@@ -20,9 +20,8 @@ point frames on native WebGPU and WebGL2 compatibility (native 1x and 4x MSAA).
 Run both backends in PowerShell:
 
 ```powershell
-$env:MARGO_GPU_SLOTS='3'
-node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163 -- node packages/points/scripts/test-browser.js
-node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163 -- node packages/points/scripts/test-browser.js --compat
+node scripts/run-with-timeout.mjs --max=15 -- node packages/points/scripts/test-browser.js
+node scripts/run-with-timeout.mjs --max=15 -- node packages/points/scripts/test-browser.js --compat
 ```
  No timings or claim of winning the historical rows.
 Timing pending the quiet rerun; the original point/block/draw work is unchanged.
@@ -49,9 +48,8 @@ Existing spot and hemisphere tests retain their original geometry assertions.
 GPU checks in PowerShell:
 
 ```powershell
-$env:MARGO_GPU_SLOTS='3'
-node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163-lines -- node packages/lines/scripts/test-browser.js
-node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp-163-lines -- node packages/lines/scripts/test-browser.js --compat
+node scripts/run-with-timeout.mjs --max=15 -- node packages/lines/scripts/test-browser.js
+node scripts/run-with-timeout.mjs --max=15 -- node packages/lines/scripts/test-browser.js --compat
 ```
 
 Timing pending the quiet rerun; the historical slower status remains.
@@ -104,9 +102,8 @@ After `npm run build:packages`, run:
 
 ```powershell
 node --test --test-timeout=120000 packages/lines/tests/render-work.test.js
-$env:MARGO_GPU_SLOTS='3'
-node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp163-r2-lines -- node packages/lines/scripts/test-browser.js
-node scripts/gpu-lock.mjs run --max=15 --wait-max=15 --owner=bp163-r2-lines -- node packages/lines/scripts/test-browser.js --compat
+node scripts/run-with-timeout.mjs --max=15 -- node packages/lines/scripts/test-browser.js
+node scripts/run-with-timeout.mjs --max=15 -- node packages/lines/scripts/test-browser.js --compat
 ```
 
 The CPU test proves 101 static frames use one upload (112 bytes versus 11,312)

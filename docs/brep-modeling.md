@@ -124,7 +124,8 @@ Freeform NURBS intersections, advanced blends and healing are the areas still be
 - `model.bodiesFromSTEP`: a parsed STEP file's solids and sheets as modeler bodies (SAT, Parasolid and JT B-reps
   arrive as STEP), so every operation works on imported parts: planes, cylinders, cones, spheres, tori and B-splines as
   they are; revolved and extruded lines and circles and offsets of analytic surfaces as the analytic surfaces they are
-  (a face's sense, and an offset's distance, turned where STEP's normal, Su x Sv, points the other way from theirs);
+  (a face's sense, and an offset's distance, turned where STEP's normal, Su x Sv, points the other way from theirs,
+  as on a rectangular trimmed surface with exactly one of usense and vsense false);
   offsets of B-splines as bicubic B-splines fitted within 1e-7 m of the offset (each noted in the result's `notes` with
   its error; one that turns inside out past a centre of curvature, or fits no closer, leaves its body out with the reason);
   seams through a pole, and loops of seams only, left out as the modeler's own closed faces have them. Round trips of a

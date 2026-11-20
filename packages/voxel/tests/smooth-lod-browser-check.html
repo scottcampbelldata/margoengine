@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Voxel smooth far levels browser check</title><style>body{margin:0}canvas{display:block;width:480px;height:320px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of @margoengine/voxel/smooth-lod, driven by smooth-lod-browser-check.mjs: a rolling smooth terrain,
+// real chunks around zero drawn by SmoothTerrainView with capped faces (skirt 32) and three far levels by SmoothLod, seen
+// from above against a magenta sky. With caps no sky pixel shows through the ground; without them the seams let some
+// through.
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {SmoothTerrain,SmoothTerrainView} from '/packages/voxel/dist/smooth.js';
+import {SmoothLod} from '/packages/voxel/dist/smooth-lod.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,140,-90],target:[0,10,150],near:0.5,far:2000}});
+engine.scene.background='#ff00ff';
+engine.gpu.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+const height=(x,z)=>24+14*Math.sin(x/53)*Math.cos(z/41)+6*Math.sin((x+z)/23)+3*Math.sin(x/7)*Math.cos(z/9);
+const density=(x,y,z)=>height(x,z)-y,material=(x,y,z)=>(y>height(x,z)-2?0:1);
+const materials=[new PbrMaterial({color:'#3fae3a',roughness:0.9}),new PbrMaterial({color:'#8a6f5a',roughness:0.9})];
+const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
+async function draw(skirt){
+ const terrain=new SmoothTerrain();
+ for(let cx=-1;cx<=0;cx++)for(let cz=-1;cz<=0;cz++)for(let cy=-1;cy<=1;cy++)terrain.addChunk(cx,cy,cz,density,material);
+ const view=SmoothTerrainView.attach(engine,{terrain,materials,budget:64,skirt});
+ const lod=SmoothLod.attach(engine,{terrain,density,material,materials,levels:3,radius:2,budget:Infinity,skirt});
+ view.update();lod.update([0,30,0]);
+ engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();
+ engine.render({delta:0});const image=readCanvas();
+ // Sky pixels in the lower two thirds (all ground in this view) and in the top row (sky past the far levels).
+ let holes=0,sky=0;const w=canvas.width,h=canvas.height;
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const o=(y*w+x)*4,m=image[o]>200&&image[o+1]<60&&image[o+2]>200;
+  if(m&&y>h/3)holes++;if(m&&y<4)sky++;}
+ const stats={view:view.stats,lod:lod.stats};view.dispose();lod.dispose();
+ return {holes,sky,stats};
+}
+window.check={errors:()=>errors,async run(){return {skirted:await draw(32),bare:await draw(0)};}};
+window.ready=true;
+</script></body></html>

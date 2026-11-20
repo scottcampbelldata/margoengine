@@ -11,7 +11,7 @@ import {
   type BinaryInput,
   type Limits,
 } from './util.js';
-import { decodeXML, readXMLTree, type XMLElement } from './xml.js';
+import { decodeXML, readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 import {
   AXES,
   converter,
@@ -73,6 +73,21 @@ export interface DAEGeometry extends LoadedGeometry {
   groups: DAEGroup[];
   faceSizes: Uint32Array;
   positionIndices: Uint32Array;
+  /** The mesh's `<lines>` and `<linestrips>`, when it has any, with vertices of their own. */
+  lines?: DAELines;
+}
+
+/** Line primitives of a mesh: their own corners (position and colour), and segments into them. */
+export interface DAELines {
+  positions: Float32Array;
+  /** Linear rgb per vertex, when a line primitive has a COLOR input. */
+  colors?: Float32Array;
+  /** The `<vertices>` entry each vertex came from. */
+  positionIndices: Uint32Array;
+  /** Segments, two vertex indices each: a `<lines>` pair is one, a `<linestrips>` strip of n corners gives n - 1. */
+  indices: Uint32Array;
+  /** One range of `indices` per line primitive, with its material symbol. */
+  groups: DAEGroup[];
 }
 
 /** A material channel: a color, or a texture read through a named UV set. */
@@ -160,12 +175,12 @@ export interface LoadedDAE {
   cameras: DAECamera[];
   /** Every `<instance_light>` in scene order, with its color, attenuation and frame at rest. */
   lights: DAELight[];
-  /** What was skipped: lines, holes, unresolved references, channels and controllers that do not fit. */
+  /** What was skipped: holes, unresolved references, channels and controllers that do not fit. */
   warnings: string[];
 }
 
 /** Options of `parseDAE`. */
-export interface DAEParseOptions extends ParseLimits {}
+export interface DAEParseOptions extends ParseLimits, XMLExternalOptions {}
 
 interface Input {
   source: Source;
@@ -204,17 +219,21 @@ function readMesh(
     positionIndices = uints(),
     indices = uints(),
     faceSizes = uints(),
-    groups: DAEGroup[] = [];
+    lineIndices = uints(),
+    linePositions = floats(),
+    lineColors = floats(),
+    linePositionIndices = uints(),
+    groups: DAEGroup[] = [],
+    lineGroups: DAEGroup[] = [];
   let hasNormal = false,
     hasUV = false,
-    hasColor = false;
+    hasColor = false,
+    hasLineColor = false;
   for (const primitive of mesh.children) {
     const type = primitive.name;
-    if (type === 'lines' || type === 'linestrips') {
-      warn(`${what}: <${type}> are not imported (only polygons)`);
-      continue;
-    }
+    const isLines = type === 'lines' || type === 'linestrips';
     if (
+      !isLines &&
       type !== 'triangles' &&
       type !== 'polylist' &&
       type !== 'polygons' &&
@@ -247,9 +266,10 @@ function readMesh(
     const normal = shared('NORMAL'),
       texcoord = shared('TEXCOORD'),
       color = shared('COLOR');
-    hasNormal ||= !!normal;
-    hasUV ||= !!texcoord;
-    hasColor ||= !!color;
+    // Line primitives keep vertices of their own, so their inputs say nothing of the triangles'.
+    hasNormal ||= !isLines && !!normal;
+    hasUV ||= !isLines && !!texcoord;
+    hasColor ||= !isLines && !!color;
     const welder = new CornerWelder(vertexCount),
       base = positions.length / 3,
       start = indices.length;
@@ -313,6 +333,43 @@ function readMesh(
         );
       return list.length / stride;
     };
+    if (isLines) {
+      // COLLADA 1.4.1 `<lines>`: one <p> of corner pairs; `<linestrips>`: one <p> per strip of two or more corners.
+      const lineStart = lineIndices.length,
+        lineWelder = new CornerWelder(vertexCount),
+        lineBase = linePositions.length / 3;
+      const lineCorner = (c: number): number => {
+        const v = at(position, c, 'vertex'),
+          k = at(color, c, 'color'),
+          before = lineWelder.count,
+          out = lineWelder.weld(v, k, NONE, NONE);
+        if (out === before) {
+          if (++totals.vertices > limit.maxVertices)
+            throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${limit.maxVertices}`);
+          linePositions.push3(read(position, v, 0), read(position, v, 1), read(position, v, 2));
+          if (color) lineColors.push3(read(color, k, 0), read(color, k, 1), read(color, k, 2));
+          else lineColors.push3(1, 1, 1);
+          linePositionIndices.push(v);
+        }
+        return lineBase + out;
+      };
+      hasLineColor ||= !!color;
+      for (const e of type === 'lines' ? [kid(primitive, 'p')] : kids(primitive, 'p')) {
+        if (!e) continue;
+        p = values(e, 'p');
+        const total = corners(p, 'p');
+        if (type === 'lines' ? total % 2 : total < 2)
+          throw new LoaderError(F, 'syntax', `${what} <${type}> has ${total} corners in a <p>`);
+        for (let k = 0; k + 1 < total; k += type === 'lines' ? 2 : 1) {
+          lineIndices.push(lineCorner(k));
+          lineIndices.push(lineCorner(k + 1));
+        }
+      }
+      const group: DAEGroup = { start: lineStart, count: lineIndices.length - lineStart };
+      if (primitive.attributes.material !== undefined) group.symbol = primitive.attributes.material;
+      if (group.count) lineGroups.push(group);
+      continue;
+    }
     if (type === 'triangles' || type === 'polylist') {
       p = values(kid(primitive, 'p'), 'p');
       const total = corners(p, 'p');
@@ -361,6 +418,15 @@ function readMesh(
     faceSizes: faceSizes.result(),
     positionIndices: positionIndices.result(),
   };
+  if (lineIndices.length) {
+    result.lines = {
+      positions: linePositions.result(),
+      positionIndices: linePositionIndices.result(),
+      indices: lineIndices.result(),
+      groups: lineGroups,
+    };
+    if (hasLineColor) result.lines.colors = lineColors.result();
+  }
   if (geometry.attributes.name !== undefined) result.name = geometry.attributes.name;
   if (hasNormal) result.normals = normals.result();
   if (hasUV) result.uvs = uvs.result();
@@ -516,7 +582,9 @@ function findNode(roots: readonly DAENode[], match: (node: DAENode) => boolean):
  */
 export function parseDAE(input: BinaryInput | string, options: DAEParseOptions = {}): LoadedDAE {
   const limit = limits(options, F),
-    root = readXMLTree(typeof input === 'string' ? input : decodeXML(toBytes(input, F)), F).children[0];
+    root = readXMLTree(typeof input === 'string' ? input : decodeXML(toBytes(input, F)), F, {
+      external: options.external,
+    }).children[0];
   if (root?.name !== 'COLLADA')
     throw new LoaderError(F, 'header', `root element is <${root?.name ?? ''}>, not <COLLADA>`);
   const warnings = new Set<string>(),

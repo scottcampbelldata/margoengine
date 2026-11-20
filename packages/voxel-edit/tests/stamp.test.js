@@ -62,7 +62,10 @@ function studioFace(model, surface, normal, { tool, mirror, color, selection }) 
   return voxels ?? model.voxels;
 }
 
-// Studio's frozen clipboard paste (pasteAt), identities given as keys; throws where the palette is full.
+// Studio's frozen clipboard paste (pasteAt), identities given as keys; throws where the palette is full. One change
+// from Studio (audit row 132, 2026-11-15): every identity match is taken before any new slot is handed out. Studio
+// handed out new slots in clip order, so a fresh colour could take an unused target slot whose identity a later clip
+// index matched, which then needed a slot and a palette copy of its own.
 function studioPaste(target, targetKeys, clip, clipKeys, origin) {
   const placed = clip
       .map(([x, y, z, color]) => ({ point: [x + origin[0], y + origin[1], z + origin[2]], color }))
@@ -73,16 +76,24 @@ function studioPaste(target, targetKeys, clip, clipKeys, origin) {
     if (target.voxels[i] && !destinations.has(i)) used.add(target.voxels[i]);
   const identities = [...targetKeys],
     remap = new Map(),
-    assigned = [];
-  for (const source of new Set(placed.map((cell) => cell.color))) {
-    const identity = clipKeys[source];
-    let index =
-      identities[source] === identity ? source : identities.findIndex((c, slot) => slot > 0 && c === identity);
+    assigned = [],
+    match = (identity) => identities.findIndex((c, slot) => slot > 0 && c === identity),
+    sources = [...new Set(placed.map((cell) => cell.color))];
+  for (const source of sources) {
+    const identity = clipKeys[source],
+      index = identities[source] === identity ? source : match(identity);
+    if (index < 1) continue;
+    used.add(index);
+    remap.set(source, index);
+  }
+  for (const source of sources) {
+    if (remap.has(source)) continue;
+    let index = match(clipKeys[source]);
     if (index < 1) {
       index = 1;
       while (index < 256 && used.has(index)) index++;
       if (index === 256) throw new RangeError('Paste requires more than 255 color/material identities in one model.');
-      identities[index] = identity;
+      identities[index] = clipKeys[source];
       assigned.push({ from: source, to: index });
     }
     used.add(index);
@@ -301,4 +312,25 @@ test('equal-looking slots stay distinct and a full palette refuses atomically', 
     () => pasteCells(full, [], { offset: [0, 0, 0], targetKeys: keys.slice(1), clipKeys: keys }),
     TypeError,
   );
+});
+
+test('pasteCells takes every identity match before handing out a new slot', () => {
+  // Slot 1 is used; slot 2 is free and already holds 'red'. Clip index 7 ('blue') is new and clip index 9 is 'red'.
+  // Handing slots out in clip order gave 7 slot 2, so 9 lost its match and needed slot 3 and a palette copy.
+  const targetKeys = Array.from({ length: 256 }, (_, i) => `k${i}`),
+    clipKeys = Array.from({ length: 256 }, (_, i) => `c${i}`);
+  targetKeys[2] = clipKeys[9] = 'red';
+  clipKeys[7] = 'blue';
+  const target = { size: [4, 1, 1], voxels: Uint8Array.from([1, 0, 0, 0]) },
+    clip = [
+      [0, 0, 0, 7],
+      [1, 0, 0, 9],
+    ];
+  for (const grid of [target, SparseGrid.fromGrid(target)]) {
+    const paste = pasteCells(grid, clip, { offset: [1, 0, 0], targetKeys, clipKeys });
+    assert.equal(paste.status, 'pasted');
+    assert.equal(paste.paletteMap[9], 2);
+    assert.equal(paste.paletteMap[7], 3);
+    assert.deepEqual(paste.assignments, [{ from: 7, to: 3 }]);
+  }
 });

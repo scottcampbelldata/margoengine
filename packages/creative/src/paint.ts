@@ -117,11 +117,12 @@ export class Painterly implements EnginePlugin {
     this.validate();
   }
 
-  /** Attaches the effect in its own PostStack. Dispose the returned effect to release both. */
+  /** Adds a new Painterly to the scene's PostStack after its last LDR effect, or to a new PostStack when the scene
+   * has none. Disposing the effect takes it out, and a stack made for it goes with it. */
   static attach(engine: EngineKernel, options: PainterlyOptions = {}): Painterly {
     const effect = new Painterly(options);
     if (!engineRuntime(engine).gpu) throw fault('unsupported', 'Painterly requires WebGPU; WebGL2 is unsupported');
-    effect.stack = PostStack.attach(engine, [effect]);
+    effect.stack = PostStack.join(engine, effect);
     return effect;
   }
 
@@ -170,7 +171,7 @@ export class Painterly implements EnginePlugin {
     this.engine = undefined;
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
-    this.stack?.dispose();
+    this.stack?.removeEffect(this);
     this.stack = undefined;
   }
   declare [Symbol.dispose]: () => void;

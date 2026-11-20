@@ -11,7 +11,9 @@ import { readFile, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 // Not engine features although they have `setup()` or take the engine: never attached by users.
-const NOT_FEATURES = new Map([['PBRModel', 'created by gltf-pro loadGLTF']]);
+const NOT_FEATURES = new Map([
+  ['PBRModel', 'created by gltf/pbr loadGLTF'],
+]);
 
 const isClass = (value) => typeof value === 'function' && /^class\b/.test(Function.prototype.toString.call(value));
 

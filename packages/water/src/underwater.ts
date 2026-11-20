@@ -170,10 +170,11 @@ export class Underwater implements EnginePlugin {
     this.surface = options.surface;
     this.resolution = options.resolution ?? 128;
   }
-  /** Attach alone; to combine effects add new Underwater(options) to a PostStack. */
+  /** Adds a new Underwater to the scene's PostStack after the last effect of its kind, or to a new PostStack when
+   * the scene has none; disposing the effect takes it out, and a stack made for it goes with it. */
   static attach(engine: EngineKernel, options: UnderwaterOptions): Underwater {
     const effect = new Underwater(options);
-    effect.stack = PostStack.attach(engine, [effect]);
+    effect.stack = PostStack.join(engine, effect);
     return effect;
   }
   private validate(): void {
@@ -412,7 +413,7 @@ export class Underwater implements EnginePlugin {
     this.engine = undefined;
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
-    this.stack?.dispose();
+    this.stack?.removeEffect(this);
     this.stack = undefined;
   }
   declare [Symbol.dispose]: () => void;

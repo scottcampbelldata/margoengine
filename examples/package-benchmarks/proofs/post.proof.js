@@ -32,7 +32,7 @@ function scene(module, samples, sources) {
     view.c.bindings.push({ binding: 1, resource: taaCamera.resource }, taaCamera);
     try {
       run(view.c);
-    } catch (error) {
+    } catch {
       gpu.note('throw');
     }
     view.end();

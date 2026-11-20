@@ -1,4 +1,4 @@
-// Real-GPU check of Hatching (@margoengine/toon/hatch) on core meshes. Takes a GPU slot itself. From the repository
+// Real-GPU check of Hatching (@margoengine/toon/hatch) on core meshes. From the repository
 // root, after building packages:   node packages/toon/test/hatch-check.mjs
 // A board facing the camera is lit at a known n.l, so the whole board has one light level and the inked share of a
 // 256 x 256 px window must be what the pattern's geometry gives: halftone dots cover 1 - light of each cell; hatching
@@ -11,10 +11,8 @@
 // them evenly (strokes along the grid cover whole pixel columns instead).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'toon-hatch' });
 const context = await openBrowser({ startPath: '/packages/toon/test/hatch-check.html', port: 5401 }),
   { page } = context,
   pageErrors = [];
@@ -22,7 +20,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 const timer = setTimeout(() => {
   console.error('toon hatch-check: over its 2 minute limit');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 // Core's display curve for a grey linear value (packages/core/src/shaders.ts), encoded 0..1.
 const display = (x) => {
@@ -104,5 +102,4 @@ try {
 } finally {
   clearTimeout(timer);
   await context.close();
-  release();
 }

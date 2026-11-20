@@ -1,18 +1,12 @@
-import { deferSpeed, isSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
-if (
-  isSpeedEntry(import.meta.url) &&
-  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
-  deferSpeed('examples/package-benchmarks/workers/run.mjs')
-)
-  process.exit(0);
 // real browser. From the repository root after `npm run build:packages`:
 //   node examples/package-benchmarks/workers/run.mjs [--rounds=6] [--skip-parse] [--skip-offscreen]
-// Takes the GPU lock (main checkout's test-results/gpu.lock, checked every 60 s), requires AC power before and after.
+// Requires AC power before and after.
 // 1. offscreen.html in Edge and Chrome: core + packages on a transferred OffscreenCanvas in a worker, platform features
 //    (Float16Array, Symbol.dispose, `using`), canvas screenshot must show drawn pixels.
 // 2. parse.html in Edge: main-thread blocking while loading a large FBX, a USDZ, SciFiHelmet and a generated GLB, with
 //    the main-thread loaders vs the /worker entries; alternating order per round, round 0 discarded, medians reported.
 // Writes examples/package-benchmarks/results/workers.json (fixtures go to test-results/workers-*).
+import { deferSpeedEntry } from '../../../scripts/support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -23,47 +17,46 @@ import { acPower } from '../parts/power.mjs';
 import { binary, grid } from '../../../packages/fbx/test/fixtures.js';
 import { exportUSDZ } from '../../../packages/exporters/dist/usdz.js';
 import { torusKnotGeometry, toGeometry } from '../../../packages/geometry/dist/index.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 
-const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
-const rounds = +arg('rounds', 6),
-  median = (values) => nearestMedian(values);
-// Round 0 is a discarded warm-up, so one measured round needs --rounds=2.
-if (!Number.isInteger(rounds) || rounds < 2)
-  throw new RangeError(`--rounds must be an integer of at least 2 (round 0 is a discarded warm-up), got ${arg('rounds', 6)}`);
-mkdirSync('test-results', { recursive: true });
-writeFileSync('test-results/workers-big.glb', bigGLB({ segments: 400, meshes: 4 })); // 4 x 160,801 vertices, 960,000 indices each (accessors are capped at 1M elements)
-writeFileSync('test-results/workers-grid.fbx', binary(grid(400), { compress: true }));
-writeFileSync(
-  'test-results/workers-knot.usdz',
-  exportUSDZ({ nodes: [{ geometry: toGeometry(torusKnotGeometry(1, 0.3, 1000, 100)) }] }),
-);
+if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/workers/run.mjs')) {
+  const arg = (name, fallback) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1] ?? fallback;
+  const rounds = +arg('rounds', 6),
+    median = (values) => nearestMedian(values);
+  // Round 0 is a discarded warm-up, so one measured round needs --rounds=2.
+  if (!Number.isInteger(rounds) || rounds < 2)
+    throw new RangeError(
+      `--rounds must be an integer of at least 2 (round 0 is a discarded warm-up), got ${arg('rounds', 6)}`,
+    );
+  mkdirSync('test-results', { recursive: true });
+  writeFileSync('test-results/workers-big.glb', bigGLB({ segments: 400, meshes: 4 })); // 4 x 160,801 vertices, 960,000 indices each (accessors are capped at 1M elements)
+  writeFileSync('test-results/workers-grid.fbx', binary(grid(400), { compress: true }));
+  writeFileSync(
+    'test-results/workers-knot.usdz',
+    exportUSDZ({ nodes: [{ geometry: toGeometry(torusKnotGeometry(1, 0.3, 1000, 100)) }] }),
+  );
 
-// Benchmarks time things, so they take the GPU alone (scripts/gpu-lock.mjs; inside `gpu-lock run --exclusive` this is a no-op).
-const releaseGpu = await acquire({ owner: 'workers', mode: 'exclusive' });
-const output = 'examples/package-benchmarks/results/workers.json',
-  previous = existsSync(output) ? JSON.parse(readFileSync(output, 'utf8')) : {};
-const report = {
-  date: new Date().toISOString(),
-  commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(),
-  acPowerBefore: acPower(),
-  offscreen: {},
-  parse: { runs: [], medians: {} },
-};
-// A skipped section keeps its previous result (with that run's date and power state).
-for (const section of ['offscreen', 'parse'])
-  if (process.argv.includes(`--skip-${section}`) && previous[section])
-    report[section] = {
-      ...previous[section],
-      from: {
-        date: previous.date,
-        commit: previous.commit,
-        acPowerBefore: previous.acPowerBefore,
-        acPowerAfter: previous.acPowerAfter,
-      },
-    };
-try {
+  const output = 'examples/package-benchmarks/results/workers.json',
+    previous = existsSync(output) ? JSON.parse(readFileSync(output, 'utf8')) : {};
+  const report = {
+    date: new Date().toISOString(),
+    commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(),
+    acPowerBefore: acPower(),
+    offscreen: {},
+    parse: { runs: [], medians: {} },
+  };
+  // A skipped section keeps its previous result (with that run's date and power state).
+  for (const section of ['offscreen', 'parse'])
+    if (process.argv.includes(`--skip-${section}`) && previous[section])
+      report[section] = {
+        ...previous[section],
+        from: {
+          date: previous.date,
+          commit: previous.commit,
+          acPowerBefore: previous.acPowerBefore,
+          acPowerAfter: previous.acPowerAfter,
+        },
+      };
   assert.notEqual(report.acPowerBefore, false, 'On battery');
   if (!process.argv.includes('--skip-offscreen'))
     for (const channel of ['msedge', 'chrome']) {
@@ -151,6 +144,4 @@ try {
     report.acPowerBefore,
     report.acPowerAfter,
   );
-} finally {
-  releaseGpu();
 }

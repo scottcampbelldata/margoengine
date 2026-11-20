@@ -1,5 +1,5 @@
 // Published-claim mode (opt-in: `npm run bench -- claims --engines=all`): each engine's own benchmark harness, run where
-// it lives in engine-bench under this run's gate and GPU lock, so its published numbers are recorded beside the shared
+// it lives in engine-bench under this run's gate, so its published numbers are recorded beside the shared
 // scenes, on the same machine and in the same result file. An engine opts in with a `harness` entry in
 // engine-bench/margo-bench/engines.json:
 //   "harness": {"command": "npm run bench:render", "cwd": "wasmgpu-repo", "results": ["wasmgpu-repo/bench/out.json"]}

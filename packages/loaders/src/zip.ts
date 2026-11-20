@@ -4,6 +4,20 @@ import { crc32 } from '../../shared/crc32.js';
 import { hasTrailingData } from '../../shared/trailing-data.js';
 
 const F = 'ZIP';
+// Read against the PKWARE .ZIP File Format Specification (APPNOTE.TXT) 6.3.10 (PKWARE Inc., 2022),
+// https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT: section numbers below are that document's.
+
+/** IBM Code Page 437 bytes 0x80 to 0xFF: a file name's encoding when general purpose bit 11 is clear (appendix D.1). */
+const CP437 =
+  'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
+const decoder = new TextDecoder();
+/** An entry name: UTF-8 when bit 11 (the language encoding flag, 4.4.4) is set, otherwise Code Page 437. */
+function entryName(bytes: Uint8Array, flags: number): string {
+  if (flags & 0x800 || bytes.every((b) => b < 0x80)) return decoder.decode(bytes);
+  let name = '';
+  for (const b of bytes) name += b < 0x80 ? String.fromCharCode(b) : CP437[b - 0x80];
+  return name;
+}
 
 /** One entry of a zip central directory: its name, method, sizes, CRC and header offset. */
 export interface ZipEntry {
@@ -62,7 +76,6 @@ export function readZipDirectory(input: BinaryInput, options: ZipOptions = {}): 
   if (count > maxEntries)
     throw new LoaderError(F, 'limit', `archive has ${count} entries, more than the limit of ${maxEntries}`);
   if (cdOffset + cdSize > eocd) throw new LoaderError(F, 'zip', 'central directory lies outside the archive');
-  const decoder = new TextDecoder();
   const entries: ZipEntry[] = [];
   let p = cdOffset;
   for (let i = 0; i < count; i++) {
@@ -76,7 +89,7 @@ export function readZipDirectory(input: BinaryInput, options: ZipOptions = {}): 
     if (p + 46 + nameLength + extraLength + commentLength > cdOffset + cdSize)
       throw new LoaderError(F, 'zip', `central directory entry ${i} name, extra field or comment overflows`);
     const entry: ZipEntry = {
-      name: decoder.decode(bytes.subarray(p + 46, p + 46 + nameLength)),
+      name: entryName(bytes.subarray(p + 46, p + 46 + nameLength), flags),
       method,
       crc32: view.getUint32(p + 16, true),
       compressedSize: view.getUint32(p + 20, true),

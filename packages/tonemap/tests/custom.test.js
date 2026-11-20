@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Tonemap } from '../dist/index.js';
 import { CustomCurve } from '../dist/custom.js';
 import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
+import { checkWGSL } from '../../webgl2-compat/dist/wgsl.js';
 
 const fragment = (h) => h.pipelines.filter((p) => p.fragment?.module.code.includes('fn sampleLUT')).at(-1).fragment.module.code;
 
@@ -17,8 +18,8 @@ test('CustomCurve with WGSL calls your function after the built-in curve, before
   const code = fragment(h);
   assert.ok(code.includes('fn film(x: vec3f) -> vec3f { return x / (x + vec3f(customCurveData.params[0].x)); }'));
   assert.ok(code.indexOf('color=customCurve(hdr);') > code.indexOf('color=agx(hdr);}'), 'after the curve choice');
-  assert.ok(code.indexOf('color=customCurve(hdr);') < code.indexOf('color=clamp((color-0.18)*p.grade.y'));
-  assert.ok(code.includes('fn customCurve(x:vec3f)->vec3f {return film(x);}'));
+  assert.ok(code.indexOf('color=customCurve(hdr);') < code.indexOf('color=clamp(margoContrast(color,p.grade.y)'));
+  assert.ok(code.includes('fn customCurve(x:vec3f)->vec3f {_=customCurveData.params;return film(x);}'));
   assert.ok(code.includes('@group(0) @binding(5) var<uniform> customCurveData:CustomCurve;'));
   assert.ok(h.groups.at(-1).entries.some((e) => e.binding === 5));
   assert.equal(custom.values()[0], Math.fround(0.6));
@@ -68,4 +69,26 @@ test('CustomCurve checks its options now and every frame', () => {
   const custom = new CustomCurve({ curve: (x) => x });
   custom.options.wgsl = 'fn b(x: vec3f) -> vec3f { return x; }';
   assert.throws(() => custom.values(), RangeError);
+});
+
+// KB-OWN-TONE3: a WGSL curve that never reads curveParams left customCurveData unused, so the automatic pipeline
+// layout dropped binding 5 while the Tonemap still bound it ("binding index 5 not present in the bind group layout").
+// The fragment entry must statically use the uniform whatever the curve reads: the WebGL2 layer's WGSL checker lists
+// the module-scope variables an entry point reaches through its calls, which is what a device's automatic layout holds.
+test('a WGSL CustomCurve that ignores curveParams still uses the binding the Tonemap binds', () => {
+  for (const wgsl of [
+    'fn reinhard(x: vec3f) -> vec3f { return x / (x + vec3f(1.0)); }',
+    'fn film(x: vec3f) -> vec3f { return x / (x + vec3f(curveParams[0].x)); }',
+  ]) {
+    const h = gpuHarness(),
+      effect = Tonemap.attach(h.engine, { extensions: [new CustomCurve({ wgsl })] });
+    h.frame();
+    const code = fragment(h),
+      used = checkWGSL(code)
+        .entryPoints.find((e) => e.name === 'fragment')
+        .globals.map((g) => g.binding);
+    assert.ok(h.groups.at(-1).entries.some((e) => e.binding === 5), 'the Tonemap binds the curve uniform');
+    assert.ok(used.includes(5), `the fragment stage uses binding 5 (${wgsl}): ${used}`);
+    effect.dispose();
+  }
 });

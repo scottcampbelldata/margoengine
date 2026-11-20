@@ -29,7 +29,7 @@ export type GeoGeometry = {
     geometries: GeoGeometry[];
 };
 
-export interface GeoOptions extends ParseLimits {
+export interface GeoOptions extends ParseLimits, XMLExternalOptions {
     maxFeatures?: number;
     maxBytes?: number;
     maxDepth?: number;
@@ -93,6 +93,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -109,5 +110,11 @@ interface LoadedGroup {
 interface ParseLimits {
     maxVertices?: number;
     maxTriangles?: number;
+}
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
 }
 ```

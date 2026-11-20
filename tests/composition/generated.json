@@ -12,7 +12,7 @@
     "creative",
     "toon",
     "transitions",
-    "scenery",
+    "moon",
     "voxel-pathtracer",
     "water",
     "sky",
@@ -38,7 +38,7 @@
     "creative",
     "toon",
     "transitions",
-    "scenery",
+    "moon",
     "voxel-pathtracer",
     "water",
     "sky",
@@ -88,7 +88,7 @@
         "post",
         "toon",
         "transitions",
-        "scenery",
+        "moon",
         "voxel-pathtracer"
       ]
     },
@@ -147,7 +147,7 @@
       "members": [
         "taa",
         "pixel",
-        "scenery",
+        "moon",
         "vfx",
         "text"
       ]
@@ -197,7 +197,7 @@
       "members": [
         "dof",
         "creative",
-        "scenery",
+        "moon",
         "sky",
         "points"
       ]
@@ -208,7 +208,7 @@
         "dof",
         "tonemap",
         "shadows",
-        "scenery",
+        "moon",
         "splats"
       ]
     },
@@ -297,7 +297,7 @@
       "members": [
         "oit",
         "clustered",
-        "scenery",
+        "moon",
         "water",
         "xr"
       ]
@@ -346,7 +346,7 @@
       "id": "c2-029",
       "members": [
         "toon",
-        "scenery",
+        "moon",
         "sky",
         "labels",
         "lighting2d"
@@ -356,7 +356,7 @@
       "id": "c2-030",
       "members": [
         "toon",
-        "scenery",
+        "moon",
         "lines",
         "sprites",
         "xr"

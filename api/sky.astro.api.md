@@ -20,7 +20,9 @@ export class AstroSky implements EnginePlugin {
     constructor(options: AstroSkyOptions);
     static attach(engine: EngineKernel, options: AstroSkyOptions): AstroSky;
     get date(): Date;
+    get time(): number;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
@@ -139,13 +141,17 @@ class Angle {
     [Symbol.toPrimitive](hint: string): string;
 }
 
+type MoonPhase = number | MoonPhaseName;
+
+type MoonPhaseName = 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'lastQuarter' | 'waningCrescent' | 'half' | 'quarter';
+
 interface SkyNightOptions {
     zenithColor?: Vec3;
     horizonColor?: Vec3;
     moonColor?: Vec3;
     moonDirection?: Vec3;
     moonSize?: number;
-    moonPhase?: number;
+    moonPhase?: MoonPhase;
     moonLitBySun?: boolean;
     glowIntensity?: number;
     starIntensity?: number;

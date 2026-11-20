@@ -73,15 +73,18 @@ export function inWorker<R>(
   transfer: (request: EncoderRequest) => Transferable[],
   signal?: AbortSignal,
 ): Promise<R[]> {
+  // An abort event fires once, so a signal that is already aborted never reaches the listener: refuse before any work.
+  if (signal?.aborted) return Promise.reject(aborted(signal));
   const worker = new Worker(workerURL(), { name: 'margoengine-encoder' }),
     results: R[] = [];
+  let onAbort: (() => void) | undefined;
   return new Promise<R[]>((resolve, reject) => {
     const next = (): void => {
       if (results.length === requests.length) return resolve(results);
       const request = requests[results.length];
       worker.postMessage({ ...request, id: results.length }, transfer(request));
     };
-    const onAbort = (): void => reject(aborted(signal));
+    onAbort = (): void => reject(aborted(signal));
     signal?.addEventListener('abort', onAbort, { once: true });
     worker.onerror = (event) => {
       event.preventDefault();
@@ -98,7 +101,11 @@ export function inWorker<R>(
       next();
     };
     next();
-  }).finally(() => worker.terminate());
+  }).finally(() => {
+    // A long-lived signal would otherwise keep every finished call's listener, and its worker, reachable.
+    if (onAbort) signal?.removeEventListener('abort', onAbort);
+    worker.terminate();
+  });
 }
 
 /**

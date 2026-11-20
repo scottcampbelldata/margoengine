@@ -1,8 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
-import type { PBRModel, PBRPrimitive, PBRRenderState } from '@margoengine/gltf-pro/model';
-import { PBRInstances } from '@margoengine/gltf-pro/instancing';
+import type { PBRModel, PBRPrimitive, PBRRenderState } from '@margoengine/gltf/pbr-model';
+import { PBRInstances } from '@margoengine/gltf/pbr-instancing';
 import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 

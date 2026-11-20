@@ -53,12 +53,12 @@ engine.start();
 gizmo.dispose(); orbit.dispose();
 ```
 
-Drag core meshes and gltf-pro models (a model moves by its `root`), with the mouse or touch:
+Drag core meshes and gltf/pbr models (a model moves by its `root`), with the mouse or touch:
 
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {DragControls, OrbitControls} from 'margoengine/controls';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
 const mesh = engine.createMesh().setGeometry(box());
@@ -93,7 +93,8 @@ addEventListener('keydown', event => {if (event.key === 'g') drag.mode = 'transl
 ```
 
 With `mode: 'rotate'` the object turns about its own origin, or the whole `group` about the grabbed object's origin, in
-world space under any parent. `recursive: true` grabs children of listed core meshes and drags the child itself;
+world space under any parent. With an `axis` the side nearest the camera follows the pointer: a drag right turns it
+right about an axis that points up on screen, and a drag down turns it down about one that points right. `recursive: true` grabs children of listed core meshes and drags the child itself;
 `transformGroup: true` grabs through them and drags the listed mesh. Only grabbing a member starts a group drag, and a
 member disposed during the drag is left behind.
 
@@ -101,12 +102,12 @@ member disposed during the drag is left behind.
 
 `WalkControls` is a Wasm-free kinematic first-person walker: eye height held above the floor, stairs, slopes, walls,
 glass, jump and crouch, keyboard + mouse, gamepad and touch, and an orbit "dollhouse" view and back. It collides on the
-CPU against the cached triangle trees of the `@margoengine/bvh` Raycaster (core meshes, gltf-pro and materials models),
+CPU against the cached triangle trees of the `@margoengine/bvh` Raycaster (core meshes, gltf/pbr and materials models),
 so it costs nothing unless you import its entry. A whole recipe: [docs/guides/walkthrough.md](../../docs/guides/walkthrough.md).
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {WalkControls} from 'margoengine/controls/walk';
 
 const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 1.65, 0], target: [0, 1.65, 1]}});
@@ -120,7 +121,7 @@ engine.start();
 - **Floor.** Nine vertical rays per sub-step (the centre and a ring at 0.9 × `radius`) find the highest walkable floor
   within `stepHeight` of the feet, in one tree pass per collider. The eye eases over the change (no teleport). Floors
   steeper than `maxSlope` are ignored; beyond `stepHeight` below, the walker falls under `gravity` and lands only on
-  floors it crosses. Gaps narrower than about 1.66 × the radius (0.41 m by default, in any direction) are stepped over.
+  floors it crosses. Each step integrates the fall exactly (top speed 50 m/s), so a jump peaks at v²/2g at any frame rate. Gaps narrower than about 1.66 × the radius (0.41 m by default, in any direction) are stepped over.
 - **Walls.** A capsule from `stepHeight` to the top of the head (eye + 0.1 m) is pushed horizontally out of every
   triangle it overlaps (exact segment-triangle closest points, up to four passes), so it slides along walls and around
   corners. Movement is split into sub-steps of at most half the radius, so a zero-thickness pane is never crossed.
@@ -179,7 +180,8 @@ Options and properties: `distance` (4), `minDistance` (1), `maxDistance` (12), `
 `lag` (0.12 s), `returnTime` (0.25 s), `probeRadius` (0.2), `collide` (true), `colliders` (null: everything), `ignore`
 (none), `raycaster` (a new one; set `layers` or `filter` on it). `armLength` reads the arm's length now, `snap()` jumps
 the pivot to the subject after a teleport, and `rotate(yaw, pitch)` takes gamepads, pointer lock or
-`@margoengine/input` actions. Events: `start`, `change`, `end`.
+`@margoengine/input` actions. `rotate` and `update(delta)` throw a `RangeError` for a value that is not finite, and
+`update` also for a negative step. Events: `start`, `change`, `end`.
 
 Without an engine, pass a `Camera` and an element and drive the controls yourself: `const fly = new FlyControls(camera, canvas); engine.onFrame((_, delta) => fly.update(delta));`.
 
@@ -200,17 +202,17 @@ up direction and angular motion retain the small pole safety gap; rotating away 
 | --- | --- |
 | `OrbitControls` | Left drag rotates, middle drag or wheel dollies, right drag (or shift/ctrl + left) pans, arrows pan after `listenToKeyEvents(target)`. One finger rotates, two fingers dolly and pan. |
 | `MapControls` | Left drag pans along the ground, right drag rotates, two fingers dolly and rotate. |
-| `TrackballControls` (`/trackball`) | Left rotates freely, middle zooms, right pans; hold A, S or D to switch the left button. Coasts with `dynamicDampingFactor`. With `enableRoll`, a drag near the edge rolls and the view passes over the poles. |
+| `TrackballControls` (`/trackball`) | Left rotates freely, middle zooms, right pans; hold A, S or D to switch the left button (only releasing that same key switches it back). Coasts with `dynamicDampingFactor` once the button is released; while the button is held still the view stays put and the fling fades. Two fingers down and up again are one `start` and one `end`. Without `enableRoll` a drag stops just short of a pole only when it would reach it; one that passes close by carries on. With `enableRoll`, a drag near the edge rolls and the view passes over the poles. |
 | `ArcballControls` (`/arcball`) | Left drag turns freely on Shoemake's arcball (rolls, passes over the poles), right drag or Shift + left pans, middle drag, the wheel and a pinch zoom toward the cursor. One finger rotates, two fingers pinch and pan. |
 | `FlyControls` (`/fly`) | WASD moves, R/F up and down, arrows yaw and pitch, pointer offset from center steers (or `dragToLook`). With `enableRoll`, Q and E roll. |
-| `FirstPersonControls` | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
+| `FirstPersonControls` (`/first-person`) | Pointer offset from center turns, WASD or arrows move, R/F up and down, left/right button walks. |
 | `PointerLockControls` | `lock()` from a click, mouse look while locked, WASD/arrows/R/F through `update(delta)`, plus `moveForward`, `moveRight`, `moveUp`. |
 | `TransformControls` | Translate (axis arrows, plane squares, center screen-plane handle), rotate (axis rings, view ring, free trackball disc), scale (axis handles, uniform center). |
 | `WalkControls` (`/walk`) | WASD/arrows, mouse look (pointer lock or drag), gamepad sticks, touch thumbstick + drag-look; collides with the scene, holds eye height, climbs stairs. |
 | `ThirdPersonControls` (`/third-person`) | Follows a subject on a spring arm that pulls in at walls. Drag or one finger turns the view, the wheel or a pinch changes the distance. |
-| `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf-pro model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`), or turns it with `mode: 'rotate'`. Mouse hover reports the object under the pointer. |
+| `DragControls` | Left button or one finger grabs the nearest listed core mesh or gltf/pbr model and moves it on the view plane, a world plane (`plane`) or a world axis (`axis`), or turns it with `mode: 'rotate'`. Mouse hover reports the object under the pointer. |
 
-Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and `addEventListener`. Script motion is checked before it changes anything: `OrbitControls` and `ArcballControls` `rotateLeft`, `rotateUp`, `rotate`, `pan`, `dollyIn` and `dollyOut`, and `FirstPersonControls` `lookAt` and `update`, throw a `RangeError` for a value that is not finite or a dolly factor that is not above 0, so one NaN cannot leave the camera at NaN. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed`, `space-changed` and `pivot-changed` (`value`). `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
+Every control has `enabled`, `connect(element)`, `disconnect()`, `update(delta)` (returns true when the camera moved), `dispose()` and `addEventListener`. Script motion is checked before it changes anything: `OrbitControls` and `ArcballControls` `rotateLeft`, `rotateUp`, `rotate`, `pan`, `dollyIn` and `dollyOut`, `FirstPersonControls` `lookAt` and `update`, `TrackballControls` `update` (also for a negative step), and `ThirdPersonControls` `rotate` and `update` (also for a negative step), throw a `RangeError` for a value that is not finite or a dolly factor that is not above 0, so one NaN cannot leave the camera at NaN. Camera controls emit `change`, and the drag-based ones `start` and `end`. `PointerLockControls` emits `lock` and `unlock`. `TransformControls` emits `change`, `mouseDown`, `mouseUp`, `objectChange`, `dragging-changed` (`value`), `axis-changed` (`value`), `mode-changed`, `space-changed` and `pivot-changed` (`value`). `DragControls` emits `dragstart` (`object`, `hit`), `drag`, `dragend`, `hoveron` and `hoveroff` (each with `object`).
 
 `DragControls` casts the pointer ray with a bvh `Raycaster` (`setFromEngine`, then `intersectObjects` on its `objects`), so it follows layers, `filter` and material sides, and works with orthographic cameras from @margoengine/cameras, whose rays start on the near plane. The drag plane passes through the grabbed point; with `axis` it contains the axis and faces the camera as far as it can. Each move intersects the new pointer ray with that plane and sets the object's position in its parent's space, so parented meshes follow the pointer. A grab stops later pointer-down listeners on the element and captures the pointer; touch uses the primary pointer and ignores other fingers. Pass your own `raycaster` to share layers and filters.
 
@@ -330,6 +332,23 @@ gizmo.rotationSnap = Math.PI / 12;                               // also snaps t
 // Holding Ctrl while dragging snaps to gizmo.heldSnap (0.25 m, 15 degrees, 0.1 scale) when no snap is set.
 ```
 
+## Move, rotate and scale at once
+
+`mode: 'all'` draws every handle together, like the all-in-one transform tools of DCC apps and editors: the move arrows,
+plane squares and centre, the rotation rings `RX`, `RY` and `RZ`, and scale cubes `SX`, `SY` and `SZ` just past the arrow
+tips. Every handle has its own name, so `gizmo.axis` and `axis-changed` say which one is hovered. With one object the
+scale cubes follow its own axes even in world space, as in the `scale` mode. W/E/R still switch to the single modes.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {TransformControls} from 'margoengine/controls';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const gizmo = TransformControls.attach(engine, {mode: 'all', space: 'local'});
+gizmo.attach(engine.createMesh().setGeometry(box()));
+gizmo.addEventListener('axis-changed', event => console.log('hovering', event.value)); // 'X', 'RY', 'SZ', ...
+```
+
 ## Gizmo arrows, drag lines and occlusion
 
 With `flipAxes`, move and scale handles point to the camera's side of each axis, so an arrow never hides behind the
@@ -350,6 +369,34 @@ const mesh = engine.createMesh().setGeometry(box());
 const gizmo = TransformControls.attach(engine, {flipAxes: true, occlude: true});
 gizmo.attach(mesh);
 gizmo.showDelta = false;  // no line or wedge during a drag
+engine.start();
+```
+
+## Gizmo offset, size and colours
+
+`offset` puts the gizmo at a point of the attached object in its own space, such as a door's hinge, and moves, turns
+and scales then go about that point: the object's origin orbits it. It applies with one object attached; a selection
+of several uses `pivot`. `fixed: false` makes `size` the gizmo's length in world units instead of a multiplier of its
+constant on-screen size. `axisColors` and `hoveredColor` take `'#rgb'`, `'#rrggbb'`, `'#rrggbbaa'` or `[r, g, b]` / `[r, g, b, a]` in
+0..1, and `lineWidth` sets the width in CSS pixels of the shafts, scale lines and rings. Each is also a live property;
+a bad value throws a `TypeError` or `RangeError` that names the fix and links to
+[margoengine.com/errors#controls-transform](https://margoengine.com/errors#controls-transform).
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {TransformControls} from 'margoengine/controls/transform';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const door = engine.createMesh().setGeometry(box());
+const gizmo = TransformControls.attach(engine, {
+  mode: 'rotate',
+  offset: [-0.5, 0, 0],  // the hinge edge of a 1 m box
+  axisColors: ['#ff2060', '#20df80', '#2080ff'],
+  hoveredColor: '#ffff40',
+  lineWidth: 4,
+});
+gizmo.attach(door);
+gizmo.fixed = false;  // size is now 1 world unit long
 engine.start();
 ```
 
@@ -388,7 +435,9 @@ active object's origin) or `'individual'` (each about its own origin, with the g
 with one object, and under `individual` with `local` each object also follows its own axes: an X drag moves each along
 its own X, and an X ring turns each about its own X. A mesh whose ancestor is attached too follows that ancestor, so
 nothing moves twice. Parents, snapping, `reset()` and Escape work on the whole set, and `gizmo.objects` lists it. A mesh
-disposed during a drag drops out; if it was the active one, the last of the others takes over and the drag ends.
+disposed during a drag drops out; if it was the active one, the last of the others takes over and the drag ends as a
+release does: `mouseUp` and `dragging-changed` (`false`) fire and the pointer capture is let go, so an orbit turned
+off for the drag comes back on.
 
 ```ts
 import {Engine, box} from 'margoengine/core';
@@ -408,8 +457,8 @@ engine.start();
 
 `ArcballGizmo.attach(arcball)` draws the ball the pointer drags: rings about the world axes and an outline, centred on the
 target, with the far half of each ring dimmed. It shows during a gesture, or all the time with `autoHide: false`. With
-`autoHide: false` a ring can be grabbed: a left drag that starts within 8 pixels of a ring's near half turns the view about
-that ring's axis only, keeping the grabbed point under the pointer; a press anywhere else is the usual free turn. Touch
+`autoHide: false` a ring can be grabbed: a left drag that starts within 8 pixels of a ring's drawn near half (anywhere along
+the line, and with the view rolled) turns the view about that ring's axis only, keeping the grabbed point under the pointer; a press anywhere else is the usual free turn. Touch
 always turns freely. A double-click moves the view centre to the point under the pointer without changing the turn or the
 distance; with no `pick`, or when `pick` returns null, that point is on the plane through the target. `focus(point)` does
 the same from code. With `enableDamping` the view glides there. `listenToKeyEvents(window)` turns on the keyboard: arrows
@@ -570,7 +619,7 @@ called; subsequent scene motion does not retarget the move.
 - **Damping.** The factors are applied per 1/60 s (`1 - (1 - factor)^(delta * 60)`), so 30 and 60 fps settle identically. Without damping, pointer input is applied immediately.
 - **Zoom to cursor.** The dolly is a scaling about the point under the cursor on the plane through the target facing the camera, so the view direction is unchanged and that point keeps its pixel exactly. A fixed-size orthographic projection keeps its target instead, since its visible size does not change.
 - **Engine integration.** Constructed with an engine, a control registers a small plugin whose `onPreUpdate` calls `update(delta)` before each render, and `engine.dispose()` disposes it. Rendering manually with `engine.render()` passes `delta = 0`, which still applies direct input but does not advance damping, auto-rotate or key movement; pass `{delta}` to advance them.
-- **Listeners.** Pointer listeners go on the canvas (or the element you pass), using pointer capture. Keyboard listeners for the trackball, fly, first-person and pointer-lock controls go on the element's `ownerDocument` unless you pass `{keyTarget}`. Nothing is touched at import time and construction only touches the element you give it, so modules are SSR-safe. `dispose()` removes every listener and restores `touch-action`.
+- **Listeners.** Pointer listeners go on the canvas (or the element you pass), using pointer capture. Keyboard listeners for the trackball, fly, first-person and pointer-lock controls go on the element's `ownerDocument` unless you pass `{keyTarget}`. A key held when the window loses focus sends no keyup, so `WalkControls` and `TrackballControls` also listen for the window's `blur` and let go of held keys and key modes then. Nothing is touched at import time and construction only touches the element you give it, so modules are SSR-safe. `dispose()` removes every listener and restores `touch-action`.
 - **Gizmo rendering.** `TransformControls` builds its handles on the CPU each frame (lines, cones, cubes, squares, rings), keeping a constant screen size (under an orthographic camera from @margoengine/cameras: the same fraction of the view height at any `zoom` or `height`, with parallel-ray picking and drags). A frame graph pass (order 1000) turns lines into screen-space quads, sorts triangles back to front and draws them with alpha blending over the finished frame, with no depth test against the scene unless `occlude` is on. It uses WebGPU when the engine does, and a tiny WebGL2 program on the fallback backend.
 - **Gizmo picking.** Hit tests are CPU-only in CSS pixels: arrows, scale axes and rings by pixel distance to their projection (back halves of rings lose ties), plane squares by a ray-plane intersection, center and view-ring handles by projected circles. Axes pointing at the camera and planes seen edge-on are hidden and unpickable.
 - **Gizmo dragging.** Translate intersects the cursor ray with a plane through the handle (the axis plane most facing the camera, the handle plane, or the view plane), projects the offset onto the axis, and writes `inverse(parentWorld) x newWorld` as the local position, so parented meshes follow the cursor exactly. Rotation is the signed angle between the grab and current points on the ring plane (falling back to a screen tangent drag when the ring is edge-on), applied as `P^-1 R P` to the local quaternion, where P is the parent's world rotation. Scale is always local: the ratio of current to grab distance along the handle axis, or one handle length of drag up or right doubles the uniform scale. World matrices come from `engineRuntime(engine).store.matrices`. The gizmo stops the pointerdown event from reaching later listeners when it grabs a handle, and emits `dragging-changed` so you can disable `OrbitControls`.
@@ -602,6 +651,8 @@ called; subsequent scene motion does not retarget the move.
 | `heldSnap` (steps used while Ctrl or Meta is held and no snap is set), `keys` (shortcut key codes) | Transform | 0.25, 15 degrees, 0.1; W E R Q + - Escape |
 | `showX`, `showY`, `showZ`, `visible`, `enabled` | Transform | `true` |
 | `flipAxes`, `showDelta`, `occlude`, `occluder` | Transform | `false`, `true`, `false`, none; see Gizmo arrows, drag lines and occlusion |
+| `offset`, `fixed` | Transform | `[0, 0, 0]`, `true`; see Gizmo offset, size and colours |
+| `axisColors`, `hoveredColor`, `lineWidth` | Transform | red, green, blue; yellow; `2.5` |
 | `element`, `order` | Transform | engine canvas, `1000` |
 | `view` (one of `engine.views`: its camera, pointers inside its rectangle, drawn only there) | Transform | `null` (engine camera, whole element) |
 
@@ -615,7 +666,7 @@ called; subsequent scene motion does not retarget the move.
 
 ## Tests
 
-`npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, roll in fly and trackball (Q and E at `rollSpeed`, the body axes, looping past the vertical, an orthonormal frame after long flights and tumbles, the rendered matrix, reset), the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset, the gizmo's size and dimming, double-click focus and the keyboard), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, several objects about each pivot in each space (`tests/transform-many.test.js`), arrows flipping to the camera with a margin and held during a drag, the delta line and swept arc, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf-pro model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup; `tests/drag-modes.test.js` covers rotate mode under a rotated parent, about an axis and as a trackball, groups that move and turn together, and `recursive` and `transformGroup`.
+`npm test` in `packages/controls` runs Node tests with synthetic pointer, wheel and keyboard events on a fake element, and real core `Camera`, `TransformStore` and `Engine` objects with a stub renderer: orbit azimuth and polar mapping, polar and azimuth clamping and pole safety, damping convergence at 30 and 60 fps, dolly limits, zoom to cursor keeping the world point on its pixel, screen-space and ground panning moving target and position equally, keyboard pan, touch rotate and pinch, `enabled`, `reset`, auto-rotate, map panning, trackball rotation, coasting and pole guard, roll in fly and trackball (Q and E at `rollSpeed`, the body axes, looping past the vertical, an orthonormal frame after long flights and tumbles, the rendered matrix, reset), the arcball (sphere mapping continuity, the angle and axis of a drag across the centre, roll and passing over the pole, an orthonormal frame after 1000 drags, pan and zoom keeping the cursor point on its pixel under perspective and fixed-size orthographic cameras, distance and zoom limits, damping coming to rest at 30 and 60 fps, enable flags and reset, the gizmo's size and dimming, double-click focus and the keyboard), fly and first-person movement and look, pointer-lock look limits and WASD helpers, and the gizmo: translating along an axis by a known screen drag, constant screen size, picking, drags and orbit pan under an orthographic camera at several zooms, snapping in world and local space, plane and screen handles, ring rotation following the cursor, rotation snapping, more than 180 degrees of rotation, the view ring and free rotation, axis and uniform scale with snapping, local versus world space, a parented mesh (translate, rotate, scale) under a rotated and scaled parent, hover highlighting, several objects about each pivot in each space (`tests/transform-many.test.js`), arrows flipping to the camera with a margin and held during a drag, the delta line and swept arc, axis toggles, OrbitControls disabled during a gizmo drag, tessellation of every mode, and listener and plugin cleanup. Drag tests move a box under a scaled parent on the view plane (checked against an independent ray-plane intersection), along an axis and on the ground plane, a gltf/pbr model by touch under an orthographic camera (600 CSS pixels for 6 world units), and check events, hover, misses falling through to later listeners, other fingers, disposed meshes and models, and cleanup; `tests/drag-modes.test.js` covers rotate mode under a rotated parent, about an axis and as a trackball, groups that move and turn together, and `recursive` and `transformGroup`.
 
 `tests/third-person.test.js` covers `ThirdPersonControls` on real core engines: the arm's place and the view kept from the
 attached camera, a wall pulling the arm in within the frame with the camera on the near side at every yaw of a full turn,
@@ -628,12 +679,12 @@ stair of 0.18 m risers climbed and descended with the eye never jumping more tha
 and 0.4 m refused; sliding along a wall at the radius; a zero-thickness glass pane and corner never crossed at 30 m/s
 at 10, 30 and 60 frames per second; eye height within 2 mm over hardwood, a 12 mm rug and a deck with 1 cm gaps; a
 0.35 m gap bridged and a 0.8 m gap fallen into; 20° and 40° ramps climbed, 60° blocked; no jump at the default
-`jumpSpeed`, a jump's apex within 5 cm of v²/2g, one jump per press, a ceiling stopping the head, a 2 m fall landing;
+`jumpSpeed`, a jump's apex equal to v²/2g within 1e-6 m at 30 and 144 updates a second, one jump per press, a ceiling stopping the head, a 2 m fall landing;
 crouching under a 1.3 m overhang and standing only past it; the generated two-storey house (`tests/house.js`) walked
 from the deck through the door, over the rug, through the doorway and up 16 stairs to the upper floor with the capsule
 never closer than its radius minus 1 cm to any box or the glass; the dollhouse view out and back (never vertical,
 framed on the bounds, orthographic through a `CameraProjection`, an orbit drag, a `FloatingOrigin` rebase, a toggle
-cancelled half way); a gltf-pro model wall, hidden models, explicit and changed collider lists; and keys, drag and
+cancelled half way); a gltf/pbr model wall, hidden models, explicit and changed collider lists; and keys, drag and
 pointer-lock look, touch thumbstick and drag-look, a gamepad, and listener and plugin cleanup.
 `npm run test:browser:walk` (real GPU, not in CI) walks the same house in Edge with the real W key, screenshots each
 waypoint and the dollhouse, checks the capsule's clearance every frame and zero WebGPU errors, and drives the touch
@@ -708,7 +759,10 @@ Properties `enablePan`, `enableZoom`, `enableTilt` default true; `zoomSpeed` is
 height. Without `clipPlanes`, the app owns valid near/far settings.
 
 `pick(x,y)`, `grab(previousHit,x,y)`, `zoomAt(x,y,wheelPixels)` and
-`tilt(hit,yaw,pitch)` accept CSS pixels and radians. Hits are in the current local
+`tilt(hit,yaw,pitch)` accept CSS pixels and radians. A positive `pitch` moves the
+eye away from the surface normal at the hit (toward the horizon), a negative one back
+toward straight above it, kept between 0 and `maxTilt` whichever way `camera.up`
+points; the horizon stays the right way up. Hits are in the current local
 frame. `normal(hit)` returns its geodetic unit normal. Constructor values are
 copied; invalid coordinates/limits throw. Events are `start`, `change`, `end`.
 Like other controls, a bare camera and element can be passed instead of an
@@ -761,7 +815,8 @@ corner handles scale; twelve edge handles rotate about their local axes. Call
 handles() for world-space positions with stable corner-0..7 and edge-0..11 ids.
 handleSize is 12 CSS pixels by default. uniformScaling defaults true; false scales
 each screen-visible local axis. scaleFromCenter defaults false, keeping the opposite
-corner fixed while scaling; true uses the center. Edge rotation uses the center.
+corner fixed while scaling; true uses the center. Edge rotation uses the center, and the
+grabbed edge follows the pointer around its axis at any box size or camera distance.
 scaleSnap is a scale-ratio step and rotationSnap is radians; both default null and
 require positive finite values when set. Negative/zero crossing scales are prevented.
 
@@ -831,7 +886,9 @@ pages/distance/horizontal have the same defaults; infinite defaults false, dampi
 actual scroll extent. Wheel-only progress uses pages, distance and viewport size.
 Infinite progress wraps offset into [0,1) while retaining movement through the seam.
 delta is signed progress change. setProgress(progress,immediate=false) drives it in
-code. range(from,length,margin=0), curve(...) and visible(...) derive normalized
+code; in infinite mode progress names a place on the loop (1.25 and 0.25 are the same
+place) and the offset takes the short way to it, at most half a loop. A wheel page
+step (deltaMode 2) is one element height, or one width when horizontal. range(from,length,margin=0), curve(...) and visible(...) derive normalized
 section progress, a bell-shaped value and membership, respectively.
 
 PathControls (also MotionPathControls) samples any path with at(t), using uniform
@@ -839,7 +896,8 @@ arc length when length and atDistance are available, including a Spline. By defa
 it drives the camera, looks along the path, loops, starts at offset 0 and smooths
 progress for 0.1 seconds; maxSpeed is Infinity, lookAhead 0.001 and focusDamping
 0.1 seconds. Set object for a mesh target, scroll for shared progress, or write
-current yourself. focus accepts a world point or live mesh. loop: false clamps
+current yourself. update(delta) returns true, and emits change, only when the camera
+or mesh moved. focus accepts a world point or live mesh. loop: false clamps
 endpoints. Use one owner for a camera/mesh transform; do not attach orbit and path
 controls to the same camera at once. Dispose controls to remove listeners/update
 plugins; paths and product meshes remain caller-owned.

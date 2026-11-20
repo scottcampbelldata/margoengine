@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 const server = await createServer({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
   configFile: false,
   // This suite serves only its middleware page, not the repository's unrelated HTML entries.
   optimizeDeps: { entries: [], noDiscovery: true, include: [] },
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'wfc-test-page',
       configureServer(server) {
@@ -30,6 +32,8 @@ try {
   browser = await launchBrowser();
   const page = await browser.newPage();
   const errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0] + 'c69');
   const { outputs: result, workers } = await page.evaluate(async () => {

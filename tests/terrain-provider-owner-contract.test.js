@@ -9,7 +9,9 @@ test('every terrain EnginePlugin detaches through actual plugin ownership', () =
     checked += result.checked;
     assert.deepEqual(result.problems, [], file);
   }
-  assert.equal(checked, 13); // every class in packages/terrain/src that implements EnginePlugin
+  // Every class in packages/terrain/src that implements EnginePlugin: 13, then GroundChange (a231d47072), WetGround
+  // (b0d0892ae7) and the rock surface (b350f844d0), each passing the ownership check above.
+  assert.equal(checked, 16);
 });
 test('terrain guard rejects misleading Engine fields named owner', () => {
   const source =

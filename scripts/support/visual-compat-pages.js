@@ -1,10 +1,10 @@
 // The demos of the visual check's WebGL2 compatibility run and how one is opened, shared by its two steps:
-// scripts/visual-compat.mjs (pixels, a shared GPU slot) and scripts/visual-compat-budget.mjs (frame cost, the GPU held
-// exclusively in chunks). Site demos run the layer the way a visitor without WebGPU gets it: `navigator.gpu` is removed
+// scripts/visual-compat.mjs (pixels) and scripts/visual-compat-budget.mjs (frame cost, in chunks). Site demos run the layer the way a visitor without WebGPU gets it: `navigator.gpu` is removed
 // before the page loads, so the page's own gate (examples/needs-webgpu.js) downloads @margoengine/webgl2-compat from the
 // site build and installs it. Khronos models (a dev-server page without the gate) get the layer from compat-shim.js.
 import { resolve } from 'node:path';
 import { createServer, preview } from 'vite';
+import { noFileWatcher } from './no-file-watcher.js';
 import { compatShim } from './compat-shim.js';
 import { demos } from './visual-demos.js';
 
@@ -122,6 +122,7 @@ export async function startServers(cases) {
   const devServer = cases.some((c) => c.demo.dev)
     ? await (
         await createServer({
+          plugins: [noFileWatcher()],
           configFile: false,
           root,
           logLevel: 'error',

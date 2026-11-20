@@ -1,17 +1,19 @@
 // @margoengine/exporters/capture on a real engine in a browser (WebGPU where available): exact-size captures of a
 // known scene at sizes unlike the canvas, the canvas restored afterwards, tiles above 4096 against a direct render,
 // transparent backgrounds, a GIF decoded by the browser's own ImageDecoder, JPEG, and WebM frame pacing.
-// Run after building the packages: node scripts/gpu-lock.mjs run --owner=<id> -- node packages/exporters/tests/capture-browser.mjs
+// Run after building the packages: node scripts/run-with-timeout.mjs -- node packages/exporters/tests/capture-browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser, resolveBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },

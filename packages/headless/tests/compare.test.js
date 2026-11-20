@@ -31,7 +31,7 @@ const clone = ({ width, height, data }) => ({ width, height, data: data.slice() 
 test('pixelDiff counts the pixels over the threshold', () => {
   const a = flat(4, 4, [10, 20, 30]),
     b = clone(a);
-  assert.deepEqual(pixelDiff(a, b), { different: 0, total: 16, ratio: 0, largest: 0, mean: 0 });
+  assert.deepEqual(pixelDiff(a, b), { different: 0, total: 16, ratio: 0, largest: 0, mean: 0, box: null });
   b.data[1] += 2; // At the threshold: the same.
   b.data[4] += 3; // Over it.
   b.data[10] += 100;
@@ -63,6 +63,68 @@ test('pixelDiff draws changes in red over a faded picture', () => {
   assert.deepEqual([...a.data.subarray(0, 4)], [100, 100, 100, 255], 'inputs stay as they are');
 });
 
+test('pixelDiff gives the box round the changed pixels and a mask of them (GAP-FILM-DIFFBOX)', () => {
+  const a = flat(7, 5, [40, 40, 40]),
+    b = clone(a),
+    at = (x, y) => (y * 7 + x) * 4;
+  b.data[at(2, 1)] = 200; // Over the threshold.
+  b.data[at(5, 3) + 1] = 0;
+  b.data[at(4, 4) + 2] = 41; // At the threshold: the same.
+  const result = pixelDiff(a, b, { mask: true });
+  assert.deepEqual(result.box, { x: 2, y: 1, width: 4, height: 3 });
+  assert.equal(result.mask.length, 35);
+  assert.deepEqual(
+    [...result.mask.keys()].filter((i) => result.mask[i]),
+    [1 * 7 + 2, 3 * 7 + 5],
+  );
+  assert.equal(pixelDiff(a, b).mask, undefined, 'no mask unless asked');
+  const one = clone(a);
+  one.data[at(6, 4) + 3] = 0;
+  assert.deepEqual(pixelDiff(a, one).box, { x: 6, y: 4, width: 1, height: 1 });
+  assert.equal(pixelDiff(a, clone(a), { mask: true }).box, null);
+  assert.ok(pixelDiff(a, clone(a), { mask: true }).mask.every((v) => v === 0));
+});
+
+test('pixelDiff clusters changed pixels into one box per group', () => {
+  const a = flat(20, 10, [0, 0, 0]),
+    b = clone(a),
+    mark = (x, y) => (b.data[(y * 20 + x) * 4] = 255);
+  // An L of touching pixels (one diagonal step), a pixel 3 columns to its right, and a pixel far away.
+  mark(1, 1);
+  mark(1, 2);
+  mark(2, 3);
+  mark(6, 3);
+  mark(18, 8);
+  assert.deepEqual(pixelDiff(a, b, { clusters: 0 }).clusters, [
+    { x: 1, y: 1, width: 2, height: 3 },
+    { x: 6, y: 3, width: 1, height: 1 },
+    { x: 18, y: 8, width: 1, height: 1 },
+  ]);
+  // Three empty columns between the L and the pixel: a gap of 3 joins them, 2 does not.
+  assert.equal(pixelDiff(a, b, { clusters: 2 }).clusters.length, 3);
+  assert.deepEqual(pixelDiff(a, b, { clusters: 3 }).clusters, [
+    { x: 1, y: 1, width: 6, height: 3 },
+    { x: 18, y: 8, width: 1, height: 1 },
+  ]);
+  assert.equal(pixelDiff(a, b, { clusters: 100 }).clusters.length, 1);
+  assert.equal(pixelDiff(a, b, { clusters: 0 }).mask, undefined, 'clusters alone return no mask');
+  assert.deepEqual(pixelDiff(a, clone(a), { clusters: 0 }).clusters, []);
+  // A U shape: its arms meet only through the bottom row, which the second pass joins.
+  const u = clone(a);
+  for (const [x, y] of [
+    [10, 0],
+    [10, 1],
+    [10, 2],
+    [11, 2],
+    [12, 2],
+    [12, 1],
+    [12, 0],
+  ])
+    u.data[(y * 20 + x) * 4] = 255;
+  assert.deepEqual(pixelDiff(a, u, { clusters: 0 }).clusters, [{ x: 10, y: 0, width: 3, height: 3 }]);
+  for (const clusters of [-1, NaN, Infinity]) assert.throws(() => pixelDiff(a, b, { clusters }), /Invalid clusters/);
+});
+
 test('both comparisons refuse images they cannot pair', () => {
   const a = flat(2, 2, [0, 0, 0]);
   for (const compare of [pixelDiff, ssim]) {
@@ -71,7 +133,8 @@ test('both comparisons refuse images they cannot pair', () => {
   }
   assert.throws(() => pixelDiff(a, a, { threshold: -1 }), RangeError);
   assert.throws(() => pixelDiff(a, a, { threshold: NaN }), RangeError);
-  for (const options of [{ window: 4 }, { window: 0 }, { sigma: 0 }]) assert.throws(() => ssim(a, a, options), RangeError);
+  for (const options of [{ window: 4 }, { window: 0 }, { sigma: 0 }])
+    assert.throws(() => ssim(a, a, options), RangeError);
 });
 
 test('SSIM of identical images is 1, and it is symmetric', () => {
@@ -121,7 +184,8 @@ test('SSIM falls as damage grows, and sees structure a pixel count does not', ()
   const a = picture(),
     damage = (amount) => {
       const out = clone(a);
-      for (let i = 0; i < out.data.length; i += 4) out.data[i + 1] = Math.max(0, out.data[i + 1] - (i % 8 ? amount : 0));
+      for (let i = 0; i < out.data.length; i += 4)
+        out.data[i + 1] = Math.max(0, out.data[i + 1] - (i % 8 ? amount : 0));
       return out;
     },
     small = ssim(a, damage(8)).score,
@@ -203,7 +267,11 @@ test('decodePNG undoes every row filter', async () => {
   for (const filter of [1, 2, 3, 4]) rows.push(filter, ...want.map((_, x) => encode(filter, x)));
   const { data } = await decodePNG(png({ width: 3, height: 5, type: 0, rows }));
   for (let y = 0; y < 5; y++)
-    assert.deepEqual([0, 1, 2].map((x) => data[(y * 3 + x) * 4]), want, `row ${y}`);
+    assert.deepEqual(
+      [0, 1, 2].map((x) => data[(y * 3 + x) * 4]),
+      want,
+      `row ${y}`,
+    );
 });
 
 test('decodePNG reads each colour type and depth', async () => {
@@ -211,7 +279,9 @@ test('decodePNG reads each colour type and depth', async () => {
   assert.deepEqual([...rgb.data], [1, 2, 3, 255]);
   const greyAlpha = await decodePNG(png({ width: 1, height: 1, type: 4, rows: [0, 7, 9] }));
   assert.deepEqual([...greyAlpha.data], [7, 7, 7, 9]);
-  const deep = await decodePNG(png({ width: 1, height: 1, type: 6, depth: 16, rows: [0, 1, 0xff, 2, 0xff, 3, 0xff, 4, 0xff] }));
+  const deep = await decodePNG(
+    png({ width: 1, height: 1, type: 6, depth: 16, rows: [0, 1, 0xff, 2, 0xff, 3, 0xff, 4, 0xff] }),
+  );
   assert.deepEqual([...deep.data], [1, 2, 3, 4]);
   const bit = await decodePNG(png({ width: 3, height: 1, type: 0, depth: 1, rows: [0, 0b10100000] }));
   assert.deepEqual([bit.data[0], bit.data[4], bit.data[8]], [255, 0, 255]);
@@ -241,7 +311,9 @@ test('decodePNG reads each colour type and depth', async () => {
 test('decodePNG refuses what is not a PNG it can read', async () => {
   await assert.rejects(decodePNG(new Uint8Array(40)), { code: 'failed' });
   await assert.rejects(decodePNG('x.png'), TypeError);
-  await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, rows: [0, 1], interlace: 2 })), { code: 'failed' });
+  await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, rows: [0, 1], interlace: 2 })), {
+    code: 'failed',
+  });
   await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, rows: [9, 1] })), { code: 'failed' });
   await assert.rejects(decodePNG(png({ width: 9, height: 9, type: 0, rows: [0, 1] })), { code: 'failed' });
   await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 3, rows: [0, 1] })), { code: 'failed' });
@@ -256,7 +328,7 @@ test('decodePNG refuses a broken chunk and a bit depth the colour type cannot ha
   await assert.rejects(decodePNG(png({ width: 1, height: 1, type: 0, depth: 0, rows: [0, 1] })), { code: 'failed' });
 });
 
-test('decodePNG gives what Chromium\'s decoder gives on PngSuite, and refuses what it refuses', async () => {
+test("decodePNG gives what Chromium's decoder gives on PngSuite, and refuses what it refuses", async () => {
   const folder = new URL('./fixtures/pngsuite/', import.meta.url),
     { reads, refuses } = JSON.parse(await readFile(new URL('chromium.json', folder), 'utf8'));
   assert.equal(reads.length, 162);
@@ -278,7 +350,8 @@ test('compareImages passes the same picture, fails a changed one, and takes PNG 
   assert.equal(same.ssim, 1);
   assert.equal(same.different, 0);
   const changed = clone(a);
-  for (let y = 10; y < 22; y++) for (let x = 14; x < 28; x++) changed.data.fill(0, (y * 48 + x) * 4, (y * 48 + x) * 4 + 3);
+  for (let y = 10; y < 22; y++)
+    for (let x = 14; x < 28; x++) changed.data.fill(0, (y * 48 + x) * 4, (y * 48 + x) * 4 + 3);
   const failed = await compareImages(bytes, changed);
   assert.equal(failed.pass, false);
   assert.equal(failed.different, 168);

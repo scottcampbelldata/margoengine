@@ -16,7 +16,9 @@ export type MeshPredicate = (mesh: Mesh) => boolean;
 export function find(target: Mesh | Scene, predicate: MeshPredicate): Mesh[] {
   if (typeof predicate !== 'function') throw typeError('find: supply a predicate', 'arguments');
   const result: Mesh[] = [];
-  traverse(target, (mesh) => { if (predicate(mesh)) result.push(mesh); });
+  traverse(target, (mesh) => {
+    if (predicate(mesh)) result.push(mesh);
+  });
   return result;
 }
 
@@ -24,7 +26,9 @@ export function find(target: Mesh | Scene, predicate: MeshPredicate): Mesh[] {
 export function findOne(target: Mesh | Scene, predicate: MeshPredicate): Mesh | null {
   if (typeof predicate !== 'function') throw typeError('findOne: supply a predicate', 'arguments');
   let result: Mesh | null = null;
-  traverse(target, (mesh) => { if (result === null && predicate(mesh)) result = mesh; });
+  traverse(target, (mesh) => {
+    if (result === null && predicate(mesh)) result = mesh;
+  });
   return result;
 }
 
@@ -53,7 +57,10 @@ export function traverseVisible(target: Mesh | Scene, visitor: (mesh: Mesh) => v
       const r = meshRuntime(mesh);
       if (!r.engine.disposed && r.engine.meshes.get(r.id) === r && parent(mesh) === null) visit(mesh);
     }
-  } else { target.check(); visit(target); }
+  } else {
+    target.check();
+    visit(target);
+  }
 }
 
 /** Visit the original ancestor chain, nearest first, excluding the mesh itself. */
@@ -68,7 +75,9 @@ export function traverseAncestors(mesh: Mesh, visitor: (mesh: Mesh) => void): vo
 }
 
 /** Unparent a mesh, retaining its local transform. Returns the mesh. */
-export function removeFromParent<T extends Mesh>(mesh: T): T { return mesh.setParent(null); }
+export function removeFromParent<T extends Mesh>(mesh: T): T {
+  return mesh.setParent(null);
+}
 
 const coordinates = (value: Vec3 | Vec3Like): MutableVec3 => {
   const v: MutableVec3 = 'x' in value ? [value.x, value.y, value.z] : [value[0], value[1], value[2]];
@@ -76,12 +85,20 @@ const coordinates = (value: Vec3 | Vec3Like): MutableVec3 => {
   return v;
 };
 const write = (out: VectorTarget, v: readonly number[]) => {
-  if ('x' in out) { out.x = v[0]; out.y = v[1]; out.z = v[2]; }
-  else { out[0] = v[0]; out[1] = v[1]; out[2] = v[2]; }
+  if ('x' in out) {
+    out.x = v[0];
+    out.y = v[1];
+    out.z = v[2];
+  } else {
+    out[0] = v[0];
+    out[1] = v[1];
+    out[2] = v[2];
+  }
   return out;
 };
 const inverse = (m: Float64Array) => {
-  const matrix = new Matrix4().fromArray(m), det = matrix.determinant();
+  const matrix = new Matrix4().fromArray(m),
+    det = matrix.determinant();
   if (!Number.isFinite(det) || det === 0) throw rangeError('graph: use an invertible transform', 'transform');
   return matrix.invert();
 };
@@ -108,9 +125,8 @@ export function worldToLocal(mesh: Mesh, point: Vec3 | Vec3Like, out: VectorTarg
 const parts = (m: Float64Array) => {
   const result = splitTRS(m, 1e-6);
   if (!result.ok) throw rangeError(`graph: ${result.reason}; choose parents permitting a TRS transform`, 'transform');
-  if (![...result.position, ...result.rotation, ...result.scale].every((v) => Number.isFinite(Math.fround(v))) ||
-    result.scale.some((v) => Math.fround(v) === 0))
-    throw rangeError('graph: result must fit nonzero float32 TRS scales', 'transform');
+  if (![...result.position, ...result.rotation, ...result.scale].every((v) => Number.isFinite(Math.fround(v))))
+    throw rangeError('graph: result must fit float32 TRS values', 'transform');
   return result;
 };
 
@@ -119,7 +135,8 @@ const parts = (m: Float64Array) => {
  * Shear that cannot be represented by local TRS rejects before any mutation. Same-parent calls are no-ops.
  */
 export function attach<T extends Mesh>(newParent: Mesh | null, mesh: T): T {
-  mesh.check(); newParent?.check();
+  mesh.check();
+  newParent?.check();
   if (parent(mesh) === newParent) return mesh;
   const world = worldMatrix(mesh);
   const matrix = newParent ? inverse(worldMatrix(newParent)).multiply({ elements: world }).elements : world;
@@ -131,22 +148,30 @@ export function attach<T extends Mesh>(newParent: Mesh | null, mesh: T): T {
 }
 
 const axisUnit = (axis: Vec3 | Vec3Like, amount: number) => {
-  const v = coordinates(axis), length = Math.hypot(...v);
+  const v = coordinates(axis),
+    length = Math.hypot(...v);
   if (!length || !Number.isFinite(length) || !Number.isFinite(amount))
     throw rangeError('graph: supply a nonzero axis and finite amount', 'transform');
   return v.map((x) => x / length) as MutableVec3;
 };
 const quaternion = (mesh: Mesh) => {
   mesh.check();
-  const { engine, id } = meshRuntime(mesh), t = engine.store.transforms;
-  const q = [t.qx[id], t.qy[id], t.qz[id], t.qw[id]], length = Math.hypot(...q);
+  const { engine, id } = meshRuntime(mesh),
+    t = engine.store.transforms;
+  const q = [t.qx[id], t.qy[id], t.qz[id], t.qw[id]],
+    length = Math.hypot(...q);
   return q.map((v) => v / length);
 };
 
 /** Translate along a normalized mesh-local axis. Distance is in parent units, independent of mesh scale. */
 export function translateOnAxis<T extends Mesh>(mesh: T, axis: Vec3 | Vec3Like, distance: number): T {
-  const direction = rotateByQuaternion(axisUnit(axis, distance), quaternion(mesh)), p = mesh.position;
-  return mesh.setPosition([p.x + direction[0] * distance, p.y + direction[1] * distance, p.z + direction[2] * distance]);
+  const direction = rotateByQuaternion(axisUnit(axis, distance), quaternion(mesh)),
+    p = mesh.position;
+  return mesh.setPosition([
+    p.x + direction[0] * distance,
+    p.y + direction[1] * distance,
+    p.z + direction[2] * distance,
+  ]);
 }
 
 /** Rotate around a normalized local axis, by radians. */
@@ -157,7 +182,9 @@ export function rotateOnAxis<T extends Mesh>(mesh: T, axis: Vec3 | Vec3Like, rad
 
 /** Rotate about a world axis at the mesh origin. Rejects an unrepresentable local shear before mutation. */
 export function rotateOnWorldAxis<T extends Mesh>(mesh: T, axis: Vec3 | Vec3Like, radians: number): T {
-  const v = axisUnit(axis, radians), m = worldMatrix(mesh), above = parent(mesh);
+  const v = axisUnit(axis, radians),
+    m = worldMatrix(mesh),
+    above = parent(mesh);
   const rotation = new Matrix4().makeRotationAxis({ x: v[0], y: v[1], z: v[2] }, radians);
   rotation.multiply({ elements: m });
   rotation.elements.set(m.subarray(12, 15), 12);

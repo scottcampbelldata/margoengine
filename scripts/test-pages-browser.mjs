@@ -11,7 +11,6 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { runScene } from './support/composition-run.mjs';
 import { compatRun } from './support/compat-shim.js';
 
@@ -110,24 +109,19 @@ async function main() {
   assert.ok(!given || names.includes(given), `unknown test page ${given}; pages: ${names.join(', ')}`);
   const results = [];
   let failed = 0;
-  const release = await acquire({ owner: 'test-pages', waitMax: 1 });
-  try {
-    for (const name of given ? [given] : names) {
-      const { findings, clicked } = await runPage(name, compat);
-      const { expected, unexpected, gone } = classify(name, findings);
-      for (const k of expected) console.log(`KNOWN FAIL ${name} ${backend} (${k.row}): ${k.text}`);
-      for (const f of unexpected) console.log(`FAIL ${name} ${backend}: ${f.kind}: ${f.text}`);
-      for (const row of gone) console.log(`FAIL ${name} ${backend}: known bug ${row} no longer shows; close its row`);
-      const ok = unexpected.length === 0 && gone.length === 0;
-      if (!ok) failed++;
-      else
-        console.log(
-          `PASS ${name} ${backend}, ${clicked} buttons${expected.length ? `, ${expected.length} known` : ''}`,
-        );
-      results.push({ page: name, backend, ok, clicked, expected, unexpected, gone });
-    }
-  } finally {
-    await release();
+  for (const name of given ? [given] : names) {
+    const { findings, clicked } = await runPage(name, compat);
+    const { expected, unexpected, gone } = classify(name, findings);
+    for (const k of expected) console.log(`KNOWN FAIL ${name} ${backend} (${k.row}): ${k.text}`);
+    for (const f of unexpected) console.log(`FAIL ${name} ${backend}: ${f.kind}: ${f.text}`);
+    for (const row of gone) console.log(`FAIL ${name} ${backend}: known bug ${row} no longer shows; close its row`);
+    const ok = unexpected.length === 0 && gone.length === 0;
+    if (!ok) failed++;
+    else
+      console.log(
+        `PASS ${name} ${backend}, ${clicked} buttons${expected.length ? `, ${expected.length} known` : ''}`,
+      );
+    results.push({ page: name, backend, ok, clicked, expected, unexpected, gone });
   }
   mkdirSync(join(root, 'test-results'), { recursive: true });
   writeFileSync(

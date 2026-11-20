@@ -32,7 +32,7 @@ async function harness(run, userAgent = '') {
     createBuffer: () => ({
       destroy() {},
       async mapAsync() {},
-      getMappedRange: () => new Uint32Array([4294967295]).buffer,
+      getMappedRange: () => new Uint32Array([0]).buffer, // the pick pass's clear: no mesh
       unmap() {},
     }),
     createBindGroup: () => ({}),

@@ -9,7 +9,7 @@ min+gzip, no dependencies, no engine needed. Works in windows, Web Workers and s
 
 ```ts
 import {AssetCache} from 'margoengine/cache';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
@@ -41,13 +41,33 @@ await assets.update({[url]: 'hash of the next release'});        // drops the ol
 console.log(response.status);
 ```
 
+`hashBytes` needs the whole file in memory, since `crypto.subtle` has no incremental digest. For a large file,
+`hashStream(chunks, {signal})` reads it a chunk at a time (an async or plain iterable of `Uint8Array`, such as a Node
+read stream, or a web `ReadableStream`) and gives the same hex; `SHA256` is the incremental hash under it (`update`,
+then `digest` once). In Node (22.3 and later) it runs on the runtime's own digest, reached through
+`process.getBuiltinModule('node:crypto')` so no bundler sees an import; elsewhere, or with `{native: false}`, it is plain
+JavaScript written from NIST FIPS 180-4, so it runs in browsers and workers alike. Both give the same hex, and `engine`
+says which one runs (`'native'` or `'js'`). On the dev PC (paired A/B in one process, 128 x 1 MiB, best of 5 rounds,
+loaded machine) the runtime digest read 2,569 MB/s and the plain JavaScript 273 MB/s, up from 161 MB/s before it read
+whole blocks in place ([perf history](../../docs/whitepaper/perf-history.md#cache-hashstream-speed-2026-11-16)). For
+example:
+
+```ts
+import {SHA256, hashBytes, hashStream} from 'margoengine/cache/hashed';
+
+const file = new Blob([new Uint8Array(3_000_000).fill(7)]);
+const streamed = await hashStream(file.stream());                // one chunk in memory at a time
+console.log(streamed === (await hashBytes(await file.arrayBuffer()))); // true
+console.log(new SHA256().update(new TextEncoder().encode('abc')).digest()); // ba7816bf...
+```
+
 `cachedFetch(url, init)` is the same through a shared default cache (`name: 'margo-assets'`, no version). To make a set
 of files available offline ahead of time, fetch them once and wait for the writes:
 `await Promise.all(urls.map(u => cache.fetch(u).then(r => r.arrayBuffer()))); await cache.flush();`
 
 ## Range requests and streaming
 
-`margoengine/cache/ranges` keeps the byte ranges a file is read in, as aligned blocks, so a streamed model (gltf-pro's
+`margoengine/cache/ranges` keeps the byte ranges a file is read in, as aligned blocks, so a streamed model (gltf/pbr's
 `loadGLTFProgressive`, KTX2 streaming, LAS and COPC point clouds) also loads from disk and offline. Only the blocks a
 request covers and does not have go to the network; a request whose blocks are all stored is answered 206 with no
 request at all.
@@ -84,7 +104,7 @@ self.addEventListener('fetch', e => {
 });
 ```
 
-- A miss is asked for widened to whole blocks (`bytes=10-19` becomes `bytes=0-65535`); gltf-pro's 256 KB requests are
+- A miss is asked for widened to whole blocks (`bytes=10-19` becomes `bytes=0-65535`); gltf/pbr's 256 KB requests are
   whole blocks already. A request needing blocks that are not stored asks for each run of adjacent missing blocks once.
   A server that ignores `Range` answers 200: the whole file is stored and the request is answered 206 from it.
 - Stored blocks are revalidated once per RangeCache with a one-byte conditional request (`Range: bytes=0-0` with
@@ -101,7 +121,7 @@ self.addEventListener('fetch', e => {
 
 | Loader | Option | Worker entry with `fetch` |
 | --- | --- | --- |
-| gltf-pro `loadGLTF`, `parseGLTFAsync` | `fetch` (file, external .bin and images) | `loadGLTFInWorker` runs on the main thread (a function cannot move to the worker); for a GLB use `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` to keep parsing in the worker |
+| gltf/pbr `loadGLTF`, `parseGLTFAsync` | `fetch` (file, external .bin and images) | `loadGLTFInWorker` runs on the main thread (a function cannot move to the worker); for a GLB use `parseGLTFInWorker(engine, await (await cache.fetch(url)).arrayBuffer())` to keep parsing in the worker |
 | fbx `loadFBX`, `parseFBX`, `convertFBX` | `fetch` (file and external textures) | `loadFBXInWorker` / `parseFBXInWorker` run on the main thread; `parseFBXInWorker(engine, bytes)` without `fetch` keeps the worker for embedded textures |
 | usdz `loadUSDZ` | `fetch` | `loadUSDZInWorker` downloads through `fetch` here and parses in the worker |
 | loaders `fetchBytes`, `load` | `fetch` (already existed) | `parse*InWorker(bytes)` |
@@ -118,7 +138,7 @@ external buffers, `mtllib` files and textures the loader resolves next to it.
 ```ts
 import {AssetCache} from 'margoengine/cache';
 import {LoadingManager} from 'margoengine/cache/manager';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {loadOBJ} from 'margoengine/loaders/mtl';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -187,7 +207,7 @@ manager.abort(); // cancels every request in flight (each reports onError); the 
   whole file once in the background, so the next visit (or the offline one) has it. Cold, that costs the range bytes
   plus the whole file. To store only the ranges read, use `margoengine/cache/ranges` (above).
 
-Request cache modes are honoured by `AssetCache`: `cache: 'no-store'` goes to the network and is not stored, `'reload'` skips the stored copy and replaces it, and `'no-cache'` (or a request `Cache-Control: no-cache`) revalidates the stored copy before it is served. `RangeCache` combines stored blocks only under a strong ETag; under a weak one or none it fetches every block of a range again, so one answer never mixes two versions.
+Request cache modes are honoured by `AssetCache` and `RangeCache`: `cache: 'no-store'` goes to the network and is not stored (a range is sent as asked, not widened to blocks), `'reload'` skips the stored copy and replaces it, and `'no-cache'` (or a request `Cache-Control: no-cache`) revalidates the stored copy before it is served, fresh or not. In a service worker the mode is the page's: with DevTools "Disable cache" or request interception on, Chromium sends `reload`, so every request goes to the network. `RangeCache` combines stored blocks only under a strong ETag; under a weak one or none it fetches every block of a range again, so one answer never mixes two versions.
 
 ## Budget, quota and failures
 
@@ -208,7 +228,7 @@ Request cache modes are honoured by `AssetCache`: `cache: 'no-store'` goes to th
 
 ## Full offline (service worker)
 
-The asset cache covers model files. For the app itself (HTML, JS, worker scripts such as gltf-pro's
+The asset cache covers model files. For the app itself (HTML, JS, worker scripts such as gltf/pbr's
 `dist/workers/gltf.js` or a decoder runtime) to start offline, add a service worker. The same class works there and
 then also covers loads made inside workers:
 
@@ -297,7 +317,7 @@ file two bundles share is downloaded and stored once, and a new release download
 import {AssetCache} from 'margoengine/cache';
 import {AssetBundles} from 'margoengine/cache/bundles';
 import {hashBytes} from 'margoengine/cache/hashed';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Engine} from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
@@ -381,7 +401,7 @@ prefetch.cancel('level2'); // the player turned back: drop what waits, abort wha
 - Prefetcher and throttle: proved in Node with stand-in servers and a stand-in `requestIdleCallback`, and in Chromium
   by `npm run test:browser` (test/browser-prefetch.js). `throttle` paces how fast bodies are read, so the bytes already in the browser's buffers when the limit
   applies arrive at full speed.
-- RangeCache: proved in Node with gltf-pro's real streaming code, an in-memory IndexedDB and a stand-in server, and in
+- RangeCache: proved in Node with gltf/pbr's real streaming code, an in-memory IndexedDB and a stand-in server, and in
   Chromium, page and service worker, by `npm run test:browser`; not timed. An `If-Range` that does not name the stored
   file goes to the server unchanged. Blocks are combined under any matching validator, weak or none included, where
   RFC 9111 section 3.4 asks for one strong validator (open, docs/known-bugs.md). Eviction reads every file's record (one per file, not per block)

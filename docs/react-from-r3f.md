@@ -25,7 +25,7 @@ built in, more through `extend`; see "Lowercase tags and extend" in the package 
 | `useThree()` | `useEngine()`, `useCamera()`, `useMargo()` | `useMargo()` also has `invalidate`, `size`, `clock`, `canvas`. |
 | `useLoader(Loader, url)` | `useLoader(load, url)` | `load` is `(url, { engine, signal, fetch }) => Promise`; suspends; shared per Canvas. |
 | `useProgress()` | `useProgress()` | `{ active, loaded, total, progress, item, errors }`. |
-| `useGLTF(url)` + `<primitive>` | `<Model src>` / `<Gltf src>` (`@margoengine/react/gltf-pro`) | Suspends, cached per Canvas, disposed on unmount. `Gltf.preload(src)` warms the cache (`useGLTF.preload`). |
+| `useGLTF(url)` + `<primitive>` | `<Model src>` / `<Gltf src>` (`@margoengine/react/gltf`) | Suspends, cached per Canvas, disposed on unmount. `Gltf.preload(src)` warms the cache (`useGLTF.preload`). |
 | `useAnimations` | `<Animation clip>` inside `<Model>` | `ref` gives `names`, `time`, `seek`, `animation`, `animator`. |
 | `<OrbitControls>`, `<MapControls>` | same names | Every public control field is a prop. `<CadControls profile>` adds CAD presets. |
 | `<Environment files>` | `<Environment src>` | `background`, `rotation`, `blur`, `exposure`. |
@@ -48,7 +48,7 @@ built in, more through `extend`; see "Lowercase tags and extend" in the package 
   handler runs a frame or two after the DOM event. A click is a pointer-up with at most three CSS pixels of movement.
 - **Refs.** A mesh ref is a stable handle; it never points at a disposed mesh across Strict Mode or Suspense.
 - **Optional features are subpaths.** Controls, shadows, post effects and loaders are optional packages: import their
-  components from `@margoengine/react/<package>` (`/controls`, `/shadows`, `/post`, `/gltf-pro`, ...) and install that
+  components from `@margoengine/react/<package>` (`/controls`, `/shadows`, `/post`, `/gltf/pbr`, ...) and install that
   package; each loads when its component mounts, so an app only ships what it uses. `<Canvas shadows>` is
   `<Shadows />` from `@margoengine/react/shadows`.
 - **`extend()` takes components.** `extend({ SphereGeometry })` (with Margo's JSX runtime) gives `<sphereGeometry>`, but

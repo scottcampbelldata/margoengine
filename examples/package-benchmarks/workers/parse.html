@@ -4,8 +4,8 @@
 // rendering every animation frame during the load, as an app would. Long tasks (>= 50 ms) come from the Long Tasks API;
 // the largest gap between animation frames also catches blocking split into shorter tasks.
 import {Engine} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
-import {loadGLTFInWorker} from '/packages/gltf-pro/dist/worker.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {loadGLTFInWorker} from '/packages/gltf/dist/worker.js';
 import {loadFBX} from '/packages/fbx/dist/index.js';
 import {loadFBXInWorker} from '/packages/fbx/dist/worker.js';
 // The 160k-quad grid needs more scene accounting than the default caps (README, Explicit limits), so it opts into largeFBX.

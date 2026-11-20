@@ -12,9 +12,13 @@ export interface GridRay {
     direction: Vec3;
 }
 
+export interface PickRayOptions {
+    backend?: 'webgpu' | 'webgl2';
+}
+
 export function groundCell(size: Vec3, ray: GridRay): MutableVec3 | null;
 
-export function pickRay(matrix: ArrayLike<number>, x: number, y: number): GridRay | null;
+export function pickRay(matrix: ArrayLike<number>, x: number, y: number, options?: PickRayOptions): GridRay | null;
 
 export function raycastGrid(source: GridSource, ray: GridRay, maxDistance?: number): GridHit | null;
 

@@ -14414,7 +14414,7 @@
   "limitations": [
     "ETC1S ETC2,remaining encoders and public lazy TypeScript/worker/API integration remain incomplete. No prebuilt removal or full job2/3 acceptance.",
     "Source errors use the fixed stored-channel/exact-area reference, not a recreated original mip filter. Every pair improves aggregate SSE; individual mip errors are retained,not replaced.",
-    "No GPU lock request,benchmark,paired wall-clock A/B,startup timing or timing-only assertion at this checkpoint. Job4 timing stays deferred.",
+    "No the GPU run request,benchmark,paired wall-clock A/B,startup timing or timing-only assertion at this checkpoint. Job4 timing stays deferred.",
     "Size is the incomplete private Wasm only; final per-target/file peak memory and entry size remain owed.",
     "Inherited full verify13548pass is retained,not rerun or represented as new package integration acceptance. Fresh fetch now shows browser teardown repair cf699846f on origin/main; rebase and required shared correctness gates/push remain pending."
   ]

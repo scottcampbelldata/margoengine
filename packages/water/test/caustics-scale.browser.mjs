@@ -2,7 +2,7 @@
 // with no GPU validation error, and light the receiver. Work counts are asserted (beam triangles per frame, map bytes);
 // The range kernels must plan onto a GPU tier of the WebGL2 layer (a workgroup barrier put them on the JavaScript tier, 214 ms a
 // frame at the default size, 0.5 ms native). GPU frame time (timestamp-query) is a diagnostic whose targets live in docs/work-lists/speed-phase.md.
-// node scripts/gpu-lock.mjs run --owner=<you> --max=10 -- node packages/water/test/caustics-scale.browser.mjs
+// node scripts/run-with-timeout.mjs --max=10 -- node packages/water/test/caustics-scale.browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));

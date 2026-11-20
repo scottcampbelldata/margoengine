@@ -703,7 +703,7 @@ window.check = {
     device.destroy();
     return { parallel, first };
   },
-  /** Compat only: the first read-back loads a chunk, and what the queue gets meanwhile stays behind it. */
+  /** Compat only: whether the read-back chunk was still unloaded at the first copy, and the queue's order behind it. */
   async readbackOrder() {
     const device = await (await createCompatGPU().requestAdapter()).requestDevice();
     const t = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: U.COPY_SRC | U.COPY_DST }),

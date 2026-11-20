@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {openBrowser} from '../../../scripts/browser.js';
+import {legDevice} from '../../../scripts/support/compat-shim.js';
 const rows=[];
 for(const compat of [false,true]){
  const context=await openBrowser({startPath:'/packages/voxel-pathtracer/tests/mesh-lights.html',port:'free',...(compat&&process.platform==='win32'?{args:['--use-angle=vulkan']}:{})});
@@ -8,10 +9,10 @@ for(const compat of [false,true]){
  try{
   await context.page.waitForFunction(()=>window.ready,null,{timeout:120000});
   const result=await context.page.evaluate(c=>window.run(c),compat);
-  console.log(JSON.stringify({compat,hardware:context.hardware,result}));
+  console.log(JSON.stringify({compat,device:legDevice(compat,context.hardware),hardware:context.hardware,result}));
   assert.deepEqual(errors,[]);assert.deepEqual(result.errors,[]);assert.deepEqual(result.messages,[]);assert.equal(result.rows.length,6);
   for(const row of result.rows){assert.equal(row.finite,true,row.name);if(row.maximumError!==undefined)assert.ok(row.maximumError<row.bound,`${row.name}: ${row.maximumError}`);else{assert.ok(row.triangles>0);assert.equal(row.drawn,true);}}
-  rows.push({compat,hardware:context.hardware,result});
+  rows.push({compat,device:legDevice(compat,context.hardware),hardware:context.hardware,result});
  }finally{await context.close();}
 }
 await writeFile('test-results/voxel-pathtracer-mesh-lights.json',JSON.stringify(rows,null,2));

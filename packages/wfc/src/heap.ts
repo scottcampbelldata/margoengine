@@ -24,7 +24,7 @@ type Wasm = {
   release(p: number, n: number): void;
   solve(p: number): number;
 };
-const help = 'Help: https://margoengine.com/docs/wfc';
+const help = 'Help: https://margoengine.com/llms/packages/wfc.md';
 const offsets = [
   [1, 0, 0],
   [-1, 0, 0],

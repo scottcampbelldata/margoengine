@@ -69,7 +69,7 @@ async function tour(engine: EngineKernel) {
 
 The panel's Save button downloads the snapshot as `scene.json` and Load restores one. `restore` matches meshes by id,
 reports the ones that are gone (`missing`), changes nothing when the file is malformed or the engine rejects a value
-(a scale of 0), and does not recreate or reparent meshes. The Resources section counts what the engine draws, and Scene
+(a colour out of range), and does not recreate or reparent meshes. The Resources section counts what the engine draws, and Scene
 shader shows the WGSL of the latest WebGPU frame; both build their text only while open. Without the panel, import
 `EditHistory` from `margoengine/inspector/history`, `snapshotMeshes`/`restoreSnapshot`/`parseSnapshot` from
 `margoengine/inspector/snapshot` and `describeEngine` from `margoengine/inspector/resources`.
@@ -297,7 +297,7 @@ Serve the repository root so the included Fox GLB is available at the URL below.
 
 ```ts
 import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {Animation} from '@margoengine/animation';
 import {AnimationPanel} from '@margoengine/inspector/animation';
 const canvas = document.body.appendChild(document.createElement('canvas'));
@@ -395,7 +395,7 @@ tools.dispose(); engine.dispose(); canvas.remove();
 
 `margoengine/inspector/packages` edits what other packages attach, found by shape without importing them: core's sun and
 ambient, every light in a `clustered*` plugin's `list` (point, spot, directional, area), the glTF PBR materials of the
-scene's gltf-pro and FBX nodes (base colour, opacity, roughness, metallic, normal scale, occlusion, emissive, alpha
+scene's gltf/pbr and FBX nodes (base colour, opacity, roughness, metallic, normal scale, occlusion, emissive, alpha
 cutoff, double sided, wireframe), the `shadows` options (distance, cascade blend, light size, bias, normal bias, caster
 margin) and every other plugin's `options` numbers and switches (Bloom's strength, threshold, exposure and radius, say).
 An option the app never set shows its documented default; an undo back past the first edit unsets it again.

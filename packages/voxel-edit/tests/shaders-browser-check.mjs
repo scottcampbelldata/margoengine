@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel-edit/shaders (run from the repository root after building packages, one GPU job
-// at a time: node scripts/gpu-lock.mjs run --owner=voxel-edit-shaders -- node packages/voxel-edit/tests/shaders-browser-check.mjs):
+// at a time: node scripts/run-with-timeout.mjs -- node packages/voxel-edit/tests/shaders-browser-check.mjs):
 // the grow and erode presets match dilateGrid and erodeGrid cell for cell, also on 16.7 million cells; selections,
 // generation, smoothing, a user brush, a compile error with its line and abort; no WebGPU validation errors.
 import assert from 'node:assert/strict';

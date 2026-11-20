@@ -5,6 +5,7 @@ import type { ControlElement } from './controls.js';
 import { normalize, sub } from '@margoengine/math/vec3';
 import { madd, type V3 } from './math.js';
 import { rollFrame } from './view.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 
 /** Mesh or model whose triangles can shorten an orbit camera's arm. */
 export type OrbitCollider = Mesh | ModelLike;
@@ -51,9 +52,9 @@ export class OrbitControls extends Orbit {
     const clearance = options.clearance ?? 0.01,
       returnTime = options.returnTime ?? 0.2;
     if (!Number.isFinite(clearance) || clearance < 0 || !Number.isFinite(returnTime) || returnTime < 0)
-      throw new RangeError('Orbit collision clearance and returnTime must be finite and nonnegative');
+      throw rangeError('Orbit collision clearance and returnTime must be finite and nonnegative', 'controls-arguments');
     if (!engine || typeof engine.use !== 'function')
-      throw new TypeError('Orbit collision needs an Engine; pass the engine to attach');
+      throw typeError('Orbit collision needs an Engine; pass the engine to attach', 'controls-arguments');
     super(engine, options.element);
     this.colliders = options.colliders === undefined ? [] : options.colliders;
     this.clearance = clearance;
@@ -74,7 +75,7 @@ export class OrbitControls extends Orbit {
       !Number.isFinite(this.returnTime) ||
       this.returnTime < 0
     )
-      throw new RangeError('Orbit collision delta, clearance and returnTime must be finite and nonnegative');
+      throw rangeError('Orbit collision delta, clearance and returnTime must be finite and nonnegative', 'controls-arguments');
     const cam = this.camera,
       old = [...cam.position] as V3,
       oldTarget = [...cam.target] as V3;

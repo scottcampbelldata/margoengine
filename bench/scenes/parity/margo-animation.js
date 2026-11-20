@@ -20,7 +20,7 @@ export function gridAt(i, n, spacing) {
 /** One RobotExpressive load and n - 1 `cloneModel` copies, each placed on the grid with its own `Animation`. */
 export async function robotCrowd(engine, data) {
   const [{ loadGLTF }, { Animation }, { cloneModel }] = await Promise.all([
-    import('@margoengine/gltf-pro'),
+    import('@margoengine/gltf/pbr'),
     import('@margoengine/animation'),
     import('@margoengine/animation/skeleton-utils'),
   ]);
@@ -169,7 +169,7 @@ export const builders = {
       ),
       s = performance.now(),
       [{ loadGLTF }, { cloneModel }] = await Promise.all([
-        import('@margoengine/gltf-pro'),
+        import('@margoengine/gltf/pbr'),
         import('@margoengine/animation/skeleton-utils'),
       ]);
     const source = await loadGLTF(engine, data.url);
@@ -222,7 +222,7 @@ async function morphCopies(canvas, data, marks, compile) {
   const engine = await engineFor(canvas, data.camera, 4096, marks),
     s = performance.now(),
     [{ loadGLTF }, { Animation }, { cloneModel }] = await Promise.all([
-      import('@margoengine/gltf-pro'),
+      import('@margoengine/gltf/pbr'),
       import('@margoengine/animation'),
       import('@margoengine/animation/skeleton-utils'),
     ]);

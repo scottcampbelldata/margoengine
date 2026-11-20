@@ -31,6 +31,17 @@ window.checkOverLife=async()=>{
  const transform=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],rot=new VFX({...still,capacity:1,lifetime:[1,1],velocity:[2,0,0],space:{mode:'local',transform},overLife:{speed:[0,2]}});await ready(rot);rot.burst(1);step(rot);transform.splice(0,16,0,1,0,0,-1,0,0,0,0,0,1,0,0,0,0,1);step(rot);const rotated=await read(rot);rot.dispose();
  return {states,first,replay,capped,rotated,error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
 };
+// The spin curve turns the drawn sprite (birth angle + initial life x the curve's integral) while rotation.x stays the
+// birth angle; a sprite red on its left half and green on its right shows the drawn angle. A mesh draw takes it too.
+window.checkDrawnSpin=async()=>{
+ device.pushErrorScope('validation');const texture={width:2,height:1,data:new Uint8Array([255,0,0,255,0,255,0,255])};
+ const e=new VFX({...still,capacity:1,lifetime:[1,1],size:6,texture,overLife:{spin:[2,10]}});await ready(e);e.burst(1);const birth=[];
+ for(let i=0;i<5;i++){step(e);birth.push((await read(e))[12]);}const image=await picture(e);e.dispose();
+ const m=new VFX({...still,capacity:1,lifetime:[1,1],size:6,mesh:{positions:[1,1,1,1,-1,-1,-1,1,-1,-1,-1,1],indices:[0,1,2,0,3,1,0,2,3,1,3,2]},overLife:{spin:[2,10]}});await ready(m);m.burst(1);step(m);const meshImage=await picture(m);m.dispose();
+ let red=[0,0,0],green=[0,0,0];for(let y=0;y<64;y++)for(let x=0;x<64;x++){const k=(y*64+x)*4;red=[red[0]+image[k]*x,red[1]+image[k]*y,red[2]+image[k]];green=[green[0]+image[k+1]*x,green[1]+image[k+1]*y,green[2]+image[k+1]];}
+ const dx=green[0]/green[2]-red[0]/red[2],dy=green[1]/green[2]-red[1]/red[2];
+ return {birth,drawn:Math.atan2(-dy,dx),meshLit:meshImage.some((v,i)=>i%4===3&&v>0),error:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};
+};
 window.checkShapes=async()=>{
  device.pushErrorScope('validation');const results=[];
  for(const emitter of [{shape:'hemisphere',radius:2},{shape:'hemisphere',radius:2,shell:true},{shape:'cylinder',radius:2,height:4},{shape:'cylinder',radius:2,height:4,shell:true},{shape:'torus',radius:2,tube:0.5},{shape:'torus',radius:2,tube:0.5,shell:true},{shape:'rectangle-edge',width:4,height:2},{shape:'grid',columns:4,rows:3,layers:2,spacing:[1,2,3]}]){

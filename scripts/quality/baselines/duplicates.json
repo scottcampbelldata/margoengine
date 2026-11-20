@@ -26,10 +26,16 @@
       "commit": "1484a92e0",
       "reason": "own physics entry gains Physics and PhysicsBody",
       "grew": 2
+    },
+    {
+      "date": "2026-11-16",
+      "commit": "d796270bd",
+      "reason": "staging is renamed studio (Scott 2026-11-16): the environment | staging pair of planar.ts and index.ts is the same 12 lines under the new name",
+      "grew": 1
     }
   ],
   "items": {
-    "environment | staging": 12,
+    "environment | studio": 12,
     "reexport packages/stage/src/index.ts * from @margoengine/core": 1
   }
 }

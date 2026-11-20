@@ -1,5 +1,6 @@
 // Intersections for the Boolean operations: exact curves where a closed form exists (plane with plane, plane with
-// cylinder, parallel cylinders, and every pair of surfaces of revolution on one axis, which meet in circles), and
+// cylinder, a plane through the axis of a torus or a cone, parallel cylinders, and every pair of surfaces of
+// revolution on one axis, which meet in circles), and
 // curves traced point by point inside a box for every other pair, spline surfaces included (march.ts).
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { frameOf, type CurveDef, type SurfaceDef } from './geometry.js';
@@ -16,8 +17,9 @@ const parallel = (a: XYZ, b: XYZ) => length(cross(a, b)) <= 1e-12;
 
 /**
  * What two analytic surfaces share: curves, the same surface, or nothing. Exact where a closed form exists (plane with
- * plane, plane with cylinder, parallel cylinders, and surfaces of revolution on one axis: planes across it, spheres
- * centred on it, cylinders, cones and tori about it, which meet in circles); otherwise the curves are traced inside
+ * plane, plane with cylinder, a plane through the axis of a torus or a cone (its meridians), parallel cylinders, and
+ * surfaces of revolution on one axis: planes across it, spheres centred on it, cylinders, cones and tori about it,
+ * which meet in circles); otherwise the curves are traced inside
  * `box` (march.ts), which those pairs (and every pair with a spline surface) need. Surfaces that come within
  * `tolerance` of touching (a plane or a cylinder along a cylinder, surfaces about one axis along a circle, or two
  * traced surfaces at a point) are taken to touch: one line or circle where they run alongside, crossing curves where
@@ -29,6 +31,8 @@ export function intersectSurfaces(a: SurfaceDef, b: SurfaceDef, box?: Box3, tole
   if (a.kind === 'plane' && b.kind === 'plane') return planePlane(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z);
   const coaxial = revolutionPair(a, b, tolerance);
   if (coaxial) return coaxial;
+  const meridians = a.kind === 'plane' ? planeThroughAxis(a.frame.origin, a.frame.z, b) : undefined;
+  if (meridians) return meridians;
   if (a.kind === 'plane' && b.kind === 'cylinder')
     return planeCylinder(a.frame.origin, a.frame.z, b.frame.origin, b.frame.z, b.frame.x, b.radius, tolerance);
   if (a.kind === 'cylinder' && b.kind === 'cylinder' && parallel(a.frame.z, b.frame.z))
@@ -186,6 +190,40 @@ function planePlane(o1: XYZ, n1: XYZ, o2: XYZ, n2: XYZ): SurfaceIntersection {
     u = scale(direction, 1 / len),
     point = scale(add(scale(cross(n2, direction), d1), scale(cross(direction, n1), d2)), 1 / (len * len));
   return { kind: 'curves', curves: [{ kind: 'line', origin: point, direction: u }] };
+}
+
+/**
+ * A plane through the axis of a torus or a cone meets it in the profile it turns, mirrored across the axis: a torus in
+ * two circles (its tube's cross-sections, centred `major` either side of the axis, radius `minor`) and a cone in two
+ * lines through its apex. Exact, where the traced curves were splines that offsets, shells and drafts cannot move.
+ * Undefined for a plane off the axis (and a torus whose tube reaches its axis, whose circles meet there).
+ */
+function planeThroughAxis(o: XYZ, n: XYZ, s: SurfaceDef): SurfaceIntersection | undefined {
+  if (s.kind !== 'torus' && s.kind !== 'cone') return undefined;
+  const { origin, z } = s.frame,
+    size = 1 + Math.max(...origin.map(Math.abs), s.kind === 'torus' ? s.major + s.minor : s.radius);
+  if (Math.abs(dot(n, z)) > 1e-12 || Math.abs(dot(sub(origin, o), n)) > 1e-12 * size) return undefined;
+  const w = unit(cross(n, z))!;
+  if (s.kind === 'torus')
+    return s.major > s.minor
+      ? {
+          kind: 'curves',
+          curves: [1, -1].map((side) => ({
+            kind: 'circle',
+            frame: frameOf(add(origin, scale(w, side * s.major)), n),
+            radius: s.minor,
+          })),
+        }
+      : undefined;
+  // The radius grows by tan(angle) a unit along z: each line runs from the circle at the origin with that lean, and the
+  // two cross at the apex.
+  const lean = Math.tan(s.angle),
+    curves: CurveDef[] = [1, -1].map((side) => ({
+      kind: 'line',
+      origin: add(origin, scale(w, side * s.radius)),
+      direction: unit(add(z, scale(w, side * lean)))!,
+    }));
+  return lean !== 0 ? { kind: 'curves', curves, crossings: [sub(origin, scale(z, s.radius / lean))] } : { kind: 'curves', curves };
 }
 
 function planeCylinder(o: XYZ, n: XYZ, c: XYZ, axis: XYZ, x: XYZ, r: number, tolerance: number): SurfaceIntersection {

@@ -4,10 +4,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Animator, addFootPlacement } from '../packages/animator/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 const near = (a, b, tolerance, label) =>
   assert.ok(Math.abs(a - b) <= tolerance, `${label}: ${a} is not within ${tolerance} of ${b}`);

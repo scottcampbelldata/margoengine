@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Animation } from '@margoengine/animation';
 import { composeMatrix, invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
 import { splitTRS } from '@margoengine/math/quat';

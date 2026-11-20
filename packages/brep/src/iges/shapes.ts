@@ -132,6 +132,66 @@ export function polynomialCurve(breaks: readonly number[], coefficients: readonl
   return segs.length ? { kind: 'nurbs', n: fromBeziers({ p: 3, segs, breaks: [...breaks] }) } : undefined;
 }
 
+/** Bernstein coefficients over [0, h] of the cubic c0 + c1 s + c2 s^2 + c3 s^3: b_r = sum C(r,k) / C(3,k) c_k h^k. */
+const BERNSTEIN = [
+  [1, 0, 0, 0],
+  [1, 1 / 3, 0, 0],
+  [1, 2 / 3, 1 / 3, 0],
+  [1, 1, 1, 1],
+];
+
+/**
+ * A parametric spline surface (IGES 114, section 4.15 and Appendix B.5) as one bicubic B-spline surface, exactly its
+ * surface and parameters. Patch (i, j) holds per coordinate the 16 coefficients A, B, C, D, E, F, G, H, K, L, M, N, P,
+ * Q, R, S of s^a t^b in the order (a, b) = (0, 0), (1, 0), (2, 0), (3, 0), (0, 1), ..., (3, 3) (s = u - TU(i),
+ * t = v - TV(j)), X then Y then Z. Each patch becomes a bicubic Bezier patch over its rectangle; the patches meet on
+ * knots of multiplicity 3, so the net is (3 M + 1) by (3 N + 1). Neighbouring patches must agree on their shared edge
+ * (the specification's surface is continuous): `gap` is the largest distance between the control points two patches
+ * give the same place, which the caller checks against its tolerance; the net takes their mean.
+ */
+export function polynomialSurface(
+  tu: readonly number[],
+  tv: readonly number[],
+  patch: (i: number, j: number) => readonly number[],
+): { surface: NurbsSurface; gap: number } | undefined {
+  const M = tu.length - 1,
+    N = tv.length - 1;
+  if (M < 1 || N < 1) return undefined;
+  for (const t of [tu, tv]) for (let i = 1; i < t.length; i++) if (!(t[i] > t[i - 1])) return undefined;
+  const nu = 3 * M + 1,
+    nv = 3 * N + 1,
+    sum = Array.from({ length: nu * nv }, () => [0, 0, 0] as V3),
+    first: (V3 | undefined)[] = new Array(nu * nv),
+    count = new Array<number>(nu * nv).fill(0);
+  let gap = 0;
+  for (let i = 0; i < M; i++)
+    for (let j = 0; j < N; j++) {
+      const hu = tu[i + 1] - tu[i],
+        hv = tv[j + 1] - tv[j],
+        c = patch(i, j);
+      for (let r = 0; r <= 3; r++)
+        for (let q = 0; q <= 3; q++) {
+          const p: V3 = [0, 0, 0];
+          for (let k = 0; k <= r; k++)
+            for (let l = 0; l <= q; l++) {
+              const f = BERNSTEIN[r][k] * BERNSTEIN[q][l] * hu ** k * hv ** l;
+              for (let x = 0; x < 3; x++) p[x] += f * c[16 * x + 4 * l + k];
+            }
+          const at = (3 * j + q) * nu + 3 * i + r,
+            was = first[at];
+          if (was) gap = Math.max(gap, dist(was, p));
+          else first[at] = p;
+          for (let x = 0; x < 3; x++) sum[at][x] += p[x];
+          count[at]++;
+        }
+    }
+  const knots = (t: readonly number[]) => [t[0], ...t.flatMap((x) => [x, x, x]), t[t.length - 1]];
+  return {
+    surface: { pu: 3, pv: 3, U: knots(tu), V: knots(tv), nu, nv, P: sum.map((s, k) => mul(s, 1 / count[k])) },
+    gap,
+  };
+}
+
 /** Whether a curve's B-spline runs with its IGES parameter: true except for conic pieces (an angle there). */
 const native = (c: Curve3): boolean => c.kind !== 'conic' && (c.kind !== 'chain' || c.parts.every(native));
 const isCircle = (c: Curve3) =>

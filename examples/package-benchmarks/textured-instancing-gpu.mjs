@@ -1,4 +1,4 @@
-// Real-GPU check of textured instancing (run on AC power, holding the GPU lock, after npm run build:packages):
+// Real-GPU check of textured instancing (run on AC power, after npm run build:packages):
 //   node examples/package-benchmarks/textured-instancing-gpu.mjs
 // 1. Frame equality: 144 textured boxes (rotated, scaled, two mirrored; per-box tint and atlas region) under shadows,
 //    clustered lights, SSAO, IBL and fog, drawn as 144 materials meshes and as one createInstancedMesh; and a generated

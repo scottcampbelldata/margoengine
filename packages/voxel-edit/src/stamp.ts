@@ -249,19 +249,33 @@ export function pasteCells(
     assignments: { from: number; to: number }[] = [];
   let needed = 0,
     free = 0;
+  // Identity matches first, so a new slot never takes a slot whose identity a later clip index would have matched.
+  const fresh: number[] = [];
   for (const source of new Set(placed.map(([, value]) => value))) {
-    const identity = options.clipKeys[source];
-    let index =
-      identities[source] === identity ? source : identities.findIndex((key, slot) => slot > 0 && key === identity);
-    if (index < 1) {
-      needed++;
-      index = 1;
-      while (index < 256 && used.has(index)) index++;
-      if (index === 256) continue;
-      free++;
-      identities[index] = identity;
-      assignments.push({ from: source, to: index });
+    const identity = options.clipKeys[source],
+      index =
+        identities[source] === identity ? source : identities.findIndex((key, slot) => slot > 0 && key === identity);
+    if (index < 1) fresh.push(source);
+    else {
+      used.add(index);
+      paletteMap[source] = index;
     }
+  }
+  for (const source of fresh) {
+    const identity = options.clipKeys[source],
+      // A clip identity listed twice in the clip palette shares the slot the first one took.
+      earlier = identities.findIndex((key, slot) => slot > 0 && key === identity);
+    if (earlier > 0) {
+      paletteMap[source] = earlier;
+      continue;
+    }
+    needed++;
+    let index = 1;
+    while (index < 256 && used.has(index)) index++;
+    if (index === 256) continue;
+    free++;
+    identities[index] = identity;
+    assignments.push({ from: source, to: index });
     used.add(index);
     paletteMap[source] = index;
   }

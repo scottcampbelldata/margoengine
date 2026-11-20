@@ -2,7 +2,8 @@
 import { applyView } from '../../shared/view-rect.js';
 // Solid or vertical-gradient background color.
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import { engineRuntime, type FrameGraph, type FramePass, type PassContext } from '@margoengine/core/extension';
+
 import {
   type ColorInput,
   LinearToSRGB as linearToSrgb,
@@ -12,6 +13,9 @@ import {
 } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
 import { linearHdr } from '../../shared/hdr-format.js';
+
+/** The marker of a background pass (shared through the global symbol registry, so no module import is needed). */
+const BACKGROUND_PASS = Symbol.for('margoengine.background-pass');
 
 export type { ColorInput } from '@margoengine/math/color';
 
@@ -74,7 +78,7 @@ export interface ColorBackgroundOptions {
   color?: ColorInput;
   /** Optional color at the bottom of the viewport for a vertical gradient. */
   bottom?: ColorInput;
-  /** Frame graph order; must run after core's main pass (order 0). Default 0.5, before glTF-pro models (1). */
+  /** Frame graph order; must run after core's main pass (order 0). Default 0.5, before glTF PBR models (1). */
   order?: number;
   /** Plugin and pass name. Default 'background'. */
   name?: string;
@@ -162,7 +166,9 @@ export class ColorBackground {
       execute: (c) => {
         if (c.backend === 'webgpu') this.record(c);
       },
-    });
+      // Marks a background pass, so a capture with its own background (CubeCamera `background`) skips it.
+      [BACKGROUND_PASS]: true,
+    } as FramePass);
   }
   onDeviceRestored(): void {
     this.release();

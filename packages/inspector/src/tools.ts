@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Camera, type Engine, type EnginePlugin } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { CanvasRecording, CanvasRecordingOptions } from '@margoengine/video/record';
 import { fault } from '../../shared/errors.js';
 
@@ -261,7 +261,7 @@ export class CameraTools implements EnginePlugin {
         index = Number(id.slice(id.lastIndexOf(':') + 1));
       if (!model || !Number.isInteger(index) || !model.cameras[index])
         throw new RangeError('Use an id from CameraTools.list()');
-      const { viewGLTFCamera } = await waitFor(import('@margoengine/gltf-pro'), this.controller.signal);
+      const { viewGLTFCamera } = await waitFor(import('@margoengine/gltf/pbr'), this.controller.signal);
       this.signal();
       if (!this.models().includes(model))
         throw fault('disposed', 'The selected camera model is no longer available; select a live camera');

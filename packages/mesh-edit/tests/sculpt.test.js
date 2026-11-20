@@ -174,6 +174,29 @@ test('dynamic topology collapses edges where detail is coarser, and open edges s
   assert.equal(edgeOf(session.mesh()), edgeOf(mesh));
 });
 
+test('regression: dynamic topology leaves no stretched edge after a grab many radii long', () => {
+  // A 2.0 pull with radius 0.3 once left edges six times the detail size: the end of the stroke only remeshed
+  // within 1.25 radii of where the grab started, and the dragged part was far beyond that.
+  const mesh = sheet(4),
+    detail = 0.1,
+    session = new MeshSculptSession(mesh, { createId, dynamicTopology: true, detailSize: detail, radius: 0.3 }),
+    count = session.triangleCount,
+    hit = session.pick([0, 5, 0], [0, -1, 0]);
+  session.beginStroke({ brush: 'grab', strength: 1 });
+  session.dab(hit.point);
+  for (let k = 1; k <= 20; k++) session.dab([hit.point[0], hit.point[1] + (2 * k) / 20, hit.point[2]]);
+  session.endStroke();
+  const out = session.mesh();
+  compilePolygonMesh(out);
+  assert.ok(Math.max(...out.vertices.map((p) => p[1])) > 1.95);
+  for (const edge of polygonMeshEdges(out)) {
+    const [a, b] = edge.vertices.map((v) => out.vertices[v]);
+    assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= (detail * 4) / 3 + 1e-12, `edge ${edge.id}`);
+  }
+  assert.equal(session.undo(), true);
+  assert.equal(session.triangleCount, count);
+});
+
 test('undo and redo cover strokes, with topology, and honor the limit', () => {
   const ball = sphere(),
     session = new MeshSculptSession(ball, {

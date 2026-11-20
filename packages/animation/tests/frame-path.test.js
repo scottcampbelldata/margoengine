@@ -159,7 +159,7 @@ test('frames re-check morph widths without the validate pass and its Map; the gr
   m.dispose();
 });
 
-test('a zero scale key still throws core setScale error from the frame path', async () => {
+test('KB-GLTFA B1: a zero scale key flattens the node from the frame path', async () => {
   using e = await engine();
   const m = model(e, animatorGLB(robot)),
     a = new Animation(m);
@@ -170,17 +170,11 @@ test('a zero scale key still throws core setScale error from the frame path', as
   track.path = 'scale';
   track.values = new Float32Array(track.values.length);
   a.clip = clip;
-  let expected;
-  try {
-    m.nodes[track.node].setScale([0, 0, 0]);
-  } catch (error) {
-    expected = error;
-  }
-  assert.ok(expected, 'core rejects a zero scale');
-  assert.throws(
-    () => a.seek(0),
-    (error) => error.constructor === expected.constructor && error.message === expected.message,
-  );
+  a.seek(0);
+  const node = m.nodes[track.node];
+  assert.deepEqual([node.scale.x, node.scale.y, node.scale.z], [0, 0, 0]);
+  e.store.tick(false);
+  assert.ok(Array.from(node.matrix).every(Number.isFinite));
   a.dispose();
   m.dispose();
 });

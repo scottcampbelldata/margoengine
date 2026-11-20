@@ -103,8 +103,9 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/').replac
     console.error(
       `Wall-clock budgets in checks measure the machine's other work. For code speed use cpuTimer() from scripts/support/cpu-budget.mjs, or move the budget to a bench. For a bound on a wait, keep it far from normal and mark it // wall-clock: <reason>.\n${problems.join('\n')}`,
     );
-    process.exit(1);
+    process.exitCode = 1;
+  } else {
+    const total = Object.values(baseline.files).reduce((sum, n) => sum + n, 0);
+    console.log(`wall-clock budgets: none new (${total} known in ${Object.keys(baseline.files).length} files)`);
   }
-  const total = Object.values(baseline.files).reduce((sum, n) => sum + n, 0);
-  console.log(`wall-clock budgets: none new (${total} known in ${Object.keys(baseline.files).length} files)`);
 }

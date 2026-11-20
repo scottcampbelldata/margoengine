@@ -4,7 +4,7 @@ import { parseUSDA } from '../dist/index.js';
 import { parseUSDFiles } from '../dist/compose.js';
 import { previewSurface } from '../dist/preview-surface.js';
 import { curves } from '../dist/curves.js';
-import { GLTFAsset } from '@margoengine/gltf-pro/asset';
+import { GLTFAsset } from '@margoengine/gltf/asset';
 import { previewReaderFixture } from './preview-fixture.js';
 
 const mesh = `def Mesh "M" { uniform token subdivisionScheme="none" rel material:binding=</Mat> int[] faceVertexCounts=[3] int[] faceVertexIndices=[0,1,2] point3f[] points=[(-1,-1,0),(1,-1,0),(0,1,0)]

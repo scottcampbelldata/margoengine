@@ -1,5 +1,5 @@
-// Real-adapter check of computeReadback (run from the repository root after building packages, under the GPU lock):
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node packages/shader/test/readback-check.mjs
+// Real-adapter check of computeReadback (run from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/shader/test/readback-check.mjs
 // One dispatch reads 4,194,304 u32 back exactly; a job on an engine that renders no frame; abort right after submit
 // and while mapping; engine disposal and device loss right after submit and while mapping; a pipeline that fails
 // validation. Every settled job destroyed its readback and uniform buffers, and no GPU error escaped its scope.

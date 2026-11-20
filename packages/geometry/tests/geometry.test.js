@@ -1136,6 +1136,8 @@ test('consumers tree-shake to what they import', async (t) => {
   const folder = await mkdtemp(join(tmpdir(), 'margoengine-geometry-shake-'));
   t.after(() => rm(folder, { recursive: true, force: true }));
   let n = 0;
+  // No `external`: a /margoengine-core/ pattern here matched no import, only a checkout folder whose name has it (the
+  // entry itself was then external and every bundle empty), so core is bundled as it always was.
   const bundle = async (code) => {
     const file = join(folder, `entry${n++}.js`);
     await writeFile(file, code);
@@ -1147,7 +1149,6 @@ test('consumers tree-shake to what they import', async (t) => {
         write: false,
         minify: true,
         lib: { entry: file, formats: ['es'], fileName: 'entry' },
-        rollupOptions: { external: [/margoengine-core/] },
       },
     });
     return (Array.isArray(out) ? out[0] : out).output[0].code;

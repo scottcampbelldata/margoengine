@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { distDir } from './support/dist-dir.mjs';
 
 const declaration = (path) => path.replace(/\.(m|c)?js$/, (_, kind = '') => `.d.${kind}ts`);
 const inside = (directory, path) => {
@@ -147,9 +148,9 @@ export function guardOptionalPeers(filename, text, manifest) {
 }
 
 /** Keep shared type dependencies inside the files shipped by an individual npm package. Runtime modules are untouched. */
-export async function packageDeclarations(root) {
-  const dist = resolve(root, 'dist'),
-    shared = resolve(root, '../shared'),
+export async function packageDeclarations(root, dist = distDir(root)) {
+  dist = resolve(dist);
+  const shared = resolve(root, '../shared'),
     visited = new Set();
   const manifestFile = join(root, 'package.json'),
     manifest = existsSync(manifestFile) ? JSON.parse(await readFile(manifestFile, 'utf8')) : null;
@@ -196,9 +197,9 @@ export async function packageDeclarations(root) {
  * copies every packages/shared module their dist JavaScript imports (and the shared modules those import) to
  * dist/shared and points the imports there, so the packed package runs without the repository around it.
  */
-export async function packageRuntime(root) {
-  const dist = resolve(root, 'dist'),
-    shared = resolve(root, '../shared'),
+export async function packageRuntime(root, dist = distDir(root)) {
+  dist = resolve(dist);
+  const shared = resolve(root, '../shared'),
     visited = new Set();
   async function visit(source, destination) {
     if (visited.has(source)) return;

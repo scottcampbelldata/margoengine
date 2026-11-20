@@ -1,6 +1,6 @@
 // Real-GPU check for fog on water, VFX particles, Gaussian splats, points/sprites and lines (setFog), and for lines'
-// SkeletonHelper. Run under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=fog-all -- node scripts/fog-all-gpu-check.js [--baseline]
+// SkeletonHelper. Run:
+//   node scripts/run-with-timeout.mjs -- node scripts/fog-all-gpu-check.js [--baseline]
 // --baseline records the unfogged images of the current dist (run it on the dist from before a change); a later run
 // requires its unfogged images to equal them bit for bit, and with none on disk says which it did not compare. Each fogged
 // image G is checked against U + a (F - U): U the
@@ -10,10 +10,8 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
-import { acquire } from './gpu-lock.mjs';
 
-const release = await acquire({ owner: 'fog-all-gpu-check' }),
-  baseline = process.argv.includes('--baseline'),
+const baseline = process.argv.includes('--baseline'),
   only = process.argv
     .find((arg) => arg.startsWith('--kinds='))
     ?.slice(8)
@@ -213,5 +211,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.fogFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

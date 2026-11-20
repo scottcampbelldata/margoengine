@@ -6,9 +6,13 @@ import { ArcballControls } from '../dist/arcball.js';
 import { DragControls } from '../dist/drag.js';
 import { FakeElement, camera } from './control-fakes.js';
 import { controlReplay } from './workcount-replay.js';
+import { withExactMath } from '../../../tests/support/exact-math.js';
 
+// The replay runs with exactly specified trigonometry, exp and log (tests/support/exact-math.js): Math's own are
+// implementation-approximated and differ in the last bit between x64 and arm64, which changed this hash on an arm64
+// Mac with the code unchanged. The parent of the work-count change gives the same hash.
 test('controls preserve every replayed camera and transform byte from the pre-workcount implementation', async () => {
-  assert.equal(await controlReplay(), 'bab1b21b918c4d8f593bd9b63e2934e782211e421b3b37a00023756bf56904fd');
+  assert.equal(await withExactMath(() => controlReplay()), '96c8b474b114c21c95be238b08ba81da54c858d456756ef6c88b7157b89cf062');
 });
 
 test('arcball does not rebuild the screen basis on 10000 idle follow-up updates', () => {

@@ -1,7 +1,7 @@
 import { rangeError } from '../../shared/errors.js';
 import {
   bindTransfer,
-  TransferFunction,
+  type TransferFunction,
   transferPreset,
   type TransferHistogram,
   type TransferWidget,
@@ -31,6 +31,8 @@ export function transferEditor(
   options: TransferEditorOptions = {},
 ): TransferEditor {
   options.signal?.throwIfAborted();
+  if (options.histogram && options.histogram.counts.length !== options.histogram.bins[0] * options.histogram.bins[1])
+    throw rangeError('Histogram counts must match its bins; regenerate the histogram', 'sciviz');
   const doc = parent.ownerDocument,
     root = doc.createElement('section');
   root.setAttribute('aria-label', 'Volume transfer function editor');
@@ -387,17 +389,17 @@ export function transferEditor(
       s = tf.state,
       x = (event.clientX - r.left) / r.width,
       y = 1 - (event.clientY - r.top) / r.height;
-    const candidates =
+    // A 2D widget is picked by its drawn shape: distance to the shape (0 inside it), then distance to its centre
+    // among the shapes that hold the click. A point is picked by distance.
+    const scores =
       s.mode === '2d'
-        ? (s.widgets ?? []).map((w) => {
-            const f = frame(w);
-            return [(f[0] - s.range[0]) / (s.range[1] - s.range[0]), f[1] / s.gradientMax];
-          })
-        : s.points.map((p) => [(p.value - s.range[0]) / (s.range[1] - s.range[0]), p.rgba[3]]);
-    if (!candidates.length) return;
-    selected = candidates
-      .map((p) => (p[0] - x) ** 2 + (p[1] - y) ** 2)
-      .reduce((best, d, i, a) => (d < a[best] ? i : best), 0);
+        ? (s.widgets ?? []).map((w) => widgetScore(w, s.range, s.gradientMax, x, y))
+        : s.points.map((p) => [0, Math.hypot((p.value - s.range[0]) / (s.range[1] - s.range[0]) - x, p.rgba[3] - y)]);
+    if (!scores.length) return;
+    selected = scores.reduce(
+      (best, d, i, a) => (d[0] < a[best][0] || (d[0] === a[best][0] && d[1] < a[best][1]) ? i : best),
+      0,
+    );
     previous = [x, y];
     canvas.setPointerCapture(event.pointerId);
     draw();
@@ -429,19 +431,8 @@ export function transferEditor(
       );
     }
   });
-  if (options.histogram && options.histogram.counts.length !== options.histogram.bins[0] * options.histogram.bins[1]) {
-    root.remove();
-    throw rangeError('Histogram counts must match its bins; regenerate the histogram', 'sciviz');
-  }
-  const binding = options.layer
-    ? bindTransfer(options.layer, tf, { render: options.render, signal: options.signal })
-    : undefined;
-  listen(tf, 'change', () => {
-    draw();
-    if (!binding) options.render?.();
-  });
-  draw();
-  let disposed = false;
+  let binding: ReturnType<typeof bindTransfer> | undefined,
+    disposed = false;
   const dispose = () => {
     if (disposed) return;
     disposed = true;
@@ -450,6 +441,65 @@ export function transferEditor(
     root.remove();
     options.signal?.removeEventListener('abort', dispose);
   };
+  // Creation is transactional: a binding that cannot apply (a disposed layer) or a first draw that fails leaves no
+  // editor in the parent, no listener on the function and the volume's own classification.
+  try {
+    binding = options.layer
+      ? bindTransfer(options.layer, tf, { render: options.render, signal: options.signal })
+      : undefined;
+    listen(tf, 'change', () => {
+      draw();
+      if (!binding) options.render?.();
+    });
+    draw();
+  } catch (error) {
+    dispose();
+    throw error;
+  }
   options.signal?.addEventListener('abort', dispose, { once: true });
   return { element: root, dispose, [Symbol.dispose]: dispose };
+}
+
+/** Distance from (x, y) to a widget's drawn shape (0 inside) and to its centre, in the canvas's unit square. */
+function widgetScore(
+  w: TransferWidget,
+  range: readonly [number, number],
+  gradientMax: number,
+  x: number,
+  y: number,
+): [number, number] {
+  const u = (v: number) => (v - range[0]) / (range[1] - range[0]),
+    g = (v: number) => v / gradientMax;
+  if (w.kind === 'rectangle') {
+    const x0 = u(w.bounds[0]),
+      x1 = u(w.bounds[1]),
+      y0 = g(w.bounds[2]),
+      y1 = g(w.bounds[3]);
+    return [
+      Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(y0 - y, 0, y - y1)),
+      Math.hypot((x0 + x1) / 2 - x, (y0 + y1) / 2 - y),
+    ];
+  }
+  if (w.kind === 'gaussian') {
+    const dx = x - u(w.center[0]),
+      dy = y - g(w.center[1]),
+      d = Math.hypot(dx, dy),
+      // The drawn ellipse has radii sigma; along the ray from the centre its edge is at d / e.
+      e = Math.hypot(dx / (w.sigma[0] / (range[1] - range[0])), dy / (w.sigma[1] / gradientMax));
+    return [e > 1 ? d * (1 - 1 / e) : 0, d];
+  }
+  const p = w.vertices.map((v) => [u(v[0]), g(v[1])]),
+    cross = (a: number[], b: number[]) => (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]),
+    sides = [cross(p[0], p[1]), cross(p[1], p[2]), cross(p[2], p[0])],
+    inside = sides.every((c) => c >= 0) || sides.every((c) => c <= 0);
+  const edge = (a: number[], b: number[]) => {
+    const ex = b[0] - a[0],
+      ey = b[1] - a[1],
+      t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / (ex * ex + ey * ey || 1)));
+    return Math.hypot(a[0] + t * ex - x, a[1] + t * ey - y);
+  };
+  return [
+    inside ? 0 : Math.min(edge(p[0], p[1]), edge(p[1], p[2]), edge(p[2], p[0])),
+    Math.hypot((p[0][0] + p[1][0] + p[2][0]) / 3 - x, (p[0][1] + p[1][1] + p[2][1]) / 3 - y),
+  ];
 }

@@ -7,6 +7,7 @@ export interface RegionOptions {
     base?: RegionWeather;
     fronts?: readonly WeatherFront[];
     cells?: readonly WeatherCell[];
+    storms?: readonly WeatherStorm[];
 }
 
 export type RegionWeather = WeatherPresetName | Partial<WeatherState>;
@@ -38,9 +39,12 @@ export class WeatherRegions implements Disposable {
     set base(value: RegionWeather);
     get fronts(): readonly WeatherFront[];
     get cells(): readonly WeatherCell[];
+    get storms(): readonly WeatherStorm[];
     addFront(front: WeatherFront): () => void;
     addCell(cell: WeatherCell): () => void;
+    addStorm(storm: WeatherStorm): () => void;
     update(delta: number): this;
+    advanceTime(delta: number): void;
     arrival(front: WeatherFront, x: number, z: number, t?: number): number;
     stateAt(x: number, z: number, t?: number): WeatherState;
     apply(machine: {
@@ -48,6 +52,12 @@ export class WeatherRegions implements Disposable {
     }, x: number, z: number): WeatherState;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+export interface WeatherStorm {
+    weatherAt(x: number, z: number, t: number): Partial<WeatherState> & {
+        readonly weight: number;
+    };
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -64,5 +74,11 @@ interface WeatherState {
     cloud: number;
     fog: number;
     lightning: number;
+    dust: number;
+    smoke: number;
+    ash: number;
+    spray: number;
+    humidity: number;
+    temperature: number;
 }
 ```

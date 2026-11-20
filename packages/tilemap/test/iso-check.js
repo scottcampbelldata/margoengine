@@ -180,6 +180,71 @@ window.check = {
       { x: -2, y: -4, zoom: 2 },
     );
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
+
+    // A lost device (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): a plain GPUTexture atlas or
+    // target is reported once through engine.onError and the frame goes on without it; setAtlas with a function form
+    // and setTarget bring the maps back.
+    {
+      const upload = (device, source) => {
+          const texture = device.createTexture({
+            size: [source.width, source.height],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture }, source.data, { bytesPerRow: source.width * 4 }, [
+            source.width,
+            source.height,
+          ]);
+          return texture;
+        },
+        targetOf = (device) =>
+          device.createTexture({ size: [8, 8], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT }),
+        groundMap = { ...isoMap, layers: isoMap.layers.slice(0, 1) },
+        camera = { x: -4, y: -10, zoom: 1 },
+        previous = engine.gpu,
+        onCanvas = GridTileMap.attach(instance, {
+          map: groundMap,
+          atlases: { floor: upload(previous, floor), wall },
+          camera,
+        }),
+        offCanvas = GridTileMap.attach(instance, {
+          map: groundMap,
+          atlases: { floor, wall },
+          target: targetOf(previous),
+          order: 11,
+        }),
+        whole = paint(groundMap, { floor, wall }, camera),
+        none = paint({ ...groundMap, layers: [] }, { floor, wall }, camera),
+        loss = { before: compare(frame(), whole).count };
+      previous.destroy();
+      await previous.lost;
+      await engine.rebootDevice();
+      engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+      const reports = [],
+        onError = engine.onError;
+      engine.onError = (error) => reports.push(error);
+      loss.frames = [];
+      try {
+        // fixed-wait: three frames drawn on purpose, each must draw past the lost texture, not a readiness wait
+        for (let i = 0; i < 3; i++) loss.frames.push(compare(frame(), none).count);
+      } catch (error) {
+        loss.thrown = error.message;
+      }
+      engine.onError = onError;
+      loss.reports = reports.map((error) => [error.code, error.message]);
+      const made = [];
+      onCanvas.setAtlas('floor', (device) => {
+        made.push(device);
+        return upload(device, floor);
+      });
+      offCanvas.setTarget(targetOf(engine.gpu));
+      loss.after = compare(frame(), whole).count;
+      frame();
+      loss.functionCalls = made.length;
+      onCanvas.dispose();
+      offCanvas.dispose();
+      out.loss = loss;
+    }
     out.errors = errors;
     return out;
   },

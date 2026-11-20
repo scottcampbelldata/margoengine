@@ -1,5 +1,5 @@
 import { createStage } from 'margoengine';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { OrbitControls } from '@margoengine/controls';
 import { sceneSamples } from '../packages/shared/quality.js';
 import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/quality';

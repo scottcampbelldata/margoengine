@@ -138,6 +138,7 @@ export interface DAEGeometry extends LoadedGeometry {
     groups: DAEGroup[];
     faceSizes: Uint32Array;
     positionIndices: Uint32Array;
+    lines?: DAELines;
 }
 
 export interface DAEGroup extends LoadedGroup {
@@ -247,7 +248,7 @@ export interface DAENode {
     children: DAENode[];
 }
 
-export interface DAEParseOptions extends ParseLimits {
+export interface DAEParseOptions extends ParseLimits, XMLExternalOptions {
 }
 
 export interface DAEPose {
@@ -362,6 +363,19 @@ export interface FetchOptions {
     maxBytes?: number;
     fetch?: typeof fetch;
     init?: RequestInit;
+    protocols?: readonly string[];
+    publicOnly?: boolean;
+    allowHost?: (hostname: string, url: URL) => boolean;
+    maxRedirects?: number;
+    accept?: readonly string[];
+}
+
+export interface FetchedResource {
+    bytes: Uint8Array;
+    url: string;
+    type: string;
+    status: number;
+    redirects: number;
 }
 
 export interface LoadedDAE {
@@ -387,6 +401,7 @@ export interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -415,6 +430,8 @@ export interface LoadedOBJ extends LoadedGeometry {
     materialLibraries: string[];
     materials: MTLMaterial[];
     images: string[];
+    pointIndices: Uint32Array;
+    lineIndices: Uint32Array;
     extras: OBJStatement[];
     warnings: string[];
 }
@@ -437,7 +454,13 @@ export interface LoadedTMX {
 export class LoaderError extends Error {
     readonly format: string;
     readonly code: LoaderErrorCode;
-    constructor(format: string, code: LoaderErrorCode, message: string);
+    readonly status?: number;
+    readonly retryAfter?: number;
+    constructor(format: string, code: LoaderErrorCode, message: string, options?: {
+        cause?: unknown;
+        status?: number;
+        retryAfter?: number;
+    });
 }
 
 export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch' | 'url';
@@ -567,9 +590,23 @@ export interface PointsToGeometryOptions {
     maxPoints?: number;
 }
 
+export type STLColor = [r: number, g: number, b: number, a: number];
+
+export interface STLGeometry extends LoadedGeometry {
+    materialise?: STLMaterialise;
+}
+
+export interface STLMaterialise {
+    color?: STLColor;
+    diffuse?: STLColor;
+    specular?: STLColor;
+    ambient?: STLColor;
+}
+
 export interface STLOptions extends ParseLimits {
     weld?: boolean;
     signal?: AbortSignal;
+    colorVariant?: 'auto' | 'viscam' | 'materialise';
 }
 
 export const THREEMF_UNITS: Readonly<Record<string, number>>;
@@ -606,7 +643,7 @@ export interface TMXObjectLayer extends TMXLayerCommon {
     objects: TMXObject[];
 }
 
-export interface TMXParseOptions {
+export interface TMXParseOptions extends XMLExternalOptions {
     resolve?: AssetResolver;
     signal?: AbortSignal;
 }
@@ -632,6 +669,10 @@ export interface TMXTileset {
     margin: number;
     columns: number;
     tilecount: number;
+    tileoffset: {
+        x: number;
+        y: number;
+    };
     image?: {
         path: string;
         width: number;
@@ -645,7 +686,7 @@ export interface TMXTilesetRef {
     tileset: number;
 }
 
-export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
+export interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
     signal?: AbortSignal;
@@ -766,9 +807,13 @@ export function faceNormal(positions: ArrayLike<number>, a: number, b: number, c
 
 export function fetchBytes(url: string | URL, options?: FetchOptions): Promise<Uint8Array>;
 
+export function fetchResource(url: string | URL, options?: FetchOptions): Promise<FetchedResource>;
+
 export function flattenDAE(dae: LoadedDAE, pose?: DAEPose): LoadedGeometry & {
     faceSizes: Uint32Array;
 };
+
+export function isPrivateHost(hostname: string): boolean;
 
 export function load<T, O extends object = object>(url: string | URL, parse: (input: Uint8Array, options?: O) => T | Promise<T>, options?: O & FetchOptions): Promise<T>;
 
@@ -796,7 +841,7 @@ export function parsePLY(input: BinaryInput, options?: PLYOptions): LoadedGeomet
 
 export function parsePLYHeader(input: BinaryInput): PLYHeader;
 
-export function parseSTL(input: BinaryInput, options?: STLOptions): LoadedGeometry;
+export function parseSTL(input: BinaryInput, options?: STLOptions): STLGeometry;
 
 export function parseTMX(input: BinaryInput | string, options?: TMXParseOptions): Promise<LoadedTMX>;
 
@@ -833,7 +878,21 @@ export function toGeometry(loaded: LoadedGeometry, options?: ToGeometryOptions):
 
 // Not exported from this entry, but used by the exports above:
 
+interface DAELines {
+    positions: Float32Array;
+    colors?: Float32Array;
+    positionIndices: Uint32Array;
+    indices: Uint32Array;
+    groups: DAEGroup[];
+}
+
 type ScalarType = 'int8' | 'uint8' | 'int16' | 'uint16' | 'int32' | 'uint32' | 'float32' | 'float64';
 
 type Value = USDValue;
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
+}
 ```

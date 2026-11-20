@@ -715,6 +715,81 @@ window.runPointTests = async () => {
   await settle(runtime.gpu);
   report.checks.push('engine.rebootDevice() rebuilds point buffers, sprite buffers and textures');
 
+  // 10b. A caller's GPUTexture map (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): a function is
+  // called once per device; a plain texture held at a restore is reported once through onError and its cloud draws
+  // untextured (white) while the frame goes on, until the map setter gets a new one.
+  const paint = (device) => {
+    const texture = device.createTexture({
+      size: [1, 1],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture({ texture }, new Uint8Array([255, 0, 0, 255]), { bytesPerRow: 4 }, [1, 1]);
+    return texture;
+  };
+  const made = [],
+    plainMap = points.add(new PointCloud({ positions: [3, 0, 0], material: { size: 8, map: paint(runtime.gpu) } })),
+    madeMap = points.add(
+      new PointCloud({
+        positions: [0, 3, 0],
+        material: {
+          size: 8,
+          map: (device) => {
+            made.push(device);
+            return paint(device);
+          },
+        },
+      }),
+    );
+  image = await frame();
+  const mapsBefore = [count(image, white), count(image, red)];
+  await settle(runtime.gpu);
+  await engine.rebootDevice();
+  watch(runtime.gpu);
+  const reports = [],
+    onError = runtime.onError;
+  runtime.onError = (error) => reports.push(error);
+  const mapsLost = [];
+  // fixed-wait: three frames drawn on purpose, each must draw with the lost map and report it once, not a readiness wait
+  for (let i = 0; i < 3; i++) {
+    image = await frame();
+    mapsLost.push([count(image, white), count(image, red)]);
+  }
+  runtime.onError = onError;
+  plainMap.material.map = paint(runtime.gpu);
+  image = await frame();
+  const mapsAfter = [count(image, white), count(image, red)];
+  report.borrowedMap = {
+    before: mapsBefore,
+    lost: mapsLost,
+    after: mapsAfter,
+    reports: reports.map((error) => [error.code, error.message]),
+    functionCalls: made.length,
+    functionDevices: made[0] !== made[1],
+  };
+  // Under 4x MSAA a red point's edge pixels blend, so the red count per point is read from the frame before the loss.
+  const help = '; see https://margoengine.com/errors#borrowed-lost',
+    [whiteBefore, redBefore] = mapsBefore,
+    m = report.borrowedMap;
+  assert(
+    whiteBefore === 64 &&
+      redBefore > 100 &&
+      redBefore % 2 === 0 &&
+      m.lost.every(([w, r]) => w === 128 && r === redBefore / 2) &&
+      JSON.stringify(m.after) === JSON.stringify(mapsBefore) &&
+      JSON.stringify(m.reports) ===
+        JSON.stringify([
+          ['state', `Points material map lost with the device; pass a function or call the map setter${help}`],
+        ]) &&
+      m.functionCalls === 2 &&
+      m.functionDevices,
+    `A GPUTexture map across a restore: ${JSON.stringify(m)}`,
+  );
+  plainMap.dispose();
+  madeMap.dispose();
+  await settle(runtime.gpu);
+  report.checks.push('a GPUTexture map: a function comes back after a restore, a plain one is reported once');
+
   // 11. Disposal removes the pass and releases GPU resources.
   let destroyed = 0;
   // The device's own classes (the WebGL2 compatibility layer's under --compat), probed from one object each.

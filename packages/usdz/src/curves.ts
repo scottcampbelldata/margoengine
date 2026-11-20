@@ -36,8 +36,12 @@ export function curves(options: CurvesOptions = {}): USDExtension {
         super.registerPasses(graph);
       }
     }
+    // The model's own scene: after the imports above the active scene is the default one again, wherever the model went.
+    const scene = engine.sceneOf(model),
+      has = (name: string) => (scene ? scene.plugins.has(name) : engine.hasPlugin(name)),
+      use = (plugin: Parameters<typeof engine.use>[0]) => (scene ? scene.use(plugin) : engine.use(plugin));
     let id = 0;
-    while (engine.hasPlugin('usd-curves-lines-' + id) || engine.hasPlugin('usd-curves-points-' + id)) id++;
+    while (has('usd-curves-lines-' + id) || has('usd-curves-points-' + id)) id++;
     let lines: InstanceType<typeof Lines> | undefined, points: InstanceType<typeof PointsPlugin> | undefined;
     model.onDispose(() => {
       // The scenes they were attached to, not whichever scene is active when the model goes.
@@ -52,7 +56,10 @@ export function curves(options: CurvesOptions = {}): USDExtension {
           sizes = model.asset.accessor(part.widths),
           colors = model.asset.accessor(part.colors);
         if (part.kind === 'curve') {
-          lines ??= Lines.attach(engine, { name: 'usd-curves-lines-' + id });
+          if (!lines) {
+            lines = new Lines({ name: 'usd-curves-lines-' + id });
+            use(lines);
+          }
           const line = lines.add(
             new Stroke({
               positions,
@@ -69,7 +76,7 @@ export function curves(options: CurvesOptions = {}): USDExtension {
         } else {
           if (!points) {
             points = new USDPoints({ name: 'usd-curves-points-' + id, edlStrength: 0 });
-            engine.use(points);
+            use(points);
           }
           const cloud = points.add(
             new PointCloud({

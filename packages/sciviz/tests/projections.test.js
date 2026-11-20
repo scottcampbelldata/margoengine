@@ -78,3 +78,16 @@ test('Albers and Mollweide preserve spherical area locally', () => {
     }
   }
 });
+test('a Lambert conformal conic origin at the divergent pole rejects on either hemisphere', () => {
+  // tan(pi/2) is 1.6e16 in floating point, not Infinity, so the northern cone's south pole gave a finite r0 of
+  // about 4.6e18 m, while the southern cone's north pole rejected.
+  for (const [parallels, origin] of [
+    [[30, 60], -90],
+    [[-30, -60], 90],
+  ])
+    assert.throws(
+      () => climateProjection('lambert-conformal-conic', { standardParallels: parallels, latitudeOrigin: origin }),
+      /divergent pole/,
+    );
+  near(climateProjection('lambert-conformal-conic', { latitudeOrigin: 90 }).forward(0, 90)[1], 0, 1e-9);
+});

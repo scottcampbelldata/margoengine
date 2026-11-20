@@ -19,7 +19,8 @@ engine.start();
 - `loadCAD(engine, url, options)` downloads a file and imports it; the format comes from the `format` option or the
   extension (`.stp`, `.igs`, `.x_t`, `.x_b` and `.xmt_txt` too). `parseCADAsync(engine, bytes, format, options)` does
   the same for an `ArrayBuffer` it transfers (and detaches). Both run in a worker and resolve with a `CADModel`: a
-  hidden `root` shown once the whole file has loaded, one child mesh per part, and `dispose()`.
+  hidden `root` shown once the whole file has loaded, one child mesh per part, and `dispose()`. The model is built in
+  the scene the call was made in, whichever scene is active when the download or the worker finishes.
 - `parseCAD(engine, input, 'stl' | 'obj')` reads STL and OBJ synchronously, units as in the file.
 - B-rep files come in meters. Each placed body is meshed once from its exact geometry and every placement of it reuses
   that geometry with its own position, rotation and scale (a mirror is a negative x scale; a sheared placement gets its
@@ -57,12 +58,13 @@ result shape; what changes for code written against the earlier importer:
 ## PartInstancer and deduplicateParts
 
 `PartInstancer.attach(engine)` (WebGPU) first runs `deduplicateParts`, which shares Geometry between identical core
-parts and points identical static glTF-pro primitives of one model at one GPU buffer pair (skinned and morphed
+parts and points identical static glTF PBR primitives of one model at one GPU buffer pair (skinned and morphed
 primitives keep their own). It then packs small closed static parts that have their own Geometry and equal material
 values under one root into root-space GPU buffers: each part stays a visible mesh with its name, Geometry, material and
 parent, core skips its claimed batch, and the plugin draws each pack once inside every core draw. A part returns to its
 own draw when it moves, hides, changes material or geometry, or another visible mesh starts sharing its geometry. Big
-parts (`partVertices`, default 4,096), shared Geometry and open shells stay on their own draws.
+parts (`partVertices`, default 4,096), shared Geometry and open shells stay on their own draws. `dispose()` (or `using`) hands every
+part back to its own draw, frees the pack buffers and takes the plugin out of its scene.
 
 ## Entries
 

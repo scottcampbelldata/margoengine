@@ -4,14 +4,35 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { readGLB, validate, validator, toolsDir } from '../tests/helpers.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+// Every step of the page run has a hard limit, so a page that never settles fails by name instead of waiting for the
+// caller's outer timeout; the finally below then closes the browser and server. The run takes seconds.
+const STEP_LIMIT_MS = 300_000;
+const limited = async (label, promise) => {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`exporters browser test: ${label} did not finish within ${STEP_LIMIT_MS / 1000} s`)),
+          STEP_LIMIT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+};
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },
@@ -35,9 +56,15 @@ try {
     if (response.status() >= 400 && !response.url().endsWith('/favicon.ico'))
       errors.push(`${response.status()} ${response.url()}`);
   });
-  await page.goto(`${server.resolvedUrls.local[0]}tests/exporters.html`);
-  await page.waitForFunction(() => typeof window.runExporterTests === 'function');
-  const report = await page.evaluate(() => window.runExporterTests());
+  await limited('loading tests/exporters.html', page.goto(`${server.resolvedUrls.local[0]}tests/exporters.html`));
+  await limited(
+    'waiting for runExporterTests',
+    page.waitForFunction(() => typeof window.runExporterTests === 'function', null, { timeout: STEP_LIMIT_MS }),
+  );
+  const report = await limited(
+    'runExporterTests',
+    page.evaluate(() => window.runExporterTests()),
+  );
   assert.deepEqual(
     errors.filter((error) => !/^Failed to load resource/.test(error)),
     [],
@@ -55,7 +82,7 @@ try {
     ['flat', Uint8Array.from(report.flat)],
     ['draco', Uint8Array.from(report.draco)],
   ]) {
-    const result = await validate(data);
+    const result = await limited(`validating ${name}`, validate(data));
     assert.equal(result.errors, 0, `${name}: ${JSON.stringify(result.messages)}`);
     assert.equal(result.warnings, 0, `${name}: ${JSON.stringify(result.messages)}`);
     report.validator[name] = { errors: result.errors, warnings: result.warnings, infos: result.infos };

@@ -132,3 +132,49 @@ test('a KTX2LayerDecoder reads a native file on the calling thread and needs a d
   await assert.rejects(decoder.createTexture(new Uint8Array(4)), /needs a device/);
   decoder.dispose();
 });
+
+test('BC1 RGB files (vkFormat 131, 132) have no alpha; BC1 RGBA files (133, 134) do', async () => {
+  // A 4 x 4 file of one level and one BC1 block, no DFD: the smallest KTX2 file of a block format.
+  const ktx2 = (vkFormat) => {
+    const bytes = new Uint8Array(112),
+      view = new DataView(bytes.buffer);
+    bytes.set([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
+    for (const [at, value] of [
+      [12, vkFormat],
+      [16, 1],
+      [20, 4],
+      [24, 4],
+      [36, 1],
+      [40, 1],
+      [80, 104],
+      [88, 8],
+      [96, 8],
+    ])
+      view.setUint32(at, value, true);
+    return bytes;
+  };
+  for (const [vkFormat, format, hasAlpha] of [
+    [131, 'bc1-rgba-unorm', false],
+    [132, 'bc1-rgba-unorm-srgb', false],
+    [133, 'bc1-rgba-unorm', true],
+    [134, 'bc1-rgba-unorm-srgb', true],
+  ]) {
+    const file = await parseKTX2(ktx2(vkFormat));
+    assert.deepEqual([file.format, file.hasAlpha], [format, hasAlpha], `vkFormat ${vkFormat}`);
+  }
+});
+
+test('uploadTexture refuses a file with more layers than the device allows', async () => {
+  const file = await parseKTX2(await fixture('arraytex_7_mipmap_reference_u.ktx2'));
+  let created = 0;
+  const device = {
+    features: new Set(),
+    limits: { maxTextureDimension2D: 8192, maxTextureArrayLayers: 6 },
+    createTexture: () => created++,
+  };
+  assert.throws(
+    () => uploadTexture(device, file),
+    (error) => error instanceof RangeError && /7 layers exceeds the device's maxTextureArrayLayers/.test(error.message),
+  );
+  assert.equal(created, 0);
+});

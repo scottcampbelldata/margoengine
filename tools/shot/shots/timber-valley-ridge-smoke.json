@@ -1,0 +1,108 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 12,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -848,
+            1668.317708,
+            -982.746
+          ],
+          "target": [
+            -1152,
+            1407.867783,
+            852.941
+          ],
+          "fov": 45
+        },
+        {
+          "time": 12,
+          "position": [
+            -752,
+            1724.360276,
+            -993.329
+          ],
+          "target": [
+            -1552,
+            1367.61696,
+            590.295
+          ],
+          "fov": 45,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "timber-valley-ridge-smoke",
+    "kind": "long",
+    "seconds": 12,
+    "scene": "timber-valley",
+    "settings": {
+      "weather": {
+        "wind": {
+          "keys": [
+            {
+              "time": 0,
+              "value": 12
+            },
+            {
+              "time": 12,
+              "value": 16,
+              "ease": "inOut"
+            }
+          ]
+        }
+      }
+    },
+    "page": {
+      "path": "packages/scenes/test/timber-valley-shot.html",
+      "css": "#viewport{position:fixed;inset:0;width:100%!important;height:100%!important}",
+      "engine": "timberShot.engine",
+      "canvas": "#viewport",
+      "aovs": "timberShot.aovs",
+      "apply": "timberShot.apply",
+      "settings": "timberShot.settings",
+      "ready": "#viewport[data-ready=\"true\"]"
+    },
+    "seed": 1910,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "supersample": 2,
+    "subframes": 8,
+    "shutter": 180,
+    "warmup": 60,
+    "probes": {
+      "early": 0.3,
+      "mid": 1
+    },
+    "lookFamily": "animatedFeature",
+    "moving": {
+      "depthScale": 2000
+    },
+    "aovs": [
+      "geometry",
+      "depth",
+      "penumbra",
+      "subject",
+      "lit",
+      "shadow",
+      "sky"
+    ],
+    "horizon": {
+      "y": -500
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { checkStorage } from './storage-limit.js';
 import { fillFrame } from './frame.js';
 import { SpriteBatch, SPRITE_STRIDE } from './sprites.js';
 import type { PointsMaterial, SpriteMaterial, PointsTextureSource } from './material.js';
+import { type BorrowSlot, borrow, lend } from '../../shared/borrowed.js';
 import {
   allocateBudget,
   boxInFrustum,
@@ -160,10 +161,9 @@ export interface PointsPickResult {
   depth: number;
 }
 
-let warnedTexture = false;
-
-const isGpuTexture = (value: PointsTextureSource): value is GPUTexture =>
-  typeof (value as GPUTexture).createView === 'function';
+type BorrowedMap = GPUTexture | ((device: GPUDevice) => GPUTexture);
+const isBorrowed = (value: PointsTextureSource): value is BorrowedMap =>
+  typeof value === 'function' || typeof (value as GPUTexture).createView === 'function';
 
 /**
  * Engine plugin that draws `PointCloud`s and `SpriteBatch`es over the scene color and depth (WebGPU).
@@ -202,7 +202,9 @@ export class PointsPlugin implements EnginePlugin {
   private readonly cloudGpu = new Map<PointCloud, CloudGpu>();
   private readonly batchGpu = new Map<SpriteBatch, BatchGpu>();
   private readonly owned = new Map<AnyMaterial, OwnedTexture>();
-  private readonly borrowed = new WeakMap<GPUTexture, { device: GPUDevice; view: GPUTextureView }>();
+  /** One slot per caller texture or function (shared/borrowed.js), so a lost texture is reported once. */
+  private readonly borrowed = new WeakMap<BorrowedMap, BorrowSlot<GPUTexture, BorrowedMap>>();
+  private readonly borrowedViews = new WeakMap<GPUTexture, GPUTextureView>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private edlLayout: GPUPipelineLayout | null = null;
   private readonly mipCache = new Map<string, GPURenderPipeline>();
@@ -238,6 +240,12 @@ export class PointsPlugin implements EnginePlugin {
     width: number;
     height: number;
   };
+  /**
+   * @internal Target pixels per unit of the clouds' pixel sizes (`size` in 'pixels' units, `minPixelSize`,
+   * `maxPixelSize`) for the frame being drawn. Unset, the sizes are pixels of the drawn target. An owner that sizes in CSS
+   * pixels (sciviz) returns the target's pixels per CSS pixel, so the material keeps the caller's values.
+   */
+  pixelScale: ((context: GpuContext) => number) | undefined;
   private readonly frameData = new Float32Array(FRAME_BYTES / 4);
   private readonly frameBits = new Uint32Array(this.frameData.buffer);
   private readonly frameWritten = new Uint32Array(FRAME_BYTES / 4);
@@ -493,8 +501,9 @@ export class PointsPlugin implements EnginePlugin {
 
   /**
    * CPU picking: the drawn point nearest to CSS pixel (x, y) of the canvas within `radius`, using the latest
-   * frame's camera, transforms and level of detail of the view picked through. Meshes do not occlude picks and clipping
-   * planes do not apply; `PointPicking` in `@margoengine/points/pick` picks on the GPU with both.
+   * frame's camera, transforms and level of detail of the view picked through. Points a `'filter'` selection mask hides
+   * do not pick. Meshes do not occlude picks and clipping planes do not apply; `PointPicking` in
+   * `@margoengine/points/pick` picks on the GPU with both.
    */
   pick(x: number, y: number, options: PointsPickOptions = {}): PointsPickResult | null {
     if (!Number.isFinite(x) || !Number.isFinite(y))
@@ -554,6 +563,8 @@ export class PointsPlugin implements EnginePlugin {
         px,
         py,
         r,
+        // A filter mask hides unselected points from the picture, so from the pick too, as on the GPU.
+        cloud.mask && cloud.maskStyle.mode === 'filter' ? (p) => !cloud.isSelected(p) : undefined,
       );
       if (!hit) continue;
       if (
@@ -589,22 +600,15 @@ export class PointsPlugin implements EnginePlugin {
     const source = material.map,
       device = this.device!;
     if (!source) return this.gpu!.whiteView;
-    if (isGpuTexture(source)) {
-      let entry = this.borrowed.get(source);
-      if (!entry) {
-        entry = { device, view: source.createView() };
-        this.borrowed.set(source, entry);
-      }
-      if (entry.device !== device) {
-        if (!warnedTexture) {
-          warnedTexture = true;
-          console.warn(
-            '@margoengine/points: a GPUTexture map belongs to a lost device; assign a new texture after onDeviceRestored. Drawing untextured.',
-          );
-        }
-        return null;
-      }
-      return entry.view;
+    if (isBorrowed(source)) {
+      let slot = this.borrowed.get(source);
+      if (!slot) this.borrowed.set(source, (slot = borrow(source, 'Points material map', 'the map setter')));
+      // A plain texture lost with the device is reported once and the material draws untextured.
+      const texture = lend(slot, device, this.engine);
+      if (!texture) return null;
+      let view = this.borrowedViews.get(texture);
+      if (!view) this.borrowedViews.set(texture, (view = texture.createView()));
+      return view;
     }
     let owned = this.owned.get(material);
     if (owned && owned.source === source && owned.version === material.mapVersion && owned.mipmaps === material.mipmaps)
@@ -637,9 +641,8 @@ export class PointsPlugin implements EnginePlugin {
     try {
       if (typeof ImageData !== 'undefined' && source instanceof ImageData)
         device.queue.writeTexture({ texture }, source.data, { bytesPerRow: width * 4 }, [width, height]);
-      else
-        // A video in a browser that refuses one as the source (Firefox) goes through a canvas (shared/copy-external.js).
-        copyExternal(device, { source }, { texture }, [width, height]);
+      // A video in a browser that refuses one as the source (Firefox) goes through a canvas (shared/copy-external.js).
+      else copyExternal(device, { source }, { texture }, [width, height]);
       generateMipmaps(device, texture, levels, this.mipCache);
       owned = {
         source,
@@ -1206,16 +1209,22 @@ export class PointsPlugin implements EnginePlugin {
     picked.orthographic = this.orthographic;
   }
 
-  private writeCloudUniform(cloud: PointCloud, r: CloudGpu, model: ArrayLike<number>, mapped: boolean): void {
+  private writeCloudUniform(
+    cloud: PointCloud,
+    r: CloudGpu,
+    model: ArrayLike<number>,
+    mapped: boolean,
+    pixelScale = 1,
+  ): void {
     const m = cloud.material,
       f = r.floats,
       u = r.uints;
     f.set(model, 0);
     f.set(m.color, 16);
     f[19] = m.opacity;
-    f[20] = m.size;
-    f[21] = m.minPixelSize;
-    f[22] = m.maxPixelSize;
+    f[20] = m.sizeUnits === 'pixels' ? m.size * pixelScale : m.size;
+    f[21] = m.minPixelSize * pixelScale;
+    f[22] = m.maxPixelSize * pixelScale;
     f[23] = m.alphaTest;
     u[24] =
       (cloud.colors && m.vertexColors ? FLAG.colors : 0) |
@@ -1307,6 +1316,7 @@ export class PointsPlugin implements EnginePlugin {
       gpu = this.gpu,
       camera = context.camera;
     this.writeFrame(context);
+    const pixelScale = this.pixelScale?.(context) ?? 1;
     const projScale = this.frameData[18],
       viewWidth = this.frameData[16],
       viewHeight = this.frameData[17];
@@ -1346,7 +1356,7 @@ export class PointsPlugin implements EnginePlugin {
       r.drawn = drawn;
       this.flushCloud(cloud, r);
       const view = this.texture(cloud.material);
-      this.writeCloudUniform(cloud, r, model, !!view && cloud.material.map !== null);
+      this.writeCloudUniform(cloud, r, model, !!view && cloud.material.map !== null, pixelScale);
       r.model.set(model);
       s.clouds++;
       const blocks = cloud.blocks,

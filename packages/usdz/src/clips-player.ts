@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro/model';
+import type { PBRModel } from '@margoengine/gltf/pbr-model';
 import { MargoError } from '@margoengine/math/errors';
 import type { CompositionOptions } from './compose.js';
 import type { USDAsset, USDOptions } from './index.js';

@@ -8,10 +8,9 @@
 //    and a floor on layer 1 only black under a layer-0 light, and lights a floor on layers 0 and 1 exactly as the
 //    unlayered light does (within 2/255: the mask is a 0 or 1 factor).
 // Frames go to test-results/clustered-light-images-*.png; nothing is recorded. Run: node
-// scripts/clustered-light-images-gpu-check.js (takes the GPU lock, after npm run build:packages).
+// scripts/clustered-light-images-gpu-check.js (after npm run build:packages).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
 const fill = (width, height, fn) => {
@@ -21,7 +20,6 @@ const fill = (width, height, fn) => {
 };
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
   dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-const release = await acquire({ owner: 'clustered-light-images-gpu-check' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/LICENSE', port: 5357 });
@@ -114,6 +112,5 @@ try {
   assert.deepEqual(pageErrors, []);
 } finally {
   await browser?.close();
-  release();
 }
 console.log('clustered light images GPU check passed');

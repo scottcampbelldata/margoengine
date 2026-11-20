@@ -87,9 +87,15 @@ export interface MaterialXTextureRequest {
 
 export function materialXDocument(parts: Partial<Omit<MaterialXDocument, 'toGraph'>> & Pick<MaterialXDocument, 'nodes' | 'materials'>): MaterialXDocument;
 
-export function parseMaterialX(input: BinaryInput | string): MaterialXDocument;
+export function parseMaterialX(input: BinaryInput | string, options?: XMLExternalOptions): MaterialXDocument;
 
 // Not exported from this entry, but used by the exports above:
 
 type BinaryInput = ArrayBuffer | ArrayBufferView;
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
+}
 ```

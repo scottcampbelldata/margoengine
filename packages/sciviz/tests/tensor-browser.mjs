@@ -129,6 +129,15 @@ result[5]=vec4f(surface(0.5,0.75,0.05,0.05,false),1.0);
       const empty = await tensorGlyphs(demo.figures.superquadric, { positions: [], tensors: [] });
       check(empty.ids.length === 0, 'empty glyph set');
       empty.dispose();
+      // stride steps every axis of a regular field (i, j, k), not the linear sample index.
+      const grid = {
+        dims: [4, 4, 1],
+        bounds: [0, 4, 0, 4, 0, 1],
+        tensors: Float64Array.from({ length: 16 * 6 }, (_, k) => (k % 6 < 3 ? 1 + (k % 6) : 0)),
+      };
+      const strided = await tensorGlyphs(demo.figures.superquadric, grid, { stride: 2 });
+      result.stridedIds = [...strided.ids];
+      strided.dispose();
       layer.dispose();
       const testCanvas = document.createElement('canvas');
       testCanvas.style.width = '320px';
@@ -170,6 +179,7 @@ result[5]=vec4f(surface(0.5,0.75,0.05,0.05,false),1.0);
       for (const f of Object.values(demo.figures)) f.dispose();
       return result;
     });
+    assert.deepEqual(report.stridedIds, [0, 2, 8, 10], 'regular-field stride keeps every second i and j');
     for (const name of ['ellipsoid', 'superquadric', 'tracking'])
       assert.ok(report[name].lit > 100, `${name} renders real data`);
     assert.notEqual(report.ellipsoid.hash, report.superquadric.hash);

@@ -3,9 +3,9 @@ import { Engine } from '../packages/core/dist/extension.js';
 import { Material, Texture, createMesh, createInstancedMesh, install } from '../packages/materials/dist/index.js';
 import type { MaterialOptions, MeshGeometry } from '../packages/materials/dist/index.js';
 import { Transmission, transmission as callerTransmission } from '../packages/materials/dist/transmission.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { PBRModel, GLTFImage } from '../packages/gltf-pro/dist/index.js';
-import { extendedMaterials } from '../packages/gltf-pro/dist/extended.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { PBRModel, GLTFImage } from '../packages/gltf/dist/pbr.js';
+import { extendedMaterials } from '../packages/gltf/dist/extended.js';
 import { PostStack } from '../packages/post/dist/index.js';
 import { Tonemap } from '../packages/tonemap/dist/index.js';
 

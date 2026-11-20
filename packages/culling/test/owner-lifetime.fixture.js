@@ -15,7 +15,7 @@ const vertices = (...points) => {
   points.forEach((p, i) => out.set(p, i * 20));
   return out;
 };
-// A caller-owned instanced model: like gltf-pro's PBRInstances it makes its row buffer on each device it is drawn on, and
+// A caller-owned instanced model: like gltf/pbr's PBRInstances it makes its row buffer on each device it is drawn on, and
 // its owner (the caller, not the culler) destroys it.
 const instancedModel = (dependency) => {
   const buffers = [];

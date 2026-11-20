@@ -66,7 +66,9 @@ async function check() {
   // Deadline only. No timings, repetitions, benchmark or machine quietness requirement.
   const deadline = setTimeout(() => {
     console.error('Field integration WebGPU correctness check exceeded its five-minute bound');
-    void endTree(process.pid, { waitMs: 10000 }).finally(() => process.exit(1));
+    void endTree(process.pid, { waitMs: 10000 }).finally(() => {
+      process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
+    });
   }, 290000);
   let context;
   const pageErrors = [];

@@ -1,5 +1,5 @@
 // Real-GPU sweep of the precise maths (bug 29; one GPU job at a time, from the repository root after building
-// packages): node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/compute-precise-sweep.mjs
+// packages): node scripts/run-with-timeout.mjs -- node packages/compute/tests/compute-precise-sweep.mjs
 // preciseSin, preciseCos and preciseTan over every binade from 2^-12 to 2^127 and precisePow at extreme exponents
 // (compute-precise-sweep-browser.js), against double precision. Prints one "N over bound" line per function and fails
 // when N is above 0 for any. Results go to test-results/compute-precise-sweep.json.

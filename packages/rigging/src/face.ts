@@ -310,16 +310,31 @@ export function addFace(animation: Animator['animation'], options: AddFaceOption
   let remove: (() => void) | null;
   if (animator) remove = animator.addSolver(update);
   else {
-    const plugin: EnginePlugin = { name, setup() {}, onPreUpdate: update };
+    // Removed by its scene (removePlugin, scene or engine disposal), the binding ends with it; a later dispose()
+    // then leaves alone another plugin registered under the same name.
+    const plugin: EnginePlugin = {
+      name,
+      setup() {},
+      onPreUpdate: update,
+      dispose: () => {
+        if (!remove) return;
+        remove = () => {};
+        dispose();
+      },
+    };
     engine.use(plugin);
     // The scene it was attached to, not whichever scene is active when it stops.
-    remove = () => engine.sceneOf(plugin)?.removePlugin(name);
+    remove = () => {
+      const scene = engine.sceneOf(plugin);
+      if (scene?.plugins.get(name) === plugin) scene.removePlugin(name);
+    };
   }
   faced.add(model);
   const stop = (): void => {
-    if (remove) faced.delete(model);
-    remove?.();
+    const detach = remove;
     remove = null;
+    if (detach) faced.delete(model);
+    detach?.();
     unsubscribe?.();
     unsubscribe = null;
   };

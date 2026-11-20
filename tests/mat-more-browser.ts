@@ -17,8 +17,8 @@ import {
   toonModel,
 } from '../packages/materials/dist/index.js';
 import type { MeshGeometry } from '../packages/materials/dist/index.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { PBRModel } from '../packages/gltf/dist/pbr.js';
 import { PostStack } from '../packages/post/dist/index.js';
 import { Tonemap } from '../packages/tonemap/dist/index.js';
 import { Clustered } from '../packages/clustered/dist/index.js';

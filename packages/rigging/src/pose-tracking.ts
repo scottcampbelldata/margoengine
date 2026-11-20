@@ -427,9 +427,7 @@ export class PoseTracker {
       let next: PoseQuaternion;
       if (measured) {
         this.ages.set(bone, 0);
-        next = this.calibration[bone]
-          ? multiplyQuaternions(measured, conjugateQuaternion(this.calibration[bone]!))
-          : measured;
+        next = this.neutral(measured, this.calibration[bone]);
         confidence[bone] = this.goal.confidence[bone];
       } else {
         const age = (this.ages.get(bone) ?? 0) + delta;
@@ -441,11 +439,28 @@ export class PoseTracker {
       this.current[bone] = interpolateQuaternions(this.current[bone] ?? ID, next, share, 0.9995);
     }
     if (this.goal.position) {
-      const position = sub([...this.goal.position], this.origin);
+      const tilt = this.calibration.hips,
+        offset = sub([...this.goal.position], this.origin),
+        position = tilt ? rotateByQuaternion(offset, conjugateQuaternion(tilt)) : offset;
       for (let i = 0; i < 3; i++) this.translation[i] += (position[i] - this.translation[i]) * share;
       this.hasPosition = true;
     } else if ((this.ages.get('hips') ?? 0) > this.hold) for (let i = 0; i < 3; i++) this.translation[i] *= 1 - share;
     return localize(structuredClone(this.current), confidence, this.hasPosition ? [...this.translation] : null);
+  }
+  /**
+   * A measured world rotation relative to the calibrated neutral. The camera sees the world turned by its tilt T, so
+   * a bone measures T A for its world rotation A, and calibration stores T N for its neutral N. Removing N alone
+   * (T A (T N)^-1 = T W T^-1 for the move W = A N^-1) leaves the move about the camera's tilted axes. With the hips
+   * calibrated, standing upright (their N is the identity), T is the hips' calibration and the move is
+   * T^-1 (T A) (T N)^-1 T = A N^-1 = W, in the world. A bone with no calibration of its own is only untilted.
+   */
+  private neutral(measured: PoseQuaternion, calibration: PoseQuaternion | undefined): PoseQuaternion {
+    const tilt = this.calibration.hips;
+    if (!tilt) return calibration ? multiplyQuaternions(measured, conjugateQuaternion(calibration)) : measured;
+    const untilted = multiplyQuaternions(conjugateQuaternion(tilt), measured);
+    return calibration
+      ? multiplyQuaternions(multiplyQuaternions(untilted, conjugateQuaternion(calibration)), tilt)
+      : untilted;
   }
   /** Return the filter to neutral; calibration and the latest goal remain available. */
   reset(): this {
@@ -545,8 +560,21 @@ export async function addPoseTracking(
   if (options.autoUpdate !== false) {
     if (options.vrm) detach = options.vrm.addPoseSource(update);
     else {
-      scene.use({ name, setup() {}, onPreUpdate: update });
-      detach = () => scene.removePlugin(name);
+      // Removed by its scene (removePlugin, scene or engine disposal), the binding ends with it; a later dispose()
+      // then leaves alone another plugin registered under the same name.
+      const plugin = {
+        name,
+        setup() {},
+        onPreUpdate: update,
+        dispose: () => {
+          detach = undefined;
+          dispose();
+        },
+      };
+      scene.use(plugin);
+      detach = () => {
+        if (scene.plugins.get(name) === plugin) scene.removePlugin(name);
+      };
     }
   }
   unsubscribe = model.onDispose(() => {

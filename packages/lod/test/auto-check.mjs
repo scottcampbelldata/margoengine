@@ -4,10 +4,8 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'lod-auto' });
 const context = await openBrowser({ startPath: '/packages/lod/test/auto-check.html', port: 5277 }),
   { page } = context,
   pageErrors = [];
@@ -15,7 +13,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 const timer = setTimeout(() => {
   console.error('lod auto-check: over its 2 minute limit');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
@@ -60,5 +58,4 @@ try {
 } finally {
   clearTimeout(timer);
   await context.close?.();
-  await release?.();
 }

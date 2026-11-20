@@ -57,7 +57,9 @@ resources. Removed layers are pruned on the next query and picker disposal relea
 
 Queries serialize; hover coalesces to the latest pointer and suppresses stale results and
 post-disposal publication. `signal` cancels queue waits, readiness and readback. `timeout`
-defaults to 30000 ms and bounds the entire query, including queue wait. Errors retain their
+defaults to 30000 ms and bounds the entire query, including queue wait. It must lie in
+(0, 2147483647] ms, the largest delay every host timer honours (Node fires a longer deadline
+after 1 ms); anything else rejects with a coded RangeError. Errors retain their
 code/help link; hover failures emit `pickerror`. Outside the canvas or a 2D plot area is a miss.
 Engine device replacement lazily rebuilds owned state and rebinds restored layer resources.
 Picking is supported on native WebGPU and full WebGL2 compatibility; native WebGL2 figures
@@ -83,8 +85,7 @@ Data provenance and licences are the existing `examples/assets/sciviz/stars.json
 `examples/assets/sciviz/clip/source.json`; no data or implementation was copied from a rival.
 
 Build packages, then run `node --test --test-timeout=120000 packages/sciviz/tests/pick-gpu*.test.js`.
-The browser command, from repository root, is `node scripts/gpu-lock.mjs run
---owner=codex-batch181 --max=4 --wait-max=60 -- node packages/sciviz/scripts/browser-root.mjs
+The browser command, from repository root, is `node scripts/run-with-timeout.mjs --max=4 -- node packages/sciviz/scripts/browser-root.mjs
 tests/pick-gpu-browser.mjs` (one shell line). Output JSON and screenshots are in test-results.
 No frame-time, throughput or rival speed result is published during the deferred speed phase.
 

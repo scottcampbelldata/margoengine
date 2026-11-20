@@ -156,6 +156,24 @@ const profile = {
   },
 };
 
+test('models are made in the scene their XR is in, whatever scene is active when a frame arrives, and go with it', async (t) => {
+  const e = await engine(t),
+    second = e.createScene('xr-room'),
+    c = controller({ handedness: 'right', gripSpace: {}, profiles: [], gamepad: { mapping: 'xr-standard' } }),
+    xr = Object.assign(host([c]), { name: 'xr', setup() {} });
+  second.use(xr);
+  const models = XRModels.attach(xr, e);
+  // The frame arrives while the default scene is active (an XR frame callback runs outside any render).
+  xr.step();
+  const meshes = models.controllerMeshes(c.source);
+  assert.equal(meshes.length, 7);
+  assert.ok(meshes.every((m) => m.scene === second), 'every controller part is in the XR scene');
+  assert.equal(e.scene.meshes.size, 0, 'the active scene gains nothing');
+  second.dispose();
+  assert.equal(models.controllerMeshes(c.source), undefined, 'disposing the scene disposes the models');
+  assert.ok(meshes.every((m) => second.meshes.get(m.id) !== m), 'and every part with them');
+});
+
 test('component states follow the layout gamepad mapping, and visual responses weigh them as the assets describe', () => {
   const c = controller({});
   c.buttons.set([0.625, 1, 1], 0); // exact in the Float32Array

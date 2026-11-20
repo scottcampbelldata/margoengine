@@ -26,7 +26,7 @@ export interface PlanarOptions {
     resolution?: number;
     clipBias?: number;
     roughness?: number;
-    normalMap?: GPUTexture | NormalMapImage;
+    normalMap?: Borrowable<GPUTexture> | NormalMapImage;
     distortion?: number;
     normalRepeat?: readonly [number, number];
     normalScroll?: readonly [number, number];
@@ -71,17 +71,21 @@ export abstract class PlanarSurface {
     set distortion(value: number);
     get layers(): number;
     set layers(value: number);
-    get normalMap(): GPUTexture | NormalMapImage | undefined;
-    set normalMap(value: GPUTexture | NormalMapImage | undefined);
+    get normalMap(): Borrowable<GPUTexture> | NormalMapImage | undefined;
+    set normalMap(value: Borrowable<GPUTexture> | NormalMapImage | undefined);
     get texture(): GPUTexture | undefined;
     get textureMatrix(): Float32Array | undefined;
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     protected abstract aim(main: Camera): boolean;
     protected abstract faces(side: number): boolean;
     protected get surfaceShader(): string;
     protected get surfaceUniformLength(): number;
+    protected get surfaceBlend(): GPUBlendState | undefined;
     protected get surfaceDepth(): GPUTextureView | undefined;
     protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void;
     protected clip(main: Camera, n: Vec3, w: number): boolean;
@@ -102,6 +106,8 @@ export type RefractorOptions = PlanarOptions;
 export const scenePasses: CapturePassFilter;
 
 // Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 
 class CaptureTarget {
     device?: GPUDevice;

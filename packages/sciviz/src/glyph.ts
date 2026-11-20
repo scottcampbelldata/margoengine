@@ -140,7 +140,7 @@ export async function prepareGlyphs(raw: GlyphInput, options: GlyphOptions = {})
             factor *
             (mode === 'scalar' ? s![i] : mode === 'magnitude' ? length : mode === 'components' ? vector[k] : 1),
         );
-      if (scale.some((x) => x === 0)) continue;
+      if (scale.every((x) => x === 0)) continue;
       if (scale.some((x) => !finite(x))) bad('scaled glyph exceeds finite float32');
       let q = [0, 0, 0, 1];
       if (length) {
@@ -207,6 +207,38 @@ function geometry(shape: GlyphShape): Geometry {
   return new Geometry(p, n, indices);
 }
 
+/**
+ * The glyph collapsed along one local axis with zero scale, as the limit of the inverse-transpose normal rule: each
+ * triangle is projected onto the plane and its normal is that axis, signed by the projected winding, so the flat
+ * shape is lit by its own normal and shows a front face from either side. A degenerate (zero-area) projected
+ * triangle, or two collapsed axes (a segment), leaves nothing to draw.
+ */
+function flatten(source: Geometry, zero: readonly boolean[]): Geometry {
+  const p: number[] = [],
+    n: number[] = [],
+    axis = zero.indexOf(true),
+    u = (axis + 1) % 3,
+    w = (axis + 2) % 3,
+    v = source.vertices,
+    idx = source.indices;
+  if (zero.filter(Boolean).length === 1)
+    for (let t = 0; t < idx.length; t += 3) {
+      const [a, b, c] = [idx[t] * 6, idx[t + 1] * 6, idx[t + 2] * 6],
+        area = (v[b + u] - v[a + u]) * (v[c + w] - v[a + w]) - (v[b + w] - v[a + w]) * (v[c + u] - v[a + u]);
+      if (area)
+        for (const corner of [a, b, c])
+          for (let k = 0; k < 3; k++) {
+            p.push(k === axis ? 0 : v[corner + k]);
+            n.push(k === axis ? Math.sign(area) : 0);
+          }
+    }
+  return new Geometry(
+    p,
+    n,
+    Array.from({ length: p.length / 3 }, (_, i) => i),
+  );
+}
+
 /** Figure-owned, automatically batched core instances sharing one Geometry and material. */
 export class GlyphLayer {
   readonly bounds: Bounds;
@@ -229,7 +261,9 @@ export class GlyphLayer {
       [instances.positions, instances.quaternions, instances.scales].some((a) =>
         Array.from(a).some((v) => !finite(v)),
       ) ||
-      instances.scales.some((v) => v === 0)
+      Array.from({ length: count }, (_, i) => i).some((i) =>
+        instances.scales.subarray(3 * i, 3 * i + 3).every((v) => v === 0),
+      )
     )
       bad('invalid prepared instance tuples');
     const b = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity],
@@ -247,7 +281,8 @@ export class GlyphLayer {
     this.bounds = (count ? b : [0, 0, 0, 0, 0, 0]) as Bounds;
     if (!this.bounds.every(finite)) bad('instance bounds exceed finite float32; rescale data or glyphs');
     const material = new PbrMaterial(options.material ?? { color: '#35c6d5', roughness: 0.65 }),
-      owned: Mesh[] = [];
+      owned: Mesh[] = [],
+      flat = new Map<string, Geometry>();
     this.#root = figure.engine.createMesh();
     try {
       for (let i = 0; i < count; i++) {
@@ -256,9 +291,13 @@ export class GlyphLayer {
         mesh.name = `glyph:${instances.ids[i]}`;
         mesh.setPosition(Array.from(instances.positions.subarray(3 * i, 3 * i + 3)) as [number, number, number]);
         mesh.setQuaternion(Array.from(instances.quaternions.subarray(4 * i, 4 * i + 4)));
-        mesh.setScale(Array.from(instances.scales.subarray(3 * i, 3 * i + 3)) as [number, number, number]);
+        const scale = Array.from(instances.scales.subarray(3 * i, 3 * i + 3)),
+          zero = scale.map((x) => x === 0),
+          key = zero.join();
+        if (zero.some(Boolean) && !flat.has(key)) flat.set(key, flatten(this.geometry, zero));
+        mesh.setScale(scale.map((x) => x || 1) as [number, number, number]);
         mesh.setMaterial(material);
-        mesh.setGeometry(this.geometry);
+        mesh.setGeometry(flat.get(key) ?? this.geometry);
       }
     } catch (error) {
       for (const mesh of owned.reverse()) mesh.dispose();

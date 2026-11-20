@@ -91,6 +91,12 @@ The rounded box is unchanged. Trade-off: two numbers per hull face. This is an o
 
 Proof: `npm run build:packages`, then `node --test --test-timeout=120000 packages/geometry/tests/convex-workcount.test.js packages/geometry/tests/parametric-workcount.test.js`.
 Both count assertions fail on the parent. Five hull digests (a ball, a sphere surface, a duplicated 5 x 5 x 5 grid with coplanar faces, equal-distance ties and an offset, anisotropic cloud) cover `convexGeometry` streams and `convexHullTriangles` indices; four parametric digests cover array, target and Float32Array results, poles and the scene's Klein bottle.
+Since 2026-11-15 the four test surfaces take their sine and cosine from a Taylor series in basic arithmetic instead of
+Math.sin and Math.cos, which ECMA-262 leaves implementation-approximated: the x64 machine that recorded the first
+digests and an arm64 Mac disagree in the last bit of some Klein samples (on the Mac, 5,805 sines and 5,160 cosines of
+332,820 are one unit in the last place off the correctly rounded value), so the Klein digest failed on the Mac with
+the code unchanged. Addition, subtraction, multiplication, division and Math.round are exactly specified, so the new
+digests hold on every machine; the parent of the sample-check change and the current code give the same four.
 
 ## Row 1.9: Euler conversion
 

@@ -416,10 +416,11 @@ test('GLB, generated normals, reflected matrix nodes and shared primitives impor
 test('Float32 transform validation is atomic; failed and recursive plugin cleanup retires every resource', async () => {
   const { engine, resources } = await headlessEngine();
   const mesh = engine.createMesh().setGeometry(box());
-  assert.throws(() => mesh.setScale([2, 1e-99, 3]), /nonzero/);
+  // A zero scale is valid (KB-GLTFA B1); a non-finite one is refused before any axis is written.
+  assert.throws(() => mesh.setScale([2, Infinity, 3]), /finite/);
   assert.equal(mesh.scale.x, 1);
   assert.throws(() => {
-    mesh.scale.y = 1e-99;
+    mesh.scale.y = Number.NaN;
   }, /transform/);
   assert.throws(() => mesh.setPosition(['2', 0, 0]), /finite/);
   engine.createMesh().setGeometry(mesh.geometry).setMaterial(mesh.material);
@@ -541,7 +542,9 @@ test('GPU extension boundaries validate before attachment', async () => {
   }
 });
 
-test('Interrupted GPU encoding skips submission and future canvas acquisition; unrelated errors remain visible', () => {
+// Before 2026-11-15 (B2) this test pinned the bug: a pass's InvalidStateError was taken as a loss, so the healthy device
+// never drew again, and the error went unreported. A lost device makes its calls no-ops; only device.lost says so.
+test('Interrupted GPU encoding skips submission; a pass DOMException fails its frame, not the device; other errors stay visible', () => {
   const saved = globalThis.GPUBufferUsage,
     savedTexture = globalThis.GPUTextureUsage;
   globalThis.GPUBufferUsage = { UNIFORM: 64, COPY_DST: 8 };
@@ -577,10 +580,10 @@ test('Interrupted GPU encoding skips submission and future canvas acquisition; u
     camera = new Camera(),
     graph = new FrameGraph();
   graph.add({
-    name: 'loss',
+    name: 'throws',
     order: -1,
     execute() {
-      throw new DOMException('Device destroyed', 'InvalidStateError');
+      throw new DOMException('Thrown by a pass', 'InvalidStateError');
     },
   });
   try {
@@ -595,11 +598,12 @@ test('Interrupted GPU encoding skips submission and future canvas acquisition; u
     );
     renderer.onLost = () => recoveries++;
     const light = { direction: new Float32Array(4), radiance: new Float32Array(4) };
-    renderer.render(camera, light, [], graph, 0);
-    renderer.render(camera, light, [], graph, 0);
-    assert.equal(submits, 0);
-    assert.equal(acquires, 1);
-    assert.equal(recoveries, 1);
+    const thrown = { name: 'InvalidStateError', message: 'Thrown by a pass' };
+    assert.throws(() => renderer.render(camera, light, [], graph, 0), thrown);
+    assert.throws(() => renderer.render(camera, light, [], graph, 0), thrown, 'the next frame runs the pass again');
+    assert.equal(submits, 0, 'an interrupted frame submits nothing');
+    assert.equal(acquires, 2, 'each frame acquires the canvas: the device is not marked lost');
+    assert.equal(recoveries, 0, 'no loss is reported');
     renderer.dispose();
     const other = new GPURenderer(
         { width: 1, height: 1 },
@@ -893,79 +897,134 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
   assert.deepEqual(
     Object.keys(react).sort(),
     [
+      'AccumulativeShadows',
       'AdaptiveDpr',
+      'AdaptiveEvents',
       'Afterimage',
       'AmbientLight',
       'ArcballControls',
+      'Backdrop',
+      'BakeShadows',
       'Billboard',
       'Bloom',
       'Bounds',
       'Box',
       'BoxGeometry',
       'CadControls',
+      'CameraControls',
+      'CameraShake',
       'Canvas',
+      'Capsule',
+      'CapsuleGeometry',
+      'Caustics',
       'Center',
+      'Circle',
+      'CircleGeometry',
+      'Clone',
+      'Cloud',
+      'Clouds',
+      'Cone',
+      'ConeGeometry',
       'ContactShadows',
       'Controller',
+      'CubeCamera',
+      'Cylinder',
+      'CylinderGeometry',
       'Decal',
       'DepthOfField',
       'DepthTexture',
       'Detailed',
       'DevTools',
+      'Dodecahedron',
+      'DodecahedronGeometry',
+      'DragControls',
       'Edges',
       'EffectComposer',
       'Environment',
+      'Extrude',
+      'ExtrudeGeometry',
       'FXAA',
       'Figure',
+      'FirstPersonControls',
       'Float',
+      'FlyControls',
       'Fog',
       'GTAO',
       'GameUi',
       'GeometryResource',
       'GizmoHelper',
-      'Instance',
-      'Instances',
       'Glitch',
       'Grid',
       'Group',
       'HemisphereLight',
       'Html',
       'Hud',
+      'Icosahedron',
+      'IcosahedronGeometry',
+      'Instance',
+      'Instances',
       'KeyboardControls',
+      'Lathe',
+      'LatheGeometry',
       'LensFlare',
+      'Lightformer',
       'Line',
       'LinePlot',
       'MapControls',
+      'MarchingCube',
+      'MarchingCubes',
+      'MarchingPlane',
       'MargoCanvas',
       'MargoContext',
+      'Merged',
       'Mesh',
       'MotionBlur',
+      'MotionPathControls',
+      'Octahedron',
+      'OctahedronGeometry',
       'OffscreenCanvas',
       'OrbitControls',
       'OrthographicCamera',
       'Outline',
+      'Outlines',
       'PbrMaterial',
       'PerformanceController',
       'PerformanceMonitor',
       'PerspectiveCamera',
+      'PivotControls',
       'Plane',
       'PlaneGeometry',
       'PointerLock',
       'Points',
+      'Polyhedron',
+      'PolyhedronGeometry',
+      'Preload',
       'PresentationControls',
+      'RandomizedLight',
       'RenderTexture',
       'RenderView',
+      'Ring',
+      'RingGeometry',
+      'RoundedBox',
+      'RoundedBoxGeometry',
       'SMAA',
       'SSAO',
       'SSGI',
       'SSR',
+      'Sampler',
       'ScatterPlot',
       'Scene',
       'SceneTargets',
+      'ScreenQuad',
       'Scroll',
       'ScrollControls',
+      'Segment',
+      'Segments',
       'Shadows',
+      'Shape',
+      'ShapeGeometry',
       'Sky',
+      'SoftShadows',
       'Sound',
       'Sparkles',
       'Sphere',
@@ -975,39 +1034,65 @@ test('Frozen core entry stays portable and the one-install React entry exposes i
       'SpriteLayer',
       'Stage',
       'Stars',
+      'Stats',
       'Sun',
       'SurfacePlot',
+      'Svg',
       'TAA',
       'TestRenderer',
+      'Tetrahedron',
+      'TetrahedronGeometry',
       'Text',
+      'Text3D',
       'Tonemap',
+      'Torus',
+      'TorusGeometry',
+      'TorusKnot',
+      'TorusKnotGeometry',
+      'TrackballControls',
       'Trail',
       'TransformControls',
+      'Tube',
+      'TubeGeometry',
       'Voxels',
+      'Wireframe',
       'XR',
       'XRPointerEvents',
+      'accumulativeOptions',
       'act',
-      'createTestRenderer',
-      'dispatchXRPointer',
       'boxGeometry',
       'clearLoader',
+      'createTestRenderer',
+      'dispatchXRPointer',
       'extend',
       'group',
       'mesh',
       'meshStandardMaterial',
+      'outlineRGB',
+      'screenQuadVertexShader',
+      'shakeNoise',
+      'useAspect',
       'useBlockTextures',
       'useBounds',
       'useCamera',
+      'useCursor',
+      'useDepthBuffer',
       'useEngine',
+      'useFBO',
       'useFrame',
+      'useIntersect',
       'useKeyboardControls',
       'useLoader',
       'useMargo',
       'useMargoStage',
+      'useMotion',
       'usePerformanceMonitor',
       'useProgress',
       'useScroll',
+      'useSurfaceSampler',
+      'useViewport',
       'useXR',
+      'viewportAt',
     ].sort(),
   );
   const graph = new FrameGraph();

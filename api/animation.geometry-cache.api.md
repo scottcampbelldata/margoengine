@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
-import { GLTFDocument, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFDocument, PBRModel } from "@margoengine/gltf/pbr";
 
 export type GeometryCacheBytes = AsyncIterable<Uint8Array> | ReadableStream<Uint8Array> | Uint8Array;
 
@@ -25,6 +25,7 @@ export class GeometryCachePlayer implements EnginePlugin {
     setup(engine: Engine): void;
     get duration(): number;
     get bounds(): Float32Array;
+    advanceTime(delta: number): void;
     seek(seconds: number): this;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;

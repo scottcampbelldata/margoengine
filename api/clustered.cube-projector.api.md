@@ -18,6 +18,7 @@ export interface CubeProjectorImage {
 
 export class CubeProjectorLights extends ProjectorLights {
     readonly term = "clusterProjector(index,light,position)*clusterCubeProjector(index,light,position)";
+    cubeWords: Uint32Array<ArrayBuffer>;
     static attach(instance: EngineKernel, options: ProjectorLightOptions): CubeProjectorLights;
     get cubes(): readonly (CubeProjectorImage | CubeProjectorEntry | null | undefined)[];
     setCubes(entries: readonly (CubeProjectorImage | CubeProjectorEntry | null | undefined)[]): this;
@@ -51,6 +52,7 @@ class Clustered implements EnginePlugin {
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
     readonly maxLights: number;
+    get shadowSlots(): number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -71,9 +73,12 @@ class Clustered implements EnginePlugin {
     set layers(hook: ClusteredLightTerm | undefined);
     get contact(): ClusteredLightTerm | undefined;
     set contact(hook: ClusteredLightTerm | undefined);
+    get bounce(): ClusteredBounce | undefined;
+    set bounce(hook: ClusteredBounce | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
+    get isDisposed(): boolean;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
     setLights(lights: readonly (PointLight | SpotLight)[]): this;
     hasReceiver(receiver: ClusteredReceiver): boolean;
@@ -106,16 +111,29 @@ interface ClusteredArea {
     shadowLights?(): readonly AreaShadowLight[];
 }
 
+interface ClusteredBounce {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 interface ClusteredDirectional {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     shadowLights?(): readonly DirectionalShadowLight[];
 }
 
+interface ClusteredLightRecord {
+    readonly position: readonly number[];
+    readonly direction?: readonly number[];
+    readonly cosOuter?: number;
+}
+
 interface ClusteredLightTerm {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     readonly term: string;
+    emission?(index: number, light: ClusteredLightRecord, position: readonly number[]): readonly [number, number, number];
+    readonly revision?: number;
 }
 
 interface ClusteredLighting {
@@ -220,6 +238,7 @@ interface LocalShadowPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    hashed?: (code: string) => string;
 }
 
 interface LocalShadowSource {
@@ -236,6 +255,8 @@ interface PointLight {
     decay?: number;
     shadow?: boolean | LocalLightShadow;
     castShadow?: boolean;
+    radius?: number;
+    bounce?: boolean;
 }
 
 interface ProjectorEntry {
@@ -260,6 +281,7 @@ class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
     readonly term: string;
     readonly lights: Clustered;
     protected device?: GPUDevice;
+    words: Uint32Array<ArrayBuffer>;
     constructor(options: ProjectorLightOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options: ProjectorLightOptions): ProjectorLights;

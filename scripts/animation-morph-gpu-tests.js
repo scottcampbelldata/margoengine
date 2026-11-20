@@ -16,7 +16,7 @@ page.on('console', (message) => {
 try {
   const result = await page.evaluate(async () => {
     const { Engine } = await import('/packages/core/dist/index.js'),
-      { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+      { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
       { Animation, sampleTrack } = await import('/packages/animation/dist/index.js'),
       { cloneModel } = await import('/packages/animation/dist/skeleton-utils.js'),
       { MorphWeightPlayer } = await import('/packages/animation/dist/morph-gpu.js');

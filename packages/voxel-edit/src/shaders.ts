@@ -4,9 +4,8 @@
 // brushes; passes read the result of the pass before. Presets in `brushes` match dilateGrid and erodeGrid exactly.
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import { brushPipelines, brushSource, compileBrush, GridBuffers, isDevice } from './brush-gpu.js';
+import { brushInputs, brushPipelines, brushSource, compileBrush, GridBuffers, isDevice } from './brush-gpu.js';
 import {
-  checkCell,
   checkGrid,
   checkOptions,
   cellLimit,
@@ -151,48 +150,14 @@ export class ShaderBrush {
   async run(grid: VoxelGrid, options: ShaderBrushRunOptions = {}): Promise<GridEdit> {
     if (this.#disposed) throw new MargoError('disposed', 'ShaderBrush is disposed; create a new one');
     checkOptions(options, 'ShaderBrush.run');
-    const count = checkGrid(grid, cellLimit(options)),
-      { selection, passes = 1, params = [], seed = 0, signal } = options;
-    if (!Number.isInteger(passes) || passes < 1 || passes > 1024)
-      throw new RangeError(`ShaderBrush passes is ${passes}; pass a whole number from 1 to 1024`);
-    if (
-      !Array.isArray(params) ||
-      params.length > 16 ||
-      !params.every((v) => typeof v === 'number' && Number.isFinite(v))
-    )
-      throw new TypeError('ShaderBrush params must be up to 16 finite numbers; pass an array such as [0.1, 0.5, 3]');
-    if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
-      throw new RangeError(`ShaderBrush seed is ${seed}; pass a whole number from 0 to 4294967295`);
-    const tool = options.tool,
-      toolOffset = options.toolOffset ?? [0, 0, 0],
-      table = options.table;
-    if (tool !== undefined) checkGrid(tool, cellLimit(options), 'ShaderBrush tool');
-    checkCell(toolOffset, 'ShaderBrush toolOffset');
-    if (table !== undefined) {
-      if (typeof table?.length !== 'number' || table.length !== 256)
-        throw new TypeError('ShaderBrush table must hold 256 numbers; pass a Uint8Array(256)');
-      for (let i = 0; i < 256; i++)
-        if (!Number.isInteger(table[i]) || table[i] < 0 || table[i] > 255)
-          throw new RangeError(`ShaderBrush table[${i}] is ${table[i]}; pass whole numbers 0 to 255`);
-    }
-    let mask: Uint8Array | null = null;
-    if (selection !== undefined) {
-      if (typeof selection?.length !== 'number')
-        throw new TypeError('ShaderBrush selection must be cell indexes; pass a Float64Array');
-      mask = new Uint8Array(Math.ceil(count / 4) * 4);
-      for (let i = 0; i < selection.length; i++) {
-        const c = selection[i];
-        if (!Number.isInteger(c) || c < 0 || c >= count)
-          throw new RangeError(
-            `ShaderBrush selection holds ${c}, not a cell index of this grid; pass 0 to ${count - 1}`,
-          );
-        mask[c] = 1;
-      }
-    }
+    const limit = cellLimit(options),
+      count = checkGrid(grid, limit),
+      inputs = brushInputs(options, count, limit, 'ShaderBrush'),
+      signal = options.signal;
     signal?.throwIfAborted();
     const buffers = new GridBuffers(this.#device, grid, 'ShaderBrush');
     try {
-      buffers.run(this.#pipeline, { passes, params, seed, mask, tool: tool ?? null, toolOffset, table: table ?? null });
+      buffers.run(this.#pipeline, inputs);
       return edited(grid, await buffers.read(signal), 0);
     } finally {
       buffers.destroy();

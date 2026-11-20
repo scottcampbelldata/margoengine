@@ -25,7 +25,6 @@ import type { EngineKernel, Mesh as MeshHandle, FrameCallback } from '@margoengi
 import { Stage as StageFacade } from '@margoengine/stage';
 import type { Shadows } from '@margoengine/shadows';
 import { createAssetCache, activateAssetCache, disposeAssetCache } from './assets.js';
-import { MargoError } from '@margoengine/math/errors';
 import { MeshShadows } from './mesh-shadows.js';
 import { setRenderLayers } from '../../shared/layers.js';
 
@@ -34,6 +33,7 @@ import {
   useScene,
   useMesh,
   live,
+  colorKey,
   setGeometry,
   zero,
   one,
@@ -55,8 +55,9 @@ import { capPixelRatio } from './pixel-ratio.js';
 import { envReadable } from './dev-mode.js';
 import { advanceFrames, bridgeFrames, FrameCallbacks, subscribeFrame } from './frame-priority.js';
 import { geometrySources } from './texture-geometry.js';
-import type { Texture } from '@margoengine/materials';
+import type { EnvMapSource, Texture } from '@margoengine/materials';
 import type { TextureSource } from './textured.js';
+import { fault } from '../../shared/errors.js';
 // Bundlers replace process.env.NODE_ENV, usually with no global `process` on the page: see dev-mode.ts.
 declare const process: { env: { NODE_ENV?: string } };
 
@@ -72,11 +73,11 @@ export interface MargoContextValue {
   invalidate(): void;
 }
 /** React context holding the engine; read it with {@link useMargo}. */
-export const MargoContext = createContext<MargoContextValue | null>(null);
+export const MargoContext = /* @__PURE__ */ createContext<MargoContextValue | null>(null);
 /** Returns the context (stage, canvas, camera, size) of the nearest MargoCanvas; throws a MargoError (`state`) outside one. */
 export function useMargo(): MargoContextValue {
   const value = useContext(MargoContext);
-  if (!value) throw new MargoError('state', 'useMargo requires <MargoCanvas>; call it inside one.');
+  if (!value) throw fault('state', 'useMargo requires <MargoCanvas>; call it inside one', 'react-usage');
   return value;
 }
 /** Props of the Canvas component; every prop is optional unless noted. */
@@ -164,13 +165,13 @@ async function resolveFallback(load: NonNullable<CanvasProps['loadFallback']>, s
     loaded = await load(signal);
   } catch (cause) {
     throw Object.assign(
-      new MargoError('unsupported', `loadFallback failed (${String(cause)}); check the import path or the network.`),
+      fault('unsupported', `loadFallback failed (${String(cause)}); check the import path or the network`, 'react-usage'),
       { cause },
     );
   }
   const factory = typeof loaded === 'function' ? loaded : loaded?.webglRenderer;
   if (typeof factory !== 'function')
-    throw new MargoError('unsupported', 'loadFallback must resolve to a renderer factory or { webglRenderer }.');
+    throw fault('unsupported', 'loadFallback must resolve to a renderer factory or { webglRenderer }', 'react-usage');
   return { factory, picking: typeof loaded === 'function' ? undefined : loaded.webglPicking };
 }
 /** Core's pick answers on every backend but the preview, where `webglPicking` covers it. */
@@ -583,7 +584,7 @@ export interface MeshProps extends PointerHandlers {
   children?: ReactNode;
 }
 /** The mesh component. */
-export const Mesh = forwardRef<MeshRef, MeshProps>(function Mesh(props, ref) {
+export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh(props, ref) {
   const {
     position = zero,
     rotation = zero,
@@ -768,16 +769,25 @@ export interface PbrMaterialProps {
   emissiveMap?: Texture | TextureSource | null;
   emissive?: string | readonly number[];
   emissiveIntensity?: number;
+  /**
+   * Reflections and image light from a cube map: a six-layer GPUTexture (a `<CubeCamera>` texture), a cube Texture,
+   * an Environment or a cube render target. Needs TextureProvider like the maps. Default none.
+   */
+  envMap?: EnvMapSource | null;
+  /** Scales the `envMap` light, finite and >= 0. Default 1. */
+  envMapIntensity?: number;
 }
 /** The pbr material component. */
 export function PbrMaterial(props: PbrMaterialProps) {
   const Binding = useScene().mappedMaterial;
-  const mapped = !!(props.map || props.normalMap || props.roughnessMap || props.metalRoughnessMap || props.emissiveMap || props.emissive);
-  if (mapped && !Binding) throw new MargoError('state', 'Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry\'s MappedPbrMaterial.');
+  const mapped = !!(props.map || props.normalMap || props.roughnessMap || props.metalRoughnessMap || props.emissiveMap || props.emissive || props.envMap);
+  if (mapped && !Binding) throw fault('state', 'Material maps require TextureProvider from @margoengine/react/textures; wrap the Mesh in it or use that entry\'s MappedPbrMaterial', 'react-usage');
   return mapped && Binding ? <Suspense fallback={null}><Binding {...props} /></Suspense> : <PlainMaterial {...props} />;
 }
 function PlainMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 }: PbrMaterialProps) {
-  const registry = useMesh();
+  const registry = useMesh(),
+    // An inline array (`color={[1, 0, 0]}`) is a new object every render; its values, not its identity, are the change.
+    key = colorKey(color);
   useCommit(() => {
     const material = new Material({ color, roughness, metalness }),
       attach = (mesh: EngineMesh) => {
@@ -790,7 +800,7 @@ function PlainMaterial({ color = '#4f46e5', roughness = 0.5, metalness = 0 }: Pb
       const mesh = live(registry);
       if (mesh?.material === material) mesh.setMaterial(new Material());
     };
-  }, [registry, color, roughness, metalness]);
+  }, [registry, key, roughness, metalness]);
   return null;
 }
 /** Props of the Group component; every prop is optional unless noted. */

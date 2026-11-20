@@ -76,3 +76,56 @@ test('pending hover cannot publish after disposal; failures are reported without
   assert.deepEqual(g.events, [{ layer: 1, index: 2 }]);
   g.interaction.dispose();
 });
+test('box and lasso selection follow the pointer that started them and keep touch gestures from the browser', () => {
+  const svg = () => ({ style: {}, setAttribute() {}, replaceChildren() {}, remove() {} }),
+    saved = globalThis.document;
+  globalThis.document = {
+    body: { append() {} },
+    createElementNS: svg,
+  };
+  try {
+    const canvas = Object.assign(new EventTarget(), {
+        style: { touchAction: 'pan-y' },
+        offsetLeft: 0,
+        offsetTop: 0,
+        clientWidth: 100,
+        clientHeight: 100,
+        parentElement: null,
+        getBoundingClientRect: () => ({ left: 0, top: 0 }),
+        setPointerCapture() {},
+        releasePointerCapture() {},
+      }),
+      selections = [];
+    const interaction = new Interaction(
+      canvas,
+      { text: '#000000', grid: '#000000', background: '#ffffff' },
+      {
+        pick: () => null,
+        hover() {},
+        error() {},
+        describe: () => null,
+        controls: () => undefined,
+        select: (region) => selections.push(region),
+      },
+    );
+    const fire = (type, pointerId, x, y) =>
+      canvas.dispatchEvent(Object.assign(new Event(type), { pointerId, clientX: x, clientY: y, button: 0, buttons: 1 }));
+    interaction.mode = 'box';
+    // A selection drag on a touch screen must not be taken by the browser as a scroll (pointercancel).
+    assert.equal(canvas.style.touchAction, 'none');
+    fire('pointerdown', 1, 10, 10);
+    fire('pointermove', 2, 90, 90);
+    fire('pointermove', 1, 30, 40);
+    fire('pointerup', 2, 90, 90);
+    assert.deepEqual(selections, []);
+    fire('pointerup', 1, 30, 40);
+    assert.deepEqual(selections, [{ rect: [10, 10, 30, 40] }]);
+    interaction.mode = 'orbit';
+    assert.equal(canvas.style.touchAction, 'pan-y');
+    interaction.mode = 'lasso';
+    interaction.dispose();
+    assert.equal(canvas.style.touchAction, 'pan-y');
+  } finally {
+    globalThis.document = saved;
+  }
+});

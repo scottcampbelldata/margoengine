@@ -11,6 +11,7 @@ import {
   determinant3,
   normalizeMaterial,
   num,
+  polylines,
   type ExportNode,
   type ExportScene,
   type Geo,
@@ -21,9 +22,12 @@ import {
 import {
   boxSize,
   checkPlacement,
+  curvesPrim,
+  primWidth,
   emptyBox,
   growBox,
   growBoxWith,
+  listedVertices,
   meshPrim,
   placedBox,
   placementOf,
@@ -197,11 +201,17 @@ function walked(roots: readonly Node[]): { order: Node[]; parents: Map<Node, Nod
 }
 
 /** Primitives a node draws. */
-const drawn = (node: Node): { geometry: Geo; material?: Mat }[] =>
-  node.primitives ?? (node.geometry ? [{ geometry: node.geometry, material: node.material }] : []);
+const drawn = (node: Node): { geometry: Geo; material?: Mat }[] => [
+  ...(node.primitives ?? (node.geometry ? [{ geometry: node.geometry, material: node.material }] : [])),
+  ...(node.lines ?? []),
+];
 
-/** True for a primitive its skin moves: the skin needs the joints on the vertices. */
-const skinned = (node: Node, geometry: Geo): boolean => !!node.skin && !!geometry.joints && !!geometry.weights;
+/**
+ * True for a primitive its skin moves: the skin needs the joints on the vertices. Points and lines are written at their
+ * node, unskinned: UsdSkel binds meshes (and the joints they carry), so they follow the node's own animation only.
+ */
+const skinned = (node: Node, geometry: Geo): boolean =>
+  !!node.skin && !!geometry.joints && !!geometry.weights && !geometry.topology;
 
 /** The skin's joints in tree order, parents first, each with a unique path, and how the skin's indices map to that order. */
 function skeleton(
@@ -214,6 +224,8 @@ function skeleton(
   skin.joints.forEach((joint, index) => {
     const node = byExport.get(joint);
     if (!node) throw new RangeError('A skin joint is not in the scene; add the joint nodes to the scene');
+    // glTF 2.0 5.28.3: skin.joints holds unique items; a repeat would bind its first index to another joint.
+    if (wanted.has(node)) throw new TypeError('Skin joints must be distinct scene nodes');
     wanted.set(node, index);
   });
   const joints: Joint[] = [],
@@ -535,6 +547,9 @@ export async function exportAnimatedUSDZ(
   if (!(typeof fps === 'number' && fps > 0 && Number.isFinite(fps)))
     throw new RangeError(`USDZ fps is ${String(fps)}; pass a rate above 0, such as 30`);
   checkPlacement(options);
+  const width = options.lineWidth ?? 0.01;
+  if (typeof width !== 'number' || !(width > 0) || !Number.isFinite(width))
+    throw new RangeError('lineWidth must be a positive finite number of scene units');
   signal?.throwIfAborted();
   const read = source instanceof Uint8Array ? sceneOfGLB(source) : { scene: source, skipped: [] },
     { scene } = read,
@@ -547,7 +562,7 @@ export async function exportAnimatedUSDZ(
     throw new RangeError(
       `The scene has no clip ${JSON.stringify(clip)}; pass an index below ${animations.length} or one of its names`,
     );
-  const roots = collect(scene, options),
+  const roots = collect(scene, options, undefined, 'refuse', ['points', 'lines']),
     { order, parents } = walked(roots),
     byExport = new Map(order.flatMap((node) => (node.source ? [[node.source, node] as const] : []))),
     tracks = new Map<Node, Tracks>();
@@ -559,6 +574,9 @@ export async function exportAnimatedUSDZ(
       continue;
     }
     const data = Float32Array.from(times);
+    // glTF 2.0 3.11: key times are finite and strictly increasing; at least one sets the clip's length.
+    if (!data.length || data.some((t, i) => !Number.isFinite(t) || (i > 0 && !(t > data[i - 1]!))))
+      throw new RangeError(`Animation channel of ${target.name ?? 'a node'} needs finite, strictly increasing key times`);
     if (!tracks.has(node)) tracks.set(node, {});
     tracks.get(node)![PATHS[path]] = { times: data, values: Float32Array.from(values), interpolation };
     duration = Math.max(duration, data[data.length - 1]);
@@ -597,11 +615,30 @@ export async function exportAnimatedUSDZ(
     }
     return { shape, flipped };
   };
-  const placed = new Map<Node, { geometry: Geo; material: Mat; shape: Shape; flipped: boolean }[]>();
+  const placed = new Map<
+    Node,
+    { geometry: Geo; material: Mat; shape: Shape; flipped: boolean; counts?: number[]; listed?: boolean }[]
+  >();
   for (const node of order) {
     const list = drawn(node)
       .filter(({ geometry }) => !skinned(node, geometry))
       .map(({ geometry, material = fallback }) => {
+        if (geometry.topology) {
+          // A Points or BasisCurves prim lists its vertices in drawing order; it has no winding to mirror.
+          const runs = geometry.topology === 'lines' ? polylines(geometry.indices) : undefined,
+            listed = listedVertices(geometry, runs ? runs.flat() : geometry.indices),
+            shape = shapeOf(listed.positions, listed.normals, listed.indices);
+          shape.users++;
+          materials.note(shape, material);
+          return {
+            geometry: listed,
+            material,
+            shape,
+            flipped: false,
+            counts: runs?.map((run) => run.length),
+            listed: true,
+          };
+        }
         const { shape, flipped } = shapeFor(node, geometry);
         shape.users++;
         materials.note(shape, material);
@@ -617,9 +654,13 @@ export async function exportAnimatedUSDZ(
     out.push(`def Xform "Node_${ids.get(node)}" {`);
     if (node.name) out.push(`    string displayName = ${JSON.stringify(node.name)}`);
     out.push(...xformOps(node, own, frames, poses));
-    for (const { geometry, material, shape, flipped } of placed.get(node) ?? []) {
+    for (const { geometry, material, shape, flipped, counts, listed } of placed.get(node) ?? []) {
       const i = meshes++,
         bound = materials.bind(i, geometry, material);
+      if (listed) {
+        curvesPrim(out, tail, i, node.name, geometry, counts, primWidth(material, width, node.world), bound, []);
+        continue;
+      }
       meshPrim(out, tail, i, node.name, geometry, shape, bound, {
         transform: flipped
           ? ['    float3 xformOp:scale = (-1, 1, 1)', '    uniform token[] xformOpOrder = ["xformOp:scale"]']

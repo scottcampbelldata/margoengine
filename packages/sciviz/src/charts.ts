@@ -51,8 +51,12 @@ export function histogram(values: ArrayLike<number>, options: BinOptions = {}): 
     lo = sorted[0];
     hi = sorted[sorted.length - 1];
     if (lo === hi) {
-      lo -= 0.5;
-      hi += 0.5;
+      // Half a unit, or two units in the last place where half a unit would not move a large value.
+      const pad = Math.max(0.5, Math.abs(lo) * 2 ** -51);
+      lo -= pad;
+      hi += pad;
+      if (!Number.isFinite(lo)) lo = -Number.MAX_VALUE;
+      if (!Number.isFinite(hi)) hi = Number.MAX_VALUE;
     }
   } else {
     lo = 0;
@@ -68,14 +72,21 @@ export function histogram(values: ArrayLike<number>, options: BinOptions = {}): 
   }
   if (!Number.isInteger(bins) || bins < 1)
     throw rangeError(`histogram bins must be a whole number of at least 1 or 'auto', got ${bins}`, 'sciviz');
-  const edges = new Float64Array(bins + 1),
-    counts = new Float64Array(bins),
-    step = (hi - lo) / bins;
-  for (let k = 0; k <= bins; k++) edges[k] = k === bins ? hi : lo + k * step;
+  // A range wider than the largest double is measured at half scale (exact: a power of two), so no edge overflows.
+  const s = Number.isFinite(hi - lo) ? 1 : 0.5,
+    scaled = (hi * s - lo * s) / bins,
+    step = scaled / s,
+    edges = new Float64Array(bins + 1),
+    counts = new Float64Array(bins);
+  for (let k = 0; k <= bins; k++) edges[k] = k === bins ? hi : (lo * s + k * scaled) / s;
   for (const v of sorted) {
     if (v < lo || v > hi) continue;
-    // The last bin is closed: the maximum counts in it.
-    counts[Math.min(bins - 1, Math.floor((v - lo) / step))]++;
+    // The last bin is closed: the maximum counts in it. A value on an edge counts in the bin that edge opens, as
+    // the edges list it (the division can round across an edge by one bin).
+    let k = Math.min(bins - 1, Math.floor((v * s - lo * s) / scaled));
+    if (k > 0 && v < edges[k]) k--;
+    else if (k < bins - 1 && v >= edges[k + 1]) k++;
+    counts[k]++;
   }
   if (options.density) {
     let total = 0;

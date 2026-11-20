@@ -8,6 +8,7 @@ import { CapsuleVolume, ConvexHullVolume, SphereVolume } from '@margoengine/kine
 import { GPUClearance } from '../dist/gpu.js';
 import { Robot } from '../dist/index.js';
 import { MeshVolume, SDFVolume } from '@margoengine/kinematics-constraints/sdf';
+import { inlinedCopies } from '../../../scripts/support/wgsl-inline.mjs';
 
 globalThis.GPUBufferUsage ??= { MAP_READ: 1, COPY_SRC: 4, COPY_DST: 8, UNIFORM: 64, STORAGE: 128 };
 globalThis.GPUMapMode ??= { READ: 1 };
@@ -250,4 +251,25 @@ test('a dispatch the device drops rejects with the cause and the fix, never sile
   const next = fakeDevice(),
     ok = new GPUClearance(next, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], { batch: 100 });
   assert.equal((await ok.evaluate(new Float32Array(3 * ok.dof))).length, 3);
+});
+
+// KB-COMPAT-FXCTIME1: Direct3D's HLSL compiler, under ANGLE's WebGL2 on Windows, inlines every call and unrolls every
+// loop it can count. The kernel called support from 24 sites and the edge test from 64 once inlined and unrolled
+// (3,409,747 characters of function body for 7 frames), and each kernel took 81 to 90 s to link cold. Each costly
+// function now has one call site, and each fixed loop bound adds params.zero, a uniform that is always 0.
+test('the kernel calls each costly function from one site, in loops no compiler can count (KB-COMPAT-FXCTIME1)', async () => {
+  const device = fakeDevice(),
+    clearance = new GPUClearance(device, arm(), [new SphereVolume({ center: [9, 9, 9], radius: 1 })], { selfCollision: true });
+  await clearance.evaluate(new Float64Array(2));
+  const { copies, size } = inlinedCopies(device.code, 'main');
+  for (const name of ['measure', 'gjk', 'supportPair', 'support', 'reduce', 'closerFace', 'outside', 'segmentField', 'turn'])
+    assert.equal(copies.get(name), 1, name);
+  // The segment and hull field reads, and the edge test of a segment and of a face.
+  assert.equal(copies.get('fieldRead'), 2);
+  assert.equal(copies.get('closerEdge'), 2);
+  assert.ok(size < 40000, `${size} characters inlined`);
+  // No loop with a constant start runs to a constant bound.
+  for (const loop of device.code.match(/for \(var \w+ = \d+u; \w+ <[^;]+;/g))
+    assert.doesNotMatch(loop, /< (\d+u|WORLD|GJK_STEPS|FRAMES);$/, loop);
+  assert.equal(whole(device, 'params')[7], 0, 'params.zero');
 });

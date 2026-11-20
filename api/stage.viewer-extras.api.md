@@ -6,11 +6,11 @@
 import { Animation } from "@margoengine/animation";
 import { EngineKernel, EngineOptions, EnginePlugin, Geometry, Mesh, PbrMaterial, Scene, Vec3 } from "@margoengine/core";
 import { ColorBackground, EnvironmentLighting, EnvironmentLoadOptions, EnvironmentSource } from "@margoengine/environment";
-import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf/pbr";
 import { Label, LabelOptions } from "@margoengine/labels";
 import { PickHit, Picking } from "@margoengine/selection";
 import { ShadowOptions, Shadows } from "@margoengine/shadows";
-import { ContactShadowOptions, ContactShadows } from "@margoengine/staging";
+import { ContactShadowOptions, ContactShadows } from "@margoengine/studio";
 import { Tonemap, TonemapOptions } from "@margoengine/tonemap";
 import { XR, XRMode, XRSessionOptions } from "@margoengine/xr";
 

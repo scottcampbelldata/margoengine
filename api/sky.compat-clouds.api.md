@@ -50,6 +50,9 @@ export interface VolumetricCloudFlash {
 export interface VolumetricCloudOptions {
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
+    weather?: CloudWeather;
+    type?: CloudType;
+    hurricane?: HurricaneOptions | Hurricane;
     coverage?: number;
     bottom?: number;
     top?: number;
@@ -60,11 +63,15 @@ export interface VolumetricCloudOptions {
     steps?: number;
     lightSteps?: number;
     maxDistance?: number;
+    stepCap?: number;
+    dimLight?: boolean;
+    erosion?: number;
     sunIntensity?: number;
     ambient?: readonly [Vec3, Vec3];
+    groundAlbedo?: number;
     depth?: () => GPUTexture | undefined;
     flash?: VolumetricCloudFlash;
-    temporal?: boolean;
+    temporal?: boolean | 'auto';
 }
 
 export interface VolumetricCloudSky {
@@ -72,13 +79,19 @@ export interface VolumetricCloudSky {
     readonly options: {
         readonly turbidity?: number;
         readonly exposure?: number;
+        readonly lighting?: {
+            readonly intensity?: number;
+        };
     };
     readonly reflectionTexture?: GPUTexture | undefined;
+    readonly lightScale?: number;
     readonly lights?: readonly {
         readonly direction: ArrayLike<number>;
         readonly radiance: ArrayLike<number>;
     }[];
     environmentLayer?: GPUTexture | undefined;
+    environmentLightLayer?: GPUTexture | undefined;
+    deck?: ((up: number) => number) | undefined;
 }
 
 export class VolumetricClouds implements EnginePlugin {
@@ -89,7 +102,10 @@ export class VolumetricClouds implements EnginePlugin {
     static attach(engine: EngineKernel, options?: VolumetricCloudOptions): VolumetricClouds;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get ready(): Promise<void>;
+    get time(): number;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -99,20 +115,32 @@ export class Weather implements EnginePlugin {
     readonly options: WeatherOptions;
     readonly name: string;
     readonly listener: Float32Array<ArrayBuffer>;
+    channelSource?: LightningChannelSource;
     occlusion?: WeatherOcclusion;
     constructor(options?: WeatherOptions);
     static attach(engine: EngineKernel, options?: WeatherOptions): Weather;
     get reactiveMask(): GPUTexture | undefined;
     get amount(): number;
     get flash(): number;
+    get liveStrikes(): readonly LiveStrike[];
+    get lastStrike(): LightningStrike | undefined;
+    readonly lightningLight: LightningLight;
+    readonly cloudFlash: {
+        position: [number, number, number];
+        intensity: number;
+        color: [number, number, number];
+        radius: number;
+    };
     get wetness(): number;
     get snowCover(): number;
     get rainShare(): number;
     get elapsed(): number;
+    get time(): number;
     onLightning(listener: (strike: LightningStrike) => void): () => void;
     onThunder(listener: (strike: LightningStrike) => void): () => void;
     strike(options?: StrikeOptions): LightningStrike;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
@@ -167,6 +195,11 @@ export interface WeatherLightningOptions {
     strength?: number;
     color?: Vec3;
     seed?: number;
+    hold?: number;
+    light?: WeatherLightningLightOptions;
+    cloud?: WeatherLightningCloudOptions;
+    link?: boolean | WeatherLightningLinkOptions;
+    bolt?: LightningBoltOptions;
 }
 
 export interface WeatherOcclusion {
@@ -179,15 +212,21 @@ export interface WeatherOptions {
     precipitation?: 'rain' | 'snow' | 'sleet' | 'none';
     snowShare?: number;
     intensity?: number;
+    rainRate?: number;
     fadeSeconds?: number;
     wind?: readonly [number, number];
     radius?: number;
     height?: number;
     particles?: number;
+    snowfallRate?: number;
+    flakeSizes?: readonly [number, number];
     color?: Vec3;
     brightness?: number;
     opacity?: number;
     reactive?: boolean;
+    exposure?: number;
+    lens?: WeatherLensOptions | false;
+    nearFade?: readonly [number, number];
     lightning?: WeatherLightningOptions;
 }
 
@@ -196,4 +235,203 @@ export function lightningFlash(seconds: number, offsets: readonly number[], ampl
 export const speedOfSound = 343;
 
 export function thunderDelay(distance: number, speed?: number): number;
+
+// Not exported from this entry, but used by the exports above:
+
+type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+
+interface CloudWeather {
+    readonly cloud: number;
+    readonly rain?: number;
+    readonly lightning?: number;
+}
+
+class Hurricane {
+    readonly options: HurricaneOptions;
+    constructor(options?: HurricaneOptions);
+    get resolved(): ResolvedHurricane;
+    centerAt(t?: number): [number, number];
+    windAt(x: number, z: number, t?: number): HurricaneWind;
+    rainAt(x: number, z: number, t?: number): number;
+    coverAt(x: number, z: number, height?: number, t?: number, depth?: number): HurricaneCover;
+    regionAt(x: number, z: number, t?: number): HurricaneRegion;
+    weatherAt(x: number, z: number, t?: number): HurricaneWeather;
+}
+
+interface HurricaneCover {
+    eye: number;
+    eyewall: number;
+    outerEyewall: number;
+    moat: number;
+    band: number;
+    shield: number;
+    canopy: number;
+    cover: number;
+}
+
+interface HurricaneOptions {
+    center?: readonly [number, number];
+    velocity?: readonly [number, number];
+    pressureDrop?: number;
+    maxWindRadius?: number;
+    holland?: number;
+    latitude?: number;
+    airDensity?: number;
+    surfaceFactor?: number;
+    inflow?: number;
+    gustFactor?: number;
+    eyeRadius?: number;
+    eyeSlope?: number;
+    eyewallWidth?: number;
+    eyeCloud?: number;
+    outerEyewall?: number;
+    outerEyewallStrength?: number;
+    moat?: number;
+    bands?: number;
+    bandPitch?: number;
+    bandWidth?: number;
+    bandStart?: number;
+    bandTop?: number;
+    bandRotation?: number;
+    bandDrift?: number;
+    principalBand?: number;
+    extent?: number;
+    shield?: number;
+    canopy?: number;
+    rainMax?: number;
+    rainExtent?: number;
+    flowPeriod?: number;
+    swirl?: number;
+}
+
+type HurricaneRegion = 'eye' | 'eyewall' | 'moat' | 'outerEyewall' | 'band' | 'shield' | 'outside';
+
+interface HurricaneWeather {
+    weight: number;
+    wind: number;
+    gust: number;
+    windDirection: number;
+    rain: number;
+    cloud: number;
+    lightning: number;
+    humidity: number;
+}
+
+interface HurricaneWind {
+    speed: number;
+    gust: number;
+    velocity: [number, number];
+    direction: number;
+}
+
+interface LightningBoltOptions {
+    scale?: number;
+    width?: number;
+    glow?: number;
+    branching?: number;
+    spread?: number;
+    detail?: number;
+    fade?: number;
+    top?: number;
+}
+
+interface LightningChannelSource {
+    lights(strike: LightningStrike, count: number, decay: number): readonly {
+        position: Vec3;
+        weight: number;
+        radius: number;
+    }[];
+}
+
+interface LightningLight {
+    position: [number, number, number];
+    color: [number, number, number];
+    intensity: number;
+    range: number;
+    decay: number;
+    shadow?: {
+        near: number;
+        far: number;
+    };
+    radius?: number;
+}
+
+interface LiveStrike {
+    readonly strike: LightningStrike;
+    readonly age: number;
+    readonly offsets: readonly number[];
+    readonly amplitudes: readonly number[];
+}
+
+interface ResolvedHurricane {
+    cx: number;
+    cz: number;
+    vx: number;
+    vz: number;
+    dp: number;
+    rmax: number;
+    b: number;
+    rho: number;
+    f: number;
+    spin: number;
+    surface: number;
+    inflow: number;
+    gust: number;
+    eye: number;
+    slope: number;
+    wall: number;
+    eyeCloud: number;
+    outer: number;
+    outerStrength: number;
+    moat: number;
+    bands: number;
+    pitch: number;
+    bandWidth: number;
+    bandStart: number;
+    bandTop: number;
+    bandRotation: number;
+    bandDrift: number;
+    principal: number;
+    extent: number;
+    shield: number;
+    canopy: number;
+    rainMax: number;
+    rainExtent: number;
+    flowPeriod: number;
+    swirl: number;
+}
+
+interface WeatherLensOptions {
+    focalDistance?: number;
+    aperture?: number;
+    filmGauge?: number;
+}
+
+interface WeatherLightningCloudOptions {
+    base?: number;
+    peak?: number;
+    radius?: number;
+    scale?: number;
+}
+
+interface WeatherLightningLightOptions {
+    peak?: number;
+    height?: number;
+    color?: Vec3;
+    scale?: number;
+    range?: number;
+    shadow?: boolean | {
+        near?: number;
+        far?: number;
+    };
+    line?: boolean;
+    segments?: number;
+}
+
+interface WeatherLightningLinkOptions {
+    clouds?: boolean;
+    fog?: boolean;
+    lights?: boolean;
+    group?: string;
+}
 ```

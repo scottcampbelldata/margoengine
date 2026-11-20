@@ -45,19 +45,57 @@ export function weld(mesh: WeightMesh, tolerance = 1e-6): Welded {
     if (v > max[i % 3]) max[i % 3] = v;
   }
   const size = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]),
-    cell = tolerance * size,
-    keys = new Map<string, number>(),
+    reach = tolerance * size,
+    keys = new Map<string, number[]>(),
     point = new Int32Array(n),
     unique: number[] = [];
+  // Points within `reach` of a kept point join it (the first kept, in input order). Kept points are hashed in cells
+  // twice `reach` wide: a point within `reach` of another lies in its cell or the next one toward it on each axis, so
+  // eight cells are searched, and a pair straddling a cell boundary is still found.
+  const cell = 2 * reach,
+    reach2 = reach * reach;
   for (let i = 0; i < n; i++) {
     const x = positions[i * 3],
       y = positions[i * 3 + 1],
-      z = positions[i * 3 + 2],
-      key = cell > 0 ? `${Math.round(x / cell)},${Math.round(y / cell)},${Math.round(z / cell)}` : `${x},${y},${z}`;
-    let id = keys.get(key);
-    if (id === undefined) {
-      keys.set(key, (id = unique.length / 3));
-      unique.push(x, y, z);
+      z = positions[i * 3 + 2];
+    let id = -1;
+    if (cell > 0) {
+      const fx = x / cell,
+        fy = y / cell,
+        fz = z / cell,
+        cx = Math.floor(fx),
+        cy = Math.floor(fy),
+        cz = Math.floor(fz),
+        sx = fx - cx < 0.5 ? -1 : 1,
+        sy = fy - cy < 0.5 ? -1 : 1,
+        sz = fz - cz < 0.5 ? -1 : 1;
+      for (let k = 0; k < 8; k++) {
+        const list = keys.get(`${cx + (k & 1 ? sx : 0)},${cy + (k & 2 ? sy : 0)},${cz + (k & 4 ? sz : 0)}`);
+        if (list)
+          for (const kept of list) {
+            const dx = unique[kept * 3] - x,
+              dy = unique[kept * 3 + 1] - y,
+              dz = unique[kept * 3 + 2] - z;
+            if (dx * dx + dy * dy + dz * dz <= reach2 && (id < 0 || kept < id)) id = kept;
+          }
+      }
+      if (id < 0) {
+        id = unique.length / 3;
+        unique.push(x, y, z);
+        const key = `${cx},${cy},${cz}`,
+          list = keys.get(key);
+        if (list) list.push(id);
+        else keys.set(key, [id]);
+      }
+    } else {
+      const key = `${x},${y},${z}`,
+        found = keys.get(key);
+      if (found) id = found[0];
+      else {
+        id = unique.length / 3;
+        keys.set(key, [id]);
+        unique.push(x, y, z);
+      }
     }
     point[i] = id;
   }

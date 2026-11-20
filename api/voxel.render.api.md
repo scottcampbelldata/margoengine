@@ -38,23 +38,29 @@ export interface VoxelCapture {
 }
 
 export interface VoxelChunkMesher {
-    mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3): Promise<ChunkMesh | null>;
+    mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3, border?: boolean): Promise<ChunkMesh | null>;
     cancel(key: string): void;
     warm?(): void;
+    setDevice?(device: GPUDevice): void;
     dispose(): void;
 }
 
 export interface VoxelLightmap {
-    readonly texture: GPUTexture;
+    readonly texture: Borrowable<GPUTexture>;
     readonly charts: Float32Array;
     readonly index: Int32Array;
     shader(code: string): string;
+}
+
+export interface VoxelOrigin {
+    readonly origin: ArrayLike<number>;
 }
 
 export class VoxelRenderer implements EnginePlugin {
     readonly name: string;
     readonly world: VoxelWorld;
     readonly textures: BlockTextures;
+    origin: VoxelOrigin | null;
     private constructor();
     static attach(engine: EngineKernel, options: VoxelRendererOptions): VoxelRenderer;
     get scale(): number;
@@ -81,6 +87,9 @@ export class VoxelRenderer implements EnginePlugin {
     drawShadow({ context, pass, matrix, cascade }: VoxelShadowContext): boolean;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -108,6 +117,7 @@ export interface VoxelRendererOptions {
     bevel?: VoxelBevel;
     lightmap?: VoxelLightmap;
     scale?: number;
+    origin?: VoxelOrigin | null;
 }
 
 export interface VoxelRendererStats {
@@ -133,7 +143,7 @@ export interface VoxelShadowContext {
 
 export interface VoxelVertexMotion {
     shader(code: string): string;
-    bindings(device: GPUDevice): GPUBindGroupEntry[];
+    bindings(device: GPUDevice, time?: number, base?: readonly number[]): GPUBindGroupEntry[];
     readonly padding: number;
     readonly version: number;
 }
@@ -210,11 +220,14 @@ class BlockTypes {
     get(id: number): BlockType;
 }
 
+type Borrowable<T> = T | ((device: GPUDevice) => T);
+
 interface ChunkMesh {
     opaque: Uint32Array;
     cutout: Uint32Array;
     translucent: Uint32Array;
     visibility: number;
+    border?: Uint32Array;
 }
 
 interface CubeFace {
@@ -251,12 +264,13 @@ interface PackedChunk {
 
 interface VoxelBevel {
     readonly amount: number;
-    mesh(faces: readonly CubeFace[], origin: readonly number[]): {
+    mesh(faces: readonly CubeFace[], origin: readonly number[], context?: readonly CubeFace[]): {
         vertices: Float32Array;
         indices: Uint32Array;
         centers: Float32Array;
     };
     readonly layout: GPUVertexBufferLayout;
+    readonly origins: GPUVertexBufferLayout;
     readonly shader: string;
     readonly shadow: string;
 }

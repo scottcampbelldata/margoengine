@@ -9,131 +9,147 @@ import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { postBrowser } from '../../post/test/post-browser.mjs';
 
-const W = 320,
-  H = 240,
-  EXPOSURE = -4,
-  value = (x, y) => (x < W / 2 ? 8 : 0.02) * ((Math.floor(x / 8) + Math.floor(y / 8)) % 2 ? 1.25 : 0.8);
-
+const EXPOSURE = -4;
+// Two views: the default radius at 320 x 240 (4 by 4 blocks), and the largest radius, 0.1, on a 320 x 1400 view, where
+// sigma is 140 pixels, so the base is built from 16 by 16 blocks (the bilateral blur needs 27 taps a side there).
+// Before the block size followed the radius, the blur stopped at 32 taps a side of 4 by 4 blocks, so it cut a
+// 35-texel sigma off at 0.91 sigma and the base differed from the oracle by over a stop at the window's edge.
+const cases = [
+  { W: 320, H: 240, radius: 0.02, block: 4 },
+  { W: 320, H: 1400, radius: 0.1, block: 16 },
+];
 await postBrowser(
   'tonemap-local',
   5370,
   () => launchBrowser({ headless: true }),
   async (page, shot) => {
-    await page.evaluate(
-      async ([W, H, EXPOSURE, valueSource]) => {
-        const value = eval(valueSource),
-          { Engine } = await import('/packages/core/dist/index.js'),
-          { Tonemap } = await import('/packages/tonemap/dist/index.js'),
-          { LocalExposure } = await import('/packages/tonemap/dist/local.js');
-        const canvas = document.querySelector('canvas'),
-          engine = await Engine.create(canvas, { backend: 'webgpu' }),
-          device = engine.gpu;
-        engine.stop();
-        if (canvas.width !== W || canvas.height !== H) throw new Error(`canvas is ${canvas.width} x ${canvas.height}`);
-        const data = new Float32Array(W * H * 4);
-        for (let y = 0; y < H; y++)
-          for (let x = 0; x < W; x++) data.set([value(x, y), value(x, y), value(x, y), 1], 4 * (y * W + x));
-        const source = device.createTexture({
-          size: [W, H],
-          format: 'rgba32float',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-        device.queue.writeTexture({ texture: source }, data, { bytesPerRow: W * 16 }, [W, H]);
-        const local = new LocalExposure(),
-          tonemap = Tonemap.attach(engine, { curve: 'linear', exposure: EXPOSURE, source: () => source });
-        window.t = { engine, tonemap, local };
-      },
-      [W, H, EXPOSURE, value.toString().replace(/\bW\b/g, String(W))],
-    );
-    const frame = async (set) => {
-      await page.evaluate(`(${set})(window.t.tonemap.options, window.t.local); window.t.engine.render({ delta: 1 / 60 })`);
-      await page.evaluate(() => window.t.engine.gpu.queue.onSubmittedWorkDone());
-      return shot();
-    };
-    const plain = await frame('() => {}'),
-      zero = await frame('(o, l) => { l.options.strength = 0; o.extensions = [l]; }'),
-      on = await frame('(o, l) => { l.options.strength = 0.5; }');
-    await page.evaluate(() => (window.t.local.dispose(), window.t.engine.dispose()));
-
-    // CPU oracle of the extension, 32-bit floats where the GPU stores them.
-    const f = Math.fround,
-      w = Math.ceil(W / 4),
-      h = Math.ceil(H / 4),
-      down = new Float32Array(w * h);
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        let sum = 0,
-          n = 0;
-        for (let j = 0; j < 4; j++)
-          for (let i = 0; i < 4; i++)
-            if (4 * x + i < W && 4 * y + j < H) {
-              sum += Math.min(14, Math.max(-14, Math.log2(Math.max(f(value(4 * x + i, 4 * y + j)), 1e-4))));
-              n++;
-            }
-        down[y * w + x] = sum / n;
-      }
-    const sigma = Math.max(0.5, (0.02 * H) / 4),
-      taps = Math.min(32, Math.ceil(3 * sigma)),
-      edges = 1.3,
-      blur = (src, dx, dy) => {
-        const out = new Float32Array(w * h);
-        for (let y = 0; y < h; y++)
-          for (let x = 0; x < w; x++) {
-            const c = src[y * w + x];
-            let sum = 0,
-              weight = 0;
-            for (let k = -taps; k <= taps; k++) {
-              const qx = Math.min(w - 1, Math.max(0, x + dx * k)),
-                qy = Math.min(h - 1, Math.max(0, y + dy * k)),
-                v = src[qy * w + qx],
-                d = v - c,
-                wt = Math.exp(-(k * k) / (2 * sigma * sigma) - (d * d) / (2 * edges * edges));
-              sum += wt * v;
-              weight += wt;
-            }
-            out[y * w + x] = sum / weight;
-          }
-        return out;
-      },
-      base = blur(blur(down, 1, 0), 0, 1),
-      at = (x, y) => base[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))],
-      encode = (v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
-    let worst = 0,
-      zeroDiff = 0;
-    const stopsAt = (x, y) => {
-      const tx = (x + 0.5) / 4 - 0.5,
-        ty = (y + 0.5) / 4 - 0.5,
-        ix = Math.floor(tx),
-        iy = Math.floor(ty),
-        fx = tx - ix,
-        fy = ty - iy,
-        b =
-          (at(ix, iy) * (1 - fx) + at(ix + 1, iy) * fx) * (1 - fy) +
-          (at(ix, iy + 1) * (1 - fx) + at(ix + 1, iy + 1) * fx) * fy;
-      return Math.min(3, Math.max(-3, -0.5 * (b + EXPOSURE - Math.log2(0.18))));
-    };
-    for (let y = 0; y < H; y++)
-      for (let x = 0; x < W; x++) {
-        const i = 4 * (y * W + x),
-          want = encode(Math.min(1, value(x, y) * 2 ** (EXPOSURE + stopsAt(x, y))));
-        worst = Math.max(worst, Math.abs(want - on.data[i]));
-        zeroDiff = Math.max(zeroDiff, Math.abs(zero.data[i] - plain.data[i]));
-      }
-    // Detail inside each region, away from the edge: the local stops of neighbouring checker cells (x1.25 against
-    // x0.8) differ by almost nothing, so the GPU frame, which matches the oracle, keeps their 1.5625 contrast.
-    const decode = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
-      r = {
-        worst,
-        zeroDiff,
-        windowSpread: Math.abs(stopsAt(68, 100) - stopsAt(60, 100)),
-        interiorSpread: Math.abs(stopsAt(260, 100) - stopsAt(252, 100)),
-        windowStops: Math.log2(decode(on.data[4 * (100 * W + 60)]) / (value(60, 100) * 2 ** EXPOSURE)),
-        interiorStops: Math.log2(decode(on.data[4 * (100 * W + 252)]) / (value(252, 100) * 2 ** EXPOSURE)),
+    for (const { W, H, radius, block } of cases) {
+      const value = (x, y) => (x < W / 2 ? 8 : 0.02) * ((Math.floor(x / 8) + Math.floor(y / 8)) % 2 ? 1.25 : 0.8);
+      await page.setViewportSize({ width: W, height: H });
+      await page.evaluate(
+        async ([W, H, EXPOSURE, valueSource, radius]) => {
+          const value = eval(valueSource),
+            { Engine } = await import('/packages/core/dist/index.js'),
+            { Tonemap } = await import('/packages/tonemap/dist/index.js'),
+            { LocalExposure } = await import('/packages/tonemap/dist/local.js');
+          const canvas = document.querySelector('canvas');
+          canvas.style.width = `${W}px`;
+          canvas.style.height = `${H}px`;
+          canvas.width = W;
+          canvas.height = H;
+          const engine = await Engine.create(canvas, { backend: 'webgpu' }),
+            device = engine.gpu;
+          engine.stop();
+          if (canvas.width !== W || canvas.height !== H)
+            throw new Error(`canvas is ${canvas.width} x ${canvas.height}`);
+          const data = new Float32Array(W * H * 4);
+          for (let y = 0; y < H; y++)
+            for (let x = 0; x < W; x++) data.set([value(x, y), value(x, y), value(x, y), 1], 4 * (y * W + x));
+          const source = device.createTexture({
+            size: [W, H],
+            format: 'rgba32float',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture: source }, data, { bytesPerRow: W * 16 }, [W, H]);
+          const local = new LocalExposure({ radius }),
+            tonemap = Tonemap.attach(engine, { curve: 'linear', exposure: EXPOSURE, source: () => source });
+          window.t = { engine, tonemap, local };
+        },
+        [W, H, EXPOSURE, value.toString().replace(/\bW\b/g, String(W)), radius],
+      );
+      const frame = async (set) => {
+        await page.evaluate(
+          `(${set})(window.t.tonemap.options, window.t.local); window.t.engine.render({ delta: 1 / 60 })`,
+        );
+        await page.evaluate(() => window.t.engine.gpu.queue.onSubmittedWorkDone());
+        return shot();
       };
-    console.log(JSON.stringify(r));
-    assert.ok(worst <= 1, `every pixel matches the CPU oracle: ${worst} levels`);
-    assert.equal(zeroDiff, 0, 'strength 0 changes no pixel');
-    assert.ok(r.windowSpread < 0.02 && r.interiorSpread < 0.02, 'the detail inside a region is not compressed');
-    assert.ok(r.interiorStops > 2.5 && r.windowStops < -0.4, 'the interior comes up and the window goes down');
+      const plain = await frame('() => {}'),
+        zero = await frame('(o, l) => { l.options.strength = 0; o.extensions = [l]; }'),
+        on = await frame('(o, l) => { l.options.strength = 0.5; }');
+      await page.evaluate(() => (window.t.local.dispose(), window.t.engine.dispose()));
+
+      // CPU oracle of the extension, 32-bit floats where the GPU stores them.
+      const f = Math.fround,
+        w = Math.ceil(W / block),
+        h = Math.ceil(H / block),
+        down = new Float32Array(w * h);
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          let sum = 0,
+            n = 0;
+          for (let j = 0; j < block; j++)
+            for (let i = 0; i < block; i++)
+              if (block * x + i < W && block * y + j < H) {
+                sum += Math.min(14, Math.max(-14, Math.log2(Math.max(f(value(block * x + i, block * y + j)), 1e-4))));
+                n++;
+              }
+          down[y * w + x] = sum / n;
+        }
+      // Three sigma a side, uncut.
+      const sigma = Math.max(0.5, (radius * H) / block),
+        taps = Math.ceil(3 * sigma),
+        edges = 1.3,
+        blur = (src, dx, dy) => {
+          const out = new Float32Array(w * h);
+          for (let y = 0; y < h; y++)
+            for (let x = 0; x < w; x++) {
+              const c = src[y * w + x];
+              let sum = 0,
+                weight = 0;
+              for (let k = -taps; k <= taps; k++) {
+                const qx = Math.min(w - 1, Math.max(0, x + dx * k)),
+                  qy = Math.min(h - 1, Math.max(0, y + dy * k)),
+                  v = src[qy * w + qx],
+                  d = v - c,
+                  wt = Math.exp(-(k * k) / (2 * sigma * sigma) - (d * d) / (2 * edges * edges));
+                sum += wt * v;
+                weight += wt;
+              }
+              out[y * w + x] = sum / weight;
+            }
+          return out;
+        },
+        base = blur(blur(down, 1, 0), 0, 1),
+        at = (x, y) => base[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))],
+        encode = (v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+      let worst = 0,
+        zeroDiff = 0;
+      const stopsAt = (x, y) => {
+        const tx = (x + 0.5) / block - 0.5,
+          ty = (y + 0.5) / block - 0.5,
+          ix = Math.floor(tx),
+          iy = Math.floor(ty),
+          fx = tx - ix,
+          fy = ty - iy,
+          b =
+            (at(ix, iy) * (1 - fx) + at(ix + 1, iy) * fx) * (1 - fy) +
+            (at(ix, iy + 1) * (1 - fx) + at(ix + 1, iy + 1) * fx) * fy;
+        return Math.min(3, Math.max(-3, -0.5 * (b + EXPOSURE - Math.log2(0.18))));
+      };
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          const i = 4 * (y * W + x),
+            want = encode(Math.min(1, value(x, y) * 2 ** (EXPOSURE + stopsAt(x, y))));
+          worst = Math.max(worst, Math.abs(want - on.data[i]));
+          zeroDiff = Math.max(zeroDiff, Math.abs(zero.data[i] - plain.data[i]));
+        }
+      // Detail inside each region, away from the edge: the local stops of neighbouring checker cells (x1.25 against
+      // x0.8) differ by almost nothing, so the GPU frame, which matches the oracle, keeps their 1.5625 contrast.
+      const decode = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
+        r = {
+          worst,
+          zeroDiff,
+          windowSpread: Math.abs(stopsAt(68, 100) - stopsAt(60, 100)),
+          interiorSpread: Math.abs(stopsAt(260, 100) - stopsAt(252, 100)),
+          windowStops: Math.log2(decode(on.data[4 * (100 * W + 60)]) / (value(60, 100) * 2 ** EXPOSURE)),
+          interiorStops: Math.log2(decode(on.data[4 * (100 * W + 252)]) / (value(252, 100) * 2 ** EXPOSURE)),
+        };
+      console.log(JSON.stringify({ W, H, radius, block, taps, ...r }));
+      assert.ok(worst <= 1, `${H} rows: every pixel matches the CPU oracle: ${worst} levels`);
+      assert.equal(zeroDiff, 0, 'strength 0 changes no pixel');
+      assert.ok(r.windowSpread < 0.02 && r.interiorSpread < 0.02, 'the detail inside a region is not compressed');
+      assert.ok(r.interiorStops > 2.5 && r.windowStops < -0.4, 'the interior comes up and the window goes down');
+    }
   },
 );

@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh, PbrMaterial, Scene, Vec3 } from "@margoengine/core";
-import { SkyMoon, SkyMoonConfig } from "@margoengine/scenery";
+import { SkyMoon, SkyMoonConfig } from "@margoengine/sky/night-preset";
 
 export function addSky(stage: Stage, options?: SkyMoonConfig): Promise<SkyMoon>;
 

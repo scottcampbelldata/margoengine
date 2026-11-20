@@ -1,17 +1,17 @@
-// gltf-pro's lighting hook composer (its README "Lighting hooks"), shared with VAT crowds whose lit fragment keeps the
+// gltf/pbr's lighting hook composer (its README "Lighting hooks"), shared with VAT crowds whose lit fragment keeps the
 // same hook points: `direct+ambient(s)`, `var color=`, `fn ambient(s:Surface)`, `+s.emissive;` and the tone-map line.
 import { margoError } from './errors.js';
 const lit = new WeakMap();
 /** Declared by a shader whose coat layer adds directional light after the sum: what the `direct` hook lets through. */
 export const directVisibility = 'var<private> margoDirectVisible:vec3f=vec3f(1);';
-/** `code` (a PBR fragment with gltf-pro's hook points, possibly already lit) with one effect's hooks composed in. */
+/** `code` (a PBR fragment with gltf/pbr's hook points, possibly already lit) with one effect's hooks composed in. */
 export function lightPBR(code, hooks) {
   const cache = lit.get(hooks),
     out = cache?.get(code);
   if (out !== undefined) return out;
   return composeLightPBR(code, hooks, cache);
 }
-// gltf-pro's built-in sky light, a fixed gradient times the ambient strength f.radiance.w, wherever a shader writes it (the
+// gltf/pbr's built-in sky light, a fixed gradient times the ambient strength f.radiance.w, wherever a shader writes it (the
 // hemisphere ambient, the clearcoat and sheen defaults, a light probe's fallback; also in materials' and VAT's shaders).
 // The gradient (ground (0.35, 0.3, 0.25) to sky 1) and the f0 x 0.5 ambient specular are Margo design choices.
 const gradient = /mix\(vec3f\(0\.35,0\.3,0\.25\),vec3f\(1(?:\.0)?\),clamp\(([\w.]+)\.y\*0\.5\+0\.5,0\.0,1\.0\)\)/g;
@@ -33,11 +33,11 @@ function composeLightPBR(code, hooks, cache) {
     if (typeof from === 'string' ? !out.includes(from) : out.search(from) < 0)
       throw margoError(
         'unsupported',
-        `PBR lighting hook point missing: ${from}; use matching @margoengine/gltf-pro and effect package versions`,
+        `PBR lighting hook point missing: ${from}; use matching @margoengine/gltf/pbr and effect package versions`,
       );
     out = out.replace(from, to);
   };
-  // gltf-pro's transmissive and extended shaders (they define margoAmbientLayers) evaluate light and ambient hooks as
+  // gltf/pbr's transmissive and extended shaders (they define margoAmbientLayers) evaluate light and ambient hooks as
   // functions of the surface: local lights see the diffuse left after transmission (margoFront), the ambient hook is
   // layered by margoAmbientLayers (thin film, diffuse transmission, bent normal).
   const layered = code.includes('fn margoAmbientLayers(');
@@ -81,7 +81,7 @@ function composeLightPBR(code, hooks, cache) {
         `let margoAmbient=${layered ? 'margoAmbientLayers(i,s,v)' : dielectric(hooks.ambient)};var color=${terms}+s.emissive+margoAmbient;`,
     );
   }
-  // Physical materials (gltf-pro's layers) light their clearcoat and sheen through these two functions.
+  // Physical materials (gltf/pbr's layers) light their clearcoat and sheen through these two functions.
   for (const [name, expression] of [
     ['margoCoatAmbient', hooks.coat],
     ['margoSheenAmbient', hooks.sheen],
@@ -105,7 +105,7 @@ function composeLightPBR(code, hooks, cache) {
             ? 'return margoHemisphere(s);'
             : out.includes('fn hemisphere_ambient(')
               ? 'return hemisphere_ambient(s);'
-              : // VAT crowds write their hemisphere ambient inline: the same terms as gltf-pro's.
+              : // VAT crowds write their hemisphere ambient inline: the same terms as gltf/pbr's.
                 'let f0=mix(vec3f(0.04),s.base.rgb,s.metal);return (s.base.rgb*(1.0-s.metal)+f0*0.5)*margoSkyHook(s.n)*s.occlusion;'
         }}`,
       );
@@ -114,7 +114,7 @@ fn margoSkyHook(n:vec3f)->vec3f {return ${hooks.sky};}
 `;
   }
   if (hooks.sky || sky) out = skyText(out);
-  // The output hook wraps the tone-mapped colour; the sRGB encoding stays after it. Shaders end either with gltf-pro's
+  // The output hook wraps the tone-mapped colour; the sRGB encoding stays after it. Shaders end either with gltf/pbr's
   // inline tone-map line or with shared/display.js toDisplay (voxels).
   const shared = 'if(f.settings.w<0.5) {color=toDisplay(color);}',
     srgb = 'select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308))';

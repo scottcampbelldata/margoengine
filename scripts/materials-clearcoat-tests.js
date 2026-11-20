@@ -9,7 +9,7 @@ export async function clearcoatBrowserChecks(page) {
   return page.evaluate(
     async ({ doc, buffers }) => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF } = await import('/packages/gltf/dist/pbr.js');
       const materials = await import('/packages/materials/dist/index.js');
       const assert = (value, message) => {
         if (!value) throw new Error(message);
@@ -334,7 +334,7 @@ export async function clearcoatBrowserChecks(page) {
           KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatRoughnessFactor: 0.05 },
           KHR_materials_sheen: { sheenColorFactor: [1, 1, 1], sheenRoughnessFactor: 0.5 },
         };
-        const { extendedMaterials } = await import('/packages/gltf-pro/dist/extended.js');
+        const { extendedMaterials } = await import('/packages/gltf/dist/extended.js');
         const native = parseGLTF(
           engine,
           sheened,

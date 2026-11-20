@@ -345,6 +345,9 @@ export async function openN5(input: CloudInput, path = '', options: CloudVolumeO
       max = options.maxDecodedBytes ?? 64 * 1024 * 1024;
     if (product(chunks) * size > max) throw bad('N5 chunk exceeds maxDecodedBytes');
     const compression = meta.compression as Metadata;
+    // The N5 Java GzipCompression writes a zlib (RFC 1950) stream instead of a gzip member when useZlib is set.
+    const useZlib = compression?.useZlib;
+    if (useZlib !== undefined && typeof useZlib !== 'boolean') throw bad('N5 gzip useZlib must be a boolean');
     const array = await virtualArray(
       store,
       shape,
@@ -360,7 +363,8 @@ export async function openN5(input: CloudInput, path = '', options: CloudVolumeO
         const actual = Array.from({ length: rank }, (_, d) => view.getUint32(4 + d * 4));
         if (actual.some((n, d) => n < 1 || n > blockSize[d])) throw bad('invalid N5 edge-block shape');
         const payload = encoded.subarray(4 + rank * 4),
-          method = String(compression?.type ?? 'raw');
+          type = String(compression?.type ?? 'raw'),
+          method = type === 'gzip' && useZlib ? 'zlib' : type;
         let decoded: Uint8Array;
         if (method === 'bzip2') {
           const { decodeBzip2 } = await import('@margoengine/decoders/bzip2');

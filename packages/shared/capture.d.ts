@@ -1,13 +1,13 @@
 import type { PassContext } from '@margoengine/core/extension';
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** What `setCapture` takes: gltf-pro's `PBRCapture`. */
+/** What `setCapture` takes: gltf/pbr's `PBRCapture`. */
 export interface CaptureHook {
   readonly targets: readonly GPUColorTargetState[];
   declarations(code: string): string;
   begin(): GPURenderPassEncoder;
 }
-/** What a capture draws: a gltf-pro model or a materials mesh. */
+/** What a capture draws: a gltf/pbr model or a materials mesh. */
 export interface CaptureModel<Hook extends CaptureHook> {
   setCapture(hook: Hook): () => void;
   draw(context: Context, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;

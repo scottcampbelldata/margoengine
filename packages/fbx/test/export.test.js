@@ -821,3 +821,48 @@ test('a camera or light glTF would refuse is refused here too', async () => {
     /Light color/,
   );
 });
+
+test('a binary file past the first 64 KiB buffer is whole and reads back', async () => {
+  // The writer grows its buffer as it goes; every write must land in the grown one, not the one it replaced.
+  const count = 20000,
+    positions = new Float32Array(count * 3).map((_, i) => ((i * 7919) % 1000) / 100),
+    normals = new Float32Array(count * 3).map((_, i) => (i % 3 === 2 ? 1 : 0)),
+    indices = Uint32Array.from({ length: count - (count % 3) }, (_, i) => i),
+    names = Array.from({ length: 400 }, (_, i) => ({ name: `Null${i}` })),
+    { fbx } = await exportFBX({ nodes: [{ name: 'Big', geometry: { positions, normals, indices } }, ...names] });
+  assert.ok(fbx.byteLength > 65536, `${fbx.byteLength} bytes`);
+  const { json } = readGLB(await convertFBX(fbx));
+  assert.equal(json.nodes.filter((n) => /^Null\d+$/.test(n.name)).length, 400);
+  assert.ok(json.meshes.length >= 1);
+});
+
+test('ASCII names with quotes and backslashes come back as they were written', async () => {
+  for (const name of ['Arm\\', 'a\\\\b', 'Arm "L"', 'C:\\rig\\"x"']) {
+    const { json } = await convert({ nodes: [{ name, geometry: quad() }] }, true);
+    assert.equal(json.nodes[0].name, name);
+  }
+});
+
+test('animation keys that are not finite or a zero rotation are refused at export', async () => {
+  const node = { geometry: quad() },
+    bad = (path, values) => exportFBX({ nodes: [node], animations: [{ channels: [{ node, path, times: [0, 1], values }] }] });
+  await assert.rejects(bad('translation', [0, 0, 0, NaN, 0, 0]), /not finite/);
+  await assert.rejects(bad('scale', [1, 1, 1, 1, Infinity, 1]), /not finite/);
+  await assert.rejects(bad('rotation', [0, 0, 0, 1, 0, 0, 0, 0]), /zero quaternion/);
+});
+
+test('a camera that leaves out its lens properties gets the FbxCamera class defaults', async () => {
+  const { sceneExtras } = await import('../dist/scene-extras.js'),
+    { fbx } = await exportFBX(
+      { nodes: [{ name: 'view', camera: { type: 'perspective', perspective: { yfov: 0.7, znear: 0.5, zfar: 80 } } }] },
+      { ascii: true },
+    ),
+    text = new TextDecoder()
+      .decode(fbx)
+      .split('\n')
+      .filter((line) => !/"(FieldOfView|FieldOfViewX|FieldOfViewY|FocalLength|FilmWidth|FilmHeight|ApertureMode)"/.test(line))
+      .join('\n'),
+    { json } = readGLB(await convertFBX(new TextEncoder().encode(text), { extensions: [sceneExtras] })),
+    yfov = json.cameras[0].perspective.yfov;
+  assert.ok(Math.abs(yfov - (25.115 * Math.PI) / 180) < 1e-3, `${yfov}`);
+});

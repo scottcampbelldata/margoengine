@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter plant states check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/scatter/states (states.browser.mjs drives it): one tree (a 0.3 m trunk to 2 m and a
+// 2 m wide crown from 2 m to 4.5 m, both cut every 0.1 m so colour lines are sharp) as a Scatter or a ScatterTiles
+// record at the origin, lit by a sun 45 degrees up from +X with Shadows, and a PlantStates map over [-8, 8] fed by
+// stand-in fire, flood and ground textures written here (the formats FireFront, Flood and GroundChange write).
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,box,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
+import {PlantStates} from '/packages/scatter/dist/states.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{camera:{position:[0,5,14],target:[0,2,0],near:0.5,far:200}}),device=engine.gpu;
+device.addEventListener?.('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([1,1,0]);
+const floor=engine.createMesh().setGeometry(box(40,0.1,40)).setPosition([0,-0.05,0]);
+const shadows=Shadows.attach(engine,{distance:40});
+shadows.add(floor,{castShadow:false});
+// A square prism of half width h from y0 to y1, its sides cut into rows of 0.1 m.
+function prism(h,y0,y1,P,N,I){
+ const rows=Math.round((y1-y0)/0.1),sides=[[1,0],[0,1],[-1,0],[0,-1]];
+ for(const [nx,nz] of sides){
+  const tx=-nz,tz=nx,base=P.length/3;
+  for(let r=0;r<=rows;r++)for(const s of [-1,1]){P.push(nx*h+tx*h*s,y0+(y1-y0)*r/rows,nz*h+tz*h*s);N.push(nx,0,nz);}
+  for(let r=0;r<rows;r++){const a=base+r*2;I.push(a,a+2,a+1,a+1,a+2,a+3);}
+ }
+ const top=P.length/3;for(const [x,z] of [[-h,-h],[h,-h],[h,h],[-h,h]]){P.push(x,y1,z);N.push(0,1,0);}I.push(top,top+2,top+1,top,top+3,top+2);
+}
+const P=[],N=[],I=[];prism(0.15,0,2,P,N,I);prism(1,2,4.5,P,N,I);
+const tree=new Geometry(P,N,I);
+const record=new Uint8Array(new Uint32Array([32768|(32768<<16),128<<8]).buffer);
+const usage=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST;
+// A source texture of one texel value everywhere: rgba32float (fire, flood) or rgba8unorm bytes (ground covers).
+function filled(texel,format='rgba32float'){
+ const t=device.createTexture({size:[4,4],format,usage}),data=format==='rgba32float'?new Float32Array(64):new Uint8Array(64);
+ for(let i=0;i<16;i++)data.set(texel,i*4);
+ device.queue.writeTexture({texture:t},data,{bytesPerRow:format==='rgba32float'?64:16},[4,4]);return t;
+}
+let scatter,states,remove,textures=[];
+const B=[-8,-8,8,8];
+window.check={
+ // kind 'scatter' or 'tiles'; spec null (no states) or {fire, wet, flow, covers (texels), response, numbers, paint}.
+ async show(kind,spec,frames=1){
+  remove?.();remove=undefined;scatter?.dispose();states?.dispose();states=undefined;for(const t of textures)t.destroy();textures=[];
+  device.pushErrorScope?.('validation');
+  const options={material:new PbrMaterial({color:[0.15,0.45,0.1],roughness:0.9})};
+  if(spec){
+   const T=(k,f)=>{if(!spec[k])return undefined;const t=filled(spec[k],f);textures.push(t);return t;};
+   const fire=T('fire'),wet=T('wet'),flow=T('flow'),covers=T('covers','rgba8unorm');
+   states=PlantStates.create(engine,{bounds:B,resolution:16,...spec.numbers,
+    fire:fire&&{texture:()=>fire,bounds:B},flood:wet&&{wet:()=>wet,velocity:flow&&(()=>flow),bounds:B},ground:covers&&{covers:()=>covers,bounds:B}});
+   if(spec.paint)states.paint(spec.paint.rect,spec.paint.color,spec.paint.amount);
+   options.states=states.plant({crownBase:2,trunkRadius:0.25,...spec.response});
+  }
+  if(kind==='scatter')scatter=Scatter.attach(engine,tree,{count:1,area:[0.001,0.001],scale:[1,1],...options});
+  else{scatter=ScatterTiles.attach(engine,tree,{bounds:[-20,-20,20,20],...options});scatter.setTile('0,0',[-20,-20],40,record);}
+  remove=shadows.add(scatter);
+  await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+  for(let i=1;i<frames;i++){engine.render({delta:0});await device.queue.onSubmittedWorkDone();}
+  const e=await device.popErrorScope?.();if(e)errors.push(e.message);
+  return errors.splice(0);
+ },
+ // Replaces one source texel everywhere and draws a frame (the map keeps its maxima).
+ async feed(key,texel){
+  const t=filled(texel,key==='covers'?'rgba8unorm':'rgba32float');textures.push(t);
+  const s={fire:undefined,flood:undefined,ground:undefined};
+  if(key==='fire')s.fire={texture:()=>t,bounds:B};
+  if(key==='flow')s.flood={wet:()=>textures.find(x=>x!==t),velocity:()=>t,bounds:B};
+  states.setSources(s);engine.render({delta:0});await device.queue.onSubmittedWorkDone();return errors.splice(0);
+ },
+ // The map: four layers of 16 x 16 cells after the two header words.
+ async map(){
+  const buffer=states.map,out=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();
+  e.copyBufferToBuffer(buffer,0,out,0,buffer.size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);
+  const data=Array.from(new Float32Array(out.getMappedRange().slice(0)));out.destroy();return data;
+ },
+ pixel([x,y,z]){const m=engine.camera.matrix,cx=m[0]*x+m[4]*y+m[8]*z+m[12],cy=m[1]*x+m[5]*y+m[9]*z+m[13],w=m[3]*x+m[7]*y+m[11]*z+m[15];return [cx/w*0.5+0.5,0.5-cy/w*0.5];},
+};
+window.ready=true;
+</script></body></html>

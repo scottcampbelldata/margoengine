@@ -6,7 +6,7 @@ import { waitForFeature } from './feature-wait.js';
 
 /** Owned triangle snapshot returned by a loaded glTF model's CPU-query API. */
 export interface TraceGLTFGeometry {
-  /** gltf-pro's 20-float vertex rows. */
+  /** gltf\/pbr's 20-float vertex rows. */
   vertices: Float32Array;
   /** Triangle vertex indices. */
   indices: Uint32Array;

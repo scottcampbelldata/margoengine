@@ -1,7 +1,7 @@
-// Structural gltf-pro model shapes shared by @margoengine/bvh, @margoengine/selection and @margoengine/physics, which
-// read PBRModels without importing gltf-pro (types in model.d.ts).
+// Structural gltf/pbr model shapes shared by @margoengine/bvh, @margoengine/selection and @margoengine/physics, which
+// read PBRModels without importing gltf/pbr (types in model.d.ts).
 
-/** gltf-pro shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
+/** gltf/pbr shape: a `root` node and `primitives` with 20-float CPU vertices (the first one is checked). */
 export const isModel = (value) =>
   !!value &&
   typeof value === 'object' &&

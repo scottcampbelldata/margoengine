@@ -47,6 +47,7 @@ export class Audio implements ListenerSource {
     set loopStart(value: number);
     get loopEnd(): number;
     set loopEnd(value: number);
+    private get nodeLoopEnd();
     get playbackRate(): number;
     set playbackRate(value: number);
     get detune(): number;
@@ -111,7 +112,7 @@ export class AudioListener implements EnginePlugin {
     registerPasses(graph: FrameGraph): void;
     update(): void;
     get following(): 'camera' | Mesh | null;
-    follow(target: 'camera' | Mesh | null, forward?: Vec3): this;
+    follow(target: 'camera' | Mesh | null, forward?: Vec3, up?: Vec3): this;
     setPose(position: Vec3, forward: Vec3, up?: Vec3): this;
     addSource(source: ListenerSource): void;
     removeSource(source: ListenerSource): void;

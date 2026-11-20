@@ -1,6 +1,6 @@
 // GPU cost of @margoengine/compute's default kernels against useSubgroups (AC power, after npm run build:packages, GPU
 // alone):
-//   node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/compute-subgroups.mjs
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/compute-subgroups.mjs
 // Sum, sum along an axis, cumsum, sort and argsort on 16,777,216 f32 values, every pass timed by GPU timestamps, the two
 // routes taking turns inside each round so clock and heat drift falls on both alike. Each row is the median of the
 // rounds, each round the mean of its faster half of trials. SUBGROUP_ROUNDS=1 gives a quick trial. Writes

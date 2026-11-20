@@ -4,6 +4,12 @@
 // highlights smoothstep(0.5, 1, l), midtones the rest). Curves: monotone cubic through the points (Fritsch and Carlson,
 // 1980), baked to 33 samples a frame and read with linear interpolation. Hue against saturation: six multipliers at
 // red, yellow, green, cyan, blue and magenta, interpolated around the HSV hue circle, scaling the distance from luma.
+// Primary controls, applied first and compiled only while one is away from its default (so a Grade without them sends
+// the GPU the same program and data as before they existed): lift, gamma and gain per channel, the colourist's three
+// primaries, out = (gain (x + lift (1 - x)))^(1 / gamma), which keeps white under lift and black under gain (the slope,
+// offset and power of the ASC Color Decision List, American Society of Cinematographers, ASC CDL v1.2, 2009, written so
+// each control holds one end of the range); then saturation about Rec. 709 luma (ITU-R BT.709-6, 2015), as the CDL's
+// saturation, out = luma + s (x - luma).
 import type { TonemapExtension } from './index.js';
 
 /** Curve control points [input, output] in 0..1, inputs strictly increasing. Two or more points. */
@@ -22,6 +28,14 @@ export interface GradeOptions {
   curves?: { master?: GradeCurve; red?: GradeCurve; green?: GradeCurve; blue?: GradeCurve };
   /** Saturation multipliers, each 0 to 4, at hues red, yellow, green, cyan, blue, magenta. Default all 1. */
   hueSaturation?: readonly [number, number, number, number, number, number];
+  /** Lift per channel, -1 to 1: raises (or lowers) the blacks and leaves white where it is. Default [0, 0, 0]. */
+  lift?: GradeWheel;
+  /** Gamma per channel, 0.1 to 10: above 1 brightens the midtones, below 1 darkens them; black and white stay. Default [1, 1, 1]. */
+  gamma?: readonly [number, number, number];
+  /** Gain per channel, 0 to 4: scales the whites and leaves black where it is. Default [1, 1, 1]. */
+  gain?: readonly [number, number, number];
+  /** Saturation about Rec. 709 luma, 0 (grey) to 4, after lift, gamma and gain. Default 1. */
+  saturation?: number;
 }
 
 const SAMPLES = 33;
@@ -78,23 +92,34 @@ export function sampleCurve(points: GradeCurve | undefined, out = new Float32Arr
   return out;
 }
 
-const code = (binding: number) => `
-struct Grade {shadows:vec4f,midtones:vec4f,highlights:vec4f,hue0:vec4f,hue1:vec4f,curve:array<vec4f,${SAMPLES}>}
-@group(0) @binding(${binding}) var<uniform> grading:Grade;
-fn gradeCurve(x:f32,channel:i32)->f32 {
- let t=clamp(x,0.0,1.0)*${SAMPLES - 1}.0;let i=min(i32(t),${SAMPLES - 2});
- return mix(grading.curve[i][channel],grading.curve[i+1][channel],t-f32(i));
+// Every name carries the binding, so several Grade and HueGrade extensions in one Tonemap each declare their own and
+// apply in order (KB-OWN-TONE2).
+const code = (b: number, tone: boolean) => `
+struct Grade${b} {shadows:vec4f,midtones:vec4f,highlights:vec4f,hue0:vec4f,hue1:vec4f,curve:array<vec4f,${SAMPLES}>${tone ? ',lift:vec4f,gamma:vec4f,gain:vec4f' : ''}}
+@group(0) @binding(${b}) var<uniform> grading${b}:Grade${b};${
+  tone
+    ? `
+fn gradeTone${b}(input:vec3f)->vec3f {
+ let lifted=grading${b}.gain.rgb*(input+grading${b}.lift.rgb*(1.0-input));
+ let c=clamp(pow(max(lifted,vec3f(0)),1.0/grading${b}.gamma.rgb),vec3f(0),vec3f(1));
+ let y=dot(c,vec3f(0.2126,0.7152,0.0722));return clamp(y+(c-y)*grading${b}.lift.w,vec3f(0),vec3f(1));
+}`
+    : ''
 }
-fn gradeColor(input:vec3f)->vec3f {
- var c=clamp(input,vec3f(0),vec3f(1));let extra=input-c;
+fn gradeCurve${b}(x:f32,channel:i32)->f32 {
+ let t=clamp(x,0.0,1.0)*${SAMPLES - 1}.0;let i=min(i32(t),${SAMPLES - 2});
+ return mix(grading${b}.curve[i][channel],grading${b}.curve[i+1][channel],t-f32(i));
+}
+fn gradeColor${b}(input:vec3f)->vec3f {
+ var c=clamp(input,vec3f(0),vec3f(1));let extra=input-c;${tone ? `c=gradeTone${b}(c);` : ''}
  let l=dot(c,vec3f(0.2126,0.7152,0.0722));let ws=1.0-smoothstep(0.0,0.5,l);let wh=smoothstep(0.5,1.0,l);
- c=clamp(c+grading.shadows.rgb*ws+grading.midtones.rgb*(1.0-ws-wh)+grading.highlights.rgb*wh,vec3f(0),vec3f(1));
- c=vec3f(gradeCurve(gradeCurve(c.r,0),1),gradeCurve(gradeCurve(c.g,0),2),gradeCurve(gradeCurve(c.b,0),3));
+ c=clamp(c+grading${b}.shadows.rgb*ws+grading${b}.midtones.rgb*(1.0-ws-wh)+grading${b}.highlights.rgb*wh,vec3f(0),vec3f(1));
+ c=vec3f(gradeCurve${b}(gradeCurve${b}(c.r,0),1),gradeCurve${b}(gradeCurve${b}(c.g,0),2),gradeCurve${b}(gradeCurve${b}(c.b,0),3));
  let hi=max(c.r,max(c.g,c.b));let lo=min(c.r,min(c.g,c.b));
  if(hi>lo){
   var h:f32;
   if(hi==c.r){h=(c.g-c.b)/(hi-lo);}else if(hi==c.g){h=2.0+(c.b-c.r)/(hi-lo);}else{h=4.0+(c.r-c.g)/(hi-lo);}
-  h=fract(h/6.0+1.0)*6.0;let k=array<f32,7>(grading.hue0.x,grading.hue0.y,grading.hue0.z,grading.hue0.w,grading.hue1.x,grading.hue1.y,grading.hue0.x);
+  h=fract(h/6.0+1.0)*6.0;let k=array<f32,7>(grading${b}.hue0.x,grading${b}.hue0.y,grading${b}.hue0.z,grading${b}.hue0.w,grading${b}.hue1.x,grading${b}.hue1.y,grading${b}.hue0.x);
   let i=min(i32(h),5);let s=mix(k[i],k[i+1],h-f32(i));let y=dot(c,vec3f(0.2126,0.7152,0.0722));
   c=clamp(y+(c-y)*s,vec3f(0),vec3f(1));
  }
@@ -124,19 +149,34 @@ const isCurve = (c: unknown) =>
  * @throws RangeError for a wheel, curve or hue multiplier out of range (checked now and every frame).
  */
 export class Grade implements TonemapExtension {
-  readonly key: string = 'grade';
   private readonly buffer = new Float32Array(20 + 4 * SAMPLES);
+  // With lift, gamma, gain or saturation in use: the same values and three more vec4s (lift and saturation, gamma, gain).
+  private readonly toneBuffer = new Float32Array(32 + 4 * SAMPLES);
   private readonly column = new Float32Array(SAMPLES);
   constructor(readonly options: GradeOptions = {}) {
     this.check();
   }
+  /** `'grade'`, or `'grade:tone'` while lift, gamma, gain or saturation is away from its default (Tonemap recompiles). */
+  get key(): string {
+    return this.tone() ? 'grade:tone' : 'grade';
+  }
+  /** Whether lift, gamma, gain or saturation is away from its default this frame. */
+  protected tone(): boolean {
+    const o = this.options,
+      off = (v: readonly number[] | undefined, at: number) => v === undefined || v.every((x) => x === at);
+    return !(off(o.lift, 0) && off(o.gamma, 1) && off(o.gain, 1) && (o.saturation ?? 1) === 1);
+  }
   patch(shader: string, binding: number): string {
-    return shader.replace('if(p.grade.w==1.0){color=sampleLUT(', 'color=gradeColor(color);\n  $&') + code(binding);
+    return (
+      shader.replace('if(p.grade.w==1.0){color=sampleLUT(', `color=gradeColor${binding}(color);\n  $&`) +
+      code(binding, this.tone())
+    );
   }
   values(): Float32Array {
     this.check();
     const o = this.options,
-      v = this.buffer,
+      tone = this.tone(),
+      v = tone ? this.toneBuffer : this.buffer,
       c = o.curves ?? {},
       h = o.hueSaturation ?? [1, 1, 1, 1, 1, 1];
     v.fill(0, 0, 20);
@@ -148,6 +188,13 @@ export class Grade implements TonemapExtension {
       sampleCurve(points, this.column);
       for (let i = 0; i < SAMPLES; i++) v[20 + 4 * i + channel] = this.column[i];
     });
+    if (tone) {
+      const at = 20 + 4 * SAMPLES;
+      v.set(o.lift ?? [0, 0, 0], at);
+      v[at + 3] = o.saturation ?? 1;
+      v.set(o.gamma ?? [1, 1, 1], at + 4);
+      v.set(o.gain ?? [1, 1, 1], at + 8);
+    }
     return v;
   }
   private check(): void {
@@ -163,6 +210,17 @@ export class Grade implements TonemapExtension {
     )
       throw new RangeError(
         'Invalid Grade options; wheels are three numbers -1 to 1, curves two or more [x, y] points in 0..1 with x increasing, hueSaturation six numbers 0 to 4.',
+      );
+    const rgb = (v: unknown, lo: number, hi: number) =>
+      v === undefined || (Array.isArray(v) && v.length === 3 && v.every((x) => x >= lo && x <= hi));
+    if (
+      !isWheel(o.lift) ||
+      !rgb(o.gamma, 0.1, 10) ||
+      !rgb(o.gain, 0, 4) ||
+      !(o.saturation === undefined || (o.saturation >= 0 && o.saturation <= 4))
+    )
+      throw new RangeError(
+        'Invalid Grade options; lift is three numbers -1 to 1, gamma three from 0.1 to 10, gain three from 0 to 4 and saturation 0 to 4.',
       );
   }
 }

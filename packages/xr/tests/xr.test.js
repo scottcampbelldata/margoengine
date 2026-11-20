@@ -329,13 +329,13 @@ test('manual XR frame rendering keeps both tracked eyes and suppresses only the 
   assert.deepEqual(f.errors, []);
   await xr.end();
 });
-// Bug KB2281-xr (bug sweep L4): the eye passes drew gltf-pro models through createRenderer with no snapshot hook, so
+// Bug KB2281-xr (bug sweep L4): the eye passes drew gltf/pbr models through createRenderer with no snapshot hook, so
 // native glass on the display-encoded layer texture fell back to the tint/add blend on encoded values (too bright over
 // a bright background). With glass in the scene the eye's samples are kept (storeOp 'store'), and the hook resolves them
 // into the renderer's snapshot target with a resolve-only pass (the layer texture need not allow COPY_SRC), then
 // reopens the eye pass on the same attachments with 'load' and the eye's viewport. Without glass nothing changes.
 for (const glass of [true, false])
-  test(`XR eye passes lend gltf-pro a glass snapshot hook ${glass ? 'when the scene holds glass' : 'only when needed'}`, async (t) => {
+  test(`XR eye passes lend gltf/pbr a glass snapshot hook ${glass ? 'when the scene holds glass' : 'only when needed'}`, async (t) => {
     const f = await fixture(t),
       xr = await XR.create(f.engine),
       calls = [],
@@ -978,4 +978,58 @@ test('a disposed XR is collected while its engine device lives; a live one still
   } finally {
     setFlagsFromString('--no-expose-gc');
   }
+});
+
+test("xr.layers filters what both eyes of the 'separate' route draw, and is checked like any layer mask", async (t) => {
+  const { setRenderLayers } = await import('../../shared/layers.js');
+  const f = await fixture(t);
+  await assert.rejects(XR.create(f.engine, { layers: -1 }), RangeError);
+  const xr = await XR.create(f.engine, { layers: 1 });
+  assert.equal(xr.route, 'separate');
+  assert.equal(xr.layers, 1);
+  assert.throws(() => (xr.layers = 2 ** 32), RangeError);
+  await xr.requestSession();
+  const viewer = {
+    ...pose(0),
+    views: [
+      { eye: 'left', projectionMatrix: identity(), transform: pose(-0.03).transform },
+      { eye: 'right', projectionMatrix: identity(), transform: pose(0.03).transform },
+    ],
+  };
+  const sceneDraws = () => f.passes.splice(0).filter((_, i) => i % 3 === 0).map((pass) => pass.draws);
+  f.session.tick(100, viewer);
+  assert.deepEqual(sceneDraws(), [1, 1], 'the box is on layer 0, which the mask holds');
+  setRenderLayers(f.mesh, 1 << 30);
+  f.session.tick(110, viewer);
+  assert.deepEqual(sceneDraws(), [0, 0], 'a mesh on a layer the mask leaves out draws in neither eye');
+  xr.layers = undefined;
+  f.session.tick(120, viewer);
+  assert.deepEqual(sceneDraws(), [1, 1], 'no mask draws every layer');
+  setRenderLayers(f.mesh, 1);
+  await xr.end();
+  xr.dispose();
+});
+
+// KB-OWN-ASYNC3: XR.create added the plugin after the adapter and device requests, when the default scene is active again.
+test('XR.create started in a second scene adds the plugin to that scene', async (t) => {
+  const f = await fixture(t),
+    other = f.engine.createScene('other');
+  let pending;
+  other.use({ name: 'probe', setup: () => (pending = XR.create(f.engine)) });
+  const xr = await pending;
+  assert.ok(f.engine.sceneOf(xr) === other, 'the plugin is not in the second scene');
+  assert.deepEqual([...f.engine.scene.plugins.keys()], [], 'a plugin landed in the default scene');
+  xr.dispose();
+  assert.deepEqual([...other.plugins.keys()], ['probe']);
+});
+test('an aborted XR.create started in a second scene leaves nothing in either scene', async (t) => {
+  const f = await fixture(t),
+    other = f.engine.createScene('other'),
+    controller = new AbortController();
+  let pending;
+  other.use({ name: 'probe', setup: () => (pending = XR.create(f.engine, { signal: controller.signal })) });
+  controller.abort(new Error('stop'));
+  await assert.rejects(pending, /stop/);
+  assert.deepEqual([...f.engine.scene.plugins.keys()], []);
+  assert.deepEqual([...other.plugins.keys()], ['probe']);
 });

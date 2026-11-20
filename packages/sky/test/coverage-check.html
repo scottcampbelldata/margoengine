@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky coverage check</title><style>body{margin:0}canvas{display:block;width:160px;height:120px}</style></head><body><canvas width="160" height="120"></canvas>
+<script type="module">
+// The sky's coverage record (`coverage` option) on a real GPU, under a PostStack (Bloom), which draws the scene into
+// a depth of its own (KB-HEARTH-CLIP1: a view target's depth read 100 % sky there). A wall fills the left half of the
+// view exactly (its edge is the centre line), so the record must be 0 in the left columns and 1 in the right ones;
+// the HDR scene must be the same with the record on and off. Driven by features-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/base.js';
+import {preetham} from '/packages/sky/dist/preetham.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,0],target:[0,0,-1],fov:60,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+engine.createMesh().setGeometry(box(20,40,1)).setMaterial(new PbrMaterial({color:'#ffffff',roughness:0.5})).setPosition([-10,0,-10.5]);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function scene(){
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();return v;
+}
+async function coverage(texture){
+ const w=texture.width,h=texture.height,row=Math.ceil(w/256)*256,buffer=device.createBuffer({size:row*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder();encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:row},[w,h]);device.queue.submit([encoder.finish()]);
+ await buffer.mapAsync(GPUMapMode.READ);const bytes=new Uint8Array(buffer.getMappedRange()),out=new Uint8Array(w*h);
+ for(let y=0;y<h;y++)out.set(bytes.subarray(y*row,y*row+w),y*w);buffer.unmap();buffer.destroy();return {width:w,height:h,data:out,format:texture.format};
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const sky=Sky.attach(engine,{timeScale:0,hours:15},{preetham}),out={};
+  engine.render({delta:0});
+  out.before=sky.coverageTexture===undefined;
+  const plain=await scene();
+  sky.options.coverage=true;
+  engine.render({delta:0});
+  const lit=await scene(),texture=sky.coverageTexture,record=await coverage(texture);
+  let differing=0;for(let i=0;i<plain.length;i++)if(plain[i]!==lit[i])differing++;
+  out.differing=differing;out.size=[record.width,record.height];out.target=[post.sceneTexture.width,post.sceneTexture.height];out.format=record.format;
+  // Columns well inside the wall (left) and well inside the sky (right), and the share of the frame the record covers.
+  let wall=0,wallSet=0,open=0,openSet=0,sum=0;
+  for(let y=0;y<record.height;y++)for(let x=0;x<record.width;x++){
+   const v=record.data[y*record.width+x];sum+=v;
+   if(x<record.width/2-2){wall++;if(v)wallSet++;}
+   else if(x>=record.width/2+2){open++;if(v===255)openSet++;}
+  }
+  Object.assign(out,{wall,wallSet,open,openSet,share:sum/(255*record.width*record.height)});
+  engine.render({delta:0});
+  out.same=sky.coverageTexture===texture;
+  sky.options.coverage=false;
+  engine.render({delta:0});
+  out.cleared=sky.coverageTexture===undefined;
+  sky.options.coverage=true;
+  engine.render({delta:0});
+  const kept=sky.coverageTexture;
+  sky.dispose();
+  out.disposed=kept!==undefined&&sky.coverageTexture===undefined;
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

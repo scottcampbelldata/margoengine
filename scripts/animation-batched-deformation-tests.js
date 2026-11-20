@@ -5,11 +5,11 @@
 // different vertex and morph target counts, skinned, morphed, skinned and morphed, and four or eight influences are
 // added, cloned and disposed between checks; one dispatch per buffer page and pipeline must deform all of them.
 // Runs as `npm run test:gpu -w @margoengine/animation` (check:gpu-packages); alone, after build:packages:
-// node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/animation-batched-deformation-tests.js
+// node scripts/run-with-timeout.mjs -- node scripts/animation-batched-deformation-tests.js
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 
 await mkdir('test-results', { recursive: true });
 const triangle = animatedTriangle(),
@@ -25,7 +25,7 @@ try {
   const result = await page.evaluate(
     async ({ doc, buffers }) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
-        { loadGLTF, parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+        { loadGLTF, parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
         { Animation } = await import('/packages/animation/dist/index.js'),
         { cloneModel } = await import('/packages/animation/dist/skeleton-utils.js'),
         { deformationShader, deformationShader8 } = await import('/packages/animation/src/shader.ts');

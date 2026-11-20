@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/layers-pbr.browser.mjs
 // `@margoengine/terrain/layers-pbr` gives each terrain layer its own normal, ambient occlusion, roughness and height
 // maps. On a flat terrain seen from above, one frame per case:

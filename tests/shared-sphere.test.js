@@ -1,5 +1,5 @@
 // shared/sphere.js worldRadius: the world radius every CPU sphere cull uses (clustered LocalShadows' per-map caster
-// cull, the LOD imposter cull, gltf-pro's progressive load order). Regression: those took the longest column of the
+// cull, the LOD imposter cull, gltf/pbr's progressive load order). Regression: those took the longest column of the
 // node matrix, which is short under shear (a rotated child of a non-uniformly scaled parent), so casters near a cube
 // face's edge or range lost their shadow in that face.
 import test from 'node:test';

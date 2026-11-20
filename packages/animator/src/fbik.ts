@@ -10,7 +10,10 @@
 // bones keep their lengths and the bend follows its pole.
 //
 // The centre of mass uses a fixed share of the body per segment (D. A. Winter, "Biomechanics and Motor Control of Human
-// Movement", segment masses): head 8.1 percent, trunk 49.7, each arm 5, each leg 16.1.
+// Movement", 4th ed. 2009, Table 4.1 after Dempster 1955): head 8.1 percent, trunk 49.7, each arm 5, each leg 16.1, each over
+// the total of the segments the rig lists, so a rig without a head or arms still has its centre of mass inside the body.
+// The same table places a whole arm's centre of mass 0.530 of the way from the shoulder to the wrist and a whole leg's
+// 0.447 of the way from the hip to the ankle.
 import type { Mesh, Vec3 } from '@margoengine/core/extension';
 import { multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
 import { finiteVector } from '@margoengine/math/validate';
@@ -113,6 +116,8 @@ const HEAD_MASS = 0.081,
   TRUNK_MASS = 0.497,
   ARM_MASS = 0.05,
   LEG_MASS = 0.161,
+  ARM_CENTRE = 0.53,
+  LEG_CENTRE = 0.447,
   DAMPING = 0.02,
   LEG_WISH = 30,
   ARM_WISH = 1,
@@ -266,6 +271,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         // This frame: the root's offset from its link, where the end goes, which way the limb bends, the end's animated
         // rotation, its length, its shortest and planned reach, and how strongly the torso must serve it (0 for not at all).
         offset: [0, 0, 0] as Point,
+        endOffset: [0, 0, 0] as Point,
         aim: [0, 0, 0] as Point,
         bend: [0, 0, 0] as Point,
         rest: [0, 0, 0, 1] as ArrayLike<number>,
@@ -396,6 +402,7 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         // Where the limb's end goes. A target pulls by its weight from the animated place.
         place = limb.target ? mixPoint(tip, limb.target, influence) : pinned ? tip : null;
       item.offset = subtract(root, start[link]);
+      item.endOffset = subtract(tip, start[link]);
       item.length = distance(root, knee) + distance(knee, tip);
       item.short = Math.abs(distance(root, knee) - distance(knee, tip));
       // A limb held where the clip has it may stay as straight as the clip has it.
@@ -424,7 +431,11 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         headBone && rig.head!.target ? mixPoint(headStart!, rig.head!.target, (rig.head!.weight ?? 1) * weight) : null;
     const standing = (rig.balance ?? true) && supports.length > 0,
       radius = rig.supportRadius ?? firstLeg * 0.1,
-      trunkShare = TRUNK_MASS / count;
+      // The shares cover only the segments the rig lists (Winter's sum to 1 for head, trunk, two arms and two legs), so
+      // the centre of mass is their weighted mean: each share over the listed total.
+      total =
+        TRUNK_MASS + (headBone ? HEAD_MASS : 0) + legs.length * LEG_MASS + arms.length * ARM_MASS,
+      trunkShare = TRUNK_MASS / count / total;
     /** The centre of mass now, into `centre` as Jacobian rows when `rows` is true; returns its place. */
     const massCentre = (withRows: boolean): Point => {
       if (withRows) centre.fill(0);
@@ -438,13 +449,15 @@ export function addFullBodyIK(animator: Animator, rig: FullBodyIK): FullBodyHand
         if (withRows) jacobian(link, point, centre, share * carriedShare);
       };
       for (let j = 0; j < count; j++) mass(trunkShare, j, places[j]);
-      if (headBone) mass(HEAD_MASS, headLink, carried(headLink, headOffset!));
-      for (const { limb, isLeg, link, offset, aim } of limbs) {
+      if (headBone) mass(HEAD_MASS / total, headLink, carried(headLink, headOffset!));
+      for (const { limb, isLeg, link, offset, endOffset, aim } of limbs) {
         const root = carried(link, offset),
-          share = isLeg ? LEG_MASS : ARM_MASS,
-          // A limb's mass sits half way down it; a held end does not move with the body.
+          share = (isLeg ? LEG_MASS : ARM_MASS) / total,
+          along = isLeg ? LEG_CENTRE : ARM_CENTRE,
+          // A limb's mass sits where Winter's table puts it on the line from its root to its end. A held end stays at its
+          // aim, so the mass moves with the body by the share of the line above it; a free end rides with the body.
           held = limb.target || (limb.pinned ?? isLeg);
-        mass(share, link, mixPoint(root, aim, 0.5), held ? 0.5 : 1);
+        mass(share, link, mixPoint(root, held ? aim : carried(link, endOffset), along), held ? 1 - along : 1);
       }
       return [x, y, z];
     };

@@ -34,7 +34,7 @@ export interface PhysicalLensTargets {
   focusDistance?: number;
 }
 
-const help = 'https://margoengine.com/docs/limits#cinematic-physical-lens';
+const help = 'https://margoengine.com/llms/packages/cinematic.md';
 
 /**
  * A physical lens stage: millimetres and f-number drive both FOV and DOF. Put it in `brain.stages` after focus tracking,

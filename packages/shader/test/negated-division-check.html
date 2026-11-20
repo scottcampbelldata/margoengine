@@ -1,0 +1,71 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Negated division check</title></head><body>
+<script type="module">
+// A division whose operand negates one component of a vector scaled by a constant, `(-(v * 2.0).z) / (v * 2.0).x` (and
+// atan2, which divides), on a real adapter. The Radeon 680M's D3D12 compiler (driver 32.0.21030.2001) drops the sign
+// (docs/known-bugs.md); every formulation Margo's shaders use must hold everywhere. One draw per (y, x) pair, the pair
+// in a uniform so nothing folds at compile time; each expression must equal its JavaScript value.
+const pairs = [[-25, 0.02], [-25, 0], [-25, -0.02], [25, 0.02], [-25, 1e-3], [-24.99, 0.0201], [-12.5, 0.01], [-25, 2], [0.02, -25]];
+for (let i = 0; i < 72; i++) { const t = (i + 0.5) * Math.PI / 36; pairs.push([25 * Math.sin(t), 25 * Math.cos(t)]); }
+const at2 = (y, x) => Math.atan2(y, x);
+// [WGSL, expected, used by Margo]. y and x come from the uniform; pos = (x, 0, -y), npos = (x, 0, y).
+const cases = {
+  // The fault: the sign of the negated component is lost (expected to fail on the 680M, reported, not asserted).
+  faultAtan2: ['atan2(-cm.z, cm.x)', at2, false],
+  faultDivide: ['(-cm.z) / cm.x', (y, x) => y / x, false],
+  // Margo's formulations.
+  blackHoleFrame: ['(-cm.z) / length(cm.xz)', (y, x) => y / Math.hypot(x, y), true],
+  negationOutside: ['-atan2(cm.z, cm.x)', at2, true],
+  equirectSelect: ['atan2(cn.x, select(-cn.z, 0.0, cn.z == 0.0))', (y, x) => at2(x, y === 0 ? 0 : -y), true],
+  equirectNormalized: ['atan2(dn.x, -dn.z)', (y, x) => { const l = Math.hypot(x, y); return at2(x / l, -y / l); }, true],
+  negatedBeforeScale: ['atan2(pz.z, pz.x)', (y, x) => at2(-y, x), true],
+  wipeAngle: ['atan2(uv.x - 0.5, 0.5 - uv.y)', (y, x) => at2(x, -y), true],
+};
+const names = Object.keys(cases), out = {};
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+out.adapter = `${adapter.info?.vendor ?? ''} ${adapter.info?.architecture ?? ''}`.trim();
+const tex = device.createTexture({ size: [1, 1], format: 'rgba32float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
+const ub = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+const rb = device.createBuffer({ size: 256, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+const got = Object.fromEntries(names.map((k) => [k, []]));
+for (let g = 0; g < names.length; g += 4) {
+  const group = names.slice(g, g + 4);
+  const module = device.createShaderModule({ code: `
+struct U { yx: vec4f, pos: vec3f, pad: f32, npos: vec3f };
+@group(0) @binding(0) var<uniform> u: U;
+@vertex fn vs(@builtin(vertex_index) v: u32) -> @builtin(position) vec4f { let p = array<vec2f, 3>(vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3)); return vec4f(p[v], 0, 1); }
+@fragment fn fs() -> @location(0) vec4f {
+  let y = u.yx.x; let x = u.yx.y;
+  let cm = u.pos * 2.0; let cn = u.npos * 2.0; let dn = normalize(cn);
+  let pz = 0.5 * vec3f(x, 0.0, -y); let uv = vec2f(x, y) * 0.5 + 0.5;
+  return vec4f(${[...group, null, null, null].slice(0, 4).map((k) => (k ? cases[k][0] : '0.0')).join(', ')});
+}` });
+  const pipeline = device.createRenderPipeline({ layout: 'auto', vertex: { module, entryPoint: 'vs' }, fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba32float' }] }, primitive: { topology: 'triangle-list' } });
+  const bind = device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ub } }] });
+  for (const [y, x] of pairs) {
+    device.queue.writeBuffer(ub, 0, new Float32Array([y, x, 0, 0, x, 0, -y, 0, x, 0, y, 0]));
+    const e = device.createCommandEncoder();
+    const pass = e.beginRenderPass({ colorAttachments: [{ view: tex.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [9, 9, 9, 9] }] });
+    pass.setPipeline(pipeline); pass.setBindGroup(0, bind); pass.draw(3); pass.end();
+    e.copyTextureToBuffer({ texture: tex }, { buffer: rb, bytesPerRow: 256 }, [1, 1]);
+    device.queue.submit([e.finish()]);
+    await rb.mapAsync(GPUMapMode.READ);
+    const v = new Float32Array(rb.getMappedRange().slice(0, 16));
+    group.forEach((k, j) => got[k].push(v[j]));
+    rb.unmap();
+  }
+}
+for (const k of names) {
+  const [, want, used] = cases[k];
+  let worst = 0, where = null;
+  got[k].forEach((v, i) => {
+    const [y, x] = pairs[i].map(Math.fround), w = want(y, x);
+    let d = Math.abs(v - w) / Math.max(1, Math.abs(w));
+    if (Math.abs(Math.abs(w) - Math.PI) < 1e-3) d = Math.min(d, Math.abs(Math.abs(v) - Math.PI));
+    if (!(d <= worst)) { worst = d; where = [y, x, v, w]; }
+  });
+  out[k] = { used, worst, where };
+}
+window.result = out;
+document.title = 'done';
+</script></body></html>

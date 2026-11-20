@@ -188,3 +188,37 @@ test('the depth copy of a 4x scene takes a masked draw per sample at the compati
   assert.deepEqual(full.draws, [3]);
   assert.match(full.pipelines[0].fragment.module.code, /@builtin\(sample_index\) sample:u32/);
 });
+
+// KB-CABIN-BLOOM1: the Karis average damped every top box brighter than its neighbours, so a steady lamp flame 2 x 3 px
+// kept 57% of its glow (packages/post/test/bloom-energy-browser.mjs measures the energy on a GPU). `fireflies` picks
+// the damping: 'temporal' (default) keeps light its 3 x 3 coarse neighbourhood held the frame before.
+test('Bloom fireflies: validated, the prefilter reads the coarsest level and its firefly settings each frame', () => {
+  for (const fireflies of ['off', 1, 'Temporal']) assert.throws(() => new Bloom({ fireflies }), /Invalid bloom fireflies/);
+  for (const [fireflies, first, later] of [
+    [undefined, [1, 3e38], [1, 0]],
+    ['temporal', [1, 3e38], [1, 0]],
+    ['karis', [0, 0], [0, 0]],
+    ['none', [0, 3e38], [0, 3e38]],
+  ]) {
+    const h = optionalGPU(),
+      effect = new Bloom({ fireflies });
+    h.engine.use(effect);
+    h.frame();
+    const uniform = h.resources.find((r) => r.size === 272 && r.usage & GPUBufferUsage.UNIFORM),
+      spikes = () => [...new Float32Array(uniform.data, 256, 2)];
+    assert.ok(uniform, 'one uniform: the composite settings, then the firefly settings at byte 256');
+    assert.deepEqual(spikes(), first.map(Math.fround), `${fireflies} on the first frame`);
+    h.frame();
+    assert.deepEqual(spikes(), later.map(Math.fround), `${fireflies} on later frames`);
+    // The prefilter's group: the firefly settings at binding 5 and, at binding 3, the coarsest level of the down chain.
+    const prefilter = h.groups.filter((g) => g.entries.some((e) => e.binding === 5));
+    assert.equal(prefilter.length, 1);
+    const at = (b) => prefilter[0].entries.find((e) => e.binding === b).resource;
+    assert.equal(at(5).buffer, uniform);
+    assert.equal(at(5).offset, 256);
+    // 128 x 96 viewport: six levels; the view it reads is the one the sixth (last) down step writes.
+    const writer = h.groups.findIndex((g) => g !== prefilter[0] && g.entries.some((e) => e.binding === 2 && e.resource === at(3)));
+    assert.equal(writer - h.groups.indexOf(prefilter[0]), 5);
+    effect.dispose();
+  }
+});

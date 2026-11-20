@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { PBRModel, MaterialExtension, PBRPrimitive } from '@margoengine/gltf-pro';
+import type { PBRModel, MaterialExtension, PBRPrimitive } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { ditherWGSL } from '../../shared/screen-door.js';
 import type {

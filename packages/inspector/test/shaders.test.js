@@ -1,4 +1,4 @@
-// Live shader editing on a real @margoengine/materials WgslMaterial mesh drawn through gltf-pro's real draw code,
+// Live shader editing on a real @margoengine/materials WgslMaterial mesh drawn through gltf/pbr's real draw code,
 // over the recording fake WebGPU device (no GPU): the fake device's compiler is a stand-in that reports an error on
 // the token `bad_token`, at its real line and column in the module text, so the test checks where the editor places
 // messages. That a real compiler (Metal here) accepts and rejects the same text is the browser check's job.

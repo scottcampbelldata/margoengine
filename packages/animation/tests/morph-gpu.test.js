@@ -4,8 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Animation } from '../dist/index.js';
 import { MorphWeightPlayer, morphWeightShader } from '../dist/morph-gpu.js';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);

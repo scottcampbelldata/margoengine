@@ -21,7 +21,7 @@ export function measureServer(server, port, { close = () => server.close() } = {
   const seconds = [];
   let elu = performance.eventLoopUtilization(),
     lastTicks = 0;
-  setInterval(() => {
+  const sampler = setInterval(() => {
     const now = performance.eventLoopUtilization(),
       used = performance.eventLoopUtilization(now, elu),
       m = process.memoryUsage();
@@ -85,7 +85,10 @@ export function measureServer(server, port, { close = () => server.close() } = {
         peakRss: Math.max(...seconds.map((s) => s.rss), memory.rss),
         errors,
       });
-    } else if (message.type === 'exit') close().then(() => process.exit(0));
+    } else if (message.type === 'exit') {
+      clearInterval(sampler);
+      close().then(() => process.disconnect());
+    }
   });
   process.send({ type: 'ready', port });
 }

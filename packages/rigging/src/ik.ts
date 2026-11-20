@@ -14,6 +14,7 @@ import {
 import type { Mesh } from '@margoengine/core/extension';
 import type { Animator } from '@margoengine/animator';
 import type { ElbowEvaluator } from '@margoengine/kinematics-constraints';
+import { parentOrder } from './rig.js';
 
 /** Settings shared by every FABRIK solve. */
 export interface FABRIKOptions {
@@ -118,10 +119,38 @@ export function solveFABRIK(points: Float64Array | number[], target: Vec3, optio
     const distance = gap();
     return { reached: distance <= tolerance, distance, iterations: 0 };
   }
+  // Inside the inner reach: the end cannot come nearer the root than the longest bone less all the others (the hole
+  // of the reachable shell; FABRIK, Aristidou and Lasenby 2011, only treats the outer bound). The closest pose points
+  // the longest bone at the target and folds every other bone straight back along the same line.
+  let longest = 0;
+  for (let i = 1; i < n - 1; i++) if (lengths[i] > lengths[longest]) longest = i;
+  const inner = 2 * lengths[longest] - total,
+    reach = Math.hypot(tx - rx, ty - ry, tz - rz);
+  if (inner > 0 && reach < inner) {
+    let dx = tx - rx,
+      dy = ty - ry,
+      dz = tz - rz,
+      d = reach;
+    if (!(d > 1e-12)) {
+      // The target is on the root: any line is as close; keep the chain's own root-to-end line.
+      (dx = points[end] - rx), (dy = points[end + 1] - ry), (dz = points[end + 2] - rz), (d = Math.hypot(dx, dy, dz));
+      if (!(d > 1e-12)) (dx = 0), (dy = 1), (dz = 0), (d = 1);
+    }
+    let along = 0;
+    for (let i = 1; i < n; i++) {
+      along += i - 1 === longest ? lengths[i - 1] : -lengths[i - 1];
+      points[i * 3] = rx + (dx / d) * along;
+      points[i * 3 + 1] = ry + (dy / d) * along;
+      points[i * 3 + 2] = rz + (dz / d) * along;
+    }
+    const distance = gap();
+    return { reached: distance <= tolerance, distance, iterations: 0 };
+  }
   let iteration = 0;
   if (pole) bendToward(points, n, pole);
-  else if (n > 2) {
-    // A straight chain has no side to fold to: start it bent a hair toward a fixed perpendicular of its line.
+  // A straight chain has no side to fold to, and a pole on its line gives none either (bendToward skips it).
+  if (n > 2) {
+    // Start a straight chain bent a hair toward a fixed perpendicular of its line.
     const ax = points[end] - rx,
       ay = points[end + 1] - ry,
       az = points[end + 2] - rz,
@@ -250,6 +279,11 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
     count = parents?.length;
   if (!Array.isArray(parents) || !(local instanceof Float64Array) || local.length !== count * 10)
     throw new TypeError('solvePoseIK needs {parents, local} with 10 local numbers per bone');
+  parents.forEach((p, i) => {
+    if (!Number.isInteger(p) || p < -1 || p >= count || p === i)
+      throw new RangeError(`IK pose bone ${i} parent ${p} is invalid; use -1 or another bone's index`);
+  });
+  parentOrder(parents, 'IK pose');
   const joints = checkChain(chain, count, (child, parent) => parents[child] === parent);
   // World transforms of every ancestor of the chain and the chain itself.
   const world = (bone: number): { position: number[]; rotation: number[] } => {
@@ -299,7 +333,12 @@ export function solvePoseIK(pose: IKPose, chain: IKChain): FABRIKResult {
       q = normalizeQuaternion(multiplyQuaternions([-parent[0], -parent[1], -parent[2], parent[3]], rotations[i]));
     local.set(q, l + 3);
   }
-  return result;
+  // Under an uneven scale the posed bones stretch as they turn, so the end is measured on the posed skeleton, not on
+  // FABRIK's points.
+  const posed = world(joints[joints.length - 1]).position,
+    t = chain.target,
+    distance = Math.hypot(posed[0] - t[0], posed[1] - t[1], posed[2] - t[2]);
+  return { reached: distance <= settings(chain).tolerance, distance, iterations: result.iterations };
 }
 
 /**

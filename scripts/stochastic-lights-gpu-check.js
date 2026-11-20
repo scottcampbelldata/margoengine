@@ -1,4 +1,4 @@
-// Real-WebGPU check of @margoengine/clustered/stochastic (after npm run build:packages; takes the GPU lock).
+// Real-WebGPU check of @margoengine/clustered/stochastic (after npm run build:packages).
 // A core floor under a pillar and eight posts, lit by 12 white point lights that cast LocalShadows, rendered by a real engine:
 // 1. With StochasticLights (2 samples, quad sharing, a new pattern each frame) the shaders compile and render without a
 //    validation error; with quad false too.
@@ -8,9 +8,7 @@
 // Run: node scripts/stochastic-lights-gpu-check.js
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-const release = await acquire({ owner: 'stochastic-lights-gpu-check' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5243 });
@@ -158,5 +156,4 @@ try {
   );
 } finally {
   await browser?.close();
-  release();
 }

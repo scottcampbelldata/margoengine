@@ -39,6 +39,7 @@ export class Puddles extends SurfaceHook {
     get time(): number;
     patch(source: string): string;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     protected validate(): void;
     protected variant(): string;
     protected write(): void;
@@ -76,6 +77,9 @@ abstract class SurfaceHook implements EnginePlugin {
     protected abstract write(): void;
     abstract patch(source: string): string;
     protected variant(): string;
+    protected shaderDeclarations(): string;
+    protected extraBindings(_device: GPUDevice): GPUBindGroupEntry[];
+    protected releaseExtra(): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

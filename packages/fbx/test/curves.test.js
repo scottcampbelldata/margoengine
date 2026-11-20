@@ -74,3 +74,36 @@ test('a rational curve keeps its weights: weight pulls it toward a control point
 test('without the entry a curve is left out, and a file of only curves has nothing to show', async () => {
   await assert.rejects(convertFBX(real('maya_nurbs_curve_form_7700_binary.fbx')), /no mesh geometry/);
 });
+
+test('an FbxLine ends a piece at each negative index, and nothing joins one piece to the next', async () => {
+  // Two pieces: (0,0,0)-(1,0,0) and (0,1,0)-(1,1,0). -2 and -4 are indices 1 and 3 marked as end points.
+  const text = `; FBX 7.4.0 project file
+FBXHeaderExtension: { FBXVersion: 7400 }
+Objects: {
+ Geometry: 10, "Geometry::L", "Line" {
+  Points: *12 { a: 0,0,0,1,0,0,0,1,0,1,1,0 }
+  PointsIndex: *4 { a: 0,-2,2,-4 }
+ }
+ Model: 1, "Model::Wire", "Line" { }
+}
+Connections: {
+ C: "OO",1,0
+ C: "OO",10,1
+}
+`,
+    glb = await convertFBX(new TextEncoder().encode(text), { extensions: [nurbsCurves] }),
+    doc = JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, new DataView(glb).getUint32(12, true)))),
+    [{ record, curve }] = fbxCurves(doc.nodes.filter((n) => n.extras).map((n) => ({ name: n.name, extras: n.extras })));
+  assert.deepEqual(record.pieces, [2, 2]);
+  assert.equal(record.polyline.length, 12);
+  // No point of the spline lies between the pieces: every sample has y 0 or y 1.
+  for (let k = 0; k <= 40; k++) {
+    const y = curve.evaluate(curve.start + ((curve.end - curve.start) * k) / 40)[1];
+    assert.ok(Math.abs(y) < 1e-9 || Math.abs(y - 1) < 1e-9, `sample ${k} at y ${y}`);
+  }
+  // A piece of one point is not a line.
+  await assert.rejects(
+    convertFBX(new TextEncoder().encode(text.replace('a: 0,-2,2,-4', 'a: -1,1,2,-4')), { extensions: [nurbsCurves] }),
+    /line piece/,
+  );
+});

@@ -2,6 +2,7 @@
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
+import { ViewStates } from '../../shared/view-rect.js';
 import type { Drawable, GpuContext } from './render.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number };
@@ -12,18 +13,23 @@ export class VolumeDepthCapture implements EnginePlugin {
   readonly name = 'sciviz-volume-depth';
   readonly members = new Set<Drawable>();
   #device!: GPUDevice;
-  #views = new Map<
-    string,
-    {
-      target: SceneTarget;
-      colour: GPUTexture;
-      depth: GPUTexture;
-      width: number;
-      height: number;
-      format: GPUTextureFormat;
-      samples: number;
-    }
-  >();
+  // A view not drawn in a frame (removed, or its id never used again) releases its capture at the next frame.
+  #views = new ViewStates<{
+    target?: SceneTarget;
+    colour?: GPUTexture;
+    depth?: GPUTexture;
+    width?: number;
+    height?: number;
+    format?: GPUTextureFormat;
+    samples?: number;
+  }>(
+    () => ({}),
+    (view) => {
+      view.target?.dispose();
+      view.colour?.destroy();
+      view.depth?.destroy();
+    },
+  );
   #active: SceneTarget | undefined;
   static attach(engine: Engine): VolumeDepthCapture {
     let capture = captures.get(engine);
@@ -45,25 +51,22 @@ export class VolumeDepthCapture implements EnginePlugin {
       execute: (c) => {
         this.#active = undefined;
         if (c.backend !== 'webgpu' || ![...this.members].some((d) => d.visible) || sceneTarget(c)) return;
-        const key = c.view?.id ?? '',
-          samples = c.descriptor.multisample?.count ?? 1;
-        let view = this.#views.get(key);
+        const samples = c.descriptor.multisample?.count ?? 1,
+          view = this.#views.get(c);
         if (
-          !view ||
+          !view.target ||
           view.width !== c.width ||
           view.height !== c.height ||
           view.format !== c.format ||
           view.samples !== samples
         ) {
-          if (view) {
-            view.target.dispose();
-            view.colour.destroy();
-            view.depth.destroy();
-          }
+          view.target?.dispose();
+          view.colour?.destroy();
+          view.depth?.destroy();
           const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
           const colour = this.#device.createTexture({ size: [c.width, c.height], format: c.format, usage });
           const depth = this.#device.createTexture({ size: [c.width, c.height], format: 'depth32float', usage });
-          view = {
+          Object.assign(view, {
             target: new SceneTarget(this.#device, colour, depth, samples),
             colour,
             depth,
@@ -71,11 +74,10 @@ export class VolumeDepthCapture implements EnginePlugin {
             height: c.height,
             format: c.format,
             samples,
-          };
-          this.#views.set(key, view);
+          });
         }
-        this.#active = view.target;
-        view.target.begin(c);
+        this.#active = view.target!;
+        view.target!.begin(c);
       },
     });
     graph.add({
@@ -89,6 +91,10 @@ export class VolumeDepthCapture implements EnginePlugin {
       },
     });
   }
+  /** Once per frame (a positive delta; picks pass 0): releases the captures of views the previous frame did not draw. */
+  onPreUpdate(delta: number): void {
+    if (delta > 0) this.#views.prune();
+  }
   forget(drawable: Drawable): void {
     this.members.delete(drawable);
     if (!this.members.size) this.#release();
@@ -98,11 +104,6 @@ export class VolumeDepthCapture implements EnginePlugin {
     this.#device = engine.gpu!;
   }
   #release(): void {
-    for (const v of this.#views.values()) {
-      v.target.dispose();
-      v.colour.destroy();
-      v.depth.destroy();
-    }
     this.#views.clear();
     this.#active = undefined;
   }

@@ -70,10 +70,16 @@ test('OBJ: every statement, n-gons, negative indices, continuation, groups, smoo
   assert.deepEqual([...obj.smoothingGroups], [1, 0, 7, 0]);
   assert.equal(obj.indices.length, (2 + 1 + 1 + 3) * 3);
   assert.deepEqual(obj.materialLibraries, ['a.mtl', 'mats/b.mtl']);
-  assert.deepEqual(obj.extras, [
-    { keyword: 'l', value: '1 2', line: 27 },
-    { keyword: 'p', value: '3', line: 28 },
+  assert.deepEqual(obj.extras, []);
+  // `l 1 2` and `p 3` weld their own corners (no normal): v 1, v 2 and v 3 at their positions.
+  assert.equal(obj.lineIndices.length, 2);
+  assert.equal(obj.pointIndices.length, 1);
+  const at = (i) => [...obj.positions.subarray(i * 3, i * 3 + 3)];
+  assert.deepEqual([...obj.lineIndices].map(at), [
+    [0, 0, 0],
+    [1, 0, 0],
   ]);
+  assert.deepEqual(at(obj.pointIndices[0]), [1, 1, 0]);
   assert.deepEqual(
     obj.groups.map(({ start, count, name, object, groupNames, material }) => ({
       start,
@@ -324,4 +330,19 @@ test('OBJ and MTL: malformed input names the line; limits', async () => {
   assert.throws(() => parseMTL('newmtl a\n\nNs high\n'), /line 3/);
   assert.throws(() => parseMTL('newmtl a\nmap_Kd -clamp yes a.png\n'), /-clamp on line 2 must be on or off/);
   assert.throws(() => parseMTL('newmtl a\nmap_Kd -bm\n'), /line 2/);
+});
+
+test('OBJ: p and l elements without faces index the v list; polylines become segments; bad ones name the line', async () => {
+  const obj = await parseOBJ(
+    text(['v 0 0 0 1 0 0', 'v 1 0 0 0 1 0', 'v 1 1 0 0 0 1', 'v 0 1 0', 'p 1 -1', 'vt 0 0', 'l 1 2 3', 'l 4/1 1', ''].join('\n')),
+  );
+  assert.equal(obj.kind, 'points');
+  assert.equal(obj.positions.length, 12);
+  assert.deepEqual([...obj.pointIndices], [0, 3]);
+  assert.deepEqual([...obj.lineIndices], [0, 1, 1, 2, 3, 0]);
+  assert.deepEqual([...obj.colors.subarray(0, 3)], [1, 0, 0]);
+  assert.deepEqual(obj.extras, []);
+  await assert.rejects(parseOBJ(text('v 0 0 0\nl 1\n')), /l on line 2 has 1 vertices/);
+  await assert.rejects(parseOBJ(text('v 0 0 0\np 1/1\n')), /p vertex "1\/1" on line 2 is not v/);
+  await assert.rejects(parseOBJ(text('v 0 0 0\nl 1 2\n')), (error) => error.code === 'range');
 });

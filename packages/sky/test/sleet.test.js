@@ -31,7 +31,7 @@ test('sleet draws the rain and the snow, each with its share of the particles an
     queue = h.engine.gpu.queue,
     write = queue.writeBuffer.bind(queue);
   queue.writeBuffer = (buffer, offset, data) => {
-    if (data.length === 44) writes.push([buffer, Float32Array.from(data)]);
+    if (data.length === 48) writes.push([buffer, Float32Array.from(data)]);
     return write(buffer, offset, data);
   };
   h.engine.use(weather);
@@ -41,13 +41,16 @@ test('sleet draws the rain and the snow, each with its share of the particles an
     h.engine.frameGraph.execute(h.context);
   };
   frame();
-  // 24,000 rain streaks and 16,000 flakes at intensity 1: ceil(24000 x 0.8 x 0.75) and ceil(16000 x 0.8 x 0.25).
+  // 24,000 rain streaks and 500,000 flakes at intensity 1 (flakes at their real size since KB-SNOW-NEARCAM2):
+  // ceil(24000 x 0.8 x 0.75) and ceil(500000 x 0.8 x 0.25).
   const draws = h.commands().filter((c) => c.startsWith('draw 6 '));
-  assert.deepEqual(draws, ['draw 6 14400', 'draw 6 3200']);
+  assert.deepEqual(draws, ['draw 6 14400', 'draw 6 100000']);
   const [rain, snow] = writes.slice(-2);
   assert.notEqual(rain[0], snow[0], 'two uniforms: one buffer holds one draw');
   assert.deepEqual([rain[1][36], snow[1][36]], [0, 1], 'the snow flag');
-  assert.deepEqual([rain[1][41], snow[1][41]], [9, Math.fround(1.2)], 'fall speeds (float32)');
+  // Rain keeps its 9 m/s; the snow carries its fall law's coefficient, each flake falling at 0.8 D^0.16 m/s for its own
+  // size (KB-SNOW-FALLSPEED1).
+  assert.deepEqual([rain[1][41], snow[1][41]], [9, Math.fround(0.8)], 'fall speeds (float32)');
   const seeds = [rain[1], snow[1]].map((v) => new Uint32Array(v.buffer)[38]);
   assert.notEqual(seeds[0], seeds[1], 'the snow on its own hash seed');
   // Plain rain is drawn once, as it always was.

@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process';
 import { copyFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { endTree } from '../../../scripts/support/shutdown.mjs';
+import { BLUEPRINTS, writeRecord } from '../../../scripts/wasm-blueprints.mjs';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const child = spawn(
@@ -16,7 +18,7 @@ const child = spawn(
     '--manifest-path',
     root + 'draco-kernel/Cargo.toml',
   ],
-  { stdio: 'inherit', windowsHide: true, env: { ...process.env, RUSTFLAGS: '-C target-feature=+simd128' } },
+  { stdio: 'inherit', windowsHide: true, env: blueprintRustEnv(root + 'draco-kernel', '-C target-feature=+simd128') },
 );
 let expired = false,
   stopped;
@@ -35,6 +37,8 @@ try {
   const source = root + 'draco-kernel/target/wasm32-unknown-unknown/release/margo_draco_encoder.wasm';
   if (!WebAssembly.validate(readFileSync(source))) throw new Error('Invalid Draco encoder Wasm');
   copyFileSync(source, root + 'src/draco-native-encoder.wasm');
+  // The record (draco-native-encoder.wasm.json) follows the bytes just built, so it cannot go stale.
+  writeRecord(BLUEPRINTS.find((entry) => entry.name === 'draco-encoder'));
 } finally {
   clearTimeout(timer);
 }

@@ -12,7 +12,7 @@ import { stochasticTiling } from '../dist/stochastic.js';
 import { layered } from '../dist/layered.js';
 import { hair } from '../dist/hair.js';
 import { eye } from '../dist/eye.js';
-import { skin, skinProfile, skinTable } from '../dist/skin.js';
+import { skin, skinProfile, skinTable, skinTransmittance } from '../dist/skin.js';
 
 async function scene() {
   const gpu = mockGPU(),
@@ -185,7 +185,7 @@ test('layered: textures shared between layers bind once, and only its users see 
     2,
   );
   assert.match(tinted, /\*f\.base\*vec4f\(1,1,1,i\.color\.a\);/);
-  assert.throws(() => f.shader('no surface here', 2), /standard gltf-pro PBR shader/);
+  assert.throws(() => f.shader('no surface here', 2), /standard gltf\/pbr shader/);
 });
 
 test('mipTexture: a chain must halve, hold enough texels and match its format', async () => {
@@ -324,6 +324,40 @@ test('hair, eye and skin refuse a physical material and bad options', async () =
   assert.throws(() => skin({ unitsPerMeter: 0 }), RangeError);
 });
 
+test('skin with subsurface drops the wrap and lets the directional light through by the skin profile', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({ features: [skin({ thickness: 0.002 })], subsurface: 0.8 });
+  createMesh(engine, quad, material);
+  const code = modules(frame()).find((c) => c.includes('fn surface('));
+  // The skin table already moves light past the terminator: subsurface's wrap on top of it counted that light twice.
+  assert.match(code, /let direct=direct_light\(s,v,l\);/);
+  assert.ok(!code.includes('margoSubsurfaceWrap(s,l)'));
+  assert.ok(!code.includes('margoSubsurface(i,s,v,l)'));
+  assert.match(code, /var color=margoSkinThrough\(i,s,l\)\+/);
+  // 2 mm, the depth at subsurfaceThickness 1, and the widest Gaussian (7.41 mm^2) of the profile.
+  assert.match(code, /let d=c\.a\*margoThickness\(i\)\*2e\+0;/);
+  assert.match(code, /vec3f\(7\.8e-2,0e\+0,0e\+0\)\*exp\(d2\/7\.41e\+0\)/);
+  assert.match(code, /max\(0\.3-dot\(margoSkinMesh,l\),0\.0\)/);
+  material.subsurface = 0;
+  assert.ok(modules(frame()).every((c) => !c.includes('margoSkinThrough')));
+  assert.throws(() => skin({ thickness: 0 }), RangeError);
+  assert.deepEqual(skin({ unitsPerMeter: 100, thickness: 0.5 }).serialization(), { unitsPerMeter: 100, thickness: 0.5 });
+});
+
+test('skin transmittance is the profile integrated over the back of a slab', () => {
+  for (let c = 0; c < 3; c++) assert.ok(Math.abs(skinTransmittance(0)[c] - 1) < 1e-12);
+  for (const depth of [0.25, 1, 2, 4]) {
+    const total = [0, 0, 0];
+    for (let r = 0.00025; r < 60; r += 0.0005) {
+      const p = skinProfile(Math.hypot(r, depth));
+      for (let c = 0; c < 3; c++) total[c] += p[c] * 2 * Math.PI * r * 0.0005;
+    }
+    const t = skinTransmittance(depth);
+    for (let c = 0; c < 3; c++) assert.ok(Math.abs(total[c] - t[c]) < 1e-5, `${depth} mm channel ${c}: ${total[c]} ${t[c]}`);
+    assert.ok(t[0] > t[1] && t[1] >= t[2], 'red passes furthest');
+  }
+});
+
 test('the skin profile is the published fit, and the table holds it', () => {
   // The weights of each colour sum to 1, so the profile integrates to 1 over the plane: sum of w G(v, r) 2 pi r dr.
   for (let c = 0; c < 3; c++) {
@@ -393,7 +427,7 @@ test('clipping planes cut in the rasterizer only on a device with clip-distances
     const code = surface(frame());
     assert.ok(code.startsWith('enable clip_distances;\n'));
     assert.match(code, /@vertex fn vertex\(i:Input\)->MargoClipped \{\s*var o:MargoClipped;/);
-    assert.match(code, /struct MargoClipped \{[^}]*@builtin\(clip_distances\) margoClip:array<f32,6>\}/);
+    assert.match(code, /struct MargoClipped \{[^}]*@builtin\(clip_distances\) margoClip:array<f32,8>\}/);
     assert.match(code, /@fragment fn fragment\(i:Out,/, 'a fragment stage cannot read the distances');
     assert.ok(!code.includes('materialClipBehind'), 'no discard');
   }
@@ -418,4 +452,211 @@ test('clipping planes cut in the rasterizer only on a device with clip-distances
     const code = surface(frame());
     assert.ok(!code.includes('clip_distances') && code.includes('materialClipBehind'), 'an eye fills the inter-stage slots');
   }
+  {
+    // WGSL's clip_distances holds 8: past 8 planes the material discards, and back at 8 it cuts in the rasterizer again.
+    const { engine, frame } = await fitted(['clip-distances']),
+      eight = Array.from({ length: 8 }, (_, i) => [Math.cos(i), Math.sin(i), 0, 1]),
+      material = new PbrMaterial({ clippingPlanes: eight });
+    createMesh(engine, quad, material);
+    assert.ok(surface(frame()).includes('clip_distances'), 'eight planes cut in the rasterizer');
+    material.clippingPlanes = [...eight, [0, 0, 1, 1]];
+    const nine = surface(frame());
+    assert.ok(!nine.includes('clip_distances') && nine.includes('materialClipBehind'), 'nine planes discard');
+    assert.match(nine, /planes:array<vec4f,16>/);
+    material.clippingPlanes = eight;
+    assert.equal(surface(frame()), undefined, 'back at eight reuses the rasterizer variant compiled first');
+  }
+});
+
+// A thin cornea with nearly parallel faces leaves a ray in the direction Snell's law gives from air into the aqueous
+// humour (Gullstrand 1.336); the eye bent the view and light rays by the cornea's 1.376, too far, which moved the iris.
+// The cornea's index still sets its reflection: F0 = ((1.376 - 1) / (1.376 + 1))^2.
+test('the eye bends its rays by the aqueous humour and reflects by the cornea', async () => {
+  const { engine, frame } = await scene(),
+    material = new PbrMaterial({ features: [eye()] });
+  createMesh(engine, quad, material);
+  const code = modules(frame()).find((c) => c.includes('fn margoEyeSurface('));
+  const bends = [...code.matchAll(/refract\(-[vl],c?n,1\.0\/([0-9.e+-]+)\)/g)].map((m) => Number(m[1]));
+  assert.deepEqual(bends, [1.336, 1.336]);
+  const f0 = ((1.376 - 1) / (1.376 + 1)) ** 2;
+  assert.ok(code.includes(`mix(0.04,mix(${f0.toExponential()},`), 'the cornea reflects by its own index when dry');
+  assert.throws(() => eye({ chamberIor: 1 }), RangeError);
+  const { engine: other, frame: next } = await scene();
+  createMesh(other, quad, new PbrMaterial({ features: [eye({ chamberIor: 1.4 })] }));
+  const custom = modules(next()).find((c) => c.includes('fn margoEyeSurface('));
+  assert.deepEqual(
+    [...custom.matchAll(/refract\(-[vl],c?n,1\.0\/([0-9.e+-]+)\)/g)].map((m) => Number(m[1])),
+    [1.4, 1.4],
+  );
+});
+
+// The cornea is steeper than the globe: 7.8 mm on a 12 mm eye (Le Grand's full theoretical eye, Atchison and Smith 2000).
+// The view ray refracted on the globe's own sphere, which magnified the entrance pupil 1.064 times against the published
+// 1.133. The whole front wears a tear film of index 1.337 (Craig et al. 1995) whose share of reflection is `wetness`.
+test("the eye bends rays on the cornea's own sphere and wears a live tear film", async () => {
+  const { engine, frame } = await scene(),
+    feature = eye();
+  createMesh(engine, quad, new PbrMaterial({ features: [feature] }));
+  const code = modules(frame()).find((c) => c.includes('fn margoEyeSurface('));
+  assert.match(code, /let cn=normalize\(d-axis\*\(radius\*\(1\.0-6\.5e-1\)\)\);/);
+  assert.match(code, /refract\(-v,cn,/);
+  const film = ((1.337 - 1) / (1.337 + 1)) ** 2;
+  assert.ok(code.includes(film.toExponential()), 'the film reflects as water of 1.337');
+  assert.match(code, /let coat=margoEyeWet\*\(1\.0-margoEyeCornea\)/);
+  assert.equal(feature.wetness, 1);
+  feature.wetness = 0.25;
+  assert.equal(feature.serialization().wetness, 0.25);
+  assert.throws(() => (feature.wetness = 2), RangeError);
+  assert.throws(() => eye({ corneaRadius: 0 }), RangeError);
+  assert.throws(() => eye({ corneaRadius: 1.5 }), RangeError);
+  assert.throws(() => eye({ wetness: -1 }), RangeError);
+  const { engine: other, frame: next } = await scene();
+  createMesh(other, quad, new PbrMaterial({ features: [eye({ corneaRadius: 1 })] }));
+  const globe = modules(next()).find((c) => c.includes('fn margoEyeSurface('));
+  assert.match(globe, /radius\*\(1\.0-1e\+0\)\)/, "corneaRadius 1 keeps the globe's sphere");
+});
+
+// The upper lid shades the ball under its margin by default (the ledge's ambient occlusion over a sky brighter
+// overhead, and its shadow): its row, after the eye's five, is height, tilt, curve and depth; false leaves a bare ball.
+test('the eye wears an upper lid by default, measured from its up, and false leaves a bare eyeball', async () => {
+  const written = [],
+    device = {
+      createBuffer: () => ({ destroy() {} }),
+      queue: { writeBuffer: (_b, _o, data) => written.push(Float32Array.from(data)) },
+    };
+  eye().bindings(device);
+  assert.equal(written.at(-1).length, 28);
+  assert.deepEqual([...written.at(-1).slice(20, 24)], [0.375, 0, -0.4, 1 / 6].map(Math.fround));
+  eye({ lid: false }).bindings(device);
+  assert.deepEqual([...written.at(-1).slice(20, 24)], [0, 0, 0, 0]);
+  eye({ lid: { height: 0.2, tilt: 0.05, curve: -0.42, depth: 0.2 } }).bindings(device);
+  assert.deepEqual([...written.at(-1).slice(20, 24)], [0.2, 0.05, -0.42, 0.2].map(Math.fround));
+  // The side row is up cross axis: the lid's tilt and the iris picture follow `up`.
+  eye({ axis: [0, 0, 1], up: [1, 0, 0] }).bindings(device);
+  assert.deepEqual([...written.at(-1).slice(16, 19)], [0, -1, 0]);
+  eye().bindings(device);
+  assert.deepEqual([...written.at(-1).slice(16, 19)], [1, 0, 0], 'the default up keeps the side the eye had');
+  assert.throws(() => eye({ lid: { depth: 0 } }), RangeError);
+  assert.throws(() => eye({ lid: { height: 2 } }), RangeError);
+  assert.throws(() => eye({ lid: true }), TypeError);
+  assert.throws(() => eye({ up: [0, 0] }), TypeError);
+  const { engine, frame } = await scene();
+  createMesh(engine, quad, new PbrMaterial({ features: [eye()] }));
+  const code = modules(frame()).find((c) => c.includes('fn margoEyeSurface('));
+  assert.match(code, /s\.occlusion\*=select\(1\.0,\(0\.2015\+0\.7985\*\(1\.0-1\.0\/\(1\.0\+0\.44\*lq\+1\.15\*lq\*lq\)\)\),lid\.w>0\.0\)\+select\(0\.0,/);
+  assert.match(code, /let lit=select\(1\.0,1\.0-smoothstep\(0\.0,0\.02,margoEyeDepth\*dot\(l,margoEyeUp\)-margoEyeBelow\*dot\(l,margoEyeLook\)\)/);
+});
+
+// The lower lid is the same ledge turned over: its row follows the upper lid's, and its ambient term takes off only the
+// ground's share of the light, 0.2015 under the overcast sky, as q / sqrt(1 + q^2) of the lower half comes back.
+test('the eye wears a lower lid by default that shades the ground light above its margin, and false leaves it off', async () => {
+  const written = [],
+    device = {
+      createBuffer: () => ({ destroy() {} }),
+      queue: { writeBuffer: (_b, _o, data) => written.push(Float32Array.from(data)) },
+    };
+  eye().bindings(device);
+  assert.deepEqual([...written.at(-1).slice(24)], [-0.45, 0, 0.3, 1 / 6].map(Math.fround));
+  eye({ lowerLid: false }).bindings(device);
+  assert.deepEqual([...written.at(-1).slice(24)], [0, 0, 0, 0]);
+  eye({ lowerLid: { height: -0.42, tilt: -0.02, curve: 0.25, depth: 0.15 } }).bindings(device);
+  assert.deepEqual([...written.at(-1).slice(24)], [-0.42, -0.02, 0.25, 0.15].map(Math.fround));
+  assert.throws(() => eye({ lowerLid: { depth: 0 } }), RangeError);
+  assert.throws(() => eye({ lowerLid: { height: -2 } }), RangeError);
+  assert.throws(() => eye({ lowerLid: true }), TypeError);
+  const { engine, frame } = await scene();
+  createMesh(engine, quad, new PbrMaterial({ features: [eye()] }));
+  const code = modules(frame()).find((c) => c.includes('fn margoEyeSurface('));
+  assert.match(code, /\+select\(0\.0,-0\.2015\*\(1\.0-uq\/sqrt\(1\.0\+uq\*uq\)\),low\.w>0\.0\);/);
+  assert.match(code, /-margoEyeLowDepth\*dot\(l,margoEyeUp\)-margoEyeAbove\*dot\(l,margoEyeLook\)/);
+  // The closed form is the integral: a cosine-weighted sum over the forward hemisphere of an even ground under the
+  // ledge, at q = height above the margin over the lid's depth.
+  const visible = (q) => {
+    let seen = 0,
+      all = 0;
+    for (let i = 0; i < 400; i++)
+      for (let j = 0; j < 400; j++) {
+        const z = (i + 0.5) / 400,
+          y = Math.sqrt(1 - z * z) * Math.sin((2 * Math.PI * (j + 0.5)) / 400);
+        if (y >= 0) continue;
+        all += z;
+        if (!(q * z < -y)) seen += z;
+      }
+    return seen / all;
+  };
+  for (const q of [0, 0.25, 0.5, 1, 2, 4]) assert.ok(Math.abs(visible(q) - q / Math.hypot(1, q)) < 0.005, `q ${q}`);
+});
+
+test('the eye carries its centre and axis along a follow matrix and reads an iris that fills part of its map', () => {
+  // A fake device that keeps what the eye uploads: 28 floats, the centre at 8 to 10 and the axis at 12 to 14.
+  const written = [],
+    device = {
+      createBuffer: () => ({ destroy() {} }),
+      queue: { writeBuffer: (_b, _o, data) => written.push(Float32Array.from(data)) },
+    };
+  let matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const feature = eye({ center: [1, 2, 3], axis: [0, 0, 1], follow: () => matrix });
+  feature.bindings(device);
+  assert.deepEqual([...written.at(-1).slice(8, 11)], [1, 2, 3]);
+  // A joint turned 90 degrees about y and moved 0.5 along x: the centre and the gaze turn with it.
+  matrix = [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0.5, 0, 0, 1];
+  feature.bindings(device);
+  const moved = written.at(-1);
+  assert.deepEqual([...moved.slice(8, 11)], [3.5, 2, -1]);
+  assert.deepEqual([...moved.slice(12, 15)], [1, 0, 0]);
+  assert.throws(() => eye({ follow: [1, 0, 0] }), TypeError);
+  matrix = [1, 2, 3];
+  assert.throws(() => feature.bindings(device), TypeError);
+  // Character Creator's iris sits within 0.123 of its map's middle: the shader scales the map lookup by that.
+  const code = eye({ irisMap: { bind: () => undefined }, irisMapRadius: 0.123 }).shader(
+    'fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {x}\nstruct Out {\n a:f32\n}\nlet p=f.model*vec4f(i.p,1);\nif(!facing&&f.settings.z<0.5){discard;}',
+    3,
+  );
+  assert.match(code, /\*1\.23e-1\+0\.5,dx\*1\.23e-1/);
+  assert.throws(() => eye({ irisMapRadius: 0.6 }), RangeError);
+});
+
+test('a mesh-axis hair direction turns with a follow matrix, so skinned strands turn with their joint', () => {
+  // A fake device that keeps what the hair uploads: the turned direction, four floats.
+  const written = [],
+    made = [],
+    device = {
+      createBuffer: () => {
+        const b = { destroyed: false, destroy() { this.destroyed = true; } };
+        made.push(b);
+        return b;
+      },
+      queue: { writeBuffer: (_b, _o, data) => written.push(Float32Array.from(data)) },
+    };
+  let matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+  const feature = hair({ direction: [0, -1, 0], follow: () => matrix });
+  assert.deepEqual(feature.bindings(device).map((e) => e.binding), [135]);
+  assert.deepEqual([...written.at(-1).slice(0, 3)], [0, -1, 0]);
+  // A steady frame uploads nothing.
+  feature.bindings(device);
+  assert.equal(written.length, 1);
+  // The joint turned 90 degrees about z and moved: the strands turn with it; the move does not touch a direction.
+  matrix = [0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0.5, 2, 0, 1];
+  feature.bindings(device);
+  assert.deepEqual([...written.at(-1).slice(0, 3)], [1, 0, 0]);
+  // The vertex stage reads the uploaded direction in the feature's own group, not a constant.
+  const source =
+    'fn direct_light(s:Surface,v:vec3f,l:vec3f)->vec3f {x}\nstruct Out {\n a:f32\n}\nlet p=f.model*vec4f(i.p,1);\nif(!facing&&f.settings.z<0.5){discard;}';
+  const code = feature.shader(source, 3);
+  assert.match(code, /@group\(3\) @binding\(135\) var<uniform> margoHairRows/);
+  assert.match(code, /margoObjectModel\*vec4f\(margoHairRows\.axis\.xyz,0\)/);
+  assert.match(feature.shader(source, 2), /@group\(2\) @binding\(135\)/);
+  // Without follow the direction stays a constant and the feature binds nothing.
+  const fixed = hair({ direction: [0, -1, 0] });
+  assert.equal(fixed.bindings, undefined);
+  assert.doesNotMatch(fixed.shader(source, 3), /margoHairRows/);
+  // The last material to let go frees the buffer.
+  feature.attach({});
+  feature.detach({});
+  assert.equal(made[0].destroyed, true);
+  // Bad follows.
+  assert.throws(() => hair({ direction: [0, -1, 0], follow: [1, 0, 0] }), TypeError);
+  assert.throws(() => hair({ follow: () => matrix }), /'u' or 'v' direction/);
+  matrix = [1, 2, 3];
+  assert.throws(() => hair({ direction: [0, -1, 0], follow: () => matrix }).bindings(device), TypeError);
 });

@@ -8,8 +8,8 @@ import { wgsl } from '../../core/dist/shaders.js';
 import { Clustered } from '../../clustered/dist/index.js';
 import { Shadows } from '../../shadows/dist/index.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
-import { pbrShader, extendedPBRShader } from '../../gltf-pro/src/shader.ts';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { pbrShader, extendedPBRShader } from '../../gltf/src/shader.ts';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import {
   CubeTexture,
   LambertMaterial,

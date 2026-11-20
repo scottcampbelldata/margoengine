@@ -76,8 +76,7 @@ function polar(m: ArrayLike<number>, o: number, out: Float32Array, at: number): 
     rank++;
     // Column k of `left` is A v / sigma.
     for (let r = 0; r < 3; r++)
-      left[r * 3 + k] =
-        (m[o + r] * eigen[i] + m[o + 4 + r] * eigen[3 + i] + m[o + 8 + r] * eigen[6 + i]) / sigma[k];
+      left[r * 3 + k] = (m[o + r] * eigen[i] + m[o + 4 + r] * eigen[3 + i] + m[o + 8 + r] * eigen[6 + i]) / sigma[k];
   }
   if (rank === 0) {
     for (let k = 0; k < 3; k++) for (let r = 0; r < 3; r++) left[r * 3 + k] = eigen[r * 3 + order[k]];
@@ -223,8 +222,8 @@ const blendLines = (extra: boolean) => {
     let stretch=mat3x3f(stretchA.x,stretchA.w,stretchB.x,stretchA.w,stretchA.y,stretchB.y,stretchB.x,stretchB.y,stretchA.z);
     v.position=vec4f(rotated(turn,stretch*v.position.xyz)+shift,1);
     let normalMatrix=mat3x3f(cross(stretch[1],stretch[2]),cross(stretch[2],stretch[0]),cross(stretch[0],stretch[1]));
-    let handedness=sign(dot(stretch[0],cross(stretch[1],stretch[2])));
-    v.normal=vec4f(rotated(turn,normalMatrix*v.normal.xyz*handedness),0);
+    let handedness=select(-1.0,1.0,dot(stretch[0],cross(stretch[1],stretch[2]))>=0.0);let bent=normalMatrix*v.normal.xyz*handedness;
+    v.normal=vec4f(rotated(turn,select(vec3f(0,1,0),bent,dot(bent,bent)>0.0)),0);
     v.tangent=vec4f(rotated(turn,stretch*v.tangent.xyz),v.tangent.w*handedness);`;
 };
 

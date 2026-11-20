@@ -2,7 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {parseFontOutlines, extrudeText} from '@margoengine/text/extrude';
+import {parseFontOutlines as parseLean, extrudeText as extrudeLean} from '@margoengine/text/extrude';
+import { openType } from '@margoengine/loaders/font-opentype';
+// These tests read CFF and variable fonts, so they pass the OpenType readers; tests/opentype-optin.test.js covers the
+// lean TrueType path without them.
+const parseFontOutlines = (bytes, options = {}) => parseLean(bytes, { openType, ...options });
+const extrudeText = (text, options) => extrudeLean(text, { openType, ...options });
 import {ttf,tables as fontTables,sfnt,simple,u16 as be16,u32 as be32} from './extrude-fixtures.js';
 const reference=JSON.parse(readFileSync(new URL('./fixtures/fonts/variable-reference.json',import.meta.url),'utf8'));
 const close=(a,b,epsilon=1e-7)=>assert.ok(Math.abs(a-b)<=epsilon,`${a} vs ${b}`);
@@ -29,8 +34,8 @@ test('variation axes clamp, reject unknown/nonfinite values and preserve the def
  const bytes=readFileSync(new URL('./fixtures/fonts/SourceSans3VF-Upright.otf',import.meta.url));
  const font=parseFontOutlines(bytes),i=font.glyphIndex('A');
  assert.equal(font.withVariations({wght:10000}).glyphAdvance(i),font.withVariations({wght:900}).glyphAdvance(i));
- assert.throws(()=>font.withVariations({nope:1}),e=>e.code==='failed');
- assert.throws(()=>font.withVariations({wght:NaN}),e=>e.code==='failed');
+ assert.throws(()=>font.withVariations({nope:1}),e=>e.name==='LoaderError'&&e.code==='range');
+ assert.throws(()=>font.withVariations({wght:NaN}),e=>e.name==='LoaderError'&&e.code==='range');
  const mesh=extrudeText('AV',{font:font.withVariations({wght:650}),curveSegments:12});
  assert.ok(mesh.indices.length>0&&mesh.positions.every(Number.isFinite));
 });
@@ -72,13 +77,13 @@ test('null HVAR variation subtables mean no width adjustment and malformed axes 
  const invalid=Uint8Array.from(original),f=table(invalid,'fvar'),data=new DataView(invalid.buffer);
  const axes=f.offset+data.getUint16(f.offset+4);
  data.setInt32(axes+4,1000*65536);
- assert.throws(()=>parseFontOutlines(invalid),e=>e.code==='failed');
+ assert.throws(()=>parseFontOutlines(invalid),e=>e.name==='LoaderError'&&e.code==='header');
  const cff=table(original,'CFF2'),truncated=Uint8Array.from(original);
  new DataView(truncated.buffer).setUint32(cff.offset+new DataView(original.buffer,original.byteOffset,original.byteLength).getUint8(cff.offset+2)+new DataView(original.buffer,original.byteOffset,original.byteLength).getUint16(cff.offset+3),0x7fffffff);
- assert.throws(()=>parseFontOutlines(truncated),e=>e.code==='failed');
+ assert.throws(()=>parseFontOutlines(truncated),e=>e.name==='LoaderError'&&e.code==='header'&&/CFF INDEX/.test(e.message));
  const shortStore=Uint8Array.from(original);
  new DataView(shortStore.buffer).setUint16(cff.offset+reference.fonts.otf.variationStoreOffset,1);
- assert.throws(()=>parseFontOutlines(shortStore),e=>e.code==='failed');
+ assert.throws(()=>parseFontOutlines(shortStore),e=>e.name==='LoaderError'&&e.code==='truncated');
 });
 // Clean-room variable TrueType fixtures from the OpenType 1.9.1 fvar, gvar and avar chapters and the common
 // variation formats (tuple variation headers, packed point numbers, packed deltas).

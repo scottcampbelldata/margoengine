@@ -1,15 +1,15 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Glass tint pass cost</title><style>body{margin:0}#host{width:1280px;height:720px}</style></head><body><div id="host"></div>
 <script type="module">
-// Driven by tint-pass-gpu.mjs. An opaque grey wall behind `layers` screen-filling glass quads loaded through gltf-pro, so
+// Driven by tint-pass-gpu.mjs. An opaque grey wall behind `layers` screen-filling glass quads loaded through gltf/pbr, so
 // every pixel of the frame runs the native glass draws `layers` times. The runner chooses what the tint draw does by
-// patching the served gltf-pro build, so this page is the same for all three arms.
+// patching the served gltf/pbr build, so this page is the same for all three arms.
 // ?width=&height= set the frame. Maps are 1024 x 1024 noise with mipmaps, sampled at about one texel a pixel.
 const query=new URLSearchParams(location.search),width=+query.get('width'),height=+query.get('height');
 const host=document.querySelector('#host');host.style.width=width+'px';host.style.height=height+'px';
 const {createStage}=await import('/packages/stage/dist/index.js');
 const {box,PbrMaterial}=await import('/packages/core/dist/index.js');
-const {parseGLTF}=await import('/packages/gltf-pro/dist/index.js');
-const {extendedMaterials}=await import('/packages/gltf-pro/dist/extended.js');
+const {parseGLTF}=await import('/packages/gltf/dist/pbr.js');
+const {extendedMaterials}=await import('/packages/gltf/dist/extended.js');
 const {Tonemap}=await import('/packages/tonemap/dist/index.js');
 const {Stats}=await import('/packages/stats/dist/index.js');
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,features:['timestamp-query'],camera:{position:[0,0,4],target:[0,0,0]}});

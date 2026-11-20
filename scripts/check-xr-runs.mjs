@@ -55,6 +55,6 @@ async function main() {
   if (process.argv.includes('--release') && open.length)
     problems.push(`${open.length} routes have no real run: open examples/xr-device-check on each device`);
   for (const problem of problems) console.error(problem);
-  if (problems.length) process.exit(1);
+  if (problems.length) process.exitCode = 1;
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

@@ -10,8 +10,9 @@ export class GpuVoxelMesher {
     readonly batch: number;
     readonly stats: GpuVoxelMesherStats;
     constructor(device: GPUDevice, options?: GpuVoxelMesherOptions);
+    setDevice(device: GPUDevice): void;
     warm(): void;
-    mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3): Promise<ChunkMesh | null>;
+    mesh(world: VoxelWorld, key: string, priority?: number, eye?: Vec3, border?: boolean): Promise<ChunkMesh | null>;
     cancel(key: string): void;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -105,6 +106,7 @@ interface ChunkMesh {
     cutout: Uint32Array;
     translucent: Uint32Array;
     visibility: number;
+    border?: Uint32Array;
 }
 
 interface ModelBox {

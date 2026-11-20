@@ -1,7 +1,7 @@
 {
   "commit": "8cc9e939",
   "date": "2026-10-25",
-  "command": "node scripts/gpu-lock.mjs run --owner=<id> -- node tools/create-margo/test/browser-check.mjs",
+  "command": "node tools/create-margo/test/browser-check.mjs",
   "about": "Each Vite starter scaffolded by create-margo, served by vite dev with this checkout's built packages linked (no npm install), opened in headless Edge; times from create to the first drawn frame. One run per template, not a quiet-machine benchmark.",
   "machine": "AMD Ryzen 9 9950X, NVIDIA RTX A6000, Windows 11, Edge",
   "templates": {

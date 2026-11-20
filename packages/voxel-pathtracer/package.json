@@ -88,7 +88,9 @@
     "test": "npm run build && node --test tests/*.test.js",
     "test:gpu:resampled": "cd ../.. && node packages/voxel-pathtracer/tests/resampled-browser.mjs",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal glassfurnace analytic glasslight sky projections arealight dispersion microfacet energy environment textures cutout shapes transparent determinism disposecompile convergence mediaboundary",
+    "test:gpu": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=base agx groundprecision denoiseholdout compat compile preview traversal glassfurnace analytic",
+    "test:gpu:light-transport": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=light-transport glasslight sky projections mediaboundary bouncelimit arealight dispersion microfacet energy environment textures cutout shapes",
+    "test:gpu:convergence": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=convergence transparent determinism disposecompile convergence",
     "test:gpu:denoise": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise denoise-diffuse denoise-opaque denoisepeak denoisehistory",
     "test:gpu:denoise-materials": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-materials denoise-materials",
     "test:gpu:denoise-caustics": "cd ../.. && node packages/voxel-pathtracer/tests/browser-check.mjs --report=denoise-caustics denoise-caustics",
@@ -120,6 +122,8 @@
   "margo": {
     "gpuTestTimeoutMinutes": {
       "test:gpu": 10,
+      "test:gpu:light-transport": 10,
+      "test:gpu:convergence": 10,
       "test:gpu:resampled": 10,
       "test:gpu:denoise": 10,
       "test:gpu:denoise-materials": 15,

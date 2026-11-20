@@ -1,9 +1,15 @@
 // Baked light for the voxel renderer (`VoxelRenderer.lightmap`), its own entry so worlds without it carry none of it.
+import type { Borrowable } from '../../shared/borrowed.js';
 
 /** Options of {@link voxelLightmap}: an atlas from `@margoengine/lightmap` and the quads it was baked for. */
 export interface VoxelLightmapOptions {
-  /** The atlas: a 2D texture with TEXTURE_BINDING usage holding linear light (not sRGB). Borrowed, never destroyed. */
-  texture: GPUTexture;
+  /**
+   * The atlas: a 2D texture with TEXTURE_BINDING usage holding linear light (not sRGB), or `(device) => texture`,
+   * called once per device, so the baked light comes back by itself after a device restore. Borrowed, never
+   * destroyed. A plain texture is lost with its device: the renderer goes on with live lighting, `engine.onError`
+   * hears of it once (`'state'`, #borrowed-lost), and assigning a new `voxelLightmap` brings the baked light back.
+   */
+  texture: Borrowable<GPUTexture>;
   /**
    * The charts: 12 numbers per quad, corners p0 to p3 counterclockwise from outside, axis-aligned rectangles on integer
    * world cells in [-16,777,215, 16,777,215]. At most 32,768 quads covering 1,048,576 cell faces, no two on one face.
@@ -22,8 +28,8 @@ export interface VoxelLightmapOptions {
 
 /** Baked light ready for `VoxelRenderer.lightmap`, from {@link voxelLightmap}. */
 export interface VoxelLightmap {
-  /** The atlas texture (borrowed). */
-  readonly texture: GPUTexture;
+  /** The atlas texture or the function that makes it per device, as given (borrowed). */
+  readonly texture: Borrowable<GPUTexture>;
   /** A header, then 24 floats per chart: corner, u and v edges with inverse squared lengths, normal, atlas corners. */
   readonly charts: Float32Array;
   /** Hash index of every covered cell face: x, y, z, (chart + 1) << 3 | face; at most 16 probes per lookup. */
@@ -38,9 +44,9 @@ export interface VoxelLightmap {
  *
  * ```ts
  * const atlas = await bakeLightmap({ positions, albedo }, { radiometry: 'physical' });
- * voxels.lightmap = voxelLightmap({ texture, positions, uv: atlas.uv, scale: atlas.lightmapScale, radiometry: 'physical' });
+ * voxels.lightmap = voxelLightmap({ texture: (device) => uploadAtlas(device), positions, uv: atlas.uv, scale: atlas.lightmapScale, radiometry: 'physical' });
  * ```
- * @throws TypeError without a texture, for a `radiometry` other than `'legacy'` or `'physical'`, or a chart that is
+ * @throws TypeError without a texture or texture function, for a `radiometry` other than `'legacy'` or `'physical'`, or a chart that is
  * not an axis-aligned rectangle.
  * @throws RangeError for chart counts, coordinates, UVs or `scale` out of range, overlapping charts, or an index that
  * cannot meet its 16-probe budget in 64 MiB.
@@ -53,8 +59,10 @@ const CELLS = 1048576;
 
 // The chart table and the hash index of every covered cell face (16 linear probes, seed and size in the header).
 function charts(atlas: VoxelLightmapOptions): { charts: Float32Array; index: Int32Array } {
-  if (!atlas || typeof atlas.texture?.createView !== 'function')
-    throw new TypeError('voxelLightmap needs {texture, positions, uv}; upload the bake atlas first');
+  if (!atlas || (typeof atlas.texture !== 'function' && typeof atlas.texture?.createView !== 'function'))
+    throw new TypeError(
+      'voxelLightmap needs {texture, positions, uv}; pass the uploaded atlas or (device) => GPUTexture',
+    );
   const { positions: p, uv } = atlas,
     scale = atlas.scale ?? 1,
     count = p?.length / 12;

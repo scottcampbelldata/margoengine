@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Selection } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 

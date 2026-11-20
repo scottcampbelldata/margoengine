@@ -6,6 +6,7 @@ import { rangeError } from '../../shared/errors.js';
 import { type BiomeDefinition, type Dimension, fieldDimension, type SpeciesRule } from './define.js';
 import { STRATA } from './reach.js';
 import type { BiomeSample } from './sample.js';
+import { meanCrownArea, stored } from './crown.js';
 import { standAt, standsOf, type Stands, TICK } from './stands.js';
 import type { BiomeWorld } from './world.js';
 import type { OverviewCorner, ViewTile } from './view.js';
@@ -38,26 +39,6 @@ const kindOf = (rule: SpeciesRule) => {
   const name = meshName(rule);
   return name === 'conifer' ? 1 : name === 'palm' ? 2 : 0;
 };
-
-/**
- * The mean square of a species' crown multiplier: crowns grow as size^0.75 (`SizeDistribution`), so the mean over the
- * size distribution of size^1.5, by 64 midpoints of its inverse CDF. Display maths, floats.
- */
-function meanCrownArea(rule: SpeciesRule): number {
-  const s = rule.size;
-  if (!s) return 1;
-  let sum = 0;
-  if (s.kind === 'reverse-j') {
-    const top = s.max ** (4 / 3), // float division: option maths
-      low = top / 10, // float division
-      rate = 10 * Math.log(s.q),
-      reach = 1 - Math.exp(-rate * (top - low));
-    for (let i = 0; i < 64; i++) sum += (low - Math.log(1 - ((i + 0.5) / 64) * reach) / rate) ** 1.5; // float division
-  } else
-    for (let i = 0; i < 64; i++)
-      sum += Math.min(3 * s.scale, s.scale * (-Math.log(1 - (i + 0.5) / 64)) ** (1 / s.shape)) ** 1.5; // float division
-  return sum / 64; // float division
-}
 
 type Tree = {
   /** Share of the ground its crowns fill at full suitability, inside a stand if it has stands. */
@@ -93,24 +74,6 @@ export function coverPlan(biomes: readonly BiomeDefinition[]): CoverPlan {
     if (trees.length) plan.set(b.id, trees);
   }
   return plan;
-}
-
-/** A region sample's value of a suitability field, in the units of a tile layer (`Dimension`). */
-function stored(s: BiomeSample, layer: string): number {
-  switch (layer) {
-    case 'temperature':
-      return s.temperature * 100;
-    case 'rainfall':
-      return s.rainfall;
-    case 'moisture':
-      return s.moisture * 255;
-    case 'slope':
-      return s.slope * 256;
-    case 'height':
-      return s.height * 1000;
-    default:
-      return s.waterDistance * 10;
-  }
 }
 
 /**

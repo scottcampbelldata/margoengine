@@ -131,8 +131,6 @@ test('a bad value anywhere changes nothing', async () => {
     { positions: new Float32Array([1, 1, 1, 2, Number.NaN, 2]) },
     { positions: [1, 1, 1, 2, 2, 1e39] },
     { positions: good, rotations: new Float32Array([0, 0, 0, Number.POSITIVE_INFINITY, 0, 0]) },
-    { positions: good, scales: new Float32Array([1, 1, 1, 1, 0, 1]) },
-    { positions: good, scales: [1, 1, 1, 1, 1e-46, 1] },
     { positions: good, scales: new Float32Array([1, 1, 1, 1, Number.NaN, 1]) },
     { positions: good, quaternions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 0]) },
     { positions: good, quaternions: new Float32Array([0, 0, 0, 1, Number.NaN, 0, 0, 1]) },
@@ -167,7 +165,10 @@ test('a mesh that went is named, even when its slot now holds another mesh', asy
   assert.equal(reused.position.x, 7);
   writer.write({ positions: new Float32Array(3) }, { count: 1 });
   e.dispose();
-  assert.throws(() => writer.write({ positions }), (error) => error.code === 'disposed');
+  assert.throws(
+    () => writer.write({ positions }),
+    (error) => error.code === 'disposed',
+  );
 });
 
 test('a store that grew keeps working', async () => {
@@ -198,4 +199,14 @@ test('later changes to the given list change nothing', async () => {
   meshes.reverse();
   writer.write({ positions: new Float32Array([1, 0, 0, 2, 0, 0]) });
   assert.equal(meshes[1].position.x, 1);
+});
+
+test('KB-GLTFA B1: zero scales are written as setScale writes them, and tick to a flattened matrix', async () => {
+  const e = await engine(),
+    meshes = list(e, 2);
+  new TransformWriter(meshes).write({ scales: [1, 0, 1, 0, 0, 1e-46] });
+  e.store.tick(false);
+  assert.deepEqual([meshes[0].scale.x, meshes[0].scale.y, meshes[0].scale.z], [1, 0, 1]);
+  assert.deepEqual([meshes[1].scale.x, meshes[1].scale.y, meshes[1].scale.z], [0, 0, 0]);
+  assert.ok(meshes.every((mesh) => Array.from(mesh.matrix).every(Number.isFinite)));
 });

@@ -18,6 +18,7 @@ import { agx } from '../../shared/agx.js';
 import { compatTier, loadCompatRoute } from '../../shared/compat.js';
 import type { RouteKernel, TraceInputs, TraceRoute } from './compat.js';
 import { acesNarkowicz } from '../../shared/aces.js';
+import { unjitteredCamera } from '../../shared/temporal-camera.js';
 import {
   FLAG_CLAMP,
   FLAG_ENV,
@@ -69,7 +70,7 @@ import {
 import { DENOISE, DISPLAY, TABLE_VEC4, TABLES, TRACE } from './shaders.js';
 import { LAMBDA_MAX, LAMBDA_MIN } from './spectrum.js';
 import { raycastSnapshot } from './traverse.js';
-import { applyView } from '../../shared/view-rect.js';
+import { applyView, viewRect } from '../../shared/view-rect.js';
 import type {
   ResolvedTraceOptions,
   TraceVec3,
@@ -106,7 +107,10 @@ const DEFAULT_WORDS = (128 << 20) / 4, // WebGPU's default maxStorageBufferBindi
   DENOISE_PASSES = ATROUS + CAUSTIC_LEVELS + 2, // prepare, the two chains, combine
   VIEW_BYTES = 176,
   PARAM_STRIDE = 512,
-  PARAM_BYTES = 368;
+  PARAM_BYTES = 368,
+  // A view not drawn in this many engine frames (`onPreUpdate` calls) is released with its buffers: a view drawn every
+  // other frame (two render calls a frame, one with it) keeps its image, an XR session's eyes are freed soon after it ends.
+  VIEW_FRAMES = 4;
 
 // First-fit allocator over runs of free words: [start, length] pairs sorted by start, neighbours merged.
 class Runs {
@@ -186,17 +190,6 @@ interface Gpu {
   route?: Promise<TraceRoute>;
   routeReady?: TraceRoute;
   inputs?: WeakMap<GPUBindGroup, TraceInputs>;
-  /**
-   * The viewport's trace on the route, running on its own (TraceRoute.run awaits its census read-backs): `landed` once
-   * its sums are complete, when a frame adds them into the image (`adds`, one per dispatch) and counts its samples.
-   */
-  routeJob?: {
-    epoch: number;
-    count: number;
-    width: number;
-    adds: { inputs: TraceInputs; rows: number }[];
-    landed: boolean;
-  };
   tableCoverage?: Promise<GPUComputePipeline>;
   display: Map<string, { pipeline?: GPURenderPipeline }>;
   buffers: SceneBuffers;
@@ -216,7 +209,6 @@ interface Gpu {
   layout?: { scene: SceneLayout; lights: LightLayout };
   version: number;
   resources: number;
-  view?: View;
 }
 /** Accumulation (and denoiser) buffers of one image size. */
 interface Targets {
@@ -254,6 +246,61 @@ interface View extends Targets {
   displayResolved?: GPUBindGroup;
   resolved?: boolean;
   denoisedAt: number;
+}
+/**
+ * One view's progressive image (KB-VPT-XR-VIEWS): its targets, samples, accumulation key and denoiser history. Each
+ * `PassContext.view` id has its own (the plain full-canvas frame too), so two views with different cameras, such as an
+ * XR session's eyes, each accumulate instead of restarting each other's image every frame; a view that is no longer
+ * drawn is released with its buffers ({@link VIEW_FRAMES}).
+ */
+interface ViewState {
+  /** Never reused: names this view's sums on the WebGL2 route. */
+  serial: number;
+  samples: number;
+  // Bumped whenever the view's accumulation restarts: a trace of the WebGL2 route that lands after it is dropped.
+  epoch: number;
+  key: Float64Array;
+  /** The view's last denoised frame (its camera, scene version and size) and whether the camera moved since. */
+  history: {
+    matrix: Float32Array;
+    corners: Float32Array;
+    version: number;
+    width: number;
+    height: number;
+    valid: boolean;
+  };
+  restarted: boolean;
+  /** The view shows preview samples (the full tracer is still compiling). */
+  previewing: boolean;
+  // Whether the view's last draw showed the traced image (false while the display pipeline for its target compiles).
+  shown: boolean;
+  frameMs: number;
+  lastTrace: number;
+  width: number;
+  height: number;
+  requested: [number, number];
+  limitedBy: VoxelPathTracerStats['limitedBy'];
+  /** Corner rays of the camera the view last traced with, for its denoiser. */
+  corners: Float32Array;
+  /** The engine frame (`onPreUpdate` count) the view was last drawn in. */
+  drawn: number;
+  released: boolean;
+  /** GPU targets on the current device state, made at the view's first draw. */
+  image?: View;
+  /** The route keys this view's sums are kept under. */
+  routeKeys: Set<string>;
+  /**
+   * The view's trace on the route, running on its own (TraceRoute.run awaits its census read-backs): `landed` once
+   * its sums are complete, when the view's next draw adds them into its image (`adds`, one per dispatch) and counts
+   * its samples.
+   */
+  routeJob?: {
+    epoch: number;
+    count: number;
+    width: number;
+    adds: { inputs: TraceInputs; rows: number; key: string }[];
+    landed: boolean;
+  };
 }
 
 let serial = 0;
@@ -348,33 +395,17 @@ export class VoxelPathTracer implements EnginePlugin {
   #cap = 64;
   #hold = 0;
   #streak = 0;
-  /** The viewport's last denoised frame (its camera, scene version and size) and whether the camera moved since. */
-  #history = {
-    matrix: new Float32Array(16),
-    corners: new Float32Array(32),
-    version: -1,
-    width: 0,
-    height: 0,
-    valid: false,
-  };
-  #restarted = false;
-  /** The viewport shows preview samples (the full tracer is still compiling). */
-  #previewing = false;
   #ready!: Promise<void>;
   #settle?: [() => void, (error: unknown) => void];
-  #samples = 0;
-  // Bumped whenever the accumulation restarts: a viewport trace of the WebGL2 route that lands after it is dropped.
-  #epoch = 0;
-  // Whether the last frame drew the traced image (false while the display pipeline for its target compiles).
-  #shown = false;
-  #key = new Float64Array(30);
-  #frameMs = 0;
-  #lastTrace = 0;
+  /** Every view's image, by `PassContext.view` id ('' for the plain frame; KB-VPT-XR-VIEWS). */
+  #views = new Map<string, ViewState>();
+  #viewSerial = 0;
+  /** The view drawn last, which `stats` reports. */
+  #current: ViewState = this.#newView();
+  /** Engine frames so far (`onPreUpdate` calls), and the one samplesPerFrame 'auto' was last paced in. */
+  #tick = 0;
+  #pacedAt = -1;
   #bytes = 0;
-  #width = 0;
-  #height = 0;
-  #requested: [number, number] = [0, 0];
-  #limitedBy: VoxelPathTracerStats['limitedBy'];
   #capturing = 0;
   #job: Promise<unknown> = Promise.resolve();
   /** Captures and renders queued or running. */
@@ -438,22 +469,26 @@ export class VoxelPathTracer implements EnginePlugin {
   set enabled(value: boolean) {
     flag(value, 'enabled');
     if (value && !this.#enabled) this.#restart();
-    if (!value) this.#shown = false;
+    if (!value) for (const v of this.#views.values()) v.shown = false;
     this.#enabled = value;
   }
 
-  /** Samples, timing and memory of the viewport image. */
+  /**
+   * Samples, timing and size of the viewport image (of the view drawn last, when a frame draws several: each view keeps
+   * its own), and the GPU memory of every view and the scene.
+   */
   get stats(): VoxelPathTracerStats {
+    const v = this.#current;
     return {
-      samples: this.#previewing ? 0 : this.#samples,
-      frameMs: this.#frameMs,
+      samples: v.previewing ? 0 : v.samples,
+      frameMs: v.frameMs,
       gpuBytes: this.#bytes,
-      converged: this.#shown && !this.#previewing && this.#samples >= this.#settings.maxSamples,
-      width: this.#width,
-      height: this.#height,
-      requestedWidth: this.#requested[0],
-      requestedHeight: this.#requested[1],
-      ...(this.#limitedBy ? { limitedBy: this.#limitedBy } : {}),
+      converged: v.shown && !v.previewing && v.samples >= this.#settings.maxSamples,
+      width: v.width,
+      height: v.height,
+      requestedWidth: v.requested[0],
+      requestedHeight: v.requested[1],
+      ...(v.limitedBy ? { limitedBy: v.limitedBy } : {}),
       sceneRevision: this.#snapshot.revision,
       packedModels: this.#snapshot.packedModels,
       reusedModels: this.#snapshot.reusedModels,
@@ -497,8 +532,7 @@ export class VoxelPathTracer implements EnginePlugin {
     const limit = this.#gpu ? Math.floor(this.#gpu.device.limits.maxStorageBufferBindingSize / 4) : DEFAULT_WORDS;
     this.#snapshot = moving(buildSnapshot(scene, this.#cache, limit, this.sceneWordReserve()), this.#settings);
     this.#version++;
-    this.#samples = 0;
-    this.#epoch++;
+    for (const v of this.#views.values()) this.#restartView(v, false);
   }
 
   /**
@@ -587,11 +621,87 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#restart();
   }
 
-  // A new image that the viewport's history must not blend into (the camera's moves keep it).
+  // A new image in every view, that a view's history must not blend into (the camera's moves keep it).
   #restart(): void {
-    this.#samples = 0;
-    this.#epoch++;
-    this.#history.valid = false;
+    for (const v of this.#views.values()) this.#restartView(v, true);
+  }
+
+  // A new image in view `v`; `forget`: its denoiser history is stale too.
+  #restartView(v: ViewState, forget: boolean): void {
+    v.samples = 0;
+    v.epoch++;
+    if (forget) v.history.valid = false;
+  }
+
+  #newView(): ViewState {
+    return {
+      serial: this.#viewSerial++,
+      samples: 0,
+      epoch: 0,
+      key: new Float64Array(30),
+      history: {
+        matrix: new Float32Array(16),
+        corners: new Float32Array(32),
+        version: -1,
+        width: 0,
+        height: 0,
+        valid: false,
+      },
+      restarted: false,
+      previewing: false,
+      shown: false,
+      frameMs: 0,
+      lastTrace: 0,
+      width: 0,
+      height: 0,
+      requested: [0, 0],
+      limitedBy: undefined,
+      corners: new Float32Array(32),
+      drawn: this.#tick,
+      released: false,
+      routeKeys: new Set(),
+    };
+  }
+
+  // The image of the view being drawn (PassContext.view id; '' for the plain frame), made at its first draw.
+  #viewOf(c: Context): ViewState {
+    const id = c.view?.id ?? '';
+    let v = this.#views.get(id);
+    if (!v) this.#views.set(id, (v = this.#newView()));
+    v.drawn = this.#tick;
+    this.#current = v;
+    return v;
+  }
+
+  // Frees view `v`'s GPU targets (and its sums on the WebGL2 route); its next draw starts a new image.
+  #releaseImage(v: ViewState): void {
+    const image = v.image;
+    v.image = undefined;
+    v.routeJob = undefined;
+    v.samples = 0;
+    v.epoch++;
+    for (const key of v.routeKeys) this.#gpu?.routeReady?.release(key);
+    v.routeKeys.clear();
+    if (!image) return;
+    this.#releaseTargets(image);
+    this.#destroy(image.frame);
+    this.#destroy(image.uniform);
+    this.#destroy(image.bands?.frames);
+  }
+
+  /**
+   * @internal Engine plugin hook, once per frame (a positive `delta`; picks pass 0): releases the views not drawn in
+   * the last VIEW_FRAMES frames, with their buffers.
+   */
+  onPreUpdate(delta: number): void {
+    if (!(delta > 0)) return;
+    this.#tick++;
+    for (const [id, v] of this.#views)
+      if (this.#tick - v.drawn > VIEW_FRAMES) {
+        this.#views.delete(id);
+        v.released = true;
+        this.#releaseImage(v);
+      }
   }
 
   /**
@@ -785,7 +895,16 @@ export class VoxelPathTracer implements EnginePlugin {
       name: this.name,
       order: this.#settings.order,
       execute: (c) => {
-        if (c.backend === 'webgpu' && this.#enabled && !this.#disposed) this.#execute(c);
+        if (c.backend !== 'webgpu' || !this.#enabled || this.#disposed) return;
+        // A temporal pass's sub-pixel raster jitter (TAA's Halton offset) is not a camera move: the tracer keys,
+        // traces and reprojects with the source camera and jitters its own pixels, so accumulation survives TAA.
+        const raster = c.camera;
+        c.camera = unjitteredCamera(raster);
+        try {
+          this.#execute(c);
+        } finally {
+          c.camera = raster;
+        }
       },
     });
   }
@@ -918,8 +1037,7 @@ export class VoxelPathTracer implements EnginePlugin {
     gpu.dummyHistory = [this.#texture(gpu, 1, 1), this.#texture(gpu, 1, 1)];
     gpu.capacity = 4;
     watchLost(device, gpu);
-    this.#samples = 0;
-    this.#epoch++;
+    for (const v of this.#views.values()) this.#restartView(v, false);
     if (this.#status !== 'compiling') this.#newReady();
     this.#status = 'compiling';
     const trace = (gpu.traceModule = device.createShaderModule({ code: this.tracingSource() })),
@@ -995,15 +1113,11 @@ export class VoxelPathTracer implements EnginePlugin {
     this.#destroy(gpu.dummy);
     this.#destroy(gpu.dummyRead);
     for (const t of gpu.dummyHistory) this.#destroyTexture(t);
-    this.#releaseTargets(gpu.view);
-    if (gpu.view) {
-      this.#destroy(gpu.view.frame);
-      this.#destroy(gpu.view.uniform);
-      this.#destroy(gpu.view.bands?.frames);
+    // Every view's targets were made on this device state; its route (and the sums it keeps) is destroyed above.
+    for (const v of this.#views.values()) {
+      v.routeKeys.clear();
+      this.#releaseImage(v);
     }
-    gpu.view = undefined;
-    this.#samples = 0;
-    this.#epoch++;
   }
 
   #releaseTargets(t: Targets | undefined): void {
@@ -1405,13 +1519,15 @@ export class VoxelPathTracer implements EnginePlugin {
   }
 
   // Denoiser levels: tile size, a-trous step, last-level flag; edge-stopping strengths; where the tile lies in the
-  // image and the camera's corner rays (from the last #writeFrame) to place first hits in the world.
+  // image and the camera's corner rays (view `v`'s last trace, or the last #writeFrame's) to place first hits in the
+  // world, and the view's history.
   #denoiseParams(
     device: GPUDevice,
     t: Targets,
     samples: number,
     tile: readonly [number, number, number, number],
     history = 0,
+    v?: ViewState,
   ): boolean {
     const data = new ArrayBuffer(PARAM_STRIDE * DENOISE_PASSES),
       u = new Uint32Array(data),
@@ -1443,10 +1559,12 @@ export class VoxelPathTracer implements EnginePlugin {
       // (widened at low sample counts in the shader), normal cosine^128, plane distance over a footprint.
       f.set([caustic ? CAUSTIC_SIGMA : LUMINANCE_SIGMA, 128, 1, 1 / samples], at + 4);
       u.set(tile, at + 8);
-      f.set(this.#corners, at + 12);
-      // The previous viewport frame: view-projection and corner rays (prepare reprojects into them).
-      f.set(this.#history.matrix, at + 44);
-      f.set(this.#history.corners, at + 60);
+      f.set(v?.corners ?? this.#corners, at + 12);
+      // The view's previous frame: view-projection and corner rays (prepare reprojects into them).
+      if (v) {
+        f.set(v.history.matrix, at + 44);
+        f.set(v.history.corners, at + 60);
+      }
     }
     device.queue.writeBuffer(t.params!, 0, data);
     return history !== 0 && this.#settings.projection === 'camera' && this.#settings.distortion === undefined;
@@ -1519,9 +1637,9 @@ export class VoxelPathTracer implements EnginePlugin {
     }
   }
 
-  // Accumulation key: scene, settings, size and every camera value a ray depends on.
-  #moved(c: Context, width: number, height: number): boolean {
-    const k = this.#key,
+  // View `v`'s accumulation key: scene, settings, size and every camera value a ray depends on.
+  #moved(v: ViewState, c: Context, width: number, height: number): boolean {
+    const k = v.key,
       cam = c.camera,
       values = [this.#version, width, height, ...cam.matrix, ...cam.position, ...cam.target, ...cam.up];
     let changed = false;
@@ -1576,6 +1694,7 @@ export class VoxelPathTracer implements EnginePlugin {
   // camera is singular.
   #traceViewport(
     gpu: Gpu,
+    v: ViewState,
     view: View,
     c: Context,
     pipeline: TraceKernel,
@@ -1610,6 +1729,7 @@ export class VoxelPathTracer implements EnginePlugin {
     let groups = [view.traceGroup!];
     if (chunks.length === 1) {
       if (!write(view.frame, 0, chunks[0])) return false;
+      v.corners.set(this.#corners);
     } else {
       const align = device.limits.minUniformBufferOffsetAlignment ?? 256,
         stride = Math.ceil(FRAME_BYTES / align) * align,
@@ -1630,10 +1750,11 @@ export class VoxelPathTracer implements EnginePlugin {
         };
       }
       for (const [i, k] of chunks.entries()) if (!write(view.bands.frames, i * stride, k)) return false;
+      v.corners.set(this.#corners);
       groups = view.bands.groups;
     }
     if ('sums' in pipeline) {
-      this.#routeViewport(gpu, pipeline, groups, chunks, width, count);
+      this.#routeViewport(gpu, v, pipeline, groups, chunks, width, count);
       return true;
     }
     // Each band goes to the GPU in a submission of its own, ahead of the frame's commands (which read the image): a
@@ -1664,12 +1785,15 @@ export class VoxelPathTracer implements EnginePlugin {
     return true;
   }
 
-  // The viewport's samples on the WebGL2 route: its dispatches run one after another on their own (each part reads
-  // its census back between windows, so the frame cannot wait for them); nothing else is traced, and the frame
-  // uniforms are not rewritten, until a later frame adds the finished sums and starts the next (#execute). A restart (camera,
-  // scene, options, dispose, a lost device) stops it at its next window and its sums are dropped.
+  // View `v`'s samples on the WebGL2 route: its dispatches run one after another on their own (each part reads its
+  // census back between windows, so the frame cannot wait for them); nothing else is traced in the view, and its frame
+  // uniforms are not rewritten, until a later draw of it adds the finished sums and starts the next (#execute). Its
+  // sums are kept under the view's own keys, so another view's trace queued meanwhile cannot overwrite them. A restart
+  // of the view (camera, scene, options, dispose, a lost device, the view released) stops it at its next window and its
+  // sums are dropped.
   #routeViewport(
     gpu: Gpu,
+    v: ViewState,
     kernel: RouteKernel,
     groups: GPUBindGroup[],
     chunks: TraceChunk[],
@@ -1679,26 +1803,29 @@ export class VoxelPathTracer implements EnginePlugin {
     const route = gpu.routeReady as TraceRoute,
       inputs = gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>,
       job = {
-        epoch: this.#epoch,
+        epoch: v.epoch,
         count,
         width,
-        adds: chunks.map((k, i) => ({ inputs: inputs.get(groups[i])!, rows: k.rows })),
+        adds: chunks.map((k, i) => ({ inputs: inputs.get(groups[i])!, rows: k.rows, key: `${v.serial}:${i}` })),
         landed: false,
       },
-      stale = () => this.#disposed || gpu.lost || this.#gpu !== gpu || this.#epoch !== job.epoch,
+      stale = () => this.#disposed || gpu.lost || this.#gpu !== gpu || v.released || v.epoch !== job.epoch,
       check = () => {
         if (stale()) throw new DOMException('The viewport image restarted', 'AbortError');
-      };
-    gpu.routeJob = job;
+      },
+      // The frame uniform as written for every chunk (they differ in their rows only): the light kinds it switches off.
+      frame = this.#frame.slice(0);
+    v.routeJob = job;
+    for (const a of job.adds) v.routeKeys.add(a.key);
     (async () => {
       for (const [i, k] of chunks.entries())
-        await route.run(kernel, job.adds[i].inputs, width, k.rows, k.count, this.#settings.maxBounces, check, i, false);
+        await route.run(kernel, job.adds[i].inputs, width, k.rows, k.count, this.#settings.maxBounces, check, job.adds[i].key, false, frame);
     })().then(
       () => {
         job.landed = true;
       },
       (error) => {
-        if (gpu.routeJob === job) gpu.routeJob = undefined;
+        if (v.routeJob === job) v.routeJob = undefined;
         // Stopped by a restart: the next frame traces the new image. Anything else is reported.
         if (!stale()) this.#engine?.onError(error);
       },
@@ -1706,7 +1833,8 @@ export class VoxelPathTracer implements EnginePlugin {
   }
 
   #execute(c: Context): void {
-    this.#shown = false;
+    const v = this.#viewOf(c);
+    v.shown = false;
     const gpu = this.#state(c.device);
     if ((!gpu.pipelines && !gpu.preview) || gpu.lost) return;
     // A scene with model material tables waits for its kernels (the raster frame shows meanwhile).
@@ -1715,25 +1843,28 @@ export class VoxelPathTracer implements EnginePlugin {
       return;
     }
     this.#syncScene(gpu);
-    const o = this.#settings,
+    // The view's rectangle in the target (the whole target without a view): its camera's aspect is the rectangle's,
+    // so the image is traced at the rectangle's size and drawn into it.
+    const rect = viewRect(c) ?? [0, 0, c.width, c.height],
+      o = this.#settings,
       // Every storage buffer holds one image (16 bytes per pixel); the denoiser's history is in textures.
       size = traceViewportSize(
-        Math.max(1, Math.round(c.width)),
-        Math.max(1, Math.round(c.height)),
+        Math.max(1, Math.round(rect[2])),
+        Math.max(1, Math.round(rect[3])),
         gpu.device.limits,
         o,
       ),
       { width, height } = size;
-    this.#requested = [size.requestedWidth, size.requestedHeight];
-    this.#limitedBy = size.limitedBy;
+    v.requested = [size.requestedWidth, size.requestedHeight];
+    v.limitedBy = size.limitedBy;
     const pipeline = this.#display(gpu, c);
     if (!pipeline) return;
     const device = gpu.device;
-    let view = gpu.view;
+    let view = v.image;
     if (!view) {
       const frame = this.#buffer(gpu, FRAME_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
         uniform = this.#buffer(gpu, VIEW_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-      view = gpu.view = {
+      view = v.image = {
         ...this.#targets(gpu, undefined, width, height, o.denoise !== false, this.#snapshot.focusing, true),
         frame,
         uniform,
@@ -1741,17 +1872,16 @@ export class VoxelPathTracer implements EnginePlugin {
       };
     } else
       Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false, this.#snapshot.focusing, true));
-    if (this.#moved(c, width, height) || (gpu.pipelines && this.#previewing)) {
-      this.#samples = 0;
-      this.#epoch++;
-      this.#restarted = true;
+    if (this.#moved(v, c, width, height) || (gpu.pipelines && v.previewing)) {
+      this.#restartView(v, false);
+      v.restarted = true;
     }
     // A new image (camera, scene, sampling options, reset, enable): the denoised one is stale even when the new
     // accumulation reaches the same sample count in one frame.
-    if (!this.#samples) view.denoisedAt = -1;
-    this.#previewing = !gpu.pipelines;
-    this.#width = width;
-    this.#height = height;
+    if (!v.samples) view.denoisedAt = -1;
+    v.previewing = !gpu.pipelines;
+    v.width = width;
+    v.height = height;
     const key = `${gpu.resources}`;
     if (view.traceKey !== key) {
       view.traceGroup = this.#traceGroup(gpu, view.frame, view);
@@ -1774,38 +1904,35 @@ export class VoxelPathTracer implements EnginePlugin {
     // together. It traced the image as it was, so after a restart it is dropped. Its add goes to the GPU in a submission
     // of its own, ahead of this frame's frame-uniform writes: the add reads the frame uniform the trace was given, and the
     // same frame then starts the next trace (KB-L6b-ti: waiting a frame more for that cost one frame in three or four).
-    const landed = gpu.routeJob?.landed ? gpu.routeJob : undefined;
+    const landed = v.routeJob?.landed ? v.routeJob : undefined;
     if (landed) {
-      gpu.routeJob = undefined;
-      if (landed.epoch === this.#epoch) {
+      v.routeJob = undefined;
+      if (landed.epoch === v.epoch) {
         const e = device.createCommandEncoder({ label: 'voxel-pathtracer route add' });
-        for (const [i, a] of landed.adds.entries())
-          (gpu.routeReady as TraceRoute).add(e, a.inputs, landed.width, a.rows, i);
+        for (const a of landed.adds) (gpu.routeReady as TraceRoute).add(e, a.inputs, landed.width, a.rows, a.key);
         device.queue.submit([e.finish()]);
-        this.#samples += landed.count;
+        v.samples += landed.count;
       }
     }
-    if (this.#previewing) {
+    if (v.previewing) {
       // Until the full tracer is compiled: one preview sample per frame, written over the image.
-      if (!this.#traceViewport(gpu, view, c, gpu.preview!, width, height, 0, 1, o.seed, false)) return;
-      this.#samples = 1;
-    } else if (gpu.routeJob) {
-      // The WebGL2 route's trace is still running (#routeViewport): nothing new this frame.
-    } else if (!this.#capturing && this.#samples < o.maxSamples) {
+      if (!this.#traceViewport(gpu, v, view, c, gpu.preview!, width, height, 0, 1, o.seed, false)) return;
+      v.samples = 1;
+    } else if (v.routeJob) {
+      // The view's WebGL2 route trace is still running (#routeViewport): nothing new this frame.
+    } else if (!this.#capturing && v.samples < o.maxSamples) {
       const pipeline = (this.#tablesNeeded() ? gpu.tableKernels : gpu.pipelines)!.trace,
-        count = Math.min(
-        o.samplesPerFrame === 'auto' ? this.#auto : o.samplesPerFrame,
-        o.maxSamples - this.#samples,
-      );
+        count = Math.min(o.samplesPerFrame === 'auto' ? this.#auto : o.samplesPerFrame, o.maxSamples - v.samples);
       if (
         !this.#traceViewport(
           gpu,
+          v,
           view,
           c,
           pipeline,
           width,
           height,
-          this.#samples,
+          v.samples,
           count,
           // With the denoiser's history every camera draws its own sample sequence (the history averages frames, which
           // must not repeat one sequence); a camera's sequence stays the same, so equal inputs still give equal images.
@@ -1815,61 +1942,66 @@ export class VoxelPathTracer implements EnginePlugin {
       )
         return;
       // On the WebGL2 route the samples count once they land (above).
-      if (!('sums' in pipeline)) this.#samples += count;
+      if (!('sums' in pipeline)) v.samples += count;
       const now = performance.now();
-      if (this.#lastTrace) {
-        this.#frameMs = now - this.#lastTrace;
-        if (o.samplesPerFrame === 'auto') this.#pace(this.#frameMs);
+      if (v.lastTrace) {
+        v.frameMs = now - v.lastTrace;
+        // Paced once per engine frame, however many views it draws: each view's interval is the frame's.
+        if (o.samplesPerFrame === 'auto' && (this.#tick === 0 || this.#pacedAt !== this.#tick)) {
+          this.#pacedAt = this.#tick;
+          this.#pace(v.frameMs);
+        }
       }
-      this.#lastTrace = now;
-    } else this.#lastTrace = 0;
-    if (!this.#samples) return;
-    const denoised = !this.#previewing && o.denoise !== false && view.denoiseGroups !== undefined;
+      v.lastTrace = now;
+    } else v.lastTrace = 0;
+    if (!v.samples) return;
+    const denoised = !v.previewing && o.denoise !== false && view.denoiseGroups !== undefined;
     // 'auto': every frame while the image is sparse, then as the samples grow by a quarter, and at convergence.
     const due =
       o.denoise === true ||
       view.denoisedAt <= 0 ||
-      this.#samples < 32 ||
-      this.#samples >= view.denoisedAt * 1.25 ||
-      this.#samples >= o.maxSamples;
-    if (denoised && view.denoisedAt !== this.#samples && due) {
-      // History: kept by the viewport (8); used (16) when only the camera changed since it was written; 64 the
+      v.samples < 32 ||
+      v.samples >= view.denoisedAt * 1.25 ||
+      v.samples >= o.maxSamples;
+    if (denoised && view.denoisedAt !== v.samples && due) {
+      // History: kept by the view (8); used (16) when only the camera changed since it was written; 64 the
       // accumulation restarted (the camera moved).
-      const h = this.#history,
+      const h = v.history,
         reuse = h.valid && h.version === this.#version && h.width === width && h.height === height;
       view.resolved = this.#denoiseParams(
         device,
         view,
-        this.#samples,
+        v.samples,
         [0, 0, width, height],
-        8 | (reuse ? 16 : 0) | (this.#restarted ? 64 : 0),
+        8 | (reuse ? 16 : 0) | (v.restarted ? 64 : 0),
+        v,
       );
       h.matrix.set(c.camera.matrix);
-      h.corners.set(this.#corners);
+      h.corners.set(v.corners);
       h.version = this.#version;
       h.width = width;
       h.height = height;
       h.valid = true;
-      this.#restarted = false;
+      v.restarted = false;
       this.#encodeDenoise(gpu, c.encoder, view);
-      view.denoisedAt = this.#samples;
+      view.denoisedAt = v.samples;
     }
-    const v = this.#view,
+    const u = this.#view,
       inverse = this.#inverse;
     if (!invertMatrix(c.camera.matrix, inverse)) return;
-    v.set(c.camera.matrix, 0);
-    v.set(inverse, 16);
-    v.set([width, height, c.width, c.height], 32);
+    u.set(c.camera.matrix, 0);
+    u.set(inverse, 16);
+    u.set([width, height, rect[2], rect[3]], 32);
     const mode =
       (linearHdr(c.format) ? 1 : 0) |
       (o.toneMapping === 'linear' ? 2 : 0) |
       (o.toneMapping === 'aces-narkowicz' ? 4 : 0) |
       (o.toneMapping === 'agx' ? 8 : 0);
     // First-hit depth only where pixels are the camera's own perspective rays (far otherwise).
-    const depth = o.projection === 'camera' && !o.distortion ? 1 / this.#samples : 0;
-    v.set([denoised ? 1 : 1 / this.#samples, 2 ** o.exposure, mode, depth], 36);
-    v.set([o.gamma ?? 0, o.vignette, 0, 0], 40);
-    device.queue.writeBuffer(view.uniform, 0, v);
+    const depth = o.projection === 'camera' && !o.distortion ? 1 / v.samples : 0;
+    u.set([denoised ? 1 : 1 / v.samples, 2 ** o.exposure, mode, depth], 36);
+    u.set([o.gamma ?? 0, o.vignette, rect[0], rect[1]], 40);
+    device.queue.writeBuffer(view.uniform, 0, u);
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }],
       depthStencilAttachment: { view: c.depth, depthLoadOp: 'load', depthStoreOp: 'store', stencilReadOnly: true },
@@ -1879,7 +2011,7 @@ export class VoxelPathTracer implements EnginePlugin {
     pass.setBindGroup(0, denoised ? (view.resolved ? view.displayResolved! : view.displayDenoised!) : view.displayRaw!);
     pass.draw(3);
     pass.end();
-    this.#shown = true;
+    v.shown = true;
   }
 
   #enqueue<T>(run: () => Promise<T>): Promise<T> {
@@ -2092,6 +2224,7 @@ export class VoxelPathTracer implements EnginePlugin {
                 check,
                 'image',
                 true,
+                this.#frame,
               );
               continue;
             }

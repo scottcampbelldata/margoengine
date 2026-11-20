@@ -186,7 +186,7 @@
       "gpu-acquisition": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--exclusive",
@@ -380,7 +380,7 @@
       "gpu-decoders-initial": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--wait-max=60",
@@ -399,7 +399,7 @@
       "gpu-decoders-input-failure": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--wait-max=60",
@@ -418,7 +418,7 @@
       "gpu-decoders-contract-failure": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--wait-max=60",
@@ -437,7 +437,7 @@
       "gpu-decoders": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--wait-max=60",
@@ -456,7 +456,7 @@
       "gpu-node-gltf": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",
@@ -476,7 +476,7 @@
       "gpu-gltf": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",
@@ -496,7 +496,7 @@
       "gpu-gltf-pro": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",
@@ -516,7 +516,7 @@
       "readmes": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",
@@ -537,7 +537,7 @@
       "readmes-final": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",
@@ -736,7 +736,7 @@
       "gpu-gltf-pro-latest": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",
@@ -756,7 +756,7 @@
       "readmes-latest": {
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Native WebGPU model rendering and texture readback",

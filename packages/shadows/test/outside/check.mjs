@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { crc32, deflateSync } from 'node:zlib';
 import { decodePNG } from '../../../../tests/support/png.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../../..', import.meta.url)));
 const dump = process.argv.find((a) => a.startsWith('--dump='))?.slice(7);
@@ -17,7 +16,7 @@ const linear = (v) => {
   const c = v / 255;
   return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 };
-// What core and gltf-pro wrote back to light: under Khronos PBR Neutral's compression a grey keeps its value but for the
+// What core and gltf/pbr wrote back to light: under Khronos PBR Neutral's compression a grey keeps its value but for the
 // toe, 0.04 off from 0.08 up and 6.25 x x below. A shadow's ratio is a ratio of light, so a partial one needs this.
 const light = (v) => {
   const y = linear(v);
@@ -48,7 +47,6 @@ const encodePNG = (width, height, rgba) => {
 };
 const fixture = async (name) => decodePNG(await readFile(`packages/shadows/test/fixtures/outside/${name}.png`));
 const { cases } = await import('./cases.mjs');
-const release = await acquire({ owner: 'shadows-outside' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/outside/outside.html', port: 5273 }),
   { page } = context,
   pageErrors = [];
@@ -149,5 +147,4 @@ try {
   console.log('shadows against Cycles: ok');
 } finally {
   await context.close?.();
-  await release();
 }

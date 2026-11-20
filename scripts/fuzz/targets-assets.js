@@ -467,7 +467,7 @@ export default [
       this.W = await import(`file://${join(root, 'packages/fbx/test/fixtures.js').replaceAll('\\', '/')}`);
       this.engine = await headless();
     },
-    // The native converter's own errors, or gltf-pro's when the GLB it wrote is refused.
+    // The native converter's own errors, or gltf/pbr's when the GLB it wrote is refused.
     named: (e) => /\bFBX\b|glTF|PBR/.test(e.message),
     async seeds() {
       const W = await import(`file://${join(root, 'packages/fbx/test/fixtures.js').replaceAll('\\', '/')}`),
@@ -504,7 +504,7 @@ export default [
     ],
     generatorRate: 0.5,
     async run(bytes) {
-      // parseFBX: the native converter, then gltf-pro on the GLB it wrote (as in a browser).
+      // parseFBX: the native converter, then gltf/pbr on the GLB it wrote (as in a browser).
       const model = await this.F.parseFBX(this.engine, bytes);
       try {
         await checkModel(model);
@@ -523,8 +523,8 @@ export default [
     timeMs: 4000,
     async setup() {
       this.U = await import('@margoengine/usdz');
-      this.prepare = (await import('@margoengine/gltf-pro/prepare')).prepareAsset;
-      this.Asset = (await import('@margoengine/gltf-pro/asset')).GLTFAsset;
+      this.prepare = (await import('@margoengine/gltf/prepare')).prepareAsset;
+      this.Asset = (await import('@margoengine/gltf/asset')).GLTFAsset;
     },
     named: (e) => /\bUSD\b|^ZIP:|LoaderError/.test(`${e.name}: ${e.message}`),
     async seeds() {
@@ -584,7 +584,7 @@ export default [
     name: 'net/snapshot',
     seeds: () => [new Uint8Array(256).map((_, i) => i * 7), new Uint8Array(512)],
     async setup() {
-      this.N = await import('@margoengine/net');
+      this.N = await import('@margoengine/netcode/interpolation');
     },
     async run(bytes) {
       // Bytes are packets from the network: time, position, rotation, velocity as float64 (hostile values included).

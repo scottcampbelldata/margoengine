@@ -1,4 +1,4 @@
-// Real-GPU check of @margoengine/post/decals (AC power, GPU lock, after npm run build:packages):
+// Real-GPU check of @margoengine/post/decals (AC power, after npm run build:packages):
 //   node examples/package-benchmarks/decals-gpu.mjs            correctness, 4x and 1x MSAA scenes (no quiet machine needed)
 //   node examples/package-benchmarks/decals-gpu.mjs --bench    plus GPU cost (run node scripts/quiet-gate.mjs first; else diagnostic)
 // Per pixel (8 px grid) the runner ray-casts the known scene (floor y = 0, unit cube) on the CPU and classifies each hit:

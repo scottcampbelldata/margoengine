@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { fault, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** One package's documentation. */
 export interface CorpusPackage {
@@ -243,6 +243,8 @@ function snippetOf(text: string, queryTerms: readonly string[]): string {
 /** Ranks README sections, docs sections, API declarations and examples for `query` (BM25 over names and words). */
 export function searchCorpus(index: CorpusIndex, query: string, options: SearchOptions = {}): SearchHit[] {
   if (typeof query !== 'string' || !query.trim()) throw typeError('search needs a non-empty query string', 'mcp');
+  if (options.limit !== undefined && (typeof options.limit !== 'number' || !Number.isFinite(options.limit)))
+    throw rangeError('limit must be a finite number (1 to 25)', 'mcp');
   const limit = Math.min(25, Math.max(1, Math.floor(options.limit ?? 8)));
   const wanted = options.package === undefined ? undefined : packageId(options.package);
   const kinds = options.kinds ? new Set(options.kinds) : undefined;
@@ -288,7 +290,7 @@ export function searchCorpus(index: CorpusIndex, query: string, options: SearchO
     });
   }
   ranked.sort((a, b) => b.score - a.score || (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
-  // One hit per page title keeps ten sections of one README from crowding out everything else.
+  // At most three hits per page keeps ten sections of one README from crowding out everything else.
   const seen = new Map<string, number>();
   const out: SearchHit[] = [];
   for (const hit of ranked) {
@@ -320,5 +322,9 @@ export async function loadCorpus(file?: string | URL, signal?: AbortSignal): Pro
       'mcp',
     );
   }
-  return JSON.parse(text) as Corpus;
+  try {
+    return JSON.parse(text) as Corpus;
+  } catch {
+    throw fault('failed', `The documentation corpus ${String(target)} is not JSON; rebuild or reinstall @margoengine/mcp`, 'mcp');
+  }
 }

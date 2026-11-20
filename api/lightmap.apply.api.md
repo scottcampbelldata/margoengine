@@ -4,7 +4,7 @@
 
 ```ts
 import { Mesh } from "@margoengine/core";
-import { PBRModel, PBRPrimitive } from "@margoengine/gltf-pro";
+import { PBRModel, PBRPrimitive } from "@margoengine/gltf/pbr";
 import { Material, MaterialMesh, Texture } from "@margoengine/materials";
 
 export interface ApplyLightmapOptions {

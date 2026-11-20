@@ -251,3 +251,29 @@ test('foot placement still works through the shared pose tools', async (t) => {
   assert.ok(Math.abs(placement.pelvisOffset + 0.1) < 1e-6);
   void axisAngle;
 });
+
+test('a scaled character measures its clip speed and distance in world units', async (t) => {
+  // A rig exported in centimetres under a 0.01 scale, or a model the app scales, travels its clip in the parent's
+  // units. Warping read that travel as world units, so at half scale a 1 m/s walk clip counted as 1 m/s when it covers
+  // 0.5 m/s in the world: the right speed got half a stride, and a distance warp ran out of clip at half the distance.
+  const f = await rig();
+  t.after(() => f.release());
+  f.model.root.setScale([0.5, 0.5, 0.5]);
+  f.store.tick(false);
+  addRootMotion(f.animator, { joint: f.pelvis, apply: false });
+  const warp = addWarping(f.animator, { pelvis: f.pelvis, legs: f.legs, velocity: [0, 0, 0.5] });
+  walk(f, [0, 0, 0.5], 4);
+  assert.ok(Math.abs(warp.stride - 1) < 1e-5, `stride ${warp.stride}`);
+  assert.equal(warp.rate, 1);
+  const g = await rig('stop');
+  t.after(() => g.release());
+  g.model.root.setScale([0.5, 0.5, 0.5]);
+  g.store.tick(false);
+  const stop = { state: 'stop', joint: g.pelvis, distance: 0.5 },
+    handle = addDistanceWarp(g.animator, stop);
+  assert.ok(Math.abs(handle.length - 0.75) < 1e-3, `length ${handle.length}`);
+  g.step(DT);
+  // 0.5 m left of 0.75 m world: the clip stands where it has covered 0.25 m world, 0.5 m of its own travel.
+  const covered = 1.5 * (1 - (1 - g.animator.time) ** 2);
+  assert.ok(Math.abs(covered - 0.5) < 1e-3, `at ${g.animator.time}, covered ${covered}`);
+});

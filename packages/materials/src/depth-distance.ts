@@ -42,7 +42,7 @@ fn margoPackDepth(value:f32)->vec4f {
   if (hooks !== 2)
     throw new MargoError(
       'state',
-      'Depth and distance materials require the gltf-pro PBR shader; update @margoengine/gltf-pro to a version that matches this package.',
+      'Depth and distance materials require the gltf/pbr shader; update @margoengine/gltf/pbr to a version that matches this package.',
     );
   return declarations + code;
 }

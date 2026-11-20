@@ -3,7 +3,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
 import {meshPBR,traceSceneFromGLTF} from '/packages/voxel-pathtracer/dist/mesh-pbr.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 window.run=async(compat=false)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
  const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
@@ -36,7 +36,7 @@ window.run=async(compat=false)=>{
   await compare('alpha cutout equals empty geometry',a,b);
   a=scene();b=scene();a.pbrMaterials[0].normalTexture=tex([255,128,255,255]);const length=Math.hypot(1,1/255,1),n=[1/length,(1/255)/length,1/length];b.meshes[0].normals=new Float32Array([...n,...n,...n,...n]);
   await compare('normal texture equals independent vertex normals',a,b);
-  const model=await loadGLTF(engine,'/packages/gltf-pro/tests/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});
+  const model=await loadGLTF(engine,'/packages/gltf/test/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});
   engine.render();const gltf=await traceSceneFromGLTF(model,{signal:AbortSignal.timeout(120000)});model.dispose();
   gltf.environment=scene().environment;const im=await render(gltf);
   rows.push({name:'licensed Khronos metadata Box snapshot survives model disposal',finite:im.color.every(Number.isFinite),triangles:gltf.meshes.reduce((n,m)=>n+m.indices.length/3,0),drawn:im.instance.some(id=>id<=-4)});

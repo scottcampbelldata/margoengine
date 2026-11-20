@@ -10,6 +10,7 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { PostStack } from '@margoengine/post/stack';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
+import { borrow, fix, lend } from '../../shared/borrowed.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { group } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -27,12 +28,23 @@ const ADD = { srcFactor: 'one', dstFactor: 'one', operation: 'add' } as const;
 export const MAX_LIQUID_PARTICLES = 4_194_304;
 
 /**
- * Where the particle centres live. `positions` is a Float32Array (uploaded at creation and on `update()`), a GPUBuffer
- * with STORAGE usage, or any object with such a `buffer` (a `@margoengine/compute` GpuArray, for instance). Particle i's
- * centre is the three floats at `offset + i * stride`.
+ * A GPU buffer a caller made, as one of: a STORAGE GPUBuffer, an object with such a `buffer` (a `@margoengine/compute`
+ * GpuArray, for instance; read live each frame), or `(device) => buffer | holder`, called once per device and again after
+ * a device restore, so nothing is lost. A plain GPUBuffer belongs to the device that made it: after a restore it is
+ * dropped and reported once through `engine.onError` (`'state'`, help `borrowed-lost`) until `update(particles)` hands
+ * in a new one. Lost positions draw no particles; lost velocities draw no whitewater.
+ */
+export type ParticleBuffer =
+  | GPUBuffer
+  | { readonly buffer: GPUBuffer }
+  | ((device: GPUDevice) => GPUBuffer | { readonly buffer: GPUBuffer });
+
+/**
+ * Where the particle centres live. `positions` is a Float32Array (uploaded at creation and on `update()`) or a
+ * `ParticleBuffer` with STORAGE usage. Particle i's centre is the three floats at `offset + i * stride`.
  */
 export interface ParticleSource {
-  positions: Float32Array | GPUBuffer | { readonly buffer: GPUBuffer };
+  positions: Float32Array | ParticleBuffer;
   /** Particles to draw, integer 0..4,194,304. Default positions.length / stride for a Float32Array; required otherwise. */
   count?: number;
   /** Floats from one centre to the next, integer 3..64. Default 3. */
@@ -41,10 +53,10 @@ export interface ParticleSource {
   offset?: number;
   /**
    * Particle velocities in world units per second, needed by whitewater: a Float32Array (uploaded with the centres) or
-   * a STORAGE GPUBuffer or GpuArray. Particle i's velocity is the three floats at `velocityOffset + i * stride`; pass the
+   * a STORAGE `ParticleBuffer`. Particle i's velocity is the three floats at `velocityOffset + i * stride`; pass the
    * positions' own array with an offset for an interleaved layout. Default none.
    */
-  velocities?: Float32Array | GPUBuffer | { readonly buffer: GPUBuffer };
+  velocities?: Float32Array | ParticleBuffer;
   /** Floats before the first velocity, integer >= 0. Default 0. */
   velocityOffset?: number;
 }
@@ -195,6 +207,8 @@ export class ParticleLiquid implements EnginePlugin {
   private stacked = false;
   private disposed = false;
   private source: ParticleSource;
+  private positionSlot?: ReturnType<typeof borrow>;
+  private velocitySlot?: ReturnType<typeof borrow>;
   private count = 0;
   private dirty = true;
   private uniform?: GPUBuffer;
@@ -212,6 +226,9 @@ export class ParticleLiquid implements EnginePlugin {
   private readonly stats: LiquidFrameStats = { passes: 0, draws: 0, bytes: 0, particles: 0, groups: 0, whitewater: 0 };
   private foam?: Whitewater;
   private loading?: Promise<void>;
+  /** The loaded whitewater and narrow band modules, kept across restores. */
+  private whitewaterCode?: typeof import('./liquid-whitewater.js');
+  private bandCode?: typeof import('./liquid-band.js');
   private stepDue = true;
   private band?: NarrowBand;
   private bandLoading?: Promise<void>;
@@ -221,12 +238,24 @@ export class ParticleLiquid implements EnginePlugin {
     this.validate();
     this.source = options.particles;
     this.count = this.countOf(this.source);
+    this.hold(this.source);
   }
 
-  /** Attaches a new ParticleLiquid to `engine` alone in its own PostStack. */
+  /** Slots for the caller's GPU buffers of a source: a plain GPUBuffer or a function; a holder is read live. */
+  private hold(s: ParticleSource, device?: GPUDevice): void {
+    const slot = (value: unknown, name: string) =>
+      typeof value === 'function' || (value && typeof (value as GPUBuffer).getMappedRange === 'function')
+        ? borrow(value, name, 'update(particles)', device)
+        : undefined;
+    this.positionSlot = slot(s.positions, 'ParticleLiquid positions');
+    this.velocitySlot = slot(s.velocities, 'ParticleLiquid velocities');
+  }
+
+  /** Adds a new ParticleLiquid to the scene's PostStack after its last HDR effect, or to a new PostStack when the
+   * scene has none; disposing the effect takes it out, and a stack made for it goes with it. */
   static attach(engine: EngineKernel, options: ParticleLiquidOptions): ParticleLiquid {
     const effect = new ParticleLiquid(options);
-    effect.stack = PostStack.attach(engine, [effect]);
+    effect.stack = PostStack.join(engine, effect);
     return effect;
   }
 
@@ -254,6 +283,7 @@ export class ParticleLiquid implements EnginePlugin {
       }
       this.source = particles;
       this.count = count;
+      this.hold(particles, this.engine?.gpu ?? undefined);
     }
     this.dirty = true;
     this.stepDue = true;
@@ -290,18 +320,23 @@ export class ParticleLiquid implements EnginePlugin {
   async readWhitewater(signal?: AbortSignal): Promise<{ spray: number; foam: number; bubbles: number }> {
     signal?.throwIfAborted();
     await this.loading;
+    // Loaded after the last frame: the pool is made now on the engine's current device, so it reads as empty.
+    const device = this.engine?.gpu,
+      ww = this.options.whitewater;
+    if (!this.foam && this.whitewaterCode && device && ww && ww.enabled !== false) this.foam = new this.whitewaterCode.Whitewater(device);
     if (!this.foam)
       throw fault('state', 'ParticleLiquid has no whitewater yet; set options.whitewater and draw a frame');
     return this.foam.read(signal);
   }
 
   private countOf(s: ParticleSource): number {
-    if (!s || typeof s !== 'object' || !s.positions || typeof s.positions !== 'object')
+    const held = (v: unknown) => !!v && (typeof v === 'object' || typeof v === 'function');
+    if (!s || typeof s !== 'object' || !held(s.positions))
       throw fault('state', 'ParticleLiquid particles need positions: a Float32Array, a GPUBuffer or a GpuArray');
     range('particles.stride', s.stride, 3, 64, true);
     range('particles.offset', s.offset, 0, 2 ** 31, true);
     range('particles.velocityOffset', s.velocityOffset, 0, 2 ** 31, true);
-    if (s.velocities !== undefined && (!s.velocities || typeof s.velocities !== 'object'))
+    if (s.velocities !== undefined && !held(s.velocities))
       throw fault('state', 'ParticleLiquid particles.velocities must be a Float32Array, a GPUBuffer or a GpuArray');
     const stride = s.stride ?? 3,
       offset = s.offset ?? 0;
@@ -429,6 +464,7 @@ export class ParticleLiquid implements EnginePlugin {
       throw fault('unsupported', 'ParticleLiquid requires WebGPU or full WebGL2 compatibility', 'webgpu');
     this.engine = engine;
     const device = engine.gpu;
+    for (const slot of [this.positionSlot, this.velocitySlot]) if (slot) fix(slot, device);
     this.uniform = device.createBuffer({ size: 320, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.steps = [
       [1, 0, 0, 0],
@@ -480,7 +516,7 @@ export class ParticleLiquid implements EnginePlugin {
     this.engine = undefined;
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
-    this.stack?.dispose();
+    this.stack?.removeEffect(this);
     this.stack = undefined;
   }
 
@@ -529,8 +565,23 @@ export class ParticleLiquid implements EnginePlugin {
     ];
   }
 
+  /** What a GPU source binds on this device (the buffer of a holder), or undefined when a plain buffer was lost. */
+  private resolve(slot: ReturnType<typeof borrow> | undefined, value: unknown, device: GPUDevice): GPUBuffer | undefined {
+    const held = slot ? lend(slot, device, this.engine) : value;
+    if (held === undefined || held === null) return undefined;
+    return typeof (held as GPUBuffer).getMappedRange === 'function'
+      ? (held as GPUBuffer)
+      : (held as { buffer: GPUBuffer }).buffer;
+  }
+
+  /** The velocity buffer of a GPU source for this device, undefined for a CPU source or a lost buffer. */
+  private velocitiesOn(device: GPUDevice): GPUBuffer | undefined {
+    const v = this.source.velocities;
+    return !v || v instanceof Float32Array ? undefined : this.resolve(this.velocitySlot, v, device);
+  }
+
   /** The GPU buffer holding the centres and its float offset; uploads a CPU source when marked changed. */
-  private positions(c: Context): GPUBuffer {
+  private positions(c: Context): GPUBuffer | undefined {
     const p = this.source.positions,
       stride = this.source.stride ?? 3,
       offset = this.source.offset ?? 0;
@@ -551,8 +602,8 @@ export class ParticleLiquid implements EnginePlugin {
       return this.storage;
     }
     // A GPUBuffer has getMappedRange; anything else is a holder such as a GpuArray.
-    const buffer =
-      typeof (p as GPUBuffer).getMappedRange === 'function' ? (p as GPUBuffer) : (p as { buffer: GPUBuffer }).buffer;
+    const buffer = this.resolve(this.positionSlot, p as ParticleBuffer, c.device);
+    if (!buffer && this.positionSlot) return undefined;
     const need = (offset + Math.max(0, this.count - 1) * stride + 3) * 4;
     if (!buffer || typeof buffer.size !== 'number' || (this.count && buffer.size < need))
       throw fault(
@@ -637,42 +688,50 @@ export class ParticleLiquid implements EnginePlugin {
       throw fault('state', 'ParticleLiquid environment needs a sampleable single-sample 2D rgba16float sky texture');
     const scale = o.resolutionScale ?? 1;
     this.resize(c, scale);
-    const live = o.enabled !== false && this.count > 0;
-    const buffer = live ? this.positions(c) : undefined;
+    const buffer = o.enabled !== false && this.count > 0 ? this.positions(c) : undefined;
+    const live = buffer !== undefined;
     const ww = o.whitewater;
-    const wanted = live && ww !== undefined && ww.enabled !== false;
-    if (wanted && !this.foam && !this.loading) {
-      const engine = this.engine;
-      this.loading = import('./liquid-whitewater.js').then((m) => {
-        if (this.engine === engine && !this.disposed) this.foam = new m.Whitewater(device);
-      });
+    const gpuVelocities = this.velocitiesOn(device);
+    const gpuSource = this.source.velocities !== undefined && !(this.source.velocities instanceof Float32Array);
+    const wanted = live && ww !== undefined && ww.enabled !== false && (!gpuSource || gpuVelocities !== undefined);
+    // The optional parts load lazily and are made here in a frame, on the device of that frame: made when the import
+    // settled they would land on a device lost and restored meanwhile.
+    if (wanted && !this.foam) {
+      if (this.whitewaterCode) this.foam = new this.whitewaterCode.Whitewater(device);
+      else
+        this.loading ??= import('./liquid-whitewater.js').then((m) => {
+          this.whitewaterCode = m;
+        });
     }
     this.foamOn = wanted && this.foam !== undefined;
-    if (live && o.narrowBand && !this.band && !this.bandLoading) {
-      const engine = this.engine,
-        depth = this.depthPipeline!,
+    const makeBand = (m: typeof import('./liquid-band.js')) => {
+      const depth = this.depthPipeline!,
         thickness = this.thicknessPipeline!;
-      this.bandLoading = import('./liquid-band.js').then((m) => {
-        if (this.engine !== engine || this.disposed) return;
-        // The band's sprites and voxel balls draw into the same targets as the liquid's own pipelines.
-        const like = (base: GPURenderPipeline, vertex: string, fragment: string) => (code: string) => {
-          const module = device.createShaderModule({ code });
-          const blend = base === thickness;
-          return device.createRenderPipeline({
-            layout: 'auto',
-            vertex: { module, entryPoint: vertex },
-            fragment: {
-              module,
-              entryPoint: fragment,
-              targets: [blend ? { format: 'r16float', blend: { color: ADD, alpha: ADD } } : { format: 'r32float' }],
-            },
-            ...(blend
-              ? {}
-              : { depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' } }),
-          });
-        };
-        this.band = new m.NarrowBand(device, like(depth, 'sprite', 'depth'), like(thickness, 'vertex', 'fragment'));
-      });
+      // The band's sprites and voxel balls draw into the same targets as the liquid's own pipelines.
+      const like = (base: GPURenderPipeline, vertex: string, fragment: string) => (code: string) => {
+        const module = device.createShaderModule({ code });
+        const blend = base === thickness;
+        return device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: vertex },
+          fragment: {
+            module,
+            entryPoint: fragment,
+            targets: [blend ? { format: 'r16float', blend: { color: ADD, alpha: ADD } } : { format: 'r32float' }],
+          },
+          ...(blend
+            ? {}
+            : { depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' } }),
+        });
+      };
+      this.band = new m.NarrowBand(device, like(depth, 'sprite', 'depth'), like(thickness, 'vertex', 'fragment'));
+    };
+    if (live && o.narrowBand && !this.band) {
+      if (this.bandCode) makeBand(this.bandCode);
+      else
+        this.bandLoading ??= import('./liquid-band.js').then((m) => {
+          this.bandCode = m;
+        });
     }
     const band = live && o.narrowBand && this.band ? this.band : undefined;
     this.write(c, scale);
@@ -789,6 +848,7 @@ export class ParticleLiquid implements EnginePlugin {
           ww!,
           o.radius ?? 0.05,
           this.source,
+          gpuVelocities,
           this.count,
           this.uniform!,
           buffer!,

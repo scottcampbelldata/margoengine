@@ -9,9 +9,10 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
+import { type BorrowSlot, type Borrowable, borrow, fix, lend, relend } from '../../shared/borrowed.js';
 import { finiteVector } from '@margoengine/math/validate';
 import { sceneTarget } from '../../shared/msaa.js';
-import { margoError } from '../../shared/errors.js';
+import { fault, margoError } from '../../shared/errors.js';
 import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -45,8 +46,10 @@ export interface Decal {
 }
 /** Options of {@link Decals}. */
 export interface DecalOptions {
-  /** RGBA atlas the decals' `rect`s address (2D, sampled; mipmaps used when present). Default a 1x1 white texel. */
-  atlas?: GPUTexture;
+  /** RGBA atlas the decals' `rect`s address (2D, sampled; mipmaps used when present), or `(device) => texture`, made
+   * once per device so it is back after a device restore. Default a 1x1 white texel. A plain texture is lost with its
+   * device: no decal draws, `engine.onError` hears of it once (`'state'`, #borrowed-lost), and `setAtlas` gives a new one. */
+  atlas?: Borrowable<GPUTexture>;
   /** Screen-size cull: a decal whose bounding sphere spans fewer than this many pixels on screen is not drawn (finite,
    * >= 0, default 1; 0 draws every decal in view). The span is a conservative bound, so a culled decal covers less. */
   minPixels?: number;
@@ -102,7 +105,7 @@ const over: GPUBlendState = {
 
 /**
  * Projected decals as a screen-space pass (box projector, world position reconstructed from scene depth, normal-angle fade,
- * texture atlas): they land on everything that writes depth before order 1.9 (core meshes, gltf-pro and materials models,
+ * texture atlas): they land on everything that writes depth before order 1.9 (core meshes, gltf/pbr and materials models,
  * terrain), after the opaque scene and before sky, water and transparent effects. Needs scene depth: attach a post
  * capture (Tonemap, Bloom, PostStack, SSAO, TAA) first. With no decals it records nothing.
  * @throws TypeError when `atlas` is not a sampled 2D GPUTexture; RangeError from `setDecals` for an invalid decal or
@@ -112,7 +115,10 @@ const over: GPUBlendState = {
  */
 export class Decals implements EnginePlugin {
   readonly name = 'post:decals';
-  readonly atlas?: GPUTexture;
+  /** The atlas as given (borrowed, never destroyed), or undefined for the white texel. */
+  get atlas(): Borrowable<GPUTexture> | undefined {
+    return this.slot.value ?? undefined;
+  }
   /** Screen-size cull threshold in pixels ({@link DecalOptions.minPixels}). */
   readonly minPixels: number;
   private engine?: Engine;
@@ -120,6 +126,8 @@ export class Decals implements EnginePlugin {
   private uniform?: GPUBuffer;
   private storage?: GPUBuffer;
   private white?: GPUTexture;
+  private readonly slot: BorrowSlot<GPUTexture>;
+  private checked?: GPUTexture;
   private sampler?: GPUSampler;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly layouts = new Map<boolean, GPUBindGroupLayout>();
@@ -145,17 +153,12 @@ export class Decals implements EnginePlugin {
   };
   constructor(options: DecalOptions = {}) {
     const atlas = options.atlas;
-    if (
-      atlas !== undefined &&
-      (typeof atlas?.createView !== 'function' ||
-        atlas.dimension !== '2d' ||
-        !(atlas.usage & GPUTextureUsage.TEXTURE_BINDING))
-    )
-      throw new TypeError('Decal atlas must be a sampled 2D GPUTexture');
+    if (atlas !== undefined && typeof atlas !== 'function' && !sampled2D(atlas))
+      throw new TypeError('Decal atlas must be a sampled 2D GPUTexture or (device) => GPUTexture');
     const minPixels = options.minPixels ?? 1;
     if (!(Number.isFinite(minPixels) && minPixels >= 0))
       throw new RangeError('Decal minPixels must be a finite number >= 0');
-    this.atlas = atlas;
+    this.slot = borrow<GPUTexture>(atlas, 'Decals atlas', 'setAtlas');
     this.minPixels = minPixels;
   }
   get owner(): Engine | undefined {
@@ -165,6 +168,18 @@ export class Decals implements EnginePlugin {
     const decals = new Decals(options);
     engineRuntime(instance).use(decals);
     return decals;
+  }
+  /**
+   * Gives the decals a new atlas (a texture, a `(device) => texture` function, or undefined for the white texel); a plain
+   * texture belongs to the device in use now. The way back after a plain atlas was lost with its device.
+   * @throws TypeError when `atlas` is not a sampled 2D GPUTexture or a function.
+   */
+  setAtlas(atlas: Borrowable<GPUTexture> | undefined): this {
+    if (atlas !== undefined && typeof atlas !== 'function' && !sampled2D(atlas))
+      throw new TypeError('Decal atlas must be a sampled 2D GPUTexture or (device) => GPUTexture');
+    relend(this.slot, atlas, this.engine?.gpu);
+    this.checked = undefined;
+    return this;
   }
   /**
    * Replaces the decals (at most {@link MAX_DECALS}); validates every entry before changing anything. Drawn in list
@@ -272,23 +287,11 @@ export class Decals implements EnginePlugin {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.sampler = this.device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
-    if (!this.atlas) {
-      this.white = this.device.createTexture({
-        size: [1, 1],
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
-      this.device.queue.writeTexture(
-        { texture: this.white },
-        new Uint8Array([255, 255, 255, 255]),
-        { bytesPerRow: 4 },
-        [1, 1],
-      );
-    }
+    fix(this.slot, this.device);
     this.storage = undefined;
     this.dirty = true;
   }
-  // After opaque meshes (0), gltf-pro models (1) and LOD (1.5); before sky (2), water (4) and volumetric fog (5).
+  // After opaque meshes (0), gltf/pbr models (1) and LOD (1.5); before sky (2), water (4) and volumetric fog (5).
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: this.name,
@@ -298,9 +301,27 @@ export class Decals implements EnginePlugin {
       },
     });
   }
+  // The atlas to bind on `device`: the white texel without one, undefined (no decal draws) while a lost plain atlas or a
+  // function's unusable result leaves nothing to sample.
+  private atlasFor(device: GPUDevice): GPUTexture | undefined {
+    if (this.slot.value == null) return (this.white ??= whiteTexel(device));
+    const atlas = lend(this.slot, device, this.engine);
+    if (atlas && atlas !== this.checked) {
+      if (!sampled2D(atlas)) {
+        this.engine?.onError(
+          fault('state', 'Decals atlas function must return a sampled 2D GPUTexture', 'borrowed-lost'),
+        );
+        return undefined;
+      }
+      this.checked = atlas;
+    }
+    return atlas;
+  }
   private render(c: Context): void {
     const device = c.device,
-      target = sceneTarget(c);
+      atlas = this.atlasFor(device);
+    if (!atlas) return;
+    const target = sceneTarget(c);
     if (!target)
       throw margoError(
         'state',
@@ -378,8 +399,7 @@ export class Decals implements EnginePlugin {
         }
         return p;
       };
-    const atlas = this.atlas ?? this.white!,
-      key = [layout, this.storage, depth, atlas];
+    const key = [layout, this.storage, depth, atlas];
     if (!this.group || this.group.key.some((k, i) => k !== key[i]))
       this.group = {
         key,
@@ -493,4 +513,16 @@ export class Decals implements EnginePlugin {
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
   }
+}
+
+const sampled2D = (t: GPUTexture): boolean =>
+  typeof t?.createView === 'function' && t.dimension === '2d' && !!(t.usage & GPUTextureUsage.TEXTURE_BINDING);
+function whiteTexel(device: GPUDevice): GPUTexture {
+  const white = device.createTexture({
+    size: [1, 1],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture({ texture: white }, new Uint8Array([255, 255, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
+  return white;
 }

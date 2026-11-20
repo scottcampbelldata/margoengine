@@ -4,8 +4,8 @@
 // the Lagrange identity, Walter et al. 2007 eq. 33), whose cross product keeps its relative precision. This suite runs
 // core's own D statements, cut from packages/core/src/shaders.ts, in a compute shader on the GPU (WebGPU, and the WebGL2
 // layer under MARGO_COMPAT=1) and compares them with an f64 D of the same float32 vectors.
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/core/tests/ggx-precision.browser.mjs
-//   (or `npm run test:gpu` in packages/core, under the GPU lock)
+//   node scripts/run-with-timeout.mjs -- node packages/core/tests/ggx-precision.browser.mjs
+//   (or `npm run test:gpu` in packages/core)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';

@@ -14,7 +14,7 @@ import { fault } from '../../../shared/errors.js';
 import type { BoundGroup, CompatComputePipeline, ComputeBuilt, ComputeRuntime } from '../device/compute.js';
 import type { CompatDevice } from '../device/device.js';
 import { type FormatInfo, FORMATS } from '../device/formats.js';
-import { CompatRenderPipeline, type Replayer, writeTexture } from '../device/render.js';
+import { CompatRenderPipeline, type Helper, type Replayer, writeTexture } from '../device/render.js';
 import {
   type Bound,
   CompatBindGroup,
@@ -43,6 +43,18 @@ interface Draw {
   readonly stage: ReturnType<typeof emitCompute>['vertex'];
   cn: WebGLUniformLocation | null;
   ct: WebGLUniformLocation | null;
+  /** The current draw's uniforms (runGPU sets them, `fire` writes them as the draw is issued) and bind groups. */
+  nx: number;
+  ny: number;
+  nz: number;
+  z: number;
+  tw: number;
+  th: number;
+  ts: number;
+  to: number;
+  groups: readonly BoundGroup[] | null;
+  /** The pipeline's onDraw: made once, when the program has linked. */
+  fire: (() => void) | null;
   dims: readonly { group: number; binding: number; location: WebGLUniformLocation }[];
 }
 interface GPUBuilt extends ComputeBuilt {
@@ -67,6 +79,8 @@ interface WordChunk {
   readonly height: number;
   rows: WebGLTexture | null;
   fbo: WebGLFramebuffer | null;
+  /** The texture's default view, made when a dispatch first draws into it. */
+  view: CompatTextureView | null;
 }
 /**
  * A buffer's word textures: one while the buffer's words fit `width` x maxTextureDimension2D (128 MiB at 4,096 x
@@ -76,10 +90,14 @@ interface Words {
   readonly width: number;
   readonly chunks: readonly WordChunk[];
   version: number;
+  /** The helper program that copies the words into a mirror (made when first needed: its source takes sizes of this buffer). */
+  mirrorHelper: Helper | null;
   destroy(): void;
 }
 
 const WORDS_WIDTH = 4096;
+/** The textures a program reads when it reads none. */
+const NO_READS: readonly { group: number; binding: number }[] = [];
 
 /** The runtime for one device. */
 export async function computeRuntime(device: CompatDevice): Promise<ComputeRuntime> {
@@ -127,6 +145,7 @@ class Runtime implements ComputeRuntime {
       );
     const gl = this.gl,
       program = pipeline.program;
+    d.fire = () => this.setUniforms(d);
     d.cn = gl.getUniformLocation(program, '_cn');
     d.ct = gl.getUniformLocation(program, '_ct');
     d.dims = d.stage.dimensions.map((x) => ({
@@ -163,7 +182,24 @@ class Runtime implements ComputeRuntime {
         glsl,
       );
       const stage = plan.tier === 'fragment' ? glsl.fragment : glsl.vertex;
-      return { target, pipeline, stage, cn: null, ct: null, dims: [] };
+      return {
+        target,
+        pipeline,
+        stage,
+        cn: null,
+        ct: null,
+        nx: 0,
+        ny: 0,
+        nz: 0,
+        z: 0,
+        tw: 0,
+        th: 0,
+        ts: 0,
+        to: 0,
+        groups: null,
+        fire: null,
+        dims: [],
+      };
     });
     // ANGLE's Direct3D backend takes minutes on a large kernel: an async pipeline must not wait for it on this thread.
     if (deferred)
@@ -178,95 +214,170 @@ class Runtime implements ComputeRuntime {
   }
 
   dispatch(r: Replayer, p: CompatComputePipeline, groups: readonly BoundGroup[], count: readonly number[]): void {
-    const built = p.built as GPUBuilt | CPUBuilt;
-    for (const [i, layout] of p.layouts.entries())
+    const built = p.built as GPUBuilt | CPUBuilt,
+      layouts = p.layouts;
+    for (let i = 0; i < layouts.length; i++) {
+      const layout = layouts[i];
       if (layout?.entries.length && !groups[i]) {
         this.device.validationError(`dispatchWorkgroups: no bind group is set at index ${i}`);
         return;
       }
+    }
     this.device.dispatches[built.tier]++;
     if (built.tier === 'cpu') this.runCPU(r, built, groups, count, p.label);
     else this.runGPU(r, built, groups, count);
   }
 
-  private bound(groups: readonly BoundGroup[], group: number, binding: number): { bound: Bound; dynamic: number } {
-    const g = groups[group],
-      bound = g?.group.entries.get(binding);
-    if (!g || !bound)
+  /** What is bound at `binding` of bind group `group` (a TypeError naming the binding when nothing is). */
+  private boundAt(groups: readonly BoundGroup[], group: number, binding: number): Bound {
+    const bound = groups[group]?.group.entries.get(binding);
+    if (!bound)
       throw new TypeError(
         `No resource is bound at @group(${group}) @binding(${binding}); bind one in the bind group set there`,
       );
-    const di = g.group.layout.dynamic.indexOf(binding);
-    return { bound, dynamic: di >= 0 ? (g.offsets[di] ?? 0) : 0 };
+    return bound;
+  }
+
+  /** The dynamic offset in force for `binding` of bind group `group` (0 when it has none). */
+  private dynamicAt(groups: readonly BoundGroup[], group: number, binding: number): number {
+    const g = groups[group] as NonNullable<BoundGroup>,
+      di = g.group.layout.dynamic.indexOf(binding);
+    return di >= 0 && di < g.offsets.length ? g.offsets[di] : 0;
+  }
+
+  /** The texture view a storage texture binding holds. */
+  private viewAt(groups: readonly BoundGroup[], group: number, binding: number): CompatTextureView {
+    return (this.boundAt(groups, group, binding) as { view: CompatTextureView }).view;
   }
 
   // ---------------------------------------------------------------- fragment and scatter tiers
 
-  private runGPU(r: Replayer, built: GPUBuilt, groups: readonly BoundGroup[], count: readonly number[]): void {
-    const gl = this.gl,
-      [wx, wy, wz] = built.plan.workgroupSize,
-      [nx, ny, nz] = count;
-    // Storage textures the program both reads and writes are read from a copy taken before the dispatch.
-    const used = groups.slice();
-    const temporary: CompatTexture[] = [];
-    const reads = built.draws[0]?.pipeline.textures ?? [];
-    for (const d of built.draws) {
-      if (
-        d.target.kind !== 'texture' ||
-        !reads.some((t) => t.group === d.target.group && t.binding === d.target.binding)
-      )
-        continue;
-      const v = (this.bound(groups, d.target.group, d.target.binding).bound as { view: CompatTextureView }).view;
-      const copy = this.snapshot(r, v);
-      temporary.push(copy.texture);
-      const g = used[d.target.group] as NonNullable<BoundGroup>;
-      used[d.target.group] = { group: this.replace(g.group, d.target.binding, copy), offsets: g.offsets };
+  /** The 2D views of one slice of a storage texture's view, made once (a dispatch draws into the same ones each frame). */
+  private readonly sliceViews = new WeakMap<CompatTextureView, CompatTextureView[]>();
+  /** The pass descriptor and attachment every dispatch pass uses, changed in place (a pass ends before the next begins). */
+  private readonly passAttachment = {
+    view: null as unknown as CompatTextureView,
+    depthSlice: 0,
+    clearValue: [0, 0, 0, 0],
+    loadOp: 'load' as GPULoadOp,
+    storeOp: 'store' as GPUStoreOp,
+  };
+  private readonly passDescriptor = { colors: [this.passAttachment] };
+  /** The buffers (and their word textures) a dispatch wrote, which copy back after its draws. */
+  private readonly writtenBuffers: CompatBuffer[] = [];
+  private readonly writtenWords: Words[] = [];
+
+  /** A 2D view of `slice` of `v`'s texture. */
+  private sliceView(v: CompatTextureView, slice: number): CompatTextureView {
+    let views = this.sliceViews.get(v);
+    if (!views) this.sliceViews.set(v, (views = []));
+    return (views[slice] ??= new CompatTextureView(v.texture, {
+      dimension: '2d',
+      format: v.format,
+      baseMipLevel: v.baseMipLevel,
+      mipLevelCount: 1,
+      baseArrayLayer: v.baseArrayLayer + slice,
+      arrayLayerCount: 1,
+    }));
+  }
+
+  /** True when the program reads the storage texture `target` binds (it is then read from a copy). */
+  private readsTarget(reads: readonly { group: number; binding: number }[], target: ComputeTarget): boolean {
+    for (let i = 0; i < reads.length; i++)
+      if (reads[i].group === target.group && reads[i].binding === target.binding) return true;
+    return false;
+  }
+
+  /** Binds every bind group the dispatch has on the pass of one of its draws. */
+  private bindAll(r: Replayer, used: readonly BoundGroup[]): void {
+    for (let i = 0; i < used.length; i++) {
+      const g = used[i];
+      if (g) r.setBindGroup(i, g.group, g.offsets, 0, g.offsets.length);
     }
-    const words: { buffer: CompatBuffer; words: Words }[] = [];
-    for (const d of built.draws) {
-      const bind = () => used.forEach((g, i) => g && r.setBindGroup(i, g.group, [...g.offsets]));
-      const dims = () => {
-        for (const x of d.dims) {
-          const v = (this.bound(groups, x.group, x.binding).bound as { view: CompatTextureView }).view;
-          const [w, h, depth] = v.texture.levelSize(v.baseMipLevel);
-          gl.uniform4i(x.location, w, h, v.texture.dimension === '3d' ? depth : v.arrayLayerCount, 1);
-        }
+  }
+
+  /** Begins a pass drawing into `view` (slice `slice` of a 3D one) with the descriptor every dispatch pass shares. */
+  private beginDispatchPass(r: Replayer, view: CompatTextureView, slice: number): void {
+    this.passAttachment.view = view;
+    this.passAttachment.depthSlice = slice;
+    r.beginPass(this.passDescriptor as never);
+  }
+
+  /** Sets the uniforms a draw of `d` reads: its counts, its target's size and the sizes of the textures it queries. */
+  private setUniforms(d: Draw): void {
+    const gl = this.gl;
+    gl.uniform4ui(d.cn, d.nx, d.ny, d.nz, d.z);
+    gl.uniform4i(d.ct, d.tw, d.th, d.ts, d.to);
+    const groups = d.groups as readonly BoundGroup[];
+    for (let i = 0; i < d.dims.length; i++) {
+      const x = d.dims[i],
+        v = this.viewAt(groups, x.group, x.binding),
+        t = v.texture;
+      gl.uniform4i(
+        x.location,
+        t.levelWidth(v.baseMipLevel),
+        t.levelHeight(v.baseMipLevel),
+        t.dimension === '3d' ? t.levelDepth(v.baseMipLevel) : v.arrayLayerCount,
+        1,
+      );
+    }
+  }
+
+  private runGPU(r: Replayer, built: GPUBuilt, groups: readonly BoundGroup[], count: readonly number[]): void {
+    const size = built.plan.workgroupSize,
+      wx = size[0],
+      wy = size[1],
+      wz = size[2],
+      nx = count[0],
+      ny = count[1],
+      nz = count[2],
+      draws = built.draws;
+    // Storage textures the program both reads and writes are read from a copy taken before the dispatch.
+    let used = groups,
+      temporary: CompatTexture[] | null = null;
+    const reads = draws[0]?.pipeline.textures ?? NO_READS;
+    for (let i = 0; i < draws.length; i++) {
+      const d = draws[i];
+      if (d.target.kind !== 'texture' || !this.readsTarget(reads, d.target)) continue;
+      const copy = this.snapshot(r, this.viewAt(groups, d.target.group, d.target.binding));
+      (temporary ??= []).push(copy.texture);
+      if (used === groups) used = groups.slice();
+      const g = used[d.target.group] as NonNullable<BoundGroup>;
+      (used as BoundGroup[])[d.target.group] = {
+        group: this.replace(g.group, d.target.binding, copy),
+        offsets: g.offsets,
       };
+    }
+    let written = 0;
+    for (let i = 0; i < draws.length; i++) {
+      const d = draws[i];
+      d.groups = groups;
+      d.nx = nx;
+      d.ny = ny;
+      d.nz = nz;
       if (d.target.kind === 'texture') {
-        const v = (this.bound(groups, d.target.group, d.target.binding).bound as { view: CompatTextureView }).view,
-          t = v.texture;
-        const [w, h, depth] = t.levelSize(v.baseMipLevel);
-        const is3d = t.dimension === '3d',
-          layered = is3d || d.target.dimension === '2d_array';
-        const slices = is3d ? depth : v.arrayLayerCount;
+        const v = this.viewAt(groups, d.target.group, d.target.binding),
+          t = v.texture,
+          w = t.levelWidth(v.baseMipLevel),
+          h = t.levelHeight(v.baseMipLevel),
+          is3d = t.dimension === '3d',
+          layered = is3d || d.target.dimension === '2d_array',
+          slices = is3d ? t.levelDepth(v.baseMipLevel) : v.arrayLayerCount;
         // Fragment: one pass per z of the dispatch (a 2D target's every z draws into its one layer, in order);
         // scatter: one pass per layer of the target, each keeping the stores to it.
         const passes =
           built.tier === 'fragment' ? (layered ? Math.min(nz * wz, slices) : nz * wz) : layered ? slices : 1;
         for (let z = 0; z < passes; z++) {
           const slice = layered ? z : 0;
-          const view = is3d
-            ? v
-            : new CompatTextureView(t, {
-                dimension: '2d',
-                format: v.format,
-                baseMipLevel: v.baseMipLevel,
-                mipLevelCount: 1,
-                baseArrayLayer: v.baseArrayLayer + slice,
-                arrayLayerCount: 1,
-              });
-          r.beginPass({
-            colors: [
-              { view, depthSlice: is3d ? slice : 0, clearValue: [0, 0, 0, 0], loadOp: 'load', storeOp: 'store' },
-            ],
-          });
+          this.beginDispatchPass(r, is3d ? v : this.sliceView(v, slice), is3d ? slice : 0);
           r.setPipeline(d.pipeline);
-          bind();
-          d.pipeline.onDraw = () => {
-            gl.uniform4ui(d.cn, nx, ny, nz, z);
-            gl.uniform4i(d.ct, w, h, slice, 0);
-            dims();
-          };
+          this.bindAll(r, used);
+          d.z = z;
+          d.tw = w;
+          d.th = h;
+          d.ts = slice;
+          d.to = 0;
+          d.pipeline.onDraw = d.fire;
           if (built.tier === 'fragment') {
             r.setScissor(0, 0, Math.min(w, nx * wx), Math.min(h, ny * wy));
             r.draw(3, 1, 0, 0);
@@ -276,40 +387,41 @@ class Runtime implements ComputeRuntime {
         continue;
       }
       // A buffer: drawn as words into its word texture.
-      const { bound, dynamic } = this.bound(groups, d.target.group, d.target.binding);
-      const b = bound as Extract<Bound, { kind: 'buffer' }>;
-      const ws = this.words(r, b.buffer),
-        first = (b.offset + dynamic) >> 2,
+      const b = this.boundAt(groups, d.target.group, d.target.binding) as Extract<Bound, { kind: 'buffer' }>,
+        ws = this.words(r, b.buffer),
+        first = (b.offset + this.dynamicAt(groups, d.target.group, d.target.binding)) >> 2,
         end = first + Math.ceil(b.size / 4);
       // One draw per word texture the binding reaches; each keeps the stores that fall in it.
-      for (const c of ws.chunks) {
+      for (let k = 0; k < ws.chunks.length; k++) {
+        const c = ws.chunks[k];
         if (c.base >= end || c.base + c.words <= first) continue;
-        r.beginPass({
-          colors: [
-            {
-              view: c.texture.createView(),
-              depthSlice: 0,
-              clearValue: [0, 0, 0, 0],
-              loadOp: 'load',
-              storeOp: 'store',
-            },
-          ],
-        });
+        this.beginDispatchPass(r, (c.view ??= c.texture.createView()), 0);
         r.setPipeline(d.pipeline);
-        bind();
-        d.pipeline.onDraw = () => {
-          gl.uniform4ui(d.cn, nx, ny, nz, 0);
-          gl.uniform4i(d.ct, ws.width, c.height, 0, first - c.base);
-          dims();
-        };
+        this.bindAll(r, used);
+        d.z = 0;
+        d.tw = ws.width;
+        d.th = c.height;
+        d.ts = 0;
+        d.to = first - c.base;
+        d.pipeline.onDraw = d.fire;
         r.draw(nx * ny * nz * wx * wy * wz, d.target.stores, 0, 0);
         r.endPass();
       }
-      if (!words.some((x) => x.buffer === b.buffer)) words.push({ buffer: b.buffer, words: ws });
+      let seen = false;
+      for (let k = 0; k < written && !seen; k++) seen = this.writtenBuffers[k] === b.buffer;
+      if (!seen) {
+        this.writtenBuffers[written] = b.buffer;
+        this.writtenWords[written++] = ws;
+      }
     }
     // Only now do buffers change: every draw above read the memory as it was before the dispatch.
-    for (const { buffer, words: ws } of words) this.copyBack(r, buffer, ws);
-    for (const t of temporary) t.destroy();
+    for (let k = 0; k < written; k++) {
+      this.copyBack(r, this.writtenBuffers[k], this.writtenWords[k]);
+      this.writtenBuffers[k] = undefined as never;
+      this.writtenWords[k] = undefined as never;
+    }
+    if (temporary) for (const t of temporary) t.destroy();
+    for (let i = 0; i < draws.length; i++) draws[i].groups = null;
   }
 
   /** A copy of a view's level and layers, read in place of a storage texture the dispatch also writes. */
@@ -349,54 +461,62 @@ class Runtime implements ComputeRuntime {
   }
 
   /** The word textures of a buffer, brought up to date with the buffer (on the GPU). */
-  private words(_r: Replayer, buffer: CompatBuffer): Words {
+  /** words()'s slow path, once per buffer: a method of its own, since a function that makes a closure allocates its context on every call. */
+  private makeWords(buffer: CompatBuffer): Words {
     const gl = this.gl,
-      device = this.device;
+      device = this.device,
+      count = Math.max(1, Math.ceil(buffer.size / 16) * 4);
+    const most = device.limits.maxTextureDimension2D,
+      width = Math.min(WORDS_WIDTH, most),
+      room = width * most,
+      chunks: WordChunk[] = [];
+    for (let base = 0; base < count; base += room) {
+      const words = Math.min(room, count - base),
+        height = Math.ceil(words / width);
+      chunks.push({
+        texture: new CompatTexture(device, {
+          size: [width, height],
+          format: 'r32uint',
+          usage: 0x14,
+          label: chunks.length ? `${buffer.label} words ${chunks.length}` : `${buffer.label} words`,
+        }),
+        base,
+        words,
+        height,
+        rows: null,
+        fbo: null,
+        view: null,
+      });
+    }
+    const created: Words = {
+      width,
+      chunks,
+      version: -1,
+      mirrorHelper: null,
+      destroy: () => {
+        for (const c of chunks) {
+          c.texture.destroy();
+          if (c.rows) {
+            device.state.forgetTexture(c.rows);
+            gl.deleteTexture(c.rows);
+          }
+          if (c.fbo) gl.deleteFramebuffer(c.fbo);
+        }
+      },
+    };
+    return created;
+  }
+
+  private words(_r: Replayer, buffer: CompatBuffer): Words {
     buffer.drain();
     let ws = buffer.computeState as Words | null;
-    const count = Math.max(1, Math.ceil(buffer.size / 16) * 4);
-    if (!ws) {
-      const most = device.limits.maxTextureDimension2D,
-        width = Math.min(WORDS_WIDTH, most),
-        room = width * most,
-        chunks: WordChunk[] = [];
-      for (let base = 0; base < count; base += room) {
-        const words = Math.min(room, count - base),
-          height = Math.ceil(words / width);
-        chunks.push({
-          texture: new CompatTexture(device, {
-            size: [width, height],
-            format: 'r32uint',
-            usage: 0x14,
-            label: chunks.length ? `${buffer.label} words ${chunks.length}` : `${buffer.label} words`,
-          }),
-          base,
-          words,
-          height,
-          rows: null,
-          fbo: null,
-        });
-      }
-      const created: Words = {
-        width,
-        chunks,
-        version: -1,
-        destroy: () => {
-          for (const c of chunks) {
-            c.texture.destroy();
-            if (c.rows) {
-              device.state.forgetTexture(c.rows);
-              gl.deleteTexture(c.rows);
-            }
-            if (c.fbo) gl.deleteFramebuffer(c.fbo);
-          }
-        },
-      };
-      buffer.computeState = ws = created;
-    }
+    const gl = this.gl,
+      device = this.device;
+    if (!ws) buffer.computeState = ws = this.makeWords(buffer);
     if (ws.version !== buffer.version && buffer.gl) {
       gl.bindBuffer(gl.PIXEL_UNPACK_BUFFER, buffer.gl);
-      for (const c of ws.chunks) {
+      for (let k = 0; k < ws.chunks.length; k++) {
+        const c = ws.chunks[k];
         device.state.scratch(gl.TEXTURE_2D, c.texture.texture);
         const full = Math.floor(c.words / ws.width),
           rest = c.words - full * ws.width,
@@ -429,10 +549,10 @@ class Runtime implements ComputeRuntime {
         texels = Math.max(1, Math.ceil(buffer.size / 16)),
         words = ws.width;
       // Texel (x, y) of the data texture is row y * w + x of the buffer: its four words, in a row of the word texture.
-      const h = r.helper(
+      const h = (ws.mirrorHelper ??= r.helper(
         `words${w}x${words}`,
         `uniform highp usampler2D t;\nout highp uvec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy); int i = (p.y * ${w} + p.x) * 4; ivec2 q = ivec2(i % ${words}, i / ${words}); c = uvec4(texelFetch(t, q, 0).x, texelFetch(t, q + ivec2(1, 0), 0).x, texelFetch(t, q + ivec2(2, 0), 0).x, texelFetch(t, q + ivec2(3, 0), 0).x); }`,
-      );
+      ));
       state.bindDrawFramebuffer(fbo);
       r.helperState(h, w, Math.ceil(texels / w));
       state.unit(0, gl.TEXTURE_2D, ws.chunks[0].texture.texture, this.device.loadSampler);
@@ -451,7 +571,8 @@ class Runtime implements ComputeRuntime {
       'words',
       'uniform highp usampler2D t;\nout highp uvec4 c;\nvoid main() { ivec2 p = ivec2(gl_FragCoord.xy); int x = p.x * 4; c = uvec4(texelFetch(t, ivec2(x, p.y), 0).x, texelFetch(t, ivec2(x + 1, p.y), 0).x, texelFetch(t, ivec2(x + 2, p.y), 0).x, texelFetch(t, ivec2(x + 3, p.y), 0).x); }',
     );
-    for (const c of ws.chunks) {
+    for (let k = 0; k < ws.chunks.length; k++) {
+      const c = ws.chunks[k];
       if (!c.rows) {
         c.rows = this.device.objects.own(buffer, gl.createTexture() as WebGLTexture);
         state.scratch(gl.TEXTURE_2D, c.rows);

@@ -169,7 +169,7 @@ test('the decoder stays out of the entry, and without the extension the file sta
   try {
     const { doc, bytes } = file();
     assert.throws(() => parseGLTF(engine, doc, [bytes], { extensions: [meshopt] }), /parseGLTFAsync/);
-    assert.throws(() => parseGLTF(engine, doc, [bytes]), /gltf-pro/);
+    assert.throws(() => parseGLTF(engine, doc, [bytes]), /gltf\/pbr/);
     delete doc.extensionsRequired;
     assert.throws(() => parseGLTF(engine, doc, [bytes]), /Truncated/);
   } finally {

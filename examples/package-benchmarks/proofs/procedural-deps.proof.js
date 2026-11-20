@@ -31,68 +31,68 @@ if (missing.length) {
   console.log(
     `HISTORICAL: fff47af recorded results/procedural-deps.json (${ref} -> fff47af); the baseline imports ${missing.join(' and ')}, removed from the lockfile by 5l.v, so it needs an install to rebuild.`,
   );
-  process.exit(0);
-}
-const { baseline, candidate } = await versions('procedural', ref, undefined, pin);
-// Speed: 200k 3D simplex samples on a terrain-like grid, and a 64^3 sphere surface.
-const grid = (noise) => () => {
-  let s = 0;
-  for (let i = 0; i < 200_000; i++) s += noise.simplex((i % 500) * 0.037, 0.3, Math.floor(i / 500) * 0.037);
-  return s;
-};
-const sphere = (x, y, z) => Math.hypot(x, y, z) - 0.7,
-  surface = (module) => () => module.marchingCubes(sphere, { resolution: [64, 64, 64] });
-for (const module of [baseline, candidate]) assert.ok(surface(module)().indices.length > 1000);
-const cases = [
-  { case: '200k 3D simplex samples', ...time(grid(new baseline.Noise(731)), grid(new candidate.Noise(731)), 8) },
-  { case: 'marchingCubes 64^3 sphere', ...time(surface(baseline), surface(candidate), 4) },
-];
-// Bytes: the root entry with its npm dependencies bundled (what an app ships), @margoengine/* external, as build-modern.
-async function bytes(entry) {
-  const output = await build({
-    configFile: false,
-    publicDir: false,
-    logLevel: 'silent',
-    build: {
-      write: false,
-      minify: true,
-      target: 'es2022',
-      lib: { entry, formats: ['es'] },
-      rollupOptions: { external: (id) => id.startsWith('@margoengine/'), output: compactOutput },
-    },
-  });
-  const code = (Array.isArray(output) ? output[0] : output).output
-    .filter((item) => item.type === 'chunk')
-    .map((item) => item.code)
-    .join('\n');
-  return { raw: Buffer.byteLength(code), gzip: gzipSync(code).length };
-}
-/** Root entry bytes of packages/procedural/src at `at` (copied to a temp folder), or of the working tree without one. */
-async function sizeAt(at) {
-  if (!at) return bytes(resolve(root, 'packages/procedural/src/index.ts'));
-  const folder = resolve(root, 'test-results/proofs-tmp', `procedural-${at.replace(/\W/g, '_')}-${process.pid}`);
-  await mkdir(resolve(folder, 'src'), { recursive: true });
-  for (const file of list(at, 'packages/procedural/src'))
-    await writeFile(resolve(folder, 'src', file), show(at, `packages/procedural/src/${file}`));
-  try {
-    return await bytes(resolve(folder, 'src/index.ts'));
-  } finally {
-    await rm(folder, { recursive: true, force: true });
+} else {
+  const { baseline, candidate } = await versions('procedural', ref, undefined, pin);
+  // Speed: 200k 3D simplex samples on a terrain-like grid, and a 64^3 sphere surface.
+  const grid = (noise) => () => {
+    let s = 0;
+    for (let i = 0; i < 200_000; i++) s += noise.simplex((i % 500) * 0.037, 0.3, Math.floor(i / 500) * 0.037);
+    return s;
+  };
+  const sphere = (x, y, z) => Math.hypot(x, y, z) - 0.7,
+    surface = (module) => () => module.marchingCubes(sphere, { resolution: [64, 64, 64] });
+  for (const module of [baseline, candidate]) assert.ok(surface(module)().indices.length > 1000);
+  const cases = [
+    { case: '200k 3D simplex samples', ...time(grid(new baseline.Noise(731)), grid(new candidate.Noise(731)), 8) },
+    { case: 'marchingCubes 64^3 sphere', ...time(surface(baseline), surface(candidate), 4) },
+  ];
+  // Bytes: the root entry with its npm dependencies bundled (what an app ships), @margoengine/* external, as build-modern.
+  async function bytes(entry) {
+    const output = await build({
+      configFile: false,
+      publicDir: false,
+      logLevel: 'silent',
+      build: {
+        write: false,
+        minify: true,
+        target: 'es2022',
+        lib: { entry, formats: ['es'] },
+        rollupOptions: { external: (id) => id.startsWith('@margoengine/'), output: compactOutput },
+      },
+    });
+    const code = (Array.isArray(output) ? output[0] : output).output
+      .filter((item) => item.type === 'chunk')
+      .map((item) => item.code)
+      .join('\n');
+    return { raw: Buffer.byteLength(code), gzip: gzipSync(code).length };
   }
+  /** Root entry bytes of packages/procedural/src at `at` (copied to a temp folder), or of the working tree without one. */
+  async function sizeAt(at) {
+    if (!at) return bytes(resolve(root, 'packages/procedural/src/index.ts'));
+    const folder = resolve(root, 'test-results/proofs-tmp', `procedural-${at.replace(/\W/g, '_')}-${process.pid}`);
+    await mkdir(resolve(folder, 'src'), { recursive: true });
+    for (const file of list(at, 'packages/procedural/src'))
+      await writeFile(resolve(folder, 'src', file), show(at, `packages/procedural/src/${file}`));
+    try {
+      return await bytes(resolve(folder, 'src/index.ts'));
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  }
+  const sizes = { before: await sizeAt(ref), after: await sizeAt(pin) };
+  const report = {
+    package: 'procedural',
+    baseline: ref,
+    candidate: pin ?? 'working tree',
+    node: process.version,
+    recordedAt: new Date().toISOString(),
+    outputsIdentical: false,
+    quietGated: false,
+    notes:
+      'Own simplex (seamless, different values) and marching tetrahedra replace simplex-noise and isosurface. Timings are diagnostic (not quiet-gated). Sizes: root entry min+gzip with npm dependencies bundled, @margoengine/* external.',
+    cases,
+    sizes,
+  };
+  await save('procedural-deps', report);
+  console.log(JSON.stringify(report, null, 2));
 }
-const sizes = { before: await sizeAt(ref), after: await sizeAt(pin) };
-const report = {
-  package: 'procedural',
-  baseline: ref,
-  candidate: pin ?? 'working tree',
-  node: process.version,
-  recordedAt: new Date().toISOString(),
-  outputsIdentical: false,
-  quietGated: false,
-  notes:
-    'Own simplex (seamless, different values) and marching tetrahedra replace simplex-noise and isosurface. Timings are diagnostic (not quiet-gated). Sizes: root entry min+gzip with npm dependencies bundled, @margoengine/* external.',
-  cases,
-  sizes,
-};
-await save('procedural-deps', report);
-console.log(JSON.stringify(report, null, 2));

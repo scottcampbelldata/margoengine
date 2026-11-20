@@ -1,0 +1,80 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky fire base check</title><style>body{margin:0;overflow:hidden}canvas{display:block;width:1920px;height:1080px}</style></head><body><canvas width="1920" height="1080"></canvas>
+<script type="module">
+// snowNight's flames over the Cabin Hearth's two logs (examples/cabin-hearth/main.ts: the same sizes and places), seen
+// from the hearth close-up (tools/shot/shots/cabin-hearth-kettle.json, its last key) at 1080p, on fixed 1/60 s frames.
+// The flame layer is the frame with the fire minus the same frame without it (display luma, a 7 px wide line). On five
+// lines up across the upper log's top, from 40 px inside the log to 90 px above its top, the rise is the pixels from
+// the first point at 10% of the line's peak to the first at 90%, over three frames 0.1 s apart. Driven by
+// fire-base-gpu.mjs.
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {cylinderGeometry,boxGeometry,toGeometry} from '/packages/geometry/dist/index.js';
+import {VFX} from '/packages/vfx/dist/index.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {snowNight} from '/packages/sky/dist/scene-kits.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const canvas=document.querySelector('canvas'),W=canvas.width,H=canvas.height;
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[1.75,0.95,-0.85],target:[1.05,0.66,-2],fov:50,near:0.05,far:60}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const quat=(axis,angle)=>{const s=Math.sin(angle/2);return [axis[0]*s,axis[1]*s,axis[2]*s,Math.cos(angle/2)];};
+const add=(data,color,position,rotation)=>{const m=engine.createMesh().setGeometry(toGeometry(data)).setMaterial(new PbrMaterial({color,roughness:0.9})).setPosition(position);if(rotation)m.setQuaternion(rotation);return m;};
+// The hearth: back wall, hearthstone, and the two logs as main.ts places them (hx 0.95, hz -2.15).
+const hx=0.95,hz=-2.15;
+add(boxGeometry(1.7,1.45,0.12),'#1b1714',[hx,0.87,-2.3]);
+add(boxGeometry(2,0.08,1.05),'#3a3530',[hx,0.16,hz+0.25]);
+add(cylinderGeometry(0.075,0.08,0.72,12),'#2a2018',[hx,0.34,hz-0.05],quat([0,0,1],Math.PI/2+0.08));
+add(cylinderGeometry(0.065,0.07,0.62,12),'#2a2018',[hx+0.04,0.44,hz+0.02],quat([0,0,1],Math.PI/2-0.12));
+// The kit's grade (AgX at +0.6 stops), as the scene shows it; no bloom and no TAA, so the rise is the flames' own.
+const kit=snowNight(),stack=PostStack.attach(engine,[new Tonemap({...kit.tonemap})]);
+// The fuel's top, as the kit asks: the centre between the log tops (0.415 and 0.505 m).
+const fuelTop=[hx,0.46,hz];
+// One frame as displayed: 8-bit, read the way a screenshot is.
+const shot=new OffscreenCanvas(W,H),g=shot.getContext('2d',{willReadFrequently:true});
+async function frame(){
+ engine.render({delta:1/60});
+ if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();
+ g.drawImage(canvas,0,0);
+ return g.getImageData(0,0,W,H).data;
+}
+const luma=(d,x,y)=>{let s=0;for(let dx=-3;dx<=3;dx++){const k=(y*W+x+dx)*4;s+=0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];}return s/7;};
+// Points on the upper log's top (radius about 0.0675 at its axis (-cos 0.12, sin 0.12, 0)), s metres along it.
+const tops=[-0.24,-0.12,0,0.12,0.24].map(s=>[hx+0.04-Math.cos(0.12)*s,0.44+Math.sin(0.12)*s+0.0675,hz+0.02]);
+const project=([x,y,z])=>{const m=engine.camera.matrix,cx=m[0]*x+m[4]*y+m[8]*z+m[12],cy=m[1]*x+m[5]*y+m[9]*z+m[13],cw=m[3]*x+m[7]*y+m[11]*z+m[15];return [Math.round((cx/cw*0.5+0.5)*W),Math.round((0.5-cy/cw*0.5)*H)];};
+window.check={
+ async run(){
+  device.pushErrorScope('validation');
+  await frame();const off=await frame();
+  const fire=VFX.attach(engine,{...structuredClone(kit.hearth.fire),position:fuelTop,softness:0.08,depth:()=>stack.depthTexture});
+  const ons=[];
+  for(let i=1;i<=162;i++){const d=await frame();if(i===150||i===156||i===162)ons.push(d);}
+  const down=40,up=90,lines=tops.map(project).map(([x,y0])=>{
+   const p=[];for(let y=y0+down;y>=y0-up;y--){let v=0;for(const on of ons)v+=Math.max(0,luma(on,x,y)-luma(off,x,y));p.push(v/ons.length);}
+   const peak=Math.max(...p);let gradient=0;for(let i=1;i<p.length;i++)gradient=Math.max(gradient,p[i]-p[i-1]);
+   return {x,y:y0,rise:p.findIndex(v=>v>=0.9*peak)-p.findIndex(v=>v>=0.1*peak),gradient,peak};
+  });
+  // The flames' shape on the last frame (Scott, 2026-11-16 03:39: measured on the render, not an intensity cap): the
+  // flame layer is every pixel the fire brightens by a tenth of full scale, above the upper log's highest top (12 px
+  // up), so the logs' edges are not counted as the flames'. Its silhouette is each flame pixel beside a pixel the fire
+  // leaves dark. Reported: the silhouette's colours, how near the clipped white (every channel 230 or more) comes to
+  // it, and the most separate flame runs (3 px or wider) on any row.
+  const on=ons[2],top=Math.min(...lines.map(l=>l.y))-12,lum=(d,k)=>0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];
+  const mask=new Uint8Array(W*H),dist=new Int32Array(W*H).fill(-1),queue=[];
+  for(let y=1;y<top;y++)for(let x=1;x<W-1;x++){const k=y*W+x;if(lum(on,k*4)-lum(off,k*4)>=25.5)mask[k]=1;}
+  let edges=0,orange=0,white=0,flame=0,whiteAt=Infinity,runs=0;
+  for(let y=1;y<top;y++)for(let x=1;x<W-1;x++){const k=y*W+x;if(!mask[k])continue;flame++;
+   if([k-1,k+1,k-W,k+W].some(n=>!mask[n]&&n>=W&&n<top*W)){dist[k]=0;queue.push(k);edges++;
+    const c=[on[k*4],on[k*4+1],on[k*4+2]],mx=Math.max(...c),span=mx-Math.min(...c),hue=!span?0:mx===c[0]?(((c[1]-c[2])/span+6)%6)*60:mx===c[1]?((c[2]-c[0])/span+2)*60:((c[0]-c[1])/span+4)*60;
+    if(hue>=10&&hue<=45&&span/mx>=0.4)orange++;}}
+  for(let h=0;h<queue.length;h++){const k=queue[h];for(const n of [k-1,k+1,k-W,k+W])if(mask[n]&&dist[n]<0){dist[n]=dist[k]+1;queue.push(n);}}
+  for(let k=0;k<W*top;k++)if(mask[k]&&Math.min(on[k*4],on[k*4+1],on[k*4+2])>=230){white++;whiteAt=Math.min(whiteAt,dist[k]);}
+  for(let y=1;y<top;y++){let n=0,w=0;for(let x=0;x<W;x++){if(mask[y*W+x])w++;else{if(w>=3)n++;w=0;}}runs=Math.max(runs,n);}
+  const shape={edges,orange:orange/edges,flame,white:white/flame,whiteFromEdge:whiteAt===Infinity?null:whiteAt,runs};
+  fire.dispose();
+  const image=await (await shot.convertToBlob({type:'image/png'})).arrayBuffer();
+  const scope=await device.popErrorScope();
+  return {lines,shape,error:scope?.message??null,errors,image:btoa(Array.from(new Uint8Array(image),c=>String.fromCharCode(c)).join(''))};
+ },
+};
+window.ready=true;
+</script></body></html>

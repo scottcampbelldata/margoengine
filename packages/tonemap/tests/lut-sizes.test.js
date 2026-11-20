@@ -8,8 +8,8 @@ import { gpuHarness } from '../../../tests/support/postfx-gpu.js';
 // KB-WGSL1: the output shader was f5a49365 until the build stripped shader comments; 61e18503 is that text without its
 // one comment (the P3 gamut note), every token and line the same (the dist equals scripts/shader-comments.mjs applied to
 // the old dist, file for file).
-const defaultShader = '672546811be6922e47f3faa5531e004859899ab5f333c9869f73295de3c49159',
-  defaultOutputShader = '61e185033d477154c99826208d4c1f3573580fb804580cf0d9fd2fe41578ed6e';
+const defaultShader = 'a2d836edccced9671def05e04e3a5ec2cdc92ee6947e49ee92759a84545d1377',
+  defaultOutputShader = '9025f4c53d4aff5af2728c2d890a4b5c36785899ead17bc4af077e22a2dfb6fd';
 const hash = (code) => createHash('sha256').update(code).digest('hex');
 
 function lut(size = 33, explicit = true) {

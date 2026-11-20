@@ -1,7 +1,7 @@
 // autoLOD's bake: what simplifying took from each primitive, baked into maps its levels draw with. Each map is read
 // through the source's own UVs, and written in the frame the level shades with, its kept vertices' normals and tangents.
 import type { BakeImage, BakeSurface } from '@margoengine/mesh-edit/bake';
-import type { GLTFCompressedImage, PBRPrimitive } from '@margoengine/gltf-pro';
+import type { GLTFCompressedImage, PBRPrimitive } from '@margoengine/gltf/pbr';
 import type { PackedGeometry } from './attributes.js';
 
 /** Options of `bake` on `autoLOD`. */

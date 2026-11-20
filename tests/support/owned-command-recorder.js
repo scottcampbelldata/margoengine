@@ -5,7 +5,7 @@ import '../../examples/package-benchmarks/proofs/gpu-recorder.js';
 // once, as a real queue does before any later submit. Each draw records the bytes of its group-0 uniform binding when
 // encoded; `submit` refuses destroyed resources and records the bytes the GPU would read at that point. A test then
 // checks that every draw still sees what it was encoded with. A draw whose uniforms upload when its `draw()` call
-// returns (gltf-pro's arena) calls `settle()` then, and the rows encoded since take the bytes the queue holds now.
+// returns (gltf/pbr's arena) calls `settle()` then, and the rows encoded since take the bytes the queue holds now.
 export function strictGPU() {
   let next = 0;
   const calls = [],
@@ -83,7 +83,7 @@ export function strictGPU() {
     }
     drawIndexed(count, instances = 1) {
       this.check();
-      // Group 0: the draw's own uniform (binding 0) and, for gltf-pro, the view block it shares (binding 3).
+      // Group 0: the draw's own uniform (binding 0) and, for gltf/pbr, the view block it shares (binding 3).
       const frame = this.groups.get(0)?.entries,
         uniform = frame?.find((e) => e.binding === 0)?.resource,
         view = frame?.find((e) => e.binding === 3)?.resource,

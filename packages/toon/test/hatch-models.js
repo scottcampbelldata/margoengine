@@ -1,7 +1,7 @@
 import { Engine } from '../../core/dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
 import { boxGeometry } from '../../geometry/dist/index.js';
-import { loadGLTF } from '../../gltf-pro/dist/index.js';
+import { loadGLTF } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { ModelHatching } from '../dist/hatch-models.js';
 import { waitForPipelines } from '../../../scripts/support/gpu-ready.js';

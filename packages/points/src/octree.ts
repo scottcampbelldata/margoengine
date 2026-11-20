@@ -59,7 +59,7 @@ export interface OctreeOptions {
   maxPointsPerNode?: number;
   /** Sample grid cells per axis of each node. Default 128. */
   grid?: number;
-  /** Deepest level. Default 16. */
+  /** Deepest level, a whole number from 0 to 64. Default 16. */
   maxDepth?: number;
   /** Shuffle seed (the sample of a node is the first point per grid cell in shuffled order). Default 1. */
   seed?: number;
@@ -96,10 +96,11 @@ export class MemoryOctree implements OctreeSource {
       throw new TypeError(`Node ${node.id} is not part of this octree; pass a node reached from this octree's root`);
     const positions = new Float32Array(index.length * 3),
       c = this.colorComponents,
+      // Bytes stay bytes; any other array holds 0..1 floats (as PointCloud reads it), which bytes would round to 0 or 1.
       colors = this.colors
-        ? this.colors instanceof Float32Array
-          ? new Float32Array(index.length * c)
-          : new Uint8Array(index.length * c)
+        ? this.colors instanceof Uint8Array || this.colors instanceof Uint8ClampedArray
+          ? new Uint8Array(index.length * c)
+          : new Float32Array(index.length * c)
         : null;
     for (let i = 0; i < index.length; i++) {
       const p = index[i];
@@ -151,6 +152,9 @@ export function buildOctree(
       throw new RangeError(`Attribute ${name} must have a whole number of components per point`);
   if (cloud.rowIds && cloud.rowIds.length !== n) throw new RangeError('rowIds must have one key per point');
   if (!(maxPoints >= 1)) throw new RangeError('Invalid maxPointsPerNode; pass a number of 1 or more');
+  // NaN would never stop a stack of equal points from splitting, one point a level.
+  if (!Number.isInteger(maxDepth) || maxDepth < 0 || maxDepth > 64)
+    throw new RangeError('Invalid maxDepth; pass a whole number from 0 to 64');
   if (!Number.isInteger(grid) || grid < 1 || grid > 1024)
     throw new RangeError('Invalid grid; pass a whole number from 1 to 1024');
   const components = cloud.colorComponents ?? (cloud.colors && n ? ((cloud.colors.length / n) as 3 | 4) : 3);

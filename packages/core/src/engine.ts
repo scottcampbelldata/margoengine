@@ -75,7 +75,8 @@ const attempt = (errors: unknown[], run: () => void): void => {
 
 /**
  * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale in the transform store. Writes
- * must be finite as float32, and scale components non-zero (RangeError otherwise); throws Error 'Mesh disposed' after disposal.
+ * must be finite as float32 (RangeError otherwise); a zero scale flattens the mesh on that axis (glTF 2.0 section 3.5.3).
+ * Throws Error 'Mesh disposed' after disposal.
  */
 export class VectorRef {
   constructor(
@@ -89,14 +90,9 @@ export class VectorRef {
       : this.mesh.engine.store.transforms[(this.kind === 'scale' ? scaleFields : positionFields)[axis]][this.mesh.id];
   }
   private validate(value: number): void {
-    // Compares, not Math.fround: a setter runs per moving mesh each frame (F32_OVERFLOW in geometry.ts). Math.fround(v)
-    // is 0 exactly when |v| <= 2 ** -150 (7.006492321624085e-46: halfway to the least float rounds to 0). No
-    // Math.abs here: V8 13 Maglev calls it for a setter's argument and boxes the result.
-    if (
-      typeof value !== 'number' ||
-      !(value < F32_OVERFLOW && value > -F32_OVERFLOW) ||
-      (this.kind === 'scale' && !(value > 7.006492321624085e-46 || value < -7.006492321624085e-46))
-    )
+    // Compares, not Math.fround: a setter runs per moving mesh each frame (F32_OVERFLOW in geometry.ts). No Math.abs
+    // here: V8 13 Maglev calls it for a setter's argument and boxes the result.
+    if (typeof value !== 'number' || !(value < F32_OVERFLOW && value > -F32_OVERFLOW))
       throw rangeError('Invalid transform', 'transform');
   }
   private write(axis: number, value: number): void {
@@ -222,6 +218,8 @@ export class Mesh {
   name = '';
   /** @internal Ids of this mesh's children, so removing it unparents them without scanning every slot. */
   declare kids?: Set<number>;
+  /** @internal The engine's revision when this mesh was made: a pick started before that never answers with it. */
+  declare born: number;
   declare readonly position: VectorRef;
   declare readonly rotation: VectorRef;
   declare readonly scale: VectorRef;
@@ -232,8 +230,9 @@ export class Mesh {
   get material(): PbrMaterial {
     return this.current;
   }
-  /** Assigning a material makes the next frame re-collect instances. */
+  /** Assigning a material makes the next frame re-collect instances; anything but a PbrMaterial is a TypeError. */
   set material(value: PbrMaterial) {
+    if (!(value instanceof PbrMaterial)) throw typeError('Invalid material', 'arguments');
     this.current = value;
     this.engine.collected = -1;
   }
@@ -280,7 +279,6 @@ export class Mesh {
   setScale(value: Vec3): this {
     this.check();
     finite(value, 3, 'Scale');
-    if (value.some((v) => Math.fround(v) === 0)) throw rangeError('Scale nonzero', 'transform');
     this.scale.set(value[0], value[1], value[2]);
     return this;
   }
@@ -309,6 +307,13 @@ export class Mesh {
       if (id === this.id) throw typeError('Hierarchy cycle', 'hierarchy');
       if (++depth >= 64) throw rangeError('Parent depth: 64', 'hierarchy');
     }
+    // The moved subtree's height counts too: its deepest mesh ends up that far below the new parent.
+    const height = (mesh?: Mesh): number => {
+      let most = 0;
+      for (const id of mesh?.kids ?? []) most = Math.max(most, 1 + height(this.engine.meshes.get(id)));
+      return most;
+    };
+    if (parent && depth + height(this) >= 64) throw rangeError('Parent depth: 64', 'hierarchy');
     const parents = this.engine.store.parents;
     this.engine.meshes.get(parents[this.id])?.kids?.delete(this.id);
     if (parent) (parent.kids ??= new Set()).add(this.id);
@@ -331,7 +336,6 @@ export class Mesh {
   }
   setMaterial(material: PbrMaterial): this {
     this.check();
-    if (!(material instanceof PbrMaterial)) throw typeError('Invalid material', 'arguments');
     this.material = material;
     return this;
   }
@@ -447,9 +451,16 @@ export class Engine {
   private running = false;
   private rendering = false;
   private primaryCulling = true;
-  private readonly frameOptions: { culling?: boolean; delta: number; views?: readonly RenderView[] } = { delta: 0 };
+  // delta starts null so V8 keeps the field tagged: each frame stores one number object, and every callback, plugin and
+  // render passes that object on. A field V8 keeps as a double makes a new number object for each call it is passed to
+  // (16 B per onFrame callback per frame in Node; 24 B a frame in Chromium's frame-alloc scenes).
+  private readonly frameOptions: { culling?: boolean; delta: number; views?: readonly RenderView[] } = {
+    delta: null as unknown as number,
+  };
   private disposing = false;
   private recovery?: Promise<void>;
+  /** Aborted by dispose(): a restore in flight stops at its next startup step and destroys what it made (KB-STRESS-1). */
+  private readonly ended = new AbortController();
   // Automatic restores since the last run of 120 drawn frames: a device lost again and again stops after 3.
   private reboots = 0;
   private good = 0;
@@ -462,7 +473,8 @@ export class Engine {
   // The last pick in flight or waiting; later picks wait for it.
   private picking?: Promise<void>;
   /** Each scene's `claimed`/`redirect` state of a shared batch, swapped in when that scene draws. */
-  private readonly claims = new WeakMap<Batch, Map<Scene, [boolean?, Batch['redirect']?]>>();
+  // Weak both ways: a disposed scene is not kept by the batches it was drawn with.
+  private readonly claims = new WeakMap<Batch, WeakMap<Scene, [boolean?, Batch['redirect']?]>>();
   /** @internal Features requested at creation, requested again when the device is restored. */ features?: GPUFeatureName[];
   /** @internal 1 for `exactSize` (no MSAA, no resize), else undefined (the quality tier's samples). */ exact?: 1;
   /** @internal `powerPreference` from creation, asked again when the device is restored. */ power?: GPUPowerPreference;
@@ -538,13 +550,19 @@ export class Engine {
     this.watchDevice();
   }
   private watchDevice(): void {
-    this.renderer.onLost = (error, memory?: boolean) => {
-      if (this.disposed || this.disposing) return;
-      if (memory) this.onError(error);
-      this.good = 0;
-      if (++this.reboots < 4) void this.rebootDevice().catch((error) => this.onError(error));
-      else if (this.reboots === 4) this.onError(fault('failed', 'GPU lost 4 times; reload the page', 'gpu-lost'));
-    };
+    const renderer = this.renderer,
+      lost = (error: Error, memory?: boolean): void => {
+        if (this.disposed || this.disposing || this.renderer !== renderer) return;
+        // The device a restore just brought in was lost before that restore ended (B3): once it has, restore again.
+        const again = () => lost(error, memory);
+        if (this.recovery) return void this.recovery.then(again, again);
+        if (memory) this.onError(error);
+        this.good = 0;
+        // A restore that dispose() ended is not an error.
+        if (++this.reboots < 4) void this.rebootDevice().catch((error) => this.disposed || this.onError(error));
+        else if (this.reboots === 4) this.onError(fault('failed', 'GPU lost 4 times; reload the page', 'gpu-lost'));
+      };
+    renderer.onLost = lost;
   }
   rebootDevice(): Promise<void> {
     if (this.disposed || this.disposing) return Promise.reject(fault('disposed', DISPOSED));
@@ -552,13 +570,17 @@ export class Engine {
     if (this.recovery) return this.recovery;
     this.recovery = (async () => {
       const previous = this.renderer,
-        next = await GPURenderer.create(this.canvas, this.features, this.exact, { powerPreference: this.power }, false);
-      // `next` has not touched the canvas, which may have a new owner by now.
-      if (this.disposed || this.disposing) {
-        next.dispose(false);
-        return;
-      }
+        next = await GPURenderer.create(
+          this.canvas,
+          this.features,
+          this.exact,
+          { powerPreference: this.power, signal: this.ended.signal },
+          false,
+        );
       try {
+        // Disposed since: `next` has not touched the canvas, which may have a new owner by now. The restore rejects
+        // with the disposed error, as when dispose() stops it at an earlier step.
+        this.ended.signal.throwIfAborted();
         for (const batch of this.batches.values()) next.add(batch.geometry, batch.instances.length / 24);
         next.configure();
       } catch (error) {
@@ -611,7 +633,7 @@ export class Engine {
     if (from !== scene) {
       for (const batch of this.batches.values()) {
         let states = this.claims.get(batch);
-        if (!states) this.claims.set(batch, (states = new Map()));
+        if (!states) this.claims.set(batch, (states = new WeakMap()));
         states.set(from, [batch.claimed, batch.redirect]);
         [batch.claimed, batch.redirect] = states.get(scene) ?? [];
       }
@@ -713,7 +735,7 @@ export class Engine {
     const mesh = new Mesh(this, id, scene);
     this.meshes.set(id, mesh);
     (scene.meshes as Map<number, Mesh>).set(id, mesh);
-    this.revision++;
+    mesh.born = this.revision++;
     this.store.active[id] = 1;
     try {
       return mesh.setParent(parent);
@@ -863,7 +885,7 @@ export class Engine {
       this.update(culling, delta, camera);
       const background = this.active.background,
         { width, height } = this.canvas;
-      if (!this.recovery && this.drew())
+      if (!this.recovery && !this.disposed && this.drew())
         this.renderer.render(
           camera,
           this.lighting,
@@ -919,7 +941,7 @@ export class Engine {
         .sort((a, b) => groups.indexOf(destination(views[a])) - groups.indexOf(destination(views[b])));
     try {
       this.resize();
-      order.forEach((index) => {
+      for (const index of order) {
         const entry = views[index];
         if (!(entry?.camera instanceof Camera) || !entry.viewport)
           throw typeError('Invalid view: pass {camera, viewport}', 'views');
@@ -937,6 +959,8 @@ export class Engine {
         this.checkScene(scene);
         this.enter(scene);
         this.update(culling, cameras.has(view.camera) ? 0 : delta, view.camera, rect, prepare, delta, view.layers);
+        // Disposed by a plugin of this view's scene: no later view draws through the freed renderer.
+        if (this.disposed) break;
         cameras.add(view.camera);
         scenes.add(scene);
         if (!this.recovery && (index || this.drew()))
@@ -952,7 +976,7 @@ export class Engine {
           });
         stacked.set(destination(view), (stacked.get(destination(view)) ?? 0) + 1);
         if (!target) drawn.push(view);
-      });
+      }
     } finally {
       this.rendering = false;
       this.drawn = drawn;
@@ -997,6 +1021,8 @@ export class Engine {
       throw rangeError('Invalid delta', 'arguments');
     this.delta = frameDelta;
     if (prepare) this.plugins.forEach(this.preUpdate);
+    // A plugin's onPreUpdate disposed the engine (KB-STRESS-2): the frame ends here, with nothing left to update or draw.
+    if (this.disposed) return;
     if (!rect) this.resize();
     camera.advance(delta);
     camera.update(rect ? rect[2] / rect[3] : this.canvas.width / this.canvas.height, this.backend === 'webgpu');
@@ -1016,7 +1042,8 @@ export class Engine {
     // the frame and its packages counted. Every frame, with the renderer's own test: a package can claim or release a
     // batch without a new collection.
     if (this.rendering) {
-      const { stats, batchList } = this;
+      const { stats } = this,
+        batchList = this.batchList;
       stats.visible = stats.drawCalls = 0;
       for (let i = 0; i < batchList.length; i++) {
         stats.visible += batchList[i].count;
@@ -1130,16 +1157,21 @@ export class Engine {
    * reading the scene as it is when its turn comes (EngineKernel.pick).
    */
   pick(x: number, y: number, view?: RenderView): Promise<Mesh | null> {
+    // A pick asked for during a frame waits for the frame's end, and the queue's tail is set before this pick's update
+    // runs, so a pick asked for inside that update (a plugin's onPreUpdate) waits its turn instead of nesting.
     const copy = view && { ...view },
-      run = this.picking
-        ? this.picking.then(() => (this.disposed || this.disposing ? null : this.pickNow(x, y, copy)))
+      prior = this.picking ?? (this.rendering ? Promise.resolve() : undefined);
+    let open!: () => void;
+    const tail = (this.picking = new Promise<void>((resolve) => (open = resolve))),
+      run = prior
+        ? prior.then(() => (this.disposed || this.disposing ? null : this.pickNow(x, y, copy)))
         : this.pickNow(x, y, copy),
       // Settles before the caller's own continuation, so a pick made once this one resolves starts at once.
       done = () => {
         if (this.picking === tail) this.picking = undefined;
-      },
-      tail: Promise<void> = run.then(done, done);
-    this.picking = tail;
+        open();
+      };
+    run.then(done, done);
     return run;
   }
   private async pickNow(x: number, y: number, view?: RenderView): Promise<Mesh | null> {
@@ -1200,9 +1232,14 @@ export class Engine {
     }
     const layers = this.layers,
       mesh = await pending;
+    // A disposed mesh, and one made after the pick started (it took a freed slot), never answer; other meshes may come
+    // and go meanwhile.
     return this.renderer === renderer &&
-      this.revision === revision &&
-      (!mesh || (mesh.scene === scene && (layers === -1 || meshLayers(mesh) & layers)))
+      (!mesh ||
+        (this.meshes.get(mesh.id) === mesh &&
+          mesh.born < revision &&
+          mesh.scene === scene &&
+          (layers === -1 || meshLayers(mesh) & layers)))
       ? mesh
       : null;
   }
@@ -1231,29 +1268,31 @@ export class Engine {
   private readonly call = (callback: FrameCallback): void => callback(this, this.frameOptions.delta);
   private readonly frame = (time: number): void => {
     this.raf = null;
-    if (this.disposed || !this.running) return;
-    if (this.pace && !this.pace(time)) {
-      this.raf = requestAnimationFrame(this.frame);
-      return;
+    // Not running: stopped or disposed (dispose() stops, and start() on a disposed engine throws).
+    if (!this.running) return;
+    if (!this.pace || this.pace(time)) {
+      // Math.min by compares (V8 13 Maglev boxes Math.min's numbers), NaN on either side included. step is never -0.
+      // The NaN test comes first so both compares run on every frame: a compare first met on a late frame has no type
+      // feedback, the optimized loop deoptimizes there and then runs thousands of frames in a tier that boxes numbers.
+      const step = (time - this.last) / 1000,
+        most = this.maxDelta,
+        delta = this.last ? (step !== step || step < most ? step : most) : 0;
+      this.last = time;
+      try {
+        this.frameOptions.delta = delta;
+        this.callbacks.forEach(this.call);
+        this.frameOptions.views = this.views?.length ? this.views : undefined;
+        if (!this.disposed) this.render(this.frameOptions);
+      } catch (error) {
+        this.stop();
+        this.onError(error);
+        return;
+      }
     }
-    // Math.min by compares (V8 13 Maglev boxes Math.min's numbers), NaN on either side included. step is never -0.
-    // The NaN test comes first so both compares run on every frame: a compare first met on a late frame has no type
-    // feedback, the optimized loop deoptimizes there and then runs thousands of frames in a tier that boxes numbers.
-    const step = (time - this.last) / 1000,
-      most = this.maxDelta,
-      delta = this.last ? (step !== step || step < most ? step : most) : 0;
-    this.last = time;
-    try {
-      this.frameOptions.delta = delta;
-      this.callbacks.forEach(this.call);
-      this.frameOptions.views = this.views?.length ? this.views : undefined;
-      if (!this.disposed) this.render(this.frameOptions);
-    } catch (error) {
-      this.stop();
-      this.onError(error);
-      return;
-    }
-    if (!this.disposed && this.running) this.raf = requestAnimationFrame(this.frame);
+    // One test for both ends, a frame pace skipped included (KB-STRESS-3): a stop() inside pace leaves no frame behind
+    // for a later start() to double. ??=: a stop() and start() inside pace or a frame callback already scheduled the
+    // next frame (one loop, not two).
+    if (this.running) this.raf ??= requestAnimationFrame(this.frame);
   };
   stop(): void {
     this.running = false;
@@ -1266,6 +1305,7 @@ export class Engine {
     if (this.disposed || this.disposing) return;
     this.disposing = true;
     this.stop();
+    this.ended.abort(fault('disposed', DISPOSED));
     const errors: unknown[] = [];
     for (const scene of this.scenes)
       for (const name of scene.plugins.keys()) attempt(errors, () => this.removePlugin(name, scene));

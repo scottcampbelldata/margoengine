@@ -17,9 +17,10 @@ export function checkTensorField(field: TensorField): number {
     field.bounds.length !== 6 ||
     field.dims.some((n) => !Number.isSafeInteger(n) || n < 1) ||
     field.bounds.some((v) => !Number.isFinite(v)) ||
-    [0, 1, 2].some((k) => field.bounds[2 * k + 1] <= field.bounds[2 * k])
+    // A span past the largest double has no voxel spacing to step or interpolate by.
+    [0, 1, 2].some((k) => !(field.bounds[2 * k + 1] > field.bounds[2 * k]) || !Number.isFinite(field.bounds[2 * k + 1] - field.bounds[2 * k]))
   )
-    tensorError('field needs three positive integer dimensions and finite increasing bounds');
+    tensorError('field needs three positive integer dimensions and finite increasing bounds with a finite span');
   const n = field.dims.reduce((a, v) => a * v, 1);
   if (!Number.isSafeInteger(n) || field.tensors.length !== n * 6 || (field.mask && field.mask.length !== n))
     tensorError('field tensor and mask lengths must match its dimensions');
@@ -35,6 +36,11 @@ function cellTensor(f: TensorField, cell: readonly number[]): Float64Array | nul
 }
 /** Trilinear interpolation of tensor coefficients; eigenvectors are decomposed after interpolation, never blended. */
 export function sampleTensor(field: TensorField, position: readonly [number, number, number]): Float64Array | null {
+  return interpolate(field, position, false);
+}
+// `partial`: a masked or non-finite neighbour drops out and the rest are reweighted (null only when none is left), so a
+// tube can be drawn wherever its fiber went; otherwise any such neighbour gives null.
+function interpolate(field: TensorField, position: readonly number[], partial: boolean): Float64Array | null {
   checkTensorField(field);
   if (position.length !== 3 || position.some((v) => !Number.isFinite(v)))
     tensorError('sample positions need three finite coordinates');
@@ -45,15 +51,22 @@ export function sampleTensor(field: TensorField, position: readonly [number, num
     lo = q.map(Math.floor),
     t = q.map((v, k) => v - lo[k]),
     out = new Float64Array(6);
+  let total = 0;
   for (let c = 0; c < 8; c++) {
     const bits = [c & 1, (c >> 1) & 1, c >> 2],
       w = bits.reduce((a, b, k) => a * (b ? t[k] : 1 - t[k]), 1);
     if (!w) continue;
     const cell = lo.map((v, k) => Math.max(0, Math.min(field.dims[k] - 1, v + bits[k]))),
       tensor = cellTensor(field, cell);
-    if (!tensor) return null;
+    if (!tensor) {
+      if (partial) continue;
+      return null;
+    }
+    total += w;
     for (let k = 0; k < 6; k++) out[k] += w * tensor[k];
   }
+  if (!total) return null;
+  if (partial && total !== 1) for (let k = 0; k < 6; k++) out[k] /= total;
   return out;
 }
 /** Deterministic stopping and integration in physical field coordinates. */
@@ -249,19 +262,28 @@ export async function hyperstreamlines(
     cells: number[] = [],
     bounds = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
   fibers.forEach((fiber, fi) => {
-    let previous: Float64Array | undefined, last: number[][] | undefined, lastNormals: number[][] | undefined;
+    let previous: Float64Array | undefined,
+      last: number[][] | undefined,
+      lastNormals: number[][] | undefined,
+      lastFA = 0;
     for (let i = 0; i < fiber.positions.length / 3; i++) {
       options.signal?.throwIfAborted();
       const p = Array.from(fiber.positions.subarray(i * 3, i * 3 + 3)),
-        t = sampleTensor(field, p as [number, number, number]);
+        // The fiber only visits valid cells, so a point of it always has one to sample: masked neighbours drop out.
+        t = interpolate(field, p, true);
       if (!t) break;
       const e = tensorEigen(t),
         v = e.vectors;
-      if (previous && v.slice(3, 6).reduce((sum, x, k) => sum + x * previous![k + 3], 0) < 0)
-        for (let k = 3; k < 9; k++) v[k] *= -1;
+      // Each transverse axis keeps its own sign from ring to ring. The decomposition is right-handed, so a flip of the
+      // principal axis flips the third one: flipping the second and third together mirrored the ring (a twisted tube).
+      if (previous)
+        for (const axis of [3, 6])
+          if (v.slice(axis, axis + 3).reduce((sum, x, k) => sum + x * previous![axis + k], 0) < 0)
+            for (let k = axis; k < axis + 3; k++) v[k] *= -1;
       previous = v;
-      const r2 = (radius * Math.max(0, e.values[1])) / e.values[0],
-        r3 = (radius * Math.max(0, e.values[2])) / e.values[0],
+      // Interpolating a valid tensor with a neighbour of another sign can leave no positive axis: the ring is a point.
+      const r2 = e.values[0] > 0 ? (radius * Math.max(0, e.values[1])) / e.values[0] : 0,
+        r3 = e.values[0] > 0 ? (radius * Math.max(0, e.values[2])) / e.values[0] : 0,
         ring: number[][] = [],
         ns: number[][] = [];
       for (let k = 0; k < sides; k++) {
@@ -290,7 +312,8 @@ export async function hyperstreamlines(
             for (const [point, normal] of corners) {
               positions.push(...point);
               normals.push(...normal);
-              values.push(e.fa);
+              // Each ring keeps its own FA, so the colour is interpolated along the segment.
+              values.push(point === last[k] || point === last[(k + 1) % sides] ? lastFA : e.fa);
               for (let a = 0; a < 3; a++) {
                 bounds[a * 2] = Math.min(bounds[a * 2], point[a]);
                 bounds[a * 2 + 1] = Math.max(bounds[a * 2 + 1], point[a]);
@@ -300,6 +323,7 @@ export async function hyperstreamlines(
           }
       last = ring;
       lastNormals = ns;
+      lastFA = e.fa;
     }
   });
   return {

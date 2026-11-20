@@ -1,15 +1,16 @@
 import { createContext, useContext, useMemo, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import type { EngineKernel } from '@margoengine/core';
-import { MargoError } from '@margoengine/math/errors';
 import { useFrame } from './components.js';
 import { useCommit, useResourceEffect, useScene } from './internal.js';
 import { inXRFrame } from './frame-priority.js';
 import { adaptiveResolution } from './adaptive-resolution.js';
+import { pauseHover } from './events.js';
 import { PerformanceController, type PerformanceCallbacks, type PerformanceOptions, type PerformanceSnapshot } from './performance-controller.js';
+import { fault, rangeError } from '../../shared/errors.js';
 export { PerformanceController } from './performance-controller.js';
 export type { PerformanceOptions, PerformanceCallbacks, PerformanceSnapshot } from './performance-controller.js';
 
-const Context = createContext<PerformanceController | null>(null);
+const Context = /* @__PURE__ */ createContext<PerformanceController | null>(null);
 /** Monitor options, an optional measured-duration source and descendants sharing the quality factor. */
 export interface PerformanceMonitorProps extends PerformanceOptions {
   children?: ReactNode;
@@ -43,7 +44,7 @@ export function PerformanceMonitor({ children, sample, ...options }: Performance
 /** Read averaged measurements; callbacks may also live on any descendant of PerformanceMonitor. */
 export function usePerformanceMonitor(callbacks: PerformanceCallbacks = {}): PerformanceSnapshot {
   const controller = useContext(Context), latest = useRef(callbacks);
-  if (!controller) throw new MargoError('state', 'usePerformanceMonitor requires a PerformanceMonitor parent; wrap the caller in PerformanceMonitor. See https://margoengine.com/errors#state');
+  if (!controller) throw fault('state', 'usePerformanceMonitor requires a PerformanceMonitor parent; wrap the caller in PerformanceMonitor', 'react-usage');
   useCommit(() => { latest.current = callbacks; });
   useCommit(() => controller.observe({
     onIncline: api => latest.current.onIncline?.(api), onDecline: api => latest.current.onDecline?.(api),
@@ -63,7 +64,7 @@ export interface AdaptiveDprProps {
 function Resolution({ min = 0.5, max = 1, pixelated = false }: AdaptiveDprProps) {
   const controller = useContext(Context)!, { engine, frames } = useScene();
   if (![min, max].every(Number.isFinite) || min <= 0 || min > max || max > 1)
-    throw new RangeError('AdaptiveDpr requires 0 < min <= max <= 1.');
+    throw rangeError('AdaptiveDpr requires 0 < min <= max <= 1', 'react-arguments');
   useResourceEffect(() => adaptiveResolution(engine, frames, () => min + (max - min) * controller.state.factor, pixelated), [engine, frames, controller, min, max, pixelated]);
   return null;
 }
@@ -71,4 +72,36 @@ function Resolution({ min = 0.5, max = 1, pixelated = false }: AdaptiveDprProps)
 export function AdaptiveDpr(props: AdaptiveDprProps) {
   const parent = useContext(Context);
   return parent ? <Resolution {...props} /> : <PerformanceMonitor><Resolution {...props} /></PerformanceMonitor>;
+}
+function Events() {
+  const controller = useContext(Context)!,
+    { engine } = useScene();
+  useResourceEffect(() => {
+    let resume: (() => void) | null = null;
+    const update = () => {
+      const declined = controller.state.factor < 1;
+      if (declined && !resume) resume = pauseHover(engine);
+      else if (!declined && resume) {
+        resume();
+        resume = null;
+      }
+    };
+    update();
+    const unsubscribe = controller.subscribe(update);
+    return () => {
+      unsubscribe();
+      resume?.();
+    };
+  }, [engine, controller]);
+  return null;
+}
+/**
+ * Pauses hover picking (pointer over, out, enter, leave and move) while measured performance has declined (the
+ * monitor's `factor` below 1), as drei's `<AdaptiveEvents>`, and resumes it once the factor is back at 1. Presses,
+ * clicks, double clicks and the wheel keep picking, so a click is never lost. Uses the enclosing `<PerformanceMonitor>`,
+ * else one of its own.
+ */
+export function AdaptiveEvents() {
+  const parent = useContext(Context);
+  return parent ? <Events /> : <PerformanceMonitor><Events /></PerformanceMonitor>;
 }

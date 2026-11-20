@@ -423,9 +423,16 @@ export class Whitewater {
     return this.textures[12];
   }
 
-  private velocityBuffer(c: { device: GPUDevice }, source: ParticleSource, count: number, upload: boolean): GPUBuffer {
+  private velocityBuffer(
+    c: { device: GPUDevice },
+    source: ParticleSource,
+    gpu: GPUBuffer | undefined,
+    count: number,
+    upload: boolean,
+  ): GPUBuffer {
     const p = source.velocities!;
-    if (p instanceof Float32Array) {
+    if (!(p instanceof Float32Array)) return gpu!;
+    {
       const stride = source.stride ?? 3,
         offset = source.velocityOffset ?? 0;
       const floats = count ? offset + (count - 1) * stride + 3 : 4;
@@ -442,9 +449,6 @@ export class Whitewater {
       }
       return this.storage;
     }
-    return typeof (p as GPUBuffer).getMappedRange === 'function'
-      ? (p as GPUBuffer)
-      : (p as { buffer: GPUBuffer }).buffer;
   }
 
   /**
@@ -462,6 +466,7 @@ export class Whitewater {
     o: WhitewaterOptions,
     radius: number,
     source: ParticleSource,
+    gpuVelocities: GPUBuffer | undefined,
     count: number,
     main: GPUBuffer,
     positions: GPUBuffer,
@@ -472,7 +477,7 @@ export class Whitewater {
     this.passes = this.draws = this.groupsMade = this.bytes = 0;
     const pool = o.maxParticles ?? 65536;
     this.allocate(count, pool, c.width, c.height);
-    const velocities = this.velocityBuffer(c, source, count, step);
+    const velocities = this.velocityBuffer(c, source, gpuVelocities, count, step);
     const t = this.textures as GPUTexture[];
     const [even, odd, bucketDepth, normals, evenLevels, oddLevels] = t as [
       GPUTexture,

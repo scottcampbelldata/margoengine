@@ -22,6 +22,23 @@ Multiple overlays for one media element share its AudioContext source and one au
 
 Build and unit tests: npm test --workspace @margoengine/video
 
+## Crop, fit and moving overlays
+
+`source: [x, y, width, height]` draws only that part of the picture (0 to 1 fractions from its top left), so a wide
+clip shows its left half, or any crop, in a box without squeezing. `setRect(rect)` and `setSource(source)` change
+either from the next frame, so one overlay follows a moving layer; `rect` and `sourceRect` read them back.
+`objectFit(fit, [pictureWidth, pictureHeight], [canvasWidth, canvasHeight], box)` gives the `rect` and `source` that
+CSS `object-fit` draws, centred (`'fill'`, `'contain'`, `'cover'`, `'none'` and `'scale-down'`; W3C CSS Images Module
+Level 3, section 5.5).
+
+```ts
+import {objectFit} from 'margoengine/video';
+// A 1920 x 1080 clip in the left half of a 1080 x 1080 canvas, cropped to fill it as CSS object-fit: cover does.
+const {rect, source} = objectFit('cover', [1920, 1080], [1080, 1080], [0, 0, 0.5, 1]);
+console.log(rect, source); // [0, 0, 0.5, 1] [0.359375, 0, 0.28125, 1]
+// Video.attach(engine, videoElement, {rect, source}); later: overlay.setRect([0.5, 0, 0.5, 1]);
+```
+
 ## External video on mesh materials
 
 `videoMaterial` from `margoengine/video/material` (or `@margoengine/video/material`) is a
@@ -74,7 +91,7 @@ the WebGPU specification permits; no platform zero-copy or speed claim is made. 
 textures consume four sampled-texture limit slots and an implicit sampler/uniform, so a
 material close to the device's binding limits may exceed them.
 
-GPU checks: `node scripts/gpu-lock.mjs run --owner=video-check -- node packages/video/test/material-check.mjs`.
+GPU checks: `node scripts/run-with-timeout.mjs -- node packages/video/test/material-check.mjs`.
 The check uses generated colour frames and a generated canvas video stream on a real GPU;
 these stand in for decoded movie files. Codec files and other GPUs are not covered by this entry's check.
 

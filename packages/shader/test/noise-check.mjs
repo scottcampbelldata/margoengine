@@ -1,5 +1,5 @@
-// Real-adapter CPU/GPU agreement for @margoengine/shader/noise (run from the repository root after building packages, under
-// the GPU lock): node scripts/gpu-lock.mjs run --owner=<id> -- node packages/shader/test/noise-check.mjs
+// Real-adapter CPU/GPU agreement for @margoengine/shader/noise (run from the repository root after building packages):
+// node scripts/run-with-timeout.mjs -- node packages/shader/test/noise-check.mjs
 // 4096 positions per field; the GPU computes in f32, the CPU twins in f64, so values agree to float rounding, not bits.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';

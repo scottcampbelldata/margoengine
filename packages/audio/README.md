@@ -87,7 +87,7 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 ## How it works
 
 - **Lazy context.** Nothing touches `AudioContext`, `window` or `document` at import time. The listener creates its `AudioContext` the first time `listener.context` is read (normally when the first sound is created), or uses the context you pass, for example an `OfflineAudioContext`. A context the listener created is closed on dispose; a context you passed is left open.
-- **Listener follows the camera.** As an engine plugin the listener adds a frame pass (order 900) that runs after the camera and world matrices are updated. It writes the listener position, forward (camera position toward target) and camera up (including rolled and exact-pole views), and skips the write when nothing changed. `listener.follow(mesh, forward = [0, 0, 1])` puts the ears on a mesh instead, such as a third-person character: its world position, its local `forward` axis (glTF characters face +Z) and local +Y as up, read from the engine's world matrices each frame (a disposed mesh keeps the last pose). `follow('camera')` goes back; `follow(null)` stops following so only `setPose` moves the listener. `setPose` also sets the pose by hand when you do not use an engine.
+- **Listener follows the camera.** As an engine plugin the listener adds a frame pass (order 900) that runs after the camera and world matrices are updated. It writes the listener position, forward (camera position toward target) and camera up (including rolled and exact-pole views), and skips the write when nothing changed. `listener.follow(mesh, forward = [0, 0, 1], up = [0, 1, 0])` puts the ears on a mesh instead, such as a third-person character: its world position, its local `forward` axis (glTF characters face +Z) and its local `up` axis, read from the engine's world matrices each frame (a disposed mesh keeps the last pose). The listener always hands Web Audio an up at right angles to forward (the part of `up` across forward), so a top view with up +Y, `setPose(p, [0, -1, 0])` or `follow(rocket, [0, 1, 0])` keeps left and right: an up along forward becomes the up of that view pitched from level, `[0, 0, -1]` looking down and `[0, 0, 1]` looking up (in the mesh's own axes for `follow`). `follow('camera')` goes back; `follow(null)` stops following so only `setPose` moves the listener. `setPose` also sets the pose by hand when you do not use an engine.
 - **Autoplay.** With `autoResume` (default) the listener resumes a suspended context on the first `pointerdown`, `mousedown`, `keydown` or `touchend` anywhere in the window, then removes its listeners. `suspend()` and `resume()` are there for explicit control.
 - **Graph.** `source -> filters -> fade gain -> volume gain -> [PannerNode] -> master gain -> destination`. Fades have their own gain stage, so `fadeIn`/`fadeOut` never fight with `volume`, and hidden-mesh muting rides on the volume stage.
 - **No clicks.** Volume, master volume, playback rate, detune, listener pose and panner pose move with `setTargetAtTime` (time constant `smoothing`, default 20 ms) on a running context. The first write, and every write on a suspended or offline context, is set immediately, so a sound never sweeps in from the origin.
@@ -122,7 +122,7 @@ Errors carry a stable `code` (`error.code`): `disposed` for a sound used after `
 | `volume` | listener, sounds | 1 |
 | `autoResume` | listener | true |
 | `smoothing` | listener (used by its sounds) | 0.02 s; 0 sets values immediately |
-| `loop`, `loopStart`, `loopEnd` | sounds | false, 0, 0 (end of buffer) |
+| `loop`, `loopStart`, `loopEnd` | sounds | false, 0, 0 (end of buffer: `loopStart: 2` alone loops from 2 s to the end in every browser; since 2026-11-15, as WebKit looped the whole buffer before) |
 | `playbackRate`, `detune` | sounds | 1, 0 cents |
 | `offset`, `duration` | sounds (buffers) | 0, whole buffer (ignored while looping) |
 | `timelineStart` | sounds (buffers, with `sync`) | 0 s |
@@ -352,7 +352,9 @@ In a game, use `listener.load(url, {signal})` for authored stems and call
 `transition('combat')` when game state changes. States map stem names to dB levels;
 omitted stems and `-Infinity` are silent. States are copied at construction. Gains
 must fit finite float32 linear values. This is gain layering of continuously running
-loops: muted stems keep their phase. No tempo analysis, stretching, sequencing of
+loops: muted stems keep their phase. Every loop is its own source started at
+`origin + k * loop` on the audio clock, so a browser that rounds start or loop points to
+whole frames (Firefox) never drifts off the grid. No tempo analysis, stretching, sequencing of
 different sections, streaming, or automatic loudness/headroom management.
 
 Options: `bpm=120` positive finite quarter-note beats/minute, `beatsPerBar=4` and
@@ -550,4 +552,160 @@ const { samples: estimate, convergence } = resynthesize(
   { iterations: 16 },
 );
 console.log(image.width, image.height, same.length, estimate.length, convergence[convergence.length - 1] < convergence[0]);
+```
+
+## WAV files without Web Audio
+
+`@margoengine/audio/wav` reads and writes RIFF WAVE files as plain bytes, so a stem or a mix can be made in Node, a
+worker or a build script with no `AudioContext` and no `OfflineAudioContext`. `decodeWav` returns the sample rate and
+one `Float32Array` per channel; `encodeWav` returns the file as a `Uint8Array` for `fs.writeFile` or a `Blob`.
+
+- Reads 8-bit (unsigned), 16, 24 and 32-bit PCM and 32 and 64-bit float, plain or `WAVE_FORMAT_EXTENSIBLE`, with any
+  number of channels; `LIST`, `bext`, `iXML` and other chunks are skipped; a file still being written (data size
+  `0xFFFFFFFF` or past the end) reads to its end.
+- Writes 16-bit PCM by default (`format: 'pcm8' | 'pcm16' | 'pcm24' | 'pcm32' | 'float32' | 'float64'`). More than two
+  channels, or 24 or 32-bit PCM or 64-bit float, get an extensible header with the usual channel mask (5.1 is `0x3F`).
+  Integer formats round to nearest, clamp (1.0 is the largest value, no wrap) and turn NaN into silence.
+- A file written then read back has the same samples, and writing what was read gives the same bytes. ffmpeg and
+  Python's `wave` module read the files it writes.
+- Not read: ADPCM, A-law, mu-law, compressed codecs inside WAV, and RF64 (over 4 GiB); they throw a coded error
+  ([errors#wav](https://margoengine.com/errors#wav)).
+- Sources: Microsoft and IBM, Multimedia Programming Interface and Data Specifications 1.0 (1991), for the RIFF and PCM
+  layout; Microsoft, Multiple Channel Audio Data and WAVE Files (2001), for `WAVE_FORMAT_EXTENSIBLE`; EBU Tech 3285
+  (Broadcast Wave Format) for the extra chunks; EBU Tech 3306 (RF64) for why files over 4 GiB are refused.
+
+```ts
+import { decodeWav, encodeWav } from '@margoengine/audio/wav';
+
+// A second of a 440 Hz tone in the left channel and 660 Hz in the right, written as a 24-bit stereo file.
+const rate = 48000;
+const tone = (hz: number) => Float32Array.from({ length: rate }, (_, i) => 0.5 * Math.sin((2 * Math.PI * hz * i) / rate));
+const file = encodeWav({ sampleRate: rate, channels: [tone(440), tone(660)] }, { format: 'pcm24' });
+// In Node: await writeFile('mix.wav', file)
+const audio = decodeWav(file);
+console.log(file.byteLength, audio.sampleRate, audio.channels.length, audio.channels[0].length, audio.format);
+```
+
+## Clipping and silence checks
+
+`@margoengine/audio/scan` checks decoded audio, in Node, a worker or a page, before it ships: a narration, a stem or a
+mix read with `decodeWav`.
+
+- `scanClipping(channels, sampleRate, { level?, run? })` finds every run of `run` (default 3) or more samples in a row
+  on one channel whose magnitude is at or over `level` of full scale (default 0.999). One full-scale sample is a peak,
+  not a clip; the level sits just under 1 so clipped audio that went through a lossy codec still counts. Returns
+  `{ runs, clippedSamples, peak }`, each run `{ channel, startSample, length, start, end }` with times in seconds.
+- `findSilences(samples, sampleRate, { floorDb?, minSeconds?, window?, spans? })` finds runs of windows (default 10 ms)
+  whose level is under `floorDb` (default -50 dBFS) lasting at least `minSeconds` (default 2), only inside `spans`
+  (`[start, end]` seconds) when given; a silence never crosses a span's edge. The level is the mean square of all
+  channels in dBFS as AES17 defines it (a full-scale sine is 0 dBFS). Returns `{ start, end, duration, level }` per
+  silence, `level` being its loudest window. Edges are found to within one window.
+- `samples` and `channels` take one channel or an array of them (Float32Array or number arrays, all one length).
+- Loudness and true peak are `@margoengine/mixer/loudness`'s job (ITU-R BS.1770, EBU R 128).
+- Web rivals: Tone.js and Howler meter live playback only and wavesurfer.js draws peaks; none scans decoded audio for
+  clips or silences. ffmpeg's `silencedetect` and `astats` filters are the command-line equivalent.
+- Sources: AES17-2020 (full scale and dBFS); IEC 61606-3 and EBU Tech 3341 (sample and true peak); Aleinik, Matveev
+  and Raev, "Detection of clipped fragments in speech signals" (2014), and Eaton and Naylor, "Detection of clipping in
+  coded speech signals" (EUSIPCO 2013), for runs at the rail rather than single peaks; ITU-R BS.1770-5 (levels over
+  short blocks of all channels); ITU-T P.56 (2011) for speech activity with a hangover, which `minSeconds` plays.
+
+```ts
+import { decodeWav, encodeWav } from '@margoengine/audio/wav';
+import { findSilences, scanClipping } from '@margoengine/audio/scan';
+
+// Two seconds of speech-like tone, four seconds of near silence, then a tone driven past full scale.
+const rate = 48000;
+const tone = (seconds: number, gain: number) =>
+  Float32Array.from({ length: seconds * rate }, (_, i) => Math.max(-1, Math.min(1, gain * Math.sin((2 * Math.PI * 220 * i) / rate))));
+const voice = new Float32Array(8 * rate);
+voice.set(tone(2, 0.3), 0);
+voice.set(tone(2, 2), 6 * rate);
+// In Node: decodeWav(await readFile('narration.wav'))
+const { channels, sampleRate } = decodeWav(encodeWav({ sampleRate: rate, channels: [voice] }));
+const clips = scanClipping(channels, sampleRate);
+const silences = findSilences(channels, sampleRate, { floorDb: -50, minSeconds: 3, spans: [[0, 8]] });
+console.log(clips.runs.length, clips.runs[0].start.toFixed(3), silences.map((s) => [s.start, s.end]));
+```
+
+## Sample rates and channel layouts without Web Audio
+
+`@margoengine/audio/resample` converts decoded audio to another sample rate and channel count on plain `Float32Array`
+channels, in Node, a worker or a page, with no `AudioContext`, `OfflineAudioContext` or ffmpeg: a take recorded at 44.1
+kHz joins a 48 kHz narration read with `decodeWav`.
+
+- `resample(audio, sampleRate, { channels?, zeroCrossings?, rolloff?, attenuation? })` takes `{ sampleRate, channels }`
+  (what `decodeWav` returns) and gives the same shape at the new rate. Each output sample is a sum of input samples
+  weighted by a Kaiser-windowed sinc centred on its time (bandlimited interpolation); when the rate goes down the sinc
+  widens so it also removes what the new rate cannot hold, and nothing folds back. The output holds
+  `ceil(length * sampleRate / input rate)` samples, so one second stays one second; samples past either end count as
+  silence. The same rate copies the samples.
+- Defaults: `zeroCrossings` 32 (4 to 256) on each side, `rolloff` 0.92 (0.5 to 1) of the lower Nyquist frequency,
+  `attenuation` 90 dB (40 to 160) for the Kaiser window. At these a 1 kHz tone taken from 44.1 to 48 kHz is within
+  -80 dB of the exact sine, the response is flat within 0.1 dB to 0.86 of the lower Nyquist frequency (19.0 kHz for
+  44.1 kHz to 48 kHz), and a tone at or above the lower Nyquist frequency comes out at least 90 dB down (tests in
+  `tests/resample.test.js`).
+- `channels` mixes by `mixChannels(channels, count)`, also exported: the Web Audio speaker rules for mono, stereo, quad
+  and 5.1 up and down (5.1 to stereo puts the centre and surrounds in at -3 dB and drops the LFE), and a discrete copy
+  for any other pair (channels in order, missing ones silent, extra ones dropped).
+- Rates are whole numbers from 1 to 768000; a bad rate or option throws a coded error
+  ([errors#audio-resample](https://margoengine.com/errors#audio-resample)).
+- Web rivals: Tone.js, Howler and the Web Audio API itself resample only through an `AudioContext` or
+  `OfflineAudioContext`, so not in Node; ffmpeg's `aresample` (swr) is the command-line equivalent.
+- Sources: J. O. Smith III and P. Gossett, "A flexible sampling-rate conversion method", ICASSP 1984, and J. O. Smith
+  III, Digital Audio Resampling Home Page (CCRMA, Stanford), for bandlimited interpolation from a filter table read
+  with linear interpolation; R. E. Crochiere and L. R. Rabiner, Multirate Digital Signal Processing (Prentice Hall,
+  1983), for the lowpass at the lower Nyquist rate; J. F. Kaiser, "Nonrecursive digital filter design using the
+  I0-sinh window function", ISCAS 1974, and Oppenheim and Schafer, Discrete-Time Signal Processing, 3rd ed. (2010),
+  section 7.6, for the window and its beta; Laakso, Valimaki, Karjalainen and Laine, "Splitting the unit delay", IEEE
+  Signal Processing Magazine 13(1), 1996, doi:10.1109/79.482137, for why Lagrange and allpass interpolators were not
+  used; W3C Web Audio API (2021), "Channel Up-Mixing and Down-Mixing", for the speaker rules.
+
+```ts
+import { decodeWav, encodeWav } from '@margoengine/audio/wav';
+import { resample } from '@margoengine/audio/resample';
+
+// A second of a 1 kHz mono take at 44.1 kHz, laid into a 48 kHz stereo voice.
+const tone = Float32Array.from({ length: 44100 }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 1000 * i) / 44100));
+// In Node: decodeWav(await readFile('take.wav'))
+const take = decodeWav(encodeWav({ sampleRate: 44100, channels: [tone] }, { format: 'float32' }));
+const voice = resample(take, 48000, { channels: 2 });
+console.log(voice.sampleRate, voice.channels.length, voice.channels[0].length); // 48000 2 48000
+```
+
+## Time-stretch at the same pitch
+
+`@margoengine/audio/stretch` makes decoded audio longer or shorter without changing its pitch, on plain `Float32Array`
+channels in Node, a worker or a page: a narration section or a recorded take made a few percent faster or slower to
+fit its slot. The mixer's pitch shift is a real-time effect that changes pitch, not length; this changes length.
+
+- `timeStretch(audio, factor, { frameMs?, toleranceMs? })` takes `{ sampleRate, channels }` (what `decodeWav`
+  returns) and returns the same shape, `round(length * factor)` samples long: `1.05` is 5 % longer (slower), `0.95` is
+  5 % shorter (faster), from `0.25` to `4`. A factor of 1 copies the samples.
+- It is WSOLA (waveform similarity overlap-add): Hann-windowed frames of `frameMs` (default 40, 10 to 200) are laid
+  half a frame apart in the output, each taken from near its place in the input, moved by up to `toleranceMs` (default
+  10, 1 to 50) to where its waveform best continues the frame before it, so periods line up and the pitch stays. Every
+  channel uses the same frame positions, chosen on their mean, so the stereo image stays put.
+- Tested on tones and chords: the pitch stays within 0.2 % and the level within 2 % at factors 0.8 to 1.25, and the
+  period of a two-note chord is unchanged (`tests/stretch.test.js`). WSOLA suits speech; for music with strong
+  transients and many voices a phase vocoder can sound better (Driedger and Mueller 2016), and it is not offered here.
+- A bad factor or option throws a coded error ([errors#audio-stretch](https://margoengine.com/errors#audio-stretch)).
+- Web rivals: Tone.js `GrainPlayer` and the `playbackRate` of Howler and `<audio>` (with `preservesPitch`) stretch
+  while playing, in a page; none returns stretched samples offline in Node. ffmpeg's `atempo` and `rubberband` filters
+  are the command-line equivalent.
+- Sources: W. Verhelst and M. Roelands, "An overlap-add technique based on waveform similarity (WSOLA) for high quality
+  time-scale modification of speech", ICASSP 1993, doi:10.1109/ICASSP.1993.319366; S. Roucos and A. M. Wilgus, "High
+  quality time-scale modification for speech", ICASSP 1985, doi:10.1109/ICASSP.1985.1168381; J. Driedger and M.
+  Mueller, "A Review of Time-Scale Modification of Music Signals", Applied Sciences 6(2):57, 2016,
+  doi:10.3390/app6020057; compared and not used: J. L. Flanagan and R. M. Golden, "Phase vocoder", BSTJ 45(9), 1966,
+  doi:10.1002/j.1538-7305.1966.tb01706.x, and J. Laroche and M. Dolson, "Improved phase vocoder time-scale
+  modification of audio", IEEE TSAP 7(3), 1999, doi:10.1109/89.759041.
+
+```ts
+import { timeStretch } from '@margoengine/audio/stretch';
+
+// Two seconds of a 220 Hz tone made 5 % shorter to fit its slot, at the same pitch.
+const rate = 48000;
+const take = { sampleRate: rate, channels: [Float32Array.from({ length: 2 * rate }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 220 * i) / rate))] };
+const fitted = timeStretch(take, 0.95);
+console.log(fitted.channels[0].length / rate); // 1.9
 ```

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 
 // Margo-made rig written by packages/animation/scripts/make-rig-fixture.js (see its fixtures README).
 const fixture = 'packages/animation/tests/fixtures/tentacle-rig.glb',
@@ -51,7 +51,7 @@ try {
   const result = await page.evaluate(
     async ({ doc, buffers, url }) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
-        { parseGLTF, loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+        { parseGLTF, loadGLTF } = await import('/packages/gltf/dist/pbr.js'),
         { Animation } = await import('/packages/animation/dist/index.js');
       const assert = (ok, message) => {
         if (!ok) throw new Error(message);

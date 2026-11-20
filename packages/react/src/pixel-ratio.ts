@@ -1,3 +1,4 @@
+import { rangeError } from '../../shared/errors.js';
 // Per-Canvas `maxDpr`, built on the one pixel-ratio control core has: `globalThis.margoLow` (the light tier's cap, which
 // also drops MSAA). Core takes no per-canvas option and is frozen, so the cap is page-wide while a Canvas holds it.
 declare global {
@@ -18,7 +19,7 @@ function apply(): void {
  */
 export function capPixelRatio(value: number): () => void {
   if (typeof value !== 'number' || !(value > 0) || !Number.isFinite(value))
-    throw new RangeError(`Canvas maxDpr must be a number above 0 (got ${String(value)}); try maxDpr={1}`);
+    throw rangeError(`Canvas maxDpr must be a number above 0 (got ${String(value)}); try maxDpr={1}`, 'react-arguments');
   if (value >= 2) return () => {};
   const hold = { value };
   if (!holds.size) saved = globalThis.margoLow;

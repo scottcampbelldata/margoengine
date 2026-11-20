@@ -154,7 +154,7 @@
    "max": 8,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 match outside output"
+    "message": "USD: LZ4 match outside output; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -163,7 +163,7 @@
    "max": 8,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 match outside output"
+    "message": "USD: LZ4 match outside output; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -172,7 +172,7 @@
    "max": 9,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 literals overflow"
+    "message": "USD: LZ4 literals overflow; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -181,7 +181,7 @@
    "max": 11,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 match outside output"
+    "message": "USD: LZ4 match outside output; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -190,7 +190,7 @@
    "max": 20,
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated LZ4 block"
+    "message": "USD: truncated LZ4 block; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -199,7 +199,7 @@
    "max": 5,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 literals overflow"
+    "message": "USD: LZ4 literals overflow; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -208,7 +208,7 @@
    "max": 8,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 match outside output"
+    "message": "USD: LZ4 match outside output; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -217,7 +217,7 @@
    "max": 8,
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated LZ4 block"
+    "message": "USD: truncated LZ4 block; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -226,7 +226,7 @@
    "max": 30,
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated LZ4 block"
+    "message": "USD: truncated LZ4 block; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -235,7 +235,7 @@
    "max": 10,
    "result": {
     "name": "LoaderError",
-    "message": "USD: empty compressed block"
+    "message": "USD: empty compressed block; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -260,7 +260,7 @@
    "max": 4,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 chunk outside block"
+    "message": "USD: LZ4 chunk outside block; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -269,7 +269,7 @@
    "max": 4,
    "result": {
     "name": "LoaderError",
-    "message": "USD: LZ4 chunk outside block"
+    "message": "USD: LZ4 chunk outside block; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -278,7 +278,7 @@
    "max": 3,
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated LZ4 chunk"
+    "message": "USD: truncated LZ4 chunk; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {

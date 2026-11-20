@@ -383,3 +383,32 @@ test('after a device restore the mesh draws from a new buffer with the frame on 
   near([height(player, writes)], [1], 1e-5);
   player.dispose();
 });
+
+// GAP-FILM-TIME: a player started at film time T shows the frame a continuous run shows at T. Run A takes n + 1 live
+// updates; run B replays n steps with `advanceTime` (what `seek` from @margoengine/cutscene/seek runs), then one.
+for (const n of [1, 600, 54000])
+  for (const loop of [true, false])
+    test(`a held cache replayed ${n} steps (loop ${loop}) shows the frame of a continuous run`, async (t) => {
+      const file = encodeGeometryCache(10, [fan(4, 3), { frameCount: 3, positions: fan(4, 3, 3).positions }]),
+        make = async () => {
+          const { engine, writes } = await gpuEngine(t),
+            player = await GeometryCachePlayer.attach(engine, file, { loop, speed: 1.5 });
+          await player.done;
+          t.after(() => player.dispose());
+          return { player, writes };
+        };
+      const a = await make(),
+        b = await make();
+      assert.equal(b.player.time, 0);
+      for (let i = 0; i <= n; i++) a.player.onPreUpdate(1 / 60);
+      for (let i = 0; i < n; i++) b.player.advanceTime(1 / 60);
+      const uploads = b.player.stats.uploads;
+      b.player.onPreUpdate(1 / 60);
+      assert.ok(b.player.stats.uploads > uploads, 'the live update shows the frame reached');
+      assert.ok(Object.is(b.player.time, a.player.time), `time ${b.player.time} != ${a.player.time}`);
+      assert.equal(b.player.playing, a.player.playing);
+      assert.deepEqual(
+        [...b.writes.get(b.player.model.primitives[0].deformed)],
+        [...a.writes.get(a.player.model.primitives[0].deformed)],
+      );
+    });

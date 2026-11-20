@@ -193,6 +193,8 @@ export const INVERSE_TRIG_IMPLAUSIBLE = 0.01;
 
 export const INVERSE_TRIG_PROBE: readonly (readonly [number, number, number])[];
 
+export const INVERSE_TRIG_SMOOTH = 65;
+
 export const INVERSE_TRIG_TOLERANCE = 0.00001;
 
 export interface IOAttributes {
@@ -639,7 +641,9 @@ function floatLiteral(v: number): string;
 export { encodeName as glslName };
 function encodeName(name: string): string;
 
-export function inverseTrigError(results: ArrayLike<number>): number;
+export function inverseTrigError(results: ArrayLike<number>, count?: number): number;
+
+export function inverseTrigVerdict(results: ArrayLike<number>): boolean;
 
 export function parseWGSL(source: string): ModuleAst;
 

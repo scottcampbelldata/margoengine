@@ -38,18 +38,18 @@ function checkHue(options: HueGradeOptions): void {
     );
 }
 
-const hueCode = `
-fn shiftGradeHue(c:vec3f)->vec3f {
+const hueCode = (b: number) => `
+fn shiftGradeHue${b}(c:vec3f)->vec3f {
  let hi=max(c.r,max(c.g,c.b));let lo=min(c.r,min(c.g,c.b));let d=hi-lo;
  if(d==0.0){return c;}
  var h:f32;
  if(hi==c.r){h=(c.g-c.b)/d;}else if(hi==c.g){h=2.0+(c.b-c.r)/d;}else{h=4.0+(c.r-c.g)/d;}
  h=fract(h/6.0+1.0)*360.0;
- let n=i32(grading.hueControl.y);var offset=grading.hueControl.x;
+ let n=i32(grading${b}.hueControl.y);var offset=grading${b}.hueControl.x;
  if(n>0){
-  var a=grading.huePoints[n-1].xy-vec2f(360,0);var b=grading.huePoints[0].xy;
-  for(var i=0;i<n;i++){let p=grading.huePoints[i].xy;
-   if(h>=p.x){a=p;b=grading.huePoints[0].xy+vec2f(360,0);if(i+1<n){b=grading.huePoints[i+1].xy;}}
+  var a=grading${b}.huePoints[n-1].xy-vec2f(360,0);var b=grading${b}.huePoints[0].xy;
+  for(var i=0;i<n;i++){let p=grading${b}.huePoints[i].xy;
+   if(h>=p.x){a=p;b=grading${b}.huePoints[0].xy+vec2f(360,0);if(i+1<n){b=grading${b}.huePoints[i+1].xy;}}
   }
   offset+=mix(a.y,b.y,(h-a.x)/(b.x-a.x));
  }
@@ -61,22 +61,32 @@ fn shiftGradeHue(c:vec3f)->vec3f {
 
 /**
  * Grade with hue shift and hue-against-hue, after wheels/curves/saturation and before a LUT.
- * Use instead of Grade in Tonemap.extensions. HSV rotation retains channel minimum/maximum and greys.
+ * Use instead of Grade in Tonemap.extensions, or after one: several Grade and HueGrade extensions apply in order.
+ * HSV rotation retains channel minimum/maximum and greys.
  * @throws RangeError for invalid Grade or hue controls; correct the options before the next frame.
  */
 export class HueGrade extends Grade {
-  override readonly key = 'grade-hue';
-  private readonly hueBuffer = new Float32Array(20 + 4 * 33 + 4 + 4 * 64);
+  // Room for Grade's values with its primaries (lift, gamma, gain), the hue control and the 64 hue points.
+  private readonly hueBuffer = new Float32Array(32 + 4 * 33 + 4 + 4 * 64);
+  // What values() returns, without and with the primaries: the same two views every frame, so a frame allocates nothing.
+  private readonly hueViews = [20, 32].map((n) => this.hueBuffer.subarray(0, n + 4 * 33 + 4 + 4 * 64));
+  override get key(): string {
+    return this.tone() ? 'grade-hue:tone' : 'grade-hue';
+  }
   constructor(override readonly options: HueGradeOptions = {}) {
     super(options);
     checkHue(options);
   }
   override patch(shader: string, binding: number): string {
+    // Only this extension's own code is edited: an earlier Grade or HueGrade in the shader keeps its own.
+    const patched = super.patch(shader, binding),
+      at = patched.lastIndexOf(`\nstruct Grade${binding} {`);
     return (
-      super
-        .patch(shader, binding)
-        .replace('curve:array<vec4f,33>}', 'curve:array<vec4f,33>,hueControl:vec4f,huePoints:array<vec4f,64>}')
-        .replace('return c+extra;', 'return shiftGradeHue(c)+extra;') + hueCode
+      patched.slice(0, at) +
+      patched
+        .slice(at)
+        .replace(/(curve:array<vec4f,33>(?:,lift:vec4f,gamma:vec4f,gain:vec4f)?)\}/, '$1,hueControl:vec4f,huePoints:array<vec4f,64>}')
+        .replace('return c+extra;', `return shiftGradeHue${binding}(c)+extra;`) + hueCode(binding)
     );
   }
   override values(): Float32Array {
@@ -89,6 +99,6 @@ export class HueGrade extends Grade {
     v[base.length] = this.options.hueShift ?? 0;
     v[base.length + 1] = points.length;
     points.forEach((p, i) => v.set(p, base.length + 4 + i * 4));
-    return v;
+    return this.hueViews[+(base.length > 20 + 4 * 33)];
   }
 }

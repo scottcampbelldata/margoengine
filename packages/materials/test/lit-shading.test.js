@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Material, createMesh, materialShader } from '../dist/index.js';
-import { pbrShader, extendedPBRShader } from '../../gltf-pro/src/shader.ts';
+import { pbrShader, extendedPBRShader } from '../../gltf/src/shader.ts';
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { Shadows } from '../../shadows/dist/index.js';
 import { Clustered } from '../../clustered/dist/index.js';
@@ -66,7 +66,7 @@ test('lambert and phong rewrite only the direct and hemisphere terms and keep ev
     assert.match(phong, /@group\(2\) @binding\(197\) var<uniform> mat_phong:vec4f;/);
     assert.ok(phong.includes('mat_phong.rgb*(mat_phong.w+2)/25.13274123*pow(max(dot(s.n,h),0.0001),mat_phong.w)'));
     assert.ok(phong.includes('fn surface(i:Out,front:bool)->Surface {\n  _=mat_phong;'), 'G-buffer keeps the layout');
-    // Shadows, clustered lights, an IBL ambient and fog compose at gltf-pro's hook points.
+    // Shadows, clustered lights, an IBL ambient and fog compose at gltf/pbr's hook points.
     const ibl = { declarations: '// ibl\n', ambient: 'iblShade(s.n,v,s.base.rgb,s.metal,s.roughness)*s.occlusion' },
       fog = { declarations: '// fog\n', output: (c) => `fog(${c})` },
       body = [new Shadows().pbr(2), new Clustered().pbr(2), ibl, fog].reduce(lightPBR, phong);

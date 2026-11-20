@@ -1,5 +1,5 @@
 // Real-GPU check of DOFLens and Autofocus on the WebGL2 compatibility layer (`@margoengine/webgl2-compat`,
-// install({force: true})). Takes a GPU slot itself. From the repository root, after building packages:
+// install({force: true})). From the repository root, after building packages:
 //   node packages/dof/tests/gpu/compat-check.mjs
 // Each case of lens.js draws natively and on the layer, on the same GPU and browser, and the canvases are compared
 // with the layer roadmap's measure (decision 4: at most 0.1% of pixels with d > 2, mean d at most 0.25, d the largest
@@ -11,12 +11,10 @@
 // both. Temporal DOF also draws on the layer through independent half-image and tile-max passes.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
 const MAX_SHARE = 0.001,
   MAX_MEAN = 0.25;
-const release = await acquire({ owner: 'dof-compat' });
 const context = await openBrowser({ startPath: '/packages/dof/tests/gpu/lens.html', port: 5289, compat: false }),
   { page } = context;
 try {
@@ -74,6 +72,10 @@ try {
     ['focus 1x', 'tilt', [null, 11.53, 32, true]],
     ['anamorphic', 'optics', [0, 0, 0, 2, 6]],
     ['cat eye', 'optics', [0.9, 0.9, 1.5, 1, undefined, 0.03]],
+    // The near gather's mip chain and trilinear sampler on the layer, over a one-sample capture: the floor's horizon
+    // crosses the whole frame, and along silhouettes a multisampled capture differs by method (the layer reads one
+    // sample of multisampled depth; docs/limits.md, "DOF on the WebGL2 layer"), 0.13% of this frame's pixels.
+    ['receding', 'receding', [true, true]],
   ];
   const run = async (mode) => {
     await page.goto(`${origin}/packages/dof/tests/gpu/lens.html?mode=${mode}`);
@@ -123,7 +125,6 @@ try {
   assert.deepEqual(pageErrors, []);
   console.log('dof compat check passed');
 } finally {
-  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hold the GPU slot past 15 s
+  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hang past 15 s
   await Promise.race([context.close(), new Promise((resolve) => setTimeout(resolve, 15000).unref())]);
-  release();
 }

@@ -20,7 +20,7 @@ export interface DepthTextureProps extends DepthTextureOptions, ErrorProps {
  * is the live plugin, whose `texture` (reversed-Z depth) and `distance` (world distance) follow resizes. PBR models in
  * the Canvas are added for you. `order` is fixed. WebGPU only.
  */
-export const DepthTexture = forwardRef<DepthPlugin, DepthTextureProps>(function DepthTexture(
+export const DepthTexture = /* @__PURE__ */ forwardRef<DepthPlugin, DepthTextureProps>(function DepthTexture(
   { order, onResize, onError },
   ref,
 ) {
@@ -53,7 +53,7 @@ export interface SceneTargetsProps extends SceneTargetsOptions, ErrorProps {}
  * own WGSL). The ref is the live plugin: `texture(name)` and `depth`. PBR models are added for you. Changing `outputs`
  * (by value) or `order` recreates the targets. WebGPU only.
  */
-export const SceneTargets = forwardRef<TargetsPlugin, SceneTargetsProps>(function SceneTargets(
+export const SceneTargets = /* @__PURE__ */ forwardRef<TargetsPlugin, SceneTargetsProps>(function SceneTargets(
   { outputs, order, onError },
   ref,
 ) {

@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export { PlaybackAnimation as Animation };
 class PlaybackAnimation extends BaseAnimation {
@@ -18,6 +18,7 @@ class PlaybackAnimation extends BaseAnimation {
     setLoop(mode: ActionLoop, repetitions?: number): this;
     seek(time: number): this;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     on<K extends keyof PlaybackEventMap>(type: K, listener: (event: PlaybackEventMap[K]) => void, options?: {
         signal?: AbortSignal;
     }): () => void;
@@ -46,6 +47,7 @@ export class PlaybackAnimation extends BaseAnimation {
     setLoop(mode: ActionLoop, repetitions?: number): this;
     seek(time: number): this;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     on<K extends keyof PlaybackEventMap>(type: K, listener: (event: PlaybackEventMap[K]) => void, options?: {
         signal?: AbortSignal;
     }): () => void;
@@ -100,6 +102,7 @@ class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

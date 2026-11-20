@@ -84,14 +84,14 @@ test('hygiene runs the check and every open site cites its known-bugs entry', ()
 });
 
 // The sites list 5 batch I1 fixed with the check (main's lane E fixed creative, labels, points, tiles, lod/auto,
-// materials batched and nodes, rigging, usdz, gltf-pro, mcp, scatter and html before it), each now detaching from its
+// materials batched and nodes, rigging, usdz, gltf/pbr, mcp, scatter and html before it), each now detaching from its
 // own scene. A site that goes back to the active-scene form fails the test above; this list keeps the count honest if
 // a file moves.
 const FIXED = {
   clustered: ['area-texture', 'area', 'contact', 'directional', 'ies', 'index', 'layers', 'projector', 'shadows', 'shapes', 'stochastic'],
   lighting2d: ['cookie', 'emissive', 'gi', 'height', 'soft'],
   materials: ['stencil-buffer'],
-  scenery: ['backdrop'],
+  sky: ['night-backdrop'],
   selection: ['picking'],
   shadows: ['index', 'virtual'],
   tilemap: ['iso', 'objects', 'renderer'],

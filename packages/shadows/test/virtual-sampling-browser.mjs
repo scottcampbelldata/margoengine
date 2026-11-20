@@ -8,12 +8,10 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const BAND = 2,
   AGREEMENT = 0.999;
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-virtual-sampling' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/virtual-sampling.html', port: 5268 }),
   { page } = context,
   pageErrors = [];
@@ -155,5 +153,4 @@ try {
   console.log('shadows virtual sampling: ok');
 } finally {
   await context.close?.();
-  await release?.();
 }

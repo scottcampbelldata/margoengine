@@ -21,7 +21,7 @@ declare const GPUMapMode: { READ: number };
 /** Screen-space density styling. Counts never depend on these choices. */
 export interface DensityStyle {
   /** 'count' (default) or a separable Gaussian over pixel counts. */ readonly mode?: 'count' | 'kernel';
-  /** Gaussian standard deviation in drawing-buffer pixels, (0,32]. Default 4. */ readonly bandwidth?: number;
+  /** Gaussian standard deviation in CSS pixels, (0,32]. Default 4. */ readonly bandwidth?: number;
   /** Opacity of one count, [0,1]. Default 0.08. Coincident marks use 1-(1-opacity)^count. */ readonly opacity?: number;
   /** sRGB colour. Default '#56b4e9'. */ readonly color?: string;
 }
@@ -33,7 +33,7 @@ export interface DensityOptions extends DensityStyle {
 /** Bounded asynchronous readback of the last rendered integer histogram, top row first. */
 export interface DensityReadOptions {
   readonly signal?: AbortSignal;
-  /** Hard deadline in milliseconds. Default 30000. */ readonly timeout?: number;
+  /** Hard deadline in milliseconds, in (0, 2147483647]. Default 30000. */ readonly timeout?: number;
 }
 interface Chunk {
   buffer: GPUBuffer;
@@ -378,7 +378,8 @@ export class DensityLayer implements Drawable {
     const linear = rgb.slice(0, 3).map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
     const alpha = opacity * rgb[3];
     next.set([...linear, alpha === 1 ? -1 : -Math.log1p(-alpha)], 24);
-    next.set([context.width, context.height, bandwidth, mode === 'kernel' ? 1 : 0], 28);
+    // The bandwidth is CSS pixels: the target's pixels per CSS pixel turn it into target pixels (SciRenderer.cssScale).
+    next.set([context.width, context.height, bandwidth * this.#renderer.cssScale(context.width), mode === 'kernel' ? 1 : 0], 28);
     this.#uniform.set(next);
     this.#device!.queue.writeBuffer(this.#params!, 0, next);
     if (this.#dirty) {
@@ -434,8 +435,9 @@ export class DensityLayer implements Drawable {
   async readCounts(options: DensityReadOptions = {}): Promise<Uint32Array> {
     this.#check();
     const timeout = options.timeout ?? 30000;
-    if (!Number.isFinite(timeout) || timeout <= 0)
-      throw rangeError('Density read timeout must be finite and positive', 'sciviz');
+    // Node fires a longer AbortSignal.timeout after 1 ms and WebIDL throws above 2^53-1, so bound it here.
+    if (!Number.isFinite(timeout) || timeout <= 0 || timeout > 0x7fffffff)
+      throw rangeError('Density read timeout in (0, 2147483647] ms', 'sciviz');
     const signal = AbortSignal.any([
       this.#lifetime.signal,
       AbortSignal.timeout(Math.ceil(timeout)),

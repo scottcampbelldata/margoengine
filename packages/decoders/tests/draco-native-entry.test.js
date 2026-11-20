@@ -125,12 +125,26 @@ test('optional Draco entry: corrupt data returns coded errors, frees allocations
   assert.equal(module.memory.buffer.byteLength, settled);
 });
 
+/** Hide Node from the decoders for one synchronous call, as an edge runtime without workers looks. */
+const withoutNode = (run) => {
+  const saved = Object.getOwnPropertyDescriptor(process.versions, 'node');
+  Object.defineProperty(process.versions, 'node', { value: undefined, configurable: true });
+  try {
+    return run();
+  } finally {
+    Object.defineProperty(process.versions, 'node', saved);
+  }
+};
+
 test('optional Draco constructors are lazy and SSR safe; invalid options fail before input transfer', async () => {
   const mesh = new DracoDecoder(),
     points = new DracoPointsDecoder();
   try {
-    await assert.rejects(mesh.decode(fixture('NormalizedTriangle.bin')), (e) => e.code === 'unsupported');
-    await assert.rejects(points.decode(fixture('draco-points/survey.drc')), (e) => e.code === 'unsupported');
+    // Without workers outside Node they refuse by name; Node decodes in this thread (tests/draco-node.test.js).
+    const meshDecode = withoutNode(() => mesh.decode(fixture('NormalizedTriangle.bin'))),
+      pointsDecode = withoutNode(() => points.decode(fixture('draco-points/survey.drc')));
+    await assert.rejects(meshDecode, (e) => e.code === 'unsupported');
+    await assert.rejects(pointsDecode, (e) => e.code === 'unsupported');
     assert.throws(() => new DracoDecoder({ workerLimit: 0 }), RangeError);
     assert.throws(() => new DracoPointsDecoder({ timeout: 0 }), RangeError);
   } finally {

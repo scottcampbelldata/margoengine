@@ -58,7 +58,9 @@ const symbolOf = (index: number) => (index ? `material-${index}` : 'material');
  * takes one `<instance_geometry>` a node, and one material per shared material: `constant` for unlit, `lambert` for `shading:
  * 'lambert'`, `phong` with its `specular` and `shininess` for `shading: 'phong'`; a standard material becomes
  * `lambert` when it is a rough dielectric (roughness 1, metalness 0), else an equivalent `phong`. Each has a base
- * color or texture and transparency for MASK and BLEND. Image paths are relative to the document; the image files come back in `textures`. Static pose only:
+ * color or texture and transparency for MASK and BLEND. A loaded model's glTF lines are a `<lines>` group of the node's
+ * geometry (COLLADA 1.4.1 section 4, "lines"), after its triangles; COLLADA has no point primitive, so its points are
+ * left out and `onWarning` says so. Image paths are relative to the document; the image files come back in `textures`. Static pose only:
  * skins, morph targets, animation, cameras and lights are not written.
  */
 export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAEResult {
@@ -66,7 +68,8 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
   if (colorSpace !== 'srgb' && colorSpace !== 'linear') throw new TypeError("colorSpace must be 'srgb' or 'linear'");
   const pixelArt = pixelArtOf(options.pixelArt),
     files = textureFiles(options.texturePrefix ?? ''),
-    roots = collect(source, options),
+    // COLLADA 1.4.1 has `<lines>` (and `<linestrips>`) inside `<mesh>` but no point primitive: points still warn.
+    roots = collect(source, options, undefined, 'refuse', ['lines']),
     encode = colorSpace === 'srgb' ? toSrgb : same;
   if (!roots.length) throw new TypeError('DAE export needs a visible node; a COLLADA visual scene cannot be empty');
   const images = new Map<string, string>(),
@@ -213,7 +216,7 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
     const shared = `<input semantic="VERTEX" source="#${id}-vertices" offset="0"/>${inputs.join('')}`;
     let base = 0;
     const groups = geos.map((geo, index) => {
-      const faces = polygons(geo.faceSizes, geo.indices),
+      const faces = geo.topology ? [] : polygons(geo.faceSizes, geo.indices),
         symbol = symbolOf(index),
         start = base,
         p = `<p>${faces
@@ -221,6 +224,8 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
           .map((corner) => corner + start)
           .join(' ')}</p>`;
       base += vertexCount(geo);
+      if (geo.topology === 'lines')
+        return `<lines material="${symbol}" count="${geo.indices.length / 2}">${shared}<p>${Array.from(geo.indices, (v) => v + start).join(' ')}</p></lines>`;
       return faces.some((face) => face.length === 4)
         ? `<polylist material="${symbol}" count="${faces.length}">${shared}<vcount>${faces.map((f) => f.length).join(' ')}</vcount>${p}</polylist>`
         : `<triangles material="${symbol}" count="${faces.length}">${shared}${p}</triangles>`;
@@ -239,8 +244,10 @@ export function exportDAE(source: ExportSource, options: DAEOptions = {}): DAERe
       m = n.local,
       rows = [0, 1, 2, 3].flatMap((r) => [m[r], m[4 + r], m[8 + r], m[12 + r]]);
     let out = `<node id="${id}"${named(n.name, id)} type="NODE"><matrix sid="transform">${rows.map(num).join(' ')}</matrix>`;
-    const parts: { geometry: Geo; material?: Mat }[] =
-      n.primitives ?? (n.geometry ? [{ geometry: n.geometry, material: n.material }] : []);
+    const parts: { geometry: Geo; material?: Mat }[] = [
+      ...(n.primitives ?? (n.geometry ? [{ geometry: n.geometry, material: n.material }] : [])),
+      ...(n.lines ?? []),
+    ];
     if (parts.length) {
       const geos = parts.map(({ geometry: part, material: mat }) => {
           const geo = shape(n, part);

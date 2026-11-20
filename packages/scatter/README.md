@@ -15,8 +15,10 @@ produce `[x,z,scale,yaw]` tuples at initialization. Submit them to a shared
 world height, and applies a vertical offset (negative values sink roots).
 `placementBounds(placements,radius)` produces enclosing world XZ rectangles.
 `clearPlacements(candidates,radius,exclusions,gap)` accepts rectangle exclusions
-`[minX,minZ,maxX,maxZ]` and circle exclusions `[x,z,radius]`; the optional gap
-defaults to 0. These initialization helpers preserve their inputs and validate
+`[minX,minZ,maxX,maxZ]`, circle exclusions `[x,z,radius]` and ground paths
+`{points: [[x, z], ...], width}` (a road, track or river bed: a footprint must stay more than `width / 2` from every
+segment of the centreline, the point to segment distance of Ericson, "Real-Time Collision Detection", 2005, 5.1.2);
+the optional gap defaults to 0. These initialization helpers preserve their inputs and validate
 height samples, scales and exclusion data.
 
 WebGPU seeded, stratified placement with density, world-height and slope rules. Compute culling packs instances into three distance LOD rings, followed by indexed indirect draws.
@@ -94,7 +96,7 @@ buried on the downhill side of steep ground. Both read the same bilinear patch
 of the heightmap as placement. Each instance keeps 32 bytes: position and scale,
 then yaw, the ground normal's X and Z packed into one float, and the LOD fade.
 
-`blades: { rootShade, widen }` shades instances as grass blades: upright meshes
+`blades: { rootShade, widen, translucency }` shades instances as grass blades: upright meshes
 whose local origin is the root and whose tallest vertex is the tip. Albedo darkens
 linearly toward the root (`rootShade`, default 0.5, is the fraction lost there).
 The shading normal blends from the ground normal at the root to the blade's own
@@ -106,6 +108,9 @@ LOD distance, so thin far blades stay about a pixel wide instead of shimmering.
 Lit and unlit scatter both support it; without `blades` the lit shader keeps
 core's shading normal untouched. Cost: one distance per vertex, one extra varying,
 and one mix and normalize per fragment.
+`translucency` (0-1, default 0) lets the sun through the blades, with the same wrapped back-light translucency
+as `ScatterBatch.translucency` (Barre-Brisebois and Bouchard, GDC 2011): blades glow against a low sun instead of
+reading as flat card; 0 leaves the lit shader as it was.
 
 LOD meshes must use matching origins, scale and shading. For procedural rocks,
 pass `true` as the third argument to `icosahedronGeometry(radius, detail, true)`
@@ -120,7 +125,7 @@ and water, so water refraction and depth occlusion include grass and rocks.
 
 `shadows.add(scatter)` (`@margoengine/shadows`) makes GPU `Scatter` and
 `ScatterTiles` cast: `drawShadow` draws each LOD ring's instances into every
-cascade, depth only, with the colour pass's pose, ground fit and wind. A lit
+cascade, depth only, with the colour pass's pose, ground fit and wind, its position `@invariant` (WGSL 12.10) as every Margo shadow caster's is, so another program drawing the same surface writes the same depth bit for bit (the per-cascade list draw and the full draw among them). A lit
 scatter (`material`) also receives. The instances drawn are the ones culled
 against the camera that frame, so an instance outside the view casts no shadow
 onto ground inside it (a tall tree just behind the camera, say), as with the
@@ -195,6 +200,29 @@ geometry. Rooted GPU bends vary by world position and time, and normals follow
 the deformation. Grass LODs use identical motion; fixed instance shadows use the
 same bend and clock in every cascade. Use `shadows.add(instances)` for moving
 vegetation, without the static-shadow option. Cull bounds include wind movement.
+A `Scatter` built without `wind` can be given one later (`scatter.options.wind = [x, z, strength]`, which `WeatherDrive` does from the
+weather's wind): the cull reach doubles for it from the next frame, as for a wind passed at construction, and returns when it is unset.
+
+A fourth number, the mean wind speed in m/s at 10 m, makes plants thrash with the Beaufort force: `wind: [x, z, strength,
+speed]`. Up to 5.4 m/s (the top of Beaufort 3, gentle breeze) the plants keep their own sway; past it the sway and leaf
+flutter run `speed / 5.4` times as fast (`windClockRate(speed)`: 2 in a force 6 strong breeze, 3.2 in a force 8 gale,
+6.1 at hurricane force), because the gusts a canopy feels come at a frequency in proportion to the mean speed. The
+strength still sets how far they bend. `scatter.windTime` is the clock the shaders read (it equals `time` with no speed
+or a light one); `WeatherDrive` of `@margoengine/weather/drive` writes the speed with the strength, so a storm's grass
+and trees thrash by themselves:
+
+```ts
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { Scatter, windClockRate } from '@margoengine/scatter';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A force 8 gale (17.2 m/s) from the west: full bend, sway 3.2 times as fast as in a breeze.
+const grass = Scatter.attach(engine, box(0.05, 0.6, 0.05), { count: 20000, area: [30, 30], material: new PbrMaterial({ color: [0.2, 0.4, 0.1] }), wind: [1, 0, 1, 17.2] });
+console.log(windClockRate(17.2), grass.wind);
+engine.start();
+```
+
+`ScatterBatch` winds (`ScatterInstances`) take the three-number form; their batches share one clock.
 Use upright vegetation whose local origin is its ground root. This is a lightweight
 whole-plant bend. Fixed `ScatterBatch` can additionally set `windDetail: 1` (0-1)
 for faster branch/foliage ripple. Radial stiffness anchors the trunk and plant
@@ -268,7 +296,26 @@ are omitted. The layout snapshots building bounds, preserves candidate order and
 does not mutate inputs. It is initialization-only CPU work for small populations.
 Scenes supply geometry/coordinates and register existing buildings in the layout.
 
-GPU `Scatter` accepts the layout's `exclusions` or an explicit rectangle array.
+GPU `Scatter` accepts the layout's `exclusions` or an explicit rectangle array, and `paths`, ground paths kept
+clear (up to 1,000,000 segments in all; `roadPath` from `@margoengine/road` gives a road's):
+
+```ts
+import {Engine} from 'margoengine/core';
+import {icosahedronGeometry, toGeometry} from 'margoengine/geometry';
+import {roadPath} from 'margoengine/road';
+import {Scatter} from 'margoengine/scatter';
+import {Spline} from 'margoengine/splines';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const curve = new Spline([[-60, 0, -40], [0, 0, 10], [60, 0, 40]]);
+// Rocks everywhere in a 160 m square except on the road and half a metre either side of it.
+Scatter.attach(engine, toGeometry(icosahedronGeometry(0.4, 1, true)), {
+  count: 4000,
+  area: [160, 160],
+  paths: [roadPath(curve, {width: 6})],
+});
+```
+
 It rejects whole scaled bounding spheres intersecting a rectangle before emitting
 any LOD. The largest LOD's bounds include geometry offsets from its origin.
 Exclusions are validated and uploaded once per device, with no frame-time CPU
@@ -319,6 +366,38 @@ occlusion; for example `[3, 2.16, 0.9]` makes a warm window bloom with optional
 geometry or transforms. It defaults to 1 and accepts a nonnegative finite number
 or a callback sampled each render, such as `() => sky.nightFactor` for night lights.
 The value must fit a GPU float; the callback remains installed after restoration.
+
+## Texture maps: scanned plants, bark and rocks
+
+`textures` draws a mesh with its glTF 2.0 metallic-roughness maps instead of one material colour: `uvs` (two per
+vertex, one array per LOD ring geometry or one for all), `baseColor` (sRGB, its alpha an alpha MASK cut-out),
+`normal` (tangent space, OpenGL green-up; no tangents needed, the frame comes from screen derivatives) and
+`occlusionRoughnessMetal` (R occlusion of the ambient light, G roughness, B metalness). The `material` colour,
+roughness and metalness multiply the maps as glTF factors. `alphaCutoff` (default 0.5 with a base colour map, else 0)
+drops texels in the colour pass and in the shadow casters, so needle and leaf cards cast their own shapes. Images are
+`{width, height, data}` RGBA8 texels or anything a 2D canvas draws (ImageBitmap, canvas, image). Mip levels are built on
+the CPU, and the base colour's alpha is rescaled per level so the cut-out keeps its coverage with distance. Works on
+`Scatter`, `ScatterTiles` and the biome forests (`BiomeMeshPart.textures` of `@margoengine/biomes/objects`).
+
+```ts
+import {Engine, Geometry, PbrMaterial} from 'margoengine';
+import {Scatter} from 'margoengine/scatter';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// One upright leaf card: its left half cut out by the map's alpha.
+const card = new Geometry([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2, 0, 2, 3]);
+const leaf = {width: 2, height: 1, data: new Uint8Array([60, 140, 50, 0, 60, 140, 50, 255])};
+const ferns = Scatter.attach(engine, card, {
+  count: 2000,
+  material: new PbrMaterial({color: [1, 1, 1], roughness: 0.8}),
+  textures: {uvs: [0, 1, 1, 1, 1, 0, 0, 0], baseColor: leaf},
+});
+```
+
+Cost: 8 more bytes a vertex, three texture reads a pixel and, with a cut-out, a fragment stage in the shadow pass. On the
+WebGL2 compatibility layer a textured plain `Scatter` draws through the layer's generic tiers (as `ScatterTiles` always
+does), not scatter's own compatibility route. Sources: Khronos glTF 2.0 (2021) section 3.9; Schueler, "Normal Mapping
+Without Precomputed Tangents" (ShaderX5, 2006; note 2013); Mikkelsen, "Bump Mapping Unparametrized Surfaces on the GPU"
+(JGT 2010); Castano, "Computing Alpha Mipmaps" (2010); Wyman and McGuire, "Hashed Alpha Testing" (JCGT 6(2), 2017).
 
 ## Density maps, a grid that follows the camera, and stored tiles
 
@@ -541,6 +620,103 @@ engine.start();
   push field is not shared between scatters: give each its own interactors.
 - Real-GPU proof: `npm run test:browser:interact --workspace @margoengine/scatter` (build the packages first).
 
+## Burnt and flooded plants: `@margoengine/scatter/states`
+
+Plants a fire or a flood leaves standing. A `PlantStates` map over a world rectangle records, per cell, the worst fire
+and the highest water there; every Scatter given `states: map.plant({...})` treats its own meshes from the cell under
+each instance's root, in the colour and the shadow passes: foliage below the crown scorch height turns red-brown, stems
+below the flame length char black, a crown fire strips the crown to bare charred branches, ash settles on upward
+faces, mud coats everything below the high-water mark with a stain line above it, a fast flow lays the plant flat
+downstream and debris catches on its upstream side. No new meshes: these are vertex and colour treatments. The map
+fills itself each frame from a `FireFront` burn texture, a `Flood` wetting record and current, and a `GroundChange`'s
+plant covers, and keeps each cell's peak, so plants stay burnt or flattened after the front or the wave has gone.
+
+```ts
+import { Engine, PbrMaterial, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+import { PlantStates, fireSource, PLANT_STATE_LOOKS, applyPlantStateSettings } from '@margoengine/scatter/states';
+import { FireFront } from '@margoengine/vfx/fire-front';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const fire = FireFront.attach(engine, { origin: [-50, -50], size: [100, 100], cell: 2, fuel: 'FM4', ignitions: [{ at: [0, 0] }] });
+const states = PlantStates.attach(engine, { bounds: [-50, -50, 50, 50], resolution: 128, fire: fireSource(fire) });
+const pines = states.plant({ crownBase: 4, trunkRadius: 0.15, stiffness: 2e5 });
+Scatter.attach(engine, box(0.3, 6, 0.3), { count: 900, area: [100, 100], material: new PbrMaterial({ color: [0.1, 0.3, 0.1] }), states: pines });
+// A flood: states.setSources({ flood: floodSource(flood) }); changed ground: { ground: change.plantCovers() }.
+states.paint([-50, -50, 0, 50], [0.45, 0.38, 0.15], 0.5); // a drought tint over the west half
+applyPlantStateSettings(states, pines, PLANT_STATE_LOOKS.conifer); // the slider rows
+engine.start();
+```
+
+| Map option | Default | Meaning |
+| --- | --- | --- |
+| `bounds` | (required) | world rectangle `[minX, minZ, maxX, maxZ]`; instances rooted outside it are untouched |
+| `resolution` | 256 | cells along x and z, 1 to 1,024 (one number or `[x, z]`); 64 bytes a cell |
+| `fire` | none | `{ texture, bounds }`, `fireSource(fireFront)` |
+| `flood` | none | `{ wet, velocity?, bounds }`, `floodSource(flood)` |
+| `ground` | none | `{ covers, bounds }`, `groundChange.plantCovers()` |
+| `ambient` | 25 | air temperature at the fire, deg C, -60 to 59 |
+| `wind` | 2 | midflame wind at the fire, m/s |
+| `manning` | 0.035 | Manning's n of the flooded ground |
+| `dryTime` | 3,600 | seconds for flood wetness to fall to 1/e |
+| `groundScorch`, `groundChar`, `groundMud` | 4, 1, 0.4 | metres a full GroundChange char or mud cell gives |
+
+| Plant response (`plant()`) | Default | Meaning |
+| --- | --- | --- |
+| `crownBase` | 0 | crown base height, m; 0 burns the whole plant (grass, low shrubs) |
+| `foliarMoisture` | 100 | percent; wetter needles need a hotter fire to crown |
+| `trunkRadius` | 0.1 | mesh units; nearer the axis is stem (charred, never stripped) |
+| `stiffness` | 0.05 | stem rigidity MEI, N m^2 (grass 0.01 to 0.1, shrubs about 5, trees 1e4 and up) |
+| `flatten` | 1.4 | turn of a fully flattened plant, radians |
+| `bareShrink` | 0.85 | share of its reach a consumed crown loses |
+| `wetDarkening`, `stainBand`, `edge` | 0.55, 0.06, 0.12 | wet albedo, stain line height m, soft edge of the lines m |
+| `scorch`, `char`, `ash`, `mud`, `debris` | linear RGB | colours of each treatment |
+
+- The physics, per cell: scorch height `4.665 I^(7/6) / ((60 - T) sqrt(I + 38.7 U^3))` m (Van Wagner 1973, I kW/m, T deg C,
+  U m/s), char height Byram's flame length `0.0775 I^0.46` m, crown consumed past twice `(0.010 CBH (460 + 25.9 FMC))^1.5`
+  kW/m (Van Wagner 1977), flattened past twice Kouwen and Li's critical shear velocity `min(0.028 + 6.33 MEI^2,
+  0.23 MEI^0.106)` with `u* = n V sqrt(g) / h^(1/6)` (Chow 1959), debris from the hazard rating `d (v + 0.5)` between
+  0.75 and 2 (Ramsbottom et al. 2006). The same formulas are exported for the CPU: `scorchHeight`, `flameLength`,
+  `crownInitiation`, `flatteningShear`, `shearVelocity`.
+- One map serves every Scatter, `ScatterTiles`, `GrassScatter` and `TrampledScatter` in the area; each gets its own
+  response, and `BiomeObjects` and `BiomeView` take `states: (key, kind) => response` for every part of a biome.
+- Colour treatments need `material`; the shape treatments (stripped crowns, flattening) work on any Scatter. A turn
+  and a radial pull keep every vertex within its distance from the root, so the cull radii hold.
+- Sliders: `PLANT_STATE_SETTINGS` (shared row shape, all live), `PLANT_STATE_LOOKS` (`conifer`, `chaparral`, `grass`,
+  `hotGale`), `applyPlantStateSettings(states, plant, values)`.
+- Cost: one compute thread a cell a frame while a source is set, five storage reads a vertex and a few more in the
+  lit stage. On the WebGL2 compatibility layer the compose pass runs as a GPU draw (never on the layer's CPU tier;
+  `states.test.js` plans it) and the treatments are part of the scatter's own vertex stages.
+- Limits: one cell per instance (the treatment is uniform along a plant within a cell), nearest source texel; the
+  peaks live on the GPU, so a device restore starts the map empty (sources and marks compose again). A source that
+  updates later in the frame than the scatters (a `Flood` ticks after them) is read as the frame before left it: the
+  plants are one frame behind the water.
+- Marks of past fires and floods, with no live source: `states.mark(rect, { scorch, char, intensity, ash, water,
+  debris, wetness })` for the cells whose centres lie in a world rectangle, or `states.markEach((x, z) => marks)` for
+  every cell from a function (a burn history, a flood line). Like a source, a mark raises a cell's fire and water and
+  never lowers them; the map composes them once when they change and again after a reset or a device restore, and
+  `reset()` forgets them. `disturbanceStates` of `@margoengine/biomes/disturbance` marks a map from a fire and flood
+  history, and `BiomeView` does it by itself from its `disturbance` option:
+
+```ts
+import { Engine, box, PbrMaterial } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+import { PlantStates, scorchHeight, flameLength } from '@margoengine/scatter/states';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const states = PlantStates.attach(engine, { bounds: [-50, -50, 50, 50], resolution: 100 });
+// Last summer's burn scar on the east half: a 2,000 kW/m fire, ash still on the ground.
+states.mark([0, -50, 50, 50], { scorch: scorchHeight(2000), char: flameLength(2000), intensity: 2, ash: 1 });
+// A flood line 0.6 m up along the creek at z < -30.
+states.markEach((x, z) => (z < -30 ? { water: 0.6 } : undefined));
+Scatter.attach(engine, box(0.3, 6, 0.3), { count: 900, area: [100, 100], material: new PbrMaterial({ color: [0.1, 0.3, 0.1] }), states: states.plant({ crownBase: 3, trunkRadius: 0.15 }) });
+engine.start();
+```
+
+- Real-GPU proof: `npm run test:browser:states --workspace @margoengine/scatter` (both backends): stand-in source
+  textures (`states.browser.mjs`) and a real dam-break `Flood` of `@margoengine/water` driving the map
+  (`states-flood.browser.mjs`: the high-water mark is the flood's own record bit for bit, the peak shear and the
+  flow direction downstream); test page `examples/test-pages/plant-states.html`.
+
 ## Imposter ring: `@margoengine/scatter/imposter`
 
 `ImposterScatter` is a `Scatter` whose far LOD ring draws as octahedral imposters instead of its mesh. Bake the far
@@ -594,14 +770,30 @@ GPU, for dense meadows. `GrassScatter.attach(engine, { count, area, lod, grass: 
 every `Scatter` option, with `blades` shading on by default.
 
 - Each blade is a quadratic Bezier spine (root, a control point above it, a leaning tip) widened into a strip that
-  tapers to a point. Its root inside the clump disc (`radius`), facing, height (`heightVariance`) and lean come from a
-  hash of the instance's world root and the blade's number, so a blade keeps its shape as the camera moves.
+  tapers to a point (its tip is a pair of vertices drawn as one point up close). Its root inside the clump disc
+  (`radius`), facing, height (`heightVariance`) and lean come from a hash of the instance's world root and the blade's
+  number, so a blade keeps its shape as the camera moves.
 - The ring meshes hold only (side, along, blade number) per vertex; `segments` sets the steps along a blade in rings
-  0, 1 and 2 (default 5, 3 and 1), so a far blade is one triangle. Distant blades widen across their own width only.
+  0, 1 and 2 (default 5, 3 and 1), so a far blade is one quad. Distant blades widen across their own width only.
+- Coverage, not pixels: every blade is drawn by prefiltered coverage, so a blade thinner than a pixel adds its true
+  share of colour and never breaks into lone pixels or broken runs without multisampling. The camera's pixel at the
+  blade's distance is worked out each frame; the blade is widened by a filter radius across its screen axis
+  (perpendicular to its spine and the eye) and each pixel takes the share of a tent filter the true strip covers as
+  alpha (Gupta and Sproull, "Filtering Edges for Gray-Scale Displays", SIGGRAPH 1981; Chan and Durand, "Fast
+  Prefiltered Lines", GPU Gems 2, 2005), blended by Porter and Duff's over. The radius is one pixel, and two for a
+  blade under 8 pixels tall (mixed over 4 pixels), the prefiltering of far vegetation (Bruneton and Neyret,
+  Eurographics 2012). The near ring draws each blade's core (a filter radius in from its edges) opaque with depth
+  first, then the whole blade blended over it; the middle and far rings write no depth (see `docs/limits.md`).
+  Dune grass (1.6 cm leaves) to 230 m at 480 x 270 without MSAA: 4,902 lone pixels per million before, 0 after on
+  WebGPU and 7.8 on the WebGL2 layer, mean luma within 0.31 codes of the same view drawn at 4 x 4 the pixels. Shadows
+  keep a pixel floor with a hashed keep (Persson 2012; Cook, Halstead, Planck and Ryu, SIGGRAPH 2007), as does a
+  colour stage that cannot carry coverage (several render targets). Cost: the near ring is drawn twice, and a covered
+  fragment blends.
 - Normals turn across the width (`round`) so flat blades shade round; wind, ground alignment and blade shading are the
   plain `Scatter`'s.
 - The shape is compiled into the shaders: make a new `GrassScatter` to change it.
 - Real-GPU proof: `npm run test:browser:grass --workspace @margoengine/scatter` (build the packages first).
+  The coverage: `npm run test:browser:grass-pixel --workspace @margoengine/scatter` (WebGPU, then the WebGL2 layer).
 
 Real WebGPU LOD, diffuse/PBR fade-mask and device-restoration checks:
 `npm run test:browser --workspace @margoengine/scatter` (build geometry/core first).
@@ -656,6 +848,50 @@ engine.start();
 
 Each record places a clump; the GPU picks the near, middle and far mesh by distance and fades between them. Manage
 the held set with `setTile` and `removeTile`; the coordinate range alone does not allocate records for unheld chunks.
+
+## Film time: seeking the wind to a cut
+
+A film rendered scene by scene starts each scene in a fresh process, and the wind clock of every `Scatter` (grass
+blades, tiles, imposters and the other subclasses included) and `ScatterInstances` adds up frame deltas. Each has
+`advanceTime(delta)`, the CPU part of its frame update, and a `time` getter (seconds on its wind clock); its
+`onPreUpdate` runs the same `advanceTime`. So `seek` from `@margoengine/cutscene/seek` replays a run's steps and the
+next frame sways every plant as a run started at 0 sways it there, bit for bit (`test/seek.test.js` to 54,000 steps;
+`test/seek-check.mjs` pixel for pixel on WebGPU and the WebGL2 compatibility layer).
+
+```ts
+import {Engine, Geometry} from 'margoengine/core';
+import {Scatter} from 'margoengine/scatter';
+import {seek} from 'margoengine/cutscene/seek';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const blade = new Geometry([-0.02, 0, 0, 0.02, 0, 0, 0, 0.8, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]);
+const grass = Scatter.attach(engine, blade, {count: 20000, area: [20, 20], blades: {}, wind: [1, 0.2, 0.6]});
+// This scene starts 95 s into the film: the gusts are where a run from 0 had them.
+await seek(engine, 95, {fps: 30});
+engine.render({delta: 1 / 30});
+console.log(grass.time);
+```
+
+`TrampledScatter`'s trample field is history on the GPU: a cut starts it flat, and the scene's warm-up frames bring
+it back (it recovers with `e^(-3 t / recover)`).
+
+## Sliders: `@margoengine/scatter/settings`
+
+A `Scatter` reads its density, colour, wind, blade root shade and blade width from its frame uniform every frame, so they change while the scene runs. `Scatter` has the setters `density` (0 to 1, the kept fraction of candidates, the same instances each time), `color` (linear RGB, used with no material), `wind` (`[x, z, strength]` or undefined, as a weather drive writes it) and `rootShade` (needs `blades`). `@margoengine/scatter/settings` lists them as a table for sliders and panels: `SCATTER_SETTINGS` has 11 rows (`scatter.density`, `scatter.color`, `wind.directionX`, `wind.directionZ`, `wind.strength`, `blades.rootShade`, `blades.widen`, `blades.translucency`, `variation.hue`, `variation.value`, `variation.clusters`; each has `name`, `group`, `kind`, `default`, `min`, `max`, `step`, `unit`, `about` and `live`). The first seven are `live`. `blades.widen` (setter `widen`, 0 to 10) also moves the cull reach with it. `blades.translucency` (`translucencyAmount`), `variation.hue` and `variation.value` (`variationHue`, `variationValue`) and `variation.clusters` (`clusters`) are `live: false`: their values are read from the material uniform every frame, but moving one off 0 (or back to 0) adds or removes a stage of the lit shader, so Scatter builds the other pipeline once (kept for the way back). Between nonzero values nothing is built. `variation` and `clusters` need a Scatter built with a `material`, translucency and widen one built with `blades`. `applyScatterSettings(scatter, values)` writes a set of values (a name left out takes its default; wind strength 0 removes the wind), and `SCATTER_LOOKS` names `natural`, `thinMeadow` and `dryWindy`. An unknown name throws `TypeError`, a value outside its row `RangeError`, and `blades.rootShade` off its default on a Scatter built without `blades` (or, for the variation rows, without a `material`) `TypeError`. Not rows: everything that places instances at construction. Proof on a real GPU (`npm run test:settings:browser`, native WebGPU and the WebGL2 layer): the defaults written draw the frame exact, 60 frames of every live row, and of the four other rows between nonzero values, create no pipeline, buffer or texture, turning translucency on from 0 builds one pipeline, and the last frame equals writing the values once.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {Scatter} from 'margoengine/scatter';
+import {SCATTER_LOOKS, applyScatterSettings} from 'margoengine/scatter/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const meadow = Scatter.attach(engine, box(0.08, 0.6, 0.08), {count: 40000, area: [24, 24], blades: {}});
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  // The wind builds over the first four seconds of the shot.
+  applyScatterSettings(meadow, {...SCATTER_LOOKS.dryWindy, 'wind.strength': 0.9 * Math.min(time / 4, 1)});
+});
+```
 
 ## Preview tier contract
 

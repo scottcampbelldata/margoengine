@@ -16,8 +16,10 @@ export function rig({ samples = 1 } = {}) {
     lines,
     camera,
     setup,
+    // As the engine does: the frame update (clocks, advanceTime) first, then the passes.
     frame: (delta = 0) =>
-      gpu.record(() =>
+      gpu.record(() => {
+        lines.onPreUpdate(delta);
         run({
           backend: 'webgpu',
           device: gpu.device,
@@ -30,7 +32,7 @@ export function rig({ samples = 1 } = {}) {
           color: view,
           depth: view,
           descriptor: { depthStencil: { format: 'depth24plus' }, multisample: { count: samples } },
-        }),
-      ),
+        });
+      }),
   };
 }

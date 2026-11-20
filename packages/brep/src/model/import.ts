@@ -293,8 +293,13 @@ class Importer {
         return { kind: 'torus', frame: this.frame(ref(args[1])), major: num(args[2]) * u, minor: num(args[3]) * u };
       case 'B_SPLINE_SURFACE_WITH_KNOTS':
         return this.spline(id);
-      case 'RECTANGULAR_TRIMMED_SURFACE':
-        return this.surface(ref(args[1]) ?? -1, reach);
+      case 'RECTANGULAR_TRIMMED_SURFACE': {
+        // ISO 10303-42 (rectangular_trimmed_surface): usense and vsense say whether each parameter of the trimmed
+        // surface runs with the basis surface's or against it, so its normal, Su x Sv of its own parameters, is the
+        // basis surface's turned where exactly one runs against. It is read as the basis surface, marked for that.
+        const basis = this.surface(ref(args[1]) ?? -1, reach);
+        return isTrue(args[6]) === isTrue(args[7]) ? basis : this.against(!this.inverted.has(basis), { ...basis });
+      }
       case 'SURFACE_OF_REVOLUTION':
         return this.revolution(id, ref(args[1]) ?? -1, ref(args[2]), reach);
       case 'SURFACE_OF_LINEAR_EXTRUSION':

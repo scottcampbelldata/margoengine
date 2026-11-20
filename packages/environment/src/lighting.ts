@@ -1,11 +1,12 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Scene-wide shading from outside core: image-based lighting from an Environment and distance/height
 // fog. Each effect is an engine plugin that patches core's frozen mesh shader through PassContext.shader (text
-// anchors, tests/shader-contracts.test.js) and a glTF-pro LightingEffect (`add(model)`) through glTF-pro's declared
+// anchors, tests/shader-contracts.test.js) and a glTF PBR LightingEffect (`add(model)`) through glTF PBR's declared
 // lighting hooks, so opaque and blended glTF primitives are lit and fogged in their own shader.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type FrameGraph } from '@margoengine/core/extension';
 import { Environment, type EnvironmentOptions, type EnvironmentSource } from './environment.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { reportRestore } from './restore-report.js';
 import type { UltraHDROptions } from './ultrahdr.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
@@ -14,20 +15,20 @@ import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
-/** glTF-pro's lighting hooks (its `PBRLighting`, declared here so environment does not import glTF-pro). */
+/** glTF PBR's lighting hooks (its `PBRLighting`, declared here so environment does not import glTF PBR). */
 export interface PBRHooks {
   readonly declarations: string;
   /** vec3f ambient light in terms of `s`. `s.f0` and `s.sw` are the dielectric Fresnel ends: the glTF defaults where the Surface has no such fields. */
   readonly ambient?: string;
-  /** Sky light toward the unit normal `n`, replacing gltf-pro's built-in sky gradient (gltf-pro PBRLighting `sky`). */
+  /** Sky light toward the unit normal `n`, replacing gltf\/pbr's built-in sky gradient (gltf/pbrLighting `sky`). */
   readonly sky?: string;
-  /** Ambient light of a physical material's clearcoat layer (gltf-pro PBRLighting `coat`). */
+  /** Ambient light of a physical material's clearcoat layer (gltf\/pbrLighting `coat`). */
   readonly coat?: string;
-  /** Ambient light of a physical material's sheen layer (gltf-pro PBRLighting `sheen`). */
+  /** Ambient light of a physical material's sheen layer (gltf\/pbrLighting `sheen`). */
   readonly sheen?: string;
   output?(color: string): string;
 }
-/** What the effects light: core's mesh shader (patched, group 0) or anything with glTF-pro's `addLighting` (hooks, group 2). */
+/** What the effects light: core's mesh shader (patched, group 0) or anything with glTF PBR's `addLighting` (hooks, group 2). */
 export interface LightingTarget {
   addLighting(effect: {
     pbr(group: number): PBRHooks | undefined;
@@ -36,7 +37,7 @@ export interface LightingTarget {
   }): () => void;
 }
 
-/** First binding of the IBL resources (five) and the fog uniform, in core's group 0 and glTF-pro's group 2. */
+/** First binding of the IBL resources (five) and the fog uniform, in core's group 0 and glTF PBR's group 2. */
 export const IBL_BINDING = 20,
   FOG_BINDING = 25;
 
@@ -61,7 +62,7 @@ export abstract class ShaderEffect {
   bindings(): GPUBindGroupEntry[] {
     return this.disposed || !this.device ? [] : this.entries();
   }
-  /** gltf-pro lighting hooks for bind group `group`; undefined while `bindings()` is empty. */
+  /** gltf\/pbr lighting hooks for bind group `group`; undefined while `bindings()` is empty. */
   pbr(group: number): PBRHooks | undefined {
     if (!this.bindings().length) return undefined;
     let hooks = this.pbrHooks.get(group);
@@ -87,7 +88,7 @@ export abstract class ShaderEffect {
     }
     return code;
   }
-  /** Adds the effect to a glTF-pro model. Returns a remover; `dispose()` removes it from every model. */
+  /** Adds the effect to a glTF PBR model. Returns a remover; `dispose()` removes it from every model. */
   add(model: LightingTarget): () => void {
     if (this.disposed) throw new MargoError('disposed', `${this.name} is disposed; create a new one`);
     let release = this.models.get(model);
@@ -155,9 +156,9 @@ export interface EnvironmentLightingOptions {
 }
 
 /**
- * Lights core meshes (`engine.use(lighting)`) and glTF-pro models (`lighting.add(model)`) with an Environment:
+ * Lights core meshes (`engine.use(lighting)`) and glTF PBR models (`lighting.add(model)`) with an Environment:
  * split-sum specular from the prefiltered cube plus SH irradiance, scaled by `environment.intensity`.
- * It replaces the constant ambient term (core's `lighting.radiance[3]`, glTF-pro's hemisphere
+ * It replaces the constant ambient term (core's `lighting.radiance[3]`, glTF PBR's hemisphere
  * ambient); direct lights, shadows and clustered lights still add on top. glTF occlusion maps scale the IBL term.
  */
 export class EnvironmentLighting extends ShaderEffect {
@@ -192,6 +193,8 @@ export class EnvironmentLighting extends ShaderEffect {
       if (engine.disposed) throw new DOMException('Engine disposed', 'AbortError');
     };
     check();
+    // The scene load was called for, kept across the awaits below.
+    const scope = captureScene(engine);
     // The decoders load with the first URL (loaders.ts): a page that lights from pixels never fetches them.
     const image =
       typeof source === 'string' || source instanceof URL
@@ -199,20 +202,28 @@ export class EnvironmentLighting extends ShaderEffect {
         : source;
     check();
     const environment = await Environment.create(engine, image, options);
-    let attached = false;
+    // Before the scope: a disposed engine or an aborted signal rejects with AbortError, not with the scope's own refusal.
     try {
       check();
-      engine.use(environment);
-      attached = true;
-      const lighting = EnvironmentLighting.attach(engine, environment);
-      lighting.loadedInto = engine;
-      return lighting;
     } catch (error) {
-      // scene-owner: active scene on purpose, the rollback runs in the same synchronous call as engine.use above.
-      if (attached) engine.removePlugin(environment.name);
-      else environment.dispose();
+      environment.dispose();
       throw error;
     }
+    return scope.run(() => {
+      let attached = false;
+      try {
+        engine.use(environment);
+        attached = true;
+        const lighting = EnvironmentLighting.attach(engine, environment);
+        lighting.loadedInto = engine;
+        return lighting;
+      } catch (error) {
+        // scene-owner: active scene on purpose, the scope is still active, so this removes from the scene engine.use added to.
+        if (attached) engine.removePlugin(environment.name);
+        else environment.dispose();
+        throw error;
+      }
+    });
   }
   constructor(
     readonly environment: Environment,
@@ -255,7 +266,7 @@ export class EnvironmentLighting extends ShaderEffect {
       declarations: this.declarations(group),
       ambient: iblCall('s.n', 'v', 's.base.rgb', 's.metal', 's.roughness', 's.f0', 's.sw') + '*s.occlusion',
       coat: 'iblPrefiltered(iblSpecular,iblSampler,iblParams,reflect(-v,s.cn),s.cr)*iblParams.w*s.occlusion',
-      // Sheen: its albedo (gltf-pro's margoSheenAlbedo, the physical shader declares it) times the spherical-harmonic
+      // Sheen: its albedo (gltf/pbr's margoSheenAlbedo, the physical shader declares it) times the spherical-harmonic
       // irradiance at the base normal, where the sheen lies.
       sheen:
         'margoSheenAlbedo(clamp(dot(s.n,v),0.0001,1.0),s.sh.w)*iblIrradiance(iblSh,iblRotate(s.n,iblParams))*iblParams.w*s.occlusion',
@@ -314,9 +325,9 @@ fn fogAmount(p:vec3f,eye:vec3f)->f32 {
 const fogMix = (value: string, eye: string) => `mix(${value},margoFog.color.rgb,fogAmount(i.position,${eye}))`;
 
 /**
- * Scene-wide distance and height fog computed in the mesh shaders, so it also covers blended (transparent) glTF-pro
+ * Scene-wide distance and height fog computed in the mesh shaders, so it also covers blended (transparent) glTF PBR
  * primitives, unlike sky's depth-based post fog. `engine.use(fog)` fogs core meshes and is required (it owns the
- * GPU uniform); `fog.add(model)` adds glTF-pro models. The mix happens after tone mapping on the canvas and in
+ * GPU uniform); `fog.add(model)` adds glTF PBR models. The mix happens after tone mapping on the canvas and in
  * linear radiance on HDR targets, so a ColorBackground with the same color matches at full fog. The background
  * itself, particles and other packages' custom shaders are not fogged.
  */

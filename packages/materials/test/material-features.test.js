@@ -24,7 +24,7 @@ import {
   materialLobes,
   nodeMaterial,
 } from '../dist/index.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { NodeMaterial, normalLocal, positionLocal } from '../../shader/dist/index.js';
 import { Fog } from '../../environment/dist/index.js';
 import { exportModel } from '../../exporters/dist/model.js';
@@ -410,7 +410,7 @@ test('lightMap adds baked light on lit shadings, multiplies unlit colour, reads 
   s.engine.dispose();
 });
 
-test('emissiveIntensity scales the emission gltf-pro draws, live and validated, with no shader change', async () => {
+test('emissiveIntensity scales the emission gltf/pbr draws, live and validated, with no shader change', async () => {
   const s = await scene(),
     material = new PbrMaterial({ emissive: [1, 0.5, 0], emissiveIntensity: 3 }),
     mesh = createMesh(s.engine, quad, material),
@@ -486,7 +486,7 @@ test('tangent-space maps and anisotropy point the derived frame up bottom-left-o
     ],
     meshes = materials.map((m) => createMesh(s.engine, quad, m)),
     signs = codes(s.frame()).map((c) => /return mat3x3f\(gu\*k,(-?)gv\*k,n\);/.exec(c)?.[1]);
-  // gltf-pro's frame (glTF: B = grad(-v), no sign) only for the material without one; b = cross(n, t) * w untouched.
+  // gltf/pbr's frame (glTF: B = grad(-v), no sign) only for the material without one; b = cross(n, t) * w untouched.
   assert.deepEqual(signs.sort(), ['', '-', '-', '-']);
   for (const mesh of meshes) mesh.destroy();
   s.engine.dispose();
@@ -543,7 +543,7 @@ test('vertexColors false passes white from the vertex stage; instance tints stil
     meshes = [createMesh(s.engine, quad, material), createInstancedMesh(s.engine, quad, material, 1)];
   meshes[1].instances.count = 1;
   const all = codes(s.frame());
-  // No map reads the UVs here, so gltf-pro's trimmed vertex stage writes only the white.
+  // No map reads the UVs here, so gltf/pbr's trimmed vertex stage writes only the white.
   assert.ok(all.some((c) => c.includes('o.color=vec4f(1); return o;')));
   assert.ok(
     all.some((c) => c.includes('o.color=vec4f(1)*k.tint;')),

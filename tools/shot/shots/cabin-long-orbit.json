@@ -1,0 +1,147 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 60,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            13.303,
+            3,
+            2.257
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 10,
+          "position": [
+            12.282,
+            3,
+            5.494
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 20,
+          "position": [
+            10.459,
+            3,
+            8.356
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 30,
+          "position": [
+            7.956,
+            3,
+            10.649
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 40,
+          "position": [
+            4.946,
+            3,
+            12.216
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 50,
+          "position": [
+            1.633,
+            3,
+            12.951
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 60,
+          "position": [
+            -1.757,
+            3,
+            12.803
+          ],
+          "target": [
+            0.5,
+            1.6,
+            0
+          ],
+          "fov": 36
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "cabin-long-orbit",
+    "kind": "long",
+    "seed": 31,
+    "seconds": 60,
+    "tier": "high",
+    "kit": "snowNight",
+    "msaa": 1,
+    "supersample": 1.5,
+    "warmup": 90,
+    "probes": {
+      "open": 0,
+      "mid": 30,
+      "end": 59.9
+    },
+    "lookBounds": {
+      "skyClip": 0.5,
+      "speckle": 400,
+      "banding": 1,
+      "flat": 20,
+      "crush": 3
+    },
+    "page": {
+      "path": "examples/cabin-hearth/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#hint,nav,#status,#error{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "cabinHearth.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

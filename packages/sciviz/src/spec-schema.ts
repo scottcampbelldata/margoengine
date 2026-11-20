@@ -23,7 +23,14 @@ export const figureSchema = {
         far: { type: 'number', exclusiveMinimum: 0 },
       },
     },
-    limits: { type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 6 },
+    limits: {
+      type: 'array',
+      items: { type: 'number' },
+      anyOf: [
+        { minItems: 4, maxItems: 4 },
+        { minItems: 6, maxItems: 6 },
+      ],
+    },
     dragMode: { enum: ['orbit', 'pan', 'box', 'lasso'] },
     resources: {
       type: 'array',

@@ -69,6 +69,10 @@
     "./scroll": {
       "types": "./dist/scroll.d.ts",
       "import": "./dist/scroll.js"
+    },
+    "./seek": {
+      "types": "./dist/seek.d.ts",
+      "import": "./dist/seek.js"
     }
   },
   "files": [

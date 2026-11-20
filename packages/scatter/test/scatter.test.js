@@ -54,6 +54,11 @@ test('alignToGround and sink fit instances to the ground in the cull and both ve
       ...(lit ? { material: new PbrMaterial() } : {}),
     });
     h.engine.use(effect);
+    // A perspective view-projection of the camera's fov (column-major, depth row -1), as core's Camera makes it.
+    const f = 1 / Math.tan((h.context.camera.fov * Math.PI) / 360),
+      matrix = new Float32Array(16);
+    [matrix[0], matrix[5], matrix[10], matrix[11], matrix[14]] = [f / 1.5, f, -0.5, -1, -0.05];
+    h.context.camera.matrix = matrix;
     h.engine.frameGraph.execute(h.context);
     const cull = h.pipelines.find((p) => p.compute).compute.module.code,
       render = h.pipelines.find((p) => p.fragment).vertex.module.code;
@@ -64,12 +69,17 @@ test('alignToGround and sink fit instances to the ground in the cull and both ve
     assert.match(
       render,
       lit
-        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[4\],frame\.eye\.xyz,material\[2\]\)/
-        : /frame\.ground,frame\.blade,frame\.eye\.xyz,frame\.wind\)/,
+        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[4\],frame\.eye\.xyz,material\[2\],material\[5\]\.y\)/
+        : /frame\.ground,frame\.blade,frame\.eye\.xyz,frame\.wind,frame\.pixel\.x\)/,
     );
+    // KB-SCATTER-SUBPIXEL1: the drawing camera's pixel footprint per metre, 2 tan(fov / 2) / height, reaches every
+    // pose (frame slot 80; material[5].y in the lit stage), so GrassScatter can floor its blades at a pixel.
+    const footprint = (2 * Math.tan((h.context.camera.fov * Math.PI) / 360)) / h.context.height;
+    assert.ok(Math.abs(effect.values[80] / footprint - 1) < 1e-5, `${effect.values[80]} against ${footprint}`);
     if (lit) {
-      assert.match(render, /var<uniform> material:array<vec4f,5>/);
-      assert.equal(effect.materialUniform.size, 80);
+      assert.match(render, /var<uniform> material:array<vec4f,6>/);
+      assert.equal(effect.materialUniform.size, 96);
+      assert.equal(new Float32Array(effect.materialUniform.data)[21], effect.values[80]);
       assert.deepEqual(Array.from(new Float32Array(effect.materialUniform.data).subarray(12, 14)), [
         0.5,
         Math.fround(0.1),
@@ -154,7 +164,7 @@ test('blades shade grass from root to tip and bend lit normals toward the ground
     assert.match(lit.code, /@location\(2\) @interpolate\(perspective,centroid\) color:vec3f/);
     assert.match(lit.code, /o\.color=material\[0\]\.rgb\*pose\.shade;/);
     assert.match(lit.code, /o\.ground=pose\.ground;/);
-    assert.match(lit.code, /var<uniform> material:array<vec4f,5>/);
+    assert.match(lit.code, /var<uniform> material:array<vec4f,6>/);
     assert.equal(lit.code.includes('lodVisible'), lodFade > 0);
     assert.deepEqual(lit.material.slice(16, 20), [0.5, 1 / 120, 2, 1 / 120].map(Math.fround));
     const off = build({ lodFade, material: new PbrMaterial({ doubleSided: true }) });
@@ -168,6 +178,41 @@ test('blades shade grass from root to tip and bend lit normals toward the ground
     assert.match(unlit.code, /frame\.color\.rgb\*i\.shade\*/);
     assert.match(unlit.code, /@location\(3\) @interpolate\(perspective,centroid\) shade:f32/);
   }
+});
+
+// Kitty Hawk film review (Scott, 2026-11-17): the dune grass read as cardboard. Lit blades had no light through them;
+// `blades.translucency` adds wrapped back-light translucency, as ScatterInstances foliage has it.
+test('translucent blades add the sun seen through them, and translucency 0 leaves the lit shader as it was', () => {
+  const blade = new Geometry([-0.04, 0, 0, 0.04, 0, 0, 0, 0.5, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]);
+  const build = (blades) => {
+    const h = optionalGPU();
+    h.engine.lighting = { direction: new Float32Array([-1, 0.13, 0, 1]), radiance: new Float32Array([1, 0.8, 0.54, 0.18]) };
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    const effect = new Scatter(blade, { count: 4, blades, material: new PbrMaterial({ doubleSided: true }) });
+    h.engine.use(effect);
+    h.engine.frameGraph.execute(h.context);
+    const code = h.pipelines.find((p) => p.fragment).vertex.module.code;
+    effect.dispose();
+    return code;
+  };
+  const lucent = build({ translucency: 0.6 });
+  assert.match(lucent, /fn foliageTranslucency\(/);
+  assert.match(
+    lucent,
+    /\+foliageTranslucency\(normalize\(i\.normal\)\*select\(-1\.0,1\.0,facing\),v,l,1\.0,i\.transl\)\*i\.color\*frame\.radiance\.xyz\*frame\.light\.w;/,
+  );
+  assert.match(lucent, /@location\(\d+\) @interpolate\(flat\) transl:f32/);
+  assert.match(lucent, /o\.transl=material\[5\]\.x;/);
+  assert.match(lucent, /var<uniform> material:array<vec4f,6>/);
+  const plain = build({}),
+    zero = build({ translucency: 0 });
+  // material[5].y is the pixel footprint every lit pose reads; the translucency slot material[5].x stays unread.
+  assert.doesNotMatch(plain, /transl:f32|material\[5\]\.x/);
+  assert.doesNotMatch(plain, /foliageTranslucency/);
+  assert.equal(zero, plain);
+  for (const translucency of [-0.1, 1.5, NaN])
+    assert.throws(() => new Scatter(blade, { blades: { translucency } }), { name: 'RangeError', message: /translucency 0-1/ });
 });
 
 test('variation and clusters tint lit instances and cluster their shading only when asked', () => {
@@ -232,6 +277,26 @@ test('scatter frustum bounds include geometry displaced from its local origin', 
   const uniform = h.resources.find((r) => r.data?.byteLength === effect.values.byteLength),
     radius = new Float32Array(uniform.data)[35];
   assert.ok(radius >= 10.5 + geometry.bounds[3]);
+  effect.dispose();
+});
+
+test('GPU paths follow the rectangles in the exclusion buffer, their segment count above the fade bits (GAP-FILM-LOOK)', () => {
+  const h = optionalGPU(),
+    points = [[-10, 0], [0, 0], [10, 10]],
+    effect = new Scatter(box(), { count: 1, exclusions: [[-3, -2, 1, 4]], paths: [{ points, width: 4 }] });
+  points[0][0] = 100;
+  h.engine.use(effect);
+  h.frame();
+  assert.equal(effect.values[19], 1, 'eye.w keeps the rectangle count');
+  assert.equal(effect.meta[39] >> 8, 2, 'two segments');
+  assert.equal(effect.meta[39] & 3, 0, 'the fade bits are untouched');
+  assert.deepEqual(
+    Array.from(new Float32Array(effect.exclusionBuffer.data)),
+    [-3, -2, 1, 4, -10, 0, 0, 0, 2, 0, 0, 0, 0, 0, 10, 10, 2, 0, 0, 0],
+  );
+  const code = h.pipelines.find((p) => p.compute).compute.module.code;
+  assert.match(code, /frame\.ids\.w>>8u/);
+  assert.throws(() => new Scatter(box(), { paths: [{ points: [[0, 0]], width: 1 }] }), /path/);
   effect.dispose();
 });
 
@@ -426,4 +491,25 @@ test('the back-culled lit pipeline sets C=1 only when core would draw the frame 
     assert.equal(culled[0].fragment.constants?.C, own ? 1 : undefined, `${label}: C follows core's choice`);
     effect.dispose();
   }
+});
+
+test('a wind set after construction widens the cull reach as a constructor wind does, and unsetting it takes it back', () => {
+  const h = optionalGPU(),
+    still = new Scatter(box(), { count: 8 }),
+    windy = new Scatter(box(), { count: 8, wind: [1, 0, 0.5] });
+  h.engine.use(still);
+  h.engine.use(windy);
+  h.frame();
+  const base = windy.values[35] / 2;
+  assert.ok(base > 0);
+  assert.equal(still.values[35], base, 'no wind: the plain reach');
+  still.options.wind = [0, 1, 0.3];
+  h.frame();
+  assert.equal(still.values[35], windy.values[35], 'a wind given later reaches as far as one given at construction');
+  assert.equal(still.values[35], 2 * base);
+  still.options.wind = undefined;
+  h.frame();
+  assert.equal(still.values[35], base);
+  still.dispose();
+  windy.dispose();
 });

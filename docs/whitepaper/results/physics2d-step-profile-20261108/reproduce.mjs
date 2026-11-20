@@ -45,17 +45,21 @@ const job = (name, args, timeout = 180000, env = {}) => {
 job('u64-regression', [join(bundle, 'u64-regression.mjs')]);
 job('prepare', [join(output, 'prepare.mjs')]);
 writeFileSync(join(output, 'reproduction.json'), JSON.stringify({ verifiedArchiveCommit: baseline.commit, repository: repo, output: outputRelative, eolNormalization: 'CRLF to LF only', originalEvidence: 'evidence/', noExistingIgnoredFilesRequired: true, profileSelected: process.argv.includes('--profile'), stageOnly: process.argv.includes('--stage-only') }, null, 2) + '\n');
-if (process.argv.includes('--stage-only')) {
-  console.log('Source-equivalent diagnostic staged; no build or timing requested.');
-  process.exit(0);
-}
-runJobs(join(output, 'build-jobs.json'));
-job('inspect', [join(output, 'inspect.mjs')]);
-if (!process.argv.includes('--profile')) {
-  console.log('Matched artifacts built and calibration loop inspected. No profiling/calibration timing ran. Use a fresh tag with --profile to select a bounded profiling session.');
-  process.exit(0);
-}
-const env = { MARGO_GPU_EXCLUSIVE: '1', ...(arg('firefox') ? { REPLAY_FIREFOX: resolve(arg('firefox')) } : {}) };
-job('run-v2', [join(output, 'run-v2.mjs')], 900000, env);
-job('summarize', [join(output, 'summarize.mjs')]);
-console.log('Matched profile evidence saved in ' + relative(repo, output) + '; all physics/source/accuracy predicates unchanged.');
+// Each stage that is not asked for returns, so the run ends by its event loop (KB-OWN-EXIT2).
+const remaining = () => {
+  if (process.argv.includes('--stage-only')) {
+    console.log('Source-equivalent diagnostic staged; no build or timing requested.');
+    return;
+  }
+  runJobs(join(output, 'build-jobs.json'));
+  job('inspect', [join(output, 'inspect.mjs')]);
+  if (!process.argv.includes('--profile')) {
+    console.log('Matched artifacts built and calibration loop inspected. No profiling/calibration timing ran. Use a fresh tag with --profile to select a bounded profiling session.');
+    return;
+  }
+  const env = { ...(arg('firefox') ? { REPLAY_FIREFOX: resolve(arg('firefox')) } : {}) };
+  job('run-v2', [join(output, 'run-v2.mjs')], 900000, env);
+  job('summarize', [join(output, 'summarize.mjs')]);
+  console.log('Matched profile evidence saved in ' + relative(repo, output) + '; all physics/source/accuracy predicates unchanged.');
+};
+remaining();

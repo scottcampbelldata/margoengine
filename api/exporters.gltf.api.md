@@ -26,6 +26,7 @@ export interface GLTFJsonResult {
 export interface GLTFOptions extends SceneOptions {
     flatten?: boolean;
     generator?: string;
+    sparseMorphs?: boolean;
 }
 
 export function base64(bytes: Uint8Array): string;
@@ -34,7 +35,7 @@ export function exportGLB(source: ExportSource, options?: GLBOptions): Uint8Arra
 
 export function exportGLTF(source: ExportSource, options?: GLTFJsonOptions): GLTFJsonResult;
 
-export function writeGLB(source: ExportSource, options: GLBOptions, prepare?: (roots: Node[]) => void, finish?: (writer: Writer) => void): Uint8Array;
+export function writeGLB(source: ExportSource, options: GLBOptions, prepare?: (roots: Node[]) => void, finish?: (writer: Writer) => void, writes?: readonly ('points' | 'lines')[]): Uint8Array;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -95,6 +96,7 @@ interface ExportPrimitive {
     geometry: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
     indices?: ArrayLike<number>;
+    mode?: PrimitiveMode;
     extras?: Extras;
 }
 
@@ -115,6 +117,13 @@ interface ExportScene {
 }
 
 type ExportSource = EngineKernel | ExportScene;
+
+interface ExportWarning {
+    code: 'unsupported';
+    message: string;
+    node: Mesh | ExportNode | null;
+    item?: object;
+}
 
 type Extras = {
     readonly [key: string]: unknown;
@@ -402,6 +411,7 @@ interface Geo {
     faceSizes?: Uint8Array;
     joints?: Uint16Array;
     weights?: Float32Array;
+    widths?: Float32Array;
     morphs?: {
         name?: string;
         positions: Float32Array;
@@ -409,11 +419,12 @@ interface Geo {
         tangents?: Float32Array;
     }[];
     base?: Geo;
+    topology?: 'points' | 'lines';
 }
 
 interface GeometryData {
     positions: ArrayLike<number>;
-    normals: ArrayLike<number>;
+    normals?: ArrayLike<number>;
     uvs?: ArrayLike<number>;
     uvs1?: ArrayLike<number>;
     uvs2?: ArrayLike<number>;
@@ -464,15 +475,15 @@ interface Mat {
     alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
-    baseColorTextureTransform?: {
-        offset: Vec2;
-        scale: Vec2;
-        rotation?: number;
-    };
+    baseColorTextureTransform?: TextureTransform;
     metallicRoughnessTexture?: TextureData;
+    metallicRoughnessTextureTransform?: TextureTransform;
     normalTexture?: TextureData;
+    normalTextureTransform?: TextureTransform;
     occlusionTexture?: TextureData;
+    occlusionTextureTransform?: TextureTransform;
     emissiveTexture?: TextureData;
+    emissiveTextureTransform?: TextureTransform;
     unlit?: boolean;
     shading: 'standard' | 'lambert' | 'phong';
     specular: number[];
@@ -483,6 +494,11 @@ interface Mat {
     transmission: number;
     ior: number;
     extras?: Extras;
+    width?: {
+        value: number;
+        units: 'pixels' | 'world';
+        kind: 'points' | 'lines';
+    };
 }
 
 interface MaterialAnimationChannelData {
@@ -509,21 +525,21 @@ interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
-    baseColorTextureTransform?: {
-        offset: Vec2;
-        scale: Vec2;
-        rotation?: number;
-    };
+    baseColorTextureTransform?: TextureTransform;
     metallicRoughnessTexture?: TextureData;
+    metallicRoughnessTextureTransform?: TextureTransform;
     normalTexture?: TextureData;
+    normalTextureTransform?: TextureTransform;
     unlit?: boolean;
     shading?: 'standard' | 'lambert' | 'phong';
     specular?: readonly number[];
     shininess?: number;
     normalScale?: number;
     occlusionTexture?: TextureData;
+    occlusionTextureTransform?: TextureTransform;
     occlusionStrength?: number;
     emissiveTexture?: TextureData;
+    emissiveTextureTransform?: TextureTransform;
     emissiveStrength?: number;
     transmission?: number;
     ior?: number;
@@ -562,6 +578,11 @@ interface Node {
         extras?: Extras;
     }[];
     primitivesKey?: object;
+    lines?: {
+        geometry: Geo;
+        material?: Mat;
+        extras?: Extras;
+    }[];
     camera?: CameraData;
     light?: LightData;
     matrix?: number[];
@@ -581,12 +602,15 @@ interface PixelArtSampling {
     wrap?: 'repeat' | 'clamp' | 'mirror';
 }
 
+type PrimitiveMode = 'POINTS' | 'LINES' | 'LINE_LOOP' | 'LINE_STRIP' | 'TRIANGLES' | 'TRIANGLE_STRIP' | 'TRIANGLE_FAN' | 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
 interface SceneOptions {
     onlyVisible?: boolean;
     root?: Mesh;
     geometryData?: Lookup<Geometry, GeometryData>;
     materialData?: Lookup<PbrMaterial, MaterialData>;
     pixelArt?: boolean | PixelArtSampling;
+    onWarning?: (warning: ExportWarning) => void;
 }
 
 interface SkinData {
@@ -610,6 +634,12 @@ interface TextureData {
     extras?: Extras;
 }
 
+interface TextureTransform {
+    offset: Vec2;
+    scale: Vec2;
+    rotation?: number;
+}
+
 class Writer {
     readonly parts: {
         bytes: Uint8Array;
@@ -617,6 +647,7 @@ class Writer {
     }[];
     length: number;
     pixelArt?: PixelArtSampling;
+    sparseMorphs: boolean;
     constructor(maxBinary?: number, maxFile?: number);
     fits(bytes: number): void;
     plan(bytes: number): void;

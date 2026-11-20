@@ -43,6 +43,7 @@ export interface ModelOrientation {
 export class VoxelModelRenderer {
     readonly world: VoxelWorld;
     static create(engine: Engine, world: VoxelWorld, options?: VoxelModelRendererOptions, signal?: AbortSignal): Promise<VoxelModelRenderer>;
+    origin: VoxelOrigin | null;
     private constructor();
     update(): void;
     dispose(): void;
@@ -51,11 +52,12 @@ export class VoxelModelRenderer {
 
 export interface VoxelModelRendererOptions {
     material?: (type: BlockType, texture: number) => Material;
+    origin?: VoxelOrigin | null;
 }
 
 export function defineBlockModel(blocks: BlockTypes, name: string, options: BlockModelOptions): number;
 
-export function meshBlockModels(world: VoxelWorld, cx: number, cy: number, cz: number, solidOnly?: boolean): BlockModelSurface[];
+export function meshBlockModels(world: VoxelWorld, cx: number, cy: number, cz: number, solidOnly?: boolean, local?: boolean): BlockModelSurface[];
 
 export function modelState(id: number, orientation?: number): number;
 
@@ -157,6 +159,10 @@ class VoxelChunk {
     get byteLength(): number;
     pack(): PackedChunk;
     static unpack(packed: PackedChunk): VoxelChunk;
+}
+
+interface VoxelOrigin {
+    readonly origin: ArrayLike<number>;
 }
 
 class VoxelWorld {

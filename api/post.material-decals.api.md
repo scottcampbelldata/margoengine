@@ -45,7 +45,11 @@ export class MaterialDecals implements EnginePlugin {
 
 export interface MaterialDecalsOptions {
     targets?: () => MaterialDecalTargets | undefined;
-    atlas?: GPUTexture;
+    atlas?: Borrowable<GPUTexture>;
     enabled?: boolean;
 }
+
+// Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 ```

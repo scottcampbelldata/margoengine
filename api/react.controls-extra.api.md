@@ -4,7 +4,9 @@
 
 ```ts
 import { PresentationOptions, ScrollControlOptions } from "@margoengine/controls/presentation";
-import { CSSProperties, ReactNode } from "react";
+import { Vec3 } from "@margoengine/core";
+import { Mesh } from "@margoengine/core/extension";
+import { CSSProperties, ReactNode, RefObject } from "react";
 
 export function KeyboardControls<T extends string = string>({ map, children, domElement, onChange }: KeyboardControlsProps<T>): import("react").JSX.Element;
 
@@ -24,6 +26,33 @@ export interface KeyboardControlsProps<T extends string = string> {
 export type KeyboardControlsState<T extends string = string> = Readonly<Record<T, boolean>>;
 
 export type KeyboardSubscribe<T extends string = string> = <V>(selector: (state: KeyboardControlsState<T>) => V, listener: (value: V, previous: V) => void) => () => void;
+
+export interface MotionCurve {
+    getPointAt(u: number): ArrayLike<number>;
+    getTangentAt(u: number): ArrayLike<number>;
+    getLength(): number;
+}
+
+export const MotionPathControls: import("react").ForwardRefExoticComponent<MotionPathControlsProps & import("react").RefAttributes<MotionState>>;
+
+export interface MotionPathControlsProps {
+    curves: readonly MotionCurve[];
+    object?: RefObject<EngineMesh | null>;
+    focus?: Vec3 | RefObject<EngineMesh | null>;
+    offset?: number;
+    damping?: number;
+    focusDamping?: number;
+    loop?: boolean;
+    children?: ReactNode;
+}
+
+export interface MotionState {
+    current: number;
+    readonly curves: readonly MotionCurve[];
+    readonly point: Point;
+    readonly tangent: Point;
+    readonly focus: Point;
+}
 
 export function PresentationControls(_arg0: PresentationControlsProps): import("react").JSX.Element;
 
@@ -69,5 +98,11 @@ export interface ScrollState {
 export function useKeyboardControls<T extends string = string>(): [KeyboardSubscribe<T>, () => KeyboardControlsState<T>];
 export function useKeyboardControls<T extends string = string, V = boolean>(selector: (state: KeyboardControlsState<T>) => V): V;
 
+export function useMotion(): MotionState;
+
 export function useScroll(): ScrollState;
+
+// Not exported from this entry, but used by the exports above:
+
+type Point = [number, number, number];
 ```

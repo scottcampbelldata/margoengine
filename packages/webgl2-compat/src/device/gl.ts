@@ -58,6 +58,44 @@ export function extensions(gl: WebGL2RenderingContext): Extensions {
   };
 }
 
+/**
+ * Slots of the numeric GL state GLState caches (GLState.changed): each names the first of its numbers. A value is
+ * compared and stored as numbers, so a replay that sets the same state every frame builds no string, array or closure
+ * to find that out (KB-COMPAT-FRAMEALLOC1: string keys and closures here were kilobytes of garbage a frame).
+ */
+export const S = {
+  /** x, y, width, height. */
+  viewport: 0,
+  /** x, y, width, height. */
+  scissor: 4,
+  /** near, far. */
+  depthRange: 8,
+  /** r, g, b, a. */
+  blendColor: 10,
+  /** The GL-wide colour mask: bits 1, 2, 4 and 8 for red, green, blue and alpha. */
+  colorMask: 14,
+  /** Draw buffer i's colour mask (OES_draw_buffers_indexed) at colorMaskAt + i, i from 0 to 7. */
+  colorMaskAt: 15,
+  depthMask: 23,
+  /** The GL-wide stencil write mask. */
+  stencilMask: 24,
+  /** The front face's stencil write mask; the back face's follows. */
+  stencilMaskFront: 25,
+  stencilMaskBack: 26,
+  cullFace: 27,
+  frontFace: 28,
+  depthFunc: 29,
+  /** slope, bias, clamp. */
+  polygonOffset: 30,
+  /** func, reference, read mask: the front face's, then the back face's at stencilFuncBack. */
+  stencilFuncFront: 33,
+  stencilFuncBack: 36,
+  /** fail, depth-fail and pass operations: the front face's, then the back face's at stencilOpBack. */
+  stencilOpFront: 39,
+  stencilOpBack: 42,
+} as const;
+const SLOTS = 45;
+
 /** The GL state the device sets, cached. Every setter is a no-op when the value is already set. */
 export class GLState {
   private program: WebGLProgram | null = null;
@@ -65,8 +103,12 @@ export class GLState {
   private drawFbo: WebGLFramebuffer | null = null;
   private readFbo: WebGLFramebuffer | null = null;
   private readonly enabled = new Map<number, boolean>();
-  private readonly keys = new Map<string, string>();
-  private readonly ubo: string[] = [];
+  /** The numeric state by slot (S); NaN where it is not known. */
+  private readonly nums = new Float64Array(SLOTS).fill(Number.NaN);
+  /** The blend state as its key: index 0 the GL-wide one, 1 + i draw buffer i's; undefined where it is not known. */
+  private readonly blends: (string | undefined)[] = new Array(9).fill(undefined);
+  /** The uniform buffer range bound at each binding point: buffer id, offset and size, three numbers a point. */
+  private ubo = new Float64Array(0);
   private readonly units: { target: number; texture: WebGLTexture | null; sampler: WebGLSampler | null }[] = [];
   private active = -1;
   /** State changes asked for and those the cache found already in place (no GL call made), for the hit rate. */
@@ -113,24 +155,62 @@ export class GLState {
     if (on) this.gl.enable(cap);
     else this.gl.disable(cap);
   }
-  /** Runs `set` when `value` differs from the last value stored under `key`. */
-  set(key: string, value: string, set: () => void): void {
-    if (this.hit(this.keys.get(key) === value)) return;
-    this.keys.set(key, value);
-    set();
+  /**
+   * True, storing the values, when the `n` numbers (1 to 4) at slot `at` (S) differ from those cached there: the caller
+   * then makes the GL call. False when they are already set.
+   */
+  changed(at: number, n: number, a: number, b = 0, c = 0, d = 0): boolean {
+    const v = this.nums;
+    if (this.hit(v[at] === a && (n < 2 || v[at + 1] === b) && (n < 3 || v[at + 2] === c) && (n < 4 || v[at + 3] === d)))
+      return false;
+    v[at] = a;
+    if (n > 1) v[at + 1] = b;
+    if (n > 2) v[at + 2] = c;
+    if (n > 3) v[at + 3] = d;
+    return true;
   }
-  /** The value last stored under `key` by `set`, while it is cached. */
-  value(key: string): string | undefined {
-    return this.keys.get(key);
+  /** The number cached at slot `at` (S), NaN when not known. */
+  num(at: number): number {
+    return this.nums[at];
   }
-  /** Drops a cached key, so the next `set` of it runs. */
-  forget(key: string): void {
-    this.keys.delete(key);
+  /** Drops `n` numbers from slot `at` (S), so the next change to them makes its GL call. */
+  forget(at: number, n = 1): void {
+    this.nums.fill(Number.NaN, at, at + n);
+  }
+  /** Sets the viewport (cached). */
+  viewport(x: number, y: number, w: number, h: number): void {
+    if (this.changed(S.viewport, 4, x, y, w, h)) this.gl.viewport(x, y, w, h);
+  }
+  /** Sets the scissor box (cached). */
+  scissor(x: number, y: number, w: number, h: number): void {
+    if (this.changed(S.scissor, 4, x, y, w, h)) this.gl.scissor(x, y, w, h);
+  }
+  /**
+   * True, storing it, when blend key `key` differs from the one cached for draw buffer `i` (-1 for the GL-wide blend
+   * state): the caller then sets the blend state.
+   */
+  blendChanged(i: number, key: string): boolean {
+    if (this.hit(this.blends[i + 1] === key)) return false;
+    this.blends[i + 1] = key;
+    return true;
+  }
+  /** Drops the cached blend state of draw buffer `i` (-1 for the GL-wide one). */
+  forgetBlend(i: number): void {
+    this.blends[i + 1] = undefined;
   }
   uniformBuffer(point: number, buffer: WebGLBuffer, id: number, offset: number, size: number): void {
-    const key = `${id}:${offset}:${size}`;
-    if (this.hit(this.ubo[point] === key)) return;
-    this.ubo[point] = key;
+    let u = this.ubo;
+    const at = point * 3;
+    if (at + 3 > u.length) {
+      // Grown once to the highest binding point used, never per call.
+      const grown = new Float64Array(at + 3).fill(Number.NaN);
+      grown.set(u);
+      this.ubo = u = grown;
+    }
+    if (this.hit(u[at] === id && u[at + 1] === offset && u[at + 2] === size)) return;
+    u[at] = id;
+    u[at + 1] = offset;
+    u[at + 2] = size;
     this.gl.bindBufferRange(this.gl.UNIFORM_BUFFER, point, buffer, offset, size);
   }
   /** Binds a texture and sampler to a unit. */
@@ -249,7 +329,10 @@ export class GLObjects {
       this.dirty = false;
       for (const [o, [, owner]] of this.live) if (owner && !owner.deref()) this.free(o);
     }
-    for (const o of this.later.splice(0)) this.free(o);
+    // By index, then emptied: splice(0) made an array on every submit.
+    const later = this.later;
+    for (let i = 0; i < later.length; i++) this.free(later[i]);
+    later.length = 0;
   }
 
   /** Deletes every object left (the device is being destroyed). */

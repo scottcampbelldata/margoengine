@@ -285,3 +285,75 @@ test('regression: overlapping shells of one input are joined first', () => {
     };
   assert.ok(!booleanMeshesExact(parts, cutter, 'union', { createId: ids() }).diagnostics.some((line) => line.includes('shells')));
 });
+
+test('regression: a keeps its face IDs when b uses the same ones, whatever order the pieces come in', () => {
+  // Both cubes name their faces box-face-0 to 5. Seed 1 of this offset set once gave five of a's faces fresh IDs in
+  // the exact difference, because a b piece came first and took the shared ID.
+  const a = createPrimitiveMesh('cube', 'box');
+  for (let s = 0; s < 8; s++) {
+    const k = 0.5 + Math.abs(Math.sin(s * 3.1)),
+      offset = [12.9898, 78.233, 37.719].map((x) => Math.sin(s * x) * 0.6),
+      b = createPrimitiveMesh('cube', 'box');
+    b.vertices = b.vertices.map((p) => p.map((x, axis) => x * k + offset[axis]));
+    for (const run of [booleanMeshes, booleanMeshesExact])
+      for (const operation of ['union', 'difference', 'intersection']) {
+        const result = run(a, b, operation, { createId: ids() });
+        for (const face of a.faces) {
+          const pieces = result.faceMap.a[face.id];
+          if (pieces.length) assert.ok(pieces.includes(face.id), `${run.name} ${operation} seed ${s}: ${face.id}`);
+        }
+        // b may keep a shared ID only when no piece of a's face with that ID survived.
+        for (const [id, source] of Object.entries(result.sources))
+          if (source.input === 'b' && id in result.faceMap.a)
+            assert.equal(result.faceMap.a[id].length, 0, `${run.name} ${operation} seed ${s}: ${id}`);
+      }
+  }
+});
+
+test('regression: an input with a shell of over 125,000 vertices is joined without a stack overflow', () => {
+  // The shell bounds test spread every coordinate into Math.max, which overflows the call stack past about 125,000.
+  const n = 148,
+    index = new Map(),
+    vertices = [],
+    faces = [],
+    uv = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ],
+    at = (p) => {
+      const key = p.join(',');
+      if (!index.has(key)) {
+        index.set(key, vertices.length);
+        vertices.push(p);
+      }
+      return index.get(key);
+    };
+  for (let axis = 0; axis < 3; axis++)
+    for (const side of [0, 1])
+      for (let i = 0; i < n; i++)
+        for (let j = 0; j < n; j++) {
+          const corner = (s, t) => {
+              const p = [0, 0, 0];
+              p[axis] = side;
+              p[(axis + 1) % 3] = s / n;
+              p[(axis + 2) % 3] = t / n;
+              return at(p);
+            },
+            loop = [corner(i, j), corner(i + 1, j), corner(i + 1, j + 1), corner(i, j + 1)];
+          faces.push({ id: `${axis}-${side}-${i}-${j}`, vertices: side ? loop : loop.reverse(), uv });
+        }
+  const small = (d, prefix) => {
+      const cube = createPrimitiveMesh('cube', prefix);
+      return { vertices: cube.vertices.map((p) => p.map((x) => x * 0.1 + d)), faces: cube.faces };
+    },
+    extra = small(5, 'near'),
+    a = {
+      vertices: [...vertices, ...extra.vertices],
+      faces: [...faces, ...extra.faces.map((f) => ({ ...f, vertices: f.vertices.map((v) => v + vertices.length) }))],
+    };
+  assert.ok(vertices.length > 125000);
+  const result = booleanMeshesExact(a, small(9, 'far'), 'union', { createId: ids() });
+  assert.equal(result.mesh.faces.length, a.faces.length + 6);
+});

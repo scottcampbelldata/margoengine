@@ -7,7 +7,7 @@ import { Snow, snowWGSL, type SnowOptions } from './snow.js';
 import { noiseWGSL } from './scene-patch.js';
 import type { PrecipitationCover } from './cover.js';
 
-/** Imported model accepting gltf-pro's composable lighting/shading effects. */
+/** Imported model accepting gltf/pbr's composable lighting/shading effects. */
 export interface WeatherGLTFModel {
   addLighting(effect: GLTFWeather): () => void;
 }
@@ -83,21 +83,34 @@ export class GLTFWeather implements EnginePlugin {
     this.onPreUpdate(0);
   }
 
-  onPreUpdate(delta: number): void {
+  /** Seconds on the rain rings' clock (the puddles' `time`). */
+  get time(): number {
+    return this.puddles.time;
+  }
+
+  /**
+   * Moves the rain rings' clock by `delta` seconds without drawing; `seek` from `@margoengine/cutscene/seek` replays
+   * these steps. Snow has no clock: it follows its weather.
+   */
+  advanceTime(delta: number): void {
     this.alive();
-    this.puddles.onPreUpdate(delta);
+    this.puddles.advanceTime(delta);
+  }
+
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
     this.snow.onPreUpdate(delta);
     this.values.set(this.puddles.packed());
     this.values.set(this.snow.packed(), 8);
     if (this.uniform) this.engine!.gpu!.queue.writeBuffer(this.uniform, 0, this.values);
   }
 
-  /** gltf-pro shading hook. Shared noise appears only once in the shader. */
+  /** gltf\/pbr shading hook. Shared noise appears only once in the shader. */
   shader(source: string, group: number): string {
     this.alive();
     const start = source.indexOf('fn surface(i:Out,front:bool)->Surface {');
     const end = source.indexOf('return s;', start);
-    if (start < 0 || end < 0) throw new MargoError('unsupported', 'GLTFWeather needs the standard gltf-pro surface shader');
+    if (start < 0 || end < 0) throw new MargoError('unsupported', 'GLTFWeather needs the standard gltf/pbr surface shader');
     const wet = this.options.puddles?.wetSurfaces ?? true;
     const edit = `{
       let weatherWater=weather_puddle_surface(i.position,s.n,s.base.rgb,s.roughness,s.metal,${wet},weatherPuddles);
@@ -108,9 +121,13 @@ export class GLTFWeather implements EnginePlugin {
       s.n=weather_snow_normal(i.position.xz,s.n,weatherCover,weatherSnow);}
     }`;
     let code = source.slice(0, end) + edit + source.slice(end);
-    // The world-space lift runs after skinning/morphing and before camera projection.
-    code = code.replace('o.clip=f.camera*p; o.position=p.xyz;',
-      'var weatherPosition=p;weatherPosition.y+=weather_snow_depth(p.xz,normalize((f.normalMatrix*vec4f(i.normal.xyz,0)).xyz).y,weatherSnow);o.clip=f.camera*weatherPosition;o.position=weatherPosition.xyz;');
+    // The world-space lift runs after skinning/morphing and before camera projection. It is the depth on flat ground at
+    // the vertex's place, not by its normal, so a hard edge's vertices rise together and its faces stay joined.
+    const projection = 'o.clip=f.camera*p; o.position=p.xyz;';
+    if (code.split(projection).length !== 2)
+      throw new MargoError('unsupported', 'GLTFWeather snow needs the standard gltf/pbr vertex projection');
+    code = code.replace(projection,
+      'var weatherPosition=p;weatherPosition.y+=weather_snow_depth(p.xz,1.0,weatherSnow);o.clip=f.camera*weatherPosition;o.position=weatherPosition.xyz;');
     const weatherShader = `${source.includes('fn weather_noise(') ? '' : noiseWGSL}
       ${puddleWGSL.slice(noiseWGSL.length)}${snowWGSL.slice(noiseWGSL.length)}
       struct WeatherGLTFUniform { puddles:WeatherPuddles, snow:WeatherSnow }
@@ -119,7 +136,7 @@ export class GLTFWeather implements EnginePlugin {
     return this.options.cover?.shader(weatherShader, group) ?? weatherShader;
   }
 
-  /** Current uniform resource for gltf-pro's group 2. */
+  /** Current uniform resource for gltf\/pbr's group 2. */
   bindings(): GPUBindGroupEntry[] {
     this.alive();
     return this.uniform ? [{ binding: 160, resource: { buffer: this.uniform } }, ...(this.options.cover?.bindings() ?? [])] : [];

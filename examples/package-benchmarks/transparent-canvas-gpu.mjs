@@ -1,4 +1,4 @@
-// Real-GPU check of TransparentCanvas from @margoengine/environment (run on AC power, holding the GPU lock, after npm run build:packages, with the
+// Real-GPU check of TransparentCanvas from @margoengine/environment (run on AC power, after npm run build:packages, with the
 // pre-fix post build copied to test-results/post-before):
 //   node examples/package-benchmarks/transparent-canvas-gpu.mjs
 // 1. Transparent canvas over a magenta page: empty pixels show the page, the box covers it, and silhouette pixels are

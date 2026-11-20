@@ -308,14 +308,18 @@ export class BiomeWorld implements Disposable {
     const biomes = options.biomes ?? (await defaultBiomes()),
       given = options.height,
       // Paths carved into heights load the splines entry; the rest of the checks read the source under them.
-      carved = typeof given === 'object' && given !== null && 'carve' in given,
-      h = carved ? given.base : given;
+      carved = typeof given === 'object' && given !== null && 'carve' in given;
+    // A carve's base may itself be carved (paths over paths): the relief checks read the source under all of them.
+    let h = given;
+    while (typeof h === 'object' && h !== null && 'carve' in h) h = h.base;
     if (carved) await import('@margoengine/biomes/splines');
     // The procedural relief is its own entry, loaded only for worlds that use it (the default height).
     if (h === undefined || (typeof h === 'object' && h !== null && 'relief' in h)) {
       relief ??= (await import('@margoengine/biomes/relief')).createRelief;
       // So is erosion, loaded only for a relief that asks for it.
       if (h?.relief?.erosion) await import('@margoengine/biomes/erosion');
+      // And the mountain valley, only for a relief with one.
+      if (h?.relief?.mountainValley) await import('@margoengine/biomes/valley');
     }
     // Heights and region fields are their own entry, so a program that only defines biomes never loads them.
     regionEntry ??= await import('@margoengine/biomes/region');

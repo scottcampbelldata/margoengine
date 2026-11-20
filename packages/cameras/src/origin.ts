@@ -56,7 +56,7 @@ export class FloatingOrigin implements EnginePlugin {
     if (!this.engine) throw margoError('state', 'FloatingOrigin is not attached; call engine.use(origin) first');
     return this.engine.camera;
   }
-  /** Places a root mesh (or a gltf-pro `model.root`) at a float64 world position and keeps it there across rebases. */
+  /** Places a root mesh (or a gltf\/pbr `model.root`) at a float64 world position and keeps it there across rebases. */
   place(mesh: Mesh, world: ArrayLike<number>): void {
     const m = meshRuntime(mesh);
     m.check();

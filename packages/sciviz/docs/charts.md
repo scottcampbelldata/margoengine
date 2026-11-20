@@ -30,6 +30,9 @@ using restored = SelectionStore.fromJSON(selection.toJSON());
 console.log(restored.rowIds);
 ```
 
+`query.series(time, value)` reads numeric columns only: an int64 or categorical column rejects with a coded error
+(int64 is never rounded), so convert it to a `Float64Array` first.
+
 A brush can carry a `predicate`, any structured-cloneable description of what produced its rows (axis ranges,
 a query string). The store keeps it with that brush through undo, redo, `toJSON` and `fromJSON`; read it back with
 `predicate(source)`, which returns a copy, or undefined once the brush is replaced, cleared or undone away. Controllers
@@ -61,10 +64,15 @@ states aggregate membership semantics and the real 2MASS sample's selection bias
 
 `/table` reads CSV, Arrow IPC and Parquet into `ColumnarTable`. Borrowed immutable
 typed columns preserve physical widths, int64, units, dictionary categories and an
-LSB-first null bitmap. Null and numeric NaN are distinct. `take` owns its copied
+LSB-first null bitmap. Null and numeric NaN are distinct. `readCSV` follows pandas
+`read_csv` defaults: empty and whitespace-only lines are skipped (before or after the
+header), and `nan`, `NaN`, `-nan`, `inf`, `-inf` and `Infinity` (any case, optional
+sign) in a numeric column read as NaN and +-Infinity rather than turning it into text. `take` owns its copied
 storage. `CrossFilter` ANDs indexed dimensions; range is [lower,upper), exact sets
 can explicitly include null. CPU/GPU aggregates have their declared precision and
 supported types; do not downcast int64/decimal values merely for chart convenience.
+Aggregation bin i holds lo + i w <= v < lo + (i + 1) w (w = range / bins; the last bin
+also holds hi), the same edges the bars are drawn with.
 `bindTableAggregate` refreshes linked output and owns only its binding/layers.
 The TLC table demo records format and numeric limits alongside the source data.
 
@@ -76,7 +84,10 @@ preserves storage, but the calculator is not an exact arbitrary-int64 query engi
 `series` returns an owned, time-sorted snapshot with original keys; `plot` must be
 called again after selection changes and owns its resulting layer. Empty/singleton
 selections draw no line. `Spreadsheet(container,query,options)` is sortable/read-only
-with bounded DOM, click/Space selection and modifier algebra. Defaults: rowHeight 28,
+with bounded DOM, click/Space selection and modifier algebra. The grid is one tab stop:
+arrow keys move the active cell, ArrowUp from the first row reaches the column headers
+(`aria-sort` names each one's order) and Enter or Space there sorts that column like a
+click, ascending first, then descending. Defaults: rowHeight 28,
 columnWidth 160, height 360, overscan 3, all columns, selectedOnly false. Dispose or
 abort removes its view/listeners, leaving the table/query alive.
 
@@ -160,8 +171,14 @@ settle. It owns axis chrome/listeners and borrows the Figure/traces. Original da
 coordinates remain available to hover even when plot coordinates are normalized.
 Secondary/broken axes, insets, visibility, range selectors and controller.toSVG
 share those mappings; use the controller exporter for custom axes/insets. Defaults:
-existing domains, four minor ticks, crosshair/unified hover true. `setLimits` on a
+existing domains, four minor ticks, crosshair/unified hover true. An axis break
+masks its band and marks each end inside the visible range (a zoom clips it); a
+secondaryY break masks and marks the right axis only. `setLimits` on a
 scaled Figure uses physical data units; `space:'plot'` requests portable plot windows.
+`numberFormatter` modes `si` and `engineering` write powers of 1000 from the value's
+shortest decimal text: `si` uses the prefixes quecto (q, 1e-30) to quetta (Q, 1e30) of
+the 2022 SI and writes e<power> beyond them; `date` prints values a Date cannot hold
+(non-finite or past 8.64e15 ms) as numbers.
 `/categorical` supplies band scales, deterministic jitter, RGB image traces and
 single/complete/average hierarchical clustering. Supply category ordering and image
 scale explicitly when physical meaning depends on them; clustering isn't a class
@@ -172,7 +189,11 @@ All supplied channels have matching lengths; patches replace only specified chan
 Original double-precision `streamData` survives display normalization. Default rollover
 is 10000 (maximum one million). Each call snapshots input and publishes only complete
 replacements; transient CPU/GPU allocation is possible. `disposeStream` ends streaming,
-leaving layer disposal to its owner. It composes with `/format` without losing original
+leaving layer disposal to its owner. Every append carries the same colour and size
+channels as the original trace, and on a 3D figure its z too (a missing z would put the
+new samples at z = 0). A layer is claimed from the moment `streamLayer` starts binding, so
+a second bind rejects until `disposeStream`; aborting the signal while it binds rejects
+with the abort reason and leaves the layer free. It composes with `/format` without losing original
 coordinates. `SlidingTimeWindow` duration is milliseconds for date axes, smoothing
 defaults to 250 ms, and `advance(elapsed)` supports deterministic caller clocks.
 
@@ -180,6 +201,8 @@ WebSocket, SSE and polling adapters expose async iterators; callers own iterator
 cleanup. Cancellation while SSE awaits bytes cancels the pending read and preserves
 the exact reason. SSE defaults Accept to text/event-stream only when the caller
 omits Accept; explicit overrides, including an empty value, remain unchanged.
+The response must be text/event-stream as Fetch extracts a MIME type: case-insensitive,
+whitespace allowed before parameters, and the last valid value of a repeated header wins.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';

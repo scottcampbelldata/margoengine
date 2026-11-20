@@ -58,3 +58,14 @@ test('a consuming build of root, geographic tiles, scalar meshes and flow import
  const modules=[result].flat().flatMap(x=>x.output).filter(x=>x.type==='chunk').flatMap(x=>Object.keys(x.modules));
  assert.ok(modules.length>10);assert.ok(modules.every(path=>!path.replaceAll('\\','/').includes('/packages/sky/')),modules.filter(path=>path.includes('sky')).join('\n'));
 });
+
+// A GPU device stand-in: every member is a callable that returns another stand-in.
+const standIn=()=>new Proxy(function(){},{get:(_,key)=>key==='then'?undefined:typeof key==='symbol'?undefined:standIn(),apply:()=>standIn()});
+test('a globe a 2D chart refuses leaves the renderer without its sky drawing',async()=>{
+ for(const k of ['GPUBufferUsage','GPUShaderStage','GPUTextureUsage'])globalThis[k]??=new Proxy({},{get:()=>1});
+ const added=new Set(),
+  renderer={device:standIn(),add:(l)=>added.add(l),remove:(l)=>added.delete(l)},
+  refusing={renderer,addLayer(){throw new TypeError('This layer needs a 3D figure');},remove(){}};
+ await assert.rejects(globeAtmosphere(refusing),TypeError);
+ assert.equal(added.size,0);
+});

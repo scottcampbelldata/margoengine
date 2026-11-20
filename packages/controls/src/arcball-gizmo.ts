@@ -4,8 +4,9 @@ import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Prim, RGBA } from './gizmo.js';
 import { madd, type V3 } from './math.js';
 import { OverlayRenderer, tessellate } from './overlay.js';
-import { basis, type Basis } from './view.js';
+import { rollFrame, type Basis } from './view.js';
 import { viewSize } from '../../shared/view-rect.js';
+import { typeError } from '../../shared/errors.js';
 
 /** What `ArcballGizmo` draws from: an `ArcballControls` on an engine. */
 export interface ArcballGizmoTarget {
@@ -74,7 +75,7 @@ export class ArcballGizmo {
   }
   constructor(controls: ArcballGizmoTarget, options: ArcballGizmoOptions = {}) {
     const engine = controls.engine;
-    if (!engine) throw new TypeError('ArcballGizmo needs controls made on an engine, not a bare Camera');
+    if (!engine) throw typeError('ArcballGizmo needs controls made on an engine, not a bare Camera', 'controls-arguments');
     this.controls = controls;
     this.engine = engine;
     this.autoHide = options.autoHide ?? true;
@@ -99,13 +100,13 @@ export class ArcballGizmo {
     const { camera, element } = this.controls,
       width = Math.max(1, element?.clientWidth ?? 1),
       height = Math.max(1, element?.clientHeight ?? 1),
-      b = basis(camera);
+      b = rollFrame(camera);
     return ((2 * (b.ortho ?? b.distance * b.tanHalf)) / height) * (Math.min(width, height) / 2);
   }
   /** The lines of the current frame. */
   prims(): Prim[] {
     const { camera } = this.controls,
-      b = basis(camera),
+      b = rollFrame(camera),
       center = [...camera.target] as V3,
       r = this.radius(),
       back: V3 = [-b.forward[0], -b.forward[1], -b.forward[2]],
@@ -142,23 +143,35 @@ export class ArcballGizmo {
       this.grabbed = null;
       if (!this.visible || this.disposed || this.autoHide) return false;
       const { camera } = this.controls,
-        b = basis(camera),
+        b = rollFrame(camera),
         center = [...camera.target] as V3,
         r = this.radius();
       let best = GRAB_PIXELS;
       AXES.forEach((axis, i) => {
         const u = normalize(cross(axis, AXES[(i + 1) % 3])) as V3,
-          v = cross(axis, u) as V3;
+          v = cross(axis, u) as V3,
+          at = (s: number): V3 => {
+            const a = (s / SEGMENTS) * Math.PI * 2;
+            return madd(madd([0, 0, 0], u, Math.cos(a) * r), v, Math.sin(a) * r);
+          };
+        // Distance to each drawn segment between projected neighbours, so the whole line grabs, not only its vertices.
         for (let s = 0; s < SEGMENTS; s++) {
-          const a = (s / SEGMENTS) * Math.PI * 2,
-            radial = madd(madd([0, 0, 0], u, Math.cos(a) * r), v, Math.sin(a) * r);
+          const start = at(s),
+            end = at(s + 1),
+            [ax, ay] = this.screen(madd(center, start, 1), b),
+            [bx, by] = this.screen(madd(center, end, 1), b),
+            dx = bx - ax,
+            dy = by - ay,
+            l = dx * dx + dy * dy,
+            t = l ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l)) : 0,
+            distance = Math.hypot(x - ax - t * dx, y - ay - t * dy);
+          if (distance >= best) continue;
+          // The grabbed point back on the circle, which must be on the near half.
+          const chord = madd(start, sub(end, start), t),
+            radial = madd([0, 0, 0], chord, r / Math.hypot(...chord));
           if (dot(radial, b.forward) > 0) continue;
-          const [px, py] = this.screen(madd(center, radial, 1), b),
-            distance = Math.hypot(px - x, py - y);
-          if (distance < best) {
-            best = distance;
-            this.grabbed = { axis, radial, x, y };
-          }
+          best = distance;
+          this.grabbed = { axis, radial, x, y };
         }
       });
       return !!this.grabbed;
@@ -167,7 +180,7 @@ export class ArcballGizmo {
       const grabbed = this.grabbed;
       if (!grabbed) return;
       const { camera } = this.controls,
-        b = basis(camera),
+        b = rollFrame(camera),
         point = madd([...camera.target] as V3, grabbed.radial, 1),
         // The ring's tangent at the grabbed point, as pixels for a small turn of the scene.
         step = 1e-3,

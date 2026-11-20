@@ -57,7 +57,7 @@ const deadline = setTimeout(() => {
       stdio: 'ignore',
     });
   console.error('resource campaign hard limit: 40 minutes');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 2400000);
 deadline.unref();
 async function child(side, path) {

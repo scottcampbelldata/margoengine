@@ -1,3 +1,4 @@
+// MARGO_COMPAT not applicable: the page encodes PNGs through ImageBitmap and OffscreenCanvas 2D and makes no GPU calls.
 // exportModel's canvas paths in a real browser (no WebGPU needed): ImageBitmap sources encode through OffscreenCanvas,
 // flipY flips rows (raw rows too), maxTextureSize shrinks. Each PNG is decoded back by the browser itself.
 // Run after building the package: node packages/exporters/tests/png-browser.mjs
@@ -5,9 +6,11 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const server = await createServer({
+  plugins: [noFileWatcher()],
   root: fileURLToPath(new URL('..', import.meta.url)),
   configFile: false,
   logLevel: 'error',

@@ -4,8 +4,8 @@
 // before the first frame or after it (late), as a materials mesh or a glTF primitive; 'mixed' is a linear layer in front
 // of a display one. Counts the pass's begin() calls: a layer left on the sorted path never opens it.
 import {Engine} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
-import {extendedMaterials} from '/packages/gltf-pro/dist/extended.js';
+import {parseGLTF} from '/packages/gltf/dist/pbr.js';
+import {extendedMaterials} from '/packages/gltf/dist/extended.js';
 import {UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
 import {OIT} from '/packages/oit/dist/index.js';
 import {ExactOIT} from '/packages/oit/dist/exact.js';

@@ -3,11 +3,12 @@ import type { Mesh as MeshHandle, EngineKernel } from '@margoengine/core';
 import type { GeometryData } from '@margoengine/geometry';
 import type { Model } from '@margoengine/gltf';
 import { parseColor } from '@margoengine/math/color';
-import { MargoError } from '@margoengine/math/errors';
 import type { PbrMaterialProps } from './components.js';
+import { useBakedShadows } from './bake-shadows.js';
 import { live, report, useMesh, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { trackedFetch } from './assets.js';
+import { fault } from '../../shared/errors.js';
 
 /** A texture image: a URL (fetched through the Canvas asset cache, counted by `useProgress`) or the PNG or JPEG bytes. */
 export type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;
@@ -39,6 +40,7 @@ export function TexturedShape({
   onError,
 }: TexturedShapeProps): null {
   const scene = useScene(),
+    baked = useBakedShadows(),
     registry = useMesh(),
     error = useRef(onError);
   error.current = onError;
@@ -48,10 +50,7 @@ export function TexturedShape({
     if (scene.world) {
       report(
         scene,
-        new MargoError(
-          'unsupported',
-          'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>.',
-        ),
+        fault('unsupported', 'A textured Box, Sphere or Plane draws in the Canvas default scene only; move it out of <Scene name>, or load the shape as a glTF <Model>', 'react-usage'),
         error.current,
       );
       return;
@@ -93,7 +92,7 @@ export function TexturedShape({
       if (live(registry)) attach();
       if (scene.shadows && (castShadow || !receiveShadow))
         removeShadows = loaded.meshes.map((mesh) =>
-          scene.shadows!.add(mesh as unknown as MeshHandle, { castShadow, receiveShadow }),
+          scene.shadows!.add(mesh as unknown as MeshHandle, { castShadow, receiveShadow, static: baked }),
         );
     })().catch((cause) => {
       if (!abort.signal.aborted && !scene.engine.disposed) report(scene, cause, error.current);
@@ -107,6 +106,6 @@ export function TexturedShape({
         model.dispose();
       }
     };
-  }, [scene.engine, scene.world, scene.shadows, registry, kind, key, map, colorKey, roughness, metalness, castShadow, receiveShadow]);
+  }, [scene.engine, scene.world, scene.shadows, registry, kind, key, map, colorKey, roughness, metalness, castShadow, receiveShadow, baked]);
   return null;
 }

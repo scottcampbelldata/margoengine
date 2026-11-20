@@ -1,15 +1,13 @@
-// Real-browser check of watchPower, built packages. Takes the GPU lock itself around the browser.
+// Real-browser check of watchPower, built packages.
 // node packages/quality/test/power-browser.mjs
 // The fakes in power.test.js cannot show that the wrappers keep the native receivers: this runs the real battery
 // manager, the real PressureObserver where the browser has one, the real queue and a real engine's pace.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
-const release = await acquire({ owner: 'quality-power' });
 setTimeout(() => {
   console.error('power-browser: stopped at its time limit');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000).unref();
 const context = await openBrowser({ startPath: '/packages/quality/test/ssaa-browser.html', port: 5214 }),
   { page } = context,
@@ -71,5 +69,4 @@ try {
   console.log('power browser check passed');
 } finally {
   await context.close();
-  await release();
 }

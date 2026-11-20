@@ -65,13 +65,11 @@ Options:
 Exit codes: 0 when every case ran and nothing regressed, 1 for a failed case or a regression, 2 for an invalid run with
 `--require-valid`.
 
-Agents on the shared PC wrap GPU runs in the lock as every GPU job does:
+Agents on the shared PC run GPU suites straight from the bench tool:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=<your id> -- npm run bench -- render
+node scripts/run-with-timeout.mjs --max=30 -- npm run bench -- render
 ```
-
-The tool takes the lock itself when it is not wrapped, so both forms are safe.
 
 ## Suites
 
@@ -95,8 +93,8 @@ The tool takes the lock itself when it is not wrapped, so both forms are safe.
 | `react` | browser | Mount 1,000 boxes declared with `@margoengine/react`, then re-render all of them every frame. |
 | `claims` | engine-bench | Opt-in: each other engine's own harness, recorded beside the shared scenes (see [Comparing engines](#comparing-engines)). |
 | `parity` | browser | Opt-in: one scene per row of `docs/threejs-parity.md` that three.js also has (`bench/scenes/parity.js`), run in Margo and in the three.js adapters in engine-bench (`three-webgpu-parity`, `three-webgl-parity`). `npm run bench:parity` runs it and `bench/parity-report.mjs` adds the results to [the speed matrix](whitepaper/perf-vs-threejs.md). |
-| `features` | Node and browser | Opt-in, about an hour: the per-feature scripts in `examples/package-benchmarks` (assembly scale, culling, post stack, loader memory, shadow shimmer, instancing, atlas + VAT, workers, every real-browser test). Each runs once under the run's gate and GPU lock. Its logs and result files go to `benchmarks/runs/<id>/features/`, and the committed results are restored. |
-| `biomes` | Node | Opt-in: biome-map goal G1 on the reference world R16, CPU ms per km2 for each stage on one thread, and the wall time per km2 of fields and stored objects for an 8 x 8 block of tiles on 1 and on 8 worker threads running the built worker script (`bench/biomes/placement.mjs`, `--workers=<n>`). The validated form, with the lock, the quiet gate, 20 samples per case, the 10 % spread limit, a cold band-path placement case, other-process load per sample, identical-output checks and the pre-J2 baseline, is `node packages/biomes/bench/placement-valid.mjs --runs=20` (packages/biomes/README.md). |
+| `features` | Node and browser | Opt-in, about an hour: the per-feature scripts in `examples/package-benchmarks` (assembly scale, culling, post stack, loader memory, shadow shimmer, instancing, atlas + VAT, workers, every real-browser test). Each runs once under the run's gate. Its logs and result files go to `benchmarks/runs/<id>/features/`, and the committed results are restored. |
+| `biomes` | Node | Opt-in: biome-map goal G1 on the reference world R16, CPU ms per km2 for each stage on one thread, and the wall time per km2 of fields and stored objects for an 8 x 8 block of tiles on 1 and on 8 worker threads running the built worker script (`bench/biomes/placement.mjs`, `--workers=<n>`). The validated form, with the quiet gate, 20 samples per case, the 10 % spread limit, a cold band-path placement case, other-process load per sample, identical-output checks and the pre-J2 baseline, is `node packages/biomes/bench/placement-valid.mjs --runs=20` (packages/biomes/README.md). |
 | `tracer` | browser | Opt-in: the voxel path tracer's camera, panorama and fisheye frames on its precise ray functions and, as the like-for-like row (`fast=1`), on the WGSL builtins. |
 
 `npm run bench` runs every suite except `features`, `claims`, `parity`, `biomes` and `tracer`, which run only when named.
@@ -118,7 +116,7 @@ Every result records:
 - the machine: CPU, threads, memory, OS and version, Node;
 - the GPU name and driver (nvidia-smi, or the OS);
 - the browser name and version, the WebGPU adapter and the user agent;
-- the gate: AC power, the GPU lock, CPU and GPU load before the run, and the CPU load before each case;
+- the gate: AC power, CPU and GPU load before the run, and the CPU load before each case;
 - the options, and per suite its status and how long it took.
 
 For each case and metric the result keeps the raw samples (one per run) and their summary:
@@ -212,21 +210,19 @@ npm run bench -- size --compare=benchmarks/baselines/<machine>.json
 The tool runs the gate before every run, so numbers from a busy or throttled machine are never mistaken for real ones:
 
 1. **AC power.** On battery the run refuses to start. `BENCH_ALLOW_BATTERY=1` runs anyway and marks it invalid.
-2. **GPU lock.** Any suite that uses the GPU holds `test-results/gpu.lock` in the main checkout
-   (`scripts/gpu-lock.mjs`) for the whole run, so no other GPU job overlaps it.
-3. **Idle baseline.** Whole-machine CPU must stay at or under `--quiet-max` (20%) for `--quiet-hold` (20 s), from
+2. **Idle baseline.** Whole-machine CPU must stay at or under `--quiet-max` (20%) for `--quiet-hold` (20 s), from
    `scripts/quiet-gate.mjs`. On NVIDIA GPUs, utilisation must also be at or under `--gpu-max` (20%) in three
    samples. A GPU that stays busy marks the run invalid.
-4. **Between cases.** The CPU load is checked again before each case. If it rose over the limit, the run waits for quiet
+3. **Between cases.** The CPU load is checked again before each case. If it rose over the limit, the run waits for quiet
    (10 s hold).
-5. **Repetition.** Each case gets 1 warm-up run and 5 measured runs. Browser runs also warm up for 60 frames before
+4. **Repetition.** Each case gets 1 warm-up run and 5 measured runs. Browser runs also warm up for 60 frames before
    measuring 300.
-6. **Noise.** If a primary metric's spread over runs is over 10%, the run is invalid.
-7. **Fixed conditions.** Browser runs use headless Edge, a 1280 x 720 canvas at DPR 1, vsync and the frame cap off,
+5. **Noise.** If a primary metric's spread over runs is over 10%, the run is invalid.
+6. **Fixed conditions.** Browser runs use headless Edge, a 1280 x 720 canvas at DPR 1, vsync and the frame cap off,
    and cross-origin isolation (fine timers). Builds are minified production bundles served without compression or
    caching. Startup and demo loads use a fresh browser per run.
 
-`--no-gate` skips steps 1 and 3 for a quick look and marks the run invalid.
+`--no-gate` skips steps 1 and 2 for a quick look and marks the run invalid.
 
 A number is official only if all of these hold:
 
@@ -301,7 +297,8 @@ process, and the page got no WebGPU adapter (docs/known-bugs.md, KB-C34i). `scri
 resource, never the pending update's; the channel name stays `msedge` in records. With no version folder that holds the
 executable it starts the top-level file as before: Chrome's version folders hold no `chrome.exe`, so Chrome starts as
 before. `BROWSER_EXECUTABLE` still wins. A GPU check that does start without a WebGPU adapter fails at once with code
-`no-webgpu-adapter` (`openBrowser` in `scripts/browser.js`), and a wait on `window.ready` ends at once with code
+`no-webgpu-adapter` (`openBrowser` in `scripts/browser.js`); in Windows session 0 (an SSH logon or a service) the error
+also carries `reason: 'windows-session-0'` and names the session as the cause. A wait on `window.ready` ends at once with code
 `page-startup-error` when the page throws before it is ready (`scripts/support/page-startup.js`), instead of waiting
 out its timeout.
 
@@ -381,7 +378,7 @@ Comparisons are apples to apples by construction:
 - **One result file.** Every engine's cases sit in the same JSON, under the same `env` (machine, GPU, driver, gate),
   so engines can never be measured on different days by accident.
 - **Published-claim mode.** `npm run bench -- claims --engines=all` (`bench:claims`) runs each engine's own benchmark
-  harness where it lives, under the same gate and GPU lock. An engine opts in with
+  harness where it lives, under the same gate. An engine opts in with
   `"harness": {"command": "npm run bench:render", "cwd": "wasmgpu-repo", "results": ["wasmgpu-repo/bench/out.json"]}` in
   `engines.json` (`command` is one shell command line; paths are relative to engine-bench). Its result files are copied to
   `benchmarks/runs/<id>/claims/<engine>/` and kept in the case as "<engine>'s own harness, not the shared scenes".
@@ -532,7 +529,7 @@ cause, or `{cause, knownBug, fixes: [{commit, tradeoff, rerun}]}`. The Margo sid
    export default {
      name: 'mysuite',
      title: 'What it measures',
-     uses: 'cpu', // 'none' (exact, no gate), 'cpu' (timed, gate) or 'gpu' (gate + GPU lock + browser)
+     uses: 'cpu', // 'none' (exact, no gate), 'cpu' (timed, gate) or 'gpu' (gate with the GPU load check + browser)
      deterministic: false, // true: one run, no warm-up (sizes, counts)
      async cases(ctx) {
        return [
@@ -595,11 +592,9 @@ Unchanged:
 - `examples/package-benchmarks/entry-sizes.mjs` (the `sizes.html` record). The size suite calls its
   `measureEntries()`.
 - `npm run proofs`.
-- `scripts/quiet-gate.mjs` and `scripts/gpu-lock.mjs`, which the gate uses.
+- `scripts/quiet-gate.mjs`, which the gate uses.
 - The per-feature GPU scripts in `examples/package-benchmarks/` and their committed results.
 
-### GPU suite hold and portable evidence records (2026-11-09)
+### Portable evidence records (2026-11-09)
 
-The parallel-plan regression compares each suite hold with twice that suite's declared hard limit, including the 6-minute parity-gamma suite; the default 10-minute limit is not substituted for an explicit limit. The hold implementation and all time budgets are unchanged. `tests/parallel-check.test.js` covers short, default and long declared limits. The decoder evidence records' excluded-directory pointers were corrected separately on main in 988ba0005; `tests/no-private-paths.test.js` checks every tracked file.
-
-`tests/gpu-lock-integration.test.js` adds live shared-holder and stale-mutex acquisition coverage to the landed mutex retirement fix. Both regressions fail on b9985bd07 and pass on e926c998d. The existing real Win32 pending-deletion test remains required. A separate native Windows parent-release probe succeeded for shared and exclusive acquisition; a broader synthetic model that marked every removed parent pending did not reproduce that native behavior and is not evidence of an additional defect.
+The decoder evidence records' excluded-directory pointers were corrected separately on main in 988ba0005; `tests/no-private-paths.test.js` checks every tracked file. The existing real Win32 pending-deletion test remains required.

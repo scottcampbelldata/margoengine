@@ -29,6 +29,7 @@ export class Render3D implements EnginePlugin {
     constructor(options: Render3DOptions);
     static attach(instance: EngineKernel, options: Render3DOptions): Render3D;
     get view(): RenderView;
+    setTarget(target: GPUTexture | (() => GPUTexture) | undefined): void;
     get output(): GPUTexture;
     get depth(): GPUTexture;
     get color(): GPUTexture;

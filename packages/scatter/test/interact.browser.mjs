@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/interact.browser.mjs
 // @margoengine/scatter/interact bends grass away from interactors and lets it recover:
 // 1. Stamp: after one frame with two interactors, every cell of the push field is the CPU's push for its centre

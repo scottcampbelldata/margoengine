@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadertoy restore browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of the borrowed-object rule for Shadertoy texture channels (KB-RESTORE-BORROWED1), driven by
+// shadertoy-restore-browser-check.mjs. A toy.pass() in a PostStack adds iChannel0 (a 2D texture) to iChannel1 (a 3D
+// texture made by a function): red and green make yellow. The plain red texture is lost with its device: after
+// engine.rebootDevice() the frames raise no validation error, iChannel0 reads opaque black (green is left), and
+// engine.onError hears of it once under the channel's name. toy.setChannel brings red back; function forms are made
+// again on each device with no report.
+import {Engine} from '/packages/core/dist/index.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {Shadertoy} from '/packages/shader/dist/shadertoy.js';
+const canvas=document.querySelector('canvas'),errors=[],reported=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,3],target:[0,0,0]}});
+engine.onError=(e)=>reported.push(`${e?.code??''} ${e?.message??e}`);
+const watch=(device)=>device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+watch(engine.gpu);
+const usage=()=>GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST;
+const red=(device)=>{const t=device.createTexture({size:[2,2],format:'rgba8unorm',usage:usage()});
+ device.queue.writeTexture({texture:t},new Uint8Array(16).map((_,i)=>(i%4===0||i%4===3?255:0)),{bytesPerRow:8},[2,2]);return t;};
+const green=(device)=>{const t=device.createTexture({size:[2,2,2],dimension:'3d',format:'rgba8unorm',usage:usage()});
+ device.queue.writeTexture({texture:t},new Uint8Array(32).map((_,i)=>(i%4===1||i%4===3?255:0)),{bytesPerRow:8,rowsPerImage:2},[2,2,2]);return t;};
+let made2d=0,made3d=0;
+const toy=new Shadertoy({image:{
+ source:'void mainImage(out vec4 f, in vec2 c) { f = vec4(texture(iChannel0, vec2(0.5)).rgb + texture(iChannel1, vec3(0.5)).rgb, 1.0); }',
+ iChannel0:red(engine.gpu),
+ iChannel1:{texture:(d)=>(made3d++,green(d)),type:'3d'},
+}});
+PostStack.attach(engine,[toy.pass()]);
+const draw=()=>{try{engine.render({delta:1/60});}catch(error){errors.push(`render threw: ${error?.message??error}`);}};
+async function frames(){for(let i=0;i<30;i++){draw();await engine.gpu.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,20));}}
+async function restore(){const previous=engine.gpu;previous.destroy();await previous.lost;await engine.rebootDevice();watch(engine.gpu);await frames();return engine.gpu!==previous;}
+window.check={
+ errors:()=>errors,reported:()=>reported,made:()=>[made2d,made3d],
+ async step(name){
+  if(name==='restore')return restore();
+  if(name==='fresh')toy.setChannel(0,red(engine.gpu));
+  if(name==='function')toy.setChannel(0,(d)=>(made2d++,red(d)));
+  await frames();return true;
+ },
+};
+window.ready=true;
+</script></body></html>

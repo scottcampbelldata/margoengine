@@ -4,7 +4,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { build } from 'vite';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { openBrowser } from '../../../scripts/browser.js';
 import { runLimited } from '../../../scripts/support/run-limited.mjs';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
@@ -81,7 +80,6 @@ async function prove() {
 process.chdir(resolve(import.meta.dirname, '../../..'));
 if (process.argv.includes('--child')) await prove();
 else {
-  const release = await acquire({ owner: 'codex-missing', mode: 'shared', max: 6, waitMax: 60 });
   await runSuite(
     async () => {
       const result = await runLimited('node packages/biomes/tests/prefetch-check.mjs --child', {
@@ -90,7 +88,7 @@ else {
       });
       assert.ok(result.ok, JSON.stringify(result));
     },
-    async () => release(),
+    async () => {},
   );
 }
 watchExit();

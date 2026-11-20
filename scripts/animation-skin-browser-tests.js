@@ -1,6 +1,6 @@
 // Real-WebGPU check of @margoengine/animation Skin on a materials createMesh mesh: the deformed vertex buffer matches
 // skin.pose() (positions and normals) after posing, a ranged weight update and a device restore, with no validation
-// errors. Run after build:packages: node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/animation-skin-browser-tests.js
+// errors. Run after build:packages: node scripts/run-with-timeout.mjs -- node scripts/animation-skin-browser-tests.js
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';

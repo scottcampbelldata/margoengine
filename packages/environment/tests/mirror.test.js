@@ -299,3 +299,42 @@ test('a cube camera renders six standard faces, each culled against its own face
   cube.dispose();
   assert.throws(() => cube.texture, /disposed/);
 });
+
+test('a cube camera background replaces the scene background passes in its faces only, at their order', async (t) => {
+  const { ColorBackground } = await import('../dist/index.js');
+  const e = await engine(t),
+    order = [];
+  const sceneBackground = new ColorBackground({ color: '#ff0000', order: 0.75 });
+  e.use(sceneBackground);
+  sceneBackground.record = () => order.push('scene background');
+  for (const [name, at] of [
+    ['opaque', 0.25],
+    ['transparent', 2],
+  ])
+    e.frameGraph.add({ name, order: at, execute: () => order.push(name) });
+  const cube = CubeCamera.attach(e, { size: 8, position: [0, 0, 0] });
+  cube.update(1);
+  assert.deepEqual(order, ['opaque', 'scene background', 'transparent'], 'no background set: the scene draws its own');
+  order.length = 0;
+  cube.background = { record: (c) => order.push(`capture background ${c.width}`) };
+  cube.update(1);
+  assert.deepEqual(
+    order,
+    ['opaque', 'capture background 8', 'transparent'],
+    'the capture background draws where the scene background did, which is skipped',
+  );
+  order.length = 0;
+  e.render();
+  assert.deepEqual(order, ['opaque', 'scene background', 'transparent'], 'the main view keeps the scene background');
+  order.length = 0;
+  cube.background = null;
+  cube.update(1);
+  assert.deepEqual(order, ['opaque', 'scene background', 'transparent']);
+  // With no scene background the capture background goes in at 0.5, before transparent passes blend over it.
+  e.removePlugin(sceneBackground.name);
+  order.length = 0;
+  cube.background = { record: () => order.push('capture background') };
+  cube.update(1);
+  assert.deepEqual(order, ['opaque', 'capture background', 'transparent']);
+  cube.dispose();
+});

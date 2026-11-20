@@ -1,4 +1,4 @@
-/** Vertex buffers of a 24-byte (core) or 80-byte (gltf-pro) caster, plus instance matrices when `instanced`. */
+/** Vertex buffers of a 24-byte (core) or 80-byte (gltf/pbr) caster, plus instance matrices when `instanced`. */
 export function casterBuffers(stride: number, displaced?: boolean, instanced?: boolean): GPUVertexBufferLayout[];
 /** How a caster cuts its surface out like its colour pass, besides its alpha texture and cutoff. */
 export interface CasterCutout {
@@ -14,6 +14,13 @@ export interface CasterCutout {
   animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
+  /**
+   * Cuts against hashed noise instead of `cutoff`, as materials `alphaHash()` does in its colour pass, so the shadow
+   * keeps a share of texels equal to the opacity: the caster shader edit (shared/alpha-hash.js `hashedDepth`) that a
+   * materials record hands over as `castHashed`, so only an app that imports `alphaHash` carries its WGSL. Only a
+   * primitive that cuts (`cutoff` above 0) uses it. Default none.
+   */
+  hashed?: (code: string) => string;
   /** Vertex displacement along the normal (materials `displacementMap`, 80-byte vertices). */
   displacement?: CasterDisplacement;
   /** Planes that clip the shadow (materials `clippingPlanes` with `clipShadows`, 80-byte vertices). */
@@ -110,7 +117,7 @@ export function clippedDepth(code: string, binding: number, name: string, hardwa
 export function depthPassDescriptor(): GPURenderPassDescriptor & {
   depthStencilAttachment: GPURenderPassDepthStencilAttachment;
 };
-/** Writes one caster's uniform (view, node matrix, alpha, cutoff, uv set, alpha transform), uploads it and draws. */
+/** Writes one caster's uniform (view, node matrix, alpha, cutoff at least `floor`, uv set, alpha transform), uploads it and draws. */
 export function drawCaster(
   pass: GPURenderPassEncoder,
   device: GPUDevice,
@@ -133,6 +140,8 @@ export function drawCaster(
   transform: ArrayLike<number> | undefined | null,
   displaced: GPUBindGroup | undefined,
   instances: { upload(device: GPUDevice): GPUBuffer; count: number } | undefined | null,
+  /** Lowest cutoff written: the larger of this and `p.cutoff`. Default 0. */
+  floor?: number,
 ): void;
 /** Whether a caster's cached draw `record` no longer fits primitive `p` drawn with `pipeline` and `displacement`. */
 export function staleCaster<R extends object>(

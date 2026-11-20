@@ -1,6 +1,6 @@
 // Clean-room homogeneous projection and even-odd selection; research: docs/clean-room.md.
 import type { GridSource } from './edit.js';
-import { cellAt, cellIndex, cellLimit, checkGrid, checkOptions, type GridLimits } from './grid.js';
+import { cellAt, cellIndex, cellLimit, checkGrid, checkOptions, depthRange, type GridLimits } from './grid.js';
 import { pickRay, raycastGrid } from './pick.js';
 import { SparseGrid } from './sparse.js';
 
@@ -19,6 +19,11 @@ export interface ScreenSelectionOptions extends GridLimits {
   visibleOnly?: boolean;
   /** Cancellation checked before iteration and for each occupied cell. */
   signal?: AbortSignal;
+  /**
+   * The backend the camera matrix was made for, `engine.backend`: `'webgpu'` (default, depth 0 to 1, reversed) or
+   * `'webgl2'` (OpenGL depth -1 to 1). The frustum's near and far tests and `visibleOnly` read depth by it.
+   */
+  backend?: 'webgpu' | 'webgl2';
 }
 
 /** Colour similarity options. */
@@ -97,6 +102,9 @@ function select(
     if (!clip.every(Number.isFinite))
       throw new RangeError('selection transform overflowed; rescale the model and camera');
   }
+  const backend = options.backend ?? 'webgpu',
+    nearZ = depthRange(backend, 'screen selection')[0],
+    gl = nearZ < 0;
   const visible = options.visibleOnly ?? false;
   if (typeof visible !== 'boolean') throw new TypeError('visibleOnly must be boolean; pass true or false');
   const inside = contains(shape),
@@ -112,13 +120,14 @@ function select(
     const cx = clip[0] * px + clip[4] * py + clip[8] * pz + clip[12],
       cy = clip[1] * px + clip[5] * py + clip[9] * pz + clip[13],
       cz = clip[2] * px + clip[6] * py + clip[10] * pz + clip[14];
-    // Margo's camera matrices use zero-to-one reverse depth on both GPU backends.
-    if (!Number.isFinite(cx + cy + cz + w) || cx < -w || cx > w || cy < -w || cy > w || cz < 0 || cz > w) return;
+    // WebGPU matrices keep depth in 0 to w (reversed); WebGL2 ones in -w to w.
+    if (!Number.isFinite(cx + cy + cz + w) || cx < -w || cx > w || cy < -w || cy > w || cz < (gl ? -w : 0) || cz > w)
+      return;
     const sx = cx / w,
       sy = cy / w;
     if (!inside(sx, sy)) return;
     if (visible) {
-      const ray = pickRay(clip, sx, sy),
+      const ray = pickRay(clip, sx, sy, { backend }),
         hit = ray && raycastGrid(source, ray);
       if (!hit || hit.cell[0] !== x || hit.cell[1] !== y || hit.cell[2] !== z) return;
     }

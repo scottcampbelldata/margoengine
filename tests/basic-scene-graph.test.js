@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkBuilt, checkFetched, sceneGraph, staticFiles } from '../scripts/support/basic-scene-graph.mjs';
 
-// The basic scene's build as margoengine/stage/gltf routes it (8f4f4db72): the entry imports the basic loader, gltf-pro
-// and animation dynamically; gltf-pro's codecs are dynamic imports of their own with Wasm and worker assets.
+// The basic scene's build as margoengine/stage/gltf routes it (8f4f4db72): the entry imports the basic loader, gltf/pbr
+// and animation dynamically; gltf/pbr's codecs are dynamic imports of their own with Wasm and worker assets.
 const basic = '../../../packages/gltf/dist/index.js',
-  pro = '../../../packages/gltf-pro/dist/index.js',
+  pro = '../../../packages/gltf/dist/pbr.js',
   animation = '../../../packages/animation/dist/index.js';
 const routed = () => ({
   'index.html': { file: 'app.js', imports: ['shared'], dynamicImports: [basic, pro, animation] },
@@ -20,7 +20,7 @@ const routed = () => ({
 });
 const requests = ['index.html', 'app.js', 'shared.js', 'cycle.js', 'gltf.js', 'parse.js', 'model.glb'];
 
-test('a basic scene fetches the routed @margoengine/gltf graph; gltf-pro, animation and codecs stay deferred', () => {
+test('a basic scene fetches the routed @margoengine/gltf graph; gltf/pbr, animation and codecs stay deferred', () => {
   const graph = sceneGraph(routed());
   assert.equal(graph.loader, basic);
   assert.deepEqual(graph.entry, ['app.js', 'shared.js', 'cycle.js']);
@@ -33,7 +33,7 @@ test('a basic scene fetches the routed @margoengine/gltf graph; gltf-pro, animat
   );
 });
 
-test('the network check passes only the exact basic requests and names a fetched gltf-pro or animation loader', () => {
+test('the network check passes only the exact basic requests and names a fetched gltf/pbr or animation loader', () => {
   const graph = sceneGraph(routed()),
     expected = new Set(requests);
   checkFetched(requests, expected, graph);

@@ -6,7 +6,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { viewMatrix } from '../../shared/view.js';
 import { orthographic } from '../../shared/projection.js';
 import { coreReceives, unshadowedCore } from '../../shared/shadow-source.js';
-import { cullingShader, clusteredSampling } from './shader.js';
+import { cullingShader, clusteredSampling, sizedCullingShader } from './shader.js';
 import { shadowCamera } from './local-shadow-math.js';
 import { viewRect, viewSize } from '../../shared/view-rect.js';
 import {
@@ -46,6 +46,21 @@ export interface PointLight {
   shadow?: boolean | LocalLightShadow;
   /** Shadowed by `LocalShadows` (`@margoengine/clustered/shadows`), with `shadow`'s map size and near/far if given. */
   castShadow?: boolean;
+  /**
+   * Size of the source: the radius of a sphere of light, world units, 0 or more. Default 0, a point. Above 0 the
+   * specular is a sphere light's (Karis 2013: the representative point and its energy normalisation), so a highlight
+   * on a smooth metal is the light's disc and never brighter than the sphere itself, F0 x intensity / (pi radius^2),
+   * however close it comes. Its diffuse is the sphere's irradiance (Snyder 1996), horizon included, never above
+   * intensity / radius^2 even inside the sphere; outside it and above the horizon that equals the point light's
+   * inverse square, and the falloff window is unchanged. It is also the default `shadow.radius` of a
+   * `castShadow` light (PCSS through `LocalShadows`). While no light has a radius the shaders are the point lights'.
+   */
+  radius?: number;
+  /**
+   * Bounces with `LightBounce` (`@margoengine/clustered/bounce`): `true` adds a light without `castShadow`, `false`
+   * leaves out a `castShadow` one. Default: bounce while it casts shadows.
+   */
+  bounce?: boolean;
 }
 /** A local spot light: a point light limited to a cone, set by `outerAngle`/`innerAngle` or `angle`/`penumbra`. */
 export interface SpotLight extends PointLight {
@@ -155,15 +170,37 @@ export interface ClusteredLightTerm {
   declarations(group: number): string;
   bindings(): GPUBindGroupEntry[];
   readonly term: string;
+  /**
+   * The CPU twin of `term` for a term of your own: its factor (r, g, b) for light `index` at world `position`, the
+   * light as {@link ClusteredLightRecord}. `LightBounce` (`@margoengine/clustered/bounce`) weighs the light each
+   * captured surface gets by it, so a lamp bounces the light it casts (KB-BOUNCE-TERMS1); the built-in terms' twins are
+   * in the bounce entry. A term without one counts as 1 there.
+   */
+  emission?(index: number, light: ClusteredLightRecord, position: readonly number[]): readonly [number, number, number];
+  /** Changes whenever {@link emission} may give other values, so `LightBounce` captures its sources again. */
+  readonly revision?: number;
 }
-/** A renderer that receives clustered lights in its own shader (gltf-pro models, materials meshes, `Terrain`); see `lights.add`. */
+/** A point or spot light as the light loop reads it: its position, and a spot's unit axis and cosine of its outer cone. */
+export interface ClusteredLightRecord {
+  readonly position: readonly number[];
+  /** A spot's unit direction (any light given with `direction`); absent for a point light. */
+  readonly direction?: readonly number[];
+  /** cos of the spot's outer cone angle. */
+  readonly cosOuter?: number;
+}
+/** The `Clustered.bounce` hook (`LightBounce` from `@margoengine/clustered/bounce`): WGSL defining `clusterBounceLighting`, and its bindings. */
+export interface ClusteredBounce {
+  declarations(group: number): string;
+  bindings(): GPUBindGroupEntry[];
+}
+/** A renderer that receives clustered lights in its own shader (gltf/pbr models, materials meshes, `Terrain`); see `lights.add`. */
 export interface ClusteredReceiver {
   /** Patches the receiver's shader with `effect`'s light loop; returns the remover. */
   addLighting(effect: ClusteredLighting): () => void;
 }
 /**
  * Clustered forward GGX lighting for up to 1,024 point and spot lights (`maxLights` raises it to 65,536): a compute
- * pass bins lights into view-space clusters, and fragments evaluate only their cluster's list. Core meshes receive it automatically; add gltf-pro
+ * pass bins lights into view-space clusters, and fragments evaluate only their cluster's list. Core meshes receive it automatically; add gltf/pbr
  * models, materials meshes or terrain with `lights.add(receiver)`. Optional integrated shadow maps (`shadows`) and
  * hooks for area, directional, IES and projector lights. `Clustered.attach(engine, options)`, then
  * `lights.setLights([...])`. WebGPU only.
@@ -204,7 +241,15 @@ export class Clustered implements EnginePlugin {
   private readonly ints = new Uint32Array(this.values.buffer);
   /** Most lights `setLights` takes (`ClusteredOptions.maxLights`). */
   readonly maxLights: number;
-  /** 16 floats per light, in pages of {@link LIGHT_PAGE} lights. */
+  /** Some light has a `radius`: each record also holds its `size` vec4f, and the shaders a sphere light's specular. */
+  private sized = false;
+  /** Floats per light record: 16, or 20 while {@link sized}. */
+  private stride = 16;
+  /** The light record layout the GPU light buffer, culling pipeline and bindings were made for. */
+  private layout = false;
+  /** Culling pipelines for point records (0) and sized records (1), made when first needed. */
+  private readonly pipelines: (GPUComputePipeline | undefined)[] = [];
+  /** {@link stride} floats per light, in pages of {@link LIGHT_PAGE} lights. */
   private data = new Float32Array(LIGHT_PAGE * 16);
   /** Per light: LocalShadows map width, height, near and far from a castShadow light's `shadow`, 0 where unset. */
   private shadowCameras = new Float32Array(LIGHT_PAGE * 4);
@@ -228,14 +273,23 @@ export class Clustered implements EnginePlugin {
   private stochasticHook?: ClusteredStochastic;
   private layersHook?: ClusteredLightTerm;
   private contactHook?: ClusteredLightTerm;
+  private bounceHook?: ClusteredBounce;
   private listValue: readonly (PointLight | SpotLight)[] = Object.freeze([]);
-  /** This frame's binding parts: own entries, then the shadow, area, directional, IES, projector, shapes, stochastic, layers and contact hooks' (or undefined). */
+  /** This frame's binding parts: own entries, then the shadow, area, directional, IES, projector, shapes, stochastic, layers, contact and bounce hooks' (or undefined). */
   private readonly parts: (GPUBindGroupEntry[] | undefined)[] = [];
   /** Joined bindings without (0) and with (1) shadows: the parts they were joined from, then the result last. */
   private readonly joined: ((GPUBindGroupEntry[] | undefined)[] | undefined)[] = [];
   private reset(): void {
     this.shaders.clear();
     this.hooks.clear();
+  }
+  /**
+   * How many lights with a `shadow` the integrated maps (`ClusteredOptions.shadows`) hold, their `maxLights` (default 4);
+   * 0 when there are none. A `setLights` with more shadowed lights than this throws, so a package that adds a shadowed
+   * light of its own (the lightning's) reads it first.
+   */
+  get shadowSlots(): number {
+    return this.localShadows?.maxLights ?? 0;
   }
   get shadow(): ClusteredShadow | undefined {
     return this.shadowHook;
@@ -315,6 +369,14 @@ export class Clustered implements EnginePlugin {
     this.contactHook = hook;
     this.reset();
   }
+  /** One bounce of light from the point, spot and opening lights (`@margoengine/clustered/bounce`). */
+  get bounce(): ClusteredBounce | undefined {
+    return this.bounceHook;
+  }
+  set bounce(hook: ClusteredBounce | undefined) {
+    this.bounceHook = hook;
+    this.reset();
+  }
   /** The point and spot lights last given to `setLights`, in order (a frozen copy of the list; the light objects are the caller's). */
   get list(): readonly (PointLight | SpotLight)[] {
     return this.listValue;
@@ -339,13 +401,18 @@ export class Clustered implements EnginePlugin {
   get owner(): Engine | undefined {
     return this.engine;
   }
+  /** True once `dispose()` ran: `setLights` then throws `'disposed'`. */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
   static attach(instance: EngineKernel, options: ClusteredOptions = {}): Clustered {
     const effect = new Clustered(options);
     engineRuntime(instance).use(effect);
     return effect;
   }
   setLights(lights: readonly (PointLight | SpotLight)[]): this {
-    if (this.disposed || !Array.isArray(lights) || lights.length > this.maxLights)
+    if (this.disposed) throw new MargoError('disposed', 'Clustered is disposed; attach a new Clustered');
+    if (!Array.isArray(lights) || lights.length > this.maxLights)
       throw new RangeError(
         `Expected at most ${this.maxLights.toLocaleString('en-US')} lights; raise ClusteredOptions.maxLights (up to 65,536)`,
       );
@@ -392,6 +459,11 @@ export class Clustered implements EnginePlugin {
         )
       )
         throw new RangeError('Light shadow radius: give a castShadow light a finite radius of 0 or more (world units)');
+      if (
+        light.radius !== undefined &&
+        !(typeof light.radius === 'number' && Number.isFinite(Math.fround(light.radius)) && light.radius >= 0)
+      )
+        throw new RangeError('Light radius must be a finite number of 0 or more (world units); 0 is a point');
       if ('direction' in light) {
         finiteVector(light.direction, 3, 'Spot direction');
         const { angle, penumbra = 0 } = light;
@@ -434,10 +506,19 @@ export class Clustered implements EnginePlugin {
       throw new RangeError(
         'Light shadows require ClusteredOptions.shadows; for LocalShadows, give a castShadow light a shadow of resolution, near and far',
       );
-    // Whole pages: the CPU copies grow here, the GPU buffer in the next frame.
-    const pages = Math.max(1, Math.ceil(lights.length / LIGHT_PAGE));
-    if (this.data.length < pages * LIGHT_PAGE * 16) {
-      const data = new Float32Array(pages * LIGHT_PAGE * 16),
+    // Whole pages: the CPU copies grow here, the GPU buffer in the next frame. A change of record size (the first light
+    // with a radius, or the last one gone) lays the copy out afresh; every record is written below.
+    const pages = Math.max(1, Math.ceil(lights.length / LIGHT_PAGE)),
+      sized = lights.some((light) => (light.radius ?? 0) > 0);
+    if (sized !== this.sized) {
+      this.sized = sized;
+      this.stride = sized ? 20 : 16;
+      this.data = new Float32Array(Math.max(pages, this.data.length / (LIGHT_PAGE * (sized ? 16 : 20))) * LIGHT_PAGE * this.stride);
+      this.reset();
+    }
+    const stride = this.stride;
+    if (this.data.length < pages * LIGHT_PAGE * stride) {
+      const data = new Float32Array(pages * LIGHT_PAGE * stride),
         cameras = new Float32Array(pages * LIGHT_PAGE * 4);
       data.set(this.data);
       cameras.set(this.shadowCameras);
@@ -446,7 +527,7 @@ export class Clustered implements EnginePlugin {
     }
     let shadows = 0;
     lights.forEach((light, i) => {
-      const offset = i * 16,
+      const offset = i * stride,
         decay = light.decay ?? 2;
       // Range 0 is unlimited: the window of an infinite range is 1 and culling never drops the light.
       this.data.set(
@@ -476,6 +557,7 @@ export class Clustered implements EnginePlugin {
       if (settings) this.shadowCameras.set(shadowCamera(settings, light.range), i * 4);
       else this.shadowCameras.fill(0, i * 4, i * 4 + 4);
       if (this.localShadows) this.data[offset + 15] = this.localShadows.shadowIndex(i);
+      if (sized) this.data.set([light.radius ?? 0, 0, 0, 0], offset + 16);
     });
     const decay = lights.some(fresh);
     if (decay !== this.decay) {
@@ -492,7 +574,7 @@ export class Clustered implements EnginePlugin {
     return this.receivers.has(receiver);
   }
   /**
-   * Lights `receiver` (a gltf-pro model, materials mesh or terrain; core meshes are lit without it). With
+   * Lights `receiver` (a gltf/pbr model, materials mesh or terrain; core meshes are lit without it). With
    * `receiveShadow: false` it gets the same lighting without local-light shadows: their maps neither darken it nor
    * need it to cast (cast with `addShadowCaster` or `LocalShadows.add`). Core meshes are not added: set
    * `mesh.receiveShadow = false` on one instead. Returns the remover.
@@ -539,6 +621,7 @@ export class Clustered implements EnginePlugin {
     parts[7] = shadows && (this.shadowHook || this.localShadows) ? this.stochasticHook?.bindings() : undefined;
     parts[8] = this.layersHook?.bindings();
     parts[9] = shadows ? this.contactHook?.bindings() : undefined;
+    parts[10] = this.bounceHook?.bindings();
     const count = parts.length;
     let any = false;
     for (let i = 1; i < count; i++) any ||= !!parts[i];
@@ -549,7 +632,7 @@ export class Clustered implements EnginePlugin {
     if (!same) this.joined[+shadows] = joined = [...parts, parts.flatMap((part) => part ?? [])];
     return joined![count]!;
   }
-  /** gltf-pro lighting hooks in bind group `group`; `shadows: false` leaves out local-light shadows (see `add`). */
+  /** gltf\/pbr lighting hooks in bind group `group`; `shadows: false` leaves out local-light shadows (see `add`). */
   pbr(group: number, shadows = true): { declarations: string; light: string; finish?: (code: string) => string } {
     // Hooks and shaders without shadows are cached under -1 - group.
     const key = shadows ? group : -1 - group;
@@ -569,6 +652,8 @@ export class Clustered implements EnginePlugin {
       directional: this.directionalHook,
       terms: [this.iesHook, this.projectorHook, this.layersHook].filter((hook) => hook !== undefined),
       shapes: this.shapesHook,
+      bounce: this.bounceHook,
+      ...(this.sized ? { sized: true } : {}),
     };
     return shadows
       ? clusteredSampling(group, this.shadowHook, this.areaHook, !!this.localShadows, this.decay, receive, {
@@ -632,16 +717,24 @@ export class Clustered implements EnginePlugin {
     this.lights = this.lightBuffer();
     this.counts = buffer(count * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
     this.indices = buffer(bytes, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-    this.pipeline = this.device.createComputePipeline({
-      layout: 'auto',
-      compute: { module: this.device.createShaderModule({ code: cullingShader }), entryPoint: 'main' },
-    });
+    this.pipeline = this.culling();
     this.bind();
     this.dirty = true;
     if (this.localShadows) {
       this.localShadows.setup(engine);
       this.entries = [...this.entries, ...this.localShadows.bindings()];
     }
+  }
+  /** The culling pipeline for the current light record layout. */
+  private culling(): GPUComputePipeline {
+    this.layout = this.sized;
+    return (this.pipelines[+this.sized] ??= this.device!.createComputePipeline({
+      layout: 'auto',
+      compute: {
+        module: this.device!.createShaderModule({ code: this.sized ? sizedCullingShader : cullingShader }),
+        entryPoint: 'main',
+      },
+    }));
   }
   /** The light buffer at the CPU copy's page count. */
   private lightBuffer(): GPUBuffer {
@@ -659,10 +752,11 @@ export class Clustered implements EnginePlugin {
     }));
     this.group = this.device!.createBindGroup({ layout: this.pipeline!.getBindGroupLayout(0), entries: this.entries });
   }
-  /** Grows the light buffer to the CPU copy's page count, then rebinds. */
+  /** Grows the light buffer to the CPU copy's page count (and record layout), then rebinds. */
   private page(): void {
     this.lights?.destroy();
     this.lights = this.lightBuffer();
+    this.pipeline = this.culling();
     this.bind();
     if (this.localShadows) this.entries = [...this.entries, ...this.localShadows.bindings()];
     this.dirty = true;
@@ -692,14 +786,14 @@ export class Clustered implements EnginePlugin {
             this.receivers.delete(receiver);
           }
         if (this.dirty) {
-          if (this.lights!.size < this.data.byteLength) this.page();
+          if (this.lights!.size < this.data.byteLength || this.layout !== this.sized) this.page();
           if (this.lightCount)
             c.device.queue.writeBuffer(
               this.lights!,
               0,
               this.data as Float32Array<ArrayBuffer>,
               0,
-              this.lightCount * 16,
+              this.lightCount * this.stride,
             );
           this.dirty = false;
         }
@@ -762,6 +856,7 @@ export class Clustered implements EnginePlugin {
     for (const buffer of [this.uniform, this.lights, this.counts, this.indices]) buffer?.destroy();
     this.uniform = this.lights = this.counts = this.indices = undefined;
     this.pipeline = undefined;
+    this.pipelines.length = 0;
     this.group = undefined;
     this.entries = this.lightEntries = [];
     this.shaders.clear();

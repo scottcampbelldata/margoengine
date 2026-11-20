@@ -1,6 +1,6 @@
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { MargoError } from '@margoengine/math/errors';
-import { PBRModel } from '@margoengine/gltf-pro/model';
+import { PBRModel } from '@margoengine/gltf/pbr-model';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { SceneTarget, sceneTarget } from '../../shared/msaa.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';

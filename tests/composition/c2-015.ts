@@ -2,10 +2,10 @@
 import { DOF } from '@margoengine/dof';
 import { Tonemap } from '@margoengine/tonemap';
 import { Shadows } from '@margoengine/shadows';
-import { Moon } from '@margoengine/scenery/moon';
+import { Moon } from '@margoengine/sky/moon';
 import { Splats } from '@margoengine/splats';
 import { expose } from './harness.ts';
 expose(
-  { 'id': 'c2-015', 'members': ['dof', 'tonemap', 'shadows', 'scenery', 'splats'] },
-  { 'dof': DOF, 'tonemap': Tonemap, 'shadows': Shadows, 'scenery': Moon, 'splats': Splats },
+  { 'id': 'c2-015', 'members': ['dof', 'tonemap', 'shadows', 'moon', 'splats'] },
+  { 'dof': DOF, 'tonemap': Tonemap, 'shadows': Shadows, 'moon': Moon, 'splats': Splats },
 );

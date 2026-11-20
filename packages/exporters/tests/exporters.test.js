@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { Geometry, PbrMaterial, box } from '@margoengine/core/extension';
 import { parseGLTF } from '@margoengine/gltf';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { num } from '../../shared/float-text.js';
 import * as exporters from '../dist/index.js';
@@ -277,6 +277,65 @@ test('flatten bakes sheared world transforms into vertices with flipped winding 
   assert.deepEqual(Array.from(idx), [0, 2, 1]);
 });
 
+test('flatten bakes primitives cut from one geometry, not their unbaked base', async () => {
+  const geometry = {
+    positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0],
+    normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+    indices: [0, 1, 2, 1, 3, 2],
+  };
+  const s = Math.SQRT1_2;
+  const scene = {
+    nodes: [
+      {
+        name: 'parent',
+        scale: [2, 1, -1],
+        children: [
+          {
+            name: 'child',
+            rotation: [0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8)],
+            primitives: [
+              { geometry, indices: [0, 1, 2] },
+              { geometry, indices: [1, 3, 2] },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  const glb = exportGLB(scene, { flatten: true });
+  await assertValid(glb);
+  const { json, bin } = readGLB(glb),
+    primitives = json.meshes.flatMap((mesh) => mesh.primitives);
+  assert.equal(primitives.length, 2, 'one drawn primitive for each cut');
+  // Both cuts share one baked POSITION: scale(2,1,-1) * rotZ(45deg) puts (1,0,0) at (2s, s, 0).
+  assert.equal(primitives[0].attributes.POSITION, primitives[1].attributes.POSITION);
+  const p = accessor(json, bin, primitives[0].attributes.POSITION);
+  close(p.subarray(0, 6), [0, 0, 0, 2 * s, s, 0], 1e-6);
+  // The mirror flips each cut's own winding.
+  assert.deepEqual(Array.from(accessor(json, bin, primitives[0].indices)), [0, 2, 1]);
+  assert.deepEqual(Array.from(accessor(json, bin, primitives[1].indices)), [1, 2, 3]);
+});
+
+test('a node with matrix may not be animated on any path, weights included (glTF 2.0 3.5.3)', () => {
+  const node = {
+    matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+    geometry: {
+      positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+      indices: [0, 1, 2],
+      morphs: [{ positions: [0, 0, 1, 0, 0, 1, 0, 0, 1] }],
+    },
+  };
+  assert.throws(
+    () =>
+      exportGLB({
+        nodes: [node],
+        animations: [{ channels: [{ node, path: 'weights', times: [0, 1], values: [0, 1] }] }],
+      }),
+    /not matrix/,
+  );
+});
+
 test('geometry data with UVs, tangents, colors and a real PNG texture (Khronos BoxTextured)', async () => {
   const source = readGLB(await fixture('BoxTextured.glb')),
     primitive = source.json.meshes[0].primitives[0];
@@ -427,7 +486,7 @@ test('input validation', async () => {
       },
       /need geometry with uvs/,
     ],
-    [{ nodes: [{ geometry: good, scale: [1, 0, 1] }] }, /Scale must be nonzero/],
+    [{ nodes: [{ geometry: good, scale: [1, NaN, 1] }] }, /Scale/],
     [{ nodes: [{ geometry: good, rotation: [0, 0, 0, 0] }] }, /Quaternion must be nonzero/],
     [{ nodes: [{ material: {} }] }, /needs geometry/],
     [{ nodes: 'x' }, /Expected a Margo Engine engine/],

@@ -417,6 +417,41 @@ class PngExport(unittest.TestCase):
         self.assertEqual(pong[:2], b"\x8a\x82")
         self.assertEqual(bytes(b ^ pong[2 + i % 4] for i, b in enumerate(pong[6:])), b"hi")
 
+    def test_a_silent_browser_names_the_stage_that_ran_out_of_time(self):
+        # Under heavy GPU load a draw once outlasted the one timeout and surfaced as a bare socket TimeoutError from
+        # the frame reader, which did not say whether the browser start, the page load or the drawing ran out.
+        import socket
+        import threading
+        from margoengine._png import _DevTools
+
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        done = threading.Event()
+
+        def serve():
+            conn, _ = server.accept()
+            request = b""
+            while b"\r\n\r\n" not in request:
+                request += conn.recv(4096)
+            conn.sendall(b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n")
+            done.wait(10)  # then never answers
+            conn.close()
+
+        thread = threading.Thread(target=serve)
+        thread.start()
+        tools = _DevTools(f"ws://127.0.0.1:{server.getsockname()[1]}/devtools/browser/x", timeout=0.3)
+        with self.assertRaisesRegex(TimeoutError, r"the figure did not finish drawing within 0\.3 s"):
+            tools.call("Runtime.evaluate", {}, "s", waiting="the figure did not finish drawing")
+        with self.assertRaisesRegex(TimeoutError, r"the browser did not answer Page.enable within 0\.3 s"):
+            tools.call("Page.enable")
+        with self.assertRaisesRegex(TimeoutError, r"the page did not finish loading"):
+            tools.wait_for("Page.loadEventFired", "s")
+        done.set()
+        thread.join()
+        tools.close()
+        server.close()
+
     def test_a_browser_name_finds_that_browser_where_its_installer_put_it(self):
         # Mac bug (2026-11-07): browser="msedge" (the Jupyter check's) matched only a file named msedge, so on macOS,
         # where Edge is "Microsoft Edge.app", to_png said the installed Edge was not found.

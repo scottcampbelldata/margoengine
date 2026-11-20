@@ -38,7 +38,7 @@ test('a changed path-traced raw reference cannot overwrite its frozen PNG', () =
 });
 
 test('IBL furnace preserves all source material and mesh data and uses no direct light', () => {
-  const input = readFileSync(new URL('../packages/gltf-pro/tests/fixtures/pointer-show.glb', import.meta.url));
+  const input = readFileSync(new URL('../packages/gltf/test/fixtures/pointer-show.glb', import.meta.url));
   const doc = JSON.parse(input.subarray(20, 20 + input.readUInt32LE(12)));
   const result = environmentScene(input);
   assert.deepEqual(result.doc.materials, doc.materials);

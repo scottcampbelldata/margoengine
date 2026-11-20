@@ -16,8 +16,8 @@ import {
   Fog,
   decodeUltraHDR,
 } from '../dist/index.js';
-import { parseGLTF } from '@margoengine/gltf-pro';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { parseGLTF } from '@margoengine/gltf/pbr';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -1107,7 +1107,7 @@ window.runEnvironmentTests = async () => {
       'engine: background fills only cleared depth around a core mesh, steady frames allocate nothing, device restore rebuilds, plugin removal and disposal',
     );
   }
-  // 9. Scene lighting in a real engine: EnvironmentLighting, Fog and ColorBackground on a core mesh and a blended glTF-pro triangle.
+  // 9. Scene lighting in a real engine: EnvironmentLighting, Fog and ColorBackground on a core mesh and a blended glTF PBR triangle.
   {
     const canvas = document.querySelector('#scene');
     const engine = await Engine.create(canvas, {
@@ -1135,7 +1135,7 @@ window.runEnvironmentTests = async () => {
       .setMaterial(new PbrMaterial({ color: '#d0a040', roughness: 0.6 }));
     mesh.setRotation([0.4, 0.6, 0]);
     const fixture = animatedTriangle();
-    // Clearcoat selects glTF-pro's physical shader variant (13 material textures), so both variants compile with IBL and fog.
+    // Clearcoat selects glTF PBR's physical shader variant (13 material textures), so both variants compile with IBL and fog.
     fixture.doc.materials = [
       {
         alphaMode: 'BLEND',
@@ -1276,7 +1276,7 @@ window.runEnvironmentTests = async () => {
     model.dispose();
     engine.dispose();
     report.checks.push(
-      'scene lighting: color background exact on cleared depth, IBL lights core meshes and glTF-pro, full fog covers opaque and blended geometry, removal restores the frame',
+      'scene lighting: color background exact on cleared depth, IBL lights core meshes and glTF PBR, full fog covers opaque and blended geometry, removal restores the frame',
     );
   }
   // 10. UltraHDR through the browser's own JPEG decoder: a gain-map JPEG assembled from two canvas-encoded JPEGs.

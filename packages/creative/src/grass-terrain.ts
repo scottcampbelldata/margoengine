@@ -4,6 +4,7 @@ import { engineRuntime } from '@margoengine/core/extension';
 import type { ScatterOptions } from '@margoengine/scatter';
 import type { TrampledScatter, TrampleOptions } from '@margoengine/scatter/interact';
 import { fault, rangeError } from '../../shared/errors.js';
+import { captureScene } from '../../shared/scene-scope.js';
 
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number };
 /** Linear RGBA colour raster, sampled bilinearly at cell centres in world XZ. Alpha is retained but unused. */
@@ -93,6 +94,8 @@ export async function createTerrainGrass(
   options: TerrainGrassOptions = {},
 ): Promise<TrampledScatter> {
   options.signal?.throwIfAborted();
+  // The scene the call was made for, kept across the lazy import.
+  const scope = captureScene(engine);
   const data = colors(options);
   const { TrampledScatter: Field } = await import('@margoengine/scatter/interact');
   options.signal?.throwIfAborted();
@@ -153,6 +156,6 @@ export async function createTerrainGrass(
     );
   const field = new TerrainField(blade, { wind: [1, 0.35, 0.45], maxSlope: 90, blades: {}, ...scatter }, interaction);
   signal?.throwIfAborted();
-  engineRuntime(engine).use(field);
+  scope.run(() => engineRuntime(engine).use(field));
   return field;
 }

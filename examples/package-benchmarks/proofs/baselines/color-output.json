@@ -1,22 +1,22 @@
 {
  "proof": "color-output",
- "ref": "f3d25c892",
- "revision": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
- "capturedAt": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
- "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
+ "ref": "8c71da0556",
+ "revision": "8c71da0556d86e43094bf3738f8651ad3775c90f",
+ "capturedAt": "b3c8204ded004c631b0bf8e3310b8ac886843431",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "f3d25c892 descends from e80acecc2": true
+  "8c71da0556 descends from e80acecc2": true
  },
  "outputs": {
-  "Tonemap alone 1x": "a88f81c424b323cff6e642827be2accfa592f848b01a8cdfa7b73e8647bec4e1",
-  "Tonemap alone 4x": "84b42fdc5055e0bc9ecad3dac834e58225252400c34d0fd569fa4faacb425e81",
-  "DOF -> Tonemap 1x": "75ee58d13e8b2b862e64ce0b661519879193a1d57950d58138098c7ed8918067",
-  "DOF -> Tonemap 4x": "de9552565263f2ee3a0e2f3b613f994a4ac70a207e5b34e3a1763d6bbbd3cd43",
-  "PostStack Bloom + Tonemap + FXAA 1x": "5523172f3173d1bfbab91f0eb37f07934e2734380d972b0c41ba8a02d2e49bb2",
-  "PostStack Bloom + Tonemap + FXAA 4x": "f646b75578747a31dba91a572c9da281a2b7aa8bac743d296dc8d5415ec920d7",
-  "TransparentCanvas 1x": "4c34b086cbc7f4c473528600d0cd18bdb441fab7a7cc393c43c57da866d83efe",
-  "TransparentCanvas 4x": "d642de769b6841f05b362ca7f537cfa5e91862de25efcce3f126b34df093563b",
-  "ColorBackground gradient 1x": "45d7b4efa7a1ba135b4de2c4a23af38fcf6c050c2ac7267f508a99305fbb1052",
-  "ColorBackground gradient 4x": "6844ddcf090e1e004e8e5835d9537e9e5f0198a5463684fc7bce2954418f2d2d"
+  "Tonemap alone 1x": "7d8d766f656e746cadd687f094ccd6b2e918e94f3cef6bef91958a8c3500221d",
+  "Tonemap alone 4x": "b1183c5950553da25ed17e29c9c45b16de8c6597e25e3946f06aaf2e8720cdfe",
+  "DOF -> Tonemap 1x": "4bb14850912425cdfd42b4665596399d8eb45a1b0cf8824c1df69a417ef6eac6",
+  "DOF -> Tonemap 4x": "9b76f72434116256d413964f2b32f50d76f5165b0ab6ba1846917792dc700f45",
+  "PostStack Bloom + Tonemap + FXAA 1x": "991228e0c3b09680000b2b6b4f7caf4df6bd68b334904e5eee2b61d2a98d0fcb",
+  "PostStack Bloom + Tonemap + FXAA 4x": "76834989de5ef48df6f247fe665a558b981480ad874d899adfb1a5c74379c2c9",
+  "TransparentCanvas 1x": "efc445b31e4c50c078e6185635667b30e2c2e045af57959ceb59c0715390f288",
+  "TransparentCanvas 4x": "94be8d030e0c0afd83becf19f93e0700ba2038844396d8e04c54dd28adee27f4",
+  "ColorBackground gradient 1x": "5e5440cec09418430179bda9b060c3857baf0a8f1821505fbd1631a31470bcb6",
+  "ColorBackground gradient 4x": "d0303f7394fa983f70ca49fd6a9e8fa7beb9d64f5c0b8ce045c01d5f19c9172b"
  }
 }

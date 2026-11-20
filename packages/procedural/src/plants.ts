@@ -28,14 +28,19 @@ export interface TreeMesh {
   readonly canopy: GeometryData;
 }
 
-/** A trunk of `segments` stacked tapered cylinders along a bend `lean` (metres of sideways drift at the top). */
-function trunk(height: number, r0: number, r1: number, lean: number, segments = 4, radial = 7): GeometryData {
-  const parts: GeometryData[] = [];
+/**
+ * A trunk of `segments` stacked cylinders tapering from radius `base` at the root to `tip` at the top, along a bend
+ * `lean` (metres of sideways drift at the top).
+ */
+function trunk(height: number, tip: number, base: number, lean: number, segments = 4, radial = 7): GeometryData {
+  const parts: GeometryData[] = [],
+    radius = (t: number) => base + (tip - base) * t;
   for (let s = 0; s < segments; s++) {
     const t0 = s / segments,
       t1 = (s + 1) / segments,
       h = height / segments,
-      piece = cylinderGeometry(r0 + (r1 - r0) * t1, r0 + (r1 - r0) * t0, h * 1.02, radial, 1),
+      // cylinderGeometry takes the top radius first.
+      piece = cylinderGeometry(radius(t1), radius(t0), h * 1.02, radial, 1),
       x = lean * ((t0 + t1) / 2) ** 2;
     parts.push(placed(piece, x, height * (t0 + t1) * 0.5, 0, 1, 1, 1, 0, (-lean / height) * 1.6 * (t0 + t1) * 0.5));
   }
@@ -166,25 +171,26 @@ export function generateSnagMesh(): TreeMesh {
 
 /** A columnar cactus with two arms, ribbed. */
 export function generateCactusMesh(): GeometryData {
-  const parts = [cylinderGeometry(0.22, 0.26, 3, 12, 6)].map((g) => placed(g, 0, 1.5, 0));
+  // Ribs: push every vertex out from its own cylinder's axis (local Y) by a 12-fold wave, before placing it.
+  const ribbed = (data: GeometryData) => {
+    for (let i = 0; i < data.positions.length; i += 3) {
+      const x = data.positions[i],
+        z = data.positions[i + 2],
+        rib = 1 + 0.06 * Math.cos(12 * Math.atan2(z, x));
+      data.positions[i] = x * rib;
+      data.positions[i + 2] = z * rib;
+    }
+    return data;
+  };
+  const parts = [placed(ribbed(cylinderGeometry(0.22, 0.26, 3, 12, 6)), 0, 1.5, 0)];
   for (const [side, y, h] of [
     [-1, 1.2, 1.1],
     [1, 1.7, 0.8],
   ] as const) {
-    parts.push(placed(cylinderGeometry(0.13, 0.15, 0.5, 10, 1), side * 0.38, y, 0, 1, 1, 1, 0, Math.PI / 2));
-    parts.push(placed(cylinderGeometry(0.12, 0.14, h, 10, 3), side * 0.6, y + h / 2, 0));
+    parts.push(placed(ribbed(cylinderGeometry(0.13, 0.15, 0.5, 10, 1)), side * 0.38, y, 0, 1, 1, 1, 0, Math.PI / 2));
+    parts.push(placed(ribbed(cylinderGeometry(0.12, 0.14, h, 10, 3)), side * 0.6, y + h / 2, 0));
   }
-  const data = mergeGeometries(parts);
-  // Ribs: push every vertex out along its radius by a 12-fold wave.
-  for (let i = 0; i < data.positions.length; i += 3) {
-    const x = data.positions[i],
-      z = data.positions[i + 2],
-      a = Math.atan2(z, x),
-      rib = 1 + 0.06 * Math.cos(12 * a);
-    data.positions[i] = x * rib;
-    data.positions[i + 2] = z * rib;
-  }
-  return computeTangents(computeVertexNormals(toNonIndexed(data)));
+  return computeTangents(computeVertexNormals(toNonIndexed(mergeGeometries(parts))));
 }
 
 /** A clump of reeds: thin upright tapered blades, a few with seed heads. Render double sided. */

@@ -8,7 +8,7 @@ export async function silentGeometryBrowserChecks(page) {
   return page.evaluate(async () => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
-    const { loadGLTF, parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF, parseGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { loadFBX } = await import('/packages/fbx/dist/index.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { Inspector } = await import('/packages/inspector/dist/index.js');
@@ -508,7 +508,7 @@ export async function silentGeometryBrowserChecks(page) {
     try {
       picker = Picking.attach(instance, { capture: false });
       for (const fixture of [
-        { name: 'gltf-pro:Box.glb', load: loadGLTF, url: '/packages/exporters/tests/fixtures/Box.glb' },
+        { name: 'gltf/pbr:Box.glb', load: loadGLTF, url: '/packages/exporters/tests/fixtures/Box.glb' },
         { name: 'fbx:blender-rig.fbx', load: loadFBX, url: '/packages/fbx/test/fixtures/blender-rig.fbx' },
       ]) {
         label = fixture.name + ':load';

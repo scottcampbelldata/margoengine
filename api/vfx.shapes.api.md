@@ -190,6 +190,12 @@ interface VFXLit {
     shadows?: VFXLightSource;
     wrap?: number;
     ambient?: readonly [number, number, number];
+    glow?: {
+        position: readonly [number, number, number];
+        power: number;
+        radius?: number;
+        color?: readonly [number, number, number];
+    };
 }
 
 interface VFXMeshParticles {
@@ -237,6 +243,7 @@ interface VFXOptions {
     bounce?: number;
     turbulence?: number;
     frequency?: number;
+    wind?: VFXWind;
     angularVelocity?: number;
     emissionExtent?: Vec3;
     intensity?: number;
@@ -286,6 +293,7 @@ interface VFXRuntime {
     render?: GPUBindGroupEntry[];
     write?(c: Context): void;
     run?(pass: GPUComputePassEncoder): void;
+    eventList?: GPUBuffer;
     draw?(c: Context): void;
     hides?(): boolean;
     births?: boolean;
@@ -341,6 +349,10 @@ interface VFXState {
         drawCalls: number;
     };
     engine: Engine;
+    spin?: {
+        code: string;
+        entry: GPUBindGroupEntry;
+    };
 }
 
 interface VFXStretch {
@@ -361,4 +373,8 @@ interface VFXVectorField {
     halfSize: Vec3;
     strength?: number;
 }
+
+type VFXWind = readonly [number, number] | {
+    sample(x: number, y: number, z: number, t: number): readonly number[];
+};
 ```

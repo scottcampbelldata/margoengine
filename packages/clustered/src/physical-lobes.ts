@@ -2,7 +2,7 @@
 // as plain GGX on the base: its clearcoat and sheen answer only the main directional light, and anisotropy and the thin
 // film do not bend its highlight. This hook rewrites a physical shader's light loops (and only those) so that each light
 // also goes through the surface's own direct BRDF and its coat and sheen, with the same falloff, cone, profile and
-// shadow as the base. Layering follows gltf-pro's `layers`: the sum under the coat is attenuated there, so the base stays
+// shadow as the base. Layering follows gltf/pbr's `layers`: the sum under the coat is attenuated there, so the base stays
 // in `result`, and the lobes above it are added after.
 import { clusterBrdf } from '../../shared/light-terms.js';
 import type { ClusteredLobes } from './index.js';
@@ -11,14 +11,20 @@ const term = 'result+=' + clusterBrdf + '*nl*',
   weighted = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^;]*);', 'g'),
   front = /(@fragment fn fragment\([^{]*\{\s*let s=surface\(i,front\);)/,
   layered = 'color=layers(s,v,l,color);',
-  // The coat over everything, and the sheen on the base under the coat: both as `layers` weighs them.
+  // The coat over everything, and the sheen on the base under the coat: both as `layers` weighs them. `layers` scales the
+  // whole base by the sheen's ambient form 1 - max3(sheen) E(n.v); KHR_materials_sheen ("Albedo-scaling technique")
+  // scales a punctual light's base by min(1 - max3(sheen) E(n.v), 1 - max3(sheen) E(n.l)), as gltf/pbr does for the sun,
+  // so each light also takes off the rest, max3(sheen) max(E(n.l) - E(n.v), 0) of its base, under the coat. The sheen
+  // lobe takes n.h from the clamped cosines (gltf/pbr margoSheenHalf, KB3297d).
   declarations = /* wgsl */ `var<private> clusterSurface:Surface;
 var<private> clusterLobeLight:vec3f=vec3f(0);
-fn clusterLobes(v:vec3f,l:vec3f)->vec3f {
-  let s=clusterSurface; let h=(v+l)/max(length(v+l),0.0001);
+fn clusterLobes(v:vec3f,l:vec3f,base:vec3f)->vec3f {
+  let s=clusterSurface;
   let nl=clamp(dot(s.n,l),0.0,1.0); let nv=clamp(dot(s.n,v),0.0001,1.0);
   let fc=0.04+0.96*pow(1-clamp(dot(s.cn,v),0.0,1.0),5.0);
-  return (1-s.cc*fc)*s.sh.rgb*margoSheenBRDF(s.sh.w,nl,nv,clamp(dot(s.n,h),0.0,1.0))*nl+s.cc*fc*ggx(s.cn,v,l,s.cr);
+  let sheenMax=max(s.sh.r,max(s.sh.g,s.sh.b));
+  let punctual=select(0.0,sheenMax*max(margoSheenAlbedo(nl,s.sh.w)-margoSheenAlbedo(nv,s.sh.w),0.0),sheenMax>0.0);
+  return (1-s.cc*fc)*(s.sh.rgb*margoSheenBRDF(s.sh.w,nl,nv,margoSheenHalf(nv,nl,v,l))*nl-punctual*base)+s.cc*fc*ggx(s.cn,v,l,s.cr);
 }
 `;
 /** The coat under area and shaped lights: the Linearly Transformed Cosines of the coat's normal and roughness, F0 0.04, no diffuse. */
@@ -42,7 +48,7 @@ export const physicalLobes: ClusteredLobes = {
         .replace(
           weighted,
           (_, weight: string) =>
-            `{let clusterWeight=${weight};result+=${direct}*clusterWeight;clusterLobeLight+=clusterLobes(v,l)*clusterWeight;}`,
+            `{let clusterWeight=${weight};let clusterBase=${direct};result+=clusterBase*clusterWeight;clusterLobeLight+=clusterLobes(v,l,clusterBase)*clusterWeight;}`,
         )
         .replace(front, '$1clusterSurface=s;')
         .replace(layered, `${layered}${area}color+=clusterLobeLight*clusterFrame.intensity.x;`)

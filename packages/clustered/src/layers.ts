@@ -25,7 +25,7 @@ export interface LightLayerReceiverOptions {
 }
 const MAX_LIGHTS = 1024,
   BINDING = 154,
-  // The light loop's call in core-style and gltf-pro shaders (Clustered.shader and Clustered.pbr).
+  // The light loop's call in core-style and gltf/pbr shaders (Clustered.shader and Clustered.pbr).
   CALL = /clusterLighting\(i\.clip\.xy,/g;
 
 const sampling = (group: number) => /* wgsl */ `
@@ -48,7 +48,7 @@ function mask(value: unknown, label: string): number {
 }
 /**
  * Light layers for clustered lighting: {@link setLayers} gives the point and spot lights of `Clustered.setLights` their
- * layer masks (index i for light i; default 1), and {@link add} lights a receiver (a gltf-pro model, materials mesh or
+ * layer masks (index i for light i; default 1), and {@link add} lights a receiver (a gltf/pbr model, materials mesh or
  * terrain) with only the lights whose mask shares a bit with its own. Core meshes are on layer 0 (mask 1). Area and
  * directional lights are not layered. Without masks or layered receivers it adds nothing to the shaders or the GPU work.
  * @throws TypeError without the Clustered lights or for an invalid or duplicate receiver; RangeError for a bad mask.
@@ -63,7 +63,8 @@ export class LightLayers implements EnginePlugin, ClusteredLightTerm {
   private device?: GPUDevice;
   private buffer?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
-  private words = new Uint32Array(4);
+  /** @internal The packed words the shader reads; LightBounce's CPU twin reads them too (bounce-terms.ts). */
+  words = new Uint32Array(4);
   private listValue: readonly (number | null | undefined)[] = Object.freeze([]);
   private readonly receivers = new Map<ClusteredReceiver, { layers: number; remove: () => void }>();
   private dirty = true;
@@ -106,7 +107,7 @@ export class LightLayers implements EnginePlugin, ClusteredLightTerm {
     return this;
   }
   /**
-   * Lights `receiver` through the Clustered lights with only the lights on its `layers` (a gltf-pro model, materials
+   * Lights `receiver` through the Clustered lights with only the lights on its `layers` (a gltf/pbr model, materials
    * mesh or terrain; see `Clustered.add`). Returns the remover.
    */
   add(receiver: ClusteredReceiver, { layers = 1, receiveShadow = true }: LightLayerReceiverOptions = {}): () => void {

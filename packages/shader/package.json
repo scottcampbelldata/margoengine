@@ -43,6 +43,10 @@
       "types": "./dist/raw.d.ts",
       "import": "./dist/raw.js"
     },
+    "./black-hole": {
+      "types": "./dist/black-hole.d.ts",
+      "import": "./dist/black-hole.js"
+    },
     "./effects": {
       "types": "./dist/effects.d.ts",
       "import": "./dist/effects.js"
@@ -90,6 +94,22 @@
     "./texture-array": {
       "types": "./dist/texture-array.d.ts",
       "import": "./dist/texture-array.js"
+    },
+    "./glsl": {
+      "types": "./dist/glsl.d.ts",
+      "import": "./dist/glsl.js"
+    },
+    "./glsl-material": {
+      "types": "./dist/glsl-material.d.ts",
+      "import": "./dist/glsl-material.js"
+    },
+    "./glsl-pass": {
+      "types": "./dist/glsl-pass.d.ts",
+      "import": "./dist/glsl-pass.js"
+    },
+    "./shadertoy": {
+      "types": "./dist/shadertoy.d.ts",
+      "import": "./dist/shadertoy.js"
     }
   },
   "files": [
@@ -103,7 +123,13 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf": "^1.0.0",
+    "@margoengine/post": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/post": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0"
@@ -112,10 +138,14 @@
     "build": "node ../../scripts/build-optional.js shader",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs && node packages/shader/test/passes-check.mjs && node packages/shader/test/inputs-check.mjs && node packages/shader/test/deform-check.mjs && node packages/shader/test/pass-check.mjs && node packages/shader/test/utils-check.mjs && node packages/shader/test/raw-check.mjs && node packages/shader/test/subgroups-check.mjs && node packages/shader/test/scene-owner-browser.mjs && node packages/shader/test/scene-owner-browser.mjs --compat && node packages/shader/test/compute-volume-check.mjs && node packages/shader/test/editor-pass-check.mjs && node packages/shader/test/texture-array-check.mjs",
+    "test:gpu": "cd ../.. && node packages/shader/test/browser-check.mjs && node packages/shader/test/noise-check.mjs && node packages/shader/test/readback-check.mjs && node packages/shader/test/editor-check.mjs && node packages/shader/test/compute-texture-check.mjs && node packages/shader/test/compute-model-check.mjs && node packages/shader/test/lighting-check.mjs && node packages/shader/test/passes-check.mjs && node packages/shader/test/inputs-check.mjs && node packages/shader/test/deform-check.mjs && node packages/shader/test/pass-check.mjs && node packages/shader/test/utils-check.mjs && node packages/shader/test/raw-check.mjs && node packages/shader/test/subgroups-check.mjs && node packages/shader/test/scene-owner-browser.mjs && node packages/shader/test/scene-owner-browser.mjs --compat && node packages/shader/test/compute-volume-check.mjs && node packages/shader/test/editor-pass-check.mjs && node packages/shader/test/texture-array-check.mjs && node packages/shader/test/black-hole-check.mjs && node packages/shader/test/negated-division-check.mjs && node packages/shader/test/glsl-check.mjs && node packages/shader/test/glsl-check.mjs --compat && node packages/shader/test/glsl-material-check.mjs && node packages/shader/test/glsl-material-check.mjs --compat && node packages/shader/test/glsl-velocity-check.mjs && node packages/shader/test/glsl-velocity-check.mjs --compat && node packages/shader/test/glsl-pass-check.mjs && node packages/shader/test/glsl-pass-check.mjs --compat && node packages/shader/test/shadertoy-check.mjs && node packages/shader/test/shadertoy-check.mjs --compat && node packages/shader/test/raw-restore-browser-check.mjs && node packages/shader/test/raw-restore-browser-check.mjs --compat && node packages/shader/test/shadertoy-restore-browser-check.mjs && node packages/shader/test/shadertoy-restore-browser-check.mjs --compat",
     "test:gpu:raw": "cd ../.. && node scripts/shader-raw-gpu-check.js",
     "test:gpu:volume": "cd ../.. && node packages/shader/test/compute-volume-check.mjs",
     "test:gpu:editor-pass": "cd ../.. && node packages/shader/test/editor-pass-check.mjs",
-    "test:gpu:texture-array": "cd ../.. && node packages/shader/test/texture-array-check.mjs"
+    "test:gpu:texture-array": "cd ../.. && node packages/shader/test/texture-array-check.mjs",
+    "test:gpu:glsl": "cd ../.. && node packages/shader/test/glsl-check.mjs && node packages/shader/test/glsl-check.mjs --compat",
+    "test:gpu:glsl-material": "cd ../.. && node packages/shader/test/glsl-material-check.mjs && node packages/shader/test/glsl-material-check.mjs --compat && node packages/shader/test/glsl-velocity-check.mjs && node packages/shader/test/glsl-velocity-check.mjs --compat",
+    "test:gpu:glsl-pass": "cd ../.. && node packages/shader/test/glsl-pass-check.mjs && node packages/shader/test/glsl-pass-check.mjs --compat",
+    "test:gpu:shadertoy": "cd ../.. && node packages/shader/test/shadertoy-check.mjs && node packages/shader/test/shadertoy-check.mjs --compat"
   }
 }

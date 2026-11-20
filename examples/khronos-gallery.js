@@ -1,20 +1,20 @@
 // Render check for the Khronos sample assets. Serve the repo root with Vite
 // (`npx vite`) after `npm run build:packages`, then open /examples/khronos-gallery.html: every model in
-// assets/khronos/manifest.json is loaded in turn and reported (loads or the error, extensions gltf-pro ignores, GPU
+// assets/khronos/manifest.json is loaded in turn and reported (loads or the error, extensions gltf/pbr ignores, GPU
 // validation errors). `?model=Name` shows one model as a still frame; that is the view scripts/visual-regression.js
 // captures (readiness: body[data-ready]); `&variant=Name` (or its index) shows that KHR_materials_variants variant (model.selectVariant).
 import { createStage } from 'margoengine';
 import { engineRuntime } from '@margoengine/core/extension';
-import { applyGLTFLights, loadGLTF, viewGLTFCamera } from '@margoengine/gltf-pro';
-import { instancing } from '@margoengine/gltf-pro/instancing';
-import { extendedMaterials } from '@margoengine/gltf-pro/extended';
+import { applyGLTFLights, loadGLTF, viewGLTFCamera } from '@margoengine/gltf/pbr';
+import { instancing } from '@margoengine/gltf/pbr-instancing';
+import { extendedMaterials } from '@margoengine/gltf/extended-materials';
 import { DracoDecoder, KTX2Decoder, MeshoptDecoder } from '@margoengine/decoders';
 import { Environment, EnvironmentLighting, ColorBackground } from '@margoengine/environment';
 import { OrbitControls } from '@margoengine/controls';
 import { Clustered } from '@margoengine/clustered';
 import { afterPresented } from '../packages/shared/demo-frame.js';
 
-// Extensions gltf-pro renders or decodes (packages/gltf-pro/src/asset.ts `supported` plus the decoder hooks passed
+// Extensions gltf/pbr renders or decodes (packages/gltf/src/asset.ts `supported` plus the decoder hooks passed
 // below). Any other extension in extensionsUsed is ignored by the loader and listed as a gap.
 const HANDLED = new Set([
   'KHR_mesh_quantization',

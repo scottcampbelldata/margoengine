@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky hurricane check</title><style>body{margin:0}canvas{display:block;width:200px;height:150px}</style></head><body><canvas></canvas>
+<script type="module">
+// A hurricane's clouds on a real GPU (VolumetricClouds with a Hurricane), read back from Bloom's HDR scene capture over
+// a black background. Each pixel's ray is followed through the storm's CPU cover (Hurricane.coverAt, the same field the
+// shader draws): where the ray meets no cloud the pixel must stay black, where it crosses solid eyewall or band it must
+// show cloud. Views: from the air straight down (eye, eyewall, moat, bands), from the air higher up (the haze follows
+// the air the ray crosses), and from sea level in the eye (clear overhead, the stadium wall low around it). Driven by
+// features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {VolumetricClouds} from '/packages/sky/dist/compat-clouds.js';
+import {Hurricane} from '/packages/sky/dist/hurricane.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,-1],fov:60,near:1,far:500000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {w:texture.width,h:texture.height,v:data};
+}
+const lum=(v,i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2];
+// The ray through pixel (x, y) of a camera at yaw (radians from -Z toward +X) and pitch, fov 60 degrees.
+const forward=(yaw,pitch)=>[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
+const ray=(x,y,w,h,yaw,pitch)=>{const t=Math.tan(Math.PI/6),cx=(2*(x+0.5)/w-1)*t*w/h,cy=(1-2*(y+0.5)/h)*t;
+ const f=forward(yaw,pitch),r=[Math.cos(yaw),0,Math.sin(yaw)],u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]];
+ const d=[0,1,2].map(k=>f[k]+r[k]*cx+u[k]*cy),l=Math.hypot(...d);return d.map(v=>v/l);};
+// A compact storm so the whole core fits the view: eye 7 km, eyewall 8 km, bands from 30 km, out to 120 km. No canopy
+// and no eye floor cloud, so what the camera sees from above is the eyewall and the bands.
+const options={maxWindRadius:10000,eyewallWidth:8000,bandStart:30000,bandWidth:6000,extent:120000,bands:3,canopy:0,eyeCloud:0,shield:0,moat:0};
+const storm=new Hurricane(options),BASE=500,TOP=15000;
+// The CPU cover along a ray inside the layer: the largest cover it crosses (and whether it crosses any at all).
+const along=(o,d,s)=>{let most=0;for(let t=0;t<400000;t+=150){const y=o[1]+d[1]*t;if(y<BASE||y>TOP)continue;most=Math.max(most,storm.coverAt(o[0]+d[0]*t,o[2]+d[2]*t,y-BASE,s).cover);}return most;};
+// The view's light with the clouds less the same view without them (coverage 0 draws nothing), per pixel.
+let layer;
+async function view(position,yaw,pitch){
+ const f=forward(yaw,pitch);engine.camera.position=position;engine.camera.target=[position[0]+f[0],position[1]+f[1],position[2]+f[2]];
+ const render=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+ await waitForPipelines(render);
+ layer.options.coverage=0;const bg=await render();delete layer.options.coverage;const img=await render();
+ for(let i=0;i<img.v.length;i++)img.v[i]-=bg.v[i];return img;
+}
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const clouds=VolumetricClouds.attach(engine,{hurricane:storm,sunDirection:[0.3,0.85,0.3],steps:96,maxDistance:400000,temporal:false}),out={};layer=clouds;
+  await clouds.ready;
+  // Each view: pixels whose ray crosses no cloud (clear), pixels whose ray crosses solid cloud (solid), their light.
+  const score=(img,o,yaw,pitch,s)=>{const clear=[],solid=[];
+   for(let y=0;y<img.h;y+=2)for(let x=0;x<img.w;x+=2){const d=ray(x,y,img.w,img.h,yaw,pitch),c=along(o,d,s),l=lum(img.v,(y*img.w+x)*4);
+    if(c===0)clear.push(l);else if(c>0.95)solid.push(l);}
+   const mean=a=>a.length?a.reduce((p,q)=>p+q,0)/a.length:0,sorted=a=>[...a].sort((p,q)=>p-q);
+   return {clear:clear.length,solid:solid.length,clearMax:clear.length?sorted(clear).at(-1):0,clearMean:mean(clear),solidMean:mean(solid),solidP10:solid.length?sorted(solid)[Math.floor(solid.length*0.1)]:0};};
+  // From the air, 40 km up, looking straight down, at 0 s and after the storm has moved 6 km east (600 s at 10 m/s).
+  clouds.advanceTime(1);
+  const air=await view([0,40000,0],0,-Math.PI/2+0.001);out.air=score(air,[0,40000,0],0,-Math.PI/2+0.001,1);
+  // Higher, 90 km up: the same cloud through thinner air must keep its light (the haze follows the air crossed).
+  const high=await view([0,90000,0],0,-Math.PI/2+0.001);out.high=score(high,[0,90000,0],0,-Math.PI/2+0.001,1);
+  // The eye from 40 km: the dark pixels' centre, at 1 s and once the storm has moved.
+  const centre=(img,o)=>{let sx=0,sz=0,n=0;for(let y=0;y<img.h;y++)for(let x=0;x<img.w;x++){const d=ray(x,y,img.w,img.h,0,-Math.PI/2+0.001),t=(o[1]-BASE)/-d[1],px=d[0]*t,pz=d[2]*t;
+   if(Math.hypot(px,pz)<20000&&lum(img.v,(y*img.w+x)*4)<1e-4){sx+=px;sz+=pz;n++;}}return [sx/n,sz/n,n];};
+  out.eyeBefore=centre(air,[0,40000,0]);
+  clouds.options.hurricane=new Hurricane({...options,velocity:[10,0]});clouds.advanceTime(599);
+  const moved=await view([0,40000,0],0,-Math.PI/2+0.001);out.eyeAfter=centre(moved,[0,40000,0]);
+  clouds.options.hurricane=storm;
+  // Sea level at the eye's centre: straight up (clear), and toward the eyewall low down (solid).
+  const up=await view([0,2,0],0,Math.PI/2-0.001);out.up=score(up,[0,2,0],0,Math.PI/2-0.001,600);
+  const wall=await view([0,2,0],0,0.25);out.wall=score(wall,[0,2,0],0,0.25,600);
+  clouds.dispose();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

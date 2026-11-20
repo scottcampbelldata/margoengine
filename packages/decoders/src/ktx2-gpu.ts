@@ -4,7 +4,7 @@
 // `rgba8` target, which costs 4 bytes a texel on the GPU where BC7 costs 1.
 import { decodeFailed, deviceUnsupported } from './errors.js';
 import { readBasisLZ, readETC1SSlice, type BasisLZTables } from './etc1s.js';
-import { ETC1S_SHADER, UASTC_SHADER, uastcMode, uastcTables } from './ktx2-gpu-shaders.js';
+import { ETC1S_SHADER, UASTC_SHADER, uastcBlockValid, uastcTables } from './ktx2-gpu-shaders.js';
 import { levelData, readKTX2Index, type KTX2Index } from './ktx2-file.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_SRC: number; COPY_DST: number };
@@ -107,6 +107,10 @@ export class KTX2GPUDecoder {
       format: GPUTextureFormat = srgb ? 'rgba8unorm-srgb' : 'rgba8unorm';
     if (Math.max(index.width, index.height) > device.limits.maxTextureDimension2D)
       throw new RangeError(`Texture ${index.width}x${index.height} exceeds the device's maxTextureDimension2D; request a higher limit`);
+    if (layers > device.limits.maxTextureArrayLayers)
+      throw new RangeError(
+        `Texture of ${layers} layers exceeds the device's maxTextureArrayLayers; request a higher limit or use fewer layers`,
+      );
     const pipeline = await (basisLZ
       ? (this.etc1s ??= this.pipeline(ETC1S_SHADER))
       : (this.uastc ??= this.pipeline(UASTC_SHADER)));
@@ -156,7 +160,8 @@ export class KTX2GPUDecoder {
     if (blocks.length !== blocksX * blocksY * layers * 16)
       throw decodeFailed(`KTX2 level ${level} holds ${blocks.length} bytes of UASTC, not whole blocks; re-export the file`);
     for (let at = 0; at < blocks.length; at += 16)
-      if (uastcMode(blocks[at]) === 19) throw decodeFailed('KTX2: a UASTC block uses a reserved mode; re-export the file');
+      if (!uastcBlockValid(blocks, at))
+        throw decodeFailed('KTX2: a UASTC block uses a reserved mode or partition pattern; re-export the file');
     this.tables ??= this.storage(uastcTables());
     const table = this.tables;
     this.run(pipeline, texture, level, width, height, layers, (band) => {

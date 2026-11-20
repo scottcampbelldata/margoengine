@@ -1,12 +1,12 @@
 import type { EngineKernel } from '@margoengine/core';
-import type { GLTFAsset, GLTFImage, PBRModel } from '@margoengine/gltf-pro';
+import type { GLTFAsset, GLTFImage, PBRModel } from '@margoengine/gltf/pbr';
 import type { LoadingManager } from '@margoengine/cache/manager';
 import type * as EnvironmentModule from '@margoengine/environment';
-import type * as GltfProModule from '@margoengine/gltf-pro';
+import type * as GltfPbrModule from '@margoengine/gltf/pbr';
 
 type EnvironmentAPI = typeof EnvironmentModule;
 export interface ModelSource {
-  api: typeof GltfProModule;
+  api: typeof GltfPbrModule;
   asset: GLTFAsset;
   images: GLTFImage[];
   first: PBRModel | null;
@@ -165,7 +165,7 @@ export function entry<T>(
     .then((value) => {
       if (cache.disposed || result.abort.signal.aborted) {
         dispose?.(value);
-        throw result.abort.signal.reason ?? new Error('Canvas disposed');
+        throw result.abort.signal.reason ?? new DOMException('Canvas disposed', 'AbortError');
       }
       result.value = value;
       result.status = 'resolved';

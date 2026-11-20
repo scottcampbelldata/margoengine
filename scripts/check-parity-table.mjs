@@ -140,6 +140,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   ];
   if (problems.length) {
     for (const p of problems) console.error(`check:parity: ${p}`);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }

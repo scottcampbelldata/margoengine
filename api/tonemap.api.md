@@ -34,6 +34,9 @@ export class Tonemap implements EnginePlugin {
     readonly name = "tonemap";
     constructor(options?: TonemapOptions);
     static attach(instance: EngineKernel, options?: TonemapOptions): Tonemap;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     setLUT(lut: CubeLUT | string | null): void;
     registerPasses(graph: FrameGraph): void;
@@ -51,19 +54,28 @@ export interface TonemapExtension {
     values?(): Float32Array;
     resources?(): readonly GPUBindingResource[];
     encode?(context: TonemapPassContext): void;
+    dispose?(): void;
 }
 
 export interface TonemapOptions {
     curve?: TonemapCurve;
     exposure?: number;
     contrast?: number;
+    whitePoint?: number;
+    toe?: number;
+    shoulder?: number;
     inputColorSpace?: 'linear-srgb' | 'acescg';
     temperature?: number;
     tint?: number;
     vignette?: number;
     vignetteRadius?: number;
     vignetteSoftness?: number;
+    vignetteColor?: readonly [number, number, number];
+    vignetteCenter?: readonly [number, number];
+    vignetteRoundness?: number;
+    vignetteBlend?: 'multiply' | 'opaque';
     grain?: number;
+    dither?: boolean | number;
     chromaticAberration?: number;
     autoExposure?: boolean | AutoExposure;
     extensions?: readonly TonemapExtension[];
@@ -80,5 +92,7 @@ export interface TonemapPassContext {
 
 export function parseCube(text: string): CubeLUT;
 
-export function whiteBalanceGain(temperature?: number, tint?: number): [number, number, number];
+export function shapeCurve(x: number, toe?: number, shoulder?: number): number;
+
+export function whiteBalanceMatrix(temperature?: number, tint?: number): number[];
 ```

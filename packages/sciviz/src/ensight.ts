@@ -249,13 +249,12 @@ function geometry(g: Gold, time: number, maxBytes: number): Part[] {
         } else {
           const spec = TYPES[type.replace(/^g_/, '')];
           if (!spec) bad(`unsupported EnSight element ${type}`);
-          for (let i = 0; i < count; i++)
-            p.cells.push(
-              element(
-                spec[0],
-                Array.from(g.values(spec[1], true), (n) => n - 1),
-              ),
-            );
+          // A bar3 lists its mid node second (EnSight element figure); VTK's quadratic edge lists it last.
+          const bar3 = spec[1] === 3 && spec[0] === 'curve';
+          for (let i = 0; i < count; i++) {
+            const ids = Array.from(g.values(spec[1], true), (n) => n - 1);
+            p.cells.push(element(spec[0], bar3 ? [ids[0], ids[2], ids[1]] : ids));
+          }
         }
       }
     } else bad(`unsupported EnSight part geometry ${mode}`);

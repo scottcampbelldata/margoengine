@@ -352,11 +352,28 @@ export function tiff({
               row[i] = (row[i] - row[i - perPixel] + 2 ** bits) % 2 ** bits;
           row.forEach((v, i) => {
             const at = y * rowBytes;
-            if (float) view.setFloat32(at + i * 4, v, little);
+            if (float)
+              bits === 64
+                ? view.setFloat64(at + i * 8, v, little)
+                : bits === 16
+                  ? view.setFloat16(at + i * 2, v, little)
+                  : view.setFloat32(at + i * 4, v, little);
             else if (bits === 16) view.setUint16(at + i * 2, v, little);
             else if (bits === 8) bytes[at + i] = v;
             else bytes[at + ((i * bits) >> 3)] |= v << (8 - bits - ((i * bits) & 7));
           });
+          // Predictor 3 (Adobe TIFF Technical Note 3): bytes spread into planes, most significant first, then
+          // differenced with a stride of one pixel's samples.
+          if (predictor === 3) {
+            const n = tw * perPixel,
+              size = bits / 8,
+              plane = new Uint8Array(rowBytes);
+            for (let i = 0; i < n; i++)
+              for (let b = 0; b < size; b++)
+                plane[(little ? size - 1 - b : b) * n + i] = bytes[y * rowBytes + i * size + b];
+            for (let i = rowBytes - 1; i >= perPixel; i--) plane[i] = (plane[i] - plane[i - perPixel]) & 255;
+            bytes.set(plane, y * rowBytes);
+          }
         }
         blocks.push(
           compression === 5
@@ -405,7 +422,8 @@ export function tiff({
       .concat(tags.filter((t) => t[2]))
       .sort((a, b) => a[0] - b[0]);
   const bytesOf = (type, values) => {
-    const size = type === LONG ? 4 : type === SHORT ? 2 : 1,
+    // RATIONAL (5) values are given as numerator, denominator pairs.
+    const size = type === LONG || type === 5 ? 4 : type === SHORT ? 2 : 1,
       b = new Uint8Array(size * values.length),
       v = new DataView(b.buffer);
     values.forEach((x, i) =>
@@ -421,7 +439,7 @@ export function tiff({
       for (const byte of data) out.push(byte);
       if (out.length % 2) out.push(0);
     }
-    return { id, type, count: values.length, data, at };
+    return { id, type, count: type === 5 ? values.length / 2 : values.length, data, at };
   });
   const ifd = out.length,
     table = new Uint8Array(2 + fields.length * 12 + 4),

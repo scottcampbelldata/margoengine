@@ -24,7 +24,7 @@
     {
       "name": "Margo original format fixtures",
       "licence": "Apache-2.0, same as repository",
-      "transformation": "Written by installed Astropy, mrcfile and tifffile public APIs. Versions and independent WCSLIB expectations in expected.json; no implementation source read."
+      "transformation": "Written by installed Astropy, mrcfile and tifffile public APIs. Versions and independent WCSLIB expectations in expected.json; no implementation source read. owner-False-zstd.ome.tiff and owner-True-zstd.ome.tiff are the LZW files recompressed by libtiff 4.7 tiffcp -c zstd (-8 for BigTIFF; every directory and the OME-XML kept)."
     }
   ],
   "files": [
@@ -69,6 +69,11 @@
       "sha256": "de06dd8acd0c086cb6e8c2b6231cde21cddc5d0e2ac90c54ae5a62cdbd02ea81"
     },
     {
+      "path": "owner-False-zstd.ome.tiff",
+      "bytes": 5198,
+      "sha256": "1b3a5d5abcba293c4fee8feede87df17e53b2cf31cfbd48192df05468dcaf13e"
+    },
+    {
       "path": "owner-float16.mrc",
       "bytes": 1144,
       "sha256": "3cd1a5d1779c0058ad339d96dedd2a4e9e7fd346a363992db181b0b61dd419bc"
@@ -97,6 +102,11 @@
       "path": "owner-True-lzw.ome.tiff",
       "bytes": 9381,
       "sha256": "cee016fd7905cde71f82ba5395fa9fc7537c0c1385f71a457fb99add61947fa1"
+    },
+    {
+      "path": "owner-True-zstd.ome.tiff",
+      "bytes": 8696,
+      "sha256": "c66821f155e882403adcb7dd2a1767412f7c4c8bfcb3ba00b6874517c26305e0"
     },
     {
       "path": "owner-uint16.mrc",

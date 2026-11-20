@@ -16,13 +16,17 @@ export interface BlockModelSurface extends MeshGeometry {
   colors: number[];
 }
 
-/** Extracts exact visible model surfaces, removing union interiors and faces hidden by solid neighbours. */
+/**
+ * Extracts exact visible model surfaces, removing union interiors and faces hidden by solid neighbours. Positions are
+ * world blocks, or blocks from the chunk's corner with `local` (exact small numbers wherever the chunk is).
+ */
 export function meshBlockModels(
   world: VoxelWorld,
   cx: number,
   cy: number,
   cz: number,
   solidOnly = false,
+  local = false,
 ): BlockModelSurface[] {
   const chunk = world.getChunk(cx, cy, cz);
   if (!chunk) return [];
@@ -35,7 +39,8 @@ export function meshBlockModels(
       type = world.blocks.table[state & 65535];
     if (!type?.model || (solidOnly ? !type.solid : type.layer === 'invisible')) continue;
     const boxes = cellBoxes(type, state),
-      cell = [cx * 32 + x, cy * 32 + y, cz * 32 + z];
+      cell = [cx * 32 + x, cy * 32 + y, cz * 32 + z],
+      at = local ? [x, y, z] : cell;
     for (let k = 0; k < boxes.length; k++)
       for (let d = 0; d < 6; d++) {
         const box = boxes[k],
@@ -85,7 +90,7 @@ export function meshBlockModels(
             const p = faceCorner(clipped, d, c),
               fu = (p[u] - box.min[u]) / (box.max[u] - box.min[u]),
               fv = (p[v] - box.min[v]) / (box.max[v] - box.min[v]);
-            g.positions.push(...p.map((n, j) => n + cell[j]));
+            g.positions.push(...p.map((n, j) => n + at[j]));
             g.normals.push(
               a === 0 ? (positive ? 1 : -1) : 0,
               a === 1 ? (positive ? 1 : -1) : 0,

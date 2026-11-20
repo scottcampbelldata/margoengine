@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export type LevelSource = string | URL | ((signal: AbortSignal) => Promise<StreamedObject>);
 

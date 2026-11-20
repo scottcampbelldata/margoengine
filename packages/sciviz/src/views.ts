@@ -372,6 +372,7 @@ export class VolumeQuad extends EventTarget {
         ...(i < 3 ? { mode: '2d' as const, axes: false } : { mode: '3d' as const, axes: false }),
       }),
     });
+    let quad: VolumeQuad | undefined;
     try {
       const { annotate } = await import('@margoengine/sciviz/annotate'),
         annotations = layout.figures.map((f) => annotate(f, { editable: false }));
@@ -385,12 +386,14 @@ export class VolumeQuad extends EventTarget {
       const planes = (['x', 'y', 'z'] as const).map((a, i) =>
         layer.slice(a, (position[i] - bounds[i * 2]) / (bounds[i * 2 + 1] - bounds[i * 2]), { opacity: 0.75 }),
       );
-      const quad = new VolumeQuad(layout, volume, bounds, annotations, planes, { ...options, range: layer.range });
+      quad = new VolumeQuad(layout, volume, bounds, annotations, planes, { ...options, range: layer.range });
       await quad.setCrosshair(position);
       options.signal?.throwIfAborted();
       return quad;
     } catch (error) {
-      layout.dispose();
+      // A constructed quad owns a resize observer, canvas click and signal listeners besides the layout.
+      if (quad) quad.dispose();
+      else layout.dispose();
       throw error;
     }
   }

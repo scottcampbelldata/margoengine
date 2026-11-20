@@ -7,9 +7,12 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
 await copyLegal(root);
 // One entry per package.json export: ./dist/<name>.js is built from src/<name>.ts.
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
@@ -25,7 +28,7 @@ await build({
   publicDir: false,
   logLevel: 'warn',
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: dist,
     emptyOutDir: true,
     target: 'es2022',
     // Modules several entries use (Controls, OrbitControls) become shared chunks.
@@ -39,7 +42,7 @@ await build({
 });
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.

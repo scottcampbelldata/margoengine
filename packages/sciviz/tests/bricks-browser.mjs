@@ -1,5 +1,5 @@
 // Real-GPU checks of @margoengine/sciviz/bricks (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sciviz/tests/bricks-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sciviz/tests/bricks-browser.mjs
 // The page draws the same volume whole and from bricks and compares the pixels; results go to
 // test-results/bricks-browser.json. With --measure it times frames at a volume larger than one texture instead (take
 // the GPU exclusively for that), to test-results/bricks-measure.json.

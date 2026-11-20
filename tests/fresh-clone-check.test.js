@@ -3,7 +3,10 @@
 // commits only one PC's pre-rewrite history held. Every way that showed up, or could show up, must count as a problem.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MISSING_HISTORY, problems } from '../scripts/fresh-clone-check.mjs';
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { linkModules, MISSING_HISTORY, problems, scratchFolder } from '../scripts/fresh-clone-check.mjs';
 
 const summary = (pass, historical, fail) => `\n${pass} pass, ${historical} historical, ${fail} fail in 0.3 min\n`;
 const row = (name, result, note = '') => `${name.padEnd(24)} 57250a49 -> tree       ${result.padEnd(10)} 0   ${note}`;
@@ -73,4 +76,52 @@ test("the clone's verify reads this checkout's outside test inputs, wherever the
   assert.ok(env.MARGO_JUPYTER_VENV);
   const bench = { MARGO_ENGINE_BENCH: 'D:/bench' };
   assert.equal(externalAssetRoot(verifyEnv(bench)), externalAssetRoot(bench), 'an override in this checkout carries over');
+});
+
+// The 2026-11-15 nightly: every dev server in the clone answered 403 (Vite's allow list held the short 8.3 temporary
+// path as given, the files their real path) and Next.js's Turbopack could not read next, @swc/helpers and the rest
+// through junctions whose real paths lie outside the clone.
+test('the clone folder sits under the real path of the temporary folder, not a link or short name to it', () => {
+  const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'margo-fresh-test-')));
+  try {
+    const real = join(scratch, 'real');
+    mkdirSync(real);
+    symlinkSync(real, join(scratch, 'alias'), 'junction');
+    const folder = scratchFolder(join(scratch, 'alias'));
+    assert.equal(dirname(folder), real);
+    assert.equal(realpathSync.native(folder), folder);
+  } finally {
+    rmSync(join(scratch, 'alias'));
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test('node_modules in the clone are its own files: real paths inside the clone, the same content', () => {
+  const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'margo-fresh-test-')));
+  try {
+    const source = join(scratch, 'checkout', 'node_modules'),
+      clone = join(scratch, 'clone');
+    mkdirSync(join(source, 'next', 'dist'), { recursive: true });
+    mkdirSync(join(source, '@swc', 'helpers'), { recursive: true });
+    mkdirSync(join(source, 'shared'), { recursive: true });
+    writeFileSync(join(source, 'next', 'package.json'), '{"name":"next"}');
+    writeFileSync(join(source, 'next', 'dist', 'index.js'), 'export {};');
+    writeFileSync(join(source, '@swc', 'helpers', 'package.json'), '{"name":"@swc/helpers"}');
+    writeFileSync(join(source, 'shared', 'index.js'), 'export const shared = 1;');
+    symlinkSync(join(source, 'shared'), join(source, 'next', 'linked'), 'junction');
+    mkdirSync(join(clone, 'packages', 'core'), { recursive: true });
+    writeFileSync(join(clone, 'packages', 'core', 'package.json'), '{"name":"@margoengine/core"}');
+    linkModules(clone, source);
+    const modules = join(clone, 'node_modules');
+    for (const file of ['next/package.json', 'next/dist/index.js', '@swc/helpers/package.json']) {
+      const path = join(modules, file);
+      assert.equal(realpathSync.native(path), path, `${file} is reached by its own path in the clone`);
+      assert.equal(readFileSync(path, 'utf8'), readFileSync(join(source, file), 'utf8'));
+    }
+    assert.equal(lstatSync(join(modules, 'next')).isSymbolicLink(), false);
+    assert.equal(realpathSync.native(join(modules, 'next', 'linked')), join(source, 'shared'), 'a link in the tree stays one');
+    assert.equal(realpathSync.native(join(modules, '@margoengine', 'core')), join(clone, 'packages', 'core'));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });

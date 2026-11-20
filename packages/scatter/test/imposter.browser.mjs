@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/imposter.browser.mjs
 // @margoengine/scatter/imposter draws the far LOD ring as octahedral imposters:
 // 1. Same instances: the imposter scatter's far ring holds as many instances as the plain Scatter's (one distribute

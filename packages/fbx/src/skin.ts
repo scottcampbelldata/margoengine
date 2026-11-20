@@ -13,6 +13,9 @@ interface PreparedSkin {
   source: FBXNode;
 }
 const prepared = new WeakMap<SceneContext, Map<object, PreparedSkin | null>>();
+type Joint = SkinData['joints'][number];
+/** Per scene, the group each additive skin's skeleton root was moved into, keyed by that root. */
+const groups = new WeakMap<SceneContext, Map<Joint, { name: string; children: Joint[] }>>();
 
 function insertInfluence(
   jointIds: Uint16Array,
@@ -145,13 +148,21 @@ function prepare(ctx: SceneContext, mesh: MeshBinding): PreparedSkin | null {
       stay = true;
     }
   if (stay) {
-    // Joints need one root, and the skeleton's own may move: a new group holds it and the joint that stays.
+    // Joints need one root, and the skeleton's own may move: a new group holds it and the joint that stays. A later
+    // additive skin on the same skeleton finds its root already in that group and adds its own joint that stays there.
     let top = jointKeys[0];
     while (ctx.parents.has(top)) top = ctx.parents.get(top)!;
     const rest: SkinData['joints'][number] = { name: `${objectName(source)} rest`, children: [] },
-      root = ctx.nodes.get(top)!,
-      at = ctx.roots.indexOf(root);
-    ctx.roots[at] = { name: `${objectName(source)} group`, children: [root, rest] };
+      root = ctx.nodes.get(top)!;
+    let held = groups.get(ctx);
+    if (!held) groups.set(ctx, (held = new Map()));
+    const group = held.get(root);
+    if (group) group.children.push(rest);
+    else {
+      const made = { name: `${objectName(source)} group`, children: [root, rest] as Joint[] };
+      ctx.roots[ctx.roots.indexOf(root)] = made;
+      held.set(root, made);
+    }
     binds.set(meshAtBind!, joints.length * 16);
     joints.push(rest);
   }

@@ -188,8 +188,14 @@ export class RangeCache {
   private async answer(request: Request, url: string): Promise<Response> {
     // Fetch rejects at once on a signal that is already aborted, stored blocks included.
     request.signal.throwIfAborted();
+    // Request cache modes (Fetch), as AssetCache: no-store skips the store both ways; reload asks the network (widened
+    // to whole blocks) and replaces what is stored; no-cache (also `Cache-Control: no-cache` on the request)
+    // revalidates the stored blocks before they are used, fresh or not.
+    if (request.cache === 'no-store') return this.network(request);
     const header = request.headers.get('range'),
-      file = await this.record(url);
+      revalidate =
+        request.cache === 'no-cache' || /(?:^|,)\s*no-cache\b/i.test(request.headers.get('cache-control') ?? ''),
+      file = request.cache === 'reload' ? undefined : await this.record(url);
     if (!file) return this.miss(request, url, header);
     // RFC 9110 section 13.1.5: an If-Range that does not name the stored file is the server's to answer.
     if (header && !ifRange(request.headers.get('if-range'), file.etag, file.modified)) return this.network(request);
@@ -215,7 +221,7 @@ export class RangeCache {
       this.stats[missing.length === last - first + 1 ? 'misses' : 'partial']++;
     } else {
       let reason: 'revalidated' | 'offline' | undefined;
-      if (!this.checked.has(url) && file.fresh <= Date.now()) {
+      if (revalidate || (!this.checked.has(url) && file.fresh <= Date.now())) {
         // Once per RangeCache, as AssetCache: a failed check is not retried on every range of a streaming file.
         this.checked.add(url);
         reason = globalThis.navigator?.onLine === false ? 'offline' : await this.revalidate(request, file);
@@ -388,7 +394,7 @@ export class RangeCache {
     if (keep) {
       this.split(blob, offset, size, got);
       this.checked.add(url);
-      this.queue((db) => this.write(db, file, got));
+      this.queue((db) => this.write(db, file, got, true));
     }
     const range = header ? byteRange(header, size) : ([0, size - 1] as [number, number]);
     if (range === 'unsatisfiable')
@@ -488,7 +494,8 @@ export class RangeCache {
   }
 
   /** Adds blocks to a file; another version of the file is replaced; least recently used files make room. */
-  private async write(db: IDBDatabase, file: Stored, blobs: Map<number, Blob>): Promise<void> {
+  /** `answered`: `file` comes from a response just received, so its freshness replaces a same-version record's. */
+  private async write(db: IDBDatabase, file: Stored, blobs: Map<number, Blob>, answered = false): Promise<void> {
     let all: IDBRequest | undefined;
     await transact(db, [M], 'readonly', (meta) => {
       all = meta.getAll();
@@ -504,6 +511,7 @@ export class RangeCache {
       blocks = [...new Set([...(same ? current.blocks : []), ...blobs.keys()])].sort((a, b) => a - b),
       next: Stored = {
         ...(same ? current : file),
+        ...(same && answered ? { fresh: file.fresh, control: file.control, expires: file.expires } : {}),
         used: Date.now(),
         blocks,
         bytes: blocks.reduce((sum, i) => sum + this.blockBytes(i, file.size), 0),

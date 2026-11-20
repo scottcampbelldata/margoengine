@@ -355,9 +355,14 @@ export function allowedBreak(breaks, entry, item) {
   );
 }
 
-/** New report packages enter watch mode only through api:update, after its breaking-change preflight. */
-export function enrollWatch(lock, names) {
-  return { ...lock, watch: [...new Set([...lock.watch, ...names.filter((name) => !lock.locked.includes(name))])].sort() };
+/**
+ * New report packages enter watch mode only through api:update, after its breaking-change preflight. A watched name
+ * that is no longer a package (`existing`, every package with entries) leaves the list, so a renamed or merged package
+ * does not stay watched under its old name.
+ */
+export function enrollWatch(lock, names, existing) {
+  const kept = existing ? lock.watch.filter((name) => existing.includes(name)) : lock.watch;
+  return { ...lock, watch: [...new Set([...kept, ...names.filter((name) => !lock.locked.includes(name))])].sort() };
 }
 
 /** The same decision drives check and update; update preflights every entry before writing any report. */

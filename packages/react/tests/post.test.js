@@ -88,11 +88,12 @@ function model(count = 0) {
 function implementation(name, Native) {
   return class Plugin {
     constructor(options = {}) {
-      new Native(options);
+      // The native options object, with any quality-tier preset values the constructor filled in.
+      const native = new Native(options);
       Object.assign(this, {
         name,
         engine: null,
-        options,
+        options: native.options ?? options,
         sources: new Set(),
         disposals: 0,
         resets: 0,
@@ -129,14 +130,17 @@ function implementation(name, Native) {
     }
   };
 }
-// PostStack's lifecycle: it attaches its effects in order and detaches them on dispose.
+// PostStack's lifecycle: it attaches its effects in order and detaches them on dispose; addEffect attaches one effect
+// at an index of the live list and removeEffect detaches (so disposes) one, as the native stack does. `calls` logs them.
 const stacks = [];
 class PostStack {
   static attach(engine, list) {
     const stack = Object.assign(new PostStack(), {
       name: 'post:stack',
       engine,
-      effects: list,
+      effects: [...list],
+      calls: [],
+      refuse: undefined,
       disposals: 0,
       depthTexture: { name: 'stack depth' },
     });
@@ -147,6 +151,24 @@ class PostStack {
     }
     stacks.push(stack);
     return stack;
+  }
+  addEffect(effect, index) {
+    assert.equal(this.disposals, 0, 'a disposed stack takes no effects');
+    assert.ok(index >= 0 && index <= this.effects.length, 'the index is within the list');
+    if (effect.name === this.refuse) throw new TypeError(`${effect.name} cannot join a PostStack`);
+    this.calls.push(['add', effect.name, index]);
+    this.effects.splice(index, 0, effect);
+    effect.engine = this.engine;
+    this.engine.use(effect);
+    return this;
+  }
+  removeEffect(effect) {
+    const index = this.effects.indexOf(effect);
+    assert.ok(index >= 0, 'only effects in the stack are removed');
+    this.calls.push(['remove', effect.name]);
+    this.engine.removePlugin(effect.name);
+    this.effects.splice(index, 1);
+    return true;
   }
   dispose() {
     if (this.disposals) return;
@@ -389,6 +411,96 @@ test('a lone Tonemap reattaches when its fixed source changes; a second effect m
   assert.equal(fourth.options.source, undefined);
 });
 
+test('adding or removing an effect changes the live PostStack in place, so only the added effect is built (GAP-POST-ADD1-REACT)', async () => {
+  const value = scene(),
+    first = model();
+  value.resources.models.add(first);
+  const parts = {
+    dof: () => h(DepthOfField, { key: 'dof' }),
+    tone: () => h(Tonemap, { key: 'tone' }),
+    ssao: () => h(SSAO, { key: 'ssao' }),
+    bloom: () => h(Bloom, { key: 'bloom' }),
+    bloom2: () => h(Bloom, { key: 'bloom2', strength: 0.3 }),
+    smaa: () => h(SMAA, { key: 'smaa' }),
+    fxaa: () => h(FXAA, { key: 'fxaa' }),
+    taa: () => h(TAA, { key: 'taa' }),
+  };
+  const child = (...names) => names.map((name) => parts[name]());
+  const view = render(tree(value, child('taa', 'dof', 'tone')));
+  await flush();
+  const stack = value.engine.plugins.get('post:stack'),
+    taa = value.engine.plugins.get('taa'),
+    [dof, tone] = stack.effects;
+  let built = effects.length;
+  assert.deepEqual([dof.name, tone.name], ['dof', 'tonemap']);
+  // SSAO comes first in stack order whatever the JSX order: it joins at index 0 and nothing else is rebuilt.
+  view.rerender(tree(value, child('tone', 'dof', 'ssao', 'taa')));
+  await flush();
+  assert.equal(value.engine.plugins.get('post:stack'), stack, 'the stack stays');
+  assert.equal(effects.length, built + 1, 'only SSAO is built');
+  const ssao = value.engine.plugins.get('ssao');
+  assert.deepEqual(stack.effects, [ssao, dof, tone]);
+  assert.deepEqual(stack.calls, [['add', 'ssao', 0]]);
+  assert.deepEqual([...ssao.sources], [first], 'the added SSAO gets the PBR models');
+  assert.equal(taa.options.depth(), stack.depthTexture);
+  // Two more at once: Bloom between DOF and Tonemap, SMAA last.
+  built = effects.length;
+  view.rerender(tree(value, child('smaa', 'tone', 'bloom', 'dof', 'ssao', 'taa')));
+  await flush();
+  const bloom = value.engine.plugins.get('bloom'),
+    smaa = value.engine.plugins.get('smaa');
+  assert.equal(effects.length, built + 2);
+  assert.deepEqual(stack.effects, [ssao, dof, bloom, tone, smaa]);
+  assert.deepEqual(stack.calls.slice(1), [
+    ['add', 'bloom', 2],
+    ['add', 'smaa', 4],
+  ]);
+  // DOF leaves and FXAA takes SMAA's place: two removals, one addition.
+  built = effects.length;
+  view.rerender(tree(value, child('fxaa', 'tone', 'bloom', 'ssao', 'taa')));
+  await flush();
+  const fxaa = value.engine.plugins.get('fxaa');
+  assert.equal(effects.length, built + 1);
+  assert.deepEqual(stack.effects, [ssao, bloom, tone, fxaa]);
+  assert.deepEqual(stack.calls.slice(3), [['remove', 'smaa'], ['remove', 'dof'], ['add', 'fxaa', 3]]);
+  assert.equal(dof.disposals, 1);
+  assert.equal(smaa.disposals, 1);
+  // A remounted Bloom (a new key) is a new effect in the same place; an option change on the others builds nothing.
+  built = effects.length;
+  view.rerender(tree(value, child('fxaa', 'tone', 'bloom2', 'ssao', 'taa')));
+  await flush();
+  const bloom2 = value.engine.plugins.get('bloom');
+  assert.notEqual(bloom2, bloom);
+  assert.equal(bloom.disposals, 1);
+  assert.equal(bloom2.options.strength, 0.3);
+  assert.equal(effects.length, built + 1);
+  assert.deepEqual(stack.effects, [ssao, bloom2, tone, fxaa]);
+  assert.deepEqual(stack.calls.slice(6), [['remove', 'bloom'], ['add', 'bloom', 1]]);
+  for (const effect of [ssao, tone, fxaa, taa]) assert.equal(effect.disposals, 0, effect.name + ' is kept');
+  assert.equal(stack.disposals, 0);
+  assert.equal(taa.resets, 0, 'TAA keeps its history');
+  assert.deepEqual(value.errors, []);
+});
+
+test('an effect the live PostStack refuses is disposed and reported once, and the composer clears', async () => {
+  const value = scene(),
+    errors = [],
+    props = { onError: (error) => errors.push(error) };
+  const view = render(tree(value, [h(DepthOfField, { key: 'dof' }), h(Tonemap, { key: 'tone' })], props));
+  await flush();
+  const stack = value.engine.plugins.get('post:stack');
+  stack.refuse = 'bloom';
+  const before = effects.length;
+  view.rerender(tree(value, [h(DepthOfField, { key: 'dof' }), h(Tonemap, { key: 'tone' }), h(Bloom, { key: 'bloom' })], props));
+  await flush();
+  assert.equal(effects.length, before + 1);
+  assert.equal(effects.at(-1).disposals, 1, 'the refused Bloom is disposed');
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /bloom cannot join a PostStack/);
+  assert.equal(stack.disposals, 1);
+  assert.equal(value.engine.plugins.size, 0);
+});
+
 test('SSAO and TAA register current and future PBR models through demand frame callbacks', async () => {
   const value = scene(),
     first = model(),
@@ -411,6 +523,32 @@ test('SSAO and TAA register current and future PBR models through demand frame c
   for (const callback of value.frames.callbacks) callback(value.engine, 0);
   assert.equal(ssao.sources.size, 0);
   assert.equal(taa.sources.size, 0);
+});
+
+test('a prop change keeps the quality-tier preset values the native effect filled in', async () => {
+  const saved = globalThis.margoPreset;
+  globalThis.margoPreset = { ssao: { samples: 8, radius: 0.9 } };
+  try {
+    const value = scene();
+    const view = render(tree(value, h(SSAO, { radius: 0.3 })));
+    await flush();
+    const ssao = value.engine.plugins.get('ssao');
+    assert.equal(ssao.options.samples, 8, 'the tier preset fills what the app left unset');
+    assert.equal(ssao.options.radius, 0.3, 'the app value wins over the preset');
+    view.rerender(tree(value, h(SSAO, { radius: 0.4 })));
+    await flush();
+    assert.equal(value.engine.plugins.get('ssao'), ssao);
+    assert.equal(ssao.options.radius, 0.4);
+    assert.equal(ssao.options.samples, 8, 'a prop change keeps the preset sample count');
+    view.rerender(tree(value, h(SSAO)));
+    await flush();
+    assert.equal(ssao.options.radius, 0.9, 'removing a prop goes back to the preset value');
+    assert.equal(ssao.options.samples, 8);
+    view.unmount();
+    await flush();
+  } finally {
+    globalThis.margoPreset = saved;
+  }
 });
 
 test('explicit sources and depth callbacks are preserved', async () => {

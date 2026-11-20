@@ -39,7 +39,7 @@ export interface NavWorkerResult<T extends NavMesh | TiledNavMesh> {
 }
 
 const fault = (code: 'failed' | 'unsupported' | 'timeout', message: string) =>
-  new MargoError(code, `${message}. Help: https://margoengine.com/docs/navmesh`);
+  new MargoError(code, `${message}. Help: https://margoengine.com/llms/packages/navmesh.md`);
 
 async function wasmBytes(url: URL, signal: AbortSignal): Promise<ArrayBuffer> {
   if (url.protocol === 'file:') {

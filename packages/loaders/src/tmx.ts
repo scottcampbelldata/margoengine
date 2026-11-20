@@ -1,6 +1,6 @@
 import { LoaderError, type AssetResolver, type LoadedGeometry, type LoadedGroup } from './types.js';
 import { resolvePath, throwIfAborted, toBytes, type BinaryInput } from './util.js';
-import { decodeXML, readXMLTree, type XMLElement } from './xml.js';
+import { decodeXML, readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 import { inflate } from './zip.js';
 
 const F = 'TMX';
@@ -23,6 +23,8 @@ export interface TMXTileset {
   /** Tiles per atlas row, from the file or computed from the image width. */
   columns: number;
   tilecount: number;
+  /** `<tileoffset>` in pixels, y down: where this tileset's tiles are drawn relative to their cell. Default 0, 0. */
+  tileoffset: { x: number; y: number };
   /** The atlas: path relative to the TMX folder (for the resolver) and size in pixels. Absent for image collections. */
   image?: { path: string; width: number; height: number };
   properties: TMXProperties;
@@ -110,7 +112,7 @@ export interface LoadedTMX {
 }
 
 /** Options of `parseTMX`. */
-export interface TMXParseOptions {
+export interface TMXParseOptions extends XMLExternalOptions {
   /** Reads external tilesets (`<tileset source>`), given their path relative to the TMX folder. */
   resolve?: AssetResolver;
   signal?: AbortSignal;
@@ -166,8 +168,15 @@ function readTileset(e: XMLElement, from: string): TMXTileset {
     margin: integer(a.margin, 0, `${what} margin`),
     columns: 0,
     tilecount: 0,
+    tileoffset: { x: 0, y: 0 },
     properties: readProperties(e),
   };
+  const offset = kid(e, 'tileoffset');
+  if (offset)
+    tileset.tileoffset = {
+      x: number(offset.attributes.x, 0, `${what} tileoffset x`),
+      y: number(offset.attributes.y, 0, `${what} tileoffset y`),
+    };
   if (a.name !== undefined) tileset.name = a.name;
   const image = kid(e, 'image');
   if (image?.attributes.source !== undefined)
@@ -344,7 +353,9 @@ export async function parseTMX(input: BinaryInput | string, options: TMXParseOpt
   throwIfAborted(signal, F);
   if (resolve !== undefined && typeof resolve !== 'function')
     throw new TypeError('TMX resolve option is not a function; pass (path) => Promise<Uint8Array | string>');
-  const root = readXMLTree(typeof input === 'string' ? input : decodeXML(toBytes(input, F)), F).children[0];
+  const root = readXMLTree(typeof input === 'string' ? input : decodeXML(toBytes(input, F)), F, {
+    external: options.external,
+  }).children[0];
   if (root?.name !== 'map') throw new LoaderError(F, 'header', `root element is <${root?.name ?? ''}>, not <map>`);
   const a = root.attributes,
     orientation = a.orientation ?? 'orthogonal';
@@ -388,7 +399,7 @@ export async function parseTMX(input: BinaryInput | string, options: TMXParseOpt
           );
         }
         throwIfAborted(signal, F);
-        tsx = readXMLTree(text(content), 'TSX').children[0];
+        tsx = readXMLTree(text(content), 'TSX', { external: options.external }).children[0];
         if (tsx?.name !== 'tileset')
           throw new LoaderError(F, 'header', `tileset "${source}" root element is <${tsx?.name ?? ''}>, not <tileset>`);
         sources.set(source, tsx);
@@ -402,7 +413,15 @@ export async function parseTMX(input: BinaryInput | string, options: TMXParseOpt
         `tileset "${tileset.name ?? source ?? firstgid}" has no atlas image (image collections are not imported)`,
       );
     const key = tileset.image
-      ? [tileset.image.path, tileset.tilewidth, tileset.tileheight, tileset.spacing, tileset.margin].join('|')
+      ? [
+          tileset.image.path,
+          tileset.tilewidth,
+          tileset.tileheight,
+          tileset.spacing,
+          tileset.margin,
+          tileset.tileoffset.x,
+          tileset.tileoffset.y,
+        ].join('|')
       : undefined;
     let index = key === undefined ? undefined : merged.get(key);
     if (index === undefined) {
@@ -475,7 +494,7 @@ export interface TileQuads extends LoadedGeometry {
 /**
  * Turns a tile layer into quads on the XZ plane, facing +Y: map column x runs along +X and row y along +Z, one cell
  * `tileSize` wide, layer pixel offsets scaled by the map's tile size. Tiles larger than a cell grow from its
- * bottom-left corner, as Tiled draws them. UVs (Margo's convention, v = 0 at the top of the image) cover each tile's
+ * bottom-left corner, as Tiled draws them, moved by the tileset's `<tileoffset>`. UVs (Margo's convention, v = 0 at the top of the image) cover each tile's
  * atlas rectangle, honoring spacing and margin, with the diagonal, horizontal and vertical flips applied in Tiled's
  * order.
  */
@@ -541,8 +560,9 @@ export function tmxLayerQuads(map: LoadedTMX, layer: TMXTileLayer, options: Tile
       px = tileset.margin + (local % tileset.columns) * (tileset.tilewidth + tileset.spacing),
       py = tileset.margin + Math.floor(local / tileset.columns) * (tileset.tileheight + tileset.spacing),
       flip = layer.flips[cell],
-      x0 = (layer.x + (cell % layer.width)) * size + ox,
-      z1 = (layer.y + Math.floor(cell / layer.width) + 1) * size + oz,
+      // TMX Map Format, <tileoffset>: the tileset's pixel offset (y down) moves every tile drawn from it.
+      x0 = (layer.x + (cell % layer.width)) * size + ox + (tileset.tileoffset.x / map.tilewidth) * size,
+      z1 = (layer.y + Math.floor(cell / layer.width) + 1) * size + oz + (tileset.tileoffset.y / map.tileheight) * size,
       w = (tileset.tilewidth / map.tilewidth) * size,
       h = (tileset.tileheight / map.tileheight) * size;
     cells[q] = cell;

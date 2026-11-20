@@ -5,7 +5,7 @@
 // and none of the packages it does not import.
 //   npm run modern:test:bundlers      (after modern:test:packages; installs the bundlers from npm)
 // It builds bundles and loads one page of ES modules in a browser started without the GPU; nothing is drawn, so it does
-// not take the GPU lock. The builds run side by side (each bundler in this process, each Next.js build in a child
+// not use the GPU. The builds run side by side (each bundler in this process, each Next.js build in a child
 // process and its own folder).
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn } from 'node:child_process';
@@ -338,7 +338,7 @@ ${result.stdout}${result.stderr}`,
         // Only what the page imports: no package outside its graph is emitted, and nothing larger than JavaScript.
         // Installed code only: Vite stands in a three-line module for an optional peer that is not installed.
         const extra =
-          /node_modules\/@margoengine\/(gltf|gltf-pro|decoders|fbx|creative|scenery|sky|environment|geometry)\//;
+          /node_modules\/@margoengine\/(gltf|decoders|fbx|creative|sky|environment|geometry)\//;
         assert.deepEqual(
           scoped.files.filter((file) => !file.endsWith('.js') && !file.endsWith('.html')),
           [],
@@ -370,7 +370,7 @@ ${result.stdout}${result.stderr}`,
           'margoengine: the initial load holds no optional engine package',
         );
         // Regression (2026-10-27): the Stage class's loaders put an optional package's .wasm into every build of a Canvas page.
-        // Regression (2026-11-06): margoengine/react re-exported the bindings that reach gltf-pro's decoders, and Vite
+        // Regression (2026-11-06): margoengine/react re-exported the bindings that reach gltf/pbr's decoders, and Vite
         // copies a .wasm when it reads a module, before tree-shaking (scripts/umbrella.mjs, REACT_SEPARATE).
         assert.deepEqual(
           umbrella.files.filter((file) => /\.wasm$|draco|basis/i.test(file)),
@@ -378,9 +378,10 @@ ${result.stdout}${result.stderr}`,
           'margoengine: no Wasm, Draco or Basis file on a page that loads no model',
         );
         assert.deepEqual(
-          umbrella.modules.filter((id) => /node_modules\/@margoengine\/(gltf-pro|decoders)\//.test(id)),
+          // The page loads no model, so it emits no glTF code at all (gltf/pbr reaches the decoders).
+          umbrella.modules.filter((id) => /node_modules\/@margoengine\/(gltf|decoders)\//.test(id)),
           [],
-          'margoengine: no chunk of gltf-pro or the decoders is emitted',
+          'margoengine: no chunk of gltf or the decoders is emitted',
         );
         for (const [label, app] of [
           ['react alone', scoped],
@@ -618,7 +619,7 @@ ${result.stdout}${result.stderr}`,
         [],
         `next ${label}: npm installed only @margoengine/react, the added packages and what they require (${engine})`,
       );
-      assert.equal(engine.includes('gltf-pro') || engine.includes('shadows'), false);
+      assert.equal(engine.includes('gltf') || engine.includes('shadows'), false);
       await mkdir(join(app, 'app'), { recursive: true });
       await writeFile(join(app, 'next.config.mjs'), 'export default {};\n');
       await writeFile(

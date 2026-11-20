@@ -2,7 +2,7 @@ import { createStage } from 'margoengine';
 import type { Mesh } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/quality';
-import { parseGLTF } from '@margoengine/gltf-pro';
+import { parseGLTF } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { DragControls, OrbitControls } from '@margoengine/controls';
 import { Animator, addCCDChain, type CCDChain, type CCDJointLimit, type CCDResult } from '../dist/index.js';

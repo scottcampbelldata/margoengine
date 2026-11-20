@@ -113,9 +113,13 @@ export async function openNetCDF(input: FileInput, options: FileOptions = {}): P
     if (n > max / 4) throw bad('list exceeds header bound');
     return n;
   };
+  // Each attribute's external type, kept so _Unsigned reinterprets only attributes stored in the variable's type.
+  const attrTypes = new WeakMap<Record<string, NetCDFAttribute>, Record<string, number>>();
   const attrs = async (): Promise<Record<string, NetCDFAttribute>> => {
     const out: Record<string, NetCDFAttribute> = Object.create(null),
+      types: Record<string, number> = Object.create(null),
       n = await list(12);
+    attrTypes.set(out, types);
     for (let i = 0; i < n; i++) {
       const key = await name(),
         type = await u32(),
@@ -125,6 +129,7 @@ export async function openNetCDF(input: FileInput, options: FileOptions = {}): P
       const size = count * sizes[type],
         bytes = (await take(Math.ceil(size / 4) * 4)).subarray(0, size);
       out[key] = type === 2 ? textOf(bytes) : decode(bytes, type);
+      types[key] = type;
     }
     return out;
   };
@@ -212,6 +217,19 @@ export async function openNetCDF(input: FileInput, options: FileOptions = {}): P
       if (product(count) * 8 > max) throw bad('selection output exceeds maxBytes');
       return { start, stride, count };
     };
+    // NUG best practices: _Unsigned = "true" marks byte, short or int data as unsigned, together with the
+    // _FillValue, missing_value and valid_* attributes stored in the variable's own type.
+    const a = v.attrs,
+      types = attrTypes.get(a)!,
+      flag = a._Unsigned,
+      unsigned = typeof flag === 'string' && flag.trim().toLowerCase() === 'true' && [1, 3, 4].includes(v.type),
+      wrap = 2 ** (8 * sizes[v.type]),
+      toUnsigned = (x: number) => (unsigned && x < 0 ? x + wrap : x);
+    const numeric = (key: string): Float64Array | undefined => {
+      const value = a[key];
+      if (!(value instanceof Float64Array)) return undefined;
+      return unsigned && types[key] === v.type ? value.map(toUnsigned) : value;
+    };
     const read = async (s: NetCDFSelection = {}): Promise<Float64Array> => {
       const current = s.signal ? AbortSignal.any([signal, s.signal]) : signal;
       current.throwIfAborted();
@@ -241,19 +259,28 @@ export async function openNetCDF(input: FileInput, options: FileOptions = {}): P
           end++;
         const bytes = await readBytes(source, address, (end - i) * size, max, current);
         if (bytes.length !== (end - i) * size) throw bad('variable data ends early');
-        out.set(decode(bytes, v.type), i);
+        out.set(decode(bytes, v.type).map(toUnsigned), i);
         i = end;
       }
       if (s.unpack !== false && v.type !== 2) {
-        const a = v.attrs;
-        const numeric = (key: string): Float64Array | undefined =>
-          a[key] instanceof Float64Array ? (a[key] as Float64Array) : undefined;
-        const fill = numeric('_FillValue') ?? [fills[v.type]],
+        // NUG attribute conventions: byte has no assumed default fill; without valid_* attributes the fill
+        // (explicit or default) bounds the valid range, 1 away for integers and 2 ulps away for floats.
+        const explicit = numeric('_FillValue'),
+          fill: ArrayLike<number> & { includes(value: number): boolean } =
+            explicit ?? (v.type === 1 ? new Float64Array() : [toUnsigned(fills[v.type])]),
           missing: ArrayLike<number> & { includes(value: number): boolean } =
             numeric('missing_value') ?? new Float64Array();
         const valid = numeric('valid_range'),
-          low = valid?.[0] ?? numeric('valid_min')?.[0] ?? -Infinity,
-          high = valid?.[1] ?? numeric('valid_max')?.[0] ?? Infinity;
+          min = numeric('valid_min')?.[0],
+          max = numeric('valid_max')?.[0];
+        let low = valid?.[0] ?? min ?? -Infinity,
+          high = valid?.[1] ?? max ?? Infinity;
+        if (!valid && min === undefined && max === undefined && fill.length) {
+          const f = fill[0],
+            gap = v.type < 5 ? 1 : 2 * 2 ** (Math.floor(Math.log2(Math.abs(f) || 1)) - (v.type === 5 ? 23 : 52));
+          if (f > 0) high = f - gap;
+          else low = f + gap;
+        }
         const scale = numeric('scale_factor')?.[0] ?? 1,
           add = numeric('add_offset')?.[0] ?? 0;
         for (let i = 0; i < out.length; i++) {

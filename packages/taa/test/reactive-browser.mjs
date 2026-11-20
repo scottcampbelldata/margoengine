@@ -1,4 +1,4 @@
-// Real-GPU check of TAA's reactive mask, built packages, on the test/stripes-fixture.js scene. Takes the GPU lock itself
+// Real-GPU check of TAA's reactive mask, built packages, on the test/stripes-fixture.js scene.
 // around the browser. A world-space plane of sine stripes 8 px across (drawn with the jittered camera, so TAA reprojects
 // it as it would any surface) keeps the 3x3 clamp wide open; a half-transparent white square that writes no velocity,
 // as particles and splats do, crosses it 6 px a frame. Plain TAA leaves a bright trail where the square was; with the square's coverage in the reactive mask
@@ -6,17 +6,18 @@
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-reactive' });
 const timer = setTimeout(() => {
   console.error('reactive-browser: timed out after 120 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-reactive/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -28,6 +29,8 @@ const browser = await launchBrowser({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 640, height: 480 }, deviceScaleFactor: 1 }),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
@@ -86,5 +89,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

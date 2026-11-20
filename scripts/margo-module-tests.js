@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
+import { compatRun, compatShim } from './support/compat-shim.js';
 const browser = await openBrowser({ startPath: '/tests/margo-modules.html' }),
   { page, hardware } = browser,
   errors = [];
@@ -209,28 +210,49 @@ try {
     phone.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
+    // A forced-compatibility run (MARGO_COMPAT=1) draws this page on the WebGL2 layer too; the audit then patches the
+    // layer's classes once they are installed (compatShim runs `__margoOnLayer`).
+    if (compatRun()) await phone.addInitScript(compatShim);
     await phone.addInitScript(() => {
-      const audit = (window.msaaAudit = { textures: 0, pipelines: 0, resolves: 0 });
-      for (const name of ['createTexture', 'createRenderPipeline', 'createRenderPipelineAsync']) {
-        const create = GPUDevice.prototype[name];
-        GPUDevice.prototype[name] = function (d) {
-          if ((d.sampleCount ?? d.multisample?.count ?? 1) > 1)
-            audit[name === 'createTexture' ? 'textures' : 'pipelines']++;
-          return create.call(this, d);
+      const audit = (window.msaaAudit = {
+        textures: 0,
+        pipelines: 0,
+        resolves: 0,
+        seen: { textures: 0, pipelines: 0, passes: 0 },
+      });
+      const patch = () => {
+        for (const name of ['createTexture', 'createRenderPipeline', 'createRenderPipelineAsync']) {
+          const create = GPUDevice.prototype[name];
+          GPUDevice.prototype[name] = function (d) {
+            const kind = name === 'createTexture' ? 'textures' : 'pipelines';
+            audit.seen[kind]++;
+            if ((d.sampleCount ?? d.multisample?.count ?? 1) > 1) audit[kind]++;
+            return create.call(this, d);
+          };
+        }
+        const begin = GPUCommandEncoder.prototype.beginRenderPass;
+        GPUCommandEncoder.prototype.beginRenderPass = function (d) {
+          audit.seen.passes++;
+          for (const a of d.colorAttachments) if (a?.resolveTarget) audit.resolves++;
+          return begin.call(this, d);
         };
-      }
-      const begin = GPUCommandEncoder.prototype.beginRenderPass;
-      GPUCommandEncoder.prototype.beginRenderPass = function (d) {
-        for (const a of d.colorAttachments) if (a?.resolveTarget) audit.resolves++;
-        return begin.call(this, d);
       };
+      if (globalThis.__margoCompat) (globalThis.__margoOnLayer ??= []).push(patch);
+      else patch();
     });
     await phone.goto('http://127.0.0.1:5193/tests/margo-modules.html');
     await phone.waitForFunction(() => window.margoModules);
     for (const name of Object.keys(results))
       if (name !== 'fbx') await phone.evaluate((name) => window.margoModules.setup(name), name);
-    mobile = await phone.evaluate(() => ({ ...window.msaaAudit, errors: window.margoModules.errors }));
+    const { seen, ...msaa } = await phone.evaluate(() => window.msaaAudit);
+    // Zero MSAA means something only when the audit saw the phone page's textures, pipelines and passes.
+    assert.ok(
+      seen.textures > 0 && seen.pipelines > 0 && seen.passes > 0,
+      `the MSAA audit counted no GPU work: ${JSON.stringify(seen)}`,
+    );
+    mobile = { ...msaa, errors: await phone.evaluate(() => window.margoModules.errors) };
     assert.deepEqual(mobile, { textures: 0, pipelines: 0, resolves: 0, errors: [] });
+    mobile.seen = seen;
     assert.deepEqual(errors, []);
     await phone.evaluate(() => window.margoModules.dispose());
   } finally {

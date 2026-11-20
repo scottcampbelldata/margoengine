@@ -794,6 +794,24 @@ window.check={
   look([20,14,24],[4,3,4]);
   return {...out,errors:errors.splice(0)};
  },
+ // KB-L5a-1: a surface vertex reached after maxBounces events samples no light. The floor sees only the back of an
+ // up-facing see-through panel; its light reaches the floor only off the ceiling, two events, so one bounce is black.
+ async bouncelimit(){
+  look([0,2,0],[0,0,0],{project:ortho(2),up:[0,0,-1]});
+  const scene={revision:1,models:[model('floor',[32,1,32],()=>1),model('ceiling',[32,1,32],()=>1)],
+   instances:[{id:'floor',modelId:'floor',matrix:translate(-16,-1,-16)},{id:'ceiling',modelId:'ceiling',matrix:translate(-16,4,-16)}],
+   materials:[{id:1,type:'diffuse',color:[1,1,1]}],
+   lights:[{id:'panel',position:[0,3,0],direction:[0,1,0],width:32,height:32,color:[1,1,1],intensity:1,opaque:false}],
+   environment:{skyIntensity:0,sunIntensity:0,ground:false}};
+  const out={};
+  for(const bounces of [1,2])out[bounces]=await withTracer(scene,{denoise:false,maxBounces:bounces},async(t)=>{
+   const img=await t.renderImage({width:16,height:16,samples:256,seed:317,jitter:false});
+   let sum=0,max=0;for(const v of img.color){sum+=v;max=Math.max(max,v);}
+   return {mean:sum/img.color.length,max,finite:img.color.every(Number.isFinite)};
+  });
+  look([20,14,24],[4,3,4]);
+  return {...out,errors:errors.splice(0)};
+ },
  async arealight(){
   const out={},floor=model('f',[64,1,64],()=>1),mat=[{id:1,color:[0.5,0.5,0.5],type:'diffuse'}];
   // Square panels centred over the origin facing down.
@@ -984,10 +1002,11 @@ window.check={
    let same=0,other=0;for(let i=0;i<a.color.length;i++){if(a.color[i]===b.color[i])same++;if(a.color[i]!==c.color[i])other++;}
    let passes;
    if(d.passes){
-    // The same render with every window of the loop recorded (the route's test switch): bit for bit the same image.
-    d.voxelTraceWholeLoop=true;
+    // The same render with every window of the loop and every light kind recorded (the route's test switches; the
+    // route leaves out the passes of a kind the frame switches off): bit for bit the same image.
+    d.voxelTraceWholeLoop=true;d.voxelTraceEveryKind=true;
     const w0=count(),whole=await t.renderImage({width:96,height:64,samples:16,seed:5}),w1=count();
-    d.voxelTraceWholeLoop=false;
+    d.voxelTraceWholeLoop=false;d.voxelTraceEveryKind=false;
     let equal=0;for(let i=0;i<a.color.length;i++)if(Object.is(a.color[i],whole.color[i]))equal++;
     passes={stopped:delta(before,after),horizon:delta(after,again),whole:delta(w0,w1),equal};
    }
@@ -1303,30 +1322,53 @@ window.check={
  },
  // A 3840 x 2160 viewport with the default device limits: traced at its native size, denoised (history in textures)
  // and not; GPU time per frame (timestamp queries around the tracer's pass), memory, and the moving camera's history.
+ // The WebGL2 compatibility layer has no timestamp queries: there the case returns the layer's coded refusal instead
+ // of GPU times, and the parts its trace route ran (src/compat.ts traces in parts, not compute dispatches).
  async native4k(){
-  const results={};
-  const d=device(),query=d.createQuerySet({type:'timestamp',count:2}),resolve=d.createBuffer({size:16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
-  const stamp=(name,order,index)=>runtime().frameGraph.add({name,order,execute:(c)=>c.encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:index}}).end()});
-  const off=[stamp('t0',19.999,0),stamp('t1',20.001,1),runtime().frameGraph.add({name:'t-resolve',order:99,execute:(c)=>{c.encoder.resolveQuerySet(query,0,2,resolve,0);c.encoder.copyBufferToBuffer(resolve,0,read,0,16);}})];
-  canvas.style.width='3840px';canvas.style.height='2160px';
-  for(const [name,options] of [['raw',{}],['denoised',{denoise:true}]]){
-   look([18,14,26],[-3,3,-2]);
-   const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:Infinity,...options});
-   await tracer.ready;
-   // fixed-wait: warm-up frames before the GPU timing below (the tracer is ready: await tracer.ready above)
-   for(let i=0;i<5;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();}
-   const gpu=[];
-   // The camera moves a little every frame: the denoiser reprojects its history each time.
-   // fixed-wait: 20 timed frames of a moving camera (a measurement, not a wait)
-   for(let i=0;i<20;i++){look([18+0.05*i,14,26-0.04*i],[-3,3,-2]);engine.render({delta:0});await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();gpu.push(Number(s[1]-s[0])/1e6);}
-   const st=tracer.stats;
-   results[name]={canvas:[canvas.width,canvas.height],traced:[st.width,st.height],requested:[st.requestedWidth,st.requestedHeight],limitedBy:st.limitedBy??null,gpuMs:[...gpu].sort((x,y)=>x-y)[gpu.length>>1],gpuBytes:st.gpuBytes,limits:{binding:d.limits.maxStorageBufferBindingSize,texture:d.limits.maxTextureDimension2D}};
-   tracer.dispose();
+  const results={},d=device(),timed=d.features.has('timestamp-query');
+  let refusal=null,parts=null,restore=()=>{},query;
+  if(timed)query=d.createQuerySet({type:'timestamp',count:2});
+  else{
+   try{d.createQuerySet({type:'timestamp',count:2});}catch(e){refusal={name:e.name,code:e.code??null,message:String(e.message)};}
+   // Each part writes its place (8 words: sx, s0, row0, rows, n, virtual width, virtual height, 0) just before its
+   // `start` program, so the virtual size last written is the part's paths.
+   const write=d.queue.writeBuffer,create=d.createCommandEncoder;let last=0;
+   parts={};
+   d.queue.writeBuffer=function(buffer,offset,data,...rest){if(data instanceof Uint32Array&&data.length===8)last=data[5]*data[6];return write.call(this,buffer,offset,data,...rest);};
+   d.createCommandEncoder=function(...a){const e=create.apply(this,a),begin=e.beginRenderPass;e.beginRenderPass=function(desc){const p=parts.current;if(p&&desc?.label==='voxel-pathtracer start'){p.count++;p.max=Math.max(p.max,last);}return begin.call(this,desc);};return e;};
+   restore=()=>{d.queue.writeBuffer=write;d.createCommandEncoder=create;delete parts.current;};
   }
-  for(const f of off)f();
-  canvas.style.width='320px';canvas.style.height='240px';
-  look([20,14,24],[4,3,4]);
-  return {results,errors:errors.splice(0),messages:messages.splice(0)};
+  const resolve=d.createBuffer({size:16,usage:GPUBufferUsage.QUERY_RESOLVE|GPUBufferUsage.COPY_SRC}),read=d.createBuffer({size:16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+  const stamp=(name,order,index)=>runtime().frameGraph.add({name,order,execute:(c)=>c.encoder.beginComputePass({timestampWrites:{querySet:query,beginningOfPassWriteIndex:index}}).end()});
+  const off=timed?[stamp('t0',19.999,0),stamp('t1',20.001,1),runtime().frameGraph.add({name:'t-resolve',order:99,execute:(c)=>{c.encoder.resolveQuerySet(query,0,2,resolve,0);c.encoder.copyBufferToBuffer(resolve,0,read,0,16);}})]:[];
+  canvas.style.width='3840px';canvas.style.height='2160px';
+  try{
+   for(const [name,options] of [['raw',{}],['denoised',{denoise:true}]]){
+    if(parts)parts.current=parts[name]={count:0,max:0};
+    look([18,14,26],[-3,3,-2]);
+    const tracer=VoxelPathTracer.attach(engine,{scene:scenes.materials(),maxSamples:Infinity,...options});
+    await tracer.ready;
+    // fixed-wait: warm-up frames before the GPU timing below (the tracer is ready: await tracer.ready above)
+    for(let i=0;i<5;i++){engine.render({delta:0});await d.queue.onSubmittedWorkDone();}
+    const gpu=[];
+    // The camera moves a little every frame: the denoiser reprojects its history each time.
+    // fixed-wait: 20 timed frames of a moving camera (a measurement, not a wait)
+    for(let i=0;i<20;i++){
+     look([18+0.05*i,14,26-0.04*i],[-3,3,-2]);engine.render({delta:0});
+     if(!timed){await d.queue.onSubmittedWorkDone();continue;}
+     await read.mapAsync(GPUMapMode.READ);const s=new BigInt64Array(read.getMappedRange().slice(0));read.unmap();gpu.push(Number(s[1]-s[0])/1e6);
+    }
+    const st=tracer.stats;
+    results[name]={canvas:[canvas.width,canvas.height],traced:[st.width,st.height],requested:[st.requestedWidth,st.requestedHeight],limitedBy:st.limitedBy??null,gpuMs:timed?[...gpu].sort((x,y)=>x-y)[gpu.length>>1]:null,gpuBytes:st.gpuBytes,limits:{binding:d.limits.maxStorageBufferBindingSize,texture:d.limits.maxTextureDimension2D}};
+    tracer.dispose();
+   }
+  }finally{
+   restore();
+   for(const f of off)f();
+   canvas.style.width='320px';canvas.style.height='240px';
+   look([20,14,24],[4,3,4]);
+  }
+  return {timed,refusal,parts,results,errors:errors.splice(0),messages:messages.splice(0)};
  },
  async picture(name,width,height,samples,camera,options={}){
   look(...camera);

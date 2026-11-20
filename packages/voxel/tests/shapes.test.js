@@ -255,6 +255,20 @@ test('mesher: slabs beside, under and over cubes hide exactly the covered part o
   );
 });
 
+test('mesher: a chunk filled with one slab or stair state shows the faces of every cell, not only its boundary', () => {
+  // A uniform chunk of whole cubes has faces only on its boundary; a uniform chunk of slabs or stairs does not, since
+  // every cell's open part shows the faces of the one beside it.
+  for (const state of [slabState(SLAB), slabState(SLAB, true), stairState(STAIR, '+x', false)]) {
+    const w = world(),
+      edits = [];
+    for (let x = 0; x < 32; x++) for (let y = 0; y < 32; y++) for (let z = 0; z < 32; z++) edits.push(x, y, z, state);
+    w.setBlocks(edits);
+    const inner = quads(mesh(w)).filter((q) => q.face < 6 && q.y > 0 && q.y < 31);
+    assert.ok(inner.length > 0, `state ${state.toString(16)}: inner cells have faces`);
+    sameFaces(w, `uniform ${state.toString(16)}`);
+  }
+});
+
 test('mesher: slab floors merge into one top, one bottom and one quad per side', () => {
   const w = world(),
     edits = [];
@@ -530,6 +544,43 @@ test('connectStairs: outer corners toward a stair behind, inner toward one in fr
   );
   const hit = raycastVoxels(ring, [19.25, 9, 19.25], [0, -1, 0], 20);
   assert.ok(hit.point[1] === 4.5 || hit.point[1] === 5, `hit at ${hit.point}`);
+});
+
+test('connectStairs: a stair beside one of its own facing and half keeps a straight run instead of turning', () => {
+  // The block-game convention: before a stair turns toward a perpendicular stair behind or in front of it, the cell on
+  // its other side is checked, and a stair there with the same facing and half means the stair continues that run.
+  const w = world(),
+    corner = (x, z) => (w.getBlock(x, 4, z) >>> 16) & 0x7f;
+  // A run facing +x along z = 4, 5, with a stair facing +z behind (5, 5): the run's end at z = 5 stays straight
+  // because (5, 4) carries the run on toward -z.
+  w.setBlocks([5, 4, 4, stairState(STAIR, '+x'), 5, 4, 5, stairState(STAIR, '+x'), 6, 4, 5, stairState(STAIR, '+z')]);
+  for (const z of [4, 5]) connectStairs(w, 5, 4, z);
+  assert.equal(corner(5, 5), 0);
+  assert.equal(corner(5, 4), 0);
+  // Without the run's other stair the outer corner forms.
+  w.setBlock(5, 4, 4, 0);
+  connectStairs(w, 5, 4, 4);
+  assert.equal(corner(5, 5), (2 << 3) | 32);
+  // Inner: a stair facing +x whose front meets a stair facing -z turns inner toward -z, unless the cell toward -z
+  // holds a stair facing +x of the same half.
+  w.setBlocks([10, 4, 5, stairState(STAIR, '+x'), 9, 4, 5, stairState(STAIR, '-z'), 10, 4, 4, stairState(STAIR, '+x')]);
+  connectStairs(w, 10, 4, 5);
+  assert.equal(corner(10, 5), 0);
+  // A stair of the other half there does not hold the run.
+  w.setBlock(10, 4, 4, stairState(STAIR, '+x', true));
+  connectStairs(w, 10, 4, 5);
+  assert.equal(corner(10, 5), 1 << 3);
+  // A blocked outer corner still falls through to the inner test.
+  const v = world(),
+    at = (x, z) => (v.getBlock(x, 4, z) >>> 16) & 0x7f;
+  v.setBlocks([
+    5, 4, 5, stairState(STAIR, '+x'),
+    6, 4, 5, stairState(STAIR, '+z'), // behind: outer toward +z, blocked by (5, 4)
+    5, 4, 4, stairState(STAIR, '+x', false, 'straight'),
+    4, 4, 5, stairState(STAIR, '+z', false, 'straight'), // in front: inner toward +z, the cell (5, 6) is free
+  ]);
+  connectStairs(v, 5, 4, 5);
+  assert.equal(at(5, 5), (1 << 3) | 32);
 });
 
 test('double slabs act as whole blocks for meshing, picking and sweeps', () => {

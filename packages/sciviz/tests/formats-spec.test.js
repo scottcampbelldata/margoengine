@@ -373,6 +373,21 @@ test('DICOM: dicomSeries takes Spacing Between Slices before Slice Thickness as 
     );
   const volume = dicomSeries(await Promise.all([slice(2), slice(1)]));
   assert.equal(volume.spacing[2], 3);
+  // A slice of another plane or pixel grid in the same series is not stacked with the first one's geometry.
+  const [a, b] = await Promise.all([slice(1), slice(2)]);
+  const flat = { ...a, orientation: [1, 0, 0, 0, 1, 0] };
+  assert.throws(() => dicomSeries([flat, { ...b, orientation: [1, 0, 0, 0, 0, -1] }]), /ImageOrientationPatient/);
+  assert.throws(() => dicomSeries([flat, b]), /ImageOrientationPatient/);
+  assert.throws(() => dicomSeries([a, { ...b, pixelSpacing: [1, 2] }]), /PixelSpacing/);
+  assert.equal(dicomSeries([flat, { ...b, orientation: [1, 0, 0, 0, 0.99999999, 0] }]).dims[2], 2);
+  // A missing slice (a step past 1.5 times the median) rejects unless allowed, and is then listed.
+  const at = (z) => ({ ...a, orientation: [1, 0, 0, 0, 1, 0], position: [0, 0, z] });
+  const holed = [at(0), at(2), at(4), at(8), at(10)];
+  assert.throws(() => dicomSeries(holed), /skip a step after slice 2/);
+  const allowed = dicomSeries(holed, { allowGaps: true });
+  assert.deepEqual(allowed.gaps, [2]);
+  assert.equal(allowed.spacing[2], 2);
+  assert.deepEqual(dicomSeries([at(0), at(2), at(4)]).gaps, []);
   assert.deepEqual([...volume.data.subarray(0, 5)], [1, 0, 0, 0, 2]);
 });
 

@@ -20,6 +20,9 @@ import {
   halveShader,
   joinShader,
   halfShaders,
+  nearShader,
+  nearDownShader,
+  NEAR_LEVELS,
 } from './shaders.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
@@ -85,6 +88,18 @@ export class DOF implements EnginePlugin {
   private cocPipeline?: GPUComputePipeline;
   private bokehPipeline?: GPUComputePipeline;
   private coarsePipeline?: GPUComputePipeline;
+  // The near gather's tap source: a mip chain (level 0 by nearShader, each level above by nearDownShader), its
+  // trilinear sampler, the whole chain's views (read by the gather), level 0's views and the bind groups that build
+  // levels 1 and up.
+  private nearPipeline?: GPUComputePipeline;
+  private nearDownPipeline?: GPUComputePipeline;
+  private nearSampler?: GPUSampler;
+  private nearTaps?: GPUTexture;
+  private nearShapes?: GPUTexture;
+  private nearScene?: GPUTexture;
+  private nearViews: GPUTextureView[] = [];
+  private nearBase: GPUTextureView[] = [];
+  private nearLevels: GPUBindGroup[] = [];
   // The WebGL2 layer's route (./compat.js): the CoC kernel without tile maxima, which this pass computes instead.
   private tilesPipeline?: GPUComputePipeline;
   private tilesGroup?: GPUBindGroup;
@@ -226,6 +241,9 @@ export class DOF implements EnginePlugin {
     });
     this.bokehPipeline = compute(engine.gpu, shaders.bokehShader);
     this.coarsePipeline = compute(engine.gpu, shaders.coarseShader);
+    this.nearPipeline = compute(engine.gpu, nearShader);
+    this.nearDownPipeline = compute(engine.gpu, nearDownShader);
+    this.nearSampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     const uniform = this.uniform,
       route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
     // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
@@ -410,6 +428,8 @@ export class DOF implements EnginePlugin {
               { binding: 3, resource: outputView },
               { binding: 4, resource: tileView },
               { binding: 5, resource: coarseView },
+              { binding: 6, resource: this.nearSampler! },
+              ...this.nearViews.map((resource, i) => ({ binding: 7 + i, resource })),
             ],
           }),
       c.device.createBindGroup({
@@ -420,6 +440,8 @@ export class DOF implements EnginePlugin {
         ? undefined!
         : group(c.device, this.coarsePipeline!, [{ buffer: this.uniform! }, this.sceneView, cocView, coarseView]),
     ];
+    if (!this.halfUniform)
+      this.groups[8] = this.nearGroup(c.device, { buffer: this.uniform! }, this.sceneView, cocView);
     if (this.halfUniform) this.halfGroups(c.device, this.sceneView);
   }
   /** Temporal: the gather's groups over the half textures (1, 3) and the halve and join groups over `input` (5, 6). */
@@ -429,8 +451,18 @@ export class DOF implements EnginePlugin {
       coc = this.halfCoc!.createView(),
       tiles = this.halfTiles!.createView(),
       blurred = this.blurred!.createView();
-    this.groups[1] = group(device, this.bokehPipeline!, [u, scene, coc, blurred, tiles, this.coarseView!]);
+    this.groups[1] = group(device, this.bokehPipeline!, [
+      u,
+      scene,
+      coc,
+      blurred,
+      tiles,
+      this.coarseView!,
+      this.nearSampler!,
+      ...this.nearViews,
+    ]);
     this.groups[3] = group(device, this.coarsePipeline!, [u, scene, coc, this.coarseView!]);
+    this.groups[8] = this.nearGroup(device, u, scene, coc);
     this.groups[5] = group(device, this.halvePipeline!, [
       input,
       this.cocView!,
@@ -440,6 +472,10 @@ export class DOF implements EnginePlugin {
     ]);
     this.groups[6] = group(device, this.joinPipeline!, [input, this.cocView!, blurred, this.outputView!]);
     if (this.tilesPipeline) this.groups[7] = group(device, this.tilesPipeline, [coc, tiles]);
+  }
+  /** The near chain's level 0 bind group over the gather's scene and CoC (full or, temporal, half size). */
+  private nearGroup(device: GPUDevice, u: GPUBufferBinding, scene: GPUTextureView, coc: GPUTextureView): GPUBindGroup {
+    return group(device, this.nearPipeline!, [u, scene, coc, ...this.nearBase]);
   }
   /** The CoC pass's bind group; on the WebGL2 route also the tile pass's (`tilesGroup`). */
   private cocGroup(device: GPUDevice, depth: GPUTexture, direct = false): GPUBindGroup {
@@ -480,6 +516,8 @@ export class DOF implements EnginePlugin {
   private blur(c: Context): void {
     // Temporal: the gather covers the half image (blocks twice as wide), then the join brings it back to full size.
     const half = this.halvePipeline ? 2 : 1;
+    this.dispatch(c, this.nearPipeline!, this.groups[8], 8 * half);
+    this.nearLevels.forEach((level, k) => this.dispatch(c, this.nearDownPipeline!, level, (16 * half) << k));
     this.dispatch(c, this.coarsePipeline!, this.groups[3], 16 * half);
     this.dispatch(c, this.bokehPipeline!, this.groups[1], 8 * half);
     if (this.joinPipeline) this.dispatch(c, this.joinPipeline, this.groups[6]);
@@ -535,6 +573,8 @@ export class DOF implements EnginePlugin {
         this.outputView!,
         this.tileView!,
         this.coarseView!,
+        this.nearSampler!,
+        ...this.nearViews,
       ]);
       this.groups[3] = group(device, this.coarsePipeline!, [
         { buffer: this.uniform! },
@@ -542,6 +582,7 @@ export class DOF implements EnginePlugin {
         this.cocView!,
         this.coarseView!,
       ]);
+      this.groups[8] = this.nearGroup(device, { buffer: this.uniform! }, input, this.cocView!);
     }
     this.circles(c);
     this.blur(c);
@@ -593,6 +634,21 @@ export class DOF implements EnginePlugin {
       });
       this.blurred = device.createTexture({ size: [hw, hh], format: 'rgba16float', usage: storage });
     }
+    // The near tap source at the gather's size, NEAR_LEVELS levels (fewer for a frame under 8 px across).
+    const levels = Math.min(NEAR_LEVELS, Math.floor(Math.log2(Math.max(hw, hh))) + 1),
+      near = () =>
+        device.createTexture({ size: [hw, hh], format: 'rgba16float', usage: storage, mipLevelCount: levels }),
+      chain = [(this.nearTaps = near()), (this.nearShapes = near()), (this.nearScene = near())],
+      level = (k: number) => chain.map((t) => t.createView({ baseMipLevel: k, mipLevelCount: 1 }));
+    this.nearViews = chain.map((t) => t.createView());
+    this.nearBase = level(0);
+    let below = this.nearBase;
+    this.nearLevels = [];
+    for (let k = 1; k < levels; k++) {
+      const above = level(k);
+      this.nearLevels.push(group(device, this.nearDownPipeline!, [...below, ...above]));
+      below = above;
+    }
     this.cocView = this.coc.createView();
     this.outputView = this.output.createView();
     this.tileView = this.tiles.createView();
@@ -611,6 +667,12 @@ export class DOF implements EnginePlugin {
     this.halfCoc?.destroy();
     this.halfTiles?.destroy();
     this.blurred?.destroy();
+    this.nearTaps?.destroy();
+    this.nearShapes?.destroy();
+    this.nearScene?.destroy();
+    this.nearTaps = this.nearShapes = this.nearScene = undefined;
+    this.nearViews = this.nearBase = [];
+    this.nearLevels = [];
     this.scene = this.depth = this.coc = this.output = this.tiles = this.coarse = undefined;
     this.halfScene = this.halfCoc = this.halfTiles = this.blurred = undefined;
     this.sceneView = this.depthView = undefined;
@@ -626,6 +688,8 @@ export class DOF implements EnginePlugin {
     this.uniform = this.halfUniform = undefined;
     this.halvePipeline = this.joinPipeline = undefined;
     this.cocPipeline = this.bokehPipeline = this.coarsePipeline = this.tilesPipeline = undefined;
+    this.nearPipeline = this.nearDownPipeline = undefined;
+    this.nearSampler = undefined;
     this.originalColor = this.originalDepth = undefined;
     this.shaders.clear();
   }

@@ -10,7 +10,7 @@
 // verdict (`stored`), what submit to done read over the same frames (`rule`) and on a settled scene, GPU use on the machine, and a bare page's empty submissions as the control for time spent
 // waiting on other work. --rival adds a second page on the high tier during the reading.
 // --bots=n has n walking, building bots on the shard during every run, each in their own view of it.
-// Run it from a checkout after `npm run build:packages`, holding a GPU slot. Emulation is not a phone: relative numbers.
+// Run it from a checkout after `npm run build:packages`. Emulation is not a phone: relative numbers.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer as createHttp } from 'node:http';
@@ -55,7 +55,7 @@ const PROFILES = {
 
 setTimeout(() => {
   console.error('loadtime: stopped at its time limit');
-  process.exit(124);
+  process.exit(124); // process.exit: the hard run limit ends the run whatever still holds it (browser, router, pipes)
 }, LIMIT).unref();
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
@@ -680,11 +680,7 @@ try {
       all.push(result);
       writeFileSync(out, JSON.stringify(all, null, 1));
     }
-    await browser.close();
-    await router.close();
-    process.exit(0);
-  }
-  if (option('first-visit')) {
+  } else if (option('first-visit')) {
     const name = option('first-visit');
     link.set(PROFILES[name]);
     const router = (globalThis.router = await startRouter(() => pipes.shard.port));
@@ -696,33 +692,31 @@ try {
       all.push(result);
       writeFileSync(out, JSON.stringify(all, null, 1));
     }
-    await browser.close();
-    await router.close();
-    process.exit(0);
-  }
-  for (const name of wanted) {
-    const profile = PROFILES[name];
-    if (!profile) throw new RangeError(`No profile ${name}; use ${Object.keys(PROFILES)}`);
-    link.set(profile);
-    for (let i = 0; i < RUNS; i++) {
-      // Odd runs: a new world (nothing generated yet). Even runs: the same world again, its area generated.
-      for (const temperature of ['cold', 'warm']) {
-        let router;
-        if (temperature === 'cold') {
-          globalThis.router?.close && (await globalThis.router.close());
-          router = globalThis.router = await startRouter(() => pipes.shard.port);
-          routerTarget = router.routerPort;
-          shardTarget = router.shardPort;
-        } else router = globalThis.router;
-        const result = await run(browser, name, profile, pipes, router, `${temperature}${i}`);
-        result.temperature = temperature;
-        all.push(result);
-        const m = result.marks ?? {};
-        console.log(
-          `${name} ${temperature}${i}: move ${((m.move ?? 0) / 1000).toFixed(2)} s, all received ${((m.loaded ?? 0) / 1000).toFixed(2)}, drawn ${((m.meshed ?? 0) / 1000).toFixed(2)}, chunks ${result.counts?.chunks}, ${Math.round((result.counts?.chunkBytes ?? 0) / 1024)} KB, busy ${result.busy}${result.solo ? ' SOLO' : ''}${result.timedOut ? ' TIMED OUT' : ''}${result.outside.length ? ` OUTSIDE ${result.outside}` : ''}${result.errors.length ? ` ERRORS ${result.errors}` : ''}`,
-        );
-        mkdirSync(join(out, '..'), { recursive: true });
-        writeFileSync(out, JSON.stringify(all, null, 1));
+  } else {
+    for (const name of wanted) {
+      const profile = PROFILES[name];
+      if (!profile) throw new RangeError(`No profile ${name}; use ${Object.keys(PROFILES)}`);
+      link.set(profile);
+      for (let i = 0; i < RUNS; i++) {
+        // Odd runs: a new world (nothing generated yet). Even runs: the same world again, its area generated.
+        for (const temperature of ['cold', 'warm']) {
+          let router;
+          if (temperature === 'cold') {
+            globalThis.router?.close && (await globalThis.router.close());
+            router = globalThis.router = await startRouter(() => pipes.shard.port);
+            routerTarget = router.routerPort;
+            shardTarget = router.shardPort;
+          } else router = globalThis.router;
+          const result = await run(browser, name, profile, pipes, router, `${temperature}${i}`);
+          result.temperature = temperature;
+          all.push(result);
+          const m = result.marks ?? {};
+          console.log(
+            `${name} ${temperature}${i}: move ${((m.move ?? 0) / 1000).toFixed(2)} s, all received ${((m.loaded ?? 0) / 1000).toFixed(2)}, drawn ${((m.meshed ?? 0) / 1000).toFixed(2)}, chunks ${result.counts?.chunks}, ${Math.round((result.counts?.chunkBytes ?? 0) / 1024)} KB, busy ${result.busy}${result.solo ? ' SOLO' : ''}${result.timedOut ? ' TIMED OUT' : ''}${result.outside.length ? ` OUTSIDE ${result.outside}` : ''}${result.errors.length ? ` ERRORS ${result.errors}` : ''}`,
+          );
+          mkdirSync(join(out, '..'), { recursive: true });
+          writeFileSync(out, JSON.stringify(all, null, 1));
+        }
       }
     }
   }
@@ -733,46 +727,50 @@ try {
   for (const p of Object.values(pipes)) p.close();
   http.close();
 }
-// The medians, one row per phase.
-const groups = {};
-for (const r of all) (groups[`${r.name} ${r.temperature}`] ??= []).push(r);
-const keys = [
-    'html',
-    'js',
-    'probe',
-    'module',
-    'adapter',
-    'device',
-    'engine',
-    'setup',
-    'frame',
-    'join',
-    'open',
-    'welcome',
-    'chunk',
-    'spawn',
-    'pipelines',
-    'draw',
-    'move',
-    'near',
-    'loaded',
-    'meshed',
-  ],
-  names = Object.keys(groups),
-  lines = [`| phase (s, median) | ${names.join(' | ')} |`, `| --- |${names.map(() => ' --- |').join('')}`];
-for (const key of keys)
-  lines.push(
-    `| ${key} | ${names
-      .map((n) => {
-        const value = median(groups[n].map((r) => r.marks?.[key]));
-        return value === undefined ? '-' : (value / 1000).toFixed(2);
-      })
-      .join(' | ')} |`,
-  );
-writeFileSync(out.replace(/\.json$/, '.md'), `${lines.join('\n')}\n`);
-console.log(lines.join('\n'));
-console.log(`Wrote ${out}`);
-process.exit(0);
+// The medians, one row per phase, for the profile runs (--reading and --first-visit write their own records). The run
+// then ends by its event loop: the browser, router, pipes and page server are closed above (KB-OWN-EXIT2).
+if (!option('reading') && !option('first-visit')) writeMedians();
+
+function writeMedians() {
+  const groups = {};
+  for (const r of all) (groups[`${r.name} ${r.temperature}`] ??= []).push(r);
+  const keys = [
+      'html',
+      'js',
+      'probe',
+      'module',
+      'adapter',
+      'device',
+      'engine',
+      'setup',
+      'frame',
+      'join',
+      'open',
+      'welcome',
+      'chunk',
+      'spawn',
+      'pipelines',
+      'draw',
+      'move',
+      'near',
+      'loaded',
+      'meshed',
+    ],
+    names = Object.keys(groups),
+    lines = [`| phase (s, median) | ${names.join(' | ')} |`, `| --- |${names.map(() => ' --- |').join('')}`];
+  for (const key of keys)
+    lines.push(
+      `| ${key} | ${names
+        .map((n) => {
+          const value = median(groups[n].map((r) => r.marks?.[key]));
+          return value === undefined ? '-' : (value / 1000).toFixed(2);
+        })
+        .join(' | ')} |`,
+    );
+  writeFileSync(out.replace(/\.json$/, '.md'), `${lines.join('\n')}\n`);
+  console.log(lines.join('\n'));
+  console.log(`Wrote ${out}`);
+}
 
 async function nvidia() {
   return new Promise((done) => {

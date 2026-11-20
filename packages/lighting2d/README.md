@@ -286,6 +286,27 @@ The local glow is an analytic intensity term, not a spatial convolution; the opt
 
 Trademark notice: names of other tools belong to their owners.
 
+## Textures after a device restore
+
+`target`, `normals` and the SDF `source` and `emission` are textures you made on the engine's device. After the device is lost and restored, a
+plain texture is gone with it: the pass skips that frame's work, reports one `'state'` error through `engine.onError` (help `borrowed-lost`), and
+waits for a new texture. A function, such as a pixel layer's `target` getter, is read every frame and needs nothing. Hand in a new texture with
+`setTarget` and `setNormals` (every entry has them; `SDFScene2D` has `source` and `emission` setters), and `SDFScene2D.encode` returns false when it
+had nothing to draw.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Lighting2D} from 'margoengine/lighting2d';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [64, 64]});
+const make = () => engine.gpu!.createTexture({size: [64, 64], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
+const lighting = Lighting2D.attach(engine, {target: make()});
+engine.render({delta: 1 / 60});
+await engine.rebootDevice(); // the first texture is gone with the old device
+lighting.setTarget(make()); // the setter takes the engine's device as it is now
+engine.render({delta: 1 / 60});
+```
+
 ## Lifetime and scene limits
 
 All entries are WebGPU-only and reject native WebGL2 with `code: 'unsupported'` and a help link. Each entry owns its GPU

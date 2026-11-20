@@ -1,0 +1,112 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 24,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            3.2,
+            1.66,
+            48
+          ],
+          "target": [
+            0.6,
+            1.45,
+            0
+          ],
+          "fov": 36
+        },
+        {
+          "time": 9,
+          "position": [
+            3.5,
+            1.6,
+            30
+          ],
+          "target": [
+            0.6,
+            1.4,
+            0
+          ],
+          "fov": 37,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 18,
+          "position": [
+            2.9,
+            1.58,
+            15
+          ],
+          "target": [
+            0.65,
+            1.35,
+            1.7
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 24,
+          "position": [
+            2.3,
+            1.55,
+            7.5
+          ],
+          "target": [
+            0.65,
+            1.3,
+            1.7
+          ],
+          "fov": 40,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "whiteout-long-walk-in",
+    "kind": "long",
+    "seed": 52,
+    "seconds": 24,
+    "tier": "high",
+    "kit": "whiteout",
+    "msaa": 1,
+    "supersample": 1.5,
+    "subframes": 8,
+    "shutter": 180,
+    "warmup": 90,
+    "probes": {
+      "far": 0,
+      "trail": 9,
+      "near": 18,
+      "window": 23.9
+    },
+    "lookBounds": {
+      "skyClip": 0.5,
+      "speckle": 400,
+      "banding": 1,
+      "flat": 20,
+      "crush": 3
+    },
+    "page": {
+      "path": "examples/whiteout-pass/index.html",
+      "query": {
+        "ui": 0,
+        "exposure": 0.0020833
+      },
+      "css": "h1,#hint,nav,#status,#error{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "whiteoutPass.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

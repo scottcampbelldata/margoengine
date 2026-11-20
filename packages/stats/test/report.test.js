@@ -68,3 +68,22 @@ test('statsReport gives frames oldest first, survives JSON, and the view row goe
   stats.dispose();
   dom.window.close();
 });
+
+test('disposing a GPUMemory leaves a tracker attached after it counting', () => {
+  // Audit 132 second pass: dispose wrote the device's original create calls back even when a second GPUMemory had
+  // wrapped them since, so the second one silently stopped counting.
+  const d = device(),
+    { createBuffer } = d,
+    first = GPUMemory.attach(d),
+    second = GPUMemory.attach(d);
+  first.dispose();
+  d.createBuffer({ size: 64 });
+  d.createTexture({ size: [2, 2], format: 'r8unorm' });
+  assert.equal(second.bytes, 68, 'the later tracker still sees new objects');
+  assert.equal(first.bytes, 0, 'the disposed tracker counts nothing more');
+  second.dispose();
+  const made = d.createBuffer({ size: 8 });
+  assert.equal(typeof made.destroy, 'function', 'creates still reach the device');
+  assert.equal(first.bytes + second.bytes, 68, 'neither disposed tracker counts on');
+  assert.notEqual(d.createBuffer, createBuffer, "the first tracker's wrapper stays, passing calls through");
+});

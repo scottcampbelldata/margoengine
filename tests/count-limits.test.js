@@ -1,11 +1,11 @@
-// The per-file node caps (glTF, gltf-pro, .margo) default to 100,000
+// The per-file node caps (glTF, gltf/pbr, .margo) default to 100,000
 // and are options up to core's 8,388,608 entities; the error names the option.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF as parseLight } from '../packages/gltf/dist/index.js';
-import { parseGLTF as parsePro } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF as parsePro } from '../packages/gltf/dist/pbr.js';
 import { decodeMargo, parseMargo } from '../packages/blender/dist/index.js';
 import { headlessModels } from './support/pbr-snapshot.js';
 
@@ -33,7 +33,7 @@ const gltf = () => ({
   buffers: [{ byteLength: 36, uri: `data:application/octet-stream;base64,${triangle}` }],
 });
 
-test('glTF (light and gltf-pro): maxNodes', () =>
+test('glTF (light and gltf/pbr): maxNodes', () =>
   headlessModels(async () => {
     for (const parse of [
       (engine, doc, options) => parseLight(engine, doc, [], options),
@@ -49,7 +49,7 @@ test('glTF (light and gltf-pro): maxNodes', () =>
     }
   }));
 
-test('.margo (blender): maxNodes on decodeMargo, parseMargo and the gltf-pro model it builds', async () => {
+test('.margo (blender): maxNodes on decodeMargo, parseMargo and the gltf/pbr model it builds', async () => {
   // The triangle fixture with its JSON section replaced: 100,001 nodes, no texture (parseMargo then decodes no image).
   const source = await readFile(new URL('../packages/blender/tests/fixtures/triangle.margo', import.meta.url)),
     view = new DataView(source.buffer, source.byteOffset);

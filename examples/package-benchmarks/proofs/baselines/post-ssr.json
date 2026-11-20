@@ -1,20 +1,20 @@
 {
  "proof": "post-ssr",
- "ref": "379431fcb8",
- "revision": "379431fcb8d0867558b694d282ca1272bf9996e9",
- "capturedAt": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
- "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
+ "ref": "8c71da0556",
+ "revision": "8c71da0556d86e43094bf3738f8651ad3775c90f",
+ "capturedAt": "b3c8204ded004c631b0bf8e3310b8ac886843431",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {
-  "379431fcb8 descends from e80acecc2": true
+  "8c71da0556 descends from e80acecc2": true
  },
  "outputs": {
-  "SSAO, Bloom, FXAA 1x": "68859e1fe9591a9b283364a17641e37804275f32039b25b93f34f20ba10fb20f",
-  "SSAO, Bloom, FXAA 4x": "466f2a55c70247866f843a1dbb4f4a5ff4977ba52daa5d32c0aecbf9bb827fec",
-  "SSAO 1x": "2606fe2e104c35e98deaf0df9420d09d37cbedc22ad91dc75676acdf97528f87",
-  "SSAO 4x": "656aadef5a90f0009af28373c35aa0e2fa3483aa8153e07f389c57676ad42492",
-  "Bloom, FXAA 1x": "d0a209f8b995a784bb2943331e03c85dca06089474b2e6c52dbb95969bbdcb71",
-  "Bloom, FXAA 4x": "8c25aa17c397e6668222fb794d222b61d093bec03017d8d7d3797a690d474be6",
-  "FXAA 1x": "035bd021f7ca9512456cb7bbc13bb6aeacaecf35ceb681b0866cb52caa0a27ae",
-  "FXAA 4x": "a98ebcf2c6916cc3a27b9e9dd59505a4bfe2b7cfb128548d6a9406b9a8f57d22"
+  "SSAO, Bloom, FXAA 1x": "c239a5750b37b35eb8c57c2359469d530d8d8f2eb06b02fd938927a418ccb390",
+  "SSAO, Bloom, FXAA 4x": "5e702bac14bb01e951ee41d6c973a7140cfa249caa2d54cd89afa29df1703ff7",
+  "SSAO 1x": "b1a8733ee5e8cfd32ef757eb9e5af097be41e3591fb295f766742dda6eb27f4e",
+  "SSAO 4x": "7d1c52f28dac7eb7c923a79f81033a2fca6eee8214a39e43c7460a8fb0162c36",
+  "Bloom, FXAA 1x": "d460cb686feecfcb15dd7244114ab9c960368f59163314c465586db2b53a8ffd",
+  "Bloom, FXAA 4x": "327806636a93cf6fafbd9536fbf48a6753f8a2b3e6731d8815191f6e677b7815",
+  "FXAA 1x": "bd82cb402018ded54ec058d8dd3697ee3bc2af056e3a87515b2e0b6ff019a01e",
+  "FXAA 4x": "716754776b6446ba3abe9dcae684a7bf4deef5c16cc7479a4baf740ed53da96a"
  }
 }

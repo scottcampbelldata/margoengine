@@ -9,11 +9,18 @@ import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { noFileWatcher } from '../../../scripts/browser.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
-const server = await createServer({ configFile: resolve(root, 'vite.config.js'), logLevel: 'error', server: { port: 0 } });
+// No file watcher: a rebuild of a served dist (core, loaders, text) mid-suite would reload the page.
+const server = await createServer({
+  configFile: resolve(root, 'vite.config.js'),
+  logLevel: 'error',
+  server: { port: 0 },
+  plugins: [noFileWatcher()],
+});
 await server.listen();
 let browser;
 try {

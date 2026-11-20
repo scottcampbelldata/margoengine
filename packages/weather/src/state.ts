@@ -1,5 +1,14 @@
-// The weather state: nine numbers that describe the sky and the air, a table of named presets, and the checks and
-// maths that keep a state valid. Presets are authoring defaults for looks that read well in games, not meteorology.
+// The weather state: thirteen numbers that describe the sky and the air, a table of named presets, and the checks and
+// maths that keep a state valid. Presets are authoring defaults for looks that read well in games, not meteorology,
+// except the air's temperature and humidity:
+// - Temperature: 15 C, the sea-level temperature of the ICAO Standard Atmosphere (ICAO Doc 7488/3, 1993; ISO 2533:1975),
+//   in every preset that does not snow. Snow falls mostly below about 1 C at the surface over land (A. Dai, "Temperature
+//   and pressure dependence of the rain-snow phase transition over land and ocean", Geophys. Res. Lett. 35, L12802,
+//   2008, https://doi.org/10.1029/2008GL033295): snow -2 C, blizzard -8 C, and sleet, the mixed phase, 1 C.
+// - Relative humidity: fog is saturated air (WMO International Cloud Atlas, WMO-No. 407: fog is suspended water droplets,
+//   which need air at saturation), 1; air under falling rain or snow is near saturation, 0.95 (0.9 in a thunderstorm's
+//   downdraft and in snow, 0.85 in a blizzard's wind and 0.8 under hail, which falls through drier air). Chosen here: a
+//   fair afternoon 0.5, part cloud 0.6, overcast 0.75.
 
 /** The weather at one moment. Every field is a plain number so materials, sky, fog and sound can follow it. */
 export interface WeatherState {
@@ -21,6 +30,18 @@ export interface WeatherState {
   fog: number;
   /** Lightning activity, 0 (none) to 1 (constant). */
   lightning: number;
+  /** Dust in the air, 0 (none) to 1 (a haboob): the mass concentration is `dustConcentration` (3,000 micrograms per cubic metre at 1). */
+  dust: number;
+  /** Smoke in the air, 0 (none) to 1 (thick smoke beside a fire): the PM2.5 concentration is `smokeConcentration` (5,000 micrograms per cubic metre at 1). */
+  smoke: number;
+  /** Volcanic ash in the air, 0 (none) to 1 (falling ash near a vent): the mass concentration is `ashConcentration` (100,000 micrograms per cubic metre at 1). */
+  ash: number;
+  /** Sea spray in the air, 0 (none) to 1 (the surf zone in a gale): the dry sea-salt load is `sprayConcentration` (5,000 micrograms per cubic metre at 1). */
+  spray: number;
+  /** Relative humidity of the air at 2 m, 0 (bone dry) to 1 (saturated). It sets the dead fuel moisture of a fire (`equilibriumMoisture`). */
+  humidity: number;
+  /** Air temperature at 2 m in degrees Celsius, -80 to 60. */
+  temperature: number;
 }
 
 /** Names of the built-in presets. */
@@ -49,6 +70,12 @@ export const STATE_FIELDS: Readonly<Record<keyof WeatherState, readonly [min: nu
   cloud: [0, 1],
   fog: [0, 1],
   lightning: [0, 1],
+  dust: [0, 1],
+  smoke: [0, 1],
+  ash: [0, 1],
+  spray: [0, 1],
+  humidity: [0, 1],
+  temperature: [-80, 60],
 };
 
 const KEYS = Object.keys(STATE_FIELDS) as (keyof WeatherState)[];
@@ -64,23 +91,29 @@ const preset = (p: Partial<WeatherState>): Readonly<WeatherState> =>
     cloud: 0,
     fog: 0,
     lightning: 0,
+    dust: 0,
+    smoke: 0,
+    ash: 0,
+    spray: 0,
+    humidity: 0.5,
+    temperature: 15,
     ...p,
   });
 
 /** The built-in presets. Frozen: copy one (`{...WEATHER_PRESETS.rain, wind: 12}`) to change it. */
 export const WEATHER_PRESETS: Readonly<Record<WeatherPresetName, Readonly<WeatherState>>> = Object.freeze({
   clear: preset({ wind: 2, gust: 0.1, cloud: 0.05 }),
-  partlyCloudy: preset({ wind: 5, gust: 0.25, cloud: 0.45 }),
-  overcast: preset({ wind: 6, gust: 0.2, cloud: 0.9, fog: 0.1 }),
-  fog: preset({ wind: 1, gust: 0.05, cloud: 0.7, fog: 0.85 }),
-  drizzle: preset({ rain: 0.2, wind: 4, gust: 0.15, cloud: 0.85, fog: 0.15 }),
-  rain: preset({ rain: 0.6, wind: 8, gust: 0.35, cloud: 0.95, fog: 0.2 }),
-  storm: preset({ rain: 0.95, wind: 18, gust: 0.7, cloud: 1, fog: 0.3 }),
-  thunderstorm: preset({ rain: 0.9, wind: 16, gust: 0.8, cloud: 1, fog: 0.25, lightning: 0.9 }),
-  hail: preset({ rain: 0.3, hail: 0.8, wind: 14, gust: 0.6, cloud: 1, fog: 0.15, lightning: 0.4 }),
-  sleet: preset({ rain: 0.4, snow: 0.4, wind: 7, gust: 0.3, cloud: 0.95, fog: 0.25 }),
-  snow: preset({ snow: 0.5, wind: 3, gust: 0.15, cloud: 0.9, fog: 0.2 }),
-  blizzard: preset({ snow: 1, wind: 25, gust: 0.8, cloud: 1, fog: 0.6 }),
+  partlyCloudy: preset({ wind: 5, gust: 0.25, cloud: 0.45, humidity: 0.6 }),
+  overcast: preset({ wind: 6, gust: 0.2, cloud: 0.9, fog: 0.1, humidity: 0.75 }),
+  fog: preset({ wind: 1, gust: 0.05, cloud: 0.7, fog: 0.85, humidity: 1 }),
+  drizzle: preset({ rain: 0.2, wind: 4, gust: 0.15, cloud: 0.85, fog: 0.15, humidity: 0.95 }),
+  rain: preset({ rain: 0.6, wind: 8, gust: 0.35, cloud: 0.95, fog: 0.2, humidity: 0.95 }),
+  storm: preset({ rain: 0.95, wind: 18, gust: 0.7, cloud: 1, fog: 0.3, humidity: 0.95 }),
+  thunderstorm: preset({ rain: 0.9, wind: 16, gust: 0.8, cloud: 1, fog: 0.25, lightning: 0.9, humidity: 0.9 }),
+  hail: preset({ rain: 0.3, hail: 0.8, wind: 14, gust: 0.6, cloud: 1, fog: 0.15, lightning: 0.4, humidity: 0.8 }),
+  sleet: preset({ rain: 0.4, snow: 0.4, wind: 7, gust: 0.3, cloud: 0.95, fog: 0.25, humidity: 0.95, temperature: 1 }),
+  snow: preset({ snow: 0.5, wind: 3, gust: 0.15, cloud: 0.9, fog: 0.2, humidity: 0.9, temperature: -2 }),
+  blizzard: preset({ snow: 1, wind: 25, gust: 0.8, cloud: 1, fog: 0.6, humidity: 0.85, temperature: -8 }),
 });
 
 /** True when `name` is one of the built-in presets. */

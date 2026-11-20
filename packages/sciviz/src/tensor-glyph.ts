@@ -28,7 +28,8 @@ export interface TensorGlyphOptions {
   /** Default direction-fa; direction is RGB of the largest-magnitude axis, fa uses colormap. */
   readonly color?: 'direction' | 'fa' | 'direction-fa';
   readonly colormap?: ColormapSource;
-  /** Regular sample stride, default 1. */
+  /** Sample stride, default 1. On a regular field it steps every axis (i, j and k), so stride 2 keeps every
+   * second sample along each axis; on scattered samples it keeps every stride-th sample. */
   readonly stride?: number;
   /** Polar subdivisions, default 16; azimuth uses twice this. Range 4..64. */
   readonly resolution?: number;
@@ -68,8 +69,17 @@ function snapshot(input: TensorSamples | TensorField, options: TensorGlyphOption
     tensors: number[] = [],
     ids: number[] = [],
     bounds = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
-  for (let i = 0; i < count; i += stride) {
-    if (i % 4096 === 0) options.signal?.throwIfAborted();
+  // A regular field is subsampled on every axis, like ParaView Extract Subset and VTK's sample rate; scattered
+  // samples have no axes, so they step the sample index.
+  const selected: number[] = [];
+  if (regular) {
+    const [nx, ny, nz] = input.dims;
+    for (let k = 0; k < nz; k += stride)
+      for (let j = 0; j < ny; j += stride) for (let i = 0; i < nx; i += stride) selected.push(i + nx * (j + ny * k));
+  } else for (let i = 0; i < count; i += stride) selected.push(i);
+  for (let s = 0; s < selected.length; s++) {
+    const i = selected[s];
+    if (s % 4096 === 0) options.signal?.throwIfAborted();
     if (input.mask && !input.mask[i]) continue;
     const p = regular
         ? [

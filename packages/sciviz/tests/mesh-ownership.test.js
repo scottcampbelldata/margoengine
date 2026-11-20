@@ -20,6 +20,14 @@ function fixture() {
   return { resources, retained, renderer, addLayer(layer) { return layer; } };
 }
 
+test('mesh colour range spans the finite values; an infinite range option is refused', () => {
+  const f = fixture(), layer = meshLayer(f, { ...set(), values: new Float32Array([0, 1, Infinity]) });
+  assert.deepEqual(layer.range, [0, 1]);
+  layer.update({ ...set(), values: new Float32Array([-Infinity, 2, 2]) });
+  assert.deepEqual(layer.range, [1.5, 2.5]);
+  assert.throws(() => meshLayer(fixture(), set(), { range: [0, Infinity] }), /finite/);
+});
+
 test('mesh construction releases every earlier GPU allocation when a later allocation fails', () => {
   const f = fixture(), cause = new Error('sampler allocation');
   f.renderer.device.createSampler = () => { throw cause; };

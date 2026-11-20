@@ -4,7 +4,8 @@
 // the WebGPU renderer's frame on a stand-in device (tests/support/still-gpu.mjs). Three meshes move every frame
 // through the position, Euler and quaternion setters. `--shadows` adds @margoengine/shadows with eight moving
 // casters. Prints JSON { bytes: [JavaScript heap bytes per frame, one per window of 1,000 frames] }.
-// `--allocate` makes every frame allocate on purpose, to prove the probe notices.
+// `--allocate` makes every frame allocate on purpose, to prove the probe notices. `--callbacks=<n>` adds n onFrame
+// callbacks that keep the frame delta, so a frame that boxes the delta for each callback shows it n times.
 import { CADCameraControls } from '../../packages/stage/dist/controls.js';
 import { Engine, TransformStore, box } from '../../packages/core/dist/extension.js';
 import { bytesPerFrame, frameDriver, stillRenderer } from './still-gpu.mjs';
@@ -12,8 +13,8 @@ import { bytesPerFrame, frameDriver, stillRenderer } from './still-gpu.mjs';
 const allocate = process.argv.includes('--allocate'),
   shadows = process.argv.includes('--shadows');
 const run = frameDriver(),
-  { canvas, renderer } = stillRenderer(),
-  engine = new Engine(canvas, await TransformStore.create(16), renderer, undefined, null);
+  { canvas, renderer } = stillRenderer();
+const engine = new Engine(canvas, await TransformStore.create(16), renderer, undefined, null);
 
 const geometry = box(),
   meshes = [0, 1, 2].map((i) =>
@@ -50,6 +51,12 @@ engine.onFrame((_, delta) => {
   for (let i = 3; i < meshes.length; i++) meshes[i].position.y = 1 + Math.sin(time + i);
   if (allocate) kept.push(new Array(64).fill(0));
 });
+const callbacks = Number(process.argv.find((a) => a.startsWith('--callbacks='))?.slice(12) ?? 0),
+  sink = new Float64Array(callbacks);
+for (let i = 0; i < callbacks; i++)
+  engine.onFrame((_, delta) => {
+    sink[i] = delta;
+  });
 engine.start();
 run(20_000);
 if (globalThis.__profile) await globalThis.__profile(run);

@@ -20,7 +20,7 @@ try {
   const result = await page.evaluate(
     async ({ doc, buffers }) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
-        { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+        { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
         { Animation } = await import('/packages/animation/dist/index.js'),
         { SkinnedCrowd, bakeBones, poseBones, skinnedCrowdVertex, SKINNED_CROWD_STRIDE } = await import(
           '/packages/animation/dist/instanced-skin.js'

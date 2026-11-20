@@ -1,9 +1,9 @@
 // GPU memory of a tile's model, so the renderer's memory budget counts what the device holds rather than the size of
 // the tile file: a compressed b3dm of 1 MB can take 20 MB of vertex buffers and mipmapped textures. Counted from the
-// model gltf-pro made: its vertex, index and uv arrays (uploaded as they are) and every texture its materials bind,
+// model gltf/pbr made: its vertex, index and uv arrays (uploaded as they are) and every texture its materials bind,
 // as rgba8 with a full mip chain, or the transcoded levels of a KTX2 image.
 
-/** The parts of a gltf-pro model (`PBRModel`) the count reads; all optional, so any model fits. */
+/** The parts of a gltf/pbr model (`PBRModel`) the count reads; all optional, so any model fits. */
 export interface MeasurableModel {
   readonly primitives?: readonly MeasurablePrimitive[];
   readonly pointsAndLines?: readonly MeasurablePrimitive[];
@@ -30,7 +30,7 @@ export function textureBytes(width: number, height: number, levels?: number): nu
   return bytes;
 }
 
-/** GPU bytes of one decoded image as gltf-pro uploads it, or 0 when there is none. */
+/** GPU bytes of one decoded image as gltf/pbr uploads it, or 0 when there is none. */
 function imageBytes(image: unknown): number {
   if (!image || typeof image !== 'object') return 0;
   const compressed =
@@ -47,7 +47,7 @@ function imageBytes(image: unknown): number {
 }
 
 /**
- * GPU bytes a gltf-pro model of a tile takes: its unique vertex, index and uv arrays plus each texture its materials
+ * GPU bytes a gltf/pbr model of a tile takes: its unique vertex, index and uv arrays plus each texture its materials
  * bind once. A model with no `primitives` (a custom `loadModel`) returns `undefined`, and the renderer counts it by
  * its file size.
  */
@@ -71,7 +71,7 @@ export function modelGpuBytes(model: MeasurableModel): number | undefined {
   for (const index of textures) {
     const def = defs[index];
     if (!def) continue;
-    // gltf-pro takes the first decoded of KHR_texture_basisu, EXT_texture_webp, EXT_texture_avif, then `source`.
+    // gltf/pbr takes the first decoded of KHR_texture_basisu, EXT_texture_webp, EXT_texture_avif, then `source`.
     const decoded = (['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'] as const)
       .map((name) => def.extensions?.[name]?.source)
       .find((source) => source !== undefined && imageAt(model, source) !== undefined);

@@ -45,10 +45,16 @@ RangeError from `attach` that names the count.
 | `materials` | none | `{ key: { color: [r, g, b] (sRGB 0..1), detail?, bump?, macro? } }` over `MATERIALS`; `detail` 0..1 (default 0.25), `bump` and `macro` 0..1 (default 0, a RangeError outside) |
 | `clipmap` | cell 1 m, 64 cells, rings by world size | `cellSize`, `resolution` and `levels` of the terrain. With no `levels` the view takes the fewest rings (`clipmapLevels`, 1 to 12) that reach the far corner of the world and `radius`: 9 for a 4 km world, 12 for 65 km. A `levels` that reaches less than `radius` is a RangeError |
 | `lookahead` | 3 | seconds ahead along the camera's velocity that tiles are fetched early |
+| `maxSteps` | unset | streaming steps (sends and tile copies) a frame may take, a work count that replaces the millisecond `budget`: the same tiles go in on the same frame on any machine, so a film frame is the same on every run. `await view.whenIdle()` before a film frame and every arrived tile is in, whatever the count. 1 or more, `Infinity` for all |
+| `clock` | `performance.now` | milliseconds clock the `budget` and the 100 ms idle check read; pass a simulation clock for replay |
 | `budget` | 0.25 | milliseconds per frame the page spends copying arrived tiles in (one step always goes in) |
 | `detailBudget` | 128 MiB | most bytes of detail density maps (one byte per texel per detail species, on this thread and the GPU); detail maps coarsen by halves to fit it and the device's largest texture |
 | `signal` | none | rejects `attach` and stops streaming |
+| `exclusions` | none | roads, rails, creeks and lots where no object is placed (`PlacementOptions.exclusions`, such as `layoutSettlements(...).exclusions` and `pathExclusions(paths)`) |
+| `meshes` | none | meshes by key drawn in place of the procedural ones (`BiomeObjectsOptions.meshes`): each key a list of parts `{geometry, color, kind}`, geometry one mesh or three LOD rings, `kind` `bark`, `foliage` or `stone`; a species, detail or `procedural:snag` whose mesh key is listed draws these, so a library or artist model drops in by name (`libraryMesh` of `@margoengine/scenes/library` loads one from glTF). Placement is unchanged; a part draws its `color`, or with `textures` (`ScatterTextures` of `@margoengine/scatter`) its glTF maps: base colour with an alpha cut-out that also shapes its shadows, normal and occlusion-roughness-metal (`libraryParts` of `@margoengine/scenes/library` loads a textured model, one part per material). Northern Rockies conifer keys (`procedural:<species>`, `procedural:<species>/<age>`, `/snag`, `/burnt`, `procedural:conifer-snag`, `procedural:burnt-trunk`; the rockies presets use `/pole`) draw the species meshes of `@margoengine/procedural/conifers`, an imposter in the far ring, unless listed here |
+| `states` | none | burnt and flooded plants (`BiomeObjectsOptions.states`): `(key, kind) => response`, asked once per part at attach with its mesh key and `kind`, returns a `PlantStates.plant()` response of `@margoengine/scatter/states` or undefined to leave the part as it is; every species, snag and detail part that gets one is scorched, charred, stripped, mud-marked or flattened from the map at its root, e.g. `states: (key, kind) => (kind === 'stone' ? undefined : kind === 'bark' ? trunks : crowns)` |
 | `water` | `'auto'` | the sea: a `@margoengine/water` surface at `climate.seaLevel` over the world and out to the horizon (`view.water`), loaded on first use; `'auto'` draws it when the world reaches below sea level, `true` always, `false` never; Water settings (`{ depth: () => bloom.depthTexture }`) draw it with those over `SEA` |
+| `horizon` | `'auto'` | far ground past the world's edge out to the horizon (`view.horizon`, a second terrain made once the ground weights are in): the edge's relief carried outward, so a valley leaving the world keeps going, blending over up to 3 km into ridged mountains (Musgrave's ridged multifractal) as high as the world's relief, in the edge's own materials with `rock` on slopes past 0.7, their textures repeating once per ring texel so their macro tone reads as rock form kilometres off. It reaches 3 world sizes past each edge (at most 48 km), a texel about a 64th of the world, meets the world's corners exactly with a 40 m skirt one cell inside, and casts no shadow and holds no plants; the scene's fog hazes it. `'auto'` draws it when every edge stands over the sea, `true` always, `false` never (KB-BIOMES-WORLDEDGE1) |
 | `sky` | none | a `Sky` (`@margoengine/sky`): the sea reflects its sky (`reflectionTexture`) and its sun glints on the waves (`lights`); without one the sea reflects a plain gradient |
 
 WebGPU only. The view streams before every frame: tiles within `radius` of the camera, and of where the camera will be
@@ -89,9 +95,14 @@ const view = await BiomeView.attach(engine, world); // water: 'auto' finds the s
 console.log(view.water !== undefined); // true
 ```
 
-`water: { rivers: 'auto' }` puts still water in the world's rivers, 1.5 m over the bed and falling with it toward the sea
-(`@margoengine/biomes/rivers`, loaded only when asked for). The terrain hides it where the ground stands higher, so the
-banks draw its edge. A world from `samples` has no lines of its own: pass yours, `rivers: [line]`, each an Int32Array of
+`water: { rivers: 'auto' }` puts still water in the world's rivers (`@margoengine/biomes/rivers`, loaded only when asked
+for). Along each line it finds the bed (the lowest ground within 6 m across it) and the lower of its banks (the highest
+ground each side within 24 m): a carved channel fills to three quarters of its depth, at most 1.5 m, so the banks stand
+over the water; open ground takes 1.5 m. The surface never rises downstream and is averaged along the line, one smooth
+falling slope (KB-BIOMES-RIVERSTEP1). The terrain hides it where the ground stands higher, so the banks draw its edge.
+The ground under the water takes the material `riverbed` (in `MATERIALS`, full at 0.3 m deep, `paintRiverbed`): the
+terrain's far rings point-sample a narrow channel away and cover its water, and the painted ground keeps the stream one
+line from the air. A world from `samples` has no lines of its own: pass yours, `rivers: [line]`, each an Int32Array of
 `[x, z, ...]` millimetres. It stands still in v1.0.0 (docs/limits.md); the coupled grid has at most 512 cells a side.
 
 The world's hydrology can fill the water in too. `water: { lakes: 'auto' }` puts a still lake in every pit whose fill
@@ -259,7 +270,7 @@ engine.start();
 
 Far trees follow the same cover. Beyond the view's `radius`, out to `far.radius` (default 2,500 m, count 300,000; `far:
 false` turns them off, and they stay off when `radius` already reaches that far) one camera-following `Scatter` per
-tree kind draws `generateTreeStandIn` (`@margoengine/procedural/standin`), a 12-triangle tree. They take over from the
+tree kind draws `generateTreeStandIn` (`@margoengine/procedural/standin`), a 14-triangle tree. They take over from the
 stored trees over the last tile of `radius`, are lit by the engine light and cast no shadow. Their positions are
 hashed, so a far tree does not grow into the stored tree that replaces it; at that distance a tree is about 5 pixels.
 

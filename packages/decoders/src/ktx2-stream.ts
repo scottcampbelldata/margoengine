@@ -437,6 +437,15 @@ export class StreamedKTX2 {
     this.height = Math.max(1, index.height);
     this.levels = index.levels.length;
     this.layers = Math.max(1, index.layerCount) * index.faceCount;
+    const { limits } = this.owner.device;
+    if (Math.max(this.width, this.height) > limits.maxTextureDimension2D)
+      throw new RangeError(
+        `Texture ${this.width}x${this.height} exceeds the device's maxTextureDimension2D; request a higher limit or use a smaller file`,
+      );
+    if (this.layers > limits.maxTextureArrayLayers)
+      throw new RangeError(
+        `Texture of ${this.layers} layers exceeds the device's maxTextureArrayLayers; request a higher limit or use fewer layers`,
+      );
     this.dimension =
       index.faceCount === 6 ? (index.layerCount ? 'cube-array' : 'cube') : index.layerCount ? '2d-array' : '2d';
     this.decoder = await this.owner.decoderFor(index);

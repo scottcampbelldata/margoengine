@@ -26,7 +26,7 @@ export interface VTKXMLDatasetOptions extends VTKXMLOptions {
     readAppended?: (offset: number, length: number, signal?: AbortSignal) => Promise<Uint8Array>;
 }
 
-export interface VTKXMLOptions extends ParseLimits {
+export interface VTKXMLOptions extends ParseLimits, XMLExternalOptions {
     surface?: 'outer' | 'all';
     signal?: AbortSignal;
 }
@@ -66,6 +66,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -82,5 +83,11 @@ interface LoadedGroup {
 interface ParseLimits {
     maxVertices?: number;
     maxTriangles?: number;
+}
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
 }
 ```

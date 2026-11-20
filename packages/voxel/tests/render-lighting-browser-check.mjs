@@ -1,5 +1,5 @@
 // Real-GPU proof of VoxelRenderer's lighting (voxel phase 5; run from the repository root after building packages, one
-// GPU job at a time: node scripts/gpu-lock.mjs run --owner=voxel-lighting -- node packages/voxel/tests/render-lighting-browser-check.mjs).
+// GPU job at a time: node scripts/run-with-timeout.mjs -- node packages/voxel/tests/render-lighting-browser-check.mjs).
 // Every number is linear HDR radiance read back at a projected world point (render-lighting-browser-check.html):
 // - Shadows (`shadows.add(voxels, {static: true})`, hard filter): the floor under a slab and under a cutout square is
 //   black with the sun straight down and no ambient, the floor beside them and under the square's transparent border is

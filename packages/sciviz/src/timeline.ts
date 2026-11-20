@@ -151,7 +151,8 @@ export class Timeline extends EventTarget {
     const fps = options.fps ?? 10;
     if (!(fps > 0) || !Number.isFinite(fps))
       return Promise.reject(rangeError(`play fps must be a positive number, got ${fps}`, 'sciviz'));
-    options.signal?.throwIfAborted();
+    // An aborted signal rejects like a later abort does, never throws from play() itself.
+    if (options.signal?.aborted) return Promise.reject(options.signal.reason);
     this.pause();
     return new Promise<void>((resolve, reject) => {
       let stopped = false,

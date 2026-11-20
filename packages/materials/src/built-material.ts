@@ -15,9 +15,9 @@ import {
   type PBRRenderState,
   type TextureTransform,
   type MaterialSide,
-} from '@margoengine/gltf-pro/model';
-import { PBRInstances } from '@margoengine/gltf-pro/instancing';
-import { extendedMaterials } from '@margoengine/gltf-pro/extended';
+} from '@margoengine/gltf/pbr-model';
+import { PBRInstances } from '@margoengine/gltf/pbr-instancing';
+import { extendedMaterials } from '@margoengine/gltf/extended-materials';
 import { physicalMapsShader } from './physical-maps.js';
 import { depthDistanceShader } from './depth-distance.js';
 import { featureMaps, featureShader } from './features.js';
@@ -50,8 +50,8 @@ import {
 } from './texture-kinds.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { copyExternal } from '../../shared/copy-external.js';
-import { clipStatement, markClipDistances, sectionShader } from '../../shared/section.js';
-export type { TextureTransform, MaterialSide } from '@margoengine/gltf-pro';
+import { clipStatement, hardwarePlanes, markClipDistances, planeCapacity, sectionShader } from '../../shared/section.js';
+export type { TextureTransform, MaterialSide } from '@margoengine/gltf/pbr';
 export {
   packAtlas,
   padTileGrid,
@@ -113,7 +113,7 @@ export type TextureSource =
   | CubeTarget
   | TranscodedTexture
   | CubeSource;
-/** Texture wrap mode on one axis: `'repeat'` (default), `'clamp'` or `'mirror'`. */
+/** Texture wrap mode on one axis: `'clamp'` (default, to the edge), `'repeat'` or `'mirror'`. */
 export type Wrap = 'repeat' | 'clamp' | 'mirror';
 /** How `parallaxMap` is marched: one offset step, stepped occlusion mapping, or relief mapping refined by bisection. */
 export type ParallaxMode = 'offset' | 'occlusion' | 'relief';
@@ -173,6 +173,9 @@ interface Slot {
   p3?: GPUTexture;
   /** Equirect cube only: the source Texture's version the faces were rendered from. */
   source?: number;
+  /** `sampler` with repeat on each axis whose wrap is unset, for a triplanar projection, and the sampler it follows. */
+  tiled?: GPUSampler;
+  tiledFrom?: GPUSampler;
 }
 /** What a non-image source is, fixed at construction (absent for images and raw RGBA8, the original path). */
 type Kind =
@@ -280,6 +283,23 @@ const dimensions = (s: ImageDimensions): [number, number] => [
 ];
 const raw = (s: unknown): s is RawImage =>
   !!s && typeof s === 'object' && 'data' in s && (s.data instanceof Uint8Array || s.data instanceof Uint8ClampedArray);
+/**
+ * Checks raw RGBA8 pixels, one condition per message (KB-MATERIALS-TEXCAP1): whole positive sizes, then the data
+ * length. The size a GPU can hold is checked against the device's own maxTextureDimension2D at upload.
+ */
+function rawCheck({ width: w, height: h, data }: RawImage): void {
+  if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) || w < 1 || h < 1)
+    throw new RangeError(`Raw texture width and height must be whole numbers of 1 or more; got ${w} x ${h}`);
+  if (data.length < w * h * 4)
+    throw new RangeError(
+      `Raw texture data is ${data.length} bytes; RGBA8 at ${w} x ${h} needs width * height * 4 = ${w * h * 4} bytes`,
+    );
+}
+/** The device-limit refusal, naming the size and the limit. */
+const tooLarge = (w: number, h: number, limit: number) =>
+  new RangeError(
+    `Texture is ${w} x ${h} pixels; this device allows ${limit} per side (maxTextureDimension2D); resize it to fit`,
+  );
 const gpuTexture = (s: unknown): s is GPUTexture =>
   !!s &&
   typeof (s as GPUTexture).createView === 'function' &&
@@ -320,8 +340,7 @@ function kindOf(source: TextureSource, o: TextureOptions): Kind | undefined {
       throw new TypeError("Texture cube faces make a cube; omit dimension or pass 'cube'");
     for (const face of faces as DataImage[])
       if ('data' in face && (face.format !== undefined || !raw(face))) validateData(face, '2d');
-      else if (raw(face) && face.data.length < face.width * face.height * 4)
-        throw new RangeError('Raw texture data must be RGBA8 of width*height*4 bytes');
+      else if (raw(face)) rawCheck(face);
     const sizes = faces.map((f) => dimensions(f as ImageDimensions));
     if (sizes.some(([w, h]) => w !== sizes[0][0] || h !== sizes[0][1] || (w && w !== h)))
       throw new RangeError('Texture cube faces must be square and the same size; resize them to one edge length');
@@ -443,17 +462,7 @@ export class Texture {
       const problem = kindOption(this.kind, key, o[key]);
       if (problem) throw new TypeError(problem);
     }
-    if (
-      !this.kind &&
-      raw(source) &&
-      (!Number.isInteger(w) ||
-        !Number.isInteger(h) ||
-        w < 1 ||
-        h < 1 ||
-        w * h > maxPixels ||
-        source.data.length < w * h * 4)
-    )
-      throw new RangeError('Raw texture data must be RGBA8 of width*height*4 bytes');
+    if (!this.kind && raw(source)) rawCheck(source);
   }
   /** Width, height and depth (layers or slices; 6 for a cube) of the current source. */
   private size(): [number, number, number] {
@@ -782,8 +791,11 @@ export class Texture {
     const format = k.format ?? 'rgba8unorm',
       dimension: TextureDimension = k.type === 'faces' ? 'cube' : k.dimension,
       limit = dimension === '3d' ? device.limits.maxTextureDimension3D : device.limits.maxTextureDimension2D;
-    if (w > limit || h > limit || (dimension === '3d' ? d > limit : d > device.limits.maxTextureArrayLayers))
-      throw new RangeError('Texture exceeds device limit; resize it to maxTextureDimension2D or less.');
+    if (w > limit || h > limit) throw tooLarge(w, h, limit);
+    if (dimension === '3d' ? d > limit : d > device.limits.maxTextureArrayLayers)
+      throw new RangeError(
+        `Texture has ${d} ${dimension === '3d' ? 'slices' : 'layers'}; this device allows ${dimension === '3d' ? limit : device.limits.maxTextureArrayLayers}`,
+      );
     let t = slot.texture;
     const pending = slot.version !== this.version;
     if (
@@ -847,7 +859,7 @@ export class Texture {
    * @internal `bind` for a material map slot, which samples a filtered 2D texture: a 3D, array or cube texture, or
    * 32-bit float texels on a device without `float32-filterable`, throws instead of failing WebGPU validation.
    */
-  sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined {
+  sampled(device: GPUDevice, srgb: boolean, slot: string, tile = false): [GPUTextureView, GPUSampler] | undefined {
     if (this.dimension !== '2d')
       throw new TypeError(
         `Material ${slot} needs a 2D Texture, not a ${this.dimension} one; sample it from a WgslMaterial texture instead`,
@@ -857,7 +869,17 @@ export class Texture {
         'unsupported',
         `Material ${slot} samples 32-bit float texels, which needs the device feature float32-filterable; request it in Engine.create features or use a 16-bit float format`,
       );
-    return this.bind(device, srgb);
+    const pair = this.bind(device, srgb),
+      o = this.options;
+    if (!pair || !tile || (o.wrapS && o.wrapT)) return pair;
+    // A triplanar projection reads the map at the world position times the scale, far past [0, 1]: an unset wrap
+    // repeats there, as the projection means (the default clamp smeared the edge texels into streaks, KB-TRIPLANAR-SIDES1).
+    const held = this.slots.get(device)!;
+    if (held.tiledFrom !== pair[1]) {
+      held.tiled = this.sampler(device, held.samplerMips, true);
+      held.tiledFrom = pair[1];
+    }
+    return [pair[0], held.tiled!];
   }
   /**
    * @internal A stamp that stays the same while `bind(device, srgb)` would return the same view and sampler as last
@@ -924,7 +946,7 @@ export class Texture {
     if (!w || !h || ('readyState' in s && s.readyState < 2))
       return slot.texture ? [this.view(slot, srgb), slot.sampler] : undefined;
     if (w > device.limits.maxTextureDimension2D || h > device.limits.maxTextureDimension2D)
-      throw new RangeError('Texture exceeds device limit; resize it to maxTextureDimension2D or less.');
+      throw tooLarge(w, h, device.limits.maxTextureDimension2D);
     let t = slot.texture;
     const pending = slot.version !== this.version;
     // A new colour space or mip setting needs a new GPU copy; it is made on the upload after `update()`. Display P3
@@ -1003,13 +1025,15 @@ export class Texture {
     }
     return [this.view(slot, srgb), slot.sampler];
   }
-  private sampler(device: GPUDevice, mips: boolean): GPUSampler {
+  /** The sampler of this texture's options; `tile` repeats on each axis whose wrap is unset instead of clamping. */
+  private sampler(device: GPUDevice, mips: boolean, tile = false): GPUSampler {
     const o = this.options,
       min = o.minFilter ?? 'linear',
-      mag = o.magFilter ?? 'linear';
+      mag = o.magFilter ?? 'linear',
+      unset = tile ? 'repeat' : 'clamp';
     return device.createSampler({
-      addressModeU: wraps[o.wrapS ?? 'clamp'],
-      addressModeV: wraps[o.wrapT ?? 'clamp'],
+      addressModeU: wraps[o.wrapS ?? unset],
+      addressModeV: wraps[o.wrapT ?? unset],
       magFilter: mag,
       minFilter: min,
       mipmapFilter: min,
@@ -1220,10 +1244,10 @@ export type DepthPacking = 'basic' | 'rgba';
 export type Blending = 'normal' | 'additive' | 'multiply' | 'none';
 /** Where a transparent material mixes with what is behind it on a display-encoded target (`Material.blendSpace`). */
 export type BlendSpace = 'display' | 'linear';
-/** A live linear colour array (what gltf-pro reads every frame) whose `set` takes any colour input, like the option. */
+/** A live linear colour array (what gltf/pbr reads every frame) whose `set` takes any colour input, like the option. */
 type LiveColor = number[] & { set(value: ColorInput): number[] };
 /**
- * Physical options (glTF KHR_materials_* meaning; gltf-pro's physical shader draws
+ * Physical options (glTF KHR_materials_* meaning; gltf/pbr's physical shader draws
  * them, so a mesh and the same glTF material render alike). Any of them, at construction or set later, makes the
  * material physical (standard shading only); `transmission` and its maps make it transmissive (drawn after opaque
  * meshes). Values stay live.
@@ -1260,7 +1284,11 @@ export interface PhysicalOptions {
   /** Linear R strength and G thickness within the configured range. */
   iridescenceMap?: Texture | null;
   iridescenceThicknessMap?: Texture | null;
-  /** KHR_materials_ior: index of refraction, >= 1 (default 1.5). */
+  /**
+   * KHR_materials_ior: index of refraction, >= 1 (default 1.5), or exactly 0 for the extension's specular-glossiness
+   * mode: an infinite index, Fresnel 1 at every angle (F0 is then `specularColor` x `specularIntensity`), dispersion with
+   * no effect. The mode is permanent: once `ior` is 0, later writes are ignored, as the extension requires.
+   */
   ior?: number;
   /** KHR_materials_dispersion: chromatic refraction strength, finite and >= 0 (default 0). Needs transmission and volume thickness for a visible effect. */
   dispersion?: number;
@@ -1413,7 +1441,7 @@ export interface MaterialOptions extends PhysicalOptions {
   /** Thick only: how far diffuse light wraps past the terminator, 0 through 1 (default 0.5). Live. */
   subsurfaceWrap?: number;
   /**
-   * Up to 6 world-space planes `[a, b, c, d]`: points with `a x + b y + c z + d < 0` are cut away (the section
+   * Up to 16 world-space planes `[a, b, c, d]`: points with `a x + b y + c z + d < 0` are cut away (the section
    * convention), in every pass that draws the material. Live; default none.
    */
   clippingPlanes?: readonly (readonly number[])[];
@@ -1505,6 +1533,12 @@ export interface MaterialFeature {
   lit?(code: string, material: Material): string;
   /** Bind group entries of `group`, read on every draw; `owner` keys what it allocates. */
   bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+  /**
+   * Edits a cut-out shadow caster's depth shader so it cuts by the feature's noise instead of the cutoff (`alphaHash`:
+   * its hash, shared/alpha-hash.js `hashedDepth`). The material record hands it to shadow passes as `castHashed`, so a
+   * shadow package carries no hash WGSL of its own.
+   */
+  castHashed?(code: string): string;
   /** Called when the feature joins a material. */
   attach?(material: Material): void;
   /** Called when the feature leaves a material. */
@@ -1679,7 +1713,7 @@ const extensions: Record<keyof PhysicalOptions, string> = {
   attenuationDistance: 'volume',
 };
 // '#rrggbb', '#rgb' and 0xrrggbb are sRGB (math's parseColor); arrays are linear [r, g, b] or [r, g, b, a], each 0-1.
-const linear = (c: ColorInput, label: string): number[] => {
+const linear = (c: ColorInput, label: string, max = 1): number[] => {
   if (typeof c === 'number' && !(Number.isInteger(c) && c >= 0 && c <= 0xffffff))
     throw new RangeError(`Material ${label} number must be a 0xrrggbb sRGB colour; set 0x000000 through 0xffffff`);
   const v =
@@ -1692,7 +1726,8 @@ const linear = (c: ColorInput, label: string): number[] => {
     throw new TypeError(
       `Invalid material ${label}; set '#rrggbb', '#rgb', 0xrrggbb or linear [r, g, b] with components 0-1`,
     );
-  v.forEach((x) => unit(x, label));
+  if (max === 1) v.forEach((x) => unit(x, label));
+  else v.forEach((x) => finiteFloat(x, label, 0));
   return v;
 };
 /** The `set` of live colours by label: one function per label, so all colours of a label keep one hidden class. */
@@ -1711,7 +1746,7 @@ function liveColor(values: number[], label: string): LiveColor {
     );
   return Object.defineProperty(values, 'set', { value: set }) as LiveColor;
 }
-// Lambert and Blinn-Phong rewrite gltf-pro's direct and hemisphere terms in place, so every lighting hook point
+// Lambert and Blinn-Phong rewrite gltf/pbr's direct and hemisphere terms in place, so every lighting hook point
 // (direct+ambient(s), var color=, fn ambient, the tone-map line) and the shadows, fog and SSAO hooks stay. Radiance is
 // scaled as on the standard path: the diffuse BRDF base/pi times n.l times the light's irradiance, the hemisphere times
 // base. Blinn-Phong (Blinn 1977) is the microfacet BRDF D*F*G/(4 n.l n.v) with Blinn's distribution normalised over
@@ -1790,7 +1825,7 @@ type MapState = {
   /** The uniforms watched for their device's loss, by field (`watchUniformLost`). */
   lost?: Map<UniformField, LostUniform>;
 };
-/** gltf-pro `PBRMaterial.castMask`, kept and refilled per material and owner: read for every caster, every pass. */
+/** gltf/pbr `PBRMaterial.castMask`, kept and refilled per material and owner: read for every caster, every pass. */
 type CastMask = {
   view: GPUTextureView;
   sampler: GPUSampler;
@@ -1800,6 +1835,14 @@ type CastMask = {
 };
 const mapStates = new WeakMap<Material, Map<object, MapState>>(),
   disposedMaterials = new WeakSet<Material>();
+/**
+ * `feature` takes `to` as a material of its own, as `from` holds it: its captured attachment state when it has one
+ * (alphaHash's raised alphaTest), otherwise its `attach` (an eye counts its users).
+ */
+function joined(feature: MaterialFeature, to: Material, from: Material): void {
+  if (feature.captureState && feature.restoreState) feature.restoreState(to, feature.captureState(from));
+  else feature.attach?.(to);
+}
 /** Throws for a disposed material: meshes may not start drawing one. */
 function usable(m: Material): void {
   if (disposedMaterials.has(m))
@@ -1891,7 +1934,7 @@ function featureMapsUsed(m: Material): boolean[] {
   return [!!maps[0], !!maps[1], !!maps[2], !!maps[3] && (m.shading === 'basic' || lit.includes(m.shading))];
 }
 /**
- * The feature letters (features.ts) `m` uses now on gltf-pro shader `code`: its shader variant. An extension lobe
+ * The feature letters (features.ts) `m` uses now on gltf/pbr shader `code`: its shader variant. An extension lobe
  * sampling a tangent-space map (clearcoat(), materialLobes anisotropy, a node graph's normalMap) calls the shared
  * frame from declarations placed ahead of its definition, so it takes `n` too.
  */
@@ -1923,7 +1966,7 @@ const unencoded: readonly Shading[] = ['normal', 'depth', 'distance'];
 /** The surface maps (surface-features.ts bindings 171-174), in uniform-row order. */
 const surfaceMaps = ['parallaxMap', 'subsurfaceThicknessMap'] as const;
 const parallaxModes: readonly ParallaxMode[] = ['offset', 'occlusion', 'relief'];
-/** Shadings the subsurface terms light (their fragment keeps gltf-pro's directional-light line). */
+/** Shadings the subsurface terms light (their fragment keeps gltf/pbr's directional-light line). */
 const scattering: readonly Shading[] = ['standard', 'lambert', 'phong'];
 /** The surface features (surface-features.ts) `m` uses now: parallax, triplanar, subsurface and its thickness map. */
 function surfaceUsed(m: Material): readonly [boolean, boolean, boolean, boolean] {
@@ -1946,7 +1989,13 @@ function surfaceUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
 }
 /** Surface map `k`'s view and sampler (0 parallax, 1 thickness); one still loading reads white (no relief, full thickness). */
 const surfaceTexture = (m: Material, k: number, device: GPUDevice) =>
-  m['surfaceTextures'][k]!.sampled(device, false, surfaceMaps[k]) ?? fallback(device, 0);
+  m['surfaceTextures'][k]!.sampled(device, false, surfaceMaps[k], projected(m, m['surfaceValues'], 4 + k * 24)) ??
+  fallback(device, 0);
+/**
+ * True when triplanar replaces the UVs of the map whose UV transform starts at `rows[at]`: the map reads UV0 (the
+ * transform's texCoord flag, row 3, is 0) and triplanar is on.
+ */
+const projected = (m: Material, rows: ArrayLike<number>, at: number) => m.triplanar && !(rows[at + 3] > 0.5);
 /** The feature uniform of `m` for `owner`, written with its current values. */
 function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffer {
   const buffer = materialBuffer(m, device, owner, 144, 'features'),
@@ -1959,7 +2008,9 @@ function featureUniform(m: Material, device: GPUDevice, owner: object): GPUBuffe
 }
 /** Feature map `k`'s view and sampler; a map still loading reads white (alpha, bump) or black (displacement, light). */
 const featureTexture = (m: Material, k: number, device: GPUDevice) =>
-  m['featureTextures'][k]!.sampled(device, k === 3, featureMaps[k]) ?? fallback(device, k < 2 ? 0 : 3);
+  // The displacement map moves vertices by the mesh's own UVs, which no projection replaces.
+  m['featureTextures'][k]!.sampled(device, k === 3, featureMaps[k], k !== 2 && projected(m, m['featureValues'], 4 + k * 8)) ??
+  fallback(device, k < 2 ? 0 : 3);
 /** `entries` plus the feature uniform and maps `m` uses now (none for a material without features). */
 function featureBindings(m: Material, device: GPUDevice, owner: object, entries: GPUBindGroupEntry[]) {
   const maps = featureMapsUsed(m),
@@ -1985,7 +2036,7 @@ function featureBindings(m: Material, device: GPUDevice, owner: object, entries:
     }
   return out;
 }
-/** What shadow casters bind to displace `m` like its beauty shader (gltf-pro `PBRMaterial.displacement`), kept while the same. */
+/** What shadow casters bind to displace `m` like its beauty shader (gltf/pbr `PBRMaterial.displacement`), kept while the same. */
 function displacementOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
   if (!m.displacementMap || !device) return undefined;
   const state = mapState(m, owner),
@@ -2025,38 +2076,43 @@ const castMaskOf = (m: Material, device: GPUDevice | null | undefined, owner: ob
 /** What picking tests `m` with: a blended material has holes too, where its coverage is 0. */
 const pickMaskOf = (m: Material, device: GPUDevice | null | undefined, owner: object): CastMask | undefined =>
   m.settings[0] !== 0 ? surfaceMask(m, device, owner) : undefined;
-/** The clipping-plane uniform of `m` for `owner` (section layout: 6 planes, count in settings.x), written now. */
+/** Planes a material holds: the uniform's room (shared/section.js). */
+const maxPlanes = planeCapacity('materialClip');
+/** The clipping-plane uniform of `m` for `owner` (section layout: 16 planes, count in settings.x), written now. */
 function clipUniform(m: Material, device: GPUDevice, owner: object): GPUBufferBinding {
-  const buffer = materialBuffer(m, device, owner, 112, 'clip'),
+  const buffer = materialBuffer(m, device, owner, maxPlanes * 16 + 16, 'clip'),
     state = mapState(m, owner),
-    data = (state.clipData ??= new Float32Array(28)),
+    data = (state.clipData ??= new Float32Array(maxPlanes * 4 + 4)),
     planes = m['clipping'];
   data.fill(0);
   data.set(planes);
-  data[24] = planes.length / 4;
-  data[25] = +m.clipIntersection;
+  data[maxPlanes * 4] = planes.length / 4;
+  data[maxPlanes * 4 + 1] = +m.clipIntersection;
   device.queue.writeBuffer(buffer, 0, data);
   if (state.clipBinding?.buffer !== buffer) state.clipBinding = { buffer };
   return state.clipBinding;
 }
-/** What shadow casters bind to clip `m` like its beauty shader (gltf-pro `PBRMaterial.clip`), or undefined. */
+/** What shadow casters bind to clip `m` like its beauty shader (gltf/pbr `PBRMaterial.clip`), or undefined. */
 function clipOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
   return device && m['clipping'].length && m.clipShadows ? clipUniform(m, device, owner) : undefined;
 }
-/** What passes that follow the surface bind to clip `m`, whether or not its shadows are clipped (gltf-pro `surfaceClip`). */
+/** What passes that follow the surface bind to clip `m`, whether or not its shadows are clipped (gltf/pbr `surfaceClip`). */
 function surfaceClipOf(m: Material, device: GPUDevice | null | undefined, owner: object) {
   return device && m['clipping'].length ? clipUniform(m, device, owner) : undefined;
 }
 const surfaceAnchor = 'if(!facing&&f.settings.z<0.5){discard;}';
 /**
- * `code` discarding what the material's planes cut away: in every fragment entry, and in gltf-pro's `surface()` so
+ * `code` discarding what the material's planes cut away: in every fragment entry, and in gltf/pbr's `surface()` so
  * fragments appended later (the SSAO occlusion output) clip too.
  */
-/** Whether `m`'s planes may cut in the rasterizer on `device`. Clip distances cut a union; an intersection stays on discard. */
-const hardwareClip = (m: Material, device: GPUDevice | null | undefined): boolean =>
-  !m.clipIntersection && !!device?.features?.has('clip-distances');
 /**
- * Whether the vertex stage of `code` has room for clip distances: six take two of the device's inter-stage slots, and
+ * Whether `m`'s planes may cut in the rasterizer on `device`. Clip distances cut a union of at most `hardwarePlanes`;
+ * an intersection, or more planes, stays on discard.
+ */
+const hardwareClip = (m: Material, device: GPUDevice | null | undefined): boolean =>
+  !m.clipIntersection && m['clipping'].length <= hardwarePlanes * 4 && !!device?.features?.has('clip-distances');
+/**
+ * Whether the vertex stage of `code` has room for clip distances: eight take two of the device's inter-stage slots, and
  * instanced drawing passes one more variable. Otherwise, as with an eye's three, the planes stay on discard.
  */
 function roomForDistances(code: string, device: GPUDevice): boolean {
@@ -2110,9 +2166,9 @@ function bare(m: Material): boolean {
 }
 const bareCode = new Map<string, string>();
 /**
- * gltf-pro's shader for a standard material without maps: each texture read becomes the value of the texture a missing
- * map stands for (white; the flat normal (0.5, 0.5, 1), exactly what the defaults hold), and gltf-pro's group-1
- * textures are dropped. Without it such a material read ten textures per fragment (gltf-pro's white defaults times
+ * gltf/pbr's shader for a standard material without maps: each texture read becomes the value of the texture a missing
+ * map stands for (white; the flat normal (0.5, 0.5, 1), exactly what the defaults hold), and gltf/pbr's group-1
+ * textures are dropped. Without it such a material read ten textures per fragment (gltf/pbr's white defaults times
  * this package's). The tangent frame stays: extension lobes on the primitive may still use it.
  */
 function bareShader(source: string): string {
@@ -2132,21 +2188,21 @@ function bareShader(source: string): string {
   for (const map of ['base', 'mr', 'ao', 'emissive'])
     edit(new RegExp(`textureSample\\(${map}Map,${map}Sampler,uv\\(i,f\\.coords[AB]\\.[xyzw]\\)\\)`, 'g'), 'vec4f(1)');
   edit(/textureSample\(normalMap,normalSampler,uv\(i,f\.coordsA\.z\)\)/g, 'vec4f(0.5,0.5,1,1)');
-  // gltf-pro's KHR physical and extended variants read their extension maps (slots 5-17) from group 1 too; a missing
-  // one holds white, the clearcoat normal map a flat normal (gltf-pro's normalMaps).
+  // gltf/pbr's KHR physical and extended variants read their extension maps (slots 5-17) from group 1 too; a missing
+  // one holds white, the clearcoat normal map a flat normal (gltf/pbr's normalMaps).
   out = out.replace(/textureSample\((\w+)Map,\1Sampler,uv\(i,\d+\)\)/g, (_, name: string) =>
     name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)',
   );
   if (count !== 5 || dropped.some((name) => new RegExp(`\\b${name}\\b`).test(out!)))
     throw new MargoError(
       'unsupported',
-      'Materials require the standard gltf-pro PBR shader; draw the mesh with gltf-pro',
+      'Materials require the standard gltf/pbr shader; draw the mesh with gltf/pbr',
     );
   if (bareCode.size >= 64) bareCode.clear();
   bareCode.set(source, out);
   return out;
 }
-/** Rewrites gltf-pro's beauty shader to multiply in this package's maps (group 2, bindings 32-43) and, for non-standard shading, return early. */
+/** Rewrites gltf/pbr's beauty shader to multiply in this package's maps (group 2, bindings 32-43) and, for non-standard shading, return early. */
 export function materialShader(source: string, group: number, shading: Shading): string {
   let cache = patched.get(source);
   const key = shading + group,
@@ -2188,7 +2244,7 @@ export function materialShader(source: string, group: number, shading: Shading):
   if (count !== (shading === 'standard' ? 5 : lit ? 5 + edits.length : 6))
     throw new MargoError(
       'state',
-      'Materials require the standard gltf-pro PBR shader; update @margoengine/gltf-pro to a version that matches this package.',
+      'Materials require the standard gltf/pbr shader; update @margoengine/gltf/pbr to a version that matches this package.',
     );
   const declarations = names
     .slice(0, shading === 'matcap' ? 6 : 5)
@@ -2211,7 +2267,7 @@ export function materialShader(source: string, group: number, shading: Shading):
 const localTerm = 'result+=' + clusterBrdf + '*nl*',
   composed = { lambert: new Map<string, string>(), phong: new Map<string, string>() };
 /**
- * `code` with its lighting effects composed in (gltf-pro's `lit` hook): Lambert and Phong put their own BRDF in place of
+ * `code` with its lighting effects composed in (gltf/pbr's `lit` hook): Lambert and Phong put their own BRDF in place of
  * clustered's per-light GGX term, so point and spot lights shade them exactly as the directional light does; a shadow
  * catcher then measures its shadows (catcher.ts). Other materials, and code without clustered lights, come back
  * unchanged.
@@ -2271,11 +2327,11 @@ export class Material {
   private added: readonly MaterialFeature[] = [];
   private addedStamp = 0;
   private readonly switches = { flatShading: false, vertexColors: true, fog: true, toneMapped: true, dithering: false };
-  /** gltf-pro layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
+  /** gltf\/pbr layout: [roughness, metalness, normalScale, aoMapIntensity] and [alphaMode, alphaTest, side (front 0, double 1, back 2), 0]. */
   readonly factors: number[];
   readonly settings: number[];
   private blend: boolean;
-  /** gltf-pro layout: two rows per map slot (offset*rotation*scale), in `MapSlot` order. */
+  /** gltf\/pbr layout: two rows per map slot (offset*rotation*scale), in `MapSlot` order. */
   readonly uvt: number[] = [];
   private uvDefault = textureTransform({}, 0);
   /** The base maps in `slots` order: map, metalRoughnessMap, normalMap, aoMap, emissiveMap, matcap. */
@@ -2344,14 +2400,14 @@ export class Material {
     ...textureTransform({}, 1),
   ];
   private lightResponse: 'multiply' | 'lambertian' = 'multiply';
-  /** Clipping planes, four normalised numbers each (at most 24), and whether they clip shadows. */
+  /** Clipping planes, four normalised numbers each (at most 64), and whether they clip shadows. */
   private clipping: number[] = [];
   private clipShadow = true;
   private clipAll = false;
   /**
-   * Up to 6 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away in every pass that
+   * Up to 16 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away in every pass that
    * draws the material (beauty, G-buffer and, with `clipShadows`, directional shadows). Reading gives normalised copies;
-   * assign a new list to change them (live). Throws TypeError for a malformed plane, RangeError for more than 6.
+   * assign a new list to change them (live). Throws TypeError for a malformed plane, RangeError for more than 16.
    */
   get clippingPlanes(): number[][] {
     const out: number[][] = [];
@@ -2360,7 +2416,7 @@ export class Material {
   }
   set clippingPlanes(v: readonly (readonly number[])[]) {
     if (!Array.isArray(v)) throw new TypeError('Material clippingPlanes must be an array of [a, b, c, d] planes');
-    if (v.length > 6) throw new RangeError('Material clippingPlanes holds at most 6 planes; pass fewer');
+    if (v.length > maxPlanes) throw new RangeError(`Material clippingPlanes holds at most ${maxPlanes} planes; pass fewer`);
     const flat: number[] = [];
     for (const p of v) {
       if (
@@ -2371,6 +2427,11 @@ export class Material {
         throw new TypeError('Material clipping plane must be four finite numbers [a, b, c, d]');
       const length = Math.hypot(p[0], p[1], p[2]);
       if (!length) throw new TypeError('Material clipping plane needs a non-zero normal [a, b, c]');
+      // A tiny normal makes d / |n| overflow float32 (the uniform would hold Infinity).
+      if (!Number.isFinite(Math.fround(p[3] / length)))
+        throw new RangeError(
+          'Material clipping plane distance d / |[a, b, c]| must be finite as float32; scale the plane up',
+        );
       flat.push(p[0] / length, p[1] / length, p[2] / length, p[3] / length);
     }
     this.clipping = flat;
@@ -2714,12 +2775,12 @@ export class Material {
   }
   private rotation = 0;
   /**
-   * Physical materials only (set once any physical option is), gltf-pro layout: [clearcoat, clearcoatRoughness, 1,
+   * Physical materials only (set once any physical option is), gltf/pbr layout: [clearcoat, clearcoatRoughness, 1,
    * transmission, specularColor rgb, specularIntensity, sheenColor rgb, sheenRoughness], and [0, ior, 0, dispersion].
    */
   readonly physical?: number[];
   readonly ext?: number[];
-  /** Transmissive materials only (set once transmission or its maps are), gltf-pro layout: [thickness, transmittance per world unit rgb]. */
+  /** Transmissive materials only (set once transmission or its maps are), gltf\/pbr layout: [thickness, transmittance per world unit rgb]. */
   readonly volume?: number[];
   /** glTF extensions (`KHR_materials_<name>`) the physical options use, in the order they were first set. */
   readonly extensions: readonly string[] = [];
@@ -3080,7 +3141,7 @@ export class Material {
     this.far = v;
   }
   /**
-   * Makes this a physical material with `key`'s lobe, on first use: gltf-pro then draws it with the matching physical
+   * Makes this a physical material with `key`'s lobe, on first use: gltf/pbr then draws it with the matching physical
    * shader variant (by pipeline key), while materials that never set a physical option keep the plain one.
    */
   private enable(key: keyof PhysicalOptions): number[] {
@@ -3181,7 +3242,9 @@ export class Material {
   set iridescenceThicknessRange(v: readonly [number, number]) {
     if (!Array.isArray(v) || v.length !== 2)
       throw new RangeError('Material iridescenceThicknessRange must be [min, max] nanometres');
-    finiteFloat(v[1], 'iridescenceThicknessRange', finiteFloat(v[0], 'iridescenceThicknessRange', 0));
+    // KHR_materials_iridescence: the minimum MAY be greater than the maximum (the map then runs thick to thin).
+    finiteFloat(v[0], 'iridescenceThicknessRange', 0);
+    finiteFloat(v[1], 'iridescenceThicknessRange', 0);
     const p = this.enable('iridescenceThicknessRange');
     p[14] = v[0];
     p[15] = v[1];
@@ -3195,8 +3258,11 @@ export class Material {
   get specularColor(): number[] {
     return this.physical?.slice(4, 7) ?? [1, 1, 1];
   }
+  /** KHR_materials_specular allows components above 1 (F0 past what the IOR gives); the shader clamps F0 to 1. */
   set specularColor(c: ColorInput) {
-    this.setColor(4, c, 'specularColor');
+    const v = linear(c, 'specularColor', Infinity),
+      p = this.enable('specularColor');
+    for (let k = 0; k < 3; k++) p[4 + k] = v[k];
   }
   get specularIntensity(): number {
     return this.physical?.[7] ?? 1;
@@ -3220,7 +3286,9 @@ export class Material {
     return this.ext?.[1] ?? 1.5;
   }
   set ior(v: number) {
-    finiteFloat(v, 'ior', 1);
+    // KHR_materials_ior: 0 switches to the specular-glossiness mode for good; "updates of it MUST be ignored".
+    if (this.ext?.[1] === 0 && this.extensions.includes('ior')) return;
+    if (v !== 0) finiteFloat(v, 'ior', 1);
     this.enable('ior');
     this.ext![1] = v;
   }
@@ -3256,7 +3324,7 @@ export class Material {
   get transmissive(): boolean {
     return !!this.volume;
   }
-  /** @internal gltf-pro's tinted-blend constant when no transmission pass refracts: color x transmission x volume attenuation. */
+  /** @internal gltf\/pbr's tinted-blend constant when no transmission pass refracts: color x transmission x volume attenuation. */
   get tint(): number[] | undefined {
     if (!this.volume) return undefined;
     for (let k = 0; k < 3; k++)
@@ -3465,11 +3533,15 @@ export class Material {
   clone(): this {
     const c = Object.create(Object.getPrototypeOf(this)) as this;
     for (const [key, value] of Object.entries(this)) (c as Record<string, unknown>)[key] = duplicate(value);
-    return Object.assign(c, {
+    Object.assign(c, {
       rgba: liveColor(this.rgba.slice(), 'color'),
       glow: liveColor(this.glow.slice(), 'emissive'),
       highlight: liveColor(this.highlight.slice(), 'specular'),
     });
+    // The clone joins each feature as a material of its own: a feature that counts or marks its materials (an eye's
+    // buffers, alphaHash's raised alphaTest) would otherwise free or undo for the original when the clone leaves it.
+    for (const v of c.added) joined(v, c, this);
+    return c;
   }
   /**
    * Copies every Material value of `source` (same shading) into this material in place, textures shared: meshes using
@@ -3482,15 +3554,21 @@ export class Material {
       throw new TypeError(
         `Material copy needs the same shading ('${this.shading}', not '${source.shading}'); clone() the source instead`,
       );
+    const before = this.added;
+    // Features this material leaves let go of it first (their undo is then overwritten by source's values below).
+    for (const v of before) if (!source.added.includes(v)) v.detach?.(this);
     const to = this as unknown as Record<string, unknown>,
       from = source as unknown as Record<string, unknown>;
     for (const key of (baseKeys ??= Object.keys(new Material()))) {
       const a = to[key],
         b = from[key];
-      // Arrays copy into the existing ones: live colours and gltf-pro rows keep their identity.
-      if (Array.isArray(a) && Array.isArray(b)) a.splice(0, a.length, ...b);
+      // Arrays copy into the existing ones: live colours and gltf/pbr rows keep their identity. The feature list is
+      // frozen (it is replaced, never edited) and takes source's list.
+      if (key === 'added') to[key] = Object.freeze((b as MaterialFeature[]).slice());
+      else if (Array.isArray(a) && Array.isArray(b)) a.splice(0, a.length, ...b);
       else to[key] = duplicate(b);
     }
+    for (const v of this.added) if (!before.includes(v) || v.captureState) joined(v, this, source);
     renderStates.delete(this);
     return this;
   }
@@ -3518,7 +3596,7 @@ export class Material {
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
     this.dispose();
   }
-  /** gltf-pro beauty shader patch; subclasses (such as `@margoengine/shader`'s NodeMaterial) may extend it. */
+  /** gltf\/pbr beauty shader patch; subclasses (such as `@margoengine/shader`'s NodeMaterial) may extend it. */
   shader(source: string, group: number): string {
     if (mapped(this)) return physicalMapsShader(source, group, mapPlan(this).slots);
     if (bare(this)) return bareShader(source);
@@ -3535,7 +3613,7 @@ export class Material {
   relight(code: string): string {
     return code;
   }
-  /** @internal gltf-pro LightingEffect bindings for one device; `engine` is the drawing engine. */
+  /** @internal gltf\/pbr LightingEffect bindings for one device; `engine` is the drawing engine. */
   bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
     if (mapped(this)) {
       const plan = mapPlan(this),
@@ -3546,8 +3624,11 @@ export class Material {
       values.set(this.volume ?? [0, 1, 1, 1], 136);
       device.queue.writeBuffer(buffer, 0, values);
       const entries: GPUBindGroupEntry[] = [{ binding: 200, resource: { buffer } }];
+      // One sampler per texture: it repeats under triplanar when any UV0 slot reads the texture.
+      const tiled = (texture: Texture) =>
+        mapSlots.some((k, i) => this[k] === texture && projected(this, this.uvt.length > i * 8 ? this.uvt : this.uvDefault, this.uvt.length > i * 8 ? i * 8 : 0));
       const bound = plan.textures.map(({ texture, srgb, fallback: role }) => {
-        const pair = texture.sampled(device, srgb, 'map');
+        const pair = texture.sampled(device, srgb, 'map', tiled(texture));
         if (pair) return pair;
         return fallback(device, role);
       });
@@ -3562,7 +3643,9 @@ export class Material {
     if (bare(this)) return entries;
     for (let i = 0; i < (this.shading === 'matcap' ? 6 : 5); i++) {
       const texture = this[slots[i]],
-        bound = texture?.sampled(device, i === 0 || i >= 4, slots[i]) ?? [i === 2 ? d.normal : d.white, d.sampler];
+        // The matcap is read by the view normal, never by the UVs.
+        tile = i < 5 && projected(this, this.uvt.length > i * 8 ? this.uvt : this.uvDefault, this.uvt.length > i * 8 ? i * 8 : 0),
+        bound = texture?.sampled(device, i === 0 || i >= 4, slots[i], tile) ?? [i === 2 ? d.normal : d.white, d.sampler];
       entries.push({ binding: 32 + i * 2, resource: bound[0] }, { binding: 33 + i * 2, resource: bound[1] });
     }
     if (this.shading === 'depth' || this.shading === 'distance') {
@@ -3605,7 +3688,7 @@ export class Material {
   }
 }
 
-/** Any CPU geometry with a bottom-left UV origin (v increases up the image); `@margoengine/geometry` output fits directly. Colors are RGB or RGBA, floats 0-1 or bytes. */
+/** Any CPU geometry with a bottom-left UV origin (v increases up the image); `@margoengine/geometry` output fits directly. Colors are RGB or RGBA: floats 0-1, or a Uint8Array (0-255) or Uint16Array (0-65535), normalised as glTF's COLOR_0. */
 export interface MeshGeometry {
   positions: ArrayLike<number>;
   normals: ArrayLike<number>;
@@ -3619,7 +3702,7 @@ export interface MeshGeometry {
   groups?: readonly { start: number; count: number; materialIndex: number }[];
 }
 const packed = new WeakMap<object, PreparedGeometry>();
-/** Packs once per geometry object into gltf-pro's 80-byte vertex (position, normal, tangent, UV0, UV1, color). Later edits to the object are not seen; `mesh.setGeometry` repacks. */
+/** Packs once per geometry object into gltf/pbr's 80-byte vertex (position, normal, tangent, UV0, UV1, color). Later edits to the object are not seen; `mesh.setGeometry` repacks. */
 export function packGeometry(g: MeshGeometry): PreparedGeometry {
   let out = packed.get(g);
   if (!out) packed.set(g, (out = pack(g)));
@@ -3648,12 +3731,17 @@ function vertexCount(g: MeshGeometry): number {
 function packVertices(g: MeshGeometry, from: number, to: number): Float32Array {
   const { positions: p, normals: n, uvs, uvs1, tangents: t, colors: c } = g,
     width = c ? c.length / (p.length / 3) : 0,
-    scale = c instanceof Uint8Array || c instanceof Uint8ClampedArray ? 1 / 255 : 1;
+    // glTF COLOR_n is float, or unsigned byte or short normalised: integer arrays map their full range to 0-1.
+    scale =
+      c instanceof Uint8Array || c instanceof Uint8ClampedArray ? 1 / 255 : c instanceof Uint16Array ? 1 / 65535 : 1;
   const v = new Float32Array((to - from) * 20);
   for (let i = from, o = 0; i < to; i++, o += 20) {
     const length = Math.hypot(n[i * 3], n[i * 3 + 1], n[i * 3 + 2]),
       tl = t ? Math.hypot(t[i * 4], t[i * 4 + 1], t[i * 4 + 2]) : 0;
     if (!length) throw new RangeError('Mesh normals must be non-zero');
+    // A NaN tangent has no length and would pass as "no tangent"; zeros are the way to give none.
+    if (t && (Number.isNaN(tl) || Number.isNaN(t[i * 4 + 3])))
+      throw new RangeError('Mesh geometry attributes must be finite; remove NaN and Infinity values.');
     for (let k = 0; k < 3; k++) {
       v[o + k] = p[i * 3 + k];
       v[o + 4 + k] = n[i * 3 + k] / length;
@@ -3779,7 +3867,7 @@ function queue(runtime: Engine): MaterialDraws {
   const members: Entry[] = [],
     tail: Phase[] = [],
     name = 'materials:' + serial++,
-    // One run, reused every frame: it keeps its batch records (gltf-pro draw-batch.ts) instead of making new ones.
+    // One run, reused every frame: it keeps its batch records (gltf/pbr draw-batch.ts) instead of making new ones.
     run = new PBRDrawRun();
   // Each arrange() makes a new list, so a loop that is drawing one keeps it while a draw re-arranges the queue.
   let phases: Phase[] = [],
@@ -3927,7 +4015,7 @@ function queue(runtime: Engine): MaterialDraws {
 const renderStates = new WeakMap<Material, PBRRenderState>(),
   features = new WeakMap<Material, NonNullable<PBRMaterial['extended']>>(),
   named = new WeakMap<Material, { key: string; value: Record<string, object> }>();
-/** gltf-pro's beauty pipeline overrides for `m`, or undefined for the default pipeline. */
+/** gltf/pbr's beauty pipeline overrides for `m`, or undefined for the default pipeline. */
 function renderStateOf(m: Material): PBRRenderState | undefined {
   if (!m.customState) return undefined;
   let state = renderStates.get(m);
@@ -3967,7 +4055,7 @@ function renderStateOf(m: Material): PBRRenderState | undefined {
   return state;
 }
 const scaledEmission = new WeakMap<Material, number[]>();
-/** gltf-pro's emission row: the live emissive colour itself, or (emissiveIntensity not 1) it scaled. */
+/** gltf/pbr's emission row: the live emissive colour itself, or (emissiveIntensity not 1) it scaled. */
 function emissionOf(m: Material): number[] {
   const k = m.emissiveIntensity;
   if (k === 1) return m.emissive;
@@ -3976,7 +4064,7 @@ function emissionOf(m: Material): number[] {
   for (let i = 0; i < 3; i++) out[i] = m.emissive[i] * k;
   return out;
 }
-/** gltf-pro's extended-material features (iridescence, anisotropy rows) for `m`, kept while they stay the same. */
+/** gltf/pbr's extended-material features (iridescence, anisotropy rows) for `m`, kept while they stay the same. */
 function extendedOf(m: Material): PBRMaterial['extended'] {
   if (!m.physical || m.physical.length <= 12) return undefined;
   const iridescence = m.extensions.includes('iridescence'),
@@ -4109,7 +4197,7 @@ type MaterialRecord = PBRMaterial & {
 /**
  * A live record field, read from the record's material on every access. Enumerable and configurable like the data
  * properties they replace (`{...record}` copies still work). The getters are made once and shared by every record, so
- * all records have one shape and gltf-pro's per-draw reads of them stay fast with thousands of materials.
+ * all records have one shape and gltf/pbr's per-draw reads of them stay fast with thousands of materials.
  */
 const live = (read: (m: Material, g: MaterialRecord) => unknown): PropertyDescriptor => ({
   get(this: MaterialRecord) {
@@ -4120,8 +4208,8 @@ const live = (read: (m: Material, g: MaterialRecord) => unknown): PropertyDescri
 });
 const surfaceFields: PropertyDescriptorMap = {
   extendedFrame: { value: true, enumerable: true },
-  // gltf-pro's placeholder record makes its own `side` accessor per record, which gave every record a hidden class
-  // of its own (gltf-pro's reads of thousands of records then missed every inline cache).
+  // gltf/pbr's placeholder record makes its own `side` accessor per record, which gave every record a hidden class
+  // of its own (gltf/pbr's reads of thousands of records then missed every inline cache).
   side: {
     get(this: MaterialRecord) {
       return this[recordMaterial].side;
@@ -4138,7 +4226,7 @@ const surfaceFields: PropertyDescriptorMap = {
   settings: live((m) => m.settings),
   // The native frame holds 13 slots; the sparse map uniform owns all 17 slots.
   uvt: live((m) => m.uvt.slice(0, extendedOf(m) ? 144 : 104)),
-  // Physical: gltf-pro's factor-only variant (five maps), live arrays, and the tinted-blend constant.
+  // Physical: gltf/pbr's factor-only variant (five maps), live arrays, and the tinted-blend constant.
   physical: live((m) => m.physical),
   ext: live((m, g) => m.ext ?? g[recordExt]),
   volume: live((m) => m.volume),
@@ -4164,6 +4252,9 @@ const surfaceFields: PropertyDescriptorMap = {
   clipHardware: live((m, g) => hardwareClip(m, g[recordRuntime].gpu)),
   surfaceClip: live((m, g) => surfaceClipOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   castMask: live((m, g) => castMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
+  // alphaHash() cuts the colour pass by noise; its shadows cut by the same hash, through the feature's own caster edit
+  // (shared/alpha-hash.js hashedDepth), so only an app that imports alphaHash bundles that WGSL.
+  castHashed: live((m) => m.features.find((f) => f.castHashed)?.castHashed),
   pickMask: live((m, g) => pickMaskOf(m, g[recordRuntime].gpu, g[recordRuntime])),
   vertexAlpha: live((m) => m.vertexColors),
   wireframe: {
@@ -4173,7 +4264,7 @@ const surfaceFields: PropertyDescriptorMap = {
     },
   },
 };
-/** gltf-pro's shading hook for a record of `m` (see `surface`). */
+/** gltf/pbr's shading hook for a record of `m` (see `surface`). */
 class MaterialShading implements PBRMaterialShading {
   /** What `liveStamp` last saw of the arrays a caller may write in place (colour, emissive, specular, factors, settings). */
   private readonly seen = new Float64Array(liveFloats).fill(Number.NaN);
@@ -4191,7 +4282,7 @@ class MaterialShading implements PBRMaterialShading {
     return shaderRevision(this.m);
   }
   /**
-   * gltf-pro `PBRMaterialShading.version`: the largest change stamp of the material and of every texture its bindings
+   * gltf/pbr `PBRMaterialShading.version`: the largest change stamp of the material and of every texture its bindings
    * read, so it grows whenever anything this record, `shader()`, `lit()` or `bindings()` reads changes. NaN where that
    * cannot be known: a material with its own `shader` or `bindings` (NodeMaterial, WgslMaterial), physical maps, an
    * envMap that is not a Texture, or a texture that is not steady (`Texture.steady`).
@@ -4277,7 +4368,7 @@ class MaterialShading implements PBRMaterialShading {
   }
 }
 /**
- * A gltf-pro material record for `m` from the placeholder record's fields `blank`, read on every draw: values, maps
+ * A gltf/pbr material record for `m` from the placeholder record's fields `blank`, read on every draw: values, maps
  * (through the shading hook), physical rows, render state and wireframe all follow a live edit from the next frame.
  * It is made in one `defineProperties` call from shared descriptors (redefining data properties as accessors would
  * leave each record a dictionary of its own).
@@ -4296,8 +4387,8 @@ function surface(blank: PropertyDescriptorMap, m: Material, runtime: Engine): PB
 const shaderRevisions = new WeakMap<Material, { key: number; revision: number }>();
 let nextShaderRevision = 1;
 /**
- * gltf-pro `PBRMaterialShading.shaderRevision` for `m`: a number that changes whenever what `shader()` and `lit()` read
- * of `m` changes, so gltf-pro composes a material's shader again only then. Their text depends on the shading (fixed),
+ * gltf/pbr `PBRMaterialShading.shaderRevision` for `m`: a number that changes whenever what `shader()` and `lit()` read
+ * of `m` changes, so gltf/pbr composes a material's shader again only then. Their text depends on the shading (fixed),
  * whether the material is bare, the feature maps in use, the feature switches, the normal maps and anisotropy (the
  * tangent frame), the envMap, the clipping planes and the optional features. Materials with physical maps (their plan follows texture loading)
  * and classes or instances with their own `shader` give NaN: composed on every frame, as before.
@@ -4326,8 +4417,9 @@ function shaderRevision(m: Material): number {
       (+surface[2] << 16) |
       (+surface[3] << 17) |
       (+m.dithering << 18) |
-      (+m.clipIntersection << 19),
-    variant = key + m['addedStamp'] * 1048576;
+      (+m.clipIntersection << 19) |
+      (+(m['clipping'].length > hardwarePlanes * 4) << 20),
+    variant = key + m['addedStamp'] * 2097152;
   let state = shaderRevisions.get(m);
   if (!state) shaderRevisions.set(m, (state = { key: variant, revision: nextShaderRevision++ }));
   else if (state.key !== variant) {
@@ -4337,7 +4429,7 @@ function shaderRevision(m: Material): number {
   return state.revision;
 }
 /**
- * `m`'s change stamp, after a look at the arrays a caller may write element by element (`color[0] = 1`; gltf-pro's
+ * `m`'s change stamp, after a look at the arrays a caller may write element by element (`color[0] = 1`; gltf/pbr's
  * factor and settings rows): a difference from `seen` (what one record last saw of them) takes a new stamp.
  */
 function liveStamp(m: Material, seen: Float64Array): number {
@@ -4382,8 +4474,8 @@ function liveStamp(m: Material, seen: Float64Array): number {
 let tracking = false;
 /**
  * Makes every Material setter, `setUVTransform` and `copy` take a new change stamp (`Material.changes`), from the first
- * mesh record on: a record's `version` (gltf-pro `PBRMaterialShading.version`) then lets gltf-pro skip reading a steady
- * material's rows and bindings. Edits before that need no stamp, as gltf-pro has derived nothing yet.
+ * mesh record on: a record's `version` (gltf/pbr `PBRMaterialShading.version`) then lets gltf/pbr skip reading a steady
+ * material's rows and bindings. Edits before that need no stamp, as gltf/pbr has derived nothing yet.
  */
 function trackChanges(): void {
   if (tracking) return;
@@ -4414,9 +4506,9 @@ function trackChanges(): void {
 }
 const records = new WeakMap<Material, WeakMap<Engine, PBRMaterial>>();
 /**
- * The gltf-pro material record the meshes of `runtime` draw `m` with: one per material, as glTF primitives that use one
- * material share one record, so gltf-pro derives a material's shader, pipeline and uniform rows once per frame for
- * all of its meshes instead of once per mesh. `blank` is gltf-pro's record for the placeholder material (`{}`).
+ * The gltf/pbr material record the meshes of `runtime` draw `m` with: one per material, as glTF primitives that use one
+ * material share one record, so gltf/pbr derives a material's shader, pipeline and uniform rows once per frame for
+ * all of its meshes instead of once per mesh. `blank` is gltf/pbr's record for the placeholder material (`{}`).
  */
 function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap): PBRMaterial {
   let byEngine = records.get(m);
@@ -4429,7 +4521,7 @@ function recordOf(m: Material, runtime: Engine, blank: PropertyDescriptorMap): P
   }
   return record;
 }
-/** A materials mesh: the gltf-pro model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
+/** A materials mesh: the gltf/pbr model plus the live `material` it draws with (read by @margoengine/exporters `exportModel`). */
 export type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {
   /**
    * The material it draws with, or a frozen snapshot of the material array (one per slot that `groups` index).
@@ -4440,7 +4532,7 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
   material: M extends Material ? Material : readonly Material[];
   /**
    * Live edit: repacks `geometry` (the same object edited in place, or a new one) into this mesh's buffers, reusing
-   * the GPU buffers while the data fits (gltf-pro `writeGeometry`). Groups may move and resize but keep their number
+   * the GPU buffers while the data fits (gltf/pbr `writeGeometry`). Groups may move and resize but keep their number
    * and material slots. With `range`, only those vertices are repacked and uploaded and the vertex count must stay;
    * indices and groups are not read, so a per-frame UV animation uploads just its vertices. Raycasts,
    * `worldTriangles`, bounds and exports see the new data at once.
@@ -4450,7 +4542,7 @@ export type MaterialMesh<M extends Material | readonly Material[] = Material> = 
   renderOrder: number;
 };
 /**
- * Creates one gltf-pro `PBRModel`. A material array draws the geometry's nonempty, nonoverlapping triangle groups;
+ * Creates one gltf/pbr `PBRModel`. A material array draws the geometry's nonempty, nonoverlapping triangle groups;
  * uncovered indices are omitted. A scalar material draws the entire geometry, ignoring groups.
  * Move it with `model.root`, edit it with `model.setGeometry(geometry, range?)`, remove it with `model.destroy()`.
  * It works with `shadows.add`, `clustered.add` and `ssao.add` like a loaded glTF. Textures are not disposed with the model.
@@ -4472,9 +4564,8 @@ export function createMesh<M extends Material | readonly Material[]>(
   const data = packGeometry(geometry),
     groups = meshGroups(geometry, data.indices.length, assigned, array);
   const prepared = groups.map((g) => ({ vertices: data.vertices, indices: groupIndices(data.indices, g) }));
-  const runtime = engineRuntime(engine),
-    set = queue(runtime);
-  // Placeholder glTF materials: every value gltf-pro draws comes from the slot's current Material (`surface`).
+  const runtime = engineRuntime(engine);
+  // Placeholder glTF materials: every value gltf/pbr draws comes from the slot's current Material (`surface`).
   const doc = {
     asset: { version: '2.0' },
     nodes: [{ mesh: 0 }],
@@ -4502,7 +4593,7 @@ export function createMesh<M extends Material | readonly Material[]>(
     for (const release of held.values()) release();
     held.clear();
   });
-  // gltf-pro's record for the placeholder material, copied for each material's shared record (own arrays each).
+  // gltf/pbr's record for the placeholder material, copied for each material's shared record (own arrays each).
   const fresh = model.primitives[0].material,
     blank = Object.getOwnPropertyDescriptors(fresh);
   for (const key of Object.keys(blank)) {
@@ -4542,14 +4633,19 @@ export function createMesh<M extends Material | readonly Material[]>(
     hold();
   };
   model.registerPasses = () => {};
+  let set: MaterialDraws | undefined;
   try {
+    set = queue(runtime);
     runtime.use(model);
   } catch (error) {
+    // The scene's first material mesh failed: its new, empty draw queue leaves with it (delete drops an empty queue).
+    set?.delete(entry);
     model.dispose();
     throw error;
   }
-  set.add(entry);
-  model.onDispose(() => set.delete(entry));
+  const draws = set;
+  draws.add(entry);
+  model.onDispose(() => draws.delete(entry));
   let current = groups,
     owned = false; // false while the primitives still draw packGeometry's cached (shareable) arrays
   const setGeometry = (next: MeshGeometry, range?: GeometryRange): MaterialMesh<M> => {
@@ -4603,7 +4699,7 @@ export function createMesh<M extends Material | readonly Material[]>(
           throw new TypeError('Material mesh renderOrder must be a number; set a finite number');
         if (!Number.isFinite(v)) throw new RangeError('Material mesh renderOrder must be finite; set a finite number');
         entry.order = v;
-        set.reorder();
+        draws.reorder();
       },
     },
     setGeometry: { value: setGeometry },

@@ -629,6 +629,7 @@ export function validateFigureSpec(input: unknown): asserts input is FigureSpec 
     !Array.isArray(v.resources) ||
     !Array.isArray(v.layers) ||
     !v.camera ||
+    typeof v.camera !== 'object' ||
     !Array.isArray(v.limits) ||
     ![4, 6].includes(v.limits.length) ||
     !v.limits.every(Number.isFinite)
@@ -660,7 +661,7 @@ export function validateFigureSpec(input: unknown): asserts input is FigureSpec 
       throw typeError('Invalid figure resource; supply unique IDs and ordered updates', 'sciviz');
     ids.add(resource.id);
     for (const update of resource.updates)
-      if (!updates.includes(update.method as (typeof updates)[number]))
+      if (!update || !updates.includes(update.method as (typeof updates)[number]))
         throw typeError('Unknown layer mutation; use a supported declarative update', 'sciviz');
   }
   if (v.layers.some((id) => !ids.has(id)) || new Set(v.layers).size !== v.layers.length)
@@ -673,9 +674,12 @@ export function validateFigureSpec(input: unknown): asserts input is FigureSpec 
       !Number.isInteger(v.time.index) ||
       v.time.index < -1 ||
       v.time.index >= v.time.times.length ||
+      !Array.isArray(v.time.frames) ||
       v.time.frames.length !== v.time.times.length)
   )
     throw typeError('Invalid timeline; supply one frame per finite time', 'sciviz');
+  // Frames are whole figures; check them here too, before fromJSON allocates the first one.
+  for (const frame of v.time?.frames ?? []) validateFigureSpec(frame);
 }
 
 /** Create one declared resource through its native factory or an explicit application codec. */
@@ -817,7 +821,6 @@ export const Figure = {
       }
       if (spec.time) {
         const frames = spec.time.frames;
-        for (const frame of frames) validateFigureSpec(frame);
         const timeline = figure.timeline(
           spec.time.times,
           async (index) => {

@@ -5,7 +5,7 @@
 ```ts
 import { Clustered } from "@margoengine/clustered";
 import { CameraOptions, EngineKernel, EnginePlugin, Geometry, Mesh, PbrMaterial, Scene, Vec3 } from "@margoengine/core";
-import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf/pbr";
 import { Json, Migrations, ResolvedEntity, SaveDocument, ValidateOptions } from "@margoengine/save";
 
 export interface AddSceneOptions extends ValidateOptions {

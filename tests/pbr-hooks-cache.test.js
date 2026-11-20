@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lightPBR } from '../packages/shared/pbr-hooks.js';
-import { pbrShader, physicalShader } from '../packages/gltf-pro/src/shader.ts';
+import { pbrShader, physicalShader } from '../packages/gltf/src/shader.ts';
 
 test('lighting cache hits preserve empty results and bypass hook getters and callbacks', () => {
   let reads = 0;

@@ -43,6 +43,15 @@ test('FA2 analytic two-node degree masses, effective traction, swinging and loca
   close(layout.positions[3], 1 + 2 * factor);
   close(layout.speed, 0.5);
 });
+test('FA2 global speed is the tolerance times traction over swinging (Jacomy et al. 2014, equation 14)', () => {
+  const layout = new GraphLayoutReference(
+    { nodes: 2, edges: [0, 1] },
+    { positions: [-1, 0, 0, 1, 0, 0], gravity: 0, scaling: 2, jitterTolerance: 0.5 },
+  );
+  // First iteration: traction / swinging = 1/2, so s(G) = 0.5 * 1/2.
+  layout.step();
+  close(layout.speed, 0.25);
+});
 test('FA2 options preserve fixed nodes, prevent overlap, handle loops, duplicates, isolates and 3D', () => {
   const g = { nodes: 4, edges: [0, 1, 0, 1, 1, 1, 2, 3], weights: [2, 0, 3, 1] },
     p = [-1, 0, 1, 1, 0, -1, 2, 1, 0, -2, 1, 0];
@@ -66,6 +75,40 @@ test('FA2 options preserve fixed nodes, prevent overlap, handle loops, duplicate
   );
   overlap.step();
   assert.ok(Math.hypot(...overlap.positions.slice(0, 3)) > 0);
+});
+// Jacomy, Venturini, Heymann and Bastian (2014), "Prevent Overlapping": with d' = d - size1 - size2, a pair
+// apart uses d' in place of d (repulsion kr m1 m2 / d', attraction d'); an overlapping pair has no attraction and a
+// constant repulsion k'r m1 m2 with k'r = 100; the local speed is divided by 10.
+const fa2Move = (force, mass) => {
+  // First iteration: previous force 0, so swing = traction * 2 and the global speed is 0.5 for tolerance 1.
+  const speed = 0.5,
+    local = (0.1 * speed) / (1 + speed * Math.sqrt(mass * Math.abs(force))) / 10;
+  return force * Math.min(local, 10 / Math.abs(force));
+};
+test('FA2 overlap prevention uses the border distance and a constant overlapping repulsion', () => {
+  // Apart: d 4, sizes 0.5 each, d' 3; masses deg + 1 = 2, so repulsion 2 * 4 / 3 and attraction 3.
+  const apart = new GraphLayoutReference(
+    { nodes: 2, edges: [0, 1] },
+    { positions: [-2, 0, 0, 2, 0, 0], gravity: 0, scaling: 2, radii: [0.5, 0.5] },
+  );
+  apart.step();
+  close(apart.positions[0], -2 + fa2Move(3 - 8 / 3, 2), 1e-7);
+  close(apart.positions[3], 2 - fa2Move(3 - 8 / 3, 2), 1e-7);
+  // Overlapping, nearly coincident: repulsion 100 * 2 * 1 * 1 = 200 whatever the centre distance.
+  const overlapping = new GraphLayoutReference(
+    { nodes: 2, edges: [] },
+    { positions: [-0.0005, 0, 0, 0.0005, 0, 0], gravity: 0, scaling: 2, radii: [1, 1] },
+  );
+  overlapping.step();
+  close(overlapping.positions[0], -0.0005 - fa2Move(200, 1), 1e-6);
+  close(overlapping.positions[3], 0.0005 + fa2Move(200, 1), 1e-6);
+  // Touching borders (d' = 0): no attraction and no repulsion.
+  const touching = new GraphLayoutReference(
+    { nodes: 2, edges: [0, 1] },
+    { positions: [-1, 0, 0, 1, 0, 0], gravity: 0, radii: [1, 1] },
+  );
+  touching.step();
+  assert.deepEqual([...touching.positions], [-1, 0, 0, 1, 0, 0]);
 });
 test('graph inputs reject nonfinite and truncated values before GPU allocation', () => {
   for (const [g, o] of [
@@ -133,6 +176,21 @@ test('label placements are priority ordered, disjoint, clipped, repeatable and p
       if (b !== c)
         assert.ok(b.x + b.width <= c.x || c.x + c.width <= b.x || b.y + b.height <= c.y || c.y + c.height <= b.y);
   }
+});
+test('graph labels clear the node border, not a fixed 6 px from its centre', () => {
+  const box = (radius) => placeGraphLabels([{ node: 0, text: 'a', x: 100, y: 60, width: 20, height: 16, radius }], 300, 200)[0];
+  assert.equal(box(undefined).x, 106);
+  for (const radius of [0, 12, 40]) {
+    const b = box(radius),
+      dx = Math.max(b.x - 100, 0, 100 - b.x - b.width),
+      dy = Math.max(b.y - 60, 0, 60 - b.y - b.height);
+    assert.equal(Math.hypot(dx, dy), radius + 4);
+  }
+  // A node too big for the right side takes the next free side, still clear of its border.
+  const left = placeGraphLabels([{ node: 0, text: 'a', x: 260, y: 60, width: 20, height: 16, radius: 30 }], 300, 200)[0];
+  assert.equal(left.x + left.width, 226);
+  for (const radius of [-1, Infinity])
+    assert.throws(() => placeGraphLabels([{ node: 0, text: 'a', x: 1, y: 1, width: 1, height: 1, radius }], 9, 9), RangeError);
 });
 test('bundling and async GPU run honor pre-aborted signals', () => {
   const controller = new AbortController();

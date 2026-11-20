@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Scene-copy transmission for gltf-pro's transmission hook: after the opaque draws the resolved scene is copied into a
+// Scene-copy transmission for gltf/pbr's transmission hook: after the opaque draws the resolved scene is copied into a
 // box-filtered mip chain, and transmissive surfaces read it where their refracted ray leaves the volume
 // (KHR_materials_transmission, KHR_materials_volume, KHR_materials_dispersion), blurred by roughness.
 import { margoError } from '../../shared/errors.js';
@@ -11,7 +11,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import type { PBRModel, PBRTransmission } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRTransmission } from '@margoengine/gltf/pbr';
 import { sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
@@ -42,6 +42,7 @@ const BINDING = 124;
 //   y row (projection y scale times a unit view axis). An orthographic view has no angular footprint, so the lateral
 //   spread over the volume path, path * tan(delta-t), is scaled by the same row instead. The lobe diameter in
 //   texels is that NDC radius times the capture height; mip L averages 2^L texels, so level = log2(diameter).
+// margoTransmission reads KHR_materials_ior 0 (the specular-glossiness mode) as an infinite index, 1e30.
 const declarations = (group: number): string => /* wgsl */ `
 @group(${group}) @binding(${BINDING}) var margoScene:texture_2d<f32>;
 @group(${group}) @binding(${BINDING + 1}) var margoSceneSampler:sampler;
@@ -66,7 +67,7 @@ fn margoTransmissionLevel(roughness:f32,ior:f32,path:f32)->f32 {
   return clamp(log2(max(texels,1.0)),0.0,f32(textureNumLevels(margoScene)-1u));
 }
 fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
-  let ior=max(f.ext.y,1.0);
+  let ior=select(max(f.ext.y,1.0),1e30,f.ext.y==0.0);
   // Node transforms scale the thickness (KHR_materials_volume): the mean of the model axis lengths.
   let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
   let path=max(margoVolume.x*s.th*scale,0.0);
@@ -105,7 +106,7 @@ const over: GPUBlendState = alphaBlend;
 let serial = 0;
 
 /**
- * Real transmission: `transmission.add(model)` makes a gltf-pro model's or materials mesh's transmissive surfaces refract
+ * Real transmission: `transmission.add(model)` makes a gltf/pbr model's or materials mesh's transmissive surfaces refract
  * the opaque scene behind them, blurred by roughness and attenuated through `thickness` of the volume, instead of tinting
  * the background. Needs an HDR scene capture (a PostStack with an HDR or display effect, such as Tonemap or Bloom). The scene is
  * copied (a mip chain) only on frames where a transmissive surface draws. WebGPU only.
@@ -143,7 +144,7 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     if (!Number.isFinite(order) || order <= 0) throw new RangeError('Transmission order must be a number > 0');
     this.order = order;
   }
-  /** Refracts the scene through the model's transmissive primitives (gltf-pro model or materials mesh). Returns a remover. */
+  /** Refracts the scene through the model's transmissive primitives (gltf\/pbr model or materials mesh). Returns a remover. */
   add(model: PBRModel): () => void {
     if (this.disposed || !this.engine)
       throw margoError(
@@ -186,18 +187,18 @@ export class Transmission implements EnginePlugin, PBRTransmission {
       },
     });
   }
-  /** @internal gltf-pro transmission hook. */
+  /** @internal gltf\/pbr transmission hook. */
   declarations(group: number): string {
     return groupCode(this.code, group, declarations);
   }
-  /** @internal gltf-pro transmission hook. */
+  /** @internal gltf\/pbr transmission hook. */
   bindings(): GPUBindGroupEntry[] {
     return [
       { binding: BINDING, resource: this.view! },
       { binding: BINDING + 1, resource: this.sampler! },
     ];
   }
-  /** @internal gltf-pro transmission hook: copies the scene, then begins the pass the transmissive surfaces draw in. */
+  /** @internal gltf\/pbr transmission hook: copies the scene, then begins the pass the transmissive surfaces draw in. */
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
     const c = this.context!,

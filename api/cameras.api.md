@@ -6,6 +6,25 @@
 import { Camera, EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
 
+export interface BoxFit {
+    position: Vec3;
+    target: Vec3;
+    distance: number;
+    nearest: number;
+}
+
+export interface BoxFitOptions {
+    aspect?: number;
+    padding?: number;
+}
+
+export interface BoxFitView {
+    position: ArrayLike<number>;
+    target: ArrayLike<number>;
+    fov: number;
+    up?: ArrayLike<number>;
+}
+
 export class CameraProjection implements EnginePlugin, ProjectionOptions {
     readonly name = "cameras";
     mode: 'orthographic' | 'perspective';
@@ -31,7 +50,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
         };
         sceneOf?: EngineKernel['sceneOf'];
     }): void;
-    fit(bounds: ArrayLike<number>, { aspect, duration, padding }?: FitOptions): void;
+    fit(bounds: ArrayLike<number>, { aspect, duration, padding, framing }?: FitOptions): void;
     onPreUpdate(delta: number): void;
     setViewOffset(fullWidth: number, fullHeight: number, x: number, y: number, width: number, height: number): void;
     applyLens(aspect: number): number;
@@ -46,6 +65,7 @@ export interface FitOptions {
     aspect?: number;
     duration?: number;
     padding?: number;
+    framing?: 'sphere' | 'box';
 }
 
 export interface LensOptions {
@@ -80,6 +100,8 @@ export interface ViewOffset {
     width: number;
     height: number;
 }
+
+export function fitBox(view: BoxFitView, bounds: ArrayLike<number>, { aspect, padding }?: BoxFitOptions): BoxFit;
 
 export function fovToLens(fov: number, aspect: number, { filmGauge, sensorFit }?: LensOptions): number;
 

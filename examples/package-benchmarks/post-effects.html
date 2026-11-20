@@ -6,7 +6,7 @@
 //   creases: a white floor (top at y = 0) and three 2.4 m long boxes standing on it, their +z faces meeting the floor at
 //            90, 60 and 120 degrees (rotated 0, +30 and -30 degrees about x). Returns each crease line and its angle.
 //   wall:    a white floor and a red 4 x 2 m wall (box 4 x 2 x 0.5, front face at z = 0.25) standing on it; floor: 'gltf'
-//            makes the floor a gltf-pro plane added to every effect that takes models (ssr.add, ssgi.add).
+//            makes the floor a gltf/pbr plane added to every effect that takes models (ssr.add, ssgi.add).
 //   moving:  a white 1 m box in front of a dark wall, seen head on; `speed` moves it along +x every frame (metres).
 //            vectors: 'taa' feeds MotionBlur taa.velocity; [x, y] a uniform motion in pixels per frame (own texture).
 //   sun:     the same view, empty but for an occluder box ('none', 'full' over the sun, 'half': its left edge through the
@@ -23,7 +23,7 @@ import {MotionBlur} from '/packages/post/dist/motion-blur.js';
 import {LensFlare} from '/packages/post/dist/lens-flare.js';
 import {Terrain} from '/packages/terrain/dist/index.js';
 import {Water} from '/packages/water/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {parseGLTF} from '/packages/gltf/dist/pbr.js';
 import {SSAO} from '/packages/post/dist/ssao.js';
 import {SSR} from '/packages/post/dist/ssr.js';
 import {Bloom} from '/packages/post/dist/bloom.js';

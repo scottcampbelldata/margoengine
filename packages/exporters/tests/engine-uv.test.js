@@ -66,6 +66,7 @@ test('Unreal flipbook: a grid of cels at one rate gives its parameters, and the 
     {
       clip: 'flow',
       material: 'water',
+      asset: 'M_flow_water',
       fps: 4,
       frames: 4,
       columns: 2,
@@ -79,6 +80,7 @@ test('Unreal flipbook: a grid of cels at one rate gives its parameters, and the 
   assert.match(python, /CONTENT = "\/Game\/Hero"/);
   assert.match(python, /COMPLEX_MESHES = \["floor"\]/, 'every -col mesh, and only those');
   assert.match(python, /"clip":"flow"/);
+  assert.match(python, /name = book\["asset"\]/);
   assert.match(python, /CTF_USE_COMPLEX_AS_SIMPLE/);
   assert.match(python, /MaterialExpressionFmod/);
   assert.match(python, /MP_BASE_COLOR/);
@@ -204,4 +206,50 @@ test('Roblox collision: colliders turn invisible with CanCollide; plain nodes ar
   assert.match(luau, /Transparency = 1/);
   assert.match(luau, /CanCollide = true/);
   assert.match(luau, /Enum\.CollisionFidelity\.Hull/);
+});
+
+test('clips that share a name, or names that clean up alike, stay apart in every engine and never leave their folder', async () => {
+  // Two clips named "a/b", one "a b" and one "CON": Unity merged the two "a/b" clips into one and wrote it under a
+  // sub-folder a/, Roblox gave two cels one file and one UVIds key, and Unreal one asset name. Two unnamed materials
+  // of one clip were both "material0".
+  const water = { name: 'water' },
+    lava = { name: 'lava' },
+    first = {},
+    second = {},
+    cel = (material, x) => [channel(material, 'scale', [0, 0.5], [0.5, 0.5, 0.5, 0.5]), channel(material, 'offset', [0, 0.5], [x, 0, x, 0.5])],
+    s = {
+      nodes: [
+        { name: 'pool', material: water },
+        { name: 'vent', material: lava },
+        { name: 'one', material: first },
+        { name: 'two', material: second },
+      ],
+      materialAnimations: [
+        { name: 'a/b', channels: cel(water, 0) },
+        { name: 'a/b', channels: cel(lava, 0.5) },
+        { name: 'a b', channels: cel(water, 0.5) },
+        { name: 'CON', channels: [...cel(first, 0), ...cel(second, 0.5)] },
+      ],
+    };
+  const unity = unityUVClips(s);
+  assert.deepEqual(
+    unity.map(({ name, file }) => [name, file]),
+    [
+      ['a/b', 'a_b'],
+      ['a/b', 'a_b_2'],
+      ['a b', 'a_b_3'],
+      ['CON', '_CON'],
+    ],
+  );
+  assert.deepEqual(unity[0].curves.map((c) => c.path).filter((p, i, all) => all.indexOf(p) === i), ['pool']);
+  assert.match(createUnityUVClips(s)[0].data, /Root \+ "\/" \+ clip\.file \+ "\.anim"/);
+  const data = new Uint8Array(4 * 4 * 4),
+    cels = (await createRobloxUVSwap(s, { texture: () => ({ data, width: 4, height: 4 }) }))
+      .map((f) => f.name)
+      .filter((n) => n.startsWith('cels/'));
+  assert.equal(new Set(cels.map((n) => n.toLowerCase())).size, cels.length);
+  for (const name of ['cels/CON_material0_0.png', 'cels/CON_material0_1.png', 'cels/CON_material1_0.png', 'cels/CON_material1_1.png'])
+    assert.ok(cels.includes(name), name);
+  const assets = unrealFlipbooks(s).map((book) => book.asset);
+  assert.deepEqual(assets, ['M_a_b_water', 'M_a_b_lava', 'M_a_b_water_2', 'M_CON_material0', 'M_CON_material1']);
 });

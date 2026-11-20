@@ -1,7 +1,7 @@
 import { Camera } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import type { Figure } from '@margoengine/sciviz';
-import { paintOverlays, swatches, textRuns } from './export.js';
+import { paintOverlays, placedBars, swatches, textRuns } from './export.js';
 import { clearColorValue } from '../../shared/clear-color.js';
 import { fault, rangeError } from '../../shared/errors.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
@@ -22,7 +22,10 @@ export interface MediaImageOptions {
   readonly size?: { readonly width: number; readonly height: number; readonly unit: 'px' | 'mm' | 'in' };
   /** Physical pixel density in dots per inch. Default 300; maximum 1000000. */
   readonly dpi?: number;
-  /** Maximum GPU tile edge, clamped to the device limit. Default 1024. */
+  /**
+   * Maximum tile edge, at most the 1024 px render block (or the largest power of two within the device limit). Tiles
+   * do not cross block edges. Default 1024. The image's pixels are the same for every tile size.
+   */
   readonly tileSize?: number;
   /** Clear pixels outside geometry to transparent. Default false. */
   readonly transparent?: boolean;
@@ -115,13 +118,28 @@ class TileClear implements EnginePlugin {
 }
 const active = new WeakSet<object>();
 /**
- * Smallest edge of a tile's render target, clamped to the device limit. The tile draws into the target's top-left
- * corner (viewport and scissor), and only that corner is read back. The Radeon 680M draws the same lines with
- * colours 1 apart in small targets (WebGPU on D3D12: both edges 128 px or less; the WebGL2 layer on ANGLE D3D11
- * too), so 64 px tiles differed from the whole image in 1,982 of 307,200 values. With every target at least 256 px,
- * each tile takes the whole image's path on both backends.
+ * Edge of a render block, the unit every pixel of a capture is drawn in, whatever the tile size. A tile is the part of
+ * one block's drawing kept by a scissor and read back, so a pixel's value depends only on its block: tiled and
+ * whole-image exports are the same bytes on every GPU. Tiles drawn with viewports of their own (cropped to each tile)
+ * made the GPU place and interpolate the same lines differently per tile: colours 1 apart in 164 of 307,200 values
+ * on Apple Metal, and 1,982 on the Radeon 680M, which also draws lines differently into render targets of 128 px or
+ * less (WebGPU on D3D12 and ANGLE D3D11). A block is a power of two, so the line capture grid stays exact across
+ * blocks (`@margoengine/lines/tiles`), and its 1024 px render target is never small.
  */
-const MIN_TILE_TARGET = 256;
+const RENDER_BLOCK = 1024;
+/** Largest power of two at or below n, for 1 <= n < 2^32. */
+const floorPow2 = (n: number): number => 2 ** (31 - Math.clz32(n));
+/** @internal The render block edge on a device: 1024, or the largest power of two within its texture limit. */
+export const renderBlock = (maxTextureDimension2D: number): number =>
+  Math.min(RENDER_BLOCK, floorPow2(maxTextureDimension2D));
+/** @internal Tile starts and sizes along one axis: at most `edge` long, none crossing a block boundary. */
+export function tileSpans(total: number, edge: number, block: number): [number, number][] {
+  const spans: [number, number][] = [];
+  for (let start = 0; start < total; start += block)
+    for (let at = start, end = Math.min(start + block, total); at < end; at += edge)
+      spans.push([at, Math.min(edge, end - at)]);
+  return spans;
+}
 
 /**
  * Renders actual off-axis tiles, never an enlarged source bitmap. Captures a fixed camera; the caller keeps layer
@@ -133,7 +151,7 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
   signal?.throwIfAborted();
   if (active.has(figure.engine)) throw fault('state', 'A media capture is already active on this engine', 'sciviz');
   active.add(figure.engine);
-  let attached: TileClear | undefined;
+  let attached: TileClear | undefined, target: GPUTexture | undefined;
   try {
     await figure.ready();
     signal?.throwIfAborted();
@@ -148,11 +166,14 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
     const tileSize = options.tileSize ?? 1024;
     if (!Number.isSafeInteger(tileSize) || tileSize < 1)
       throw rangeError('tileSize must be a positive integer', 'sciviz');
-    const edge = Math.min(tileSize, device.limits.maxTextureDimension2D),
+    const block = renderBlock(device.limits.maxTextureDimension2D),
+      edge = Math.min(tileSize, block),
       layout = figure.exportLayout();
     figure.render();
+    // Every overlay box is read now, in the frame's task: tiles are read back across later tasks (placedBars).
     const runs = options.overlays === false ? [] : textRuns(layout.roots, origin),
-      boxes = options.overlays === false ? [] : swatches(layout.roots, origin);
+      boxes = options.overlays === false ? [] : swatches(layout.roots, origin),
+      bars = options.overlays === false ? [] : placedBars(layout.bars);
     const source = engine.camera,
       aspect = cssWidth / cssHeight;
     const { setLineCameraTile } = await import('@margoengine/lines/tiles');
@@ -176,11 +197,18 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
     const plugin = new TileClear(tint);
     engine.use(plugin);
     attached = plugin;
-    for (let y = 0; y < height; y += edge)
-      for (let x = 0; x < width; x += edge) {
+    // One block-sized target serves every tile; queue order keeps each readback ahead of the next tile's drawing.
+    target = device.createTexture({ size: [block, block], format: 'rgba8unorm', usage: 0x10 | 0x01 });
+    const texture = target,
+      columns = tileSpans(width, edge, block);
+    for (const [y, h] of tileSpans(height, edge, block))
+      for (const [x, w] of columns) {
         signal?.throwIfAborted();
-        const w = Math.min(edge, width - x),
-          h = Math.min(edge, height - y);
+        // The block's top-left pixel, where its viewport starts; the tile sits at (x - bx, y - by) in the target.
+        const bx = x - (x % block),
+          by = y - (y % block),
+          ox = x - bx,
+          oy = y - by;
         let releaseLineTile: (() => void) | undefined;
         // Round the complete view-projection exactly as the whole-image camera does before cropping it.
         // Cropping the projection first changes the multiplication's rounding at antialiased line edges.
@@ -191,12 +219,12 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
             matrix: camera.matrix,
             fullWidth: width,
             fullHeight: height,
-            x,
-            y,
-            width: w,
-            height: h,
+            x: bx,
+            y: by,
+            width: block,
+            height: block,
           });
-          camera.matrix.set(cropProjection(camera.matrix, width, height, x, y, w, h));
+          camera.matrix.set(cropProjection(camera.matrix, width, height, bx, by, block, block));
         };
         const sx = Math.min(w, Math.max(0, clip[0] * width - x)),
           sy = Math.min(h, Math.max(0, clip[1] * height - y)),
@@ -206,42 +234,27 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
           budget = options.maxBytes ?? 256 * 1024 * 1024;
         if (stride * h > budget || stride * h > device.limits.maxBufferSize)
           throw rangeError('Tile readback exceeds maxBytes or the device buffer limit; reduce tileSize', 'sciviz');
-        const targetWidth = Math.max(w, Math.min(MIN_TILE_TARGET, device.limits.maxTextureDimension2D)),
-          targetHeight = Math.max(h, Math.min(MIN_TILE_TARGET, device.limits.maxTextureDimension2D));
-        const texture = device.createTexture({
-          size: [targetWidth, targetHeight],
-          format: 'rgba8unorm',
-          usage: 0x10 | 0x01,
-        });
         let buffer: GPUBuffer | undefined;
         try {
           buffer = device.createBuffer({ size: stride * h, usage: 0x01 | 0x08 });
-          // Lines use target width/CSS width for pixel density. Counter the tile width synchronously; restore before any await.
-          const restore: (() => void)[] = [];
-          for (const layer of figure.layers)
-            if ('kind' in layer && layer.kind === 'scatter') {
-              const m = layer.cloud.material,
-                previous = [m.size, m.minPixelSize, m.maxPixelSize],
-                scale = width / cssWidth;
-              if (m.sizeUnits === 'pixels') m.size *= scale;
-              m.minPixelSize *= scale;
-              m.maxPixelSize *= scale;
-              restore.push(() => {
-                [m.size, m.minPixelSize, m.maxPixelSize] = previous;
-              });
-            }
+          // Lines use target width/CSS width for pixel density. Sciviz layers and points sized in CSS pixels read the
+          // export's scale from the renderer (SciRenderer.cssScale); restore it before any await.
+          const renderer = figure.renderer,
+            previousScale = renderer.exportScale;
+          renderer.exportScale = width / cssWidth;
+          const restore = () => (renderer.exportScale = previousScale);
           try {
             if (Math.round(ex) > Math.round(sx) && Math.round(ey) > Math.round(sy))
               engine.render({
                 views: [
                   {
                     camera,
-                    viewport: [0, 0, w / targetWidth, h / targetHeight],
+                    viewport: [0, 0, 1, 1],
                     scissor: [
-                      sx / targetWidth,
-                      sy / targetHeight,
-                      Math.max(0, ex - sx) / targetWidth,
-                      Math.max(0, ey - sy) / targetHeight,
+                      (ox + sx) / block,
+                      (oy + sy) / block,
+                      Math.max(0, ex - sx) / block,
+                      Math.max(0, ey - sy) / block,
                     ],
                     target: { color: texture },
                     id: plugin.name,
@@ -261,10 +274,13 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
               device.queue.submit([clear.finish()]);
             }
           } finally {
-            for (const undo of restore) undo();
+            restore();
           }
           const encoder = device.createCommandEncoder();
-          encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: stride, rowsPerImage: h }, [w, h]);
+          encoder.copyTextureToBuffer({ texture, origin: [ox, oy] }, { buffer, bytesPerRow: stride, rowsPerImage: h }, [
+            w,
+            h,
+          ]);
           device.queue.submit([encoder.finish()]);
           await buffer.mapAsync(1);
           signal?.throwIfAborted();
@@ -285,17 +301,17 @@ export async function* renderMediaTiles(figure: Figure, options: MediaImageOptio
             g.putImageData(new ImageData(pixels, w, h), 0, 0);
             g.translate(-x, -y);
             g.scale(width / (origin.width || cssWidth), height / (origin.height || cssHeight));
-            paintOverlays(g, runs, layout.bars, origin, 1, boxes);
+            paintOverlays(g, runs, bars, origin, 1, boxes);
             pixels.set(g.getImageData(0, 0, w, h).data);
           }
           yield { x, y, width: w, height: h, pixels };
         } finally {
           releaseLineTile?.();
           buffer?.destroy();
-          texture.destroy();
         }
       }
   } finally {
+    target?.destroy();
     // Leave the scene the tile clear joined, not whichever scene is active when the capture ends.
     if (attached && !figure.engine.disposed) figure.engine.sceneOf(attached)?.removePlugin(attached.name);
     active.delete(figure.engine);

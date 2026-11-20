@@ -35,7 +35,7 @@ export interface WeatherFxSource {
   /** Set by {@link WeatherFX}: the cover map that keeps rain off what is under the occluders. */
   occlusion?: WeatherOcclusion;
 }
-/** One drawable primitive of an occluder that is not a core mesh: gltf-pro models and terrain expose them as `shadowPrimitives`. */
+/** One drawable primitive of an occluder that is not a core mesh: gltf/pbr models and terrain expose them as `shadowPrimitives`. */
 export interface OccluderPrimitive {
   readonly node: { readonly matrix: ArrayLike<number> };
   readonly vertex: GPUBuffer;
@@ -45,7 +45,7 @@ export interface OccluderPrimitive {
   /** 24 (core vertices) or 80 (PBR vertices). */
   readonly stride: number;
 }
-/** What keeps the rain off: a core mesh, or a source of {@link OccluderPrimitive}s (a gltf-pro model, terrain). */
+/** What keeps the rain off: a core mesh, or a source of {@link OccluderPrimitive}s (a gltf/pbr model, terrain). */
 export type RainOccluder = Mesh | { readonly shadowPrimitives?: readonly OccluderPrimitive[] };
 /** {@link WeatherFX} settings, read every frame from `fx.options`. */
 export interface WeatherFxOptions {
@@ -94,9 +94,12 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,0.0);
 `;
 // Splashes: each slot lands once a period at a new place in the box, on the topmost surface the cover map holds there
 // (the ground height where it holds none): a crown ring spreading at the base and four droplets thrown out on arcs.
+// A landing's hash key is the slot times 32768 plus its landing count modulo 32768: unique in u32 for all 100,000
+// slots. Until 2026-11-14 it was slot times 65536, which wrapped past slot 65535, so slots 65536 and up landed where
+// slots 0 to 34463 had.
 const splashShader = /* wgsl */ `${common}${rainCover(1)}
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->Out {
- let clock=fx.eye.w/fx.box.z+rnd(ii,0u);let n=ii*65536u+u32(floor(clock))%65536u;
+ let clock=fx.eye.w/fx.box.z+rnd(ii,0u);let n=ii*32768u+u32(floor(clock))%32768u;
  let xz=fx.eye.xz+(vec2f(rnd(n,1u),rnd(n,2u))-0.5)*fx.box.x;
  let d=rainCoverDepth(xz);let y=select(fx.screen.w,rainCoverFrame.area.w-d*rainCoverFrame.depth.x,d<1.0);
  if(abs(y-fx.eye.y)>fx.box.y){return culled;}

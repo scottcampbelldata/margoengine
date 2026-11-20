@@ -1,0 +1,79 @@
+{
+  "name": "@margoengine/horses",
+  "version": "1.0.0",
+  "description": "Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 32-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "horses",
+    "gaits",
+    "cavalry",
+    "animals"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/horses"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js horses",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu": "cd ../.. && node packages/horses/test/horses-check.mjs"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./anatomy": {
+      "types": "./dist/anatomy.d.ts",
+      "import": "./dist/anatomy.js"
+    },
+    "./gaits": {
+      "types": "./dist/gaits.d.ts",
+      "import": "./dist/gaits.js"
+    },
+    "./model": {
+      "types": "./dist/model.d.ts",
+      "import": "./dist/model.js"
+    },
+    "./seat": {
+      "types": "./dist/seat.d.ts",
+      "import": "./dist/seat.js"
+    },
+    "./crowd": {
+      "types": "./dist/crowd.d.ts",
+      "import": "./dist/crowd.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/materials": "^1.0.0"
+  }
+}

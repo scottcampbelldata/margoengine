@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import validator from 'gltf-validator';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { headlessEngine } from '../../exporters/tests/helpers.js';
 import { convertFBX } from '../dist/index.js';

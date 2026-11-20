@@ -6,7 +6,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { blendStates, resolveState, type WeatherPresetName, type WeatherState } from './state.js';
 
-/** A preset name or a partial state (missing fields from the weather beneath it). */
+/** A preset name or a partial state (missing fields from the map's current base weather). */
 export type RegionWeather = WeatherPresetName | Partial<WeatherState>;
 
 /**
@@ -46,6 +46,17 @@ export interface WeatherCell {
   life?: readonly [number, number];
 }
 
+/**
+ * A storm whose weather changes across it, such as a hurricane or a tornado (`Hurricane` from `@margoengine/sky/hurricane`
+ * and `Tornado` from `@margoengine/sky/tornado` fit):
+ * `weatherAt` gives the weather it makes at world `(x, z)` at time `t`, and the `weight` of the storm there (1 where it
+ * holds whole, 0 where it is gone), which the map blends over what lies beneath. Fields left out keep the weather
+ * beneath; a `wind` over 60 m/s counts as 60.
+ */
+export interface WeatherStorm {
+  weatherAt(x: number, z: number, t: number): Partial<WeatherState> & { readonly weight: number };
+}
+
 /** {@link WeatherRegions} settings. */
 export interface RegionOptions {
   /** Weather everywhere nothing else is. Default `'clear'`. */
@@ -54,17 +65,22 @@ export interface RegionOptions {
   fronts?: readonly WeatherFront[];
   /** Cells, applied in order over the fronts. Default none. */
   cells?: readonly WeatherCell[];
+  /**
+   * Storms whose weather varies across them (a hurricane's calm eye, its eyewall and rain bands), applied in order over
+   * the cells, read at each `stateAt`. Default none.
+   */
+  storms?: readonly WeatherStorm[];
 }
 
 interface ResolvedFront {
   readonly f: WeatherFront;
-  readonly behind: WeatherState;
-  readonly ahead?: WeatherState;
-  readonly along?: WeatherState;
+  behind: WeatherState;
+  ahead?: WeatherState;
+  along?: WeatherState;
 }
 interface ResolvedCell {
   readonly c: WeatherCell;
-  readonly state: WeatherState;
+  state: WeatherState;
 }
 
 const finite = (value: unknown, name: string, min: number, max: number): void => {
@@ -124,6 +140,7 @@ export class WeatherRegions implements Disposable {
   private baseState: WeatherState;
   private frontList: ResolvedFront[] = [];
   private cellList: ResolvedCell[] = [];
+  private stormList: WeatherStorm[] = [];
   private clock = 0;
   private disposed = false;
 
@@ -133,6 +150,7 @@ export class WeatherRegions implements Disposable {
     this.baseState = resolveState(options.base ?? 'clear');
     for (const f of options.fronts ?? []) this.addFront(f);
     for (const c of options.cells ?? []) this.addCell(c);
+    for (const storm of options.storms ?? []) this.addStorm(storm);
   }
 
   /** Seconds of map time; fronts and cells move with it. */
@@ -150,7 +168,14 @@ export class WeatherRegions implements Disposable {
   }
   set base(value: RegionWeather) {
     this.alive();
-    this.baseState = resolveState(value);
+    const base = resolveState(value),
+      // Partial fronts and cells take their missing fields from the base: resolve them over the new one (all checked
+      // before any changes) in place, so the removers addFront and addCell returned still find them.
+      fronts = this.frontList.map((r) => checkFront(r.f, base)),
+      cells = this.cellList.map((r) => checkCell(r.c, base));
+    this.baseState = base;
+    this.frontList.forEach((r, i) => Object.assign(r, fronts[i]));
+    this.cellList.forEach((r, i) => Object.assign(r, cells[i]));
   }
   /** Fronts in the order they apply. */
   get fronts(): readonly WeatherFront[] {
@@ -159,6 +184,10 @@ export class WeatherRegions implements Disposable {
   /** Cells in the order they apply. */
   get cells(): readonly WeatherCell[] {
     return this.cellList.map((r) => r.c);
+  }
+  /** Storms in the order they apply. */
+  get storms(): readonly WeatherStorm[] {
+    return [...this.stormList];
   }
 
   /** Adds a front over those already there; returns a remover. A bad front throws and nothing changes. */
@@ -181,12 +210,31 @@ export class WeatherRegions implements Disposable {
     };
   }
 
+  /** Adds a storm over the cells and earlier storms; returns a remover. Throws a TypeError for one without `weatherAt`. */
+  addStorm(storm: WeatherStorm): () => void {
+    this.alive();
+    if (typeof storm !== 'object' || storm === null || typeof storm.weatherAt !== 'function')
+      throw new TypeError('A weather storm needs weatherAt(x, z, t); pass a Hurricane or a Tornado from @margoengine/sky');
+    this.stormList.push(storm);
+    return () => {
+      this.stormList = this.stormList.filter((x) => x !== storm);
+    };
+  }
+
   /** Moves map time on by `delta` seconds. */
   update(delta: number): this {
+    this.advanceTime(delta);
+    return this;
+  }
+
+  /**
+   * The same step as `update`: fronts and cells move on by `delta` seconds. Regions are not a plugin, so pass them to
+   * `seek` from `@margoengine/cutscene/seek` in `extra` to replay their clock.
+   */
+  advanceTime(delta: number): void {
     this.alive();
     finite(delta, 'delta', 0, 1e9);
     this.clock += delta;
-    return this;
   }
 
   /**
@@ -233,6 +281,13 @@ export class WeatherRegions implements Disposable {
       }
       if (w > 0) state = blendStates(state, weather, w, 'linear');
     }
+    for (const storm of this.stormList) {
+      const { weight, ...fields } = storm.weatherAt(x, z, t);
+      if (!(weight >= 0 && weight <= 1))
+        throw new RangeError('A weather storm weight must be a number from 0 to 1; return {weight, ...state fields} from weatherAt');
+      if (fields.wind !== undefined) fields.wind = Math.min(60, fields.wind);
+      if (weight > 0) state = blendStates(state, resolveState(fields, state), weight, 'linear');
+    }
     return state;
   }
 
@@ -251,6 +306,7 @@ export class WeatherRegions implements Disposable {
     this.disposed = true;
     this.frontList = [];
     this.cellList = [];
+    this.stormList = [];
   }
   [Symbol.dispose](): void {
     this.dispose();

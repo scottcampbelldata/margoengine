@@ -4,6 +4,8 @@ import { decodePNG } from '@margoengine/decoders/png';
 import { type AccessorValues, type GLBParts, readAccessor, splitGLB } from './glb.js';
 import { nativeAppNames, nativeExtension } from './native-names.js';
 import {
+  unitRotation,
+  byteStrideAllowed,
   canonicalEqual,
   canonicalJSON,
   copyBundleTree,
@@ -188,15 +190,16 @@ export function unrealPrecisionPreflight<S extends PrecisionScene>(
       break;
     }
   if (
-    scene.objects.some((object) =>
-      [...object.transform.position, ...object.transform.rotation, ...object.transform.scale].some(
-        (value) => !float32Within(value, 1e-5),
-      ),
+    scene.objects.some(
+      (object) =>
+        [...object.transform.position, ...object.transform.rotation, ...object.transform.scale].some(
+          (value) => !float32Within(value, 1e-5),
+        ) || !unitRotation(object.transform.rotation),
     )
   )
     reject(
       'TRANSFORM_PRECISION',
-      'An authored local transform cannot be represented by Unreal Float32 storage within the unchanged 1e-5 budget. Preserve the original and choose another target; export never rounds it silently.',
+      'An authored local transform cannot be represented by Unreal Float32 storage within the unchanged 1e-5 budget, or its rotation is more than 1e-5 off unit length (the writer would normalise it). Preserve the original and choose another target; export never rounds it silently.',
     );
   const ids = new Set<string>();
   let extension = false,
@@ -225,7 +228,11 @@ export function unrealPrecisionPreflight<S extends PrecisionScene>(
       'The initial Unreal precision profile requires one used material/atlas. Multiple-material native appearance awaits its own qualification.',
     );
   for (const id of ids) {
-    const material = scene.document.materials[id]! as S['document']['materials'][string];
+    const material = scene.document.materials[id] as S['document']['materials'][string] | undefined;
+    if (!material) {
+      reject('MATERIAL_MISSING', `Faces name material ${id}, which the document does not hold.`);
+      continue;
+    }
     try {
       if (checks.materialOutsideProfile(material) || material.alphaMode !== 'opaque' || !material.doubleSided)
         reject(
@@ -326,6 +333,9 @@ export async function createUnrealPrecisionBundle(input: UnrealPrecisionBundleIn
   return { files, manifest };
 }
 
+// glTF 2.0 3.7.2.1: no index may be its type's primitive restart value, the type's maximum.
+const RESTART: Record<number, number> = { 5121: 255, 5123: 65535, 5125: 4294967295 };
+
 function fail(label: string): never {
   throw new RangeError('UNREAL_PRECISION_PACKAGE_INVALID: ' + label + '; export the package again');
 }
@@ -381,7 +391,11 @@ function read(bytes: Uint8Array, parse: (text: string) => unknown) {
     !Array.isArray(json.nodes) ||
     !Array.isArray(json.meshes) ||
     !Array.isArray(json.accessors) ||
-    !Array.isArray(json.bufferViews)
+    !Array.isArray(json.bufferViews) ||
+    !Array.isArray(json.materials) ||
+    !Array.isArray(json.textures) ||
+    !Array.isArray(json.samplers) ||
+    !Array.isArray(json.images)
   )
     fail('Complete single static scene inventory');
   const usedAccessors = new Set<number>(),
@@ -399,6 +413,7 @@ function read(bytes: Uint8Array, parse: (text: string) => unknown) {
       !ownFields(a, ['bufferView', 'byteOffset', 'count', 'componentType', 'type', 'normalized', 'min', 'max']) ||
       !ownFields(b, ['buffer', 'byteOffset', 'byteLength', 'byteStride', 'target']) ||
       (a.normalized !== undefined && a.normalized !== false) ||
+      !byteStrideAllowed(b.byteStride, width === 1) ||
       !Number.isSafeInteger(a.bufferView) ||
       a.bufferView < 0 ||
       b.buffer !== 0 ||
@@ -485,7 +500,8 @@ export async function verifyUnrealPrecisionBundle<S extends PrecisionScene>(
       sourceNames.has(o.name) ||
       !onlyFields(o, ['id', 'name', 'parentId', 'transform']) ||
       !onlyFields(o.transform, ['position', 'rotation', 'scale']) ||
-      [...o.transform.position, ...o.transform.rotation, ...o.transform.scale].some((v) => !float32Within(v, 1e-5))
+      [...o.transform.position, ...o.transform.rotation, ...o.transform.scale].some((v) => !float32Within(v, 1e-5)) ||
+      !unitRotation(o.transform.rotation)
     )
       fail('Unsupported source object/transform precision');
     sourceNames.add(o.name);
@@ -726,7 +742,7 @@ export async function verifyUnrealPrecisionBundle<S extends PrecisionScene>(
     if (
       [p, n, uv, c].some((a) => a.component !== 5126 || a.count !== p.count) ||
       ![5121, 5123, 5125].includes(ix.component) ||
-      ix.count !== faces.length * 6
+      ix.count !== faces.reduce((sum, face) => sum + face.localTriangles.length * 3, 0)
     )
       fail('Complete indexed attribute inventory');
     const minimum = [Infinity, Infinity, Infinity],
@@ -775,7 +791,7 @@ export async function verifyUnrealPrecisionBundle<S extends PrecisionScene>(
         }
         triangles++;
       }
-    if (!referenced.every((v) => v === 1) || (p.count > 65535 && maxIndex <= 65535))
+    if (!referenced.every((v) => v === 1) || maxIndex >= RESTART[ix.component]!)
       fail('Complete physical references/wide indices');
   }
   same(meshCount, j.meshes.length, 'No unused or substituted native meshes');

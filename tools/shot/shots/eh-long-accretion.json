@@ -1,0 +1,138 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 50,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -0.7,
+            1.2,
+            12.6
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 38
+        },
+        {
+          "time": 50,
+          "position": [
+            0.4,
+            1.05,
+            11.6
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "id": "accretion",
+      "target": "hole",
+      "property": "accretion",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0.35
+        },
+        {
+          "time": 30,
+          "value": 1.5
+        },
+        {
+          "time": 50,
+          "value": 1.5
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "id": "turbulence",
+      "target": "hole",
+      "property": "turbulence",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0
+        },
+        {
+          "time": 30,
+          "value": 1
+        },
+        {
+          "time": 50,
+          "value": 1
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "id": "flareAge",
+      "target": "hole",
+      "property": "flareAge",
+      "keys": [
+        {
+          "time": 0,
+          "value": -12
+        },
+        {
+          "time": 26,
+          "value": 14
+        },
+        {
+          "time": 26.01,
+          "value": -2
+        },
+        {
+          "time": 50,
+          "value": 22
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "eh-long-accretion",
+    "kind": "long",
+    "seed": 73,
+    "seconds": 50,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1.5,
+    "subframes": 4,
+    "shutter": 180,
+    "warmup": 30,
+    "probes": {
+      "open": 0,
+      "flare": 15,
+      "late": 35,
+      "end": 49.9
+    },
+    "page": {
+      "path": "examples/event-horizon/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#panel,#status,#error,#telemetry{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "eventHorizon.engine",
+      "apply": "eventHorizon.apply",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

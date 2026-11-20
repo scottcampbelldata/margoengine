@@ -35,7 +35,10 @@ interface ShadowEffect<Context = unknown> {
     readonly call?: string;
     readonly style?: string;
     resources?(): readonly GPUBindingResource[];
+    readonly revision?: number;
+    rebind?(): boolean;
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
+    advanceTime?(delta: number): void;
     update?(frame: ShadowEffectFrame<Context>): void;
     dispose?(): void;
 }
@@ -51,6 +54,10 @@ interface ShadowEffectMap {
     width: number;
     height: number;
     layers: number;
+    engine?: {
+        readonly gpu: GPUDevice | null;
+        onError(error: unknown): void;
+    };
 }
 
 type ShadowFilter = 'soft' | 'pcf' | 'hard';
@@ -64,6 +71,9 @@ interface ShadowOptions {
     distance?: number;
     lambda?: number;
     lightSize?: number;
+    samples?: number;
+    blockerSamples?: number;
+    focus?: number;
     bias?: number;
     normalBias?: number;
     casterMargin?: number;
@@ -138,6 +148,7 @@ interface ShadowPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    hashed?: (code: string) => string;
     dynamic?: boolean;
 }
 
@@ -178,6 +189,9 @@ class Shadows implements EnginePlugin {
         declarations: string;
         direct(direct: string, normal?: string): string;
     };
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

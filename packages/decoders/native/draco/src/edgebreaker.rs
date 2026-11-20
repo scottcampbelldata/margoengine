@@ -376,6 +376,10 @@ impl Topology<'_> {
 
 // A merge changes vertex identity, not corner order. Path compression expresses
 // the specification's ReplaceVerts without rescanning every previous face.
+// Out of line (KB4824a): inlined at five call sites, it made the symbol loop of
+// `connect` the largest body an optimizing engine compiles (V8 TurboFan on
+// arm64: 1,783,536 B peak; 974,264 B with root out of line).
+#[inline(never)]
 fn root(parent: &mut [usize], v: usize, budget: &mut Budget) -> Result<usize> {
     let mut r = v;
     loop {

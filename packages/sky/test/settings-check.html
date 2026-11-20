@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky settings check</title><style>body{margin:0;overflow:hidden}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// The settings table of @margoengine/sky/settings on a real GPU: a sky lit scene (a ground, five pillars in the fog)
+// through PostStack and Tonemap with a Grade, the camera looking east 12 degrees up. `apply(name, values, deltas)` writes
+// the values with applySkySettings, renders one frame per delta and keeps the displayed 8-bit frame, read the way a
+// screenshot is, for `diff`. Driven by features-check.mjs ("settings"); ?w=&h= sets the canvas size (stills of the looks).
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {Grade} from '/packages/tonemap/dist/grade.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {applySkySettings} from '/packages/sky/dist/settings.js';
+import {VolumetricClouds} from '/packages/sky/dist/compat-clouds.js';
+import {TornadoCloud} from '/packages/sky/dist/tornado.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const query=new URLSearchParams(location.search);
+if(query.get('samples')==='1')globalThis.margoLow=1;
+const canvas=document.querySelector('canvas'),W=Number(query.get('w')??256),H=Number(query.get('h')??192);
+canvas.width=W;canvas.height=H;canvas.style.width=W+'px';canvas.style.height=H+'px';
+// ?az= turns the camera to that compass angle (the sun's convention: 0 is +Z, 90 is +X); default 90.
+const up=Math.tan(12*Math.PI/180)*1000,az=Number(query.get('az')??90)*Math.PI/180;
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,2,0],target:[Math.sin(az)*1000,2+up,Math.cos(az)*1000],fov:80,near:0.5,far:100000}}),device=engine.gpu,errors=[];
+engine.stop();
+// Counts of the GPU objects made after this point, for the rule that a live row costs none of them.
+const made={pipelines:0,buffers:0,textures:0};
+for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){
+ const real=device[method];
+ if(real)device[method]=function(...a){made[key]++;return real.apply(this,a);};
+}
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// The ground covers the left half of the view (z < 0) so the sky below the horizon shows on the right; ?ground=full
+// covers it all (the stills).
+const full=query.get('ground')==='full';
+engine.createMesh().setGeometry(box(4000,0.2,full?4000:2000)).setMaterial(new PbrMaterial({color:'#6b6550',roughness:0.95})).setPosition([0,-1,full?0:-1000]);
+for(const [x,z] of [[60,-30],[110,-12],[170,-60],[240,-40],[320,-10]])engine.createMesh().setGeometry(box(8,40,8)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.7})).setPosition([x,19,z]);
+const grade=new Grade(),tonemap=new Tonemap({extensions:[grade]}),stack=PostStack.attach(engine,[tonemap]);
+const sky=new Sky({lighting:{},fog:{depth:()=>stack.depthTexture}});
+engine.use(sky);
+const frames=new Map(),shot=new OffscreenCanvas(W,H),g=shot.getContext('2d',{willReadFrequently:true});
+async function frame(delta){
+ engine.render({delta});
+ if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();
+ g.drawImage(canvas,0,0);
+ return g.getImageData(0,0,W,H).data;
+}
+// The volumetric layer for the volumetric.* rows, attached only while they are checked (clouds(true)).
+let clouds;
+// The tornado for the tornado.* rows, attached only while they are checked (tornado(true)): 3 km east, in the view.
+let storm;
+window.check={samples:sceneSamples,
+ clouds(on){if(on&&!clouds){clouds=VolumetricClouds.attach(engine,{sky,wind:[0,0],depth:()=>stack.depthTexture});}else if(!on&&clouds){clouds.dispose();clouds=undefined;}},
+ tornado(on){if(on&&!storm){storm=TornadoCloud.attach(engine,{tornado:{center:[3000,0]},sky,depth:()=>stack.depthTexture});}else if(!on&&storm){storm.dispose();storm=undefined;}},
+ counts:()=>({...made}),
+ errors:()=>errors.splice(0),
+ // Writes values (unless null), renders one frame per delta and keeps the last frame under name.
+ async apply(name,values,deltas=[0,0]){
+  device.pushErrorScope('validation');
+  if(values)applySkySettings({sky,tonemap,grade,clouds,tornado:storm},values);
+  if(clouds)await clouds.ready;
+  if(storm)await storm.ready;
+  let last;for(const d of deltas)last=await frame(d);
+  const error=await device.popErrorScope();
+  if(error)errors.push(error.message);
+  frames.set(name,last);
+ },
+ // Pixels of frame a that differ from frame b by 2 levels or more in any channel, and the largest difference.
+ diff(a,b){
+  const x=frames.get(a),y=frames.get(b);let changed=0,max=0;
+  for(let p=0;p<x.length;p+=4){let d=0;for(let c=0;c<3;c++)d=Math.max(d,Math.abs(x[p+c]-y[p+c]));if(d>=2)changed++;max=Math.max(max,d);}
+  return {changed,max};
+ },
+ // The RGBA bytes of a frame and its size.
+ pixels(a){return {width:W,height:H,data:Array.from(frames.get(a))};},
+ // Mean RGB of a frame, for the record.
+ mean(a){const x=frames.get(a),s=[0,0,0];for(let p=0;p<x.length;p+=4)for(let c=0;c<3;c++)s[c]+=x[p+c];return s.map(v=>Math.round(v/(x.length/4)));},
+};
+window.ready=true;
+</script></body></html>

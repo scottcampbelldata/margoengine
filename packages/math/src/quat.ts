@@ -145,3 +145,55 @@ export function splitTRS(m: ArrayLike<number>, tolerance = 1e-5): TRSSplit {
       return { ok: false, reason: 'shear' };
   return { ok: true, position: [m[12], m[13], m[14]], rotation: rotationToQuaternion(r), scale };
 }
+
+/** Options of {@link splitNodeMatrix}. */
+export interface NodeMatrixSplitOptions {
+  /** Largest dot product of two unit columns still read as perpendicular. Default 1e-5, as {@link splitTRS}. */
+  tolerance?: number;
+  /** Read a column as zero when its float32 values are all 0 (a glTF file's numbers), not only exact zeros. Default false. */
+  float32?: boolean;
+}
+
+const unit3 = (v: readonly number[]): number[] | undefined => {
+  const k = Math.hypot(v[0], v[1], v[2]);
+  return k > 0 && Number.isFinite(k) ? [v[0] / k, v[1] / k, v[2] / k] : undefined;
+};
+const cross3 = (a: readonly number[], b: readonly number[]): number[] => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
+
+/**
+ * {@link splitTRS} plus the zero scales glTF 2.0 section 3.5.3 allows a node: a column that is all zeros is a zero scale
+ * on that axis. The rotation is completed from the nonzero columns as a right-handed frame, so their split is the one
+ * `splitTRS` gives; nonzero columns that are dependent stay `'singular'` and ones that are not perpendicular `'shear'`.
+ * All three columns zero split to the identity rotation and scale `[0, 0, 0]`.
+ */
+export function splitNodeMatrix(m: ArrayLike<number>, options: NodeMatrixSplitOptions = {}): TRSSplit {
+  const { tolerance = 1e-5, float32 = false } = options,
+    columns = [0, 1, 2].map((c) => [m[c * 4], m[c * 4 + 1], m[c * 4 + 2]]),
+    zero = columns.map((v) => v.every((x) => (float32 ? Math.fround(x) : x) === 0));
+  if (!zero.includes(true)) return splitTRS(m, tolerance);
+  const full = Array.from({ length: 16 }, (_, i) => m[i]),
+    kept = [0, 1, 2].filter((c) => !zero[c]),
+    set = (c: number, v: number[]) => full.splice(c * 4, 3, ...v);
+  if (!kept.length) [0, 1, 2].forEach((c) => set(c, [+(c === 0), +(c === 1), +(c === 2)]));
+  else if (kept.length === 1) {
+    // Any frame around the one axis left: the next axis is perpendicular to it, the last completes it.
+    const k = kept[0],
+      a = unit3(columns[k]);
+    if (!a) return { ok: false, reason: 'singular' };
+    const b = unit3(cross3(a, Math.abs(a[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]))!;
+    set((k + 1) % 3, b);
+    set((k + 2) % 3, cross3(a, b));
+  } else {
+    const missing = zero.indexOf(true),
+      c = unit3(cross3(columns[(missing + 1) % 3], columns[(missing + 2) % 3]));
+    if (!c) return { ok: false, reason: 'singular' };
+    set(missing, c);
+  }
+  const trs = splitTRS(full, tolerance);
+  if (trs.ok) zero.forEach((z, c) => z && (trs.scale[c] = 0));
+  return trs;
+}

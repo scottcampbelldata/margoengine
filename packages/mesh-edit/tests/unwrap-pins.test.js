@@ -331,3 +331,19 @@ test('unwrap pins fuzz: random meshes and pin sets never produce overlapping cha
   }
   assert.ok(laid >= 30 && pinnedLaid >= 20, `only ${laid} layouts (${pinnedLaid} pinned) succeeded`);
 });
+
+test('a pin uv that is not exactly two numbers is a TypeError, not a chart outside the square', () => {
+  const cube = K.createPrimitiveMesh('cube', 'box');
+  for (const uv of [[0.5], [0.1, 0.2, 0.3], []])
+    assert.throws(
+      () =>
+        K.unwrapMesh(cube, {
+          pins: [
+            { vertex: 0, uv },
+            { vertex: 1, uv: [0.9, 0.9] },
+          ],
+        }),
+      (error) => error instanceof TypeError && /uv pair/.test(error.message),
+      `uv of length ${uv.length}`,
+    );
+});

@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { preview } from 'vite';
 import { launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { killTree } from './gpu-lock.mjs';
+import { killTree } from './run-with-timeout.mjs';
 import { decodePNG } from '../tests/support/png.js';
 const results = resolve(import.meta.dirname, '../test-results/template-installs');
 const report = JSON.parse(readFileSync(join(results, 'report.json'))),

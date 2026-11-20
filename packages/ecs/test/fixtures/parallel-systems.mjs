@@ -30,6 +30,6 @@ export function fail({ components }) {
   throw new TypeError('deliberate system failure');
 }
 export function exit() {
-  process.exit(23);
+  process.exit(23); // process.exit: the system ends its worker thread at once, the death the pool must report
 }
 export function noop() {}

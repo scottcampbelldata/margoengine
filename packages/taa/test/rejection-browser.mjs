@@ -6,20 +6,24 @@
 //   square nothing moves.
 //   locks: a still bright line 0.4 px wide on a dark plane is hit by the jitter on some frames only; the min/max clamp
 //   throws its history away on the frames that miss it and the line vanishes, while a locked line keeps its history.
+// The line and stripe rigs that prove a rejection mode run with settle false, so they measure pixels that are not settled
+// (Scott, 2026-11-16, "Revise asserts"); with settle on, the default, the still line holds its mean and still stripes
+// do not move at all, checked by the settled rigs.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-rejection' });
 const timer = setTimeout(() => {
   console.error('rejection-browser: timed out after 150 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 150_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-rejection/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -29,8 +33,10 @@ const server = await createServer({
 await listenWhenFree(() => server.listen(), { port: 5374 });
 const browser = await launchBrowser({ headless: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1000, height: 520 }, deviceScaleFactor: 1 }),
+  const page = await browser.newPage({ viewport: { width: 1000, height: 760 }, deviceScaleFactor: 1 }),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
@@ -42,10 +48,13 @@ try {
     const rigs = {
       clamp: await rig('clamp', { pattern: 'dots', alpha: 1 }),
       variance: await rig('variance', { pattern: 'dots', alpha: 1, taa: { rejection: 'variance' } }),
-      lineClamp: await rig('lineClamp', { pattern: 'line' }),
-      lineLocks: await rig('lineLocks', { pattern: 'line', taa: { locks: true } }),
-      surface: await rig('surface', { pattern: 'sine', alpha: 0 }),
-      sky: await rig('sky', { pattern: 'sine', alpha: 0, sky: true }),
+      lineClamp: await rig('lineClamp', { pattern: 'line', taa: { settle: false } }),
+      lineLocks: await rig('lineLocks', { pattern: 'line', taa: { locks: true, settle: false } }),
+      surface: await rig('surface', { pattern: 'sine', alpha: 0, taa: { settle: false } }),
+      sky: await rig('sky', { pattern: 'sine', alpha: 0, sky: true, taa: { settle: false } }),
+      lineSettled: await rig('lineSettled', { pattern: 'line' }),
+      surfaceSettled: await rig('surfaceSettled', { pattern: 'sine', alpha: 0 }),
+      skySettled: await rig('skySettled', { pattern: 'sine', alpha: 0, sky: true }),
     };
     window.t = {
       gpuErrors: () => Object.values(rigs).flatMap((r) => r.gpuErrors),
@@ -89,9 +98,9 @@ try {
   for (const mode of stripes) assert.ok(Math.abs(trail[mode].far) < 2, `away from the square nothing moves (${mode})`);
 
   // Thin-feature locks against a line the jitter misses on some frames: 16 frames, after 24 to settle.
-  const lines = ['lineClamp', 'lineLocks'];
+  const lines = ['lineClamp', 'lineLocks', 'lineSettled'];
   await page.evaluate((names) => window.t.frames(names, 24), lines);
-  const frames = { lineClamp: [], lineLocks: [] };
+  const frames = { lineClamp: [], lineLocks: [], lineSettled: [] };
   // fixed-wait: the measurement itself: 16 consecutive frames, two jitter cycles, each one captured and compared.
   for (let f = 0; f < 16; f++) {
     await page.evaluate((names) => window.t.frames(names, 1), lines);
@@ -117,12 +126,24 @@ try {
   assert.ok(flicker.lineClamp.brightest > 60 && flicker.lineLocks.brightest > 60, 'the line shows in both');
   assert.ok(flicker.lineClamp.dimmest < 15, `the clamped line vanishes on some frames (${flicker.lineClamp.dimmest})`);
   assert.ok(flicker.lineLocks.dimmest > 30, `the locked line never does (${flicker.lineLocks.dimmest})`);
+  // Settled (the default): the line shows one level every frame, its box-filtered mean. The line covers 0.2 px of each
+  // of columns 159 and 160, so each pixel's footprint holds 0.02 + 0.2 * 0.88 in linear light, 122.4 sRGB levels; the
+  // 8 jitter phases estimate that coverage. RTX A6000: 123 every frame (0 levels apart, 0.6 from the mean).
+  const lineMean = 255 * (1.055 * (0.02 + 0.2 * 0.88) ** (1 / 2.4) - 0.055);
+  assert.ok(
+    flicker.lineSettled.brightest - flicker.lineSettled.dimmest <= 1,
+    `the settled line holds still (${JSON.stringify(flicker.lineSettled)})`,
+  );
+  assert.ok(
+    Math.abs(flicker.lineSettled.dimmest - lineMean) < 3,
+    `the settled line shows its mean, ${lineMean.toFixed(1)} (${flicker.lineSettled.dimmest})`,
+  );
 
   // History over the sky (2026-11-13: pixels at depth 0, the reversed-Z far plane, had none, so the march noise of
   // volumetric clouds over the sky stood unaveraged): the same stripes, once on a surface and once at depth 0, change
   // from frame to frame by the same amount once settled (Radeon 680M, Vulkan: 17.0 and 17.0 levels); without sky
   // history the sky's changed by the whole jitter (24.7 against 17.0).
-  const backdrops = ['surface', 'sky'];
+  const backdrops = ['surface', 'sky', 'surfaceSettled', 'skySettled'];
   await page.evaluate((names) => window.t.frames(names, 30), backdrops);
   const change = {};
   for (const mode of backdrops) {
@@ -136,11 +157,13 @@ try {
   console.log('frame-to-frame change of settled stripes in sRGB levels', change);
   assert.ok(change.surface > 0.05, `the jitter moves the stripes at all (${change.surface})`);
   assert.ok(change.sky < change.surface * 1.15, `the sky keeps history as a surface does (${JSON.stringify(change)})`);
+  // Settled (the default): still stripes on a surface and on the sky do not move at all (RTX A6000: 0 and 0 levels).
+  for (const mode of ['surfaceSettled', 'skySettled'])
+    assert.equal(change[mode], 0, `settled stripes hold still (${mode} ${change[mode]})`);
   assert.deepEqual(await page.evaluate(() => window.t.gpuErrors()), []);
   assert.deepEqual(errors, []);
   console.log('history rejection check passed');
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

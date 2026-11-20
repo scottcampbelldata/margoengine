@@ -110,6 +110,8 @@ test('all patterns, bounded options and pre-aborted calls', async () => {
     'fire',
     'starfield',
     'road',
+    'stone',
+    'soot',
   ]) {
     const s = await baker.bake({ pattern, mipmaps: false });
     s.dispose();
@@ -123,6 +125,10 @@ test('all patterns, bounded options and pre-aborted calls', async () => {
     { roughness: -1 },
     { time: Infinity },
     { mipmaps: 1 },
+    { tint: 2 },
+    { tint: NaN },
+    { chip: -0.1 },
+    { pattern: 'stone', chip: 1.5 },
     { repeat: [3, 3] },
     { width: 2049 },
     { signal: AbortSignal.abort('stop') },
@@ -130,6 +136,27 @@ test('all patterns, bounded options and pre-aborted calls', async () => {
     await assert.rejects(baker.bake(o));
   assert.equal(f.textures.length, count);
   await assert.rejects(createPBRTextureBaker({}), (e) => e.code === 'unsupported');
+});
+test('tint and chip reach the shader; stone tints by default and the other patterns keep their maps', async () => {
+  const f = fixture();
+  using baker = await createPBRTextureBaker(f.device);
+  const uniform = (k) => new Float32Array(f.writes.at(-1).buffer, 0, 28)[k];
+  (await baker.bake({ pattern: 'stone', mipmaps: false })).dispose();
+  assert.equal(f.writes.at(-1).byteLength, 112);
+  assert.equal(new Uint32Array(f.writes.at(-1).buffer)[2], 11);
+  assert.equal(uniform(24), 0.25);
+  assert.equal(uniform(25), 0);
+  (await baker.bake({ pattern: 'bricks', mipmaps: false })).dispose();
+  assert.equal(uniform(24), 0, 'bricks keep their plain colour unless tint is set');
+  (await baker.bake({ pattern: 'bricks', tint: 0.5, chip: 0.75, mipmaps: false })).dispose();
+  assert.equal(uniform(24), 0.5);
+  assert.equal(uniform(25), 0.75);
+  (await baker.bake({ pattern: 'soot', mipmaps: false })).dispose();
+  assert.equal(new Uint32Array(f.writes.at(-1).buffer)[2], 12);
+  assert.deepEqual(
+    [...new Float32Array(f.writes.at(-1).buffer, 32, 8)].map((x) => Math.round(x * 1000) / 1000),
+    [0.03, 0.028, 0.026, 1, 1, 1, 1, 1],
+  );
 });
 test('in-flight abort, dispose and device loss release incomplete outputs', async () => {
   for (const kind of ['abort', 'dispose', 'loss']) {

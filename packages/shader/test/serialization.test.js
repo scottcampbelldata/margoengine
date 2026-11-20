@@ -14,3 +14,20 @@ test('compiled storage-buffer vertex programs retain all declarations, geometry 
   assert.deepEqual(buffer.data, positions.data);
   assert.notEqual(buffer.data, positions.data);
 });
+
+test('a raw material keeps its depth compare, depth bias and alpha to coverage through a save and restore', async () => {
+  const { RawShaderMaterial } = await import('../dist/raw.js');
+  const material = new RawShaderMaterial({
+    vertexShader: '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f { return vec4f(0.0, 0.0, 0.5, 1.0); }\n@fragment fn fragment()->@location(0) vec4f { return vec4f(1.0); }',
+    depthCompare: 'equal',
+    depthBias: 3,
+    depthBiasSlopeScale: 1.5,
+    alphaToCoverage: true,
+  });
+  const archive = await captureMaterialLibrary({ material }, { codecs: shaderMaterialCodecs });
+  const restored = await restoreMaterialLibrary(JSON.parse(JSON.stringify(archive)), { codecs: shaderMaterialCodecs });
+  assert.equal(restored.material.depthCompare, 'equal');
+  assert.equal(restored.material.depthBias, 3);
+  assert.equal(restored.material.depthBiasSlopeScale, 1.5);
+  assert.equal(restored.material.alphaToCoverage, true);
+});

@@ -57,7 +57,9 @@ export async function warpModuleCode() {
 async function check() {
   const deadline = setTimeout(() => {
     console.error('Ecotone warp WebGPU correctness check exceeded its 290 second deadline');
-    void endTree(process.pid, { waitMs: 10000 }).finally(() => process.exit(1));
+    void endTree(process.pid, { waitMs: 10000 }).finally(() => {
+      process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
+    });
   }, 290000);
   let context;
   const pageErrors = [];

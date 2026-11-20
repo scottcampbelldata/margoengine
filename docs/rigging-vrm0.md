@@ -1,7 +1,7 @@
 # VRM 0.x runtime conversion
 
 Batch 213 job 1 adds only `@margoengine/rigging/vrm0` and its umbrella alias.
-`readVRM` remains a 1.x reader. `loadVRM0` converts before gltf-pro creates the
+`readVRM` remains a 1.x reader. `loadVRM0` converts before gltf/pbr creates the
 model, so its source document, node list, skinning and runtime avatar agree.
 Source bytes and objects are not modified. This does not publish or relicense
 an avatar as a new VRM 1.0 asset.

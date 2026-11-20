@@ -105,6 +105,70 @@ window.check = {
     out.tinted = [...frame().subarray((2 * WIDTH + 10) * 4, (2 * WIDTH + 10) * 4 + 3)];
     layer.dispose();
     out.validation = (await engine.gpu.popErrorScope())?.message ?? null;
+
+    // A lost device (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): pixels and functions come
+    // back by themselves; a plain GPUTexture is reported once through engine.onError, its layer draws nothing and
+    // the frame goes on, until setAtlas gives a new one.
+    {
+      const upload = (device) => {
+          const texture = device.createTexture({
+            size: [4, 8],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture }, data, { bytesPerRow: 16 }, [4, 8]);
+          return texture;
+        },
+        made = [],
+        makeAtlas = (device) => {
+          made.push(device);
+          return upload(device);
+        },
+        previous = engine.gpu,
+        layers = [
+          SkeletalLayer.attach(instance, { atlas: { width: 4, height: 8, data } }),
+          SkeletalLayer.attach(instance, { atlas: upload(previous) }),
+          SkeletalLayer.attach(instance, { atlas: makeAtlas }),
+        ];
+      // Bind-pose strips: pixels at x 10, the plain texture at x 30, the function at x 50.
+      const at = [10, 30, 50];
+      layers.forEach((each, n) => {
+        const mesh = strip().mesh;
+        each.add(mesh).x = at[n];
+        mesh.y = 2;
+      });
+      const image = (drawn) => {
+        const expected = blank();
+        for (const x0 of drawn)
+          for (let j = 0; j < 8; j++) for (let i = 0; i < 4; i++) put(expected, x0 + i, 2 + j, texel(i, j));
+        return expected;
+      };
+      const all = image(at),
+        without = image([10, 50]),
+        loss = { before: wrong(frame(), all) };
+      previous.destroy();
+      await previous.lost;
+      await engine.rebootDevice();
+      engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+      const reports = [],
+        onError = engine.onError;
+      engine.onError = (error) => reports.push(error);
+      loss.frames = [];
+      try {
+        for (let i = 0; i < 3; i++) loss.frames.push(wrong(frame(), without).count);
+      } catch (error) {
+        loss.thrown = error.message;
+      }
+      engine.onError = onError;
+      loss.reports = reports.map((error) => [error.code, error.message]);
+      loss.functionCalls = made.length;
+      loss.functionDevices = made[0] !== made[1];
+      layers[1].setAtlas(upload(engine.gpu));
+      loss.after = wrong(frame(), all).count;
+      for (const each of layers) each.dispose();
+      loss.disposed = wrong(frame(), blank()).count;
+      out.loss = loss;
+    }
     out.background = BACKGROUND;
     out.texel0 = texel(0, 0);
     out.texel27 = texel(2, 7);

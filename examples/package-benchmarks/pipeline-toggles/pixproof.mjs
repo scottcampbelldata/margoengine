@@ -1,6 +1,7 @@
-// From the repo root after build:packages and `node examples/package-benchmarks/pipeline-toggles/old-gltf.mjs`, under the GPU lock on AC:
-// node examples/package-benchmarks/pipeline-toggles/pixproof.mjs - screenshots gltf-pro 15c87f1 vs working tree, same scene, compares bytes.
+// From the repo root after build:packages and `node examples/package-benchmarks/pipeline-toggles/old-gltf.mjs`:
+// node examples/package-benchmarks/pipeline-toggles/pixproof.mjs - screenshots gltf/pbr 15c87f1 vs working tree, same scene, compares bytes.
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
 import { requireAC } from '../parts/power.mjs';
@@ -11,6 +12,7 @@ await writeFile(
   '<!doctype html><meta charset="utf-8"><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style><canvas id="view"></canvas><script type="module" src="/examples/package-benchmarks/pipeline-toggles/pixproof.js"></script>',
 );
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   logLevel: 'error',
   server: { host: '127.0.0.1', port: 5294, strictPort: true, hmr: false, watch: { ignored: ['**'] } },

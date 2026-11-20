@@ -11,6 +11,7 @@ import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import { displayShader } from '../../shared/display.js';
 import { margoError } from '../../shared/errors.js';
+import { type BorrowSlot, type Borrowable, borrow, fix, lend, relend } from '../../shared/borrowed.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { PostStack } from './stack.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -26,9 +27,11 @@ export interface LensOptions {
   dirtIntensity?: number;
   /** Linear brightness (largest channel) above which light lights the dirt. Default 1. */
   threshold?: number;
-  /** Dirt image (linear RGB, any size, stretched over the view), a GPUTexture of this engine's device. Default a
-   * built-in pattern of soft smudges. */
-  dirt?: GPUTexture;
+  /** Dirt image (linear RGB, any size, stretched over the view): a GPUTexture of this engine's device, or
+   * `(device) => texture`, made once per device so it is back after a device restore. Default a built-in pattern of
+   * soft smudges. A plain texture is lost with its device: the built-in dirt draws, `engine.onError` hears of it once
+   * (`'state'`, #borrowed-lost), and assigning `options.dirt` a new texture brings the image back. */
+  dirt?: Borrowable<GPUTexture>;
   /** False passes frames through. Default true. */
   enabled?: boolean;
 }
@@ -106,6 +109,7 @@ export class Lens implements EnginePlugin {
   private sampler?: GPUSampler;
   private blank?: GPUTexture;
   private dirt?: GPUTexture;
+  private readonly slot: BorrowSlot<GPUTexture>;
   private dirtView?: GPUTextureView;
   private readonly values = new Float32Array(64 * 4);
   private glow: GPUTexture[] = [];
@@ -120,6 +124,7 @@ export class Lens implements EnginePlugin {
 
   constructor(readonly options: LensOptions = {}) {
     this.check();
+    this.slot = borrow<GPUTexture>(options.dirt, 'Lens dirt', 'set options.dirt');
   }
   /** Attaches a new Lens to `engine` alone in its own PostStack. */
   static attach(engine: EngineKernel, options: LensOptions = {}): Lens {
@@ -156,6 +161,7 @@ export class Lens implements EnginePlugin {
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING,
     });
+    fix(this.slot, engine.gpu);
   }
   /** Removes the effect, releases its GPU resources and disposes the stack `attach` created. Safe to call twice. */
   dispose(): void {
@@ -182,8 +188,14 @@ export class Lens implements EnginePlugin {
     const o = this.options;
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw new TypeError('Lens enabled must be a boolean; pass true or false');
-    if (o.dirt !== undefined && typeof (o.dirt as { createView?: unknown })?.createView !== 'function')
-      throw new TypeError('Lens dirt must be a GPUTexture of the engine device; leave it unset for the built-in dirt');
+    if (
+      o.dirt !== undefined &&
+      typeof o.dirt !== 'function' &&
+      typeof (o.dirt as { createView?: unknown })?.createView !== 'function'
+    )
+      throw new TypeError(
+        'Lens dirt must be a GPUTexture of the engine device or (device) => GPUTexture; leave it unset for the built-in dirt',
+      );
     if (
       (o.distortion !== undefined && !(o.distortion >= -1 && o.distortion <= 1)) ||
       (o.dirtIntensity !== undefined && !(o.dirtIntensity >= 0 && o.dirtIntensity <= 10)) ||
@@ -201,6 +213,10 @@ export class Lens implements EnginePlugin {
       aspect = c.width / c.height,
       small = [Math.max(1, Math.ceil(c.width / 8)), Math.max(1, Math.ceil(c.height / 8))];
     if (!on && output.hdr) return input;
+    // Assigning options.dirt gives a new image that belongs to the device in use now; a lost one falls back to the
+    // built-in smudges, what an omitted dirt draws.
+    if (this.slot.value !== o.dirt) relend(this.slot, o.dirt, device);
+    const dirt = lend(this.slot, device, this.engine);
     if (this.result?.width !== c.width || this.result.height !== c.height) {
       this.freeTargets();
       const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
@@ -211,10 +227,10 @@ export class Lens implements EnginePlugin {
       this.result = device.createTexture({ size: [c.width, c.height], format: 'rgba16float', usage });
       this.resultView = this.result.createView();
     }
-    if (this.input !== input || this.dirt !== o.dirt) {
+    if (this.input !== input || this.dirt !== dirt) {
       this.input = input;
-      this.dirt = o.dirt;
-      this.dirtView = (o.dirt ?? this.blank!).createView();
+      this.dirt = dirt;
+      this.dirtView = (dirt ?? this.blank!).createView();
       this.groups.clear();
     }
     // Barrel: scale so the corners (r^2 = (aspect^2 + 1) / 4) read the corners. Pincushion reads inward already.
@@ -222,7 +238,7 @@ export class Lens implements EnginePlugin {
       v = this.values;
     for (let slot = 0; slot < 4; slot++)
       v.set(
-        [slot === 1 ? 1 : 0, slot === 2 ? 1 : 0, o.threshold ?? 1, intensity, k, fit, aspect, o.dirt ? 1 : 0],
+        [slot === 1 ? 1 : 0, slot === 2 ? 1 : 0, o.threshold ?? 1, intensity, k, fit, aspect, dirt ? 1 : 0],
         slot * 64,
       );
     device.queue.writeBuffer(this.uniform!, 0, v);

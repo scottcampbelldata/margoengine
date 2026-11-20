@@ -214,7 +214,7 @@ export class Selection implements EnginePlugin {
       throw new MargoError('disposed', 'Selection is disposed; create a new Selection to keep selecting.');
     return this.sources.add(source);
   }
-  /** Core meshes, gltf-pro models, or glTF nodes (from `engine.pick`); a node outlines its own and its descendants' primitives. */
+  /** Core meshes, gltf\/pbr models, or glTF nodes (from `engine.pick`); a node outlines its own and its descendants' primitives. */
   set(meshes: Iterable<Mesh | ModelLike>): void {
     if (this.disposed)
       throw new MargoError('disposed', 'Selection is disposed; create a new Selection to keep selecting.');
@@ -513,7 +513,7 @@ export class Selection implements EnginePlugin {
     this.mark(c, xr.draw, true);
     draw(c, xr.composite!, xr.bind!.get(slice));
   }
-  /** Selected gltf-pro primitives into the mask, equal depth against the scene so occluded parts stay unmarked (x-ray: no depth test). */
+  /** Selected gltf\/pbr primitives into the mask, equal depth against the scene so occluded parts stay unmarked (x-ray: no depth test). */
   private drawModels(c: Context, xray: boolean): void {
     const e = this.engine!,
       draws = xray ? this.xr!.draws : this.draws,

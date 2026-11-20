@@ -68,8 +68,9 @@ namespace MargoMesh.Unity.Editor {
         static readonly Regex HashPattern = new Regex("^[0-9a-f]{64}$", RegexOptions.CultureInvariant);
         static readonly Regex SourcePattern = new Regex("^Assets/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*/model[.]glb$", RegexOptions.CultureInvariant);
         static readonly Regex ReservedFolder = new Regex("^(editor|resources|plugins|streamingassets|cvs|con|prn|aux|nul|com[1-9]|lpt[1-9])$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        static readonly Regex Collision = new Regex("-(convcolonly|convcol|colonly|col)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        static readonly string[] Executable = { ".cs", ".dll", ".asmdef", ".asmref", ".rsp", ".winmd", ".so", ".dylib", ".bundle", ".exe" };
+        static readonly Regex Collision = new Regex("[-_$](convcolonly|convcol|colonly|col)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        // Every file type Unity compiles, loads or links as code or a plug-in (Unity Manual, "Import and configure plug-ins").
+        static readonly string[] Executable = { ".cs", ".dll", ".asmdef", ".asmref", ".rsp", ".winmd", ".so", ".dylib", ".bundle", ".exe", ".jar", ".aar", ".jslib", ".jspre", ".a", ".m", ".mm", ".c", ".cpp", ".h" };
 
         // ---- Paths and hashes
 
@@ -290,7 +291,8 @@ namespace MargoMesh.Unity.Editor {
                 int count = Int(accessor, "count"), size = ComponentSize(Int(accessor, "componentType")), arity = Arity(Text(accessor, "type"));
                 int offset = OptionalInt(accessor, "byteOffset"), packed = checked(size * arity);
                 int stride = view.ContainsKey("byteStride") ? Int(view, "byteStride") : packed;
-                Require(count > 0 && stride >= packed && offset % size == 0 && (long)offset + (long)(count - 1) * stride + packed <= Int(view, "byteLength"),
+                // glTF 2.0 3.6.2.4: the accessor's offset into the buffer, view offset included, is a multiple of its component size.
+                Require(count > 0 && stride >= packed && offset % size == 0 && ((long)OptionalInt(view, "byteOffset") + offset) % size == 0 && (long)offset + (long)(count - 1) * stride + packed <= Int(view, "byteLength"),
                     "Source accessor exceeds its buffer view or is misaligned; export the GLB again.");
                 if (Int(accessor, "componentType") != Float)
                     continue;

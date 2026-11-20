@@ -1,5 +1,5 @@
-// Classic parser workers run in browsers, which give every dedicated worker createImageBitmap, so gltf-pro's Node
-// fallback (packages/gltf-pro/src/node-image-decode.ts) is never reached there. This stub keeps the worker free of
+// Classic parser workers run in browsers, which give every dedicated worker createImageBitmap, so gltf/pbr's Node
+// fallback (packages/gltf/src/node-image-decode.ts) is never reached there. This stub keeps the worker free of
 // the @margoengine/decoders specifier, which an IIFE could not resolve anyway.
 export async function decodeWithoutBrowser() {
   throw new TypeError(

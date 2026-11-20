@@ -46,8 +46,9 @@ export function meshCorners(m: VFXMeshParticles): Float32Array {
  * half the particle size, so the billboards' cull sphere (radius size) holds it. Lambert shading from one directional
  * light plus ambient (direction.w), opaque and depth written.
  */
-const shader = (align: 'random' | 'velocity') =>
+const shader = (align: 'random' | 'velocity', spin = '') =>
   frame +
+  spin +
   /* wgsl */ `
 @group(0) @binding(1) var<storage,read> particles:array<vec4f>;
 @group(0) @binding(2) var<storage,read> alive:array<u32>;
@@ -59,7 +60,7 @@ fn turn(v:vec3f,axis:vec3f,angle:f32)->vec3f {let c=cos(angle);let s=sin(angle);
 fn meshHash(v:u32)->u32 {var x=v;x=(x^(x>>16u))*0x7feb352du;x=(x^(x>>15u))*0x846ca68bu;return x^(x>>16u);}
 @vertex fn vertex(@builtin(vertex_index) corner:u32,@builtin(instance_index) instance:u32)->Out {
   let at=alive[instance]*2;let cold=f.control.x*2+at;let p=particles[at];let vs=particles[at+1];let color=particles[cold];let r=particles[cold+1];
-  let angle=r.x+r.y*(r.z-p.w);var q=meshCorners[corner*2].xyz;var n=meshCorners[corner*2+1].xyz;
+  let angle=r.x+r.y*(r.z-p.w)${spin ? '+drawnSpin(r.z,p.w)' : ''};var q=meshCorners[corner*2].xyz;var n=meshCorners[corner*2+1].xyz;
   ${
     align === 'random'
       ? `let h=meshHash(bitcast<u32>(r.x));let z=f32(h&0xffffu)/32767.5-1;let lon=f32(h>>16u)/65536*6.2831853;let s=sqrt(max(0.0,1-z*z));
@@ -183,7 +184,7 @@ export const mesh: VFXExtension<VFXMeshParticles> = {
           key = c.format + ':' + format + ':' + samples;
         let drawing = pipelines.get(key);
         if (!drawing) {
-          module ??= device.createShaderModule({ code: shader(align) });
+          module ??= device.createShaderModule({ code: shader(align, state.spin?.code) });
           const pipeline = device.createRenderPipeline({
             layout: 'auto',
             vertex: { module, entryPoint: 'vertex' },
@@ -202,6 +203,7 @@ export const mesh: VFXExtension<VFXMeshParticles> = {
                 { binding: 2, resource: { buffer: state.alive } },
                 { binding: 15, resource: { buffer: vertices } },
                 { binding: 16, resource: { buffer: light } },
+                ...(state.spin ? [state.spin.entry] : []),
               ],
             }),
           ];

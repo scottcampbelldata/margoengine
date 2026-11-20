@@ -120,12 +120,29 @@ export function readGLB(buffer) {
   const sizes = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
   const accessor = (index) => {
     const a = doc.accessors[index],
-      b = doc.bufferViews[a.bufferView],
-      width = a.componentType === 5123 ? 2 : 4;
-    const bytes = bin.slice(
-      (b.byteOffset ?? 0) + (a.byteOffset ?? 0),
-      (b.byteOffset ?? 0) + (a.byteOffset ?? 0) + a.count * sizes[a.type] * width,
-    );
+      width = a.componentType === 5123 ? 2 : 4,
+      element = sizes[a.type] * width;
+    // glTF 2.0 3.6.2.1 and 3.6.2.3: no bufferView reads as zeros, and sparse rows replace elements (morph targets).
+    let bytes = new Uint8Array(a.count * element);
+    if (a.bufferView !== undefined) {
+      const b = doc.bufferViews[a.bufferView];
+      bytes = bin.slice((b.byteOffset ?? 0) + (a.byteOffset ?? 0), (b.byteOffset ?? 0) + (a.byteOffset ?? 0) + a.count * element);
+    }
+    if (a.sparse) {
+      const { count, indices, values } = a.sparse,
+        at = (doc.bufferViews[indices.bufferView].byteOffset ?? 0) + (indices.byteOffset ?? 0),
+        from = (doc.bufferViews[values.bufferView].byteOffset ?? 0) + (values.byteOffset ?? 0),
+        rows = new DataView(bin.buffer, bin.byteOffset);
+      for (let i = 0; i < count; i++) {
+        const row =
+          indices.componentType === 5121
+            ? rows.getUint8(at + i)
+            : indices.componentType === 5123
+              ? rows.getUint16(at + i * 2, true)
+              : rows.getUint32(at + i * 4, true);
+        bytes.set(bin.subarray(from + i * element, from + (i + 1) * element), row * element);
+      }
+    }
     return a.componentType === 5126
       ? new Float32Array(bytes.buffer)
       : a.componentType === 5123

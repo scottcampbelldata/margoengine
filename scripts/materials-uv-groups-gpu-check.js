@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
-const release = await acquire({ owner: 'materials-uv-groups-gpu-check' });
 let browser;
 try {
   await mkdir('test-results/materials-uv-groups', { recursive: true });
@@ -158,5 +156,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.uvGroups?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

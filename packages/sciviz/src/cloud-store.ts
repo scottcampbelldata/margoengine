@@ -12,7 +12,7 @@ export interface CloudStore {
   get(key: string, signal?: AbortSignal, range?: CloudRange): Promise<Uint8Array | undefined>;
 }
 
-/** HTTP/S3 request options. S3 URLs use the public virtual-hosted HTTPS endpoint. */
+/** HTTP/S3 request options. S3 URLs use the public virtual-hosted HTTPS endpoint; a base URL's query (a signed or SAS token) is sent with every object request. */
 export interface CloudStoreOptions {
   readonly init?: RequestInit;
   readonly signal?: AbortSignal;
@@ -54,7 +54,10 @@ export function cloudStore(input: CloudInput, options: CloudStoreOptions = {}): 
           'Range',
           range.offset < 0 ? `bytes=-${range.length}` : `bytes=${range.offset}-${range.offset + range.length - 1}`,
         );
-      const response = await fetch(new URL(key.split('/').map(encodeURIComponent).join('/'), url), {
+      // Relative resolution drops the base query, so a signed or SAS-token base keeps it on every object URL.
+      const target = new URL(key.split('/').map(encodeURIComponent).join('/'), url);
+      target.search = url.search;
+      const response = await fetch(target, {
         ...options.init,
         headers,
         signal,

@@ -1,5 +1,5 @@
 // Real-GPU check of `Sharpen` (@margoengine/taa/sharpen), built packages, on the test/stripes-fixture.js 'sine' scene.
-// Takes the GPU lock itself around the browser. Two engines draw the same jittered frames, one with TAA alone and one
+// Two engines draw the same jittered frames, one with TAA alone and one
 // with TAA and `present: new Sharpen({ amount: 1 })`. TAA's history is never sharpened, so both resolve the same frame
 // and the plain one is the sharpened one's input: every sharpened pixel must lie inside the range of that pixel and its
 // four neighbours in the plain frame (no halo, no clipping), the stripes must gain contrast (their spread about the row
@@ -7,17 +7,18 @@
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-sharpen' });
 const timer = setTimeout(() => {
   console.error('sharpen-browser: timed out after 150 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 150_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-sharpen/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -29,6 +30,8 @@ const browser = await launchBrowser({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 700, height: 300 }, deviceScaleFactor: 1 }),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
@@ -116,5 +119,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

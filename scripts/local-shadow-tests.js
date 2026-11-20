@@ -41,7 +41,7 @@ export async function localShadowBrowserChecks(page) {
     async (payload) => {
       const { EngineKernel } = await import('/packages/core/dist/index.js'),
         { engineRuntime, box, PbrMaterial } = await import('/packages/core/dist/extension.js');
-      const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+      const { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
         { Clustered, clusteredSampling } = await import('/packages/clustered/dist/index.js'),
         { Shadows } = await import('/packages/shadows/dist/index.js');
       const { Terrain } = await import('/packages/terrain/dist/index.js'),

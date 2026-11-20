@@ -180,3 +180,53 @@ test('renderer neighbour invalidation stays inside the world chunk coordinate ra
   controller.abort(reason);
   await assert.rejects(VoxelModelRenderer.create({}, world, {}, controller.signal), (error) => error === reason);
 });
+
+test('local surfaces 2^24 blocks out hold the same chunk-local positions as near zero; world positions are offset', () => {
+  const S = 2 ** 24,
+    near = scene([{ min: [0, 0, 0.4], max: [1, 0.3, 0.6] }]),
+    far = scene([{ min: [0, 0, 0.4], max: [1, 0.3, 0.6] }]);
+  near.world.setBlock(0, 0, 0, 0);
+  near.world.setBlock(5, 3, 7, near.id);
+  far.world.setBlock(0, 0, 0, 0);
+  far.world.setBlock(S + 5, 3, -S + 7, far.id);
+  const a = meshBlockModels(near.world, 0, 0, 0, false, true),
+    b = meshBlockModels(far.world, S / 32, 0, -S / 32, false, true),
+    world = meshBlockModels(near.world, 0, 0, 0);
+  assert.ok(a[0].positions.length > 0);
+  assert.deepEqual(b[0].positions, a[0].positions);
+  assert.deepEqual(world[0].positions, a[0].positions, 'chunk 0: local and world positions agree');
+  assert.deepEqual(b[0].indices, a[0].indices);
+  assert.ok(b[0].positions.every((p) => p >= 0 && p <= 32));
+});
+
+test('a model mesh that fails to build leaves none of its chunk behind, and the next update builds the chunk once', () => {
+  const blocks = new BlockTypes(),
+    a = defineBlockModel(blocks, 'pane', { boxes: [pane] }),
+    b = defineBlockModel(blocks, 'post', { boxes: [{ min: [0.4, 0, 0.4], max: [0.6, 1, 0.6] }] }),
+    world = new VoxelWorld({ blocks, minY: 0, maxY: 31 });
+  world.setBlock(0, 0, 0, a);
+  world.setBlock(2, 0, 0, b);
+  // A materials runtime whose second mesh fails, as an allocation can.
+  const live = new Set();
+  let calls = 0;
+  const runtime = {
+    Material: class {
+      dispose() {}
+    },
+    createMesh() {
+      if (++calls === 2) throw new Error('out of memory');
+      const mesh = {
+        root: { setPosition() {} },
+        destroy: () => live.delete(mesh),
+      };
+      live.add(mesh);
+      return mesh;
+    },
+  };
+  const renderer = new VoxelModelRenderer({}, world, {}, runtime);
+  assert.throws(() => renderer.update(), /out of memory/);
+  renderer.update();
+  assert.equal(live.size, 2, 'one mesh per model surface, none left over from the failed build');
+  renderer.dispose();
+  assert.equal(live.size, 0, 'dispose destroys every mesh');
+});

@@ -111,21 +111,21 @@ function checkState(
   const { parent, initial, history, regions, regionHistory } = value;
   if (parent !== undefined && (!isName(parent) || !Object.hasOwn(states, parent)))
     add(`${path}.parent`, 'Unknown parent; name one of the states');
-  // The parent chain of a name, or null if it goes round or leaves the states.
-  const chain = (start: string): string[] | null => {
+  // The known ancestors of a name, itself first, or null when it is its own ancestor. The walk stops at an unknown
+  // parent (reported on the state that names it) and at a cycle further up (reported on the states in it).
+  const chain = (start: unknown): string[] | null => {
     const seen: string[] = [];
-    for (let at: unknown = start; at !== undefined; ) {
-      if (!isName(at) || !Object.hasOwn(states, at) || seen.includes(at)) return null;
+    for (let at: unknown = start; isName(at) && Object.hasOwn(states, at); ) {
+      if (seen.includes(at)) return at === start ? null : seen;
       seen.push(at);
       const state = states[at];
       at = isRecord(state) ? state.parent : undefined;
     }
     return seen;
   };
-  if (!chain(name) && parent !== undefined && isName(parent) && Object.hasOwn(states, parent))
-    add(`${path}.parent`, 'Hierarchy cycle; a state cannot be its own ancestor');
+  if (!chain(name)) add(`${path}.parent`, 'Hierarchy cycle; a state cannot be its own ancestor');
   if (initial !== undefined) {
-    const line = isName(initial) && Object.hasOwn(states, initial) ? chain(initial) : null;
+    const line = chain(initial);
     if (!line?.includes(name) || initial === name) add(`${path}.initial`, 'Name one of the descendants of this state');
   }
   if (history !== undefined && history !== 'shallow' && history !== 'deep')
@@ -180,7 +180,6 @@ export function validateMachine<C>(value: unknown, bindings?: MachineBindings<C>
   const issues: MachineIssue[] = [],
     add = (path: string, message: string) => void issues.push({ path, message });
   if (isRecord(value) && value.version !== 1) add('version', 'Unknown version; this reader takes version 1');
-  else if (!isRecord(value)) add('document', 'A machine is an object');
   checkRegion(value, '', add, bindings as MachineBindings<never> | undefined, true);
   return issues;
 }

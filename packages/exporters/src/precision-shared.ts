@@ -272,3 +272,46 @@ export const opaqueRGBA8 = (image: PrecisionImage): boolean =>
 
 /** Untrusted parsed JSON (what `JSON.parse` returns): the verifiers read it field by field with runtime checks. */
 export type ParsedJSON = ReturnType<typeof JSON.parse>;
+
+/**
+ * The unit geometric normal of one emitted world triangle (corner order kept), refusing a nonfinite corner and a
+ * triangle whose corners are collinear within float64 rounding: `|ab x ac| <= 4 eps |ab| |ac|`, a bound relative to
+ * the edge lengths, so a valid triangle with 1e-5 m edges passes and only a truly collapsed one fails.
+ * @throws RangeError naming `label`.
+ */
+export function emittedTriangleNormal(points: readonly (readonly number[])[], label: string): number[] {
+  if (points.length !== 3 || !points.every((p) => p.length === 3 && p.every(Number.isFinite)))
+    throw new RangeError(`${label} has nonfinite world corners; use finite transforms and positions before exporting.`);
+  const [a, b, c] = points as [readonly number[], readonly number[], readonly number[]];
+  const ab = [b[0]! - a[0]!, b[1]! - a[1]!, b[2]! - a[2]!],
+    ac = [c[0]! - a[0]!, c[1]! - a[1]!, c[2]! - a[2]!];
+  // Scale by the largest component first so the products neither overflow nor underflow.
+  const scale = Math.max(...ab.map(Math.abs), ...ac.map(Math.abs));
+  if (!Number.isFinite(scale))
+    throw new RangeError(
+      `${label} has a nonfinite world normal magnitude; reduce coordinate or transform magnitude before exporting.`,
+    );
+  const u = ab.map((n) => n / scale),
+    v = ac.map((n) => n / scale);
+  const n = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+  const length = Math.hypot(...n);
+  if (!(scale > 0) || !(length > 4 * Number.EPSILON * Math.hypot(...u) * Math.hypot(...v)))
+    throw new RangeError(`${label} has a degenerate triangle; move distinct corners before exporting.`);
+  return n.map((x) => x / length);
+}
+
+/**
+ * True when a buffer view's `byteStride` is allowed: absent, or for vertex data a whole number from 4 to 252 in steps
+ * of 4 (glTF 2.0 3.6.2.4 Data Alignment and 5.11.4 bufferView.byteStride). A view of index data must not define it
+ * (3.6.1.1: buffer views with other types of data MUST NOT define byteStride).
+ */
+export const byteStrideAllowed = (byteStride: unknown, indexData: boolean): boolean =>
+  byteStride === undefined ||
+  (!indexData &&
+    Number.isSafeInteger(byteStride) &&
+    (byteStride as number) >= 4 &&
+    (byteStride as number) <= 252 &&
+    (byteStride as number) % 4 === 0);
+
+/** A rotation quaternion within the 1e-5 budget of unit length, which the GLB writers keep as given. */
+export const unitRotation = (q: readonly number[]): boolean => Math.abs(Math.hypot(...q) - 1) <= 1e-5;

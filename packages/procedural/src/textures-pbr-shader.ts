@@ -9,6 +9,7 @@ struct Params {
  color: vec4f, secondary: vec4f,
  offset: vec2f, stagger: f32, time: f32,
  normalStrength: f32, heightScale: f32, roughness: f32, roughnessVariation: f32,
+ tint: f32, chip: f32, pad0: f32, pad1: f32,
 }
 @group(0) @binding(0) var<uniform> p: Params;
 @group(0) @binding(1) var albedo: texture_storage_2d<rgba8unorm,write>;
@@ -16,17 +17,27 @@ struct Params {
 @group(0) @binding(3) var roughness: texture_storage_2d<rgba8unorm,write>;
 @group(0) @binding(4) var height: texture_storage_2d<rgba8unorm,write>;
 ${noise}
+var<private> cellTone: f32;
+fn chipped(uv: vec2f, edge: f32, inner: f32, soft: f32)->f32 {
+ let broken=inner+p.chip*0.12*noise(uv,64u);
+ return smoothstep(broken,broken+soft,edge);
+}
 fn encodeRGBA8(value:vec4f)->vec4f {return floor(clamp(value,vec4f(0),vec4f(1))*255.0+0.5)/255.0;}
 fn field(inputUV: vec2f)->f32 {
  var uv=fract(inputUV);
  if p.kind==6u || p.kind==8u {uv=fract(uv+vec2f(p.time*0.03,p.time*0.09));}
  let n=(noise(uv,4u)*8.0+noise(uv,8u)*4.0+noise(uv,16u)*2.0+noise(uv,32u))/15.0;
  var value=n;
+ cellTone=0.0;
  if p.kind==1u || p.kind==2u {
   let row=u32(floor(uv.y*p.repeat.y));
   let shift=select(0.0,f32(row%2u)*p.stagger,p.kind==1u);
   let local=fract(uv*p.repeat+vec2f(shift,0));let edge=min(local,1.0-local);
-  value=select(0.0,1.0,all(edge>=vec2f(p.grout)))*(1.0-p.detail*(1.0-n));
+  var solid=select(0.0,1.0,all(edge>=vec2f(p.grout)));
+  if p.chip>0.0 {solid=chipped(uv,min(edge.x,edge.y),p.grout,p.chip*0.1);}
+  value=solid*(1.0-p.detail*(1.0-n));
+  let column=u32(floor(uv.x*p.repeat.x+shift))%u32(p.repeat.x);
+  cellTone=hash(vec2u(column,row)+vec2u(531u,977u))-0.5;
  }else if p.kind==3u {value=0.2+0.8*(0.5+0.5*cos(6.28318530718*(uv.x*p.repeat.x+p.detail*n)));
  }else if p.kind==4u {value=smoothstep(0.35-p.detail*0.2,0.65+p.detail*0.2,n);
  }else if p.kind==5u {value=pow(0.5+0.5*cos(6.28318530718*(uv.x*p.repeat.x+4.0*p.detail*n)),4.0);
@@ -47,6 +58,23 @@ fn field(inputUV: vec2f)->f32 {
   let lane=abs(fract(uv.x*p.repeat.x)-0.5);
   let dash=select(0.0,1.0,fract(uv.y*p.repeat.y)<0.5);
   value=select(n*0.12,1.0,lane<0.035 && dash>0.0);
+ }else if p.kind==11u {
+  // Worley 1996 cells: F1 picks the stone, (F2 - F1) / 2 is about the distance to its mortar line.
+  let q=uv*p.repeat;let cell=vec2i(floor(q));let local=fract(q);let period=vec2i(p.repeat);
+  var f1=8.0;var f2=8.0;var id=vec2u(0u);
+  for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+   let delta=vec2i(x,y);let wrapped=vec2u(((cell+delta)%period+period)%period);
+   let jitter=vec2f(hash(wrapped+vec2u(71u,13u)),hash(wrapped+vec2u(19u,97u)))*0.8+0.1;
+   let d=length(vec2f(delta)+jitter-local);
+   if d<f1 {f2=f1;f1=d;id=wrapped;} else if d<f2 {f2=d;}
+  }}
+  let solid=chipped(uv,(f2-f1)*0.5,p.grout*0.5,0.08+p.chip*0.05);
+  value=solid*(0.8+0.2*hash(id+vec2u(3u,5u)))*(1.0-p.detail*(1.0-n));
+  cellTone=hash(id+vec2u(531u,977u))-0.5;
+ }else if p.kind==12u {
+  // A rising plume (Morton, Taylor and Turner 1956): half-width grows linearly with height, density as (b0 / b)^(5/3).
+  let x=uv.x-0.5;let b=0.2+0.13*uv.y;let streak=noise(vec2f(uv.x,uv.y*0.125),32u);
+  value=pow(0.2/b,5.0/3.0)*exp(-(x/b)*(x/b))*(1.0-p.detail+p.detail*(0.6+0.8*streak))*(0.85+0.15*n);
  }
  return clamp(value,0.0,1.0);
 }
@@ -54,12 +82,12 @@ fn field(inputUV: vec2f)->f32 {
 fn main(@builtin(global_invocation_id) id:vec3u){
  if any(id.xy>=p.size){return;}
  let uv=(vec2f(id.xy)+0.5)/vec2f(p.size)+p.offset;
- let h=field(uv);let step=1.0/vec2f(p.size);
+ let h=field(uv);let tone=cellTone;let step=1.0/vec2f(p.size);
  let dx=(field(uv+vec2f(step.x,0))-field(uv-vec2f(step.x,0)))*f32(p.size.x)*0.5*p.heightScale*p.normalStrength;
  let dy=(field(uv+vec2f(0,step.y))-field(uv-vec2f(0,step.y)))*f32(p.size.y)*0.5*p.heightScale*p.normalStrength;
  let normal=normalize(vec3f(-dx,-dy,1));
  let rough=clamp(p.roughness+(h-0.5)*p.roughnessVariation,0.0,1.0);
- textureStore(albedo,vec2i(id.xy),encodeRGBA8(vec4f(mix(p.secondary.rgb,p.color.rgb,h),1)));
+ textureStore(albedo,vec2i(id.xy),encodeRGBA8(vec4f(mix(p.secondary.rgb,p.color.rgb*(1.0+2.0*p.tint*tone),h),1)));
  textureStore(normals,vec2i(id.xy),encodeRGBA8(vec4f(normal*0.5+0.5,1)));
  textureStore(roughness,vec2i(id.xy),encodeRGBA8(vec4f(vec3f(rough),1)));
  textureStore(height,vec2i(id.xy),encodeRGBA8(vec4f(vec3f(h*p.heightScale),1)));

@@ -126,3 +126,28 @@ test('security: SVG for PDF is read as strict XML with no DOM parser; hostile va
     [globalThis.DOMParser, globalThis.XMLSerializer] = saved;
   }
 });
+test('paint-order stroke paints the stroke under the fill, as SVG halo labels need', async () => {
+  const content = async (body) =>
+    (await decode(await svgToPDF(svg(body), { font }))).streams.join('\n');
+  const ops = (s) => s.split('\n').filter((l) => /^(S|f|f\*|B|B\*|sh)$|\/S\d+ sh$/.test(l));
+  // Default order: one fill-then-stroke operator.
+  assert.deepEqual(ops(await content('<rect width="10" height="10" fill="#f00" stroke="#fff"/>')), ['B']);
+  for (const body of [
+    '<rect width="10" height="10" fill="#f00" stroke="#fff" paint-order="stroke"/>',
+    '<g paint-order="markers stroke"><rect width="10" height="10" fill="#f00" stroke="#fff"/></g>',
+    '<rect width="10" height="10" style="paint-order: stroke fill" fill="#f00" stroke="#fff"/>',
+  ])
+    assert.deepEqual(ops(await content(body)), ['S', 'f'], body);
+  assert.deepEqual(
+    ops(await content('<rect width="10" height="10" fill="#f00" stroke="#fff" paint-order="fill stroke"/>')),
+    ['B'],
+  );
+  // A gradient fill also goes over its stroke.
+  const gradient = ops(
+    await content(
+      '<linearGradient id="g"><stop offset="0" stop-color="#00f"/><stop offset="1" stop-color="#f00"/></linearGradient><rect width="10" height="10" fill="url(#g)" stroke="#fff" paint-order="stroke"/>',
+    ),
+  );
+  assert.equal(gradient[0], 'S');
+  assert.match(gradient[1], /sh$/);
+});

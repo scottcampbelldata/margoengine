@@ -1,7 +1,7 @@
 import type { TransmissionPassOptions } from './transmission-pass.js';
 export { Transmission, type TransmissionPassOptions } from './transmission-pass.js';
-import type { MaterialExtension } from '@margoengine/gltf-pro';
-import { textureCoordinates } from '@margoengine/gltf-pro/coordinates';
+import type { MaterialExtension } from '@margoengine/gltf/pbr';
+import { textureCoordinates } from '@margoengine/gltf/texture-coordinates';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import type { ClearcoatTexture } from './index.js';
 import { transmissionShader } from './transmission-shader.js';
@@ -53,7 +53,8 @@ export function validateTransmission(options: TransmissionOptions): {
   if (!options || typeof options !== 'object' || Array.isArray(options))
     throw new TypeError('Invalid transmission options; pass an options object such as { factor: 1 }.');
   const factor = transmissionScalar(options.factor, 0, 'factor', 0, 1),
-    ior = transmissionScalar(options.ior, 1.5, 'IOR', 1),
+    // KHR_materials_ior: at least 1, or exactly 0 for the specular-glossiness mode (an infinite index).
+    ior = options.ior === 0 ? 0 : transmissionScalar(options.ior, 1.5, 'IOR', 1),
     dispersion = transmissionScalar(options.dispersion, 0, 'dispersion');
   const volume = options.volume;
   if (volume !== undefined && (!volume || typeof volume !== 'object' || Array.isArray(volume)))
@@ -116,15 +117,15 @@ export function createTransmission(options: TransmissionOptions = {}, base?: Mat
   const factors = [
     ...(base?.factors ?? []),
     values.factor,
-    values.ior,
+    // 0 is an infinite index: 1e30 gives F0 1 and a ray that cannot leave, in float32.
+    values.ior === 0 ? 1e30 : values.ior,
     values.thickness,
     values.inverseDistance,
     ...values.color,
     values.dispersion,
   ];
   const scatterIndex = factors.length / 4;
-  if (values.scatter)
-    factors.push(...values.scatter.color, values.scatter.anisotropy, ...values.scatter.extinction, 0);
+  if (values.scatter) factors.push(...values.scatter.color, values.scatter.anisotropy, ...values.scatter.extinction, 0);
   textures.push({ view: options.opaqueColor });
   const slot = (map?: ClearcoatTexture) => {
     if (!map) return undefined;

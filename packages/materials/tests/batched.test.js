@@ -172,6 +172,9 @@ test('argument errors name the fix; dispose frees the GPU buffers, the mesh and 
     id = batch.add(triangle);
   assert.throws(() => batch.setMatrix(id, [1, 2]), TypeError);
   assert.throws(() => batch.setMatrix(id, [...translate(0, 0, 0).slice(0, 15), Number.NaN]), RangeError);
+  // 1e39 is a finite double but Infinity as float32: it was stored and drew the item from Infinity and NaN.
+  assert.throws(() => batch.setMatrix(id, [...translate(0, 0, 0).slice(0, 12), 1e39, 0, 0, 1]), RangeError);
+  assert.equal(batch.getMatrix(id)[12], 0, 'a refused matrix leaves the item where it was');
   assert.throws(() => batch.setVisible(id, 1), TypeError);
   assert.throws(() => batch.add(triangle, { matrix: [0] }), TypeError);
   assert.equal(batch.count, 1, 'a failed add leaves nothing behind');

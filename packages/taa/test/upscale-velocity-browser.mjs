@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
-const release = await acquire({ owner: 'codex-batch192', max: 4, waitMax: 60 });
 const timer = setTimeout(() => {
   console.error('upscale-velocity-browser: timed out after 240 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 240_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-upscale-velocity/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -211,5 +211,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

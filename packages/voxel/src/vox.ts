@@ -294,20 +294,44 @@ const MATERIAL_FIELDS: Fields = [
   ...(['weight', 'rough', 'spec', 'ior', 'att', 'flux', 'plastic'] as const).map((p) => [p, `_${p}`, NUMBER] as const),
 ];
 
-// Stored text is UTF-8 (a BOM kept); text that is not is read byte for byte as windows-1252.
-// ponytail: such text comes back as UTF-8, so its bytes change on a round trip; keep raw bytes if a writer needs them.
+// Stored text is UTF-8 (a BOM kept); text that is not is read byte for byte as windows-1252 (WHATWG Encoding: every
+// byte maps to its own code point, so the bytes come back exactly). `decodedLegacy` says which way the last text went.
 const utf8 = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }),
   legacy = new TextDecoder('windows-1252'),
   encoder = new TextEncoder();
+let decodedLegacy = false;
 const decodeText = (bytes: Uint8Array): string => {
+  decodedLegacy = false;
   // Short ASCII (MagicaVoxel's keys and numbers) skips the decoder.
   if (bytes.length <= 64 && bytes.every((b) => b < 128)) return String.fromCharCode(...bytes);
   try {
     return utf8.decode(bytes);
   } catch {
+    decodedLegacy = true;
     return legacy.decode(bytes);
   }
 };
+// The windows-1252 byte of each code point that decoder gives, built on first use.
+let legacyBytes: Map<number, number> | undefined;
+const encodeLegacy = (text: string): Uint8Array | undefined => {
+  legacyBytes ??= new Map(
+    Array.from(legacy.decode(Uint8Array.from({ length: 256 }, (_, b) => b)), (c, b) => [c.codePointAt(0) as number, b]),
+  );
+  const out = new Uint8Array(text.length);
+  for (let i = 0; i < text.length; i++) {
+    const b = legacyBytes.get(text.charCodeAt(i));
+    if (b === undefined) return undefined;
+    out[i] = b;
+  }
+  return out;
+};
+// Per parsed dictionary, the entries whose text was windows-1252: whether the key was, and the value that was. writeVox
+// writes those back in windows-1252, so a parsed file keeps its bytes; a value changed since goes out as UTF-8.
+interface LegacyEntry {
+  key: boolean;
+  value?: string;
+}
+const legacyText = new WeakMap<Map<string, string>, Map<string, LegacyEntry>>();
 
 // --- Parsing --------------------------------------------------------------------------------------------------------
 
@@ -317,7 +341,8 @@ const quote = (text: string): string => JSON.stringify(text.length > 40 ? `${tex
 
 /**
  * Parses a MagicaVoxel `.vox` file (version 150 or 200). Models, palette, materials, scene graph and layers are
- * decoded; every other chunk is kept as bytes in `chunks`, so {@link writeVox} gives the same bytes back. The result
+ * decoded; every other chunk is kept as bytes in `chunks`, so {@link writeVox} gives the same bytes back (dictionary
+ * text that is not UTF-8 reads as windows-1252 and is written back in it while unchanged). The result
  * shares no memory with `bytes`.
  * @throws TypeError when `bytes` is not a Uint8Array or ArrayBuffer, or does not start with `VOX ` and a MAIN chunk.
  * @throws RangeError for a truncated, oversized or inconsistent file: a chunk past its parent, trailing bytes, a SIZE
@@ -389,11 +414,17 @@ export function parseVox(bytes: Uint8Array | ArrayBuffer): VoxScene {
     },
     dict = () => {
       const map = new Map<string, string>();
+      let marks: Map<string, LegacyEntry> | undefined;
       for (let pairs = count(0, 8, 'attributes'); pairs--; ) {
-        const key = text();
+        const key = text(),
+          keyLegacy = decodedLegacy;
         if (map.has(key)) throw bad(`${where()} has attribute ${quote(key)} twice`);
-        map.set(key, text());
+        const value = text();
+        map.set(key, value);
+        if (keyLegacy || decodedLegacy)
+          (marks ??= new Map()).set(key, { key: keyLegacy, value: decodedLegacy ? value : undefined });
       }
+      if (marks) legacyText.set(map, marks);
       return map;
     },
     // Decodes `list`'s typed fields of `attributes` onto `item`.
@@ -678,9 +709,9 @@ class Out {
       this.at += 4;
     }
   }
-  text(value: string): void {
+  text(value: string, asLegacy = false): void {
     if (value.length > 64 || /[^\0-\x7f]/.test(value)) {
-      const bytes = encoder.encode(value);
+      const bytes = (asLegacy && encodeLegacy(value)) || encoder.encode(value);
       this.int(bytes.length);
       this.push(bytes);
       return;
@@ -691,10 +722,12 @@ class Out {
     for (let i = 0; i < value.length; i++) this.bytes[this.at++] = value.charCodeAt(i);
   }
   dict(map: Map<string, string>): void {
+    const marks = legacyText.get(map);
     this.int(map.size);
     for (const [key, value] of map) {
-      this.text(key);
-      this.text(value);
+      const mark = marks?.get(key);
+      this.text(key, mark?.key);
+      this.text(value, mark?.value === value);
     }
   }
   // Starts chunk `id` and returns where its two sizes go; close() fills them in.
@@ -728,7 +761,9 @@ function attributesOf(item: object, list: Fields, what: string): Map<string, str
     stored = from.attributes;
   if (stored !== undefined && !(stored instanceof Map))
     throw new TypeError(`${what} attributes must be a Map of strings`);
-  const out = new Map<string, string>(stored as Map<string, string> | undefined);
+  const out = new Map<string, string>(stored as Map<string, string> | undefined),
+    marks = stored && legacyText.get(stored as Map<string, string>);
+  if (marks) legacyText.set(out, marks);
   for (const [key, value] of out)
     if (typeof key !== 'string' || typeof value !== 'string') throw new TypeError(`${what} attributes must be strings`);
   for (const [prop, key, codec] of list) {

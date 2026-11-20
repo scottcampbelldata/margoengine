@@ -140,6 +140,20 @@ export function uastcTables(): Uint32Array {
 /** The mode a block's first byte names; 19 is reserved. */
 export const uastcMode = (byte: number): number => MODE_BY_BITS[byte & 127];
 
+/**
+ * Whether the UASTC block at `at` is one the specification defines: not the reserved mode 19, and a partition pattern
+ * inside its mode's table (30 two-subset patterns, 11 three-subset ones for mode 3, 19 for mode 7). The PAT field has
+ * room for more, and the shader would read a neighbouring table for them.
+ */
+export function uastcBlockValid(bytes: Uint8Array, at: number): boolean {
+  const mode = uastcMode(bytes[at]);
+  if (mode === 19) return false;
+  const [field, , , subsets] = MODES[mode];
+  if (subsets < 2) return true;
+  const pattern = ((bytes[at + (field >> 3)] | (bytes[at + (field >> 3) + 1] << 8)) >> (field & 7)) & (mode === 3 ? 15 : 31);
+  return pattern < (mode === 3 ? 11 : mode === 7 ? 19 : 30);
+}
+
 const JOB = /* wgsl */ `
 struct Job {
   blocksX: u32,

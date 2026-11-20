@@ -1,5 +1,5 @@
-import { textureCoordinates, textureTransform } from '@margoengine/gltf-pro/model';
-import type { GLTFLight, PBRMaterial, PBRModel, TextureTransform } from '@margoengine/gltf-pro';
+import { textureCoordinates, textureTransform } from '@margoengine/gltf/pbr-model';
+import type { GLTFLight, PBRMaterial, PBRModel, TextureTransform } from '@margoengine/gltf/pbr';
 import { attenuationPower } from '../../shared/attenuation.js';
 import { createKeyframeClip, type Keyframe, type KeyframeClip, type PropertyTrackData } from './keyframes.js';
 import { animationIndex, animationInterpolation, animationSampler, type AnimationDefinition } from './gltf.js';
@@ -125,6 +125,7 @@ const cameraFields: Record<string, string[]> = {
   perspective: ['yfov', 'aspectRatio', 'znear', 'zfar'],
   orthographic: ['xmag', 'ymag', 'znear', 'zfar'],
 };
+const iorPointer = /^\/materials\/\d+\/extensions\/KHR_materials_ior\/ior$/;
 const colors = new Set(['pbrMetallicRoughness/baseColorFactor', 'emissiveFactor', 'color']);
 /** Says an unplayable but valid pointer is skipped; caught per channel and reported as a warning. */
 class Skip {
@@ -177,6 +178,17 @@ export const pointerChannels: PointerChannels = (model, def, clip) => {
     if (times.some((v, i) => v < 0 || (i > 0 && v <= times[i - 1])))
       throw new RangeError(`${label} key times must be nonnegative and strictly increasing; fix the sampler input`);
     duration = Math.max(duration, times[times.length - 1]);
+    if (iorPointer.test(pointer)) {
+      // KHR_materials_ior: an IOR of 0 is a mode set once in JSON, not a value on the scale; no sampler may key a
+      // value below 1, 0 included, even for a material whose JSON IOR is 0.
+      const keyed = model.asset.accessor(sampler.output, 'SCALAR'),
+        step = interpolation === 'CUBICSPLINE' ? 3 : 1;
+      for (let k = 0; k < times.length; k++)
+        if (keyed[k * step + (step >> 1)] < 1)
+          throw new RangeError(
+            `${label} pointer ${pointer} keys an IOR of ${keyed[k * step + (step >> 1)]}; KHR_materials_ior allows animated IORs of 1 or more only`,
+          );
+    }
     let resolved: { nodes: number[]; path: AnimationPath; mesh: boolean } | Target;
     try {
       resolved = resolvePointer(model, doc, pointer, label);
@@ -466,10 +478,12 @@ function materialTarget(model: PBRModel, doc: Json, material: number, path: stri
     skip(`targets ${needs.split('/').pop()}, which the material does not define`);
   if (extension && !object(lookup(def, extension)))
     skip(`targets ${extension.slice(11)}, which the material does not use`);
+  if (path === 'extensions/KHR_materials_ior/ior' && lookup(def, path) === 0)
+    skip('targets an IOR of 0, a mode KHR_materials_ior keeps for good (updates are ignored)');
   if (!mats.length) skip('targets a material no primitive draws');
   if (field === 'physical' || field === 'ext' || field === 'volume') {
     if (mats.some((m) => !m.physical))
-      skip('targets a physical material factor gltf-pro did not load (pass decoders.materials)');
+      skip('targets a physical material factor gltf/pbr did not load (pass decoders.materials)');
     if ((field === 'volume' || offset === 3) && mats.some((m) => !m.tint && !m.attenuation))
       skip('targets transmission or volume of a material loaded without transmission');
   }
@@ -482,7 +496,7 @@ function materialTarget(model: PBRModel, doc: Json, material: number, path: stri
       const key = `material ${material}`,
         shared = (states.get(key) as MaterialState | undefined) ?? materialState(def, mats);
       states.set(key, shared);
-      // gltf-pro's base colour can be the asset document's own array; write a copy.
+      // gltf/pbr's base colour can be the asset document's own array; write a copy.
       if (field === 'base') for (const m of mats) m.base = m.base.slice();
       return (value) => {
         if (field === 'emissive' || field === 'strength') {
@@ -496,6 +510,8 @@ function materialTarget(model: PBRModel, doc: Json, material: number, path: stri
           else if (offset === 4) shared.distance = value[0];
           else for (let c = 0; c < 3; c++) shared.atten[c] = value[c];
         } else if (field === 'dispersion') for (const m of mats) m.dispersion = value[0];
+        // A cubic spline between IOR keys of 1 or more can dip below 1, and an IOR of 0 reads as the infinite mode.
+        else if (field === 'ext' && offset === 1) for (const m of mats) m.ext![1] = Math.max(1, value[0]);
         else for (const m of mats) for (let c = 0; c < size; c++) m[field]![offset + c] = value[c];
         if (field === 'base' || field === 'volume' || (field === 'physical' && offset === 3)) tint(shared);
       };
@@ -540,7 +556,7 @@ function materialState(def: Json, mats: PBRMaterial[]): MaterialState {
   };
 }
 
-// Recomputes what gltf-pro derives from base colour, transmission and volume at load.
+// Recomputes what gltf/pbr derives from base colour, transmission and volume at load.
 function tint({ mats, atten, thickness, distance }: MaterialState): void {
   const depth = thickness / distance;
   for (const m of mats) {

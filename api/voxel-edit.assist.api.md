@@ -11,11 +11,15 @@ export function noiseFill(size: [number, number, number], options?: {
     palette?: number;
 }): VoxelGrid;
 
-export function paletteUsage(grid: VoxelGrid): Uint32Array;
+export function paletteUsage(grid: VoxelGrid, limits?: GridLimits): Uint32Array;
 
 export function suggestPalette(count: number, seed?: number): [number, number, number][];
 
 // Not exported from this entry, but used by the exports above:
+
+interface GridLimits {
+    maxCells?: number;
+}
 
 interface VoxelGrid {
     readonly size: Vec3;

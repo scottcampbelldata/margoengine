@@ -10,9 +10,12 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { interfaceHash } from '../../shared/bindgen-wasm.js';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 const peers = Object.keys({ ...manifest.dependencies, ...manifest.peerDependencies });
 await copyLegal(root);
@@ -54,7 +57,7 @@ await build({
   logLevel: 'warn',
   plugins: [rapierWasm],
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: dist,
     emptyOutDir: true,
     target: 'es2022',
     lib: {
@@ -71,11 +74,11 @@ await build({
     },
   },
 });
-await copyFile(resolve(rapierDir, 'rapier_wasm2d_bg.wasm'), resolve(root, 'dist/rapier2d.wasm'));
+await copyFile(resolve(rapierDir, 'rapier_wasm2d_bg.wasm'), resolve(dist, 'rapier2d.wasm'));
 // Rapier ships inside this package, so its licence and a notice of what was taken ship beside it.
-await copyFile(resolve(rapierDir, 'LICENSE'), resolve(root, 'dist/LICENSE-Apache-2.0.txt'));
+await copyFile(resolve(rapierDir, 'LICENSE'), resolve(dist, 'LICENSE-Apache-2.0.txt'));
 await writeFile(
-  resolve(root, 'dist/THIRD-PARTY-NOTICE.md'),
+  resolve(dist, 'THIRD-PARTY-NOTICE.md'),
   `# Third-party notice
 
 This package bundles Rapier (\`@dimforge/rapier2d\` ${rapierVersion}, https://rapier.rs, by Dimforge),
@@ -88,7 +91,7 @@ licensed under the Apache License 2.0 (\`LICENSE-Apache-2.0.txt\` beside this fi
 );
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.

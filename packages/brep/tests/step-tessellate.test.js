@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { model, parseSTEP, tessellateSTEP, validateSTEP } from '../dist/index.js';
+import { withExactMath } from '../../../tests/support/exact-math.js';
 
 const real = (x) => {
   if (Math.abs(x) < 1e-13) return '0.';
@@ -486,7 +487,9 @@ test('meshes on surfaces other than revolutions are bit for bit as before the tw
   // Digests recorded from the build before the tangent rim fix (19b9e2060): laying a twisted face out at
   // (u + twist(v), meridian(v)), and taking Su x Sv as degenerate within rounding of |Su| |Sv|, change nothing for
   // planes, cylinders, cones, spheres, tori, extrusions and B-splines. A deliberate change to their meshing records
-  // them again, saying why.
+  // them again, saying why. The meshes are made with exactly specified trigonometry (tests/support/exact-math.js):
+  // Math.sin, cos, atan2 and the rest are implementation-approximated and differ in the last bit between x64 and
+  // arm64, which moved 14 of these digests on an arm64 Mac with the code unchanged.
   const parts = {
       box: () => box(10, 20, 30),
       cylinder: () => cylinder(10, 20),
@@ -504,24 +507,24 @@ test('meshes on surfaces other than revolutions are bit for bit as before the tw
     expected = {
       'box at 0.01': '52db400ee2a571bc',
       'box at 0.001': '52db400ee2a571bc',
-      'cylinder at 0.01': '4f8135d172813839',
-      'cylinder at 0.001': 'eb246e560815365d',
-      'cylinder, no seam at 0.01': '49b656b9cd56d877',
-      'cylinder, no seam at 0.001': 'b762152e2f307cad',
-      'cylinder, extruded side at 0.01': '40adfcbab4006dbd',
-      'cylinder, extruded side at 0.001': 'f17e875213045b89',
-      'sphere at 0.01': '9b9371d0bbc92654',
-      'sphere at 0.001': 'dceeb57e98a78cb5',
-      'sphere, unbounded at 0.01': 'bbc4dd37ea6c54f6',
-      'sphere, unbounded at 0.001': 'bc2e1acedd8340ba',
-      'hemisphere at 0.01': '3aeec675d7990828',
-      'hemisphere at 0.001': '1970e5f75812ac60',
-      'cone at 0.01': '66ae58c4e9cfc2cb',
-      'cone at 0.001': 'fdfb86e687eca4ad',
-      'cone sector at 0.01': 'b45fcb524e54db68',
-      'cone sector at 0.001': '5a96f72268edde18',
-      'torus at 0.01': '991c7bb9027978fa',
-      'torus at 0.001': 'd55ba361c6ab6829',
+      'cylinder at 0.01': '319eb5830e4097b3',
+      'cylinder at 0.001': '6eade8540b17123c',
+      'cylinder, no seam at 0.01': 'bf0786e4b7d0cc92',
+      'cylinder, no seam at 0.001': '2a97115a11ddddfd',
+      'cylinder, extruded side at 0.01': '9ccaf0aee16ec429',
+      'cylinder, extruded side at 0.001': 'ad84c41dfef6d792',
+      'sphere at 0.01': 'decf545db989d53e',
+      'sphere at 0.001': '906b2aa1a219572d',
+      'sphere, unbounded at 0.01': 'c0a11b6e5ccdb910',
+      'sphere, unbounded at 0.001': 'c7a7d9a5e9a7bc1d',
+      'hemisphere at 0.01': 'a3d2e378d7673269',
+      'hemisphere at 0.001': 'a38f9a8130648edb',
+      'cone at 0.01': '471649836a966fad',
+      'cone at 0.001': '2ba9ec130da4cddc',
+      'cone sector at 0.01': '36dc6d328ea12388',
+      'cone sector at 0.001': '1394d59796b9d598',
+      'torus at 0.01': '8e4551d6130aacf3',
+      'torus at 0.001': '4d28a0aeeabaff2e',
       'B-spline cylinder at 0.01': 'de99f9199d18b05f',
       'B-spline cylinder at 0.001': 'b9f598c44123e6b1',
       'bicubic B-spline block at 0.01': '088f1a7eb69144a2',
@@ -530,7 +533,7 @@ test('meshes on surfaces other than revolutions are bit for bit as before the tw
   const got = {};
   for (const [name, part] of Object.entries(parts))
     for (const deflection of [0.01, 0.001]) {
-      const m = mesh(part(), deflection);
+      const m = withExactMath(() => mesh(part(), deflection));
       assert.deepEqual(m.failures, [], `${name} at ${deflection}`);
       got[`${name} at ${deflection}`] = meshDigest(m);
     }

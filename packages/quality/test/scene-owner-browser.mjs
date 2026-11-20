@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 
-setTimeout(() => process.exit(124), 120_000).unref();
+setTimeout(() => {
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
+}, 120_000).unref();
 const context = await openBrowser({ startPath: '/packages/quality/test/ssaa-browser.html', port: 'free' });
 const problems = [];
 context.page.on('pageerror', (error) => problems.push(error.message));

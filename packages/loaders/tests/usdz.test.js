@@ -208,3 +208,54 @@ test('USDA ignores every transform op up to the last reset', () => {
   );
   assert.deepEqual(Array.from(result.positions.slice(0, 3)), [1, 2, 3]);
 });
+
+const firstPoints = (source) =>
+  [...parseUSDA(stage(source)).positions.slice(0, 6)].map((v) => Math.round(v * 1e6) / 1e6 + 0);
+test('UsdGeomXformOp: rotateX/Y/Z, every rotateABC order, orient, suffixed ops and !invert! pivots', () => {
+  const xform = (ops, order) => `def Xform "X" {\n${ops}\n uniform token[] xformOpOrder = ${order}\n${triangle}}`;
+  // rotateZ 90 takes (1, 0, 0) to (0, 1, 0).
+  assert.deepEqual(firstPoints(xform('float xformOp:rotateZ = 90', '["xformOp:rotateZ"]')).slice(3), [0, 1, 0]);
+  // rotateYZX (90, 90, 0): Y first takes (1, 0, 0) to (0, 0, -1), then Z leaves it, then X keeps it on -Z... worked
+  // by hand: Ry(90) x = (0, 0, -1); Rz(90) (0, 0, -1) = (0, 0, -1); Rx(0) is the identity.
+  assert.deepEqual(
+    firstPoints(xform('float3 xformOp:rotateYZX = (90, 90, 0)', '["xformOp:rotateYZX"]')).slice(3),
+    [0, 0, -1],
+  );
+  // rotateZYX (90, 0, 90) in that op's angle order (Z, Y, X): Z first gives (0, 1, 0), X (90) then gives (0, 0, 1).
+  assert.deepEqual(
+    firstPoints(xform('float3 xformOp:rotateZYX = (90, 0, 90)', '["xformOp:rotateZYX"]')).slice(3),
+    [0, 0, 1],
+  );
+  // orient (w, i, j, k) = (cos 45, 0, 0, sin 45): a 90 degree turn about Z.
+  const h = Math.SQRT1_2;
+  assert.deepEqual(
+    firstPoints(xform(`quatf xformOp:orient = (${h}, 0, 0, ${h})`, '["xformOp:orient"]')).slice(3),
+    [0, 1, 0],
+  );
+  // A rotate pivot: translate(p), rotateZ 90, invert translate(p) turns about (1, 0, 0), so (1, 0, 0) stays put and
+  // the origin goes to (1, -1, 0).
+  const pivot = xform(
+    'double3 xformOp:translate:pivot = (1, 0, 0)\n float xformOp:rotateZ = 90',
+    '["xformOp:translate:pivot", "xformOp:rotateZ", "!invert!xformOp:translate:pivot"]',
+  );
+  assert.deepEqual(firstPoints(pivot), [1, -1, 0, 1, 0, 0]);
+  assert.throws(() => parseUSDA(stage(xform('', '["xformOp:translate"]'))), /not authored/);
+});
+
+test('UsdShadeMaterialBindingAPI: a binding on an ancestor applies to its meshes; purpose guide hides a subtree', () => {
+  const material = `def Material "Mat" {
+ token outputs:surface.connect = </Mat/Surface.outputs:surface>
+ def Shader "Surface" { uniform token info:id = "UsdPreviewSurface"
+ color3f inputs:diffuseColor = (1, 0, 0) token outputs:surface }
+}`;
+  const mesh = parseUSDA(
+    stage(
+      `${material}\ndef Xform "Group" { rel material:binding = </Mat>\n${triangle}\n def Xform "Guide" { uniform token purpose = "guide"\n${triangle.replace('"Triangle"', '"G"')}\n}\n}`,
+    ),
+  );
+  assert.equal(mesh.groups.length, 1, 'the guide subtree is not drawn');
+  assert.deepEqual(
+    mesh.groups[0].color.map((v) => Math.round(v * 1e6) / 1e6),
+    [1, 0, 0, 1],
+  );
+});

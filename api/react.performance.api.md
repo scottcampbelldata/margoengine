@@ -14,6 +14,8 @@ export interface AdaptiveDprProps {
     pixelated?: boolean;
 }
 
+export function AdaptiveEvents(): import("react").JSX.Element;
+
 export interface PerformanceCallbacks {
     onIncline?: (api: PerformanceSnapshot) => void;
     onDecline?: (api: PerformanceSnapshot) => void;

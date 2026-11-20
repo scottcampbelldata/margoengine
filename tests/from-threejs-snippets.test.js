@@ -37,7 +37,7 @@ for (const file of guides)
         assert.match(
           from,
           task?.react
-            ? /^(margoengine\/react(\/gltf-pro)?|react|react-dom\/client)$/
+            ? /^(margoengine\/react(\/gltf)?|react|react-dom\/client)$/
             : /^(margoengine(\/[a-z0-9-]+){0,2}|@margoengine\/[a-z0-9-]+(\/[a-z0-9-]+)?|@dimforge\/rapier3d-compat)$/,
           `snippet at line ${line} imports ${from}`,
         );
@@ -49,7 +49,7 @@ for (const file of guides)
       resolve(dir, 'globals.d.ts'),
       [
         "import type {EngineKernel, Mesh} from '@margoengine/core';",
-        "import type {PBRModel} from '@margoengine/gltf-pro';",
+        "import type {PBRModel} from '@margoengine/gltf/pbr';",
         '// Names the guide uses without declaring them; a snippet that declares its own shadows these.',
         'declare global {const engine: EngineKernel; const canvas: HTMLCanvasElement; const mesh: Mesh; const model: PBRModel;}',
         'export {};',

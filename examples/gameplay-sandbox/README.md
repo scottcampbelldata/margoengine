@@ -31,7 +31,8 @@ into the current sky radiance. Haze starts at 45 m, preserving nearby shores,
 while skyward horizon sampling removes the dark ground strip. The same settings
 follow the full clock into blue moonlit nights with warm cabin lighting.
 
-After sunset, shared `Sky` blends in blue moonlight at 10% of daytime intensity,
+After sunset, shared `Sky` blends in this scene's blue moonlight (`lighting.moon`: intensity 0.6, dimmed by the
+cloud sheet's 38% cover through `cloudTransmittance`),
 keeps four PCSS shadow cascades active, and supplies a navy RGB ambient floor and
 matching sky/water reflections. The shared moon preset sits about 12° above the
 horizon. Water uses the shared `Sky.lights` records to reflect the actual sun and

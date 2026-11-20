@@ -91,10 +91,31 @@ export function sunlitSky(options?: SunlitSkyOptions): SkyOptions & {
 
 // Not exported from this entry, but used by the exports above:
 
+type MoonBrightnessName = 'bright' | 'dim';
+
+type MoonColorName = 'blood' | 'reddened';
+
+type MoonPhase = number | MoonPhaseName;
+
+type MoonPhaseName = 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'lastQuarter' | 'waningCrescent' | 'half' | 'quarter';
+
+interface SkyAtmosphereOptions {
+    sunIntensity?: number;
+    sunColor?: Vec3;
+    rayleigh?: number;
+    rayleighColor?: Vec3;
+    mie?: number;
+    mieColor?: Vec3;
+    mieAnisotropy?: number;
+    ozone?: number;
+    scatteredLight?: Vec3;
+}
+
 interface SkyCloudOptions {
     coverage?: number;
     speed?: number;
     height?: number;
+    depth?: number;
 }
 
 interface SkyFogOptions {
@@ -106,6 +127,11 @@ interface SkyFogOptions {
     color?: Vec3;
 }
 
+interface SkyGradientStop {
+    elevation: number;
+    color: Vec3;
+}
+
 interface SkyLightingOptions {
     intensity?: number;
     minimum?: number;
@@ -113,12 +139,43 @@ interface SkyLightingOptions {
     sunset?: Vec3;
     moon?: {
         intensity?: number;
+        brightness?: number | MoonBrightnessName;
+        color?: Vec3 | MoonColorName;
+        extinction?: number;
+        cloudCover?: number;
+    };
+    twilight?: false | {
+        brightness?: number;
+        cloudCover?: number;
         color?: Vec3;
     };
     ambient?: {
         day: Vec3;
         night: Vec3;
     };
+    ground?: number;
+}
+
+interface SkyLookOptions {
+    zenithColor?: Vec3;
+    zenithStrength?: number;
+    horizonColor?: Vec3;
+    horizonStrength?: number;
+    groundColor?: Vec3;
+    groundStrength?: number;
+    gradient?: readonly SkyGradientStop[];
+    gradientStrength?: number;
+    gradientIntensity?: number;
+    sunDiscSize?: number;
+    sunDiscColor?: Vec3;
+    sunDiscIntensity?: number;
+    sunDiscSoftness?: number;
+    glowColor?: Vec3;
+    glowStrength?: number;
+    glowWidth?: number;
+    glowSunward?: number;
+    cloudColor?: Vec3;
+    cloudDensity?: number;
 }
 
 interface SkyNightOptions {
@@ -127,7 +184,7 @@ interface SkyNightOptions {
     moonColor?: Vec3;
     moonDirection?: Vec3;
     moonSize?: number;
-    moonPhase?: number;
+    moonPhase?: MoonPhase;
     moonLitBySun?: boolean;
     glowIntensity?: number;
     starIntensity?: number;
@@ -147,6 +204,9 @@ interface SkyOptions {
     turbidity?: number;
     exposure?: number;
     lighting?: SkyLightingOptions;
+    atmosphere?: SkyAtmosphereOptions;
+    look?: SkyLookOptions;
     environment?: boolean;
+    coverage?: boolean;
 }
 ```

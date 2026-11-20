@@ -3,6 +3,7 @@ import { cross, sub } from '@margoengine/math/vec3';
 import { meshSelectionVertices } from './components.js';
 import { replaceRegionCaps } from './region-topology.js';
 import type { ComponentEditResult, PolygonFace, PolygonMesh, MeshEditOptions } from './types.js';
+import { greatestOf } from './least.js';
 
 /** Options for {@link extrudeMeshRegion}, in the mesh's local coordinates. */
 export interface RegionExtrudeOptions extends MeshEditOptions {
@@ -23,7 +24,7 @@ export interface RegionExtrudeResult extends ComponentEditResult {
 function unitDirection(value: readonly number[]): MutableVec3 {
   if (!Array.isArray(value) || value.length !== 3 || !value.every(Number.isFinite))
     throw new TypeError('Region direction needs three finite numbers; supply a local direction or omit it.');
-  const magnitude = Math.max(...value.map(Math.abs));
+  const magnitude = greatestOf(value.map(Math.abs));
   if (!magnitude) throw new RangeError('Region direction must be finite and nonzero; choose a supported local axis.');
   const scaled = value.map((v) => v / magnitude),
     length = Math.hypot(...scaled);

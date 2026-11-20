@@ -563,11 +563,20 @@ export function finishBoolean(
       a: Object.fromEntries(a.faces.map((face) => [face.id, [] as string[]])),
       b: Object.fromEntries(b.faces.map((face) => [face.id, [] as string[]])),
     };
+  // Claim kept IDs before naming anything: every first piece of an `a` face, then of a `b` face, whatever order the
+  // loops come in, so a `b` face never takes an ID that `a` uses.
+  const keeps = new Set<BooleanLoop>();
+  for (const input of [0, 1])
+    for (const loop of merged)
+      if (loop.input === input && !usedIds.has(loop.face)) {
+        usedIds.add(loop.face);
+        keeps.add(loop);
+      }
   let triangulated = 0;
   for (const loop of merged) {
     const input = loop.input === 0 ? 'a' : 'b',
       wanted = loop.face,
-      id = usedIds.has(wanted) ? createId() : (usedIds.add(wanted), wanted);
+      id = keeps.has(loop) ? wanted : createId();
     let pieces: PolygonFace[] | null =
       loop.vertices.length <= 64 && !polygonGeometryError(loop.vertices.map((v) => vertices[v]))
         ? [{ id, vertices: loop.vertices, uv: loop.uv }]

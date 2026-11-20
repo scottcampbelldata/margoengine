@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {openBrowser} from '../../../scripts/browser.js';
+import {legDevice} from '../../../scripts/support/compat-shim.js';
 import {runComputeOnCPU} from '@margoengine/webgl2-compat/compute';
 import {DENOISE_ML} from '../src/denoise-ml-shader.ts';
 import {WEIGHTS} from '../src/denoise-ml-weights.ts';
@@ -23,7 +24,7 @@ for(const compat of [false,true]){
   }
   assert.ok(result.syntheticMSE.network<result.syntheticMSE.raw,JSON.stringify(result.syntheticMSE));assert.ok(result.realMSE.network<result.realMSE.raw,JSON.stringify(result.realMSE));
   delete result.fixture;delete result.synthetic;delete result.syntheticOutput;delete result.realOutput;
-  console.log(JSON.stringify({compat,hardware:context.hardware,result}));rows.push({compat,hardware:context.hardware,result});
+  console.log(JSON.stringify({compat,device:legDevice(compat,context.hardware),hardware:context.hardware,result}));rows.push({compat,device:legDevice(compat,context.hardware),hardware:context.hardware,result});
  }finally{await context.close();}
 }
 await writeFile('test-results/voxel-pathtracer-denoise-ml.json',JSON.stringify({training:'tests/fixtures/denoise-ml-training.json',asset:fixture.asset,referenceSamples:fixture.referenceSamples,rows},null,2));

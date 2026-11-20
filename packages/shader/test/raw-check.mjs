@@ -72,6 +72,9 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu));
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
 
+  await shows('depthTexture', [0.5, 0, 0]);
+  await shows('depthEqual', [1, 0, 0]);
+  await shows('depthBiased', [0, 1, 0]);
   await shows('uniformList', [0, 1, 0]);
   await shows('uniformFlat', [0, 0.5, 0.25]);
   await shows('uniformColours', [1, 0, 0]);
@@ -120,6 +123,25 @@ try {
   await lit('shadowCut');
   await lit('shadowTransparent');
   await lit('shadowOut');
+  await shadowed('glslShadow');
+  await lit('glslShadowCut');
+  // TAA's jitter reaches a GLSL vertex stage as it reaches WGSL: the turned edges resolve the same, unlike a frame without TAA.
+  const edgeRow = async (name) => {
+    await scene(name);
+    const png = await image(),
+      row = Array.from({ length: png.width }, (_, x) => at(png, x, png.height / 2)[0]);
+    await clear();
+    assert.equal(row[Math.floor(png.width / 2)], 255, name + ': the middle is the quad colour');
+    return row;
+  };
+  const glslRow = await edgeRow('glslTAA'),
+    wgslRow = await edgeRow('wgslTAA'),
+    plainRow = await edgeRow('glslNoTAA'),
+    most = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+  console.log('glsl taa edge row against wgsl', most(glslRow, wgslRow), 'against no TAA', most(glslRow, plainRow));
+  assert.ok(most(glslRow, wgslRow) <= 2, 'glslTAA: the GLSL edges resolve as the WGSL ones do');
+  assert.ok(most(glslRow, plainRow) > 8, 'glslTAA: TAA changes the edges, so the comparison above has something to see');
+  console.log('ok glslTAA');
 
   // SSAO darkens the ambient light the mesh gave it near the crease; with depth alone it has no light to take away.
   const own = await scene('ssaoOwn'),
@@ -149,6 +171,7 @@ try {
   await picks('pickInFront', { raw: true });
   await picks('pickHidden', { miss: null });
   await picks('pickMoved', { shown: true, source: null });
+  await picks('glslPick', { shown: true, source: null });
   await picks('pickFollowed', { core: true, raw: true });
   await picks('pickRemoved', { miss: null, gone: null });
   assert.deepEqual(pageErrors, []);

@@ -5,12 +5,14 @@ import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },
@@ -47,6 +49,12 @@ try {
       `Near-plane clipping failed: ${JSON.stringify(report.gallery.nearPlane)}`,
     );
     report.checks.push('Line crossing the camera plane is clipped at the near plane');
+    const { butt, round } = report.gallery.roundCaps;
+    assert.ok(
+      butt.length > 50 && Math.abs(round.length - butt.length - butt.thickness) <= 3,
+      `Round caps of a rightward segment do not reach past its ends: ${JSON.stringify(report.gallery.roundCaps)}`,
+    );
+    report.checks.push('Round caps of a segment with a normal of (-0, 1) reach half the width past each end');
     await page
       .locator('#gallery')
       .screenshot({ path: resolve(results, samples === 4 ? 'lines-gallery.png' : 'lines-gallery-mobile.png') });

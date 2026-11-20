@@ -2,8 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Material, createMesh } from '@margoengine/materials';
-import { parseGLTF } from '@margoengine/gltf-pro';
-import { extendedMaterials } from '@margoengine/gltf-pro/extended';
+import { parseGLTF } from '@margoengine/gltf/pbr';
+import { extendedMaterials } from '@margoengine/gltf/extended-materials';
 import { exportModel } from '../dist/model.js';
 import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { materialEngine as headless, readGLB, validate, validator } from './helpers.js';

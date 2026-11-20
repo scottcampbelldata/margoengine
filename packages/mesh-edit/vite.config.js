@@ -11,7 +11,7 @@ export default defineConfig({
     alias: [
       { find: /^@margoengine\/core\/extension$/, replacement: resolve(repository, 'packages/core/dist/extension.js') },
       { find: /^@margoengine\/core$/, replacement: resolve(repository, 'packages/core/dist/index.js') },
-      { find: /^@margoengine\/gltf-pro$/, replacement: resolve(repository, 'packages/gltf-pro/dist/index.js') },
+      { find: /^@margoengine\/gltf\/pbr$/, replacement: resolve(repository, 'packages/gltf/dist/pbr.js') },
       { find: /^@margoengine\/mesh-edit$/, replacement: resolve(root, 'dist/index.js') },
       { find: /^@margoengine\/mesh-edit\/(.+)$/, replacement: resolve(root, 'dist/$1.js') },
     ],

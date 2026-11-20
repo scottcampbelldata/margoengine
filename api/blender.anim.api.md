@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { GLTFDocument, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFDocument, PBRModel } from "@margoengine/gltf/pbr";
 
 export interface MargoGLTF {
     readonly document: GLTFDocument;

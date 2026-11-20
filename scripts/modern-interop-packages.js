@@ -12,7 +12,7 @@ const names = [
     'math',
     'geometry',
     'decoders',
-    'gltf-pro',
+    'gltf',
     'blender',
     'loaders',
     'exporters',

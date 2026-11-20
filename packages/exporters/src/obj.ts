@@ -6,6 +6,7 @@ import {
   drawables,
   num,
   polygons,
+  polylines,
   textureFiles,
   toWorld,
   token,
@@ -78,7 +79,9 @@ const linear = (v: number): number => v;
 
 /**
  * Exports world-space OBJ with one group per mesh, normals, UVs when present, and 1-based indices. Geometry
- * `faceSizes` quads are written as 4-corner faces.
+ * `faceSizes` quads are written as 4-corner faces. A loaded model's glTF points are written as `p` elements and its
+ * lines as `l` polylines (a strip or loop as one polyline), in their own group after the mesh's faces, with the same
+ * `usemtl` and vertex colours (Wavefront OBJ: point and line elements name `v` and, for lines, `vt`; no normals).
  */
 export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJResult {
   const withMaterials = options.materials ?? false,
@@ -116,10 +119,13 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
     opacity = new Map<string, string>(),
     encode = colorSpace === 'srgb' ? toSrgb : linear;
   if (withMaterials) lines.push(`mtllib ${mtlName}`);
+  // Points and lines write `v` (and `vt` for lines) without `vn`, so the three lists count apart.
   let vertexBase = 1,
     uvBase = 1,
+    normalBase = 1,
     index = 0;
-  for (const item of drawables(collect(source, options, undefined, withTextures ? 'baseColor' : 'shape'))) {
+  const roots = collect(source, options, undefined, withTextures ? 'baseColor' : 'shape', ['points', 'lines']);
+  for (const item of drawables(roots, true)) {
     const { positions, normals, indices } = toWorld(item),
       geo = item.geometry,
       uvs = geo.uvs,
@@ -168,6 +174,29 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
       }
       lines.push(`usemtl ${name}`);
     }
+    if (geo.topology) {
+      // Wavefront OBJ point and line elements: `p v1 v2 ...` and `l v1/vt1 v2/vt2 ...`, which name no normals.
+      for (let i = 0; i < geo.count; i++) {
+        let line = `v ${num(positions[i * 3] * scale)} ${num(positions[i * 3 + 1] * scale)} ${num(positions[i * 3 + 2] * scale)}`;
+        if (vertexColors) {
+          const c = i * geo.colorSize;
+          line += ` ${num(encode(vertexColors[c]))} ${num(encode(vertexColors[c + 1]))} ${num(encode(vertexColors[c + 2]))}`;
+        }
+        lines.push(line);
+      }
+      const lineUVs = geo.topology === 'lines' ? uvs : undefined;
+      if (lineUVs) for (let i = 0; i < geo.count; i++) lines.push(`vt ${num(lineUVs[i * 2])} ${num(1 - lineUVs[i * 2 + 1])}`);
+      const t = uvBase - vertexBase;
+      if (geo.topology === 'points')
+        for (let i = 0; i < indices.length; i += 32)
+          lines.push(`p ${Array.from(indices.subarray(i, i + 32), (v) => v + vertexBase).join(' ')}`);
+      else
+        for (const polyline of polylines(indices))
+          lines.push(`l ${polyline.map((v) => (lineUVs ? `${v + vertexBase}/${v + vertexBase + t}` : v + vertexBase)).join(' ')}`);
+      vertexBase += geo.count;
+      if (lineUVs) uvBase += geo.count;
+      continue;
+    }
     // Written vertices: every source vertex, with `merge` the first corner of each welded set, or without `share`
     // each face corner in face order (faces then index written vertices 0, 1, 2, ...).
     // ponytail: welding buckets values on a 1e-5 grid, so corners straddling a cell edge stay apart.
@@ -209,18 +238,20 @@ export function exportOBJ(source: ExportSource, options: OBJOptions = {}): OBJRe
         lines.push(`vt ${num(offset[0] + cos * u + sin * v)} ${num(1 - (offset[1] - sin * u + cos * v))}`);
       }
     for (const i of kept) lines.push(`vn ${num(normals[i * 3])} ${num(normals[i * 3 + 1])} ${num(normals[i * 3 + 2])}`);
-    const t = uvBase - vertexBase;
+    const t = uvBase - vertexBase,
+      nt = normalBase - vertexBase;
     let corner = 0;
     for (const face of faces)
       lines.push(
         `f ${face
           .map((i) => {
             const a = (share ? remap[i] : corner++) + vertexBase;
-            return uvs ? `${a}/${a + t}/${a}` : `${a}//${a}`;
+            return uvs ? `${a}/${a + t}/${a + nt}` : `${a}//${a + nt}`;
           })
           .join(' ')}`,
       );
     vertexBase += kept.length;
+    normalBase += kept.length;
     if (uvs) uvBase += kept.length;
   }
   lines.push('');

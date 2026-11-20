@@ -27,16 +27,45 @@ export function fakeIndexedDB() {
     failWrites: false,
     /** The durability option of each readwrite transaction, in order. */
     durabilities: [],
-    open(name) {
+    // Versions as Indexed Database 3.0 has them: open(name) takes the current version (1 for a new database), a
+    // higher version upgrades once every other connection has closed (they get versionchange), a lower one fails,
+    // and a transaction on a store the database does not have throws NotFoundError.
+    open(name, version) {
       const req = { result: null, error: null, onsuccess: null, onerror: null, onupgradeneeded: null };
       later(() => {
-        let stores = databases.get(name);
-        const fresh = !stores;
-        if (fresh) databases.set(name, (stores = new Map()));
+        let entry = databases.get(name);
+        if (!entry) databases.set(name, (entry = { version: 0, stores: new Map(), connections: new Set() }));
+        const stores = entry.stores,
+          target = version ?? (entry.version || 1);
+        if (target < entry.version) {
+          req.error = new DOMException('Requested version is lower', 'VersionError');
+          req.onerror?.();
+          return;
+        }
+        const upgrade = target > entry.version;
+        if (upgrade) {
+          for (const other of [...entry.connections]) other.onversionchange?.();
+          if (entry.connections.size) {
+            req.error = new DOMException('An open connection blocks the upgrade', 'AbortError');
+            req.onerror?.();
+            return;
+          }
+          entry.version = target;
+        }
         const db = {
+          get version() {
+            return entry.version;
+          },
+          onversionchange: null,
+          close: () => entry.connections.delete(db),
           objectStoreNames: { contains: (s) => stores.has(s) },
-          createObjectStore: (s) => stores.set(s, new Map()),
+          createObjectStore: (s) => {
+            if (!upgrade) throw new DOMException('Not in a version change', 'InvalidStateError');
+            stores.set(s, new Map());
+          },
           transaction(storeName, mode, options) {
+            if (!entry.connections.has(db)) throw new DOMException('The connection is closed', 'InvalidStateError');
+            if (!stores.has(storeName)) throw new DOMException(`No object store ${storeName}`, 'NotFoundError');
             if (mode === 'readwrite') factory.durabilities.push(options?.durability);
             const data = stores.get(storeName);
             const pending = new Map(data);
@@ -88,7 +117,8 @@ export function fakeIndexedDB() {
           },
         };
         req.result = db;
-        if (fresh) req.onupgradeneeded?.();
+        entry.connections.add(db);
+        if (upgrade) req.onupgradeneeded?.();
         req.onsuccess?.();
       });
       return req;

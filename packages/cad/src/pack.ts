@@ -421,9 +421,13 @@ export class PartPacks {
     depth.depthStoreOp = 'store';
     depth.stencilLoadOp = stencil ? 'load' : undefined;
     depth.stencilStoreOp = stencil ? 'store' : undefined;
+    // The rectangles core's draw of the same call uses: the call's own, else the view's viewport and scissor.
+    const view = c.view?.viewport,
+      viewport = options.viewport === undefined ? view : options.viewport,
+      scissor = options.scissor === undefined ? (options.viewport === undefined ? (c.view?.scissor ?? view) : undefined) : options.scissor;
     const pass = c.encoder.beginRenderPass(this.pass);
-    if (options.viewport) pass.setViewport(...options.viewport, 0, 1);
-    if (options.scissor) pass.setScissorRect(...options.scissor);
+    if (viewport) pass.setViewport(...viewport, 0, 1);
+    if (scissor) pass.setScissorRect(...scissor);
     pass.setPipeline(pipeline);
     pass.setBindGroup(0, group);
     for (const pack of this.packs) {

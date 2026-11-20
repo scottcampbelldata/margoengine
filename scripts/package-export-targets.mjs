@@ -1,6 +1,6 @@
 // Every file a package's `exports` map promises, checked on disk. build-modern runs it on the packages it just built and
 // fails loudly when one is missing (KB-RM4, 2026-11-11: a full CI run carried on for 40 minutes with no
-// packages/web/dist, and the first sign was check:examples-types failing on @margoengine/web imports);
+// packages/kit-web/dist, and the first sign was check:examples-types failing on @margoengine/kit-web imports);
 // tests/package-exports.test.js runs it on every package.
 import { existsSync, globSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';

@@ -38,7 +38,7 @@ export interface MeshSourceOwner extends PBRSource {
   })[];
   prepareDeformation?: (context: MeshDeformationContext) => void;
   readPickingGeometry(): Promise<readonly MeshPose[]>;
-  /** Draws `target` from `source`'s GPU buffer pair (gltf-pro `PBRModel.shareBuffers`); false when they do not qualify. */
+  /** Draws `target` from `source`'s GPU buffer pair (gltf\/pbr `PBRModel.shareBuffers`); false when they do not qualify. */
   shareBuffers?(target: PBRSourcePrimitive, source: PBRSourcePrimitive): boolean;
   createRenderer(device: GPUDevice): {
     prepare(context: MeshDeformationContext): void;
@@ -72,12 +72,12 @@ export interface MeshSource {
 }
 export function setMeshSource(mesh: PublicMesh, source: MeshSource): void;
 export function clearMeshSource(mesh: PublicMesh): void;
-/** The gltf-pro record of `mesh` while its model lives, else undefined: meshTriangles without an object per call. */
+/** The gltf/pbr record of `mesh` while its model lives, else undefined: meshTriangles without an object per call. */
 export function meshSource(mesh: PublicMesh | null | undefined): MeshSource | undefined;
 export function meshTriangles(
   mesh: PublicMesh | null | undefined,
 ): { kind: 'core'; geometry: Geometry } | { kind: 'pbr'; source: MeshSource } | null;
-/** gltf-pro primitives' triangles in one list (positions, and normals with `normals`); `check` runs before allocation. */
+/** gltf/pbr primitives' triangles in one list (positions, and normals with `normals`); `check` runs before allocation. */
 export function mergePrimitives(
   primitives: readonly { readonly vertices: Float32Array; readonly indices: ArrayLike<number> }[],
   normals?: boolean,

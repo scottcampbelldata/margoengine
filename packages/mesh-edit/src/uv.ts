@@ -18,6 +18,7 @@ import {
 import { newellNormal } from './polygon.js';
 import { clonePolygonMesh } from './result.js';
 import { projectedTexelSample } from './uv-transfer.js';
+import { greatestOf, leastOf } from './least.js';
 
 const finiteUVPair = (uv: readonly number[]): boolean =>
   uv.length === 2 && Number.isFinite(uv[0]) && Number.isFinite(uv[1]);
@@ -50,10 +51,10 @@ function flatFace(face: PaintFace, world: ReturnType<typeof paintWorldVertices>)
     dot(sub(point, origin), tangent),
     dot(sub(point, origin), bitangent),
   ]);
-  const minU = Math.min(...flat.map((point) => point[0])),
-    maxU = Math.max(...flat.map((point) => point[0])),
-    minV = Math.min(...flat.map((point) => point[1])),
-    maxV = Math.max(...flat.map((point) => point[1]));
+  const minU = leastOf(flat.map((point) => point[0])),
+    maxU = greatestOf(flat.map((point) => point[0])),
+    minV = leastOf(flat.map((point) => point[1])),
+    maxV = greatestOf(flat.map((point) => point[1]));
   return { flat, minU, maxU, minV, maxV };
 }
 
@@ -94,10 +95,10 @@ function mark(
 
 function reserveFaceUV(used: Uint8Array, atlasWidth: number, atlasHeight: number, face: PaintFace): void {
   if (!face.uv.length || face.uv.some((uv) => !finiteUVPair(uv))) return;
-  const x = Math.floor(Math.min(...face.uv.map((uv) => uv[0])) * atlasWidth + 1e-6) - 1,
-    y = Math.floor(Math.min(...face.uv.map((uv) => uv[1])) * atlasHeight + 1e-6) - 1,
-    right = Math.ceil(Math.max(...face.uv.map((uv) => uv[0])) * atlasWidth - 1e-6) + 1,
-    bottom = Math.ceil(Math.max(...face.uv.map((uv) => uv[1])) * atlasHeight - 1e-6) + 1;
+  const x = Math.floor(leastOf(face.uv.map((uv) => uv[0])) * atlasWidth + 1e-6) - 1,
+    y = Math.floor(leastOf(face.uv.map((uv) => uv[1])) * atlasHeight + 1e-6) - 1,
+    right = Math.ceil(greatestOf(face.uv.map((uv) => uv[0])) * atlasWidth - 1e-6) + 1,
+    bottom = Math.ceil(greatestOf(face.uv.map((uv) => uv[1])) * atlasHeight - 1e-6) + 1;
   mark(used, atlasWidth, atlasHeight, x, y, right - x, bottom - y);
 }
 

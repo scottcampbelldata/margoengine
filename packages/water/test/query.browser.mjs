@@ -120,8 +120,7 @@ try {
               ? { terrain: { heightmap: () => texture, origin: [-10, -10], size: [20, 20] }, still: kind === 'still' }
               : {}),
           });
-      if (fft) surface.setTime(1.25);
-      else surface.time = 1.25;
+      surface.setTime(1.25);
       engine.render({ delta: kind === 'coast' ? 1 / 60 : 0 });
       const snapshot = await WaveQuery.capture(surface);
       // Independent raster oracle: actual draw vertices, indices and uniforms, output interpolated world/normal.
@@ -226,8 +225,13 @@ return Probe(vec4f(i.world,1),vec4f(${fft ? 'oceanAt(i.base).normal' : 'normaliz
         const state = await read(surface.coastal.states[surface.coastal.current]);
         const get = (image, x, z, c) =>
           image.data[Math.max(0, Math.min(4, z)) * image.row + Math.max(0, Math.min(4, x)) * 4 + c];
+        // The drawn surface takes a dry neighbour (under 3 mm) at the wet cell's own level, so its slope into a dry
+        // bank is flat; the forward difference into the bank's ground was right only while the flow stood still
+        // (KB-WATER-SWASH1 put it in motion: 5e-4 m/s apart beside this map's dry column).
         const height = (x, z) => get(state, x, z, 0) + get(state, x, z, 1);
+        const level = (x, z, nx, nz) => (get(state, nx, nz, 0) > 0.003 ? height(nx, nz) : height(x, z));
         const cellVelocity = (x, z) => {
+          if (get(state, x, z, 0) < 0.003) return [0, 0, 0];
           const q = [0, 1, 2, 3].map((c) => get(flux, x, z, c));
           const incoming = [
             x > 0 ? get(flux, x - 1, z, 1) : 0,
@@ -241,7 +245,7 @@ return Probe(vec4f(i.world,1),vec4f(${fft ? 'oceanAt(i.base).normal' : 'normaliz
           const dh = (incoming[0] + incoming[1] - q[0] - q[1] + incoming[2] + incoming[3] - q[2] - q[3]) / 4;
           return [
             ux,
-            dh + (ux * (height(x + 1, z) - height(x, z))) / 4 + (uz * (height(x, z + 1) - height(x, z))) / 4,
+            dh + (ux * (level(x, z, x + 1, z) - height(x, z))) / 4 + (uz * (level(x, z, x, z + 1) - height(x, z))) / 4,
             uz,
           ];
         };
@@ -271,12 +275,10 @@ return Probe(vec4f(i.world,1),vec4f(${fft ? 'oceanAt(i.base).normal' : 'normaliz
       }
       if (!['coast', 'still'].includes(kind)) {
         const epsilon = 0.002;
-        if (fft) surface.setTime(1.25 - epsilon);
-        else surface.time = 1.25 - epsilon;
+        surface.setTime(1.25 - epsilon);
         engine.render({ delta: 0 });
         const before = await WaveQuery.capture(surface);
-        if (fft) surface.setTime(1.25 + epsilon);
-        else surface.time = 1.25 + epsilon;
+        surface.setTime(1.25 + epsilon);
         engine.render({ delta: 0 });
         const after = await WaveQuery.capture(surface);
         for (let i = 0; i < snapshot.vertices.length; i += 12)
@@ -313,6 +315,34 @@ return Probe(vec4f(i.world,1),vec4f(${fft ? 'oceanAt(i.base).normal' : 'normaliz
         aborted = e.name === 'AbortError';
       }
       if (!aborted) throw new Error('in-flight cancellation must reject');
+      // A scene that floats something steps it in its own onPreUpdate, after Water's: Water once dropped its drawn view
+      // there, so every capture taken in a frame rejected with `state` and the boat in examples/storm-light ran on
+      // stale data. The capture must read the frame on screen, the one captured right after it was drawn.
+      engine.render({ delta: 1 / 60 });
+      const drawn = await WaveQuery.capture(surface);
+      let early;
+      engine.use({
+        name: 'water-query:capture-in-update',
+        setup() {},
+        onPreUpdate() {
+          early ??= WaveQuery.capture(surface).catch((e) => e);
+        },
+      });
+      engine.render({ delta: 1 / 60 });
+      engine.removePlugin('water-query:capture-in-update');
+      const inUpdate = await early;
+      if (!(inUpdate instanceof WaveQuery)) throw new Error(`capture in onPreUpdate failed: ${inUpdate}`);
+      const points = [
+        [0, 0],
+        [3, -2],
+        [-6, 5],
+      ];
+      if (
+        inUpdate.time !== drawn.time ||
+        JSON.stringify(points.map(([x, z]) => inUpdate.sample(x, z))) !==
+          JSON.stringify(points.map(([x, z]) => drawn.sample(x, z)))
+      )
+        throw new Error(`capture in onPreUpdate is not the frame on screen: ${inUpdate.time} against ${drawn.time}`);
       if (kind === 'fft') {
         const pending = WaveQuery.capture(surface);
         surface.onDeviceRestored(surface.engine);

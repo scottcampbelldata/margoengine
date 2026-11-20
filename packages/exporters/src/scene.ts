@@ -8,8 +8,9 @@ import type { Vec2 } from '@margoengine/math';
 import type { PBRSource } from '../../shared/pbr-source.js';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { vertexValues } from '../../shared/vertex-map.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
-import { splitTRS } from '@margoengine/math/quat';
+import { splitNodeMatrix } from '@margoengine/math/quat';
 import { accumulateNormals } from '../../shared/normals.js';
 
 /** Deepest node chain an export walks; one level deeper throws before any node is written. */
@@ -19,8 +20,11 @@ const MAX_HIERARCHY_DEPTH = 1024;
 export interface GeometryData {
   /** xyz per vertex. */
   positions: ArrayLike<number>;
-  /** xyz per vertex. Normalized on export; zero vectors are replaced by the area-weighted face normal. */
-  normals: ArrayLike<number>;
+  /**
+   * xyz per vertex, optional. Normalized on export. A triangle vertex without one (omitted, or a zero vector) takes the
+   * area-weighted normal of its faces; a point or line keeps none and is drawn unlit (glTF 2.0 section 3.9.7).
+   */
+  normals?: ArrayLike<number>;
   /** uv per vertex (glTF convention, v down). */
   uvs?: ArrayLike<number>;
   /** Optional second UV set. */
@@ -133,6 +137,13 @@ export interface TextureData {
   extras?: Extras;
 }
 
+/** A KHR_texture_transform: uv' = offset + rotation * scale * uv, Float32 values; `rotation` in radians, default 0. */
+export interface TextureTransform {
+  offset: Vec2;
+  scale: Vec2;
+  rotation?: number;
+}
+
 /** A glTF metallic-roughness material described as data. Its factors are written as the exact numbers given. */
 export interface MaterialData {
   name?: string;
@@ -152,9 +163,13 @@ export interface MaterialData {
    * (top left, v down), so the image turns clockwise on the surface. glTF writers write it as given; `exportUSDZ`
    * writes a `UsdTransform2d`. `offset` and `scale` are targets of `materialAnimations`.
    */
-  baseColorTextureTransform?: { offset: Vec2; scale: Vec2; rotation?: number };
+  baseColorTextureTransform?: TextureTransform;
   metallicRoughnessTexture?: TextureData;
+  /** KHR_texture_transform of `metallicRoughnessTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  metallicRoughnessTextureTransform?: TextureTransform;
   normalTexture?: TextureData;
+  /** KHR_texture_transform of `normalTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  normalTextureTransform?: TextureTransform;
   /** Shade with base color only, ignoring lights: KHR_materials_unlit in glTF. Default false. */
   unlit?: boolean;
   /**
@@ -172,10 +187,14 @@ export interface MaterialData {
   normalScale?: number;
   /** Ambient occlusion in its red channel. glTF writers only. */
   occlusionTexture?: TextureData;
+  /** KHR_texture_transform of `occlusionTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  occlusionTextureTransform?: TextureTransform;
   /** How much `occlusionTexture` darkens, 0 to 1. Default 1. */
   occlusionStrength?: number;
   /** Emitted color in its rgb, multiplied by `emissive` (so set `emissive`, e.g. [1, 1, 1]). glTF writers only. */
   emissiveTexture?: TextureData;
+  /** KHR_texture_transform of `emissiveTexture`, as `baseColorTextureTransform`. glTF writers only. */
+  emissiveTextureTransform?: TextureTransform;
   /** Multiplier on the emitted color, finite and >= 0, for emission brighter than 1: KHR_materials_emissive_strength. Default 1. */
   emissiveStrength?: number;
   /** Fraction of light transmitted through the surface, 0 to 1: KHR_materials_transmission. Default 0. */
@@ -185,7 +204,7 @@ export interface MaterialData {
   extras?: Extras;
 }
 
-/** A glTF camera on a data-scene node, looking down the node's -Z; a gltf-pro `GLTFCamera` record fits as it is. */
+/** A glTF camera on a data-scene node, looking down the node's -Z; a gltf/pbr `GLTFCamera` record fits as it is. */
 export interface CameraData {
   type: 'perspective' | 'orthographic';
   name?: string;
@@ -195,7 +214,7 @@ export interface CameraData {
   extras?: Extras;
 }
 
-/** A KHR_lights_punctual light on a data-scene node, pointing down the node's -Z; a gltf-pro `GLTFLight` record fits as it is. */
+/** A KHR_lights_punctual light on a data-scene node, pointing down the node's -Z; a gltf/pbr `GLTFLight` record fits as it is. */
 export interface LightData {
   type: 'directional' | 'point' | 'spot';
   name?: string;
@@ -219,10 +238,67 @@ export interface LightData {
 export interface ExportPrimitive {
   geometry: Geometry | GeometryData;
   material?: PbrMaterial | MaterialData;
-  /** Triangle list into `geometry`'s vertices, used instead of its `indices`. Nonempty, whole triangles. */
+  /**
+   * Index list into `geometry`'s vertices, used instead of its `indices`, read as `mode` says: whole triangles for
+   * triangles (the default), one index a point, two a segment, a run for a strip or loop.
+   */
   indices?: ArrayLike<number>;
+  /**
+   * What the indices draw, by glTF 2.0 name or number (section 3.7.2.1): 'POINTS' 0, 'LINES' 1, 'LINE_LOOP' 2,
+   * 'LINE_STRIP' 3, 'TRIANGLES' 4, 'TRIANGLE_STRIP' 5, 'TRIANGLE_FAN' 6. Default 'TRIANGLES'. Strips, loops and fans
+   * are written as the point, line or triangle lists they draw. Points and lines go to the writers with a form for
+   * them (glTF, OBJ, PLY, COLLADA lines, USDZ); the rest call `onWarning`. A point or line primitive needs no normals
+   * and takes no morph targets.
+   */
+  mode?: PrimitiveMode;
   /** glTF writers only. */
   extras?: Extras;
+}
+
+/** A primitive's topology by glTF 2.0 name or `mesh.primitive.mode` number (section 3.7.2.1). */
+export type PrimitiveMode =
+  | 'POINTS'
+  | 'LINES'
+  | 'LINE_LOOP'
+  | 'LINE_STRIP'
+  | 'TRIANGLES'
+  | 'TRIANGLE_STRIP'
+  | 'TRIANGLE_FAN'
+  | 0
+  | 1
+  | 2
+  | 3
+  | 4
+  | 5
+  | 6;
+const MODE_NAMES = ['POINTS', 'LINES', 'LINE_LOOP', 'LINE_STRIP', 'TRIANGLES', 'TRIANGLE_STRIP', 'TRIANGLE_FAN'];
+
+/** @internal A {@link PrimitiveMode} as its glTF number. */
+export function modeNumber(mode: unknown): number {
+  const at = typeof mode === 'string' ? MODE_NAMES.indexOf(mode) : Number.isInteger(mode) ? (mode as number) : -1;
+  if (at < 0 || at > 6)
+    throw new TypeError(
+      `Unknown primitive mode ${String(mode)}; use a glTF mode name (${MODE_NAMES.join(', ')}) or 0 to 6`,
+    );
+  return at;
+}
+
+/**
+ * @internal A mode's index run as the list it draws (glTF 2.0 section 3.7.2.1): points and lines as they are, a loop
+ * or strip as segments, a triangle strip or fan as triangles. A strip, loop or fan too short to draw anything is empty.
+ */
+export function listOfMode(mode: number, run: ArrayLike<number>): number[] {
+  const n = run.length,
+    out: number[] = [];
+  if (mode === 2 || mode === 3) {
+    for (let i = 0; i + 1 < n; i++) out.push(run[i], run[i + 1]);
+    if (mode === 2 && n > 2) out.push(run[n - 1], run[0]);
+  } else if (mode === 5) {
+    for (let i = 0; i + 2 < n; i++) out.push(run[i], run[i + 1 + (i % 2)], run[i + 2 - (i % 2)]);
+  } else if (mode === 6) {
+    for (let i = 1; i + 1 < n; i++) out.push(run[i], run[i + 1], run[0]);
+  } else for (let i = 0; i < n; i++) out.push(run[i]);
+  return out;
 }
 
 /** An {@link ExportPrimitive} as plain data with its material, the form an application's own mesh builder hands over. */
@@ -336,6 +412,24 @@ export interface SceneOptions {
    * Interchange needs `@margoengine/exporters/unreal-pixel-art` after import.
    */
   pixelArt?: boolean | PixelArtSampling;
+  /**
+   * Called once per engine mesh or data node for points and lines a writer has no form for: a loaded model's glTF
+   * points and lines (`pointsAndLines`), a data primitive's `mode`, or the `@margoengine/lines` lines and
+   * `@margoengine/points` clouds that follow a mesh; and once per such line or cloud that follows no mesh. The glTF
+   * writers and `exportModel` write them all. Default `console.warn` of the message.
+   */
+  onWarning?: (warning: ExportWarning) => void;
+}
+/**
+ * What {@link SceneOptions.onWarning} receives: the error code it would carry, a message and the engine mesh or data
+ * node, or null for a `@margoengine/lines` line or `@margoengine/points` cloud that follows no mesh (`item` is it).
+ */
+export interface ExportWarning {
+  code: 'unsupported';
+  message: string;
+  node: Mesh | ExportNode | null;
+  /** The plugin line or point cloud left out, for a warning about one that follows no mesh. */
+  item?: object;
 }
 /** How {@link SceneOptions.pixelArt} samples textures. */
 export interface PixelArtSampling {
@@ -391,9 +485,19 @@ export interface Geo {
   faceSizes?: Uint8Array;
   joints?: Uint16Array;
   weights?: Float32Array;
+  /**
+   * A plugin stroke's or cloud's per-point multiplier of its material `width` (a `Stroke`'s `widths`, a cloud's
+   * `sizes`): glTF `_WIDTH`, USD vertex `widths`.
+   */
+  widths?: Float32Array;
   morphs?: { name?: string; positions: Float32Array; normals?: Float32Array; tangents?: Float32Array }[];
   /** The geometry whose vertex attributes this primitive shares, with its own `indices`. */
   base?: Geo;
+  /**
+   * A point list (`indices` one vertex each) or line list (`indices` two per segment) instead of triangles. Only a
+   * node's `lines` hold these, so the triangle writers never see one.
+   */
+  topology?: 'points' | 'lines';
 }
 /** @internal Normalized material. */
 export interface Mat {
@@ -408,11 +512,15 @@ export interface Mat {
   alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
   alphaCutoff?: number;
   baseColorTexture?: TextureData;
-  baseColorTextureTransform?: { offset: Vec2; scale: Vec2; rotation?: number };
+  baseColorTextureTransform?: TextureTransform;
   metallicRoughnessTexture?: TextureData;
+  metallicRoughnessTextureTransform?: TextureTransform;
   normalTexture?: TextureData;
+  normalTextureTransform?: TextureTransform;
   occlusionTexture?: TextureData;
+  occlusionTextureTransform?: TextureTransform;
   emissiveTexture?: TextureData;
+  emissiveTextureTransform?: TextureTransform;
   unlit?: boolean;
   shading: 'standard' | 'lambert' | 'phong';
   specular: number[];
@@ -424,6 +532,11 @@ export interface Mat {
   ior: number;
   /** Copied by the glTF writers, which alone write extras. */
   extras?: Extras;
+  /**
+   * A plugin line's width or point cloud's diameter, in CSS pixels or world units. The USD writers write world units as
+   * `widths`; the glTF writers write it in the primitive's extras.
+   */
+  width?: { value: number; units: 'pixels' | 'world'; kind: 'points' | 'lines' };
 }
 /** @internal Normalized node. */
 export interface Node {
@@ -443,6 +556,8 @@ export interface Node {
   primitives?: { geometry: Geo; material?: Mat; extras?: Extras }[];
   /** The data node's `primitives` array, so nodes sharing it share one glTF mesh. */
   primitivesKey?: object;
+  /** Points and lines, in source order, for the writers that pass `writes` to `collect`. */
+  lines?: { geometry: Geo; material?: Mat; extras?: Extras }[];
   camera?: CameraData;
   light?: LightData;
   /** Column-major local matrix, written instead of TRS. */
@@ -455,7 +570,7 @@ export interface Node {
   retainedVisibility?: boolean;
 }
 
-/** @internal Map slots of an @margoengine/materials Material, in gltf-pro's map order. */
+/** @internal Map slots of an @margoengine/materials Material, in gltf/pbr's map order. */
 export const materialSlots = [
   'map',
   'metalRoughnessMap',
@@ -476,6 +591,8 @@ export const materialSlots = [
   'thicknessMap',
 ] as const;
 
+// The key gltf/pbr defines on each node it creates, holding its PBRModel (gltf/pbr src/model.ts `cpuSource`).
+const pbrModelKey = Symbol.for('margoengine.pbr-source.v1');
 function fail(message: string): never {
   throw new TypeError(message);
 }
@@ -544,8 +661,263 @@ function triangleIndices(source: unknown, count: number, label: string): Uint32A
   return indices;
 }
 
+/** A validated point list (one index each) or line list (two per segment) into `count` vertices; all of them when omitted. */
+function listIndices(source: unknown, count: number, topology: 'points' | 'lines'): Uint32Array {
+  if (source === undefined) {
+    if (topology === 'lines' && count % 2) throw new RangeError('Non-indexed lines need complete segments');
+    return Uint32Array.from({ length: count }, (_, i) => i);
+  }
+  if (!isObject(source) || typeof source.length !== 'number' || (topology === 'lines' && source.length % 2))
+    throw new RangeError(
+      `${topology === 'lines' ? 'Line' : 'Point'} indices must hold complete ${topology === 'lines' ? 'segments' : 'points'}`,
+    );
+  const indices = new Uint32Array(source.length);
+  for (let i = 0; i < indices.length; i++) {
+    const index = (source as unknown as ArrayLike<number>)[i];
+    if (!Number.isInteger(index) || index < 0 || index >= count)
+      throw new RangeError('Index exceeds vertices; keep every index below the vertex count');
+    indices[i] = index;
+  }
+  return indices;
+}
+
+type Part = { geometry: Geo; material: Mat; extras: Extras };
+/** A `@margoengine/lines` line or `@margoengine/points` cloud, found by its public fields. */
+interface PluginItem {
+  object: object;
+  visible: boolean;
+  matrix: ArrayLike<number>;
+  name?: string;
+  mesh: Mesh | null;
+  topology: 'points' | 'lines';
+  /** Bytes its vertex attributes and indices take, for a writer's size plan. */
+  bytes: number;
+  /** Its point or line list, or null when it draws nothing (fewer than two line points, no finite cloud point). */
+  part: () => Part | null;
+}
+/** The public fields of a `@margoengine/lines` Line that the exporters read. */
+interface PluginLine {
+  visible: boolean;
+  matrix: Float32Array;
+  points: Float32Array;
+  colors: Float32Array | null;
+  count: number;
+  mode: 'segments' | 'strip' | 'loop';
+  attachedMesh: Mesh | null;
+  material: { color: Float32Array; opacity: number; width: number; worldUnits: boolean; vertexColors?: boolean };
+}
+/** The public fields of a `@margoengine/points` PointCloud that the exporters read. */
+interface PluginCloud {
+  name: string;
+  visible: boolean;
+  matrix: Float32Array;
+  count: number;
+  positions: Float32Array;
+  normals: Float32Array | null;
+  colors: Uint32Array | null;
+  floatColors: Float32Array | null;
+  colorSpace: 'srgb' | 'linear';
+  sizes: Float32Array | null;
+  attachedMesh: Mesh | null;
+  material: {
+    color: Float32Array;
+    opacity: number;
+    size: number;
+    sizeUnits: 'pixels' | 'world';
+    shading: string;
+    vertexColors: boolean;
+  };
+}
+const isPluginLine = (v: unknown): v is PluginLine =>
+  isObject(v) &&
+  v.points instanceof Float32Array &&
+  v.matrix instanceof Float32Array &&
+  typeof v.count === 'number' &&
+  typeof v.mode === 'string' &&
+  isObject(v.material) &&
+  typeof v.material.width === 'number' &&
+  v.material.color instanceof Float32Array;
+const isPluginCloud = (v: unknown): v is PluginCloud =>
+  isObject(v) &&
+  v.positions instanceof Float32Array &&
+  v.matrix instanceof Float32Array &&
+  typeof v.count === 'number' &&
+  isObject(v.material) &&
+  typeof v.material.size === 'number' &&
+  v.material.color instanceof Float32Array;
+/** sRGB-encoded 0..1 to linear (IEC 61966-2-1:1999). */
+const srgbToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+
+/** The lines of a `Lines` plugin (its `lines`) and the clouds of a `PointsPlugin` (its `pointClouds`). */
+function pluginItems(plugin: unknown): PluginItem[] {
+  if (!isObject(plugin)) return [];
+  const out: PluginItem[] = [],
+    { lines, pointClouds } = plugin as { lines?: unknown; pointClouds?: unknown };
+  if (lines instanceof Set)
+    for (const line of lines)
+      if (isPluginLine(line))
+        out.push({
+          object: line,
+          visible: line.visible !== false,
+          matrix: line.matrix,
+          mesh: line.attachedMesh ?? null,
+          topology: 'lines',
+          bytes: line.count * 40,
+          part: () => linePart(line),
+        });
+  if (pointClouds instanceof Set)
+    for (const cloud of pointClouds)
+      if (isPluginCloud(cloud))
+        out.push({
+          object: cloud,
+          visible: cloud.visible !== false,
+          matrix: cloud.matrix,
+          name: cloud.name || undefined,
+          mesh: cloud.attachedMesh ?? null,
+          topology: 'points',
+          bytes: cloud.count * 44,
+          part: () => cloudPart(cloud),
+        });
+  return out;
+}
+
+/** The plugin's colour and opacity as an unlit (or, for lit sphere points, lit) material with the item's width. */
+function pluginMaterial(
+  color: Float32Array,
+  opacity: number,
+  unlit: boolean,
+  translucent: boolean,
+  width: { value: number; units: 'pixels' | 'world'; kind: 'points' | 'lines' },
+): Mat {
+  const mat = normalizeMaterial({
+    color: [color[0], color[1], color[2], opacity],
+    unlit,
+    alphaMode: opacity < 1 || translucent ? 'BLEND' : 'OPAQUE',
+    roughness: 1,
+    metalness: 0,
+  });
+  mat.width = width;
+  return mat;
+}
+
+/**
+ * A line's centre polyline as a line list: segments in pairs, a strip's run, a loop closed. glTF gives a line no width
+ * (glTF 2.0 section 3.9.7), so the line's own goes in the primitive's extras as `lineWidth` with `lineWidthUnits`.
+ */
+function linePart(line: PluginLine): Part | null {
+  const n = line.count;
+  if (n < 2) return null;
+  const positions = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) positions[i * 3 + k] = line.points[i * 4 + k];
+  const run = Uint32Array.from({ length: line.mode === 'segments' ? n - (n % 2) : n }, (_, i) => i),
+    indices = line.mode === 'segments' ? run : listOfMode(line.mode === 'loop' ? 2 : 3, run),
+    data: GeometryData = { positions, indices },
+    m = line.material,
+    colors =
+      (m.vertexColors ?? true) && line.colors && line.colors.length >= n * 4 ? line.colors.slice(0, n * 4) : null;
+  if (colors) data.colors = colors;
+  const units = m.worldUnits ? 'world' : 'pixels',
+    translucent = colors !== null && colors.some((v, i) => i % 4 === 3 && v < 1),
+    geometry = normalizeGeometry(data, 'lines'),
+    widths = multipliers((line as { widths?: unknown }).widths, n);
+  if (widths) geometry.widths = widths;
+  return {
+    geometry,
+    material: pluginMaterial(m.color, m.opacity, true, translucent, { value: m.width, units, kind: 'lines' }),
+    extras: { lineWidth: m.width, lineWidthUnits: units },
+  };
+}
+
+/**
+ * A point cloud's finite points as a point list, its colours linear RGBA (the cloud draws non-finite points nowhere).
+ * glTF gives a point no size (glTF 2.0 section 3.9.7), so the cloud's diameter goes in the primitive's extras as
+ * `pointSize` with `pointSizeUnits`.
+ */
+function cloudPart(cloud: PluginCloud): Part | null {
+  const n = cloud.count,
+    p = cloud.positions,
+    kept: number[] = [],
+    finite = (v: number) => Number.isFinite(Math.fround(v));
+  for (let i = 0; i < n; i++) if (finite(p[i * 3]) && finite(p[i * 3 + 1]) && finite(p[i * 3 + 2])) kept.push(i);
+  if (!kept.length) return null;
+  // A dropped point's position is never read, but the accessor must stay finite: it takes the first kept point's.
+  const positions = p.slice(0, n * 3);
+  if (kept.length < n)
+    for (let i = 0; i < n; i++)
+      if (!finite(positions[i * 3]) || !finite(positions[i * 3 + 1]) || !finite(positions[i * 3 + 2]))
+        positions.copyWithin(i * 3, kept[0] * 3, kept[0] * 3 + 3);
+  const data: GeometryData = { positions, indices: kept },
+    m = cloud.material;
+  if (cloud.normals) data.normals = cloud.normals.subarray(0, n * 3);
+  let translucent = false;
+  if (cloud.colors && m.vertexColors) {
+    const colors = new Float32Array(n * 4),
+      floats = cloud.floatColors,
+      decode = cloud.colorSpace === 'srgb' ? srgbToLinear : (c: number) => c;
+    for (let i = 0; i < n; i++)
+      for (let k = 0; k < 4; k++) {
+        const v = floats ? floats[i * 4 + k] : ((cloud.colors[i] >>> (k * 8)) & 255) / 255;
+        colors[i * 4 + k] = k < 3 ? decode(v) : v;
+        if (k === 3 && v < 1) translucent = true;
+      }
+    data.colors = colors;
+  }
+  const geometry = normalizeGeometry(data, 'points'),
+    sizes = multipliers(cloud.sizes, n);
+  if (sizes) geometry.widths = sizes;
+  return {
+    geometry,
+    material: pluginMaterial(m.color, m.opacity, m.shading !== 'sphere', translucent, {
+      value: m.size,
+      units: m.sizeUnits,
+      kind: 'points',
+    }),
+    extras: { pointSize: m.size, pointSizeUnits: m.sizeUnits },
+  };
+}
+
+/** The first `n` of a per-point width multiplier array, or undefined when there is none or all are 1. */
+function multipliers(values: unknown, n: number): Float32Array | undefined {
+  if (!(values instanceof Float32Array) || values.length < n) return undefined;
+  const out = values.slice(0, n);
+  if (out.some((v) => !Number.isFinite(v) || v < 0))
+    throw new RangeError('Width multipliers must be finite and non-negative');
+  return out.every((v) => v === 1) ? undefined : out;
+}
+
+/** `geo` with an affine matrix applied to its positions and (by the cofactor matrix, sign kept) its normals. */
+function bakeMatrix(geo: Geo, m: Float64Array): Geo {
+  const positions = new Float32Array(geo.positions.length),
+    normals = new Float32Array(geo.normals.length),
+    c = [
+      m[5] * m[10] - m[6] * m[9],
+      m[6] * m[8] - m[4] * m[10],
+      m[4] * m[9] - m[5] * m[8],
+      m[2] * m[9] - m[1] * m[10],
+      m[0] * m[10] - m[2] * m[8],
+      m[1] * m[8] - m[0] * m[9],
+      m[1] * m[6] - m[2] * m[5],
+      m[2] * m[4] - m[0] * m[6],
+      m[0] * m[5] - m[1] * m[4],
+    ],
+    sign = m[0] * c[0] + m[1] * c[1] + m[2] * c[2] < 0 ? -1 : 1;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = geo.positions[i],
+      y = geo.positions[i + 1],
+      z = geo.positions[i + 2];
+    for (let r = 0; r < 3; r++) positions[i + r] = m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r];
+    const nx = geo.normals[i],
+      ny = geo.normals[i + 1],
+      nz = geo.normals[i + 2],
+      out = [0, 1, 2].map((r) => sign * (c[r] * nx + c[3 + r] * ny + c[6 + r] * nz)),
+      l = Math.hypot(out[0], out[1], out[2]);
+    if (l > 0) for (let r = 0; r < 3; r++) normals[i + r] = out[r] / l;
+  }
+  return { ...geo, positions, normals };
+}
+
 /** Validates and normalizes geometry data. Normals and tangents become unit length, tangent w becomes +1 or -1. */
-export function normalizeGeometry(data: Geometry | GeometryData): Geo {
+export function normalizeGeometry(data: Geometry | GeometryData, topology?: 'points' | 'lines'): Geo {
   if (isCoreGeometry(data)) {
     const count = data.vertices.length / 6,
       positions = new Float32Array(count * 3),
@@ -562,9 +934,11 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
   if (typeof length !== 'number' || length === 0 || length % 3) throw new RangeError('Positions need xyz per vertex');
   const count = length / 3,
     positions = floats(data.positions, length, 'Positions'),
-    normals = floats(data.normals, length, 'Normals');
+    // Omitted normals stay zero: a triangle vertex then takes its faces' normal below, a point or line keeps none.
+    normals = data.normals === undefined ? new Float32Array(length) : floats(data.normals, length, 'Normals');
   let indices: Uint32Array;
-  if (data.indices === undefined) {
+  if (topology) indices = listIndices(data.indices, count, topology);
+  else if (data.indices === undefined) {
     if (count % 3) throw new RangeError('Non-indexed geometry needs complete triangles');
     indices = Uint32Array.from({ length: count }, (_, i) => i);
   } else indices = triangleIndices(data.indices, count, 'Indices');
@@ -581,6 +955,8 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
       normals[i * 3 + 2] = z / l;
       continue;
     }
+    // A point or line has no face to take a normal from: an unset normal stays zero, and writers leave it out.
+    if (topology) continue;
     fallback ??= faceNormals(positions, indices, count);
     const fx = fallback[i * 3],
       fy = fallback[i * 3 + 1],
@@ -589,7 +965,9 @@ export function normalizeGeometry(data: Geometry | GeometryData): Geo {
     normals.set(fl > 1e-12 ? [fx / fl, fy / fl, fz / fl] : [0, 0, 1], i * 3);
   }
   const geo: Geo = { positions, normals, indices, count, colorSize: 4 };
+  if (topology) geo.topology = topology;
   if (data.faceSizes !== undefined) {
+    if (topology) fail('faceSizes needs triangles');
     const sizes = data.faceSizes;
     if (!isObject(sizes) || typeof sizes.length !== 'number') fail('faceSizes must be an array of 3s and 4s');
     if (sizes.length > indices.length / 3)
@@ -696,7 +1074,10 @@ export function checkTexture(texture: unknown, label: string): TextureData | und
   if (!isObject(texture) || !(texture.image instanceof Uint8Array)) fail(`${label} needs an image Uint8Array`);
   const { image, mimeType, name } = texture as unknown as TextureData;
   if (name !== undefined && typeof name !== 'string') fail(`${label} name must be a string`);
-  if (!undecoded.has(image) && (mimeType === 'image/png' ? !isPNG(image) : mimeType === 'image/jpeg' ? !isJPEG(image) : true))
+  if (
+    !undecoded.has(image) &&
+    (mimeType === 'image/png' ? !isPNG(image) : mimeType === 'image/jpeg' ? !isJPEG(image) : true)
+  )
     fail(`${label} must be a PNG or JPEG matching its mimeType`);
   for (const [key, values] of [
     ['magFilter', filters],
@@ -728,6 +1109,27 @@ export const samplerOf = (
 
 /** sRGB #111111 in linear rgb, the default Phong highlight. */
 const PHONG_SPECULAR = [0, 0, 0].map(() => ((17 / 255 + 0.055) / 1.055) ** 2.4);
+
+/** A texture slot's KHR_texture_transform, validated; it needs the slot's texture. */
+function checkTransform(
+  transform: TextureTransform | undefined,
+  texture: TextureData | undefined,
+  slot: string,
+): TextureTransform | undefined {
+  if (transform === undefined) return undefined;
+  if (!texture || !isObject(transform) || Array.isArray(transform))
+    fail(`${slot}Transform needs an object with offset/scale and a ${slot}`);
+  const offset = floats(transform.offset, 2, 'Texture transform offset'),
+    scale = floats(transform.scale, 2, 'Texture transform scale'),
+    out: TextureTransform = { offset: [offset[0], offset[1]], scale: [scale[0], scale[1]] };
+  if (transform.rotation !== undefined) {
+    const rotation = transform.rotation;
+    if (typeof rotation !== 'number' || !Number.isFinite(Math.fround(rotation)))
+      throw new RangeError('Texture transform rotation must be a finite Float32 number of radians');
+    out.rotation = rotation;
+  }
+  return out;
+}
 
 /** Validates and normalizes a core PbrMaterial or material data. Base color is linear. */
 export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
@@ -770,24 +1172,15 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
   const specular = vector(m.specular, [...PHONG_SPECULAR], 'Specular'),
     shininess = m.shininess ?? 30;
   if (specular.some((v) => v < 0 || v > 1)) throw new RangeError('Material specular must be linear rgb in [0, 1]');
-  if (!(shininess >= 0 && shininess < Infinity)) throw new RangeError('Material shininess must be finite and >= 0');
+  if (typeof shininess !== 'number' || !(shininess >= 0 && shininess < Infinity))
+    throw new RangeError('Material shininess must be finite and >= 0');
   const lit = shading !== 'standard';
   const baseColorTexture = checkTexture(m.baseColorTexture, 'baseColorTexture');
-  let baseColorTextureTransform: Mat['baseColorTextureTransform'];
-  if (m.baseColorTextureTransform !== undefined) {
-    const transform = m.baseColorTextureTransform;
-    if (!baseColorTexture || !isObject(transform) || Array.isArray(transform))
-      fail('baseColorTextureTransform needs an object with offset/scale and a baseColorTexture');
-    const offset = floats(transform.offset, 2, 'Texture transform offset'),
-      scale = floats(transform.scale, 2, 'Texture transform scale');
-    baseColorTextureTransform = { offset: [offset[0], offset[1]], scale: [scale[0], scale[1]] };
-    if (transform.rotation !== undefined) {
-      const rotation = transform.rotation;
-      if (typeof rotation !== 'number' || !Number.isFinite(Math.fround(rotation)))
-        throw new RangeError('Texture transform rotation must be a finite Float32 number of radians');
-      baseColorTextureTransform.rotation = rotation;
-    }
-  }
+  const baseColorTextureTransform = checkTransform(m.baseColorTextureTransform, baseColorTexture, 'baseColorTexture'),
+    metallicRoughnessTexture = checkTexture(m.metallicRoughnessTexture, 'metallicRoughnessTexture'),
+    normalTexture = checkTexture(m.normalTexture, 'normalTexture'),
+    occlusionTexture = checkTexture(m.occlusionTexture, 'occlusionTexture'),
+    emissiveTexture = checkTexture(m.emissiveTexture, 'emissiveTexture');
   return {
     name: m.name,
     color,
@@ -800,10 +1193,18 @@ export function normalizeMaterial(data: PbrMaterial | MaterialData): Mat {
     metalness: lit ? 0 : unit(m.metalness, 'Metalness', 0),
     baseColorTexture,
     baseColorTextureTransform,
-    metallicRoughnessTexture: checkTexture(m.metallicRoughnessTexture, 'metallicRoughnessTexture'),
-    normalTexture: checkTexture(m.normalTexture, 'normalTexture'),
-    occlusionTexture: checkTexture(m.occlusionTexture, 'occlusionTexture'),
-    emissiveTexture: checkTexture(m.emissiveTexture, 'emissiveTexture'),
+    metallicRoughnessTexture,
+    metallicRoughnessTextureTransform: checkTransform(
+      m.metallicRoughnessTextureTransform,
+      metallicRoughnessTexture,
+      'metallicRoughnessTexture',
+    ),
+    normalTexture,
+    normalTextureTransform: checkTransform(m.normalTextureTransform, normalTexture, 'normalTexture'),
+    occlusionTexture,
+    occlusionTextureTransform: checkTransform(m.occlusionTextureTransform, occlusionTexture, 'occlusionTexture'),
+    emissiveTexture,
+    emissiveTextureTransform: checkTransform(m.emissiveTextureTransform, emissiveTexture, 'emissiveTexture'),
     unlit: m.unlit,
     shading,
     specular,
@@ -851,8 +1252,11 @@ function attributeBytes(data: Geometry | GeometryData): number {
   let perVertex = 24;
   if (data.uvs !== undefined) perVertex += 8;
   if (data.uvs1 !== undefined) perVertex += 8;
+  if (data.uvs2 !== undefined) perVertex += 8;
+  if (data.uvs3 !== undefined) perVertex += 8;
   if (data.tangents !== undefined) perVertex += 16;
   if (data.colors !== undefined) perVertex += data.colors?.length === count * 3 ? 12 : 16;
+  if (data.colors1 !== undefined) perVertex += data.colors1?.length === count * 3 ? 12 : 16;
   if (data.joints !== undefined) perVertex += 24;
   for (const morph of Array.isArray(data.morphs) ? data.morphs : [])
     perVertex += 12 + (morph?.normals !== undefined ? 12 : 0) + (morph?.tangents !== undefined ? 12 : 0);
@@ -886,7 +1290,12 @@ export function compose(t: number[], q: number[], s: number[]): Float64Array {
 export const determinant3 = (m: Float64Array): number =>
   m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 
-/** Inverse transpose of the upper 3x3, as a column-major 3x3. */
+/**
+ * The matrix that turns a normal, as a column-major 3x3: the inverse transpose of the upper 3x3, or for a zero determinant
+ * (a scale of 0 flattens the node) its cofactor matrix, which maps every normal onto the flattened axis or to zero
+ * (Turkowski, "Properties of Surface-Normal Transformations", Graphics Gems, 1990). Callers normalize the result, and
+ * {@link unitNormal} turns a zero one into +Y as the engine shades it.
+ */
 export function normalMatrix(m: Float64Array): Float64Array {
   const a = m[0],
     b = m[1],
@@ -897,10 +1306,10 @@ export function normalMatrix(m: Float64Array): Float64Array {
     g = m[8],
     h = m[9],
     i = m[10];
-  const det = determinant3(m);
-  if (!det || !Number.isFinite(det))
-    throw new RangeError('Singular transform; use a transform with a non-zero determinant');
-  // Cofactor matrix equals det * inverse transpose.
+  const determinant = determinant3(m);
+  if (!Number.isFinite(determinant)) throw new RangeError('Transform must be finite');
+  // Cofactor matrix equals det * inverse transpose; at det 0 the cofactor matrix itself, as not mirrored.
+  const det = determinant || 1;
   return new Float64Array([
     (e * i - f * h) / det,
     (f * g - d * i) / det,
@@ -914,9 +1323,25 @@ export function normalMatrix(m: Float64Array): Float64Array {
   ]);
 }
 
-/** Splits an affine matrix into translation, unit quaternion and scale, or returns null when it has shear. */
+/**
+ * @internal Writes the unit of normal `v` into `out` at `at`, or world +Y when `v` is zero, as the engine shades a
+ * normal a flattened (zero scale) matrix maps to zero.
+ */
+export function unitNormal(v: ArrayLike<number>, out: { [i: number]: number }, at: number): void {
+  const l = Math.hypot(v[0], v[1], v[2]);
+  if (!l) {
+    out[at] = 0;
+    out[at + 1] = 1;
+    out[at + 2] = 0;
+  } else for (let r = 0; r < 3; r++) out[at + r] = v[r] / l;
+}
+
+/**
+ * Splits an affine matrix into translation, unit quaternion and scale (a zero column is a zero scale, as glTF 2.0
+ * section 3.5.3 allows), or returns null when its nonzero columns are sheared or dependent.
+ */
 export function decompose(m: Float64Array): { t: number[]; r: number[]; s: number[] } | null {
-  const trs = splitTRS(m, 1e-6);
+  const trs = splitNodeMatrix(m, { tolerance: 1e-6 });
   return trs.ok ? { t: trs.position, r: unitQuaternion(trs.rotation), s: trs.scale } : null;
 }
 
@@ -940,9 +1365,6 @@ function unitQuaternion(q: number[]): number[] {
 // --- collection ---
 
 function makeNode(name: unknown, t: number[], r: number[], s: number[], parent: Float64Array | null): Node {
-  // Checked on the given numbers: a tiny nonzero scale such as 1e-50 is valid, only an exact 0 is zero.
-  if (s.some((v) => v === 0) && !collapsed(s))
-    throw new RangeError('Scale must be nonzero on every axis, or [0, 0, 0] to collapse a hidden node');
   // The written rotation keeps its saved value; the matrices use it at unit length.
   const length = Math.hypot(r[0], r[1], r[2], r[3]),
     local = compose(
@@ -986,10 +1408,13 @@ export function collect(
   options: SceneOptions = {},
   plan?: (bytes: number) => void,
   loaded: LoadedModels = 'refuse',
+  writes: readonly ('points' | 'lines')[] = [],
 ): Node[] {
   if (!isObject(options)) fail('Options must be an object');
   const onlyVisible = options.onlyVisible ?? true;
   if (typeof onlyVisible !== 'boolean') fail('onlyVisible must be boolean');
+  if (options.onWarning !== undefined && typeof options.onWarning !== 'function') fail('onWarning must be a function');
+  const warn = options.onWarning ?? ((warning: ExportWarning) => console.warn(warning.message));
   const geometries = new Map<object, Geo>(),
     materials = new Map<object, Mat>(),
     images = new Set<Uint8Array>(),
@@ -1012,6 +1437,43 @@ export function collect(
       geometries.set(value, geo);
     }
     return geo;
+  };
+  /**
+   * A data primitive of `mode` (not 4) as its own normalized geometry: a point or line list, or a strip's or fan's
+   * triangles. Its run is `indices`, else the geometry's own indices, else every vertex in order.
+   */
+  const listGeometry = (value: Geometry | GeometryData, mode: number, indices: unknown, at: number): Geo => {
+    const given = (isCoreGeometry(value) && options.geometryData?.get(value)) || value;
+    let data: GeometryData;
+    if (isCoreGeometry(given)) {
+      const count = given.vertices.length / 6;
+      data = {
+        positions: Float32Array.from({ length: count * 3 }, (_, i) => given.vertices[Math.floor(i / 3) * 6 + (i % 3)]),
+        normals: Float32Array.from(
+          { length: count * 3 },
+          (_, i) => given.vertices[Math.floor(i / 3) * 6 + 3 + (i % 3)],
+        ),
+        indices: given.indices,
+      };
+    } else data = given;
+    if (!isObject(data)) fail(`primitives[${at}] needs geometry`);
+    plan?.(attributeBytes(data));
+    const count = vertexCount(data),
+      run = indices ?? data.indices;
+    if (run !== undefined && (!isObject(run) || typeof (run as unknown as ArrayLike<number>).length !== 'number'))
+      fail(`primitives[${at}] indices must be an array of vertex indices`);
+    const list = listOfMode(
+      mode,
+      (run as ArrayLike<number> | undefined) ?? Uint32Array.from({ length: count }, (_, i) => i),
+    );
+    if (mode >= 5) {
+      if (!list.length) throw new RangeError(`primitives[${at}] draws no triangle; a strip or fan needs 3 vertices`);
+      return normalizeGeometry({ ...data, indices: list, faceSizes: undefined });
+    }
+    const topology = mode ? 'lines' : 'points';
+    if (data.morphs?.length) fail(`primitives[${at}] is ${topology}; points and lines take no morph targets`);
+    if (!list.length) throw new RangeError(`primitives[${at}] draws no ${topology}; give it vertices`);
+    return normalizeGeometry({ ...data, indices: list, faceSizes: undefined }, topology);
   };
   const material = (value: PbrMaterial | MaterialData): Mat => {
     let mat = materials.get(value);
@@ -1081,12 +1543,16 @@ export function collect(
       },
     };
   };
-  const pbr = (triangles: Extract<ReturnType<typeof meshTriangles>, { kind: 'pbr' }>, node: Node): void => {
-    const { model: source, primitives } = triangles.source,
-      // A materials mesh (createMesh) draws its live Material's textures, which gltf-pro's maps do not list.
-      owner = (source as { material?: Record<string, unknown> | readonly Record<string, unknown>[] }).material;
-    if (!primitives.length) return;
-    node.primitives = primitives.map((primitive) => {
+  type PBRPart = PBRSource['primitives'][number];
+  /** One gltf\/pbr primitive as normalized geometry and material; `topology` for a point or line list. */
+  const pbrPart = (
+    source: PBRSource,
+    primitive: PBRPart,
+    topology?: 'points' | 'lines',
+  ): { geometry: Geo; material: Mat } => {
+    {
+      // A materials mesh (createMesh) draws its live Material's textures, which gltf/pbr's maps do not list.
+      const owner = (source as { material?: Record<string, unknown> | readonly Record<string, unknown>[] }).material;
       const { vertices, indices, definition, material: mat } = primitive,
         count = vertices.length / 20,
         side = mat.side ?? (mat.settings[2] === 2 ? 'back' : mat.settings[2] ? 'double' : 'front');
@@ -1114,8 +1580,16 @@ export function collect(
           for (let c = 0; c < width; c++) out[i * width + c] = vertices[i * 20 + offset + c];
         return out;
       };
-      const data: GeometryData = { positions: attribute(0, 3), normals: attribute(4, 3), indices };
-      const attrs = definition.attributes ?? {};
+      const attrs = definition.attributes ?? {},
+        // A part of a split primitive reads the definition's per-vertex accessors through its vertexMap.
+        perVertex = (id: number, type: string, width: number) =>
+          vertexValues(source.asset.accessor(id, type), width, primitive.part?.vertexMap);
+      // A point or line without NORMAL has none to keep (gltf/pbr's packed slot holds zeros or a placeholder).
+      const data: GeometryData = {
+        positions: attribute(0, 3),
+        normals: topology && attrs.NORMAL === undefined ? new Float32Array(count * 3) : attribute(4, 3),
+        indices,
+      };
       if (attrs.TANGENT !== undefined) data.tangents = attribute(8, 4);
       if (attrs.TEXCOORD_0 !== undefined) data.uvs = attribute(12, 2);
       if (attrs.TEXCOORD_1 !== undefined) data.uvs1 = attribute(14, 2);
@@ -1127,25 +1601,32 @@ export function collect(
           data.uvs = uvs;
         }
       }
-      // One UV set is all a format that names image files has, so it holds the set the texture samples.
-      if (base?.texCoord === 1) data.uvs = data.uvs1;
+      // One UV set is all a format that names image files has, so it holds the set the texture samples. The
+      // interleaved vertices hold sets 0 and 1 only; a higher set is read from its own accessor. glTF 2.0
+      // textureInfo.texCoord names TEXCOORD_<n>, which the primitive must have.
+      if (base && base.texCoord !== 0) {
+        const set = attrs[`TEXCOORD_${base.texCoord}`];
+        if (set === undefined)
+          fail(
+            `A base color texture samples TEXCOORD_${base.texCoord}, which its primitive does not have; add that UV set or set texCoord to one the primitive has`,
+          );
+        data.uvs = base.texCoord === 1 ? data.uvs1 : perVertex(set, 'VEC2', 2).slice();
+      }
       if (attrs.COLOR_0 !== undefined) data.colors = attribute(16, 4);
       if (attrs.JOINTS_1 !== undefined || attrs.WEIGHTS_1 !== undefined)
         fail('Export supports at most four skin influences per vertex');
-      if (attrs.JOINTS_0 !== undefined) data.joints = source.asset.accessor(attrs.JOINTS_0, 'VEC4');
-      if (attrs.WEIGHTS_0 !== undefined) data.weights = source.asset.accessor(attrs.WEIGHTS_0, 'VEC4');
+      if (attrs.JOINTS_0 !== undefined) data.joints = perVertex(attrs.JOINTS_0, 'VEC4', 4);
+      if (attrs.WEIGHTS_0 !== undefined) data.weights = perVertex(attrs.WEIGHTS_0, 'VEC4', 4);
       if (definition.targets?.length)
         data.morphs = definition.targets.map((target: Record<string, number>, i: number) => ({
           name: primitive.targetNames[i],
           positions:
-            target.POSITION === undefined
-              ? new Float32Array(count * 3)
-              : source.asset.accessor(target.POSITION, 'VEC3'),
-          normals: target.NORMAL === undefined ? undefined : source.asset.accessor(target.NORMAL, 'VEC3'),
-          tangents: target.TANGENT === undefined ? undefined : source.asset.accessor(target.TANGENT, 'VEC3'),
+            target.POSITION === undefined ? new Float32Array(count * 3) : perVertex(target.POSITION, 'VEC3', 3),
+          normals: target.NORMAL === undefined ? undefined : perVertex(target.NORMAL, 'VEC3', 3),
+          tangents: target.TANGENT === undefined ? undefined : perVertex(target.TANGENT, 'VEC3', 3),
         }));
-      const geometry = normalizeGeometry(data);
-      if (side === 'back') {
+      const geometry = normalizeGeometry(data, topology);
+      if (side === 'back' && !topology) {
         // normalizeGeometry owns these arrays, so the source's shared front-side geometry remains untouched.
         for (let i = 0; i < geometry.indices.length; i += 3)
           [geometry.indices[i + 1], geometry.indices[i + 2]] = [geometry.indices[i + 2], geometry.indices[i + 1]];
@@ -1172,7 +1653,12 @@ export function collect(
         pbrMaterials.set(mat, material);
       }
       return { geometry, material };
-    });
+    }
+  };
+  const pbr = (triangles: Extract<ReturnType<typeof meshTriangles>, { kind: 'pbr' }>, node: Node): void => {
+    const { model: source, primitives } = triangles.source;
+    if (!primitives.length) return;
+    node.primitives = primitives.map((primitive) => pbrPart(source, primitive));
     node.geometry = node.primitives[0].geometry;
     node.material = node.primitives[0].material;
     const count = node.geometry.morphs?.length ?? 0;
@@ -1227,6 +1713,37 @@ export function collect(
         fail('root must be a live mesh of this engine');
       roots = [options.root];
     }
+    // @margoengine/lines and @margoengine/points draw through plugins, not meshes: their lines and clouds are read by
+    // public fields, without importing either package, and go with the mesh they follow or as nodes of their own.
+    const plugged = new Map<Mesh | null, PluginItem[]>();
+    for (const plugin of (source as { plugins?: ReadonlyMap<string, unknown> }).plugins?.values() ?? [])
+      for (const item of pluginItems(plugin)) {
+        if (onlyVisible && !item.visible) continue;
+        let list = plugged.get(item.mesh);
+        if (!list) plugged.set(item.mesh, (list = []));
+        list.push(item);
+      }
+    const formOf = `this format writes ${[...writes, 'triangles'].join(' and ')} only`,
+      pluginPart = (item: PluginItem): Part | null => {
+        plan?.(item.bytes);
+        return item.part();
+      };
+    const takePlugged = (items: readonly PluginItem[] | undefined, node: Node, handle: Mesh): void => {
+      let left = 0;
+      for (const item of items ?? []) {
+        if (!writes.includes(item.topology)) left++;
+        else {
+          const part = pluginPart(item);
+          if (part) (node.lines ??= []).push(part);
+        }
+      }
+      if (left)
+        warn({
+          code: 'unsupported',
+          message: `Mesh "${node.name ?? ''}": ${left} plugin lines or point clouds left out; ${formOf}`,
+          node: handle,
+        });
+    };
     const visit = (handle: Mesh, parent: Float64Array | null, depth: number): Node | null => {
       const mesh = meshRuntime(handle),
         id = mesh.id,
@@ -1247,6 +1764,22 @@ export function collect(
         node.geometry = geometry(triangles.geometry);
         node.material = material(mesh.material);
       } else if (triangles?.kind === 'pbr') pbr(triangles, node);
+      // gltf/pbr marks each node it creates with its model; points and lines stay out of the triangle source.
+      const model = (handle as unknown as Record<symbol, PBRSource | undefined>)[pbrModelKey],
+        parts = model?.pointsAndLines?.filter((p) => p.node === (handle as unknown)) ?? [];
+      let left = 0;
+      for (const part of parts) {
+        const topology = part.topology === 'point-list' ? 'points' : 'lines';
+        if (writes.includes(topology)) (node.lines ??= []).push(pbrPart(model!, part, topology));
+        else left++;
+      }
+      if (left)
+        warn({
+          code: 'unsupported',
+          message: `Mesh "${mesh.name ?? ''}": ${left} point or line primitives left out; this format writes ${[...writes, 'triangles'].join(' and ')} only, use exportModel (@margoengine/exporters/model) to keep them`,
+          node: handle,
+        });
+      takePlugged(plugged.get(handle), node, handle);
       for (const child of children.get(id) ?? []) {
         const out = visit(child, node.world, depth + 1);
         if (out) node.children.push(out);
@@ -1271,7 +1804,32 @@ export function collect(
       }
     }
     const collected = roots.map((mesh) => visit(mesh, base, 0)).filter((node): node is Node => node !== null);
-    if (collected.length && !drawables(collected).length) fail('Engine export has no supported mesh geometry');
+    // A line or cloud that follows no mesh is a node of its own at its matrix, in a whole-scene export.
+    if (options.root === undefined)
+      for (const item of plugged.get(null) ?? []) {
+        if (!writes.includes(item.topology)) {
+          warn({
+            code: 'unsupported',
+            message: `A plugin ${item.topology === 'lines' ? 'line' : 'point cloud'} left out; ${formOf}`,
+            node: null,
+            item: item.object,
+          });
+          continue;
+        }
+        const part = pluginPart(item);
+        if (!part) continue;
+        const m = Float64Array.from(item.matrix),
+          parts = decompose(m),
+          node = parts
+            ? makeNode(item.name, parts.t, parts.r, parts.s, null)
+            : makeNode(item.name, [0, 0, 0], [0, 0, 0, 1], [1, 1, 1], null);
+        // A sheared matrix has no TRS: its points (and normals) are placed in world space under an identity node.
+        if (!parts) part.geometry = bakeMatrix(part.geometry, m);
+        node.lines = [part];
+        collected.push(node);
+      }
+    if (collected.length && !drawables(collected, writes.length > 0).length)
+      fail('Engine export has no supported mesh geometry');
     return collected;
   }
 
@@ -1299,12 +1857,13 @@ export function collect(
         m = Float64Array.from(values);
       if (m[3] || m[7] || m[11] || m[15] !== 1) throw new RangeError('Matrix must be affine: its last row 0, 0, 0, 1');
       const parts = decompose(m);
-      if (!parts)
-        throw new RangeError('Matrix must split into translation, rotation and nonzero scale; glTF forbids shear');
+      if (!parts) throw new RangeError('Matrix must split into translation, rotation and scale; glTF forbids shear');
       node = makeNode(data.name, parts.t, parts.r, parts.s, parent);
       node.local = m;
       node.world = parent ? multiplyMatrices(parent, m) : m;
-      node.matrix = values;
+      // A zero column (a zero scale) is written as its translation, rotation and scale: the glTF validator reads such a
+      // matrix as not decomposable to TRS (NODE_MATRIX_NON_TRS), while the same node as TRS is valid.
+      if (!parts.s.includes(0)) node.matrix = values;
     } else
       node = makeNode(
         data.name,
@@ -1338,28 +1897,48 @@ export function collect(
             if (primitive.indices === undefined) planIndices(primitive.geometry, primitive.geometry);
             else planIndices(primitive, primitive.geometry, isObject(primitive.indices) ? primitive.indices.length : 0);
       }
-      node.primitives = data.primitives.map((primitive: ExportPrimitive, i: number) => {
+      const triangles: NonNullable<Node['primitives']> = [];
+      let left = 0;
+      data.primitives.forEach((primitive: ExportPrimitive, i: number) => {
         if (!isObject(primitive) || primitive.geometry === undefined) fail(`primitives[${i}] needs geometry`);
-        let geo = geometry(primitive.geometry);
-        if (primitive.indices !== undefined)
-          geo = {
-            ...geo,
-            indices: triangleIndices(primitive.indices, geo.count, `primitives[${i}] indices`),
-            faceSizes: undefined,
-            base: geo,
-          };
-        return {
-          geometry: geo,
-          material: primitive.material === undefined ? undefined : material(primitive.material),
-          extras: primitive.extras,
-        };
+        const mode = primitive.mode === undefined ? 4 : modeNumber(primitive.mode),
+          mat = primitive.material === undefined ? undefined : material(primitive.material);
+        if (mode === 4) {
+          let geo = geometry(primitive.geometry);
+          if (primitive.indices !== undefined)
+            geo = {
+              ...geo,
+              indices: triangleIndices(primitive.indices, geo.count, `primitives[${i}] indices`),
+              faceSizes: undefined,
+              base: geo,
+            };
+          triangles.push({ geometry: geo, material: mat, extras: primitive.extras });
+          return;
+        }
+        const topology = mode === 0 ? 'points' : mode < 4 ? 'lines' : undefined;
+        if (topology && !writes.includes(topology)) {
+          left++;
+          return;
+        }
+        const geo = listGeometry(primitive.geometry, mode, primitive.indices, i);
+        if (topology) (node.lines ??= []).push({ geometry: geo, material: mat, extras: primitive.extras });
+        else triangles.push({ geometry: geo, material: mat, extras: primitive.extras });
       });
-      const targets = node.primitives[0].geometry.morphs?.length ?? 0;
-      if (node.primitives.some((primitive) => (primitive.geometry.morphs?.length ?? 0) !== targets))
-        fail('Every primitive of a mesh needs the same number of morph targets');
-      node.primitivesKey = data.primitives;
-      node.geometry = node.primitives[0].geometry;
-      node.material = node.primitives[0].material;
+      if (left)
+        warn({
+          code: 'unsupported',
+          message: `Node "${data.name ?? ''}": ${left} point or line primitives left out; this format writes ${[...writes, 'triangles'].join(' and ')} only`,
+          node: data,
+        });
+      if (triangles.length) {
+        const targets = triangles[0].geometry.morphs?.length ?? 0;
+        if (triangles.some((primitive) => (primitive.geometry.morphs?.length ?? 0) !== targets))
+          fail('Every primitive of a mesh needs the same number of morph targets');
+        node.primitives = triangles;
+        node.geometry = triangles[0].geometry;
+        node.material = triangles[0].material;
+      }
+      if (triangles.length || node.lines) node.primitivesKey = data.primitives;
     } else if (data.geometry !== undefined) {
       if (isObject(data.geometry)) planIndices(data.geometry, data.geometry);
       node.geometry = geometry(data.geometry);
@@ -1450,7 +2029,8 @@ export function textureFiles(prefix: unknown): {
 
 /** @internal Whether an `upAxis` option turns a Y-up scene onto a format's Z-up axes. */
 export function turnsToZUp(upAxis: unknown, format: string): boolean {
-  if (upAxis !== undefined && upAxis !== 'y' && upAxis !== 'z') throw new RangeError(`${format} upAxis must be 'y' or 'z'`);
+  if (upAxis !== undefined && upAxis !== 'y' && upAxis !== 'z')
+    throw new RangeError(`${format} upAxis must be 'y' or 'z'`);
   return upAxis !== 'z';
 }
 
@@ -1461,6 +2041,20 @@ export function standZUp(values: Float64Array): Float64Array {
     out[i] = values[i];
     out[i + 1] = -values[i + 2];
     out[i + 2] = values[i + 1];
+  }
+  return out;
+}
+
+/**
+ * @internal A line list's segments joined into polylines, in order: a segment that starts where the previous one
+ * ended extends it, so a strip comes back as one polyline and a loop as one that ends on its first vertex.
+ */
+export function polylines(indices: Uint32Array): number[][] {
+  const out: number[][] = [];
+  for (let i = 0; i + 1 < indices.length; i += 2) {
+    const last = out[out.length - 1];
+    if (last && last[last.length - 1] === indices[i]) last.push(indices[i + 1]);
+    else out.push([indices[i], indices[i + 1]]);
   }
   return out;
 }
@@ -1476,7 +2070,11 @@ export interface Drawable {
 /** A [0, 0, 0] scale: the node and its descendants are hidden. */
 const collapsed = (s: readonly number[]): boolean => s.every((v) => v === 0);
 
-export function drawables(nodes: Node[]): Drawable[] {
+/**
+ * @internal What the nodes draw, depth first. With `lines`, each node's points and lines follow its triangles, their
+ * geometry's `topology` set; writers without a point or line form leave it false.
+ */
+export function drawables(nodes: Node[], lines = false): Drawable[] {
   const out: Drawable[] = [],
     shape = shaper(nodes);
   const walk = (node: Node) => {
@@ -1491,6 +2089,9 @@ export function drawables(nodes: Node[]): Drawable[] {
         });
     else if (node.geometry)
       out.push({ name: node.name, geometry: shape(node, node.geometry), material: node.material, world: node.world });
+    if (lines)
+      for (const part of node.lines ?? [])
+        out.push({ name: node.name, geometry: shape(node, part.geometry), material: part.material, world: node.world });
     node.children.forEach(walk);
   };
   nodes.forEach(walk);
@@ -1570,7 +2171,8 @@ export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
           const w = geometry.weights![v * 4 + k] / total;
           if (!w) continue;
           const joint = palette[geometry.joints![v * 4 + k]];
-          if (!joint) throw new RangeError('Joint index exceeds skin joints; keep joint indices below the skin joint count');
+          if (!joint)
+            throw new RangeError('Joint index exceeds skin joints; keep joint indices below the skin joint count');
           for (let i = 0; i < 16; i++) m[i] += w * joint[i];
         }
         const x = positions[v * 3],
@@ -1588,7 +2190,7 @@ export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
         }
         flip[v] = determinant < 0 ? 1 : 0;
       }
-      if (flip.some((f) => f)) {
+      if (!geometry.topology && flip.some((f) => f)) {
         indices = indices.slice();
         for (let i = 0; i < indices.length; i += 3)
           if (flip[indices[i]]) [indices[i + 1], indices[i + 2]] = [indices[i + 2], indices[i + 1]];
@@ -1612,7 +2214,10 @@ export function shaper(roots: Node[]): (node: Node, geometry: Geo) => Geo {
 }
 
 /** @internal World-space vertices, unit normals and winding-corrected indices of one drawable. */
-export function toWorld({ geometry, world }: Drawable, includeNormals = true): {
+export function toWorld(
+  { geometry, world }: Drawable,
+  includeNormals = true,
+): {
   positions: Float64Array;
   normals: Float64Array;
   indices: Uint32Array;
@@ -1631,13 +2236,15 @@ export function toWorld({ geometry, world }: Drawable, includeNormals = true): {
       const nx = geometry.normals[i * 3],
         ny = geometry.normals[i * 3 + 1],
         nz = geometry.normals[i * 3 + 2];
-      const v = [n[0] * nx + n[3] * ny + n[6] * nz, n[1] * nx + n[4] * ny + n[7] * nz, n[2] * nx + n[5] * ny + n[8] * nz],
-        l = Math.hypot(v[0], v[1], v[2]) || 1;
-      for (let r = 0; r < 3; r++) normals[i * 3 + r] = v[r] / l;
+      unitNormal(
+        [n[0] * nx + n[3] * ny + n[6] * nz, n[1] * nx + n[4] * ny + n[7] * nz, n[2] * nx + n[5] * ny + n[8] * nz],
+        normals,
+        i * 3,
+      );
     }
   }
   let indices = geometry.indices;
-  if (determinant3(world) < 0) {
+  if (!geometry.topology && determinant3(world) < 0) {
     indices = indices.slice();
     for (let i = 0; i < indices.length; i += 3) {
       const b = indices[i + 1];

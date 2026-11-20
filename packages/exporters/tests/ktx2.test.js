@@ -419,3 +419,34 @@ test('compressTextures refuses a texture that reads no image and stops on an abo
   });
   await assert.rejects(compressTextures(file('fixtures/BoxTextured.glb'), { color: 'jpeg' }), RangeError);
 });
+
+test('compressTextures in a browser gives each worker job its own bytes, so a texture in two roles survives transfer', async () => {
+  const png = await encodePNG(quadrants(16, FOUR)),
+    glb = handmade([{ bytes: png, mimeType: 'image/png' }], [{ source: 0 }], {
+      pbrMetallicRoughness: { baseColorTexture: { index: 0 } },
+      occlusionTexture: { index: 0 },
+    }),
+    posted = [],
+    had = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
+  // Own stand-in for a browser Worker: postMessage moves the transfer list as a real one does, emptying the sender's buffers.
+  globalThis.Worker = class {
+    postMessage(message, transfer) {
+      try {
+        const moved = structuredClone(message, { transfer });
+        posted.push(moved.job.source.length);
+        setTimeout(() => this.onmessage({ data: { result: { data: new Uint8Array([0xab, 0, 0, posted.length]) } } }));
+      } catch (error) {
+        setTimeout(() => this.onmessage({ data: { error: { name: 'Error', message: String(error) } } }));
+      }
+    }
+    terminate() {}
+  };
+  try {
+    const { compressed } = await compressTextures(glb);
+    assert.equal(compressed, 2);
+    assert.deepEqual(posted, [png.length, png.length], 'both roles reach the worker with every byte of the PNG');
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'Worker', had);
+    else delete globalThis.Worker;
+  }
+});

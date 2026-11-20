@@ -205,7 +205,7 @@ export class FurMaterial extends Material {
     if (!code.includes('+margoFurMove(') || !code.includes('if(margoFurCoverage('))
       throw new MargoError(
         'unsupported',
-        'Fur needs the standard PBR shader; use matching materials and gltf-pro versions',
+        'Fur needs the standard PBR shader; use matching materials and gltf/pbr versions',
       );
     return declarations(group) + code;
   }

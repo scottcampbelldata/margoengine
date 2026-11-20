@@ -1,12 +1,14 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
+import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
+import type { PostStack } from '@margoengine/post/stack';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { fullscreen, render, group } from '../../shared/gpu.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { lattice, noiseWGSL } from './scene-patch.js';
+let attachments = 0;
 
 /** Lens raindrop settings, read each frame. */
 export interface LensDropsOptions {
@@ -140,26 +142,42 @@ const shader = (hdr: boolean) => `${fullscreen}${displayShader}${lensWGSL}
 
 /**
  * Refracting drops and downward streaks as an HDR PostStack stage. Construct with
- * new LensDrops(options), then pass it to PostStack.attach(engine, [lens]).
+ * LensDrops.attach(engine, options), which joins the scene's PostStack (or makes one), or pass new LensDrops(options)
+ * to PostStack.attach(engine, [lens]).
  * No textures or simulation history are required; time and seed determine the pattern.
  * @throws TypeError/RangeError for invalid options; MargoError for standalone setup or disposed use.
  */
 export class LensDrops implements EnginePlugin {
-  /** Lazily creates an owned one-effect PostStack. Await attachment; abort cancels before registration. */
+  /**
+   * Adds a new LensDrops to the scene's PostStack after its last HDR effect, or to a new PostStack when the scene has
+   * none. Disposing it takes it out, and a stack made for it goes with it. Await attachment; abort cancels before
+   * registration.
+   */
   static async attach(engine: EngineKernel, options: LensDropsOptions = {}, signal?: AbortSignal): Promise<LensDrops> {
     signal?.throwIfAborted();
+    const runtime = engineRuntime(engine);
+    // The scene active now, kept across the await: the drops join its stack, not the stack of whichever scene is active
+    // when the import settles.
+    let scene!: NonNullable<ReturnType<Engine['sceneOf']>>;
+    const probe = { name: `weather-lens:attach:${attachments++}`, setup() { scene = runtime.sceneOf(probe)!; } };
+    runtime.use(probe);
+    scene.removePlugin(probe.name);
     const { PostStack } = await import('@margoengine/post/stack');
     signal?.throwIfAborted();
     const lens = new LensDrops(options);
     try {
-      lens.stack = PostStack.attach(engine, [lens]);
+      let thrown: unknown;
+      const join = { name: probe.name, setup() { try { lens.stack = PostStack.join(engine, lens); } catch (error) { thrown = error; } } };
+      scene.use(join);
+      scene.removePlugin(join.name);
+      if (thrown !== undefined) throw thrown;
       return lens;
     } catch (error) {
       lens.dispose();
       throw error;
     }
   }
-  private stack?: { dispose(): void };
+  private stack?: PostStack;
   readonly name = 'weather-lens';
   private engine?: Engine;
   private uniform?: GPUBuffer;
@@ -187,7 +205,16 @@ export class LensDrops implements EnginePlugin {
     this.sampler = engine.gpu.createSampler({minFilter:'linear',magFilter:'linear'});
   }
 
-  onPreUpdate(delta: number): void {
+  /** Seconds on the drops' own clock (used when `options.time` is not set). */
+  get time(): number { return this.clock; }
+
+  onPreUpdate(delta: number): void { this.advanceTime(delta); }
+
+  /**
+   * Moves the drops' clock by `delta` seconds without drawing: all of a frame update. `seek` from
+   * `@margoengine/cutscene/seek` replays these steps, so the drops are where a continuous run has them.
+   */
+  advanceTime(delta: number): void {
     if (this.disposed) throw new MargoError('disposed', 'LensDrops is disposed; create a new LensDrops');
     validate(this.options);
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('LensDrops delta must be finite and nonnegative; pass seconds');
@@ -214,8 +241,8 @@ export class LensDrops implements EnginePlugin {
   dispose(): void {
     if(this.disposed)return;
     this.disposed=true;
-    this.stack?.dispose();this.stack=undefined;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.stack?.removeEffect(this);this.stack=undefined;
     this.uniform?.destroy();this.uniform=undefined;this.sampler=undefined;this.pipelines.clear();
   }
   declare [Symbol.dispose]: () => void;

@@ -6,7 +6,7 @@ const fixture=await readFile('packages/webgl2-compat/test/xr.html','utf8');
 const replace=(s,from,to)=>{assert.ok(s.includes(from),from);return s.replace(from,to);};
 function documentFor(moved){let s=fixture;
  s=replace(s,'const mode =',`import {MeshDetection,ImageTracking,DOMOverlay,PersistentAnchors,domOverlaySessionOptions,imageTrackingSessionOptions} from '/packages/xr/dist/ar-extra.js';
- import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+ import {loadGLTF} from '/packages/gltf/dist/pbr.js';
  const matrix=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,${moved?.6:0},1,2,1]);let detected;
  const mode =`);
  s=replace(s,'getPose: () => null','getPose: () => ({transform:{matrix}}),detectedMeshes:new Set([detected]),getImageTrackingResults:()=>[{index:0,imageSpace:{},trackingState:"tracked",measuredWidthInMeters:.2}]');

@@ -71,8 +71,15 @@ export function unproject(
   return [x * 180, (Math.atan(Math.sinh(y * Math.PI)) * 180) / Math.PI];
 }
 
+// Slippy-map zoom levels are whole numbers; past 30 a tile index no longer fits the 32-bit integers servers use.
+const checkZoom = (zoom: number) => {
+  if (!Number.isInteger(zoom) || zoom < 0 || zoom > 30)
+    throw rangeError(`Tile zoom must be a whole number from 0 to 30, got ${zoom}`, 'sciviz');
+};
+
 /** The tile `[x, y]` at `zoom` that holds a point, in the slippy-map scheme. */
 export function tileAt(lon: number, lat: number, zoom: number): [number, number] {
+  checkZoom(zoom);
   const n = 2 ** zoom,
     [x, y] = project(lon, lat, 0, 'mercator');
   return [
@@ -83,7 +90,10 @@ export function tileAt(lon: number, lat: number, zoom: number): [number, number]
 
 /** A tile's west, south, east and north edges in degrees. */
 export function tileBounds(zoom: number, x: number, y: number): [number, number, number, number] {
+  checkZoom(zoom);
   const n = 2 ** zoom;
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= n || y >= n)
+    throw rangeError(`Tile ${x}, ${y} is not a tile at zoom ${zoom} (whole numbers from 0 to ${n - 1})`, 'sciviz');
   const [west, north] = unproject((x / n) * 2 - 1, 1 - (y / n) * 2);
   const [east, south] = unproject(((x + 1) / n) * 2 - 1, 1 - ((y + 1) / n) * 2);
   return [west, south, east, north];
@@ -94,18 +104,33 @@ export function tileBounds(zoom: number, x: number, y: number): [number, number,
  * east of its east edge crosses the 180th meridian and takes the tiles on both sides.
  */
 export function tilesIn(box: readonly [number, number, number, number], zoom: number): [number, number, number][] {
-  const [west, s, east, n] = box,
-    w = wrap(west),
-    e = wrap(east);
-  if (w > e) {
-    const both = [...tilesIn([w, s, 180, n], zoom), ...tilesIn([-180, s, e, n], zoom)];
-    return both.filter(([, x, y], i) => both.findIndex(([, x2, y2]) => x2 === x && y2 === y) === i);
-  }
-  const [x0, y0] = tileAt(w, n, zoom),
-    [x1, y1] = tileAt(e, s, zoom),
-    out: [number, number, number][] = [];
-  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) out.push([zoom, x, y]);
+  const out: [number, number, number][] = [];
+  for (const [x0, y0, x1, y1] of tileRanges(box, zoom))
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) out.push([zoom, x, y]);
   return out;
+}
+
+/** The column and row ranges [x0, y0, x1, y1] that {@link tilesIn} lists, without listing them. */
+function tileRanges(box: readonly [number, number, number, number], zoom: number): [number, number, number, number][] {
+  checkZoom(zoom);
+  const [west, s, east, n] = box;
+  if (![west, s, east, n].every(Number.isFinite) || !(s <= n))
+    throw rangeError('A tile box needs finite west, south, east and north with south at most north', 'sciviz');
+  // A box 360 degrees or more wide covers every column (wrapping its ends alone made [0, 360] one column).
+  const whole = east - west >= 360,
+    w = whole ? -180 : wrap(west),
+    e = whole ? 180 : wrap(east),
+    row = (lon0: number, lon1: number): [number, number, number, number] => {
+      const [x0, y0] = tileAt(lon0, n, zoom),
+        [x1, y1] = tileAt(lon1, s, zoom);
+      return [x0, y0, x1, y1];
+    };
+  if (w <= e) return [row(w, e)];
+  // Across the 180th meridian: the east part, then the west part without the columns the east part already holds.
+  const east0 = row(w, 180),
+    west0 = row(-180, e);
+  if (west0[2] >= east0[0]) return [[0, east0[1], 2 ** zoom - 1, east0[3]]];
+  return [east0, west0];
 }
 
 /** Where tiles come from: a URL template with `{z}`, `{x}` and `{y}`, or a function giving each tile's image. */
@@ -134,8 +159,16 @@ export interface TileLayerOptions {
   readonly signal?: AbortSignal;
 }
 
+const SEGMENTS = 16;
+
+// Tiles are placed relative to their own centre (Ohlarik 2008, "Precisions, Precisions"; Cozzi and Ring 2011, 3D Engine
+// Design for Virtual Globes, ch. 5, "relative to centre"): the CPU maps each tile's centre and its grid offsets into
+// the scene in double precision, and the GPU adds the small float32 offsets to the centre, already in scene units. Past
+// zoom 20 a tile's corner (x + u) / 2^zoom needs more than float32's 24 bits, and the figure's data-to-scene
+// translation for a small area is huge, so neither may reach the GPU. The globe's surface normal only shades, so the
+// shader computes it from float32 latitude and longitude.
 const tileShader = /* wgsl */ `${frameWGSL}
-struct Tile { model: mat4x4f, tile: vec4f, params: vec4f }
+struct Tile { model: mat4x4f, tile: vec4f, params: vec4f, centre: vec4f, offsets: array<vec4f, ${(SEGMENTS + 1) ** 2}> }
 @group(1) @binding(0) var<uniform> tile: Tile;
 @group(1) @binding(1) var image: texture_2d<f32>;
 @group(1) @binding(2) var imageSampler: sampler;
@@ -147,22 +180,17 @@ const PI = 3.14159265358979;
   let corner = index % 6u;
   let di = select(0u, 1u, corner == 1u || corner == 2u || corner == 4u);
   let dj = select(0u, 1u, corner == 2u || corner == 4u || corner == 5u);
-  let u = f32(cell % segments + di) / f32(segments);
-  let v = f32(cell / segments + dj) / f32(segments);
-  let mx = (tile.tile.x + u) / tile.tile.z;
-  let my = (tile.tile.y + v) / tile.tile.z;
-  let lon = mx * 2.0 * PI - PI;
-  let lat = atan(sinh(PI * (1.0 - 2.0 * my)));
-  var data = vec3f(2.0 * mx - 1.0, 1.0 - 2.0 * my, 0.0);
+  let i = cell % segments + di;
+  let j = cell / segments + dj;
+  let u = f32(i) / f32(segments);
+  let v = f32(j) / f32(segments);
   var normal = vec3f(0.0, 0.0, 1.0);
-  if (tile.tile.w == 1.0) { data = vec3f(lon / PI, lat / PI, 0.0); }
   if (tile.tile.w == 2.0) {
-    let s = sin(lat);
-    let n = 1.0 / sqrt(1.0 - tile.params.y * s * s);
-    data = vec3f(n * cos(lat) * cos(lon), n * cos(lat) * sin(lon), n * (1.0 - tile.params.y) * s);
-    normal = vec3f(cos(lat) * cos(lon), cos(lat) * sin(lon), s);
+    let lon = (tile.tile.x + u) / tile.tile.z * 2.0 * PI - PI;
+    let lat = atan(sinh(PI * (1.0 - 2.0 * (tile.tile.y + v) / tile.tile.z)));
+    normal = vec3f(cos(lat) * cos(lon), cos(lat) * sin(lon), sin(lat));
   }
-  let world = tile.model * vec4f(data, 1.0);
+  let world = vec4f(tile.centre.xyz + tile.offsets[j * (segments + 1u) + i].xyz, 1.0);
   var out: Out;
   out.clip = frame.clip * world;
   out.uv = vec2f(u, v);
@@ -185,9 +213,39 @@ interface LoadedTile {
   readonly texture: GPUTexture;
   readonly uniform: GPUBuffer;
   readonly group: GPUBindGroup;
+  /** The tile's (SEGMENTS + 1)^2 grid points in data units, double precision. */
+  readonly grid: Float64Array;
 }
 
-const SEGMENTS = 16;
+/** A tile's grid points in the projection's data units, computed in double precision. */
+function tileGrid(z: number, x: number, y: number, projection: Projection): Float64Array {
+  const n = 2 ** z,
+    side = SEGMENTS + 1,
+    grid = new Float64Array(side * side * 3);
+  for (let j = 0; j < side; j++) {
+    const my = (y + j / SEGMENTS) / n,
+      lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * my)));
+    for (let i = 0; i < side; i++) {
+      const mx = (x + i / SEGMENTS) / n,
+        k = (j * side + i) * 3;
+      if (projection === 'mercator') {
+        grid[k] = 2 * mx - 1;
+        grid[k + 1] = 1 - 2 * my;
+      } else if (projection === 'plate') {
+        grid[k] = 2 * mx - 1;
+        grid[k + 1] = lat / Math.PI;
+      } else {
+        const lon = mx * 2 * Math.PI - Math.PI,
+          s = Math.sin(lat),
+          r = 1 / Math.sqrt(1 - WGS84.e2 * s * s);
+        grid[k] = r * Math.cos(lat) * Math.cos(lon);
+        grid[k + 1] = r * Math.cos(lat) * Math.sin(lon);
+        grid[k + 2] = r * (1 - WGS84.e2) * s;
+      }
+    }
+  }
+  return grid;
+}
 
 async function pixelsOf(image: Blob | ImageBitmap | ImageData): Promise<ImageData> {
   if (typeof ImageData !== 'undefined' && image instanceof ImageData) return image;
@@ -219,7 +277,10 @@ export class TileLayer implements Drawable {
   #sampler!: GPUSampler;
   #device: GPUDevice | undefined;
   readonly #model = new Float32Array(16);
-  readonly #values = new Float32Array(24);
+  // The figure's transform in double precision: the tiles' centres are placed with it on the CPU.
+  readonly #exact = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  readonly #values = new Float32Array(28 + (SEGMENTS + 1) ** 2 * 4);
+  #stale = true;
   #note: HTMLElement | undefined;
   #disposed = false;
 
@@ -270,13 +331,13 @@ export class TileLayer implements Drawable {
 
   /** @internal Fetches and uploads the tiles. */
   async load(options: TileLayerOptions): Promise<void> {
-    const list = tilesIn(options.area ?? [-180, -MERCATOR_MAX_LAT, 180, MERCATOR_MAX_LAT], this.zoom),
-      max = options.maxTiles ?? 256;
-    if (list.length > max)
-      throw rangeError(
-        `${list.length} tiles at zoom ${this.zoom} is over maxTiles ${max}; lower zoom or area`,
-        'sciviz',
-      );
+    // Count the tiles before listing them: a whole-world area at zoom 24 holds 2^48 tiles.
+    const area = options.area ?? [-180, -MERCATOR_MAX_LAT, 180, MERCATOR_MAX_LAT],
+      max = options.maxTiles ?? 256,
+      count = tileRanges(area, this.zoom).reduce((sum, [x0, y0, x1, y1]) => sum + (x1 - x0 + 1) * (y1 - y0 + 1), 0);
+    if (count > max)
+      throw rangeError(`${count} tiles at zoom ${this.zoom} is over maxTiles ${max}; lower zoom or area`, 'sciviz');
+    const list = tilesIn(area, this.zoom);
     const source = options.tiles;
     if (typeof source !== 'string' && typeof source !== 'function')
       throw typeError('tileLayer needs tiles: a URL template or a function', 'sciviz');
@@ -344,7 +405,8 @@ export class TileLayer implements Drawable {
         { binding: 2, resource: this.#sampler },
       ],
     });
-    return { z, x, y, pixels, texture, uniform, group };
+    this.#stale = true;
+    return { z, x, y, pixels, texture, uniform, group, grid: tileGrid(z, x, y, this.projection) };
   }
 
   /** @internal Reuploads retained tile pixels without fetching or decoding again. */
@@ -359,8 +421,10 @@ export class TileLayer implements Drawable {
   }
 
   /** @internal */
-  setModel(model: Float32Array): void {
+  setModel(model: Float32Array, exact?: Float64Array): void {
     this.#model.set(model);
+    this.#exact.set(exact ?? model);
+    this.#stale = true;
   }
 
   /** @internal */
@@ -371,12 +435,34 @@ export class TileLayer implements Drawable {
   /** @internal */
   prepare(context?: GpuContext): void {
     if (context) this.#appearance?.prepare?.(context);
-    const mode = this.projection === 'mercator' ? 0 : this.projection === 'plate' ? 1 : 2;
+    if (!this.#stale) return;
+    this.#stale = false;
+    const mode = this.projection === 'mercator' ? 0 : this.projection === 'plate' ? 1 : 2,
+      m = this.#exact,
+      v = this.#values,
+      mid = (SEGMENTS / 2) * (SEGMENTS + 2);
+    v.set(this.#model, 0);
+    v.set([SEGMENTS, WGS84.e2, 0, 0], 20);
     for (const t of this.#tiles) {
-      const v = this.#values;
-      v.set(this.#model, 0);
+      // The centre and each offset from it go to scene units in double precision; only the results are rounded.
+      const g = t.grid,
+        cx = g[mid * 3],
+        cy = g[mid * 3 + 1],
+        cz = g[mid * 3 + 2];
       v.set([t.x, t.y, 2 ** t.z, mode], 16);
-      v.set([SEGMENTS, WGS84.e2, 0, 0], 20);
+      v[24] = m[0] * cx + m[4] * cy + m[8] * cz + m[12];
+      v[25] = m[1] * cx + m[5] * cy + m[9] * cz + m[13];
+      v[26] = m[2] * cx + m[6] * cy + m[10] * cz + m[14];
+      v[27] = 1;
+      for (let k = 0, o = 28; k < g.length; k += 3, o += 4) {
+        const dx = g[k] - cx,
+          dy = g[k + 1] - cy,
+          dz = g[k + 2] - cz;
+        v[o] = m[0] * dx + m[4] * dy + m[8] * dz;
+        v[o + 1] = m[1] * dx + m[5] * dy + m[9] * dz;
+        v[o + 2] = m[2] * dx + m[6] * dy + m[10] * dz;
+        v[o + 3] = 0;
+      }
       this.#renderer.device!.queue.writeBuffer(t.uniform, 0, v);
     }
   }
@@ -385,10 +471,24 @@ export class TileLayer implements Drawable {
   draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (!this.#tiles.length) return;
     const pipeline = renderer.pipeline(`geo-tiles:${this.#appearance?.key ?? ''}`, context, (target) => {
-      const module = renderer.device!.createShaderModule({ code: this.#appearance ? tileShader.replace('shade(albedo, in.normal, normalize(frame.eye.xyz - in.world))', 'planetSurface(in.world, albedo)') + this.#appearance.shader : tileShader, label: 'sciviz tiles' });
+      const module = renderer.device!.createShaderModule({
+        code: this.#appearance
+          ? tileShader.replace(
+              'shade(albedo, in.normal, normalize(frame.eye.xyz - in.world))',
+              'planetSurface(in.world, albedo)',
+            ) + this.#appearance.shader
+          : tileShader,
+        label: 'sciviz tiles',
+      });
       return {
         label: 'sciviz tiles',
-        layout: renderer.device!.createPipelineLayout({ bindGroupLayouts: [renderer.frameLayout!, this.#layout, ...(this.#appearance ? [this.#appearance.layout] : [])] }),
+        layout: renderer.device!.createPipelineLayout({
+          bindGroupLayouts: [
+            renderer.frameLayout!,
+            this.#layout,
+            ...(this.#appearance ? [this.#appearance.layout] : []),
+          ],
+        }),
         vertex: { module, entryPoint: 'vertex' },
         fragment: { module, entryPoint: 'fragment', targets: [{ format: target.format }] },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
@@ -421,12 +521,15 @@ export class TileLayer implements Drawable {
 /** Loads map tiles and draws them under a figure's data layers; resolves once every tile is in. */
 export async function tileLayer(figure: Figure, options: TileLayerOptions): Promise<TileLayer> {
   const layer = new TileLayer(figure.renderer, options);
+  // A figure that refuses the layer (a 2D chart, or one disposed while the tiles loaded) gets nothing drawn, and the
+  // tiles' textures are freed.
   try {
     await layer.load(options);
+    figure.addLayer(layer);
   } catch (error) {
     layer.dispose();
     throw error;
   }
   figure.renderer.add(layer);
-  return trackSpecLayer(figure, 'tiles', [options], figure.addLayer(layer));
+  return trackSpecLayer(figure, 'tiles', [options], layer);
 }

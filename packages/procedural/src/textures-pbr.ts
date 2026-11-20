@@ -4,7 +4,10 @@ import { textureSettings } from './texture-settings.js';
 import { pbrShader, pbrMipShader } from './textures-pbr-shader.js';
 import type { TextureBakeOptions } from './textures.js';
 
-/** Periodic material fields; all original /textures patterns plus marble, cloud, grass, fire, starfield and road. */
+/**
+ * Material fields; all original /textures patterns plus marble, cloud, grass, fire, starfield, road, stone (irregular
+ * cells with mortar) and soot (a plume mask, rising from the middle of the v = 0 edge). Every pattern but soot repeats.
+ */
 export type PBRTexturePattern =
   | 'noise'
   | 'bricks'
@@ -16,7 +19,9 @@ export type PBRTexturePattern =
   | 'grass'
   | 'fire'
   | 'starfield'
-  | 'road';
+  | 'road'
+  | 'stone'
+  | 'soot';
 /** Shared material field, lighting-map and mipmap settings. Colours are linear RGB. */
 export interface PBRTextureOptions extends Omit<TextureBakeOptions, 'pattern'> {
   /** Default bricks. */
@@ -33,6 +38,16 @@ export interface PBRTextureOptions extends Omit<TextureBakeOptions, 'pattern'> {
   time?: number;
   /** Complete chain down to 1x1, using area-filtered linear colour and renormalized normals. Default true. */
   mipmaps?: boolean;
+  /**
+   * Per-cell colour variation of bricks, tiles and stone, 0..1: each cell's colour is scaled by a seeded factor in
+   * 1 +- tint, mortar untouched. Default 0.25 for stone, 0 for the rest (their maps stay as before).
+   */
+  tint?: number;
+  /**
+   * Chipped edges of bricks, tiles and stone, 0..1: a rounded bevel with a noisy, broken edge for close-ups.
+   * Default 0 (sharp edges as before).
+   */
+  chip?: number;
 }
 /** Four owned GPU textures, usable on native WebGPU or the full WebGL2 compatibility device. */
 export interface PBRTextureSet {
@@ -75,6 +90,8 @@ const patterns: PBRTexturePattern[] = [
   'fire',
   'starfield',
   'road',
+  'stone',
+  'soot',
 ];
 const failed = (message: string) => fault('failed', message, 'procedural');
 const palettes: Partial<
@@ -104,6 +121,14 @@ const palettes: Partial<
     [0.9, 0.85, 0.5],
     [0.04, 0.04, 0.045],
   ],
+  stone: [
+    [0.42, 0.4, 0.37],
+    [0.12, 0.11, 0.1],
+  ],
+  soot: [
+    [0.03, 0.028, 0.026],
+    [1, 1, 1],
+  ],
 };
 function settings(o: PBRTextureOptions, maximum: number) {
   if (!o || typeof o !== 'object' || Array.isArray(o))
@@ -121,20 +146,24 @@ function settings(o: PBRTextureOptions, maximum: number) {
     roughness = o.roughness ?? 0.7,
     roughnessVariation = o.roughnessVariation ?? 0.3,
     time = o.time ?? 0,
-    mipmaps = o.mipmaps ?? true;
+    mipmaps = o.mipmaps ?? true,
+    tint = o.tint ?? (pattern === 'stone' ? 0.25 : 0),
+    chip = o.chip ?? 0;
   if (
     kind < 0 ||
     !Number.isFinite(normalStrength) ||
     normalStrength < 0 ||
     normalStrength > 8 ||
-    ![heightScale, roughness, roughnessVariation].every((x) => Number.isFinite(x) && x >= 0 && x <= 1) ||
+    ![heightScale, roughness, roughnessVariation, tint, chip].every((x) => Number.isFinite(x) && x >= 0 && x <= 1) ||
     !Number.isFinite(time) ||
     time < 0 ||
     time > 1e6 ||
     typeof mipmaps !== 'boolean'
   )
-    throw failed('Invalid PBR settings; use bounded strength, height, roughness, time and a boolean mipmaps');
-  return { ...base, kind, normalStrength, heightScale, roughness, roughnessVariation, time, mipmaps };
+    throw failed(
+      'Invalid PBR settings; use bounded strength, height, roughness, tint, chip, time and a boolean mipmaps',
+    );
+  return { ...base, kind, normalStrength, heightScale, roughness, roughnessVariation, time, mipmaps, tint, chip };
 }
 async function waiting<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   // Observe rejected driver work even when cancellation wins.
@@ -187,9 +216,9 @@ class Baker implements PBRTextureBaker {
             usage: 4 | 8 | 1,
           }),
         );
-      const uniform = this.device.createBuffer({ size: 96, usage: 64 | 8 });
+      const uniform = this.device.createBuffer({ size: 112, usage: 64 | 8 });
       buffers.push(uniform);
-      const bytes = new ArrayBuffer(96),
+      const bytes = new ArrayBuffer(112),
         ints = new Uint32Array(bytes),
         floats = new Float32Array(bytes);
       ints.set([o.width, o.height, o.kind, o.seed]);
@@ -197,6 +226,7 @@ class Baker implements PBRTextureBaker {
       floats.set([...o.color, 1, ...o.secondary, 1], 8);
       floats.set([...o.offset.map((x) => ((x % 1) + 1) % 1), o.stagger, o.time], 16);
       floats.set([o.normalStrength, o.heightScale, o.roughness, o.roughnessVariation], 20);
+      floats.set([o.tint, o.chip], 24);
       this.device.queue.writeBuffer(uniform, 0, bytes);
       const encoder = this.device.createCommandEncoder(),
         pass = encoder.beginComputePass();

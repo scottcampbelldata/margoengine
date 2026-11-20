@@ -195,6 +195,6 @@
       "externalAssets": 647,
       "documentationLinks": true
     },
-    "note": "Three newer main commits change test assets, decoder harness/docs and GPU lock timeout bookkeeping. No package runtime source changed; affected tests and generated guides pass after integration. Full verify was invoked once before that integration."
+    "note": "Three newer main commits change test assets, decoder harness/docs and the GPU run timeout bookkeeping. No package runtime source changed; affected tests and generated guides pass after integration. Full verify was invoked once before that integration."
   }
 }

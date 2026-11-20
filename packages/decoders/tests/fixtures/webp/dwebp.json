@@ -20,6 +20,20 @@
   "height": 83,
   "yuv": "41616e063ce81a37342e93f5648dbc3495ad400bfb0ae11ac31adb0866cb8e77"
  },
+ "lossy-sharpness-1": {
+  "size": 1784,
+  "sha256": "4b61c04232d72a949bd21c83beb5f37ae79f04bb63ff91d79bcc6a4f8950e49b",
+  "width": 97,
+  "height": 83,
+  "yuv": "68cb32fa322e762c623cb732821d1fa2725df08c080613a75eb0f0b19e0c62f9"
+ },
+ "lossy-sharpness-7": {
+  "size": 1344,
+  "sha256": "1e5630863e7d4a47c2a46d47519367e4b90f91164b207e9e8476f69668c1cab5",
+  "width": 97,
+  "height": 83,
+  "yuv": "f5561569ff927bb727ef700f3d4e5580b0da47eb80b06f99897b96cd0a734a9f"
+ },
  "lossless": {
   "size": 10516,
   "sha256": "abe15cc98e5dd0906321002e96cd073c3a7a462f125a1cdea982cf86c6466a6d",

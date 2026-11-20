@@ -12,6 +12,7 @@ import {
 import { SRGBToLinear } from '@margoengine/math/color';
 import { DEFAULT_MAX_BYTES, type FetchOptions, fetchBytes } from './load.js';
 import { assetURL } from '../../shared/asset-url.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import {
   DEFAULT_MAX_MATERIAL_BYTES,
   type LoadedOBJ,
@@ -515,7 +516,10 @@ export interface LoadedOBJMesh {
   materials: MTLMaterialSet;
   /** The OBJ's warnings followed by the material set's. */
   warnings: string[];
-  /** Destroys the mesh and disposes the material set (and the fallback material when loadOBJ made it). */
+  /**
+   * Destroys the mesh and disposes the material set (and the fallback material when loadOBJ made it). A scene that
+   * removes the mesh (removePlugin, scene or engine disposal) releases them the same way.
+   */
   dispose(): void;
 }
 
@@ -547,7 +551,9 @@ export async function loadOBJ(
     fetch: opts.fetch,
     init: opts.init,
   };
-  const bytes = await fetchBytes(objUrl, fetchOptions);
+  // The mesh is made after the awaits below: it goes in the scene this call started in.
+  const scope = captureScene(engine),
+    bytes = await fetchBytes(objUrl, fetchOptions);
   const origin = new URL(objUrl).origin,
     perFile = opts.maxBytes ?? DEFAULT_MAX_BYTES,
     budget = opts.maxMaterialBytes ?? DEFAULT_MAX_MATERIAL_BYTES;
@@ -581,12 +587,22 @@ export async function loadOBJ(
     fallback = opts.fallback ?? (ownFallback as Material);
   let mesh: MaterialMesh<Material[]>;
   try {
-    mesh = createOBJMesh(engine, obj, set, { fallback, renderOrder: opts.renderOrder ?? 0 });
+    mesh = scope.run(() => createOBJMesh(engine, obj, set, { fallback, renderOrder: opts.renderOrder ?? 0 }));
   } catch (error) {
     set.dispose();
     ownFallback?.dispose();
     throw error;
   }
+  // The materials, textures and fallback made here go with the mesh, also when its scene removes it (removePlugin,
+  // scene or engine disposal) before dispose() is called.
+  let released = false;
+  const release = (): void => {
+    if (released) return;
+    released = true;
+    set.dispose();
+    ownFallback?.dispose();
+  };
+  mesh.onDispose(release);
   return {
     mesh,
     obj,
@@ -594,8 +610,7 @@ export async function loadOBJ(
     warnings: [...obj.warnings, ...set.warnings],
     dispose() {
       mesh.destroy();
-      set.dispose();
-      ownFallback?.dispose();
+      release();
     },
   };
 }

@@ -78,7 +78,7 @@ are exercised without sleeps, timing assertions or lowered numeric bounds.
 
 Run unit tests with `npm test --workspace @margoengine/water`. Run
 `node packages/water/test/query.browser.mjs`, then the same with `--compat`,
-each under `node scripts/gpu-lock.mjs run --owner=codex-batch234 --wait-max=60 --max=3 -- ...`.
+each under `node scripts/run-with-timeout.mjs --max=3 -- ...`.
 Numerical/native/compatibility records are in
 `docs/whitepaper/results/batch234-water-query-{webgpu,compat}.json`.
 The initial six-case results have height error below 0.000002 m and macro-normal
@@ -105,7 +105,7 @@ optional and no optional ceiling increase is needed.
 
 ## Landing acceptance
 
-The round invoked full `npm run verify` exactly once, without a GPU lease.
+The round invoked full `npm run verify` exactly once.
 Its water-SSR preservation failure identified the unnecessary flux texture
 COPY_SRC addition made for the test oracle. That addition was removed entirely;
 the independent oracle now extracts the existing sampleable flux by compute.

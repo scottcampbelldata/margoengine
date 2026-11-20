@@ -3,18 +3,19 @@ import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { ColorInput, Vec3 } from '@margoengine/math';
 import type { Material, MeshGeometry } from '@margoengine/materials';
 import type { BatchedMesh as Batch, BatchedMeshOptions } from '@margoengine/materials/batched';
-import { MargoError } from '@margoengine/math/errors';
 import { composeMatrix } from '@margoengine/math/mat4';
 import { eulerToQuaternion } from '@margoengine/math/quat';
+import { useBakedShadows } from './bake-shadows.js';
 import { useCommit, useCreated, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { fault } from '../../shared/errors.js';
 
 interface ErrorProps {
   /** Loading the optional package or attaching failed. */
   onError?: (error: unknown) => void;
 }
 
-const BatchContext = createContext<Batch | null>(null);
+const BatchContext = /* @__PURE__ */ createContext<Batch | null>(null);
 /** Props of `<BatchedMesh>`: its fixed capacity, an optional material, and `<BatchedItem>` children. */
 export interface BatchedMeshProps extends BatchedMeshOptions, ErrorProps {
   /** The batch's `@margoengine/materials` material. Default a plain PBR material that shows vertex colours. */
@@ -28,11 +29,12 @@ export interface BatchedMeshProps extends BatchedMeshOptions, ErrorProps {
  * `<BatchedItem>` per object inside. Capacity (`maxItems`, `maxVertices`, `maxIndices`), `renderOrder` and `material`
  * are fixed: changing one recreates the batch. The ref is the live BatchedMesh. WebGPU only.
  */
-export const BatchedMesh = forwardRef<Batch, BatchedMeshProps>(function BatchedMesh(
+export const BatchedMesh = /* @__PURE__ */ forwardRef<Batch, BatchedMeshProps>(function BatchedMesh(
   { maxItems, maxVertices, maxIndices, renderOrder, material, castShadow = false, children, onError },
   ref,
 ) {
-  const scene = useScene();
+  const scene = useScene(),
+    baked = useBakedShadows();
   const batch = useCreated<
     [typeof import('@margoengine/materials/batched'), typeof import('@margoengine/materials')],
     Batch
@@ -58,8 +60,9 @@ export const BatchedMesh = forwardRef<Batch, BatchedMeshProps>(function BatchedM
     [maxItems, maxVertices, maxIndices, renderOrder, material],
   );
   useEffect(() => {
-    if (castShadow && batch && scene.shadows) return scene.shadows.add(batch.mesh as unknown as MeshHandle);
-  }, [batch, scene.shadows, castShadow]);
+    if (castShadow && batch && scene.shadows)
+      return scene.shadows.add(batch.mesh as unknown as MeshHandle, { static: baked });
+  }, [batch, scene.shadows, castShadow, baked]);
   return <BatchContext.Provider value={batch}>{batch && children}</BatchContext.Provider>;
 });
 
@@ -91,7 +94,7 @@ export function BatchedItem({
   visible = true,
 }: BatchedItemProps): null {
   const batch = useContext(BatchContext);
-  if (!batch) throw new MargoError('state', 'BatchedItem is outside a BatchedMesh; render it inside <BatchedMesh>');
+  if (!batch) throw fault('state', 'BatchedItem is outside a BatchedMesh; render it inside <BatchedMesh>', 'react-usage');
   const id = useRef<number | null>(null),
     transform = (): ArrayLike<number> =>
       matrix ?? composeMatrix(position, eulerToQuaternion(rotation[0], rotation[1], rotation[2]), scale, scratch);

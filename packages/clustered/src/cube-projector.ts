@@ -69,7 +69,8 @@ fn clusterCubeProjector(index:u32,light:ClusterLight,position:vec3f)->vec3f {
 export class CubeProjectorLights extends ProjectorLights {
   /** Per-light product for coexisting spot and cube images. */
   override readonly term='clusterProjector(index,light,position)*clusterCubeProjector(index,light,position)';
-  private cubeWords=new Uint32Array(HEADER);
+  /** @internal The packed words the shader reads; LightBounce's CPU twin reads them too (bounce-terms.ts). */
+  cubeWords=new Uint32Array(HEADER);
   private cubesActive=false;
   private cubesDisposed=false;
   private cubesList:readonly (CubeProjectorImage|CubeProjectorEntry|null|undefined)[]=[];

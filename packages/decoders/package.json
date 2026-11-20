@@ -35,7 +35,8 @@
     "prepack": "npm run build",
     "test:browser:hdr6": "cd ../.. && node packages/decoders/tests/hdr6-browser.mjs",
     "test:browser:avif": "cd ../.. && node packages/decoders/tests/avif-browser.mjs",
-    "test:avif:native": "node scripts/test-avif-native.mjs"
+    "test:avif:native": "node scripts/test-avif-native.mjs",
+    "test:gpu:compression": "cd ../.. && npm run modern:test:gltf-compression"
   },
   "sideEffects": false,
   "exports": {
@@ -118,6 +119,14 @@
     "./tiff": {
       "types": "./dist/tiff.d.ts",
       "import": "./dist/tiff.js"
+    },
+    "./tiff-codecs": {
+      "types": "./dist/tiff-codecs.d.ts",
+      "import": "./dist/tiff-codecs.js"
+    },
+    "./geotiff": {
+      "types": "./dist/geotiff.d.ts",
+      "import": "./dist/geotiff.js"
     },
     "./ktx2-layers": {
       "types": "./dist/ktx2-layers.d.ts",

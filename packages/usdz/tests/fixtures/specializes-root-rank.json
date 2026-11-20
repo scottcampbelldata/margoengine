@@ -1,0 +1,104 @@
+{
+ "shallower-implied": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        specializes = </C>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n)\n{\n    over \"b\"\n    {\n    }\n}\ndef \"M\" (\n)\n{\n    def \"c\" (\n    )\n    {\n        over \"c\" (\n            append inherits = </C>\n            payload = @./l0.usda@</M> (offset = 10)\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n        def \"b\"\n        {\n        }\n    }\n}\ndef \"M\"\n{\n    over \"b\" (\n        payload = @./l1.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    over \"b\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"a\" (\n    )\n    {\n        def \"c\" (\n            payload = @./l2.usda@ (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    14
+   ],
+   "/P/a": [
+    15
+   ],
+   "/P/a/c": [
+    16,
+    10
+   ],
+   "/P/a/c/b": [
+    11,
+    4
+   ],
+   "/P/a/c/b/c": [
+    5
+   ],
+   "/P/a/c/b/c/c": [
+    12,
+    7,
+    6,
+    2,
+    0
+   ],
+   "/P/a/c/b/c/c/a": [
+    8,
+    1,
+    2,
+    12,
+    7
+   ],
+   "/P/a/c/b/c/c/a/a": [
+    8
+   ],
+   "/P/a/c/b/c/c/a/a/b": [
+    9
+   ],
+   "/P/a/c/b/c/c/a/b": [
+    9,
+    3,
+    13
+   ]
+  }
+ },
+ "no-variant": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"c\"\n    {\n    }\n}\ndef \"M\" (\n)\n{\n    def \"c\" (\n    )\n    {\n        def \"b\" (\n            specializes = </C>\n        )\n        {\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n    subLayers = [@./l0.usda@ (offset = 4)]\n)\ndef \"M\" (\n)\n{\n    def \"c\" (\n    )\n    {\n        def \"a\" (\n            references = @./l0.usda@</M> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"c\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"a\" (\n    )\n    {\n        def \"c\" (\n            append references = @./l2.usda@ (offset = 10)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    10
+   ],
+   "/P/a": [
+    11
+   ],
+   "/P/a/c": [
+    12,
+    5,
+    2
+   ],
+   "/P/a/c/c": [
+    6,
+    3
+   ],
+   "/P/a/c/c/b": [
+    4,
+    8,
+    0
+   ],
+   "/P/a/c/c/b/c": [
+    9,
+    1
+   ],
+   "/P/a/c/c/a": [
+    7,
+    2
+   ],
+   "/P/a/c/c/a/c": [
+    3
+   ],
+   "/P/a/c/c/a/c/b": [
+    4,
+    8,
+    0
+   ],
+   "/P/a/c/c/a/c/b/c": [
+    9,
+    1
+   ]
+  }
+ }
+}

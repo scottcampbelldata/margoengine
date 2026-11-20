@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import type { Engine, Mesh as EngineMesh, Vec3, Geometry } from '@margoengine/core/extension';
 import type { FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
-import type { PBRModel, LightingEffect } from '@margoengine/gltf-pro';
+import type { PBRModel, LightingEffect } from '@margoengine/gltf/pbr';
 import type { Shadows } from '@margoengine/shadows';
 import type * as ShadowsModule from '@margoengine/shadows';
 import type { AssetCache } from './assets.js';
-import { MargoError } from '@margoengine/math/errors';
+import { fault } from '../../shared/errors.js';
 
 export interface Registry {
   current: EngineMesh | null;
@@ -15,6 +15,8 @@ export interface Registry {
   unregister(mesh: EngineMesh): void;
   geometry?: Geometry | null;
   geometryOverride?: (mesh: EngineMesh, geometry: Geometry | null) => void;
+  /** Set by `<Instances>`: the instance meshes it draws now, each a core mesh with the shared geometry. */
+  instanceMeshes?: () => EngineMesh[];
 }
 export interface Resources {
   models: Set<PBRModel>;
@@ -29,7 +31,7 @@ export interface Resources {
 export type ShadowsLoader = () => Promise<typeof ShadowsModule>;
 // Optional model behaviours share the instance that this mount owns. The URL
 // cache keeps source data only; animation state is never shared between mounts.
-export const ModelContext = createContext<PBRModel | null | undefined>(undefined);
+export const ModelContext = /* @__PURE__ */ createContext<PBRModel | null | undefined>(undefined);
 /**
  * Pointer event passed to React handlers. It goes to the hit mesh first, then to each parent with handlers, as a DOM
  * event bubbles, until a handler calls `stopPropagation()`.
@@ -138,15 +140,15 @@ export function createViews(engine: Engine): Views {
   };
   return views;
 }
-export const Context = createContext<Scene | null>(null);
+export const Context = /* @__PURE__ */ createContext<Scene | null>(null);
 export function useScene(): Scene {
   const scene = useContext(Context);
-  if (!scene) throw new MargoError('state', 'Engine components require <Canvas>; render them inside one.');
+  if (!scene) throw fault('state', 'Engine components require <Canvas>; render them inside one', 'react-usage');
   return scene;
 }
 export function useMesh(): Registry {
   const { registry } = useScene();
-  if (!registry) throw new MargoError('state', 'Geometry and material require <Mesh>; render them inside one.');
+  if (!registry) throw fault('state', 'Geometry and material require <Mesh>; render them inside one', 'react-usage');
   return registry;
 }
 export function live(registry: Registry): EngineMesh | null {
@@ -303,4 +305,8 @@ export function useModelSources(scene: Scene, effect: { add(model: never): () =>
       for (const remove of added.values()) remove();
     };
   }, [scene, effect]);
+}
+/** A colour prop by value: the string itself, or an array's numbers joined, so an inline array literal is no change. */
+export function colorKey(color: string | readonly number[] | undefined): string | undefined {
+  return color === undefined || typeof color === 'string' ? color : `[${color.join(',')}]`;
 }

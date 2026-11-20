@@ -1,6 +1,7 @@
 import { MargoError, type MutableVec2, type MutableVec3 } from '@margoengine/math';
 import { assertOptions, direction, manifoldEdges, remappedEdgeResult, selectedEdges } from './edit-support.js';
 import { assertPolygonMesh, edgeId, faceGeometryError, meshPolygonNormal } from './polygon.js';
+import { leastOf } from './least.js';
 import { faceUVAt, loopFaces } from './polygon-split.js';
 import { meshTileUV } from './primitives.js';
 import { compactVertices, createMeshEditResult, faceIdFactory } from './result.js';
@@ -273,7 +274,7 @@ export function bevelMeshEdges(
     open.set(b, a); // the corner face runs opposite to the gap's half-edges
   }
   while (open.size) {
-    const start = Math.min(...open.keys()),
+    const start = leastOf(open.keys()),
       loop = [start];
     let at = open.get(start)!;
     open.delete(start);

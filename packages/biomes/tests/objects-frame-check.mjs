@@ -1,10 +1,8 @@
 // gpu-timing: none (same cameras and shadows checked for GPU errors; speed sampling lives in objects-frame-speed.mjs)
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 
-const release = await acquire({ owner: 'biomes-objects-frame-correctness', mode: 'shared', max: 10 });
 const context = await openBrowser({ startPath: '/packages/biomes/tests/objects-frame-check.html', port: 'free' });
 const { page } = context,
   errors = [];
@@ -29,11 +27,7 @@ await runSuite(
     );
   },
   async () => {
-    try {
-      await context.close();
-    } finally {
-      release();
-    }
+    await context.close();
   },
 );
 watchExit();

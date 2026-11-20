@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/pixel/tests/render3d-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/pixel/tests/render3d-check.mjs
 // A cube at 32 x 32: the outline falls exactly where the CPU finds depth edges and creases from the depth read back, the
 // rest is the view's colour; off, the output is the colour; a captured sheet has N frames of the right size; a compositor
 // layer takes the picture; a device loss. Results: test-results/render3d-browser.json.

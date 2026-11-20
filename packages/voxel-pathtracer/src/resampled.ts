@@ -55,35 +55,76 @@ export class ResampledVoxelPathTracer extends VoxelPathTracer {
 
 function resampledSource(source: string, candidates: number): string {
   if (candidates === 1) return source;
-  const edits = [
-    ['var<private> rng:u32;', 'var<private> rng:u32;var<private> emitterSearch:bool;'],
+  const lights = Math.ceil(candidates / 2),
+    directions = Math.floor(candidates / 2);
+  // One proposal per pass of the light kinds loop: light kind 1 runs KIND_REPEAT.y times in a row (the WebGL2 route
+  // draws its sample, shadow and gather programs that many times, src/compat-staged.ts), and the reservoir lives in
+  // private state between the passes. A loop of proposals inside one pass held closest() and shadow() in one staged
+  // program; fxc (ANGLE Direct3D 11) took 254 s to link it and 356 s more at its first draw (KB-L5a-3). The proposals,
+  // their random numbers and the sums are those of the loop, in the same order.
+  const edits: [string | RegExp, (match: string) => string][] = [
+    [
+      'var<private> rng:u32;',
+      (m) =>
+        `${m}var<private> emitterSearch:bool;var<private> risC:u32;var<private> risKept:vec3f;var<private> risScale:f32;var<private> risSum:f32;`,
+    ],
     // Directional light proposals pass media without scattering. The final shadow
     // evaluation supplies their transmittance, just as for power-based proposals.
-    ['let u=ue;', 'let u=select(ue,0u,emitterSearch&&(u32(mat(ue*MV+3u).w)&MEDIA)!=0u);'],
+    ['let u=ue;', () => 'let u=select(ue,0u,emitterSearch&&(u32(mat(ue*MV+3u).w)&MEDIA)!=0u);'],
     [
       'let v=select(0u,base|pv,pv!=0u);',
-      'var v=select(0u,base|pv,pv!=0u);if(emitterSearch&&(u32(mat(v*MV+3u).w)&MEDIA)!=0u){v=0u;}',
+      () => 'var v=select(0u,base|pv,pv!=0u);if(emitterSearch&&(u32(mat(v*MV+3u).w)&MEDIA)!=0u){v=0u;}',
     ],
-    ['pv!=0u&&!uniform&&!step);', 'v!=0u&&!uniform&&!step);'],
+    ['pv!=0u&&!uniform&&!step);', () => 'v!=0u&&!uniform&&!step);'],
     [
       'let t=rectHit(k,o,d);\n  if(t<=0.0',
-      'if(emitterSearch&&!opaqueArea(k)){continue;}\n  let t=rectHit(k,o,d);\n  if(t<=0.0',
+      () => 'if(emitterSearch&&!opaqueArea(k)){continue;}\n  let t=rectHit(k,o,d);\n  if(t<=0.0',
     ],
-    ['var ls:LightPoint;', 'if(q==1u){L+=resampledEmitters(kind,m,n,wo,o,mask);continue;}\n   var ls:LightPoint;'],
+    // Pass start: the first proposal empties the reservoir; the pass after the last adds its estimate to L (where the
+    // loop added it, before kind 2 adds anything). Natively the loop goes back to kind 1 until every proposal ran.
+    [
+      /for\(var q=0u;q<[^;{}]+;q\+\+\)\{/,
+      (m) =>
+        `${m}\n   if(q==1u){if(risC==0u){risKept=vec3f(0.0);risScale=0.0;risSum=0.0;}risC++;}` +
+        `else if(q==2u&&risC!=0u){if(risC<KIND_REPEAT.y){q=1u;risC++;}else{L+=risKept*(risScale*risSum);risC=0u;}}`,
+    ],
+    // The proposal: power-sampled emitters first, then cosine (or phase) directions to the emitter they meet.
+    [
+      'if(q==1u){ls=sampleEmitter();}',
+      () =>
+        `if(q==1u){if(risC<=${lights}u){ls=sampleEmitter();}else{var wd=cosineDir(n);if(kind==1u){wd=sampleHg(-wo,m.g);}ls=directionalEmitter(o,wd);}}`,
+    ],
+    ['let v=ls.p-o;let d2=dot(v,v);', (m) => `${m}if(q==1u&&d2<=0.0){continue;}`],
+    // Each proposal contributes f / (N_light p_light + N_direction p_direction); lp holds that denominator.
+    [
+      'radiance=ls.radiance;lp=ls.pdfA*d2/cl;',
+      (m) =>
+        `${m}\n   if(q==1u){var bp=max(dot(n,wi),0.0)*INV_PI;if(kind==1u){bp=hgPdf(dot(-wo,wi),m.g);}lp=${lights}.0*ls.pdfA*d2/cl+${directions}.0*bp;}`,
+    ],
+    // The weights partition unity in solid angle, including null and missed proposals. With target luminance(f), the
+    // selected RGB contribution is sum(weights)*RGB/luminance(RGB). The largest weight normalizes the sum so it cannot
+    // overflow as proposals accumulate. Visibility is in the target; a proposal no BSDF lobe reaches adds nothing.
+    [
+      'if(fogged&&!far){v*=exp(-f.fog.x*dist);}',
+      (m) =>
+        `${m}\n    if(q==1u){let contribution=e.f*radiance*v/lp;let weight=lum(contribution);if(!(weight<=0.0)){` +
+        'if(weight>risScale){risSum*=risScale/weight;risScale=weight;}let scaled=weight/risScale;risSum+=scaled;' +
+        'if(rand()*risSum<scaled){risKept=contribution/weight;}}}\n    else ',
+    ],
     // This integral is now entirely estimated by the mixed reservoir. Delta
     // paths and camera emission (lastPdf == 0) retain their original treatment.
-    ['return power2(lastPdf,lp);', 'return 0.0;'],
+    ['return power2(lastPdf,lp);', () => 'return 0.0;'],
   ];
-  if (edits.some(([original]) => !source.includes(original)))
+  if (edits.some(([original]) => (typeof original === 'string' ? !source.includes(original) : !original.test(source))))
     throw new MargoError(
       'state',
       'Emissive sampling kernel does not match this tracer; rebuild the package, see https://margoengine.com/errors#voxel-pathtracer',
     );
   let result = source;
   for (const [original, replacement] of edits) result = result.replace(original, replacement);
-  const lights = Math.ceil(candidates / 2),
-    directions = Math.floor(candidates / 2);
   const helpers = /* wgsl */ `
+// Light kind 1 runs once per proposal (x: the kind, y: the passes).
+const KIND_REPEAT=vec2u(1u,${candidates}u);
 // A directional proposal's emitting surface and the power sampler's area PDF.
 fn directionalEmitter(o:vec3f,wi:vec3f)->LightPoint {
  var light:LightPoint;
@@ -97,50 +138,15 @@ fn directionalEmitter(o:vec3f,wi:vec3f)->LightPoint {
  let total=fl(f.scene.x+scene[ib+36u]*MODEL+10u);
  let pick=fl(ib+38u);
  if(pick<=0.0||total<=0.0){return light;}
- let w=worldX(h.inst);
+ let x=instX(h.inst);let w=x.world;
  let area=length(cross(colOf(w,(h.axis+1u)%3u),colOf(w,(h.axis+2u)%3u)));
  // End shadow rays outside the emitting voxel, as sampleEmitter does. Ending
  // exactly on its face lets rounding put the endpoint inside its own occluder.
  light.p=o+wi*h.t+h.sgn*EPS*colOf(w,h.axis);
- light.n=h.sgn*normalize(rowOf(localX(h.inst),h.axis));
+ light.n=h.sgn*normalize(rowOf(x.local,h.axis));
  light.radiance=m.emission;
  light.pdfA=pick*lum(m.emission)/total/area;
  return light;
-}
-// Each candidate contributes f / (N_light p_light + N_direction p_direction).
-// The weights partition unity in solid angle, including null/missed candidates.
-// With target luminance(f), the selected RGB contribution is sum(weights)*RGB/luminance(RGB).
-fn resampledEmitters(kind:u32,m:Mat,n:vec3f,wo:vec3f,o:vec3f,mask:u32)->vec3f {
- var kept=vec3f(0.0);var scale=0.0;var sum=0.0;
- for(var candidate=0u;candidate<${candidates}u;candidate++){
-  var light:LightPoint;
-  if(candidate<${lights}u){light=sampleEmitter();}
-  else{
-   var wi=cosineDir(n);
-   if(kind==1u){wi=sampleHg(-wo,m.g);}
-   light=directionalEmitter(o,wi);
-  }
-  if(light.pdfA<=0.0){continue;}
-  let v=light.p-o;let d2=dot(v,v);
-  if(d2<=0.0){continue;}
-  let wi=v/sqrt(d2);var cosine=-dot(light.n,wi);
-  if(light.twoSided){cosine=abs(cosine);}
-  if(cosine<=0.0){continue;}
-  let e=evalAt(kind,m,n,wo,wi,mask);
-  var bp=max(dot(n,wi),0.0)*INV_PI;
-  if(kind==1u){bp=hgPdf(dot(-wo,wi),m.g);}
-  let denominator=${lights}.0*light.pdfA*d2/cosine+${directions}.0*bp;
-  var visibility=shadow(o,wi,sqrt(d2));
-  if(f.fog.z>0.0){visibility*=exp(-f.fog.x*sqrt(d2));}
-  let contribution=e.f*light.radiance*visibility/denominator;
-  let weight=lum(contribution);
-  if(weight<=0.0){continue;}
-  // Normalize by the largest weight so the reservoir sum cannot overflow as candidates accumulate.
-  if(weight>scale){sum*=scale/weight;scale=weight;}
-  let scaled=weight/scale;sum+=scaled;
-  if(rand()*sum<scaled){kept=contribution/weight;}
- }
- return kept*(scale*sum);
 }
 `;
   // The compatibility route extracts declarations before the compute entry.

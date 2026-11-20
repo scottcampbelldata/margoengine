@@ -64,6 +64,14 @@ const vocabulary: Record<string, [number, string, number?]> = {
   N: [1, 'N'],
   mol: [1, 'mol'],
 };
+// UDUNITS-2 takes a plural only on a unit name; a symbol never does (ms is the millisecond, Pa s a viscosity).
+const named = new Set(['meter', 'metre', 'second', 'minute', 'hour', 'day', 'kelvin', 'pascal', 'bar', 'millibar', 'radian', 'degree']);
+const lookup = (key: string) =>
+  Object.hasOwn(vocabulary, key)
+    ? vocabulary[key]
+    : key.endsWith('s') && named.has(key.slice(0, -1))
+      ? vocabulary[key.slice(0, -1)]
+      : undefined;
 const derived: Record<string, Record<string, number>> = {
   P: { M: 1, L: -1, T: -2 },
   W: { M: 1, L: 2, T: -3 },
@@ -93,7 +101,7 @@ function parse(source: string): Unit {
     const match = /^([A-Za-z_%]+|1)(?:\^?([+-]?\d+))?$/.exec(token);
     if (!match) throw bad(`unsupported unit expression ${source}`);
     const key = match[1],
-      u = vocabulary[key] ?? vocabulary[key.endsWith('s') ? key.slice(0, -1) : key];
+      u = lookup(key);
     if (!u) throw bad(`unknown unit ${key}`);
     const exponent = Number(match[2] ?? 1) * (divide ? -1 : 1);
     if (u[2] !== undefined && (tokens.length !== 1 || exponent !== 1))

@@ -10,11 +10,18 @@
 import { fork } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { availableParallelism, cpus, freemem, setPriority, totalmem } from 'node:os';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
-import { mergeMetrics, parseMetricsUrls, parseSteps, parseTarget, summarizeCloses, summarizeSamples } from './remote-args.mjs';
+import {
+  mergeMetrics,
+  parseMetricsUrls,
+  parseSteps,
+  parseTarget,
+  summarizeCloses,
+  summarizeSamples,
+} from './remote-args.mjs';
 
 const BOTS_PER_PROCESS = 50,
-  wait = (ms) => new Promise((done) => setTimeout(done, ms)),
   round = (v, d = 2) => (v === null || v === undefined ? v : Math.round(v * 10 ** d) / 10 ** d);
 const quantiles = (values) => {
   if (!values.length) return null;
@@ -78,205 +85,226 @@ export async function runRemote(arg) {
     stopAll = () => {
       for (const child of children) if (child.exitCode === null) child.kill('SIGKILL');
     };
+  // A bot process that fails stops the run: every wait and every question to the bots ends with `halt`'s reason, and the
+  // run ends by its event loop with code 3 (KB-OWN-EXIT2).
+  const halt = new AbortController(),
+    wait = (ms) =>
+      sleep(ms, undefined, { signal: halt.signal }).catch((error) => {
+        throw halt.signal.aborted ? halt.signal.reason : error;
+      }),
+    halted = new Promise((_, fail) => halt.signal.addEventListener('abort', () => fail(halt.signal.reason))),
+    unless = (promise) => Promise.race([promise, halted]);
+  halted.catch(() => {}); // read by the race above; a run that ends without a halt never rejects it
   // The hard limit of the whole run: every bot process goes with it.
   const limit = setTimeout(() => {
     console.log(`hard limit of ${maxSeconds} s reached, stopping every bot`);
     stopAll();
-    process.exit(2);
+    process.exit(2); // process.exit: the hard run limit ends the run whatever it is waiting on
   }, maxSeconds * 1000);
   process.on('SIGTERM', () => {
     stopAll();
-    process.exit(143);
+    process.exit(143); // process.exit: a SIGTERM from the caller ends the run at once, the bots killed first
   });
-  const sum = (key) => progress.reduce((t, m) => t + (m?.[key] ?? 0), 0);
-  const all = (type, send) =>
-    Promise.all(
-      children
-        .filter((c) => c.connected)
-        .map(
-          (child) =>
-            new Promise((done) => {
-              const on = (m) => {
-                if (m.type !== type) return;
-                child.off('message', on);
-                done(m);
-              };
-              child.on('message', on);
-              child.send(send);
-            }),
+  try {
+    await rise();
+  } catch (error) {
+    if (!halt.signal.aborted || error !== halt.signal.reason) throw error;
+    console.error(error.message);
+    process.exitCode = 3;
+  } finally {
+    stopAll();
+    clearTimeout(limit);
+  }
+
+  async function rise() {
+    const sum = (key) => progress.reduce((t, m) => t + (m?.[key] ?? 0), 0);
+    const all = (type, send) =>
+      unless(
+        Promise.all(
+          children
+            .filter((c) => c.connected)
+            .map(
+              (child) =>
+                new Promise((done) => {
+                  const on = (m) => {
+                    if (m.type !== type) return;
+                    child.off('message', on);
+                    done(m);
+                  };
+                  child.on('message', on);
+                  child.send(send);
+                }),
+            ),
         ),
-    );
-  async function sampleBox(url) {
-    const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) throw new Error(`metrics ${res.status}`);
-    return res.json();
-  }
-  // One box stopping mid-hold must not cost the other box's numbers: only all of them failing is a failed sample.
-  async function sampleMetrics() {
-    if (!metricsUrls.length) return undefined;
-    const answers = await Promise.allSettled(metricsUrls.map(sampleBox));
-    if (answers.every((answer) => answer.status === 'rejected')) throw answers[0].reason;
-    return mergeMetrics(answers.map((answer) => answer.value));
-  }
-
-  let finishing = false,
-    total = 0,
-    first = 1,
-    over = 0;
-  for (const step of steps) {
-    const stepName = `${scenario} ${step.count}`,
-      delta = step.count - total,
-      processes = Math.ceil(delta / BOTS_PER_PROCESS);
-    console.log(`${stepName}: ${delta} more at ${step.joinRate}/s`);
-    const joinStart = Date.now();
-    await all('marked', { type: 'mark' });
-    for (let p = 0; p < processes; p++) {
-      const share = Math.floor(delta / processes) + (p < delta % processes ? 1 : 0),
-        slot = children.length,
-        child = fork(
-          fileURLToPath(new URL('./remote-bot.mjs', import.meta.url)),
-          [JSON.stringify({ ...settings, count: share, first, joinRate: step.joinRate / processes })],
-          { serialization: 'advanced' },
-        );
-      child.on('message', (m) => {
-        if (m.type === 'progress') progress[slot] = m;
-      });
-      child.on('exit', (code) => {
-        if (code && !finishing) {
-          console.error(`bot process ${slot} failed with ${code}; stopping`);
-          stopAll();
-          process.exit(3);
-        }
-      });
-      children.push(child);
-      first += share;
-    }
-    total = step.count;
-    // Join phase: samples go on through it, since a surge is measured here.
-    const joinSamples = [],
-      deadline = performance.now() + (delta / step.joinRate) * 1000 + 180_000 + (scenario === 'spread' ? 420_000 : 0),
-      settled = () =>
-        sum('loaded') + sum('failed') + sum('waiting') >= total - sum('closed') &&
-        sum('joined') + sum('failed') + sum('waiting') >= total &&
-        (settings.travel !== 'fly' ||
-          scenario !== 'spread' ||
-          sum('arrived') >= 0.9 * (total - sum('closed') - sum('waiting')));
-    let shown = 0;
-    await wait(2000);
-    while (performance.now() < deadline && !settled()) {
-      await sampleMetrics().then(
-        (m) => m && joinSamples.push(m),
-        () => {},
       );
-      if (performance.now() - shown > 15_000) {
-        shown = performance.now();
-        console.log(
-          `  joined ${sum('joined')} loaded ${sum('loaded')} arrived ${sum('arrived')} waiting ${sum('waiting')} closed ${sum('closed')} failed ${sum('failed')}`,
-        );
-      }
-      await wait(2000);
+    async function sampleBox(url) {
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`metrics ${res.status}`);
+      return res.json();
     }
-    const joinReports = await all('report', { type: 'report' }),
-      joinEnd = Date.now();
+    // One box stopping mid-hold must not cost the other box's numbers: only all of them failing is a failed sample.
+    async function sampleMetrics() {
+      if (!metricsUrls.length) return undefined;
+      const answers = await Promise.allSettled(metricsUrls.map(sampleBox));
+      if (answers.every((answer) => answer.status === 'rejected')) throw answers[0].reason;
+      return mergeMetrics(answers.map((answer) => answer.value));
+    }
 
-    // The hold.
-    await all('marked', { type: 'mark' });
-    const holdStart = Date.now(),
-      samples = [],
-      machine = [],
-      nic0 = await nicBytes();
-    let cpu0 = cpuTimes();
-    for (const until = holdStart + step.window * 1000; Date.now() < until; ) {
-      await sampleMetrics().then(
-        (m) => m && samples.push({ at: m.at, load: m.load, online: m.counters?.online, shards: m.shards }),
-        (error) => samples.push({ at: Date.now(), error: error.message }),
-      );
-      const cpu1 = cpuTimes(),
-        perCore = cpu1.map((c, i) => {
-          const busy = c.busy - cpu0[i].busy,
-            idle = c.idle - cpu0[i].idle;
-          return busy / Math.max(1, busy + idle);
+    let finishing = false,
+      total = 0,
+      first = 1,
+      over = 0;
+    for (const step of steps) {
+      const stepName = `${scenario} ${step.count}`,
+        delta = step.count - total,
+        processes = Math.ceil(delta / BOTS_PER_PROCESS);
+      console.log(`${stepName}: ${delta} more at ${step.joinRate}/s`);
+      const joinStart = Date.now();
+      await all('marked', { type: 'mark' });
+      for (let p = 0; p < processes; p++) {
+        const share = Math.floor(delta / processes) + (p < delta % processes ? 1 : 0),
+          slot = children.length,
+          child = fork(
+            fileURLToPath(new URL('./remote-bot.mjs', import.meta.url)),
+            [JSON.stringify({ ...settings, count: share, first, joinRate: step.joinRate / processes })],
+            { serialization: 'advanced' },
+          );
+        child.on('message', (m) => {
+          if (m.type === 'progress') progress[slot] = m;
         });
-      cpu0 = cpu1;
-      machine.push({
-        at: Date.now(),
-        peakCore: Math.max(...perCore),
-        mean: perCore.reduce((a, v) => a + v, 0) / perCore.length,
-      });
+        child.on('exit', (code) => {
+          if (code && !finishing) {
+            stopAll();
+            halt.abort(new Error(`bot process ${slot} failed with ${code}; stopping`));
+          }
+        });
+        children.push(child);
+        first += share;
+      }
+      total = step.count;
+      // Join phase: samples go on through it, since a surge is measured here.
+      const joinSamples = [],
+        deadline = performance.now() + (delta / step.joinRate) * 1000 + 180_000 + (scenario === 'spread' ? 420_000 : 0),
+        settled = () =>
+          sum('loaded') + sum('failed') + sum('waiting') >= total - sum('closed') &&
+          sum('joined') + sum('failed') + sum('waiting') >= total &&
+          (settings.travel !== 'fly' ||
+            scenario !== 'spread' ||
+            sum('arrived') >= 0.9 * (total - sum('closed') - sum('waiting')));
+      let shown = 0;
       await wait(2000);
+      while (performance.now() < deadline && !settled()) {
+        await sampleMetrics().then(
+          (m) => m && joinSamples.push(m),
+          () => {},
+        );
+        if (performance.now() - shown > 15_000) {
+          shown = performance.now();
+          console.log(
+            `  joined ${sum('joined')} loaded ${sum('loaded')} arrived ${sum('arrived')} waiting ${sum('waiting')} closed ${sum('closed')} failed ${sum('failed')}`,
+          );
+        }
+        await wait(2000);
+      }
+      const joinReports = await all('report', { type: 'report' }),
+        joinEnd = Date.now();
+
+      // The hold.
+      await all('marked', { type: 'mark' });
+      const holdStart = Date.now(),
+        samples = [],
+        machine = [],
+        nic0 = await nicBytes();
+      let cpu0 = cpuTimes();
+      for (const until = holdStart + step.window * 1000; Date.now() < until; ) {
+        await sampleMetrics().then(
+          (m) => m && samples.push({ at: m.at, load: m.load, online: m.counters?.online, shards: m.shards }),
+          (error) => samples.push({ at: Date.now(), error: error.message }),
+        );
+        const cpu1 = cpuTimes(),
+          perCore = cpu1.map((c, i) => {
+            const busy = c.busy - cpu0[i].busy,
+              idle = c.idle - cpu0[i].idle;
+            return busy / Math.max(1, busy + idle);
+          });
+        cpu0 = cpu1;
+        machine.push({
+          at: Date.now(),
+          peakCore: Math.max(...perCore),
+          mean: perCore.reduce((a, v) => a + v, 0) / perCore.length,
+        });
+        await wait(2000);
+      }
+      const nic1 = await nicBytes(),
+        holdReports = await all('report', { type: 'report' }),
+        holdEnd = Date.now();
+      const r = summarizeStep(
+        step,
+        total,
+        joinStart,
+        joinEnd,
+        holdStart,
+        holdEnd,
+        joinSamples,
+        samples,
+        joinReports,
+        holdReports,
+        machine,
+        nic0,
+        nic1,
+      );
+      r.minutes = round((performance.now() - began) / 60_000, 1);
+      results.steps.push(r);
+      await save();
+      console.log(
+        `  ${r.server.shards.map((s) => `s${s.index} ${s.players}p tick ${round(s.tickP50, 1)}/${round(s.tickP95, 1)}/${round(s.tickMax, 0)} ms ${round(s.ticksPerSecond, 2)}/s`).join('; ')}` +
+          ` | live ${r.players.live} waiting ${r.players.waiting} rtt ${r.players.rttMs?.median}/${r.players.rttMs?.p95} edit ${r.players.editToOthersMs?.median}/${r.players.editToOthersMs?.p95}` +
+          ` corr/min ${r.players.correctionsPerPlayerPerMinute} closes ${JSON.stringify(r.players.closes)}` +
+          ` | down ${r.bots.downMbit} Mbit bots busy ${r.bots.processBusyMax} cpu ${r.bots.machineCpuMean} peak ${r.bots.machineCpuPeak}` +
+          `${r.server.inBudget ? '' : ' OVER BUDGET'}${r.bots.saturated ? ' BOTS SATURATED' : ''}`,
+      );
+      if (r.bots.saturated) {
+        console.log('  the bot machine is the limit here: stopping the rise');
+        results.stoppedBy = 'bot machine';
+        break;
+      }
+      const challenged = joinReports.concat(holdReports).some((rep) => rep.join.other > 0);
+      if (challenged) {
+        console.log('  /join answered something that is not JSON (a proxy limit or challenge): stopping');
+        results.stoppedBy = 'proxy answer';
+        break;
+      }
+      if (!r.server.inBudget && metricsUrls.length && ++over > overStop) {
+        results.stoppedBy = 'over budget';
+        break;
+      }
     }
-    const nic1 = await nicBytes(),
-      holdReports = await all('report', { type: 'report' }),
-      holdEnd = Date.now();
-    const r = summarizeStep(
-      step,
-      total,
-      joinStart,
-      joinEnd,
-      holdStart,
-      holdEnd,
-      joinSamples,
-      samples,
-      joinReports,
-      holdReports,
-      machine,
-      nic0,
-      nic1,
-    );
-    r.minutes = round((performance.now() - began) / 60_000, 1);
-    results.steps.push(r);
+    if (dropAfter > 0) {
+      await all('marked', { type: 'mark' });
+      const each = Math.ceil(dropAfter / children.length);
+      for (const child of children) if (child.connected) child.send({ type: 'drop', count: each });
+      await wait(45_000);
+      const reports = await all('report', { type: 'report' });
+      results.afterDrop = {
+        dropped: dropAfter,
+        enteredAfterFull: reports.reduce((a, rep) => a + rep.enteredAfterFull, 0),
+        full: reports.reduce((a, rep) => a + rep.join.full, 0),
+        waiting: reports.reduce((a, rep) => a + rep.waiting, 0),
+        live: reports.reduce((a, rep) => a + rep.live, 0),
+      };
+      console.log(`after drop ${JSON.stringify(results.afterDrop)}`);
+    }
+    results.machine.memoryFreeMB = round(freemem() / 2 ** 20, 0);
+    results.machine.memoryTotalMB = round(totalmem() / 2 ** 20, 0);
     await save();
-    console.log(
-      `  ${r.server.shards.map((s) => `s${s.index} ${s.players}p tick ${round(s.tickP50, 1)}/${round(s.tickP95, 1)}/${round(s.tickMax, 0)} ms ${round(s.ticksPerSecond, 2)}/s`).join('; ')}` +
-        ` | live ${r.players.live} waiting ${r.players.waiting} rtt ${r.players.rttMs?.median}/${r.players.rttMs?.p95} edit ${r.players.editToOthersMs?.median}/${r.players.editToOthersMs?.p95}` +
-        ` corr/min ${r.players.correctionsPerPlayerPerMinute} closes ${JSON.stringify(r.players.closes)}` +
-        ` | down ${r.bots.downMbit} Mbit bots busy ${r.bots.processBusyMax} cpu ${r.bots.machineCpuMean} peak ${r.bots.machineCpuPeak}` +
-        `${r.server.inBudget ? '' : ' OVER BUDGET'}${r.bots.saturated ? ' BOTS SATURATED' : ''}`,
-    );
-    if (r.bots.saturated) {
-      console.log('  the bot machine is the limit here: stopping the rise');
-      results.stoppedBy = 'bot machine';
-      break;
-    }
-    const challenged = joinReports.concat(holdReports).some((rep) => rep.join.other > 0);
-    if (challenged) {
-      console.log('  /join answered something that is not JSON (a proxy limit or challenge): stopping');
-      results.stoppedBy = 'proxy answer';
-      break;
-    }
-    if (!r.server.inBudget && metricsUrls.length && ++over > overStop) {
-      results.stoppedBy = 'over budget';
-      break;
-    }
+    finishing = true;
+    for (const child of children) if (child.connected) child.send({ type: 'exit' });
+    await wait(1500);
+    console.log(`wrote ${out}`);
   }
-  if (dropAfter > 0) {
-    await all('marked', { type: 'mark' });
-    const each = Math.ceil(dropAfter / children.length);
-    for (const child of children) if (child.connected) child.send({ type: 'drop', count: each });
-    await wait(45_000);
-    const reports = await all('report', { type: 'report' });
-    results.afterDrop = {
-      dropped: dropAfter,
-      enteredAfterFull: reports.reduce((a, rep) => a + rep.enteredAfterFull, 0),
-      full: reports.reduce((a, rep) => a + rep.join.full, 0),
-      waiting: reports.reduce((a, rep) => a + rep.waiting, 0),
-      live: reports.reduce((a, rep) => a + rep.live, 0),
-    };
-    console.log(`after drop ${JSON.stringify(results.afterDrop)}`);
-  }
-  results.machine.memoryFreeMB = round(freemem() / 2 ** 20, 0);
-  results.machine.memoryTotalMB = round(totalmem() / 2 ** 20, 0);
-  await save();
-  finishing = true;
-  for (const child of children) if (child.connected) child.send({ type: 'exit' });
-  await wait(1500);
-  stopAll();
-  clearTimeout(limit);
-  console.log(`wrote ${out}`);
-  process.exit(0);
 }
 
 function joinSide(reports) {

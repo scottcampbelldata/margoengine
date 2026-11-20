@@ -3,11 +3,32 @@ import { fault } from '../../shared/errors.js';
 import { createCustomTransition, type CustomTransitionOptions } from './custom.js';
 import { LiveTransitions, type LiveTransitionOptions } from './live.js';
 import type { Transitions } from './index.js';
-import { GLSLParser } from './glsl-parser.js';
-import { GLSLEmitter } from './glsl-emit.js';
-import { preprocessGLSL } from './glsl-preprocess.js';
+import { GLSLParser, GLSLEmitter, preprocessGLSL, type GLSLHost, type GLSLSourceInfo } from './glsl-front.js';
 /** A scalar or flattened vector, column-major matrix or fixed array uniform value. */
 export type GLSLUniformValue = number | boolean | readonly (number | boolean)[];
+/** The transition contract around the shared GLSL front end: progress, ratio, from/to samplers, getFromColor/getToColor. */
+const transitionHost = (uniforms: Readonly<Record<string, GLSLUniformValue>>, flipY: boolean): GLSLHost => ({
+  uniforms,
+  flipY,
+  names: {
+    progress: { code: 'settings.x', type: 'float' },
+    ratio: { code: '(f32(textureDimensions(after).x)/f32(textureDimensions(after).y))', type: 'float' },
+    from: { code: 'before', type: 'sampler2D' },
+    to: { code: 'after', type: 'sampler2D' },
+    gl_FragCoord: { code: 'user_frag_coord', type: 'vec4' },
+  },
+  colorReaders: { getFromColor: 'before', getToColor: 'after' },
+  prologue: 'var<private> user_frag_coord:vec4f;',
+  entry: { name: 'transition', type: 'vec4', params: ['vec2'] },
+  missingEntry: 'Supply vec4 transition(vec2 uv)',
+  epilogue: (entry) =>
+    [
+      'fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{',
+      'user_frag_coord=vec4f(uv.x*f32(textureDimensions(after).x),(1.0-uv.y)*f32(textureDimensions(after).y),0.0,1.0);',
+      `return ${entry}(${flipY ? 'vec2f(uv.x,1.0-uv.y)' : 'uv'});`,
+      '}',
+    ].join('\n'),
+});
 /** Values and coordinate convention for importing a GLSL transition. */
 export interface GLSLTransitionOptions {
   /** Additional uniform values, snapshotted into WGSL constants. Default values come from // = JSON annotations. */
@@ -16,7 +37,7 @@ export interface GLSLTransitionOptions {
   flipY?: boolean;
 }
 /**
- * Translates trusted GLSL ES 1.00 containing vec4 transition(vec2 uv) to the custom WGSL function contract.
+ * Translates trusted GLSL ES 1.00 or 3.00 (`#version 300 es`) containing vec4 transition(vec2 uv) to the custom WGSL function contract.
  * Exposes progress, ratio, getFromColor/getToColor, and from/to sampler2D aliases. No external shader assets are bundled.
  * Syntax/type diagnostics carry code failed; asynchronous factory compilation validates the emitted WGSL before attachment.
  */
@@ -36,8 +57,9 @@ export function translateGLSLTransition(source: string, options: GLSLTransitionO
     }
   }
   Object.assign(uniforms, options.uniforms);
-  const program = new GLSLParser(preprocessGLSL(source)).parse();
-  return new GLSLEmitter(program, uniforms, options.flipY ?? true).emit();
+  const info: GLSLSourceInfo = { version: 100 };
+  const program = new GLSLParser(preprocessGLSL(source, info)).parse();
+  return new GLSLEmitter(program, transitionHost(uniforms, options.flipY ?? true), info.version).emit();
 }
 /** Compiles and attaches a frozen GLSL transition. Call start('wipe',seconds); supplied GLSL controls the treatment. */
 export async function createGLSLTransition(

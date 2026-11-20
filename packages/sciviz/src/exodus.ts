@@ -31,6 +31,14 @@ interface Variable {
   attributes: Readonly<Record<string, NetCDFAttribute>>;
   read(time?: number): Promise<Float64Array>;
 }
+// Exodus II numbering (SAND92-2137 Figure 4; SEACAS hex27 figure) to the VTK order `element` takes. Exodus lists the
+// bottom, vertical then top mid-edge nodes, VTK bottom, top then vertical; HEX27 lists the centroid, then the bottom,
+// top, x-min, x-max, y-min and y-max face centres, VTK the x-min, x-max, y-min, y-max, bottom and top faces, then the
+// centroid. TET10, PYRAMID13, QUAD8/9, TRI6 and BAR3 already agree.
+const range = (a: number, b: number) => Array.from({ length: b - a }, (_, i) => a + i);
+const hexEdges = [...range(0, 12), ...range(16, 20), ...range(12, 16)];
+const hexOrder: Record<number, number[]> = { 20: hexEdges, 27: [...hexEdges, 23, 24, 25, 26, 21, 22, 20] };
+const wedgeOrder: Record<number, number[]> = { 15: [...range(0, 9), ...range(12, 15), ...range(9, 12)] };
 /** Reads classic/64-bit-offset Exodus through NetCDF and NetCDF-4 Exodus through the HDF5 owner reader. */
 export async function readExodus(input: FileInput, options: ExodusOptions = {}): Promise<ExodusDataSet> {
   const max = byteLimit(options.maxBytes),
@@ -135,14 +143,14 @@ export async function readExodus(input: FileInput, options: ExodusOptions = {}):
                     : /^SPHERE|^CIRCLE/.test(type)
                       ? 'point'
                       : bad(`unsupported Exodus element ${type}`);
+      if (shape === 'wedge' && width === 18)
+        bad('Exodus WEDGE18 has no published mid-face node order; write the block as WEDGE15');
+      const order = shape === 'hex' ? hexOrder[width] : shape === 'wedge' ? wedgeOrder[width] : undefined;
       blocks.push({ id: Number(name.slice(7)), start: cells.length, count });
-      for (let i = 0; i < count; i++)
-        cells.push(
-          element(
-            shape,
-            Array.from(conn.subarray(i * width, (i + 1) * width), (x) => x - 1),
-          ),
-        );
+      for (let i = 0; i < count; i++) {
+        const ids = Array.from(conn.subarray(i * width, (i + 1) * width), (x) => x - 1);
+        cells.push(element(shape, order ? order.map((k) => ids[k]) : ids));
+      }
     }
     if (!cells.length) bad('Exodus has no element blocks');
     const times = vars.time_whole ? await read('time_whole') : new Float64Array(),
@@ -158,9 +166,10 @@ export async function readExodus(input: FileInput, options: ExodusOptions = {}):
         pointArrays[name] = all.slice(i * np, (i + 1) * np);
       }
     }
-    const blockIds = vars.eb_prop1 ? await read('eb_prop1') : Float64Array.from(blocks, (b) => b.id),
-      elementBlocks = blocks.map((b, i) => ({
-        id: blockIds[i],
+    // connectN and eb_prop1 both count every block, null blocks (no connectN) included.
+    const blockIds = vars.eb_prop1 ? await read('eb_prop1') : undefined,
+      elementBlocks = blocks.map((b) => ({
+        id: blockIds ? blockIds[b.id - 1] : b.id,
         start: b.start,
         count: b.count,
         arrays: Object.create(null) as Record<string, Float64Array>,

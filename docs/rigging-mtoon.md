@@ -8,8 +8,8 @@ stays caller-owned. Disposing the effect restores its original material records;
 disposing the model first disposes the effect. `Symbol.dispose` is supported.
 Importing the entry registers nothing and allocates no GPU resources.
 
-The material uses gltf-pro's skinning, morphs, instances, lighting hooks, view
-selection and render states. The new optional `gltf-pro/material-draw` entry
+The material uses gltf/pbr's skinning, morphs, instances, lighting hooks, view
+selection and render states. The new optional `gltf/material-draw` entry
 installs a synchronous adapter on a model, including already-created isolated
 renderers. Each adapter receives the actual source or replica primitive records
 and delegates each layer to the original draw. A one-call bypass permits nested
@@ -31,13 +31,13 @@ Metallic, roughness, occlusion and vertex colours do not change MToon shading.
 | Shade RGB | black, each linear component 0 through 1 |
 | Shading shift / shift-map scale | 0 / 1, finite float32 |
 | Toony / GI equalization | 0.9 / 0.9, 0 through 1 |
-| Matcap factor | white; an absent matcap map contributes zero |
+| Matcap factor | white; an absent matcap map, or one still streaming, contributes zero; expression texture moves do not move it (expressions.md: matcap has no UV access) |
 | Parametric rim RGB / power / lift | black / 5 / 0; power nonnegative, lift finite |
 | Rim lighting mix | 1, 0 through 1 |
 | Outline mode / width | none / 0; world widths in metres, screen widths relative to view height |
 | Outline RGB / lighting mix | black / 1, colour and mix components 0 through 1 |
 | UV scroll X/Y / rotation | 0 / 0 / 0; UV units per second and radians per second |
-| Transparent depth writing / queue offset | false / 0; integer -9 through 9 with the specification's alpha-mode sign restrictions |
+| Transparent depth writing / queue offset | false / 0; integer -9 through 9; on BLEND it keeps the specification's sign for its depth-write mode, on OPAQUE and MASK it is ignored ("only works when alphaMode is BLEND") |
 | Texture coordinates | TEXCOORD_0; also 1, 2 and 3, including KHR_texture_transform overrides |
 
 The specification prose says black for the default shade, while its JSON schema
@@ -54,7 +54,7 @@ Within a model, opaque, MASK, depth-writing blend and ordinary blend groups run
 in authored order; equal-queue transparent primitives retain native distance
 sorting. Legacy explicit queues retain their 0 through 5000 values; -1 selects
 the mode's default. Separate models retain the native graph's ordering. Custom
-material resources retain gltf-pro's existing same-device restriction for
+material resources retain gltf/pbr's existing same-device restriction for
 isolated renderers; load on a target device before rendering there.
 
 ## Legacy migration
@@ -95,9 +95,28 @@ not downloaded implementation files. The reference ran only in external
 engine-bench, from a version-pinned public module and an in-memory harness.
 
 Independent model queue offsets do not reorder the whole scene across model
-boundaries. Optional shadow-caster alpha shaders do not yet apply spatially
-masked MToon UV animation; the body, normal, emission and outline paths do.
-Those optional-package integration refinements remain follow-ups. No shader
+boundaries. Spatially masked MToon UV animation applies to the body, normal,
+emission and outline paths and to shadow-caster cut-outs.
+
+UV animation keeps its frame steps after any uptime (2026-11-15). The time and
+the speeds are multiplied on the CPU in float64 and sent as small phases: scroll
+in UV units and rotation in turns, each as a phase plus a whole count k, which
+the shaders combine with the mask value m as phase x m + period x fract(k x m).
+Rotation always uses a period of one turn. Scroll uses a period of 2 on an axis
+when every map the animation moves samples the same texel after a step of 2:
+the specification assumes REPEAT or MIRRORED_REPEAT wrapping and animates before
+KHR_texture_transform, so this holds when each map's transform moves whole
+numbers along that axis and its sampler does not clamp an axis the step reaches.
+Otherwise that axis keeps the full scroll, which loses float32 precision as
+before (a half scale or a rotation in the texture transform, or a clamped
+sampler). A white or binary mask is exact; a fractional mask value is off by at
+most the float32 rounding of k x m, which changes only when k does. Sources:
+VRM Consortium, VRMC_materials_mtoon 1.0 specification, UV animation (2022,
+https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_materials_mtoon-1.0/README.md);
+Khronos, KHR_texture_transform (2017,
+https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_texture_transform);
+D. Goldberg, "What every computer scientist should know about floating-point
+arithmetic", ACM Computing Surveys 23(1), 1991, https://doi.org/10.1145/103162.103163. No shader
 fallback, missing rim or omitted outline is used to pass an assertion.
 README examples are deferred to the README-owed list.
 
@@ -155,6 +174,6 @@ https://www.w3.org/TR/WGSL/#discard-statement (discarded fragments do not reach
 the color target). The fix preserves queue isolation while selecting ordinary
 materials exactly once. No external implementation source was read.
 
-The selected changed/dependent CPU run passes 5,554 assertions, with README work excluded by Scott's build-phase instruction. Both new eleven-case MToon browser runs and the original seventeen-check rigging suite pass on native and compatibility. gltf-pro shader equivalence, complete extension coverage, viewer/device restoration and volume pixel checks also pass on both backends. The extension suite needs MARGO_COMPAT=1 rather than the --compat positional filter.
+The selected changed/dependent CPU run passes 5,554 assertions, with README work excluded by Scott's build-phase instruction. Both new eleven-case MToon browser runs and the original seventeen-check rigging suite pass on native and compatibility. gltf/pbr shader equivalence, complete extension coverage, viewer/device restoration and volume pixel checks also pass on both backends. The extension suite needs MARGO_COMPAT=1 rather than the --compat positional filter.
 
 The existing physical-material shader-composition fixture passes native and all 160 BRDF numeric cases on compatibility, but its two worst-case 16-texture compatibility pipelines exceed MAX_TEXTURE_IMAGE_UNITS(16). No MToon adapter or PBRModel draw participates in that direct shader fixture. Parent-identical input hashes are in whitepaper/results/batch213-physical-compat-existing-failure.json; this separate optional compatibility defect remains in known-bugs under the build-phase scope rule. No test, assertion or tolerance was weakened.

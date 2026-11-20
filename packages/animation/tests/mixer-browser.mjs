@@ -10,7 +10,7 @@ try {
   const result = await browser.page.evaluate(
     async ({ doc, buffers }) => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { parseGLTF, loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF, loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const { Animation } = await import('/packages/animation/dist/index.js');
       const { AnimationMixer, LoopOnce } = await import('/packages/animation/dist/mixer.js');
       const canvas = document.createElement('canvas');

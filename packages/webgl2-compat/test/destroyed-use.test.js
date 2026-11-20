@@ -31,6 +31,7 @@ function recordingContext() {
       type === 0x8df2 ? { precision: 23, rangeMin: 127, rangeMax: 127 } : { precision: 0, rangeMin: 31, rangeMax: 30 },
     getError: () => errors.shift() ?? 0,
     isContextLost: () => false,
+    canvas: new EventTarget(),
   };
   return new Proxy(context, {
     get(c, key) {
@@ -234,4 +235,28 @@ test('onSubmittedWorkDone resolves in a later task, also on a destroyed device',
   setTimeout(() => (fired = true), 0);
   for (let i = 0; i < 20 && !fired; i++) await device.queue.onSubmittedWorkDone();
   assert.equal(fired, true, 'a timer runs while the page waits for the queue');
+});
+
+test('a destroyed device takes its context-loss listener off the canvas, which may outlive it', async () => {
+  const { gl, device } = await setup();
+  const loss = () => {
+    const event = new Event('webglcontextlost', { cancelable: true });
+    gl.canvas.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  device.destroy();
+  assert.equal((await device.lost).reason, 'destroyed');
+  // A listener left behind would keep the device alive with the canvas and claim this loss for a restore.
+  assert.equal(loss(), false, 'no listener answers a loss after destroy');
+});
+
+test('a context loss loses the device once and then leaves the canvas', async () => {
+  const { gl, device } = await setup();
+  const event = new Event('webglcontextlost', { cancelable: true });
+  gl.canvas.dispatchEvent(event);
+  assert.equal(event.defaultPrevented, true, 'the live device claims the loss');
+  assert.equal((await device.lost).reason, 'unknown');
+  const again = new Event('webglcontextlost', { cancelable: true });
+  gl.canvas.dispatchEvent(again);
+  assert.equal(again.defaultPrevented, false, 'a lost device no longer listens');
 });

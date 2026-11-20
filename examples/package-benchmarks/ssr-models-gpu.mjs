@@ -1,9 +1,8 @@
-// Real-GPU check and cost of SSR's model capture (`ssr.add(model)`). Run on AC power, holding the GPU lock,
+// Real-GPU check and cost of SSR's model capture (`ssr.add(model)`). Run on AC power,
 // after npm run build:packages:
 //   node examples/package-benchmarks/ssr-models-gpu.mjs [--rounds=3] [--frames=90] [--no-timing] [--diagnostic]
-// gpu-lock: correctness with --no-timing
 // Correctness (ssr.html, each scene rendered with SSR on and off in the same PostStack pipeline):
-// 1. Mirror floor as a generated glTF plane (gltf-pro, metal 1, roughness 0) at 4x/1x and as a @margoengine/materials
+// 1. Mirror floor as a generated glTF plane (gltf/pbr, metal 1, roughness 0) at 4x/1x and as a @margoengine/materials
 //    mesh: the red box appears in the floor exactly inside the projected planar-mirror bounds and at the mirrored centre,
 //    like the core floor (same scene, ssr-gpu.mjs); the floor's IBL specular is replaced, not added (green at the mirrored
 //    centre falls from the grey environment reflection to the red box's). Not added with ssr.add: the floor is unchanged.

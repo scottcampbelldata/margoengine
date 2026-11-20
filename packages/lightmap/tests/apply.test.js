@@ -102,7 +102,77 @@ test('bad input is refused before any material changes', () => {
     /a bake/,
   );
   assert.throws(() => applyLightmap(lit, { ...atlas, lightmapScale: 0 }), /a bake/);
-  assert.throws(() => applyLightmap({}, atlas), /Material, a materials or glTF-pro mesh or a core Mesh/);
+  assert.throws(() => applyLightmap({}, atlas), /Material, a materials or glTF PBR mesh or a core Mesh/);
   assert.throws(() => applyLightmap(null, atlas), TypeError);
   assert.equal(lit.lightMap, null);
+});
+
+// KB-OWN-LIGHTMAP1: a device restore gives the engine a new GPUDevice, and WebGPU objects are valid only with the
+// device that made them (W3C WebGPU, section 3.2.1). The model's extension kept the attach-time device's view and
+// sampler, so the model's restore bound them on the new device and failed validation. Each fake object names its device.
+globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+const fakeDevice = () => {
+  const device = {
+    limits: { maxTextureDimension2D: 8192 },
+    features: new Set(),
+    lost: new Promise(() => {}),
+    createTexture: (d) => ({
+      device,
+      format: d.format,
+      dimension: '2d',
+      width: d.size[0],
+      height: d.size[1],
+      depthOrArrayLayers: 1,
+      mipLevelCount: d.mipLevelCount ?? 1,
+      usage: d.usage,
+      createView: () => ({ device }),
+      destroy() {},
+    }),
+    createSampler: (d) => ({ device, ...d }),
+    queue: { writeTexture() {}, copyExternalImageToTexture() {} },
+  };
+  return device;
+};
+const fakeModel = (engine) => {
+  const primitive = { material: { name: 'grey' } };
+  return { primitive, model: { disposed: false, root: { engine }, primitives: [primitive], onDispose: () => () => {} } };
+};
+
+test('a lit glTF PBR model binds its lightmap on the device drawing it, also after a device restore', () => {
+  const first = fakeDevice(),
+    second = fakeDevice(),
+    engine = { gpu: first },
+    { primitive, model } = fakeModel(engine),
+    own = primitive.material,
+    app = applyLightmap(model, meshBake),
+    extension = primitive.material.extension;
+  assert.notEqual(primitive.material, own);
+  let [{ view, sampler }] = extension.textures;
+  assert.equal(view.device, first);
+  assert.equal(sampler.device, first);
+  assert.equal(sampler.addressModeU, 'clamp-to-edge');
+  assert.equal(sampler.magFilter, 'linear');
+  // The restore: the engine draws with a new device and the model derives its draws again.
+  engine.gpu = second;
+  [{ view, sampler }] = extension.textures;
+  assert.equal(view.device, second, 'the view is made on the restored device');
+  assert.equal(sampler.device, second, 'the sampler is made on the restored device');
+  assert.equal(sampler.addressModeV, 'clamp-to-edge');
+  app.dispose();
+  assert.equal(primitive.material, own);
+});
+
+test("a live bake's texture went with its device: a restored model binds a black texture of the new device", () => {
+  const first = fakeDevice(),
+    second = fakeDevice(),
+    engine = { gpu: first },
+    { primitive, model } = fakeModel(engine),
+    live = { device: first, texture: first.createTexture({ size: [4, 4], format: 'rgba16float', usage: 4 }) },
+    app = applyLightmap(model, live),
+    extension = primitive.material.extension;
+  assert.equal(extension.textures[0].view.device, first);
+  engine.gpu = second;
+  assert.equal(extension.textures[0].view.device, second);
+  assert.equal(extension.textures[0].sampler.device, second);
+  app.dispose();
 });

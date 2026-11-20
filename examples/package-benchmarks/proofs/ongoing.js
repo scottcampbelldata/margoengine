@@ -4,16 +4,16 @@
 // one of these GPU call logs (16 of 20 broke on main on 2026-11-10 because no package test ran them).
 // tests/proof-guards.test.js checks this map against the proof sources and the package scripts.
 export const ongoing = {
-  'clustered-area-lights': ['clustered', 'gltf-pro'],
-  'clustered-light-hooks': ['clustered', 'gltf-pro'],
-  'clustered-local-shadows': ['clustered', 'gltf-pro'],
+  'clustered-area-lights': ['clustered', 'gltf'],
+  'clustered-light-hooks': ['clustered', 'gltf'],
+  'clustered-local-shadows': ['clustered', 'gltf'],
   'color-output': ['dof', 'environment', 'post', 'tonemap'],
   'deformed-shadows': ['animation', 'shadows'],
-  'environment-hemisphere': ['environment', 'gltf-pro'],
+  'environment-hemisphere': ['environment', 'gltf'],
   'environment-volumetric': ['environment'],
-  'gltf-pro-lighting-hooks': ['clustered', 'environment', 'gltf-pro', 'shadows'],
+  'gltf-pbr-lighting-hooks': ['clustered', 'environment', 'gltf', 'shadows'],
   'lines-perspective': ['lines'],
-  'materials-uv-transform': ['gltf-pro', 'materials'],
+  'materials-uv-transform': ['gltf', 'materials'],
   'math-consolidation': [
     'animation',
     'animator',
@@ -33,7 +33,7 @@ export const ongoing = {
     'text',
     'usdz',
   ],
-  'oit-detached': ['gltf-pro'],
+  'oit-detached': ['gltf'],
   'post-ssr': ['post'],
   'post-ssr-models': ['post'],
   'post-stack': ['creative', 'dof', 'post', 'tonemap'],

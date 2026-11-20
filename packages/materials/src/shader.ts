@@ -1,4 +1,4 @@
-import type { MaterialExtension } from '@margoengine/gltf-pro';
+import type { MaterialExtension } from '@margoengine/gltf/pbr';
 import { coordinateExpression, coordinateWGSL } from './coordinates.js';
 import { ggxDOf, smithGCorrelated } from '../../shared/light-terms.js';
 

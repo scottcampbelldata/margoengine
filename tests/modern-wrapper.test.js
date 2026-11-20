@@ -63,8 +63,12 @@ test('facade preserves real mesh handles, hierarchy and rollback after bad trans
     assert.ok(Math.abs(orb.scale.z - 1.2) < 1e-6);
     assert.throws(() => orb.position.set(7, NaN, 8), /transform/);
     assert.equal(orb.position.x, 1);
-    assert.throws(() => orb.scale.set(2, 0, 2), /transform/);
+    assert.throws(() => orb.scale.set(2, Infinity, 2), /transform/);
     assert.ok(Math.abs(orb.scale.x - 1.2) < 1e-6);
+    // A zero scale is a valid transform (glTF 2.0 section 3.5.3).
+    orb.scale.set(1.2, 0, 1.2);
+    assert.equal(orb.scale.y, 0);
+    orb.scale.setAll(1.2);
     orb.rotation.set(0.2, 0.3, 0.4);
     assert.throws(() => orb.rotation.set(4, 5, Infinity), /transform/);
     assert.ok(Math.abs(orb.rotation.x - 0.2) < 1e-6);
@@ -73,7 +77,7 @@ test('facade preserves real mesh handles, hierarchy and rollback after bad trans
     orb.rotation.setAll(0);
     const count = engine.meshes.size,
       allocated = resources.size;
-    assert.throws(() => app.box({ scale: [1, 0, 1] }), /nonzero/);
+    assert.throws(() => app.box({ scale: [1, NaN, 1] }), /transform/);
     assert.throws(() => app.box({ size: [1, 2] }), /3 values/);
     assert.throws(() => app.sphere({ roughness: NaN }), {
       name: 'RangeError',

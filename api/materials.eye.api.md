@@ -4,24 +4,40 @@
 
 ```ts
 import { Engine } from "@margoengine/core/extension";
-import { MaterialSide, TextureTransform } from "@margoengine/gltf-pro";
+import { MaterialSide, TextureTransform } from "@margoengine/gltf/pbr";
 import { ColorInput } from "@margoengine/math";
 
 export interface EyeFeature extends MaterialFeature {
     pupil: number;
     irisColor: [number, number, number];
+    wetness: number;
+}
+
+export interface EyeLid {
+    height?: number;
+    tilt?: number;
+    curve?: number;
+    depth?: number;
 }
 
 export interface EyeOptions {
     irisMap?: Texture;
     irisMapPupil?: number;
+    irisMapRadius?: number;
     irisColor?: readonly [number, number, number];
     pupil?: number;
     irisRadius?: number;
     depth?: number;
+    corneaRadius?: number;
+    wetness?: number;
     ior?: number;
+    chamberIor?: number;
     axis?: readonly [number, number, number];
+    up?: readonly [number, number, number];
+    lid?: EyeLid | false;
+    lowerLid?: EyeLid | false;
     center?: readonly [number, number, number];
+    follow?: () => ArrayLike<number>;
 }
 
 export function eye(options?: EyeOptions): EyeFeature;
@@ -370,6 +386,7 @@ interface MaterialFeature {
     tangentFrame?: boolean;
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    castHashed?(code: string): string;
     attach?(material: Material): void;
     detach?(material: Material): void;
 }
@@ -540,7 +557,7 @@ class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
-    sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
+    sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }

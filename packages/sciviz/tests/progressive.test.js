@@ -95,3 +95,76 @@ test('controller is an optional engine plugin with disposable ownership and no g
   attached.dispose();
   assert.equal(plugin, undefined);
 });
+
+test('a view no longer drawn releases its reduced target at the next frame, like other per-view state', (t) => {
+  const usage = globalThis.GPUTextureUsage;
+  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
+  t.after(() => {
+    globalThis.GPUTextureUsage = usage;
+  });
+  const destroyed = new Set(),
+    texture = (size, format) => ({
+      width: size[0],
+      height: size[1],
+      format,
+      createView: () => ({}),
+      destroy() {
+        destroyed.add(this);
+      },
+    });
+  const device = { createTexture: ({ size, format }) => texture(size, format) },
+    renderer = { device, samplingScale: 1, add() {}, remove() {} },
+    passes = [];
+  let plugin;
+  const engine = {
+    gpu: device,
+    hasPlugin: () => !!plugin,
+    use(p) {
+      plugin = p;
+      p.setup(this);
+      p.registerPasses({ add: (pass) => passes.push(pass) });
+    },
+    removePlugin() {
+      plugin = undefined;
+    },
+  };
+  renderer.engine = engine;
+  const controller = new ProgressiveRendering({ engine, renderer }),
+    begin = passes.find((p) => p.order === -10000);
+  const made = [],
+    create = device.createTexture;
+  device.createTexture = (d) => {
+    const t = create(d);
+    made.push(t);
+    return t;
+  };
+  const draw = (id) =>
+    begin.execute({
+      backend: 'webgpu',
+      device,
+      camera: { matrix: new Float32Array(16), position: [0, 0, 0] },
+      width: 64,
+      height: 64,
+      format: 'rgba8unorm',
+      descriptor: { depthStencil: { format: 'depth24plus' } },
+      color: {},
+      depth: {},
+      view: { id, viewport: [0, 0, 64, 64], index: 0, count: 1 },
+    });
+  draw('removed');
+  const removed = made.splice(0);
+  assert.equal(removed.length, 2);
+  controller.onPreUpdate(1 / 60);
+  draw('kept');
+  controller.onPreUpdate(1 / 60);
+  draw('kept');
+  // A pick (zero delta) is not a frame and does not release anything.
+  controller.onPreUpdate(0);
+  assert.ok(
+    removed.every((t) => destroyed.has(t)),
+    'the removed view no longer holds GPU memory',
+  );
+  assert.ok(made.every((t) => !destroyed.has(t)), 'the view still drawn keeps its target');
+  controller.dispose();
+  assert.ok(made.every((t) => destroyed.has(t)));
+});

@@ -4,6 +4,11 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
+import { PassContext } from "@margoengine/core/extension";
+
+export interface CaptureBackground {
+    record(context: CapturePassContext): void;
+}
 
 export type CapturePassFilter = (pass: {
     readonly name: string;
@@ -17,6 +22,7 @@ export class CubeCamera {
     position: Vec3;
     exclude?: Iterable<Mesh>;
     passes: CapturePassFilter;
+    background?: CaptureBackground | null;
     version: number;
     static attach(engine: EngineKernel, options?: CubeCameraOptions): CubeCamera;
     constructor(options?: CubeCameraOptions);
@@ -44,8 +50,15 @@ export interface CubeCameraOptions {
     layers?: number;
     exclude?: Iterable<Mesh>;
     passes?: CapturePassFilter;
+    background?: CaptureBackground | null;
     name?: string;
 }
 
 export const scenePasses: CapturePassFilter;
+
+// Not exported from this entry, but used by the exports above:
+
+type CapturePassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

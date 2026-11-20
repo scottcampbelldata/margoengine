@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/sprites/shader (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/shader-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/shader-check.mjs
 // Under exactSize [64, 32], shaded layers read back against values worked out here: a flash mixes toward white by its
 // params, an outline fills exactly the ring of texels around opaque ones, a dissolve keeps all at 0 and drops all at 1,
 // a palette swap turns red to blue only, the layer's time reaches the shader, and a shader runs in filter 'linear'.

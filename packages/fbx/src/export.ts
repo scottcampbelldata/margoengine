@@ -235,6 +235,16 @@ function channelKeys(
       throw new RangeError(
         'Animation key times must be finite, not negative and strictly increasing; sort or fix them',
       );
+  for (let i = 0; i < values.length; i++)
+    if (!Number.isFinite(values[i]))
+      throw new RangeError(`Animation channel ${path} has a value that is not finite at index ${i}; fix the key`);
+  // glTF rotation outputs are unit quaternions (glTF 2.0, 3.11); a zero one has no Euler angles at all.
+  if (path === 'rotation')
+    for (let key = 0; key < count; key++) {
+      const at = (cubic ? key * 3 + 1 : key) * 4;
+      if (!(Math.hypot(values[at], values[at + 1], values[at + 2], values[at + 3]) > 0))
+        throw new RangeError(`Animation channel rotation key ${key} is a zero quaternion; use a unit quaternion`);
+    }
   if (!cubic) return { times: Array.from(times), values: Array.from(values) };
   const out: Keys = { times: [], values: [] },
     at = (key: number, part: number, k: number) => values[(key * 3 + part) * width + k];
@@ -857,14 +867,34 @@ class Out {
     }
     return at;
   }
+  // reserve() may swap in a grown buffer, so it runs before this.bytes or this.view is read.
   put(bytes: Uint8Array): void {
-    this.bytes.set(bytes, this.reserve(bytes.length));
+    const at = this.reserve(bytes.length);
+    this.bytes.set(bytes, at);
+  }
+  u8(value: number): void {
+    const at = this.reserve(1);
+    this.bytes[at] = value;
   }
   u32(value: number): void {
-    this.view.setUint32(this.reserve(4), value, true);
+    const at = this.reserve(4);
+    this.view.setUint32(at, value, true);
+  }
+  i32(value: number): void {
+    const at = this.reserve(4);
+    this.view.setInt32(at, value, true);
+  }
+  f64(value: number): void {
+    const at = this.reserve(8);
+    this.view.setFloat64(at, value, true);
+  }
+  i64(value: bigint): void {
+    const at = this.reserve(8);
+    this.view.setBigInt64(at, value, true);
   }
   zeros(count: number): void {
-    this.bytes.fill(0, this.reserve(count), this.length);
+    const at = this.reserve(count);
+    this.bytes.fill(0, at, this.length);
   }
 }
 
@@ -875,7 +905,7 @@ async function deflate(bytes: Uint8Array): Promise<Uint8Array> {
 
 async function writeProperty(out: Out, value: Prop): Promise<void> {
   const code = (char: string) => {
-    out.bytes[out.reserve(1)] = char.charCodeAt(0);
+    out.u8(char.charCodeAt(0));
   };
   if (typeof value === 'string' || value instanceof Uint8Array) {
     const bytes = typeof value === 'string' ? encoder.encode(value) : value;
@@ -884,16 +914,16 @@ async function writeProperty(out: Out, value: Prop): Promise<void> {
     out.put(bytes);
   } else if (typeof value === 'number') {
     code('D');
-    out.view.setFloat64(out.reserve(8), value, true);
+    out.f64(value);
   } else if (typeof value === 'bigint') {
     code('L');
-    out.view.setBigInt64(out.reserve(8), value, true);
+    out.i64(value);
   } else if ('int' in value) {
     code('I');
-    out.view.setInt32(out.reserve(4), value.int, true);
+    out.i32(value.int);
   } else if ('flag' in value) {
     code('C');
-    out.bytes[out.reserve(1)] = value.flag;
+    out.u8(value.flag);
   } else {
     const raw = new Uint8Array(value.length * value.BYTES_PER_ELEMENT),
       view = new DataView(raw.buffer);
@@ -957,6 +987,7 @@ async function encodeBinary(tree: Rec[], limit: number, signal?: AbortSignal): P
 function asciiValue(value: Prop): string {
   if (typeof value === 'string') {
     const [name, kind] = value.split('\0\x01');
+    // FBX text has no backslash escape (Autodesk's files write paths raw); a quote is &quot;, as the FBX SDK writes it.
     return `"${(kind === undefined ? value : `${kind}::${name}`).replace(/"/g, '&quot;')}"`;
   }
   if (typeof value === 'number' || typeof value === 'bigint') return String(value);

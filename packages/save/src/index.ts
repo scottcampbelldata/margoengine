@@ -27,6 +27,7 @@ export {
   indexedDBStorage,
   memoryStorage,
   webStorage,
+  type IndexedDBStorage,
   type IndexedDBStorageOptions,
   type SaveStorage,
   type StorageCallOptions,

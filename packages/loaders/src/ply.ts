@@ -265,6 +265,20 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
     faceStart = indices.length;
     faceProperties = Object.create(null);
   };
+  // Turk's PLY `edge` element: vertex1 and vertex2 (and optional colour), read as line segments.
+  const edgeElement = header.elements.find((e) => e.name === 'edge'),
+    e1 = edgeElement ? find(edgeElement.properties, ['vertex1']) : -1,
+    e2 = edgeElement ? find(edgeElement.properties, ['vertex2']) : -1;
+  if (edgeElement && edgeElement.count > 0 && (e1 < 0 || e2 < 0 || edgeElement.properties[e1].list || edgeElement.properties[e2].list))
+    throw new LoaderError(F, 'header', 'edge element needs scalar vertex1 and vertex2 properties');
+  const lines = uints(edgeElement ? edgeElement.count * 2 : 0);
+  const storeEdge = (i: number): void => {
+    for (const v of [row[e1], row[e2]]) {
+      if (!Number.isInteger(v) || v < 0 || v >= vertexCount)
+        throw new LoaderError(F, 'range', `edge ${i} names vertex ${v}, outside 0..${vertexCount - 1}`);
+      lines.push(v);
+    }
+  };
   const at = (corner: number): number => polygon[corner];
   const checkCorners = (count: number): void => {
     if (!Number.isSafeInteger(count) || count < 0 || count > MAX_POLYGON)
@@ -303,6 +317,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
     for (const element of header.elements) {
       const isVertex = element === vertexElement,
         isFace = element === faceElement,
+        isEdge = element === edgeElement,
         properties = element.properties,
         name = element.name;
       for (let i = 0; i < element.count; i++) {
@@ -321,6 +336,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
         }
         if (isVertex) storeVertex(i);
         if (isFace) storeFace();
+        if (isEdge) storeEdge(i);
       }
     }
   } else {
@@ -334,13 +350,14 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
     for (const element of header.elements) {
       const isVertex = element === vertexElement,
         isFace = element === faceElement,
+        isEdge = element === edgeElement,
         properties = element.properties,
         width = properties.length;
       const minimum = properties.reduce((sum, p) => sum + SIZES[p.list ? p.list.count : p.type], 0);
       if (element.count * minimum > end - offset) truncated(`the "${element.name}" element`);
       const fixed = properties.every((p) => !p.list);
       // Fixed-size rows of other elements are never looked at, and the check above already proved they fit.
-      if (fixed && !isVertex && !isFace) {
+      if (fixed && !isVertex && !isFace && !isEdge) {
         offset += element.count * minimum;
         continue;
       }
@@ -375,6 +392,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
         }
         if (isVertex) storeVertex(i);
         if (isFace) storeFace();
+        if (isEdge) storeEdge(i);
       }
     }
   }
@@ -383,6 +401,7 @@ export function parsePLY(input: BinaryInput, options: PLYOptions = {}): LoadedGe
   if (colors) result.colors = colors;
   if (uvs) result.uvs = uvs;
   if (indices.length) result.indices = indices.result();
+  if (lines.length) result.lineIndices = lines.result();
   if (groups.length) result.groups = groups;
   return result;
 }

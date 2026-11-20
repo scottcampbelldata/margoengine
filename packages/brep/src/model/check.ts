@@ -48,9 +48,17 @@ export function checkBody(body: Body): ValidityProblem[] {
     if (crossing) report(f.name, crossing);
   }
   for (const e of body.edges) {
+    // How far a point of the edge may be from a face and still touch it: ten times the edge's tolerance along the edge,
+    // and ten times a vertex's within that reach of the vertex. A vertex's tolerance is a ball round its point (its
+    // edges' curves end somewhere in it), so it widens the test there, never along the whole edge.
     const own = new Set(e.coedges.map((c) => c.loop.face)),
       box = edgeBox(e),
-      touch = Math.max(1e-6, 10 * e.tolerance, 10 * e.start.tolerance, 10 * e.end.tolerance),
+      along = Math.max(1e-6, 10 * e.tolerance),
+      ends = [e.start, e.end].map((v) => ({ point: v.point, reach: Math.max(along, 10 * v.tolerance) })),
+      atEnd = (p: XYZ) => ends.some((v) => distance(p, v.point) <= v.reach),
+      touchAt = (p: XYZ) => ends.reduce((r, v) => (distance(p, v.point) <= v.reach ? Math.max(r, v.reach) : r), along),
+      // The most any point of the edge may be off a face it touches: what its pieces' boxes are padded by.
+      touch = Math.max(along, ...ends.map((v) => v.reach)),
       c = curveEvaluator(e.curve),
       [t0, t1] = edgeParameters(e, 1),
       [lo, hi] = [Math.min(t0, t1), Math.max(t0, t1)];
@@ -67,21 +75,22 @@ export function checkBody(body: Body): ValidityProblem[] {
         near = track.map((b) => !!overlap(b, fbox) && (!tree || hits(tree, b)));
       if (!near.includes(true)) continue;
       const s = surfaceEvaluator(f.surface),
-        gap = (t: number) => {
-          const p = c.at(t).slice(0, 3) as XYZ,
-            q = s.parameters(p);
-          return distance(s.at(q[0], q[1]).slice(0, 3) as XYZ, p);
+        at = (t: number) => c.at(t).slice(0, 3) as XYZ,
+        off = (p: XYZ) => {
+          const q = s.parameters(p);
+          return distance(s.at(q[0], q[1]).slice(0, 3) as XYZ, p) > touchAt(p);
         },
-        inside = (p: XYZ) => uv.get(f)!.contains(p) && boundaryDistance(f, p) > touch;
+        inside = (p: XYZ) => uv.get(f)!.contains(p) && boundaryDistance(f, p) > touchAt(p);
       // An edge lying in the face's surface crosses nothing there, and must not lie inside the face.
-      if (edgeParameters(e, 6).every((t) => gap(t) <= touch)) {
-        const mid = c.at(edgeParameters(e, 2)[1]).slice(0, 3) as XYZ;
+      if (!edgeParameters(e, 6).some((t) => off(at(t)))) {
+        const mid = at(edgeParameters(e, 2)[1]);
         if (inside(mid)) report(e.name, `lies inside ${f.name}, which it does not bound`);
         continue;
       }
+      // A crossing within a vertex's reach is the edge meeting a face of its own there.
       for (const t of crossings(e, f, lo, hi, near)) {
-        const p = c.at(t).slice(0, 3) as XYZ;
-        if (gap(t) > touch || distance(p, e.start.point) <= touch || distance(p, e.end.point) <= touch) continue;
+        const p = at(t);
+        if (off(p) || atEnd(p)) continue;
         if (inside(p)) {
           report(e.name, `passes through ${f.name} at (${p.map((x) => x.toPrecision(6)).join(', ')}) m`);
           break;

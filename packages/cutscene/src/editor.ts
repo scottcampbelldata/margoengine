@@ -517,6 +517,8 @@ export class TimelineEditor {
   /** True while a move is under way: the rows wait for the selection's new places. */
   private holding = false;
   private disposed = false;
+  /** Aborted at dispose: removes every listener the panel added. */
+  private readonly abort = new AbortController();
   constructor(document: CutsceneDocument | string | unknown, options: TimelineEditorOptions = {}) {
     const { parent, zoom = 100, step = 0.1, snap = true, fileName = 'cutscene.json', ...model } = options;
     if (!(zoom >= MIN_ZOOM && zoom <= MAX_ZOOM)) throw new RangeError(`Timeline zoom must be ${MIN_ZOOM} to ${MAX_ZOOM}; pass pixels a second`);
@@ -548,7 +550,7 @@ export class TimelineEditor {
       made.textContent = text;
       made.title = title;
       made.setAttribute('aria-label', title);
-      made.addEventListener('click', action);
+      made.addEventListener('click', action, { signal: this.abort.signal });
       return made;
     };
     this.bar.key = button('Key', 'Add key at the playhead', () => this.addKey());
@@ -575,12 +577,13 @@ export class TimelineEditor {
     this.lanes = tag('div', '', this.inner);
     this.head = tag('div', 'mtl-play', this.inner);
 
-    root.addEventListener('pointerdown', (event) => this.press(event));
-    root.addEventListener('pointermove', (event) => this.pointerMove(event));
-    root.addEventListener('pointerup', (event) => this.release(event));
-    root.addEventListener('pointercancel', (event) => this.release(event));
-    root.addEventListener('keydown', (event) => this.key(event));
-    root.addEventListener('wheel', (event) => this.wheel(event), { passive: false });
+    const signal = this.abort.signal;
+    root.addEventListener('pointerdown', (event) => this.press(event), { signal });
+    root.addEventListener('pointermove', (event) => this.pointerMove(event), { signal });
+    root.addEventListener('pointerup', (event) => this.release(event), { signal });
+    root.addEventListener('pointercancel', (event) => this.release(event), { signal });
+    root.addEventListener('keydown', (event) => this.key(event), { signal });
+    root.addEventListener('wheel', (event) => this.wheel(event), { passive: false, signal });
     this.unsubscribe = this.model.on('change', (label) => {
       if (!this.holding) this.draw();
       this.emit('change', label);
@@ -626,6 +629,7 @@ export class TimelineEditor {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.abort.abort();
     this.unsubscribe();
     this.listeners.clear();
     this.element.remove();

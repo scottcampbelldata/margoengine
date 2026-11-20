@@ -1,6 +1,6 @@
 /**
  * KHR_texture_transform as the two rows of one 2x3 affine map, uv' = T * R * S * uv. Rotation uses the sign
- * that `@margoengine/gltf-pro/coordinates` renders with (u' = c*u + s*v, v' = -s*u + c*v; checked there against
+ * that `@margoengine/gltf/texture-coordinates` renders with (u' = c*u + s*v, v' = -s*u + c*v; checked there against
  * the Khronos TextureTransformTest and TextureTransformMultiTest references), so a property or feature-ID texture
  * read on the CPU, highlighted on the GPU and drawn by the model all sample the same texel.
  */

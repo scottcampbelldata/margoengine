@@ -32,6 +32,14 @@ for (const compat of [false, true]) {
       sheet.sort('c0', true); sheet.element.scrollTop = 0; sheet.element.scrollLeft = 0; sheet.render();
       sheet.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); sheet.element.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
       check(query.selection.rowIds[0] === 99998, 'keyboard navigation selects source identity after sort');
+      const key = (k) => sheet.element.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })), active = () => sheet.element.querySelector('#' + CSS.escape(sheet.element.getAttribute('aria-activedescendant') ?? 'none'));
+      key('ArrowUp'); key('ArrowUp');
+      check(active()?.getAttribute('role') === 'columnheader' && active().textContent === 'c0', 'ArrowUp from the first row reaches the column headers');
+      key('ArrowRight'); key('Enter');
+      check(active()?.textContent === 'c1' && active().getAttribute('aria-sort') === 'ascending' && query.table.value('c1', sheet.rows[0]) === 1, 'Enter on a column header sorts it ascending');
+      key(' ');
+      check(active()?.getAttribute('aria-sort') === 'descending' && query.table.value('c1', sheet.rows[0]) === 100000 && query.selection.rowIds.length === 1 && query.selection.rowIds[0] === 99998, 'Space on a column header sorts it descending and selects no row');
+      key('ArrowDown'); check(active()?.getAttribute('role') === 'gridcell', 'ArrowDown from the headers returns to the first row');
       sheet.selectedOnly = true; check(sheet.rows.length === 1, 'selected-only spreadsheet');
       abort.abort(); check(!container.children.length, 'abort removes the view and listeners'); container.remove();
       demo.sheet.dispose(); demo.tmrSheet.dispose(); demo.figure.dispose(); demo.tmrFigure.dispose(); demo.query.dispose(); demo.tmr.dispose();

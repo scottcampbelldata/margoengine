@@ -19,6 +19,11 @@ export interface FBXCurveRecord {
   knots: number[];
   /** The curve drawn as straight pieces, flat xyz: eight per knot span, or the points of a line. */
   polyline: number[];
+  /**
+   * A line's separate polylines, as the number of `polyline` points in each, in order. FbxLine marks the last point
+   * of each with a negative index, and nothing joins one to the next. Only on a `Line`.
+   */
+  pieces?: number[];
 }
 
 /** Straight pieces per knot span of the `polyline`. */
@@ -77,20 +82,36 @@ function splineRecord(ctx: SceneContext, model: FBXNode, source: FBXNode): FBXCu
 
 function lineRecord(ctx: SceneContext, model: FBXNode, source: FBXNode): FBXCurveRecord {
   const all = moved(ctx, model, array(source, 'Points'), 3),
-    indices = Array.from(array(source, 'PointsIndex'), (v) => (v < 0 ? -v - 1 : v)),
-    polyline: number[] = [];
-  for (const i of indices) {
+    raw = Array.from(array(source, 'PointsIndex')),
+    polyline: number[] = [],
+    pieces: number[] = [],
+    // Degree 1 knots: one parameter per point, which stands still across the gap between pieces. The repeated knot
+    // there (degree + 1 of them) breaks the spline, as a clamped end does (Piegl and Tiller, The NURBS Book, 2.3).
+    params: number[] = [];
+  let run = 0;
+  raw.forEach((v, k) => {
+    // FbxLine::AddPointIndex stores an end point as -index - 1 (FBX SDK 2017).
+    const end = v < 0 || k === raw.length - 1,
+      i = v < 0 ? -v - 1 : v;
     if (!Number.isInteger(i) || (i + 1) * 3 > all.length) invalid('line index');
     polyline.push(all[i * 3], all[i * 3 + 1], all[i * 3 + 2]);
-  }
+    params.push(k === 0 ? 0 : run ? params[k - 1] + 1 : params[k - 1]);
+    run++;
+    if (end) {
+      if (run < 2) invalid('line piece');
+      pieces.push(run);
+      run = 0;
+    }
+  });
   const count = polyline.length / 3;
   return {
     form: 'Line',
     degree: 1,
     points: polyline,
     weights: new Array<number>(count).fill(1),
-    knots: [0, ...Array.from({ length: count }, (_, i) => i), count - 1],
+    knots: [0, ...params, params.at(-1) ?? count - 1],
     polyline,
+    pieces,
   };
 }
 

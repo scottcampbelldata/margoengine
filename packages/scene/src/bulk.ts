@@ -7,8 +7,6 @@ import { hypot } from '../../shared/hypot.js';
 
 /** Nearest float64 that rounds to float32 infinity: what `mesh.position.set` compares with. */
 const OVERFLOW = 3.4028235677973366e38;
-/** Below this a value rounds to float32 zero: what `mesh.scale.set` compares with. */
-const UNDERFLOW = 7.006492321624085e-46;
 type Numbers = ArrayLike<number>;
 
 /** What {@link TransformWriter.write} writes. Every field is optional; row `i` belongs to mesh `i`. */
@@ -66,11 +64,8 @@ export class TransformWriter {
     this.check(from, size);
     if (positions) rows(positions, 3, size, 'positions');
     if (rotations) rows(rotations, 3, size, 'rotations');
-    if (scales) {
-      rows(scales, 3, size, 'scales');
-      for (let i = 0, end = size * 3; i < end; i++)
-        if (!(scales[i] > UNDERFLOW || scales[i] < -UNDERFLOW)) throw rangeError('Invalid transform', 'transform');
-    }
+    // A zero scale is valid, as in core (glTF 2.0 section 3.5.3); rows() refuses values that are not finite float32.
+    if (scales) rows(scales, 3, size, 'scales');
     if (quaternions) {
       rows(quaternions, 4, size, 'quaternions');
       for (let i = 0, end = size * 4; i < end; i += 4)

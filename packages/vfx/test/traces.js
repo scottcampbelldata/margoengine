@@ -2,7 +2,9 @@
 // fixtures/traces.json from a build. First recorded before the entry split (1970fda); re-recorded when the particle
 // layout, culling and one-triangle billboards changed the GPU work (examples/package-benchmarks/vfx-gpu.mjs proves the
 // pixels), and when respawn seeds became slot + frame number instead of an atomic ticket (gate 9: same frames, same
-// particles on any GPU schedule).
+// particles on any GPU schedule), and when a plain sprite took the square's triangle so its top corners are drawn
+// (the texture and leaf-field WGSL only; the same buffers and commands), and when a birth's seed became its step and
+// birth number instead of its slot (GAP-FILM-VFXSEED: the simulation WGSL only; the same buffers and commands).
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';

@@ -1,0 +1,118 @@
+// Real-GPU check (repository root, after building packages, AC power; also run by check:gpu-packages):
+//   node packages/studio/test/browser-check.mjs [--no-record]
+// Renders a floor, a core cube touching it, a materials (gltf/pbr) sphere touching it and a cube floating above the
+// shadow height, with contact shadows off (opacity 0) and on, and asserts pixels; then times the contact-shadow
+// passes with timestamp queries. Writes test-results/studio-contact.png and, unless --no-record (test runs), the
+// timings to examples/package-benchmarks/results/studio-contact.json (a checked-in record).
+// Under MARGO_COMPAT=1 the WebGL2 layer offers no 'timestamp-query' (webgl2-compat src/device/render.ts: "Timestamp
+// queries are not offered on WebGL2"; a timestampWrites descriptor is refused as unsupported). The pixel assertions
+// run unchanged; the page's timing then finds no query set and returns null, which is asserted, the timing rows are
+// skipped with a printed note, and no record is written.
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { openBrowser } from '../../../scripts/browser.js';
+import { decodePNG } from '../../../tests/support/png.js';
+import { acPower } from '../../../examples/package-benchmarks/parts/power.mjs';
+import { compatRun } from '../../../scripts/support/compat-shim.js';
+
+const root = resolve(import.meta.dirname, '../../..'),
+  compat = compatRun();
+// Desktops without a battery report AC power (true); only a laptop on battery (false) refuses.
+const power = () => acPower() !== false;
+assert.ok(power(), 'On battery: run real-GPU checks on AC power');
+const report = {
+  recordedAt: new Date().toISOString(),
+  commit: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(),
+  acPowerBefore: true,
+  pixels: null,
+  timing: [],
+};
+for (const [low, res] of [
+  [0, 256],
+  [0, 512],
+  [0, 1024],
+  [1, 256],
+]) {
+  const context = await openBrowser({
+      startPath: `/packages/studio/test/browser-check.html?low=${low}&res=${res}`,
+      port: 5211,
+      args: ['--enable-webgpu-developer-features'],
+    }),
+    { page, hardware } = context,
+    pageErrors = [];
+  page.on('pageerror', (e) => pageErrors.push(e.message));
+  page.on('console', (m) => {
+    if (m.type() === 'error' || m.type() === 'warning') pageErrors.push(m.text());
+  });
+  try {
+    report.hardware ??= hardware;
+    await page.waitForFunction(() => window.ready, null, { timeout: 30000 });
+    if (!report.pixels) {
+      const shot = async () => {
+        const png = await page.locator('canvas').screenshot(),
+          image = await decodePNG(png);
+        return {
+          png,
+          at: ([x, y]) => {
+            const o = (y * image.width + x) * 4;
+            return [...image.data.slice(o, o + 3)];
+          },
+        };
+      };
+      let result = await page.evaluate(() => window.check.render(0));
+      assert.equal(result.error, null);
+      assert.deepEqual(result.errors, []);
+      const off = await shot();
+      result = await page.evaluate(() => window.check.render(0.8));
+      assert.equal(result.error, null);
+      assert.deepEqual(result.errors, []);
+      const on = await shot();
+      writeFileSync(resolve(root, 'test-results/studio-contact.png'), on.png);
+      const points = await page.evaluate(() => window.check.points()),
+        luma = (rgb) => 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+      const pixels = Object.fromEntries(
+        Object.entries(points).map(([name, p]) => [
+          name,
+          { at: p, off: off.at(p), on: on.at(p), ratio: +(luma(on.at(p)) / luma(off.at(p))).toFixed(3) },
+        ]),
+      );
+      report.pixels = pixels;
+      console.log(JSON.stringify(pixels));
+      const same = (name) => pixels[name].off.every((v, i) => Math.abs(v - pixels[name].on[i]) <= 1);
+      assert.ok(
+        Math.abs(luma(pixels.sphereContact.off) / luma(pixels.floorReference.off) - 1) < 0.1,
+        'sphere test point shows the floor',
+      );
+      assert.ok(pixels.cubeContact.ratio < 0.9, 'dark contact in front of the core cube');
+      assert.ok(pixels.sphereContact.ratio < 0.9, 'contact shadow beside the gltf/pbr sphere');
+      assert.ok(same('underFloating'), 'a mesh above `height` casts nothing');
+      assert.ok(same('outside'), 'floor outside the plane unchanged');
+      assert.ok(same('cubeTop'), 'the plane never paints over the mesh');
+      console.log('ok pixels');
+    }
+    for (const isStatic of [false, true]) {
+      const row = await page.evaluate(([f, s]) => window.check.timing(f, s), [65, isStatic]);
+      if (compat) {
+        assert.equal(row, null, 'compat: the WebGL2 layer offers no timestamp-query, so the page has no query set');
+        console.log(`compat: no timestamp-query on the WebGL2 layer, timing (static ${isStatic}) skipped`);
+        continue;
+      }
+      assert.ok(row, 'timestamp-query unavailable');
+      report.timing.push(row);
+      console.log(JSON.stringify(row));
+    }
+    assert.deepEqual(pageErrors, []);
+  } finally {
+    await context.close();
+  }
+}
+report.acPowerAfter = power();
+assert.ok(report.acPowerAfter, 'Power dropped to battery during the run; discard it');
+if (!process.argv.includes('--no-record') && !compat)
+  writeFileSync(
+    resolve(root, 'examples/package-benchmarks/results/studio-contact.json'),
+    JSON.stringify(report, null, 1) + '\n',
+  );
+console.log('studio browser check passed');

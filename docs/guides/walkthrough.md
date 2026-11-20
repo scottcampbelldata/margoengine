@@ -29,7 +29,7 @@ Put your level in the Vite project's `public/assets/` folder as `house.glb`, so 
 ```ts
 import {Engine} from '@margoengine/core';
 import {applyQualityTier, paceEngine, watchQuality} from '@margoengine/quality';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {computePrimitiveBVHAsync} from '@margoengine/bvh';
 import {CameraProjection} from '@margoengine/cameras';
 import {WalkControls} from '@margoengine/controls/walk';

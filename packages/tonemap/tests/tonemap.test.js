@@ -115,7 +115,7 @@ test('DOF HDR chaining works on resize/restoration and rejects missing or invali
   assert.throws(() => Tonemap.attach(h.engine), /HDR source/);
   const grade = Tonemap.attach(h.engine, { source: () => dof.outputTexture });
   h.frame();
-  assert.equal(h.counts.compute, 3);
+  assert.equal(h.counts.compute, 7); // the DOF dispatches, as in dof.test.js; the near-field mip chain added 4
   assert.equal(h.context.color, h.originalColor);
   h.context.width = 256;
   h.frame();

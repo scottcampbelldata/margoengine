@@ -4,6 +4,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { BindGroups, TextureOption, viewOf } from './resources.js';
 import type { Point2D } from './index.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number };
@@ -187,7 +188,10 @@ export function emissiveLightAt(
 
 /** Options for the {@link EmissiveLighting2D} plugin. */
 export interface EmissiveLighting2DOptions {
-  /** Target texture or function returning target texture. */
+  /**
+   * Target texture, or a function read each frame. A plain texture lost at a device restore skips the pass, reported
+   * once, until {@link EmissiveLighting2D.setTarget} gives a new one.
+   */
   target?: GPUTexture | (() => GPUTexture);
   /** Active emissive sprites. */
   sprites?: readonly EmissiveSpriteItem2D[];
@@ -319,6 +323,8 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   #engine: Engine | null = null;
   #pipeline: GPURenderPipeline | null = null;
   #presentation: GPURenderPipeline | null = null;
+  #presentLayout: GPUBindGroupLayout | null = null;
+  readonly #groups = new BindGroups();
   #createBloom?: () => EmissiveBloom2D;
   #bloomPass?: EmissiveBloom2D;
   #filtered: GPUTexture | null = null;
@@ -328,7 +334,7 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   #device: GPUDevice | null = null;
   #format: string | null = null;
   #disposed = false;
-  #target?: GPUTexture | (() => GPUTexture);
+  readonly #target: TextureOption;
   /** Owned rgba16float emission and local glow, excluding all other scene lighting. Replaced on resize/restore. */
   emissiveTexture: GPUTexture | null = null;
   /** Owned rgba16float local threshold extraction, before spatial filtering. */
@@ -342,7 +348,7 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
   constructor(options: EmissiveLighting2DOptions = {}) {
     this.name = options.name ?? `emissive-lighting2d-${++emissivePluginCount}`;
     this.order = options.order ?? 22;
-    this.#target = options.target;
+    this.#target = new TextureOption(options.target, 'EmissiveLighting2D target', 'setTarget');
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.bloom = options.bloom ?? true;
     this.bloomIntensity = options.bloomIntensity ?? 1.0;
@@ -379,13 +385,23 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
       );
     }
     this.#engine = engine;
+    this.#target.fix(engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
       execute: (c: PassContext) => {
-        if (c.backend === 'webgpu') this.render(this.#target, c.encoder);
+        // A plain target lost with its device skips the pass (reported once) until setTarget gives a new one.
+        if (c.backend === 'webgpu' && engine.gpu) this.render(this.#target.get(engine.gpu, engine), c.encoder);
       },
     });
+  }
+
+  /**
+   * Replaces the texture the attached pass draws to, from the next frame: a texture, a function read each frame, or
+   * undefined for none. After a device restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: GPUTexture | (() => GPUTexture) | undefined): void {
+    this.#target.set(target, this.#engine?.gpu);
   }
 
   /** Adds an emissive sprite. */
@@ -464,6 +480,8 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
         vertex: { module, entryPoint: 'vs_main' },
         fragment: { module, entryPoint: 'present', targets: [{ format: target.format }] },
       });
+      // getBindGroupLayout makes a new object each call: kept, so the presentation group can be kept too.
+      this.#presentLayout = this.#presentation.getBindGroupLayout(1);
     }
 
     const spriteList = Array.from(this.#sprites);
@@ -521,23 +539,21 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
-          view: this.emissiveTexture!.createView(),
+          view: viewOf(this.emissiveTexture!),
           loadOp: 'clear',
           clearValue: [0, 0, 0, 1],
           storeOp: 'store',
         },
-        { view: this.bloomTexture!.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' },
+        { view: viewOf(this.bloomTexture!), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' },
       ],
     });
     pass.setPipeline(this.#pipeline);
 
-    const bindGroup = device.createBindGroup({
-      layout: this.#bindGroupLayout!,
-      entries: [
-        { binding: 0, resource: { buffer: this.#uniformBuffer } },
-        { binding: 1, resource: { buffer: this.#storageBuffer } },
-      ],
-    });
+    // Kept while the two buffers are the same objects: a steady frame makes no bind group or view.
+    const bindGroup = this.#groups.get(device, 'sprites', this.#bindGroupLayout!, [
+      { binding: 0, resource: { buffer: this.#uniformBuffer } },
+      { binding: 1, resource: { buffer: this.#storageBuffer } },
+    ]);
 
     pass.setBindGroup(0, bindGroup);
     pass.draw(3);
@@ -547,21 +563,18 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
       this.#bloomPass ??= this.#createBloom();
       this.#bloomPass.encodeImage(
         { device, encoder, width: target.width, height: target.height },
-        shown.createView(),
-        this.#filtered!.createView(),
+        viewOf(shown),
+        viewOf(this.#filtered!),
       );
       shown = this.#filtered!;
     }
     const presentation = encoder.beginRenderPass({
-      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
+      colorAttachments: [{ view: viewOf(target), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
     });
     presentation.setPipeline(this.#presentation!);
     presentation.setBindGroup(
       1,
-      device.createBindGroup({
-        layout: this.#presentation!.getBindGroupLayout(1),
-        entries: [{ binding: 0, resource: shown.createView() }],
-      }),
+      this.#groups.get(device, 'present', this.#presentLayout!, [{ binding: 0, resource: viewOf(shown) }]),
     );
     presentation.draw(3);
     presentation.end();
@@ -607,6 +620,7 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     this.emissiveTexture = this.bloomTexture = this.#filtered = null;
     this.#bloomPass?.dispose();
     this.#bloomPass = undefined;
-    this.#presentation = null;
+    this.#presentation = this.#presentLayout = null;
+    this.#groups.clear();
   }
 }

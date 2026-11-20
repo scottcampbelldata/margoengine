@@ -8,7 +8,7 @@ import { openBrowser } from '../../../scripts/browser.js';
 
 const limit = setTimeout(() => {
   console.error('webgl2-compat idle-fence check exceeded its 120 second limit');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120000);
 const context = await openBrowser({ startPath: '/packages/webgl2-compat/test/features.html', port: 'free' });
 const { page } = context;

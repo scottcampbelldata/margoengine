@@ -3,20 +3,18 @@
 // on up to 28 pixels by up to 10 levels at 270 degrees in 4 of 5 rebuilds (KB5700f's NVIDIA family: blended primitives
 // that cover a pixel more than once in one draw, docs/limits.md); with the BLEND glass made OPAQUE it repeats 5 of 5,
 // and an AMD RDNA 2 iGPU on the same PC repeats the unchanged model 5 of 5. So off NVIDIA the 4x captures are asserted
-// too, and on NVIDIA they are reported. Takes a GPU slot itself. From the repository root, after building packages:
+// too, and on NVIDIA they are reported. From the repository root, after building packages:
 // node packages/oit/test/gpu/repeat-check.mjs (MARGO_COMPAT=1 for the WebGL2 layer)
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
 const url = '/examples/assets/khronos-samples/GlassVaseFlowers.glb',
-  builds = 4,
-  release = await acquire({ owner: 'oit-repeat' });
+  builds = 4;
 const timer = setTimeout(() => {
   console.error('repeat-check: timed out after 600 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 600_000);
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/real.html', port: 'free' }),
   { page } = context;
@@ -57,5 +55,4 @@ try {
 } finally {
   clearTimeout(timer);
   await context.close();
-  await release();
 }

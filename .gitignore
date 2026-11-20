@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# A package build in progress (scripts/support/dist-dir.mjs).
+dist-next/
 packages/*/LICENSE
 packages/*/NOTICE
 !packages/brep/NOTICE

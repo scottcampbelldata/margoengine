@@ -1,8 +1,8 @@
-// Proof (environment's BRDF LUT moved from a texture to a storage buffer; gltf-pro names the combination when
+// Proof (environment's BRDF LUT moved from a texture to a storage buffer; gltf/pbr names the combination when
 // a shader declares more sampled textures or samplers than the device allows). The 14-frame story of
-// gltf-pro-lighting-hooks.proof.js (shadows, clustered, environment IBL, fog and a text-patching effect added, removed and
+// gltf-pbr-lighting-hooks.proof.js (shadows, clustered, environment IBL, fog and a text-patching effect added, removed and
 // reordered; HDR and canvas targets; MSAA 1x/4x; beauty, SSAO-ambient and G-buffer draws; standard, physical, unlit and
-// blended materials) records every GPU call of gltf-pro + shadows + clustered + environment at `ref` and in the working tree.
+// blended materials) records every GPU call of gltf/pbr + shadows + clustered + environment at `ref` and in the working tree.
 // Without IBL: identical. With IBL: identical once the intended change is mapped back (the IBL WGSL: LUT declaration,
 // iblBrdfTerms, iblShade's arguments; and the LUT bind group entry, a view before, a buffer binding now).
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/binding-limit.proof.js [ref] [pin]
@@ -11,11 +11,16 @@ import assert from 'node:assert/strict';
 import { refs, versions } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 const { ref, pin } = refs('e017d50', 'f8a36ca');
 const all = await Promise.all(
-  ['gltf-pro', 'shadows', 'clustered', 'environment'].map((name) => versions(name, ref, undefined, pin)),
+  [
+    ['gltf', 'src/pbr.ts'],
+    ['shadows'],
+    ['clustered'],
+    ['environment'],
+  ].map(([name, entry]) => versions(name, ref, entry, pin)),
 );
 const [baseline, candidate] = ['baseline', 'candidate'].map((k) => all.map((v) => v[k]));
 const materials = [
@@ -110,7 +115,7 @@ async function story([gltf, shadowsModule, clusteredModule, environment], sample
         gpu.note('draw', frame, mode);
         try {
           model.draw(view.c, mode, view.c.color, view.c.depth);
-        } catch (error) {
+        } catch {
           gpu.note('throw');
         }
       }
@@ -146,7 +151,7 @@ const mapBack = (log) => {
   }
   return { log: JSON.parse(json), mapped }; // JSON round trip on both sides (undefined array members become null)
 };
-const result = { packages: ['gltf-pro', 'shadows', 'clustered', 'environment'], baseline: ref };
+const result = { packages: ['gltf/pbr', 'shadows', 'clustered', 'environment'], baseline: ref };
 for (const withIbl of [false, true]) {
   let calls = 0,
     modules = 0,

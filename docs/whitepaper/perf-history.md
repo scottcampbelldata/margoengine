@@ -1,5 +1,16 @@
 # Performance history: losses, causes and fixes
 
+## WebGL2 layer: fence polls and allocation checks waited on Windows Chrome (2026-11-18, fixed)
+
+- **Loss:** water's owner/lifetime cases took 2.9 times as long on the WebGL2 layer as on native WebGPU (354 s against
+  124 s of case time), RTX A6000, ANGLE Direct3D 11, Chrome 157.
+- **Cause:** each fence poll yielded with `scheduler.postTask({ delay: 1 })`, which Chrome on Windows runs on the 15.6 ms
+  timer tick (15.1 ms a poll), and every allocation read `getError`, a GPU-process round trip (61,489 calls, 21.4 s).
+- **Fix:** a port task and a 1 ms timer a poll (2.0 ms); one `getError` per batch of allocations (13,255 calls, 4.9 s),
+  the same work and the same errors in the same scopes. Case time 214 s against 107 s native (2.0 times). Remaining:
+  per-context program compiles, which WebGL2 cannot share. Known bugs KB-COMPAT-POSTTASK1 and KB-COMPAT-GETERROR1;
+  reproduction in [reproduce.md](reproduce.md#webgl2-layer-waits-2026-11-18).
+
 ## Batch 170 vfx: no loss on per-frame uploads (2026-11-10)
 
 100,000 live particles: Margo sends one 224-byte uniform block per steady frame (24 GPU commands), three.quarks 0.17.1
@@ -213,8 +224,8 @@ computed unrelated fields; weight IDs and weights triggered separate full classi
 serial tile requests left world workers unused. Exact-extent height sampling, paired outputs
 and bounded worker batches retain all exported bytes and metadata while reducing tile requests
 from 1,536 to 1,024. The complete parent/current proof is results/biomes-io-20261109.json.
-No wall-clock ratio is published from this loaded machine. One held README GPU slot now
-runs one full page lifecycle at a time, without changing the workload or deadline.
+No wall-clock ratio is published from this loaded machine. README pages now
+run one full page lifecycle at a time, without changing the workload or deadline.
 
 This page lists every performance loss and every significant bug that Margo's checks caught and that was then fixed.
 Each entry gives:
@@ -373,7 +384,7 @@ open. No missed replacement target may be accepted as a published loss.
 
   [claims.md](claims.md) (PKG-109) makes no claim from these numbers.
 - **Rerun:**
-  - Pixels: `node examples/package-benchmarks/parts/cull-pixels.mjs` under the GPU lock. It recorded 0 of 153,600 pixels
+  - Pixels: `node examples/package-benchmarks/parts/cull-pixels.mjs`. It recorded 0 of 153,600 pixels
     different in 13 steps.
   - Speed: the comparison harness was removed under the clean-room rule. Re-running it needs a checkout from before
     2026-10-24.
@@ -398,7 +409,7 @@ open. No missed replacement target may be accepted as a published loss.
 
 The code this entry measured is no longer part of Margo Engine, so its cases are not run. Removing a package is not a speed change.
 
-### 5. gltf-pro plain materials lost early depth testing again
+### 5. gltf/pbr plain materials lost early depth testing again
 
 - **Loss:** on a full-screen DamagedHelmet, 0.852 ms GPU per frame with the unreachable `discard`, against 0.524 ms
   without it.
@@ -408,10 +419,10 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
 - **Cause:** the consolidation set up the face and alpha tests at compile time only for instanced and MASK materials.
   Every plain opaque or blended material therefore compiled with a runtime `discard` that can never run, and that
   turned off early depth testing.
-- **Fix:** `b78a5ab4` perf(gltf-pro): plain materials compile without discard again.
+- **Fix:** `b78a5ab4` perf(gltf/pbr): plain materials compile without discard again.
 - **After:** **not recorded.** The fix restores the 0.524 ms configuration, but no timing was taken after it.
 - **Rerun:** `node examples/package-benchmarks/pipeline-toggles/toggle.mjs gpu`.
-- **Guard:** the GPU-call proofs `oit-detached`, `gltf-pro-lighting-hooks` and `materials-uv-transform`
+- **Guard:** the GPU-call proofs `oit-detached`, `gltf-pbr-lighting-hooks` and `materials-uv-transform`
   (`npm run proofs -- --current`). They record the compile-time constants of each pipeline.
 
 ### 6. VFX, one million particles
@@ -462,16 +473,16 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
 ### 9. Packages loading code they never use (static leaks)
 
 - **Loss:** startup gzip of each entry, including what bundlers pulled in:
-  - gltf-pro 525,254 B;
+  - gltf/pbr 525,254 B;
   - materials 577,486 B;
   - fbx/worker 553,075 B.
 
   Source: `120b8361` message.
-- **Cause:** gltf-pro imported two helpers statically from the decoders root while also loading decoders on demand. So
-  bundlers folded all of decoders into every gltf-pro user's startup.
+- **Cause:** gltf/pbr imported two helpers statically from the decoders root while also loading decoders on demand. So
+  bundlers folded all of decoders into every gltf/pbr user's startup.
 - **Fix:** `120b8361` perf: entries load only what they import (static leaks 78 -> 28). New small entries were added
-  with the same names as their roots, such as `decoders/texture` and `gltf-pro/coordinates`.
-- **After:** gltf-pro 49,465 B, materials 102,178 B, fbx/worker 44,092 B (same message).
+  with the same names as their roots, such as `decoders/texture` and `gltf/texture-coordinates`.
+- **After:** gltf/pbr 49,465 B, materials 102,178 B, fbx/worker 44,092 B (same message).
 - **Rerun:** `npm run quality` (sizes gate).
 - **Guard:** the leak items in `scripts/quality/baselines/sizes.json`, checked by `scripts/quality-gate.mjs` in CI.
 
@@ -482,15 +493,15 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
   (RTX A6000, Edge 156 headless): `npm run bench -- parity --cases=p-unlit --engines=margo,three-webgl-parity --runs=3
   --no-gate` on `1ff80aff`, run `20261025-232359-1ff80aff-dev` (`benchmarks/runs/`, not committed). The first speed-matrix
   ledger run records its own first numbers; this entry keeps these.
-- **Cause:** every materials mesh is a gltf-pro `PBRModel`, and each model's `draw()` began and ended its own render
+- **Cause:** every materials mesh is a gltf/pbr `PBRModel`, and each model's `draw()` began and ended its own render
   pass. A wrapper around the WebGPU calls counted 620,124 `beginRenderPass` calls in 62 frames, one per mesh per
   frame; each pass stores and reloads the 4x multisampled colour and depth. The materials package's comment said "one
   pass per engine", which was the intent.
-- **Fix:** `PBRDrawRun` in gltf-pro: draws given the same run continue one pass (a blended primitive still ends the
+- **Fix:** `PBRDrawRun` in gltf/pbr: draws given the same run continue one pass (a blended primitive still ends the
   pass around itself); the materials queue passes one run per frame. The queue's per-frame staleness check also
   allocated two closures per mesh; it is now a loop.
 - **After (diagnostic):** 166 -> about 80-97 ms per frame (profile script, busy machine, 3 runs 93.6, 91.2, 97.3 ms;
-  the bench tool could not take the GPU lock for hours). Still 13-15 times three.js: the cost left is per-mesh work
+  the bench tool could not run for hours). Still 13-15 times three.js: the cost left is per-mesh work
   (one `queue.writeBuffer`, three `setBindGroup`, `setPipeline` and two buffer binds per mesh, plus about 3 us of
   JavaScript per mesh), then listed in known-bugs.md; entries 22 and 23 have what came next.
 - **Rerun:** `npm run bench -- parity --cases=p-unlit --engines=margo,three-webgl-parity --runs=3`.
@@ -556,7 +567,7 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
 - **Guard:** `packages/materials/tests/shared-derivation.test.js` (one derivation, one instanced draw for 20 meshes,
   instance rows in mesh order, a moved mesh uploads 96 bytes, a moving camera 192), `shared-pass.test.js` (one pass,
   blended meshes included; a phase change draws each mesh once, in its new phase), `physical-maps-cache.test.js`,
-  `tests/gltf-pro-uniform-writers.test.js`, `packages/gltf-pro/tests/views.test.js` (two views keep their cameras at
+  `tests/gltf-pbr-uniform-writers.test.js`, `packages/gltf/test/views.test.js` (two views keep their cameras at
   submit).
 
 ### 23. Materials meshes: wireframe, blended and one-material-each scenes
@@ -570,8 +581,8 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
      draws of about 2 us of JavaScript each;
   3. a derivation was reused only within a frame: each of the 4,096 `p-uv-transform` materials composed its shader,
      feature key and pipeline key again every frame, and derived twice per mesh (a batch-only pass, then its own draw);
-  4. materials records (one per Material) redefined gltf-pro's data properties as accessors with new closures each, so
-     every record had a dictionary shape of its own and gltf-pro's reads of 4,096 records missed every inline cache;
+  4. materials records (one per Material) redefined gltf/pbr's data properties as accessors with new closures each, so
+     every record had a dictionary shape of its own and gltf/pbr's reads of 4,096 records missed every inline cache;
   5. every draw inverted its node matrix again, moved or not;
   6. batching wireframes cost GPU time (0.73 to 0.85 ms): a closed mesh listed every shared edge twice (a b, b c, c a
      per triangle), twice the vertex and line work for the same picture.
@@ -605,7 +616,7 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
 - **Guard:** `packages/materials/tests/steady-batches.test.js` (wireframe meshes as one line-list instanced draw;
   consecutive blended meshes as one draw, back to front; colour-only materials folded with their tints in sort order and
   live edits; another blending ends the batch; a steady material composes no shader while its bindings run and a flat
-  shading edit composes one; record copies), `packages/gltf-pro/tests/wireframe.test.js` (each edge once).
+  shading edit composes one; record copies), `packages/gltf/test/wireframe.test.js` (each edge once).
 
 ### 24. Materials meshes: 4,096 materials, one each
 
@@ -617,12 +628,12 @@ The code this entry measured is no longer part of Margo Engine, so its cases are
      colour never shared a draw (drawOwn, uniform compare, bind groups: about 6 us a mesh);
   2. every material read its rows through the record's getters and ran `bindings()` (texture lookups, a new entries
      list, the group 2 compare) every frame, about 3 us each, because nothing said whether it had changed;
-  3. every material record still had a hidden class of its own: gltf-pro's placeholder record makes its `side`
+  3. every material record still had a hidden class of its own: gltf/pbr's placeholder record makes its `side`
      accessor per record, and the materials records copied it (entry 23 had replaced the other accessors);
   4. every live colour had its own hidden class too: its `set` was a new closure per colour.
 - **Fixes:** a change stamp on `Material` (every setter, `setUVTransform`, `copy`, buffer releases, and a compare of the
   colour and factor arrays a caller may write in place) and on `Texture` (`update()`, options, `dispose()`, and
-  `steady(device)`: no upload or sampler rebuild pending), reported to gltf-pro as the new optional
+  `steady(device)`: no upload or sampler rebuild pending), reported to gltf/pbr as the new optional
   `PBRMaterialShading.version`; while it and the draw context stay the same, a draw reuses the derivation whole (rows,
   pipeline, group 2) without reading the record or calling `bindings()`; complete derivations carry a draw group (one
   object per pipeline and group 2 resources), and draws of different material records of one group batch as rows
@@ -762,14 +773,14 @@ ms against 0.75 and 1.98, faster, with no change of their own.
      caster's block each frame (94% of the frame in its `render`);
   2. TAA's velocity pass began a render pass per mesh, a compute pass per PBR snapshot, and wrote each mesh's block
      every frame because the camera rows were in it;
-  3. each gltf-pro model drew in its own render pass, each Animation deformed in its own compute pass, and every draw's
+  3. each gltf/pbr model drew in its own render pass, each Animation deformed in its own compute pass, and every draw's
      derivation rebuilt its shader text (`compactTests`, `coordinateShader`), so the caches after it hashed new long
      strings per draw per frame;
   4. each `cloneModel` copy repacked its vertices from the shared accessors.
 - **Fixes:** a caster's bounding sphere (core meshes: their geometry's; new optional `LocalShadowPrimitive.bounds`)
   is tested against each map's frustum planes, taken from that layer's own matrix, and a block is written only when
   its caster moved. TAA draws all object velocities in one render pass, takes all snapshots in one compute pass after
-  it, and keeps the camera rows in one block a frame. gltf-pro models whose passes were added one right after another
+  it, and keeps the camera rows in one block a frame. gltf/pbr models whose passes were added one right after another
   draw as one `PBRDrawRun` at the first one's pass; Animations of a frame graph deform in one compute pass; the two
   shader-text steps are memoised; packings are kept per asset and primitive. No core or stage bytes;
   `clustered/shadows` grows 338 and `taa` 188 gzip bytes (baseline reasons recorded).
@@ -795,7 +806,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   --partial`.
 - **Guard:** `packages/clustered/test/shadows.test.js` (a caster with bounds draws only into the faces it reaches),
   `tests/deep-render-taa-failures.test.js` (one velocity pass for four meshes; still meshes write no block),
-  `packages/gltf-pro/tests/model-runs.test.js` (back-to-back models share one pass, a pass between splits them; copies
+  `packages/gltf/test/model-runs.test.js` (back-to-back models share one pass, a pass between splits them; copies
   share packed arrays), `tests/deep-interaction-animation-resources.test.js` (three Animations, one compute pass).
 
 ### 29. Core picking and removing meshes
@@ -896,14 +907,14 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   buffers for arrays it already shared with the source (about 11 ms), re-baked its static parts into new arrays at the
   same pose (about 13 ms), and made a texture view and a sampler for every map slot of every primitive, native calls
   (about 10 ms with the bind groups).
-- **Fixes:** gltf-pro counts vertex and index buffers per device, asset and array: a model of the same asset takes
+- **Fixes:** gltf/pbr counts vertex and index buffers per device, asset and array: a model of the same asset takes
   the buffer instead of uploading, writes one in place only while no other model holds it (`writeGeometry` gives it
   its own buffer otherwise), and the last holder retires it. Baked static batch arrays are reused for the same part
   arrays at the same root-relative poses (bit-equal, four poses per first part kept), so their buffers are shared too.
   Each texture has one default view and each sampler state one sampler per device. Models of different assets never
   share buffers. Trade-off: the first edit of a geometry buffer another copy holds uploads a new buffer. No core
   bytes.
-- **Image:** no scene image (a task scene); the visual check covers gltf-pro's draws.
+- **Image:** no scene image (a task scene); the visual check covers gltf/pbr's draws.
 - **After** (diagnostic, busy machine, RTX A6000; run `20261026-203857`; rows in
   [perf-vs-threejs.md](perf-vs-threejs.md)):
 
@@ -916,7 +927,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   groups and core node creation.
 - **Rerun:** `npm run bench -- parity --engines=margo,three-webgpu-parity,three-webgl-parity --cases=p-skeleton-clone
   --runs=5`, then `node bench/parity-report.mjs <run.json> --partial`.
-- **Guard:** `packages/gltf-pro/tests/model-runs.test.js` (copies share vertex and index buffers, freed with the last
+- **Guard:** `packages/gltf/test/model-runs.test.js` (copies share vertex and index buffers, freed with the last
   one; a copy's edit leaves the shared buffer and later copies with the asset data; copies share baked batch arrays,
   another pose bakes anew; copies share samplers), `tests/modern-silent-render-drops.test.js` (eye renderers on one
   device share the static vertex buffer and free everything on disposal).
@@ -947,7 +958,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   node matrix, which is short under shear (a rotated child of a non-uniformly scaled parent): such a caster near a
   cube-face edge or the light's range could lose its shadow in that face. `shared/sphere.js` `worldRadius` bounds the
   stretch through the Gershgorin bound of M^T M (exact for rotation and scale) plus a float32 pad; LocalShadows, the
-  LOD imposter cull and gltf-pro's progressive load order use it. The `p-point-shadows` image is unchanged.
+  LOD imposter cull and gltf/pbr's progressive load order use it. The `p-point-shadows` image is unchanged.
 - **Labels:** the matrix names what each case of a multi-case row measures (`bench/scenes/parity.js` `LABELS`): helmet's
   default PCSS shadows beside the setup closest to three's, `p-stl` beside `p-stl-normals`, dense beside localized.
 - **Guard:** `packages/clustered/test/shadows.test.js` (casters across face seams, on edges and corners, grazing the
@@ -966,7 +977,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   primitive and shared by its clones, weights, bone palettes) and deforms them all with one dispatch per buffer page
   and pipeline (four or eight influences) from a per-workgroup work list; the per-vertex arithmetic is the
   per-primitive shader's, term for term. Every reader of `PBRPrimitive.deformed` takes the new `deformedOffset` (or a
-  record's `vertexOffset`): gltf-pro draws, shadow casters, TAA velocity and snapshots, selection, picking and its CPU
+  record's `vertexOffset`): gltf/pbr draws, shadow casters, TAA velocity and snapshots, selection, picking and its CPU
   readback, the inspector. A buffer bound at offset 0 is bound with the same call as before, so the feature-off
   proofs are unchanged. Same work and same output: no copy back into per-primitive buffers, nothing moved out of the
   measured passes. Trade-off: about 2.8 KB more gzip on the animation root entry; buffers grow geometrically (old
@@ -1034,7 +1045,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   because this GPU averages some pixels' samples, and the split only changes which. Restoring a pass per blended mesh
   would cost 2,000 passes a frame and still not give the spec's result, so the engine keeps one pass and instancing.
   The images stay within the matrix's tolerance (SSIM 1.0).
-- **Rerun:** `node scripts/gpu-lock.mjs run --max=8 --owner=<you> -- node scripts/gpu-blend-passes.mjs` (add
+- **Rerun:** `node scripts/run-with-timeout.mjs --max=8 -- node scripts/gpu-blend-passes.mjs` (add
   `--adapter=d3d11` for D3D11).
 - **Guard:** `packages/materials/tests/steady-batches.test.js` ("the p-blending quads reach the GPU once each"): the
   scene's 2,000 additive quads in 16 colours, each exactly once, farthest first, with its own world matrix and colour
@@ -1053,7 +1064,7 @@ ms against 0.75 and 1.98, faster, with no change of their own.
   3. Environment's half-float upload used a bit loop; it now stores through `Float16Array` (same bits).
   4. The FBX pivot chain rebuilt its fixed matrices for every animation key and allocated every product; the fixed
      parts are made once per node and the products use scratch matrices, in the same order.
-  5. gltf-pro decoded a model's images one after another; up to 8 now decode at once, results taken in image order.
+  5. gltf/pbr decoded a model's images one after another; up to 8 now decode at once, results taken in image order.
      Every `cloneModel` copy also compiled its own mip pipelines (200 shader modules for `p-morph`'s 100 copies); they
      are now kept per device.
   6. Raw meshes rebuilt their normal matrix with temporary arrays every frame and re-bound the material group per
@@ -1090,8 +1101,8 @@ ms against 0.75 and 1.98, faster, with no change of their own.
 - **Guard:** `packages/environment/tests/exr-write.test.js` (yields follow time; bytes do not depend on them),
   `packages/environment/tests/half-upload.test.js`, `packages/geometry/tests/extrude.test.js` (no per-triangle
   pushes), `packages/geometry/tests/triangulate.test.js` (-0 meets 0), `packages/fbx/test/geometry.test.js` (the
-  cached chain equals the chain built by hand, bit for bit), `packages/gltf-pro/tests/async-images.test.js` (8 at
-  once, in order, failures close every bitmap), `packages/gltf-pro/tests/model-runs.test.js` (one mip shader per
+  cached chain equals the chain built by hand, bit for bit), `packages/gltf/test/async-images.test.js` (8 at
+  once, in order, failures close every bitmap), `packages/gltf/test/model-runs.test.js` (one mip shader per
   device), `packages/shader/test/raw.test.js` (one material bind per run), `tests/bench-feature-bytes.test.js`.
 
 ## Size of the frozen core
@@ -1175,9 +1186,9 @@ These entries have no timing. The loss is a feature that did not work.
 - **Rerun:** `npm run check:wgsl`, `npm run visual:check`.
 - **Guard:** the WGSL compile gate and the visual baselines.
 
-### 14. React `<Environment>` did not compile on gltf-pro models (10 days)
+### 14. React `<Environment>` did not compile on gltf/pbr models (10 days)
 
-- **Loss:** `<Environment src=...>` failed on every gltf-pro model with "cannot take the address of 'var iblBrdf' in
+- **Loss:** `<Environment src=...>` failed on every gltf/pbr model with "cannot take the address of 'var iblBrdf' in
   handle address space".
   - It broke at `b1276ce5`, which moved the BRDF table to a storage buffer, and was fixed 10 days later.
   - React's browser test found it; that test was not part of `check:merge`.
@@ -1229,7 +1240,7 @@ These entries have no timing. The loss is a feature that did not work.
 - **Cause:** a regression from `70c73f64` in how the tangent frame is built when a model has no tangents.
 - **Fix:** `20bc1db3` moves every user onto one helper, `packages/shared/tangent-frame.js`.
 - **Rerun:** `npm run proofs -- --current`, `npm run visual:check`.
-- **Guard:** the pinned shader fingerprints in `packages/gltf-pro/tests/physical-map-renderer.test.js`, and the gltf-pro
+- **Guard:** the pinned shader fingerprints in `packages/gltf/test/physical-map-renderer.test.js`, and the gltf/pbr
   proofs.
 
 ### 18. Fuzzing: unbounded allocations, including a zip bomb
@@ -1360,8 +1371,8 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   `tests/vite-cache-isolation.test.js`), and suites that waited silently for a fixed port held by another run
   (`6ddd733b`: the voxel path tracer's spec-math suite "needed 276 s", of which the check itself took about 5 s; guard
   `tests/browser-port-wait.test.js`).
-- **What we got wrong:** we first blamed check timeouts on time spent queueing for the GPU lock. Measurement showed
-  they were not lock waits: the causes were the fixed ports above and the GPU resets of entry 41.
+- **What we got wrong:** we first blamed check timeouts on time spent waiting for other GPU jobs. Measurement showed
+  they were not waits: the causes were the fixed ports above and the GPU resets of entry 41.
 - **Guard for the class:** `scripts/check-fixed-waits.mjs` (in `npm run verify`) fails on any new fixed frame count or
   sleep in a GPU or browser check unless it gives a reason; the existing ones are counted and the count only goes down.
 
@@ -1399,8 +1410,8 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   dispatches and a new device worked, so the page got wrong results with no error. Only the event log shows it.
 - **What we got wrong:** our first theory was the path tracer's long dispatches. We bounded them (`49dca9dd`: at most
   2^20 paths per dispatch, where a 4K frame was 8.3 million in one; same pixels, native4k frame time unchanged), which
-  is right for slower GPUs, but two controlled exclusive runs gave 0 resets, and each reset hit one short page, not the
-  long run. Also not the trigger, each tried under the GPU lock with a watcher sampling every second: killing the
+  is right for slower GPUs, but two controlled runs with nothing else on the GPU gave 0 resets, and each reset hit one short page, not the
+  long run. Also not the trigger, each tried with a watcher sampling every second: killing the
   browser's GPU process mid-dispatch (15 times) or the whole browser tree (15 times), CDP `Browser.crashGpuProcess`
   beside a second busy browser (12 times), 300 device create and destroy cycles, 6 browsers dispatching back to back
   for 90 s, and long submissions against 2 or 3 other browsers.
@@ -1501,7 +1512,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
     `/assets` also allowed `/assets-other/`, and that branch skipped the encoded-separator check; and the final URL
     after a redirect was never checked for glTF buffers and images or FBX textures. Entries now match on a path
     boundary, encoded separators and dot segments are refused on both branches, and every redirect is checked against
-    the same policy. Guard: `tests/security.test.js`, `packages/gltf-pro/tests/progressive.test.js`,
+    the same policy. Guard: `tests/security.test.js`, `packages/gltf/test/progressive.test.js`,
     `packages/fbx/test/loading-materials.test.js`.
   - **OBJ material libraries (F04, F17), `b96f5f40`.** `loadOBJ` fetched every `mtllib` named in the file with the
     caller's request options, so an absolute URL in an untrusted OBJ made a request to any host with the caller's
@@ -1628,7 +1639,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   machine, so the builtin column's 0.36 and 0.59 are two states of the same floor, and ratios under about 1.6 are not
   firm. Each row is the median of the rounds, each round the mean of its faster half of twelve trials. The tracer's
   control row shows its noise: under 1%.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/precise-math-gpu.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/precise-math-gpu.mjs`.
   Result: `examples/package-benchmarks/results/precise-math-gpu.json`.
 - **Not measured:** other GPUs. The AMD and Mesa compilers named in entry 37 may price `pmHide` differently.
 
@@ -1639,7 +1650,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Measured cause:** the frame's CPU side took 8 ms, and 264 of its 320 ms were GPU work already queued by the build:
   waiting on the queue before the first frame left a 55 ms frame. Every `cloneModel` copy uploaded and mipped its own
   textures: 700 textures, 100 of them 1024 x 1024 with 11 levels, 300 bitmap copies and 300 submits.
-- **Fix:** copies hold the source's decoded images and gltf-pro shares one texture per device, image and format, counted
+- **Fix:** copies hold the source's decoded images and gltf/pbr shares one texture per device, image and format, counted
   like the vertex buffers. The same work reaches the same pixels: the run's screenshot is byte for byte the one before
   (SHA-256 `67648a86...` both ways). Nothing is skipped: each image is still uploaded and mipped, once.
 - **Result (RTX A6000, Edge, other sessions running, so diagnostic and not gated):**
@@ -1654,13 +1665,13 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   left, and its plan, is in [known-bugs.md](../known-bugs.md#build-plus-first-frame-of-100-morphed-copies-is-still-slower-than-threes-webgl-backend).
 - **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5
   --warmup=1 --no-compare --no-fail`.
-- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `packages/animation/tests/clone.test.js`.
+- **Guard:** `packages/gltf/test/model-runs.test.js`, `packages/animation/tests/clone.test.js`.
 
 ### 50. Materials with no maps fetch only what they read
 
 - **Loss:** `createInstancedMesh` boxes at 50,000 took 0.615 ms of GPU against three's WebGL2 `InstancedMesh`, because
-  gltf-pro's vertex stage read all five vec4 of its 80-byte vertex for a material with no map.
-- **Fix:** `packages/gltf-pro/src/vertex-inputs.ts` reads the finished shader text when a pipeline is built. With a flat
+  gltf/pbr's vertex stage read all five vec4 of its 80-byte vertex for a material with no map.
+- **Fix:** `packages/gltf/src/vertex-inputs.ts` reads the finished shader text when a pipeline is built. With a flat
   normal (materials' bare standard material) the tangent frame's terms are exact zeros, so it goes; then each field of
   `Out` no fragment reads goes, and each vertex input and the instance UV row nothing reads. It runs after every patch,
   so no patch anchors on a trimmed stage. Text it cannot read for certain keeps every input.
@@ -1676,7 +1687,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Same output:** `packages/materials/test/vertex-inputs-browser.mjs` draws plain, mirrored, vertex-coloured and mapped
   meshes with the trimming on and off: no pixel differs.
 - **Rerun:** `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
-- **Guard:** `packages/gltf-pro/tests/vertex-inputs.test.js` and the browser test above, which also asserts the
+- **Guard:** `packages/gltf/test/vertex-inputs.test.js` and the browser test above, which also asserts the
   pipelines' attribute counts.
 - **Still open:** the rest of the gap ([known-bugs.md](../known-bugs.md#createinstancedmesh-draws-50000-boxes-slower-than-threejs)).
 
@@ -1789,7 +1800,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Loss:** after entry 49 the first frame still blocked on its render pipeline, and its key needs the target formats and
   sample count, which only the pass context carried.
 - **Fix:** core gained one read-only getter, `Engine.renderTarget` (Scott's exception to the core rule, 2026-11-05; 44 B
-  gzip), and gltf-pro gained `PBRModel.compile()`, which runs the draw's own derivation and compiles with
+  gzip), and gltf/pbr gained `PBRModel.compile()`, which runs the draw's own derivation and compiles with
   `createRenderPipelineAsync`. The draw then finds the same pipeline under the same key, so nothing it draws changes.
   It is opt-in: compiling at every load would compile twice in any scene that adds lights or effects after loading.
 - **Result (RTX A6000, Edge, other sessions running, so diagnostic and not gated):**
@@ -1805,7 +1816,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   `p-morph-compiled` sits beside it, Margo only: three's matching call, `compileAsync`, is not in its scene.
 - **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo --runs=5 --warmup=1 --no-compare --no-fail`
   (the case name also selects `p-morph-compiled`).
-- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, `tests/core-timestamp-feature.test.js`.
+- **Guard:** `packages/gltf/test/model-runs.test.js`, `tests/core-timestamp-feature.test.js`.
 
 ### 57. Binary STL reads each corner once
 
@@ -1826,7 +1837,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 ### 58. Plain glTF materials keep their shader and pipeline between frames
 
 - **Loss:** `p-morph` CPU 0.49 ms a frame against three's WebGL 0.26 (run `20261105-234620`). About half of the frame was
-  gltf-pro deriving each of the 200 draws again.
+  gltf/pbr deriving each of the 200 draws again.
 - **Cause:** only materials-package records could keep a shader across frames, because that check needs a shading hook's
   revision. A plain record composed its shader text and pipeline key on every draw, and a draw that first asked to join
   a batch derived twice.
@@ -1838,7 +1849,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   0.175 ms.
 - **Left:** see [known-bugs.md](../known-bugs.md#morph-targets-cpu-per-animation-per-frame).
 - **Rerun:** `node bench/cli.mjs parity --cases=p-morph --engines=margo,three-webgl-parity --runs=3`.
-- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a plain material keeps its shader and pipeline between
+- **Guard:** `packages/gltf/test/model-runs.test.js`, "a plain material keeps its shader and pipeline between
   frames, and every edit still shows" (fails with the kept path disabled); `tests/replica.test.js` caught mirrored
   instances, which is why instances stay out.
 
@@ -1855,7 +1866,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Left:** the last tick went on 2026-11-06 (`PBRModel.adoptStaticBatches`, not measured yet); the rest is in
   [known-bugs.md](../known-bugs.md#clonemodel-slower-than-threes-clone).
 - **Rerun:** `node bench/cli.mjs parity --cases=p-skeleton-clone --engines=margo,three-webgl-parity --runs=3`.
-- **Guard:** `packages/gltf-pro/tests/model-runs.test.js`, "a model with a static batch costs one engine tick to set up".
+- **Guard:** `packages/gltf/test/model-runs.test.js`, "a model with a static batch costs one engine tick to set up".
 
 ### 60. `Picking.pickMany`: many picks, one readback
 
@@ -1884,7 +1895,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Measured:** `useSubgroups` against the default kernels, 16,777,216 f32 values, RTX A6000, Edge, GPU timestamps, 3 alternating rounds, other jobs running, diagnostic: sort 11.93 to 7.00 ms, argsort 13.62 to 8.85 ms, sum 0.087 to 0.066 ms, sum along an axis 0.59 ms both, cumsum 0.546 to 0.557 ms.
 - **Cause:** the radix sort's local pass ranked a digit with four one-bit splits of 19 barriers each; four ballots and one exchange replace them. A sum or a scan moves the same bytes either way, and memory is its limit on this GPU, so fewer barriers buy little. Cumsum is not faster: treat it as no gain until the quiet run.
 - **Tried and dropped:** neighbouring threads reading neighbouring elements along an axis made a 16-output sum 2.2 times slower (1.32 against 0.59 ms) with only 16 workgroups in flight, so the axis kernel keeps the default kernel's runs.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/compute-subgroups.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/compute-subgroups.mjs`.
 - **Guard:** `packages/compute/tests/compute-subgroups-browser.js`.
 
 ### 63. `helmet`: where the default shadows' time goes (accepted difference in work)
@@ -1898,7 +1909,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   known-bugs (fewer taps, a capped radius) changes the image, so it was not taken. Like for like,
   `helmet-filterpcf-cascades1` is 0.074 ms against 0.085 and 0.068.
 - **Not done:** limiting the nearest-depth pass to the texels casters reach would keep the output, but needs bounds on
-  `ShadowPrimitive`, which gltf-pro models do not give today.
+  `ShadowPrimitive`, which gltf/pbr models do not give today.
 - **Rerun:** `node bench/cli.mjs parity --cases=helmet --engines=margo,three-webgl-parity,three-webgpu-parity --runs=5`.
   A quiet run is still owed.
 
@@ -2072,6 +2083,13 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
 - **Rerun:** not recorded: the timings have no committed script. `node packages/voxel-pathtracer/tests/browser-check.mjs --compat`
   repeats the correctness checks.
 - **Guard:** that check, and `compute-browser.mjs` for the polling `createComputePipelineAsync`.
+- **Update 2026-11-16 (work counts):** the route that replaced this one runs the path loop as staged fragment
+  programs. A 480 x 300 sample there draws 443 passes (no distant light) or 523 (with the sun) against 1,527: a light
+  kind the frame switches off draws no pass and 480 x 300 is one part, the same values
+  (`packages/voxel-pathtracer/tests/route-work.test.js`, CPU). A 480 x 300, 16384-sample reference on ANGLE Direct3D 11
+  took about 449 s against 555 s (busy machine, diagnostic; 14 s on WebGPU). Rerun: `MARGO_COMPAT=1 node
+  scripts/gpu-package-tests.mjs --no-build --select=voxel-pathtracer/test:gpu:denoise` and read the reference's
+  progress lines.
 
 ### 74. `MeshBridge.sync`: a world with nothing moving pays one pass again
 
@@ -2606,7 +2624,7 @@ Each of these passed alone and failed in a busy full run. In each, the fault was
   393216. Margo's FFT stays within 0.01 of the NumPy float64 bins that the test locks; the CPU comparison of every
   bin was at most 0.00845 off. TensorFlow.js is the same transform with a wider error (energy 0.028% high, peak
   magnitude 0.06% low). Busy machine, diagnostic. Not a loss.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/compute/scripts/rival-bench.mjs`.
   The oracle is `packages/compute/tests/numpy-oracle.test.js`. Citation in clean-room.md.
 
 ### 101. Exact rectangle SAT and a certified preferred face; solver alternatives rejected
@@ -2685,7 +2703,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   Mean absolute channel difference of the last pair is 1.801; 7.48% of pixels differ by more than 8. The field sum
   32731.121874443877 is locked by `packages/sciviz/tests/volume-field.test.js`. Busy machine, diagnostic. Tracked in
   known-bugs.md. Publishing the number does not close it.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/sciviz/scripts/rival-bench.mjs`.
   Citation in clean-room.md.
 
 ### 103. truck 7k prefix against GaussianSplats3D (diagnostic, loss)
@@ -2699,7 +2717,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   GaussianSplats3D 4.500 to 7.470). Against the photograph, Margo PSNR 12.226 dB (MAE 52.272) and the rival 9.994 dB
   (MAE 60.646). Camera-to-world was also scored for Margo (10.672 dB) and lost to world-to-camera. Neither picture
   matches the photograph. Busy machine, diagnostic. Tracked in known-bugs.md. Publishing the number does not close it.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
   Citation in clean-room.md.
 
 ### 104. quadtree screen-space error against 3DTilesRendererJS (diagnostic, win)
@@ -2711,7 +2729,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
 - **Result:** the selected sets are equal, 1,120 tiles, checksum 121586381 (992 at level 5, 128 at level 6).
   Frame time is a win. Margo 0.300 ms, 3DTilesRendererJS 2.300 ms. The rounds do not overlap (Margo 0.300 to
   0.900, 3DTilesRendererJS 2.300 to 3.100). Diagnostic until a quiet rerun.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/tiles/scripts/rival-bench.mjs`.
   Citation in clean-room.md. The Margo set is `packages/tiles/tests/sse-scene.test.js`.
 
 ### 105. 10 million points against potree-core (diagnostic, loss)
@@ -2724,7 +2742,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   overlap (Margo 9.000 to 12.400, potree-core 5.400 to 7.600). The rival's seven frames were 7 draw calls and
   70,000,000 points. Diagnostic until a quiet rerun. Tracked in known-bugs.md. Publishing the number does not
   close it.
-- **Rerun:** `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
   Citation in clean-room.md. The grid is `packages/points/tests/points-10m.test.js`.
 
 ### 106. Flat 2D support-planner buffers: fewer allocation requests, speed loss still open
@@ -2752,7 +2770,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   **0.9916**, IQR **0.9807 to 1.0010**, faster **18/24**. The small movement remains inside spread; no stable
   timing gain is claimed. The earlier nested trial's ratio 0.9931 (14/24) is retained as superseded evidence.
 - **Browser before/after:** minimum milliseconds from 12 rounds each, unchanged scene and black-box rivals,
-  exclusive GPU lease. Separate sessions have changing load and are not a controlled before/after gain.
+  with nothing else running on the GPU. Separate sessions have changing load and are not a controlled before/after gain.
 
   | Browser/backend | Before Margo / Box2D v3 / Rapier | After Margo / Box2D v3 / Rapier |
   | --- | --- | --- |
@@ -2794,8 +2812,8 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   one process, fresh unchanged 100-row scenes, 60 settle steps plus minimum of 40 steps. All three explicit
   pins and every 5,050-awake visit match. Minimum 5.0895 to 4.9111 ms; paired candidate/control ratio median
   **1.0001**, IQR **0.9254 to 1.0686**, candidate faster **12/24**. No timing win is established.
-- **Browser before/after:** 12-round minimum milliseconds, separate changing-load sessions, exclusive GPU
-  lease, unchanged black-box rivals and scene. Margo loses to Box2D in all rounds and beats Rapier in all rounds.
+- **Browser before/after:** 12-round minimum milliseconds, separate changing-load sessions, nothing else running on the GPU,
+  unchanged black-box rivals and scene. Margo loses to Box2D in all rounds and beats Rapier in all rounds.
 
   | Browser/backend | Before Margo / Box2D v3 / Rapier | After Margo / Box2D v3 / Rapier |
   | --- | --- | --- |
@@ -2831,14 +2849,14 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   RTX A6000, busy machine, diagnostic. Different completion costs include a one-pixel rival readback.
   Image loss: MAE 1.567519 versus 0.048151; PSNR 35.388 versus 61.305 dB. Max byte errors 15 versus 1.
   Weighted averaging cannot reproduce general ordered coverage. Publishing does not close the loss.
-- **Reproduce:** `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
+- **Reproduce:** `node scripts/run-with-timeout.mjs -- node packages/oit/scripts/rival-bench.mjs`.
   Oracle tests: `node --test packages/oit/test/oit-reference.test.js`. Dependencies stay in engine-bench/batch-168.
 
 The closing independent Cycles path trace (Blender 5.3.0 Beta, 1024 samples, seed 168) confirms entry 109:
 Margo MAE 1.632960 versus Babylon 0.132651, PSNR 33.630 versus 38.261 dB. Exact oracle versus Cycles
 MAE 0.094812, identical centre RGB (198,163,103); reference noise and silhouette sampling produce max
 125 in each comparison. No additional timing claim. [Raw Cycles comparison](results/batch-168-oit-cycles.json).
-Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
+Command: `node scripts/run-with-timeout.mjs --max=6 -- node scripts/rival-oit-cycles.mjs`.
 
 ### 110. Preetham angular radiance against Mitsuba sunsky
 
@@ -2849,7 +2867,7 @@ Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner
   [All cases](results/batch-168-sky.json). Different analytic models and Margo chromaticity/clamp tuning;
   not a measured atmosphere or absolute-irradiance claim. No speed row. Accepted difference (KB3148c, 2026-11-11):
   the paper Preetham model alone measures MAE 1.436382; Margo's tuning moves the grid by MAE 0.012108.
-- **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
+- **Reproduce:** `node scripts/run-with-timeout.mjs --max=3 -- node packages/sky/scripts/rival-bench.mjs`.
   External Mitsuba setup is in reproduce.md. Coordinate and metric oracle: `packages/sky/test/sunsky-reference.test.js`.
 
 ### 111. Default contact shadow against ray-traced ground occlusion
@@ -2860,10 +2878,10 @@ Command: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner
 - **Result:** picture loss, normalized darkness MAE 0.048174, RMSE 0.074416, max 0.288788. Mean darkness
   0.000177 versus 0.048351. Fixed blur of nearness is local and does not integrate hemispherical visibility.
   [Raw result](results/batch-168-staging.json). No speed measurement. Accepted difference (KB3193, 2026-11-11):
-  the default is a footprint cue by design; AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer (`packages/staging/test/sky-occlusion-browser.mjs`;
+  the default is a footprint cue by design; AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer (`packages/studio/test/sky-occlusion-browser.mjs`;
   `rival-bench.mjs --ambient`).
-- **Reproduce:** `node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
-  Oracle: `node --test packages/staging/test/contact-reference.test.js`.
+- **Reproduce:** `node scripts/run-with-timeout.mjs --max=3 -- node packages/studio/scripts/rival-bench.mjs`.
+  Oracle: `node --test packages/studio/test/contact-reference.test.js`.
 
 ### 112. Exact 2D frame preparation: checked bounds and lazy rejected components
 
@@ -2942,12 +2960,12 @@ The Box2D browser goal remains unmet. Quiet release reruns remain required; no a
   device): each vertex invocation fetched 48 bytes of the 80-byte vertex (position, normal and colour, three `float32x4`
   reads) and 96 bytes of instance data (six attributes): 144 bytes, against 120 for `CulledInstances` (two `float32x3`
   vertex reads and the same 96-byte record).
-- **Three cuts, each exact by construction** (`perf(gltf-pro)` instanced vertex fetch cuts): a geometry whose every
+- **Three cuts, each exact by construction** (`perf(gltf/pbr)` instanced vertex fetch cuts): a geometry whose every
   vertex colour is (1, 1, 1, 1) (what a mesh without colours packs) reads the constant `vec4f(1)` in the instanced
   vertex stage instead of the colour input (`1 * x` is exact); the instance layout drops the UV row the trimmed shader
   no longer declares (same stride); locations read only as `xyz` are fetched as `float32x3`, the w the shader never reads
   taking WebGPU's default.
-- **Counted after** (`packages/gltf-pro/tests/vertex-inputs.test.js`): 24 bytes of vertex (two `float32x3`) and 80 of
+- **Counted after** (`packages/gltf/test/vertex-inputs.test.js`): 24 bytes of vertex (two `float32x3`) and 80 of
   instance (five attributes) = 104 bytes a vertex invocation, below `CulledInstances`' 120. Varying scalars unchanged
   (11), no function-scope arrays. A repacked 24-byte vertex stream was judged and rejected: it duplicates buffers and
   must be rebuilt on a material swap, for no fetch saving beyond the `float32x3` reads.
@@ -2968,7 +2986,7 @@ The Box2D browser goal remains unmet. Quiet release reruns remain required; no a
   ellipses across the frame. The Jacobian's point is now clamped to 1.3 times the half-view tangent (the training
   convention; Kerbl et al. 2023, Zwicker et al. 2001, Ye and Kanazawa 2023). Not the paper's dataset-average PSNR;
   the rival row of entry 103 used the wrong pose and is rerun in the speed phase.
-- **Rerun:** `node scripts/gpu-lock.mjs run --owner=<you> --gpu=splats-truck-photo -- node packages/splats/scripts/truck-photo.mjs`.
+- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/splats/scripts/truck-photo.mjs`.
 
 ### 116. Cornell box irradiance against Cycles at matched bounces (KB2604h, 2026-11-11, picture error)
 
@@ -2989,16 +3007,16 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
 
 - **volume-64 against VTK.js 38.0.5 (entry 102).** 1.500 ms against 1.300 ms for one 256 x 256 frame plus the pixel
   read. The rounds overlap. Mean absolute channel difference 1.801. Rerun:
-  `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
+  `node scripts/run-with-timeout.mjs -- node packages/sciviz/scripts/rival-bench.mjs`.
 
 - **Truck 7k prefix against GaussianSplats3D 0.4.7 (entry 103).** 10.765 ms against 4.500 ms for one still frame of
   699,050 degree-3 splats. The rounds do not overlap. The picture loss (12.226 dB) was a projection bug, fixed in
   entry 115 (20.882 dB on the full cloud); the timed rerun uses the full cloud at the camera-to-world pose.
-  Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+  Rerun: `node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
 
 - **10 million points against potree-core 2.0.17 (entry 105).** 9.000 ms against 5.400 ms for one settled frame.
   Both draw every point. The rounds do not overlap. Rerun:
-  `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+  `node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
 
 - **Cornell box irradiance against Cycles (entries 108 and 116).** Mean absolute error 0.024863 per channel
   (relative 0.087125) over 881 texels at one indirect bounce on both sides; 0.012063 over 8 seeds. Blender 5.3.0
@@ -3029,7 +3047,7 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
     moving `CulledInstances` (10k) went from 13.6 to 1.34 ms CPU per frame.
   - Rerun: `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu --runs=3`.
   - Guard: `packages/culling/test/culling.test.js`, `packages/materials/test/materials.test.js`,
-    `packages/math/test/euler-quaternion.test.js`, `packages/gltf-pro/tests/instancing.test.js`.
+    `packages/math/test/euler-quaternion.test.js`, `packages/gltf/test/pbr-instancing.test.js`.
   - Still open: `createInstancedMesh` at 50k and the upload of moving instances (the 1k cost of a package pass closed in
     entry 51). Each is in [known-bugs.md](../known-bugs.md#performance-losses-still-open).
   - [claims.md](claims.md) records that there is no publishable result yet.
@@ -3050,7 +3068,7 @@ These entries lack a recorded number, a named machine or a quiet run:
 1. Shadow casters (entry 1): before and after on a named machine with nothing else running.
 2. Back-face culling, boxes (entry 2): a quiet run instead of the diagnostic busy-machine numbers.
 3. CAD 10k single-sided (entry 3): a quiet run.
-4. gltf-pro plain materials (entry 5): the after time on DamagedHelmet.
+4. gltf/pbr plain materials (entry 5): the after time on DamagedHelmet.
 5. Kernel snapshot compare (entry 8): before and after with the machine and a committed result.
 6. three.js `InstancedMesh` against Margo instanced (open loss): a quiet run once the fix lands.
 7. Galaxy S23 Ultra island (open loss): an after number, which needs the device.
@@ -3553,7 +3571,7 @@ The [volume comparison](../sciviz-rivals.md) adds --runs=1 without clocks, full 
 
 - Cause, counted in a Node test on RobotExpressive (74 nodes, 19 primitives on 14 nodes, the `p-skeleton-clone` copy):
   each copy passed 225 fresh arrays to the node setters (a position, a scale and a quaternion per node and the root;
-  core `setScale` also scans its argument with a closure), and the gltf-pro `PBRModel` constructor, which every copy
+  core `setScale` also scans its argument with a closure), and the gltf/pbr `PBRModel` constructor, which every copy
   runs, filtered all 19 primitives once per primitive node (14 passes, 266 element visits).
 - Fix: `cloneModel` writes positions and scales through `node.position.set` and `node.scale.set` and quaternions from
   one scratch array through `setQuaternion` (the same store writes and Euler lanes); a store value the setters refuse
@@ -3586,7 +3604,7 @@ The [volume comparison](../sciviz-rivals.md) adds --runs=1 without clocks, full 
   a skin without binds (parent 172 and 4). Identical output: clip names, durations, targets, widths and key arrays as the
   accessors give; inverse binds equal the accessor data or identities; uploaded palette bytes over three seeks equal the
   parent's product (views of each joint's bind) byte for byte; the animation GPU suites pass unchanged.
-- Accepted difference in work: gltf-pro packs vertices, bakes static batches and uploads buffers at load, which three
+- Accepted difference in work: gltf/pbr packs vertices, bakes static batches and uploads buffers at load, which three
   defers to its first render (`docs/limits.md`); never moved or shrunk. The like-for-like row "parse + first frame" is
   pending.
 - Timing pending the quiet rerun (`node bench/cli.mjs parity --cases=p-gltf-animated --engines=margo,three-webgpu-parity,three-webgl-parity --runs=5 --warmup=1 --no-compare --no-fail`).
@@ -3674,3 +3692,42 @@ rules (no `git stash` and no `npx` in any form). None changed the repository.
 ### Batch 163 job 3: line and skeleton work (2026-11-10)
 
 `perf(lines): avoid redundant frame and empty fan work` reduces static frame uploads from 101 to one and independent butt/square segment vertices from 78 to 6. Exact uniform bytes and GPU pixel controls retain output. Timing pending the quiet rerun. [Sources and commands](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).
+
+## Cache hashStream speed (2026-11-16)
+
+KB-CACHE-HASHSTREAM-SPEED. `SHA256` and `hashStream` in `@margoengine/cache/hashed` now use the runtime's own
+incremental SHA-256 in Node (through `process.getBuiltinModule('node:crypto')`, so no bundler sees an import), and the
+plain JavaScript that browsers and workers run reads whole 64-byte blocks in place, with no copy and no view per block.
+Output is unchanged: every path gives the same hex as `node:crypto` on the measured data, and
+`packages/cache/test/hash-stream.test.js` checks both paths on lengths 0 to 65,537 in six chunkings.
+
+Paired A/B in one process (old build, new JavaScript, new runtime path, interleaved round by round on the same 128 x 1
+MiB, best of 5 rounds per path), dev PC, Node 26.12.0, CPU load 54 % at the time, so the figures are diagnostic until
+the quiet rerun:
+
+| Path | Best of 5 | Rate |
+| --- | --- | --- |
+| Before (plain JavaScript, one block copy per 64 bytes) | 835.5 ms | 161 MB/s |
+| Plain JavaScript, blocks read in place | 492.4 ms | 273 MB/s |
+| Runtime digest (default in Node) | 52.2 ms | 2,569 MB/s |
+
+Why not a faster JavaScript or Wasm core: one stream's SHA-256 is serial (each block needs the state the one before
+left, NIST FIPS 180-4, doi:10.6028/NIST.FIPS.180-4); SIMD helps only the message schedule or several streams at once
+(Gueron and Krasnov 2012, doi:10.1007/s13389-012-0037-z), and the big gain for one stream is the processor's SHA round
+instructions (Gulley et al., Intel SHA Extensions, 2013), which the runtime digest uses and Wasm cannot. Reproduce: build
+the old `packages/cache/dist/hashed.js` from the parent commit into a folder, then run the same loop over
+`new SHA256()`, `new SHA256({native: false})` and the old class, comparing per-round minimums and each hex with
+`createHash('sha256')`.
+
+## Bounce visibility maps by tiles (2026-11-17, KB-SHOT-COMPAT-SKYCOV1)
+
+The sky-coverage shot check passed its 10 minute limit on the WebGL2 layer and took 575 s on WebGPU. A CPU profile of
+the Cabin Hearth page (both backends alike) put 128 of 135 s in `LightBounce`'s rebuilds during the warm-up:
+`buildVisibility` tested 235 million texel rays per rebuild (every texel of the map for each of the 224,097
+triangle-VPL pairs whose disc reaches the VPL's plane), with an array made per ray, 11.7 s each, 13 rebuilds a page
+load. It now tests a triangle only in the 4 x 4 texel tiles its edge planes through the VPL can reach and reads each
+ray from a table made once per VPL: 68.7 million rays and 0.71 s on the same input (Node 26, A6000 desktop under load),
+the same maps byte for byte (sha256 2577013444a9...). Work count, not wall clock: `buildVisibility(..., {stats})`
+`stats.rays`; packages/clustered/test/bounce.test.js bounds it below 0.35 of the brute force's rays on a cabin of quads
+and asserts equal maps. Reproduce: dump one `buildVisibility` input from the cabin page and run the old and new
+`bounce-math.ts` on it (tile 2 tests 20.2 million rays in 0.80 s, tile 8 140 million in 0.89 s, so 4 is kept).

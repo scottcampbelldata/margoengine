@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CompatDevice, CompatBuffer } from '../dist/device.js';
 
+// Chrome on Windows runs scheduler.postTask's delayed tasks on the system timer tick: a poll with delay 1 took 15.1 ms
+// where a port message and then setTimeout(1) from that task took 2.0 ms (Chrome 157, 2026-11-18), so every fence wait
+// of the layer cost about 13 ms more than it had to (KB-COMPAT-POSTTASK1). The page here has a scheduler whose postTask
+// fails the test, and setTimeout is watched: each poll is one port task and a 1 ms timer set from it, which carries no
+// timer nesting level (HTML's 4 ms clamp applies only to timers set from timers).
 const installScheduler = (t) => {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'scheduler');
   t.after(() => {
@@ -11,28 +16,40 @@ const installScheduler = (t) => {
   Object.defineProperty(globalThis, 'scheduler', {
     configurable: true,
     value: {
-      postTask(callback, options) {
-        assert.equal(options.delay, 1, 'polls leave an idle interval for WebGL fence status');
-        return new Promise((resolve) => {
-          const channel = new MessageChannel();
-          channel.port1.onmessage = () => {
-            channel.port1.close();
-            channel.port2.close();
-            callback();
-            resolve();
-          };
-          channel.port2.postMessage(null);
-        });
+      postTask() {
+        throw new Error('GPU polls must not use scheduler.postTask delays (15 ms on Windows Chrome)');
       },
     },
   });
 };
 
+/** Watches setTimeout: every delay a poll asks for, each from a port message task, never from a timer callback. */
+const watchTimers = (t) => {
+  const native = globalThis.setTimeout,
+    delays = [];
+  let inTimer = 0;
+  t.mock.method(globalThis, 'setTimeout', (fn, delay, ...rest) => {
+    assert.equal(inTimer, 0, 'a GPU poll timer is never set from a timer callback (HTML clamps nested timers to 4 ms)');
+    delays.push(delay);
+    return native(
+      (...a) => {
+        inTimer++;
+        try {
+          return fn(...a);
+        } finally {
+          inTimer--;
+        }
+      },
+      delay,
+      ...rest,
+    );
+  });
+  return delays;
+};
+
 test('serial fence waits yield tasks without nested timers; pending work and loss remain ordered', async (t) => {
   installScheduler(t);
-  t.mock.method(globalThis, 'setTimeout', () => {
-    throw new Error('GPU readiness must not depend on a clamped timer');
-  });
+  const delays = watchTimers(t);
   let checks = 0,
     deleted = 0,
     flushed = 0;
@@ -56,6 +73,8 @@ test('serial fence waits yield tasks without nested timers; pending work and los
   device.idle = CompatDevice.prototype.idle.bind(device);
   for (let i = 0; i < 32; i++) await device.idle();
   assert.equal(checks, 96);
+  // One 1 ms timer a poll that found the fence pending, set from a port task: an idle interval for WebGL fence status.
+  assert.ok(delays.length > 0 && delays.every((d) => d === 1), `poll delays ${delays}`);
   assert.equal(deleted, 32);
   assert.equal(flushed, 32);
   let landed = false;
@@ -106,9 +125,7 @@ test('a device fence is followed by a command of its own before the flush, with 
 
 test('map readiness also yields a port task, checks every pending result and rejects loss', async (t) => {
   installScheduler(t);
-  t.mock.method(globalThis, 'setTimeout', () => {
-    throw new Error('readback polls must not use a clamped timer');
-  });
+  const delays = watchTimers(t);
   let checks = 0;
   const buffer = {
     destroyed: false,
@@ -135,6 +152,7 @@ test('map readiness also yields a port task, checks every pending result and rej
     buffer.mapState = 'unmapped';
   }
   assert.equal(checks, 64);
+  assert.ok(delays.length > 0 && delays.every((d) => d === 1), `poll delays ${delays}`);
   buffer.device.destroyed = true;
   await assert.rejects(CompatBuffer.prototype.mapAsync.call(buffer, 1), { name: 'AbortError' });
 });

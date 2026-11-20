@@ -6,6 +6,7 @@
 // composites with known numbers, an edit-to-pixels check, device restore and a 16-chunk-radius timing world. Driven by
 // render-browser-check.mjs.
 import {Engine} from '/packages/core/dist/index.js';
+import {Camera} from '/packages/core/dist/camera.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {sceneSamples} from '/packages/core/dist/quality.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
@@ -127,10 +128,11 @@ async function readHDR(texture){
  await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
 }
 const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
-// One finished frame of the current view: the canvas is read in the task that rendered it.
-async function shot(){
- for(let i=0;i<3;i++){engine.render({delta:0});await device().queue.onSubmittedWorkDone();}
- engine.render({delta:0});
+// One finished frame of the current view (or of `views`, as engine.render takes them): the canvas is read in the task
+// that rendered it.
+async function shot(views){
+ for(let i=0;i<3;i++){engine.render({delta:0,views});await device().queue.onSubmittedWorkDone();}
+ engine.render({delta:0,views});
  if(!post)return readCanvas();
  await device().queue.onSubmittedWorkDone();return readHDR(post.sceneTexture);
 }
@@ -291,6 +293,20 @@ window.check={
   const img=await shot(),w=canvas.width,h=canvas.height,p=(Math.floor(h*0.75)*w+(w>>1))*4,water=[img[p],img[p+1],img[p+2]];
   renderer.dispose();sky.dispose();post.dispose();post=undefined;l.direction.set(saved[0]);l.radiance.set(saved[1]);
   return {water,errors:errors.splice(0)};
+ },
+ // Two views side by side through one camera: the halves must match. Fragments shade from the point their pixel's ray
+ // meets the face, and a pixel counts from the target's corner, not the view's (textures, AO and light were taken from
+ // another ray in any view not at the full target).
+ async sideBySide(){
+  const v=views.find((x)=>x.name==='tree and overhang');look(views[0]);
+  renderer=attach(world,keys,'greedy');await ready(renderer,world,keys,'greedy');
+  const camera=new Camera({position:v.position,target:v.target,near:0.1,far:400}),
+   split=[0,0.5].map((x)=>({camera,viewport:[x,0,0.5,1],clear:{color:'#000'}}));
+  const img=await shot(split),W=canvas.width,H=canvas.height,half=W>>1;
+  const left=new Uint8ClampedArray(half*H*4),right=new Uint8ClampedArray(half*H*4);
+  for(let y=0;y<H;y++){left.set(img.subarray((y*W)*4,(y*W+half)*4),y*half*4);right.set(img.subarray((y*W+half)*4,(y*W+2*half)*4),y*half*4);}
+  renderer.dispose();
+  return {even:W%2===0,result:compareImages(left,right,[0,0,0],half,tolerance(v)),errors:errors.splice(0)};
  },
  // Frames at 60 Hz from a block edit to its pixels: a gold block placed in view and removed again, five times.
  async edit(){

@@ -40,7 +40,7 @@ export interface PickingPrimitive {
   /**
    * Moving UVs of the cut-out (VRMC_materials_mtoon 1.0 UV animation; shared/caster.js `animationCode`): an 80-byte
    * uniform, the mask view and its sampler. The alpha map is read at the animated UV in place of `alphaTransform`'s, so
-   * a click passes through the holes the colour pass shows. gltf-pro fills it from a material's `castAnimation`.
+   * a click passes through the holes the colour pass shows. gltf/pbr fills it from a material's `castAnimation`.
    */
   animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the test, as the colour pass does (materials `vertexColors: false`). Default true. */

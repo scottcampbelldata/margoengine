@@ -185,9 +185,19 @@ export function cfTimeCodec(units: string, options: CFTimeOptions = {}): CFTimeC
     decode(value: number): CFDateTime {
       if (!Number.isFinite(value)) throw bad('time value must be finite');
       // Keep epoch and subday separate, avoiding loss of subsecond precision in a large absolute epoch.
-      const offset = value * scale + baseSeconds,
-        days = Math.floor(offset / 86400),
+      const offset = value * scale + baseSeconds;
+      let days = Math.floor(offset / 86400),
         rem = offset - days * 86400;
+      // The rounded quotient and remainder can land one day off: keep 0 <= rem < 86400 (a tiny negative offset
+      // otherwise left rem at exactly 86400, hour 24).
+      if (rem < 0) {
+        days--;
+        rem += 86400;
+      }
+      if (rem >= 86400) {
+        days++;
+        rem -= 86400;
+      }
       if (!Number.isSafeInteger(days)) throw bad('time offset exceeds precision');
       const [year, month, day] = dateAt(baseDay + days, calendar),
         hour = Math.floor(rem / 3600),

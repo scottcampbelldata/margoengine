@@ -213,18 +213,27 @@ export class Triangle {
   }
   /**
    * True when the triangle and an axis-aligned box share a point (separating-axis test: the box faces, the triangle's
-   * plane and the nine edge pairs). Touching counts. An empty box (`max` below `min`) meets nothing.
+   * plane and the nine edge pairs). Touching counts. An empty box (`max` below `min`) meets nothing. A box may be
+   * unbounded (infinite bounds) on any side.
    */
   intersectsBox(box: BoxLike): boolean {
-    const { min, max } = box;
-    if (max.x < min.x || max.y < min.y || max.z < min.z) return false;
-    const cx = (min.x + max.x) / 2,
-      cy = (min.y + max.y) / 2,
-      cz = (min.z + max.z) / 2,
-      { a, b, c } = this;
-    half[0] = (max.x - min.x) / 2;
-    half[1] = (max.y - min.y) / 2;
-    half[2] = (max.z - min.z) / 2;
+    const { min, max } = box,
+      { a, b, c } = this,
+      // An infinite side is cut back to the triangle's own extent on that axis: the overlap is the same, and the
+      // centre and half sizes stay finite (an infinite bound made them NaN, so no axis could separate).
+      x0 = min.x === -Infinity ? Math.min(a.x, b.x, c.x) : min.x,
+      y0 = min.y === -Infinity ? Math.min(a.y, b.y, c.y) : min.y,
+      z0 = min.z === -Infinity ? Math.min(a.z, b.z, c.z) : min.z,
+      x1 = max.x === Infinity ? Math.max(a.x, b.x, c.x) : max.x,
+      y1 = max.y === Infinity ? Math.max(a.y, b.y, c.y) : max.y,
+      z1 = max.z === Infinity ? Math.max(a.z, b.z, c.z) : max.z;
+    if (x1 < x0 || y1 < y0 || z1 < z0) return false;
+    const cx = (x0 + x1) / 2,
+      cy = (y0 + y1) / 2,
+      cz = (z0 + z1) / 2;
+    half[0] = (x1 - x0) / 2;
+    half[1] = (y1 - y0) / 2;
+    half[2] = (z1 - z0) / 2;
     v[0] = a.x - cx;
     v[1] = a.y - cy;
     v[2] = a.z - cz;

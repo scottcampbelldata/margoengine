@@ -87,6 +87,26 @@ Float colors default to `colorSpace: 'linear'`. Byte arrays are still read as 0.
 
 `PointCloud` accepts the object `@margoengine/loaders` returns for PLY, PCD, XYZ and other point clouds without importing that package: `{kind: 'points', positions: Float32Array, colors?: Float32Array (sRGB rgb 0..1), normals?: Float32Array}`. Pass it straight in: `new PointCloud({...loaded, material: {size: 2}})`. Normals are kept on `cloud.normals` but not used for shading.
 
+## Export
+
+`points.pointClouds` is the live, read-only set of clouds the plugin draws, in the order added (empty by default;
+`add` puts a cloud in, `remove` takes it out). The `@margoengine/exporters` scene writers read it through
+`engine.plugins`, so `exportGLB(engine)` writes each visible cloud as a glTF POINTS primitive with its colours,
+normals and its `size` in the primitive's extras as `pointSize` and `pointSizeUnits` (`sizes` as `_WIDTH`):
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+import {exportGLB} from 'margoengine/exporters';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const points = new PointsPlugin();
+engine.use(points);
+points.add(new PointCloud({positions: [0, 0, 0, 1, 0, 0], material: {size: 3}}));
+console.log(points.pointClouds.size); // 1
+const glb = exportGLB(engine);
+```
+
 ## Options
 
 `PointsPlugin`
@@ -117,7 +137,7 @@ Float colors default to `colorSpace: 'linear'`. Byte arrays are still read as 0.
 | Option | Default | |
 | --- | --- | --- |
 | `color`, `opacity` | white, 1 | |
-| `map`, `mapFilter` | null, `'linear'` | GPUTexture or image source |
+| `map`, `mapFilter` | null, `'linear'` | GPUTexture, `(device) => GPUTexture` or image source |
 | `mipmaps` | true (sprites: false) | Generate mips of an uploaded map |
 | `alphaTest` | 0 | |
 | `transparent`, `blending` | false (sprites: true), `'normal'` | `'additive'` also available |
@@ -147,13 +167,36 @@ points.add(new PointCloud({positions: new Float32Array([0, 0, 0]), material: {ma
 points.add(new SpriteBatch({material: {map, mipmaps: true}})).add({position: [1, 0, 0], size: 0.1});
 ```
 
+Pass a `GPUTexture` map as a function of the device: the plugin calls it once per device, so after a driver reset or
+`rebootDevice()` the map comes back by itself.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+const map = (device: GPUDevice) => {
+  const texture = device.createTexture({
+    size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture({texture}, new Uint8Array([255, 0, 0, 255]), {bytesPerRow: 4}, [1, 1]);
+  return texture;
+};
+points.add(new PointCloud({positions: new Float32Array([0, 0, 0]), material: {map, size: 6}}));
+```
+
+A plain `GPUTexture` belongs to the device that made it. After a device restore the material draws untextured and the
+plugin reports it once through `engine.onError` (`MargoError` `'state'`, help `borrowed-lost`) until `material.map` is
+given a texture made on `engine.gpu` (docs/conventions.md, "Borrowed GPU objects").
+
 A `GPUTexture` you pass keeps the mips it has, and they are used. A map with `alphaTest` tests the filtered alpha, so holes in a map soften as a point shrinks. Every upload, including `needsUpdate()` on a video or canvas, makes the chain again. A browser that takes no video as a copy source (Firefox) gets each frame through a canvas it is drawn on: the same pixels, one extra draw an upload.
 
 ## Selection masks
 
 `cloud.setMask(values, style?)` marks points selected (true or above 0, one value a point in stored order) and the
 shader fades, highlights or hides the others while every other look stays: shapes, per-point sizes, sphere shading,
-eye-dome lighting, fog, clipping and GPU picking (hidden points cannot be picked). The mask is one bit a point after a
+eye-dome lighting, fog, clipping and GPU picking (hidden points cannot be picked, and the CPU fallback `pick` skips
+them too). The mask is one bit a point after a
 16-byte style header, so `updateMask(start, values)` uploads count/8 bytes once at the next frame and never reallocates
 or recompiles. Styles: `mode` 'fade' (default; unselected points show `fade` of their displayed sRGB colour, default
 0.12), 'highlight' (fade plus selected points moved `highlightAmount`, default 0.7, toward `highlight`, default
@@ -373,7 +416,8 @@ for tools and round-trip tests.
 
 `buildOctree(cloud)` splits a cloud into a nested-sample octree: each node keeps one point per cell of a 128-cell grid
 over its cube (in a seeded shuffle, so the sample is even), and its eight children hold the rest; every point lands in
-exactly one node. `OctreeCloud` draws the nodes the camera needs, largest on screen first, under `pointBudget`, loads
+exactly one node. Colours given as a Uint8Array or Uint8ClampedArray stay 0..255 bytes; any other array is read as
+0..1 floats. `maxDepth` is a whole number from 0 to 64 (RangeError otherwise). `OctreeCloud` draws the nodes the camera needs, largest on screen first, under `pointBudget`, loads
 them from any `OctreeSource` (the built octree, or your own that fetches nodes from a server) and frees the least
 recently used past `maxLoadedPoints`. Refinement is additive, so a parent's points stay drawn under its children and
 nothing ever leaves a hole.
@@ -570,10 +614,70 @@ Pass `normals` on the cloud and each disc lies flat on its surface; without them
 
 `setFog` works as on `PointsPlugin`, a disc taking the fog at its centre. A cloud belongs to one plugin. From `PointsMaterial` a surfel reads `color`, `size`, `sizeUnits`, `minPixelSize`, `maxPixelSize`, `vertexColors`, `alphaTest` (a point's alpha also weighs it, so alpha 0 hides it), `fog`, `clippingPlanes` and `clipIntersection`. Surfels are opaque and always test and write depth: `opacity`, `transparent`, `blending`, `map`, `shape`, `shading`, `edl`, `depthTest` and `depthWrite` have no effect. `PointsPlugin.pick` does not see them. It costs two draws of every point plus a full-screen pass, and its extra targets take about 100 MB at 1920 x 1080 with 4x MSAA. At 4x on the WebGPU compatibility level (which multisamples no `r32float` or `rgba16float`) the front depth is packed into `rgba8unorm` and the sums go into two `rg16float` targets, the same memory and precision; the full-screen pass is one draw per sample there. On the WebGL2 layer below its full tier (`/tiers`) the front depth is packed the same way, as that tier would store `r32float` in half floats, and the LDR tier is refused (`unsupported`), as its 8-bit targets would clamp the sums.
 
+## Attribute filters and style expressions (`margoengine/points/style`)
+
+Show, hide, colour and size points by their attributes: Potree's filters (classification, return number, number of
+returns, GPS time, point source, intensity, any other column) and the OGC 3D Tiles styling language (`show`, `color`,
+`pointSize`, `defines`, conditions, `color()`, `rgb()`, `hsl()`, vectors, maths and regular expressions). A `LASPoints`
+from `margoengine/points/las` is a table as it is; so is an octree node's `attributes`, or any object of typed arrays.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+import {parseLAS, writeLAS} from 'margoengine/points/las';
+import {PointStyle, bindPointStyle, createStyledCloud} from 'margoengine/points/style';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const points = PointsPlugin.attach(engine);
+
+// A small survey: ground (class 2), vegetation (class 5) and noise (class 7), with first and later returns.
+const n = 3000, world = new Float64Array(n * 3), classification = new Uint8Array(n), returnNumber = new Uint8Array(n);
+for (let i = 0; i < n; i++) {
+  world.set([i % 60, (i % 7) * 0.5, Math.floor(i / 60)], i * 3);
+  classification[i] = [2, 5, 7][i % 3];
+  returnNumber[i] = 1 + (i % 2);
+}
+const las = await parseLAS(writeLAS({positions: world, classification, returnNumber, numberOfReturns: returnNumber.map(() => 2)}));
+const cloud = points.add(new PointCloud({positions: las.positions, material: {size: 3}}));
+
+// Hide noise and later returns; colour by class, as a 3D Tiles style. `${Classification}` finds `classification`.
+const style = bindPointStyle(cloud, las, {
+  filter: {classification: [2, 5], returnNumber: [1, 1]},
+  color: {conditions: [['${Classification} === 2', "color('#a0522d')"], ['true', "color('forestgreen')"]]},
+  pointSize: '${POSITION}.y > 2.0 ? 5.0 : 3.0',
+});
+console.log(style.result.shown, 'of', cloud.count, 'shown');
+style.update({show: '${GpsTime} >= 0.0', color: "hsl(${intensity} / 65535.0, 1.0, 0.5)"}); // live: one write
+style.dispose();                       // the cloud's own colours, sizes and mask come back
+
+// Or keep only the points a style shows, in a new cloud: hidden points then take no memory or budget.
+const ground = createStyledCloud(cloud, las, new PointStyle({filter: {classification: [2]}}));
+points.add(ground.cloud);
+engine.render();
+```
+
+- `bindPointStyle(cloud, table, style)` writes the cloud in place and returns a binding (`update`, `dispose`, `using`).
+  Hidden points go through the cloud's selection mask in `'filter'` mode: they draw nothing and cannot be picked, but
+  stay in the cloud's blocks, so they still count against the point budget. The binding owns the mask while it lives.
+- `createStyledCloud(source, table, style)` builds a new cloud of the shown points (and their `indices`), as
+  `createClippedCloud` does for volumes.
+- `styleSource(octreeSource, style)` styles each node of a `PotreeSource`, `CopcSource` or `MemoryOctree` as it loads:
+  hidden points are dropped and `color` becomes the node's colours. Give the wrapped source to `OctreeCloud`.
+- `new PointStyle(options).evaluate(table)` gives the raw result: `show` (1 or 0 a point), `colors` (sRGB RGBA) and
+  `sizes`, for exports and charts.
+
+Rules, from the 3D Tiles styling specification: `show` must give a boolean and `color` four numbers, or a MargoError
+`state` says which; a property the table lacks reads `undefined`; a define reads the column of its own name. Margo's
+choices: a `color` whose conditions all fail keeps the point's own colour (its `${COLOR}`), not white; `pointSize` is
+in the material's units (pixels by default, as in 3D Tiles), clamped by `minPixelSize` and `maxPixelSize`; column names
+match exactly first, then ignoring case, `_`, `-` and spaces. Filters are inclusive `[min, max]` ranges, and
+`classification` lists the classes to show. Styles run on the CPU, once per call: about one pass over the columns per
+`update`, so restyle on a change, not every frame. `pointSize` does not apply to octree nodes. The same interpreter
+drives `margoengine/tiles/style` for 3D Tiles.
+
 ## Colours and measures
 
-`classificationColors(classes, {palette, hidden})` colours by ASPRS class (`ASPRS_CLASSES` names them; hidden classes
-get alpha 0). `rampColors(values, {min, max, gamma, stops})` maps intensity, height or any attribute through a ramp
+`classificationColors(classes, {palette, hidden})` colours by ASPRS class (`ASPRS_CLASSES` names them, 19 to 22 of
+LAS 1.4 R15 included; hidden classes get alpha 0). `rampColors(values, {min, max, gamma, stops})` maps intensity, height or any attribute through a ramp
 (1st to 99th percentile by default; `ELEVATION_STOPS` is a blue-to-red ramp). `rgb16ToRgba8` turns 16-bit scanner RGB
 into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` hits, `measurePointDistance`, `measurePath`,
 `measureArea` (planar polygon), `measureHeight` (along +y) and `measureAngle` (degrees) give the usual survey measures.
@@ -585,8 +689,8 @@ into bytes (and keeps 8-bit values stored in 16-bit fields). With `points.pick` 
 - `points.pick` is CPU-side over the points drawn in the latest frame; meshes do not occlude it, and clipping planes do not apply to it. `PointPicking` does both on the GPU, but answers later, through a promise.
 - Block bounds only grow on updates; call `rebuild()` to tighten them or to include points that turned finite. Non-finite points are never drawn. A `reorder`ed cloud cannot be rebuilt.
 - Per-point colors are stored as RGBA8 by default, so HDR vertex colors are clamped to 0..1; `colorFormat: 'float'` keeps them, at four times the color memory. A float color must be finite and 0 or more.
-- A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (with a one-time warning) until you assign a new texture. Uploaded image sources are rebuilt automatically.
-- Transparent points and sprites are not sorted per point. Use `alphaTest` or additive blending for order-independent results. Round antialiased edges of opaque points write depth.
+- A `GPUTexture` you pass is created on a device the plugin does not own: after a device loss the material draws untextured (reported once through `engine.onError`, help `borrowed-lost`) until you assign a new texture, or pass `(device) => GPUTexture` so it comes back by itself. Uploaded image sources are rebuilt automatically.
+- Transparent points and sprites are not sorted per point on their own draw. For correct overlap of translucent clouds, add the plugin to an order-independent pass with `addEffect` from `margoengine/oit/vfx` (weighted blended or moments, and exact per-pixel layers on native WebGPU, where the compatibility layer refuses `ExactOIT` with a coded `unsupported`); otherwise use `alphaTest` or additive blending. Round antialiased edges of opaque points write depth.
 - A plain `PointCloud` does not grow its points when the budget subsamples its blocks; `OctreeCloud` does with `adaptiveSize`. `OctreeCloud` streams nodes from any `OctreeSource`, but the package has no on-disk octree format of its own; it reads COPC and Potree.
 
 ## Tests

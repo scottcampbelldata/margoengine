@@ -1,5 +1,5 @@
 // Extra material outputs and rendered scene passes as textures. One scene pass draws its models before the frame's colour
-// pass into targets of its own, through gltf-pro's capture hook, so anything drawn later this frame can sample them.
+// pass into targets of its own, through gltf/pbr's capture hook, so anything drawn later this frame can sample them.
 import { MargoError } from '@margoengine/math/errors';
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
@@ -68,7 +68,7 @@ export class PassMaterial extends NodeMaterial {
       if (code.split(site).length !== 2)
         throw new MargoError(
           'unsupported',
-          'PassMaterial requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and shader versions',
+          'PassMaterial requires the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and shader versions',
         );
       // A block, so the graph's generated names cannot meet those of the surface it lands in.
       out = this.declared + code.replace(site, () => `\n  {\n  ${this.lines}\n  }${site}`);
@@ -78,13 +78,13 @@ export class PassMaterial extends NodeMaterial {
   }
 }
 
-/** What gltf-pro's `PBRCapture` needs; the model side of it. */
+/** What gltf/pbr's `PBRCapture` needs; the model side of it. */
 interface CaptureHook {
   declarations(code: string): string;
   readonly targets: readonly GPUColorTargetState[];
   begin(): GPURenderPassEncoder;
 }
-/** A model a {@link ScenePass} draws: a gltf-pro model or a mesh from `createMesh`. */
+/** A model a {@link ScenePass} draws: a gltf/pbr model or a mesh from `createMesh`. */
 export interface ScenePassModel {
   setCapture(hook: CaptureHook): () => void;
   onDispose(callback: () => void): () => void;

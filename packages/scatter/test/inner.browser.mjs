@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/inner.browser.mjs
 // `inner` leaves a hole round the camera: the distribute pass's output holds no instance nearer than it, the instances
 // beyond `inner + innerFade` are exactly those of a run without it, and the band between thins toward the camera.

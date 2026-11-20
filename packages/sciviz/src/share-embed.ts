@@ -24,8 +24,8 @@ export interface EmbedOptions {
   readonly signal?: AbortSignal;
 }
 function origin(value: string): string {
-  const parsed = new URL(value);
-  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.origin !== value)
+  const parsed = typeof value === 'string' ? URL.parse(value) : null;
+  if (!parsed || !['https:', 'http:'].includes(parsed.protocol) || parsed.origin !== value)
     throw typeError('Embed requires an exact HTTP(S) origin without a path', 'sciviz');
   return value;
 }
@@ -131,8 +131,8 @@ export function serveEmbed(figure: Figure, options: EmbedOptions): { dispose(): 
           await applyShareView(figure, { camera: message.value });
           break;
         case 'setTime':
-          await applyShareView(figure, { timeIndex: message.value });
           if (message.value === undefined) throw typeError('setTime needs a time index', 'sciviz');
+          await applyShareView(figure, { timeIndex: message.value });
           break;
         case 'setSelection':
           select(figure, message.value);
@@ -166,7 +166,7 @@ export function serveEmbed(figure: Figure, options: EmbedOptions): { dispose(): 
 }
 /** Disposable parent-side command connection with state events. */
 export interface EmbedClient extends EventTarget {
-  /** Requests reject after 10 seconds by default, or on cancellation/disposal. */
+  /** Requests reject after `timeout` ms (default 10,000; 1 to 2,147,483,647), or on cancellation/disposal. */
   request(
     method: 'getState' | 'setCamera' | 'setTime' | 'setSelection',
     value?: CameraState | number | EmbedSelection,
@@ -227,8 +227,9 @@ export function connectEmbed(options: EmbedOptions): EmbedClient {
     ): Promise<EmbedState> {
       if (disposed) return Promise.reject(fault('disposed', 'Embed client disposed', 'sciviz'));
       const timeout = opts.timeout ?? 10000;
-      if (!Number.isFinite(timeout) || timeout <= 0)
-        return Promise.reject(rangeError('Embed timeout must be positive', 'sciviz'));
+      // Timers hold a signed 32-bit delay; a longer one fires at once.
+      if (!(timeout >= 1 && timeout <= 0x7fffffff))
+        return Promise.reject(rangeError('Embed timeout must be 1 to 2147483647 ms', 'sciviz'));
       if (opts.signal?.aborted) return Promise.reject(opts.signal.reason);
       if (pending.size >= 32) return Promise.reject(fault('state', 'Embed client queue is full', 'sciviz'));
       return new Promise((resolve, reject) => {

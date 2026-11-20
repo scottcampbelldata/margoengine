@@ -291,7 +291,8 @@ export class IESLights implements EnginePlugin, ClusteredLightTerm {
   private device?: GPUDevice;
   private buffer?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
-  private words = new Uint32Array(HEADER_WORDS);
+  /** @internal The packed words the shader reads; LightBounce's CPU twin reads them too (bounce-terms.ts). */
+  words = new Uint32Array(HEADER_WORDS);
   private listValue: readonly (IESProfile | IESLightProfile | null | undefined)[] = Object.freeze([]);
   private active = false;
   private dirty = true;

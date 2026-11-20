@@ -25,7 +25,7 @@ export class WeatherAudio {
         use(plugin: WeatherAudio): unknown;
     }, listener: AudioListener, options: WeatherAudioOptions): WeatherAudio;
     update(): WeatherAudioMix;
-    setup(): void;
+    setup(engine?: AudioEngine): void;
     onPreUpdate(): void;
     thunder(strike: ThunderStrike): Audio;
     get playing(): number;
@@ -66,6 +66,12 @@ export function weatherNoise(rate: number, seed?: number, seconds?: number): {
 
 // Not exported from this entry, but used by the exports above:
 
+interface AudioEngine {
+    sceneOf?(plugin: object): {
+        removePlugin(name: string): void;
+    } | undefined;
+}
+
 interface WeatherState {
     rain: number;
     snow: number;
@@ -76,5 +82,11 @@ interface WeatherState {
     cloud: number;
     fog: number;
     lightning: number;
+    dust: number;
+    smoke: number;
+    ash: number;
+    spray: number;
+    humidity: number;
+    temperature: number;
 }
 ```

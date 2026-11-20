@@ -266,7 +266,13 @@ const storeOf = (t: Type): Type => (t.kind === 'ref' || t.kind === 'ptr' ? t.sto
 const roundUp = (k: number, n: number) => Math.ceil(n / k) * k;
 const strideOf = (t: ArrayType): number => roundUp(alignOf(t.element), sizeOf(t.element));
 
-/** True when evaluating the expression cannot change state (it calls no user function). */
+/**
+ * Built-ins whose value comes from derivatives of the 2x2 quad: the explicit ones and the samplers that take implicit
+ * derivatives. A fragment stage pins each value it computes (see `pin`).
+ */
+const DERIVATIVE = /^(?:(?:dpdx|dpdy|fwidth)(?:Coarse|Fine)?|textureSample(?:Bias|Compare|Grad)?)$/;
+
+/** True when evaluating the expression cannot change state (it calls no user function and pins no derivative). */
 function pure(e: IRExpr): boolean {
   switch (e.kind) {
     case 'call':
@@ -280,8 +286,9 @@ function pure(e: IRExpr): boolean {
     case 'deref':
       return pure(e.pointer);
     case 'construct':
-    case 'builtin':
       return e.args.every(pure);
+    case 'builtin':
+      return !DERIVATIVE.test(e.name) && e.args.every(pure);
     case 'convert':
     case 'bitcast':
       return pure(e.arg);
@@ -401,8 +408,11 @@ export class StageEmitter {
   /** Storage textures may be read (textureLoad); the compute stages set it. */
   protected storageTextures = false;
   private counter = 0;
-  /** Loop context for break/continue: 'plain' loops and switches, or loops with a continuing block. */
-  private breakable: { kind: 'loop' | 'switch' | 'continuing'; flag?: string }[] = [];
+  /**
+   * Loop context for break/continue: 'plain' loops and switches, or loops with a continuing block. A switch's flag is
+   * made by the first `continue` inside it (see the 'switch' statement), `at` is the line its declaration goes before.
+   */
+  private breakable: { kind: 'loop' | 'switch' | 'continuing'; flag?: string; at?: number }[] = [];
   private baseVertex = false;
   /** Calls the current statement evaluates into a temporary first (see markHoists). */
   private readonly hoists = new Set<IRExpr>();
@@ -410,6 +420,8 @@ export class StageEmitter {
   /** How deeply sampler-taking helpers nest in each function (see `nesting`). */
   private readonly samplingDepths = new Map<IRFunction, number>();
   private baseInstance = false;
+  /** True once a derivative-made value is pinned into `_dk` (fragment stage only). */
+  private pinned = false;
 
   constructor(
     protected readonly module: IRModule,
@@ -847,8 +859,9 @@ export class StageEmitter {
         return;
       case 'switch': {
         const unsigned = isUint(s.selector.type as ScalarType);
+        const target: { kind: 'switch'; flag?: string; at: number } = { kind: 'switch', at: this.lines.length };
         this.line(`switch (${this.value(s.selector)}) {`);
-        this.breakable.push({ kind: 'switch' });
+        this.breakable.push(target);
         for (const c of s.clauses) {
           const labels = c.selectors.map((v) =>
             v === null ? 'default:' : `case ${unsigned ? uintLiteral(v) : intLiteral(v)}:`,
@@ -859,6 +872,13 @@ export class StageEmitter {
         }
         this.breakable.pop();
         this.line('}');
+        // ANGLE's Direct3D 11 back end cannot compile a `continue` inside a `switch` (Chrome 157, RTX A6000: "Error
+        // compiling dynamic pixel executable", then a lost context), so a continue there sets the switch's flag and
+        // breaks out of it, and the loop continues once the switch ends (KB-SW1).
+        if (target.flag) {
+          this.lines.splice(target.at, 0, `${'  '.repeat(this.depth)}bool ${target.flag} = false;`);
+          this.line(`if (${target.flag}) ${this.continueStatement()}`);
+        }
         return;
       }
       case 'loop':
@@ -905,7 +925,7 @@ export class StageEmitter {
         return;
       }
       case 'continue':
-        this.line('continue;');
+        this.line(this.continueStatement());
         return;
       case 'discard':
         this.line('discard;');
@@ -915,6 +935,14 @@ export class StageEmitter {
         this.line(s.value ? `return ${this.value(s.value)};` : 'return;');
         return;
     }
+  }
+
+  /** A `continue` here: plain in a loop, a flag and a break inside a switch (see the 'switch' statement). */
+  private continueStatement(): string {
+    const target = this.breakable.at(-1);
+    if (target?.kind !== 'switch') return 'continue;';
+    target.flag ??= this.temp();
+    return `{ ${target.flag} = true; break; }`;
   }
 
   /**
@@ -1724,6 +1752,42 @@ export class StageEmitter {
   // ---------------------------------------------------------------- built-in functions
 
   private builtin(name: string, args: readonly IRExpr[], result: Type): string {
+    if (DERIVATIVE.test(name)) return this.pin(this.unpinnedBuiltin(name, args, result), result);
+    return this.unpinnedBuiltin(name, args, result);
+  }
+
+  /**
+   * Keeps a value made from derivatives where WGSL computes it. WGSL defines a derivative taken in uniform control flow
+   * (W3C, "WebGPU Shading Language", "Derivatives" and "Uniformity"), wherever its value is used later. GLSL ES 3.00.6
+   * section 8.9 leaves one undefined inside non-uniform control flow, and a compiler that sees the value used only in
+   * a later per-pixel branch may move the derivative into it (HLSL compilers treat gradients that way: Microsoft,
+   * "tex2D", Remarks; LLVM, "Convergent Operation Semantics", shows why such sinking breaks quad operations). ANGLE's
+   * Direct3D 11 compile on the RTX A6000 did, and read 0 there (docs/known-bugs.md, "a derivative used only inside a
+   * per-pixel branch"). So each such value is also added into `_dk`, which every output selects on a value known only
+   * at run time and never true (`gl_FragCoord.w > 0.0` for a rasterized fragment): the value is then live on every path
+   * to the outputs, so the derivative must run before the branch, while no output changes.
+   */
+  private pin(code: string, t: Type): string {
+    const s = elementOfT(t);
+    if (this.stage !== 'fragment' || !s || !isFloatS(s)) return code;
+    if (!this.pinned) this.globals.push('vec4 _dk = vec4(0.0);');
+    this.pinned = true;
+    const n = t.kind === 'vector' ? t.size : 1,
+      ty = this.type(t);
+    const fn = this.generated(
+      `pin:${ty}`,
+      (fname) => `${ty} ${fname}(${ty} v) { _dk${n === 4 ? '' : `.${SWIZZLE.slice(0, n)}`} += v; return v; }`,
+    );
+    return `${fn}(${code})`;
+  }
+
+  /** The pin's value as a `t` (a float or integer scalar or vector), for an output's never-taken select operand. */
+  private pinAs(t: Type): string {
+    const n = t.kind === 'vector' ? t.size : 1;
+    return `${this.type(t)}(_dk${n === 4 ? '' : `.${SWIZZLE.slice(0, n)}`})`;
+  }
+
+  private unpinnedBuiltin(name: string, args: readonly IRExpr[], result: Type): string {
     if (name.startsWith('texture') && name !== 'textureBarrier') return this.texture(name, args, result);
     if (name === 'arrayLength') {
       const r = this.pointer(args[0], false);
@@ -2393,7 +2457,7 @@ export class StageEmitter {
             return;
           case 'frag_depth':
             fragDepth = true;
-            sets.push(`gl_FragDepth = ${code};`);
+            sets.push(this.pinned ? `gl_FragDepth = gl_FragCoord.w > 0.0 ? ${code} : _dk.x;` : `gl_FragDepth = ${code};`);
             return;
           case 'sample_mask':
             this.notes.add('@builtin(sample_mask) output is dropped on WebGL2');
@@ -2425,8 +2489,13 @@ export class StageEmitter {
       // fragment (its w is 1 / clip w, above 0): ANGLE D3D11 on the Radeon 680M folds a last add or multiply written
       // straight to a 16-bit float or 8-bit UNORM output into the export and stores the step below at a few texels, where
       // native WebGPU stores the value (docs/known-bugs.md, list 5 R6 row 28). The compiler cannot fold the select away.
+      // Its other operand is the derivative pin when the stage has one (see `pin`), for an integer output too.
       sets.push(
-        kind.kind === 'float' ? `_o${loc} = gl_FragCoord.w > 0.0 ? ${code} : ${this.type(t)}(0.0);` : `_o${loc} = ${code};`,
+        this.pinned
+          ? `_o${loc} = gl_FragCoord.w > 0.0 ? ${code} : ${this.pinAs(t)};`
+          : kind.kind === 'float'
+            ? `_o${loc} = gl_FragCoord.w > 0.0 ? ${code} : ${this.type(t)}(0.0);`
+            : `_o${loc} = ${code};`,
       );
     };
     const ret = fn.returnType;
@@ -2446,7 +2515,11 @@ export class StageEmitter {
       body.push('gl_Position = vec4(_pos.x, -_pos.y, _pos.z, _pos.w);');
       if (this.options.clipControl === false) body.push('gl_Position.z = 2.0 * _pos.z - _pos.w;');
       if (this.options.points) body.push('gl_PointSize = 1.0;');
-    } else body.push(...sets);
+    } else {
+      body.push(...sets);
+      // No output to carry the pin: a derivative can still decide a discard, so the pin decides one that never runs.
+      if (this.pinned && !sets.length && this.mayDiscard(fn)) body.push('if (gl_FragCoord.w <= 0.0 && _dk != vec4(0.0)) discard;');
+    }
     if (this.baseVertex) declarations.push('uniform highp uint _bv;');
     if (this.baseInstance) declarations.push('uniform highp uint _bi;');
     return {

@@ -202,13 +202,14 @@ export class MeshSculptSession {
   /** What the last pick and dab visited, and what the undo steps hold. */
   get stats(): SculptStats {
     let undoEntries = 0;
-    for (const step of [...this.#undo, ...this.#redo]) undoEntries += step.moved.size + step.faces.size + step.edges.size;
+    for (const step of [...this.#undo, ...this.#redo])
+      undoEntries += step.moved.size + step.faces.size + step.edges.size;
     return { pickTriangles: this.#pickTriangles, dabVertices: this.#dabVertices, undoEntries };
   }
 
   /**
    * The surface as draw buffers that follow it. Call {@link SculptDrawing.update} after dabs: it refreshes only the
-   * vertices that changed and says which to upload. `@margoengine/mesh-edit/sculpt-view` does this for a gltf-pro model.
+   * vertices that changed and says which to upload. `@margoengine/mesh-edit/sculpt-view` does this for a gltf/pbr model.
    */
   drawing(): SculptDrawing {
     return (this.#drawing ??= new SculptDrawing(this.#surface, this.#index));
@@ -310,8 +311,7 @@ export class MeshSculptSession {
   /** Finish the stroke. @throws RangeError with no open stroke. */
   endStroke(): void {
     if (!this.#stroke) throw new RangeError('No sculpt stroke is open; call beginStroke first.');
-    if (this.#dynamic && this.#stroke.brush.brush === 'grab')
-      for (const { start } of this.#stroke.held) this.#retopologize(start);
+    if (this.#dynamic && this.#stroke.brush.brush === 'grab') this.#retopologizeHeld();
     this.#stroke = null;
     this.#step = null;
   }
@@ -384,21 +384,21 @@ export class MeshSculptSession {
   }
 
   /** A topology pass over what is near `center` now, and what it must do afterwards. */
-  #watch(center: Vec3, reach: number): { watch: SurfaceWatch; finish: () => void } {
+  /** A watch over the faces around `region`; `added` hears of each vertex an edit makes. */
+  #watch(region: Iterable<number>, added?: (v: number) => void): { watch: SurfaceWatch; finish: () => void } {
     const step = this.#step!,
       { tris, sharp } = this.#surface,
       index = this.#index,
       faces = new Set<number>(),
-      vertices = new Set<number>(),
-      inReach = index.within(center, reach);
-    this.#dabVertices += index.tested;
+      vertices = new Set<number>();
     return {
       watch: {
-        faces: index.facesOf(inReach),
+        faces: index.facesOf(region),
         around: index.around,
         point: (v) => {
           this.#notePoint(v);
           vertices.add(v);
+          added?.(v);
         },
         face: (f) => {
           faces.add(f);
@@ -520,23 +520,56 @@ export class MeshSculptSession {
 
   /** Hold the detail size under the brush: split long edges there, collapse short ones. */
   #retopologize(center: Vec3): void {
-    const stroke = this.#stroke!,
-      reach = stroke.brush.radius * 1.25,
-      surface = this.#surface,
+    const reach = this.#stroke!.brush.radius * 1.25,
+      { points } = this.#surface,
+      index = this.#index,
       inside = (v: number): boolean => {
-        const p = surface.points[v];
+        const p = points[v];
         return Math.hypot(p[0] - center[0], p[1] - center[1], p[2] - center[2]) < reach;
       },
+      region = (): number[] => {
+        const found = index.within(center, reach);
+        this.#dabVertices += index.tested;
+        return found;
+      };
+    this.#remesh(region, inside, 4);
+  }
+
+  /**
+   * After a grab: hold the detail size over every vertex the stroke held, wherever the drag took it, and over the
+   * vertices the splits add. A distance test around where the grab started misses the dragged part of a pull longer
+   * than about twice the radius. Splitting runs until no edge there is long, longest first, as in longest-edge
+   * bisection (Rivara, 1984), so the longest edge never grows and the passes end.
+   */
+  #retopologizeHeld(): void {
+    const held = new Set<number>();
+    for (const hold of this.#stroke!.held) for (const { v } of hold.vertices) held.add(v);
+    this.#remesh(
+      () => held,
+      (v) => held.has(v),
+      Infinity,
+      (v) => held.add(v),
+    );
+  }
+
+  /** Split edges longer than 4/3 of the detail size with an end in the region, then collapse those under 4/5 of it. */
+  #remesh(
+    region: () => Iterable<number>,
+    inside: (v: number) => boolean,
+    passes: number,
+    added?: (v: number) => void,
+  ): void {
+    const surface = this.#surface,
       near = (a: number, b: number): boolean => inside(a) || inside(b),
       high = this.#detail * (4 / 3),
       low = this.#detail * (4 / 5);
-    for (let pass = 0; pass < 4; pass++) {
-      const { watch, finish } = this.#watch(center, reach),
+    for (let pass = 0; pass < passes; pass++) {
+      const { watch, finish } = this.#watch(region(), added),
         split = splitLongEdges(surface, high, near, watch);
       finish();
       if (!split) break;
     }
-    const { watch, finish } = this.#watch(center, reach);
+    const { watch, finish } = this.#watch(region());
     collapseShortEdges(surface, low, high, near, watch);
     finish();
   }

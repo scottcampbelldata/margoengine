@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PointCloud } from '../../points/dist/index.js';
-import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
+import { PBRInstances } from '../../gltf/dist/pbr-instancing.js';
 import { TilesStyle } from '../dist/style.js';
 import { BatchTable, FeatureTable } from '../dist/index.js';
 
@@ -44,7 +44,7 @@ test('OGC styling: precedence and short circuit without host access', () => {
     'Math.random()',
     '${x[foo()]}',
   ])
-    assert.throws(() => value(source, { x: {} }), /Tile style/);
+    assert.throws(() => value(source, { x: {} }), /Style: /);
 });
 test('OGC styling: vectors, CSS colours, numeric functions and conversions', () => {
   assert.equal(value('vec3(1) === vec3(1,1,1)'), true);
@@ -100,7 +100,7 @@ test('style outputs reject incorrect types, malformed input and excessive nestin
   ])
     assert.throws(() => new TilesStyle(style).evaluate(), /Style|style/);
   for (const source of ['1 +', 'vec2(1', 'true false', '('.repeat(130) + '1' + ')'.repeat(130)])
-    assert.throws(() => value(source), /Tile style/);
+    assert.throws(() => value(source), /Style: /);
 });
 test('point styling changes colour, visibility and pixel size and restores authored arrays', () => {
   const cloud = new PointCloud({

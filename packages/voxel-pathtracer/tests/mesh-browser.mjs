@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { legDevice, legDevices } from '../../../scripts/support/compat-shim.js';
 const results = [];
 for (const compat of [false, true]) {
   const context = await openBrowser({
@@ -13,7 +14,7 @@ for (const compat of [false, true]) {
   try {
     await context.page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     const result = await context.page.evaluate((compat) => window.run(compat), compat);
-    console.log(JSON.stringify({ compat, hardware: context.hardware, result }));
+    console.log(JSON.stringify({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result }));
     assert.deepEqual(pageErrors, []);
     assert.deepEqual(result.errors, []);
     assert.deepEqual(result.messages, []);
@@ -44,11 +45,11 @@ for (const compat of [false, true]) {
     assert.equal(result.lifecycle.disposed, 0);
     assert.equal(result.refusal.code, 'unsupported');
     assert.match(result.refusal.message, /https:\/\/margoengine.com\/errors#voxel-pathtracer/);
-    results.push({ compat, hardware: context.hardware, result });
+    results.push({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result });
   } finally {
     await context.close();
   }
 }
 await mkdir('test-results', { recursive: true });
 await writeFile('test-results/voxel-pathtracer-mesh.json', JSON.stringify(results, null, 2));
-console.log('mesh: native, compatibility, analytic transport, mixed secondary paths and lifecycle passed');
+console.log(`mesh: ${legDevices(results)} legs, analytic transport, mixed secondary paths and lifecycle passed`);

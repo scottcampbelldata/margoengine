@@ -8,6 +8,8 @@ test('pulse validates period, amplitude and manual time without owning scene mes
  const h=optionalGPU(), effect=new XRaySelection();h.engine.use(effect);
  effect.time=3;h.context.delta=0.5;h.frame();assert.equal(effect.time,3);
  effect.play();h.context.view={index:0};h.frame();assert.equal(effect.time,3.5);
- h.context.view={index:1};h.frame();assert.equal(effect.time,3.5,'secondary views must not advance the pulse');
+ // A further view of the same frame runs the passes again with no frame update, as the engine draws it.
+ h.context.view={index:1};h.engine.frameGraph.execute(h.context);assert.equal(effect.time,3.5,'secondary views must not advance the pulse');
+ h.context.view={index:0};h.frame();assert.equal(effect.time,4,'the next frame does');
  assert.throws(()=>{effect.time=NaN},RangeError);effect.dispose();effect.dispose();assert.equal(h.engine.plugins.size,0);
 });

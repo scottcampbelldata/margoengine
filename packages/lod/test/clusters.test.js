@@ -12,7 +12,7 @@ import { wgsl } from '../../core/src/shaders.ts';
 import { fadeKeeps, coreFadeShader } from '@margoengine/lod/fade';
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { glbChunks, GLB_JSON, GLB_BIN } from '../../shared/glb.js';
 
 const grid = (n = 12) => {

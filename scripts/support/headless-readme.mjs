@@ -9,9 +9,12 @@ export function referenceMaker(code, file = 'reference.png') {
   return `${code.slice(0, cut)}await writeFile('${file}', await encodePNG(await readPixels(engine)));\n`;
 }
 
-/** Prepare a caller-named PNG reference for the documented headless comparison shape. */
+/**
+ * Prepare a caller-named PNG reference for the documented headless comparison shape. Only an example that calls
+ * `compareImages` reads a reference; one that uses `pixelDiff` or `ssim` on pixels it makes needs none.
+ */
 export function headlessReference(code) {
-  if (!/from ['"]@margoengine\/headless\/compare['"]/.test(code)) return undefined;
+  if (!/from ['"]@margoengine\/headless\/compare['"]/.test(code) || !/compareImages\(/.test(code)) return undefined;
   const cut = code.indexOf('const result = await compareImages(');
   if (cut < 0) throw new Error('Headless comparison reference needs const result = await compareImages(');
   const file = /await readFile\(['"]([\w./-]+\.png)['"]\)/.exec(code.slice(cut))?.[1];

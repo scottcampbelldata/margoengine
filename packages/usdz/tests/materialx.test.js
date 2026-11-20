@@ -620,3 +620,32 @@ test('materialGraph holds a RealityKit surface and lists an image it has no hook
   assert.equal(result.graph.nodes[0].metalRough.roughness.value, 0.75);
   assert.ok(result.skipped.some((item) => /needs options.texture/.test(item.reason)));
 });
+
+test('0 minus an image is not read as the image, while the image minus 0 and 0 plus it are', async () => {
+  const graph = (id, first, second) => `def Shader "Map"
+    {
+        uniform token info:id = "ND_image_color3"
+        asset inputs:file = @map.png@
+        color3f outputs:out
+    }
+    def Shader "Op"
+    {
+        uniform token info:id = "${id}"
+        color3f inputs:in1${first}
+        color3f inputs:in2${second}
+        color3f outputs:out
+    }`;
+  const map = '.connect = </Look/Map.outputs:out>',
+    zero = ' = (0, 0, 0)',
+    base = 'color3f inputs:base_color.connect = </Look/Op.outputs:out>';
+  const negative = await inline(look('ND_standard_surface_surfaceshader', base, graph('ND_subtract_color3', zero, map)));
+  assert.equal(negative.material.pbrMetallicRoughness.baseColorTexture, undefined);
+  assert.ok(negative.asset.issues.some((issue) => /ND_subtract_color3 .* has no PBR form/.test(issue.message)));
+  for (const [id, first, second] of [
+    ['ND_subtract_color3', map, zero],
+    ['ND_add_color3', zero, map],
+  ]) {
+    const { material } = await inline(look('ND_standard_surface_surfaceshader', base, graph(id, first, second)));
+    assert.ok(material.pbrMetallicRoughness.baseColorTexture, id);
+  }
+});

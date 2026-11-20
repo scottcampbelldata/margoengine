@@ -1,0 +1,47 @@
+// Dune Coast: @margoengine/scenes/dune-coast in a page, for viewing and for the shot tool (tools/shot). URL options:
+// `view` (an anchor or view name, default first-flight), `fov` (degrees), and any scene setting by name (weather, date,
+// hour, wind, windFrom, grass, hill, surf, visibility, quality, camp, seed). The page sets #viewport[data-ready="true"]
+// after 30 frames and exposes `window.duneCoast = {engine, scene}`; the shot tool drives the camera itself.
+import { Engine } from '@margoengine/core';
+import { attach, info } from '@margoengine/scenes/dune-coast';
+
+const query = new URLSearchParams(location.search),
+  viewport = document.querySelector<HTMLElement>('#viewport')!,
+  error = document.querySelector<HTMLElement>('#error')!,
+  status = document.querySelector<HTMLElement>('#status');
+const settings: Record<string, unknown> = {};
+for (const [key, spec] of Object.entries(info.settings)) {
+  const value = query.get(key);
+  if (value === null) continue;
+  settings[key] =
+    typeof spec.default === 'number' ? Number(value) : typeof spec.default === 'boolean' ? value !== '0' : value;
+}
+const canvas = document.createElement('canvas');
+viewport.append(canvas);
+const resize = () => {
+  canvas.width = Math.round(innerWidth * devicePixelRatio);
+  canvas.height = Math.round(innerHeight * devicePixelRatio);
+};
+resize();
+addEventListener('resize', resize);
+try {
+  const engine = await Engine.create(canvas, { camera: { fov: 50, near: 0.3, far: 30000 } });
+  const scene = attach(engine, settings);
+  await scene.ready;
+  scene.view(query.get('view') ?? 'first-flight', Number(query.get('fov') ?? 50));
+  let frames = 0;
+  engine.use({
+    name: 'dune-coast-page',
+    setup() {},
+    onPreUpdate() {
+      if (++frames === 30) {
+        status?.remove();
+        viewport.dataset.ready = 'true';
+      }
+    },
+  });
+  (window as unknown as Record<string, unknown>).duneCoast = { engine, scene };
+  addEventListener('pagehide', () => scene.dispose(), { once: true });
+} catch (cause) {
+  error.textContent = String(cause);
+}

@@ -7,7 +7,7 @@ import { FaceSink } from './face-sink.js';
 import { assertPolygonMesh, collectPolygonEdges, newellNormal } from './polygon.js';
 import { clonePolygonMesh, createMeshEditResult } from './result.js';
 import type { MeshEditResult, PolygonMesh } from './types.js';
-import { weldMeshVertices } from './weld.js';
+import { weldVerticesWhere } from './weld.js';
 
 /** An axis by name. */
 export type ModifierAxis = 'x' | 'y' | 'z';
@@ -150,8 +150,14 @@ function applyArray(mesh: PolygonMesh, modifier: ArrayModifier): MeshEditResult 
     relative = vectorOption(modifier.relativeOffset, modifier.offset ? [0, 0, 0] : [1, 0, 0], 'Array relativeOffset'),
     merge = numberOption(modifier.merge, 0, 'Array merge', (x) => x >= 0),
     size = [0, 1, 2].map((k) => {
-      const values = mesh.vertices.map((p) => p[k]);
-      return values.length ? Math.max(...values) - Math.min(...values) : 0;
+      // A loop, not Math.max(...values): spreading a large mesh's coordinates overflows the call stack.
+      let lo = Infinity,
+        hi = -Infinity;
+      for (const p of mesh.vertices) {
+        lo = Math.min(lo, p[k]);
+        hi = Math.max(hi, p[k]);
+      }
+      return mesh.vertices.length ? hi - lo : 0;
     }),
     step = [0, 1, 2].map((k) => fixed[k] + relative[k] * size[k]),
     vertices: MutableVec3[] = [],
@@ -172,7 +178,14 @@ function applyArray(mesh: PolygonMesh, modifier: ArrayModifier): MeshEditResult 
       );
   const result = sink.result(mesh, vertexMap);
   if (!merge) return result;
-  const welded = weldMeshVertices(result.mesh, { distance: merge });
+  // Copies are laid out one after another, so a vertex's copy is its index over the base count. Only vertices of
+  // neighboring copies join; close vertices inside one copy (a thin slot, say) stay apart.
+  const base = mesh.vertices.length,
+    welded = weldVerticesWhere(
+      result.mesh,
+      { distance: merge },
+      (a, b) => Math.abs(Math.floor(a / base) - Math.floor(b / base)) === 1,
+    );
   return compose(mesh, result, welded);
 }
 
@@ -278,7 +291,7 @@ function applyScrew(mesh: PolygonMesh, modifier: ScrewModifier): MeshEditResult 
     rings = closed ? steps : steps + 1,
     u = (axis + 1) % 3,
     v = (axis + 2) % 3,
-    extent = Math.max(1e-300, ...mesh.vertices.flat().map(Math.abs));
+    extent = mesh.vertices.reduce((most, p) => Math.max(most, Math.abs(p[0]), Math.abs(p[1]), Math.abs(p[2])), 1e-300);
   // Which way the sweep leaves the surface decides the winding of everything it makes.
   let lean = 0;
   for (const face of mesh.faces) {

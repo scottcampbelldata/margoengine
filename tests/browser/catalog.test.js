@@ -1,6 +1,7 @@
+// MARGO_COMPAT not applicable: the catalog page is search, links and clipboard, with no GPU calls.
 // Real-browser catalog check (Edge): layout overflow, real clicks and the browser clipboard. Not part of `verify`:
-// `tests/catalog.test.js` runs nearly the same checks inside verify. Run under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=<agent id> -- npm run test:catalog:browser
+// `tests/catalog.test.js` runs nearly the same checks inside verify. Run:
+//   node scripts/run-with-timeout.mjs -- npm run test:catalog:browser
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';

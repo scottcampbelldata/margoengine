@@ -45,6 +45,33 @@ const sunAt=(azimuth,elevation)=>{const a=azimuth*rad,e=elevation*rad;return [Ma
 async function centre(sky,options,az,el,height){
  Object.assign(sky.options,options);aim(az,el,height);await frame();const f=await frame();return {v:f.at(f.w>>1,f.h>>1),ms:f.ms,f};
 }
+// Hillaire 2020 sec. 5.5.2 on the CPU for Earth's air, the same 8 x 8 directions and 20 steps as the table's build, with
+// transmittance marched in 400 steps instead of read from its table: Psi = L2 / (1 - f_ms) at radius r, sun cosine mus.
+function psi(r,mus){
+ const b=6360,top=6460,ray=[0.005802,0.013558,0.0331],ozone=[0.00065,0.001881,0.000085];
+ const medium=(h)=>{const R=Math.exp(-h/8),M=Math.exp(-h/1.2),O=Math.max(0,1-Math.abs(h-25)/15);return {s:ray.map((v)=>v*R+0.003996*M),e:ray.map((v,c)=>v*R+0.00444*M+ozone[c]*O)};};
+ const len=(v)=>Math.hypot(v[0],v[1],v[2]),dot=(x,y)=>x[0]*y[0]+x[1]*y[1]+x[2]*y[2],along=(o,d,t)=>o.map((v,k)=>v+d[k]*t);
+ const hit=(o,d,rad)=>{const l=len(o),q=dot(o,d),c=(l-rad)*(l+rad),disc=q*q-c;if(disc<0)return -1;const s=Math.sqrt(disc);if(c<=0)return -q+s;const n=-q-s;return n>=0?n:-1;};
+ const toTop=(o,d)=>{const reach=Math.max(hit(o,d,top),0)/400,depth=[0,0,0];for(let i=0;i<400;i++){const e=medium(len(along(o,d,(i+0.5)*reach))-b).e;for(let c=0;c<3;c++)depth[c]+=e[c]*reach;}return depth.map((x)=>Math.exp(-x));};
+ const sun=[Math.sqrt(Math.max(1-mus*mus,0)),mus,0],o=[0,r,0],L=[0,0,0],G=[0,0,0];
+ for(let k=0;k<64;k++){
+  const ct=1-2*(Math.floor(k/8)+0.5)/8,phi=2*Math.PI*((k%8)+0.5)/8,st=Math.sqrt(1-ct*ct),d=[st*Math.cos(phi),ct,st*Math.sin(phi)];
+  const ground=r<=b?(ct<0?0:-1):hit(o,d,b),dt=Math.max(ground>=0?ground:hit(o,d,top),0)/20,through=[1,1,1];
+  for(let i=0;i<20;i++){
+   const p=along(o,d,(i+0.5)*dt),m=medium(len(p)-b),lit=hit(p,sun,b*0.99999)>=0&&dot(p,sun)<0?0:1,T=toTop(p,sun);
+   for(let c=0;c<3;c++){const span=(1-Math.exp(-m.e[c]*dt))/Math.max(m.e[c],1e-7);L[c]+=through[c]*span*m.s[c]*T[c]*lit/(4*Math.PI);G[c]+=through[c]*span*(m.e[c]-m.s[c]);through[c]*=Math.exp(-m.e[c]*dt);}
+  }
+  if(ground>=0){const p=along(o,d,ground),n=p.map((v)=>v/len(p)),mu=dot(n,sun),T=toTop(p,sun);for(let c=0;c<3;c++)L[c]+=through[c]*T[c]*Math.max(mu,0)*0.3/Math.PI;}
+  for(let c=0;c<3;c++)G[c]+=through[c];
+ }
+ return L.map((v,c)=>v/G[c]);
+}
+// Earth's transmittance from radius r along sun cosine mu to the top of the air, marched in 4,000 steps.
+function march(r,mu){
+ const ozone=[0.00065,0.001881,0.000085],ray=[0.005802,0.013558,0.0331],q=r*mu,reach=Math.max(-q+Math.sqrt(Math.max(q*q-(r-6460)*(r+6460),0)),0),dt=reach/4000,depth=[0,0,0];
+ for(let i=0;i<4000;i++){const s=(i+0.5)*dt,h=Math.hypot(Math.sqrt(1-mu*mu)*s,r+mu*s)-6360,R=Math.exp(-h/8),M=Math.exp(-h/1.2),O=Math.max(0,1-Math.abs(h-25)/15);for(let c=0;c<3;c++)depth[c]+=(ray[c]*R+0.00444*M+ozone[c]*O)*dt;}
+ return depth.map((x)=>Math.exp(-x));
+}
 window.check={samples:sceneSamples,
  async run(){
   device.pushErrorScope('validation');
@@ -66,6 +93,18 @@ window.check={samples:sceneSamples,
   const rows=[];for(let y=0;y<32;y++){let m=0;for(let x=0;x<32;x++)m=Math.max(m,table[(y*32+x)*4]);rows.push(m);}
   out.closed={sky:closed.v,nonfinite,largest,rows};
   sky.options.atmosphere=undefined;
+  // The multiple scattering table against the CPU build at the (r, mu) its lookup reads each texel for: texel (i, j)
+  // at sun cosine i / 31 x 2 - 1 and height j / 31 of the air (0.5/32 + u x 31/32). Built at texel centres instead,
+  // the ground row held the air 1.56 km up and the last column a sun cosine of 31/32.
+  await centre(sky,{sunDirection:sunAt(0,60)},90,40);const earth=await texels(sky.table.multiple);
+  out.table=[[16,0],[24,0],[31,0],[20,10],[31,31]].map(([i,j])=>({i,j,gpu:Array.from(earth.subarray((j*32+i)*4,(j*32+i)*4+3)),
+   edge:psi(6360+100*j/31,i/31*2-1),centre:psi(6360+100*(j+0.5)/32,(i+0.5)/32*2-1)}));
+  // The transmittance table against a 4,000-step CPU march at each texel's (r, mu) (Bruneton 2017 sec. 2.3 mapping).
+  // Its top row once held 1 for every downward ray: sqrt(H^2 + b^2) rounded above the top radius in f32.
+  const trans=await texels(sky.table.transmittance),H=Math.sqrt(100*12820);
+  out.transmittance=[[255,63],[200,63],[128,62],[128,0],[40,10]].map(([i,j])=>{
+   const rho=H*j/63,r=Math.sqrt(rho*rho+6360*6360),dmin=6460-r,d=dmin+i/255*(rho+H-dmin),mu=d<=0?1:Math.max(-1,Math.min(1,(H*H-rho*rho-d*d)/(2*r*d)));
+   return {i,j,gpu:Array.from(trans.subarray((j*256+i)*4,(j*256+i)*4+3)),cpu:march(r,mu)};});
   // Orbit, 1,000 km up, the sun overhead: the ground below, the limb (the planet's edge is 30.2 degrees down), and space.
   const orbit=(el)=>centre(sky,{sunDirection:sunAt(0,90),altitude:1e6},0,el);
   out.ground=(await orbit(-89)).v;out.limb=(await orbit(-29)).v;

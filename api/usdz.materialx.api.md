@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { MaterialXConversion, MaterialXConvertOptions } from "@margoengine/loaders/materialx";
 
 export interface MaterialGraphOptions extends MaterialXConvertOptions {

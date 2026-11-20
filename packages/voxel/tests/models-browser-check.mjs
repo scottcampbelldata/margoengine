@@ -12,6 +12,10 @@ try {
   assert.equal(result.removed, 0);
   assert.equal(result.reloaded, result.before);
   assert.equal(result.disposed, 0);
+  assert.equal(result.far0, result.before, 'the far panel under its origin draws');
+  assert.ok(result.farSame, 'the far panel draws the same pixels as near zero');
+  assert.ok(result.left > 0 && result.left !== result.before, 'the panel one block left is in view and moved');
+  assert.ok(result.movedSame, 'a moved origin moves the far panel like the near panel one block left');
   assert.deepEqual(result.errors, []);
   assert.deepEqual(errors, []);
   console.log('voxel models', JSON.stringify(result));

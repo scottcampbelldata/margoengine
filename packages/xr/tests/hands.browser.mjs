@@ -7,7 +7,7 @@ const fixture=await readFile('packages/webgl2-compat/test/xr.html','utf8');
 const replace=(s,from,to)=>{assert.ok(s.includes(from),from);return s.replace(from,to);};
 function documentFor(moved){let s=fixture;
  s=replace(s,"const mode =",`import {HAND_JOINT_NAMES,SkinnedHands} from '/packages/xr/dist/hands.js';
- import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+ import {loadGLTF} from '/packages/gltf/dist/pbr.js';
  const jointPoses=new Map();
  const mode =`);
  s=replace(s,'inputSources = [];',`inputSources = ['left','right'].map(handedness=>({handedness,profiles:['generic-hand'],targetRayMode:'tracked-pointer',targetRaySpace:{},hand:new Map(HAND_JOINT_NAMES.map(name=>[name,{handedness,name}]))}));`);

@@ -8,12 +8,14 @@ import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core
 
 export class MeshletMesh extends CulledParts {
     readonly meshlets: Meshlets;
+    readonly maxKeptTriangles: number;
     static attach(engine: EngineKernel, batches: readonly CulledPartsBatch[], options?: MeshletMeshOptions): MeshletMesh;
-    constructor(batches: readonly CulledPartsBatch[], { maxVertices, maxTriangles, ...options }?: MeshletMeshOptions);
+    constructor(batches: readonly CulledPartsBatch[], { maxVertices, maxTriangles, maxKeptTriangles, ...options }?: MeshletMeshOptions);
     readTriangles(): Promise<number>;
     readShadowTriangles(cascade: number): Promise<number>;
     protected refine(c: Context): void;
     protected drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void;
+    protected drawOccluders(pass: GPURenderPassEncoder, batch: number, index: GPUBuffer): void;
     prepareShadow({ context, matrices, cascades }: {
         context: {
             device: GPUDevice;
@@ -27,6 +29,7 @@ export class MeshletMesh extends CulledParts {
 }
 
 export interface MeshletMeshOptions extends CulledInstancesOptions, MeshletOptions {
+    maxKeptTriangles?: number;
 }
 
 export interface MeshletOptions {
@@ -100,6 +103,7 @@ class CulledInstances implements EnginePlugin {
     protected singleSided(batch: number): boolean;
     protected write(i: number, m: ArrayLike<number>): void;
     protected bind(pipeline: GPUComputePipeline | GPURenderPipeline, entries: [number, GPUBindingResource][]): GPUBindGroup;
+    protected drawOccluders(pass: GPURenderPassEncoder, batch: number, index: GPUBuffer): void;
     protected refine(_c: Context): void;
     protected drawBatch(main: GPURenderPassEncoder, batch: number, index: GPUBuffer): void;
     protected release(): void;

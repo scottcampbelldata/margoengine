@@ -1,12 +1,12 @@
 {
  "proof": "environment-hemisphere",
- "ref": "97bd9b4818",
- "revision": "97bd9b481871d60d3e76a68eb051c1cbd131130c",
- "capturedAt": "53a7f779f0a8596488cfe540b5a062504cb17f86",
- "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
+ "ref": "8c71da0556",
+ "revision": "8c71da0556d86e43094bf3738f8651ad3775c90f",
+ "capturedAt": "b3c8204ded004c631b0bf8e3310b8ac886843431",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "texts": "087715676bccb4b5e06b226f1bf657f848223536133e02736d4107bbc1eb3e3c",
-  "calls": "1fffda68b1f43da8c6c9b5eb952fc7c3089a4394def88cc495981c2a46e95c68"
+  "texts": "7066ab30716416e0fdcc9c49bb0f162591ae4b4e17bf85c450e8fb6da151cb6f",
+  "calls": "2c13263449949a9b1dd4f1dd81ca3bfcf1b1e380f05d3837eb79c11b4ca1f8bc"
  }
 }

@@ -20,6 +20,7 @@ import {
   atmosphereCommon,
   atmosphereLookups,
   atmosphereParameters,
+  eyeRadius,
   type AtmosphereParameters,
 } from './atmosphere-luts.js';
 import { sunDirection } from './clock.js';
@@ -240,9 +241,7 @@ export async function bakeHillaireEnvironment(
     table.medium(a as Required<AtmosphereParameters>, 1);
     table.values[34] = sky.sunIlluminance;
     table.values.set(sky.sun, 36);
-    // Stay above the surface after Float32 rounding, also for large planets.
-    const clearance = Math.max(0.001, a.bottomRadius * 2 ** -22);
-    table.values[45] = a.bottomRadius + Math.max(clearance, (options.altitude ?? 0) / 1000);
+    table.values[45] = eyeRadius(a.bottomRadius, (options.altitude ?? 0) / 1000);
     const values = new Float32Array(32),
       original = new Float32Array(64);
     night.write(original, { ...n, starTwinkleIntensity: 0 }, 0);
@@ -407,6 +406,7 @@ export class HillaireSky implements EnginePlugin {
   private parameters!: Required<AtmosphereParameters>;
   private parameterSource?: AtmosphereParameters | null;
   private disposed = false;
+  private seconds = 0;
   private readonly presentation = overlayPass();
   private readonly scratch = new Float64Array(52);
   constructor(readonly options: HillaireSkyOptions = {}) {
@@ -482,12 +482,24 @@ export class HillaireSky implements EnginePlugin {
       },
     });
   }
-  onPreUpdate(delta: number): void {
+  /** Seconds on this sky's clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the time of day by `delta` seconds times `timeScale`, without drawing. Each frame update runs it, so `seek`
+   * from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
     this.validate();
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid HillaireSky delta; pass a finite delta of 0 or more seconds.');
+    this.seconds += delta;
     const o = this.options;
     o.hours = ((((o.hours ?? 12) + delta * (o.timeScale ?? 1 / 3600)) % 24) + 24) % 24;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
     this.place();
   }
   private write(c: Context): void {
@@ -504,8 +516,8 @@ export class HillaireSky implements EnginePlugin {
     v[39] = 2 ** (o.exposure ?? 0);
     v.set(c.camera.position, 40);
     v[43] = perUnit / 1000;
-    // The planet's centre lies under the camera: radius = ground + height (km), at least a metre up.
-    v[45] = a.bottomRadius + Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? 0)) / 1000);
+    // The planet's centre lies under the camera: radius = ground + height (km), kept above the ground in Float32.
+    v[45] = eyeRadius(a.bottomRadius, (c.camera.position[1] * perUnit + (o.altitude ?? 0)) / 1000);
     v[46] = +!linearHdr(c.format);
     v[47] = +(o.sunDisc ?? true);
     sunThrough(a, v[45], this.sun[1], this.sunTransmittance);

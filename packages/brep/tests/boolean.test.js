@@ -974,3 +974,38 @@ test('exact predicates and crossings: orient3d is exact; crossings closer than a
   const half = Math.sqrt(0.01 ** 2 - (0.01 - 1e-9) ** 2);
   assert.ok(Math.abs(ts[0] - (0.02 - half)) < 1e-12 && Math.abs(ts[1] - (0.02 + half)) < 1e-12, `${ts}`);
 });
+
+test('Booleans whose cutting plane holds a cylinder\'s or a cone\'s seam line: cut along it', () => {
+  // The plane y = 0 holds the side's seam (x = r, y = 0) and the axis, so it meets each end circle at its start, at
+  // its middle and at its end: the circle crosses it at its middle, half a turn round.
+  // Whichever way the plane faces, the rounding at the circle's end falls on one side of it or the other.
+  const circle = { kind: 'circle', frame: frameOf([0, 0, 0], [0, 0, 1], [1, 0, 0]), radius: 5 * mm };
+  for (const normal of [
+    [0, 1, 0],
+    [0, -1, 0],
+  ]) {
+    const plane = { kind: 'plane', frame: frameOf([0, 0, 0], normal, [1, 0, 0]) },
+      ts = curveSurfaceCrossings(circle, plane, 0, 2 * Math.PI).filter((t) => t > 1e-6 && t < 2 * Math.PI - 1e-6);
+    assert.equal(ts.length, 1, `normal ${normal}: ${ts}`);
+    assert.ok(Math.abs(ts[0] - Math.PI) < 1e-9, `normal ${normal}: ${ts}`);
+  }
+  const volume = (b) => model.massProperties(b).volume / mm ** 3,
+    // A box over y >= 0 (its -y face the plane y = 0), and one over y <= 0 (its +y face that plane).
+    above = () => box('b', [30 * mm, 15 * mm, 30 * mm], at(-15, 0, -15)),
+    below = () => box('b', [30 * mm, 15 * mm, 30 * mm], at(-15, -15, -15)),
+    shapes = [
+      ['cylinder', () => cylinder('y', 5 * mm, 8 * mm), Math.PI * 25 * 8],
+      ['cone', () => model.cone('y', 5 * mm, 2 * mm, 8 * mm), (Math.PI * 8 * (25 + 10 + 4)) / 3],
+      ['cone to an apex', () => model.cone('y', 5 * mm, 0, 8 * mm), (Math.PI * 8 * 25) / 3],
+    ];
+  for (const [kind, shape, whole] of shapes)
+    for (const [side, cut] of [
+      ['above', above],
+      ['below', below],
+    ])
+      for (const op of ['subtract', 'intersect']) {
+        const out = boolean('h', op, shape(), cut());
+        assert.deepEqual(model.checkBody(out), [], `${kind} ${op} ${side}`);
+        assert.ok(Math.abs(volume(out) - whole / 2) <= 1e-9 * whole, `${kind} ${op} ${side}: ${volume(out)} vs ${whole / 2}`);
+      }
+});

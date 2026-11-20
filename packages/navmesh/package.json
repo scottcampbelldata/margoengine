@@ -73,6 +73,14 @@
     "./obstacles": {
       "types": "./dist/obstacles.d.ts",
       "import": "./dist/obstacles.js"
+    },
+    "./formations": {
+      "types": "./dist/formations.d.ts",
+      "import": "./dist/formations.js"
+    },
+    "./formation-settings": {
+      "types": "./dist/formation-settings.d.ts",
+      "import": "./dist/formation-settings.js"
     }
   },
   "files": [

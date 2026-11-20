@@ -11,7 +11,7 @@ function edit(code: string, from: string, to: string): string {
   if (code.split(from).length !== 2)
     throw new MargoError(
       'unsupported',
-      'ShadowCatcherMaterial requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and materials versions',
+      'ShadowCatcherMaterial requires the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and materials versions',
     );
   return code.replace(from, () => to);
 }

@@ -136,6 +136,26 @@ window.check = {
     });
     await settle(4);
   },
+  // A floor that recedes from just in front of the camera to the focus, dark, with a white strip on it whose edge runs
+  // slanted across the frame: the bottom rows lie far in front of the focus (maxRadius 32), wholly in the near field.
+  async receding(enabled = true, exact = false) {
+    await start([], exact);
+    const dim = new PbrMaterial({ color: '#101010', roughness: 1, metalness: 0 }),
+      lit = new PbrMaterial({ color: '#ffffff', roughness: 1, metalness: 0 });
+    engine
+      .createMesh()
+      .setGeometry(box(80, 0.01, 80))
+      .setMaterial(dim)
+      .setPosition([0, -0.8, -30]);
+    engine
+      .createMesh()
+      .setGeometry(box(40, 0.01, 80))
+      .setMaterial(lit)
+      .setPosition([-22.3, -0.79, -30])
+      .setRotation([0, 0.069, 0]);
+    DOF.attach(engine, { focalDistance: 30, focalLength: 0.1, aperture: 0.5, maxRadius: 32, enabled });
+    await settle(4);
+  },
   // More frames of the current case.
   more: (frames) => settle(frames),
   // Two boxes at one depth, above and below the middle; tilt null: no lens.

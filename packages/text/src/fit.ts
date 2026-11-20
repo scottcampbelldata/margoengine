@@ -36,7 +36,7 @@ export interface FittedLayout extends TextLayout {
 }
 
 const invalid = (message: string): never => {
-  throw new MargoError('failed', `${message}; use positive bounds and an ordered finite clip rectangle (https://margoengine.com/docs/text)`);
+  throw new MargoError('failed', `${message}; use positive bounds and an ordered finite clip rectangle (https://margoengine.com/llms/packages/text.md)`);
 };
 
 /** Pure fitted layout. Whole graphemes are removed and the final line is reshaped with the ellipsis. */

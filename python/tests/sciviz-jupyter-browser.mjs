@@ -1,5 +1,5 @@
 // A real kernel, binary widget comm, AFM loading and two-way state in JupyterLab.
-// Run through gpu-lock after python/build-notebook.mjs. Every operation has a deadline.
+// Run after python/build-notebook.mjs. Every operation has a deadline.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

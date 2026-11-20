@@ -37,7 +37,7 @@ try {
     const report = await page.evaluate(
       async (fixture) => {
         const { Engine } = await import('/packages/core/dist/index.js'),
-          { loadGLTF, textureCoordinates } = await import('/packages/gltf-pro/dist/index.js'),
+          { loadGLTF, textureCoordinates } = await import('/packages/gltf/dist/pbr.js'),
           materials = await import('/packages/materials/dist/index.js');
         const assert = (ok, message) => {
           if (!ok) throw new Error(message);

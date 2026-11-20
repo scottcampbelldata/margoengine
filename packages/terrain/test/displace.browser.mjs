@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/displace.browser.mjs
 // Near displacement (`@margoengine/terrain/displace`) of real rock (Poly Haven Aerial Rocks 02 at 1k: colour, normal,
 // ARM and displacement maps), one 4 m repeat seen from 0.35 m above it at a slant:

@@ -1,7 +1,10 @@
 import { MargoError } from '@margoengine/math/errors';
+import { blackbodyChromaticity } from '@margoengine/math/color';
 // Optional grading extras, compiled in only when an option asks for them so the default shaders stay byte-identical.
-// White balance: Kim et al. (2002) cubic-spline fit of the Planckian locus in CIE xy, then the CIE XYZ to linear
-// Rec.709 matrix. Vignette: radial smoothstep. Grain: PCG integer hash (Jarzynski and Olano, 2020), animated per frame.
+// White balance: Kim et al. (2002) cubic-spline fit of the Planckian locus in CIE xy, then a von Kries adaptation in
+// the linearised Bradford cone space (Lam 1985; Suesstrunk, Holm and Finlayson 2001) as one 3x3 matrix. Vignette: radial smoothstep, multiplied by or blended toward a colour. Dither: triangular (TPDF) noise of
+// up to one code value either way on the encoded value, the last step before the target quantises it (Gjoel 2016, after
+// Lipshitz, Wannamaker and Vanderkooy 1992), narrowed near 0 and 1 so black and white stay exact. Grain: PCG integer hash (Jarzynski and Olano, 2020), animated per frame.
 // Chromatic aberration: radial red/blue channel offset. Auto-exposure: log-average luminance metering with
 // exponential adaptation (the "18% grey" key value of Reinhard et al. 2002), weighted evenly, by a centre Gaussian, a
 // spot disc or a mask, optionally through a percentile-trimmed histogram of log luminance.
@@ -81,18 +84,10 @@ export function meterValues(out: Float32Array, rect: readonly number[], a: AutoE
 /** Kelvin value that leaves the image unchanged. */
 export const NEUTRAL_TEMPERATURE = 6500;
 
-function planckian(kelvin: number): [number, number, number] {
-  const t = Math.min(25000, Math.max(1667, kelvin)),
-    x =
-      t <= 4000
-        ? -0.2661239e9 / t ** 3 - 0.2343589e6 / t ** 2 + 0.8776956e3 / t + 0.17991
-        : -3.0258469e9 / t ** 3 + 2.1070379e6 / t ** 2 + 0.2226347e3 / t + 0.24039,
-    y =
-      t <= 2222
-        ? -1.1063814 * x ** 3 - 1.3481102 * x ** 2 + 2.18555832 * x - 0.20219683
-        : t <= 4000
-          ? -0.9549476 * x ** 3 - 1.37418593 * x ** 2 + 2.09137015 * x - 0.16748867
-          : 3.081758 * x ** 3 - 5.8733867 * x ** 2 + 3.75112997 * x - 0.37001483,
+// The Planckian white at `kelvin` in linear Rec.709: CIE xy by Kim et al. (2002, `blackbodyChromaticity` of
+// @margoengine/math/color), as XYZ with Y = 1, then XYZ to RGB.
+function planckian(kelvin: number): number[] {
+  const [x, y] = blackbodyChromaticity(kelvin),
     X = x / y,
     Z = (1 - x - y) / y;
   return [
@@ -102,13 +97,34 @@ function planckian(kelvin: number): [number, number, number] {
   ];
 }
 
+// Linear Rec.709 to the linearised Bradford cone responses (Lam 1985, as printed by Suesstrunk, Holm and Finlayson
+// 2001) and back: Bradford times the inverse of the XYZ to Rec.709 matrix above, and that matrix times the inverse of
+// Bradford, multiplied out to 8 digits.
+const LMS = [
+    [0.42272531, 0.49134529, 0.027357931],
+    [0.055699661, 0.96153401, 0.023183824],
+    [0.021382653, 0.087641898, 0.9805081],
+  ],
+  RGB = [
+    [2.538044, -1.2932767, -0.040236827],
+    [-0.14600373, 1.1166482, -0.02232905],
+    [-0.04229855, -0.07160724, 1.0227527],
+  ];
+const apply = (m: number[][], v: number[]) => m.map((r) => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]),
+  luma = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2],
+  REFERENCE = apply(LMS, planckian(NEUTRAL_TEMPERATURE));
+
 /**
- * Linear RGB gain that makes a scene lit at `temperature` Kelvin (and `tint`, -1 green to 1 magenta) look neutral, like
- * a camera's white-balance setting: a low temperature cools the picture, a high one warms it. The gain keeps luminance
- * and is exactly (1, 1, 1) at 6500 K with no tint.
+ * White balance as a 3x3 matrix on linear Rec.709 RGB, column-major (the WGSL `mat3x3f` order), that makes a scene lit
+ * at `temperature` Kelvin (and `tint`, -1 green to 1 magenta) look neutral, like a camera's white-balance setting: a
+ * low temperature cools the picture, a high one warms it. It is a von Kries chromatic adaptation in the Bradford cone
+ * space from the Planckian white at `temperature` to the one at 6500 K, so it stays well defined over the whole range
+ * (an RGB gain cannot: below 1903.4 K the Planckian white lies outside Rec.709 and its blue is negative). A grey card
+ * lit by the light keeps its luminance as it turns neutral, and the matrix is exactly the identity at 6500 K with no
+ * tint. Strong corrections can push colours outside Rec.709; the shader clips them at 0.
  * @throws RangeError for a temperature outside 1667-25000 K or a tint outside -1..1.
  */
-export function whiteBalanceGain(temperature = NEUTRAL_TEMPERATURE, tint = 0): [number, number, number] {
+export function whiteBalanceMatrix(temperature = NEUTRAL_TEMPERATURE, tint = 0): number[] {
   if (
     !Number.isFinite(temperature) ||
     temperature < 1667 ||
@@ -118,14 +134,20 @@ export function whiteBalanceGain(temperature = NEUTRAL_TEMPERATURE, tint = 0): [
     tint > 1
   )
     throw new RangeError('Tonemap white balance needs a temperature of 1667-25000 K and a tint of -1 to 1');
-  const ref = planckian(NEUTRAL_TEMPERATURE),
-    now = planckian(temperature),
-    gain: [number, number, number] = [ref[0] / now[0], ref[1] / now[1], ref[2] / now[2]];
-  gain[1] *= 1 - 0.25 * tint;
-  const norm = (0.2126 * ref[0] + 0.7152 * ref[1] + 0.0722 * ref[2]) / ref[1];
-  // Rescale so the white point keeps its luminance (identity stays exactly 1).
-  const lum = (0.2126 * gain[0] + 0.7152 * gain[1] + 0.0722 * gain[2]) / norm;
-  return temperature === NEUTRAL_TEMPERATURE && tint === 0 ? [1, 1, 1] : [gain[0] / lum, gain[1] / lum, gain[2] / lum];
+  if (temperature === NEUTRAL_TEMPERATURE && tint === 0) return [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  // m = RGB * diag(reference / source) * LMS in the cone space; the tint scales its green row.
+  const card = planckian(temperature),
+    source = apply(LMS, card),
+    m = RGB.map((r, i) =>
+      [0, 1, 2].map(
+        (j) =>
+          (i === 1 ? 1 - 0.25 * tint : 1) *
+          r.reduce((sum, v, k) => sum + (v * REFERENCE[k] * LMS[k][j]) / source[k], 0),
+      ),
+    ),
+    // Rescale so a grey card lit by the light keeps its luminance while it turns neutral.
+    k = luma(card) / luma(apply(m, card));
+  return [0, 1, 2].flatMap((col) => [m[0][col] * k, m[1][col] * k, m[2][col] * k]);
 }
 
 /** True when any extra needs the effects shader variant. */
@@ -134,6 +156,7 @@ export function usesEffects(o: {
   tint?: number;
   vignette?: number;
   grain?: number;
+  dither?: boolean | number;
   chromaticAberration?: number;
   autoExposure?: unknown;
 }): boolean {
@@ -142,15 +165,17 @@ export function usesEffects(o: {
     o.tint ||
     o.vignette ||
     o.grain ||
+    o.dither ||
     o.chromaticAberration ||
     o.autoExposure
   );
 }
 
 const FX = `
-struct Fx {wb:vec4f,vig:vec4f,rect:vec4f,time:vec4f}
+struct Fx {wb0:vec4f,wb1:vec4f,wb2:vec4f,vig:vec4f,rect:vec4f,time:vec4f,vc:vec4f,vp:vec4f}
 @group(0) @binding(3) var<uniform> fx:Fx;
 fn fxPcg(v:u32)->u32 {let s=v*747796405u+2891336375u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn fxBalance(c:vec3f)->vec3f {return mat3x3f(fx.wb0.xyz,fx.wb1.xyz,fx.wb2.xyz)*c;}
 fn fxNoise(pos:vec2f)->f32 {
   let h=fxPcg(u32(pos.x)+fxPcg(u32(pos.y)+fxPcg(u32(fx.time.x))));return f32(h)/4294967295.0-0.5;
 }
@@ -163,11 +188,20 @@ fn fxFetch(pos:vec4f)->vec4f {
   let b=textureLoad(scene,clamp(vec2i(pos.xy-o),vec2i(0),size),0).b;
   return vec4f(r,g.g,b,g.a);
 }
+fn fxDither(c:vec3f,pos:vec4f)->vec3f {
+  if(fx.vp.w==0.0){return c;}
+  let s=vec3u(u32(pos.x),u32(pos.y),fxPcg(u32(fx.time.x)+0x9e3779b9u));
+  let a=vec3u(fxPcg(s.x+fxPcg(s.y+s.z)),fxPcg(s.x+fxPcg(s.y+s.z+1u)),fxPcg(s.x+fxPcg(s.y+s.z+2u)));
+  let b=vec3u(fxPcg(a.x),fxPcg(a.y),fxPcg(a.z));
+  let n=(vec3f(a)+vec3f(b))/4294967295.0-1.0;
+  return c+n*min(vec3f(fx.vp.w),min(c,1.0-c));
+}
 fn fxFinish(c:vec3f,pos:vec4f,white:f32)->vec3f {
   var color=c;
-  if(fx.wb.w>0.0){
-    let d=(pos.xy-fx.rect.xy)/fx.rect.zw*2.0-1.0;let r=length(d)*0.70710678;
-    color*=1.0-fx.wb.w*smoothstep(fx.vig.x,fx.vig.x+fx.vig.y,r);
+  if(fx.wb0.w>0.0){
+    let d=((pos.xy-fx.rect.xy)/fx.rect.zw-fx.vp.xy)*2.0*mix(vec2f(1),fx.rect.zw*1.41421356/length(fx.rect.zw),fx.vp.z);
+    let v=fx.wb0.w*smoothstep(fx.vig.x,fx.vig.x+fx.vig.y,length(d)*0.70710678);
+    color=select(color*mix(vec3f(1),fx.vc.rgb,v),mix(color,fx.vc.rgb,v),fx.vc.w==1.0);
   }
   if(fx.vig.z>0.0){
     let l=clamp(dot(color,vec3f(0.2126,0.7152,0.0722))/white,0.0,1.0);
@@ -199,8 +233,13 @@ export function effectsShader(code: string, auto: boolean): string {
   const stops = auto ? 'p.grade.x+ae[0]' : 'p.grade.x';
   out = out.split('let source=textureLoad(scene,vec2i(pos.xy),0);').join('let source=fxFetch(pos);');
   if (out.includes('hdr=max(hdr,vec3f(0))*exp2(p.grade.x);'))
-    out = swap(out, 'hdr=max(hdr,vec3f(0))*exp2(p.grade.x);', `hdr=max(hdr,vec3f(0))*fx.wb.xyz*exp2(${stops});`);
-  if (out.includes('hdr*=exp2(p.grade.x);')) out = swap(out, 'hdr*=exp2(p.grade.x);', `hdr*=fx.wb.xyz*exp2(${stops});`);
+    out = swap(
+      out,
+      'hdr=max(hdr,vec3f(0))*exp2(p.grade.x);',
+      `hdr=max(fxBalance(max(hdr,vec3f(0))),vec3f(0))*exp2(${stops});`,
+    );
+  if (out.includes('hdr*=exp2(p.grade.x);'))
+    out = swap(out, 'hdr*=exp2(p.grade.x);', `hdr=fxBalance(hdr)*exp2(${stops});`);
   if (out.includes('  color=clamp(color,vec3f(0),vec3f(1));\n  return vec4f(select'))
     out = swap(
       out,
@@ -213,6 +252,9 @@ export function effectsShader(code: string, auto: boolean): string {
       '  color=clamp(color,vec3f(0),vec3f(white));\n  if(m>0.0)',
       '  color=clamp(fxFinish(color,pos,white),vec3f(0),vec3f(white));\n  if(m>0.0)',
     );
+  // Dither the encoded value, the last step before the target quantises it.
+  const encode = 'return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),';
+  out = swap(out, encode, 'return vec4f(fxDither(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),pos),');
   if (!out.includes('fxFinish(color'))
     throw new MargoError(
       'failed',

@@ -9,7 +9,7 @@ import { Tonemap } from '../../tonemap/dist/index.js';
 import { Skeleton, Skin } from '../../animation/dist/index.js';
 import { boneHeatWeights, checkSkin, type RigJoint } from '../dist/index.js';
 import { solveSkeletonIK } from '../dist/ik.js';
-import { loadGLTF } from '../../gltf-pro/dist/index.js';
+import { loadGLTF } from '../../gltf/dist/pbr.js';
 import { Animation as ModelAnimation } from '../../animation/dist/index.js';
 import { addVRM, readVRM } from '../dist/vrm.js';
 import { loadVRM0 } from '../dist/vrm0.js';

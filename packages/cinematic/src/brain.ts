@@ -359,6 +359,8 @@ export class CameraBrain implements EnginePlugin {
   readonly stages: CameraStage[] = [];
   private readonly cameras: VirtualCamera[] = [];
   private readonly listeners = { change: new Set<BrainListener>(), blended: new Set<BrainListener>() };
+  /** Events of the step running now: the clock step queues them, a live update sends them after it. */
+  private readonly events: ['change' | 'blended', CameraBrainEvent][] = [];
   private layers: Layer[] = [];
   private blendFrom: VirtualCamera | null = null;
   private engine?: Engine;
@@ -453,7 +455,7 @@ export class CameraBrain implements EnginePlugin {
     return best && shown?.enabled && this.cameras.includes(shown) && shown.priority === best.priority ? shown : best;
   }
   private emit(kind: 'change' | 'blended', from: VirtualCamera | null, to: VirtualCamera, duration: number): void {
-    for (const listener of [...this.listeners[kind]]) listener({ from, to, duration });
+    this.events.push([kind, { from, to, duration }]);
   }
   private get aspect(): number {
     const canvas = this.engine?.canvas;
@@ -481,13 +483,33 @@ export class CameraBrain implements EnginePlugin {
    * @throws RangeError for a bad delta, a priority that is not finite, a blend `ease` that gives no number, or a stage's error.
    */
   update(delta: number): CameraPose {
+    this.step(delta);
+    // Sent once the step is done, so a listener sees this frame's pose and a listener's error leaves the step whole.
+    const events = this.events.splice(0);
+    for (const [kind, event] of events) for (const listener of [...this.listeners[kind]]) listener(event);
+    return this.pose;
+  }
+  /**
+   * The film clock: the same step as {@link CameraBrain.update} (cameras, their stages, the blend, the brain's stages
+   * and the camera write) without calling a `change` or `blended` listener, as `@margoengine/cutscene/seek` steps every
+   * clock. A seek of n steps then leaves the brain where n live updates leave it, so a film rendered scene by scene
+   * keeps its blends, camera moves and focus pulls across a cut (KB-FILM-BRAIN1). Events of the replayed steps are
+   * not sent later.
+   * @throws RangeError as {@link CameraBrain.update} does.
+   */
+  advanceTime(delta: number): void {
+    this.step(delta);
+    this.events.length = 0;
+  }
+  private step(delta: number): void {
+    this.events.length = 0;
     checkDelta(delta);
     const aspect = this.aspect;
     for (const camera of this.cameras) if (camera.enabled) camera.update(delta, aspect);
     this.advance(delta);
     const next = this.choose(),
       shown = this.live;
-    if (!next) return this.pose;
+    if (!next) return;
     if (next !== shown) {
       const blend = shown ? this.blendFor(shown, next) : { duration: 0 },
         { duration, ease = smoothstep, style = 'direct' } = blend,
@@ -498,10 +520,15 @@ export class CameraBrain implements EnginePlugin {
       this.emit('change', shown, next, duration);
       if (!duration) this.emit('blended', shown, next, 0);
     }
-    // Cameras a blend still shows keep moving even after they were disabled.
-    if (this.layers.length > 1)
-      for (const layer of this.layers)
-        if (!layer.camera.enabled && this.cameras.includes(layer.camera)) layer.camera.update(delta, aspect);
+    // Cameras a blend still shows keep moving even after they were disabled, once a frame each: a switch back and
+    // forth puts one camera in two layers.
+    const layers = this.layers;
+    if (layers.length > 1)
+      for (let i = 0; i < layers.length; i++) {
+        const camera = layers[i].camera;
+        if (!camera.enabled && this.cameras.includes(camera) && layers.findIndex((l) => l.camera === camera) === i)
+          camera.update(delta, aspect);
+      }
     copyPose(this.pose, this.layers[0].camera.pose);
     for (let i = 1; i < this.layers.length; i++) {
       const layer = this.layers[i],
@@ -513,7 +540,6 @@ export class CameraBrain implements EnginePlugin {
     this.context.aspect = aspect;
     for (const stage of this.stages) runStage(stage, this.pose, delta, this.context);
     this.write();
-    return this.pose;
   }
   /** Writes the pose, with a screen up that is never parallel to the view (core refuses that). */
   private write(): void {

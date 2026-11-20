@@ -7,12 +7,16 @@ import React, { StrictMode } from 'react';
 const created = [];
 function plugin(kind, extra = {}) {
   return class Plugin {
+    // `new X()` then `scene.use(x)` (how a binding attaches to the enclosing Scene) or `X.attach(engine, ...args)`.
+    constructor() {
+      Object.assign(this, { kind, args: [], disposals: 0, sources: new Set(), ...extra });
+      this.name = kind + ':' + created.length;
+      created.push(this);
+    }
     static attach(engine, ...args) {
       const value = new Plugin();
-      Object.assign(value, { kind, engine, args, disposals: 0, sources: new Set(), ...extra });
-      value.name = kind + ':' + created.length;
+      value.args = args;
       engine.use(value);
-      created.push(value);
       return value;
     }
     add(source) {
@@ -22,9 +26,28 @@ function plugin(kind, extra = {}) {
     dispose() {
       if (this.disposals) return;
       this.disposals++;
-      this.engine.removePlugin(this.name);
+      this.owner.removePlugin(this.name);
     }
   };
+}
+// A plugin owner (the default scene or a named one): `use` records the owner, as core's sceneOf does.
+function owner(target) {
+  const plugins = new Map();
+  return Object.assign(target, {
+    plugins,
+    use(effect) {
+      assert.equal(plugins.has(effect.name), false);
+      plugins.set(effect.name, effect);
+      effect.owner = target;
+      effect.engine ??= target.engine ?? target;
+    },
+    removePlugin(name) {
+      const effect = plugins.get(name);
+      plugins.delete(name);
+      effect?.dispose();
+    },
+    hasPlugin: (name) => plugins.has(name),
+  });
 }
 const Batch = plugin('batch');
 Object.assign(Batch.prototype, {
@@ -121,30 +144,19 @@ const flush = () => act(async () => {});
 const h = React.createElement;
 const scenes = [];
 function scene() {
-  const plugins = new Map(),
-    errors = [];
+  const errors = [];
   const value = {
-    engine: {
+    engine: owner({
       backend: 'webgpu',
       disposed: false,
       onError: (error) => errors.push(error),
-      plugins,
-      use(effect) {
-        assert.equal(plugins.has(effect.name), false);
-        plugins.set(effect.name, effect);
-      },
-      removePlugin(name) {
-        const effect = plugins.get(name);
-        plugins.delete(name);
-        effect?.dispose();
-      },
-      hasPlugin: (name) => plugins.has(name),
       lighting: {
         direction: new Float32Array([3, 5, 4, 3]),
         radiance: new Float32Array([1, 1, 1, 0.15]),
         ambient: new Float32Array([1, 1, 1]),
       },
-    },
+    }),
+    world: null,
     resources: { models: new Set(), lighting: new Map() },
     frames: { callbacks: new Set() },
     shadows: null,
@@ -289,6 +301,32 @@ test('AmbientLight, HemisphereLight and Fog attach once, light every PBR model a
   assert.deepEqual([ambient.current, hemisphere.current, fog.current], kept, 'prop changes keep the plugins');
   assert.equal(ambient.current.intensity, 2);
   assert.equal(fog.current.near, 1, 'a removed fog option returns to its default');
+});
+
+test('AmbientLight, HemisphereLight and Fog inside a <Scene> light that scene, not the default one', async () => {
+  const value = scene(),
+    world = owner({ engine: value.engine }),
+    model = { disposed: false },
+    lights = [React.createRef(), React.createRef(), React.createRef()];
+  value.resources.models.add(model);
+  render(
+    tree(
+      { ...value, world },
+      [
+        h(AmbientLight, { key: 'a', ref: lights[0], intensity: 0.4 }),
+        h(HemisphereLight, { key: 'h', ref: lights[1], sky: '#88aaff' }),
+        h(Fog, { key: 'f', ref: lights[2], far: 50 }),
+      ],
+    ),
+  );
+  await flush();
+  assert.equal(value.engine.plugins.size, 0, 'nothing in the default scene');
+  assert.deepEqual([...world.plugins.values()], lights.map((ref) => ref.current), 'each in the named scene');
+  for (const ref of lights) assert.equal(ref.current.sources.size, 0, `${ref.current.kind} leaves default-scene models alone`);
+  assert.equal(lights[0].current.intensity, 0.4, 'live props still apply');
+  cleanup();
+  await flush();
+  assert.equal(world.plugins.size, 0, 'unmount detaches them from the named scene');
 });
 
 test('Voxels attaches the renderer and lighting, updates light from the frame loop, and keeps them through live props', async () => {

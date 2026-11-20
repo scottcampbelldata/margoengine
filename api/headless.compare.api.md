@@ -16,18 +16,30 @@ export interface CompareResult extends PixelDiff {
 
 export type ImageSource = HeadlessPixels | Uint8Array;
 
+export interface PixelBox {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
 export interface PixelDiff {
     different: number;
     total: number;
     ratio: number;
     largest: number;
     mean: number;
+    box: PixelBox | null;
     image?: HeadlessPixels;
+    mask?: Uint8Array;
+    clusters?: PixelBox[];
 }
 
 export interface PixelDiffOptions {
     threshold?: number;
     image?: boolean;
+    mask?: boolean;
+    clusters?: number;
 }
 
 export interface SSIMOptions {

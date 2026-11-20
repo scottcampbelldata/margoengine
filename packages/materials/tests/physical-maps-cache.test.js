@@ -1,9 +1,9 @@
-// gltf-pro derives each material's shader every frame (draw-memo.ts), so the physical-maps specialization must not
+// gltf/pbr derives each material's shader every frame (draw-memo.ts), so the physical-maps specialization must not
 // rebuild its text each time: regular expressions over the whole PBR shader were 28% of a 400-sphere physical frame.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { physicalMapsShader } from '../src/physical-maps.ts';
-import { physicalShader } from '../../gltf-pro/src/shader.ts';
+import { physicalShader } from '../../gltf/src/shader.ts';
 
 test('the physical-maps shader is derived once per source and slot plan', () => {
   const source = physicalShader(),

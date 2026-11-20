@@ -230,7 +230,7 @@ export class CulledInstances implements EnginePlugin {
   }
   /**
    * Lets geometry that is not a part hide parts in `'occlusion'` mode, so a building hides what is behind it: a core mesh,
-   * a gltf-pro model, a materials mesh or a `Terrain`. It is drawn depth-only each frame, every primitive of it, so add
+   * a gltf/pbr model, a materials mesh or a `Terrain`. It is drawn depth-only each frame, every primitive of it, so add
    * the large things. Cut-out, blended, displaced and clipped primitives do not occlude, and neither do back faces.
    * @throws TypeError for anything else.
    */
@@ -574,9 +574,7 @@ export class CulledInstances implements EnginePlugin {
           pass.setBindGroup(0, sided ? this.groups.sided : this.groups.prepass);
           const g = this.geometryBuffers.get(batch.geometry)!;
           pass.setVertexBuffer(0, g.vertex);
-          pass.setVertexBuffer(1, b.earlyList, this.starts[i] * 4);
-          pass.setIndexBuffer(g.index, 'uint32');
-          pass.drawIndexedIndirect(b.earlyArgs, i * 20);
+          this.drawOccluders(pass, i, g.index);
         });
         this.outside?.draw(pass, c, this.engine!, this.samples);
         pass.end();
@@ -654,6 +652,16 @@ export class CulledInstances implements EnginePlugin {
       this.drawBatch(main, i, g.index);
     });
     main.end();
+  }
+  /**
+   * Draws a batch's occluders depth-only into the Hi-Z target, its pipeline, bindings and vertices set: the large parts
+   * drawn last frame. `./meshlets` draws each part's clusters kept last frame instead (two-pass occlusion).
+   */
+  protected drawOccluders(pass: GPURenderPassEncoder, batch: number, index: GPUBuffer): void {
+    const b = this.buffers;
+    pass.setVertexBuffer(1, b.earlyList, this.starts[batch] * 4);
+    pass.setIndexBuffer(index, 'uint32');
+    pass.drawIndexedIndirect(b.earlyArgs, batch * 20);
   }
   /** Runs after the parts are culled and before the main pass; see `./meshlets`. */
   protected refine(_c: Context): void {}

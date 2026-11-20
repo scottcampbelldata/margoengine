@@ -201,14 +201,25 @@ export class Capsule {
       b = n.x * this.end.x + n.y * this.end.y + n.z * this.end.z + plane.constant;
     return (a <= 0 && b >= 0) || (a >= 0 && b <= 0) || Math.min(Math.abs(a), Math.abs(b)) <= this.radius;
   }
-  /** Exact against an axis-aligned box. An empty box (`max` below `min`) meets nothing. */
+  /**
+   * Exact against an axis-aligned box. An empty box (`max` below `min`) meets nothing. A box may be unbounded
+   * (infinite bounds) on any side.
+   */
   intersectsBox(box: BoxLike): boolean {
-    const { min, max } = box;
-    if (max.x < min.x || max.y < min.y || max.z < min.z) return false;
-    const { start, end, radius } = this,
-      cx = (min.x + max.x) / 2,
-      cy = (min.y + max.y) / 2,
-      cz = (min.z + max.z) / 2;
+    const { min, max } = box,
+      { start, end, radius } = this,
+      // An infinite side is cut back to the capsule's own extent on that axis: the overlap is the same, and the
+      // centre and half sizes stay finite (an infinite bound made them NaN or infinite: every axis read as inside).
+      x0 = min.x === -Infinity ? Math.min(start.x, end.x) - radius : min.x,
+      y0 = min.y === -Infinity ? Math.min(start.y, end.y) - radius : min.y,
+      z0 = min.z === -Infinity ? Math.min(start.z, end.z) - radius : min.z,
+      x1 = max.x === Infinity ? Math.max(start.x, end.x) + radius : max.x,
+      y1 = max.y === Infinity ? Math.max(start.y, end.y) + radius : max.y,
+      z1 = max.z === Infinity ? Math.max(start.z, end.z) + radius : max.z;
+    if (x1 < x0 || y1 < y0 || z1 < z0) return false;
+    const cx = (x0 + x1) / 2,
+      cy = (y0 + y1) / 2,
+      cz = (z0 + z1) / 2;
     return (
       segmentBoxDistanceSq(
         start.x - cx,
@@ -217,9 +228,9 @@ export class Capsule {
         end.x - start.x,
         end.y - start.y,
         end.z - start.z,
-        (max.x - min.x) / 2,
-        (max.y - min.y) / 2,
-        (max.z - min.z) / 2,
+        (x1 - x0) / 2,
+        (y1 - y0) / 2,
+        (z1 - z0) / 2,
       ) <=
       radius * radius
     );

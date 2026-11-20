@@ -9,7 +9,8 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { parseCube, validateLUT, type CubeLUT } from './cube.js';
-import { outputShader, tonemapShader, sizedLUTShader, classicShader } from './shaders.js';
+import { outputShader, tonemapShader, sizedLUTShader, classicShader, shapeShader } from './shaders.js';
+export { shapeCurve } from './shaders.js';
 import type { StackHost, StackStage } from '../../shared/stack.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewRect } from '../../shared/view-rect.js';
@@ -19,13 +20,13 @@ import {
   meterValues,
   validMetering,
   usesEffects,
-  whiteBalanceGain,
+  whiteBalanceMatrix,
   NEUTRAL_TEMPERATURE,
   type AutoExposure,
 } from './effects.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
 export { parseCube };
-export { whiteBalanceGain, type AutoExposure };
+export { whiteBalanceMatrix, type AutoExposure };
 export type { CubeLUT };
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; COPY_SRC: number };
@@ -72,6 +73,11 @@ export interface TonemapExtension {
   resources?(): readonly GPUBindingResource[];
   /** Encodes the extension's own passes each frame, before the presentation pass reads its resources. */
   encode?(context: TonemapPassContext): void;
+  /**
+   * Frees the GPU objects the extension made for the Tonemap's device. The Tonemap calls it when it is disposed or
+   * removed from its scene and when its device is restored; the extension makes them again on its next encode.
+   */
+  dispose?(): void;
 }
 /** Tonemap settings. Every field except `source` is read each frame, so change them on `tonemap.options`. */
 export interface TonemapOptions {
@@ -82,8 +88,26 @@ export interface TonemapOptions {
   curve?: TonemapCurve;
   /** Exposure in stops, -16-16; default 0. */
   exposure?: number;
-  /** Linear contrast about 18% gray, 0-4; default 1. */
+  /**
+   * Contrast about 18% gray, 0-4; default 1: display-linear `0.18 * (x / 0.18) ** contrast`, a slope in log exposure
+   * like a grading app's contrast, so a contrast above 1 deepens the shadows without clipping them to black. Contrast 0
+   * gives flat 18% gray everywhere, black included (`0 ** 0` is 1).
+   */
   contrast?: number;
+  /**
+   * White point, 0-64; default 0 (off). The scene-linear value (after exposure) that lands on exactly 1: the curve output
+   * is divided by the curve's value there, and brighter values clip (Hable 2010; Reinhard et al. 2002). Values from 0
+   * to 0.01 act as 0.01. Setting it (or `toe` or `shoulder`) away from its default compiles one more program; the
+   * default leaves the shader and the output as they were. A `CustomCurve` replaces the curve and the shaping with it.
+   */
+  whitePoint?: number;
+  /**
+   * Slope of the display curve at black, 0-3; default 1 (off). Below 1 is a softer toe, above 1 a steeper one: the cubic
+   * Hermite spline through (0, 0) and (1, 1) after the white point (`shapeCurve`), monotone over 0 to 3.
+   */
+  toe?: number;
+  /** Slope of the display curve at white, 0-3; default 1 (off). Below 1 rolls the highlights off before white; 0 reaches white flat. */
+  shoulder?: number;
   /** Core produces linear-sRGB. Use acescg only for an external AP1/D60 source. */
   inputColorSpace?: 'linear-srgb' | 'acescg';
   /**
@@ -99,8 +123,29 @@ export interface TonemapOptions {
   vignetteRadius?: number;
   /** Width of the vignette fall-off, as a fraction of the corner distance, 0-1; default 0.5. */
   vignetteSoftness?: number;
+  /** Vignette colour, linear Rec.709 0-1 per channel; default [0, 0, 0] (black, the classic darkening). */
+  vignetteColor?: readonly [number, number, number];
+  /** Vignette centre as fractions of the view, x from the left and y from the top, 0-1; default [0.5, 0.5]. */
+  vignetteCenter?: readonly [number, number];
+  /**
+   * Vignette shape, 0-1: 0 (default) stretches it with the view into an ellipse through the corners; 1 makes it a
+   * circle. The corner distance stays 1 either way, so `vignetteRadius` keeps its meaning.
+   */
+  vignetteRoundness?: number;
+  /**
+   * How the vignette meets the picture: `'multiply'` (default) multiplies the colour by `vignetteColor` as the vignette
+   * comes in (black darkens, a tint tints); `'opaque'` blends toward `vignetteColor` itself, like a painted matte.
+   */
+  vignetteBlend?: 'multiply' | 'opaque';
   /** Animated film grain, 0-1; default 0 (off). Strongest in the mid-tones. */
   grain?: number;
+  /**
+   * Output dithering against banding in smooth gradients: triangular noise of up to one code value of the target either
+   * way, added to the encoded colour just before the target quantises it, and narrowed near 0 and 1 so pure black and
+   * white stay exact. `true` is 1; a number 0-1 scales the noise. It changes every frame. One code value is 1/255 on an
+   * 8-bit target and 1/1023 on `rgb10a2unorm`; float targets do not band, so there it adds nothing. Default off.
+   */
+  dither?: boolean | number;
   /** Radial red/blue fringing, 0-1 (1 shifts the channels by 2% of the view at its edge); default 0 (off). */
   chromaticAberration?: number;
   /**
@@ -114,8 +159,15 @@ export interface TonemapOptions {
   source?: () => GPUTexture | undefined;
 }
 
+const BLACK = [0, 0, 0],
+  CENTRE = [0.5, 0.5];
+// One code value of a render target: the step its quantisation leaves, 0 for float targets.
+const codeValue = (format: GPUTextureFormat) =>
+  format.includes('8unorm') ? 1 / 255 : format === 'rgb10a2unorm' ? 1 / 1023 : 0;
 const inRange = (v: number | undefined, lo: number, hi: number) =>
   v === undefined || (Number.isFinite(v) && v >= lo && v <= hi);
+const triple = (v: readonly number[] | undefined, n: number) =>
+  v === undefined || (Array.isArray(v) && v.length === n && v.every((x) => inRange(x, 0, 1)));
 function validAuto(a: boolean | AutoExposure | undefined): boolean {
   if (a === undefined || typeof a === 'boolean') return true;
   const { min = -4, max = 4, speed = 1.5, compensation = 0 } = a;
@@ -165,9 +217,17 @@ export class Tonemap implements EnginePlugin {
   private meterGroup?: GPUBindGroup;
   private meterBuffer?: GPUBuffer;
   private frameCount = 0;
+  /** The grain and dither pattern's frame number: set by each frame update, or by each draw when no update reaches it. */
+  private grainFrame = 0;
+  private clocked = false;
+  /** A zero-delta update came since the last grain step: the next draw steps it (KB-FILM-TAAPHASE1). */
+  private pending = false;
+  private seconds = 0;
   private extBuffers: (GPUBuffer | undefined)[] = [];
   private extResources: GPUBindingResource[] = [];
-  private readonly fxValues = new Float32Array(16);
+  private readonly fxValues = new Float32Array(32);
+  private balanceKelvin = NaN;
+  private balanceTint = NaN;
   private readonly meterValues = new Float32Array(16);
   private meterMask?: GPUTexture;
   private blankMask?: GPUTexture;
@@ -180,6 +240,33 @@ export class Tonemap implements EnginePlugin {
     const effect = new Tonemap(options);
     engineRuntime(instance).use(effect);
     return effect;
+  }
+  /** Seconds on the grain clock: the sum of the frame deltas its updates moved it by. */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the grain and dither pattern one frame on, and the clock by `delta` seconds: the CPU part of its frame update,
+   * which a seek from `@margoengine/cutscene/seek` replays, so the next drawn frame shows the grain a continuous run
+   * shows there. Every view drawn in that frame shows the same grain. A Tonemap that no update reaches (one stacked in
+   * a PostStack) moves its grain at each draw instead. A `delta` of 0 is the same instant drawn again (a capture's
+   * render inside the frame): it moves nothing at once, and the next draw moves the grain if no timed update came
+   * first (KB-FILM-TAAPHASE1). Auto exposure is view history: a cut snaps it to the metered scene on its first frame
+   * (docs/limits.md, class C).
+   */
+  advanceTime(delta: number): void {
+    if (this.disposed) return;
+    this.clocked = true;
+    if (!(delta > 0)) {
+      this.pending = true;
+      return;
+    }
+    this.seconds += delta;
+    this.grainFrame = this.frameCount++ & 0xffffff;
+    this.pending = false;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   /** In a PostStack, grades the stack's HDR result as its display effect. */
   private joinStack(_host: StackHost): StackStage {
@@ -206,7 +293,15 @@ export class Tonemap implements EnginePlugin {
       !inRange(o.vignetteRadius, 0, 1) ||
       !inRange(o.vignetteSoftness, 0, 1) ||
       !inRange(o.grain, 0, 1) ||
+      !inRange(o.vignetteRoundness, 0, 1) ||
+      !(o.vignetteBlend === undefined || o.vignetteBlend === 'multiply' || o.vignetteBlend === 'opaque') ||
+      !triple(o.vignetteColor, 3) ||
+      !triple(o.vignetteCenter, 2) ||
+      !(typeof o.dither === 'boolean' || inRange(o.dither, 0, 1)) ||
       !inRange(o.chromaticAberration, 0, 1) ||
+      !inRange(o.whitePoint, 0, 64) ||
+      !inRange(o.toe, 0, 3) ||
+      !inRange(o.shoulder, 0, 3) ||
       !inRange(o.tint, -1, 1) ||
       !inRange(o.temperature, 1667, 25000) ||
       !validAuto(o.autoExposure) ||
@@ -227,7 +322,7 @@ export class Tonemap implements EnginePlugin {
       (o.source !== undefined && typeof o.source !== 'function')
     )
       throw new RangeError(
-        'Invalid Tonemap options; use curve agx, acescg, neutral, reinhard, cineon or linear, exposure within -16..16, contrast within 0..4, and keep source unchanged after attach.',
+        'Invalid Tonemap options; use curve agx, acescg, neutral, reinhard, cineon or linear, exposure within -16..16, contrast within 0..4, whitePoint within 0..64, toe and shoulder within 0..3, and keep source unchanged after attach.',
       );
     if (!this.source && o.inputColorSpace === 'acescg')
       throw new MargoError('state', 'ACEScg input requires an external ACEScg source; pass options.source');
@@ -415,9 +510,10 @@ export class Tonemap implements EnginePlugin {
       fxOn = usesEffects(o),
       exts = o.extensions ?? NO_EXTENSIONS,
       classic = curves.indexOf(o.curve!) > 2,
+      shaped = (o.whitePoint ?? 0) > 0 || (o.toe ?? 1) !== 1 || (o.shoulder ?? 1) !== 1,
       flags = exts.length
         ? -1
-        : (excess ? 1 : 0) | (variableLUT ? 2 : 0) | (fxOn ? (auto ? 12 : 4) : 0) | (classic ? 16 : 0),
+        : (excess ? 1 : 0) | (variableLUT ? 2 : 0) | (fxOn ? (auto ? 12 : 4) : 0) | (classic ? 16 : 0) | (shaped ? 32 : 0),
       // The key string is built only when what it names may have changed (a frame with extensions always builds it):
       // a steady frame builds no string.
       key =
@@ -434,6 +530,7 @@ export class Tonemap implements EnginePlugin {
             (variableLUT ? ':lut-size' : '') +
             (fxOn ? (auto ? ':fx-auto' : ':fx') : '') +
             (classic ? ':classic' : '') +
+            (shaped ? ':shape' : '') +
             (exts.length ? ':' + exts.map((e) => e.key).join(',') : '');
     this.keyFlags = flags;
     this.keyFormat = format;
@@ -443,6 +540,7 @@ export class Tonemap implements EnginePlugin {
       if (variableLUT) code = sizedLUTShader(code);
       if (fxOn) code = effectsShader(code, auto);
       if (classic) code = classicShader(code);
+      if (shaped) code = shapeShader(code);
       for (const [i, e] of exts.entries()) code = e.patch(code, 5 + i, 16 + 4 * i);
       for (const b of this.extBuffers) b?.destroy();
       this.extBuffers = exts.map(
@@ -509,6 +607,10 @@ export class Tonemap implements EnginePlugin {
     v[1] = o.contrast ?? 1;
     v[2] = o.curve === 'acescg' ? 1 : o.curve === 'agx' ? 0 : o.curve === undefined ? 2 : curves.indexOf(o.curve);
     v[3] = +!!this.lut;
+    // White point, then toe and shoulder minus 1: the slots are 0 for the defaults, as they always were.
+    v[7] = o.whitePoint ?? 0;
+    v[11] = (o.toe ?? 1) - 1;
+    v[15] = (o.shoulder ?? 1) - 1;
     for (let i = 0; i < 3; i++) {
       v[4 + i] = this.lut?.domainMin[i] ?? 0;
       v[8 + i] = this.lut?.domainMax[i] ?? 1;
@@ -522,7 +624,7 @@ export class Tonemap implements EnginePlugin {
         e = exts[i];
       if (buffer && e.values) c.device.queue.writeBuffer(buffer, 0, e.values() as Float32Array<ArrayBuffer>);
     }
-    if (fxOn) this.applyEffects(c, source, auto);
+    if (fxOn) this.applyEffects(c, source, auto, format);
     this.attachment.view = view;
     this.attachment.loadOp = viewLoadOp(c, 'clear');
     const pass = c.encoder.beginRenderPass(this.presentation);
@@ -545,7 +647,7 @@ export class Tonemap implements EnginePlugin {
   }
   private effectsBuffer(device: GPUDevice): GPUBuffer {
     return (this.fxBuffer ??= device.createBuffer({
-      size: 64,
+      size: 128,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
   }
@@ -556,19 +658,36 @@ export class Tonemap implements EnginePlugin {
     }));
   }
   // Writes the effects uniform and, with auto-exposure, meters the source into the adapted-exposure buffer.
-  private applyEffects(c: Context, source: GPUTexture | GPUTextureView, auto: boolean): void {
+  private applyEffects(c: Context, source: GPUTexture | GPUTextureView, auto: boolean, format: GPUTextureFormat): void {
     const o = this.options,
       f = this.fxValues,
       rect = viewRect(c) ?? [0, 0, c.width, c.height],
-      gain = whiteBalanceGain(o.temperature ?? NEUTRAL_TEMPERATURE, o.tint ?? 0);
-    f.set(gain, 0);
+      kelvin = o.temperature ?? NEUTRAL_TEMPERATURE,
+      tint = o.tint ?? 0;
+    // The white-balance matrix as three vec4 columns (the first column's w is the vignette amount), rebuilt only when
+    // the temperature or tint changes, so a steady frame allocates nothing.
+    if (kelvin !== this.balanceKelvin || tint !== this.balanceTint) {
+      const m = whiteBalanceMatrix(kelvin, tint);
+      for (let i = 0; i < 9; i++) f[4 * Math.floor(i / 3) + (i % 3)] = m[i];
+      this.balanceKelvin = kelvin;
+      this.balanceTint = tint;
+    }
     f[3] = o.vignette ?? 0;
-    f[4] = o.vignetteRadius ?? 0.5;
-    f[5] = Math.max(o.vignetteSoftness ?? 0.5, 1e-4);
-    f[6] = o.grain ?? 0;
-    f[7] = (o.chromaticAberration ?? 0) * 0.02;
-    f.set(rect, 8);
-    f[12] = this.frameCount++ & 0xffffff;
+    f[12] = o.vignetteRadius ?? 0.5;
+    f[13] = Math.max(o.vignetteSoftness ?? 0.5, 1e-4);
+    f[14] = o.grain ?? 0;
+    f[15] = (o.chromaticAberration ?? 0) * 0.02;
+    f.set(rect, 16);
+    if (!this.clocked || this.pending) this.grainFrame = this.frameCount++ & 0xffffff;
+    this.pending = false;
+    f[20] = this.grainFrame;
+    const colour = o.vignetteColor ?? BLACK,
+      centre = o.vignetteCenter ?? CENTRE;
+    f.set(colour, 24);
+    f[27] = +(o.vignetteBlend === 'opaque');
+    f.set(centre, 28);
+    f[30] = o.vignetteRoundness ?? 0;
+    f[31] = +(o.dither ?? 0) * codeValue(format);
     c.device.queue.writeBuffer(this.effectsBuffer(c.device), 0, f as Float32Array<ArrayBuffer>);
     if (!auto) return;
     const a = typeof o.autoExposure === 'object' ? o.autoExposure : {},
@@ -642,6 +761,8 @@ export class Tonemap implements EnginePlugin {
     for (const b of this.extBuffers) b?.destroy();
     this.extBuffers = [];
     this.extResources = [];
+    // What the extensions made on this device goes with it (KB-OWN-TONE1).
+    for (const extension of this.options.extensions ?? NO_EXTENSIONS) extension.dispose?.();
     this.meterPipeline = this.meterGroup = undefined;
     this.original = undefined;
     this.shaders.clear();

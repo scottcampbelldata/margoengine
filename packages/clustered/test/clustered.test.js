@@ -241,12 +241,35 @@ test('physicalLobes leaves a shader without lobes alone, and weighs every light 
   assert.equal(physicalLobes.finish(plain), plain);
   const physical = `fn layers(s:Surface,v:vec3f,l:vec3f,under:vec3f)->vec3f {}\n${plain}${term}falloff*cone;\n  color=layers(s,v,l,color);`;
   const out = physicalLobes.finish(physical);
-  assert.equal(out.match(/clusterLobeLight\+=clusterLobes\(v,l\)\*clusterWeight;/g).length, 2);
+  assert.equal(out.match(/clusterLobeLight\+=clusterLobes\(v,l,clusterBase\)\*clusterWeight;/g).length, 2);
+  assert.equal(out.match(/let clusterBase=[^;]*\*nl;result\+=clusterBase\*clusterWeight;/g).length, 2);
+  // KHR_materials_sheen's punctual albedo scaling: each light's base loses max3(sheen) max(E(n.l) - E(n.v), 0) more
+  // than the ambient form `layers` applies to the whole base.
+  assert.match(
+    out,
+    /let punctual=select\(0\.0,sheenMax\*max\(margoSheenAlbedo\(nl,s\.sh\.w\)-margoSheenAlbedo\(nv,s\.sh\.w\),0\.0\),sheenMax>0\.0\);/,
+  );
+  assert.match(out, /\(1-s\.cc\*fc\)\*\(s\.sh\.rgb\*margoSheenBRDF\([^;]*\*nl-punctual\*base\)/);
+  // KB3297d: n.h from the clamped cosines, so a shading normal facing away from the viewer misses the Charlie peak.
+  assert.match(out, /margoSheenBRDF\(s\.sh\.w,nl,nv,margoSheenHalf\(nv,nl,v,l\)\)\*nl/);
   assert.match(out, /let s=surface\(i,front\);clusterSurface=s;/);
   assert.match(out, /color=layers\(s,v,l,color\);color\+=clusterLobeLight\*clusterFrame\.intensity\.x;/);
   assert.doesNotMatch(out, /margoDirect/, 'isotropic physical shaders keep the loop BRDF');
   assert.doesNotMatch(out, /clusterAreaLighting/);
   const full = physicalLobes.finish(`fn margoDirect(s:Surface,v:vec3f,l:vec3f)->vec3f {}\nfn clusterAreaLighting() {}\n${physical}`);
-  assert.match(full, /result\+=margoDirect\(clusterSurface,v,l\)\*clusterWeight;/);
+  assert.match(full, /let clusterBase=margoDirect\(clusterSurface,v,l\);result\+=clusterBase\*clusterWeight;/);
   assert.match(full, /if\(s\.cc>0\.0\)\{clusterLobeLight\+=s\.cc\*clusterAreaLighting\(/);
+});
+
+// KB-FLICKER-DISPOSE1: a disposed Clustered refused new lights with "Expected at most 64 lights; raise
+// ClusteredOptions.maxLights", a fix that could never work; it names what happened instead.
+test('setLights on a disposed Clustered throws MargoError disposed, not a light-count error', () => {
+  const lights = new Clustered();
+  lights.setLights([{ position: [0, 1, 0], range: 4 }]);
+  lights.dispose();
+  assert.throws(() => lights.setLights([]), { name: 'MargoError', code: 'disposed', message: /Clustered is disposed/ });
+  assert.throws(() => new Clustered({ maxLights: 1 }).setLights([{ position: [0, 0, 0] }, { position: [1, 0, 0] }]), {
+    name: 'RangeError',
+    message: /at most 1 lights/,
+  });
 });

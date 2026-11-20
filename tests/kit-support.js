@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { KITS, KIT_MEMBERS } from '../scripts/umbrella.mjs';
+import { KITS, KIT_MEMBERS, KIT_ROOT } from '../scripts/umbrella.mjs';
 import { importsOf, packageOf } from '../scripts/publish-rehearsal.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -23,13 +23,13 @@ export async function checkKit(name, entry) {
     assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort(), source);
     for (const key of Object.keys(b)) assert.equal(a[key], b[key], `${source} ${key}`);
   }
-  if (name === 'react-kit') {
+  if (name === 'kit-react') {
     assert.equal(typeof entry.Canvas, 'function');
     assert.equal('Voxel' in entry, false, 'the web root must not advertise a renderer outside its installed profile');
     assert.equal('XR' in entry, false);
   }
   else {
-    for (const [source, names] of KITS[name].from) {
+    for (const [source, names] of KITS[KIT_ROOT[name]].from) {
       const original = await import(source);
       for (const binding of names) assert.equal(entry[binding], original[binding], binding);
     }
@@ -37,7 +37,7 @@ export async function checkKit(name, entry) {
   }
   // A model-free application must not even emit a decoder asset. Separate loader entries keep
   // Vite's asset discovery away from the root, before its tree-shaker has run.
-  if (name !== 'react-kit') {
+  if (name !== 'kit-react') {
     const out = await bundle(`export { createStage } from '${manifest.name}';`);
     assert.ok(out.every((file) => !/wasm|draco|basis/i.test(file.fileName)), manifest.name);
     const direct = await bundle("export { createStage } from '@margoengine/stage';");

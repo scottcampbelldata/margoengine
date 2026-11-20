@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { MeshoptDecoder, meshoptDecodeGltfBuffer as plain } from '../dist/meshopt.js';
 import { meshoptDecodeGltfBufferSIMD as simd, MeshoptSIMDDecoder } from '../dist/meshopt-simd.js';
+import { encodeAttributes } from './support/meshopt-encode.js';
+import { invalidIndexStreams } from './support/meshopt-invalid-index.js';
 
 const fixtures = new URL('./fixtures/', import.meta.url),
   repo = new URL('../../../', import.meta.url),
@@ -195,4 +197,29 @@ test('the embedded module was built from the Rust source in this repository', ()
     recorded = /source sha256 ([0-9a-f]{64})/.exec(generated)?.[1],
     source = readFileSync(new URL('../native/meshopt-simd/src/lib.rs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   assert.equal(recorded, createHash('sha256').update(source).digest('hex'), 'run node scripts/meshopt-simd-build.mjs');
+});
+
+test('the Wasm refuses the v1 channel modes the TypeScript decoder refuses, with or without elements', () => {
+  for (const count of [0, 40]) {
+    const data = Uint8Array.from({ length: count * 8 }, (_, i) => (i * 37) & 255),
+      encoded = encodeAttributes(data, count, 8, { version: 1, channels: [{ mode: 0 }, { mode: 0 }] });
+    for (const mode of [0x03, 0x04, 0x05, 0x10, 0x13]) {
+      const src = Uint8Array.from(encoded, (b, i) => (i === encoded.length - 2 ? mode : b));
+      assert.throws(() => simd(src, count, 8, 'ATTRIBUTES'), { message: /invalid vertex channel mode$/ }, `${mode}`);
+    }
+  }
+});
+
+test('the Wasm refuses the invalid index streams the TypeScript decoder refuses, with the same error', () => {
+  for (const [mode, count, bytes] of invalidIndexStreams) {
+    const src = Uint8Array.from(bytes);
+    let expected;
+    try {
+      plain(src, count, 4, mode);
+    } catch (error) {
+      expected = error;
+    }
+    assert.ok(expected, `${mode} ${bytes}`);
+    assert.throws(() => simd(src, count, 4, mode), { message: expected.message }, `${mode} ${bytes}`);
+  }
 });

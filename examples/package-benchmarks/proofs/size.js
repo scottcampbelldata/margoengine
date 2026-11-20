@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { build } from 'vite';
-import { show } from './history.js';
+import { isHistorical, show } from './history.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
@@ -57,6 +57,7 @@ for (const name of names) {
       after = await size(name);
     report.packages[name] = { before, after, gzipDelta: after.gzip - before.gzip };
   } catch (error) {
+    if (isHistorical(error)) throw error; // this clone lacks the baseline commit: the whole run is HISTORICAL
     report.packages[name] = { error: String(error.message ?? error).slice(0, 160) };
   }
   console.log(name, JSON.stringify(report.packages[name]));

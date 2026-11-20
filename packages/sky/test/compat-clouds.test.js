@@ -25,7 +25,7 @@ test('compat clouds entry composes the original cloud and weather passes', () =>
   const code = [...h.shaders.values()].join('\n');
   assert.match(code, /texture_storage_3d/);
   assert.match(code, /cloudDensityAt/);
-  assert.deepEqual([...clouds.drift], [10, 3, 3]);
+  assert.deepEqual([...clouds.drift], [10, 3, 3, 10, 3]);
   assert.equal(weather.amount, 1);
   clouds.dispose();
   weather.dispose();

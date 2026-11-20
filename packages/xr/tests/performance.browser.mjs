@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';import {readFile,writeFile} from 'node:fs/promises';import {fileURLToPath} from 'node:url';import {openBrowser} from '../../../scripts/browser.js';
 process.chdir(fileURLToPath(new URL('../../..',import.meta.url)));
 const fixture=await readFile('packages/webgl2-compat/test/xr.html','utf8');const replace=(s,from,to)=>{assert.ok(s.includes(from),from);return s.replace(from,to);};
-let html=replace(fixture,'const mode =',`import {XRPerformance,performanceSessionOptions} from '/packages/xr/dist/performance.js';import {loadGLTF} from '/packages/gltf-pro/dist/index.js';const mode =`);
+let html=replace(fixture,'const mode =',`import {XRPerformance,performanceSessionOptions} from '/packages/xr/dist/performance.js';import {loadGLTF} from '/packages/gltf/dist/pbr.js';const mode =`);
 html=replace(html,'this.gl = gl;','this.fixedFoveation=.2; this.gl = gl;');
 html=replace(html,'createProjectionLayer({ colorFormat, depthStencilFormat })','createProjectionLayer({ colorFormat, depthStencilFormat,scaleFactor })');
 html=replace(html,'nativeLayer = {','nativeLayer = { fixedFoveation:.2,scaleFactor,');

@@ -1,7 +1,7 @@
-// @margoengine/mesh-edit/sculpt-view: draws a sculpt session with gltf-pro and keeps it up to date. Each frame uploads only
+// @margoengine/mesh-edit/sculpt-view: draws a sculpt session with gltf/pbr and keeps it up to date. Each frame uploads only
 // the vertices the brush changed; triangles changing (dynamic topology, or an undo of it) rewrite the whole mesh.
 import type { Engine, EnginePlugin } from '@margoengine/core';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro/model';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr-model';
 import type { MeshSculptSession, SculptDrawing } from './sculpt.js';
 
 /** Options for {@link SculptView}. */
@@ -10,7 +10,9 @@ export interface SculptViewOptions {
   material?: Record<string, unknown>;
 }
 
-const CLAY = { pbrMetallicRoughness: { baseColorFactor: [0.72, 0.66, 0.6, 1], metallicFactor: 0, roughnessFactor: 0.6 } };
+const CLAY = {
+  pbrMetallicRoughness: { baseColorFactor: [0.72, 0.66, 0.6, 1], metallicFactor: 0, roughnessFactor: 0.6 },
+};
 
 let serial = 0;
 
@@ -30,14 +32,16 @@ export class SculptView implements EnginePlugin {
   readonly stats = { uploadedVertices: 0, rewrites: 0 };
 
   #drawing: SculptDrawing;
+  #engine: Engine;
   #disposed = false;
 
-  /** Draws `session` in `engine`. @throws RangeError when the mesh is over gltf-pro's 1,000,000 vertices per primitive. */
+  /** Draws `session` in `engine`. @throws RangeError when the mesh is over gltf\/pbr's 1,000,000 vertices per primitive. */
   static attach(engine: Engine, session: MeshSculptSession, options: SculptViewOptions = {}): SculptView {
     return new this(engine, session, options);
   }
 
   constructor(engine: Engine, session: MeshSculptSession, options: SculptViewOptions = {}) {
+    this.#engine = engine;
     this.#drawing = session.drawing();
     this.#drawing.update();
     const { vertices, indices } = this.#drawing;
@@ -78,11 +82,13 @@ export class SculptView implements EnginePlugin {
     }
   }
 
-  /** Removes the mesh from the scene. The session stays usable. */
+  /** Removes the mesh and this view from the scene. The session stays usable. */
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
     this.model.dispose();
+    const scene = this.#engine.sceneOf(this);
+    scene?.removePlugin(this.name);
   }
 
   [Symbol.dispose](): void {

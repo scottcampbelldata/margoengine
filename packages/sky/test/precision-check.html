@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky shader precision check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas width="256" height="192"></canvas>
+<script type="module">
+// The float32 values inside the Milky Way's and the aurora's own shaders, read back exactly: each entry's shader as it
+// ships, its colour output swapped for four of its values as float bits in an rgba32uint target. compat-gpu.mjs
+// checks them against float64 on native WebGPU and on the WebGL2 layer: the pixel's solid angle, the aurora's shell
+// distances and its height above the ground (docs/known-bugs.md, "Milky Way and aurora on the WebGL2 layer").
+// A blend pair checks how the scene capture rounds two outputs one float32 ULP apart.
+import {Engine} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {degrees} from '/packages/sky/dist/sun.js';
+import {skyMatrix} from '/packages/sky/dist/astro.js';
+import {MilkyWay} from '/packages/sky/dist/milky-way.js';
+import {Aurora} from '/packages/sky/dist/aurora.js';
+const W=256,H=192,rad=Math.PI/180;
+const entry=new URLSearchParams(location.search).get('entry');
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,0],target:[0,0,-1],fov:40,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// The entry's shader and its last uniform write, as the entry makes them.
+const codes=[],writes=[],createShaderModule=device.createShaderModule.bind(device),writeBuffer=device.queue.writeBuffer.bind(device.queue);
+device.createShaderModule=(d)=>{codes.push(d.code);return createShaderModule(d);};
+device.queue.writeBuffer=(b,o,data,...r)=>{writes.push(new Float32Array(data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength)));return writeBuffer(b,o,data,...r);};
+Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+let marker,size,sets;
+if(entry==='milky-way'){
+ // As milky-way-check.html's 'smooth' field: the galactic centre near the zenith from 30 degrees south.
+ const observer={latitude:degrees(-30),longitude:degrees(20)},date=new Date('2026-06-20T22:00:00Z');
+ MilkyWay.attach(engine,{...observer,date,brightness:200,extinction:0,clouds:0});
+ const m=skyMatrix(date,observer),ra=266.40499*rad,dec=-28.93617*rad,j=[Math.cos(dec)*Math.cos(ra),Math.cos(dec)*Math.sin(ra),Math.sin(dec)];
+ engine.camera.target=[0,1,2].map(r=>m[r*3]*j[0]+m[r*3+1]*j[1]+m[r*3+2]*j[2]);
+ marker='fn band(';size=40;sets={ray:'omega,d.x,d.y,d.z'};
+}else{
+ // As aurora-check.html's view: 40 degrees up toward the arcs, 60 degrees of view.
+ engine.camera.fov=60;engine.camera.target=[0,Math.sin(40*rad),-Math.cos(40*rad)];
+ Aurora.attach(engine,{brightness:200,sky:{options:{},nightFactor:1},speed:0});
+ marker='fn curtains(';size=48;sets={ray:'omega,d.x,d.y,d.z',shell:'t0,t1,height(o+d*t1),height(o+d*t0)'};
+}
+engine.render({delta:0});await device.queue.onSubmittedWorkDone();
+const code=codes.find(c=>c.includes(marker)),uniform=writes.filter(w=>w.length===size).at(-1);
+const target=device.createTexture({size:[W,H],format:'rgba32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+const buffer=device.createBuffer({size:size*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});writeBuffer(buffer,0,uniform);
+async function values(list){
+ const head='@fragment fn fragment(i:O)->@location(0) vec4f {',last=code.lastIndexOf(' return vec4f(');
+ if(!code.includes(head)||last<0)throw new Error('the entry shader changed shape; update precision-check.html');
+ const module=createShaderModule({code:code.slice(0,last).replace(head,'@fragment fn fragment(i:O)->@location(0) vec4u {')+` return bitcast<vec4u>(vec4f(${list}));\n}\n`});
+ const pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'vertex'},fragment:{module,entryPoint:'fragment',targets:[{format:'rgba32uint'}]}});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[{view:target.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}]});
+ pass.setPipeline(pipeline);pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}}]}));pass.draw(6);pass.end();
+ const out=device.createBuffer({size:W*H*16,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ encoder.copyTextureToBuffer({texture:target},{buffer:out,bytesPerRow:W*16},[W,H]);device.queue.submit([encoder.finish()]);
+ await out.mapAsync(GPUMapMode.READ);const data=Array.from(new Uint32Array(out.getMappedRange()));out.unmap();out.destroy();return data;
+}
+// Two outputs one float32 ULP apart, below and at a half float (1168 x 2^-15), blended one plus one onto 0.0179901123046875
+// (589.5 x 2^-15) in an rgba16float target, as a sky layer adds its light to the scene capture.
+async function blend(){
+ const half=device.createTexture({size:[2,1],format:'rgba16float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+ const below=new Float32Array([1168*2**-15]),bits=new Uint32Array(below.buffer);bits[0]--;
+ const module=createShaderModule({code:`@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(vec2f(f32(i&1u),f32(i>>1u))*4.0-1.0,0.0,1.0);}
+@fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f {return vec4f(select(bitcast<f32>(${bits[0]}u),${1168*2**-15},p.x>1.0),0.0,0.0,0.0);}`});
+ const pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'v'},fragment:{module,entryPoint:'f',targets:[{format:'rgba16float',blend:{color:{srcFactor:'one',dstFactor:'one'},alpha:{srcFactor:'zero',dstFactor:'one'}}}]}});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginRenderPass({colorAttachments:[{view:half.createView(),loadOp:'clear',storeOp:'store',clearValue:[0.0179901123046875,0,0,1]}]});
+ pass.setPipeline(pipeline);pass.draw(3);pass.end();
+ const out=device.createBuffer({size:256,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ encoder.copyTextureToBuffer({texture:half},{buffer:out,bytesPerRow:256},[2,1]);device.queue.submit([encoder.finish()]);
+ await out.mapAsync(GPUMapMode.READ);const h=new Uint16Array(out.getMappedRange()).slice();out.unmap();out.destroy();half.destroy();
+ return {inputs:[below[0],1168*2**-15],bits:[h[0],h[4]]};
+}
+window.check={dispose:()=>engine.dispose(),
+ async run(){
+  device.pushErrorScope('validation');
+  const out={uniform:Array.from(uniform)};
+  for(const [name,list] of Object.entries(sets))out[name]=await values(list);
+  out.blend=await blend();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors};
+ }};
+window.ready=true;
+</script></body></html>

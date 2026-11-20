@@ -92,7 +92,10 @@ test('a comment that code searches for by text is an anchor and stays', () => {
 
 test('only shader text is rewritten: JavaScript, C#, Rust and prose strings keep their comments', () => {
   assert.equal(shaderLanguage('fn main() { // x\n}'), 'wgsl');
-  assert.equal(shaderLanguage('let a: vec3f = b; // x\n'), 'wgsl');  assert.equal(shaderLanguage('fn f(p: ptr<function, vec3u>) { // x\n}'), 'wgsl');
+  assert.equal(shaderLanguage('let a: vec3f = b; // x\n'), 'wgsl');
+  // A fragment that only returns (xr's AR resolve shipped its comment this way until KB-WGSL1).
+  assert.equal(shaderLanguage('// keep the pixel\n  return vec4f(c.rgb, 1.0);'), 'wgsl');
+  assert.equal(shaderLanguage('fn f(p: ptr<function, vec3u>) { // x\n}'), 'wgsl');
   assert.equal(shaderLanguage('#version 300 es\nvoid main() { // x\n}'), 'glsl');
   assert.equal(shaderLanguage('class P extends AudioWorkletProcessor { process() { let a = 1; } } // x'), null);
   assert.equal(shaderLanguage('using System;\nnamespace M { // x\n}'), null);

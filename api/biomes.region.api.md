@@ -95,8 +95,62 @@ interface IslandOptions {
     readonly shelf?: number;
 }
 
+interface MountainValley {
+    readonly axis: Int32Array;
+    readonly creek: Int32Array;
+    readonly rail: Int32Array | null;
+    frame(x: number, z: number): [number, number];
+    floorHeight(along: number): number;
+    floorWidth(along: number): number;
+    readonly grid: Readonly<{
+        height: Int32Array;
+        flow: Int32Array;
+        direction: Int8Array;
+        nx: number;
+        nz: number;
+        step: number;
+    }>;
+}
+
+interface MountainValleyOptions {
+    readonly outlet?: 'west' | 'east' | 'north' | 'south';
+    readonly center?: number;
+    readonly floor?: number;
+    readonly fall?: number;
+    readonly wall?: number;
+    readonly steepness?: number;
+    readonly ridges?: 'rounded' | 'sharp';
+    readonly gulches?: number;
+    readonly creek?: {
+        readonly width?: number;
+        readonly depth?: number;
+    };
+    readonly rail?: {
+        readonly grade?: number;
+        readonly width?: number;
+    } | false;
+    readonly step?: number;
+}
+
+interface MountainValleySettings {
+    outlet: 'west' | 'east' | 'north' | 'south';
+    center: number;
+    floor: number;
+    fall: number;
+    wall: number;
+    steepness: number;
+    ridges: 'rounded' | 'sharp';
+    gulches: number;
+    creekWidth: number;
+    creekDepth: number;
+    railGrade: number;
+    railWidth: number;
+    step: number;
+}
+
 interface PathCarve {
-    readonly mode?: 'flatten' | 'cut';
+    readonly mode?: 'flatten' | 'cut' | 'level';
+    readonly top?: number;
     readonly depth?: number;
     readonly grade?: number;
 }
@@ -123,6 +177,7 @@ interface Relief {
     readonly valleyWidth: number;
     readonly islands: readonly ReliefIsland[];
     readonly erosion?: Erosion;
+    readonly mountainValley?: MountainValley;
     waterCells(origin: readonly [number, number], step: number, nx: number, nz: number): Uint8Array;
     readonly settings: Readonly<{
         seed: number;
@@ -143,6 +198,8 @@ interface Relief {
             radius: number;
             shelf: number;
         }> | null;
+        ria?: Readonly<Record<keyof Required<RiaOptions>, number>>;
+        mountainValley?: Readonly<MountainValleySettings>;
     }>;
 }
 
@@ -167,8 +224,24 @@ interface ReliefOptions {
     readonly seaDepth?: number;
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
+    readonly ria?: RiaOptions;
     readonly islands?: IslandOptions;
+    readonly mountainValley?: MountainValleyOptions;
     readonly erosion?: ReliefErosionOptions;
+}
+
+interface RiaOptions {
+    readonly center?: number;
+    readonly width?: number;
+    readonly headWidth?: number;
+    readonly length?: number;
+    readonly depth?: number;
+    readonly headDepth?: number;
+    readonly slope?: number;
+    readonly flat?: number;
+    readonly flatHeight?: number;
+    readonly run?: number;
+    readonly river?: boolean;
 }
 
 type RiverLine = Int32Array;

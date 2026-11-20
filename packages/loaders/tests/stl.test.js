@@ -340,3 +340,87 @@ test('signal: aborted before and during the parse, both flavors and the weld', (
   }
   assert.equal(parseSTL(binary(SQUARE), { signal: new AbortController().signal }).positions.length, 18);
 });
+
+// Materialise Magics colour STL (the "STL (file format)" article's colour section; Magics' own manual is not public):
+// "COLOR=" and RGBA bytes in the 80-byte header, then ",MATERIAL=" with diffuse, specular and ambient RGBA; per facet
+// red in bits 0-4, green 5-9, blue 10-14, and bit 15 CLEAR for a facet colour, set for the part colour.
+function magics(triangles, attributes, { color, material, prefix = 'Magics ' } = {}) {
+  const bytes = binary(triangles, { attributes, header: '' });
+  let at = 0;
+  const put = (text) => {
+    bytes.set(new TextEncoder().encode(text), at);
+    at += text.length;
+  };
+  const rgba = (c) => {
+    bytes.set(c, at);
+    at += 4;
+  };
+  put(prefix);
+  if (color) {
+    put('COLOR=');
+    rgba(color);
+  }
+  if (material) {
+    put(',MATERIAL=');
+    material.forEach(rgba);
+  }
+  return bytes;
+}
+
+test('regression: Materialise colour STL reads COLOR= and MATERIAL= and its reversed facet bits', () => {
+  const ownRed = 31, // bit 15 clear: the facet's own colour, red in the low bits
+    usePart = 0x8000 | 31; // bit 15 set: the part colour, whatever the bits hold
+  const mesh = parseSTL(magics(SQUARE, [ownRed, usePart], { color: [0, 255, 0, 255] }));
+  closeTo(mesh.colors.slice(0, 9), [1, 0, 0, 1, 0, 0, 1, 0, 0]);
+  closeTo(mesh.colors.slice(9, 18), [0, 1, 0, 0, 1, 0, 0, 1, 0]);
+  assert.deepEqual(mesh.materialise, { color: [0, 1, 0, 1] });
+  // Blue in bits 10 to 14, green in 5 to 9; the same word read as VisCAM would be red and not coloured at all.
+  const blueGreen = parseSTL(magics(SQUARE, [31 << 10, 16 << 5], { color: [255, 255, 255, 128] }));
+  closeTo(blueGreen.colors.slice(0, 3), [0, 0, 1]);
+  closeTo(blueGreen.colors.slice(9, 12), [0, 16 / 31, 0]);
+  closeTo([blueGreen.materialise.color[3]], [128 / 255]);
+  // ",MATERIAL=" diffuse is preferred over COLOR= for the part colour; all three are returned.
+  const material = parseSTL(
+    magics(SQUARE, [usePart, usePart], {
+      color: [255, 0, 0, 255],
+      material: [
+        [0, 0, 255, 255],
+        [255, 255, 255, 255],
+        [51, 51, 51, 255],
+      ],
+    }),
+  );
+  closeTo(material.colors.slice(0, 3), [0, 0, 1]);
+  closeTo(material.materialise.specular, [1, 1, 1, 1]);
+  closeTo(material.materialise.ambient, [0.2, 0.2, 0.2, 1]);
+  // Welding keeps the two colours apart along the shared edge.
+  const welded = parseSTL(magics(SQUARE, [ownRed, usePart], { color: [0, 255, 0, 255] }), { weld: true });
+  assert.equal(welded.positions.length / 3, 6);
+});
+
+test('regression: colorVariant forces either reading; VisCAM files are unchanged', () => {
+  // No COLOR= in the header: auto stays VisCAM, so bit 15 clear is no colour.
+  assert.equal(parseSTL(binary(SQUARE, { attributes: [31, 31] })).colors, undefined);
+  assert.equal(parseSTL(binary(SQUARE, { attributes: [31, 31] })).materialise, undefined);
+  // Forced Materialise without a header colour: facet colours read, part-colour facets get gray.
+  const forced = parseSTL(binary(SQUARE, { attributes: [31, 0x8000] }), { colorVariant: 'materialise' });
+  closeTo(forced.colors.slice(0, 3), [1, 0, 0]);
+  closeTo(forced.colors.slice(9, 12), [0.8, 0.8, 0.8]);
+  assert.deepEqual(forced.materialise, {});
+  // Forced VisCAM ignores a COLOR= header.
+  const viscam = parseSTL(magics(SQUARE, [0x8000 | 31, 0], { color: [0, 255, 0, 255] }), { colorVariant: 'viscam' });
+  closeTo(viscam.colors.slice(0, 3), [0, 0, 1]);
+  closeTo(viscam.colors.slice(9, 12), [0.8, 0.8, 0.8]);
+  assert.equal(viscam.materialise, undefined);
+  // A COLOR= cut off by the end of the header is not a colour.
+  const cut = magics(SQUARE, [0, 0], { prefix: ' '.repeat(72) + 'COLOR=' });
+  assert.equal(parseSTL(cut).materialise, undefined);
+  assert.throws(
+    () => parseSTL(binary(SQUARE), { colorVariant: 'rgb' }),
+    (e) => e instanceof LoaderError && e.code === 'range' && /colorVariant/.test(e.message),
+  );
+  assert.throws(
+    () => parseSTL(ascii(SQUARE), { colorVariant: 'rgb' }),
+    (e) => e.code === 'range',
+  );
+});

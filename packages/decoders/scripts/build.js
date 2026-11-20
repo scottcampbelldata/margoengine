@@ -9,17 +9,18 @@ import { staticEmbind } from '../../../scripts/static-embind.js';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { NATIVE_FEATURES, buildNative } from './build-native.mjs';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 // Plain TypeScript emit keeps every `new URL('./…', import.meta.url)` literal intact, so the consuming app's
 // bundler (Vite, webpack 5, Next.js) emits the worker and the Wasm decoders as its own assets.
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
-const dist = resolve(root, 'dist');
+const dist = distDir(root);
 await rm(dist, { recursive: true, force: true });
 await copyLegal(root);
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
@@ -74,7 +75,8 @@ for (const folder of ['draco', 'draco-full', 'basis', 'jxl']) {
 }
 // The Basis transcoder's embind wrappers would need 'unsafe-eval'; ship the closure form instead (scripts/static-embind.js).
 // Node loads the Emscripten wrapper with require, so its folder is CommonJS.
-await writeFile(resolve(dist, 'basis/package.json'), '{ "type": "commonjs" }\n');
+for (const folder of ['basis', 'draco', 'draco-full'])
+  await writeFile(resolve(dist, folder, 'package.json'), '{ "type": "commonjs" }\n');
 const basis = resolve(dist, 'basis/basis_transcoder.js');
 await writeFile(basis, staticEmbind(await readFile(basis, 'utf8'), 'basis_transcoder.js'));
 await copyFile(resolve(root, 'vendor/NOTICE.md'), resolve(dist, 'THIRD-PARTY-NOTICE.md'));
@@ -83,7 +85,7 @@ await mkdir(resolve(dist, 'shared'), { recursive: true });
 for (const name of ['crc32', 'errors', 'inflate', 'png', 'zstd'])
   await copyFile(resolve(repository, `packages/shared/${name}.js`), resolve(dist, `shared/${name}.js`));
 // The TIFF reader shares the zlib inflater for its Deflate strips.
-for (const name of ['brotli', 'png', 'tiff', 'ktx2-file', 'ktx2-inflate', 'xz']) {
+for (const name of ['brotli', 'png', 'tiff', 'tiff-codecs', 'ktx2-file', 'ktx2-inflate', 'xz']) {
   const file = resolve(dist, `${name}.js`);
   await writeFile(file, (await readFile(file, 'utf8')).replaceAll('../../shared/', './shared/'));
 }

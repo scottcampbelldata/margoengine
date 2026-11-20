@@ -1,5 +1,5 @@
 // Real-GPU proof of VoxelRenderer `scale` and @margoengine/voxel/lod (run from the repository root after building
-// packages, one GPU job at a time: node scripts/gpu-lock.mjs run --owner=voxel-lod -- node
+// packages, one GPU job at a time: node scripts/run-with-timeout.mjs -- node
 // packages/voxel/tests/lod-browser-check.mjs):
 // - a world drawn at scale 2 from twice the eye, near and far gives the image it gives at scale 1, up to samples on
 //   quad edges (positions in float32 round differently once doubled): under 1% of the drawn pixels, no 2 x 2 block;

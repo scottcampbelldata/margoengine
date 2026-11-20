@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Smoke check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body>
+<script type="module">
+// The smoke column on a real GPU (WebGPU, or the WebGL2 layer under MARGO_COMPAT=1), driven by smoke-check.mjs:
+// - rise and lean: a column in calm air and in winds of 2, 5 and 15 m/s, 300 frames of 1/30 s with no churn; every live
+//   puff's height follows the CPU step of its speed curve within 1% and the plume law (plumeRise) within 7% after its
+//   first second, and its lean atan(U_h / w) follows the CPU step of the wind's pull within 0.5 degrees;
+// - the same frames give the same puffs: two fresh engines give the same particle bytes;
+// - writing every live smoke row each frame for 60 frames (applySmokeSettings) makes no pipeline, buffer or texture and
+//   no GPU error, and the default rows draw the frame of a column built without them.
+import {Engine} from '/packages/core/dist/index.js';
+import {Smoke,plumeRise,buoyancyFlux} from '/packages/vfx/dist/smoke.js';
+import {SMOKE_LIVE_SETTINGS,applySmokeSettings,smokeSettingDefaults} from '/packages/vfx/dist/settings.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const W=256,H=192;
+async function scene(){
+ const c=document.createElement('canvas');c.width=W;c.height=H;document.body.append(c);
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,40,220],target:[0,40,0],near:0.5,far:2000}});
+ e.stop();
+ const errs=[];e.gpu.addEventListener('uncapturederror',x=>errs.push(x.error.message));
+ return {c,e,errs};
+}
+async function step(e,dt){e.render({delta:dt});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();}
+async function read(e,buffer){
+ const copy=e.gpu.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),enc=e.gpu.createCommandEncoder();
+ enc.copyBufferToBuffer(buffer,0,copy,0,buffer.size);e.gpu.queue.submit([enc.finish()]);
+ await copy.mapAsync(GPUMapMode.READ);const out=new Float32Array(copy.getMappedRange().slice(0));copy.destroy();return out;
+}
+const L=20,dt=1/30,frames=300;
+async function column(U){
+ const {e,errs}=await scene();
+ const smoke=Smoke.attach(e,{position:[0,0,0],heat:5e6,lifetime:L,rate:10,turbulence:0,prewarm:false,...(U?{wind:[U,0]}:{})});
+ for(let f=0;f<frames;f++)await step(e,dt);
+ const p=await read(e,smoke.effect.gpuState.particles);
+ const {speed}=smoke.effect.options.overLife,w0=smoke.effect.options.velocity[1],n=speed.length;
+ const s=a=>{const x=Math.min(1,Math.max(0,a))*(n-1),k=Math.min(Math.floor(x),n-2);return speed[k]+(speed[k+1]-speed[k])*(x-k);};
+ const k=1-Math.exp(-4*dt),rows=[];let worstStep=0,worstLaw=0,worstLean=0,count=0;
+ for(let i=0;i<smoke.capacity;i++){
+  const life=p[i*8+3];if(!(life>0&&life<L))continue;
+  const m=Math.round((L-life)/dt);if(m<1)continue;
+  let z=0,vy=w0*s(0),vx=0;
+  for(let j=1;j<=m;j++){vy+=w0*(s(j*dt/L)-s((j-1)*dt/L));vx+=(U-vx)*k;z+=vy*dt;}
+  const y=p[i*8+1],gx=p[i*8+4],gy=p[i*8+5];count++;
+  worstStep=Math.max(worstStep,Math.abs(y-z)/Math.max(z,0.1));
+  if(m*dt>=1)worstLaw=Math.max(worstLaw,Math.abs(y/plumeRise(m*dt,buoyancyFlux(5e6),U,2).rise-1));
+  if(U&&m*dt>=0.5){const lean=Math.atan2(Math.abs(gx),gy)*180/Math.PI,want=Math.atan2(Math.abs(vx),vy)*180/Math.PI;worstLean=Math.max(worstLean,Math.abs(lean-want));}
+ }
+ e.dispose();
+ return {U,count,worstStep,worstLaw,worstLean,errors:errs};
+}
+async function bytes(){
+ const {e}=await scene();
+ const smoke=Smoke.attach(e,{position:[0,0,0],lifetime:10,rate:20,wind:[3,1]});
+ for(let f=0;f<60;f++)await step(e,1/30);
+ const p=await read(e,smoke.effect.gpuState.particles);e.dispose();return p;
+}
+async function picture(set,none=false){
+ const {c,e}=await scene();
+ const smoke=none?null:Smoke.attach(e,{position:[0,0,0],lifetime:10,rate:20});
+ if(set)set(smoke);
+ const shot=new OffscreenCanvas(W,H),g=shot.getContext('2d',{willReadFrequently:true});let last;
+ for(let f=0;f<20;f++){await step(e,1/30);g.drawImage(c,0,0);last=g.getImageData(0,0,W,H).data;}
+ e.dispose();return last;
+}
+window.check={
+ async rise(){const out=[];for(const U of [0,2,5,15])out.push(await column(U));return out;},
+ async repeat(){const a=await bytes(),b=await bytes();let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i]&&!(a[i]!==a[i]&&b[i]!==b[i]))n++;return {differing:n,floats:a.length};},
+ async live(){
+  const {e,errs}=await scene(),made={pipelines:0,buffers:0,textures:0};
+  const smoke=Smoke.attach(e,{position:[0,0,0],lifetime:10,rate:20});
+  for(let f=0;f<3;f++)await step(e,1/30);
+  for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){const real=e.gpu[method];if(real)e.gpu[method]=function(...a){made[key]++;return real.apply(this,a);};}
+  const live=SMOKE_LIVE_SETTINGS.filter(r=>r.kind==='number');
+  for(let f=0;f<60;f++){
+   const t=f/59,v={...smokeSettingDefaults(),lifetime:10,color:[0.2+0.3*t,0.25,0.3]};
+   for(const r of live)v[r.name]=r.name.startsWith('wind.')?(r.name==='wind.x'?2+6*t:-3*t):r.name==='rate'?5+15*t:r.name==='heat'?1e5+1e7*t:r.name==='radius'?0.5+3*t:r.min+(r.max-r.min)*(0.1+0.3*t);
+   applySmokeSettings(smoke,v);await step(e,1/30);
+  }
+  e.dispose();return {made,errors:errs,rows:SMOKE_LIVE_SETTINGS.length};
+ },
+ async defaults(){
+  const plain=await picture(),set=await picture(s=>applySmokeSettings(s,{lifetime:10,rate:20})),empty=await picture(null,true);
+  let n=0,lit=0;for(let i=0;i<plain.length;i++)if(plain[i]!==set[i])n++;for(let i=0;i<plain.length;i+=4)if(plain[i]!==empty[i]||plain[i+1]!==empty[i+1]||plain[i+2]!==empty[i+2])lit++;
+  return {differing:n,lit};
+ },
+};
+window.ready=true;
+</script></body></html>

@@ -205,7 +205,8 @@ test('signed int64 ids and key ticks are exact, including an offset byte view', 
 
 test('ASCII supports comments, quoted escapes, scientific values, and direct properties', async () => {
   const text = ascii
-    .replace('"Model::Triangle"', '"Model::A \\\"quoted\\\" name"')
+    // The FBX SDK writes a quote in a string as &quot;; it has no backslash escape.
+    .replace('"Model::Triangle"', '"Model::A &quot;quoted&quot; name"')
     .replace('  Properties70:', '  Custom: 1e-3 ; comment\n  Properties70:')
     .replace('Geometry: 1,', 'Geometry: 1, ; continued properties\r\n')
     .replace('"Mesh" {\n  Vertices', '"Mesh"\r\n {\n  Vertices')
@@ -355,4 +356,34 @@ test('abort reasons are preserved before and during asynchronous parsing', async
     parseDocument(binary(roots([geometry([['Vertices', [bomb], []]]), model(2)]))),
     /exceeds declared array size/,
   );
+});
+
+test('ASCII strings keep backslashes raw, as Autodesk files write paths: a trailing backslash and a pair stay', async () => {
+  // A real 3ds Max ASCII file writes its paths with single raw backslashes, D:\Dev\... and no escape.
+  const real = (await import('node:fs')).readFileSync(
+    new URL('./fixtures/real/max_pbr_metal_rough_material_7700_ascii.fbx', import.meta.url),
+  );
+  assert.ok(new TextDecoder().decode(real).includes(String.raw`"D:\Dev\clean`));
+  const BS = '\\',
+    text = ascii
+      .replace('"Model::Triangle"', `"Model::C:${BS}rig${BS}"`)
+      .replace('   P: "Visibility"', `   P: "Path", "KString", "", "", "${BS}${BS}server${BS}share${BS}a.png"\n   P: "Visibility"`);
+  const doc = await parseDocument(encode(text)),
+    model = doc.objects.get(2n);
+  assert.equal(objectName(model), `C:${BS}rig${BS}`);
+  assert.equal(property(model, 'Path'), `${BS}${BS}server${BS}share${BS}a.png`);
+});
+
+test('ASCII punctuation inside a quoted string is text: "{", "}", "," and "*" values do not break the file', async () => {
+  const text = ascii
+    .replace('"Model::Triangle"', '"Model::{,}*"')
+    .replace('   P: "Visibility"', '   P: "Mark", "KString", "", "", "}"\n   P: "Star", "KString", "", "", "*"\n   P: "Visibility"');
+  const doc = await parseDocument(encode(text)),
+    model = doc.objects.get(2n);
+  assert.equal(objectName(model), '{,}*');
+  assert.equal(property(model, 'Mark'), '}');
+  assert.equal(property(model, 'Star'), '*');
+  assert.deepEqual([...property(model, 'Lcl Translation')], [1, 2, 3]);
+  // A quoted brace is not the end of an array.
+  await assert.rejects(parseDocument(encode(ascii.replace('a: 0,1,-3 }', 'a: 0,1,-3 "}" }'))));
 });

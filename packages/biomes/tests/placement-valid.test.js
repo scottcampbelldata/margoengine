@@ -1,5 +1,5 @@
 // The checks of bench/placement-valid.mjs that decide whether a G1 measurement counts: repetition, spread, outputs,
-// lock, quiet gate and host; the slow-sample diagnosis; and the cold case's setup. Nothing here takes the GPU lock or
+// quiet gate and host; the slow-sample diagnosis; and the cold case's setup. Nothing here starts a GPU job or
 // times anything.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +11,6 @@ import {
   BenchWorker,
   GATE,
   MIN_RUNS,
-  OWNER,
   TARGETS,
   caseFailures,
   coldPlacement,
@@ -24,12 +23,11 @@ import {
 const steady = (median, n = MIN_RUNS) => Array.from({ length: n }, (_, i) => median * (1 + ((i % 5) - 2) / 100));
 const gate = (extra = {}) => ({
   ac: true,
-  lock: { mode: 'exclusive', pid: 7, owner: OWNER },
   quiet: { cpuLoadPercent: 4, gpu: { checked: true, utilizationPercent: [0, 1, 0] } },
   ...extra,
 });
 const host = { gpu: [{ name: 'NVIDIA RTX A6000' }] };
-const good = { gate: gate(), lockAtEnd: { mode: 'exclusive', pid: 7, owner: OWNER }, pid: 7, host };
+const good = { gate: gate(), host };
 
 test('summarize gives median, min, max and spread over the median', () => {
   assert.deepEqual(summarize([4, 1, 3, 2]), { n: 4, median: 2.5, min: 1, max: 4, spread: 1.2 });
@@ -66,21 +64,8 @@ test('samples that placed different objects fail', () => {
   assert.match(caseFailures('x', { samples: steady(100), digests }).join(), /different objects/);
 });
 
-test('good conditions pass; a wrapping gpu-lock run counts as holding the lock', () => {
+test('good conditions pass', () => {
   assert.deepEqual(conditionFailures(good), []);
-  const held = { held: 'by the wrapping gpu-lock run' };
-  assert.deepEqual(conditionFailures({ ...good, gate: gate({ lock: held }), lockAtEnd: held }), []);
-});
-
-test('the lock must be this run, exclusive, at the start and at the end', () => {
-  assert.match(
-    conditionFailures({ ...good, gate: gate({ lock: null }) }).join(),
-    /not held by this run when timing started/,
-  );
-  const other = { mode: 'exclusive', pid: 8, owner: OWNER };
-  assert.match(conditionFailures({ ...good, lockAtEnd: other }).join(), /when timing ended/);
-  const shared = { mode: 'shared', pid: 7, owner: OWNER };
-  assert.match(conditionFailures({ ...good, gate: gate({ lock: shared }) }).join(), /timing started/);
 });
 
 test('battery, a skipped or loud CPU gate, an unread or busy GPU and another host all fail', () => {

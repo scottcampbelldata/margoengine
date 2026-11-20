@@ -5,7 +5,7 @@
 // conic arcs (100, 104), composite curves (102), linear paths (106), lines (110), parametric splines (112), rational
 // B-splines (126), offset curves (130, fitted), curves on surfaces (142: the model-space curve, else the parameter-space
 // curve mapped through the surface and fitted). Surfaces: planes (108, 190), ruled
-// surfaces (118), surfaces of revolution (120), tabulated cylinders (122), rational B-spline surfaces (128), offset
+// surfaces (118), parametric spline surfaces (114), surfaces of revolution (120), tabulated cylinders (122), rational B-spline surfaces (128), offset
 // surfaces (140), cylinders, cones, spheres and tori (192 to 198). Transformation matrices (124) chain as the
 // specification says; lengths come out in millimetres (units flag over model space scale).
 import { MargoError } from '@margoengine/math/errors';
@@ -48,7 +48,7 @@ import {
   type V3,
   type Xf,
 } from './geometry.js';
-import { conicArc, polynomialCurve, ruledSurface } from './shapes.js';
+import { conicArc, polynomialCurve, polynomialSurface, ruledSurface } from './shapes.js';
 
 /** What {@link igesToSTEP} produces. */
 export interface IGESConversion {
@@ -325,13 +325,24 @@ export function igesToSTEP(input: string | ArrayBuffer | ArrayBufferView): IGESC
         if (!(l > 0)) throw invalid(`${name(e)}: its coefficients A, B and C are all zero`);
         return local({ kind: 'plane', o: mul(normal, n(e, 3) / (l * l)), n: unit(normal) });
       }
-      case 114:
-        // The order of the 48 coefficients per patch is given only by a formula image in the specification and has
-        // not been checked against it yet (docs/known-bugs.md), so the entity is refused rather than guessed.
-        throw new MargoError(
-          'unsupported',
-          'unsupported IGES entity 114 (parametric spline surface): coefficient order not yet verified against the IGES 5.3 spec; convert the surface to entity 128 in the sending CAD system',
-        );
+      case 114: {
+        // Section 4.15: CTYPE, PTYPE, M, N, TU(1..M+1), TV(1..N+1), then 48 coefficients a patch (X, Y, Z, each A to S
+        // of s^a t^b with s fastest), patch (i, j) from index 7 + M + N + 48 ((i - 1)(N + 1) + j - 1); the (N + 1)-th
+        // patch of each row and the (M + 1)-th row are placeholders postprocessors ignore.
+        const M = n(e, 2),
+          N = n(e, 3);
+        if (!(Number.isInteger(M) && Number.isInteger(N) && M >= 1 && N >= 1))
+          throw invalid(`${name(e)}: its segment counts ${M} and ${N} are not positive integers`);
+        const at = (i: number, j: number) => 6 + M + N + 48 * (i * (N + 1) + j);
+        need(e, at(M - 1, N - 1) + 48);
+        const tu = Array.from({ length: M + 1 }, (_, i) => n(e, 4 + i)),
+          tv = Array.from({ length: N + 1 }, (_, j) => n(e, 5 + M + j)),
+          spline = polynomialSurface(tu, tv, (i, j) => Array.from({ length: 48 }, (_, k) => n(e, at(i, j) + k)));
+        if (!spline) throw invalid(`${name(e)}: its breakpoints do not increase`);
+        const gap = spline.gap * scaleOf(m);
+        if (gap > tol) throw invalid(`${name(e)}: neighbouring patches are ${gap} mm apart on their shared edge`);
+        return local({ kind: 'nurbs', s: spline.surface, dom: [tu[0], tu[M], tv[0], tv[N]] });
+      }
       case 118: {
         need(e, 3);
         const c1 = curve(ptr(e, 0), m),

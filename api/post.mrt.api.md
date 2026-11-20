@@ -16,7 +16,7 @@ export class SceneTargets implements EnginePlugin {
     view(name: string): GPUTextureView | undefined;
     get depth(): GPUTexture | undefined;
     onResize(listener: () => void): () => void;
-    add(model: SSRModel): () => void;
+    add(model: SSRModel, { subject }?: SceneTargetsAddOptions): () => void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
@@ -24,10 +24,22 @@ export class SceneTargets implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export interface SceneTargetsAddOptions {
+    subject?: boolean;
+}
+
 export interface SceneTargetsOptions {
     outputs: Readonly<Record<string, TargetValue | TargetOutput>>;
     order?: number;
 }
+
+export const TARGET_MASK_LIMITS: Readonly<{
+    partial: number[];
+    full: 0.02;
+    facing: 0.05;
+    groundFacing: 0.2;
+    ground: 0.7071;
+}>;
 
 export interface TargetOutput {
     value?: TargetValue;
@@ -36,7 +48,7 @@ export interface TargetOutput {
     clear?: GPUColor;
 }
 
-export type TargetValue = 'albedo' | 'normal' | 'position' | 'distance' | 'emissive' | 'material';
+export type TargetValue = 'albedo' | 'normal' | 'position' | 'distance' | 'emissive' | 'material' | 'shadow' | 'penumbra' | 'litGround' | 'shadedGround' | 'subject';
 
 // Not exported from this entry, but used by the exports above:
 

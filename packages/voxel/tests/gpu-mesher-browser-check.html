@@ -5,11 +5,13 @@
 // stone checkerboard, uniform stone and water chunks, an all-air chunk and a chunk with a slab, meshed by
 // GpuVoxelMesher and by meshChunk: the same words in every layer and the same visibility, before and after a large
 // edit, the translucent quads sorted the same; the slab chunk goes to meshChunk. Then the terrain drawn by a
-// VoxelRenderer with its worker mesher and with the GPU mesher gives the same picture.
+// VoxelRenderer with its worker mesher and with the GPU mesher gives the same picture. Asked for their borders, both
+// meshers list the same shell faces, and a beveled terrain (whose seams take those faces) draws the same with either.
 import {Engine} from '/packages/core/dist/index.js';
 import {BlockTypes,VoxelWorld,slabState} from '/packages/voxel/dist/index.js';
 import {VoxelLighting} from '/packages/voxel/dist/light.js';
-import {meshChunk,meshInput,sortQuads} from '/packages/voxel/dist/mesher.js';
+import {VoxelMesher,meshChunk,meshInput,sortQuads} from '/packages/voxel/dist/mesher.js';
+import {voxelBevel} from '/packages/voxel/dist/bevel.js';
 import {GpuVoxelMesher} from '/packages/voxel/dist/gpu-mesher.js';
 import {BlockTextures,VoxelRenderer} from '/packages/voxel/dist/render.js';
 const canvas=document.querySelector('canvas'),errors=[];
@@ -65,6 +67,15 @@ async function compare(mesher,eye){
   if(g.visibility!==c.visibility)bad.push(`${k} visibility ${g.visibility} ${c.visibility}`);});
  return {chunks:list.length,quads,bad,gpuMs,cpuMs};
 }
+async function borders(mesher){
+ const list=keys(),workers=new VoxelMesher({workers:2}),
+  gpu=await Promise.all(list.map((k)=>mesher.mesh(world,k,0,undefined,true))),cpu=await Promise.all(list.map((k)=>workers.mesh(world,k,0,undefined,true)));
+ workers.dispose();const bad=[];let faces=0;
+ list.forEach((k,i)=>{const g=gpu[i].border,c=cpu[i].border;faces+=c?.length??0;
+  if(!(g===c||(g&&c&&same(g,c))))bad.push(`${k} border gpu ${g?.length} cpu ${c?.length}`);
+  for(const l of ['opaque','cutout','translucent'])if(!same(gpu[i][l],cpu[i][l]))bad.push(`${k} ${l} with border`);});
+ return {faces,bad};
+}
 const readCanvas=()=>{const c=new OffscreenCanvas(canvas.width,canvas.height).getContext('2d');c.drawImage(canvas,0,0);return c.getImageData(0,0,canvas.width,canvas.height).data;};
 async function picture(options){
  for(const k of keys())world.dirty.add(k);
@@ -90,9 +101,11 @@ window.check={
   let differ=0;for(let i=0;i<cpuPicture.image.length;i+=4)if(cpuPicture.image[i]!==gpuPicture.image[i]||cpuPicture.image[i+1]!==gpuPicture.image[i+1]||cpuPicture.image[i+2]!==gpuPicture.image[i+2])differ++;
   let lit=0;for(let i=0;i<gpuPicture.image.length;i+=4)if(gpuPicture.image[i]+gpuPicture.image[i+1]+gpuPicture.image[i+2]>30)lit++;
   const rendererStats={...gpuMesher.stats};
+  const bordered=await borders(mesher),bevel=voxelBevel(0.15),cpuBevel=await picture({bevel}),gpuBevel=await picture({bevel,mesher:gpuMesher});
+  let bevelDiffer=0;for(let i=0;i<cpuBevel.image.length;i+=4)if(cpuBevel.image[i]!==gpuBevel.image[i]||cpuBevel.image[i+1]!==gpuBevel.image[i+1]||cpuBevel.image[i+2]!==gpuBevel.image[i+2])bevelDiffer++;
   mesher.dispose();gpuMesher.dispose();
   let disposed='';try{mesher.mesh(world,'0,0,0');}catch(err){disposed=err.code;}
-  return {first,sorted,edited,stats,differ,lit,pixels:canvas.width*canvas.height,draws:[cpuPicture.draws,gpuPicture.draws],rendererStats,disposed};
+  return {first,sorted,edited,stats,differ,bordered,bevelDiffer,lit,pixels:canvas.width*canvas.height,draws:[cpuPicture.draws,gpuPicture.draws],rendererStats,disposed};
  },
 };
 window.ready=true;

@@ -48,12 +48,12 @@ fn bladeVertex(position: vec3f, uv: vec2f, id: u32) -> Output {
   // Interpolation can dip below zero; fractional powers would then poison bloom with NaNs.
   let height = clamp(i.uv.y, 0.0, 1.0);
   let wrap = max(dot(n, lightDir) + 0.45, 0.0) / 1.45;
-  let sss = pow(max(dot(-lightDir, viewDir), 0.0), 2.0) * height * 0.4;
-  let root = vec3f(0.025, 0.065, 0.012);
-  let tip = mix(vec3f(0.25, 0.46, 0.045), vec3f(0.38, 0.57, 0.085), i.variation);
+  let sss = pow(max(dot(-lightDir, viewDir), 0.0), 2.0) * height * frame.translucency.w;
+  let root = frame.root.xyz;
+  let tip = mix(frame.tip.xyz, frame.tipVariant.xyz, i.variation);
   let color = mix(root, tip, pow(height, 0.7));
   let light = frame.radiance.xyz * frame.light.w;
-  let linear = color * (frame.radiance.w + wrap * light) + vec3f(0.34, 0.5, 0.09) * sss * light;
+  let linear = color * (frame.radiance.w + wrap * light) + frame.translucency.xyz * sss * light;
   return vec4f(displayColor(linear), 1);
 }
 

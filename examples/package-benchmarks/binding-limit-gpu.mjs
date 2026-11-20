@@ -1,7 +1,7 @@
-// Real-GPU check of the texture binding limit (run on AC power, holding the GPU lock, after npm run build:packages):
+// Real-GPU check of the texture binding limit (run on AC power, after npm run build:packages):
 //   node examples/package-benchmarks/binding-limit-gpu.mjs [ref]
-// binding-limit.html draws a PHYSICAL-variant gltf-pro sphere grid with shadows, environment IBL + fog, clustered lights and
-// LocalShadows. 1. With environment as of `ref` (BRDF LUT texture) on a default-limits device the frame fails with gltf-pro's
+// binding-limit.html draws a PHYSICAL-variant gltf/pbr sphere grid with shadows, environment IBL + fog, clustered lights and
+// LocalShadows. 1. With environment as of `ref` (BRDF LUT texture) on a default-limits device the frame fails with gltf/pbr's
 // named-combination error (17 sampled textures). 2. The same at the adapter's raised limits is the reference. 3. The working
 // tree (BRDF LUT in a storage buffer) on a default-limits device renders with no error and must match the reference.
 // 4. Karis's analytic fit in place of the LUT, measured only (whole frame, and per sphere: centre vs rim, i.e. grazing).

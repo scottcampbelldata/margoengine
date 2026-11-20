@@ -59,6 +59,32 @@ test('the root Vite config leaves every top-level git-ignored folder out of the 
   for (const folder of folders) assert.ok(entries.includes(`!${folder}**`), `${folder} is excluded`);
 });
 
+// KB-L5a-6: under heavy load Windows once failed to start git (exit 0xC0000142, STATUS_DLL_INIT_FAILED) and the guiding
+// GPU test died on a bare "Command failed: git ls-files". A failed git now stops the config with a coded message that
+// names the Windows cause; nothing retries it.
+test('a git that cannot start stops the root Vite config with a coded message (KB-L5a-6)', async () => {
+  const { ignoredRootFolders } = await import('../vite.config.mjs');
+  const failing = (fields) => () => {
+    throw Object.assign(new Error('Command failed: git ls-files'), fields);
+  };
+  assert.throws(
+    () => ignoredRootFolders(failing({ status: 3221225794, stdout: '', stderr: '' })),
+    (error) =>
+      error.code === 'ERR_DEV_SERVER_GIT_LIST' &&
+      /0xC0000142/.test(error.message) &&
+      /desktop heap/.test(error.message) &&
+      error.cause.status === 3221225794,
+  );
+  assert.throws(
+    () => ignoredRootFolders(failing({ code: 'ENOENT' })),
+    (error) => error.code === 'ERR_DEV_SERVER_GIT_LIST' && /not on PATH/.test(error.message),
+  );
+  assert.throws(
+    () => ignoredRootFolders(failing({ status: 128, stderr: 'fatal: not a git repository\n' })),
+    (error) => error.code === 'ERR_DEV_SERVER_GIT_LIST' && /status 128: fatal: not a git repository\./.test(error.message),
+  );
+});
+
 // The root server's file watcher used to crawl the whole checkout at start (chokidar opens one native watch per file:
 // about 30,000 here, built packages, examples and tests). Requests waited on that crawl, so the first sciviz demo after
 // `npm run dev:examples` took 38.5 to 55.6 s on the workstation, and every tab already open at the start waited with it.
@@ -196,6 +222,44 @@ test('the probe fails on a module the page loads that does not exist', async () 
 test('the probe fails on a server that exits before it answers', async () => {
   const { problems } = await run('process.exit(3);');
   assert.ok(problems.some((p) => /exited 3/.test(p)), problems.join('\n'));
+});
+
+// A server whose page loads module /m<n>.js, which imports /m<n+1>.js, up to `last` (Infinity: a server that keeps
+// naming new URLs). Module `broken` answers 404.
+const chainSource = (last, broken = -1) => `
+import http from 'node:http';
+const port = Number(process.argv[2]);
+http.createServer((request, response) => {
+  if (request.url === '/') { response.setHeader('content-type', 'text/html'); response.end('<script type="module" src="/m1.js"></script>'); return; }
+  const n = Number(/^\\/m(\\d+)\\.js$/.exec(request.url)?.[1]);
+  if (!(n >= 1 && n <= ${last}) || n === ${broken}) { response.statusCode = 404; response.end(); return; }
+  response.setHeader('content-type', 'text/javascript');
+  response.end(n < ${last} ? 'import "/m' + (n + 1) + '.js";' : 'export {};');
+}).listen(port, '127.0.0.1');
+`;
+async function runChain(source, limitMs) {
+  const dir = fixture(source),
+    port = await freePort();
+  try {
+    return await probe({ command: process.execPath, args: ['server.mjs', String(port)], cwd: dir, page: `http://127.0.0.1:${port}/`, settleMs: 200, listenLimitMs: 10_000, limitMs });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// Local CI (2026-11-16, from commit f98a123978 on): the gameplay sandbox's dev servers and the root dev:sandbox failed
+// with "more than 200 URLs reachable; the crawl stopped". The probe stopped at a fixed 200 URLs, and the sandbox loads
+// 204 real modules (FirstPersonControls became its own controls entry, the sky gained its moon and twilight modules).
+// The probe now follows the whole graph, checks every module in it, and catches a runaway server by its hard limit.
+test('the probe follows a module graph larger than 200 URLs to the end and checks every module in it', { timeout: 60_000 }, async () => {
+  assert.deepEqual((await runChain(chainSource(300), 30_000)).problems, []);
+  const { problems } = await runChain(chainSource(300, 260), 30_000);
+  assert.ok(problems.some((p) => /m260\.js answered 404/.test(p)), problems.join('\n'));
+});
+
+test('the probe reports a server that keeps naming new URLs once its hard limit passes', { timeout: 60_000 }, async () => {
+  const { problems } = await runChain(chainSource('Infinity'), 4_000);
+  assert.ok(problems.some((p) => /the crawl from .* did not finish within 4 s \(\d+ URLs reached/.test(p)), problems.join('\n'));
 });
 
 // A server that loses its port exits while another process on that port answers the probe's requests. The probe used

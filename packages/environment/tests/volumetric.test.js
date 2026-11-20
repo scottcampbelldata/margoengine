@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Camera } from '../../core/dist/extension.js';
 import { SceneTarget } from '../../shared/msaa.js';
-import { VolumetricFog } from '../dist/volumetric.js';
+import { VolumetricFog, CLOUD_ALBEDO } from '../dist/volumetric.js';
 
 const usage = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING;
 const floats = (hex) => {
@@ -53,6 +53,10 @@ function rig({ samples = 4, format = 'rgba16float', capture = true, plugins = []
   };
   return { gpu, view, engine, fog, frame, record: (work) => gpu.record(work) };
 }
+// Clustered's terms as the froxel loop writes them (2026-11-15): the spot cone's cosines are the light's own, widened by
+// the froxel's footprint seen from the light (outerCos and innerCos).
+const widened = (terms) =>
+  terms.replaceAll('light.directionOuter.w', 'outerCos').replaceAll('light.params.x', 'innerCos');
 const uniformWrites = (log, fog) =>
   log.filter((e) => e[0] === 'writeBuffer' && e[3].length === 304 * 2).map((e) => floats(e[3]));
 
@@ -156,6 +160,29 @@ test('uniform: near-plane distance plane, grid, shape, sun and ambient from engi
   assert.deepEqual([a[43], b[43], ...b.subarray(68, 71)], [0, 0, 0, 0, 0], 'temporal 0: no history, no jitter');
 });
 
+// Regression (KB-STORM-OPTIONS1): storm-light raised the fog's ambient itself by a hand-set multiple of the flash. The fog
+// now reads the lightning light: the deck the flash lights sends rho E / (2 pi) back down, E = I / d^2 at the camera.
+test('lightning: the deck the flash lights adds rho E / (2 pi) to the ambient, read every frame', () => {
+  const light = { position: [0, 702, -1000], color: [0.5, 0.75, 1], intensity: 0 },
+    { fog, frame, record } = rig({ options: { ambient: [0.01, 0.02, 0.03], lightning: { light } } });
+  const ambient = () =>
+    [...uniformWrites(record(() => frame(0)), fog)[0].subarray(60, 63)];
+  assert.deepEqual(ambient(), [0.01, 0.02, 0.03].map(Math.fround), 'no flash: the ambient as given');
+  light.intensity = 1.43e7;
+  // The camera sits at [0, 2, 0]: the light is 700 up and 1000 away, d^2 = 1.49e6.
+  const e = 1.43e7 / (700 * 700 + 1000 * 1000),
+    lit = ambient();
+  assert.equal(CLOUD_ALBEDO, 0.8);
+  for (let i = 0; i < 3; i++)
+    assert.ok(Math.abs(lit[i] - ([0.01, 0.02, 0.03][i] + (0.8 * e * light.color[i]) / (2 * Math.PI))) < 1e-5, `${i}`);
+  fog.options.lightning = { light, albedo: 0 };
+  assert.deepEqual(ambient(), [0.01, 0.02, 0.03].map(Math.fround), 'albedo 0: no deck light');
+  for (const bad of [{ light, albedo: 2 }, { light, albedo: NaN }, { light: null }, 3]) {
+    fog.options.lightning = bad;
+    assert.throws(() => frame(1), RangeError);
+  }
+});
+
 test("depth: the capture's, an explicit provider, or a clear error; display targets tone map the fog", () => {
   assert.throws(() => rig({ capture: false }).frame(0), /needs scene depth/);
   const { gpu } = rig({ capture: false }),
@@ -200,7 +227,8 @@ test('shadows and clustered lights compose through their declared WGSL and bindi
   assert.match(code, /clustered group 1/);
   assert.match(code, /shadows group 2/);
   assert.match(code, /lit\+=0\.25\*sunShadow\(n\+d\*/);
-  assert.match(code, /\*clusterShadow\(light,p,vec3f\(0\)\)/);
+  // The shadow is taken at each quadrature point a + w u of the froxel ray's integrated part (2026-11-15).
+  assert.match(code, /\*clusterShadow\(light,a\+w\*u,vec3f\(0\)\)/);
   const groups = log.filter((e) => e[0] === 'pass.setBindGroup').map((e) => e[1]);
   assert.deepEqual(groups, [0, 1, 2, 0, 0, 0, 1, 2, 0, 0], 'per frame: inject 0-2, integrate 0, composite 0');
   assert.equal(
@@ -208,12 +236,65 @@ test('shadows and clustered lights compose through their declared WGSL and bindi
     2,
     'light and shadow groups built once',
   );
+  // Clustered's own `shadows` option declares clusterShadowVisibility (bindings 28 to 30): the fog calls it too, so
+  // the light passes no wall and the bindings stay in the inject pass's layout (2026-11-14, Cabin Hearth).
+  const own = rig({
+      options: { lights: source((g) => `// clustered group ${g}\nfn clusterShadowVisibility(){}`, lightEntries) },
+    }),
+    ownCode = own
+      .record(() => own.frame(0))
+      .find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;
+  assert.match(ownCode, /\*clusterShadowVisibility\(light,a\+w\*u,vec3f\(0\)\)/);
+  assert.doesNotMatch(ownCode, /\*clusterShadow\(light/);
+  // KB-CABIN-WINDOWGLOW1: with AreaLights on the same Clustered the declarations hold the area lights' storage buffer
+  // (binding 17). The fog scatters their light too, so the binding stays in the inject pass's automatic layout; left
+  // declared and unused it fell out, the light group failed to build and every frame was lost (Cabin Hearth's window).
+  const withArea = rig({
+      options: {
+        lights: source((g) => `// clustered group ${g}\n@group(${g}) @binding(17) var<storage,read> areaLights:AreaLightData;`, lightEntries),
+      },
+    }),
+    areaCode = withArea
+      .record(() => withArea.frame(0))
+      .find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code;
+  assert.match(areaCode, /light\+=areaFog\(p,v,volume\.scatter\.w,sigma\);/);
+  assert.match(areaCode, /for\(var j=0u;j<areaLights\.count\.x;j\+\+\)/);
+  assert.doesNotMatch(ownCode, /areaFog/, 'no area lights, no area loop');
   const shadowOnly = rig({ options: { shadows } }),
     only = shadowOnly.record(() => shadowOnly.frame(0));
   assert.match(only.find((e) => e[0] === 'module')[2].code, /shadows group 1/);
   const plain = rig(),
     base = plain.record(() => plain.frame(0)).find((e) => e[0] === 'module')[2].code;
   assert.doesNotMatch(base, /sunShadow|localLight/);
+});
+
+test('KB-FOG-HOOK-BINDINGS1: the inject pass keeps every binding of a Clustered hook it does not read', async () => {
+  const { keepBindings } = await import('../../shared/keep-bindings.js');
+  assert.equal(keepBindings(), '');
+  assert.equal(
+    keepBindings('@group(1) @binding(164) var<storage,read> clusterBounce:array<vec4f>;\n@group(1) @binding(40) var iesMap: texture_2d<f32>;', undefined),
+    'if(false){_=&clusterBounce;_=iesMap;}',
+  );
+  // A bounce hook (binding 164) in the lights' declarations, as LightBounce sets: the fog never reads it, but the bind
+  // group holds it, so the pass's automatic layout must too. Without the dead-branch use the layout dropped it and the
+  // bind group failed validation ("binding index 164 not present in the bind group layout"): no fog, every frame.
+  const source = (declarations, entries) => ({ pbr: (group) => ({ declarations: declarations(group) }), bindings: () => entries }),
+    lightEntries = [{ binding: 4, resource: {} }, { binding: 164, resource: {} }];
+  const hooked = rig({
+      options: {
+        lights: source(
+          (g) =>
+            `// clustered group ${g}\n@group(${g}) @binding(164) var<storage,read> clusterBounce:array<vec4f>;\n` +
+            'fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {return vec3f(0.0);}',
+          lightEntries,
+        ),
+      },
+    }),
+    code = hooked
+      .record(() => hooked.frame(0))
+      .find((e) => e[0] === 'module' && /fn inject/.test(e[2].code))[2].code,
+    body = code.slice(code.indexOf('fn inject('));
+  assert.match(body, /if\(false\)\{[^}]*_=&clusterBounce;[^}]*\}/);
 });
 
 test("contract with clustered and shadows: the froxel light loop repeats clusterLighting's cell lookup and the cascade bias", async () => {
@@ -245,10 +326,10 @@ test("contract with clustered and shadows: the froxel light loop repeats cluster
     'return result*clusterFrame.intensity.x;',
   ]) {
     assert.ok(clustered.includes(line), `clustered no longer has: ${line}`);
-    assert.ok(local.includes(line), `volumetric lost: ${line}`);
+    assert.ok(local.includes(widened(line)), `volumetric lost: ${line}`);
   }
   for (const text of [
-    'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}',
+    'struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,soft:vec4f,nearest:vec4f}',
     // The cascade bias: settings.y plus one texel of depth, the texel's world size read from the cascade matrix.
     'let world=max(size.x/length(vec3f(matrix[0].x,matrix[1].x,matrix[2].x)),size.y/length(vec3f(matrix[0].y,matrix[1].y,matrix[2].y)));',
     '-shadowFrame.settings.y-1*world*length(vec3f(matrix[0].z,matrix[1].z,matrix[2].z))',
@@ -282,15 +363,19 @@ test("froxel lights take each light's decay, cone and unlimited range from clust
   try {
     lights.setLights([{ position: [0, 2, 0], range: 5, direction: [0, -1, 0], outerAngle: 0.6 }]);
     const old = local();
-    assert.ok(old.includes(`    ${legacyTerms}\n    result+=`) && !old.includes('let kind='));
+    assert.ok(old.includes(`      ${widened(legacyTerms)}\n      sum+=`) && !old.includes('let kind='));
     lights.setLights([
       { position: [0, 2, 0], range: 0, decay: 1 },
       { position: [0, 3, 0], range: 6, direction: [0, -1, 0], angle: Math.PI / 2, penumbra: 0.4 },
     ]);
     const fresh = local();
-    assert.ok(fresh.includes(`    ${decayTerms}\n    result+=`) && !fresh.includes(legacyTerms));
+    assert.ok(fresh.includes(`      ${widened(decayTerms)}\n      sum+=`) && !fresh.includes(widened(legacyTerms)));
     assert.ok(lights.pbr(1).declarations.includes(decayTerms), "the very terms of clustered's light loop");
-    assert.equal(fresh.replace(decayTerms, legacyTerms), old, 'nothing else in the froxel loop changes');
+    assert.equal(
+      fresh.replace(widened(decayTerms), widened(legacyTerms)),
+      old,
+      'nothing else in the froxel loop changes',
+    );
     lights.setLights([{ position: [0, 2, 0], range: 5, direction: [0, -1, 0], outerAngle: 0.6 }]);
     assert.equal(local(), old, 'the original text once no light sets decay or angle');
   } finally {

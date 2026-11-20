@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/sculpt.browser.mjs
 // `@margoengine/terrain/sculpt` on real elevation (Mount Rainier, the Terrarium tile in packages/shadows/test/fixtures,
 // 256 x 256 texels 100 m apart) with painted weights:

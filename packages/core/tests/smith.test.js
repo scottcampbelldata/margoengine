@@ -70,3 +70,19 @@ test("core's GGX D keeps a2 / pi where the half vector faces away from the norma
     h = [Math.sqrt(1 - 0.81), 0, 0.9];
   assert.ok(Math.abs(d(n, h, 0.9, a2) / (a2 / (3.14159265 * (0.81 * (a2 - 1) + 1) ** 2)) - 1) < 1e-9);
 });
+
+// Regression (KB-G2guard, 2026-11-12): core's G2 divided by max(den, 0.0001). On a smooth surface at grazing angles den
+// falls far below 1e-4 (a2 = 1e-6, nl = nv = 0.001: 2.8e-6), so G2 came out 0.02 against 0.71 exact, darker than the
+// separable G1 G1 it replaced. den is never below 2 nl nv, so the floor only has to stop 0/0 at nl = a2 = 0; it is a
+// normal float32 far below any lit pixel's den.
+test("core's G2 keeps the exact value on smooth surfaces at grazing angles, and 0 at nl = a2 = 0", () => {
+  for (const nl of [1e-5, 1e-4, 0.001, 0.003, 0.01])
+    for (const nv of [1e-4, 0.001, 0.01, 0.5])
+      for (const a2 of [1e-10, 1e-8, 1e-6, 1e-4]) {
+        const want = correlatedG2(nl, nv, a2);
+        assert.ok(Math.abs(coreG(nl, nv, a2) / want - 1) < 1e-9, `G at nl ${nl}, nv ${nv}, a2 ${a2}: ${coreG(nl, nv, a2)} vs ${want}`);
+      }
+  assert.equal(coreG(0, 0.5, 0), 0);
+  const floor = Number(/,([0-9.e+-]+)\)$/.exec(/let g=([^;]+);/.exec(wgsl)[1])[1]);
+  assert.ok(Math.fround(floor) >= 2 ** -126 && floor <= 1e-20, `floor ${floor}`);
+});

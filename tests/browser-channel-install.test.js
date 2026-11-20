@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, win32 } from 'node:path';
+import { win32 } from 'node:path';
 import {
   channelExecutable,
   chromiumExecutablePath,
@@ -33,16 +31,34 @@ function fakeExe(version) {
   return Buffer.concat([Buffer.from('MZ'), Buffer.alloc(62), key, Buffer.alloc(100), block, Buffer.alloc(16)]);
 }
 
-/** A fake install under a temporary LOCALAPPDATA: `files` maps a path under the Application folder to its version. */
+/**
+ * A fake install under a Windows LOCALAPPDATA, held in memory: `files` maps a path under the Application folder to its
+ * version. The paths are Windows paths (win32.join), so they cannot live on a macOS or Linux disk; the install is read
+ * through the `files` layer every resolver takes, which makes the test the same on every host.
+ */
 function install(product, exe, files) {
-  const root = mkdtempSync(join(tmpdir(), 'kbc34i-')),
-    app = join(root, ...product, 'Application');
+  const root = win32.join('C:\\', 'Users', 'kbc34i', 'AppData', 'Local'),
+    app = (...parts) => win32.join(root, ...product, 'Application', ...parts),
+    entries = new Map();
+  const addDir = (path) => {
+    for (let dir = path; dir !== win32.dirname(dir) && !entries.has(dir); dir = win32.dirname(dir)) entries.set(dir, 'dir');
+  };
   for (const [path, version] of Object.entries(files)) {
-    mkdirSync(join(app, path, '..'), { recursive: true });
-    if (version === 'dir') mkdirSync(join(app, path), { recursive: true });
-    else writeFileSync(join(app, path), version ? fakeExe(version) : Buffer.from('not an executable'));
+    const full = app(...path.split('/'));
+    addDir(win32.dirname(full));
+    if (version === 'dir') addDir(full);
+    else entries.set(full, version ? fakeExe(version) : Buffer.from('not an executable'));
   }
-  return { root, app: (...parts) => win32.join(root, ...product, 'Application', ...parts), exe, done: () => rmSync(root, { recursive: true, force: true }) };
+  const layer = {
+    exists: (path) => entries.has(path),
+    list: (path) =>
+      entries.get(path) === 'dir' ? [...entries.keys()].filter((p) => win32.dirname(p) === path && p !== path).map((p) => win32.basename(p)) : [],
+    read: (path) => {
+      const entry = entries.get(path);
+      return entry instanceof Buffer ? entry : undefined;
+    },
+  };
+  return { root, app, exe, files: layer, done: () => {} };
 }
 const edge = (files) => install(['Microsoft', 'Edge'], 'msedge.exe', files);
 
@@ -62,14 +78,15 @@ test('mid-update (two version folders, a pending new_msedge.exe): Edge starts fr
   try {
     const browser = resolveBrowser({ env: { LOCALAPPDATA: fake.root }, platform: 'win32', argv: [] });
     const expected = fake.app('157.0.4341.42', 'msedge.exe');
-    assert.equal(chromiumExecutablePath(browser, 'msedge', {}), expected);
-    assert.equal(chromiumLaunchOptions({ env: { LOCALAPPDATA: fake.root }, platform: 'win32', argv: [] }).executablePath, expected);
+    assert.equal(chromiumExecutablePath(browser, 'msedge', {}, { files: fake.files }), expected);
+    assert.equal(chromiumLaunchOptions({ env: { LOCALAPPDATA: fake.root }, platform: 'win32', argv: [], files: fake.files }).executablePath, expected);
     // Through launchBrowser, as every suite starts it: the channel stays (records still say msedge), the exe is the folder's.
     const launched = [];
     await launchBrowser({
       env: { LOCALAPPDATA: fake.root },
       platform: 'win32',
       argv: [],
+      files: fake.files,
       headless: true,
       hosting: null,
       launchers: { chromium: { launch: async (options) => (launched.push(options), { close: async () => {} }) } },
@@ -90,7 +107,7 @@ test('after the swap, with the old folder still on disk, Edge starts from the ne
     '157.0.4341.46/msedge.exe': '157.0.4341.46',
   });
   try {
-    assert.equal(installedVersionExecutable(fake.app('msedge.exe')), fake.app('157.0.4341.46', 'msedge.exe'));
+    assert.equal(installedVersionExecutable(fake.app('msedge.exe'), { files: fake.files }), fake.app('157.0.4341.46', 'msedge.exe'));
   } finally {
     fake.done();
   }
@@ -106,7 +123,7 @@ test('an unreadable top-level version takes the newest folder that is not the pe
     'SetupMetrics/msedge.exe': '1.0.0.0',
   });
   try {
-    assert.equal(installedVersionExecutable(fake.app('msedge.exe')), fake.app('157.0.4341.42', 'msedge.exe'));
+    assert.equal(installedVersionExecutable(fake.app('msedge.exe'), { files: fake.files }), fake.app('157.0.4341.42', 'msedge.exe'));
   } finally {
     fake.done();
   }
@@ -122,13 +139,13 @@ test('no version folder with the exe (Chrome keeps only a stub at the top), anot
   const bare = edge({ 'msedge.exe': '157.0.4341.42' });
   try {
     const env = { LOCALAPPDATA: chrome.root, MARGO_BROWSER: 'chrome' };
-    assert.equal(channelExecutable(resolveBrowser({ env, platform: 'win32', argv: [] }), 'chrome'), chrome.app('chrome.exe'));
-    assert.equal(installedVersionExecutable(bare.app('msedge.exe')), bare.app('msedge.exe'));
-    assert.equal(channelExecutable(resolveBrowser({ env: { LOCALAPPDATA: bare.root }, platform: 'linux', argv: [] }), 'msedge'), undefined);
-    assert.equal(channelExecutable(resolveBrowser({ env: {}, platform: 'win32', argv: [] }), 'msedge'), undefined);
+    assert.equal(channelExecutable(resolveBrowser({ env, platform: 'win32', argv: [] }), 'chrome', { files: chrome.files }), chrome.app('chrome.exe'));
+    assert.equal(installedVersionExecutable(bare.app('msedge.exe'), { files: bare.files }), bare.app('msedge.exe'));
+    assert.equal(channelExecutable(resolveBrowser({ env: { LOCALAPPDATA: bare.root }, platform: 'linux', argv: [] }), 'msedge', { files: bare.files }), undefined);
+    assert.equal(channelExecutable(resolveBrowser({ env: {}, platform: 'win32', argv: [] }), 'msedge', { files: bare.files }), undefined);
     // An executable the caller or BROWSER_EXECUTABLE names still wins over the install.
     const own = resolveBrowser({ env: { LOCALAPPDATA: bare.root, BROWSER_EXECUTABLE: 'D:/own/msedge.exe' }, platform: 'win32', argv: [] });
-    assert.equal(chromiumExecutablePath(own, 'msedge', {}), 'D:/own/msedge.exe');
+    assert.equal(chromiumExecutablePath(own, 'msedge', {}, { files: bare.files }), 'D:/own/msedge.exe');
   } finally {
     chrome.done();
     bare.done();

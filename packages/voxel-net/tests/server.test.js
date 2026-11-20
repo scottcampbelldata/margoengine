@@ -400,3 +400,20 @@ test('close is fine when a generator thread has already died', { timeout: 60_000
   await drive([a.client], 300);
   await server.close();
 });
+
+// Regression (2026-11-19, KB-OWN-EXIT2): close() during the first await of listen() resolved at once (no listener yet),
+// then listen() went on and opened one anyway: a closed server kept its port and the process alive. A Plaza shard told
+// to stop while it was starting lingered until its router killed it.
+test('close while listen is starting: listen rejects and no listener is left open', async () => {
+  const listeners = () => process.getActiveResourcesInfo().filter((name) => name === 'TCPServerWrap').length,
+    settle = () => new Promise((done) => setTimeout(done, 0));
+  // A closed handle leaves the list one turn of the loop after its close callback (the previous test's server).
+  await settle();
+  const before = listeners(),
+    server = new VoxelServer({ blocks, workers: 1 }),
+    listening = server.listen(0);
+  await server.close();
+  await assert.rejects(listening, { code: 'state' });
+  await settle();
+  assert.equal(listeners(), before, 'no listening socket is left');
+});

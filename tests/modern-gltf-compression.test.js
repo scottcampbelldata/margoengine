@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, loadGLTF, parseGLTF, parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, loadGLTF, parseGLTF, parseGLTFAsync } from '../packages/gltf/dist/pbr.js';
 import { MeshoptDecoder } from '../packages/decoders/dist/meshopt.js';
 import { decodeDraco, initDraco } from '../packages/decoders/dist/codec.js';
 import { optionalGPU } from './support/optional-gpu.js';

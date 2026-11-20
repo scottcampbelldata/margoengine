@@ -50,10 +50,12 @@ export function parseXML(source: string): E57Element {
   const skipMisc = () => {
     for (;;) {
       while (i < source.length && /\s/.test(source[i])) i++;
-      if (source.startsWith('<?', i)) i = source.indexOf('?>', i) + 2 || fail('unclosed declaration');
-      else if (source.startsWith('<!--', i)) i = source.indexOf('-->', i) + 3 || fail('unclosed comment');
+      // indexOf gives -1 for an unclosed one: adding the closer's length to it would jump back into the text.
+      let end: number;
+      if (source.startsWith('<?', i)) end = (source.indexOf('?>', i) + 1 || fail('unclosed declaration')) + 1;
+      else if (source.startsWith('<!--', i)) end = (source.indexOf('-->', i) + 1 || fail('unclosed comment')) + 2;
       else return;
-      if (i <= 1) fail('unclosed markup');
+      i = end;
     }
   };
   const element = (depth: number): E57Element => {
@@ -274,8 +276,9 @@ function fieldOf(e: E57Element): E57Field | undefined {
     };
   }
   if (type === 'ScaledInteger' || type === 'Integer') {
-    const minimum = Number(a.minimum ?? (type === 'Integer' ? -(2 ** 63) : 0)),
-      maximum = Number(a.maximum ?? (type === 'Integer' ? 2 ** 63 - 1 : 0));
+    // ASTM E2807-11 gives Integer and ScaledInteger alike the full 64-bit range when the attributes are absent.
+    const minimum = Number(a.minimum ?? -(2 ** 63)),
+      maximum = Number(a.maximum ?? 2 ** 63 - 1);
     if (!Number.isFinite(minimum) || !Number.isFinite(maximum) || maximum < minimum)
       throw new TypeError(`E57 field ${e.name} has an invalid range; the file is corrupt`);
     const range = maximum - minimum;
@@ -523,9 +526,15 @@ export function parseE57(input: ArrayBuffer | Uint8Array, options: E57Options = 
       red = get('colorRed'),
       green = get('colorGreen'),
       blue = get('colorBlue'),
-      redField = fields.find((f) => f.name === 'colorRed');
-    const cMin = num(child(colorLimits ?? scan, 'colorRedMinimum'), redField ? redField.minimum : 0),
-      cMax = num(child(colorLimits ?? scan, 'colorRedMaximum'), redField ? redField.maximum : 255);
+      // Each channel has its own limits (colorRedMinimum, colorGreenMinimum, ...), falling back to its field's range.
+      channel = ['Red', 'Green', 'Blue'].map((c) => {
+        const f = fields.find((x) => x.name === `color${c}`),
+          lo = num(child(colorLimits ?? scan, `color${c}Minimum`), f ? f.minimum * f.scale + f.offset : 0),
+          hi = num(child(colorLimits ?? scan, `color${c}Maximum`), f ? f.maximum * f.scale + f.offset : 255);
+        return { lo, scale: 255 / (hi - lo || 1) };
+      }),
+      // Rounded and clamped: a value past its stated limit would wrap round a byte (300 to 44).
+      toByte = (v: number, c: number) => Math.min(255, Math.max(0, Math.round((v - channel[c].lo) * channel[c].scale)));
     const attributes: Record<string, Float64Array> = {};
     const known = new Set([
       'cartesianX',
@@ -575,10 +584,9 @@ export function parseE57(input: ArrayBuffer | Uint8Array, options: E57Options = 
                 (m) => new Uint8Array(m),
                 4,
                 (o, at, i) => {
-                  const s = 255 / (cMax - cMin || 1);
-                  o[at] = (red[i] - cMin) * s;
-                  o[at + 1] = (green[i] - cMin) * s;
-                  o[at + 2] = (blue[i] - cMin) * s;
+                  o[at] = toByte(red[i], 0);
+                  o[at + 1] = toByte(green[i], 1);
+                  o[at + 2] = toByte(blue[i], 2);
                   o[at + 3] = 255;
                 },
               )
@@ -667,7 +675,9 @@ export function writeE57(scans: readonly E57WriteScan[], options: { packetBytes?
     logical.push(b);
     length += b.byteLength;
   };
-  const physical = (l: number) => Math.floor(l / PAYLOAD) * PAGE + (l % PAYLOAD);
+  const physical = (l: number) => Math.floor(l / PAYLOAD) * PAGE + (l % PAYLOAD),
+    // Text in CDATA: a ']]>' inside would close it early, so it is split across two sections.
+    cdata = (text: string) => `<![CDATA[${text.replaceAll(']]>', ']]]]><![CDATA[>')}]]>`;
   push(new Uint8Array(48));
   const xmlScans: string[] = [];
   const packetLimit = Math.min(options.packetBytes ?? 60_000, 64_000);
@@ -787,7 +797,7 @@ export function writeE57(scans: readonly E57WriteScan[], options: { packetBytes?
       ? `<colorLimits type="Structure">${['Red', 'Green', 'Blue'].map((c) => `<color${c}Minimum type="Integer">0</color${c}Minimum><color${c}Maximum type="Integer">255</color${c}Maximum>`).join('')}</colorLimits>`
       : '';
     xmlScans.push(
-      `<vectorChild type="Structure"><guid type="String"><![CDATA[scan-${s}]]></guid><name type="String"><![CDATA[${scan.name ?? `scan ${s}`}]]></name>${pose}${limits}${colorLimits}<points type="CompressedVector" fileOffset="${physical(sectionStart)}" recordCount="${n}"><prototype type="Structure">${fields.map((f) => f.xml).join('')}</prototype><codecs type="Vector" allowHeterogeneousChildren="1"/></points></vectorChild>`,
+      `<vectorChild type="Structure"><guid type="String"><![CDATA[scan-${s}]]></guid><name type="String">${cdata(scan.name ?? `scan ${s}`)}</name>${pose}${limits}${colorLimits}<points type="CompressedVector" fileOffset="${physical(sectionStart)}" recordCount="${n}"><prototype type="Structure">${fields.map((f) => f.xml).join('')}</prototype><codecs type="Vector" allowHeterogeneousChildren="1"/></points></vectorChild>`,
     );
   }
   const xml = new TextEncoder().encode(

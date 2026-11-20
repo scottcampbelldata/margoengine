@@ -47,6 +47,8 @@ type PickView = RenderView & { pixels: true };
 const covers = (rect: readonly number[] | undefined, c: Context) =>
   !rect || (rect[0] === 0 && rect[1] === 0 && rect[2] === c.width && rect[3] === c.height);
 const contextQuery = Symbol('selection query');
+/** Marks a pick whose answer must lie on the centre pixel (a world ray), not the mouse pick's one pixel tolerance. Shared by key so the separately built spatial entry sees the same symbol. */
+export const exactPick: unique symbol = Symbol.for('margoengine.selection.exactPick') as never;
 type QueryView = PickView & { [contextQuery]?: (view: PickView) => Promise<void> };
 const attachedPickers = new WeakMap<Engine, Picking>();
 type Snapshot = { geometry: Geometry | null; values: Float32Array; visible: number };
@@ -55,7 +57,7 @@ const microShader =
     .replace('id:u32}', 'id:u32,@location(1) position:vec3f,@location(2) material:vec4f}')
     .replace(
       'u32(i.factors.w))',
-      'u32(i.factors.w),p.xyz,vec4f(i.factors.xyz,sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz)))))',
+      'u32(i.factors.w),p.xyz,vec4f(i.factors.xyz,select(-1.0,1.0,dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))>=0.0)))',
     ) +
   `
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) u32 {
@@ -144,7 +146,7 @@ export interface PickingOverlay {
     splat?: number;
   } | null;
 }
-/** A pick result: the core mesh, or for gltf-pro models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
+/** A pick result: the core mesh, or for gltf/pbr models the glTF node with its model and primitive. `approximate`: a pick proxy (imposter level) hit through its bounding sphere; `mesh` is the LOD anchor. */
 export interface PickHit {
   /** World surface normal when using the optional hit-details picker. */
   normal?: readonly [number, number, number];
@@ -157,7 +159,7 @@ export interface PickHit {
   primitive?: ModelPrimitiveLike;
   primitiveIndex?: number;
   approximate?: boolean;
-  /** Instanced primitives (gltf-pro PBRInstances): the instance index. */
+  /** Instanced primitives (gltf\/pbrInstances): the instance index. */
   instanceId?: number;
   /** A hit on `@margoengine/points/pick`'s overlay: the cloud. `mesh` is then the mesh it follows or its stand-in. */
   cloud?: object;
@@ -175,7 +177,7 @@ export interface PickHit {
   splat?: number;
 }
 
-/** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf-pro vertices. */
+/** UV sphere scaled so its faces enclose the unit sphere (proxy picks cover at least the bounding sphere the bvh Raycaster tests), as 20-float gltf/pbr vertices. */
 function proxySphere(device: GPUDevice): ModelPrimitiveLike {
   const rows = 8,
     cols = 16,
@@ -345,7 +347,10 @@ export class Picking implements EnginePlugin {
     this.surface?.setup(this.device);
     this.uniform = this.device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     // Three 12-byte rows use WebGPU's 256-byte copy pitch; padding is never resolved as IDs.
-    this.read = this.device.createBuffer({ size: this.surface ? 2304 : 768, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    this.read = this.device.createBuffer({
+      size: this.surface ? 2304 : 768,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
     this.micro = this.device.createTexture({
       size: [3, 3],
       format: 'r32uint',
@@ -384,15 +389,25 @@ export class Picking implements EnginePlugin {
     if (!pipeline) {
       if (this.pipelines.size >= 64)
         throw new RangeError('Too many picking shader variants; reduce distinct materials and formats to 64 or fewer.');
-      const module = c.device.createShaderModule({ code: !mrt && this.surface ? this.surface.shader(code, 'core') : code });
+      const module = c.device.createShaderModule({
+        code: !mrt && this.surface ? this.surface.shader(code, 'core') : code,
+      });
       pipeline = c.device.createRenderPipeline({
         ...c.descriptor,
         layout: 'auto',
-        vertex: { ...c.descriptor.vertex, module, ...(!mrt && this.surface ? { buffers: this.surface.buffers(c.descriptor.vertex.buffers as GPUVertexBufferLayout[], 'core') } : {}) },
+        vertex: {
+          ...c.descriptor.vertex,
+          module,
+          ...(!mrt && this.surface
+            ? { buffers: this.surface.buffers(c.descriptor.vertex.buffers as GPUVertexBufferLayout[], 'core') }
+            : {}),
+        },
         fragment: {
           module,
           entryPoint: 'fragment',
-          targets: mrt ? [{ format: c.format }, { format: 'r32uint' }] : [{ format: 'r32uint' }, ...(this.surface?.targets ?? [])],
+          targets: mrt
+            ? [{ format: c.format }, { format: 'r32uint' }]
+            : [{ format: 'r32uint' }, ...(this.surface?.targets ?? [])],
         },
         depthStencil: mrt
           ? c.descriptor.depthStencil
@@ -491,10 +506,13 @@ export class Picking implements EnginePlugin {
     }
     return true;
   }
-  /** `engine.pick` hook: the core mesh, or the glTF node of a gltf-pro model, at a canvas CSS pixel, in `view` when given. */
+  /** `engine.pick` hook: the core mesh, or the glTF node of a gltf\/pbr model, at a canvas CSS pixel, in `view` when given. */
   async onPick(x: number, y: number, view?: PickView): Promise<Mesh | null> {
     const query = (view as QueryView | undefined)?.[contextQuery];
-    if (query) { await query(view!); return null; }
+    if (query) {
+      await query(view!);
+      return null;
+    }
     const { batch } = this;
     if (batch) {
       this.batch = undefined;
@@ -553,11 +571,25 @@ export class Picking implements EnginePlugin {
     return out;
   }
   /** Runtime for optional query entries; validates the picker lifetime before access. */
-  protected get queryEngine(): Engine { this.ready(); return this.engine!; }
-  /** Run an optional readback inside the engine's serialized, refreshed scene/view pick context. */
-  protected async queryContext(x: number, y: number, view: RenderView | undefined, run: (view: PickView) => Promise<void>): Promise<void> {
+  protected get queryEngine(): Engine {
     this.ready();
-    const request = { ...view, camera: view?.camera ?? this.engine!.camera, viewport: view?.viewport ?? (view?.pixels ? [0, 0, this.engine!.canvas.width, this.engine!.canvas.height] : [0, 0, 1, 1]), [contextQuery]: run } as QueryView;
+    return this.engine!;
+  }
+  /** Run an optional readback inside the engine's serialized, refreshed scene/view pick context. */
+  protected async queryContext(
+    x: number,
+    y: number,
+    view: RenderView | undefined,
+    run: (view: PickView) => Promise<void>,
+  ): Promise<void> {
+    this.ready();
+    const request = {
+      ...view,
+      camera: view?.camera ?? this.engine!.camera,
+      viewport:
+        view?.viewport ?? (view?.pixels ? [0, 0, this.engine!.canvas.width, this.engine!.canvas.height] : [0, 0, 1, 1]),
+      [contextQuery]: run,
+    } as QueryView;
     await this.engine!.pick(x, y, request);
   }
   /** Throws unless a pick can run now. */
@@ -616,7 +648,7 @@ export class Picking implements EnginePlugin {
     if (px < left || px >= right || py < top || py >= bottom) return null;
     const encoder = batchEncoder ?? device.createCommandEncoder();
     let texture: GPUTexture, origin: number[], candidates: Map<Mesh, PickingSource[]> | undefined;
-    // ModelLike and proxy IDs are not in the forward pass (gltf-pro and imposters draw their own pipelines), so those scenes use the micro pass.
+    // ModelLike and proxy IDs are not in the forward pass (gltf/pbr and imposters draw their own pipelines), so those scenes use the micro pass.
     if (captured) {
       texture = this.ids!;
       origin = [x0, y0];
@@ -629,16 +661,26 @@ export class Picking implements EnginePlugin {
     this.surface?.copy(encoder, read, offset, origin, [width, height]);
     const camera = view?.camera ?? e.camera;
     if (!batchEncoder) device.queue.submit([encoder.finish()]);
-    return { at: offset / 4, cx: px - x0, cy: py - y0, width, height, candidates, instances: this.instanceHits, ...(this.surface ? { matrix: this.frame.slice(0, 16), eye: [...camera.position], origin } : {}) };
+    return {
+      at: offset / 4,
+      cx: px - x0,
+      cy: py - y0,
+      width,
+      height,
+      candidates,
+      instances: this.instanceHits,
+      ...(this.surface ? { matrix: this.frame.slice(0, 16), eye: [...camera.position], origin } : {}),
+    };
   }
   /** The hit of one mapped tile: the center's ID, else the nearest neighbor's, resolved and checked against the scene. */
   protected decode(scene: PickScene, data: Uint32Array, tile: PickTile, view: PickView | undefined): PickHit | null {
     const e = this.engine!,
       { device, live, meshes, models, starts, total, list, capacity } = scene,
       { at, cx, cy, width, height, candidates } = tile;
-    let hx = cx, hy = cy;
+    let hx = cx,
+      hy = cy;
     let id = data[at + cy * 64 + cx];
-    if (!id)
+    if (!id && !(view as { [exactPick]?: boolean } | undefined)?.[exactPick])
       for (const [dx, dy] of [
         [0, -1],
         [-1, 0],
@@ -652,7 +694,8 @@ export class Picking implements EnginePlugin {
         const nx = cx + dx,
           ny = cy + dy;
         if (nx >= 0 && ny >= 0 && nx < width && ny < height && data[at + ny * 64 + nx]) {
-          hx = nx; hy = ny;
+          hx = nx;
+          hy = ny;
           id = data[at + ny * 64 + nx];
           break;
         }
@@ -708,7 +751,16 @@ export class Picking implements EnginePlugin {
           Object.assign(hit, { model, primitive: model.primitives[primitiveIndex], primitiveIndex });
       }
     }
-    if (this.surface && tile.matrix && tile.eye && tile.origin && !hit.approximate && !hit.line && !hit.cloud && !hit.splats)
+    if (
+      this.surface &&
+      tile.matrix &&
+      tile.eye &&
+      tile.origin &&
+      !hit.approximate &&
+      !hit.line &&
+      !hit.cloud &&
+      !hit.splats
+    )
       this.surface.decode(hit, data, at, hx, hy, tile.matrix, tile.eye, tile.origin);
     return hit;
   }
@@ -771,7 +823,9 @@ export class Picking implements EnginePlugin {
         encoder = captured ? device.createCommandEncoder() : undefined;
       batch.points.forEach(([x, y], i) => {
         const onCanvas = x >= 0 && y >= 0 && x < cssWidth && y < cssHeight,
-          tile = onCanvas ? this.submit(scene, x, y, view, read, i * (this.surface ? 2304 : tileBytes), captured, encoder) : null;
+          tile = onCanvas
+            ? this.submit(scene, x, y, view, read, i * (this.surface ? 2304 : tileBytes), captured, encoder)
+            : null;
         tiles.push(tile);
         if (onCanvas && !tile) batch.outside.push(i);
       });
@@ -878,7 +932,15 @@ export class Picking implements EnginePlugin {
         values[values.length - 1] = mesh.id;
       }
     const pass = encoder.beginRenderPass({
-      colorAttachments: [{ view: c.color, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' }, ...(this.surface?.views.map(view => ({view, clearValue: {r:0,g:0,b:0,a:0}, loadOp: 'clear' as const, storeOp:'store' as const})) ?? [])],
+      colorAttachments: [
+        { view: c.color, clearValue: { r: 0, g: 0, b: 0, a: 0 }, loadOp: 'clear', storeOp: 'store' },
+        ...(this.surface?.views.map((view) => ({
+          view,
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          loadOp: 'clear' as const,
+          storeOp: 'store' as const,
+        })) ?? []),
+      ],
       depthStencilAttachment: { view: c.depth, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' },
     });
     pass.setPipeline(pipeline);
@@ -902,7 +964,7 @@ export class Picking implements EnginePlugin {
       pass.drawIndexed(geometry.indices.length, values.length / 24);
       offset += values.length;
     }
-    // gltf-pro primitives whose bounding sphere meets the micro frustum, alpha cut-outs and transparency ignored, deformed (skinned) buffers used.
+    // gltf/pbr primitives whose bounding sphere meets the micro frustum, alpha cut-outs and transparency ignored, deformed (skinned) buffers used.
     const draws = this.draws,
       models = this.models.list,
       starts = this.models.starts;
@@ -940,11 +1002,18 @@ export class Picking implements EnginePlugin {
       draws.add((this.sphere ??= proxySphere(device)), e.store.capacity + 1 + this.models.total + i, k);
     }
     if (draws.count) {
-      this.modelPipeline ??= modelPipeline(device, modelCode(idFragment), 'r32uint', {
-        format: 'depth32float',
-        depthWriteEnabled: true,
-        depthCompare: 'greater-equal',
-      }, undefined, this.surface);
+      this.modelPipeline ??= modelPipeline(
+        device,
+        modelCode(idFragment),
+        'r32uint',
+        {
+          format: 'depth32float',
+          depthWriteEnabled: true,
+          depthCompare: 'greater-equal',
+        },
+        undefined,
+        this.surface,
+      );
       draws.draw(device, pass, this.modelPipeline, matrix);
     }
     pass.end();

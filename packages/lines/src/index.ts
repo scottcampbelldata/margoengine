@@ -6,6 +6,7 @@ export type { LineOptions, LineMaterialOptions } from './line.js';
 export {
   GridHelper,
   PolarGridHelper,
+  type GridFade,
   AxesHelper,
   Box3Helper,
   BoxHelper,
@@ -40,6 +41,7 @@ export type { FogLike } from '../../shared/fog.js';
 export type { MaskStyle } from '../../shared/selection-mask.js';
 export {
   computeLineDistances,
+  distinctNeighbours,
   expandLine,
   triangleArea,
   segmentCount,

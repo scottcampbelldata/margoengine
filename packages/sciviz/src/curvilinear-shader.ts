@@ -1,7 +1,29 @@
 // Public inverse-map mathematics, independently implemented. No companion code used.
-export const curvilinearShader = /* wgsl */ `
+import { colorLookupWGSL } from './color-lookup.js';
+
+const plainTransfer = /* wgsl */ `
+fn transferAt(value:f32,y:f32)->vec4f {
+ let n=vec2f(textureDimensions(transfer));let uv=select(vec2f(value,y),(vec2f(value,y)*(n-1.0)+0.5)/n,u.classification.x>0.5);
+ return textureSampleLevel(transfer,linearSampler,uv,0.0);
+}`;
+// A colour scale's float table (under, over, NaN colours, log or binned steps) is not filterable: read it with the
+// shared lookup, and a gradient or preintegrated table with explicit bilinear loads, as the regular volume does.
+const encodedTransfer = /* wgsl */ `${colorLookupWGSL}
+fn transferAt(value:f32,y:f32)->vec4f {
+ if(u.classification.x<0.5){return colourLookup(transfer,value);}
+ let n=vec2f(textureDimensions(transfer));let p=clamp(vec2f(value,y),vec2f(0.0),vec2f(1.0))*(n-1.0);
+ let i=vec2i(floor(p));let j=min(i+vec2i(1),vec2i(n)-vec2i(1));let f=fract(p);
+ return mix(mix(textureLoad(transfer,i,0),textureLoad(transfer,vec2i(j.x,i.y),0),f.x),mix(textureLoad(transfer,vec2i(i.x,j.y),0),textureLoad(transfer,j,0),f.x),f.y);
+}`;
+// Direct3D's HLSL compiler (fxc, under ANGLE's WebGL2 on Windows) inlines every call and unrolls every loop it can
+// count: the march's inverse map (a bisection of up to 32 steps per axis, 24 Newton steps over 8 corners) was copied
+// into the program dozens of times and took it 38 to 62 s to link. Every fixed loop bound adds `Z`, the uniform
+// `u.zero.x` that is always 0, so no compiler can count it, and the gradient reads its six samples through one
+// call (KB-COMPAT-FXCTIME1). The same operations run in the same order: the same colours.
+/** @internal The mapped-grid ray caster, specialised for a plain (filterable) or a colour-scale (float table) transfer. */
+export const curvilinearShader = (encoded: boolean): string => /* wgsl */ `
 struct Mapped {
- model:mat4x4f,inverse:mat4x4f,dims:vec4f,options:vec4f,classification:vec4f,spacing:vec4f,
+ model:mat4x4f,inverse:mat4x4f,dims:vec4f,options:vec4f,classification:vec4f,zero:vec4f,
  low:vec4f,span:vec4f,center:vec4f,planes:array<vec4f,4>,slice:vec4f
 }
 @group(1) @binding(0) var<uniform> u:Mapped;
@@ -12,12 +34,13 @@ struct Mapped {
 @group(1) @binding(5) var nodes:texture_2d<f32>;
 @group(1) @binding(6) var axes:texture_2d<f32>;
 @group(1) @binding(7) var valid:texture_3d<f32>;
+fn Z()->u32 {return u32(u.zero.x);}
 fn load(t:texture_2d<f32>,index:u32)->vec4f {let w=textureDimensions(t).x;return textureLoad(t,vec2i(i32(index%w),i32(index/w)),0);}
 fn nodePoint(p:vec3u)->vec3f {return load(points,p.x+u32(u.dims.x)*(p.y+u32(u.dims.y)*p.z)).xyz;}
 fn interval(v:f32,axis:u32)->f32 {
  var lo=0u;var hi=u32(u.dims[axis])-1u;
  if(v<load(axes,lo)[axis]-1e-6 || v>load(axes,hi)[axis]+1e-6){return -1.0;}
- for(var k=0u;k<32u && hi-lo>1u;k++){let m=(lo+hi)/2u;if(load(axes,m)[axis]>v){hi=m;}else{lo=m;}}
+ for(var k=0u;k<32u+Z() && hi-lo>1u;k++){let m=(lo+hi)/2u;if(load(axes,m)[axis]>v){hi=m;}else{lo=m;}}
  return (f32(lo)+clamp((v-load(axes,lo)[axis])/(load(axes,hi)[axis]-load(axes,lo)[axis]),0.0,1.0))/(u.dims[axis]-1.0);
 }
 fn inverseMap(p:vec3f)->vec4f {
@@ -38,11 +61,11 @@ fn inverseMap(p:vec3f)->vec4f {
   let cell=u32(b.w)-1u;let size=vec3u(u.dims.xyz)-1u;
   let base=vec3u(cell%size.x,(cell/size.x)%size.y,cell/(size.x*size.y));
   var c:array<vec3f,8>;
-  for(var k=0u;k<8u;k++){c[k]=nodePoint(base+vec3u(k&1u,(k>>1u)&1u,k>>2u));}
+  for(var k=0u;k<8u+Z();k++){c[k]=nodePoint(base+vec3u(k&1u,(k>>1u)&1u,k>>2u));}
   var q=vec3f(0.5);
-  for(var iteration=0u;iteration<24u;iteration++) {
+  for(var iteration=0u;iteration<24u+Z();iteration++) {
    var value=vec3f(0.0);var j0=vec3f(0.0);var j1=vec3f(0.0);var j2=vec3f(0.0);
-   for(var k=0u;k<8u;k++) {
+   for(var k=0u;k<8u+Z();k++) {
     let bit=vec3u(k&1u,(k>>1u)&1u,k>>2u);let w=select(1.0-q,q,bit>vec3u(0u));let sign=select(vec3f(-1.0),vec3f(1.0),bit>vec3u(0u));
     value+=c[k]*w.x*w.y*w.z;j0+=c[k]*sign.x*w.y*w.z;j1+=c[k]*w.x*sign.y*w.z;j2+=c[k]*w.x*w.y*sign.z;
    }
@@ -60,7 +83,7 @@ fn inverseMap(p:vec3f)->vec4f {
 fn scalar(q:vec3f)->vec2f {
  let p=clamp(q,vec3f(0.0),vec3f(1.0))*(u.dims.xyz-1.0);let a=vec3i(floor(p));let f=fract(p);
  var value=0.0;
- for(var k=0u;k<8u;k++) {
+ for(var k=0u;k<8u+Z();k++) {
   let bit=vec3i(i32(k&1u),i32((k>>1u)&1u),i32(k>>2u));let v=min(a+bit,vec3i(u.dims.xyz)-1);let w=select(1.0-f,f,bit>vec3i(0));let weight=w.x*w.y*w.z;
   if(weight>1e-7 && textureLoad(valid,v,0).r<0.5){return vec2f(0.0);}
   value+=textureLoad(data,v,0).r*weight;
@@ -69,14 +92,16 @@ fn scalar(q:vec3f)->vec2f {
 fn sample(p:vec3f)->vec2f {let q=inverseMap(p);if(q.w==0.0){return vec2f(0.0);}return scalar(q.xyz);}
 fn gradient(p:vec3f,v:f32)->vec3f {
  let h=u.options.x*0.5;var g=vec3f(0.0);
- for(var a=0u;a<3u;a++){var delta=vec3f(0.0);delta[a]=h;let lo=sample(p-delta);let hi=sample(p+delta);g[a]=(select(v,hi.x,hi.y>0.0)-select(v,lo.x,lo.y>0.0))/(2.0*h*u.span[a]);}
+ var lo=vec2f(0.0);
+ for(var k=0u;k<6u+Z();k++){let a=k/2u;var delta=vec3f(0.0);delta[a]=h;let s=sample(select(p-delta,p+delta,(k&1u)==1u));
+  if((k&1u)==0u){lo=s;}else{g[a]=(select(v,s.x,s.y>0.0)-select(v,lo.x,lo.y>0.0))/(2.0*h*u.span[a]);}}
  return g;
 }
+${encoded ? encodedTransfer : plainTransfer}
 fn classify(p:vec3f,q:vec3f,v:f32,next:vec3f)->vec4f {
  var y=0.5;if(u.classification.x==1.0){y=length(gradient(p,v))*u.classification.y;}
  if(u.classification.x==2.0){let s=sample(next);y=select(v,s.x,s.y>0.0);}
- let n=vec2f(textureDimensions(transfer));let uv=select(vec2f(v,y),(vec2f(v,y)*(n-1.0)+0.5)/n,u.classification.x>0.5);
- return textureSampleLevel(transfer,linearSampler,uv,0.0);
+ return transferAt(v,y);
 }
 fn kept(q:vec3f)->bool {for(var k=0u;k<u32(u.center.w);k++){if(dot(u.planes[k].xyz,q)+u.planes[k].w<0.0){return false;}}return true;}
 struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
@@ -86,7 +111,7 @@ struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
  let world=a.xyz/a.w;let worldDir=normalize(b.xyz/b.w-world);let origin=(u.inverse*vec4f(world,1.0)).xyz;
  let raw=(u.inverse*vec4f(worldDir,0.0)).xyz;let speed=length(raw);let d=raw/speed;
  var enter=0.0;var exit=1e30;
- for(var axis=0u;axis<3u;axis++){if(abs(d[axis])<1e-20){if(origin[axis]<0.0||origin[axis]>1.0){discard;}}else{let lo=-origin[axis]/d[axis];let hi=(1.0-origin[axis])/d[axis];enter=max(enter,min(lo,hi));exit=min(exit,max(lo,hi));}}
+ for(var axis=0u;axis<3u+Z();axis++){if(abs(d[axis])<1e-20){if(origin[axis]<0.0||origin[axis]>1.0){discard;}}else{let lo=-origin[axis]/d[axis];let hi=(1.0-origin[axis])/d[axis];enter=max(enter,min(lo,hi));exit=min(exit,max(lo,hi));}}
  let opaque=opaquePoint(in.position.xy,in.ndc);if(opaque.w>0.0){exit=min(exit,dot(opaque.xyz-world,worldDir)*speed);}
  if(exit<=enter){discard;}
  let physicalSpeed=length(d*(u.span.xyz/max(max(u.span.x,u.span.y),u.span.z)));let step=max(u.options.x/physicalSpeed/u.options.y,(exit-enter)/4096.0);var t=enter;var total=vec4f(0.0);var peak=-1.0;var found=false;var peakPoint=vec3f(0.0);var peakQ=vec3f(0.0);

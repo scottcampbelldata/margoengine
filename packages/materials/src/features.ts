@@ -25,7 +25,7 @@ function edit(code: string, from: string | RegExp, to: string | ((match: string,
   if (next === code)
     throw new MargoError(
       'unsupported',
-      'Material features require the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and materials versions',
+      'Material features require the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and materials versions',
     );
   return next;
 }
@@ -72,7 +72,7 @@ export function featureShader(code: string, group: number, key: string): string 
       'let n=normalize(cross(dpdy(i.position),dpdx(i.position)));',
     );
   // A normal map's +Y is up the image (glTF 2.0 material.schema.json normalTexture: "+X is right and +Y is up").
-  // gltf-pro's derived frame (shared/tangent-frame.js) sends B along grad(-v), toward decreasing v, up the image for
+  // gltf/pbr's derived frame (shared/tangent-frame.js) sends B along grad(-v), toward decreasing v, up the image for
   // glTF's upper-left texture origin. Materials meshes have a bottom-left UV origin and flipY uploads, so up the image
   // is increasing v, where MikkTSpace tangents of these UVs put B too (mikktspace.c: vOt along increasing t; bitangent =
   // fSign * cross(vN, tangent)): B becomes grad(v). Authored tangents keep b = cross(n, t) * w: this only changes the

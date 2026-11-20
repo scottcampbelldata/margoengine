@@ -1,12 +1,12 @@
 // Product viewer test page: stress and edge-case testing for:
-// @margoengine/staging, @margoengine/environment, @margoengine/shadows,
+// @margoengine/studio, @margoengine/environment, @margoengine/shadows,
 // @margoengine/post, @margoengine/dof, @margoengine/taa, @margoengine/tonemap,
 // @margoengine/oit, @margoengine/materials, @margoengine/decoders,
 // using only documented public APIs.
 import { ready } from './page-harness';
 import { createStage, type Stage } from '@margoengine/stage';
-import { loadGLTF, type PBRModel } from '@margoengine/gltf-pro';
-import { ContactShadows } from '@margoengine/staging';
+import { loadGLTF, type PBRModel } from '@margoengine/gltf/pbr';
+import { ContactShadows } from '@margoengine/studio';
 import {
   Environment,
   EnvironmentLighting,
@@ -346,7 +346,7 @@ async function loadProduct(option: ProductModelOption) {
     const ms = performance.now() - t0;
     hudPrimitives.textContent = String(currentModel.primitives.length);
     log(
-      `[GLTF-Pro] Loaded "${option.name}" in ${ms.toFixed(1)} ms. Primitives: ${currentModel.primitives.length}`,
+      `[glTF PBR] Loaded "${option.name}" in ${ms.toFixed(1)} ms. Primitives: ${currentModel.primitives.length}`,
       'info',
     );
 
@@ -388,7 +388,7 @@ async function loadProduct(option: ProductModelOption) {
     // A load whose engine the page disposed meanwhile (scene recreate) rejects with code disposed, as it should.
     const stopped = (err as { code?: unknown }).code === 'disposed' && loadEngine !== stage?.engine;
     if (stopped) log(`[Model] Load of "${option.name}" stopped: its engine was disposed.`, 'info');
-    else log(`[GLTF-Pro][error] Failed to load "${option.name}": ${(err as Error).message}`, 'error');
+    else log(`[glTF PBR][error] Failed to load "${option.name}": ${(err as Error).message}`, 'error');
   }
 }
 

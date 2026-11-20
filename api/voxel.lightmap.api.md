@@ -4,14 +4,14 @@
 
 ```ts
 export interface VoxelLightmap {
-    readonly texture: GPUTexture;
+    readonly texture: Borrowable<GPUTexture>;
     readonly charts: Float32Array;
     readonly index: Int32Array;
     shader(code: string): string;
 }
 
 export interface VoxelLightmapOptions {
-    texture: GPUTexture;
+    texture: Borrowable<GPUTexture>;
     positions: ArrayLike<number>;
     uv: ArrayLike<number>;
     scale?: number;
@@ -19,4 +19,8 @@ export interface VoxelLightmapOptions {
 }
 
 export function voxelLightmap(options: VoxelLightmapOptions): VoxelLightmap;
+
+// Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 ```

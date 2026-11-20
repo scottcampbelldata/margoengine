@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   ticks,
   niceNumber,
@@ -28,6 +30,12 @@ test('ticks stay inside the range at nice steps, with labels that show the step'
   // Range 0.25 -> nice 0.5, / 5 -> step 0.1: no float drift in 0.1 * 3.
   assert.deepEqual(ticks(0.1, 0.35, 6).values, [0.1, 0.2, 0.3]);
   assert.deepEqual(ticks(5, 5).values, [5]);
+  // A lone tick has no step: its label is the value's shortest exact text, not three padded decimals.
+  assert.deepEqual(ticks(5, 5).labels, ['5']);
+  assert.deepEqual(ticks(-0.1, -0.1).labels, ['−0.1']);
+  assert.deepEqual(ticks(1.2345678, 1.2345678).labels, ['1.2345678']);
+  assert.deepEqual(ticks(3e9, 3e9).labels, ['3e9']);
+  assert.equal(formatTick(2.5e-7, 0), '2.5e-7');
   assert.deepEqual(ticks(10, 0).values, ticks(0, 10).values, 'reversed ranges');
   assert.equal(formatTick(2.5e7, 5e6), '2.5e7');
   assert.equal(formatTick(0.00002, 0.00001), '2e-5');
@@ -131,5 +139,51 @@ test('random fields (every ambiguous face configuration) still give closed, cons
     const surface = extract(field, n, 0);
     assert.ok(surface.length > 100 && closedAndOriented(surface), `trial ${trial}`);
     assert.ok(signedVolume(surface) > 0, 'encloses the inside');
+  }
+});
+
+// Runs `expression` (with ticks and dateTicks in scope) in a child process under a time limit, so a loop that never
+// ends fails the test instead of hanging the run.
+const finishes = (expression) => {
+  const run = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `import { ticks, dateTicks } from '@margoengine/sciviz/maths'; console.log(JSON.stringify(${expression}));`,
+    ],
+    { cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8', timeout: 10_000 },
+  );
+  assert.equal(run.status, 0, `${expression} did not finish in 10 s: ${run.signal ?? run.stderr}`);
+  return JSON.parse(run.stdout);
+};
+
+test('ticks finish at any magnitude: a step below one unit in the last place, a span past the largest double', () => {
+  // Nanosecond timestamps: a 256 ns span at 1e18 asks for a step (100) below the doubles' spacing there (128).
+  assert.deepEqual(finishes('ticks(1e18, 1.0000000000000003e18).values'), [1e18, 1.0000000000000003e18]);
+  // max - min is Infinity: the step is found at a tenth of the scale.
+  assert.deepEqual(finishes('ticks(-1e308, 1e308).values'), [-1e308, -5e307, 0, 5e307, 1e308]);
+  assert.deepEqual(ticks(0, 1.5e308).values, [0, 5e307, 1e308, 1.5e308], 'a nice span past the largest double');
+});
+
+test('ticks of tiny ranges keep their values: below 1e-20 and down to the smallest subnormal', () => {
+  assert.deepEqual(ticks(0, 1e-25).values, [0, 2e-26, 4e-26, 6e-26, 8e-26, 1e-25]);
+  assert.deepEqual(ticks(1e-30, 3e-30).values, [1e-30, 1.5e-30, 2e-30, 2.5e-30, 3e-30]);
+  assert.deepEqual(ticks(0, 5e-324).values, [0, 5e-324]);
+  assert.equal(niceNumber(5e-324, false), 5e-324);
+  assert.equal(niceNumber(1e-320, true), 1e-320);
+  assert.deepEqual(ticks(0, 0.7, 8).values, [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7], 'decimal values, not 0.1 x 3');
+});
+
+test('every non-empty range gets ticks, and labels tell neighbouring ticks apart', () => {
+  // No multiple of the nice step (0.1) falls inside: the ends are the ticks.
+  assert.deepEqual(ticks(0.31, 0.39, 2).values, [0.31, 0.39]);
+  for (const [min, max] of [
+    [1.6e9, 1.6000000001e9],
+    [1e18, 1.0000000000000003e18],
+    [123456.789, 123456.78900001],
+  ]) {
+    const { labels } = ticks(min, max);
+    assert.equal(new Set(labels).size, labels.length, `labels over [${min}, ${max}]: ${labels.join(' ')}`);
   }
 });

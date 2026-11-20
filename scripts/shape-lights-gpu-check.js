@@ -1,4 +1,4 @@
-// Real-WebGPU check of @margoengine/clustered/shapes (after npm run build:packages; takes the GPU lock).
+// Real-WebGPU check of @margoengine/clustered/shapes (after npm run build:packages).
 // 1. clusterShapeLighting, as ShapeLights declares it, runs in a compute shader for sphere, disc and tube lights at
 //    receivers seen from several angles and roughnesses, wholly above and across the horizon; every value equals the
 //    float64 mirror of the WGSL (packages/clustered/test/shapes-reference.js) within float32 rounding.
@@ -7,7 +7,6 @@
 // Run: node scripts/shape-lights-gpu-check.js
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { ShapeLights } from '../packages/clustered/dist/shapes.js';
 import { shapes } from '../packages/clustered/test/shapes-reference.js';
 
@@ -35,7 +34,6 @@ lights.forEach((_, i) => {
 });
 const base = [0.8, 0.6, 0.4];
 
-const release = await acquire({ owner: 'shape-lights-gpu-check' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5241 });
@@ -203,5 +201,4 @@ struct Sample {view:vec4f,material:vec4f}
   );
 } finally {
   await browser?.close();
-  release();
 }

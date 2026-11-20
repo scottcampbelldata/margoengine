@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/compat.browser.mjs
 // The clipmap terrain on the WebGL2 compatibility layer (`@margoengine/webgl2-compat`, install({force: true})): each
 // case (rules only; painted weights and a hole; a runtime virtual texture; the same 1e5 m out under a FloatingOrigin) draws the same scene natively and on the

@@ -1,5 +1,5 @@
 import { margoError } from './errors.js';
-// Transmission's energy split, shared by gltf-pro's native physical shader and extension-composited transmission:
+// Transmission's energy split, shared by gltf/pbr's native physical shader and extension-composited transmission:
 // diffuse and ambient light scale by 1 - s.tr, so the transmitted light replaces only them and reflections keep
 // their strength.
 export const transmittedDiffuse = [
@@ -8,8 +8,8 @@ export const transmittedDiffuse = [
 ];
 
 /**
- * A material gltf-pro draws as native glass (a tint pass over the light behind it): it transmits, has no explicit
- * render state and no extension that replaces the physical surface. gltf-pro and @margoengine/xr read the same rule.
+ * A material gltf/pbr draws as native glass (a tint pass over the light behind it): it transmits, has no explicit
+ * render state and no extension that replaces the physical surface. gltf/pbr and @margoengine/xr read the same rule.
  */
 export function nativeGlassMaterial(m) {
   return !!m.tint && !m.renderState && !m.extension?.replacesPhysical;
@@ -22,7 +22,7 @@ export function transmissionWeight(code) {
     if (!code.includes(from))
       throw margoError(
         'unsupported',
-        `PBR shader transmission target missing: ${from}; use matching @margoengine/gltf-pro and materials versions`,
+        `PBR shader transmission target missing: ${from}; use matching @margoengine/gltf/pbr and materials versions`,
       );
     code = code.replaceAll(from, to);
   }

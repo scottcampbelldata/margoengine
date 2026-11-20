@@ -2,7 +2,7 @@
 // load per model for every copy on B. The frames must match, and A must fetch the model once.
 import { box, Engine, PbrMaterial } from '../../../core/dist/index.js';
 import { Clustered } from '../../../clustered/dist/index.js';
-import { loadGLTF } from '../../../gltf-pro/dist/index.js';
+import { loadGLTF } from '../../../gltf/dist/pbr.js';
 import { Stage } from '../../dist/index.js';
 import { addScene } from '../../dist/scene.js';
 import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';

@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/biomes/tests/shadows-check.mjs [--msaa]
 // BiomeView's `shadows` option: a temperate forest at noon with the view's terrain and trees added to a Shadows darkens
 // at least 5 percent of the frame by 20 percent or more against the same view without it, and brightens nothing. The

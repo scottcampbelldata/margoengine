@@ -1,5 +1,5 @@
 import { defaultLimits, importLimits, type FBXImportLimits } from './limits.js';
-import type { ExportNode, GeometryData } from '@margoengine/exporters';
+import type { ExportNode } from '@margoengine/exporters';
 import {
   array,
   findChild,
@@ -18,7 +18,7 @@ import {
   fbxGeometricTransform,
   determinant3,
 } from './math.js';
-import { buildGeometry, geometryBytes, type BuiltGeometry } from './geometry.js';
+import { buildGeometry, geometryBytes, type BuiltGeometry, type NormalGeometryData } from './geometry.js';
 import { applyInheritance, type InheritBinding } from './inherit.js';
 import type { ExtensionHooks } from './extension.js';
 
@@ -66,7 +66,7 @@ export class SceneBudget {
 
 export interface MeshBinding {
   node: ExportNode;
-  geometry: GeometryData;
+  geometry: NormalGeometryData;
   controlPoints: Uint32Array;
   source: FBXNode;
   model: FBXNode;
@@ -200,7 +200,7 @@ export function localParts(
 }
 
 export function transformGeometry(
-  geometry: GeometryData,
+  geometry: NormalGeometryData,
   m: Float64Array,
   budget?: SceneBudget,
   normalMatrix?: Float64Array,
@@ -317,7 +317,7 @@ function cloneGeometry(ctx: SceneContext, baked: BuiltGeometry): BuiltGeometry {
   return {
     ...baked,
     primitives: baked.primitives.map((p) => {
-      const geometry: GeometryData = {
+      const geometry: NormalGeometryData = {
         positions: new Float32Array(p.geometry.positions),
         normals: new Float32Array(p.geometry.normals),
       };

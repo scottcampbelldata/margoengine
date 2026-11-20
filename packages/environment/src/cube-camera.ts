@@ -7,12 +7,13 @@ import {
   CaptureTarget,
   captureScene,
   scenePasses,
+  type CaptureBackground,
   type CapturePassContext,
   type CapturePassFilter,
 } from './capture.js';
 import { checkLayers } from '../../shared/view-rect.js';
 
-export { scenePasses, type CapturePassFilter } from './capture.js';
+export { scenePasses, type CaptureBackground, type CapturePassFilter } from './capture.js';
 
 declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
@@ -40,6 +41,11 @@ export interface CubeCameraOptions {
   exclude?: Iterable<Mesh>;
   /** Frame-graph passes each face runs. Default {@link scenePasses}. */
   passes?: CapturePassFilter;
+  /**
+   * Background the faces draw in place of the scene's (an `EnvironmentBackground`, `ImageBackground` or
+   * `ColorBackground` used without `engine.use`, through `record`). Default none: the scene's own background.
+   */
+  background?: CaptureBackground | null;
   /** Plugin name. Default 'cube-camera-N'. */
   name?: string;
 }
@@ -120,6 +126,8 @@ export class CubeCamera {
   exclude?: Iterable<Mesh>;
   /** Frame-graph passes each face runs. */
   passes: CapturePassFilter;
+  /** Background the faces draw in place of the scene's; null or undefined keeps the scene's own. Read at each face. */
+  background?: CaptureBackground | null;
   /** Increments whenever `texture` is replaced (device restore). */
   version = 0;
   private readonly near: number;
@@ -159,6 +167,7 @@ export class CubeCamera {
     this.layers = options.layers ?? 0xffffffff;
     this.exclude = options.exclude;
     this.passes = options.passes ?? scenePasses;
+    this.background = options.background;
     if (typeof this.passes !== 'function')
       throw new TypeError('CubeCamera passes must be a function (pass) => boolean; pass scenePasses or omit it');
     this.camera.near = this.near;
@@ -257,6 +266,7 @@ export class CubeCamera {
         layers: this.layersValue,
         exclude: this.exclude,
         filter: this.passes,
+        background: this.background,
         owner: this,
         finish: (c) => this.store(c, state, face),
       });

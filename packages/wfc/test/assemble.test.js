@@ -71,3 +71,35 @@ test('assembly validates before mutation, rolls back failures and preserves exac
     (e) => e === 'stop',
   );
 });
+test('assembly copies each node quaternion, not its Float32 Euler lanes, so poses near pitch 90 degrees keep their bits', async () => {
+  using e = await engine();
+  const t = e.store.transforms,
+    mul = (a, b) => [
+      a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+      a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+      a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+      a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+    ];
+  let worst = 0;
+  // q = Rx(x) Ry(p) Rz(z) with the pitch 1e-1 to 1e-9 radians short of 90 degrees: the Euler lanes lost up to 1.4e-6.
+  for (let k = 0; k < 400; k++) {
+    const p = Math.PI / 2 - 10 ** (-1 - k / 50),
+      x = 0.3 + k * 0.01,
+      z = 0.7 - k * 0.003,
+      q = mul(
+        mul([Math.sin(x / 2), 0, 0, Math.cos(x / 2)], [0, Math.sin(p / 2), 0, Math.cos(p / 2)]),
+        [0, 0, Math.sin(z / 2), Math.cos(z / 2)],
+      ),
+      root = e.createMesh(),
+      node = e.createMesh(root).setQuaternion(q).setGeometry(box());
+    using a = assembleWFC(e, [1, 1, 1], [0], [{ source: 0, rotation: [1, 0, 0, 0, 1, 0, 0, 0, 1] }], [
+      { root, meshes: [node] },
+    ]);
+    const copy = a.meshes[1];
+    for (const lane of ['qx', 'qy', 'qz', 'qw']) worst = Math.max(worst, Math.abs(t[lane][copy.id] - t[lane][node.id]));
+    node.dispose();
+    root.dispose();
+  }
+  // Two float32 steps at 1: setQuaternion normalises again in float64.
+  assert.ok(worst <= 1.2e-7, `largest quaternion lane difference ${worst}`);
+});

@@ -4,10 +4,10 @@ import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gp
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { sphereGeometry } from '../../geometry/dist/index.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
+import { extendedMaterials } from '../../gltf/dist/extended.js';
 import { PostStack, Bloom, FXAA } from '../../post/dist/index.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { Material, createMesh } from '../dist/index.js';
 import { Transmission } from '../dist/transmission.js';
 import * as ref from './physical-reference.js';
@@ -89,7 +89,7 @@ test('CPU reference: refraction obeys Snell, volume follows Beer-Lambert, blur a
   );
 });
 
-test('Material physical options: live gltf-pro arrays, validation, fixed shape', () => {
+test('Material physical options: live gltf/pbr arrays, validation, fixed shape', () => {
   const plain = new Material({ color: [0.5, 0.5, 0.5] });
   assert.equal(plain.physical, undefined);
   assert.equal(plain.ext, undefined);
@@ -145,7 +145,7 @@ test('Material physical options: live gltf-pro arrays, validation, fixed shape',
   assert.equal(glass.transmissive, true);
   assert.deepEqual(glass.extensions, ['transmission', 'volume']);
   assert.deepEqual(glass.volume, [0.5, 0.5 ** 0.5, 1, 0.25 ** 0.5]);
-  // The tinted-blend constant matches gltf-pro's: color x transmission x attenuationColor^(thickness / distance).
+  // The tinted-blend constant matches gltf/pbr's: color x transmission x attenuationColor^(thickness / distance).
   glass.transmission = 0.5;
   glass.attenuationDistance = Infinity;
   glass.thickness = 2;
@@ -197,10 +197,10 @@ async function scene({ samples = 4, post = 'hdr' } = {}) {
 const of = (log, name) => log.filter((e) => e[0] === name);
 const passes = (log) => of(log, 'beginRenderPass').map((e) => e[1]);
 const textures = (code) => code.match(/var\s*\w+\s*:\s*texture_(?!storage)/g).length;
-// gltf-pro uniform rows: physical factors at float 208, ext (unlit, ior) at 100.
+// gltf/pbr uniform rows: physical factors at float 208, ext (unlit, ior) at 100.
 const floats = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer);
 
-test("physical materials meshes draw gltf-pro's factor-only physical variant: 5 + 5 textures, live factors", async () => {
+test("physical materials meshes draw gltf/pbr's factor-only physical variant: 5 + 5 textures, live factors", async () => {
   const { engine, frame } = await scene({ post: null }),
     m = new Material({ clearcoat: 1, sheenColor: [0.2, 0.3, 0.4], ior: 1.4 });
   const mesh = createMesh(engine, sphereGeometry(1, 8, 4), m),
@@ -356,7 +356,7 @@ for (const samples of [4, 1])
     // Dispose restores the tinted blend (beauty draws them again).
     glass.root.visible = true;
     transmission.dispose();
-    // Tinted blend (gltf-pro 5w.f): a margoTint draw multiplies the background, then the lit glass adds on; no blend constant.
+    // Tinted blend (gltf/pbr 5w.f): a margoTint draw multiplies the background, then the lit glass adds on; no blend constant.
     const after = frame(4);
     assert.equal(passes(after).filter((p) => p.label?.startsWith('transmission')).length, 0);
     assert.equal(of(after, 'pass.setBlendConstant').length, 0);

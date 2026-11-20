@@ -145,6 +145,7 @@ class ColorBar {
     readonly element: HTMLDivElement;
     readonly colormap: Colormap;
     readonly bar: HTMLDivElement;
+    onDispose: (() => void) | undefined;
     constructor(canvas: HTMLCanvasElement, map: Colormap, range: readonly [number, number], theme: Theme, options?: ColorBarOptions);
     dispose(): void;
     [Symbol.dispose](): void;
@@ -212,7 +213,7 @@ interface CreateFigureOptions extends FigureOptions {
 interface CustomLayer {
     readonly dimensions?: '2d' | '3d';
     readonly bounds: Bounds;
-    setModel(model: Float32Array): void;
+    setModel(model: Float32Array, exact?: Float64Array): void;
     dispose(): void;
 }
 
@@ -588,6 +589,7 @@ interface ScatterLayerOptions {
 
 class SciRenderer implements EnginePlugin {
     samplingScale: number;
+    exportScale: number | undefined;
     cpuIsosurface?: (data: Float32Array, level: number, options: {
         dims: readonly [number, number, number];
         maxTriangles: number;
@@ -623,6 +625,7 @@ class SciRenderer implements EnginePlugin {
         depth: GPUTextureFormat;
         multisample?: GPUMultisampleState;
     }) => GPURenderPipelineDescriptor): GPURenderPipeline;
+    cssScale(width: number): number;
     dispose(): void;
     [Symbol.dispose](): void;
 }

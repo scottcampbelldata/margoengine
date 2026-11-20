@@ -141,6 +141,11 @@ export interface SpeciesRule {
   readonly lod?: readonly [near: number, mid: number, far: number];
   readonly color?: ColorVariation;
   readonly tags?: readonly string[];
+  /**
+   * The surface fuel model under this species' crowns, by name (`'FM8'` is Anderson 1982's closed timber litter), read by
+   * `fuelMap` of `@margoengine/biomes/fuel`. Default none: the species adds no fuel to the map.
+   */
+  readonly fuel?: string;
 }
 
 /** A per-frame detail species (grass, flowers, pebbles), drawn from a density map. */
@@ -181,6 +186,11 @@ export interface BiomeDefinition {
   /** Whittaker biome classes or Holdridge life zones this biome stands for (the `'whittaker'` and `'holdridge'`
    * classifiers weight biomes by them; see `WHITTAKER` and `holdridgeZone`). */
   readonly zones?: readonly string[];
+  /**
+   * The fuel model of the open ground between this biome's crowns, by name (`'FM1'` is Anderson 1982's short grass,
+   * `'FM5'` green brush), read by `fuelMap` of `@margoengine/biomes/fuel`. Default none: open ground carries no fuel.
+   */
+  readonly openFuel?: string;
 }
 
 /** Envelope fields: layer, conversion from plain units to stored units, and the blend width of an open range. */
@@ -263,6 +273,7 @@ export function envelopeOf(definition: BiomeDefinition): readonly Dimension[] {
 }
 
 const ID = /^[a-z0-9][a-z0-9-]*$/;
+const FUEL = /^[A-Za-z][\w-]{0,31}$/;
 
 /** The range fields of a {@link GroundLayer}, in the order views read them. */
 const GROUND_FIELDS = Object.freeze([
@@ -296,6 +307,8 @@ function species(list: unknown, what: string): void {
       !(s.stands?.scale >= 50 && s.stands.scale <= 2000 && s.stands.cover >= 0.1 && s.stands.cover <= 1)
     )
       throw rangeError('A species stands rule needs scale 50..2000 metres and cover 0.1..1', 'biomes');
+    if (s.fuel !== undefined && !(typeof s.fuel === 'string' && FUEL.test(s.fuel)))
+      throw typeError('A species fuel is a fuel model name such as "FM8"', 'biomes');
   }
 }
 
@@ -349,6 +362,8 @@ export function defineBiome(definition: BiomeDefinition): BiomeDefinition {
   species(d.props, 'props');
   if (d.details !== undefined && !Array.isArray(d.details))
     throw typeError('Biome details must be an array of detail rules', 'biomes');
+  if (d.openFuel !== undefined && !(typeof d.openFuel === 'string' && FUEL.test(d.openFuel)))
+    throw typeError('A biome openFuel is a fuel model name such as "FM1"', 'biomes');
   if (d.priority !== undefined && !Number.isFinite(d.priority))
     throw rangeError('A biome priority must be a finite number', 'biomes');
   if (d.weight !== undefined && !(Number.isFinite(d.weight) && d.weight >= 0.1 && d.weight <= 10))

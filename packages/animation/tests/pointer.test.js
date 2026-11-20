@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Animation } from '../dist/index.js';
 import { pointerChannels } from '../dist/pointer.js';
-import { GLTFAsset, parseGLTFAsync, viewGLTFCamera } from '@margoengine/gltf-pro';
+import { GLTFAsset, parseGLTFAsync, viewGLTFCamera } from '@margoengine/gltf/pbr';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 import { atlas } from '../../exporters/tests/material-animation-fixture.js';
 

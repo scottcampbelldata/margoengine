@@ -1,7 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Texture } from '@margoengine/materials';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
-import type { MaterialExtension, PBRModel, PBRPrimitive } from '@margoengine/gltf-pro/model';
+import type { MaterialExtension, PBRModel, PBRPrimitive } from '@margoengine/gltf/pbr-model';
+import { sceneScope } from '../../shared/scene-scope.js';
 
 /** Linear RGBA8 irradiance, top row first, with a shared HDR scale. */
 export interface ImportedLightmap {
@@ -110,9 +111,12 @@ export function applyLightmap(
   lightmap: ImportedLightmap,
   nodes?: readonly number[],
 ): ImportedLightmapInstallation {
-  const result = new ImportedLightmapInstallation(model, lightmap, nodes);
+  const result = new ImportedLightmapInstallation(model, lightmap, nodes),
+    engine = model.root.engine;
   try {
-    model.root.engine.use(result);
+    // engine.use joins the active scene; the installation belongs to the model's scene, which is the active one only
+    // when the bake is applied from there (after an await or for a model in another scene it is not).
+    sceneScope(engine, engine.sceneOf(model)).run(() => engine.use(result));
     return result;
   } catch (error) {
     result.dispose();

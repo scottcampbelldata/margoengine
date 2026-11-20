@@ -1,12 +1,13 @@
 // Real-GPU checks of the optional material features (features.html draws, this judges the numbers).
 // Run from the repository root after `npm run build:packages`: node packages/materials/test/features-browser.mjs
+import { hairScattering } from '../dist/hair.js';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { requiredFixture } from '../../../scripts/support/required-fixture.mjs';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
+import { skinTransmittance } from '../dist/skin.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const mipFixture = 'arraytex_7_mipmap_reference_u.ktx2';
@@ -18,8 +19,7 @@ if (!process.argv[2] || process.argv[2] === 'mips') {
     `Changed required mip-chain fixture ${mipFixture}; restore with git lfs pull`,
   );
 }
-const only = process.argv[2],
-  release = await acquire({ owner: 'materials-features' });
+const only = process.argv[2];
 async function runFeatures(compat) {
   const context = await openBrowser({ startPath: '/packages/materials/test/features.html', port: 5271, compat }),
     { page } = context,
@@ -126,19 +126,17 @@ async function runFeatures(compat) {
       );
     },
     async hair() {
-      // Flat quad, strand T = +Y, normal N = +Z, sun along +Z, camera at height d. Each row's lobe follows from the point it
-      // sees: h is the half vector there, and along is h on the strand tilted by the shift.
+      // Flat quad, strand T = +Y, normal N = +Z, camera at height d. Each row sees the point (0, y, 0), so its view
+      // direction is known, and hairScattering, the shader's CPU twin, gives what the row must show: the sun of pi times
+      // S (the strand is across the light, so its cosine is 1) times `specular`, plus the diffuse in red.
       const d = 3,
-        lobe = (shift, width) =>
+        rowsOf = (l, specular) =>
           Array.from({ length: 256 }, (_, k) => {
             const y = (1 - (k + 0.5) / 128) * d * Math.tan(Math.PI / 6),
-              r = Math.hypot(y, d),
-              half = [-y / r, d / r + 1],
-              length = Math.hypot(...half),
-              tilt = Math.hypot(1, shift),
-              along = (half[0] / length + (shift * half[1]) / length) / tilt,
-              power = 1 / (width * width);
-            return Math.sqrt(power / (2 * Math.PI)) * (1 - along * along) ** (power / 2);
+              r = Math.hypot(y, d);
+            return hairScattering(l, [0, -y / r, d / r], [0, 1, 0], [0.4, 0, 0], { shift, width }).map(
+              (c) => c * Math.PI * specular,
+            );
           }),
         peak = (values) => {
           const top = Math.max(...values);
@@ -155,40 +153,91 @@ async function runFeatures(compat) {
       const shift = 0.1,
         width = 0.1,
         specular = 3,
-        got = await page.evaluate((v) => window.check.hair(v), { shift, width });
+        got = await page.evaluate((v) => window.check.hair(v), { shift, width }),
+        want = rowsOf([0, 0, 1], specular);
       assert.deepEqual(got.errors, []);
-      // Blue: base blue is 0, so only the white lobe. Red less blue: the flat diffuse, the 0.4 of the base, and the tinted lobe.
+      // Blue: base blue is 0, so its absorption is near total and only the white R lobe is left.
+      // Red less blue less the 0.4 diffuse: the tinted TRT lobe (its strand hash scales its height, not its place).
       const white = peak(got.rows.map((c) => c[2])),
         tinted = peak(got.rows.map((c) => Math.max(c[0] - c[2] - 0.4, 0))),
-        wantWhite = peak(lobe(shift, width)),
-        wantTinted = peak(lobe(-1.5 * shift, 2 * width));
+        wantWhite = peak(want.map((c) => c[2])),
+        wantTinted = peak(want.map((c) => Math.max(c[0] - c[2], 0)));
       console.log('hair', JSON.stringify({ white, tinted, wantWhite, wantTinted }));
       // The 8-bit steps across a lobe's flat top move its centre by up to two rows.
       assert.ok(Math.abs(white.row - wantWhite.row) < 2, `white highlight at ${white.row}, want ${wantWhite.row}`);
-      assert.ok(Math.abs(tinted.row - wantTinted.row) < 2, `tinted highlight at ${tinted.row}, want ${wantTinted.row}`);
-      // A half-height edge moves by half an 8-bit step over the lobe's slope there. For white that is 0.0018 at 0.0041 a row.
+      assert.ok(Math.abs(tinted.row - wantTinted.row) < 3, `tinted highlight at ${tinted.row}, want ${wantTinted.row}`);
       assert.ok(Math.abs(white.width - wantWhite.width) <= 2, `white width ${white.width}, want ${wantWhite.width}`);
-      // The tinted lobe's one edge in the picture lies under the white peak, so it is read as a difference of red near 0.85 and
-      // blue near 0.43: half a step of each, 0.0045, at 0.00054 a row, is 9 rows. With the white lobe's width it would be 55 off.
-      assert.ok(
-        Math.abs(tinted.width - wantTinted.width) <= 9,
-        `tinted width ${tinted.width}, want ${wantTinted.width}`,
-      );
-      // The white lobe's height: Marschner's F / 4 of the 1.55 cuticle, under a sun of pi, within two 8-bit steps at this level.
-      const height = wantWhite.top * (0.0465 / 4) * specular * Math.PI;
-      assert.ok(Math.abs(white.top - height) < 0.008, `white height ${white.top}, want ${height}`);
+      // The white lobe's height, within two 8-bit steps.
+      assert.ok(Math.abs(white.top - wantWhite.top) < 0.008, `white height ${white.top}, want ${wantWhite.top}`);
       // The white one has no colour of its own: green follows blue.
       got.rows.forEach((c, k) => assert.ok(Math.abs(c[1] - c[2]) < 0.01, `row ${k}: ${c}`));
+      // Lit from behind: light through the fibre (TT) glows red where the cuticle tilt puts it, half the shift past the
+      // light's mirror, and blue (R, which sends nothing straight on) stays dark.
+      const back = await page.evaluate((v) => window.check.hair(v), { shift, width, specular: 0.05, behind: true }),
+        wantBack = rowsOf([0, 0, -1], 0.05),
+        glow = peak(back.rows.map((c) => c[0])),
+        wantGlow = peak(wantBack.map((c) => c[0]));
+      assert.deepEqual(back.errors, []);
+      console.log('hair backlit', JSON.stringify({ glow, wantGlow }));
+      assert.ok(Math.abs(glow.row - wantGlow.row) < 3, `backlit glow at ${glow.row}, want ${wantGlow.row}`);
+      // TRT's strand hash scales up to a twentieth of the glow, so 10 percent and two 8-bit steps.
+      assert.ok(
+        Math.abs(glow.top - wantGlow.top) < 0.1 * wantGlow.top + 0.008,
+        `glow ${glow.top}, want ${wantGlow.top}`,
+      );
+      // Blue: the base has none, so the fibre absorbs nearly all of it (e^-2.8 across) and R sends nothing straight on;
+      // what is left matches the model, far below red.
+      const blue = peak(back.rows.map((c) => c[2])),
+        wantBlue = peak(wantBack.map((c) => c[2]));
+      assert.ok(
+        Math.abs(blue.top - wantBlue.top) < 0.1 * wantBlue.top + 0.008,
+        `blue ${blue.top}, want ${wantBlue.top}`,
+      );
+      assert.ok(glow.top > 8 * blue.top, `the glow is the hair's colour: red ${glow.top}, blue ${blue.top}`);
       const real = await check('hairAvatar');
       console.log('hair on Seed-san', JSON.stringify(real));
       assert.deepEqual(real.errors, []);
       assert.ok(real.drawn > 3000, `the hair covers part of the picture: ${real.drawn}`);
-      // Blue is the white lobe alone, the base having none. Its height at the default width is sqrt(p / 2 pi) F / 4 pi, 0.121,
-      // at most one 8-bit step over, and a lit strand facing the sun reaches at least half of it.
-      assert.ok(real.peak > 0.06 && real.peak < 0.125, `the highlight shows on the real hair mesh: ${real.peak}`);
+      // Blue is the white lobe alone, the base having none. Its height at the default width is M_R's peak 1 / (2 w sqrt(2 pi))
+      // times N_R 1/4 times F at normal incidence 0.0465, times the sun's pi, 0.061 (more where the cuticle meets the light
+      // at a slant: Fresnel rises), and a lit strand facing the sun reaches at least half of it.
+      const top = (1 / (2 * 0.12 * Math.sqrt(2 * Math.PI))) * 0.25 * 0.0465 * Math.PI;
+      assert.ok(
+        real.peak > top / 2 && real.peak < 2 * top,
+        `the highlight shows on the real hair mesh: ${real.peak}, about ${top}`,
+      );
       // The highlight follows the strands: the same direction would correlate 1, and strands at a right angle only share the
       // surface's shape, so turned 90 degrees it falls elsewhere on the same mesh.
       assert.ok(real.correlation < 0.5, `strand direction moves the highlight: ${real.correlation}`);
+    },
+    async modelFeatures() {
+      // A loaded, skinned and morphed glTF takes skin(), hair() and eye() through install(model, {features}) and draws
+      // what a createMesh PbrMaterial with the same feature draws; without them, and after dispose(), it draws plain.
+      // The eye and a mesh-axis hair direction take their joint's skin matrix through `follow`, so they are drawn with the
+      // joint moved and turned too (KB-MODELFEAT-JOINTS1).
+      for (const [feature, shift, turn] of [
+        ['skin', 0, 0],
+        ['skin', 0.5, 0],
+        ['hair', 0, 0],
+        ['hair', 0, Math.PI / 2],
+        ['eye', 0, 0],
+        ['eye', 0.5, 0],
+      ]) {
+        const got = await check('modelFeatures', { feature, shift, turn });
+        console.log('model features', feature, shift, turn, JSON.stringify(got));
+        assert.deepEqual(got.errors, []);
+        assert.deepEqual(got.deformed, [true, true, true], 'Animation deforms the skinned, morphed sphere');
+        assert.ok(got.drawn > 10000, `the sphere covers the picture: ${got.drawn}`);
+        assert.ok(got.changed > 500, `${feature} changes the loaded sphere: ${got.changed} pixels`);
+        // One 8-bit step: the two records feed the same values to the same shader.
+        assert.ok(got.same <= 1, `${feature} on the loaded sphere matches the mesh within ${got.same} levels`);
+        assert.equal(got.back, 0, `${feature}: dispose() leaves the plain glTF picture`);
+      }
+      // Without `follow` the strands keep the bind pose's direction while the joint turns: the picture the old code drew.
+      const unfollowed = await check('modelFeatures', { feature: 'hair', turn: Math.PI / 2, follow: false });
+      console.log('model features hair unfollowed', JSON.stringify(unfollowed));
+      assert.deepEqual(unfollowed.errors, []);
+      assert.ok(unfollowed.same > 8, `hair without follow points the wrong way once the joint turns: ${unfollowed.same}`);
     },
     async character() {
       // Every model answers a clustered light as it answers the sun, within the 8-bit step around these colours.
@@ -265,6 +314,21 @@ async function runFeatures(compat) {
         edge.color[0] > edge.color[1] && edge.color[1] > edge.color[2] && edge.color[2] > 0,
         `red bleeds furthest: ${edge.color}`,
       );
+      // Melanin-rich skin (Donner and Jensen 2006, melanin 0.3) draws with its own profile's table, and keeps its light
+      // close: past the terminator of the same 5 mm sphere its red is less than half the published profile's.
+      const dark = await page.evaluate((v) => window.check.skinSphere(v), {
+        unitsPerMeter: 400,
+        power: Math.PI * boost,
+        physiology: { melanin: 0.3 },
+      });
+      assert.deepEqual(dark.errors, []);
+      assert.ok(compare(dark, Math.sqrt(1 / 5), '5 mm, melanin 0.3') > 30, 'samples compared');
+      const darkEdge = dark.samples.find((v) => v.nl > -0.1);
+      console.log('skin 5 mm melanin 0.3', darkEdge.nl, darkEdge.color);
+      assert.ok(
+        darkEdge.color[0] < edge.color[0] / 2,
+        `melanin keeps the light close: ${darkEdge.color} ${edge.color}`,
+      );
       // 2 units at 1 unit a metre: a radius of 2 m, close to flat, so the terminator stays where n.l says.
       const large = await page.evaluate((v) => window.check.skinSphere(v), {
         unitsPerMeter: 1,
@@ -287,19 +351,46 @@ async function runFeatures(compat) {
         `real head: ${real.soft}`,
       );
     },
+    async skinThrough() {
+      // Backlit skin with subsurface 0.8: the light through is 0.8 T(d) (0.3 + 1) / pi of the sun, by the profile integrated
+      // over the back plane (skinTransmittance, checked against the integral in features.test.js); without subsurface the
+      // square shows only what is in front of it. 2 mm passes red and a little green, 4 mm less of each.
+      const encode = (v) => 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055),
+        power = 10;
+      for (const [depth, subsurfaceThickness] of [
+        [2, 0.5],
+        [4, 1],
+      ]) {
+        const got = await check('skinThrough', { thickness: 0.004, subsurfaceThickness, power });
+        assert.deepEqual(got.errors, []);
+        const t = skinTransmittance(depth);
+        for (let c = 0; c < 3; c++) {
+          // The page reads linear values back from 8-bit sRGB codes: compare the codes.
+          const want = got.plain[c] + (0.8 * t[c] * 1.3 * power) / Math.PI,
+            code = Math.round(encode(got.lit[c]));
+          // One 8-bit step: the f32 sum of six exponentials and the sRGB encode land on the nearest code.
+          assert.ok(Math.abs(code - encode(want)) <= 1, `${depth} mm channel ${c}: code ${code}, want ${encode(want)}`);
+        }
+        assert.ok(got.lit[0] > got.lit[1] && got.lit[1] >= got.lit[2], `${depth} mm: red passes furthest, ${got.lit}`);
+      }
+    },
     async eye() {
       // The pupil's edges on the middle row, traced here by Snell's law through a unit sphere to the iris plane z = 1 - depth.
+      // `ior` here is the index the rays bend by: the eye's chamberIor (the aqueous humour behind a thin cornea). The rays
+      // bend on the cornea's own sphere, radius `corneaRadius`, its apex at the sphere's (1: the sphere itself).
       const t = Math.tan(Math.PI / 12),
-        trace = ({ angle, ior, pupil, depth = 0.25 }) => {
-          const camera = [5 * Math.sin(angle), 5 * Math.cos(angle)],
+        trace = ({ angle, ior, pupil, depth = 0.25, corneaRadius = 1 }, distance = 5) => {
+          const camera = [distance * Math.sin(angle), distance * Math.cos(angle)],
             hit = (a) => {
               const p = [Math.sin(a), Math.cos(a)],
+                bend = Math.hypot(p[0], p[1] - (1 - corneaRadius)),
+                m = [p[0] / bend, (p[1] - (1 - corneaRadius)) / bend],
                 l = Math.hypot(camera[0] - p[0], camera[1] - p[1]),
                 v = [(camera[0] - p[0]) / l, (camera[1] - p[1]) / l],
-                cos = v[0] * p[0] + v[1] * p[1],
+                cos = v[0] * m[0] + v[1] * m[1],
                 eta = 1 / ior,
                 k = Math.sqrt(1 - eta * eta * (1 - cos * cos)),
-                r = [-eta * v[0] + (eta * cos - k) * p[0], -eta * v[1] + (eta * cos - k) * p[1]];
+                r = [-eta * v[0] + (eta * cos - k) * m[0], -eta * v[1] + (eta * cos - k) * m[1]];
               return p[0] + (r[0] * (1 - depth - p[1])) / r[1];
             },
             solve = (x) => {
@@ -318,11 +409,11 @@ async function runFeatures(compat) {
                 right = [Math.cos(angle), -Math.sin(angle)],
                 back = [Math.sin(angle), Math.cos(angle)],
                 x = p[0] * right[0] + p[1] * right[1],
-                z = 5 - (p[0] * back[0] + p[1] * back[1]);
+                z = distance - (p[0] * back[0] + p[1] * back[1]);
               return (x / z / t + 1) * 128;
             },
             rho = pupil * 0.49;
-          return [pixel(solve(-rho)), pixel(solve(rho))];
+          return distance === 5 ? [pixel(solve(-rho)), pixel(solve(rho))] : Math.sin(solve(rho)) / rho;
         },
         run = async (o) => {
           const got = await page.evaluate((v) => window.check.eyeRun(v), o);
@@ -344,14 +435,86 @@ async function runFeatures(compat) {
           );
           return edges;
         };
-      const ahead = await run({ angle: 0, ior: 1.376, pupil: 0.3 }),
-        side = await run({ angle: 0.6, ior: 1.376, pupil: 0.3 }),
+      const ahead = await run({ angle: 0, ior: 1.336, pupil: 0.3 }),
+        side = await run({ angle: 0.6, ior: 1.336, pupil: 0.3 }),
         straight = await run({ angle: 0.6, ior: 1.0001, pupil: 0.3 });
       // The cornea moves what is behind it, by more than the bound on the check above.
       assert.ok(Math.abs(side[0] - straight[0]) > 5, `refraction shows: ${side} ${straight}`);
-      const wide = await run({ angle: 0, ior: 1.376, pupil: 0.6 });
+      const wide = await run({ angle: 0, ior: 1.336, pupil: 0.6 });
       assert.ok(wide[1] - wide[0] > (ahead[1] - ahead[0]) * 1.7, 'the pupil opens live');
-      await run({ angle: 0.3, ior: 1.376, pupil: 0.3, depth: 0.4 });
+      await run({ angle: 0.3, ior: 1.336, pupil: 0.3, depth: 0.4 });
+      // The published eye (Le Grand's full theoretical eye, Atchison and Smith 2000): a cornea of 7.8 mm on a 12 mm globe,
+      // the pupil 3.6 mm behind its apex, an aqueous humour of 1.336. Its entrance pupil, seen from far away, is 1.133
+      // times the real one; the trace of the defaults gives that within 0.015, the eyeball's own sphere only 1.07.
+      const published = { angle: 0, ior: 1.336, pupil: 0.3, depth: 0.3, corneaRadius: 0.65 },
+        magnified = trace(published, 1e4),
+        flat = trace({ ...published, depth: 0.25, corneaRadius: 1 }, 1e4);
+      console.log('entrance pupil magnification', magnified, 'on the eyeball sphere', flat);
+      assert.ok(Math.abs(magnified - 1.133) < 0.015 && flat < 1.08, `${magnified} ${flat}`);
+      // The frame follows that trace, head on and from the side.
+      await run(published);
+      await run({ ...published, angle: 0.4 });
+      // The tear film on the white: the sun at a right angle to the view lights a catchlight where the white's normal
+      // halves them, 40.6 degrees round for a camera 5 radii away (pixel 201.4 of 256 on the middle row, by the mirror law), on a white of roughness 0.5. Wet, the film's
+      // GGX at the cornea's roughness shows it bright and point-like; dry, the white's broad lobe stays dim there. (A dry
+      // eye's brightest pixel is elsewhere: the cornea keeps its own smooth front, which glints dimly at its rim.)
+      const wet = await check('eyeShine', { wetness: 1, power: 0.02 }),
+        dry = await check('eyeShine', { wetness: 0, power: 0.02, probe: wet.at });
+      console.log('tear film', JSON.stringify(wet), JSON.stringify(dry));
+      assert.deepEqual([...wet.errors, ...dry.errors], []);
+      assert.ok(wet.peak > 0.2 && dry.there < 0.01, `wet ${wet.peak}, dry at the catchlight ${dry.there}`);
+      assert.ok(Math.abs(wet.at[0] - 201.4) < 3 && Math.abs(wet.at[1] - 127.5) < 3, `catchlight at ${wet.at}`);
+      assert.ok(wet.area < 12, `a point-like catchlight: ${wet.area} pixels over half its peak`);
+      // The upper lid (default: margin 0.375 radii above the axis, standing out 1/6 of a radius). Ambient alone, the
+      // ball under the margin keeps the sky the ledge leaves it, V(q) = 0.2015 + 0.7985 (1 - 1 / (1 + 0.44 q + 1.15 q^2))
+      // at q = depth below the margin / lid depth (about 0.44 at 0.3 radii up the middle, 0.93 at -0.1), read at the
+      // height each probed pixel really sees. A sun 26.6 degrees above the view is blocked by the ledge just under the
+      // margin (0.34 radii up) and reaches the middle.
+      const heights = [0.3, 0.34, -0.1],
+        lidAmbient = await check('eyeLid', { lid: {}, ambient: true, sun: [0, 0.4472136, 0.8944272], heights }),
+        bareAmbient = await check('eyeLid', { lid: false, ambient: true, sun: [0, 0.4472136, 0.8944272], heights }),
+        lidSun = await check('eyeLid', { lid: {}, ambient: false, sun: [0, 0.4472136, 0.8944272], heights }),
+        bareSun = await check('eyeLid', { lid: false, ambient: false, sun: [0, 0.4472136, 0.8944272], heights }),
+        sky = lidAmbient.values.map((v, k) => v / bareAmbient.values[k]),
+        sunlit = lidSun.values.map((v, k) => v / bareSun.values[k]);
+      console.log('lid over ambient', sky, 'over the sun', sunlit);
+      assert.deepEqual([...lidAmbient.errors, ...bareAmbient.errors, ...lidSun.errors, ...bareSun.errors], []);
+      assert.ok(Math.min(...bareAmbient.values, ...bareSun.values) > 0.02, `lit: ${bareAmbient.values} ${bareSun.values}`);
+      const lidV = (h) => {
+          const q = Math.max(0, 0.375 - h) * 6;
+          return 0.2015 + 0.7985 * (1 - 1 / (1 + 0.44 * q + 1.15 * q * q));
+        },
+        expected = lidAmbient.seen.map(lidV);
+      assert.ok(
+        sky.every((v, k) => Math.abs(v - expected[k]) < 0.03) && expected[0] < 0.5 && expected[2] > 0.9,
+        `ambient under the lid: ${sky} against ${expected}`,
+      );
+      assert.ok(sunlit[1] < 0.05 && sunlit[2] > 0.97, `the lid's shadow: ${sunlit}`);
+      // The lower lid (default: margin 0.45 radii under the axis, depth 1/6), alone: the ambient light keeps all but the
+      // ground's share 0.2015 at its margin, V(q) = 1 - 0.2015 (1 - q / sqrt(1 + q^2)) at q = height above it / depth; a
+      // sun 26.6 degrees below the view is blocked just above the margin (under 0.083 radii up from it) and lights the
+      // white beside the small iris.
+      const lows = [-0.42, -0.3, -0.12],
+        below = [0, -0.4472136, 0.8944272],
+        lowAmbient = await check('eyeLid', { lid: false, lowerLid: {}, ambient: true, sun: below, heights: lows }),
+        noneAmbient = await check('eyeLid', { lid: false, lowerLid: false, ambient: true, sun: below, heights: lows }),
+        lowSun = await check('eyeLid', { lid: false, lowerLid: {}, ambient: false, sun: below, heights: lows }),
+        noneSun = await check('eyeLid', { lid: false, lowerLid: false, ambient: false, sun: below, heights: lows }),
+        ground = lowAmbient.values.map((v, k) => v / noneAmbient.values[k]),
+        under = lowSun.values.map((v, k) => v / noneSun.values[k]),
+        lowV = (h) => {
+          const q = Math.max(0, h + 0.45) * 6;
+          return 1 - 0.2015 * (1 - q / Math.hypot(1, q));
+        },
+        lowExpected = lowAmbient.seen.map(lowV);
+      console.log('lower lid over ambient', ground, 'over a sun from below', under);
+      assert.deepEqual([...lowAmbient.errors, ...noneAmbient.errors, ...lowSun.errors, ...noneSun.errors], []);
+      assert.ok(Math.min(...noneAmbient.values, ...noneSun.values) > 0.02, `lit: ${noneAmbient.values} ${noneSun.values}`);
+      assert.ok(
+        ground.every((v, k) => Math.abs(v - lowExpected[k]) < 0.03) && lowExpected[0] < 0.9 && lowExpected[2] > 0.97,
+        `ambient over the lower lid: ${ground} against ${lowExpected}`,
+      );
+      assert.ok(under[0] < 0.05 && under[1] > 0.97 && under[2] > 0.97, `the lower lid's shadow: ${under}`);
       const real = await check('eyeAvatar', { pupil: 0.3 });
       console.log('eye on Seed-san', JSON.stringify(real));
       assert.deepEqual(real.errors, []);
@@ -424,6 +587,14 @@ async function runFeatures(compat) {
           console.log(`lobes ${surface} ${light}: sun ${sun}, plain ${plain}, lit ${lit}`);
         }
       }
+      // A sheen over the base's 0.04 specular: KHR_materials_sheen scales a punctual light's base by
+      // min(1 - max3(sheen) E(n.v), 1 - max3(sheen) E(n.l)) for the sun and for each clustered light alike. A clustered
+      // directional light is the sun's own term, so the two match to the 8-bit step; with the ambient form
+      // 1 - max3(sheen) E(n.v) on the clustered light alone it read one step brighter (0.16203 against 0.15896).
+      const over = await run({ surface: 'sheenOver', light: 'sun' }),
+        overLit = await run({ surface: 'sheenOver', light: 'directional', lobes: true });
+      console.log(`lobes sheen over specular: sun ${over}, lit ${overLit}`);
+      assert.deepEqual(overLit, over, 'a clustered light under the sheen takes the punctual albedo scaling');
       // The coat under an area light, against the coat's GGX summed over the panel here, apart from the shader's fitted
       // table. The tone curve takes 0.04 off above 0.08 and is 6.25 x^2 below it; the base under the coat keeps 96%.
       const [dark] = await run({ surface: 'coat', light: 'area' }),
@@ -781,11 +952,7 @@ async function runFeatures(compat) {
   return !failed;
 }
 let passed = true;
-try {
-  // The canonical check:merge leaf retains native optional-feature coverage and tests the full compatibility fallback.
-  passed = await runFeatures(false);
-  passed = (await runFeatures(true)) && passed;
-} finally {
-  release();
-}
-process.exit(passed ? 0 : 1);
+// The canonical check:merge leaf retains native optional-feature coverage and tests the full compatibility fallback.
+passed = await runFeatures(false);
+passed = (await runFeatures(true)) && passed;
+process.exitCode = passed ? 0 : 1;

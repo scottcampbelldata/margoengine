@@ -1,4 +1,4 @@
-// Builds gltf-pro's src/index.ts at a git ref (default 15c87f1) into test-results/gltf-before/ for pixproof.mjs.
+// Builds gltf/pbr's src/index.ts at a git ref (default 15c87f1) into test-results/gltf-before/ for pixproof.mjs.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -38,7 +38,7 @@ const result = await build({
     write: false,
     minify: false,
     target: 'es2022',
-    lib: { entry: resolve(root, 'packages/gltf-pro/src/index.ts'), formats: ['es'] },
+    lib: { entry: resolve(root, 'packages/gltf/src/pbr.ts'), formats: ['es'] },
     rollupOptions: { external: (id) => id.startsWith('@margoengine/') },
   },
 });
@@ -47,5 +47,5 @@ for (const chunk of chunks) writeFileSync(resolve(out, chunk.fileName), chunk.co
 console.log(
   'wrote',
   chunks.map((c) => c.fileName),
-  chunks[0].code.includes('margoFaceTest') ? 'NEW CODE (wrong ref?)' : 'baseline gltf-pro',
+  chunks[0].code.includes('margoFaceTest') ? 'NEW CODE (wrong ref?)' : 'baseline gltf/pbr',
 );

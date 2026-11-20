@@ -8,6 +8,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const kernel = resolve(root, 'kernel');
@@ -47,8 +48,16 @@ function build() {
   const target = resolve(kernel, 'target');
   execFileSync(
     'cargo',
-    ['build', '--locked', '--manifest-path', resolve(kernel, 'Cargo.toml'), '--target', 'wasm32-unknown-unknown', '--release'],
-    { stdio: 'inherit', env: { ...process.env, CARGO_TARGET_DIR: target, RUSTFLAGS } },
+    [
+      'build',
+      '--locked',
+      '--manifest-path',
+      resolve(kernel, 'Cargo.toml'),
+      '--target',
+      'wasm32-unknown-unknown',
+      '--release',
+    ],
+    { stdio: 'inherit', env: blueprintRustEnv(kernel, RUSTFLAGS) },
   );
   const wasmPath = resolve(target, 'wasm32-unknown-unknown/release/margoengine_physics_kernel.wasm');
   const optimized = wasmPath.replace('.wasm', '.optimized.wasm');

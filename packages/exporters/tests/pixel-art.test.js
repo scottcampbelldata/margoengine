@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { parseGLTFAsync } from '@margoengine/gltf-pro';
+import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { exportDAE, exportGLB, exportGLTF, paletteTexture, pixelArtTexture } from '../dist/index.js';
 import { exportModel } from '../dist/model.js';
 import { headlessModels } from '../../../tests/support/pbr-snapshot.js';

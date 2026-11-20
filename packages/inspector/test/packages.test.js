@@ -10,7 +10,7 @@ import { EditHistory } from '../dist/history.js';
 import { PackageEditor, describeObject, editProperty, findPackageObjects } from '../dist/packages.js';
 
 // The objects are real package instances (Bloom, Shadows, a materials PbrMaterial) or the shapes their packages
-// document (a clustered plugin's `list`, a gltf-pro primitive's material), placed on an engine without attaching them,
+// document (a clustered plugin's `list`, a gltf/pbr primitive's material), placed on an engine without attaching them,
 // so no GPU is needed: the editor finds them by shape and writes the fields those packages read every frame.
 async function scene(t) {
   const dom = new JSDOM('<body></body>');

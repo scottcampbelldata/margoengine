@@ -17,7 +17,7 @@ test('codemod moves each binding to the subpath named after its package, and is 
   for (const line of [
     "import { Canvas, Mesh } from '@margoengine/react';",
     "import { OrbitControls } from '@margoengine/react/controls';",
-    "import { Gltf, type GltfProps } from '@margoengine/react/gltf-pro';",
+    "import { Gltf, type GltfProps } from '@margoengine/react/gltf';",
     "import { Box } from '@margoengine/react/geometry';",
     "import { Html } from '@margoengine/react/html';",
     "import { EffectComposer, Bloom } from '@margoengine/react/post';",

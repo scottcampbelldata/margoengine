@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import { KIT_MEMBERS } from './umbrella.mjs';
 import { readTarball, startRegistry } from './publish-rehearsal.mjs';
-import { killTree, windowsCommandLine } from './gpu-lock.mjs';
+import { killTree, windowsCommandLine } from './run-with-timeout.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 export const RESULTS = join(root, 'test-results/kit-installs');
@@ -72,11 +72,11 @@ export async function prepare() {
   try {
     const cases = { core: ['@margoengine/core'], stage: ['@margoengine/stage'],
       ...Object.fromEntries(Object.keys(KIT_MEMBERS).map((kit) => [kit, [`@margoengine/${kit}`]])),
-      together: ['@margoengine/game', '@margoengine/web', '@margoengine/viz'], all: ['margoengine'] };
+      together: ['@margoengine/game', '@margoengine/kit-web', '@margoengine/kit-viz'], all: ['margoengine'] };
     for (const [name, install] of Object.entries(cases)) {
       const app = join(work, name); mkdirSync(app);
       writeFileSync(join(app, 'package.json'), JSON.stringify({ name: `kit-${name}-check`, private: true, type: 'module' }));
-      await run('npm', ['install', ...install, ...(name === 'react-kit' ? ['react@19.3.0', 'react-dom@19.3.0'] : []), ...args], { cwd: app, env });
+      await run('npm', ['install', ...install, ...(name === 'kit-react' ? ['react@19.3.0', 'react-dom@19.3.0'] : []), ...args], { cwd: app, env });
       const installed = installedEnginePackages(app);
       assert.deepEqual(installed.map((p) => p.name).sort(), requiredClosure(install, packages), `${name}: install escaped its dependency closure`);
       for (const { name: dependency, value } of installed) {
@@ -90,20 +90,20 @@ export async function prepare() {
         packedBytes: installed.reduce((sum, p) => sum + packages.get(p.name).bytes.length, 0), app };
       // The assertion runs before tooling or compatibility is added, proving the base install is standalone.
       const source = name === 'core' ? '@margoengine/core' : name === 'stage' ? '@margoengine/stage' : name === 'all' ? 'margoengine' : name === 'together' ? '@margoengine/game' : `@margoengine/${name}`;
-      const program = name === 'react-kit' ? `import {createElement as h} from 'react'; import {createRoot} from 'react-dom/client'; import {Canvas,Sphere} from '${source}'; const host=document.createElement('div'); host.style='width:128px;height:128px'; document.body.replaceChildren(host); createRoot(host).render(h(Canvas,{camera:{position:[0,0,5],target:[0,0,0]}},h(Sphere,{color:'#e8b04a'})));` : name === 'core'
+      const program = name === 'kit-react' ? `import {createElement as h} from 'react'; import {createRoot} from 'react-dom/client'; import {Canvas,Sphere} from '${source}'; const host=document.createElement('div'); host.style='width:128px;height:128px'; document.body.replaceChildren(host); createRoot(host).render(h(Canvas,{camera:{position:[0,0,5],target:[0,0,0]}},h(Sphere,{color:'#e8b04a'})));` : name === 'core'
         ? `import {Engine,box,PbrMaterial} from '${source}'; const engine=await Engine.create(document.querySelector('canvas'),{camera:{position:[0,0,5],target:[0,0,0]}}); const colors=['#ff0000','#00ff00','#0000ff','#ffff00','#ff00ff','#00ffff','#ff8000','#80ff00','#0080ff','#8000ff','#ff0080','#00ff80']; for(let i=0;i<colors.length;i++){const mesh=engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color:colors[i]})); mesh.position.set((i%4-1.5)*0.7,(Math.floor(i/4)-1)*0.7,0); mesh.scale.set(0.5,0.5,0.5);} engine.start(); window.kitEngine=engine;`
         : `import {createStage} from '${source}'; const stage=await createStage('canvas',{camera:{position:[0,0,5],target:[0,0,0]}}); stage.sphere({color:'#e8b04a'}); window.kitEngine=stage.engine;`;
       writeFileSync(join(app, 'main.js'), program);
       if (name === 'together') {
         const integration = `import assert from 'node:assert/strict';
-import * as game from '@margoengine/game'; import * as web from '@margoengine/web'; import * as viz from '@margoengine/viz';
+import * as game from '@margoengine/game'; import * as web from '@margoengine/kit-web'; import * as viz from '@margoengine/kit-viz';
 assert.equal(game.createStage,web.createStage); assert.equal(web.createStage,viz.createStage);
 assert.equal(game.EnvironmentLighting,viz.EnvironmentLighting); assert.equal(web.Shadows,game.Shadows);
-import {Engine} from '@margoengine/game/core'; import {Engine as WebEngine} from '@margoengine/web/core';
+import {Engine} from '@margoengine/game/core'; import {Engine as WebEngine} from '@margoengine/kit-web/core';
 assert.equal(Engine,WebEngine);`;
         writeFileSync(join(app, 'integration.mjs'), integration);
         await run(process.execPath, ['integration.mjs'], { cwd: app, seconds: 60 });
-        writeFileSync(join(app, 'main.js'), `import {EnvironmentLighting} from '@margoengine/web'; import {Lines,GridHelper} from '@margoengine/viz';\n${program}\nconst lines=new Lines(); window.kitEngine.use(lines); lines.add(new GridHelper({size:4,divisions:4})); await EnvironmentLighting.load(window.kitEngine,{width:16,height:8,data:new Float32Array(16*8*4).fill(1)});`);
+        writeFileSync(join(app, 'main.js'), `import {EnvironmentLighting} from '@margoengine/kit-web'; import {Lines,GridHelper} from '@margoengine/kit-viz';\n${program}\nconst lines=new Lines(); window.kitEngine.use(lines); lines.add(new GridHelper({size:4,divisions:4})); await EnvironmentLighting.load(window.kitEngine,{width:16,height:8,data:new Float32Array(16*8*4).fill(1)});`);
       }
       writeFileSync(join(app, 'index.html'), '<!doctype html><title>Kit install</title><canvas width="128" height="128" style="width:128px;height:128px"></canvas><script type="module" src="/main.js"></script>');
       // A real app build resolves engine code exclusively inside this empty install. The build tool itself

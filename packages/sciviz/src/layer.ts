@@ -21,17 +21,7 @@ export const isGpuArray = (value: unknown): value is GpuArray =>
 /** Number of elements of a data source. */
 export const sizeOf = (data: DataSource): number => (isGpuArray(data) ? data.size : data.length);
 
-/** Min and max of CPU data, skipping NaN; [0, 1] when there is nothing finite. */
-export function extent(data: ArrayLike<number>): [number, number] {
-  let lo = Infinity,
-    hi = -Infinity;
-  for (let i = 0; i < data.length; i++) {
-    const v = data[i];
-    if (v < lo) lo = v;
-    if (v > hi) hi = v;
-  }
-  return lo <= hi ? [lo, hi] : [0, 1];
-}
+export { extent } from './extent.js';
 
 /**
  * A read-only storage buffer holding `data` as f32: a GpuArray's own buffer when it is a contiguous f32 array (no
@@ -91,15 +81,24 @@ export type Bounds = [number, number, number, number, number, number];
  * the engine), centred and scaled so the data bounds fill a box of half-size `half`. Returns a column-major 4x4.
  */
 export function dataToScene(bounds: Bounds, half: readonly [number, number, number]): Float32Array {
-  const scale = (lo: number, hi: number, h: number) => (hi > lo ? (2 * h) / (hi - lo) : 1),
+  return new Float32Array(dataToSceneExact(bounds, half));
+}
+
+/**
+ * @internal {@link dataToScene} in double precision. A layer that places geometry far from the data origin at a scale
+ * float32 cannot hold (map tiles past zoom 20) takes its translation from this one.
+ */
+export function dataToSceneExact(bounds: Bounds, half: readonly [number, number, number]): Float64Array {
+  // Halved bounds: a span or centre past the largest double (bounds [1e308, 1.7e308]) stays finite.
+  const scale = (lo: number, hi: number, h: number) => (hi > lo ? h / (hi / 2 - lo / 2) : 1),
     sx = scale(bounds[0], bounds[1], half[0]),
     sy = scale(bounds[2], bounds[3], half[1]),
     sz = scale(bounds[4], bounds[5], half[2]),
-    cx = (bounds[0] + bounds[1]) / 2,
-    cy = (bounds[2] + bounds[3]) / 2,
-    cz = (bounds[4] + bounds[5]) / 2;
+    cx = bounds[0] / 2 + bounds[1] / 2,
+    cy = bounds[2] / 2 + bounds[3] / 2,
+    cz = bounds[4] / 2 + bounds[5] / 2;
   // Columns: where data x, y and z units go, then the translation.
-  return new Float32Array([sx, 0, 0, 0, 0, 0, -sy, 0, 0, sz, 0, 0, -sx * cx, -sz * cz, sy * cy, 1]);
+  return new Float64Array([sx, 0, 0, 0, 0, 0, -sy, 0, 0, sz, 0, 0, -sx * cx, -sz * cz, sy * cy, 1]);
 }
 
 /** Scene position of a data point under `model` (from {@link dataToScene}). */

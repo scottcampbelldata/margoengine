@@ -433,3 +433,31 @@ test('SVG arcs: rotated ellipses keep every piece end on the ellipse and end exa
   const centre = [Math.cos(phi) * qx - Math.sin(phi) * qy + 5, Math.sin(phi) * qx + Math.cos(phi) * qy + 5];
   for (const c of pieces) assert.ok(Math.abs(frame(c.slice(-2), centre) - 1) < 1e-9);
 });
+
+test('SVG 2 sections 5.6 and 8.2: a symbol or nested svg without width and height fills 100% of the viewport', () => {
+  const { paths } = parseSVG(
+    svg(
+      '<defs><symbol id="s" viewBox="0 0 2 2"><rect width="2" height="2"/></symbol></defs><use href="#s"/>' +
+        '<svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg>',
+    ),
+  );
+  // Both 100% of the root's 100 x 100 viewport, so the 2 x 2 and 10 x 10 boxes scale to 100 x 100.
+  assert.deepEqual(ends(paths[0].commands)[2], [100, 100]);
+  assert.deepEqual(ends(paths[1].commands)[2], [100, 100]);
+});
+
+test('CSS Syntax 3 section 5.4.5: an unreadable fill or stroke is dropped, so the cascade falls back', () => {
+  const { paths, warnings } = parseSVG(
+    svg(
+      '<style>.c { fill: blue }</style>' +
+        '<g fill="red" stroke="lime"><rect width="1" height="1" fill="bogus" stroke="#12"/></g>' +
+        '<rect class="c" width="1" height="1" style="fill: nonsense"/>' +
+        '<rect width="1" height="1" fill="url(#missing) red"/>',
+    ),
+  );
+  assert.deepEqual(paths[0].fill, [1, 0, 0], 'inherits red from the group');
+  assert.deepEqual(paths[0].stroke, [0, 1, 0], 'inherits lime from the group');
+  assert.deepEqual(paths[1].fill, [0, 0, 1], 'the style rule survives an unreadable inline value');
+  assert.deepEqual(paths[2].fill, [1, 0, 0], 'a url with a colour fallback is valid paint');
+  assert.ok(warnings.some((w) => /fill "bogus" is not a colour; the declaration is ignored/.test(w)));
+});

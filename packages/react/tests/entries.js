@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-/** The dist file of each entry: index, controls, gltf-pro, ... */
+/** The dist file of each entry: index, controls, gltf/pbr, ... */
 export const entryFiles = Object.values(manifest.exports).map(({ import: target }) =>
   target.replace('./dist/', '').replace(/\.js$/, ''),
 );

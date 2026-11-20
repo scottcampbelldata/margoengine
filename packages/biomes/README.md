@@ -62,19 +62,20 @@ with the terrain.
 | [Workers](docs/workers.md) | tiles and objects on Web Workers, caching, what a placement reads from its neighbours |
 | [Same seed, same bytes, everywhere](docs/determinism.md) | the integer toolkit (`/toolkit`) behind byte-identical output |
 | [Files in and out](docs/files.md) | `/io`: heightmaps, weight maps, biome masks, layer dumps, `saveWorld` and `loadWorld` |
-| [Procedural relief, hydrology and erosion](docs/relief-and-hydrology.md) | `createRelief` (coasts, islands, river valleys), `/hydrology` (flow, wetness, lakes, channels, on the CPU or a GPU world's device) and `/erosion` (integer thermal and hydraulic erosion) |
+| [Procedural relief, hydrology and erosion](docs/relief-and-hydrology.md) | `createRelief` (coasts, islands, ria bays, river valleys, northern Rockies mountain valleys cut by stream power), `/hydrology` (flow, wetness, lakes, channels, on the CPU or a GPU world's device) and `/erosion` (integer thermal and hydraulic erosion) |
 | [Seasons](docs/seasons.md) | `/seasons`: green-up, autumn, snow and wet ground for any day of the year |
-| [Disturbance and ecosystem growth](docs/disturbance.md) | `/disturbance`: fire history, flood return periods and succession stages; `/ecosystem`: plants that grow, compete for light, seed and age over years |
-| [Roads and paths](docs/roads-and-paths.md) | `/splines`: polylines and smooth curves that keep objects off, paint a road surface and flatten or cut the ground; `/settlements`: villages, roads that follow the terrain, lanes and houses |
+| [Disturbance and ecosystem growth](docs/disturbance.md) | `/disturbance`: fire history, flood return periods and succession stages, and `BiomeView`'s `disturbance` option that shows them as burnt and flooded plants; `/ecosystem`: plants that grow, compete for light, seed and age over years |
+| [Roads and paths](docs/roads-and-paths.md) | `/splines`: polylines and smooth curves that keep objects off, paint a road surface and flatten or cut the ground; `/settlements`: villages, roads that follow the terrain, lanes or a street grid with a main street to the quay, house lots, pads and driveways |
+| [Fuel, the northern Rockies conifers and southern California chaparral](docs/fuel.md) | `/fuel`: `fuelMap(world)`, a fuel model name for every corner (species and open ground name their fuel, roads clear it, slash sets it) that `FireFront` takes as its `fuel`; the `rockies` conifer presets, `rockiesWorld` and the mountain valley `rockiesValleyWorld`; the Sanriku ria bay `riaWorld` is in the relief page |
 
 ## Entries
 
-Each is loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their worlds
-and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a relief
+Each is loaded only when used: the root (`BiomeWorld`, fields, classification), `/presets` (eight biomes, their worlds,
+the northern Rockies conifer presets and the reference world `R16`), `/relief` (the procedural landscape; `BiomeWorld.create` loads it only for a relief
 height, the default), `/digest` (canonical bytes and SHA-256, loaded by `world.digest`), `/zones` (Whittaker and
 Holdridge classifiers), `/multinoise` (nearest-point classifier over axes you choose), `/koppen` (Koppen-Geiger labels), `/toolkit` (the integer helpers), `/placement` (stored
 objects), `/stats` (point-pattern statistics), `/erosion` (thermal and hydraulic erosion; `BiomeWorld.create` loads it only for a relief
-with `erosion`), `/disturbance` (fire, flood and succession), `/settlements` (village sites, a road network that follows the terrain, lanes and house lots), `/graph` (placement rule graphs), `/ecosystem` (forest growth over years), `/splines` (roads and paths; `BiomeWorld.create` loads it only for a carved
+with `erosion`), `/valley` (northern Rockies mountain valleys cut by stream power; `BiomeWorld.create` loads it only for a relief with `mountainValley`), `/disturbance` (fire, flood and succession), `/settlements` (village sites, a road network that follows the terrain, lanes or a street grid, house lots, pads and driveways), `/fuel` (surface fuel models by place, for fire fronts), `/graph` (placement rule graphs), `/ecosystem` (forest growth over years), `/splines` (roads and paths; `BiomeWorld.create` loads it only for a carved
 height), `/gpu` (the device kernels; loaded only for a world that
 may compute on a device), `/io` (heightmap, weight and mask files, layer dumps), `/view`,
 `/objects` (stored objects and detail drawn through scatter) and `/editor`. The lazily loaded ones come through the
@@ -83,7 +84,7 @@ package name, so an app holds one copy of each module.
 ## Sources
 
 Repository checks separate correctness and speed. During the build phase,
-`test:gpu:flythrough` and `test:gpu:objects-frame` use shared GPU slots for
+`test:gpu:flythrough` and `test:gpu:objects-frame` run for
 correctness; their `:speed` counterparts retain the original measured scenes
 and budgets and report deferral. CPU timing tests follow the same phase. From
 the repository root, inspect the named release suite without running measurements:
@@ -97,6 +98,84 @@ on a quiet machine. The retained scenes and budgets stay unchanged until then.
 
 Written clean room from public papers: Volder 1959 (CORDIC), Jarzynski and Olano 2020 (PCG hashes for GPUs), Perlin
 2002 (quintic fade), Wendland 1995 (compactly supported kernels). Details in `docs/clean-room.md`.
+## Sliders for erosion: `@margoengine/biomes/settings`
+
+The entry also exports the ground-material look families of `@margoengine/biomes/view` (`BIOME_LOOKS`, `MATERIALS`,
+`biomeMaterials`), so a page or `@margoengine/scenes/look-family` picks one without loading the view.
+
+`erode` is a one-shot over a height grid, so its options are a table of rows that all rebuild: `EROSION_SETTINGS` lists `erosion.iterations`, `erosion.talus`, `erosion.thermal`, `erosion.capacity`, `erosion.incision`, `erosion.deposition`, `erosion.sea` (metres, null is no sea) and `relief.step` (a relief's grid spacing in metres) with `name`, `group`, `kind`, `default`, `min`, `max`, `step`, `unit`, `about` and `live` (false for every row: a change runs erosion again over the first heights). `erodeWithSettings(grid, values)` runs `erode` with a set of values (a name left out takes its default), `erodeReliefWithSettings(relief, values)` runs `erodeRelief`, and `erosionOptions(values)` gives the checked options. `DISTURBANCE_SETTINGS` is the same kind of table for the burnt and flooded plants of `BiomeView`'s `disturbance` option (eight rows, all `live: false`; see [disturbance](docs/disturbance.md#burnt-and-flooded-plants-in-the-view)). `EROSION_LOOKS` names five looks made only of row values: `youngHills`, `oldWornHills`, `badlands`, `riverValley` and `desertWadi`. The defaults give the bytes of a plain `erode`. An unknown name throws `TypeError`, a value outside its range (or iterations that are not a whole number) `RangeError`. The model has no rainfall or evaporation rows: every cell sheds the same water and the drainage carries it out, so `capacity`, `incision` and `deposition` are its dials.
+
+```ts
+import {erode} from '@margoengine/biomes/erosion';
+import {EROSION_LOOKS, erodeWithSettings} from '@margoengine/biomes/settings';
+
+const nx = 65, nz = 65, step = 16000;
+const height = new Int32Array(nx * nz).map((_, i) => 20000 + 1800 * Math.floor(i / nx) + ((i * 2654435761) >>> 24) * 40);
+const grid = {height, nx, nz, step};
+const young = erodeWithSettings(grid, EROSION_LOOKS.youngHills);
+const worn = erodeWithSettings(grid, {...EROSION_LOOKS.oldWornHills, 'erosion.iterations': 128});
+const plain = erode(grid);
+console.log(young.outflow, worn.outflow, plain.outflow);
+```
+
+## Look families for the ground: `@margoengine/biomes/view`
+
+`BIOME_LOOKS` holds the ground-material look families: `natural` keeps every material, `animatedFeature` draws the ground as broad
+soft colour fields. The roadmap gives no biome values, so they come from its aims for the animated look (larger colour masses, lower
+fine-detail contrast, more macro variation, saturation up 10 to 15 percent): saturation 1.12 about each colour's Rec. 709 luma, the
+generated fine detail at 0.6 and its relief at 0.8 of each material's, and the large-scale light and dark at 1.4 times (each kept in 0 to
+1). `biomeMaterials(look)` returns the whole `MATERIALS` table with the family applied, for `BiomeView.attach(engine, world, {materials})`;
+pass your own table as the second argument, or your own multipliers as the first.
+
+```js
+import { biomeMaterials } from '@margoengine/biomes/view';
+
+const materials = biomeMaterials('animatedFeature');
+console.log(materials.grass.detail < 0.4, materials.rock.macro > 0.5); // true true
+```
+
+## Wet ground and plants after a flood: `BiomeView`'s `wetness`
+
+`BiomeView.attach(engine, world, { wetness: { record, velocity, origin, size } })` draws the biome wet where a flood has
+been, from its wetting record (`Flood.wetTexture` of `@margoengine/water/flood`: red the deepest depth, green the seconds
+since the cell was last wet, blue 1 once it has been wet). The ground takes `WetGround` of
+`@margoengine/terrain/wet-ground` (darker and glossier, `view.wetGround`, its `setLook` live) and the plants a
+`PlantStates` map of `@margoengine/scatter/states` over the record (`view.plantStates`, a cell every 2 m, at most 1,024 a
+side): below the high-water mark they are mud coated with a stain line above it, and with `velocity`
+(`Flood.velocityTexture`) they lie flattened downstream where the current was strong. Ground and plants dry over the same
+`dryTime` (default 10,800 s); `darkening` and `gloss` are WetGround's. With `disturbance` too, the history's map over the
+world takes the flood. Both entries load with import() only when `wetness` is given.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+import { TerrainHeightmap } from '@margoengine/terrain';
+import { Water } from '@margoengine/water';
+import { Flood } from '@margoengine/water/flood';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const world = await BiomeWorld.create();
+// The flood runs over a 512 m square of the world's ground, the sea coming in from its east side.
+const origin: [number, number] = [-256, -256],
+  size: [number, number] = [512, 512];
+const heightmap = TerrainHeightmap.attach(engine, (x, z) => world.heightAt(x, z), { size, origin, resolution: 256 });
+const water = Water.attach(engine, { height: 0, terrain: { heightmap: () => heightmap.texture, origin, size } });
+const flood = Flood.attach(engine, { surface: water, boundary: { east: 'sea' } });
+flood.tsunami({ height: 5, period: 300 });
+const view = await BiomeView.attach(engine, world, {
+  water: false,
+  wetness: { record: () => flood.wetTexture, velocity: () => flood.velocityTexture, origin, size, dryTime: 3600 },
+});
+await view.ready;
+console.log(view.wetGround !== undefined, view.plantStates !== undefined); // true true
+engine.start();
+```
+
+Measured on WebGPU and the WebGL2 layer (`tests/wetness-check.mjs`): with the west half of the default world 2 m under
+water just now, the west half draws at 0.62 of its dry luma with the ground wet and the plants clean, and 2.6% darker
+again with the plants mud coated; the never-wet east half is within 0.3% of the view without a record.
+
 ## Larger erosion grids in Rust/Wasm
 
 The optional `@margoengine/biomes/erosion-wasm` entry supports up to 4,194,304
@@ -138,8 +217,8 @@ committed module with `npm run build:erosion --workspace @margoengine/biomes`.
 
 Production-browser proof (from the repository root): build the package, then run
 `node --test --test-timeout=120000 packages/biomes/tests/erosion-bundle.test.js`
-to prepare and validate a real Vite consumer outside the GPU lease. Run
-`node packages/biomes/tests/erosion-browser.mjs` in one shared GPU slot afterward.
+to prepare and validate a real Vite consumer. Run
+`node packages/biomes/tests/erosion-browser.mjs` afterward.
 The same preparation runs with the package CPU tests. The browser proof checks
 lazy asset loading, exact served Wasm bytes and every real-crop field on WebGPU
 and WebGL2 pages; it makes no GPU erosion or elapsed-speed claim.

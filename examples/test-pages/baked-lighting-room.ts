@@ -2,7 +2,7 @@ import { ready } from './page-harness';
 import { Engine, Geometry, PbrMaterial, box } from '@margoengine/core';
 import { install as installCompat } from '@margoengine/webgl2-compat';
 import { bakeLightmap, type Lightmap } from '@margoengine/lightmap';
-import { SkyMoon } from '@margoengine/scenery/sky';
+import { SkyMoon } from '@margoengine/sky/night-preset';
 import { Scatter } from '@margoengine/scatter';
 import { CulledInstances } from '@margoengine/culling';
 import { AssetCache } from '@margoengine/cache';
@@ -173,7 +173,7 @@ async function initScene() {
   });
   roomMesh = engine.createMesh().setGeometry(roomGeom).setMaterial(roomMat);
 
-  // 2. Attach Night Scenery (@margoengine/scenery)
+  // 2. Attach Night Scenery (@margoengine/sky)
   try {
     skyMoon = SkyMoon.attach(engine, {
       moonDirection: [0.45, 0.35, -1],
@@ -353,7 +353,7 @@ btnCancelBake.onclick = () => {
   }
 };
 
-// --- Scenery Moon Controls (@margoengine/scenery) ---
+// --- Scenery Moon Controls (@margoengine/sky) ---
 btnToggleSky.onclick = () => {
   if (!engine) return;
   if (skyMoon) {

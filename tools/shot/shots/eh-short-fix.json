@@ -1,0 +1,130 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 24,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -0.6,
+            1,
+            13.5
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 62
+        },
+        {
+          "time": 24,
+          "position": [
+            -0.4,
+            0.9,
+            12.5
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 62,
+          "ease": "smoothstep"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "id": "turbulence",
+      "target": "hole",
+      "property": "turbulence",
+      "keys": [
+        {
+          "time": 0,
+          "value": 1
+        },
+        {
+          "time": 24,
+          "value": 1
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "id": "prefilter",
+      "target": "hole",
+      "property": "prefilter",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0
+        },
+        {
+          "time": 5.99,
+          "value": 0
+        },
+        {
+          "time": 6,
+          "value": 1
+        },
+        {
+          "time": 11.99,
+          "value": 1
+        },
+        {
+          "time": 12,
+          "value": 0
+        },
+        {
+          "time": 17.99,
+          "value": 0
+        },
+        {
+          "time": 18,
+          "value": 1
+        },
+        {
+          "time": 24,
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "eh-short-fix",
+    "kind": "short",
+    "seed": 83,
+    "seconds": 24,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1,
+    "subframes": 4,
+    "shutter": 180,
+    "warmup": 30,
+    "probes": {
+      "before": 3,
+      "after": 9,
+      "before-again": 15,
+      "end": 23.9
+    },
+    "page": {
+      "path": "examples/event-horizon/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#panel,#status,#error,#telemetry{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "eventHorizon.engine",
+      "apply": "eventHorizon.apply",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

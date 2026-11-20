@@ -14,6 +14,8 @@ import {
   meshoptDecodeIndexSequence,
   meshoptDecodeVertexBuffer,
 } from '../dist/meshopt.js';
+import { encodeAttributes } from './support/meshopt-encode.js';
+import { invalidIndexStreams } from './support/meshopt-invalid-index.js';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const fixtures = new URL('./fixtures/', import.meta.url);
@@ -301,10 +303,9 @@ test('meshopt: triangle codes follow the FIFO rules of the bitstream', () => {
   assert.deepEqual([...out.subarray(0, 12)], [0, 1, 2, 0, 2, 3, 0, 3, 2, 2, 3, 0xffffffff]);
   // After triangle 3 the FIFO holds (2, 0xffffffff) newest and (0xffffffff, 3) next; last = 0xffffffff, so +1 = 0.
   assert.deepEqual([...out.subarray(12)], [0xffffffff, 3, 0]);
-  // Version 0 reads the vertex FIFO for 13 and 14 instead; slot 13 was never written, so it is all ones.
+  // Version 0 reads the vertex FIFO for 13 and 14 instead; slot 13 was never written, so the stream is invalid.
   const v0 = Uint8Array.of(0xe0, ...codes, 0x00, ...new Uint8Array(16));
-  meshoptDecodeIndexBuffer(out, 15, v0);
-  assert.equal(out[11], 0xffffffff);
+  assert.throws(() => meshoptDecodeIndexBuffer(out, 15, v0), { message: /vertex FIFO entry that was never written/ });
 });
 
 test('meshopt: filters follow Appendix B on hand-made inputs', () => {
@@ -339,4 +340,27 @@ test('meshopt: filters follow Appendix B on hand-made inputs', () => {
   // COLOR 8-bit, K = 8: Y = 100, Co = 20, Cg = -10, alpha 0x80 | 0x55 -> R 130, G 90, B 90, A 0xaa | 1.
   const col = run(Uint8Array.of(100, 20, 256 - 10, 0xd5), 4, 'COLOR');
   assert.deepEqual([...col], [130, 90, 90, 0xab]);
+});
+
+test('meshopt: a v1 channel mode outside 0, 1 and 2 (or a rotation on 0 or 1) is refused, even with no elements', () => {
+  // KHR_meshopt_compression, attribute channel modes: low nibble 3 to 15 is invalid, and so are modes 0 and 1 with a
+  // non-zero high nibble. 0x04 decoded as byte deltas, 0x05 as 2-byte deltas and 0x10 was accepted; an empty stream
+  // never checked its modes.
+  for (const count of [0, 40]) {
+    const data = Uint8Array.from({ length: count * 8 }, (_, i) => (i * 37) & 255),
+      encoded = encodeAttributes(data, count, 8, { version: 1, channels: [{ mode: 0 }, { mode: 0 }] });
+    const withMode = (mode) => Uint8Array.from(encoded, (b, i) => (i === encoded.length - 2 ? mode : b));
+    for (const mode of [0x03, 0x04, 0x05, 0x0f, 0x10, 0x11, 0x13, 0xf1])
+      throwsNamed(() => decode(withMode(mode), count, 8, 'ATTRIBUTES'), Error, /invalid vertex channel mode$/);
+    for (const mode of [0x00, 0x01, 0x02, 0x12, 0xf2])
+      assert.equal(decode(withMode(mode), count, 8, 'ATTRIBUTES').length, count * 8, `mode ${mode}`);
+  }
+});
+
+test('meshopt: index streams that read unwritten FIFO slots, break the codeaux rules or run a varint past 5 bytes are refused', () => {
+  for (const [mode, count, bytes, message] of invalidIndexStreams)
+    assert.throws(() => decode(Uint8Array.from(bytes), count, 4, mode), { message }, `${mode} ${bytes}`);
+  // A five-byte varint whose last byte ends it is valid: 0xffffffff is baseline 1 with delta ~0x3fffffff.
+  const five = decode(Uint8Array.of(0xd1, 0xff, 0xff, 0xff, 0xff, 0x0f, 0, 0, 0, 0), 1, 4, 'INDICES');
+  assert.equal(new Uint32Array(five.buffer, five.byteOffset, 1)[0], 0xc0000000);
 });

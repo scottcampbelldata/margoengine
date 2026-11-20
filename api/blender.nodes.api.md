@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { MaterialExtension, PBRModel } from "@margoengine/gltf-pro";
+import { MaterialExtension, PBRModel } from "@margoengine/gltf/pbr";
 
 export interface MargoNodeGraph {
     version: 1;

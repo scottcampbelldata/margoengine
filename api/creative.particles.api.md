@@ -4,12 +4,12 @@
 
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { VFXObstacle, VFXTexture } from "@margoengine/vfx";
+import { VFXObstacle, VFXOptions, VFXTexture } from "@margoengine/vfx";
 import { VFX } from "@margoengine/vfx/base";
 
 export class GPUParticles extends VFX {
     readonly name = "gpu-particles";
-    static attach(engine: EngineKernel, options?: ParticleOptions): GPUParticles;
+    static attach(engine: EngineKernel, options?: ParticleOptions | VFXOptions): GPUParticles;
     constructor(options?: ParticleOptions);
     get count(): number;
 }

@@ -45,6 +45,19 @@ test('CSV complete records survive every byte boundary, embedded CRLF/quotes, UT
   await assert.rejects(collect(readSeries(memory(new TextEncoder().encode('x\n"bad')), { chunkBytes: 1 })));
   await assert.rejects(collect(readSeries(memory(bytes), { signal: AbortSignal.abort() })));
 });
+test('CSV chunks keep the column kinds of the first chunk that has a value, as a streaming Arrow CSV reader does', async () => {
+  // One record per chunk: "x" makes the code column text, so the later "3" stays the text "3", not the number 3.
+  const kinds = async (text, options = {}) => (await collect(readSeries(memory(new TextEncoder().encode(text)), { chunkBytes: 1, ...options })))
+    .map((chunk) => Object.fromEntries(Object.entries(chunk.table.columns).map(([name, column]) => [name, column.categories ? 'string' : column.values.constructor.name])));
+  for (const chunk of await kinds('code,v\nx,1\n3,2\n')) assert.deepEqual(chunk, { code: 'string', v: 'Float64Array' });
+  const chunks = await collect(readSeries(memory(new TextEncoder().encode('code,v\nx,1\n3,2\n')), { chunkBytes: 1 }));
+  assert.deepEqual(values(chunks, 'code'), ['x', '3']);
+  // A column with no value yet is not pinned; a later text value in a pinned numeric column is a coded error.
+  assert.deepEqual((await kinds('a,b\n,1\n5,2\n')).at(-1), { a: 'Float64Array', b: 'Float64Array' });
+  await assert.rejects(kinds('a\n1\nx\n'), /CSV a is not numeric; see https:\/\/margoengine\.com\/errors#sciviz/);
+  // Explicit types still win.
+  for (const chunk of await kinds('a\n1\n2\n', { types: { a: 'string' } })) assert.deepEqual(chunk, { a: 'string' });
+});
 
 test('Range Arrow batches and Parquet groups match owner-writer scalars, nulls, units and compression', async () => {
   for (const format of ['arrow', 'parquet']) {
@@ -147,4 +160,14 @@ test('spectra preserve tiny physical units, one-sided PSD, Nyquist, odd lengths 
   await assert.rejects(seriesSpectrum(gpu, [1,NaN], 64)); await assert.rejects(seriesSpectrum(gpu, [1,2], 0));
   await assert.rejects(seriesSpectrogram(gpu, input, 64, { maxBytes: 1 }));
   await assert.rejects(seriesSpectrum(gpu, input, 64, { signal: AbortSignal.abort() }));
+});
+test('a spectrogram view puts each cell centre on its window centre and frequency bin', async () => {
+  const { addSpectrogramView } = await import('../dist/series.js');
+  let seen;
+  const figure = { heatmap: async (values, options) => (seen = { values, options }) };
+  const spectrogram = { times: Float64Array.of(10.5, 11, 11.5), frequency: Float64Array.of(0, 1, 2), power: new Float64Array(9).fill(1), hopSeconds: 0.5, binHz: 1 };
+  await addSpectrogramView(figure, spectrogram);
+  // Heatmap x and y are the first and last cell centres, so the cells span 10.25..11.75 s and -0.5..2.5 Hz.
+  assert.deepEqual(seen.options.x, [10.5, 11.5]); assert.deepEqual(seen.options.y, [0, 2]);
+  assert.equal(seen.options.nx, 3); assert.equal(seen.options.ny, 3);
 });

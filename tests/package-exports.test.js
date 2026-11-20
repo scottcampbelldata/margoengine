@@ -11,7 +11,7 @@ test('every declared package export target exists after build, including all con
   assert.deepEqual(problems, [], 'run npm run build:packages; every declared export branch must emit its target');
 });
 
-// KB-RM4 (2026-11-11): a full CI run went on for forty minutes with no packages/web/dist. build-modern now checks every
+// KB-RM4 (2026-11-11): a full CI run went on for forty minutes with no packages/kit-web/dist. build-modern now checks every
 // package it built with the same function and stops.
 test('build:packages checks the export targets of every package it built before it ends', () => {
   const build = readFileSync('scripts/build-modern.js', 'utf8');

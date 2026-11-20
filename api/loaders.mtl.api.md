@@ -64,6 +64,11 @@ interface FetchOptions {
     maxBytes?: number;
     fetch?: typeof fetch;
     init?: RequestInit;
+    protocols?: readonly string[];
+    publicOnly?: boolean;
+    allowHost?: (hostname: string, url: URL) => boolean;
+    maxRedirects?: number;
+    accept?: readonly string[];
 }
 
 interface LoadedGeometry {
@@ -73,6 +78,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -94,6 +100,8 @@ interface LoadedOBJ extends LoadedGeometry {
     materialLibraries: string[];
     materials: MTLMaterial[];
     images: string[];
+    pointIndices: Uint32Array;
+    lineIndices: Uint32Array;
     extras: OBJStatement[];
     warnings: string[];
 }

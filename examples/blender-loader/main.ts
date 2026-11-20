@@ -1,6 +1,6 @@
 import { createStage } from 'margoengine';
 import { parseMargo } from '@margoengine/blender';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   input = document.querySelector<HTMLInputElement>('#file')!;

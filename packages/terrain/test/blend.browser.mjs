@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/blend.browser.mjs
 // Mesh to terrain blending (`@margoengine/terrain/blend`): a 2 m box half a metre into flat sandy ground, seen square
 // from 6 m. The same view is drawn without and with the blend:

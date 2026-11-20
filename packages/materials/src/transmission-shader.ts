@@ -1,4 +1,4 @@
-import type { MaterialExtension } from '@margoengine/gltf-pro';
+import type { MaterialExtension } from '@margoengine/gltf/pbr';
 import { coordinateExpression } from './coordinates.js';
 import type { ClearcoatTextureSlot } from './shader.js';
 import { volumeScatterWgsl } from '../../shared/volume-scatter.js';

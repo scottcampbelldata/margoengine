@@ -478,6 +478,27 @@ function compressedBlock(data, at, end, out, frameStart, window, state, scratch)
  * const bytes = await decompressZstd(compressed, { maxOutputSize: 1 << 24 });
  */
 export async function decompressZstd(input, options = {}) {
+  const run = decode(input, options);
+  for (let step = run.next(); ; step = run.next()) {
+    if (step.done) return step.value;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    options.signal?.throwIfAborted();
+  }
+}
+
+/**
+ * {@link decompressZstd} without yielding: the same output, limits and errors, for synchronous callers (a TIFF strip).
+ * The signal is checked between blocks.
+ * @example
+ * const bytes = decompressZstdSync(compressed, { maxOutputSize: 1 << 24 });
+ */
+export function decompressZstdSync(input, options = {}) {
+  const run = decode(input, options);
+  for (let step = run.next(); ; step = run.next()) if (step.done) return step.value;
+}
+
+/** The decoder: yields every YIELD_EVERY output bytes, where the async wrapper gives the event loop a turn. */
+function* decode(input, options) {
   if (!(input instanceof Uint8Array)) throw new TypeError('Expected Zstandard bytes as a Uint8Array');
   const { signal, maxOutputSize = 1 << 28, maxWindowSize = 1 << 27, destination } = options;
   if (destination !== undefined && !(destination instanceof Uint8Array))
@@ -553,7 +574,7 @@ export async function decompressZstd(input, options = {}) {
       signal?.throwIfAborted();
       if (out.length >= nextYield) {
         nextYield = out.length + YIELD_EVERY;
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        yield;
         signal?.throwIfAborted();
       }
       if (at + 3 > data.length) throw damaged('a truncated block header');

@@ -107,7 +107,7 @@ test('light shafts march the clouds they are given, from their options and drift
     queue = h.engine.gpu.queue,
     write = queue.writeBuffer.bind(queue);
   queue.writeBuffer = (buffer, offset, data) => {
-    if (data.length === 64) writes.push(Float32Array.from(data));
+    if (data.length === 96) writes.push(Float32Array.from(data));
     return write(buffer, offset, data);
   };
   h.engine.use(sky);

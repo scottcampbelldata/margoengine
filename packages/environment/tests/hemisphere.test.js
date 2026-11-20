@@ -1,12 +1,12 @@
 // CPU checks (mock GPU) for HemisphereLight and AmbientLight: the core-shader patch beside IBL and light probes in either
-// order, gltf-pro's sky hook in every gltf-pro-family shader, and the live uniform. Values on a real adapter:
+// order, gltf/pbr's sky hook in every gltf-pbr-family shader, and the live uniform. Values on a real adapter:
 // examples/package-benchmarks/light-features-gpu.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
-import { pbrShader, extendedPBRShader, physicalShader, transmissiveShader } from '../../gltf-pro/src/shader.ts';
+import { pbrShader, extendedPBRShader, physicalShader, transmissiveShader } from '../../gltf/src/shader.ts';
 import { materialShader } from '../../materials/dist/index.js';
 import { EnvironmentLighting, HemisphereLight, AmbientLight, HEMISPHERE_BINDING } from '../dist/index.js';
 import { LightProbes } from '../dist/probes.js';
@@ -95,7 +95,7 @@ test('LightProbes without an environment fall back to the hemisphere in either o
     );
 });
 
-test("gltf-pro's sky hook replaces the fixed gradient in every gltf-pro-family shader, beside IBL, inside probes' fallback", () => {
+test("gltf/pbr's sky hook replaces the fixed gradient in every gltf-pbr-family shader, beside IBL, inside probes' fallback", () => {
   const { sky, ibl, probes } = effects(),
     hooks = { sky: sky.pbr(2), ibl: ibl.pbr(2), probes: probes.pbr(2) },
     shaders = {

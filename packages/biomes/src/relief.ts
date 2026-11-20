@@ -8,6 +8,10 @@ import type { Erosion, ReliefErosionOptions } from './erosion.js';
 import { erosionHook } from './erosion-hook.js';
 import { clampInt, divFloor, divWide, imod, isqrt, ONE, sincos } from './fixed.js';
 import { fbm, hash3, ridged } from './hash.js';
+import type { MountainValley, MountainValleyOptions, MountainValleySettings } from './valley.js';
+import { mountainValleyHook } from './valley-hook.js';
+
+export type { MountainValley, MountainValleyOptions, MountainValleySettings } from './valley.js';
 
 /** River valley shape of {@link ReliefOptions}. Lengths in metres. */
 export interface ValleyOptions {
@@ -42,7 +46,7 @@ export interface ReliefOptions {
   readonly size?: readonly [number, number];
   /** Mean lowland height in metres. Default 120. */
   readonly base?: number;
-  /** Height of the highest ridges above the lowland in metres, 0..8,000. Default 900. */
+  /** Height of the highest ridges above the lowland in metres, 0..8,000. Default 350. */
   readonly relief?: number;
   /**
    * Side of the world that runs down into the sea, `'island'` for islands with sea on every side (see `islands`), or
@@ -57,14 +61,66 @@ export interface ReliefOptions {
   readonly shelf?: number;
   /** River valley shape. Default `{ width: 250, floor: 0, mouth: width }`. */
   readonly valley?: ValleyOptions;
+  /**
+   * A drowned valley (a Sanriku style ria bay) cut into a straight coast, with steep hills round it and a little level
+   * ground at its head (see {@link RiaOptions}). Needs `coast` west, east, north or south. Default: none, and then the
+   * heights are exactly what they were.
+   */
+  readonly ria?: RiaOptions;
   /** Islands, with `coast: 'island'` only. Default `{ count: 1 }`. */
   readonly islands?: IslandOptions;
+  /**
+   * A northern Rockies mountain valley in place of the open landscape (see {@link MountainValleyOptions}): a main valley
+   * with a level floor falling to an outlet on one edge, a creek and a rail grade on the floor, and steep walls cut into
+   * side gulches and ridges by stream-power drainage. `base` is the floor's height at the outlet and `relief` caps the
+   * ridges above it. The `@margoengine/biomes/valley` entry must be loaded first (`BiomeWorld.create` loads
+   * it for a relief with this option). Needs `coast: 'none'`, no `ria`, `islands` or `erosion` (the valley's own drainage cuts it) and no
+   * `rivers` (the creek is the relief's river).
+   * Default: none, and then the heights are exactly what they were.
+   */
+  readonly mountainValley?: MountainValleyOptions;
   /**
    * Thermal and hydraulic erosion of the landscape on a grid over the world (`erodeRelief` of
    * `@margoengine/biomes/erosion`, which must be loaded first; `BiomeWorld.create` loads it for a relief height with this
    * option). Default: none.
    */
   readonly erosion?: ReliefErosionOptions;
+}
+
+/**
+ * A ria: a drowned river valley cut into a straight coast, the shape of a Sanriku fishing bay (`ReliefOptions.ria`).
+ * Lengths in metres. The bay runs inland from the coast edge along an axis that sways a little, narrowing from `width` at
+ * the mouth to `headWidth` at its head, shallowing from `depth` to the waterline; steep hills rise from the water on
+ * both sides and a small river runs on from the head. Ground within `flat` of the head is levelled to `flatHeight`, the
+ * only room for a town. The rest of the coast is steep from the waterline too (no beach, no shelf).
+ */
+export interface RiaOptions {
+  /** Where the axis meets the coast, 0.1..0.9 of the way along it. Default 0.5. */
+  readonly center?: number;
+  /** Half width of the bay at the mouth, 20..2,000. Default 500. */
+  readonly width?: number;
+  /** Half width of the bay at its head, 5 up to `width`. Default 140. */
+  readonly headWidth?: number;
+  /** Length of the bay inland from the coast edge, 200..8,000. Default 2,800. */
+  readonly length?: number;
+  /** Depth of the water at the mouth, 0..200. Default 25. */
+  readonly depth?: number;
+  /**
+   * Depth of the water at the head, 0 up to `depth`: the floor falls from it to `depth` along the bay, so a harbour at
+   * the head has water to moor in (Sanriku bays hold 5 to 10 m at their inner harbours). Default 0: the floor shallows to
+   * the waterline at the head.
+   */
+  readonly headDepth?: number;
+  /** Rise of the ground per metre from the waterline, 0.1..1.5. Default 0.55. */
+  readonly slope?: number;
+  /** Radius of the level ground at the head of the bay, 0..1,500. Default 420. */
+  readonly flat?: number;
+  /** Height of that ground above the sea, 0..30. Default 4.5. */
+  readonly flatHeight?: number;
+  /** Distance over which the hills climb to full relief, 100..8,000. Default 350. */
+  readonly run?: number;
+  /** Whether a river runs 4 km inland from the head along the axis (the `valley` option shapes it). Default true. */
+  readonly river?: boolean;
 }
 
 /** A river centre line in millimetres, `[x0, z0, x1, z1, ...]`, from its mouth upstream. */
@@ -92,6 +148,8 @@ export interface Relief {
   readonly islands: readonly ReliefIsland[];
   /** The erosion grid of a relief made with the `erosion` option (height, flow, wear, deposit), else undefined. */
   readonly erosion?: Erosion;
+  /** The valley of a relief made with the `mountainValley` option (lines, frame, floor and drainage grid), else undefined. */
+  readonly mountainValley?: MountainValley;
   /**
    * The cells of a grid (`nx` x `nz` corner samples `step` mm apart from world `origin` in mm) along the river centre
    * lines, within half a cell: 1 for water, 0 elsewhere. Worlds take them as water sources.
@@ -111,6 +169,10 @@ export interface Relief {
     valley: Readonly<{ width: number; floor: number; mouth: number }>;
     /** Island settings in mm, or null for every other coast. */
     islands: Readonly<{ count: number; radius: number; shelf: number }> | null;
+    /** The ria with defaults filled in and lengths in mm; absent without the option. */
+    ria?: Readonly<Record<keyof Required<RiaOptions>, number>>;
+    /** The mountain valley with defaults filled in, lengths in mm and rates in Q16; absent without the option. */
+    mountainValley?: Readonly<MountainValleySettings>;
   }>;
 }
 
@@ -121,6 +183,63 @@ const SHELF = 1_500_000,
   VALLEY = 250_000;
 // A valley's width moves from `mouth` to `width` over this distance from the mouth, mm.
 const MOUTH_RUN = 1_000_000;
+// Ria: the quantised options and the shaping constants. Lengths in mm, the slope a Q16 rise per unit run.
+interface Ria {
+  axis: number;
+  mouth: number;
+  head: number;
+  length: number;
+  depth: number;
+  headDepth: number;
+  slope: number;
+  flat: number;
+  flatHeight: number;
+  run: number;
+  river: boolean;
+  /** Largest sway of the axis (mm) and the lowland noise amplitude of the hills' foot. */
+  sway: number;
+}
+const RIA_LOW = 12_000,
+  RIA_RIVER = 4_000_000;
+function riaOf(o: RiaOptions, coast: string, along: number): Ria {
+  const bad = () =>
+    rangeError(
+      "Invalid relief ria; use it with coast west, east, north or south, center 0.1..0.9, width 20..2,000 m, headWidth 5 m up to width, length 200..8,000 m, depth 0..200 m, headDepth 0..depth, slope 0.1..1.5, flat 0..1,500 m, flatHeight 0..30 m and run 100..8,000 m",
+      'biomes',
+    );
+  if (typeof o !== 'object' || o === null) throw bad();
+  const { center = 0.5, width = 500, headWidth = 140, length = 2800, depth = 25, slope = 0.55, flat = 420 } = o,
+    { flatHeight = 4.5, run = 350, river = true, headDepth = 0 } = o;
+  if (
+    !['west', 'east', 'north', 'south'].includes(coast) ||
+    !(center >= 0.1 && center <= 0.9) ||
+    !(width >= 20 && width <= 2000) ||
+    !(headWidth >= 5 && headWidth <= width) ||
+    !(length >= 200 && length <= 8000) ||
+    !(depth >= 0 && depth <= 200) ||
+    !(headDepth >= 0 && headDepth <= depth) ||
+    !(slope >= 0.1 && slope <= 1.5) ||
+    !(flat >= 0 && flat <= 1500) ||
+    !(flatHeight >= 0 && flatHeight <= 30) ||
+    !(run >= 100 && run <= 8000) ||
+    typeof river !== 'boolean'
+  )
+    throw bad();
+  return {
+    axis: Math.floor(along * center),
+    mouth: mm(width),
+    head: mm(headWidth),
+    length: mm(length),
+    depth: mm(depth),
+    headDepth: mm(headDepth),
+    slope: Math.round(slope * ONE),
+    flat: mm(flat),
+    flatHeight: mm(flatHeight),
+    run: mm(run),
+    river,
+    sway: Math.min(150_000, Math.floor(mm(width) / 3)),
+  };
+}
 // Island beach: the shelf rises to BEACH_LOW, the beach ring climbs to BEACH_TOP over 60 to 120 m (mm).
 const BEACH_LOW = 1000,
   BEACH_TOP = 4000;
@@ -236,6 +355,41 @@ export function createRelief(options: ReliefOptions = {}): Relief {
       'Invalid relief shelf or valley; shelf 1..16,000 m (on islands up to the radius), valley width and mouth 1..4,000 m and a floor from 0 up to below both',
       'biomes',
     );
+  if (options.mountainValley !== undefined) {
+    const { settings: check, build } = mountainValleyHook;
+    if (!check || !build)
+      throw fault(
+        'state',
+        "A relief with mountainValley needs the valley entry; await import('@margoengine/biomes/valley') first (BiomeWorld.create loads it)",
+        'biomes',
+      );
+    const alone =
+        coast === 'none' && options.ria === undefined && io === undefined && count === 0 && options.erosion === undefined,
+      ms = check(options.mountainValley, [sx, sz], alone),
+      { valley, height } = build(ms, seed, [ox, oz], [sx, sz], baseMm, reliefMm),
+      rivers = [valley.creek];
+    return {
+      height,
+      rivers,
+      valleyWidth: Math.floor(ms.creekWidth / 2),
+      islands: Object.freeze([]),
+      mountainValley: valley,
+      waterCells: (at, step, nx, nz) => riverCells(rivers, at, step, nx, nz),
+      settings: Object.freeze({
+        seed,
+        origin: [ox, oz] as const,
+        size: [sx, sz] as const,
+        base: baseMm,
+        relief: reliefMm,
+        coast,
+        seaDepth: sea,
+        shelf,
+        valley: Object.freeze({ width, floor: vFloor, mouth }),
+        islands: null,
+        mountainValley: Object.freeze(ms),
+      }),
+    };
+  }
   // Coast frame: distance inland from the coast edge (u) and position along it (v), both in mm.
   const frame = (x: number, z: number): [number, number] =>
     coast === 'west'
@@ -268,6 +422,11 @@ export function createRelief(options: ReliefOptions = {}): Relief {
   // How far a straight coast's shelf edge moves inland at position v along it, mm: the outline warp, 600 m at most.
   const coastWarp = (v: number) =>
     Math.floor(((fbm(seed + 3, divFloor(v * ONE, 3_000_000), 0, 3) - 32768) * 600_000) / 32768);
+  // Ria: its axis sways by up to `sway` over 1.2 km runs, a function of the distance inland uu from the coast line.
+  const ria = options.ria === undefined ? null : riaOf(options.ria, coast, along),
+    riaAxis = (uu: number) =>
+      ria!.axis +
+      Math.floor(((fbm(seed + 9, divFloor(Math.max(uu, 0) * ONE, 1_200_000), 0, 2) - 32768) * ria!.sway) / 32768);
   // Rivers: 8 segments inland from the mouth, meandering by hashed offsets. On a straight coast the mouth is on the
   // shelf's outer edge (the sea floor), so the valley is carved across the whole shelf down to the sea: a mouth inland
   // of the warped shore left the shelf's land between it and the sea as a ridge, closing the river in a basin. Without
@@ -305,6 +464,26 @@ export function createRelief(options: ReliefOptions = {}): Relief {
               ? Math.floor(shelf / 3)
               : clampInt(coastWarp(v), 0, next);
       // Back to world coordinates.
+      const [x, z] =
+        coast === 'east'
+          ? [ox + sx - u, oz + v]
+          : coast === 'north'
+            ? [ox + v, oz + u]
+            : coast === 'south'
+              ? [ox + v, oz + sz - u]
+              : [ox + u, oz + v];
+      line[2 * k] = x;
+      line[2 * k + 1] = z;
+    }
+    rivers.push(line);
+  }
+  if (ria?.river) {
+    // The ria's river: from the bay head inland along the axis, in 8 segments of half a kilometre.
+    const line = new Int32Array(18);
+    for (let k = 0; k <= 8; k++) {
+      const uu = ria.length + Math.floor((RIA_RIVER * k) / 8),
+        v = riaAxis(uu),
+        u = uu + coastWarp(v);
       const [x, z] =
         coast === 'east'
           ? [ox + sx - u, oz + v]
@@ -384,6 +563,48 @@ export function createRelief(options: ReliefOptions = {}): Relief {
     }
     return h;
   };
+  // The ground of a ria at `uu` mm inland of the coast line and `v` along it: water (a U section in the bay, a sloping
+  // floor in the sea), else the lower of the hills (a low land plus ridges that climb with the distance from the water)
+  // and the waterline's rise, levelled near the bay head.
+  const riaHeight = (r: Ria, uu: number, v: number, x: number, z: number): number => {
+    const dv = Math.abs(v - riaAxis(uu)),
+      w = uu <= 0 ? r.mouth : uu >= r.length ? r.head : r.mouth + Math.floor(((r.head - r.mouth) * smooth(divFloor(uu * ONE, r.length))) / ONE),
+      bayFloor = (): number => {
+        const lengthwise = uu <= 0 ? ONE : ONE - smooth(divFloor(uu * ONE, r.length));
+        // From `headDepth` at the head to `depth` at the mouth (0 at the head without it, the bytes of before).
+        const floor = r.headDepth + Math.floor(((r.depth - r.headDepth) * lengthwise) / ONE);
+        return -Math.floor((floor * (ONE - smooth(clampInt(divFloor(dv * ONE, w), 0, ONE)))) / ONE);
+      };
+    if (uu <= 0) return Math.min(Math.max(-sea, Math.floor((uu * 3) / 10)), dv < w ? bayFloor() : 0);
+    // Distance to the nearest water: the sea over the coast line, the bay's side, or past its head the head's rim.
+    let dBay: number;
+    if (uu <= r.length) dBay = dv - w;
+    else {
+      const a = (uu - r.length) >> 6,
+        b = dv >> 6;
+      dBay = isqrt(a * a + b * b) * 64 - r.head;
+    }
+    if (dBay < 0 && uu <= r.length) return bayFloor();
+    const dist = Math.max(0, Math.min(uu, dBay)),
+      lowland = fbm(seed, lattice(x, 2_048_000), lattice(z, 2_048_000), 7),
+      ridge = ridged(seed + 2, lattice(x, 1_500_000), lattice(z, 1_500_000), 6),
+      climb = smooth(clampInt(divFloor(dist * ONE, r.run), 0, ONE)),
+      land =
+        baseMm +
+        Math.floor(((lowland - 32768) * RIA_LOW) / 32768) +
+        Math.floor((Math.floor((ridge * climb) / ONE) * reliefMm) / ONE),
+      cap = Math.floor((dist * r.slope) / ONE);
+    let h = Math.min(Math.max(land, 500), cap);
+    if (r.flat > 0 && r.flatHeight > 0) {
+      // Level ground round a point just inland of the bay head, up to the waterline's rise.
+      const a = (uu - r.length - Math.floor(r.flat / 2)) >> 6,
+        b = dv >> 6,
+        t = smooth(clampInt(Math.floor(((ONE - divFloor(isqrt(a * a + b * b) * 64 * ONE, r.flat)) * 5) / 2), 0, ONE)),
+        target = Math.min(r.flatHeight, cap);
+      h += Math.floor(((target - h) * t) / ONE);
+    }
+    return h;
+  };
   const height = (x: number, z: number): number => {
     let h: number;
     if (isle) {
@@ -404,7 +625,8 @@ export function createRelief(options: ReliefOptions = {}): Relief {
       const [u, v] = frame(x, z),
         warp = coastWarp(v),
         d = u - warp;
-      if (d < shelf) {
+      if (ria) h = riaHeight(ria, d, v, x, z);
+      else if (d < shelf) {
         // Smoothstep from the sea floor at the edge to the land height at the shelf's inner end.
         const t = clampInt(divFloor(d * ONE, shelf), 0, ONE),
           s = smooth(t);
@@ -468,6 +690,23 @@ export function createRelief(options: ReliefOptions = {}): Relief {
       shelf,
       valley: Object.freeze({ width, floor: vFloor, mouth }),
       islands: isle ? Object.freeze({ count: islandCount, radius, shelf }) : null,
+      ...(ria
+        ? {
+            ria: Object.freeze({
+              center: ria.axis,
+              width: ria.mouth,
+              headWidth: ria.head,
+              length: ria.length,
+              depth: ria.depth,
+              headDepth: ria.headDepth,
+              slope: ria.slope,
+              flat: ria.flat,
+              flatHeight: ria.flatHeight,
+              run: ria.run,
+              river: ria.river ? 1 : 0,
+            }),
+          }
+        : {}),
     }),
   };
   const erosion = options.erosion;

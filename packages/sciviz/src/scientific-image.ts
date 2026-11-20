@@ -22,6 +22,8 @@ export interface ScientificGrid {
 export function imageGrid(image: ScientificImage): ScientificGrid {
   const dims: [number, number, number] = [...image.dims],
     data = Float32Array.from(image.data);
+  if (dims.length !== 3 || dims.some((n) => !Number.isSafeInteger(n) || n < 1))
+    throw rangeError('Scientific grid dimensions must be three positive integers', 'sciviz');
   if (data.length !== dims[0] * dims[1] * dims[2])
     throw rangeError('Scientific grid sample count differs from dimensions', 'sciviz');
   const origin = image.world([0, 0, 0]),
@@ -63,8 +65,18 @@ export function imageGrid(image: ScientificImage): ScientificGrid {
       hi = Math.max(hi, v);
     }
   }
-  // Give a singleton axis a nonzero display extent while keeping its first sample fixed.
-  for (let i = 0; i < 3; i++) if (bounds[2 * i] === bounds[2 * i + 1]) bounds[2 * i + 1]++;
+  for (let i = 0; i < 3; i++) {
+    if (bounds[2 * i] !== bounds[2 * i + 1]) continue;
+    // A singular transform (FITS CDELT of 0, a CD matrix with a zero column) puts every sample of an axis at one
+    // coordinate (rotations failed the sample check above); a unit extent would invent spacing the file lacks.
+    if (dims[i] > 1)
+      throw rangeError(
+        'Scientific grid axis with several samples has zero physical extent; give the image a nonsingular world transform',
+        'sciviz',
+      );
+    // Give a singleton axis (one sample) a nonzero display extent while keeping its first sample fixed.
+    bounds[2 * i + 1]++;
+  }
   return { data, dims, bounds, range: lo <= hi ? [lo, hi] : [0, 0], image };
 }
 /** Draws a grid in physical axes; resample rotated, sheared or nonuniform images before drawing. */

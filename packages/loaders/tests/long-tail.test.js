@@ -610,11 +610,24 @@ test('AMF: volume, material, object and vertex colours', async () => {
         ),
     ),
   );
+  // ISO/ASTM 52915: colour takes priority in reverse order of material, object, volume, vertex and triangle, so the
+  // object's red outranks the material the first volume names.
   assert.deepEqual(model.groups.map((g) => g.color), [
-    [0, 1, 0, 1],
+    [1, 0, 0, 1],
     [0, 0, 1, 1],
     [1, 0, 0, 1],
   ]);
+  const ranked = await parseAMF(
+    amf(
+      `<object id="1"><mesh><vertices>${vertex(0, 0, 0, color(1, 0, 0))}${vertex(1, 0, 0)}${vertex(0, 1, 0)}${vertex(1, 1, 0)}</vertices>` +
+        `<volume>${color(0, 0, 1)}${tri(0, 1, 2)}<triangle>${color(0, 1, 0)}<v1>1</v1><v2>3</v2><v3>2</v3></triangle></volume></mesh></object>`,
+    ),
+  );
+  // Vertex 0 keeps its red over the volume's blue; 1 and 2 show the volume's blue; the green triangle gets three
+  // corners of its own, so vertex 3 (used by no other triangle) stays white.
+  near(ranked.colors, [1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0]);
+  assert.deepEqual(Array.from(ranked.indices), [0, 1, 2, 4, 5, 6]);
+  near(ranked.positions.subarray(12), [0.001, 0, 0, 0.001, 0.001, 0, 0, 0.001, 0]);
   const painted = await parseAMF(
     amf(
       `<object id="1"><mesh><vertices>${vertex(0, 0, 0, color(1, 0, 0))}${vertex(1, 0, 0)}${vertex(0, 1, 0)}</vertices><volume>${tri(0, 1, 2)}</volume></mesh></object>`,

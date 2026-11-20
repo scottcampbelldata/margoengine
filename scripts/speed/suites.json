@@ -206,7 +206,7 @@
   },
   {
     "id": "packages/compute/tests/compute-browser.mjs",
-    "command": "node scripts/gpu-lock.mjs run --owner=compute-speed --max=4 --wait-max=60 --gpu=Compute_browser_real_kernels_and_deferred_throughput -- node packages/compute/tests/compute-browser.mjs",
+    "command": "node scripts/run-with-timeout.mjs --max=4 -- node packages/compute/tests/compute-browser.mjs",
     "limitMinutes": 65
   },
   {
@@ -280,8 +280,8 @@
     "limitMinutes": 20
   },
   {
-    "id": "packages/staging/scripts/rival-bench.mjs",
-    "command": "node packages/staging/scripts/rival-bench.mjs",
+    "id": "packages/studio/scripts/rival-bench.mjs",
+    "command": "node packages/studio/scripts/rival-bench.mjs",
     "limitMinutes": 20
   },
   {
@@ -505,8 +505,8 @@
     "limitMinutes": 20
   },
   {
-    "id": "examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js --time",
-    "command": "node examples/package-benchmarks/proofs/gltf-pro-lighting-hooks.proof.js --current --time",
+    "id": "examples/package-benchmarks/proofs/gltf-pbr-lighting-hooks.proof.js --time",
+    "command": "node examples/package-benchmarks/proofs/gltf-pbr-lighting-hooks.proof.js --current --time",
     "limitMinutes": 20
   },
   {
@@ -541,7 +541,7 @@
   },
   {
     "id": "packages/quality/test/browser-check.mjs",
-    "command": "node scripts/gpu-lock.mjs run --owner=quality-speed --max=2 --wait-max=60 -- node packages/quality/test/browser-check.mjs",
+    "command": "node scripts/run-with-timeout.mjs --max=2 -- node packages/quality/test/browser-check.mjs",
     "limitMinutes": 63
   }
 ]

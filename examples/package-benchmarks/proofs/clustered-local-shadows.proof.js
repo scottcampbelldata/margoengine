@@ -1,7 +1,7 @@
 // Proof that point/spot light shadows (`@margoengine/clustered/shadows`) change nothing for apps that do not attach them:
 // clustered's root gained a `castShadow` light field and a shadow hook in its light loop. A 9-frame story (lights set,
-// moved, a gltf-pro model added and removed, intensity scale changed, MSAA 1x/4x, device restored) records every GPU call,
-// descriptor, shader module and buffer write of clustered (core-mesh shader patch and compute pass) and of a gltf-pro model
+// moved, a gltf/pbr model added and removed, intensity scale changed, MSAA 1x/4x, device restored) records every GPU call,
+// descriptor, shader module and buffer write of clustered (core-mesh shader patch and compute pass) and of a gltf/pbr model
 // it lights, at `ref` and in the working tree: identical. With `castShadow: true` lights but no LocalShadows, the only
 // difference is the light buffer's unused params.z (the shadow ordinal); shaders and every other call stay identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-local-shadows.proof.js [ref] [pin] [--current]
@@ -11,11 +11,11 @@ import { refs, versions, entryAt, golden } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
-const { ref, pin } = refs('0ed56b9', '590278e', '1fdb559080');
+const { ref, pin } = refs('0ed56b9', '590278e', '8c71da0556');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin),
-  gltf = await entryAt('gltf-pro', 'src/index.ts', pin);
+  gltf = await entryAt('gltf', 'src/pbr.ts', pin);
 const point = { position: [0, 2, 1], range: 6, color: [1, 0.5, 0.2], intensity: 9 },
   spot = { position: [1, 3, 0], range: 8, direction: [0, -1, 0.2], outerAngle: 0.6, innerAngle: 0.3, intensity: 20 };
 
@@ -88,7 +88,7 @@ for (const samples of [1, 4]) {
   assert.ok(
     expected.some((e) => e[0] === 'module' && /clusterLighting\(/.test(e[2].code)) &&
       expected.some((e) => e[0] === 'context' && /clusterLighting\(i\.clip/.test(e[1])),
-    "story must light the gltf-pro model and patch core's shader",
+    "story must light the gltf/pbr model and patch core's shader",
   );
   assert.deepEqual(actual, expected, `clustered GPU calls differ at ${samples}x`);
   const shadowed = await story(candidate, true, samples);

@@ -6,8 +6,8 @@
   "scope": "Independent UV1 and grouped materials/instancing/export in optional packages; core and stage unchanged",
   "sourceSha256": {
     "packages/materials/src/built-material.ts": "0666b6ee1bad622253ee1b96c78e6c883be7dbf5f2a42296568a5f8fd9ef87fa",
-    "packages/gltf-pro/src/index.ts": "40701ecf6766d3d3b8de1266a44dce248ec8331fb688301ed7c18c2aea23a5f1",
-    "packages/gltf-pro/src/shader.ts": "10ecb4fbf6dc59b0b2450b75222467e176c68c2601fcb5f02d5559b33ca731a1",
+    "packages/gltf/src/pbr.ts": "40701ecf6766d3d3b8de1266a44dce248ec8331fb688301ed7c18c2aea23a5f1",
+    "packages/gltf/src/shader.ts": "10ecb4fbf6dc59b0b2450b75222467e176c68c2601fcb5f02d5559b33ca731a1",
     "packages/exporters/src/model.ts": "4a5d6ae55b88fa919cd504b7d62b9f96be3b92a633b0325ce676c04fc40448b8",
     "tests/materials-uv-groups-browser.ts": "e2b1007c489ae3bcd63df565d97af76c96fee169d4ede26881a2b68ed3687370",
     "scripts/materials-uv-groups-gpu-check.js": "7bdfec3fc369b5a285ef470f96aed89a0a1a5a5b8c2dd4f002cc849b9b1b90ec"

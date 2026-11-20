@@ -17,7 +17,7 @@ export interface DepthTextureOptions {
  * 1 at the near plane, 0 far or empty; bind as `texture_depth_2d`) and `distance` (r32float, world distance from the
  * camera, 0 where empty; any material can read it, e.g. `new Texture(depth.distance)` in a WgslMaterial, with
  * `textureLoad`). Both follow the drawing size and are replaced on resize (`onResize`). Core meshes always draw into it;
- * add gltf-pro models and materials meshes with `add(model)`. Do not add a model whose material samples it. WebGPU only.
+ * add gltf/pbr models and materials meshes with `add(model)`. Do not add a model whose material samples it. WebGPU only.
  */
 export class DepthTexture implements EnginePlugin {
   private engine?: Engine;

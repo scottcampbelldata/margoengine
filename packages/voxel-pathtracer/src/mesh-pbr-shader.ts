@@ -2,6 +2,11 @@ import { MargoError } from '@margoengine/math/errors';
 import { PBR_LOBES } from './mesh-pbr-lobes.js';
 import { meshSource } from './mesh-shader.js';
 
+// pbrMaterial reads every texture slot but the normal map (pbrMappedNormal reads it) through ONE pbrTexture call in a
+// loop whose bound, the slot count, is read from the record (word 3), so Direct3D's compiler, which inlines every
+// call, keeps one filter body instead of twelve (KB5451). The same calls with the same arguments give the same values;
+// the sRGB slots (mask 0x489) are base, emissive, sheen and specular colour. pbrMapNormal turns the texel the loop read
+// into the shading normal; pbrMappedNormal reads its own texel first.
 const PBR = /* wgsl */ `
 fn pbrRecord(h:Hit)->u32 {
  if(h.inst!=TRIANGLE||h.value==0u){return 0u;}
@@ -67,21 +72,31 @@ fn pbrVisible(h:Hit,back:bool)->bool {
  if(scene[r+1u]==0u){return true;}
  return fl(r+7u)*pbrAttribute(h,12u).a*pbrTexture(h,r,0u,false).a>=fl(r+15u);
 }
-fn pbrMaterial(h:Hit,p:vec3f,input:Mat)->Mat {
+fn pbrMaterial(h:Hit,l:vec3f,input:Mat)->Mat {
  let r=pbrRecord(h);var m=input;
- if(r==0u){let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;return m;}
- let base=vec3f(fl(r+4u),fl(r+5u),fl(r+6u))*pbrTexture(h,r,0u,true).rgb*pbrAttribute(h,12u).rgb;
- let mr=pbrTexture(h,r,1u,false);let rough=fl(r+13u)*mr.g;
+ if(r==0u){let tex=faceTexel(h,l).rgb;m.color*=tex;m.metalColor*=tex;return m;}
+ var t0:vec4f;var t1:vec4f;var t3:vec4f;var t4:vec4f;var t5:vec4f;var t6:vec4f;var t7:vec4f;var t8:vec4f;var t9:vec4f;
+ var t10:vec4f;var t11:vec4f;var t12:vec4f;
+ for(var slot=0u;slot<scene[r+3u];slot++){
+  if(slot==2u){continue;}
+  let v=pbrTexture(h,r,slot,((0x489u>>slot)&1u)!=0u);
+  switch slot {
+   case 0u:{t0=v;} case 1u:{t1=v;} case 3u:{t3=v;} case 4u:{t4=v;} case 5u:{t5=v;} case 6u:{t6=v;}
+   case 7u:{t7=v;} case 8u:{t8=v;} case 9u:{t9=v;} case 10u:{t10=v;} case 11u:{t11=v;} default:{t12=v;}
+  }
+ }
+ let base=vec3f(fl(r+4u),fl(r+5u),fl(r+6u))*t0.rgb*pbrAttribute(h,12u).rgb;
+ let mr=t1;let rough=fl(r+13u)*mr.g;
  m.pbr=1u;pbrLayer.viewF=vec3f(0.0);
- pbrLayer.coat=fl(r+32u)*pbrTexture(h,r,4u,false).r;let coatRough=fl(r+33u)*pbrTexture(h,r,5u,false).g;pbrLayer.coatAlpha=coatRough*coatRough;
- pbrLayer.coatN=pbrMappedNormal(h,6u,fl(r+34u));
- pbrLayer.sheen=vec3f(fl(r+36u),fl(r+37u),fl(r+38u))*pbrTexture(h,r,7u,true).rgb;pbrLayer.sheenR=fl(r+35u)*pbrTexture(h,r,8u,false).a;
- pbrLayer.specWeight=fl(r+39u)*pbrTexture(h,r,9u,false).a;pbrLayer.specRGB=vec3f(fl(r+40u),fl(r+41u),fl(r+42u))*pbrTexture(h,r,10u,true).rgb;
- let thickness=mix(fl(r+45u),fl(r+46u),pbrTexture(h,r,12u,false).g);
- pbrLayer.film=vec3f(fl(r+43u)*pbrTexture(h,r,11u,false).r,fl(r+44u),thickness);
+ pbrLayer.coat=fl(r+32u)*t4.r;let coatRough=fl(r+33u)*t5.g;pbrLayer.coatAlpha=coatRough*coatRough;
+ pbrLayer.coatN=pbrMapNormal(h,r,6u,fl(r+34u),t6);
+ pbrLayer.sheen=vec3f(fl(r+36u),fl(r+37u),fl(r+38u))*t7.rgb;pbrLayer.sheenR=fl(r+35u)*t8.a;
+ pbrLayer.specWeight=fl(r+39u)*t9.a;pbrLayer.specRGB=vec3f(fl(r+40u),fl(r+41u),fl(r+42u))*t10.rgb;
+ let thickness=mix(fl(r+45u),fl(r+46u),t12.g);
+ pbrLayer.film=vec3f(fl(r+43u)*t11.r,fl(r+44u),thickness);
  m.color=base;m.metalColor=base;m.metal=fl(r+12u)*mr.b;m.glass=0.0;
  m.alpha=max(1e-6,rough*rough);m.spec=1.0;m.f0=0.04;m.ior=1.5;
- m.emission=vec3f(fl(r+8u),fl(r+9u),fl(r+10u))*fl(r+11u)*pbrTexture(h,r,3u,true).rgb;
+ m.emission=vec3f(fl(r+8u),fl(r+9u),fl(r+10u))*fl(r+11u)*t3.rgb;
  m.flags=0u;m.density=0.0;m.scatter=0.0;m.disp=0.0;m.g=0.0;
  if(rough==0.0){m.flags|=SMOOTH;}
  if(any(m.emission>vec3f(0.0))){m.flags|=EMISSIVE;}
@@ -91,9 +106,14 @@ fn pbrDirection(h:Hit,v:vec3f)->vec3f {
  let x=meshX(h.mesh);return vec3f(dot(x.r0.xyz,v),dot(x.r1.xyz,v),dot(x.r2.xyz,v));
 }
 fn pbrMappedNormal(h:Hit,mapSlot:u32,scale:f32)->vec3f {
- let n=triangleShadingNormal(h);let r=pbrRecord(h);
- if(r==0u||scene[r+16u+mapSlot]==0u){return n;}
- var map=pbrTexture(h,r,mapSlot,false).xyz*2.0-1.0;map=vec3f(map.xy*scale,map.z);
+ let r=pbrRecord(h);
+ if(r==0u||scene[r+16u+mapSlot]==0u){return triangleShadingNormal(h);}
+ return pbrMapNormal(h,r,mapSlot,scale,pbrTexture(h,r,mapSlot,false));
+}
+fn pbrMapNormal(h:Hit,r:u32,mapSlot:u32,scale:f32,texel:vec4f)->vec3f {
+ let n=triangleShadingNormal(h);
+ if(scene[r+16u+mapSlot]==0u){return n;}
+ var map=texel.xyz*2.0-1.0;map=vec3f(map.xy*scale,map.z);
  if(dot(map,map)==0.0){return n;}
  let info=scene[2]+scene[h.mesh+28u];var t:vec3f;var hand=1.0;
  if(scene[info+2u]!=0u){
@@ -115,7 +135,7 @@ fn pbrMappedNormal(h:Hit,mapSlot:u32,scale:f32)->vec3f {
  }
  t-=n*dot(n,t);if(dot(t,t)<1e-20){return n;}t=normalize(t);
  let b=normalize(cross(n,t))*hand;let result=normalize(t*map.x+b*map.y+n*map.z);
- return select(result,-result,dot(result,hitNormal(h))<0.0);
+ return select(result,-result,dot(result,triangleHitNormal(h))<0.0);
 }
 fn pbrNormal(h:Hit)->vec3f {let r=pbrRecord(h);return pbrMappedNormal(h,2u,fl(r+14u));}
 // Light proposals need visibility, emitted radiance and the coating above it.
@@ -135,21 +155,39 @@ fn pbrEmitterRadiance(h:Hit,wo:vec3f)->vec3f {
 export function meshPBRSource(input: string): string {
   let source = meshSource(input);
   const edit = (from: string, to: string) => {
-    if (!source.includes(from)) throw new MargoError('state', 'Mesh PBR kernel mismatch; rebuild: https://margoengine.com/errors#voxel-pathtracer');
+    if (!source.includes(from))
+      throw new MargoError(
+        'state',
+        'Mesh PBR kernel mismatch; rebuild: https://margoengine.com/errors#voxel-pathtracer',
+      );
     source = source.replace(from, to);
   };
   edit('seen:vec4f}', 'seen:vec4f,pbr:u32}');
   edit('mat(id*MV+5u));', 'mat(id*MV+5u),0u);');
-  edit('fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {', 'fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {if(m.pbr!=0u){return pbrLayerEvalPrepared(m,n,wo,wi,mask);}');
-  edit('fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {', 'fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {if(m.pbr!=0u){return pbrLayerSamplePrepared(m,n,wo);}');
-  edit('  // Light sampled at a glossy metal seen from a diffuse vertex', '  if(m.pbr!=0u){pbrPrepareView(m,n,-d);}\n  // Light sampled at a glossy metal seen from a diffuse vertex');
+  edit(
+    'fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {',
+    'fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {if(m.pbr!=0u){return pbrLayerEvalPrepared(m,n,wo,wi,mask);}',
+  );
+  edit(
+    'fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {',
+    'fn sampleSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32)->Bounce {if(m.pbr!=0u){return pbrLayerSamplePrepared(m,n,wo);}',
+  );
+  edit(
+    '  // Light sampled at a glossy metal seen from a diffuse vertex',
+    '  if(m.pbr!=0u){pbrPrepareView(m,n,-d);}\n  // Light sampled at a glossy metal seen from a diffuse vertex',
+  );
   edit('let e=select(m.emission,m.seen.xyz,', 'let e=select(pbrEmitted(m,-d),m.seen.xyz,');
   edit('c=select(m.emission,m.seen.xyz,', 'c=select(pbrEmitted(m,-ray.d),m.seen.xyz,');
-  edit('if(h.inst==TRIANGLE){return triangleShadingNormal(h);}', 'if(h.inst==TRIANGLE){return pbrNormal(h);}');
-  edit('  (*h).t=t;(*h).inst=TRIANGLE;',
-    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;');
-  edit('let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,p,m);');
-  edit('let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,p,m);');
+  edit(
+    'fn triangleShading(h:Hit)->vec3f {return triangleShadingNormal(h);}',
+    'fn triangleShading(h:Hit)->vec3f {return pbrNormal(h);}',
+  );
+  edit(
+    '  (*h).t=t;(*h).inst=TRIANGLE;',
+    '  var candidate:Hit;candidate.inst=TRIANGLE;candidate.value=scene[tb+3u];candidate.tri=tb;candidate.meshHead=head;candidate.mesh=instance;candidate.bary=hit.yz;\n  if(!pbrVisible(candidate,back)){continue;}\n  (*h).t=t;(*h).inst=TRIANGLE;',
+  );
+  edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');
+  edit('let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;', 'm=pbrMaterial(h,lp,m);');
   edit('return material(h.value).emission;', 'return pbrEmitterRadiance(h,wo);');
   edit('fn triangleBase(', PBR_LOBES + PBR + '\nfn triangleBase(');
   return source;

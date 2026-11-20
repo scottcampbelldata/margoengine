@@ -220,7 +220,7 @@ test('PostStack validates its order and keeps an LDR-only stack on the core shad
     ['display', 'display'],
   ])
     assert.throws(() => new PostStack(kinds.map((kind, i) => fake('x' + i, kind, log))), /order/);
-  assert.throws(() => new PostStack([]), /distinct/);
+  assert.deepEqual(new PostStack([]).effects, [], 'an empty list is allowed (GAP-POST-ADD1)');
   assert.throws(() => new PostStack([{ name: 'smaa' }, { name: 'fxaa' }]), {
     name: 'TypeError',
     message: /use SMAA or FXAA/,
@@ -323,6 +323,21 @@ test('PostStack refuses standalone capture owners and they refuse a live stack',
   };
   assert.throws(() => PostStack.attach(f.engine, [new SSAO(), broken]), /boom/);
   assert.equal(f.plugins.size, 0);
+});
+
+test('a second PostStack.attach on a scene names addEffect and join, and leaves the first stack and its effects alone', () => {
+  // Regression: a scene whose sky preset had made the stack refused a page's own stack with "Invalid plugin".
+  const h = harness(4),
+    first = PostStack.attach(h.engine, [new Bloom()]),
+    ssao = new SSAO();
+  assert.throws(
+    () => PostStack.attach(h.engine, [ssao]),
+    (e) => e.code === 'attached' && /already has a PostStack; add effects to it with addEffect or PostStack.join/.test(e.message),
+  );
+  assert.equal(h.plugins.get('post:stack'), first);
+  assert.deepEqual(first.effects.map((e) => e.name), ['bloom']);
+  first.addEffect(ssao, 0);
+  assert.deepEqual(first.effects.map((e) => e.name), ['ssao', 'bloom']);
 });
 
 test('FXAA alone wraps the finished frame, nests around another effect and restores and disposes cleanly', async () => {

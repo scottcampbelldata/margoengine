@@ -59,6 +59,41 @@ tiles.visible = true; // draws exactly as before
 
 The `visible` property (default `true`) can be set at any time: a hidden map draws nothing, so with a `target` that target is not cleared either; setting it back to true draws the same pixels. It does not change the map's own layer `visible` flags.
 
+### Atlases and targets across a device restore
+
+Pass a `GPUTexture` atlas as a function of the device: the map calls it once per device, so after a driver reset or
+`rebootDevice()` the tiles come back by themselves.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {createTileLayer, TileMap} from 'margoengine/tilemap';
+const engine = await EngineKernel.create(document.querySelector('canvas')!, {exactSize: [64, 32]});
+const tiles = TileMap.attach(engine, {
+  map: {
+    width: 2, height: 1, tileWidth: 2, tileHeight: 2,
+    layers: [createTileLayer('ground', 2, 1, Uint32Array.of(1, 2))],
+    tilesets: [{name: 'grass', firstGid: 1, tileWidth: 2, tileHeight: 2, tileCount: 2, columns: 2}],
+  },
+  atlases: {
+    grass: (device: GPUDevice) => {
+      const texture = device.createTexture({
+        size: [4, 2], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      device.queue.writeTexture({texture}, new Uint8Array(32).fill(255), {bytesPerRow: 16}, [4, 2]);
+      return texture;
+    },
+  },
+});
+engine.render({delta: 1 / 60});
+console.log(tiles.stats.draws); // 1
+```
+
+A plain `GPUTexture` (atlas, image or `target`) belongs to the device that made it. After a device restore the map
+drops it, reports it once through `engine.onError` (`MargoError` `'state'`, help `borrowed-lost`) and skips what it
+drew while the rest of the frame goes on, until `setAtlas`, `setImage` or `setTarget` hands in one made on
+`engine.gpu`, for example from your own plugin's `onDeviceRestored(engine)`. `GridTileMap` and `ObjectTileMap` follow
+the same rule.
+
 To draw into a compositor layer of `margoengine/pixel`, pass `target: layer.target, camera: layer.camera, parallax: false, mapLayers: ['ground']`, with one `TileMap` per layer that scrolls on its own.
 
 Tiles animate by their `animation` steps on the `time` clock (milliseconds; each frame adds its delta), which changes a small lookup and no cells. A tile larger than the cell sits on the cell's bottom left, as in Tiled. Layer `offset`, `opacity`, `tint`, `visible` and `parallax` and tileset `margin`, `spacing` and `tileOffset` are honoured. Overlapping oversize tiles of different tilesets draw tileset by tileset. Object layers are data only: draw tile objects with `margoengine/sprites`. Image collection tilesets (`columns: 0`) must be packed into one atlas first. After writing into `layer.data` yourself, call `invalidate(layer)`.
@@ -253,3 +288,7 @@ Layers come back to front, with `__opacity`, `visible` and the total pixel offse
 Apache-2.0. Optional, tree-shakable package; core peer: ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/tilemap
+
+## Film time
+
+`TileMap`, `GridTileMap` and `ObjectTileMap` move their tile animation clock (`time`, in milliseconds) with `advanceTime(delta)` in the frame update, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the tile frames a continuous run shows.

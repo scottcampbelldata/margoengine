@@ -1,14 +1,14 @@
 {
  "proof": "selection-xray-off",
- "ref": "f3d25c892",
- "revision": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
- "capturedAt": "f3d25c892c6c678a73b3faa9a82dbe15f1923518",
- "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
+ "ref": "41050c560",
+ "revision": "41050c560ab2a9fad4c3ac4c505f496def2553c6",
+ "capturedAt": "41050c560ab2a9fad4c3ac4c505f496def2553c6",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "1x xray undefined": "344abacd7e562617f0637a78b73256f9bbc5d3ea93c1a9fafc6644ef4804b3b7",
-  "1x xray false": "344abacd7e562617f0637a78b73256f9bbc5d3ea93c1a9fafc6644ef4804b3b7",
-  "4x xray undefined": "142cdb757c92d99abd8c1e5dbbf64f851c717cb19780ead87bc93d87c9575c7e",
-  "4x xray false": "142cdb757c92d99abd8c1e5dbbf64f851c717cb19780ead87bc93d87c9575c7e"
+  "1x xray undefined": "a8c241dab57fe324eaee477dc34b375830d9bb88306f3cb736eb71cdac940362",
+  "1x xray false": "a8c241dab57fe324eaee477dc34b375830d9bb88306f3cb736eb71cdac940362",
+  "4x xray undefined": "b673707792acaedc5a419bcb627fe1856221f0eff633de966e2b8338f60754da",
+  "4x xray false": "b673707792acaedc5a419bcb627fe1856221f0eff633de966e2b8338f60754da"
  }
 }

@@ -19,7 +19,7 @@ function edit(code: string, from: string, to: string): string {
   if (next === code)
     throw new MargoError(
       'unsupported',
-      'Material surface features require the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and materials versions',
+      'Material surface features require the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and materials versions',
     );
   return next;
 }
@@ -29,7 +29,7 @@ function wrapSurface(code: string, name: string, body: string): string {
   if (code.split(head).length !== 2)
     throw new MargoError(
       'unsupported',
-      'Material surface features need exactly one PBR surface() function; use matching @margoengine/gltf-pro and materials versions',
+      'Material surface features need exactly one PBR surface() function; use matching @margoengine/gltf/pbr and materials versions',
     );
   return `${code.replace(head, `fn ${name}(i:Out,front:bool)->Surface {`)}\n${head}\n${body}\n}\n`;
 }
@@ -103,7 +103,7 @@ export function triplanarShader(code: string): string {
   if (!fields)
     throw new MargoError(
       'unsupported',
-      'Material triplanar needs the standard gltf-pro PBR Surface struct; use matching @margoengine/gltf-pro and materials versions',
+      'Material triplanar needs the standard gltf/pbr Surface struct; use matching @margoengine/gltf/pbr and materials versions',
     );
   const blend = fields
     .split(',')

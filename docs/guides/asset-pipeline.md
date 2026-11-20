@@ -50,7 +50,7 @@ npx margo-convert build ./assets --out dist --hash-names   # Fox.fbdf9e94.glb, n
 ```
 
 ```ts
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 const manifest = await (await fetch('/dist/margo-manifest.json')).json();
 const fox = manifest.files.find((f) => f.source === 'Fox.glb').outputs[0].path; // 'Fox.fbdf9e94.glb'
@@ -72,7 +72,7 @@ Every preset prunes, dedupes and welds. They differ in what they assume about th
 
 For a browser. Static meshes sharing a material are merged, positions are stored as 16-bit integers (the mesh bounds
 move into the node transform), normals as 8-bit, and every vertex and index buffer is meshopt-compressed. The GLB
-requires `KHR_mesh_quantization` and `EXT_meshopt_compression`, which Margo's loaders (`@margoengine/gltf-pro`) read; so
+requires `KHR_mesh_quantization` and `EXT_meshopt_compression`, which Margo's loaders (`@margoengine/gltf/pbr`) read; so
 do other glTF loaders that support those extensions.
 
 ```bash

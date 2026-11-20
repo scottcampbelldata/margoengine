@@ -1122,12 +1122,16 @@ export class VoxelServer {
   /**
    * Starts accepting WebSocket clients on `port` (0: any free port) and `host`, and starts the tick. With `tls` the
    * clients connect over `wss://`.
-   * @throws MargoError `'state'` (rejects) when already listening or closed; the server's error when it cannot listen.
+   * @throws MargoError `'state'` (rejects) when already listening or closed, or closed before it was listening; the
+   *   server's error when it cannot listen.
    */
   async listen(port = 0, host = '127.0.0.1'): Promise<AddressInfo> {
     if (this.#http || this.#closed)
       throw new MargoError('state', 'VoxelServer is already listening or closed; create a new VoxelServer');
     await this.start();
+    // close() may have run during that await, before there was a listener for it to close.
+    if (this.#closed)
+      throw new MargoError('state', 'VoxelServer was closed while it was starting; create a new VoxelServer');
     const refuse = (_req: IncomingMessage, res: ServerResponse) => {
         res.writeHead(426, { 'Content-Type': 'text/plain' });
         res.end('voxel-net: connect with a WebSocket\n');
@@ -1155,6 +1159,11 @@ export class VoxelServer {
       http.once('error', fail);
       http.listen(port, host, () => done());
     });
+    // close() during the bind could not stop it, so the listener it asked to close is closed here.
+    if (this.#closed) {
+      await new Promise<void>((done) => http.close(() => done()));
+      throw new MargoError('state', 'VoxelServer was closed while it was starting; create a new VoxelServer');
+    }
     return http.address() as AddressInfo;
   }
   /**

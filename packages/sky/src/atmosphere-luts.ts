@@ -84,6 +84,14 @@ export function atmosphereParameters(p: AtmosphereParameters = {}): Required<Atm
   if (!(Math.abs(a.mieG) < 0.99)) throw new RangeError('Invalid atmosphere mieG; use a number between -0.99 and 0.99');
   return a;
 }
+/**
+ * The eye's distance from the planet's centre, km, for a height above the ground in km: at least a metre up, and at
+ * least 2^-22 of the radius, two Float32 steps, so the radius the shaders read stays above the ground's. A planet
+ * wider than about 8,000 km rounded a metre away, put the eye on the ground sphere, and every upward ray hit the
+ * ground at 0: a black sky.
+ */
+export const eyeRadius = (bottomRadius: number, height: number): number =>
+  bottomRadius + Math.max(0.001, bottomRadius * 2 ** -22, height);
 // Uniform layout (vec4s after the matrix): rayleigh rgb + height, mie scattering/absorption/height/g, ozone rgb +
 // centre, albedo rgb + ozone half width, radii bottom/top + sun illuminance + display flag, sun xyz + exposure scale,
 // eye xyz (km from the planet centre) + km per world unit, view: aerial reach km, slices, 0, 0; then Mie scattering
@@ -91,6 +99,9 @@ export function atmosphereParameters(p: AtmosphereParameters = {}): Required<Atm
 // Distance along unit d from o (km from the centre) to the sphere of radius r: the far root from inside, the near one
 // from outside, -1 when missed. The constant is (|o| - r)(|o| + r), which keeps a camera a metre up exact in f32.
 // Transmittance table mapping (Bruneton 2017 sec. 2.3): x_mu over the distance to the top, x_r over the horizon length.
+// distanceToTop is the far root from radius r, inside the air, with cosine mu: the tables' marches start on or inside
+// the top sphere, and sphereHit from a point on it (|o| rounded a hair above the radius, as Metal's length does) took
+// the near root, about 0, so a downward ray from the top crossed no air.
 /**
  * WGSL shared by every pass of the model: the uniform, the medium, intersections, phase functions and the
  * transmittance table's mapping. Kilometres throughout. Sources: Hillaire 2020, "A Scalable and Production Ready Sky
@@ -112,9 +123,12 @@ fn sphereHit(o:vec3f,d:vec3f,r:f32)->f32 {
  let l=length(o);let b=dot(o,d);let c=(l-r)*(l+r);let disc=b*b-c;if(disc<0.0){return -1.0;}
  let s=sqrt(disc);if(c<=0.0){return -b+s;}let near=-b-s;return select(-1.0,near,near>=0.0);
 }
+fn distanceToTop(a:Atmosphere,r:f32,mu:f32)->f32 {
+ let t=a.radii.y;return max(0.0,-r*mu+sqrt(max(r*r*mu*mu-(r-t)*(r+t),0.0)));
+}
 fn transmittanceUV(a:Atmosphere,r:f32,mu:f32)->vec2f {
  let b=a.radii.x;let t=a.radii.y;let H=sqrt((t-b)*(t+b));let rho=sqrt(max((r-b)*(r+b),0.0));
- let d=max(0.0,-r*mu+sqrt(max(r*r*(mu*mu-1.0)+t*t,0.0)));let dmin=t-r;let dmax=rho+H;
+ let d=distanceToTop(a,r,mu);let dmin=t-r;let dmax=rho+H;
  let x=vec2f((d-dmin)/max(dmax-dmin,1e-6),rho/H);return 0.5/vec2f(256.0,64.0)+x*(1.0-1.0/vec2f(256.0,64.0));
 }
 fn transmittanceRMu(a:Atmosphere,uv:vec2f)->vec2f {
@@ -129,7 +143,7 @@ const transmittance = /* wgsl */ `${atmosphereCommon}
 @group(0) @binding(1) var table:texture_storage_2d<rgba16float,write>;
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){
  if(any(id.xy>=vec2u(256,64))){return;}let a=atmosphere;let rm=transmittanceRMu(a,(vec2f(id.xy)+0.5)/vec2f(256.0,64.0));
- let o=vec3f(0,rm.x,0);let d=vec3f(sqrt(max(1.0-rm.y*rm.y,0.0)),rm.y,0);let reach=max(sphereHit(o,d,a.radii.y),0.0);
+ let o=vec3f(0,rm.x,0);let d=vec3f(sqrt(max(1.0-rm.y*rm.y,0.0)),rm.y,0);let reach=distanceToTop(a,rm.x,rm.y);
  var depth=vec3f(0);let dt=reach/40.0;
  for(var i=0;i<40;i++){let p=o+d*((f32(i)+0.5)*dt);depth+=atmosphereExtinction(a,length(p)-a.radii.x)*dt;}
  textureStore(table,vec2i(id.xy),vec4f(exp(-depth),1));
@@ -173,6 +187,11 @@ fn integrateScattering(a:Atmosphere,o:vec3f,d:vec3f,t:f32,n:u32,throughputIn:vec
 // step, so throughput exp(-depth) is never formed; Psi = (vL / vg) exp(eg - eL), the escape sum is never empty and an
 // empty L2 gives zero.
 // Direction k of an 8 x 8 grid, uniform over the sphere in (phi, cos theta).
+// Texel (i, j) holds sun cosine i/31 * 2 - 1 and altitude j/31 of the air's depth, the same grid multipleScattering
+// reads with 0.5/32 + u * 31/32, so the first and last texel centres are the domain's edges (Hillaire 2020 sec. 5.5.2
+// parameterises the table by sun zenith cosine and height over the whole range). Row 0 is on the ground itself: there
+// a direction below the horizon meets the ground at distance 0, one above it never does (sphereHit from a point on
+// the sphere would return the far root through the planet).
 const multiple = /* wgsl */ `${atmosphereCommon}
 @group(0) @binding(0) var<uniform> atmosphere:Atmosphere;
 @group(0) @binding(1) var transmittanceTable:texture_2d<f32>;
@@ -186,11 +205,11 @@ fn scaledAdd(x:Scaled,y:Scaled)->Scaled {
 }
 var<workgroup> sums:array<Scaled,128>;
 @compute @workgroup_size(64) fn main(@builtin(workgroup_id) texel:vec3u,@builtin(local_invocation_index) k:u32){
- let a=atmosphere;let mus=(f32(texel.x)+0.5)/32.0*2.0-1.0;let r=a.radii.x+(f32(texel.y)+0.5)/32.0*(a.radii.y-a.radii.x);
+ let a=atmosphere;let x=vec2f(texel.xy)/31.0;let mus=x.x*2.0-1.0;let r=a.radii.x+x.y*(a.radii.y-a.radii.x);
  let sun=vec3f(sqrt(max(1.0-mus*mus,0.0)),mus,0);let o=vec3f(0,r,0);
  let cosTheta=1.0-2.0*(f32(k/8u)+0.5)/8.0;let phi=2.0*PI*(f32(k%8u)+0.5)/8.0;let s=sqrt(max(1.0-cosTheta*cosTheta,0.0));
  let d=vec3f(s*cos(phi),cosTheta,s*sin(phi));
- let ground=sphereHit(o,d,a.radii.x);let t=select(sphereHit(o,d,a.radii.y),ground,ground>=0.0);let dt=max(t,0.0)/20.0;
+ let ground=select(sphereHit(o,d,a.radii.x),select(-1.0,0.0,cosTheta<0.0),texel.y==0u);let t=select(distanceToTop(a,r,cosTheta),ground,ground>=0.0);let dt=max(t,0.0)/20.0;
  var depth=vec3f(0);var l2=Scaled(vec3f(0),vec3f(0));var escape=Scaled(vec3f(0),vec3f(0));
  for(var i=0;i<20;i++){
   let p=o+d*((f32(i)+0.5)*dt);let pr=length(p);let h=pr-a.radii.x;

@@ -1,7 +1,7 @@
 // The client: predicts its own player by running the game's step ahead of the server with its own inputs,
 // reconciles when a snapshot disagrees (back to the server's state, then replays the inputs the server has not
 // seen), and draws everything else interpolated between snapshots a little in the past.
-import { Timeline } from '@margoengine/net/timeline';
+import { Timeline } from './interpolation-timeline.js';
 import { ClockSync } from './clock.js';
 import type { Game } from './game.js';
 import { decodeEnvelope, encodeEnvelope, MAX_INPUTS_PER_MESSAGE, ENVELOPE_VERSION } from './protocol.js';
@@ -27,7 +27,7 @@ export interface GameClientOptions<Input> {
   inputBuffer?: number;
   /**
    * Ticks the interpolated view stays behind the newest snapshot (default 2 snapshot intervals), or an `AdaptiveDelay`
-   * from `@margoengine/net/delay` to pick the delay from what the link does. Passing one is what loads it.
+   * from `@margoengine/netcode/interpolation-delay` to pick the delay from what the link does. Passing one is what loads it.
    */
   interpolationDelay?: number | ViewClock;
   /** How many of the newest unconfirmed inputs each input message repeats, 1 to 32 (default 8). */

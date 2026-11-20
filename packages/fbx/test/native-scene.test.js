@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import validator from 'gltf-validator';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { headlessEngine } from '../../exporters/tests/helpers.js';
 import { convertFBX } from '../dist/index.js';
@@ -135,6 +135,16 @@ test('native UV seams copy skin influences and morph deltas from the original co
   }
   assert.equal(seam.length, 2);
   assert.notEqual(uvs[seam[0] * 2], uvs[seam[1] * 2], 'one source control point has two UVs');
+});
+
+test('a cubic curve with no name is refused with its id and the entry that reads it', async () => {
+  // Mixamo writes every curve as "AnimCurve::" (no name); the refusal named nothing and did not say how to import it.
+  const source = rigFixture().replace('"AnimCurve::X"', '"AnimCurve::"').replace('a: 4,4\n', 'a: 8,8\n');
+  await assert.rejects(convertFBX(bytes(source)), (error) => {
+    assert.match(error.message, /cubic animation on curve 33;/);
+    assert.match(error.message, /animationLayers from @margoengine\/fbx\/layers/);
+    return true;
+  });
 });
 
 test('native scene rejects unsupported inheritance, missing bind data and progressive morphs', async () => {

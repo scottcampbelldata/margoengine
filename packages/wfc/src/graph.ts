@@ -213,7 +213,7 @@ export class GraphModel {
     }
     throw new MargoError(
       'failed',
-      'WFC exhausted its search budget; check rules and pins or increase attempts/backtracks. Help: https://margoengine.com/docs/wfc',
+      'WFC exhausted its search budget; check rules and pins or increase attempts/backtracks. Help: https://margoengine.com/llms/packages/wfc.md',
     );
   }
 }

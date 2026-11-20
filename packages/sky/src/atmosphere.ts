@@ -30,30 +30,46 @@ export const transmittance = `
 }`;
 // CPU twin of the transmittance table above: same radii, densities, coefficients and 64-step integration.
 const RAYLEIGH = [0.005802, 0.013558, 0.0331];
-const optical = new Float64Array(4);
-/** Rayleigh and Mie optical lengths (km of sea-level air) from radius `r` along cosine `mu` to the top, at `at`. */
-function opticalLengths(r: number, mu: number, at: number): void {
+const optical = new Float64Array(6);
+/**
+ * Rayleigh and Mie optical lengths (km of sea-level air) from radius `r` along cosine `mu` to the top, at `at`; with
+ * `ozone`, the ozone tent's (km at its peak, 25 km up and 15 km wide) at index 4 (from the eye) or 5 (from the ground).
+ */
+function opticalLengths(r: number, mu: number, at: number, ozone = false): void {
   const step = (-r * mu + Math.sqrt(Math.max(0, r * r * (mu * mu - 1) + 6460 * 6460))) / 64;
   let rayleigh = 0,
-    mie = 0;
+    mie = 0,
+    tent = 0;
   for (let i = 0; i < 64; i++) {
     const d = (i + 0.5) * step,
       h = Math.max(0, Math.sqrt(r * r + d * d + 2 * r * mu * d) - 6360);
     rayleigh += Math.exp(-h / 8) * step;
     mie += Math.exp(-h / 1.2) * step;
+    if (ozone) tent += Math.max(0, 1 - Math.abs(h - 25) / 15) * step;
   }
   optical[at] = rayleigh;
   optical[at + 1] = mie;
+  if (ozone) optical[4 + at / 2] = tent;
 }
+const OZONE = [0.00065, 0.001881, 0.000085];
 /**
  * The sun's linear RGB colour through the atmosphere, relative to the sun at the zenith: the transmittance
  * (Bruneton and Neyret 2008, the sky's own table) from an eye `altitude` km up toward a sun of elevation cosine `mu`,
  * divided by the zenith transmittance, so it is 1 at noon overhead. It fades over the sun's disc (0.014 rad) as the
- * disc crosses the horizon and is 0 once it has set. Writes the three channels into `out` and returns it.
+ * disc crosses the horizon and is 0 once it has set. Writes the three channels into `out` and returns it. `air`, the
+ * sky's `atmosphere` option as the look feature packs it (Rayleigh per km RGB, ozone scale, Mie scattering RGB,
+ * asymmetry, Mie amount), puts the sun through that air instead of Earth's: still relative to the zenith through it.
  */
-export function sunlight(mu: number, altitude: number, turbidity: number, out = new Float32Array(3)): Float32Array {
+export function sunlight(
+  mu: number,
+  altitude: number,
+  turbidity: number,
+  out = new Float32Array(3),
+  air?: Readonly<ArrayLike<number>>,
+): Float32Array {
   if (!Number.isFinite(mu) || !Number.isFinite(altitude) || !Number.isFinite(turbidity) || out.length !== 3)
     throw new RangeError('Invalid sunlight: pass finite mu, altitude and turbidity and a 3-element output');
+  if (air) return sunlightThrough(mu, altitude, turbidity, out, air);
   const r = 6360 + Math.min(99.9, Math.max(0.001, altitude)),
     horizon = -Math.sqrt(Math.max(0, 1 - (6360 / r) ** 2)),
     x = Math.max(0, Math.min(1, (mu - horizon + 0.014) / 0.028)),
@@ -64,4 +80,52 @@ export function sunlight(mu: number, altitude: number, turbidity: number, out = 
   for (let i = 0; i < 3; i++)
     out[i] = disc ? disc * Math.exp(-(RAYLEIGH[i] * (optical[0] - optical[2]) + mie * (optical[1] - optical[3]))) : 0;
   return out;
+}
+function sunlightThrough(
+  mu: number,
+  altitude: number,
+  turbidity: number,
+  out: Float32Array,
+  air: Readonly<ArrayLike<number>>,
+): Float32Array {
+  const r = 6360 + Math.min(99.9, Math.max(0.001, altitude)),
+    horizon = -Math.sqrt(Math.max(0, 1 - (6360 / r) ** 2)),
+    x = Math.max(0, Math.min(1, (mu - horizon + 0.014) / 0.028)),
+    disc = x * x * (3 - 2 * x),
+    mie = (0.003996 * Math.max(0.25, (turbidity - 1) * 0.5)) / 0.9;
+  opticalLengths(r, Math.min(1, Math.max(mu, horizon + 1e-4)), 0, true);
+  opticalLengths(r, 1, 2, true);
+  for (let i = 0; i < 3; i++)
+    out[i] = disc
+      ? disc *
+        Math.exp(
+          -(
+            air[i] * (optical[0] - optical[2]) +
+            mie * air[8] * (optical[1] - optical[3]) +
+            OZONE[i] * air[3] * (optical[4] - optical[5])
+          ),
+        )
+      : 0;
+  return out;
+}
+/**
+ * The luminance of the transmittance straight up from an eye `altitude` km high through the sky's air (Earth's, or
+ * `air` as {@link sunlight} reads it): the share of the sun above the air that reaches that eye with the sun at the
+ * zenith. The Bruneton sky's sun is 20 sky units above the air, so its zenith sun on the ground is 20 times this.
+ */
+export function zenithTransmittance(altitude: number, turbidity: number, air?: Readonly<ArrayLike<number>>): number {
+  const r = 6360 + Math.min(99.9, Math.max(0.001, altitude)),
+    mie = (0.003996 * Math.max(0.25, (turbidity - 1) * 0.5)) / 0.9,
+    weights = [0.2126, 0.7152, 0.0722];
+  opticalLengths(r, 1, 2, !!air);
+  let sum = 0;
+  for (let i = 0; i < 3; i++)
+    sum +=
+      weights[i] *
+      Math.exp(
+        -(air
+          ? air[i] * optical[2] + mie * air[8] * optical[3] + OZONE[i] * air[3] * optical[5]
+          : RAYLEIGH[i] * optical[2] + mie * optical[3]),
+      );
+  return sum;
 }

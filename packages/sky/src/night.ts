@@ -1,11 +1,17 @@
 import { finiteVector } from '@margoengine/math/validate';
 import type { SkyFeatures } from './base.js';
+import { moonPhase, moonWaning } from './moon-phase.js';
 // The moon lies beyond the air: its disc hides the stars, while the air in front (the gradient and the glow) still
 // shows over it. Its unlit part adds only earthshine, which the Earth gives back most near new moon (half its phase
 // from full to new); a gibbous moon's dark limb is the sky, not a grey second disc beside the bright one. The glow is
 // atmosphere in front of the moon: added last and whole, over the disc as round it (until 2026-11-13 thinned to 40%
 // over the disc, so a gibbous moon's dark limb showed as a grey disc offset from the bright one). These notes sit
 // outside the WGSL, so the shipped shader carries no extra comment text (the night literal ships whole).
+// The disc's default radiance in the sky's units, about seven to ten times what the moon gives a thin deck lit beside
+// it, so the disc stays the brightest thing in a night shot and blooms through a veil (elements plan step 6: the
+// earlier [0.92, 0.95, 1] drew the disc dimmer than the cloud it lit). The full moon's luminance is about 2,500 cd/m2,
+// thousands of times a moonlit cloud's, so any ratio a display shows is a floor, never too bright.
+const NIGHT_MOON_COLOR = [6.4, 7.6, 9.6] as const;
 /** Stylized night (`night` option): gradient, twinkling stars and a phased moon with glow. */
 export const night: NonNullable<SkyFeatures['night']> = {
   wgsl: `// Star-cell hash: the PCG hash (M. O'Neill, PCG, 2014; GPU form in Jarzynski and Olano, "Hash Functions for GPU
@@ -38,8 +44,10 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
  var cover=0.0;
  if(cosine>0.0){
   var right=normalize(cross(moon.xyz,select(vec3f(0,1,0),vec3f(0,0,1),abs(moon.y)>0.99)));
-  // moonLitBySun (flag 2): the lit limb faces the sun across the sky, as the real moon's does.
-  if(frame.sunlight.w>1.5){let s=frame.sun.xyz-moon.xyz*dot(frame.sun.xyz,moon.xyz);if(dot(s,s)>1e-8){right=normalize(s);}}
+  // moonLitBySun (flag 2): the lit limb faces the sun across the sky, as the real moon's does. A waning moon (flag 3)
+  // is lit on its left.
+  if(abs(frame.sunlight.w-2.0)<0.5){let s=frame.sun.xyz-moon.xyz*dot(frame.sun.xyz,moon.xyz);if(dot(s,s)>1e-8){right=normalize(s);}}
+  if(frame.sunlight.w>2.5){right=-right;}
   let disc=vec2f(dot(r,right),dot(r,cross(right,moon.xyz)))/frame.nightMoonColor.w;let radius=dot(disc,disc);
   // A 0.02 floor on the limb term lets the filtered rim just outside the disc take the lighting just inside it.
   let limb=sqrt(max(0.0004,1.0-radius));let lit=disc.x*sqrt(max(0.0,1.0-params.x*params.x))+limb*params.x;
@@ -65,7 +73,8 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
       finiteVector(n.moonDirection, 3, 'Moon direction');
       if (!Math.hypot(...n.moonDirection)) throw new RangeError('Moon direction must be nonzero');
     }
-    for (const v of [n.moonSize, n.moonPhase, n.glowIntensity, n.starIntensity, n.starTwinkleIntensity, n.hazeDensity])
+    if (n.moonPhase !== undefined) moonPhase(n.moonPhase);
+    for (const v of [n.moonSize, n.glowIntensity, n.starIntensity, n.starTwinkleIntensity, n.hazeDensity])
       if (v !== undefined && !Number.isFinite(Math.fround(v)))
         throw new RangeError('Sky parameters must be finite Float32 numbers');
     if (n.moonSize !== undefined && !(Math.fround(n.moonSize) > 0 && Math.fround(n.moonSize) < Math.PI / 2))
@@ -82,12 +91,14 @@ fn stylizedNight(r:vec3f,footprint:f32)->vec3f {
     v[47] = Math.max(0, n.hazeDensity ?? 1);
     for (let i = 0; i < 3; i++) v[48 + i] = d[i] / length;
     v[51] = Math.cos(size);
-    v.set(n.moonColor ?? [0.92, 0.95, 1], 52);
+    v.set(n.moonColor ?? NIGHT_MOON_COLOR, 52);
     v[55] = Math.sin(size);
-    v[56] = Math.max(-1, Math.min(1, n.moonPhase ?? 0.85));
+    v[56] = moonPhase(n.moonPhase ?? 0.85);
     v[57] = Math.max(0, n.glowIntensity ?? 1.2);
     v[58] = Math.max(0, n.starIntensity ?? 0.8);
     v[59] = time;
+    // Flags: 2 turns the lit limb toward the sun; 3 lights the left limb, for a waning phase name.
     if (n.moonLitBySun) v[63] = 2;
+    else if (n.moonPhase !== undefined && moonWaning(n.moonPhase)) v[63] = 3;
   },
 };

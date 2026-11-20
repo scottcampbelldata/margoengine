@@ -81,7 +81,7 @@
    "result": {
     "name": "LoaderError",
     "code": "range",
-    "message": "LZF: LZF back reference points before the output"
+    "message": "LZF: LZF back reference points before the output; see https://margoengine.com/errors#loader-range"
    }
   },
   {
@@ -91,7 +91,7 @@
    "result": {
     "name": "LoaderError",
     "code": "range",
-    "message": "LZF: LZF literal run overflows the output"
+    "message": "LZF: LZF literal run overflows the output; see https://margoengine.com/errors#loader-range"
    }
   },
   {
@@ -101,7 +101,7 @@
    "result": {
     "name": "LoaderError",
     "code": "truncated",
-    "message": "LZF: LZF literal run overflows the input"
+    "message": "LZF: LZF literal run overflows the input; see https://margoengine.com/errors#loader-truncated"
    }
   },
   {
@@ -111,7 +111,7 @@
    "result": {
     "name": "LoaderError",
     "code": "range",
-    "message": "LZF: LZF back reference overflows the output"
+    "message": "LZF: LZF back reference overflows the output; see https://margoengine.com/errors#loader-range"
    }
   },
   {
@@ -121,7 +121,7 @@
    "result": {
     "name": "LoaderError",
     "code": "truncated",
-    "message": "LZF: LZF back reference overflows the input"
+    "message": "LZF: LZF back reference overflows the input; see https://margoengine.com/errors#loader-truncated"
    }
   },
   {
@@ -131,7 +131,7 @@
    "result": {
     "name": "LoaderError",
     "code": "truncated",
-    "message": "LZF: LZF back reference overflows the input"
+    "message": "LZF: LZF back reference overflows the input; see https://margoengine.com/errors#loader-truncated"
    }
   },
   {
@@ -141,7 +141,7 @@
    "result": {
     "name": "LoaderError",
     "code": "truncated",
-    "message": "LZF: LZF back reference overflows the input"
+    "message": "LZF: LZF back reference overflows the input; see https://margoengine.com/errors#loader-truncated"
    }
   },
   {
@@ -151,7 +151,7 @@
    "result": {
     "name": "LoaderError",
     "code": "truncated",
-    "message": "LZF: LZF produced 2 bytes, expected 4"
+    "message": "LZF: LZF produced 2 bytes, expected 4; see https://margoengine.com/errors#loader-truncated"
    }
   },
   {
@@ -169,7 +169,7 @@
    "result": {
     "name": "LoaderError",
     "code": "range",
-    "message": "LZF: invalid LZF output length -1"
+    "message": "LZF: invalid LZF output length -1; see https://margoengine.com/errors#loader-range"
    }
   },
   {
@@ -179,7 +179,7 @@
    "result": {
     "name": "LoaderError",
     "code": "range",
-    "message": "LZF: invalid LZF output length 1.5"
+    "message": "LZF: invalid LZF output length 1.5; see https://margoengine.com/errors#loader-range"
    }
   }
  ],
@@ -188,7 +188,7 @@
   "result": {
    "name": "LoaderError",
    "code": "truncated",
-   "message": "PCD: LZF produced 1 bytes, expected 4"
+   "message": "PCD: LZF produced 1 bytes, expected 4; see https://margoengine.com/errors#loader-truncated"
   }
  },
  "fixture": {

@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/bump.browser.mjs
 // TerrainLayer.bump and macro (biome look plan round 2, item 3). Past about 50 m the layer textures' mips average every
 // layer to its mean colour and the ground was lit by the vertex normal only, so rock and snow read as flat grey. `bump`

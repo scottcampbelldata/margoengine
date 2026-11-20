@@ -1,5 +1,4 @@
 import { forwardRef } from 'react';
-import type { EngineKernel } from '@margoengine/core';
 import type { ColorInput } from '@margoengine/math';
 import type {
   AmbientLight as AmbientPlugin,
@@ -9,6 +8,7 @@ import type {
 } from '@margoengine/environment';
 import { useCommit, useCreated, useModelSources, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { attachBinding } from './package-binding.js';
 
 type EnvironmentApi = typeof import('@margoengine/environment');
 const load = () => optionalPeer('@margoengine/environment', () => import('@margoengine/environment'));
@@ -26,9 +26,10 @@ export interface AmbientLightProps extends ErrorProps {
 }
 /**
  * The same light from every direction on core meshes and models (`@margoengine/environment`'s AmbientLight, which
- * takes the place of the built-in ambient). Colour and intensity are live. The ref is the live light. WebGPU only.
+ * takes the place of the built-in ambient). Colour and intensity are live. The ref is the live light. Inside a `<Scene>`
+ * it lights that scene's meshes. WebGPU only.
  */
-export const AmbientLight = forwardRef<AmbientPlugin, AmbientLightProps>(function AmbientLight(
+export const AmbientLight = /* @__PURE__ */ forwardRef<AmbientPlugin, AmbientLightProps>(function AmbientLight(
   { color = '#ffffff', intensity = 1, onError },
   ref,
 ) {
@@ -37,14 +38,14 @@ export const AmbientLight = forwardRef<AmbientPlugin, AmbientLightProps>(functio
     scene,
     {
       load,
-      create: (api) => api.AmbientLight.attach(scene.engine as unknown as EngineKernel),
+      create: (api) => attachBinding(scene, new api.AmbientLight()),
       dispose: (value) => value.dispose(),
       ref,
       onError,
     },
-    [],
+    [scene.world],
   );
-  useModelSources(scene, light);
+  useModelSources(scene, scene.world ? null : light);
   useCommit(() => {
     if (!light) return;
     light.color = color;
@@ -64,9 +65,10 @@ export interface HemisphereLightProps extends ErrorProps {
 }
 /**
  * Ambient light of `sky` colour from above and `ground` colour from below (`@margoengine/environment`'s
- * HemisphereLight) on core meshes and models. Live; the ref is the live light. WebGPU only.
+ * HemisphereLight) on core meshes and models. Live; the ref is the live light. Inside a `<Scene>` it lights that
+ * scene's meshes. WebGPU only.
  */
-export const HemisphereLight = forwardRef<HemispherePlugin, HemisphereLightProps>(function HemisphereLight(
+export const HemisphereLight = /* @__PURE__ */ forwardRef<HemispherePlugin, HemisphereLightProps>(function HemisphereLight(
   { sky = '#ffffff', ground, intensity = 1, onError },
   ref,
 ) {
@@ -75,14 +77,14 @@ export const HemisphereLight = forwardRef<HemispherePlugin, HemisphereLightProps
     scene,
     {
       load,
-      create: (api) => api.HemisphereLight.attach(scene.engine as unknown as EngineKernel),
+      create: (api) => attachBinding(scene, new api.HemisphereLight()),
       dispose: (value) => value.dispose(),
       ref,
       onError,
     },
-    [],
+    [scene.world],
   );
-  useModelSources(scene, light);
+  useModelSources(scene, scene.world ? null : light);
   useCommit(() => {
     if (!light) return;
     light.sky = sky;
@@ -99,9 +101,10 @@ export interface FogProps extends Omit<FogOptions, 'name'>, ErrorProps {
 }
 /**
  * Distance and height fog computed in the mesh shaders (`@margoengine/environment`'s Fog), so it also covers
- * transparent models. Every option is live; a removed one returns to its default. WebGPU only.
+ * transparent models. Every option is live; a removed one returns to its default. Inside a `<Scene>` it fogs that
+ * scene's meshes. WebGPU only.
  */
-export const Fog = forwardRef<FogPlugin, FogProps>(function Fog(
+export const Fog = /* @__PURE__ */ forwardRef<FogPlugin, FogProps>(function Fog(
   { color = '#ffffff', near = 1, far = 1000, density = 0, heightFalloff = 0, height = 0, enabled = true, onError },
   ref,
 ) {
@@ -110,14 +113,14 @@ export const Fog = forwardRef<FogPlugin, FogProps>(function Fog(
     scene,
     {
       load,
-      create: (api) => api.Fog.attach(scene.engine as unknown as EngineKernel),
+      create: (api) => attachBinding(scene, new api.Fog()),
       dispose: (value) => value.dispose(),
       ref,
       onError,
     },
-    [],
+    [scene.world],
   );
-  useModelSources(scene, fog);
+  useModelSources(scene, scene.world ? null : fog);
   useCommit(() => {
     if (!fog) return;
     Object.assign(fog, { color, near, far, density, heightFalloff, height, enabled });

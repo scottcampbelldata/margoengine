@@ -90,3 +90,25 @@ test('the cover map follows the camera on its texel grid and draws each occluder
   fx.dispose();
   weather.dispose();
 });
+
+test('every splash slot lands on its own hash key, up to the 100,000 splashes the options allow', () => {
+  // The key was slot * 65536 + landing % 65536 in u32: slot 65536 wrapped onto slot 0, so the top 34,464 slots
+  // repeated the first ones' places.
+  const h = tracedGPU(),
+    weather = new Weather({ intensity: 1, fadeSeconds: 0 }),
+    fx = new WeatherFX({ weather, splashes: 100000 });
+  h.engine.use(weather);
+  h.engine.use(fx);
+  weather.onPreUpdate(0.1);
+  h.context.bindings = [];
+  h.engine.frameGraph.execute(h.context);
+  const key = [...h.shaders.values()]
+    .join('\n')
+    .match(/let n=ii\*(\d+)u\+u32\(floor\(clock\)\)%(\d+)u;\s*let xz=/);
+  assert.ok(key, 'the splash shader was compiled');
+  const [stride, period] = [Number(key[1]), Number(key[2])];
+  assert.ok(stride >= period, 'no two landings of one slot share a key');
+  assert.ok((100000 - 1) * stride + period - 1 < 2 ** 32, `the largest key ${99999 * stride + period - 1} fits in u32`);
+  fx.dispose();
+  weather.dispose();
+});

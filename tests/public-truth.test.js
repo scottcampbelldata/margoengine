@@ -2,12 +2,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   jsonLdLicenses,
   licenceProblems,
   buildsCodeAtRunTime,
+  packageCountFiles,
   packageCountProblems,
   publicTruthProblems,
+  restatePackageCount,
   restateTestCount,
   testCountProblems,
   unsafeEvalProblems,
@@ -68,6 +71,30 @@ test('a stated package count that differs from the catalog fails, and true count
   );
   assert.equal(wrong.length, 6, wrong.join('\n'));
   assert.match(wrong[0], /a\.md: states 83 packages, the catalog has 93/);
+});
+
+// Bug (2026-11-16): @margoengine/scenes made 105 packages and four public files still said 104; scripts/build-catalog.js
+// now restates every count with the catalog, so the next package cannot leave one behind.
+test('restating sets every package count to the catalog, and leaves partial counts and other numbers alone', () => {
+  const files = {
+    'a.md': '104 packages in 12 layers, the same as the catalog.\nSearch all 104 packages by task.',
+    'b.html':
+      '<b>104</b><span>packages in the catalog</span>, the release includes 104 packages (none published to npm yet)',
+    'c.md': 'The 47 packages whose code runs in Node, and 37 packages with WGSL shaders, are partial counts.',
+    'd.md': '104 packages, 312 entries',
+  };
+  const stale = packageCountProblems(files, 1105);
+  assert.equal(stale.length, 6, stale.join('\n'));
+  assert.match(stale[0], /npm run catalog:build restates it/);
+  const restated = Object.fromEntries(
+    Object.entries(files).map(([path, text]) => [path, restatePackageCount(text, 1105)]),
+  );
+  assert.deepEqual(packageCountProblems(restated, 1105), []);
+  assert.equal(restated['a.md'], '1,105 packages in 12 layers, the same as the catalog.\nSearch all 1,105 packages by task.');
+  assert.equal(restated['c.md'], files['c.md']);
+  assert.equal(restated['d.md'], '1,105 packages, 312 entries');
+  const read = packageCountFiles(fileURLToPath(new URL('..', import.meta.url)));
+  assert.ok(read.includes('site/whitepaper/engine.html') && read.includes('docs/releasing.md'), read.join(', '));
 });
 
 // Bug 63 (audit E-09) and E-07: the white paper said nothing in the engine needs 'unsafe-eval' although the optional

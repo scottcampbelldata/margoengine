@@ -56,6 +56,7 @@ class Bus implements Disposable {
     setEffects(specs: readonly EffectSpec[]): this;
     send(target: Bus | string, { gain, pre }?: SendOptions): Send;
     sendsTo(target: Bus): boolean;
+    dropSendsTo(target: Bus): void;
     duck({ amount, attack, at }?: DuckOptions): Duck;
     peak(): number;
     teardown(): void;

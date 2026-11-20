@@ -36,7 +36,7 @@ import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** What a level shows: a core Mesh or a model with a `root` Mesh (gltf-pro, materials), toggled through `visible`; a core Geometry swapped onto the anchor; an Imposter or ImposterFrames; or null (nothing). */
+/** What a level shows: a core Mesh or a model with a `root` Mesh (gltf/pbr, materials), toggled through `visible`; a core Geometry swapped onto the anchor; an Imposter or ImposterFrames; or null (nothing). */
 export type LODObject = Mesh | { readonly root: Mesh } | Geometry | Imposter | ImposterFrames | DeferredLevel | null;
 /** A level that is not always there (`@margoengine/lod/stream`): while `request` says no, the system keeps showing what it has. */
 export interface DeferredLevel {
@@ -73,7 +73,7 @@ export interface LODSystemOptions {
   /** Multiplies every evaluated distance: above 1 switches to coarser levels sooner (a quality knob). Default 1. */
   bias?: number;
 }
-/** One object of a gltf-pro model's `lods`, as `LOD.fromModel` reads it. */
+/** One object of a gltf/pbr model's `lods`, as `LOD.fromModel` reads it. */
 export interface LODModelEntry {
   node: Mesh;
   levels: readonly Mesh[];
@@ -86,7 +86,7 @@ export const MAX_LEVELS = 8;
 export class LOD {
   /** Local bounding sphere (x, y, z, radius) of the level shown, written by `LODSystem.pickProxies()`. */
   readonly sphere = new Float64Array(4);
-  /** The first gltf-pro model among the levels, reported with approximate pick hits; null without one. */
+  /** The first gltf\/pbr model among the levels, reported with approximate pick hits; null without one. */
   readonly model: { readonly root: Mesh } | null;
   /** Live {@link LODOptions.color}, read each frame an imposter level shows. */
   readonly color = new Float32Array([1, 1, 1]);
@@ -109,7 +109,7 @@ export class LOD {
     return this.system.levelOf(this);
   }
   /**
-   * Registers each `MSFT_lod` object of a gltf-pro `model` in `system`, its `screenCoverage` as the `screen` levels
+   * Registers each `MSFT_lod` object of a gltf/pbr `model` in `system`, its `screenCoverage` as the `screen` levels
    * (default 0.25, halved per level). An extra last coverage entry adds an empty level, which hides the object.
    * @throws as {@link LODSystem.add}.
    */
@@ -209,7 +209,7 @@ export class LODSystem implements EnginePlugin {
   private samples = 0;
   private depthFormat?: string;
   private readonly frame = new Float32Array(32);
-  private time = 0;
+  private clock = 0;
   private readonly effects = new Set<ImposterLighting>();
   private code = imposterShader;
   private lit?: GPUBindGroup;
@@ -246,8 +246,19 @@ export class LODSystem implements EnginePlugin {
       },
     });
   }
+  /** Seconds on the imposter animation clock. */
+  get time(): number {
+    return this.clock;
+  }
+  /**
+   * Moves the imposter animation clock by `delta` seconds without picking levels or drawing (a delta of 0 or less
+   * moves nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly; level fades are view history.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.clock += delta;
+  }
   onPreUpdate(delta = 0): void {
-    this.time += delta;
+    this.advanceTime(delta);
     this.update();
   }
   get size(): number {
@@ -394,7 +405,10 @@ export class LODSystem implements EnginePlugin {
     lod.index = -1;
   }
   private grow(size: number): void {
-    const copy = <T extends Int32Array | Uint8Array | Int8Array | Float32Array | Float64Array | Int16Array>(a: T, stride = 1): T => {
+    const copy = <T extends Int32Array | Uint8Array | Int8Array | Float32Array | Float64Array | Int16Array>(
+      a: T,
+      stride = 1,
+    ): T => {
       const out = new (a.constructor as { new (length: number): T })(size * stride);
       out.set(a);
       return out;
@@ -451,7 +465,7 @@ export class LODSystem implements EnginePlugin {
     const frames = this.atlases[s].frames;
     if (!frames) return s;
     const n = frames.imposters.length,
-      at = Math.floor(this.handles[i].frame + this.time * frames.fps);
+      at = Math.floor(this.handles[i].frame + this.clock * frames.fps);
     return s + (((at % n) + n) % n);
   }
   /** Writes object `i`'s instance record: world matrix `m` at `o`, then its colour and emissive. */
@@ -516,6 +530,13 @@ export class LODSystem implements EnginePlugin {
     for (let s = 0; s < this.atlases.length; s++) this.atlases[s].imposter.ready();
     // Screen levels use the camera's clip matrix: w is view depth in perspective and 1 in orthographic, and the y row's
     // length is the projection's y scale, so orthographic zoom (e.g. @margoengine/cameras) changes levels as expected.
+    // Levels are picked in onPreUpdate, before core updates the camera for the frame (KB-LOD-SCREENLAG1): the matrix is
+    // rebuilt here from the camera's fields as they stand, so a cut or a seek picks for the view it draws, not the last.
+    for (let i = 0; i < this.count; i++)
+      if (this.screen[i]) {
+        e.camera.update(e.canvas.width / e.canvas.height, e.backend === 'webgpu');
+        break;
+      }
     const m = e.store.matrices,
       p = e.camera.position,
       ex = p[0],

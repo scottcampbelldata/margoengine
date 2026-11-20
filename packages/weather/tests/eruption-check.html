@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Eruption browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas id="a"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/weather/eruption: drawPlume puts the rising column and then the umbrella into a vfx
+// Clouds and the picture changes with each, the same frame twice is the same, a seek back draws the earlier column
+// again, and clearPlume leaves the picture as it was without the eruption.
+import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Clouds} from '/packages/vfx/dist/clouds.js';
+import {Eruption} from '/packages/weather/dist/eruption.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const errors=[];
+const canvas=document.querySelector('#a');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-15000,1500,-9000],target:[0,6000,0],near:10,far:400000}});engine.stop();
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const S=100000;engine.createMesh().setGeometry(new Geometry([-S,0,-S,S,0,-S,-S,0,S,S,0,S],[0,1,0,0,1,0,0,1,0,0,1,0],[0,2,1,1,2,3])).setMaterial(new PbrMaterial({color:'#4a4440',roughness:0.95}));
+const device=engine.gpu;
+async function read(texture){
+ const pipeline=device.createComputePipeline({layout:'auto',compute:{module:device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'}),entryPoint:'main'}});
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(){engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const count=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4)n++;return n;};
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const clouds=Clouds.attach?Clouds.attach(engine):(()=>{const c=new Clouds();engine.use(c);return c;})();
+  const eruption=new Eruption({massRate:1e7,rise:1,duration:7200,wind:6,windDirection:90,seed:3});
+  const bare=await shot();
+  eruption.seek(150);eruption.drawPlume(clouds,12);out.rising=eruption.column().top;
+  const rising=await shot();out.columnChanged=count(bare,rising);out.sameTwice=count(rising,await shot());
+  eruption.seek(2400);eruption.drawPlume(clouds,12);out.umbrella=eruption.umbrella()?.radius??0;
+  const spread=await shot();out.umbrellaChanged=count(rising,spread);
+  eruption.seek(150);eruption.drawPlume(clouds,12);out.seekBack=count(rising,await shot());
+  eruption.clearPlume();out.cleared=count(bare,await shot());
+  clouds.dispose();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

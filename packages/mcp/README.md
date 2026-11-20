@@ -293,3 +293,82 @@ Implemented from the published specification: JSON-RPC 2.0, one message per line
 2025-11-25, 2025-06-18, 2025-03-26 and 2024-11-05), `ping`, `tools/list`, `tools/call`,
 `resources/list`, `resources/templates/list`, `resources/read`, `prompts/list`, `prompts/get` (paged with a cursor)
 and `notifications/cancelled`. Requests run side by side. Nothing but protocol messages goes to stdout.
+
+### Scene of the result
+
+`AssetInstaller.load` installs the model, or the environment and its lighting, in the scene that was active when the request arrived, even if the active scene changes while the asset downloads. An abort or a failure leaves nothing in either scene.
+
+### App name on asset requests
+
+`AssetLibrary` (`@margoengine/mcp/assets`) sends one User-Agent with every catalogue and download request.
+Poly Haven's API terms ask each application to name itself, so pass your app's own product token (RFC 9110, section
+10.1.5) as `userAgent`; it must be 1 to 256 printable ASCII characters. The default is `'MargoEngine-MCP/1.0 asset-tools'`.
+
+```js
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AssetLibrary } from '@margoengine/mcp/assets';
+
+const library = new AssetLibrary({
+  directory: join(tmpdir(), 'film-assets'),
+  userAgent: 'MyFilmApp/2.1 (+https://example.com)',
+});
+console.log(typeof library.search); // 'function': search, files and download now name MyFilmApp
+```
+
+### Asset folders, references, licences and sources
+
+Each asset and variant downloads into one folder of `directory`, named after the provider, id and variant (for
+example `polyhaven-rock_01-gltf_1k_gltf-1a2b3c4d`). A later `download` of the same asset and variant, in this process
+or a new one, checks every file's size and SHA-256 against the folder's `margo-asset.json` (FIPS 180-4) and returns
+the folder with `reused: true` without downloading anything; a changed or partial folder is downloaded again. A
+download is written to a temporary folder and renamed into place when complete, so an abort or a failure leaves
+nothing behind, and two calls for the same folder at once share one download.
+
+A reference is `provider:id`. `lookup`, `files` and `download` take one without a search first: the library asks the
+provider for that id.
+
+Every `CatalogAsset` carries its own licence as an SPDX identifier, or an SPDX `AND` expression when the item has
+several (SPDX specification 2.3, Annex D), with `licenseUrl` and `credit`. `licenses` lists the identifiers you accept
+(default `['CC0-1.0']`): searches leave other items out and a reference to one is refused with its licence named. Add
+`'CC-BY-4.0'` to take the Khronos samples that need a credit, and show `credit` in your film or app.
+
+`sources` adds catalogues through the `AssetSource` interface (`name`, `hosts`, `kinds`, optional `headers`,
+`search`, `lookup`, `files`). The library checks every catalogue and download URL against the source's `hosts` (https
+only, redirects too), caps every response, and never writes `headers` to a manifest. `smithsonianSource({ apiKey })`
+is one: Smithsonian Open Access images and GLB models of media marked CC0, with ids `<record id>~<media index>`; the
+api.data.gov key goes in the `X-Api-Key` header, never in a URL. `wire_asset` installs an `image` as a texture.
+
+```ts
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { AssetLibrary, licenseUrl, type AssetSource, type CatalogAsset } from '@margoengine/mcp/assets';
+
+// A catalogue of your own: one CC0 picture and one that needs a credit.
+const items: Record<string, string> = { plate: 'CC0-1.0', poster: 'CC-BY-4.0' };
+const describe = (id: string): CatalogAsset => ({
+  provider: 'studio', id, kind: 'image', title: id, source: `https://assets.example/${id}`,
+  license: items[id], licenseUrl: licenseUrl(items[id]), credit: 'Example studio',
+});
+const studio: AssetSource = {
+  name: 'studio',
+  hosts: ['assets.example'],
+  kinds: ['image'],
+  async search({ query }) { return Object.keys(items).filter((id) => id.includes(query)).map(describe); },
+  async lookup(id) { return id in items ? describe(id) : undefined; },
+  async files(asset) { return [{ variant: 'png', url: `https://assets.example/${asset.id}.png` }]; },
+};
+// Answers offline, as the real host would.
+const fetch = async () => new Response(new Uint8Array([137, 80, 78, 71]));
+
+const directory = await mkdtemp(join(tmpdir(), 'film-assets-'));
+const library = new AssetLibrary({ directory, fetch, sources: [studio] });
+console.log((await library.search({ query: '', provider: 'studio' })).map((a) => a.id)); // [ 'plate' ]
+const first = await library.download('studio:plate', 'png'); // no search needed
+const again = await library.download('studio:plate', 'png');
+console.log(first.reused, again.reused, first.directory === again.directory); // false true true
+await library.lookup('studio:poster').catch((error) => console.log(error.message.split(';')[0]));
+// Asset licence CC-BY-4.0 is not in licenses
+await rm(directory, { recursive: true, force: true });
+```

@@ -1,7 +1,7 @@
 // One package build at a time in a checkout. build-modern removes a package's dist before it writes the new one, so two
 // builds of the same packages at once delete each other's output (KB-RM4, 2026-11-11: in the 15:00 full CI run two root
 // tests ran api:check side by side, both found the same six packages stale and rebuilt them together; one build died on
-// ENOTEMPTY while removing game/dist, and packages/web/dist stayed missing for every later step).
+// ENOTEMPTY while removing game/dist, and packages/kit-web/dist stayed missing for every later step).
 //
 // The lock is a folder (mkdir is atomic on every platform) holding owner.json with the holder's pid and start time. A
 // holder whose process is gone, or that has held it past the hard limit, is reclaimed. A waiter gives up at its own

@@ -29,7 +29,7 @@ await writeFile(
   resolve(consumer, 'main.js'),
   `
 import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 window.runKTX2Consumer=async()=>{
   const NativeWorker=window.Worker,workers=[];
   window.Worker=class extends NativeWorker{

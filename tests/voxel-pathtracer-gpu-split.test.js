@@ -1,5 +1,7 @@
-// The voxel path tracer's GPU browser check runs as five package scripts, each inside its own time limit on an Intel
-// Arc 140V, where the one old script ran past 900 s in the denoise caustics reference with eight cases still to go.
+// The voxel path tracer's GPU browser check runs as seven package scripts, each inside its own time limit on an Intel
+// Arc 140V, where the one old script ran past 900 s in the denoise caustics reference with eight cases still to go, and
+// on the WebGL2 layer over ANGLE Direct3D 11, where the base script's 26 cases needed about 780 s of cold compiles
+// against its 600 s limit and was killed as hung in `transparent` (KB-L5a-8).
 // These tests keep the split honest: every case the check knows runs in exactly one of the scripts, no script runs the
 // whole check with no case named, every script is planned by scripts/gpu-package-tests.mjs with its own limit, and every
 // one runs in check:merge whenever the package is affected.
@@ -19,6 +21,8 @@ const root = join(import.meta.dirname, '..'),
 /** The scripts that split the check, in run order. A missing one, or one more, fails below. */
 const SPLIT = [
   'test:gpu',
+  'test:gpu:light-transport',
+  'test:gpu:convergence',
   'test:gpu:denoise',
   'test:gpu:denoise-materials',
   'test:gpu:denoise-caustics',
@@ -114,4 +118,21 @@ test('check:merge runs every split script whenever the package is affected', () 
     const { hits } = analyse({ files: [file], workspaces, footprints });
     for (const script of SPLIT) assert.ok(hits.includes(`gpu/voxel-pathtracer/${script}`), `${file}: ${script}`);
   }
+});
+
+test('every split script fits its time limit with the cases measured cold on Direct3D 11 (KB-L5a-8)', () => {
+  const measured = JSON.parse(readFileSync(join(root, dir, 'tests/compat-d3d11-case-seconds.json'), 'utf8')).seconds;
+  // Only the cases browser-check.mjs runs on the WebGL2 layer were measured there; the denoise and viewport scripts run
+  // on WebGPU-only paths or have their own longer limits, so they are not summed here.
+  for (const s of checkScripts().filter((x) => ['test:gpu', 'test:gpu:light-transport', 'test:gpu:convergence'].includes(x.script))) {
+    const missing = s.cases.filter((c) => !(c in measured));
+    assert.deepEqual(missing, [], `${s.script}: every case has a measured Direct3D 11 time`);
+    const total = s.cases.reduce((sum, c) => sum + measured[c], 0),
+      limit = pkg.margo.gpuTestTimeoutMinutes[s.script] * 60;
+    // A quarter of the limit is kept free: each script is its own page, which compiles its first programs cold again
+    // (agx and groundprecision waited 77 to 79 s for the GPU), and the GPU is shared with other lanes.
+    assert.ok(total <= 0.75 * limit, `${s.script}: ${total.toFixed(1)} s of Direct3D 11 case time against a ${limit} s limit`);
+  }
+  for (const c of cases.filter((n) => n in measured))
+    assert.equal(checkScripts().filter((s) => SPLIT.includes(s.script) && s.cases.includes(c)).length, 1, c);
 });

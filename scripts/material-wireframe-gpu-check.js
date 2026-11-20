@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-// Parallel worktrees use MARGO_GPU_LOCK to serialize access to the physical adapter.
-const release = await acquire({ owner: 'material-wireframe-gpu-check' }),
-  output = 'test-results/material-wireframe',
+const output = 'test-results/material-wireframe',
   report = { checks: [], failures: [], captures: [], shadows: [] };
 let browser,
   samples = 4;
@@ -170,5 +167,4 @@ try {
   );
   await browser?.page.evaluate(() => window.wireframeFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

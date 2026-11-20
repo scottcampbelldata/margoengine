@@ -94,7 +94,11 @@ export class TetrahedralVolume implements Drawable {
       entries: [
         { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: this.source.colormap.encoding ? 'unfilterable-float' : 'float' },
+        },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
         { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
       ],
@@ -164,9 +168,10 @@ export class TetrahedralVolume implements Drawable {
   }
   /** @internal */ draw(pass: GPURenderPassEncoder, context: GpuContext, renderer: SciRenderer): void {
     if (this.#disposed || !this.source.valid || !this.#group) return;
-    const pipeline = renderer.pipeline('tetrahedral volume', context, (target) => {
+    const encoded = !!this.source.colormap.encoding;
+    const pipeline = renderer.pipeline(`tetrahedral volume|${encoded}`, context, (target) => {
       const module = renderer.device!.createShaderModule({
-        code: frameWGSL + volumeDepthWGSL + tetrahedralShader,
+        code: frameWGSL + volumeDepthWGSL + tetrahedralShader(encoded),
         label: 'sciviz tetrahedral ray casting',
       });
       return {

@@ -1,5 +1,5 @@
 // Real-adapter check of post's SSAO under an orthographic camera and on image-based lighting (environment IBL).
-// Run from the repository root after building packages, with the GPU lock held: node scripts/ssao-gpu-check.js
+// Run from the repository root after building packages: node scripts/ssao-gpu-check.js
 // `--baseline` only saves the perspective frames (run it on the previous build); a normal run compares them pixel for
 // pixel when test-results/ssao-baseline/ exists, then checks orthographic and IBL occlusion.
 import assert from 'node:assert/strict';
@@ -24,8 +24,8 @@ try {
     const { CameraProjection } = await import('/packages/cameras/dist/index.js'),
       { SSAO } = await import('/packages/post/dist/index.js');
     const { Environment, EnvironmentLighting } = await import('/packages/environment/dist/index.js'),
-      { parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
-    const { animatedTriangle } = await import('/tests/support/gltf-pro-fixture.js');
+      { parseGLTF } = await import('/packages/gltf/dist/pbr.js');
+    const { animatedTriangle } = await import('/tests/support/gltf-pbr-fixture.js');
     // Sky-like environment: bright blue-white above, warm dark ground below.
     const sky = () => {
       const width = 64,
@@ -156,7 +156,7 @@ try {
   };
   const result = { hardware, baseline };
 
-  // 1. Perspective frames must not change: SSAO on core meshes plus a glTF-pro source, IBL alone (core + glTF-pro), plain.
+  // 1. Perspective frames must not change: SSAO on core meshes plus a glTF PBR source, IBL alone (core + glTF PBR), plain.
   const perspective = {
     ssao: { model: true },
     ibl: { ssao: false, ibl: true, model: true },

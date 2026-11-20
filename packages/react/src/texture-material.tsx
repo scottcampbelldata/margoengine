@@ -9,6 +9,7 @@ import type { PbrMaterialProps } from './components.js';
 import { modelPicking } from './picking.js';
 import { textureLoaders, identity, own, nextId } from './texture-cache.js';
 import { separateRoughness } from './roughness-feature.js';
+import { typeError } from '../../shared/errors.js';
 /** Supplies map bindings to root material children without importing optional peers from the root entry. */
 export function TextureProvider({ children }: { children?: ReactNode }) {
   const scene = useScene();
@@ -57,7 +58,7 @@ export function MappedMaterial(props: PbrMaterialProps & { transmissionOptions?:
   const textures = useLoader(loader, key);
   let i = 0;
   const maps = Object.fromEntries(names.map((name) => [name, props[name] ? textures[i++] : null]));
-  return <TextureMaterial color={props.color ?? '#ffffff'} roughness={props.roughness} metalness={props.metalness} emissive={props.emissive} emissiveIntensity={props.emissiveIntensity} transmissionOptions={props.transmissionOptions} {...maps} />;
+  return <TextureMaterial color={props.color ?? '#ffffff'} roughness={props.roughness} metalness={props.metalness} emissive={props.emissive} emissiveIntensity={props.emissiveIntensity} transmissionOptions={props.transmissionOptions} envMap={props.envMap ?? null} envMapIntensity={props.envMapIntensity} {...maps} />;
 }
 
 /** Native material options plus a borrowed material and optional UV geometry. */
@@ -71,13 +72,19 @@ export interface TextureMaterialProps extends Omit<MaterialOptions, 'color'> {
   geometry?: MeshGeometry;
   /** Optional transmission capture and volume controls, including caller-owned GPU extension maps. */
   transmissionOptions?: TransmissionOptions;
+  /** Draw order among material meshes of the same pass (opaque, then transparent): lower first. Default 0. */
+  renderOrder?: number;
   onError?: (error: unknown) => void;
 }
 /** Any native material on a React Mesh, in its owning Scene on WebGPU and the WebGL2 compatibility device. */
-export function TextureMaterial({ material, geometry: supplied, onError, roughnessMap, transmissionOptions, ...options }: TextureMaterialProps) {
+export function TextureMaterial({ material, geometry: supplied, onError, roughnessMap, transmissionOptions, renderOrder = 0, ...options }: TextureMaterialProps) {
   const scene = useScene(), registry = useMesh();
-  const key = JSON.stringify(Object.fromEntries(Object.entries(options).filter(([, value]) => typeof value !== 'object')));
-  const references = Object.values(options).filter((value) => value && typeof value === 'object');
+  // Numbers, strings and number arrays (an inline `color={[1, 0, 0]}` is a new array every render) count by value;
+  // textures and other objects by identity.
+  const byValue = (value: unknown) =>
+    typeof value !== 'object' || value === null || (Array.isArray(value) && value.every((v) => typeof v === 'number'));
+  const key = JSON.stringify(Object.fromEntries(Object.entries(options).filter(([, value]) => byValue(value))));
+  const references = Object.values(options).filter((value) => !byValue(value));
   const signature = references.map((value) => identity(value as object)).join();
   useCommit(() => {
     const lease = { active: true, closed: false };
@@ -104,9 +111,9 @@ export function TextureMaterial({ material, geometry: supplied, onError, roughne
         try {
           const input = supplied ?? geometrySources.get(geometry);
           const data = typeof input === 'function' ? input() : input;
-          if (!data) throw new TypeError('TextureMaterial requires UV geometry; pass geometry or use Box, Sphere or Plane.');
+          if (!data) throw typeError('TextureMaterial requires UV geometry; pass geometry or use Box, Sphere or Plane', 'react-arguments');
           const plugin = { name: 'react:texture-mesh:' + nextId(), setup() {
-            mesh = api!.createMesh(scene.engine as unknown as EngineKernel, data, surface!);
+            mesh = api!.createMesh(scene.engine as unknown as EngineKernel, data, surface!, { renderOrder });
             if (transmissionOptions) {
               for (const primitive of mesh.primitives) primitive.material.transmission = transmissionOptions;
               api!.install(mesh);
@@ -124,7 +131,7 @@ export function TextureMaterial({ material, geometry: supplied, onError, roughne
         } catch (error) { detach(); report(scene, error, onError); }
       });
     };
-    if (registry.geometryOverride) throw new TypeError('TextureMaterial requires one material owner per Mesh; remove the extra material.');
+    if (registry.geometryOverride) throw typeError('TextureMaterial requires one material owner per Mesh; remove the extra material', 'react-arguments');
     registry.geometryOverride = override;
     const attach = (target: Parameters<typeof override>[0]) => override(target, registry.geometry ?? target.geometry);
     registry.attachments.add(attach);
@@ -159,7 +166,7 @@ export function TextureMaterial({ material, geometry: supplied, onError, roughne
       const target = live(registry);
       if (target) target.setGeometry(registry.geometry ?? null);
     };
-  }, [scene.engine, scene.world, registry, material, supplied, roughnessMap, transmissionOptions, key, signature]);
+  }, [scene.engine, scene.world, registry, material, supplied, roughnessMap, transmissionOptions, renderOrder, key, signature]);
   return null;
 }
 const source = Symbol.for('margoengine.pbr-source.v1');

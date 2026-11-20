@@ -112,3 +112,44 @@ test('superseded and aborted AFM loads dispose late figures and remove every mod
     globalThis.document = previous;
   }
 });
+test('a render whose signal aborts during the first load rejects with the abort reason and leaves nothing behind', async () => {
+  const previous = globalThis.document;
+  globalThis.document = { createElement: () => ({ style: {}, setAttribute() {} }) };
+  try {
+    const state = {
+        spec: {
+          version: 1,
+          options: {},
+          limits: [0, 1, 0, 1, 0, 1],
+          dragMode: 'orbit',
+          resources: [],
+          layers: [],
+          camera: { position: [2, 2, 2], target: [0, 0, 0], up: [0, 1, 0], near: 0.01, far: 100, fov: 45 },
+        },
+        buffers: {},
+        backend: 'webgpu',
+      },
+      listeners = new Set(),
+      model = {
+        get: (key) => state[key],
+        set: (key, value) => (state[key] = value),
+        save_changes() {},
+        on: (key, f) => listeners.add(f),
+        off: (key, f) => listeners.delete(f),
+      },
+      el = Object.assign(new EventTarget(), { style: {}, children: [], replaceChildren: (...c) => (el.children = c) }),
+      controller = new AbortController(),
+      reason = new Error('closed by the host'),
+      at = pending.length,
+      rendering = render({ model, el, signal: controller.signal });
+    controller.abort(reason);
+    const late = Object.assign(new EventTarget(), { layers: [], disposed: 0, dispose: () => ++late.disposed });
+    pending[at].resolve(late);
+    await assert.rejects(rendering, (error) => error === reason);
+    assert.equal(late.disposed, 1);
+    assert.equal(listeners.size, 0);
+    assert.equal(el.children.length, 0);
+  } finally {
+    globalThis.document = previous;
+  }
+});

@@ -44,8 +44,11 @@ struct Beam {
 }
 @group(1) @binding(2) var<storage,read> range:array<f32>;
 @vertex fn beamVertex(@builtin(vertex_index) id:u32,@builtin(instance_index) layer:u32)->Beam {
- let triangle=id/6u*3u;let a=causticSample(triangle);let b=causticSample(triangle+1u);let c=causticSample(triangle+2u);
- let samples=array<Sample,3>(a,b,c);let level=mix(caustic[20].x,caustic[20].y,f32(layer)/(caustic[20].z-1.0));
+ let triangle=id/6u*3u;var samples:array<Sample,3>;
+ // One call in a loop, not three: a shader compiler inlines every call, and each copy of the surface costs the WebGL2
+ // layer's D3D compiler about a second and a half (KB-WATER-SURFCOMPILE1).
+ for(var k=0u;k<3u;k++){samples[k]=causticSample(triangle+k);}
+ let a=samples[0];let b=samples[1];let c=samples[2];let level=mix(caustic[20].x,caustic[20].y,f32(layer)/(caustic[20].z-1.0));
  let light=caustic[12].xyz;let eta=1.0/caustic[21].x;
  var destinations:array<vec3f,3>;var direction=vec3f(0);var transmission=0.0;var distance=0.0;var valid=light.y>0.0;
  for(var i=0u;i<3u;i++){
@@ -110,7 +113,8 @@ export function causticRange(state: QueryState): string {
 @compute @workgroup_size(64) fn measure(@builtin(global_invocation_id) id:vec3u){
  if(id.x>=${count}u){return;}
  var weight=0.0;
- let a=causticSample(id.x*3u);let b=causticSample(id.x*3u+1u);let c=causticSample(id.x*3u+2u);
+ var samples:array<Sample,3>;for(var k=0u;k<3u;k++){samples[k]=causticSample(id.x*3u+k);}
+ let a=samples[0];let b=samples[1];let c=samples[2];
  let eta=1.0/caustic[21].x;let light=caustic[12].xyz;
  let na=normalize(a.normal);let nb=normalize(b.normal);let nc=normalize(c.normal);
  let ra=refract(-light,na,eta);let rb=refract(-light,nb,eta);let rc=refract(-light,nc,eta);

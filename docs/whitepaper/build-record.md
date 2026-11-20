@@ -18,7 +18,7 @@ fixed-seed respawn, CPU streaklines reusing one field copy, device replay and an
 Analytic GPU/CPU checks, exact restored pixels, WebGPU/WebGL2 compatibility parity and four demo layouts pass;
 the existing native WebGL2 flow path and jobs 2 to 6 remain pending. Flow JS: 8,596 B gzip, ceiling raised from
 2,386 to 8,854 B under Scott's optional-entry ruling; root/driver/Wasm and core + stage remain unchanged.
-No benchmark, exclusive GPU hold, speed claim, relaxed tolerance or raised README budget is part of this piece.
+No benchmark, speed claim, relaxed tolerance or raised README budget is part of this piece.
 
 The continuation's full verify stopped at a stale aggregate API-summary header (891 entries instead of 890),
 while all declarations matched. Full report regeneration repairs the aggregate without changing API code;
@@ -108,10 +108,9 @@ local OBJ URL, fetch OBJ rather than MTL bytes and pass an absolute material bas
 The optional color renderer reads the existing colored PLY sample; OBJ examples use the
 complete previously licensed Doorman family, including seven texture companions.
 
-The first combined runtime attempt failed at Windows mutex creation with EPERM; the next
+The first combined runtime attempt failed with Windows EPERM creating the scheduler's folder; the next
 reached the terrain-view example's 20 s deadline. These are failures, not passing evidence.
-Mutex cleanup now retires its reusable name before deletion, with a real native pending-delete
-regression. Page examples now run one at a time within the one held GPU slot, with deterministic
+Page examples now run one at a time, with deterministic
 lifecycle/failure regressions. The complete-page deadline and every example's work are unchanged.
 
 The independent prefetch cause is now repaired by shared raw generations, independent abort
@@ -200,8 +199,8 @@ Batches 1 to 3 are phase 1. Batches 19 and 21 are partly done, each with one job
 | [32](#batch-32-shader-part-2-of-2) | shader | 4 | 4 | 0 | 0 | 0 |
 | [33](#batch-33-materials-part-1-of-2) | materials | 8 | 8 | 0 | 0 | 0 |
 | [34](#batch-34-materials-part-2-of-2) | materials | 4 | 4 | 0 | 0 | 0 |
-| [35](#batch-35-gltf-pro) | gltf-pro | 8 | 8 | 0 | 0 | 0 |
-| [36](#batch-36-gltf-pro) | gltf-pro | 1 | 1 | 0 | 0 | 0 |
+| [35](#batch-35-gltfpbr) | gltf/pbr | 8 | 8 | 0 | 0 | 0 |
+| [36](#batch-36-gltfpbr) | gltf/pbr | 1 | 1 | 0 | 0 | 0 |
 | [37](#batch-37-oit) | oit | 6 | 5 | 1 | 0 | 0 |
 | [38](#batch-38-gltf) | gltf | 6 | 6 | 0 | 0 | 0 |
 | [49](#batch-49-shadows) | shadows | 8 | 7 | 0 | 1 | 0 |
@@ -217,7 +216,7 @@ The highest-priority open defects.
 | 2 | Fourteen packages' own `npm test` missed test files | DONE | `68b55c2ed` | `tests/package-test-scripts.test.js` |
 | 3 | Frame budget failed on the gameplay sandbox (WebGL2 layer, CPU tier) | DONE | `88a2ae178` | `packages/webgl2-compat/test/routes.test.js` |
 | 4 | `KHR_materials_specular` weight did not scale Fresnel at grazing angles | DONE | `43b39e9df`, `63868c640` | material and environment tests in both commits |
-| 5 | gltf-pro's native tint draw read factors, never maps | DONE | `6f0836ee3` | `packages/gltf-pro/tests/extensions.test.js` |
+| 5 | gltf/pbr's native tint draw read factors, never maps | DONE | `6f0836ee3` | `packages/gltf/test/extensions.test.js` |
 
 - **Bugs:** job 1 also found a reversed guard that left `DevTools` panels on in every production browser build. Job 3
   moved the VFX and scatter prefix counts and the sky's spherical-harmonics projection off the layer's CPU tier: median
@@ -596,7 +595,7 @@ One-call features on the stage, each in its own entry, with the stage root and c
 | 4 | Load a saved scene document | DONE | `a2608079f` | `/scene` | LIM-131 |
 
 - **Bugs:** `ColorBackground`, `ImageBackground` and `EnvironmentBackground` stayed registered after `dispose()`, so a
-  replacement could not attach (`packages/environment/tests/transparent.test.js`). `@margoengine/staging` used
+  replacement could not attach (`packages/environment/tests/transparent.test.js`). `@margoengine/studio` used
   `@margoengine/math` without declaring it, so a parallel build could fail; `tests/package-order.test.js` now checks every
   package. Before landing, the physics draft treated any mesh with its vertices on box corners as a box.
 - **Proved:** job 1 on real WebGPU with a simulated session; no headset has run it. Job 2 on real WebGPU with a real glTF.
@@ -613,7 +612,7 @@ The umbrella package.
 | # | Job | Status | Commit | New entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Published on npm | PARKED: nothing is published; the preparation landed and the release waits for Scott | `f960906f9` (preparation) | none | LIM-137 |
-| 2 | Unrequested Wasm in builds | DONE | `ff90665d1` | `margoengine/react/gltf-pro`, `/fbx`, `/animation`, `/materials` | none |
+| 2 | Unrequested Wasm in builds | DONE | `ff90665d1` | `margoengine/react/gltf`, `/fbx`, `/animation`, `/materials` | none |
 
 - **Bugs:** a page with one `Canvas` emitted 719,753 B of Draco and Basis Wasm it never asked for, because Vite copies a
   `new URL` file when it reads a module, before tree-shaking. Those bindings moved to their own entries. `FloatingOrigin`,
@@ -860,7 +859,7 @@ Level of detail end to end.
 | 7 | Selection outlines on imposters | DONE | `cfcc8993e` | none (`drawSelectionMask`) | LIM-161 |
 
 - **Bugs:** job 1: wrong normals on imposter subassembly parts and far meshes (`packages/lod/test/auto.test.js`). Job 2:
-  gltf-pro's quantized tangents failed the prepared geometry check, and tiny parts were lost from levels. Job 7: imposter
+  gltf/pbr's quantized tangents failed the prepared geometry check, and tiny parts were lost from levels. Job 7: imposter
   pixels with alpha 0 could pass the dither, had no depth and showed through any wall; the `hidden` assertion in
   `packages/lod/test/imposter-outline-check.mjs` failed before the fix. That fix sits in a `feat` commit under the
   one-commit-per-job rule.
@@ -889,8 +888,8 @@ outputs.
 - **Bugs:** jobs 1 to 3: a store the body made and did not return was lost, two writes in one body read inline so the second
   saw the first, and storage reads kept in a `let` survived statements that wrote the buffer
   (`packages/shader/test/control.test.js`, `compute-model.test.js`). Job 5: `instancedShader`'s normal anchor missed
-  `margoNormal` (`packages/shader/test/passes.test.js`). Job 6: gltf-pro's `vertexInputs` dropped every `@builtin` field when it trimmed attributes
-  (`packages/gltf-pro/tests/vertex-inputs.test.js`), and a mesh without tangents gave a NaN from `normalize(0)`. Caught
+  `margoNormal` (`packages/shader/test/passes.test.js`). Job 6: gltf/pbr's `vertexInputs` dropped every `@builtin` field when it trimmed attributes
+  (`packages/gltf/test/vertex-inputs.test.js`), and a mesh without tangents gave a NaN from `normalize(0)`. Caught
   before landing in job 8: `previous` was written after the draws, which gave zero velocity because uniforms upload ahead
   of the frame's commands, and the `color` output held display-encoded light on an encoded canvas. Undoing either fix fails
   `packages/shader/test/pass-check.mjs`. These fixes sit in `feat` commits under the one-commit-per-job rule.
@@ -900,7 +899,7 @@ outputs.
   reads pixels back, and the expected velocity was worked out by hand. `instanceIndex` now works in a NodeMaterial, so its
   old refusal test moved to `globalId`: a feature change, not a loosened check.
 - **Limits:** TAA velocity does not follow `positionNode` or `discard()`, and CPU raycasts and BVH picking see the bind pose
-  of a mesh skinned in the graph. A mesh without tangents gets a fixed frame. Scene passes draw opaque and masked gltf-pro
+  of a mesh skinned in the graph. A mesh without tangents gets a fixed frame. Scene passes draw opaque and masked gltf/pbr
   surfaces only, draw each model a second time, are single-sampled, and hold one capture hook per model, so a model cannot
   also be in `SSR`. `velocity()` covers camera motion unless a mesh passes its previous position.
 - **Unmeasured:** no timing was taken in this batch, so the cost of 16 storage reads per vertex per pass against
@@ -1035,9 +1034,9 @@ before the fragment stage where the device can.
 - **Gate:** core and stage were not touched; job 4 needed no core change, as core's `options.features` already passes the feature
   to the device. The new entries are recorded in the size gate. Nothing failed reached `main`.
 
-## Batch 35: gltf-pro
+## Batch 35: gltf/pbr
 
-Eight jobs took `@margoengine/gltf-pro` to the glTF extensions that were still missing: splats, bump, later UV sets, volume scatter, fixture and image lights, texture streaming, rigid bodies and behaviour graphs. Each big one is an optional entry; core and stage did not change.
+Eight jobs took `@margoengine/gltf/pbr` to the glTF extensions that were still missing: splats, bump, later UV sets, volume scatter, fixture and image lights, texture streaming, rigid bodies and behaviour graphs. Each big one is an optional entry; core and stage did not change.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -1050,25 +1049,25 @@ Eight jobs took `@margoengine/gltf-pro` to the glTF extensions that were still m
 | 7 | KHR_physics_rigid_bodies, KHR_implicit_shapes | DONE | 0e2dd31f7 | `/physics` | LIM-275 |
 | 8 | KHR_interactivity | DONE | 869810a55 | `/interactivity`, `@margoengine/animation/interactivity` | LIM-276 |
 
-- **Bugs fixed, each with a regression test:** flat splats rounded to a covariance `validateSplats` refused (`packages/splats/test/splat-edit.test.js`). `parseIES` did not read the `IES:LM-63-2019` first line and multiplied candela by the field after the ballast factor, which is the file generation type in 2019, so a real 8,500 cd sample read 9,350 (`packages/clustered/test/ies.test.js`). A body on a driven joint went to sleep, so a slow door stopped at 0.6486 of 0.7 (`packages/gltf-pro/tests/physics.test.js`). bvh named `TEXCOORD_1` for any later set. The `kinematics` row of `scripts/supply-chain.mjs` held the uv row's strings after a bad merge that dropped the uv notice.
+- **Bugs fixed, each with a regression test:** flat splats rounded to a covariance `validateSplats` refused (`packages/splats/test/splat-edit.test.js`). `parseIES` did not read the `IES:LM-63-2019` first line and multiplied candela by the field after the ballast factor, which is the file generation type in 2019, so a real 8,500 cd sample read 9,350 (`packages/clustered/test/ies.test.js`). A body on a driven joint went to sleep, so a slow door stopped at 0.6486 of 0.7 (`packages/gltf/test/physics.test.js`). bvh named `TEXCOORD_1` for any later set. The `kinematics` row of `scripts/supply-chain.mjs` held the uv row's strings after a bad merge that dropped the uv notice.
 - **Proved:** job 1 on real CesiumJS and godot-gsplat files. Job 3 on a real Blender 5.3 export. Job 4 on the real Khronos ScatteringSkull. Job 5 on the real Example.gltf, the wall within 3 percent of Lambert, and type B on a real floodlight report: every V plane meets at H = 90 and the table holds 5,871.8 lm against 5,871 stated, 6,531.1 with the axes swapped. Job 6 on the real FlightHelmet: 4,163,257 of 33,959,955 B read from far, and a close-up equal to the plain loader byte for byte. Job 7 on five real MIT samples: the pendulum at 2.9374 s against 2.9382 s by formula. Job 8 at 1,155 of 1,156 conformance sub-tests, 187 of 187 invalid graphs rejected, and a real click on an RTX A6000 that turns a file's material green on the engine loop while its clip stays unstarted.
 - **Stand-ins:** job 2's height ramp checks use built tables. Job 1's mesh plus splats depth file, job 5's image-light cube (the real EnvironmentTest is under the Adobe Stock License, so it stays out of the repository) and job 8's click file, a graph built for the check, as no published file turns a material on a click.
 - **Limits:** job 8 fails one sub-test on purpose: `/scene isValid` declares `int` where the glTF Object Model says `ref`, and Margo keeps the specification. Hover stops at the first object. Jobs 4 and 7 follow drafts and say so; the two physics extensions can still change. Job 5 keeps `irradianceCoefficients` as data only, and no file can show the sign of type B's V. Job 3 casts and picks a cut-out on set 2 or 3 uncut. Job 6 keeps PNG and JPEG whole. Each has its row in `docs/limits.md`.
 - **Unmeasured:** no speed was timed for jobs 1, 7 or 8, and no large graph has been timed. Job 8 has no GPU run of skins and physics driven together.
-- **Slips:** verify failed once on job 5, a fixture `NOTICE.md` under `packages/` named another engine, and the credit moved to the supply-chain row. It failed once on job 6: `GLTFTextureStream` had no static `attach`, and a test used a fixed 50 ms wait. It failed twice on job 7: a `new (shape: Shape)` type that broke five README examples, then stale ignored output in `packages/ifc` and `margoengine/viz` 18 B past the stated size. Nothing was loosened: each was fixed at the cause, and the sizes page states the measured figures. Job 8 first gave gltf-pro a peer on animation, which `scripts/package-order.js` refused as a cycle, so the binding moved to animation. Its first draft called `engine.pick` with no picker attached, which returns nothing for a glTF model; the GPU check caught it. A wait script was started with no arguments and went to the background, and was stopped by its own id. A shell heredoc with apostrophes failed, and scripts moved to files.
+- **Slips:** verify failed once on job 5, a fixture `NOTICE.md` under `packages/` named another engine, and the credit moved to the supply-chain row. It failed once on job 6: `GLTFTextureStream` had no static `attach`, and a test used a fixed 50 ms wait. It failed twice on job 7: a `new (shape: Shape)` type that broke five README examples, then stale ignored output in `packages/ifc` and `margoengine/viz` 18 B past the stated size. Nothing was loosened: each was fixed at the cause, and the sizes page states the measured figures. Job 8 first gave gltf/pbr a peer on animation, which `scripts/package-order.js` refused as a cycle, so the binding moved to animation. Its first draft called `engine.pick` with no picker attached, which returns nothing for a glTF model; the GPU check caught it. A wait script was started with no arguments and went to the background, and was stopped by its own id. A shell heredoc with apostrophes failed, and scripts moved to files.
 - **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
-## Batch 36: gltf-pro
+## Batch 36: gltf/pbr
 
-One job finished `@margoengine/gltf-pro`'s extension list: a file's own statement of who made it and under what licence, for asset pipelines and attribution. It is a new optional entry, so nothing is paid until it is imported, and core and stage are untouched.
+One job finished `@margoengine/gltf/pbr`'s extension list: a file's own statement of who made it and under what licence, for asset pipelines and attribution. It is a new optional entry, so nothing is paid until it is imported, and core and stage are untouched.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
 | 1 | KHR_xmp_json_ld | DONE | this commit | `/metadata` | LIM-278 |
 
 - **Entry:** the suggested `/asset` already holds `GLTFAsset`, so the metadata is a new entry `/metadata`. `readGLTFMetadata(model)` is a function of the entry and no `model.metadata` field exists, as with `/lights` and `/physics`, so the root carries none of its code.
-- **Bugs fixed, each with a regression test:** a file listing `KHR_xmp_json_ld` in `extensionsRequired` was refused at load, though the extension says it has no effect on rendering (`packages/gltf-pro/tests/metadata.test.js`, "a file requiring the extension loads").
-- **Proved:** real files for author, licence and copyright. `XmpMetadataRoundedCube.glb` loads as a model on the main thread and through the parse-worker job. Also read: the Khronos metadata tool's `Box.gltf` with its buffer and its two language edge cases, `boom_box.gltf` and `rocket_ship.gltf`, and the already committed ScatteringSkull. A survey of all 280 glTF and GLB files of glTF-Sample-Assets at 8f492390, leaving out its embedded, Draco, quantized and meshopt copies, found the extension in two models only. The `gltf-pro/metadata` fuzz target ran 32,876 inputs with no finding.
+- **Bugs fixed, each with a regression test:** a file listing `KHR_xmp_json_ld` in `extensionsRequired` was refused at load, though the extension says it has no effect on rendering (`packages/gltf/test/metadata.test.js`, "a file requiring the extension loads").
+- **Proved:** real files for author, licence and copyright. `XmpMetadataRoundedCube.glb` loads as a model on the main thread and through the parse-worker job. Also read: the Khronos metadata tool's `Box.gltf` with its buffer and its two language edge cases, `boom_box.gltf` and `rocket_ship.gltf`, and the already committed ScatteringSkull. A survey of all 280 glTF and GLB files of glTF-Sample-Assets at 8f492390, leaving out its embedded, Draco, quantized and meshopt copies, found the extension in two models only. The `gltf/metadata` fuzz target ran 32,876 inputs with no finding.
 - **Stand-ins:** `cc:license`, `xmpRights:UsageTerms` and `xmpRights:WebStatement` appear in no file found, so the licence order is tested on built documents, as are broken references, a renamed Dublin Core prefix, structures and the five object kinds besides `mesh`.
 - **Limits:** read only, so exporters drop the packets. A packet another extension references reads through `packets`, not `objects`. XMP inside a PNG or JPEG is not read.
 - **Unmeasured:** no speed was timed. The entry adds no shader and draws nothing, so no GPU check is new.
@@ -1088,13 +1087,13 @@ Six jobs took `@margoengine/oit` past weighted blending: exact and moment-based 
 | 5 | Depth and motion | DONE | 839264f9b | `/depth` | LIM-289 |
 | 6 | Particles and VFX in OIT | DONE | this commit | `/vfx` | LIM-293 |
 
-- **Route:** `addEffect` works through a hook beside gltf-pro's. Each pass splits its declarations into `margoTransparentAt(color, clip, depth)` and a PBR wrapper; `VFX`, `Splats` and `PointsPlugin` own their shader edits and hand it their view depth. `PointsPlugin` now culls in a pass before anything draws, because its order 10 comes after the transparent pass at 8.
-- **Bugs fixed, each with a regression test:** none in existing code beyond a stale README pointer ("glTF Pro README Transparency hook" does not exist), reworded in job 2. Open: two identical runs of GlassVaseFlowers differ on a few pixels, cause not found (`docs/known-bugs.md`).
+- **Route:** `addEffect` works through a hook beside gltf/pbr's. Each pass splits its declarations into `margoTransparentAt(color, clip, depth)` and a PBR wrapper; `VFX`, `Splats` and `PointsPlugin` own their shader edits and hand it their view depth. `PointsPlugin` now culls in a pass before anything draws, because its order 10 comes after the transparent pass at 8.
+- **Bugs fixed, each with a regression test:** none in existing code beyond a stale README pointer ("glTF PBR README Transparency hook" does not exist), reworded in job 2. Open: two identical runs of GlassVaseFlowers differ on a few pixels, cause not found (`docs/known-bugs.md`).
 - **Proved:** on an RTX A6000, 1x and 4x MSAA, on generated layers: exact 0.66 of 255 against weighted 13.26 on four layers; moments 6.24 against 13.26, dense layers 2.81 against 71.81; each blending kind equals the sorted 8-bit pixel; glass depth equals an opaque plane bit for bit, velocity 0.0289 against 0, depth of field 6 soft pixels against 0, a click lands on glass. Effects land within 2 of 255 of the formula on both sides of a pane, and hand the pass depth 3.5 at 3.5 in both camera kinds. Real files: six Khronos models, three new in `examples/assets/khronos-samples/`, through every pass from eight sides with no GPU error (`real-check.mjs`): on GlassVaseFlowers moments move 0.63% of pixels against exact, weighted 2.30%; `TransparentDepth` moved pixels nearer on all six and none farther.
 - **Stand-ins:** planes and single effects are generated. The real files have no reference picture, so what they give is gaps between paths, not correctness. Their particles are generated too.
 - **Limits:** `blending` is on `OIT` only, so `ExactOIT` and `MomentOIT` leave native transmission alone, which on real files is most glass: TransmissionTest and CommercialRefrigerator draw nothing in them. With `blending`, stacked glass adds light with no dimming between parts, up to 247 of 255 on 1% of TransmissionTest's side view. A BLEND part inside transmission draws over it without `blending`. `MomentOIT` falls back to near and far with an effect added. Surfels stay out; `TransparentDepth` takes models only.
 - **Unmeasured:** no time on any job; timed numbers would be diagnostic with lanes running. Only one GPU has run any of it.
-- **Slips:** blending files were drafted in the tree during a landing and moved out before the next add; the moment default range was too wide (error 20 and 16) until a box round the added models and `fit()`; a failed `&&` chain left gltf-pro unbuilt. Job 6: a view depth written to the uniform in every frame changed a pinned VFX trace, so it writes only under a hook; an empty `constants` key changed the recorded pipelines in the `quality-presets` proof, so it is set only under a hook; a `declare` in the splats README failed the examples gate; the first real run lit nothing, because the models were not added to the environment lighting, and its numbers were thrown away. Job 6 stopped at verify five times, nothing failed reached main: a README example with a declared stand-in, the `constants` key, the duplicates gate on the hook holder and bind lines copied into three packages, now `transparencySlot` and `surfacePass` in `packages/shared/pass.js`, and the camera basis test in `packages/cameras`, which pins the padding the points near plane had taken, so that value too is written only under a hook, and a race between the worker package's README test and the port test's walk of `packages/`, fixed by keeping the scratch folder under `test-results`.
+- **Slips:** blending files were drafted in the tree during a landing and moved out before the next add; the moment default range was too wide (error 20 and 16) until a box round the added models and `fit()`; a failed `&&` chain left gltf/pbr unbuilt. Job 6: a view depth written to the uniform in every frame changed a pinned VFX trace, so it writes only under a hook; an empty `constants` key changed the recorded pipelines in the `quality-presets` proof, so it is set only under a hook; a `declare` in the splats README failed the examples gate; the first real run lit nothing, because the models were not added to the environment lighting, and its numbers were thrown away. Job 6 stopped at verify five times, nothing failed reached main: a README example with a declared stand-in, the `constants` key, the duplicates gate on the hook holder and bind lines copied into three packages, now `transparencySlot` and `surfacePass` in `packages/shared/pass.js`, and the camera basis test in `packages/cameras`, which pins the padding the points near plane had taken, so that value too is written only under a hook, and a race between the worker package's README test and the port test's walk of `packages/`, fixed by keeping the scratch folder under `test-results`.
 - **Gate:** lint, hygiene, verify, the package tests, the GPU checks and `tests/claims-file.test.js`, the push from one script that stops at the first failing step.
 
 ## Batch 38: gltf
@@ -1107,15 +1106,15 @@ The light glTF loader takes more files without growing its root.
 | 2 | Base colour texture and alpha mask | DONE | `d9d654f4d` | `/textured` | LIM-166 |
 | 3 | Meshopt buffers through an optional hook | DONE | `ffc22b634` | `/meshopt` | LIM-169 |
 | 4 | GPU instancing extension | DONE | `aa51781c5` | `/instancing` | LIM-172 |
-| 5 | Automatic upgrade to gltf-pro | DONE | `ad62cfe1d` | `/auto` | LIM-174 |
+| 5 | Automatic upgrade to gltf/pbr | DONE | `ad62cfe1d` | `/auto` | LIM-174 |
 | 6 | Cameras and punctual lights as data | DONE | `52273e0a7` | `/scene-data` | LIM-175 |
 
 - **Bugs:** caught before landing: a `BLEND` material with a texture was turned opaque, and after a device restore the mipmap
   cache kept a sampler from the old device. `0cdcd0be2` fixed the flaky USDZ timing test that failed job 4's `verify`.
 - **Proved:** real GPU for jobs 2, 4 and 5, with one core draw for all instances and a refused file drawn through the real
-  gltf-pro. Job 3 runs the real decoder. Jobs 1 and 6 are CPU tests.
+  gltf/pbr. Job 3 runs the real decoder. Jobs 1 and 6 are CPU tests.
 - **Limits:** textures are WebGPU only, and a cut-out picks and casts as solid. Quantized files shrink on the wire, not on the
-  GPU. `loadAuto` moves to gltf-pro only on an `unsupported` refusal, so a file over a light limit rejects with that limit. A
+  GPU. `loadAuto` moves to gltf/pbr only on an `unsupported` refusal, so a file over a light limit rejects with that limit. A
   file with no mesh is refused.
 - **Gate:** job 2 failed the gate twice before it passed, on error messages with no fix text, then on a missing corpus entry
   and an unmarked fixed wait. Nothing failed reached `main`. After their last rebases jobs 2, 3 and 4 reran the package,
@@ -1200,7 +1199,7 @@ Seven jobs, each in its own optional entry of `@margoengine/exporters`, so a mod
 - **Job 1, proved:** 24 real Khronos GLBs add no validator error or warning, every stream decodes in Google's decoder, `gltf-transform` read Fox and BoomBox, and a Chromium 156 browser test ran the worker. Bugs: bounds were computed after the arrays moved to the worker (`tests/exporters-browser.js`, and the bounds test in `tests/draco.test.js`), and Draco holds explicit grids as text with six decimals (`asOption`, `sharedGrid`, and the grid tests in `tests/draco.test.js`).
 - **Job 2, proved:** 21 real Khronos GLBs, 211 KTX2 images, all pass `ktx validate --warnings-as-errors --gltf-basisu` on a Mac and decode in Binomial's transcoder; the validator gives only the two messages it gives every KTX2 image, as it does not implement the extension; `gltf-transform` read Lantern and Fox. Sizes run from 57% (Lantern) to 256% (AlphaBlendModeTest), ABeautifulGame 214% in 378 s, diagnostic. Bugs: ETC1S with alpha needs bytesPlanes 8 8 (`ktx validate` error 6021, `tests/ktx2.test.js`), worker errors lost their type in a browser (`rebuilt` in `encoder-host.ts`, `tests/exporters-browser.js`), and a stale README line. The Basis encoder is prebuilt under the AGENTS.md exception, recorded in `THIRD-PARTY-NOTICES.md` and `vendor/NOTICE.md`.
 - **Job 3, proved:** 25 real Khronos GLBs pass `usdchecker --arkit`; `usdcat --flatten` composed bounds equal glTF node maths, worst 6.85e-6 of mesh size on NodePerformanceTest's 10,000 meshes; no matrix has a negative determinant; NegativeScaleTest shows every tick in SceneKit. Against the old writer sizes run -4.6% (ToyCar) to +2.9% (NodePerformanceTest), and ABeautifulGame is 91.4 MB against 165.9 MB with every node a copy. 8 of 8 mutations caught.
-- **Job 4, proved:** on 25 of 25 GLBs every stream decodes in the meshoptimizer library, no validator error or warning is new once decoded, `gltfpack` and `gltf-transform` read all of them (NodePerformanceTest needed over 200 s and passed in its own run), gltf-pro counts the same triangles, and bounds differ by at most 7.6e-6. Sizes 27% (MetalRoughSpheres) to 138% (InterpolationTest), ABeautifulGame 55%. `gltfpack -c` is smaller on most files as this pass writes no filters; that is in `docs/limits.md`. The encoder moved out of `tools/margo-convert/pipeline/` into the entry, so there is one. Mutation checks found two gaps, closed by a weight test and a sampler stream assertion.
+- **Job 4, proved:** on 25 of 25 GLBs every stream decodes in the meshoptimizer library, no validator error or warning is new once decoded, `gltfpack` and `gltf-transform` read all of them (NodePerformanceTest needed over 200 s and passed in its own run), gltf/pbr counts the same triangles, and bounds differ by at most 7.6e-6. Sizes 27% (MetalRoughSpheres) to 138% (InterpolationTest), ABeautifulGame 55%. `gltfpack -c` is smaller on most files as this pass writes no filters; that is in `docs/limits.md`. The encoder moved out of `tools/margo-convert/pipeline/` into the entry, so there is one. Mutation checks found two gaps, closed by a weight test and a sampler stream assertion.
 - **Job 5, proved:** on 25 real Khronos GLBs with the defaults every node's triangles are unchanged corner by corner, triangles with no area aside. No validator error or warning is new with the defaults or with `simplify` and `lods`, `gltfpack` and `gltf-transform` read both outputs, no level vertex lies outside the source and no level is larger than the one before. Sizes 43.0% (DirectionalLight) to 101.9% (InterpolationTest), ABeautifulGame 79.7%. `margo-convert`'s weld now calls `weldVertices`, so there is one weld; the tool keeps its own dedupe because it works on its own model, not on a GLB.
 - **Job 5, unproven and unmeasured:** `MSFT_lod` itself is unproven, as the validator does not implement it and no outside reader is here; the extension's JSON is checked in `tests/optimize.test.js` only. ABeautifulGame took 30.5 s with simplify and levels against 0.4 s for `gltfpack -si 0.5` at one level, diagnostic. How much of that gap is work the two do differently has not been measured.
 - **Job 5, bugs caught in the draft, each with a test in `tests/optimize.test.js`:** shared primitive objects renumbered twice by `dropUnreadAccessors`, an accessor key without bounds, an all-degenerate primitive writing empty accessors, a mesh merge that ignored pointer extensions, `EXT_lights_image_based` image indices, `verticesBefore` counting a shared POSITION twice, a camera copied to level nodes, pointer channels not cloned, quantized normals scale, and flat levels now take normals and tangents from rows.
@@ -1209,13 +1208,13 @@ Seven jobs, each in its own optional entry of `@margoengine/exporters`, so a mod
 - **Job 6, bugs the real files found in the draft, none of which its own tests saw:** `primvars:skel:jointIndices` wrote its metadata with a comma, which `usdcat` refused on every skinned file while the stand-in reader passed (regression in `tests/usdz-anim.test.js`). A KayKit clip that scales a character up from nothing was refused as a shear, because a zero matrix has no rotation to read; joints now multiply their parts and need no inverse (two regressions there). The draft's own `faceNormals` duplicated the collector's fallback and went; a `Math.min` a mutation showed did nothing went too. robot-expressive's weights sum to as much as 1.76, against the spec; the collector scales them, so the proof's maths was corrected to do the same, and it first read as a 33% error. 32 mutations caught, after two more tests.
 - **Job 7, proved:** 25 real Khronos GLBs and AnimatedColorsCube, written by `export3MF`, opened in two outside readers. Microsoft's `Windows.Graphics.Printing3D`, driven from PowerShell, read the unit, vertices, triangles, meshes, items, base colours, colour group colours and title of all 26 with no gap against what was written, and refused a garbage file, so it can say no. PrusaSlicer 2.9.7's merged STL holds exactly the triangles the build items place on all 26, 268,268 on NodePerformanceTest's 10,000 items, and its X and Y extents match glTF maths within 7.9e-8 of the model's size. Z only compares on one object, as the slicer drops each object to the bed; on one-object files all three axes hold. 19 mutations caught. The reader inside `tests/threemf.test.js` is a stand-in; these two are the proof.
 - **Job 7, unproven:** no part was printed. 12 of 26 sliced to G-code (BoomBox, BoxVertexColors, CommercialRefrigerator, Corset, DirectionalLight, Fox, Lantern, MaterialsVariantsShoe, NormalTangentMirrorTest, OrientationTest, RiggedFigure, AnimatedColorsCube). The other 14 did not: 7 crashed the slicer with 0xC0000005, at least 6 of them right after it logged path conflicts between overlapping parts, InterpolationTest's last message being cut from the log; 4 gave no layers or no first layer (AlphaBlendModeTest, MetalRoughSpheres, SheenChair, ToyCar); 3 fell outside its default bed. None of these was fixed or chased further, and no test shows the crash is the slicer's alone, though Margo's files for those samples read clean in both readers. `--info` on NodePerformanceTest passed the 560 s limit and was killed at 3,405 of 10,000 objects; its STL above is complete. Many samples are open meshes in their source, and the slicer says so.
-- **Bugs outside the jobs:** one, not fixed here. `npm run check:readmes` failed on `main` at `9a4655720`, as the gltf-pro `/lights` example landed above a block that leant on the setup before it. Another lane's `e7e4097e7` fixed it first, so this lane's own fix was dropped at the rebase.
+- **Bugs outside the jobs:** one, not fixed here. `npm run check:readmes` failed on `main` at `9a4655720`, as the gltf/pbr `/lights` example landed above a block that leant on the setup before it. Another lane's `e7e4097e7` fixed it first, so this lane's own fix was dropped at the rebase.
 - **Docs:** every job's package README section, `docs/limits.md` row and `claims.md` row are in that job's own commit. `reproduce.md` rows came with jobs 3 to 7. `docs/threejs-parity.md` changed with jobs 1, 2, 3, 4, 6 and 7, and `docs/three-parity-matrix.md` with jobs 1 and 2. The playbook is not changed, as no job touched the kernel, GPU maths, backends, tiers or gates. `perf-history.md` has no row, as no job makes a speed claim; every time above is diagnostic.
 - **Slips:** `6b0b12600`, the Batch 41 docs fix, reached `main` with its second verify killed: `push.sh` was edited while running and bash skipped the failed step. What had passed: lint, hygiene and verify on the pre-rebase `f8382cfd2`, lint and hygiene on the rebased tree, and `tests/claims-file.test.js` by hand after the push, 4 of 4. It was docs only. The script now sits in one `{ }` block with `set -eo pipefail`, and the tree that passed must equal HEAD right before `git push`; failing, SIGKILLed, SIGTERMed and timed-out steps, a nested node kill, an `npm run` self kill and an outside `taskkill` under npm were all tried, and none reached the push line.
 - **Slips, rules broken:** the second helper ran `npx --version` once in the worktree; it printed a version and changed nothing. The fourth appended a stray `npx --version >/dev/null 2>&1 & true` to a test command; `git status` was unchanged after and no npx process was left. The fifth chained `node .lane/claims-fix.mjs` after a rebase with `;`, during job 6, against the brief; the rebase had stopped on a `claims.md` conflict the script is written for, and the diff against `main` then showed the one row and the range line.
 - **Slips caught before any commit:** the first `.lane/settle-limits.py` had a DOTALL regex that cut `docs/limits.md` to 17 lines during a rebase; a row count showed it, the file was rebuilt from git stages 2 and 3, and the diff against `main` was the one row and the range line. A mutation run in job 6 reported none surviving only because a test title with an apostrophe stopped the file parsing, so every mutation looked caught; the tests were fixed and the run done again. A job 5 limits row said `gltfpack -si` does not keep vertices a subset, which nobody measured; it now says that gap has not been measured.
 - **Not a slip, stated anyway:** `push.sh`'s move check pattern changed to `quality-|quality/[^b]` while it was not running, so the generated `scripts/quality/baselines/sizes.json` alone no longer forces a full rerun.
-- **Gate:** every job passed `lint`, `hygiene`, `verify`, the exporters tests and the exporters browser test. Job 1 passed on `b750b4549`, then went out after a move to `cf66cd230` that touched nothing it uses, with the exporters build, package tests and claims and sizes tests. Job 2's first run failed at `npm run quality` and nothing was pushed; after the fix it passed in full on `7f4a981b2`. Job 3 passed on `8eaaf29dd`, job 4 on `d458eb940`, `694f07857` and `18e04b891`, and each then went out through that short list after a move touching only other packages. Job 5 passed on `5952a1649` and again in full on `6a169101f`, as that move touched `packages/lod` and `scripts/supply-chain.mjs`. Job 6's first run stopped at the rebase on generated files, then passed in full on `053eebfd0`; it went out after a move to `75a9990ef` with the exporters build, package tests 433 of 433 and claims and sizes tests 10 of 10. Job 7's first run failed at `verify` and nothing was pushed: this section named a path in the private folder, which `tests/no-private-paths.test.js` refuses, so the pointer went. Its second run failed at `check:readmes` on the gltf-pro bug above, and again nothing was pushed. Its third run passed in full on `e7e4097e7`; a later move changed `package-lock.json`, so the script ran the full gate again, which passed on `34031883f`.
+- **Gate:** every job passed `lint`, `hygiene`, `verify`, the exporters tests and the exporters browser test. Job 1 passed on `b750b4549`, then went out after a move to `cf66cd230` that touched nothing it uses, with the exporters build, package tests and claims and sizes tests. Job 2's first run failed at `npm run quality` and nothing was pushed; after the fix it passed in full on `7f4a981b2`. Job 3 passed on `8eaaf29dd`, job 4 on `d458eb940`, `694f07857` and `18e04b891`, and each then went out through that short list after a move touching only other packages. Job 5 passed on `5952a1649` and again in full on `6a169101f`, as that move touched `packages/lod` and `scripts/supply-chain.mjs`. Job 6's first run stopped at the rebase on generated files, then passed in full on `053eebfd0`; it went out after a move to `75a9990ef` with the exporters build, package tests 433 of 433 and claims and sizes tests 10 of 10. Job 7's first run failed at `verify` and nothing was pushed: this section named a path in the private folder, which `tests/no-private-paths.test.js` refuses, so the pointer went. Its second run failed at `check:readmes` on the gltf/pbr bug above, and again nothing was pushed. Its third run passed in full on `e7e4097e7`; a later move changed `package-lock.json`, so the script ran the full gate again, which passed on `34031883f`.
 
 ## Batch 81: animation
 
@@ -1227,14 +1226,14 @@ Crowds of animated characters got cheaper and more varied, and baked simulations
 | 2 | GPU morph evaluation | DONE | `4bdfaed07` | `@margoengine/animation/morph-gpu` | LIM-189 |
 | 3 | Animation LOD | DONE | `9b6ea1d16` | `/lod` | LIM-191 |
 | 4 | Subclip and make-additive | DONE | `b04f2eea4` | `/clip-utils` | LIM-194 |
-| 5 | Cheaper clone ticks | DONE | `1a61c13b0` | none, `cloneModel` and gltf-pro `adoptStaticBatches` | LIM-199 |
+| 5 | Cheaper clone ticks | DONE | `1a61c13b0` | none, `cloneModel` and gltf/pbr `adoptStaticBatches` | LIM-199 |
 | 6 | Dual quaternion skinning | DONE | `8a7fce1de` | `/dqs` | LIM-201 |
 | 7 | Bone-texture GPU instancing | DONE | `651cb62ae` | `/instanced-skin` | LIM-203 |
 | 8 | Geometry cache playback | DONE | `b09c5e2d5` | `/geometry-cache` | LIM-207 |
 
 - **Bugs:** a shared page held dead assets and arrays (`packages/animation/tests/batch.test.js`). A morph loop wrapped wrongly
   at an exact lap, off by 0.63 (`scripts/animation-morph-gpu-tests.js`, `tests/morph-gpu.test.js`). `PBRModel.compile()` read a
-  root matrix not yet written as singular and compiled nothing (`packages/gltf-pro/tests/model-runs.test.js`). Caught before
+  root matrix not yet written as singular and compiled nothing (`packages/gltf/test/model-runs.test.js`). Caught before
   landing: unbounded thread counts, a cubic curve cut in its tangent (`tests/clip-utils.test.js`), a bad LOD README example,
   and in the geometry cache a reader that slept for good after a seek back, because the chunk on show counted against `ahead`,
   and a loop that waited for the network each lap (`tests/geometry-cache.test.js`).
@@ -1259,7 +1258,7 @@ Crowds of animated characters got cheaper and more varied, and baked simulations
 - **Slips:** the helper twice picked process ids by script name instead of by a recorded id; both were its own and no other
   lane was hit. It leaked 467 `tail` processes from a wait loop and killed them after checking their folder. It ran
   `npx` twice in a worktree against the rule, `--no-install` and `--version`, which fetched nothing. Job 5's commit carries an 845 line diff in
-  `packages/gltf-pro/README.md` from normalized line endings.
+  `packages/gltf/README.md` from normalized line endings.
 
 ## Batch 82: animator
 
@@ -1322,7 +1321,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Gap | Job | Status | Commit | Claim |
 | --- | --- | --- | --- | --- |
 | C20 | Claims read PROVEN on stand-in proof: seven now read PROVEN (STAND-IN) and say what stood in; LIM-193 and LIM-197 name the real run in LIM-208 | DONE | `e4d931a4c` | LIM-091, 109, 120, 129, 134, 149, 151, 193, 197 |
-| B8 | loadAuto moves on a limit only the light loader has, and gltf-pro keeps a file's instances | DONE | `28bf8fb66` | LIM-174 |
+| B8 | loadAuto moves on a limit only the light loader has, and gltf/pbr keeps a file's instances | DONE | `28bf8fb66` | LIM-174 |
 | B9 | MeshBridge.sync writes through TransformWriter, one write per group for each run of changed rows | DONE | `e1daa8a3e` | - |
 | B17 | engine.onFrame callbacks run on a headless stage's step | DONE | `8fdc212d4` | - |
 | A9 | resolveFromURL reads LDraw parts from a hosted library, and the README says where to get it | DONE | `69ad9dc6d` | - |
@@ -1400,7 +1399,7 @@ An audit of the finished batches against their job text listed 70 gaps for the H
 | Batch 81 geometry cache | PC2 and MDD readers, a real cache played | DONE | `d47fd042a` | LIM-355 |
 | B82 | LIM-211 and LIM-213 on real CMU takes | DONE | `95f3e4a63` | LIM-211, LIM-213 |
 | test-readers-fbx | The sixth test reader: exportFBX read from its bytes, and by Blender | DONE | this commit | - |
-| fbx-model | fbx imports gltf-pro/model, no decoder files in a page | DONE | this commit | - |
+| fbx-model | fbx imports gltf/pbr-model, no decoder files in a page | DONE | this commit | - |
 
 ## LAZ: one LAS reader, and every point format on a real file
 
@@ -1472,7 +1471,7 @@ Five jobs took `@margoengine/tween` from single tweens to the things a motion de
 
 - **What was reused:** job 2 runs on the spline's arc-length table and `SplineFrames`; job 1 on `createRandom` from math; job 3 on `Timeline.seek`; job 4's bezier on the solver of `cubicBezier`, moved to its own file so both use one; job 5 on the `Spring` that was there. Nothing in html or ui drives a timeline from scroll, so job 3 is new.
 - **Bug fixed, job 0:** README examples were type-checked only by `modern:test:packages`, which only check:merge runs, and no landing runs check:merge. `check:readmes` in `verify` now does it for every package, each example as its own module. Regression: `tests/readme-types.test.js`, which fails on a `Float64Array` where a `Float32Array` belongs. Planting that same mistake in the kinematics README failed the check. It found 715 errors: 388 fixed, 328 left and listed in `docs/known-bugs.md`, many of them wrong published types. The list only shrinks.
-- **The new check earned its place at once:** it stopped job 1's landing on an example in the gltf-pro README, left without its imports when another lane added a block above it (e7e4097e7), and it stopped job 2 on this batch's own README example, which passed the wrong arguments to `createMesh`.
+- **The new check earned its place at once:** it stopped job 1's landing on an example in the gltf/pbr README, left without its imports when another lane added a block above it (e7e4097e7), and it stopped job 2 on this batch's own README example, which passed the wrong arguments to `createMesh`.
 - **Landings stopped, nothing failed reached main:** job 0 at verify, because `site/llms-full.txt` is built from the READMEs it changed. Job 1 at verify, on the size baseline a new entry needs. Job 3 at verify, on a fixed wait in its browser test, replaced with a wait for ten still frames. Job 0, job 3 and job 4 had main move under a passed verify; each was rebased, its records and claim number regenerated, and pushed after the build, `check:readmes`, `api:check`, the package tests and the claims, llms, API and lock tests passed.
 - **Found by testing the tests:** job 2's first measure of even speed compared chords, which are honestly shorter across a tight bend, so it compares positions now, against an independent walk of the curve 100 times finer than the table. In job 4, removing the monotone limiter fails the test that says rising data stays rising.
 - **Proved:** jobs 1, 4 and 5 against closed forms: stagger offsets within 1e-12, a one-segment bezier against `cubicBezier` within 1e-9, a JSON round trip bit for bit, spring overshoot within 1e-5 of `exp(-pi * r / sqrt(1 - r * r))`, and bounce 0 at a damping ratio of exactly 1. Job 2 on a curve more than 10 times uneven in its raw parameter, within 2% of a step, with the forward axis on the tangent within 1e-12 for all six axes. Job 3 on a real page in a real browser (`packages/tween/test/scroll-browser.mjs`): script and mouse wheel, `cover` and `contain`, a scrolling element, scrub on real frames, a page that grows, and an abort.
@@ -1699,7 +1698,7 @@ Two jobs Scott approved on 2026-11-07. A core bug fix for `engine.stats`, and th
 - **Size:** core 21,468 to 21,487 B gzip, 17 B under its cap; core plus stage 22,859 to 22,878 B.
 - **Existing tests changed:** one assertion in `tests/core-parity-hooks.test.js` pinned the primary view's counts after another camera; it now pins the frame last drawn, and the README sentence changed with it. Frustum, visibility and batches stay restored and pinned.
 - **Bugs found on the way:** `scripts/core-parity-hooks-gpu-check.js` ran in no check and had failed since 2026-10-17 on a stale reference shader: fixed, and it runs in `modern:test:extensions`. Four voxel-net examples listened on 8787 side by side, so the losers failed: examples on one port now take turns, regression test in `tests/run-readme-examples.test.js`. 20 more GPU check scripts run in no check: `docs/known-bugs.md`.
-- **Job 2:** whole in the full check, narrowed to the affected packages otherwise, every example when a file it runs changes, in no gate before the push. One shared GPU slot, ended by the GPU lock at 60 minutes.
+- **Job 2:** whole in the full check, narrowed to the affected packages otherwise, every example when a file it runs changes, in no gate before the push. A hard limit ends it at 60 minutes.
 - **Proved:** two runs through check:merge's runner failed on real findings, the next passed, and so did the run on the rebased tree: 641 of 767. A known entry that passes and a new failure each failed the step on the way.
 - **Not done:** a known entry that fails with a new error is not caught. 118 of 126 reasons matched exactly, and the rest hold build paths, cut text or a module name that changes per run, so an exact compare would fail on nothing.
 - **Gate:** lint, hygiene, verify, the tests of what changed, core's GPU check and `check:views` for job 1, the push from one script that stops at the first failing step.
@@ -1728,8 +1727,8 @@ Five jobs that take every package off Rapier's own objects while Rapier still ru
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `Physics.load()` and the React loader | DONE | `fddce13e6` | `physics`, `physics2d`, `stage/physics`, `react/physics`, `gltf-pro/physics` | - |
-| 2 | `PhysicsCollider`, `voxels` and `halfSpace` shapes, `voxel/physics` on them | DONE | `4b0f67a7b` | `physics`, `voxel/physics`, `gltf-pro/physics` | limits row Physics colliders |
+| 1 | `Physics.load()` and the React loader | DONE | `fddce13e6` | `physics`, `physics2d`, `stage/physics`, `react/physics`, `gltf/physics` | - |
+| 2 | `PhysicsCollider`, `voxels` and `halfSpace` shapes, `voxel/physics` on them | DONE | `4b0f67a7b` | `physics`, `voxel/physics`, `gltf/physics` | limits row Physics colliders |
 | 3 | Bodies on nested meshes and `follow` | DONE | `02dcab857` | `physics` | limits row Bodies below the root |
 | 4 | Colliders from a sprite's alpha | DONE | `3ecd92bc4` | `physics2d/outline` | limits row Colliders from alpha |
 | 5 | Joint `frameA` and `frameB`, ragdoll off `raw` | DONE | `4779c15fc` | `physics`, `ragdoll` | limits row Joint frames and solver figures |
@@ -1739,12 +1738,12 @@ Five jobs that take every package off Rapier's own objects while Rapier still ru
 - **Scope of that proof:** it reads `packages/`. `tools/create-margo` and `examples/package-benchmarks` still name Rapier, as the install line of the templates and in the benchmarks that measure it; no file there reaches `raw`, `physics.world` or `physics.rapier`. Those lines change with the switch. Inside the physics packages only `src` is meant to hold the solver, but their tests and READMEs name it too.
 - **Bugs fixed:** a body added before its parent lagged a frame: `packages/physics/tests/nested.test.js`. A frame that was no quaternion would have gone to the solver unchecked: `packages/physics/tests/frames.test.js`.
 - **Existing tests changed:** ragdoll's tests read the same figures through the public calls, and the assert of four corners under each foot is unchanged. Their `skip` path went with the import that needed it, so they now fail where the solver is missing: 88 pass, 0 skipped. Tests of voxel, glTF, stage and React moved the same way in jobs 1 to 3. No tolerance or time budget rose.
-- **Proved on real files:** the seven glTF_Physics samples through `packages/gltf-pro/tests/physics.test.js` on the final code, 30 pass, 0 fail, 0 skipped, with the samples set; a real Noto Emoji doughnut whose hole holds a ball; ragdoll on its real rigs.
-- **Stand-in or missing:** the seven samples state no licence at commit 9dc61cb3, so they stay out of the repository and their 10 tests skip without them; the recipe is in `packages/gltf-pro/tests/fixtures/physics/NOTICE.md`. The 11th gltf-pro skip is not physics: the tower capture of the splat tests.
+- **Proved on real files:** the seven glTF_Physics samples through `packages/gltf/test/physics.test.js` on the final code, 30 pass, 0 fail, 0 skipped, with the samples set; a real Noto Emoji doughnut whose hole holds a ball; ragdoll on its real rigs.
+- **Stand-in or missing:** the seven samples state no licence at commit 9dc61cb3, so they stay out of the repository and their 10 tests skip without them; the recipe is in `packages/gltf/test/fixtures/physics/NOTICE.md`. The 11th gltf/pbr skip is not physics: the tower capture of the splat tests.
 - **Sources not read:** Douglas-Peucker 1973 (the method comes from Hershberger and Snoeyink TR-92-07), Hertel-Mehlhorn, Maple 2003 past its abstract, and Whyatt and Wade: `docs/clean-room.md` says which and why.
 - **Size:** `@margoengine/physics` grew to 19,104 B gzip for job 5, and its budget with it: an optional entry; core and stage do not change.
 - **Unmeasured:** no speed was taken; none of this changes what the solver does each step.
-- **Gate:** lint, hygiene, verify, the tests of physics, ragdoll, gltf-pro, voxel, react and stage, the GPU tests of physics, gltf-pro extensions and react, the push from one script that stops at the first failing step. The first gate of job 5 stopped at verify on the installed Rapier types, where a solver contact point can be null; nothing was pushed.
+- **Gate:** lint, hygiene, verify, the tests of physics, ragdoll, gltf/pbr, voxel, react and stage, the GPU tests of physics, gltf/pbr extensions and react, the push from one script that stops at the first failing step. The first gate of job 5 stopped at verify on the installed Rapier types, where a solver contact point can be null; nothing was pushed.
 
 ## Batch 123: physics P1, kernel skeleton
 
@@ -1965,7 +1964,7 @@ cache set as `globalThis.fetch` from calling itself, and this commit adds the re
   the `globalThis.fetch` of construction (`packages/cache/test/global-fetch.test.js`). The LoadingManager README example
   fetched from example.com, which serves nothing and sends no CORS header; it now loads same-origin files and runs in
   check:readme-run, off the known list.
-- **Proved:** gltf-pro's `GLTFStream` loads a 1 MB+ GLB through `RangeCache` in ranges, then offline from the stored
+- **Proved:** gltf/pbr's `GLTFStream` loads a 1 MB+ GLB through `RangeCache` in ranges, then offline from the stored
   blocks with one failed revalidation and no other request. In Chromium 156 and Edge 157 it reads the real SheenChair.glb
   (4,125,648 B) in 10 ranges, again offline after a reload with no request reaching the server, and revalidates with one
   conditional one-byte request in a new session. With 2,000 stored files, on the stand-in and on the browser's IndexedDB alike, 30 writes read 120 records with
@@ -1983,7 +1982,7 @@ cache set as `globalThis.fetch` from calling itself, and this commit adds the re
   `node_modules/.bin`. The suggested `/index` entry became `/eviction`, since `margoengine/cache/index` reads as the
   root. Not pushed: landing was not open, so `npm run verify` and the push wait for the manager's landing.
 - **Gate:** lint, hygiene, the cache tests, check:readmes, check:parity, the size gate, and check:readme-run for the
-  cache examples on the Radeon 680M under the GPU lock (10 of 10 run since the manager example's fix), and
+  cache examples on the Radeon 680M (10 of 10 run since the manager example's fix), and
   `npm run test:browser --workspace @margoengine/cache` in Chromium and Edge.
 - **Found outside cache:** the README check drops real files under 200 bytes as LFS pointers, so a glTF whose `.bin` is
   that small gets another model's buffer; recorded in docs/known-bugs.md with repro and cause.
@@ -2102,7 +2101,7 @@ quality gate refuse a baseline whose total is not the sum of its items; this com
   passed every check but did not push, as main moved during it; after two more rebases (the claim renumbered to
   LIM-357, then LIM-358) and regenerated records it landed by the short rule, the second rebase inside the landing lock.
 - **Gate:** lint, hygiene, verify, the sky and weather tests, check:readme-run for sky and weather and both packages'
-  GPU tests on the Radeon 680M under the GPU lock, for every job's full landing. Pushes after a rebase onto commits
+  GPU tests on the Radeon 680M, for every job's full landing. Pushes after a rebase onto commits
   that touch nothing the sky uses reran the sky and weather tests, the records' tests, the sizes gate and api:check;
   the quality-gate fix and this record ran hygiene, the tests they touch and the sizes gate (Scott's order that day).
 
@@ -2164,12 +2163,12 @@ byte-identical; regression `packages/tiles/tests/terrain.test.js`).
   connection reset at fetch, before any check; its second stopped at api:check, the rebase having kept main's
   api-surface row for tiles, so the record was regenerated and the landing run again whole. The orthographic draft predated the list-3 format commit and was reapplied on it; the
   first run failed on tests whose stand-in engines have no `camera.matrix`, so a missing matrix now reads as perspective.
-- **Gate:** jobs 1 and 2 by the full landing (lint, hygiene, verify, the tiles tests, the tiles browser checks under the
-  GPU lock). Jobs 3 to 6 by Scott's quick landing that day (rebase, records, build, api:check, supply-chain check, the
+- **Gate:** jobs 1 and 2 by the full landing (lint, hygiene, verify, the tiles tests, the tiles browser checks).
+  Jobs 3 to 6 by Scott's quick landing that day (rebase, records, build, api:check, supply-chain check, the
   tiles tests, the claims, llms, lock and api-conventions tests, the 16 browser checks), with lint, hygiene, readmes,
   parity, the API quality gate and the tiles README run (8 of 8) before it. Jobs 7 and 8 by the landing checks in AGENTS.md: rebase,
   build, api:check, `npm run quality`, lint, hygiene, the tiles tests, the claims, llms and lock tests and the tiles
-  browser checks under the GPU lock; the README run for tiles before each. One `npm run verify` on the newest main after
+  browser checks; the README run for tiles before each. One `npm run verify` on the newest main after
   the last push.
 
 ## Lane I batch 58: sky, part 2
@@ -2206,12 +2205,12 @@ Follow-up in the same batch: `45d38a12` measures entry-sizes.json and basic-scen
   first two landings stopped on rebase conflicts in the shared records; the claim was renumbered from the file inside
   the landing lock (LIM-369 to LIM-375).
 - **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the sky, react, scenery,
-  gameplay-sandbox and voxel-sandbox tests, the sky GPU tests under the GPU lock, the claims, llms, lock-sync and
+  gameplay-sandbox and voxel-sandbox tests, the sky GPU tests, the claims, llms, lock-sync and
   sizes-page tests. One `npm run verify` on the newest main after the last push.
 
 ## Lane N batch 113: net
 
-Three jobs for `@margoengine/net`, on this PC with the full check per job; each is a new optional entry, and core and
+Three jobs for `@margoengine/netcode/interpolation`, on this PC with the full check per job; each is a new optional entry, and core and
 stage are untouched. The batch's aim is that snapshot playback has one home: a measured delay, any field, one ring.
 Nothing is timed.
 
@@ -2221,7 +2220,7 @@ Nothing is timed.
 | 2 | Any field interpolation | DONE | `55454160` | `/fields` | LIM-377 |
 | 3 | One home with netcode | DONE | this commit | `/timeline` | the next claim after LIM-377 on the day |
 
-- **Job 3 in full:** `TimeRing` and `Timeline` hold the order, the ring and the search. `SnapshotBuffer` keeps its 11-float rows with the ring reading the time inside them; `FieldBuffer`, `GameClient`'s snapshot history (a map and a list before) and `LagCompensation`'s frames (an array with a linear search before) all sit on it, and netcode's angle blend is the shared one. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`, typed by a small interface so netcode does not load it. `@margoengine/net` loses its core peer, which it never imported, so a netcode server does not pull core in.
+- **Job 3 in full:** `TimeRing` and `Timeline` hold the order, the ring and the search. `SnapshotBuffer` keeps its 11-float rows with the ring reading the time inside them; `FieldBuffer`, `GameClient`'s snapshot history (a map and a list before) and `LagCompensation`'s frames (an array with a linear search before) all sit on it, and netcode's angle blend is the shared one. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`, typed by a small interface so netcode does not load it. `@margoengine/netcode/interpolation` loses its core peer, which it never imported, so a netcode server does not pull core in.
 - **Bugs fixed:** `LagCompensation.at` at an exact recorded tick blended toward the next tick at weight 0, so a shape only the next tick held came through and a shot could hit it before it existed (`packages/netcode/tests/lag.test.js`). `tests/sizes-page.test.js` failed on main after `01c3aec9` moved entry-sizes.json alone; both records were measured afresh (`b1180f8b`), and `45d38a12` from another lane landed the same repair minutes earlier, so the commit carries only the fields row and the commit lines.
 - **Proved:** the tests of each entry. Delay: a clean link gives exactly one send interval at any clock offset, the 99th percentile of uniform jitter, lost snapshots, the spike shape of Moon et al., a lasting route change, clock drift within its bound, a view that never goes back. On a link that turns bad and calms it goes hungry on under 2% of frames, over three times less than a fixed delay of the same mean. Fields: colour in linear light against IEC 61966-2-1's value, loop seams both ways, no blend across a clip, and the pose bit for bit against `SnapshotBuffer` over 320 samples. Timeline: every existing `net` and `netcode` test passes unchanged on the shared ring; on the loopback, the client's view on a clean link sits closer than the fixed default, never goes hungry, and under 60 ms of jitter goes hungry on under 3% of frames.
 - **Stand-in:** every link above is simulated and seeded (the test's own and `LoopbackNetwork`). No captured network trace was used.
@@ -2275,7 +2274,7 @@ Follow-up in the same batch: `34dd3b7a` makes the drive check wait for its pipel
   were rebuilt on main inside the landing lock, renumbering their claims from the file. Job 6's first landing was
   stopped for that fix; its script was killed and the landing lock it held was removed by this lane.
 - **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the weather tests, the
-  umbrella test, the weather GPU checks under the GPU lock, the claims, llms, lock-sync, sizes-page and fixed-waits
+  umbrella test, the weather GPU checks, the claims, llms, lock-sync, sizes-page and fixed-waits
   tests; `npm run verify` for job 6 (the lock file) and once on the newest main after the last push.
 
 ## Lane N batch 114: netcode
@@ -2356,8 +2355,8 @@ each piece paid for only when imported. Nothing is timed.
   array of actions in the README did not type-check; nothing was pushed, and that check now runs before the commit. Job
   6's first ship stopped in verify on a fixed wait another lane had added under `packages/weather`; that lane fixed it
   in `34dd3b7a`, and the rerun passed on top of the fix. Job 7's first ship stopped in verify on the eviction bug above, and its second at a rebase, since main had that fix by then, and its third in the second verify of a ship, on the heap read above. Its fourth stopped on the WGSL corpus test,
-  since `@margoengine/scenery` had gained shaders on main; that lane recorded them in `1368f520`. While looking, the
-  whole corpus recorder was started by mistake and stopped within minutes, with its GPU slot given back and nothing
+  since `@margoengine/sky` had gained shaders on main; that lane recorded them in `1368f520`. While looking, the
+  whole corpus recorder was started by mistake and stopped within minutes, with nothing
   kept. Nothing that
   failed was pushed.
 - **Gate:** lint, hygiene, verify, the behavior tests and the claims test per job, with `check:readmes`, api-conventions,
@@ -2383,14 +2382,14 @@ Four jobs for `@margoengine/save`, on this PC with the full check per job; each 
 - **Sources:** Pillai et al. (OSDI 2014): body in full, references in part. Koopman (DSN 2002) and Terry et al. (SOSP 1995) in full. RFC 9110: sections 8.8.1, 8.8.3, 10.2.3, 13.1 to 13.1.2, 13.2, 15.5.13, not the whole. Fetch Standard section 3.3 and Indexed Database 3.0 section 2.7 and its IDL, through a summarising fetch only. The paper's ALICE tool, Apache's source and every other tool's source were not read. Job 1 and job 2 have no outside source beyond the specs named in `docs/clean-room.md`.
 - **Limits:** rows in `docs/limits.md`. CRC-32 finds accidents and is no signature. Two processes on one key are not coordinated by slots, safe writes or `remoteHandler`. `keys()` needs a JSON list, which a WebDAV server does not give. Nothing here was timed.
 - **Sizes:** new entries `/engine` 8,438 B, `/slots` 5,741 B, `/safe` 2,102 B, `/remote` 3,411 B; `/node` grew from 939 B to 1,405 B for the turn queue and the folder fsync.
-- **Slips:** job 1's first land stopped twice, on two throw messages with no fix and a wrong folder in its GPU script; job 3's first land stopped at check:readmes on an example's type, and job 4's at the fixed-wait rule on the Apache script's unmarked wait. A file was briefly written to `/tmp` in job 1 and removed. `gltf-pro`'s README line for job 1 came in with job 2. Stale claim numbers were redone once in job 1.
+- **Slips:** job 1's first land stopped twice, on two throw messages with no fix and a wrong folder in its GPU script; job 3's first land stopped at check:readmes on an example's type, and job 4's at the fixed-wait rule on the Apache script's unmarked wait. A file was briefly written to `/tmp` in job 1 and removed. `gltf/pbr`'s README line for job 1 came in with job 2. Stale claim numbers were redone once in job 1.
 - **Gate:** lint, hygiene, verify, the save tests, test:gpu, check:readmes and check:readme-run for each job; the short rule after a rebase that touched nothing this uses.
 
 ## Lane I batch 60: scenery
 
-Five jobs for `@margoengine/scenery` on the AMD mini PC (lane I, work list 3): four new optional entries, one job already
+Five jobs for `@margoengine/sky` on the AMD mini PC (lane I, work list 3): four new optional entries, one job already
 built. Core and stage are untouched; the sky entries use `@margoengine/sky/astro` through its public API. GPU work is
-proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x and 1x MSAA. Nothing is timed.
+proved on a Radeon 680M through `packages/sky/test/night-check.mjs`, at 4x and 1x MSAA. Nothing is timed.
 
 | # | Job | Status | Commit | Entry | Claim |
 | --- | --- | --- | --- | --- | --- |
@@ -2411,10 +2410,10 @@ proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x
   within 0.26% of a 4,000-step CPU column, redder higher up (15.3 against 0.21), moving with time, the same at the same
   time. The sky layers draw nothing below the horizon, behind a mesh or by day.
 - **Sizes:** new `/presets` 977 B gzip, `/scenes` 17,291, `/stars` 4,506 (4,589 after job 5), `/aurora`
-  5,610 (the two share `SkyLayer`). `@margoengine/scenery` now depends on `@margoengine/math`, `post` and `tonemap`.
+  5,610 (the two share `SkyLayer`). `@margoengine/sky` now depends on `@margoengine/math`, `post` and `tonemap`.
 - **Bugs fixed with tests:** the Milky Way first blended by straight alpha, as AstroSky's points do: on a half-float
   target a faint band's alpha fell into half precision's subnormals and lost up to 6% of its light; the sky layers now
-  add their light (`packages/scenery/src/backdrop.ts`, held to 1% by the stars GPU check). The aurora's first shader
+  add their light (`packages/sky/src/night-backdrop.ts`, held to 1% by the stars GPU check). The aurora's first shader
   raised a negative number to a power (NaN on the GPU, where JavaScript gives a number) and used the WGSL keyword
   `patch`; the aurora GPU check compares every block against the CPU and caught both.
 - **Corpus:** jobs 1, 2 and 4 added WGSL without recording it in the webgl2-compat corpus, which verify on main caught
@@ -2427,9 +2426,9 @@ proved on a Radeon 680M through `packages/scenery/test/scenery-check.mjs`, at 4x
   the short rule. Job 5's landing first stopped at api:check (main's entry sizes for `@margoengine/save` were stale and
   this lane's records step ran api:update before entry-sizes; reordered), then at the quality gate's copied-code check
   (the plugin set-up repeated across files); the Milky Way and the aurora now share it as `SkyLayer` in
-  `packages/scenery/src/backdrop.ts`.
+  `packages/sky/src/night-backdrop.ts`.
 - **Gate:** per job: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the scenery and stage tests,
-  the umbrella and API convention tests, the scenery GPU checks under the GPU lock, the claims, llms, lock-sync,
+  the umbrella and API convention tests, the scenery GPU checks, the claims, llms, lock-sync,
   sizes-page and fixed-waits tests; `npm run verify` for job 2 (the lock file) and on the newest main with job 5.
 
 ## Lane H batch 48: blender
@@ -2487,7 +2486,7 @@ README runner's known-failure list; they now load the package's real fixtures an
   of `scripts/node22-packages.json`; it moved to the Node list, so its tests also run on Node 22 in CI.
 - **Gate:** per job by the landing checks in AGENTS.md: rebase, build:packages, api:check, `npm run quality`, lint, hygiene, the
   blender tests and the add-on's Python tests, the claims, llms, lock-sync, sizes-page and fixed-waits tests, the
-  blender GPU checks under the GPU lock; `npm run verify` for jobs 6 and 8 (job 8 changes `scripts/`), which is also the
+  blender GPU checks; `npm run verify` for jobs 6 and 8 (job 8 changes `scripts/`), which is also the
   verify on the newest main after the last push.
 
 ## Lane C batch 116: xr
@@ -3248,7 +3247,7 @@ untouched.
   multiple scattering into shadowed froxels and from clustered lights (job 3).
 - **Bugs fixed on the way:** none in the batch's own code beyond its tests; the job 1 README example used a
   placeholder identifier and was rewritten to run. On main: the react bindings and instances browser checks and three
-  GPU lock tests (five slots), folded into the manager's main fix.
+  GPU tests, folded into the manager's main fix.
 - **Limits and unmeasured:** rows in `docs/limits.md`; no job's GPU cost is timed; nothing was run on another machine.
 
 ## Lane I batch 63: biomes
@@ -3529,7 +3528,7 @@ Five optional video entries, built clean room on the workstation (RTX A6000, Edg
 - **Limits:** external texture imports avoid JS frame uploads but promise no browser/driver zero-copy. Material/360/alpha require WebGPU and refuse WebGL2 with coded help links; recording and decoding are renderer independent. Video alpha is colour-pass only, not auxiliary caster/picking coverage. Recording is real time with no exact frame-count/A-V sync guarantee and all compressed bytes in memory. Decoder scope is nonfragmented self-contained unencrypted avc1 MP4, first video track, one description and limited rate-1 edits; file/index and per-request GOP are buffered, audio ignored, caller closes output frames. Keying is sRGB RGB distance with no despill/reconstruction, and packed colour must be straight. Source/playback/CORS ownership is explicit throughout.
 - **Later real-file follow-up (2026-11-09):** the CC0 MDN flower AVC clip passes all 150 edited timestamps and byte-exact decoded frames against FFprobe-demuxed WebCodecs. This exposed and fixed double rounding of fractional edit offsets; bounds now compare exact native ticks before one rounding. The entry measures 3,458 B within its unchanged 3,593 B budget. Headset projection, other browsers/GPUs, cross-decoder accuracy, browser-internal copy behavior, keying quality and speed remain unmeasured. Generated rendering controls remain stand-ins; no speed number is published.
 - **Docs:** every job updates the video README with a runnable example, limits, claims, clean-room record, operational-playbook evidence and API/umbrella/generated LLM docs. No new open engine bug required a known-bugs entry; no speed claim required perf-history/perf-vs/reproduce edits.
-- **Gates:** lint, hygiene, full verify, video's package tests and GPU suite through gpu-lock, and check:readme-run --packages=video before each push. API update committed for every new export; early API conventions, quality API, parity and lock sync checks pass. Rebase follow-up rebuilds/regenerates records and checks package tests, claims and quality. This push marks list-3 row 112 done and closes the batch.
+- **Gates:** lint, hygiene, full verify, video's package tests and GPU suite, and check:readme-run --packages=video before each push. API update committed for every new export; early API conventions, quality API, parity and lock sync checks pass. Rebase follow-up rebuilds/regenerates records and checks package tests, claims and quality. This push marks list-3 row 112 done and closes the batch.
 - **Main README blocker resolved separately:** `fix(splats)` commit e165bfedf documents Picking hit versus engine mesh return types, with `Regression: scripts/check-readme-types.mjs`. Main concurrently corrected the call during rebase; the separate fix preserves it and clarifies its result. All README examples type-check; check:readme-run --packages=splats exits 0 with the corrected picking example running and four pre-existing known sample-input cases unchanged. No new exception or known-list entry.
 
 ## Lane C batch 103: text
@@ -3665,7 +3664,7 @@ Reviewed all six Grok fixes against the original findings. With each fix removed
 
 The finish adds real-GPU restoration cancellation, far-plane boundary and wholly clipped cases, mixed-component and zero normalization, and retained compatibility result details. It corrects the playbook's CPU-route description and reconciles claims/limits with WebGL2 evidence. The full compatibility suite exposed a visibility-kernel declaration/binding loss for stretch and an ExactOIT guard that relied only on an optional limit; both have regression tests proved red with their source fixes removed. ExactOIT remains WebGPU-only: compatibility checks its documented rejection and renders the lit-particle comparison through weighted OIT. No accuracy bar, time bar or size budget changes.
 
-Finish sizes (min+gzip B): VFX root 31,435 (budget 32,070), base 11,191 (11,336), shadows 3,055 (3,061), nodes 3,238 (3,349); ExactOIT 4,663. Core + stage stays 23,626 B, below 25,000. Reproduce with the package tests, `test:gpu` for VFX both normally and with `MARGO_COMPAT=1`, `test:gpu` for OIT, and the runnable README checks for both packages, all GPU work under `node scripts/gpu-lock.mjs run --owner=codex-79 -- ...`. Tests use the RTX A6000 only; timings and other GPUs remain unproved.
+Finish sizes (min+gzip B): VFX root 31,435 (budget 32,070), base 11,191 (11,336), shadows 3,055 (3,061), nodes 3,238 (3,349); ExactOIT 4,663. Core + stage stays 23,626 B, below 25,000. Reproduce with the package tests, `test:gpu` for VFX both normally and with `MARGO_COMPAT=1`, `test:gpu` for OIT, and the runnable README checks for both packages. Tests use the RTX A6000 only; timings and other GPUs remain unproved.
 
 Repository gates additionally caught the handoff's fixed 100 ms cancellation-test sleep, the new error anchor's digits, and stale generated site text. The cancellation check now observes actual mapping-promise settlement and yields one MessageChannel task for unhandled-rejection reporting; removing the production cancellation handler still fails on both backends. The help anchor is `vfx-float`, matching the existing anchor-name rule, and error/help text is generated from its owning sources. The existing fixed-wait, error-page and llms regression tests pass without any baseline or rule change.
 
@@ -3901,14 +3900,14 @@ Six optional audio capabilities, built in order, one commit and push per job. Be
 - **Owning bug fixes:** initial text/extrude readonly classifyLoops API baseline repair a4c0a9179 has its regression. Event review found sparse-array holes skipped by Array.every and AudioVoicePool stopped an existing voice before validating new play inputs. Explicit finite checks and validation-before-stealing fix the cause; audio.test.js/events.test.js fail before and pass after. No core workaround.
 - **Slips:** occlusion fixture initially confused compatibility API/backend labels; it now checks the compatibility device. Doppler's invalid error code and missing pose arguments were corrected. Events received claim 605 after a main rebase collision. Music tests initially inspected a bus pre-tap instead of its fader, and two interface comments were missing; corrected traversal/comments pass unchanged expectations. Music's new size item needed a documented initial budget and its helper needed structured reason arguments. Music rebase kept both sides and moved its claim to 607; a helper's git-show buffer was enlarged for generated llms text. Ambisonic fixture plugin names and host HTTP transport were corrected as recorded above. No assertions, tolerances, test skips or time budgets were loosened; no timing exception or published speed claim.
 - **Docs per job:** 1: README, limits, claims, clean-room, known-bugs, playbook, API/llms and evidence. 2: same. 3: same plus owning pool regression record. 4: same plus mixer peer/lock metadata. 5: same. 6: same plus licensed fixture provenance/supply-chain, this build record and list-3 row 110 done. Perf-history/reproduce/perf comparisons do not change because no speed was measured or claimed.
-- **Checks:** each job runs lint, hygiene, full verify, audio tests, GPU-locked browser suite and audio README execution, with hard time limits. API reports are regenerated on every export change. Unrelated main moves use the prescribed rebuild/API/quality and focused package/claims/llms/GPU/README checks. Existing two /sounds/*.ogg README 404 examples remain on the known list; every new generated-PCM example runs.
+- **Checks:** each job runs lint, hygiene, full verify, audio tests, the GPU browser suite and audio README execution, with hard time limits. API reports are regenerated on every export change. Unrelated main moves use the prescribed rebuild/API/quality and focused package/claims/llms/GPU/README checks. Existing two /sounds/*.ogg README 404 examples remain on the known list; every new generated-PCM example runs.
 - **Final entry sizes (gzip B, bare optional peers external):** root 7638; occlusion 1516; doppler 1090; events 5491; music 1572; zones 1139; ambisonics 1919. Core plus stage 23,626 B, below 25,000 B. Music and zones require the optional mixer peer; root imports none of these feature entries.
 - **Limits:** sampled CPU obstruction, instantaneous subsonic Doppler, finite pooled event voices, fixed-tempo stem gain layering, authored fixed room zones, and first-order virtual-cardioid stereo AmbiX. No diffraction/sonic-boom propagation, time stretching/section sequencing, continuous room acoustics, HOA/FuMa conversion or HRTF. Recordings/listening quality remain unmeasured except the stated external-stimulus file path; physical XR headset, other browsers/devices and speed remain unmeasured.
 
 
 ## Batch 160: outside rendering correctness
 
-Eight-job plan: work list. Job 1 measures gltf-pro's base
+Eight-job plan: work list. Job 1 measures gltf/pbr's base
 metallic-roughness family against Khronos Sample Viewer public-UI PNG output. It preserves all 123
 primitives, adds a shared camera/sun, and keeps every pixel in the score. RTX A6000 RGB MAE
 1.837511698404948 (WebGPU), 1.837506612141927 (WebGL2 compatibility); native WebGL2 explicitly
@@ -3920,7 +3919,7 @@ Jobs 4 through 8 and the final list-1 completion mark remain outstanding.
 The required README run found that pointer-show.glb was missing. Added a Margo-authored public-example
 fixture with animated camera, material and sun, a README download link and a regression test of the
 three values after seeking. Removed only the two now-runnable pointer-example entries from the
-README known-failure list (gltf-pro and animation use the same sample). No API behavior was loosened.
+README known-failure list (gltf/pbr and animation use the same sample). No API behavior was loosened.
 
 Job 2 measures the complete 27-primitive ClearCoatTest against the hosted Sample Viewer, with
 all source factors/textures preserved and matched camera/sun. RGB MAE is 1.6809107462565105
@@ -4082,8 +4081,8 @@ First landing gates: full verify passed 13,214 tests with zero failures/skips (4
 the scoped README commands. Those README commands retain their recorded exceptions (62/94 for the original four
 packages; 11/12 for voxel-net), including the other causes Scott deferred. No exception was loosened. Rebased onto
 main `14af78269`; regenerated the tracked llms pages after that merge. Lane-M's teardown fix is `cff40d127`.
-The capture-only rerun could not acquire any of the three GPU slots within its 480-second tree deadline, so it
-never started the test and supplies no new rendering evidence; the original 18 successful GPU suites remain recorded.
+The capture-only rerun hit its 480-second tree deadline before the test started, so it
+never ran the test and supplies no new rendering evidence; the original 18 successful GPU suites remain recorded.
 
 Batch 77 review: corrected both tile-capacity P2s in scatter, including three related cases found in the ring audit
 (camera conversion, rounded tile upper edge and rounded distance). CPU and generated WGSL share an inclusive
@@ -4149,7 +4148,7 @@ Current min+gzip entries with bare peers external: root 1824 B, overlapping 2451
 
 Limits: bounded restarts can fail, chunk order affects output and retained boundaries can prevent future chunks; no order independence, infinite satisfiability or cross-chunk playability guarantee. Chunk memory grows until clear/dispose. The worker solves local heap rules only, accepts one progress consumer, clones inputs and needs browser Workers/CSP permissions. Work counts are not percentages; Wasm counters wrap after 2^32-1. Synchronous APIs still cannot receive new abort events on their blocked thread. No quiet-machine release speed result, artist-asset compatibility, rival comparison or frame-time guarantee is claimed.
 
-Failures resolved: initial dense validation hit its five-minute hard limit, then passed after the linear membership fix; stale API size summaries were regenerated after entry sizes, rather than before them; the worker's missing emitted artifact was fixed by package-owned copying and installed-byte regression. One launcher fixture needed its new result shape. The previous GPU-slot deadline expired before any test ran; resumed waits use the normal lock wait with a hard limit. The unpushed duplicate SQL cleanup da5bf4383 was rebased out as requested. Batch 160's fix landed as 52ccbbb00 and is used from main; no duplicate cleanup commit was pushed. No WFC defect or timing-test failure remains open. Quiet release speed evidence is still unmeasured.
+Failures resolved: initial dense validation hit its five-minute hard limit, then passed after the linear membership fix; stale API size summaries were regenerated after entry sizes, rather than before them; the worker's missing emitted artifact was fixed by package-owned copying and installed-byte regression. One launcher fixture needed its new result shape. The previous GPU request expired before any test ran; resumed requests have a hard limit. The unpushed duplicate SQL cleanup da5bf4383 was rebased out as requested. Batch 160's fix landed as 52ccbbb00 and is used from main; no duplicate cleanup commit was pushed. No WFC defect or timing-test failure remains open. Quiet release speed evidence is still unmeasured.
 
 Closing evidence: verify passed in 377 s, with 13,255 passed, zero failed and 14 existing suite skips (the same skip count before worker solving). WFC separately passed 37/37 with zero skips. Real WebGPU/WebGL2 checks passed, and all 7 README examples passed. No test, tolerance or budget was weakened.
 
@@ -4209,13 +4208,13 @@ IridescenceMetallicSpheres, all 346 primitives, 512 x 512, fixed shared camera/w
 
 The manager-authorized shared determinism investigation ended within its 45-minute cap without a proven root cause. Job 4 stays local at 97c74a713; job 5, including an exact failing repeat-capture reproducer and detailed notes, is local at bfd887103. Their original budgets remain frozen. Job 6 is independent and closes neither failure; the batch list row remains open while parked work remains unresolved.
 
-Job 6 checks passed: lint, hygiene, the 11 reference/packing contracts, full verify (13,320 tests, zero failures or skips), and both material cases' unchanged GPU-locked budgets on native WebGPU and WebGL2 compatibility. Root harness/docs only; package README execution and API regeneration are not applicable. No speed result was measured.
+Job 6 checks passed: lint, hygiene, the 11 reference/packing contracts, full verify (13,320 tests, zero failures or skips), and both material cases' unchanged GPU budgets on native WebGPU and WebGL2 compatibility. Root harness/docs only; package README execution and API regeneration are not applicable. No speed result was measured.
 
 ### Job 7: constant-environment IBL
 
 The complete job 1 source scene (123 primitives, 528,291 vertices, 1,040,409 triangles) is lit with constant linear [0.3,0.5,0.7] radiance and no sun. Margo EnvironmentLighting defaults are compared with Mitsuba 3.9.1 scalar_rgb public-API output, 128 spp, seed 160, direct max depth 2 and full max depth 8. Full-transport all-pixel RGB-byte MAE is 1.8851051330566406 / 1.8851038614908855 (native/compatibility); direct-only is 2.9175326029459634 / 2.9175211588541665. Exact first budgets, raw and display hashes are frozen in batch-160-environment.json. Native WebGL2 is explicitly refused. Geometry visibility/reflections, split-sum/SH and principled/glTF differences remain open; this constant furnace does not establish nonuniform-sky or directional prefilter accuracy. No renderer/package code or speed claim changed. Batch 168 sky evidence is reused.
 
-Job 7 checks passed: lint, hygiene, all four new reference contracts, full verify and the frozen GPU-locked direct/full budgets on both backends. Root harness/docs only; package README execution and API regeneration are not applicable.
+Job 7 checks passed: lint, hygiene, all four new reference contracts, full verify and the frozen GPU direct/full budgets on both backends. Root harness/docs only; package README execution and API regeneration are not applicable.
 
 ### Job 8: clustered and shadowed Cornell lights
 
@@ -4321,7 +4320,7 @@ output. All 1,280 selected fixture triangles and every output byte are retained.
 Across two fresh browser processes and 400 frames, NVIDIA 617.42 produces 3 native
 WebGPU hashes and 7 raw-WebGL2 hashes. Independent standalone Dawn 0.6.2 gives 2
 D3D12 and 5 D3D11 hashes in 200 frames each. AMD and one-sample controls give one
-hash. Exclusive GPU access retains variation in a separate NVIDIA control.
+hash. Variation remains in a separate NVIDIA control with the GPU to itself.
 No material/texture/IBL/volume/tone-map/derivative/atomic/time input is involved.
 
 The inference is a NVIDIA multisample-blend platform problem. The internal
@@ -4347,6 +4346,12 @@ The fresh complete-scene repeats still fail exactly: 2 IOR and 4 volume hashes
 in 24 frames each, with unchanged original error ranges. Their reports are
 recorded under currentMainRepeats in the evidence JSON. No package README or
 public export changed, so package README execution/API regeneration do not apply.
+
+Recheck 2026-11-18 (still OPEN): standalone Dawn D3D12 now gives 3 hashes in 200 frames on the same
+NVIDIA driver (32.0.16.1742), always frame 0, frame 1 and then one steady picture for frames 2 to 199;
+D3D11 gave 5. A new multisampled texture or new pipelines every frame keep the same early pictures, and
+the AMD control gives 1 hash. docs/known-bugs.md ("Batch 160 jobs 4 and 5") has the details. No
+determinism is claimed for this platform; the repeat assertions stay failing evidence.
 
 ## Batch 65: roads
 
@@ -4570,9 +4575,9 @@ the local duplicate repairs were dropped during rebase. The unchanged root
 regressions pass on the final tree. No baseline, assertion, tolerance, workload
 or deadline was weakened.
 
-One GPU admission wait expired after ten minutes with all slots held by other
-lanes; the native orientation test had not started. The passing checks were kept,
-and that unstarted test ran after capacity became available under its original
+One GPU request expired after ten minutes while other lanes used the GPU; the native
+orientation test had not started. The passing checks were kept,
+and that unstarted test ran afterward under its original
 limits. Its final result passed.
 
 This closing documentation commit marks row 68 done. Entry sizes and limits above
@@ -4644,25 +4649,25 @@ one failure, zero skips. Full API check and the actual short-path regression pas
 with one snapshot-list request; every README ownership regression passes. The only
 failure is the biome chain contract: test:gpu:prefetch named a script outside
 tests/ and lacked the required runSuite/watchExit entry. The proof now lives in
-tests/prefetch-check.mjs, retains its exclusive hold and 300 s child bound, and
+tests/prefetch-check.mjs, retains its 300 s child bound, and
 uses runSuite/watchExit. The documented scripts/prefetch-proof.mjs command forwards
-to that entry. Existing chain/plan/exclusive-lock regressions pass after repair.
+to that entry. Existing chain/plan regressions pass after repair.
 No gate was relaxed and the complete proof workload is unchanged. Batch 160's
 browser teardown repair is still absent from main, so the real prefetch rerun and
-dependent push still wait for it. The first real README request never acquired
-the GPU within its 10-minute queue limit; zero examples ran. A new request extends
-only its queue allowance to 20 minutes, retaining the same page and execution
+dependent push still wait for it. The first real README request ended at its
+10-minute limit before the GPU was free; zero examples ran. A new request extends
+only that limit to 20 minutes, retaining the same page and execution
 budgets. All 311 shadows/quality/post package CPU tests, lint and hygiene pass.
 
 
 The prefetch-plan follow-up also exposed an eval-import guard defect in the GPU
 planner: pathToFileURL(undefined) threw before exported plan() was usable. Its CLI
 guard now checks for argv[1], just as the llms guard does. The actual eval-process
-regression fails before repair and passes afterwards; all 12 chain/plan/lock/import
+regression fails before repair and passes afterwards; all 12 chain/plan/import
 tests pass. No scheduling or GPU logic changes. The full biomes CPU suite passes
-476 tests, zero failures/skips. The initial package-GPU request also expired in
-the queue without starting any test; it is rescheduled with a 20-minute queue
-allowance and separate shared/exclusive groups, preserving each registered test's
+476 tests, zero failures/skips. The initial package-GPU request also expired
+without starting any test; it is rescheduled with a 20-minute
+allowance, preserving each registered test's
 budget. The stale ownership-gpu-package-results.json from the unsuccessful request
 is not evidence for this group; use the rescheduled logs/results only.
 
@@ -4679,19 +4684,19 @@ a package defect. All 476 biome and 311 effect-package CPU tests pass. The final
 verify disables only shadow-cache bookkeeping (MARGO_RESULT_CACHE=off); every
 normal build/check/test runs and no result is served or test omitted.
 
-Real README and registered package-GPU validation remain queued, each supervised
-with hard limits and unchanged per-test/page budgets. The initial two queue
-expirations ran zero tests. These CPU results alone do not satisfy landing requirements:
+Real README and registered package-GPU validation remain to be run, each supervised
+with hard limits and unchanged per-test/page budgets. The initial two
+expired requests ran zero tests. These CPU results alone do not satisfy landing requirements:
 batch 160's browser repair must arrive on main, then catalog/prefetch must be
 confirmed, and the over-2x 7.4 ms diagnostic frame still needs attribution. No
 quiet-machine speed number, busy exemption or new accepted limit is claimed.
 
 
 GPU follow-up: the registered shadows/test:gpu:cutout-casters test passes in
-22.5 s under its exclusive hold (302.4 s supervisor including queue), with no
+22.5 s (302.4 s supervisor including the wait before it started), with no
 driver-reset rerun. Its rescheduled result file is current and contains exactly
-that selected test. The remaining 15 shared package scripts and the two README
-requests are still supervised and queued; none is claimed passed.
+that selected test. The remaining 15 package scripts and the two README
+requests are still supervised and not yet run; none is claimed passed.
 
 
 ### Missing-items landing confirmation (2026-11-09)
@@ -4738,7 +4743,7 @@ corpus (558 pipelines, 1,238 entries, 733 draws), the full GPU suite (327.1 s),
 and all 12 runtime README examples. Removing fractional weights fails the
 unchanged native/compatibility comparison (0.875 versus 1), with its mutation
 marker retained. Core plus stage remains 23,924 B; compatibility entry remains
-within its unchanged 102,814 B ceiling. No benchmark or exclusive hold ran.
+within its unchanged 102,814 B ceiling. No benchmark ran.
 
 
 ### Batch 160 job 4 restoration after main teardown repair
@@ -4762,10 +4767,10 @@ Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
 results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
 to docs/whitepaper). The full volume ceiling remains 13,792,000.
 The analytic GPU test passes twenty exact slab pixels on each backend; all 47
-gltf-pro/materials runtime README examples pass with zero exceptions.
+gltf/materials runtime README examples pass with zero exceptions.
 The complete changed-package CPU run passes 783 tests with zero failures/skips.
 Earlier completed package browser/GPU steps are retained, not blindly rerun:
-gltf-pro shader/extensions/materials/viewer/native-volume, all materials steps
+gltf/pbr shader/extensions/materials/viewer/native-volume, all materials steps
 with dispersion/cutout-casters completed by job4-material-remaining12.
 The unrelated voxel denoise-materials AMD watchdog remains an open investigation;
 these proofs do not classify it as a driver fault or close the batch.
@@ -4776,7 +4781,7 @@ tests with zero failures/skips (449.7 s). API reports match 887 entries and
 8,638 exports; core plus stage remains 23,924 B. The four frozen viewer/transport
 JSONs are byte-identical to the parked originals after line-ending normalization.
 Every fresh AMD proof, native-volume regression and runtime README gate passes.
-No benchmark, exclusive hold, tolerance increase or skipped test is included.
+No benchmark, tolerance increase or skipped test is included.
 
 ### Fixed: physical-camera README shares one HDR capture (2026-11-09)
 
@@ -4787,16 +4792,16 @@ engine.start renders the configured picture. tests/readme-physical-camera.test.j
 fails before the repair and verifies the single capture, TAA depth/velocity
 and physical exposure targets after it. The obsolete runtime exception is removed.
 
-Landing checks after GPU queue repairs b7af6646a and d2e8310ef: the sole failed
+Landing checks after GPU request repairs b7af6646a and d2e8310ef: the sole failed
 verify unit-test step was resumed, with 13,612 of 13,613 tests passing and zero
-skips. Its only failure was an unavailable private-file pointer inherited in the
-GPU lock report. Rewording that pointer passes the existing no-private-paths
-regression; the queue FIFO and bootstrap regressions pass. Earlier lint, hygiene,
+skips. Its only failure was an unavailable private-file pointer inherited in a
+report. Rewording that pointer passes the existing no-private-paths
+regression. Earlier lint, hygiene,
 API, quality, types, size and proofs passed. Camera tests pass all 83 cases.
-One shared GPU slot then passed the camera browser suite (10.1 s) and all nine
+The camera browser suite then passed (10.1 s) and all nine
 executable README examples, zero failures (28.9 s combined supervisor).
 No camera runtime, assets, exports, core/stage or held physics source changes.
-Evidence: test-results/skip-gaps/camera-resume-*.log. Browser teardown and queue
+Evidence: test-results/skip-gaps/camera-resume-*.log. Browser teardown and request
 repairs were inherited from main; no assertion or budget was relaxed.
 
 Research: Paul Haeberli and Kurt Akeley, The Accumulation Buffer: Hardware Support
@@ -4817,8 +4822,7 @@ a complete 2x2x2 identity Cube, with no fetch or new parser behavior. The actual
 README regression fails before the repair and passes with exact identity samples,
 LUT clearing and both owners disposed. Research: the skip-gaps research notes.
 Landing: lint and hygiene pass; full verify passes 13,637 tests with no failures
-or skips (287.1 s), and all 130 package CPU cases pass. One shared GPU slot
-passes all ten package GPU suites and all 19 executable README examples with
+or skips (287.1 s), and all 130 package CPU cases pass. All ten package GPU suites and all 19 executable README examples pass, with
 zero exceptions (59.5 s combined). No size ceiling, runtime or export changed.
 The earlier recording-enabled verify attempt was interrupted during shadow-cache
 bookkeeping before its test chains; the complete successful run disabled only
@@ -4827,8 +4831,8 @@ shadow recording, never checks or result work. Evidence: test-results/skip-gaps/
 ### Batched picking pre-rebase validation (2026-11-09)
 
 Lint, hygiene, API, quality, proofs and full verify pass: 13,669 tests, zero
-failures or skips (440.5 s supervisor). All 83 selection CPU cases pass. One
-shared GPU slot passes picking, all three captured/MSAA/micro batch comparisons,
+failures or skips (440.5 s supervisor). All 83 selection CPU cases pass. The
+GPU checks pass picking, all three captured/MSAA/micro batch comparisons,
 real-model perspective/orthographic checks and x-ray, plus all six executable
 README examples (36.9 s combined). No --time loop or benchmark was run.
 The historical 83 vs 67 ms remains an open loss for the deferred speed phase.
@@ -4836,14 +4840,13 @@ Fresh genuine entry/network records share commit 1d7571281 and dirty=false;
 the actual basic scene fetches five requests and no extra file. API generation
 follows measurement. Selection is 20,808 B gzip, previously 20,745 B (+63),
 below its unchanged ceiling; core + stage stays 23,924 B under 25,000 B.
-The short network capture now explicitly limits its shared hold to one minute
-and waits at least 60 minutes, with the existing regression expanded.
+The short network capture now has an explicit one-minute limit, with the existing regression expanded.
 Evidence: test-results/skip-gaps/item3-*.log; research in skip-gaps-research.md.
 
 Final main rebase: inherited preview error-link and compatibility changes. Rebuilt
 all packages and regenerated genuine entry/network records together from
 375b56d0b, dirty=false, then API and llms. Lint, hygiene, API, all 83 selection
-cases and 21 record/document regressions pass. The fresh shared-slot selection
+cases and 21 record/document regressions pass. The fresh selection
 GPU suite and all six README examples pass (20.2 s combined); the GPU suite
 includes captured/MSAA/micro counts and real-model perspective/orthographic
 equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
@@ -4941,7 +4944,7 @@ GPU or browser suite on WebGPU and the WebGL2 layer first). What that cost is in
 
 Run on the AMD mini PC (AMD Radeon 680M, RDNA 2 iGPU, driver 32.0.21030.2001, Windows 11; Chromium with WebGPU on Dawn
 D3D12 and the WebGL2 layer on ANGLE D3D11), the project's only AMD GPU. Every package's GPU and browser tests ran on
-both backends, one GPU slot, the mini-pc heat profile; the failed suites ran again on current main after the fixes.
+both backends, the mini-pc heat profile; the failed suites ran again on current main after the fixes.
 Every row, with what came out, the cause and its state, is in the AMD GPU hunt list.
 
 - **Fixed in the owning package, each with a regression test:** animator and four other packages' browser checks
@@ -4959,7 +4962,7 @@ Every row, with what came out, the cause and its state, is in the AMD GPU hunt l
 - **Reruns on `b187ac2d4` (2026-11-11, after the 11/10 19:09 crash):** row 15 fixed by `2bea967e7` (304 B left, the
   open Edge 157 entry, same figures here); row 24 passes (4.05e-5 on both backends) after `eefc81bbc` and the f32
   reference; row 32 gets its compat branch, row 18's notebook suite makes its own fixtures, and row 16's gallery page
-  loads gltf-pro with its first model (129,989 B to 56,264 B before the first frame; budget unchanged). Open: row 17
+  loads gltf/pbr with its first model (129,989 B to 56,264 B before the first frame; budget unchanged). Open: row 17
   (the grass scene saturates, reported), row 18 export-media (known-bugs), row 19 (needs the path tracer, banned here),
   and the dedicated hunts 26, 28, 29, 31, 33 and 34. The list 5 row stays in progress.
 - **Rows 17 and 18 (2026-11-11, session 7):** row 17 by the manager's ruling: the grass check's meadow drops from
@@ -4973,7 +4976,7 @@ Every row, with what came out, the cause and its state, is in the AMD GPU hunt l
 ## List 5 on the AMD mini PC: batch I1, packages work together, part 1 (2026-11-10 to 2026-11-11)
 
 Run on the AMD mini PC (AMD Radeon 680M, Windows 11; Chromium with WebGPU on Dawn D3D12 and the WebGL2 layer on ANGLE
-D3D11), one GPU slot, the mini-pc heat profile. Sciviz stays out until its batches 175, 176 and 178 are done.
+D3D11), the mini-pc heat profile. Sciviz stays out until its batches 175, 176 and 178 are done.
 
 - **J5, packaging (`fb8ac941d`, CPU only):** `examples/all-entries/entries.ts`, generated from the exports maps, imports
   every public entry of every package in one type program run by check:examples-types; each contract group is bundled
@@ -4982,7 +4985,7 @@ D3D11), one GPU slot, the mini-pc heat profile. Sciviz stays out until its batch
   [integration-packaging.md](../integration-packaging.md).
 - **J1, plugin lifetime and device loss:** by manager ruling, J1's own runner was folded into `check:owners` instead
   of kept as a second runner. Fixtures now gate 33 packages, the 24 the prompt names except html and inspector (DOM
-  the CPU model lacks; pending, docs/limits.md) plus eleven more (audio, controls, environment, gltf-pro, labels,
+  the CPU model lacks; pending, docs/limits.md) plus eleven more (audio, controls, environment, gltf/pbr, labels,
   points, post, sky, text, ui, video). New harness cases: `cycles` (GPU objects alive must not grow from the second
   disposal to the third), leaked `onFrame` callbacks and `engine.views` left changed; each has a deliberate-defect
   test. `warmUp` uses up a fixed per-device first-use set (materials' 1x1 default textures) before measuring, so

@@ -1,11 +1,11 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Many distinct geometries in one materials mesh, so one draw call per pass (beauty, each shadow cascade, SSAO).
 // Items are copied into shared vertex and index ranges once; a compute pass writes the drawn vertices from each item's
-// matrix, colour and visibility whenever one changes, through gltf-pro's deformation hook (the same one skins use), so
+// matrix, colour and visibility whenever one changes, through gltf/pbr's deformation hook (the same one skins use), so
 // shadows, clustered lights, fog, IBL, SSAO and picking all draw the batch as they draw any materials mesh.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import type { PBRDeformationContext } from '@margoengine/gltf-pro';
+import type { PBRDeformationContext } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from '@margoengine/math/color';
 import { Material, createMesh, packGeometry, type MaterialMesh, type MeshGeometry } from './built-material.js';
@@ -50,9 +50,9 @@ struct Item {matrix:mat4x4f,tint:vec4f}
   if(k==0xffffffffu||items[k].tint.w<0.5){output[id.x]=Vertex(vec4f(0,0,0,1),vec4f(0,0,1,0),vec4f(1,0,0,1),v.uv,v.color);return;}
   let m=items[k].matrix;
   let normalMatrix=mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz));
-  let handedness=sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz)));
+  let handedness=select(-1.0,1.0,dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))>=0.0);let bent=normalMatrix*v.normal.xyz*handedness;
   v.position=vec4f((m*vec4f(v.position.xyz,1)).xyz,1);
-  v.normal=vec4f(normalize(normalMatrix*v.normal.xyz*handedness),0);
+  v.normal=vec4f(normalize(select(vec3f(0,1,0),bent,dot(bent,bent)>0.0)),0);
   v.tangent=vec4f((m*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);
   v.color=vec4f(v.color.rgb*items[k].tint.rgb,v.color.a);output[id.x]=v;
 }
@@ -258,8 +258,9 @@ export class BatchedMesh implements EnginePlugin {
     if (!matrix || typeof matrix !== 'object' || matrix.length !== 16)
       throw new TypeError('BatchedMesh matrix needs 16 numbers; pass a column-major 4x4 matrix');
     for (let i = 0; i < 16; i++)
-      if (typeof matrix[i] !== 'number' || !Number.isFinite(matrix[i]))
-        throw new RangeError('BatchedMesh matrix has a non-finite value; pass finite numbers');
+      // The matrix is stored as float32: a finite double past its range would become Infinity there.
+      if (typeof matrix[i] !== 'number' || !Number.isFinite(Math.fround(matrix[i])))
+        throw new RangeError('BatchedMesh matrix has a value that is not finite as float32; pass finite numbers');
     this.items.set(matrix, id * ITEM);
     this.mark(this.dirtyItems, id, id + 1);
     return this;

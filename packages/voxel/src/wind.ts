@@ -94,8 +94,15 @@ export function sampleVoxelWind(
 
 /** GPU vertex motion for a VoxelRenderer, shared by beauty, surface capture and shadows. */
 export class VoxelWind implements VoxelVertexMotion {
-  private readonly values = new Float32Array([1, 0, 0, 0]);
-  private gpu?: { device: GPUDevice; buffer: GPUBuffer };
+  // Uniform: XZ direction, then per distinct (speed, frequency) the phase time * speed + dot(base.xz, direction) *
+  // frequency reduced in float64 (four to a vec4f), so the shader never multiplies a large float32 time or position:
+  // it adds dot(p.xz, direction) * frequency for p in the renderer's integer frame (world cells minus `base`).
+  private values = new Float32Array([1, 0, 0, 0, 0, 0, 0, 0]);
+  private clock: number | undefined;
+  private speeds: (readonly [number, number])[] = [];
+  private base: readonly number[] = [0, 0, 0];
+  private speedsVersion = -1;
+  private gpu?: { device: GPUDevice; buffer: GPUBuffer; size: number };
   private readonly cache = new Map<string, string>();
   private count = -1;
   private paddingVersion = -1;
@@ -127,14 +134,13 @@ export class VoxelWind implements VoxelVertexMotion {
   }
   /** Explicit clock, or undefined for the renderer clock. */
   get time(): number | undefined {
-    return this.values[3] ? this.values[2] : undefined;
+    return this.clock;
   }
   set time(value: number | undefined) {
     this.check();
     if (value !== undefined && (!Number.isFinite(value) || Math.abs(value) > 1e6))
       throw new RangeError('Wind time must be finite within +/-1e6 seconds; pass time or undefined for renderer time');
-    this.values[2] = value ?? 0;
-    this.values[3] = value === undefined ? 0 : 1;
+    this.clock = value;
     this.dirty = true;
   }
   private check(): void {
@@ -153,18 +159,55 @@ export class VoxelWind implements VoxelVertexMotion {
     return this.renderer.world.blocks.table.length;
   }
   /** Renderer adapter: creates/restores one owned uniform buffer and uploads live direction/time. */
-  bindings(device: GPUDevice): GPUBindGroupEntry[] {
+  bindings(device: GPUDevice, time?: number, base?: readonly number[]): GPUBindGroupEntry[] {
     this.check();
-    if (this.gpu?.device !== device) {
+    if (base) this.base = base;
+    const speeds = this.speedTable();
+    if (this.values.length !== 4 + 4 * Math.max(1, Math.ceil(speeds.length / 4))) {
+      const values = new Float32Array(4 + 4 * Math.max(1, Math.ceil(speeds.length / 4)));
+      values.set(this.values.subarray(0, 2));
+      this.values = values;
+    }
+    if (this.gpu?.device !== device || this.gpu.size !== this.values.byteLength) {
       this.gpu?.buffer.destroy();
-      this.gpu = { device, buffer: device.createBuffer({ size: 16, usage: 64 | 8 }) };
+      const size = this.values.byteLength;
+      this.gpu = { device, buffer: device.createBuffer({ size, usage: 64 | 8 }), size };
       this.dirty = true;
+    }
+    const clock = this.clock ?? time;
+    if (clock !== undefined) {
+      const [bx, , bz] = this.base,
+        // The shader's unit direction, data.xy / max(length(data.xy), 1e-6), and its frequency are float32: the base's
+        // part uses the same values, so a wind shorter or longer than 1 keeps its phase when the base moves.
+        length = Math.max(Math.fround(Math.hypot(this.values[0], this.values[1])), Math.fround(1e-6)),
+        dx = Math.fround(this.values[0] / length),
+        dz = Math.fround(this.values[1] / length);
+      for (let i = 0; i < speeds.length; i++) {
+        const [speed, frequency] = speeds[i],
+          phase = clock * speed + (bx * dx + bz * dz) * Math.fround(frequency),
+          reduced = Math.fround(phase - Math.floor(phase / (2 * Math.PI)) * 2 * Math.PI);
+        if (this.values[4 + i] !== reduced) (this.values[4 + i] = reduced), (this.dirty = true);
+      }
     }
     if (this.dirty) {
       device.queue.writeBuffer(this.gpu.buffer, 0, this.values);
       this.dirty = false;
     }
     return [{ binding: 11, resource: { buffer: this.gpu.buffer } }];
+  }
+  // The distinct (speed, frequency) pairs of the block types' vertex motion, in table order; a material's windInfo w is
+  // its index.
+  private speedTable(): (readonly [number, number])[] {
+    if (this.speedsVersion !== this.version) {
+      this.speedsVersion = this.version;
+      this.speeds = [];
+      for (const type of this.renderer.world.blocks.table) {
+        const m = type.layer === 'invisible' ? undefined : type.vertexMotion;
+        if (m && !this.speeds.some(([s, f]) => s === m.speed && f === m.frequency))
+          this.speeds.push([m.speed, m.frequency]);
+      }
+    }
+    return this.speeds;
   }
   /** Renderer adapter: composes motion with the existing voxel shader without changing static worlds. */
   shader(code: string): string {
@@ -202,28 +245,28 @@ export class VoxelWind implements VoxelVertexMotion {
           'let side=select(-1.0,1.0,front);',
           'let windN=cross(dpdx(o.windWorld),dpdy(o.windWorld));let side=select(-1.0,1.0,front);',
         );
-        const normal = 'if(face==2u&&(w.y&0x100000u)!=0u){normal=voxelRipple(i.position.xz,t)*side;}';
+        const normal = 'if(face==2u&&(w.y&0x100000u)!=0u){normal=voxelRipple(i.position.xz,f.waves)*side;}';
         next = next.replace(
           normal,
           normal +
             '\n if(windInfo(w.y&4095u).x>0.0&&dot(windN,windN)>0.0){normal=normalize(windN)*select(-1.0,1.0,dot(windN,normal)>=0.0);}\n',
         );
       }
-      next += `\nfn windBase(w0:u32,w1:u32,c:u32,t:f32)->vec3f {var p=voxelPlace(w0,w1,c,t);let face=(w0>>15u)&7u;if(windInfo(w1&4095u).x==2.0&&(face==2u||(face!=3u&&face<6u&&c>=2u))){p.y-=voxelRise(w1,t);}return p;}
-fn windPlace(w0:u32,w1:u32,c:u32,t:f32,O:vec3f)->vec3f {let p=windBase(w0,w1,c,t);let face=(w0>>15u)&7u;let surface=(w1&0x100000u)!=0u&&(face==2u||(face!=3u&&face<6u&&c>=2u));return p+windOffset(O+p,O.y+f32((w0>>5u)&31u),w1&4095u,t,surface);}\n`;
+      next += `\nfn windBase(w0:u32,w1:u32,c:u32,t:vec4f)->vec3f {var p=voxelPlace(w0,w1,c,t);let face=(w0>>15u)&7u;if(windInfo(w1&4095u).x==2.0&&(face==2u||(face!=3u&&face<6u&&c>=2u))){p.y-=voxelRise(w1,t);}return p;}
+fn windPlace(w0:u32,w1:u32,c:u32,t:vec4f,O:vec3f)->vec3f {let p=windBase(w0,w1,c,t);let face=(w0>>15u)&7u;let surface=(w1&0x100000u)!=0u&&(face==2u||(face!=3u&&face<6u&&c>=2u));return p+windOffset(O+p,O.y+f32((w0>>5u)&31u),w1&4095u,surface);}\n`;
     }
-    if (code.includes('o.clip=f.camera*vec4f(v.p,1.0)')) {
+    if (code.includes('o.clip=f.camera*vec4f(p,1.0)')) {
       next = next
         .replace(
-          'o.clip=f.camera*vec4f(v.p,1.0)',
-          'o.clip=f.camera*vec4f(v.p+windOffset(v.p,floor(v.p.y),v.material&4095u,f.glow.w,true),1.0)',
+          'o.clip=f.camera*vec4f(p,1.0)',
+          'o.clip=f.camera*vec4f(p+windOffset(p,floor(p.y),v.material&4095u,true),1.0)',
         )
-        .replace('o.world=v.p;', 'o.world=v.p+windOffset(v.p,floor(v.p.y),v.material&4095u,f.glow.w,true);');
+        .replace('o.world=p;', 'o.world=p+windOffset(p,floor(p.y),v.material&4095u,true);');
     }
     if (code.includes('shadow.matrix*vec4f(p,1.0)'))
       next = next.replace(
         'shadow.matrix*vec4f(p,1.0)',
-        'shadow.matrix*vec4f(p+windOffset(p,floor(p.y),material&4095u,shadow.time.x,true),1.0)',
+        'shadow.matrix*vec4f(p+windOffset(p,floor(p.y),material&4095u,true),1.0)',
       );
     const types = this.renderer.world.blocks.table;
     let material = 0,
@@ -235,20 +278,20 @@ fn windPlace(w0:u32,w1:u32,c:u32,t:f32,O:vec3f)->vec3f {let p=windBase(w0,w1,c,t
         if (type.textures.indexOf(type.textures[face]) === face) {
           const m = type.vertexMotion;
           if (m) {
-            cases += `case ${material}u:{return vec4f(${m.kind === 'liquid' ? '2.0' : '1.0'},${m.amplitude},${m.frequency},${m.speed});}\n`;
+            cases += `case ${material}u:{return vec4f(${m.kind === 'liquid' ? '2.0' : '1.0'},${m.amplitude},${m.frequency},${this.speedTable().findIndex(([s, f]) => s === m.speed && f === m.frequency)});}\n`;
             if (m.rooted) roots += `case ${material}u:{return true;}\n`;
           }
           material++;
         }
     }
     const header = `
-struct WindFrame {data:vec4f}
+struct WindFrame {data:vec4f,phase:array<vec4f,${Math.max(1, Math.ceil(this.speedTable().length / 4))}>}
 @group(0) @binding(11) var<uniform> windFrame:WindFrame;
 fn windInfo(m:u32)->vec4f {switch m {${cases} default:{return vec4f(0.0);}}}
 fn windRoot(m:u32)->bool {switch m {${roots} default:{return false;}}}
-fn windOffset(p:vec3f,floorY:f32,material:u32,clock:f32,surface:bool)->vec3f {
+fn windOffset(p:vec3f,floorY:f32,material:u32,surface:bool)->vec3f {
  let config=windInfo(material);let magnitude=length(windFrame.data.xy);let direction=windFrame.data.xy/max(magnitude,0.000001);let strength=min(magnitude,1.0);
- let time=select(clock,windFrame.data.z,windFrame.data.w>0.5);let phase=dot(p.xz,direction)*config.z+time*config.w;
+ let slot=u32(config.w);let phase=dot(p.xz,direction)*config.z+windFrame.phase[slot>>2u][slot&3u];
  if(config.x==2.0){return vec3f(0.0,select(0.0,config.y*strength*(sin(phase)+0.5*sin(1.7*phase+1.2))/1.5,surface),0.0);}
  let h=clamp(p.y-floorY,0.0,1.0);let weight=select(1.0,h*h*(3.0-2.0*h),windRoot(material));let bend=config.y*strength*weight*(0.75*sin(phase)+0.25*sin(1.91*phase+0.73));return vec3f(direction.x*bend,0.0,direction.y*bend);
 }

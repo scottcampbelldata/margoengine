@@ -31,7 +31,7 @@
       "seconds": 59.7,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",

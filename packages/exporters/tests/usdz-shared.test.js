@@ -171,11 +171,11 @@ test('a mirrored node lands every vertex and normal where its matrix puts them',
   assert.ok(facing * (face[0] * n[0] + face[1] * n[1] + face[2] * n[2]) > 0, 'triangles face their normals');
 });
 
-test('a singular node is refused, used once or shared', () => {
+test('a singular node exports as a plain shape, used once or shared', () => {
   // Each scale is nonzero, so the collector takes it; the determinant underflows Float64 to exactly 0.
   const flat = { scale: [1e-120, 1e-120, 1e-120], geometry: quad };
-  assert.throws(() => exportUSDZ({ nodes: [flat] }), /Singular transform/);
-  assert.throws(() => exportUSDZ({ nodes: [{ geometry: quad }, flat] }), /Singular transform/);
+  assert.doesNotThrow(() => exportUSDZ({ nodes: [flat] }));
+  assert.doesNotThrow(() => exportUSDZ({ nodes: [{ geometry: quad }, flat] }));
 });
 
 test('the shape holds the UV sets its users read, and textures stay per material', async () => {

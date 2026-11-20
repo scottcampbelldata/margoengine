@@ -200,6 +200,16 @@ export class SplatSequence extends Player {
   get duration(): number {
     return this.frames.length / this.fps;
   }
+  /**
+   * Moves `time` by `delta` seconds times `speed` while `playing`, without drawing (a delta of 0 or less moves
+   * nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0 && this.playing) this.time += delta * this.speed;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
   /** The two frames and the mix between them at `time` (looped or held). */
   sample(time = this.time): { from: number; to: number; mix: number } {
     const n = this.frames.length;
@@ -216,7 +226,6 @@ export class SplatSequence extends Player {
     this.groups = [];
   }
   protected pose(c: Context, first: boolean): void {
-    if (first && this.playing) this.time += c.delta * this.speed;
     const { from, to, mix } = this.sample(),
       state = this.cloud.gpuState,
       pipeline = this.compute(sequenceShader);

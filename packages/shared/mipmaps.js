@@ -1,4 +1,4 @@
-// Mip chain generation for the textures gltf-pro, materials and the other packages upload: each level from the one
+// Mip chain generation for the textures gltf/pbr, materials and the other packages upload: each level from the one
 // above with a fullscreen triangle. Callers keep one pipeline per format and mode in their own `cache`.
 // - Every level takes the area filter: each source texel weighted by its overlap with the destination footprint, as
 //   alpha-mips.js does for MASK maps (the box filter of a non-power-of-two image, Williams 1983, "Pyramidal

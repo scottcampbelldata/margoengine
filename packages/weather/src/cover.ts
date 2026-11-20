@@ -82,7 +82,7 @@ export class PrecipitationCover implements EnginePlugin {
     } });
   }
 
-  /** Cover declarations and weather calls in either a core or gltf-pro shader. */
+  /** Cover declarations and weather calls in either a core or gltf\/pbr shader. */
   shader(source: string, group: number): string {
     // Models may compile while preparing the frame, before the map pass allocates
     // its first texture. Shader structure must not depend on resource readiness.
@@ -97,26 +97,32 @@ export class PrecipitationCover implements EnginePlugin {
     // A map texel holds an occluder only where the occluder covers its centre, so a receiver within half a texel
     // inside a shelter's edge can fall in an empty texel. The highest occluder among the four texels around the
     // receiver shelters every point under an occluder at least one texel wide (and up to one texel past its edge).
+    // Those four texel centres lie up to one texel from the receiver on each axis, so a sloped occluder's own top
+    // surface, a roof, reads up to sqrt(2) texels times its slope higher than itself there and sheltered itself in
+    // stripes a texel apart. A receiver facing up (normal y 0.5 or more, slopes to 60 degrees) adds that rise to the
+    // bias: slope-scaled depth bias, as in shadow maps (Williams 1978; Dou, Yan, Kerzner, Dai and Wyman 2014).
+    // Steeper receivers (walls) keep the plain bias, so a wall under an eave stays dry to its top.
     let helpers = `
       struct WeatherCoverFrame {area:vec4f,depth:vec4f}
       @group(${group}) @binding(162) var<uniform> weatherCoverFrame:WeatherCoverFrame;
       @group(${group}) @binding(163) var weatherCoverMap:texture_depth_2d;
-      fn weather_exposed(p:vec3f)->bool {
+      fn weather_exposed(p:vec3f,ny:f32)->bool {
         let f=weatherCoverFrame;let uv=(p.xz-f.area.xy)*f.area.z;
         if(any(uv<vec2f(0))||any(uv>=vec2f(1))){return true;}
         let n=i32(f.depth.y)-1;let b=vec2i(floor(uv*f.depth.y-0.5));var d=1.0;
         for(var k=0;k<4;k++){d=min(d,textureLoad(weatherCoverMap,clamp(b+vec2i(k&1,k/2),vec2i(0),vec2i(n)),0));}
-        return d>=1.0||p.y+${this.bias.toExponential() }>=f.area.w-d*f.depth.x;
+        let rise=select(0.0,1.41421356*sqrt(max(1.0-ny*ny,0.0))/max(ny,0.5)/(f.area.z*f.depth.y),ny>=0.5);
+        return d>=1.0||p.y+${this.bias.toExponential() }+rise>=f.area.w-d*f.depth.x;
       }`;
     if (code.includes('weather_cover_water(')) helpers += `
       fn weather_cover_water(p:vec3f,n:vec3f,c:vec3f,r:f32,m:f32,wet:bool,u:WeatherPuddles)->mat3x4f {
-        var v=u;if(!weather_exposed(p)){v.a.x=0.0;v.a.y=0.0;}
+        var v=u;if(!weather_exposed(p,n.y)){v.a.x=0.0;v.a.y=0.0;}
         return weather_puddle_surface(p,n,c,r,m,wet,v);
       }`;
     if (code.includes('weather_cover_snow(')) helpers += `
-      fn weather_cover_snow(p:vec3f,ny:f32,c:f32)->f32 {return weather_snow_at(p.xz,ny,select(0.0,c,weather_exposed(p)));}`;
+      fn weather_cover_snow(p:vec3f,ny:f32,c:f32)->f32 {return weather_snow_at(p.xz,ny,select(0.0,c,weather_exposed(p,ny)));}`;
     if (code.includes('weather_cover_depth(')) helpers += `
-      fn weather_cover_depth(p:vec3f,ny:f32,u:WeatherSnow)->f32 {var v=u;if(!weather_exposed(p)){v.a.x=0.0;}return weather_snow_depth(p.xz,ny,v);}`;
+      fn weather_cover_depth(p:vec3f,ny:f32,u:WeatherSnow)->f32 {var v=u;if(!weather_exposed(p,ny)){v.a.x=0.0;}return weather_snow_depth(p.xz,ny,v);}`;
     code = helpers + code;
     if (this.cache.size >= 32) this.cache.clear();
     this.cache.set(key, code);

@@ -153,7 +153,7 @@ interface VRMAvatar {
     firstPerson?: {
         meshAnnotations?: {
             node: number;
-            type: string;
+            type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly';
         }[];
         [field: string]: unknown;
     };

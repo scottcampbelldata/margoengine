@@ -24,14 +24,16 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/sky": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js vfx",
     "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:parity": "cd ../.. && node packages/vfx/test/parity.mjs --all && node packages/vfx/test/parity.mjs --all --compat",
-    "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs && node packages/vfx/test/lit-check.mjs && node packages/vfx/test/flipbook-webgl2.mjs && node packages/vfx/test/shadows-nodes-webgl2.mjs"
+    "test:gpu": "cd ../.. && node packages/vfx/test/browser-check.mjs && node packages/vfx/test/features-check.mjs && node packages/vfx/test/lit-check.mjs && node packages/vfx/test/flipbook-webgl2.mjs && node packages/vfx/test/shadows-nodes-webgl2.mjs && node packages/vfx/test/seek-check.mjs && node packages/vfx/test/clouds-check.mjs && node packages/vfx/test/blown-sand-check.mjs && node packages/vfx/test/settings-check.mjs && node packages/vfx/test/smoke-check.mjs && node packages/vfx/test/fire-front-check.mjs && node packages/vfx/test/flame-check.mjs && node packages/vfx/test/gunfire-check.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -134,6 +136,38 @@
     "./json": {
       "types": "./dist/json.d.ts",
       "import": "./dist/json.js"
+    },
+    "./fire": {
+      "types": "./dist/fire.d.ts",
+      "import": "./dist/fire.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    },
+    "./clouds": {
+      "types": "./dist/clouds.d.ts",
+      "import": "./dist/clouds.js"
+    },
+    "./blown-sand": {
+      "types": "./dist/blown-sand.d.ts",
+      "import": "./dist/blown-sand.js"
+    },
+    "./flame": {
+      "types": "./dist/flame.d.ts",
+      "import": "./dist/flame.js"
+    },
+    "./smoke": {
+      "types": "./dist/smoke.d.ts",
+      "import": "./dist/smoke.js"
+    },
+    "./fire-front": {
+      "types": "./dist/fire-front.d.ts",
+      "import": "./dist/fire-front.js"
+    },
+    "./gunfire": {
+      "types": "./dist/gunfire.d.ts",
+      "import": "./dist/gunfire.js"
     }
   },
   "files": [

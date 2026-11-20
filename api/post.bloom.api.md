@@ -21,6 +21,8 @@ export class Bloom implements EnginePlugin {
     [Symbol.dispose]: () => void;
 }
 
+export type BloomFireflies = 'temporal' | 'karis' | 'none';
+
 export type BloomImageContext = Pick<PostPassContext, 'device' | 'encoder' | 'width' | 'height'>;
 
 export interface BloomOptions {
@@ -28,6 +30,7 @@ export interface BloomOptions {
     threshold?: number;
     exposure?: number;
     radius?: number;
+    fireflies?: BloomFireflies;
 }
 
 export function bloomWeights(radius: number, levels: number): number[];

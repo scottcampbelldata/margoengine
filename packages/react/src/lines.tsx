@@ -15,7 +15,7 @@ export interface LineProps extends Omit<LineOptions, 'positions'> {
   onError?: (error: unknown) => void;
 }
 /** A native, antialiased line. The ref exposes setPositions/setMatrix/material for frame-loop updates. */
-export const Line = forwardRef<NativeLine, LineProps>(function Line(
+export const Line = /* @__PURE__ */ forwardRef<NativeLine, LineProps>(function Line(
   { points, lineWidth, segments = false, onError, ...options },
   ref,
 ) {
@@ -109,3 +109,4 @@ export function Grid({ size, divisions, centerColor, color, position, onError }:
   }, [scene, size, divisions, colors, at]);
   return null;
 }
+export { Segments, Segment, type SegmentsProps, type SegmentProps, type SegmentHandle } from './segments.js';

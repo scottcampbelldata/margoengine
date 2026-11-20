@@ -6,7 +6,8 @@ import type { RenderTarget, RenderView } from './renderer.js';
 import type { Geometry, PbrMaterial } from './geometry.js';
 /**
  * Live x/y/z view of a mesh's position (world units), rotation (Euler radians) or scale. Writes must be finite as
- * float32, and scale components non-zero; invalid values throw RangeError. Throws Error 'Mesh disposed' after disposal.
+ * float32; invalid values throw RangeError. A zero scale flattens the mesh on that axis (glTF 2.0 section 3.5.3): it draws
+ * nothing at (0, 0, 0), and its normals stay finite. Throws Error 'Mesh disposed' after disposal.
  */
 export interface VectorRef {
   x: number;

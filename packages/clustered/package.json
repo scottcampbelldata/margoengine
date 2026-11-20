@@ -37,7 +37,10 @@
     "test:gpu:area-shapes": "cd ../.. && node scripts/clustered-area-shapes-gpu.mjs",
     "test:gpu:atlas": "cd ../.. && node scripts/clustered-shadow-atlas-gpu.mjs",
     "test:gpu:cube-projector": "cd ../.. && node scripts/clustered-cube-projector-gpu.mjs",
-    "test:gpu:images": "cd ../.. && node scripts/clustered-light-images-gpu-check.js"
+    "test:gpu:images": "cd ../.. && node scripts/clustered-light-images-gpu-check.js",
+    "test:gpu:line": "cd ../.. && node scripts/clustered-line-gpu-check.js",
+    "test:gpu:sphere": "cd ../.. && node scripts/clustered-sphere-light-gpu-check.js",
+    "test:gpu:bounce": "cd ../.. && node scripts/clustered-bounce-gpu-check.js"
   },
   "sideEffects": false,
   "exports": {
@@ -112,6 +115,18 @@
     "./contact": {
       "types": "./dist/contact.d.ts",
       "import": "./dist/contact.js"
+    },
+    "./line": {
+      "types": "./dist/line.d.ts",
+      "import": "./dist/line.js"
+    },
+    "./bounce": {
+      "types": "./dist/bounce.d.ts",
+      "import": "./dist/bounce.js"
+    },
+    "./groups": {
+      "types": "./dist/groups.d.ts",
+      "import": "./dist/groups.js"
     }
   },
   "files": [

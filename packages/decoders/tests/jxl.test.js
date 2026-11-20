@@ -41,6 +41,13 @@ test('the header reader refuses what is not a complete JPEG XL header', () => {
   assert.throws(() => readJXLHeader(file('grayscale.jxl').subarray(0, 3)), failed);
   assert.throws(() => readJXLHeader(file('alpha_premultiplied.jxl').subarray(0, 40)), failed);
   assert.throws(() => readJXLHeader([0xff, 0x0a]), TypeError);
+  // The signature box is 12 bytes, its content 0D 0A 87 0A (the magic number of the image/jxl registration): a box
+  // typed 'JXL ' with other content is not a JPEG XL file.
+  for (const at of [8, 9, 10, 11]) {
+    const bytes = file('alpha_premultiplied.jxl').slice();
+    bytes[at] ^= 0x40;
+    assert.throws(() => readJXLHeader(bytes), failed, `signature byte ${at}`);
+  }
 });
 
 test('every fixture decodes to the recorded pixels, at the size its header gives', () => {

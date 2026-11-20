@@ -1,4 +1,5 @@
 import { createServer as createViteServer } from 'vite';
+import { noFileWatcher } from '../../scripts/support/no-file-watcher.js';
 import { createServer } from 'node:http';
 import { networkInterfaces, homedir } from 'node:os';
 import { resolve, join } from 'node:path';
@@ -71,6 +72,7 @@ if (certificate.ca || !certificate.checkIP(host) || !certificate.verify(certific
 const publicCertificate = certificate.raw;
 writeFileSync(join(directory, 'afterlight.cer'), publicCertificate);
 const server = await createViteServer({
+  plugins: [noFileWatcher()],
   root: import.meta.dirname,
   configFile: resolve(import.meta.dirname, 'vite.config.ts'),
   server: { host, port, strictPort: true, https: { key: readFileSync(keyPath), cert: readFileSync(certPath) } },

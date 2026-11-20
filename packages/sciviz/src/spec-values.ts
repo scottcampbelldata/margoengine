@@ -38,6 +38,7 @@ export interface SpecIOOptions {
    */
   readonly colormaps?: readonly Colormap[];
 }
+const colormapKinds = ['sequential', 'diverging', 'cyclic', 'isoluminant', 'categorical'];
 const halfArray = (globalThis as unknown as { Float16Array?: typeof Float32Array }).Float16Array;
 const arrays = {
   ...(halfArray ? { Float16Array: halfArray } : {}),
@@ -212,7 +213,11 @@ export class ValueIO {
     this.check();
     if (value === undefined) return { $undefined: true };
     if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
-    if (typeof value === 'number') return Number.isFinite(value) ? value : { $number: String(value) };
+    // JSON has no -0 (it writes 0), so a scalar -0 is tagged like the nonfinite numbers.
+    if (typeof value === 'number')
+      return Number.isFinite(value) && !Object.is(value, -0)
+        ? value
+        : { $number: Object.is(value, -0) ? '-0' : String(value) };
     if (typeof value !== 'object')
       throw typeError('Figure contains a callback; replace it with declarative data or register a codec', 'sciviz');
     const ref = references.get(value);
@@ -339,8 +344,8 @@ export class ValueIO {
     const v = value as Record<string, SpecValue>;
     if ('$undefined' in v) return undefined;
     if ('$number' in v) {
-      if (!['NaN', 'Infinity', '-Infinity'].includes(v.$number as string))
-        throw typeError('Invalid tagged number; use a standard nonfinite token', 'sciviz');
+      if (!['NaN', 'Infinity', '-Infinity', '-0'].includes(v.$number as string))
+        throw typeError('Invalid tagged number; use NaN, Infinity, -Infinity or -0', 'sciviz');
       return Number(v.$number);
     }
     if ('$ref' in v) {
@@ -349,13 +354,14 @@ export class ValueIO {
       return ref;
     }
     if ('$array' in v) {
+      // Name an unknown dtype before reading or hashing any bytes.
+      const alignment = this.constructorOf(v.$array as string).BYTES_PER_ELEMENT;
       let bytes: Uint8Array;
       if ('$buffer' in v) {
         const buffer = this.options.buffers?.get(v.$buffer as string);
         if (typeof v.$buffer !== 'string' || !buffer || !ArrayBuffer.isView(buffer))
           throw typeError('Missing binary figure attachment; supply the named buffers with the spec', 'sciviz');
         bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        const alignment = this.constructorOf(v.$array as string).BYTES_PER_ELEMENT;
         if (!endian || bytes.byteOffset % alignment) bytes = bytes.slice();
       } else bytes = specUnbase64(v.bytes as string, this.max - this.used);
       this.check(bytes.length);
@@ -371,14 +377,21 @@ export class ValueIO {
       );
     }
     if ('$date' in v) {
-      const date = new Date(v.$date as string);
+      const date = typeof v.$date === 'string' ? new Date(v.$date) : new Date(Number.NaN);
       if (!Number.isFinite(date.getTime())) throw typeError('Invalid saved date; supply ISO UTC text', 'sciviz');
       return date;
     }
     if ('$transfer' in v) {
       const table = (await this.decode(v.$transfer, references, depth + 1)) as Float64Array;
       const range = v.range as number[];
-      if (table.length !== 1024 || range.length !== 2 || !(range[1] > range[0]))
+      if (
+        !(table instanceof Float64Array) ||
+        table.length !== 1024 ||
+        !Array.isArray(range) ||
+        range.length !== 2 ||
+        !range.every(Number.isFinite) ||
+        !(range[1] > range[0])
+      )
         throw typeError('Invalid component transfer; supply 256 RGBA values and an increasing range', 'sciviz');
       return {
         evaluate(value: number) {
@@ -401,8 +414,13 @@ export class ValueIO {
     }
     if ('$colormap' in v) {
       const table = (await this.decode(v.table, references, depth + 1)) as Float32Array;
-      if (!(table instanceof Float32Array) || table.length !== 1024)
-        throw typeError('Invalid colormap table; supply 256 RGBA samples', 'sciviz');
+      if (
+        !(table instanceof Float32Array) ||
+        table.length !== 1024 ||
+        typeof v.$colormap !== 'string' ||
+        !colormapKinds.includes(v.kind as string)
+      )
+        throw typeError('Invalid colormap table; supply 256 RGBA samples, a name and a colour map kind', 'sciviz');
       // The saved table identifies the map: a registered or built-in map with the same name, kind and every table
       // value restores as itself (KB5700h); any other map is rebuilt from the table.
       const candidates = [

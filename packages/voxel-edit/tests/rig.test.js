@@ -143,3 +143,20 @@ test('malformed rigs, poses and clips are refused with a fix', () => {
   for (const make of bad)
     assert.throws(make, (e) => (e instanceof TypeError || e instanceof RangeError) && /; \S/.test(e.message));
 });
+
+test('VoxelRig: bones named like Object.prototype members pose and bake at rest (KB-P9f)', () => {
+  const part = { size: [1, 1, 1], voxels: Uint8Array.of(3) },
+    rig = new VoxelRig({
+      bones: [{ name: 'constructor' }, { name: 'toString', parent: 'constructor', joint: [0, 0, 0] }],
+      parts: [
+        { bone: 'constructor', grid: part },
+        { bone: 'toString', grid: part, offset: [2, 0, 0] },
+      ],
+    });
+  const [a, b] = rig.matrices();
+  assert.deepEqual([a[12], b[12]], [0, 2]);
+  // A clip with no track for them leaves them at rest too.
+  rig.matrices({ rotations: sampleRigClip({ duration: 1, tracks: [] }, 0) });
+  assert.equal(rig.bake().grid.voxels.filter(Boolean).length, 2);
+  assert.deepEqual(rig.matrices({ rotations: { toString: rigRotation([0, 1, 0], 180) } })[1][12], -2);
+});

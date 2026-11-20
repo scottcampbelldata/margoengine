@@ -1,10 +1,10 @@
-// GPU picking and outlines for gltf-pro models on a mock device: real PBRModels (generated quads, the helmet asset), real core Engine.
+// GPU picking and outlines for gltf/pbr models on a mock device: real PBRModels (generated quads, the helmet asset), real core Engine.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
-import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
+import { PBRInstances } from '../../gltf/dist/pbr-instancing.js';
 import { Picking, Selection } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -136,7 +136,7 @@ async function world() {
   };
 }
 
-test('engine.pick returns gltf-pro model nodes from the culled micro pass, with model, primitive and stale guards', async () => {
+test('engine.pick returns gltf/pbr model nodes from the culled micro pass, with model, primitive and stale guards', async () => {
   const w = await world(),
     { engine, draws } = w,
     model = quads(engine, [

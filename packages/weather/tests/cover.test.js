@@ -31,7 +31,11 @@ test('the same depth test masks wetness, rings, snow colour and vertex depth in 
   assert.match(shader,/v.a.x=0.0;v.a.y=0.0/);
   assert.match(shader,/weather_cover_snow\(i.position,/);
   assert.match(shader,/weather_cover_depth\(p.xyz,/);
-  assert.match(shader,/p.y\+2e-2>=/);
+  assert.match(shader,/p.y\+2e-2\+rise>=/);
+  // A sloped receiver adds its own rise across the four texels (sqrt(2) texels times its slope), so a roof does not
+  // shelter itself in stripes; walls (normal y under 0.5) keep the plain bias. GPU proof: cover-check.html slope probes.
+  assert.match(shader,/let rise=select\(0\.0,1\.41421356\*sqrt\(max\(1\.0-ny\*ny,0\.0\)\)\/max\(ny,0\.5\)\/\(f\.area\.z\*f\.depth\.y\),ny>=0\.5\);/);
+  assert.match(shader,/weather_exposed\(p,n\.y\)/);
   // Edge texels: the highest occluder of the four texels around the receiver (regression, batch 236 job 2).
   assert.match(shader,/k<4;k\+\+\)\{d=min\(d,textureLoad\(weatherCoverMap,clamp\(/);
   assert.equal(cover.shader(source,group),shader);
@@ -59,4 +63,22 @@ test('the small WebGL2 preview is refused during setup before the capture is tou
  for(const engine of [{backend:'webgl2',gpu:null,sceneOf(){}},{backend:'webgl2',gpu:{},sceneOf(){}}])
   assert.throws(()=>cover.setup(engine),e=>e.code==='unsupported'&&e.message.startsWith('PrecipitationCover needs WebGPU')&&e.message.includes('https://margoengine.com/errors#webgpu'));
  assert.equal(source.options.weather.occlusion.buffer,undefined,'capture not set up');
+});
+
+// KB-RESTORE-BORROWED1 (docs/conventions.md, "Borrowed GPU objects"): PrecipitationMap.buffer and .view and
+// PrecipitationCapture.coverTexture are the capture's own outputs, never a caller's objects (registry rows exempt).
+// The cover reads them live and the capture makes them again at a device restore, so the bindings after a restore are
+// the new ones and nothing of the lost device stays bound.
+test('after a device restore the cover binds the capture\'s new map, never the old one', () => {
+ const source=capture(),cover=new PrecipitationCover(source);
+ cover.setup({sceneOf(){},gpu:{}});
+ const before=cover.bindings();
+ assert.equal(before.length,2);
+ cover.onDeviceRestored({gpu:{}});
+ const after=cover.bindings();
+ assert.equal(after.length,2);
+ assert.notEqual(after[0].resource.buffer,before[0].resource.buffer,'a new buffer');
+ assert.notEqual(after[1].resource,before[1].resource,'a new view');
+ assert.equal(after[0].resource.buffer,source.options.weather.occlusion.buffer);
+ assert.equal(after[1].resource,source.options.weather.occlusion.view);
 });

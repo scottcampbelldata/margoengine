@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Blown sand check</title><style>body{margin:0;background:#000}canvas{display:block;width:320px;height:180px}</style></head><body><canvas width="320" height="180"></canvas>
+<script type="module">
+// Real-GPU check of @margoengine/vfx/blown-sand in an engine, driven by blown-sand-check.mjs: a sand floor seen low
+// along the wind, drawn with no sand, with sand under a 12 m/s wind at two times, and under a 3 m/s wind (below the
+// threshold). Each step sets the sand's clock and renders one frame; the driver screenshots the canvas.
+import {BlownSand} from '/packages/vfx/dist/blown-sand.js';
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+const errors=[],canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[-3,0.6,-2],target:[2,0.15,6],fov:50,near:0.05,far:500}});
+engine.stop();
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.scene.background='#9fb8d8';
+engine.createMesh().setGeometry(box(400,0.2,400)).setPosition([0,-0.1,0]).setMaterial(new PbrMaterial({color:[0.5,0.42,0.29],roughness:0.9}));
+// A gentle rise ahead so some sand rides a slope: the drawn floor stays flat; the sand's ground is what it is told.
+const ground=()=>0;
+let sand=null;
+window.step=async({wind,time})=>{
+ const before=engine.stats.drawCalls;
+ if(wind===null){sand?.dispose();sand=null;}
+ else{if(!sand)sand=BlownSand.attach(engine,{ground,wind:{speed:wind,direction:0,gust:0.3},seed:7,amount:1});
+  sand.options.wind={speed:wind,direction:0,gust:0.3};sand.time=time;}
+ engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();
+ return {errors:errors.splice(0),drawCalls:engine.stats.drawCalls,particles:sand?.stats.particles??0,before};
+};
+window.ready=true;
+</script></body></html>

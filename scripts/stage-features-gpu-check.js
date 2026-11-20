@@ -1,8 +1,8 @@
 // Real-adapter check of the stage's lazy lighting packs: a stage scene with a loaded glTF model on a floor, then
 // `await addEnvironment(app, url)` and `await addShadows(app)` must each change the frame, with zero WebGPU validation
 // errors, and `app.dispose()` must release both (and abort an environment load still in flight).
-// Run from the repository root after building packages, with the GPU lock held:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/stage-features-gpu-check.js
+// Run from the repository root after building packages:
+//   node scripts/run-with-timeout.mjs -- node scripts/stage-features-gpu-check.js
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';

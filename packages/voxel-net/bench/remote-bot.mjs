@@ -1,6 +1,7 @@
 // One bot process of the real network bench (remote.mjs forks these): its share of bots ask /join as the page does, join
 // through the proxy with the page's Origin, and play. A bot told full keeps asking, as the page does.
 import { performance } from 'node:perf_hooks';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { clock, VoxelBot } from '../dist/bot.js';
 
@@ -12,6 +13,23 @@ const o = JSON.parse(process.argv[2]),
 let window = fresh(),
   stopped = false,
   connectFailed = 0;
+// Told to stop (an 'exit' message, or remote.mjs gone), every timer, wait and join request ends and every bot closes, so
+// the process ends by its event loop (KB-OWN-EXIT2).
+const stopping = new AbortController(),
+  timers = [];
+/** Waits `ms`, or less when the run stops. */
+const pause = (ms) =>
+  sleep(ms, undefined, { signal: stopping.signal }).catch((error) => {
+    if (error.name !== 'AbortError') throw error;
+  });
+function stop() {
+  if (stopped) return;
+  stopped = true;
+  for (const timer of timers) clearInterval(timer);
+  stopping.abort();
+  for (const bot of bots) bot.close();
+  if (process.connected) process.disconnect();
+}
 
 function fresh() {
   return {
@@ -35,45 +53,52 @@ function fresh() {
 
 // Play every bot at 60 updates a second.
 let last = performance.now();
-setInterval(() => {
-  const now = performance.now(),
-    dt = Math.min(0.1, (now - last) / 1000);
-  last = now;
-  for (const bot of bots) bot.update(dt);
-}, 16);
+timers.push(
+  setInterval(() => {
+    const now = performance.now(),
+      dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    for (const bot of bots) bot.update(dt);
+  }, 16),
+);
 
 // One ping per bot every 5 s, the way round the whole path: bot, Cloudflare, nginx, the shard's event loop and back.
-setInterval(() => {
-  for (const bot of bots) {
-    if (bot.closeCode !== undefined || bot.pingAt || bot.client.detached) continue;
-    bot.pingAt = clock();
-    bot.connection.ping();
-  }
-}, 5000).unref();
+timers.push(
+  setInterval(() => {
+    for (const bot of bots) {
+      if (bot.closeCode !== undefined || bot.pingAt || bot.client.detached) continue;
+      bot.pingAt = clock();
+      bot.connection.ping();
+    }
+  }, 5000),
+);
 
 const near = (b) => {
   const p = b.client.player.position;
   return (p[0] - b.home[0]) ** 2 + (p[2] - b.home[1]) ** 2 <= o.leash ** 2;
 };
-setInterval(() => {
-  process.send({
-    type: 'progress',
-    joined: bots.length,
-    spawned: bots.filter((b) => b.times.spawn).length,
-    loaded: bots.filter((b) => b.times.loaded).length,
-    arrived: bots.filter((b) => b.times.spawn && near(b)).length,
-    closed: bots.filter((b) => b.closeCode !== undefined).length,
-    waiting: waiting.size,
-    failed: connectFailed,
-  });
-}, 1000).unref();
+timers.push(
+  setInterval(() => {
+    if (!process.connected) return;
+    process.send({
+      type: 'progress',
+      joined: bots.length,
+      spawned: bots.filter((b) => b.times.spawn).length,
+      loaded: bots.filter((b) => b.times.loaded).length,
+      arrived: bots.filter((b) => b.times.spawn && near(b)).length,
+      closed: bots.filter((b) => b.closeCode !== undefined).length,
+      waiting: waiting.size,
+      failed: connectFailed,
+    });
+  }, 1000),
+);
 
 async function ask(id) {
   const asked = clock();
   try {
     const res = await fetch(o.target.join, {
         headers: { Origin: o.target.origin },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.any([AbortSignal.timeout(15_000), stopping.signal]),
       }),
       text = await res.text(),
       ms = clock() - asked;
@@ -124,7 +149,7 @@ async function play(id) {
         break;
       }
       if (answer.retry >= 30_000) refused = true;
-      await new Promise((done) => setTimeout(done, answer.retry * (0.8 + 0.4 * Math.random())));
+      await pause(answer.retry * (0.8 + 0.4 * Math.random()));
     }
     waiting.delete(id);
   }
@@ -148,6 +173,8 @@ async function play(id) {
         ...(o.fakeAddresses ? { 'X-Real-IP': `10.${(id >> 16) & 255}.${(id >> 8) & 255}.${id & 255}` } : {}),
       },
     });
+    // Stopped while it joined: it leaves at once.
+    if (stopped) return bot.close();
     bot.id = id;
     bot.home = home;
     bot.asked = asked;
@@ -242,16 +269,12 @@ process.on('message', (message) => {
       bot.close();
       left--;
     }
-  } else if (message.type === 'exit') {
-    stopped = true;
-    for (const bot of bots) bot.close();
-    setTimeout(() => process.exit(0), 300);
-  }
+  } else if (message.type === 'exit') stop();
 });
-process.on('disconnect', () => process.exit(0));
+process.on('disconnect', stop);
 
 // Arrivals at the asked rate; a slow join does not hold up the next player.
-for (let i = 0; i < o.count; i++) {
+for (let i = 0; i < o.count && !stopped; i++) {
   void play(o.first + i);
-  await new Promise((done) => setTimeout(done, 1000 / o.joinRate));
+  await pause(1000 / o.joinRate);
 }

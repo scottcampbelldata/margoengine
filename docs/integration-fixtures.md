@@ -3,7 +3,7 @@
 Every plugin package that attaches with `engine.use` or `scene.use` keeps one owner/lifetime fixture,
 `packages/<name>/test(s)/owner-lifetime.fixture.js`. `npm run check:owners` runs them: first the CPU model (the real
 core scene router and frame graph on a fake GPU), then, per package, a real WebGPU device and the WebGL2 compatibility
-layer, each under one GPU slot. Packages with no fixture are printed as pending, never passed. Integration job J1 (work
+layer, each. Packages with no fixture are printed as pending, never passed. Integration job J1 (work
 list 5, batch I1) folded its own runner into this check instead of keeping a second one (manager ruling, 2026-11-11).
 
 Run: `npm run check:owners -- --packages=taa,stats` (add `--cpu-only` for the CPU model alone). The fast gate in
@@ -17,7 +17,9 @@ entry is `{ name, visible?, viewDraws?, warmUp?, create(ctx) }`; `create` return
 
 - `plugin`: the registration under test. When `create` leaves it unattached, the harness attaches it with
   `scene.use(plugin)`.
-- `dispose()`: detaches and disposes the way the package README says.
+- `dispose()`: detaches and disposes the way the package README says. It may return a promise, or the handle may have
+  only `[Symbol.asyncDispose]()` (as `await using` takes it); a plugin's own `dispose` may return one too. The harness
+  awaits each, 5,000 ms at most, before it checks anything released: one that never settles fails the entry by name.
 - `dependencies`: caller-owned plugins `create` installed through `ctx.dependency(fn)` (an Environment, an Animation).
 - `check({ phase, host, views })`: optional package assertions after each render and after disposal.
 - `cleanup()`: releases what the caller owns (meshes, models, its own textures), after the leak checks.
@@ -34,9 +36,30 @@ per-device set.
 (`--entry=<name>` on `scripts/check-owner-lifetime-browser.mjs`), each inside the leaf's 180 s limit, which never
 rises. Entry names must then be unique. post and culling set it: their 31 and 30 entries in one WebGL2 leaf ran past 180 s on a Radeon 680M (post 208 s).
 
+`export const leafCases = <n>` (a whole number of 13-case entries, at most 208) instead packs the entries, in fixture
+order, into leaves of at most `n` cases (`--entry` given once per entry), so a large fixture does not pay a dev server,
+a browser and the shared shader compiles once per entry. water sets 104 (eight entries a leaf): its 35 entries, one leaf
+each and 70 with the WebGL2 pass, ran past the gate's 10 minutes on 2026-11-18 with every case passing. A leaf of named
+entries prints one line per entry with its seconds.
+
+On the WebGL2 layer a case cost 2.9 times its native time (water: 354 s of case time against 124 s), mostly waiting:
+each fence poll waited a 15 ms Windows timer tick (KB-COMPAT-POSTTASK1) and each allocation a `getError` round trip
+(KB-COMPAT-GETERROR1). With both fixed in `@margoengine/webgl2-compat`, water's check:owners passes in 344 s (was
+505 s), 214 s of WebGL2 case time against 107 s native (2.0 times), on the same loaded workstation, every case run.
+What remains is the GPU process compiling and linking each device's programs again (about 5 ms a program, some 11,000
+programs for water's 1,110 devices): WebGL2 has no program binaries to share between contexts, where native WebGPU
+reuses its compiled pipelines across devices.
+
 `ctx` is `{ engine, scene, host, dependency }`. `create` runs inside a setup of `scene`, so `engine.use` and
 `X.attach(engine)` join `scene`, as they do for an app. Meshes and textures the caller owns are made inside
 `dependency(fn)`, so they are its, not the plugin's.
+
+A package with no plugin of its own whose API hands the caller GPU objects keeps a fixture through the smallest caller
+plugin a game writes. decoders does: `uploadTexture` (from the dds, ktx, pvr, jxl and ktx2 readers) returns a texture
+its caller owns, so its fixture's plugin uploads a DDS file in setup, uploads again on a restored device and destroys
+the texture on disposal. Without that destroy all 13 cases fail "no leaked GPU buffers, textures or query sets".
+Only a package that makes no GPU object at all would be excluded instead, with its reason in
+`scripts/support/owner-lifetime-registry.mjs`.
 
 ## Cases
 

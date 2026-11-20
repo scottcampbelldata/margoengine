@@ -38,7 +38,7 @@ type Variant = {
 };
 let fields = 0;
 
-/** Grass field settings, fixed at construction except the wind ones; invalid values throw RangeError. */
+/** Grass field settings, fixed at construction except the wind ones and the live setters of `GrassField` (see `@margoengine/creative/grass-settings`); invalid values throw RangeError. */
 export interface GrassOptions {
   /** Blade count, an integer 1-16,777,216 (bounded by device limits). Default 100,000. */
   blades?: number;
@@ -82,7 +82,7 @@ export class GrassField implements EnginePlugin {
   private group?: GPUBindGroup;
   private canvasFormat?: GPUTextureFormat;
   private readonly variants = new Map<string, Variant>();
-  private readonly frame = new Float32Array(72);
+  private readonly frame = new Float32Array(88);
   private time = 0;
   private readonly spores: boolean;
   private readonly pass = overlayDepthPass();
@@ -142,6 +142,11 @@ export class GrassField implements EnginePlugin {
     this.frame[58] = bladeHeight;
     this.frame[60] = drawDistance;
     this.frame[61] = blades;
+    this.frame[63] = 1;
+    this.frame.set([0.025, 0.065, 0.012, 0], 72);
+    this.frame.set([0.25, 0.46, 0.045, 0], 76);
+    this.frame.set([0.38, 0.57, 0.085, 0], 80);
+    this.frame.set([0.34, 0.5, 0.09, 0.4], 84);
     engineRuntime(stage.engine).use(this);
   }
 
@@ -160,6 +165,84 @@ export class GrassField implements EnginePlugin {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 2)
       throw new RangeError('Wind strength must be 0..2');
     this.frame[55] = value;
+  }
+  /** X/Z wind direction as a unit vector; assign any nonzero finite pair and it is normalised. */
+  get windDirection(): readonly [number, number] {
+    return [this.frame[52], this.frame[53]];
+  }
+  set windDirection(value: readonly [number, number]) {
+    finiteVector(value, 2, 'Wind direction');
+    const length = Math.hypot(value[0], value[1]);
+    if (!length) throw new RangeError('Wind direction must be nonzero');
+    this.frame[52] = value[0] / length;
+    this.frame[53] = value[1] / length;
+  }
+  /** Blade height in world units, 0-100 (exclusive of 0); read every frame. */
+  get bladeHeight(): number {
+    return this.frame[58];
+  }
+  set bladeHeight(value: number) {
+    if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)) || Math.fround(value) <= 0 || value > 100)
+      throw new RangeError('Blade height must be above 0 and at most 100');
+    this.frame[58] = value;
+  }
+  /** Cull distance in world units, 0-100,000 (exclusive of 0); read every frame. */
+  get drawDistance(): number {
+    return this.frame[60];
+  }
+  set drawDistance(value: number) {
+    if (typeof value !== 'number' || !Number.isFinite(Math.fround(value)) || Math.fround(value) <= 0 || value > 100_000)
+      throw new RangeError('Draw distance must be above 0 and at most 100000');
+    this.frame[60] = value;
+  }
+  /** Fraction of the blades kept, 0-1 (a hash of the blade number, so lowering it only thins the field); read every frame. */
+  get density(): number {
+    return this.frame[63];
+  }
+  set density(value: number) {
+    if (typeof value !== 'number' || !(value >= 0 && value <= 1)) throw new RangeError('Grass density must be 0..1');
+    this.frame[63] = value;
+  }
+  /** Blade colour at the root, linear RGB 0-1 (default [0.025, 0.065, 0.012]); read every frame. */
+  get rootColor(): readonly [number, number, number] {
+    return [this.frame[72], this.frame[73], this.frame[74]];
+  }
+  set rootColor(value: readonly [number, number, number]) {
+    this.colour(value, 72, 'rootColor');
+  }
+  /** Blade colour at the tip, linear RGB 0-1 (default [0.25, 0.46, 0.045]); each blade mixes it toward `tipVariantColor`. */
+  get tipColor(): readonly [number, number, number] {
+    return [this.frame[76], this.frame[77], this.frame[78]];
+  }
+  set tipColor(value: readonly [number, number, number]) {
+    this.colour(value, 76, 'tipColor');
+  }
+  /** The tip colour of the most varied blades, linear RGB 0-1 (default [0.38, 0.57, 0.085]). */
+  get tipVariantColor(): readonly [number, number, number] {
+    return [this.frame[80], this.frame[81], this.frame[82]];
+  }
+  set tipVariantColor(value: readonly [number, number, number]) {
+    this.colour(value, 80, 'tipVariantColor');
+  }
+  /** Colour of sunlight seen through the blades, linear RGB 0-1 (default [0.34, 0.5, 0.09]). */
+  get translucencyColor(): readonly [number, number, number] {
+    return [this.frame[84], this.frame[85], this.frame[86]];
+  }
+  set translucencyColor(value: readonly [number, number, number]) {
+    this.colour(value, 84, 'translucencyColor');
+  }
+  /** Strength of the back-light, 0-4 (default 0.4): the glow of blades against a low sun; 0 is none. */
+  get translucency(): number {
+    return this.frame[87];
+  }
+  set translucency(value: number) {
+    if (typeof value !== 'number' || !(value >= 0 && value <= 4)) throw new RangeError('Grass translucency must be 0..4');
+    this.frame[87] = value;
+  }
+  private colour(value: readonly [number, number, number], at: number, name: string): void {
+    if (!Array.isArray(value) || value.length !== 3 || !value.every((v) => typeof v === 'number' && v >= 0 && v <= 1))
+      throw new RangeError(`Grass ${name} must be three numbers from 0 to 1`);
+    this.frame.set(value, at);
   }
   get windTime(): number {
     return this.time;

@@ -1,8 +1,8 @@
 // Shadows, update nodes, and a plain particle on the WebGL2 compatibility layer.
 // The layer is installed by scripts/browser.js when MARGO_COMPAT=1, before the page's first requestAdapter.
 // Same numbers as packages/vfx/test/features-check.mjs (checkShadows, checkNodes) plus checkPlain.
-// Run from the repository root, under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node packages/vfx/test/shadows-nodes-webgl2.mjs
+// Run from the repository root:
+//   node scripts/run-with-timeout.mjs -- node packages/vfx/test/shadows-nodes-webgl2.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 
@@ -95,6 +95,11 @@ try {
     `ok nodes webgl2: at ${nodes.got.at.map((v) => v.toFixed(5)).join(',')} v ${nodes.got.v.map((v) => v.toFixed(5)).join(',')}`,
   );
 
+  const wind = await page.evaluate(() => window.checkWind());
+  clean(wind, 'wind');
+  assert.deepEqual(wind.mismatches, [], JSON.stringify(wind));
+  console.log(`ok wind webgl2: ${wind.rows.map((row) => `U ${row.U} worst ${row.worst.toFixed(3)} deg`).join('; ')}`);
+
   const norm = await page.evaluate(() => window.checkNodeNorm());
   clean(norm, 'node norm');
   const unit = (got, label) => {
@@ -130,6 +135,7 @@ try {
     release,
     norm,
     f32,
+    wind,
   };
   await mkdir('test-results', { recursive: true });
   await writeFile('test-results/vfx-shadows-nodes-webgl2.json', JSON.stringify(report, null, 1));

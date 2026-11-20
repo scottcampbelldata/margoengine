@@ -23,7 +23,6 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const LIT_MARGIN = 16,
   LIT_MIN = 0.85,
@@ -38,7 +37,6 @@ const virtualPort = 5273,
   plainPort = 5267,
   virtual = process.argv.includes('--page=virtual'),
   name = virtual ? 'virtual-lit-faces' : 'shadows-lit-faces';
-const release = await acquire({ owner: name });
 const context = await openBrowser({
     startPath: `/packages/shadows/test/${virtual ? 'virtual-' : ''}lit-faces.html`,
     port: virtual ? virtualPort : plainPort,
@@ -238,5 +236,4 @@ try {
   console.log(`${name}: ok`);
 } finally {
   await context.close?.();
-  await release?.();
 }

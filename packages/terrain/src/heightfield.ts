@@ -2,7 +2,8 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
 import { planeGeometry } from '@margoengine/geometry/primitives';
-import { computeVertexNormals, type GeometryData } from '@margoengine/geometry/utils';
+import { computeVertexNormals, toGeometry, type GeometryData } from '@margoengine/geometry/utils';
+import type { Geometry } from '@margoengine/core';
 import type { HeightField } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 
@@ -63,6 +64,14 @@ export function heightfieldGeometry(height: HeightField, options: HeightfieldOpt
     data.positions[i + 2] = z;
   }
   return computeVertexNormals(data);
+}
+
+/**
+ * {@link heightfieldGeometry} as a core `Geometry`, ready for `mesh.setGeometry` (positions and normals; core keeps no
+ * UVs). Use `heightfieldGeometry` when you need the UVs or want to edit the arrays first.
+ */
+export function heightfield(height: HeightField, options: HeightfieldOptions): Geometry {
+  return toGeometry(heightfieldGeometry(height, options));
 }
 
 let serial = 0;

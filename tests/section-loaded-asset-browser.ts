@@ -1,7 +1,7 @@
 // Built package imports exercise the same loader and rendering boundary as consumers.
 import { Engine, Geometry, PbrMaterial } from '../packages/core/dist/extension.js';
-import { loadGLTF } from '../packages/gltf-pro/dist/index.js';
-// The scene `section` binding that gltf-pro and shadows read comes from the test section plugin.
+import { loadGLTF } from '../packages/gltf/dist/pbr.js';
+// The scene `section` binding that gltf/pbr and shadows read comes from the test section plugin.
 import { TestSectionPlugin } from './support/section-plugin.js';
 import { Shadows } from '../packages/shadows/dist/index.js';
 

@@ -29,6 +29,7 @@ export class MachineView<C> {
   private readonly content: HTMLDivElement;
   private readonly window: Window | null;
   private readonly detach: () => void;
+  private readonly unlisten: () => void;
   private frame: number | undefined;
   private disposed = false;
   private signature = '';
@@ -55,10 +56,13 @@ export class MachineView<C> {
     const title = doc.createElement('h2'); title.textContent = 'State machine';
     const bar = doc.createElement('div');
     const refresh = doc.createElement('button'); refresh.type = 'button'; refresh.textContent = 'Refresh';
-    refresh.addEventListener('click', () => this.refresh(filter.value));
+    const onRefresh = () => this.refresh(filter.value);
+    refresh.addEventListener('click', onRefresh);
     const filter = doc.createElement('input'); filter.type = 'search'; filter.placeholder = 'Filter states';
     filter.setAttribute('aria-label', 'Filter states');
-    filter.addEventListener('input', () => { this.signature = ''; this.refresh(filter.value); });
+    const onFilter = () => { this.signature = ''; this.refresh(filter.value); };
+    filter.addEventListener('input', onFilter);
+    this.unlisten = () => { refresh.removeEventListener('click', onRefresh); filter.removeEventListener('input', onFilter); };
     bar.append(refresh, filter);
     this.content = doc.createElement('div');
     root.append(style, title, bar, this.content);
@@ -148,7 +152,7 @@ export class MachineView<C> {
     if (this.disposed) return;
     this.disposed = true;
     if (this.frame !== undefined) this.window?.cancelAnimationFrame(this.frame);
-    this.detach(); this.owned?.dispose(); this.element.remove();
+    this.detach(); this.unlisten(); this.owned?.dispose(); this.element.remove();
     this.disclosures.clear();
   }
   declare [Symbol.dispose]: () => void;

@@ -1,7 +1,8 @@
-// Real-GPU check of @margoengine/clustered/area (AC power, GPU lock, after npm run build:packages):
+// Real-GPU check of @margoengine/clustered/area (AC power, after npm run build:packages):
 //   node examples/package-benchmarks/area-lights-gpu.mjs            correctness (no quiet machine needed)
 //   node examples/package-benchmarks/area-lights-gpu.mjs --bench    plus GPU cost per light (run node scripts/quiet-gate.mjs first)
-// 1. A glossy (roughness 0.2) and a rough (0.8) grey floor, as a core mesh and as a materials plane (gltf-pro, lit through
+// (--no-timing: the correctness checks only, as without --bench.)
+// 1. A glossy (roughness 0.2) and a rough (0.8) grey floor, as a core mesh and as a materials plane (gltf/pbr, lit through
 //    lights.add), under one rectangle light: at ~700 pixel centres per frame the screenshot equals the CPU mirror of the
 //    WGSL (test/ltc-reference.js) pushed through each path's tone mapping, within 3/255; on the core floors a few of those
 //    points are also compared with brute-force GGX + Lambert quadrature (radiance from the inverted tone map).
@@ -9,6 +10,7 @@
 //    the rough floor's is not, and its largest pixel-to-pixel radiance step is much smaller (soft falloff). No AreaLights
 //    equals an empty one.
 // 3. Two-sided: a light facing away from the floor leaves it black; twoSided lights it exactly like the light turned down.
+//    A window's light set back in its wall with a sill (`recess`, `sill`) equals the CPU mirror's clipped rectangle.
 // 4. --bench: GPU pass time (timestamp queries, median) at 1280x720 with no AreaLights, an empty one, and 1/4/16 lights.
 // Writes the frames to test-results/area-lights-*.png, and with --bench results/area-lights-gpu.json.
 import assert from 'node:assert/strict';
@@ -21,8 +23,8 @@ import { AreaLights } from '../../packages/clustered/dist/area.js';
 import { ltc, bruteForce } from '../../packages/clustered/test/ltc-reference.js';
 import { cpuLoad, powerOnlineText as ac } from './parts/power.mjs';
 
-const bench = process.argv.includes('--bench'),
-  benchOnly = process.argv.includes('--bench-only');
+const bench = process.argv.includes('--bench') && !process.argv.includes('--no-timing'),
+  benchOnly = process.argv.includes('--bench-only') && !process.argv.includes('--no-timing');
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'run on AC power only');
 const pack = (light) => {
@@ -35,7 +37,7 @@ const linear = (byte) => {
   const c = byte / 255;
   return c >= 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92;
 };
-// Output transform: core and gltf-pro both end in Khronos PBR Neutral (packages/shared/display.js).
+// Output transform: core and gltf/pbr both end in Khronos PBR Neutral (packages/shared/display.js).
 const output = {
   core: (rgb) => pbrNeutral(rgb.map((c) => Math.max(c, 0))).map(srgb),
   materials: (rgb) => pbrNeutral(rgb.map((c) => Math.max(c, 0))).map(srgb),
@@ -171,6 +173,37 @@ try {
         for (const r of physical)
           assert.ok(Math.abs(r.relative) < 0.2, `${name}: GPU ${r.gpu} vs brute force ${r.bruteForce} at ${r.pixel}`);
       }
+    // KB-BOUNCE-REVEAL1: a window's light set back in its wall, with a sill: the shader clips the rectangle to what each
+    // floor point sees through the opening, as the CPU mirror does (the mirror is checked against a traced wall and
+    // sill in test/area.test.js). The bare light must differ, so the clip is on.
+    const window = { position: [0, 1, -1.2], direction: [0, 0, 1], width: 1.2, height: 0.8, intensity: 6, recess: 0.25, sill: 0.12 },
+      bareWindow = { ...window, recess: 0, sill: 0 };
+    report.recessed = [];
+    for (const kind of ['core', 'materials']) {
+      const name = `${kind}-recessed`,
+        { image, eye } = await shot(name, { floor: kind + '0.8', light: window }),
+        light = pack(window),
+        bare = pack(bareWindow);
+      let worst = 0,
+        lit = 0,
+        shaded = 0;
+      floorPoints.forEach((p, i) => {
+        const v = eye.map((e, k) => e - p[k]),
+          length = Math.hypot(...v),
+          at = (l) => output[kind](ltc(l, p, [0, 1, 0], v.map((x) => x / length), [0.6, 0.6, 0.6], 0.8, 0).total),
+          want = at(light),
+          got = pixel(image, grid[i]);
+        worst = Math.max(worst, ...got.map((g, k) => Math.abs(g - want[k])));
+        if (want[1] > 20) lit++;
+        if (at(bare)[1] > want[1] + 10) shaded++;
+      });
+      const row = { floor: kind, samples: grid.length, litSamples: lit, shadedByReveal: shaded, maxDiffVsCpuMirror: worst };
+      report.recessed.push(row);
+      console.log(JSON.stringify(row));
+      assert.ok(lit > 40, `${name}: only ${lit} lit samples`);
+      assert.ok(shaded > 40, `${name}: the reveal shades only ${shaded} samples`);
+      assert.ok(worst <= 3, `${name}: GPU differs from the CPU mirror by ${worst}/255`);
+    }
     // Highlight shape: half-maximum region of a square light's reflection, measured on the floor (x across, z toward the camera).
     const square = { position: [0, 1.4, -1.2], direction: [0, -1, 0], width: 0.8, height: 0.8, intensity: 8 },
       fine = [];

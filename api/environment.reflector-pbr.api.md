@@ -7,6 +7,57 @@ import { Camera, EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export class MeshReflector extends Reflector {
+    static attach(engine: EngineKernel, options?: MeshReflectorOptions): MeshReflector;
+    constructor(options?: MeshReflectorOptions);
+    get mixStrength(): number;
+    set mixStrength(value: number);
+    get mixBlur(): number;
+    set mixBlur(value: number);
+    get mixContrast(): number;
+    set mixContrast(value: number);
+    get mirror(): number;
+    set mirror(value: number);
+    get blurSize(): readonly [number, number];
+    set blurSize(value: readonly [number, number]);
+    get depthScale(): number;
+    set depthScale(value: number);
+    get minDepthThreshold(): number;
+    set minDepthThreshold(value: number);
+    get maxDepthThreshold(): number;
+    set maxDepthThreshold(value: number);
+    get depthToBlurRatioBias(): number;
+    set depthToBlurRatioBias(value: number);
+    get reflectorOffset(): number;
+    set reflectorOffset(value: number);
+    get f0(): ColorInput;
+    set f0(value: ColorInput);
+    get roughness(): number;
+    set roughness(value: number);
+    protected aim(main: Camera): boolean;
+    protected get surfaceBlend(): GPUBlendState;
+    protected get surfaceUniformLength(): number;
+    protected get surfaceDepth(): GPUTextureView | undefined;
+    protected surfaceUniforms(c: Extract<PassContext, {
+        backend: 'webgpu';
+    }>, values: Float32Array): void;
+    protected get surfaceShader(): string;
+}
+
+export interface MeshReflectorOptions extends Omit<ReflectorOptions, 'roughness'> {
+    mixStrength?: number;
+    mixBlur?: number;
+    mixContrast?: number;
+    mirror?: number;
+    blur?: readonly [number, number];
+    depthScale?: number;
+    minDepthThreshold?: number;
+    maxDepthThreshold?: number;
+    depthToBlurRatioBias?: number;
+    reflectorOffset?: number;
+    f0?: ColorInput;
+}
+
 export class PBRReflector extends Reflector {
     static attach(engine: EngineKernel, options?: PBRReflectorOptions): PBRReflector;
     constructor(options?: PBRReflectorOptions);
@@ -38,6 +89,8 @@ export function reflectorBlurFraction(distance: number, blurDistance?: number): 
 export function reflectorFresnel(nv: number, f0?: number): number;
 
 // Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 
 type CapturePassFilter = (pass: {
     readonly name: string;
@@ -75,7 +128,7 @@ interface PlanarOptions {
     resolution?: number;
     clipBias?: number;
     roughness?: number;
-    normalMap?: GPUTexture | NormalMapImage;
+    normalMap?: Borrowable<GPUTexture> | NormalMapImage;
     distortion?: number;
     normalRepeat?: readonly [number, number];
     normalScroll?: readonly [number, number];
@@ -120,17 +173,21 @@ abstract class PlanarSurface {
     set distortion(value: number);
     get layers(): number;
     set layers(value: number);
-    get normalMap(): GPUTexture | NormalMapImage | undefined;
-    set normalMap(value: GPUTexture | NormalMapImage | undefined);
+    get normalMap(): Borrowable<GPUTexture> | NormalMapImage | undefined;
+    set normalMap(value: Borrowable<GPUTexture> | NormalMapImage | undefined);
     get texture(): GPUTexture | undefined;
     get textureMatrix(): Float32Array | undefined;
     setup(engine: EngineKernel): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     protected abstract aim(main: Camera): boolean;
     protected abstract faces(side: number): boolean;
     protected get surfaceShader(): string;
     protected get surfaceUniformLength(): number;
+    protected get surfaceBlend(): GPUBlendState | undefined;
     protected get surfaceDepth(): GPUTextureView | undefined;
     protected surfaceUniforms(_context: PlanarContext, _values: Float32Array): void;
     protected clip(main: Camera, n: Vec3, w: number): boolean;

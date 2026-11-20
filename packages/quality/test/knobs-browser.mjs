@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 setTimeout(() => {
   console.error('quality knobs hard timeout');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 180000).unref();
 const context = await openBrowser({ startPath: '/packages/quality/test/ssaa-browser.html', port: 'free' });
 const problems = [];

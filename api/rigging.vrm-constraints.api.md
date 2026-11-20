@@ -4,7 +4,7 @@
 
 ```ts
 import { Animator } from "@margoengine/animator";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface VRMConstraintDocument {
     nodes?: readonly {

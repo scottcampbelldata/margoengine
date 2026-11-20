@@ -230,7 +230,7 @@ test('Range requests: a miss passes through and fills the whole file in the back
   );
 });
 
-// gltf-pro, fbx and usdz take the same `fetch` option; they need a GPU engine, so the real-browser check
+// gltf/pbr, fbx and usdz take the same `fetch` option; they need a GPU engine, so the real-browser check
 // (examples/package-benchmarks/cache/) covers them with loadGLTF.
 test('@margoengine/loaders fetchBytes takes cache.fetch and loads offline from the cache', async () => {
   globalThis.indexedDB = fakeIndexedDB();

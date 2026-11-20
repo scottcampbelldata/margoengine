@@ -13,6 +13,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
+import { compatRun, compatShim } from './support/compat-shim.js';
 
 const opened = await openBrowser({ startPath: '/tests/lifecycle-browser.html', port: 5236 }),
   base = opened.page.url(),
@@ -22,6 +23,9 @@ const opened = await openBrowser({ startPath: '/tests/lifecycle-browser.html', p
 /** A fresh page on its own context (pixel ratio, init script), with every uncaught error collected. */
 async function open({ deviceScaleFactor = 1, init } = {}) {
   const context = await browser.newContext({ viewport: { width: 800, height: 600 }, deviceScaleFactor });
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js); openBrowser
+  // installs it only on its own page, and this context is the browser's.
+  if (compatRun()) await context.addInitScript(compatShim);
   if (init) await context.addInitScript(init);
   const page = await context.newPage(),
     errors = [];
@@ -102,6 +106,7 @@ try {
   const strip = {
     'no navigator.gpu': () => {
       delete Navigator.prototype.gpu;
+      delete navigator.gpu; // the layer's stub is an own property of navigator
     },
     'no adapter': () => {
       if (navigator.gpu) navigator.gpu.requestAdapter = async () => null;

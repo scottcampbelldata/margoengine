@@ -49,7 +49,7 @@ export interface XRCompositionLayer {
 }
 /** Where a layer sits: a position in metres and an orientation quaternion in `space` (default the XR reference space). */
 export interface LayerPlacement {
-  /** Default [0, 1.5, -2] for quads and cylinders, [0, 0, 0] otherwise. */
+  /** Default [0, 1.5, -2] for quads, [0, 1.5, 0] for cylinders (seen from their centre), [0, 0, 0] otherwise. */
   position?: readonly [number, number, number];
   /** Unit quaternion [x, y, z, w]. Default [0, 0, 0, 1]. */
   orientation?: readonly [number, number, number, number];
@@ -157,6 +157,8 @@ interface Entry extends XRPanel {
   readonly order: 'below' | 'above';
   readonly follow: boolean;
   readonly stereo: boolean;
+  /** 'stereo-left-right' or 'stereo-top-bottom': one texture holds both eyes and is drawn as one image. */
+  readonly packed: boolean;
   readonly faces: number;
   readonly isStatic: boolean;
   dirty: boolean;
@@ -325,6 +327,7 @@ export class XRLayers {
       layout === 'stereo',
       cube ? 6 : 1,
       options.isStatic ?? false,
+      layout === 'stereo-left-right' || layout === 'stereo-top-bottom',
     );
   }
   private track(
@@ -335,6 +338,7 @@ export class XRLayers {
     stereo: boolean,
     faces: number,
     isStatic: boolean,
+    packed = false,
   ): XRPanel {
     const self = this,
       entry: Entry = {
@@ -343,6 +347,7 @@ export class XRLayers {
         order,
         follow,
         stereo,
+        packed,
         faces,
         isStatic,
         dirty: true,
@@ -398,7 +403,13 @@ export class XRLayers {
       for (const eye of eyes) {
         const image = host.binding.getSubImage!(entry.layer, frame, eye),
           descriptor = image.getViewDescriptor(),
-          base = descriptor.baseArrayLayer ?? 0;
+          base = descriptor.baseArrayLayer ?? 0,
+          // A packed layout's one texture holds both views side by side or stacked (WebXR Layers, allocation), but
+          // its eye 'none' viewport is the first view's half (initialize the viewport, offset 0 of 2): the one image
+          // holding both eyes covers the whole texture.
+          viewport = entry.packed
+            ? { x: 0, y: 0, width: image.colorTexture.width, height: image.colorTexture.height }
+            : image.viewport;
         for (let face = 0; face < entry.faces; face++) {
           const source = pick(content, eye, face);
           if (typeof source === 'function') {
@@ -406,12 +417,12 @@ export class XRLayers {
               device: host.device,
               texture: image.colorTexture,
               view: image.colorTexture.createView({ ...descriptor, baseArrayLayer: base + face }),
-              viewport: image.viewport,
+              viewport,
               eye,
               face,
             });
           } else {
-            const { x, y, width, height } = image.viewport,
+            const { x, y, width, height } = viewport,
               size = imageSize(source);
             // A video in a browser that refuses one as the source (Firefox) goes through a canvas.
             copyExternal(

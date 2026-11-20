@@ -6,6 +6,10 @@
 import { EngineKernel, Mesh } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export type AnyRawShaderMaterial = RawShaderMaterial<{
+    value: unknown;
+}>;
+
 export interface RawAttribute {
     data: ArrayLike<number>;
     type: RawAttributeType;
@@ -19,15 +23,15 @@ export type RawBindGroup = (device: GPUDevice) => {
     group: GPUBindGroup;
 };
 
-export type RawBlending = 'none' | 'normal' | 'additive' | 'multiply' | 'premultiplied' | GPUBlendState;
+export type RawBlending = 'none' | 'normal' | 'additive' | 'subtractive' | 'multiply' | 'premultiplied' | GPUBlendState;
 
 export interface RawBounds {
     center: readonly [number, number, number];
     radius: number;
 }
 
-export class RawMesh {
-    material: RawShaderMaterial;
+export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
+    material: M;
     readonly matrix: Float32Array;
     mesh: Mesh | null;
     visible: boolean;
@@ -44,7 +48,8 @@ export class RawMesh {
     owner?: RawShaders;
     gpu?: MeshGpu;
     disposed: boolean;
-    constructor(options: RawMeshOptions);
+    constructor(options: RawMeshOptions<M>);
+    get drawTopology(): GPUPrimitiveTopology;
     get layout(): readonly {
         name: string;
         type: RawAttributeType;
@@ -70,8 +75,8 @@ export class RawMesh {
     draw(pass: GPURenderPassEncoder, first: number, count: number, instances: number, bound: BoundBuffers): void;
 }
 
-export interface RawMeshOptions {
-    material: RawShaderMaterial;
+export interface RawMeshOptions<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
+    material: M;
     attributes?: Record<string, RawAttribute>;
     index?: Uint16Array | Uint32Array | readonly number[] | null;
     instanceCount?: number;
@@ -119,17 +124,24 @@ export class RawPicking {
     [Symbol.dispose]: () => void;
 }
 
-export class RawShaderMaterial {
+export class RawShaderMaterial<U extends {
+    value: unknown;
+} = RawUniform> {
     readonly name: string;
-    readonly uniforms: Record<string, RawUniform>;
+    readonly uniforms: Record<string, U>;
     readonly textures: Record<string, RawTexture>;
     readonly storage: Record<string, RawStorage>;
     transparent: boolean;
     blending: RawBlending;
     depthTest: boolean;
+    depthCompare: GPUCompareFunction;
+    depthBias: number;
+    depthBiasSlopeScale: number;
+    alphaToCoverage: boolean;
     depthWrite: boolean;
     cull: 'back' | 'front' | 'none';
     colorWrite: boolean;
+    wireframe: boolean;
     onError?: (error: Error) => void;
     error?: Error;
     readonly members: readonly Member[];
@@ -149,7 +161,8 @@ export class RawShaderMaterial {
     [Symbol.dispose]: () => void;
     state(): string;
     blend(): GPUBlendState | undefined;
-    prepare(device: GPUDevice, pass: number): MaterialGpu;
+    drawnBy?: RawShaders;
+    prepare(device: GPUDevice, pass: number, owner?: RawShaders): MaterialGpu;
     get writesGBuffer(): boolean;
     pipeline(plugin: RawShaders, gpu: MaterialGpu, device: GPUDevice, mesh: RawMesh, kind: RawPass, c?: RawPassContext, compare?: GPUCompareFunction): GPURenderPipeline | undefined;
 }
@@ -160,7 +173,7 @@ export interface RawShaderMaterialOptions {
     vertexEntry?: string;
     fragmentEntry?: string;
     uniforms?: Record<string, RawUniform>;
-    textures?: Record<string, RawTextureSource | RawTexture | null>;
+    textures?: Record<string, RawTextureInput | RawTexture | null>;
     storage?: Record<string, RawStorage>;
     groups?: readonly RawBindGroup[];
     gbufferEntry?: string;
@@ -168,9 +181,14 @@ export interface RawShaderMaterialOptions {
     transparent?: boolean;
     blending?: RawBlending;
     depthTest?: boolean;
+    depthCompare?: GPUCompareFunction;
+    depthBias?: number;
+    depthBiasSlopeScale?: number;
+    alphaToCoverage?: boolean;
     depthWrite?: boolean;
     cull?: 'back' | 'front' | 'none';
     colorWrite?: boolean;
+    wireframe?: boolean;
     name?: string;
 }
 
@@ -185,9 +203,11 @@ export class RawShaders implements EnginePlugin {
         pending: number;
     };
     readonly watchers: Set<RawPicking>;
+    get pass(): number;
+    get kernel(): EngineKernel | undefined;
     static attach(engine: EngineKernel, options?: RawShadersOptions): RawShaders;
     constructor(options?: RawShadersOptions);
-    add(mesh: RawMesh): RawMesh;
+    add<T extends RawMesh>(mesh: T): T;
     remove(mesh: RawMesh): boolean;
     ready(): Promise<void>;
     track(job: Promise<void>): void;
@@ -196,7 +216,7 @@ export class RawShaders implements EnginePlugin {
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
-    cameraBlock(camera: PassContext['camera'], m: ArrayLike<number>, width: number, height: number, delta: number, encoding: number): Float32Array<ArrayBuffer>;
+    cameraBlock(camera: PassContext['camera'], m: ArrayLike<number>, width: number, height: number, delta: number, encoding: number, view?: ArrayLike<number>): Float32Array<ArrayBuffer>;
     nextPass(): number;
     shadow(mesh: RawMesh, { context: c, pass, matrix, cascade }: RawShadowContext): void;
     draw(context: PassContext, mode: 'gbuffer' | 'ambient' | 'occlusion', _color: GPUTextureView, _depth: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: {
@@ -232,11 +252,13 @@ export interface RawStorage {
 }
 
 export interface RawTexture {
-    texture: RawTextureSource | null;
+    texture: RawTextureInput | null;
     sampler?: GPUSamplerDescriptor;
     dimension?: '2d' | '2d-array' | 'cube' | '3d';
-    sampleType?: 'float' | 'unfilterable-float' | 'sint' | 'uint';
+    sampleType?: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth';
 }
+
+export type RawTextureInput = RawTextureSource | ((device: GPUDevice) => GPUTexture | GPUTextureView);
 
 export type RawTextureSource = GPUTexture | GPUTextureView | BindableTexture;
 
@@ -305,6 +327,7 @@ interface Member {
 
 interface MeshGpu {
     device: GPUDevice;
+    wire?: boolean;
     object: GPUBuffer;
     written?: Float32Array;
     vertex?: HeldBuffer;

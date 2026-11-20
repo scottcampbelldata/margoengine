@@ -1,7 +1,7 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import type { PBRModel, PBRMaterialShading } from '@margoengine/gltf-pro/model';
-import { textureCoordinates } from '@margoengine/gltf-pro/coordinates';
+import type { PBRModel, PBRMaterialShading } from '@margoengine/gltf/pbr-model';
+import { textureCoordinates } from '@margoengine/gltf/texture-coordinates';
 import type { USDImagePlacement } from './extension.js';
 
 /** Internal serializable opacity binding. */
@@ -137,7 +137,7 @@ fn usdPrimvar(slot:u32,p:vec4f)->vec4f {let tri=u32(round(p.x));let u=p.z;let v=
           if (alpha) {
             const anchor = '  let mr=';
             if (!code.includes(anchor))
-              throw new TypeError('USD primvars need the PBR surface shader; use matching gltf-pro and usdz packages');
+              throw new TypeError('USD primvars need the PBR surface shader; use matching gltf/pbr and usdz packages');
             code = code.replaceAll(anchor, alpha + '\n' + anchor);
           }
           if (edits) code = code.replaceAll('  return s;', edits + '  return s;');

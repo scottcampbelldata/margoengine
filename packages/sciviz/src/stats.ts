@@ -142,19 +142,20 @@ export class StatisticalChart {
     y1 += dy;
     const sx = (x: number) => padding + ((x - x0) / (x1 - x0)) * (width - 2 * padding),
       sy = (y: number) => height - padding - ((y - y0) / (y1 - y0)) * (height - 2 * padding);
-    const d = (p: readonly StatisticalPoint[]) => {
-      let connected = false;
-      return p
-        .map(([x, y]) => {
-          if (!Number.isFinite(x) || !Number.isFinite(y)) {
-            connected = false;
-            return '';
-          }
-          const s = `${connected ? 'L' : 'M'}${sx(x)},${sy(y)}`;
-          connected = true;
-          return s;
-        })
-        .join('');
+    // A NaN point splits a mark into parts; a polygon closes every part (SVG 2, 9.3.4 closepath), not only the last.
+    const d = (p: readonly StatisticalPoint[], close: boolean) => {
+      let connected = false,
+        out = '';
+      for (const [x, y] of p) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          if (connected && close) out += 'Z';
+          connected = false;
+          continue;
+        }
+        out += `${connected ? 'L' : 'M'}${sx(x)},${sy(y)}`;
+        connected = true;
+      }
+      return connected && close ? out + 'Z' : out;
     };
     const marks = this.marks
       .map((m) =>
@@ -166,17 +167,18 @@ export class StatisticalChart {
                   `<circle cx="${sx(x)}" cy="${sy(y)}" r="2.5" fill="${escape(m.color)}" opacity="${m.opacity ?? 1}"/>`,
               )
               .join('')
-          : `<path d="${d(m.points)}${m.kind === 'polygon' ? 'Z' : ''}" fill="${m.kind === 'polygon' ? escape(m.color) : 'none'}" stroke="${escape(m.color)}" stroke-width="1.4" opacity="${m.opacity ?? 1}"/>`,
+          : `<path d="${d(m.points, m.kind === 'polygon')}" fill="${m.kind === 'polygon' ? escape(m.color) : 'none'}" stroke="${escape(m.color)}" stroke-width="1.4" opacity="${m.opacity ?? 1}"/>`,
       )
       .join('');
     const xt = this.categories.length
       ? this.categories.map((label, x) => ({ x, label }))
-      : ticks(x0, x1, 6).values.map((x) => ({ x, label: String(Number(x.toPrecision(4))) }));
-    const yt = ticks(y0, y1, 5).values;
-    const grid = yt
+      : (({ values, labels }) => values.map((x, i) => ({ x, label: labels[i] })))(ticks(x0, x1, 6));
+    // Tick labels carry just enough digits to tell neighbours apart (ticks.ts), so 1000.1 and 1000.2 differ.
+    const yt = ticks(y0, y1, 5);
+    const grid = yt.values
       .map(
-        (y) =>
-          `<path d="M${padding},${sy(y)}H${width - padding}" stroke="#dde4e8"/><text x="${padding - 8}" y="${sy(y) + 4}" text-anchor="end">${Number(y.toPrecision(4))}</text>`,
+        (y, i) =>
+          `<path d="M${padding},${sy(y)}H${width - padding}" stroke="#dde4e8"/><text x="${padding - 8}" y="${sy(y) + 4}" text-anchor="end">${escape(yt.labels[i])}</text>`,
       )
       .join('');
     const labels = xt

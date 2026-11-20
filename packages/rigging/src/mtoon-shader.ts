@@ -10,8 +10,8 @@ fn mtRaw(i:Out,k:u32)->vec2f {return select(i.uv.xy,i.uv.zw,mt.rows[8u+k*3u].w>0
 fn mtTransform(p:vec2f,k:u32)->vec2f {let a=mt.rows[8u+k*3u];let b=mt.rows[9u+k*3u];return vec2f(dot(a.xyz,vec3f(p,1)),dot(b.xyz,vec3f(p,1)));}
 fn mtAnimate(i:Out,p:vec2f)->vec2f {
  let mask=textureSampleLevel(mtMap5,mtSampler5,mtTransform(mtRaw(i,5u),5u),0.0).b;
- let t=mt.rows[5].w*mask;let a=mt.rows[6].z*t;let c=cos(a);let s=sin(a);let q=p-0.5;
- return vec2f(c*q.x+s*q.y,-s*q.x+c*q.y)+0.5+mt.rows[6].xy*t;
+ let t=mt.rows[6].xyz*mask+fract(vec3f(mt.rows[5].w,mt.rows[7].zw)*mask)*vec3f(2,2,1);let a=6.2831853*t.z;let c=cos(a);let s=sin(a);let q=p-0.5;
+ return vec2f(c*q.x+s*q.y,-s*q.x+c*q.y)+0.5+t.xy;
 }
 fn mtUV(i:Out,k:u32)->vec2f {return mtTransform(mtAnimate(i,mtRaw(i,k)),k);}
 fn mtStep(nl:f32,shift:f32)->f32 {let width=1.0-mt.rows[4].y;let x=nl+shift;if(width==0.0){return select(0.0,1.0,x>=0.0);}return clamp(0.5+x/(2.0*width),0.0,1.0);}
@@ -28,7 +28,7 @@ fn mtRim(i:Out,s:Surface,v:vec3f,lighting:vec3f)->vec3f {
 const replace = (code: string, from: string | RegExp, to: string): string => {
   const next = code.replace(from, () => to);
   if (next === code)
-    throw fault('unsupported', 'MToon shader contract changed; use matching rigging and gltf-pro versions');
+    throw fault('unsupported', 'MToon shader contract changed; use matching rigging and gltf/pbr versions');
   return next;
 };
 /** Internal standard PBR shader adapter; optional material, no renderer replacement. */
@@ -64,13 +64,24 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {return margoAmbientTerm(i
 @fragment fn fragment(`,
   );
   if (outline) {
+    // The outline hull shows its back faces, whose two-sided normal is flipped toward the camera. The outline is lit as
+    // the surface it wraps (VRMC_materials_mtoon 1.0 outlineLightingMixFactor mixes in that surface's lighting), so
+    // its lighting, GI and rim use the vertex's own outward normal: the flip is undone.
+    out = replace(
+      out,
+      'let n=normalize(i.normal)*select(-1.0,1.0,facing);',
+      'let n=-normalize(i.normal)*select(-1.0,1.0,facing);',
+    );
+    // The hull is built on o.clip and o.position after the standard projection, which stays in place, so a later world
+    // edit of that projection (weather's snow lift) moves the outline with the body it wraps.
     out = replace(
       out,
       'o.clip=f.camera*p; o.position=p.xyz;',
-      `let n=normalize((f.normalMatrix*vec4f(i.normal.xyz,0)).xyz);
+      `o.clip=f.camera*p; o.position=p.xyz;
+    let n=normalize((f.normalMatrix*vec4f(i.normal.xyz,0)).xyz);
     o.uv=i.uv;
     let mask=textureSampleLevel(mtMap4,mtSampler4,mtUV(o,4u),0.0).g;
-    var world=p;var clip=f.camera*p;
+    var world=vec4f(o.position,1.0);var clip=o.clip;
     if(mt.rows[7].x<1.5){world+=vec4f(n*mt.rows[6].w*mask,0);clip=f.camera*world;}
     else {let projected=(f.camera*vec4f(n,0));let dir=projected.xy-clip.xy*projected.w/clip.w;
       let aspect=mt.rows[7].y;let screen=vec2f(dir.x*aspect,dir.y);let len=length(screen);
@@ -103,7 +114,7 @@ export function mtoonLit(code: string, outline = false): string {
   const fragment = out.slice(out.indexOf('@fragment fn fragment('));
   const equation = /var color=([^;]*);/.exec(fragment)?.[1];
   if (!equation)
-    throw fault('unsupported', 'MToon lighting sum contract changed; use matching rigging and gltf-pro versions');
+    throw fault('unsupported', 'MToon lighting sum contract changed; use matching rigging and gltf/pbr versions');
   // Evaluate the composed incident light with a white diffuse surface. This
   // retains every local-light and direct-shadow hook, without material colour.
   out = replace(

@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"><title>GLSL motion vectors</title><style>body{margin:0}canvas{width:64px;height:64px;display:inline-block}</style></head><body>
+<script type="module">
+// TAA's motion vectors of one moving square, three ways: a RawShaderMaterial whose WGSL velocityEntry writes the move
+// (margoVelocity, last frame's uniform beside it), a ShaderMaterial whose GLSL vertex stage makes the same move with
+// `velocity: {shift: 'shiftBefore'}`, and the same GLSL without `velocity` (TAA then sees only the camera's motion
+// over its depth). Each frame the square slides by its uniform, turns and moves by its matrix, and the camera moves.
+import {Engine} from '/packages/core/dist/index.js';
+import {TAA} from '/packages/taa/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {RawMesh,RawShaders,RawShaderMaterial} from '/packages/shader/dist/raw.js';
+import {ShaderMaterial,shaderMesh} from '/packages/shader/dist/glsl-material.js';
+const W=64,H=64,errors=[];
+const quad={positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],indices:[0,1,2,0,2,3]};
+const wgsl=`
+struct Out { @builtin(position) @invariant clip:vec4f }
+@vertex fn vertex(a:Attributes)->Out { return Out(camera.viewProjection*mesh.world*vec4f(a.position+vec3f(uniforms.shift,0,0),1)); }
+@vertex fn velocity(a:Attributes)->MargoVelocity { return margoVelocity(a.position+vec3f(uniforms.shift,0,0), a.position+vec3f(uniforms.shiftBefore,0,0)); }
+@fragment fn fragment()->@location(0) vec4f { return vec4f(1); }`;
+const glsl=`uniform float shift;
+void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position + vec3(shift, 0.0, 0.0), 1.0); }`;
+const fragment='precision highp float;\nvoid main() { gl_FragColor = vec4(1.0); }';
+async function rig(kind){
+  const canvas=Object.assign(document.createElement('canvas'),{width:W,height:H});document.body.append(canvas);
+  const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:[W,H],camera:{position:[0,0,6],target:[0,0,0]}});
+  engine.stop();
+  engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));engine.onError=e=>errors.push(e.message);
+  const taa=TAA.attach(engine),raw=RawShaders.attach(engine),uniforms={shift:{value:0},shiftBefore:{value:0}};
+  let material,mesh;
+  if(kind==='wgsl'){
+    material=new RawShaderMaterial({vertexShader:wgsl,uniforms,cull:'none',velocityEntry:'velocity'});
+    mesh=new RawMesh({material,attributes:{position:{data:quad.positions,type:'vec3f'}},index:quad.indices});
+  }else{
+    material=new ShaderMaterial({vertexShader:glsl,fragmentShader:fragment,uniforms,side:'double',...(kind==='glsl'?{velocity:{shift:'shiftBefore'}}:{})});
+    mesh=shaderMesh(quad,material);
+  }
+  raw.add(mesh);taa.add(raw);
+  return {engine,taa,raw,material,mesh};
+}
+const rigs={wgsl:await rig('wgsl'),glsl:await rig('glsl'),plain:await rig('plain')};
+// Frame i: the uniform slide, a turn about z with a move, and a camera move.
+function pose(r,i){
+  const u=r.material.uniforms;u.shiftBefore.value=u.shift.value;u.shift.value=0.05*i;
+  const a=0.03*i,c=Math.cos(a),s=Math.sin(a);r.mesh.matrix.set([c,s,0,0,-s,c,0,0,0,0,1,0,0.02*i,0.01*i,0,1]);
+  Object.assign(r.engine.camera,{position:[0.03*i,0.02*i,6],target:[0.03*i,0,0]});
+}
+async function read(engine,texture){
+  const device=engine.gpu,buffer=device.createBuffer({size:256*H,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+  encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:256},[W,H]);device.queue.submit([encoder.finish()]);
+  await buffer.mapAsync(GPUMapMode.READ);const out=Array.from(new Uint8Array(buffer.getMappedRange().slice(0)));buffer.unmap();buffer.destroy();return out;
+}
+window.check={
+  async run(frames){
+    for(const r of Object.values(rigs))await waitForPipelines(async()=>{pose(r,0);r.engine.render({delta:1/60});await r.engine.gpu.queue.onSubmittedWorkDone();await r.raw.ready();});
+    for(const r of Object.values(rigs))for(let i=1;i<=frames;i++){pose(r,i);r.engine.render({delta:1/60});}
+    const out={};
+    for(const [k,r] of Object.entries(rigs)){await r.engine.gpu.queue.onSubmittedWorkDone();const v=r.taa.velocity;out[k]={velocity:await read(r.engine,v.texture),depth:await read(r.engine,v.expectedDepth)};}
+    return {out,errors:errors.splice(0),pending:Object.values(rigs).map(r=>r.raw.stats.pending)};
+  },
+  close(){for(const r of Object.values(rigs))r.engine.dispose();return errors.splice(0);},
+};
+window.ready=true;
+</script></body></html>

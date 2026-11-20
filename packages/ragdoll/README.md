@@ -10,7 +10,7 @@ size: an app that does not import this package ships none of it.
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { Animator } from 'margoengine/animator';
 import { Physics } from 'margoengine/physics';
@@ -146,7 +146,7 @@ one skeleton or the wrong engine, and `unsupported` for a hinge on a solver with
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Physics } from 'margoengine/physics';
 import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
@@ -202,7 +202,7 @@ import { Ragdoll } from 'margoengine/ragdoll';
 import { addGetUp } from 'margoengine/ragdoll/getup';
 import { Animation } from 'margoengine/animation';
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Physics } from 'margoengine/physics';
 import { Animator } from 'margoengine/animator';
 
@@ -249,7 +249,7 @@ No facing convention is needed: only the turn about the up axis is free, and wha
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Physics } from 'margoengine/physics';
 import { fitRagdollShapes } from 'margoengine/ragdoll/hulls';
 
@@ -284,7 +284,7 @@ A profile is a ragdoll as plain JSON: bones by name, joints and limits, sizes, m
 ```ts
 import { Ragdoll } from 'margoengine/ragdoll';
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Physics } from 'margoengine/physics';
 import { humanoidProfile, ragdollOptions, saveRagdollProfile } from 'margoengine/ragdoll/profile';
 
@@ -329,7 +329,7 @@ import { Ragdoll } from 'margoengine/ragdoll';
 import { addRagdollBalance } from 'margoengine/ragdoll/balance';
 import { addRagdollMotors } from 'margoengine/ragdoll/powered';
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Physics } from 'margoengine/physics';
 import { humanoidProfile, ragdollOptions } from 'margoengine/ragdoll/profile';
 

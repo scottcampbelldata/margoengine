@@ -134,3 +134,19 @@ test('serialization budgets and URL loading retain cancellation and failure caus
     (e) => e.code === 'failed' && /404/.test(e.message),
   );
 });
+
+// The shadows feature writes its light list's GPUBuffer into the options it was given (`shadows.buffer`), so saving an
+// attached effect with shadows threw "is an external object". That field is the feature's output, not a setting.
+test('an attached effect with shadows saves its settings without the light list buffer', async () => {
+  const { optionalGPU } = await import('../../../tests/support/optional-gpu.js');
+  const h = optionalGPU();
+  h.engine.stats = { drawCalls: 0 };
+  const effect = new VFX({ capacity: 4, shadows: { count: 2, range: 5 } });
+  h.engine.use(effect);
+  const buffer = effect.options.shadows.buffer;
+  assert.ok(buffer, 'the feature set its light list');
+  const preset = parseEffect(serializeEffect(effect));
+  assert.deepEqual(preset.options.shadows, { count: 2, range: 5 });
+  assert.equal(effect.options.shadows.buffer, buffer, 'the effect keeps its light list');
+  effect.dispose();
+});

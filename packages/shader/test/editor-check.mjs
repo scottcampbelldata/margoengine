@@ -1,5 +1,5 @@
-// Real-adapter check of the node editor (run from the repository root after building packages, under the GPU lock):
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node packages/shader/test/editor-check.mjs
+// Real-adapter check of the node editor (run from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/shader/test/editor-check.mjs
 // A browser mouse and keyboard build a surface graph in the editor: Shift+A opens the palette, typing finds a node,
 // number fields take constants, dragging connects sockets. Each valid graph becomes a material on a plane that the GPU
 // draws, and the canvas pixels are read back: (1, 0.5, 0.25) * 0.5, then * 1 after retyping a field (hot reload), the same

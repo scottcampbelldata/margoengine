@@ -170,7 +170,7 @@ core's (`test/gpu/meshes-occlusion-check.mjs`).
 
 ## Loaded models and materials meshes: `CulledModels`
 
-`CulledModels` from `margoengine/culling/models` runs the same compute cull on gltf-pro models and materials meshes,
+`CulledModels` from `margoengine/culling/models` runs the same compute cull on gltf/pbr models and materials meshes,
 whatever they were loaded or built from. Instanced primitives compact their rows, so a forest of a million trees costs
 the CPU the same as ten. Every other primitive gets one indirect draw record, so an ordinary glTF scene is culled too.
 
@@ -193,7 +193,7 @@ setTimeout(async () => console.log(await culled.readCounts()), 1000);   // rows 
 
 Each frame, before any draw, every primitive of an added model that has `instances` tests its rows against the frustum
 (and the pyramid of the occluders, with `occlusion`),
-compacts the kept rows in order, and sets `primitive.redirect`, gltf-pro's hook for this, which core's `Batch.redirect`
+compacts the kept rows in order, and sets `primitive.redirect`, gltf/pbr's hook for this, which core's `Batch.redirect`
 matches; every draw of the primitive in that frame (main pass, SSAO, outline) reads the kept rows with one indirect draw.
 A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInstancedMesh` all go the same way. With no
 `minRadius` the image is the same as without culling.
@@ -202,9 +202,9 @@ A glTF with EXT_mesh_gpu_instancing, a `PBRInstances` you assign and `createInst
   geometry, such as a displacement map, needs `padding` of at least the farthest it moves them, in the primitive's units.
 - Shadows, picking and export read every row, so casters outside the view still cast.
 - A primitive without `instances` gets a record in one shared list, written by one dispatch for all of them, and sets
-  `primitive.culled`, gltf-pro's hook for this. A culled primitive draws nothing, so it costs no vertex or fragment work,
+  `primitive.culled`, gltf/pbr's hook for this. A culled primitive draws nothing, so it costs no vertex or fragment work,
   but it still costs its draw call on the CPU: WebGPU has no multi-draw, so CPU cost still grows with the number of
-  primitives. Give repeated objects `instances`. A primitive gltf-pro has joined into an instanced batch stays in that draw.
+  primitives. Give repeated objects `instances`. A primitive gltf/pbr has joined into an instanced batch stays in that draw.
 - Skinned and morphed primitives are not culled: their bounds are only known on the GPU.
 - `{occlusion: true}` also drops rows and primitives hidden behind the surfaces you give `culled.addOccluder(wall)`: a
   core mesh, a model, a materials mesh or a Terrain. Give it the large things: an occluder draws depth-only every frame,
@@ -269,39 +269,53 @@ cast no shadows through this class, and the WebGL2 layer draws every shown insta
 
 ## One large mesh, cluster by cluster: `MeshletMesh`
 
-`MeshletMesh` from `margoengine/culling/meshlets` splits one mesh into clusters of neighbouring triangles. Each frame a compute
-pass tests every cluster of every part against the frustum, against a cone of its normals and, with `culling: 'occlusion'`,
-against the Hi-Z pyramid, and the main pass draws only the kept clusters.
-Clusters facing away are dropped only when the back-face discard would drop their triangles anyway: a single-sided material, a
-perspective camera, no mirroring. The image does not change.
+`MeshletMesh` from `margoengine/culling/meshlets` splits one mesh into clusters of neighbouring triangles and draws it as
+many instances as you like, each with its own matrix and material. Each frame a compute pass tests every cluster of every
+instance against the frustum, against a cone of its normals and, with `culling: 'occlusion'`, against the Hi-Z pyramid, and
+the main pass draws only the kept clusters. Clusters facing away are dropped only when the back-face discard would drop
+their triangles anyway: a single-sided material, a perspective camera, no mirroring. The image does not change.
 
 ```js
 import { Engine, box, PbrMaterial } from 'margoengine';
 import { MeshletMesh } from 'margoengine/culling/meshlets';
 const engine = await Engine.create(document.querySelector('canvas')!);
-const mesh = MeshletMesh.attach(engine, [
-  {
-    geometry: box(4, 4, 4),
-    material: new PbrMaterial({ doubleSided: false }),
-    transforms: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
-  },
-]);
+// 100 copies of one mesh in a row, each its own part.
+const transforms = new Float32Array(100 * 16);
+for (let i = 0; i < 100; i++) transforms.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, i * 5, 0, 0, 1], i * 16);
+const mesh = MeshletMesh.attach(
+  engine,
+  [{ geometry: box(4, 4, 4), material: new PbrMaterial({ doubleSided: false }), transforms }],
+  { culling: 'occlusion' },
+);
 mesh.setTransform(0, 0, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 2, 0, 1]);
 ```
 
-It takes one batch, of as many parts as you like: each part is a copy of the mesh with its own matrix and material, culled
-cluster by cluster on its own, and drawn with one indirect call. Each part holds a region of the mesh's indices, so copies
-cost index memory, and a device limit refuses too many: `CulledParts` draws many small copies for less.
+It takes one batch, of up to 65,535 parts. Each part is culled whole first, then cluster by cluster, and drawn with one
+indirect call. The kept clusters of all parts share one pool of indices, `maxKeptTriangles` big (default: every triangle of
+every part, up to 4,194,304). Parts are placed in slot order, and a part whose clusters do not fit draws its whole mesh, so a
+small pool costs triangles, never pixels. `CulledParts` draws many small copies for less CPU work.
 
-`culling: 'occlusion'` adds the Hi-Z test per cluster, so a wall hides the part of a mesh behind it and a mesh hides its own
-far side. The depth comes from `addOccluder` sources and from whole parts drawn as occluders first, which is a depth draw of a
-whole part. `shadows.add(mesh)` culls per cascade too: each cascade draws only the clusters inside its light box, in a list of
-its own, so four cascades hold four more regions per part. A pick draws the whole mesh.
+`culling: 'occlusion'` culls in two passes, cluster by cluster: the clusters each part drew last frame are drawn depth-only
+at this frame's matrices, the Hi-Z pyramid is built from them (with `addOccluder` sources), and then every cluster is tested
+against it. A wall of small parts hides what is behind it, a mesh hides its own far side, and a cluster that comes into view
+is drawn the frame it does. `shadows.add(mesh)` culls per cascade too: each cascade draws only the clusters inside its light
+box, in a pool of its own. A pick draws the whole mesh.
 
 `maxVertices` (default 64) and `maxTriangles` (124) set the cluster size, next to the options of `CulledParts`, whose picking and
 part culling it keeps. `buildMeshlets(geometry)` gives the clusters alone. `readTriangles()` resolves how many triangles the last
-frame kept over all parts, and `readShadowTriangles(cascade)` the same for a shadow pass. The WebGL2 layer draws the whole mesh, and both count every
-part drawn whole.
+frame drew over all parts, and `readShadowTriangles(cascade)` the same for a shadow pass. On the WebGL2 layer the frustum and
+cone tests run on the CPU and each run of neighbouring kept clusters is one draw; that layer has no Hi-Z, so `'occlusion'`
+culls against the frustum there, as every culling class does.
+
+Sources (read clean room, no code): N. Greene, M. Kass and G. Miller, "Hierarchical Z-buffer visibility", SIGGRAPH 1993,
+<https://doi.org/10.1145/166117.166147>; U. Haar and S. Aaltonen, "GPU-Driven Rendering Pipelines", SIGGRAPH 2015 Advances in
+Real-Time Rendering, <https://advances.realtimerendering.com/s2015/>; G. Wihlidal, "Optimizing the Graphics Pipeline with
+Compute", GDC 2016, <https://www.gdcvault.com/play/1023109/Optimizing-the-Graphics-Pipeline-With>; B. Karis, R. Stubbe and
+G. Thomas, "Nanite: A Deep Dive", SIGGRAPH 2021 Advances in Real-Time Rendering, <https://advances.realtimerendering.com/s2021/>;
+L. Shirman and S. Abi-Ezzi, "The Cone of Normals Technique for Fast Processing of Curved Patches", Computer Graphics Forum 12(3),
+1993, <https://doi.org/10.1111/1467-8659.1230261>; W. D. Hillis and G. L. Steele, "Data Parallel Algorithms", CACM 29(12), 1986,
+<https://doi.org/10.1145/7902.7903>; G. E. Blelloch, "Prefix Sums and Their Applications", CMU-CS-90-190, 1990,
+<https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf>.
 
 
 ## Moving objects: `DynamicInstances`
@@ -411,7 +425,7 @@ The box test runs on parts that pass the sphere test, so it only ever drops more
 
 ## Any geometry as occluder
 
-In `'occlusion'` mode only parts hide parts until you say otherwise. `addOccluder` adds a core mesh, a gltf-pro model, a
+In `'occlusion'` mode only parts hide parts until you say otherwise. `addOccluder` adds a core mesh, a gltf/pbr model, a
 materials mesh or a `Terrain`, so a building hides the parts behind it even though it is not a part:
 
 ```ts
@@ -473,7 +487,7 @@ fragments beyond core's single-sided rule or changes core's clip-position line.
 
 ## Measurements
 
-Intel Arc 140V (Core Ultra 7 258V), headless Edge, 1432x768, 4x MSAA, AC power, GPU lock held:
+Intel Arc 140V (Core Ultra 7 258V), headless Edge, 1432x768, 4x MSAA, AC power:
 `examples/package-benchmarks/parts/results-culling.json`, written by `node examples/package-benchmarks/parts/culling.mjs
 --check --views=orbit,still,grazing --layouts=sheet,stack`.
 

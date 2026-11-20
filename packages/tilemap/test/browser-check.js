@@ -433,51 +433,82 @@ window.check = {
       record('after those errors the canvas still draws', difference(frame(), blank()));
     }
 
-    // A lost device: pixels and functions come back by themselves, a plain GPUTexture asks for setAtlas.
+    // A lost device (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): pixels and functions come
+    // back by themselves; a plain GPUTexture atlas or target is reported once through engine.onError, its map draws
+    // nothing and the frame goes on, until setAtlas or setTarget gives a new one.
     {
-      const layer = createTileLayer('a', 2, 1, Uint32Array.of(1, 2)),
-        tiles = TileMap.attach(instance, {
-          map: mapOf(2, 1, 2, 2, [setOf('s', 1, 4, 4, 2, 2)], [layer]),
-          atlases: { s: grid.image },
-        }),
+      const upload = (device) => {
+          const texture = device.createTexture({
+            size: [grid.image.width, grid.image.height],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture }, grid.image.data, { bytesPerRow: grid.image.width * 4 }, [
+            grid.image.width,
+            grid.image.height,
+          ]);
+          return texture;
+        },
+        made = [],
+        fromFunction = (device) => {
+          made.push(device);
+          return upload(device);
+        },
+        targetOf = (device) =>
+          device.createTexture({
+            size: [4, 2],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+          }),
+        mapAt = (x, atlas, extra = {}) =>
+          TileMap.attach(instance, {
+            map: mapOf(2, 1, 2, 2, [setOf('s', 1, 4, 4, 2, 2)], [createTileLayer('a', 2, 1, Uint32Array.of(1, 2))]),
+            atlases: { s: atlas },
+            camera: { x: -x, y: 0, zoom: 1 },
+            ...extra,
+          }),
         previous = engine.gpu,
-        plainTexture = previous.createTexture({
-          size: [grid.image.width, grid.image.height],
-          format: 'rgba8unorm',
-          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-      previous.queue.writeTexture({ texture: plainTexture }, grid.image.data, { bytesPerRow: grid.image.width * 4 }, [
-        grid.image.width,
-        grid.image.height,
-      ]);
-      const plainLayer = createTileLayer('a', 2, 1, Uint32Array.of(1, 2)),
-        plain = TileMap.attach(instance, {
-          map: mapOf(2, 1, 2, 2, [setOf('s', 1, 4, 4, 2, 2)], [plainLayer]),
-          atlases: { s: plainTexture },
-          camera: { x: -10, y: 0, zoom: 1 },
-          order: 15,
-        });
-      const both = blank();
-      tile(both, grid.texel, 0, 0, 0, 2, 2);
-      tile(both, grid.texel, 1, 2, 0, 2, 2);
-      tile(both, grid.texel, 0, 10, 0, 2, 2);
-      tile(both, grid.texel, 1, 12, 0, 2, 2);
-      record('plain GPUTexture atlas', difference(frame(), both));
+        maps = [
+          mapAt(0, grid.image),
+          mapAt(10, upload(previous), { order: 15 }),
+          mapAt(20, fromFunction, { order: 16 }),
+        ],
+        targeted = mapAt(0, grid.image, { target: targetOf(previous), order: 17 });
+      const image = (xs) => {
+        const expected = blank();
+        for (const x of xs) {
+          tile(expected, grid.texel, 0, x, 0, 2, 2);
+          tile(expected, grid.texel, 1, x + 2, 0, 2, 2);
+        }
+        return expected;
+      };
+      record('plain GPUTexture atlas', difference(frame(), image([0, 10, 20])));
       previous.destroy();
       await previous.lost;
       await engine.rebootDevice();
       engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
-      let code = null;
+      const reports = [],
+        onError = engine.onError;
+      engine.onError = (error) => reports.push(error);
+      let thrown = null;
       try {
-        instance.render({ delta: 1 / 60 });
+        // fixed-wait: three frames drawn on purpose, each must draw past the lost atlas, not a readiness wait
+        for (let i = 0; i < 3; i++) record(`lost plain atlas, frame ${i + 1}`, difference(frame(), image([0, 20])));
       } catch (error) {
-        code = error.code;
+        thrown = error.message;
       }
-      out.lostPlainAtlas = code;
-      plain.setAtlas('s', grid.image);
-      record('after device loss', difference(frame(), both));
-      plain.dispose();
-      tiles.dispose();
+      engine.onError = onError;
+      out.lostPlainAtlas = {
+        thrown,
+        reports: reports.map((error) => [error.code, error.message]),
+        functionCalls: made.length,
+        functionDevices: made[0] !== made[1],
+      };
+      maps[1].setAtlas('s', upload(engine.gpu));
+      targeted.setTarget(targetOf(engine.gpu));
+      record('after setAtlas', difference(frame(), image([0, 10, 20])));
+      out.lostPlainAtlas.validation = errors.length;
+      for (const map of [...maps, targeted]) map.dispose();
       record('after dispose', difference(frame(), blank()));
     }
 

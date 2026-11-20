@@ -5,6 +5,7 @@ import { Water } from '../dist/index.js';
 import { FFTOcean } from '../dist/fft.js';
 import { readFileSync } from 'node:fs';
 import { riverModel, riverStep } from './rivers-reference.js';
+import { coastStep } from './coast-reference.js';
 
 // A 24 x 8 channel of 1 m cells: a 10 m waterfall at x = 12, then a 0.5 m per cell chute, closed by banks at z = 0, 7.
 const fall = () => {
@@ -84,23 +85,25 @@ test('a waterfall carries its inflow downstream with bounded velocity and conser
   assert.ok(m.depth.every((d) => d >= 0 && d < 5));
 });
 
-test("Water's own coast pipe stays within the Froude and Courant bounds over the same fall", () => {
+test("Water's own coast flow stays within the Courant bound and free fall over the same fall", () => {
   // Regression (KB5736a): the coast pipe drove each pipe with the full surface difference and no cap, so a 10 m fall
-  // reached 240 m/s (one cell per substep at 240 substeps per second), over the Courant bound. Its speed is now capped
-  // at Froude 4 and half a cell per step, the bounds water/rivers uses; coast dynamics below them are unchanged.
+  // reached 240 m/s (one cell per substep at 240 substeps per second), over the Courant bound. The coast flow
+  // (KB-WATER-SWASH1, test/coast-reference.js) caps a face at half a cell per step; the water off the 10 m brink and down
+  // the chute, 10 m more over its 20 cells, never moves faster than a fall from the top, sqrt(2 g 20.5) = 20 m/s.
   const coastal = readFileSync(new URL('../src/coastal.ts', import.meta.url), 'utf8');
-  assert.match(coastal, /let cap=v\.x\*min\(4\.0\*sqrt\(9\.81\*v\.x\),0\.5\*min\(frame\.flow\.y,frame\.flow\.z\)\/dt\);/);
-  assert.match(coastal, /vec4f\(0\),vec4f\(cap\)\);/);
+  assert.ok(coastal.includes('let cap=h*0.5*min(frame.flow.y,frame.flow.z)/dt;return clamp(moved,-cap,cap);'));
   const m = fall(),
     dt = 1 / 240;
   let peak = 0;
   for (let i = 0; i < 4800; i++) {
-    const depth = m.depth.slice(),
-      v = riverStep(m, dt, source, 'surface');
+    // The source (6 m^3/s over the six 1 m cells of its footprint, x 1 to 3, z 3 to 4, as riverStep spreads it), then a step.
+    for (let z = 3; z <= 4; z++) for (let x = 1; x <= 3; x++) m.depth[z * m.width + x] += dt;
+    const v = coastStep(m, dt);
     peak = Math.max(peak, v);
-    assert.ok(v <= 4 * Math.sqrt(9.81 * Math.max(...depth)) + 1e-9, `step ${i} speed ${v}`);
+    assert.ok(v <= 0.5 / dt + 1e-9 && v <= Math.sqrt(2 * 9.81 * 20.5), `step ${i} speed ${v}`);
   }
-  assert.ok(peak > 0 && peak <= 0.5 / dt + 1e-9, `surface pipe peak ${peak}`);
+  assert.ok(m.depth[4 * m.width + 21] > 0.001, `the fall reached the chute's end: ${m.depth[4 * m.width + 21]}`);
+  assert.ok(peak > 1, `coast flow peak ${peak}`);
 });
 
 test('a source narrower than a cell feeds the one cell under it', () => {

@@ -92,11 +92,38 @@ test('endOwned ends each listed child by pid and waits for them through the nati
 test('endOwned reports a browser the kernel has not finished with at the bound, and never asks the server to wait on it', async () => {
   const child = stuckBrowser();
   let kills = 0;
-  const begun = Date.now();
+  const begun = performance.now();
   const { settled } = endOwned({ process: () => child, kill: async () => kills++ }, [], { reapMs: 100, settle: null });
   assert.deepEqual(await settled, [child.pid]);
-  assert.ok(Date.now() - begun >= 100);
+  // The bound is measured on the monotonic clock; the wall clock may be corrected under a run (KB-BH-REAP1).
+  assert.ok(performance.now() - begun >= 100);
   assert.equal(kills, 0, 'the server cleanup would wait on the exit itself');
+});
+
+test('endOwned: a timer that fires before the bound by the monotonic clock is re-armed, whatever the wall clock reads (KB-BH-REAP1)', async (t) => {
+  // Local CI 2026-11-15: the runner timed a run at 104 ms on the monotonic clock while Date.now read under 100. Here
+  // the wall clock and the timers agree that 100 ms have passed, but the monotonic clock has seen only 98.6.
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_000_000 });
+  let mono = 5_000;
+  t.mock.method(performance, 'now', () => mono);
+  const child = stuckBrowser();
+  const { settled } = endOwned({ process: () => child, kill: async () => {} }, [], { reapMs: 100, settle: null });
+  let result = null;
+  settled.then((value) => (result = value));
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+  mono += 98.6;
+  t.mock.timers.tick(100);
+  await flush();
+  assert.equal(Date.now() - 1_000_000, 100, 'the wall clock reads the bound');
+  assert.equal(result, null, 'not late: only 98.6 ms have passed on the monotonic clock');
+  mono += 1.2;
+  t.mock.timers.tick(1);
+  await flush();
+  assert.equal(result, null, 'not late at 99.8 ms: re-armed for the 1.4 ms left, rounded up to 2');
+  mono += 1;
+  t.mock.timers.tick(1);
+  await flush();
+  assert.deepEqual(result, [child.pid], 'late once the monotonic clock has passed the bound');
 });
 
 test('endOwned ends the whole tree by helper program when Chromium listed nothing', async () => {
@@ -127,6 +154,9 @@ test('hostBrowser speaks the protocol: ready, then the acknowledgement at once, 
     assert.equal(await run, 0);
     assert.deepEqual(lines.slice(1), [{ terminated: { browser: child.pid, children: [] } }, { done: true, survivors: [], elapsedMs: lines[2].elapsedMs }]);
     assert.equal(alive(child.pid), false);
+    // Regression (2026-11-19, KB-OWN-EXIT2): the host kept reading its input after the end request, so a host process
+    // could not end by its event loop and needed process.exit.
+    assert.equal(input.listenerCount('data'), 0, `the input is let go after ${how}`);
   }
 });
 
@@ -158,6 +188,20 @@ test('startHost runs a real host: end is acknowledged at once and the host prove
   assert.equal(await exit, 0);
   assert.equal(alive(host.pid), false);
   assert.equal(alive(host.process.pid), false);
+});
+
+test('startHost keeps a result that arrives before finished() is called: a host that answers and ends early is not HOST_GONE', { timeout: 30_000 }, async () => {
+  // launchBrowser's close awaits Playwright's own close beside end(); a host that ends the browser first sends its
+  // result and exits while nobody waits on it yet. That result used to be dropped, and the later finished() failed with
+  // HOST_GONE although the host had answered (shadows test:gpu, a closed browser on a loaded Mac).
+  const host = await startHost({ name: 'early result' }, { hostPath: fixture });
+  const exit = new Promise((resolve) => host.process.once('exit', resolve));
+  assert.deepEqual(await host.end([]), { browser: host.pid, children: [] });
+  assert.equal(await exit, 0);
+  await new Promise((resolve) => setImmediate(resolve)); // the host's stdout has closed too
+  const result = await host.finished();
+  assert.deepEqual(result, { done: true, survivors: [], elapsedMs: result.elapsedMs });
+  host.release();
 });
 
 test('startHost: a browser the kernel never finishes with is logged as a survivor at the bound, in the host, not the suite', { timeout: 30_000 }, async () => {

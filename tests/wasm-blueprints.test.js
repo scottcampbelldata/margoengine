@@ -1,11 +1,20 @@
 // The committed Wasm blueprints (scripts/wasm-blueprints.mjs): every shipped Rust crate is listed, and a record goes
 // stale when anything that decides the blueprint's bytes changes, so a crate edited without a rebuild cannot land.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { BLUEPRINTS, NOT_SHIPPED, staleBlueprints, unlistedCrates, writeRecord } from '../scripts/wasm-blueprints.mjs';
+import { blueprintRustEnv, hostSourcePath, portableRemaps } from '../scripts/rust-wasm-env.mjs';
+import {
+  BLUEPRINTS,
+  blueprintBytes,
+  NOT_SHIPPED,
+  staleBlueprints,
+  unlistedCrates,
+  writeRecord,
+} from '../scripts/wasm-blueprints.mjs';
 
 test('every Rust crate under packages/ is listed as a shipped blueprint or as not shipped', () => {
   assert.deepEqual(unlistedCrates(), []);
@@ -26,6 +35,7 @@ function fixture(t) {
     'packages/p/common/Cargo.toml': '[package]\nname = "common"\n',
     'packages/p/common/src/lib.rs': 'pub const C: u32 = 2;\n',
     'packages/p/scripts/build.mjs': "const RUSTFLAGS = '-C target-feature=+simd128';\n",
+    'scripts/rust-wasm-env.mjs': "export const remaps = ['--remap-path-prefix=src=src/'];\n",
   };
   for (const [path, text] of Object.entries(files)) {
     mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -42,13 +52,14 @@ function fixture(t) {
   return { root, entry };
 }
 
-test('a record goes stale when the crate, a path dependency, the build flags or the toolchain change', (t) => {
+test('a record goes stale when the crate, a path dependency, the build flags, the toolchain or the shared environment change', (t) => {
   for (const [file, text] of [
     ['packages/p/kernel/src/lib.rs', 'pub fn f() -> u32 { 3 }\n'],
     ['packages/p/kernel/src/new.rs', 'pub fn g() {}\n'],
     ['packages/p/common/src/lib.rs', 'pub const C: u32 = 4;\n'],
     ['packages/p/scripts/build.mjs', "const RUSTFLAGS = '';\n"],
     ['rust-toolchain.toml', '[toolchain]\nchannel = "1.100.0"\n'],
+    ['scripts/rust-wasm-env.mjs', 'export const remaps = [];\n'],
   ]) {
     const { root, entry } = fixture(t);
     assert.deepEqual(staleBlueprints(root, [entry]), [], 'fresh record');
@@ -81,4 +92,78 @@ test('a blueprint that holds a build path is refused', (t) => {
   const module = Buffer.concat([Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, section.length]), section]);
   writeFileSync(join(root, entry.blueprint), module);
   assert.throws(() => writeRecord(entry, root), { code: 'WASM_BLUEPRINT_PATH' });
+});
+
+// Cargo names a crate's own files with the host separator, so panic locations read src\lib.rs on Windows and src/lib.rs
+// elsewhere: the same sources gave different committed bytes by system (known-bugs, "other committed Wasm blueprints
+// differed by build system"). Every build runs in scripts/rust-wasm-env.mjs, and no blueprint may hold such a path.
+test('no committed blueprint holds a host-specific Rust source path', () => {
+  for (const entry of BLUEPRINTS)
+    assert.equal(hostSourcePath(blueprintBytes(entry)), null, `${entry.name}: ${entry.blueprint}`);
+});
+
+// Not only the listed blueprints: every .wasm git holds (vendored decoders and encoders included) must be free of a
+// host-specific Rust source path, so none can be rebuilt differently by system.
+test('no committed .wasm file in the repository holds a host-specific Rust source path', () => {
+  const files = execFileSync('git', ['ls-files', '-z', '*.wasm'], { encoding: 'utf8', maxBuffer: 1 << 24 })
+    .split('\0')
+    .filter(Boolean);
+  assert.ok(files.length >= 25, `found ${files.length} committed .wasm files`);
+  for (const file of files) assert.equal(hostSourcePath(readFileSync(file)), null, file);
+});
+
+test('a blueprint with a backslash source path is stale and cannot be recorded', (t) => {
+  const { root, entry } = fixture(t);
+  const name = Buffer.from(' panicked at src\\lib.rs');
+  const section = Buffer.concat([Buffer.from([1, 0x6e]), name]);
+  writeFileSync(
+    join(root, entry.blueprint),
+    Buffer.concat([Buffer.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 0, section.length]), section]),
+  );
+  assert.throws(() => writeRecord(entry, root), { code: 'WASM_BLUEPRINT_HOST_PATH' });
+  assert.match(
+    staleBlueprints(root, [entry])[0] ?? '',
+    /holds the host path src\\lib\.rs, so its bytes differ by system/,
+  );
+});
+
+test('the build environment maps every source folder onto forward slashes and drops what changes the build', (t) => {
+  const crate = mkdtempSync(join(tmpdir(), 'margo-rust-env-'));
+  t.after(() => rmSync(crate, { recursive: true, force: true }));
+  for (const file of ['src/lib.rs', 'src/b/m.rs', 'src/a/x/y.rs']) {
+    mkdirSync(dirname(join(crate, file)), { recursive: true });
+    writeFileSync(join(crate, file), '');
+  }
+  assert.deepEqual(portableRemaps(crate), [
+    '--remap-path-prefix=src=src/',
+    '--remap-path-prefix=src/a=src/a/',
+    '--remap-path-prefix=src/b=src/b/',
+    '--remap-path-prefix=src/a/x=src/a/x/',
+  ]);
+  const env = blueprintRustEnv(crate, '-C target-feature=+simd128', {
+    base: {
+      PATH: 'p',
+      RUSTC: 'other-rustc',
+      RUSTUP_TOOLCHAIN: 'nightly',
+      CARGO_ENCODED_RUSTFLAGS: '-Copt-level=0',
+      CARGO_PROFILE_RELEASE_LTO: 'false',
+      CARGO_BUILD_RUSTFLAGS: '-g',
+      CARGO_TARGET_DIR: '/elsewhere',
+    },
+  });
+  assert.deepEqual(Object.keys(env).sort(), ['CARGO_TARGET_DIR', 'PATH', 'RUSTFLAGS']);
+  assert.equal(env.CARGO_TARGET_DIR, join(crate, 'target'));
+  assert.equal(env.RUSTFLAGS, `${portableRemaps(crate).join(' ')} -C target-feature=+simd128`);
+});
+
+test('every blueprint build script builds through the shared environment', () => {
+  for (const script of new Set(BLUEPRINTS.filter((entry) => entry.name !== 'meshopt-simd').map((e) => e.script)))
+    assert.match(readFileSync(script, 'utf8'), /blueprintRustEnv\(/, script);
+});
+
+test('a gzip blueprint names no build system in its header', () => {
+  const machinery = BLUEPRINTS.find((entry) => entry.deflated === 'gzip');
+  const base64 = /machineryWasm: string = '([^']+)'/.exec(readFileSync(machinery.blueprint, 'utf8'))[1];
+  // RFC 1952 2.3.1: byte 9 is the OS of the compressing system; 255 is unknown.
+  assert.equal(Buffer.from(base64, 'base64')[9], 255);
 });

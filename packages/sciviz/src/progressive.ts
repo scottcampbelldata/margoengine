@@ -1,7 +1,7 @@
 // Clean-room policy and references: docs/sciviz-progressive.md and docs/clean-room.md.
 import type { Engine, EnginePlugin, FrameGraph } from '@margoengine/core/extension';
 import { SceneTarget } from '../../shared/msaa.js';
-import { applyView } from '../../shared/view-rect.js';
+import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { fault } from '../../shared/errors.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Figure } from './figure.js';
@@ -26,7 +26,11 @@ export class ProgressiveRendering implements EnginePlugin {
   readonly name = 'sciviz-progressive';
   readonly #figure: Figure;
   readonly #options: ProgressiveOptions;
-  readonly #views = new Map<string, ViewState>();
+  // A view not drawn in a frame (removed, or its id never used again) releases its target at the next frame.
+  readonly #views = new ViewStates<ViewState>(
+    () => ({ policy: new ProgressivePolicy(this.#options), signature: '' }),
+    (view) => this.#release(view),
+  );
   readonly #pipelines = new Map<string, GPURenderPipeline>();
   #engine: Engine | undefined;
   #active: { view: ViewState; width: number; height: number; rectangle: GpuContext['view'] } | undefined;
@@ -96,12 +100,7 @@ export class ProgressiveRendering implements EnginePlugin {
   }
   #begin(c: GpuContext): void {
     this.#started = performance.now();
-    const key = c.view?.id ?? '';
-    let view = this.#views.get(key);
-    if (!view) {
-      view = { policy: new ProgressivePolicy(this.#options), signature: '' };
-      this.#views.set(key, view);
-    }
+    const view = this.#views.get(c);
     const signature = [
       ...c.camera.matrix,
       ...c.camera.position,
@@ -238,6 +237,10 @@ struct Pixel { @location(0) colour:vec4f, @builtin(frag_depth) depth:f32 }
       });
     }
   }
+  /** @internal Once per frame (a positive delta; picks pass 0): releases the views the previous frame did not draw. */
+  onPreUpdate(delta: number): void {
+    if (delta > 0) this.#views.prune();
+  }
   #release(view: ViewState): void {
     view.target?.dispose();
     view.target?.resolvedColor.destroy();
@@ -248,7 +251,6 @@ struct Pixel { @location(0) colour:vec4f, @builtin(frag_depth) depth:f32 }
   onDeviceRestored(): void {
     this.#generation++;
     this.#pending = false;
-    for (const view of this.#views.values()) this.#release(view);
     this.#views.clear();
     this.#pipelines.clear();
     this.#active = undefined;

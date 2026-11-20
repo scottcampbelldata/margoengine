@@ -2,15 +2,12 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
-import { acquire } from './gpu-lock.mjs';
 
-// In worktrees, set MARGO_GPU_LOCK to the shared adapter lock before running this script.
 const selectedBackend = process.argv.find((arg) => arg.startsWith('--backend='))?.slice(10);
 assert.ok(
   selectedBackend === undefined || ['native', 'compat'].includes(selectedBackend),
   'Use --backend=native or --backend=compat to diagnose one complete backend grid',
 );
-const release = await acquire({ owner: 'material-dispersion-gpu-check' });
 async function runDispersion(compat) {
   const backend = compat ? 'compat' : 'native';
   let browser;
@@ -319,10 +316,6 @@ async function runDispersion(compat) {
     await browser?.close();
   }
 }
-try {
-  // The canonical package/check:merge leaf covers real native and full compatibility devices.
-  if (selectedBackend !== 'compat') await runDispersion(false);
-  if (selectedBackend !== 'native') await runDispersion(true);
-} finally {
-  release();
-}
+// The canonical package/check:merge leaf covers real native and full compatibility devices.
+if (selectedBackend !== 'compat') await runDispersion(false);
+if (selectedBackend !== 'native') await runDispersion(true);

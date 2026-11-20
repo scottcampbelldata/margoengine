@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { holdMinutes, runMinutes } from '../scripts/gpu-package-tests.mjs';
+import { runMinutes, stepMinutes } from '../scripts/gpu-package-tests.mjs';
 
 const tests = [
     { label: 'shadows test:gpu', dir: 'shadows', script: 'test:gpu', minutes: 10 },
@@ -13,23 +13,23 @@ const tests = [
     { label: 'sky test:gpu', dir: 'sky', script: 'test:gpu', minutes: 20 },
   ],
   profile = { name: 'test', split: false };
-const holds = (...picked) => picked.reduce((sum, t) => sum + holdMinutes(t), 0);
+const limits = (...picked) => picked.reduce((sum, t) => sum + stepMinutes(t), 0);
 
-test('a whole run may take the sum of its tests hold limits', () => {
-  assert.equal(runMinutes('check:gpu-packages -- --no-build', tests, profile), holds(...tests));
-  // 193 tests at even the shortest hold are far past 30 minutes.
-  assert.ok(holds(tests[0]) * 193 > 30);
+test('a whole run may take the sum of its tests limits', () => {
+  assert.equal(runMinutes('check:gpu-packages -- --no-build', tests, profile), limits(...tests));
+  // 193 tests at even the shortest limit are far past 30 minutes.
+  assert.ok(limits(tests[0]) * 193 > 30);
 });
 
 test('--select and --only narrow the sum to the tests that run', () => {
-  assert.equal(runMinutes('check:gpu-packages -- --select=shadows/test:gpu:vsm', tests, profile), holds(tests[1]));
-  assert.equal(runMinutes('check:gpu-packages -- --only=shadows', tests, profile), holds(tests[0], tests[1]));
+  assert.equal(runMinutes('check:gpu-packages -- --select=shadows/test:gpu:vsm', tests, profile), limits(tests[1]));
+  assert.equal(runMinutes('check:gpu-packages -- --only=shadows', tests, profile), limits(tests[0], tests[1]));
   assert.equal(runMinutes('check:gpu-packages -- --select=nothing/here', tests, profile), 0);
 });
 
 test('a test the machine profile excludes adds nothing', () => {
   const excluding = { ...profile, exclude: { sky: 'no sky here' } };
-  assert.equal(runMinutes('check:gpu-packages', tests, excluding), holds(tests[0], tests[1]));
+  assert.equal(runMinutes('check:gpu-packages', tests, excluding), limits(tests[0], tests[1]));
 });
 
 test('the corpus recorder gives check:gpu-packages that sum, never less than its suite cap', () => {

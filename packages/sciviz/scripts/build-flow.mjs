@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { readFileSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { endTree } from '../../../scripts/support/shutdown.mjs';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const testing = process.argv.includes('--test');
 const manifest = fileURLToPath(new URL('../flow-kernel/Cargo.toml', import.meta.url));
@@ -13,6 +14,7 @@ const child = spawn(
   {
     stdio: 'inherit',
     windowsHide: true,
+    env: testing ? process.env : blueprintRustEnv(fileURLToPath(new URL('../flow-kernel', import.meta.url))),
   },
 );
 let expired = false,

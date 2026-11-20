@@ -349,3 +349,36 @@ test('a survivor that missed the resume joins the later recovery epoch instead o
   assert.equal(d.epoch, b.epoch);
   assert.deepEqual(d.confirmed, { frame: 5, state: { score: 5, label: 'safe' } });
 });
+
+test('a follower that hears the handoff target leave before the transfer still joins the recovery', async (t) => {
+  // The A to B link is slow, so B sees C's close before A's TRANSFER (whose roster still holds C) and drops it; A's
+  // recovery STATUS then comes two epochs ahead of B. B must join that round instead of ignoring it until timeout.
+  const network = new LoopbackNetwork({ latency: 10 }),
+    [ab, ba] = network.pair({ latency: 50 }),
+    [ac, ca] = network.pair(),
+    [bc, cb] = network.pair();
+  const make = (local, peers) =>
+    new HostMigration({ schema, stateType: 'State', local, peers, initial: { score: 0, label: 'start' }, timeout: 2000 });
+  const errors = [],
+    a = make(1, new Map([[2, ab], [3, ac]])),
+    b = new HostMigration({
+      schema,
+      stateType: 'State',
+      local: 2,
+      peers: new Map([[1, ba], [3, bc]]),
+      initial: { score: 0, label: 'start' },
+      timeout: 2000,
+      onerror: (error) => errors.push(error),
+    }),
+    c = make(3, new Map([[1, ca], [2, cb]]));
+  t.after(() => [a, b, c].forEach((s) => s.close()));
+  const failed = assert.rejects(a.handoff(3), /target left/);
+  c.close();
+  network.advance(1000);
+  await Promise.resolve();
+  await failed;
+  assert.equal(a.isHost, true);
+  assert.equal(b.host, 1, 'B follows the recovered host');
+  assert.equal(b.epoch, a.epoch, 'both peers are in the same epoch');
+  assert.deepEqual(errors, []);
+});

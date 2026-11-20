@@ -17,6 +17,7 @@ export type UnrealCollisionShape = 'convex' | 'box' | 'sphere';
 export interface UnrealFlipbook {
     clip: string;
     material: string;
+    asset: string;
     fps: number;
     frames: number;
     columns: number;
@@ -94,6 +95,7 @@ interface ExportPrimitive {
     geometry: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
     indices?: ArrayLike<number>;
+    mode?: PrimitiveMode;
     extras?: Extras;
 }
 
@@ -119,7 +121,7 @@ type Extras = {
 
 interface GeometryData {
     positions: ArrayLike<number>;
-    normals: ArrayLike<number>;
+    normals?: ArrayLike<number>;
     uvs?: ArrayLike<number>;
     uvs1?: ArrayLike<number>;
     uvs2?: ArrayLike<number>;
@@ -179,21 +181,21 @@ interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
-    baseColorTextureTransform?: {
-        offset: Vec2;
-        scale: Vec2;
-        rotation?: number;
-    };
+    baseColorTextureTransform?: TextureTransform;
     metallicRoughnessTexture?: TextureData;
+    metallicRoughnessTextureTransform?: TextureTransform;
     normalTexture?: TextureData;
+    normalTextureTransform?: TextureTransform;
     unlit?: boolean;
     shading?: 'standard' | 'lambert' | 'phong';
     specular?: readonly number[];
     shininess?: number;
     normalScale?: number;
     occlusionTexture?: TextureData;
+    occlusionTextureTransform?: TextureTransform;
     occlusionStrength?: number;
     emissiveTexture?: TextureData;
+    emissiveTextureTransform?: TextureTransform;
     emissiveStrength?: number;
     transmission?: number;
     ior?: number;
@@ -206,6 +208,8 @@ interface MorphData {
     normals?: ArrayLike<number>;
     tangents?: ArrayLike<number>;
 }
+
+type PrimitiveMode = 'POINTS' | 'LINES' | 'LINE_LOOP' | 'LINE_STRIP' | 'TRIANGLES' | 'TRIANGLE_STRIP' | 'TRIANGLE_FAN' | 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 interface SkinData {
     name?: string;
@@ -226,5 +230,11 @@ interface TextureData {
     wrapT?: 'repeat' | 'clamp' | 'mirror';
     texCoord?: 0 | 1 | 2 | 3;
     extras?: Extras;
+}
+
+interface TextureTransform {
+    offset: Vec2;
+    scale: Vec2;
+    rotation?: number;
 }
 ```

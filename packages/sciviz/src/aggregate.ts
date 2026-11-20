@@ -3,7 +3,7 @@ import { rangeError as makeRangeError } from '../../shared/errors.js';
 import { CrossFilter, type TableColumn } from './table.js';
 import { integerOf, LIMBS, numberOf, partialInteger, rounded, STATS, words } from './aggregate-exact.js';
 import { covers } from './aggregate-raster.js';
-import { aggregateShader } from './aggregate-shader.js';
+import { aggregateShader, mergeShader, SLICE_ROWS } from './aggregate-shader.js';
 import type {
   AggregateGlyph,
   RasterAggregate,
@@ -105,17 +105,32 @@ export async function aggregateRaster(input: RasterTable, options: RasterAggrega
       'Exact raster accumulator exceeds this GPU storage binding limit; reduce raster dimensions',
       'sciviz',
     );
-  // Bounded dispatch work prevents a large canvas from turning one dispatch into an unresponsive GPU job.
-  const chunk = Math.max(1, Math.min(chunkRows, Math.floor(8388608 / bins)));
-  // Live logical buffers: host records, uploaded records, result, mapped readback, returned copy and uniforms.
+  // Bounded dispatch work prevents a large canvas from turning one dispatch into an unresponsive GPU job. On the GPU
+  // each invocation tests at most SLICE_ROWS rows: Chrome on ANGLE Metal drops a draw (the WebGL2 layer's dispatch)
+  // whose single invocation runs too long, with no error and no context loss, so a 64-bin raster's 32768-row chunk in
+  // one invocation per bin read back all zeros. A chunk is cut into row slices tested side by side and merged on the
+  // GPU; the slice records must fit one storage binding, so few slots shorten the chunk instead.
+  const records = gpu ? Math.floor(gpu.device.limits.maxStorageBufferBindingSize / (stride * 4)) : bins,
+    chunk = Math.max(
+      1,
+      Math.min(chunkRows, Math.floor(8388608 / bins), gpu ? Math.floor(records / bins) * SLICE_ROWS : Infinity),
+    ),
+    slicesMax = gpu ? Math.ceil(Math.min(chunk, table.length) / SLICE_ROWS) : 1,
+    partialBytes = slicesMax > 1 ? bins * slicesMax * stride * 4 : 0;
+  // Live logical buffers: host records, uploaded records, slice records, result, mapped readback, returned copy and
+  // uniforms.
   const peakStagingBytes =
-    Math.min(chunk, table.length) * 64 * (gpu ? 2 : 1) + (gpu ? outputBytes * 3 + 16 : 0) + (mask?.byteLength ?? 0);
+    Math.min(chunk, table.length) * 64 * (gpu ? 2 : 1) +
+    (gpu ? outputBytes * 3 + partialBytes + 32 : 0) +
+    (mask?.byteLength ?? 0);
   let primitives = 0,
     contributions = 0,
     rowBinTests = 0,
     dispatches = 0;
-  const output = gpu?.zeros(bins * stride, 'u32');
-  const program = gpu?.kernel(aggregateShader(categories.length));
+  const output = gpu?.zeros(bins * stride, 'u32'),
+    partial = partialBytes ? gpu!.zeros(partialBytes / 4, 'u32') : undefined;
+  const program = gpu?.kernel(aggregateShader(categories.length)),
+    merge = partial ? gpu!.kernel(mergeShader(categories.length)) : undefined;
   const project = (v: number, axis: number): number => {
     const lo = bounds[axis * 2],
       hi = bounds[axis * 2 + 1],
@@ -181,28 +196,37 @@ export async function aggregateRaster(input: RasterTable, options: RasterAggrega
       rowBinTests += n * bins;
       if (gpu) {
         using source = gpu.array(src, { dtype: 'u32' });
-        program!.run({ src: source, dst: output!, p: { count: n, width, height, glyph: kind } }, { count: bins });
-        const partial = (await output!.read({ signal: options.signal })) as Uint32Array;
-        dispatches++;
+        const slices = Math.ceil(n / SLICE_ROWS);
+        program!.run(
+          {
+            src: source,
+            dst: slices > 1 ? partial! : output!,
+            p: { count: n, width, height, glyph: kind, rows: SLICE_ROWS, slices },
+          },
+          { count: bins * slices },
+        );
+        if (slices > 1) merge!.run({ src: partial!, dst: output!, p: { bins, slices } }, { count: bins });
+        dispatches += slices > 1 ? 2 : 1;
+        const result = (await output!.read({ signal: options.signal })) as Uint32Array;
         for (let b = 0; b < bins; b++) {
           const o = b * stride,
-            c = partial[o],
-            v = partial[o + 1];
+            c = result[o],
+            v = result[o + 1];
           count[b] += c;
           contributions += c;
           for (let k = 0; k < categories.length; k++)
-            categoricalCount[b * categories.length + k] += partial[o + STATS + LIMBS * 2 + k];
+            categoricalCount[b * categories.length + k] += result[o + STATS + LIMBS * 2 + k];
           if (!v) continue;
           if (!valid[b]) {
-            first[b] = numberOf(partial[o + 6], partial[o + 7]);
-            firstRow[b] = partial[o + 10];
+            first[b] = numberOf(result[o + 6], result[o + 7]);
+            firstRow[b] = result[o + 10];
           }
-          last[b] = numberOf(partial[o + 8], partial[o + 9]);
-          lastRow[b] = partial[o + 11];
+          last[b] = numberOf(result[o + 8], result[o + 9]);
+          lastRow[b] = result[o + 11];
           valid[b] += v;
-          min[b] = Math.min(min[b], numberOf(partial[o + 2], partial[o + 3]));
-          max[b] = Math.max(max[b], numberOf(partial[o + 4], partial[o + 5]));
-          sums[b] += partialInteger(partial, o + STATS);
+          min[b] = Math.min(min[b], numberOf(result[o + 2], result[o + 3]));
+          max[b] = Math.max(max[b], numberOf(result[o + 4], result[o + 5]));
+          sums[b] += partialInteger(result, o + STATS);
         }
       } else {
         for (let i = 0; i < n; i++) {
@@ -233,7 +257,9 @@ export async function aggregateRaster(input: RasterTable, options: RasterAggrega
     }
   } finally {
     output?.dispose();
+    partial?.dispose();
     program?.dispose();
+    merge?.dispose();
   }
   for (let b = 0; b < bins; b++) {
     sum[b] = rounded(sums[b]);

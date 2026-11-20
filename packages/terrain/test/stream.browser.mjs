@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/stream.browser.mjs
 // `@margoengine/terrain/stream` on real elevation: nine adjacent Terrarium tiles around Mount Rainier (zoom 10, x 164 to
 // 166, y 359 to 361, from the Terrain Tiles on AWS open data set; USGS 3DEP, GMTED2010 and SRTM data), 256 x 256 each,

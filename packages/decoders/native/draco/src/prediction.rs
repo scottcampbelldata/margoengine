@@ -199,6 +199,10 @@ impl Mesh<'_, '_> {
         Ok(true)
     }
 
+    // Out of line (KB4824a): inlined, its 128-bit projection made the
+    // predictor 5 row loop the second largest optimizing compile (V8 TurboFan
+    // on arm64: 939,896 B merged; 664,000 B for this function alone).
+    #[inline(never)]
     pub fn tex_coords(
         &self,
         id: usize,

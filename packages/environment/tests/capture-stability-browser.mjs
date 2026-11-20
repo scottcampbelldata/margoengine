@@ -2,9 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
-const release = await acquire({ owner: 'environment-capture-stability' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/env-mirror.html', port: 'free' });
@@ -101,12 +99,8 @@ ${source}`);
   );
 } finally {
   try {
-    try {
-      await browser?.page.evaluate(() => window.mirrorFixture?.dispose());
-    } finally {
-      await browser?.close();
-    }
+    await browser?.page.evaluate(() => window.mirrorFixture?.dispose());
   } finally {
-    release();
+    await browser?.close();
   }
 }

@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"><title>GLSL programs as post passes</title><style>body{margin:0}canvas{width:32px;height:32px;display:block}</style></head><body><canvas id="margo"></canvas>
+<script type="module">
+// Each program of test/glsl-pass-fixtures.js as the second ShaderPass of a PostStack whose first pass draws a known
+// image (passGenerator, which reads no input), and as GLSL in the browser's own WebGL (the oracle) over the oracle's
+// own drawing of that image. Both stages are display stages of 8-bit colour, as the oracle's readback is.
+import {Engine} from '/packages/core/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {ShaderPass,fullscreenVertex} from '/packages/shader/dist/glsl-pass.js';
+import {NodePass,inputColor,vec4} from '/packages/shader/dist/index.js';
+import {passFixtures,passGenerator} from '/packages/shader/test/glsl-pass-fixtures.js';
+const W=32,H=32,canvas=document.querySelector('#margo');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:[W,H]}),device=engine.gpu,errors=[];
+engine.scene.background='#30507a';
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.onError=e=>errors.push(e.message);
+let stack,pass,first;
+const valueOf=(f,which)=>Object.fromEntries(Object.entries(f.uniforms??{}).map(([k,[,...v]])=>[k,v[which-1]??v[0]]));
+const settle=async()=>{await waitForPipelines(async()=>{engine.render();await device.queue.onSubmittedWorkDone();if(pass?.ready)await pass.ready();if(first)await first.ready();});return errors.splice(0);};
+const clear=()=>{stack?.dispose();pass?.dispose();first?.dispose();stack=pass=first=undefined;};
+function oracle(f,which,image){
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const legacy=!/^\s*#\s*version\s+300/m.test(f.fragment);
+  const gl=c.getContext(legacy?'webgl':'webgl2',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+  const vertex=f.vertex?(f.oracle?.vertex??'')+f.vertex:fullscreenVertex(f.fragment);
+  const fragment=legacy&&!/precision\s+\w+\s+float/.test(f.fragment)?'precision highp float;\n'+f.fragment:f.fragment;
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+source);return s;};
+  const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+  const stream=(names,data,size)=>{for(const n of names){const at=gl.getAttribLocation(p,n);if(at<0)continue;const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,0,0);}};
+  stream(['position','aPosition'],[-1,-1,0,3,-1,0,-1,3,0],3);stream(['uv'],[0,0,2,0,0,2],2);
+  for(const [name,v] of Object.entries(valueOf(f,which))){const at=gl.getUniformLocation(p,name),t=f.uniforms[name][0];
+    if(t==='float')gl.uniform1f(at,v);else gl[`uniform${t.at(-1)}fv`](at,v);}
+  for(const name of f.identity??[])gl.uniformMatrix4fv(gl.getUniformLocation(p,name),false,[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+  // The input image: canvas rows from the top, so GL's bottom-up rows take them in reverse.
+  if(image){const rows=new Uint8Array(W*H*4);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const s=((H-1-y)*W+x)*3,d=(y*W+x)*4;rows.set([image[s],image[s+1],image[s+2],255],d);}
+  const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,W,H,0,gl.RGBA,gl.UNSIGNED_BYTE,rows);
+  for(const [k,x] of [[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,k,x);
+  for(const n of ['tDiffuse','textureSampler','uColorBuffer']){const at=gl.getUniformLocation(p,n);if(at)gl.uniform1i(at,0);}}
+  gl.viewport(0,0,W,H);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);gl.drawArrays(gl.TRIANGLES,0,3);
+  const out=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  const rgb=[];for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)rgb.push(...out.slice((y*W+x)*4,(y*W+x)*4+3));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return rgb;
+}
+window.check={
+  count:()=>passFixtures.length,
+  async draw(i){
+    clear();
+    const f=passFixtures[i],uniforms=Object.fromEntries(Object.entries(valueOf(f,1)).map(([k,v])=>[k,{value:v}]));
+    pass=new ShaderPass({vertexShader:f.vertex,fragmentShader:f.fragment,uniforms},{attributes:f.attributes});
+    first=new ShaderPass({fragmentShader:passGenerator.fragment},{name:'generator'});
+    stack=PostStack.attach(engine,[first,pass]);
+    return settle();
+  },
+  async change(i){const f=passFixtures[i];for(const [k,v] of Object.entries(valueOf(f,2)))pass.uniforms[k].value=v;return settle();},
+  oracle:(i,which)=>oracle(passFixtures[i],which,oracle(passGenerator,1)),
+  // ShaderPass.attach and NodePass.attach (KB-NODEPASS-ATTACH): each inverts the scene alone in a PostStack of its own.
+  async plain(){clear();return settle();},
+  async attach(kind){
+    clear();
+    pass=kind==='shader'
+      ?await ShaderPass.attach(engine,{fragmentShader:'uniform sampler2D tDiffuse;\nvarying vec2 vUv;\nvoid main() { gl_FragColor = vec4(1.0 - texture2D(tDiffuse, vUv).rgb, 1.0); }'},{name:'attached-shader-pass'})
+      :await NodePass.attach(engine,vec4(inputColor().rgb.oneMinus(),1),{name:'attached-node-pass'});
+    return {errors:await settle(),plugins:[...engine.scene.plugins.keys()].sort()};
+  },
+  detach(){pass.dispose();pass=undefined;return [...engine.scene.plugins.keys()];},
+  close(){clear();engine.dispose();return errors.splice(0);},
+};
+window.ready=true;
+</script></body></html>

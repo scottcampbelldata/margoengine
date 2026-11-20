@@ -48,10 +48,13 @@ export interface PostImagePixels {
 
 // Not exported from this entry, but used by the exports above:
 
+type BloomFireflies = 'temporal' | 'karis' | 'none';
+
 interface BloomOptions {
     strength?: number;
     threshold?: number;
     exposure?: number;
     radius?: number;
+    fireflies?: BloomFireflies;
 }
 ```

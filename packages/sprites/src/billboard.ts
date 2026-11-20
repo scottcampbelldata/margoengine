@@ -4,7 +4,8 @@
 // axes, the usual view-plane construction (Akenine-Moller, Haines and Hoffman, Real-Time Rendering, 4th ed., 13.6).
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
-import { atlasTexture } from '../../shared/atlas-texture.js';
+import { borrowedAtlas } from '../../shared/atlas-texture.js';
+import { type BorrowSlot, borrow, fix } from '../../shared/borrowed.js';
 import { texelVarying } from '../../shared/texel-varying.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { overlayDepthPass, overlayPass } from '../../shared/pass.js';
@@ -269,7 +270,8 @@ let layerCount = 0;
  * no filtering; on an sRGB or float target they are decoded from sRGB, like any colour texture. WebGPU only.
  * @throws TypeError / RangeError on invalid options or, each frame, an invalid billboard.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` when a billboard is
- * already in a layer, `'state'` for a plain `GPUTexture` atlas after a device loss.
+ * already in a layer. A plain `GPUTexture` atlas held at a device restore is reported once through `engine.onError`
+ * (`'state'`, help `borrowed-lost`); the layer draws nothing until {@link BillboardLayer.setAtlas} gives a new one.
  */
 export class BillboardLayer implements EnginePlugin {
   readonly name: string;
@@ -287,7 +289,7 @@ export class BillboardLayer implements EnginePlugin {
   private engine?: Engine;
   private device?: GPUDevice;
   private colorAtlas?: OwnedAtlas;
-  private stale = false;
+  private slot!: BorrowSlot<GPUTexture, SpriteAtlas>;
   private layout?: GPUBindGroupLayout;
   private module?: GPUShaderModule;
   private readonly pipelines = new Map<string, GPURenderPipeline>();
@@ -328,6 +330,7 @@ export class BillboardLayer implements EnginePlugin {
     if (!Number.isFinite(order)) throw rangeError('Invalid billboard order', 'sprite-options');
     if (!(alphaTest >= 0 && alphaTest <= 1)) throw rangeError('Invalid billboard alphaTest', 'sprite-options');
     this.atlas = options.atlas;
+    this.slot = borrow(options.atlas, 'BillboardLayer atlas', 'setAtlas');
     this.sizeAttenuation = options.sizeAttenuation ?? true;
     this.lockY = options.lockY ?? false;
     this.transparent = options.transparent ?? false;
@@ -376,7 +379,7 @@ export class BillboardLayer implements EnginePlugin {
     if (this.colorAtlas?.owned) this.colorAtlas.texture.destroy();
     this.colorAtlas = undefined;
     this.atlas = atlas;
-    this.stale = false;
+    this.slot = borrow(atlas, 'BillboardLayer atlas', 'setAtlas', this.engine?.gpu);
     this.generation++;
   }
   setup(engine: Engine): void {
@@ -387,6 +390,7 @@ export class BillboardLayer implements EnginePlugin {
         this.disposed ? 'disposed' : 'webgpu',
       );
     this.engine = engine;
+    fix(this.slot, engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
@@ -399,7 +403,7 @@ export class BillboardLayer implements EnginePlugin {
     if (delta > 0) this.states.prune();
   }
   onDeviceRestored(): void {
-    this.stale = !!this.colorAtlas && !this.colorAtlas.owned && typeof this.atlas !== 'function';
+    // A caller's plain GPUTexture is reported once at its next use (shared/borrowed.js); the rest comes back by itself.
     this.release();
   }
   dispose(): void {
@@ -423,13 +427,16 @@ export class BillboardLayer implements EnginePlugin {
     this.pipelines.clear();
     this.generation++;
   }
-  private prepare(device: GPUDevice): void {
+  /** False while a caller's atlas is lost with the device: the layer draws nothing this frame. */
+  private prepare(device: GPUDevice): boolean {
     if (this.device !== device) {
       if (this.device) this.release();
       this.device = device;
     }
-    if (this.stale) throw fault('state', 'Billboard atlas lost with the device; call setAtlas', 'sprite-state');
-    this.colorAtlas ??= atlasTexture(device, this.atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
+    this.colorAtlas ??= borrowedAtlas(this.slot, device, this.engine, () =>
+      rangeError('Invalid sprite pixels', 'sprite-options'),
+    );
+    if (!this.colorAtlas) return false;
     if (!this.layout) {
       this.layout = device.createBindGroupLayout({
         entries: [
@@ -440,6 +447,7 @@ export class BillboardLayer implements EnginePlugin {
       });
       this.module = device.createShaderModule({ label: 'billboards', code: shader });
     }
+    return true;
   }
   private pipeline(device: GPUDevice, format: GPUTextureFormat, depth: GPUTextureFormat, samples: number) {
     const key = `${format}/${depth}/${samples}`;
@@ -479,7 +487,7 @@ export class BillboardLayer implements EnginePlugin {
       throw rangeError('Invalid billboard alphaTest', 'sprite-options');
     const device = c.device,
       camera = c.camera;
-    this.prepare(device);
+    if (!this.prepare(device)) return;
     const boards = this.drawList;
     boards.length = 0;
     for (const b of this.list) if (b.visible) boards.push(b);

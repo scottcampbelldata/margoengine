@@ -63,7 +63,7 @@ try {
           });
         },
       });
-      const { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTFAsync } = await import('/packages/gltf/dist/pbr.js');
       const { glbChunks, GLB_JSON, GLB_BIN } = await import('/packages/shared/glb.js');
       const { multiplyQuaternions } = await import('/packages/math/dist/quat.js');
       const { Animation } = await import('/packages/animation/dist/index.js');

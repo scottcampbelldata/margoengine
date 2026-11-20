@@ -32,7 +32,7 @@ const NAMED_ELSEWHERE = ['KHR_animation_pointer', 'KHR_interactivity', LOD];
 export interface OptimizeGLBOptions {
   /** Merges identical images, samplers, textures, materials, accessors and meshes. Default true. */
   dedupe?: boolean;
-  /** Merges vertices equal in every attribute and morph target, and drops triangles with no area. Default true. */
+  /** Merges vertices equal in every attribute and morph target, and drops triangles that repeat a vertex. Default true. */
   weld?: boolean;
   /** Fraction of each primitive's triangles to keep, above 0 and below 1. Default: nothing is simplified. */
   simplify?: number;
@@ -115,13 +115,26 @@ function squeezed<T>(list: T[], to: number[]): number {
   return removed;
 }
 
-/** Calls `visit` on every texture reference of a material, inside any extension: objects under a name ending in Texture. */
+/**
+ * Calls `visit` on every texture reference under `value`, inside any extension: objects under a name ending in
+ * `Texture` or `texture` (a material's textureInfo, EXT_mesh_features `featureIds[].texture`).
+ */
 function eachTextureInfo(value: unknown, visit: (info: JSONObject) => void): void {
   if (typeof value !== 'object' || value === null) return;
   for (const [key, field] of Object.entries(value)) {
-    if (key.endsWith('Texture') && Number.isSafeInteger((field as JSONObject)?.index)) visit(field as JSONObject);
+    if (/texture$/i.test(key) && Number.isSafeInteger((field as JSONObject)?.index)) visit(field as JSONObject);
     eachTextureInfo(field, visit);
   }
+}
+
+/**
+ * Calls `visit` on every place in the file that names a texture by `index`: textureInfo objects anywhere outside the
+ * texture and image lists (materials, primitive and node extensions), and EXT_structural_metadata property textures.
+ */
+function eachTextureReference(json: JSONObject, visit: (holder: JSONObject) => void): void {
+  for (const [key, value] of Object.entries(json)) if (key !== 'textures' && key !== 'images') eachTextureInfo(value, visit);
+  for (const property of json.extensions?.EXT_structural_metadata?.propertyTextures ?? [])
+    if (Number.isSafeInteger(property?.index)) visit(property);
 }
 
 /** Calls `visit` on every object of a texture that names an image: the texture and its image-format extensions. */
@@ -167,10 +180,9 @@ function dedupeResources(parts: GLBParts, stats: OptimizeStats): void {
   const materials: JSONObject[] = json.materials ?? [],
     toTexture = firstOf(textures, (texture) => JSON.stringify(texture));
   stats.textures += squeezed(textures, toTexture);
-  for (const material of materials)
-    eachTextureInfo(material, (info) => {
-      info.index = toTexture[info.index];
-    });
+  eachTextureReference(json, (info) => {
+    info.index = toTexture[info.index];
+  });
   const toMaterial = firstOf(materials, (material) => JSON.stringify(material));
   stats.materials += squeezed(materials, toMaterial);
   eachMaterialReference(json, (holder) => {
@@ -185,6 +197,7 @@ const allOf = (count: number): Uint32Array => Uint32Array.from({ length: count -
  * Merges vertices equal in every given array. Triangles that repeat a vertex go, before and after, and only the vertices
  * the rest use stay, numbered in order of first use. Zero and minus zero count as equal.
  * @returns `keep[new]` is the old vertex, `indices` the triangles in the new numbering.
+ * @throws RangeError for an index that is not a whole number from 0 to `vertexCount - 1` (glTF 2.0 3.7.2.1).
  */
 export function weldVertices(
   arrays: readonly { readonly values: ArrayLike<number>; readonly width: number }[],
@@ -214,6 +227,9 @@ export function weldVertices(
     source: number[] = [];
   for (let i = 0; i < indices.length; i++) {
     const vertex = indices[i];
+    // glTF 2.0 3.7.2.1: every index names an existing vertex.
+    if (!Number.isInteger(vertex) || vertex < 0 || vertex >= vertexCount)
+      throw new RangeError(`index ${i} is ${vertex}, outside the ${vertexCount} vertices; fix the index data.`);
     let id = known[vertex];
     if (id < 0) {
       const hash = hashOf(vertex);
@@ -519,6 +535,9 @@ export async function optimizeGLB(glb: Uint8Array, options: OptimizeGLBOptions =
           primitive.indices === undefined
             ? allOf(count)
             : Uint32Array.from(readAccessor(parts, primitive.indices).values);
+      // A non-indexed list of 1 or 2 vertices holds no whole triangle; an accessor may not be empty (glTF 2.0 5.1,
+      // accessor.count minimum 1), so the primitive keeps its own accessors.
+      if (!indices.length) return;
       if (!counted.has(primitive.attributes.POSITION)) stats.verticesBefore += count;
       counted.add(primitive.attributes.POSITION);
       stats.trianglesBefore += Math.floor(indices.length / 3);
@@ -537,7 +556,7 @@ export async function optimizeGLB(glb: Uint8Array, options: OptimizeGLBOptions =
       }
       const count = piece.columns.get('POSITION')!.values.length / 3,
         { keep, indices } = weldVertices([...piece.columns.values()], piece.indices, count);
-      // Only triangles with no area: an accessor may not be empty, so the piece stays as it was.
+      // Only triangles that repeat a vertex: an accessor may not be empty, so the piece stays as it was.
       if (!indices.length) return;
       for (const [name, column] of piece.columns) piece.columns.set(name, gathered(column, keep));
       piece.indices = indices;

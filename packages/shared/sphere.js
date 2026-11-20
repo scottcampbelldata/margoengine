@@ -1,5 +1,5 @@
 // World bounding spheres for CPU culls: clustered LocalShadows' per-map caster cull, the LOD imposter cull and
-// gltf-pro's progressive load order.
+// gltf/pbr's progressive load order.
 
 /**
  * Radius of a local sphere of radius `radius` moved by the column-major 4x4 at `m[o]`. The largest stretch of the

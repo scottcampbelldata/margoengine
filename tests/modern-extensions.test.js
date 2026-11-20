@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GLTFAsset, PBRModel, parseGLTF } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel, parseGLTF } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { SSAO } from '../packages/post/dist/index.js';
 import { SceneFade } from '../packages/post/dist/scene-fade.js';
 import { sampleTrack } from '../packages/animation/dist/sampling.js';
 import { multiplyMatrices } from '../packages/math/src/mat4.ts';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 test('glTF accessors enforce bounds, decode normalized data, and apply sparse deltas', () => {
   const bytes = new Uint8Array([0, 127, 255, 0, 1, 0, 0, 0]),
@@ -88,8 +88,11 @@ test('PBR construction rolls back invalid hierarchy/transforms and preserves nod
     assert.throws(() => new PBRModel(engine, new GLTFAsset(fixture.doc, fixture.buffers)), /hierarchy cycle/);
     assert.equal(engine.meshes.size, 0);
     delete fixture.doc.nodes[1].children;
+    // glTF 2.0 section 3.5.3 allows a zero scale (KB-GLTFA B1): the node loads flattened and leaves nothing behind.
     fixture.doc.nodes[1].scale = [0, 1, 1];
-    assert.throws(() => new PBRModel(engine, new GLTFAsset(fixture.doc, fixture.buffers)), /nonzero/);
+    const flattened = new PBRModel(engine, new GLTFAsset(fixture.doc, fixture.buffers));
+    assert.equal(flattened.nodes[1].scale.x, 0);
+    flattened.dispose();
     assert.equal(engine.meshes.size, 0);
     delete fixture.doc.nodes[1].scale;
     const indices = new Uint32Array([0, 1, 0xffffffff]),

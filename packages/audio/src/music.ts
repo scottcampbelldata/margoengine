@@ -47,8 +47,10 @@ export class AudioMusic {
   private readonly loop: number;
   private readonly leadTime: number;
   private readonly fade: number;
-  private sources: AudioBufferSourceNode[] = [];
+  private readonly sources = new Set<AudioBufferSourceNode>();
   private origin: number | null = null;
+  /** Index of the next loop to schedule, counted from origin. */
+  private next = 0;
   private disposed = false;
 
   constructor(listener: AudioListener, stems: Readonly<Record<string, AudioBuffer>>,
@@ -81,32 +83,21 @@ export class AudioMusic {
     listener.addSource(this);
   }
 
-  /** Start every stem at the same audio time and loop phase. Returns that time. Already playing raises state. */
+  /**
+   * Start every stem at the same audio time and loop phase. Returns that time. Already playing raises state.
+   * Each loop k of each stem is its own one-shot source started at `at + k * loop` on the audio clock, so a browser
+   * that rounds start times to whole frames stays within a frame of the grid and never accumulates drift.
+   */
   start(state: string, at = this.listener.context.currentTime + this.leadTime): number {
     this.assertLive();
     const levels = this.levels(state), context = this.listener.context;
     nonnegative(at, 'start time');
     if (this.origin !== null || at < context.currentTime || !Number.isFinite(at + this.loop))
       throw fault('state', 'Music start needs a stopped transport and a finite future time; stop first or use transition');
-    const sources: AudioBufferSourceNode[] = [];
-    try {
-      this.stems.forEach(([, buffer], i) => {
-        const bus = this.mixer.bus(String(i));
-        bus.setGain(levels[i], {at: context.currentTime, seconds: 0});
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.loop = true;
-        source.loopEnd = this.loop;
-        source.connect(bus.input);
-        source.start(at);
-        sources.push(source);
-      });
-    } catch (error) {
-      for (const source of sources) { source.disconnect(); source.stop(); }
-      throw error;
-    }
-    this.sources = sources;
+    this.stems.forEach((_, i) => this.mixer.bus(String(i)).setGain(levels[i], {at: context.currentTime, seconds: 0}));
     this.origin = at;
+    this.next = 0;
+    try { this.schedule(); } catch (error) { this.stop(); throw error; }
     return at;
   }
 
@@ -130,12 +121,42 @@ export class AudioMusic {
   /** Stop immediately, including scheduled starts. A later start resets the grid and all pending state automation. */
   stop(): void {
     this.assertLive();
-    for (const source of this.sources) { source.stop(); source.disconnect(); }
-    this.sources = [];
+    for (const source of this.sources) { source.onended = null; source.stop(); source.disconnect(); }
+    this.sources.clear();
     this.origin = null;
   }
-  /** @internal Audio-clock scheduling requires no frame work. */
-  update(): void {}
+  /** @internal Keeps loops scheduled ahead of the audio clock; every loop end refills too, so hidden tabs keep time. */
+  update(): void {
+    if (!this.disposed && this.origin !== null) this.schedule();
+  }
+  /**
+   * Schedule loops whose start lies before the horizon: an OfflineAudioContext's whole render (it runs in one go),
+   * otherwise max(1 s, 2 loops) past currentTime + leadTime. A loop whose start already passed (a stalled main
+   * thread) starts now at its matching offset, so the grid holds.
+   */
+  private schedule(): void {
+    const context = this.listener.context, origin = this.origin!, now = context.currentTime;
+    const offline = context as Partial<OfflineAudioContext>;
+    const horizon = typeof offline.startRendering === 'function' && typeof offline.length === 'number'
+      ? offline.length / context.sampleRate : now + this.leadTime + Math.max(1, 2 * this.loop);
+    for (let when = origin + this.next * this.loop; when < horizon; when = origin + ++this.next * this.loop) {
+      const late = Math.max(0, now - when);
+      if (late >= this.loop) continue;
+      this.stems.forEach(([, buffer], i) => {
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(this.mixer.bus(String(i)).input);
+        source.onended = () => {
+          this.sources.delete(source);
+          source.disconnect();
+          this.update();
+        };
+        try { source.start(when + late, late, this.loop - late); }
+        catch (error) { source.disconnect(); throw error; }
+        this.sources.add(source);
+      });
+    }
+  }
   /** Stop sources, release owned mixer buses, keep shared buffers. Listener teardown also disposes music. */
   dispose(): void {
     if (this.disposed) return;

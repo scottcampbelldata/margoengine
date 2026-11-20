@@ -1,4 +1,4 @@
-// Complete frozen reference scenes, exact repeats across three fresh browser processes; GPU lock required.
+// Complete frozen reference scenes, exact repeats across three fresh browser processes.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';

@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/pixel/tests/browser-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/pixel/tests/browser-check.mjs
 // Under exactSize [64, 32] each frame reads back byte for byte against an image composed on the CPU: layers at 4x, quarter
 // turns of a 1-pixel line, 30 degrees (only source colours), scrolling by parts of a pixel, parallax, smooth scroll,
 // blends, opacity, order, views, targets drawn by a frame-graph pass, a core view and sprites, Tonemap order, MSAA and a

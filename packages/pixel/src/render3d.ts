@@ -4,6 +4,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from 
 import { hexColor } from '@margoengine/math';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { TextureOption } from '../../shared/texture-option.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -208,7 +209,7 @@ export class Render3D implements EnginePlugin {
   /** The outline settings, read each frame. False turns it off. */
   outline: OutlineOptions | false;
   readonly #camera: Camera;
-  readonly #target?: GPUTexture | (() => GPUTexture);
+  readonly #target: TextureOption;
   readonly #background?: string;
   readonly #sceneToDraw?: Scene;
   readonly #layerMask?: number;
@@ -240,7 +241,7 @@ export class Render3D implements EnginePlugin {
     this.#camera = options.camera;
     this.width = width;
     this.height = height;
-    this.#target = options.target;
+    this.#target = new TextureOption(options.target, 'Render3D target', 'setTarget');
     this.outline = options.outline ?? {};
     this.#background = options.background;
     this.#sceneToDraw = options.scene;
@@ -291,10 +292,22 @@ export class Render3D implements EnginePlugin {
     }
     return this.#madeView;
   }
-  /** The picture with its outline, when no `target` was given. */
+  /**
+   * Replaces the target from the next frame (undefined: the picture goes to {@link Render3D.output}'s own texture). A plain
+   * texture belongs to the engine's device as it is now, so call this from `onDeviceRestored` to bring a lost one back; a
+   * function is read every frame and needs nothing.
+   */
+  setTarget(target: GPUTexture | (() => GPUTexture) | undefined): void {
+    this.#target.set(target, this.#engine?.gpu);
+  }
+  /**
+   * The picture with its outline, when no `target` was given. A plain `target` lost with its device is reported once
+   * through `engine.onError`, and until `setTarget` hands in a new one the picture goes to the pass's own texture here.
+   */
   get output(): GPUTexture {
     void this.view;
-    if (this.#target) return typeof this.#target === 'function' ? this.#target() : this.#target;
+    const given = this.#target.get(this.#device!, this.#engine);
+    if (given) return given;
     this.#ownOutput ??= this.#device!.createTexture({
       label: 'render3d output',
       size: [this.width, this.height],
@@ -321,6 +334,7 @@ export class Render3D implements EnginePlugin {
     if (this.#disposed) throw fault('disposed', 'Render3D disposed; create a new one');
     if (engine.backend !== 'webgpu') throw fault('unsupported', 'Render3D needs WebGPU', 'webgpu');
     this.#engine = engine;
+    this.#target.fix(engine.gpu);
     const own = (c: PassContext): c is Extract<PassContext, { backend: 'webgpu' }> =>
       c.backend === 'webgpu' && !!this.#colorTexture && c.view?.target?.color === this.#colorTexture;
     // Core's view clear is opaque. Without a background the view keeps the colour below, which this clears to transparent.

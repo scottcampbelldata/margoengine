@@ -33,13 +33,16 @@ export interface GPUGraphOptions {
   readonly dissuadeHubs?: boolean;
   /** FA2 edge-weight exponent. Default 1. */
   readonly weightInfluence?: number;
-  /** FA2 global swinging tolerance. Default 1. */
+  /** FA2 global swinging tolerance: global speed = tolerance x traction / swinging. Default 1. */
   readonly jitterTolerance?: number;
   /** Barnes-Hut opening angle; 0 is exact. Default 0.7. */
   readonly theta?: number;
   /** Power-of-two leaf grid side. Default 128 in 2D, 16 in 3D; maximum 512 / 64. */
   readonly gridSide?: number;
-  /** Data-unit radius per node for FA2 overlap prevention. Default 0, disabled. */
+  /**
+   * Data-unit radius per node for FA2 overlap prevention: forces use the border distance, overlapping pairs repel
+   * with 100 x scaling x masses and do not attract. Default none, disabled.
+   */
   readonly radii?: ArrayLike<number>;
   /** Nodes with a nonzero value stay fixed while still exerting forces. Default none. */
   readonly fixed?: ArrayLike<number>;

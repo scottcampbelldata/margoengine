@@ -3,7 +3,7 @@
 // Cloud shadows against the sky's own clouds, and every kind of receiver under an effect. light-function-browser.mjs asserts.
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {cloudShadows,lightPattern} from '/packages/shadows/dist/light-function.js';
@@ -111,6 +111,48 @@ window.check.receiver=async(name,kind)=>{
   e.dispose();r.source.dispose?.();
   await frames(1);
   return {open,dark,errors};
+};
+// A device restore with a plain mask, then the function form (docs/conventions.md, "Borrowed GPU objects"). Frames are
+// drawn on engine.gpu, the device of the moment; nothing may throw, and the plain mask is reported once.
+const blackOn=(gpu,counter)=>{counter&&counter.n++;const t=gpu.createTexture({size:[1,1],format:'rgba8unorm',usage:6});gpu.queue.writeTexture({texture:t},new Uint8Array([0,0,0,255]),{bytesPerRow:4},[1,1]);return t;};
+window.check.restore=async(kind)=>{
+  const out={errors:[],thrown:[],reports:[]};
+  const draw=async(n)=>{for(let i=0;i<n;i++){const gpu=engine.gpu;gpu.pushErrorScope('validation');try{engine.render();}catch(e){out.thrown.push(String(e?.message??e));}await gpu.queue.onSubmittedWorkDone();const e=await gpu.popErrorScope();if(e)out.errors.push(e.message);}};
+  const shot=async()=>{await draw(2);return middle();};
+  engine.onError=(e)=>out.reports.push({code:e?.code,message:String(e?.message??e)});
+  engine.lighting.direction.set([0.3/1.1,1/1.1,0.2/1.1]);engine.lighting.radiance.set([3,3,3,0]);
+  Object.assign(engine.camera,{near:0.05,far:300,fov:50});
+  look([0.4,6,0.5],[0,0,0]);
+  const run=async(texture)=>{
+    const m=engine.createMesh().setGeometry(box(40,1,40)).setPosition([0,-0.5,0]),pattern=lightPattern({texture,size:1});
+    const options={filter:'hard',effects:[pattern],...(kind==='shadows'?{resolution:1024,cascades:1,distance:100}:{distance:60})};
+    const e=(kind==='virtual'?VirtualShadows:Shadows).attach(engine,options);
+    e.add(m,{castShadow:false});
+    await waitForPipelines(()=>draw(1));await draw(kind==='virtual'?20:3);
+    return {m,pattern,e};
+  };
+  // The plain view: dark under the mask, then the same light as no mask after the restore, then dark from setTexture.
+  const own=blackOn(engine.gpu),a=await run(own.createView());
+  out.plain={dark:await shot()};
+  a.pattern.options.strength=0;out.plain.open=await shot();a.pattern.options.strength=1;
+  own.destroy();
+  const old=engine.gpu;old.destroy();await old.lost;await engine.rebootDevice();
+  await draw(3);
+  out.plain.lost=await shot();
+  out.plain.reports=out.reports.length;
+  a.pattern.setTexture?.(blackOn(engine.gpu).createView());
+  out.plain.back=await shot();
+  a.e.dispose();a.m.dispose?.();await draw(1);
+  // The function form: called once per device, nothing reported, dark on both devices.
+  const counter={n:0},b=await run((gpu)=>blackOn(gpu,counter).createView());
+  out.made={before:await shot()};
+  const prior=engine.gpu;prior.destroy();await prior.lost;await engine.rebootDevice();
+  await draw(3);
+  out.made.after=await shot();
+  out.made.calls=counter.n;
+  b.e.dispose();b.m.dispose?.();await draw(1);
+  engine.onError=()=>{};
+  return out;
 };
 window.ready=true;
 </script></body></html>

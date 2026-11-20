@@ -1,5 +1,5 @@
 // The real-GPU check of @margoengine/post/depth (DepthTexture): every case at 1x and 4x MSAA, reading pixels back.
-//   npm run check:depth   (takes the GPU lock itself; under `gpu-lock.mjs run` it nests)
+//   npm run check:depth
 // Cases: (a) reversed-Z depth of a box against camera.matrix, 0 where empty; (b) the distance target against the
 // analytic distance to the box face; (c) an orthographic camera (@margoengine/cameras): depth linear in distance,
 // distance still exact; (d) a WgslMaterial plane reading depth.distance with textureLoad shows a colour made from it;
@@ -9,9 +9,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-const release = await acquire({ owner: 'depth-browser' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5297 });
@@ -573,5 +571,4 @@ try {
   console.log(JSON.stringify(report, null, 2));
 } finally {
   await browser?.close();
-  release();
 }

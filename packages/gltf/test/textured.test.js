@@ -78,7 +78,7 @@ test('textured refuses the synchronous parse, and the root refuses the file with
   try {
     const { doc, bytes } = file();
     assert.throws(() => parseGLTF(engine, doc, [bytes], { extensions: [textured] }), /parseGLTFAsync/);
-    assert.throws(() => parseGLTF(engine, doc, [bytes]), /gltf-pro/);
+    assert.throws(() => parseGLTF(engine, doc, [bytes]), /gltf\/pbr/);
   } finally {
     engine.dispose();
   }
@@ -277,15 +277,15 @@ test('what the light path does not draw stays refused and rolls back', async (t)
   const { engine } = await gpuEngine(t);
   try {
     const map = { baseColorTexture: { index: 0 } };
-    await assert.rejects(load(engine, file({ material: { alphaMode: 'BLEND' } })), /gltf-pro/);
-    await assert.rejects(load(engine, file({ material: { normalTexture: { index: 0 } } })), /gltf-pro/);
+    await assert.rejects(load(engine, file({ material: { alphaMode: 'BLEND' } })), /gltf\/pbr/);
+    await assert.rejects(load(engine, file({ material: { normalTexture: { index: 0 } } })), /gltf\/pbr/);
     await assert.rejects(
       load(engine, file({ material: { pbrMetallicRoughness: { ...map, metallicRoughnessTexture: { index: 0 } } } })),
-      /gltf-pro/,
+      /gltf\/pbr/,
     );
     await assert.rejects(
       load(engine, file({ textures: [{ extensions: { KHR_texture_basisu: { source: 0 } } }] })),
-      /gltf-pro/,
+      /gltf\/pbr/,
     );
     await assert.rejects(
       load(
@@ -328,7 +328,7 @@ test('a malformed texture reference is a named error and rolls back', async (t) 
   }
 });
 
-test('an image over the GPU limit is a RangeError and a WebGL engine is refused, both with nothing left behind', async (t) => {
+test('an image over the GPU limit is a RangeError and the WebGL2 preview is refused, pointing at the layer, both with nothing left behind', async (t) => {
   withBitmaps(t, { width: 1 << 15, height: 4 });
   const { engine } = await gpuEngine(t);
   try {
@@ -339,7 +339,7 @@ test('an image over the GPU limit is a RangeError and a WebGL engine is refused,
   }
   const { engine: webgl } = await headlessEngine();
   try {
-    await assert.rejects(load(webgl, file()), /requires WebGPU/);
+    await assert.rejects(load(webgl, file()), /needs WebGPU or the WebGL2 compatibility layer; call install()/);
     assert.equal(webgl.meshes.size, 0);
   } finally {
     webgl.dispose();

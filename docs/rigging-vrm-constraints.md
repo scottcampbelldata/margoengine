@@ -15,7 +15,7 @@ The readonly constraints array exposes independent records. Only each record's
 weight is writable; its default is 1 and its finite range is zero through one.
 All weights validate before any pose write. Sources, targets, kind and axis are
 immutable. The reader retains the source document, including standard extras,
-without mutation. The data remains in gltf-pro when the extension is required;
+without mutation. The data remains in gltf/pbr when the extension is required;
 the controller is an explicit optional installation.
 
 Rotation transfers the source's local rest-relative change. Roll extracts twist
@@ -44,7 +44,7 @@ change 1725 and 460 pixels respectively when constraints are enabled, then resto
 exactly after disposal. Native coverage is 5314 / 3696 pixels and compatibility
 5317 / 3696. This is RTX A6000 correctness evidence, not a speed or cross-vendor
 claim. Run the package's test:constraints:browser command with and without
---compat under the shared GPU lock; both real files run in each invocation.
+--compat; both real files run in each invocation.
 
 ## Research compared
 

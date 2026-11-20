@@ -214,3 +214,31 @@ test('calendar uses UTC dates, leap days, week starts, gaps and color scale', ()
   assert.throws(() => a.toSVG({ width: 0 }));
   assert.doesNotMatch(a.toSVG(), /NaN|Infinity|<image/);
 });
+test('vector charts take a million points, refuse dates past a Date, label close scale steps apart and write XML 1.0 text', () => {
+  // Spreading a large array into Math.max or a rest parameter overflowed the call stack (an uncoded RangeError).
+  const n = 1e6,
+    theta = Float64Array.from({ length: n }, (_, i) => (i * 360) / n),
+    radius = new Float64Array(n).fill(2);
+  assert.equal(c.polarChart(theta, radius).kind, 'Polar');
+  const rows = Array.from({ length: 300000 }, (_, i) => ({ x: i, open: 1, high: 2, low: 0, close: 1.5 }));
+  assert.equal(c.candlestickChart(rows).kind, 'Candlestick');
+  assert.throws(() => c.polarChart(Float64Array.of(0, 1), Float64Array.of(1, Infinity)), { code: 'out-of-range' });
+  // A date axis past the last Date (8.64e15 ms) is a coded error, not toISOString's bare RangeError.
+  assert.throws(() => c.candlestickChart([{ x: 9e15, open: 1, high: 2, low: 0, close: 1 }], { dateAxis: true }), {
+    code: 'out-of-range',
+  });
+  // Scale labels resolve their step and stay in plain decimals: 1000.2 to 1001, not five times 1.0e+3.
+  const radar = c.radarChart(
+    [{ label: 'a', domain: [1000, 1001] }, { label: 'b', domain: [0, 1234] }, { label: 'c' }],
+    [{ label: 's', values: [1000.5, 1, 1] }],
+  );
+  const texts = radar.labels.map((l) => l.text);
+  for (const t of ['1000.2', '1000.4', '1000.6', '1000.8', '1001', '250', '490', '740', '990', '1230'])
+    assert.ok(texts.includes(t), `${t} in ${texts}`);
+  assert.ok(!texts.some((t) => /e[+-]/.test(t)), texts.join(' '));
+  const polar = c.polarChart([0, 90], [1, 1234]).labels.map((l) => l.text);
+  assert.ok(polar.includes('1230') && !polar.some((t) => /e[+-]/.test(t)), polar.join(' '));
+  // Labels from data are escaped with the shared XML 1.0 writer: a C0 control becomes U+FFFD.
+  const svg = c.pieChart([{ label: 'a\u0001b', value: 1 }]).toSVG();
+  assert.ok(!svg.includes('\u0001') && svg.includes('a�b'));
+});

@@ -316,6 +316,34 @@ window.runLineTests = async () => {
       zigzag.material.set({ join, cap });
       await frame();
     }
+  // A repeated point joins across itself: the zigzag with its second corner given twice draws the same pixels.
+  const zigzagPoints = [-3, -2, 0, -1, 1, 0, 1, -2, 0, 3, 1, 0],
+    repeatedPoints = [-3, -2, 0, -1, 1, 0, -1, 1, 0, 1, -2, 0, 3, 1, 0];
+  const repeatDiff = {};
+  for (const join of ['miter', 'bevel', 'round'])
+    for (const cap of ['butt', 'round']) {
+      zigzag.material.set({ join, cap });
+      zigzag.setPositions(zigzagPoints);
+      const plain = await frame();
+      zigzag.setPositions(repeatedPoints);
+      const repeated = await frame();
+      let differ = 0;
+      for (let i = 0; i < plain.bytes.length; i += 4)
+        if (
+          plain.bytes[i] !== repeated.bytes[i] ||
+          plain.bytes[i + 1] !== repeated.bytes[i + 1] ||
+          plain.bytes[i + 2] !== repeated.bytes[i + 2]
+        )
+          differ++;
+      repeatDiff[`${join} ${cap}`] = differ;
+    }
+  report.repeatDiff = repeatDiff;
+  assert(
+    Object.values(repeatDiff).every((n) => n === 0),
+    `A repeated point changed the drawn line: ${JSON.stringify(repeatDiff)}`,
+  );
+  zigzag.setPositions(zigzagPoints);
+  report.checks.push('A repeated point in a strip joins across it, pixel for pixel');
   const loop = lines.add(
     new Line({ mode: 'loop', positions: [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], width: 3, join: 'miter' }),
   );
@@ -457,6 +485,10 @@ window.runGallery = async () => {
   );
   // A line that passes behind the camera must be clipped at the near plane, not mirrored.
   lines.add(new Line({ positions: [3, -2, 30, 3, -2, -30], width: 6, color: '#30ff30' }));
+  // Rightward segments, butt on the left and round on the right: their normal is (-0, 1), whose atan2 Apple's Metal gives as -pi/2,
+  // so the round cap's fan was drawn into the segment and the line came out no longer than the butt one.
+  lines.add(new Line({ positions: [-6, 5.6, 0, -2, 5.6, 0], width: 24, cap: 'butt', color: '#ff00ff' }));
+  lines.add(new Line({ positions: [2, 5.6, 0, 6, 5.6, 0], width: 24, cap: 'round', color: '#ff00ff' }));
   engine.render();
   await runtime.gpu.queue.onSubmittedWorkDone();
   const result = { errors };
@@ -478,5 +510,22 @@ window.runGallery = async () => {
       else clipped++;
     }
   result.nearPlane = { mirrored, clipped };
+  // Each magenta band's extent in pixels: the round band is longer than the butt band by its own thickness.
+  const bands = [
+    { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity },
+    { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity },
+  ];
+  for (let y = 0; y < copy.height; y++)
+    for (let x = 0; x < copy.width; x++) {
+      const i = (y * copy.width + x) * 4;
+      if (!(pixels[i] > 200 && pixels[i + 1] < 80 && pixels[i + 2] > 200)) continue;
+      const band = bands[x < copy.width / 2 ? 0 : 1];
+      band.x0 = Math.min(band.x0, x);
+      band.x1 = Math.max(band.x1, x);
+      band.y0 = Math.min(band.y0, y);
+      band.y1 = Math.max(band.y1, y);
+    }
+  const [butt, round] = bands.map((b) => ({ length: b.x1 - b.x0 + 1, thickness: b.y1 - b.y0 + 1 }));
+  result.roundCaps = { butt, round };
   return result;
 };

@@ -26,6 +26,7 @@ export function harness({ samples = 4, shader = wgsl, format = 'bgra8unorm', lig
       radiance: new Float32Array([1, 1, 1, 0.15]),
       ambient: new Float32Array([1, 1, 1]),
     },
+    plugins,
     hasPlugin: (name) => plugins.has(name),
     sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? engine : undefined),
     use(plugin) {
@@ -70,7 +71,15 @@ export function harness({ samples = 4, shader = wgsl, format = 'bgra8unorm', lig
     for (const plugin of [...plugins.values()]) plugin.onPreUpdate?.(0);
     graph.execute(view.c);
   };
-  return { gpu, engine, view, plugins, draws, frame, live: () => resources.filter((r) => !r.destroyed) };
+  // A device restore as the engine does it: a new device, every plugin told. Returns the new mock GPU (record on it).
+  const lose = () => {
+    const fresh = mockGPU();
+    engine.gpu = view.c.device = fresh.device;
+    view.c.encoder = fresh.encoder;
+    engine.restore();
+    return fresh;
+  };
+  return { gpu, engine, view, plugins, draws, frame, lose, live: () => resources.filter((r) => !r.destroyed) };
 }
 /** WGSL of every shader module created in `log`. */
 export const modules = (log) => log.filter((e) => e[0] === 'module').map((e) => e[2].code);

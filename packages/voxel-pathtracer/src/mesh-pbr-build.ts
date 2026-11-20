@@ -119,6 +119,8 @@ export class PBRMeshBuilder implements TraceGeometryBuilder {
     for (const m of materials.values()) {
       const at = base + materialOffsets.get(m.id)!;
       out[at] = 1;
+      // The texture slot count, the bound of pbrMaterial's slot loop (a word the shader reads, so no compiler unrolls it).
+      out[at + 3] = MAPS.length;
       f.set(m.baseColorFactor ?? [1, 1, 1, 1], at + 4);
       f.set(m.emissiveFactor ?? [0, 0, 0], at + 8);
       f[at + 11] = m.emissiveStrength ?? 1;

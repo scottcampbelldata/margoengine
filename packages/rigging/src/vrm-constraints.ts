@@ -1,4 +1,4 @@
-import type { PBRModel } from '@margoengine/gltf-pro/model';
+import type { PBRModel } from '@margoengine/gltf/pbr-model';
 import type { Animator } from '@margoengine/animator';
 import type { Mesh } from '@margoengine/core/extension';
 import { engineRuntime } from '@margoengine/core/extension';

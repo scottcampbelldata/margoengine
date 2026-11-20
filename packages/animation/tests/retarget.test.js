@@ -157,7 +157,7 @@ test('retargeted clips sample the source clip each frame and play on the target'
   }
 });
 
-test('glTF-pro models: rigs from every node, live apply, and clips sampled through their Animation', async () => {
+test('glTF PBR models: rigs from every node, live apply, and clips sampled through their Animation', async () => {
   const e = await engine(),
     named = () => {
       const fixture = skinnedStrip();

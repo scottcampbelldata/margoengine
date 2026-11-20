@@ -157,6 +157,8 @@ export abstract class Room<State = unknown> {
   /** Each client's message bucket: tokens left and when it was last refilled. */
   private buckets = new WeakMap<RoomClient, { tokens: number; at: number }>();
   private nextId = 1;
+  /** The onJoin or onReconnect still running for a client: its drop waits for it, so onLeave never runs first. */
+  private hooks = new WeakMap<RoomClient, Promise<void>>();
   /** @internal */ onEmpty: (() => void) | null = null;
   /** @internal Where errors thrown by this room's hooks and handlers go (its RoomServer's `onerror`). */
   report: (error: unknown) => void = (error) => console.error(error);
@@ -333,7 +335,7 @@ export abstract class Room<State = unknown> {
     this.clients.push(client);
     this.seat(client, connection);
     try {
-      await this.onJoin(client, options);
+      await this.during(client, () => this.onJoin(client, options));
       this.patch();
     } catch (error) {
       this.fail(client, error, 'onJoin failed');
@@ -383,13 +385,32 @@ export abstract class Room<State = unknown> {
     this.seat(client, connection);
     if (timer === undefined) old.close(CloseCode.removed, 'reconnected on a new connection');
     try {
-      await this.onReconnect(client);
+      await this.during(client, () => this.onReconnect(client));
       this.patch();
     } catch (error) {
       this.fail(client, error, 'onReconnect failed');
       return 'failed';
     }
     return 'joined';
+  }
+
+  /**
+   * Runs a join hook of `client`, recording it so a drop that comes while it runs waits for it: a client that closes
+   * during an async onJoin would otherwise get onLeave first, and onJoin would then put it back in the state.
+   */
+  private during(client: RoomClient, hook: () => void | Promise<void>): void | Promise<void> {
+    // A hook that throws or returns at once stays synchronous: only a pending promise has a window to guard.
+    const run = hook();
+    if (!(run instanceof Promise)) return run;
+    const settled: Promise<void> = run.then(
+        () => this.forget(client, settled),
+        () => this.forget(client, settled),
+      );
+    this.hooks.set(client, settled);
+    return run;
+  }
+  private forget(client: RoomClient, settled: Promise<void>): void {
+    if (this.hooks.get(client) === settled) this.hooks.delete(client);
   }
 
   /** Reports `error` and closes `client` with CloseCode.error (its `onLeave` then runs). */
@@ -439,6 +460,13 @@ export abstract class Room<State = unknown> {
   }
 
   private async drop(client: RoomClient, consented: boolean, code: number): Promise<void> {
+    const connection = client.connection,
+      running = this.hooks.get(client);
+    if (running) {
+      await running;
+      // A reconnect that seated the client on a new connection while its hook ran has taken over from this drop.
+      if (client.connection !== connection) return;
+    }
     const i = this.clients.indexOf(client);
     if (i < 0) return;
     this.clients.splice(i, 1);
@@ -617,7 +645,9 @@ export class RoomServer {
     if (!(room.messageBurst >= 1 && room.messageBurst < Number.POSITIVE_INFINITY))
       throw new RangeError(`Room '${name}' messageBurst is ${room.messageBurst}; pass a finite number >= 1`);
     room.roomName = name;
-    room.roomId = randomId();
+    // A repeated id (about 36 random bits) would replace a live room in the map and orphan its clients.
+    do room.roomId = randomId();
+    while (this.live.has(room.roomId) || [...this.creating.keys()].some((r) => r.roomId === room.roomId));
     room.report = (error) => this.report(error, room);
     const ready = (async () => room.onCreate({ ...definition.defaults, ...options }))();
     this.creating.set(room, ready);
@@ -964,6 +994,11 @@ export class RoomsClient {
     signal?.throwIfAborted();
     const connection = await this.connect(),
       untyped = schema as UntypedSchema;
+    // An abort while connect() ran has already fired: its listener below would never hear it.
+    if (signal?.aborted) {
+      connection.close(CloseCode.normal, 'aborted');
+      throw signal.reason;
+    }
     return new Promise((resolve, reject) => {
       // The abort reason wins: the close it causes must not reject the join with a close message first.
       const abort = () => {

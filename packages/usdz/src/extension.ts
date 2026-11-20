@@ -1,7 +1,7 @@
 import type { GLTFDocument, GLTFMaterial } from '../../shared/gltf.js';
 import type { Specs } from './crate.js';
 import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro/model';
+import type { PBRModel } from '@margoengine/gltf/pbr-model';
 
 /**
  * An optional part of the USD import, from an entry of this package, passed in `USDOptions.extensions`. It stays out of
@@ -173,7 +173,7 @@ export interface ExtensionHooks extends USDExtension {
   /** Resolves optional time-dependent value sources before geometry preparation. */
   resolve?(read: ValueRead): void;
   /** Lazily supplies optional PBR material readers before direct or worker model construction. */
-  decoders?(): Promise<NonNullable<Parameters<typeof import('@margoengine/gltf-pro/model').parseGLTF>[4]>>;
+  decoders?(): Promise<NonNullable<Parameters<typeof import('@margoengine/gltf/pbr-model').parseGLTF>[4]>>;
   /** Attaches optional renderers after model creation, on the main thread, including worker loads. */
   created?(engine: EngineKernel, model: PBRModel): void | Promise<void>;
   /** Prepares optional prim schemas before the mesh walk, within the reader's geometry budgets. */

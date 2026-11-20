@@ -36,6 +36,9 @@ test('all builders already preserve caller face order, indexed and nonindexed, t
         xs.map((_, i) => i),
       );
       assert.notEqual(tree.index, indices);
+      // The documented cost of the self-contained layout: 12 B of vertex indices and 4 B of face number a triangle.
+      assert.equal(tree.index.byteLength, 12 * xs.length);
+      assert.equal(tree.triangles.byteLength, 4 * xs.length);
       const roundtrip = MeshBVH.fromArrayBuffer(tree.toArrayBuffer(), source);
       for (const value of [tree, roundtrip]) {
         value.refit();

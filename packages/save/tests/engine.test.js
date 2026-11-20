@@ -24,7 +24,7 @@ function model(engine, url, nodes = [{ translation: [1, 2, 3] }, { name: 'hand' 
     }),
     batch = engine.createMesh(root),
     plugin = {
-      name: `gltf-pro:${serial++}`,
+      name: `gltf/pbr:${serial++}`,
       root,
       nodes: made,
       ownedMeshes: [root, ...made, batch],
@@ -442,6 +442,21 @@ test('damage is refused before anything changes', async () => {
     [(d) => (d.entities[0].components.geometry = 7), /no saved geometry 7/],
     [(d) => (d.meta.engine.camera.position = [1]), /camera/],
     [(d) => (d.meta.engine.lighting.direction = 'up'), /lighting/],
+    // A value commit would apply after the plugins, or one every later frame would throw on (KB-P9a).
+    [(d) => (d.meta.engine.lighting.direction = [0, 1, 0, 1, 9]), /lighting/],
+    [(d) => (d.meta.engine.lighting.ambient = [1, 1, 1, 1]), /lighting/],
+    [(d) => (d.meta.engine.background = 7), /background/],
+    [(d) => (d.meta.engine.camera.near = 0), /camera/],
+    [(d) => (d.meta.engine.camera.far = d.meta.engine.camera.near), /camera/],
+    [(d) => (d.meta.engine.camera.fov = 180), /camera/],
+    [(d) => (d.meta.engine.camera.target = [...d.meta.engine.camera.position]), /camera/],
+    [
+      (d) => {
+        const { position: p, target: t } = d.meta.engine.camera;
+        d.meta.engine.camera.up = [p[0] - t[0], p[1] - t[1], p[2] - t[2]];
+      },
+      /camera/,
+    ],
     [(d) => (d.meta.engine.plugins = 3), /plugins/],
     [(d) => (d.entities[0].components.mesh = { shape: 'box' }), /a model URL/],
     [(d) => (d.entities[0].parent = 'nobody'), /nobody/],
@@ -449,8 +464,10 @@ test('damage is refused before anything changes', async () => {
   for (const [damage, message] of bad) {
     const document = copy();
     damage(document);
+    const direction = Array.from(engine.scene.lighting.direction);
     await assert.rejects(restoreScene(engine, document), message);
     kept.check();
+    assert.deepEqual(Array.from(engine.scene.lighting.direction), direction);
   }
   const document = copy();
   document.entities[0].components.material = { color: 'not a colour' };

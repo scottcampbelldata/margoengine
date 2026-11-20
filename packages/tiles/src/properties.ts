@@ -1,5 +1,5 @@
 // Optional EXT_structural_metadata property attributes and textures. Binary transforms share the table decoder.
-import type { GLTFAsset } from '@margoengine/gltf-pro';
+import type { GLTFAsset } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { ACCESSOR_WIDTHS } from '../../shared/accessor.js';
 import { rawAccessor } from './raw-accessor.js';
@@ -384,7 +384,7 @@ export function readPropertyMetadata(asset: GLTFAsset, options: PropertyReadOpti
       if (!Number.isInteger(triangle) || triangle < 0 || triangle >= triangles)
         throw new RangeError('Metadata triangle index is outside the primitive; use a source triangle index');
       // glTF 2.0 section 3.7.2.1: strip P_i = {v_i, v_(i+1+i%2), v_(i+2-i%2)}, fan P_i = {v_(i+1), v_(i+2), v_0}, the
-      // order gltf-pro lists them in and so the order a ray hit's barycentric weights follow. Before batch 132b
+      // order gltf/pbr lists them in and so the order a ray hit's barycentric weights follow. Before batch 132b
       // (2026-11-13) an odd strip triangle was read as {v_(i+1), v_i, v_(i+2)} and a fan as {v_0, v_(i+1), v_(i+2)}: the
       // same triangles, with the weights applied to the wrong corners.
       const corners =

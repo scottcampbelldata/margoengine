@@ -1,4 +1,4 @@
-// Bug 26: browser suites waited 30 s for `window.modern` and timed out, about 1 run in 38 under shared GPU slots. Every
+// Bug 26: browser suites waited 30 s for `window.modern` and timed out, about 1 run in 38 beside other GPU suites. Every
 // suite's Vite dev server used the default dependency cache, node_modules/.vite: one per checkout, and one for most
 // worktrees, whose node_modules/.vite linked to the main checkout's. A server with another root or other aliases
 // re-optimizes into that folder and replaces the files a second server's page has not fetched yet; that server then
@@ -125,7 +125,7 @@ test('a failed start leaves nothing open, so its process exits', () => {
       await startDevServer({ startPath: '/LICENSE', port: 0, plugins: [broken] }).catch(() => {});
       setTimeout(() => {
         console.log('still open: ' + process.getActiveResourcesInfo().join(', '));
-        process.exit(3);
+        process.exit(3); // process.exit: the watchdog ends a run that is still going past its hard limit
       }, 20_000).unref();`;
   // wall-clock: a bound on a hang, far from the about 1 s a clean exit takes.
   const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 60_000 });
@@ -165,7 +165,7 @@ test('a checkout reached through a Windows short path serves its pages', () => {
       await dev.close();
       setTimeout(() => {
         console.log('still open: ' + process.getActiveResourcesInfo().join(', '));
-        process.exit(3);
+        process.exit(3); // process.exit: the watchdog ends a run that is still going past its hard limit
       }, 20_000).unref();`;
   // Local CI 2026-11-11 03:00: this child never exited, and with no limit spawnSync held the runner's event loop until
   // its hang watch ended the run (KB2215). Its dev server watched files then (tests/dev-server-watch.test.js); a child

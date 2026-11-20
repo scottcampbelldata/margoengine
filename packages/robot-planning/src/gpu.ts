@@ -41,9 +41,15 @@ const NOTHING = 3e38;
 /** Floats before a field's samples. */
 const FIELD_HEADER = 32;
 
+// Direct3D's HLSL compiler (fxc, under ANGLE's WebGL2 on Windows) inlines every call and unrolls every loop it can
+// count, so each call site is a copy of the callee's whole tree. The kernel calls each costly function from one site,
+// in a loop where several were (a support pair per GJK step, one face and one edge test in `reduce`, one GJK for hulls
+// and pairs, one field read per segment), and every such loop adds `params.zero`, a uniform that is always 0, to its
+// bound, so no compiler can count it and copy the body (KB-COMPAT-FXCTIME1). The same operations run in the same
+// order, so every result is the one the unrolled form gave.
 const kernel = (frames: number): string => /* wgsl */ `
 ${preciseMathWgsl(['preciseSin', 'preciseCos'])}
-struct Params { count: u32, dof: u32, shapes: u32, colliders: u32, pairs: u32, early: u32, stop: f32, unused: u32 }
+struct Params { count: u32, dof: u32, shapes: u32, colliders: u32, pairs: u32, early: u32, stop: f32, zero: u32 }
 struct Set { first: u32, count: u32, frame: u32, radius: f32 }
 
 @group(0) @binding(0) var<uniform> params: Params;
@@ -96,7 +102,7 @@ fn place(pose: u32) {
   origins[0] = joints[3].xyz;
   rotations[WORLD] = mat3x3f(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), vec3f(0.0, 0.0, 1.0));
   origins[WORLD] = vec3f(0.0);
-  for (var j = 1u; j < WORLD; j++) {
+  for (var j = 1u; j < WORLD + params.zero; j++) {
     let at = 4u + (j - 1u) * 5u;
     let c0 = joints[at];
     let c1 = joints[at + 1u];
@@ -139,11 +145,19 @@ fn support(part: Set, direction: vec3f) -> vec3f {
   return rotation * points[found].xyz + origins[part.frame];
 }
 
-fn difference(a: Set, b: Set, direction: vec3f) -> vec3f {
-  let w = support(a, direction) - support(b, -direction);
-  let size = abs(w);
-  extent = max(extent, max(size.x, max(size.y, size.z)));
-  return w;
+/** support(a, da) - support(b, db), through one support call. */
+fn supportPair(a: Set, b: Set, da: vec3f, db: vec3f) -> vec3f {
+  var ends: array<vec3f, 2>;
+  for (var side = 0u; side < 2u + params.zero; side++) {
+    var part = a;
+    var direction = da;
+    if (side == 1u) {
+      part = b;
+      direction = db;
+    }
+    ends[side] = support(part, direction);
+  }
+  return ends[0] - ends[1];
 }
 
 fn closerEdge(i: u32, j: u32, mask: u32) -> u32 {
@@ -191,7 +205,12 @@ fn closerFace(i: u32, j: u32, k: u32, mask: u32) -> u32 {
       return (1u << i) | (1u << j) | (1u << k);
     }
   }
-  return closerEdge(j, k, closerEdge(i, k, closerEdge(i, j, mask)));
+  // Then its edges in turn, (i j), (i k) and (j k), each given the mask the one before returned.
+  var edges = mask;
+  for (var e = 0u; e < 3u + params.zero; e++) {
+    edges = closerEdge(select(i, j, e == 2u), select(j, k, e >= 1u), edges);
+  }
+  return edges;
 }
 
 fn outside(i: u32, j: u32, k: u32, l: u32) -> bool {
@@ -212,22 +231,20 @@ fn reduce(count: u32) -> u32 {
   var mask = 0u;
   if (count == 2u) {
     mask = closerEdge(0u, 1u, 0u);
-  } else if (count == 3u) {
-    mask = closerFace(0u, 1u, 2u, 0u);
   } else {
-    if (outside(0u, 1u, 2u, 3u)) {
-      mask = closerFace(0u, 1u, 2u, mask);
+    // A triangle is its one face. A tetrahedron's faces (0 1 2), (0 1 3), (0 2 3) and (1 2 3) count where the origin
+    // is beyond them: face f leaves out vertex 3 - f.
+    let faces = select(4u, 1u, count == 3u);
+    for (var f = 0u; f < faces + params.zero; f++) {
+      let l = 3u - f;
+      let i = select(0u, 1u, l == 0u);
+      let j = select(1u, 2u, l <= 1u);
+      let k = select(2u, 3u, l <= 2u);
+      if (count == 3u || outside(i, j, k, l)) {
+        mask = closerFace(i, j, k, mask);
+      }
     }
-    if (outside(0u, 1u, 3u, 2u)) {
-      mask = closerFace(0u, 1u, 3u, mask);
-    }
-    if (outside(0u, 2u, 3u, 1u)) {
-      mask = closerFace(0u, 2u, 3u, mask);
-    }
-    if (outside(1u, 2u, 3u, 0u)) {
-      mask = closerFace(1u, 2u, 3u, mask);
-    }
-    if (mask == 0u) {
+    if (count == 4u && mask == 0u) {
       return 4u;
     }
   }
@@ -244,21 +261,48 @@ fn reduce(count: u32) -> u32 {
 /** Distance between two point sets; 0 when they overlap. */
 fn gjk(a: Set, b: Set) -> f32 {
   extent = 0.0;
-  var direction = support(b, vec3f(1.0, 0.0, 0.0)) - support(a, vec3f(1.0, 0.0, 0.0));
-  if (dot(direction, direction) == 0.0) {
-    direction = vec3f(1.0, 0.0, 0.0);
-  }
-  simplex[0] = difference(a, b, direction);
-  var v = simplex[0];
-  var count = 1u;
-  for (var round_ = 0u; round_ < GJK_STEPS; round_++) {
-    let squared = dot(v, v);
-    let noise = extent * extent;
-    if (squared <= FLAT * FLAT * noise) {
-      witness = vec3f(0.0);
-      return 0.0;
+  var v = vec3f(0.0);
+  var count = 0u;
+  var squared = 0.0;
+  // Step 0 takes the first direction from both sets' support points along x, step 1 places the first vertex along it,
+  // and each later step is one round: one support pair a step.
+  for (var step = 0u; step < GJK_STEPS + 2u + params.zero; step++) {
+    var first = a;
+    var second = b;
+    var da = -v;
+    var db = v;
+    if (step == 0u) {
+      first = b;
+      second = a;
+      da = vec3f(1.0, 0.0, 0.0);
+      db = da;
+    } else if (step == 1u) {
+      da = v;
+      db = -v;
+    } else {
+      squared = dot(v, v);
+      let noise = extent * extent;
+      if (squared <= FLAT * FLAT * noise) {
+        witness = vec3f(0.0);
+        return 0.0;
+      }
     }
-    simplex[count] = difference(a, b, -v);
+    let w = supportPair(first, second, da, db);
+    if (step == 0u) {
+      v = w;
+      if (dot(v, v) == 0.0) {
+        v = vec3f(1.0, 0.0, 0.0);
+      }
+      continue;
+    }
+    let size = abs(w);
+    extent = max(extent, max(size.x, max(size.y, size.z)));
+    simplex[count] = w;
+    if (step == 1u) {
+      v = w;
+      count = 1u;
+      continue;
+    }
     // The new vertex is no nearer the origin than v is: its length is the distance. Taking v from it before the product
     // keeps the rounding near |v| E. Subtracting the two products would leave E squared, and that over |v| near contact.
     if (dot(v, v - simplex[count]) <= 1e-6 * squared + 4e-7 * sqrt(squared) * extent) {
@@ -324,17 +368,35 @@ fn segmentField(part: Set, h: u32) -> f32 {
   let slope = fields[h + 27u] * length(along);
   let accuracy = fields[h + 26u];
   let limit = u32(fields[h + 28u]);
-  var best = min(fieldRead(h, start), fieldRead(h, end));
+  var best = FAR;
   var floorBound = FAR;
   var cells = 0u;
   var stack: array<vec2f, 48>;
   var top = 1u;
   stack[0] = vec2f(0.0, 1.0);
-  while (top > 0u) {
-    top--;
-    let span = stack[top];
-    let middle = (span.x + span.y) * 0.5;
-    let value = fieldRead(h, start + along * middle);
+  // Reads 0 and 1 are the ends; each later one halves a span from the stack: one fieldRead call.
+  var ends = 0u;
+  loop {
+    var at = start;
+    var span = vec2f(0.0);
+    var middle = 0.0;
+    if (ends == 1u) {
+      at = end;
+    } else if (ends >= 2u) {
+      if (top == 0u) {
+        break;
+      }
+      top--;
+      span = stack[top];
+      middle = (span.x + span.y) * 0.5;
+      at = start + along * middle;
+    }
+    let value = fieldRead(h, at);
+    if (ends < 2u) {
+      best = select(min(best, value), value, ends == 0u);
+      ends++;
+      continue;
+    }
     let bound = value - slope * (span.y - span.x) * 0.5;
     best = min(best, value);
     if (bound >= best - accuracy) {
@@ -352,38 +414,67 @@ fn segmentField(part: Set, h: u32) -> f32 {
   return min(best - accuracy, floorBound) - part.radius;
 }
 
-fn hullField(part: Set, h: u32) -> f32 {
-  let rotation = rotations[part.frame];
-  var low = vec3f(FAR);
-  var high = vec3f(-FAR);
-  for (var i = part.first; i < part.first + part.count; i++) {
-    let p = rotation * points[i].xyz + origins[part.frame];
-    low = min(low, p);
-    high = max(high, p);
+/**
+ * Two point sets by GJK, less both radii; a set of one or two points against a field along its segment; a hull against
+ * a field by GJK to each cell's centre. One gjk call serves the pairs and the hulls.
+ */
+fn measure(part: Set, collider: Set) -> f32 {
+  let field = collider.frame == FIELD;
+  if (field && part.count <= 2u) {
+    return segmentField(part, collider.first);
   }
-  let accuracy = fields[h + 26u];
-  let lipschitz = fields[h + 27u];
-  let limit = u32(fields[h + 28u]);
-  let box = high - low;
+  let h = collider.first;
+  var accuracy = 0.0;
+  var lipschitz = 0.0;
+  var limit = 0u;
   var best = FAR;
   var floorBound = FAR;
   var cells = 0u;
   var stack: array<vec4f, 64>;
   var top = 1u;
-  stack[0] = vec4f((low + high) * 0.5, max(box.x, max(box.y, box.z)) * 0.5);
+  if (field) {
+    let rotation = rotations[part.frame];
+    var low = vec3f(FAR);
+    var high = vec3f(-FAR);
+    for (var i = part.first; i < part.first + part.count; i++) {
+      let p = rotation * points[i].xyz + origins[part.frame];
+      low = min(low, p);
+      high = max(high, p);
+    }
+    accuracy = fields[h + 26u];
+    lipschitz = fields[h + 27u];
+    limit = u32(fields[h + 28u]);
+    let box = high - low;
+    stack[0] = vec4f((low + high) * 0.5, max(box.x, max(box.y, box.z)) * 0.5);
+  }
   let point = Set(0u, 0u, WORLD, 0.0);
   while (top > 0u) {
     top--;
     let cell = stack[top];
     let reach = cell.w * SQRT3;
-    probe = cell.xyz;
-    let gap = gjk(part, point);
+    var other = collider;
+    if (field) {
+      probe = cell.xyz;
+      other = point;
+    }
+    let gap = gjk(part, other);
+    if (!field) {
+      return gap - part.radius - collider.radius;
+    }
     if (gap > reach) {
       continue;
     }
-    // A point of the hull in this cell, for the best reading so far.
-    let centre = fieldRead(h, cell.xyz);
-    let value = select(centre, fieldRead(h, cell.xyz + witness), gap > 0.0);
+    // A point of the hull in this cell, for the best reading so far: the centre, then the point nearest the hull.
+    var reads: array<f32, 2>;
+    for (var r = 0u; r < 2u + params.zero; r++) {
+      var at = cell.xyz;
+      if (r == 1u) {
+        at = cell.xyz + witness;
+      }
+      reads[r] = fieldRead(h, at);
+    }
+    let centre = reads[0];
+    let value = select(centre, reads[1], gap > 0.0);
     best = min(best, value);
     let bound = centre - lipschitz * reach;
     if (bound >= best - accuracy) {
@@ -395,23 +486,13 @@ fn hullField(part: Set, h: u32) -> f32 {
       continue;
     }
     let next = cell.w * 0.5;
-    for (var i = 0u; i < 8u; i++) {
+    for (var i = 0u; i < 8u + params.zero; i++) {
       let side = vec3f(f32(i & 1u) * 2.0 - 1.0, f32((i >> 1u) & 1u) * 2.0 - 1.0, f32((i >> 2u) & 1u) * 2.0 - 1.0);
       stack[top] = vec4f(cell.xyz + side * next, next);
       top++;
     }
   }
   return min(best - accuracy, floorBound);
-}
-
-fn measure(shape: Set, collider: Set) -> f32 {
-  if (collider.frame == FIELD) {
-    if (shape.count <= 2u) {
-      return segmentField(shape, collider.first);
-    }
-    return hullField(shape, collider.first);
-  }
-  return gjk(shape, collider) - shape.radius - collider.radius;
 }
 
 @compute @workgroup_size(${WORKGROUP})
@@ -422,18 +503,20 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   place(pose);
   var least = FAR;
-  for (var s = 0u; s < params.shapes; s++) {
-    for (var c = 0u; c < params.colliders; c++) {
-      least = min(least, measure(sets[s], sets[params.shapes + c]));
-      if (params.early != 0u && least <= params.stop) {
-        gaps[pose] = least;
-        return;
-      }
+  // Every shape against every collider, shape by shape, then the self-collision pairs: one measure call.
+  let crossed = params.shapes * params.colliders;
+  for (var k = 0u; k < crossed + params.pairs; k++) {
+    var shape: Set;
+    var collider: Set;
+    if (k < crossed) {
+      shape = sets[k / params.colliders];
+      collider = sets[params.shapes + k % params.colliders];
+    } else {
+      let pair = pairs[k - crossed];
+      shape = sets[pair.x];
+      collider = sets[pair.y];
     }
-  }
-  for (var p = 0u; p < params.pairs; p++) {
-    let pair = pairs[p];
-    least = min(least, measure(sets[pair.x], sets[pair.y]));
+    least = min(least, measure(shape, collider));
     if (params.early != 0u && least <= params.stop) {
       break;
     }
@@ -683,6 +766,8 @@ export class GPUClearance {
     whole[4] = this.pairs;
     whole[5] = this.stop === null ? 0 : 1;
     float[6] = this.stop ?? 0;
+    // params.zero: the kernel adds it to its loop bounds, so no shader compiler can count them and unroll the loops.
+    whole[7] = 0;
     for (let start = 0; start < total; start += batch) {
       signal?.throwIfAborted();
       if (this.disposed) throw typeError('GPUClearance is disposed; make a new one', 'kinematics');

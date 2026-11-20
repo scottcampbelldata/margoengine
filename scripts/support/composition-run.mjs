@@ -1,11 +1,12 @@
 // Running C2 composition scenes (scripts/composition-browser-tests.mjs): a hard limit per scene, so a scene that never
-// returns fails at once naming itself instead of holding the GPU until the lease monitor reclaims it. Every row's
-// compatibility pass runs on the browser's default ANGLE backend (Direct3D 11 on Windows), the voxel path tracer's
-// included since its staged route compiles there (packages/voxel-pathtracer, test:gpu:d3d11).
+// returns fails at once naming itself instead of running on until the suite's own time limit ends the whole run.
+// Every row's compatibility pass runs on the browser's default ANGLE backend (Direct3D 11 on Windows), the voxel path
+// tracer's included since its staged route compiles there (packages/voxel-pathtracer, test:gpu:d3d11).
 
 /**
- * The most one scene run (both of its pipeline waits and its readbacks) may take: under the GPU lease's 3 minute idle
- * window (scripts/gpu-lock.mjs, MARGO_GPU_IDLE_MIN), so the scene is named before the lease ends the whole run.
+ * The most one scene run (both of its pipeline waits and its readbacks) may take: well under the suite's own run limit
+ * (runLimitMs in scripts/gpu-package-tests.mjs, at most 10 minutes), so the scene is named before that limit ends the
+ * whole run.
  */
 export const SCENE_LIMIT_MS = 150_000;
 

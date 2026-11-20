@@ -152,7 +152,9 @@ export function parseMath(source: string): MathNode {
       const d = peek();
       if (!d) fail('Expected delimiter.');
       i++;
-      out = node('delimiter', [], d === '.' ? '' : (symbols[d.replace(/^\\/, '')] ?? d));
+      // \{ \} and \| are escaped delimiters (TeX's \lbrace, \rbrace and \Vert); \langle and the like are named ones.
+      const escaped: Record<string, string> = { '\\{': '{', '\\}': '}', '\\|': '‖' };
+      out = node('delimiter', [], d === '.' ? '' : (escaped[d] ?? symbols[d.replace(/^\\/, '')] ?? d));
     } else if (t.startsWith('\\')) {
       const cmd = t.slice(1);
       if (accents.has(cmd)) out = node('accent', [argument()], cmd);

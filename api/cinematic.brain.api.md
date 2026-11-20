@@ -34,6 +34,7 @@ export class CameraBrain implements EnginePlugin {
     blendFor(from: VirtualCamera | null, to: VirtualCamera): CameraBlend;
     private get aspect();
     update(delta: number): CameraPose;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     dispose(): void;

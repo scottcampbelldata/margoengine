@@ -138,3 +138,44 @@ test('SceneFade preserves borrowed output, completes normal and reduced-motion f
     else delete globalThis.navigator;
   }
 });
+
+test('KB-FILM-CLOCK1: SceneFade with a clock option fades by that clock, not by how fast the machine renders', async (t) => {
+  let wall = 0;
+  t.mock.method(performance, 'now', () => (wall += 1000));
+  const h = optionalGPU(),
+    device = h.engine.gpu,
+    output = device.createTexture({
+      size: [128, 96],
+      format: 'bgra8unorm',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    });
+  h.engine.canvas = {
+    getContext: (kind) =>
+      kind === 'webgpu'
+        ? {
+            getConfiguration: () => ({ device, format: output.format, alphaMode: 'premultiplied', usage: GPUTextureUsage.RENDER_ATTACHMENT }),
+            configure() {},
+            getCurrentTexture: () => output,
+          }
+        : null,
+  };
+  device.createRenderPipelineAsync = async (options) => device.createRenderPipeline(options);
+  device.createCommandEncoder = () => ({ copyTextureToTexture() {}, finish: () => ({}) });
+  device.queue.submit = () => {};
+  let now = 500;
+  const fade = SceneFade.attach(h.engine, 200, () => now);
+  try {
+    fade.capture();
+    await fade.warm();
+    const uniform = h.resources.find((resource) => resource.label === 'scene-fade:uniform');
+    fade.start();
+    now += 100;
+    h.frame();
+    h.frame();
+    assert.equal(new Float32Array(uniform.data)[2], 0.5, 'two frames at one clock reading drew different fades');
+    assert.throws(() => new SceneFade(180, 3), TypeError);
+  } finally {
+    fade.dispose();
+    h.cleanup();
+  }
+});

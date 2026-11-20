@@ -30,6 +30,19 @@ export interface WeldResult extends ComponentEditResult {
  * options; MargoError `failed` when a moved face folds over itself.
  */
 export function weldMeshVertices(mesh: PolygonMesh, options: WeldOptions = {}): WeldResult {
+  return weldVerticesWhere(mesh, options);
+}
+
+/**
+ * {@link weldMeshVertices} where only pairs `pair(kept, other)` allows may merge (`kept` the lower index). The array
+ * modifier uses it to join neighboring copies without collapsing close vertices inside one copy.
+ * @internal
+ */
+export function weldVerticesWhere(
+  mesh: PolygonMesh,
+  options: WeldOptions,
+  pair: (kept: number, other: number) => boolean = () => true,
+): WeldResult {
   assertPolygonMesh(mesh);
   assertOptions(options, 'Weld');
   const distance = options.distance ?? 0.0001;
@@ -71,7 +84,7 @@ export function weldMeshVertices(mesh: PolygonMesh, options: WeldOptions = {}): 
       for (let dy = -reach; dy <= reach; dy++)
         for (let dz = -reach; dz <= reach; dz++)
           for (const other of grid.get(key(x + dx, y + dy, z + dz)) ?? []) {
-            if (other <= index || merged[other]) continue;
+            if (other <= index || merged[other] || !pair(index, other)) continue;
             const q = mesh.vertices[other];
             if (Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) > distance) continue;
             merged[other] = 1;

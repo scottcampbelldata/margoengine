@@ -43,7 +43,7 @@ export function parseKMZ(input: BinaryInput, options?: KMZOptions): Promise<KMZR
 
 type BinaryInput = ArrayBuffer | ArrayBufferView;
 
-interface DAEParseOptions extends ParseLimits {
+interface DAEParseOptions extends ParseLimits, XMLExternalOptions {
 }
 
 interface LoadedGeometry {
@@ -53,6 +53,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -69,6 +70,12 @@ interface LoadedGroup {
 interface ParseLimits {
     maxVertices?: number;
     maxTriangles?: number;
+}
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
 }
 
 interface ZipOptions {

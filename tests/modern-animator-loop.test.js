@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Animator } from '../packages/animator/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 test('nonlooping animator holds the final pose and crossfades from that pose after completion', async () => {
   const store = await TransformStore.create(32),

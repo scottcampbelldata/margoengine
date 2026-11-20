@@ -81,11 +81,7 @@ test('spelling: no spaces, lower case, line numbers, checksums, comments of both
   near(layers[0].extrusion, [0, 0, 1, 1, 0, 1, 2, 0, 1, -1.5, 0.5, 1]);
 });
 
-test('arcs move the position, are not drawn and warn once; an empty file is empty', () => {
-  const { layers, warnings, filament } = parseGCode('G1 Z1\nG2 X5 Y5 I1 J1 E1\nG3 X6 Y6 I1 J1 E2\nG1 X7 E3\n');
-  assert.deepEqual(warnings, ['G2 and G3 arcs move the position but are not drawn']);
-  near(layers[0].extrusion, [6, 6, 1, 7, 6, 1]);
-  assert.equal(filament, 1, 'only the drawn move counts');
+test('an empty file is empty', () => {
   const empty = parseGCode('; nothing\nM84\n');
   assert.deepEqual(empty.layers, []);
   assert.deepEqual(empty.min, [0, 0, 0]);
@@ -109,4 +105,178 @@ test('bad input and limits throw coded errors', () => {
   coded(() => parseGCode('G1 X1\nG1 X2\n', { maxVertices: 3 }), 'limit', /vertex count/);
   coded(() => parseGCode('G1 X1', { maxVertices: -1 }), 'range', /maxVertices/);
   assert.equal(parseGCode(new TextEncoder().encode('G1 X1 E1')).layers.length, 1);
+});
+
+// Points of a layer's segments (end of each), and checks that each is on a circle.
+const ends = (list) => {
+  const out = [];
+  for (let i = 3; i < list.length; i += 6) out.push([list[i], list[i + 1], list[i + 2]]);
+  return out;
+};
+const onCircle = (points, centre, radius, u = 0, v = 1) =>
+  points.forEach((p) =>
+    assert.ok(Math.abs(Math.hypot(p[u] - centre[0], p[v] - centre[1]) - radius) < 1e-4, `${p} is off the circle`),
+  );
+const bounds = (points, axis) => [Math.min(...points.map((p) => p[axis])), Math.max(...points.map((p) => p[axis]))];
+// Chord ends fall within the 0.002 mm tolerance of a circle's extremes, not on them.
+const about = (actual, expected, label) =>
+  actual.forEach((v, i) => assert.ok(Math.abs(v - expected[i]) < 0.01, `${label}: ${actual} against ${expected}`));
+
+test('regression: G3 and G2 by centre offsets draw arcs as chords within 0.002 mm, E spread along them', () => {
+  const ccw = parseGCode('G1 Z1\nG1 X10 E1\nG3 X0 Y10 I-10 J0 E3\n');
+  const quarter = ends(ccw.layers[0].extrusion).slice(1);
+  onCircle(quarter, [0, 0], 10);
+  assert.ok(
+    quarter.every((p) => p[0] >= -1e-9 && p[1] >= -1e-9),
+    'G3 turns counter-clockwise: the short way here',
+  );
+  near(quarter.at(-1), [0, 10, 1], 'it ends on the given point');
+  const chords = quarter.length,
+    half = Math.PI / 4 / chords;
+  assert.ok(10 * (1 - Math.cos(half)) <= 0.002 + 1e-12, 'the chords stay within the tolerance');
+  assert.equal(
+    chords,
+    Math.ceil(Math.PI / 2 / (2 * Math.acos(1 - 0.002 / 10))),
+    'and use no more chords than it needs',
+  );
+  assert.equal(ccw.filament, 3);
+  near(ccw.max, [10, 10, 1]);
+  const cw = ends(parseGCode('G1 Z1\nG1 X10 E1\nG2 X0 Y10 I-10 E3\n').layers[0].extrusion).slice(1);
+  onCircle(cw, [0, 0], 10);
+  about(bounds(cw, 1), [-10, 10], 'G2 turns clockwise: three quarters, through y = -10');
+});
+
+test('regression: R arcs take the short way when R > 0 and the long way when R < 0', () => {
+  const points = (code) => ends(parseGCode(`G1 Z1\n${code}\n`).layers[0].travel).slice(1);
+  const semicircle = points('G2 X10 Y0 R5');
+  onCircle(semicircle, [5, 0], 5);
+  about(bounds(semicircle, 1), [0, 5], 'G2 over the top');
+  const short = points('G3 X10 R10'),
+    long = points('G3 X10 R-10'),
+    rise = Math.sqrt(75);
+  onCircle(short, [5, rise], 10);
+  onCircle(long, [5, -rise], 10);
+  about(bounds(short, 1), [rise - 10, 0], 'short arc below the chord');
+  about(bounds(long, 1), [-rise - 10, 0], 'long arc around the bottom');
+  about([Math.max(...points('G2 X10 R-10').map((p) => p[1]))], [rise + 10], 'G2 R-10 mirrors it');
+});
+
+test('regression: a full circle, P turns and a helix', () => {
+  const circle = ends(parseGCode('G1 Z1\nG2 I5 E2\n').layers[0].extrusion);
+  onCircle(circle, [5, 0], 5);
+  about(bounds(circle, 0), [0, 10], 'an arc that ends where it starts is a whole turn');
+  about(bounds(circle, 1), [-5, 5], 'y');
+  const twice = ends(parseGCode('G1 Z1\nG2 I5 P2 E2\n').layers[0].extrusion);
+  onCircle(twice, [5, 0], 5);
+  assert.ok(Math.abs(twice.length - circle.length * 2) <= 1, 'P2 turns twice');
+  const helix = ends(parseGCode('G3 I5 Z2\n').layers[0].travel);
+  onCircle(helix, [5, 0], 5);
+  near([helix.at(-1)[2]], [2], 'the normal axis ends at Z');
+  near([helix[(helix.length >> 1) - 1][2]], [(2 * (helix.length >> 1)) / helix.length], 'and moves evenly');
+});
+
+test('regression: G18 and G19 select the ZX and YZ planes, turning about the positive Y and X axes', () => {
+  const path = (code) => ends(parseGCode(code).layers[0].travel).slice(1);
+  const zx = path('G0 X10\nG18\nG2 X0 Z10 I-10 K0\n');
+  onCircle(zx, [0, 0], 10, 0, 2);
+  assert.ok(
+    zx.every((p) => p[0] >= -1e-9 && p[2] >= -1e-9 && p[1] === 0),
+    'G18 G2 from X to Z is a quarter',
+  );
+  about(bounds(path('G0 X10\nG18\nG3 X0 Z10 I-10\n'), 0), [-10, 10], 'G3 the other way round');
+  const yz = path('G0 Y10\nG19\nG3 Y0 Z10 J-10\n');
+  onCircle(yz, [0, 0], 10, 1, 2);
+  assert.ok(
+    yz.every((p) => p[1] >= -1e-9 && p[2] >= -1e-9 && p[0] === 0),
+    'G19 G3 from Y to Z is a quarter',
+  );
+  about(bounds(path('G0 Y10\nG19\nG2 Y0 Z10 J-10\n'), 1), [-10, 10], 'G19 G2');
+  const back = path('G0 X10\nG19\nG17\nG3 X0 Y10 I-10\n');
+  onCircle(back, [0, 0], 10);
+});
+
+test('regression: arcs in inches and in relative mode; arc errors are coded', () => {
+  const inches = ends(parseGCode('G20\nG0 X1\nG3 X0 Y1 I-1\n').layers[0].travel).slice(1);
+  onCircle(inches, [0, 0], 25.4);
+  const relative = ends(parseGCode('G0 X10\nG91\nG3 X-10 Y10 I-10\n').layers[0].travel).slice(1);
+  onCircle(relative, [0, 0], 10);
+  near(relative.at(-1), [0, 10, 0]);
+  const coded = (text, code, pattern) =>
+    assert.throws(
+      () => parseGCode(text),
+      (e) => e instanceof LoaderError && e.code === code && e.format === 'G-code' && pattern.test(e.message),
+    );
+  coded('G2 X5 Y5 I1 J1', 'range', /off its circle on line 1/);
+  coded('G2 X5 Y5', 'syntax', /centre offsets in its plane or R/);
+  coded('G18\nG2 X5 J1', 'syntax', /centre offsets in its plane/);
+  coded('G2 X10 R4', 'range', /shorter than half its chord/);
+  coded('G2 R4', 'syntax', /end away from its start/);
+  coded('G2 I5 P1.5', 'syntax', /whole number of turns/);
+  coded('G2 X10 I', 'syntax', /I has no number/);
+  assert.throws(
+    () => parseGCode('G2 I5', { maxVertices: 20 }),
+    (e) => e.code === 'limit',
+  );
+  assert.deepEqual(parseGCode('G2 I5').warnings, []);
+});
+
+// LinuxCNC G-code reference, G90.1 and G91.1 (arc distance mode) and G2/G3 P; Marlin G2-G3 page, P "complete circles".
+test('regression: G90.1 reads I, J and K as the centre itself, G91.1 as an offset again', () => {
+  const path = (code) => ends(parseGCode(code).layers[0].travel).slice(1);
+  // Start (10, 0), centre (0, 0): absolute I0 J0 and incremental I-10 draw the same quarter.
+  const absolute = path('G0 X10\nG90.1\nG3 X0 Y10 I0 J0\n');
+  onCircle(absolute, [0, 0], 10);
+  near(absolute.at(-1), [0, 10, 0]);
+  const incremental = path('G0 X10\nG3 X0 Y10 I-10 J0\n');
+  assert.equal(absolute.length, incremental.length);
+  absolute.forEach((p, i) => near(p, incremental[i], `chord ${i}`));
+  // G91.1 switches back; G91 relative axes leave the absolute centre absolute.
+  onCircle(path('G0 X10\nG90.1\nG91.1\nG3 X0 Y10 I-10\n'), [0, 0], 10);
+  const relativeAxes = path('G0 X10\nG90.1\nG91\nG3 X-10 Y10 I0 J0\n');
+  onCircle(relativeAxes, [0, 0], 10);
+  near(relativeAxes.at(-1), [0, 10, 0]);
+  // The plane picks the words: G18 takes K (u) and I (v), G19 J and K.
+  onCircle(path('G0 X10\nG18\nG90.1\nG2 X0 Z10 I0 K0\n'), [0, 0], 10, 0, 2);
+  onCircle(path('G0 Y10\nG19\nG90.1\nG3 Y0 Z10 J0 K0\n'), [0, 0], 10, 1, 2);
+  // Inches scale the centre too; a full circle about an absolute centre.
+  onCircle(path('G20\nG0 X1\nG90.1\nG3 X0 Y1 I0 J0\n'), [0, 0], 25.4);
+  const circle = ends(parseGCode('G0 X10 Y5\nG90.1\nG2 I5 J5\n').layers[0].travel);
+  onCircle(circle, [5, 5], 5);
+  about(bounds(circle, 0), [0, 10], 'whole turn about (5, 5)');
+  // LinuxCNC: both centre words of the plane are required in G90.1; R still works.
+  assert.throws(
+    () => parseGCode('G0 X10\nG90.1\nG3 X0 Y10 I0\n'),
+    (e) =>
+      e instanceof LoaderError &&
+      e.code === 'syntax' &&
+      /G90.1 arc needs both centre words of its plane or R on line 3/.test(e.message),
+  );
+  onCircle(path('G0 X10\nG90.1\nG3 X0 Y10 R10\n'), [0, 0], 10);
+});
+
+test('regression: arcP chooses LinuxCNC turns (default) or Marlin complete circles for P', () => {
+  // Chords drawn, without the G0 that leads in.
+  const count = (code, options) => ends(parseGCode(code, options).layers[0].travel).length - 1;
+  const quarter = count('G0 X10\nG3 X0 Y10 I-10\n'),
+    turn = count('G0 X10\nG3 I-10\n');
+  assert.equal(count('G0 X10\nG3 X0 Y10 I-10 P1\n'), quarter, 'LinuxCNC P1 is the arc alone');
+  assert.ok(Math.abs(count('G0 X10\nG3 X0 Y10 I-10 P2\n') - (quarter + turn)) <= 1, 'LinuxCNC P2 adds one turn');
+  const marlin = { arcP: 'circles' };
+  assert.equal(count('G0 X10\nG3 X0 Y10 I-10\n', marlin), quarter, 'no P: the arc alone');
+  assert.equal(count('G0 X10\nG3 X0 Y10 I-10 P0\n', marlin), quarter, 'Marlin P0 is the arc alone');
+  // Marlin's Pn draws what LinuxCNC's P(n + 1) does, chord for chord.
+  assert.equal(
+    count('G0 X10\nG3 X0 Y10 I-10 P1\n', marlin),
+    count('G0 X10\nG3 X0 Y10 I-10 P2\n'),
+    'Marlin P1 adds a circle',
+  );
+  const three = count('G0 X10\nG3 I-10 P2\n', marlin);
+  assert.equal(three, count('G0 X10\nG3 I-10 P3\n'), 'a full circle with P2: three turns');
+  assert.ok(Math.abs(three - 3 * turn) <= 3, 'about three times one turn');
+  assert.equal(count('G0 X10\nG3 X0 Y10 I-10\n', { arcP: 'turns' }), quarter);
+  const coded = (fn, code, pattern) =>
+    assert.throws(fn, (e) => e instanceof LoaderError && e.code === code && pattern.test(e.message));
+  coded(() => parseGCode('G2 I5 P0'), 'syntax', /whole number of turns/);
+  coded(() => parseGCode('G2 I5 P-1', marlin), 'syntax', /whole number of circles, 0 or more/);
+  coded(() => parseGCode('G2 I5', { arcP: 'loops' }), 'range', /arcP must be 'turns' or 'circles'/);
 });

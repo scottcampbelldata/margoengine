@@ -120,7 +120,7 @@ test('the counts after an alternate camera are that frame, package draws include
     { engine, other } = h,
     // Sees what the engine camera sees, so restoring the primary view collects nothing: the other road through it.
     twin = new Camera({ position: [0, 0, 0], target: [0, 0, -1], near: 0.1, far: 10 });
-  // What a package does while it draws (gltf-pro, splats, animation): one draw call, here for two nodes.
+  // What a package does while it draws (gltf/pbr, splats, animation): one draw call, here for two nodes.
   engine.frameGraph.add({
     name: 'package-draw',
     order: 1,

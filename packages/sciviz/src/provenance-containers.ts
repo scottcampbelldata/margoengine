@@ -77,24 +77,35 @@ async function transform(
     .pipeThrough(compress ? new CompressionStream('deflate') : new DecompressionStream('deflate'));
   const reader = stream.getReader(),
     parts = [];
-  let size = 0;
+  let size = 0,
+    // Set once the stream has ended or errored; only a stream left open mid-way is cancelled (cancelling an errored
+    // stream rejects with its stored error, which would replace the coded one).
+    ended = false;
   const cancel = () => {
     void reader.cancel(options.signal?.reason);
   };
   options.signal?.addEventListener('abort', cancel, { once: true });
   try {
     while (true) {
-      const { value, done } = await reader.read();
+      let read: ReadableStreamReadResult<Uint8Array>;
+      try {
+        read = await reader.read();
+      } catch (cause) {
+        // A cancelled read resolves as done, so a rejected read is malformed compressed data.
+        ended = true;
+        throw Object.assign(typeError('Corrupt compressed provenance; use the original export', 'sciviz'), { cause });
+      }
+      ended = read.done;
       options.signal?.throwIfAborted();
-      if (done) break;
-      size += value.length;
+      if (read.done) break;
+      size += read.value.length;
       if (size > bound(options))
         throw rangeError('Provenance exceeds maxBytes; reduce data or raise the explicit bound', 'sciviz');
-      parts.push(value);
+      parts.push(read.value);
     }
   } finally {
     options.signal?.removeEventListener('abort', cancel);
-    await reader.cancel();
+    if (!ended) await reader.cancel();
     reader.releaseLock();
   }
   const result = new Uint8Array(size);
@@ -104,6 +115,14 @@ async function transform(
     offset += part.length;
   }
   return result;
+}
+function recordOf(text: () => string): FigureProvenance {
+  try {
+    return JSON.parse(text()) as FigureProvenance;
+  } catch (cause) {
+    // Malformed UTF-8 (the fatal decoder) or text that is not JSON.
+    throw Object.assign(typeError('Provenance record is not UTF-8 JSON; use the original export', 'sciviz'), { cause });
+  }
 }
 function ownText(data: Uint8Array): boolean {
   const zero = data.indexOf(0);
@@ -152,7 +171,7 @@ export async function readPNGProvenance(
     bytes = flag ? await transform(text, false, options) : text;
   if (bytes.length > bound(options))
     throw rangeError('Provenance exceeds maxBytes; raise the explicit bound', 'sciviz');
-  return JSON.parse(decoder.decode(bytes)) as FigureProvenance;
+  return recordOf(() => decoder.decode(bytes));
 }
 const svgNamespace = 'http://www.w3.org/2000/svg';
 function parseSVG(svg: string): XMLDocumentTree {
@@ -209,5 +228,5 @@ export function embedSVGProvenance(svg: string, record: FigureProvenance): strin
 export function readSVGProvenance(svg: string): FigureProvenance | undefined {
   const elements = parseSVG(svg).getElementsByTagNameNS(namespace, 'provenance');
   if (elements.length > 1) throw typeError('Duplicate SVG provenance; supply an unambiguous export', 'sciviz');
-  return elements.length ? (JSON.parse(elements[0].textContent!) as FigureProvenance) : undefined;
+  return elements.length ? recordOf(() => elements[0].textContent!) : undefined;
 }

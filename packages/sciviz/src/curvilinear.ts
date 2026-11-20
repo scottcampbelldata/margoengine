@@ -69,6 +69,11 @@ export class CurvilinearVolume implements Drawable {
         'Mapped volume needs one finite scalar or NaN mask per node, and at least one finite scalar',
         'sciviz',
       );
+    // Refuse a topology the GPU cannot hold before the source layer or any texture exists, so nothing is left behind.
+    const limit = figure.renderer.device!.limits.maxTextureDimension2D;
+    for (const values of [this.#grid.points, this.#grid.nodes, this.#grid.axes])
+      if (Math.ceil(Math.max(1, values.length / 4) / limit) > limit)
+        throw rangeError('Mapped topology exceeds this GPU texture limit; reduce the grid', 'sciviz');
     this.#valid = Uint8Array.from(data, (v) => (Number.isFinite(v) ? 255 : 0));
     this.#reference = options.referenceStep ?? this.#grid.reference;
     if (!(this.#reference > 0) || !Number.isFinite(this.#reference))
@@ -92,8 +97,6 @@ export class CurvilinearVolume implements Drawable {
       count = Math.max(1, values.length / 4),
       w = Math.min(count, d.limits.maxTextureDimension2D),
       h = Math.ceil(count / w);
-    if (h > d.limits.maxTextureDimension2D)
-      throw rangeError('Mapped topology exceeds this GPU texture limit; reduce the grid', 'sciviz');
     const tex = d.createTexture({
       size: [w, h],
       format: 'rgba32float',
@@ -111,7 +114,11 @@ export class CurvilinearVolume implements Drawable {
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { viewDimension: '3d' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: this.source.colormap.encoding ? 'unfilterable-float' : 'float' },
+        },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
         ...[4, 5, 6].map((binding) => ({
           binding,
@@ -174,8 +181,11 @@ export class CurvilinearVolume implements Drawable {
       ],
       36,
     );
+    // Floats 44 to 47 are u.zero, which stays 0: the shader adds it to its loop bounds (KB-COMPAT-FXCTIME1). Only the
+    // first four classification floats are written; the rest (the voxel spacing) would land in u.zero and run the
+    // Newton loop for as many steps as the spacing, which hung the GPU on a grid in large units.
     v.fill(0, 44, 80);
-    v.set(this.source.classificationUniforms(), 40);
+    v.set(this.source.classificationUniforms().slice(0, 4), 40);
     v.set([g.bounds[0], g.bounds[2], g.bounds[4], g.nodes.length / 8], 48);
     v.set(
       [g.bounds[1] - g.bounds[0], g.bounds[3] - g.bounds[2], g.bounds[5] - g.bounds[4], this.source.shading ? 1 : 0],
@@ -215,13 +225,14 @@ export class CurvilinearVolume implements Drawable {
     section?: CurvilinearSection,
   ): void {
     const outline = section?.outline ?? false,
-      blend = section ? section.opacity < 1 : true;
+      blend = section ? section.opacity < 1 : true,
+      encoded = !!this.source.colormap.encoding;
     const pipeline = renderer.pipeline(
-      `mapped volume|${section ? 'section' : 'ray'}|${outline}|${blend}`,
+      `mapped volume|${section ? 'section' : 'ray'}|${outline}|${blend}|${encoded}`,
       context,
       (target) => {
         const module = renderer.device!.createShaderModule({
-          code: frameWGSL + volumeDepthWGSL + curvilinearShader,
+          code: frameWGSL + volumeDepthWGSL + curvilinearShader(encoded),
           label: 'sciviz mapped volume',
         });
         return {

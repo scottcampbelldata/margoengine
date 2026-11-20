@@ -1,5 +1,5 @@
 // Real-adapter check of @margoengine/shader/raw and /effects (run from the repository root after building the shader
-// package): node scripts/gpu-lock.mjs run --owner=shader-raw -- node scripts/shader-raw-gpu-check.js
+// package): node scripts/run-with-timeout.mjs -- node scripts/shader-raw-gpu-check.js
 // At 4x and 1x MSAA: every WGSL module compiles without errors and no GPU error escapes; a RawMesh with a per-vertex
 // and a per-instance attribute matches its analytic colours and is hidden behind / drawn in front of a core box by
 // reversed-Z depth; live uniforms and ranged attributes update; device restoration redraws the same pixels; pixelate and
@@ -9,13 +9,11 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
-import { acquire } from './gpu-lock.mjs';
 
 const W = 320,
   H = 240,
   port = 5302,
   out = 'test-results/shader-raw';
-const release = await acquire({ owner: 'shader-raw-gpu-check' });
 let browser;
 try {
   await mkdir(out, { recursive: true });
@@ -304,5 +302,4 @@ try {
   assert.deepEqual(failures, [], 'Raw shader / screen effect GPU checks failed');
 } finally {
   await browser?.close();
-  release();
 }

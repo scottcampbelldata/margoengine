@@ -1,0 +1,360 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX flame check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// The flame settings table on a real GPU (KB-LOOK-VFX-FIRE1): a Fire on its engine, every flame row written each frame for
+// 60 frames makes no pipeline, buffer or texture and no GPU error; the defaults draw the frame of a fire with no settings
+// applied; the animatedFeature look draws a different, still lit frame. Driven by flame-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {Fire} from '/packages/vfx/dist/fire.js';
+import {Flame,FLAME_PEAK} from '/packages/vfx/dist/flame.js';
+import {FireFront} from '/packages/vfx/dist/fire-front.js';
+import {Smoke} from '/packages/vfx/dist/smoke.js';
+import {FLAME_LIVE_SETTINGS,FLAME_LOOKS,applyFlameSettings,flameSettingDefaults} from '/packages/vfx/dist/settings.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LightGroups} from '/packages/clustered/dist/groups.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {boxGeometry} from '/packages/geometry/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {POST_LOOKS,applyPostSettings} from '/packages/post/dist/settings.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {TONEMAP_LOOKS,applyTonemapSettings} from '/packages/tonemap/dist/settings.js';
+async function scene(){
+ const c=document.createElement('canvas');c.width=256;c.height=192;document.body.append(c);
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,1.2,3],target:[0,0.5,0],near:0.05,far:100}});
+ e.stop();
+ const errs=[];e.gpu.addEventListener('uncapturederror',x=>errs.push(x.error.message));
+ return {c,e,errs,fire:Fire.attach(e,{position:[0,0,0],castShadow:false})};
+}
+async function draw(s,frames,each){
+ const shot=new OffscreenCanvas(256,192),g=shot.getContext('2d',{willReadFrequently:true});
+ let last;
+ for(let f=0;f<frames;f++){
+  if(each)each(f/Math.max(1,frames-1));
+  s.e.render({delta:1/60});
+  if(isCompatDevice(s.e.gpu))await s.e.gpu.queue.onSubmittedWorkDone();
+  g.drawImage(s.c,0,0);last=g.getImageData(0,0,256,192).data;
+ }
+ return last;
+}
+const differ=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)if(a[p]!==b[p])n++;return n;};
+const lit=a=>{let n=0;for(let p=0;p<a.length;p+=4)if(a[p]+a[p+1]+a[p+2]>30)n++;return n;};
+window.check={
+ async defaults(){
+  const plain=await scene(),set=await scene();
+  const a=await draw(plain,40),b=await draw(set,40,()=>applyFlameSettings(set.fire,{}));
+  const errors=[...plain.errs,...set.errs];plain.e.dispose();set.e.dispose();
+  return {differing:differ(a,b),lit:lit(a),errors};
+ },
+ async look(){
+  const plain=await scene(),styled=await scene();
+  const a=await draw(plain,40),b=await draw(styled,40,()=>applyFlameSettings(styled.fire,FLAME_LOOKS.animatedFeature));
+  const errors=[...plain.errs,...styled.errs],r={differing:differ(a,b),litPlain:lit(a),litStyled:lit(b),errors};
+  plain.e.dispose();styled.e.dispose();
+  return r;
+ },
+ async live(){
+  const s=await scene(),made={pipelines:0,buffers:0,textures:0};
+  await draw(s,3);
+  for(const [method,key] of [['createRenderPipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipeline','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){
+   const real=s.e.gpu[method];
+   if(real)s.e.gpu[method]=function(...a){made[key]++;return real.apply(this,a);};
+  }
+  s.e.gpu.pushErrorScope('validation');
+  await draw(s,60,t=>{
+   const v=flameSettingDefaults();
+   for(const row of FLAME_LIVE_SETTINGS){
+    if(row.kind==='color')v[row.name]=[0.3+0.5*t,0.1,0.05];
+    else v[row.name]=row.name==='flames.opacity'||row.name==='flames.ramp'?t:row.min+(row.max-row.min)*(0.1+0.4*t);
+   }
+   applyFlameSettings(s.fire,v);
+  });
+  const error=await s.e.gpu.popErrorScope(),errors=[...s.errs,...(error?[error.message]:[])];
+  s.e.dispose();
+  return {made,errors,rows:FLAME_LIVE_SETTINGS.length};
+ },
+};
+// Large flames (Flame, Fire with a flameLength, the flames of a FireFront) on a real GPU. `?dist=<folder>` loads Flame
+// from another build (the proof that each bound fails on the code before it). Bounds:
+// - big: no pixel over the stated peak or white, at the default rows and at every row at its hottest; the core reaches
+//   the peak and reads yellow-white (green at least 0.75 of red, blue under red).
+// - puff: the flame's upper area pulses at Cetegen and Ahmed's 1.5 D^(-1/2) Hz (the strongest line of its periodogram).
+// - height: the height where flame shows half the time is Heskestad's 0.235 Q^(2/5) - 1.02 D (Zukoski et al. 1985).
+// - lights: the flame lights the ground through a LightGroups, and the light flickers at the puffing frequency.
+// - rows / front: every flame row moved every frame, and a moving front, make no pipeline, buffer or texture.
+const flameDist=new URLSearchParams(location.search).get('dist');
+const Big=flameDist?(await import(flameDist+'/flame.js')).Flame:Flame;
+const Looks=flameDist?await import(flameDist+'/settings.js'):{FLAME_LOOKS,applyFlameSettings};
+const shade=(v)=>Math.round(255*(v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055));
+async function bigScene(cam={position:[0,5,30],target:[0,5,0]},w=256,h=192,night=false){
+ const c=document.createElement('canvas');c.width=w;c.height=h;c.style.width=w+'px';c.style.height=h+'px';document.body.append(c);
+ const e=await Engine.create(c,{backend:'webgpu',camera:{near:0.5,far:800,...cam}});
+ e.stop();
+ if(night){e.lighting.radiance.set([0.03,0.04,0.08,0.05]);e.lighting.ambient.set([0.5,0.6,1]);}
+ const errs=[];e.gpu.addEventListener('uncapturederror',x=>errs.push(x.error.message));
+ return {c,e,errs};
+}
+function pixels(s){
+ const w=s.c.width,h=s.c.height,shot=new OffscreenCanvas(w,h),g=shot.getContext('2d',{willReadFrequently:true});
+ g.drawImage(s.c,0,0);return g.getImageData(0,0,w,h).data;
+}
+function stats(s){
+ const d=pixels(s),bg=[d[0],d[1],d[2]];
+ let lit=0,top=0,white=0,core=[0,0,0];
+ for(let p=0;p<d.length;p+=4){
+  const m=Math.max(d[p],d[p+1],d[p+2]);
+  if(Math.abs(d[p]-bg[0])+Math.abs(d[p+1]-bg[1])+Math.abs(d[p+2]-bg[2])>12)lit++;
+  if(m>top||(m===top&&d[p]+d[p+1]+d[p+2]>core[0]+core[1]+core[2])){top=m;core=[d[p],d[p+1],d[p+2]];}
+  if(Math.min(d[p],d[p+1],d[p+2])>=250)white++;
+ }
+ return {lit,top,white,core};
+}
+async function frames(s,n,each,read){for(let f=0;f<n;f++){if(each)each(f);s.e.render({delta:1/30});if(isCompatDevice(s.e.gpu))await s.e.gpu.queue.onSubmittedWorkDone();if(read)read(f);}}
+const hottest={'flames.core':3000,'flames.edge':2000,'flames.radiance':4,'flames.flicker':3,'flames.opacity':1};
+window.check.big=async function(peak,rows){
+ const s=await bigScene(),flame=Big.attach(s.e,{position:[0,0,0],length:8,footprint:[14,8],peak});
+ if(rows)applyFlameSettings(flame,{...hottest,'flames.peak':peak});
+ let white=0,top=0;
+ await frames(s,150,null,(f)=>{if(f%10===9){const st=stats(s);white+=st.white;top=Math.max(top,st.top);}});
+ const out={...stats(s),white,top,limit:shade(peak),errors:s.errs,length:flame.flameLength,peak};
+ s.e.dispose();return out;
+};
+// The expected puffing of a footprint, written here from the paper so a build without puffingFrequency is judged too.
+const expectedPuff=(fx,fz)=>1.5/Math.sqrt(Math.max(Math.min(Math.sqrt(4*fx*fz/Math.PI),2*Math.min(fx,fz)),0.05));
+function strongest(series,rate,lo,hi){
+ const n=series.length,mean=series.reduce((a,b)=>a+b,0)/n;let best=0,at=0;
+ for(let f=lo;f<=hi;f+=0.005){let re=0,im=0;for(let i=0;i<n;i++){const v=series[i]-mean,a=2*Math.PI*f*i/rate;re+=v*Math.cos(a);im+=v*Math.sin(a);}const p=re*re+im*im;if(p>best){best=p;at=f;}}
+ return at;
+}
+window.check.puff=async function(){
+ const L=4,fp=[3,3],s=await bigScene({position:[0,0.75*L,24],target:[0,0.75*L,0]},160,120),flame=Big.attach(s.e,{position:[0,0,0],length:L,footprint:fp}),series=[];
+ await frames(s,40);
+ // Lit pixels in the upper half of the frame (above 0.75 L): the bulges the puffing sheds.
+ await frames(s,600,null,()=>{const d=pixels(s);let n=0;for(let y=0;y<60;y++)for(let x=0;x<160;x++){const p=(y*160+x)*4;if(d[p]+d[p+1]+d[p+2]>90)n++;}series.push(n);});
+ const out={measured:strongest(series,30,0.2,3),expected:expectedPuff(...fp),errors:s.errs,mean:series.reduce((a,b)=>a+b,0)/series.length};
+ s.e.dispose();return out;
+};
+window.check.height=async function(){
+ const heat=2e6,fp=[2,2],D=Math.sqrt(4*fp[0]*fp[1]/Math.PI),expected=0.235*(heat/1000)**0.4-1.02*D,
+  dist=80,fov=8,h=200,s=await bigScene({position:[0,expected,dist],target:[0,expected,0],fov},120,h);
+ Big.attach(s.e,{position:[0,0,0],heat,footprint:fp});
+ await frames(s,40);
+ const seen=new Array(h).fill(0),n=300;
+ await frames(s,n,null,()=>{const d=pixels(s);for(let y=0;y<h;y++){let any=false;for(let x=0;x<120&&!any;x++){const p=(y*120+x)*4;if(d[p]+d[p+1]+d[p+2]>90)any=true;}if(any)seen[y]++;}});
+ // Row y shows the height expected + (0.5 - (y + 0.5) / h) 2 tan(fov / 2) dist on the flame's plane.
+ let top=h;for(let y=h-1;y>=0;y--)if(seen[y]>=n/2)top=y;
+ const height=expected+(0.5-(top+0.5)/h)*2*Math.tan(fov*Math.PI/360)*dist;
+ const out={height,expected,errors:s.errs};s.e.dispose();return out;
+};
+window.check.lights=async function(){
+ const L=4,fp=[3,3],s=await bigScene({position:[0,4,10],target:[0,0,0]},160,120,true),
+  lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
+  ground=createMesh(s.e,boxGeometry(60,0.2,60),new Material({color:[0.5,0.45,0.4],roughness:0.9}));
+ ground.root.setPosition([0,-0.1,0]);lights.add(ground);
+ const flame=Big.attach(s.e,{position:[0,0,0],length:L,footprint:fp,lights:groups}),series=[],ground0=[];
+ await frames(s,30);
+ // The ground beside and in front of the flame (the bottom rows, outer thirds: no flame there).
+ await frames(s,300,null,()=>{const d=pixels(s);let g=0;for(let y=90;y<120;y++)for(let x=0;x<160;x++){if(x>40&&x<120)continue;const p=(y*160+x)*4;g+=d[p];}ground0.push(g/2400);let t=0;for(const l of flame.lights??[])t+=l.intensity??0;series.push(t);});
+ const mean=(a)=>a.reduce((x,y)=>x+y,0)/a.length,out={groundLit:mean(ground0),groundSwing:Math.max(...ground0)-Math.min(...ground0),
+  lightSwing:mean(series)>0?(Math.max(...series)-Math.min(...series))/mean(series):0,
+  flicker:mean(series)>0?strongest(series,30,0.2,3):0,expected:expectedPuff(...fp),count:(flame.lights??[]).length,errors:s.errs};
+ s.e.dispose();
+ const dark=await bigScene({position:[0,4,10],target:[0,0,0]},160,120,true),g2=createMesh(dark.e,boxGeometry(60,0.2,60),new Material({color:[0.5,0.45,0.4],roughness:0.9}));
+ g2.root.setPosition([0,-0.1,0]);Big.attach(dark.e,{position:[0,0,0],length:L,footprint:fp,glow:0});
+ await frames(dark,30);const d=pixels(dark);let g=0;for(let y=90;y<120;y++)for(let x=0;x<160;x++){if(x>40&&x<120)continue;g+=d[(y*160+x)*4];}out.groundDark=g/2400;dark.e.dispose();
+ return out;
+};
+function counted(s){
+ const made={pipelines:0,buffers:0,textures:0};
+ for(const [method,key] of [['createRenderPipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipeline','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){
+  const real=s.e.gpu[method];if(real)s.e.gpu[method]=function(...a){made[key]++;return real.apply(this,a);};
+ }
+ return made;
+}
+window.check.rows=async function(){
+ const s=await bigScene(),lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
+  flame=Big.attach(s.e,{position:[0,0,0],length:8,footprint:[14,8],lights:groups}),
+  fire=Fire.attach(s.e,{position:[20,0,0],flameLength:6,width:8,lights:groups});
+ await frames(s,3);
+ const made=counted(s);s.e.gpu.pushErrorScope('validation');
+ await frames(s,90,(f)=>{
+  const t=f/89,v=flameSettingDefaults();
+  for(const row of FLAME_LIVE_SETTINGS){
+   if(row.kind==='color')v[row.name]=[0.3+0.5*t,0.1,0.05];
+   else v[row.name]=row.min+(row.max-row.min)*t;
+  }
+  applyFlameSettings(flame,v);applyFlameSettings(fire,v);flame.options.length=4+4*t;
+ });
+ const err=await s.e.gpu.popErrorScope(),out={made,errors:[...s.errs,...(err?[err.message]:[])],rows:FLAME_LIVE_SETTINGS.length};
+ s.e.dispose();return out;
+};
+window.check.fire=async function(){
+ const s=await bigScene(),fire=Fire.attach(s.e,{position:[0,0,0],flameLength:10,width:12,castShadow:false});
+ await frames(s,150);
+ const out={...stats(s),errors:s.errs,length:fire.flame?.flameLength};
+ s.e.dispose();return out;
+};
+window.check.front=async function(){
+ const s=await bigScene({position:[0,28,95],target:[0,6,0]}),lights=Clustered.attach(s.e),
+  front=FireFront.attach(s.e,{size:[160,100],cell:2,fuel:'FM4',moisture:0.04,wind:[8,0],spotting:0,segment:30,columns:0,flames:6,buildingFlames:2,
+   flame:{lights},structures:[{at:[-10,0],radius:5},{at:[25,12],radius:5}],structureExposure:4,ignitions:[{at:[-50,0],radius:4}]});
+ await front.ready;
+ s.e.gpu.pushErrorScope('validation');
+ await frames(s,3);
+ const made=counted(s);
+ let maxLength=0,houses=0,lit=0;
+ await frames(s,150,()=>{
+  front.advanceTime(1);
+  for(const f of front.flameVolumes)maxLength=Math.max(maxLength,f.options.length);
+  for(const f of front.buildingFlameVolumes)if(f.options.length>0)houses=Math.max(houses,f.options.length);
+ },()=>{lit=Math.max(lit,front.flameVolumes.reduce((n,f)=>n+f.lights.filter(l=>l.intensity>0).length,0));});
+ const st=stats(s),err=await s.e.gpu.popErrorScope(),out={...st,made,maxLength,houses,litLights:lit,pool:front.flameVolumes.length+front.buildingFlameVolumes.length,errors:[...s.errs,...(err?[err.message]:[])]};
+ s.e.dispose();return out;
+};
+// Look of a large flame (KB-FLAME-LOOK2, judged against USFS photos of house and crown fires: crisp tongues, no hatch,
+// a ragged crown). Luminance is the brightest channel over the frame's brightest.
+function lum(s){const d=pixels(s),w=s.c.width,h=s.c.height,y=new Float32Array(w*h);let top=1;for(let i=0;i<w*h;i++){y[i]=Math.max(d[4*i],d[4*i+1],d[4*i+2]);top=Math.max(top,y[i]);}for(let i=0;i<w*h;i++)y[i]/=top;return {y,w,h};}
+// - edges: along every row, a crossing from under 10% to over 60% of the brightest takes this many pixels between
+//   (the soft rim of a blurred flame is several pixels; a crisp tongue edge one or two), and the tongues carry fine
+//   detail: the mean |Laplacian| of the lit pixels over their mean. The glow is off here: on this bare background (no
+//   ground mesh) its light on the ground plane is a pool round the base that the 10% to 60% walk would count as rim;
+//   the glow has its own check.
+window.check.edges=async function(){
+ const s=await bigScene(),flame=Big.attach(s.e,{position:[0,0,0],length:8,footprint:[14,8],glow:0});
+ let widths=0,crossings=0,detail=0,mean=0;
+ await frames(s,60,null,(f)=>{if(f%12!==11)return;const {y,w,h}=lum(s);
+  for(let r=0;r<h;r++){let from=-1,state=0;for(let x=0;x<w;x++){const v=y[r*w+x];
+   if(v<0.1){if(state===2&&from>=0){widths+=x-from-1;crossings++;}state=0;from=x;}
+   else if(v>0.6){if(state===0&&from>=0){widths+=x-from-1;crossings++;}state=2;from=x;}}}
+  for(let r=1;r<h-1;r++)for(let x=1;x<w-1;x++){const i=r*w+x;if(y[i]<0.1)continue;detail+=Math.abs(4*y[i]-y[i-1]-y[i+1]-y[i-w]-y[i+w]);mean+=y[i];}});
+ const out={width:widths/Math.max(crossings,1),crossings,detail:detail/Math.max(mean,1e-6),errors:s.errs};s.e.dispose();return out;
+};
+// - grazing: a 60 m stretch of front seen nearly end-on (64 fixed steps over the 60 m ray drew layers and a hatch):
+//   a frame drawn again at the same clock is the same picture (the dither moves only with time), and the flame shows.
+window.check.grazing=async function(){
+ const s=await bigScene({position:[-50,2.5,4],target:[0,2,0]},512,384),flame=Big.attach(s.e,{position:[0,0,0],length:4,footprint:[60,4]});
+ await frames(s,30);const a=pixels(s);s.e.render({delta:0});if(isCompatDevice(s.e.gpu))await s.e.gpu.queue.onSubmittedWorkDone();const b=pixels(s);
+ let differing=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])differing++;
+ const out={differing,lit:stats(s).lit,errors:s.errs};s.e.dispose();return out;
+};
+// - crown: a 44 m crown fire over trees 8 m apart: the lowest lit row of each column of pixels varies (a torching
+//   stand has a ragged foot, not a flat slab), and a row a fifth of the flame up crosses several separate columns. The
+//   glow is off, as in edges: here the flame stands 14 m up with no ground, so its light on the ground plane under it
+//   would be a pool in the air at the trees' feet.
+window.check.crown=async function(){
+ const s=await bigScene({position:[0,16,70],target:[0,20,0]}),flame=Big.attach(s.e,{position:[0,14,0],length:22,footprint:[44,10],wind:[3,0],crowns:8,glow:0});
+ let spread=0,runs=0,height=0;
+ await frames(s,60,null,(f)=>{if(f%20!==19)return;const {y,w,h}=lum(s);const bottoms=[];let topRow=h,low=0;
+  for(let x=0;x<w;x++){let b=-1;for(let r=h-1;r>=0;r--)if(y[r*w+x]>0.15){b=r;break;}if(b>=0){bottoms.push(b);low=Math.max(low,b);}for(let r=0;r<h;r++)if(y[r*w+x]>0.15){topRow=Math.min(topRow,r);break;}}
+  const m=bottoms.reduce((a,b)=>a+b,0)/Math.max(bottoms.length,1);spread+=Math.sqrt(bottoms.reduce((a,b)=>a+(b-m)*(b-m),0)/Math.max(bottoms.length,1));
+  height+=low-topRow;const row=Math.round(low-0.2*(low-topRow));let inRun=false,count=0;for(let x=0;x<w;x++){const lit=y[row*w+x]>0.15;if(lit&&!inRun)count++;inRun=lit;}runs+=count;});
+ const out={spread:spread/3,runs:runs/3,height:height/3,errors:s.errs};s.e.dispose();return out;
+};
+// - graded: the animatedFeature looks of vfx (with flames.peak 4), post (bloom) and tonemap together: the flame core
+//   passes the bloom threshold so it glows (more lit pixels than the same frame without bloom), keeps a yellow-white
+//   hue through the tonemap and never turns white.
+window.check.graded=async function(){
+ const run=async(bloomOn)=>{
+  const s=await bigScene(),bloom=new Bloom(),tonemap=new Tonemap(),pick=(look,pre)=>Object.fromEntries(Object.entries(look).filter(([k])=>pre.some(p=>k.startsWith(p))));
+  applyPostSettings({bloom},{...pick(POST_LOOKS.animatedFeature,['bloom.']),...(bloomOn?{}:{'bloom.strength':0})});
+  applyTonemapSettings({tonemap},pick(TONEMAP_LOOKS.animatedFeature,['tonemap.','vignette.']));
+  PostStack.attach(s.e,[bloom,tonemap]);
+  const flame=Big.attach(s.e,{position:[0,0,0],length:8,footprint:[14,8]});Looks.applyFlameSettings(flame,{...Looks.FLAME_LOOKS.animatedFeature,'flames.peak':4});
+  let white=0;await frames(s,45,null,(f)=>{if(f%15===14)white+=stats(s).white;});
+  const out={...stats(s),white,errors:s.errs};s.e.dispose();return out;
+ };
+ const plain=await run(false),glow=await run(true);
+ return {plain,glow,errors:[...plain.errors,...glow.errors]};
+};
+// - veil: a house fire at night with its own smoke column (on by default), and with a dark 5 MW column 30 m behind it
+//   instead: the smoke leaves the flame as bright as the same frame without the puffs (pixels over half the
+//   brightest channel). The flame volume writes no depth; drawn before the puffs, the column behind it (and
+//   puffs walked out of the column along the ground by unchecked churn) covered it as a dark veil, and only where a wall
+//   or the ground hid those puffs did the flame show, as a hard-edged slab (KB-FLAME-SMOKEBOX1, KB-FIRE-SMOKEVEIL1).
+window.check.veil=async function(){
+ const bright=(s)=>{const d=pixels(s);let n=0;for(let i=0;i<d.length;i+=4)if(Math.max(d[i],d[i+1],d[i+2])>128)n++;return n;};
+ const run=async(behind)=>{
+  const s=await bigScene({position:[-4,6,26],target:[2,5,0]},320,180,true),lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
+   part=(size,at)=>{const m=createMesh(s.e,boxGeometry(...size),new Material({color:[0.42,0.36,0.3],roughness:0.9}));m.root.setPosition(at);lights.add(m);};
+  part([400,0.2,400],[0,-0.1,0]);part([0.3,6,10],[7,3,-2]);part([10,6,0.3],[2,3,-7]);
+  const fire=Fire.attach(s.e,{position:[-2,0,1.5],flameLength:9,width:6,breadth:5,lights:groups,...(behind?{smoke:false}:{})}),
+   smoke=behind?Smoke.attach(s.e,{position:[-2,0,-30],heat:5e6,radius:4,lifetime:6,color:[0.02,0.02,0.02],opacity:1}):fire.smoke;
+  await frames(s,90);const smoked=bright(s);
+  // The same frame (same clock, same flame) without the puffs.
+  smoke?.dispose();s.e.render({delta:0});if(isCompatDevice(s.e.gpu))await s.e.gpu.queue.onSubmittedWorkDone();
+  const out={clear:bright(s),smoked,smoke:!!fire.smoke,errors:s.errs};s.e.dispose();return out;
+ };
+ const own=await run(false),behind=await run(true);
+ return {own,behind,errors:[...own.errors,...behind.errors]};
+};
+// Job KB-FLAME-FRONTEMBERS1 / front look (judged against USFS photos of a running line: flames stand on the slope, the
+// ground and the smoky air around glow, sparks in front of the flames show):
+// - stand: a 40 m line of 6 m flames on a 30 percent slope (the ground and the flame's slope) shows at least 0.8 of the
+//   flame pixels of the same line on level ground; with a level base the flame was buried in the slope uphill.
+// - glow: a 6 m flame at night with no lights, its ground albedo the test ground's 0.3, in wildfire haze (0.003 per metre, a FireFront's): the ground one to two flame lengths away and the air over the flame are
+//   brighter than with glow 0 (the light it scatters in the haze and throws on the ground, Sun et al. 2005).
+// - order: a dark smoke column between the camera and the flame covers it (bright pixels fall), and one behind it does
+//   not: the flame draws before the particles and writes its depth where opaque.
+const flamePixels=(s)=>{const d=pixels(s);let n=0;for(let i=0;i<d.length;i+=4)if(d[i]>120&&d[i]>1.3*d[i+2]+20)n++;return n;};
+window.check.stand=async function(){
+ const run=async(slope)=>{
+  const s=await bigScene({position:[0,9,70],target:[0,4,0]},256,192,true),
+   g=createMesh(s.e,boxGeometry(300,0.2,300),new Material({color:[0.3,0.27,0.24],roughness:0.9}));
+  g.root.setRotation([0,0,Math.atan(slope)]);g.root.setPosition([0,-0.1,0]);
+  Big.attach(s.e,{position:[0,0,0],length:6,footprint:[40,4],slope:[slope,0],glow:0});
+  await frames(s,60);const out={pixels:flamePixels(s),errors:s.errs};s.e.dispose();return out;
+ };
+ const level=await run(0),slope=await run(0.3);
+ return {level:level.pixels,slope:slope.pixels,errors:[...level.errors,...slope.errors]};
+};
+window.check.glow=async function(){
+ const run=async(glow)=>{
+  const s=await bigScene({position:[0,6,22],target:[0,2,0]},256,192,true),
+   g=createMesh(s.e,boxGeometry(300,0.2,300),new Material({color:[0.3,0.27,0.24],roughness:0.9}));
+  g.root.setPosition([0,-0.1,0]);
+  Big.attach(s.e,{position:[0,0,0],length:6,footprint:[6,4],groundAlbedo:0.3,haze:0.003,...(glow?{}:{glow:0})});
+  await frames(s,40);const d=pixels(s),w=256;
+  // The ground in front of the flame (rows below it, columns beside it) and the air over its tips.
+  let ground=0,gn=0,air=0,an=0;
+  for(let y=130;y<175;y++)for(let x=30;x<226;x++){if(x>90&&x<166)continue;const i=(y*w+x)*4;ground+=d[i];gn++;}
+  for(let y=4;y<30;y++)for(let x=96;x<160;x++){const i=(y*w+x)*4;air+=d[i];an++;}
+  const out={ground:ground/gn,air:air/an,errors:s.errs};s.e.dispose();return out;
+ };
+ const off=await run(false),on=await run(true);
+ return {off,on,errors:[...off.errors,...on.errors]};
+};
+window.check.order=async function(){
+ const run=async(z)=>{
+  const s=await bigScene({position:[0,5,40],target:[0,5,0]},256,192,true);
+  Big.attach(s.e,{position:[0,0,0],length:8,footprint:[14,6],glow:0});
+  const smoke=z===null?undefined:Smoke.attach(s.e,{position:[0,0,z],heat:5e6,radius:4,lifetime:6,color:[0.02,0.02,0.02],opacity:1});
+  await frames(s,90);const out={pixels:flamePixels(s),errors:s.errs};smoke?.dispose();s.e.dispose();return out;
+ };
+ const clear=await run(null),front=await run(15),behind=await run(-15);
+ return {clear:clear.pixels,front:front.pixels,behind:behind.pixels,errors:[...clear.errors,...front.errors,...behind.errors]};
+};
+// Pictures of the large flames for a person to look at (not a check): flame-check.mjs --shot <dir> saves them. A night
+// scene at 1280 by 720: ground, walls and trunks that the flames light (receivers of the Clustered).
+async function picture(s){
+ const shot=new OffscreenCanvas(s.c.width,s.c.height),g=shot.getContext('2d');g.drawImage(s.c,0,0);
+ const blob=await shot.convertToBlob({type:'image/png'}),buf=new Uint8Array(await blob.arrayBuffer());
+ let bin='';for(let i=0;i<buf.length;i+=8192)bin+=String.fromCharCode(...buf.subarray(i,i+8192));
+ return btoa(bin);
+}
+window.check.shot=async function(kind){
+ const cams={house:{position:[-4,6,26],target:[2,5,0]},crown:{position:[0,16,70],target:[0,20,0]},grazing:{position:[-50,2.5,4],target:[0,2,0]},front:{position:[0,22,80],target:[0,8,0]}},
+  s=await bigScene(cams[kind],1280,720,true),lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
+  part=(size,at,color)=>{const m=createMesh(s.e,boxGeometry(...size),new Material({color,roughness:0.9}));m.root.setPosition(at);lights.add(m);return m;};
+ part([400,0.2,400],[0,-0.1,0],[0.2,0.17,0.14]);
+ if(kind==='house'){part([0.3,6,10],[7,3,-2],[0.42,0.36,0.3]);part([10,6,0.3],[2,3,-7],[0.42,0.36,0.3]);Fire.attach(s.e,{position:[-2,0,1.5],flameLength:9,width:6,breadth:5,lights:groups});}
+ if(kind==='crown'){for(let i=-4;i<=4;i++)part([0.7,16,0.7],[i*8,8,-6+(i%2)*8],[0.22,0.16,0.11]);Big.attach(s.e,{position:[0,14,0],length:22,footprint:[44,10],wind:[3,0],crowns:8,lights:groups});}
+ if(kind==='grazing')Big.attach(s.e,{position:[0,0,0],length:4,footprint:[60,4],lights:groups});
+ if(kind==='front'){
+  const front=FireFront.attach(s.e,{size:[160,100],cell:2,fuel:'FM4',moisture:0.04,wind:[8,0],spotting:0,segment:30,columns:0,flames:8,buildingFlames:3,flame:{lights:groups},
+   structures:[{at:[-10,0],radius:5},{at:[25,12],radius:5},{at:[35,-14],radius:5}],structureExposure:4,ignitions:[{at:[-50,0],radius:4}]});
+  await front.ready;await frames(s,200,()=>front.advanceTime(0.5));
+ }else await frames(s,150);
+ const png=await picture(s);s.e.dispose();return png;
+};
+window.ready=true;
+</script></body></html>

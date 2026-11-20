@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// @margoengine/culling/models: GPU culling of the primitives of gltf-pro models and materials meshes. They draw in their
-// own pass, so the hooks are `primitive.redirect` for instance rows, which gltf-pro reads as core reads `Batch.redirect`,
+// @margoengine/culling/models: GPU culling of the primitives of gltf/pbr models and materials meshes. They draw in their
+// own pass, so the hooks are `primitive.redirect` for instance rows, which gltf/pbr reads as core reads `Batch.redirect`,
 // and `primitive.culled` for a plain primitive: one indirect draw record, one dispatch for all of them.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
@@ -33,13 +33,13 @@ declare const GPUBufferUsage: {
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
-/** The parts of a gltf-pro `PBRInstances` the culler reads. */
+/** The parts of a gltf/pbr `PBRInstances` the culler reads. */
 export interface CullableInstances {
   readonly count: number;
   readonly capacity: number;
   upload(device: GPUDevice): GPUBuffer;
 }
-/** The parts of a gltf-pro `PBRPrimitive` the culler reads. */
+/** The parts of a gltf/pbr `PBRPrimitive` the culler reads. */
 export interface CullablePrimitive {
   node: { readonly matrix: ArrayLike<number> };
   vertices: Float32Array;
@@ -49,7 +49,7 @@ export interface CullablePrimitive {
   redirect?: { instances: GPUBuffer; args: GPUBuffer };
   culled?: { args: GPUBuffer; offset: number };
 }
-/** A gltf-pro `PBRModel` or a materials mesh: whatever has `primitives`. */
+/** A gltf/pbr `PBRModel` or a materials mesh: whatever has `primitives`. */
 export interface CullableModel {
   readonly primitives: readonly CullablePrimitive[];
   readonly disposed?: boolean;
@@ -231,14 +231,14 @@ export class CulledModels implements EnginePlugin {
    */
   add(model: CullableModel, { padding = 0 }: CulledModelOptions = {}): this {
     if (!Array.isArray(model?.primitives))
-      throw new TypeError('Invalid culled model; pass a gltf-pro model or materials mesh, which have primitives');
+      throw new TypeError('Invalid culled model; pass a gltf/pbr model or materials mesh, which have primitives');
     if (!(padding >= 0 && Number.isFinite(padding)))
       throw new RangeError('Invalid culled model padding; pass a finite number of 0 or more');
     this.models.set(model, padding);
     return this;
   }
   /**
-   * With `occlusion`, lets `source` hide what is behind it: a core mesh, a gltf-pro model, a materials mesh or a Terrain.
+   * With `occlusion`, lets `source` hide what is behind it: a core mesh, a gltf/pbr model, a materials mesh or a Terrain.
    * Give it the large things. It draws depth-only each frame, so a wall the frame shows hides at once, and cut-out, blended,
    * displaced and clipped primitives do not occlude, and neither do back faces.
    * @throws TypeError for anything else.
@@ -630,7 +630,7 @@ export class CulledModels implements EnginePlugin {
     if (primitive.culled === record) primitive.culled = undefined;
     this.records.delete(primitive);
   }
-  // The primitive draws all its rows again, from gltf-pro's own buffer.
+  // The primitive draws all its rows again, from gltf/pbr's own buffer.
   private drop(primitive: CullablePrimitive): void {
     this.dropPlain(primitive);
     const slot = this.slots.get(primitive);

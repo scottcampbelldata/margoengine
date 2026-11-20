@@ -22,7 +22,7 @@ export interface AggregateShadeOptions {
     | 'eq-hist';
   readonly colormap?: ColormapName;
   /** Physical scalar display range. Default nonempty finite extrema. */ readonly range?: readonly [number, number];
-  /** Circular dilation radius 0..32, default 0. Highest original alpha wins. */ readonly spread?: number;
+  /** Circular dilation radius 0..32, default 0. Where discs overlap the highest shaded level wins, whatever the scan order. */ readonly spread?: number;
   /** Grow until this fraction of occupied pixels has an occupied neighbour, default disabled. */ readonly density?: number;
 }
 /** Packed RGBA8, bottom row first. Empty bins stay transparent before spreading. */
@@ -73,7 +73,8 @@ export function shadeAggregate(result: RasterAggregate, options: AggregateShadeO
     }
   }
   const map = colormap(options.colormap ?? 'ember'),
-    pixels = new Uint32Array(values.length);
+    pixels = new Uint32Array(values.length),
+    levels = new Float64Array(values.length).fill(-1);
   for (let b = 0; b < values.length; b++)
     if (occupied(b)) {
       const span = hi - lo;
@@ -90,17 +91,18 @@ export function shadeAggregate(result: RasterAggregate, options: AggregateShadeO
       if (transform === 'eq-hist') t = cdf.get(values[b])!;
       if (transform === 'log') t = Math.log1p(255 * t) / Math.log(256);
       if (transform === 'cbrt') t = Math.cbrt(t);
+      levels[b] = t;
       const [r, g, blue] = map.sample(t);
       pixels[b] =
         (Math.round(r * 255) | (Math.round(g * 255) << 8) | (Math.round(blue * 255) << 16) | (255 << 24)) >>> 0;
     }
   if (!radius) return pixels;
   const { width, height } = result;
-  if (options.density === undefined) return dilate(pixels, width, height, radius);
+  if (options.density === undefined) return dilate(pixels, levels, width, height, radius);
   let spread: Uint32Array = pixels;
   for (let r = 0; r < radius && neighbourFraction(spread, width, height) < options.density; r++) {
     // Always grow the original marks: repeated dilation would exceed the requested disc radius.
-    spread = dilate(pixels, width, height, r + 1);
+    spread = dilate(pixels, levels, width, height, r + 1);
   }
   return spread;
 }
@@ -123,8 +125,11 @@ function neighbourFraction(pixels: Uint32Array, width: number, height: number): 
   return occupied ? adjacent / occupied : 1;
 }
 
-function dilate(pixels: Uint32Array, width: number, height: number, radius: number): Uint32Array {
-  const spread = pixels.slice();
+/** Grey dilation: an empty pixel takes the colour of the highest level among the discs covering it (colour is a
+ * function of level, so ties give one colour), so the result never depends on which mark is visited first. */
+function dilate(pixels: Uint32Array, levels: Float64Array, width: number, height: number, radius: number): Uint32Array {
+  const spread = pixels.slice(),
+    best = levels.slice();
   for (let b = 0; b < pixels.length; b++)
     if (pixels[b]) {
       const x = b % width,
@@ -139,9 +144,12 @@ function dilate(pixels: Uint32Array, width: number, height: number, radius: numb
             yy >= 0 &&
             xx < width &&
             yy < height &&
-            !pixels[yy * width + xx]
-          )
+            !pixels[yy * width + xx] &&
+            levels[b] > best[yy * width + xx]
+          ) {
             spread[yy * width + xx] = pixels[b];
+            best[yy * width + xx] = levels[b];
+          }
         }
     }
   return spread;

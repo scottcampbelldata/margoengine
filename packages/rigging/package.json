@@ -89,9 +89,17 @@
       "types": "./dist/vrma.d.ts",
       "import": "./dist/vrma.js"
     },
+    "./vrm-first-person": {
+      "types": "./dist/vrm-first-person.d.ts",
+      "import": "./dist/vrm-first-person.js"
+    },
     "./pose-tracking": {
       "types": "./dist/pose-tracking.d.ts",
       "import": "./dist/pose-tracking.js"
+    },
+    "./hands": {
+      "types": "./dist/hands.d.ts",
+      "import": "./dist/hands.js"
     }
   },
   "files": [
@@ -111,8 +119,9 @@
     "@margoengine/animator": "^1.0.0",
     "@margoengine/core": "^1.0.0",
     "@margoengine/kinematics-constraints": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/animation": "^1.0.0"
+    "@margoengine/gltf": "^1.0.0",
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/decoders": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/animator": {
@@ -124,10 +133,13 @@
     "@margoengine/kinematics-constraints": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/gltf": {
       "optional": true
     },
     "@margoengine/animation": {
+      "optional": true
+    },
+    "@margoengine/decoders": {
       "optional": true
     }
   },
@@ -139,6 +151,7 @@
     "test:mtoon:browser": "cd ../.. && node packages/rigging/tests/mtoon-light.browser.mjs && node packages/rigging/tests/mtoon-replica.browser.mjs && node packages/rigging/tests/mtoon-matcap.browser.mjs && node packages/rigging/tests/mtoon-uv.browser.mjs && node packages/rigging/tests/mtoon-uv-animation.browser.mjs && node packages/rigging/tests/mtoon-uv-shadow.browser.mjs && node packages/rigging/tests/mtoon-expressions.browser.mjs && node packages/rigging/tests/mtoon-local-rim.browser.mjs && node packages/rigging/tests/mtoon-gbuffer.browser.mjs && node packages/rigging/tests/mtoon-outline.browser.mjs && node packages/rigging/tests/mtoon-avatar.browser.mjs && node packages/rigging/tests/mtoon-avatar.browser.mjs --vrm1",
     "test:constraints:browser": "node tests/vrm-constraints.browser.mjs",
     "test:vrma:browser": "node tests/vrma.browser.mjs",
-    "test:pose-tracking:browser": "node tests/pose-tracking.browser.mjs"
+    "test:pose-tracking:browser": "node tests/pose-tracking.browser.mjs",
+    "test:first-person:browser": "cd ../.. && node packages/rigging/tests/vrm-first-person.browser.mjs"
   }
 }

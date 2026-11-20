@@ -45,6 +45,8 @@ export class CookieLighting2D implements EnginePlugin {
     addLight(options?: CookieLight2DOptions): CookieLight2D;
     removeLight(light: CookieLight2D): void;
     setOccluders(occluders: readonly Occluder2D[]): void;
+    setTarget(target: GPUTexture | (() => GPUTexture)): void;
+    setNormals(normals: GPUTexture | (() => GPUTexture) | undefined): void;
     setup(engine: Engine): void;
     onDeviceRestored(): void;
     dispose(): void;

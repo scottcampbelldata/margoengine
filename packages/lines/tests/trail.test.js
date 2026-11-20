@@ -169,3 +169,39 @@ test('a flat trail keeps a unit normal, takes world units and refuses what it ca
   assert.throws(() => new Trail({ normal: [0, NaN, 0] }), RangeError);
   assert.throws(() => new Trail({ normal: [0, 1, 0], dashed: true }), /no dashes/);
 });
+
+// GAP-FILM-TIME: a trail's fade clock started at film time T reads what a continuous run reads at T. Run A takes n + 1
+// frames; run B is fresh, replays n steps with `advanceTime` on the Lines plugin (what `seek` from
+// @margoengine/cutscene/seek runs), then takes one frame. The samples are the target's history (a warm-up of
+// `lifetime` refills them), so the target here stands still and the head is the same in both runs.
+for (const n of [1, 600, 54000])
+  test(`a trail replayed ${n} steps equals a continuous run`, () => {
+    const a = rig(),
+      b = rig(),
+      ta = a.lines.add(new Trail({ lifetime: 1, target: () => [1, 2, 3] })),
+      tb = b.lines.add(new Trail({ lifetime: 1, target: () => [1, 2, 3] }));
+    assert.equal(b.lines.time, 0, 'a fresh Lines starts at 0');
+    assert.equal(tb.time, 0, 'a fresh Trail starts at 0');
+    for (let step = 0; step <= n; step++) a.lines.onPreUpdate(1 / 60);
+    for (let step = 0; step < n; step++) b.lines.advanceTime(1 / 60);
+    b.lines.onPreUpdate(1 / 60);
+    assert.ok(Object.is(tb.time, ta.time));
+    assert.ok(Object.is(b.lines.time, a.lines.time));
+    a.frame(0);
+    b.frame(0);
+    assert.deepEqual(Array.from(tb.points), Array.from(ta.points));
+    assert.deepEqual(Array.from(tb.colors), Array.from(ta.colors));
+  });
+
+test('a second view of a frame draws the trail without moving its clock', () => {
+  const { lines, frame } = rig(),
+    trail = lines.add(new Trail({ lifetime: 1, minDistance: 0, target: () => [0, 0, 0] }));
+  frame(0.25);
+  const before = trail.time;
+  // The passes again with no update, as a second view draws them.
+  for (const pass of [0, 1]) frame.call(null, 0);
+  assert.equal(trail.time, before);
+  trail.visible = false;
+  lines.advanceTime(1);
+  assert.equal(trail.time, before, 'a hidden trail does not move, as before');
+});

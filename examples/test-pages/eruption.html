@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Eruption - Margo Engine Test</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 14px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 70vh; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  button { font: inherit; padding: 6px 10px; }
+  #status { padding: 0 8px 8px; }
+</style>
+<canvas id="view"></canvas>
+<div id="controls">
+  <button id="btnPlay">Play (60x)</button>
+  <button id="btnStart">Before the eruption</button>
+  <button id="btnRise">2 minutes: the column rises</button>
+  <button id="btnUmbrella">40 minutes: the umbrella and the ash fall</button>
+  <button id="btnEnd">6 hours: the deposit</button>
+  <button id="btnPlinian">Plinian rows</button>
+  <button id="btnWeak">Weak plume rows</button>
+  <button id="btnCollapse">Collapsing rows</button>
+  <button id="btnWind">Wind across the valley</button>
+  <button id="btnWeather">Hand the wind back to the weather</button>
+</div>
+<div id="status"></div>
+<script type="module" src="./eruption.ts"></script></html>

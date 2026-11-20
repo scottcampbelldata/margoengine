@@ -1,8 +1,8 @@
-// X-ray (hidden-line) outlines on a mock device: core meshes through the renderer's draw hook, gltf-pro models through the replay.
+// X-ray (hidden-line) outlines on a mock device: core meshes through the renderer's draw hook, gltf/pbr models through the replay.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Selection } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -95,7 +95,7 @@ test('x-ray marks the whole selection without the depth test, outlines it dashed
   );
 });
 
-test('x-ray replays selected gltf-pro primitives without the depth test before the equal-depth mask', async () => {
+test('x-ray replays selected gltf/pbr primitives without the depth test before the equal-depth mask', async () => {
   const h = optionalGPU(),
     device = h.engine.gpu,
     c = h.context,

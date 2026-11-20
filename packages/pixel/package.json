@@ -65,7 +65,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js pixel",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "cd ../.. && node packages/pixel/tests/browser-check.mjs && node packages/pixel/tests/palette-check.mjs && node packages/pixel/tests/render3d-check.mjs && node packages/pixel/tests/scale-check.mjs && node packages/pixel/tests/crt-check.mjs && node packages/pixel/tests/follow-check.mjs",
+    "test:gpu": "cd ../.. && node packages/pixel/tests/browser-check.mjs && node packages/pixel/tests/palette-check.mjs && node packages/pixel/tests/render3d-check.mjs && node packages/pixel/tests/scale-check.mjs && node packages/pixel/tests/crt-check.mjs && node packages/pixel/tests/follow-check.mjs && node packages/pixel/tests/pixel-restore-check.mjs",
     "prepack": "npm run build"
   }
 }

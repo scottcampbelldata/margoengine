@@ -94,7 +94,11 @@ export interface WebGL2Capabilities {
   readonly supported: boolean;
   /** What keeps the context below `full`: extension names, or `highp-fragment`. Empty when supported. */
   readonly missing: readonly string[];
-  /** True when fragment shaders have 32-bit `highp` floats and ints (GLSL ES 3.00 makes it optional). */
+  /**
+   * True when fragment shaders have 32-bit `highp` floats and ints. GLSL ES 3.00 (sections 4.1.3 and 4.5.1) requires
+   * both; a context whose `HIGH_INT` report falls short of (31, 30) (Firefox on macOS reports 24, 24) is measured
+   * instead: a fragment shader's 32-bit wrapping integer arithmetic must read back exact.
+   */
   readonly highpFragment: boolean;
   /** Each extension in {@link COMPAT_EXTENSIONS}: true when `getExtension` returned it. */
   readonly extensions: Readonly<Record<CompatExtension, boolean>>;
@@ -145,8 +149,14 @@ export function webgl2Capabilities(gl: WebGL2ProbeContext): WebGL2Capabilities {
   }
   const float = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT),
     int = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_INT),
-    // highp: a 23-bit mantissa, and ints over [-2^31, 2^31) (reported as rangeMin 31, rangeMax 30).
-    highpFragment = (float?.precision ?? 0) >= 23 && (int?.rangeMin ?? 0) >= 31 && (int?.rangeMax ?? 0) >= 30;
+    // highp: a 23-bit mantissa, and ints over [-2^31, 2^31) (reported as rangeMin 31, rangeMax 30). A short int report
+    // is measured on the GPU where the context can draw: the ES 3.0 query is a report, the shading language the rule.
+    reportedInt = (int?.rangeMin ?? 0) >= 31 && (int?.rangeMax ?? 0) >= 30,
+    highpFragment =
+      (float?.precision ?? 0) >= 23 &&
+      (reportedInt ||
+        (typeof (gl as Partial<HighpIntProbeContext>).createProgram === 'function' &&
+          measureHighpInt(gl as unknown as HighpIntProbeContext)));
   const missing: string[] = REQUIRED_EXTENSIONS.filter((name) => !extensions[name]);
   if (!highpFragment) missing.push('highp-fragment');
   const tier: CompatTier = !missing.length
@@ -264,5 +274,158 @@ export function probeWebGL2(options: ProbeOptions = {}): WebGL2Capabilities | nu
     return webgl2Capabilities(gl);
   } finally {
     gl.getExtension('WEBGL_lose_context')?.loseContext();
+  }
+}
+
+/** The GL calls the highp int measurement makes (a structural type, so a test can pass a stand-in). */
+interface HighpIntProbeContext {
+  createShader(type: number): unknown;
+  shaderSource(shader: unknown, source: string): void;
+  compileShader(shader: unknown): void;
+  createProgram(): unknown;
+  attachShader(program: unknown, shader: unknown): void;
+  linkProgram(program: unknown): void;
+  getProgramParameter(program: unknown, pname: number): unknown;
+  getUniformLocation(program: unknown, name: string): unknown;
+  useProgram(program: unknown): void;
+  uniform4ui(location: unknown, x: number, y: number, z: number, w: number): void;
+  createTexture(): unknown;
+  bindTexture(target: number, texture: unknown): void;
+  texStorage2D(target: number, levels: number, format: number, width: number, height: number): void;
+  createFramebuffer(): unknown;
+  bindFramebuffer(target: number, framebuffer: unknown): void;
+  framebufferTexture2D(target: number, attachment: number, textarget: number, texture: unknown, level: number): void;
+  checkFramebufferStatus(target: number): number;
+  createVertexArray(): unknown;
+  bindVertexArray(array: unknown): void;
+  bindBuffer(target: number, buffer: unknown): void;
+  viewport(x: number, y: number, width: number, height: number): void;
+  disable(cap: number): void;
+  enable(cap: number): void;
+  isEnabled(cap: number): boolean;
+  colorMask(r: boolean, g: boolean, b: boolean, a: boolean): void;
+  drawArrays(mode: number, first: number, count: number): void;
+  readPixels(x: number, y: number, w: number, h: number, format: number, type: number, pixels: Uint32Array): void;
+  getParameter(pname: number): unknown;
+  deleteShader(shader: unknown): void;
+  deleteProgram(program: unknown): void;
+  deleteTexture(texture: unknown): void;
+  deleteFramebuffer(framebuffer: unknown): void;
+  deleteVertexArray(array: unknown): void;
+}
+
+// The inputs: a 32-bit odd constant, a signed value near -2^31, and two shift amounts, passed as uniforms so the
+// compiler cannot fold the arithmetic.
+const INPUT = [0x9e3779b9, 0x80000001, 16, 7] as const;
+const FRAGMENT = `#version 300 es
+precision highp float;precision highp int;uniform highp uvec4 u;layout(location=0) out highp uvec4 o;
+void main(){uint a=u.x;int s=int(u.y);o=uvec4(a*0x85EBCA6Bu,(a^(a>>u.z))+0xFFFFFFF0u,uint(s*3),uint(s>>1)^uint(s/int(u.w)));}`;
+const VERTEX = '#version 300 es\nvoid main(){gl_PointSize=1.0;gl_Position=vec4(0,0,0,1);}';
+
+/** What GLSL ES 3.00 section 4.1.3 makes the probe shader write: 32-bit two's complement, wrapping. */
+function expectedHighpInt(): [number, number, number, number] {
+  const [a, y, z, w] = INPUT,
+    s = y | 0;
+  return [
+    Math.imul(a, 0x85ebca6b) >>> 0,
+    (((a ^ (a >>> z)) >>> 0) + 0xfffffff0) >>> 0,
+    Math.imul(s, 3) >>> 0,
+    ((s >> 1) ^ Math.trunc(s / w)) >>> 0,
+  ];
+}
+
+/**
+ * Measures 32-bit highp int arithmetic in a fragment shader: one pixel of an RGBA32UI target, read back and
+ * compared with `expectedHighpInt`. Leaves the context's bindings and state as it found them.
+ * @returns True when every word matches.
+ */
+function measureHighpInt(gl: HighpIntProbeContext): boolean {
+  const C = {
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    LINK_STATUS: 0x8b82,
+    TEXTURE_2D: 0x0de1,
+    RGBA32UI: 0x8d70,
+    FRAMEBUFFER: 0x8d40,
+    DRAW_FRAMEBUFFER_BINDING: 0x8ca6,
+    READ_FRAMEBUFFER_BINDING: 0x8caa,
+    DRAW_FRAMEBUFFER: 0x8ca9,
+    READ_FRAMEBUFFER: 0x8ca8,
+    COLOR_ATTACHMENT0: 0x8ce0,
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    CURRENT_PROGRAM: 0x8b8d,
+    VERTEX_ARRAY_BINDING: 0x85b5,
+    TEXTURE_BINDING_2D: 0x8069,
+    PIXEL_PACK_BUFFER: 0x88eb,
+    PIXEL_PACK_BUFFER_BINDING: 0x88ed,
+    VIEWPORT: 0x0ba2,
+    COLOR_WRITEMASK: 0x0c23,
+    SCISSOR_TEST: 0x0c11,
+    RASTERIZER_DISCARD: 0x8c89,
+    POINTS: 0,
+    RGBA_INTEGER: 0x8d99,
+    UNSIGNED_INT: 0x1405,
+  };
+  const saved = {
+    draw: gl.getParameter(C.DRAW_FRAMEBUFFER_BINDING),
+    read: gl.getParameter(C.READ_FRAMEBUFFER_BINDING),
+    program: gl.getParameter(C.CURRENT_PROGRAM),
+    vao: gl.getParameter(C.VERTEX_ARRAY_BINDING),
+    texture: gl.getParameter(C.TEXTURE_BINDING_2D),
+    pack: gl.getParameter(C.PIXEL_PACK_BUFFER_BINDING),
+    viewport: gl.getParameter(C.VIEWPORT) as ArrayLike<number>,
+    mask: gl.getParameter(C.COLOR_WRITEMASK) as ArrayLike<boolean>,
+    scissor: gl.isEnabled(C.SCISSOR_TEST),
+    discard: gl.isEnabled(C.RASTERIZER_DISCARD),
+  };
+  const vs = gl.createShader(C.VERTEX_SHADER),
+    fs = gl.createShader(C.FRAGMENT_SHADER),
+    program = gl.createProgram(),
+    texture = gl.createTexture(),
+    framebuffer = gl.createFramebuffer(),
+    vao = gl.createVertexArray();
+  try {
+    gl.shaderSource(vs, VERTEX);
+    gl.shaderSource(fs, FRAGMENT);
+    gl.compileShader(vs);
+    gl.compileShader(fs);
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, C.LINK_STATUS)) return false;
+    gl.bindTexture(C.TEXTURE_2D, texture);
+    gl.texStorage2D(C.TEXTURE_2D, 1, C.RGBA32UI, 1, 1);
+    gl.bindFramebuffer(C.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(C.FRAMEBUFFER, C.COLOR_ATTACHMENT0, C.TEXTURE_2D, texture, 0);
+    if (gl.checkFramebufferStatus(C.FRAMEBUFFER) !== C.FRAMEBUFFER_COMPLETE) return false;
+    gl.useProgram(program);
+    gl.uniform4ui(gl.getUniformLocation(program, 'u'), ...INPUT);
+    gl.bindVertexArray(vao);
+    gl.bindBuffer(C.PIXEL_PACK_BUFFER, null);
+    gl.viewport(0, 0, 1, 1);
+    gl.colorMask(true, true, true, true);
+    gl.disable(C.SCISSOR_TEST);
+    gl.disable(C.RASTERIZER_DISCARD);
+    gl.drawArrays(C.POINTS, 0, 1);
+    const pixel = new Uint32Array(4);
+    gl.readPixels(0, 0, 1, 1, C.RGBA_INTEGER, C.UNSIGNED_INT, pixel);
+    return expectedHighpInt().every((word, i) => pixel[i] === word);
+  } finally {
+    gl.bindFramebuffer(C.DRAW_FRAMEBUFFER, saved.draw);
+    gl.bindFramebuffer(C.READ_FRAMEBUFFER, saved.read);
+    gl.useProgram(saved.program);
+    gl.bindVertexArray(saved.vao);
+    gl.bindTexture(C.TEXTURE_2D, saved.texture);
+    gl.bindBuffer(C.PIXEL_PACK_BUFFER, saved.pack);
+    gl.viewport(saved.viewport[0], saved.viewport[1], saved.viewport[2], saved.viewport[3]);
+    gl.colorMask(saved.mask[0], saved.mask[1], saved.mask[2], saved.mask[3]);
+    if (saved.scissor) gl.enable(C.SCISSOR_TEST);
+    if (saved.discard) gl.enable(C.RASTERIZER_DISCARD);
+    gl.deleteVertexArray(vao);
+    gl.deleteFramebuffer(framebuffer);
+    gl.deleteTexture(texture);
+    gl.deleteProgram(program);
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
   }
 }

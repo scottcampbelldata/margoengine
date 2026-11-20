@@ -1,5 +1,5 @@
 // Clean-room LZFSE block framing (Keramics), LZVN packets and table ANS (Duda 2013).
-// No implementation source consulted. See docs/clean-room.md, batch 241.
+// No implementation source consulted. See docs/clean-room.md.
 import { decodeFailed } from './errors.js';
 
 /** Limits for {@link decodeLZFSE}. */
@@ -11,7 +11,7 @@ export interface LZFSEOptions {
 }
 
 const corrupt = (why: string): never => {
-  throw decodeFailed(`LZFSE: ${why}; export the file again (https://margoengine.com/docs/errors#failed)`);
+  throw decodeFailed(`LZFSE: ${why}; export the file again (https://margoengine.com/errors#failed)`);
 };
 
 // Reads little-endian bit fields in either direction. Reverse streams consume the

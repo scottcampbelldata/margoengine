@@ -87,7 +87,7 @@ export function parseSnapshot(data: unknown): SceneSnapshot {
  * Writes a snapshot's values onto the live meshes with the same ids and reports how many it updated. The whole
  * snapshot is checked before anything changes, so a bad file leaves the scene as it was. A shared material changes for
  * every mesh using it, as when editing it by hand.
- * @throws TypeError / RangeError for a malformed snapshot or a value the engine rejects (scale of 0, colour range),
+ * @throws TypeError / RangeError for a malformed snapshot or a value the engine rejects (a colour out of range),
  * MargoError `'state'` after `engine.dispose()`.
  */
 export function restoreSnapshot(engine: Engine, snapshot: unknown): RestoreResult {

@@ -15,7 +15,7 @@ test('codemod rewrites every former Stage method into its feature entry and is i
     'const fx = await app.effects({ grain: 0.01 });',
     "const light = await app.environment('/studio.hdr', { intensity: 2 });",
     'const shadows = await app.shadows({ resolution: 1024 });',
-    'const { Scenery } = (await app.scenery()) as typeof import("margoengine/scenery");',
+    'const { Scenery } = (await app.scenery()) as typeof import("margoengine/sky/night-preset");',
     '// A comment that mentions app.sky() is left alone.',
     "engine.environment('x');",
     '',
@@ -33,7 +33,7 @@ test('codemod rewrites every former Stage method into its feature entry and is i
     'const fx = await addEffects(app, { grain: 0.01 });',
     "const light = await addEnvironment(app, '/studio.hdr', { intensity: 2 });",
     'const shadows = await addShadows(app, { resolution: 1024 });',
-    "const { Scenery } = await import('margoengine/scenery');",
+    "const { Scenery } = await import('margoengine/sky/night-preset');",
     '// A comment that mentions app.sky() is left alone.',
     "engine.environment('x');",
   ])

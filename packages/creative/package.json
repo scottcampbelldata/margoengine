@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:settings:browser": "cd ../.. && node packages/creative/tests/grass-settings-browser.mjs && node packages/creative/tests/grass-settings-browser.mjs --compat",
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js ../../tests/modern-grass.test.js ../../tests/deep-render-creative.test.js ../../tests/audit-rendering-composition.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js",
@@ -33,7 +34,9 @@
     "dev": "vite --config vite.config.js --open /examples/earth/index.html",
     "prepack": "npm run build",
     "test:gpu:grass-atmosphere": "cd ../.. && node packages/creative/scripts/test-grass-terrain.js && node packages/creative/scripts/test-orbit-atmosphere.js",
-    "test:gpu:paint-aniso": "cd ../.. && node packages/creative/scripts/test-paint-aniso.js"
+    "test:gpu:paint-aniso": "cd ../.. && node packages/creative/scripts/test-paint-aniso.js",
+    "test:gpu:post-contrast": "cd ../.. && node packages/creative/tests/post-contrast-browser.mjs",
+    "test:gpu:post-contrast-zero": "cd ../.. && node packages/creative/tests/post-contrast-zero-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -64,6 +67,10 @@
     "./grass": {
       "types": "./dist/grass.d.ts",
       "import": "./dist/grass.js"
+    },
+    "./grass-settings": {
+      "types": "./dist/grass-settings.d.ts",
+      "import": "./dist/grass-settings.js"
     },
     "./planet": {
       "types": "./dist/planet.d.ts",

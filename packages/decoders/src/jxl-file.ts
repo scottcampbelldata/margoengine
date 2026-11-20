@@ -145,11 +145,12 @@ function readColour(bits: Bits): { srgb: boolean; iccProfile: boolean } {
 }
 
 // The codestream of a container file: a `jxlc` box, or the `jxlp` boxes in order. A bare codestream comes back as it is.
+// A container starts with the 12-byte signature box 00 00 00 0C 'JXL ' 0D 0A 87 0A (the image/jxl magic number).
 function codestream(bytes: Uint8Array): Uint8Array {
   if (bytes[0] === 0xff && bytes[1] === 0x0a) return bytes;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength),
     parts: Uint8Array[] = [];
-  if (bytes.length < 12 || view.getUint32(0) !== 12 || view.getUint32(4) !== 0x4a584c20)
+  if (bytes.length < 12 || view.getUint32(0) !== 12 || view.getUint32(4) !== 0x4a584c20 || view.getUint32(8) !== 0x0d0a870a)
     throw refuse('neither a codestream nor a container signature is there');
   let at = 0;
   while (at + 8 <= bytes.length) {

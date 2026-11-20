@@ -1,0 +1,268 @@
+{
+ "again": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n        over \"a\"\n        {\n        }\n    }\n}\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n    def \"a\" (\n        append inherits = </C>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    payload = @./l0.usda@ (offset = 10)\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    def \"a\" (\n        references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"R\" (\n    references = @./l1.usda@</M/a> (offset = 10)\n)\n{\n    def \"a\" (\n        references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    3,
+    1
+   ],
+   "/M/a": [
+    4,
+    0,
+    2
+   ],
+   "/M/a/a": [
+    1
+   ],
+   "/R": [
+    8,
+    0,
+    4,
+    2
+   ],
+   "/R/a": [
+    9,
+    1,
+    7,
+    5,
+    3
+   ],
+   "/R/a/a": [
+    0,
+    4,
+    2
+   ],
+   "/R/a/a/a": [
+    1
+   ]
+  }
+ },
+ "held": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"c\"\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n    over \"c\" (\n        prepend inherits = </C>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\"\n{\n    over \"c\" (\n        append references = @./l0.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        def \"c\" (\n            references = @./l0.usda@ (offset = 10)\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"c\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        prepend references = @./l1.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    9
+   ],
+   "/P/b": [
+    10,
+    4
+   ],
+   "/P/b/c": [
+    5,
+    2,
+    7,
+    0
+   ],
+   "/P/b/c/c": [
+    7,
+    6,
+    2,
+    3,
+    0,
+    8,
+    1
+   ],
+   "/P/b/c/c/c": [
+    7,
+    8,
+    3,
+    0,
+    1
+   ],
+   "/P/b/c/c/c/c": [
+    8,
+    1
+   ]
+  }
+ },
+ "gated": {
+  "files": {
+   "l0.usda": "#usda 1.0\n",
+   "l1.usda": "#usda 1.0\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        specializes = </C>\n    )\n    {\n        over \"a\" (\n            inherits = </C>\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    custom double v0.timeSamples = { 1: 87, 4: 58 }\n    over \"a\"\n    {\n        def \"a\"\n        {\n            custom double v0 = 655\n        }\n    }\n}\ndef \"P\" (\n    inherits = </C>\n    append references = @./l2.usda@</M> (offset = 10)\n)\n{\n    def \"a\" (\n        append references = @./l2.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    6,
+    3,
+    0
+   ],
+   "/P/a": [
+    7,
+    4,
+    0,
+    1,
+    3
+   ],
+   "/P/a/a": [
+    3,
+    5,
+    1,
+    2,
+    4
+   ],
+   "/P/a/a/a": [
+    3,
+    2,
+    4,
+    5
+   ],
+   "/P/a/a/a/a": [
+    4,
+    5
+   ],
+   "/P/a/a/a/a/a": [
+    5
+   ]
+  }
+ },
+ "later": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    append inherits = </C/a>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\" (\n)\n{\n    over \"a\" (\n    )\n    {\n    }\n}\ndef \"R\" (\n    payload = @./l1.usda@ (offset = 10)\n)\n{\n    over \"a\" (\n        payload = @./l0.usda@</M>\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/R": [
+    4,
+    1,
+    2
+   ],
+   "/R/a": [
+    5,
+    0,
+    3
+   ]
+  }
+ },
+ "nested": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n)\n{\n    over \"a\" (\n    )\n    {\n        over \"b\"\n        {\n        }\n    }\n}\ndef \"M\" (\n    specializes = </C/a>\n)\n{\n    def \"a\" (\n        append inherits = </C>\n    )\n    {\n    }\n    def \"b\" (\n        specializes = </C/a>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"c\" (\n        payload = @./l0.usda@</M/a>\n    )\n    {\n        def \"a\" (\n            references = @./l0.usda@ (offset = 10)\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"P\" (\n)\n{\n    def \"c\" (\n        append references = @./l1.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    6,
+    3,
+    1
+   ],
+   "/M/b": [
+    5,
+    1,
+    2
+   ],
+   "/M/a": [
+    4,
+    0
+   ],
+   "/M/c": [
+    7,
+    0,
+    4
+   ],
+   "/M/c/a": [
+    8,
+    1,
+    3
+   ],
+   "/M/c/a/b": [
+    5,
+    2,
+    1
+   ],
+   "/M/c/a/a": [
+    0,
+    4
+   ],
+   "/P": [
+    9
+   ],
+   "/P/c": [
+    10,
+    6
+   ],
+   "/P/c/c": [
+    0,
+    7,
+    4
+   ],
+   "/P/c/c/a": [
+    1,
+    8,
+    3
+   ],
+   "/P/c/c/a/b": [
+    2,
+    5,
+    1
+   ],
+   "/P/c/c/a/a": [
+    0,
+    4
+   ]
+  }
+ },
+ "kind": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    over \"a\" (\n        inherits = </C/a>\n        payload = @./l0.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 5)]\n)\nclass \"C\"\n{\n    def \"a\" (\n    )\n    {\n        def \"c\"\n        {\n        }\n    }\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n        append references = @./l1.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n)\nclass \"C\" (\n)\n{\n    def \"c\"\n    {\n    }\n}\ndef \"Q\"\n{\n    def \"c\" (\n        payload = @./l2.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    10
+   ],
+   "/Q/c": [
+    11,
+    6,
+    1
+   ],
+   "/Q/c/a": [
+    7,
+    2,
+    4,
+    1,
+    0,
+    8,
+    3
+   ],
+   "/Q/c/a/a": [
+    2,
+    0,
+    8,
+    3,
+    4
+   ],
+   "/Q/c/a/a/c": [
+    9,
+    5
+   ],
+   "/Q/c/a/a/a": [
+    4
+   ],
+   "/Q/c/a/a/a/c": [
+    5
+   ],
+   "/Q/c/a/c": [
+    5,
+    9
+   ]
+  }
+ }
+}

@@ -2,7 +2,7 @@
 // code. Prints the level-1 weight each API's hardware sampler used at LODs 0.125 to 0.875; exact trilinear filtering
 // gives weight = LOD fraction. Not a gate: the known-bugs entry "AMD Direct3D 11 steepens the trilinear blend" quotes
 // its output. From the repository root, AMD iGPU of the workstation:
-//   MARGO_GPU=amd GPU_POWER=low-power node scripts/gpu-lock.mjs run --owner=<you> --gpu=render-correctness -- node scripts/reference-rendering/mip-blend-control.mjs
+//   MARGO_GPU=amd GPU_POWER=low-power node scripts/run-with-timeout.mjs -- node scripts/reference-rendering/mip-blend-control.mjs
 import { openBrowser } from '../browser.js';
 import { runSuite } from '../support/shutdown.mjs';
 

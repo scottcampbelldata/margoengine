@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-// The caller holds one shared GPU slot, across native WebGPU and the WebGL2 compatibility layer.
+// It runs across native WebGPU and the WebGL2 compatibility layer.
 for (const backend of ['native', 'compat']) {
   const browser = await openBrowser({
     startPath: `/packages/stage/test/gpu/gltf.html${backend === 'compat' ? '?compat' : ''}`,

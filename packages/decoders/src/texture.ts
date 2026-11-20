@@ -41,6 +41,10 @@ export function createKTX2Texture(
   options: KTX2TextureOptions = {},
 ): GPUTexture {
   const block = transcodeFormats[result.target]?.block ?? 1;
+  if (Math.max(result.width, result.height) > device.limits.maxTextureDimension2D)
+    throw new RangeError(
+      `Texture ${result.width}x${result.height} exceeds the device's maxTextureDimension2D; request a higher limit or use a smaller file`,
+    );
   const texture = device.createTexture({
     label: options.label,
     size: [result.width, result.height, 1],

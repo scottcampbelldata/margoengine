@@ -108,6 +108,10 @@ default even when another clip is named Idle. State names and motions match the
 ordered source identities, speed1, offset0, no mirror/feet IK, write defaults
 enabled and no parameter bindings, transitions, nested machines or behaviours.
 Unlisted controller subassets or effective motion overrides are rejected.
+Each saved texture, material, mesh and clip asset's main object is named after its
+file (`Mesh_0_0`, `Animation_0`), as Unity expects for a single-object native asset,
+so a reimport keeps the name and the saved hashes. The glTF clip name lives on the
+state, so `Animator.Play("Walk-loop")` plays the source clip `Walk-loop`.
 Existing unsupported edits are rejected before resource writes, then checked
 again after asynchronous import and after serialization. They are never reset.
 An existing stored or post-save prefab root must have activeSelf=true. A disabled

@@ -34,7 +34,7 @@ export interface DynamicGIOptions {
  * Bounce light that follows the scene each frame: `LightProbes` with an irradiance volume over `min`..`max` in live mode
  * ({@link LightProbes.setLiveVolume}). Opening a door or moving the sun changes the light in the room within one sweep
  * ({@link sweepFrames} frames); further bounces settle over the next sweeps. Lights core meshes after `engine.use(gi)`
- * and gltf-pro, materials and terrain models after `gi.add(model)`; no bake needed. Everything else is `LightProbes`.
+ * and gltf/pbr, materials and terrain models after `gi.add(model)`; no bake needed. Everything else is `LightProbes`.
  */
 export class DynamicGI extends LightProbes {
   /** Same as `engine.use(new DynamicGI(options))`; returns the DynamicGI. */

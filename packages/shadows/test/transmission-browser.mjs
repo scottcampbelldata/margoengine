@@ -6,10 +6,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-transmission' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/transmission.html', port: 5277 }),
   { page } = context,
   pageErrors = [];
@@ -44,5 +42,4 @@ try {
   console.log('transmission: ok');
 } finally {
   await context.close?.();
-  await release();
 }

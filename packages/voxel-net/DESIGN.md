@@ -38,7 +38,7 @@ The bench will measure that directly.
 - `./server` (Node only): `VoxelServer`, the WebSocket server and the generator worker.
 - `./bot` (Node only): `VoxelBot`, a headless client for load tests.
 
-Depends on `@margoengine/voxel` and `@margoengine/net`; no other runtime dependency.
+Depends on `@margoengine/voxel` and `@margoengine/netcode/interpolation`; no other runtime dependency.
 
 ## Server
 
@@ -68,7 +68,11 @@ Depends on `@margoengine/voxel` and `@margoengine/net`; no other runtime depende
   `maxPerAddress`) before the 101 answer, so a flood of sockets costs no player objects or timers (README,
   "Connections, login and saved edits").
 - Binary messages only. Client frames must be masked; fragmentation, ping/pong and close are handled; text frames close
-  with 1003, protocol errors with 1002, messages over the limit (default 4 KiB from clients) with 1009.
+  with 1003, protocol errors with 1002, messages over the limit (default 4 KiB from clients) with 1009. A received
+  close code a peer may not send (RFC 6455 7.4: 1005, 1006, 1015, unregistered codes below 3000, 5000 and up) closes
+  with 1002 and a close reason that is not UTF-8 with 1007 (section 8.1); a sent reason is cut to 123 bytes on a whole
+  character so the close frame fits a 125-byte control frame (section 5.5). A request for another version than 13 gets
+  426 with `Sec-WebSocket-Version: 13` (section 4.4).
 - Backpressure: chunk sends stop while a socket holds more than 256 KiB unsent; a client more than 8 MiB behind is
   dropped as too slow.
 - A player's inputs wait while the chunks within one chunk of it are not made, and those chunks go to the front of the
@@ -182,7 +186,7 @@ Clients never ask for chunks; the server decides. A client cannot make the serve
 - Each tick the server takes one snapshot of every player (position, look direction as a quaternion), shared by all
   clients. Each client gets the players within its **player distance** through `EntityCodec.encode(nearby, lastSent)`;
   players who leave the distance are removed by the codec's removal record.
-- The client pushes each player's positions into a `SnapshotBuffer` (packages/net/src/index.ts) keyed by server time
+- The client pushes each player's positions into a `SnapshotBuffer` (packages/netcode/src/interpolation.ts) keyed by server time
   (tick / 20 s), with velocity taken from successive positions, and draws them 100 ms behind the newest snapshot.
 
 ## Chat and inventory (`./chat`, 2026-11-09)

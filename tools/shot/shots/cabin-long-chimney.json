@@ -1,0 +1,78 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 20,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            5,
+            3.5,
+            8
+          ],
+          "target": [
+            0.95,
+            4.4,
+            -1.45
+          ],
+          "fov": 34
+        },
+        {
+          "time": 20,
+          "position": [
+            4,
+            4.6,
+            6
+          ],
+          "target": [
+            0.95,
+            4.6,
+            -1.45
+          ],
+          "fov": 34,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "cabin-long-chimney",
+    "kind": "long",
+    "seed": 31,
+    "seconds": 20,
+    "tier": "high",
+    "kit": "snowNight",
+    "msaa": 1,
+    "supersample": 1.5,
+    "warmup": 90,
+    "probes": {
+      "open": 0,
+      "mid": 10,
+      "end": 19.9
+    },
+    "lookBounds": {
+      "skyClip": 0.5,
+      "speckle": 400,
+      "banding": 1,
+      "flat": 20,
+      "crush": 3
+    },
+    "page": {
+      "path": "examples/cabin-hearth/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#hint,nav,#status,#error{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "cabinHearth.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

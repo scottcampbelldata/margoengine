@@ -314,7 +314,7 @@
    "path": "tests/fixtures/fuzz/usdc-count-128mib.usdc",
    "parse": {
     "name": "LoaderError",
-    "message": "USD: token index outside table"
+    "message": "USD: token index outside table; see https://margoengine.com/errors#loader-syntax"
    },
    "streams": [
     {
@@ -626,7 +626,7 @@
    "path": "tests/fixtures/fuzz/usdc-count-109mib.usdc",
    "parse": {
     "name": "LoaderError",
-    "message": "USD: Crate read outside layer"
+    "message": "USD: Crate read outside layer; see https://margoengine.com/errors#loader-syntax"
    },
    "streams": [
     {
@@ -1046,7 +1046,7 @@
    "input": "01000000",
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated integer codes"
+    "message": "USD: truncated integer codes; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -1056,7 +1056,7 @@
    "input": "01000000",
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated integer codes"
+    "message": "USD: truncated integer codes; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {
@@ -1066,7 +1066,7 @@
    "input": "0100000039020300040000",
    "result": {
     "name": "LoaderError",
-    "message": "USD: truncated integer values"
+    "message": "USD: truncated integer values; see https://margoengine.com/errors#loader-syntax"
    }
   },
   {

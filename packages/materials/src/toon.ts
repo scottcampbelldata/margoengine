@@ -1,8 +1,8 @@
-// Toon shading for loaded glTF-pro models: each chosen primitive draws a copy of its material record whose shading hook
-// (gltf-pro PBRMaterial.shading) rewrites the lighting as toon-shader.ts does for ToonMaterial. The copy shares the
+// Toon shading for loaded glTF PBR models: each chosen primitive draws a copy of its material record whose shading hook
+// (gltf/pbrMaterial.shading) rewrites the lighting as toon-shader.ts does for ToonMaterial. The copy shares the
 // glTF material's colours, factors and maps (live edits show), so skinned, morphed and instanced primitives keep their
 // deformation and textures; dispose() puts the original records back.
-import type { PBRMaterial, PBRMaterialShading, PBRModel, PBRPrimitive } from '@margoengine/gltf-pro';
+import type { PBRMaterial, PBRMaterialShading, PBRModel, PBRPrimitive } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { Texture } from './built-material.js';
 import { toonLit, toonShader } from './toon-shader.js';
@@ -20,7 +20,7 @@ export interface ToonModelOptions {
 }
 const whites = new WeakMap<GPUDevice, [GPUTextureView, GPUSampler]>();
 /**
- * A loaded glTF-pro model (or some of its primitives) drawn with toon shading, made by `toonModel`. `steps` and
+ * A loaded glTF PBR model (or some of its primitives) drawn with toon shading, made by `toonModel`. `steps` and
  * `gradientMap` are live; `dispose()` restores the model's own materials.
  */
 export class ToonModel {
@@ -37,7 +37,7 @@ export class ToonModel {
     options: ToonModelOptions = {},
   ) {
     if (!model || model.disposed || !Array.isArray(model.primitives))
-      throw new TypeError('toonModel needs a live glTF-pro model; pass the PBRModel loadGLTF or parseGLTF returned');
+      throw new TypeError('toonModel needs a live glTF PBR model; pass the PBRModel loadGLTF or parseGLTF returned');
     if (model.primitives.some((p) => Object.hasOwn(p.material, 'extendedFrame')))
       throw new TypeError('toonModel is for loaded glTF models; give a createMesh mesh a ToonMaterial instead');
     const { steps, gradientMap, primitives } = options ?? {};
@@ -149,12 +149,12 @@ function white(device: GPUDevice): [GPUTextureView, GPUSampler] {
   return w;
 }
 /**
- * Draws a loaded glTF-pro model (or the `primitives` named) with toon shading, as `ToonMaterial` draws a constructed
+ * Draws a loaded glTF PBR model (or the `primitives` named) with toon shading, as `ToonMaterial` draws a constructed
  * mesh: Lambert diffuse read through `gradientMap` or `steps` bands, for the sun, clustered lights and shadows, with
  * the model's own colours and maps. Skinned, morphed and instanced primitives keep their deformation. Physical layers
  * (clearcoat, sheen, transmission, iridescence) and material extensions are left out of the toon primitives.
  * `selectVariant` replaces the toon materials; call `toonModel` again after it.
- * @throws TypeError for a disposed or non-glTF-pro model; RangeError for a primitive not in the model or bad `steps`.
+ * @throws TypeError for a disposed or non-glTF PBR model; RangeError for a primitive not in the model or bad `steps`.
  */
 export function toonModel(model: PBRModel, options?: ToonModelOptions): ToonModel {
   return new ToonModel(model, options);

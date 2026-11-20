@@ -9,10 +9,20 @@ const rms = (data) =>
   Math.sqrt(data.subarray(2400).reduce((sum, value) => sum + value * value, 0) / (data.length - 2400));
 
 export async function runOcclusionTests() {
-  const reports = [];
+  const reports = [],
+    notRun = [];
   for (const backend of ['webgpu', 'webgl2', 'webgl2-compat']) {
     const compat = backend === 'webgl2-compat' ? await import('@margoengine/webgl2-compat') : null;
-    if (compat) await compat.install({ force: true });
+    if (compat)
+      try {
+        await compat.install({ force: true });
+      } catch (error) {
+        // The layer refuses a context below its full tier with code 'unsupported'; the runner names it, and fails on a
+        // browser that should run everything.
+        if (error?.code !== 'unsupported') throw error;
+        notRun.push(`runOcclusionTests on webgl2-compat: ${error.message}`);
+        continue;
+      }
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 64;
     document.body.append(canvas);
@@ -75,5 +85,5 @@ export async function runOcclusionTests() {
       compat?.uninstall();
     }
   }
-  return { fixture: 'Generated sine waves and engine box geometry, stand-ins', reports };
+  return { fixture: 'Generated sine waves and engine box geometry, stand-ins', reports, notRun };
 }

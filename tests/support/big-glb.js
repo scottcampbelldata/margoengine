@@ -1,5 +1,5 @@
 // A generated GLB for parse tests and benchmarks: `meshes` grids of segments x segments quads under one parent node,
-// float positions/normals/uvs with uint32 indices, and every other grid without normals (gltf-pro generates them).
+// float positions/normals/uvs with uint32 indices, and every other grid without normals (gltf/pbr generates them).
 // `instances` > 0 draws each grid that many times through EXT_mesh_gpu_instancing (TRANSLATION + SCALE).
 // `lattice` > 0 makes an assembly: each grid is centred on its own node, nodes on a lattice x lattice x n grid 4.5 apart.
 export function bigGLB({ segments = 256, meshes = 2, instances = 0, lattice = 0 } = {}) {

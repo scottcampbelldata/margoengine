@@ -47,7 +47,8 @@ test('offset enters destination at normalized time and emits events from that po
   assert.equal(f.graph.animator.entryTime, 1.5);
   assert.equal(f.graph.animator.time, 1.6);
   assert.deepEqual(heard, ['start', 'later']);
-  assert.ok(Math.abs(f.translation(0)[0] - 1.16) < 1e-6);
+  // A runs on to 0.1 through the fade: 0.9 * 0.1 + 0.1 * 11.6.
+  assert.ok(Math.abs(f.translation(0)[0] - 1.25) < 1e-6);
   f.graph.trigger('next');
   f.step(0.1);
   assert.equal(f.graph.state, 'b', 'large offset does not finish the one-second fade');
@@ -153,4 +154,41 @@ test('chained interruptions keep the selected source and validate saved source c
   f.graph.trigger('follow');
   f.step(0);
   assert.equal(f.graph.state, 'd', 'A supplies both interruptions although B was the first destination');
+});
+
+test('the state a crossfade leaves keeps playing; an interrupted fade holds the pose it cut in on', async (t) => {
+  // The crossfade mixed a snapshot of the old pose, frozen, into the new state: a walk stopped mid-stride for the
+  // whole fade. A crossfade keeps the old state running until its weight reaches 0.
+  const data = animatorDocument(
+    { Root: [null, 0, 0, 0] },
+    {
+      A: { duration: 2, fps: 4, tracks: { 'Root.translation': (s) => [s, 0, 0] } },
+      B: { duration: 2, fps: 4, tracks: { 'Root.translation': () => [0, 0, 0] } },
+      C: { duration: 2, fps: 4, tracks: { 'Root.translation': () => [5, 0, 0] } },
+    },
+  );
+  const f = await animatorRun(data, { initial: 'a', states: { a: 'A', b: 'B', c: 'C' } });
+  t.after(() => f.release());
+  f.step(0.5);
+  f.animator.transition('b', 1);
+  f.step(0.5);
+  // Half way: A has run on to 1, B is 0.
+  assert.ok(Math.abs(f.translation(0)[0] - 0.5) < 1e-6, `at ${f.translation(0)[0]}`);
+  const held = f.translation(0)[0];
+  f.animator.transition('c', 1);
+  f.step(0.25);
+  assert.ok(Math.abs(f.translation(0)[0] - (0.75 * held + 0.25 * 5)) < 1e-6, `at ${f.translation(0)[0]}`);
+  // The live fade survives a snapshot.
+  const g = await animatorRun(data, { initial: 'a', states: { a: 'A', b: 'B', c: 'C' } });
+  t.after(() => g.release());
+  g.step(0.5);
+  g.animator.transition('b', 1);
+  g.step(0.25);
+  const saved = JSON.parse(JSON.stringify(g.animator.captureState()));
+  assert.equal(saved.fade.live, true);
+  g.step(0.5);
+  const expected = g.translation(0)[0];
+  g.animator.restoreState(saved);
+  g.step(0.5);
+  assert.equal(g.translation(0)[0], expected);
 });

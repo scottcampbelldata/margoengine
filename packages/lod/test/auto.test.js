@@ -1,10 +1,10 @@
-// autoLOD, hierarchicalLOD, LOD.fromModel and gltf-pro's MSFT_lod reading. Draw counts on a real GPU: auto-check.mjs.
+// autoLOD, hierarchicalLOD, LOD.fromModel and gltf/pbr's MSFT_lod reading. Draw counts on a real GPU: auto-check.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { box } from '../../core/dist/extension.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { ImposterFrames, LOD, LODSystem, normalMatrix } from '@margoengine/lod';
@@ -335,7 +335,7 @@ test('simplifyAttributes keeps vertices apart that deform apart, as a closed mou
 });
 
 /** Fox.glb, a real skinned file, as a model of `engine`. */
-const realFox = (engine, edit = () => {}) => {
+const realFox = (engine, edit = () => {}, partVertices) => {
   const chunks = glbChunks(new Uint8Array(readFileSync(new URL('../../../examples/assets/khronos/Fox/Fox.glb', import.meta.url)))),
     doc = JSON.parse(new TextDecoder().decode(chunks.find((c) => c.type === GLB_JSON).data)),
     bin = chunks.find((c) => c.type === GLB_BIN).data;
@@ -343,7 +343,9 @@ const realFox = (engine, edit = () => {}) => {
   doc.textures = undefined;
   for (const material of doc.materials ?? []) material.pbrMetallicRoughness = {};
   const images = edit(doc) ?? [],
-    model = new PBRModel(engine, new GLTFAsset(doc, [bin]), images);
+    asset = new GLTFAsset(doc, [bin]);
+  if (partVertices) asset.partVertices = partVertices;
+  const model = new PBRModel(engine, asset, images);
   engine.use(model);
   return model;
 };
@@ -459,6 +461,41 @@ test('a real Fox: each level holds the skin of the vertices it kept, and follows
     }
     model.dispose();
     assert.equal(lod.levels[1].object.disposed, true, 'levels go with the model');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a real Fox split into parts: each level vertex holds the skin of the file vertex it kept', async () => {
+  // Fox's 1,728 vertices in parts of at most 1,024. A level of a split primitive is simplified from the parts merged
+  // whole again, whose vertices are numbered apart from the file's; the level's JOINTS_0 and WEIGHTS_0 come from the
+  // file's vertex each one is. Before the fix they were read at the merged number, another vertex's skin.
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      model = realFox(engine, undefined, 1024);
+    assert.ok(model.primitives.length >= 2 && model.primitives.every((p) => p.part), `${model.primitives.length} parts`);
+    const attributes = model.primitives[0].definition.attributes,
+      joints = model.asset.accessor(attributes.JOINTS_0, 'VEC4'),
+      weights = model.asset.accessor(attributes.WEIGHTS_0, 'VEC4'),
+      key = (v, o) => [...v.subarray(o, o + 4), ...v.subarray(o + 12, o + 20)].join(),
+      records = new Map();
+    for (const p of model.primitives)
+      for (let o = 0; o < p.vertices.length; o += 20) records.set(key(p.vertices, o), p.part.vertexMap[o / 20]);
+    const lod = await autoLOD(system, model, { ratios: [0.5], screens: [0.5] }),
+      level = lod.levels[1].object,
+      [primitive] = level.primitives,
+      kept = primitive.definition.attributes,
+      ids = level.asset.accessor(kept.JOINTS_0, 'VEC4'),
+      amounts = level.asset.accessor(kept.WEIGHTS_0, 'VEC4');
+    assert.equal(ids.length, (primitive.vertices.length / 20) * 4);
+    for (let i = 0; i < ids.length / 4; i++) {
+      const from = records.get(key(primitive.vertices, i * 20));
+      assert.notEqual(from, undefined, 'a vertex of the source');
+      assert.deepEqual([...ids.subarray(i * 4, i * 4 + 4)], [...joints.subarray(from * 4, from * 4 + 4)], `vertex ${i}`);
+      assert.deepEqual([...amounts.subarray(i * 4, i * 4 + 4)], [...weights.subarray(from * 4, from * 4 + 4)]);
+    }
+    model.dispose();
   } finally {
     engine.dispose();
   }
@@ -896,4 +933,80 @@ test('normalMatrix turns normals with the object, mirrored ones outward', () => 
   const mirror = normalMatrix(new Float32Array([-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
   assert.equal(mirror.mirrored, true);
   assert.deepEqual(apply(mirror, [1, 0, 0]).map(Math.round), [-1, 0, 0], 'the outward side stays outward');
+});
+
+// KB-OWN-ASYNC1: a level is made after awaits, when the default scene is active again. It belongs in the scene its source is
+// in, whichever scene the call comes from.
+const inScene = (scene, make) => {
+  let made;
+  scene.use({
+    name: 'scene-of-source',
+    setup() {
+      made = make();
+    },
+  });
+  scene.removePlugin('scene-of-source');
+  return made;
+};
+
+test('autoLOD of a model in a second scene builds its levels there, called from the default scene', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      other = engine.createScene('other'),
+      model = inScene(other, () => loadedModel(engine)),
+      before = [...engine.scene.plugins.keys()],
+      lod = await autoLOD(system, model, { ratios: [0.5, 0.25], screens: [0.5, 0.25] });
+    assert.equal(lod.levels.length, 3);
+    for (const { object } of lod.levels.slice(1)) {
+      assert.ok(object.root.scene === other, `a level root is in scene ${object.root.scene.name}`);
+      assert.ok(engine.sceneOf(object) === other, 'a level model plugin is not in the second scene');
+    }
+    assert.deepEqual([...engine.scene.plugins.keys()], before, 'a plugin landed in the default scene');
+    assert.equal(engine.scene.meshes.size, 0, 'a mesh landed in the default scene');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('an aborted autoLOD of a model in a second scene leaves no level in either scene', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      other = engine.createScene('other'),
+      model = inScene(other, () => loadedModel(engine)),
+      kept = other.meshes.size,
+      controller = new AbortController(),
+      started = autoLOD(system, model, { ratios: [0.5], screens: [0.5], signal: controller.signal });
+    controller.abort(new Error('stop'));
+    await assert.rejects(started, /stop/);
+    assert.equal(other.meshes.size, kept, 'a level mesh stayed in the second scene');
+    assert.equal(engine.scene.meshes.size, 0, 'a mesh landed in the default scene');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('hierarchicalLOD of meshes in a second scene makes its far meshes and follower there, called from the default scene', async () => {
+  const engine = await headless();
+  try {
+    const system = LODSystem.attach(engine),
+      other = engine.createScene('other'),
+      a = other.createMesh().setGeometry(box(1, 1, 1)),
+      b = other.createMesh().setGeometry(box(1, 1, 1)).setPosition([100, 0, 0]);
+    engine.store.tick(false);
+    const before = engine.scene.meshes.size,
+      built = await hierarchicalLOD(system, [a, b], { cell: 50, follow: true });
+    assert.ok(built.meshes.length > 0);
+    for (const mesh of built.meshes) assert.ok(mesh.scene === other, `a far mesh is in scene ${mesh.scene.name}`);
+    assert.ok(
+      [...other.plugins.keys()].some((name) => name.startsWith('lod-follow')),
+      'the follower is not in the second scene',
+    );
+    assert.ok(![...engine.scene.plugins.keys()].some((name) => name.startsWith('lod-follow')), 'the follower landed in the default scene');
+    assert.equal(engine.scene.meshes.size, before, 'a mesh landed in the default scene');
+    built.remove();
+  } finally {
+    engine.dispose();
+  }
 });

@@ -217,7 +217,11 @@ test('a [0, 0, 0] scale collapses a node: glTF keeps it, mesh-only formats leave
     1,
     'flatten leaves collapsed meshes out',
   );
-  assert.throws(() => exportGLB({ nodes: [{ geometry: quad, scale: [1, 0, 1] }] }), /Scale must be nonzero/);
+  // Any other zero scale is kept as glTF allows it (tests/zero-scale.test.js).
+  assert.deepEqual(
+    readGLB(exportGLB({ nodes: [{ geometry: quad, scale: [1, 0, 1] }] })).json.nodes[0].scale,
+    [1, 0, 1],
+  );
 });
 
 test('skins name their skeleton root and keep extras; animations keep extras', async () => {

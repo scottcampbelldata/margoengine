@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><title>Imported weather correctness</title></head><body><canvas style="width:256px;height:192px"></canvas>
 <script type="module">
 import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/model-entry.js';
+import {parseGLTF} from '/packages/gltf/dist/model-entry.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {GLTFWeather} from '/packages/weather/dist/gltf.js';
 import {PrecipitationCover} from '/packages/weather/dist/cover.js';
@@ -40,6 +40,16 @@ const roofPacked=d.createBuffer({size:144,usage:32|8});d.queue.writeBuffer(roofP
 // 0.21875 m from x=-14): the probe at x=8.05 lies under it in a texel the canopy does not reach.
 const canopy=d.createBuffer({size:144,usage:32|8});d.queue.writeBuffer(canopy,0,new Float32Array([8,3,8,0,1,0,10,3,8,0,1,0,10,3,10,0,1,0,8,3,8,0,1,0,10,3,10,0,1,0,8,3,10,0,1,0]));
 roof.shadowPrimitives.push({...roof.shadowPrimitives[0],vertex:canopy});
+// A 30 degree roof slope, x -12 to -9, rising from y 1 at z 12 to y 3.31 at z 16, out of view. Its own top surface is
+// a receiver too (a roof gathers snow): the four texels around a point on it hold the slope up to a texel uphill, up
+// to 0.18 m above the point, and without a slope-scaled bias the roof sheltered itself in stripes a texel apart.
+const t30=Math.tan(Math.PI/6),slope=d.createBuffer({size:144,usage:32|8});d.queue.writeBuffer(slope,0,new Float32Array([-12,1,12,0,0.866,-0.5,-9,1,12,0,0.866,-0.5,-9,1+4*t30,16,0,0.866,-0.5,-12,1,12,0,0.866,-0.5,-9,1+4*t30,16,0,0.866,-0.5,-12,1+4*t30,16,0,0.866,-0.5]));
+roof.shadowPrimitives.push({...roof.shadowPrimitives[0],vertex:slope});
+// Probes as x, y, z and the normal's y: the seven flat ones, 24 points on the slope's own surface, and one sloped
+// receiver under the flat roof, which the slope bias must leave sheltered.
+const probes=[[-3,0,0,1],[3,0,0,1],[-3,4,0,1],[30,0,0,1],[-5.5,0,-5.5,1],[-1,0,-2.5,1],[8.05,0,9,1]];
+for(let k=0;k<24;k++){const z=12.5+k*0.13;probes.push([-10.5+(k%3)*0.07,1+(z-12)*t30,z,0.866]);}
+probes.push([-3,1,0,0.866]);
 const fx=new WeatherFX({weather:rain,occluders:[roof],resolution:128,splashes:0,lensDrops:0});
 const cover=PrecipitationCover.attach(engine,fx);
 let coverInfo=null;const patch=cover.shader.bind(cover);cover.shader=(source,group)=>{const out=patch(source,group);if(group===2)coverInfo={changed:out!==source,water:out.includes('weather_cover_water(i.position,'),snow:out.includes('weather_cover_snow(i.position,'),bindings:cover.bindings().length};return out;};
@@ -48,9 +58,10 @@ const wet=GLTFWeather.attach(engine,{cover,puddles:{wetness:0},snow:{cover:0,dep
 import {Puddles} from '/packages/weather/dist/puddles.js';import {Snow} from '/packages/weather/dist/snow.js';
 const coreWet=Puddles.attach(engine,{wetness:0});const coreSnow=Snow.attach(engine,{cover:0,depth:0});
 async function exposure(){
- const src='fn weather_snow_at(xz:vec2f,ny:f32,c:f32)->f32{return c;} @group(0) @binding(0) var<storage,read_write> result:array<f32>; @compute @workgroup_size(1) fn main(){let positions=array<vec3f,7>(vec3f(-3,0,0),vec3f(3,0,0),vec3f(-3,4,0),vec3f(30,0,0),vec3f(-5.5,0,-5.5),vec3f(-1,0,-2.5),vec3f(8.05,0,9));for(var k=0u;k<7u;k++){let i=positions[k];result[k]=select(0.0,1.0,weather_exposed(i));}} // weather_snow_at(i.position.xz,';
+ const n=probes.length,list=probes.map(q=>`vec4f(${q.map(v=>v.toFixed(5)).join(',')})`).join(',');
+ const src=`fn weather_snow_at(xz:vec2f,ny:f32,c:f32)->f32{return c;} @group(0) @binding(0) var<storage,read_write> result:array<f32>; @compute @workgroup_size(1) fn main(){let positions=array<vec4f,${n}>(${list});for(var k=0u;k<${n}u;k++){let i=positions[k];result[k]=select(0.0,1.0,weather_exposed(i.xyz,i.w));}} // weather_snow_at(i.position.xz,`;
  const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code:cover.shader(src,0)}),entryPoint:'main'}});
- const out=d.createBuffer({size:28,usage:128|4}),st=d.createBuffer({size:28,usage:8|1}),e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:out}},...cover.bindings()]}));pass.dispatchWorkgroups(1);pass.end();e.copyBufferToBuffer(out,0,st,0,28);d.queue.submit([e.finish()]);await st.mapAsync(1);const a=[...new Float32Array(st.getMappedRange())];st.unmap();st.destroy();out.destroy();return a;
+ const out=d.createBuffer({size:4*n,usage:128|4}),st=d.createBuffer({size:4*n,usage:8|1}),e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:out}},...cover.bindings()]}));pass.dispatchWorkgroups(1);pass.end();e.copyBufferToBuffer(out,0,st,0,4*n);d.queue.submit([e.finish()]);await st.mapAsync(1);const a=[...new Float32Array(st.getMappedRange())];st.unmap();st.destroy();out.destroy();return a;
 }
 window.run=async()=>{
  d.pushErrorScope('validation');const dry=await shot(),exposed=await exposure();

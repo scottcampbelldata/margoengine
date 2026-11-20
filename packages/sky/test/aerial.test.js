@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AerialPerspective, EARTH_ATMOSPHERE, atmosphereParameters } from '@margoengine/sky/aerial';
 import { Sky } from '@margoengine/sky';
+import { HillaireSky } from '@margoengine/sky/hillaire';
 import { tracedGPU } from '../../../tests/support/gpu-trace.js';
 
 const depthOf = (h, samples = 4) =>
@@ -98,4 +99,34 @@ test('aerial perspective builds its tables once, its volume every frame, and dra
   assert.equal(writes.at(-1)[34], 20, 'the Bruneton model is built at 20');
   aerial.dispose();
   sky.dispose();
+});
+
+test('a wide planet keeps the eye above its ground in Float32, for the sky and the air', () => {
+  // At 60,000 km a Float32 step is about 4 m: a metre of clearance rounded away, the eye sat on the ground sphere,
+  // sphereHit took the far root from it and every upward ray met the ground at 0, so the sky and the air were black.
+  for (const bottomRadius of [6360, 60000, 99999]) {
+    const h = tracedGPU();
+    const atmosphere = { bottomRadius, topRadius: bottomRadius + 100 },
+      sky = new HillaireSky({ hours: 12, timeScale: 0, atmosphere }),
+      aerial = new AerialPerspective({ sky, depth: () => depthOf(h) }),
+      writes = [],
+      queue = h.engine.gpu.queue,
+      write = queue.writeBuffer.bind(queue);
+    queue.writeBuffer = (buffer, offset, data) => {
+      if (data.length === 56) writes.push(Float32Array.from(data));
+      return write(buffer, offset, data);
+    };
+    h.engine.camera.position[1] = 0;
+    h.engine.use(sky);
+    h.engine.use(aerial);
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+    assert.equal(writes.length, 2, 'the sky and the air each upload their uniform');
+    for (const v of writes) {
+      assert.equal(v[32], Math.fround(bottomRadius));
+      assert.ok(v[45] > v[32], `eye ${v[45]} above the ground ${v[32]} at ${bottomRadius} km`);
+    }
+    sky.dispose();
+    aerial.dispose();
+  }
 });

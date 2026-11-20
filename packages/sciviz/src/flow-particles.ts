@@ -31,7 +31,7 @@ export interface FlowParticlesOptions {
   readonly lifetime?: number;
   /** Re-release dead particles at their seeds at the next step endpoint. Default true. */
   readonly respawn?: boolean;
-  /** Trail width in device pixels, >0 and <=64. Default 2. */
+  /** Trail width in CSS pixels, >0 and <=64. Default 2. */
   readonly width?: number;
   /** Linear opacity, 0..1. Default 0.8. Older trail samples fade quadratically. */
   readonly opacity?: number;

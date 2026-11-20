@@ -369,6 +369,71 @@ for (const obstacle of [exact, baked]) {
 
 `MeshVolume` is exact and pays for it per query. `SDFVolume` costs the same whatever the mesh, and is only as fine as its grid: a wall thinner than a cell may not be there at all, which is why the margin matters, and a coarse field reads obstacles fatter than they are. A grid field must hold the whole obstacle: past the grid's edge a reading is the distance to the grid. Segment and hull queries on both answer no more than the true gap, so the swept checks keep their promise. A segment that crosses a mesh reads minus its radius, and an overlapping hull reads zero or less: the value ranks poses, it is not a depth. This entry needs `@margoengine/bvh`, an optional peer of this package, and only this entry does.
 
+## Longer chains (`margoengine/kinematics-constraints/chain`)
+
+`ChainAvoidanceSolver` reaches a target with a chain of any length (2 to 257 joints) by CCD or FABRIK, then turns the chain about the root to target line until every link capsule clears the colliders. The first candidate keeps the pose the solver reached; each later one turns it a further `2 * PI / candidates`, so the swivel angles tried are evenly spaced round the circle. Lengths, the root and the reached end are held. A failed solve returns the input pose with `resolved: false`.
+
+```ts
+import { SphereVolume } from 'margoengine/kinematics-constraints';
+import { ChainAvoidanceSolver } from 'margoengine/kinematics-constraints/chain';
+
+const obstacle = new SphereVolume({ center: [1, 1, 0], radius: 0.25 });
+const chain = new ChainAvoidanceSolver([obstacle], { algorithm: 'fabrik', radius: 0.05, minClearance: 0.03 });
+const joints = [[0, 0, 0], [1, 1, 0], [2, 0, 0], [3, 1, 0], [4, 0, 0]] as const;
+const result = chain.solve(joints, [4, 0, 0]);
+if (result.resolved) console.log(result.joints, 'clear by', result.clearance);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `algorithm` | `'fabrik'` | `'ccd'` or `'fabrik'`. |
+| `radius` | `0` | Capsule radius, one number or one per link. |
+| `minClearance` | `0` | Gap every link must keep beyond its radius. |
+| `tolerance` | `1e-5` | Target and link length tolerance. |
+| `iterations` | `64` | Sweeps per candidate, 1..1024. |
+| `candidates` | `32` | Bend seeds and swivel angles tried, 1..256. |
+| `acceptPose` | none | Called with a copy of each clear pose; return false to reject it. |
+
+`createLimbAvoidance(solver)` adapts a solver to a three-joint full-body limb: it returns the accepted knee or elbow, or null.
+
+## Joint limits (`margoengine/kinematics-constraints/joint-limits`)
+
+`JointLimitSet` checks local, rest-relative joint rotations against Euler XYZ boxes, hinges or swing cones with an optional twist range, and `jointLimitPredicate` turns it into `SolveOptions.acceptPose`, so the swivel search walks past clear but illegal elbows.
+
+```ts
+import { JointLimitSet, jointLimitPredicate } from 'margoengine/kinematics-constraints/joint-limits';
+
+// Shoulder: a 90-degree swing cone about +Y with twist within 45 degrees. Elbow: a hinge on +X from 0 to 150 degrees.
+const limits = new JointLimitSet([
+  { type: 'cone', axis: [0, 1, 0], angle: Math.PI / 2, twist: [-Math.PI / 4, Math.PI / 4] },
+  { type: 'hinge', axis: [1, 0, 0], min: 0, max: (150 * Math.PI) / 180 },
+]);
+const halfElbow = Math.sin(Math.PI / 6);
+console.log(limits.accepts([[0, 0, 0, 1], [halfElbow, 0, 0, Math.cos(Math.PI / 6)]])); // true: a 60-degree bend
+const acceptPose = jointLimitPredicate(limits, () => [[0, 0, 0, 1], [0, 0, 0, 1]]);
+```
+
+Quaternions are `[x, y, z, w]`. Bounds are radians within -pi..pi; the tolerance defaults to 1e-7 radians. A null entry leaves that joint free.
+
+## Several goals at once (`margoengine/kinematics-constraints/multi-goal`)
+
+`MultiGoalIKSolver` solves every goal and loop closure together by damped least squares over a forest of fixed, revolute and prismatic joints with hard bounds. Goals take a world position, a rotation or both, each with a weight and per-axis masks.
+
+```ts
+import { MultiGoalIKSolver } from 'margoengine/kinematics-constraints/multi-goal';
+
+// A planar two-link arm on Z hinges, elbow bounded to one side.
+const arm = new MultiGoalIKSolver([
+  { type: 'revolute', axis: [0, 0, 1] },
+  { type: 'revolute', parent: 0, position: [1, 0, 0], axis: [0, 0, 1], min: 0, max: Math.PI },
+  { type: 'fixed', parent: 1, position: [1, 0, 0] },
+]);
+const result = arm.solve({ goals: [{ frame: { joint: 2 }, position: [1, 1, 0] }] });
+console.log(result.resolved, result.values);
+```
+
+Options and defaults: `iterations` 128 per seed, `candidates` 4 seeds, `positionTolerance` and `orientationTolerance` 1e-5, `damping` 0.01, `maxStep` 0.25. A request may carry `values` to start from and an `AbortSignal`. `resolved` is true only when every active goal and loop is within both tolerances.
+
 ## Scope
 
 `Success` describes static analytical proxy clearance at one evaluated instant, within numerical tolerance. It covers neither unsupplied mesh/skinning geometry nor unchecked link portions. Set proxies to enclose the full deformation envelope and any desired padding in your application.

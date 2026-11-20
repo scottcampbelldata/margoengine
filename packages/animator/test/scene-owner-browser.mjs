@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
 const browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 'free' });
@@ -22,7 +22,7 @@ try {
           async ({ doc, buffers, target, factory, mode }) => {
             const { EngineKernel } = await import('/packages/core/dist/index.js');
             const { engineRuntime } = await import('/packages/core/dist/extension.js');
-            const { GLTFAsset, PBRModel } = await import('/packages/gltf-pro/dist/index.js');
+            const { GLTFAsset, PBRModel } = await import('/packages/gltf/dist/pbr.js');
             const { Animation } = await import('/packages/animation/dist/index.js');
             const { Animator } = await import('/packages/animator/dist/index.js');
             const { AnimatorGraph } = await import('/packages/animator/dist/graph.js');

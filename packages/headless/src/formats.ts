@@ -7,6 +7,9 @@ import type { HeadlessPixels, HeadlessReadOptions } from './index.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 function checkPixels({ width, height, data }: HeadlessPixels): void {
+  // Every format here needs a whole number of pixels a side, at least one (ITU T.81 B.2.2 without DNL; WebP lossless 3.2).
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1)
+    throw rangeError('Invalid image size', 'headless');
   if (data?.length !== width * height * 4) throw rangeError('Frame data does not match its size', 'headless');
 }
 

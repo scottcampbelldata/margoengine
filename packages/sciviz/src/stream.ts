@@ -65,7 +65,7 @@ export async function streamLayer<L extends LineLayer | ScatterLayer>(
     rollover < (layer.kind === 'line' ? 2 : 1) ||
     rollover > 1000000 ||
     !figure.layers.includes(layer) ||
-    ('append' in layer && !bindings.get(layer)?.disposed)
+    (bindings.has(layer) && !bindings.get(layer)!.disposed)
   )
     throw rangeError(
       'Choose an unbound native line/scatter in this figure and a rollover of 2..1000000 for lines or 1..1000000 for scatter',
@@ -96,8 +96,6 @@ export async function streamLayer<L extends LineLayer | ScatterLayer>(
       else await figure.updateData(layer, data, { signal });
     },
     binding = { disposed: false };
-  await update(state);
-  bindings.set(layer, binding);
   let disposed = false,
     pending: Promise<void> = Promise.resolve();
   const check = () => {
@@ -122,7 +120,8 @@ export async function streamLayer<L extends LineLayer | ScatterLayer>(
     return commit(() => {
       const count = data.x.length;
       if (!count) return state;
-      for (const key of ['color', 'size'] as const)
+      // A 3D trace carries z from its positions; leaving it out would place new samples at z = 0.
+      for (const key of figure.is2d ? (['color', 'size'] as const) : (['z', 'color', 'size'] as const))
         if (Boolean(data[key]) !== Boolean(state[key]))
           throw rangeError(`Supply the same ${key} channel on every append as on the original trace`, 'sciviz');
       const next = {} as Owned,
@@ -166,7 +165,17 @@ export async function streamLayer<L extends LineLayer | ScatterLayer>(
     own.abort(fault('disposed', 'Bind a new stream after disposing live updates', 'sciviz'));
     options.signal?.removeEventListener('abort', dispose);
   };
+  // Claim the layer before the first upload, so a second bind waits for this one to be disposed, and release it
+  // if the caller aborts at any point while it binds.
+  bindings.set(layer, binding);
   options.signal?.addEventListener('abort', dispose, { once: true });
+  try {
+    await update(state);
+    signal.throwIfAborted();
+  } catch (error) {
+    dispose();
+    throw error;
+  }
   Object.defineProperties(layer, {
     streamData: {
       configurable: true,

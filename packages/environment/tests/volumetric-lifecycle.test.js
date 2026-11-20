@@ -101,6 +101,8 @@ test('volumetric wind advances once per engine frame and has the same phase in l
   };
   try {
     h.context.delta = 0.1;
+    // The engine's frame update moves the wind (advanceTime) before any view draws.
+    h.fog.onPreUpdate(0.1);
     h.frame('a');
     h.context.delta = 0;
     h.frame('b');

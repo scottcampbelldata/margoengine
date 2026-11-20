@@ -388,8 +388,9 @@ export function parseKVX(bytes: Uint8Array | ArrayBuffer, limits: GridLimits = {
   const size: Vec3 = [sx, sz, sy],
     voxels = new Uint8Array(sizeCells(size, cellLimit(limits), 'KVX size')),
     offsets = 28,
-    columns = offsets + (sx + 1) * 4;
-  if (columns + sx * (sy + 1) * 2 > 4 + length) short('KVX file');
+    columns = offsets + (sx + 1) * 4,
+    body = columns + sx * (sy + 1) * 2;
+  if (body > 4 + length) short('KVX file');
   for (let x = 0; x < sx; x++) {
     const slab = offsets + dv.getInt32(offsets + x * 4, true);
     for (let y = 0; y < sy; y++) {
@@ -397,6 +398,9 @@ export function parseKVX(bytes: Uint8Array | ArrayBuffer, limits: GridLimits = {
         end = slab + dv.getUint16(row + 2, true);
       let at = slab + dv.getUint16(row, true);
       if (end > 4 + length) short('KVX column');
+      // A column lies in the voxel data, start before end; anything else would be read as header bytes or skipped.
+      if (at < body || end < at)
+        throw new RangeError('KVX column offsets point outside its voxel data; the file is damaged, export it again');
       while (at < end) {
         if (at + 3 > end) short('KVX slab');
         const top = data[at],

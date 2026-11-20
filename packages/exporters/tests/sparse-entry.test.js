@@ -60,7 +60,7 @@ test('sparse morph targets save bytes on write and retain exact dense values and
         },
       ],
     },
-    dense = exportGLB(source),
+    dense = exportGLB(source, { sparseMorphs: false }),
     sparse = exportSparseGLB(source, { sparse: 'morphs', interleave: false }),
     before = splitGLB(dense),
     out = splitGLB(sparse),

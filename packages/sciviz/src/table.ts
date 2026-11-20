@@ -107,9 +107,10 @@ export class CrossFilter extends EventTarget {
   }
   /** @internal */
   check(): void { if (this.#disposed) throw fault('state', 'CrossFilter is disposed', 'sciviz'); }
-  /** @internal Combine changed words only; no other column is re-evaluated. */
+  /** @internal Combine changed words only; no other column is re-evaluated. A dimension disposed after its filter only leaves. */
   update(words: Set<number>, removed?: TableDimension): void {
-    this.check(); if (removed) this.#dimensions.delete(removed);
+    if (removed) { this.#dimensions.delete(removed); if (this.#disposed) return; }
+    this.check();
     for (const w of words) {
       let value = w === this.#mask.length - 1 && this.table.length % 32 ? 0xffffffff >>> (32 - this.table.length % 32) : 0xffffffff;
       for (const dim of this.#dimensions) value &= dim.mask[w];
@@ -196,6 +197,13 @@ export class TableDimension {
     for (let w = 0; w < next.length; w++) if (this.mask[w] !== next[w]) { this.mask[w] = next[w]; words.add(w); }
     this.#mode = 'all'; this.#range = undefined; this.#set = undefined; this.#done(words); return this;
   }
-  dispose(): void { if (this.#disposed) return; this.clear(); this.#filter.update(new Set(), this); this.#disposed = true; this.#order = undefined; this.#groups = undefined; }
+  /** Release the dimension: its rows pass again (one change event). Safe to call twice or after the filter's own dispose. */
+  dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true; this.#order = undefined; this.#groups = undefined; this.#mode = 'all'; this.#range = undefined; this.#set = undefined;
+    const next = full(this.#filter.table.length), words = new Set<number>();
+    for (let w = 0; w < next.length; w++) if (this.mask[w] !== next[w]) { this.mask[w] = next[w]; words.add(w); }
+    this.#filter.update(words, this);
+  }
   [Symbol.dispose](): void { this.dispose(); }
 }

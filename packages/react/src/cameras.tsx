@@ -135,13 +135,13 @@ function useCameraObject({
   return camera;
 }
 /** A perspective camera; a non-default ref can be passed to RenderView. Default cameras retain the engine handle. */
-export const PerspectiveCamera = forwardRef<Camera, PerspectiveCameraProps>(function PerspectiveCamera(props, ref) {
+export const PerspectiveCamera = /* @__PURE__ */ forwardRef<Camera, PerspectiveCameraProps>(function PerspectiveCamera(props, ref) {
   const camera = useCameraObject(props);
   useDefault(camera, props.makeDefault ?? false, ref, JSON.stringify(props));
   return null;
 });
 /** Orthographic camera driven by the optional cameras package, with resize-aware height, bounds and zoom. */
-export const OrthographicCamera = forwardRef<Camera, OrthographicCameraProps>(function OrthographicCamera(
+export const OrthographicCamera = /* @__PURE__ */ forwardRef<Camera, OrthographicCameraProps>(function OrthographicCamera(
   { makeDefault = false, onError, ...props },
   ref,
 ) {

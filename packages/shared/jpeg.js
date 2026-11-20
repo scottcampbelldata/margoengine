@@ -321,16 +321,11 @@ function sampler(plane, stride, component, maxH, maxV, width, height) {
 }
 const clamp = (value) => (value <= 0 ? 0 : value >= 255 ? 255 : (value + 0.5) | 0);
 /**
- * Decodes JPEG bytes to RGBA8 pixels. Grey images expand to RGB, and YCbCr converts as JFIF says; an Adobe marker saying
- * the file holds plain RGB is honoured. Subsampled chroma is filtered up linearly, as JFIF places it. EXIF orientation
- * and colour profiles are ignored: samples come out as stored.
- *
- * @throws TypeError when `bytes` is not a Uint8Array.
- * @throws RangeError when the image is larger than `maxPixels`.
- * @throws MargoError `failed` for a damaged or cut short file, and `unsupported` for arithmetic coding, lossless
- * JPEG, 12-bit samples and four-component CMYK files.
+ * Decodes JPEG bytes to their components without colour conversion: one sampler per component, in frame order, that
+ * reads the component at full image size (subsampled components filtered up linearly, centred as JFIF places them).
+ * `counts` lists the component counts accepted. Adobe APP14 transform is reported, not applied.
  */
-export function decodeJPEG(bytes, options = {}) {
+export function decodeJPEGComponents(bytes, options = {}, counts = [1, 3]) {
   if (!(bytes instanceof Uint8Array)) throw new TypeError('decodeJPEG needs the file as a Uint8Array');
   const { maxPixels = 2 ** 26 } = options;
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw refuse('the file does not start with an SOI marker');
@@ -401,7 +396,7 @@ export function decodeJPEG(bytes, options = {}) {
       if (!width || !height) throw refuse('the frame has no size');
       if (width * height > maxPixels)
         throw new RangeError(`JPEG is ${width} x ${height}, over maxPixels ${maxPixels}; raise maxPixels`);
-      if (count !== 1 && count !== 3)
+      if (!counts.includes(count))
         throw margoError('unsupported', `JPEG: ${count} components are not read; convert the image to RGB or grey`);
       if (p + 6 + count * 3 > end) throw refuse('the frame header is damaged');
       for (let i = 0; i < count; i++) {
@@ -490,13 +485,26 @@ export function decodeJPEG(bytes, options = {}) {
         );
     return sampler(plane, stride, component, maxH, maxV, width, height);
   });
-  const data = new Uint8Array(width * height * 4),
+  return { width, height, ids: components.map(({ id }) => id), adobeTransform, planes };
+}
+/**
+ * Decodes JPEG bytes to RGBA8 pixels. Grey images expand to RGB, and YCbCr converts as JFIF says; an Adobe marker saying
+ * the file holds plain RGB is honoured. Subsampled chroma is filtered up linearly, as JFIF places it. EXIF orientation
+ * and colour profiles are ignored: samples come out as stored.
+ *
+ * @throws TypeError when `bytes` is not a Uint8Array.
+ * @throws RangeError when the image is larger than `maxPixels`.
+ * @throws MargoError `failed` for a damaged or cut short file, and `unsupported` for arithmetic coding, lossless
+ * JPEG, 12-bit samples and four-component CMYK files.
+ */
+export function decodeJPEG(bytes, options = {}) {
+  const { width, height, ids, adobeTransform, planes } = decodeJPEGComponents(bytes, options),
+    data = new Uint8Array(width * height * 4),
     [first, second, third] = planes,
     // Three components are YCbCr unless an Adobe marker or the component names say RGB.
     rgb =
       planes.length === 3 &&
-      (adobeTransform === 0 ||
-        (adobeTransform < 0 && components[0].id === 82 && components[1].id === 71 && components[2].id === 66));
+      (adobeTransform === 0 || (adobeTransform < 0 && ids[0] === 82 && ids[1] === 71 && ids[2] === 66));
   for (let y = 0, out = 0; y < height; y++)
     for (let x = 0; x < width; x++, out += 4) {
       const a = first(x, y);

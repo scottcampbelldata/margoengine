@@ -1,12 +1,15 @@
 import { useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
-import type { PBRModel, PBRMaterial } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRMaterial } from '@margoengine/gltf/pbr';
+import { useBakedShadows } from './bake-shadows.js';
+import { casters } from './casters.js';
 import { useScene, useCommit, useResourceEffect, zero, one, ModelContext, type PointerHandlers, type Listeners } from './internal.js';
 import { liveHandlers } from './events.js';
 import { retainAsset, type ModelFormat } from './assets.js';
 import { instantiateModel, modelAsset, preloadModel, type FormatLoader } from './model-assets.js';
 import { modelPicking } from './picking.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 interface Loading {
   src: string;
   pending: boolean;
@@ -42,7 +45,7 @@ function values(value: readonly number[], size: number, label: string, min = 0, 
     value.length !== size ||
     value.some((v) => typeof v !== 'number' || !Number.isFinite(Math.fround(v)) || v < min || v > max)
   )
-    throw new RangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}.`);
+    throw rangeError(`Invalid ${label}: pass an array of ${size} finite number(s) between ${min} and ${max}`, 'react-arguments');
 }
 function applyMaterials(originals: Map<PBRMaterial, PBRMaterial>, overrides: ModelProps['materials']): void {
   for (const [material, original] of originals) {
@@ -80,7 +83,7 @@ function applyMaterials(originals: Map<PBRMaterial, PBRMaterial>, overrides: Mod
     }
     if (o.doubleSided !== undefined) {
       if (typeof o.doubleSided !== 'boolean')
-        throw new TypeError('materials doubleSided must be a boolean; pass true or false.');
+        throw typeError('materials doubleSided must be a boolean; pass true or false', 'react-arguments');
       m.settings[2] = +o.doubleSided;
     }
   }
@@ -96,6 +99,7 @@ export function ModelResource({
   ...props
 }: ModelProps & { format?: ModelFormat; load?: FormatLoader }) {
   const { engine, registry, resources, shadows, assetCache, pointerHandlers } = useScene(),
+    baked = useBakedShadows(),
     [model, setModel] = useState<PBRModel | null>(null);
   const [loading, setLoading] = useState<Loading | null>(null);
   const latest = useRef({ ...props, position, rotation, scale }),
@@ -209,16 +213,33 @@ export function ModelResource({
     if (model && !model.disposed) applyMaterials(originals.current, props.materials);
   }, [model, props.materials]);
   useCommit(() => {
+    if (!model || model.disposed || !castShadow) return;
+    const set = casters(engine),
+      source = {
+        get shadowPrimitives() {
+          return model.shadowPrimitives;
+        },
+        get disposed() {
+          return model.disposed;
+        },
+      };
+    set.add(source);
+    return () => void set.delete(source);
+  }, [engine, model, castShadow]);
+  useCommit(() => {
     if (!model || model.disposed || !shadows) return;
     const removeCaster = castShadow
-      ? shadows.add({
+      ? shadows.add(
+          {
           get shadowPrimitives() {
             return model.shadowPrimitives;
           },
           get disposed() {
             return model.disposed;
           },
-        })
+          },
+          { static: baked },
+        )
       : undefined;
     let removeReceiver: (() => void) | undefined;
     try {
@@ -231,7 +252,7 @@ export function ModelResource({
       removeCaster?.();
       removeReceiver?.();
     };
-  }, [model, shadows, castShadow, receiveShadow]);
+  }, [model, shadows, castShadow, receiveShadow, baked]);
   // Start after the first commit so even an initially hidden Suspense subtree
   // has a passive unmount cleanup that can abort its outstanding request.
   if (loading?.src === props.src && loading.pending) throw loading.promise;
@@ -243,7 +264,7 @@ export function ModelResource({
 }
 
 /**
- * A glTF or GLB model through `@margoengine/gltf-pro` (PBR materials, textures, compression, animation). Suspends while
+ * A glTF or GLB model through `@margoengine/gltf/pbr` (PBR materials, textures, compression, animation). Suspends while
  * it loads; `Model.preload(url)` loads it ahead of the first mount. Also exported as `Gltf`.
  */
 // A pure Object.assign, not `Component.preload = ...`: a module-level assignment is a side effect that keeps the module

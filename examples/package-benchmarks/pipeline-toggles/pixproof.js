@@ -1,9 +1,9 @@
-// Real-GPU pixel proof for gltf-pro's discard constants: the same scene drawn by gltf-pro at 15c87f1 and by the working tree.
+// Real-GPU pixel proof for gltf/pbr's discard constants: the same scene drawn by gltf/pbr at 15c87f1 and by the working tree.
 import { Engine } from '/packages/core/dist/extension.js';
 import { SSAO } from '/packages/post/dist/index.js';
 const which = new URLSearchParams(location.search).get('which');
 const gltf = await import(
-  which === 'before' ? '/test-results/gltf-before/margoengine.js' : '/packages/gltf-pro/dist/index.js'
+  which === 'before' ? '/test-results/gltf-before/margoengine.js' : '/packages/gltf/dist/pbr.js'
 );
 const quad = () => {
   const positions = new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]),

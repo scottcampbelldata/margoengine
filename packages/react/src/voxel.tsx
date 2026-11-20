@@ -38,7 +38,7 @@ interface Attached {
  * `bevel`, `lighting`) recreate it when changed; `daylight`, `blockLightColor` and `lightmap` are live. The ref is
  * the live VoxelRenderer. WebGPU and Web Workers only.
  */
-export const Voxels = forwardRef<VoxelRenderer, VoxelsProps>(function Voxels(
+export const Voxels = /* @__PURE__ */ forwardRef<VoxelRenderer, VoxelsProps>(function Voxels(
   {
     world,
     textures,

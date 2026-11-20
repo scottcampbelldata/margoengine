@@ -570,3 +570,85 @@ test('decodeSave stops a gzip member that expands past maxBytes before it fills 
   await assert.rejects(decodeSave(bomb, { maxBytes: json.length - 1 }), RangeError);
   await assert.rejects(decodeSave(bomb, { maxBytes: -1 }), RangeError);
 });
+
+test('indexedDBStorage: two stores in one database each get their store (KB-P3g)', async () => {
+  const idb = fakeIndexedDB(),
+    saves = indexedDBStorage({ factory: idb }),
+    profiles = indexedDBStorage({ factory: idb, store: 'profiles' });
+  await saves.write('slot-1', new Uint8Array([1]));
+  // The database is at version 1 with only 'saves'; the second storage must add 'profiles' one version up.
+  await profiles.write('ada', new Uint8Array([2]));
+  assert.deepEqual([...(await profiles.read('ada'))], [2]);
+  // The first storage's connection closed for that upgrade; it opens again and still reads its own store.
+  assert.deepEqual([...(await saves.read('slot-1'))], [1]);
+  assert.deepEqual(await saves.keys(), ['slot-1']);
+  assert.deepEqual(await profiles.keys(), ['ada']);
+});
+
+test('expandSave: an override parent names a prefab-local entity, as an override $ref does (KB-P9b)', () => {
+  const flat = expandSave(
+    parseSave({
+      format: 'margo-save',
+      version: 1,
+      prefabs: {
+        crate: {
+          entities: [
+            { id: 'box', components: {} },
+            { id: 'lid', parent: 'box', components: {} },
+            { id: 'tag', parent: 'box', components: { on: { $ref: 'box' } } },
+          ],
+        },
+      },
+      entities: [
+        { id: 'c1', prefab: 'crate', overrides: { tag: { parent: 'lid', components: { on: { $ref: 'lid' } } } } },
+      ],
+    }),
+  );
+  const tag = flat.find((e) => e.id === 'c1/tag');
+  assert.equal(tag.parent, 'c1/lid');
+  assert.deepEqual(tag.components.on, { $ref: 'c1/lid' });
+  // Parents still come first.
+  assert.ok(flat.findIndex((e) => e.id === 'c1/lid') < flat.indexOf(tag));
+});
+
+test('fileStorage keys skip names it never wrote, so every listed key reads (KB-P9c)', async () => {
+  const { writeFile } = await import('node:fs/promises');
+  const directory = await mkdtemp(join(tmpdir(), 'margo-keys-'));
+  try {
+    const storage = fileStorage(directory);
+    await storage.write('Slot-1', new Uint8Array([1]));
+    // A stray file with a bad escape, and one in capitals, which fileStorage writes escaped.
+    await writeFile(join(directory, '100%.save'), 'x');
+    await writeFile(join(directory, 'ABC.save'), 'x');
+    const keys = await storage.keys();
+    assert.deepEqual(keys, ['Slot-1']);
+    for (const key of keys) assert.notEqual(await storage.read(key), null);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('indexedDBStorage: close() ends the database connection, is safe twice and the storage opens again on use', async () => {
+  const idb = fakeIndexedDB(), opened = [], open = idb.open.bind(idb);
+  idb.open = (...args) => {
+    const request = open(...args);
+    let result;
+    Object.defineProperty(request, 'result', { get: () => result, set: (db) => { result = db; opened.push(db); } });
+    return request;
+  };
+  const isOpen = (db) => { try { db.transaction('saves', 'readonly'); return true; } catch { return false; } };
+  const saves = indexedDBStorage({ factory: idb });
+  await saves.close();
+  assert.equal(opened.length, 0, 'closing before first use opens nothing');
+  await saves.write('slot-1', new Uint8Array([1]));
+  assert.equal(opened.length, 1);
+  assert.ok(isOpen(opened[0]));
+  await saves.close();
+  await saves.close();
+  assert.ok(!isOpen(opened[0]), 'the connection is closed');
+  assert.deepEqual([...(await saves.read('slot-1'))], [1]);
+  assert.equal(opened.length, 2, 'the next call opens the database again');
+  saves[Symbol.dispose]();
+  await saves.close();
+  assert.ok(!isOpen(opened[1]));
+});

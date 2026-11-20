@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shot tool test scene</title>
+  <!-- No size for the canvas here: the shot's page.css makes it fill the window, so a shot whose CSS did not apply
+    fails its size check (tools/shot/test/determinism-check.mjs). -->
+  <style>html,body{height:100%;margin:0;background:#000}#viewport{display:block;width:240px;height:160px}</style>
+</head>
+<body>
+  <canvas id="viewport" aria-label="Spinning boxes in seeded places, for the shot tool's determinism check"></canvas>
+  <script type="module" src="./scene.js"></script>
+</body>
+</html>

@@ -81,7 +81,7 @@ const mixamo = (bone) =>
       .replace(/^./, (c) => c.toUpperCase()));
 const godot = (bone) => capital(bone);
 const roblox = (bone) =>
-  ({ hips: 'LowerTorso', chest: 'UpperTorso', head: 'Head' })[bone] ??
+  ({ hips: 'LowerTorso', spine: 'UpperTorso', head: 'Head' })[bone] ??
   (/^(left|right)(UpperArm|LowerArm|Hand|UpperLeg|LowerLeg|Foot)$/.test(bone) ? capital(bone) : null);
 
 /** A clip that waves both arms and bends the knees, keyed on humanoid bones named by `name`. */
@@ -180,7 +180,8 @@ test('Roblox R15 takes Mixamo clips: trunk and limbs map, missing bones are list
   const mix = humanoid(mixamo),
     r15 = humanoid(roblox, { extraRoot: 'HumanoidRootPart' }),
     prepared = prepareRetarget(mix, r15);
-  assert.equal(prepared.names.UpperTorso, 'mixamorig:Spine1');
+  // VRM 1.0 humanoid.md: spine is required and chest optional, so R15's one trunk bone is the spine (Mixamo Spine).
+  assert.equal(prepared.names.UpperTorso, 'mixamorig:Spine');
   assert.equal(prepared.names.HumanoidRootPart, '');
   assert.equal(prepared.hip, 'LowerTorso');
   assert.deepEqual(prepared.unmapped, []);
@@ -192,4 +193,105 @@ test('Roblox R15 takes Mixamo clips: trunk and limbs map, missing bones are list
     () => prepareRetarget(mix, { names: ['x'], parents: [-1], rest: new Float64Array(10) }),
     /not recognised/,
   );
+});
+
+// The CMU motion capture skeleton as @margoengine/loaders/mocap's parseASF names its joints (Acclaim bone names).
+const cmu = (bone) => {
+  const side = /^(left|right)/.exec(bone)?.[1]?.[0] ?? '';
+  const rest = bone.replace(/^(left|right)/, '');
+  return (
+    {
+      hips: 'root',
+      spine: 'lowerback',
+      chest: 'upperback',
+      upperChest: 'thorax',
+      neck: 'lowerneck',
+      head: 'head',
+      Shoulder: `${side}clavicle`,
+      UpperArm: `${side}humerus`,
+      LowerArm: `${side}radius`,
+      Hand: `${side}wrist`,
+      MiddleProximal: `${side}fingers`,
+      UpperLeg: `${side}femur`,
+      LowerLeg: `${side}tibia`,
+      Foot: `${side}foot`,
+      Toes: `${side}toes`,
+    }[side ? rest : bone] ?? null
+  );
+};
+
+test('the CMU mocap skeleton is detected and drives a Mixamo A-pose rig as Mixamo clips do', () => {
+  const names = humanoid(cmu).names;
+  assert.equal(detectSkeleton(names)?.preset, 'cmu');
+  // CMU's own extra joints (hip joints, upper neck, hands past the wrist, thumbs) are not humanoid bones.
+  assert.equal(detectSkeleton([...names, 'lhipjoint', 'rhipjoint', 'upperneck', 'lhand', 'lthumb'])?.preset, 'cmu');
+  assert.equal(humanoidBones(names, 'cmu').get('leftHand'), names.indexOf('lwrist'));
+  const target = humanoid(mixamo, { pose: 'A' }),
+    fromCmu = prepareRetarget(humanoid(cmu), target),
+    fromMixamo = prepareRetarget(humanoid(mixamo), target);
+  assert.equal(fromCmu.from, 'cmu');
+  assert.equal(fromCmu.names['mixamorig:LeftForeArm'], 'lradius');
+  assert.equal(fromCmu.hip, 'mixamorig:Hips');
+  assert.deepEqual(fromCmu.unmapped, fromMixamo.unmapped);
+  // The same motion keyed on either naming gives the same clip on the target, rest alignment included.
+  const a = new Retarget(humanoid(cmu), fromCmu.target, fromCmu).clip(clip(cmu), { fps: 10 }),
+    b = new Retarget(humanoid(mixamo), fromMixamo.target, fromMixamo).clip(clip(mixamo), { fps: 10 });
+  assert.equal(a.tracks.length, b.tracks.length);
+  for (const track of b.tracks) {
+    const other = a.tracks.find((t) => t.target === track.target && t.path === track.path);
+    assert.ok(other, `${track.target} ${track.path}`);
+    for (const time of [0, 0.25, 0.5, 0.75, 1]) {
+      const width = track.path === 'rotation' ? 4 : 3,
+        x = sampleKeyframes(track, time, new Float64Array(width)),
+        y = sampleKeyframes(other, time, new Float64Array(width));
+      x.forEach((v, i) => assert.ok(Math.abs(v - y[i]) < 1e-12, `${track.target} at ${time}: ${x} against ${y}`));
+    }
+  }
+});
+
+test('rest alignment turns the limbs only: a source whose trunk and collarbones lean leaves the target standing straight', () => {
+  // A motion-capture skeleton's trunk and collarbone directions are its body's layout (the neck base sits ahead of the
+  // mid-back, the collarbone rises to the shoulder), not a pose: aiming the target's trunk along them hunches and shrugs it.
+  const source = humanoid(cmu),
+    at = (name) => source.names.indexOf(name) * 10;
+  source.rest.set([0, 0.15, 0.08], at('lowerneck')); // neck base ahead of the chest
+  source.rest.set([0.1, 0.05, 0], at('lhumerus')); // the collarbone rising to the shoulder
+  const target = humanoid(mixamo, { pose: 'A' }),
+    prepared = prepareRetarget(source, target);
+  for (const bone of ['mixamorig:Hips', 'mixamorig:Spine', 'mixamorig:Spine1', 'mixamorig:Spine2', 'mixamorig:Neck', 'mixamorig:LeftShoulder']) {
+    const b = target.names.indexOf(bone) * 10 + 3;
+    assert.deepEqual(Array.from(prepared.target.rest.subarray(b, b + 4)), Array.from(target.rest.subarray(b, b + 4)), bone);
+  }
+  // The A-pose arm is still aimed along the source's level upper arm.
+  const arm = target.names.indexOf('mixamorig:LeftArm') * 10 + 3,
+    [x, y, z, w] = prepared.target.rest.subarray(arm, arm + 4);
+  assert.ok(Math.abs(2 * (x * y + w * z)) < 1e-9 && 1 - 2 * (y * y + z * z) > 0.999999, 'the upper arm is level');
+});
+
+test("Character Creator's CC3+ skeleton is detected and takes Mixamo clips", () => {
+  // The names as a CC4 export writes them, twist and share bones beside the limbs (wilbur.fbx, 2026-11-18).
+  const cc = (bone) =>
+    ({ hips: 'CC_Base_Hip', spine: 'CC_Base_Waist', chest: 'CC_Base_Spine01', upperChest: 'CC_Base_Spine02' })[bone] ??
+    ({ neck: 'CC_Base_NeckTwist01', head: 'CC_Base_Head' })[bone] ??
+    bone.replace(/^(left|right)(.*)$/, (_, s, part) =>
+      `CC_Base_${s === 'left' ? 'L' : 'R'}_` +
+      { Shoulder: 'Clavicle', UpperArm: 'Upperarm', LowerArm: 'Forearm', Hand: 'Hand', MiddleProximal: 'Mid1', UpperLeg: 'Thigh', LowerLeg: 'Calf', Foot: 'Foot', Toes: 'ToeBase' }[part],
+    );
+  const target = humanoid(cc, { extraRoot: 'CC_Base_BoneRoot' });
+  target.names.push('CC_Base_L_UpperarmTwist01', 'CC_Base_Pelvis');
+  target.parents.push(target.names.indexOf('CC_Base_L_Upperarm'), target.names.indexOf('CC_Base_Hip'));
+  target.rest = Float64Array.from([...target.rest, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]);
+  assert.deepEqual(detectSkeleton(target.names), { preset: 'characterCreator', bones: 24 });
+  const bones = humanoidBones(target.names, 'characterCreator');
+  assert.equal(target.names[bones.get('leftMiddleProximal')], 'CC_Base_L_Mid1');
+  assert.equal(target.names[bones.get('rightLowerLeg')], 'CC_Base_R_Calf');
+  const source = humanoid(mixamo),
+    prepared = prepareRetarget(source, target);
+  assert.equal(prepared.from, 'mixamo');
+  assert.equal(prepared.to, 'characterCreator');
+  assert.equal(prepared.hip, 'CC_Base_Hip');
+  assert.equal(prepared.names.CC_Base_L_Upperarm, 'mixamorig:LeftArm');
+  assert.equal(prepared.names.CC_Base_L_UpperarmTwist01, '');
+  const out = new Retarget(source, prepared.target, prepared).clip(clip(mixamo), { fps: 10 });
+  assert.ok(out.tracks.some((track) => track.target === 'CC_Base_L_Upperarm'));
 });

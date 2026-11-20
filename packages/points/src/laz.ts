@@ -1637,8 +1637,18 @@ export function decodeLazChunk(
 ): Uint8Array {
   const info = lazInfo(records);
   checkItems(info, header);
-  const out = new Uint8Array(count * header.pointRecordLength);
-  decodeChunk(chunk, { start: 0, end: chunk.byteLength, count }, 0, header.pointRecordLength, readersFor(info), out);
+  const length = header.pointRecordLength;
+  if (!Number.isSafeInteger(count) || count < 0)
+    throw new RangeError(`LAZ chunk point count ${count} is not a whole number of 0 or more; pass the count its index gives`);
+  // A layered chunk states its own count after its first point: compare before allocating count records, so a corrupt
+  // index (a COPC hierarchy entry) cannot ask for gigabytes.
+  if (count && info.compressor === 3 && chunk.byteLength >= length + 4) {
+    const stated = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength).getUint32(length, true);
+    if (stated !== count)
+      throw new RangeError(`LAZ chunk 0 holds ${stated} points but its table says ${count}; the file is corrupt`);
+  }
+  const out = new Uint8Array(count * length);
+  decodeChunk(chunk, { start: 0, end: chunk.byteLength, count }, 0, length, readersFor(info), out);
   return out;
 }
 

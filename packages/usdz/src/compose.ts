@@ -1,7 +1,7 @@
 // USD composition for the import: sublayers, references, payloads, inherits, specializes and variants, from any mix of
 // text and binary layers, in a .usdz or spread over files.
 import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro/model';
+import type { PBRModel } from '@margoengine/gltf/pbr-model';
 import { fetchBytes, LoaderError, readZipDirectory, readZipEntry } from '@margoengine/loaders/common';
 import { parseCrate, type Specs } from './crate.js';
 import type { ExtensionHooks, LayerRead, USDExtension, USDIssue } from './extension.js';

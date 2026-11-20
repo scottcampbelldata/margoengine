@@ -109,7 +109,7 @@ const shaped = (header: PointsHeader): LASHeader => ({
 });
 
 /**
- * Reads an ASPRS LAS or LAZ point cloud, versions 1.0 to 1.4 and point formats 0 to 10: positions by the file's scale
+ * Reads an ASPRS LAS or LAZ point cloud, versions 1.0 to 1.5 and point formats 0 to 10 (0 to 5 refused for 1.5, which removed them): positions by the file's scale
  * and offset, intensity, classification, returns, GPS time and colour, with the header and its variable records, extra
  * bytes and the coordinate reference system. Positions are relative to `origin`, because survey coordinates are too
  * large for 32-bit floats; add it back for world coordinates. Colours are scaled to [0,1] from 16 bits, or from 8 for

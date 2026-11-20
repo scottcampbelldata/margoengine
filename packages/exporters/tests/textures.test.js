@@ -194,6 +194,11 @@ test('GLB PNG works without platform, JPEG fallback, external resolver and malfo
   assert.equal((await transformTextures(external, { format: 'png', resolveImage: async uri => { assert.equal(uri, 'textures/albedo.png'); return image; } })).transformed, 2);
   parts.json.images[0] = { uri: `data:image/png;base64,${Buffer.from(image).toString('base64')}` };
   assert.equal((await transformTextures(joinGLB(parts), { format: 'png' })).transformed, 2);
+  // RFC 2397 data without base64: %XX escapes are octets, so a PNG's %89 signature byte is not read as UTF-8.
+  parts.json.images[0] = { uri: `data:image/png,${Array.from(image, (b) => `%${b.toString(16).padStart(2, '0')}`).join('')}` };
+  assert.equal((await transformTextures(joinGLB(parts), { format: 'png' })).transformed, 2);
+  parts.json.images[0] = { uri: 'data:image/png,%8' };
+  await assert.rejects(transformTextures(joinGLB(parts), { format: 'png' }), TypeError);
   parts.json.images[0] = { bufferView: 900, mimeType: 'image/png' };
   await assert.rejects(transformTextures(joinGLB(parts), { format: 'png' }), RangeError);
   const empty = joinGLB({ json: { asset: { version: '2.0' } }, bin: null, chunks: [] });

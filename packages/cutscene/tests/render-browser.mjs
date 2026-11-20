@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/cutscene/render (from the repository root after building packages; check:gpu-packages
-// takes the GPU lock around it): node packages/cutscene/tests/render-browser.mjs
+// runs it): node packages/cutscene/tests/render-browser.mjs
 // Renders a cutscene to WebM and MP4 with sound, then reads the files back with the browser's own demuxers and decoders.
 // MARGO_KEEP_VIDEO=<path> keeps the files, to open them in other tools.
 import assert from 'node:assert/strict';

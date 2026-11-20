@@ -1,9 +1,11 @@
+// MARGO_COMPAT not applicable: the script runs its own WebGL2-layer leg (install({ force: true })) beside native WebGPU for every feature.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { trackPipelines } from '../../../scripts/support/gpu-ready.js';
@@ -17,7 +19,7 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true, include: [] },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'road-check',
       configureServer(s) {

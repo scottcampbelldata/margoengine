@@ -75,6 +75,14 @@ interface DICOMImage {
     readonly elements: Readonly<Record<string, string | number[]>>;
 }
 
+interface DICOMSeriesOptions {
+    readonly allowGaps?: boolean;
+}
+
+interface DICOMSeriesVolume extends FormatVolume {
+    readonly gaps: readonly number[];
+}
+
 type FileInput = string | URL | ArrayBuffer | ArrayBufferView | FileSource;
 
 interface FileOptions {
@@ -226,11 +234,11 @@ interface ZarrOptions {
 
 type ZarrStore = string | URL | Readonly<Record<string, Uint8Array | string>> | ((key: string, signal?: AbortSignal) => Promise<Uint8Array | undefined>);
 
-function dicomSeries(images: readonly DICOMImage[]): FormatVolume;
+function dicomSeries(images: readonly DICOMImage[], options?: DICOMSeriesOptions): DICOMSeriesVolume;
 
-function loadDICOMSeries(urls: readonly (string | URL)[], options?: FormatOptions & {
+function loadDICOMSeries(urls: readonly (string | URL)[], options?: FormatOptions & DICOMSeriesOptions & {
     readonly init?: RequestInit;
-}): Promise<FormatVolume>;
+}): Promise<DICOMSeriesVolume>;
 
 function loadNIfTI(url: string | URL, options?: FormatOptions & {
     readonly init?: RequestInit;

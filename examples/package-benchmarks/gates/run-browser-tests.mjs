@@ -1,14 +1,12 @@
-// Runs every real-browser test script once, serially, under the GPU lock and on AC power.
+// Runs every real-browser test script once, serially and on AC power.
 // From the repository root, after `npm run build:packages`:
 //   node examples/package-benchmarks/gates/run-browser-tests.mjs [--only=substring,substring] [--label=browser-tests]
-// Takes test-results/gpu.lock in the main checkout around each script (scripts that take it themselves run without it),
-// checks AC power before and after each script and repeats a run that started or ended on battery. Writes
+// Checks AC power before and after each script and repeats a run that started or ended on battery. Writes
 // examples/package-benchmarks/results/gates-<label>.json with pass/fail, duration and the output tail per script.
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdir, writeFile, readdir } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { acPower } from '../parts/power.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 const arg = (name, fallback) =>
@@ -16,7 +14,6 @@ const arg = (name, fallback) =>
 const only = arg('only', '').split(',').filter(Boolean),
   label = arg('label', 'browser-tests');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const selfLocking = new Set(['packages/staging/test/browser-check.mjs']);
 
 const list = async (dir, test) =>
   (await readdir(resolve(root, dir)).catch(() => [])).filter(test).map((f) => `${dir}/${f}`);
@@ -91,17 +88,9 @@ for (const script of scripts) {
       console.log('on battery, waiting for AC');
       await sleep(30_000);
     }
-    const locks = !selfLocking.has(script);
-    // These are correctness tests: they share the GPU (scripts/gpu-lock.mjs).
-    const releaseGpu = locks ? await acquire({ owner: 'run-browser-tests', mode: 'shared' }) : () => {};
-    let r, before, after;
-    try {
-      before = acPower();
-      r = await run(script);
+    const before = acPower(),
+      r = await run(script),
       after = acPower();
-    } finally {
-      releaseGpu();
-    }
     if (before === false || after === false) {
       report.discarded++;
       console.log('discarded (battery)', script);

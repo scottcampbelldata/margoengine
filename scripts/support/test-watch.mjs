@@ -154,7 +154,7 @@ function endRun() {
         ? `HUNG RUN: child processes may still be alive: ${left.join(', ')}\n`
         : `HUNG RUN ENDED: ${count} child processes stopped and gone\n`,
     );
-    process.exit(1);
+    process.exit(1); // process.exit: the watchdog ends a hung run, its children already stopped
   }
   const { status, stdout, stderr, error } = spawnSync(
     'powershell',
@@ -167,7 +167,7 @@ function endRun() {
       ? `HUNG RUN ENDED: ${stdout.trim()} child processes stopped and gone\n`
       : `HUNG RUN: child processes may still be alive (status ${status}): ${error?.message ?? stderr}\n`,
   );
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a hung run, its children already stopped
 }
 
 export default async function* watch(source) {

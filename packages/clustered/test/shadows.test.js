@@ -118,9 +118,10 @@ test('local shadows: point lights use six layers, spot lights one; maps re-rende
   const frameData = new Float32Array(shadows.bindings()[0].resource.buffer.data);
   assert.deepEqual(
     [...frameData.subarray(0, 4)].map((v) => +v.toFixed(4)),
-    [2, 1, 1.5, +(1 / 64).toFixed(4)],
+    [2, 1, 0.25, +(1 / 64).toFixed(4)],
   );
-  assert.deepEqual([...frameData.subarray(4, 7)], [0, 1, frameData[6]]);
+  // KB-LOCALSHADOW-OFFSET1: first layer, point, texel per unit distance, and the receiver-plane lift 1 + slopeBias.
+  assert.deepEqual([...frameData.subarray(4, 8)], [0, 1, frameData[6], 1]);
   assert.deepEqual([...frameData.subarray(8, 10)], [6, 0]);
   h.frame();
   assert.equal(h.passes.length, 0);
@@ -277,7 +278,16 @@ test('local shadows: a castShadow pi/2 spot (a hemisphere) takes the six cube la
 test('local shadows: options are validated', () => {
   const lights = new Clustered();
   assert.throws(() => new LocalShadows({}), /Clustered/);
-  for (const bad of [{ maxLights: 0 }, { maxLights: 17 }, { resolution: 8 }, { bias: -1 }, { normalBias: Number.NaN }])
+  for (const bad of [
+    { maxLights: 0 },
+    { maxLights: 17 },
+    { resolution: 8 },
+    { bias: -1 },
+    { normalBias: Number.NaN },
+    { slopeBias: -1 },
+    { slopeBias: Infinity },
+    { receiverPlane: 1 },
+  ])
     assert.throws(() => new LocalShadows({ lights, ...bad }), RangeError);
   const shadows = new LocalShadows({ lights });
   assert.throws(() => shadows.bindings(), /not attached/);
@@ -800,6 +810,19 @@ test('local shadows: a point or spot shadow radius turns on PCSS; radius 0 uploa
     assert.match(h.context.shader, /if\(localShadowFrame\.soft\[slot\*2u-2u\]\.x>0\)\{return clusterSoftShadow\(/);
     assert.match(h.context.shader, /fn clusterSoftShadow\(/);
     assert.match(h.context.shader, /soft:array<vec4f,32>/);
+    // KB-PCSS-BLOCK1: one tap pattern shared by every pixel drew the penumbra as 24 shifted hard shadows (stair steps,
+    // radial streaks). Both spirals start at the pixel's own angle (interleaved gradient noise of its screen pixel from
+    // the clustered camera), and each tap moves within its own ring by a second noise value. The penumbra itself is
+    // measured on the GPU (scripts/clustered-shadow-gpu-check.js, "no stair step").
+    const softFn = h.context.shader.slice(h.context.shader.indexOf('fn clusterSoftShadow('));
+    assert.match(h.context.shader, /fn localShadowTurn\(position:vec3f\)->vec3f \{\n {2}let eye=clusterFrame\.view\*/);
+    assert.match(softFn, /let turn=localShadowTurn\(p\);var direction=turn\.xy;/);
+    assert.match(softFn, /let o=direction\*select\(sqrt\(\(f32\(i\)\+turn\.z\)\/16\.0\),0\.0,i==0u\)\*reach;/);
+    assert.match(
+      softFn,
+      /direction=turn\.xy;\n {2}for\(var i=0u;i<24u;i\+\+\)\{let o=direction\*sqrt\(\(f32\(i\)\+turn\.z\)\/24\.0\)\*radius;/,
+    );
+    assert.ok(!h.context.shader.includes('localShadowTap'), 'no fixed spiral shared by every pixel');
     const v = frame(),
       at = v.length - 16 * 8,
       tanSpot = Math.tan(0.6) * 1.25,
@@ -903,4 +926,43 @@ test('local shadows: a drawLocalShadow source (terrain) draws into every re-rend
   assert.equal(versioned.length, 0, 'a disposed hook source is dropped');
   shadows.dispose();
   lights.dispose();
+});
+
+test('local shadows: hard edges compare each texel with the receiver plane unless receiverPlane is false (KB-LOCALSHADOW-OFFSET1)', () => {
+  const point = { position: [0, 3, 0], range: 10, castShadow: true };
+  for (const [options, settings, lift] of [
+    [{}, [1, 1, 0.25], 1],
+    [{ slopeBias: 0.5, normalBias: 0.1, bias: 2 }, [1, 2, 0.1], 1.5],
+    [{ receiverPlane: false, normalBias: 1.5 }, [1, 1, 1.5], 0],
+  ]) {
+    const h = harness(),
+      lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+      shadows = LocalShadows.attach(h.engine, { lights, resolution: 64, ...options });
+    lights.setLights([point]);
+    shadows.add(caster(h.engine));
+    h.frame();
+    const frame = new Float32Array(shadows.bindings()[0].resource.buffer.data);
+    assert.deepEqual([...frame.subarray(0, 3)].map((v) => +v.toFixed(4)), settings);
+    assert.equal(frame[7], lift);
+    // One PCF for every hard map: the receiver plane's 16 texel loads, and the comparison sampler's 9 taps when off.
+    assert.match(h.context.shader, /fn localShadowPCF\(/);
+    assert.match(h.context.shader, /if\(plane<0\.5\)\{for/);
+    assert.match(h.context.shader, /let rise=dot\(slope,\(t\+0\.5\)\/size-uv\);if\(behind>0&&stored<z\+rise-behind\)\{continue;\}/);
+    assert.match(h.context.shader, /z\+max\(rise,0\.0\)\*plane>=stored/);
+    // Point and spot lights keep every texel (behind 0): their filter is the KB-LOCALSHADOW-OFFSET1 one.
+    assert.match(h.context.shader, /return localShadowPCF\(localShadowFrame\.matrices\[layer\],p,n,uv,ndc\.z,i32\(layer\),texel\*4\.0,info\.w,0\.0\);/);
+    shadows.dispose();
+    lights.dispose();
+  }
+});
+
+test('shadowSlots is the number of shadowed lights the integrated maps hold: 0 without maps, maxLights with them (default 4)', () => {
+  assert.equal(new Clustered().shadowSlots, 0);
+  assert.equal(new Clustered({ shadows: {} }).shadowSlots, 4);
+  assert.equal(new Clustered({ shadows: { maxLights: 9 } }).shadowSlots, 9);
+  // The count is the limit setLights enforces: one more shadowed light than slots throws.
+  const lights = new Clustered({ shadows: { maxLights: 1 } }),
+    lamp = () => ({ position: [0, 5, 0], range: 20, shadow: true });
+  lights.setLights([lamp()]);
+  assert.throws(() => lights.setLights([lamp(), lamp()]), RangeError);
 });

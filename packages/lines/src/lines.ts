@@ -3,7 +3,7 @@ import { requireWebGPU } from '../../shared/require-webgpu.js';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { meshWorldMatrix } from '@margoengine/math/mesh';
-import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT } from './geometry.js';
+import { CAPS, JOINS, MODES, VERTICES_PER_SEGMENT, distinctNeighbours } from './geometry.js';
 import { Line } from './line.js';
 import { lineFrame, type LineExtension } from './extension.js';
 import { fillFrame } from './math.js';
@@ -39,6 +39,10 @@ interface Resources {
   floats: Float32Array;
   uints: Uint32Array;
   written: Float32Array;
+  /** Each point's nearest distinct neighbours (`distinctNeighbours`), uploaded after the points. */
+  near: Float32Array;
+  /** The mode `near` was computed for. */
+  nearMode: string;
   /** The buffer of the line's solid triangles, with `group` over it in place of the points. */
   fill?: { buffer: GPUBuffer; group: GPUBindGroup; bytes: number; version: number };
 }
@@ -115,6 +119,7 @@ export class Lines implements EnginePlugin {
   private readonly modules = new Map<string, GPUShaderModule>();
   private readonly extendedLayouts = new Map<string, GPUBindGroupLayout>();
   private engine?: Engine;
+  private elapsed = 0;
   private device?: GPUDevice;
   private layouts?: { frame: GPUBindGroupLayout; style: GPUBindGroupLayout; pipeline: GPUPipelineLayout };
   private frameBuffer?: GPUBuffer;
@@ -194,6 +199,22 @@ export class Lines implements EnginePlugin {
     for (const line of [...this.members]) this.remove(line);
   }
 
+  /** Seconds on the plugin's frame clock: each frame update moves it (`advanceTime`), a draw does not. */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves every visible line with a clock of its own (a `Trail`'s fade clock) by `delta` seconds without drawing. Each
+   * frame update runs it once, however many views draw, so `seek` from `@margoengine/cutscene/seek` replays it.
+   */
+  advanceTime(delta: number): void {
+    if (!(delta > 0)) return;
+    this.elapsed += delta;
+    for (const line of this.members) if (line.visible) (line as { advanceTime?: (delta: number) => void }).advanceTime?.(delta);
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
   setup(engine: Engine): void {
     requireWebGPU(engine, 'Lines');
     this.engine = engine;
@@ -324,7 +345,13 @@ export class Lines implements EnginePlugin {
         return buffer;
       };
       const uniform = make(STYLE_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-      const points = make(Math.max(16, line.points.byteLength), GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      // The points, then their nearest distinct neighbours, two points to a vec4.
+      const capacity = line.points.length / 4,
+        nearFloats = Math.ceil(capacity / 2) * 4;
+      const points = make(
+        Math.max(16, line.points.byteLength + nearFloats * 4),
+        GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      );
       const colorBuffer = make(
         Math.max(16, colors?.byteLength ?? 16),
         GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -356,6 +383,8 @@ export class Lines implements EnginePlugin {
         floats: new Float32Array(style),
         uints: new Uint32Array(style),
         written: new Float32Array(STYLE_BYTES / 4).fill(NaN),
+        near: new Float32Array(nearFloats),
+        nearMode: '',
       };
     } catch (error) {
       extra?.dispose();
@@ -447,9 +476,17 @@ export class Lines implements EnginePlugin {
       r.extra?.update();
       if (r.version !== line.version) {
         device.queue.writeBuffer(r.points, 0, line.points as Float32Array<ArrayBuffer>, 0, line.count * 4);
+        r.nearMode = '';
         if (line.colors)
           device.queue.writeBuffer(r.colors, 0, line.colors as Float32Array<ArrayBuffer>, 0, line.count * 4);
         r.version = line.version;
+      }
+      // Strips and loops join across repeated points: recomputed when the points or the mode changed.
+      if (line.mode !== 'segments' && r.nearMode !== line.mode) {
+        const count = line.count,
+          near = distinctNeighbours(line.points, count, line.mode, r.near);
+        device.queue.writeBuffer(r.points, count * 16, near as Float32Array<ArrayBuffer>, 0, Math.ceil(count / 2) * 4);
+        r.nearMode = line.mode;
       }
       // The whole mask (header and bits, capacity/8 bytes), once after it changed.
       if (r.mask && line.mask && r.maskVersion !== line.maskVersion) {
@@ -514,7 +551,8 @@ export class Lines implements EnginePlugin {
     const engine = this.engine as unknown as EngineKernel,
       device = this.device,
       lists = this.drawLists;
-    this.collect(engine, context.delta);
+    // Clocks moved in the frame update (advanceTime); every view of a frame draws the same lines.
+    this.collect(engine, 0);
     for (const list of lists)
       for (const [line] of list) {
         stats.lines++;
@@ -652,8 +690,12 @@ export class Lines implements EnginePlugin {
     this.modules.clear();
   }
 
-  /** Releases every GPU resource. Lines stay registered, so the plugin can be used again. */
+  /** Leaves its scene and releases every GPU resource. Lines stay members, so the plugin can be attached again. */
   dispose(): void {
+    // Leaves its scene first, as engine.removePlugin does, so no pass or registration outlives the plugin; removal
+    // deletes the registration before it calls dispose, so this runs once. A structural engine with no scenes has no
+    // registration to leave.
+    this.engine?.sceneOf?.(this)?.removePlugin(this.name);
     this.releaseGpu();
     this.engine = undefined;
   }

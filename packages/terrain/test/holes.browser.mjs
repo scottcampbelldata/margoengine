@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/holes.browser.mjs
 // Terrain holes (`TerrainTextures.holes`, made by `@margoengine/terrain/holes`) on real elevation (the Mount Rainier
 // tile in packages/shadows/test/fixtures, 256 x 256 texels):

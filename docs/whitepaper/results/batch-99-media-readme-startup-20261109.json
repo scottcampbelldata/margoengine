@@ -110,7 +110,7 @@
       "seconds": 22.94,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -175,7 +175,7 @@
       "seconds": 5.374,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -277,7 +277,7 @@
       "seconds": 2.849,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -295,7 +295,7 @@
       "seconds": 21.303,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -312,7 +312,7 @@
       "seconds": 50.794,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -461,7 +461,7 @@
         "seconds": 45.933,
         "command": [
           "node",
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-99",
           "--wait-max=60",
@@ -483,7 +483,7 @@
         "seconds": 48.282,
         "command": [
           "node",
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-99",
           "--wait-max=60",

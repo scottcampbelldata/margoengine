@@ -2,7 +2,11 @@
 // ecliptic longitude 90 degrees). glTF export turns that into the engine's y up: engine (x, y, z) = Blender (x, z, -y).
 // `node examples/orrery/blender/write-layout.mjs` writes this to blender/layout.json for the Blender build;
 // tests/orrery-gears.test.js checks the file is current.
-import { PLANETS, dateOfJulianDay, julianDay, planetPosition, type PlanetName } from './ephemeris.ts';
+import {
+  HELIOCENTRIC_PLANETS as PLANETS,
+  yearCalendar,
+  type HeliocentricPlanet as PlanetName,
+} from '@margoengine/sky/ephemeris';
 import { ARBOR, FRAME, L1, L2, designTrains, modules, radii, type Train } from './gears.ts';
 
 export type Moon = {
@@ -128,17 +132,8 @@ export function planetLayouts(trains = designTrains()): PlanetLayout[] {
   }));
 }
 
-/** Calendar ring ticks: Earth's heliocentric longitude at 0h UTC on every day of `year`, and where months begin. */
-export function calendar(year = 2026) {
-  const start = julianDay(Date.UTC(year, 0, 1)),
-    end = julianDay(Date.UTC(year + 1, 0, 1));
-  const days: { longitude: number; day: number; month: number }[] = [];
-  for (let jd = start; jd < end; jd++) {
-    const date = dateOfJulianDay(jd);
-    days.push({ longitude: planetPosition('earth', jd).longitude, day: date.getUTCDate(), month: date.getUTCMonth() });
-  }
-  return { year, days };
-}
+/** Calendar ring ticks: Earth's heliocentric longitude at 0h UTC on every day of `year` (@margoengine/sky/ephemeris). */
+export const calendar = (year = 2026) => yearCalendar(year);
 
 export const MONTHS = [
   'JANUARY',

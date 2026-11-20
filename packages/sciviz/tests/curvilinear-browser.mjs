@@ -141,6 +141,20 @@ for (const compat of [false, true]) {
         });
         const opaque = center(await pixels());
         v.dispose();
+        // A colour scale's float table is not filterable: values below its domain take its under colour in the
+        // ray caster and in a section, with no GPU validation error.
+        const { colorScale } = await import('/packages/sciviz/dist/colormaps.js');
+        v = curvilinearVolume(f, { dims, points }, new Float32Array(125).fill(-2), {
+          ...opts,
+          mode: 'mip',
+          colormap: colorScale('coolwarm', { domain: [0, 1], under: '#00ff00', over: '#ff0000' }),
+        });
+        const encoded = center(await pixels());
+        const encodedSection = v.slice(1, 2);
+        v.visible = false;
+        const encodedSlice = center(await pixels());
+        encodedSection.dispose();
+        v.dispose();
         f.dispose();
         // KB5700b: the physical metric squares span-scaled lengths; at 1e20 (or 1e-20) units they overflowed (or
         // underflowed) float32. A unit cube scaled with its referenceStep and limits draws the same pixel.
@@ -161,10 +175,15 @@ for (const compat of [false, true]) {
           g.engine.camera.target = [0, 0, 0];
           g.engine.scene.background = '#000000';
           g.renderer.device.addEventListener('uncapturederror', (e) => gpuErrors.push(e.error.message));
-          const layer = curvilinearVolume(g, { dims, points: points.map((p) => p * s) }, new Float32Array(125).fill(0.5), {
-            ...opts,
-            referenceStep: 0.5 * s,
-          });
+          const layer = curvilinearVolume(
+            g,
+            { dims, points: points.map((p) => p * s) },
+            new Float32Array(125).fill(0.5),
+            {
+              ...opts,
+              referenceStep: 0.5 * s,
+            },
+          );
           await g.ready();
           const b = await createImageBitmap(await g.toPNG({ overlays: false })),
             c = new OffscreenCanvas(96, 96),
@@ -193,6 +212,8 @@ for (const compat of [false, true]) {
           regularPixel,
           mask,
           opaque,
+          encoded,
+          encodedSlice,
           scaled,
           gpuErrors,
         };
@@ -216,6 +237,8 @@ for (const compat of [false, true]) {
     assert.ok(Math.abs(report.warpedPixel[0] - report.regularPixel[0]) <= 1);
     assert.deepEqual(report.mask, [0, 0, 0]);
     assert.deepEqual(report.opaque, [255, 0, 0], 'opacity 1 is opaque at referenceStep 1000');
+    assert.deepEqual(report.encoded, [0, 255, 0], 'colour-scale ray caster draws the under colour');
+    assert.deepEqual(report.encodedSlice, [0, 255, 0], 'colour-scale section draws the under colour');
     for (const pixel of report.scaled)
       assert.ok(Math.abs(pixel[0] - report.expectedCube) <= 1, `scaled cube ${pixel} vs ${report.expectedCube}`);
     await browser.page.goto(new URL('/examples/sciviz-curvilinear.html', browser.page.url()).href);

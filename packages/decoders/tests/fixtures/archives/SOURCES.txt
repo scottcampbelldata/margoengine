@@ -1,3 +1,5 @@
 Written by outside encoders, not by Margo: Python 3.15's bz2 (libbzip2) and lzma (liblzma) modules, on data Margo's test
 script made (repeated text, runs of bytes, zeros, floats). No third-party content. expected.json holds the length and the
 SHA-256 of what each one decodes to.
+floats.delta4.xz, floats.delta2x.xz, floats.blocks.xz and floats.x86.xz: the xz command (XZ Utils 5.8.4, liblzma) on the
+same floats, with --delta=dist=4, --delta=dist=1 --delta=dist=256, five 400,000-byte blocks (-T2) and --x86.

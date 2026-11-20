@@ -1,4 +1,3 @@
-import './support/gpu-lock-env.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -9,6 +8,7 @@ import {
   FIREFOX_WEBGPU_PREFS,
   FIREFOX_WARNING_PREFS,
   firefoxExecutable,
+  firefoxHome,
   firefoxLaunchOptions,
   LAUNCH_FAILED,
   launchBrowser,
@@ -209,6 +209,34 @@ test('Firefox: a step that needs no WebGPU keeps its headless choice; caller pre
   const fromEnv = pick({ MARGO_BROWSER: 'firefox', BROWSER_EXECUTABLE: '/own/firefox' });
   assert.equal(firefoxLaunchOptions(fromEnv, {}, { launcher, realpath: same }).executablePath, '/own/firefox');
   assert.equal(firefoxLaunchOptions(fromEnv, { executablePath: '/replay/firefox' }, { launcher, realpath: same }).executablePath, '/replay/firefox');
+});
+
+test('Firefox on macOS starts with a private home, so it never needs ~/Library/Application Support/Firefox (regression: exit 3, "Could not find profile folder.")', async () => {
+  const { launcher, launched } = fakeFirefox('/pw/firefox');
+  const same = (path) => path;
+  const home = '/tmp/margo-firefox-home-x';
+  const mac = firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, 'darwin'), { env: { PATH: '/bin' } }, { launcher, realpath: same, home });
+  assert.deepEqual(mac.env, { PATH: '/bin', CFFIXED_USER_HOME: home });
+  const own = firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, 'darwin'), { env: { CFFIXED_USER_HOME: '/mine' } }, { launcher, realpath: same, home });
+  assert.deepEqual(own.env, { CFFIXED_USER_HOME: '/mine' });
+  for (const platform of ['win32', 'linux'])
+    assert.equal(firefoxLaunchOptions(pick({ MARGO_BROWSER: 'firefox' }, platform), {}, { launcher, realpath: same }).env, undefined);
+  // Through launchBrowser, as every suite calls it.
+  const opened = await launchBrowser({
+    env: { MARGO_BROWSER: 'firefox' },
+    platform: 'darwin',
+    argv: [],
+    launchers: { chromium: missing('chromium'), firefox: launcher },
+    makeHome: () => '/tmp/fixed-home',
+    report: (text) => assert.fail(text),
+    exit: (code) => assert.fail(`exit ${code}`),
+  });
+  assert.equal(launched.at(-1).env.CFFIXED_USER_HOME, '/tmp/fixed-home');
+  await opened.close();
+  const made = [];
+  const dir = firefoxHome({ make: (path, options) => made.push([path, options]) });
+  assert.match(dir, /margo-firefox-home$/);
+  assert.deepEqual(made, [[dir, { recursive: true }]]);
 });
 
 test('firefoxExecutable resolves the real path, keeps a path it cannot resolve, and gives up only without a launcher path', () => {

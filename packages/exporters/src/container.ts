@@ -51,6 +51,7 @@ const order = [
   'accessors',
   'bufferViews',
   'buffers',
+  'extras',
 ];
 
 /** @internal A glTF document under construction and its binary buffer. */
@@ -106,11 +107,13 @@ export class Bin {
     return this.list('accessors', accessor);
   }
 
-  /** Puts the top-level keys in a stable order and records the buffer length. */
+  /** Puts the top-level keys in a stable order, keeping every key, and records the buffer length. */
   finish(): void {
     if (this.length) this.json.buffers = [{ byteLength: this.length }];
     const sorted: Record<string, unknown> = {};
     for (const key of order) if (this.json[key] !== undefined) sorted[key] = this.json[key];
+    // Anything else (a key a later glTF version or an extension adds) follows in the order it was set; none is dropped.
+    for (const key of Object.keys(this.json)) if (!(key in sorted)) sorted[key] = this.json[key];
     for (const key of Object.keys(this.json)) delete this.json[key];
     Object.assign(this.json, sorted);
   }

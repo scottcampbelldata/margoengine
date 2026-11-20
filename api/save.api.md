@@ -33,6 +33,11 @@ export interface EntityRef {
     $ref: string;
 }
 
+export interface IndexedDBStorage extends SaveStorage {
+    close(): Promise<void>;
+    [Symbol.dispose](): void;
+}
+
 export interface IndexedDBStorageOptions {
     database?: string;
     store?: string;
@@ -167,7 +172,7 @@ export function findRefs(value: Json, path?: string, out?: {
     id: string;
 }[];
 
-export function indexedDBStorage(options?: IndexedDBStorageOptions): SaveStorage;
+export function indexedDBStorage(options?: IndexedDBStorageOptions): IndexedDBStorage;
 
 export function loadGame(storage: SaveStorage, key: string, options?: LoadOptions): Promise<SaveDocument | null>;
 

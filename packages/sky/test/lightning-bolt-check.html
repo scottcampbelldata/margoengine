@@ -1,0 +1,86 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky lightning bolt check</title><style>body{margin:0}canvas{display:block;width:640px;height:360px}</style></head><body><canvas></canvas>
+<script type="module">
+// The drawn lightning bolt (LightningBolt) and the light along its channel, read back from Bloom's HDR scene capture:
+// a held flash over a night scene with a ground, a hill, a cloud deck and a Clustered light list. The bolt must draw a
+// thin bright branching line the hill hides, the settings rows must change it, and the ground must be lit from the
+// channel. Driven by features-check.mjs (`lightning-bolt`), on WebGPU and under MARGO_COMPAT=1 on the WebGL2 layer.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LightGroups} from '/packages/clustered/dist/groups.js';
+import {applySkySettings} from '/packages/sky/dist/settings.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {VolumetricClouds,Weather} from '/packages/sky/dist/compat-clouds.js';
+import {LightningBolt} from '/packages/sky/dist/lightning-bolt.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,3,12],target:[0,500,-3000],near:0.5,far:20000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const sky=new Sky({hours:23,timeScale:0});engine.use(sky);
+const lights=Clustered.attach(engine,{shadows:{resolution:512}});
+const groups=LightGroups.attach(engine,lights);
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,0]);
+const hill=engine.createMesh().setGeometry(box(6000,4000,40)).setMaterial(new PbrMaterial({color:'#303030',roughness:0.9})).setPosition([0,-4000,-300]);
+const block=engine.createMesh().setGeometry(box(6,6,6)).setMaterial(new PbrMaterial({color:'#b0b0b0',roughness:0.9})).setPosition([0,3,-30]);
+const clouds=new VolumetricClouds({sky,coverage:0.9,bottom:1500,top:2600,density:0.05});engine.use(clouds);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x>=s.x||id.y>=s.y){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {data,w:texture.width,h:texture.height};
+}
+const shot=async()=>{engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+// Mean luminance of a band of rows (fractions of the frame height from the top) over the middle half of the width.
+const band=(img,top,bottom)=>{let s=0,n=0;for(let y=Math.floor(top*img.h);y<Math.floor(bottom*img.h);y++)for(let x=Math.floor(img.w/4);x<Math.floor(img.w*3/4);x++){const i=(y*img.w+x)*4;s+=0.2126*img.data[i]+0.7152*img.data[i+1]+0.0722*img.data[i+2];n++;}return s/n;};
+const regions=img=>({deck:band(img,0.05,0.3),ground:band(img,0.8,0.98)});
+// Bright pixels (HDR luminance above 8), their count, the rows they cover and the brightest, over the whole frame.
+const stats=img=>{let n=0,max=0,top=img.h,bottom=0,sum=0;for(let y=0;y<img.h;y++)for(let x=0;x<img.w;x++){const i=(y*img.w+x)*4,l=0.2126*img.data[i]+0.7152*img.data[i+1]+0.0722*img.data[i+2];if(l>8){n++;top=Math.min(top,y);bottom=Math.max(bottom,y);}max=Math.max(max,l);sum+=l;}return {bright:n,rows:n?bottom-top+1:0,max,sum,h:img.h};};
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const weather=new Weather({intensity:0,lightning:{strength:0,seed:3,bolt:{top:1200},cloud:{base:1500}}});engine.use(weather);
+  const bolt=new LightningBolt({weather});engine.use(bolt);
+  weather.strike({distance:3000,azimuth:Math.PI,strength:1});
+  const hold=async v=>{weather.options.lightning.hold=v;await shot();await shot();return shot();};
+  for(let i=0;i<3;i++)await shot();
+  out.none=stats(await hold(0));
+  out.bolt=stats(await hold(1));
+  out.again=stats(await hold(1));
+  // A second stroke's light dims it: a held 0.3 is dimmer than 1 but the same shape.
+  out.dim=stats(await hold(0.3));
+  const o=weather.options.lightning;
+  o.bolt.scale=0;out.off=stats(await hold(1));o.bolt.scale=1;
+  o.bolt.glow=0;out.coreOnly=stats(await hold(1));o.bolt.glow=80;
+  o.bolt.glow=600;out.wideGlow=stats(await hold(1));o.bolt.glow=80;
+  o.bolt.width=20;out.fat=stats(await hold(1));o.bolt.width=1.5;
+  o.bolt.branching=0;out.plain=stats(await hold(1));o.bolt.branching=0.4;out.forked=stats(await hold(1));delete o.bolt.branching;
+  // The hill (a block of the frame in front of the whole channel) hides it through the depth test.
+  hill.setPosition([0,1000,-300]);
+  out.hidden=stats(await hold(1));
+  hill.setPosition([0,-4000,-300]);
+  out.shown=stats(await hold(1));
+  // The ground under the channel's light against the point light 700 m up (line false): both light it.
+  const ground=img=>{let s=0,n=0;for(let y=Math.floor(img.h*0.85);y<img.h;y++)for(let x=0;x<img.w;x++){const i=(y*img.w+x)*4;s+=0.2126*img.data[i]+0.7152*img.data[i+1]+0.0722*img.data[i+2];n++;}return s/n;};
+  o.bolt.scale=0;
+  o.link={lights:false};out.groundDark=ground(await hold(1));delete o.link;
+  out.groundLine=ground(await hold(1));
+  o.light={line:false};out.groundPoint=ground(await hold(1));
+  o.light={segments:1};out.groundOne=ground(await hold(1));delete o.light;
+  o.bolt.scale=1;
+  // Settings rows through applySkySettings.
+  applySkySettings({sky,weather},{hours:23,timeScale:0,'lightning.hold':1,'lightning.bolt.scale':0});out.rowOff=stats(await shot().then(()=>shot()).then(()=>shot()));
+  applySkySettings({sky,weather},{hours:23,timeScale:0,'lightning.hold':1});out.rowOn=stats(await shot().then(()=>shot()).then(()=>shot()));
+  out.lights=groups.names;
+  weather.options.lightning.hold=1;
+  for(let i=0;i<2;i++)await shot();
+  bolt.dispose();weather.dispose();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }};
+window.ready=true;
+</script></body></html>

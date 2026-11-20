@@ -1,6 +1,6 @@
 // Regression: `npm run modern:test:extensions` ran its eight suites in one process with no time limit, so a wait that
 // never ended (getCompilationInfo() that Chromium left pending, in material-extension-tests.js) held the run until the
-// GPU lock's 30 minute limit with no message. Each suite now runs alone under runLimited, which ends its process tree
+// 30 minute limit with no message. Each suite now runs alone under runLimited, which ends its process tree
 // at the limit and names the suite.
 import test from 'node:test';
 import assert from 'node:assert/strict';

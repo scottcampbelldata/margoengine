@@ -5,10 +5,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-vsm' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/vsm.html', port: 5276 }),
   { page } = context,
   pageErrors = [];
@@ -100,5 +98,4 @@ try {
   console.log('variance filter: ok');
 } finally {
   await context.close?.();
-  await release();
 }

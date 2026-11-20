@@ -4,11 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import validator from 'gltf-validator';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { headlessEngine } from '../../exporters/tests/helpers.js';
 import { convertFBX, parseFBX } from '../dist/index.js';
 import { sceneExtras } from '../dist/scene-extras.js';
-import { modelFromPrepared } from '../../gltf-pro/dist/worker.js';
+import { modelFromPrepared } from '../../gltf/dist/worker.js';
 import { readGLB } from './native-scene-helper.js';
 import { runParseWorker } from '../../../tests/support/parse-worker.js';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
@@ -168,7 +168,7 @@ test('a file with only a camera converts with the extension and still reports no
   const bytes = fbx([cameraAttribute(number('FieldOfView', 40))]);
   await assert.rejects(convertFBX(bytes), /no mesh geometry/);
   assert.equal((await read(bytes)).cameras.length, 1);
-  // gltf-pro's model needs a mesh to draw, so such a file stops at the GLB, with its error.
+  // gltf/pbr's model needs a mesh to draw, so such a file stops at the GLB, with its error.
   await assert.rejects(parseFBX(await headlessEngine(), bytes, { extensions }), /no renderable meshes/);
 });
 

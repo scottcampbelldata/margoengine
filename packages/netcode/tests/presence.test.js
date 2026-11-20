@@ -209,3 +209,16 @@ test('real OS processes discover and reserve remotely, then client joins owning 
     rmSync(folder, { recursive: true });
   }
 });
+
+test('SQLite adapter finds keys under a namespace with characters outside the BMP', async () => {
+  // SQLite substr() counts characters; a JavaScript length counts UTF-16 units, two for each such character.
+  const folder = resolve('test-results/batch256', `presence-store-${crypto.randomUUID()}`);
+  mkdirSync(folder, { recursive: true });
+  try {
+    using a = await openSqlitePresence(resolve(folder, 'store.sqlite'), { namespace: 'arena-\u{1F3AE}' });
+    await a.publish({ processId: 'a', endpoint: 'ws://a', rooms: [] }, 10000);
+    assert.deepEqual((await a.processes()).map((p) => p.processId), ['a']);
+  } finally {
+    rmSync(folder, { recursive: true });
+  }
+});

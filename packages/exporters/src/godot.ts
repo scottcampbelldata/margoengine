@@ -1,4 +1,4 @@
-// Godot import bundle: the unchanged GLB plus a `.import` seed, a post-import script and a manifest. The supplied GLB
+// Godot import bundle: the GLB (unchanged unless it holds sparse accessors, which are repacked dense) plus a `.import` seed, a post-import script and a manifest. The supplied GLB
 // is never rewritten; only Godot's public scene-import and convex-shape APIs interpret the profile.
 import type { GodotFlipbookBinding } from './godot-flipbook.js';
 import { splitGLB } from './glb.js';
@@ -183,7 +183,7 @@ function helpers(document: Json, nodes: Json[], parents: number[], ids: unknown,
   nodes.forEach((node, i) => {
     const extensions = isObject(node.extensions) ? node.extensions : {};
     const visibility = isObject(extensions.KHR_node_visibility) ? extensions.KHR_node_visibility : {};
-    if (visibility.visible === false && typeof node.name === 'string' && /-convcol$/i.test(node.name))
+    if (visibility.visible === false && typeof node.name === 'string' && /[-_$]convcol$/i.test(node.name))
       hiddenConvex.add(i);
   });
   const selected = [...requested].sort().map((id) => {
@@ -192,7 +192,7 @@ function helpers(document: Json, nodes: Json[], parents: number[], ids: unknown,
     if (i === undefined) throw new TypeError(`${label} is missing from this GLB; list only exported extras.id values`);
     const node = nodes[i];
     if (!hiddenConvex.has(i))
-      throw new TypeError(`${label} needs a hidden mesh node named *-convcol; export it with retainedVisibility false`);
+      throw new TypeError(`${label} needs a hidden mesh node named *-convcol (or _convcol, $convcol); export it with retainedVisibility false`);
     const mesh = meshes[index(node.mesh, meshes.length, `${label} mesh`)];
     const primitives = records(mesh.primitives, 'Godot helper primitives');
     if (!primitives.length) throw new TypeError(`${label} has no mesh primitives; export its geometry`);
@@ -302,9 +302,17 @@ export async function createGodotImportBundle(
   if (!(glb instanceof Uint8Array))
     throw new TypeError('Godot bundle needs GLB bytes as a Uint8Array; pass exportGLB output');
   if (!isObject(options)) throw new TypeError('Godot bundle needs an options object; pass at least { folder }');
-  const folder = folderName(options.folder),
-    owned = Uint8Array.from(glb);
-  const { json: document, bin } = splitGLB(owned);
+  const folder = folderName(options.folder);
+  let owned: Uint8Array<ArrayBufferLike> = Uint8Array.from(glb);
+  let parts = splitGLB(owned);
+  // Morph targets are written sparse by default; the profile carries only ordinary accessors, so densify them first
+  // (every accessor index and logical value is kept). A GLB without sparse accessors is used byte for byte.
+  if ((Array.isArray(parts.json.accessors) ? (parts.json.accessors as unknown[]) : []).some((accessor) => isObject(accessor) && accessor.sparse !== undefined)) {
+    const { denseGLB } = await import('./sparse.js');
+    owned = denseGLB(owned);
+    parts = splitGLB(owned);
+  }
+  const { json: document, bin } = parts;
   validateEmbeddedImportData(document, bin, GODOT);
   const nodes = records(document.nodes, 'GLB nodes'),
     parents = nodeParents(nodes, GODOT);

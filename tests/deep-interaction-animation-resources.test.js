@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Animation } from '../packages/animation/dist/index.js';
-import { GLTFAsset } from '../packages/gltf-pro/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { GLTFAsset } from '../packages/gltf/dist/pbr.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 import { optionalGPU } from './support/optional-gpu.js';
 
 test('animation retains inverse bind views through 120 moving frames and recreates resources after restoration', () => {

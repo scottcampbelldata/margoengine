@@ -11,8 +11,7 @@
 //   node scripts/record-wgsl-corpus.mjs --add --suites=...      add these suites' modules to the corpus on disk, for a
 //                                                               package that gained shaders
 // Each suite runs as it does in check:merge, with NODE_OPTIONS=--import=scripts/support/wgsl-corpus-hook.mjs and
-// MARGO_WGSL_CORPUS=test-results/wgsl-corpus, so every browser it launches records into a shard; the suites take the
-// GPU lock themselves. A suite that fails is reported and the run exits 1 after writing what was recorded, so a broken
+// MARGO_WGSL_CORPUS=test-results/wgsl-corpus, so every browser it launches records into a shard. A suite that fails is reported and the run exits 1 after writing what was recorded, so a broken
 // check cannot silently shrink the corpus. Every suite has a hard time limit (30 minutes; MARGO_CORPUS_SUITE_MIN), except
 // check:gpu-packages, which ends each of its tests at that test's own limit: its limit is the sum of those (runMinutes in
 // scripts/gpu-package-tests.mjs), as one 30-minute cap over all of them stopped a full run on a slow GPU with nothing
@@ -76,5 +75,5 @@ console.log(
 );
 if (failed.length) {
   for (const f of failed) console.error(`  suite failed: ${f}`);
-  process.exit(1);
+  process.exitCode = 1;
 }

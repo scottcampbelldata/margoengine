@@ -8,6 +8,28 @@ import { Engine } from "@margoengine/core/extension";
 import { Texture } from "@margoengine/materials";
 import { ReactNode } from "react";
 
+export interface DepthBufferOptions {
+    size?: number;
+    frames?: number;
+    onError?: (error: unknown) => void;
+}
+
+export interface FBO {
+    readonly texture: Texture;
+    readonly target: {
+        readonly color: GPUTexture;
+        readonly depth?: GPUTexture;
+    };
+    readonly width: number;
+    readonly height: number;
+}
+
+export interface FBOOptions {
+    format?: GPUTextureFormat;
+    depth?: boolean;
+    onError?: (error: unknown) => void;
+}
+
 export function Hud(_arg0: HudProps): import("react").JSX.Element | null;
 
 export interface HudProps {
@@ -37,6 +59,11 @@ export interface RenderTextureProps {
     onTexture?: (texture: Texture | null) => void;
     onError?: (error: unknown) => void;
 }
+
+export function useDepthBuffer(_arg1?: DepthBufferOptions): GPUTexture | null;
+
+export function useFBO(width?: number, height?: number, options?: FBOOptions): FBO | null;
+export function useFBO(options?: FBOOptions): FBO | null;
 
 // Not exported from this entry, but used by the exports above:
 

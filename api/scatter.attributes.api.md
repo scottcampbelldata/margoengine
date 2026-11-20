@@ -59,6 +59,8 @@ class ScatterInstances implements EnginePlugin {
     static attach(engine: EngineKernel, generate: () => readonly ScatterBatch[]): ScatterInstances;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     drawShadow({ context, pass, matrix, cascade }: {
         context: ScatterPassContext;
@@ -78,5 +80,5 @@ type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
-type ScatterWind = readonly [number, number, number];
+type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];
 ```

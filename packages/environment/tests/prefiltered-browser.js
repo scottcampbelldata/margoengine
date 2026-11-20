@@ -53,6 +53,38 @@ window.runTests = async () => {
     cancelled = error.name === 'AbortError';
   }
   assert(cancelled, 'cancelled save');
+  // Regression (KB-A3d): a save during a refresh would mix the old SH with new texels. It rejects with code 'state'
+  // until the refresh settles, and a save that starts after it holds the refreshed state.
+  {
+    const cubeSource = device.createTexture({
+      size: [16, 16, 6],
+      format: 'rgba16float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+    });
+    const fill = (half) =>
+      device.queue.writeTexture({ texture: cubeSource }, new Uint16Array(16 * 16 * 6 * 4).fill(half), { bytesPerRow: 16 * 8, rowsPerImage: 16 }, [16, 16, 6]);
+    fill(0x3c00); // 1.0
+    const live = await Environment.create(device, { texture: cubeSource }, { specularMips: 3, samples: 16, brdfSize: 16, brdfSamples: 16 });
+    assert(!live.refreshPending, 'no refresh pending after create');
+    fill(0x4000); // 2.0
+    const refreshed = live.refresh();
+    assert(live.refreshPending, 'refreshPending while a refresh runs');
+    let code;
+    try {
+      await savePrefilteredEnvironment(live);
+    } catch (error) {
+      code = error.code;
+    }
+    assert(code === 'state', `a save during a refresh rejects with code 'state' (got ${code})`);
+    await refreshed;
+    assert(!live.refreshPending, 'refreshPending clears when the refresh settles');
+    const saved = await loadPrefilteredEnvironment(device, await savePrefilteredEnvironment(live));
+    await compare(device, live, saved);
+    assert(Math.abs(saved.sh.radiance[0] - live.sh.radiance[0]) < 1e-6 && live.sh.radiance[0] > 0, 'refreshed SH saved');
+    saved.dispose();
+    live.dispose();
+    cubeSource.destroy();
+  }
   const url = URL.createObjectURL(new Blob([file]));
   const fromURL = await loadPrefilteredEnvironment(device, url, { intensity: 2, rotation: 0.5 });
   URL.revokeObjectURL(url);
@@ -85,6 +117,7 @@ window.runTests = async () => {
     checks: [
       'real HDR cube, every specular mip, SH and LUT are lossless',
       'URL, overrides, cancellation',
+      "a save during a refresh rejects with code 'state'; after it the file holds the refreshed state",
       'background and IBL attach, device replacement reuploads without filtering',
     ],
     fileBytes: file.length,

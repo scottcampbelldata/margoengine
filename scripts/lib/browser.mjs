@@ -1,8 +1,9 @@
 import { chromium, firefox, webkit } from '@playwright/test';
 import { gpuAdapterArg } from './gpu-adapter.mjs';
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
-import { win32 } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, win32 } from 'node:path';
 import { createInterface } from 'node:readline';
 import { closeAll, endTree, traceShutdown, SHUTDOWN_BUDGET_MS, SHUTDOWN_STEPS } from '../support/shutdown.mjs';
 import { HOST_LOG, HOST_PATH, REAP_MS } from '../support/browser-host.mjs';
@@ -155,13 +156,13 @@ export function browserLabel(options) {
  * copy, for example one installed in a throwaway fixture project. Skips the suite like {@link launchBrowser} when the
  * browser is not Chromium-based. `webgpu: false` leaves the WebGPU switches out.
  */
-export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, platform, argv, ...options } = {}) {
+export function chromiumLaunchOptions({ name, args = [], webgpu = true, env, platform, argv, files = nodeFiles, ...options } = {}) {
   const browser = resolveBrowser({ name, env, platform, argv }),
     reason = unsupportedReason(browser, 'chromium');
   if (reason) return skipSuite(reason);
   // A Windows channel starts from its version folder, as launchBrowser starts it (channelExecutable, KB-C34i).
   const executablePath =
-    browser.executablePath ?? options.executablePath ?? (browser.channel ? channelExecutable(browser, browser.channel) : undefined);
+    browser.executablePath ?? options.executablePath ?? (browser.channel ? channelExecutable(browser, browser.channel, { files }) : undefined);
   return {
     ...options,
     args: launchArgs(browser, args, { webgpu }),
@@ -211,6 +212,29 @@ async function listOwnedPids(browser, listMs) {
 export const TEARDOWN_GRACE_MS = 2_000;
 
 /**
+ * The hard limit on closing a browser this module launched under a host (KB-P3h). Past it the close kills the host's
+ * whole process tree (the host, the browser and everything under them: `taskkill /T /F` on Windows, the process groups
+ * elsewhere), releases the host and fails with `SHUTDOWN_TIMEOUT` and `killed`, so a close that cannot finish never holds
+ * its suite past the limit. Sized from measurement: a close took 0.25 s alone and
+ * 0.28 to 2.03 s beside two GPU suites and ten CPU hogs (nodes-browser, 2026-11-15); its own bounded waits add up to
+ * about 7 s (the 5,000 ms listing, the 2,000 ms grace and two acknowledgements of a few ms). The limit is about three
+ * times that, and leaves `CLOSE_KILL_MS` inside the shared 30,000 ms budget for the kill.
+ */
+export const CLOSE_LIMIT_MS = 20_000;
+
+/** How long the kill at `CLOSE_LIMIT_MS` waits for the killed processes to be gone before the close fails anyway. */
+export const CLOSE_KILL_MS = 8_000;
+
+/** Where the close limit and its kill are documented: the help link of the error it throws. */
+export const CLOSE_LIMIT_HELP = 'docs/limits.md#browser-close-limit';
+
+/** Kills each of `pids` and its tree; resolves to the ones still running after `waitMs`. */
+async function killTrees(pids, waitMs) {
+  const left = await Promise.all(pids.map((pid) => endTree(pid, { waitMs, settle: null })));
+  return [...new Set(left.flat())];
+}
+
+/**
  * Starts a browser host (scripts/support/browser-host.mjs) with Playwright's launch `settings` and resolves once it
  * reports the server's endpoint. The host owns every wait on the browser process (its handle, pipes, WebSocket server
  * and temporary profile), so this process never waits on the kernel's teardown of a browser it has ended; see the
@@ -225,12 +249,16 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
     windowsHide: true,
     env,
   });
-  const waiting = [];
+  // Lines the host sent before anyone asked for them (its result can arrive while the close still awaits Playwright's
+  // own close beside end()): kept in order, so a later next() reads them even after the host has ended.
+  const waiting = [],
+    unread = [];
   let gone = null,
     released = false;
   const next = () =>
     new Promise((resolve, reject) => {
-      if (gone) reject(gone);
+      if (unread.length) resolve(unread.shift());
+      else if (gone) reject(gone);
       else if (released) resolve(null);
       else waiting.push({ resolve, reject });
     });
@@ -246,7 +274,9 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
     } catch {
       return;
     }
-    waiting.shift()?.resolve(message);
+    const waiter = waiting.shift();
+    if (waiter) waiter.resolve(message);
+    else unread.push(message);
   });
   // A host that is gone has ended its stdout; its process 'exit' can arrive before its last line has been read.
   let ended = null;
@@ -305,10 +335,27 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
  * disconnects, and the kernel's teardown of the ended processes is waited for only up to `graceMs`. Past that the
  * host carries on alone (it records a survivor after `REAP_MS`) and the suite moves on: a browser process the kernel
  * is still tearing down after `TerminateProcess` can hold nothing of the suite's any more.
+ *
+ * A hosted close has a hard limit, `budgetMs` (default `CLOSE_LIMIT_MS`): a close still open then (a host that never
+ * acknowledges, a client close that never returns) kills the host's process tree with `kill` (default: `endTree` on the
+ * host and on the browser, waiting up to `killMs`), releases the host, and throws `SHUTDOWN_TIMEOUT` with `open` (the
+ * steps still open), `killed` (the pids it killed) and `survivors` (any still running after `killMs`). Before KB-P3h
+ * the budget threw but left the host and its browser running and the host's pipes referenced, so a caller that went on
+ * after the error (scripts/visual-regression.js does) could never exit: the host waits for an end request that never
+ * comes, and the suite waits for the host.
  */
 export function withBoundedClose(
   browser,
-  { end = endTree, host = ownedHosts.get(browser), graceMs = TEARDOWN_GRACE_MS, listMs = LIST_PROCESSES_MS, budgetMs = SHUTDOWN_BUDGET_MS, report = console.error } = {},
+  {
+    end = endTree,
+    host = ownedHosts.get(browser),
+    graceMs = TEARDOWN_GRACE_MS,
+    listMs = LIST_PROCESSES_MS,
+    budgetMs = host ? CLOSE_LIMIT_MS : SHUTDOWN_BUDGET_MS,
+    killMs = CLOSE_KILL_MS,
+    kill = killTrees,
+    report = console.error,
+  } = {},
 ) {
   if (typeof browser?.close !== 'function') return browser;
   const close = browser.close.bind(browser);
@@ -328,43 +375,19 @@ export function withBoundedClose(
         pending.delete(name);
       }
     };
-    return closeAll({
+    // Set once the close below has finished, either way: a closeAll that ends before it ended at the limit.
+    let finished = false;
+    const closing = closeAll({
       budgetMs,
       browser: {
         [SHUTDOWN_STEPS]: pending,
         close: async () => {
           if (host) {
-            let outcome;
             try {
-              // Listing needs a connected client: read it before close() can disconnect its CDP session.
-              const pids = await step('Chromium process listing', () => listOwnedPids(browser, listMs));
-              const children = pids ? pids.filter((pid) => pid !== host.pid) : null;
-              const results = await Promise.allSettled([
-                step(`Chromium process termination (${host.pid}; children ${children ? children.join(', ') || 'none' : 'unlisted, whole tree'})`, () =>
-                  host.end(children),
-                ),
-                step('Playwright client close', () => close(...args)),
-              ]);
-              for (const result of results) if (result.status === 'rejected') throw result.reason;
-              let timer;
-              outcome = await step(`Chromium process teardown (${host.pid})`, () =>
-                Promise.race([host.finished(), new Promise((resolve) => (timer = setTimeout(resolve, graceMs, null)))]),
-              );
-              clearTimeout(timer);
+              return await hostedClose();
             } finally {
-              // On every path: a host left referenced would hold the suite open after its last check.
-              host.release();
+              finished = true;
             }
-            if (!outcome)
-              report(
-                `browser host ${host.process?.pid}: Chromium ${host.pid} was ended but the kernel had not finished tearing it down ${graceMs} ms later; the host waits up to ${REAP_MS} ms and records a survivor in ${HOST_LOG}`,
-              );
-            else if (outcome.survivors?.length)
-              throw Object.assign(new Error(`Chromium processes did not exit: ${outcome.survivors.join(', ')}`), {
-                code: 'SHUTDOWN_TIMEOUT',
-                open: outcome.survivors.map((pid) => `Chromium process ${pid}`),
-              });
-            return;
           }
           // An end that fails (its CDP session refused, say) still closes the ordinary way, then throws: a browser left
           // running holds its suite's process open after the last check, and the run around it never ends.
@@ -379,6 +402,58 @@ export function withBoundedClose(
         },
       },
     });
+    if (!host) return closing;
+    return closing.catch(async (error) => {
+      if (finished) throw error;
+      const pids = [host.process?.pid, host.pid].filter((pid) => Number.isInteger(pid) && pid > 0);
+      let survivors;
+      try {
+        survivors = await kill(pids, killMs);
+      } finally {
+        host.release();
+      }
+      const open = error.open ?? [];
+      throw Object.assign(
+        new Error(
+          `browser close passed its ${budgetMs} ms limit (still open: ${open.join(', ') || 'unknown'}); killed browser host ${host.process?.pid} and browser ${host.pid} with their process trees${survivors.length ? `, but ${survivors.join(', ')} still ran ${killMs} ms later` : ''}; see ${CLOSE_LIMIT_HELP}`,
+          { cause: error },
+        ),
+        { code: 'SHUTDOWN_TIMEOUT', open, killed: pids, survivors },
+      );
+    });
+    async function hostedClose() {
+      let outcome;
+      try {
+        // Listing needs a connected client: read it before close() can disconnect its CDP session.
+        const pids = await step('Chromium process listing', () => listOwnedPids(browser, listMs));
+        const children = pids ? pids.filter((pid) => pid !== host.pid) : null;
+        const results = await Promise.allSettled([
+          step(`Chromium process termination (${host.pid}; children ${children ? children.join(', ') || 'none' : 'unlisted, whole tree'})`, () =>
+            host.end(children),
+          ),
+          step('Playwright client close', () => close(...args)),
+        ]);
+        for (const result of results) if (result.status === 'rejected') throw result.reason;
+        let timer;
+        outcome = await step(`Chromium process teardown (${host.pid})`, () =>
+          Promise.race([host.finished(), new Promise((resolve) => (timer = setTimeout(resolve, graceMs, null)))]),
+        );
+        clearTimeout(timer);
+      } finally {
+        // On every path: a host left referenced would hold the suite open after its last check.
+        host.release();
+      }
+      if (!outcome)
+        report(
+          `browser host ${host.process?.pid}: Chromium ${host.pid} was ended but the kernel had not finished tearing it down ${graceMs} ms later; the host waits up to ${REAP_MS} ms and records a survivor in ${HOST_LOG}`,
+        );
+      else if (outcome.survivors?.length)
+        throw Object.assign(new Error(`Chromium processes did not exit: ${outcome.survivors.join(', ')}`), {
+          code: 'SHUTDOWN_TIMEOUT',
+          open: outcome.survivors.map((pid) => `Chromium process ${pid}`),
+        });
+      return;
+    }
   };
   return browser;
 }
@@ -418,17 +493,38 @@ export function firefoxExecutable(launcher, { realpath = realpathSync.native } =
 }
 
 /**
+ * The home folder Firefox gets on macOS: `margo-firefox-home` under the temporary folder, made on first use and reused
+ * by every later launch. Why: Firefox's profile service creates `~/Library/Application Support/Firefox` at start even
+ * when `-profile` names the profile, and macOS refuses that folder to a process without access to other apps' data (the
+ * desktop app's agents, for one): mkdir fails with EPERM, Firefox prints "Could not find profile folder." and exits
+ * 1, so every Firefox suite ended with exit 3 (cannot start firefox) before its first check. CoreFoundation takes the
+ * user's home from CFFIXED_USER_HOME when it is set, so Firefox makes those folders here instead and never touches the
+ * user's own Firefox data. The folder is kept: macOS marks the `Library/Application Support` that Firefox makes in it
+ * as Firefox's data, so this process may not delete it, and a fixed name keeps one copy rather than one per run. The
+ * profile itself stays in Playwright's own temporary profile, made and removed per launch.
+ */
+export function firefoxHome({ make = mkdirSync } = {}) {
+  const dir = join(tmpdir(), 'margo-firefox-home');
+  make(dir, { recursive: true });
+  return dir;
+}
+/**
  * Launch options for Playwright's Firefox: the caller's options with FIREFOX_WEBGPU_PREFS and FIREFOX_WARNING_PREFS under the caller's own
  * `firefoxUserPrefs`, headed when the step needs WebGPU (headless Firefox has none), and the executable: the caller's
- * `executablePath`, else BROWSER_EXECUTABLE, else Playwright's install by its real path (see firefoxExecutable).
+ * `executablePath`, else BROWSER_EXECUTABLE, else Playwright's install by its real path (see firefoxExecutable). On
+ * macOS the browser also gets `home` (see firefoxHome) as its home unless its environment already names one.
  */
-export function firefoxLaunchOptions(browser, options = {}, { needs = 'webgpu', launcher, realpath } = {}) {
+export function firefoxLaunchOptions(browser, options = {}, { needs = 'webgpu', launcher, realpath, home } = {}) {
   const executablePath = options.executablePath ?? browser.executablePath ?? firefoxExecutable(launcher, { realpath });
+  const childEnv = options.env ?? process.env;
   return {
     ...options,
     ...(needs === 'webgpu' ? { headless: false } : {}),
     firefoxUserPrefs: { ...FIREFOX_WEBGPU_PREFS, ...FIREFOX_WARNING_PREFS, ...options.firefoxUserPrefs },
     ...(executablePath ? { executablePath } : {}),
+    ...(browser.platform === 'darwin' && home && !childEnv.CFFIXED_USER_HOME
+      ? { env: { ...childEnv, CFFIXED_USER_HOME: home } }
+      : {}),
   };
 }
 
@@ -583,7 +679,8 @@ export function launchFailureMessage(browser, error, { suite } = {}) {
 /**
  * Launches the chosen browser. Playwright launch options (headless, args, ...) pass through; the channel, the
  * executable and the WebGPU switches come from {@link resolveBrowser}. A step the browser cannot run is skipped with a
- * clear line (see {@link skipSuite}). Options: `name` (force a browser), `needs` ('webgpu' | 'chromium' | 'none').
+ * clear line (see {@link skipSuite}). Options: `name` (force a browser), `needs` ('webgpu' | 'chromium' | 'none'),
+ * `files` (the file layer a Windows install is read through; tests pass an in-memory Windows install).
  * With nothing chosen on Windows and Edge missing, falls back to Playwright's Chromium as before.
  */
 
@@ -598,16 +695,20 @@ export async function launchBrowser({
   hosting = startHost,
   report = console.error,
   exit = process.exit,
+  makeHome = firefoxHome,
+  files = nodeFiles,
   ...options
 } = {}) {
   const browser = resolveBrowser({ name, env, platform, argv }),
     reason = unsupportedReason(browser, needs);
   if (reason) return skipSuite(reason);
   try {
-    if (browser.engine === 'firefox')
+    if (browser.engine === 'firefox') {
+      const home = browser.platform === 'darwin' ? makeHome() : undefined;
       return withBoundedClose(
-        await launchers.firefox.launch(firefoxLaunchOptions(browser, options, { needs, launcher: launchers.firefox })),
+        await launchers.firefox.launch(firefoxLaunchOptions(browser, options, { needs, launcher: launchers.firefox, home })),
       );
+    }
     if (browser.engine !== 'chromium') return withBoundedClose(await launchers[browser.engine].launch({ ...options }));
     const launch = async (channel) => {
       const settings = {
@@ -615,7 +716,7 @@ export async function launchBrowser({
         args: launchArgs(browser, args),
         ...(channel ? { channel } : {}),
       };
-      const executablePath = chromiumExecutablePath(browser, channel, options, { launcher: launchers.chromium });
+      const executablePath = chromiumExecutablePath(browser, channel, options, { launcher: launchers.chromium, files });
       if (executablePath) settings.executablePath = executablePath;
       // A Chromium this module owns runs under a browser host of its own (scripts/support/browser-host.mjs), which holds
       // the process and everything that waits on it; this process only connects to it.

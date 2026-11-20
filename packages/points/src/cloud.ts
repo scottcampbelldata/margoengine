@@ -156,6 +156,9 @@ export class PointCloud extends SelectionMasked {
       options.material instanceof PointsMaterial ? options.material : new PointsMaterial(options.material);
     let stored = positions instanceof Float32Array ? positions : Float32Array.from(positions),
       normals = options.normals ?? null;
+    // Surfels upload count * 12 bytes of normals and the reorder reads one per point: a short array is no normals.
+    if (normals && normals.length !== positions.length)
+      throw new RangeError(`normals needs ${positions.length} values (xyz per point); pass one normal a point`);
     if (options.colors) this.setColors(options.colors, options.colorComponents, false);
     if (options.sizes) this.setSizes(options.sizes, false);
     const blocks = buildBlocks(stored, this.count, this.blockSize, this.seed);

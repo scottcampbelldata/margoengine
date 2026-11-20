@@ -9,7 +9,7 @@ export async function pbrBoxBrowserChecks(page) {
   return page.evaluate(async () => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
-    const { loadGLTF, parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF, parseGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { loadGLTF: loadBasicGLTF } = await import('/packages/gltf/dist/index.js');
     const { Physics } = await import('/packages/physics/dist/index.js');
     const { exportGLB } = await import('/packages/exporters/dist/index.js');

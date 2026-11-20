@@ -1,9 +1,10 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Several named render targets from one scene pass: each output is a built-in surface value (albedo, normal,
-// position, distance, emissive, material) or the caller's WGSL over the same surface, written by core meshes (a replay
-// of core's lit shader with its lighting in a dead block, as SSR's material replay) and by gltf-pro models and
-// materials meshes added with `add()` (gltf-pro's capture hook, shared with SSR and SSGI through capture.ts). Its own
-// single-sample depth is a sampleable depth texture of the same pass.
+// position, distance, emissive, material, the sun's shadow visibility and the look masks made from it) or the caller's
+// WGSL over the same surface, written by core meshes (a replay of core's lit shader with its lighting in a dead block,
+// as SSR's material replay; the sun visibility a shadow plugin wrapped around `direct` stays live), by gltf/pbr models
+// and materials meshes added with `add()` (gltf/pbr's capture hook, shared with SSR and SSGI through capture.ts) and by
+// terrain (its SSR-style capture hook). Its own single-sample depth is a sampleable depth texture of the same pass.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { margoError } from '../../shared/errors.js';
@@ -19,15 +20,41 @@ type TargetSet = { width: number; height: number; textures: GPUTexture[]; depth:
  * A built-in output: `albedo` (base colour and alpha), `normal` (world shading normal, w 1), `position` (world, w 1),
  * `distance` (world distance from the camera in x), `emissive` (rgb, w 1), `material` (roughness, metalness,
  * occlusion, 1). Core meshes have no emissive (black) and occlusion 1.
+ *
+ * Sun light and the look masks (`@margoengine/headless/look` T1, T5, T6): `shadow` (the sun's shadow visibility in x,
+ * 1 lit to 0 hidden, the luminance of what a shadow plugin lets through, 1 with none; the cosine to the sun in y),
+ * `penumbra` (1 on a surface facing the sun whose visibility is partial), `litGround` (1 on ground, a normal within
+ * 45 degrees of up, that faces the sun and is fully lit), `shadedGround` (the same ground with the sun fully hidden)
+ * and `subject` (1 on models added with `{subject: true}`). The masks are `r8unorm`; see {@link TARGET_MASK_LIMITS}.
  */
-export type TargetValue = 'albedo' | 'normal' | 'position' | 'distance' | 'emissive' | 'material';
+export type TargetValue =
+  | 'albedo'
+  | 'normal'
+  | 'position'
+  | 'distance'
+  | 'emissive'
+  | 'material'
+  | 'shadow'
+  | 'penumbra'
+  | 'litGround'
+  | 'shadedGround'
+  | 'subject';
+/**
+ * The limits the built-in look masks use: `partial` is the visibility range a `penumbra` pixel lies strictly inside,
+ * `full` how close to 1 (lit) or 0 (hidden) the ground masks need it, `facing` the least cosine to the sun of a
+ * penumbra pixel and `groundFacing` of a ground pixel (a grazing sun puts no clear shadow down), `ground` the least
+ * up component of a ground normal (45 degrees).
+ */
+export const TARGET_MASK_LIMITS = Object.freeze({ partial: [0.02, 0.98], full: 0.02, facing: 0.05, groundFacing: 0.2, ground: 0.7071 });
 /** One named output: a built-in `value` or a `wgsl` expression, and its texture format. */
 export interface TargetOutput {
   /** Built-in value written. Default 'albedo' when `wgsl` is unset. */
   value?: TargetValue;
   /**
    * WGSL expression of type `vec4f` over `t: TargetSurface` {position: vec3f, normal: vec3f, albedo: vec4f, roughness:
-   * f32, metalness: f32, occlusion: f32, emissive: vec3f, eye: vec3f}, all world space: `vec4f(t.normal.y, 0, 0, 1)`.
+   * f32, metalness: f32, occlusion: f32, emissive: vec3f, eye: vec3f, shadow: f32, light: vec3f, subject: f32}, all
+   * world space: `vec4f(t.normal.y, 0, 0, 1)`. `shadow` is the sun's visibility (1 lit, 0 hidden), `light` the unit
+   * direction toward the sun, `subject` 1 on models added with `{subject: true}`.
    */
   wgsl?: string;
   /**
@@ -42,10 +69,23 @@ export interface TargetOutput {
 export interface SceneTargetsOptions {
   /** Named outputs, 1 to 7, in attachment order: a built-in value name or a {@link TargetOutput}. */
   outputs: Readonly<Record<string, TargetValue | TargetOutput>>;
-  /** Frame-graph order of the targets pass. Default -5: before the main pass, so this frame's materials can sample them. */
+  /**
+   * Frame-graph order of the targets pass. Default -4.5: after the passes at -5 that change core's shader and draw
+   * shadow maps (Shadows, sections), whatever order they were attached in, and before the main pass, so this frame's
+   * materials can sample the targets.
+   */
   order?: number;
 }
+/** Options of {@link SceneTargets.add}. */
+export interface SceneTargetsAddOptions {
+  /** The model is the shot's subject: `t.subject` reads 1 on it (the `subject` value). Default false. */
+  subject?: boolean;
+}
 
+const L = TARGET_MASK_LIMITS,
+  facing = 'dot(t.normal,t.light)',
+  ground = `t.normal.y>=${L.ground}&&${facing}>=${L.groundFacing}`,
+  mask = (test: string): [string, GPUTextureFormat] => [`vec4f(select(0.0,1.0,${test}),0,0,1)`, 'r8unorm'];
 const values: Record<TargetValue, [string, GPUTextureFormat]> = {
   albedo: ['t.albedo', 'rgba8unorm'],
   normal: ['vec4f(t.normal,1)', 'rgba16float'],
@@ -53,9 +93,21 @@ const values: Record<TargetValue, [string, GPUTextureFormat]> = {
   distance: ['vec4f(distance(t.eye,t.position),0,0,1)', 'r32float'],
   emissive: ['vec4f(t.emissive,1)', 'rgba16float'],
   material: ['vec4f(t.roughness,t.metalness,t.occlusion,1)', 'rgba16float'],
+  shadow: [`vec4f(t.shadow,max(${facing},0.0),0,1)`, 'rg16float'],
+  penumbra: mask(`${facing}>${L.facing}&&t.shadow>${L.partial[0]}&&t.shadow<${L.partial[1]}`),
+  litGround: mask(`${ground}&&t.shadow>=${1 - L.full}`),
+  shadedGround: mask(`${ground}&&t.shadow<=${L.full}`),
+  subject: ['vec4f(t.subject,0,0,1)', 'r8unorm'],
 };
 const surface =
-  'struct TargetSurface {position:vec3f,normal:vec3f,albedo:vec4f,roughness:f32,metalness:f32,occlusion:f32,emissive:vec3f,eye:vec3f}\n';
+  'struct TargetSurface {position:vec3f,normal:vec3f,albedo:vec4f,roughness:f32,metalness:f32,occlusion:f32,emissive:vec3f,eye:vec3f,shadow:f32,light:vec3f,subject:f32}\n';
+// Rec. 709 luminance: a coloured shadow (tinted glass) counts by how much light it lets through.
+const luminance = 'vec3f(0.2126,0.7152,0.0722)';
+/** The sun visibility a lit shader computes, `direct` (the light a shadow plugin wraps) set to 1; 1.0 when unshadowed. */
+const sunVisibility = (code: string, position: string, normal: string): string =>
+  code.includes('fn shadowLit(') ? `dot(shadowLit(vec3f(1),${position},${normal}),${luminance})` : '1.0';
+// Terrain's capture hook (SSR's contract for shaders without the PBR Surface): its Frame names eye and light.
+const terrainFrame = /struct Frame \{camera:mat4x4f,eye:vec4f,light:vec4f,/;
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/;
 // Integer and depth formats would need other WGSL output types; colour-renderable float and unorm formats only.
 const floatFormat = /^(r|rg|rgba|bgra)(8unorm|8unorm-srgb|16float|32float)$|^rgb10a2unorm$|^rg11b10ufloat$/;
@@ -64,7 +116,7 @@ const floatFormat = /^(r|rg|rgba|bgra)(8unorm|8unorm-srgb|16float|32float)$|^rgb
  * Multiple render targets with named outputs: one pass draws the scene's surfaces into a texture per output, plus a
  * sampleable depth (`depth`). `SceneTargets.attach(engine, {outputs: {albedo: 'albedo', normal: 'normal', mask:
  * {wgsl: 'vec4f(t.roughness)', format: 'r8unorm'}}})`; read `targets.texture('normal')` after a frame. Core meshes
- * always draw; add gltf-pro models and materials meshes with `add(model)` so their own materials (maps, skinning,
+ * always draw; add gltf/pbr models and materials meshes with `add(model)` so their own materials (maps, skinning,
  * instances) write the outputs. The textures follow the drawing size and are replaced on resize (`onResize`). A
  * material that samples a target must not be added (a pass cannot write and read one texture). WebGPU only.
  */
@@ -92,9 +144,10 @@ export class SceneTargets implements EnginePlugin {
   private pass?: GPURenderPassEncoder;
   private disposed = false;
   private readonly models = new Map<SSRModel, () => void>();
+  private readonly hooks = new WeakMap<SSRModel, SSRCapture>();
   private readonly listeners = new Set<() => void>();
-  private readonly modelCode = new Map<string, string>();
   private readonly hook: SSRCapture;
+  private readonly subjectHook: SSRCapture;
   private static serial = 0;
 
   constructor(readonly options: SceneTargetsOptions) {
@@ -104,7 +157,7 @@ export class SceneTargets implements EnginePlugin {
     const entries = Object.entries(outputs);
     if (entries.length < 1 || entries.length > 7)
       throw new RangeError(`SceneTargets takes 1 to 7 outputs, not ${entries.length}; pass fewer`);
-    const order = options.order ?? -5;
+    const order = options.order ?? -4.5;
     if (typeof order !== 'number' || !Number.isFinite(order))
       throw new TypeError('SceneTargets order must be a finite number; pass a frame-graph order');
     this.name = 'scene-targets:' + SceneTargets.serial++;
@@ -138,22 +191,35 @@ export class SceneTargets implements EnginePlugin {
       surface +
       `struct MargoCapture {${this.formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
       `fn margoTargets(t:TargetSurface)->MargoCapture {var o:MargoCapture;${lines.join('')}return o;}\n`;
-    this.hook = {
+    this.hook = this.makeHook(0);
+    this.subjectHook = this.makeHook(1);
+  }
+  /** The capture hook of models whose `t.subject` reads `subject`. */
+  private makeHook(subject: 0 | 1): SSRCapture {
+    const cache = new Map<string, string>(),
+      flag = subject ? '1.0' : '0.0',
+      fields = this.formats.map((_, i) => `o.o${i}`).join(',');
+    return {
       targets: this.formats.map((format) => ({ format })),
       declarations: (code) => {
-        let out = this.modelCode.get(code);
+        let out = cache.get(code);
         if (out === undefined) {
-          if (!code.includes('struct Surface'))
+          let capture: string;
+          if (code.includes('struct Surface'))
+            capture = `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=k;_=v;return margoTargets(TargetSurface(margoPosition,s.n,s.base,s.roughness,s.metal,s.occlusion,s.emissive,f.eye.xyz,${sunVisibility(code, 'margoPosition', 's.n')},f.light.xyz,${flag}));}\n`;
+          else if (terrainFrame.test(code))
+            // Terrain returns `margoSSR(n, v, base, metal, rough)` as a MargoSSR: the same outputs under that name.
+            capture =
+              `struct MargoSSR {${this.formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
+              `fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {_=v;let o=margoTargets(TargetSurface(margoPosition,n,vec4f(base,1),rough,metal,1.0,vec3f(0),frame.eye.xyz,${sunVisibility(code, 'margoPosition', 'n')},frame.light.xyz,${flag}));return MargoSSR(${fields});}\n`;
+          else
             throw margoError(
               'unsupported',
-              'SceneTargets captures gltf-pro surfaces only; add gltf-pro models or materials meshes',
+              'SceneTargets captures gltf/pbr surfaces and terrain only; add gltf/pbr models, materials meshes or a Terrain',
             );
-          if (this.modelCode.size >= 64) this.modelCode.clear();
-          out =
-            'var<private> margoPosition:vec3f;\n' +
-            this.code +
-            'fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=k;_=v;return margoTargets(TargetSurface(margoPosition,s.n,s.base,s.roughness,s.metal,s.occlusion,s.emissive,f.eye.xyz));}\n';
-          this.modelCode.set(code, out);
+          if (cache.size >= 64) cache.clear();
+          out = 'var<private> margoPosition:vec3f;\n' + this.code + capture;
+          cache.set(code, out);
         }
         return out;
       },
@@ -205,14 +271,20 @@ export class SceneTargets implements EnginePlugin {
     return () => this.listeners.delete(listener);
   }
   /**
-   * Draws `model` (a gltf-pro model or materials mesh) into the targets with its own materials; returns a remover.
-   * Models not added still draw in the scene but leave the targets alone.
+   * Draws `model` (a gltf/pbr model, materials mesh or Terrain) into the targets with its own materials; returns a
+   * remover. Models not added still draw in the scene but leave the targets alone. `{subject: true}` marks the model as
+   * the shot's subject (`t.subject` 1, the `subject` value); adding a model again with the other choice moves it.
    */
-  add(model: SSRModel): () => void {
+  add(model: SSRModel, { subject = false }: SceneTargetsAddOptions = {}): () => void {
     if (this.disposed) throw margoError('disposed', 'SceneTargets is disposed; create new SceneTargets');
     if (!model || typeof model.setCapture !== 'function')
-      throw new TypeError('SceneTargets.add needs a gltf-pro model or materials mesh');
-    return captureModel(this.models, model, this.hook);
+      throw new TypeError('SceneTargets.add needs a gltf/pbr model, materials mesh or Terrain');
+    if (typeof subject !== 'boolean') throw new TypeError('SceneTargets.add subject must be true or false');
+    const hook = subject ? this.subjectHook : this.hook;
+    const current = this.models.get(model);
+    if (current && this.hooks.get(model) !== hook) current();
+    this.hooks.set(model, hook);
+    return captureModel(this.models, model, hook);
   }
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'SceneTargets is disposed; create new SceneTargets');
@@ -227,7 +299,7 @@ export class SceneTargets implements EnginePlugin {
   registerPasses(graph: FrameGraph): void {
     graph.add({
       name: this.name,
-      order: this.options.order ?? -5,
+      order: this.options.order ?? -4.5,
       execute: (c) => {
         if (c.backend === 'webgpu') this.draw(c);
       },
@@ -249,15 +321,22 @@ export class SceneTargets implements EnginePlugin {
         depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater-equal' },
       };
     }
-    // Core's lit shader with its lighting in a dead block: every binding stays statically used, none of it computed.
+    // Core's lit shader with its lighting in a dead block: every binding stays statically used, none of it computed but
+    // the sun's visibility: what a shadow plugin wrapped around `direct` in `let linear=`, with `direct` set to 1.
     const key = c.shader;
     if (this.pipelineKey !== key) {
-      const code = c.shader
-        .replace(/(@fragment[^{]*)->@location\(0\) vec4f/, '$1->MargoCapture')
-        .replace(
-          /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
-          'if(false){$1_=$2;}return margoTargets(TargetSurface(i.position,n,vec4f(i.color,1),i.material.x,i.material.y,1.0,vec3f(0),frame.eye.xyz));',
-        );
+      const wrapped = /let linear=(.+?)\*frame\.radiance\.xyz\*frame\.light\.w/.exec(c.shader)?.[1] ?? 'direct',
+        sun =
+          wrapped !== 'direct' && /\bdirect\b/.test(wrapped)
+            ? `dot(${wrapped.replace(/\bdirect\b/g, 'vec3f(1)')},${luminance})`
+            : '1.0',
+        code = c.shader
+          .replace(/(@fragment[^{]*)->@location\(0\) vec4f/, '$1->MargoCapture')
+          .replace(
+            /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
+            (_, dead: string, colour: string) =>
+              `if(false){${dead}_=${colour};}return margoTargets(TargetSurface(i.position,n,vec4f(i.color,1),i.material.x,i.material.y,1.0,vec3f(0),frame.eye.xyz,${sun},frame.light.xyz,0.0));`,
+          );
       if (!code.includes('->MargoCapture') || !code.includes('return margoTargets('))
         throw margoError(
           'unsupported',
@@ -304,7 +383,7 @@ export class SceneTargets implements EnginePlugin {
       });
       if (this.models.size) {
         this.context = c;
-        for (const model of this.models.keys()) drawCapture(model, this.hook, c);
+        for (const model of this.models.keys()) drawCapture(model, this.hooks.get(model) ?? this.hook, c);
       }
     } finally {
       this.pass?.end();

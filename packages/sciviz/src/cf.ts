@@ -287,7 +287,8 @@ export async function readCFField(file: NetCDFFile, name: string, options: CFRea
     const b = c.bounds;
     if (b.dimensions.length !== 2 || b.dimensions[0] !== c.variable.dimensions[0] || b.shape[1] !== 2)
       throw bad('rectilinear coordinate bounds must be [coordinate,2]');
-    return convertCFUnits(await b.read({ signal: options.signal }), c.units, 'degrees');
+    // CF 7.1: bounds carry their coordinate's units, so they take the same default degrees as the coordinate read.
+    return convertCFUnits(await b.read({ signal: options.signal }), c.units || 'degrees', 'degrees');
   };
   return Object.freeze({
     nx,

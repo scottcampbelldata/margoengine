@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Inverted-hull outlines for loaded glTF-pro models and @margoengine/materials meshes: each triangle primitive is drawn a
+// Inverted-hull outlines for loaded glTF PBR models and @margoengine/materials meshes: each triangle primitive is drawn a
 // second time with its back faces pushed out along the world normal (Raskar & Cohen, "Image Precision Silhouette
 // Edges", I3D 1999), from the vertices its deformer wrote this frame (`deformed`), so skinned and morphed characters
 // keep their outline in every pose; instanced primitives draw one hull per instance. Seam-free (`smooth`): copies of a
@@ -18,7 +18,7 @@ import { instanceMatrix } from '../../shared/instances.js';
 import { isModel, type ModelLike, type ModelPrimitiveLike } from '../../shared/model.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { applyView, inView } from '../../shared/view-rect.js';
-import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
+import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import { beginScenePass } from '../../shared/scene-pass.js';
 import { positionRings } from './rings.js';
 export { positionRings } from './rings.js';
@@ -41,7 +41,7 @@ export interface ModelOutlineOptions {
   color?: readonly [number, number, number];
   /**
    * Seam-free: every copy of a vertex at one position pushes out along their average normal, so hard-edged meshes get
-   * an unbroken outline. Default true. Live as `smooth`. Needs vertex buffers with STORAGE usage (gltf-pro's and
+   * an unbroken outline. Default true. Live as `smooth`. Needs vertex buffers with STORAGE usage (gltf/pbr's and
    * animation's have it); a primitive without draws as `smooth: false`.
    */
   smooth?: boolean;
@@ -55,7 +55,7 @@ export interface ModelOutlineOptions {
    * vertex's alpha, so one mesh can thin and tint its line where it is painted. Default false. Live as `vertexColors`.
    */
   vertexColors?: boolean;
-  /** The models to outline (glTF-pro `PBRModel`s or materials meshes). Default: every model attached to the engine. */
+  /** The models to outline (glTF PBR `PBRModel`s or materials meshes). Default: every model attached to the engine. */
   models?: readonly ModelLike[];
 }
 
@@ -70,7 +70,7 @@ struct Out {@builtin(position) clip:vec4f,@location(0) color:vec3f}
 @vertex fn vertex(@location(0) position:vec3f,@location(1) own:vec3f,@location(2) tint:vec4f,@builtin(instance_index) slot:u32,@builtin(vertex_index) index:u32)->Out{
   let normal=NORMAL;let d=draws[slot];let m=d.model;let a=m[0].xyz;let b=m[1].xyz;let c=m[2].xyz;
   let paint=select(vec4f(1),tint,u.flags.x>0);
-  let n=mat3x3f(cross(b,c),cross(c,a),cross(a,b))*normal*sign(dot(a,cross(b,c)));
+  let n=mat3x3f(cross(b,c),cross(c,a),cross(a,b))*normal*select(-1.0,1.0,dot(a,cross(b,c))>=0.0);
   let l=length(n);let p=m*vec4f(position,1)+vec4f(select(vec3f(0),n/l,l>0)*d.style.w*paint.a,0);
   return Out(u.camera*p,d.style.rgb*paint.rgb);
 }
@@ -124,7 +124,7 @@ const determinant = (m: ArrayLike<number>): number =>
   m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
 
 /**
- * Inverted-hull outlines on loaded and animated characters: every triangle primitive of the glTF-pro models (and
+ * Inverted-hull outlines on loaded and animated characters: every triangle primitive of the glTF PBR models (and
  * materials meshes) on the engine, or of `models`, drawn again front-culled with its vertices pushed `outline` world
  * units out along the normal, in `color`. Skinned and morphed primitives use their deformer's vertices of this frame;
  * instanced primitives draw one hull per instance; hidden nodes and nodes outside a view's layers draw none.
@@ -155,6 +155,9 @@ export class ModelOutlines implements EnginePlugin {
   private styles: Readonly<Record<string, OutlineStyle>> = {};
   private readonly smoothing = new Map<ModelPrimitiveLike, Smoothing>();
   private frame = 0;
+  /** The frame (`currentFrame`) the storage rows were last written in, and the end of the rows written in it. */
+  private rowFrame = -1;
+  private rowEnd = 0;
   private ringLayout?: GPUBindGroupLayout;
   private readonly values = new Float32Array(20);
   private rows = new Float32Array(16 * 20);
@@ -374,14 +377,20 @@ export class ModelOutlines implements EnginePlugin {
     const rows = this.collect(c);
     this.frame++;
     if (!rows) return;
-    this.prepare(c, rows);
     const device = c.device,
       v = this.values;
+    // `queue.writeBuffer` lands before the frame's commands run, so each view of a frame writes its rows after the
+    // earlier views' rows instead of over them (two views on different render layers draw different rows).
+    const now = currentFrame(device, c.view ?? c),
+      base = now === this.rowFrame ? this.rowEnd : 0;
+    this.rowFrame = now;
+    this.rowEnd = base + rows;
+    this.prepare(c, base + rows);
     v.set(c.camera.matrix);
     v[16] = +this.vertexColors;
     this.outlineFrame(v, c);
     const copy = writeUniform(device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
-    device.queue.writeBuffer(this.storage!, 0, this.rows as Float32Array<ArrayBuffer>, 0, rows * 20);
+    device.queue.writeBuffer(this.storage!, base * 80, this.rows as Float32Array<ArrayBuffer>, 0, rows * 20);
     const pass = beginScenePass(c, this.colorAttachment, this.depthAttachment);
     applyView(pass, c);
     pass.setBindGroup(0, this.groups!.get(copy));
@@ -394,7 +403,7 @@ export class ModelOutlines implements EnginePlugin {
       if (group) pass.setBindGroup(1, group);
       pass.setVertexBuffer(0, p.deformed ?? p.buffers!.vertex, (p.deformed && p.deformedOffset) || 0);
       pass.setIndexBuffer(p.buffers!.index, 'uint32');
-      pass.drawIndexed(p.indices.length, run.count, 0, 0, run.first);
+      pass.drawIndexed(p.indices.length, run.count, 0, 0, base + run.first);
     }
     pass.end();
     // Rings of primitives no longer drawn go after 120 frames.

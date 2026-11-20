@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/edges.browser.mjs
 // Thin blades shaded from 0 at the root to 1 at the tip (unlit and lit `Scatter` blades, and `ScatterInstances` vertex
 // colour and occlusion), drawn with 4x multisampling into the linear HDR scene, write no negative radiance. Before the

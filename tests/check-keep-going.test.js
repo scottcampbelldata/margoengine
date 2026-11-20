@@ -20,7 +20,7 @@ test('keepGoingMode: the flag or the variable, off otherwise', () => {
 test('runJobs keepGoing: every other suite runs, nothing beside the failure is aborted, exit stays 1', async () => {
   const ran = [],
     aborted = [];
-  const results = await runJobs([job('a'), job('b'), job('c'), job('timing', { exclusive: true })], {
+  const results = await runJobs([job('a'), job('b'), job('c'), job('d')], {
     limit: 2,
     keepGoing: true,
     run: async (j, signal) => {
@@ -30,7 +30,7 @@ test('runJobs keepGoing: every other suite runs, nothing beside the failure is a
       return { ok: j.id !== 'a' };
     },
   });
-  assert.deepEqual(ran.sort(), ['a', 'b', 'c', 'timing']);
+  assert.deepEqual(ran.sort(), ['a', 'b', 'c', 'd']);
   assert.deepEqual(aborted, []);
   assert.deepEqual(
     results.map((r) => r.outcome),
@@ -165,14 +165,17 @@ test('runSteps keepGoing: a step that fails during a driver reset still gets its
   assert.deepEqual(out.failures, []);
 });
 
-test('stepJobs: with keepGoing the timing part does not wait for the shared part to pass, but still runs last', () => {
-  const steps = planned('verify', 'build:site', 'check:gpu-packages');
-  const timing = (options) => stepJobs(steps, () => true, options).find((j) => j.exclusive);
-  assert.deepEqual(timing().after, ['check:gpu-packages']);
-  assert.deepEqual(timing({ keepGoing: true }).after, ['build:site']);
+test('stepJobs: the GPU suites are one job, after what they read, with nothing split off', () => {
+  const jobs = stepJobs(planned('verify', 'build:site', 'check:gpu-packages'));
+  assert.deepEqual(
+    jobs.map((j) => j.id),
+    ['build:site', 'check:gpu-packages'],
+  );
+  assert.deepEqual(jobs[1].after, ['build:site']);
+  assert.equal(jobs[1].command, 'npm run check:gpu-packages');
 });
 
-test('runStepsParallel keepGoing: a failed shared suite step leaves the rest and the timing part running', async () => {
+test('runStepsParallel keepGoing: a failed GPU suite step leaves the rest running', async () => {
   const ran = [];
   const out = await runStepsParallel(
     planned('verify', 'build:site', 'check:gpu-packages', 'check:wgsl', 'check:quickstart'),
@@ -183,11 +186,11 @@ test('runStepsParallel keepGoing: a failed shared suite step leaves the rest and
       logFor: (id) => `${id}.log`,
       run: async (command, name) => {
         ran.push(command);
-        return { ok: !/phase=shared|check:quickstart/.test(command), name };
+        return { ok: !/check:gpu-packages|check:quickstart/.test(command), name };
       },
     },
   );
-  assert.ok(ran.some((c) => c.includes('--phase=timing')));
+  assert.equal(ran.filter((c) => c === 'npm run check:gpu-packages').length, 1);
   assert.ok(ran.includes('npm run check:wgsl'));
   assert.deepEqual(out.failures.map((f) => f.step).sort(), ['npm run check:gpu-packages', 'npm run check:quickstart']);
   assert.ok(out.failed);

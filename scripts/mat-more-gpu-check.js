@@ -2,14 +2,12 @@
 // per-material envMap (CubeTexture faces, a cube render target, an Environment, mip sampling by roughness), float, 3D and
 // array data textures in a WgslMaterial, a standalone KTX2 texture, Display P3 textures and the shadow catcher's
 // directional and area light shadows. Each case compares against an analytic value or a feature-off render.
-// Run: node scripts/gpu-lock.mjs run --owner=mat-more -- node scripts/mat-more-gpu-check.js
+// Run: node scripts/run-with-timeout.mjs -- node scripts/mat-more-gpu-check.js
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { P3_TO_SRGB } from '../packages/math/dist/color.js';
 
-const release = await acquire({ owner: 'mat-more-gpu-check' });
 let browser;
 const checks = [],
   failures = [];
@@ -165,5 +163,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.matMoreFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

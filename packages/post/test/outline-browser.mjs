@@ -1,18 +1,18 @@
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
-// Real-GPU check of Outline on a cube, built packages. Takes the GPU lock itself around the browser.
+// Real-GPU check of Outline on a cube, built packages.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
-const release = await acquire({ owner: 'post-outline' });
 const timer = setTimeout(() => {
   console.error('outline-browser: timed out after 120 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/post-outline/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -164,5 +164,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

@@ -80,13 +80,17 @@ function target() {
     plugins = new Map(),
     callbacks = new Set();
   f.doc.nodes = [{ translation: [0, 2, 0], children: [1] }, {}];
+  // A real scene's removePlugin calls the plugin's dispose once it is out.
   const scene = {
+    plugins,
     use(plugin) {
       assert.ok(!plugins.has(plugin.name));
       plugins.set(plugin.name, plugin);
     },
     removePlugin(name) {
+      const plugin = plugins.get(name);
       plugins.delete(name);
+      plugin?.dispose?.();
     },
   };
   const t = { qx: [0, 0], qy: [0, 0], qz: [0, 0], qw: [1, 1], x: [0, 0], y: [2, 0], z: [0, 0] };
@@ -225,4 +229,55 @@ test('model disposal releases playback without writing to destroyed nodes', asyn
   player.dispose();
   assert.equal(t.plugins.size, 0);
   assert.equal(player.playing, false);
+});
+test('a custom expression may not take a preset name (audit p4 R24)', async () => {
+  const f = fixture(),
+    expressions = f.doc.extensions.VRMC_vrm_animation.expressions;
+  expressions.preset = {};
+  expressions.custom = { happy: { node: 2 } };
+  await assert.rejects(readVRMA(f.doc, { buffers: [f.buffer] }), /preset expression's name/);
+  expressions.custom = { grin: { node: 2 } };
+  await readVRMA(f.doc, { buffers: [f.buffer] });
+});
+test('rotation keys may be normalized bytes or shorts, as glTF 2.0 3.11 allows (audit p4 R25)', async () => {
+  const quantized = (values, Type, componentType, normalized = true) => {
+    const f = fixture(),
+      data = Type.from(values),
+      bytes = new Uint8Array(data.buffer),
+      start = f.buffer.length,
+      buffer = new Uint8Array(start + bytes.length + 3 - ((bytes.length + 3) % 4));
+    buffer.set(f.buffer);
+    buffer.set(bytes, start);
+    f.doc.buffers[0].byteLength = buffer.length;
+    f.doc.bufferViews.push({ buffer: 0, byteOffset: start, byteLength: bytes.length });
+    f.doc.accessors.push({ bufferView: f.doc.bufferViews.length - 1, componentType, normalized, count: 2, type: 'VEC4' });
+    // Channel 1 turns the head (node 1).
+    f.doc.animations[0].samplers[1].output = f.doc.accessors.length - 1;
+    return readVRMA(f.doc, { buffers: [buffer] });
+  };
+  const head = (vrma) => vrma.clips[0].tracks.find((t) => t.node === 1 && t.path === 'rotation').values;
+  const shorts = await quantized([0, 0, 0, 32767, 0, 0, 32767, 0], Int16Array, 5122);
+  assert.deepEqual(Array.from(head(shorts)), [0, 0, 0, 1, 0, 0, 1, 0]);
+  // 90 / 127 is 0.7087 for 0.7071: within a byte's step of unit length, renormalized on read.
+  const bytes = head(await quantized([0, 0, 0, 127, 0, 0, 90, 90], Int8Array, 5120));
+  assert.ok(Math.abs(bytes[6] - Math.SQRT1_2) < 1e-6 && Math.abs(bytes[7] - Math.SQRT1_2) < 1e-6, `${bytes}`);
+  await assert.rejects(quantized([0, 0, 0, 32767, 0, 0, 32767, 0], Int16Array, 5122, false), /FLOAT/);
+  await assert.rejects(quantized([0, 0, 0, 100, 0, 0, 100, 0], Int8Array, 5120), /normalized/);
+});
+
+// KB-OWN-RIG1: a player whose plugin its scene removed (removePlugin, scene or engine disposal) stayed live, and its
+// dispose() then removed whatever plugin had taken the name since.
+test('a player whose scene removed its plugin ends, and its dispose leaves a same-name plugin alone', async () => {
+  const f = fixture(),
+    t = target(),
+    player = await playVRMA(await readVRMA(f.doc, { buffers: [f.buffer] }), t.animation, t.avatar),
+    scene = t.animation.model.root.scene,
+    [name] = [...t.plugins.keys()];
+  scene.removePlugin(name);
+  assert.equal(player.playing, false);
+  assert.equal(t.callbacks.size, 0, 'the model disposal listener is gone');
+  const replacement = { name, setup() {} };
+  scene.use(replacement);
+  player.dispose();
+  assert.equal(t.plugins.get(name), replacement);
 });

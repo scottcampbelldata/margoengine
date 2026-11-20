@@ -33,7 +33,8 @@
     "test:gpu:locomotion": "cd ../.. && node packages/xr/tests/locomotion.browser.mjs",
     "test:gpu:hands": "cd ../.. && node packages/xr/tests/hands.browser.mjs",
     "test:gpu:ar-extra": "cd ../.. && node packages/xr/tests/ar-extra.browser.mjs",
-    "test:gpu:performance": "cd ../.. && node packages/xr/tests/performance.browser.mjs"
+    "test:gpu:performance": "cd ../.. && node packages/xr/tests/performance.browser.mjs",
+    "test:gpu:view-layers": "cd ../.. && node packages/xr/tests/view-layers.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -90,7 +91,7 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/selection": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/geometry": "^1.0.0"
   },
   "dependencies": {
@@ -103,7 +104,7 @@
     "@margoengine/animation": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/gltf": {
       "optional": true
     },
     "@margoengine/geometry": {

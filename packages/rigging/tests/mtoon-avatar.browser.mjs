@@ -8,7 +8,7 @@ try {
   const result = await context.page.evaluate(async (vrm1) => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { CameraProjection } = await import('/packages/cameras/dist/index.js');
-    const { parsePreparedPBR } = await import('/packages/gltf-pro/dist/index.js');
+    const { parsePreparedPBR } = await import('/packages/gltf/dist/pbr.js');
     const { SceneTarget } = await import('/packages/shared/msaa.js');
     const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
     const { MToon } = await import('/packages/rigging/dist/mtoon.js');
@@ -64,7 +64,7 @@ try {
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { addVRM, readVRM } = await import('/packages/rigging/dist/vrm.js');
     const model = vrm1
-      ? await (await import('/packages/gltf-pro/dist/index.js')).loadGLTF(engine, '/examples/assets/vrm/Seed-san.vrm', {
+      ? await (await import('/packages/gltf/dist/pbr.js')).loadGLTF(engine, '/examples/assets/vrm/Seed-san.vrm', {
           signal: AbortSignal.timeout(90000),
         })
       : await loadVRM0(engine, '/examples/assets/vrm/AliciaSolid_vrm-0.51.vrm', { signal: AbortSignal.timeout(90000) });

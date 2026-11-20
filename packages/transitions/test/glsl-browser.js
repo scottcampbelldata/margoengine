@@ -2,6 +2,7 @@ export async function glslChecks() {
   const { Engine } = await import('../../core/dist/extension.js');
   const { translateGLSLTransition, createGLSLTransition, createLiveGLSLTransition } = await import('../dist/glsl.js');
   const { glslFixtures } = await import('./glsl-fixtures.js');
+  const { glslES3Fixtures } = await import('./glsl-es3-fixtures.js');
   const { fullscreen } = await import('../../shared/gpu.js');
   const assert = (ok, m) => {
     if (!ok) throw new Error(m);
@@ -103,9 +104,19 @@ export async function glslChecks() {
     'vec4 margoFetchProj(sampler2D t,vec4 p){return margoFetch(t,p.xy/p.w);}' +
     'vec4 margoFetchProj(sampler2D t,vec3 p,float bias){return margoFetch(t,p.xy/p.z);}' +
     'vec4 margoFetchProj(sampler2D t,vec4 p,float bias){return margoFetch(t,p.xy/p.w);}\n';
+  // GLSL ES 3.00 lookups read by the same rule: the images have one level, so lod, bias and gradients select nothing,
+  // and an offset moves the coordinate by whole texels. texelFetch and textureSize stay the browser's own.
+  const oracleES3 =
+    '#define texture margoFetch\n#define textureProj margoFetchProj\n#define textureLod margoFetchLod\n#define textureProjLod margoFetchProjLod\n#define textureGrad margoFetchGrad\n#define textureOffset margoFetchOffset\n' +
+    'vec4 margoFetchLod(sampler2D t,vec2 uv,float lod){return margoFetch(t,uv);}' +
+    'vec4 margoFetchProjLod(sampler2D t,vec3 p,float lod){return margoFetch(t,p.xy/p.z);}' +
+    'vec4 margoFetchProjLod(sampler2D t,vec4 p,float lod){return margoFetch(t,p.xy/p.w);}' +
+    'vec4 margoFetchGrad(sampler2D t,vec2 uv,vec2 dx,vec2 dy){return margoFetch(t,uv);}' +
+    'vec4 margoFetchOffset(sampler2D t,vec2 uv,ivec2 o){return margoFetch(t,uv+vec2(o)/vec2(textureSize(t,0)));}\n';
   try {
-    for (const fixture of glslFixtures) {
-      const source = fixture.oracleSource ?? fixture.source;
+    for (const fixture of [...glslFixtures, ...glslES3Fixtures.map((f) => ({ ...f, es3: true }))]) {
+      // The oracle's own #version 300 es header comes first, so a fixture's #version line goes.
+      const source = (fixture.oracleSource ?? fixture.source).replace(/^\s*#\s*version[^\n]*\n/, '');
       const declarations = 'uniform float progress;uniform float ratio;uniform sampler2D from;uniform sampler2D to;';
       const nativeSource = source.replace(
         /\buniform\s+(?:(?:lowp|mediump|highp)\s+)?\w+\s+(?:from|to|progress|ratio)\s*;/g,
@@ -117,6 +128,7 @@ export async function glslChecks() {
           declarations +
           '\n' +
           oracleFetch +
+          (fixture.es3 ? oracleES3 : '') +
           '\nvec4 getFromColor(vec2 uv){return margoFetch(from,uv);}vec4 getToColor(vec2 uv){return margoFetch(to,uv);}\n' +
           nativeSource +
           '\nvoid main(){outputColor=transition(v_uv);}',
@@ -237,5 +249,5 @@ export async function glslChecks() {
     gl.getExtension('WEBGL_lose_context')?.loseContext();
     engine.dispose();
   }
-  return { glslPixels: pixels, glslFixtures: glslFixtures.length };
+  return { glslPixels: pixels, glslFixtures: glslFixtures.length, glslES3Fixtures: glslES3Fixtures.length };
 }

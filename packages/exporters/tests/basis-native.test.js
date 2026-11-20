@@ -207,3 +207,94 @@ test('BasisLZ codebook limits tell callers how to reduce the input', () => {
     message: /16128 entries; reduce quality or split the image/,
   });
 });
+
+test('the external encoder gets room for every block of a long one-texel strip and its mips', async () => {
+  // Every 4x4 block costs UASTC 16 bytes however few texels it holds, so a 16384 x 1 strip with its 15 mips needs
+  // 8,193 blocks (131,088 bytes). The output was sized from the pixel count (2 bytes a texel + 64 KiB = 98,304).
+  const input = { width: 16384, height: 1, data: new Uint8Array(16384 * 4).fill(200) },
+    expected = await encodeKTX2(image(4, 4, () => [72, 143, 208, 255]), { mode: 'uastc', mipmaps: false }),
+    prefix = fileURLToPath(new URL('../.basis-strip-', import.meta.url)),
+    folder = mkdtempSync(prefix),
+    at = (name) => new URL(name, pathToFileURL(folder + '/'));
+  try {
+    writeFileSync(at('package.json'), '{"type":"commonjs"}');
+    // Own mock of the public factory contract: it fails, as an encoder must, when the output cannot hold the blocks.
+    writeFileSync(
+      at('basis_encoder.js'),
+      `module.exports = () => Promise.resolve({ initializeBasis() {}, BasisEncoder: class {
+      constructor() { this.size = [0, 0]; this.mips = false; return new Proxy(this, { get: (target, name) => name in target ? target[name] : () => {} }); }
+      setSliceSourceImage(slice, rgba, width, height) { this.size = [width, height]; }
+      setMipGen(on) { this.mips = on; }
+      encode(output) {
+        let blocks = 0;
+        for (let [w, h] = this.size; ; w = Math.max(1, w >> 1), h = Math.max(1, h >> 1)) {
+          blocks += Math.ceil(w / 4) * Math.ceil(h / 4);
+          if (!this.mips || (w === 1 && h === 1)) break;
+        }
+        if (output.length < blocks * 16 + 256) return 0;
+        const bytes = new Uint8Array(${JSON.stringify([...expected])}); output.set(bytes); return bytes.length;
+      }
+      delete() {}
+    } });`,
+    );
+    writeFileSync(at('basis_encoder.wasm'), new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]));
+    const file = await encodeKTX2(input, { mode: 'uastc', encoderPath: pathToFileURL(folder + '/').href });
+    assert.deepEqual(file, expected);
+  } finally {
+    assert.ok(folder.startsWith(prefix));
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('a worker encode refuses a signal that is already aborted and leaves no listener on a live one', async () => {
+  const { inWorker } = await import('../dist/encoder-host.js'),
+    posted = [],
+    had = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
+  // Own stand-in for a browser Worker: it answers each job on the next tick.
+  globalThis.Worker = class {
+    postMessage(message) {
+      posted.push(message);
+      setTimeout(() => this.onmessage({ data: { result: message.id } }));
+    }
+    terminate() {}
+  };
+  try {
+    const request = { kind: 'basis-native', wrapperURL: '', wasmURL: '', job: {} };
+    await assert.rejects(inWorker([request], () => [], AbortSignal.abort()), { name: 'AbortError' });
+    assert.equal(posted.length, 0);
+    const controller = new AbortController(),
+      live = new Set(),
+      { signal } = controller,
+      add = signal.addEventListener.bind(signal),
+      remove = signal.removeEventListener.bind(signal);
+    signal.addEventListener = (type, listener, options) => (live.add(listener), add(type, listener, options));
+    signal.removeEventListener = (type, listener, options) => (live.delete(listener), remove(type, listener, options));
+    assert.deepEqual(await inWorker([request, request], () => [], signal), [0, 1]);
+    assert.equal(live.size, 0);
+  } finally {
+    if (had) Object.defineProperty(globalThis, 'Worker', had);
+    else delete globalThis.Worker;
+  }
+});
+
+test('a KTX2 file without global data has no padding before its levels, and BasisLZ refuses wide endpoints', () => {
+  // KTX 2.0 section 2: sgdPadding exists only when sgdByteLength > 0; supercompressed levels need no alignment.
+  const levels = [{ data: new Uint8Array(16).fill(7), rawLength: 16 }],
+    file = packKTX2(4, 4, levels, 'uastc', false, false),
+    view = new DataView(file.buffer, file.byteOffset, file.byteLength),
+    dfdEnd = view.getUint32(48, true) + view.getUint32(52, true);
+  assert.equal(view.getBigUint64(64, true), 0n);
+  assert.equal(view.getBigUint64(72, true), 0n);
+  assert.equal(Number(view.getBigUint64(80, true)), dfdEnd);
+  assert.equal(file.length, dfdEnd + 16);
+  // With global data the 8-byte sgdPadding stays.
+  const withGlobal = packKTX2(4, 4, levels, 'etc1s', false, false, new Uint8Array(5)),
+    g = new DataView(withGlobal.buffer);
+  assert.equal(Number(g.getBigUint64(64, true)) % 8, 0);
+  // KTX 2.0 D.2.2: endpoint colours are masked to 5 bits and the intensity to 3; a wider value is refused.
+  const block = new Uint8Array(8);
+  block.set([32, 0, 0, 0]);
+  assert.throws(() => encodeBasisLZ([block], [[4, 4]], false), /5-bit colours and a 3-bit intensity/);
+  block.set([0, 0, 0, 8]);
+  assert.throws(() => encodeBasisLZ([block], [[4, 4]], false), /5-bit colours/);
+});

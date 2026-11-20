@@ -79,7 +79,7 @@
   "peerDependencies": {
     "@margoengine/animation": "^1.0.0",
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/shader": "^1.0.0"
   },
@@ -90,7 +90,7 @@
     "@margoengine/core": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/gltf": {
       "optional": true
     },
     "@margoengine/materials": {

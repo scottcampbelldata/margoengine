@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync, gzipSync } from 'node:zlib';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const kernel = resolve(root, 'kernel');
@@ -20,8 +21,16 @@ function build() {
   const target = resolve(kernel, 'target');
   execFileSync(
     'cargo',
-    ['build', '--locked', '--manifest-path', resolve(kernel, 'Cargo.toml'), '--target', 'wasm32-unknown-unknown', '--release'],
-    { stdio: 'inherit', env: { ...process.env, CARGO_TARGET_DIR: target, RUSTFLAGS } },
+    [
+      'build',
+      '--locked',
+      '--manifest-path',
+      resolve(kernel, 'Cargo.toml'),
+      '--target',
+      'wasm32-unknown-unknown',
+      '--release',
+    ],
+    { stdio: 'inherit', env: blueprintRustEnv(kernel, RUSTFLAGS) },
   );
   const wasmPath = resolve(target, 'wasm32-unknown-unknown/release/margoengine_machinery_kernel.wasm');
   const optimized = wasmPath.replace('.wasm', '.optimized.wasm');
@@ -46,7 +55,10 @@ function build() {
   const text = wasm.toString('latin1');
   for (const leak of ['Users', 'Development', '.cargo', '.rustup'])
     assert.ok(!text.includes(leak), `The blueprint holds a build path (${leak})`);
+  // RFC 1952 2.3.1: zlib writes its build system's OS code (0x0a on Windows, 3 on Linux, 19 on macOS) into header byte
+  // 9, so the committed file differed by system; 255 is "unknown" and the same everywhere.
   const compressed = gzipSync(wasm);
+  compressed[9] = 255;
   assert.deepEqual(gunzipSync(compressed), wasm, 'Kernel compression must be lossless');
   writeFileSync(
     resolve(root, 'src/wasm.ts'),

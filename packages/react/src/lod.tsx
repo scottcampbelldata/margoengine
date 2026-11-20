@@ -5,6 +5,7 @@ import { Mesh } from './components.js';
 import { useCreated, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { attachBinding, detachBinding } from './package-binding.js';
+import { rangeError } from '../../shared/errors.js';
 
 /** Distance thresholds, hysteresis and transform for the child detail levels. */
 export interface DetailedProps {
@@ -20,7 +21,7 @@ export interface DetailedProps {
 }
 const owners = new WeakMap<LOD, LODSystem>();
 /** Switch between child groups by distance. Each child may contain any number of nested meshes or models. */
-export const Detailed = forwardRef<LOD, DetailedProps>(function Detailed(
+export const Detailed = /* @__PURE__ */ forwardRef<LOD, DetailedProps>(function Detailed(
   { distances, hysteresis = 0.1, position, rotation, scale, children, onError },
   ref,
 ) {
@@ -28,7 +29,7 @@ export const Detailed = forwardRef<LOD, DetailedProps>(function Detailed(
     items = Children.toArray(children),
     count = items.length;
   if (!count || count !== distances.length)
-    throw new RangeError('Detailed needs one distance per child and at least one child.');
+    throw rangeError('Detailed needs one distance per child and at least one child', 'react-arguments');
   const [anchor, setAnchor] = useState<MeshHandle | null>(null),
     [levels, setLevels] = useState<ReadonlyMap<number, MeshHandle>>(new Map());
   const register = useCallback((index: number, mesh: MeshHandle | null) => {
@@ -63,7 +64,7 @@ export const Detailed = forwardRef<LOD, DetailedProps>(function Detailed(
     </Mesh>
   );
 });
-const DetailedBinding = forwardRef<
+const DetailedBinding = /* @__PURE__ */ forwardRef<
   LOD,
   {
     scene: ReturnType<typeof useScene>;

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { copyFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { endTree } from '../../../scripts/support/shutdown.mjs';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 const root = new URL('../', import.meta.url);
 const manifest = new URL('mesh-kernel/Cargo.toml', root);
 const args = process.argv.includes('--test')
@@ -11,7 +12,9 @@ const child = spawn('cargo', [...args, '--manifest-path', fileURLToPath(manifest
   stdio: 'inherit',
   windowsHide: true,
   detached: process.platform !== 'win32',
-  env: { ...process.env, RUSTFLAGS: '-C target-feature=+simd128' },
+  env: process.argv.includes('--test')
+    ? { ...process.env, RUSTFLAGS: '-C target-feature=+simd128' }
+    : blueprintRustEnv(fileURLToPath(new URL('mesh-kernel', root)), '-C target-feature=+simd128'),
 });
 let expired = false,
   killed;

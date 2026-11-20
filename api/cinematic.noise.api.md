@@ -10,6 +10,7 @@ export class CameraNoise {
     time: number;
     readonly values: Float64Array<ArrayBuffer>;
     constructor(profile: NoiseProfile, options?: CameraNoiseOptions);
+    advanceTime(delta: number): void;
     update(pose: CameraPose, delta: number): void;
 }
 

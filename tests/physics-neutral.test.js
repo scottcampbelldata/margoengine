@@ -49,7 +49,7 @@ test('no package outside physics reaches the solver through raw, world or rapier
   for (const file of files) {
     if (!/\.(ts|tsx|js|mjs)$/.test(file)) continue;
     const source = text(file);
-    if (!/@margoengine\/physics|physics(2d)?\/dist|gltf-pro\/physics|GLTFPhysics/.test(source)) continue;
+    if (!/@margoengine\/physics|physics(2d)?\/dist|gltf\/physics|GLTFPhysics/.test(source)) continue;
     source.split('\n').forEach((line, i) => {
       if (solver.test(line)) found.push(`${file}:${i + 1}: ${line.trim()}`);
     });

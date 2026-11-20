@@ -921,7 +921,7 @@
    ]
   },
   {
-   "path": "packages/gltf-pro/tests/fixtures/Triangle.meshopt.gltf",
+   "path": "packages/gltf/test/fixtures/Triangle.meshopt.gltf",
    "views": [
     {
      "bufferView": 0,

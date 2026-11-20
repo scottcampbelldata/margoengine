@@ -410,11 +410,20 @@ export class HTMLTexture {
         surface.draws++;
       })
       .catch((error: unknown) => {
-        if (surface.signal.aborted) return;
-        // A failed raster is an error of the page (a tainting image, say): reported, never hidden.
-        queueMicrotask(() => {
-          throw error;
-        });
+        if (surface.signal.aborted || this.disposed || !this.surfaces.has(surface)) return;
+        // A failed raster is an error of the page (a tainting image, say): reported through the engine's error path
+        // with its cause, never hidden and never rethrown where no caller can catch it. The surface keeps its last
+        // texture; `invalidate()` draws it again once the page is fixed.
+        const reason = error instanceof Error ? error.message : String(error);
+        this.runtime?.onError(
+          Object.assign(
+            margoError(
+              'failed',
+              `HTMLTexture could not draw its element (${reason}); fix the element or its resources and call surface.invalidate(); see https://margoengine.com/errors#html-texture`,
+            ),
+            { cause: error },
+          ),
+        );
       })
       .finally(() => {
         surface.busy = false;

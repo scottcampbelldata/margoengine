@@ -132,7 +132,7 @@ test('without instancing the file stays refused; malformed instances are named e
   const { engine } = await headlessEngine();
   try {
     const { doc, bytes } = file();
-    assert.throws(() => parseGLTF(engine, doc, [bytes]), /gltf-pro/);
+    assert.throws(() => parseGLTF(engine, doc, [bytes]), /gltf\/pbr/);
     assert.throws(() => load(engine, file({})), /instance attributes/);
     const uneven = file({ TRANSLATION: 2, SCALE: 4 });
     uneven.doc.accessors[4].count = 2;
@@ -150,7 +150,7 @@ test('without instancing the file stays refused; malformed instances are named e
     flat.bytes.fill(0, doc.bufferViews[5].byteOffset);
     assert.throws(() => load(engine, flat), /instance rotation/);
     const extra = file(undefined, { extensions: { [NAME]: { attributes: { TRANSLATION: 2 } }, VENDOR_thing: {} } });
-    assert.throws(() => load(engine, extra), /gltf-pro/);
+    assert.throws(() => load(engine, extra), /gltf\/pbr/);
     assert.equal(engine.meshes.size, 0);
   } finally {
     engine.dispose();

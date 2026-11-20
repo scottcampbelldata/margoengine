@@ -168,7 +168,15 @@ export class AMRVolume implements Drawable {
       d = this.#figure.renderer.device!;
     v.set(this.source.model);
     invertMatrix(this.source.model, v.subarray(16, 32));
-    v.set([0, this.source.quality, this.source.density, this.source.mode === 'mip' ? 1 : this.source.mode === 'minip' ? 2 : 0], 32);
+    v.set(
+      [
+        0,
+        this.source.quality,
+        this.source.density,
+        this.source.mode === 'mip' ? 1 : this.source.mode === 'minip' ? 2 : 0,
+      ],
+      32,
+    );
     v.set([0, 0, this.#reference / max, this.#linear ? 1 : 0], 36);
     v.set([...spans.map((n) => n / max), this.source.shading ? 1 : 0], 40);
     v.set([this.data.nodes.length, this.source.clip.length, 0, 0], 44);
@@ -229,6 +237,8 @@ export class AMRVolume implements Drawable {
     this.#textures = [];
     this.#group = undefined;
   }
+  /** @internal The figure's transform; the layer draws with its hidden source volume's model. */
+  setModel(): void {}
   /** @internal */ restore(): void {
     if (!this.#disposed) {
       this.#release();
@@ -241,6 +251,7 @@ export class AMRVolume implements Drawable {
     this.#disposed = true;
     this.#figure.renderer.remove(this);
     this.#release();
+    this.#figure.remove(this);
     this.#figure.remove(this.source);
   }
   /** Same as dispose(), for using. */ [Symbol.dispose](): void {
@@ -250,6 +261,13 @@ export class AMRVolume implements Drawable {
 /** Attach a direct block volume. Source scalar values and hierarchy are snapshotted. */
 export function amrVolume(figure: Figure, data: AMRData, options: AMRVolumeOptions = {}): AMRVolume {
   const layer = new AMRVolume(figure, data, options);
+  // The figure takes the layer before the renderer draws it; a refused layer frees its textures and source.
+  try {
+    figure.addLayer(layer);
+  } catch (error) {
+    layer.dispose();
+    throw error;
+  }
   figure.renderer.add(layer);
   return layer;
 }
@@ -360,6 +378,7 @@ export async function contourAMR(
       options.dims ??
       ([0, 1, 2].map((k) => Math.round((b[2 * k + 1] - b[2 * k]) / spacing[k]) + 1) as [number, number, number]),
     max = options.maxPoints ?? 2_000_000;
+  if (dims.length !== 3) amrError('contour dims takes three sample counts, one per axis');
   if (
     dims.some((n) => !Number.isSafeInteger(n) || n < 2) ||
     !Number.isSafeInteger(max) ||

@@ -2,7 +2,7 @@
 // shot against the shapes as they were at the moment the shooter saw them (its interpolated view), not where they
 // are now. That is what makes a shot that looked like a hit on screen count as one.
 
-import { Timeline } from '@margoengine/net/timeline';
+import { Timeline } from './interpolation-timeline.js';
 
 /** One hit shape: a circle (2 coordinates) or a sphere (3) of `radius`. */
 export interface Hitbox {

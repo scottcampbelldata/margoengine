@@ -293,6 +293,8 @@ export class FlyControls extends Controls {
     update(delta?: number): boolean;
 }
 
+export type GizmoColor = string | readonly number[];
+
 export type GizmoDelta = {
     kind: 'line';
     from: V3;
@@ -309,6 +311,8 @@ export interface GizmoFrame {
     mode: TransformMode;
     origin: V3;
     axes: [V3, V3, V3];
+    hide?: readonly HandleName[];
+    scaleAxes?: [V3, V3, V3];
     size: number;
     eye: V3;
     up: V3;
@@ -321,6 +325,9 @@ export interface GizmoFrame {
     dragging: boolean;
     flip?: readonly [number, number, number];
     delta?: GizmoDelta | null;
+    colors?: readonly [RGBA, RGBA, RGBA];
+    hover?: RGBA;
+    lineWidth?: number;
 }
 
 export interface Handle {
@@ -329,7 +336,7 @@ export interface Handle {
     pick: Pick;
 }
 
-export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE';
+export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE' | 'RX' | 'RY' | 'RZ' | 'SX' | 'SY' | 'SZ';
 
 export type HeightField = (x: number, z: number) => number;
 
@@ -568,11 +575,13 @@ export class TransformControls extends EventDispatcher {
     showZ: boolean;
     flipAxes: boolean;
     showDelta: boolean;
+    hide: readonly HandleName[];
     occlude: boolean;
     occluder: GizmoOccluder | undefined;
     object: Mesh | null;
     axis: HandleName | null;
     dragging: boolean;
+    fixed: boolean;
     readonly overlay: OverlayRenderer;
     readonly pluginName: string;
     static attach(engine: EngineKernel, options?: TransformControlsOptions): TransformControls;
@@ -612,6 +621,14 @@ export class TransformControls extends EventDispatcher {
     setRotationSnap(step: number | null): void;
     setScaleSnap(step: number | null): void;
     reset(): void;
+    get offset(): readonly [number, number, number];
+    set offset(value: readonly [number, number, number]);
+    get axisColors(): readonly [RGBA, RGBA, RGBA] | null;
+    set axisColors(value: readonly [GizmoColor, GizmoColor, GizmoColor] | null);
+    get hoveredColor(): RGBA | null;
+    set hoveredColor(value: GizmoColor | null);
+    get lineWidth(): number;
+    set lineWidth(value: number);
     frame(): GizmoFrame | null;
     handles(): Handle[];
     pick(x: number, y: number): HandleName | null;
@@ -635,13 +652,19 @@ export interface TransformControlsOptions {
     flipAxes?: boolean;
     showDelta?: boolean;
     occlude?: boolean;
+    hide?: readonly HandleName[];
     occluder?: GizmoOccluder;
     element?: ControlElement;
     view?: RenderView;
     order?: number;
+    offset?: readonly [number, number, number];
+    fixed?: boolean;
+    axisColors?: readonly [GizmoColor, GizmoColor, GizmoColor] | null;
+    hoveredColor?: GizmoColor | null;
+    lineWidth?: number;
 }
 
-export type TransformMode = 'translate' | 'rotate' | 'scale';
+export type TransformMode = 'translate' | 'rotate' | 'scale' | 'all';
 
 export type TransformPivot = 'median' | 'active' | 'individual';
 

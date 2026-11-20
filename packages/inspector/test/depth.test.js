@@ -165,7 +165,7 @@ test('an edit that the engine rejects is not recorded, and undo skips a mesh tha
   const { engine, inspector, dom } = await scene(t),
     mesh = engine.createMesh().setGeometry(box());
   inspector.select(mesh);
-  edit(dom, field(inspector, 'scale.y'), '0');
+  edit(dom, field(inspector, 'scale.y'), 'x');
   assert.equal(inspector.history.undoCount, 0);
   edit(dom, field(inspector, 'position.y'), '3');
   mesh.dispose();
@@ -330,10 +330,12 @@ test('restore checks the whole snapshot first and rolls back a value the engine 
   const good = inspector.snapshot();
   const bad = structuredClone(good);
   bad.meshes[0].position = [5, 5, 5];
+  // A zero scale is accepted (glTF 2.0 section 3.5.3); the colour after it is out of range, so the restore rolls back.
   bad.meshes[1].scale = [0, 1, 1];
-  assert.throws(() => restoreSnapshot(engine, bad));
+  bad.meshes[1].material.color = [5, 0, 0];
+  assert.throws(() => restoreSnapshot(engine, bad), /material/);
   assert.equal(a.position.x, 1, 'The first mesh was put back after the second failed');
-  assert.equal(b.scale.x, 1);
+  assert.equal(b.scale.x, 1, 'The zero scale applied before the rejected colour was put back');
   assert.equal(inspector.history.undoCount, 0);
   const rejects = (data, type, text) =>
     assert.throws(

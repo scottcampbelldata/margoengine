@@ -104,7 +104,7 @@ export class OverlayRenderer {
     this.lastTriangles = vertices.length / FLOATS / 3;
     if (!vertices.length) return;
     if (ctx.backend === 'webgpu') this.drawGPU(ctx, vertices, occlude);
-    else this.drawGL(ctx.gl, ctx.width, ctx.height, vertices, occlude);
+    else this.drawGL(ctx, vertices, occlude);
   }
 
   private drawGPU(ctx: Extract<PassContext, { backend: 'webgpu' }>, vertices: Float32Array, occlude: boolean): void {
@@ -172,13 +172,8 @@ export class OverlayRenderer {
     pass.end();
   }
 
-  private drawGL(
-    gl: WebGL2RenderingContext,
-    width: number,
-    height: number,
-    vertices: Float32Array,
-    occlude: boolean,
-  ): void {
+  private drawGL(ctx: Exclude<PassContext, { backend: 'webgpu' }>, vertices: Float32Array, occlude: boolean): void {
+    const gl = ctx.gl;
     if (gl !== this.gl) {
       this.release();
       this.gl = gl;
@@ -225,7 +220,15 @@ export class OverlayRenderer {
       gl.vertexAttribPointer(1, 4, gl.FLOAT, false, FLOATS * 4, 16);
       gl.bindVertexArray(null);
     }
-    gl.viewport(0, 0, width, height);
+    // The view's rectangle (top-left origin, drawing-buffer pixels) flipped to GL's bottom-left origin, or the target.
+    const v = ctx.view?.viewport ?? [0, 0, ctx.width, ctx.height],
+      s = ctx.view?.scissor ?? v,
+      scissor = !!ctx.view && !gl.isEnabled(gl.SCISSOR_TEST);
+    gl.viewport(v[0], ctx.height - v[1] - v[3], v[2], v[3]);
+    if (ctx.view) {
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(s[0], ctx.height - s[1] - s[3], s[2], s[3]);
+    }
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.glBuffer);
@@ -236,6 +239,7 @@ export class OverlayRenderer {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, vertices.length / FLOATS);
+    if (scissor) gl.disable(gl.SCISSOR_TEST);
     gl.disable(gl.BLEND);
     gl.enable(gl.DEPTH_TEST);
     gl.depthMask(true);

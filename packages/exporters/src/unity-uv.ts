@@ -1,7 +1,7 @@
 // Unity UV clips for a glTFast import: AnimationClips with constant keys on the material's base-color scale and offset.
 // The property is baseColorTexture_ST, the main texture of the glTFast shaders the Unity support package pins.
 import type { ExportScene } from './scene.js';
-import { uvClips } from './uv-clips.js';
+import { uniqueNamer, uvClips } from './uv-clips.js';
 
 /** One property curve of a Unity UV clip. */
 export interface UnityUVCurve {
@@ -15,6 +15,8 @@ export interface UnityUVCurve {
 /** The data {@link createUnityUVClips} writes. */
 export interface UnityUVClip {
   name: string;
+  /** The `.anim` file name, without the extension: the name made safe for a path, distinct from every other clip's. */
+  file: string;
   curves: UnityUVCurve[];
 }
 
@@ -24,10 +26,13 @@ export interface UnityUVClip {
  * @throws TypeError for a channel that is not a STEP base-color offset or scale, or a material no node draws.
  */
 export function unityUVClips(scene: ExportScene): UnityUVClip[] {
-  const clips = new Map<string, UnityUVCurve[]>();
-  for (const { clip, paths, keys } of uvClips(scene)) {
-    const curves = clips.get(clip) ?? [];
-    clips.set(clip, curves);
+  // By clip, not by name: two clips may share a name, and each is its own AnimationClip.
+  const clips = new Map<number, UnityUVClip>(),
+    file = uniqueNamer();
+  for (const { clip, animation, paths, keys } of uvClips(scene)) {
+    let entry = clips.get(animation);
+    if (!entry) clips.set(animation, (entry = { name: clip, file: file(clip), curves: [] }));
+    const { curves } = entry;
     const times = keys.map((key) => key.time),
       columns: [string, number[]][] = [
         ['x', keys.map((key) => key.scale[0])],
@@ -39,7 +44,7 @@ export function unityUVClips(scene: ExportScene): UnityUVClip[] {
       for (const [axis, values] of columns)
         curves.push({ path, property: `material.baseColorTexture_ST.${axis}`, times, values });
   }
-  return [...clips].map(([name, curves]) => ({ name, curves }));
+  return [...clips.values()];
 }
 
 /**
@@ -79,7 +84,7 @@ namespace MargoExport.${folder}
         const string Root = "Assets/${folder}";
 
         [Serializable] class Curve { public string path = ""; public string property = ""; public float[] times = new float[0]; public float[] values = new float[0]; }
-        [Serializable] class Clip { public string name = ""; public Curve[] curves = new Curve[0]; }
+        [Serializable] class Clip { public string name = ""; public string file = ""; public Curve[] curves = new Curve[0]; }
         [Serializable] class Data { public Clip[] clips = new Clip[0]; }
 
         [MenuItem("Tools/Margo Export/${folder} UV Clips")]
@@ -101,7 +106,7 @@ namespace MargoExport.${folder}
                 var settings = AnimationUtility.GetAnimationClipSettings(result);
                 settings.loopTime = true;
                 AnimationUtility.SetAnimationClipSettings(result, settings);
-                AssetDatabase.CreateAsset(result, Root + "/" + clip.name + ".anim");
+                AssetDatabase.CreateAsset(result, Root + "/" + clip.file + ".anim");
             }
             AssetDatabase.SaveAssets();
         }

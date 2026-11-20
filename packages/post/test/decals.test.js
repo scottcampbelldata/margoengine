@@ -256,3 +256,60 @@ test('the screen-span bound is conservative: a decal whose sphere spans minPixel
   assert.equal(keep['cull'](m, width, height), 1);
   assert.equal(drop['cull'](m, width, height), 0);
 });
+
+// KB-RESTORE-BORROWED1: a plain atlas belongs to the device that made it. After a restore no decal draws and nothing of
+// it is bound, one report says so, setAtlas brings the decals back; a function atlas is made once per device.
+test('Decals atlas across a device restore: a plain one is dropped and reported once, a function one is remade', () => {
+  const viewed = [],
+    tex = (device, name) => {
+      const t = device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING });
+      const createView = t.createView;
+      t.createView = (d) => (viewed.push(name), createView(d));
+      return t;
+    },
+    plain = tex(mockGPU().device, 'plain'),
+    { view, engine, decals, frame } = rig({ samples: 1, options: { atlas: plain } }),
+    errors = [];
+  engine.onError = (error) => errors.push(error);
+  const restore = () => {
+    const fresh = mockGPU();
+    engine.gpu = view.c.device = fresh.device;
+    view.c.encoder = fresh.encoder;
+    decals.onDeviceRestored(engine);
+    return fresh;
+  };
+  const draws = (g, i) => g.record(() => frame(i)).filter((e) => e[0] === 'pass.draw').length;
+  assert.equal(decals.atlas, plain, 'the atlas as given');
+  decals.setDecals([floor]);
+  frame(0);
+  assert.deepEqual(viewed, ['plain'], 'bound while its device is the one in use');
+  const g1 = restore();
+  assert.equal(draws(g1, 1), 0, 'no decal draws without an atlas to sample');
+  frame(2);
+  assert.deepEqual(viewed, ['plain'], 'nothing of the lost atlas is bound on the new device');
+  assert.equal(errors.length, 1, 'reported once');
+  assert.equal(errors[0].code, 'state');
+  assert.match(errors[0].message, /Decals atlas lost with the device.*borrowed-lost/);
+  assert.equal(plain.destroyed, undefined, 'borrowed, never destroyed');
+  // A new atlas through setAtlas brings the decals back.
+  const again = tex(g1.device, 'again');
+  decals.setAtlas(again);
+  assert.equal(draws(g1, 3), 1, 'drawn again');
+  assert.deepEqual(viewed, ['plain', 'again']);
+  // The function form: made once per device, no report.
+  const made = [];
+  decals.setAtlas((device) => (made.push(device), tex(device, 'made' + made.length)));
+  assert.equal(draws(g1, 4), 1);
+  frame(5);
+  assert.equal(made.length, 1, 'made once per device');
+  const g2 = restore();
+  assert.equal(draws(g2, 6), 1, 'the function atlas is back on the new device');
+  assert.deepEqual(made, [g1.device, g2.device]);
+  assert.deepEqual(viewed.slice(-1), ['made2']);
+  assert.equal(errors.length, 1, 'no report for the function form');
+  // Without an atlas the white texel is bound again.
+  decals.setAtlas(undefined);
+  assert.equal(draws(g2, 7), 1);
+  assert.throws(() => decals.setAtlas({}), /sampled 2D GPUTexture or \(device\)/);
+  decals.dispose();
+});

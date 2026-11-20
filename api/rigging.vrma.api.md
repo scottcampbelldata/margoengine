@@ -6,7 +6,7 @@
 import { Animation, Interpolation } from "@margoengine/animation";
 import { RetargetRig } from "@margoengine/animation/skeleton-utils";
 import { Vec3 } from "@margoengine/core";
-import { GLTFDocument } from "@margoengine/gltf-pro";
+import { GLTFDocument } from "@margoengine/gltf/pbr";
 
 export interface VRMA {
     readonly document: GLTFDocument;
@@ -185,7 +185,7 @@ interface VRMAvatar {
     firstPerson?: {
         meshAnnotations?: {
             node: number;
-            type: string;
+            type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly';
         }[];
         [field: string]: unknown;
     };

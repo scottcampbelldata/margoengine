@@ -243,3 +243,51 @@ test('mesh: junk from a peer goes to onerror, a failed link is dropped, and no c
   assert.throws(() => new PeerMesh(left), { code: 'unsupported' });
   if (before) globalThis.RTCPeerConnection = before;
 });
+
+test('signal: an authorize that throws or rejects refuses the join and is never an unhandled rejection', async (t) => {
+  const seen = [];
+  const listener = (reason) => seen.push(reason);
+  process.on('unhandledRejection', listener);
+  t.after(() => process.off('unhandledRejection', listener));
+  for (const authorize of [
+    () => {
+      throw new Error('auth store down');
+    },
+    async () => {
+      throw new Error('auth store down');
+    },
+  ]) {
+    const w = world({ authorize });
+    await assert.rejects(join(w, 'lobby'), { code: 'failed' });
+    assert.equal(w.signals.peers('lobby'), 0);
+    w.stop();
+  }
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(seen, []);
+});
+
+test('signal: junk from the signalling server closes the client instead of throwing into the transport', async () => {
+  const network = new LoopbackNetwork({ latency: 1 });
+  const [near, far] = network.pair();
+  far.onmessage = () => {};
+  let code = 0;
+  far.onclose = (c) => (code = c);
+  const joining = SignalClient.join(near, 'lobby');
+  joining.catch(() => {});
+  far.send(text.encode('{not json'));
+  assert.doesNotThrow(() => network.advance(10));
+  await assert.rejects(joining, { code: 'failed' });
+  assert.equal(code, CloseCode.protocol);
+
+  const [a, b] = network.pair();
+  b.onmessage = () => {};
+  const client = SignalClient.join(a, 'lobby');
+  b.send(text.encode(JSON.stringify({ kind: 'joined', id: 1, peers: [] })));
+  network.advance(10);
+  const joined = await client;
+  let closed = 0;
+  joined.onclose = (c) => (closed = c);
+  b.send(new Uint8Array([0xff, 0xfe]));
+  assert.doesNotThrow(() => network.advance(10));
+  assert.equal(closed, CloseCode.protocol);
+});

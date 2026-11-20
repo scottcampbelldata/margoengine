@@ -287,6 +287,34 @@ const hex = (bytes: ArrayBuffer): string => [...new Uint8Array(bytes)].map((byte
 const entityTag = async (bytes: Uint8Array): Promise<string> =>
   `"${hex(await crypto.subtle.digest('SHA-256', bytes as BufferSource)).slice(0, 32)}"`;
 
+/**
+ * A request body of at most `maxBytes`, or null past it: read chunk by chunk, so a body sent without a length (or with
+ * a false one) is cut off at the limit instead of filling memory.
+ */
+async function bounded(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+  if (!request.body) return new Uint8Array(0);
+  const reader = request.body.getReader(),
+    chunks: Uint8Array[] = [];
+  let length = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    length += value.length;
+    if (length > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(length);
+  let at = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, at);
+    at += chunk.length;
+  }
+  return out;
+}
+
 /** The tags a list header names; the whole of `*` is the string '*'. */
 const listed = (value: string): string[] | '*' =>
   value.trim() === '*' ? '*' : value.split(',').map((tag) => tag.trim()).filter(Boolean);
@@ -342,8 +370,8 @@ export function remoteHandler(storage: SaveStorage, options: RemoteHandlerOption
     }
     const size = Number(request.headers.get('content-length') ?? 0);
     if (size > maxBytes) return answer(413);
-    const bytes = new Uint8Array(await request.arrayBuffer());
-    if (bytes.length > maxBytes) return answer(413);
+    const bytes = await bounded(request, maxBytes);
+    if (!bytes) return answer(413);
     await storage.write(key, bytes, { signal });
     return answer(stored ? 204 : 201, null, { etag: await entityTag(bytes) });
   };

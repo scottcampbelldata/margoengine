@@ -1,5 +1,5 @@
-// Proof that gltf-pro's transparency hook (@margoengine/oit) changes nothing on the GPU while no hook is set:
-// gltf-pro at `ref` (before the hook) and in the working tree record every GPU call, descriptor, shader module and buffer
+// Proof that gltf/pbr's transparency hook (@margoengine/oit) changes nothing on the GPU while no hook is set:
+// gltf/pbr at `ref` (before the hook) and in the working tree record every GPU call, descriptor, shader module and buffer
 // write of a 6-frame story: opaque, MASK, BLEND (twice), BLEND + clearcoat (physical) and a BLEND material
 // with a custom renderState, a text-patching lighting effect added and removed, a hidden blended node, an HDR and a
 // canvas target, MSAA 1x/4x, beauty/SSAO-ambient/G-buffer draws through the frame graph and directly. They must be identical.
@@ -10,16 +10,16 @@ import assert from 'node:assert/strict';
 import { refs, versions, golden } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
-const { ref, pin } = refs('b803d56', '0e02ead', '675ee2476e');
-const { baseline, candidate } = await versions('gltf-pro', ref, undefined, pin);
+const { ref, pin } = refs('b803d56', '0e02ead', '8c71da0556');
+const { baseline, candidate } = await versions('gltf', ref, 'src/pbr.ts', pin);
 const materials = [
   {},
   { alphaMode: 'MASK', alphaCutoff: 0.3 },
   { alphaMode: 'BLEND', pbrMetallicRoughness: { baseColorFactor: [1, 0, 0, 0.5] } },
   // Was BLEND + KHR_materials_transmission (0.5) until 5w.f: transmission now draws twice (tint multiply, then the lit
-  // surface) with the transmissive shader, by design; packages/gltf-pro/tests/materials-ext.test.js covers it.
+  // surface) with the transmissive shader, by design; packages/gltf/test/materials-ext.test.js covers it.
   { alphaMode: 'BLEND', pbrMetallicRoughness: { baseColorFactor: [1, 1, 0, 0.6] } },
   {
     alphaMode: 'BLEND',
@@ -97,13 +97,13 @@ for (const samples of [1, 4]) {
   const expected = await golden(`${samples}x`, () => story(baseline, samples)),
     actual = await story(candidate, samples);
   assert.ok(expected.filter((e) => e[0] === 'beginRenderPass').length > 20, 'story must draw');
-  assert.deepEqual(actual, expected, `gltf-pro GPU calls differ at ${samples}x without a transparency hook`);
+  assert.deepEqual(actual, expected, `gltf/pbr GPU calls differ at ${samples}x without a transparency hook`);
   calls += expected.length;
   modules += expected.filter((e) => e[0] === 'module').length;
 }
 console.log(
   JSON.stringify({
-    package: 'gltf-pro',
+    package: 'gltf/pbr',
     baseline: ref,
     identicalCalls: calls,
     shaderModules: modules,

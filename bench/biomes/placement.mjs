@@ -1,19 +1,12 @@
-import { deferSpeed, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
-if (
-  isSpeedEntry(import.meta.url) &&
-  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
-  deferSpeed('bench/biomes/placement.mjs')
-)
-  process.exit(0);
 // Biomes goal G1 (spec 1.1): time per km2 of each CPU stage on the reference world R16, median of N warm runs.
-// Run from the repository root after `npm run build:packages`, on a quiet machine (benchmarks take the GPU lock
-// exclusively): node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node bench/biomes/placement.mjs [--runs=20]
+// Run from the repository root after `npm run build:packages`, on a quiet machine:
+// node scripts/run-with-timeout.mjs -- node bench/biomes/placement.mjs [--runs=20]
 // Also the `biomes` suite of `npm run bench -- biomes`. Prints one JSON object: ms per km2 per stage, and the spread.
 // Stages: relief heights (B0), climate fields with classification (B1, B2), stored-object placement (B5). G1 is
 // fields plus placement per km2; `workers` times the same work for a block of tiles on 1 and on 8 worker threads
 // (B7, `--workers=<n>`).
 // The fields stage builds R16's region fields once in its setup (several seconds, not timed).
-import { pathToFileURL } from 'node:url';
+import { deferSpeedEntry, isSpeedEntry } from '../../scripts/support/speed-phase.mjs';
 import { median } from '../lib/node.mjs';
 
 const dist = (entry) => new URL(`../../packages/biomes/dist/${entry}.js`, import.meta.url).href;
@@ -153,7 +146,7 @@ export async function measureWorkers({ workers = 8, side = 8 } = {}) {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (isSpeedEntry(import.meta.url) && !deferSpeedEntry(import.meta.url, 'bench/biomes/placement.mjs')) {
   const runs = Number(process.argv.find((a) => a.startsWith('--runs='))?.slice(7) ?? 20),
     workers = Number(process.argv.find((a) => a.startsWith('--workers='))?.slice(10) ?? 8);
   console.log(

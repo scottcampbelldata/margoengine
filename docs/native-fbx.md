@@ -39,16 +39,16 @@ Geometry inside one FBX stays at or below 1,000,000 position vertices, counted t
 
 `@margoengine/animation` is the consumer that defines the skin and clip subset. The writer emits only documents that pass these checks.
 
-- `asset.version` is `"2.0"`. Animated nodes use `translation`, `rotation`, and `scale`. They do not use `matrix`. `gltf-pro` accepts a static matrix and decomposes it, and the animation package rejects a channel whose node has `matrix`.
+- `asset.version` is `"2.0"`. Animated nodes use `translation`, `rotation`, and `scale`. They do not use `matrix`. `gltf/pbr` accepts a static matrix and decomposes it, and the animation package rejects a channel whose node has `matrix`.
 - One animation channel per node and path. Paths are `translation`, `rotation`, `scale`, and `weights`.
 - Sampler inputs and outputs are component type `5126` (Float32). Input is `SCALAR`. Output is `VEC3` for translation and scale, `VEC4` for rotation, and `SCALAR` for weights.
 - Times are finite, non-negative, and strictly increasing. The default interpolation is `LINEAR`. `STEP` and `CUBICSPLINE` are legal. Cubic output length is `times.length * width * 3`.
 - A skin's `joints` are unique node indices. `inverseBindMatrices` is Float32 `MAT4`, one matrix per joint, column major. Omitting the accessor means identity binds, which this writer will not do. It always writes the matrices.
 - A skinned primitive has `JOINTS_0` and `WEIGHTS_0` only. `JOINTS_1` and `WEIGHTS_1` are rejected by the animation package. Joint ids are unsigned byte or unsigned short, not normalized. Weights are Float32, or normalized unsigned byte or short. This writer uses unsigned short joints and Float32 weights. Each vertex has four influences. Each id is in range of that primitive's skin joint list. The four weights sum to a positive number. The animation package divides by that sum.
-- Morph targets are per-primitive `POSITION`, `NORMAL`, and `TANGENT` deltas, each `VEC3`. The count matches the base vertex count. Initial weights live on the node, then the mesh. Names go in `meshes[].extras.targetNames` because `gltf-pro` reads them there.
+- Morph targets are per-primitive `POSITION`, `NORMAL`, and `TANGENT` deltas, each `VEC3`. The count matches the base vertex count. Initial weights live on the node, then the mesh. Names go in `meshes[].extras.targetNames` because `gltf/pbr` reads them there.
 - Four influences is a hard renderer limit. More FBX influences are reduced before export, not written as a second set.
 
-`gltf-pro` still requires a normal of non-zero length on every vertex, a renderable mesh, and a hierarchy no deeper than 62. Textures need `TEXCOORD_0` or `TEXCOORD_1`. The FBX path writes `TEXCOORD_0` only.
+`gltf/pbr` still requires a normal of non-zero length on every vertex, a renderable mesh, and a hierarchy no deeper than 62. Textures need `TEXCOORD_0` or `TEXCOORD_1`. The FBX path writes `TEXCOORD_0` only.
 
 ## Exporter changes
 
@@ -256,7 +256,7 @@ Normals and UVs use layer elements. The builder reads the first `LayerElementNor
 
 Any other mapping throws. After triangulation, values are stored per exported vertex, not per control point. A control point with two different normals becomes two glTF vertices. The same split applies to UVs and vertex colors. Joint weights are copied onto each split vertex from the control point.
 
-Missing normals are generated from the triangle faces, area-weighted, then normalized. A zero-length generated normal throws, which matches `gltf-pro`.
+Missing normals are generated from the triangle faces, area-weighted, then normalized. A zero-length generated normal throws, which matches `gltf/pbr`.
 
 `LayerElementMaterial` with `AllSame` uses one material index. `ByPolygon` uses one material index per polygon. Each material group becomes its own child mesh node under the original model transform, because the data-scene writer stores one geometry and one material on a node.
 
@@ -365,7 +365,7 @@ Channels that would target a node using a baked `matrix` are not emitted that wa
 | `src/animation.ts` | Stacks, curves, ticks, Euler to quaternion. |
 | `src/convert.ts` | Builds the `ExportScene` and calls `exportGLB`. |
 
-`package.json` depends on `@margoengine/exporters` and `@margoengine/gltf-pro`, and peers on core. It does not depend on `three`. The package remains `sideEffects: false`.
+`package.json` depends on `@margoengine/exporters` and `@margoengine/gltf/pbr`, and peers on core. It does not depend on `three`. The package remains `sideEffects: false`.
 
 ## Tests
 

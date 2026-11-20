@@ -1,7 +1,7 @@
-// @margoengine/blender/components: tagged `margo:` custom properties of a static .margo scene become glTF Pro colliders,
+// @margoengine/blender/components: tagged `margo:` custom properties of a static .margo scene become glTF PBR colliders,
 // physics bodies, punctual lights and named scripts on load, as Godot's and Unity's import pipelines read tagged
 // objects. The tags become KHR_implicit_shapes, KHR_physics_rigid_bodies, KHR_lights_punctual and glTF cameras in the
-// decoded document, so glTF Pro's own readers (`applyGLTFPhysics`, `applyGLTFLights`, `viewGLTFCamera`) do the rest.
+// decoded document, so glTF PBR's own readers (`applyGLTFPhysics`, `applyGLTFLights`, `viewGLTFCamera`) do the rest.
 // The add-on writes the tags itself for Blender's lights and cameras, so a lit, framed scene opens as authored.
 import type { EngineKernel } from "@margoengine/core";
 import {
@@ -9,12 +9,13 @@ import {
   type GLTFDocument,
   type GLTFLightReceiver,
   type PBRModel,
-} from "@margoengine/gltf-pro/model";
+} from "@margoengine/gltf/pbr-model";
 import type {
   GLTFPhysics,
   GLTFPhysicsOptions,
-} from "@margoengine/gltf-pro/physics";
+} from "@margoengine/gltf/physics";
 import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
 import { decodeImages, maxBytes } from "./container.js";
 import { decodeMargo, type MargoAsset, type MargoOptions } from "./index.js";
 
@@ -269,7 +270,8 @@ export function margoComponents(asset: MargoAsset): MargoComponentsDocument {
     const camera = text("margo:camera", cameraTypes);
     if (camera) {
       if (light) bad("margo:camera", "on an object without margo:light");
-      const znear = number("margo:znear", Number.MIN_VALUE, 0.1)!,
+      // glTF 2.0 (5.13): a perspective znear is above 0, an orthographic one at least 0.
+      const znear = number("margo:znear", camera === "orthographic" ? 0 : Number.MIN_VALUE, 0.1)!,
         zfar = number("margo:zfar", Number.MIN_VALUE),
         aspect = number("margo:aspect", Number.MIN_VALUE);
       if (zfar !== undefined && zfar <= znear) bad("margo:zfar", "above margo:znear");
@@ -342,7 +344,10 @@ export async function parseMargoComponents(
   { signal, maxNodes, scripts = {}, physics, clustered, exposure, view = true }: MargoComponentsOptions = {},
 ): Promise<MargoScene> {
   signal?.throwIfAborted();
-  const asset = decodeMargo(input, { maxNodes }),
+  // The model, its lights and what its scripts make are built after the awaits below: they go in the scene this call
+  // started in (KB-OWN-BLEND2). The physics world follows the model's scene.
+  const scope = captureScene(engine),
+    asset = decodeMargo(input, { maxNodes }),
     parts = margoComponents(asset);
   for (const use of parts.scripts)
     if (typeof scripts[use.name] !== "function")
@@ -360,34 +365,38 @@ export async function parseMargoComponents(
   try {
     signal?.throwIfAborted();
     try {
-      model = parsePreparedPBR(engine, parts.document, asset.geometry, images, { maxNodes });
+      model = scope.run(() => parsePreparedPBR(engine, parts.document, asset.geometry, images, { maxNodes }));
     } catch (error) {
       for (const image of images) image.close();
       throw error;
     }
     if (parts.hasPhysics) {
-      const { applyGLTFPhysics } = await import("@margoengine/gltf-pro/physics");
+      const { applyGLTFPhysics } = await import("@margoengine/gltf/physics");
       world = await applyGLTFPhysics(model, { physics });
       signal?.throwIfAborted();
     }
     if (parts.hasLights) {
-      const { applyGLTFLights } = await import("@margoengine/gltf-pro");
-      cleanups.push(applyGLTFLights(model, { clustered, exposure }));
+      const { applyGLTFLights } = await import("@margoengine/gltf/pbr");
+      const lit = model;
+      cleanups.push(scope.run(() => applyGLTFLights(lit, { clustered, exposure })));
       signal?.throwIfAborted();
     }
     if (view && parts.camera !== undefined) {
-      const { viewGLTFCamera } = await import("@margoengine/gltf-pro");
+      const { viewGLTFCamera } = await import("@margoengine/gltf/pbr");
       signal?.throwIfAborted();
       viewGLTFCamera(model, model.cameras.find((camera) => camera.nodeIndex === parts.camera)!);
     }
+    const built = model;
     for (const use of parts.scripts) {
-      const cleanup = scripts[use.name]({
-        node: model.nodes[use.nodeIndex],
-        nodeIndex: use.nodeIndex,
-        properties: use.properties,
-        model,
-        physics: world,
-      });
+      const cleanup = scope.run(() =>
+        scripts[use.name]({
+          node: built.nodes[use.nodeIndex],
+          nodeIndex: use.nodeIndex,
+          properties: use.properties,
+          model: built,
+          physics: world,
+        }),
+      );
       if (typeof cleanup === "function") cleanups.push(cleanup);
     }
   } catch (error) {
@@ -410,7 +419,8 @@ export async function loadMargoComponents(
   { fetch: get = globalThis.fetch, ...options }: MargoComponentsOptions & { fetch?: typeof fetch } = {},
 ): Promise<MargoScene> {
   options.signal?.throwIfAborted();
-  const target = new URL(url, globalThis.location?.href);
+  const scope = captureScene(engine),
+    target = new URL(url, globalThis.location?.href);
   if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
       ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoComponents",
@@ -420,5 +430,6 @@ export async function loadMargoComponents(
     signal: options.signal,
     label: ".margo download",
   });
-  return parseMargoComponents(engine, bytes, options);
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(() => parseMargoComponents(engine, bytes, options));
 }

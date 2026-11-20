@@ -103,11 +103,14 @@ test('Sky: the light projection runs on the GPU and adds the same terms in the s
   let seed = 11;
   for (let i = 0; i < data.length; i++) data[i] = (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 31;
   // The CPU runner takes buffers only: the light map becomes one, read at the same texels.
-  const light = (source) => {
-    const words = new Float32Array(40).fill(7),
-      read = source
-        .replace('var level:texture_2d<f32>', 'var<storage,read> level:array<vec4f>')
-        .replace('textureLoad(level,vec2i(i32(x),i32(y)),0)', 'level[y*32u+x]');
+  // The light buffer is 11 vec4f since KB-SKY-FLOOR1: nine coefficients, one word left alone, and the ground's input
+  // (rgb the sun's E / pi, w the albedo; w 0 turns the ground off).
+  const light = (source, ground) => {
+    const words = new Float32Array(44).fill(7);
+    words.set(ground, 40);
+    const read = source
+      .replace('var level:texture_2d<f32>', 'var<storage,read> level:array<vec4f>')
+      .replace('textureLoad(level,vec2i(i32(x),i32(y)),0)', 'level[y*32u+x]');
     runComputeOnCPU({
       source: read,
       workgroups: [1],
@@ -118,7 +121,15 @@ test('Sky: the light projection runs on the GPU and adds the same terms in the s
     });
     return [...words];
   };
-  assert.deepEqual(light(projectRoute), light(project), 'nine coefficients word for word, the tenth left alone');
+  for (const ground of [
+    [0, 0, 0, 0],
+    [0.3, 0.25, 0.2, 0.2],
+  ])
+    assert.deepEqual(
+      light(projectRoute, ground),
+      light(project, ground),
+      `nine coefficients word for word, the tenth and the ground input left alone (ground ${ground})`,
+    );
 });
 
 test('splats: one CPU invocation sorts the projected keys in the order of the 8-pass GPU radix sort', async () => {
@@ -225,10 +236,23 @@ test('VFX: the route kernels are point draws, and frames of them equal the WebGP
   const vfx = await route('vfx'),
     { simulationShader, billboardShader, multisampled, foggedBillboard } = await import('../../vfx/src/shader.ts'),
     code = vfx.routeShaders(simulationShader);
-  for (const [name, source] of Object.entries(code)) {
-    const plan = planCompute({ source, entryPoint: 'main' });
+  // `events` says whether the update kernel writes event flags; it is not a kernel, so only the three kernels are planned.
+  assert.equal(typeof code.events, 'boolean');
+  assert.equal(code.events, false);
+  for (const name of ['flags', 'update', 'marks']) {
+    const plan = planCompute({ source: code[name], entryPoint: 'main' });
     assert.equal(plan.tier, 'scatter', `${name}: ${plan.reason}`);
-    assert.doesNotMatch(source, /atomic|var<workgroup>|workgroupBarrier/, name);
+    assert.doesNotMatch(code[name], /atomic|var<workgroup>|workgroupBarrier/, name);
+  }
+  // A simulation with events writes the flags from its update kernel, and stores each event once `update` has returned,
+  // so the kernel is a point draw too (KB-VFX-EVENTS-CPU: storing the event before the births read planned it on the CPU tier).
+  for (const on of ['death', 'collision']) {
+    const raised = vfx.routeShaders((await import('../../vfx/src/events.ts')).events.simulation(simulationShader, { on }));
+    assert.equal(raised.events, true);
+    assert.match(raised.update, /storeEvents\(id\.x\);eventFlags\[id\.x\]=eventHere/);
+    assert.doesNotMatch(raised.update, /atomic|var<workgroup>|workgroupBarrier/, 'events');
+    const plan = planCompute({ source: raised.update, entryPoint: 'main' });
+    assert.equal(plan.tier, 'scatter', `${on} events: ${plan.reason}`);
   }
   for (const source of [vfx.compactShader, vfx.totalsShader(1, 2)])
     assert.equal(planCompute({ source, entryPoint: 'main' }).tier, 'scatter');

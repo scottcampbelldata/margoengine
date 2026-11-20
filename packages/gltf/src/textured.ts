@@ -28,7 +28,7 @@ const TRANSFORM = 'KHR_texture_transform',
       `Invalid glTF ${what}; the file is not valid glTF 2.0, re-export it and check it with the glTF Validator`,
     ),
   refused = (what: string) =>
-    new MargoError('unsupported', `${what} is not on the light path; load the file with @margoengine/gltf-pro`);
+    new MargoError('unsupported', `${what} is not on the light path; load the file with @margoengine/gltf/pbr`);
 
 /** What a material draws with. `image` and `sampler` index the document; a MASK with no texture has neither. */
 interface Surface {
@@ -91,16 +91,29 @@ async function imageBytes(file: GLTFFile, id: number): Promise<Uint8Array> {
   }
   if (typeof image.uri !== 'string') throw invalid('image');
   const data = /^data:image\/[a-z+.-]+;base64,([A-Za-z0-9+/]*={0,2})$/.exec(image.uri);
-  if (data) return Uint8Array.from(atob(data[1]), (c) => c.charCodeAt(0));
+  if (data) {
+    try {
+      return Uint8Array.from(atob(data[1]), (c) => c.charCodeAt(0));
+    } catch (cause) {
+      throw new TypeError(`glTF image ${id} has a data: URI with invalid base64; re-export the file`, { cause });
+    }
+  }
   if (!file.fetch) throw new TypeError('glTF image URI needs the file location; use loadGLTF');
   return file.fetch(image.uri);
 }
-async function decode(bytes: Uint8Array): Promise<ImageBitmap> {
-  // As stored: glTF colour is sRGB, and an alpha test needs the alpha the artist wrote.
-  return createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>]), {
-    colorSpaceConversion: 'none',
-    premultiplyAlpha: 'none',
-  });
+async function decode(bytes: Uint8Array, id: number): Promise<ImageBitmap> {
+  try {
+    // As stored: glTF colour is sRGB, and an alpha test needs the alpha the artist wrote.
+    return await createImageBitmap(new Blob([bytes as Uint8Array<ArrayBuffer>]), {
+      colorSpaceConversion: 'none',
+      premultiplyAlpha: 'none',
+    });
+  } catch (cause) {
+    throw new TypeError(
+      `glTF image ${id} could not be decoded (${(cause as Error)?.message ?? cause}); re-export it as PNG or JPEG`,
+      { cause },
+    );
+  }
 }
 const addressMode = (wrap: unknown): GPUAddressMode =>
   wrap === 33071 ? 'clamp-to-edge' : wrap === 33648 ? 'mirror-repeat' : 'repeat';
@@ -131,7 +144,7 @@ function texturedShader(shader: string): string {
   if (!code.includes('o.uv=i.uv') || !code.includes('var i=source'))
     throw new MargoError(
       'failed',
-      'A package replaced the core shader parts @margoengine/gltf/textured patches; remove that package or load the file with @margoengine/gltf-pro',
+      'A package replaced the core shader parts @margoengine/gltf/textured patches; remove that package or load the file with @margoengine/gltf/pbr',
     );
   return code;
 }
@@ -180,7 +193,7 @@ class TexturedDraw implements EnginePlugin {
     if (!engine.gpu)
       throw new MargoError(
         'unsupported',
-        'Textured glTF requires WebGPU; use a WebGPU engine; see https://margoengine.com/errors#webgpu',
+        'Textured glTF needs WebGPU or the WebGL2 compatibility layer; call install() from @margoengine/webgl2-compat before Engine.create where WebGPU is missing; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
     this.frame = engine.gpu.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
@@ -445,7 +458,7 @@ class TexturedDraw implements EnginePlugin {
 /** A file's decoded images and surfaces, from `load` to `finish`. */
 const files = /* @__PURE__ */ new WeakMap<
   GLTFFile,
-  { images: Map<number, ImageBitmap>; surfaces: Map<number, Surface> }
+  { images: Map<number, ImageBitmap>; surfaces: Map<number, Surface>; owned?: boolean }
 >();
 /** The parts each loaded model draws here, for `texturedAlphaMasks`. */
 const modelParts = /* @__PURE__ */ new WeakMap<Model, Part[]>();
@@ -530,16 +543,23 @@ export const textured: GLTFExtension = {
       if (surface) surfaces.set(id, surface);
     });
     const used = new Set([...surfaces.values()].flatMap(({ image }) => (image === undefined ? [] : [image])));
-    try {
-      await Promise.all(
-        [...used].map(async (id) => {
-          images.set(id, await decode(await imageBytes(file, id)));
-        }),
-      );
-    } catch (error) {
-      for (const bitmap of images.values()) bitmap.close();
-      throw error;
+    // Every decode settles before a failure is passed on, so a bitmap still in flight is closed with the rest.
+    const results = await Promise.allSettled(
+      [...used].map(async (id) => {
+        images.set(id, await decode(await imageBytes(file, id), id));
+      }),
+    );
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) {
+      textured.abandon!(file);
+      throw failed.reason;
     }
+  },
+  abandon(file) {
+    // The load failed or was aborted after `load`: bitmaps no model took are closed here.
+    const state = files.get(file);
+    files.delete(file);
+    if (state && !state.owned) for (const bitmap of state.images.values()) bitmap.close();
   },
   read(file) {
     const { surfaces } = files.get(file)!;
@@ -559,7 +579,8 @@ export const textured: GLTFExtension = {
     };
   },
   finish(model: Model, file: GLTFFile, built: GLTFBuilt) {
-    const { images, surfaces } = files.get(file)!,
+    const state = files.get(file)!,
+      { images, surfaces } = state,
       engine = built.engine,
       parts: Part[] = [];
     for (const { geometry, source, expanded } of built.primitives) {
@@ -609,7 +630,21 @@ export const textured: GLTFExtension = {
       draws.set(graph, draw);
     }
     const owner = draw;
-    for (const part of parts) owner.add(part);
+    const leave = () => {
+      if (!owner.parts.size) {
+        draws.delete(graph);
+        engine.sceneOf(owner)?.removePlugin(owner.name);
+      }
+    };
+    try {
+      for (const part of parts) owner.add(part);
+    } catch (error) {
+      // An upload that throws (an image over the GPU's size) takes back every part and the plugin it joined.
+      for (const part of parts) if (owner.parts.get(part.geometry) === part) owner.remove(part);
+      leave();
+      throw error;
+    }
+    state.owned = true;
     modelParts.set(model, parts);
     const dispose = model.dispose;
     let live = true;
@@ -618,10 +653,7 @@ export const textured: GLTFExtension = {
         live = false;
         for (const part of parts) owner.remove(part);
         for (const bitmap of images.values()) bitmap.close();
-        if (!owner.parts.size) {
-          draws.delete(graph);
-          engine.sceneOf(owner)?.removePlugin(owner.name);
-        }
+        leave();
       }
       dispose();
     };

@@ -136,3 +136,60 @@ test('bad fronts, cells and inputs throw by name; removers and dispose work', ()
     assert.equal(scoped.stateAt(0, 0).rain, 0);
   }
 });
+
+test('a new base refills the missing fields of partial fronts and cells; removers still work', () => {
+  const map = new WeatherRegions({
+    base: 'clear',
+    fronts: [{ origin: [0, 0], direction: 0, speed: 0, width: 100, behind: { fog: 1 } }],
+    cells: [{ center: [0, 5000], radius: 100, weather: { lightning: 1 } }],
+  });
+  const removeFront = map.addFront({ origin: [0, -3000], direction: 0, speed: 0, width: 100, behind: { hail: 1 } });
+  map.base = 'snow';
+  // Behind the first front: its fog over the new base's snow, not over the clear base it was added with.
+  near(map.stateAt(0, -1000).fog, 1, 1e-12);
+  near(map.stateAt(0, -1000).snow, WEATHER_PRESETS.snow.snow, 1e-12);
+  near(map.stateAt(0, -1000).cloud, WEATHER_PRESETS.snow.cloud, 1e-12);
+  near(map.stateAt(0, 5000).snow, WEATHER_PRESETS.snow.snow, 1e-12);
+  near(map.stateAt(0, 5000).lightning, 1, 1e-12);
+  near(map.stateAt(0, -5000).snow, WEATHER_PRESETS.snow.snow, 1e-12);
+  // A bad base changes nothing; the remover of a front added before the change still removes it.
+  assert.throws(() => (map.base = { rain: 2 }), RangeError);
+  near(map.stateAt(0, -5000).hail, 1, 1e-12);
+  removeFront();
+  assert.equal(map.fronts.length, 1);
+  near(map.stateAt(0, -5000).hail, 0, 1e-12);
+});
+
+test('a storm varies across itself: its weather is blended over the map by its weight, read live', () => {
+  // A ring storm: calm inside 10 km, a 40 m/s gale with rain from 10 to 30 km, gone past 50 km.
+  const storm = {
+    weatherAt(x, z) {
+      const r = Math.hypot(x, z);
+      if (r < 10000) return { weight: 1, wind: 0, gust: 0, rain: 0 };
+      if (r < 30000) return { weight: 1, wind: 80, gust: 1, rain: 0.9, windDirection: 1 };
+      return { weight: Math.max(0, 1 - (r - 30000) / 20000), wind: 20, rain: 0.3 };
+    },
+  };
+  const map = new WeatherRegions({ base: { ...WEATHER_PRESETS.partlyCloudy, wind: 5 }, storms: [storm] });
+  assert.deepEqual(map.storms, [storm]);
+  const eye = map.stateAt(0, 0),
+    wall = map.stateAt(20000, 0),
+    edge = map.stateAt(40000, 0),
+    out = map.stateAt(60000, 0);
+  assert.equal(eye.wind, 0);
+  assert.equal(eye.rain, 0);
+  assert.equal(wall.wind, 60, 'a storm wind over 60 m/s counts as 60');
+  assert.equal(wall.gust, 1);
+  assert.equal(wall.windDirection, 1);
+  assert.equal(wall.cloud, WEATHER_PRESETS.partlyCloudy.cloud, 'fields left out keep the weather beneath');
+  assert.equal(edge.wind, 12.5, 'half the storm blended over the base');
+  assert.equal(out.wind, 5);
+  assertState(wall);
+  const remove = map.addStorm({ weatherAt: () => ({ weight: 1, fog: 1 }) });
+  assert.equal(map.stateAt(20000, 0).fog, 1, 'storms apply in order');
+  remove();
+  assert.equal(map.storms.length, 1);
+  assert.throws(() => map.addStorm({}), TypeError);
+  assert.throws(() => new WeatherRegions({ storms: [{ weatherAt: () => ({ weight: 2 }) }] }).stateAt(0, 0), RangeError);
+  map.dispose();
+});

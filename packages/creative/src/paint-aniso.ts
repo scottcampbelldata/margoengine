@@ -119,12 +119,13 @@ export class AnisotropicPainterly implements EnginePlugin {
   constructor(readonly options: AnisotropicPainterlyOptions = {}) {
     this.#validate();
   }
-  /** Creates and owns a PostStack; otherwise place a new effect after the stack's display stage. */
+  /** Adds a new effect to the scene's PostStack after its last LDR effect, or to a new PostStack when the scene has
+   * none. Disposing the effect takes it out, and a stack made for it goes with it. */
   static attach(engine: EngineKernel, options: AnisotropicPainterlyOptions = {}): AnisotropicPainterly {
     const effect = new AnisotropicPainterly(options);
     if (!engineRuntime(engine).gpu)
       throw fault('unsupported', 'Anisotropic paint needs a GPU device; use WebGPU or the full compatibility layer');
-    effect.#stack = PostStack.attach(engine, [effect]);
+    effect.#stack = PostStack.join(engine, effect);
     return effect;
   }
   /** False copies the input exactly. */
@@ -277,7 +278,7 @@ export class AnisotropicPainterly implements EnginePlugin {
     this.#engine = undefined;
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.#release();
-    this.#stack?.dispose();
+    this.#stack?.removeEffect(this);
     this.#stack = undefined;
   }
   [Symbol.dispose](): void {

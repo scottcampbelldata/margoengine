@@ -15,15 +15,13 @@
 // and wrote the images upside down) its GLB re-import had upright colours but the normal map inverted: 92 / 225 per
 // probe, maxDiff 146-147. exportGLB(engine) drew the plane untextured (200 grey, maxDiff 199-200) and now refuses it;
 // loaders' OBJ UVs passed to createMesh without 1 - v draw upside down (maxDiff 204).
-// Run: node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/normal-map-orientation-gpu-check.js [--measure]
+// Run: node scripts/run-with-timeout.mjs -- node scripts/normal-map-orientation-gpu-check.js [--measure]
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
-const release = await acquire({ owner: 'normal-map-orientation-gpu-check' }),
-  output = 'test-results/normal-map-orientation',
+const output = 'test-results/normal-map-orientation',
   measure = process.argv.includes('--measure'),
   cases = [
     ...['mesh', 'gltf', 'gltf-tangents', 'mesh-tangents', 'mesh-uv1', 'mesh-node', 'gltf-node'],
@@ -130,5 +128,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.normalOrientation?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

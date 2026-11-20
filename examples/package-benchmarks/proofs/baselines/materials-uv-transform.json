@@ -1,11 +1,11 @@
 {
  "proof": "materials-uv-transform",
- "ref": "675ee2476e",
- "revision": "675ee2476ea7b594256c2888f7d0bbd85cb1755d",
- "capturedAt": "675ee2476ea7b594256c2888f7d0bbd85cb1755d",
- "capturedOn": "Node v24.18.0 (V8 13.6.233.17-node.50) win32-x64",
+ "ref": "8c71da0556",
+ "revision": "8c71da0556d86e43094bf3738f8651ad3775c90f",
+ "capturedAt": "b3c8204ded004c631b0bf8e3310b8ac886843431",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "story": "acfa3fdd9b809e98c8b927bae1b3eb1a10ece05b5970b030e7f8975ed8004e98"
+  "story": "901cd24e82f1438eab18adc2ff7c9a308d7268cce102850ad746526d27c5012c"
  }
 }

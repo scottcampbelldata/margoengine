@@ -21,17 +21,18 @@ export interface Decal {
 }
 
 export interface DecalOptions {
-    atlas?: GPUTexture;
+    atlas?: Borrowable<GPUTexture>;
     minPixels?: number;
 }
 
 export class Decals implements EnginePlugin {
     readonly name = "post:decals";
-    readonly atlas?: GPUTexture;
+    get atlas(): Borrowable<GPUTexture> | undefined;
     readonly minPixels: number;
     constructor(options?: DecalOptions);
     get owner(): Engine | undefined;
     static attach(instance: EngineKernel, options?: DecalOptions): Decals;
+    setAtlas(atlas: Borrowable<GPUTexture> | undefined): this;
     setDecals(list: readonly Decal[]): this;
     get count(): number;
     get drawn(): number;
@@ -43,4 +44,8 @@ export class Decals implements EnginePlugin {
 }
 
 export const MAX_DECALS = 4096;
+
+// Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 ```

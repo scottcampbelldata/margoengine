@@ -61,7 +61,7 @@ export interface Duck {
 export interface Send {
   /** Changes the level in dB. */
   setGain(db: number, options?: RampOptions): void;
-  /** Disconnects the send. */
+  /** Disconnects the send. Idempotent; a send whose bus or target was removed is already disconnected. */
   remove(): void;
 }
 
@@ -160,7 +160,7 @@ export class Bus implements Disposable {
   private readonly inserts = new Set<{ input: AudioNode; output: AudioNode; dispose(): void }>();
   private insertEdges: [AudioNode, AudioNode][] = [];
   private readonly ducks = new Set<{ depth: number }>();
-  private readonly sends = new Set<{ node: GainNode; target: Bus }>();
+  private readonly sends = new Set<{ node: GainNode; target: Bus; source: GainNode }>();
   private analyser: AnalyserNode | undefined;
   private disposed = false;
 
@@ -298,7 +298,7 @@ export class Bus implements Disposable {
     const value = linearGain(gain);
     const node = context.createGain();
     node.gain.value = value;
-    const record = { node, target: to };
+    const record = { node, target: to, source: pre ? this.preTap : this.output };
     (pre ? this.preTap : this.output).connect(node).connect(to.input);
     this.sends.add(record);
     return {
@@ -306,9 +306,9 @@ export class Bus implements Disposable {
         rampParam(context, node.gain, linearGain(db), options);
       },
       remove: () => {
+        if (!this.sends.delete(record)) return;
         node.disconnect();
         (pre ? this.preTap : this.output).disconnect(node);
-        this.sends.delete(record);
       },
     };
   }
@@ -317,6 +317,16 @@ export class Bus implements Disposable {
   sendsTo(target: Bus): boolean {
     for (const send of this.sends) if (send.target === target) return true;
     return false;
+  }
+
+  /** @internal Disconnects and forgets every send to `target` (it is being removed). */
+  dropSendsTo(target: Bus): void {
+    for (const send of this.sends)
+      if (send.target === target) {
+        this.sends.delete(send);
+        send.node.disconnect();
+        send.source.disconnect(send.node);
+      }
   }
 
   /**
@@ -403,6 +413,9 @@ export interface MixerOptions {
   /** Buses to create now, in order (a parent must come before its children). */
   buses?: Readonly<Record<string, BusOptions>>;
 }
+
+/** The latest route() of each node, so an older route's undo does not touch a newer one. */
+const routes = new WeakMap<AudioNode, object>();
 
 /** Anything that can be routed: a node, or an object with `getOutput()` such as `Audio` from `@margoengine/audio`. */
 export type Routable = AudioNode | { getOutput(): AudioNode };
@@ -494,6 +507,7 @@ export class Mixer implements Disposable {
     for (const other of this.all.values())
       if (other.state.parent === name)
         throw new MargoError('state', `Bus "${name}" still has the child "${other.name}"; remove the child first`);
+    for (const other of this.all.values()) if (other !== bus) other.dropSendsTo(bus);
     bus.teardown();
     this.all.delete(name);
     this.refreshGates({ seconds: 0 });
@@ -509,7 +523,8 @@ export class Mixer implements Disposable {
 
   /**
    * Connects a source to a bus, first removing its other connections (an `Audio` from `@margoengine/audio` is
-   * wired to its listener until now). Configure filters and panning first. Returns a function that undoes it.
+   * wired to its listener until now). Configure filters and panning first. Returns a function that undoes it
+   * (idempotent, and a no-op once the source is routed again).
    */
   route(source: Routable, bus: Bus | string): () => void {
     this.alive();
@@ -520,7 +535,15 @@ export class Mixer implements Disposable {
       throw new TypeError('route needs an AudioNode or an object with getOutput()');
     node.disconnect();
     node.connect(target.input);
-    return () => node.disconnect(target.input);
+    // A later route() of the same node disconnects this one; its undo then has nothing to undo (Web Audio would
+    // throw InvalidAccessError for disconnecting an edge that is gone).
+    const token = {};
+    routes.set(node, token);
+    return () => {
+      if (routes.get(node) !== token) return;
+      routes.delete(node);
+      node.disconnect(target.input);
+    };
   }
 
   /** A positional sound source feeding `bus`; see {@link Emitter}. */

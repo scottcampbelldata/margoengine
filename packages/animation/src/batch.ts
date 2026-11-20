@@ -1,7 +1,7 @@
 // Batched deformation: every skinned or morphed primitive of a device lives in a few shared storage buffers, so the
 // primitives of many models deform in one dispatch per pipeline (four- and eight-influence) and buffer page instead
 // of one dispatch each. Readers find a primitive's vertices at `PBRPrimitive.deformedOffset` in `deformed`.
-import type { PBRPrimitive } from '@margoengine/gltf-pro';
+import type { PBRPrimitive } from '@margoengine/gltf/pbr';
 import { batchedDeformationShader, type SkinningMode } from './shader.js';
 
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number };
@@ -132,9 +132,12 @@ type BlockKind = 's' | 'm' | 'i';
 /** The key of a primitive's shared vertices (`s`), deltas (`m`) or influences (`i`) within its asset and `blockOwner`. */
 const blockKey = (spec: SlotSpec, kind: BlockKind) =>
   kind + ':' + spec.count + ':' + (kind === 'i' ? (spec.skin ?? '') : '');
-/** What equal blocks have in common: bind-pose vertices are one packed array, the rest come from one definition. */
+/**
+ * What equal blocks have in common: bind-pose vertices are one packed array, the rest come from one definition, or for
+ * a part of a split primitive from the vertices its `vertexMap` names (two parts of one definition differ).
+ */
 const blockOwner = (spec: SlotSpec, kind: BlockKind): object =>
-  kind === 's' ? spec.primitive.vertices : spec.definition;
+  kind === 's' ? spec.primitive.vertices : (spec.primitive.part?.vertexMap ?? spec.definition);
 const same = (a: SlotSpec, b: SlotSpec, kind: BlockKind) =>
   a.asset === b.asset && blockOwner(a, kind) === blockOwner(b, kind) && blockKey(a, kind) === blockKey(b, kind);
 

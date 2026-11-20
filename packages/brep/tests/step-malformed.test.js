@@ -97,3 +97,30 @@ test('STEP: a unit context the reader cannot read is refused, never taken as met
   assert.equal(cone.bodies[0], undefined);
   assert.match(cone.problems[0].problem, /gives an angle, and the file's context no plane-angle unit for it/);
 });
+
+test('STEP: a face on the wrong surface is flagged, each edge by the most it is off, while its volume follows its edges', () => {
+  // The fuzz case m162: the plate's top face #70 refers to the plane #74 (y = 0, the front's) in place of its own #47
+  // (z = 8 mm), and a direction gains the label '82'. The top's edges #56, #61 and #66 run up to 50 mm off y = 0
+  // (#51 lies in it); each was reported by its first sample past the tolerance (12.5 mm for #56 and #66).
+  const good = fixture('dangling-shell').replace('#99999', '#131'),
+    text = good
+      .replace("#70=ADVANCED_FACE('',(#69),#47,.T.);", "#70=ADVANCED_FACE('',(#69),#74,.T.);")
+      .replace("#109=DIRECTION('',(-1.,0.,0.));", "#109=DIRECTION('82',(-1.,0.,0.));");
+  assert.notEqual(text, good);
+  const imported = model.bodiesFromSTEP(parseSTEP(text)),
+    [plate] = imported.bodies,
+    problems = model.checkBody(plate);
+  assert.deepEqual(
+    problems.map((p) => [p.name, p.problem]),
+    ['#56', '#61', '#66'].map((e) => [`Plate/edge:${e}`, '5.00e-2 m off the surface of Plate/face:#70']),
+  );
+  assert.deepEqual(
+    imported.problems.map((p) => p.problem),
+    problems.map((p) => `${p.name}: ${p.problem}`),
+  );
+  // The volume integrates strips from each edge's foot on its face to the edge, so it is the one the edges bound.
+  assert.ok(Math.abs(model.massProperties(plate).volume / 1e-9 - 32000) <= 1e-9 * 32000);
+  const [whole] = model.bodiesFromSTEP(parseSTEP(good)).bodies;
+  assert.deepEqual(model.checkBody(whole), []);
+  assert.ok(Math.abs(model.massProperties(whole).volume / 1e-9 - 32000) <= 1e-9 * 32000);
+});

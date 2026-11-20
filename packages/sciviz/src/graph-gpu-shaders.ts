@@ -1,4 +1,6 @@
 // Clean room from FR (1991), Barnes and Hut (1986), Jacomy et al. (2014).
+// FA2 overlap prevention in pairForce: kr m / d' along the unit direction apart, k'r m = 100 kr m overlapping,
+// nothing touching (d' = 0); attraction uses d' and stops at d' <= 0.
 const header = `struct Params {
   n: u32, padded: u32, leaves: u32, base: u32,
   side: u32, dims: u32, fan: u32, model: u32,
@@ -27,8 +29,9 @@ fn pairForce(delta: vec3f, mass: f32, radius: f32, i: u32) -> vec3f {
     let gap = d - radius;
     scale = cfg.scaling * mass / max(d2, eps * eps);
     if (cfg.overlap == 1u) {
-      scale = cfg.scaling * mass / max(gap * gap, eps * eps);
-      if (gap < 0.0) { scale = 100.0 * cfg.scaling * mass; }
+      let unit = 1.0 / select(d, eps, d2 == 0.0);
+      scale = select(0.0, cfg.scaling * mass / max(gap, eps) * unit, gap > 0.0);
+      if (gap < 0.0) { scale = 100.0 * cfg.scaling * mass * unit; }
     }
   }
   return v * scale;
@@ -168,8 +171,12 @@ export const attractionShader =
     let d = length(delta); let weight = edges[edge.y]; var factor = d / cfg.k;
     if (cfg.model == 1u) {
       factor = 1.0 / weight.y;
-      if (cfg.linLog == 1u) { factor *= log(1.0 + d) / max(d, 1e-20); }
-      if (cfg.overlap == 1u && d <= attrs[i].x + attrs[edge.x].x) { factor = 0.0; }
+      var reach = d;
+      if (cfg.overlap == 1u) {
+        reach = max(0.0, d - attrs[i].x - attrs[edge.x].x);
+        factor *= reach / max(d, 1e-20);
+      }
+      if (cfg.linLog == 1u) { factor *= log(1.0 + reach) / max(reach, 1e-20); }
     }
     f += delta * factor * weight.x;
   }
@@ -210,7 +217,7 @@ export const speedShader =
   var sum = vec4f(0.0);
   for (var i = 0u; i < cfg.count; i++) { sum += stats[i]; }
   var speed = old[0].x;
-  if (sum.x > 0.0) { speed = min(cfg.jitter * cfg.jitter * sum.y / sum.x, speed * 1.5); }
+  if (sum.x > 0.0) { speed = min(cfg.jitter * sum.y / sum.x, speed * 1.5); }
   state[0] = vec4f(speed, sum.x, sum.y, sum.z);
 }`;
 export const moveShader =

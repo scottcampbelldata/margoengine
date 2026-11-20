@@ -132,11 +132,11 @@ Telemetry accepts little-endian `[u32 timestampMs, u16 count, (u16 jointIndex, f
 
 `AssemblyBVH.create(meshes)` builds a Wasm triangle BVH. Render after editing transforms, then `rebuild()` after transform/visibility changes; recreate it after geometry changes. `raycast` returns a mesh, triangle, world point and distance; `snap` selects triangle vertices, edge midpoints or supplied circular-ring centers. `measureClearance(a,b,'obb'|'aabb')` measures bounding boxes, not exact mesh solids; OBBs reject sheared transforms. Dispose the BVH separately. Float32 geometry/transforms limit metrology precision.
 
-Assembly BVHs also discover static glTF Pro/FBX triangles, including multiple primitives per mesh, without attaching core geometry. Vertex and edge snapping work on those sources. PBR circular-ring snapping requires an explicit local anchor. Active GPU skin/morph buffers cause creation, rebuild and queries to throw with a direction to use asynchronous `Raycaster.intersectModel(model)`; a static assembly never silently substitutes the bind pose for a deformed surface.
+Assembly BVHs also discover static glTF PBR/FBX triangles, including multiple primitives per mesh, without attaching core geometry. Vertex and edge snapping work on those sources. PBR circular-ring snapping requires an explicit local anchor. Active GPU skin/morph buffers cause creation, rebuild and queries to throw with a direction to use asynchronous `Raycaster.intersectModel(model)`; a static assembly never silently substitutes the bind pose for a deformed surface.
 
 CPU machinery tools work with either backend. Section rendering requires WebGPU; caps require depth32float-stencil8 and closed, consistently oriented geometry. Depth-fail winding uses a dedicated plane-depth/stencil target and composites against beauty depth. For open, nonmanifold or mixed-winding surfaces, use `{ cap: false }`; no stencil algorithm can infer their missing solid interior.
 
-`SectionPlanes` also clips native primitives loaded by `@margoengine/gltf-pro` and their directional shadows from `@margoengine/shadows`. Both renderers reuse the existing section uniform and world-space plane test. Use `{ cap: false }` for loaded models: stencil caps currently draw core geometry only. Attached sections redraw the directional shadow atlas each frame so editing planes or `enabled` cannot leave stale shadows; removing sections restores normal caching.
+`SectionPlanes` also clips native primitives loaded by `@margoengine/gltf/pbr` and their directional shadows from `@margoengine/shadows`. Both renderers reuse the existing section uniform and world-space plane test. Use `{ cap: false }` for loaded models: stencil caps currently draw core geometry only. Attached sections redraw the directional shadow atlas each frame so editing planes or `enabled` cannot leave stale shadows; removing sections restores normal caching.
 
 Three more entries draw on top of the scene:
 
@@ -147,3 +147,7 @@ Three more entries draw on top of the scene:
 `packages/machinery/test/*-check.mjs` (`npm run test:gpu` in this package) check edges, dimensions and caps on open shells on a real adapter.
 
 This ESM package includes TypeScript declarations and requires `@margoengine/core` 1.0.0. See the API and supported geometry guide.
+
+### Attaching from a second scene
+
+`SurfacePhysics.attach` and `TelemetryChannel.attach` remember the scene that is active when you call them, before their first await, and join that scene when they finish. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.

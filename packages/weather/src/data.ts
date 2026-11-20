@@ -290,7 +290,23 @@ export function metarState(report: Metar, options: MetarStateOptions = {}): Weat
     cloud,
     fog,
     lightning,
+    dust: 0,
+    smoke: 0,
+    ash: 0,
+    spray: 0,
+    ...air(report.temperature, report.dewPoint),
   };
+}
+
+// The air of a report: its temperature, and its relative humidity from the dew point by the Magnus form of the saturation
+// vapour pressure, e = 6.1094 exp(17.625 T / (T + 243.04)) hPa (O. A. Alduchov and R. E. Eskridge, "Improved Magnus form
+// approximation of saturation vapor pressure", J. Appl. Meteor. 35(4), 601-609, 1996). A report without them keeps the
+// clear preset's 15 C and 0.5.
+function air(temperature: number | undefined, dewPoint: number | undefined): { humidity: number; temperature: number } {
+  const t = temperature === undefined || !Number.isFinite(temperature) ? 15 : Math.min(60, Math.max(-80, temperature)),
+    e = (c: number) => Math.exp((17.625 * c) / (c + 243.04)),
+    humidity = temperature === undefined || dewPoint === undefined || !Number.isFinite(dewPoint) ? 0.5 : Math.min(1, e(Math.min(dewPoint, t)) / e(t));
+  return { humidity, temperature: t };
 }
 
 /** Reads a report and returns its state in one call: `metarState(parseMetar(text), options)`. */

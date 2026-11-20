@@ -1,5 +1,5 @@
 {
-  "$comment": "SHA-256 of BiomeWorld.digest(2, 1) for each preset world (presetWorlds, all presets as candidates, 1 km) at seeds 1, 2 and 0xFFFFFFFF (classify.test.js). A change changes every biome map; advance it only with a reason in the commit.",
+  "$comment": "SHA-256 of BiomeWorld.digest(2, 1) for each preset world (presetWorlds, all presets as candidates, 1 km; `rockies` has its own three biomes) at seeds 1, 2 and 0xFFFFFFFF (classify.test.js). A change changes every biome map; advance it only with a reason in the commit.",
   "temperate:1": "cc9dbc41a1a1c6532a2cdf82a7a21ecf69cb3be3b1cd0183f6352062cd2f91e6",
   "temperate:2": "ab319af65ff0691089eae3496fbb07c7a4ee4a2b795c132d4c6157efc0c33c4a",
   "temperate:4294967295": "2708dc645208a8271aad08f4d9d7aa3714bc6c158e7262786bed453123c37026",
@@ -23,5 +23,8 @@
   "savanna:4294967295": "c5fc7251201fc29ed5d274fcd55f9bc1fddf753a3a681f70bae84d49bd1229c9",
   "tropical:1": "b1c02e7a4694c8a2ce10f45cc40b68383bb027c8a3da7ab33a39f980b5b5910a",
   "tropical:2": "cb4f664cb06da2fe51482337284b2b2d89bb1e633c186b4f53267ce7151729aa",
-  "tropical:4294967295": "8ef21a686a6e06dd72f71c3e87400c05d3194dc2ef121b73253e150806ac6b69"
+  "tropical:4294967295": "8ef21a686a6e06dd72f71c3e87400c05d3194dc2ef121b73253e150806ac6b69",
+  "rockies:1": "eba4650afb3f53ad59cef353789b316f2e01c0a5b74cac83a37de4863611b95b",
+  "rockies:2": "c213f4defe3b09a10828b1ec60116c5e717f6f7ed47202095328eb8e1bc1ef64",
+  "rockies:4294967295": "cb6209d2020be51c8ed44a42fe01db5a8d89fed9d2d6da50c0cd3737aa74d60e"
 }

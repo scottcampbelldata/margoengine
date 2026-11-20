@@ -115,7 +115,7 @@ test('constructed meshes map forward-Z polygon offset values to reverse-Z and pr
   }
 });
 
-// KB3148b: blendSpace is opt-in render state; the gltf-pro record carries it only when linear.
+// KB3148b: blendSpace is opt-in render state; the gltf/pbr record carries it only when linear.
 test('Material blendSpace defaults to display, validates, and reaches the PBR render state when linear', async () => {
   const { linearBlendShader } = await import('../src/native-glass.js');
   const m = new Material({ transparent: true });

@@ -1,14 +1,15 @@
 {
   "name": "@margoengine/gltf",
   "version": "1.0.0",
-  "description": "Lazy static glTF/GLB loading for Margo Engine.",
+  "description": "glTF 2.0 for Margo Engine: a light static loader at the root, metallic-roughness PBR rendering at @margoengine/gltf/pbr.",
   "keywords": [
     "margoengine",
     "webgpu",
     "3d",
     "gltf",
     "glb",
-    "loader"
+    "loader",
+    "pbr"
   ],
   "homepage": "https://margoengine.com",
   "bugs": {
@@ -26,10 +27,25 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node --test test/*.test.js && node --test --test-name-pattern=\"glTF loader|GLB,\" ../../tests/modern.test.js",
-    "test:gpu:mask-mips": "cd ../.. && node packages/gltf-pro/scripts/test-mask-mips-browser.mjs && node packages/gltf-pro/scripts/test-mask-mips-browser.mjs --compat",
+    "test": "node --test --test-name-pattern=\"glTF loader|GLB,\" ../../tests/modern.test.js && node --test test/*.test.js ../../tests/modern-extensions.test.js ../../tests/modern-gltf*.test.js ../../tests/gltf-draco-limits.test.js ../../tests/deep-render-pbr-resources.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
+    "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu": "node ../../scripts/test-gltf-browser.mjs",
-    "prepack": "npm --prefix ../.. run build:packages"
+    "test:shader:browser": "cd ../.. && node packages/gltf/scripts/test-shader-review.js",
+    "test:extensions:browser": "cd ../.. && node packages/gltf/scripts/test-extensions-browser.js",
+    "test:gpu:materials": "cd ../.. && node scripts/gltf-pbr-materials-gpu-check.js",
+    "test:gpu:viewer": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node scripts/stage-viewer-gpu-check.js --compat",
+    "test:gpu:native-volume": "cd ../.. && node packages/gltf/scripts/test-native-volume.mjs && node packages/gltf/scripts/test-native-volume.mjs --compat",
+    "test:gpu:spec-gloss": "cd ../.. && node packages/gltf/scripts/test-spec-gloss-browser.mjs && node packages/gltf/scripts/test-spec-gloss-browser.mjs --compat",
+    "test:gpu:dds": "cd ../.. && node packages/gltf/scripts/test-dds-browser.mjs && node packages/gltf/scripts/test-dds-browser.mjs --compat",
+    "test:gpu:mask-mips": "cd ../.. && node packages/gltf/scripts/test-mask-mips-browser.mjs && node packages/gltf/scripts/test-mask-mips-browser.mjs --compat",
+    "test:gpu:mipmaps": "cd ../.. && node packages/gltf/scripts/test-mipmaps-browser.mjs && node packages/gltf/scripts/test-mipmaps-browser.mjs --compat",
+    "test:gpu:parts": "cd ../.. && node packages/gltf/scripts/test-parts-browser.mjs && node packages/gltf/scripts/test-parts-browser.mjs --compat",
+    "test:gpu:skinned-parts": "cd ../.. && node packages/gltf/scripts/test-skinned-parts-browser.mjs && node packages/gltf/scripts/test-skinned-parts-browser.mjs --compat",
+    "test:gpu:mask-alpha": "cd ../.. && node packages/gltf/scripts/test-mask-alpha-browser.mjs && node packages/gltf/scripts/test-mask-alpha-browser.mjs --compat",
+    "test:gpu:base-textures": "cd ../.. && node packages/gltf/scripts/test-base-textures-browser.mjs && node packages/gltf/scripts/test-base-textures-browser.mjs --compat",
+    "test:browser:audio": "cd ../.. && node packages/gltf/scripts/test-audio-browser.mjs",
+    "test:gpu:pixel-images": "cd ../.. && node packages/gltf/scripts/test-node-images.mjs && node packages/gltf/scripts/test-pixel-images.mjs && node packages/gltf/scripts/test-pixel-images.mjs --compat",
+    "test:gpu:compression": "cd ../.. && npm run modern:test:gltf-compression"
   },
   "sideEffects": false,
   "exports": {
@@ -60,28 +76,131 @@
     "./textured": {
       "types": "./dist/textured.d.ts",
       "import": "./dist/textured.js"
+    },
+    "./pbr": {
+      "types": "./dist/pbr.d.ts",
+      "import": "./dist/pbr.js"
+    },
+    "./pbr-model": {
+      "types": "./dist/model-entry.d.ts",
+      "import": "./dist/model-entry.js"
+    },
+    "./asset": {
+      "types": "./dist/asset-entry.d.ts",
+      "import": "./dist/asset-entry.js"
+    },
+    "./scene": {
+      "types": "./dist/scene.d.ts",
+      "import": "./dist/scene.js"
+    },
+    "./extended-materials": {
+      "types": "./dist/extended.d.ts",
+      "import": "./dist/extended.js"
+    },
+    "./pbr-instancing": {
+      "types": "./dist/pbr-instancing.d.ts",
+      "import": "./dist/pbr-instancing.js"
+    },
+    "./prepare": {
+      "types": "./dist/prepare.d.ts",
+      "import": "./dist/prepare.js"
+    },
+    "./progressive": {
+      "types": "./dist/progressive.d.ts",
+      "import": "./dist/progressive.js"
+    },
+    "./splats": {
+      "types": "./dist/splats.d.ts",
+      "import": "./dist/splats.js"
+    },
+    "./lights": {
+      "types": "./dist/lights.d.ts",
+      "import": "./dist/lights.js"
+    },
+    "./physics": {
+      "types": "./dist/physics.d.ts",
+      "import": "./dist/physics.js"
+    },
+    "./interactivity": {
+      "types": "./dist/interactivity.d.ts",
+      "import": "./dist/interactivity.js"
+    },
+    "./report": {
+      "types": "./dist/report.d.ts",
+      "import": "./dist/report.js"
+    },
+    "./metadata": {
+      "types": "./dist/metadata.d.ts",
+      "import": "./dist/metadata.js"
+    },
+    "./texture-coordinates": {
+      "types": "./dist/coordinates.d.ts",
+      "import": "./dist/coordinates.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./material-draw": {
+      "types": "./dist/material-draw.d.ts",
+      "import": "./dist/material-draw.js"
+    },
+    "./spec-gloss": {
+      "types": "./dist/spec-gloss.d.ts",
+      "import": "./dist/spec-gloss.js"
+    },
+    "./dds": {
+      "types": "./dist/dds.d.ts",
+      "import": "./dist/dds.js"
+    },
+    "./audio": {
+      "types": "./dist/audio.d.ts",
+      "import": "./dist/audio.js"
     }
   },
   "files": [
     "dist",
     "NOTICE"
   ],
+  "dependencies": {
+    "@margoengine/decoders": "^1.0.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
+    "@margoengine/splats": "^1.0.0",
+    "@margoengine/audio": "^1.0.0"
   },
   "peerDependenciesMeta": {
-    "@margoengine/decoders": {
+    "@margoengine/clustered": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/environment": {
+      "optional": true
+    },
+    "@margoengine/geometry": {
+      "optional": true
+    },
+    "@margoengine/physics": {
+      "optional": true
+    },
+    "@margoengine/splats": {
+      "optional": true
+    },
+    "@margoengine/audio": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@margoengine/decoders": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/clustered": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
+    "@margoengine/splats": "^1.0.0",
+    "@margoengine/audio": "^1.0.0"
   }
 }

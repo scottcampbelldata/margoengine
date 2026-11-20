@@ -1122,6 +1122,7 @@ export function unwrapMesh(mesh: PolygonMesh, options: UnwrapOptions = {}): Unwr
         pin.vertex < 0 ||
         pin.vertex >= mesh.vertices.length ||
         !Array.isArray(pin.uv) ||
+        pin.uv.length !== 2 ||
         !pin.uv.every((x: unknown) => typeof x === 'number' && x >= 0 && x <= 1)
       )
         throw new TypeError('Unwrap pins need an existing vertex index and a uv pair from 0 to 1; repair the pin.');

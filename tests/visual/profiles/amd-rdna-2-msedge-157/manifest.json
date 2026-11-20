@@ -1003,12 +1003,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 157.0.4341.46",
+    "browser": "msedge 157.0.4341.60",
     "gpu": "amd rdna-2",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-11-13T13:44:14.930Z",
-    "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+    "date": "2026-11-19T01:32:55.842Z",
+    "commit": "796219d1df696e1ac8eb305db8374d6b9777a64c",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1029,12 +1029,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 157.0.4341.46",
+    "browser": "msedge 157.0.4341.60",
     "gpu": "amd rdna-2",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-11-13T13:44:14.930Z",
-    "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+    "date": "2026-11-19T01:32:55.842Z",
+    "commit": "796219d1df696e1ac8eb305db8374d6b9777a64c",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1055,12 +1055,12 @@
     "hot": 0.0002
    },
    "environment": {
-    "browser": "msedge 157.0.4341.46",
+    "browser": "msedge 157.0.4341.60",
     "gpu": "amd rdna-2",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-11-13T13:44:14.930Z",
-    "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+    "date": "2026-11-19T01:32:55.842Z",
+    "commit": "796219d1df696e1ac8eb305db8374d6b9777a64c",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1085,8 +1085,8 @@
     "gpu": "amd rdna-2",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-11-13T13:44:14.930Z",
-    "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+    "date": "2026-11-14T08:41:15.818Z",
+    "commit": "86eb5d81e134b84a8bb2d9ccc3580f4d0186fb27",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1111,8 +1111,8 @@
     "gpu": "amd rdna-2",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-11-13T13:44:14.930Z",
-    "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+    "date": "2026-11-14T08:41:15.818Z",
+    "commit": "86eb5d81e134b84a8bb2d9ccc3580f4d0186fb27",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -1137,8 +1137,8 @@
     "gpu": "amd rdna-2",
     "acPowerBefore": true,
     "acPowerAfter": true,
-    "date": "2026-11-13T13:44:14.930Z",
-    "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+    "date": "2026-11-14T08:41:15.818Z",
+    "commit": "86eb5d81e134b84a8bb2d9ccc3580f4d0186fb27",
     "packagesDirty": false,
     "renderedInputsDirty": false,
     "renderedInputChanges": []
@@ -2031,12 +2031,12 @@
  },
  "profile": "amd-rdna-2-msedge-157",
  "environment": {
-  "browser": "msedge 157.0.4341.46",
+  "browser": "msedge 157.0.4341.60",
   "gpu": "amd rdna-2",
   "acPowerBefore": true,
   "acPowerAfter": true,
-  "date": "2026-11-13T13:44:14.930Z",
-  "commit": "6a527e1bd91caa4ad6b07d6cfc4894393dbf36c4",
+  "date": "2026-11-19T01:32:55.842Z",
+  "commit": "796219d1df696e1ac8eb305db8374d6b9777a64c",
   "packagesDirty": false,
   "renderedInputsDirty": false,
   "renderedInputChanges": []

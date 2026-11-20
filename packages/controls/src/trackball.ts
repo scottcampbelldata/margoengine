@@ -2,14 +2,16 @@ import type { Camera, EngineKernel } from '@margoengine/core';
 import {
   Controls,
   documentOf,
+  windowOf,
   type ControlElement,
   type EventTargetLike,
   type InputEventListener,
 } from './controls.js';
-import { EPS, madd, rotateAxis, type V3 } from './math.js';
+import { EPS, finiteInput, madd, rotateAxis, type V3 } from './math.js';
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import { basis, rollFrame } from './view.js';
 import { moved } from './steer.js';
+import { rangeError } from '../../shared/errors.js';
 export { Controls };
 
 /** `MOUSE` values (kept local so this entry does not load the orbit module). */
@@ -63,18 +65,33 @@ function ballTurn(a: readonly number[], b: readonly number[]): V3 {
 
 /**
  * Rotates `eye` about the unit `axis` by `angle`, stopping just short of the world Y axis: the arc is walked in
- * small steps, and when a step comes within POLE of the axis or its heading flips (it went over the top), the eye is
- * placed exactly POLE from the axis at the previous step's heading. The length of `eye` is kept.
+ * small steps, and when a step comes within POLE of the axis anywhere along it (not only at its end), the eye is placed
+ * exactly POLE from the axis at the previous step's heading. The length of `eye` is kept.
+ *
+ * Along the rotation (Rodrigues) the height is y(phi) = A + B cos phi + C sin phi with A = k_y (k . v), B = v_y - A and
+ * C = (k x v)_y, so |y| peaks only at phi0 = atan2(C, B) and phi0 + pi; a step is tested exactly by its end and by any
+ * such peak inside it. A drag that merely passes near a pole therefore carries on.
  */
 function rotateClear(eye: V3, axis: readonly number[], angle: number): V3 {
   const length = Math.hypot(...eye),
-    steps = Math.max(1, Math.ceil(Math.abs(angle) / ARC_STEP));
+    steps = Math.max(1, Math.ceil(Math.abs(angle) / ARC_STEP)),
+    a = axis[1] * dot(axis, eye),
+    b = eye[1] - a,
+    c = axis[2] * eye[0] - axis[0] * eye[2],
+    peak = Math.atan2(c, b),
+    reach = Math.cos(POLE) * length;
   let previous = eye;
   for (let i = 1; i <= steps; i++) {
-    const next = rotateAxis(eye, axis, (angle * i) / steps),
+    const from = (angle * (i - 1)) / steps,
+      to = (angle * i) / steps,
+      lo = Math.min(from, to),
+      hi = Math.max(from, to),
+      // The first peak after the step's start; the next one is pi later, beyond any step of at most ARC_STEP.
+      inside = peak + Math.ceil((lo - peak) / Math.PI) * Math.PI,
+      next = rotateAxis(eye, axis, to),
       flat = Math.hypot(next[0], next[2]),
-      flipped = previous[0] * next[0] + previous[2] * next[2] < 0;
-    if (Math.atan2(flat, Math.abs(next[1])) < POLE || flipped) {
+      passes = inside > lo && inside <= hi && Math.abs(a + b * Math.cos(inside) + c * Math.sin(inside)) > reach;
+    if (Math.atan2(flat, Math.abs(next[1])) < POLE || passes) {
       let hx = previous[0],
         hz = previous[2];
       const h = Math.hypot(hx, hz);
@@ -144,6 +161,7 @@ export class TrackballControls extends Controls {
   private readonly pointers = new Map<number, Pointer>();
   private driver = -1;
   private keyMode: State = 'none';
+  private keyCode = '';
   private previousTouchAction = '';
   // Rotation: last circle point, rotation vector gathered from moves since the last update, and the coast.
   private ball: [number, number] = [0, 0];
@@ -179,8 +197,12 @@ export class TrackballControls extends Controls {
       this.previousTouchAction = element.style.touchAction;
       element.style.touchAction = 'none';
     }
-    const keys = this.keyTarget ?? documentOf(element);
+    const keys = this.keyTarget ?? documentOf(element),
+      view = windowOf(keys, element);
     return [
+      ...(view
+        ? [[view, 'blur', this.onBlur as InputEventListener] as [EventTargetLike, string, InputEventListener]]
+        : []),
       [element, 'pointerdown', this.onDown as InputEventListener],
       [element, 'pointermove', this.onMove as InputEventListener],
       [element, 'pointerup', this.onUp as InputEventListener],
@@ -225,9 +247,12 @@ export class TrackballControls extends Controls {
 
   /** Applies the gathered rotation, zoom and pan, and the coast, for `delta` seconds (default 1/60). Returns true when the camera moved. */
   update(delta = 1 / 60): boolean {
+    finiteInput('Trackball update step', delta);
+    if (delta < 0)
+      throw rangeError(`Trackball update step must be 0 or more; pass a finite number of seconds, not ${delta}`, 'controls-arguments');
     const camera = this.camera,
       before = [...camera.position, ...camera.target],
-      frames = 60 * Math.max(0, delta),
+      frames = 60 * delta,
       damping = Math.min(1, Math.max(1e-6, this.dynamicDampingFactor)),
       // Share of a remaining zoom or pan gap taken this update: dynamicDampingFactor per 1/60 s, compounded.
       share = this.staticMoving ? 1 : 1 - (1 - damping) ** frames,
@@ -261,6 +286,10 @@ export class TrackballControls extends Controls {
         swing(this.coastAxis, angle);
         if (this.staticMoving) this.coastRate = 0;
         else if (frames > 0) this.coastRate = angle / frames;
+      } else if (!this.staticMoving && this.coastRate > 0 && this.state !== 'none') {
+        // Held still: no coast, but the fling fades as it would have, so a release right after it still coasts and
+        // holding still lets it die out.
+        this.coastRate *= Math.sqrt(1 - damping) ** frames;
       } else if (!this.staticMoving && this.coastRate > 0) {
         // Angular speed keeps sqrt(1 - damping) per 1/60 s: the spin's half-life is twice that of the zoom and pan
         // easing, so a fling carries on for a moment (at the default, about 9 drag frames' worth in total). The
@@ -371,6 +400,7 @@ export class TrackballControls extends Controls {
   private retouch(): void {
     const [a, b] = this.touches();
     if (!a) return;
+    const entering = !this.state.startsWith('touch');
     if (!b) {
       this.state = 'touch-rotate';
       this.grab(a);
@@ -380,7 +410,8 @@ export class TrackballControls extends Controls {
       this.panEnd = this.screen({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
       this.panStart = [...this.panEnd];
     }
-    this.dispatchEvent({ type: 'start' });
+    // One gesture from the first finger down to the last finger up: one start, one end.
+    if (entering) this.dispatchEvent({ type: 'start' });
   }
   private finish(): void {
     if (this.state === 'none') return;
@@ -489,8 +520,14 @@ export class TrackballControls extends Controls {
     if (code === this.keys[0] && !this.noRotate) this.keyMode = 'rotate';
     else if (code === this.keys[1] && !this.noZoom) this.keyMode = 'zoom';
     else if (code === this.keys[2] && !this.noPan) this.keyMode = 'pan';
+    if (this.keyMode !== 'none') this.keyCode = code;
   };
-  private readonly onKeyUp = (): void => {
+  private readonly onKeyUp = (event: KeyboardEvent): void => {
+    // Only releasing the key that set the mode ends it (UI Events: each keyup names its own physical key in `code`).
+    if (event.code === this.keyCode) this.keyMode = 'none';
+  };
+  /** A key held when the window loses focus never sends keyup: drop its mode. */
+  private readonly onBlur = (): void => {
     this.keyMode = 'none';
   };
 }

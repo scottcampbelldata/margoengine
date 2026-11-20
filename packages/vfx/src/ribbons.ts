@@ -129,6 +129,12 @@ export const ribbons: VFXExtension<VFXRibbons> = {
       return v;
     };
     return {
+      // A seek replays the same births with the same birth angles, so points recorded before it would match them.
+      reset() {
+        device.queue.writeBuffer(history, 0, new Uint8Array(history.size));
+        records = 0;
+        elapsed = Infinity;
+      },
       hides: () => settings().heads === false,
       write(c) {
         const v = settings(),

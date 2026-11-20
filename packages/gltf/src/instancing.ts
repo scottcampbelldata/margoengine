@@ -45,7 +45,7 @@ function expand(file: GLTFFile, node: GLTFNode, first: number, limit: number): {
   if (first + count > limit)
     throw new MargoError(
       'unsupported',
-      `Too many glTF nodes (${first + count} > ${limit}; raise the maxNodes option, or load it with @margoengine/gltf-pro, which draws instances without nodes)`,
+      `Too many glTF nodes (${first + count} > ${limit}; raise the maxNodes option, or load it with @margoengine/gltf/pbr, which draws instances without nodes)`,
     );
   const instances: GLTFNode[] = [];
   for (let i = 0; i < count; i++) {

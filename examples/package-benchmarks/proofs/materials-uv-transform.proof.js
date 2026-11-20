@@ -1,7 +1,7 @@
-// Proof that texture transforms (materials `uvTransform`, gltf-pro's shared `textureTransform`) leave untransformed
+// Proof that texture transforms (materials `uvTransform`, gltf/pbr's shared `textureTransform`) leave untransformed
 // rendering unchanged: a 12-frame story of materials meshes (textured, untextured, normal-mapped, transparent, matcap)
 // and a glTF with and without KHR_texture_transform makes byte-identical GPU calls, shaders and uniform writes with
-// @margoengine/materials + @margoengine/gltf-pro built from `ref` and from the candidate.
+// @margoengine/materials + @margoengine/gltf/pbr built from `ref` and from the candidate.
 // Run: node examples/package-benchmarks/proofs/materials-uv-transform.proof.js [ref] [pin] [--current]
 // Pinned: 1970fda (before the transforms) against 700838e, the commit that added them and made this claim. --current:
 // de20fb3c against the working tree (one view per texture, one sampler per state; e2cb3815 before it: a steady material keeps its shader across frames, so a texture update uploads before the
@@ -12,34 +12,44 @@
 // output and the earlier normal-frame, topology, uniform and batching changes (claims.md).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
 import { Engine, TransformStore } from '@margoengine/core/extension';
-import { refs, announce, atRef, golden } from './compare.js';
+import { refs, announce, atRef, golden, placeAt } from './compare.js';
 import { show as showAt } from './history.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/'),
-  { ref, pin } = refs('1970fda', '700838e', '675ee2476e');
-const sources = ['materials/src', 'gltf-pro/src', 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/');
+  { ref, pin } = refs('1970fda', '700838e', '8c71da0556');
 // A revision this clone lacks is HISTORICAL (history.js); only a file the revision lacks reads the working tree.
 const show = (from, file) => showAt(from, file.slice(slash(root).length + 1));
 /**
- * materials with gltf-pro (every entry) bundled in, both read from `from` or the working tree. Core and the splats peer
- * gltf-pro loads on demand stay external, as in the packages' own build.
+ * materials with gltf/pbr (every entry) bundled in, both read from `from` or the working tree. Core and the splats peer
+ * gltf/pbr loads on demand stay external, as in the packages' own build.
  */
 async function load(from) {
+  // The PBR loader's folder at `from`: its own package before it folded into gltf (placeAt), gltf since.
+  const pbr = placeAt('gltf', 'src/pbr.ts', from).name,
+    sources = ['materials/src', `${pbr}/src`, 'shared'].map((name) => slash(resolve(root, 'packages', name)) + '/'),
+    manifestPath = resolve(root, 'packages', pbr, 'package.json'),
+    manifest = JSON.parse((from && show(from, slash(manifestPath))) ?? readFileSync(manifestPath, 'utf8')),
+    // Each entry specifier of that package to its source file.
+    targets = Object.fromEntries(
+      Object.entries(manifest.exports).map(([key, target]) => [
+        manifest.name + key.slice(1),
+        resolve(root, 'packages', pbr, target.import.replace('./dist/', 'src/').replace(/\.js$/, '.ts')),
+      ]),
+    );
   const plugins = [
     {
       name: 'git-source',
       enforce: 'pre',
       resolveId(id, importer) {
-        if (id.startsWith('@margoengine/gltf-pro'))
-          return resolve(root, `packages/gltf-pro/src/${id.slice(22) || 'index'}.ts`);
-        // A file renamed or deleted since `from` (shared/math.js, gltf-pro's instances.ts) resolves to its path in `from`.
+        if (targets[id]) return targets[id];
+        // A file renamed or deleted since `from` (shared/math.js, gltf/pbr's instances.ts) resolves to its path in `from`.
         if (!from || !importer || !id.startsWith('.')) return null;
         const file = slash(resolve(importer.split('?')[0], '..', id)),
           ts = file.replace(/\.js$/, '.ts');
@@ -79,8 +89,8 @@ async function load(from) {
   await writeFile(file, chunks[0].code + '\nexport {PBRModel as __PBRModel, GLTFAsset as __GLTFAsset};\n');
   return import(pathToFileURL(file).href);
 }
-announce('materials + gltf-pro src/index.ts', ref, pin);
-const baseline = await atRef('materials + gltf-pro', ref, () => load(ref)),
+announce('materials + gltf src/pbr.ts', ref, pin);
+const baseline = await atRef('materials + gltf/pbr', ref, () => load(ref)),
   candidate = await load(pin);
 
 const box = (() => {
@@ -208,7 +218,7 @@ assert.ok(
 assert.deepEqual(actual, expected, 'GPU calls differ');
 console.log(
   JSON.stringify({
-    packages: ['materials', 'gltf-pro'],
+    packages: ['materials', 'gltf/pbr'],
     baseline: ref,
     candidate: pin ?? 'working tree',
     identicalCalls: expected.length,

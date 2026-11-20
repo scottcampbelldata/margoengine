@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Camera, Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Shadows, cascadeSplits, fitCascades } from '../packages/shadows/dist/index.js';
 import { Clustered } from '../packages/clustered/dist/index.js';
 import { VFX } from '../packages/vfx/dist/index.js';
 import { Animator, blend1D, blend2D, solveTwoBoneIK } from '../packages/animator/dist/index.js';
 import { Terrain, clipmapGrid } from '../packages/terrain/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 import { optionalGPU } from './support/optional-gpu.js';
 import { wgsl } from '../packages/core/src/shaders.ts';
 
@@ -133,7 +133,11 @@ test('game modules reject bad inputs before allocating GPU resources', () => {
     { gravity: [NaN, 0, 0] },
     { emissionExtent: [-1, 0, 0] },
     { emissionExtent: [0, NaN, 0] },
-    { intensity: 17 },
+    // Intensity runs 0 to 65,504, the half-float maximum of the HDR target (9c670bdf87, KB-FIRE-RECEIVER1): 17 is valid.
+    { intensity: -1 },
+    { intensity: 65_504.001 },
+    { intensity: NaN },
+    { intensity: Infinity },
   ])
     assert.throws(() => new VFX(options));
   assert.throws(() => new VFX({ capacity: 10 }).burst(11), /burst/);

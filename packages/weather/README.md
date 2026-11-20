@@ -36,9 +36,9 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 ## The machine
 
 - `transitionTo(target, {seconds = 30, ease = 'smoothstep'})` blends to a preset or a partial state. Starting another one mid-blend continues from the current weather, so nothing jumps. `set(target)` jumps.
-- `schedule([{to, seconds, hold}], {loop})` runs steps in order. `randomWalk(from, {chain, hold, blend, seed})` wanders by a weighted chain (`TEMPERATE` by default; a made-up mild climate), the same way for the same seed.
-- `on(listener)` gets `start` and `arrive` events once each per transition. A listener that changes the weather throws `MargoError` `'state'`.
-- `update(delta)` moves everything; a long delta (a hidden tab) is applied in pieces of at most 5 s so the ground and the schedule behave as if time had passed normally. Every blend and hold that ends inside a piece is processed, however many there are, so no time is lost. A call refused for a bad target, seconds or ease (`transitionTo`, `set`) throws before it stops a running schedule or walk. `state` is a fresh copy each read.
+- `schedule([{to, seconds, hold}], {loop})` runs steps in order. `randomWalk(from, {chain, hold, blend, seed})` wanders by a weighted chain (`TEMPERATE` by default; a made-up mild climate), the same way for the same seed; seeds that differ in any way (-1 and 4294967295, 1 and 1.5) walk differently.
+- `on(listener)` gets `start` and `arrive` events once each per transition. A listener may call `set` or `stop`; its `transitionTo`, `schedule`, `randomWalk` or `update` throws `MargoError` `'state'` before changing anything.
+- `update(delta)` moves everything; a long delta (a hidden tab) is applied in pieces of at most 5 s so the ground and the schedule behave as if time had passed normally. Every blend and hold that ends inside a piece is processed, however many there are, so no time is lost. A call refused for a bad target, seconds, ease or seed (`transitionTo`, `set`, `schedule`, which checks every step's ease up front, and `randomWalk`) throws before it stops a running schedule or walk. `state` is a fresh copy each read.
 - `wetness` rises under rain and hail (about 20 s) and dries (about 90 s); `snowCover` builds under snow (about 2 minutes) and melts (about 5 minutes). The time constants match the sky's own `Weather`.
 - `using` and `dispose()` end it; use afterwards throws `MargoError` `'disposed'`.
 
@@ -86,7 +86,8 @@ replaced core shader throws `MargoError` `'unsupported'`.
 
 `Snow` from `margoengine/weather/snow` lays snow on every core mesh: up-facing surfaces whiten first and steeper ones
 as the cover grows, the snow line is patchy, the surface has a fine grain, and the snow has thickness: covered
-surfaces are lifted by it, so a step or a kerb fills in and a plate's edge rises. It follows a `WeatherMachine` or the
+surfaces are lifted by it, so a plate's edge rises and ground snow buries the foot of a wall that a roof shelters
+(see "Snow and rain kept off under a roof" below). It follows a `WeatherMachine` or the
 sky's `Weather` by their `snowCover`, or the `cover` you set. WebGPU only.
 
 ```ts
@@ -106,10 +107,420 @@ snow.options.variation = 0.6; // deeper drifts and thinner patches
 Cover follows `snowWeight` (at full cover anything within about 70 degrees of flat), with the edge broken up by noise.
 Under snow a surface takes `color` (`SNOW_COLOR`) and `roughness` (`SNOW_ROUGHNESS`), loses its metalness and has a
 grain of strength `grain` (0.3). Its thickness is `depth` (0.12 m) times the cover on flat ground, less on slopes and
-none on walls, varied in drifts `drift` metres wide (4) by up to `variation` (0.4): the vertex stage moves each covered
-vertex up by it. `snowAt` and `snowDepthAt` are the same maths in JavaScript; `snowWGSL` is the shader for your own
-materials. `Snow` and `Puddles` work together on one scene. A bad option throws `RangeError` or `TypeError`; a replaced
-core shader throws `MargoError` `'unsupported'`.
+none on walls, varied in drifts `drift` metres wide (4) by up to `variation` (0.4). The vertex stage moves every vertex
+the sky sees up by the thickness on flat ground at its place, whichever way its face turns: a flat-shaded box has its
+own vertices per face, and its top and the top of its sides share a place, so they rise together and the faces stay
+joined (a lift by each vertex's own normal raised the top off the sides, a gap seen side on; fixed 2026-11-14). Without
+a cover every vertex is under the open sky, so everything rises by the same thickness; with a `PrecipitationCover` the
+vertices under a shelter stay down, and the sides of a shelter rise only at their top edge. `snowAt` and `snowDepthAt`
+are the same maths in JavaScript; `snowWGSL` is the shader for your own materials. `Snow` and `Puddles` work together
+on one scene. A bad option throws `RangeError` or `TypeError`; a replaced core shader throws `MargoError`
+`'unsupported'`.
+
+## Snow and rain kept off under a roof
+
+`PrecipitationCover` from `margoengine/weather/cover` gives rain, `Puddles`, `Snow` and `GLTFWeather` one top-down
+depth map of the meshes you name as shelters, so nothing under a roof gets wet, white or lifted. It takes a new,
+unattached `WeatherFX` from `margoengine/sky/weather-fx` (the capture) and runs only its map pass. WebGPU only.
+
+```ts
+import { Engine, PbrMaterial, box } from 'margoengine/core';
+import { Weather } from 'margoengine/sky/weather';
+import { WeatherFX } from 'margoengine/sky/weather-fx';
+import { PrecipitationCover } from 'margoengine/weather/cover';
+import { Snow } from 'margoengine/weather/snow';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box(40, 0.2, 40)).setMaterial(new PbrMaterial({ color: '#3d4a33', roughness: 0.9 }));
+// A shelter: the ground under this roof stays bare, and only the roof's top and the top of its sides rise.
+const roof = engine.createMesh().setGeometry(box(4, 0.2, 4)).setPosition([0, 2.5, 0]);
+roof.setMaterial(new PbrMaterial({ color: '#6b4a32', roughness: 0.8 }));
+
+const weather = Weather.attach(engine, { precipitation: 'snow', intensity: 0.6, radius: 20 });
+const cover = PrecipitationCover.attach(engine, new WeatherFX({ weather, occluders: [roof], splashes: 0, lensDrops: 0 }));
+Snow.attach(engine, { cover: 1, depth: 0.15 });
+console.log(cover.bias); // 0.02 m: a surface within 2 cm of a shelter's top still counts as under the sky
+```
+
+The map is the capture's square of side 2 x the weather's `radius` (default 25 m) around the camera, at the capture's
+`resolution` (default 256 texels), so set `radius` to reach every sheltered surface in view: outside the square
+everything counts as under the sky. A point is sheltered by the highest shelter of the four texels around it, so it
+stays dry under any shelter at least one texel wide, and up to one texel past its edge. `bias` (0.02 m, finite and 0
+or more) is how far below a shelter's top a surface may lie and still count as on top of it. A surface facing up
+(sloped up to 60 degrees) adds its own rise across those texels, so a sloped roof gathers snow on its own top instead
+of sheltering itself in stripes (slope-scaled bias, as in shadow maps); a steeper one, a wall, keeps the plain bias. Pass the cover as
+`GLTFWeather`'s `cover` option for imported models. An attached or disposed capture throws `MargoError`; a bad `bias`
+throws `RangeError`.
+
+## Snow that drifts and slides
+
+`SnowDrift` from `margoengine/weather/snow-drift` is lying snow on a ground grid that the wind moves: it scours windward
+slopes and crests, drops the snow on lee slopes and in hollows, grows cornices on sharp lee edges that break off when
+they overhang too far, sloughs snow off ground steeper than its angle of repose, and keeps the slide state an avalanche
+starts from (a slab on a buried weak layer and how near it is to sliding). It is a pure function of its options, the
+weather it follows and film time: fixed steps, cells in a fixed order and no randomness, so `seek` to any time gives the
+same snow however it got there (going back replays from 0). Pass it to `Snow` as `field` to draw it on the ground.
+
+```ts
+import { Engine, Geometry, PbrMaterial } from 'margoengine/core';
+import { heightfield } from 'margoengine/terrain';
+import { WeatherMachine } from 'margoengine/weather';
+import { Snow } from 'margoengine/weather/snow';
+import { SnowDrift } from 'margoengine/weather/snow-drift';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A ridge across an east wind: a long windward ramp and a steep lee face, sampled every metre.
+const N = 129,
+  origin: [number, number] = [-64, -64];
+const ridge = (x: number, z: number) => (x < 0 ? 12 * Math.max(0, 1 + x / 50) : 12 * Math.max(0, 1 - x / 10));
+const ground = new Float32Array(N * N);
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) ground[j * N + i] = ridge(origin[0] + i, origin[1] + j);
+engine
+  .createMesh()
+  .setGeometry(heightfield(ridge, { size: [N - 1, N - 1], origin, resolution: N - 1 }))
+  .setMaterial(new PbrMaterial({ color: '#4a4038', roughness: 0.9 }));
+
+const weather = new WeatherMachine('blizzard', { seed: 2 });
+// The blizzard's snow, wind speed, temperature and humidity; the wind turned to blow across the ridge (toward +X).
+const drift = new SnowDrift({ width: N, depth: N, origin, ground, weather, windDirection: 90, timeScale: 600 });
+Snow.attach(engine, { field: drift });
+const cornices = engine.createMesh().setMaterial(new PbrMaterial({ color: '#eef1f5', roughness: 0.85 }));
+let drawn = -1;
+engine.onFrame((_, delta) => {
+  drift.update(delta); // 10 minutes of storm per second of film
+  if (drift.version === drawn) return;
+  const g = drift.corniceGeometry();
+  cornices.setGeometry(new Geometry(g.positions, g.normals, g.indices));
+  drawn = drift.version;
+});
+drift.seek(30); // five hours in
+console.log(drift.depthAt(-30, 0), drift.depthAt(0, 0), drift.depthAt(3, 0)); // windward, the bare crest, the lee drift
+console.log(drift.cornices().length, drift.slide().release); // cornice cells, cells whose slab would release
+```
+
+Snowfall is the option `snowfall` in mm/h of water, or follows the weather's `snow` by `snowfallRate`: the rate whose
+extinction (Rasmussen, Vivekanandan, Cole, Myers and Masters 1999: sigma = 2 S / (Vt m/A), dry snow falling at 1 m/s
+with 0.2 kg/m^2 of mass per area) is the snow extinction `visibility` uses, so light snow (0.35) is about 0.9 mm/h,
+moderate (0.65) 1.9 and 1 about 4. `snowVisibility(rate, fallSpeed?, massPerArea?)` is the same relation the other way:
+1 mm/h of dry snow leaves about 1.4 km, wet snow (1.5 m/s, 0.8 kg/m^2) six times as far. Snow falls as snow below 0 C,
+half at 1 C and none from 2 C (`snowShare`, Dai 2008), at the new-snow density of Hedstrom and Pomeroy 1998
+(`newSnowDensity`: 119 kg/m^3 at 0 C, 68 in deep cold).
+
+The wind moves snow above the threshold of Li and Pomeroy 1997 (`snowThreshold`: 9.43 + 0.18 T + 0.0033 T^2 m/s at
+10 m, lowest about 7 m/s near -27 C, 9.9 for wet snow) or the `threshold` you set. `snowTransport` is the larger of
+Pomeroy and Gray's 1990 saltation and the developed total of the Prairie Blowing Snow Model (Pomeroy, Gray and
+Landine 1993: U10^4.04 / 714,801 kg/m/s, times 1 - (Ut/U)^2), times `transport`. The terrain weights the wind as
+MicroMet does (Liston and Elder 2006: 1 + `slopeWeight` x the slope along the wind + `curvatureWeight` x the
+curvature over `curvatureLength`, each scaled to -0.5..0.5), and a lee cell whose upwind horizon rises by
+`shelterAngle` within `shelterDistance` loses `shelter` of it (Winstral, Elder and Davis 2002). The snow in motion grows
+toward that capacity over `fetch` (100 m, Takeuchi 1980) and lands over `settle` (5 m) where the wind can carry less;
+the depth changes by what crosses each cell's faces (Liston and Sturm 1998, SnowTran-3D), never more than the snow
+there, so every kilogram is counted in `budget` (fallen, blown in and out at the edges, sublimated, held in cornices).
+`inflow` (true) brings snow in at the upwind edge as from a snowfield beyond; `sublimation` (0.02) is the share lost
+per 100 m of travel in dry air (none at full humidity). Wind-moved snow lands at `windDensity` (300 kg/m^3).
+
+Snow on ground steeper than `repose` (45 degrees; 90 never) slides to its lower neighbours, half the excess a pass and
+two passes a step (Fearing 2000; Musgrave, Kolb and Mace 1989), so a steep face sheds to its foot. A cornice grows on a
+cell whose ground drops by more than `corniceAngle` (35 degrees) to the next cell downwind and is no lower than the cell
+upwind: it catches `corniceCapture` (0.25) of the snow blowing over it. `cornices()` lists them (place, lean,
+kg per metre, `overhang` from a quarter-ellipse cross-section at `corniceDensity`, `height` 0.6 of it);
+`corniceGeometry()` is a closed, flat-shaded mesh of them; past `corniceMax` (3 m) a cornice breaks off onto the lee
+cell below and `corniceFalls()` records it (Vogel, Eckerstorfer and Christiansen 2012).
+
+The slide state follows Foehn 1987 and Schweizer, Jamieson and Schneebeli 2003. Snow lying at time 0 (`initialDepth`)
+is old snow on a weak layer; new and wind-laid snow is the slab on it. After `burial` seconds of fair weather (6 hours)
+the surface becomes the next weak layer and the slab joins the old snow. `slide()` gives, per cell, the slab depth and
+mass, the old snow depth, the weak layer's shear strength (`weakLayer` 500 Pa, Jamieson and Johnston 2001's 0.2 to
+2 kPa, plus `weakFriction` x the slab's normal stress and `sintering` Pa per hour of age), the shear stress the slab puts
+on it (rho g h sin psi cos psi on the bed's slope psi, plus `trigger` Pa), the slope and the index strength / stress
+(capped at `STABILITY_MAX` 10 where there is no slab or slope); `release` counts cells under 1. `snowStability` names
+the class (`release` under 1, `poor` under 1.5, `fair` under 2.5, then `good`), and `stabilityAt(x, z)` reads one cell.
+
+`wind`, `windDirection` (degrees, 0 toward +Z, 90 toward +X), `snowfall`, `temperature` and `humidity` follow the
+`weather` while unset (null); a value overrides it. `timeScale` is simulated seconds per film second (1); `step` (10 s),
+`width`, `depth`, `cellSize`, `initialDepth` and `initialDensity` are fixed, and changing `step` or the initial snow
+replays from 0. `snowDepth()`, `snowMass()`, `depthAt`, `surfaceAt` and `mass` read the snow; `version` grows with every
+step. With a `field`, `Snow` gives every surface on the field's ground (up to `band`, 0.05 m, above it) the field's depth
+and whitens it by it (`snowFieldCover`: smoothstep(0.003, 0.03, depth), with the snow line's slope rule), and keeps the
+weather's `cover` and `depth` off the field or above its ground; `snowFieldAt`, `snowFieldCover` and `snowFieldDepth`
+are the shader's maths in JavaScript, and the real-GPU test holds the WGSL to them on WebGPU and the WebGL2 layer. A
+bad option throws `RangeError` or `TypeError`. `examples/test-pages/snow-drift.html` is a whole ridge scene that checks
+its budget, seek and step and the drawn field after every button.
+
+## Avalanches with a powder cloud
+
+`Avalanche` from `margoengine/weather/avalanche` is a snow avalanche on a terrain grid, deterministic over film time
+with no physics engine. At `releaseTime` a slab breaks away (a rectangle across the slope, or with a `SnowDrift` as
+`snow` every sample whose slide state is under 1); the dense core flows down the ground as a depth-averaged layer
+(Savage and Hutter 1989) with Voellmy's friction (dry `friction` mu and turbulent `turbulence` xi, as RAMMS), takes
+the snow cover in its path at `entrainment` times its speed and stops as deposit. A fast front throws part of what it
+takes up into a powder cloud: parcels that grow in height as they run, entrain air, pick up more cover above
+`cloudThreshold` and settle out below it (Beghin et al. 1981; Rastello and Hopfinger 2004); the weather's wind drifts
+them. The cloud's head is fed at the core's front, so it runs with or ahead of the core and overruns it on the run-out
+(Sovilla, McElwaine and Louge 2015). Plants bend along the flow from `bendPressure` (`plantBend`, or `plantPushers` for
+a `TrampledScatter` of `margoengine/scatter/interact`), trees break where the pressure passes `breakPressure` and a deep
+deposit buries plants. It is a snow field: pass
+it to `Snow` as `field` and the ground shows the cover, the bare scar, the moving core and the deposit; `drawCloud`
+puts the cloud into a `Clouds` of `margoengine/vfx/clouds` as soft lit puffs; `AvalancheScatter` gives a `Scatter` the
+snow surface and the plants left standing. `seek` to any time gives the same avalanche however it got there.
+
+```ts
+import { Engine, PbrMaterial } from 'margoengine/core';
+import { heightfield } from 'margoengine/terrain';
+import { Clouds } from 'margoengine/vfx/clouds';
+import { WeatherMachine } from 'margoengine/weather';
+import { Snow } from 'margoengine/weather/snow';
+import { Avalanche } from 'margoengine/weather/avalanche';
+import { AVALANCHE_LOOKS, applyAvalancheSettings } from 'margoengine/weather/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [300, 220, 700], target: [0, 120, 250], near: 1, far: 4000 },
+});
+// A 38 degree face falling toward +Z into a flat valley at z = 400, a gully down its middle, a sample every 4 m.
+const N = 129,
+  cell = 4,
+  origin: [number, number] = [-256, 0];
+const face = (x: number, z: number) =>
+  0.78 * Math.max(0, 400 - z) + 0.4 * Math.abs(x) * Math.min(1, Math.max(0, 400 - z) / 150);
+const ground = new Float32Array(N * N);
+for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) ground[j * N + i] = face(origin[0] + i * cell, origin[1] + j * cell);
+engine
+  .createMesh()
+  .setGeometry(heightfield(face, { size: [(N - 1) * cell, (N - 1) * cell], origin, resolution: N - 1 }))
+  .setMaterial(new PbrMaterial({ color: '#4a4038', roughness: 0.9 }));
+
+const weather = new WeatherMachine('snow', { seed: 2 });
+const slide = new Avalanche({
+  width: N,
+  depth: N,
+  cellSize: cell,
+  origin,
+  ground,
+  weather,
+  cover: 1.2, // metres of snow on the face
+  release: { at: [0, 60], size: [40, 25] }, // a slab 80 m across and 50 m down the slope
+  releaseDepth: 1.2,
+  releaseTime: 2, // film seconds
+});
+applyAvalancheSettings(slide, { ...AVALANCHE_LOOKS.dryPowder, releaseTime: 2, releaseDepth: 1.2 });
+Snow.attach(engine, { field: slide });
+const clouds = Clouds.attach(engine);
+engine.onFrame((_, delta) => {
+  slide.update(delta);
+  slide.drawCloud(clouds);
+});
+slide.seek(12);
+console.log(Math.max(...slide.flowSpeed()), slide.powderCloud().length, slide.budget()); // m/s, parcels, kg
+// Plants bending along the flow now: pass these each frame to a TrampledScatter's setInteractors.
+console.log(slide.plantPushers().length, slide.plantBend().length / 2); // pushers, samples
+```
+
+The rows are `AVALANCHE_SETTINGS` in `margoengine/weather/settings` (23 rows on the shared shape; `wind` and
+`windDirection` null follow the weather and a value overrides it; `releaseDepth`, `step`, `density` and `coverDensity`
+start it again), with the looks `weather`, `dryPowder`, `wetSlide` and `slowMotion`. `voellmySpeed(slope, h)` and
+`voellmyRunout(speed, h)` are the analytic cases the solver is tested against (the steady speed to 3 percent).
+`examples/test-pages/avalanche.html` is a whole mountain scene that checks the budget, a step against a seek and the
+field Snow reads.
+
+## Volcanic eruption columns
+
+`Eruption` from `margoengine/weather/eruption` is an eruption column over film time with no physics engine. The vent
+jets a hot mix of gas and ash; the dense gas-thrust region slows until the air it takes in and heats makes it lighter
+than the air, then it rises as a buoyant plume (Morton, Taylor and Turner 1956; Woods 1988), bent over by the wind
+(Woodhouse et al. 2013), to a height that follows Mastin et al.'s (2009) fit of real eruptions within its 50 percent
+band. Too slow or gas-poor a jet collapses as a fountain (`column().collapse`). Its top rises over film time; at the
+level of neutral buoyancy the umbrella cloud spreads as a gravity current (Woods and Kienle 1994; Suzuki and Koyaguchi
+2009) and drifts with the wind; each grain size of the ash leaves the column where it can no longer be carried (Carey
+and Sparks 1986), falls through the wind (Bonadonna et al. 1998, 2005) and lands, so `ashThickness`, `ashGrid` and
+`visibility` grow downwind over time and `ashEvent()` hands the whole fall to `GroundChange` of
+`margoengine/terrain/ground-change` as an ash cover. Lightning flashes in the plume and at the vent, more as it is
+stronger; `flashLightning(sky)` fires each strike once through the sky's `Weather`, so its light, the cloud deck and
+the thunder follow the sky's own lightning link. `drawPlume` puts the column and the umbrella into a `Clouds` of
+`margoengine/vfx/clouds`. `seek` to any time gives the same eruption however it got there.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Clouds } from 'margoengine/vfx/clouds';
+import { WeatherMachine } from 'margoengine/weather';
+import { Eruption } from 'margoengine/weather/eruption';
+import { ERUPTION_LOOKS, applyEruptionSettings } from 'margoengine/weather/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [-40000, 4000, -30000], target: [0, 9000, 0], near: 10, far: 300000 },
+});
+const weather = new WeatherMachine('clear', { seed: 3 });
+const eruption = new Eruption({ vent: [0, 1500, 0], weather });
+applyEruptionSettings(eruption, { ...ERUPTION_LOOKS.plinian, start: 2, wind: 12, windDirection: 60 });
+const clouds = Clouds.attach(engine);
+engine.onFrame((_, delta) => {
+  eruption.update(delta);
+  eruption.drawPlume(clouds);
+});
+eruption.seek(1800);
+const column = eruption.column();
+console.log(column.steadyTop, column.neutral, eruption.umbrella()?.radius); // metres above the vent
+console.log(eruption.ashThickness(20000, 12000), eruption.ashEvent().thickness); // metres of fallen ash
+// Ground: groundChange.add(eruption.ashEvent()). Sky: each frame, eruption.flashLightning(skyWeather).
+```
+
+The rows are `ERUPTION_SETTINGS` in `margoengine/weather/settings` (25 rows on the shared shape; `wind` and
+`windDirection` null follow the weather and a value overrides it; `height` null takes `massRate`, a value takes
+Mastin's rate for that height), with the looks `weather`, `plinian`, `weakPlume` and `strongPlume` (Costa et al.
+2016's test eruptions), `collapsing` and `slowMotion`. `mastinRate(height)`, `mastinHeight(rate)`,
+`standardAtmosphere(z)` (ICAO) and `ashFallSpeed(d, rho, air)` are exported too.
+
+## Lava flows, fountains and bombs
+
+`LavaFlow` from `margoengine/weather/lava` is lava from one vent over film time. The flow runs down your ground by the
+path of steepest descent (Favalli et al. 2005, with a small jitter so it is not locked to a grid; it fills a shallow
+hollow and spills over its rim) as a sheet with a yield strength: its thickness carries the supply and its speed
+follows Jeffreys (1925) with Hulme's (1974) plug correction. Its core cools down the channel by radiation and
+convection from a crust and a share of hot cracks (Harris and Rowland 2001; Crisp and Baloga 1990), gaining latent heat
+as it crystallises, so it slows as its viscosity and yield strength rise (Dragoni 1989). The heat budget is FLOWGO's
+(Harris and Rowland 2001): the crust covers 0.9 exp(-0.16 u) of a surface moving at u m/s (`crackSpeed`), the hottest
+exposed lava is 120 K below the core (`hotOffset`), and the base conducts to the ground through a basal crust a tenth of
+the sheet (`baseCrust`, `baseTemperature`). The sheet keeps its depth at the vent and widens as it slows (mass
+conservation, Q = w d u), so it spreads where the slope breaks onto a flat, up to `maxWidth`. It stops:
+`'cooled'` where its Graetz number u d_e^2 / (kappa x) falls to 300 (Pinkerton and Wilson 1994) or its core reaches the solidus,
+`'ponded'` on flat ground (the pond then spreads as Huppert 1982, and `lavaEvent()` carries it to `GroundChange` as
+a `pond` that keeps the volume the vent feeds past the end of the path), `'stalled'`, or at `maxLength`. The front advances
+as the vent supplies it (`start`, `rise`, `duration`, `wane`) and stops when the supply is spent. Lengths fit mapped
+flows within 2 times (the test): Mauna Loa 1984 at 400 m^3/s runs 27.5 km (mapped 25 to 27), Pu'u 'O'o 1997 at 30 m^3/s
+3.5 km (4), Etna 1998 at 7 m^3/s 0.70 km (0.755), and Etna flows of 1 to 30 m^3/s grow as TADR^0.49 against Calvari and
+Pinkerton's (1998) 10^3.11 TADR^0.47 m, at about 0.7 of it. After the vent stops, `coreTemperature(i, t)` cools the
+stagnant sheet by conduction, its top at the air and its base at the lava-ground contact temperature (`slabCore`,
+Carslaw and Jaeger 1959): a 2 m sheet's middle falls below the crust isotherm in about 10 days, and the cracks' glow
+follows it.
+
+Levees rise behind the front: the margins stop and cool, and a Bingham sheet holds still where it is thinner than
+Hulme's (1974) h_c = tau / (rho g sin theta), so `leveeShare(i, t)` is h_c at the yield strength (Dragoni 1989) of the
+margin's cooling crust over the sheet's thickness, up to `leveeMax` (0.35; never above 1, the sheet's own height). It
+only grows with time and stands higher on gentle slopes. `lavaEvent(points, t)` carries the levees as they stand at `t`;
+set the event again as film time runs to grow them.
+
+The flow splits where the ground offers a second way down past a divide (Dietterich and Cashman 2014: flows part round
+ground they cannot overtop, Favalli et al. 2005): a local maximum of the drop 45 degrees or more off the steepest, at
+least `branchShare` (0.7) of it, with a drop under half its own between them, at most `maxBranches` (8) times and two
+widths apart. The flux is shared by the drops (at one thickness the flux per width goes as the slope), so a branch is
+thinner, cools sooner and runs shorter. Arms that part round an island run together again where the ground brings
+them back (Dietterich and Cashman 2014 map channels that split and rejoin): an arm that comes within `joinDistance`
+(1; 0 never) times their half-widths summed of another, after being clear of every other, ends there (`stop`
+'joined', `joins` naming the arm and point), and the other is solved again from that point carrying both fluxes at
+their flux-weighted temperature, so it runs on further. An arm that comes alongside another instead, moving within 45
+degrees of its way with its top below the other's levee crest (`leveeMax` over that sheet), runs beside it, braided:
+the levee between keeps them apart, so it never steps further over the other's edge than where it came alongside, and
+each carries its own lava on. Two 12 m channels in troughs 11 m apart run 1.8 km side by side; with no levees
+(`leveeMax` 0) the second ends in the first. `endFlux(k)` is the lava reaching an arm's end (its flux, less
+its branches, plus what runs into it); over the arms not `joined` these always sum to the effusion rate. `branches()`
+lists the arms (the trunk, `path()`, first), each with its parent, split point, flux, path, stop and join, and
+`lavaEvents()` gives one ground event per arm.
+
+On ground gentler than `tubeSlope` (4 degrees; 0 for none) a channel the vent still feeds `tubeTime` (a day) after
+its front passed roofs over into a lava tube (Peterson et al. 1994): `roofTime(i)` and `tubed(i, t)` say when, the
+hot cracks no longer show, and `coreTemperature(i, t)` is the tube's, `tubeTemperatures()`: inside, the lava loses
+heat only by conduction, up through a roof as thick as the crust grown in `tubeTime` and down into the ground heated
+for as long (Carslaw and Jaeger 1959). A Kupaianaha-like tube (4 m^3/s down 3 degrees, 4 m wide) cools 1.3 K/km
+against 0.6 K/km measured by Helz et al. (2003) and about 1 K/km by Keszthelyi (1995); the same open channel cools
+7 K/km.
+
+A front that cools to a stop runs on once the tube behind it is roofed (Calvari and Pinkerton 1998: tube-fed flows on
+Etna reached 3 km past the longest channel-fed one; Keszthelyi 1995): it waits at its stop until the last roof behind
+it closes (`front()` says `cooled`, speed 0), then flows on with the tube's lava, `tubeTemperatures()` at the mouth,
+its surface fresh and its Graetz length counted from the mouth, at most `maxRunOns` (16; 0 never) times. Each point's
+`wait` (supply seconds the front waited behind it) and `opened` (when its lava came into the open) say where. 1 m^3/s
+in a 4 m channel down 1 degree stops at 7.1 km in the open and runs to 35 km fed by its tubes.
+
+A front that stalls while still fed can also break out (`breakoutHeight`, metres of inflation, 0 by default: off).
+The supply spreads under the crust of the sluggish stretch behind the front (Graetz under twice `stopGraetz`) and lifts
+it by Q t / area (Hon et al. 1994 measured pahoehoe sheets inflating by injection under their crust; Hoblitt et al.
+2012); at that height the levee ruptures where the ground one width outside it lies lowest, through the roof where the
+stretch has roofed, and all the lava leaves from there as a new arm (`breakout: true` in `branches()`), its surface
+fresh and its core the fluid core fed under the crust: the channel's core at the head of the sluggish stretch, less only
+what conducts through the crust grown since the front passed (as in a tube), not the stalled lava's. A tube that would
+feed the front on sooner wins. The same 1 m^3/s flow with no tubes and 2 m of inflation breaks out 7.3 km down 32
+hours after the vent opens at 1,273 K (the stalled lava there is 1,261 K), and a lobe runs 1.2 km beside it, against
+the 0.7 to 0.8 km a breakout lobe of Kilauea's June 27th flow ran in January 2015 before it stalled (USGS HVO; Poland et
+al. 2016).
+
+With breakouts on, a stalled front also blocks the tube behind it. The supply backs up: the lava's level rises over
+the front's top as the sluggish stretch lifts, filling the tube's head room (Kauahikaua et al. 1998), and the first
+closed roof whose hold it beats bursts, the weight of a roof d thick plus its strength as a beam clamped at the levees,
+rho g d + 2 `roofStrength` d^2 / w^2 (1 MPa by default). The lobe leaves with the tube's lava, far hotter than the
+stalled front's. The 1 m^3/s flow with tubes and a levee that holds 20 m bursts a day-old roof 320 m behind its front
+about 21 hours after it stalls, at 21 kPa over the roof, and a 6.4 km lobe runs from there. The ground draws the
+roofs: `lavaEvent()` carries each point's `roofTime` as `roofs`, and GroundChange grows a crust in from the levees
+over the channel from the front's arrival until it closes level with their crests, with no glow under it. Skylights,
+holes where the roof fell in or never closed (Kauahikaua et al. 1998), open about every `skylightSpacing` (200 m; 0
+for none) and show the stream fresh until the tube drains: `drains` gives the second the supply's end passes each
+point, after which the stream under a skylight crusts like open lava.
+
+```js
+import { LavaFlow } from 'margoengine/weather/lava';
+
+const lava = new LavaFlow({ vent: [0, 1000, 0], ground: (x, z) => 1000 - 0.0175 * z, effusionRate: 1, width: 4, maxWidth: 4, duration: 1e7, step: 10 });
+const mouth = lava.path().findIndex((p, i) => i > 0 && p.wait > lava.path()[i - 1].wait);
+console.log(lava.length, lava.arrival(mouth) / 86400); // tube-fed length, metres; the day the front starts again
+```
+
+The surface's crust is solved by conduction under a radiating, convecting surface with the latent heat released to the
+solidus: `crustThickness(age)` stays within 30 percent of Hon et al.'s (1994) 0.0779 sqrt(hours) metres and
+`surfaceTemperature(age)` falls below 1,150 K in a minute. `radiance(i)` is the glow of each path point (hot cracks at
+the core's temperature plus the crust at its own, through Planck's law and the CIE observer), `lavaGlow(kelvin)` the
+colour and luminance of any temperature. `lavaEvent()` hands the flow to `GroundChange` of
+`margoengine/terrain/ground-change` as a lava event with its path, arrival times, widths, thicknesses and glow, so the
+ground draws the sheet, its levees and its glowing cracks growing down the slope. A fountain throws clots up to
+`fountainHeight` (Wilson and Head 1981) and bursts throw bombs on drag-slowed ballistic paths through the ICAO air
+(Mastin 2001); `clots()`, `bombs()`, `drawClots(instances)` and `drawBombs(instances)` give or draw them, and
+`impacts(from, to)` or `takeImpacts()` give each landing for dust and sound. `glowLights()` turns the glow into point
+lights over the fountain and along the flow, which `update` writes into `lights` (a `LightGroup` of
+`margoengine/clustered/groups`), so the lava lights the ground at night. `seek` to any time gives the same lava however
+it got there.
+
+```ts
+import { Engine, PbrMaterial } from 'margoengine/core';
+import { Clustered } from 'margoengine/clustered';
+import { LightGroups } from 'margoengine/clustered/groups';
+import { sphereGeometry } from 'margoengine/geometry';
+import { toGeometry } from 'margoengine/geometry/utils';
+import { Material, createInstancedMesh } from 'margoengine/materials';
+import { heightfieldGeometry } from 'margoengine/terrain';
+import { GroundChange } from 'margoengine/terrain/ground-change';
+import { WeatherMachine } from 'margoengine/weather';
+import { LavaFlow } from 'margoengine/weather/lava';
+import { LAVA_LOOKS, applyLavaSettings } from 'margoengine/weather/lava-settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 160, -300], target: [0, 40, 150], near: 1, far: 5000 },
+});
+const ground = (x: number, z: number) => 100 - 0.12 * z + 3 * Math.sin(x * 0.03);
+const grid = { size: [600, 600] as [number, number], origin: [-300, -300] as [number, number], resolution: 300 };
+const mesh = engine.createMesh().setGeometry(toGeometry(heightfieldGeometry(ground, grid)));
+mesh.setMaterial(new PbrMaterial({ color: '#3a3634', roughness: 0.95 }));
+const lights = LightGroups.attach(engine, Clustered.attach(engine));
+const weather = new WeatherMachine('clear', { seed: 3 });
+const lava = new LavaFlow({ vent: [0, ground(0, -250), -250], ground, weather, lights: lights.group('lava') });
+applyLavaSettings(lava, { ...LAVA_LOOKS.strombolian, start: 1, effusionRate: 30 });
+const change = GroundChange.attach(engine, mesh, { grid, events: [lava.lavaEvent()] });
+const blobs = createInstancedMesh(engine, sphereGeometry(1, 12, 8), new Material({ shading: 'basic' }), 4000);
+engine.onFrame((_, delta) => {
+  lava.update(delta);
+  change.setTime(lava.time);
+  lava.drawBombs(blobs.instances);
+});
+lava.seek(600);
+console.log(lava.front().distance, lava.stop, lava.crustThickness(3600)); // metres, why it stops, metres of crust
+console.log(lava.takeImpacts().length, lava.glowLights().length); // bombs landed so far, glow lights
+```
+
+Set the event again after changing a flow or supply row (`change.clear(); change.add(lava.lavaEvent())`; for a flow
+that splits, `change.clear(); for (const e of lava.lavaEvents()) change.add(e)`). The rows are
+`LAVA_SETTINGS` in `margoengine/weather/lava-settings` (59 rows on the shared shape, every one live; `wind` and
+`windDirection` null follow the weather and a value overrides it), with the looks `weather`, `hawaiian`,
+`strombolian`, `aa`, `vulcanian` and `night`. `binghamSpeed`, `binghamThickness`, `pondRadius`, `airDensity`,
+`planck`, `lavaGlow` and `SUN_LUMINANCE` are exported too. After the ground under the same `ground` object changes
+(sculpted or streamed terrain), call `invalidate()`.
+`examples/test-pages/lava.html` is a whole flow at night that checks a step against a seek (front and ground events),
+the arms' fluxes, the levee cap and the tube against the open channel.
 
 ## Weather in different places
 
@@ -141,7 +552,12 @@ radius) outside it, moves at `velocity` (`[x, z]` m/s) and, with `life: [from, t
 of that span at each end. Fronts apply in order over the base and cells over the fronts. `stateAt(x, z, t)` samples
 any place and time; `apply(machine, x, z)` sets a machine there (call it every frame before `machine.update`) so its
 wind, ground wetness and snow follow the place; `arrival(front, x, z)` gives the seconds until a front arrives
-(negative once it has passed). `addFront` and `addCell` return removers. Bad input throws `TypeError` or `RangeError`.
+(negative once it has passed). `storms` (or `addStorm`) lays storms whose weather varies across them over the cells:
+anything with `weatherAt(x, z, t)` returning a partial state and its `weight` there (0 to 1), such as `Hurricane` from
+`@margoengine/sky/hurricane`, whose wind, gusts, rain, cloud and lightning follow its calm eye, its eyewall and its
+spiral bands, or `Tornado` from `@margoengine/sky/tornado`, whose turning wind, inflow and rear-flank rain follow
+the vortex along its path (the sky package's README has both models and their sources). A storm wind over 60 m/s counts as 60, and
+fields left out keep the weather beneath. `addFront`, `addCell` and `addStorm` return removers. A partial `behind`, `ahead`, `along` or cell `weather` takes its missing fields from the map's base, and setting `map.base` fills them again from the new one. Bad input throws `TypeError` or `RangeError`.
 
 ## Weather you can hear
 
@@ -170,8 +586,8 @@ opens from 2.5 to 8 kHz with the hail; the wind's is `wind` (0.5) times (speed /
 by up to a third, through a band-pass that rises from 250 Hz by 30 Hz per m/s; `volume` (1) scales everything and
 `thunder` (1) a strike at loudness 1. `rainSound` and `windSound` are the `Audio` objects, for routing further.
 `buffers: {rain, wind, thunder}` plays your own recordings instead (a thunder recording is played faster or slower to
-fit the strike's length). `weatherAudioMix(state)` gives the levels alone and `weatherNoise(rate)` the generated samples.
-`new WeatherAudio(listener, options)` and `update()` work without an engine; `dispose()` stops everything.
+fit the strike's length). `weatherAudioMix(state)` gives the levels alone and `weatherNoise(rate, seed)` the generated samples; every seed (0 included) gives its own rain, wind and thunder, and no two seeds share a sound's noise.
+`new WeatherAudio(listener, options)` and `update()` work without an engine; `dispose()` stops everything and removes attached sounds from their scene.
 
 ## Real weather: METAR reports
 
@@ -208,9 +624,40 @@ visibility, the 5 percent contrast that defines visibility), so `fogDensity` of 
 
 ## Driving the sky
 
-`skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
+`skyWeather(state, wind?)` returns the sky `Weather` settings for a state: `Object.assign(weather.options, skyWeather(state))`. It includes `rainRate` (mm/h, from `rainRate(state)`), from which the sky draws the rain's drop size and fall speed (Gunn and Kinzer 1949; Marshall and Palmer 1948), so a storm's rain falls faster and leans more in the same wind than a drizzle. `hailSettings` does the same for `Hail`. `fogDensity(state)` gives an exponential-fog density per metre (0.0002 clear to 0.02 thick).
 
 ### Clouds and fog from the state, automatically
+
+Give the drive nothing but the weather and it finds its targets among the scene's plugins by name and shape: the sky
+(`sky`), the cloud layer (`sky:volumetric-clouds`), the fog volume (`volumetric-fog`), the rain and snow (`weather`) and
+`hail`, and every sea (`water:N`, a `Water` built without `waves`: with or without a `wind` option) to which it gives `setWind` the state's mean wind when it changes; a sea that also has `setRainRate` (a `Flood` from `@margoengine/water/flood`) is given the state's rain rate in mm/h when that changes, unless its rain was set by hand (`holdFromWeather(flood, 'rain')`). A target you hand in wins, and `auto: false` turns the search off. A cloud layer that draws a storm (a `hurricane` option, or `type: 'hurricane'`)
+gets the weather only: its cover, density and turning cloud are the storm's, so the drive takes back the coverage,
+density and drift it wrote there (a value held by hand stays).
+
+```ts
+import { WeatherMachine, beaufort, rainRate, visibility } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { Engine } from 'margoengine/core';
+import { Sky } from 'margoengine/sky';
+import { VolumetricClouds } from 'margoengine/sky/volumetric-clouds';
+import { Weather } from 'margoengine/sky/weather';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const sky = Sky.attach(engine, { hours: 15 });
+VolumetricClouds.attach(engine, { sky });
+Weather.attach(engine);
+const weather = new WeatherMachine('storm');
+WeatherDrive.attach(engine, { weather }); // the whole wiring: sky, clouds and rain follow the storm
+const { wind, rain, fog, snow } = weather.state;
+console.log(beaufort(wind), rainRate({ rain }), visibility({ fog, rain, snow })); // force, mm/h, metres
+```
+
+One physics for every package: `beaufort(U)` is the Beaufort force of a wind speed (WMO table), `windProfile(U10, z)` the
+wind at height z, `rainRate(state)` the rain rate in mm/h (80 rain^3: drizzle 0.6, rain 17, storm 69) and
+`visibility(state)` the metres at which a black object keeps 2 percent contrast (Koschmieder: 3.912 over the air's
+extinction): 23 km in clear air, about 200 m at fog 1, 1.3 km in 25 mm/h rain (Marshall and Palmer 1948), 350 m in heavy
+snow (Federal Meteorological Handbook No. 1). Sources: Koschmieder 1924 and WMO-No. 8; Hsu, Meindl and Gilhousen 1994
+(doi:10.1175/1520-0450(1994)033<0757:DTPLWP>2.0.CO;2) for the 1/7 profile.
 
 `WeatherDrive` from `margoengine/weather/drive` does that wiring for you every frame: it steps the weather and writes
 its cloud and fog into the sky's cloud sheet and fog, `VolumetricClouds` layers, `@margoengine/environment`'s `Fog` and
@@ -236,17 +683,369 @@ weather.transitionTo('storm', { seconds: 120 }); // clouds close in and the fog 
 ```
 
 Cloud cover is the state's `cloud`; a cloud layer's density rises from 0.02 to 0.08 per metre with the strongest of
-rain, snow, hail and lightning, and it drifts with the wind times `windAloft` (3). Fog: an exponential fog and a fog
+rain, snow, hail and lightning, and it drifts with the wind field's own direction at the wind of its base height, the
+1/7 power law U10 (z / 10)^(1/7) (`windProfile`): 2.05 times the ground wind at 1,500 m (`windAloft` gives a plain factor
+over the ground wind instead). Fog: an exponential fog and a fog
 volume get `fogDensity` as their extinction; a squared fog (environment `Fog`, the sky's default fog) gets that over
 the square root of 3, which leaves the same 5 percent of contrast at the same distance. A sky's cloud sheet and fog are
 set only when the sky has them. The wind for rain and hail is the machine's wind field at `listener.position` (or
 `position`). With `advance: false` you step the weather yourself. `driveSettings(state)` gives the numbers alone.
+
+Fog volumes given as `fogWind` get that wind too, as `[x, 0, z]`, so their noise streams past with the gusts: blowing
+snow in a blizzard, mist driven across a moor. A volume in `fogWind` but not in `fogVolumes` keeps the density the
+scene gives it (thicker than the drive's 196 m for a whiteout, say); a volume in neither keeps its own `wind`.
+
+```ts
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { Engine } from 'margoengine/core';
+import { Weather } from 'margoengine/sky/weather';
+import { VolumetricFog } from 'margoengine/environment/volumetric';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const weather = new WeatherMachine('blizzard');
+WeatherDrive.attach(engine, {
+  weather,
+  precipitation: Weather.attach(engine, { precipitation: 'snow' }),
+  fogWind: VolumetricFog.attach(engine, { density: 0.04, height: 1, heightFalloff: 0.1, noise: 0.6 }),
+  listener: engine.camera,
+});
+```
+
+Scatter and grass bend with the same wind. `scatter` (every `Scatter`, found by its `scatter:N` name, built with a `wind` option or not: a scatter doubles its culling reach while any wind is set) gets `scatterWind(wind)`: the direction the wind blows toward, `windBend(U)` = (U / 20)^2, at most 1, as the strength, because the force of the air on a blade grows with the square of its speed, and the speed U itself (at most 100 m/s), from which the scatter runs its sway `U / 5.4` times as fast past Beaufort 3, so grass and trees thrash in a gale (`windClockRate` of `@margoengine/scatter`). A creative `GrassField` (`grass-field:N`) gets `grassWind(wind)`: its `windDirection`, a `windStrength` of twice that bend (0 to 2) and a `windSpeed` of 0.15 per m/s. The direction stays within 5 degrees of the field's; dead calm keeps the last direction at strength 0. Without a wind field the drive leaves them alone.
+
+Particle effects lean with it too: every `VFX` (`vfx:N`, which includes the flames, embers and steam of a `Fire`) gets the field's `[x, z]` as its `wind` option, so smoke rising at w in a wind U leans atan(U / w) (`vfx` hands targets in; `auto: false` leaves them alone). An effect given a wind of its own (anything but unset or `[0, 0]` that the drive did not write, such as the `wind.x` and `wind.z` rows of `@margoengine/vfx/settings`) keeps it: a value overrides the weather.
+
+The weather is the master of every target, and a value set by hand is an override. The settings appliers (`applyEnvironmentSettings`, `applyVfxSettings`, `applySmokeSettings`, `applySandSettings`, `applyWaterSettings`) mark each option they set with `holdFromWeather` (`packages/shared/settings.js`), and the drive never writes a marked option (sky and cloud numbers, fog density and colour, fog volume wind, scatter and grass wind, rain, hail, sea wind, blown-sand wind and fog); null in the row releases it and the weather writes it again on the next frame. A fog volume built with a `visibility` is left alone. To override a target of your own, call `holdFromWeather(target, 'density')`, and `holdFromWeather(target, 'density', false)` to hand it back.
+
+```ts
+import { scatterWind, grassWind, windBend } from 'margoengine/weather';
+console.log(windBend(10), windBend(5)); // 0.25 and 0.0625: twice the wind, four times the bend
+console.log(scatterWind([3, 4])); // [0.6, 0.8, 0.0625, 5]
+console.log(grassWind([0, 10])); // { windDirection: [0, 1], windStrength: 0.5, windSpeed: 1.5 }
+```
 
 ## Hail
 
 `Hail.attach(engine, options)` (from `margoengine/weather/hail`, WebGPU only) draws stones that fall at `fallSpeed` (default 18 m/s), hit the ground at `groundY`, bounce twice (`restitution` 0.2) and stop. Every position is a closed-form function of time and the stone's index, so only one uniform block is uploaded per frame; stones are depth-tested against the scene and fade at the edge of the box that follows the camera. Options: `intensity`, `fadeSeconds`, `wind`, `groundY`, `radius`, `height`, `particles` (6,000 at intensity 1), `fallSpeed`, `restitution`, `stoneRadius`, `color`, `brightness`, `opacity`, `seed`, `lit` and `splashes`; all are read each frame from `hail.options` and validated.
 
 Stones are lit (`lit`, default true) as small ice balls by the engine's light (`engine.lighting`: the sun's direction, strength and colour, and the ambient light): Lambert diffuse on the side toward the sun, a glint of it, and the far side in the stone's own shadow, lit only by the ambient; `lit: false` keeps the flat `color`. Where a stone first lands, `splashes` ice chips (4, at most 8) burst out at 0.6 to 1.8 m/s and 1 to 2.5 m/s upward and fall back under gravity, fading over `SPLASH_SECONDS` (0.35 s); like the stones they are a closed-form function of time, drawn in the same instanced draw. `stoneState(tau, options)` is the same height and speed formula in JavaScript. Without an engine, `new Hail(options)` and `update(delta)` still ease `amount`.
+
+## Rain on the lens
+
+`LensDrops.attach(engine, options)` (from `margoengine/weather/lens`, WebGPU or the WebGL2 compatibility layer, needs `@margoengine/post`) refracts drops and downward streaks over the finished picture as a stage of the scene's `PostStack`. A scene that already has a `PostStack` (bloom, water, a camera effect) gets the lens as one more HDR stage, after its last HDR effect; a scene without one gets a stack that goes when the lens does. `lens.dispose()` takes the lens out of the stack. Options: `wetness` (0 to 1, default 0.6), `radius`, `speed`, `distortion`, `streaks`, `seed`, `enabled` and `time`.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PostStack } from 'margoengine/post/stack';
+import { Bloom } from 'margoengine/post/bloom';
+import { LensDrops } from 'margoengine/weather/lens';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+PostStack.attach(engine, [new Bloom()]); // the scene already has a stack
+const lens = await LensDrops.attach(engine, { wetness: 0.8 }); // joins it
+lens.dispose(); // leaves it; the bloom stays
+```
+
+## Film time: seeking weather to a cut
+
+A film rendered scene by scene starts each scene in a fresh process, and every weather clock adds up frame deltas: the
+machine's blend, schedule, random walk, wetness and snow cover (`WeatherMachine`), the hail clock and amount (`Hail`),
+the rain rings (`Puddles`, `GLTFWeather`), the lens drops (`LensDrops`) and the map time of `WeatherRegions`. Each has
+`advanceTime(delta)`, the CPU part of its frame update, and a `time` getter (seconds on its clock); its `onPreUpdate`
+(or `update`) runs the same steps. `WeatherDrive.advanceTime` steps its weather with `advanceTime` and writes the same
+targets, so `seek` from `@margoengine/cutscene/seek` replays a run's steps and the next frame draws what a run started at
+0 draws there, bit for bit (`tests/seek.test.js` field for field to 54,000 steps; `tests/seek-check.mjs` pixel for pixel
+on WebGPU and the WebGL2 compatibility layer).
+
+```ts
+import { Engine } from 'margoengine/core';
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { Hail } from 'margoengine/weather/hail';
+import { Puddles } from 'margoengine/weather/puddles';
+import { Weather } from 'margoengine/sky/weather';
+import { seek } from 'margoengine/cutscene/seek';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const weather = new WeatherMachine('overcast', { seed: 7 });
+weather.schedule([{ to: 'thunderstorm', seconds: 60, hold: 120 }, { to: 'hail', seconds: 20, hold: 30 }]);
+// The drive first: a seek replays plugins in attach order, as the engine updates them.
+const drive = WeatherDrive.attach(engine, { weather, listener: engine.camera });
+drive.options.precipitation = Weather.attach(engine);
+drive.options.hail = Hail.attach(engine);
+Puddles.attach(engine, { weather });
+// This scene starts 95 s into the film: the storm, the wet ground, the stones and the rings are where a run from 0 had them.
+const { unseekable } = await seek(engine, 95, { fps: 30 });
+engine.render({ delta: 1 / 30 });
+console.log(weather.time, weather.wetness, unseekable);
+```
+
+- A replayed step calls no `on` listener: the live frame after the seek hears what the continuous run heard on that
+  frame. A listener that changes the weather (`set`, `stop`) is not replayed; put such changes in the schedule, or make
+  them from film code on the same step.
+- `WeatherDrive.time` is its weather's `time`. A machine stepped by a drive needs nothing more; a machine you step
+  yourself and `WeatherRegions` are not plugins, so pass them to `seek` in `extra`.
+- `LensDrops` replays its own clock; an `options.time` you set still wins. `GLTFWeather` snow has no clock (it follows
+  its weather).
+- `WeatherAudio` and `PrecipitationCover` have no clock: the sound follows the state, and the cover map is drawn from
+  the scene each frame. They show in the seek's `unseekable` list and need nothing.
+- The events `Avalanche`, `SnowDrift` and `Eruption` are stepped by your frame code, not by the engine, so pass them
+  to `seek` in `extra`: each has `advanceTime(delta)`, the same as its `update(delta)` (an eruption's `timeScale`
+  included), and a `time` getter. The seek makes the same calls a continuous run made, so the slab, the drifts and the
+  column at the cut equal that run's bit for bit (`tests/seek-events.test.js`, 1, 600 and 5,400 steps).
+
+```ts
+import { Eruption } from 'margoengine/weather/eruption';
+import { SnowDrift } from 'margoengine/weather/snow-drift';
+import { seekSync } from 'margoengine/cutscene/seek';
+
+const world = { scene: { plugins: new Map() } }; // or your engine: its plugins step first, then `extra`
+const eruption = new Eruption({ rise: 1, wind: 8, timeScale: 10 });
+const ground = new Float32Array(32 * 32);
+const drift = new SnowDrift({ width: 32, depth: 32, ground, initialDepth: 0.3, wind: 14, snowfall: 2, timeScale: 60 });
+// This scene starts 40 s into the film: the column and the drifts are where a run from 0 had them.
+seekSync(world, 40, { fps: 30, extra: [eruption, drift] });
+console.log(eruption.time, drift.simulated); // about 400 film seconds of eruption and 2,400 simulated seconds of snow
+```
+
+## One panel for the whole weather: settings
+
+`@margoengine/weather/settings` lists the weather's master controls as one table for sliders and tools: wind speed
+(m/s, with its Beaufort force in `about`), wind direction, gust, rain rate (mm/h), snow, hail, visibility (m), fog, cloud
+cover, lightning, dust and a storm level. `WEATHER_SETTINGS` has 13 rows, each with `name`, `group`, `kind`, `default`, `min`,
+`max`, `step`, `unit`, `about` and `live`; the row shape is the one every package's settings share
+(`packages/shared/settings.js`, the model is `@margoengine/sky/settings`). Every row is `live`: writing it only changes
+the weather state, so a film can key it over a shot, and `applyWeatherSettings` makes no pipeline, buffer or texture
+(`tests/dust.test.js` pins each bound of the dust: the visibility against the published relations, dust 0 changing nothing bit for bit, the colour, the saltation threshold, the sand's wind within 5 degrees of the field's; `tests/settings-check.mjs` counts 60 frames of every row and compares displayed frames byte for byte: the default rows draw the `clear` preset's frame and `WEATHER_LOOKS.storm` the `storm` preset's, native and on the WebGL2 layer).
+
+`storm` is the storm level, 0 the `clear` preset, 0.5 the `rain` preset and 1 the `storm` preset, with the numbers
+between them blended. Every other row except `windDirection` has a null default and follows the storm level until it is
+given a value (`nullable`, `weather: 'storm'`); give `wind: 30` and only the wind leaves the level. `rainRate` is the
+state's `rain` as mm of water an hour (`rain = (R / 80)^(1/3)`); `visibility` is Koschmieder's distance and sets the fog
+that leaves it, in the rain and snow set (`fogForVisibility`), and wins over `fog`: 23,000 m is clear air and about
+200 m the thickest fog, and rain or snow already in the air can leave less than the visibility asked.
+
+`applyWeatherSettings(machine, values)` jumps the machine to the state of those values (a name left out takes its
+default), ends any transition and returns the state. A `WeatherDrive` on the same machine pushes it every frame into
+every package it finds (the sky's clouds and fog, the sea, the rain and snow, hail, the fog volume, scatter, grass, smoke
+and fire), so moving the one wind slider moves the sea, grass, scatter, rain, smoke, fire and fog together; a package
+row that is `nullable` with `weather` set follows these rows while it is null, and overrides them when it is given a
+value (`tests/settings.test.js` is the vane test: with every package at its default, each follows the wind within 5
+degrees of the field's, with its own law for the size). A name not in the table throws a `TypeError`, a value outside
+its row's range or kind a `RangeError`.
+
+### Dust: haze, sandstorm, haboob
+
+`dust` (0 to 1, a field of the state and a row of the panel) is dust in the air. Its mass concentration is
+`dustConcentration(dust)`, 3,000 dust^2 micrograms of PM10 per cubic metre, and the visibility it leaves is the
+published relation PM10 = 485.67 V^-0.776 (V in km; Jugder et al. 2014, tabulated in Camino et al., Aeolian Research 16,
+2015) inverted, `dustVisibility`: 0.2 leaves about 6 km of dust haze, 0.5 about 570 m (a sandstorm), 0.9 about 130 m and 1
+about 95 m. The relation is not valid over 10 km of visibility (Camino et al.), so thinner dust adds extinction in
+proportion to its concentration and the haze fades to nothing with no step. `airExtinction`, `visibility`,
+`fogForVisibility` (so the `visibility` row) and `fogDensity` all include `dustExtinction`; with `dust` 0 each is the
+value it was before, bit for bit. The row follows the storm level at null, which holds no dust: a storm at sea has none.
+`WEATHER_LOOKS` gains `dustHaze`, `sandstorm` and `haboob`.
+
+A `WeatherDrive` also does three things for sand and dust, all of them package calls:
+
+- **Wind over sand raises the dust.** While a `BlownSand` (`@margoengine/vfx/blown-sand`) is in the scene, the wind
+  above its threshold raises the state's dust by the saltation flux (`dustFromWind`: Owen's flux over the threshold,
+  up to 0.5), so a gale over a desert makes a sandstorm with no dust set by hand; `dustFromSand: false` turns it off, and
+  a dust the state holds itself is never lowered.
+- **The fog turns dust coloured.** While dust is most of the air's extinction, the sky fog's colour is `dustColor()`
+  (a yellow-brown from the single-scattering albedo of desert dust, Dubovik et al. 2002) times `dustLight` (default 1;
+  the fog's colour is a fixed value, so give less at dusk). The colour the fog had comes back when the dust clears.
+- **The sand follows the weather.** Each `BlownSand` takes the state's wind speed, direction and gustiness as its `wind`
+  while its wind is unset or `{speed: 0}` (a speed above 0 on the layer overrides), and the air's extinction as its `fog`
+  while that is unset.
+
+### Smoke: haze, wildfire smoke, a black day
+
+`smoke` (0 to 1, a field of the state and a row of the panel) is smoke in the air. Its PM2.5 concentration is
+`smokeConcentration(smoke)`, 5,000 smoke^2 micrograms per cubic metre, and its extinction is 4 m2/g of that mass (Reid
+et al. 2005: 3.6 m2/g of scattering and about 0.5 of absorption), `smokeExtinction`; the visibility is Koschmieder's
+3.912 over it as for fog and dust: 0.15 leaves about 6.3 km of haze, 0.35 about 1.5 km, 0.5 about 760 m and 1 about 190 m.
+`airExtinction`, `visibility`, `fogForVisibility` and `fogDensity` all include it; with `smoke` 0 each is the value it
+was before, bit for bit. The row follows the storm level at null (no smoke). `WEATHER_LOOKS` gains `smokeHaze`,
+`wildfireSmoke` and `blackDay`.
+
+A `WeatherDrive` does three things for it, all package calls:
+
+- **The sun dims and reddens.** The sky's `atmosphere.sunColor` is multiplied by `smokeSunTransmittance(smoke, elevation)`,
+  exp(-tau (lambda / 550 nm)^-1.8 / sin elevation) over a 2 km layer (the Angstrom exponent 1.8 of smoke, Eck et al.
+  1999), read at the sun's height in `sky.sun`: 0.2 smoke leaves the noon sun a red 0.33 / 0.20 / 0.09 of its light, and a
+  black day none. A sky with a `look`, or one that takes it (`sky.airControls`, true for the root `Sky`), and no
+  `atmosphere` gets one; any other sky is left alone, and with no smoke nothing is written. The colour it had comes back
+  when the smoke clears.
+- **The sky is the layer's glow.** `sunColor` takes the dome down with the sun, and the light the smoke, ash and spray
+  scatter down, `hazeLight` less the direct share times the sine of the sun's height, goes in the sky's
+  `atmosphere.scatteredLight`: the layer lit from above shines evenly over the sky, so under a thick load the dome, its
+  reflections, the light it gives the scene and a `VolumetricFog`'s ambient are a dim glow, not the clear sky
+  (KB-AIR-SKYLIGHT1). Under the ash fall look the sky reads 19, 26, 33 against 215, 220, 228 in clear air.
+- **The fog takes the smoke colour.** While dust and smoke together are most of the air's extinction, the sky fog's colour
+  is `smokeColor()` (a grey brown from the single-scattering albedo of smoke, 0.84 to 0.89) times `smokeLight`, or the
+  mix of dust and smoke colours by their share of the extinction.
+- **A fire front makes smoke.** Each `FireFront` in the scene (found as `fire-front:N`, or the `fires` option) reports its
+  `smokeEmission` in grams of PM2.5 a second (the fuel it burns times `smokeYield`, 15 g/kg, Akagi et al. 2011); the
+  drive raises the state's `smoke` to `smokeFromEmission(grams, wind, smokeWidth)`, the box model Q / (U H W) over a
+  crosswind width of 2 km (`smokeWidth`) and the 2 km layer. `smokeFromFire: false` turns it off, and a smoke the state
+  holds itself is never lowered. The drive also hands each front its wind every frame (`setWind`, the 10 m wind at the
+  front), so a fire given as `fires` spreads in the weather's wind (KB-FIRE-DRIVEWIND1).
+
+```js
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { WEATHER_LOOKS, applyWeatherSettings } from 'margoengine/weather/settings';
+import { smokeSunTransmittance, smokeVisibility, smokeConcentration } from 'margoengine/weather';
+
+const weather = new WeatherMachine('clear');
+const drive = new WeatherDrive({ weather });
+const state = applyWeatherSettings(weather, WEATHER_LOOKS.wildfireSmoke);
+drive.update(1 / 60);
+console.log(Math.round(smokeVisibility(smokeConcentration(state.smoke))), 'm of smoke visibility');
+console.log(smokeSunTransmittance(state.smoke, Math.PI / 2).map((t) => t.toFixed(2)).join(' '), 'of the noon sun, red green blue');
+```
+
+```js
+import { WeatherMachine } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { WEATHER_LOOKS, applyWeatherSettings } from 'margoengine/weather/settings';
+import { dustVisibility, dustConcentration } from 'margoengine/weather';
+
+const weather = new WeatherMachine('clear');
+const drive = new WeatherDrive({ weather });
+const state = applyWeatherSettings(weather, WEATHER_LOOKS.sandstorm);
+drive.update(1 / 60);
+console.log(state.dust, Math.round(dustVisibility(dustConcentration(state.dust))), 'm of dust visibility');
+```
+
+### Ash and sea spray: ash fall, darkness at noon, sea haze and the surf
+
+`ash` and `spray` (0 to 1 each, fields of the state and rows of the panel) are volcanic ash and sea spray in the air.
+Both are coarse grains, much larger than the wavelength of light, so each removes twice its geometric cross section at
+every wavelength (van de Hulst 1957): `coarseExtinction(micrograms, radius, density)` is 3 C / (2 rho r), the same law
+`Eruption.visibility` uses for each grain class. They dim the sun grey, without reddening it (an Angstrom exponent of 0,
+where smoke's is 1.8). `airExtinction`, `visibility`, `fogForVisibility` and `fogDensity` all include them; with both at
+0 each is the value it was before, bit for bit. The rows follow the storm level at null (none). `WEATHER_LOOKS` gains
+`ashfall` (about 930 m, the direct sun gone), `ashDarkness` (under 200 m), `seaSpray` (about 13 km) and `surfHaze` (about 3 km).
+
+- **Ash.** `ashConcentration(ash)` is 100,000 ash^2 micrograms per cubic metre of grains 1.75 micrometres across in
+  effective radius (the coarse mode of the 2010 Eyjafjallajokull plume, Waquet et al. 2014) and 2,500 kg/m3: ash 1
+  leaves about 114 m, and Ansmann et al.'s (2011) distal peak of 1,500 micrograms is ash 0.12, about 7 km.
+  `ashColor()` is a neutral grey from the single-scattering albedo of ash, 0.94 to 0.95 (Toledano et al. 2012).
+  `ashForExtinction` inverts the extinction.
+- **An eruption makes ash.** Each `Eruption` attached with `Eruption.attach(engine, options)` (named `eruption:N`; it
+  steps itself each frame), or handed in as `eruptions`, gives the drive its falling ash at the camera: the extinction
+  3.912 / `eruption.visibility(x, z)` less the clear air becomes the state's `ash`, so the drive's visibility there is
+  the eruption's own. `ashFromEruption: false` turns it off; an ash the state holds itself is never lowered.
+- **Sea spray.** `seaSalt(wind, distance)` is the dry sea-salt load over the open sea, exp(0.16 U + 1.45) micrograms per
+  cubic metre (Lovett 1978, 1,821 samples from North Atlantic weather ships), times 1 + 29 exp(-d / 2 km) at a distance
+  d downwind of breaking surf (one to two orders of magnitude more beside the surf zone, de Leeuw et al. 2000; 30 is
+  the geometric middle). A sea-salt particle at 80 percent humidity has twice its dry radius (Lewis and Schwartz 2004),
+  so `sprayExtinction` is 4 times the dry grains'. The open sea in a 10 m/s wind leaves about 19 km; the surf zone in a
+  gale under 1 km. `sprayColor()` is white (sea salt does not absorb).
+- **The sea makes spray.** With a `Water` in the scene (`water:N`, or the `water` option) the drive raises the state's
+  `spray` to `sprayFromWind(wind)`, thicker near the breakers: a `Water` given `terrain.heights` reports its own
+  breaker line (`water.breakerLine()`), which the drive reads when `surf` is unset; `surf` (`[x, z]` points joined in
+  order) gives one by hand and overrides it. `sprayFromSea: false` turns it off.
+- **The fog and the sun.** While dust, smoke, ash and spray together are at least half the air's extinction, the sky
+  fog's colour is their colours mixed by their share of it, each times its own light (`dustLight`, `smokeLight`,
+  `ashLight`, `sprayLight`); one alone gives its own colour exactly. Under smoke, ash or spray that colour is lit by
+  `hazeLight(state, elevation)`, the light that still reaches the air: the direct sun through the layers plus the rest
+  they scatter times what a two-stream slab passes down (Meador and Weaver 1980). So the haze, and the ground behind it,
+  darken as the load thickens: a black day or an ash darkness is dark at noon. A `VolumetricFog` the drive writes
+  (`fogVolumes`, or found as `volumetric-fog`, with no `visibility` of its own) takes the load's colour too: each load's
+  colour by its share of the volume's extinction, the rest of the air white, so ash greys it and smoke browns it; it is
+  lit by the scene's lights, so no haze light is put on it. A colour held by the `air.color` row of
+  `@margoengine/environment/settings` is never written; with no load the colour it had comes back. The sky's `atmosphere.sunColor` is multiplied by
+  `sunTransmittance(state, elevation)`: the smoke's reddening times the grey exp(-tau / sin elevation) of the ash over a
+  3 km layer and the spray over 500 m.
+
+```js
+import { WeatherMachine, visibility, sunTransmittance, hazeLight, sprayFromWind } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+import { Eruption } from 'margoengine/weather/eruption';
+
+const weather = new WeatherMachine('clear');
+weather.set({ ...weather.state, wind: 12, windDirection: 0 });
+// An eruption 40 km south, its ash blown north; a coast whose breakers run along z = 60.
+const eruption = new Eruption({ vent: [0, 0, -40000], weather });
+eruption.seek(5400);
+const drive = new WeatherDrive({ weather, eruptions: eruption, surf: [[-3000, 60], [3000, 60]], position: [0, 5, 0] });
+const air = drive.update(0);
+console.log(air.ash.toFixed(2), 'ash and', air.spray.toFixed(2), 'spray:', Math.round(air.visibility), 'm of visibility');
+console.log(sunTransmittance(air, Math.PI / 3).map((t) => t.toFixed(2)).join(' '), 'of the sun, red green blue');
+console.log(hazeLight(air, Math.PI / 3).map((t) => t.toFixed(2)).join(' '), 'of the light on the haze');
+console.log(Math.round(visibility({ fog: 0, rain: 0, snow: 0, spray: sprayFromWind(10) })), 'm over the open sea at 10 m/s');
+```
+
+### Humidity, temperature and the fuel of a fire
+
+`humidity` (relative humidity at 2 m, 0 to 1) and `temperature` (degrees Celsius at 2 m, -80 to 60) are fields of the
+state and rows of the panel; at null they follow the storm level. The presets hold 15 C (the ICAO standard atmosphere at
+sea level) except snow (-2 C), blizzard (-8 C) and sleet (1 C), since snow falls mostly below about 1 C (Dai 2008);
+fog is saturated air (1), rain and drizzle 0.95, a fair day 0.5. A METAR's temperature and dew point set them
+(`weatherFromMetar`, the Magnus form of Alduchov and Eskridge 1996). Nothing that draws reads them, so every picture is
+as it was; they set the dead fuel moisture of a fire.
+
+`equilibriumMoisture(humidity, temperature)` is the moisture dead wood settles to in that air, Simard's (1968)
+regressions as the US National Fire-Danger Rating System gives them (Cohen and Deeming 1985). `fuelLevelAir` warms and
+dries the air at the fuel bed in daylight by the cloud cover (add 25, 19, 12 or 5 F and scale the humidity by 0.75, 0.83,
+0.92 or 1). `FuelMoistureModel` steps the 1, 10 and 100 hour dead fuel toward that target by Fosberg's timelag response
+(m += (target - m)(1 - exp(-dt / tau)), tau 1, 10 and 100 hours); while it rains the 1 and 10 hour fuels go toward 35
+percent and the 100-hour fuel toward 0.5 d + 41 percent after d hours of rain. A `WeatherDrive` with a `FireFront` in the
+scene runs one and writes each fire's `moisture`, `moisture10` and `moisture100` while they are unset (a value a
+person set wins; `fuelMoistureFromWeather: false` turns it off; `fuelTimeScale` runs the fuel clock faster, for a film
+that shows an afternoon in a minute). The look `redFlag` (32 C, 15 percent humidity, 9 m/s) dries fine fuel in the sun to
+about 2 percent; a fair day leaves about 7.
+
+```js
+import { FuelMoistureModel, WeatherMachine, equilibriumMoisture } from 'margoengine/weather';
+import { WEATHER_LOOKS, applyWeatherSettings } from 'margoengine/weather/settings';
+
+const weather = new WeatherMachine('clear');
+const state = applyWeatherSettings(weather, WEATHER_LOOKS.redFlag);
+console.log((equilibriumMoisture(0.3, 30) * 100).toFixed(1), 'percent in 30 percent air at 30 C'); // 5.8
+const fuel = new FuelMoistureModel({ start: { moisture: 0.35, moisture10: 0.35, moisture100: 0.35 } });
+for (let hour = 0; hour < 3; hour++) fuel.step(state, 3600); // three dry hours after rain
+console.log(fuel.moisture); // the 1-hour fuel is nearly dry, the 100-hour fuel has hardly moved
+// WeatherDrive.attach(engine, { weather }) writes these into every FireFront in the scene while its moisture rows are null.
+```
+
+The named looks are `calm`, `breeze`, `gale`, `storm`, `hurricane`, `fog`, `drizzle`, `downpour`, `dustHaze`, `sandstorm`, `haboob`, `smokeHaze`, `wildfireSmoke`, `blackDay`, `blizzard`, `redFlag` and `animatedFeature`; each
+is only values of the rows, so a look is a starting point a slider can move on from.
+
+```ts
+import { WeatherMachine, beaufort } from 'margoengine/weather';
+import { WEATHER_LOOKS, WEATHER_SETTINGS, applyWeatherSettings, weatherSettingDefaults, weatherStateOf } from 'margoengine/weather/settings';
+
+const machine = new WeatherMachine('clear', { seed: 7 });
+// The panel's state: every row at its default, then a look to start from.
+const values: Record<string, number | null> = { ...weatherSettingDefaults(), ...WEATHER_LOOKS.gale };
+console.log(beaufort(weatherStateOf(values).wind)); // 8, a gale
+// One slider per row, built from the table; null puts a row back on the storm level.
+for (const row of WEATHER_SETTINGS) {
+  const slider = Object.assign(document.createElement('input'), { type: 'range', title: row.about, min: String(row.min), max: String(row.max), step: String(row.step) });
+  slider.value = String(values[row.name] ?? row.min);
+  slider.oninput = () => {
+    values[row.name] = Number(slider.value);
+    applyWeatherSettings(machine, values); // every frame is fine: it only writes the state
+  };
+  document.body.append(slider);
+}
+applyWeatherSettings(machine, values);
+// WeatherDrive.attach(engine, { weather: machine }) then carries it to the sea, rain, fog, fire, smoke, scatter and grass.
+```
+
+Lying snow has two tables on the same row shape. `SNOW_SETTINGS` (8 rows) is `Snow`'s look: `cover` follows the
+weather's snow cover while null, then `depth`, `variation`, `drift`, `grain`, `roughness`, `color` and the field's
+`band`; `applySnowSettings(snow, values)` writes them, and a set `cover` wins over the weather until it is set back to
+null. `SNOW_DRIFT_SETTINGS` (33 rows) is every `SnowDrift` option: `wind`, `windDirection`, `snowfall`, `temperature`
+and `humidity` follow the weather while null; `step`, `initialDepth` and `initialDensity` are not live (they replay from
+0); the wind, slope, cornice and slide rows are live. `applySnowDriftSettings(drift, values)` writes them (`inflow`
+'snowfield' or 'bare'), `SNOW_DRIFT_LOOKS` has `weather`, `filmDay`, `powder`, `windSlab` and `blizzard`, and
+`snowSettingValues(target, drift?)` reads a panel's starting state back.
 
 ## Limits
 
@@ -255,12 +1054,18 @@ Stones are lit (`lit`, default true) as small ice balls by the engine's light (`
   shaded by the scene's shadows (a stone under a roof is lit as in the open); a splash is four chips per stone, not a
   bounce off the surface it hits. The box around the camera is at most 400 m across; stones outside it do not exist.
 - Puddles stand in the low spots of a procedural relief, not of your geometry, and on every flat core mesh, roofs
-  included: there is no cover (water stands under a roof too) and no flow. They draw on core meshes, not glTF-pro
+  included: there is no cover (water stands under a roof too) and no flow. They draw on core meshes, not glTF PBR
   models or other packages' own shaders. Rings tilt the normal only; the water has no depth, refraction or reflection
   of its own beyond the scene's lighting.
-- Snow lifts each vertex by its own normal, so a mesh whose faces share no vertices (`box()`) opens a slit as deep as
-  the snow along its top edges; smooth meshes (terrain, shared normals) stay closed. Snow has no cover from roofs and
-  no wind drift, and shadows draw the unlifted shape. A vertex stage another package replaced keeps its shape.
+- Snow's shadows draw the unlifted shape, and a vertex stage another package replaced keeps its shape. Without a
+  `PrecipitationCover` nothing is sheltered.
+- `SnowDrift` is a height field: a cornice is a separate mesh (`corniceGeometry`), not part of the ground, and nothing
+  tunnels or overhangs in the snow itself. The wind over the terrain is MicroMet's weighting and Winstral's shelter, not
+  a flow solution, so there are no eddies and no lee vortex; snow in motion is a flux, not drawn particles. The snow does
+  not settle or melt after it lands (a layer keeps its density). The slide state marks where a slab would release; the
+  avalanche itself is another feature. It runs on the CPU, about 0.15 microseconds per cell per step on the dev PC
+  (a 96 x 8 grid, 1,080 steps in 123 ms, the shelter search every 6 steps included); a seek back replays from 0. The field draws on core meshes
+  (WebGPU and the WebGL2 layer), not glTF PBR models.
 - Region fronts are straight and move at a constant speed, cells are circles at a constant velocity; none bends,
   stalls or forms by itself. They are authoring shapes, not a forecast model.
 - Weather audio is one rain and one wind loop heard everywhere at once (no louder rain on a roof, no wind direction)
@@ -272,7 +1077,7 @@ Stones are lit (`lit`, default true) as small ice balls by the engine's light (`
   environment's.
 - Hail needs WebGPU; on a WebGL engine `attach` throws `MargoError` `'unsupported'`. Everything else runs anywhere, Node included.
 
-Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail`, `./puddles` and `./snow` import core).
+Apache-2.0. Optional, tree-shakable package; no core dependency in the root entry (only `./hail`, `./puddles` and `./snow` import core; `./snow-drift` is plain JavaScript; `./avalanche` imports core's extension runtime only for `AvalancheScatter`).
 
 Build and unit tests: npm test --workspace @margoengine/weather
 

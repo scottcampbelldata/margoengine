@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel/light-rgb (run from the repository root after building packages, one GPU job at
-// a time: node scripts/gpu-lock.mjs run --owner=voxel-rgb -- node packages/voxel/tests/light-rgb-browser-check.mjs):
+// a time: node scripts/run-with-timeout.mjs -- node packages/voxel/tests/light-rgb-browser-check.mjs):
 // a dark stone room with a red torch and a blue lamp, the renderer's block light off: black without VoxelColorLight;
 // with it the floor by the torch is red (red over 4 times blue), by the lamp blue (blue over 4 times red); no WebGPU
 // validation errors.

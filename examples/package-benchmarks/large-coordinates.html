@@ -1,9 +1,9 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Large coordinates GPU check</title><style>body{margin:0;background:#000}canvas{width:640px;height:360px;display:block}</style></head><body><canvas></canvas>
 <script type="module">
-// Driven by large-coordinates-gpu.mjs: the 10 mm flange of large-coordinates-scene.js as core meshes or a gltf-pro
+// Driven by large-coordinates-gpu.mjs: the 10 mm flange of large-coordinates-scene.js as core meshes or a gltf/pbr
 // model, `distance` metres from the origin, with or without FloatingOrigin; one frame per camera step.
 import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {parseGLTF} from '/packages/gltf/dist/pbr.js';
 import {FloatingOrigin} from '/packages/cameras/dist/origin.js';
 import {Picking} from '/packages/selection/dist/index.js';
 import {ROTATION,BOLTS,CAMERA,cameraOffset,position,flange} from './large-coordinates-scene.js';
@@ -11,7 +11,7 @@ const canvas=document.querySelector('canvas'),engine=await Engine.create(canvas,
 const device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
 const shape=flange(),geometry=new Geometry(shape.positions,shape.normals,shape.indices),bolt=box(0.001,0.001,0.001);
 const steel=new PbrMaterial({color:'#9fb4c8',roughness:0.35,metalness:0.6}),brass=new PbrMaterial({color:'#e0b040',roughness:0.4});
-// The same flange and bolts as a glTF asset (gltf-pro PBR shading).
+// The same flange and bolts as a glTF asset (gltf/pbr shading).
 function gltfFlange(){
   const f32=a=>new Float32Array(a),buffers=[f32(shape.positions),f32(shape.normals),new Uint32Array(shape.indices)],b=box(0.001,0.001,0.001),bp=[],bn=[];
   for(let i=0;i<b.vertices.length;i+=6){bp.push(b.vertices[i],b.vertices[i+1],b.vertices[i+2]);bn.push(b.vertices[i+3],b.vertices[i+4],b.vertices[i+5]);}
@@ -32,7 +32,7 @@ window.check={
   async setup(kind,mode,distance){
     scene?.dispose();scene=null;if(origin)engine.removePlugin(origin.name);origin=null;
     world=position(distance);
-    // gltf-pro models are picked through selection's Picking plugin; core meshes through plain engine.pick.
+    // gltf/pbr models are picked through selection's Picking plugin; core meshes through plain engine.pick.
     if(kind==='gltf'&&!engine.hasPlugin('picking'))Picking.attach(engine);if(kind!=='gltf'&&engine.hasPlugin('picking'))engine.removePlugin('picking');
     let root;
     if(kind==='gltf'){const model=gltfFlange();root=model.root;scene={dispose:()=>model.dispose(),root,parts:new Set([root,...model.nodes])};}

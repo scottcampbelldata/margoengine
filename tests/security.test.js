@@ -13,7 +13,7 @@ import { parseJSON } from '../packages/shared/json.js';
 import { runWorker, serve } from '../packages/shared/worker.js';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
 import { parseGLTF as parseLight, loadGLTF as loadLight } from '../packages/gltf/dist/index.js';
-import { parseGLTF as parsePro, loadGLTF as loadPro } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF as parsePro, loadGLTF as loadPro } from '../packages/gltf/dist/pbr.js';
 import { decodeMargo } from '../packages/blender/dist/index.js';
 import { parseSTL } from '../packages/loaders/dist/index.js';
 import { parseUSDA } from '../packages/usdz/dist/index.js';
@@ -162,7 +162,7 @@ test('parseJSON drops __proto__, constructor and prototype keys at every depth, 
   clean();
 });
 
-test('glTF (light and gltf-pro) and .margo JSON: hostile extras keys are dropped and Object.prototype is untouched', async () => {
+test('glTF (light and gltf/pbr) and .margo JSON: hostile extras keys are dropped and Object.prototype is untouched', async () => {
   const text = gltfText(hostileJSON);
   const light = parseLight(await headless(), text);
   assert.equal(light.meshes.length, 1);
@@ -228,7 +228,7 @@ function glb(text) {
   return out;
 }
 
-test('gltf-pro: an inherited accessor type or component type is unsupported, not a NaN that switches off budgets', async () => {
+test('gltf/pbr: an inherited accessor type or component type is unsupported, not a NaN that switches off budgets', async () => {
   await headlessModels(async () => {
     const engine = await headless();
     for (const patch of [{ type: 'constructor' }, { type: 'toString' }, { componentType: '__proto__' }]) {
@@ -242,7 +242,7 @@ test('gltf-pro: an inherited accessor type or component type is unsupported, not
   });
 });
 
-test('glTF loaders fetch only URIs inside the model directory (light and gltf-pro)', async (t) => {
+test('glTF loaders fetch only URIs inside the model directory (light and gltf/pbr)', async (t) => {
   const base = 'https://app.test/models/',
     files = new Map([
       [base + 'tri.bin', Buffer.from(triangle, 'base64')],
@@ -363,7 +363,7 @@ test('parser worker protocol: bad replies reject with an Error, unknown jobs get
 });
 
 test('progressive glTF worker ignores malformed messages and starts at most one stream', async () => {
-  const code = await readFile(new URL('packages/gltf-pro/dist/workers/progressive.js', root), 'utf8');
+  const code = await readFile(new URL('packages/gltf/dist/workers/progressive.js', root), 'utf8');
   const scope = { postMessage() {} };
   new Function('self', code)(scope);
   for (const data of [null, 7, 'x', {}, { order: 'nope' }, { order: [1, 'a'] }, { url: 42 }])

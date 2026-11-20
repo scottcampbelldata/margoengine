@@ -1,4 +1,4 @@
-// One-shot parser workers (gltf-pro, fbx, usdz, loaders): the client posts one job, takes the reply and terminates the
+// One-shot parser workers (gltf/pbr, fbx, usdz, loaders): the client posts one job, takes the reply and terminates the
 // worker. ArrayBuffers and ImageBitmaps move in both directions without copies.
 
 /** Every ArrayBuffer (behind typed arrays too) and ImageBitmap reachable from value, once each. */
@@ -22,13 +22,7 @@ export function transferables(root, out = new Set(), seen = new Set()) {
 /** Bytes as an ArrayBuffer to post: a whole ArrayBuffer moves (the caller's copy is detached), anything else is copied. */
 export function movable(input) {
   if (input instanceof ArrayBuffer) return input;
-  if (
-    ArrayBuffer.isView(input) &&
-    input.buffer instanceof ArrayBuffer &&
-    input.byteOffset === 0 &&
-    input.byteLength === input.buffer.byteLength
-  )
-    return input.buffer;
+  // A typed array is copied even when it covers its whole buffer: moving that buffer would empty the caller's view.
   if (ArrayBuffer.isView(input)) return input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength);
   if (typeof input === 'string') return input;
   throw new TypeError('Expected an ArrayBuffer, typed array or string');

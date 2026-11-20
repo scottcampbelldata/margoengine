@@ -12,7 +12,7 @@ pub mod margo_wire {
 use std::collections::BTreeMap;
 /// Invalid value, malformed bytes or unsupported nesting. Never a partial decode.
 #[derive(Debug, Clone, PartialEq)] pub struct Error(pub &'static str);
-impl std::fmt::Display for Error { fn fmt(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result { write!(f,"Schema codec: {}; use validated values and matching schema bytes (https://margoengine.com/docs/errors)",self.0) } }
+impl std::fmt::Display for Error { fn fmt(&self,f:&mut std::fmt::Formatter<'_>)->std::fmt::Result { write!(f,"Schema codec: {}; use validated values and matching schema bytes (https://margoengine.com/errors)",self.0) } }
 impl std::error::Error for Error {}
 pub type Result<T> = std::result::Result<T,Error>;
 #[derive(Clone,Debug)] pub(super) enum V { U(u32), I(i32), N(f64), B(bool), S(String), Bytes(Vec<u8>), E(u32), A(Vec<V>), O(Option<Box<V>>), M(BTreeMap<u32,V>), T(Vec<V>) }

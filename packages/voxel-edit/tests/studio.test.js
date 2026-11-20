@@ -4,7 +4,7 @@ import test from 'node:test';
 import { noiseFill, paletteUsage, suggestPalette } from '../dist/assist.js';
 import { gridToExportSource } from '../dist/export.js';
 import { VoxelHistory } from '../dist/history.js';
-import { fetchLibrary, resolveLibraryUrl } from '../dist/library.js';
+import { fetchAsset, fetchLibrary, resolveLibraryUrl } from '../dist/library.js';
 
 const grid = (size, values) => ({ size, voxels: Uint8Array.from(values) });
 
@@ -42,7 +42,47 @@ test('history copies grids and enforces a retained byte budget', () => {
   assert.equal(h.current.voxels[0], 1);
   h.current.voxels[0] = 4;
   assert.equal(h.current.voxels[0], 1);
-  assert.throws(() => h.push(grid([2, 1, 1], [1, 1])), RangeError);
+  // Scott's ruling (2026-11-15): a push past maxBytes drops the oldest steps; it once threw and recorded nothing.
+  h.push(grid([2, 1, 1], [1, 2]));
+  assert.equal(h.depth, 1);
+  assert.equal(h.bytes, 2);
+  assert.deepEqual([...h.current.voxels], [1, 2]);
+  assert.equal(h.canUndo, false);
+});
+
+test('history over maxBytes drops the oldest steps, discards redo first and keeps an oversized step alone', () => {
+  const h = new VoxelHistory(grid([1, 1, 1], [1]), { maxBytes: 4 });
+  h.push(grid([1, 1, 1], [2]), 'a');
+  h.push(grid([2, 1, 1], [3, 3]), 'b');
+  assert.equal(h.bytes, 4);
+  assert.deepEqual(
+    h.entries().map((e) => e.label),
+    ['initial', 'a', 'b'],
+  );
+  h.push(grid([2, 1, 1], [4, 4]), 'c');
+  assert.deepEqual(
+    h.entries().map((e) => e.label),
+    ['b', 'c'],
+  );
+  assert.equal(h.bytes, 4);
+  assert.deepEqual([...h.undo().voxels], [3, 3]);
+  // The redo branch (c) goes before any older step: b stays.
+  h.push(grid([1, 1, 1], [5]), 'd');
+  assert.deepEqual(
+    h.entries().map((e) => e.label),
+    ['b', 'd'],
+  );
+  // One step larger than the whole budget is kept as the only step, so bytes may exceed maxBytes only then.
+  h.push(grid([5, 1, 1], [6, 6, 6, 6, 6]), 'big');
+  assert.equal(h.depth, 1);
+  assert.equal(h.bytes, 5);
+  assert.equal(h.label, 'big');
+  h.push(grid([1, 1, 1], [7]), 'e');
+  assert.deepEqual(
+    h.entries().map((e) => e.label),
+    ['e'],
+  );
+  assert.equal(new VoxelHistory(grid([3, 1, 1], [1, 1, 1]), { maxBytes: 2 }).bytes, 3);
 });
 
 test('history keeps a byte total across redo-branch drops and depth trims', () => {
@@ -169,4 +209,51 @@ test('fetchLibrary resolves assets against the response URL and enforces size an
   } finally {
     server.close();
   }
+});
+
+test('a relative library index without a base gives URLs relative to the same place', () => {
+  // These once came back as root paths (/library/tree.vox), wrong for a page that is not at the site root.
+  assert.equal(resolveLibraryUrl('library/index.json', 'tree.vox'), 'library/tree.vox');
+  assert.equal(resolveLibraryUrl('library/index.json', '../shared/rock.vox?v=2#a'), 'shared/rock.vox?v=2#a');
+  assert.equal(resolveLibraryUrl('../packs/index.json', 'a/tree.vox'), '../packs/a/tree.vox');
+  assert.equal(resolveLibraryUrl('index.json', '../../tree.vox'), '../../tree.vox');
+  assert.equal(resolveLibraryUrl('//cdn.example/pack/index.json', 'tree.vox'), '//cdn.example/pack/tree.vox');
+});
+
+test('library reads stop at maxBytes without buffering the rest of a body', async () => {
+  let pulls = 0;
+  const endless = () =>
+      new Response(
+        new ReadableStream({
+          pull(controller) {
+            // A finite stand-in for an endless body: 4,096 chunks of 4 bytes, no Content-Length.
+            if (++pulls > 4096) controller.close();
+            else controller.enqueue(new Uint8Array(4));
+          },
+        }),
+      ),
+    fetch = async () => endless();
+  await assert.rejects(
+    fetchAsset({ id: 'a', name: 'a', url: 'https://x.example/a.vox' }, { fetch, maxBytes: 8 }),
+    /is 12 bytes, over 8/,
+  );
+  assert.ok(pulls <= 4, `the body was read ${pulls} chunks past an 8-byte limit`);
+  await assert.rejects(fetchLibrary('https://x.example/i.json', { fetch, maxBytes: Number.NaN }), /maxBytes is NaN/);
+  await assert.rejects(fetchAsset({ id: 'a', name: 'a', url: 'u' }, { fetch, maxBytes: -1 }), RangeError);
+  const small = await fetchAsset(
+    { id: 'a', name: 'a', url: 'u' },
+    { fetch: async () => new Response(Uint8Array.from([1, 2, 3])), maxBytes: 3 },
+  );
+  assert.deepEqual([...new Uint8Array(small)], [1, 2, 3]);
+});
+
+test('paletteUsage takes maxCells like every grid operation', () => {
+  // A grid past 16,777,216 cells was refused with no way to raise the budget.
+  const big = { size: [4097, 4096, 1], voxels: new Uint8Array(4097 * 4096) };
+  big.voxels[5] = 9;
+  assert.throws(() => paletteUsage(big), /maxCells/);
+  const counts = paletteUsage(big, { maxCells: 4097 * 4096 });
+  assert.equal(counts[9], 1);
+  assert.equal(counts[0], 4097 * 4096 - 1);
+  assert.throws(() => paletteUsage({ size: [1, 1, 1], voxels: new Uint8Array(1) }, null), TypeError);
 });

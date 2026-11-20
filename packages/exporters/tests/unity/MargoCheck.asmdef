@@ -1,0 +1,1 @@
+{ "name": "MargoCheck", "references": ["MargoMesh.Unity.Editor", "MargoMesh.Unity"], "includePlatforms": ["Editor"] }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { igesToSTEP, isIGES, parseIGES, readIGES, tessellateSTEP } from '../dist/index.js';
-import { cube, cylinder, model, plate, square114 } from './iges-models.js';
+import { cube, cylinder, model, plate, spline114 } from './iges-models.js';
 import { writeIGES } from './iges-writer.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/iges/${name}.igs`, import.meta.url), 'latin1');
@@ -197,18 +197,79 @@ test('IGES: untrimmed surfaces (118, 120, 122, 128, 140) mesh over their whole p
   );
 });
 
-test('IGES: a parametric spline surface (114) is refused until its coefficient order is verified', () => {
+// x = u, y = v, z = u^2 v^3 over u in [0, 3] and v in [-1, 2], in 2 x 2 patches of unequal sizes. Every coefficient
+// of z's patches but A to D is a cross term; a reader that took t fastest (or the patches v outer) would put the mesh
+// on z = x^3 y^2 (or tear it between patches).
+const poly = (terms) => {
+  const p = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
+  for (const [a, b, c] of terms) p[a][b] = c;
+  return p;
+};
+const TU = [0, 1, 3],
+  TV = [-1, 0.5, 2],
+  XYZ = [poly([[1, 0, 1]]), poly([[0, 1, 1]]), poly([[2, 3, 1]])];
+
+/** The area of z = x^2 y^3 over [0, 3] x [-1, 2]: 8-point Gauss-Legendre on a 48 x 48 grid of cells. */
+function exactArea() {
+  const g = [
+      [0.1834346424956498, 0.362683783378362],
+      [0.5255324099163290, 0.3137066458778873],
+      [0.7966664774136267, 0.2223810344533745],
+      [0.9602898564975363, 0.1012285362903763],
+    ].flatMap(([x, w]) => [
+      [x, w],
+      [-x, w],
+    ]),
+    cells = 48,
+    hu = 3 / cells,
+    hv = 3 / cells;
+  let area = 0;
+  for (let i = 0; i < cells; i++)
+    for (let j = 0; j < cells; j++)
+      for (const [a, wa] of g)
+        for (const [b, wb] of g) {
+          const x = (i + (a + 1) / 2) * hu,
+            y = -1 + (j + (b + 1) / 2) * hv;
+          area += ((wa * wb * hu * hv) / 4) * Math.hypot(1, 2 * x * y ** 3, 3 * x * x * y * y);
+        }
+  return area;
+}
+
+test('IGES: a parametric spline surface (114) reads exactly, its coefficients in the order section 4.15 gives', () => {
   const m = model();
-  square114(m, 0);
+  spline114(m, TU, TV, XYZ);
+  const { meshes } = mesh(writeIGES(m.list)),
+    r = measure(meshes[0]),
+    p = meshes[0].positions;
+  assert.equal(meshes.length, 1);
+  // On the surface wherever the mesher put a vertex: z = x^2 y^3, to the float32 rounding of the positions (each of
+  // x, y and z within 2^-24 of itself moves x^2 y^3 by at most (2 + 3 + 1) 2^-24 |z|).
+  for (let i = 0; i < p.length; i += 3) {
+    const z = p[i] ** 2 * p[i + 1] ** 3,
+      off = Math.abs(p[i + 2] - z);
+    assert.ok(off <= 7 * 2 ** -24 * Math.max(Math.abs(z), 1e-3), `(${p[i]}, ${p[i + 1]}, ${p[i + 2]}) is ${off} off`);
+  }
+  assert.deepEqual(
+    r.box.map((v) => Math.round(v * 1e9) / 1e9),
+    [0, -1, -9, 3, 2, 72],
+  );
+  near(r.area, exactArea(), 1e-3, 'area');
+  // The B-spline STEP gets is exact: its control net is the patches' Bezier nets, knots at the breakpoints.
+  const step = igesToSTEP(writeIGES(m.list)).step;
+  const spline = step.split('\n').find((l) => l.includes('B_SPLINE_SURFACE_WITH_KNOTS'));
+  assert.ok(spline.includes("B_SPLINE_SURFACE_WITH_KNOTS('',3,3,"), spline);
+  assert.ok(spline.includes('(4,3,4),(4,3,4),(0.0,1.0,3.0),(-1.0,0.5,2.0)'), spline);
+});
+
+test('IGES: a parametric spline surface (114) whose patches part on a shared edge is refused, and left out beside others', () => {
+  const m = model();
+  spline114(m, TU, TV, XYZ, { patch: (i, j, c) => i === 1 && j === 1 && (c[32] += 0.5) });
   assert.throws(() => igesToSTEP(writeIGES(m.list)), {
-    name: 'MargoError',
-    code: 'unsupported',
-    message:
-      'unsupported IGES entity 114 (parametric spline surface): coefficient order not yet verified against the IGES 5.3 spec; convert the surface to entity 128 in the sending CAD system',
+    name: 'TypeError',
+    message: /entity 1 \(type 114\) left out: entity 1 \(type 114\): neighbouring patches are 0\.5 mm apart on their shared edge/,
   });
-  // Beside other surfaces it is left out with the same message, and the rest converts.
   const n = model();
-  square114(n, 0);
+  spline114(n, TU, TV, XYZ, { patch: (i, j, c) => i === 1 && j === 1 && (c[32] += 0.5) });
   n.list.push(
     ...plate().map((e) => ({
       ...e,
@@ -217,7 +278,7 @@ test('IGES: a parametric spline surface (114) is refused until its coefficient o
   );
   const conversion = igesToSTEP(writeIGES(n.list));
   assert.equal(conversion.counts.faces, 1);
-  assert.match(conversion.warnings[0], /entity 114 .*convert the surface to entity 128/);
+  assert.match(conversion.warnings[0], /type 114.*apart on their shared edge/);
 });
 
 test('IGES: bounded surfaces (143, 141) with a hole and an offset curve (130), and a bounded plane (108)', () => {

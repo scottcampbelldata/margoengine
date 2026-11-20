@@ -168,7 +168,84 @@ window.check = {
       tiles.dispose();
     }
     await engine.gpu.queue.onSubmittedWorkDone();
-    return { results, validation: (await engine.gpu.popErrorScope())?.message ?? null, errors };
+    const validation = (await engine.gpu.popErrorScope())?.message ?? null;
+
+    // A lost device (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): a plain GPUTexture image or
+    // target is reported once through engine.onError, the frame goes on without it until setImage or setTarget, and a
+    // function atlas is called once per device. The image layer gives no size, so the lost texture's own size is used.
+    const upload = (device, source) => {
+        const texture = device.createTexture({
+          size: [source.width, source.height],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        device.queue.writeTexture({ texture }, source.data, { bytesPerRow: source.width * 4 }, [
+          source.width,
+          source.height,
+        ]);
+        return texture;
+      },
+      made = [],
+      sheetOf = (device) => {
+        made.push(device);
+        return upload(device, atlases.sheet);
+      },
+      ground = createTileLayer('ground', 2, 1, Uint32Array.of(4, 5)),
+      picture = { type: 'image', name: 'picture', offset: [12, 6], image: { source: 'mist' } },
+      lossMap = { width: 2, height: 1, tileWidth: 4, tileHeight: 4, tilesets: [sheet], layers: [ground, picture] },
+      camera = { x: 0, y: 0, zoom: 1 },
+      count = (actual, expected) => {
+        let wrong = 0;
+        for (let i = 0; i < actual.length; i++) if (actual[i] !== expected[i]) wrong++;
+        return wrong;
+      },
+      previous = engine.gpu,
+      onCanvas = ObjectTileMap.attach(instance, {
+        map: lossMap,
+        atlases: { sheet: sheetOf },
+        images: { mist: upload(previous, images.mist) },
+      }),
+      offCanvas = ObjectTileMap.attach(instance, {
+        map: lossMap,
+        atlases,
+        images,
+        target: previous.createTexture({
+          size: [8, 8],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        }),
+        order: 11,
+      }),
+      whole = reference(lossMap, camera, 0),
+      withoutPicture = reference({ ...lossMap, layers: [ground] }, camera, 0),
+      loss = { before: count(frame(), whole) };
+    previous.destroy();
+    await previous.lost;
+    await engine.rebootDevice();
+    engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+    const reports = [],
+      onError = engine.onError;
+    engine.onError = (error) => reports.push(error);
+    loss.frames = [];
+    try {
+      // fixed-wait: three frames drawn on purpose, each must draw past the lost texture, not a readiness wait
+      for (let i = 0; i < 3; i++) loss.frames.push(count(frame(), withoutPicture));
+    } catch (error) {
+      loss.thrown = error.message;
+    }
+    engine.onError = onError;
+    loss.reports = reports.map((error) => [error.code, error.message]);
+    loss.functionCalls = made.length;
+    loss.functionDevices = made[0] !== made[1];
+    onCanvas.setImage('mist', upload(engine.gpu, images.mist));
+    offCanvas.setTarget(
+      engine.gpu.createTexture({ size: [8, 8], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT }),
+    );
+    loss.after = count(frame(), whole);
+    onCanvas.dispose();
+    offCanvas.dispose();
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { results, validation, errors, loss };
   },
 };
 window.ready = true;

@@ -48,10 +48,16 @@ func _import_post_parse(state: GLTFState) -> Error:
 \t\t\t\treturn ERR_INVALID_DATA
 \t\t\tvar colored: bool = attributes.has("COLOR_0")
 \t\t\tvar materials: Array = [entry.mesh.get_surface_material(surface)]
+\t\t\tif materials[0] == null and colored:
+\t\t\t\t# glTF 2.0 3.9.6: no material means every material default, white with metallic and roughness 1.
+\t\t\t\tvar fallback := StandardMaterial3D.new()
+\t\t\t\tfallback.metallic = 1.0
+\t\t\t\tfallback.roughness = 1.0
+\t\t\t\tmaterials[0] = fallback
 \t\t\tif not overrides.is_empty():
 \t\t\t\tmaterials.append(overrides[surface])
 \t\t\tfor material in materials:
-\t\t\t\tif material == null and not colored:
+\t\t\t\tif material == null:
 \t\t\t\t\tcontinue
 \t\t\t\tif not material is BaseMaterial3D:
 \t\t\t\t\treturn ERR_UNAVAILABLE
@@ -89,7 +95,7 @@ func _import_post_parse(state: GLTFState) -> Error:
  * opts in), and clip looping (glTF has no loop flag; the add-on reads each clip's `extras.loop`). Save the files in the
  * project, enable "glTF vertex colors and loops" under Project Settings > Plugins and reimport. Only material
  * vertex-color flags and clip loop flags change; a material shared by colored and uncolored primitives is cloned
- * once. Pack the entries with `encodeZIP` or write them out as they are.
+ * once, and a colored primitive with no material gets glTF's default one (white, metallic and roughness 1). Pack the entries with `encodeZIP` or write them out as they are.
  */
 export function createGodotImportAddon(): BundleEntry[] {
   return [

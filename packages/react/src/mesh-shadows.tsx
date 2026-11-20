@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { Mesh as MeshHandle } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
+import { useBakedShadows } from './bake-shadows.js';
+import { casters } from './casters.js';
 import { live, report, useMesh, useScene } from './internal.js';
 
 /**
@@ -20,8 +22,15 @@ export function MeshShadows({
   const scene = useScene(),
     registry = useMesh(),
     error = useRef(onError),
-    enabled = castShadow || !receiveShadow;
+    enabled = castShadow || !receiveShadow,
+    baked = useBakedShadows();
   error.current = onError;
+  useEffect(() => {
+    if (!castShadow) return;
+    const set = casters(scene.engine);
+    set.add(registry);
+    return () => void set.delete(registry);
+  }, [scene.engine, registry, castShadow]);
   useEffect(() => {
     if (!enabled || !scene.shadows) return;
     let remove: (() => void) | undefined;
@@ -29,7 +38,7 @@ export function MeshShadows({
       remove?.();
       remove = undefined;
       try {
-        remove = scene.shadows!.add(mesh as unknown as MeshHandle, { castShadow, receiveShadow });
+        remove = scene.shadows!.add(mesh as unknown as MeshHandle, { castShadow, receiveShadow, static: baked });
       } catch (cause) {
         report(scene, cause, error.current);
       }
@@ -41,6 +50,6 @@ export function MeshShadows({
       registry.attachments.delete(attach);
       remove?.();
     };
-  }, [registry, scene.shadows, enabled, castShadow, receiveShadow]);
+  }, [registry, scene.shadows, enabled, castShadow, receiveShadow, baked]);
   return null;
 }

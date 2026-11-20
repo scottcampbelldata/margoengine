@@ -4,9 +4,10 @@ import { writeMargo } from './write-container.js';
 // @margoengine/exporters/ktx2 (Node or browser); parseMargoKTX2 transcodes them with @margoengine/decoders' KTX2Decoder
 // and draws the scene as parseMargo does. Both codecs load only when called.
 import type { EngineKernel } from "@margoengine/core";
-import { parsePreparedPBR, type GLTFImage, type PBRModel } from "@margoengine/gltf-pro/model";
+import { parsePreparedPBR, type GLTFImage, type PBRModel } from "@margoengine/gltf/pbr-model";
 import { countLimit } from "../../shared/limits.js";
 import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
 import { decodeImages, maxBytes, readContainer } from "./container.js";
 import type { MargoAsset, MargoOptions } from "./index.js";
 import { decodeScene } from "./scene.js";
@@ -120,7 +121,7 @@ export function decodeMargoKTX2(
 }
 
 /**
- * Decodes `.margo` bytes with KTX2 textures and attaches the scene to `engine` as a glTF Pro `PBRModel` (WebGPU only):
+ * Decodes `.margo` bytes with KTX2 textures and attaches the scene to `engine` as a glTF PBR `PBRModel` (WebGPU only):
  * each KTX2 image is transcoded to a compressed format the device has (BC7, ASTC or ETC2, else RGBA8) and uploads with
  * its mipmaps. A device has those formats only when the engine asked for them: create it with
  * `features: ['texture-compression-bc', 'texture-compression-astc', 'texture-compression-etc2']`, or the textures hold
@@ -135,7 +136,9 @@ export async function parseMargoKTX2(
   { signal, maxNodes, ktx2 }: MargoKTX2Options = {},
 ): Promise<PBRModel> {
   signal?.throwIfAborted();
-  const asset = decodeMargoKTX2(input, { maxNodes }),
+  // The model is built after the awaits below: it goes in the scene this call started in.
+  const scope = captureScene(engine),
+    asset = decodeMargoKTX2(input, { maxNodes }),
     kinds = ((asset.document.images ?? []) as { mimeType?: string }[]).map((image) => image.mimeType),
     pngs = asset.images.filter((_, i) => kinds[i] !== "image/ktx2"),
     bitmaps = await decodeImages(pngs, signal);
@@ -155,7 +158,7 @@ export async function parseMargoKTX2(
       images.push(kinds[i] === "image/ktx2" ? await transcoder!.transcode(bytes, { signal }) : bitmaps[next++]);
     }
     signal?.throwIfAborted();
-    return parsePreparedPBR(engine, asset.document, asset.geometry, images, { maxNodes });
+    return scope.run(() => parsePreparedPBR(engine, asset.document, asset.geometry, images, { maxNodes }));
   } catch (error) {
     for (const image of bitmaps) image.close();
     throw error;
@@ -176,7 +179,8 @@ export async function loadMargoKTX2(
   { fetch: get = globalThis.fetch, ...options }: MargoKTX2Options & { fetch?: typeof fetch } = {},
 ): Promise<PBRModel> {
   options.signal?.throwIfAborted();
-  const target = new URL(url, globalThis.location?.href);
+  const scope = captureScene(engine),
+    target = new URL(url, globalThis.location?.href);
   if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
       ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoKTX2",
@@ -186,5 +190,6 @@ export async function loadMargoKTX2(
     signal: options.signal,
     label: ".margo download",
   });
-  return parseMargoKTX2(engine, bytes, options);
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(() => parseMargoKTX2(engine, bytes, options));
 }

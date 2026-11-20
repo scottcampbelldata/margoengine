@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { deflateSync } from 'node:zlib';
+import { deflateSync, crc32 } from 'node:zlib';
 import { JSDOM } from 'jsdom';
 import { Camera } from '@margoengine/core';
 import { recordedResources } from '@margoengine/sciviz/spec';
@@ -117,6 +117,42 @@ test('PNG iTXt is UTF-8, compressed, idempotent and preserves all original image
   await assert.rejects(embedPNGProvenance(png, record, { maxBytes: 100 }), /maxBytes/);
   await assert.rejects(readPNGProvenance(first, { signal: AbortSignal.abort(new Error('cancelled')) }), /cancelled/);
   fig.dispose();
+});
+test('a damaged provenance record rejects with a coded error, not an empty TypeError or SyntaxError', async () => {
+  const png = new Blob(pngParts(1, 1, 6, deflateSync(new Uint8Array([0, 200, 100, 50, 255]))), { type: 'image/png' });
+  const withText = async (payload, flag) => {
+    // Rebuild the iTXt chunk with a valid CRC so only its payload is wrong.
+    const bytes = new Uint8Array(await (await embedPNGProvenance(png, { version: 1 })).arrayBuffer()),
+      view = new DataView(bytes.buffer);
+    let at = 8;
+    while (String.fromCharCode(...bytes.subarray(at + 4, at + 8)) !== 'iTXt') at += view.getUint32(at) + 12;
+    const header = new TextEncoder().encode(`MargoProvenance\0${String.fromCharCode(flag)}\0\0\0`),
+      data = new Uint8Array(header.length + payload.length);
+    data.set(header);
+    data.set(payload, header.length);
+    const chunk = new Uint8Array(data.length + 12),
+      out = new DataView(chunk.buffer);
+    out.setUint32(0, data.length);
+    chunk.set(new TextEncoder().encode('iTXt'), 4);
+    chunk.set(data, 8);
+    out.setUint32(data.length + 8, crc32(chunk.subarray(4, data.length + 8)));
+    const end = at + view.getUint32(at) + 12,
+      result = new Uint8Array(bytes.length - (end - at) + chunk.length);
+    result.set(bytes.subarray(0, at));
+    result.set(chunk, at);
+    result.set(bytes.subarray(end), at + chunk.length);
+    return result;
+  };
+  const deflated = deflateSync(new TextEncoder().encode('{"version":1}'));
+  for (const [payload, flag, message] of [
+    [new Uint8Array([120, 156, 255, 255, 255, 255]), 1, /^Corrupt compressed provenance/],
+    [deflated.subarray(0, deflated.length - 6), 1, /^Corrupt compressed provenance/],
+    [deflateSync(new TextEncoder().encode('{"version":')), 1, /^Provenance record is not UTF-8 JSON/],
+    [new Uint8Array([0xff, 0xfe]), 0, /^Provenance record is not UTF-8 JSON/],
+  ])
+    await assert.rejects(readPNGProvenance(await withText(payload, flag)), (e) => e instanceof TypeError && message.test(e.message));
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><metadata><margo:provenance xmlns:margo="urn:margoengine:provenance:1">{oops</margo:provenance></metadata></svg>';
+  assert.throws(() => readSVGProvenance(svg), (e) => e instanceof TypeError && /^Provenance record is not UTF-8 JSON/.test(e.message));
 });
 test('SVG keeps unrelated metadata and escapes arbitrary JSON without creating markup', async () => {
   const env = new JSDOM();

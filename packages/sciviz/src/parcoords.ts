@@ -222,8 +222,10 @@ export class MultivariatePlot extends EventTarget {
   /** Accessible axis reorder/flip/brush controls. Dispose the returned binding before removing its container. */
   controls(parent: HTMLElement): { dispose(): void; [Symbol.dispose](): void } {
     this.#check(); const form = document.createElement('div'); parent.append(form);
+    // Range inputs show the current brush whatever made it (pointer, code, undo or another linked view).
+    let ranges: (() => void)[] = []; const sync = () => { for (const show of ranges) show(); };
     const update = () => {
-      form.replaceChildren();
+      form.replaceChildren(); ranges = [];
       for (let position = 0; position < this.data.axes.length; position++) {
         const k = this.data.order[position * 2], axis = this.data.axes[k], field = document.createElement('fieldset'), legend = document.createElement('legend');
         legend.textContent = axis.label ?? axis.column; field.append(legend); field.draggable = true;
@@ -232,11 +234,12 @@ export class MultivariatePlot extends EventTarget {
         field.addEventListener('drop', (e) => { e.preventDefault(); const names = Array.from({ length: this.data.axes.length }, (_, i) => this.data.axes[this.data.order[i * 2]].column), name = e.dataTransfer!.getData('text/plain'), from = names.indexOf(name); if (from >= 0) { names.splice(from, 1); names.splice(position, 0, name); this.reorder(names); } });
         for (const [label, action] of [['Flip', () => this.flip(axis.column)], ['Left', () => { if (!position) return; const names = Array.from({ length: this.data.axes.length }, (_, i) => this.data.axes[this.data.order[i * 2]].column); [names[position - 1], names[position]] = [names[position], names[position - 1]]; this.reorder(names); }], ['Clear brush', () => this.brush(axis.column)]] as const) { const button = document.createElement('button'); button.type = 'button'; button.textContent = label; button.addEventListener('click', action); field.append(button); }
         const inputs = this.data.domains[k].map((value, end) => { const label = document.createElement('label'), input = document.createElement('input'); label.textContent = end ? ' Upper ' : ' Lower '; input.type = 'number'; input.step = 'any'; input.value = String(this.#brushes.get(k)?.[end] ?? value); label.append(input); field.append(label); return input; });
+        ranges.push(() => inputs.forEach((input, end) => { input.value = String(this.#brushes.get(k)?.[end] ?? this.data.domains[k][end]); }));
         for (const input of inputs) input.addEventListener('change', () => this.brush(axis.column, [Number(inputs[0].value), Number(inputs[1].value)]));
         form.append(field);
       }
     };
-    update(); this.addEventListener('axes', update); const dispose = () => { this.removeEventListener('axes', update); form.remove(); }; return { dispose, [Symbol.dispose]: dispose };
+    update(); this.addEventListener('axes', update); this.addEventListener('change', sync); const dispose = () => { this.removeEventListener('axes', update); this.removeEventListener('change', sync); form.remove(); }; return { dispose, [Symbol.dispose]: dispose };
   }
   /** Release every layer, event handler and owned figure/selection. Borrowed selections survive. */
   dispose(): void { if (this.#disposed) return; this.#disposed = true; this.#offPointer?.(); this.selection.removeEventListener('change', this.#change); if (this.#density) this.#density.generation++; this.figure.dispose(); if (this.#ownsSelection) this.selection.dispose(); }

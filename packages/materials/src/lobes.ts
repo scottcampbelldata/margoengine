@@ -1,5 +1,5 @@
-import type { MaterialExtension, MaterialExtensionTexture } from '@margoengine/gltf-pro';
-import { textureCoordinates } from '@margoengine/gltf-pro/coordinates';
+import type { MaterialExtension, MaterialExtensionTexture } from '@margoengine/gltf/pbr';
+import { textureCoordinates } from '@margoengine/gltf/texture-coordinates';
 import type { ClearcoatTexture } from './index.js';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';
 import { lobeShader, type LobeShaderConfig } from './lobe-shader.js';
@@ -33,7 +33,7 @@ export interface IridescenceOptions {
   iridescenceTexture?: ClearcoatTexture;
   iridescenceThicknessTexture?: ClearcoatTexture;
 }
-/** The lobes `materialLobes()` adds on top of a base material, plus the shared `ior` (default 1.5, at least 1). */
+/** The lobes `materialLobes()` adds on top of a base material, plus the shared `ior` (default 1.5, at least 1, or 0 for KHR_materials_ior's specular-glossiness mode, F0 1). */
 export interface MaterialLobeOptions {
   ior?: number;
   sheen?: SheenOptions;
@@ -77,7 +77,8 @@ function color(
 }
 export function validateLobes(options: MaterialLobeOptions): MaterialLobeOptions {
   record(options, 'lobes');
-  const result: MaterialLobeOptions = { ior: scalar(options.ior, 1.5, 'IOR', 1, Infinity) };
+  // KHR_materials_ior: at least 1, or exactly 0 for the specular-glossiness mode (F0 1).
+  const result: MaterialLobeOptions = { ior: options.ior === 0 ? 0 : scalar(options.ior, 1.5, 'IOR', 1, Infinity) };
   for (const key of Object.keys(lobeMaps) as (keyof typeof lobeMaps)[])
     if (options[key] !== undefined) {
       record(options[key], key);

@@ -107,7 +107,7 @@ test('worker crash, malformed messages, clone failure, solver errors and watchdo
     if (mode === 'range') worker.reply({ error: { name: 'RangeError', message: 'bad grid' } });
     if (mode === 'coded')
       worker.reply({
-        error: { name: 'MargoError', code: 'failed', message: 'failed. Help: https://margoengine.com/docs/wfc' },
+        error: { name: 'MargoError', code: 'failed', message: 'failed. Help: https://margoengine.com/llms/packages/wfc.md' },
       });
     await rejected;
     assert.equal(worker.terminated, 1, mode);
@@ -159,7 +159,7 @@ test('actual worker forwards coded missing-asset failures and rejects sparse gri
   using missing = new WFCWorkerSolve([1, 1, 1], tiles, { backend: 'wasm' });
   await assert.rejects(
     missing.result,
-    (e) => e.code === 'failed' && /https:\/\/margoengine.com\/docs\/wfc/.test(e.message),
+    (e) => e.code === 'failed' && /https:\/\/margoengine.com\/llms\/packages\/wfc\.md/.test(e.message),
   );
   using sparse = new WFCWorkerSolve([1, , 1], tiles, { backend: 'wasm' });
   await assert.rejects(sparse.result, RangeError);

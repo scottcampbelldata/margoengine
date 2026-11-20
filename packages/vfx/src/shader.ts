@@ -11,7 +11,11 @@ import { surfaceEntry } from '../../shared/pass.js';
  * against the four side planes in clip space, with row-norm margins that bound any offset of that length (1% and a
  * w-relative slack cover rounding); the side planes together also reject everything behind the eye. (The test uses the
  * true size, so a far particle the billboard grows to its 1.5 px minimum can be culled up to a pixel early at an edge.)
- * A respawn's seed is its slot and the simulated frame number (control.z).
+ * A birth's seed is its step number (control.z) and its birth number in that step (its ticket: the dying slots before
+ * it), never its slot, so the same steps birth the same particles whatever history left which slots free: a seek and
+ * a warm-up give the particles of a continuous run (GAP-FILM-VFXSEED). Random numbers keyed by a counter instead of
+ * carried state, as in Salmon, Moraes, Dror and Shaw 2011 ("Parallel random numbers: as easy as 1, 2, 3", SC11), with
+ * each key put through the integer hash first (GPU integer hashes compared by Jarzynski and Olano 2020, JCGT 9(3)).
  *
  * Slot order, never atomic tickets, so the same frames give the same particles and the same blend order whatever order
  * the GPU runs the threads in (visual checks were load-dependent before). One dispatch each, per frame:
@@ -57,7 +61,7 @@ fn update(i:u32,ticket:u32)->u32 {
   p.positionLife.w-=dt;
   if(p.positionLife.w<=0){
     if(ticket>=f.control.y){particles[at].w=0;return 0u;}
-    let seed=hash(i+hash(f.control.z));
+    let seed=hash(hash(ticket)^hash(f.control.z));
     let life=mix(f.shape.y,f.shape.z,random(seed));
     let origin=f.emitterTime.xyz+(vec3f(random(seed+5u),random(seed+6u),random(seed+7u))*2-1)*f.emissionExtent.xyz;
     p.positionLife=vec4f(origin,max(0.0,life-dt));
@@ -66,6 +70,7 @@ fn update(i:u32,ticket:u32)->u32 {
     particles[cold]=p.color;particles[cold+1]=p.rotation;
   }
   p.velocitySize=vec4f(p.velocitySize.xyz+(f.gravityDelta.xyz+curlNoise(p.positionLife.xyz))*dt,p.velocitySize.w);
+  if(f.control.w!=0u){let wind=unpack2x16float(f.control.w);let k=1.0-exp(-4.0*dt);p.velocitySize=vec4f(p.velocitySize.x+(wind.x-p.velocitySize.x)*k,p.velocitySize.y,p.velocitySize.z+(wind.y-p.velocitySize.z)*k,p.velocitySize.w);}
   p.positionLife=vec4f(p.positionLife.xyz+p.velocitySize.xyz*dt,p.positionLife.w);
   if(p.positionLife.y-p.velocitySize.w*0.5<f.shape.w){p.positionLife.y=f.shape.w+p.velocitySize.w*0.5;if(p.velocitySize.y<0){p.velocitySize.y=-p.velocitySize.y*f.physics.z;}}
   particles[at]=p.positionLife;particles[at+1]=p.velocitySize;

@@ -1,5 +1,5 @@
 import type { EngineKernel } from '@margoengine/core';
-import type { GLTFImage, PBRModel } from '@margoengine/gltf-pro';
+import type { GLTFImage, PBRModel } from '@margoengine/gltf/pbr';
 import {
   closeImages,
   disposeSource,
@@ -13,7 +13,7 @@ import {
 } from './assets.js';
 import { optionalPeer } from './optional.js';
 
-/** Loads a model file into a gltf-pro model: gltf-pro's `loadGLTF`, or the FBX loader the `<Fbx>` binding passes. */
+/** Loads a model file into a gltf/pbr model: gltf/pbr's `loadGLTF`, or the FBX loader the `<Fbx>` binding passes. */
 export type ModelLoader = (
   engine: EngineKernel,
   src: string,
@@ -22,7 +22,7 @@ export type ModelLoader = (
 /** Imports the loader of a format other than glTF (the `<Fbx>` binding's `@margoengine/fbx`). */
 export type FormatLoader = () => Promise<ModelLoader>;
 
-const gltfPro = () => optionalPeer('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'));
+const gltfPbr = () => optionalPeer('@margoengine/gltf/pbr', () => import('@margoengine/gltf/pbr'));
 
 async function copyImages(images: readonly GLTFImage[]): Promise<GLTFImage[]> {
   const copies: GLTFImage[] = [];
@@ -51,7 +51,7 @@ async function loadModel(
   signal: AbortSignal,
   format?: FormatLoader,
 ): Promise<ModelSource> {
-  const api = await gltfPro();
+  const api = await gltfPbr();
   signal.throwIfAborted();
   const loader: ModelLoader = format ? await format() : api.loadGLTF;
   const fetch = await trackedFetch(cache);
@@ -98,7 +98,7 @@ export async function instantiateModel(source: ModelSource, engine: EngineKernel
     throw error;
   }
 }
-/** The cached source of `src` on this Canvas: glTF through gltf-pro, or `format`'s loader for `'fbx'`. */
+/** The cached source of `src` on this Canvas: glTF through gltf/pbr, or `format`'s loader for `'fbx'`. */
 export function modelAsset(
   cache: AssetCache,
   src: string,

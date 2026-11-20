@@ -1,4 +1,4 @@
-import { colorLookupWGSL } from './color-lookup.js';
+import { colorLookupWGSL, rangeUniform } from './color-lookup.js';
 import { trackSpecLayer } from './spec-hooks.js';
 // Unstructured grids: tetrahedra, hexahedra, wedges and pyramids with point or cell data, in VTK's UnstructuredGrid
 // layout (points, connectivity, offsets, cell types; VTK file formats, Kitware, "VTK User's Guide" chapter 19). The
@@ -643,7 +643,7 @@ export interface MeshLayerOptions {
   readonly scalarOpacity?: boolean;
   /** Colour map. Default `'aurora'`. */
   readonly colormap?: ColormapSource;
-  /** Value range the colour map spans. Default the values' min and max. */
+  /** Value range the colour map spans, finite. Default the finite values' min and max. */
   readonly range?: readonly [number, number];
   /** Opacity, 0 to 1. Default 1. */
   readonly opacity?: number;
@@ -653,7 +653,7 @@ export interface MeshLayerOptions {
 
 const meshShader = /* wgsl */ `${frameWGSL}
 ${colorLookupWGSL}
-struct Mesh { model: mat4x4f, normalModel: mat4x4f, style: vec4f, missing: vec4f }
+struct Mesh { model: mat4x4f, normalModel: mat4x4f, style: vec4f, missing: vec4f, range: vec4f }
 @group(1) @binding(0) var<uniform> mesh: Mesh;
 @group(1) @binding(1) var<storage, read> corners: array<vec4f>;
 @group(1) @binding(2) var colours: texture_2d<f32>;
@@ -672,13 +672,13 @@ struct Out { @builtin(position) clip: vec4f, @location(0) world: vec3f, @locatio
 }
 fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u; }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  let t = (in.value - mesh.style.x) / max(mesh.style.y - mesh.style.x, 1e-30);
+  let t = colourFraction(in.value, mesh.range);
   var albedo = colourLookup(colours, t).rgb;
   if (isNan(in.value)) { albedo = mesh.missing.rgb; }
   var n = in.normal;
   if (dot(n, n) < 1e-12) { n = vec3f(0.0, 1.0, 0.0); }
   let colour = shade(albedo, normalize(n), normalize(frame.eye.xyz - in.world));
-  return vec4f(toOutput(colour), mesh.style.z * select(1.0, select(0.0, clamp(in.value, 0.0, 1.0), !isNan(in.value)), mesh.style.w > 0.5));
+  return vec4f(toOutput(colour), mesh.style.x * select(1.0, select(0.0, clamp(in.value, 0.0, 1.0), !isNan(in.value)), mesh.style.y > 0.5));
 }`;
 
 /**
@@ -737,7 +737,7 @@ export class MeshLayer implements Drawable {
   #texture: GPUTexture | undefined;
   #sampler: GPUSampler | undefined;
   readonly #model = new Float32Array(16);
-  readonly #values = new Float32Array(40);
+  readonly #values = new Float32Array(44);
   #set: TriangleSet;
   #disposed = false;
 
@@ -755,8 +755,11 @@ export class MeshLayer implements Drawable {
     this.#missing = [SRGBToLinear(missing[0]), SRGBToLinear(missing[1]), SRGBToLinear(missing[2])];
     this.#fixedRange = !!options.range;
     this.#range = options.range ? [options.range[0], options.range[1]] : [0, 1];
-    if (options.range && !(options.range[0] < options.range[1]))
-      throw rangeError('Mesh range must be [min, max] with min < max', 'sciviz');
+    if (
+      options.range &&
+      !(Number.isFinite(options.range[0]) && Number.isFinite(options.range[1]) && options.range[0] < options.range[1])
+    )
+      throw rangeError('Mesh range must be finite [min, max] with min < max', 'sciviz');
     this.#bounds = set.bounds;
     this.#set = set;
     try {
@@ -859,6 +862,8 @@ export class MeshLayer implements Drawable {
       packed[i * 8 + 3] = set.values[i];
       packed.set(set.normals.subarray(i * 3, i * 3 + 3), i * 8 + 4);
       const v = set.values[i];
+      // Finite values only: an infinite one as the range's end pushed every other value to one end colour.
+      if (!Number.isFinite(v)) continue;
       if (v < min) min = v;
       if (v > max) max = v;
     }
@@ -895,8 +900,9 @@ export class MeshLayer implements Drawable {
     invertMatrix(this.#model, inverse);
     for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) v[16 + c * 4 + r] = inverse[r * 4 + c];
     v[31] = 1;
-    v.set([this.#range[0], this.#range[1], this.#opacity, this.#scalarOpacity ? 1 : 0], 32);
+    v.set([this.#opacity, this.#scalarOpacity ? 1 : 0, 0, 0], 32);
     v.set([...this.#missing, 1], 36);
+    v.set([...rangeUniform(this.#range), 0], 40);
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
   }
 

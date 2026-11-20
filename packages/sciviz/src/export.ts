@@ -2,7 +2,13 @@
 // over it at the canvas's resolution) and SVG (text and colour bars as vector elements over the frame as an embedded
 // PNG; a 2D chart whose layers are all bars, heatmaps, lines or scatters of up to 50,000 points is vector throughout).
 import type { Colormap } from './colormaps.js';
+import { escapeXML } from '../../shared/xml-escape.js';
+import { srgbByte as byte, srgbHex } from '../../shared/srgb-hex.js';
+
 import type { EngineKernel } from '@margoengine/core';
+
+/** @internal `#rrggbb` of an sRGB triple (0..1), each channel clamped; a NaN channel is 00. */
+export const hex = srgbHex;
 
 /** @internal Copy the fresh canvas frame to an owned buffer before awaiting GPU completion. */
 export async function captureGPU(
@@ -75,6 +81,17 @@ export interface SVGOptions {
 export interface PaintedBar {
   readonly bar: HTMLElement;
   readonly map: Colormap;
+  /** Its box when the frame was drawn (see {@link placedBars}); read at paint time when absent. */
+  readonly rect?: DOMRect;
+}
+
+/**
+ * @internal The connected colour bars with their boxes read now. An export reads every overlay box in the task that
+ * draws its frame: a layout change while the GPU copy is read back (a new containing block, an inserted element) would
+ * otherwise put the overlays where the frame did not draw them.
+ */
+export function placedBars(bars: readonly PaintedBar[]): PaintedBar[] {
+  return bars.filter((b) => b.bar.isConnected).map((b) => ({ ...b, rect: b.bar.getBoundingClientRect() }));
 }
 
 /** @internal One text run on screen: its text, box (CSS pixels from the canvas's top-left) and style. */
@@ -104,7 +121,7 @@ export function textRuns(roots: readonly Element[], origin: DOMRect): TextRun[] 
       if (!value || element.closest('[hidden]')) continue;
       const style = getComputedStyle(element),
         r = element.getBoundingClientRect();
-      if (!r.width || !r.height || style.visibility === 'hidden' || style.display === 'none') continue;
+      if (!r.width || !r.height || style.visibility !== 'visible' || style.display === 'none') continue;
       runs.push({
         text: '',
         x: r.left - origin.left,
@@ -127,7 +144,7 @@ export function textRuns(roots: readonly Element[], origin: DOMRect): TextRun[] 
       if (!text || !parent) continue;
       if (parent.closest('[data-sciviz-math]')) continue;
       const style = getComputedStyle(parent);
-      if (style.visibility === 'hidden' || style.display === 'none' || parent.closest('[hidden]')) continue;
+      if (style.visibility !== 'visible' || style.display === 'none' || parent.closest('[hidden]')) continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       const r = range.getBoundingClientRect();
@@ -164,11 +181,14 @@ export interface Swatch {
 /** @internal The visible legend swatches under `roots`, relative to `origin`. */
 export function swatches(roots: readonly Element[], origin: DOMRect): Swatch[] {
   const out: Swatch[] = [];
-  for (const root of roots)
+  for (const root of roots) {
+    // The same visibility rules as the text runs: a legend hidden by the page leaves no swatches behind its text.
+    if (!root.isConnected) continue;
     for (const element of root.querySelectorAll<HTMLElement>('[data-sciviz-swatch]')) {
       const r = element.getBoundingClientRect();
-      if (!r.width || !r.height) continue;
+      if (!r.width || !r.height || element.closest('[hidden]')) continue;
       const style = getComputedStyle(element);
+      if (style.visibility !== 'visible' || style.display === 'none') continue;
       out.push({
         x: r.left - origin.left,
         y: r.top - origin.top,
@@ -182,6 +202,7 @@ export function swatches(roots: readonly Element[], origin: DOMRect): Swatch[] {
         points: element.dataset.scivizPolygon?.split(',').map(Number),
       });
     }
+  }
   return out;
 }
 
@@ -214,9 +235,9 @@ export function paintOverlays(
       g.fill();
     } else g.fillRect(box.x, box.y, box.width, box.height);
   }
-  for (const { bar, map } of bars) {
-    if (!bar.isConnected) continue;
-    const r = bar.getBoundingClientRect(),
+  for (const { bar, map, rect } of bars) {
+    if (!rect && !bar.isConnected) continue;
+    const r = rect ?? bar.getBoundingClientRect(),
       x = r.left - origin.left,
       y = r.top - origin.top,
       gradient = g.createLinearGradient(0, y + r.height, 0, y),
@@ -257,8 +278,7 @@ export function paintOverlays(
   g.restore();
 }
 
-const escape = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const escape = escapeXML;
 
 /** @internal SVG `<text>` elements for text runs. */
 export function svgText(runs: readonly TextRun[]): string {
@@ -290,20 +310,29 @@ export function svgSwatches(boxes: readonly Swatch[]): string {
     .join('\n');
 }
 
+/**
+ * @internal An SVG element id from its definition's text (32-bit FNV-1a, Fowler, Noll and Vo). Exported SVGs are
+ * often inlined into one HTML page, where ids share one namespace: fixed ids such as `sciviz-bar-0` made a second
+ * chart's url(#...) paint with the first chart's gradient or clip. Equal ids now mean equal definitions.
+ */
+export function svgId(prefix: string, definition: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < definition.length; i++) h = Math.imul(h ^ definition.charCodeAt(i), 0x01000193);
+  return `${prefix}-${(h >>> 0).toString(36)}`;
+}
+
 /** @internal SVG for colour bars: a gradient-filled, outlined rectangle each. */
 export function svgBars(bars: readonly PaintedBar[], origin: DOMRect): string {
   return bars
     .filter(({ bar }) => bar.isConnected)
-    .map(({ bar, map }, i) => {
+    .map(({ bar, map }) => {
       const r = bar.getBoundingClientRect(),
         entries = map.gradientStops(32);
-      const stops = entries
-        .map(
-          ({ offset, color }) =>
-            `<stop offset="${offset}" stop-color="rgb(${color.map((v) => Math.round(v * 255)).join(',')})"/>`,
-        )
-        .join('');
-      return `<linearGradient id="sciviz-bar-${i}" x1="0" y1="1" x2="0" y2="0">${stops}</linearGradient><rect x="${r.left - origin.left}" y="${r.top - origin.top}" width="${r.width}" height="${r.height}" fill="url(#sciviz-bar-${i})" stroke="${escape(getComputedStyle(bar).borderTopColor)}"/>`;
+      const gradient = `x1="0" y1="1" x2="0" y2="0">${entries
+          .map(({ offset, color }) => `<stop offset="${offset}" stop-color="rgb(${color.map(byte).join(',')})"/>`)
+          .join('')}`,
+        id = svgId('sciviz-bar', gradient);
+      return `<linearGradient id="${id}" ${gradient}</linearGradient><rect x="${r.left - origin.left}" y="${r.top - origin.top}" width="${r.width}" height="${r.height}" fill="url(#${id})" stroke="${escape(getComputedStyle(bar).borderTopColor)}"/>`;
     })
     .join('\n');
 }
@@ -314,15 +343,5 @@ export function base64(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(s);
 }
-
-/** @internal `#rrggbb` of an sRGB triple (0..1). */
-export const hex = (r: number, g: number, b: number): string =>
-  `#${[r, g, b]
-    .map((v) =>
-      Math.round(Math.min(1, Math.max(0, v)) * 255)
-        .toString(16)
-        .padStart(2, '0'),
-    )
-    .join('')}`;
 
 export { escape as escapeXML };

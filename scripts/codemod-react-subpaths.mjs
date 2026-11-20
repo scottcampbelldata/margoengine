@@ -5,7 +5,7 @@
 // becomes
 //   import { Canvas, Mesh } from '@margoengine/react';
 //   import { OrbitControls } from '@margoengine/react/controls';
-//   import { Gltf } from '@margoengine/react/gltf-pro';
+//   import { Gltf } from '@margoengine/react/gltf';
 // It also moves the names of the removed `@margoengine/react/kit` and the effects that left `/post` for their own
 // packages (DepthOfField: /dof, Tonemap: /tonemap, TAA: /taa), and rewrites `preload(url)` to the component's
 // `Gltf.preload(url)`, `Fbx.preload(url)` or `Environment.preload(url)` by extension. `margoengine/react`, the one
@@ -36,7 +36,7 @@ export const SUBPATHS = {
     'TransformControls',
     'TransformControlsProps',
   ],
-  'gltf-pro': ['Model', 'ModelProps', 'MaterialOverride', 'Gltf', 'GltfProps'],
+  gltf: ['Model', 'ModelProps', 'MaterialOverride', 'Gltf', 'GltfProps'],
   fbx: ['Fbx', 'FbxProps'],
   animation: ['Animation', 'AnimationProps', 'AnimationHandle'],
   environment: [
@@ -277,5 +277,5 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
     }
   }
   console.log(`${changed} file(s) ${check ? 'to change' : 'changed'}, ${unresolved} place(s) to rewrite by hand`);
-  process.exit(unresolved || (check && changed) ? 1 : 0);
+  process.exitCode = unresolved || (check && changed) ? 1 : 0;
 }

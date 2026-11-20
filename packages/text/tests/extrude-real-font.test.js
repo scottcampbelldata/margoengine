@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { parseFontOutlines, extrudeText } from '../dist/extrude.js';
+import { parseFontOutlines as parseLean, extrudeText as extrudeLean } from '../dist/extrude.js';
+import { openType } from '@margoengine/loaders/font-opentype';
+// These tests read CFF and variable fonts, so they pass the OpenType readers; tests/opentype-optin.test.js covers the
+// lean TrueType path without them.
+const parseFontOutlines = (bytes, options = {}) => parseLean(bytes, { openType, ...options });
+const extrudeText = (text, options) => extrudeLean(text, { openType, ...options });
 import { tables } from './extrude-fixtures.js';
 import { closed, volume } from './extrude-assertions.js';
 

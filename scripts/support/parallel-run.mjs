@@ -1,9 +1,7 @@
 // Runs check jobs side by side (scripts/gpu-package-tests.mjs for GPU suites, scripts/check-merge.mjs for its steps), so
-// a check uses the machine fully and does exactly the work a serial run does. Scott: "Use the hardware fully.
-// Correctness tests can share a big GPU; only timing benchmarks need it exclusively."
-//   - Longest first: the suites that bound the run start while slots are free.
+// a check uses the machine fully and does exactly the work a serial run does. Scott: "Use the hardware fully."
+//   - Longest first: the suites that bound the run start first.
 //   - A job names its `resources` (a fixed port, a shared output path); two jobs with one in common never run at once.
-//   - A job with `exclusive` runs after every other job, with nothing beside it.
 //   - The first failure stops the run: running jobs are aborted (their trees killed by the caller's runner), jobs not
 //     started are reported `not-run`, and the failing job is named. Time limits are the runner's (runLimited).
 //   - Keep going (--keep-going or MARGO_CHECK_KEEP_GOING=1): a failure stops nothing beside it; only a job that needs the
@@ -28,10 +26,9 @@ export function parallelMode({ argv = [], env = {}, profile = {} } = {}) {
 export const keepGoingMode = ({ argv = [], env = {} } = {}) =>
   argv.includes('--keep-going') || env.MARGO_CHECK_KEEP_GOING === '1';
 
-/** Shared jobs longest first (ties keep their order), then exclusive jobs in their order. */
+/** Jobs longest first (ties keep their order). */
 export function longestFirst(jobs) {
-  const shared = jobs.filter((j) => !j.exclusive).sort((a, b) => (b.estimate ?? 0) - (a.estimate ?? 0));
-  return [...shared, ...jobs.filter((j) => j.exclusive)];
+  return [...jobs].sort((a, b) => (b.estimate ?? 0) - (a.estimate ?? 0));
 }
 
 /** The last `lines` lines of a log file, or a note that it cannot be read. */
@@ -43,22 +40,28 @@ export function tailOf(file, lines = 40) {
   }
 }
 
-const seconds = (ms) => Math.round(ms / 100) / 10;
-
 /**
  * Runs `jobs` and resolves one result per job, in the order given: the job plus what `run` returned, `outcome` ('pass',
- * 'fail', or 'not-run' with `reason`), `ok`, `hold` ('shared' or 'exclusive'), `startedAt`, `endedAt` and
- * `slotWaitSeconds`. A job is `{ id, label, estimate?, resources?, after?: [id], exclusive? }`. `run(job, signal)`
- * resolves `{ ok, aborted? }` and must end the job's process tree when `signal` aborts. `take(mode, job)` resolves the
- * release of that job's own hold; it is given back before the job's resources. `limit` caps jobs running at once. A
- * plan that can never finish (an `after` cycle or an unknown id) throws PARALLEL_PLAN_STUCK. With `keepGoing` a failure
+ * 'fail', or 'not-run' with `reason`), `ok`, `startedAt` and `endedAt`. A job is
+ * `{ id, label, estimate?, resources?, after?: [id] }`. `run(job, signal)` resolves `{ ok, aborted? }` and must end
+ * the job's process tree when `signal` aborts. `prepare(job, signal)` (a suite's builds) runs first and resolves
+ * null, or a result that ends the job as failed without running it. `retry(label, attempt)` may run a failed job once
+ * more (after a GPU driver reset). `limit` caps jobs running at once. A plan that can never finish (an `after` cycle or an unknown id) throws PARALLEL_PLAN_STUCK. With `keepGoing` a failure
  * aborts nothing; a job whose `after` holds a job that did not pass is 'not-run', naming it, and the rest still run.
  */
 export function runJobs(
   jobs,
-  { limit, run, take = async () => () => {}, now = Date.now, log = () => {}, keepGoing = false },
+  {
+    limit,
+    run,
+    prepare = async () => null,
+    retry = (label, attempt) => attempt(),
+    now = Date.now,
+    log = () => {},
+    keepGoing = false,
+  },
 ) {
-  if (!(limit >= 1)) throw new RangeError(`runJobs: limit must be 1 or more, got ${limit}; use MARGO_GPU_SLOTS=3`);
+  if (!(limit >= 1)) throw new RangeError(`runJobs: limit must be 1 or more, got ${limit}`);
   const pending = longestFirst(jobs),
     running = new Map(),
     busy = new Set(),
@@ -70,53 +73,55 @@ export function runJobs(
     const startable = (job) =>
       running.size < limit &&
       (job.after ?? []).every((id) => passed.has(id)) &&
-      !(job.resources ?? []).some((r) => busy.has(r)) &&
-      (job.exclusive
-        ? running.size === 0 && !pending.some((p) => !p.exclusive)
-        : ![...running.keys()].some((r) => r.exclusive));
+      !(job.resources ?? []).some((r) => busy.has(r));
     const start = async (job) => {
-      const controller = new AbortController(),
-        hold = job.exclusive ? 'exclusive' : 'shared',
-        asked = now();
+      const controller = new AbortController();
       running.set(job, controller);
       for (const r of job.resources ?? []) busy.add(r);
-      let release = () => {},
-        result;
+      let result;
       try {
-        // A stop must not wait for a slot: a hold that arrives after it is given straight back.
-        const taking = Promise.resolve(take(hold, job));
-        const stopped = new Promise((done) =>
-          controller.signal.addEventListener('abort', () => done(null), { once: true }),
-        );
-        const got = await Promise.race([taking, stopped]);
-        if (got === null) {
-          taking.then(
-            (late) => late(),
-            () => {},
-          );
+        const early = await prepare(job, controller.signal);
+        if (early) throw Object.assign(new Error(early.message ?? `${job.label}: its preparation failed`), { early });
+        if (controller.signal.aborted)
           result = { outcome: 'not-run', ok: false, reason: `the run stopped at ${stoppedBy?.label}` };
-        } else {
-          release = got;
-          const startedAt = now(),
-            r = await run(job, controller.signal),
-            outcome = r.ok ? 'pass' : r.aborted && stoppedBy ? 'not-run' : 'fail';
+        else {
+          const startedAt = now();
+          // A rerun through `retry` (after a driver reset) runs the job again.
+          const attempt = () => run(job, controller.signal);
+          const first = await attempt();
+          let used = false;
+          const r =
+            first.ok || first.aborted
+              ? first
+              : await retry(job.label, async () => {
+                  if (!used) return (used = true), first;
+                  return attempt();
+                });
+          const outcome = r.ok ? 'pass' : r.aborted && stoppedBy ? 'not-run' : 'fail';
           result = {
             ...r,
             outcome,
             ok: Boolean(r.ok),
             startedAt,
             endedAt: now(),
-            slotWaitSeconds: seconds(startedAt - asked),
             ...(outcome === 'not-run' && { reason: `ended when the run stopped at ${stoppedBy?.label}` }),
           };
         }
       } catch (error) {
-        result = { outcome: 'fail', ok: false, message: error?.message ?? String(error) };
+        const early = error?.early,
+          ended = early?.aborted && stoppedBy;
+        result = early
+          ? {
+              ...early,
+              ok: false,
+              outcome: ended ? 'not-run' : 'fail',
+              ...(ended && { reason: `ended when the run stopped at ${stoppedBy.label}` }),
+            }
+          : { outcome: 'fail', ok: false, message: error?.message ?? String(error) };
       }
-      release();
       running.delete(job);
       for (const r of job.resources ?? []) busy.delete(r);
-      results.set(job, { ...job, ...result, hold });
+      results.set(job, { ...job, ...result });
       if (result.ok) passed.add(job.id);
       if (result.outcome === 'fail' && keepGoing) {
         blocked.add(job.id);

@@ -1,19 +1,15 @@
 // @margoengine/cutscene/render: a cutscene at a fixed frame rate into a video file, for trailers. Time is the render's
 // own, not the wall clock, so a slow machine makes the same file as a fast one. Frames and the file come from
 // @margoengine/headless/video; the sound of the document's audio tracks is mixed here, in plain code, so a mix is the
-// same on every machine, and encoded with the same file.
+// same on every machine, and encoded with the same file. The encoder loads when a render starts, so an app that only
+// mixes sound or steps frames does not load it.
 import type { Camera, Engine } from '@margoengine/core';
-import {
-  type EncodeVideoOptions,
-  type EncodedVideo,
-  type FrameTiming,
-  encodeVideo,
-  renderFrames,
-} from '@margoengine/headless/video';
+import type { EncodeVideoOptions, EncodedVideo, FrameTiming } from '@margoengine/headless/video';
 import type { CutsceneOptions, CutsceneState } from './cutscene.js';
 import { Cutscene } from './cutscene.js';
 import type { CutsceneDocument } from './document.js';
 import { CutscenePlayer } from './player.js';
+import { seek, seekSync } from './seek.js';
 
 /** A sound to mix: an `AudioBuffer`, or anything with the same members. */
 export interface MixSound {
@@ -62,11 +58,17 @@ export interface CutsceneFramesOptions {
   from?: number;
   /** End of the span, seconds. Default the end of the cutscene. */
   to?: number;
+  /**
+   * The engine you draw the frames with. A span from after 0 then seeks its fresh clocks to `from` first (`seekSync`
+   * from `@margoengine/cutscene/seek`, steps of `1 / fps`), so sky, wind, waves and every other clock show what a run
+   * from 0 shows there. Default none: the frames are plain state.
+   */
+  engine?: Parameters<typeof seekSync>[0];
 }
 
 /** Options of {@link renderCutscene}. */
 export interface RenderCutsceneOptions
-  extends CutsceneFramesOptions,
+  extends Omit<CutsceneFramesOptions, 'engine'>,
     Pick<EncodeVideoOptions, 'format' | 'codec' | 'bitrate' | 'keyFrameInterval' | 'webCodecs'>,
     CutsceneOptions {
   /** Puts a frame's state on your scene: objects, animation, particles. May be async. Required. */
@@ -177,11 +179,12 @@ export function mixCutsceneAudio(
  */
 export function* cutsceneFrames(
   cutscene: Cutscene,
-  { fps = 30, from, to }: CutsceneFramesOptions = {},
+  { fps = 30, from, to, engine }: CutsceneFramesOptions = {},
 ): Generator<CutsceneFrame, void, void> {
   positive(fps, 'fps');
   const [start, end] = span(cutscene, from, to),
     frames = frameCount(start, end, fps);
+  if (engine && start > 0) seekSync(engine, start, { fps });
   for (let index = 0; index < frames; index++) {
     const time = start + index / fps;
     yield { index, time, state: cutscene.evaluate(time) };
@@ -194,8 +197,10 @@ const frameCount = (from: number, to: number, fps: number): number => Math.max(1
 /**
  * Renders a cutscene to a WebM or MP4 file with WebCodecs, at a fixed frame rate. The engine must be on a
  * `createHeadlessCanvas` canvas of the video's size. A {@link CutscenePlayer} you pass fires every instant in order as
- * the frames go by, as if it played; listeners may spawn things, and the frames show them.
- * @throws RangeError for a bad span or rate, or a sound nobody gave; see `encodeVideo` for what the encoder refuses.
+ * the frames go by, as if it played; listeners may spawn things, and the frames show them. A span from after 0 first
+ * seeks the engine's clocks to `from` (`seek` from `@margoengine/cutscene/seek`), so they must be fresh.
+ * @throws RangeError for a bad span or rate, or a sound nobody gave; MargoError `'state'` for a span from after 0 on
+ * an engine whose clocks already moved; see `encodeVideo` for what the encoder refuses.
  */
 export async function renderCutscene(
   engine: Engine,
@@ -226,6 +231,10 @@ export async function renderCutscene(
     [start, end] = span(scene, from, to),
     frames = frameCount(start, end, fps),
     audio = sounds ? mixCutsceneAudio(scene, sounds, { sampleRate, from: start, to: end }) : undefined;
+  // A span from after 0 starts the world where a render from 0 has it: every clock replayed to `start` in steps of the
+  // render's own 1 / fps, so frame 0 here equals that render's frame at `start` (GAP-FILM-TIME).
+  if (start > 0) await seek(engine, start, { fps, signal });
+  const { encodeVideo, renderFrames } = await import('@margoengine/headless/video');
   player.seek(start);
   const finished = player.play();
   const update = async ({ index }: FrameTiming): Promise<void> => {

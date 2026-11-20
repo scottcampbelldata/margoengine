@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 async function scene(

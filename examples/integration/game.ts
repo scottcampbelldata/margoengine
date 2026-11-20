@@ -1,7 +1,7 @@
 // Composed from the package README calls listed in docs/integration-everything.md.
 import { box, PbrMaterial } from '@margoengine/core';
 import { loadGLTF as loadStatic } from '@margoengine/gltf';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { Physics } from '@margoengine/physics';
 import { Crowd, NavMesh } from '@margoengine/navmesh';

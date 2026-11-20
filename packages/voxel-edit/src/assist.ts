@@ -1,5 +1,5 @@
 // Assist helpers an editor can offer: a random fill, a starting palette and palette usage counts.
-import { checkGrid, type VoxelGrid } from './grid.js';
+import { cellLimit, checkGrid, type GridLimits, type VoxelGrid } from './grid.js';
 
 /**
  * A new grid of `size` where each cell is filled with `palette` (default 1) when a seeded random value in [0, 1)
@@ -60,9 +60,14 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [f(0), f(8), f(4)];
 }
 
-/** How many cells of each palette index a grid uses, 256 counts. Index 0 is air and is included. */
-export function paletteUsage(grid: VoxelGrid): Uint32Array {
-  checkGrid(grid, 16_777_216, 'Usage grid');
+/**
+ * How many cells of each palette index a grid uses, 256 counts. Index 0 is air and is included.
+ * @throws RangeError past `maxCells` (default 16,777,216, at most 67,108,864), like every grid operation.
+ */
+export function paletteUsage(grid: VoxelGrid, limits: GridLimits = {}): Uint32Array {
+  if (typeof limits !== 'object' || limits === null)
+    throw new TypeError('paletteUsage limits are not an object; pass {maxCells}');
+  checkGrid(grid, cellLimit(limits), 'Usage grid');
   const counts = new Uint32Array(256);
   for (const v of grid.voxels) counts[v]++;
   return counts;

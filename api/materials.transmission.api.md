@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { MaterialExtension, MaterialExtensionTexture, PBRModel, PBRTransmission, TextureTransform } from "@margoengine/gltf-pro";
+import { MaterialExtension, MaterialExtensionTexture, PBRModel, PBRTransmission, TextureTransform } from "@margoengine/gltf/pbr";
 
 export class Transmission implements EnginePlugin, PBRTransmission {
     readonly name: string;

@@ -23,7 +23,8 @@ in the root installation guide, rather than the unrelated registry package.
   mixing (`/multivolume`), categorical fusion,
   cinematic and quality wrappers, mapped/tetrahedral/AMR volumes and atmosphere.
 - [Charts and linked data](docs/charts.md): selections, tables, queries, statistics,
-  formatting, streaming and publication.
+  formatting, streaming and publication. The `Spreadsheet` sorts from the keyboard too:
+  ArrowUp from the first row reaches the column headers, and Enter or Space sorts.
 - [Large data and geography](docs/large-data.md): cloud volumes, point clouds,
   aggregation, density, graph layout, time series, climate and map layers.
 - [State and application integration](docs/applications.md): portable state,
@@ -52,8 +53,12 @@ build phase and these correctness checks make no speed claim.
 `@margoengine/sciviz/netcdf` opens CDF-1 classic and CDF-2 64-bit-offset files without eagerly decoding variables.
 All six external types, fixed and interleaved record variables, UTF-8 text attributes, strided hyperslabs and the sole-record
 padding exception are supported. `read()` returns owned float64 samples, last dimension fastest. By default it
-maps `_FillValue`, `missing_value` and invalid packed values to NaN before applying CF `scale_factor` and
-`add_offset`; `unpack: false` returns external numeric values (char values are byte codes). Selection `start`,
+maps `_FillValue`, `missing_value` and values outside `valid_range`/`valid_min`/`valid_max` to NaN before
+applying CF `scale_factor` and `add_offset`, following the NetCDF Users Guide attribute conventions: with no
+valid_* attribute the fill (explicit, or the type default) bounds the valid range, and a byte variable without
+`_FillValue` has no fill, so every byte value is valid. `_Unsigned = "true"` reads byte, short and int data, and
+the `_FillValue`, `missing_value` and valid_* attributes stored in the variable's type, as unsigned (a stored byte
+-1 reads 255), with or without unpacking. `unpack: false` returns external numeric values (char values are byte codes). Selection `start`,
 `count` and `stride` default to the whole variable. `volume()` reverses the selected non-singleton dimensions
 into x,y,z. Give physical bounds explicitly; the default is sample-index bounds, with singleton axes one unit wide.
 
@@ -318,7 +323,7 @@ WebGL2 flow awaits the remaining native backend work. Creation copies inputs in 
 with `signal` cancellation. Later caller mutation has no effect. Importing the entry allocates no GPU resources.
 
 Defaults: `count: 1024` (1..1,000,000), `seeding: { kind: 'uniform' }`, `from: firstFrame.time`,
-`trails: 32` (2..256), `lifetime: 10` positive time units, `respawn: true`, `width: 2` device pixels
+`trails: 32` (2..256), `lifetime: 10` positive time units, `respawn: true`, `width: 2` CSS pixels
 (positive, at most 64), `opacity: 0.8` (0..1), `color: '#7ddcff'` (sRGB hex, optional hex alpha multiplies opacity),
 `maxSteps: 10000` (1..1,000,000 total accepted steps). Rendering includes square particle heads and
 screen-width trail segments with quadratic age fade. History is bounded, on the GPU, and cut at respawn
@@ -457,7 +462,7 @@ lines at the ticks and HTML tick labels.
 | --- | --- | --- |
 | `mode` | `'3d'` | `'3d'` box you orbit, or `'2d'` chart (see 2D charts) |
 | `margin` | see 2D charts | space around a 2D chart's plot area, in CSS px |
-| `theme` | `'dark'` | `'dark'` or `'light'` chrome and background |
+| `theme` | `'dark'` | `'dark'` or `'light'` chrome and background, or a Theme whose `background`, `axis`, `grid` and `text` are `#rrggbb` |
 | `axes` | `true` | box, grid and tick labels |
 | `titles` | `{ x: 'x', y: 'y', z: 'z' }` | axis titles |
 | `ticks` | `5` | about how many ticks per axis |
@@ -476,7 +481,7 @@ lines at the ticks and HTML tick labels.
 | --- | --- |
 | `await fig.scatter({ x, y, z?, color?, size? }, { colormap, range, size, edl, shape })` | point cloud with level of detail; `color` values go through the colour map |
 | `await fig.line({ x, y, z?, color? }, { width, colormap })` | fat line with round joins |
-| `fig.surface(z, { nx, ny, x, y, colormap, range, contours, grid, opacity })` | height field coloured by height, contour lines, NaN holes |
+| `fig.surface(z, { nx, ny, x, y, colormap, range, contours, grid, opacity })` | height field coloured by height, contour lines, NaN and infinite heights as holes |
 | `fig.volume(data, { dims, bounds, colormap, range, opacity, density, mode, quality, shading, clip })` | ray-marched volume; `mode: 'mip'` for maximum intensity |
 | `volume.slice('x' \| 'y' \| 'z', position)` | a plane through the volume, coloured by its map |
 | `brickedVolume(fig, source, options)` from `/bricks` | a volume larger than one texture or the memory budget, loaded by view ([below](#bricked-volumes)) |
@@ -559,8 +564,11 @@ await fig.line({ x: [0, 10, 20], y: [0, 15, 0], z: [1.2, 1.2, 1.2] }, { width: 3
 
 `Figure.create(canvas, { mode: '2d' })` makes a chart: a flat plot area inside `margin` (default top 16, right 24,
 bottom 48, left 64 CSS px; right 96 once there is a colour bar), axes with tick labels on the left and bottom, and
-data fitted with 4% padding. Drag to pan, scroll to zoom about the pointer, double-click to reset. `fig.setLimits([x0,
-x1, y0, y1])` sets the window in code, and `fig.setLimits()` goes back to the data. Drawing is clipped to the plot area.
+data fitted with 4% padding. Drag to pan, scroll to zoom about the pointer, double-click to reset. Zooming in stops at
+64 float32 steps across the window (2^-17 of its largest coordinate) and zooming out or panning at the largest
+float32, the precision the GPU draws in. `fig.setLimits([x0, x1, y0, y1])` sets the window in code, and
+`fig.setLimits()` goes back to the data. Drawing is clipped to the plot area. Exported SVGs name their gradients and
+clip paths from their content, so several charts inlined in one page keep their own.
 
 | Call | Draws |
 | --- | --- |
@@ -598,7 +606,13 @@ heat.colorbar('coolwarm', [-1, 1]);
 - **Log.** Ticks at decades, with 2 and 5 between them over short ranges. Values at or below 0 are not drawn. Bars
   start at 1 instead of 0. Histogram bins are equal ratios.
 - **Date.** Values are milliseconds since 1970, as from `Date.now()` or `date.getTime()`. Ticks fall on whole UTC
-  seconds, minutes, hours, days, weeks, months or years, and tooltips show UTC dates.
+  seconds, minutes, hours, days, weeks, months or years, and tooltips show UTC dates. A range of a few seconds or
+  less gets millisecond ticks (1, 2 or 5 times a power of ten, labelled 12:30:01.25), and a zero-width range one tick.
+  Any year a `Date` holds works, before year 0 and 0 to 99 included; a range past a `Date`'s 8.64e15 ms throws a
+  `RangeError`.
+- **Linear.** Ticks are decimal values (0.3, not 0.1 x 3) at any magnitude, from subnormals to ranges wider than
+  the largest double. The step never falls below the spacing of doubles at the range's ends, labels carry the digits
+  that tell neighbours apart, and a range no nice step lands in gets its two ends as ticks.
 
 Picks, tooltips and selections report data values. Surfaces, volumes and isosurfaces need linear axes.
 `axisScale(type)`, `logTicks` and `dateTicks` from `@margoengine/sciviz/maths` give the same mappings and ticks.
@@ -642,6 +656,11 @@ steps halve before any point is published. A line stops at the grid's edge, a Na
 True closed orbits continue to maxSteps; no visited-point filter or path trimming is used. Both layers also take `colormap`, `range`,
 `color`, `width` and `name`, and need linear axes. `streamline`, `sampleField` and `arrowSegments` from
 `@margoengine/sciviz/maths` do the same work without drawing.
+
+For 3D glyphs at grid points, cells or table rows, `glyphLayer` from `@margoengine/sciviz/glyph` is described in
+[Analysis and scientific datasets](docs/analysis.md). With `scaleMode: 'components'` each glyph is scaled by its
+vector's x, y and z in the glyph's own frame, so a planar field (z = 0) draws flat glyphs in its plane, lit by the
+plane's normal from either side; only a glyph whose three scale components are all zero is left out.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';
@@ -859,7 +878,10 @@ Zarr chunk byte limits come from shape and dtype metadata; their errors name tha
   a pixel. The Modality LUT Sequence or `RescaleSlope` and `RescaleIntercept` is applied. Elements sent as UN read with
   their dictionary VR. `dicomSeries` orders the slices of one series by position along the slice normal (instance
   number when positions are missing), takes the slice step from the positions (else `SpacingBetweenSlices`, else
-  `SliceThickness`) and builds the voxel to patient matrix. A multi-frame image whose Frame Increment Pointer names
+  `SliceThickness`) and builds the voxel to patient matrix. Slices of another orientation or pixel spacing are refused,
+  and so is a missing slice (a step more than 1.5 times the median, the case 3D Slicer warns about as "not equally
+  spaced") unless `dicomSeries(images, { allowGaps: true })` (also a `loadDICOMSeries` option) stacks it anyway and
+  lists the gaps in `gaps`. A multi-frame image whose Frame Increment Pointer names
   Frame Time or Frame Time Vector gives the volume's time steps (`frames`); any other multi-frame image is refused with
   code `unsupported`, since its frames are not known to lie in space. Compressed transfer syntaxes (JPEG, JPEG-LS,
   JPEG 2000, RLE), 32-bit OW pixel data in big endian files and YBR_PARTIAL_422 or 420 are refused with code
@@ -917,7 +939,9 @@ latitude and height into the same data units so scatter, line and other layers s
   Formulas from Snyder's "Map Projections: A Working Manual" (USGS, 1987), chapters 7 and 12.
 - `project(lon, lat, height, projection)` and `unproject(x, y, projection)` convert points; longitudes outside
   ±180 degrees wrap by 360. `tileAt`, `tileBounds` and `tilesIn` work in the slippy-map scheme (z/x/y, y from the
-  north); a box whose west edge lies east of its east edge crosses the 180th meridian.
+  north); a box whose west edge lies east of its east edge crosses the 180th meridian, and one 360 degrees or more
+  wide covers every column. Zoom is a whole number from 0 to 30 and a tile index a whole number inside the zoom's
+  grid; anything else throws a `RangeError`.
 - `tileLayer(fig, { tiles, projection, zoom, area, maxTiles, attribution, init, signal })` loads every tile of `area`
   at `zoom` (default 2) from a URL template with `{z}`, `{x}` and `{y}` or from your own function, then draws them.
   Each tile is a 16 by 16 grid whose vertices the shader projects, so the globe is round and seams close. A 404 counts
@@ -962,7 +986,8 @@ connected in view.
   `dimensions` (2 or 3, default 2), `theta` (default 0.9), `length` (the ideal edge length k, default 1),
   `temperature` (first step limit, default a tenth of the start square's side, at least k), `cooling` (default 0.97),
   `simmer` (lowest step limit in units of k, default 0.05), `gravity` (default 0.01), `seed` or `positions` (xyz per
-  node; a 2D layout sets z to 0).
+  node; a 2D layout sets z to 0). Weights, positions and every option must be finite (theta may be Infinity), and
+  weights at least 0; anything else throws a RangeError rather than giving NaN positions.
 - `layout.step()` runs one iteration; `for await (const step of layout.run({ iterations, tolerance, signal }))` runs
   them and yields to the page between iterations, stopping at the limit (default 300), once no node moves more than
   `tolerance` times k, or when the signal aborts.
@@ -1004,10 +1029,12 @@ per point or per cell, in VTK's UnstructuredGrid layout (`points`, `connectivity
   without cracks. Cell values stay constant per cell.
 - `gridLayer(fig, grid, { slice, values, colormap, range, opacity, missing })` draws either one, coloured through a
   colour map; `layer.update(sliceGrid(grid, plane))` moves the slice. `meshLayer(fig, set)` draws any triangle set.
-- `parseVtk(text or bytes)` reads a legacy `.vtk` file (versions up to 4.2, ASCII or BINARY) holding an
+- `parseVtk(text or bytes)` reads a legacy `.vtk` file (versions up to 5.1, whose CELLS hold OFFSETS and
+  CONNECTIVITY arrays; ASCII or BINARY) holding an
   UNSTRUCTURED_GRID. Voxels become hexahedra; vertices, lines, surface and quadratic cells are skipped and counted in
   `skipped`. Every SCALARS array is kept by name (`pointArrays`, `cellArrays`); the first of each kind is `pointData` and
-  `cellData`. Version 5.1 files and XML `.vtu` are refused with a `RangeError` naming the version.
+  `cellData`. XML `.vtu` is refused with a `RangeError` (not a legacy VTK file). The mesh's colour `range` defaults to
+  the finite values' min and max; a given range must be finite.
 
 Wedges follow VTK's corrected order: points 0, 1, 2 run counter-clockwise seen from 3, 4, 5, as in a hexahedron.
 
@@ -1076,7 +1103,7 @@ console.log(left.points[0].indices.length);
 colour bars painted over it (`{ overlays: false }` leaves them out). `await fig.toSVG()` returns SVG text in CSS
 pixels. A 2D chart whose layers are bars, histograms, heatmaps, lines and scatters of up to 50,000 points is written
 as vector shapes throughout. Any other figure is a fresh frame embedded as a PNG, with the text and colour bars as
-vector elements over it; `{ vector: false }` forces that for a chart too.
+vector elements over it; `{ vector: false }` forces that for a chart too. Both wait for `fig.ready()` first and reject with its error.
 
 ```ts
 import { Figure } from '@margoengine/sciviz';
@@ -1144,7 +1171,7 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
   GPU buffer; only the triangle total is read back. The case table is derived from the cube's geometry with one
   face-consistent rule, so surfaces are closed (the Node tests check every case and random fields).
 - **Picking.** Points and vertices are projected with the last frame's camera, and the nearest within the radius
-  wins (the one nearer the eye on a tie). For surfaces, the pointer's ray is stepped across the grid at half a cell
+  wins; of the points within half a pixel of the closest, the one nearest the eye is picked, whatever their order. For surfaces, the pointer's ray is stepped across the grid at half a cell
   and bisected to where it crosses the bilinear surface. Box and lasso selections test projected points (even-odd rule
   for the lasso). All of this runs on the CPU and is exported from `@margoengine/sciviz/maths`.
 - **Errors.** Argument errors throw `TypeError` or `RangeError` naming the fix; every message links to
@@ -1152,7 +1179,7 @@ console.log(ticks(0, 97).labels); // ['0', '20', '40', '60', '80']
 
 LIC is a separate optional entry: 23,461 B minified gzip in the integrated build (24,165 B ceiling).
 This includes the same full-precision published colormap data as the other colour-bearing entries; the
-normalized pre-restoration measurement was 10,429 B. Core + stage remains 24,844 B combined gzip.
+normalized pre-restoration measurement was 10,429 B. Core + stage remains under 25,000 B combined gzip (`npm run measure:size` prints the figure).
 
 ## Stream tubes and ribbons
 

@@ -339,28 +339,40 @@ export function conics() {
   return m.list;
 }
 
-/** A bicubic parametric spline surface (114) patch: x = x0 + 2 s, y = 3 t, z = 1 (one patch, 2 x 3). */
-export const square114 = (m, x0, status = '00000000') =>
-  m.add({
-    type: 114,
-    params: [
-      3,
-      1,
-      1,
-      1,
-      0,
-      1,
-      0,
-      1,
-      // Patch (1, 1): x, y, z coefficients in the order 1, s, s^2, s^3, t, s t, ...
-      ...[x0, 2, ...Array(14).fill(0)],
-      ...[0, 0, 0, 0, 3, ...Array(11).fill(0)],
-      ...[1, ...Array(15).fill(0)],
-      // Placeholders for the (N + 1)-th column and (M + 1)-th row of patches.
-      ...Array(48 * 3).fill(0),
-    ],
-    status,
-  });
+/**
+ * A parametric spline surface (114) of X, Y and Z given as bicubic polynomials in the global u and v (each a 4 x 4
+ * array, poly[a][b] the coefficient of u^a v^b), written over the breakpoints tu and tv as IGES 5.3 section 4.15 lays
+ * it out: per patch (i, j) each coordinate's Taylor coefficients about (TU(i), TV(j)), in the order A, B, C, D of
+ * s^0..s^3 at t^0, E, F, G, H at t^1, K to N at t^2 and P to S at t^3, X then Y then Z; an (N + 1)-th placeholder patch
+ * after each row of patches, and an (M + 1)-th placeholder row. `patch(i, j, c)` may change a patch's 48 values.
+ */
+export function spline114(m, tu, tv, polys, { status = '00000000', patch = () => {} } = {}) {
+  const choose = (n, k) => (k === 0 || k === n ? 1 : choose(n - 1, k - 1) + choose(n - 1, k)),
+    shifted = (poly, u0, v0) => {
+      // (u0 + s)^a (v0 + t)^b = sum C(a,k) u0^(a-k) s^k C(b,l) v0^(b-l) t^l.
+      const c = Array.from({ length: 16 }, () => 0);
+      for (let a = 0; a <= 3; a++)
+        for (let b = 0; b <= 3; b++)
+          for (let k = 0; k <= a; k++)
+            for (let l = 0; l <= b; l++)
+              c[4 * l + k] += poly[a][b] * choose(a, k) * u0 ** (a - k) * choose(b, l) * v0 ** (b - l);
+      return c;
+    };
+  const M = tu.length - 1,
+    N = tv.length - 1,
+    params = [3, 1, M, N, ...tu, ...tv];
+  for (let i = 0; i <= M; i++)
+    for (let j = 0; j <= N; j++) {
+      if (i === M || j === N) {
+        params.push(...Array(48).fill(0));
+        continue;
+      }
+      const c = polys.flatMap((poly) => shifted(poly, tu[i], tv[j]));
+      patch(i, j, c);
+      params.push(...c);
+    }
+  return m.add({ type: 114, params, status });
+}
 
 /**
  * Untrimmed surfaces, each meshed over its whole parameter rectangle: a surface of revolution (120, a cylinder side of

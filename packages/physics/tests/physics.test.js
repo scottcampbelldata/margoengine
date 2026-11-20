@@ -901,8 +901,9 @@ rtest('dispose frees every body, collider, joint, controller and the world', () 
 });
 
 rtest('engine plugin lifecycle: use, onPreUpdate, removePlugin disposes', () => {
-  // A stand-in with the same plugin contract as core's Engine.use and removePlugin.
+  // A stand-in with the same plugin contract as core's Engine.use, sceneOf and removePlugin, with one scene.
   const plugins = new Map();
+  const scene = { removePlugin: (name) => engine.removePlugin(name) };
   const engine = {
     disposed: false,
     use(plugin) {
@@ -911,6 +912,7 @@ rtest('engine plugin lifecycle: use, onPreUpdate, removePlugin disposes', () => 
       return this;
     },
     hasPlugin: (name) => plugins.has(name),
+    sceneOf: (plugin) => (plugins.get(plugin.name) === plugin ? scene : undefined),
     removePlugin(name) {
       const plugin = plugins.get(name);
       plugins.delete(name);
@@ -931,6 +933,28 @@ rtest('engine plugin lifecycle: use, onPreUpdate, removePlugin disposes', () => 
   const second = new Physics(engine, { rapier: RAPIER });
   engine.removePlugin('physics');
   assert.ok(second.isDisposed, 'removePlugin disposes');
+});
+
+// KB-OWN-BLEND2: dispose removed the plugin named 'physics' from the active scene. A world in a second scene, disposed
+// while the default scene was active, stayed in its scene, and a default-scene plugin of that name was removed instead.
+rtest('dispose removes the world from its own scene, not the active one', async () => {
+  const engine = await hierarchyEngine(),
+    other = engine.createScene('b');
+  try {
+    let physics;
+    other.use({ name: 'loader', setup: () => (physics = new Physics(engine, { rapier: RAPIER })) });
+    other.removePlugin('loader');
+    assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
+    const bystander = { name: 'physics', disposed: 0, setup() {}, dispose() { this.disposed++; } };
+    engine.use(bystander);
+    physics.dispose();
+    assert.ok(physics.isDisposed);
+    assert.equal(other.plugins.size, 0, 'the world is still in its scene');
+    assert.ok(engine.scene.plugins.get('physics') === bystander, 'the default scene lost its own plugin');
+    assert.equal(bystander.disposed, 0);
+  } finally {
+    engine.dispose();
+  }
 });
 
 rtest('debugRender returns line segments that margoengine-lines can draw', () => {
@@ -1291,8 +1315,8 @@ rtest('misuse throws coded errors that name the fix', () => {
   const joint = physics.addJoint(a, b, { type: 'fixed' });
   joint.remove();
   assert.throws(() => joint.setLimits(0, 1), { code: 'state', message: /Joint was removed; create/ });
-  const engineA = { hasPlugin: () => false },
-    engineB = { hasPlugin: () => false };
+  const engineA = { hasPlugin: () => false, sceneOf: () => undefined },
+    engineB = { hasPlugin: () => false, sceneOf: () => undefined };
   physics.setup(engineA);
   assert.throws(() => physics.setup(engineB), { code: 'attached', message: /one Physics per engine/ });
   physics.dispose();

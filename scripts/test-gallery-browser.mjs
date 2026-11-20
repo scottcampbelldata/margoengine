@@ -1,6 +1,6 @@
 // `npm run test:gallery:browser`: the Harrow Head gallery and the voxel sandbox, built as the site builds them
 // (scripts/site-gallery.mjs) from this checkout into test-results/gallery-site, in a real WebGPU browser. Runs in
-// check:gpu-packages under one GPU slot, after `npm run build:packages`; its sources are examples/gallery. It once
+// check:gpu-packages, after `npm run build:packages`; its sources are examples/gallery. It once
 // read the site's own build folder, which only `npm run build:site` makes: the GPU runner alone failed it, and an older
 // site build passed (tests/site-gallery.test.js).
 //   every page in examples/gallery is built; title and description are unique; no long dashes; body text at least 16 px;
@@ -15,9 +15,10 @@ import { preview } from 'vite';
 import { buildGallery, buildVoxel } from './site-gallery.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { compatRun, compatShim } from './support/compat-shim.js';
 import { decodePNG } from '../tests/support/png.js';
 
-/** Hard limit for the whole run: past this the process exits so a hung page cannot hold its GPU slot. */
+/** Hard limit for the whole run: past this the process exits so a hung page cannot hang the check. */
 const LIMIT_MS = 300_000;
 /** A section has this long to appear; the largest published model is 13.5 MB read from disk. */
 const SECTION_MS = 60_000;
@@ -45,12 +46,30 @@ async function pageBytes(folder, chunk, seen, entry = true) {
   return bytes;
 }
 
+// MARGO_COMPAT=1: every page of the context runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js). The
+// built site has no copy of the layer, so the context serves the package's own dist files under /__compat/.
+const layerDist = resolve(import.meta.dirname, '../packages/webgl2-compat/dist');
+async function onLayer(context) {
+  if (!compatRun()) return;
+  await context.route('**/__compat/**', (route) =>
+    route.fulfill({
+      path: join(layerDist, new URL(route.request().url()).pathname.split('/__compat/')[1]),
+      contentType: 'text/javascript',
+    }),
+  );
+  await context.addInitScript(compatShim, '/__compat/device.js');
+}
+
 let browser, site;
 const timer = setTimeout(() => {
   console.error(`test-gallery-browser: over its ${LIMIT_MS / 1000} s limit, stopping`);
-  // Closing the browser is itself bounded: a hung browser must not hold the GPU slot.
-  setTimeout(() => process.exit(1), 15_000).unref();
-  closeAll({ browser, servers: [site] }).finally(() => process.exit(1));
+  // Closing the browser is itself bounded: a hung browser must not hang the check.
+  setTimeout(() => {
+    process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
+  }, 15_000).unref();
+  closeAll({ browser, servers: [site] }).finally(() => {
+    process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
+  });
 }, LIMIT_MS);
 try {
   const pages = (await readdir(source)).filter((name) => name.endsWith('.html')).sort();
@@ -99,8 +118,9 @@ try {
       [1440, 900],
       [390, 844],
     ]) {
-      const context = await browser.newContext({ viewport: { width, height } }),
-        page = await context.newPage(),
+      const context = await browser.newContext({ viewport: { width, height } });
+      await onLayer(context);
+      const page = await context.newPage(),
         problems = [];
       page.on('pageerror', (error) => problems.push(error.message));
       page.on('console', (m) => {
@@ -197,8 +217,9 @@ try {
   assert.equal(descriptions.size, pages.length, 'every page has its own description');
 
   // The published voxel sandbox hides the dedication as well.
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } }),
-    page = await context.newPage();
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await onLayer(context);
+  const page = await context.newPage();
   await page.goto(`${origin}/voxel/`);
   await page.waitForFunction(() => window.voxelSandbox?.ready === true, null, { timeout: SECTION_MS });
   assert.ok(!(await page.locator('#toast').innerText()).includes('Margie'));

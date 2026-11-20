@@ -249,3 +249,5 @@ export function parseBVH(input: BinaryInput | string, options: BVHOptions = {}):
   }
   return { bones, clip: { name, tracks: frames ? tracks : [] }, frames, frameTime };
 }
+
+export { parseAMC, parseASF, type AMCOptions, type ASFBoneData, type ASFOptions, type ASFSkeleton } from './acclaim.js';

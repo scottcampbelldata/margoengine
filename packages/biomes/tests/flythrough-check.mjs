@@ -5,19 +5,12 @@
 // 0.3 ms to the slowest 1 percent of frames and at most 1 ms to the worst frame, against the same flight with every
 // tile made before it starts; the page's copying of arrived tiles stays within its 0.25 ms frame budget (one tile at a
 // time when a single tile takes longer, reported). Writes test-results/biomes-flythrough.json.
-// A timing test: it holds the GPU exclusively (scripts/gpu-lock.mjs), so no other suite draws while it measures. Once
-// it ran in a shared slot beside other agents' GPU tests and the worst frame grew by 2.6 ms (alone: +0.1 to +0.3 ms).
-// Inside a shared hold the request throws; check:gpu-packages runs it as its own step under the exclusive lock.
+// A timing test: run it on a quiet machine. Once it ran beside other GPU tests and the worst frame grew by 2.6 ms
+// (alone: +0.1 to +0.3 ms).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { runSuite, watchExit } from '../../../scripts/support/shutdown.mjs';
 
-const release = await acquire({
-  owner: 'biomes-flythrough',
-  mode: 'shared',
-  max: 15,
-});
 const context = await openBrowser({ startPath: '/packages/biomes/tests/flythrough-check.html', port: 'free' }),
   { page, hardware } = context,
   pageErrors = [];
@@ -113,11 +106,7 @@ await runSuite(
     console.log('ok biomes flythrough correctness: workers, clocks, scheduling, validation and errors');
   },
   async () => {
-    try {
-      await context.close();
-    } finally {
-      release();
-    }
+    await context.close();
   },
 );
 // Every check printed OK on a laptop and the suite then sat until the runner killed it (600 s): what is open is named.

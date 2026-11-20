@@ -1,5 +1,5 @@
-// Headless PBRModel comparison for the parser-worker equality tests (gltf-pro, fbx, usdz).
-import { PBRModel } from '../../packages/gltf-pro/dist/index.js';
+// Headless PBRModel comparison for the parser-worker equality tests (gltf/pbr, fbx, usdz).
+import { PBRModel } from '../../packages/gltf/dist/pbr.js';
 import { Engine, TransformStore } from '../../packages/core/dist/extension.js';
 
 export const headless = async (gpu = null) =>

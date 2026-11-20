@@ -152,7 +152,10 @@ export interface StateClock {
   advance(time: number, step: number): number;
   /** Seconds along `clip`, counted over its loops, at the state's `time`. */
   clipTime(clip: string, time: number): number;
-  /** The time state `from` would be at now, to keep it playing through a crossfade; undefined freezes it. */
+  /**
+   * The time state `from` would be at now, to keep it playing through a crossfade; undefined leaves it to the Animator
+   * (the state left plays on at the current clip rate, or an interrupted fade holds its blended pose).
+   */
   follow?(from: string, time: number): number | undefined;
 }
 /** @internal One frame's finished pose: local transforms per glTF node, morph weights per node. */
@@ -184,7 +187,7 @@ export interface AnimatorState {
   layers: AnimatorLayer[];
   rest: SavedPose;
   current: SavedPose;
-  fade?: { pose: SavedPose; elapsed: number; duration: number; from: string; fromTime?: number };
+  fade?: { pose: SavedPose; elapsed: number; duration: number; from: string; fromTime?: number; live?: boolean };
 }
 const savePose = (p: Pose): SavedPose => ({
   position: p.position.map((v) => [...v]),
@@ -259,7 +262,11 @@ export class Animator implements EnginePlugin {
   private readonly weightNodes: number[];
   private readonly morphed: Set<number>;
   private readonly applied: Float64Array[];
-  private fade?: { pose: Pose; elapsed: number; duration: number; from: string; fromTime?: number };
+  /**
+   * The crossfade in progress. `live`: the state it leaves keeps playing from `fromTime` (a fade that began while no
+   * other fade ran); otherwise `pose` is the blended pose an interruption left, held still.
+   */
+  private fade?: { pose: Pose; elapsed: number; duration: number; from: string; fromTime?: number; live?: boolean };
   private entry = 0;
   private readonly clocks = new Map<string, StateClock>();
   private layers = new Set<AdditiveLayer>();
@@ -522,7 +529,8 @@ export class Animator implements EnginePlugin {
         !nonnegative(f.duration) ||
         f.duration === 0 ||
         f.elapsed >= f.duration ||
-        (f.fromTime !== undefined && !nonnegative(f.fromTime))
+        (f.fromTime !== undefined && !nonnegative(f.fromTime)) ||
+        (f.live !== undefined && (typeof f.live !== 'boolean' || (f.live && f.fromTime === undefined)))
       )
         fail();
       fade = { ...f, pose: loadPose(f.pose) };
@@ -577,7 +585,11 @@ export class Animator implements EnginePlugin {
       );
     if (state === this.state) return this;
     const from = this.state;
-    this.fade = duration ? { pose: clone(this.current), elapsed: 0, duration, from, fromTime: this.time } : undefined;
+    // The state left keeps playing through the fade, as in the crossfades of the big engines; an interruption has no
+    // one state to play, so it fades from the blended pose it cut in on, held still.
+    this.fade = duration
+      ? { pose: clone(this.current), elapsed: 0, duration, from, fromTime: this.time, live: !this.fade }
+      : undefined;
     this.state = state;
     this.time = 0;
     this.entry = 0;
@@ -890,9 +902,11 @@ export class Animator implements EnginePlugin {
     if (!pose) pose = clone(this.rest);
     for (let i = 0; i < this.poseSteps.length; i++) this.poseSteps[i](pose.position, pose.rotation);
     if (this.fade) {
-      const f = this.fade,
-        follow = clock?.follow?.(f.from, this.time),
-        from = follow === undefined ? undefined : this.treePose(f.from, follow);
+      const f = this.fade;
+      let follow = clock?.follow?.(f.from, this.time);
+      // Unfollowed, a live fade's old state runs on from where it was left at the current state's clip rate.
+      if (follow === undefined && f.live) follow = (f.fromTime ?? 0) + (f.elapsed + step) * this.clipRate;
+      const from = follow === undefined ? undefined : this.treePose(f.from, follow);
       if (from)
         for (let i = 0; i < this.fadeSteps.length; i++)
           this.fadeSteps[i](from.position, from.rotation, f.from, follow!);

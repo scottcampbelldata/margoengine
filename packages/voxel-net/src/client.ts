@@ -1,10 +1,10 @@
 // The voxel-net client (design: packages/voxel-net/DESIGN.md, "Movement", "Block edits", "Other players"): it fills a
 // VoxelWorld from the server's chunk messages, predicts its own player with VoxelCharacter at fixed steps and replays
-// them on a correction, shows its edits at once, and smooths other players with @margoengine/net's SnapshotBuffer.
+// them on a correction, shows its edits at once, and smooths other players with @margoengine/netcode/interpolation's SnapshotBuffer.
 // The transport is the caller's: a browser WebSocket (connectVoxelNet) or a Node one (the bots).
 import type { MutableVec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import { createSnapshot, type Snapshot, SnapshotBuffer } from '@margoengine/net';
+import { createSnapshot, type Snapshot, SnapshotBuffer } from '@margoengine/netcode/interpolation';
 import { chunkKey, type VoxelWorld } from '@margoengine/voxel';
 import { decodeBlockChanges, decodeChunk, EntityCodec } from '@margoengine/voxel/codec';
 import { VoxelCharacter, type VoxelCharacterOptions } from '@margoengine/voxel/query';

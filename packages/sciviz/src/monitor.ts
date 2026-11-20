@@ -99,6 +99,9 @@ function countsFor(layer: Layer): DataCounts {
   return {};
 }
 
+// Disposed monitors, so a repeat install replaces one instead of returning a monitor that only throws.
+const retired = new WeakSet<FigureStats>();
+
 /** Installed explicitly; no import side effects or automatic frame hooks. */
 export class FigureStats {
   readonly #figure: Figure;
@@ -184,7 +187,7 @@ export class FigureStats {
             ? key.name
             : 'kind' in key
               ? String(key.kind)
-              : key.constructor.name),
+              : (key.constructor?.name ?? 'object')),
         counts: count,
         inventoryAvailable: source !== undefined,
       };
@@ -195,17 +198,21 @@ export class FigureStats {
   dispose(): void {
     this.#adapters.clear();
     this.#disposed = true;
+    retired.add(this);
   }
   [Symbol.dispose](): void {
     this.dispose();
   }
 }
 
-/** Adds fig.stats without changing Figure's root imports. Repeat installation returns the same monitor. */
+/** Adds fig.stats without changing Figure's root imports. Repeat installation returns the same monitor until it is
+ * disposed; after that it installs a new one. */
 export function installFigureStats<T extends Figure>(figure: T): T & { readonly stats: FigureStats } {
   if ('stats' in figure) {
-    if (figure.stats instanceof FigureStats) return figure as T & { readonly stats: FigureStats };
-    throw fault('state', 'Figure already has a different stats property', 'sciviz');
+    if (figure.stats instanceof FigureStats && !retired.has(figure.stats))
+      return figure as T & { readonly stats: FigureStats };
+    if (!(figure.stats instanceof FigureStats))
+      throw fault('state', 'Figure already has a different stats property', 'sciviz');
   }
   return Object.defineProperty(figure, 'stats', { value: new FigureStats(figure), configurable: true }) as T & {
     readonly stats: FigureStats;

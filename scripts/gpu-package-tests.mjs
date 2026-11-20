@@ -9,17 +9,15 @@ import { deferSpeed, reportSpeedPhase, speedEnabled } from './support/speed-phas
 // `<dir>/<script>` or `root/<script>`, see testId; check:merge passes the ones a change affects), --list (print the plan).
 // Every test has a hard time limit (10 min; MARGO_GPU_TEST_TIMEOUT_MIN, or "margo": { "gpuTestTimeoutMinutes": n } in the
 // package's package.json): a hung test has its whole process tree killed, is named in the output and fails the step.
-// Holds one shared slot of the GPU lock (scripts/gpu-lock.mjs, up to 3 at once) for its shared tests; a timing test (one whose file
-// asks for the GPU exclusively, see lockMode) runs after them as its own step under its own exclusive hold, released
-// after it. Each test's result and time go to
-// test-results/gpu-packages.json. A test that fails while the Windows event log shows a GPU driver reset runs once more
-// (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden:
+// Tests run directly on the GPU, each under its own hard time limit (Scott, 2026-11-16). Each test's result and time
+// go to test-results/gpu-packages.json. A test that fails while the Windows event log shows a GPU driver reset runs once
+// more (scripts/support/driver-resets.mjs, bug 25); the reset and the rerun are printed and kept in that file, never hidden:
 // a run that passed only that way ends with a "PASSED WITH A DRIVER RESET" line per test and the file's top-level
 // `passedAfterDriverReset` is true (the file is `{ profile, passedAfterDriverReset, results }`).
 // Machine profiles (MARGO_MACHINE_PROFILE, scripts/support/machine-profiles.json, item 57.1a): a profile can leave
 // packages out (each reported as EXCLUDED BY PROFILE with its stated reason, never a silent skip), run heavy suites as
 // short steps, and watch the temperature: at the profile's stop temperature the running step's process tree is ended,
-// the GPU lock is released, the run waits (at most the profile's maximum) for the resume temperature and runs that same
+// the run waits (at most the profile's maximum) for the resume temperature and runs that same
 // step again, then goes on. Each pause is reported as PAUSED FOR HEAT with the step, the peak, stop and resume
 // temperatures and the time waited; a wait that runs out, or a step that keeps reaching the stop, is PAUSED FOR HEAT:
 // NOT RESUMED with the reason. A run with no failure but a heat stop it did not resume from exits 75 (the heat guard's
@@ -27,19 +25,17 @@ import { deferSpeed, reportSpeedPhase, speedEnabled } from './support/speed-phas
 // MARGO_MACHINE_PROFILE unset the profile is matched by hardware (scripts/support/machine-profile.mjs); a machine no
 // profile matches stops here before any GPU work, never falls back to one.
 // Side by side (--parallel or MARGO_CHECK_PARALLEL=1; --serial or MARGO_CHECK_SERIAL=1 and every heat or split profile
-// run one at a time): the same tests under scripts/support/parallel-run.mjs, longest first, each holding its own shared
-// slot, none beside another with the same fixed port or output (scripts/support/suite-resources.mjs), each with its log
-// in test-results/gpu-suites/. Timing tests still run last, alone, under an exclusive hold. The first failure stops the
-// run, names the suite and prints its log; a serial run goes on to the end and reports all failures.
+// run one at a time): the same tests under scripts/support/parallel-run.mjs, longest first, none beside another with
+// the same fixed port or output (scripts/support/suite-resources.mjs), each with its log in test-results/gpu-suites/.
+// The first failure stops the run, names the suite and prints its log; a serial run goes on to the end and reports all
+// failures.
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { margoError } from '../packages/shared/errors.js';
-import { exitOnHelp } from './support/help.mjs';
-import { acquire, lockDir, slots } from './gpu-lock.mjs';
-import { worktreeIdentity } from './support/gpu-admission.mjs';
+import { showHelp } from './support/help.mjs';
+import { DEFAULT_MINUTES } from './run-with-timeout.mjs';
 import { keepGoingMode, parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
 import { suiteResources } from './support/suite-resources.mjs';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
@@ -49,11 +45,6 @@ import { STEPS } from './modern-extension-suite.mjs';
 import { packageMinutes, runLimited, testLimitMs } from './support/run-limited.mjs';
 
 const root = resolve(import.meta.dirname, '..');
-/** Stable admission identity shared by this worktree's serial and parallel suites. */
-export function suiteOwner(worktree = root, label) {
-  const identity = createHash('sha256').update(worktreeIdentity(worktree)).digest('hex');
-  return `gpu-packages-${identity}${label ? `/${label}` : ''}`;
-}
 export const HEAT_EXIT = 75;
 const json = (file) => JSON.parse(readFileSync(join(root, file), 'utf8'));
 
@@ -87,8 +78,12 @@ export const ROOT = {
     'the own 2D physics kernel in Wasm (simd128) gives the native pinned bits on a WebGPU page and a WebGL2 page',
   'test:orrery':
     'the Orrery example: production build, a picture, arms and wheels at the computed angles, fly-in, play, phone, missing model',
+  'test:cabin-hearth':
+    'the Cabin Hearth example by its pixels: firelit hearthstone falling off, flames over the logs, moonlit wall, lantern patch',
   'test:storm-light':
     'the Storm Light example: production build, a lit night first frame, the Storm slider, reduced motion, phone, missing model',
+  'test:shot':
+    'the shot tool: two renders of a small scene identical, the shot clock and seed, GPU readbacks settled, a leak caught',
 };
 /**
  * `test:release` suites that drive a browser yet stay out of check:merge, each with its reason. Anything else in
@@ -114,6 +109,22 @@ export const NOT_IN_CHECKS = {
  * Twenty-one such files were once written for one job and run by hand: nothing ran them, and five had rotted.
  */
 export const LOOSE_CHECKS = {};
+/**
+ * Root suites that check one package's own shaders or kernels, with the packages that own them. Each owner runs the
+ * suite from its own GPU script (`"test:gpu:<name>": "cd ../.. && npm run <suite>"`, PREPARE commands first), so a
+ * change to that package runs it in the fast gate, which runs only the changed packages' GPU scripts; plan() folds
+ * those scripts into the one root test, so a full or affected run still runs the suite once. KB-POSTFX-DOFSTALE1: from
+ * 2026-11-15 the depth-of-field and tonemap changes broke modern:test:postfx:browser's hand-built bindings, and no push
+ * ran it. tests/gpu-root-owners.test.js holds this map to the owners' scripts, and fails on a root suite that imports a
+ * package's sources (`/packages/<name>/src/`) without that package here.
+ */
+export const ROOT_OWNERS = {
+  'modern:test:postfx:browser': ['dof', 'tonemap'],
+  'modern:test:sky': ['sky'],
+  'modern:test:usdz:browser': ['usdz'],
+  'modern:test:gltf-compression': ['decoders', 'gltf'],
+  'test:physics2d-kernel-browsers': ['physics2d'],
+};
 /** Commands a root suite needs first (it reads their output), run once before it. */
 export const PREPARE = {
   'modern:test:browser': [
@@ -128,32 +139,35 @@ export const PREPARE = {
 };
 /**
  * What `npm run check:merge` runs when this runner changes (scripts/support/file-classes.mjs RUNNER): the runner does
- * not change what a test draws, and its planning, limits, lock modes and heat guard are pinned by unit tests
- * (heat-containment, gpu-timing-lock, voxel-pathtracer-gpu-split), so one real test of each kind it treats
- * differently runs, plus every test the change affects through packages. Kinds (tests/check-merge-affected.test.js
- * checks each is here): a shared package test that splits into steps (shader test:gpu), the exclusive timing test,
- * which also has a per-script time limit (biomes test:gpu:flythrough, the only one), a split suite (voxel test:gpu), a
- * root suite (lifecycle) and a root suite with PREPARE commands (usdz).
+ * not change what a test draws, and its planning, limits and heat guard are pinned by unit tests (heat-containment,
+ * voxel-pathtracer-gpu-split), so one real test of each kind it treats differently runs, plus every test the change
+ * affects through packages. Kinds (tests/check-merge-affected.test.js checks each is here): a package test that splits
+ * into steps (shader test:gpu), a test with a per-script time limit (biomes test:gpu:flythrough, the only one), a split
+ * suite (voxel test:gpu), a root suite (lifecycle) and a root suite with PREPARE commands (usdz).
  */
 export const RUNNER_SMOKE = [
   'shader/test:gpu',
   'biomes/test:gpu:flythrough',
-  'biomes/test:gpu:flythrough:speed',
   'voxel/test:gpu',
   'root/test:lifecycle:browser',
   'root/modern:test:usdz:browser',
 ];
 /** Browser scripts under packages/ that are tools, not tests (the guard below skips them). */
 const TOOLS = {
+  'packages/webgl2-compat/scripts/browser-matrix.mjs':
+    'the browser matrix of docs/limits.md (Safari, the iOS Simulator, Firefox, Android Chrome), not a gate: run with --browser (npm run matrix)',
   'scripts/reference-rendering/mip-blend-control.mjs':
-    'raw WebGL2 and WebGPU trilinear blend control quoted by docs/known-bugs.md, not a gate; run directly under the GPU lock',
+    'raw WebGL2 and WebGPU trilinear blend control quoted by docs/known-bugs.md, not a gate; run directly',
   'packages/culling/test/gpu/compat-cost.mjs':
-    'per-frame cost measurement of the WebGL2-layer culling paths for the speed phase, not a gate; run directly under the GPU lock',
+    'per-frame cost measurement of the WebGL2-layer culling paths for the speed phase, not a gate; run directly',
+  'packages/culling/test/gpu/indirect-repro.mjs':
+    'WebKit indirect-draw repro quoted by docs/known-bugs.md, not a gate: it prints differing pixels; run directly',
+  'packages/gltf/scripts/draw-order-probe.mjs':
+    'plain WebGPU draw-order repro quoted by docs/known-bugs.md, not a gate: it prints differing pixels; run directly',
   'packages/text/scripts/make-readme-atlas.mjs':
-    'writes the documented OFL font atlas under the GPU lock; text test:browser fetches and renders the committed atlas, generation is not a test',
-  'packages/staging/scripts/rival-bench.mjs':
-    'contact-shadow ray reference comparison, run directly under the GPU lock',
-  'packages/sky/scripts/rival-bench.mjs': 'external sunsky radiance comparison, run directly under the GPU lock',
+    'writes the documented OFL font atlas; text test:browser fetches and renders the committed atlas, generation is not a test',
+  'packages/studio/scripts/rival-bench.mjs': 'contact-shadow ray reference comparison, run directly',
+  'packages/sky/scripts/rival-bench.mjs': 'external sunsky radiance comparison, run directly',
   'packages/biomes/tests/gpu-region-fields-check.mjs':
     'exact-head region-fields hardware proof pinned to the RTX A6000, run directly',
   'packages/biomes/tests/gpu-fixed-lerp-check.mjs':
@@ -167,28 +181,29 @@ const TOOLS = {
   'packages/biomes/tests/gpu-placement-flow-check.mjs':
     'exact-head placement-flow hardware proof pinned to the RTX A6000, run directly',
   'packages/compute/scripts/rival-bench.mjs':
-    'paired timing against TensorFlow.js WebGPU, installed outside the repository; run directly under the GPU lock',
+    'paired timing against TensorFlow.js WebGPU, installed outside the repository; run directly',
   'packages/sciviz/scripts/rival-bench.mjs':
-    'paired volume timing against VTK.js, installed outside the repository; run directly under the GPU lock',
+    'paired volume timing against VTK.js, installed outside the repository; run directly',
   'packages/splats/scripts/truck-photo.mjs':
-    'external Truck photograph comparison (data outside the repository), run directly under the GPU lock',
+    'external Truck photograph comparison (data outside the repository), run directly',
   'packages/splats/scripts/rival-bench.mjs':
-    'paired timing against GaussianSplats3D, installed outside the repository; run directly under the GPU lock',
+    'paired timing against GaussianSplats3D, installed outside the repository; run directly',
   'packages/loaders/scripts/real-files-render.mjs':
     'opt-in drawing of downloaded public files, and the Lottie frames of test:real-files, run directly by that script',
   'packages/netcode/tests/webtransport-proof/proof.mjs':
     'by-hand proof against an HTTP/3 server on the outside tool aioquic, which needs Python; run directly',
   'packages/webgl2-compat/test/metal-dropped-draw-repro.mjs':
     'raw WebGL2 repro of the ANGLE Metal dropped draw, not a gate: it prints what the browser does (test:gpu checks the fix in compute-browser.mjs scatterAfterWrite); run directly',
+  'packages/sciviz/tests/webgl-long-invocation-repro.mjs':
+    'raw WebGL2 repro of the ANGLE Metal draw dropped for a long single invocation, not a gate: it prints what the browser does (test:browser:aggregate checks the sliced aggregation); run directly',
   'packages/sky/test/compat-night-probe.mjs':
     'raw repro of the compat meadow difference on ANGLE Metal, not a gate: it prints the differing pixels per GLSL variant (test:gpu checks meadow in browser-check.mjs, test/compat-night-glsl.test.js pins the GLSL); run directly',
-  'packages/vfx/test/bench-soft.mjs':
-    'benchmark of soft particles with the GPU held exclusively (test:gpu checks the pixels)',
+  'packages/vfx/test/bench-soft.mjs': 'benchmark of soft particles (test:gpu checks the pixels)',
   'packages/voxel-pathtracer/tests/magicavoxel/mv-vox.mjs': 'renders .vox files for a side-by-side comparison',
   'packages/webgl2-compat/scripts/capabilities.mjs':
     'prints the WebGL2 report of every installed browser and ANGLE back end (test:browser checks the default one)',
   'packages/webgl2-compat/test/perf-browser.mjs':
-    'times the M7 performance matrix with the GPU held exclusively (test:gpu checks the same scenes for pixels)',
+    'times the M7 performance matrix (test:gpu checks the same scenes for pixels)',
   'packages/culling/test/gpu/compat-cost.mjs':
     'prints draws, triangles, stalls and frame times per crowd size for docs/limits.md, asserts nothing (test:gpu checks the culled counts); run directly',
 };
@@ -261,17 +276,77 @@ export function unrunCheckFiles(files, commands, covered = [], exempt = LOOSE_CH
 /** A test's stable id: `dof/test:browser` for a package script, `root/modern:test:xr:browser` for a root suite. */
 export const testId = (test) => (test.name ? `root/${test.name}` : test.label.replace(' ', '/'));
 
+/**
+ * The ROOT suite a package script only runs (`cd ../.. && npm run <suite>`, with that suite's PREPARE commands first),
+ * or undefined. Such a script is the owner's way into the suite (ROOT_OWNERS), not a second test.
+ */
+export function rootSuiteOf(command, root = ROOT, prepare = PREPARE) {
+  const rest = command.replace(/^cd \.\.\/\.\. && /, '');
+  return Object.keys(root).find((name) => rest === [...(prepare[name] ?? []), `npm run ${name}`].join(' && '));
+}
+
+/**
+ * Root suites a package's own GPU scripts do not reach, as `<suite>: <package> ...` lines: an owner in `owners`
+ * (ROOT_OWNERS) with no script that runs the suite (rootSuiteOf), or a package whose sources (`/packages/<name>/src/`)
+ * a suite's files import that is not one of its owners. `packageScripts(dir)` gives a package's scripts, `read(file)`
+ * a file's text or undefined.
+ */
+export function unownedRootSuites({
+  scripts,
+  packageScripts,
+  read,
+  root = ROOT,
+  owners = ROOT_OWNERS,
+  prepare = PREPARE,
+}) {
+  const problems = [];
+  for (const [suite, dirs] of Object.entries(owners)) {
+    if (!(suite in root)) problems.push(`${suite}: in ROOT_OWNERS but not a ROOT suite`);
+    for (const dir of dirs)
+      if (
+        !Object.entries(packageScripts(dir) ?? {}).some(
+          ([name, command]) => isGpuScript(name) && rootSuiteOf(command, root, prepare) === suite,
+        )
+      )
+        problems.push(
+          `${suite}: ${dir} owns it but no GPU script of ${dir} runs it; add "test:gpu:<name>": "cd ../.. && ${[...(prepare[suite] ?? []), `npm run ${suite}`].join(' && ')}"`,
+        );
+  }
+  for (const suite of Object.keys(root)) {
+    const files = [...(scripts[suite] ?? '').matchAll(/\bnode (?:--\S+ )*(\S+\.m?js)/g)].map((m) => m[1]);
+    const imported = new Set(
+      files.flatMap((file) => [...(read(file) ?? '').matchAll(/\/packages\/([\w-]+)\/src\//g)].map((m) => m[1])),
+    );
+    for (const dir of [...imported].sort())
+      if (!(owners[suite] ?? []).includes(dir))
+        problems.push(`${suite}: checks ${dir}'s sources but ${dir} is not among its ROOT_OWNERS`);
+  }
+  return problems;
+}
+
+/** Whether `test` is picked by --only (a label, or the label of an owner's script folded into it) and --select. */
+export const picked = (test, only, chosen) =>
+  (!only || [test.label, ...(test.owners ?? [])].some((label) => label.includes(only))) &&
+  (!chosen ||
+    [testId(test), ...(test.owners ?? []).map((label) => label.replace(' ', '/'))].some((id) => chosen.has(id)));
+
 /** [{ label, cwd, command }] in run order: packages by directory, then ROOT. Throws on an unrun root script. */
 export function plan({
   compositionPackages = process.argv.find((a) => a.startsWith('--composition-packages='))?.slice(23),
 } = {}) {
-  const tests = [];
+  const tests = [],
+    owners = {};
   for (const dir of readdirSync(join(root, 'packages')).sort()) {
     const file = `packages/${dir}/package.json`;
     if (!existsSync(join(root, file))) continue;
     for (const [name, script] of Object.entries(json(file).scripts ?? {})) {
       if (!isGpuScript(name)) continue;
-      const command = script.replace(/^npm run build && /, '');
+      const command = script.replace(/^npm run build && /, ''),
+        suite = rootSuiteOf(command);
+      if (suite) {
+        (owners[suite] ??= []).push(`${dir} ${name}`);
+        continue;
+      }
       if (/\bnpm run build\b/.test(command))
         throw new Error(`${file} "${name}" builds after its start (${script}); begin it with "npm run build && "`);
       tests.push({
@@ -328,6 +403,7 @@ export function plan({
       name,
       dir: 'root',
       script: name,
+      ...(owners[name] && { owners: owners[name] }),
     });
   }
   const checkFiles = readdirSync(join(root, 'scripts'))
@@ -342,45 +418,51 @@ export function plan({
     throw new Error(
       `GPU check(s) ${unnamed.join(', ')} are in no check, so they rot unseen; name each in a package's test:gpu script or, with its reason, in LOOSE_CHECKS`,
     );
-  // A timing test takes the GPU exclusively itself; it runs as its own step under the exclusive hold, never in a
-  // shared slot beside other suites (or its measurements carry their load).
+  // A timing test says so in its header (`// timing test: deferred in the build phase`): its numbers need a quiet machine,
+  // so the correctness gate leaves it out until scripts/speed-phase.json says `active` (Scott, 2026-11-10).
   for (const test of tests) {
     const files = (test.name ? scriptFiles('.', scripts[test.name]) : scriptFiles(test.cwd, test.command)).filter(
       (file) => existsSync(join(root, file)),
     );
-    if (lockMode(test.label, files, (file) => readFileSync(join(root, file), 'utf8')) === 'exclusive')
-      test.exclusive = true;
+    if (files.some((file) => TIMING_TEST.test(readFileSync(join(root, file), 'utf8')))) test.timing = true;
   }
 
-  // Every file under packages/*/{test,tests,scripts} that drives a browser must be run by one of these commands (or by
-  // a check:merge script): a GPU test with no script is the gap this check closes.
-  const run = new Set();
+  // The check:merge scripts run browser files too; every browser test file must be reached from them or the tests.
   const merged = merge
     .split(' && ')
     .map((part) => /^npm run (\S+)/.exec(part)?.[1])
     .filter((name) => scripts[name])
     .map((name) => ({ cwd: '.', command: scripts[name] }));
-  for (const { cwd, command } of [...tests.filter((t) => !t.name), ...merged])
-    for (const file of scriptFiles(cwd, command)) run.add(file);
-  // A check:merge step runs outside this check's hold and takes its own lock: a timing test there asks for the GPU
-  // exclusively itself, and must not share its step with other checks either (this throws when one does).
-  mergeTimingSteps();
-  const files = browserFiles();
-  // A test that takes test-results/gpu.lock by hand waits forever inside this check's own hold.
-  const ownLock = files.filter((file) => {
-    const text = readFileSync(join(root, file), 'utf8');
-    return text.includes('gpu.lock') && !text.includes('gpu-lock.mjs');
-  });
-  if (ownLock.length)
-    throw new Error(
-      `${ownLock.join(', ')} take(s) the GPU lock by hand; use acquire() from scripts/gpu-lock.mjs, which runs inside a holder`,
-    );
-  const unrunFiles = files.filter((file) => !run.has(file) && !(file in TOOLS));
+  // Every browser test file (isBrowserFile: named for the browser or driving one) must be reached from what this check
+  // runs: a check dropped from its package's chain is named here, with no hand-kept list (Scott, 2026-11-16).
+  const starts = [
+      ...tests.map((t) => (t.name ? { cwd: '.', command: scripts[t.name] } : { cwd: t.cwd, command: t.command })),
+      ...merged,
+    ],
+    unrunFiles = unrunBrowserFiles(starts, testUniverse(), (file) => readFileSync(join(root, file), 'utf8'));
   if (unrunFiles.length)
     throw new Error(
-      `${unrunFiles.join(', ')} drive(s) a browser but no script this check runs starts it; add a "test:browser" or "test:gpu" script to the owning package (or list a tool in TOOLS)`,
+      `${unrunFiles.join(', ')}: browser test file(s) that nothing check:gpu-packages runs reaches; add each to its package's "test:gpu" or "test:browser" chain (or, run by hand with its reason, to TOOLS)`,
     );
   return tests;
+}
+
+/** A timing test: its file says so in a header line. */
+export const TIMING_TEST = /^\/\/ timing test: deferred in the build phase\s*$/m;
+
+/**
+ * Splits the steps into the shared ones and the timing ones (`timing`, from the file's header). While the speed phase is
+ * deferred the timing steps are left out and each is named once as deferred (`defer(label)`); once it is active they run
+ * after every shared step, one at a time, so nothing else runs beside a measurement.
+ */
+export function splitTiming(steps, { active = speedEnabled(), defer = deferSpeed } = {}) {
+  const shared = steps.filter((s) => !s.timing),
+    timing = steps.filter((s) => s.timing);
+  if (!active) {
+    for (const step of timing) defer(step.label);
+    return { shared, timing: [] };
+  }
+  return { shared, timing };
 }
 
 /** Repo-relative .js/.mjs files a script command runs with node, following `cd` (paths with '/'). */
@@ -396,83 +478,102 @@ function scriptFiles(cwd, command) {
   return files;
 }
 
-/** A timing test: its file awaits an exclusive hold of the GPU from scripts/gpu-lock.mjs's acquire, mode exclusive. */
-export const TIMING_TEST = /\bawait acquire\(\{[^}]*\bmode:\s*['"]exclusive['"]/;
+/** A browser test file: under packages/<dir>/{test,tests,scripts}, `browser` in its name (`*-browser.mjs`, `*.browser.mjs`,
+ * `browser-check.js`, a page module `*-browser.js`) or a body that drives a browser (DRIVES_BROWSER). */
+export const isBrowserFile = (path, text) =>
+  /^packages\/[^/]+\/(?:tests?|scripts)\/(?:.*\/)?[^/]+\.m?js$/.test(path) &&
+  !/\.test\.m?js$/.test(path) &&
+  !/\/fixtures\//.test(path) &&
+  (/browser/i.test(path.slice(path.lastIndexOf('/') + 1)) || drivesBrowser(text));
+
+const packageOf = (path) => /^packages\/[^/]+/.exec(path)?.[0] ?? '';
+const stemOf = (path) =>
+  path
+    .slice(path.lastIndexOf('/') + 1)
+    .replace(/\.(?:m?js|html)$/, '')
+    .replace(/[-.]browser$/, '');
+const uncomment = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[\s;])\/\/.*$/gm, '$1');
 
 /**
- * A timing measurement on the GPU: a file that reads the clock (`performance.now()`) and holds what it read to a time
- * budget (a budget in ms, a frame budget). In a shared slot the other slots' GPU work lands in its numbers (visual:compat's frame budget read 86 ms against 50
- * beside other suites, 2026-10-30), so such a file must be a timing test (TIMING_TEST). A GPU file that reads the clock
- * for something else (its own steps' wall time, a teardown budget) says so in a comment, `gpu-timing: none (<reason>)`.
+ * The browser test files (isBrowserFile) that nothing a check runs reaches, so they rot unseen. `commands` are
+ * `{ cwd, command }` the checks run (package GPU scripts, ROOT suites, check:merge steps); `universe` every .js, .mjs and
+ * .html file a run may load (package test folders, scripts/, tests/); `read(path)` its text. Reached: a file a command
+ * starts with node, then, from any reached file (comments left out), a path it names (`./x.mjs`, `/packages/a/tests/b.html`,
+ * a bare `b-browser.js` beside it) and, inside one package, a file whose stem (name less extension and `-browser`) is a
+ * quoted word or a command argument (`--page=gi` loads `tests/gi.html` and `gi-browser.js`). Files in `exempt` (TOOLS:
+ * tools run by hand, each with its reason) are not counted. No hand-kept list of tests: removing a file from its
+ * package's chain makes it unreached, and this names it.
  */
-export const measuresTiming = (text) =>
-  /\bperformance\.now\(\)/.test(text) &&
-  /budget[^\n]{0,80}\bms\b|\bms\b[^\n]{0,80}budget|frame budget|budgetMs/i.test(text) &&
-  !/gpu-timing: none \(\S[^)]*\)/.test(text);
-
-/**
- * The GPU lock mode a planned test runs under: 'exclusive' when the files it runs are timing tests (TIMING_TEST),
- * else 'shared'. A test whose files mix a timing test with other checks throws GPU_TIMING_TEST_SHARED: in one step the
- * other checks would hold the exclusive GPU for nothing, or the timing test would run in a shared slot. A file that
- * measures timing (measuresTiming) but is no timing test throws GPU_TIMING_MEASURED_SHARED: it would hold a
- * measurement to a budget from a shared slot. `read(file)` gives a repo-relative file's text.
- */
-export function lockMode(label, files, read) {
-  const texts = files.map((file) => [file, read(file)]);
-  const shared = texts.filter(([, text]) => measuresTiming(text) && !TIMING_TEST.test(text)).map(([file]) => file);
-  if (shared.length)
-    throw margoError(
-      'GPU_TIMING_MEASURED_SHARED',
-      `${label} runs ${shared.join(', ')}, which holds a time it measures to a budget but takes no exclusive GPU hold; await an exclusive hold from scripts/gpu-lock.mjs's acquire (mode exclusive) in a step of its own (in chunks if it runs long), or, if that clock times something other than GPU work, say so with a "gpu-timing: none (<reason>)" comment`,
-    );
-  const timing = texts.filter(([, text]) => TIMING_TEST.test(text)).map(([file]) => file);
-  if (!timing.length) return 'shared';
-  const others = texts.map(([file]) => file).filter((file) => !timing.includes(file));
-  if (others.length)
-    throw margoError(
-      'GPU_TIMING_TEST_SHARED',
-      `${label} runs the timing test ${timing.join(', ')} in one step with ${others.join(', ')}; give the timing test a script of its own (for example "test:gpu:<name>") so it runs alone under the exclusive GPU lock`,
-    );
-  return 'exclusive';
-}
-
-/**
- * The timing tests among the check:merge steps (each `npm run <name>` of check:merge:steps whose files ask for the GPU
- * exclusively): `[{ label, files }]`. Throws GPU_TIMING_TEST_SHARED for a step that runs a timing test together with
- * other checks, and GPU_TIMING_MEASURED_SHARED for a GPU step that holds a measured time to a budget in a shared slot.
- */
-export function mergeTimingSteps() {
-  const scripts = json('package.json').scripts,
-    readText = (file) => readFileSync(join(root, file), 'utf8');
-  return (scripts['check:merge:steps'] ?? '')
-    .split(' && ')
-    .map((part) => /^npm run (\S+)/.exec(part)?.[1])
-    .filter((name) => scripts[name])
-    .flatMap((name) => {
-      const label = `check:merge ${name}`,
-        files = scriptFiles('.', scripts[name]).filter((file) => existsSync(join(root, file)));
-      // Only a file that takes the GPU lock does GPU work here; a CPU step (the bundler matrix) may time itself.
-      const gpu = files.filter((file) => readText(file).includes('gpu-lock.mjs'));
-      return lockMode(label, gpu, readText) === 'exclusive' ? [{ label, files: gpu }] : [];
-    });
-}
-
-/** Files under packages/<dir>/{test,tests,scripts}/ (not node tests) that open a browser. */
-function browserFiles() {
-  const found = [];
-  const walk = (dir) => {
-    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
-      const path = `${dir}/${entry.name}`;
-      if (entry.isDirectory()) {
-        if (entry.name !== 'node_modules' && entry.name !== 'fixtures') walk(path);
-      } else if (/\.m?js$/.test(entry.name) && !entry.name.endsWith('.test.js')) {
-        if (drivesBrowser(readFileSync(join(root, path), 'utf8'))) found.push(path);
-      }
+export function unrunBrowserFiles(commands, universe, read, exempt = TOOLS) {
+  const known = new Set(universe),
+    reached = new Set(),
+    queue = [],
+    byStem = new Map(),
+    byName = new Map();
+  for (const file of universe) {
+    const stem = `${packageOf(file)}:${stemOf(file)}`,
+      name = file.slice(file.lastIndexOf('/') + 1);
+    byStem.set(stem, [...(byStem.get(stem) ?? []), file]);
+    byName.set(name, [...(byName.get(name) ?? []), file]);
+  }
+  const reach = (file) => {
+    if (known.has(file) && !reached.has(file)) {
+      reached.add(file);
+      queue.push(file);
     }
   };
-  for (const pkg of readdirSync(join(root, 'packages')))
+  const stems = (pkg, word) => {
+    if (pkg) for (const file of byStem.get(`${pkg}:${word}`) ?? []) reach(file);
+  };
+  for (const { cwd, command } of commands) {
+    for (const file of scriptFiles(cwd, command)) reach(file);
+    const pkg = packageOf(cwd.replaceAll('\\', '/'));
+    for (const token of command.split(/\s+/)) {
+      const flag = /^--([\w-]+)(?:=([\w-]+))?$/.exec(token);
+      if (flag) stems(pkg, flag[2] ?? flag[1]);
+      else stems(pkg, token);
+    }
+  }
+  while (queue.length) {
+    const file = queue.pop(),
+      text = uncomment(read(file) ?? ''),
+      dir = file.slice(0, file.lastIndexOf('/')),
+      pkg = packageOf(file);
+    for (const [, name] of text.matchAll(/(?:^|[^\w./@-])((?:\.{1,2}\/|\/)?[\w@./-]*?[\w-]+\.(?:m?js|html))\b/g)) {
+      if (name.startsWith('./') || name.startsWith('../'))
+        reach(relative(root, resolve(root, dir, name)).replaceAll('\\', '/'));
+      else if (name.startsWith('/')) reach(name.slice(1));
+      else if (name.includes('/')) {
+        for (const other of byName.get(name.slice(name.lastIndexOf('/') + 1)) ?? [])
+          if (other === name || other.endsWith(`/${name}`)) reach(other);
+      } else reach(`${dir}/${name}`);
+    }
+    for (const [, word] of text.matchAll(/['"`]([\w-]{2,})['"`]/g)) stems(pkg, word);
+  }
+  return universe.filter((file) => isBrowserFile(file, read(file) ?? '') && !reached.has(file) && !(file in exempt));
+}
+
+/**
+ * Every .js, .mjs and .html file a GPU run may load: package test, tests and scripts folders, scripts/ and tests/.
+ * A dot-named folder is a running test's scratch space (tests/.dev-server-watch-<pid> is made and removed while other
+ * root tests plan), never a test source, so the walk does not enter it: a file removed between the walk and its read
+ * failed the plan with ENOENT (KB-ROOT-RED18 part 5).
+ */
+export function testUniverse(base = root) {
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(join(base, dir), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== 'dist' && !entry.name.startsWith('.')) walk(path);
+      } else if (/\.(?:m?js|html)$/.test(entry.name)) found.push(path);
+    }
+  };
+  for (const pkg of readdirSync(join(base, 'packages')).sort())
     for (const sub of ['test', 'tests', 'scripts'])
-      if (existsSync(join(root, 'packages', pkg, sub))) walk(`packages/${pkg}/${sub}`);
+      if (existsSync(join(base, 'packages', pkg, sub))) walk(`packages/${pkg}/${sub}`);
+  walk('scripts');
+  walk('tests');
   return found.sort();
 }
 
@@ -538,12 +639,6 @@ export function splitSteps(test) {
 }
 
 /**
- * The steps in run order: every shared step first, then the timing steps (`exclusive`), each in plan order, so the run
- * gives up its shared slot once and the timing steps wait for the GPU alone at the end, not in the middle of the run.
- */
-export const lockOrder = (steps) => [...steps.filter((s) => !s.exclusive), ...steps.filter((s) => s.exclusive)];
-
-/**
  * The repo-relative files a planned step runs with node: a root suite's package.json script, else the step's own
  * command (following its `cd`); none for a step with no command.
  */
@@ -597,16 +692,23 @@ export const pauseText = (p) =>
  * Runs the steps in order and resolves one result per step, each with `outcome`: 'pass', 'fail', 'excluded' (with
  * `reason`), 'heat-not-resumed' (with `reason`) or 'not-run' (with `reason`), and `pauses` (each heat pause: peak,
  * stop and resume temperatures, seconds waited). `runStep(step, signal)` runs one step and resolves `{ ok, seconds,
- * aborted? }`; it must end the step when `signal` aborts. `read()` gives degrees C or null (scripts/support/heat.mjs);
- * `take(mode, step)` takes the GPU lock in `mode` ('shared', or 'exclusive' for a step with `exclusive`, a timing
- * test) and resolves its release, which is called before every cooldown and taken again after, so the lock is never
- * held while waiting for heat; the run switches holds between a shared step and an exclusive one. A heat profile with no reading at the start throws
- * THERMAL_SOURCE_MISSING: a run that cannot watch its temperature does not start. `pollMs` overrides the profile's
- * sample interval (tests).
+ * aborted? }`; it must end the step when `signal` aborts. `read()` gives degrees C or null (scripts/support/heat.mjs).
+ * `prepare(step)` runs the step's builds first and resolves null, or a result that ends the step without running it.
+ * `retry(label, attempt)` may run a failed step once more (after a GPU driver reset). A heat profile with no reading
+ * at the start throws THERMAL_SOURCE_MISSING: a run that cannot watch its temperature does not start. `pollMs`
+ * overrides the profile's sample interval (tests).
  */
 export async function runPlan(
   steps,
-  { profile, runStep, read = () => null, take = async () => () => {}, log = console.log, pollMs } = {},
+  {
+    profile,
+    runStep,
+    prepare = async () => null,
+    read = () => null,
+    retry = (label, attempt) => attempt(),
+    log = console.log,
+    pollMs,
+  } = {},
 ) {
   const heat = profile.heat,
     poll = pollMs ?? (heat ? heat.pollS * 1000 : 0),
@@ -616,28 +718,11 @@ export async function runPlan(
       'THERMAL_SOURCE_MISSING',
       `machine profile ${profile.name} watches the temperature but no reading could be had; set MARGO_THERMAL_FILE to a file holding the current temperature, or run on a machine with /sys/class/thermal zones`,
     );
-  // A timing step (`exclusive`) runs under its own exclusive hold of the GPU, taken just before it and released just
-  // after; every other step runs under the shared hold. take(mode, step) resolves the release of a hold in that mode.
-  const modeOf = (step) => (step?.exclusive ? 'exclusive' : 'shared');
-  let held = modeOf(steps.find((s) => !s.excluded)),
-    release = await take(
-      held,
-      steps.find((s) => !s.excluded),
-    ),
-    stopped = null;
-  const hold = async (step) => {
-    if (modeOf(step) === held) return;
-    release();
-    release = () => {};
-    held = modeOf(step);
-    release = await take(held, step);
-  };
-  // Releases the GPU lock, waits (bounded) for the resume temperature, and takes the lock again if it came.
+  let stopped = null;
+  // Waits (bounded) for the resume temperature.
   const coolFor = async (step, pause) => {
-    release();
-    release = () => {};
     log(
-      `\nPAUSED FOR HEAT: ${step.label}: ${pause.reason}; peak ${pause.peakC ?? '?'} C. GPU lock released; waiting at most ${heat.maxWaitMin} min for below ${heat.resumeC} C`,
+      `\nPAUSED FOR HEAT: ${step.label}: ${pause.reason}; peak ${pause.peakC ?? '?'} C. Step ended; waiting at most ${heat.maxWaitMin} min for below ${heat.resumeC} C`,
     );
     const cool = await coolDown({ read, resumeC: heat.resumeC, maxWaitMs: heat.maxWaitMin * 60_000, pollMs: poll });
     Object.assign(pause, {
@@ -648,13 +733,12 @@ export async function runPlan(
     });
     if (cool.resumed) {
       log(`RESUMED: ${step.label} at ${cool.lastC} C after ${cool.waitedS} s; running this step again from its start`);
-      release = await take(held, step);
     } else
       pause.notResumed = `still ${cool.lastC ?? 'unreadable'} C after the maximum wait of ${heat.maxWaitMin} min (lowest ${cool.lowestC ?? 'unreadable'} C; resume needs below ${heat.resumeC} C)`;
     return cool.resumed;
   };
-  try {
-    for (const step of steps) {
+  for (const step of steps) {
+    {
       if (step.excluded) {
         results.push({ ...step, outcome: 'excluded', reason: step.excluded });
         continue;
@@ -663,10 +747,10 @@ export async function runPlan(
         results.push({ ...step, outcome: 'not-run', reason: stopped });
         continue;
       }
-      await hold(step);
       const pauses = [];
       let peakC = null,
-        result = null;
+        result = await prepare(step);
+      if (result) result = { ...result, outcome: result.ok ? 'pass' : 'fail' };
       while (!result) {
         // Starting hot only trips the stop at once: cool first (the same bounded wait, reported as a pause).
         const before = heat ? read() : null;
@@ -685,9 +769,23 @@ export async function runPlan(
           continue;
         }
         const controller = new AbortController(),
-          watch = heat ? watchHeat({ read, stopC: heat.stopC, pollMs: poll, onStop: () => controller.abort() }) : null,
-          run = await runStep(step, controller.signal),
-          seen = watch?.stop();
+          watch = heat ? watchHeat({ read, stopC: heat.stopC, pollMs: poll, onStop: () => controller.abort() }) : null;
+        // `retry` (a rerun after a driver reset) calls the attempt again. A run ended by the heat watch is not retried:
+        // the heat pause, not a reset, explains it.
+        const attempt = () => runStep(step, controller.signal);
+        let run;
+        try {
+          const first = await attempt();
+          let used = false;
+          run =
+            first.ok || first.aborted
+              ? first
+              : await retry(step.label, () => (used ? attempt() : ((used = true), first)));
+        } catch (error) {
+          watch?.stop();
+          throw error;
+        }
+        const seen = watch?.stop();
         if (seen && seen.peakC !== null) peakC = Math.max(peakC ?? seen.peakC, seen.peakC);
         if (!(run.aborted && seen?.reason)) {
           result = { ...run, outcome: run.ok ? 'pass' : 'fail' };
@@ -707,8 +805,6 @@ export async function runPlan(
       if (result.outcome === 'heat-not-resumed' && pauses.at(-1).resumed === false)
         stopped = `the run stopped for heat at ${step.label}: ${result.reason}`;
     }
-  } finally {
-    release();
   }
   return results;
 }
@@ -749,14 +845,21 @@ export function summaryLines(results) {
   return lines;
 }
 
-/** Measured seconds of the suites that bound a run (a full run, 2026-10-29); the last run's own times win. Others: 5 s. */
+/**
+ * Measured seconds of the suites that bound a run (a full run, 2026-10-29; the WebGL2 layer's corpus draw parts
+ * 2026-11-18, KB-COMPAT-CORPUSTIME1); the last run's own times win. Others: 5 s.
+ */
 export const MEASURED_SECONDS = {
   'biomes test:gpu': 431,
   'voxel-pathtracer test:gpu': 271,
   'voxel test:gpu:slow-compile': 247,
+  'webgl2-compat test:browser': 247,
   'voxel test:gpu': 160,
   'webgl2-compat test:gpu': 158,
-  'webgl2-compat test:browser': 87,
+  'webgl2-compat test:browser:compute-robot-planning-3': 149,
+  'webgl2-compat test:browser:compute-robot-planning-2': 133,
+  'webgl2-compat test:browser:compute-robot-planning-1': 123,
+  'webgl2-compat test:browser:compute': 86,
   'root test:frame-alloc:browser': 83,
   'lod test:gpu': 62,
   'root test:docs:browser': 47,
@@ -778,40 +881,43 @@ export function suiteJobs(steps, resourcesOf, last = {}) {
     }));
 }
 
-/** A hold's limit in minutes: a run and its rerun after a driver reset, plus room for the PREPARE builds. */
-export const holdMinutes = (step) =>
-  Math.ceil((2 * testLimitMs(step.minutes)) / 60_000) + (PREPARE[step.name] ? 25 : 5);
+/**
+ * One run's time limit: the suite's own (testLimitMs), but at most DEFAULT_MINUTES (10 min, Scott 2026-11-16), so a
+ * suite that runs long is ended by this runner and reported. A suite that needs longer is split into suites that each
+ * fit.
+ */
+export const runLimitMs = (step) => Math.min(testLimitMs(step.minutes), DEFAULT_MINUTES * 60_000);
+
+/** A step's share of a whole run's limit in minutes: its run and a rerun after a driver reset, plus its PREPARE builds. */
+export const stepMinutes = (step) => 2 * DEFAULT_MINUTES + (PREPARE[step.name] ? 20 : 0);
 
 /**
  * The longest a run of this script with `args` (its --only and --select) can take without anything hung, in minutes:
- * the sum of its steps' hold limits, since every step is ended at its own. A caller that wraps a whole run in one
- * limit (scripts/record-wgsl-corpus.mjs) takes this, not a fixed cap that a slow GPU outgrows with nothing hung.
+ * the sum of its steps' limits (stepMinutes), since every step is ended at its own. A caller that wraps a whole run in
+ * one limit (scripts/record-wgsl-corpus.mjs) takes this, not a fixed cap that a slow GPU outgrows with nothing hung.
  */
 export function runMinutes(args, tests = plan(), profile = machineProfile()) {
   const only = /--only=(\S+)/.exec(args)?.[1],
     select = /--select=(\S+)/.exec(args)?.[1],
     chosen = select && new Set(select.split(',').filter(Boolean)),
-    picked = tests.filter((t) => (!only || t.label.includes(only)) && (!chosen || chosen.has(testId(t))));
-  return planSteps(picked, profile)
+    chosenTests = tests.filter((t) => picked(t, only, chosen));
+  return planSteps(chosenTests, profile)
     .filter((step) => !step.excluded)
-    .reduce((sum, step) => sum + holdMinutes(step), 0);
+    .reduce((sum, step) => sum + stepMinutes(step), 0);
 }
 
 /**
- * The suites side by side: each in its own slot of the GPU lock with its own log. The first failure stops the run, unless
- * `keepGoing`: then every suite runs and every failure is reported.
+ * The suites side by side, each with its own log. The first failure stops the run, unless `keepGoing`: then every
+ * suite runs and every failure is reported.
  */
-export async function runSideBySide(
-  steps,
-  { env, phase, keepGoing = false, logs = join(root, 'test-results/gpu-suites') },
-) {
+export async function runSideBySide(steps, { env, keepGoing = false, logs = join(root, 'test-results/gpu-suites') }) {
   const record = join(root, 'test-results/gpu-packages.json'),
     scripts = json('package.json').scripts,
     last = existsSync(record)
       ? Object.fromEntries(JSON.parse(readFileSync(record, 'utf8')).results.map((r) => [r.label, r.seconds]))
       : {},
     resources = suiteResources(root, steps, { scripts, prepare: PREPARE });
-  if (phase !== 'timing') rmSync(logs, { recursive: true, force: true });
+  rmSync(logs, { recursive: true, force: true });
   mkdirSync(logs, { recursive: true });
   const prepared = new Map();
   const prepare = (command, logFile, signal) => {
@@ -822,45 +928,41 @@ export async function runSideBySide(
       );
     return prepared.get(command);
   };
-  const jobs = suiteJobs(steps, resources, last);
+  const jobs = suiteJobs(steps, resources, last),
+    logOf = (step) => join(logs, `${step.id.replace(/[^\w.-]+/g, '_')}.log`);
   const done = await runJobs(jobs, {
-    limit: slots(),
+    // No limit on suites at once beyond what their resources allow.
+    limit: jobs.length || 1,
     keepGoing,
     log: (line) => console.error(line),
-    take: (mode, step) =>
-      acquire({
-        owner: suiteOwner(root, step.label),
-        mode,
-        timing: mode === 'exclusive' ? `GPU timing suite: ${step.label}` : undefined,
-        max: holdMinutes(step),
-        poll: 2000,
-        command: step.command,
-      }),
-    run: async (step, signal) => {
-      const logFile = join(logs, `${step.id.replace(/[^\w.-]+/g, '_')}.log`);
+    // A rerun after a driver reset.
+    retry: async (label, attempt) => {
+      const result = await retryAfterDriverReset(label, attempt);
+      console.log(`${result.ok ? 'pass' : 'FAIL'}   ${label}  ${result.seconds} s`);
+      return result;
+    },
+    // The suite's builds run before its GPU run.
+    prepare: async (step, signal) => {
+      const logFile = logOf(step);
       writeFileSync(logFile, `=== ${step.label}\n`);
-      console.log(`start  ${step.label}`);
       for (const command of PREPARE[step.name] ?? [])
         if (!(await prepare(command, logFile, signal)).ok)
           return { ok: false, log: logFile, message: `${command} failed (needed by ${step.label}); see ${logFile}` };
-      const once = async () => {
-        const result = await runLimited(step.command, {
-          cwd: join(root, step.cwd),
-          env: { ...env, MARGO_GPU_LOCK_NESTED_MODE: step.exclusive ? 'exclusive' : 'shared' },
-          limitMs: testLimitMs(step.minutes),
-          label: step.label,
-          signal,
-          logFile,
-        });
-        if (result.message) console.error(`\nHUNG: ${result.message}`);
-        return { ...result, log: logFile };
-      };
-      const first = await once();
-      if (first.ok || first.aborted) return first;
-      let used = false;
-      const result = await retryAfterDriverReset(step.label, async () => (used ? once() : ((used = true), first)));
-      console.log(`${result.ok ? 'pass' : 'FAIL'}   ${step.label}  ${result.seconds} s`);
-      return result;
+      return null;
+    },
+    run: async (step, signal) => {
+      const logFile = logOf(step);
+      console.log(`start  ${step.label}`);
+      const result = await runLimited(step.command, {
+        cwd: join(root, step.cwd),
+        env,
+        limitMs: runLimitMs(step),
+        label: step.label,
+        signal,
+        logFile,
+      });
+      if (result.message) console.error(`\nHUNG: ${result.message}`);
+      return { ...result, log: logFile };
     },
   });
   const byId = new Map(done.map((r) => [r.id, r]));
@@ -871,63 +973,50 @@ export async function runSideBySide(
 
 export const USAGE = `usage: node scripts/gpu-package-tests.mjs [options]
 
-Runs every real-GPU browser test once, after building the packages, holding shared slots of the GPU lock.
+Runs every real-GPU browser test once, after building the packages, each directly with a hard time limit.
 
 Options:
   --no-build                 dist is current; skip the package build
   --only=<substring>         run the tests whose label contains the substring
   --select=<id>,<id>         run exactly these tests; an id is <dir>/<script> or root/<script>
   --list                     print the plan and the machine profile, run nothing
-  --parallel                 run suites side by side, each in its own GPU slot (or MARGO_CHECK_PARALLEL=1)
+  --parallel                 run suites side by side (or MARGO_CHECK_PARALLEL=1)
   --serial                   one suite at a time, whatever else is set (or MARGO_CHECK_SERIAL=1)
   --keep-going               a failed suite stops nothing; the run ends with every failure and exit 1 (or MARGO_CHECK_KEEP_GOING=1)
-  --phase=shared|timing      only the shared suites, or only the timing suites added to the shared phase's results (check:merge)
   -h, --help                 print this help and exit
 
 Example:
   node scripts/gpu-package-tests.mjs --no-build --select=sky/test:gpu,root/test:basic-scene`;
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  exitOnHelp(USAGE);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href && !showHelp(USAGE)) await main();
+
+/** The command line run: the plan, or every picked suite once. */
+async function main() {
   const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
   const select = process.argv.find((a) => a.startsWith('--select='))?.slice(9);
   const chosen = select === undefined ? undefined : new Set(select.split(',').filter(Boolean));
-  const tests = plan().filter((t) => (!only || t.label.includes(only)) && (!chosen || chosen.has(testId(t))));
-  const unknown = chosen ? [...chosen].filter((id) => !tests.some((t) => testId(t) === id)) : [];
+  const tests = plan().filter((t) => picked(t, only, chosen));
+  const unknown = chosen ? [...chosen].filter((id) => !tests.some((t) => picked(t, undefined, new Set([id])))) : [];
   if (unknown.length) throw new Error(`--select names no GPU test: ${unknown.join(', ')}; list them with --list`);
   const profile = machineProfile(),
-    phase = process.argv.find((a) => a.startsWith('--phase='))?.slice(8),
-    steps = lockOrder(planSteps(tests, profile)).filter(
-      (s) => !phase || (phase === 'timing' ? s.exclusive : !s.exclusive),
-    ),
+    planned = planSteps(tests, profile),
     sideBySide = parallelMode({ argv: process.argv, env: process.env, profile }),
     keepGoing = keepGoingMode({ argv: process.argv, env: process.env });
   reportSpeedPhase('check:gpu-packages');
-  if (!speedEnabled()) {
-    for (let i = steps.length - 1; i >= 0; i--)
-      if (steps[i].exclusive) {
-        deferSpeed(steps[i].label);
-        steps.splice(i, 1);
-      }
-  }
-  if (phase && phase !== 'shared' && phase !== 'timing')
-    throw new RangeError(`--phase must be shared or timing, got ${phase}`);
+  // Timing tests wait for the speed phase (scripts/speed-phase.json): deferred, they are named and left out of this run.
+  const { shared: steps, timing: timingSteps } = splitTiming(planned);
   if (process.argv.includes('--list')) {
     console.log(describeProfile(profile));
-    for (const s of steps)
+    for (const s of [...steps, ...timingSteps])
       console.log(
-        s.excluded
-          ? `${s.label}: EXCLUDED BY PROFILE (${s.excluded})`
-          : `${s.label}: (${s.cwd}) ${s.command}${s.exclusive ? '  [timing: exclusive GPU, own step]' : ''}`,
+        s.excluded ? `${s.label}: EXCLUDED BY PROFILE (${s.excluded})` : `${s.label}: (${s.cwd}) ${s.command}`,
       );
-    process.exit(0);
+    return;
   }
-  // Children taking this same lock run inside it; any other lock they take is still taken. In this gate a Jupyter check
-  // that cannot run (no Python, no network to make its venv) fails instead of printing SKIP (python/tests/venv.mjs).
+  // In this gate a Jupyter check that cannot run (no Python, no network to make its venv) fails instead of printing
+  // SKIP (python/tests/venv.mjs).
   const env = {
     ...process.env,
-    MARGO_GPU_LOCK_NESTED: join(lockDir, 'nested'),
-    MARGO_GPU_LOCK_NESTED_MODE: 'shared',
     MARGO_REQUIRE_JUPYTER: process.env.MARGO_REQUIRE_JUPYTER ?? '1',
   };
   const run = (command, cwd) => {
@@ -936,7 +1025,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     return { ok: status === 0, seconds: Math.round((performance.now() - t0) / 100) / 10 };
   };
   console.log(describeProfile(profile));
-  // The build needs no GPU, so it runs before the lock is taken.
+  // The build needs no GPU; it runs before every test.
   if (!process.argv.includes('--no-build') && !run('npm run build:packages', '.').ok)
     throw new Error('npm run build:packages failed; fix the build first');
   const started = performance.now(),
@@ -944,61 +1033,49 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     prepareFailed = new Set(),
     thermal = profile.heat ? thermalSource() : null;
   if (thermal) console.log(`temperature from the ${thermal.name}`);
-  const results = sideBySide
-    ? await runSideBySide(steps, { env, phase, keepGoing })
-    : await runPlan(steps, {
-        profile,
-        read: thermal?.read,
-        // A short poll: other holders often release and take the lock again within seconds. Held for the whole run (about
-        // 10 min alone, 15 with another run beside it), so the hold limit is 60 min; a heat pause releases it while it waits.
-        // A timing step holds the GPU exclusively for itself alone: the hold limit is its own time limit plus 5 min, the
-        // heartbeat keeps it, and it is released as soon as the step ends.
-        take: (mode, step) =>
-          acquire({
-            owner: suiteOwner(root, mode === 'exclusive' ? step.label : undefined),
-            mode,
-            timing: mode === 'exclusive' ? `GPU timing suite: ${step.label}` : undefined,
-            max: mode === 'exclusive' ? Math.ceil(testLimitMs(step.minutes) / 60_000) + 5 : 60,
-            poll: 2000,
-          }),
-        runStep: async (step, signal) => {
-          // Each preparing command once, however many suites need it.
-          for (const command of PREPARE[step.name] ?? []) {
-            if (prepared.has(command)) continue;
-            if (prepareFailed.has(command) || !run(command, '.').ok) {
-              if (!keepGoing) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
-              // Once only: every other suite that needs it fails the same way, and the rest go on.
-              prepareFailed.add(command);
-              console.error(`${command} failed (needed by ${step.label}); that suite counts as failed`);
-              return { ok: false, seconds: 0 };
+  const runSteps = (list, beside) =>
+    beside
+      ? runSideBySide(list, { env, keepGoing })
+      : runPlan(list, {
+          profile,
+          read: thermal?.read,
+          // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed.
+          retry: retryAfterDriverReset,
+          // Each preparing command once, however many suites need it, before the suite runs.
+          prepare: async (step) => {
+            for (const command of PREPARE[step.name] ?? []) {
+              if (prepared.has(command)) continue;
+              if (prepareFailed.has(command) || !run(command, '.').ok) {
+                if (!keepGoing) throw new Error(`${command} failed (needed by ${step.label}); fix it first`);
+                // Once only: every other suite that needs it fails the same way, and the rest go on.
+                prepareFailed.add(command);
+                console.error(`${command} failed (needed by ${step.label}); that suite counts as failed`);
+                return { ok: false, seconds: 0 };
+              }
+              prepared.add(command);
             }
-            prepared.add(command);
-          }
-          console.log(`\n=== ${step.label}`);
-          const once = async () => {
+            return null;
+          },
+          runStep: async (step, signal) => {
+            console.log(`\n=== ${step.label}`);
             const result = await runLimited(step.command, {
               cwd: join(root, step.cwd),
-              env: { ...env, MARGO_GPU_LOCK_NESTED_MODE: step.exclusive ? 'exclusive' : 'shared' },
-              limitMs: testLimitMs(step.minutes),
+              env,
+              limitMs: runLimitMs(step),
               label: step.label,
               signal,
             });
             if (result.message) console.error(`\nHUNG: ${result.message}`);
             return result;
-          };
-          // A test that fails while the GPU driver resets (bug 25) runs once more; the reset and the rerun are printed. A
-          // step ended by the heat watch goes back to runPlan as it is: the heat pause, not a reset, explains it.
-          const first = await once();
-          if (first.ok || first.aborted) return first;
-          let used = false;
-          return retryAfterDriverReset(step.label, async () => (used ? once() : ((used = true), first)));
-        },
-      });
+          },
+        });
+  const results = [
+    ...(await runSteps(steps, sideBySide)),
+    ...(timingSteps.length ? await runSteps(timingSteps, false) : []),
+  ];
   mkdirSync(join(root, 'test-results'), { recursive: true });
-  // The timing phase adds to what the shared phase wrote, so one file holds the run.
   const recordFile = join(root, 'test-results/gpu-packages.json'),
-    earlier = phase === 'timing' ? JSON.parse(readFileSync(recordFile, 'utf8')).results : [],
-    { json, warnings } = report([...earlier, ...results], profile);
+    { json, warnings } = report(results, profile);
   writeFileSync(recordFile, JSON.stringify({ ...json, parallel: sideBySide }, null, 2) + '\n');
   console.log(`\nGPU package tests, ${describeProfile(profile)}${sideBySide ? ', side by side' : ''}:`);
   for (const line of summaryLines(results)) console.log(line);
@@ -1022,7 +1099,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error(
       'No test failed, but a heat stop was not resumed: the run is incomplete (exit 75). Rerun the steps named above when the machine is cool, or on a profile that can take the load.',
     );
+  // Every suite has ended by now, a stopped run's too (runJobs aborts the suites beside a failure and waits for them), so
+  // the run ends by its event loop with this code (KB-OWN-EXIT2).
   process.exitCode = code;
-  // A stopped run may still be queued for a slot it no longer wants: end now, nothing else is left to do.
-  if (sideBySide && code) process.exit(code);
 }

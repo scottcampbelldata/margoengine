@@ -67,6 +67,32 @@ for (const compat of [false, true]) {
       check(demo.bars.values.reduce((a, b) => a + b, 0) === subset.length, 'histogram uses selected rows');
       demo.selection.undo();
       check(demo.selected === demo.cloud.count, 'undo restores all views');
+      {
+        // A click on a bin selects its rows, but the click that ends a pan or a box drag over a bin does not.
+        const host = demo.histogram.engine.canvas,
+          box = host.getBoundingClientRect();
+        let at;
+        for (let x = 4; x < box.width && !at; x += 2)
+          for (let y = box.height - 4; y > 0 && !at; y -= 4)
+            if (demo.histogram.pick(x, y)?.layer === demo.bars) at = { x: box.left + x, y: box.top + y };
+        check(at, 'a histogram bin is under the pointer somewhere');
+        const fire = (type, x, y) =>
+          host.dispatchEvent(
+            new PointerEvent(type, { clientX: x, clientY: y, button: 0, pointerId: 1, bubbles: true, cancelable: true }),
+          );
+        const press = (from, to) => {
+          fire('pointerdown', from.x, from.y);
+          fire('pointerup', to.x, to.y);
+          host.dispatchEvent(new MouseEvent('click', { clientX: to.x, clientY: to.y, button: 0, bubbles: true }));
+        };
+        const all = demo.selected;
+        press({ x: at.x, y: Math.max(box.top + 1, at.y - 40) }, at);
+        check(demo.selected === all, `a drag released over a bin keeps the selection (${demo.selected} of ${all})`);
+        press(at, at);
+        check(demo.selected > 0 && demo.selected < all, `a click on a bin selects its rows (${demo.selected})`);
+        demo.selection.undo();
+        check(demo.selected === all, 'undo restores the bin click');
+      }
       // KB5588c: a bound scatter keeps its own drawing (eye-dome lighting, per-point sizes, square shape) and a bound
       // line its own styling (dashes); the SVG export applies the selection as drawn.
       const styledCanvas = document.createElement('canvas');

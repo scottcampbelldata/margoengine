@@ -5,10 +5,9 @@
 // direction)) with penumbra 0 a hard edge, up to a pi/2 hemisphere. Lights without decay or angle must keep the original
 // inverse-square term. The same holds for the light terms @margoengine/environment's VolumetricFog compiles for these
 // lights on a real engine, whose whole froxel shader must build and run without a validation error.
-// Run: node scripts/clustered-falloff-gpu-check.js (takes the GPU lock).
+// Run: node scripts/clustered-falloff-gpu-check.js.
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
 const deg = Math.PI / 180,
   top = [0, 3, 0],
@@ -54,7 +53,6 @@ function expected(light, position) {
   return [falloff, smoothstep(Math.cos(outer), Math.cos(inner), x)];
 }
 
-const release = await acquire({ owner: 'clustered-falloff-gpu-check' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5232 });
@@ -163,9 +161,14 @@ try {
         canvas.remove();
         if (validation || errors.length)
           throw new Error(validation?.message ?? errors.map((m) => m.message).join('\n'));
+        // Since 2026-11-15 the froxel loop widens the cone by the froxel's footprint seen from the light, through
+        // outerCos and innerCos; with no footprint they are the light's own cosines, and the terms must be clustered's.
         const local = code.slice(code.indexOf('fn localLight(')),
-          from = local.indexOf('let l=delta/max(distance,0.0001);') + 'let l=delta/max(distance,0.0001);'.length;
-        return local.slice(from, local.indexOf('result+=', from));
+          from = local.indexOf(';', local.indexOf('let keep=')) + 1;
+        return (
+          'let outerCos=light.directionOuter.w;let innerCos=light.params.x;' +
+          local.slice(from, local.indexOf('sum+=', from))
+        );
       };
       // The decay-aware light terms, cut from the shader clusteredSampling emits once a light sets decay or angle.
       const shader = clusteredSampling(0, undefined, undefined, false, true),
@@ -213,5 +216,4 @@ try {
   );
 } finally {
   await browser?.close();
-  release();
 }

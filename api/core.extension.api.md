@@ -197,6 +197,7 @@ export class Mesh {
     [Symbol.dispose]: () => void;
     name: string;
     kids?: Set<number>;
+    born: number;
     readonly position: VectorRef;
     readonly rotation: VectorRef;
     readonly scale: VectorRef;
@@ -478,6 +479,7 @@ class Mesh {
     [Symbol.dispose]: () => void;
     name: string;
     kids?: Set<number>;
+    born: number;
     readonly position: VectorRef;
     readonly rotation: VectorRef;
     readonly scale: VectorRef;

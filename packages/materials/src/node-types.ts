@@ -1,4 +1,4 @@
-import type { MaterialExtensionTexture } from '@margoengine/gltf-pro';
+import type { MaterialExtensionTexture } from '@margoengine/gltf/pbr';
 
 /** A linear RGBA constant, stored in the optional material factors block. */
 export interface ColorNode {

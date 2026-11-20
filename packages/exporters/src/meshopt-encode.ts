@@ -1,6 +1,6 @@
 // glTF meshopt bufferView encoding, written clean room from the EXT_meshopt_compression and
-// KHR_meshopt_compression specifications (Appendix A "Bitstream"): the version 0 attribute codec and the version 0
-// triangle codec. Margo's decoder (@margoengine/decoders/meshopt) is the reader these streams are tested against.
+// KHR_meshopt_compression specifications (Appendix A "Bitstream"): the version 0 attribute codec (header 0xa0, which
+// both specifications accept) and the triangle codec with header 0xe1, the only triangle header either allows. Margo's decoder (@margoengine/decoders/meshopt) is the reader these streams are tested against.
 // Nothing here was derived from another encoder's source.
 
 const GROUP = 16;
@@ -105,7 +105,8 @@ export function encodeVertexBuffer(data: Uint8Array, count: number, size: number
 const AUX = [0x00, 0x01, 0x10, 0x12, 0x21, 0x02, 0x20, 0x13, 0x31, 0x23, 0x32, 0x03, 0x30, 0x11];
 
 /**
- * Encodes a triangle list with the version 0 triangle codec. Vertices are renumbered in order of first use, which the
+ * Encodes a triangle list with the triangle codec (header 0xe1): an edge's third vertex is the next new vertex, vertex
+ * FIFO entry 1 to 12, last - 1, last + 1 or an explicit delta. Vertices are renumbered in order of first use, which the
  * codec requires; the result carries the renumbering so the caller can reorder its vertex data to match.
  * @param indices a multiple of 3 indices into `vertexCount` vertices
  * @returns `remap[old]` is the new index of vertex `old` (vertices no triangle uses follow the used ones); `indices` are
@@ -176,8 +177,10 @@ export function encodeTriangles(
         let lo = 0,
           cost = 0;
         if (z >= 0) {
-          const f = fifoIndex(z, 1, 14);
+          const f = fifoIndex(z, 1, 12);
           if (f > 0) lo = f;
+          else if (z === last - 1) lo = 13;
+          else if (z === last + 1) lo = 14;
           else {
             lo = 15;
             cost = varintSize(z, last);
@@ -198,8 +201,10 @@ export function encodeTriangles(
         z = next++;
         map[zOld] = z;
         pushVertex(z);
-      } else if (lo === 15) {
-        putVarint(z);
+      } else if (lo >= 13) {
+        // 13 and 14 name last - 1 and last + 1 and move last there; 15 reads a delta from last.
+        if (lo === 15) putVarint(z);
+        else last = z;
         pushVertex(z);
       }
       pushEdge(z, y);
@@ -282,7 +287,7 @@ export function encodeTriangles(
   }
 
   const bytes = new Uint8Array(1 + triangles + data.length + 16);
-  bytes[0] = 0xe0;
+  bytes[0] = 0xe1;
   bytes.set(codes, 1);
   bytes.set(data, 1 + triangles);
   for (let i = 0; i < 14; i++) bytes[bytes.length - 16 + i] = AUX[i];

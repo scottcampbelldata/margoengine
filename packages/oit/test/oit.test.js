@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
+import { extendedMaterials } from '../../gltf/dist/extended.js';
 import { Material, Texture, createMesh } from '../../materials/dist/index.js';
 import { OIT } from '../dist/index.js';
 import { addMesh } from '../dist/meshes.js';
@@ -13,7 +13,7 @@ import { PreciseOIT } from '../dist/precise.js';
 import { MomentOIT } from '../dist/moments.js';
 import { TransparentDepth } from '../dist/depth.js';
 import { addEffect } from '../dist/vfx.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 // Opaque, BLEND, BLEND + transmission (keeps the sorted path) and BLEND + clearcoat (physical variant).
 const materials = [
@@ -64,7 +64,7 @@ async function scene(samples = 4) {
 }
 const of = (log, name) => log.filter((e) => e[0] === name);
 // The native glass adapter owns its copy/resolve/presentation passes, checked in materials' regression.
-// These assertions retain the complete gltf-pro geometry and OIT pass sequence.
+// These assertions retain the complete gltf/pbr geometry and OIT pass sequence.
 const passes = (log) =>
   of(log, 'beginRenderPass')
     .map((e) => e[1])

@@ -22,7 +22,7 @@ export interface VolumeLabel {
   readonly name?: string;
   /** Linear-light colour and per-voxel opacity, each in [0,1]. */
   readonly rgba: TransferRGBA;
-  /** Boundary colour/opacity and thickness in framebuffer pixels (integer 1..16, default 1). Default no outline. */
+  /** Boundary colour/opacity and thickness in CSS pixels (integer 1..16, default 1). Default no outline. */
   readonly outline?: { readonly rgba: TransferRGBA; readonly width?: number };
 }
 /** One independent scalar component, classified after interpolation. */

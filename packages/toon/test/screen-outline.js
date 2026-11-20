@@ -1,7 +1,7 @@
 import { Engine, Geometry, PbrMaterial } from '../../core/dist/index.js';
 import { sphereGeometry } from '../../geometry/dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
-import { loadGLTF } from '../../gltf-pro/dist/index.js';
+import { loadGLTF } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { Toon, ModelOutlines } from '../dist/screen-outline.js';

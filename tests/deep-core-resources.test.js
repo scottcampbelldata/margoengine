@@ -28,7 +28,7 @@ test('Core picking releases partial allocations and permits retries after setup 
         return {};
       },
       mapAsync: async () => {},
-      getMappedRange: () => new Uint32Array([0xffffffff]).buffer,
+      getMappedRange: () => new Uint32Array([0]).buffer, // the pick pass's clear: no mesh
       unmap() {},
     };
     resources.push(value);
@@ -192,7 +192,7 @@ test('Core picking compiles its pipeline once per shader text and counts it towa
     destroy() {},
     createView: () => ({}),
     mapAsync: async () => {},
-    getMappedRange: () => new Uint32Array([0xffffffff]).buffer,
+    getMappedRange: () => new Uint32Array([0]).buffer, // the pick pass's clear: no mesh
     unmap() {},
   });
   const device = {

@@ -1,6 +1,6 @@
 /**
  * How `Shadows` filters its depth map. `'soft'`: PCSS, penumbrae that widen with blocker distance and `lightSize`
- * (16 blocker reads and 32 comparison taps per lit pixel). `'pcf'`: four hardware comparison taps half a texel apart,
+ * (`blockerSamples` reads, 16 by default, and `samples` comparison taps, 32 by default, per lit pixel). `'pcf'`: four hardware comparison taps half a texel apart,
  * a smooth edge about three texels wide, no blocker search. `'hard'`: one hardware comparison tap (the sampler's own
  * 2x2 bilinear comparison), the cheapest edge.
  */
@@ -25,10 +25,12 @@ export interface ShadowEffectMap {
   width: number;
   height: number;
   layers: number;
+  /** The engine the shadows draw for: an effect reports a lost borrowed object through its `onError`. */
+  engine?: { readonly gpu: GPUDevice | null; onError(error: unknown): void };
 }
 /**
  * Something the shadow pass multiplies the sun by, from `@margoengine/shadows/light-function` and the other optional
- * entries, or written by hand. Give it in the `effects` option of `Shadows` or `VirtualShadows`: every receiver, gltf-pro
+ * entries, or written by hand. Give it in the `effects` option of `Shadows` or `VirtualShadows`: every receiver, gltf/pbr
  * models and materials included, then takes it. WebGPU only; resource names start `shadowFx`.
  */
 export interface ShadowEffect<Context = unknown> {
@@ -45,8 +47,21 @@ export interface ShadowEffect<Context = unknown> {
   readonly style?: string;
   /** The resources of those bindings in order, read when the receivers' bindings are made. */
   resources?(): readonly GPUBindingResource[];
+  /**
+   * A number that changes when `wgsl` would now give other code (code it loads on first use has arrived). `Shadows` and
+   * `VirtualShadows` read it before composing a receiver's shader and compose every receiver again when it changes.
+   * Omitted, the code never changes.
+   */
+  readonly revision?: number;
+  /** True when `resources` would now give other objects (a replaced texture); read after `update`, the bindings are made again. */
+  rebind?(): boolean;
   /** Makes GPU objects; runs at attach, after a new map size and after a device loss. Runs again on the same effect. */
   setup?(device: GPUDevice, map: ShadowEffectMap): void;
+  /**
+   * Moves the effect's own clock by a frame delta in seconds. `Shadows` and `VirtualShadows` run it in their frame
+   * update, never in a pass, so two views in a frame move it once and a seek replays it.
+   */
+  advanceTime?(delta: number): void;
   /** Runs once per frame after the depth passes. */
   update?(frame: ShadowEffectFrame<Context>): void;
   /** Frees GPU objects. */
@@ -57,6 +72,57 @@ export interface ShadowFilterEffect<Context = unknown> extends ShadowEffect<Cont
   /** WGSL that returns visibility, 0 to 1, in place of the named filters, with `uv`, `layer`, `reference`, `position` and `normal` in scope. */
   readonly body: string;
 }
+/** The `'soft'` filter's live options, which `Shadows` and `VirtualShadows` share. */
+export interface SoftShadowOptions {
+  /** Comparison taps per lit pixel, a whole number from 1 to 128. Default 32. */
+  samples?: number;
+  /** Blocker-search reads per lit pixel, a whole number from 1 to 128. Default 16. */
+  blockerSamples?: number;
+  /** Blocker-to-receiver distance, world units, 0 or more, of the sharpest penumbra. Default 0. */
+  focus?: number;
+}
+/**
+ * Checks the `'soft'` filter's counts and focus for `Shadows` and `VirtualShadows` alike; both write them, in this
+ * order, to the `soft` vec4f of their frame uniform, which {@link pcss} reads. Runs every frame, so compares and no
+ * call: V8's middle tier (Maglev) boxes a fractional number it passes to Number.isFinite or Math.fround.
+ * Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103.
+ */
+export function checkSoft(o: SoftShadowOptions): void {
+  for (let i = 0; i < 2; i++) {
+    const v = i === 0 ? (o.samples ?? 32) : (o.blockerSamples ?? 16);
+    if (!(v >= 1 && v <= 128) || v % 1 !== 0)
+      throw new RangeError('Invalid shadow options; samples and blockerSamples must be whole numbers from 1 to 128.');
+  }
+  const focus = o.focus ?? 0;
+  if (!(focus < 3.4028235677973366e38) || !(focus >= 0))
+    throw new RangeError('Invalid shadow options; focus must be finite and 0 or more.');
+}
+/**
+ * The PCSS body both entries' `'soft'` filters run (Fernando 2005, "Percentage-Closer Soft Shadows"): a blocker search
+ * of `shadowFrame.soft.y` reads over `search`, then `shadowFrame.soft.x` comparison taps over the penumbra, both on the
+ * golden-angle spiral from `turn`. Each entry gives only how it reads its map: `start` declares `turn` and `search`,
+ * `read` one blocker read at `offset` (adds to `sum` and `blockers`), `penumbra` the width from the world gap between
+ * blocker and receiver less `focus` (`gap(range)`, with the entry's depth range), `radius` its clamp and `tap` one
+ * comparison tap at `offset` (adds to `visibility`).
+ */
+export function pcss(p: { start: string; read: string; penumbra(gap: (range: string) => string): string; radius: string; tap: string }): string {
+  return `
+  ${p.start}
+  let searchTaps=shadowFrame.soft.y;var blockers=0.0;var sum=0.0;var direction=turn;
+  for(var j=0u;j<u32(searchTaps);j++){
+    let offset=direction*sqrt(f32(j)/searchTaps)*search;direction=shadowGolden*direction;
+    ${p.read}
+  }
+  if(blockers==0){return 1;}
+  let blocker=sum/blockers;
+  let penumbra=${p.penumbra((range) => `abs((reference-blocker)*${range}-shadowFrame.soft.z)`)};
+  let taps=shadowFrame.soft.x;let radius=${p.radius};var visibility=0.0;direction=turn;
+  for(var j=0u;j<u32(taps);j++){
+    let offset=direction*sqrt((f32(j)+0.5)/taps)*radius;direction=shadowGolden*direction;
+    ${p.tap}
+  }
+  return visibility/taps;`;
+}
 // Each filter's last step, after the cascade lookup (layer) and receiver-plane bias shared by all three.
 const filters: Record<ShadowFilter, string> = {
   // Taps follow a golden-angle (Vogel) spiral computed in the loop: tap j sits at radius sqrt((j+0.5)/n), turned one
@@ -64,35 +130,30 @@ const filters: Record<ShadowFilter, string> = {
   // arrays in per-pixel scratch memory, which phone GPUs handle badly. Each pixel starts the spiral at its own angle
   // from interleaved gradient noise of its screen position (Jimenez 2014), so a penumbra shows fine noise instead of
   // the steps of one pattern shared by every pixel. No time term: the same view renders the same pixels every frame.
-  // PCSS blocker search and penumbra estimate: Fernando 2005, "Percentage-Closer Soft Shadows". The search reaches
+  // PCSS blocker search and penumbra estimate: Fernando 2005, "Percentage-Closer Soft Shadows". Tap counts come from
+  // the frame (shadowFrame.soft: x filter taps, y blocker reads, `samples` and `blockerSamples`): Fernando 2005 notes the
+  // counts trade quality for speed with the light size, and Bavoil 2008 (GDC, "Advanced Soft Shadow Mapping Techniques")
+  // shows fewer blocker reads give noisier penumbrae. soft.z (`focus`) is the blocker-to-receiver distance, world units,
+  // at which the penumbra is sharpest: the estimate takes |gap - focus| in place of the gap, 0 giving Fernando's. The search reaches
   // from the receiver to the nearest caster in its layer (shadowFrame.nearest, the layer's smallest depth this frame):
   // a blocker farther up cannot exist, so the 16 reads stay where blockers are, however far casterMargin and the
   // cascade sphere put the near plane. Tap 0 reads the receiver's own texel, so a receiver whose texel is covered always
   // finds a blocker. A read counts only when it is nearer the light than both the receiver plane and the receiver
   // itself (min(...,0)): a surface behind the receiver cannot shade it, however the plane tilts on that side, which
   // keeps a curved or faceted receiver from reading its own far side, or the ground behind it, as a blocker.
-  soft: /* wgsl */ `
-  let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));
-  let search=max(texel.x,shadowFrame.settings.x*max(reference-shadowFrame.nearest[layer],0.0)*shadowFrame.ranges[layer]*length(rowX)*0.5);
-  var blockers=0.0;var sum=0.0;var direction=turn;
-  for(var j=0u;j<16u;j++){
-    let offset=direction*sqrt(f32(j)/16.0)*search;direction=shadowGolden*direction;
-    let coord=vec2i((uv+offset)*dimensions);
+  soft: pcss({
+    start: /* wgsl */ `let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));
+  let search=max(texel.x,shadowFrame.settings.x*max(reference-shadowFrame.nearest[layer],0.0)*shadowFrame.ranges[layer]*length(rowX)*0.5);`,
+    read: /* wgsl */ `let coord=vec2i((uv+offset)*dimensions);
     if(any(coord<vec2i(0))||any(coord>=vec2i(dimensions))){continue;}
     let d=textureLoad(shadowMap,coord,i32(layer),0);
     let plane=min(dot((vec2f(coord)+0.5)*texel-uv,slope),0.0);
-    if(d<reference+plane){sum+=d-plane;blockers+=1;}
-  }
-  if(blockers==0){return 1;}
-  let blocker=sum/blockers;
-  let penumbra=shadowFrame.settings.x*(reference-blocker)*shadowFrame.ranges[layer]*length(rowX)*0.5;
-  let radius=clamp(penumbra,texel.x,0.1);var visibility=0.0;direction=turn;
-  for(var j=0u;j<32u;j++){
-    let offset=direction*sqrt((f32(j)+0.5)/32.0)*radius;direction=shadowGolden*direction;
-    let coord=uv+offset;
-    if(any(coord<vec2f(0))||any(coord>vec2f(1))){visibility+=1;}else{visibility+=textureSampleCompareLevel(shadowMap,shadowSampler,coord,i32(layer),reference+min(dot(offset,slope),0.0));}
-  }
-  return visibility/32.0;`,
+    if(d<reference+plane){sum+=d-plane;blockers+=1;}`,
+    penumbra: (gap) => `shadowFrame.settings.x*${gap('shadowFrame.ranges[layer]')}*length(rowX)*0.5`,
+    radius: 'clamp(penumbra,texel.x,0.1)',
+    tap: /* wgsl */ `let coord=uv+offset;
+    if(any(coord<vec2f(0))||any(coord>vec2f(1))){visibility+=1;}else{visibility+=textureSampleCompareLevel(shadowMap,shadowSampler,coord,i32(layer),reference+min(dot(offset,slope),0.0));}`,
+  }),
   // Each tap is the sampler's 2x2 bilinear comparison; four of them half a texel apart add up to a 3x3-texel
   // quadratic B-spline. Written out, not looped: no arrays, no blocker search, no transcendental per tap.
   // PCF: Reeves, Salesin & Cook 1987, "Rendering Antialiased Shadows with Depth Maps".
@@ -153,7 +214,7 @@ export function shadowSampling(
   const declarations = effectDeclarations(group, effects),
     spread = effects.find((effect) => effect.tint)?.tint;
   return /* wgsl */ `
-struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,nearest:vec4f}
+struct ShadowFrame {matrices:array<mat4x4f,4>,view:mat4x4f,splits:vec4f,ranges:vec4f,settings:vec4f,soft:vec4f,nearest:vec4f}
 @group(${group}) @binding(1) var<uniform> shadowFrame:ShadowFrame;
 @group(${group}) @binding(2) var shadowMap:texture_depth_2d_array;
 @group(${group}) @binding(3) var shadowSampler:sampler_comparison;
@@ -204,6 +265,21 @@ fn shadowTint(position:vec3f,normal:vec3f)->vec3f {
 }${effects.length ? 'fn shadowReach()->f32 {return shadowFrame.splits.w;}\n' : ''}${declarations}fn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {if(all(direct==vec3f(0))){return direct;}return ${effectLight(effects, `shadowVisibility(position,normal)${colored ? '*shadowTint(position,normal)' : ''}`)};}
 `;
 }
+/**
+ * Whether any effect's `revision` has moved since `seen` (its last values, updated in place). The first read only
+ * records them.
+ */
+export function effectsRevised(effects: readonly ShadowEffect[], seen: number[]): boolean {
+  let changed = false;
+  for (let i = 0; i < effects.length; i++) {
+    const r = effects[i].revision ?? 0;
+    if (seen[i] !== r) {
+      changed ||= seen[i] !== undefined;
+      seen[i] = r;
+    }
+  }
+  return changed;
+}
 /** The effects' declarations. */
 export const effectDeclarations = (group: number, effects: readonly ShadowEffect[]): string =>
   effects.map((effect, i) => effect.wgsl(group, EFFECT_BINDING + i * EFFECT_STRIDE)).join('');
@@ -220,6 +296,17 @@ export const effectEntries = (effects: readonly ShadowEffect[]): GPUBindGroupEnt
   effects.flatMap((effect, i) =>
     (effect.resources?.() ?? []).map((resource, k) => ({ binding: EFFECT_BINDING + i * EFFECT_STRIDE + k, resource })),
   );
+/** Makes the effects' entries in `entries` again when one says its resources changed (`rebind`); true when it did. */
+export const rebindEffects = (entries: GPUBindGroupEntry[], effects: readonly ShadowEffect[]): boolean => {
+  let stale = false;
+  for (let i = 0; i < effects.length; i++) if (effects[i].rebind?.()) stale = true;
+  if (!stale) return false;
+  let kept = 0;
+  for (let i = 0; i < entries.length; i++) if (entries[i].binding < EFFECT_BINDING) entries[kept++] = entries[i];
+  entries.length = kept;
+  entries.push(...effectEntries(effects));
+  return true;
+};
 /** `options.effects`, checked. */
 export const validEffects = (effects: unknown): readonly ShadowEffect[] => {
   if (effects === undefined) return [];
@@ -254,7 +341,7 @@ struct Frame {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed ? ',alphaUV0
 @group(0) @binding(1) var alphaMap:texture_2d<f32>;
 @group(0) @binding(2) var alphaSampler:sampler;
 struct In {@location(0) position:${pbr ? 'vec4f' : 'vec3f'},${pbr ? '@location(3) uv:vec4f,@location(4) color:vec4f' : ''}}
-struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
 @vertex fn vertex(i:In)->Out {var o:Out;o.clip=f.camera*f.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}${transformed ? 'let sourceUV=o.uv;o.uv=vec2f(dot(f.alphaUV0.xy,sourceUV)+f.alphaUV0.z,dot(f.alphaUV1.xy,sourceUV)+f.alphaUV1.z);' : ''}return o;}
 @fragment fn fragment(i:Out){if(textureSampleLevel(alphaMap,alphaSampler,i.uv,0).a*f.alpha.x*i.alpha<f.alpha.y){discard;}}
 `;

@@ -5,8 +5,9 @@ import { OutlineFont, type TextShapeOptions } from './outline-font.js';
 export { OutlineFont } from './outline-font.js';
 export type { OutlineFontSource, OutlineGlyph, TextShapeOptions } from './outline-font.js';
 export type { OutlineCommand, OutlineFillRule } from './outline.js';
-export { parseTTF } from './ttf.js';
-export type { TTFParseOptions } from './ttf.js';
+export { parseTTF, parseTTFSource } from './ttf.js';
+export type { OpenTypeReaders, TTFFontSource, TTFParseOptions } from './ttf.js';
+export type { FontVariationAxis } from './sfnt-variation.js';
 
 /** Options of `textGeometry`. Lengths are in `size` units. */
 export interface TextGeometryOptions extends TextShapeOptions {

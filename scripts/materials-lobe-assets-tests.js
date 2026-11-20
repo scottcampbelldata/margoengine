@@ -63,7 +63,7 @@ try {
     const report = await page.evaluate(
       async (fixture) => {
         const { Engine } = await import('/packages/core/dist/index.js'),
-          { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+          { loadGLTF } = await import('/packages/gltf/dist/pbr.js'),
           materials = await import('/packages/materials/dist/index.js');
         const assert = (condition, message) => {
           if (!condition) throw new Error(message);
@@ -117,7 +117,7 @@ try {
           });
           const device = engine.gpu;
           device.pushErrorScope('validation');
-          // The lobes under test come from @margoengine/materials alone: load with the base shader, as gltf-pro did
+          // The lobes under test come from @margoengine/materials alone: load with the base shader, as gltf/pbr did
           // by default before it brought in its own physical shader for files that use these extensions.
           model = await loadGLTF(engine, fixture.url, { decoders: { materials: false } });
           const originalDocument = JSON.stringify(model.asset.doc),

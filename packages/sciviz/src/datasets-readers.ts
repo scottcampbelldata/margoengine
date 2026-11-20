@@ -181,7 +181,16 @@ async function values(array: VTKXMLArray | undefined, signal?: AbortSignal): Pro
   if (!array) bad('required topology array is missing');
   return array!.read(signal);
 }
-async function leaf(dataset: VTKXMLDataset, options: DataSetReadOptions): Promise<DataSet> {
+/** VTK 9.1 renumbered the Lagrange hexahedron to match the quadratic one: the nodes of edges 10 and 11 trade places
+ * (edge 10 runs 2 to 6, edge 11 runs 3 to 7, as `elementNodes` lists them). XML files older than version 2.2 carry
+ * the earlier order, so their edge 10 and 11 node blocks are swapped back here. */
+function legacyHexEdges(version: string | undefined): boolean {
+  if (version === undefined) return true;
+  const v = /^\s*(\d+)\.(\d+)\s*$/.exec(version);
+  if (!v) bad('VTKFile version must be major.minor');
+  return Number(v![1]) < 2 || (Number(v![1]) === 2 && Number(v![2]) < 2);
+}
+async function leaf(dataset: VTKXMLDataset, options: DataSetReadOptions, legacyHex: boolean): Promise<DataSet> {
   const blocks: DataSetInput[] = [];
   for (const piece of dataset.pieces) {
     const named = async (a: Readonly<Record<string, VTKXMLArray>>) =>
@@ -266,6 +275,12 @@ async function leaf(dataset: VTKXMLDataset, options: DataSetReadOptions): Promis
           order = 1;
           while (order <= 10 && elementNodes(element.shape, order).length !== ids.length) order++;
           if (order > 10) bad('Lagrange count does not match order 1..10');
+          if (legacyHex && type === 72 && order > 1) {
+            const n = order - 1,
+              ten = 8 + 10 * n,
+              eleven = 8 + 11 * n;
+            ids = [...ids.slice(0, ten), ...ids.slice(eleven, eleven + n), ...ids.slice(ten, eleven), ...ids.slice(eleven + n)];
+          }
         }
         cells.push({ ...element, ids, order });
       } else if (type === 42) {
@@ -326,7 +341,8 @@ async function open(
     !/type\s*=\s*['"](?:vtkMultiBlockDataSet|vtkPartitionedDataSet|vtkPartitionedDataSetCollection)['"]/.test(header)
   ) {
     using file = await openVTK(input, options);
-    return await leaf(file.dataset, options);
+    const version = /<VTKFile\s[^>]*?\bversion\s*=\s*['"]([^'"]*)['"]/.exec(header)?.[1];
+    return await leaf(file.dataset, options, legacyHexEdges(version));
   }
   const all = await readBytes(fileSource(input, max), 0, max, max, options.signal);
   if (all.length === max) bad('composite XML reaches maxBytes');

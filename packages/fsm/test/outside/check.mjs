@@ -45,5 +45,5 @@ console.log(
     delayed: total((state) => state.transitions.some((transition) => transition.after)),
   }),
 );
-if (differ) process.exit(1);
-writeFileSync(new URL('traces.json', folder), `${JSON.stringify(traces)}\n`);
+if (differ) process.exitCode = 1;
+else writeFileSync(new URL('traces.json', folder), `${JSON.stringify(traces)}\n`);

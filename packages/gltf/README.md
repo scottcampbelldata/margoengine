@@ -2,7 +2,10 @@
 
 Import `margoengine/gltf` from the `margoengine` package, or `@margoengine/gltf` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Lazy static glTF/GLB loading, named nodes and shared primitive geometry for Margo Engine.
+glTF 2.0 for Margo Engine in one package: the root is a lazy static glTF/GLB loader (named nodes, shared primitive
+geometry), and [`@margoengine/gltf/pbr`](#pbr-rendering-margoenginegltfpbr) is full metallic-roughness PBR rendering with
+its own entries for workers, streaming, instancing, lights, physics, behaviour graphs and more. Each entry loads only what
+it imports, so a page with the light loader pays nothing for PBR.
 
 Package name: `@margoengine/gltf`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
 
@@ -25,7 +28,7 @@ engine.start();
 
 The root loader reads static models with float positions and constant colours. Each feature below is its own entry, so
 a file that needs none of them costs none of their bytes. Pass the ones you want in `extensions`, to `loadGLTF` or
-`parseGLTF`; they combine. A file needing something no entry covers still throws, with a pointer to `@margoengine/gltf-pro`.
+`parseGLTF`; they combine. A file needing something no entry covers still throws, with a pointer to `@margoengine/gltf/pbr`.
 
 ### Quantized meshes
 
@@ -50,7 +53,7 @@ engine.start();
 `@margoengine/gltf/textured` draws `baseColorTexture` and `alphaMode: 'MASK'`, so a prop with one texture stays on the
 light path. It reads any `TEXCOORD_n` set, in float or normalized form, applies `KHR_texture_transform`, multiplies by
 `baseColorFactor` and cuts at `alphaCutoff` (default 0.5). PNG and JPEG images come from the GLB, a data URI or a URL
-next to the file. Other maps, `BLEND`, and compressed or WebP textures still need `@margoengine/gltf-pro`.
+next to the file. Other maps, `BLEND`, and compressed or WebP textures still need `@margoengine/gltf/pbr`.
 A cut-out's mip levels keep the share of texels that pass its cutoff, so leaves do not thin out in the distance.
 
 ```ts
@@ -66,7 +69,9 @@ engine.start();
 ```
 
 Images decode asynchronously, so for bytes already in memory use `parseGLTFAsync(engine, bytes, [], { extensions })` in
-place of `parseGLTF`. WebGPU only: a WebGL engine refuses the file. The meshes stay core meshes, so they move, pick and
+place of `parseGLTF`. It draws on WebGPU and on the WebGL2 compatibility layer (`install()` from
+`@margoengine/webgl2-compat` before `Engine.create`, where the browser has no WebGPU), with the same pixels on the
+same GPU; the small WebGL2 preview refuses the file with `MargoError` code `unsupported`, naming the layer. The meshes stay core meshes, so they move, pick and
 dispose as usual, and packages that patch core's shader apply to them. A cut-out casts its outline through
 `@margoengine/shadows`, and `engine.stats.drawCalls` counts these draws. GPU picks see a cut-out as solid, because core's
 pick draw has no uv; for a ray that passes through the holes, `texturedAlphaMasks(model, {signal, pixels})` gives
@@ -108,7 +113,14 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
-Decoded data may reach 64 MiB per file. For bytes in memory use `parseGLTFAsync`.
+Decoded data may reach 64 MiB per file; a larger one is refused with code `unsupported` naming `@margoengine/gltf/pbr`
+(512 MiB by default), which `loadAuto` moves to by itself. For bytes in memory use `parseGLTFAsync`.
+
+What the light loader reads as the glTF 2.0 specification says: `asset.version` 2.x with no `minVersion` or
+`minVersion` 2.0 (section 3.2); a primitive without POSITION is skipped and the rest loads (3.7.2.1); an OPAQUE colour
+draws whatever its alpha (3.9.4); a material is checked only when a primitive uses it; the GLB BIN chunk serves buffer 0
+only (3.6.1.2). A failed or aborted load closes every image it decoded. An extension that holds something from `load`
+releases it in its optional `abandon(file)`, which runs when the load fails or is aborted after `load`.
 
 ### GPU instancing
 
@@ -134,10 +146,10 @@ any node, and counts toward `maxNodes` (default 100,000).
 ### Any file, without choosing a loader
 
 `loadAuto` from `@margoengine/gltf/auto` reads the file, runs the light loader with only the entries that file calls for,
-and imports `@margoengine/gltf-pro` only if the light loader refuses it as unsupported, or the file passes a limit only
-the light loader has: one million vertices in total, one million values in an accessor, or instances past `maxNodes`.
-Each URL is downloaded once, whichever loader runs. A malformed file is an error either way, and so is a file over a limit
-both loaders share: 64 MiB, or more real nodes than `maxNodes`. Install `@margoengine/gltf-pro` beside this package for
+and imports `@margoengine/gltf/pbr` only if the light loader refuses it as unsupported, or the file passes a limit only
+the light loader has: one million vertices in total, one million values in an accessor, 64 MiB of downloads, or
+instances past `maxNodes`. Each URL is downloaded once, whichever loader runs. A malformed file is an error either way,
+and so is a file over a limit both loaders share: gltf/pbr's 512 MiB, or more real nodes than `maxNodes`. Install `@margoengine/gltf/pbr` beside this package for
 files that need it; without it such a file rejects with a message that says so. It also takes `signal`, `fetch`,
 `maxNodes` and `allowedURLs`.
 
@@ -153,7 +165,7 @@ engine.start();
 // On teardown: model.dispose(); engine.dispose();
 ```
 
-`model` is a light `Model` or a `PBRModel`; `loader` tells them apart, and with `'gltf-pro'` the result also holds the
+`model` is a light `Model` or a `PBRModel`; `loader` tells them apart, and with `'gltf/pbr'` the result also holds the
 `reason` the light loader gave.
 
 ### Cameras and lights as data
@@ -199,6 +211,42 @@ A GLB's BIN chunk may be up to 3 bytes longer than buffer 0's `byteLength`, to p
 4.4.3.3). `parseGLTF`, `parseGLTFAsync` and `loadGLTF` refuse a longer chunk, as the Khronos glTF Validator does, with a `MargoError` (code `failed`)
 that gives both lengths and links to https://margoengine.com/errors#failed. Export the file again.
 
+### Loading into a second scene
+
+`parseGLTFAsync`, `loadGLTF` and `loadAuto` remember the scene that is active when you call them, before their first
+await, and build the model there, textured draw included, even though the download finishes later. Start a load inside
+a second scene's plugin `setup` (or any code running while that scene is set up) and the meshes and the draw belong to
+that scene; start it anywhere else and they belong to the default scene. If the scene is disposed while the load runs,
+the load rejects with a `TypeError` and nothing is left in the default scene. An abort leaves nothing in either scene.
+
+### A report without a GPU (`@margoengine/gltf/report`)
+
+`reportGLTF(bytes, options)` reads a GLB (or glTF JSON with embedded buffers) in Node or a browser with no GPU and no
+engine, with the loader's own accessor reader: triangles, vertices and primitives the default scene draws (each node
+and `EXT_mesh_gpu_instancing` instance counted), meshes, nodes, materials, textures, images with their sizes from
+their headers (PNG, JPEG, WebP, KTX2), texture pixels and RGBA bytes, world bounds of every drawn vertex, the
+extensions used and required (and which of those Margo's loaders do not read), and `problems`, each with a stable
+`code` and a sentence: `not-gltf`, `json`, `extension`, `external`, `image-format`, `accessor`, `index-range`,
+`not-finite` (a NaN or infinity in an attribute, named with its primitive and attribute; the finite rest is still
+counted), `no-normals`, `no-uvs`, `no-material`, `zero-area`, `inside-out` (a closed primitive whose signed volume is
+negative in its own space: a mirroring node, whose world transform has a negative determinant, turns the front face
+too, glTF 2.0 section 3.7.4, so it never turns a mesh inside out), `decode` and `empty`. `zeroAreaByNode` lists each
+scene node that draws zero-area triangles with its mesh and counts, so a repair knows which meshes to open. It never
+throws on a bad file. With `alpha: true` it also decodes the base colour
+textures of MASK and BLEND primitives and returns `cutouts.bounds`, the bounds of what those cards draw where their
+alpha passes the cutoff, so a tree of leaf cards is framed by its leaves rather than its quads' see-through margins.
+Draco geometry that cannot be decoded where the report runs is counted from its accessors' declared counts and
+bounds, with a `decode` problem.
+
+```ts
+import {reportGLTF} from 'margoengine/gltf/report';
+import {readFile} from 'node:fs/promises';
+const report = await reportGLTF(new Uint8Array(await readFile('FourUV.glb')), {alpha: true});
+console.log(report.ok, report.counts.triangles, report.bounds?.size, report.extensions.required);
+for (const problem of report.problems) console.log(problem.code, problem.detail);
+for (const {where, mesh, zeroArea} of report.zeroAreaByNode) console.log(`${where} (mesh ${mesh}): ${zeroArea} zero-area triangles`);
+```
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
@@ -206,3 +254,1086 @@ GPU-only attachments refuse the small WebGL2 preview during setup with `MargoErr
 The textured pass uses the same CPU-normalized light direction as constant
 materials. Direction magnitude does not change the lighting; its fourth
 component still controls intensity.
+
+## PBR rendering (`@margoengine/gltf/pbr`)
+
+Import `margoengine/gltf/pbr` from the `margoengine` package, or `@margoengine/gltf/pbr` from this package alone; the two
+are the same module. Its other entries sit beside it: `/pbr-model` (the model classes without the decoders),
+`/pbr-instancing`, `/extended-materials`, `/texture-coordinates`, `/asset`, `/scene`, `/prepare`, `/progressive`,
+`/worker`, `/splats`, `/lights`, `/physics`, `/interactivity`, `/metadata`, `/material-draw`, `/spec-gloss`, `/dds` and
+`/audio`.
+
+Optional WebGPU glTF 2.0 metallic-roughness rendering, separate from the frozen core and stage.
+
+Core + stage must remain below **25,000 bytes gzip**; CI rejects 25,000 bytes and above. Optional loaders, decoder code, workers and Wasm stay outside that measurement.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF, type MaterialExtension} from 'margoengine/gltf/pbr';
+const stage = await createStage('#viewport', {backend:'webgpu'});
+const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
+const b = model.bounds;
+stage.engine.camera.fitToBoundingBox([b[0],b[1],b[2]], [b[3],b[4],b[5]]);
+// Call model.destroy() when unloading the model, or stage.dispose() on unmount.
+```
+
+A loaded model has `root` (the group every node hangs from), `nodes` (every glTF node, by index), `meshes` (the nodes that draw a triangle primitive, each once, in primitive order) and `primitives`. `@margoengine/gltf`'s `loadGLTF` returns `root`, `nodes` and `meshes` too, so code that loops over `model.meshes` runs on either loader. To cast shadows, `shadows.add(model)` or `shadows.add(model.root)` does the whole model.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { Shadows } from 'margoengine/shadows';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
+console.log(model.meshes.length); // the drawn nodes, as from the light loader
+Shadows.attach(engine).add(model.root); // the root is a group: every node below it casts
+```
+
+`Picking.attach(engine)` from `@margoengine/selection` discovers loader-owned
+primitive nodes automatically. `selection.set([primitive.node])` also discovers
+their model; explicit `add(model)` remains supported and is deduplicated.
+Custom buffer providers still register explicitly. Both consume `model.pickingPrimitives`,
+which borrows the current static or GPU-deformed buffers and alpha metadata.
+Registration changes no beauty shader, vertex layout or material bindings.
+
+`model.readPickingGeometry()` returns an asynchronous, independently owned CPU
+snapshot for `Raycaster.intersectModel(model)` in `@margoengine/bvh`. Static
+geometry uses CPU copies; animated geometry is copied from the actual GPU output.
+The optional `prepareDeformation` hook encodes the latest pose before reading,
+without advancing animation time. Snapshots include world matrices, indices,
+material sides and identity (`primitiveIndex` in `model.primitives`, absent for
+point and line primitives, and the glTF `nodeIndex` when it has one) captured
+with the query,
+before any readback. Restoration, disposal or replacement of
+an in-flight deformation output invalidates the result and releases staging
+buffers. Caller-provided deformation buffers need `COPY_SRC` for CPU snapshots.
+
+Use `import {GLTFAsset} from '@margoengine/gltf/asset'` for accessor decoding
+without loading PBR rendering or its shaders. The root export retains the same
+constructor; `GLTFDocument` is available as a type from either entry.
+`@margoengine/gltf/splats` exports `gaussianSplats` and `readGaussianSplats` ([below](#gaussian-splats-in-gltf-splats)).
+A node `scale` with a zero axis, and a `matrix` with zero columns, load in both loaders (glTF 2.0 section 3.5.3): the
+node is flattened on that axis, or drawn as nothing when every axis is zero. A matrix whose nonzero columns are
+dependent or not orthogonal still throws (`Singular glTF matrix`, `Sheared matrices are unsupported`).
+
+`@margoengine/gltf/texture-coordinates` exports `textureCoordinates` and the `TextureTransform` type (also on the root)
+for material extensions that read texture coordinates without loading the renderer.
+
+The native volume tint estimates a slab through `thicknessFactor` in mesh units and
+converts the refracted path to world units before applying Beer-Lambert absorption.
+Node scale, rotation, shear, reflection and `EXT_mesh_gpu_instancing` affect that path;
+`attenuationDistance` stays in world units. This path retains its scalar thickness
+approximation and display-space blend; the optional transmission installation supplies
+screen-space refraction and thickness textures. Default normal textures use exactly
+neutral half-float texels, including when a live shading hook retains fallback bindings.
+Run `npm run test:gpu:native-volume --workspace @margoengine/gltf` after the package
+build for 56 analytic slab pixels on each backend, including transmission animated from zero.
+
+#### Animate an opaque material into glass
+
+`KHR_materials_transmission` may start at its default factor of `0`. The physical
+parser retains the volume while zero stays on the opaque draw path. Pointer playback
+activates the tint and native background capture when the factor becomes positive;
+seeking back to zero restores the opaque path. This example builds its own triangle
+and animation, with no asset download:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parseGLTF, type GLTFDocument} from 'margoengine/gltf/pbr';
+import {extendedMaterials} from 'margoengine/gltf/extended-materials';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 3], target: [0, 0, 0]},
+});
+const data = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0, 0, 1, 0, 1]);
+const doc: GLTFDocument = {
+  asset: {version: '2.0'},
+  extensionsUsed: ['KHR_materials_transmission', 'KHR_materials_volume', 'KHR_animation_pointer'],
+  buffers: [{byteLength: data.byteLength}],
+  bufferViews: [{buffer: 0, byteLength: 36}, {buffer: 0, byteOffset: 36, byteLength: 8},
+    {buffer: 0, byteOffset: 44, byteLength: 8}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3'},
+    {bufferView: 1, componentType: 5126, count: 2, type: 'SCALAR'},
+    {bufferView: 2, componentType: 5126, count: 2, type: 'SCALAR'}],
+  materials: [{pbrMetallicRoughness: {metallicFactor: 0}, extensions: {
+    KHR_materials_transmission: {transmissionFactor: 0},
+    KHR_materials_volume: {thicknessFactor: 1, attenuationColor: [0.25, 0.5, 1], attenuationDistance: 1},
+  }}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, material: 0}]}],
+  nodes: [{mesh: 0}], scenes: [{nodes: [0]}], scene: 0,
+  animations: [{samplers: [{input: 1, output: 2}], channels: [{sampler: 0, target: {
+    path: 'pointer', extensions: {KHR_animation_pointer: {
+      pointer: '/materials/0/extensions/KHR_materials_transmission/transmissionFactor',
+    }},
+  }}]}],
+};
+const model = parseGLTF(engine, doc, [data], [], {materials: extendedMaterials});
+const animation = Animation.attach(model, {pointers: pointerChannels, loop: false});
+animation.playing = false;
+animation.seek(1);
+console.log(model.primitives[0].material.tint); // [0.25, 0.5, 1]
+engine.start();
+```
+
+`KHR_node_visibility` sets each node's `visible` flag, also when the extension is required. A hidden ancestor hides the meshes and lights below it; transforms, animation, sockets and cameras keep working. Toggle `model.nodes[index].visible` to change it. `model.clusteredLights()` leaves out lights under hidden nodes. After changing visibility, call `applyGLTFLights(model)` again to refresh the imported sun; if the model no longer has a visible sun, the lighting from before goes back, unless the caller changed it since. `@margoengine/animation/pointer` plays animated visibility (`KHR_animation_pointer`).
+
+Supports base color/alpha, metallic-roughness (G/B), normal maps, occlusion (R), emissive, vertex colors, UV sets 0 to 3, tangents or derivative tangent frames, alpha masking/blending, double-sided materials, GLB/external buffers/images, normalized and sparse accessors. GGX, Smith, and Schlick implement analytical direct lighting with hemispherical ambient fill. Canvas output uses Khronos PBR Neutral tone mapping and sRGB encoding; HDR captures remain linear. Color/emissive textures decode sRGB; other maps remain linear. Images have generated mip chains (an area filter at odd sizes, so no texel is skipped; colour weighted by alpha for `BLEND` base colour maps, so transparent texels give no dark fringes) and honor glTF filtering and wrapping.
+
+The outside-reference test renders all 123 primitives of Khronos MetalRoughSpheresNoTextures with a shared
+camera and sun. Against a Sample Viewer PNG, full-frame RGB byte MAE is 1.7865498860677083 on the recorded
+RTX A6000; the WebGL2 compatibility layer measures 1.7865447998046875. Native WebGL2 rejects PBR with code
+`unsupported`. These are measured error ceilings, not visual parity. The unresolved picture loss, full
+settings, source hashes and coverage are in [reproduction steps](../../docs/whitepaper/reproduce.md#batch-160-metallic-roughness).
+From a built checkout, with the outside reference PNG already captured:
+
+```sh
+node scripts/reference-rendering/fetch-assets.mjs
+node scripts/run-with-timeout.mjs --max=5 -- node scripts/reference-rendering/run.mjs
+node scripts/run-with-timeout.mjs --max=5 -- node scripts/reference-rendering/run.mjs --compat
+```
+
+Loaded triangle materials expose live `side: 'front' | 'back' | 'double'`, initialized from glTF's `doubleSided`.
+For example, `model.primitives[0].material.side = 'back'` switches to back-only rendering next frame. Mirrored
+nodes and mixed mirrored instances retain local winding. Picking and beauty/auxiliary passes agree on sides;
+points and lines ignore triangle sides. Shadow casters retain their existing two-sided policy. `exportModel`
+in `@margoengine/exporters` bakes back-only winding and normals into glTF-compatible geometry.
+
+Set `primitive.material.wireframe = true` to draw triangle edges as one-pixel WebGPU lines. The flag is live,
+defaults to false, and applies to beauty, auxiliary, transparency, capture and shadow passes, including groups,
+instances and deformed vertices. Each edge draws once per primitive, so a shared edge blends like any other on
+transparent surfaces. Points and existing lines keep their topology. Lines ignore triangle face culling and
+polygon bias. Edge index buffers are allocated on first use, reused across toggles, and released on restoration
+or disposal. Picking, CPU snapshots and glTF export retain the original filled triangle geometry; glTF has no
+wireframe material flag. Directional sources registered with `Shadows.add(source, {static: true})` require the
+existing `Shadows.invalidate()` call after a live toggle; automatically cached casters update themselves.
+
+Cut-outs keep their density in the distance: the mip chain of a `MASK` base colour map (uncompressed, sampled with
+mips) is built on the GPU so each level passes the material's cutoff for the same share of texels as the full image,
+the nearest share that level's texels allow (Castano, "Computing Alpha Mipmaps", 2010). Colour is averaged in linear
+light weighted by alpha, so transparent texels lend no colour to leaf edges, and every texel of an odd-sized image is
+counted. The chain is fitted to the material's cutoff and base alpha at load; the same image under another cutoff gets
+its own copy. Nothing to set.
+
+`primitive.material.renderState` supplies beauty-only blend/depth overrides, polygon bias, stencil face states,
+masks/reference, `colorWrite`, `alphaToCoverage` (MASK materials on a multisampled target: edges cut by sample coverage) and `blendSpace` (`'linear'`: a BLEND material on a display-encoded target mixes in linear light from the native glass snapshot, one pass break and target copy per surface; default `'display'`; KB3148b; a transparency hook with `linearLayers`, such as `@margoengine/oit`'s `OIT`, takes it order-independently, KB3148d). Bias defaults to literal WebGPU values; `depthBiasMode: 'away'` keeps positive
+offsets away from the camera across main reverse-Z and forward-Z device views. `stencilReference` is live per draw
+and reuses pipelines. Native front/back stencil states follow raster winding. Different face operations temporarily
+use the original primitives instead of winding-normalized static batches; symmetric state restores batching.
+Stencil requires a stencil attachment;
+`StencilBuffer` from `@margoengine/materials` supplies one for the scene when needed. Auxiliary/capture replays,
+picking and shadows retain their existing behavior. See the [material controls](../materials/README.md#polygon-offset-and-stencil)
+for constructor options, target boundaries and transmission behavior. glTF export omits these render controls.
+
+`loadGLTF` automatically decodes `KHR_draco_mesh_compression` primitives and
+`EXT_meshopt_compression` and `KHR_meshopt_compression` buffer views and `KHR_texture_basisu` textures using `@margoengine/decoders`, installed as
+a dependency. Draco workers and Wasm start only when compressed primitives are
+encountered and are released after decoding, including on failure or cancellation.
+Meshopt decoding is synchronous and cached per buffer view, including views used
+by skin, morph and animation accessors. Unknown required extensions still fail.
+Both meshopt names support marked fallback buffers and URI-less placeholders.
+Marked fallback files are not fetched; compressed views supply their bytes instead.
+An unmarked, absent fallback requires the matching compression extension to be
+required. A buffer or view cannot declare both names. Normal loads need no decoder
+configuration:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
+console.log(model.primitives.length);
+engine.render();
+model.dispose();
+engine.dispose();
+```
+
+For in-memory JSON or GLB bytes, use `await parseGLTFAsync(engine, input)` or pass an options object as the third
+argument, for example `{buffers, signal, draco, ktx2}`. Both forms decode embedded PNG/JPEG and KTX2 images;
+external buffers and images resolve against the page. Passing `undefined` as the third argument alone behaves like
+omitting it. Decoded bitmaps close with the model, or before rejection on decode, size-limit, cancellation or attachment
+failure.
+
+The positional `await parseGLTFAsync(engine, input, buffers, images, {signal, draco, ktx2})` overload keeps supplied
+ordinary bitmaps and decodes embedded KTX2 when needed. Passing `undefined` for buffers with a fourth or fifth argument
+retains this positional behavior. Use the no-options/options-object form for automatic ordinary image decoding.
+`@margoengine/gltf/pbr-model` holds `PBRModel`, `PBRDrawRun`, `GLTFAsset`, `parseGLTF`, `parsePreparedPBR`, `closeImages`,
+`textureTransform`, `textureCoordinates` and every type, and reaches no decoder module. A bundler copies the Draco and
+Basis Wasm when it reads a module that names them, used or not, so import from `/model` in code that loads no compressed
+file. Only the package root names them; a Draco or KTX2 file reached any other way is refused with `unsupported`, unless
+`decoders.decoderModule` says where they are:
+
+```ts
+import {GLTFAsset} from 'margoengine/gltf/pbr-model';
+const doc = await (await fetch('/model.gltf')).json();
+const bytes = new Uint8Array(await (await fetch('/model.bin')).arrayBuffer());
+const asset = new GLTFAsset(doc, [bytes], undefined, {decoderModule: () => import('margoengine/decoders')});
+await asset.decode();
+```
+
+The existing `parseGLTF(engine, input, buffers, images)` remains synchronous for
+uncompressed assets, and for meshopt assets when you pass the decoder as
+`decoders: { meshopt }`; the built-in meshopt decoder loads on demand in
+`loadGLTF`, `parseGLTFAsync` and `asset.decode()`, so an app that never loads a glTF does not bundle it. Draco input directs callers to the async API.
+Both async APIs accept `{signal}`, an optional reusable `draco` decoder with a
+`decode` method, and an optional `ktx2` decoder with a `transcode` method. A supplied decoder stays owned by its caller. The default Draco
+decoder requires browser module workers; server callers can supply a decoder.
+Draco attributes and indices populate the original accessors, preserving skin and
+morph data and leaving attributes outside the compression map on the usual path.
+Normalized integer UVs, colors and extra channels are converted once according to
+their accessor metadata; decoding leaves the caller's glTF document unchanged.
+
+KTX2 transcodes are lazy, preserve every mip level, and choose BC7, ASTC, ETC2 or
+RGBA8 from the device's enabled features. Color/emissive roles use sRGB formats;
+data maps use linear formats. Loader-owned workers terminate after decoding,
+including failure and abort. Retained mip bytes support device restoration without
+another transcode. `KHR_texture_basisu.source` takes precedence over a PNG fallback.
+The positional `parseGLTFAsync` overload decodes embedded/data-URI KTX2; use the options-object overload or `loadGLTF`
+for external images.
+Synchronous `parseGLTF` also accepts already decoded `GLTFImage` blueprints.
+
+`KHR_texture_transform` supports offset, rotation, scale, and the overriding UV set
+on all five PBR maps. UV0 and UV1 already share the fixed 80-byte vertex layout. A draw fetches only the parts of that vertex its finished shader reads, so a material with no maps
+reads position, normal and, while `vertexColors` is on, colour. An input the shader reads only as `.xyz`, such as
+position and normal, is fetched as three floats on every draw. Instanced draws (`createInstancedMesh`) fetch less again:
+no instance UV row when no map reads it, and no colour when every vertex colour is white (the shader reads the
+constant 1, the same value). Nothing to set.
+Nonidentity transforms append affine rows to group 3 alongside any caller material
+factors. Identity transforms and ordinary UV0 materials retain the exact original
+shader, 400-byte frame, and groups 0/1. Normal maps derive their tangent frame from
+transformed or secondary UVs; alpha-masked directional shadows use the same mapping.
+Optional material maps support the same transform through `materials.install()`.
+`textureCoordinates(info)` exposes the validated UV selection and packed affine rows;
+caller-owned clearcoat/transmission textures accept a glTF-style `transform` option.
+
+`KHR_animation_pointer` is accepted when required. gltf/pbr loads the pointer channels as data; `Animation` from
+`@margoengine/animation`, given `pointerChannels` from `@margoengine/animation/pointer`, plays them on the model's live
+values (node transforms and weights, material factors and
+texture transforms, `model.lights`, `model.cameras`, node visibility) and lists the pointers it skips in
+`animation.warnings`. Lights and cameras are data: hand them on after each update.
+
+Copy the included [pointer-show.glb](test/fixtures/pointer-show.glb) into your app's public folder to run
+this example. It contains a triangle, perspective camera and directional sun, all animated by pointers.
+
+```ts
+import {createStage} from 'margoengine';
+import {applyGLTFLights, loadGLTF, viewGLTFCamera} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {pointerChannels} from 'margoengine/animation/pointer';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/pointer-show.glb'); // extensionsRequired: ['KHR_animation_pointer']
+const animation = Animation.attach(model, {pointers: pointerChannels});
+animation.playing = false;
+animation.seek(0.5); // writes material factors, light and camera values
+viewGLTFCamera(model, 0); // the animated yfov
+applyGLTFLights(model); // the animated sun; pass {clustered} for point and spot lights
+```
+
+`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy, diffuse transmission, volume scatter or a bump map with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf/extended-materials` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+
+`KHR_materials_dispersion` is accepted when required. Its factor is validated and
+retained as `primitive.material.dispersion` even without a materials decoder;
+it defaults to 0 and accepts finite non-negative values, including values above 1.
+With `extendedMaterials`, declaring the extension reserves the physical frame even
+at 0. Chromatic refraction is visible through `@margoengine/materials/transmission`
+when transmission and volume thickness are positive. Dispersion alone does not
+reserve transmission. The factor remains live, and 0 preserves the existing
+refraction output. Native transmission uses scalar volume thickness; imported
+`KHR_materials_volume.thicknessTexture` is sampled by the explicit
+`@margoengine/materials` installation route.
+
+`loadGLTF(engine, url, {optimize: true})` runs the import step of `@margoengine/geometry/optimize` on each opaque primitive
+as it packs: the same triangles in the order the vertex cache and early depth test read fastest, with `BLEND` primitives
+left in the file's order. It needs `@margoengine/geometry`, takes load time, and keeps a load on the main thread. A
+file built with `margo-convert` is already in this order, so leave it off there.
+
+The optional `/worker` entry exposes `loadGLTFInWorker` and `parseGLTFInWorker`. Ordinary assets parse and pack in a worker. Automatic Draco/KTX2 inputs transfer their source buffers back before codec work, then decode on the GPU-owning thread; custom decoders or `fetch` keep the entire load there. The `/progressive` loader exposes `ready` and `complete`; compressed assets use the normal async loader before publishing a model, and its `textures` option streams KTX2 mip levels ("Texture mip streaming" below). `maxDownloadBytes`, `maxNodes`, allowed resource URLs and abort signals remain enforced; `maxDownloadBytes` counts the root JSON/GLB file together with its fetched and data-URI resources.
+
+In a multi-view frame, a model draws only the nodes in the view's layers, and each view keeps its own camera uniforms
+even when one command encoder records several views or probe faces. Buffers released mid-draw (a callback that
+disposes the model) stay valid until the frame is submitted.
+
+The loader passes declared vertex/index counts (up to 16,777,216 vertices a primitive, loaded as parts like any
+other), accessor widths and the remaining decoded-data budget (4x `maxDownloadBytes`, whose default is 512 MiB) into
+Draco; `@margoengine/decoders` outputs at most 256 MiB per decode. The default decoder rejects oversized
+actual geometry before allocating output arrays, including topology without an
+index accessor. It still needs to decode internal Wasm geometry before reading
+those counts. Custom `draco.decode` hooks should honor the supplied `limits`;
+the loader also validates returned data before constructing GPU resources.
+
+`parsePreparedPBR(engine, document, geometry, images)` accepts a static glTF-style scene/material document and per-mesh arrays of `PreparedGeometry` (`vertices: Float32Array`, `indices: Uint32Array`). Vertices use the existing 80-byte layout: position4, normal4, tangent4, UV0+UV1, color4. Arrays are validated and retained without repacking; keep them immutable until destruction, or replace them with `model.writeGeometry(geometry, range?)`. This path has no accessors, skins or animations and is used by the separate `@margoengine/blender` loader. Existing glTF loading and animation APIs are unchanged.
+
+`model.writeGeometry(geometry)` takes one `PreparedGeometry` per entry of `model.primitives` and swaps them in place: GPU buffers are rewritten while the new data fits and reallocated at twice their size otherwise. With `range` (`{start, count}` in vertices) only those vertices changed: vertex and index counts stay and only that range uploads (pass new array objects when positions moved, so BVH and selection caches keyed on them refresh). Nodes, materials and plugin registrations stay; static batches are retired and edited primitives cast dynamic shadows. Skinned, morphed and `shareBuffers` primitives are refused, and `createRenderer` replicas keep their original geometry. `@margoengine/materials` meshes wrap it as `mesh.setGeometry`.
+
+Transmissive materials honour their maps on the default path too: a black half of a `transmissionTexture` hides the light behind it, and `metallicRoughnessTexture`, base colour, sheen, clearcoat and iridescence all change how much passes. That takes a second textured draw per glass surface; [docs/limits.md](../../docs/limits.md) has the measured cost.
+
+### Sky light by default
+
+A model in a scene with a `Sky` from `@margoengine/sky` that lights the scene (`lighting.ambient`, or `environment`) takes
+that sky's image-based light by itself, as core meshes do: diffuse light and reflections blurred by each material's
+roughness. It joins on its next draw and leaves when the sky goes or the model is disposed; `sky.add(model)` is no longer
+needed. An ambient given to the model itself (`environment.add(model)`, `probes.add(model)`, or `sky.add(model)` with
+another sky) takes the sky's place, one ambient per shader as on core meshes. `model.sceneSky = false` keeps the built-in
+ambient (a fixed sky and ground gradient). Default true.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Sky } from '@margoengine/sky';
+import { dayPreset } from '@margoengine/sky/day-presets';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+Sky.attach(engine, dayPreset('overcast'));
+const lantern = await loadGLTF(engine, '/examples/assets/khronos/Lantern/Lantern.glb');
+// Lit by the overcast sky from its first frame. To leave it with the built-in ambient instead:
+// lantern.sceneSky = false;
+```
+
+`KHR_materials_specular` and `KHR_materials_ior` reach every light: direct, `Clustered` local lights, `EnvironmentLighting`, `LightProbes` and sky ambient. A lighting hook reads them as `s.f0` and `s.sw`; on shaders without those fields `lightPBR` writes 0.04 and 1 in their place.
+
+Attach animation with the separate animation package. Register this model with `ssao.add(model)` to include its mapped normals and ambient lighting in SSAO. Neither extension is imported by this package. Disposal and device restoration retain CPU asset blueprints.
+
+Optional consumers use one weak triangle-source registry across separately bundled packages. Inspector and line helpers use bind-pose positions/normals with current transforms; static spatial queries and shadow mesh registrations also retain loader-owned primitives. `mesh.geometry` remains null, so core does not receive a second drawable. Physics fits static primitive nodes or a geometry-free model root's descendants without changing the hierarchy; skinned or morphed meshes require explicit colliders. glTF export retains supported skin/morph attributes. Disposal clears registry entries, and reused mesh slots cannot inherit them.
+
+`model.raw` borrows one live GPU record per primitive (`vertex`, `index`, `count`,
+`stride: 80`, node and alpha metadata), including current deformation. `bounds`
+scans bind-pose CPU positions through current node matrices. Fit these bounds
+through `camera.fitToBoundingBox`; the frozen stage's `fit(meshes)` and internal
+raw adapter continue to support core geometry only. Active deformation requires
+the asynchronous pose snapshot for accurate CPU raycasts.
+
+#### Drawing a model into your own render pass (`createRenderer`)
+
+`model.createRenderer(device)` returns a `PBRDeviceRenderer` that appends the model's PBR draws to a render pass you
+already opened (a stereo eye, another device, your own target). `draw(context, pass, view, options)` returns the pass
+that is open afterwards; keep recording on it. Glass (`KHR_materials_transmission`) on a display-encoded target (any
+format but `rgba16float`) needs the light behind each surface in linear values, and only you can end and reopen your
+pass, so lend it `options.snapshot`: end the pass, write the colour drawn so far into `target` (same size and format,
+single-sample; resolve a multisampled pass first) and return the pass reopened with `loadOp: 'load'`. Without it glass
+multiplies and adds in the stored values, exact only on an `rgba16float` target; a bright highlight over a bright
+background then comes out too bright (KB2281: 197 of 255 against 143). Default: unset.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {parseGLTF, type GLTFDocument} from 'margoengine/gltf/pbr';
+import {extendedMaterials} from 'margoengine/gltf/extended-materials';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0, 1], target: [0, 0, 0]},
+});
+const data = new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]);
+const doc: GLTFDocument = {
+  asset: {version: '2.0'},
+  extensionsUsed: ['KHR_materials_transmission'],
+  buffers: [{byteLength: data.byteLength}],
+  bufferViews: [{buffer: 0, byteLength: 36}],
+  accessors: [{bufferView: 0, componentType: 5126, count: 3, type: 'VEC3'}],
+  materials: [{emissiveFactor: [0.1, 0.15, 0.2], extensions: {KHR_materials_transmission: {transmissionFactor: 1}}}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, material: 0}]}],
+  nodes: [{mesh: 0}], scenes: [{nodes: [0]}], scene: 0,
+};
+const model = parseGLTF(engine, doc, [new Uint8Array(data.buffer)], [], {materials: extendedMaterials});
+engine.render();
+
+const device = engine.gpu!, format: GPUTextureFormat = 'rgba8unorm', size: [number, number] = [256, 256];
+const color = device.createTexture({size, format,
+  usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING});
+const depth = device.createTexture({size, format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT});
+const renderer = model.createRenderer(device);
+const encoder = device.createCommandEncoder();
+const context = {
+  backend: 'webgpu' as const, device, encoder, format, width: size[0], height: size[1], camera: engine.camera,
+  color: color.createView(), depth: depth.createView(), bindings: [], shader: '', indirect: false, delta: 0,
+  descriptor: {layout: 'auto', vertex: {module: device.createShaderModule({code: ''})},
+    depthStencil: {format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal'},
+    multisample: {count: 1}} as GPURenderPipelineDescriptor,
+  draw() {},
+};
+const open = (first: boolean) => encoder.beginRenderPass({
+  colorAttachments: [{view: context.color, loadOp: first ? 'clear' : 'load', clearValue: [0.5, 0.5, 0.5, 1],
+    storeOp: 'store'}],
+  depthStencilAttachment: {view: context.depth, depthLoadOp: first ? 'clear' : 'load', depthClearValue: 1,
+    depthStoreOp: 'store'},
+});
+// The view matrix of a camera at z = 1 looking at the origin.
+const view = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -1, 1];
+renderer.prepare(context);
+const pass = renderer.draw(context, open(true), view, {
+  snapshot(current, target) {
+    current.end();
+    encoder.copyTextureToTexture({texture: color}, {texture: target}, size);
+    return open(false);
+  },
+});
+pass.end();
+device.queue.submit([encoder.finish()]);
+renderer.dispose();
+```
+
+#### Mixed core/PBR scene helpers
+
+Import the optional `@margoengine/gltf/scene` entry for camera fitting and
+raw GPU records across core geometry and loaded glTF/FBX models:
+
+```ts
+import {createStage} from 'margoengine';
+import {box} from 'margoengine/core';
+import {loadGLTF, type MaterialExtension} from 'margoengine/gltf/pbr';
+import {getSceneBounds, fitScene, gatherSceneBuffers} from 'margoengine/gltf/scene';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/SciFiHelmet.glb');
+const coreMesh = stage.engine.createMesh().setGeometry(box());
+const roots = [model.root, coreMesh];
+fitScene(stage.engine, roots, {duration: 0.3, padding: 1.1});
+const bounds = getSceneBounds(stage.engine, roots);
+const buffers = gatherSceneBuffers(stage.engine, roots);
+```
+
+Each selected root includes its descendants. Overlapping selections visit each
+node once. Hidden meshes and meshes under hidden ancestors are excluded by
+default; `{visibleOnly: false}` includes them. Frustum culling does not affect
+selection. Bounds scan actual CPU positions under current world transforms;
+skinned/morphed positions remain the bind pose. Empty bounds throw `No geometry`.
+`fitScene` returns the bounds used and accepts `aspect`, `duration`, and `padding`;
+aspect defaults to the displayed canvas dimensions, falling back to its size.
+
+`gatherSceneBuffers` returns one record per core node or PBR primitive, preserving
+distinct nodes/primitives even when they share GPU buffers. Records include
+`kind`, `node`, a borrowed world `matrix`, `vertex`, `index`, index `count`, and
+`indexFormat: 'uint32'`. Core records have `stride: 24`, `geometry`, and the shared
+batch `instance` buffer. That instance buffer reflects the last render and does
+not provide a stable instance offset for an individual node. PBR records have
+`stride: 80`, primitive identity, and alpha/UV metadata.
+
+These records borrow existing resources: do not destroy their buffers or modify
+their matrices. Requery after animation or device restoration to obtain current
+buffers; gathering does not encode animation, upload geometry, or read back the
+GPU. An empty selection returns `[]`; WebGL2 returns `null`. Foreign/disposed
+roots and unavailable GPU resources report errors. The frozen `Stage.fit` and
+internal facade adapter retain their original contracts.
+
+`model.lods` lists a file's `MSFT_lod` objects (`node`, `levels`, `screenCoverage`): the level nodes load though no scene names them, under the first level's parent, hidden, until `LOD.fromModel` from `margoengine/lod` drives them.
+
+Register with `shadows.add(model)` and `clustered.add(model)` for optional directional shadows and local PBR lights, including the current skinned vertex buffer. `addLighting()` accepts an optional shader/binding hook without importing these packages. `shadowPrimitives` exposes current opaque/masked GPU geometry to depth consumers; blended materials are omitted. A material's `displacement` (materials' `displacementMap`: its feature uniform, view and sampler) is passed on with each of its primitives so depth passes displace them as the beauty pass does (`shared/displacement.js`).
+
+`primitive.material.shading` accepts one `LightingEffect` for that material's
+surface shader and group 2 bindings. Constructed materials use it so geometry
+groups can share a model while retaining separate textures and shading. It
+composes before `addLighting()` effects and applies to beauty, g-buffer,
+ambient and capture draws; its resources must remain in the selected entry
+point's static resource interface. `extension.lighting: false` suppresses
+scene lighting while retaining the material's own shading. Callbacks own their
+resources and must recreate them after device restoration. Cross-device
+renderers reject local shading until the caller recreates it for that device;
+same-device renderers can reuse it. Its optional `lit(code)` rewrites the shader
+after the `addLighting()` effects are composed in (materials' Lambert and Phong
+put their own BRDF in clustered's light loop there); returning `code` changes
+nothing.
+
+`model.selectVariant(index)` picks a `KHR_materials_variants` look, and `model.selectedVariant` reads it back (`undefined` for the file's default). `model.ownedMeshes` is every mesh the model built, with its root and nodes; a mesh you parented to a node is yours and is not in it.
+
+#### Primitives of any size (scans)
+
+A primitive with more vertices than `maxPartVertices` (default 262,144: 20 MiB of 80-byte vertices, inside every
+device's storage binding, the WebGL2 layer's included) loads as several parts of its node, up to 16,777,216 vertices a
+primitive. Triangles go in Morton order of their centres, so each part is a compact piece of the surface with tight
+bounds, and are cut greedily: shared vertices stay shared inside a part, and only those on a cut are copied (0.37% on
+a 1,001,000-vertex grid). Blended primitives keep the file's triangle order. Each part is an ordinary `PBRPrimitive`
+with the same node, material and `definition`, and `part` says which it is; drawing, frustum culling, picking,
+`@margoengine/exporters` (one primitive per part, same material) and `@margoengine/lod` levels (simplified as one
+surface, then split again) work part by part. Skinned and morphed primitives split the same way (strand hair on a
+rigged character, a dense scanned body): skinning and morphing are per vertex (glTF 2.0 sections 3.7.3 and 3.7.2.2), so
+each part reads `JOINTS_n`, `WEIGHTS_n` and its morph target deltas at the file vertices `part.vertexMap` names, keeps
+the node's skin, morph weights and material, and `@margoengine/animation` deforms it exactly as it deforms the same mesh
+split by hand into one primitive per part, and as the whole primitive at those vertices (`npm run
+test:gpu:skinned-parts`, natively and on the WebGL2 layer). Code that reads a definition's per-vertex accessors itself
+reads them through `part.vertexMap`, as the example below shows.
+
+`loadGLTFProgressive` spends `frameBudget` milliseconds a frame on uploads, so a slower machine finishes fewer steps a frame (KB-FILM-CLOCK1). For a film pass `maxJobs`, a count of upload steps a frame that replaces the budget (1 or more, `Infinity` for every waiting step), and `clock` for a simulation clock; the finished model after `await load.complete` is the same whatever the budget. `loadGLTFProgressive` takes `maxPartVertices` too and streams a split primitive part by part: the worker packs one part
+at a time, the first replaces the placeholder box and each later one is drawn as it arrives, so a scan fills in while it
+loads; once `complete` resolves the model equals a `loadGLTF` of the same file. Packed geometry still counts toward the
+decoded budget, 4x `maxDownloadBytes`. A 9,999,392-triangle height field in one primitive (a 240 MB GLB) loads with no
+options as 20 parts and draws exactly what the same field pre-split at export into the same 20 parts draws, natively
+and on the WebGL2 layer; close up, `CulledModels` draws 9 parts and 4,683,190 triangles (`npm run test:gpu:parts`).
+`maxPartVertices` takes 1,024 to 1,048,576: 65,536 draws 12 parts and 1,550,309 triangles in that view, 1,048,576
+draws 4 parts and 8,363,067.
+
+Every frame each primitive drawn by the standard vertex stage is tested against the camera frustum on the CPU by its
+bounding sphere (one test per primitive, the sphere measured once per vertex array), so a part out of view costs no
+draw with no culling package attached. Instanced, skinned, morphed or deformed primitives, and materials with their own
+shader or a displacement map, are not tested, as their vertices may move past the stored ones; `CulledModels` culls
+those on the GPU, with its `padding` for displaced ones. Shadow casters, picking and export still see every part.
+
+```ts
+import {parseGLTFAsync} from 'margoengine/gltf/pbr';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 100 x 100 vertex grid, two triangles a cell, as one glTF primitive.
+const positions = new Float32Array(100 * 100 * 3), indices = new Uint32Array(99 * 99 * 6);
+for (let i = 0; i < 100 * 100; i++) positions.set([(i % 100) / 50 - 1, Math.floor(i / 100) / 50 - 1, 0], i * 3);
+for (let y = 0, o = 0; y < 99; y++)
+  for (let x = 0; x < 99; x++, o += 6) {
+    const i = y * 100 + x;
+    indices.set([i, i + 1, i + 100, i + 1, i + 101, i + 100], o);
+  }
+const bin = new Uint8Array(positions.byteLength + indices.byteLength);
+bin.set(new Uint8Array(positions.buffer));
+bin.set(new Uint8Array(indices.buffer), positions.byteLength);
+const doc = {
+  asset: {version: '2.0'}, scene: 0, scenes: [{nodes: [0]}], nodes: [{mesh: 0}],
+  meshes: [{primitives: [{attributes: {POSITION: 0}, indices: 1}]}],
+  buffers: [{byteLength: bin.byteLength}],
+  bufferViews: [
+    {buffer: 0, byteLength: positions.byteLength},
+    {buffer: 0, byteOffset: positions.byteLength, byteLength: indices.byteLength},
+  ],
+  accessors: [
+    {bufferView: 0, componentType: 5126, type: 'VEC3', count: 10000, min: [-1, -1, 0], max: [0.98, 0.98, 0]},
+    {bufferView: 1, componentType: 5125, type: 'SCALAR', count: indices.length},
+  ],
+};
+// 10,000 vertices in parts of at most 4,096 (the default 262,144 keeps this one whole).
+const model = await parseGLTFAsync(engine, doc, [bin.buffer], [], {maxPartVertices: 4096});
+for (const p of model.primitives) console.log(p.part?.index, p.part?.count, p.vertices.length / 20);
+// A part's vertex k is the file's vertex part.vertexMap[k]: read JOINTS_n, WEIGHTS_n or morph deltas there.
+const positions0 = model.asset.accessor(doc.meshes[0].primitives[0].attributes.POSITION, 'VEC3'),
+  last = model.primitives.at(-1)!,
+  file = last.part!.vertexMap[0];
+console.log(positions0.subarray(file * 3, file * 3 + 3), last.vertices.subarray(0, 3));
+```
+
+#### More than two UV sets
+
+A texture may read `TEXCOORD_0` to `TEXCOORD_3`, as Blender writes them for a material on its third or fourth UV map. Only a primitive whose material (or a `KHR_materials_variants` mapping) reads set 2 or 3 pays: it gets a second vertex buffer, `primitive.uvs`, four floats a vertex, and its own shader. A file that merely carries those attributes loads as before. The 80-byte vertex stays as it is.
+
+```ts
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/models/FourUV.glb');
+// TEXCOORD_2 then TEXCOORD_3 of each vertex, present only when a material reads either.
+console.log(model.primitives[0].uvs);
+```
+
+`loadGLTFInWorker`, `loadGLTFProgressive`, Draco, `EXT_mesh_gpu_instancing`, `@margoengine/lod` levels and far meshes, and `@margoengine/exporters` all keep the later sets. `writeGeometry` keeps them too: a write that changes the vertex count passes its own `uvs`. Such primitives stay out of static batches. A `MASK` or `BLEND` base map on set 2 or 3 casts and picks uncut, as the depth passes read the first two sets only, and a `.margo` file holds two sets. A fifth set is refused by name.
+
+#### Scattering in glTF volumes (`KHR_materials_volume_scatter`, draft)
+
+A material with `KHR_materials_diffuse_transmission` glows from behind under shadows too: its lighting hook's `direct(direct, normal)` gets the side facing the light, so the surface does not shadow its own back. Its shadow casters carry `transmits`, the factor times the colour factor, for `transmission` of `@margoengine/shadows/transmission`.
+
+`loadGLTF` and `parseGLTFAsync` read `KHR_materials_volume_scatter` by themselves through `@margoengine/gltf/extended-materials`, so milky glass, jade and wax look solid where the light has far to go and clear where it has not. It needs `KHR_materials_volume` with a thickness and an `attenuationDistance`, and light that enters: `KHR_materials_transmission` or `KHR_materials_diffuse_transmission`. Otherwise it does nothing, as the spec has it. `multiscatterColorFactor` (default `[0, 0, 0]`) times `multiscatterColorTexture` (sRGB) is the multi-scatter colour; `scatterAnisotropy` (default `0`, from -1 to 1) moves scattering forward or back.
+
+```ts
+import {parseGLTF} from 'margoengine/gltf/pbr';
+import {extendedMaterials} from 'margoengine/gltf/extended-materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const doc = await (await fetch('/model.gltf')).json();
+const buffers = [new Uint8Array(await (await fetch('/model.bin')).arrayBuffer())];
+// The default loaders need none of this; the synchronous parser takes the decoder by hand.
+const model = parseGLTF(engine, doc, buffers, [], {materials: extendedMaterials});
+console.log(model.primitives[0].material.extended?.scatter);
+```
+
+This is a rasterizer's reading, with no light walked through the medium. Over the depth x, which is `thicknessFactor` times the green channel of `thicknessTexture` along the surface normal, a share 1 - exp(-sigma_s (1 - g) x) of the entering light scatters and comes back as a diffuse lobe of the multi-scatter colour, with sigma_s from the spec's albedo mapping. A dense medium therefore matches a diffuse surface of that colour, the comparison the spec itself draws. Light does not spread sideways under the surface, so edges stay sharp. Specular transmission keeps its Beer-Lambert term, which already counts what scattered out of the straight path. Diffuse transmission had none, so it is scaled by what crosses the depth. For the view through the glass to refract, and for `KHR_materials_volume` thickness maps on that view, use `install(model)` from `@margoengine/materials`, which reads this extension too.
+
+The text read is the draft of Khronos glTF pull request 2453 (Status "Draft") as of 2026-11-06: it can still change, and pull request 2579 proposes `KHR_materials_scatter` in its place. The multi-scatter colour and thickness maps count toward the eight extension textures of an extended material. Phase function detail beyond the 1 - g scale is not drawn.
+
+#### Bump maps in glTF (`EXT_materials_bump`, draft)
+
+`loadGLTF` and `parseGLTFAsync` read `EXT_materials_bump` by themselves through `@margoengine/gltf/extended-materials`: the red channel of `bumpTexture`, read as linear data, times `bumpFactor` is a height, and the surface normal becomes `normalize(n - grad d)`. It tilts the normal a normal map has already tilted, so a file can hold large forms in the normal map and fine detail in the bump map. `heightSpace: 'object'` scales the height with the node, along the surface normal, so uneven scale works too; `'world'` keeps it in metres. Without `heightSpace` the draft leaves the strength to the renderer: Margo reads it as `'world'`.
+
+```ts
+import {parseGLTF} from 'margoengine/gltf/pbr';
+import {extendedMaterials} from 'margoengine/gltf/extended-materials';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const doc = await (await fetch('/model.gltf')).json();
+const buffers = [new Uint8Array(await (await fetch('/model.bin')).arrayBuffer())];
+// The default loaders need none of this; the synchronous parser takes the decoder by hand.
+const model = parseGLTF(engine, doc, buffers, [], {materials: extendedMaterials});
+console.log(model.primitives[0].material.extended?.bump);
+```
+
+This follows the draft of Khronos glTF pull request 2339 as it stood on 2026-11-04, Status "Draft": it can still change. The height has one row in the extended uniform and the map is one of the eight extension textures of an extended material, so a ninth loses its bump.
+
+#### Gaussian splats in glTF (`/splats`)
+
+A file with `KHR_gaussian_splatting` primitives loads through plain `loadGLTF` or `parseGLTFAsync`: the meshes draw as usual, and the splats go to `@margoengine/splats`, so a captured scene and modelled objects share one file, one loader and one depth buffer. Nothing to pass: `@margoengine/gltf/splats` and `@margoengine/splats` load only for a file that holds splats, and the worker loaders read such a file on the page's thread. `@margoengine/splats` is an optional peer dependency; a splat file without it stops with an error that names it.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {type MaterialExtension} from 'margoengine/gltf/pbr';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/capture.glb', {maxDownloadBytes: 2 ** 28});
+const b = model.bounds; // takes in the splat centres
+stage.engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]]);
+console.log(model.splats.map(({cloud}) => cloud.count));
+// model.dispose() disposes the clouds too.
+```
+
+Read against the extension's README (Complete, Ratified by the Khronos Group, as of 2026-11-06) and the draft `KHR_gaussian_splatting_compression_spz_2` (Draft, pull request 2531, as of the same day). Every attribute type of the `ellipse` kernel reads, with spherical harmonics up to degree 3, both colour spaces (`srgb_rec709_display`, `lin_rec709_display`), and the draft's SPZ payload through `parseSpz`. A file written against the draft may leave `kernel` and `colorSpace` out; they then take `ellipse` and `srgb_rec709_display`. A file that breaks the extension's rules, such as a band of harmonics with a coefficient missing, is refused with the fault named. An unknown kernel or colour space is refused too.
+
+- `model.splats` holds `{cloud, bounds}` per cloud. Each primitive is placed by its node's world matrix (centres, shapes and harmonics), then the file's primitives merge into one cloud, so they sort together. Splats past 3,000,000 start another cloud.
+- `{decoders: {splats: false}}` keeps the extension's fallback: the primitive draws as plain points, or a file that requires the extension is refused. Synchronous `parseGLTF` does the same.
+- `readGaussianSplats(asset, primitive, {signal})` from `@margoengine/gltf/splats` returns one primitive's `SplatData` in local space with no GPU, for `cropSplats` and the other `@margoengine/splats/data` tools.
+
+Limits are in [docs/limits.md](../../docs/limits.md): the clouds do not follow later node moves or visibility changes.
+
+#### IES fixtures and image-based lights in glTF (`/lights`)
+
+`EXT_lights_ies` puts measured light fixtures on a file's nodes and `EXT_lights_image_based` gives a scene its environment. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFLightExtensions` turns them into lights, loading `@margoengine/clustered` and `@margoengine/environment` only when the file has that light.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {applyGLTFLightExtensions} from 'margoengine/gltf/lights';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/lobby.gltf');
+const lights = await applyGLTFLightExtensions(model, {exposure: 0.01, background: true});
+console.log(lights.iesLights.map(({profile}) => profile.peak), lights.imageLight?.intensity);
+// lights.dispose() removes all of it.
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `exposure` | `1` | Scales every fixture's candela: IES files are in real candela, which is far brighter than a scene's sun of 1. |
+| `background` | `false` | Draws the image-based light's cube behind the scene. |
+| `clustered` | one attached here | The `Clustered` to add to; the file's `KHR_lights_punctual` point and spot lights join the same list. |
+| `scene` | the file's `scene`, else 0 | The scene whose image-based light to use. |
+| `baseURL`, `fetch`, `signal` | where `loadGLTF` read the file, `globalThis.fetch`, none | How `.ies` and image files are read. |
+
+Read against the two extensions' READMEs on the Khronos glTF repository as of 2026-11-06: `EXT_lights_ies` (Vendor extension, status Complete) and `EXT_lights_image_based` (Multi-Vendor extension). Neither is a draft.
+
+- A fixture is a clustered point light with its profile resampled for its node, so it can aim anywhere, uplights included. The beam runs down the node's -Z. `multiplier` and `color` scale it as the extension says; `color` clamps to 0 to 1.
+- `.ies` files read through `parseIES`: types B and C, as the extension requires. Type A, which it leaves optional, is refused.
+- A cube face reads as the sRGB decode of rgb / alpha with its rows swapped, which is how the one real file reads: projected onto spherical harmonics, only that reading gives every l = 1 and l = 2 coefficient the file states its sign (the extension's "flipped about its vertical axis" would get six or more wrong). `Environment` prefilters its own mips from mip 0, so the file's lower mips are not read, and its own irradiance comes from the same cube: `irradianceCoefficients` stays in `lights.imageLight` as data.
+- `gltfIESLights(model)` and `gltfImageLight(model)` return the data without a GPU; `orientIES`, `placeIESLights` (the fixtures and aimed profiles for a list of lights, given each node's world matrix) and `rotateCube` are the steps between. Fixtures share an aimed profile only when they use the same parsed profile and point the same way (two unnamed profiles of one LM-63 format once shared the first one's beam).
+
+Limits are in [docs/limits.md](../../docs/limits.md): lights stay where their nodes were when applied, and at most 16 fixtures differ in profile or aim.
+
+#### Rigid bodies in glTF (`/physics`, draft)
+
+`KHR_physics_rigid_bodies` carries colliders, mass, joints and trigger volumes on a file's nodes, and `KHR_implicit_shapes` its boxes, spheres, cylinders, capsules and planes. Every loader reads a file that uses them, even as required extensions, and keeps them as data; `applyGLTFPhysics` builds them in `@margoengine/physics`, which it loads on first use, so authored physics survives export.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {applyGLTFPhysics} from 'margoengine/gltf/physics';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const model = await loadGLTF(stage.engine, '/door.gltf');
+const world = await applyGLTFPhysics(model);
+world.onTrigger(({entered, nodeIndex, motionNodeIndex}) => console.log(entered, nodeIndex, motionNodeIndex));
+console.log(world.bodies.size, world.joints.size, world.notes);
+// world.dispose() removes all of it.
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `physics` | one attached here, after `Physics.load()` | The `Physics` world to add to. |
+
+Read against pull request 2424 (`KHR_physics_rigid_bodies`, status Draft) and pull request 2370 (`KHR_implicit_shapes`, status Release Candidate) on the Khronos glTF repository as of 2026-11-06. Both can still change.
+
+- A node with a `motion` is a body that moves it, with the colliders of its descendants on it; a descendant with its own `motion` is its own body. A collider with no `motion` above it is fixed. A `mass` or `inertiaDiagonal` of 0 is infinite, as the draft says, and values the file leaves out come from the colliders.
+- A node the file animates is kinematic and follows its animation, its scale included. `KHR_animation_pointer` channels on joint drives play on the world's clock from when `applyGLTFPhysics` ran, looping.
+- A joint is a `generic` joint of `@margoengine/physics` between the two attachment frames. Limits and drives are measured from the joint node to `connectedNode`, so a drive with a target of 0.7 puts the connected node at +0.7 in the joint node's frame. A body on a joint with a drive never sleeps, because a slow body would stop short of its target.
+- Collision filters compare whole filters pair by pair, each side having to let the other in.
+- The world it makes joins the model's scene, so a model in a second scene gets its world there whichever scene is active when the solver has loaded; pass `physics` to add to a world of your own.
+- `geometry.node` reads that node's mesh and its children's, and `geometry.mesh`, which the extension's own sample files write in place of `node`, reads that mesh.
+- `world.bodyOf(node)` finds the body that moves a node. `world.setPointer(pointer, value)` writes a joint drive's `maxForce`, `positionTarget`, `velocityTarget`, `stiffness` or `damping`, or a motion's `linearVelocity`, `angularVelocity` or `gravityFactor`, and returns false for anything else.
+- `world.notes` lists what this file asks for that the world holds only approximately, by node. Empty means the file is represented as written.
+
+Limits are in [docs/limits.md](../../docs/limits.md): the solver's order of combine rules differs from the draft's, soft limits are held hard, ranges on several axes are boxes, finite planes are thin boxes, and a file can have 15 distinct collision filters.
+
+#### Behaviour graphs in glTF (`/interactivity`)
+
+`KHR_interactivity` carries a behaviour graph in the file: on a click, play an animation, change a material, wait, count. `KHR_node_selectability` and `KHR_node_hoverability` say which nodes take a click or a hover. Every loader reads such a file, even with these as required extensions. To run the graph on a rendered model, attach it with `@margoengine/animation/interactivity`, which [its README](../animation/README.md#behaviour-graphs-margoengineanimationinteractivity) covers. This entry is the graph alone: it needs no engine, and time moves only through `tick`, so a server or a test can run a file.
+
+```ts
+import {GLTFAsset} from 'margoengine/gltf/pbr';
+import {loadBehaviorGraph} from 'margoengine/gltf/interactivity';
+
+const doc = {
+  asset: {version: '2.0'},
+  extensions: {
+    KHR_interactivity: {
+      graphs: [{
+        events: [{id: 'ready'}],
+        declarations: [{op: 'event/onStart'}, {op: 'event/send'}],
+        nodes: [
+          {declaration: 0, flows: {out: {node: 1, socket: 'in'}}},
+          {declaration: 1, configuration: {event: {value: [0]}}},
+        ],
+      }],
+    },
+  },
+};
+const {graph, rejected} = loadBehaviorGraph(new GLTFAsset(doc, []));
+if (rejected) console.warn(rejected);
+graph?.on('ready', () => console.log('the file is running'));
+graph?.tick(1 / 60);
+```
+
+| Option of `loadBehaviorGraph` | Default | Meaning |
+| --- | --- | --- |
+| `live` | none | Called with each written property's pointer and value. |
+| `camera` | none | Returns the viewer's camera for `activeCamera`; without it those pointers read as NaN. |
+| `sample` | none | Samples a clip's channel. `sampleChannel` of `@margoengine/animation/interactivity`. Without it `animation/start` takes its `err` flow. |
+| `physics` | none | Runs `rigid_body/*` operations. |
+| `log` | none | Receives `debug/log` text. |
+| `maxActivations` | 1,000,000 | Node activations one step may run before the graph halts. A graph can loop forever, and a file is untrusted. |
+| `maxEventsPerTick` | 10,000 | Custom events one tick delivers; the rest wait for the next tick. |
+| `supported` | none | More extension names for a graph to see as enabled. |
+
+`graph` has `tick(seconds)`, `on(id, listener)`, `send(id, values)`, `variable(idOrName)`, `select(node, info)`, `hover(node)`, `link(otherGraph)` for files that share events, and `halted`, the reason a graph stopped. A graph the specification rejects comes back as `rejected` and the model stays valid.
+
+Read against the specification on Khronos main at commit a7963af6dc (2026-10-19), status "Complete, Ratified by the Khronos Group". On the published conformance suite this entry passes 1,155 of 1,156 sub-tests and rejects 187 of 187 invalid graphs. The one failure is a disagreement between that suite and the glTF Object Model, described with the other limits in [docs/limits.md](../../docs/limits.md).
+
+#### Author, licence and copyright in glTF (`/metadata`)
+
+`KHR_xmp_json_ld` carries XMP metadata in the file: who made it, under what licence, and which object each statement is about. Every loader keeps it as plain data, so it costs nothing until you import the entry, and a file that lists the extension as required still loads. `readGLTFMetadata` takes a loaded model, a `GLTFAsset` or a glTF document.
+
+```ts
+import {GLTFAsset} from 'margoengine/gltf/pbr';
+import {readGLTFMetadata} from 'margoengine/gltf/metadata';
+
+const doc = {
+  asset: {version: '2.0', copyright: '2026 Ana Silva', extensions: {KHR_xmp_json_ld: {packet: 0}}},
+  meshes: [{name: 'Chair', primitives: [], extensions: {KHR_xmp_json_ld: {packet: 1}}}],
+  extensions: {
+    KHR_xmp_json_ld: {
+      packets: [
+        {
+          '@context': {dc: 'http://purl.org/dc/elements/1.1/'},
+          'dc:creator': {'@list': ['Ana Silva']},
+          'dc:rights': 'CC-BY-4.0',
+        },
+        {
+          '@context': {dc: 'http://purl.org/dc/elements/1.1/', rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'},
+          'dc:title': {
+            '@type': 'rdf:Alt',
+            'rdf:_1': {'@language': 'en-us', '@value': 'Chair'},
+            'rdf:_2': {'@language': 'it-it', '@value': 'Sedia'},
+          },
+        },
+      ],
+    },
+  },
+};
+const metadata = readGLTFMetadata(new GLTFAsset(doc, []), {language: 'it'});
+console.log(metadata.asset.authors, metadata.asset.license, metadata.asset.copyright);
+console.log(metadata.fieldsOf('mesh', 0).title, metadata.fieldsOf('mesh', 0).authors); // Sedia, and the file's author
+for (const packet of metadata.packets) console.log(packet.fields.title, packet.fields.license); // every credit in the file
+```
+
+| Field | Read from |
+| --- | --- |
+| `title`, `description`, `date`, `source` | `dc:title`, `dc:description`, the first `dc:date`, `dc:source` |
+| `authors`, `contributors`, `publishers` | `dc:creator`, `dc:contributor`, `dc:publisher`, always arrays |
+| `tool` | `xmp:CreatorTool`; for the whole file, else glTF `asset.generator` |
+| `rights` | `dc:rights` as written |
+| `license` | `cc:license`, else `xmpRights:UsageTerms`, else `xmpRights:WebStatement`, else `rights` |
+| `copyright` | For the whole file glTF `asset.copyright`, else `rights`; for an object its own `rights`, else the whole file's |
+
+| Member of the result | Meaning |
+| --- | --- |
+| `asset` | The fields for the whole file. A file without the extension still gives `asset.copyright` and `asset.generator`. |
+| `objects` | Each scene, node, mesh, material, image and animation with its own packet. |
+| `fieldsOf(kind, index)` | The fields for one object: its packet over `asset`, property by property, as the extension gives objects precedence. |
+| `packets` | Every packet, referenced or not, with `fields`, `properties`, `raw` and `get(namespace, name)` for any other XMP property. `xmpNamespaces` holds the URIs of `dc`, `xmp`, `xmpRights`, `cc` and `rdf`. |
+
+| Option of `readGLTFMetadata` | Default | Meaning |
+| --- | --- | --- |
+| `language` | none | BCP 47 tag to prefer among language alternatives: the exact tag, then the same language in another region. With none, or no match, `x-default`, then the first listed. |
+
+Properties resolve by namespace URI, so `dc11:creator` reads as an author when `dc11` names Dublin Core, and `dc:creator` does not when a packet points `dc` elsewhere. A prefix a packet leaves out of `@context` keeps its usual meaning, because a real exporter writes `xmp:CreatorTool` that way. A bad packet list or `packet` reference throws a `TypeError` here and never at load. Limits are in [docs/limits.md](../../docs/limits.md).
+
+#### Texture mip streaming (`textures` of `/progressive`)
+
+KTX 2.0 keeps the smallest mip first, so a texture can start from a small read of the head of its file. With `textures` set, `loadGLTFProgressive` opens each KTX2 image from those smallest levels and loads finer ones only as the texture's size on screen calls for them, inside a memory budget. Levels nothing needs leave when the budget runs out. It reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream`, loaded only with this option.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTFProgressive} from 'margoengine/gltf/progressive';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const load = loadGLTFProgressive(stage.engine, '/city.gltf', {textures: {budgetBytes: 128 * 1024 * 1024}});
+const model = await load.complete;
+const textures = await load.textures;
+console.log(model.primitives.length, textures?.usedBytes, textures?.textures);
+```
+
+| Option of `textures` (or `true`) | Default | Meaning |
+| --- | --- | --- |
+| `budgetBytes` | 256 MiB | Most GPU memory the load's textures may hold. A stream always keeps its coarsest levels, whatever the budget. Change it later through `load.textures`. |
+| `concurrency` | `2` | Levels loading at once. |
+| `headBytes` | 64 KiB | Bytes of an image's first Range read. |
+| `decoder`, `hdrDecoder` | made on first use | Level decoders, as `KTX2Streamer`. |
+| `onError` | `console.error` | Called when a finer level fails; the texture keeps the levels it has. |
+
+`load.textures` is a promise of the live stream: `usedBytes`, `budgetBytes` (settable), `textures` (each one's size, finest level held, level count and size on screen) and `update()`. It runs by itself about five times a second for as long as the model lives; disposing the model frees it.
+
+A texture's size on screen is the square root of its primitive's surface area over its UV area, which is the length one whole texture covers, times the pixels one world unit covers at the nearest point of the primitive's bounding sphere, on the nearest camera that sees it. Tiling, atlases and `KHR_texture_transform` scale need no special case. An image inside a GLB or a `.bin` streams too, by Range reads at its offset, and those bytes stay out of the buffers; on a server without Range the file comes once and the texture streams from memory. A file `loadGLTFProgressive` takes whole (Draco, meshopt, or a `fetch` option) still streams its KTX2 images. `complete` means every primitive is loaded and every texture is drawing from at least its coarsest levels.
+
+PNG, JPEG, WebP and AVIF files hold no mips, so they load whole, and a KTX2 file stored with one level has nothing to stream. `model.uploadImage` refuses a streamed image, and a replica on another device refuses a streamed model. Off WebGPU the option has no effect. See `docs/limits.md`.
+
+#### Optional material extension slot
+
+Attach a `MaterialExtension` to `primitive.extension`, or to the shared
+`primitive.material.extension`, after `parseGLTF` or `loadGLTF` returns. The
+primitive slot takes precedence. No material package is imported or discovered
+by the loader. `parseGLTF` stays synchronous; `loadGLTF` retains its existing
+Promise-based loading API.
+
+```ts
+import {type MaterialExtension, type PBRModel} from 'margoengine/gltf/pbr';
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadGLTF(engine, '/model.glb');
+const tint: MaterialExtension = {
+  factors: new Float32Array([1, 0.5, 0.25, 1]),
+  wgsl: 's.base *= materialFactors[0];'
+};
+model.primitives[0].extension = tint;
+```
+
+Bind groups are permanently allocated as follows: group 0 is the original
+400-byte frame buffer, group 1 is the original five texture/sampler pairs,
+group 2 is lighting and local material shading, and **group 3 is the optional material extension**.
+Unextended primitives use exactly the original shader, pipeline descriptors,
+uniform uploads and bindings. Extension GPU resources are created lazily during
+`draw()`, including when an extension is attached after model setup.
+
+`factors` is an optional, nonempty `Float32Array` of finite values whose length
+is a multiple of four. It becomes `materialFactors: array<vec4f, N>` at group 3,
+binding 0. Mutations upload on the next visible draw; changing its length
+reallocates only the secondary buffer. `textures` optionally supplies
+`{view, sampler?}` entries for filterable 2D textures; each is a `GPUTextureView` or `GPUSampler`, or
+`(device) => object`, called once per device and again after a device restore (`view: (device) => makeView(device)`).
+Entry N exposes `materialTextureN` at binding `1 + 2*N` and, if supplied,
+`materialSamplerN` at binding `2 + 2*N`. Missing factors, textures and samplers
+allocate no corresponding resources. Texture views and samplers stay owned by
+the caller. A plain view or sampler belongs to the device that made it: after a device restore it is dropped and
+reported once through `engine.onError` (`'state'`, help `borrowed-lost`), the surface reads a 1 x 1 white texture and a
+linear sampler in its place, and giving the material a new `MaterialExtension` brings it back. The function form needs
+no replacement, and is the one `createRenderer(device)` accepts for another device.
+
+`wgsl` contains statements inserted immediately after `surface(i, front)` in
+beauty, g-buffer and ambient fragment entry points. It can mutate `s: Surface`
+and read `i`, `front`, the original frame `f`, and the generated extension
+resources. `declarations` optionally supplies module-scope WGSL helpers. Callers
+must supply valid WGSL for all three entry points and leave bind group allocation
+to the slot. Generated phony assignments retain declared resources in each
+entry point's interface without sampling them. A resource-bearing extension
+without lighting also binds the empty group 2 required by the pipeline layout.
+
+`direct` optionally supplies beauty-only statements after the directional
+lighting calculation. It may update `direct` before the existing lighting effects
+apply, so additional lobes share directional shadow visibility. It does not run
+in g-buffer or ambient entry points. Unextended shader strings stay unchanged.
+A second model of the same asset can hold this model's decoded images, and then shares the GPU textures made from
+them instead of uploading and mipping its own. Each image and texture goes with its last holder, in any disposal order
+(`cloneModel` from `@margoengine/animation/skeleton-utils` does this for you):
+
+```ts
+import {PBRModel, loadGLTF} from 'margoengine/gltf/pbr';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const first = await loadGLTF(engine, 'robot.glb');
+const second = new PBRModel(engine, first.asset, first.shareImages());
+engine.use(second);
+```
+
+`shareImages()` counts the new holder at once: pass the images to `closeImages(images)` if no model ends up holding
+them.
+
+`second.adoptStaticBatches(first)`, called before `engine.use(second)`, takes `first`'s baked static batches so
+`second` skips baking and the engine-wide tick baking needs. `second` must be a fresh model of the same asset in the
+same local pose, and `first` must be set up and unparented. It returns false, changing nothing, when the batches do not
+fit, and `second` then bakes for itself. Either way draws are right. `cloneModel` in `@margoengine/animation` calls it.
+
+`model.compile()` compiles the model's render pipelines without blocking, so its first frame does not wait for them.
+Call it once the scene's lights and effects are set: anything that changes a shader afterwards compiles on the draw as
+before, so it is never needed for correctness. Start it early and await it late, so the compile overlaps other work. The
+wait moves rather than disappears: `p-morph`'s first frame fell by 83 ms and its build grew by 54 to 72.
+
+```ts
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+
+const model = await loadGLTF(engine, 'robot.glb');
+const compiled = model.compile();
+// ...build the rest of the scene...
+await compiled;
+```
+
+It does nothing off WebGPU, leaves batched textureless meshes to their first draw, and rejects with the GPU's error if
+a pipeline fails. Copies of a model share pipelines, so one call serves them all.
+
+Optional material packages can borrow decoded images with `model.image(index)`;
+the model retains ownership and closes them when disposed.
+
+`output` optionally supplies beauty-only WGSL immediately before the final
+return, after tone mapping/output encoding. `lighting: false` omits optional
+lighting shaders and bindings for a caller-managed surface. The material package
+uses these hooks for transmission while retaining the baseline factor-zero path.
+`transmission` (a WGSL weight, kept in `s.tr`) scales diffuse and ambient light by
+1 minus it, and `ior` (a WGSL index of refraction, kept as `s.f0`) sets the
+dielectric F0 of direct and ambient light to ((ior - 1) / (ior + 1))^2 in place of
+0.04, as the native physical path does; without `ior` the F0 stays 0.04.
+The optional `coat` layer goes over all the surface's light, as
+`KHR_materials_clearcoat` defines it: direct, local, ambient and emitted light keep
+the share `keep`, the layer's `direct` light adds on top with the same shadow
+visibility, and `(1 - keep) * margoCoatAmbient(s, v)` adds its ambient light. `normal`
+and `roughness` land in `s.cn` and `s.cr`, which an environment's `coat` hook reads.
+`direct` hooks of lighting effects must scale the light they wrap, since a coated
+shader evaluates them once on `vec3f(1)` and multiplies every sun lobe by the result.
+Native physical materials do the same for their clearcoat and sheen lobes, so a
+shadow removes those highlights with the base's; fragments where nothing is lit
+stay zero, so `Shadows` still skips them. An effect with only a raw `shader` edit of
+`direct+ambient(s)` reaches the base's light and misses these lobes, so a shadowing
+effect uses the `direct` hook. All four fields are WGSL expressions
+evaluated after `wgsl`:
+
+```ts
+import {type MaterialExtension} from 'margoengine/gltf/pbr';
+
+const varnish: MaterialExtension = {
+  wgsl: 'let varnishKeep=0.9;',
+  coat: {keep: 'varnishKeep', direct: 'vec3f(0)', normal: 's.n', roughness: '0.1'},
+};
+```
+
+The optional `ambient` statements can mutate `materialAmbient` after hemisphere
+lighting in beauty and ambient-only passes. They are applied after lighting
+effects have matched the standard PBR source. Materials uses this hook for sheen,
+specular color and thin-film reflection; primitives without a hook retain their
+original shader and bindings.
+`PBRModel.beginOpaquePass(context)` defers blended beauty draws across models;
+`PBRModel.endOpaquePass(context)` flushes them after a caller-owned scene copy,
+and `cancelOpaquePass(context)` releases an interrupted phase. Calls to `draw()`
+with an explicit `opaque` or `blend` phase participate in the same deferral:
+opaque primitives draw immediately and blended primitives flush once per model.
+Calls outside that optional phase retain their existing order and bindings.
+An extension with `afterOpaque: true` (materials transmission sets it) also flushes with the blended draws, after the
+opaque capture, but keeps its authored alpha mode, blending and depth writes; such primitives cast no opaque shadows.
+
+A package whose frame-graph pass draws one run and nothing else can declare `joins` on its pass: the run's render pass then takes core's clear and resolves the frame ([core README](../core/README.md#viewport-and-scissor-per-core-draw)), one render pass for the whole frame.
+
+A package that draws many models itself passes a `PBRDrawRun` as the last argument of `draw()`. Every `draw()` of the
+run continues one render pass instead of beginning its own, which saves a store and a reload of the multisampled colour
+and depth per model (10,000 meshes of `@margoengine/materials` cost 168 ms of CPU a frame with a pass each). Blended
+draws continue it too; a blended primitive drawn without a run ends the pass around itself. Within a run:
+
+- draws of one material record derive its shader, pipeline and lighting bind group once per frame, not once per draw;
+- the run sets a pipeline, bind group or buffer only when it changes;
+- opaque draws that differ only in their node matrix (same material record, same geometry arrays, no instances,
+  deformation, material extension, transmission or wireframe) draw as one instanced draw at `run.end()` or before the
+  run's next other draw, with their world matrices as instance rows; a moved mesh uploads its own 96-byte row. Opaque
+  draws may therefore reorder between such batches (as engines sort opaque draws by material); each batch keeps its
+  meshes in draw order, and a mesh alone draws exactly as without a run.
+
+Every draw's camera, light and target rows come from one 192-byte view block that the draws of a view share, so a
+moving camera uploads 192 bytes, not every draw's uniform. Call `run.end()` after the last draw; a run can carry the
+next frame's draws after that:
+
+```ts
+import {PBRDrawRun, type PBRModel} from '@margoengine/gltf/pbr';
+export function drawAll(models: PBRModel[], c: Parameters<PBRModel['draw']>[0]) {
+  const run = new PBRDrawRun();
+  try {
+    for (const model of models) model.draw(c, 'beauty', c.color, c.depth, 'all', undefined, run);
+  } finally {
+    run.end();
+  }
+}
+```
+
+Full generated WGSL, including the injection and resource layout, distinguishes
+pipeline cache entries. Even an empty extension cannot share the baseline
+pipeline. Removing an extension releases its secondary buffer on the next
+visible draw and restores the baseline path. Model disposal and device
+restoration release all owned secondary buffers. Extensions that require
+blending use the existing `material.settings[0] = 2` path. This slot adds no new
+material lobes, passes or attributes.
+
+Run `node scripts/material-extension-tests.js` for the material slot's WebGPU
+checks, also included in `npm run modern:test:extensions`.
+
+Limits: triangle primitives; at most eight skin influences in the animation package; UV sets 0 to 3. Unknown required extensions still reject. Ambient fill uses fixed sky/ground colors unless the scene has a lighting `Sky` (`sceneSky`, above) or the model is given an environment; image-based lighting is a separate optional package. Bounds describe the bind pose with current node transforms; GPU picking requires the optional selection package.
+
+`npm run modern:test:gltf-parity` checks texture-coordinate and alpha-shadow pixel
+parity, KTX2 mip upload and worker disposal in a production Vite build, complete
+Khronos assets, and eight-influence character deformation against a CPU reference.
+These checks are also part of `npm run modern:test:extensions`.
+
+The demo at `/examples/flight-helmet.html` loads the [Khronos FlightHelmet](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/FlightHelmet) (CC0 1.0). Asset credits are in [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md).
+
+#### Absent physical maps on limited devices
+
+Native glTF physical materials bind only authored extension maps. Absent maps use their existing
+constant fallback in the shader, leaving texture units available for image lighting and shadows.
+The five core map bindings stay stable. Fallback views remain available if a material hook is added
+or removed live; its full resource interface is retained. This fixes the viewer's
+transmission lens plus IBL and shadows on a 16-unit WebGL2 compatibility device. Authored maps
+are retained; a material that really exceeds hardware limits still has that limit.
+
+The existing loadGLTF examples apply unchanged. Run scripts/stage-viewer-gpu-check.js with --compat
+for the licensed FlightHelmet integration regression, including cascaded
+shadows, IBL, visible product, turntable radius, failed-load rollback and disposal. No speed claim.
+
+#### Required outside GPU samples
+
+The extension GPU harness resolves FlightHelmet, EnvironmentTest, ScatteringSkull and the large
+tower capture through the same external cache as verify. Every case validates its files and
+companions by hash. Missing files fail with the existing fetch-skip-assets recovery command; an
+unset MARGO_SPLAT_SAMPLES uses the normal shared cache. No case reports success without its input.
+
+#### GLB padding
+
+A GLB's BIN chunk may be up to 3 bytes longer than buffer 0's `byteLength`, to pad it to 4 bytes (glTF 2.0 section
+4.4.3.3). `parseGLTF`, `parseGLTFAsync`, `loadGLTF`, the worker loaders and `loadGLTFProgressive` (main thread and worker) refuse a longer chunk, as the Khronos glTF Validator does, with a `MargoError` (code `failed`)
+that gives both lengths and links to https://margoengine.com/errors#failed. Export the file again.
+
+#### Git LFS pointer files
+
+A repository cloned without Git LFS serves small pointer files (text starting
+`version https://git-lfs`) in place of its models. `loadGLTF` and `parseGLTFAsync` check the first
+bytes of every .gltf, .glb, external .bin and image they fetch (the streaming loader checks its .gltf
+root), and refuse a pointer with a `MargoError` (code `failed`) that names the URL and links to
+https://margoengine.com/errors#git-lfs. Run `git lfs pull` where the files are served, then reload.
+
+```ts
+import { loadGLTF } from '@margoengine/gltf/pbr';
+import type { EngineKernel } from '@margoengine/core';
+
+export async function load(engine: EngineKernel) {
+  try {
+    return await loadGLTF(engine, '/models/robot.glb');
+  } catch (error) {
+    // A pointer file reads: "... is a Git LFS pointer file, not the asset; run git lfs pull ..."
+    if (error instanceof Error && error.message.includes('Git LFS pointer')) console.error(error.message);
+    throw error;
+  }
+}
+```
+
+### Loading into a second scene
+
+`loadGLTF`, `parseGLTFAsync`, `loadGLTFProgressive`, `loadGLTFInWorker` and `parseGLTFInWorker` remember the scene that is
+active when you call them, before their first await, and attach the model there (and its Gaussian splat clouds, and
+the progressive loader's texture stream). Start a load inside a second scene's plugin `setup` and the model belongs
+to that scene; start it anywhere else and it belongs to the default scene. If that scene is disposed while the load
+runs, the load rejects with a `TypeError`. An abort leaves nothing in either scene.
+
+### Preview tier contract
+
+The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
+
+`PBRModel` already refused the preview during setup. The tier regression loads an HTTP glTF fixture, checks direct refusal and automatic escalation, then verifies model and selection pixels on both complete tiers.

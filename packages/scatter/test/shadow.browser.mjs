@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/shadow.browser.mjs
 // GPU scatter casts into Shadows: a box drawn as a `Scatter`, and as a `ScatterTiles` record, darkens the floor where
 // its shadow falls by at least 25 percent once `shadows.add(scatter)` adds it, and not without it. Before scatter had

@@ -66,6 +66,10 @@
       "types": "./dist/legacy.d.ts",
       "import": "./dist/legacy.js"
     },
+    "./character-creator": {
+      "types": "./dist/character-creator.d.ts",
+      "import": "./dist/character-creator.js"
+    },
     "./surfaces": {
       "types": "./dist/surfaces.d.ts",
       "import": "./dist/surfaces.js"
@@ -82,7 +86,7 @@
   "dependencies": {
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/loaders": "^1.0.0"
   },

@@ -26704,7 +26704,7 @@
         "sha256": "ceefec4089601dd3c6024a49d845cc95b85b9b48df15e2b7ec445fef20f69802"
       },
       {
-        "file": "scripts/gpu-lock.mjs",
+        "file": "the command runner",
         "sha256": "164bc688f2de13e84982c810ea717e6a473b1e2f072e8362aa9821904bd4c28a"
       },
       {

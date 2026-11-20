@@ -6,7 +6,7 @@ The resulting `GLTFPixelImage` holds `width`, `height` and `data`: top-first RGB
 
 Existing download, decoded-image and device dimension limits still apply. Decoder support and errors are those of the existing optional image decoder. CPU memory includes four bytes per pixel plus each independent React image copy. No decoder speed claim is made, and different JPEG decoders need not round identically.
 
-Evidence: `packages/gltf-pro/tests/node-images.test.js` covers PNG/JPEG data URIs, buffer views and fetched files, upload bytes, mip allocation, restoration, failures and abort. Its six source cases fail on the original loader. `test-node-images.mjs` compares real Node WebGPU texture renders exactly with uniform base-colour references. `test-pixel-images.mjs` compares PNG bitmap/pixel rendering and restoration pixel for pixel on native WebGPU and WebGL2. Material, MToon and React regressions cover the consuming paths.
+Evidence: `packages/gltf/test/node-images.test.js` covers PNG/JPEG data URIs, buffer views and fetched files, upload bytes, mip allocation, restoration, failures and abort. Its six source cases fail on the original loader. `test-node-images.mjs` compares real Node WebGPU texture renders exactly with uniform base-colour references. `test-pixel-images.mjs` compares PNG bitmap/pixel rendering and restoration pixel for pixel on native WebGPU and WebGL2. Material, MToon and React regressions cover the consuming paths.
 
 Clean-room sources compared before implementation:
 

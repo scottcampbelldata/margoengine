@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { PBRModel, PBRMaterial, PBRMaterialShading } from '@margoengine/gltf-pro';
-import { setMaterialDraw, type MaterialDrawCall } from '@margoengine/gltf-pro/material-draw';
+import type { PBRModel, PBRMaterial, PBRMaterialShading } from '@margoengine/gltf/pbr';
+import { setMaterialDraw, type MaterialDrawCall } from '@margoengine/gltf/material-draw';
 import { engineRuntime } from '@margoengine/core/extension';
 import { fault } from '../../shared/errors.js';
 import { retire, writeUniform } from '../../shared/frame-resources.js';
@@ -49,7 +49,7 @@ function watchLost(device: GPUDevice): Set<ModelHatching> {
 }
 
 /**
- * Live hatching/halftone on a glTF-pro model or materials mesh, retaining its textures, deformation and lighting.
+ * Live hatching/halftone on a glTF PBR model or materials mesh, retaining its textures, deformation and lighting.
  * Pattern units/defaults match core Hatching. Borrowed model/materials remain caller-owned.
  */
 export class ModelHatching extends HatchStyle {

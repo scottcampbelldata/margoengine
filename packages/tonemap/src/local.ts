@@ -23,22 +23,31 @@ export interface LocalExposureOptions {
   edges?: number;
 }
 
+// The base is built from SCALE by SCALE blocks, or from blocks twice, four times... as large when the blur's sigma
+// would need more than TAPS taps a side at quarter resolution (the downsampled bilateral of Durand and Dorsey 2002).
 const SCALE = 4,
   TAPS = 32;
+/** Block size in pixels of the base for a blur of `sigma` pixels: SCALE times the least power of two that keeps 3 sigma within TAPS texels. */
+function localBlock(sigma: number): number {
+  let block = SCALE;
+  while ((3 * sigma) / block > TAPS) block *= 2;
+  return block;
+}
 
 const quad = `@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
   let xy=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));return vec4f(xy[i],0,1);
 }
 `;
-// Quarter resolution: the mean log2 luminance of each 4 by 4 block inside the image.
+// The mean log2 luminance of each block (b.x by b.x pixels; 4 unless the radius needs larger) inside the image.
 // clean(): NaN and -Inf count as black, +Inf as 65504, so one bad texel cannot spread through the base and its blur.
 const downShader =
   quad +
   cleanShader +
   `@group(0) @binding(0) var scene:texture_2d<f32>;
+@group(0) @binding(1) var<uniform> b:vec4f;
 @fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
-  let size=vec2i(textureDimensions(scene));let o=vec2i(pos.xy)*${SCALE};var sum=0.0;var n=0.0;
-  for(var y=0;y<${SCALE};y++){for(var x=0;x<${SCALE};x++){
+  let block=i32(b.x);let size=vec2i(textureDimensions(scene));let o=vec2i(pos.xy)*block;var sum=0.0;var n=0.0;
+  for(var y=0;y<block;y++){for(var x=0;x<block;x++){
     let q=o+vec2i(x,y);
     if(q.x<size.x&&q.y<size.y){
       let l=dot(max(clean(textureLoad(scene,q,0).rgb),vec3f(0)),vec3f(0.2126,0.7152,0.0722));
@@ -67,7 +76,7 @@ const local = (binding: number, extra: number) => `
 @group(0) @binding(${binding}) var<uniform> localExposure:vec4f;
 @group(0) @binding(${extra}) var localBase:texture_2d<f32>;
 fn localStops(pos:vec2f,stops:f32)->f32 {
-  let size=vec2i(textureDimensions(localBase));let t=pos/${SCALE}.0-0.5;let i=vec2i(floor(t));let f=fract(t);
+  let size=vec2i(textureDimensions(localBase));let t=pos/localExposure.z-0.5;let i=vec2i(floor(t));let f=fract(t);
   let a=textureLoad(localBase,clamp(i,vec2i(0),size-1),0).r;
   let b=textureLoad(localBase,clamp(i+vec2i(1,0),vec2i(0),size-1),0).r;
   let c=textureLoad(localBase,clamp(i+vec2i(0,1),vec2i(0),size-1),0).r;
@@ -77,7 +86,9 @@ fn localStops(pos:vec2f,stops:f32)->f32 {
 }`;
 
 // The exposure line of each Tonemap shader variant; the local stops go right after it.
-const EXPOSURE = /(hdr=max\(hdr,vec3f\(0\)\)\*(?:fx\.wb\.xyz\*)?exp2\(([^;]*)\);|hdr\*=(?:fx\.wb\.xyz\*)?exp2\(([^;]*)\);)/;
+// (Plain, then with the effects variant's white balance.)
+const EXPOSURE =
+  /(hdr=max\((?:hdr|fxBalance\(max\(hdr,vec3f\(0\)\)\)),vec3f\(0\)\)\*exp2\(([^;]*)\);|hdr(?:\*=|=fxBalance\(hdr\)\*)exp2\(([^;]*)\);)/;
 
 const inRange = (v: number | undefined, lo: number, hi: number) =>
   v === undefined || (Number.isFinite(v) && v >= lo && v <= hi);
@@ -86,13 +97,15 @@ const inRange = (v: number | undefined, lo: number, hi: number) =>
  * Local exposure for {@link Tonemap}: brightens dark regions and darkens bright ones toward middle grey while keeping
  * the detail inside each region, so a bright window and a dark interior both hold detail. Give it to Tonemap's
  * `extensions`; change `local.options` any time. It adds three small render passes at quarter resolution before the
- * presentation pass and holds two `r32float` textures; dispose it (or `using`) when done.
+ * presentation pass and holds three `r32float` textures, which the Tonemap frees when it is disposed, removed or restored.
  * @throws RangeError for an option out of range (checked now and every frame).
  */
 export class LocalExposure implements TonemapExtension {
   readonly key = 'local';
   private readonly uniform = new Float32Array(4);
-  private readonly blurValues = new Float32Array(8);
+  private readonly blurValues = new Float32Array(12);
+  /** Block size of the base, set by each frame's encode before the uniform is written. */
+  private block = SCALE;
   private device?: GPUDevice;
   private textures: GPUTexture[] = [];
   private views: GPUTextureView[] = [];
@@ -106,7 +119,10 @@ export class LocalExposure implements TonemapExtension {
   }
   patch(shader: string, binding: number, extra = binding + 1): string {
     const m = EXPOSURE.exec(shader);
-    if (!m) throw new RangeError('LocalExposure: the Tonemap shader has no exposure step to follow; use LocalExposure only in Tonemap extensions.');
+    if (!m)
+      throw new RangeError(
+        'LocalExposure: the Tonemap shader has no exposure step to follow; use LocalExposure only in Tonemap extensions.',
+      );
     const stops = m[2] ?? m[3];
     return shader.replace(m[1], `${m[1]}hdr*=exp2(localStops(pos.xy,${stops}));`) + local(binding, extra);
   }
@@ -115,6 +131,7 @@ export class LocalExposure implements TonemapExtension {
     const o = this.options;
     this.uniform[0] = o.strength ?? 0.5;
     this.uniform[1] = o.maxStops ?? 3;
+    this.uniform[2] = this.block;
     return this.uniform;
   }
   /** The quarter-resolution base, bound after the uniform. */
@@ -124,8 +141,12 @@ export class LocalExposure implements TonemapExtension {
   /** Builds the base for this frame: downsample, then the two blur directions. */
   encode(c: TonemapPassContext): void {
     const device = c.device,
-      w = Math.max(1, Math.ceil(c.width / SCALE)),
-      h = Math.max(1, Math.ceil(c.height / SCALE));
+      o = this.options,
+      pixels = (o.radius ?? 0.02) * c.height,
+      block = localBlock(pixels),
+      w = Math.max(1, Math.ceil(c.width / block)),
+      h = Math.max(1, Math.ceil(c.height / block));
+    this.block = block;
     if (this.device !== device) {
       this.release();
       this.device = device;
@@ -140,8 +161,9 @@ export class LocalExposure implements TonemapExtension {
         };
       this.down = pipeline(downShader);
       this.blur = pipeline(blurShader);
-      // Two 16-byte slots, 256 bytes apart (the minimum uniform offset alignment).
-      this.blurBuffer = device.createBuffer({ size: 272, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      // Three 16-byte slots, 256 bytes apart (the minimum uniform offset alignment): the two blur directions, then the
+      // block size of the downsample.
+      this.blurBuffer = device.createBuffer({ size: 528, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     }
     if (this.textures[0]?.width !== w || this.textures[0]?.height !== h) {
       for (const t of this.textures) t.destroy();
@@ -160,7 +182,13 @@ export class LocalExposure implements TonemapExtension {
       this.source = c.source;
       const src = 'createView' in c.source ? c.source.createView() : c.source;
       this.groups = [
-        device.createBindGroup({ layout: this.down!.getBindGroupLayout(0), entries: [{ binding: 0, resource: src }] }),
+        device.createBindGroup({
+          layout: this.down!.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: src },
+            { binding: 1, resource: { buffer: this.blurBuffer!, offset: 512, size: 16 } },
+          ],
+        }),
         ...[0, 1].map((k) =>
           device.createBindGroup({
             layout: this.blur!.getBindGroupLayout(0),
@@ -172,16 +200,18 @@ export class LocalExposure implements TonemapExtension {
         ),
       ];
     }
-    const o = this.options,
-      sigma = Math.max(0.5, ((o.radius ?? 0.02) * c.height) / SCALE),
+    const sigma = Math.max(0.5, pixels / block),
       v = this.blurValues;
     v[0] = v[4] = sigma;
-    v[1] = v[5] = Math.min(TAPS, Math.ceil(3 * sigma));
+    // Three sigma a side, never more than TAPS (localBlock keeps it within).
+    v[1] = v[5] = Math.ceil(3 * sigma);
     v[2] = v[6] = o.edges ?? 1.3;
     v[3] = 0;
     v[7] = 1;
     device.queue.writeBuffer(this.blurBuffer!, 0, v as Float32Array<ArrayBuffer>, 0, 4);
     device.queue.writeBuffer(this.blurBuffer!, 256, v as Float32Array<ArrayBuffer>, 4, 4);
+    v[8] = block;
+    device.queue.writeBuffer(this.blurBuffer!, 512, v as Float32Array<ArrayBuffer>, 8, 4);
     const passes: [GPURenderPipeline, GPUBindGroup, GPUTextureView][] = [
       [this.down!, this.groups[0], this.views[0]],
       [this.blur!, this.groups[1], this.views[1]],

@@ -1,6 +1,7 @@
+// MARGO_COMPAT not applicable: the pages run the WebGL2 preview and the layer themselves, which is what this check tests.
 // Real-browser proof of the WebGL2 preview's optional entries (from the repository root after building packages;
-// check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/preview-browser-check.mjs
+// ):
+//   node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/test/preview-browser-check.mjs
 // `/pick`: real read-pixels picks through CSS pixels, depth, faces, views and layers, with the canvas left as it was.
 // `/restore`: a really lost context comes back with the same pixels and working picks, and rebootDevice works.
 // `/auto`: without WebGPU a plain scene stays on the preview and a refused one moves to the compatibility layer;

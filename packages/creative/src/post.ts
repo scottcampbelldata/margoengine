@@ -29,7 +29,11 @@ fn world(uv:vec2f,depth:f32)->vec3f{let p=f.inverse*vec4f(uv*vec2f(2,-2)+vec2f(-
 // Height fog: closed-form integral of an exponential height density along the ray (Wenzel, "Real-time Atmospheric
 // Effects in Games", SIGGRAPH 2006 course). God rays: the radial-blur method of Mitchell, "Volumetric Light Scattering
 // as a Post-Process" (GPU Gems 3 ch. 13, 2007), with Margo's own sample count, decay and tint. Grade: ASC CDL v1.2
-// form (slope/offset/saturation), BT.709 luma, 18% grey pivot. Focus blur taps and radius cap are Margo's.
+// form (slope/offset/saturation), BT.709 luma, 18% grey pivot. Contrast is a power about that pivot,
+// 0.18 (c / 0.18)^k: a slope of k in log2 exposure, as contrast works in the log grading space ACEScc (Academy
+// S-2014-003) and the CDL's power, so it never clips black. Until 2026-11-14 it was linear, (c - 0.18) k + 0.18 clamped
+// at 0, which sent every scene-linear channel below 0.18 (1 - 1/k) to black. Contrast 0 is flat 0.18, black included,
+// as the formula is in JavaScript and IEEE 754 pow; pow(0, 0) is undefined in WGSL and GLSL ES 3.00, so it is not run. Focus blur taps and radius cap are Margo's.
 const resolve =
   frame +
   `
@@ -46,7 +50,7 @@ fn grainPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u)
  let density=f.fog.x*exp(clamp(-f.eye.y*f.fog.y,-20.0,20.0));let dy=(w.y-f.eye.y)*f.fog.y;let integral=select((1-exp(clamp(-dy,-20.0,20.0)))/select(dy,1.0,abs(dy)<0.001),1.0,abs(dy)<0.001);let visibility=exp(-max(0.0,density*distance*integral));c=mix(f.color.xyz,c,visibility);
  let sunWorld=f.eye.xyz+f.sun.xyz*f.settings.y;let ray=normalize(sunWorld-f.eye.xyz);let farRay=normalize(w-f.eye.xyz);let alignment=pow(max(dot(ray,farRay),0.0),16.0);var shafts=0.0;
  let sunClip=f.camera*vec4f(sunWorld,1);if(sunClip.w>0&&f.fog.z>0){let sunUV=sunClip.xy/sunClip.w*vec2f(0.5,-0.5)+0.5;for(var i=1;i<=16;i++){let q=clamp(vec2i(mix(uv,sunUV,f32(i)*0.05)*vec2f(size)),vec2i(0),vec2i(size)-1);shafts+=select(0.0,1.0,textureLoad(depth,q,0)<0.000001)*pow(0.95,f32(i))/16.0;}}c+=vec3f(1,0.8,0.5)*shafts*alignment*f.fog.z;
- c=max(vec3f(0),c*exp2(f.grade.x)*f.gain.xyz+f.lift.xyz);let luminance=dot(c,vec3f(0.2126,0.7152,0.0722));c=mix(vec3f(luminance),c,f.grade.z);c=max(vec3f(0),(c-0.18)*f.grade.y+0.18);
+ c=max(vec3f(0),c*exp2(f.grade.x)*f.gain.xyz+f.lift.xyz);let luminance=dot(c,vec3f(0.2126,0.7152,0.0722));c=mix(vec3f(luminance),c,f.grade.z);c=max(c,vec3f(0));if(f.grade.y==0.0){c=vec3f(0.18);}else if(f.grade.y!=1.0){c=0.18*pow(c/0.18,vec3f(f.grade.y));}
  c=toDisplay(c);let noise=f32(grainPcg(id.x+grainPcg(id.y+grainPcg(bitcast<u32>(f.lens.w))))>>8u)*5.9604645e-8-0.5;textureStore(output,p,vec4f(clamp(c+noise*f.lens.z,vec3f(0),vec3f(1)),1));}`;
 const present =
   vertex +
@@ -68,7 +72,7 @@ export interface AtmosphereOptions {
 export interface PostOptions {
   /** Exposure in stops, -10 to 10. Default 0. */
   exposure?: number;
-  /** Contrast around mid grey, 0-4. Default 1. */
+  /** Contrast about 18% grey, 0-4; default 1: scene-linear `0.18 * (c / 0.18) ** contrast`, a slope in log exposure, so a contrast above 1 deepens the shadows without clipping them to black; contrast 0 gives flat 18% grey everywhere, black included (`0 ** 0` is 1). */
   contrast?: number;
   /** Saturation, 0-4 (0 is greyscale). Default 1. */
   saturation?: number;
@@ -106,7 +110,8 @@ export class PostProcessing implements EnginePlugin {
   private present?: GPURenderPipeline;
   private original?: GPUTextureView;
   private readonly values = new Float32Array(68);
-  private time = 0;
+  private clock = 0;
+  private updated = false;
   private ready = false;
   private presentKey = '';
   private readonly inverse = this.values.subarray(0, 16);
@@ -298,7 +303,8 @@ export class PostProcessing implements EnginePlugin {
       v = this.values;
     if (!invertMatrixStable(c.camera.matrix, this.inverse, this.inverseWorkspace))
       throw new MargoError('state', 'Invalid post camera; give the camera a finite, invertible projection');
-    this.time += c.delta;
+    // The clock moves in the frame update (advanceTime); a PostProcessing no update reaches moves it per draw.
+    if (!this.updated) this.clock += c.delta;
     v.set(c.camera.position, 16);
     // The unit direction, normalized here: shaders never normalize a uniform-only light value (core's frame light).
     const toward = a.sun ?? sun,
@@ -314,7 +320,7 @@ export class PostProcessing implements EnginePlugin {
     v[36] = o.focus ?? 5;
     v[37] = o.aperture ?? 0;
     v[38] = o.grain ?? 0;
-    v[39] = this.time;
+    v[39] = this.clock;
     v[40] = c.camera.near;
     v[41] = c.camera.far;
     v.set(o.gain ?? gain, 44);
@@ -362,11 +368,26 @@ export class PostProcessing implements EnginePlugin {
       pass.end();
     }
   }
+  /** Seconds on the grain clock: each frame update moves it (`advanceTime`), a draw does not. */
+  get time(): number {
+    return this.clock;
+  }
+  /**
+   * Moves the film grain clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
+   * runs it, so `seek` from `@margoengine/cutscene/seek` replays the grain exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.clock += delta;
+  }
+  onPreUpdate(delta: number): void {
+    this.updated = true;
+    this.advanceTime(delta);
+  }
   onDeviceRestored(engine: Engine): void {
-    const time = this.time;
+    const time = this.clock;
     this.release();
     this.setup(engine);
-    this.time = time;
+    this.clock = time;
   }
   dispose(): void {
     const engine = this.engine;

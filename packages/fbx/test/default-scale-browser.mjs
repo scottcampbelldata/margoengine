@@ -1,11 +1,11 @@
 // The default-limit FBX mesh (996,004 vertices, test/default-scale.js) loads with default options and renders, on
-// native WebGPU and (MARGO_COMPAT=1) the WebGL2 layer. gltf-pro draws its one glTF primitive as parts of at most
+// native WebGPU and (MARGO_COMPAT=1) the WebGL2 layer. gltf/pbr draws its one glTF primitive as parts of at most
 // 262,144 vertices (its default maxPartVertices), so the assertions are: the parts cover the mesh exactly (every vertex,
 // every triangle once, test/part-coverage.js), one upload of the parts' geometry, one draw per part, a steady frame
 // that creates no buffer and re-uploads no geometry. Load time and GPU frame
 // time (timestamp-query, when the adapter has it) are printed as diagnostics; their targets live in
 // docs/work-lists/speed-phase.md for the quiet run.
-// node scripts/gpu-lock.mjs run --owner=<you> --max=10 -- node packages/fbx/test/default-scale-browser.mjs
+// node scripts/run-with-timeout.mjs --max=10 -- node packages/fbx/test/default-scale-browser.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { defaultScaleMesh } from './default-scale.js';

@@ -26,7 +26,7 @@ export function record(row) {
  * The gate's problems for one measured row against its recorded expectation `want` (undefined when not recorded):
  * the recorded status; a "differs" row no worse than its recorded share and mean (x1.5 plus 0.001 / 0.25); a demo
  * recorded with an exact still frame keeps it (its two native captures equal, so its status cannot flip with noise).
- * Pixels only: the frame budget is frameProblems, measured by its own step with the GPU held exclusively.
+ * Pixels only: the frame budget is frameProblems, measured by its own step.
  */
 export function gateProblems(row, want, { write = false } = {}) {
   const problems = [];

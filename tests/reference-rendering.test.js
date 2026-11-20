@@ -72,8 +72,62 @@ test('metallic-roughness budget is the measured unrounded result, with real WebG
   assert.equal(baseline.referenceSha256, baseline.compat.referenceSha256);
 });
 
+test('the like-for-like transfer swaps only the exact sRGB encode for the viewer pow(x, 1/2.2)', async () => {
+  const { viewerTransfer } = await import('../scripts/reference-rendering/viewer-transfer.mjs');
+  const line =
+    'color=select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308));' +
+    'let s=select(share*12.92,1.055*pow(share,vec3f(1.0/2.4))-0.055,share>=vec3f(0.0031308));';
+  const { code, count } = viewerTransfer(line);
+  assert.equal(count, 2);
+  assert.equal(
+    code,
+    'color=pow(max(color,vec3f(0)),vec3f(1.0/2.2));let s=pow(max(share,vec3f(0)),vec3f(1.0/2.2));',
+  );
+  // Mismatched identifiers are not an encode and stay as they are.
+  const other = 'select(a*12.92,1.055*pow(b,vec3f(1.0/2.4))-0.055,a>=vec3f(0.0031308))';
+  assert.deepEqual(viewerTransfer(other), { code: other, count: 0 });
+  // Every gltf/pbr output path carries the encode the rewrite targets, so the row measures the material shaders.
+  const shader = readFileSync(new URL('../packages/gltf/src/shader.ts', import.meta.url), 'utf8');
+  assert.ok(viewerTransfer(shader).count >= 3);
+  const run = readFileSync(new URL('../scripts/reference-rendering/run.mjs', import.meta.url), 'utf8');
+  assert.match(run, /if \(likeForLike\) assertBudget\(result\.metrics, baseline\.likeForLike\.metrics\);/);
+  assert.match(run, /exactSize: \[entry\.settings\.width, entry\.settings\.height\]/);
+});
+
+// Accepted differences (docs/limits.md, "Sample Viewer like for like"): once both pictures share the viewer's
+// pow(x, 1/2.2) transfer and one sample per pixel, these are the measured residuals of the BRDF itself. The integer
+// budgets equal the first measurement and are never raised.
+for (const [family, absolute, square, max, foreground, ratio] of [
+  ['clearcoat', 43493, 611869, 94, 60513, 0.033],
+  ['metallic-roughness', 7268, 465094, 254, 40277, 0.014],
+  ['anisotropy', 157467, 6235269, 254, 55730, 0.2],
+  ['iridescence', 273485, 15367203, 97, 64173, 0.45],
+  ['sheen', 218842, 2944566, 103, 59693, 0.21],
+])
+  test(`${family} like-for-like row is the measured residual of the BRDF alone`, () => {
+    const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
+    const row = b.likeForLike;
+    assert.deepEqual(
+      [row.metrics.absolute, row.metrics.square, row.metrics.max, row.metrics.foreground],
+      [absolute, square, max, foreground],
+    );
+    assert.equal(row.metrics.pixels, 512 * 512);
+    assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
+    assert.equal(row.sceneSha256, b.sceneSha256);
+    assert.equal(row.referenceSha256, b.referenceSha256);
+    assert.equal(row.margo.backend, 'webgpu');
+    assert.equal(row.margo.primitives, b.margo.primitives);
+    assert.deepEqual([row.margo.width, row.margo.height], [512, 512]);
+    assert.equal(row.hardware.webgpu.vendor, 'nvidia');
+    assert.equal(row.transfer.samples, 1);
+    assert.ok(row.transfer.rewrittenEncodes > 0);
+    assert.match(row.domain, /pow\(x, 1\/2\.2\), one sample per pixel/);
+    // The two display differences carry nearly all of the frozen loss.
+    assert.ok(row.metrics.absolute < ratio * b.metrics.absolute);
+  });
+
 test('material-family camera preparation preserves source materials, geometry and nodes', () => {
-  const original = readFileSync(new URL('../packages/gltf-pro/tests/fixtures/pointer-show.glb', import.meta.url));
+  const original = readFileSync(new URL('../packages/gltf/test/fixtures/pointer-show.glb', import.meta.url));
   const source = JSON.parse(original.subarray(20, 20 + original.readUInt32LE(12)).toString());
   const scene = prepareScene(original, referenceCase('clearcoat'));
   assert.deepEqual(scene.doc.materials, source.materials);
@@ -107,10 +161,18 @@ test('sheen has measured budgets for its entire twenty-primitive scene on both b
   const baseline = JSON.parse(
     readFileSync(new URL('../docs/whitepaper/results/batch-160-sheen.json', import.meta.url)),
   );
+  // KB3297 (punctual sheen albedo scaling): 1,119,468 / 33,899,646 on both before, then 1,086,074 / 1,088,183 and
+  // 32,897,050 / 32,906,691. KB3297c (Estevez and Kulla visibility, its albedo table): both backends draw the same
+  // picture; the maximum moves from 167 to 171 on the same silhouette pixel (docs/known-bugs.md, KB3297c). KB3297d
+  // (no sheen roughness floor, n.h from the clamped cosines; Scott approved the re-pin 2026-11-15): 1,056,434 to
+  // 1,057,125 and 32,408,128 to 32,409,491, max 171 to 119; like for like 217,478 to 218,842, 3,061,310 to 2,944,566,
+  // max 205 to 103. The absolute rise is the viewer's encoded albedo-table ring (KB3297c) that the old floor hid.
+  assert.deepEqual(
+    [baseline.metrics.absolute, baseline.compat.metrics.absolute, baseline.metrics.square, baseline.compat.metrics.square],
+    [1057125, 1057125, 32409491, 32409491],
+  );
   for (const row of [baseline, baseline.compat]) {
-    assert.equal(row.metrics.absolute, 1119468);
-    assert.equal(row.metrics.square, 33899646);
-    assert.equal(row.metrics.max, 167);
+    assert.equal(row.metrics.max, 119);
     assert.equal(row.metrics.mae, row.metrics.absolute / (512 * 512 * 3));
     assert.equal(row.margo.primitives, 20);
     assert.equal(row.nativeWebGL2.code, 'unsupported');

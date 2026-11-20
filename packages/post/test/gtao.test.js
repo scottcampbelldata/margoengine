@@ -110,3 +110,57 @@ test("GTAO's slice visibility integrates to 1 over the open hemisphere for any n
     assert.ok(Math.abs(sum / slices - 1) < 1e-4, `tilt ${tilt}: ${sum / slices}`);
   }
 });
+
+// Sky occlusion (KB-LOOK-POST-SKYOCC1): a second, longer horizon search clamped to the sky half of each slice.
+test('GTAO sky occlusion is off by default with the plain uniform, and on writes its reach and steps', async () => {
+  const off = harness(),
+    gtao = new GTAO({ radius: 1.5, slices: 3, steps: 5 }),
+    log = off.gpu.record(() => {
+      off.engine.use(new PostStack([gtao]));
+      off.frame();
+    });
+  assert.match(kernel(log), /fn sky\(p:vec2i,position:vec3f,n:vec3f,v:vec3f,cell:vec4f,slices:u32,size:vec2u\)->f32 \{\n  if\(f\.size\.z<=0\.0\)\{return 1\.0;\}/);
+  assert.deepEqual([...written(log, 224).subarray(48, 56)], [1.5, 5, 3, 1, 1280, 720, 0, 0], 'size.zw stay 0 when off');
+  gtao.options.skyRadius = 8;
+  await null;
+  assert.deepEqual([...written(off.gpu.record(() => off.frame()), 224).subarray(54, 56)], [8, 16]);
+  gtao.options.skySteps = 24;
+  await null;
+  assert.deepEqual([...written(off.gpu.record(() => off.frame()), 224).subarray(54, 56)], [8, 24]);
+  for (const bad of [{ skyRadius: -1 }, { skyRadius: 1001 }, { skyRadius: Number.NaN }, { skySteps: 0 }, { skySteps: 33 }, { skySteps: 1.5 }])
+    assert.throws(() => new GTAO(bad), { name: 'RangeError', message: /skyRadius 0 to 1000, skySteps an integer 1-32/ });
+});
+
+test("GTAO's sky term gives an infinite slot's floor its view factor to the opening", () => {
+  // The shader's own arc and sky clamp, over many slices, with each slice's horizon from the slot's rims: the floor at
+  // the middle of a slot of width w and depth h, seen from straight above, sees sin(atan(w / 2h)) of the sky.
+  const h = harness();
+  const code = kernel(h.gpu.record(() => h.engine.use(new PostStack([new GTAO()])))),
+    body = code.match(/fn arc\(h:f32,g:f32\)->f32 \{return ([^;]+);\}/)[1],
+    arc = new Function('h', 'g', `const {cos,sin}=Math;return ${body};`),
+    skyArc = (x, g) => Math.sign(x) * arc(x, g);
+  assert.match(code, /let a0=max\(g,u\)-0\.5\*PI;let b0=min\(g,u\)\+0\.5\*PI;/);
+  for (const [w, depth] of [
+    [2, 2],
+    [2, 4],
+    [6, 1],
+  ]) {
+    let seen = 0,
+      open = 0;
+    const slices = 3600;
+    for (let k = 0; k < slices; k++) {
+      const phi = ((k + 0.5) * Math.PI) / slices,
+        across = Math.abs(Math.cos(phi)),
+        cosine = across < 1e-9 ? 0 : depth / Math.hypot(depth, w / 2 / across),
+        // Normal and world up both along v: g = u = 0.
+        a0 = -Math.PI / 2,
+        b0 = Math.PI / 2,
+        lo = Math.max(-Math.acos(cosine), a0),
+        hi = Math.min(Math.acos(cosine), b0);
+      open += skyArc(b0, 0) - skyArc(a0, 0);
+      seen += Math.max(skyArc(hi, 0) - skyArc(lo, 0), 0);
+    }
+    const exact = Math.sin(Math.atan(w / 2 / depth));
+    assert.ok(Math.abs(seen / open - exact) < 1e-4, `w ${w}, h ${depth}: ${seen / open} against ${exact}`);
+  }
+});

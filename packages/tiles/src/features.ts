@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
-import type { PBRModel, PBRPrimitive, MaterialExtension } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRPrimitive, MaterialExtension } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { SRGBToLinear } from '@margoengine/math/color';
 import { readStructuralMetadata, type FeatureIdSet, type PropertyTable } from './metadata.js';

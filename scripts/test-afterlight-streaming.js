@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'vite';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { listenWhenFree } from './browser.js';
 import { resolve } from 'node:path';
 import { installDemoLoadAudit } from './demo-load-audit.js';
@@ -11,6 +12,7 @@ import { closeAll } from './support/shutdown.mjs';
 await mkdir('test-results', { recursive: true });
 const root = resolve('examples/gameplay-sandbox');
 const server = await createServer({
+  plugins: [noFileWatcher()],
   root,
   configFile: resolve(root, 'vite.config.ts'),
   logLevel: 'error',

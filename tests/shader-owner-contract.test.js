@@ -10,7 +10,9 @@ test('shader EnginePlugin cleanup removes actual scene ownership', () => {
     checked += result.checked;
     assert.deepEqual(result.problems, [], file);
   }
-  assert.equal(checked, 4);
+  // ComputePass, ShaderPass, ScenePass, NodePass, RawShaders, Shadertoy and ShaderClock (the frame clock that shader
+  // `time` reads).
+  assert.equal(checked, 7);
 });
 test('shader owner guard rejects absent and active-scene detachment', () => {
   const source = (body) => `class Pass implements EnginePlugin {dispose(){${body}}}`;

@@ -13,6 +13,7 @@ export interface TAAUpscaleOptions {
     depthThreshold?: number;
     clampGamma?: number;
     sharpen?: number;
+    settle?: boolean;
 }
 
 export class TAAUpscaleVelocity implements EnginePlugin {
@@ -38,6 +39,7 @@ interface CasterCutout {
   opacity?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   vertexAlpha?: boolean;
+  hashed?: (code: string) => string;
   displacement?: CasterDisplacement;
   clip?: GPUBufferBinding;
   surfaceClip?: GPUBufferBinding;
@@ -76,6 +78,8 @@ class TAA implements EnginePlugin {
     add(source: VelocitySource | TAAVelocityPass): () => void;
     reset(viewId?: string): void;
     onPreUpdate(delta: number): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get velocity(): TAAVelocity | undefined;
@@ -101,6 +105,7 @@ interface TAAOptions {
     clipGamma?: number;
     locks?: boolean;
     present?: TAAPresent;
+    settle?: boolean;
 }
 
 interface TAAPresent {

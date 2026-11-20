@@ -44,7 +44,7 @@ export interface SSAOOptions {
   enabled?: boolean;
 }
 /**
- * A renderer whose own surfaces SSAO should see and darken, such as a gltf-pro model; registered with `ssao.add`.
+ * A renderer whose own surfaces SSAO should see and darken, such as a gltf/pbr model; registered with `ssao.add`.
  * Each frame SSAO calls `draw(context, 'occlusion', gbuffer, depth, 'all', external)` inside its open G-buffer pass.
  * Core meshes need no source.
  */
@@ -126,7 +126,6 @@ export class SSAO implements EnginePlugin {
   private captureShader = '';
   private ambientSource?: string;
   private ambientCode = '';
-  private ambientAll = false;
   private readonly compositeAttachment: GPURenderPassColorAttachment = {
     view: undefined!,
     loadOp: 'clear',
@@ -177,6 +176,14 @@ export class SSAO implements EnginePlugin {
   /** True once a PostStack has taken this effect (joinStack). */
   protected get stacked(): boolean {
     return !!this.host;
+  }
+  /**
+   * The last frame's blurred visibility (an `r32float` view at the drawing size, 1 open, 0 fully occluded; read with
+   * `textureLoad`), the factor the composite darkens the ambient light by; undefined before the first frame. For checks
+   * and debug views.
+   */
+  get occlusionView(): GPUTextureView | undefined {
+    return this.ao;
   }
   get depthTexture(): GPUTexture | undefined {
     return this.host ? this.host.depthTexture : this.textures[1];
@@ -582,27 +589,30 @@ export class SSAO implements EnginePlugin {
         pass.end();
       }
     } else c.encoder.beginRenderPass(this.clearPass!).end();
-    // Convention: a plugin that replaces the ambient light (environment IBL) names it `let margoAmbient=`. Then the replay keeps the
-    // whole shader and only returns margoAmbient (`_=` keeps every binding statically used, so all of c.bindings fit the layout).
+    // The replay keeps the whole lit shader and returns only the ambient term, so it statically uses every binding the
+    // scene's shader uses and binds all of c.bindings, as SSGI's and SSR's replays do. A plugin binding read above
+    // `let direct=` (TerrainColors' look uniform, KB-POST-GTAO-TERRAINLOOK1) fits the layout as well as one read below.
+    // Convention: a plugin that replaces the ambient light (environment IBL) names it `let margoAmbient=`; then the
+    // lighting runs (`_=`) and the replay returns margoAmbient. Otherwise the lighting sits in a dead block.
     if (this.ambientSource !== c.shader) {
       this.ambientSource = c.shader;
-      this.ambientAll = c.shader.includes('let margoAmbient=');
+      const all = c.shader.includes('let margoAmbient=');
       // environment's HemisphereLight writes its light as `*margoSkyLight(n)` in place of the ambient term, or beside
       // margoAmbient where image-based light replaced that term.
-      const sky = /let linear=[^;]*i\.color\*\(1\.0-i\.material\.y\)\*margoSkyLight\(n\)/.test(c.shader);
-      this.ambientCode = this.ambientAll
-        ? c.shader.replace(
-            /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
-            `$1_=$2;return vec4f(margoAmbient${sky ? '+i.color*(1.0-i.material.y)*margoSkyLight(n)' : ''},1);`,
-          )
-        : c.shader.replace(
-            /let direct=[\s\S]*return vec4f\([^\n]+\);/,
-            sky
-              ? 'return vec4f(i.color*(1.0-i.material.y)*margoSkyLight(n),1);'
-              : c.shader.includes('skyAmbient.rgb')
-                ? 'return vec4f(i.color*(1.0-i.material.y)*skyAmbient.rgb,1);'
-                : 'return vec4f(i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb,1);',
-          );
+      const sky = /let linear=[^;]*i\.color\*\(1\.0-i\.material\.y\)\*margoSkyLight\(n\)/.test(c.shader),
+        skyLight = 'i.color*(1.0-i.material.y)*margoSkyLight(n)',
+        term = all
+          ? `margoAmbient${sky ? '+' + skyLight : ''}`
+          : sky
+            ? skyLight
+            : c.shader.includes('skyAmbient.rgb')
+              ? 'i.color*(1.0-i.material.y)*skyAmbient.rgb'
+              : 'i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb';
+      this.ambientCode = c.shader.replace(
+        /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
+        (_, lit: string, colour: string) =>
+          `${all ? `${lit}_=${colour};` : `if(false){${lit}_=${colour};}`}return vec4f(${term},1);`,
+      );
     }
     const code = this.ambientCode;
     if (!this.ambientPipeline || this.ambientShader !== code) {
@@ -623,20 +633,8 @@ export class SSAO implements EnginePlugin {
     }
     const color = c.color;
     c.color = ambient;
-    // Retain TAA's vertex camera and Sky's absolute ambient color when either is used by the replay.
     try {
-      c.draw({
-        pipeline: this.ambientPipeline,
-        clear: false,
-        bindings: this.ambientAll
-          ? c.bindings
-          : c.bindings.filter(
-              (entry) =>
-                entry.binding === 18 ||
-                (entry.binding === 8 && c.shader.includes('skyAmbient.rgb')) ||
-                (entry.binding === 144 && c.shader.includes('fn margoSkyLight(')),
-            ),
-      });
+      c.draw({ pipeline: this.ambientPipeline, clear: false, bindings: c.bindings });
     } finally {
       c.color = color;
     }

@@ -1,4 +1,4 @@
-import type { GLTFAsset } from '@margoengine/gltf-pro';
+import type { GLTFAsset } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { ACCESSOR_WIDTHS, COMPONENT_BYTES, readComponent } from '../../shared/accessor.js';
 import type { PropertyReadOptions } from './properties.js';

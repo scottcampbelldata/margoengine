@@ -1,22 +1,23 @@
 // Real-GPU check of TAA with stereo eyes, drawn as @margoengine/xr's EyeViews draws them: each eye is a RenderView with
 // its own target and id (xr-0, xr-1) through `engine.render({views})`, and a camera whose `project` is the eye's own
 // off-axis frustum with depth reversed, as an XRView gives it. TAA keeps history, jitter cycle and captures per view id.
-// Built packages; takes the GPU lock itself around the browser. A spinning box is drawn for 24 frames by two eyes
+// Built packages. A spinning box is drawn for 24 frames by two eyes
 // 6.4 cm apart; each eye's frame must equal, byte for byte, the frame that eye gets when drawn alone for the same 24
 // frames, so neither eye reprojects the other's history, and the two eyes must differ (parallax).
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-xr' });
 const timer = setTimeout(() => {
   console.error('xr-browser: timed out after 120 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-xr/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -28,6 +29,8 @@ const browser = await launchBrowser({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 640, height: 480 }, deviceScaleFactor: 1 }),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
@@ -125,5 +128,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

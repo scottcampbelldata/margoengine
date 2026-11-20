@@ -13,14 +13,30 @@ export {
   type GroundPlacement,
   type GroundBounds,
   type GroundCircle,
+  type GroundPath,
   type Placement,
 } from './placement.js';
-import { windShader, validateWind, type ScatterWind } from './wind.js';
-import { fadeCode, poseShader } from './pose.js';
+import { windShader, validateWind, windClockRate, type ScatterWind } from './wind.js';
+import {
+  checkTextures,
+  chainsOf,
+  cutoffOf,
+  interleave,
+  texturedFragment,
+  texturedShadow,
+  texturedVertex,
+  uploadChain,
+  type MipChain,
+  type ScatterTextures,
+} from './maps.js';
+export type { ScatterImage, ScatterTextures } from './maps.js';
+import { translucencyShader } from './translucency.js';
+import { fadeCode, pixelFootprint, poseShader } from './pose.js';
 import { outsideLod } from './lod.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 export type { ScatterWind } from './wind.js';
-import { validateExclusions, type GroundBounds } from './placement.js';
+export { WIND_THRASH_FROM, windClockRate } from './wind.js';
+import { pathSegments, validateExclusions, type GroundBounds, type GroundPath } from './placement.js';
 import {
   engineRuntime,
   type Engine,
@@ -35,6 +51,8 @@ import { displayShader } from '../../shared/display.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
+import { coverBlend, coverCode, splitDeclaration } from './cover.js';
+export { coverCode, coverDeclaration, splitDeclaration } from './cover.js';
 import { OrderedCull, candidateShader } from './order.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
@@ -59,6 +77,12 @@ export interface ScatterBlades {
    * distance from 0 at the camera. Thin distant blades otherwise fall below a pixel and shimmer.
    */
   widen?: number;
+  /**
+   * Sunlight seen through the blades, 0-1 (default 0): wrapped back-light translucency (Barre-Brisebois and Bouchard,
+   * GDC 2011), as `ScatterInstances` foliage takes it. Blades glow against a low sun, so a field reads as thin leaves
+   * instead of flat card. 1 matches the albedo's front-lit diffuse. 0 leaves the shader as it was.
+   */
+  translucency?: number;
 }
 /**
  * Colour spread for lit GPU `Scatter` and `ScatterTiles` (see `ScatterOptions.variation`). Each instance draws its two
@@ -102,14 +126,31 @@ export interface ScatterOptions {
   color?: readonly [number, number, number];
   /** Shade instances with core's PBR shader (and receive PCSS shadows) instead of the simple diffuse colour. */
   material?: PbrMaterial;
+  /**
+   * Texture maps of the mesh (a scanned plant, bark or rock): base colour with an alpha cut-out (glTF MASK, also in the
+   * shadow casters), a normal map and an occlusion-roughness-metal map, multiplied by `material` as glTF factors. See
+   * {@link ScatterTextures}. Needs `material`. Default none: one material colour for the whole mesh. Cost: 8 more bytes
+   * a vertex, three texture reads a pixel and, with a cut-out, a fragment stage in the shadow pass.
+   */
+  textures?: ScatterTextures;
   /** World XZ rectangles `[minX, minZ, maxX, maxZ]` kept free of instances (up to 1,000,000). */
   exclusions?: readonly GroundBounds[];
+  /**
+   * Ground paths kept free of instances (a road, track or river bed): each instance's footprint stays more than
+   * `width / 2` from the path's centreline. `roadPath` from `@margoengine/road` gives a road's. Up to 1,000,000
+   * segments in all. Default none.
+   */
+  paths?: readonly GroundPath[];
   /**
    * Red-channel height texture covering `area` around `center` (r32float, r16float, rgba32float, rgba16float or
    * r8unorm), read every frame. Default: flat ground.
    */
   heightmap?: () => GPUTexture | undefined;
-  /** Rooted wind bend `[directionX, directionZ, strength]`. Omitted: static. */
+  /**
+   * Rooted wind bend `[directionX, directionZ, strength]`, or `[directionX, directionZ, strength, speed]` with the mean
+   * wind in m/s at 10 m, which makes the plants thrash faster in a storm (`windClockRate`; a weather drive writes it).
+   * Omitted: static.
+   */
   wind?: ScatterWind;
   /**
    * How far each instance's up axis tilts from world +Y toward the ground normal, 0-1 (default 0, upright). 1 lays
@@ -174,9 +215,24 @@ export interface ScatterOptions {
    * about ten vertex operations; the shadow pass is unchanged.
    */
   clusters?: number;
+  /**
+   * Per-instance plant states (default none): a source from `@margoengine/scatter/states` (`PlantStates.plant()`)
+   * that scorches, chars, strips, mud-coats, stains and flattens each instance from the state map at its root, in the
+   * colour and shadow passes alike. Colour treatments need `material`; the shape treatments work on any Scatter.
+   */
+  states?: ScatterStateSource;
+}
+/**
+ * What `ScatterOptions.states` takes: code for every posing vertex stage reading `entries()` from `binding` on in bind
+ * group `group`, and an update recorded once a frame before the distribute pass. Made by `PlantStates.plant()`.
+ */
+export interface ScatterStateSource {
+  poseCode(code: string, group: number, binding: number): string;
+  entries(device: GPUDevice): { buffer: GPUBuffer }[];
+  update(context: { device: GPUDevice; encoder: GPUCommandEncoder }): void;
 }
 const frame = `
-struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f}
+struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f,pixel:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
@@ -237,7 +293,7 @@ const renderCode =
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
 struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f,@location(2) ${centroid} ground:vec4f,@location(3) ${centroid} shade:f32}
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output{
- let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind);
+ let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.pixel.x);
  return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw,pose.ground,pose.shade);
 }
 ${displayShader}
@@ -276,18 +332,18 @@ const lookCode = (clusters: boolean) =>
  * the `variation` colour and `clusters` the cluster shade and normal. Without `tint` and `clusters` the text is the
  * original, byte for byte.
  */
-const pbrVertex = (fade: boolean, blades: boolean, tint = false, clusters = false) =>
+const pbrVertex = (fade: boolean, blades: boolean, tint = false, clusters = false, translucent = false) =>
   windShader +
   poseShader +
   (tint ? lookShader : '') +
   `
 struct ScatterInstance {position:vec4f,rotation:vec4f}
 @group(1) @binding(0) var<storage,read> instances:array<ScatterInstance>;
-@group(1) @binding(1) var<uniform> material:array<vec4f,5>;
+@group(1) @binding(1) var<uniform> material:array<vec4f,6>;
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output {
- let data=instances[index];${tint ? lookCode(clusters) : ''}let pose=scatterPose(p,${clusters ? 'bent' : 'n'},data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2]);
+ let data=instances[index];${tint ? lookCode(clusters) : ''}let pose=scatterPose(p,${clusters ? 'bent' : 'n'},data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2],material[5].y);
  var o:Output;o.position=pose.world;o.clip=frame.camera*vec4f(o.position,1);o.normal=pose.normal;
- o.color=${tint ? 'tint' : 'material[0].rgb'}${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}return o;
+ o.color=${tint ? 'tint' : 'material[0].rgb'}${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}${translucent ? 'o.transl=material[5].x;' : ''}return o;
 }
 `;
 // Depth only, for one shadow cascade: the colour pass's pose and wind (frame values 16-19 and 68-79), the light's
@@ -300,9 +356,9 @@ struct ShadowFrame {light:mat4x4f,eye:vec4f,wind:vec4f,ground:vec4f,blade:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:ShadowFrame;
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
-@vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->@builtin(position) vec4f {
+@vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->@builtin(position) @invariant vec4f {
  let data=instances[index];
- return frame.light*vec4f(scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind).world,1);
+ return frame.light*vec4f(scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.eye.w).world,1);
 }
 `;
 // The same, drawing only the instances the cascade's list names (see `shadowCullCode`).
@@ -335,22 +391,25 @@ struct Cull {light:array<mat4x4f,4>,lists:vec4u,size:vec4f}
  }
 }`;
 /** The depth-only pipeline of a shadow vertex shader (24-byte core vertices). */
-function shadowDepth(d: GPUDevice, code: string): GPURenderPipeline {
+function shadowDepth(d: GPUDevice, code: string, uvs = false): GPURenderPipeline {
+  const module = d.createShaderModule({ code });
   return d.createRenderPipeline({
     layout: 'auto',
     vertex: {
-      module: d.createShaderModule({ code }),
+      module,
       entryPoint: 'vertex',
       buffers: [
         {
-          arrayStride: 24,
+          arrayStride: uvs ? 32 : 24,
           attributes: [
             { shaderLocation: 0, offset: 0, format: 'float32x3' },
             { shaderLocation: 1, offset: 12, format: 'float32x3' },
+            ...(uvs ? [{ shaderLocation: 2, offset: 24, format: 'float32x2' as const }] : []),
           ],
         },
       ],
     },
+    ...(code.includes('@fragment') ? { fragment: { module, entryPoint: 'fragment', targets: [] } } : {}),
     depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'less-equal' },
   });
 }
@@ -372,12 +431,28 @@ function validateWorld(o: ScatterOptions): void {
 }
 
 /**
- * The distribute shader for a set of options. Without bounds, densityMap, follow and inner it is the original text,
- * byte for byte; each option rewrites only its own part.
+ * The distribute shader for a set of options. Without bounds, densityMap, follow, inner and paths it is the original
+ * text, byte for byte; each option rewrites only its own part.
  */
 export function scatterCullShader(o: ScatterOptions): string {
+  const code = optionShader(o);
+  return o.paths?.length ? code.replace(PLANES, PATHS + PLANES) : code;
+}
+
+// Ground paths (GAP-FILM-LOOK): segments (a, b) and their half width follow the rectangles in the exclusions buffer,
+// two entries each, and their count is ids.w >> 8; only a scatter with paths carries the loop. The test is the point
+// to segment distance (C. Ericson, "Real-Time Collision Detection", 2005, 5.1.2) against half width plus radius.
+const PLANES = ' for(var j=0u;j<6u;j++){if(dot(frame.planes[j].xyz,p)+frame.planes[j].w < -radius){return;}}',
+  PATHS = ` for(var j=0u;j<(frame.ids.w>>8u);j++){
+  let at=u32(frame.eye.w)+2u*j;let s=exclusions[at];let keep=exclusions[at+1u].x+radius;
+  let ab=s.zw-s.xy;let ap=p.xz-s.xy;let o=ap-ab*clamp(dot(ap,ab)/max(dot(ab,ab),1e-20),0.0,1.0);
+  if(dot(o,o)<=keep*keep){return;}
+ }
+`;
+
+function optionShader(o: ScatterOptions): string {
   if (!extended(o)) return cull;
-  let code = cull.replace('blade:vec4f}', 'blade:vec4f,offset:vec4f,bounds:vec4f}');
+  let code = cull.replace('pixel:vec4f}', 'pixel:vec4f,offset:vec4f,bounds:vec4f}');
   if (o.follow)
     // Random numbers from the world cell (grid cell plus the camera's cell offset), not the instance index.
     code = code
@@ -438,6 +513,8 @@ export class Scatter implements EnginePlugin {
   protected compute?: GPUComputePipeline;
   private pipelines = new Map<string, GPURenderPipeline>();
   protected readonly values: Float32Array;
+  /** The cull reach before the wind allowance (the meshes' reach, widened for blades); `values[35]` is this, doubled while a wind is set. */
+  protected reach = 0;
   protected readonly meta: Uint32Array;
   protected readonly geometries: readonly Geometry[];
   #disposed = false;
@@ -446,8 +523,9 @@ export class Scatter implements EnginePlugin {
     return this.#disposed;
   }
   readonly count: number;
-  private readonly materialValues = new Float32Array(20);
-  private time = 0;
+  private readonly materialValues = new Float32Array(24);
+  private seconds = 0;
+  private windClock = 0;
   protected terrain?: GPUTexture;
   protected computeGroup?: GPUBindGroup;
   private readonly renderGroups = new Map<GPURenderPipeline, GPUBindGroup[]>();
@@ -455,6 +533,11 @@ export class Scatter implements EnginePlugin {
   private readonly exclusionValues: Float32Array;
   private pbrUniform?: GPUBuffer;
   private materialUniform?: GPUBuffer;
+  /** `textures`: each ring's uvs, the cut-off, the mip chains (kept for a device restore) and the uploaded maps. */
+  private readonly uvs?: Float32Array[];
+  private readonly cut: number = 0;
+  private chains?: { base: MipChain; normal: MipChain; orm: MipChain };
+  private maps?: { textures: GPUTexture[]; groups: Map<GPURenderPipeline, GPUBindGroup>; sampler: GPUSampler };
   private readonly pbrValues = new Float32Array(32);
   private pbrShader = '';
   // Core's frame state before any plugin patches it, read by a pass at the lowest order.
@@ -467,7 +550,8 @@ export class Scatter implements EnginePlugin {
   private readonly presentation = overlayDepthPass();
   private readonly attachment = this.presentation.colorAttachments[0];
   private readonly depthAttachment = this.presentation.depthStencilAttachment;
-  protected readonly options: ScatterOptions;
+  /** The options it was built with, after its preset: read by `applyScatterSettings` (which rows apply). */
+  readonly options: ScatterOptions;
   private shadowPipeline?: GPURenderPipeline;
   /** Per cascade: its uniform (light matrix and pose values) and one bind group per LOD ring. */
   private shadowUniforms: GPUBuffer[] = [];
@@ -497,13 +581,18 @@ export class Scatter implements EnginePlugin {
   private route?: import('./compat.js').ScatterRoute;
   /** Whether any instance can fade between LOD meshes: shaders keep the dither `discard` only then. */
   private readonly fade: boolean;
+  /** `blades.translucency`, read from the material uniform once the lit shader has the stage (0: the shader as it was). */
+  private translucency = 0;
+  /** The cull reach before `blades.widen` widens it, and the last LOD distance the blades widen toward. */
+  private bladeReach = 0;
+  private lodEnd = 1;
   /** `variation` hue and value; both 0 (and no `clusters`) keep the original lit vertex stage. */
-  private readonly tint: readonly [number, number];
+  private tint: readonly [number, number];
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
     this.options = preset('scatter', input);
     const options = this.options;
-    // The world-rectangle options extend the frame by two vec4s (follow offsets, bounds); without them it is as before.
-    this.values = new Float32Array(extended(options) ? 88 : 80);
+    // The world-rectangle options extend the frame by two vec4s (follow offsets, bounds) after the pixel footprint (80).
+    this.values = new Float32Array(extended(options) ? 92 : 84);
     this.meta = new Uint32Array(this.values.buffer);
     this.geometries = geometry instanceof Geometry ? [geometry, geometry, geometry] : [...geometry];
     const {
@@ -564,6 +653,15 @@ export class Scatter implements EnginePlugin {
       );
     if (options.material !== undefined && !(options.material instanceof PbrMaterial))
       throw new TypeError('Expected a PBR scatter material');
+    if (options.textures !== undefined) {
+      if (!options.material)
+        throw new RangeError('Scatter textures shade through a material; pass material: new PbrMaterial()');
+      this.uvs = checkTextures(
+        options.textures,
+        this.geometries.map((g) => g.vertices.length / 6),
+      );
+      this.cut = cutoffOf(options.textures);
+    }
     if (!Number.isFinite(lodFade) || lodFade < 0 || lodFade > 100000)
       throw new RangeError('Invalid scatter LOD fade; set lodFade to a finite number from 0 to 100000.');
     if (
@@ -580,12 +678,18 @@ export class Scatter implements EnginePlugin {
       throw new RangeError('Scatter inner must be a distance from 0 up to below the last lod, innerFade 0 or more');
     if (options.wind) validateWind(options.wind);
     validateWorld(options);
-    if (options.bounds) this.values.set(options.bounds, 84);
-    if (inner) this.values.set([inner, innerFade], 82);
-    const exclusions = options.exclusions ?? [];
+    if (options.bounds) this.values.set(options.bounds, 88);
+    if (inner) this.values.set([inner, innerFade], 86);
+    const exclusions = options.exclusions ?? [],
+      segments = pathSegments(options.paths ?? []);
     validateExclusions(exclusions);
-    this.exclusionValues = new Float32Array(Math.max(1, exclusions.length) * 4);
+    this.exclusionValues = new Float32Array(Math.max(1, exclusions.length + 2 * segments.length) * 4);
     for (let i = 0; i < exclusions.length; i++) this.exclusionValues.set(exclusions[i], i * 4);
+    for (let i = 0; i < segments.length; i++) {
+      const at = (exclusions.length + 2 * i) * 4;
+      this.exclusionValues.set(segments[i].slice(0, 4), at);
+      this.exclusionValues[at + 4] = segments[i][4];
+    }
     this.values[19] = exclusions.length; // eye.w holds the fixed exclusion count.
     this.count = count;
     this.values.set(
@@ -607,7 +711,6 @@ export class Scatter implements EnginePlugin {
       ],
       20,
     );
-    this.values[35] *= options.wind ? 2 : 1;
     this.values[31] = Math.min(lodFade, 2 * lod[0], lod[1] - lod[0], 2 * (lod[2] - lod[1]));
     this.meta.set(
       [
@@ -618,6 +721,7 @@ export class Scatter implements EnginePlugin {
       ],
       36,
     );
+    this.meta[39] |= segments.length << 8; // ids.w: ring fade bits 0 and 1, path segment count above them
     this.values.set(color, 40);
     this.values[72] = alignToGround;
     this.values[73] = sink;
@@ -626,9 +730,20 @@ export class Scatter implements EnginePlugin {
     if (blades !== undefined) {
       if (typeof blades !== 'object' || blades === null)
         throw new TypeError('Scatter blades must be an options object');
-      const { rootShade = 0.5, widen = 1 } = blades;
-      if (![rootShade, widen].every(Number.isFinite) || rootShade < 0 || rootShade > 1 || widen < 0 || widen > 10)
-        throw new RangeError('Scatter blades need rootShade 0-1 and widen 0-10');
+      const { rootShade = 0.5, widen = 1, translucency = 0 } = blades;
+      if (
+        ![rootShade, widen, translucency].every(Number.isFinite) ||
+        rootShade < 0 ||
+        rootShade > 1 ||
+        widen < 0 ||
+        widen > 10 ||
+        translucency < 0 ||
+        translucency > 1
+      )
+        throw new RangeError('Scatter blades need rootShade 0-1 and widen 0-10, and translucency 0-1');
+      this.translucency = translucency;
+      this.lodEnd = lod[2];
+      this.bladeReach = this.values[35];
       let top = 0;
       for (const g of this.geometries)
         for (let i = 1; i < g.vertices.length; i += 6) top = Math.max(top, g.vertices[i]);
@@ -636,6 +751,11 @@ export class Scatter implements EnginePlugin {
       this.values.set([rootShade, widen / lod[2], 1 / top, 1 / lod[2]], 76);
       this.values[35] *= 1 + widen; // cull bounds include the widest blades
     }
+    this.reach = this.values[35];
+    this.values[35] = this.reach * (options.wind ? 2 : 1); // applyReach, which a subclass overrides, is not callable before its fields exist
+    const states = options.states;
+    if (states !== undefined && (typeof states?.poseCode !== 'function' || typeof states.entries !== 'function' || typeof states.update !== 'function'))
+      throw new TypeError('Scatter states must be a source from PlantStates.plant() in @margoengine/scatter/states');
     const { variation, clusters = 0 } = options;
     if (variation !== undefined && (typeof variation !== 'object' || variation === null))
       throw new TypeError('Scatter variation must be an options object; pass { hue, value }');
@@ -649,7 +769,7 @@ export class Scatter implements EnginePlugin {
     this.tint = [hue, value];
     this.values[75] = clusters; // ground.w: read only by the clusters vertex code
     // Compute emits fading instances only for a nonzero width between rings that use different meshes.
-    this.fade = this.values[31] > 0 && this.meta[39] !== 0;
+    this.fade = this.values[31] > 0 && (this.meta[39] & 3) !== 0;
   }
   static attach(
     engine: EngineKernel,
@@ -688,7 +808,7 @@ export class Scatter implements EnginePlugin {
     d.queue.writeBuffer(this.exclusionBuffer, 0, this.exclusionValues as Float32Array<ArrayBuffer>);
     if (this.options.material) {
       this.pbrUniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.materialUniform = d.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.materialUniform = d.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
     // Readable (COPY_SRC) so a test or tool can read how many instances each ring drew.
@@ -700,18 +820,38 @@ export class Scatter implements EnginePlugin {
     for (let i = 0; i < 3; i++) {
       const g = this.geometries[i];
       commands[i * 5] = g.indices.length;
-      const v = d.createBuffer({ size: g.vertices.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+      const data = this.uvs ? interleave(g.vertices, this.uvs[i]) : g.vertices,
+        v = d.createBuffer({ size: data.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
       this.vertices.push(v);
       const index = d.createBuffer({
         size: g.indices.byteLength,
         usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
       });
       this.indices.push(index);
-      d.queue.writeBuffer(v, 0, g.vertices as Float32Array<ArrayBuffer>);
+      d.queue.writeBuffer(v, 0, data as Float32Array<ArrayBuffer>);
       d.queue.writeBuffer(index, 0, g.indices as Uint32Array<ArrayBuffer>);
       this.instances.push(d.createBuffer({ size: this.ringCapacity() * 32, usage: GPUBufferUsage.STORAGE }));
     }
     d.queue.writeBuffer(this.commands, 0, commands);
+    if (this.options.textures) {
+      const chains = (this.chains ??= chainsOf(this.options.textures));
+      this.maps = {
+        textures: [
+          uploadChain(d, chains.base, 'rgba8unorm-srgb'),
+          uploadChain(d, chains.normal, 'rgba8unorm'),
+          uploadChain(d, chains.orm, 'rgba8unorm'),
+        ],
+        groups: new Map(),
+        sampler: d.createSampler({
+          addressModeU: 'repeat',
+          addressModeV: 'repeat',
+          magFilter: 'linear',
+          minFilter: 'linear',
+          mipmapFilter: 'linear',
+          maxAnisotropy: 8,
+        }),
+      };
+    }
     this.fallback = d.createTexture({
       size: [1, 1],
       format: 'r32float',
@@ -721,7 +861,9 @@ export class Scatter implements EnginePlugin {
     this.compute = compute(d, candidateShader(this.cullCode()));
     // ScatterTiles keeps the layer's generic tiers: its rings grow and its records are its own.
     const uniform = this.uniform;
-    if (this.constructor === Scatter)
+    // A textured Scatter draws through the layer's generic tiers, as ScatterTiles does (the route's shadow stage has no uvs),
+    // and so does one with states (the route's stages bind no pose entries).
+    if (this.constructor === Scatter && !this.uvs && !this.options.states)
       loadCompatRoute(d, () => import('./compat.js'))?.then(({ ScatterRoute }) => {
         if (this.uniform !== uniform) return;
         this.route = new ScatterRoute({
@@ -746,10 +888,145 @@ export class Scatter implements EnginePlugin {
         this.pbrGroups.clear();
       });
   }
-  onPreUpdate(delta: number): void {
+  /**
+   * Sets the cull reach for the wind now in `options.wind`: a bent instance reaches twice as far, so the reach doubles
+   * while any wind is set. It is read every frame, so a wind given after construction (a weather drive writes one)
+   * widens the culling the same way a wind passed to the constructor does.
+   */
+  protected applyReach(): void {
+    this.values[35] = this.reach * (this.options.wind ? 2 : 1);
+  }
+  /** Called when this Scatter's own reach changed (a blade `widen`); a Scatter that shares its culling updates the sharer too. */
+  protected reachChanged(): void {
+    this.applyReach();
+  }
+  /** Fraction of candidates kept, 0-1; read every frame, so it can change while drawing (a settings slider keys it). */
+  get density(): number {
+    return this.options.density ?? 1;
+  }
+  set density(value: number) {
+    if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+      throw new RangeError('Scatter density must be a number from 0 to 1');
+    this.options.density = value;
+    this.values[27] = value;
+  }
+  /** Diffuse colour (linear RGB 0-1) when no `material` is given; read every frame. */
+  get color(): readonly [number, number, number] {
+    return this.options.color ?? [0.12, 0.35, 0.08];
+  }
+  set color(value: readonly [number, number, number]) {
+    if (!Array.isArray(value) || value.length !== 3 || !value.every((v) => typeof v === 'number' && v >= 0 && v <= 1))
+      throw new RangeError('Scatter color must be three numbers from 0 to 1');
+    this.options.color = [value[0], value[1], value[2]];
+    this.values.set(value, 40);
+  }
+  /** The rooted wind `[x, z, strength]` or `[x, z, strength, speed]`, or undefined for none; read every frame, as a weather drive writes it. */
+  get wind(): ScatterWind | undefined {
+    return this.options.wind;
+  }
+  set wind(value: ScatterWind | undefined) {
+    if (value !== undefined) validateWind(value);
+    this.options.wind = value && (value.length === 4 ? [value[0], value[1], value[2], value[3]] : [value[0], value[1], value[2]]);
+  }
+  /** Albedo lost at the blade root, 0-1 (`blades.rootShade`); read every frame. Throws when built without `blades`. */
+  get rootShade(): number {
+    return this.values[76];
+  }
+  set rootShade(value: number) {
+    if (this.options.blades === undefined)
+      throw new MargoError('state', 'Scatter rootShade needs a scatter built with the blades option');
+    if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+      throw new RangeError('Scatter rootShade must be a number from 0 to 1');
+    this.options.blades = { ...this.options.blades, rootShade: value };
+    this.values[76] = value;
+  }
+  /** Blade width at the last LOD distance as a fraction, 0-10 (`blades.widen`); read every frame, and it widens the cull reach with it. Throws when built without `blades`. */
+  get widen(): number {
+    return this.options.blades?.widen ?? 1;
+  }
+  set widen(value: number) {
+    if (this.options.blades === undefined)
+      throw new MargoError('state', 'Scatter widen needs a scatter built with the blades option');
+    if (typeof value !== 'number' || !(value >= 0 && value <= 10))
+      throw new RangeError('Scatter widen must be a number from 0 to 10');
+    this.options.blades = { ...this.options.blades, widen: value };
+    this.values[77] = value / this.lodEnd;
+    this.reach = this.bladeReach * (1 + value);
+    this.reachChanged();
+  }
+  /**
+   * Sunlight through the blades, 0-1 (`blades.translucency`); read every frame while it stays above 0. Moving it off 0 (or
+   * back to 0) picks another lit pipeline, built once on the next frame. Throws when built without `blades`.
+   */
+  get translucencyAmount(): number {
+    return this.translucency;
+  }
+  set translucencyAmount(value: number) {
+    if (this.options.blades === undefined)
+      throw new MargoError('state', 'Scatter translucency needs a scatter built with the blades option');
+    if (typeof value !== 'number' || !(value >= 0 && value <= 1))
+      throw new RangeError('Scatter translucency must be a number from 0 to 1');
+    this.options.blades = { ...this.options.blades, translucency: value };
+    this.translucency = value;
+  }
+  /** Hue turn of `variation`, 0-0.5 (a turn of up to this either way). Needs a `material`; turning it on from 0 picks another pipeline. */
+  get variationHue(): number {
+    return this.tint[0];
+  }
+  set variationHue(value: number) {
+    this.setTint(value, this.tint[1]);
+  }
+  /** Brightness change of `variation`, 0-1 (also the strength of `clusters`). Needs a `material`; turning it on from 0 picks another pipeline. */
+  get variationValue(): number {
+    return this.tint[1];
+  }
+  set variationValue(value: number) {
+    this.setTint(this.tint[0], value);
+  }
+  private setTint(hue: number, value: number): void {
+    if (typeof hue !== 'number' || typeof value !== 'number' || !(hue >= 0 && hue <= 0.5) || !(value >= 0 && value <= 1))
+      throw new RangeError('Scatter variation needs hue 0-0.5 and value 0-1; pass numbers in those ranges');
+    if ((hue > 0 || value > 0) && !this.options.material)
+      throw new MargoError('state', 'Scatter variation shades through a material; build the Scatter with material: new PbrMaterial()');
+    this.tint = [hue, value];
+    this.options.variation = { ...this.options.variation, hue, value };
+  }
+  /** Leaf-cluster cell size in mesh units, 0 (off) to 100000 (`clusters`). Needs a `material`; turning it on from 0 picks another pipeline. */
+  get clusters(): number {
+    return this.values[75];
+  }
+  set clusters(value: number) {
+    if (typeof value !== 'number' || !(value >= 0 && value <= 100000))
+      throw new RangeError('Scatter clusters must be a cell size from 0 to 100000; pass 0 to turn it off');
+    if (value > 0 && !this.options.material)
+      throw new MargoError('state', 'Scatter clusters shade through a material; build the Scatter with material: new PbrMaterial()');
+    this.options.clusters = value;
+    this.values[75] = value;
+  }
+  /** Seconds on the wind clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the wind clock by `delta` seconds without drawing: all of a frame update. `seek` from
+   * `@margoengine/cutscene/seek` replays these steps, so every plant sways where a continuous run has it.
+   */
+  advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid scatter delta; pass a finite frame time of 0 or more.');
-    this.time += delta;
+    this.seconds += delta;
+    const wind = this.options.wind;
+    this.windClock += wind?.length === 4 ? delta * windClockRate(wind[3]) : delta;
+  }
+  /**
+   * Seconds of wind motion so far: the clock the shaders read. It runs with `time` while the wind has no speed or one up
+   * to Beaufort 3, and faster in a stronger wind (`windClockRate`), so a storm thrashes the plants.
+   */
+  get windTime(): number {
+    return this.windClock;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -774,6 +1051,7 @@ export class Scatter implements EnginePlugin {
             'state',
             'Scatter needs a sampleable floating-height texture; return one from options.heightmap',
           );
+        this.applyReach();
         this.values.fill(0, 68, 71);
         if (this.options.wind) {
           const wind = this.options.wind,
@@ -782,13 +1060,15 @@ export class Scatter implements EnginePlugin {
           this.values[69] = wind[1] / length;
           this.values[70] = wind[2];
         }
-        this.values[71] = this.time;
+        this.values[71] = this.windClock;
         if (this.options.follow) this.followCamera(c.camera.position);
+        this.options.states?.update(c);
         this.beforeDistribute(c, terrain);
         this.values.set(c.camera.matrix);
         this.values.set(c.camera.position, 16);
         this.values.set(c.camera.planes, 44);
         this.values[43] = +linearHdr(c.format);
+        this.values[80] = pixelFootprint(c.camera.matrix, c.view?.viewport[3] ?? c.height);
         c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
         this.cull(c, terrain);
       },
@@ -876,12 +1156,12 @@ export class Scatter implements EnginePlugin {
    * its bend here, reading what `poseEntries` binds from `binding` on in bind group `group`.
    */
   protected poseCode(code: string, _group: number, _binding: number): string {
-    return code;
+    return this.options.states?.poseCode(code, _group, _binding) ?? code;
   }
 
   /** Bindings after the built-in ones of each posing vertex stage's instance group (see `poseCode`). */
   protected poseEntries(): { buffer: GPUBuffer }[] {
-    return [];
+    return this.options.states?.entries(this.engine!.gpu!) ?? [];
   }
 
   /** Runs before the frame values are uploaded (the tiles entry uploads new tiles here). */
@@ -897,10 +1177,143 @@ export class Scatter implements EnginePlugin {
       oz = Math.floor(eye[2] / cellZ) - Math.floor(rows / 2);
     this.values[22] = (ox + columns / 2) * cellX;
     this.values[23] = (oz + rows / 2) * cellZ;
-    this.values[80] = ox;
-    this.values[81] = oz;
+    this.values[84] = ox;
+    this.values[85] = oz;
   }
 
+  /**
+   * The colour pipeline, its instance groups per ring and its lighting group for one `part` of a ring: 'opaque', or
+   * 'cover' blended by each vertex's coverage and writing no depth (undefined when the stage cannot carry it; see
+   * `coverCode`), or the two halves of a split ring, 'body' (opaque) and 'tip' (covered), marked `splitDeclaration`.
+   */
+  private colourPipeline(
+    c: ScatterPassContext,
+    key: string,
+    lit: boolean,
+    culled: boolean,
+    own: boolean,
+    part: 'opaque' | 'cover' | 'body' | 'tip',
+  ): { pipeline: GPURenderPipeline; groups: GPUBindGroup[]; lighting?: GPUBindGroup } | undefined {
+    const cover = part === 'cover' || part === 'tip',
+      id = key + (part === 'opaque' ? '' : ':' + part);
+    let pipeline = this.pipelines.get(id);
+    if (!pipeline) {
+      const blades = this.values[78] > 0,
+        clusters = this.values[75] > 0,
+        translucent = blades && this.translucency > 0,
+        vertex = pbrVertex(this.fade, blades, this.looks(), clusters, translucent);
+      let code = !lit ? (this.fade ? renderCode : solidCode) : c.shader.replace(/struct Input \{[^}]+\}/, '');
+      if (lit) {
+        // After core's varyings and any a patch added to its Output (terrain's mesh id): 4 and 5 on a plain shader.
+        const at = freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? '');
+        code = code
+          .replace(
+            '@location(3) material:vec4f',
+            '@location(3) material:vec4f' +
+              (this.fade ? `,@location(${at}) @interpolate(flat) lodFade:vec2f` : '') +
+              (blades ? `,@location(${at + 1}) ${centroid} ground:vec4f` : '') +
+              (translucent ? `,@location(${at + 2}) @interpolate(flat) transl:f32` : ''),
+          )
+          // Blades shade core's colour from root to tip, and clusters change it from vertex to vertex: like the ground
+          // weight, read inside the triangle (see `centroid`). Read at a pixel centre outside a thin triangle, a
+          // clustered colour extrapolated past its vertices and went negative (dark specks on far canopies).
+          .replace('@location(2) color:vec3f', `@location(2) ${blades || clusters ? centroid + ' ' : ''}color:vec3f`)
+          .replace(
+            /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
+            c.shader.includes('var<uniform> taaCamera:')
+              ? vertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
+              : vertex,
+          );
+        if (this.fade)
+          code =
+            code.replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') +
+            fadeCode;
+        if (this.uvs) code = texturedVertex(code, at + 3);
+        if (blades || clusters) code = positiveColor(code);
+        // Blades bend core's shading normal after its back-face flip, so both sides of a blade share the ground term.
+        if (blades)
+          code = code.replace(
+            coreNormal,
+            'let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,facing),i.ground.xyz,i.ground.w));',
+          );
+        // Translucent blades add the sun seen through them, from the blade's own normal (before the ground blend).
+        if (translucent)
+          code =
+            translucencyShader +
+            code.replace(
+              /let linear=([^;]+);/,
+              `let linear=$1+foliageTranslucency(normalize(i.normal)*select(-1.0,1.0,facing),v,l,1.0,i.transl)*i.color*frame.radiance.xyz*frame.light.w;`,
+            );
+      }
+      if (lit && this.uvs) code = texturedFragment(code, this.cut, coreNormal);
+      if (cover) {
+        const covered = coverCode(code, lit, lit ? freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? '') : 0);
+        if (!covered) return undefined;
+        code = covered;
+      }
+      if (part === 'body' || part === 'tip') code = splitDeclaration + code;
+      code = this.poseCode(code, lit ? 1 : 0, 2);
+      const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, lit) : code });
+      pipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+          module,
+          entryPoint: 'vertex',
+          buffers: [
+            {
+              arrayStride: this.uvs ? 32 : 24,
+              attributes: [
+                { shaderLocation: 0, offset: 0, format: 'float32x3' },
+                { shaderLocation: 1, offset: 12, format: 'float32x3' },
+                ...(this.uvs ? [{ shaderLocation: 2, offset: 24, format: 'float32x2' as const }] : []),
+              ],
+            },
+          ],
+        },
+        fragment: {
+          module,
+          entryPoint: 'fragment',
+          targets: [{ format: c.format, ...(cover ? { blend: coverBlend } : {}) }],
+          ...(own ? { constants: { C: 1 } } : {}),
+        },
+        ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
+        multisample: c.descriptor.multisample,
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthWriteEnabled: !cover,
+          depthCompare: 'greater-equal',
+        },
+      });
+      this.pipelines.set(id, pipeline);
+    }
+    let groups = this.renderGroups.get(pipeline);
+    if (!groups) {
+      groups = this.colourInstances().map((buffer, ring) => {
+        const count = this.route ? [this.route.ringCount(ring)] : [];
+        return lit
+          ? c.device.createBindGroup({
+              layout: pipeline!.getBindGroupLayout(1),
+              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map(
+                (resource, binding) => ({
+                  binding,
+                  resource,
+                }),
+              ),
+            })
+          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count, ...this.poseEntries()]);
+      });
+      this.renderGroups.set(pipeline, groups);
+    }
+    let lighting = this.pbrGroups.get(pipeline);
+    if (lit && !lighting) {
+      lighting = c.device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: this.pbrUniform! } }, ...c.bindings],
+      });
+      this.pbrGroups.set(pipeline, lighting);
+    }
+    return { pipeline: pipeline!, groups, lighting };
+  }
   private draw(c: ScatterPassContext): void {
     const lit = !!this.options.material;
     if (lit) {
@@ -908,6 +1321,8 @@ export class Scatter implements EnginePlugin {
       // The material's alpha and spare slot, which the lit vertex stage does not read: `variation` hue and value.
       if (this.looks()) [this.materialValues[3], this.materialValues[7]] = this.tint;
       this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades, clusters
+      this.materialValues[20] = this.translucency; // read by the translucent shader only
+      this.materialValues[21] = this.values[80]; // the pixel footprint, material[5].y
       c.device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
       if (this.pbrShader !== c.shader) {
         this.pipelines.clear();
@@ -948,113 +1363,39 @@ export class Scatter implements EnginePlugin {
       ':' +
       c.descriptor.depthStencil!.format +
       (culled ? ':culled' : '') +
-      (own ? ':own' : '');
-    let pipeline = this.pipelines.get(key);
-    if (!pipeline) {
-      const blades = this.values[78] > 0,
-        clusters = this.values[75] > 0,
-        vertex = pbrVertex(this.fade, blades, this.looks(), clusters);
-      let code = !lit ? (this.fade ? renderCode : solidCode) : c.shader.replace(/struct Input \{[^}]+\}/, '');
-      if (lit) {
-        // After core's varyings and any a patch added to its Output (terrain's mesh id): 4 and 5 on a plain shader.
-        const at = freeLocation(/struct Output \{[^}]+\}/.exec(code)?.[0] ?? '');
-        code = code
-          .replace(
-            '@location(3) material:vec4f',
-            '@location(3) material:vec4f' +
-              (this.fade ? `,@location(${at}) @interpolate(flat) lodFade:vec2f` : '') +
-              (blades ? `,@location(${at + 1}) ${centroid} ground:vec4f` : ''),
-          )
-          // Blades shade core's colour from root to tip, and clusters change it from vertex to vertex: like the ground
-          // weight, read inside the triangle (see `centroid`). Read at a pixel centre outside a thin triangle, a
-          // clustered colour extrapolated past its vertices and went negative (dark specks on far canopies).
-          .replace('@location(2) color:vec3f', `@location(2) ${blades || clusters ? centroid + ' ' : ''}color:vec3f`)
-          .replace(
-            /@vertex fn vertex\([\s\S]*?(?=@fragment)/,
-            c.shader.includes('var<uniform> taaCamera:')
-              ? vertex.replace('o.clip=frame.camera*', 'o.clip=taaCamera*')
-              : vertex,
-          );
-        if (this.fade)
-          code =
-            code.replace(/(@fragment fn fragment[^{]+\{)/, '$1\n if(!lodVisible(i.clip.xy,i.lodFade)){discard;}') +
-            fadeCode;
-        if (blades || clusters) code = positiveColor(code);
-        // Blades bend core's shading normal after its back-face flip, so both sides of a blade share the ground term.
-        if (blades)
-          code = code.replace(
-            coreNormal,
-            'let n=normalize(mix(normalize(i.normal)*select(-1.0,1.0,facing),i.ground.xyz,i.ground.w));',
-          );
-      }
-      code = this.poseCode(code, lit ? 1 : 0, 2);
-      const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, lit) : code });
-      pipeline = c.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: 24,
-              attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x3' },
-                { shaderLocation: 1, offset: 12, format: 'float32x3' },
-              ],
-            },
-          ],
-        },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [{ format: c.format }],
-          ...(own ? { constants: { C: 1 } } : {}),
-        },
-        ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
-        multisample: c.descriptor.multisample,
-        depthStencil: {
-          format: c.descriptor.depthStencil!.format,
-          depthWriteEnabled: true,
-          depthCompare: 'greater-equal',
-        },
-      });
-      this.pipelines.set(key, pipeline);
+      (own ? ':own' : '') +
+      this.stageKey();
+    const parts = [0, 1, 2].map((i) => (this.drawsRing(i) ? this.coverRing(i) : undefined)),
+      opaque = this.colourPipeline(c, key, lit, culled, own, 'opaque')!,
+      cover = parts.includes('cover') ? this.colourPipeline(c, key, lit, culled, own, 'cover') : undefined,
+      tip = parts.includes('split') ? this.colourPipeline(c, key, lit, culled, own, 'tip') : undefined,
+      body = tip && this.colourPipeline(c, key, lit, culled, own, 'body')!;
+    // Opaque parts first, near to far, writing depth; then the covered parts far to near, blended over them. A stage
+    // that cannot carry coverage (see `coverCode`) draws its rings opaque.
+    const draws: [number, NonNullable<typeof cover>][] = [];
+    for (let i = 0; i < 3; i++) {
+      const part = parts[i];
+      if (part === undefined) continue;
+      if (part === 'split' && body) draws.push([i, body]);
+      else if (!(part === 'cover' && cover)) draws.push([i, opaque]);
     }
-    let groups = this.renderGroups.get(pipeline);
-    if (!groups) {
-      groups = this.colourInstances().map((buffer, ring) => {
-        const count = this.route ? [this.route.ringCount(ring)] : [];
-        return lit
-          ? c.device.createBindGroup({
-              layout: pipeline!.getBindGroupLayout(1),
-              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map(
-                (resource, binding) => ({
-                  binding,
-                  resource,
-                }),
-              ),
-            })
-          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count, ...this.poseEntries()]);
-      });
-      this.renderGroups.set(pipeline, groups);
-    }
-    let lighting = this.pbrGroups.get(pipeline);
-    if (lit && !lighting) {
-      lighting = c.device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: { buffer: this.pbrUniform! } }, ...c.bindings],
-      });
-      this.pbrGroups.set(pipeline, lighting);
+    for (let i = 2; i >= 0; i--) {
+      if (parts[i] === 'cover' && cover) draws.push([i, cover]);
+      else if (parts[i] === 'split' && tip) draws.push([i, tip]);
     }
     this.attachment.view = c.color;
     this.depthAttachment.view = c.depth;
     const pass = c.encoder.beginRenderPass(this.presentation);
     applyView(pass, c);
-    pass.setPipeline(pipeline);
-    if (lit) pass.setBindGroup(0, lighting!);
-    for (let i = 0; i < 3; i++) {
-      if (!this.drawsRing(i)) continue;
-      pass.setBindGroup(lit ? 1 : 0, groups[i]);
+    let current: typeof opaque | undefined;
+    for (const [i, use] of draws) {
+      if (use !== current) {
+        current = use;
+        pass.setPipeline(use.pipeline);
+        if (lit) pass.setBindGroup(0, use.lighting!);
+        if (this.maps) pass.setBindGroup(2, this.mapGroup(c.device, use.pipeline, 2, 3));
+      }
+      pass.setBindGroup(lit ? 1 : 0, use.groups[i]);
       pass.setVertexBuffer(0, this.vertices[i]);
       pass.setIndexBuffer(this.indices[i], 'uint32');
       if (this.route) pass.drawIndexed(this.geometries[i].indices.length, this.ringCapacity());
@@ -1062,6 +1403,17 @@ export class Scatter implements EnginePlugin {
     }
     pass.end();
     this.drawn(c);
+  }
+  /**
+   * How the colour pass draws LOD ring `ring` (default 'opaque'). 'cover' draws it with partial coverage: blended over
+   * what is drawn by the alpha its pose gives in `scatterCover`, writing no depth, so blades thinner than a pixel add
+   * their share of colour instead of whole pixels. 'split' draws it twice, both stages marked `splitDeclaration`: an
+   * opaque one writing depth (the pose draws there only what its covered stage covers fully), then the covered one
+   * over it. Covered
+   * parts draw after the opaque ones and after core's meshes (the ground), far rings first.
+   */
+  protected coverRing(_ring: number): 'opaque' | 'cover' | 'split' {
+    return 'opaque';
   }
   /** Colour-only rings; optional occlusion keeps the shadow rings untouched. */
   protected colourInstances(): GPUBuffer[] {
@@ -1169,8 +1521,8 @@ export class Scatter implements EnginePlugin {
       cull = this.cascadeCull,
       culled = !!cull && context.encoder === cull.encoder && cascade < cull.cascades,
       pipeline = culled
-        ? (this.listPipeline ??= shadowDepth(d, this.poseCode(shadowListCode, 0, 3)))
-        : (this.shadowPipeline ??= shadowDepth(d, this.poseCode(shadowCode, 0, 2)));
+        ? (this.listPipeline ??= shadowDepth(d, this.poseCode(this.shadowText(shadowListCode), 0, 3), !!this.uvs))
+        : (this.shadowPipeline ??= shadowDepth(d, this.poseCode(this.shadowText(shadowCode), 0, 2), !!this.uvs));
     // One uniform per cascade: every cascade's pass is recorded before the queue writes reach the GPU.
     const uniform = (this.shadowUniforms[cascade] ??= d.createBuffer({
       size: 128,
@@ -1192,9 +1544,11 @@ export class Scatter implements EnginePlugin {
     const values = this.shadowValues;
     values.set(matrix);
     values.set(this.values.subarray(16, 20), 16); // the eye: blades widen with camera distance, as drawn
+    values[19] = this.values[80]; // eye.w: the camera's pixel footprint, so blades floor their width as drawn
     values.set(this.values.subarray(68, 80), 20); // wind and time, ground fit, blades
     d.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
     pass.setPipeline(pipeline);
+    if (this.maps && this.cut > 0) pass.setBindGroup(1, this.mapGroup(d, pipeline, 1, 1));
     for (let i = 0; i < 3; i++) {
       pass.setBindGroup(0, groups[i]);
       pass.setVertexBuffer(0, this.vertices[i]);
@@ -1202,6 +1556,35 @@ export class Scatter implements EnginePlugin {
       if (culled) pass.drawIndexedIndirect(cull!.commands!, (cascade * 3 + i) * 20);
       else pass.drawIndexedIndirect(this.commands, i * 20);
     }
+  }
+  /** A shadow vertex stage for `textures`: uvs in and, with a cut-out, a fragment stage dropping cut texels. */
+  private shadowText(code: string): string {
+    if (!this.uvs) return code;
+    return this.cut > 0
+      ? texturedShadow(code, this.cut)
+      : code.replace('@location(1) n:vec3f,', '@location(1) n:vec3f,@location(2) uv:vec2f,');
+  }
+  /** The bind group `at` of the maps for `pipeline`: the sampler and the first `maps` maps (3 in colour, 1 in shadow). */
+  private mapGroup(d: GPUDevice, pipeline: GPURenderPipeline, at: number, maps: number): GPUBindGroup {
+    const m = this.maps!,
+      made = m.groups.get(pipeline);
+    if (made) return made;
+    const group = d.createBindGroup({
+      layout: pipeline.getBindGroupLayout(at),
+      entries: [m.sampler, ...m.textures.slice(0, maps).map((t) => t.createView())].map((resource, binding) => ({
+        binding,
+        resource,
+      })),
+    });
+    m.groups.set(pipeline, group);
+    return group;
+  }
+  /** The lit stages now on (variation, clusters, translucency), as a pipeline key suffix: turning one on or off picks another pipeline. */
+  private stageKey(): string {
+    return (
+      (this.looks() ? ':look' + (this.values[75] > 0 ? 'c' : '') : '') +
+      (this.translucency > 0 && this.values[78] > 0 ? ':transl' : '')
+    );
   }
   /** Whether `variation` or `clusters` changes the lit vertex stage. */
   private looks(): boolean {
@@ -1227,6 +1610,8 @@ export class Scatter implements EnginePlugin {
     this.pbrUniform?.destroy();
     this.materialUniform?.destroy();
     this.pbrUniform = this.materialUniform = undefined;
+    for (const t of this.maps?.textures ?? []) t.destroy();
+    this.maps = undefined;
     this.pbrShader = '';
     this.pbrBindings.length = 0;
     this.pbrGroups.clear();

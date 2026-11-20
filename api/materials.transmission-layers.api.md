@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel, PBRTransmission } from "@margoengine/gltf-pro";
+import { PBRModel, PBRTransmission } from "@margoengine/gltf/pbr";
 
 export interface TransmissionBackgroundOIT {
     readonly order: number;

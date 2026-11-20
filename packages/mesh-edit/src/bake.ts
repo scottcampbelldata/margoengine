@@ -56,7 +56,7 @@ export interface BakeMapsOptions {
   maps?: readonly ('normal' | 'ao' | 'color')[];
   /** How far from the low surface rays search, both ways, in mesh units. Default 5% of the high mesh's size. */
   distance?: number;
-  /** Colour source: a texture read at the high mesh's UVs, or a function of the hit returning RGBA 0 to 255. Needed for `'color'`. */
+  /** Colour source: a texture read at the high mesh's UVs (nearest texel, repeating outside 0 to 1 as glTF's default sampler does), or a function of the hit returning RGBA 0 to 255. Needed for `'color'`. */
   color?: BakeImage | ((sample: BakeSample) => readonly [number, number, number, number]);
   /** Occlusion rays per texel, 1 to 1024. Default 32. */
   aoRays?: number;
@@ -123,10 +123,11 @@ function smoothNormals(positions: ArrayLike<number>, indices: ArrayLike<number>)
   return out;
 }
 
+/** Nearest texel at `(u, v)` with glTF's default REPEAT wrap, so tiled UVs outside 0 to 1 read the tile, not its edge. */
 function sampleImage(image: BakeImage, u: number, v: number): [number, number, number, number] {
   const { width, height, data } = image,
-    x = Math.min(width - 1, Math.max(0, Math.floor(u * width))),
-    y = Math.min(height - 1, Math.max(0, Math.floor(v * height))),
+    x = Math.min(width - 1, Math.floor((u - Math.floor(u)) * width)),
+    y = Math.min(height - 1, Math.floor((v - Math.floor(v)) * height)),
     at = (y * width + x) * 4;
   return [data[at], data[at + 1], data[at + 2], data[at + 3]];
 }
@@ -343,7 +344,9 @@ function bakeSurfaces(
         const axis = sign
             ? [0, 1, 2].map(
                 (k) =>
-                  tangents![corner[0] * 4 + k] * w + tangents![corner[1] * 4 + k] * s + tangents![corner[2] * 4 + k] * r,
+                  tangents![corner[0] * 4 + k] * w +
+                  tangents![corner[1] * 4 + k] * s +
+                  tangents![corner[2] * 4 + k] * r,
               )
             : tangent,
           along = dot(axis as MutableVec3, n),

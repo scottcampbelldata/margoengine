@@ -30,6 +30,11 @@ type Context = Extract<PassContext, {
 
 type GroundBounds = readonly [minX: number, minZ: number, maxX: number, maxZ: number];
 
+interface GroundPath {
+    readonly points: readonly (readonly [x: number, z: number])[];
+    readonly width: number;
+}
+
 class OrderedCull {
     readonly n: number;
     readonly candidates: GPUBuffer;
@@ -49,16 +54,40 @@ class Scatter implements EnginePlugin {
     protected fallback?: GPUTexture;
     protected compute?: GPUComputePipeline;
     protected readonly values: Float32Array;
+    protected reach: number;
     protected readonly meta: Uint32Array;
     protected readonly geometries: readonly Geometry[];
     get disposed(): boolean;
     readonly count: number;
     protected terrain?: GPUTexture;
     protected computeGroup?: GPUBindGroup;
-    protected readonly options: ScatterOptions;
+    readonly options: ScatterOptions;
     constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input?: ScatterOptions);
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
+    protected applyReach(): void;
+    protected reachChanged(): void;
+    get density(): number;
+    set density(value: number);
+    get color(): readonly [number, number, number];
+    set color(value: readonly [number, number, number]);
+    get wind(): ScatterWind | undefined;
+    set wind(value: ScatterWind | undefined);
+    get rootShade(): number;
+    set rootShade(value: number);
+    get widen(): number;
+    set widen(value: number);
+    get translucencyAmount(): number;
+    set translucencyAmount(value: number);
+    get variationHue(): number;
+    set variationHue(value: number);
+    get variationValue(): number;
+    set variationValue(value: number);
+    get clusters(): number;
+    set clusters(value: number);
+    get time(): number;
+    advanceTime(delta: number): void;
+    get windTime(): number;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     protected cull(c: ScatterPassContext, terrain: GPUTexture): void;
@@ -75,6 +104,7 @@ class Scatter implements EnginePlugin {
         buffer: GPUBuffer;
     }[];
     protected beforeDistribute(_c: ScatterPassContext, _terrain: GPUTexture): void;
+    protected coverRing(_ring: number): 'opaque' | 'cover' | 'split';
     protected colourInstances(): GPUBuffer[];
     protected colourCommands(): GPUBuffer;
     protected drawsRing(_ring: number): boolean;
@@ -100,7 +130,14 @@ class Scatter implements EnginePlugin {
 interface ScatterBlades {
     rootShade?: number;
     widen?: number;
+    translucency?: number;
 }
+
+type ScatterImage = {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array | Uint8ClampedArray;
+} | ImageBitmap | OffscreenCanvas | HTMLCanvasElement | HTMLImageElement;
 
 interface ScatterOptions {
     count?: number;
@@ -116,7 +153,9 @@ interface ScatterOptions {
     seed?: number;
     color?: readonly [number, number, number];
     material?: PbrMaterial;
+    textures?: ScatterTextures;
     exclusions?: readonly GroundBounds[];
+    paths?: readonly GroundPath[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;
     alignToGround?: number;
@@ -130,16 +169,36 @@ interface ScatterOptions {
     follow?: boolean;
     variation?: ScatterVariation;
     clusters?: number;
+    states?: ScatterStateSource;
 }
 
 type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+interface ScatterStateSource {
+    poseCode(code: string, group: number, binding: number): string;
+    entries(device: GPUDevice): {
+        buffer: GPUBuffer;
+    }[];
+    update(context: {
+        device: GPUDevice;
+        encoder: GPUCommandEncoder;
+    }): void;
+}
+
+interface ScatterTextures {
+    readonly uvs: ArrayLike<number> | readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>];
+    readonly baseColor?: ScatterImage;
+    readonly normal?: ScatterImage;
+    readonly occlusionRoughnessMetal?: ScatterImage;
+    readonly alphaCutoff?: number;
+}
+
 interface ScatterVariation {
     hue?: number;
     value?: number;
 }
 
-type ScatterWind = readonly [number, number, number];
+type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];
 ```

@@ -4,6 +4,7 @@ import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import { madd, rotateAxis, type V3 } from './math.js';
 import { rollFrame, ray } from './view.js';
 import { MargoError } from '@margoengine/math/errors';
+import { rangeError } from '../../shared/errors.js';
 
 /** Structural interface of cameras/origin's FloatingOrigin; no camera package is loaded. */
 export interface GlobeOrigin {
@@ -33,7 +34,7 @@ export interface GlobeOptions {
 }
 type Point = { x: number; y: number; tilt: boolean };
 const finite = (v: readonly number[]): V3 => {
-  if (v.length !== 3 || !v.every(Number.isFinite)) throw new RangeError('Globe coordinates need three finite numbers');
+  if (v.length !== 3 || !v.every(Number.isFinite)) throw rangeError('Globe coordinates need three finite numbers', 'controls-arguments');
   return [...v] as V3;
 };
 
@@ -87,8 +88,9 @@ export class GlobeControls extends Controls {
       !(maxAltitude >= minAltitude) ||
       !(maxTilt > 0 && maxTilt < Math.PI / 2)
     ) {
-      throw new RangeError(
+      throw rangeError(
         'Use positive ellipsoid radii and minimum altitude, maxAltitude >= minAltitude and maxTilt in (0, PI/2)',
+        'controls-arguments',
       );
     }
     super(source, element);
@@ -124,12 +126,12 @@ export class GlobeControls extends Controls {
   /** Outward geodetic unit normal of a world surface point. */
   normal(point: readonly [number, number, number]): V3 {
     const p = sub(finite(point), this.centre);
-    if (!Math.hypot(...p)) throw new RangeError('A surface normal needs a point different from the ellipsoid centre');
+    if (!Math.hypot(...p)) throw rangeError('A surface normal needs a point different from the ellipsoid centre', 'controls-arguments');
     return normalize(p.map((v, i) => v / this.radii[i] ** 2));
   }
   /** Nearest forward ellipsoid hit at element CSS pixels; null on sky. */
   pick(x: number, y: number): V3 | null {
-    if (![x, y].every(Number.isFinite)) throw new RangeError('Globe pick needs finite CSS coordinates');
+    if (![x, y].every(Number.isFinite)) throw rangeError('Globe pick needs finite CSS coordinates', 'controls-arguments');
     const e = this.element;
     if (!e || !(e.clientWidth > 0 && e.clientHeight > 0)) return null;
     const r = ray(rollFrame(this.camera), x, y, e.clientWidth, e.clientHeight);
@@ -195,28 +197,39 @@ export class GlobeControls extends Controls {
   tilt(point: readonly [number, number, number], yaw: number, pitch: number): void {
     this.alive();
     const anchor = finite(point);
-    if (![yaw, pitch].every(Number.isFinite)) throw new RangeError('Globe tilt needs finite angular deltas');
+    if (![yaw, pitch].every(Number.isFinite)) throw rangeError('Globe tilt needs finite angular deltas', 'controls-arguments');
     const normal = this.normal(anchor),
       eye = sub(this.camera.position, anchor);
     if (!(Math.hypot(...eye) > 0)) return;
     const tilted = rotateAxis(eye, normal, yaw),
       target = rotateAxis(sub(this.camera.target, anchor), normal, yaw),
       up = rotateAxis(this.camera.up, normal, yaw);
-    const right = normalize(cross(sub(target, tilted), up));
     const current = Math.acos(Math.max(-1, Math.min(1, dot(normalize(tilted), normal))));
-    // A positive rotation around screen right reduces the angle from the normal.
-    const amount = current - Math.max(0, Math.min(this.maxTilt, current + pitch));
-    this.commit(
-      madd(anchor, rotateAxis(tilted, right, amount), 1),
-      madd(anchor, rotateAxis(target, right, amount), 1),
-      rotateAxis(up, right, amount),
-    );
+    // Hinge k = normal x eye: a positive turn about it moves the eye away from the normal whatever camera.up is.
+    // Straight above the point the hinge is up x normal, the screen right of a top-down view, so the sky comes up.
+    let hinge = cross(normal, tilted);
+    if (Math.hypot(...hinge) <= 1e-12 * Math.hypot(...tilted)) {
+      hinge = cross(up, normal);
+      if (!(Math.hypot(...hinge) > 0)) hinge = cross(normal, Math.abs(normal[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]);
+    }
+    const k = normalize(hinge),
+      amount = Math.max(0, Math.min(this.maxTilt, current + pitch)) - current,
+      eye2 = rotateAxis(tilted, k, amount),
+      target2 = rotateAxis(target, k, amount);
+    let up2 = rotateAxis(up, k, amount);
+    if (dot(up2, normal) < 0) {
+      // camera.up pointed into the ground: keep the horizon the right way up (sky-up, no roll about the view).
+      const forward = normalize(sub(target2, eye2)),
+        level = madd(normal, forward, -dot(normal, forward));
+      if (Math.hypot(...level) > 1e-9) up2 = normalize(level);
+    }
+    this.commit(madd(anchor, eye2, 1), madd(anchor, target2, 1), up2);
   }
   /** Zoom toward an ellipsoid hit. Positive pixels zoom out; sky uses the view centre. */
   zoomAt(x: number, y: number, pixels: number): void {
     this.alive();
     if (![x, y, pixels, this.zoomSpeed].every(Number.isFinite))
-      throw new RangeError('Globe zoom needs finite coordinates, delta and speed');
+      throw rangeError('Globe zoom needs finite coordinates, delta and speed', 'controls-arguments');
     const anchor = this.pick(x, y) ?? this.camera.target;
     const factor = 2 ** Math.max(-32, Math.min(32, (pixels * this.zoomSpeed) / 500));
     this.commit(

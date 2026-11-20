@@ -1,0 +1,91 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 10,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1397.5449859106498,
+            879.5004601690722,
+            69.86376022973494
+          ],
+          "target": [
+            -1297.5449859106498,
+            881.0004601690722,
+            69.86376022973494
+          ],
+          "fov": 45
+        },
+        {
+          "time": 10,
+          "position": [
+            -1317.5449859106498,
+            880.4604601690722,
+            69.86376022973494
+          ],
+          "target": [
+            -1197.5449859106498,
+            965.1080741628591,
+            369.8637602297349
+          ],
+          "fov": 45,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "timber-valley-town-street",
+    "kind": "long",
+    "seconds": 10,
+    "scene": "timber-valley",
+    "page": {
+      "path": "packages/scenes/test/timber-valley-shot.html",
+      "css": "#viewport{position:fixed;inset:0;width:100%!important;height:100%!important}",
+      "engine": "timberShot.engine",
+      "canvas": "#viewport",
+      "aovs": "timberShot.aovs",
+      "apply": "timberShot.apply",
+      "settings": "timberShot.settings",
+      "ready": "#viewport[data-ready=\"true\"]"
+    },
+    "seed": 1910,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "supersample": 2,
+    "subframes": 8,
+    "shutter": 180,
+    "warmup": 60,
+    "probes": {
+      "early": 0.3,
+      "mid": 1
+    },
+    "lookFamily": "animatedFeature",
+    "moving": {
+      "depthScale": 2000
+    },
+    "aovs": [
+      "geometry",
+      "depth",
+      "penumbra",
+      "subject",
+      "lit",
+      "shadow",
+      "sky"
+    ],
+    "horizon": {
+      "y": -500
+    }
+  }
+}

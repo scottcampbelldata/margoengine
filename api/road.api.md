@@ -21,5 +21,14 @@ export interface RoadOptions {
     crossSection?: readonly (readonly [number, number])[];
 }
 
+export interface RoadPathOptions extends Pick<RoadOptions, 'width' | 'curbWidth' | 'crossSection' | 'segments'> {
+    margin?: number;
+}
+
 export function road(curve: Spline, { width, curbWidth, curbHeight, segments, uvMeters, crossSection }?: RoadOptions): RoadMesh;
+
+export function roadPath(curve: Spline, { width, curbWidth, crossSection, segments, margin }?: RoadPathOptions): {
+    points: [number, number][];
+    width: number;
+};
 ```

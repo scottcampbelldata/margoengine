@@ -214,3 +214,71 @@ test('arraySource averages coarser levels, skips NaN and checks its size', () =>
   // A flat field still has a range the transfer function can span.
   assert.deepEqual([...arraySource(new Float32Array(8).fill(3), [2, 2, 2]).range], [2.5, 3.5]);
 });
+
+// A GPU device stand-in: every member is a callable that returns another stand-in.
+const standIn = () =>
+  new Proxy(function () {}, {
+    get: (_, key) => (key === 'maxTextureDimension3D' ? 2048 : key === 'then' ? undefined : standIn()),
+    apply: () => standIn(),
+  });
+
+test('a bricked volume the figure refuses is not left drawing with its atlas held', async () => {
+  const { brickedVolume } = await import('@margoengine/sciviz/bricks');
+  globalThis.GPUBufferUsage ??= { COPY_DST: 8, UNIFORM: 64 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2 };
+  globalThis.GPUTextureUsage ??= { COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
+  const added = new Set(),
+    destroyed = [],
+    device = new Proxy(standIn(), {
+      get: (t, key) =>
+        key === 'createTexture' || key === 'createBuffer'
+          ? () => ({ createView: standIn(), destroy: () => destroyed.push(key) })
+          : t[key],
+    }),
+    renderer = { device, add: (l) => added.add(l), remove: (l) => added.delete(l) },
+    // A 2D chart refuses a volume.
+    refusing = {
+      renderer,
+      addLayer() {
+        throw new TypeError('This layer needs a 3D figure');
+      },
+    };
+  assert.throws(
+    () => brickedVolume(refusing, arraySource(new Float32Array(8), [2, 2, 2]), { brickSize: 4 }),
+    TypeError,
+  );
+  assert.equal(added.size, 0);
+  // Atlas, page table, transfer table and uniform buffer.
+  assert.equal(destroyed.length, 4);
+});
+
+test('a restored bricked volume and slice release the textures and buffers of the lost device', async () => {
+  const { brickedVolume } = await import('@margoengine/sciviz/bricks');
+  globalThis.GPUBufferUsage ??= { COPY_DST: 8, UNIFORM: 64 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2 };
+  globalThis.GPUTextureUsage ??= { COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
+  const live = new Set(),
+    device = new Proxy(standIn(), {
+      get: (t, key) =>
+        key === 'createTexture' || key === 'createBuffer'
+          ? () => {
+              const object = { createView: standIn(), destroy: () => live.delete(object) };
+              live.add(object);
+              return object;
+            }
+          : t[key],
+    }),
+    renderer = { device, add() {}, remove() {} },
+    figure = { renderer, addLayer() {}, removeLayer() {} };
+  const layer = brickedVolume(figure, arraySource(new Float32Array(8), [2, 2, 2]), { brickSize: 4 }),
+    slice = layer.slice('z');
+  // Atlas, page table, transfer table, volume uniform and slice uniform.
+  assert.equal(live.size, 5);
+  for (let i = 0; i < 3; i++) {
+    layer.restore();
+    slice.restore();
+    assert.equal(live.size, 5);
+  }
+  layer.dispose();
+  assert.equal(live.size, 0);
+});

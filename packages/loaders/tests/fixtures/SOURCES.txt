@@ -40,3 +40,12 @@ OpenVDB 13.0 in Blender 5.3.0 Beta ecaf39c37b28 by make-vdb-empty.py (no OpenVDB
 The same native writer saves both precisions; vdb-empty-oracle.json is what native OpenVDB reads back.
 Full-precision empty streams retain a compressed empty block; the half-value stream omits that block.
 These paired controls distinguish precision from file version. Reproduction command is in make-vdb-empty.py.
+
+Carnegie Mellon University Graphics Lab Motion Capture Database (http://mocap.cs.cmu.edu/), "free for all uses",
+redistribution of the data allowed. "The data used in this project was obtained from mocap.cs.cmu.edu. The database
+was created with funding from NSF EIA-0196217." Used by tests/acclaim.test.js, trimmed by hand to a few KB:
+  cmu/35.asf: subject 35's skeleton, http://mocap.cs.cmu.edu/subjects/35/35.asf (source SHA-256
+    2a8e2eda3c0d7d828566b2a9a8ab36b2b8b3864110574e8b73c8f069fded416c), comment lines dropped and white space collapsed.
+  cmu/35_01-every-20th.amc: walk 35_01, http://mocap.cs.cmu.edu/subjects/35/35_01.amc (source SHA-256
+    0743f4ea48e7e199cd56b2810b5ce81f8ede08d32ff79aa4e363c44cc4fe33aa), frames 1, 21, ..., 121 of the first second
+    renumbered 1 to 7, values rounded to 3 decimals.

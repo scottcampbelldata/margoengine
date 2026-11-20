@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { crc32 } from '@margoengine/loaders';
 import { parseUSDA, parseUSDC, parseUSDZ } from '../dist/index.js';
-import { modelFromPrepared } from '../../gltf-pro/dist/worker.js';
+import { modelFromPrepared } from '../../gltf/dist/worker.js';
 import { exportUSDZ } from '../../exporters/dist/usdz.js';
 import { torusKnotGeometry, toGeometry } from '../../geometry/dist/index.js';
 import { runParseWorker, assertSameBytes } from '../../../tests/support/parse-worker.js';

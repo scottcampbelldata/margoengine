@@ -122,7 +122,7 @@ test('physics sample provenance preserves the exact pinned commit in notices and
 });
 
 test('direct glTF extension GPU cases require every external family instead of silently passing absent files', () => {
-  const source = readFileSync('packages/gltf-pro/scripts/test-extensions-browser.js', 'utf8');
+  const source = readFileSync('packages/gltf/scripts/test-extensions-browser.js', 'utf8');
   for (const family of ['helmet/', 'ibl/', 'skull/', 'tower.glb'])
     assert.ok(source.includes(`requireExternalAssets('${family}')`), `GPU case must validate ${family}`);
   assert.doesNotMatch(

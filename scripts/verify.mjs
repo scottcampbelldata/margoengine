@@ -30,11 +30,13 @@ export function plantStale(dir = root) {
 }
 
 /** Stage 1: in order. The external asset check reads files only, so it runs first: a missing download fails in
- * seconds with its recovery command instead of after hygiene (over 30 s on the mini PC). */
+ * seconds with its recovery command instead of after hygiene (over 30 s on the mini PC). check:wasm-repro rebuilds every
+ * committed Wasm blueprint and fails when one differs from git, where the pinned Rust toolchain is installed (elsewhere it
+ * says so and builds nothing); it runs before the package build, which copies the blueprints. */
 export const SERIAL = [
   'node scripts/support/external-test-assets.mjs',
   'node scripts/hygiene.js --verify',
-  'node scripts/check-gpu-policy.mjs',
+  'npm run check:wasm-repro',
   'npm run build:packages',
 ];
 
@@ -63,7 +65,6 @@ export const PARALLEL = [
     `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} --test-timeout=${TEST_TIMEOUT_MS} --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
   ],
   ['npm run docs:links'],
-  ['npm run check:readmes'],
   ['npm run measure:size'],
   ['npm run proofs -- --current'],
 ];

@@ -1,6 +1,7 @@
 import { webkit } from '@playwright/test';
 import { launchBrowser, resolveBrowser, softwareAdapterReason } from './lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { realpathSync } from 'node:fs';
 import { createServer as createNetServer } from 'node:net';
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
@@ -13,12 +14,13 @@ import { holdStaleDocumentGpu } from './support/stale-document.js';
 import { compatIgnoredLine, compatRun, compatShim } from './support/compat-shim.js';
 import { closeAll, traceShutdown } from './support/shutdown.mjs';
 import { watchStartupErrors } from './support/page-startup.js';
+import { windowsSession } from './support/windows-session.mjs';
 
 /**
  * Starts a server on a fixed port with `start` (for example `() => server.listen()`), waiting while something else holds
- * the port: GPU suites share the GPU (scripts/gpu-lock.mjs, 3 slots), so two suites that use the same port can run at
+ * the port: GPU suites run side by side, so two suites that use the same port can run at
  * once and the second waits for the first to close its server. Other errors are thrown as they are; past `waitMs`
- * (default 20 min, a shared GPU hold's limit) it throws naming the port.
+ * (default 20 min) it throws naming the port.
  */
 export async function listenWhenFree(start, { port, waitMs = 20 * 60_000, poll = 1000, log = console.error } = {}) {
   const begun = Date.now();
@@ -55,6 +57,8 @@ export function freePort() {
     });
   });
 }
+
+export { noFileWatcher } from './support/no-file-watcher.js';
 
 /** Folder holding each running dev server's own dependency cache (`startDevServer`), one `<pid>-<random>` folder each. */
 export const DEV_CACHE_ROOT = 'test-results/vite-cache';
@@ -118,7 +122,7 @@ export async function startDevServer({
     server = await createServer({
       root,
       resolve: { alias: aliases },
-      plugins: [own, ...plugins],
+      plugins: [noFileWatcher(), own, ...plugins],
       cacheDir,
       optimizeDeps: { entries: [entry] },
       // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
@@ -471,6 +475,8 @@ export function delayWorkerMessages(ms) {
 
 /** Error code of an openBrowser whose hardware probe got no WebGPU adapter in a Chromium browser. */
 export const NO_WEBGPU_ADAPTER = 'no-webgpu-adapter';
+/** The `reason` of a NO_WEBGPU_ADAPTER error raised in Windows session 0 (an SSH logon or a service), the known cause. */
+export const SESSION_ZERO = 'windows-session-0';
 
 /**
  * The reason a GPU check must not start because the browser gave the probe no WebGPU adapter, or null. Chromium only
@@ -478,13 +484,17 @@ export const NO_WEBGPU_ADAPTER = 'no-webgpu-adapter';
  * whatever it gets. Before KB-C34i a null adapter passed, and the suite then waited out its ready timeout (120 s) for a
  * page whose engine.create had already thrown "WebGPU adapter unavailable".
  */
-export function noAdapterReason(engine, hardware, { softwareAdapterOk = false, args = [] } = {}) {
+export function noAdapterReason(engine, hardware, { softwareAdapterOk = false, args = [], session = null } = {}) {
   if (engine !== 'chromium' || softwareAdapterOk || hardware?.webgpu) return null;
   // A launch on ANGLE Vulkan is a WebGL2-only launch: Chromium gives its pages no WebGPU adapter (Edge 157 on Windows,
   // 2026-11-11), and the WebGL2 compatibility legs run there on purpose. Its GPU process is up when WebGL has a hardware
   // renderer; a lost one leaves no renderer or SwiftShader (KB-L5a-7).
   if (args.includes('--use-angle=vulkan') && hardware?.webglRenderer && !/swiftshader/i.test(hardware.webglRenderer))
     return null;
+  // Over SSH on Windows the browser runs in session 0, the Services session isolated from the signed-in desktop; Edge's
+  // GPU process there gave no adapter in 2 of 12 launches on the dev PC (docs/known-bugs.md, 2026-11-14). Say so.
+  if (session?.id === 0)
+    return `${NO_WEBGPU_ADAPTER} (${SESSION_ZERO}): the browser gave no WebGPU adapter, and this process runs in Windows session 0 (${JSON.stringify(session.name)}), the non-desktop session an SSH logon or a service gets. Chromium's GPU process there now and then has no adapter (docs/known-bugs.md, 2026-11-14). Run GPU work in the signed-in desktop session: for shots, the render queue (docs/shots.md, Render queue); otherwise a scheduled task set to run only when the user is signed in. WebGL renderer ${JSON.stringify(hardware?.webglRenderer ?? null)}; ${hardware?.userAgent ?? 'no user agent'}`;
   return `${NO_WEBGPU_ADAPTER}: the browser gave no WebGPU adapter (requestAdapter answered null, or navigator.gpu is missing; WebGL renderer ${JSON.stringify(hardware?.webglRenderer ?? null)}; ${hardware?.userAgent ?? 'no user agent'}). The GPU process failed to start or was lost: look for a GPU driver reset (Windows event 4101) or a browser update swapping its files during the launch (docs/known-bugs.md, KB-C34i)`;
 }
 
@@ -495,6 +505,10 @@ export async function openBrowser({
   powerPreference = process.env.GPU_POWER ?? 'high-performance',
   firefoxUserPrefs = {},
   startPath = '/tests/modern.html',
+  // The page the browser loads first, where the hardware is probed; the dev server still pre-bundles `startPath`'s
+  // imports. A caller that navigates to its page itself (tools/shot, with the shot's query) opens on a blank page so
+  // its page loads once: a second navigation aborted the first load's fetches (KB-SHOT-DOUBLELOAD1).
+  openPath = startPath,
   aliases = {},
   plugins = [],
   headless = true,
@@ -519,6 +533,8 @@ export async function openBrowser({
   // A caller that tests the browser harness or the page, not the GPU (tests/page-ready.test.js), runs on whatever adapter
   // the machine has, including a software one on a runner without a GPU.
   softwareAdapterOk = false,
+  // Device pixels per CSS pixel of the page (window.devicePixelRatio), for high-density display tests.
+  deviceScaleFactor = 1,
 } = {}) {
   // A compatibility run never passes as one in silence on a page the script pins to native WebGPU.
   const ignored = compatIgnoredLine(startPath, compat);
@@ -542,7 +558,7 @@ export async function openBrowser({
       // headless choice and prefs are kept.
       browser = await launchBrowser({ name: 'firefox', needs: 'none', headless, firefoxUserPrefs });
     else browser = await webkit.launch({ headless });
-    const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1100 }, deviceScaleFactor });
     page.setDefaultTimeout(30000);
     // First, so every GPU wrapper below sees held promises: a document the tab has left runs no more of its GPU
     // continuations, which in WebKit wrote into the next document's window (support/stale-document.js, KB-L4-W1).
@@ -581,7 +597,7 @@ export async function openBrowser({
       if (response.status() >= 500 && response.url().startsWith(origin))
         serverErrors.push(`${response.status()} ${response.statusText()} ${response.url()}`);
     });
-    await page.goto(`${origin}${startPath}`);
+    await page.goto(`${origin}${openPath}`);
     const probeHardware = () =>
       page.evaluate(async (powerPreference) => {
         const canvas = document.createElement('canvas'),
@@ -623,8 +639,14 @@ export async function openBrowser({
     const missing = noAdapterReason(browserName === 'chromium' ? resolveBrowser({ name: channel }).engine : browserName, hardware, {
       softwareAdapterOk,
       args,
+      // Looked up only when there is no adapter, to name the cause.
+      session: hardware?.webgpu ? null : windowsSession(),
     });
-    if (missing) throw Object.assign(new Error(missing), { code: NO_WEBGPU_ADAPTER });
+    if (missing)
+      throw Object.assign(new Error(missing), {
+        code: NO_WEBGPU_ADAPTER,
+        ...(missing.startsWith(`${NO_WEBGPU_ADAPTER} (${SESSION_ZERO})`) && { reason: SESSION_ZERO }),
+      });
     if (browserName === 'chromium' && !softwareAdapterOk) {
       // A real-GPU check never runs on SwiftShader by accident (MARGO_SOFTWARE_GPU=1 or an explicit
       // --use-webgpu-adapter=swiftshader in BROWSER_ARGS asks for it).

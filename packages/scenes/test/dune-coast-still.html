@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>dune coast still</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// One still of @margoengine/scenes/dune-coast. URL: view (an anchor name), w and h (pixels), frames (warm-up frames for
+// the surf and the TAA, default 90), and any number or text setting (weather, hour, date, wind, grass, surf, quality).
+// A model from the asset library can stand in the scene for a check still: asset (its URL, e.g.
+// /asset-library/kitty-hawk/flyer-1903/flyer-1903.glb), at (world x,z; default 0,-4 on the rail), yaw (degrees), lift
+// (metres above the sand), eye and look (camera position and target as x,y,z offsets from the model's ground point;
+// they replace the view), and the Flyer's moving parts: warp (morph weight), elevator and rudder (degrees), prop (radians).
+import {Engine} from '/packages/core/dist/index.js';
+import {attach,info} from '/packages/scenes/dist/dune-coast.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+const q=new URLSearchParams(location.search),errors=[],canvas=document.querySelector('canvas');
+const w=Number(q.get('w')??960),h=Number(q.get('h')??540);
+canvas.width=w;canvas.height=h;canvas.style.width=w+'px';canvas.style.height=h+'px';
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,3,10],target:[0,2,0],fov:50,near:0.3,far:30000}});
+engine.stop();
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const settings={};
+for(const [k,spec] of Object.entries(info.settings)){const v=q.get(k);if(v===null)continue;settings[k]=typeof spec.default==='number'?Number(v):typeof spec.default==='boolean'?v!=='0':v;}
+const scene=attach(engine,settings);
+// early=1 (KB-SCENES-BLOWNSAND-STATIC1): time moves on before the lazily loaded parts arrive, by advanceTime and by
+// frames; the sand's clock must still be the sum of every delta in order, as if it had been there from attach.
+let expected=0;
+if(q.get('early')){scene.advanceTime(2.5);expected+=2.5;for(let i=0;i<3;i++){engine.render({delta:1/30});expected+=1/30;}}
+await scene.ready;
+scene.view(q.get('view')??'first-flight',Number(q.get('fov')??50));
+const nums=(k,d)=>(q.get(k)??d).split(',').map(Number);
+let asset=null;
+if(q.get('asset')){
+  const [ax,az]=nums('at','0,-4'),gy=scene.height(ax,az)+Number(q.get('lift')??0),yaw=Number(q.get('yaw')??0)*Math.PI/180;
+  const model=await loadGLTF(engine,q.get('asset'));
+  model.root.position.set(ax,gy,az);model.root.rotation.set(0,yaw,0);
+  scene.parts.shadows.add(model.root,{});scene.parts.occlusion?.add(model);
+  const byName=Object.fromEntries(model.nodes.map(n=>[n.name,n]));
+  const deg=Math.PI/180;
+  if(byName.elevator&&q.get('elevator'))byName.elevator.rotation.set(Number(q.get('elevator'))*deg,0,0);
+  if(byName.rudder&&q.get('rudder'))byName.rudder.rotation.set(0,Number(q.get('rudder'))*deg,0);
+  for(const [name,spin] of [['propeller_left',-1],['propeller_right',1]])if(byName[name]&&q.get('prop'))byName[name].rotation.set(0,0,spin*Number(q.get('prop')));
+  if(q.get('warp'))for(const p of model.primitives)if(p.weights?.length)p.weights[0]=Number(q.get('warp'));
+  if(q.get('eye')){const e=nums('eye','0,2,8'),l=nums('look','0,1,0');engine.camera.position=[ax+e[0],gy+e[1],az+e[2]];engine.camera.target=[ax+l[0],gy+l[1],az+l[2]];if(q.get('fov'))engine.camera.fov=Number(q.get('fov'));}
+  asset={nodes:model.nodes.map(n=>n.name),bounds:[...model.bounds],primitives:model.primitives.length};
+}
+window.check={async run(){const frames=Number(q.get('frames')??90);for(let i=0;i<frames;i++){engine.render({delta:1/30});expected+=1/30;if(i%15===14)await engine.gpu.queue.onSubmittedWorkDone();}await engine.gpu.queue.onSubmittedWorkDone();return {errors,ground:scene.height(0,0),asset,post:scene.parts.preset.post.effects.map(e=>e.name),sand:scene.parts.blownSand?{time:scene.parts.blownSand.time,expected,particles:scene.parts.blownSand.stats.particles}:null};}};
+window.ready=true;
+</script></body></html>

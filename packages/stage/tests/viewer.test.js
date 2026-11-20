@@ -90,9 +90,9 @@ const Tonemap = {
     return (world.tonemap = part('tonemap', { options }));
   },
 };
-mock.module('@margoengine/gltf-pro', { namedExports: { loadGLTF } });
+mock.module('@margoengine/gltf/pbr', { namedExports: { loadGLTF } });
 mock.module('@margoengine/environment', { namedExports: { EnvironmentLighting, ColorBackground } });
-mock.module('@margoengine/staging', { namedExports: { ContactShadows } });
+mock.module('@margoengine/studio', { namedExports: { ContactShadows } });
 mock.module('@margoengine/shadows', { namedExports: { Shadows } });
 mock.module('@margoengine/tonemap', { namedExports: { Tonemap } });
 const { addViewer } = await import('@margoengine/stage/viewer');

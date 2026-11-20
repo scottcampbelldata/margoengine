@@ -16,7 +16,7 @@ const depthShader =
 }`;
 
 /** The draws and pass descriptor that copy `count`-sample depth into a `format` attachment, made once per pair. */
-function depthCopy(device, source, view, count, format) {
+function depthCopy(device, source, view, count, format, single = false) {
   // Preserve each reversed-Z coverage sample when returning to an outer scene.
   const load = (sample) => depthShader.replace(/return max[^;]+;/, `return textureLoad(source,q,${sample});`),
     draw = (code, multisample) => {
@@ -32,8 +32,10 @@ function depthCopy(device, source, view, count, format) {
     };
   return {
     // The compatibility level has no sample_index: one draw per sample, the pipeline's mask writing that sample alone.
-    draws:
-      count !== 4
+    // A single-sample target's depth is a plain 2D depth texture, read at mip level 0.
+    draws: single
+      ? [draw(load(0).replace('_multisampled', ''), { count })]
+      : count !== 4
         ? [draw(depthShader, { count })]
         : compatibilityLevel(device)
           ? [0, 1, 2, 3].map((sample) => draw(load(sample), { count, mask: 1 << sample }))
@@ -126,7 +128,11 @@ export class SceneTarget {
     let formats = this.pipelines.get(count);
     if (!formats) this.pipelines.set(count, (formats = new Map()));
     let cached = formats.get(format);
-    if (!cached) formats.set(format, (cached = depthCopy(this.device, this.depthSource, view, count, format)));
+    if (!cached) {
+      // With one sample the scene's depth is the resolved depth itself; its view is made on the first copy only.
+      this.depthSource ??= this.resolvedDepth.createView({ aspect: 'depth-only' });
+      formats.set(format, (cached = depthCopy(this.device, this.depthSource, view, count, format, this.samples === 1)));
+    }
     cached.descriptor.depthStencilAttachment.view = view;
     cached.descriptor.depthStencilAttachment.depthLoadOp = this.viewContext?.view ? 'load' : 'clear';
     const pass = encoder.beginRenderPass(cached.descriptor);

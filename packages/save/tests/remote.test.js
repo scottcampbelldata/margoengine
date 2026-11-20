@@ -354,3 +354,23 @@ test('it composes: slots over checked copies over HTTP', async (t) => {
   assert.equal((await elsewhere.list())[0].title, 'cloud 2');
   assert.equal((await elsewhere.load('slot-1')).meta.title, 'cloud 2');
 });
+
+test('remoteHandler stops reading a body without a length once it passes maxBytes (KB-P9d)', async () => {
+  const handle = remoteHandler(memoryStorage(), { base: '/saves', maxBytes: 1024 });
+  let pulled = 0;
+  const body = new ReadableStream({
+    pull(controller) {
+      // A hostile client streams without content-length; 1,000 chunks would be 1 MB.
+      if (++pulled > 1000) controller.close();
+      else controller.enqueue(new Uint8Array(1024));
+    },
+  });
+  const response = await handle(
+    new Request('http://localhost/saves/k', { method: 'PUT', body, duplex: 'half' }),
+  );
+  assert.equal(response.status, 413);
+  assert.ok(pulled <= 4, `read ${pulled} chunks of 1 KiB for a 1 KiB limit`);
+  // A body at the limit is still taken.
+  const fits = await handle(new Request('http://localhost/saves/k', { method: 'PUT', body: new Uint8Array(1024) }));
+  assert.equal(fits.status, 201);
+});

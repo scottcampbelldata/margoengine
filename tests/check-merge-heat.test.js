@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import {
   heatWatched,
   NO_GPU_STEPS,
+  PLAIN_STEPS,
   runSteps,
   SELF_WATCHED_STEPS,
   STEP_AFTER,
@@ -274,4 +275,21 @@ test('check:merge always covers the test-page contract and road fold regression 
   assert.ok(manifest.scripts['check:road-invariants'].includes('packages/road/test/testpage.test.js'));
   assert.equal(heatWatched('check:testpage-contracts'), false);
   assert.deepEqual(STEP_AFTER['check:testpage-contracts'], ['verify']);
+});
+
+test('check:merge always runs the core and stage stress class check, with more seeds than the package tests', () => {
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  const core = JSON.parse(readFileSync(join(root, 'packages/core/package.json'), 'utf8'));
+  const stage = JSON.parse(readFileSync(join(root, 'packages/stage/package.json'), 'utf8'));
+  const script = readFileSync(join(root, 'scripts/core-stress.mjs'), 'utf8');
+  assert.ok(manifest.scripts['check:merge:steps'].split(' && ').includes('npm run check:core-stress'));
+  assert.equal(manifest.scripts['check:core-stress'], 'node scripts/core-stress.mjs');
+  for (const file of ['tests/deep-core-stress.test.js', 'packages/stage/tests/stress.test.js']) assert.ok(script.includes(file));
+  // The fast gate reaches the same files through the package tests of core and stage.
+  assert.ok(core.scripts.test.includes('../../tests/deep-core*.test.js'));
+  assert.ok(stage.scripts.test.includes('tests/*.test.js'));
+  assert.match(script, /\?\? '1000'/);
+  assert.equal(heatWatched('check:core-stress'), false);
+  assert.ok(PLAIN_STEPS.includes('check:core-stress'));
+  assert.deepEqual(STEP_AFTER['check:core-stress'], ['verify']);
 });

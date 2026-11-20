@@ -11,8 +11,8 @@ import { rotateByQuaternion, multiplyQuaternions, axisAngleToQuaternion } from '
 import { bodyPoints, handPoints } from './pose-tracking-fixture.js';
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset } from '../../gltf-pro/dist/asset-entry.js';
-import { PBRModel } from '../../gltf-pro/dist/model-entry.js';
+import { GLTFAsset } from '../../gltf/dist/asset-entry.js';
+import { PBRModel } from '../../gltf/dist/model-entry.js';
 import { Animation } from '../../animation/dist/index.js';
 import { readVRM } from '../dist/vrm.js';
 import { glbChunks, GLB_JSON, GLB_BIN } from '../../shared/glb.js';
@@ -310,4 +310,56 @@ test('native binder preserves bone lengths, restores touched transforms and deta
   model.dispose();
   assert.doesNotThrow(() => second.dispose());
   assert.throws(() => second.update(0.1), { code: 'disposed' });
+});
+test('calibration absorbs camera tilt: a turn in the world reads as that turn, not one about tilted axes (audit p4 R23)', () => {
+  const tilt = axisAngleToQuaternion([0, 0, 1], 0.7),
+    turn = axisAngleToQuaternion([0, 1, 0], 0.5),
+    tracker = new PoseTracker({ ...options, smoothing: 0 });
+  tracker.push({ poseWorldLandmarks: transformed(bodyPoints(), tilt) }).calibrate();
+  const neutral = tracker.update(0.1);
+  tracker.push({ poseWorldLandmarks: transformed(transformed(bodyPoints(), turn), tilt) });
+  const pose = tracker.update(0.1);
+  for (const bone of ['hips', 'spine', 'leftUpperArm', 'rightLowerLeg']) sameRotation(pose.worldRotations[bone], turn);
+  // The hips moved by the turn about the world origin, measured in the world.
+  const rest = solveBodyPose(bodyPoints(), options).position,
+    moved = rotateByQuaternion(rest, turn);
+  close(
+    pose.position.map((v, i) => v - neutral.position[i]),
+    moved.map((v, i) => v - rest[i]),
+  );
+});
+
+// KB-OWN-RIG1: a binding whose plugin its scene removed (removePlugin, scene or engine disposal) stayed live, and its
+// dispose() then removed whatever plugin had taken the name since.
+test('a binding whose scene removed its plugin ends, and its dispose leaves a same-name plugin alone', async (t) => {
+  const chunks = glbChunks(
+      new Uint8Array(readFileSync(new URL('../../../examples/assets/vrm/Seed-san.vrm', import.meta.url))),
+    ),
+    doc = JSON.parse(new TextDecoder().decode(chunks.find((c) => c.type === GLB_JSON).data)),
+    store = await TransformStore.create(512),
+    engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, store, {
+      backend: 'webgl2',
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    }),
+    model = new PBRModel(engine, new GLTFAsset(doc, [chunks.find((c) => c.type === GLB_BIN).data])),
+    animation = new Animation(model),
+    avatar = readVRM(doc);
+  t.after(() => {
+    animation.dispose();
+    model.dispose();
+    engine.dispose();
+  });
+  const handle = await addPoseTracking(animation, avatar, { ...options, smoothing: 0 }),
+    scene = model.root.scene,
+    name = `pose-tracking:${model.root.id}`;
+  assert.ok(scene.plugins.has(name));
+  scene.removePlugin(name);
+  assert.throws(() => handle.update(0), { code: 'disposed' });
+  const replacement = { name, setup() {} };
+  scene.use(replacement);
+  handle.dispose();
+  assert.equal(scene.plugins.get(name), replacement);
 });

@@ -339,3 +339,31 @@ test('interest: a bad option or a bad value says what to fix', () => {
     /priority/,
   );
 });
+
+test('interest: a viewer far from the origin, past 2^53 grid cells, still gets its view (no endless cell scan)', async () => {
+  // Run in a child so the old endless loop fails the test on a hard time limit instead of hanging the runner.
+  const { spawnSync } = await import('node:child_process');
+  const script = `
+    import { defineGame, defineSchema } from './dist/index.js';
+    import { InterestManager } from './dist/interest.js';
+    const schema = defineSchema({ types: { Input: { x: 'f32' }, Thing: { x: 'f64', y: 'f64' },
+      State: { things: { type: 'map', of: 'Thing', maxSize: 8 } } } });
+    const game = defineGame({ schema, state: 'State', input: 'Input', tickRate: 30,
+      initial: () => ({ things: new Map() }), join() {}, leave() {}, step() {} });
+    const interest = new InterestManager(game, { radius: 10, cell: 1,
+      collections: { things: { position: (t) => [t.x, t.y] } } });
+    const far = 2 ** 54; // float64 steps of 4 here, so x++ over cell indices stands still
+    const state = { things: new Map([[1, { x: far, y: 0 }], [2, { x: far + 8, y: 0 }], [3, { x: far + 12, y: 0 }], [4, { x: 0, y: 0 }]]) };
+    const seen = interest.view(state, 1);
+    console.log(JSON.stringify([...seen.things.keys()].sort()));
+  `;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    cwd: new URL('..', import.meta.url),
+    timeout: 10_000,
+    encoding: 'utf8',
+  });
+  assert.equal(run.signal, null, 'the view returned within the time limit');
+  assert.equal(run.status, 0, run.stderr);
+  // The neighbour 8 away is in the radius of 10; the one 12 away and the one at the origin are not.
+  assert.deepEqual(JSON.parse(run.stdout), [1, 2]);
+});

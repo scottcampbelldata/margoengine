@@ -57,30 +57,30 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 - **Colours.** `'#rrggbb'` strings are sRGB and converted to linear, as `new THREE.Color('#...')` does; number arrays are
   linear RGB. Output is tone mapped and sRGB-encoded for you.
 - **Two levels of mesh.** Core meshes are position + normal geometry with a constant PBR material, instanced
-  automatically. Textured meshes and loaded glTF models are drawn by `@margoengine/gltf-pro` (through
+  automatically. Textured meshes and loaded glTF models are drawn by `@margoengine/gltf/pbr` (through
   `@margoengine/materials` for meshes you build). Shadows, clustered lights and SSAO light core meshes automatically
-  and need `add(model)` for gltf-pro models.
+  and need `add(model)` for gltf/pbr models.
 
 ## Install only what you import
 
 There are three ways in: `@margoengine/core` or `@margoengine/stage` alone, a domain install profile, or
 `margoengine` for every feature. For a web app, `npm create margo@latest my-app -- --template web` scaffolds a
-working scene that depends on `@margoengine/web`; game, viz, React and Next starters also install their own profile.
+working scene that depends on `@margoengine/kit-web`; game, viz, React and Next starters also install their own profile.
 Publication is pending: the [kits guide](guides/kits.md) documents the verified private tarball route and package
 counts. No release command here publishes anything.
 
 Each row below is also available as an independent npm package. The examples later in this guide use full-install
 aliases to keep the comparisons readable. With a profile, replace `margoengine/controls/orbit` with
-`@margoengine/web/controls/orbit`, or import `@margoengine/controls/orbit` directly if that package is installed.
+`@margoengine/kit-web/controls/orbit`, or import `@margoengine/controls/orbit` directly if that package is installed.
 All packages share a release version. A profile preserves module identity and tree-shaking; it also reduces what
 npm installs. See [the starting-path review](guides/kit-migration.md) for the full install-to-frame audit.
 
 ```sh
 npm install @margoengine/core                      # engine, camera, meshes, constant PBR material
 npm install @margoengine/stage                     # facade plus core only
-npm install @margoengine/web                       # web domain profile
+npm install @margoengine/kit-web                       # web domain profile
 npm install margoengine                            # every feature package
-npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @margoengine/controls
+npm install @margoengine/geometry @margoengine/materials @margoengine/gltf/pbr @margoengine/controls
 ```
 
 | You use in three.js | Margo package |
@@ -89,7 +89,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | WebGL fallback | `@margoengine/webgl2-compat/preview` |
 | `BoxGeometry`, `SphereGeometry`, `ExtrudeGeometry`, `BufferGeometryUtils` | `@margoengine/geometry` |
 | `TextureLoader`, `MeshStandardMaterial` with maps and the other mesh materials | `@margoengine/materials` |
-| `GLTFLoader` (textured, extensions) | `@margoengine/gltf-pro` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
+| `GLTFLoader` (textured, extensions) | `@margoengine/gltf/pbr` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
 | `FBXLoader`, `USDZLoader`, `PLYLoader`/`PCDLoader`/`3MFLoader`, `STLLoader`/`OBJLoader` | `@margoengine/fbx`, `@margoengine/usdz`, `@margoengine/loaders` |
 | `AnimationMixer`, skinning, morphs | `@margoengine/animation` (+ `@margoengine/animator` for blending) |
 | `DirectionalLight` shadows | `@margoengine/shadows` |
@@ -120,7 +120,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf-pro @
 | stats.js | `@margoengine/stats` |
 | `renderer.info`, Spector.js, lil-gui scene inspectors | `@margoengine/inspector` (`@margoengine/inspector/frame`: frame debugger) |
 | `ViewHelper` | `@margoengine/viewcube` |
-| ContactShadows example (product-shot ground shadow) | `@margoengine/staging` |
+| ContactShadows example (product-shot ground shadow) | `@margoengine/studio` |
 | react-three-fiber | `@margoengine/react` |
 
 Feature entries keep bundles smaller still: `@margoengine/post/ssao`, `@margoengine/post/bloom`,
@@ -259,7 +259,7 @@ immutable once attached; build a new `Geometry` to change it. For UVs, vertex co
 ## Materials and textures
 
 Core's `PbrMaterial` is colour, roughness, metalness and `doubleSided`. Textures, transparency and the other shading
-models come from `@margoengine/materials`, which draws through gltf-pro (WebGPU only).
+models come from `@margoengine/materials`, which draws through gltf/pbr (WebGPU only).
 
 Core materials are live, like three.js's `material.color.set(...)`: `set` changes the given values in place and every
 mesh using the material shows them on the next frame (no new material, pipeline or bind group).
@@ -427,7 +427,7 @@ lighting.radiance.set([1, 0.96, 0.9, 0.15]); // rgb: light colour (linear), w: a
 
 const shadows = Shadows.attach(engine, {resolution: 2048, distance: 100}); // follows the directional light
 shadows.add(mesh);                           // casters; core meshes receive automatically
-shadows.add(model);                          // gltf-pro models cast and receive once added
+shadows.add(model);                          // gltf/pbr models cast and receive once added
 
 const lights = Clustered.attach(engine);     // up to 1,024 point and spot lights
 lights.setLights([
@@ -452,7 +452,7 @@ import {LocalShadows} from '@margoengine/clustered/shadows';
 
 const lamps = Clustered.attach(engine);
 const lampShadows = LocalShadows.attach(engine, {lights: lamps, maxLights: 4, resolution: 512});
-lampShadows.add(mesh);                        // casters: core meshes, gltf-pro models, materials meshes
+lampShadows.add(mesh);                        // casters: core meshes, gltf/pbr models, materials meshes
 lampShadows.add(model);
 lamps.add(model);                             // receivers, as for unshadowed local light
 lamps.setLights([
@@ -492,14 +492,14 @@ local.add(model);                             // receivers, as for point and spo
 - `intensity` is radiance, as three.js's; colours are linear. No shadows from area lights.
 
 The soft ground shadow of product shots (three.js's ContactShadows example: a depth render from below, blurred, on a
-plane) is `@margoengine/staging`. It needs no light and works with or without `Shadows`:
+plane) is `@margoengine/studio`. It needs no light and works with or without `Shadows`:
 
 ```ts
-import {ContactShadows} from '@margoengine/staging';
+import {ContactShadows} from '@margoengine/studio';
 
 const contact = ContactShadows.attach(engine, {opacity: 0.6, blur: 0.08});
 contact.fit(model.bounds); // under the model: ground at its lowest point, plane twice its footprint
-contact.add(model);        // gltf-pro models, materials meshes and core meshes
+contact.add(model);        // gltf/pbr models, materials meshes and core meshes
 ```
 
 ## Environment, background and fog
@@ -523,7 +523,7 @@ const image = await loadEnvironmentImage('/studio.hdr'); // .hdr, .exr or UltraH
 const environment = await Environment.attach(engine, image, {rotation: 0.5});
 EnvironmentBackground.attach(engine, environment, {blur: 0.2});
 const ibl = EnvironmentLighting.attach(engine, environment); // core meshes
-ibl.add(model);                                              // gltf-pro models
+ibl.add(model);                                              // gltf/pbr models
 
 // Or a plain colour and fog:
 ColorBackground.attach(engine, {color: '#bcd4e6'});
@@ -566,7 +566,7 @@ gltf.scene.position.set(0, 1, 0);
 ```
 
 ```ts
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {DracoDecoder, KTX2Decoder, MeshoptDecoder} from '@margoengine/decoders';
 import {engineRuntime} from '@margoengine/core/extension';
 
@@ -585,7 +585,7 @@ the JSON is parsed, with one box per part, then streams the real geometry (what 
 textures, without frame hitches; `complete` is the same model `loadGLTF` would have built.
 
 ```ts
-import {loadGLTFProgressive} from '@margoengine/gltf-pro/progressive';
+import {loadGLTFProgressive} from '@margoengine/gltf/progressive';
 
 const load = loadGLTFProgressive(engine, '/factory.glb', {onProgress: p => console.log(p.stage, p.primitivesLoaded, p.primitives)});
 const model = await load.ready; // boxes with the real bounds: fit and orbit right away
@@ -615,7 +615,7 @@ import {loadFBX} from '@margoengine/fbx';
 import {loadUSDZ} from '@margoengine/usdz';
 import {parsePLY, parseSTL, createMeshes} from '@margoengine/loaders';
 
-const character = await loadFBX(engine, '/character.fbx');  // skins, morphs and clips; a gltf-pro model
+const character = await loadFBX(engine, '/character.fbx');  // skins, morphs and clips; a gltf/pbr model
 const chair = await loadUSDZ(engine, '/chair.usdz');        // static USDA/USDC/USDZ
 const raw = parseSTL(await (await fetch('/part.stl')).arrayBuffer()); // STL as plain typed arrays, like STLLoader
 const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arrayBuffer()));
@@ -632,14 +632,14 @@ THREE.Cache.enabled = true; // in-memory, this page only
 
 ```ts
 import {AssetCache} from '@margoengine/cache';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 // IndexedDB: survives reloads, works offline, revalidates with ETag/Last-Modified, LRU within maxBytes.
 const cache = new AssetCache({name: 'plant-viewer', version: '2026.10', maxBytes: 2 ** 30});
 const line = await loadGLTF(engine, '/line-4.glb', {fetch: cache.fetch});
 ```
 
-Every loader (gltf-pro, fbx, usdz, `@margoengine/loaders`) takes the same `fetch` option.
+Every loader (gltf/pbr, fbx, usdz, `@margoengine/loaders`) takes the same `fetch` option.
 
 ## Animation
 
@@ -705,9 +705,9 @@ const glb = await exportModel(model, {binary: true, animations: [clips], maxText
 const {text, bin} = await exportModel([model], {embed: false, binUri: 'scene.bin'});          // .gltf + .bin
 ```
 
-`exportModel` writes gltf-pro models and `@margoengine/materials` meshes with their current pose, visibility and
+`exportModel` writes gltf/pbr models and `@margoengine/materials` meshes with their current pose, visibility and
 material values: skins, morph targets, clips, `EXT_mesh_gpu_instancing`, PBR textures and the KHR material extensions
-gltf-pro draws. Core meshes and plain data go through `exportGLB(engine)` / `exportGLTF(engine)` (static). Cameras and
+gltf/pbr draws. Core meshes and plain data go through `exportGLB(engine)` / `exportGLTF(engine)` (static). Cameras and
 lights are not written.
 
 ## Controls
@@ -844,13 +844,13 @@ crates.instances.count = 600; // draw the first 600
 
 Shadows, clustered lights, IBL, fog and SSAO take `crates` like any materials mesh; `Raycaster` and `Picking` hits
 carry `instanceId`. A loaded model instances the same way (`new PBRInstances(n)` on `primitive.instances`, matrices in
-the primitive's node space). Instancing lives in its own entry, `@margoengine/gltf-pro/instancing`, so apps that never
+the primitive's node space). Instancing lives in its own entry, `@margoengine/gltf/pbr-instancing`, so apps that never
 instance do not load it; `EXT_mesh_gpu_instancing` files load instanced when its reader is passed like a decoder (a
 file that requires the extension is rejected without it):
 
 ```ts
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {PBRInstances, instancing} from '@margoengine/gltf-pro/instancing';
+import {loadGLTF} from '@margoengine/gltf/pbr';
+import {PBRInstances, instancing} from '@margoengine/gltf/pbr-instancing';
 
 const city = await loadGLTF(engine, '/instanced-city.glb', {decoders: {instancing}});
 const tree = await loadGLTF(engine, '/tree.glb'), forest = new PBRInstances(500);
@@ -922,8 +922,13 @@ const stack = PostStack.attach(engine, [
   new Tonemap({curve: 'agx'}),      // one display effect (OutputPass)
   new FXAA(),                       // LDR effects last
 ]);
-ssao.add(model);                    // gltf-pro models join SSAO's normals; core meshes are automatic
+ssao.add(model);                    // gltf/pbr models join SSAO's normals; core meshes are automatic
 ```
+
+Changing the chain later: `composer.addPass(pass)` is `stack.addEffect(effect)` (placed after the last effect of its
+kind), `insertPass(pass, index)` is `stack.addEffect(effect, index)`, `removePass(pass)` is `stack.removeEffect(effect)`
+(it also disposes the effect), and `composer.passes` is `stack.effects`. `stack.moveEffect(effect, index)` reorders
+without disposing. Nothing else recompiles: only the added effect builds its pipelines.
 
 Temporal anti-aliasing instead of FXAA: leave `FXAA` out of the stack and wrap the stack with TAA.
 
@@ -951,12 +956,12 @@ import {Bloom} from '@margoengine/post/bloom';
 
 const ssr = new SSR({maxRoughness: 0.6});   // rougher surfaces keep the environment reflection only
 PostStack.attach(engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
-const stop = ssr.add(model);                // a glTF-pro model (or materials mesh) reflects too; stop() undoes it
+const stop = ssr.add(model);                // a glTF PBR model (or materials mesh) reflects too; stop() undoes it
 ssr.enabled = false;                        // toggles without recompiling; SSR.attach(engine) runs it alone
 ```
 
 - Glossy core meshes (`PbrMaterial` roughness below `maxRoughness`) reflect what is on screen; with `EnvironmentLighting`
-  SSR replaces the IBL specular where a ray hits and keeps it where it misses (off-screen, behind objects). glTF-pro
+  SSR replaces the IBL specular where a ray hits and keeps it where it misses (off-screen, behind objects). glTF PBR
   models and `@margoengine/materials` meshes reflect once added with `ssr.add(model)` (with their own maps); water and
   terrain are reflected but do not reflect. No `groundReflector`/`selects`: every glossy core mesh and added model reflects.
 - The stack captures the scene once in linear HDR and runs the effects in array order. The engine renders it; there is
@@ -1201,7 +1206,7 @@ does not reopen the core freeze or the closed v1 limits listed there.
 Materials already support one class per shading model (unlit, Lambert, Phong, PBR, normal, matcap, depth, distance),
 physical factors and maps, iridescence, anisotropy, dispersion, wireframe, front/back/double sides, live swaps and
 live render state. Blend/depth controls, polygon offset, color-write suppression and stencil are available
-through `Material` and gltf-pro render state, with optional `StencilBuffer` for a scene stencil attachment. These
+through `Material` and gltf/pbr render state, with optional `StencilBuffer` for a scene stencil attachment. These
 features add no core or stage functionality.
 
 | three.js | Status in Margo |

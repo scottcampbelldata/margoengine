@@ -11,7 +11,7 @@ export async function gltfRoute(target: URL, signal: AbortSignal) {
   if (!['http:', 'https:'].includes(target.protocol)) throw typeError('glTF URL must use HTTP(S)', 'arguments');
   const get = globalThis.fetch,
     response = await get(target, { signal }),
-    // gltf-pro's default download budget: a file the advanced loader takes is not refused here first.
+    // gltf/pbr's default download budget: a file the advanced loader takes is not refused here first.
     bytes = await readResponse(response, { maxBytes: 512 * 1024 * 1024, signal, label: 'glTF download' });
   // A pointer from a clone without Git LFS would otherwise fail below as invalid JSON.
   rejectLFSPointer(bytes, target.href);

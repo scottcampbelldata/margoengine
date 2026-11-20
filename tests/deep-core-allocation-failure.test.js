@@ -471,7 +471,8 @@ test('a restore that ends after dispose leaves the canvas to whoever holds it no
     gpu.context.device = owner; // the page made another engine on this canvas
     return create();
   };
-  await withDevice(next.device, () => engine.rebootDevice());
+  // Disposed during the restore: it rejects with the disposed error (KB-STRESS-1), as rebootDevice() after dispose does.
+  await withDevice(next.device, () => assert.rejects(engine.rebootDevice(), { code: 'disposed' }));
   assert.equal(next.device.destroyed, true);
   assert.equal(gpu.context.device, owner);
 });

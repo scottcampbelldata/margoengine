@@ -203,6 +203,27 @@ test('every chart exports vector marks, axes and escaped labels, including gaps 
   const gap = stats.stepChart([0, 1, 2], [1, NaN, 3]).toSVG();
   assert.match(gap, /d="M[^\"]+M/);
 });
+
+test('SVG axis labels tell neighbouring ticks apart at any offset', () => {
+  // Four significant digits printed 1000.1 to 1000.5 as 1000 and 5000.01 to 5000.05 as 5000.
+  const svg = new stats.StatisticalChart([
+    {
+      kind: 'line',
+      points: [
+        [1000.1, 5000.01],
+        [1000.5, 5000.05],
+      ],
+      color: '#000',
+    },
+  ]).toSVG();
+  const labels = (anchor) => [...svg.matchAll(new RegExp(`text-anchor="${anchor}">([^<]+)<`, 'g'))].map((m) => m[1]);
+  for (const side of [labels('middle'), labels('end')]) {
+    assert.ok(side.length >= 3, side.join(' '));
+    assert.equal(new Set(side).size, side.length, side.join(' '));
+  }
+  assert.ok(labels('middle').includes('1000.2'), labels('middle').join(' '));
+  assert.ok(labels('end').includes('5000.02'), labels('end').join(' '));
+});
 test('invalid inputs fail with coded errors and oversized density/loess work rejects before loops', () => {
   for (const f of [
     () => stats.boxSummary([]),
@@ -228,4 +249,39 @@ test('frozen GHCN and NASA inputs retain hashes and yield real chart output', ()
     const values = rows.map((r) => (s.file === 'ghcn.json' ? r.tmax : r.pl_rade));
     assert.match(stats.cdfChart(values).toSVG(), /<path/);
   }
+});
+
+test('a polygon split by a NaN point closes every part', () => {
+  // Only the last part was closed: the first triangle was left open and its fill and outline disagreed.
+  const svg = new stats.StatisticalChart([
+    {
+      kind: 'polygon',
+      points: [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [NaN, NaN],
+        [2, 2],
+        [3, 2],
+        [2, 3],
+      ],
+      color: '#123',
+    },
+  ]).toSVG();
+  const d = svg.match(/<path d="(M[^"]*)" fill="#123"/)[1];
+  assert.deepEqual(d.match(/[MLZ]/g).join(''), 'MLLZMLLZ');
+  const line = new stats.StatisticalChart([
+    {
+      kind: 'line',
+      points: [
+        [0, 0],
+        [1, 1],
+        [NaN, 0],
+        [2, 2],
+        [3, 3],
+      ],
+      color: '#456',
+    },
+  ]).toSVG();
+  assert.ok(!line.match(/<path d="(M[^"]*)" fill="none" stroke="#456"/)[1].includes('Z'));
 });

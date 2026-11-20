@@ -10,6 +10,11 @@ export type GroundBounds = readonly [minX: number, minZ: number, maxX: number, m
 
 export type GroundCircle = readonly [x: number, z: number, radius: number];
 
+export interface GroundPath {
+    readonly points: readonly (readonly [x: number, z: number])[];
+    readonly width: number;
+}
+
 export type GroundPlacement = readonly [x: number, z: number, scale: number, yaw: number];
 
 export type Placement = readonly [x: number, y: number, z: number, scale: number, yaw: number];
@@ -29,16 +34,40 @@ export class Scatter implements EnginePlugin {
     protected fallback?: GPUTexture;
     protected compute?: GPUComputePipeline;
     protected readonly values: Float32Array;
+    protected reach: number;
     protected readonly meta: Uint32Array;
     protected readonly geometries: readonly Geometry[];
     get disposed(): boolean;
     readonly count: number;
     protected terrain?: GPUTexture;
     protected computeGroup?: GPUBindGroup;
-    protected readonly options: ScatterOptions;
+    readonly options: ScatterOptions;
     constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input?: ScatterOptions);
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
+    protected applyReach(): void;
+    protected reachChanged(): void;
+    get density(): number;
+    set density(value: number);
+    get color(): readonly [number, number, number];
+    set color(value: readonly [number, number, number]);
+    get wind(): ScatterWind | undefined;
+    set wind(value: ScatterWind | undefined);
+    get rootShade(): number;
+    set rootShade(value: number);
+    get widen(): number;
+    set widen(value: number);
+    get translucencyAmount(): number;
+    set translucencyAmount(value: number);
+    get variationHue(): number;
+    set variationHue(value: number);
+    get variationValue(): number;
+    set variationValue(value: number);
+    get clusters(): number;
+    set clusters(value: number);
+    get time(): number;
+    advanceTime(delta: number): void;
+    get windTime(): number;
     onPreUpdate(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     protected cull(c: ScatterPassContext, terrain: GPUTexture): void;
@@ -55,6 +84,7 @@ export class Scatter implements EnginePlugin {
         buffer: GPUBuffer;
     }[];
     protected beforeDistribute(_c: ScatterPassContext, _terrain: GPUTexture): void;
+    protected coverRing(_ring: number): 'opaque' | 'cover' | 'split';
     protected colourInstances(): GPUBuffer[];
     protected colourCommands(): GPUBuffer;
     protected drawsRing(_ring: number): boolean;
@@ -92,7 +122,14 @@ export interface ScatterBatch {
 export interface ScatterBlades {
     rootShade?: number;
     widen?: number;
+    translucency?: number;
 }
+
+export type ScatterImage = {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array | Uint8ClampedArray;
+} | ImageBitmap | OffscreenCanvas | HTMLCanvasElement | HTMLImageElement;
 
 export class ScatterInstances implements EnginePlugin {
     readonly name: string;
@@ -109,6 +146,8 @@ export class ScatterInstances implements EnginePlugin {
     static attach(engine: EngineKernel, generate: () => readonly ScatterBatch[]): ScatterInstances;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     drawShadow({ context, pass, matrix, cascade }: {
         context: ScatterPassContext;
@@ -138,7 +177,9 @@ export interface ScatterOptions {
     seed?: number;
     color?: readonly [number, number, number];
     material?: PbrMaterial;
+    textures?: ScatterTextures;
     exclusions?: readonly GroundBounds[];
+    paths?: readonly GroundPath[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;
     alignToGround?: number;
@@ -152,6 +193,26 @@ export interface ScatterOptions {
     follow?: boolean;
     variation?: ScatterVariation;
     clusters?: number;
+    states?: ScatterStateSource;
+}
+
+export interface ScatterStateSource {
+    poseCode(code: string, group: number, binding: number): string;
+    entries(device: GPUDevice): {
+        buffer: GPUBuffer;
+    }[];
+    update(context: {
+        device: GPUDevice;
+        encoder: GPUCommandEncoder;
+    }): void;
+}
+
+export interface ScatterTextures {
+    readonly uvs: ArrayLike<number> | readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>];
+    readonly baseColor?: ScatterImage;
+    readonly normal?: ScatterImage;
+    readonly occlusionRoughnessMetal?: ScatterImage;
+    readonly alphaCutoff?: number;
 }
 
 export interface ScatterVariation {
@@ -159,9 +220,15 @@ export interface ScatterVariation {
     value?: number;
 }
 
-export type ScatterWind = readonly [number, number, number];
+export type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];
 
-export function clearPlacements(candidates: readonly GroundPlacement[], radius: number, exclusions: readonly (GroundBounds | GroundCircle)[], gap?: number): GroundPlacement[];
+export const WIND_THRASH_FROM = 5.4;
+
+export function clearPlacements(candidates: readonly GroundPlacement[], radius: number, exclusions: readonly (GroundBounds | GroundCircle | GroundPath)[], gap?: number): GroundPlacement[];
+
+export function coverCode(code: string, lit: boolean, at?: number): string | undefined;
+
+export const coverDeclaration = "var<private> scatterCover:vec3f=vec3f(0.0,65536.0,0.0);\n";
 
 export function groundTransforms(placements: readonly GroundPlacement[], height: (x: number, z: number) => number, offsetY?: number): Float32Array;
 
@@ -176,6 +243,10 @@ export function randomPlacements(total: number, bounds: GroundBounds, scale: rea
 export function scatterCullShader(o: ScatterOptions): string;
 
 export function spacePlacements(candidates: readonly GroundPlacement[], radius: number, gap?: number): GroundPlacement[];
+
+export const splitDeclaration = "const scatterSplit=true;\n";
+
+export function windClockRate(speed: number): number;
 
 // Not exported from this entry, but used by the exports above:
 

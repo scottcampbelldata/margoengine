@@ -2,7 +2,7 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseGLTF as parseCoreGLTF } from '@margoengine/gltf';
-import { parsePreparedPBR } from '@margoengine/gltf-pro';
+import { parsePreparedPBR } from '@margoengine/gltf/pbr';
 import { Stage } from 'margoengine';
 import { loadedModel, worldBounds } from '../packages/stage/dist/model.js';
 import { loadedPBRFixtures, serveLoadedPBRFixtures } from './support/loaded-pbr-fixtures.js';
@@ -73,7 +73,7 @@ for (const fixture of loadedPBRFixtures) {
         ...worldPositions(control.geometry.vertices, 6, control.matrix),
       ];
       const expectedCenter = center(pointBounds(points));
-      if (fixture.producer === 'gltf-pro') assert.deepEqual(expectedCenter, [6, 0, 0]);
+      if (fixture.producer === 'gltf/pbr') assert.deepEqual(expectedCenter, [6, 0, 0]);
       else
         for (const [axis, value] of [5.304, 0, -0.361].entries())
           assert.ok(Math.abs(expectedCenter[axis] - value) < 0.001);

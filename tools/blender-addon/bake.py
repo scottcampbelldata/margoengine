@@ -1,12 +1,25 @@
 """Node graph baking: a material outside the direct Principled subset (procedural node graphs, textured metallic or
 roughness, other shaders) is baked with Cycles at export to base colour, packed metallic-roughness, normal and emission
-images on the object's active UV map, so any Blender surface material exports. No runtime code: the images are
+images on the object's render UV map, so any Blender surface material exports. No runtime code: the images are
 ordinary embedded PNG textures."""
 import bpy
 import numpy as np
 
 # Principled inputs baked from the socket itself; an input that is not linked stays a constant factor.
 CHANNELS = ("Base Color", "Alpha", "Metallic", "Roughness", "Emission Color")
+
+
+def render_uv(mesh):
+    """The UV map Blender shades and renders with: the one marked active for rendering (MeshUVLoopLayer.active_render,
+    which an unlinked Image Texture vector and Texture Coordinate's UV output read), not the one active for display and
+    editing (UVLoopLayers.active), which Cycles' bake would otherwise rasterise on. None for a mesh without UV maps."""
+    return next((layer for layer in mesh.uv_layers if layer.active_render), mesh.uv_layers.active)
+
+
+def second_uv(mesh):
+    """The first UV map other than the render map: TEXCOORD_1, which carries the lightmap."""
+    first = render_uv(mesh)
+    return next((layer for layer in mesh.uv_layers if layer.name != first.name), None) if first else None
 
 
 def principled(material):
@@ -19,12 +32,14 @@ def principled(material):
 
 
 def bake_material(context, obj, material, size):
-    """Bakes `material` on `obj` (an original object in the view layer with an active UV map) with Cycles on the CPU.
+    """Bakes `material` on `obj` (an original object in the view layer with a UV map) with Cycles on the CPU, laid out
+    on its render UV map (render_uv), the TEXCOORD_0 the exporter writes.
     Returns {"base", "metal_rough", "normal", "emission"}: linear float arrays of size x size x 4 in Blender's
     bottom-up row order, or None where a constant carries the channel, plus "factors" (the constants) and
     "coverage" (a boolean size x size mask of the texels the object's faces cover). The scene, selection, nodes and
     images are restored afterwards, also on failure."""
-    if obj.type != "MESH" or not obj.data.uv_layers.active:
+    uv = render_uv(obj.data) if obj.type == "MESH" else None
+    if uv is None:
         raise ValueError(f"Material '{material.name}' needs baking: add a UV map to object '{obj.name}'")
     if obj.name not in context.view_layer.objects:
         raise ValueError(f"Material '{material.name}' needs baking on object '{obj.name}', which is not in the view layer; make the instance real")
@@ -44,7 +59,7 @@ def bake_material(context, obj, material, size):
     surface = (link.from_node.name, link.from_socket.identifier)
     temporary_images, others = [], []
     previous_active = tree.nodes.active.name if tree.nodes.active else None
-    names = {"output": output.name, "shader": shader.name if shader else None}
+    names = {"output": output.name, "shader": shader.name if shader else None, "uv": uv.name}
     kinds = {n.type for n in tree.nodes}  # before the temporary nodes below
     target = tree.nodes.new("ShaderNodeTexImage")
     names["target"] = target.name
@@ -66,7 +81,7 @@ def bake_material(context, obj, material, size):
         made = image(kind.lower())
         node("target").image = made
         material.node_tree.nodes.active = node("target")
-        bpy.ops.object.bake(type=kind, margin=4, use_clear=True, **extra)
+        bpy.ops.object.bake(type=kind, margin=4, use_clear=True, uv_layer=names["uv"], **extra)
         values = np.empty(size * size * 4, dtype=np.float32)
         bpy.data.images[temporary_images[-1]].pixels.foreach_get(values)
         values = values.reshape(size, size, 4)

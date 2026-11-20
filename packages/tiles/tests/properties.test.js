@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
 import { readPropertyMetadata, loadPropertyMetadata } from '../dist/properties.js';
 const folder = new URL('../../../examples/assets/3d-tiles/EXT_structural_metadata/', import.meta.url);
 const json = (relative) => JSON.parse(readFileSync(new URL(relative, folder)));
@@ -317,7 +317,7 @@ test('source triangle strips, fans and indexed lists use the correct corner orde
   f.asset.accessor = (index) =>
     index === 1 ? Float32Array.from([0, 0, 1, 0, 0, 1, 1, 1]) : Float32Array.from([3, 2, 1, 0]);
   const image = { width: 2, height: 2, data: new Uint8Array([10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0]) };
-  // Corner order of glTF 2.0 section 3.7.2.1, as gltf-pro's listIndices (pack.ts, not in its dist entry points) builds
+  // Corner order of glTF 2.0 section 3.7.2.1, as gltf/pbr's listIndices (pack.ts, not in its dist entry points) builds
   // the triangles a ray hit refers to.
   // Batch 132b (lane N, 2026-11-13) changed these expectations: they were 30 (strip) and 10 (fan), the corners of an
   // order that put the weights on other vertices. The loop below checks every weight against the specification's corners.
@@ -352,8 +352,8 @@ test('source triangle strips, fans and indexed lists use the correct corner orde
   metadata = readPropertyMetadata(f.asset, { image: () => image });
   assert.equal(metadata.sample(0, 0, 0, [1, 0, 0])[0].value, 40);
 });
-test('property texture KHR_texture_transform rotation matches the gltf-pro renderer texel for texel (review 5)', async () => {
-  const { textureCoordinates } = await import('../../gltf-pro/dist/index.js');
+test('property texture KHR_texture_transform rotation matches the gltf/pbr renderer texel for texel (review 5)', async () => {
+  const { textureCoordinates } = await import('../../gltf/dist/pbr.js');
   const schema = { classes: { c: { properties: { value: { type: 'SCALAR', componentType: 'UINT8' } } } } };
   // 2x2 image, top row first: TL=10 TR=20 / BL=30 BR=40; clamp to edge.
   const image = { width: 2, height: 2, data: new Uint8Array([10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0]) };

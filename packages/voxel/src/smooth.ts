@@ -6,6 +6,9 @@ import type { Engine, Mesh, PbrMaterial } from '@margoengine/core';
 import { Geometry } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
+import type { VoxelOrigin } from './render.js';
+import { checkOrigin, originPoint } from './origin.js';
+import { G, meshClipped } from './smooth-clip.js';
 
 const N = 32,
   CELLS = N * N * N,
@@ -176,14 +179,15 @@ export class SmoothTerrain {
         }
   }
 
-  // The chunks whose mesh reads cell (x, y, z): its own, and the lower neighbours when it is on their border.
+  // The chunks whose mesh reads cell (x, y, z): its own, and the neighbours whose mesh reads it past their border.
   #touchCell(x: number, y: number, z: number): void {
     const lx = x & 31,
       ly = y & 31,
       lz = z & 31;
-    for (let dy = ly === 0 ? -1 : 0; dy <= (ly === 31 ? 1 : 0); dy++)
-      for (let dz = lz === 0 ? -1 : 0; dz <= (lz === 31 ? 1 : 0); dz++)
-        for (let dx = lx === 0 ? -1 : 0; dx <= (lx === 31 ? 1 : 0); dx++) {
+    // A skirted mesh (meshSmoothChunk with `skirt`) reads two cells past its upper faces, so cells 0 and 1 count.
+    for (let dy = ly <= 1 ? -1 : 0; dy <= (ly === 31 ? 1 : 0); dy++)
+      for (let dz = lz <= 1 ? -1 : 0; dz <= (lz === 31 ? 1 : 0); dz++)
+        for (let dx = lx <= 1 ? -1 : 0; dx <= (lx === 31 ? 1 : 0); dx++) {
           const key = keyOf((x >> 5) + dx, (y >> 5) + dy, (z >> 5) + dz);
           if (this.#chunks.has(key)) this.dirty.add(key);
         }
@@ -202,13 +206,20 @@ function checkMaterial(value: number): number {
   return value;
 }
 
+/** One material's triangles of a meshed smooth chunk, in the chunk's own blocks. */
+export interface SmoothMeshPart {
+  positions: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+}
+
 /**
  * Output of {@link meshSmoothChunk}: triangles in chunk-local blocks (the chunk's corner at the origin), grouped by
  * material. Surface points sit at the mean of their net cell's edge crossings; normals follow the density gradient.
  */
 export interface SmoothChunkMesh {
   /** Per material index present: xyz positions, xyz normals and triangle indices. */
-  parts: Map<number, { positions: Float32Array; normals: Float32Array; indices: Uint32Array }>;
+  parts: Map<number, SmoothMeshPart>;
   /** Triangles in all parts. */
   triangles: number;
 }
@@ -226,7 +237,11 @@ const SZ = 34,
  * quad takes the material of its solid sample. Undefined when the chunk is not loaded.
  * @throws RangeError when `key` is not three chunk coordinates.
  */
-export function meshSmoothChunk(terrain: SmoothTerrain, key: string): SmoothChunkMesh | undefined {
+export function meshSmoothChunk(
+  terrain: SmoothTerrain,
+  key: string,
+  options?: MeshSmoothChunkOptions,
+): SmoothChunkMesh | undefined {
   if (!(terrain instanceof SmoothTerrain))
     throw new TypeError('meshSmoothChunk expects a SmoothTerrain and a key; pass (terrain, "cx,cy,cz")');
   const c = /^(-?\d+),(-?\d+),(-?\d+)$/.exec(String(key))?.slice(1).map(Number);
@@ -234,31 +249,21 @@ export function meshSmoothChunk(terrain: SmoothTerrain, key: string): SmoothChun
     throw new RangeError(`Chunk key "${key}" is not three chunk coordinates; pass 'cx,cy,cz' as terrain.keys() gives`);
   const [cx, cy, cz] = c,
     own = terrain.getChunk(cx, cy, cz);
+  const skirt = checkSkirt(options, 'meshSmoothChunk');
   if (!own) return undefined;
+  if (skirt !== undefined) {
+    // Samples -1..33, the mesh clipped to the chunk's box; skirts on the faces with no loaded neighbour.
+    const { density, material } = gather(terrain, cx, cy, cz, own, G);
+    let skirts = 0;
+    for (let f = 0; f < 6; f++) {
+      const d = [0, 0, 0];
+      d[f >> 1] = f & 1 ? 1 : -1;
+      if (!terrain.getChunk(cx + d[0], cy + d[1], cz + d[2])) skirts |= 1 << f;
+    }
+    return meshClipped(density, material, [{ lo: [0, 0, 0], hi: [N, N, N], skirts }], skirt, 1);
+  }
   // Samples -1..32 in each axis.
-  const density = new Float32Array(SZ * SZ * SZ),
-    material = new Uint8Array(SZ * SZ * SZ);
-  for (let Y = 0; Y < SZ; Y++)
-    for (let Z = 0; Z < SZ; Z++)
-      for (let X = 0; X < SZ; X++) {
-        let x = X - 1,
-          y = Y - 1,
-          z = Z - 1,
-          chunk = own;
-        if (x < 0 || x > 31 || y < 0 || y > 31 || z < 0 || z > 31) {
-          const near = terrain.getChunk(cx + (x >> 5), cy + (y >> 5), cz + (z >> 5));
-          if (near) chunk = near;
-          else {
-            x = Math.max(0, Math.min(31, x));
-            y = Math.max(0, Math.min(31, y));
-            z = Math.max(0, Math.min(31, z));
-          }
-        }
-        const i = (x & 31) + ((z & 31) << 5) + ((y & 31) << 10),
-          p = X + Z * SZ + Y * SY;
-        density[p] = chunk.density[i] / SCALE;
-        material[p] = chunk.material[i];
-      }
+  const { density, material } = gather(terrain, cx, cy, cz, own, SZ);
   const corner = [0, 1, SY, SY + 1, SZ, SZ + 1, SZ + SY, SZ + SY + 1],
     // Net cell (i, j, k), i from -1 to 31, has samples i..i + 1: id (i + 1) + 33 (k + 1) + 1089 (j + 1).
     ids = new Int32Array(33 * 33 * 33).fill(-1),
@@ -353,14 +358,114 @@ export function meshSmoothChunk(terrain: SmoothTerrain, key: string): SmoothChun
   return { parts, triangles };
 }
 
+/** Options of {@link meshSmoothChunk}. */
+export interface MeshSmoothChunkOptions {
+  /**
+   * Cap depth in blocks, 0 to 32: when given, the mesh is clipped to the chunk's box, so it ends exactly on the faces,
+   * and every face with no loaded neighbour is closed by the solid part of its plane, up to this depth from the border.
+   * 32 closes those faces whole, so the chunk joins a coarser far level of `@margoengine/voxel/smooth-lod` with no
+   * crack; a smaller depth can leave a gap where the ground runs nearly parallel to a face. Default: no clipping and no
+   * caps.
+   */
+  skirt?: number;
+}
+
+function checkSkirt(options: { skirt?: number } | undefined, name: string): number | undefined {
+  if (options === undefined) return undefined;
+  if (!options || typeof options !== 'object')
+    throw new TypeError(`${name} options must be an object such as {skirt: 4}`);
+  const { skirt } = options;
+  if (skirt === undefined) return undefined;
+  if (typeof skirt !== 'number' || !(skirt >= 0 && skirt <= 32))
+    throw new RangeError(`${name} skirt is ${skirt}; pass a depth from 0 to 32 blocks`);
+  return skirt;
+}
+
+// Samples -1..size - 2 around chunk (cx, cy, cz): its own cells, its loaded neighbours' and past an unloaded neighbour
+// its own border cells again.
+function gather(
+  terrain: SmoothTerrain,
+  cx: number,
+  cy: number,
+  cz: number,
+  own: SmoothChunk,
+  size: number,
+): { density: Float32Array; material: Uint8Array } {
+  const SZ = size,
+    SY = size * size,
+    density = new Float32Array(SZ * SZ * SZ),
+    material = new Uint8Array(SZ * SZ * SZ);
+  for (let Y = 0; Y < SZ; Y++)
+    for (let Z = 0; Z < SZ; Z++)
+      for (let X = 0; X < SZ; X++) {
+        let x = X - 1,
+          y = Y - 1,
+          z = Z - 1,
+          chunk = own;
+        if (x < 0 || x > 31 || y < 0 || y > 31 || z < 0 || z > 31) {
+          let ox = x >> 5,
+            oy = y >> 5,
+            oz = z >> 5;
+          const near = terrain.getChunk(cx + ox, cy + oy, cz + oz);
+          if (near) chunk = near;
+          else {
+            // Past a face with no neighbour the border repeats along that axis only, so two loaded neighbours read the
+            // same value for a sample in the chunk missing beside both.
+            if (ox && !terrain.getChunk(cx + ox, cy, cz)) (ox = 0), (x = Math.max(0, Math.min(31, x)));
+            if (oy && !terrain.getChunk(cx, cy + oy, cz)) (oy = 0), (y = Math.max(0, Math.min(31, y)));
+            if (oz && !terrain.getChunk(cx, cy, cz + oz)) (oz = 0), (z = Math.max(0, Math.min(31, z)));
+            const side = terrain.getChunk(cx + ox, cy + oy, cz + oz);
+            if (side) chunk = side;
+            else {
+              x = Math.max(0, Math.min(31, x));
+              y = Math.max(0, Math.min(31, y));
+              z = Math.max(0, Math.min(31, z));
+            }
+          }
+        }
+        const i = (x & 31) + ((z & 31) << 5) + ((y & 31) << 10),
+          p = X + Z * SZ + Y * SY;
+        density[p] = chunk.density[i] / SCALE;
+        material[p] = chunk.material[i];
+      }
+  return { density, material };
+}
+
 /** Options of {@link SmoothTerrainView.attach}. */
 export interface SmoothTerrainViewOptions {
   /** The terrain to draw. The view meshes the chunks in `terrain.dirty` and removes their keys. */
   terrain: SmoothTerrain;
-  /** Core material per material index; an index without one draws with `materials[0]`. */
-  materials: readonly PbrMaterial[];
+  /**
+   * Core material per material index; an index without one draws with `materials[0]`. Needed unless `createMesh`
+   * is given.
+   */
+  materials?: readonly PbrMaterial[];
+  /**
+   * Makes the mesh of one chunk part in place of a core mesh with `materials[material]`: for textured materials, such
+   * as a triplanar `PbrMaterial` of `@margoengine/materials` (`createMesh(engine, part, rock)`), which need no UVs.
+   * `part` holds the part's positions, normals and indices in the chunk's own blocks; place the mesh at `origin`, the
+   * chunk's corner in engine space (world blocks minus the view's `origin` option). The view disposes what it returns
+   * when the chunk is meshed again, unloaded or the view is disposed. When the view's origin moves, a returned object
+   * with `position.set(x, y, z)` (a core mesh) is moved to the chunk's new corner; any other is made again. Default: a
+   * core mesh with `materials[material]` (or `materials[0]`).
+   */
+  createMesh?: (part: SmoothMeshPart, material: number, origin: Vec3) => { dispose(): void };
   /** Most chunks meshed per {@link SmoothTerrainView.update}, nearest the camera first. Default 4. */
   budget?: number;
+  /**
+   * Origin rebasing for worlds far from zero, as `VoxelRendererOptions.origin` (pass the same object): an object whose
+   * `origin` is the float64 world point (blocks) drawn at engine zero, such as a `FloatingOrigin` of
+   * `@margoengine/cameras/origin`; read every update. Chunk meshes are placed at their corner minus the origin in
+   * float64, so their float32 positions stay small wherever the terrain is. Default null (world and engine space are
+   * the same).
+   */
+  origin?: VoxelOrigin | null;
+  /**
+   * Cap depth in blocks (0 to 32) for terrain drawn beside `SmoothLod` far levels: each chunk mesh is clipped to its
+   * box and its faces with no loaded neighbour are closed (see {@link MeshSmoothChunkOptions.skirt}); pass 32 for
+   * closed seams. Default undefined: unclipped meshes, the surface open past an unloaded neighbour.
+   */
+  skirt?: number;
 }
 
 /**
@@ -372,27 +477,38 @@ export class SmoothTerrainView {
   readonly terrain: SmoothTerrain;
   #engine: Engine;
   #materials: readonly PbrMaterial[];
+  #create: ((part: SmoothMeshPart, material: number, origin: Vec3) => { dispose(): void }) | undefined;
   #budget: number;
-  #meshes = new Map<string, Mesh[]>();
+  #skirt: number | undefined;
+  #meshes = new Map<string, { dispose(): void }[]>();
+  #placed: [number, number, number] = [0, 0, 0]; // the origin the meshes are placed for
   #disposed = false;
+  /** Live {@link SmoothTerrainViewOptions.origin}; null for none. */
+  origin: VoxelOrigin | null;
 
   private constructor(engine: Engine, options: SmoothTerrainViewOptions) {
     this.#engine = engine;
     this.terrain = options.terrain;
-    this.#materials = options.materials;
+    this.origin = checkOrigin(options.origin, 'SmoothTerrainView');
+    this.#materials = options.materials ?? [];
+    this.#create = options.createMesh;
     this.#budget = options.budget ?? 4;
+    this.#skirt = checkSkirt(options, 'SmoothTerrainView');
   }
 
   /**
-   * @throws TypeError when `engine` is not an Engine, `terrain` is not a SmoothTerrain or `materials` is empty.
-   * @throws RangeError when `budget` is not a whole number of 1 or more.
+   * @throws TypeError when `engine` is not an Engine, `terrain` is not a SmoothTerrain, `materials` is empty or
+   *   `origin` is not null or an object with `origin`.
+   * @throws RangeError when `budget` is not a whole number of 1 or more or `skirt` is outside 0 to 32.
    */
   static attach(engine: Engine, options: SmoothTerrainViewOptions): SmoothTerrainView {
     if (typeof engine?.createMesh !== 'function') throw new TypeError('SmoothTerrainView.attach expects an Engine');
     if (!(options?.terrain instanceof SmoothTerrain))
       throw new TypeError('SmoothTerrainView terrain must be a SmoothTerrain');
-    if (!Array.isArray(options.materials) || !options.materials.length)
-      throw new TypeError('SmoothTerrainView materials must be a non-empty array of PbrMaterial');
+    if (options.createMesh !== undefined && typeof options.createMesh !== 'function')
+      throw new TypeError('SmoothTerrainView createMesh must be a function (part, material, origin) => mesh');
+    if (!options.createMesh && (!Array.isArray(options.materials) || !options.materials.length))
+      throw new TypeError('SmoothTerrainView materials must be a non-empty array of PbrMaterial, or pass createMesh');
     const { budget = 4 } = options;
     if (!Number.isInteger(budget) || budget < 1)
       throw new RangeError(`SmoothTerrainView budget is ${budget}; pass a whole number of 1 or more`);
@@ -407,38 +523,76 @@ export class SmoothTerrainView {
   }
 
   /**
-   * Meshes up to `budget` dirty chunks, nearest the camera first, and swaps their core meshes. Returns the chunks done.
+   * Moves the chunk meshes when the origin moved, then meshes up to `budget` dirty chunks, nearest the camera first,
+   * and swaps their core meshes. Returns the chunks done. When meshing or `createMesh` throws, the error goes on, the
+   * chunk stays pending with its previous meshes drawn, and the new meshes made before the throw are disposed.
    * @throws MargoError `disposed` after dispose().
+   * @throws RangeError when the origin holds a value that is not a finite number.
    */
   update(): number {
     if (this.#disposed) throw new MargoError('disposed', 'SmoothTerrainView is disposed; attach a new one');
-    const { dirty } = this.terrain;
+    const shift = originPoint(this.origin, 'SmoothTerrainView'),
+      { dirty } = this.terrain;
+    if (shift.some((v, a) => v !== this.#placed[a])) {
+      this.#placed = shift;
+      for (const [key, list] of this.#meshes) {
+        const [cx, cy, cz] = key.split(',').map(Number);
+        for (const mesh of list) {
+          const position = (mesh as { position?: { set?(x: number, y: number, z: number): unknown } }).position;
+          if (typeof position?.set === 'function')
+            position.set(cx * N - shift[0], cy * N - shift[1], cz * N - shift[2]);
+          else dirty.add(key);
+        }
+      }
+    }
     if (!dirty.size) return 0;
-    const eye = this.#engine.camera.position,
+    const camera = this.#engine.camera.position,
+      eye = [camera[0] + shift[0], camera[1] + shift[1], camera[2] + shift[2]],
       distance = (key: string) => {
         const [x, y, z] = key.split(',').map(Number);
         return Math.hypot(x * N + 16 - eye[0], y * N + 16 - eye[1], z * N + 16 - eye[2]);
       },
       keys = [...dirty].sort((a, b) => distance(a) - distance(b)).slice(0, this.#budget);
     for (const key of keys) {
-      dirty.delete(key);
+      // Built first and swapped in after, so a failing mesher or createMesh leaves the chunk pending with its old
+      // meshes drawn (and frees the new ones made before the failure) instead of dropping it half drawn.
+      const fresh = this.#build(key, shift);
       this.#drop(key);
-      const mesh = meshSmoothChunk(this.terrain, key);
-      if (!mesh) continue;
-      const [cx, cy, cz] = key.split(',').map(Number),
-        list: Mesh[] = [];
-      for (const [m, part] of mesh.parts) {
-        if (part.positions.length < 9) continue;
-        const core = this.#engine
-          .createMesh()
-          .setGeometry(new Geometry(part.positions, part.normals, part.indices))
-          .setMaterial(this.#materials[m] ?? this.#materials[0]);
-        core.position.set(cx * N, cy * N, cz * N);
-        list.push(core);
-      }
-      if (list.length) this.#meshes.set(key, list);
+      if (fresh.length) this.#meshes.set(key, fresh);
+      dirty.delete(key);
     }
     return keys.length;
+  }
+
+  // The meshes of chunk `key`; on a throw, the ones already made are disposed and the error goes on.
+  #build(key: string, shift: readonly number[]): { dispose(): void }[] {
+    const list: { dispose(): void }[] = [];
+    try {
+      const mesh = meshSmoothChunk(this.terrain, key, this.#skirt === undefined ? undefined : { skirt: this.#skirt });
+      if (!mesh) return list;
+      const [cx, cy, cz] = key.split(',').map(Number),
+        origin: Vec3 = [cx * N - shift[0], cy * N - shift[1], cz * N - shift[2]];
+      for (const [m, part] of mesh.parts) {
+        if (part.positions.length < 9) continue;
+        if (this.#create) {
+          const made = this.#create(part, m, origin);
+          if (typeof made?.dispose !== 'function')
+            throw new TypeError('SmoothTerrainView createMesh must return an object with dispose()');
+          list.push(made);
+          continue;
+        }
+        const core: Mesh = this.#engine.createMesh();
+        list.push(core);
+        core
+          .setGeometry(new Geometry(part.positions, part.normals, part.indices))
+          .setMaterial(this.#materials[m] ?? this.#materials[0]);
+        core.position.set(origin[0], origin[1], origin[2]);
+      }
+      return list;
+    } catch (error) {
+      for (const made of list) made.dispose();
+      throw error;
+    }
   }
 
   #drop(key: string): void {

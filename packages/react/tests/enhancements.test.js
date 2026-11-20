@@ -190,7 +190,7 @@ function makeModel(engine, asset = { doc: { images: [] } }, images = []) {
   models.push(model);
   return model;
 }
-mock.module('@margoengine/gltf-pro', {
+mock.module('@margoengine/gltf/pbr', {
   namedExports: {
     PBRModel: class {
       constructor(engine, asset, images) {

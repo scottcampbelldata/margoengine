@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
+import { deflateSync, gzipSync } from 'node:zlib';
 import {
   cloudStore,
   openCloudZarr,
@@ -196,6 +197,29 @@ test('N5 big-endian sparse and partial edge blocks adapt to existing ROI reader'
   assert.deepEqual([...(await volume.source.read(req([3, 2, 2])))], [0, 0, 1234, 0, 0, 5678, 0, 0, 0, 0, 0, 0]);
 });
 
+test('N5 gzip blocks written with useZlib are zlib streams, not gzip members', { timeout: 15000 }, async () => {
+  const values = Uint8Array.from({ length: 24 }, (_, i) => i * 7);
+  const pack = (payload) => {
+    const block = new Uint8Array(12 + payload.length),
+      v = new DataView(block.buffer);
+    v.setUint16(2, 2);
+    v.setUint32(4, 6);
+    v.setUint32(8, 4);
+    block.set(payload, 12);
+    return block;
+  };
+  const open = (compression, payload) =>
+    openN5({
+      'attributes.json': JSON.stringify({ dimensions: [6, 4], blockSize: [6, 4], dataType: 'uint8', compression }),
+      '0/0': pack(payload),
+    });
+  const zlib = await open({ type: 'gzip', level: -1, useZlib: true }, deflateSync(values));
+  assert.deepEqual([...(await zlib.source.read(req([6, 4, 1])))], [...values]);
+  const gzip = await open({ type: 'gzip', level: -1, useZlib: false }, gzipSync(values));
+  assert.deepEqual([...(await gzip.source.read(req([6, 4, 1])))], [...values]);
+  await assert.rejects(open({ type: 'gzip', useZlib: 'yes' }, gzipSync(values)), /useZlib/);
+});
+
 test('precomputed raw chunks honour offset, channel planes and partial edges', { timeout: 15000 }, async () => {
   const volume = await openPrecomputed(
     {
@@ -265,6 +289,10 @@ test('cloud HTTP ranges validate, retain auth headers and respect lifetime abort
   assert.equal(await store.get('missing'), undefined);
   await assert.rejects(store.get('forbidden'), /403/);
   assert.equal(calls[0][2], 'test');
+  // A signed or SAS-token base URL keeps its query on every object request.
+  const signed = cloudStore(`http://127.0.0.1:${server.address().port}/root?sig=a%2Fb&sv=1`, { maxBytes: 64 });
+  assert.deepEqual([...(await signed.get('c/0', undefined, { offset: 1, length: 2 }))], [1, 2]);
+  assert.equal(calls.at(-1)[0], '/root/c/0?sig=a%2Fb&sv=1');
   controller.abort('lifetime');
   await assert.rejects(store.get('object', new AbortController().signal), (e) => e === 'lifetime');
 });

@@ -2,7 +2,8 @@
 import { MargoError } from '@margoengine/math/errors';
 import { rangeError } from '../../shared/errors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
-import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine/gltf-pro';
+import { vertexValues } from '../../shared/vertex-map.js';
+import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine/gltf/pbr';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { ordinaryWeightBuffer } from './weight-buffer.js';
@@ -190,7 +191,10 @@ function multiplyAt(a: ArrayLike<number>, b: Float32Array, at: number, out: Floa
   for (let c = 0; c < 4; c++)
     for (let r = 0; r < 4; r++)
       out[c * 4 + r] =
-        a[r] * b[at + c * 4] + a[4 + r] * b[at + c * 4 + 1] + a[8 + r] * b[at + c * 4 + 2] + a[12 + r] * b[at + c * 4 + 3];
+        a[r] * b[at + c * 4] +
+        a[4 + r] * b[at + c * 4 + 1] +
+        a[8 + r] * b[at + c * 4 + 2] +
+        a[12 + r] * b[at + c * 4 + 3];
 }
 // Only the ordinary same-realm native method has synchronous copy semantics
 // known here. Custom writers may change inputs during the copy and restore
@@ -272,12 +276,13 @@ function morphDeltas(
   asset: PBRModel['asset'],
   targets: ReturnType<typeof morphDefinition>['targets'],
   count: number,
+  vertexMap?: Uint32Array,
 ): Float32Array {
   const deltas = new Float32Array(count * targets.length * 12);
   targets.forEach((target, t) =>
     morphAttributes.forEach((name, k) => {
       if (target[name] === undefined) return;
-      const data = asset.accessor(target[name], 'VEC3');
+      const data = vertexValues(asset.accessor(target[name], 'VEC3'), 3, vertexMap);
       for (let i = 0; i < count; i++) deltas.set(data.subarray(i * 3, i * 3 + 3), (t * count + i) * 12 + k * 4);
     }),
   );
@@ -343,6 +348,8 @@ export class Animation implements EnginePlugin {
   /** Seconds into the current clip. Wraps at the clip's end while `loop` is on; jump with `seek`. */
   time = 0;
   clip = 0;
+  /** `time` moved since the pose was last applied (a replayed `advanceTime` step poses on the next frame). */
+  private due = false;
   private device?: GPUDevice;
   private arena?: DeformArena;
   private resources: Deformation[] = [];
@@ -433,7 +440,8 @@ export class Animation implements EnginePlugin {
           times = model.asset.accessor(sampler.input, 'SCALAR'),
           interpolation = animationInterpolation(sampler.interpolation);
         let ordered = true;
-        for (let i = 0; i < times.length && ordered; i++) ordered = !(times[i] < 0 || (i > 0 && times[i] <= times[i - 1]));
+        for (let i = 0; i < times.length && ordered; i++)
+          ordered = !(times[i] < 0 || (i > 0 && times[i] <= times[i - 1]));
         if (!ordered)
           throw new RangeError(
             'Invalid animation time/interpolation; keyframe times must be >= 0 and strictly increasing',
@@ -658,6 +666,7 @@ export class Animation implements EnginePlugin {
     );
   }
   private apply(time: number): void {
+    this.due = false;
     const clip = this.clips[this.clip];
     if (!clip) return;
     const t = (this.options.loop ?? true) && clip.duration > 0 ? time % clip.duration : Math.min(time, clip.duration);
@@ -670,12 +679,9 @@ export class Animation implements EnginePlugin {
       // The transform refs check the node and the values (the sampler leaves only finite Float32 values); their
       // setters write the same lanes as setPosition and setScale without those methods' per-call array scan.
       if (track.path === 'translation') node.position.set(value[0], value[1], value[2]);
-      else if (track.path === 'scale') {
-        // A zero scale gets core's own error from setScale.
-        if (Math.fround(value[0]) === 0 || Math.fround(value[1]) === 0 || Math.fround(value[2]) === 0)
-          node.setScale(value as unknown as [number, number, number]);
-        else node.scale.set(value[0], value[1], value[2]);
-      } else if (track.path === 'rotation') {
+      // A zero scale key is valid (glTF 2.0 section 3.5.3): pop-in animations start from it.
+      else if (track.path === 'scale') node.scale.set(value[0], value[1], value[2]);
+      else if (track.path === 'rotation') {
         if (value.length !== 4) node.setQuaternion(Array.from(value));
         else {
           for (let c = 0; c < 4; c++) this.quaternion[c] = value[c];
@@ -719,15 +725,19 @@ export class Animation implements EnginePlugin {
           'Missing glTF skin; the node must reference a skin index that exists in the glTF skins array',
         );
       if (!targets.length && skinId === undefined) continue;
+      // A part of a split primitive reads the definition's per-vertex accessors through its vertexMap.
       const count = p.vertices.length / 20,
         record = deformationRecord(p),
-        asset = this.model.asset;
+        asset = this.model.asset,
+        vertexMap = p.part?.vertexMap,
+        // Vertices of the file's primitive, which every per-vertex accessor of the definition has one element for.
+        sourceCount = vertexMap ? asset.accessor(definition.attributes.POSITION, 'VEC3').length / 3 : count;
       if (count * targets.length * 48 > this.device.limits.maxStorageBufferBindingSize)
         throw new RangeError('Morph deltas exceed device limit; reduce the vertex or morph target count');
       // Checked now; packed only for the first copy of the primitive placed on the device (the others share it).
       for (const target of targets)
         for (const name of morphAttributes)
-          if (target[name] !== undefined && asset.accessor(target[name], 'VEC3').length !== count * 3)
+          if (target[name] !== undefined && asset.accessor(target[name], 'VEC3').length !== sourceCount * 3)
             throw new RangeError('Morph target count mismatch; every morph attribute needs one VEC3 per vertex');
       let inverseBind: Float32Array = noBinds,
         joints: number[] = [];
@@ -762,12 +772,12 @@ export class Animation implements EnginePlugin {
             weightIndex = attributes['WEIGHTS_' + set];
           if (jointIndex === undefined || weightIndex === undefined)
             throw new TypeError('Skin attributes require paired JOINTS_' + set + ' and WEIGHTS_' + set);
-          const ids = this.model.asset.accessor(jointIndex, 'VEC4'),
-            weights = this.model.asset.accessor(weightIndex, 'VEC4');
+          const allIds = this.model.asset.accessor(jointIndex, 'VEC4'),
+            allWeights = this.model.asset.accessor(weightIndex, 'VEC4');
           const jointAccessor = animationAccessor(doc, jointIndex);
           if (
-            ids.length !== count * 4 ||
-            weights.length !== count * 4 ||
+            allIds.length !== sourceCount * 4 ||
+            allWeights.length !== sourceCount * 4 ||
             (jointAccessor?.componentType !== 5121 && jointAccessor?.componentType !== 5123) ||
             jointAccessor?.normalized
           )
@@ -785,7 +795,7 @@ export class Animation implements EnginePlugin {
             throw new TypeError(
               'Invalid skin weight component type; use float, or normalized unsigned byte or short weights',
             );
-          sets.push({ ids, weights });
+          sets.push({ ids: vertexValues(allIds, 4, vertexMap), weights: vertexValues(allWeights, 4, vertexMap) });
         }
         for (let i = 0; i < count; i++) {
           const weights = sets[0].weights;
@@ -826,7 +836,7 @@ export class Animation implements EnginePlugin {
         asset: this.model.asset,
         definition: p.definition,
         skin: skinId,
-        deltas: () => morphDeltas(asset, targets, count),
+        deltas: () => morphDeltas(asset, targets, count, vertexMap),
         influences: () => jointIds.subarray(0, joints.length ? count * stride : 0),
       });
     }
@@ -878,17 +888,24 @@ export class Animation implements EnginePlugin {
       return;
     }
     this.checkFrame();
+    this.advanceTime(delta);
+    if (this.due) this.apply(this.time);
+  }
+  /**
+   * Moves the clip clock by `delta` seconds times `speed`, wrapping or stopping at the clip's end as `loop` says: the
+   * CPU part of the frame update, which a seek from `@margoengine/cutscene/seek` replays. It poses nothing; the next
+   * frame update applies the pose at the time reached.
+   */
+  advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid animation delta; pass a finite delta >= 0 seconds');
-    if (this.playing) {
-      this.time += delta * (this.options.speed ?? 1);
-      const duration = this.clips[this.clip]?.duration ?? 0;
-      // A looping clip keeps `time` inside the clip, as `loop` says, so a scrub bar or a save reads the shown frame.
-      if ((this.options.loop ?? true) && duration > 0) this.time %= duration;
-      this.apply(this.time);
-      if (this.options.loop === false && this.time >= (this.clips[this.clip]?.duration ?? Infinity))
-        this.playing = false;
-    }
+    if (!this.playing || this.disposed) return;
+    this.time += delta * (this.options.speed ?? 1);
+    const duration = this.clips[this.clip]?.duration ?? 0;
+    // A looping clip keeps `time` inside the clip, as `loop` says, so a scrub bar or a save reads the shown frame.
+    if ((this.options.loop ?? true) && duration > 0) this.time %= duration;
+    this.due = true;
+    if (this.options.loop === false && this.time >= (this.clips[this.clip]?.duration ?? Infinity)) this.playing = false;
   }
   registerPasses(graph: FrameGraph): void {
     let group = deformGroups.get(graph);

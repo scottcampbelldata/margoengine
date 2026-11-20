@@ -1,4 +1,5 @@
-// Transport-only browser proof: no rendering, GPU API or GPU lock.
+// MARGO_COMPAT not applicable: a transport-only page with no GPU calls (the browser runs with --disable-gpu).
+// Transport-only browser proof: no rendering or GPU API.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -11,7 +12,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const folder = join(root, 'test-results/batch242-webrtc-browser');
 const limit = setTimeout(() => {
   console.error('WebRTC browser proof exceeded 60 seconds');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 60000);
 let browser, web;
 try {

@@ -5,7 +5,7 @@
 // plane, with a PostStack([Tonemap]) HDR capture that readHDR() copies back (linear rgba16float as float32 values).
 // `lit` adds every lighting package to the sphere (shadows, IBL, fog, clustered lights with LocalShadows).
 import {Engine} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
+import {parseGLTF} from '/packages/gltf/dist/pbr.js';
 import {Material,Texture,createMesh} from '/packages/materials/dist/index.js';
 import {Transmission} from '/packages/materials/dist/transmission.js';
 import {planeGeometry,sphereGeometry} from '/packages/geometry/dist/index.js';

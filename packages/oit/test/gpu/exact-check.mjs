@@ -1,4 +1,4 @@
-// Real-GPU check for ExactOIT against sorted blending worked out by hand. Takes a GPU slot itself. From the repository
+// Real-GPU check for ExactOIT against sorted blending worked out by hand. From the repository
 // root, after building packages: node packages/oit/test/gpu/exact-check.mjs
 // Under MARGO_COMPAT=1 ExactOIT refuses by design (README "Exact (ExactOIT)": it needs storage buffers in fragment
 // shaders, `setup` throws 'unsupported'; use OIT). The check then asserts that coded refusal at 1x and 4x, that core's
@@ -6,12 +6,10 @@
 // fallback, weighted OIT, draws the layers; the ExactOIT picture assertions are skipped with a printed note.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const compat = compatRun(),
-  release = await acquire({ owner: 'oit-exact' });
+const compat = compatRun();
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/exact.html', port: 5285 }),
   { page } = context;
 const biggest = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
@@ -201,5 +199,4 @@ try {
   console.log('oit exact check passed');
 } finally {
   await context.close();
-  release();
 }

@@ -420,7 +420,7 @@ test('missing CPU geometry reports the actionable automatic trimesh diagnostic o
   assert.deepEqual(canvasFailures, failures);
   assert.equal(
     failures[0].message,
-    'RigidBody: automatic trimesh collider generation requires retained CPU geometry. Provide an explicit <CuboidCollider> or configure loader geometry retention.',
+    'RigidBody: automatic trimesh collider generation requires retained CPU geometry; provide an explicit <CuboidCollider> or configure loader geometry retention; see https://margoengine.com/errors#react-usage',
   );
 });
 

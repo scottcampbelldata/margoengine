@@ -91,13 +91,13 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/gltf": {
       "optional": true
     }
   },

@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>TAA seek check</title><style>body{margin:0}canvas{display:inline-block;width:192px;height:128px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas><canvas id="c"></canvas>
+<script type="module">
+// GAP-FILM-TIME bound for TAA (class C, view history). Three alike worlds with boxes moving on a closed-form path set
+// by film code from its step: A draws n + 1 live frames; B is fresh, seeks (n - P) / fps with
+// @margoengine/cutscene/seek and draws P + 1 frames (its prewarm, P = 53); C draws P + 1 frames with no seek. The jitter
+// phase is a clock, so A and B jitter alike; B's history starts empty and each frame keeps historyWeight w = 0.9 of
+// it, through a clamp and a reprojection that never widen a gap, so after P frames the resolved frames differ by at
+// most 0.9^53 of the LDR range: under 1 level of 255. Driven by seek-check.mjs.
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {TAA} from '/packages/taa/dist/index.js';
+import {seek} from '/packages/cutscene/dist/seek.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const FPS=60,P=53,errors=[];
+async function world(id){
+ const engine=await Engine.create(document.getElementById(id),{backend:'webgpu',camera:{position:[0,2,7],target:[0,0.5,0],near:0.1,far:100}}),device=engine.gpu;
+ engine.stop();
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const taa=TAA.attach(engine,{historyWeight:0.9});
+ engine.createMesh().setGeometry(box(8,0.05,8)).setMaterial(new PbrMaterial({color:'#404040',roughness:1})).setPosition([0,-0.25,0]);
+ const boxes=[0,1,2].map(i=>engine.createMesh().setGeometry(box(0.6,0.6+0.3*i,0.6)).setMaterial(new PbrMaterial({color:['#803020','#208030','#203080'][i],roughness:1})));
+ return {engine,device,taa,boxes};
+}
+// Film code: positions from the film's own step, live or replayed alike.
+const film=(w,step)=>w.boxes.forEach((m,i)=>m.setPosition([2.2*Math.sin(step/37+i*2.1),0.3*i,1.5*Math.cos(step/53+i)]));
+async function draw(w,step,delta=1/FPS){film(w,step);w.engine.render({delta});await w.device.queue.onSubmittedWorkDone();}
+const copy='@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}';
+async function read(w){
+ const {device}=w,texture=w.taa.velocity.resolved,module=device.createShaderModule({code:copy});
+ const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+// Largest gap in the colour channels, and the largest colour value (the fixture must stay LDR).
+const gap=(a,b)=>{let m=0;for(let i=0;i<a.length;i++)if(i%4!==3)m=Math.max(m,Math.abs(a[i]-b[i]));return m;};
+const peak=a=>{let m=0;for(let i=0;i<a.length;i++)if(i%4!==3)m=Math.max(m,a[i]);return m;};
+const a=await world('a'),b=await world('b'),c=await world('c');
+// Pipelines compile on warm-up frames of delta 0, which move no clock; every world gets the same number of them.
+const counts=[];
+for(const w of [a,b,c]){let n=0;await waitForPipelines(async()=>{n++;await draw(w,0,0);});counts.push(n);}
+const most=Math.max(...counts);
+for(const [i,w] of [a,b,c].entries())for(let k=counts[i];k<most;k++)await draw(w,0,0);
+window.check={async run(n=600){
+ const zero=[a,b,c].map(w=>w.taa.time);
+ for(let step=0;step<=n;step++)await draw(a,step);
+ const result=await seek(b.engine,(n-P)/FPS,{fps:FPS});
+ for(let step=n-P;step<=n;step++)await draw(b,step);
+ for(let step=n-P;step<=n;step++)await draw(c,step);
+ const [ia,ib,ic]=await Promise.all([read(a),read(b),read(c)]);
+ return {errors,zero,steps:result.steps,clocks:result.clocks,unseekable:result.unseekable,name:b.taa.name,
+  sampleA:a.taa['sample'],sampleB:b.taa['sample'],sampleC:c.taa['sample'],gap:gap(ia,ib),fresh:gap(ia,ic),peak:peak(ia)};
+}};
+window.ready=true;
+</script></body></html>

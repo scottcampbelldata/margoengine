@@ -104,8 +104,10 @@ export function buildTetMesh(
     for (let k = 0; k < 4; k++) {
       const value = geometryOnly ? 0 : values![association === 'point' ? ids[k] : cell];
       valid &&= Number.isFinite(value);
+      // Normalised but not clamped, as the regular volume stores its voxels: the field inside a cell is the linear
+      // interpolation of the given values, and a colour scale's under and over colours see values outside the range.
       cells[cell * 24 + 12 + k] = Number.isFinite(value)
-        ? Math.max(0, Math.min(1, (value - range[0]) / (range[1] - range[0])))
+        ? Math.max(-65504, Math.min(65504, (value - range[0]) / (range[1] - range[0])))
         : 0;
     }
     const scalar = Array.from(cells.subarray(cell * 24 + 12, cell * 24 + 16));

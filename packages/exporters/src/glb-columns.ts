@@ -62,6 +62,9 @@ export function compacted(columns: Map<string, Column>, indices: Uint32Array): U
     kept: number[] = [],
     out = new Uint32Array(indices.length);
   for (let i = 0; i < indices.length; i++) {
+    // glTF 2.0 3.7.2.1: every index names an existing vertex.
+    if (indices[i] >= remap.length)
+      throw new RangeError(`index ${i} is ${indices[i]}, outside the ${remap.length} vertices; fix the index data.`);
     if (remap[indices[i]] === 0xffffffff) {
       remap[indices[i]] = kept.length;
       kept.push(indices[i]);

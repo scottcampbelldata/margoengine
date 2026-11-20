@@ -49,3 +49,56 @@ test('different typed views retain their shared backing buffer and byte offsets'
   assert.equal(y.byteOffset, 4);
   assert.deepEqual(new Uint8Array(x.buffer), bytes);
 });
+
+// A drawable source is captured as decoded rows (top row first) and restored as raw rows, which a Texture keeps at
+// v = 0. The default flipY upload had put the image's top row at v = 1, so a restored bitmap came back upside down;
+// and an image element was read at its layout width and height, not its natural pixel size.
+test('a captured drawable texture restores with its flipY orientation and natural size', async () => {
+  const top = [255, 0, 0, 255],
+    bottom = [0, 0, 255, 255],
+    sizes = [];
+  globalThis.ImageBitmap = class {
+    width = 1;
+    height = 2;
+  };
+  globalThis.HTMLImageElement = class {
+    width = 1;
+    height = 1;
+    naturalWidth = 1;
+    naturalHeight = 2;
+  };
+  globalThis.OffscreenCanvas = class {
+    constructor(w, h) {
+      sizes.push([w, h]);
+    }
+    getContext() {
+      return {
+        drawImage() {},
+        getImageData: () => ({ data: new Uint8ClampedArray([...top, ...bottom]) }),
+      };
+    }
+  };
+  try {
+    const flipped = new Texture(new ImageBitmap()),
+      kept = new Texture(new ImageBitmap(), { flipY: false }),
+      element = new Texture(new HTMLImageElement());
+    const archive = await captureMaterialLibrary({
+      a: new Material({ map: flipped }),
+      b: new Material({ map: kept }),
+      c: new Material({ map: element }),
+    });
+    const restored = await restoreMaterialLibrary(JSON.parse(JSON.stringify(archive)));
+    assert.deepEqual([...restored.a.map.source.data], [...bottom, ...top]);
+    assert.deepEqual([...restored.b.map.source.data], [...top, ...bottom]);
+    assert.deepEqual([...restored.c.map.source.data], [...bottom, ...top]);
+    assert.deepEqual(sizes, [
+      [1, 2],
+      [1, 2],
+      [1, 2],
+    ]);
+  } finally {
+    delete globalThis.ImageBitmap;
+    delete globalThis.HTMLImageElement;
+    delete globalThis.OffscreenCanvas;
+  }
+});

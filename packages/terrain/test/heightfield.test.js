@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { heightfieldGeometry, TerrainHeightmap } from '../dist/index.js';
+import { heightfield, heightfieldGeometry, TerrainHeightmap } from '../dist/index.js';
 
 test('heightfield normals and world coordinates follow the supplied height sampler', () => {
   const data = heightfieldGeometry((x, z) => x + 2 * z, { size: [4, 6], origin: [10, 20], resolution: 2 });
@@ -65,4 +65,18 @@ test('height texture samples cell centers, restores and releases owned resources
   const bad = new TerrainHeightmap(() => NaN, { size: [4, 4], resolution: 2 });
   assert.throws(() => bad.setup(engine), /finite/);
   assert.equal(textures.length, 2);
+});
+
+test('heightfield gives the same grid as a core Geometry for setGeometry (GAP-FILM-LOOK)', () => {
+  const height = (x, z) => x + 2 * z,
+    options = { size: [4, 6], origin: [10, 20], resolution: 2 },
+    data = heightfieldGeometry(height, options),
+    geometry = heightfield(height, options);
+  assert.equal(geometry.vertices.length, (data.positions.length / 3) * 6);
+  for (let i = 0; i < data.positions.length / 3; i++)
+    for (let a = 0; a < 3; a++) {
+      assert.equal(geometry.vertices[i * 6 + a], Math.fround(data.positions[i * 3 + a]));
+      assert.equal(geometry.vertices[i * 6 + 3 + a], Math.fround(data.normals[i * 3 + a]));
+    }
+  assert.deepEqual(Array.from(geometry.indices), Array.from(data.indices));
 });

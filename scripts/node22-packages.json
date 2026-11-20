@@ -10,7 +10,6 @@
     "@margoengine/headless": "renders in Node through a WebGPU binding the app passes in: thumbnails and the asset pipeline",
     "@margoengine/mcp": "bin margoengine-mcp: an MCP server over stdio (node:fs, node:child_process, node:readline)",
     "@margoengine/netcode": "@margoengine/netcode/node: the WebSocket game server on node:http",
-    "@margoengine/net": "imported by the netcode and voxel-net servers",
     "@margoengine/voxel-net": "@margoengine/voxel-net/server: the voxel world server on node:http and worker_threads",
     "@margoengine/voxel": "world state, codec, query and generation run inside voxel-net's server",
     "@margoengine/voxel-edit": "reads and writes MagicaVoxel .vox files and sparse edits with no GPU, used by tools",
@@ -40,7 +39,6 @@
     },
     "@margoengine/exporters": "margo-convert's export path (glTF, USDZ, game engine formats) runs in Node",
     "@margoengine/decoders": "margo-convert decodes PNG and meshopt in Node",
-    "@margoengine/gltf-pro": "imported by exporters; its loaders parse server-side",
     "@margoengine/loaders": "format parsers documented as SSR safe (STL, OBJ, PLY, 3MF, DXF, DAE and more)",
     "@margoengine/points": "LAS, LAZ, E57 and octree parsers",
     "@margoengine/tiles": "3D Tiles tileset parsing and traversal with no GPU",
@@ -82,7 +80,7 @@
       ]
     },
     "@margoengine/gltf": {
-      "reason": "margo-convert parses glTF with it in Node; its own tests are a section of tests/modern.test.js (core, run on 24), so the margo-convert tests cover its Node path here",
+      "reason": "margo-convert parses glTF with it in Node, and exporters import its gltf/pbr loaders, which parse server-side; its own tests are a section of tests/modern.test.js (core, run on 24), so the margo-convert tests cover its Node path here",
       "tests": [
         "tests/margo-convert-pipeline.test.js"
       ]
@@ -96,6 +94,10 @@
   },
   "browserOnly": {
     "@margoengine/scene": "helpers over core meshes, used where core draws; runs in the browser",
+    "@margoengine/scenes": "renders with WebGPU (its entries attach sky, water, shadows and meshes); runs in the browser",
+    "@margoengine/humans": "dresses and animates a model with WebGPU materials, skinning and an Animator; runs in the browser",
+    "@margoengine/horses": "builds a horse glTF and poses it with WebGPU skinning and strand hair; runs in the browser",
+    "@margoengine/armies": "bakes people and draws crowds with WebGPU instanced skinning and vertex animation; runs in the browser",
     "@margoengine/worker": "moves a canvas to a Web Worker and forwards DOM input; runs in the browser",
     "@margoengine/lighting2d": "2D lights render with WebGPU (pipelines, stencil and textures); runs in the browser",
     "@margoengine/pixel": "the pixel camera and layer compositor render with WebGPU; runs in the browser",
@@ -111,9 +113,9 @@
     "@margoengine/dof": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/environment": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/game": "the game kit re-exports packages that render with WebGPU and drive the DOM and Web Audio; runs in the browser",
-    "@margoengine/react-kit": "an install profile that re-exports React and Next.js packages; on Node it is only imported (SSR), which the end-user proof covers",
-    "@margoengine/viz": "an install profile that re-exports the visualization packages; on Node it is only imported (SSR), which the end-user proof covers",
-    "@margoengine/web": "an install profile that re-exports the web viewer packages; on Node it is only imported (SSR), which the end-user proof covers",
+    "@margoengine/kit-react": "an install profile that re-exports React and Next.js packages; on Node it is only imported (SSR), which the end-user proof covers",
+    "@margoengine/kit-viz": "an install profile that re-exports the visualization packages; on Node it is only imported (SSR), which the end-user proof covers",
+    "@margoengine/kit-web": "an install profile that re-exports the web viewer packages; on Node it is only imported (SSR), which the end-user proof covers",
     "@margoengine/html": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/input": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
     "@margoengine/labels": "drives the DOM, pointer and keyboard input, Web Audio, WebXR or WebGL; runs in the browser",
@@ -125,13 +127,12 @@
     "@margoengine/post": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/quality": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/scatter": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
-    "@margoengine/scenery": "the engine facade a page imports; on Node it is only imported (SSR), which the end-user proof covers",
     "@margoengine/sciviz": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/selection": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/shadows": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/sky": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/stage": "the engine facade a page imports; on Node it is only imported (SSR), which the end-user proof covers",
-    "@margoengine/staging": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
+    "@margoengine/studio": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/stats": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/taa": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",
     "@margoengine/terrain": "renders with WebGPU (its src creates GPU pipelines, buffers or textures); runs in the browser",

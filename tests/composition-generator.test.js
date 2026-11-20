@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import {
   C2,
   coveringArray,
+  memberPackage,
   missingTuples,
   pairCoverage,
   selectCompositionRows,
@@ -41,7 +42,7 @@ test('committed pages and manifest match the generator exactly', () => {
   const matrix = JSON.parse(readFileSync(new URL('./composition/generated.json', import.meta.url)));
   for (const { id, members } of matrix.rows) {
     const source = readFileSync(new URL(`./composition/${id}.ts`, import.meta.url), 'utf8');
-    for (const member of members) assert.match(source, new RegExp(`'@margoengine/${member}(?:/[^']+)?'`));
+    for (const member of members) assert.match(source, new RegExp(`'@margoengine/${memberPackage(member)}(?:/[^']+)?'`));
   }
 });
 

@@ -78,11 +78,12 @@
     "test:browser:objects": "node tests/objects-browser.mjs",
     "test:browser:lightmap": "node tests/lightmap-browser.mjs",
     "test:browser:meshopt": "node tests/meshopt-browser.mjs",
-    "test:browser:nodes": "node tests/nodes-browser.mjs"
+    "test:browser:nodes": "node tests/nodes-browser.mjs",
+    "test:browser:lightmap-scene": "node tests/lightmap-scene.browser.mjs && node tests/lightmap-scene.browser.mjs --compat"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/lightmap": "^1.0.0"

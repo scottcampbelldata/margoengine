@@ -69,7 +69,7 @@ function BillboardBinding({
   return null;
 }
 /** A group that keeps facing the camera, whatever its parents do. Its children face it along +Z. */
-export const Billboard = forwardRef<MeshRef, BillboardProps>(function Billboard(
+export const Billboard = /* @__PURE__ */ forwardRef<MeshRef, BillboardProps>(function Billboard(
   { follow, lockX, lockY, children, ...props },
   ref,
 ) {

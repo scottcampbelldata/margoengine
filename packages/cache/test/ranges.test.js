@@ -1,5 +1,5 @@
 // @margoengine/cache/ranges: byte ranges kept as aligned blocks, so files read in pieces (progressive glTF streaming)
-// load from disk and offline. The last test runs gltf-pro's own streaming code through the cache.
+// load from disk and offline. The last test runs gltf/pbr's own streaming code through the cache.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
@@ -172,10 +172,10 @@ test('without IndexedDB every request goes to the network', async () => {
   assert.equal(network.log.length, 2);
 });
 
-// gltf-pro's progressive streaming code (GLTFStream, the half that runs in its worker) with the global fetch answered by
+// gltf/pbr's progressive streaming code (GLTFStream, the half that runs in its worker) with the global fetch answered by
 // the cache, as a service worker answers the worker's requests. Its final buffers must equal the file, cold and offline.
 test('progressive glTF streaming loads through the cache, and again offline from the stored blocks', async () => {
-  const dist = new URL('../../gltf-pro/dist/', import.meta.url),
+  const dist = new URL('../../gltf/dist/', import.meta.url),
     chunk = readdirSync(dist).find((name) => /^stream-.*\.js$/.test(name));
   const { GLTFStream } = await import(new URL(chunk, dist).href);
   const glb = bigGLB({ segments: 120, meshes: 3 }),
@@ -289,4 +289,69 @@ test('a file replaced while a revalidation is held never answers new bytes with 
     [80, bytes(80, 9)[0], '"new"', 'application/new'],
   );
   await reader.flush();
+});
+
+test('request cache modes: no-store skips the store, reload replaces the blocks, no-cache revalidates fresh blocks', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const files = { '/m.glb': { body: bytes(3000), etag: '"v1"', control: 'max-age=3600' } },
+    network = server(files),
+    cache = new RangeCache({ name: 'modes', block: B, fetch: network }),
+    at = (init, range = 'bytes=0-1023') => cache.fetch(base + 'm.glb', { ...init, headers: { range, ...init?.headers } });
+  // no-store: the range goes to the network as asked (not widened) and nothing is kept.
+  assert.deepEqual(await read(await at({ cache: 'no-store' }, 'bytes=10-19')), files['/m.glb'].body.slice(10, 20));
+  assert.deepEqual(ranges(network), ['bytes=10-19']);
+  await cache.flush();
+  assert.deepEqual(await cache.usage(), { bytes: 0, files: 0, blocks: 0 });
+  // A normal range is stored; the same range again is fresh and stays off the network.
+  await read(await at());
+  await cache.flush();
+  await read(await at());
+  assert.equal(network.log.length, 2);
+  // no-cache: the fresh blocks are revalidated with the ETag before they are served.
+  assert.deepEqual(await read(await at({ cache: 'no-cache' })), files['/m.glb'].body.slice(0, 1024));
+  assert.deepEqual([network.log.at(-1).range, network.log.at(-1).etag], ['bytes=0-0', '"v1"']);
+  await read(await at({ headers: { 'cache-control': 'no-cache' } }));
+  assert.equal(network.log.length, 4, 'a request Cache-Control: no-cache revalidates as well');
+  // reload: the stored blocks are skipped, the block is asked for whole and unconditionally, and replaces them.
+  files['/m.glb'] = { body: bytes(3000, 9), etag: '"v2"', control: 'max-age=3600' };
+  assert.deepEqual(await read(await at({ cache: 'reload' })), files['/m.glb'].body.slice(0, 1024));
+  assert.deepEqual([network.log.at(-1).range, network.log.at(-1).etag], ['bytes=0-1023', null]);
+  await cache.flush();
+  assert.deepEqual(await read(await at()), files['/m.glb'].body.slice(0, 1024), 'the reloaded blocks are stored');
+  assert.equal(network.log.length, 5);
+  assert.deepEqual(await cache.usage(), { bytes: 1024, files: 1, blocks: 1 });
+});
+
+test('a reload of an unchanged file stores the lifetime of the answer it just received', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const files = { '/m.glb': { body: bytes(3000), etag: '"v1"', control: 'max-age=0' } },
+    network = server(files),
+    first = new RangeCache({ name: 'reload-life', block: B, fetch: network });
+  await read(await first.fetch(base + 'm.glb', { headers: { range: 'bytes=0-1023' } }));
+  await first.flush();
+  files['/m.glb'].control = 'max-age=3600';
+  await read(await first.fetch(base + 'm.glb', { cache: 'reload', headers: { range: 'bytes=0-1023' } }));
+  await first.flush();
+  // A new session finds the stored blocks fresh for the reloaded hour: no revalidation goes out.
+  const second = new RangeCache({ name: 'reload-life', block: B, fetch: network }),
+    before = network.log.length;
+  assert.deepEqual(
+    await read(await second.fetch(base + 'm.glb', { headers: { range: 'bytes=0-1023' } })),
+    files['/m.glb'].body.slice(0, 1024),
+  );
+  assert.equal(network.log.length, before, 'the reload kept the old max-age=0 lifetime');
+});
+
+test('a stale must-revalidate file whose server answers 503 is served from its blocks and counted offline', async () => {
+  globalThis.indexedDB = fakeIndexedDB();
+  const body = bytes(2000, 5),
+    files = { '/m.glb': { body, etag: '"s"', control: 'max-age=0, must-revalidate' } },
+    network = server(files),
+    warm = new RangeCache({ name: 'stale-503', block: B, fetch: network });
+  await read(await warm.fetch(base + 'm.glb', { headers: { range: 'bytes=0-1023' } }));
+  await warm.flush();
+  // Accepted difference for offline play (docs/limits.md, "Stale copies on failure"): looser than RFC 9111 5.2.2.2.
+  const down = new RangeCache({ name: 'stale-503', block: B, fetch: async () => new Response('down', { status: 503 }) });
+  assert.deepEqual(await read(await down.fetch(base + 'm.glb', { headers: { range: 'bytes=0-99' } })), body.slice(0, 100));
+  assert.equal(down.stats.offline, 1);
 });

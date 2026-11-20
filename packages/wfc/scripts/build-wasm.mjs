@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 execFileSync(
   'cargo',
@@ -18,7 +19,7 @@ execFileSync(
   {
     stdio: 'inherit',
     timeout: 300000,
-    env: { ...process.env, CARGO_TARGET_DIR: root + 'target', RUSTFLAGS: '-C target-feature=+simd128' },
+    env: blueprintRustEnv(root + 'native/solver', '-C target-feature=+simd128', { target: root + 'target' }),
   },
 );
 const bytes = readFileSync(root + 'target/wasm32-unknown-unknown/release/margo_wfc_solver.wasm');

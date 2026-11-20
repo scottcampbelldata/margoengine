@@ -3,8 +3,8 @@
 // Driven by offline-gpu.mjs: loadGLTF through @margoengine/cache, timed from the call to the first submitted frame, with
 // a geometry digest (every primitive's packed vertices and indices) to prove the offline model is the online one.
 import {Engine} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
-import {parseGLTFInWorker} from '/packages/gltf-pro/dist/worker.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {parseGLTFInWorker} from '/packages/gltf/dist/worker.js';
 import {AssetCache} from '/packages/cache/dist/index.js';
 
 const canvas=document.querySelector('canvas'),errors=[],name='margo-cache-check';
@@ -29,7 +29,7 @@ window.check={
   // The cache inside a dedicated Web Worker (started while online so its script loads): fetch there and hash the bytes.
   startWorker(){worker=new Worker(new URL('./worker.js',import.meta.url),{type:'module'});return new Promise((resolve,reject)=>{worker.onmessage=()=>resolve();worker.onerror=e=>reject(new Error(e.message));});},
   worker(url){return new Promise(resolve=>{worker.onmessage=({data})=>resolve(data);worker.postMessage({url:new URL(url,location.href).href,name});});},
-  // Worker parsing of a cached GLB: bytes from cache.fetch, parsed by gltf-pro's worker (whose script needs the network).
+  // Worker parsing of a cached GLB: bytes from cache.fetch, parsed by gltf/pbr's worker (whose script needs the network).
   async parseInWorker(url){
     model?.dispose();model=undefined;
     const cache=new AssetCache({name,version:'check-1',maxBytes:2**30}),start=performance.now();

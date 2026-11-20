@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BiomeWorld, defineBiome } from '../dist/index.js';
-import { presets, presetWorlds } from '../dist/presets.js';
+import { presets, presetWorlds, rockiesPresets, rockiesWorld } from '../dist/presets.js';
 import { WHITTAKER, holdridge, holdridgeZone, whittaker, whittakerClass } from '../dist/zones.js';
 import { KOPPEN, koppen, koppenClass } from '../dist/koppen.js';
 import { random } from './random.js';
@@ -306,6 +306,53 @@ test('golden digests of every preset world at seeds 1, 2 and 0xFFFFFFFF', async 
       });
       assert.equal(await w.digest(2, 1), golden[`${id}:${seed}`], `${id} seed ${seed}`);
     }
+});
+
+test('rockies: the three conifer presets are frozen, name their fuel models and split a steep inland world three ways', async () => {
+  assert.deepEqual(Object.keys(rockiesPresets), ['rockies-moist-forest', 'rockies-dry-forest', 'rockies-opening']);
+  assert.deepEqual(
+    Object.keys(presets).filter((id) => id.startsWith('rockies')),
+    [],
+    'the nine presets are unchanged',
+  );
+  for (const [id, def] of Object.entries(rockiesPresets)) {
+    assert.ok(Object.isFrozen(def) && Object.isFrozen(def.climate), id);
+    assert.equal(def.id, id);
+    assert.deepEqual(defineBiome(JSON.parse(JSON.stringify(def))), def, `${id} round-trips through JSON`);
+  }
+  const pw = rockiesWorld;
+  assert.deepEqual(
+    pw.biomes.map((b) => b.id),
+    Object.keys(rockiesPresets),
+  );
+  const w = await BiomeWorld.create({
+      size: [1024, 1024],
+      biomes: pw.biomes,
+      climate: pw.climate,
+      height: { relief: pw.relief },
+    }),
+    share = new Map();
+  for (let z = -500; z < 500; z += 16)
+    for (let x = -500; x < 500; x += 16) {
+      const id = w.sampleRegion(x, z).biomes[0];
+      share.set(id, (share.get(id) ?? 0) + 1);
+    }
+  for (const id of Object.keys(rockiesPresets))
+    assert.ok(share.get(id) > 20, `${id}: ${share.get(id)} of 3969 corners`);
+});
+
+test('golden digests of the rockies world at seeds 1, 2 and 0xFFFFFFFF', async () => {
+  const pw = rockiesWorld;
+  for (const seed of [1, 2, 0xffffffff]) {
+    const w = await BiomeWorld.create({
+      seed,
+      size: [1024, 1024],
+      biomes: pw.biomes,
+      climate: pw.climate,
+      height: { relief: pw.relief },
+    });
+    assert.equal(await w.digest(2, 1), golden[`rockies:${seed}`], `rockies seed ${seed}`);
+  }
 });
 
 test('sample returns the biomes of the tile cell, and region samples classify too', async () => {

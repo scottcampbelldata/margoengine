@@ -60,12 +60,14 @@ export class CustomCurve implements TonemapExtension {
       const name = FN.exec(wgsl)![1];
       if (new RegExp(`fn\\s+${name}\\s*\\(`).test(shader) || /^(custom(Sample|Curve|CurveData)|curveParams)$/.test(name))
         throw new RangeError(`CustomCurve: the name ${name} is already used by the Tonemap shader; rename the function.`);
-      call = `return ${name}(x);`;
+      // The phony read keeps customCurveData in the pipeline's automatic layout when the curve ignores curveParams:
+      // the Tonemap always binds it, and a layout without it fails the bind group (KB-OWN-TONE3).
+      call = `_=customCurveData.params;return ${name}(x);`;
       extra = `\n${wgsl.replace(/\bcurveParams\b/g, 'customCurveData.params')}`;
     }
     // After the built-in curve, before contrast: SDR (clamp to 1) and the ColorOutput shader (clamp to white).
-    const sdr = 'color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(1));',
-      hdr = 'color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(white));';
+    const sdr = 'color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(1));',
+      hdr = 'color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(white));';
     return (
       shader
         .replace(sdr, 'color=customCurve(hdr);\n  ' + sdr)

@@ -83,10 +83,10 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
 
 // The app each template scaffolds, its engine imports, and what its build must contain.
 const templates = {
-  web: { main: 'src/main.ts', imports: "from '@margoengine/web/environment'" },
+  web: { main: 'src/main.ts', imports: "from '@margoengine/kit-web/environment'" },
   game: { main: 'src/main.ts', imports: "from '@margoengine/game'" },
-  viz: { main: 'src/main.ts', imports: "from '@margoengine/viz'" },
-  react: { main: 'src/scene.tsx', imports: "from '@margoengine/react-kit'" },
+  viz: { main: 'src/main.ts', imports: "from '@margoengine/kit-viz'" },
+  react: { main: 'src/scene.tsx', imports: "from '@margoengine/kit-react'" },
 };
 
 for (const [template, { main, imports }] of Object.entries(templates))
@@ -99,7 +99,7 @@ for (const [template, { main, imports }] of Object.entries(templates))
       manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
     assert.deepEqual(
       Object.keys(manifest.dependencies).filter((name) => name.includes('margoengine')),
-      [`@margoengine/${template === 'react' ? 'react-kit' : template}`],
+      [`@margoengine/${template === 'game' ? 'game' : `kit-${template}`}`],
       'one engine dependency',
     );
     assert.ok(readFileSync(join(app, main), 'utf8').includes(imports), imports);
@@ -118,8 +118,13 @@ for (const [template, { main, imports }] of Object.entries(templates))
     );
     console.log(`create-margo ${template} app: ${scripts.length} JS file(s), ${gzip} bytes gzip`);
     // Every JS chunk counts, lazy ones included (docs/limits.md, "Web template bundle"). 81,500 since KB-RM1: 80,833 B
-    // measured after the WGSL comment and EXR header waste came out; the bytes over 80,000 are bug fixes.
-    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 81_500, `unexpected bundle size ${gzip}`);
+    // measured after the WGSL comment and EXR header waste came out; the bytes over 80,000 are bug fixes. 82,000 since
+    // KB-OWN-ASYNC3 (8dd3646751, +211 B: EnvironmentLighting.load attaching in the scene it was called in): 81,576 B.
+    // dc6459275e (hashed alpha shadow casters) took it to 82,110 B; the hash and its caster edit now ride on materials
+    // alphaHash() (tests/alpha-hash-free-imports.test.js), 81,613 B, and the bound is back at 82,000. 83,000 since
+    // 09a33b8dd9 (82,837 B): shadow group casters, PCSS options, device-restore and frame-time fixes and controls help
+    // links, +1,246 B, each commit measured in docs/limits.md.
+    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 83_000, `unexpected bundle size ${gzip}`);
     else assert.ok(gzip > 10_000, `unexpected bundle size ${gzip}`);
     // WGSL comments are documentation for the source, not bytes for the user: they once cost the web template 698 B.
     if (template === 'web')
@@ -139,7 +144,7 @@ test('the next template type-checks against the local packages', { timeout: 120_
   run(['app', '--template', 'next'], temp);
   const app = join(temp, 'app'),
     manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
-  assert.ok(readFileSync(join(app, 'app/page.tsx'), 'utf8').includes("from '@margoengine/react-kit'"));
+  assert.ok(readFileSync(join(app, 'app/page.tsx'), 'utf8').includes("from '@margoengine/kit-react'"));
   link(app, manifest);
   // next-env.d.ts is what `next dev` writes on first run.
   writeFileSync(

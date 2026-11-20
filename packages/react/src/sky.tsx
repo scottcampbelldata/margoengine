@@ -10,7 +10,7 @@ interface ErrorProps {
 /** Props of the Sky component; every prop is optional unless noted. */
 export interface SkyProps extends SkyOptions, ErrorProps {}
 /** The sky component. */
-export const Sky = forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...props }, ref) {
+export const Sky = /* @__PURE__ */ forwardRef<SkyPlugin, SkyProps>(function Sky({ onError, ...props }, ref) {
   // The sky is the only light of many scenes, so it supplies the fallback environment (metals are black without one).
   const options: SkyOptions = { environment: true, ...props },
     scene = useScene(),

@@ -384,3 +384,95 @@ test('coastal rivers reach the sea: no shelf ridge between the mouth and the sho
     }
   }
 });
+
+// Ria (scenes plan push 3): a drowned valley cut into a straight coast, steep hills round it, level ground at its head.
+const ria = (extra = {}) =>
+  createRelief({ coast: 'east', size: [4096, 4096], base: 14, relief: 220, ria: {}, valley: { width: 40, mouth: 40 }, ...extra });
+/** The water spans (heights under -0.5 m) along z at world x, as [start, end] metres. */
+function waterSpans(relief, x) {
+  const spans = [];
+  let start = null;
+  for (let z = -2048; z <= 2048; z += 4) {
+    const wet = relief.height(x * 1000, z * 1000) < -500;
+    if (wet && start === null) start = z;
+    if (!wet && start !== null) (spans.push([start, z - 4]), (start = null));
+  }
+  if (start !== null) spans.push([start, 2048]);
+  return spans;
+}
+
+test('ria: one bay that narrows from the mouth to the head, then dry land and no water past it', () => {
+  const r = ria(),
+    mouth = waterSpans(r, 1548), // 500 m from the east edge
+    mid = waterSpans(r, 848),
+    near = waterSpans(r, -100), // 2.1 km in
+    past = waterSpans(r, -1800); // 3.8 km in, beyond the 2.8 km head and the warp
+  for (const s of [mouth, mid, near]) assert.equal(s.length, 1, 'a single bay at every cross section');
+  const width = (s) => s[0][1] - s[0][0];
+  assert.ok(width(mouth) > width(mid) && width(mid) > width(near), `narrowing ${width(mouth)} ${width(mid)} ${width(near)}`);
+  assert.ok(width(mouth) > 600 && width(mouth) <= 1100, `mouth ${width(mouth)} m`);
+  assert.ok(width(near) < 450, `head end ${width(near)} m`);
+  assert.deepEqual(past, [], 'past the head the ground is dry (the river bed stays above the sea)');
+  // The axis sways a little: the bay is centred within 200 m of the middle of the coast at the mouth.
+  assert.ok(Math.abs((mouth[0][0] + mouth[0][1]) / 2) < 200);
+  assert.equal(r.height(2_040_000, 0), -40_000, 'the open sea is 40 m deep');
+});
+
+test('ria: the bay floor is deeper at the mouth than at the head, and both sides climb steeply', () => {
+  const r = ria(),
+    deepest = (x) => Math.min(...Array.from({ length: 500 }, (_, i) => r.height(x * 1000, (-1000 + i * 4) * 1000))) / 1000;
+  const [m, h] = [deepest(1700), deepest(-50)];
+  assert.ok(m < -20 && m > -40, `mouth floor ${m} m`);
+  assert.ok(h > m + 10, `head floor ${h} m`);
+  const [a, b] = waterSpans(r, 848)[0];
+  for (const edge of [a - 4, b + 4]) {
+    const dir = edge < 0 ? -1 : 1,
+      rise = (r.height(848_000, (edge + dir * 100) * 1000) - r.height(848_000, edge * 1000)) / 1000;
+    assert.ok(rise > 25 && rise < 90, `100 m from the water the ground has risen ${rise} m`);
+    assert.ok(r.height(848_000, (edge + dir * 900) * 1000) > 90_000, 'hills over 90 m within 900 m of the water');
+  }
+});
+
+test('ria: there is level ground at the bay head and none like it beside the bay', () => {
+  const r = ria(),
+    level = (relief) => {
+      let n = 0;
+      for (let x = -2000; x <= 0; x += 8)
+        for (let z = -600; z <= 600; z += 8) {
+          const h = relief.height(x * 1000, z * 1000) / 1000;
+          if (h > 3.5 && h < 5.5) n++;
+        }
+      return n;
+    };
+  assert.ok(level(r) > 1500, `${level(r)} level cells of 64 m2 at the head`);
+  assert.ok(level(ria({ ria: { flat: 0 } })) < level(r) / 2, 'without the flat the ground is steep there');
+});
+
+test('ria: same options give the same heights, the river runs from the head, options are validated, no ria leaves the settings alone', () => {
+  const a = ria(),
+    b = ria();
+  for (let i = 0; i < 400; i++) assert.equal(a.height(i * 9_731 - 2_000_000, i * 7_919 - 2_000_000), b.height(i * 9_731 - 2_000_000, i * 7_919 - 2_000_000));
+  assert.equal(a.rivers.length, 1);
+  assert.equal(ria({ ria: { river: false } }).rivers.length, 0);
+  assert.equal(a.settings.ria.length, 2_800_000);
+  assert.equal(createRelief({ coast: 'east' }).settings.ria, undefined);
+  // headDepth: water at the head for a harbour, the floor falling from it to depth; 0 keeps the floor of before.
+  const deep = createRelief({ coast: 'east', base: 14, relief: 220, ria: { headDepth: 8 } }),
+    shallow = createRelief({ coast: 'east', base: 14, relief: 220, ria: {} }),
+    zero = createRelief({ coast: 'east', base: 14, relief: 220, ria: { headDepth: 0 } }),
+    // On the axis 100 m and 400 m out from the head of a 2.8 km bay whose coast line is the world's east edge.
+    { origin, size } = deep.settings;
+  for (const out of [100, 400]) {
+    // The axis sways, so the deepest point across the bay within 200 m of the middle.
+    const x = origin[0] + size[0] - 2_800_000 + out * 1000,
+      across = (r) => Math.min(...Array.from({ length: 41 }, (_, i) => r.height(x, origin[1] + deep.settings.ria.center + (i - 20) * 10_000)));
+    assert.ok(across(deep) <= -7000, `${out} m out: ${across(deep)} mm`);
+    assert.ok(across(shallow) > -3000, `without headDepth ${out} m out: ${across(shallow)} mm`);
+    assert.equal(across(zero), across(shallow));
+  }
+  assert.equal(deep.settings.ria.headDepth, 8000);
+  assert.throws(() => createRelief({ coast: 'east', ria: { depth: 5, headDepth: 6 } }), RangeError);
+  assert.ok(!('ria' in createRelief({ coast: 'east' }).settings));
+  for (const bad of [{ coast: 'none' }, { coast: 'island' }, { ria: { width: 5 } }, { ria: { headWidth: 900 } }, { ria: { length: 100 } }, { ria: { slope: 2 } }, { ria: { river: 1 } }, { ria: null }])
+    assert.throws(() => ria(bad), RangeError, JSON.stringify(bad));
+});

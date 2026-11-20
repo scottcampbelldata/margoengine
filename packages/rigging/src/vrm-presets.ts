@@ -1,0 +1,21 @@
+// The VRM 1.0 preset expression names (VRMC_vrm-1.0 expressions.md), shared by the VRM and VRMA readers.
+export const PRESETS: ReadonlySet<string> = new Set<string>([
+  'happy',
+  'angry',
+  'sad',
+  'relaxed',
+  'surprised',
+  'aa',
+  'ih',
+  'ou',
+  'ee',
+  'oh',
+  'blink',
+  'blinkLeft',
+  'blinkRight',
+  'lookUp',
+  'lookDown',
+  'lookLeft',
+  'lookRight',
+  'neutral',
+]);

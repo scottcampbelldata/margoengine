@@ -8,19 +8,9 @@ import { sceneSamples } from './quality.js';
 import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { partialRect, validateRectangle } from '../../shared/view-rect.js';
-// TypeScript's DOM library omits WebGPU flag namespaces and the canvas overload.
-declare const GPUBufferUsage: {
-  COPY_DST: number;
-  COPY_SRC: number;
-  MAP_READ: number;
-  INDEX: number;
-  VERTEX: number;
-  UNIFORM: number;
-  INDIRECT: number;
-  STORAGE: number;
-};
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
-declare const GPUMapMode: { READ: number };
+// WebGPU usage flags are written as their numbers, which the WebGPU specification fixes, so the minifier folds each
+// combination into one constant. Buffer: MAP_READ 1, COPY_SRC 4, COPY_DST 8, INDEX 16, VERTEX 32, UNIFORM 64,
+// STORAGE 128, INDIRECT 256. Texture: COPY_SRC 1, RENDER_ATTACHMENT 16. Map mode: READ 1.
 
 const defaultDraw: DrawOptions = {},
   drawable = (batch: Batch) => (batch.count || batch.redirect) && !batch.claimed;
@@ -257,8 +247,15 @@ const settle = <T>(
   });
 
 export class GPURenderer implements Renderer {
-  /** `memory`: the loss is core's own rebuild after an allocation failed out of memory, to be reported once. */
-  onLost?: (error: Error, memory?: boolean) => void;
+  /**
+   * `memory`: the loss is core's own rebuild after an allocation failed out of memory, to be reported once. Called from
+   * device.lost, so a device lost before the hook was set (during startup or a restore, B3) still calls it.
+   */
+  set onLost(hook: (error: Error, memory?: boolean) => void) {
+    this.device.lost.then((info) => {
+      if (!this.disposed) hook(this.memory ?? fault('failed', `GPU lost: ${info.message}`, 'gpu-lost'), !!this.memory);
+    });
+  }
   get target(): RenderTarget {
     return {
       format: this.format,
@@ -427,7 +424,7 @@ export class GPURenderer implements Renderer {
     private readonly descriptor: GPURenderPipelineDescriptor,
     private readonly culled: GPURenderPipeline,
   ) {
-    this.uniform = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({ size: 128, usage: 72 });
     this.bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: { buffer: this.uniform } }],
@@ -436,10 +433,7 @@ export class GPURenderer implements Renderer {
       layout: culled.getBindGroupLayout(0),
       entries: [{ binding: 0, resource: { buffer: this.uniform } }],
     });
-    device.lost.then((info) => {
-      this.deviceLost = true;
-      if (!this.disposed) this.onLost?.(this.memory ?? fault('failed', `GPU lost: ${info.message}`, 'gpu-lost'), !!this.memory);
-    });
+    device.lost.then(() => (this.deviceLost = true));
     device.addEventListener('uncapturederror', ({ error }) => {
       // An allocation made outside an error scope failed (KB6434a): the object is unusable and every frame that uses
       // it fails, so the device is rebuilt as after a loss, and the failure is reported once.
@@ -462,17 +456,17 @@ export class GPURenderer implements Renderer {
     try {
       const upload = (data: Float32Array | Uint32Array, usage: number) => {
         if (data.byteLength > this.device.limits.maxBufferSize) throw rangeError('GPU buffer limit', 'limits');
-        const buffer = this.device.createBuffer({ size: data.byteLength, usage: usage | GPUBufferUsage.COPY_DST });
+        const buffer = this.device.createBuffer({ size: data.byteLength, usage: usage | 8 });
         buffers.push(buffer);
         this.device.queue.writeBuffer(buffer, 0, data as Float32Array<ArrayBuffer>);
         return buffer;
       };
-      const vertex = upload(geometry.vertices, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE),
-        index = upload(geometry.indices, GPUBufferUsage.INDEX | GPUBufferUsage.STORAGE);
+      const vertex = upload(geometry.vertices, 160),
+        index = upload(geometry.indices, 144);
       if (capacity * 96 > this.device.limits.maxBufferSize) throw rangeError('GPU buffer limit', 'limits');
       const instance = this.device.createBuffer({
         size: capacity * 96,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        usage: 168,
       });
       buffers.push(instance);
       this.remove(geometry);
@@ -508,11 +502,8 @@ export class GPURenderer implements Renderer {
     try {
       this.renderFrame(camera, lighting, batches, graph, delta, view);
     } catch (error) {
-      if (error instanceof DOMException && ['InvalidStateError', 'OperationError'].includes(error.name)) {
-        this.deviceLost = true;
-        this.onLost?.(error);
-        return;
-      }
+      // Not a loss, whatever its name (B2): an InvalidStateError or OperationError from a pass is a failure of that
+      // call, reported like any other. A lost device says so through device.lost, which restores it.
       // A frame that throws threw the pending uncaptured error first, if there was one: that frame reports it, and no
       // later one does. Uncaptured errors arrive in a task of their own, never inside a frame, so none is lost here.
       this.failure = undefined;
@@ -717,7 +708,7 @@ export class GPURenderer implements Renderer {
             else if (options.indirect ?? context.indirect) {
               resource.indirect ??= this.device.createBuffer({
                 size: 20,
-                usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.COPY_DST,
+                usage: 264,
               });
               resource.command ??= new Uint32Array([batch.geometry.indices.length, 0, 0, 0, 0]);
               if (resource.command[1] !== batch.count) {
@@ -822,7 +813,7 @@ export class GPURenderer implements Renderer {
           size: [width, height],
           sampleCount: this.descriptor.multisample!.count,
           format: each,
-          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+          usage: 16,
         });
         set.textures.push(texture);
         set.views.push(texture.createView());
@@ -870,10 +861,10 @@ export class GPURenderer implements Renderer {
       color = device.createTexture({
         size: [1, 1],
         format: 'r32uint',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        usage: 17,
       });
-      depth = device.createTexture({ size: [1, 1], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
-      read = device.createBuffer({ size: 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      depth = device.createTexture({ size: [1, 1], format: 'depth32float', usage: 16 });
+      read = device.createBuffer({ size: 4, usage: 9 });
       const matrix = camera.matrix.slice(),
         sw = span?.[0] ?? this.canvas.width,
         sh = span?.[1] ?? this.canvas.height,
@@ -891,7 +882,7 @@ export class GPURenderer implements Renderer {
       frame.set(lighting.radiance, 24);
       frame.fill(1, 28, 31);
       if (lighting.ambient) frame.set(lighting.ambient, 28);
-      uniform = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      uniform = device.createBuffer({ size: 128, usage: 72 });
       device.queue.writeBuffer(uniform, 0, frame);
       // Reuse shader pass hooks for fragment clipping; caps and FX draws are suppressed.
       const encoder = device.createCommandEncoder(),
@@ -915,7 +906,7 @@ export class GPURenderer implements Renderer {
       graph.prepare(context);
       const code = context.shader
         .replace('@location(3) material:vec4f', '@location(3) material:vec4f,@location(4) @interpolate(flat) id:u32')
-        .replace('o.color=i.color.rgb', 'o.id=u32(i.factors.w);o.color=i.color.rgb')
+        .replace('o.color=i.color.rgb', 'o.id=u32(i.factors.w)+1u;o.color=i.color.rgb')
         .replace('->@location(0) vec4f {', '->@location(0) u32 {')
         .replace(/let n=normalize\(i.normal\)[\s\S]*$/, 'return i.id;\n}');
       // Cached like draw variants: compiling a pick pipeline every call cost about 3 ms a pick.
@@ -932,7 +923,9 @@ export class GPURenderer implements Renderer {
         });
       const pass = encoder.beginRenderPass({
         colorAttachments: [
-          { view: color.createView(), clearValue: [4294967295, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
+          // Ids are written one up over a clear of 0: Firefox 157 clears an r32uint target through float32, so a clear
+          // of 0xffffffff came back 0 and every empty pixel picked mesh 0.
+          { view: color.createView(), clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
         ],
         depthStencilAttachment: {
           view: depth.createView(),
@@ -960,7 +953,7 @@ export class GPURenderer implements Renderer {
       device.queue.submit([encoder.finish()]);
       // A device lost during the readback rejects the map: nothing was picked.
       if (
-        !(await read.mapAsync(GPUMapMode.READ).then(
+        !(await read.mapAsync(1).then(
           () => 1,
           (error) => {
             if (this.deviceLost || this.disposed) return 0;
@@ -971,7 +964,7 @@ export class GPURenderer implements Renderer {
         return null;
       const id = new Uint32Array(read.getMappedRange())[0];
       read.unmap();
-      return id === 4294967295 ? null : id;
+      return id === 0 ? null : id - 1;
     } finally {
       uniform?.destroy();
       color?.destroy();

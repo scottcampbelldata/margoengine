@@ -25,7 +25,7 @@ node scripts/parity-task-profile.mjs
 
 Use `--cases=p-math,p-geometry-utils` for a subset, and `--out=<path>` to retain
 the result elsewhere. A wrapping test runner must apply a hard time limit; this
-CPU-only script never requests a GPU slot. It profiles exactly one unchanged
+CPU-only script never uses the GPU. It profiles exactly one unchanged
 catalog operation after adapter setup, with Node's inspector at a 100 microsecond
 sampling interval. Sampling counts vary with load, optimization and GC. They
 identify code paths, not speed ratios. The checked tests verify single execution,
@@ -47,7 +47,7 @@ The following failures remain for the next complete jobs:
 | Margo light probe | The scene supplies nine SH coefficients; the current adapter only knows baked LightProbes. Add the missing coefficient-source API in environment if no supported input fits. |
 | Margo grading | Fixed 2026-11-11 (KB6250b, aa6ffaab01): the adapter builds the case with shader's `NodePass` and the hue and saturation utilities instead of throwing unsupported. Parity smoke `p-color-grading@margo: ok` (one run, no timing: speed phase). Regression: tests/parity-adapters.test.js. |
 | Margo lens flare | Built in post (2026-11-11, KB6250c): `LensFlare` takes a point `position` and up to 16 configurable screen-size `elements`, and the adapter now builds the scene's light and four elements. Proved by packages/post/test/lens-flare.test.js and `npm run test:gpu:flare` (WebGPU and the WebGL2 layer); the matrix row updates at the next parity run, which the build phase defers. |
-| Margo meshopt | Fixed in round 2: the owning gltf-pro parser and async resolver now apply the fallback contract to EXT and KHR. See the regression and reproduction below. |
+| Margo meshopt | Fixed in round 2: the owning gltf/pbr parser and async resolver now apply the fallback contract to EXT and KHR. See the regression and reproduction below. |
 | Reference depth material, WebGPU | Closed in round 3 as rival unsupported (KB6250f): three.js 0.186.1 WebGPURenderer refuses MeshDepthMaterial. The WebGL comparison stands. |
 | Reference USDZ, both | Closed in round 3 as rival unsupported (KB6250d): three.js 0.186.1 USDZLoader throws reading `isVector3` on the shared fixture in both backends. |
 | Reference texture formats, both | Closed in round 3 as rival unsupported (KB6250e): three.js 0.186.1 DDSLoader refuses the uncompressed FourCC-zero DDS. The fixture keeps that case; no work was removed. |
@@ -80,14 +80,14 @@ The shared extension lookup now serves both buffers and views, rejects dual decl
 and checks that marked fallback references use that marker's extension. Core, stage,
 the packer and decoder output are unchanged. There is no speed claim or new API.
 
-`packages/gltf-pro/tests/meshopt-fallback.test.js` fails on the parent build and tests
+`packages/gltf/test/meshopt-fallback.test.js` fails on the parent build and tests
 explicit and implicit placeholders, byte-identical EXT/KHR accessors, cached views,
 the external fallback download contract, invalid marker types, mixed/dual declarations,
 references to fallback storage and source/decoded bounds. Reproduce after building:
 
 ```sh
-node --test --test-timeout=120000 packages/gltf-pro/tests/meshopt-fallback.test.js
-node scripts/gpu-lock.mjs run --owner=meshopt-smoke --max=15 --wait-max=15 -- node scripts/parity-smoke-browser.mjs --runs=1 --cases=p-meshopt --engines=margo
+node --test --test-timeout=120000 packages/gltf/test/meshopt-fallback.test.js
+node scripts/run-with-timeout.mjs --max=15 -- node scripts/parity-smoke-browser.mjs --runs=1 --cases=p-meshopt --engines=margo
 ```
 
 Research compared: Arseny Kapoulkine, Jasper St. Pierre, Alexey Knyazev and Don McCurdy,

@@ -124,7 +124,7 @@ test('exactly vertical views: core throws, the projection renders north-up and k
       eye = [0, 1, 2].map((r) => view[r] * 1.5 + view[8 + r] * 2 + view[12 + r]);
     assert.ok(
       near(eye, [0.5, 0, -10], 1e-6),
-      'shared viewMatrix (shadows, ssao, gltf-pro) uses camera.up: +x right, -z up',
+      'shared viewMatrix (shadows, ssao, gltf/pbr) uses camera.up: +x right, -z up',
     );
     camera.update(2, true);
     assert.ok(near(ndc(camera.matrix, [1.5, 0, 2]), east, 1e-6), 'stable');

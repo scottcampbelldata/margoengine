@@ -91,10 +91,11 @@ function reduce(corners: Float32Array, limit: number): Float32Array {
  *
  * ```ts
  * import {jointHulls} from 'margoengine/rigging/hulls';
- * // A 1 m box skinned to two joints: the lower half to joint 0, the upper half to joint 1.
- * const corners = [-0.5, 0.5].flatMap((x) => [0, 1].flatMap((y) => [-0.5, 0.5].flatMap((z) => [x, y, z])));
- * const joints = new Uint16Array([0, 0, 0, 0, 1, 1, 1, 1]);
- * const hulls = jointHulls({positions: corners, skin: {joints, weights: new Float32Array(8).fill(1), influences: 1}});
+ * // A 1 m column skinned to two joints: the lower box (y 0 to 0.4) to joint 0, the upper (0.6 to 1) to joint 1.
+ * // Each joint needs vertices that span a volume, so each box has its own eight corners.
+ * const positions = [0, 0.4, 0.6, 1].flatMap((y) => [-0.5, 0.5].flatMap((x) => [-0.5, 0.5].flatMap((z) => [x, y, z])));
+ * const joints = new Uint16Array(16).map((_, v) => (v < 8 ? 0 : 1));
+ * const hulls = jointHulls({positions, skin: {joints, weights: new Float32Array(16).fill(1), influences: 1}});
  * hulls.length; // 2 (hulls[1].joint === 1)
  * ```
  *

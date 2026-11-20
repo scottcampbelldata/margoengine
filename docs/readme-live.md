@@ -36,7 +36,7 @@ completion, and refusal of missing models, disposal, stream closure or node
 cleanup. The runner regression fails against the old module-completion-only
 harness. tests/run-readme-examples.test.js retains the unfinished-module and
 whole-page deadline checks. The normal check:merge README step already covers
-this fixture class; verify runs the CPU regressions without a GPU lease.
+this fixture class; verify runs the CPU regressions.
 
 Validation: all 34 runner and fixture tests pass, including four live fixture/observer tests.
 The old harness fails the load-before-pagehide runner regression with "module

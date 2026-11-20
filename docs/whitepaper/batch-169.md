@@ -295,9 +295,9 @@ After `npm run build:packages`, run
 Install `troika-three-text@0.52.4` only in an external test directory with
 `npm install --prefix <external-dir> --ignore-scripts --no-audit --no-fund troika-three-text@0.52.4`.
 The rival and its dependencies stay outside this repository and are used only as
-black boxes. In PowerShell, set `$env:MARGO_GPU_SLOTS='3'`, then run
+black boxes. Run
 `node scripts/bp-169-text-oracle.mjs --rival=<absolute-external-dir>`.
-The harness holds the shared GPU lock, bounds each sync at 60 seconds and its hold
+The harness bounds each sync at 60 seconds and the whole run
 at five minutes, and prints every width and difference. Its worker is disabled
 and CPU SDF is selected; it is not a rendering-speed comparison. No font is newly
 copied: existing fixture provenance is in packages/text/tests/fixtures/fonts/NOTICE.md.

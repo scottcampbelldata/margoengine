@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>look family gpu</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// A small scene of every drawing part applyLookFamily looks after (sky, terrain, water, volumetric air, smoke, the
+// GTAO, SSGI and bloom passes, the Tonemap and its Grade), for look-family-gpu.mjs. window.check.family(part, name)
+// applies a family to one part through @margoengine/scenes/look-family; window.check.draw() renders frames with the clock
+// held (delta 0) and returns the GPU errors so far.
+import {Engine} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {TerrainColors,heightfield} from '/packages/terrain/dist/index.js';
+import {Water} from '/packages/water/dist/index.js';
+import {VolumetricFog} from '/packages/environment/dist/volumetric.js';
+import {Smoke} from '/packages/vfx/dist/smoke.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {Grade} from '/packages/tonemap/dist/grade.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {GTAO} from '/packages/post/dist/gtao.js';
+import {SSGI} from '/packages/post/dist/ssgi.js';
+import {applyLookFamily} from '/packages/scenes/dist/look-family.js';
+const errors=[],canvas=document.querySelector('canvas');
+canvas.width=480;canvas.height=270;canvas.style.width='480px';canvas.style.height='270px';
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,14,60],target:[0,2,0],fov:50,near:0.3,far:20000}});
+engine.stop();
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// skip: parts to leave out (terrain, water, smoke, gtao). The terrain colours are drawn under the GTAO, which once gave
+// a GPU validation error (KB-POST-GTAO-TERRAINLOOK1); without the GTAO the post part (the family turns it on) is left
+// out.
+const skip=new Set((new URLSearchParams(location.search).get('skip')??'').split(','));
+const gtao=new GTAO(),ssgi=new SSGI(),bloom=new Bloom(),grade=new Grade(),tonemap=new Tonemap({extensions:[grade]});
+const stack=PostStack.attach(engine,[gtao,ssgi,bloom,tonemap].filter(e=>!skip.has(e.name)));
+const sky=Sky.attach(engine,{});
+const ground=engine.createMesh();
+ground.setGeometry(heightfield((x,z)=>6*Math.sin(x/9)*Math.cos(z/11)+1,{size:[160,160],origin:[-80,-120],resolution:1}));
+const colors=skip.has('terrain')?null:TerrainColors.attach(engine,ground);
+const water=skip.has('water')?null:new Water({size:[400,200],segments:64});
+if(water)engine.use(water);
+// The air is the VolumetricFog (it takes the place of the scene Fog, which a scene draws one or the other of).
+const air=VolumetricFog.attach(engine,{});
+const smoke=skip.has('smoke')?null:Smoke.attach(engine,{position:[10,2,-10]});
+// The lens rows of the post family (dof.aperture, lens, motion blur) need a DOF, lens and TAA velocity this page does
+// not draw: they get option holders and are proved on the CPU (look-family-parts.test.js).
+const lens={dof:{options:{}},lens:{options:{}},motionBlur:{options:{}}};
+const targets={sky:{sky},terrain:colors,water,environment:{air},smoke,tonemap:{tonemap,grade},post:{gtao,ssgi,bloom,...lens}};
+for(const [part,target] of Object.entries(targets))if(!target)delete targets[part];
+if(skip.has('gtao'))delete targets.post;
+// smokeFamily: a family given to the smoke column before its first frame. A column's rows act on the puffs it lets go,
+// so its check runs time (window.check.run) on columns that each had one family from the start.
+const smokeFamily=new URLSearchParams(location.search).get('smokeFamily');
+if(smoke&&smokeFamily)applyLookFamily(smokeFamily,{smoke});
+window.check={
+  async run(frames){for(let i=0;i<frames;i++){engine.render({delta:1/30});if(i%15===14)await engine.gpu.queue.onSubmittedWorkDone();}await engine.gpu.queue.onSubmittedWorkDone();return errors.slice();},
+  parts:Object.keys(targets),
+  family(part,name){applyLookFamily(name,{[part]:targets[part]});},
+  // The Water's foam history fades with the frame time only (held at delta 0), so with a Water each still first runs
+  // 3 s of frames for its foam to settle, then sets the wave clock back to 0: every still is drawn at the same time.
+  // A scene with a Water has no smoke, whose column those frames would move on.
+  async draw(frames=24){if(water){for(let i=0;i<90;i++){engine.render({delta:1/30});if(i%15===14)await engine.gpu.queue.onSubmittedWorkDone();}water.setTime(0);}for(let i=0;i<frames;i++){engine.render({delta:0});if(i%8===7)await engine.gpu.queue.onSubmittedWorkDone();}await engine.gpu.queue.onSubmittedWorkDone();return errors.slice();},
+  post:()=>stack.effects.map(e=>e.name),
+  errors:()=>errors.slice(),
+};
+window.ready=true;
+</script></body></html>

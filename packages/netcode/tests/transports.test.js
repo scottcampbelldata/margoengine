@@ -101,10 +101,33 @@ test('the WebSocket server follows RFC 6455: accept key, masking, binary only, s
   assert.equal(closeCode(await raw(listener.port, upgrade(origin), [masked(2, new Array(17).fill(0))])), 1009);
   assert.match((await raw(listener.port, upgrade('Origin: https://evil.example\r\n'))).toString(), /^HTTP\/1.1 403/);
   assert.match((await raw(listener.port, upgrade())).toString(), /^HTTP\/1.1 403/);
-  assert.match(
-    (await raw(listener.port, upgrade(origin).replace('Version: 13', 'Version: 8'))).toString(),
-    /^HTTP\/1.1 400/,
-  );
+  // RFC 6455 4.4: another version is refused with 426 and the version this server speaks.
+  const other = (await raw(listener.port, upgrade(origin).replace('Version: 13', 'Version: 8'))).toString();
+  assert.match(other, /^HTTP\/1.1 426/);
+  assert.match(other, /\r\nSec-WebSocket-Version: 13\r\n/i);
+});
+
+test('the WebSocket server checks a received close frame (RFC 6455 5.5.1, 7.4)', async (t) => {
+  const listener = await listenWebSocket();
+  t.after(() => listener.close());
+  const heard = [];
+  listener.onconnection = (connection) => (connection.onclose = (code) => heard.push(code));
+  const close = (code, reason = []) => masked(8, [code >> 8, code & 255, ...reason]);
+  // Codes no peer may put in a frame fail the connection with 1002.
+  for (const code of [999, 1004, 1005, 1006, 1015, 2000, 5000])
+    assert.equal(closeCode(await raw(listener.port, upgrade(), [close(code)])), 1002, `code ${code}`);
+  // A close payload of one byte has no whole code.
+  assert.equal(closeCode(await raw(listener.port, upgrade(), [masked(8, [3])])), 1002);
+  // A reason that is not UTF-8 fails with 1007.
+  assert.equal(closeCode(await raw(listener.port, upgrade(), [close(1000, [0xff, 0xfe])])), 1007);
+  // Valid codes are echoed: registered ones, IANA's 1012 to 1014, and the private range.
+  heard.length = 0;
+  for (const code of [1000, 1001, 1011, 1013, 3000, 4999])
+    assert.equal(closeCode(await raw(listener.port, upgrade(), [close(code)])), code, `code ${code}`);
+  assert.deepEqual(heard, [1000, 1001, 1011, 1013, 3000, 4999]);
+  // A code the application passes that may not go on the wire is sent as 1000.
+  listener.onconnection = (connection) => connection.close(1004, 'reserved');
+  assert.equal(closeCode(await raw(listener.port, upgrade())), 1000);
 });
 
 // Bug 67 (audit E-02): the raw listener had no connection cap, no idle deadline and took any Origin. Its defaults now
@@ -346,4 +369,20 @@ test('WebRTC data channels: reliable and unreliable messages keep their channel;
   assert.equal(b.open, false);
   assert.equal(closed, CloseCode.normal);
   assert.throws(() => dataChannelConnection({}), /createDataChannels/);
+});
+
+test('WebRTC data channels: either channel closing closes both, on both ends', async () => {
+  const [ra, rb] = channelPair('netcode-reliable'),
+    [ua, ub] = channelPair('netcode-unreliable');
+  const a = dataChannelConnection({ reliable: ra, unreliable: ua }),
+    b = dataChannelConnection({ reliable: rb, unreliable: ub });
+  let closed = 0;
+  a.onclose = () => closed++;
+  // The far end (or the browser) closes only the unreliable channel.
+  ub.close();
+  assert.equal(a.open, false);
+  assert.equal(b.open, false);
+  assert.equal(closed, 1);
+  assert.equal(ra.readyState, 'closed', 'the reliable channel is not left open');
+  assert.equal(rb.readyState, 'closed');
 });

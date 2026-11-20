@@ -200,23 +200,38 @@ class _DevTools:
 
     def __init__(self, url: str, timeout: float):
         self._ws = WebSocket(url, timeout)
+        self._timeout = timeout
         self._id = 0
+
+    def _receive(self, waiting: str) -> str:
+        # One timeout per stage: a silent socket says which stage ran out, not a bare "timed out" from the socket read.
+        try:
+            return self._ws.receive()
+        except (socket.timeout, TimeoutError):
+            raise TimeoutError(f"{waiting} within {self._timeout:g} s; raise timeout= if the machine is busy ({HELP})") from None
 
     def wait_for(self, event: str, session: str) -> None:
         """Reads messages until ``event`` arrives for ``session``."""
         while True:
-            message = json.loads(self._ws.receive())
+            message = json.loads(self._receive(f"the page did not finish loading ({event})"))
             if message.get("method") == event and message.get("sessionId") == session:
                 return
 
-    def call(self, method: str, params: Optional[Dict[str, Any]] = None, session: Optional[str] = None) -> Dict[str, Any]:
+    def call(
+        self,
+        method: str,
+        params: Optional[Dict[str, Any]] = None,
+        session: Optional[str] = None,
+        waiting: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        waiting = waiting or f"the browser did not answer {method}"
         self._id += 1
         message: Dict[str, Any] = {"id": self._id, "method": method, "params": params or {}}
         if session:
             message["sessionId"] = session
         self._ws.send(json.dumps(message))
         while True:
-            reply = json.loads(self._ws.receive())
+            reply = json.loads(self._receive(waiting))
             if reply.get("id") == self._id:
                 if "error" in reply:
                     raise RuntimeError(f"browser refused {method}: {reply['error'].get('message')} ({HELP})")
@@ -346,6 +361,7 @@ def render_png(page: str, *, width: int, height: int, scale: float, browser: Opt
                     "timeout": int(timeout * 1000),
                 },
                 session,
+                waiting="the figure did not finish drawing",
             )
             if "exceptionDetails" in result:
                 details = result["exceptionDetails"]

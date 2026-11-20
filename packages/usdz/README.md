@@ -2,7 +2,7 @@
 
 Import `margoengine/usdz` from the `margoengine` package, or `@margoengine/usdz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Optional static USDA, USDC and USDZ ingestion into `@margoengine/gltf-pro`. Core and the stage facade are unchanged. The package uses Margo's shared bounded USDA tokenizer and ZIP reader, plus its native Crate decoder for USDC. Building and using it requires no external renderer or CAD runtime.
+Optional static USDA, USDC and USDZ ingestion into `@margoengine/gltf/pbr`. Core and the stage facade are unchanged. The package uses Margo's shared bounded USDA tokenizer and ZIP reader, plus its native Crate decoder for USDC. Building and using it requires no external renderer or CAD runtime.
 
 USDZ remains an ancillary format outside the six core launch packages and is not a core launch blocker.
 
@@ -23,7 +23,7 @@ of Cesium's BoxTextured sample (CC-BY-4.0 with trademark limitations). Run
 the shared external cache. The example exercises the static reader, including its archived texture;
 it does not require an animation or subdivision extension.
 
-`parseUSDA(textOrBytes)`, `parseUSDC(bytes)`, and async `parseUSDZ(bytes)` return a `USDAsset` with typed mesh streams, a glTF document/buffers, and async `create(engine)` to attach PBR rendering. `loadUSDZ` fetches with streaming byte bounds and creates the model. Malformed, unsupported or oversized input throws a `LoaderError` (`error.format === 'USD'`; `error.code` is `syntax`, `unsupported` or `limit`). Options: `maxBytes`, `maxVertices`, `maxTriangles`, `maxDepth`, `signal`. Defaults: 64 MiB, one million expanded vertices/triangles, depth 32. The engine grows its store when the hierarchy plus the PBR model root exceed the initial capacity. Texture ownership passes to the PBR model and is released on destruction or failed setup.
+`parseUSDA(textOrBytes)`, `parseUSDC(bytes)`, and async `parseUSDZ(bytes)` return a `USDAsset` with typed mesh streams, a glTF document/buffers, and async `create(engine)` to attach PBR rendering. `loadUSDZ` fetches with streaming byte bounds and creates the model. Malformed, unsupported or oversized input throws a `LoaderError` (`error.format === 'USD'`; `error.code` is `syntax`, `unsupported` or `limit`). A text layer follows the grammar of the AOUSD USD Core Specification v1.1.0, so a `variantSet` with no variants between its braces is a `syntax` error, as OpenUSD refuses it. Options: `maxBytes`, `maxVertices`, `maxTriangles`, `maxDepth`, `signal`. Defaults: 64 MiB, one million expanded vertices/triangles, depth 32. The engine grows its store when the hierarchy plus the PBR model root exceed the initial capacity. Texture ownership passes to the PBR model and is released on destruction or failed setup.
 
 Supports stored and Deflate ZIP entries with CRC checks, static ASCII/binary hierarchies, Y/Z up and authored units, ordered translate/scale/rotateXYZ/affine transforms, triangles and convex planar polygons, left-handed winding, authored normals and vertex/face-varying UVs including indices, inherited material bindings, and constant UsdPreviewSurface diffuse/roughness/metallic factors. UsdUVTexture diffuse and normal maps are decoded from the archive. A texture's `wrapS`/`wrapT` (`repeat`, `mirror`, `clamp`; `black` and `useMetadata` fall back to repeat) become a glTF sampler, and a `UsdTransform2d` on its `st` becomes `KHR_texture_transform` (same angle and sign, in radians). `mesh.uvs` holds `st` as authored (origin at the image's bottom left); the glTF document holds them as uvs (s, 1 - t). Separate roughness and metallic maps are packed into glTF's green/blue channels during creation.
 
@@ -32,6 +32,15 @@ Standard USDZ is an uncompressed, aligned archive. Deflate support accepts a bro
 Vertex colors read through a `UsdPrimvarReader` of `displayColor` or `displayOpacity` load as `mesh.colors` (four floats per vertex) and glTF COLOR_0, a constant `inputs:opacity` or the base colour map's alpha gives `BLEND`, or `MASK` with `inputs:opacityThreshold`; so a file from `exportUSDZ` keeps its paint and alpha. A separate opacity map and a reader of any other primvar are refused.
 
 Without the entries below this is a static mesh subset of one flattened layer: meshes need `subdivisionScheme = "none"`, and subdivision or hole faces are refused. A prim may reference a class or other prim of the same layer (`references = </Path>`, what `exportUSDZ` writes for a shared geometry), and what it authors wins; class prims are not drawn. Other composition is refused. A mesh's `GeomSubset`s with materials are primitives of their own (`mesh.subsets`), a texture reads the primvar its `UsdPrimvarReader` names, every `xformOp` of the schema is read (`rotateX`, all six Euler orders, `orient`, suffixes such as `xformOp:translate:pivot` and `!invert!`), `!resetXformStack!` is honoured (see [Reset transform stacks](#reset-transform-stacks)), guide and proxy meshes are left out, and a mesh with no material shows its `displayColor`. Physical Apple AR Quick Look round trips are untested.
+
+## Loading into a second scene
+
+`USDAsset.create`, `loadUSDZ`, `parseUSDInWorker` and `loadUSDZInWorker` remember the scene that is active when you
+call them, before their first await, and build the model there, with whatever an extension's `created` hook adds
+(such as the `previewSurface()` plugin), even though the textures, download or worker finish later. Start a load
+inside a second scene's plugin `setup` and the model belongs to that scene; start it anywhere else and it belongs to the
+default scene. If the scene is disposed while the load runs, the load rejects with a `TypeError` and nothing is left in
+the default scene.
 
 ## Composition
 
@@ -62,7 +71,7 @@ Not read: value clips, relocates, splines, `.abc` and other non-USD layers, impl
 
 `npm run modern:test:usdz` checks synthetic USDA/USDC equivalence, ZIP/Deflate, CRC, topology, aborts and bounds. `npm run modern:test:usdz:browser` then verifies texture-channel packing, actual WebGPU pixels, bitmap cleanup and the file-picker demo. The synthetic crate fixture was generated by OpenUSD 26.08 from the checked-in USDA; `tests/generate-fixture.py` regenerates it when OpenUSD is installed. OpenUSD is not a runtime dependency.
 
-Build the workspace independently with `npm run build --workspace @margoengine/usdz`, or build all packages with `npm run build:packages`. Both paths need no other installed package. Run `npx vite --host 127.0.0.1` at the root and open `/examples/usdz-loader/` for the file demo. Peer ranges target core/gltf-pro 1.x. Apache-2.0 licensed.
+Build the workspace independently with `npm run build --workspace @margoengine/usdz`, or build all packages with `npm run build:packages`. Both paths need no other installed package. Run `npx vite --host 127.0.0.1` at the root and open `/examples/usdz-loader/` for the file demo. Peer ranges target core/gltf/pbr 1.x. Apache-2.0 licensed.
 
 ## Skeletons and blend shapes
 
@@ -129,11 +138,11 @@ USD's schema default is `catmullClark`, so a polygon model that forgets `subdivi
 
 ## Lights and cameras
 
-`lights()` from `margoengine/usdz/lux` reads `DistantLight`, `SphereLight`, `RectLight`, `DiskLight`, `CylinderLight` and `Camera` prims into the glTF document, so a lit stage opens lit: they load as `model.lights` and `model.cameras`, and `applyGLTFLights` and `viewGLTFCamera` from `margoengine/gltf-pro` use them. A `.usdz` also needs `composition()`; `loadUSDFiles` composes by itself. A stage holding only cameras or lights opens too.
+`lights()` from `margoengine/usdz/lux` reads `DistantLight`, `SphereLight`, `RectLight`, `DiskLight`, `CylinderLight` and `Camera` prims into the glTF document, so a lit stage opens lit: they load as `model.lights` and `model.cameras`, and `applyGLTFLights` and `viewGLTFCamera` from `margoengine/gltf/pbr` use them. A `.usdz` also needs `composition()`; `loadUSDFiles` composes by itself. A stage holding only cameras or lights opens too.
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {applyGLTFLights,viewGLTFCamera} from 'margoengine/gltf-pro';
+import {applyGLTFLights,viewGLTFCamera} from 'margoengine/gltf/pbr';
 import {loadUSDFiles} from 'margoengine/usdz/compose';
 import {lights} from 'margoengine/usdz/lux';
 

@@ -139,17 +139,14 @@ export function meshoptDecodeVertexBuffer(target: Uint8Array, count: number, siz
     }
 
     // Channel modes live in the tail; check them once, after the first block shows the data is all there.
-    if (v1 && !checkedModes) {
-      for (let c = 0; c < channels; c++) if ((src[modesAt + c] & 3) === 3) fail('invalid vertex channel mode');
-      checkedModes = true;
-    }
+    if (v1 && !checkedModes) checkedModes = checkModes(src, modesAt, channels);
 
     for (let i = 0; i < n; i++) {
       const out = (start + i) * size;
       for (let c = 0; c < channels; c++) {
         const b = c * 4;
         const mode = v1 ? src[modesAt + c] : 0;
-        const kind = mode & 3;
+        const kind = mode & 15;
         if (kind === 0) {
           for (let k = b; k < b + 4; k++) {
             const v = (prev[k] + unzig8(lanes[k * 256 + i])) & 0xff;
@@ -185,20 +182,40 @@ export function meshoptDecodeVertexBuffer(target: Uint8Array, count: number, siz
     }
   }
   if (length - pos !== tailSize) fail('vertex stream has trailing or missing data');
+  // An empty stream runs no block, and its modes must still be valid.
+  if (v1 && !checkedModes) checkModes(src, modesAt, channels);
+}
+
+/**
+ * KHR_meshopt_compression, version 1 channel modes: the low nibble is 0 (byte deltas), 1 (2-byte deltas) or 2 (4-byte
+ * XOR deltas); only mode 2 may set the high nibble, its rotation. Any other byte makes the stream invalid.
+ */
+function checkModes(src: Uint8Array, modesAt: number, channels: number): true {
+  for (let c = 0; c < channels; c++) {
+    const mode = src[modesAt + c],
+      kind = mode & 15;
+    if (kind > 2 || (kind < 2 && mode >> 4)) fail('invalid vertex channel mode');
+  }
+  return true;
 }
 
 // ------------------------------------------------------------------------------------------------ index codecs
 
-/** Reads an unsigned LEB128 value of at most 5 bytes at `state.pos` (32-bit wraparound). */
+/**
+ * Reads an unsigned LEB128 value of 1 to 5 bytes at `state.pos` (32-bit wraparound). A fifth byte with its high bit
+ * set is damage: the bitstream allows at most 5 bytes, the last with a clear high bit.
+ */
 function readVarint(src: Uint8Array, state: { pos: number }): number {
   let value = 0;
   let shift = 0;
   let pos = state.pos;
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; ; i++) {
+    if (pos >= src.length) fail('truncated index stream');
     const byte = src[pos++];
     value |= (byte & 127) << shift;
     shift += 7;
     if (byte < 128) break;
+    if (i === 4) fail('index varint is longer than 5 bytes');
   }
   state.pos = pos;
   return value >>> 0;
@@ -232,23 +249,35 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
   const fifoLimit = version === 1 ? 13 : 15;
 
   const tail = length - 16;
-  // FIFOs start filled with all ones: a slot read before it was written yields 0xffffffff (0xffff in 16 bits).
-  const edgeA = new Uint32Array(16).fill(0xffffffff);
-  const edgeB = new Uint32Array(16).fill(0xffffffff);
-  const verts = new Uint32Array(16).fill(0xffffffff);
+  // The codeaux table: its last two bytes are 0 and no nibble of it is 0xf (Appendix A, mode 1).
+  for (let i = 0; i < 16; i++) {
+    const aux = src[tail + i];
+    if (i >= 14 ? aux !== 0 : (aux & 15) === 15 || aux >> 4 === 15) fail('invalid codeaux table');
+  }
+  // FIFO contents start undefined: a stream that reads a slot before it was written is invalid.
+  const edgeA = new Uint32Array(16);
+  const edgeB = new Uint32Array(16);
+  const verts = new Uint32Array(16);
   let edgeHead = 0;
   let vertHead = 0;
+  let edges = 0;
+  let vertices = 0;
   const pushEdge = (a: number, b: number): void => {
     edgeA[edgeHead] = a;
     edgeB[edgeHead] = b;
     edgeHead = (edgeHead + 1) & 15;
+    if (edges < 16) edges++;
   };
   const pushVertex = (v: number): void => {
     verts[vertHead] = v;
     vertHead = (vertHead + 1) & 15;
+    if (vertices < 16) vertices++;
   };
   // Index 0 is the most recent entry.
-  const vertex = (i: number): number => verts[(vertHead - 1 - i) & 15];
+  const vertex = (i: number): number => {
+    if (i >= vertices) fail('triangle code reads a vertex FIFO entry that was never written');
+    return verts[(vertHead - 1 - i) & 15];
+  };
 
   let next = 0;
   let last = 0;
@@ -269,6 +298,7 @@ export function meshoptDecodeIndexBuffer(out: Uint32Array | Uint16Array, count: 
     let c: number;
     if (hi < 15) {
       // An edge from the FIFO plus one more vertex.
+      if (hi >= edges) fail('triangle code reads an edge FIFO entry that was never written');
       const e = (edgeHead - 1 - hi) & 15;
       a = edgeA[e];
       b = edgeB[e];

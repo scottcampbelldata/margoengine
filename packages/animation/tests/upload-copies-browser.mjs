@@ -11,7 +11,7 @@ browser.page.on('pageerror', (e) => errors.push(e.message));
 try {
   const result = await browser.page.evaluate(async () => {
     const { Engine } = await import('/packages/core/dist/index.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { invertMatrixStable, multiplyMatrices } = await import('/packages/math/dist/mat4.js');
     const canvas = document.createElement('canvas');

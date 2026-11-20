@@ -17,6 +17,20 @@ try {
     else assert.equal(r.emptyDraws, 0);
   }
   assert.equal(result.validation, null);
+  // KB-RESTORE-BORROWED1: no frame throws, one report per lost image or target, the function atlas is called once per
+  // device, and setImage and setTarget bring the map back; every frame compares byte for byte.
+  const help = '; see https://margoengine.com/errors#borrowed-lost';
+  assert.deepEqual(result.loss, {
+    before: 0,
+    frames: [0, 0, 0],
+    reports: [
+      ['state', `ObjectTileMap image lost with the device; pass a function or call setImage${help}`],
+      ['state', `ObjectTileMap target lost with the device; pass a function or call setTarget${help}`],
+    ],
+    functionCalls: 2,
+    functionDevices: true,
+    after: 0,
+  });
   assert.deepEqual(result.errors, []);
   assert.deepEqual(errors, []);
   console.log(

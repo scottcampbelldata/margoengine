@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/weather",
   "version": "1.0.0",
-  "description": "Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; helpers for the sky's Weather; and bouncing GPU hail.",
+  "description": "Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; snow avalanches with a powder cloud that run out, entrain the cover, break trees and settle; volcanic eruption columns with an umbrella cloud, ash fall and plume lightning; lava flows that run down the ground and crust over with glowing cracks, fountains, bombs and glow lights; snow that drifts, builds cornices, sloughs and carries a slab's slide state; helpers for the sky's Weather; and bouncing GPU hail.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -43,6 +43,26 @@
       "types": "./dist/snow.d.ts",
       "import": "./dist/snow.js"
     },
+    "./snow-drift": {
+      "types": "./dist/snow-drift.d.ts",
+      "import": "./dist/snow-drift.js"
+    },
+    "./avalanche": {
+      "types": "./dist/avalanche.d.ts",
+      "import": "./dist/avalanche.js"
+    },
+    "./eruption": {
+      "types": "./dist/eruption.d.ts",
+      "import": "./dist/eruption.js"
+    },
+    "./lava": {
+      "types": "./dist/lava.d.ts",
+      "import": "./dist/lava.js"
+    },
+    "./lava-settings": {
+      "types": "./dist/lava-settings.d.ts",
+      "import": "./dist/lava-settings.js"
+    },
     "./regions": {
       "types": "./dist/regions.d.ts",
       "import": "./dist/regions.js"
@@ -70,6 +90,10 @@
     "./cover": {
       "types": "./dist/cover.d.ts",
       "import": "./dist/cover.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
     }
   },
   "files": [
@@ -94,7 +118,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js weather",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs",
+    "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs && node packages/weather/tests/seek-check.mjs && node packages/weather/tests/settings-check.mjs",
     "prepack": "npm run build",
     "test:browser:parity": "cd ../.. && node packages/weather/tests/parity-browser.mjs gltf && node packages/weather/tests/parity-browser.mjs gltf --compat && node packages/weather/tests/parity-browser.mjs cover && node packages/weather/tests/parity-browser.mjs cover --compat && node packages/weather/tests/parity-browser.mjs lens && node packages/weather/tests/parity-browser.mjs lens --compat"
   }

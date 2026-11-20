@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>horses check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// GPU check page of @margoengine/horses. window.check.horse(): a cavalry horse built by addHorse eases into a trot under
+// a key light with shadows; returns the frame as PNG bytes, the pose after chunked play and after a seek to the same
+// film time, and the saddle path a rider seat follows. window.check.herd(): 60 horses of addHorseCrowd driven by a
+// @margoengine/navmesh/formations cavalry wedge and line on the march, as PNG bytes.
+import {Engine} from '/packages/core/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {addHorse} from '/packages/horses/dist/index.js';
+import {addHorseCrowd} from '/packages/horses/dist/crowd.js';
+import {mountRider} from '/packages/horses/dist/seat.js';
+import {Army} from '/packages/navmesh/dist/formations.js';
+const canvas=document.querySelector('canvas');canvas.width=480;canvas.height=360;canvas.style.width='480px';canvas.style.height='360px';
+const make=async(camera)=>{
+  const engine=await Engine.create(canvas,{camera:{fov:35,near:0.05,far:400,...camera}});
+  engine.stop();
+  const errors=[];engine.gpu?.addEventListener?.('uncapturederror',e=>errors.push(e.error.message));
+  engine.scene.background='#30333a';
+  engine.lighting.direction.set([0.5,0.6,0.62,3]);engine.lighting.radiance.set([1,0.95,0.88,0.45]);
+  return {engine,errors};
+};
+const png=async()=>[...new Uint8Array(await (await new Promise(r=>canvas.toBlob(r,'image/png'))).arrayBuffer())];
+const settle=async(engine)=>{for(let i=0;i<4;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}};
+window.check={
+  async horse(){
+    const {engine,errors}=await make({position:[4.2,1.6,3.2],target:[0,1.0,1.2]});
+    Shadows.attach(engine,{resolution:1024});
+    const horse=await addHorse(engine,{type:'cavalry',position:[0,-6.2],coat:'bay',markings:{blaze:true,socks:[0.3,0,0,0]}});
+    horse.speed=4;
+    const saddle=[];
+    const rider={root:{setPosition(p){saddle.push(p[1]);},setQuaternion(){}}},mount=mountRider(horse,rider,{height:1.75});
+    for(let i=0;i<75;i++)horse.advanceTime(1/30);
+    const played={d:horse.distance,t:horse.time,cs:horse.currentSpeed,pose:JSON.stringify(horse.pose),frame:JSON.stringify(horse.frame()),gait:horse.currentGait,speed:horse.currentSpeed,hip:mount.hip};
+    await settle(engine);
+    const bytes=await png();
+    horse.seek(1.1);horse.seek(2.5);
+    const sought={d:horse.distance,t:horse.time,cs:horse.currentSpeed,pose:JSON.stringify(horse.pose),frame:JSON.stringify(horse.frame()),hip:mount.hip};
+    const ys=saddle.slice(-30),rise=Math.max(...ys)-Math.min(...ys);
+    mount.dispose();horse.dispose();
+    const after=engine.plugins.has(horse.animation.name);
+    engine.dispose();
+    return {bytes,errors,played,sought,rise,after,clips:horse.clips.map(c=>c.name)};
+  },
+  async herd(){
+    const {engine,errors}=await make({position:[0,22,-48],target:[0,0,4]});
+    const army=new Army();
+    const wedge=army.add({count:25,kind:'cavalry',shape:'wedge',position:[-8,0]}),
+      line=army.add({count:35,kind:'cavalry',shape:'line',ranks:2,position:[10,-6]});
+    wedge.march({speed:6});line.march({speed:3.5});
+    const herd=await addHorseCrowd(engine,{type:'cavalry'});
+    army.advanceTime(2);herd.update(army.members);
+    await settle(engine);
+    const bytes=await png();
+    const gaits=army.members.map(m=>herd.pose(m.speed,m.distance).clip),seats=army.members.map((m,i)=>[herd.saddles[i*16+12]-m.x,herd.saddles[i*16+13],herd.saddles[i*16+14]-m.z]);
+    herd.dispose();engine.dispose();
+    return {bytes,errors,count:herd.count,gaits,seats,withers:herd.body.withers,clips:herd.clips.map(c=>c.name),bones:herd.bake.bones};
+  },
+};
+window.ready=true;
+</script></body></html>

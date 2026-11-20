@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
-import { GLTFDocument, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFDocument, PBRModel } from "@margoengine/gltf/pbr";
 
 export class MSFTMaterialLOD implements EnginePlugin {
     readonly model: PBRModel;

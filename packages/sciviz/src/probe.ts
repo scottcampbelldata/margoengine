@@ -66,6 +66,14 @@ function hexShape(uvw: number[]) {
   const derivatives = hexCorners.map(c => [0,1,2].map(a => c.reduce((v, x, k) => v * (a === k ? (x ? 1 : -1) : x ? uvw[k] : 1 - uvw[k]), 1)));
   return { weights, derivatives };
 }
+// Bilinear quad, corners in VTK order: the interpolant a regular image uses, so a curvilinear twin samples the same.
+const quadCorners = [[0,0],[1,0],[1,1],[0,1]];
+function quadShape(uv: number[]) {
+  const weights = quadCorners.map(c => c.reduce((v, x, a) => v * (x ? uv[a] : 1 - uv[a]), 1));
+  const derivatives = quadCorners.map(c => [0,1].map(a => c.reduce((v, x, k) => v * (a === k ? (x ? 1 : -1) : x ? uv[k] : 1 - uv[k]), 1)));
+  return { weights, derivatives };
+}
+const tangents = (p: number[][], derivatives: number[][]) => [0,1].map(a => [0,1,2].map(b => p.reduce((s, v, k) => s + derivatives[k][a] * v[b], 0)));
 function simplexWeights(p: number[][], at: number[], tolerance: number): number[] | null {
   const q = sub3(at, p[0]);
   if (p.length === 1) return Math.hypot(...q) <= tolerance ? [1] : null;
@@ -184,6 +192,17 @@ export class CellLocator {
           const j=[0,1,2].map(a=>[0,1,2].map(b=>p.reduce((s,v,k)=>s+derivatives[k][a]*v[b],0))),step=solve(j[0],j[1],j[2],error);
           if(!step)break;uvw=uvw.map((x,a)=>x+step[a]);
         }
+      }else if(g.types[cell]===9){
+        // Gauss-Newton on the surface: a point off a planar quad keeps a residual above tolerance and misses.
+        let uv=[0.5,0.5];
+        for(let turn=0;turn<24;turn++){
+          const {weights,derivatives}=quadShape(uv),error=sub3(at,[0,1,2].map(a=>p.reduce((s,v,k)=>s+weights[k]*v[a],0)));
+          if(Math.hypot(...error)<=tolerance){if(uv.every(x=>x>=-64*Number.EPSILON&&x<=1+64*Number.EPSILON))return this.interpolate(cell,ids,weights);break;}
+          const [ju,jv]=tangents(p,derivatives),a=dot3(ju,ju),b=dot3(ju,jv),c=dot3(jv,jv),det=a*c-b*b,ru=dot3(ju,error),rv=dot3(jv,error);
+          if(!(det>0)||!Number.isFinite(det))break;
+          const step=[(c*ru-b*rv)/det,(a*rv-b*ru)/det];uv=uv.map((x,k)=>x+step[k]);
+          if(Math.hypot(...step)<=64*Number.EPSILON)break;
+        }
       }else{
         const one={...g,connectivity:ids,offsets:[ids.length],types:[g.types[cell]]};
         for(const simplex of simplices(one)){const w=simplexWeights(simplex.ids.map(id=>point(g,id)),at,tolerance);if(w)return this.interpolate(cell,simplex.ids,w);}
@@ -236,7 +255,7 @@ export async function resampleDataset(locator:CellLocator,target:ProbeInput,opti
 /** Resample to a regular image with the given sample dimensions and signed bounds. */
 export function resampleToImage(locator:CellLocator,dims:readonly[number,number,number],bounds:Bounds,options:ProbeOptions={}):Promise<ResampledDataset>{return resampleDataset(locator,{dims,bounds},options);}
 
-/** Exact simplex field integrals; 3-point tensor Gauss integration of nonfolded trilinear hexahedra. */
+/** Exact simplex field integrals; 3-point tensor Gauss integration of bilinear quads and nonfolded trilinear hexahedra. */
 export async function integrateGrid(input:ProbeInput,options:ProbeOptions={}):Promise<GridIntegrals>{
   options.signal?.throwIfAborted();validate(input);const grid=isImage(input)?materialize(input):input;
   const make=()=>({measure:0,pa:Object.fromEntries(Object.entries(rows(grid,true)).map(([k,v])=>[k,new Float64Array(v.length/countPoints(grid)||1)])),ca:Object.fromEntries(Object.entries(rows(grid,false)).map(([k,v])=>[k,new Float64Array(v.length/countCells(grid)||1)]))}),out=[make(),make(),make()];
@@ -254,6 +273,13 @@ export async function integrateGrid(input:ProbeInput,options:ProbeOptions={}):Pr
       for(let a=0;a<3;a++)for(let b=0;b<3;b++)for(let c=0;c<3;c++){
         const shape=hexShape([x[a],x[b],x[c]]),j=[0,1,2].map(a=>[0,1,2].map(b=>p.reduce((s,v,k)=>s+shape.derivatives[k][a]*v[b],0))),det=dot3(j[0],cross3(j[1],j[2]));
         if(det===0||!Number.isFinite(det)||(sign&&Math.sign(det)!==sign))throw rangeError('Hex integration needs a nondegenerate consistently signed Jacobian; repair the cell','sciviz');sign=Math.sign(det);add(3,Math.abs(det)*w[a]*w[b]*w[c],ids,shape.weights,cell);
+      }
+    }else if(grid.types[cell]===9){
+      let normal:number[]|undefined;
+      for(let a=0;a<3;a++)for(let b=0;b<3;b++){
+        const shape=quadShape([x[a],x[b]]),[ju,jv]=tangents(p,shape.derivatives),n=cross3(ju,jv),area=Math.hypot(...n);
+        if(!(area>0)||!Number.isFinite(area)||(normal&&dot3(n,normal)<=0))throw rangeError('Integration needs nondegenerate finite cells; repair the geometry','sciviz');
+        normal??=n;add(2,area*w[a]*w[b],ids,shape.weights,cell);
       }
     }else for(const simplex of simplices({...grid,connectivity:ids,offsets:[ids.length],types:[grid.types[cell]]})){
       const p=simplex.ids.map(id=>point(grid,id)),dimension=p.length-1;if(!dimension)continue;

@@ -5,12 +5,10 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../../..', import.meta.url)));
 const page0 = '/packages/culling/test/gpu/last-pass.html';
-const release = await acquire({ owner: 'culling-last-pass' });
 const context = await openBrowser({ startPath: `${page0}?scene=none`, port: 5282 }),
   { page } = context,
   pageErrors = [];
@@ -56,5 +54,4 @@ try {
   console.log('ok - the last pass resolves the frame, and the frame is unchanged');
 } finally {
   await context.close();
-  release();
 }

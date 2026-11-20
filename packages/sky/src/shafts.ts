@@ -16,7 +16,16 @@ import { displayShader } from '../../shared/display.js';
 import { applyView, viewRect } from '../../shared/view-rect.js';
 import { sunlight } from './atmosphere.js';
 import { depthWGSL, sceneDepth } from './depth.js';
-import { CloudVolumes, cloudField, writeLayer, type VolumetricCloudOptions } from './volumetric-clouds.js';
+import {
+  CLOUD_FLOATS,
+  CloudVolumes,
+  cloudField,
+  stormFieldFor,
+  wantsStorm,
+  withStorm,
+  writeLayer,
+  type VolumetricCloudOptions,
+} from './volumetric-clouds.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
@@ -35,6 +44,8 @@ export interface ShaftSky {
 export interface ShaftClouds {
   readonly options: VolumetricCloudOptions;
   readonly drift: ArrayLike<number>;
+  /** Seconds on the layer's clock (`VolumetricClouds.time`): where a storm it draws has moved. Default 0. */
+  readonly time?: number;
 }
 /** {@link LightShafts} settings, read every frame from `shafts.options`. */
 export interface LightShaftOptions {
@@ -155,7 +166,7 @@ export class LightShafts implements EnginePlugin {
   private bound?: GPUTexture | GPUTextureView;
   private disposed = false;
   private readonly values = new Float32Array(48);
-  private readonly cloudValues = new Float32Array(64);
+  private readonly cloudValues = new Float32Array(CLOUD_FLOATS);
   private readonly scratch = new Float64Array(52);
   private readonly color = new Float32Array(3);
   constructor(readonly options: LightShaftOptions) {
@@ -270,7 +281,7 @@ export class LightShafts implements EnginePlugin {
   private writeClouds(c: Context, clouds: ShaftClouds): void {
     const v = this.cloudValues;
     v.set(c.camera.position, 16);
-    writeLayer(v, clouds.options, clouds.drift);
+    writeLayer(v, clouds.options, clouds.drift, clouds.time ?? 0);
     v[34] = clouds.options.maxDistance ?? 80000;
     v[35] = this.options.cloudSamples ?? defaults.cloudSamples;
     this.cloudUniform ??= c.device.createBuffer({
@@ -288,7 +299,10 @@ export class LightShafts implements EnginePlugin {
     const d = c.device,
       clouds = this.options.clouds,
       width = Math.max(1, Math.ceil(c.width / 2)),
-      height = Math.max(1, Math.ceil(c.height / 2));
+      height = Math.max(1, Math.ceil(c.height / 2)),
+      field = clouds ? stormFieldFor(clouds.options) : undefined;
+    // A storm's code loads on first use; the shafts wait for it (`VolumetricClouds.ready`).
+    if (clouds && wantsStorm(clouds.options) && !field) return;
     if (clouds) this.writeClouds(c, clouds);
     if (!this.mask || this.mask.width !== width || this.mask.height !== height) {
       this.mask?.destroy();
@@ -300,9 +314,9 @@ export class LightShafts implements EnginePlugin {
       this.blurGroup = undefined;
       this.bound = undefined;
     }
-    const maskKey = `${depth.samples}:${!!clouds}`;
+    const maskKey = `${depth.samples}:${!!clouds}:${!!field}`;
     if (this.maskKey !== maskKey) {
-      const module = d.createShaderModule({ code: maskShader(depthWGSL(1, depth.samples), !!clouds) });
+      const module = d.createShaderModule({ code: withStorm(maskShader(depthWGSL(1, depth.samples), !!clouds), field) });
       this.maskPipeline = d.createRenderPipeline({
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },

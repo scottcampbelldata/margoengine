@@ -1,48 +1,50 @@
 // Proof that light probes (`@margoengine/environment/probes`) and decals (`@margoengine/post/decals`) cost nothing for apps
 // that do not import them:
-// 1. Every pre-existing entry of environment and post (and clustered, gltf-pro, materials, terrain, which the probes
+// 1. Every pre-existing entry of environment and post (and clustered, gltf/pbr, materials, terrain, which the probes
 //    reach) bundles (Vite, minified, bare imports external, src and packages/shared from the ref) to the same bytes at `ref`
-//    and at the candidate, except the entries holding the SSR off-screen fallback (post's ssr.ts, gltf-pro's capture
+//    and at the candidate, except the entries holding the SSR off-screen fallback (post's ssr.ts, gltf/pbr's capture
 //    hook), whose new text is emitted only next to LightProbes' `probeSpecular`; their GPU calls without probes are
-//    proven identical by part 3 and by gltf-pro-lighting-hooks.proof.js and oit-detached.proof.js run with the same refs
+//    proven identical by part 3 and by gltf-pbr-lighting-hooks.proof.js and oit-detached.proof.js run with the same refs
 //    (`node <proof> ecdcb31 7d144fb`). The other edit is `export` on environment's ShaderEffect.
-// 2. GPU calls: a 6-frame story of EnvironmentLighting + Fog on core's shader and a gltf-pro model records identical calls
+// 2. GPU calls: a 6-frame story of EnvironmentLighting + Fog on core's shader and a gltf/pbr model records identical calls
 //    at `ref` and now, also with a LightProbes constructed but never attached; Decals with an empty list records nothing.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/probes-decals.proof.js [ref] [pin]
 // Pinned: ecdcb31 against 7d144fb, the commit that added probes and decals ("now" above). Part 1 is a statement about
 // that one change (later commits edit these sources for other reasons), so there is no --current mode.
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { refs, versions, bundle, commit, entryAt, announce, fileAt, coreAt } from './compare.js';
+import { refs, versions, bundle, commit, entryAt, announce, fileAt, coreAt, placeAt } from './compare.js';
 import { modified } from './history.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 const { ref, pin } = refs('ecdcb31', '7d144fb'),
   { Engine, TransformStore, wgsl } = await coreAt(pin),
   root = resolve(import.meta.dirname, '../../..'),
   base = commit(ref),
-  now = pin && commit(pin);
+  now = pin && commit(pin),
+  // The PBR loader's folder at the claim's refs: its own package then (placeAt), gltf since the fold.
+  pbr = placeAt('gltf', 'src/pbr.ts', now ?? base).name;
 const show = (file) => fileAt(file, base);
 const code = async (name, entry, at) => (await bundle(name, entry, at, true)).map((chunk) => chunk.code).join('\n');
-const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
+const gltf = await entryAt('gltf', 'src/pbr.ts', pin),
   { LightProbes } = await entryAt('environment', 'src/probes.ts', pin),
   { Decals } = await entryAt('post', 'src/decals.ts', pin);
 // Existing sources edited: environment's lighting.ts (`export`), and the SSR off-screen fallback: post's ssr.ts and
-// gltf-pro's capture hook (shader.ts) emit new text only when the shader holds LightProbes' `probeSpecular`.
-announce('entry bundles of environment, post, clustered, gltf-pro, materials, terrain', ref, pin);
+// gltf/pbr's capture hook (shader.ts) emit new text only when the shader holds LightProbes' `probeSpecular`.
+announce('entry bundles of environment, post, clustered, gltf/pbr, materials, terrain', ref, pin);
 const changed = modified(base, now, [
-  ...['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain'].map((n) => `packages/${n}/src`),
+  ...['environment', 'post', 'clustered', pbr, 'materials', 'terrain'].map((n) => `packages/${n}/src`),
   'packages/shared',
 ]);
 assert.deepEqual(
   changed,
-  ['packages/environment/src/lighting.ts', 'packages/gltf-pro/src/shader.ts', 'packages/post/src/ssr.ts'],
+  ['packages/environment/src/lighting.ts', `packages/${pbr}/src/shader.ts`, 'packages/post/src/ssr.ts'],
   'unexpected edits to existing sources',
 );
 let entries = 0;
 const differ = [];
-for (const name of ['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain']) {
+for (const name of ['environment', 'post', 'clustered', pbr, 'materials', 'terrain']) {
   const manifest = JSON.parse(show(`packages/${name}/package.json`));
   for (const [path, target] of Object.entries(manifest.exports)) {
     const entry = target.import.replace('./dist/', 'src/').replace(/\.js$/, '.ts'),
@@ -54,9 +56,9 @@ for (const name of ['environment', 'post', 'clustered', 'gltf-pro', 'materials',
     }
   }
 }
-// Those entries' GPU calls without probes: part 3 below, gltf-pro-lighting-hooks.proof.js and oit-detached.proof.js with
+// Those entries' GPU calls without probes: part 3 below, gltf-pbr-lighting-hooks.proof.js and oit-detached.proof.js with
 // these refs (identical).
-assert.ok(differ.includes('post/ssr') && differ.includes('gltf-pro'), 'the SSR wiring is in the bundles');
+assert.ok(differ.includes('post/ssr') && differ.includes(pbr), 'the SSR wiring is in the bundles');
 // GPU calls of the scene effects the probes share code with (environment root), before and after.
 const { baseline, candidate } = await versions('environment', ref, undefined, pin);
 async function story(environment, withProbes) {
@@ -132,11 +134,11 @@ assert.deepEqual(
   'an empty Decals recorded GPU calls',
 );
 // 3. The SSR fallback wiring without probes: PostStack [SSR] and [SSAO, SSR, Bloom, FXAA] over core's plain and IBL-patched
-//    shaders, with a gltf-pro model reflecting through SSR's capture hook, 1x/4x, 12 frames (resize, option edits, toggle,
-//    restore): post and gltf-pro at `ref` and now record identical GPU calls. With LightProbes' shader the replay and the
+//    shaders, with a gltf/pbr model reflecting through SSR's capture hook, 1x/4x, 12 frames (resize, option edits, toggle,
+//    restore): post and gltf/pbr at `ref` and now record identical GPU calls. With LightProbes' shader the replay and the
 //    capture record the pixel position and remove probeSpecular.
 const post = await versions('post', ref, undefined, pin),
-  pro = await versions('gltf-pro', ref, undefined, pin);
+  pro = await versions('gltf', ref, 'src/pbr.ts', pin);
 const ibl =
   wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;') +
   '\nfn iblBrdfTerms(nv:f32,r:f32)->vec2f {return vec2f(1,0);}';
@@ -194,7 +196,7 @@ async function ssrStory(m, g, make, samples, shader) {
       view.begin(i);
       try {
         for (const pass of passList) pass.execute(view.c);
-      } catch (error) {
+      } catch {
         gpu.note('throw');
       }
       view.end();
@@ -247,7 +249,7 @@ for (const make of Object.values(lists))
 }
 console.log(
   JSON.stringify({
-    packages: ['environment', 'post', 'clustered', 'gltf-pro', 'materials', 'terrain'],
+    packages: ['environment', 'post', 'clustered', 'gltf/pbr', 'materials', 'terrain'],
     baseline: ref,
     identicalEntryBundles: entries,
     changedEntries: differ,

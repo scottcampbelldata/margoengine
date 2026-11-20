@@ -4,6 +4,7 @@ import { Reflector, type ReflectorOptions } from '@margoengine/environment/refle
 import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { linearColor, type ColorInput } from './color.js';
+export { MeshReflector, type MeshReflectorOptions } from './mesh-reflector.js';
 
 /** Settings of a Fresnel floor with contact-preserving depth-dependent blur. */
 export interface PBRReflectorOptions extends ReflectorOptions {

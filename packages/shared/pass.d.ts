@@ -17,7 +17,7 @@ export const overlayBlend: GPUBlendState;
 export function attachableMesh<M extends { check(): void } | null>(mesh: M): M;
 /**
  * What an order-independent pass offers an effect that is no PBR surface (particles, splats, points), in place of
- * gltf-pro's transparency hook. Same contract, but `surface` declares `fn margoTransparentAt(color:vec4f,clip:vec4f,
+ * gltf/pbr's transparency hook. Same contract, but `surface` declares `fn margoTransparentAt(color:vec4f,clip:vec4f,
  * depth:f32)->MargoTransparent`: `clip` is the fragment's position builtin, `depth` its view depth.
  */
 export interface SurfaceTransparency {

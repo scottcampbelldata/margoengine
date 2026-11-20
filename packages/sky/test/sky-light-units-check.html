@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky light and sun in one unit</title><style>body{margin:0}canvas{display:block;width:160px;height:120px}</style></head><body><canvas width="160" height="120"></canvas>
+<script type="module">
+// KB-SKY-SUNUNITS1: a level grey plate under a clear sky, seen from above. `?light=both` is lit by the sky's sun and its
+// light map (lighting.ambient); `?light=sun` by the sun alone (no ambient, core's constant ambient off). Query: model
+// (preetham or bruneton), elevation in degrees, intensity (lighting.intensity). Driven by sky-light-units-check.mjs,
+// which undoes the display curve and takes the sky's share of the light on the plate.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {degrees,sunlitSky} from '/packages/sky/dist/sun.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const q=new URLSearchParams(location.search),light=q.get('light')??'both',model=q.get('model')??'preetham',
+ elevation=Number(q.get('elevation')??60),intensity=Number(q.get('intensity')??1),albedo=Number(q.get('albedo')??0.2);
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,6,0.001],target:[0,0,0],near:0.05,far:5000}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+device.lost.then(i=>errors.push('lost: '+i.message));
+const options=sunlitSky({elevation:degrees(elevation),azimuth:degrees(160),intensity,skyAmbient:light==='both'});
+if(light==='both')options.lighting.ambient={day:[0,0,0],night:[0,0,0]};
+else engine.lighting.ambient.set([0,0,0]);
+Sky.attach(engine,{...options,model});
+engine.createMesh().setGeometry(box(8,0.1,8)).setMaterial(new PbrMaterial({color:[albedo,albedo,albedo],roughness:1,metallic:0}));
+async function frame(){
+ const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+ engine.render({delta:0});
+ if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();
+ g.drawImage(canvas,0,0);
+ const d=g.getImageData(60,40,40,40).data,m=[0,0,0];
+ for(let k=0;k<d.length;k+=4)for(let i=0;i<3;i++)m[i]+=d[k+i];
+ return m.map(v=>v/(d.length/4));
+}
+window.check={async run(count=3){const frames=[];for(let i=0;i<count;i++)frames.push(await frame());await device.queue.onSubmittedWorkDone();return {errors,frames};}};
+window.ready=true;
+</script></body></html>

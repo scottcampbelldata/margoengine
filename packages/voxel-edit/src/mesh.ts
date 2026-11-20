@@ -66,7 +66,8 @@ interface RecordedFace {
   face: number;
   w: number;
   h: number;
-  palette: number;
+  /** Palette index of the face; bevelQuads copies it onto every vertex of the triangles this face owns. */
+  material: number;
 }
 
 /** Options of {@link chamferGrid}. */
@@ -103,7 +104,10 @@ export interface ChamferStats {
   /** Exposed faces before chamfering. */
   quads: number;
   triangles: number;
-  /** Faces whose inset was shortened so the panel would not cross itself. */
+  /**
+   * Faces whose inset was shortened. Always 0: the chamfer insets each unit edge of a face by `bevel`, below half a
+   * cell, so no panel can cross itself and nothing is shortened.
+   */
   clamped: number;
 }
 
@@ -189,8 +193,10 @@ export function meshGrid(
 
 /**
  * Chamfers the exposed faces of a grid by `bevel` cells. The hard cubic mesh stays available from {@link meshGrid}
- * (omit a chamfer). Faces between two filled cells are not emitted, so openings stay open. A face shared by several
- * cube corners moves once, and each triangle keeps the palette of its source face.
+ * (omit a chamfer). Faces between two filled cells are not emitted, so openings stay open. The chamfer is the
+ * face-edge-vertex construction of `@margoengine/voxel/bevel` (Doo and Sabin 1978): each face keeps a panel inset by
+ * `bevel` from its creased edges, each crease becomes a 45 degree strip, and each corner a closing polygon, so the
+ * mesh is closed. Each triangle keeps the palette of the face that owns it.
  * @throws RangeError when `bevel` is outside (0, 0.5) or a budget is exceeded.
  */
 export function chamferGrid(
@@ -237,13 +243,9 @@ export function chamferGrid(
   }
   const triangles = built.indices.length / 3,
     trianglePalette = new Uint8Array(triangles);
-  // bevelQuads emits 10 triangles per face, in face order.
-  for (let face = 0; face < faces.length; face++) trianglePalette.fill(faces[face].palette, face * 10, face * 10 + 10);
-  let clamped = 0;
-  for (const face of faces) {
-    const reach = Math.hypot(face.w, face.h) / 2;
-    if (bevel > reach * 0.49) clamped++;
-  }
+  // A face owns a varying number of triangles (its panel, half strips and corner fans), and all three vertices of a
+  // triangle carry the owner's material, so each triangle's palette is read from its first vertex.
+  for (let t = 0; t < triangles; t++) trianglePalette[t] = built.materials[built.indices[t * 3]];
   const min: MutableVec3 = [0, 0, 0],
     max: MutableVec3 = [0, 0, 0];
   if (positions.length) {
@@ -257,7 +259,7 @@ export function chamferGrid(
   }
   return {
     mesh: { positions, normals: built.normals, indices: built.indices, trianglePalette, min, max },
-    stats: { voxels: quadStats.voxels, quads: faces.length, triangles, clamped },
+    stats: { voxels: quadStats.voxels, quads: faces.length, triangles, clamped: 0 },
   };
 }
 
@@ -457,7 +459,7 @@ function greedy(
               // bevel u/v: ±x is (z, y), ±y is (x, z), ±z is (x, y).
               w: axis === 2 ? w : h,
               h: axis === 2 ? h : w,
-              palette: Math.abs(face),
+              material: Math.abs(face),
             });
           }
           if (out) {

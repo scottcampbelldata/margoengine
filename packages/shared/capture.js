@@ -1,4 +1,4 @@
-// A model takes one capture hook (gltf-pro `setCapture`). SSR, SSGI and a ScenePass all capture models, so the hook a model
+// A model takes one capture hook (gltf/pbr `setCapture`). SSR, SSGI and a ScenePass all capture models, so the hook a model
 // gets is this one per model: while an effect draws the model's capture (`drawCapture`) it forwards to that effect's hook.
 // With one effect it is that effect's hook exactly: same declarations, targets and pass. The state sits on the model under
 // a registered symbol because post and shader each bundle their own copy of this file.

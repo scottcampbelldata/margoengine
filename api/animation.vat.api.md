@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface CrowdLayout {
     readonly vertex: string;
@@ -47,6 +47,7 @@ export class VATCrowd implements EnginePlugin {
     truncate(n: number): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     addLighting(effect: VATLighting): () => void;
     drawShadow({ context: c, pass, matrix, cascade }: {
@@ -137,6 +138,7 @@ class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

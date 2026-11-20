@@ -7,7 +7,7 @@
     "landing": "Optional decoder entry after output, size, memory and other gates; keep warm losses open and prebuilt default until speed parity."
   },
   "checkNotes": {
-    "browser": "After rebase, page-ready 4/4 pass including teardown at unchanged timeout. An unnecessary GPU-lock wrapper for this plain-HTML, non-GPU test expired before startup; no test failed in that wrapper.",
+    "browser": "After rebase, page-ready 4/4 pass including teardown at unchanged timeout. An unnecessary the GPU run wrapper for this plain-HTML, non-GPU test expired before startup; no test failed in that wrapper.",
     "setup": "Early private experiment-driver attempts failed on a nested Python source split, Python 3.15 loader removal, a CRLF match in the restoration proof, and an assumption that the glTF build supports predictive traversal. Drivers were corrected; all original inputs and acceptance bars retained. These are experiment setup failures, not production-test passes.",
     "verify": "Latest full verify launched under a 40-minute process-tree deadline. Check its completion JSON; no pass is claimed while it is running. Required latest GPU/README gates remain before landing."
   },
@@ -2422,7 +2422,7 @@
       "name": "resume8-mapping-ab.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--exclusive",
@@ -2531,7 +2531,7 @@
       "name": "resume8-page-ready.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--max=2",

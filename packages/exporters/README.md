@@ -53,7 +53,7 @@ Use `exportModel` from `@margoengine/exporters/model` to save loaded glTF models
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {exportModel} from 'margoengine/exporters/model';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
@@ -62,13 +62,106 @@ const glb = await exportModel(model, {binary: true});
 const {text, bin} = await exportModel(model, {embed: false});
 ```
 
-Loaded glTF-pro models retain their scene cameras and existing directional, point and spot lights in GLB and JSON
+Loaded glTF PBR models retain their scene cameras and existing directional, point and spot lights in GLB and JSON
 output. `exportModel` writes live perspective/orthographic projections, light color/intensity/range and spot cones,
 with node attachments, hierarchy and live transforms. Hidden nodes follow `onlyVisible`; a model with no cameras or
 lights exports without camera arrays or punctual-light declarations. No additional light type is introduced.
 `retainedVisibility: true` copies each written node's source `KHR_node_visibility`, as data-scene nodes'
 `retainedVisibility` writes it (listed in `extensionsUsed`); runtime visibility is not read, so pass
 `onlyVisible: false` to keep nodes the source hides.
+
+Points and lines come back too. gltf/pbr keeps a file's POINTS, LINES, LINE_LOOP and LINE_STRIP primitives in
+`model.pointsAndLines`, and `exportModel` writes them into their mesh in the source order, with their attributes
+(`COLOR_0` included) and materials, as glTF mode 0 (POINTS) or 1 (LINES). Loops and strips, and triangle strips and
+fans, are written as the indexed lists gltf/pbr decodes them to (glTF 2.0 section 3.7.2.1), so a re-import reads the
+same vertices and indices.
+
+The engine scene writers keep them in each format's own point and line form, after the mesh's triangles, with the
+node's transform, material and vertex colours:
+
+| Writer | Points | Lines | Source |
+| --- | --- | --- | --- |
+| `exportOBJ` | `p` elements | `l` polylines (a strip or loop is one polyline), with `vt` when the lines have UVs | Wavefront OBJ, Appendix B1 |
+| `exportPLY` | vertices no face uses, one per point | an `edge` element of `int vertex1`, `int vertex2` (and the first vertex's colour with `colors`) | Turk 1994 |
+| `exportDAE` | none: COLLADA has no point primitive, so `onWarning` | a `<lines>` group of the node's geometry | COLLADA 1.4.1, `<lines>` |
+| `exportUSDZ` | `UsdGeomPoints` | linear `UsdGeomBasisCurves`, one curve per polyline | OpenUSD UsdGeom schemas |
+| `exportGLTF`, `exportGLB` | a mode 0 (POINTS) primitive in the node's mesh | a mode 1 (LINES) primitive | glTF 2.0 section 3.7.2.1 |
+| `exportAnimatedUSDZ` | `UsdGeomPoints` under the animated node | linear `UsdGeomBasisCurves` | OpenUSD UsdGeom schemas |
+| `createGodotImportBundle` | kept in the bundle's GLB as written | kept | Godot `Mesh.PrimitiveType` has points and lines |
+
+`@margoengine/loaders` reads them back (`parseOBJ` `pointIndices` and `lineIndices`, `parsePLY` `lineIndices`,
+`parseDAE` `geometry.lines`), and `@margoengine/usdz` with its `curves()` extension. glTF draws a point or line one
+pixel wide and gives it no size, so USD gets a constant `widths` of `lineWidth` (default 0.01 scene units). AR Quick
+Look is not known to draw Points or BasisCurves (not tried on a device); usdview and other USD readers do. A point or
+line without normals is written without NORMAL, as glTF draws it unlit then (section 3.7.2.1); its material is the
+source's. STL, 3MF and `exportRobloxGLB` (Roblox meshes are triangles) leave points and lines out, and the Unity
+profile refuses a GLB that holds them with code `unsupported` (it takes one atlas-bound triangle mesh). The writers
+that leave them out call `onWarning` once per mesh or data node with `{code: 'unsupported', message, node}`, and
+`console.warn` the message when no `onWarning` is given.
+
+A data scene says a primitive is points or lines with `mode`, a glTF mode name or number (default `'TRIANGLES'`).
+Strips and loops are written as the segments they draw and fans and triangle strips as triangles, and every writer
+above takes them; `sceneOfGLB` keeps a GLB's modes, so `exportUSDZ(glb)` and `exportAnimatedUSDZ(glb)` do too:
+
+```ts
+import {exportGLB} from 'margoengine/exporters';
+
+const ring = {positions: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]}; // no normals: drawn unlit
+const glb = exportGLB({
+  nodes: [{name: 'ring', primitives: [
+    {geometry: ring, mode: 'POINTS', material: {color: [1, 0.5, 0, 1], unlit: true}},
+    {geometry: ring, mode: 'LINE_LOOP'}, // written as LINES: 0-1, 1-2, 2-3, 3-0
+  ]}],
+});
+```
+
+```ts
+import {Engine} from 'margoengine/core';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {exportOBJ, exportSTL} from 'margoengine/exporters';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+await loadGLTF(engine, '/SciFiHelmet.glb');
+const {obj} = exportOBJ(engine); // a model's points and lines come out as p and l elements
+const stl = exportSTL(engine, {onWarning: (warning) => console.log(warning.code, warning.message)});
+```
+
+### Lines and point clouds of `@margoengine/lines` and `@margoengine/points`
+
+Every scene writer above also exports the lines of a `Lines` plugin and the clouds of a `PointsPlugin` used on the
+engine. It reads them through `engine.plugins` by their public fields (`lines`, `pointClouds`), so exporters imports
+neither package and adds nothing to a page that does not use them. A line or cloud that follows a mesh (`mesh: box`,
+`cloud.attach(box)`) goes into that mesh after its triangles and is left out with it when hidden; one that follows
+none is a node of its own at its `matrix` (whole-scene exports only, not a `root` export). Hidden ones are left out
+unless `onlyVisible: false`.
+
+| Written | glTF | USD |
+| --- | --- | --- |
+| a line | its centre polyline as LINES (a strip's run, a loop closed), unlit | linear `BasisCurves` |
+| a cloud | its finite points as POINTS, unlit unless `shading: 'sphere'`, sRGB colours decoded to linear | `Points` |
+| line width, point diameter | primitive `extras`: `lineWidth` and `lineWidthUnits`, `pointSize` and `pointSizeUnits` (`'pixels'` or `'world'`) | world units as `widths`; pixels keep `lineWidth` (0.01) |
+| a `Stroke`'s `widths`, a cloud's `sizes` | `_WIDTH`, a float per vertex multiplying the width | per-vertex `widths` |
+
+glTF gives a point or line no size and recommends 1 px (glTF 2.0 section 3.9.7), and no Khronos extension holds one,
+so another viewer draws them 1 px wide; Godot 4.7.2 keeps the POINTS and LINES surfaces unshaded with `point_size` 1.
+Dashes, joins, caps, point shapes and textures are not written. STL, 3MF and Roblox call `onWarning` once for a
+mesh's items and once for each free one, with `node: null` and `item` set to the line or cloud.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Lines, Line} from 'margoengine/lines';
+import {PointsPlugin, PointCloud} from 'margoengine/points';
+import {exportGLB} from 'margoengine/exporters';
+
+const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
+const lines = Lines.attach(engine);
+lines.add(new Line({positions: [0, 0, 0, 1, 0, 0, 1, 1, 0], width: 4, color: '#ff6600'}));
+const points = new PointsPlugin();
+engine.use(points);
+points.add(new PointCloud({positions: [0, 0, 0, 0, 1, 0, 0, 0, 1], material: {size: 6}}));
+// One LINES primitive with extras {lineWidth: 4, lineWidthUnits: 'pixels'}, one POINTS with {pointSize: 6, ...}.
+const glb = exportGLB(engine);
+```
 
 Materials meshes use v-up UV orientation (v = 0 at the bottom of a `flipY` texture); glTF puts v = 0 at the
 image's top. `exportModel` writes their UVs as `1 - v`, each texture's PNG with its GPU rows bottom first (a `flipY`
@@ -87,7 +180,7 @@ Live `side: 'back'` triangle materials are saved as ordinary front-only glTF mat
 
 ## How it works
 
-Engine exports recognize primitives loaded by `@margoengine/gltf-pro` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data. Formats with no skeleton write the shape the model has at its nodes' current pose: morph weights first, then the skin, with weights normalized. STL and PLY write a textured model's shape, and OBJ its shape, UVs and flat colors, plus its base color images [with `textures`](#loaded-models-as-obj-stl-and-ply). The other engine exports refuse PBR textures (a textured `createMesh` mesh included: use `exportModel`) and material extensions. More than four skin influences throws in every format. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
+Engine exports recognize primitives loaded by `@margoengine/gltf/pbr` and `@margoengine/fbx`, without attaching core geometry. glTF/GLB retain all primitives on each node and their bind-pose skin/morph data. Formats with no skeleton write the shape the model has at its nodes' current pose: morph weights first, then the skin, with weights normalized. STL and PLY write a textured model's shape, and OBJ its shape, UVs and flat colors, plus its base color images [with `textures`](#loaded-models-as-obj-stl-and-ply). The other engine exports refuse PBR textures (a textured `createMesh` mesh included: use `exportModel`) and material extensions. More than four skin influences throws in every format. An engine forest containing no supported mesh geometry also throws; visibility filtering and intentionally empty data scenes remain supported.
 
 Engine export entrypoints also bake back-only optional PBR triangles by reversing winding and negating base and morph normals. This preserves their visible side in glTF, GLB, USDZ, OBJ, PLY and STL, including mirrored world transforms. Front-only and double-sided materials retain their existing geometry behavior.
 
@@ -104,11 +197,13 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | Option | Exporters | Default |
 | --- | --- | --- |
 | `onlyVisible` | all | `true`. Skip hidden meshes (or nodes with `visible: false`) and their descendants |
+| `onWarning` | all | `console.warn` of the message. Called once per engine mesh or data node with `{code: 'unsupported', message, node}` for points or lines (a loaded model's, or a data primitive's `mode`) that the format leaves out: all of them in STL, 3MF and `exportRobloxGLB`, points in COLLADA |
 | `root` | all, engine source | Whole scene. A live mesh; it and its descendants are exported. In hierarchy mode the root keeps its local transform |
 | `geometryData` | all, engine source | None. A `Map`/`WeakMap` from core `Geometry` to richer `GeometryData` |
 | `materialData` | all, engine source | None. A `Map`/`WeakMap` from `PbrMaterial` to `MaterialData` |
 | `flatten` | glTF | `false`. World transforms on root nodes instead of the hierarchy |
 | `generator` | glTF | `'Margo Engine exporters'`, written to `asset.generator` |
+| `sparseMorphs` | glTF | `true`. Morph target deltas sparse when smaller; see [sparse morph targets](#sparse-morph-targets). `false` writes them dense |
 | `maxBinaryBytes`, `maxBytes` | `exportGLB` | 4,294,967,295 (the GLB format limit). Output limits; see [GLB size limits](#glb-size-limits) |
 | `embed` | `exportGLTF` | `true`, base64 data URI. `false` returns `bin` for a separate file |
 | `binUri` | `exportGLTF` | `'scene.bin'`, a relative file name |
@@ -125,7 +220,7 @@ Engine export entrypoints also bake back-only optional PBR triangles by reversin
 | `shareVertices` | OBJ | `true`, faces share the mesh's indexed corners. `false` gives every face its own `v`/`vt`/`vn` corners (not with `mergeVertices`) |
 | `scale` | OBJ | `1`. Multiplies every position |
 
-`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], nonzero scales (or [0, 0, 0], below) and quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
+`GeometryData` is `{positions, normals, uvs?, tangents?, colors?, indices?, faceSizes?, joints?, weights?, morphs?}` with xyz, xyz, uv, xyzw and linear rgb or rgba per vertex. `uvs` follow glTF (v = 0 at the image's top, images as encoded): a materials mesh's v-up UVs go in as `1 - v`. `faceSizes` lists corners per face in index order: 3 for a triangle, 4 for the next two triangles when they form a quad (sharing an edge, as (a, b, c), (a, c, d)); OBJ and DAE write those quads as 4-corner faces, the other formats write the triangles. Inputs are validated: finite Float32 values, matching lengths, complete triangles, indices in range, colors in [0, 1], finite scales (a 0 on any axis is kept, below) and nonzero quaternions, PNG or JPEG bytes that match `mimeType`, and textured materials only on geometry with the UV set they sample.
 
 ### Retaining hidden nodes
 
@@ -173,7 +268,41 @@ const glb = exportGLB({nodes: [mesh, joint], animations: [{name: 'Move', channel
 }]}]});
 ```
 
-Load these GLBs with `@margoengine/gltf-pro` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
+Load these GLBs with `@margoengine/gltf/pbr` and attach `@margoengine/animation` for skinning, morphs and clip playback. Other export formats continue to write the static base geometry.
+
+### Sparse morph targets
+
+A face shape moves a few hundred vertices of a head with tens of thousands, so `exportGLTF` and `exportGLB` write each
+target's `POSITION`, `NORMAL` and `TANGENT` deltas as a sparse accessor (glTF 2.0 section 3.6.2.3): the moved
+vertices' indices, 8, 16 or 32 bits by the last moved vertex, and their xyz values. The writer counts both ways per
+accessor and keeps the dense array when that is no larger; a target that moves nothing gets an accessor with no
+buffer view, which reads as zeros (section 3.6.2.1). Every reader decodes the same floats bit for bit, `-0` deltas
+included, and `POSITION` keeps its `min`/`max`. A Character Creator man with 160 face shapes, converted by
+`@margoengine/fbx`, went from 271,631,268 to 88,838,072 bytes, his morph data from 230,940,768 to 48,146,519.
+`sparseMorphs: false` writes every target dense, for a reader without sparse support. To densify a GLB you already
+have, `denseGLB(bytes)` from `margoengine/exporters/sparse` repacks every sparse accessor as an ordinary one with
+identical decoded values; the Godot bundle calls it for you.
+
+```ts
+import {exportGLB} from 'margoengine/exporters';
+
+// A strip of 1,000 vertices with a face shape that moves only vertex 7.
+const count = 1000;
+const positions = new Float32Array(count * 3);
+const normals = new Float32Array(count * 3);
+for (let v = 0; v < count; v++) {
+  positions.set([Math.floor(v / 2), v % 2, 0], v * 3);
+  normals[v * 3 + 2] = 1;
+}
+const indices = new Uint32Array((count - 2) * 3).map((_, i) => Math.floor(i / 3) + (i % 3));
+const smile = new Float32Array(count * 3);
+smile[7 * 3 + 1] = 0.25;
+const scene = {nodes: [{geometry: {positions, normals, indices, morphs: [{name: 'smile', positions: smile}]}, morphWeights: [0]}]};
+
+const sparse = exportGLB(scene); // the target holds one 8-bit index and one xyz value
+const dense = exportGLB(scene, {sparseMorphs: false}); // the target holds 1,000 xyz values
+console.log(sparse.byteLength, dense.byteLength, sparse.byteLength < dense.byteLength); // true
+```
 
 ## Loaded models as OBJ, STL and PLY
 
@@ -182,7 +311,7 @@ Pass the engine, which writes every mesh in it.
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {exportOBJ, exportPLY, exportSTL} from 'margoengine/exporters';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
@@ -246,7 +375,7 @@ A loaded model's base colour may be held in WebP, KTX2 (Basis Universal) or DDS,
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {exportOBJ, writeTextures} from 'margoengine/exporters';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
@@ -314,7 +443,7 @@ lighting model as `@margoengine/materials` names it: COLLADA writes the matching
 `camera` (`{type, perspective: {yfov, znear, zfar?, aspectRatio?}}` or `{type, orthographic: {xmag, ymag, znear, zfar}}`)
 becomes a glTF camera and its `light` (`{type: 'directional' | 'point' | 'spot', color, intensity, range?,
 innerConeAngle?, outerConeAngle?}`) a `KHR_lights_punctual` light; both face the node's -Z and shared objects are
-written once. A gltf-pro `GLTFCamera` or `GLTFLight` record fits as it is. `flatten: true` rejects cameras and lights.
+written once. A gltf/pbr `GLTFCamera` or `GLTFLight` record fits as it is. `flatten: true` rejects cameras and lights.
 Only the glTF writers use cameras and lights.
 
 ```ts
@@ -384,7 +513,7 @@ validator in the tests:
 - **Textures and extensions.** `MaterialData` adds `occlusionTexture` (with `occlusionStrength`), `emissiveTexture`
   (multiplied by `emissive`, so set it to [1, 1, 1]), `normalScale`, and `transmission`, `ior` and `emissiveStrength`,
   written as `KHR_materials_transmission`, `KHR_materials_ior` and `KHR_materials_emissive_strength` when they differ
-  from glTF's defaults. A texture's `texCoord: 1` samples `uvs1` (`TEXCOORD_1`). `uvs2`, `uvs3` and `colors1` write `TEXCOORD_2`, `TEXCOORD_3` and `COLOR_1` in the glTF writers only; `texCoord` 2 and 3 sample them.
+  from glTF's defaults. Every texture slot has its own KHR_texture_transform (`baseColorTextureTransform`, `metallicRoughnessTextureTransform`, `normalTextureTransform`, `occlusionTextureTransform`, `emissiveTextureTransform`, each `{offset, scale, rotation?}` and each needing its texture), written by the glTF writers and read back by the GLB reader; the USDZ, OBJ and Roblox writers use the base colour transform only. A texture's `texCoord: 1` samples `uvs1` (`TEXCOORD_1`). `uvs2`, `uvs3` and `colors1` write `TEXCOORD_2`, `TEXCOORD_3` and `COLOR_1` in the glTF writers only; `texCoord` 2 and 3 sample them.
 - **Indexed palette textures.** `await paletteTexture(rgba)` lays out RGBA8 palette entries one per texel in the
   smallest square power-of-two PNG, sampled NEAREST without mipmaps and clamped, and returns each entry's texel-centre
   UV, so a face picks its exact palette colour.
@@ -398,7 +527,12 @@ validator in the tests:
 - **Node matrices and collapsed nodes.** `matrix` (column-major, affine, without shear: glTF forbids sheared node
   matrices) replaces translation, rotation and scale on a node that is not animated; it is written exactly as given.
   A scale of [0, 0, 0] collapses a node: glTF keeps it (a hidden cel, shown later by a scale channel), the mesh-only
-  formats leave it out. Any other scale with a 0 component is refused; tiny nonzero and negative scales are kept.
+  formats leave it out. A scale with a 0 on one or two axes flattens the node, as glTF 2.0 section 3.5.3 allows: glTF
+  writes it as given (a node `matrix` with a zero column is written as its translation, rotation and scale, since the
+  glTF validator reads such a matrix as not decomposable), USDZ writes the flattened matrix, and OBJ, STL, PLY and
+  flattened glTF bake the flattened positions with normals turned by the cofactor matrix: onto the flattened axis, or
+  +Y where that maps a normal to zero, as the engine shades it. 3MF refuses it with MargoError `'unsupported'`: its
+  items are solids to print and a flattened one has no volume. Tiny nonzero and negative scales are kept.
 - **Skins** name their `skeleton` root (checked to be an ancestor of every joint).
 - **Lightmaps.** glTF has no standard lightmap material slot, and this writer does not invent an extension. A scene's
   `lightmap: {texture, texCoord?, key?, extras?}` writes the texture into the document and records it under the root
@@ -508,8 +642,8 @@ const withColliders = appendGLBMeshes(glb, [
 
 ### Importer naming (`@margoengine/exporters/import-names`)
 
-Godot reads collision roles from node name suffixes (`-col`, `-convcol`, `-colonly`, `-convcolonly`; the Unity
-import profile reads the same ones) and loops clips whose names end in `-loop`. `collisionTag(name)` returns a
+Godot reads collision roles from node name suffixes (`-col`, `-convcol`, `-colonly`, `-convcolonly`, after a `-`, `_`
+or `$` in any case, as the Godot manual says; the Unity import profile reads the same ones) and loops clips whose names end in `-loop`. `collisionTag(name)` returns a
 name's suffix or null, `collisionBase(name)` strips every suffix, and `withCollisionTag(name, tag)` replaces them
 with one (or none for null). `clipImportName(name, loop)` removes leading and trailing `loop`/`cycle` tokens and adds
 `-loop` when `loop` is true, so a clip loops exactly when asked. `godotImportedNodeName(name, hasMesh)` gives the node name
@@ -561,7 +695,7 @@ caller coordination.
 
 The configured Godot 4.7.2 mechanism embeds PNGs uncompressed, without mipmaps, disables mesh compression/LODs/shadow
 meshes and retains immutable animation tracks. Existing nearest texture samplers are preserved. The explicit helper
-inventory must match every hidden, static `-convcol` mesh node by its unique exported `extras.id`; ordinary art, skins,
+inventory must match every hidden, static `-convcol` (or `_convcol`, `$convcol`) mesh node by its unique exported `extras.id`; ordinary art, skins,
 morphs, instances and animated helper ancestry are rejected as helper inputs. The script validates all imported
 identities/shapes and requires identity shape-to-mesh alignment before replacing any shape with native
 `ArrayMesh.create_convex_shape(false, false)`, preserving its margin. Failure frees the rejected scene. There is no
@@ -581,7 +715,10 @@ acceptance in another version. There is no guessed global or per-clip optimizer 
 
 The delivery preflight requires one embedded BIN buffer and bounds every declared buffer view and ordinary accessor
 against it, including geometry, image, skin and animation references. Additional/external buffers, external images,
-sparse accessors and unsupported matrix encodings reject without mutating caller bytes or emitting partial files.
+compressed data and unsupported matrix encodings
+reject without mutating caller bytes or emitting partial files. Sparse accessors (the default `exportGLB` morph target
+layout) are repacked dense automatically with every accessor index and value kept, so `model.glb` and its hash then
+differ from the bytes you passed; a GLB without sparse accessors is used byte for byte.
 
 This is a target import profile, separate from raw Godot defaults and generic/Roblox exports. Exact native RGBA,
 normals, UVs, animation holds/loops, collision surfaces and physics require acceptance for the asset and destination
@@ -592,7 +729,8 @@ open-editor copy ordering and other versions remain separately tested behavior. 
 Godot's glTF import reads `COLOR_0` as sRGB, ignores it unless the material opts in, and has no clip loop flag.
 `createGodotImportAddon()` (from `@margoengine/exporters/godot-addon`) returns an editor add-on (`addons/gltf_import/plugin.cfg`, `plugin.gd`, `extension.gd`)
 that fixes both for any GLB: materials of primitives with `COLOR_0` use it as linear albedo (a material shared with
-uncolored primitives is cloned once), and each clip's `extras.loop` boolean sets its loop. Write the entries into the
+uncolored primitives is cloned once; a colored primitive with no material gets glTF's default material, white with
+metallic and roughness 1), and each clip's `extras.loop` boolean sets its loop. Write the entries into the
 project, enable "glTF vertex colors and loops" under Project Settings > Plugins, then reimport.
 
 A baked GLB (a lightmap on TEXCOORD_1, written as `lightmap`) needs its own material in Godot.
@@ -786,7 +924,7 @@ Textures held in WebP or DDS (`EXT_texture_webp`, `MSFT_texture_dds`) are decode
 
 ### Meshopt (`@margoengine/exporters/meshopt`)
 
-`compressMeshopt(glb, options)` stores geometry, skins and animation as `EXT_meshopt_compression`, and by default stores vertices as small integers with `KHR_mesh_quantization`. The codecs are plain code written from the extension's text, so there is no Wasm to load and no worker, and the work runs on the calling thread with a pause between primitives. A reader needs both extensions; `@margoengine/gltf-pro` and `@margoengine/gltf/meshopt` read the file with the decoder in `@margoengine/decoders`.
+`compressMeshopt(glb, options)` stores geometry, skins and animation as `EXT_meshopt_compression`, and by default stores vertices as small integers with `KHR_mesh_quantization`. The codecs are plain code written from the extension's text, so there is no Wasm to load and no worker, and the work runs on the calling thread with a pause between primitives. A reader needs both extensions; `@margoengine/gltf/pbr` and `@margoengine/gltf/meshopt` read the file with the decoder in `@margoengine/decoders`.
 
 ```ts
 import { exportGLB } from 'margoengine/exporters';
@@ -842,7 +980,7 @@ console.log(`${stats.verticesBefore} -> ${stats.verticesAfter} vertices, ${stats
 | Option | Default | What it does |
 | --- | --- | --- |
 | `dedupe` | true | Merges images with the same bytes, then the samplers, textures, materials, accessors and meshes that makes equal |
-| `weld` | true | Merges vertices equal in every attribute and morph target, drops triangles with no area and vertices no triangle uses. Off, only unused vertices go |
+| `weld` | true | Merges vertices equal in every attribute and morph target, drops triangles that repeat a vertex and vertices no triangle uses. Off, only unused vertices go |
 | `simplify` | none | Fraction of each primitive's triangles to keep, above 0 and below 1 |
 | `lods` | `[]` | Fractions of the triangles each further level keeps, decreasing, written as `MSFT_lod`. With `simplify`, fractions of what that leaves |
 | `screenCoverage` | none | `MSFT_screencoverage`, decreasing, at most one more than `lods`. Without it the reader picks its own switches |
@@ -872,6 +1010,26 @@ const glb = exportGLB({nodes: [{
 console.log(glb.byteLength);
 ```
 
+## One GLB from a .gltf folder (`@margoengine/exporters/gltf-to-glb`)
+
+`gltfToGLB` packs a .gltf and the files beside it into one GLB: every buffer, data URI and image goes into the BIN chunk, each buffer view moves to its new offset, and each image with a `uri` moves into a buffer view with its `mimeType` read from its first bytes (PNG, JPEG, WebP, KTX2 or AVIF). Meshes, materials, extensions and extras stay as written, and the input object is not changed. A model downloaded as a folder becomes one file to load, store or send.
+
+```ts
+import {gltfToGLB} from 'margoengine/exporters/gltf-to-glb';
+
+const gltf = {asset: {version: '2.0'}, buffers: [{byteLength: 4, uri: 'data:application/octet-stream;base64,AAAAAA=='}]};
+const glb = await gltfToGLB(gltf);
+console.log(glb.byteLength); // 88: the 12-byte header, a 64-byte JSON chunk and a 12-byte BIN chunk
+```
+
+- Pass the .gltf as its text, its bytes or the parsed object, and `read(uri)` returning the bytes of each file it names, for example `(uri) => readFile(new URL(uri, pathToFileURL(file)))` in Node or `(uri) => fetch(new URL(uri, base)).then((r) => r.arrayBuffer())` in a page. `uri` comes as written in the file, percent-encoded. `signal` stops between reads.
+- A uri with a scheme, an absolute path or a `..` segment names a file outside the .gltf's folder and is refused before `read` is asked, unless you pass `outside: true` for a file you trust.
+- `EXT_meshopt_compression` and `KHR_meshopt_compression` views point at buffers too: they are moved with the rest, and their fallback buffers, which carry no data, are kept after the BIN buffer.
+- A buffer shorter than its `byteLength`, an image of no known type without a `mimeType`, and a GLB past 4 GiB (the GLB header's 32-bit length) throw with a help link.
+- `imageMimeType(bytes)` is the signature check on its own.
+
+Sources: Khronos, glTF 2.0 Specification, 2021, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (sections 3.3, 3.6, 3.9 and 4.4, the GLB container); RFC 2397, "The data URL scheme"; RFC 3986, URI references; the image signatures of PNG (ISO/IEC 15948), JPEG (ITU-T T.81), WebP (RFC 9649), KTX2 (Khronos KTX File Format Specification 2.0) and AVIF (AOM AV1 Image File Format 1.1).
+
 ## Reading JPEG pixels (`@margoengine/exporters/jpeg-read`)
 
 `decodeJPEG` turns JPEG bytes into RGBA pixels with no canvas, in Node or a worker. Writers that repack images use it; `@margoengine/fbx/pbr` packs metal and rough maps with it.
@@ -888,8 +1046,8 @@ console.log(width, height);
 The engine/data-scene `exportGLTF` and `exportGLB` entrypoints write cameras, lights, extras and
 `KHR_materials_unlit`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_emissive_strength`, and
 base-color `KHR_texture_transform` with its `KHR_animation_pointer` clips only from data-scene nodes and materials, and no
-instancing or other KHR material extensions; use `exportModel` for loaded glTF-pro camera/light attachments and PBR
-metadata. The writers do not produce sparse accessors or interleaved buffers; [compressed GLB files](#compressed-glb-files) come from the passes above. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
+instancing or other KHR material extensions; use `exportModel` for loaded glTF PBR camera/light attachments and PBR
+metadata. The writers produce sparse accessors only for morph targets ([`sparseMorphs`](#sparse-morph-targets)) and no interleaved buffers; [compressed GLB files](#compressed-glb-files) come from the passes above. Engine/data-scene skins support four influences per vertex. `exportGLTF` puts images
 in the buffer rather than separate image files. PLY writes every vertex as given; OBJ welds only whole
 corners (`mergeVertices`), never `v`, `vt` and `vn` separately. Node names are not made unique. The existing `@margoengine/gltf` loader accepts what these exporters write from
 an engine, but data-scene exports with deformation, vertex colors or textures need the optional packages described above.
@@ -906,11 +1064,20 @@ validator errors. GPU operations and PNG decoding use Node boundary shims; the l
 
 `npm run test:browser` builds a parented hierarchy with shared geometry, two materials and a hidden mesh in a real WebGPU engine (Playwright, honoring `BROWSER_CHANNEL`, `BROWSER_EXECUTABLE` and `BROWSER_ARGS`), exports it, re-imports the GLB into the same engine and compares canvas pixels, world matrices and vertex data, checks for zero WebGPU validation errors, and validates the browser-made GLB, glTF and flattened GLB with the Khronos validator.
 
+`npm run test:unity` (opt-in, needs a licensed Unity Editor) builds a temporary Unity project with the
+`com.margo.mesh` support package, glTFast 6.20.0 and a one-mesh, one-clip bundle, runs Unity in batch mode
+(20 minute limit, whole process tree killed on timeout) and checks that every saved asset's main object
+is named after its file, that a forced reimport changes no saved file or .meta, that `IsCurrent` stays true and
+that the controller state keeps the glTF clip name. Unity comes from `MARGO_UNITY_EDITOR` or the Unity Hub default
+install of 6000.6.7f1; set `MARGO_UNITY_PACKAGES` to a folder holding `com.unity.cloud.gltfast` to embed it
+instead of letting Unity fetch it from the Unity registry. With no Editor or no licence it prints
+`test:unity SKIPPED: <reason>. Nothing was checked.` and exits 0; `MARGO_UNITY_REQUIRED=1` makes a skip fail.
+
 Apache-2.0 licensed.
 
 ## USDZ for AR Quick Look
 
-`exportUSDZ(engineOrDataSceneOrGLB, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. Positions, normals and reflected winding use the existing validated scene collector. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
+`exportUSDZ(engineOrDataSceneOrGLB, options)` returns a `Uint8Array`: a static USDA root and its texture images in an uncompressed ZIP with 64-byte-aligned entries. Positions, normals and reflected winding use the existing validated scene collector. The ZIP is ZIP32: a package of more than 65,535 files, or past 4 GiB, throws a `RangeError`, as the USDZ rules name no ZIP64. Names are kept as display names; hidden descendants are skipped. The stage has a default prim, Y up, meter units, mesh extents and UsdPreviewSurface color/roughness/metalness/emission/opacity materials.
 
 A textured model loaded in an engine is refused, as its images are on the GPU: pass the bytes of the GLB, or what `exportModel` gives, and `measureUSDZ(bytes).skipped` names what the file holds that a USDZ cannot.
 
@@ -945,6 +1112,7 @@ console.log(`${height} m as authored, ${usdz.length} bytes at 1.2 m`);
 | --- | --- | --- |
 | `height` | the source's own size | The rest pose's height in metres. The whole model scales evenly from the origin |
 | `ground` | `false` | Moves the model so the rest pose's lowest point is at y = 0 |
+| `lineWidth` | `0.01` | Scene units: the `widths` of a loaded model's points (diameter) and lines, as `UsdGeomPoints` and `UsdGeomBasisCurves` |
 
 Every mesh is written in its own space, with the node's world matrix as `xformOp:transform`, so its points are the ones you gave. A geometry object two or more nodes draw is written once as a class prim, and each node references it with its own transform, name and material, so a thousand copies of a box cost a thousand short nodes. A node with a reflection in its matrix draws a reflected copy of the geometry, written once for all the nodes that mirror it, with the reflection taken out of the node's matrix and the winding reversed in the file: no matrix in the file has a negative determinant, so nothing depends on how a viewer treats a negative scale. Parents are folded into each node's matrix; the file holds no Xform tree.
 
@@ -969,7 +1137,7 @@ Vertex colors (RGB or RGBA, baked AO included) multiply the base color and are w
 
 Material textures are the same `TextureData` (encoded PNG or JPEG bytes) the glTF writers take, from a data scene or from `materialData` for engine meshes. Each becomes a `UsdUVTexture` reading the mesh's `primvars:st` (its `uvs`, V flipped to USD's bottom-left origin) or `primvars:st1` (`uvs1`, for `texCoord: 1`) through a `UsdPrimvarReader_float2`, with its `wrapS`/`wrapT`:
 
-- `baseColorTexture` drives `diffuseColor` (`inputs:scale` is the color factor, sRGB) and, for BLEND and MASK, `opacity` from its alpha; MASK writes `opacityThreshold = alphaCutoff` (default 0.5). A `baseColorTextureTransform` becomes a `UsdTransform2d` that samples the same texels: `rotation` (radians; positive turns the picture clockwise on the surface, as gltf-pro draws KHR_texture_transform) is written in degrees with the same sign, because the V flip also flips the rotation sense, and the translation is re-expressed in st.
+- `baseColorTexture` drives `diffuseColor` (`inputs:scale` is the color factor, sRGB) and, for BLEND and MASK, `opacity` from its alpha; MASK writes `opacityThreshold = alphaCutoff` (default 0.5). A `baseColorTextureTransform` becomes a `UsdTransform2d` that samples the same texels: `rotation` (radians; positive turns the picture clockwise on the surface, as gltf/pbr draws KHR_texture_transform) is written in degrees with the same sign, because the V flip also flips the rotation sense, and the translation is re-expressed in st.
 - `metallicRoughnessTexture` drives `roughness` from green and `metallic` from blue, scaled by the factors.
 - `normalTexture` (scale 2, bias -1, with `normalScale` on x and y), `occlusionTexture` red (`occlusionStrength`) and `emissiveTexture` (times `emissive` and `emissiveStrength`) are read as raw, raw and sRGB.
 
@@ -1130,6 +1298,9 @@ console.log(names, python.length, unity.length, luau.length, roblox.length);
 
 - **Refused, with the fix named:** a channel that is not STEP (bake it to cels), a material no node draws, and in Unreal cels
   of unequal times or sizes or off a regular grid. Unreal also refuses a concave `-colonly`: split it into `-convcolonly` pieces.
+- File and asset names (Unity's `.anim` files, Roblox cels and their `UVIds` keys, Unreal's `M_<clip>_<material>`) keep
+  A-Z, a-z, 0-9, `_` and `-`, with every other run of characters as one `_`; a name met before, ignoring case, takes
+  `_2`, `_3` and so on, so two clips with one name stay two clips. A clip keeps its own name inside Unity's JSON.
 - `exportRobloxGLB` still refuses `materialAnimations`: leave them out of its scene, then run `createRobloxUVSwap` on the full one.
 - All three are checked by hand in the engine, not in CI.
 
@@ -1376,6 +1547,9 @@ console.log(spriteFrames.length, tileSet.length, cells.length, script.length, fi
 - **Unity.** Sprite rects are Y up, and pivots are rebased on the trimmed rect so frames stay put. The C# builds `.anim`
   clips on `SpriteRenderer`, a `MapTile` asset per used tile, and `Map.prefab` with a `Tilemap` and `TilemapCollider2D` per
   layer. Unequal tile frame times repeat frames at their common divisor, since Unity runs a tile at one rate.
+  Page images, tileset images, tileset names and clip names become files under `Assets/<folder>/`, so each must be a
+  plain file name (no folder part such as a Tiled `../art/ground.png`, none of `\ / : * ? " < > |`); one that is not, or
+  two images with one file name, is refused with a `RangeError`, never renamed.
 - Both engines are checked by hand in the engine, not in CI. Object layers are not exported.
 
 ### Sprite atlases and ZIP archives
@@ -1419,7 +1593,7 @@ central headers) and decodes the PNGs.
 `node --test packages/exporters/tests/capture.test.js` decodes every GIF with an independent GIF89a decoder (exact
 pixels, delays, loop, transparency, LZW resets and the end-code width, quantisation error), round-trips PNG through
 zlib, and checks capture sizing, tiling and restoring against a mocked canvas.
-`node scripts/gpu-lock.mjs run --owner=<id> -- node packages/exporters/tests/capture-browser.mjs` checks a real
+`node scripts/run-with-timeout.mjs -- node packages/exporters/tests/capture-browser.mjs` checks a real
 WebGPU engine: a 333x111 capture from a 200x150 canvas, 4200x100 tiles against a direct render, transparency, GIFs
 decoded by `ImageDecoder`, JPEG and WebM duration.
 

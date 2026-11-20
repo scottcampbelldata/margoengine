@@ -6,6 +6,7 @@ import { assertPolygonMesh, collectPolygonEdges, polygonAreaVector } from './pol
 import { loopFaces } from './polygon-split.js';
 import { faceIdFactory } from './result.js';
 import type { MeshEditOptions, PolygonFace, PolygonMesh } from './types.js';
+import { leastOf } from './least.js';
 
 /** Polygon soup accepted before geometric/topological repair. UVs may be missing or malformed. */
 export interface MeshRepairInput {
@@ -193,7 +194,7 @@ export function repairMesh(input: MeshRepairInput, options: MeshRepairOptions = 
       discard(f.id, 'removed collapsed or pinched face');
       continue;
     }
-    const min = loop.indexOf(Math.min(...loop)),
+    const min = loop.indexOf(leastOf(loop)),
       forward = loop.map((_, i) => loop[(min + i) % loop.length]).join(','),
       backward = loop.map((_, i) => loop[(min - i + loop.length) % loop.length]).join(','),
       canonical = forward < backward ? forward : backward;

@@ -44,7 +44,8 @@ for (const fallback of [false, true]) {
       try {
         const surface = fig.surface(new Float32Array([0, 1, 1, 0]), { nx: 2, ny: 2 });
         let snap = await snapshot();
-        check(snap.layers[0].gpuBytes === 16 + 192 + 1024, 'surface descriptor bytes');
+        // Index buffer, the 52-float uniform (a range vec4 since b1119c009c) and the colour table.
+        check(snap.layers[0].gpuBytes === 16 + 208 + 1024, `surface descriptor bytes ${snap.layers[0].gpuBytes}`);
         check(snap.counts.cells === 1, 'surface cells');
         fig.remove(surface);
         const values = Float32Array.from({ length: 512 }, (_, i) => i % 8);

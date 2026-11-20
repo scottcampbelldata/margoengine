@@ -7,6 +7,10 @@ import { fault, rangeError } from '../../shared/errors.js';
 import { pickVisible } from './pick-visibility.js';
 import { pointPickWGSL, cellPickWGSL, surfacePickWGSL, volumePickWGSL, meshPickWGSL } from './pick-gpu-shaders.js';
 
+/** Largest deadline every host timer honours: Node fires longer AbortSignal.timeout delays after 1 ms, and
+ * WebIDL rejects values above 2^53-1 synchronously. */
+const MAX_TIMER = 0x7fffffff;
+
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; VERTEX: number; COPY_SRC: number; MAP_READ: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
@@ -28,7 +32,7 @@ export interface GpuPickOptions {
   readonly opacityThreshold?: number;
   /** Cancellation includes waiting for an earlier pick and GPU readback. */
   readonly signal?: AbortSignal;
-  /** Hard deadline in milliseconds. Default 30000. */
+  /** Hard deadline in milliseconds, in (0, 2147483647], the largest delay every host timer honours. Default 30000. */
   readonly timeout?: number;
 }
 
@@ -102,10 +106,14 @@ export class GpuPicking {
       radius < 0 ||
       threshold <= 0 ||
       threshold > 1 ||
-      timeout <= 0
+      timeout <= 0 ||
+      timeout > MAX_TIMER
     )
       return Promise.reject(
-        rangeError('Use finite coordinates, radius >= 0, opacityThreshold in (0,1], timeout > 0', 'sciviz'),
+        rangeError(
+          'Use finite coordinates, radius >= 0, opacityThreshold in (0,1], timeout in (0, 2147483647] ms',
+          'sciviz',
+        ),
       );
     const signal = AbortSignal.any([
       this.#lifetime.signal,

@@ -4,7 +4,7 @@ You normally use this package as [`margoengine`](../margoengine/README.md): `imp
 
 High-level setup for Margo Engine. Mount a canvas, enable orbit/pan/zoom, start rendering and create a spinning orb in five lines. The stage creates a WebGPU engine. Pass `fallback` from the optional `@margoengine/webgl2-compat/preview` when a browser has no WebGPU; without it, creation rejects with `WebGPU unavailable`. Core handles resize and automatically recovers a lost WebGPU device. A lost WebGL2 context reports through `onError` and stops rendering; dispose and recreate the stage to resume.
 
-This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/scenery`, `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics` (its solver comes inside it), `@margoengine/save`, `@margoengine/animation`, `@margoengine/clustered`, `@margoengine/labels` and `@margoengine/selection` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
+This package is built from source alongside the engine. See the [package catalog](../../docs/README.md) for npm availability. Run `npm run build:packages` in the repository, or install its local tarball and `@margoengine/core`. The only dependency is `@margoengine/core`. `@margoengine/gltf`, `@margoengine/creative`, `@margoengine/sky`, `@margoengine/gltf/pbr`, `@margoengine/environment`, `@margoengine/studio`, `@margoengine/shadows`, `@margoengine/tonemap`, `@margoengine/xr`, `@margoengine/physics` (its solver comes inside it), `@margoengine/save`, `@margoengine/animation`, `@margoengine/clustered`, `@margoengine/labels` and `@margoengine/selection` are optional peers, used only by the feature entries below. The root entry imports none of them, not even lazily, so any bundler (Vite, Rollup, esbuild, webpack, Turbopack) builds an app that installs only this package and core. Each feature entry imports its package on the first call and rejects with `Install <package>` when it is absent, which keeps that code out of the initial scene.
 
 Apps using Stage load this facade and its shared core, then only the feature entries they use and those features' required dependencies. Apps using the Engine API directly can load core without Stage. Choose specific feature imports and load heavier features on demand; keep one matching core version across the app.
 
@@ -104,15 +104,15 @@ the ones it imports. With `margoengine` the entries are `margoengine/stage/<entr
 | Entry | Function | Package it imports on the first call |
 | --- | --- | --- |
 | `@margoengine/stage/gltf` | `await addGLTF(app, url, {fit, signal})`: loads glTF/GLB, exposes root transforms and fits the camera | `@margoengine/gltf` |
-| `@margoengine/stage/sky` | `await addSky(app, options)`: attaches SkyMoon (sun, moon, stars) | `@margoengine/scenery/sky` |
+| `@margoengine/stage/sky` | `await addSky(app, options)`: attaches SkyMoon (sun, moon, stars) | `@margoengine/sky/night-preset` |
 | `@margoengine/stage/particles` | `await addParticles(app, options)`: attaches GPU particles | `@margoengine/creative/particles` |
 | `@margoengine/stage/effects` | `await addEffects(app, options)`: attaches post-processing and atmosphere | `@margoengine/creative/post` |
 | `@margoengine/stage/environment` | `await addEnvironment(app, source, options)`: image-based lighting from an HDR, EXR or UltraHDR JPEG | `@margoengine/environment` |
 | `@margoengine/stage/shadows` | `await addShadows(app, options)`: cascaded shadows; the meshes present now cast | `@margoengine/shadows` |
 | `@margoengine/stage/xr` | `await addXRButton(app, options)`: an accessible Enter VR or Enter AR button that starts an XR session | `@margoengine/xr` |
 | `@margoengine/stage/physics` | `await addBody(app, mesh, options)`: a rigid body and a fitted collider, loading physics on first use; `await addPhysics(app, options)` for the world | `@margoengine/physics` and its solver |
-| `@margoengine/stage/scene` | `await addScene(app, source, options)`: loads a save or prefab document, one mesh per entity, with lights and cameras, all or nothing | `@margoengine/save`; `@margoengine/gltf-pro` when an entity names a model, `@margoengine/animation` when two entities name the same one, `@margoengine/clustered` for point, spot and extra directional lights |
-| `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf-pro`, `@margoengine/environment`, `@margoengine/staging` or `@margoengine/shadows`, `@margoengine/tonemap` |
+| `@margoengine/stage/scene` | `await addScene(app, source, options)`: loads a save or prefab document, one mesh per entity, with lights and cameras, all or nothing | `@margoengine/save`; `@margoengine/gltf/pbr` when an entity names a model, `@margoengine/animation` when two entities name the same one, `@margoengine/clustered` for point, spot and extra directional lights |
+| `@margoengine/stage/viewer` | `await addViewer(app, url, options)`: a product viewer: model, image-based light, backdrop, shadow, tone mapping, fit and turntable tuned together | `@margoengine/gltf/pbr`, `@margoengine/environment`, `@margoengine/studio` or `@margoengine/shadows`, `@margoengine/tonemap` |
 | `@margoengine/stage/viewer-extras` | `await addViewerExtras(app, url, options)`: `addViewer` plus hotspots, animation clips, material variants, picking, a poster and an AR button; `registerViewerElement()` defines the `margo-viewer` element (see [Viewer extras](../../docs/stage-viewer-extras.md)) | `@margoengine/animation`, `@margoengine/labels` and `@margoengine/selection` only for the features you use, plus the viewer's packages |
 | `@margoengine/stage/lights` | `await addLights(app, lights, options)`: point, spot, rectangular area and extra directional lights in one call, shared with models loaded before or after it | `@margoengine/clustered` (and its `area` or `directional` entry when the call uses them) |
 
@@ -130,7 +130,7 @@ console.log(robot.meshes.length);
 
 Use `fit: false` to preserve camera framing and `signal` to cancel. Fits use the world-space AABB of transformed vertices. A failed fit retires the imported model. Existing loader byte limits, rollback and supported model subsets apply: glTF supports static opaque constant-color geometry, without textures, skinning or animation.
 
-`app.fit()` also reads registered meshes from the optional `@margoengine/gltf-pro` and FBX loaders, including their current node world transforms. Pass primitive nodes explicitly to fit a selection; grouping nodes themselves have no geometry. Hidden meshes and their hidden descendants stay excluded from fitting. PBR bounds use CPU bind-pose positions; fitting does not advance animation or read back GPU deformation. These queries leave PBR rendering in its optional package and keep `mesh.geometry` null. `addGLTF` continues to use the basic glTF loader.
+`app.fit()` also reads registered meshes from the optional `@margoengine/gltf/pbr` and FBX loaders, including their current node world transforms. Pass primitive nodes explicitly to fit a selection; grouping nodes themselves have no geometry. Hidden meshes and their hidden descendants stay excluded from fitting. PBR bounds use CPU bind-pose positions; fitting does not advance animation or read back GPU deformation. These queries leave PBR rendering in its optional package and keep `mesh.geometry` null. `addGLTF` continues to use the basic glTF loader.
 
 A URL that returns a Git LFS pointer file (text starting `version https://git-lfs`, served by a repository cloned
 without Git LFS) rejects with a `MargoError` (code `failed`) that names the URL and links to
@@ -197,7 +197,7 @@ Buttons of one stage share one `XR` plugin (`button.xr`, with `controllers`, `se
 
 ## Model viewer
 
-`addViewer` is the one call for a product page: it loads a glTF with `@margoengine/gltf-pro` and sets up everything around it, sized to the model. Each part imports its package on first use, and `false` leaves the part and its package out.
+`addViewer` is the one call for a product page: it loads a glTF with `@margoengine/gltf/pbr` and sets up everything around it, sized to the model. Each part imports its package on first use, and `false` leaves the part and its package out.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -231,7 +231,7 @@ A failed `addViewer` leaves the stage unchanged. Whichever step fails, a package
 
 Turn periods must be finite and nonzero, including negative or subnormal values; `resumeAfter` must be finite and nonnegative. Elapsed time is reduced modulo the period before computing an angle so extreme finite settings keep the camera finite.
 
-The turntable orbits the camera about the world's Y axis, not the model, so a model root off centre stays framed and shadows stay cached. A drag holds it. A file with nothing to draw rejects with `Viewer model has no geometry to frame`. `viewer.dispose()` leaves the camera where it is. Needs WebGPU. The `@margoengine/gltf-pro` model is a `PBRModel` (`viewer.model`), not the `LoadedModel` of `addGLTF`.
+The turntable orbits the camera about the world's Y axis, not the model, so a model root off centre stays framed and shadows stay cached. A drag holds it. A file with nothing to draw rejects with `Viewer model has no geometry to frame`. `viewer.dispose()` leaves the camera where it is. Needs WebGPU. The `@margoengine/gltf/pbr` model is a `PBRModel` (`viewer.model`), not the `LoadedModel` of `addGLTF`.
 
 ## Physics in one call
 
@@ -290,7 +290,7 @@ level.meshes.get('ball')!.position.y = 3;
 level.dispose(); // removes every mesh, model and light of the scene
 ```
 
-Four components are built in. `mesh` is a glTF URL, relative to the document (loaded with `@margoengine/gltf-pro`), or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`. `material` is the PBR options, such as `{color, roughness, metalness}`, and cannot move the mesh. `onEntity` takes every other component.
+Four components are built in. `mesh` is a glTF URL, relative to the document (loaded with `@margoengine/gltf/pbr`), or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`. `material` is the PBR options, such as `{color, roughness, metalness}`, and cannot move the mesh. `onEntity` takes every other component.
 
 Lights and cameras come from the document too. Both look down their entity's -Z axis, as in glTF, and take its world pose at load:
 

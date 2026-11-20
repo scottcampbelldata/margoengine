@@ -54,10 +54,10 @@ class Font implements TextMeasurer {
     readonly weight: string;
     readonly style: string;
     readonly face?: FontFace;
-    readonly size: 48;
-    readonly buffer: 8;
-    readonly radius: 10;
-    readonly cutoff: 0.25;
+    readonly size: number;
+    readonly buffer: number;
+    readonly radius: number;
+    readonly cutoff: number;
     revision: number;
     constructor(options?: FontOptions);
     get css(): string;

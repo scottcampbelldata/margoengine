@@ -47,6 +47,7 @@ export interface BloomOptions {
     threshold?: number;
     exposure?: number;
     radius?: number;
+    fireflies?: BloomFireflies;
 }
 
 export class FXAA implements EnginePlugin {
@@ -80,6 +81,8 @@ export interface GTAOOptions {
     slices?: number;
     steps?: number;
     enabled?: boolean;
+    skyRadius?: number;
+    skySteps?: number;
 }
 
 export class Glitch implements EnginePlugin {
@@ -195,12 +198,16 @@ export interface PostImagePixels {
 }
 
 export class PostStack implements EnginePlugin {
-    readonly effects: readonly EnginePlugin[];
     readonly name = "post:stack";
-    constructor(effects: readonly EnginePlugin[]);
-    static attach(engine: EngineKernel, effects: readonly EnginePlugin[]): PostStack;
+    constructor(effects?: readonly EnginePlugin[]);
+    static attach(engine: EngineKernel, effects?: readonly EnginePlugin[]): PostStack;
+    static join(engine: EngineKernel, effect: EnginePlugin, index?: number): PostStack;
+    get effects(): readonly EnginePlugin[];
     get depthTexture(): GPUTexture | undefined;
     get sceneTexture(): GPUTexture | undefined;
+    addEffect(effect: EnginePlugin, index?: number): this;
+    removeEffect(effect: EnginePlugin): boolean;
+    moveEffect(effect: EnginePlugin, index: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
@@ -242,6 +249,7 @@ export class SSAO implements EnginePlugin {
     static attach(instance: EngineKernel, options?: SSAOOptions): SSAO;
     get enabled(): boolean;
     protected get stacked(): boolean;
+    get occlusionView(): GPUTextureView | undefined;
     get depthTexture(): GPUTexture | undefined;
     set enabled(value: boolean);
     add(source: SSAOSource): () => void;
@@ -337,8 +345,8 @@ export class SceneFade implements EnginePlugin {
     readonly duration: number;
     readonly name = "post:scene-fade";
     readonly finished: Promise<void>;
-    constructor(duration?: number);
-    static attach(instance: EngineKernel, duration?: number): SceneFade;
+    constructor(duration?: number, clock?: () => number);
+    static attach(instance: EngineKernel, duration?: number, clock?: () => number): SceneFade;
     setup(engine: Engine): void;
     capture(): void;
     warm(): Promise<void>;
@@ -353,10 +361,14 @@ export function bloomWeights(radius: number, levels: number): number[];
 
 // Not exported from this entry, but used by the exports above:
 
+type BloomFireflies = 'temporal' | 'karis' | 'none';
+
 type BloomImageContext = Pick<PostPassContext, 'device' | 'encoder' | 'width' | 'height'>;
 
+type Borrowable<T> = T | ((device: GPUDevice) => T);
+
 interface LensFlareElement {
-    texture?: GPUTexture;
+    texture?: Borrowable<GPUTexture>;
     size: number;
     distance?: number;
     color?: readonly [number, number, number];

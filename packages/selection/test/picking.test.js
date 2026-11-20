@@ -283,3 +283,14 @@ test('micro picking ignores empty core Geometry without requesting nonexistent G
   h.effect.dispose();
   h.cleanup();
 });
+test('a pick marked exact reads only the centre pixel, so a world ray never answers with a neighbour off the ray', async () => {
+  const h = harness(1);
+  h.frame();
+  h.setPixels([[0, 1, 1]]);
+  const view = { camera: h.engine.camera, viewport: [0, 0, 128, 96], pixels: true };
+  assert.equal(await h.effect.onPick(64, 48, view), h.mesh, 'a mouse pick keeps its one pixel tolerance');
+  assert.equal(await h.effect.onPick(64, 48, { ...view, [Symbol.for('margoengine.selection.exactPick')]: true }), null);
+  h.setPixels([[1, 1, 1]]);
+  assert.equal(await h.effect.onPick(64, 48, { ...view, [Symbol.for('margoengine.selection.exactPick')]: true }), h.mesh);
+  h.effect.dispose();
+});

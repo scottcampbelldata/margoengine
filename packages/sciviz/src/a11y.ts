@@ -55,23 +55,33 @@ function abortable<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
-/** Exact one-pass finite-value ranges, extreme positions and online least-squares trend in observation order. */
+// About the power of two at or above a magnitude (1 for 0; at most 2^1023, which is finite), so data divided by it
+// lies within [-2, 2] exactly.
+const powerAbove = (m: number) => (m > 0 ? 2 ** Math.min(1023, Math.ceil(Math.log2(m))) : 1);
+
+/**
+ * Exact finite-value ranges, extreme positions and least-squares trend in observation order. A first pass finds the
+ * ranges; the second runs Welford's online update (Welford 1962) on the data divided by powers of two, so means and
+ * products of values near the largest double do not overflow (exact for normal values: the results are unchanged).
+ */
 export function describeSeries(series: AccessibleSeries): DataDescription {
   let finite = 0,
     minimum = Infinity,
     maximum = -Infinity,
     minimumIndex = -1,
     maximumIndex = -1,
+    largestX = 0,
     mean = 0,
     meanX = 0,
     sxx = 0,
     sxy = 0;
+  const at = (i: number, row: AccessibleDatum) => (Number.isFinite(row.x) ? row.x! : i);
   for (let i = 0; i < series.count; i++) {
     const row = series.datum(i),
-      y = row.value,
-      x = Number.isFinite(row.x) ? row.x! : i;
+      y = row.value;
     if (!Number.isFinite(y)) continue;
     finite++;
+    largestX = Math.max(largestX, Math.abs(at(i, row)));
     if (y < minimum) {
       minimum = y;
       minimumIndex = i;
@@ -80,14 +90,25 @@ export function describeSeries(series: AccessibleSeries): DataDescription {
       maximum = y;
       maximumIndex = i;
     }
-    const dx = x - meanX,
+  }
+  const scaleY = finite ? powerAbove(Math.max(-minimum, maximum)) : 1,
+    scaleX = powerAbove(largestX);
+  for (let i = 0, k = 0; i < series.count; i++) {
+    const row = series.datum(i),
+      value = row.value;
+    if (!Number.isFinite(value)) continue;
+    k++;
+    const x = at(i, row) / scaleX,
+      y = value / scaleY,
+      dx = x - meanX,
       dy = y - mean;
-    meanX += dx / finite;
-    mean += dy / finite;
+    meanX += dx / k;
+    mean += dy / k;
     sxx += dx * (x - meanX);
     sxy += dx * (y - mean);
   }
-  const slope = sxx > 0 ? sxy / sxx : 0;
+  mean *= scaleY;
+  const slope = sxx > 0 ? (sxy / sxx) * (scaleY / scaleX) : 0;
   return {
     count: series.count,
     finite,
@@ -124,6 +145,10 @@ export interface SonificationOptions {
   /** Allocation/event budget, default 100000 records. Exceeding it rejects instead of discarding data. */ readonly maxPoints?: number;
   readonly signal?: AbortSignal;
 }
+
+// Where v lies from lo to hi; a span past the largest double is measured in halves (exact for normal values).
+const fraction = (v: number, lo: number, hi: number) =>
+  Number.isFinite(hi - lo) ? (v - lo) / (hi - lo) : (v / 2 - lo / 2) / (hi / 2 - lo / 2);
 
 /** Map scalar value to pitch and source time to listening time, following astronomical time-series sonification practice. */
 export function sonificationPlan(values: ArrayLike<number>, options: SonificationOptions = {}): SonificationPlan {
@@ -173,11 +198,10 @@ export function sonificationPlan(values: ArrayLike<number>, options: Sonificatio
   for (let i = 0; i < n; i++) {
     if ((i & 16383) === 0) options.signal?.throwIfAborted();
     const v = values[i],
-      f = hi > lo ? Math.min(1, Math.max(0, (v - lo) / (hi - lo))) : 0.5;
+      f = hi > lo ? Math.min(1, Math.max(0, fraction(v, lo, hi))) : 0.5;
     audible[i] = Number.isFinite(v) ? 1 : 0;
     frequencies[i] = audible[i] ? pitch[0] * (pitch[1] / pitch[0]) ** f : pitch[0];
-    at[i] =
-      n === 1 ? 0 : duration * (times ? (((times[i] - times[0]) / (times[n - 1] - times[0])) * (n - 1)) / n : i / n);
+    at[i] = n === 1 ? 0 : duration * (times ? (fraction(times[i], times[0], times[n - 1]) * (n - 1)) / n : i / n);
   }
   return { frequencies, audible, times: at, duration };
 }
@@ -386,13 +410,14 @@ async function nativeSeries(figure: Figure, signal: AbortSignal): Promise<Access
 /** Attach keyboard data exploration, live summaries, full pageable data tables and explicit sonification controls. */
 export function attachAccessibility(figure: Figure, options: AccessibilityOptions = {}): AccessibilityHandle {
   options.signal?.throwIfAborted();
+  // Options are checked before the figure's current view is replaced, so a refused call leaves that view working.
+  const size = options.pageSize ?? 50;
+  if (!Number.isInteger(size) || size < 1 || size > 1000)
+    throw rangeError('Accessibility pageSize must be 1..1000; correct pageSize', 'sciviz');
   views.get(figure)?.dispose();
   const canvas = (figure.engine as unknown as { canvas: HTMLCanvasElement }).canvas,
     doc = canvas.ownerDocument,
     host = canvas.parentElement ?? doc.body;
-  const size = options.pageSize ?? 50;
-  if (!Number.isInteger(size) || size < 1 || size > 1000)
-    throw rangeError('Accessibility pageSize must be 1..1000; correct pageSize', 'sciviz');
   const originalPosition = host.style.position;
   if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
   const id = `margo-a11y-${serial++}`,
@@ -554,7 +579,11 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
           canvas.clientHeight,
           'webgpu',
         );
-      marker.hidden = !p.inFrustum;
+      // A 2D chart clips its marks to the plot area: a record outside the window is not drawn, even in the margins.
+      const area = figure.is2d ? figure.plotArea : undefined;
+      marker.hidden =
+        !p.inFrustum ||
+        (!!area && !(p.x >= area.x && p.x <= area.x + area.width && p.y >= area.y && p.y <= area.y + area.height));
       marker.style.left = `${canvas.offsetLeft + p.x}px`;
       marker.style.top = `${canvas.offsetTop + p.y}px`;
     }
@@ -710,7 +739,8 @@ export function attachAccessibility(figure: Figure, options: AccessibilityOption
     typeof matchMedia === 'function' ? matchMedia('(prefers-contrast: more), (forced-colors: active)') : undefined;
   const engine = figure.engine as unknown as Engine;
   const suspended = () => false;
-  let motionApplied = false, originalPace: Engine['pace'];
+  let motionApplied = false,
+    originalPace: Engine['pace'];
   const restoreMotion = () => {
     if (!motionApplied) return;
     reducedMotionFigures.delete(figure);

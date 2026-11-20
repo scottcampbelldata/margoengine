@@ -453,3 +453,63 @@ export function gradeSRGB<T extends NumberArray = number[]>(
     target[offset + i] = ((graded[i] - 0.5) * contrast + 0.5 + brightness) * (1 + (tint[i] - 1) * tintStrength);
   return target;
 }
+
+/**
+ * CIE 1931 xy chromaticity of a blackbody (Planckian radiator) at `kelvin`, 1,667 to 25,000 K: the cubic-spline fit of
+ * the Planckian locus by Kim, Kang, Bang, Kim, Lee and Lee ("Design of advanced color temperature control system for
+ * HDTV applications", J. Korean Physical Society 41(6), 2002), which follows Planck's law integrated against the CIE
+ * 1931 2 degree colour-matching functions (CIE 018:2019 Table 6, doi:10.25039/CIE.DS.xvudnb9b) to within 0.0004 in x
+ * and y from 1,860 to 6,504 K.
+ * @throws RangeError for a temperature outside 1,667 to 25,000 K.
+ */
+export function blackbodyChromaticity(kelvin: number): [number, number] {
+  if (typeof kelvin !== 'number' || !(kelvin >= 1667 && kelvin <= 25000))
+    throw new RangeError(`Invalid blackbody temperature ${String(kelvin)}; use 1667 to 25000 Kelvin.`);
+  const t = kelvin,
+    x =
+      t <= 4000
+        ? -0.2661239e9 / t ** 3 - 0.2343589e6 / t ** 2 + 0.8776956e3 / t + 0.17991
+        : -3.0258469e9 / t ** 3 + 2.1070379e6 / t ** 2 + 0.2226347e3 / t + 0.24039,
+    y =
+      t <= 2222
+        ? -1.1063814 * x ** 3 - 1.3481102 * x ** 2 + 2.18555832 * x - 0.20219683
+        : t <= 4000
+          ? -0.9549476 * x ** 3 - 1.37418593 * x ** 2 + 2.09137015 * x - 0.16748867
+          : 3.081758 * x ** 3 - 5.8733867 * x ** 2 + 3.75112997 * x - 0.37001483;
+  return [x, y];
+}
+
+/**
+ * Linear sRGB of CIE 1931 chromaticity `x`, `y` with its largest channel 1: XYZ with Y = 1, the IEC 61966-2-1 XYZ to
+ * linear sRGB matrix, and {@link clipToSRGB} for a colour outside sRGB (a negative channel is desaturated toward the
+ * colour's luminance until it is 0). For light colours, whose strength is set apart from their colour.
+ * @throws RangeError for a chromaticity with y not above 0 or x + y above 1.
+ */
+export function chromaticityToLinearSRGB<T extends NumberArray = number[]>(x: number, y: number, out?: T, offset = 0): T {
+  if (!(y > 0 && x >= 0 && x + y <= 1))
+    throw new RangeError(`Invalid chromaticity (${String(x)}, ${String(y)}); use x of 0 or more, y above 0 and x + y up to 1.`);
+  const X = x / y,
+    Z = (1 - x - y) / y,
+    rgb = [
+      3.2404542 * X - 1.5371385 - 0.4985314 * Z,
+      -0.969266 * X + 1.8760108 + 0.041556 * Z,
+      0.0556434 * X - 0.2040259 + 1.0572252 * Z,
+    ],
+    target = clipToSRGB(rgb, out, offset),
+    top = Math.max(target[offset], target[offset + 1], target[offset + 2]);
+  for (let i = 0; i < 3; i++) target[offset + i] /= top;
+  return target;
+}
+
+/**
+ * The colour of a blackbody at `kelvin` (1,667 to 25,000 K) as linear sRGB with its largest channel 1:
+ * {@link blackbodyChromaticity} then {@link chromaticityToLinearSRGB}. A flame, a filament or firelight takes its
+ * colour from its colour temperature this way; give the strength separately (a light's intensity).
+ * @example
+ * blackbodyColor(1900); // a kerosene flame: about [1, 0.233, 0]
+ * @throws RangeError for a temperature outside 1,667 to 25,000 K.
+ */
+export function blackbodyColor<T extends NumberArray = number[]>(kelvin: number, out?: T, offset = 0): T {
+  const [x, y] = blackbodyChromaticity(kelvin);
+  return chromaticityToLinearSRGB(x, y, out, offset);
+}

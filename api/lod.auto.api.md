@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { Material, MaterialMesh } from "@margoengine/materials";
 import { MutableVec3 } from "@margoengine/math";
 
@@ -190,6 +190,8 @@ class LODSystem implements EnginePlugin {
     constructor({ hysteresis, bias }?: LODSystemOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta?: number): void;
     get size(): number;
     add(anchor: Mesh, levels: readonly LODLevel[], { radius, color, emissive, frame }?: LODOptions): LOD;

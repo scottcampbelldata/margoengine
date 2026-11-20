@@ -5,13 +5,11 @@
 // node packages/oit/test/gpu/linear-check.mjs (MARGO_COMPAT=1 for the WebGL2 layer, where ExactOIT refuses by design).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
 const compat = compatRun(),
   names = ['oit', 'blending', 'exact', 'moments', 'peel', 'precise'];
-const release = await acquire({ owner: 'oit-linear' });
 const browser = await openBrowser({ startPath: '/packages/oit/test/gpu/linear.html', port: 'free' }),
   { page } = browser,
   errors = [];
@@ -70,5 +68,4 @@ try {
   console.log('oit linear-check: ok', checked, 'cases');
 } finally {
   await browser.close();
-  await release();
 }

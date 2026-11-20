@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/variation.browser.mjs
 // Lit scatter `variation` and `clusters`, as a `Scatter` and as a `ScatterTiles` grid, 400 green objects from above:
 // - unset and `{ variation: { hue: 0, value: 0 }, clusters: 0 }` draw the same bytes (the lit vertex stage is the

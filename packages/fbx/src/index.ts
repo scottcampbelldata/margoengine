@@ -1,7 +1,8 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro/model';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr-model';
 import { readResponse } from '../../shared/loading.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { defaultLimits, importLimits } from './limits.js';
 import { convert } from './convert.js';
 import type { FBXExtension } from './extension.js';
@@ -48,7 +49,9 @@ export async function parseFBX(
   input: ArrayBuffer | ArrayBufferView,
   options: FBXOptions = {},
 ): Promise<PBRModel> {
-  const glb = await convertFBX(input, options),
+  // The model is built after the awaits below: it goes in the scene this call started in.
+  const scope = captureScene(engine),
+    glb = await convertFBX(input, options),
     view = new DataView(glb),
     jsonLength = view.getUint32(12, true),
     doc = JSON.parse(new TextDecoder().decode(new Uint8Array(glb, 20, jsonLength))),
@@ -74,20 +77,23 @@ export async function parseFBX(
     }
     options.signal?.throwIfAborted();
     const limits = importLimits(options.extensions);
-    const model = new PBRModel(
-      engine,
-      new GLTFAsset(
-        doc,
-        [],
-        binaryStart <= glb.byteLength ? new Uint8Array(glb, binaryStart) : undefined,
-        {},
-        limits === defaultLimits ? undefined : limits.outputBytes,
-        limits.nodes,
-      ),
-      images,
+    const model = scope.run(
+      () =>
+        new PBRModel(
+          engine,
+          new GLTFAsset(
+            doc,
+            [],
+            binaryStart <= glb.byteLength ? new Uint8Array(glb, binaryStart) : undefined,
+            {},
+            limits === defaultLimits ? undefined : limits.outputBytes,
+            limits.nodes,
+          ),
+          images,
+        ),
     );
     try {
-      engineRuntime(engine).use(model);
+      scope.run(() => engineRuntime(engine).use(model));
       return model;
     } catch (error) {
       model.dispose();
@@ -104,14 +110,18 @@ export async function parseFBX(
 export async function loadFBX(engine: EngineKernel, url: string | URL, options: FBXOptions = {}): Promise<PBRModel> {
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');
-  const response = await (options.fetch ?? fetch)(target, { signal: options.signal }),
+  // parseFBX starts after the download: inside the scene this call started in, so it builds the model there.
+  const scope = captureScene(engine),
+    response = await (options.fetch ?? fetch)(target, { signal: options.signal }),
     bytes = await readResponse(response, {
       maxBytes: importLimits(options.extensions).inputBytes,
       signal: options.signal,
       label: 'FBX',
     });
-  return parseFBX(engine, bytes, {
-    ...options,
-    resourcePath: options.resourcePath ?? new URL('.', response.url || target).href,
-  });
+  return scope.run(() =>
+    parseFBX(engine, bytes, {
+      ...options,
+      resourcePath: options.resourcePath ?? new URL('.', response.url || target).href,
+    }),
+  );
 }

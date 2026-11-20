@@ -113,6 +113,7 @@ test('SSAO replays the RGB ambient and Sky replaces the constant ambient with it
     assert.ok(ambient, 'SSAO must replay the same RGB ambient that beauty receives');
     h.context.shader = wgsl;
     sky.pass(h.context);
+    sky.patch(h.context);
     // The engine's constant ambient term drops to zero; margoAmbient (SH diffuse plus sky reflections) replaces it.
     assert.match(
       h.context.shader,
@@ -158,6 +159,7 @@ test('SSAO occludes the Sky light (margoAmbient) and keeps its live bindings', (
     if (options?.pipeline?.fragment.module.code.includes('return vec4f(margoAmbient,1);')) replays.push(options);
   };
   h.engine.frameGraph.add({ name: 'test:sky', order: -6, execute: (c) => sky.pass(c) });
+  h.engine.frameGraph.add({ name: 'test:sky-patch', order: -0.5, execute: (c) => sky.patch(c) });
   h.engine.use(ssao);
   try {
     h.engine.frameGraph.execute(h.context);

@@ -1,7 +1,7 @@
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { floats, limits, throwIfAborted, toBytes, uints, type BinaryInput, type Growable } from './util.js';
 import { readZipDirectory, readZipEntry, type ZipEntry, type ZipOptions } from './zip.js';
-import { decodeXML, readXML } from './xml.js';
+import { decodeXML, readXML, type XMLExternalOptions } from './xml.js';
 import { hexColor } from '@margoengine/math/color';
 
 const F = '3MF';
@@ -21,7 +21,10 @@ export const THREEMF_UNITS: Readonly<Record<string, number>> = {
 /**
  * Options of parse3MF: size limits, zip limits, the unit handling, the component nesting depth and an AbortSignal.
  */
-export interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
+export interface ThreeMFOptions
+  extends ParseLimits,
+    XMLExternalOptions,
+    Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
   /** `'meters'` (default) scales by the model unit; `'file'` keeps the file's own units. */
   units?: 'meters' | 'file';
   /** Component nesting limit. Default 32. */
@@ -136,6 +139,7 @@ function parseModel(
   xml: string,
   limit: { maxVertices: number; maxTriangles: number },
   extension?: ThreeMFExtension,
+  external?: XMLExternalOptions['external'],
 ): Model {
   const model: Model = {
     unit: 'millimeter',
@@ -150,7 +154,10 @@ function parseModel(
   let object: ObjectData | undefined,
     colors: Color[] | undefined,
     metadataName: string | undefined,
-    metadataText = '';
+    metadataText = '',
+    // 3MF Core 1.4 section 4.1: <metadata> inside an object's or item's <metadatagroup> describes that element, not
+    // the model, so only top-level entries reach the model metadata.
+    metadataGroups = 0;
   let vertexCount = 0,
     triangleCount = 0,
     sawModel = false;
@@ -167,8 +174,11 @@ function parseModel(
             if (!Object.hasOwn(THREEMF_UNITS, model.unit))
               throw new LoaderError(F, 'unsupported', `unknown unit "${model.unit.slice(0, 32)}"`);
             break;
+          case 'metadatagroup':
+            metadataGroups++;
+            break;
           case 'metadata':
-            metadataName = a.name;
+            metadataName = metadataGroups ? undefined : a.name;
             metadataText = '';
             break;
           case 'basematerials':
@@ -261,6 +271,7 @@ function parseModel(
         extension?.close?.(model, name);
         if (name === 'object') object = undefined;
         else if (name === 'basematerials' || name === 'colorgroup') colors = undefined;
+        else if (name === 'metadatagroup') metadataGroups--;
         else if (name === 'metadata' && metadataName) {
           model.metadata[metadataName] = metadataText.trim();
           metadataName = undefined;
@@ -271,6 +282,7 @@ function parseModel(
       },
     },
     F,
+    { external },
   );
   if (!sawModel) throw new LoaderError(F, 'syntax', 'no <model> element');
   return model;
@@ -352,7 +364,7 @@ export async function read3MF(
     let model = models.get(key);
     if (!model) {
       if (models.size >= 1024) throw new LoaderError(F, 'limit', 'too many model parts');
-      model = parseModel(decodeXML(await read(path)), limit, extension);
+      model = parseModel(decodeXML(await read(path)), limit, extension, options.external);
       models.set(key, model);
     }
     return model;

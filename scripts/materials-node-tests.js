@@ -20,7 +20,7 @@ export async function nodeBrowserChecks(page) {
   return page.evaluate(
     async (fixtures) => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF } = await import('/packages/gltf/dist/pbr.js');
       const materials = await import('/packages/materials/dist/index.js');
       const assert = (value, message) => {
         if (!value) throw new Error(message);

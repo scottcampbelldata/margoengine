@@ -1,13 +1,13 @@
 // CPU checks (mock GPU) for @margoengine/environment/probes: validation, buffer layout, the ambient patch on core's shader
-// variants and gltf-pro's hooks, the bake's capture shader and GPU work, and the CPU irradiance mirror. The GPU itself is
+// variants and gltf/pbr's hooks, the bake's capture shader and GPU work, and the CPU irradiance mirror. The GPU itself is
 // checked by examples/package-benchmarks/probes-gpu.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { EnvironmentLighting, Fog, floatToHalf } from '../dist/index.js';
 import { LightProbes, MAX_REFLECTION_PROBES, PROBE_BINDING } from '../dist/probes.js';
 
@@ -239,7 +239,7 @@ async function gltfModel(engine) {
   return { core, model };
 }
 
-test('LightProbes reach gltf-pro models through the ambient hook and the bake captures core meshes and added models', async () => {
+test('LightProbes reach gltf/pbr models through the ambient hook and the bake captures core meshes and added models', async () => {
   const gpu = mockGPU(),
     engine = fakeEngine(gpu),
     { core, model } = await gltfModel(engine);
@@ -280,7 +280,10 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
     'the hemisphere ambient is replaced, not added',
   );
   // Bake: the engine renders one ordinary frame, then the capture frame runs the passes with the probe flag set.
-  const clustered = frame.state.shader.replace(
+  // KB-PROBES-TAA1: with TAA the main shader draws through its jittered `taaCamera`; the capture must draw from the
+  // probe camera. Before, the capture kept TAA's clip transform and drew the main camera's view into every face.
+  assert.ok(frame.state.shader.includes('o.clip=frame.camera*p;'), "core's clip transform");
+  const clustered = frame.state.shader.replace('o.clip=frame.camera*p;', 'o.clip=taaCamera*p;').replace(
     'fn fogAmount',
     '\nfn clusterLighting(pixel:vec2f)->vec3f {if(depth<clusterFrame.depth.x||depth>clusterFrame.depth.y){return vec3f(0);}let count=clusterCounts[cell];for(var j=0u;j<count;j++){let light=clusterLights[clusterIndices[cell*1024u+j]];}}\nfn fogAmount',
   );
@@ -313,12 +316,10 @@ test('LightProbes reach gltf-pro models through the ambient hook and the bake ca
     /@group\(0\) @binding\(0\) var<uniform> margoMainFrame:Frame;\n@group\(0\) @binding\(27\) var<uniform> frame:Frame;/,
     'probe camera frame',
   );
-  assert.match(
-    capture,
-    /if\(false\)\{let mapped=[^\n]*\}return vec4f\(linear,1\);/,
-    'linear radiance out, tone map dead but bindings kept',
-  );
-  assert.match(capture, /0\.0\*fogAmount\(/, 'no fog in the capture');
+  assert.match(capture, /if\(false\)\{_=linear;\}return vec4f\(linear,1\);/, 'linear radiance out, no tone map');
+  assert.match(capture, /o\.clip=frame\.camera\*p;_=taaCamera;/, "the probe camera's clip, TAA's uniform kept bound");
+  assert.doesNotMatch(capture, /o\.clip=taaCamera\*p/, "not TAA's jittered main camera");
+  assert.doesNotMatch(capture, /(?<!fn |0\.0\*)fogAmount\(/, 'no fog in the capture');
   assert.match(capture, /let count=clusterFrame\.grid\.w;/);
   assert.match(capture, /let light=clusterLights\[j\];/);
   assert.doesNotMatch(capture, /depth>clusterFrame\.depth\.y/, "every clustered light, not the camera's clusters");
@@ -961,4 +962,57 @@ test('external probe baking renders its owning scene on every bounce', async () 
   await h.probes.bake({ bounces: 2 });
   assert.equal(seen.length, 3);
   h.probes.dispose();
+});
+
+// KB-SCENES-SKYOCC1: the sky's light carried no visibility, so a shed's floor was lit as the open sand. With `sky` the
+// probes own the ambient term and fall back to the sky's own skyIrradiance and skyRadiance outside the volume (the sum
+// is the sky's skyLighting there), bind the sky's resources beside the probe buffer, capture the sky and wait for it.
+test('LightProbes with a sky: the sky lights what the probes do not, captured, bound and validated', () => {
+  const skyWgsl = /const declarations = `([^`]*)`/.exec(readFileSync(new URL('../../sky/src/lighting.ts', import.meta.url), 'utf8'))[1];
+  assert.match(skyWgsl, /fn skyRadiance\(r:vec3f,rough:f32\)->vec3f/, 'the sky declares its radiance for the probes');
+  const gpu = mockGPU(),
+    engine = fakeEngine(gpu);
+  let ready = [];
+  const sky = {
+    name: 'sky',
+    registerPasses(graph) {
+      graph.add({ name: 'sky', order: 1, execute() {} });
+    },
+    pbr: (group) => (ready.length ? { declarations: skyWgsl.replaceAll('@group(0)', `@group(${group})`) } : undefined),
+    bindings: () => ready,
+  };
+  assert.throws(() => new LightProbes({ sky: {}, volume: { ...room, counts: [2, 2, 2] } }), /must be a Sky/);
+  assert.throws(
+    () => new LightProbes({ sky, environment: fakeEnvironment(engine.gpu), volume: { ...room, counts: [2, 2, 2] } }),
+    /environment or sky/,
+  );
+  const probes = new LightProbes({ sky, volume: { ...room, counts: [2, 2, 2] } });
+  assert.equal(probes.sky, sky);
+  probes.setup(engine);
+  assert.deepEqual(probes.bindings(), [], 'the sky not ready: the sky lights the scene by itself');
+  assert.equal(probes.shader(coreShader, 0), coreShader);
+  ready = [{ binding: 8 }, { binding: 10 }, { binding: 11 }];
+  assert.deepEqual(
+    probes.bindings().map((e) => e.binding),
+    [8, 10, 11, PROBE_BINDING],
+  );
+  assert.equal(probes.bindings(), probes.bindings(), 'the entries are kept while the sky keeps its bindings');
+  const code = probes.shader(coreShader, 0);
+  assert.match(code, /fn skyIrradiance\(/);
+  assert.match(code, /let fallback=diffuse\*skyIrradiance\(n\);/);
+  assert.match(code, /return s\.rgb\+\(1\.0-s\.a\)\*skyRadiance\(r,rough\);/);
+  assert.match(
+    fragment(code),
+    /let margoAmbient=probeShade\(i\.position,n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\),vec3f\(0\.04\),1\.0\);/,
+  );
+  assert.doesNotMatch(code, /frame\.radiance\.w\*frame\.ambient/, "core's flat ambient is not added beside the sky");
+  const hooks = probes.pbr(2);
+  assert.match(hooks.declarations, /@group\(2\) @binding\(8\) var<uniform> skyLight/);
+  assert.match(hooks.ambient, /probeShade\(i\.position,s\.n,v,s\.base\.rgb,s\.metal,s\.roughness,vec3f\(0\),/);
+  // The sky's passes are replayed into every capture, so the probes see it through doors and windows.
+  const broken = new LightProbes({ sky: { ...sky, pbr: () => ({ declarations: 'fn other() {}' }) }, volume: { ...room, counts: [2, 2, 2] } });
+  broken.setup(engine);
+  assert.throws(() => broken.shader(coreShader, 0), /skyIrradiance and skyRadiance/);
+  broken.dispose();
+  probes.dispose();
 });

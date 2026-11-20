@@ -1,5 +1,6 @@
 // Clean room: Nielson/Hamann 1991, Bowyer 1981, Watson 1981. See docs/clean-room.md.
 import { rangeError } from '../../shared/errors.js';
+import { escapeXML } from '../../shared/xml-escape.js';
 import { delaunay2D } from './contour2d-triangulate.js';
 
 /** Coordinate and scalar value. NaN scalars mask incident cells; coordinates must be finite. */
@@ -230,8 +231,7 @@ export interface ContourSVGOptions {
   readonly colors?: readonly string[];
   readonly title?: string;
 }
-const escape = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);
+const escape = escapeXML;
 /** Standalone vector SVG, polygon bands with holes and rotated inline labels with a background halo. */
 export function contourSVG(data: Contours2D, options: ContourSVGOptions = {}): string {
   const {

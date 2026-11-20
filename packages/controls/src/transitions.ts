@@ -8,6 +8,7 @@ import { ArcballControls as Arcball } from './arcball.js';
 import { TrackballControls as Trackball } from './trackball.js';
 import type { V3 } from './math.js';
 import type { KeyAction } from './profiles.js';
+import { rangeError } from '../../shared/errors.js';
 
 /** Transition timing in seconds. Cancellation resolves false; completion resolves true. */
 export interface TransitionOptions {
@@ -57,7 +58,7 @@ type Motion = {
 };
 
 const fail = (message: string): never => {
-  throw new RangeError(`Camera transition: ${message}; pass a valid view and transition options`);
+  throw rangeError(`Camera transition: ${message}; pass a valid view and transition options`, 'controls-arguments');
 };
 const vector = (v: readonly number[]): V3 => {
   if (v.length !== 3 || !v.every(Number.isFinite)) fail('use three finite coordinates');

@@ -71,7 +71,12 @@ export async function acceptVoxelNetWebTransport(
   options: WebTransportConnectionOptions & { request?: Parameters<VoxelServer['accept']>[1]; address?: string } = {},
 ): Promise<void> {
   const connection = await acceptWebTransport(session, options);
-  server.accept(voxelNetServerConnection(connection), options.request, options.address);
+  try {
+    server.accept(voxelNetServerConnection(connection), options.request, options.address);
+  } catch (error) {
+    connection.close();
+    throw error;
+  }
 }
 
 /**
@@ -106,7 +111,12 @@ export async function connectVoxelNetWebTransport(
   options: ConnectVoxelNetWebTransportOptions = {},
 ): Promise<VoxelNetClient> {
   const connection = await openWebTransport(url, options);
-  return joinOver(connection, world, options);
+  try {
+    return joinOver(connection, world, options);
+  } catch (error) {
+    connection.close();
+    throw error;
+  }
 }
 
 /**
@@ -135,8 +145,10 @@ export function joinOver(
     );
   connection.onmessage = (data) => client.receive(data);
   connection.onclose = (code, reason) => {
+    // Read before client.close(), which ends through the close above and would mark a server's close as the client's.
+    const mine = byClient;
     client.close();
-    client.onClose({ code: code === NETCODE_TIMEOUT ? 1006 : code, reason, byClient });
+    client.onClose({ code: code === NETCODE_TIMEOUT ? 1006 : code, reason, byClient: mine });
   };
   return client;
 }

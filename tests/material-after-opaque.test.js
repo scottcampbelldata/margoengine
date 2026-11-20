@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseGLTF, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { install, installNodeMaterial, nodeMaterial } from '../packages/materials/dist/index.js';
 import { transmission } from '../packages/materials/dist/transmission.js';
 import { optionalGPU, uniformBytes } from './support/optional-gpu.js';

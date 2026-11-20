@@ -1,0 +1,54 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky ambient on a glTF model</title><style>body{margin:0}canvas{display:block;width:320px;height:180px}</style></head><body><canvas width="320" height="180"></canvas>
+<script type="module">
+// KB-FILM-SKYADD1: a sunlit bruneton sky with clouds, agx tone mapping and shadows, lighting a glTF model with
+// transmission through sky.add before the first frame. `?mode=add` (sky.add), `auto` (no sky.add: the model joins its
+// scene's sky by itself, KB-GLTF-SCENESKY1), `none` (the model left out of the sky, model.sceneSky false) or `empty`
+// (no model); `?model=<path>`. Reports each of the first frames as displayed (8-bit), drawn at delta 0, so every frame is
+// the same instant. Driven by sky-add-gltf-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {degrees,sunlitSky} from '/packages/sky/dist/sun.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+import {WeatherMachine} from '/packages/weather/dist/index.js';
+import {WeatherDrive} from '/packages/weather/dist/drive.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const q=new URLSearchParams(location.search),mode=q.get('mode')??'add',file=q.get('model')??'/examples/assets/khronos-samples/TransmissionTest.glb';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,1,3],target:[0,0.3,0],near:0.05,far:5000}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const drive=q.get('weather')?WeatherDrive.attach(engine,{weather:new WeatherMachine(q.get('weather'),{seed:3})}):undefined;
+const sky=Sky.attach(engine,{...sunlitSky({elevation:degrees(32),azimuth:degrees(130)}),model:'bruneton',clouds:{coverage:0.42,speed:6}});
+if(drive){drive.options.sky=sky;drive.options.precipitation=Weather.attach(engine,{fadeSeconds:0});}
+Tonemap.attach(engine,{curve:'agx',exposure:0});
+const shadows=Shadows.attach(engine,{resolution:1024,distance:50});
+const ground=engine.createMesh().setGeometry(box(40,0.2,40)).setMaterial(new PbrMaterial({color:'#5d7a3a',roughness:0.95})).setPosition([0,-0.1,0]);
+shadows.add(ground,{static:true});
+let model;
+if(mode!=='empty'){
+ model=await loadGLTF(engine,file);
+ shadows.add(model);
+ if(mode==='add')sky.add(model);
+ else if(mode==='none')model.sceneSky=false;
+ const b=model.bounds,size=Math.max(b[3]-b[0],b[4]-b[1],b[5]-b[2]);
+ engine.camera.position=[(b[0]+b[3])/2+size*0.9,(b[1]+b[4])/2+size*0.6,(b[2]+b[5])/2+size*1.4];
+ engine.camera.target=[(b[0]+b[3])/2,(b[1]+b[4])/2,(b[2]+b[5])/2];
+}else{engine.camera.position=[0.9,0.9,1.6];engine.camera.target=[0,0.3,0];}
+async function frame(){
+ const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+ engine.render({delta:Number(q.get('delta')??0)});
+ if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();
+ g.drawImage(canvas,0,0);
+ const d=g.getImageData(0,0,c.width,c.height).data;
+ // A digest of every pixel, and the mean of the middle third (where the model stands).
+ let h=2166136261,mid=0,n=0;
+ for(let i=0;i<d.length;i++){h=Math.imul(h^d[i],16777619)>>>0;}
+ for(let y=60;y<120;y++)for(let x=107;x<213;x++){const k=(y*320+x)*4;mid+=d[k]+d[k+1]+d[k+2];n+=3;}
+ return {digest:h.toString(16),mid:mid/n};
+}
+window.check={async run(count=6){const frames=[];for(let i=0;i<count;i++)frames.push(await frame());await device.queue.onSubmittedWorkDone();return {mode,errors,frames,bounds:model?Array.from(model.bounds):null};}};
+window.ready=true;
+</script></body></html>

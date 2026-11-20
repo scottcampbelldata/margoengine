@@ -398,3 +398,31 @@ test('README import example runs as written (GLB through exporters)', () => {
   assert.equal(mesh.faces.length, 6);
   assert.equal(tiles.merged, 0);
 });
+
+test('import: an OBJ polygon over 64 corners is split into convex faces, not dropped as degenerate', () => {
+  // A 100-sided cap, as OBJ cylinders write it, came back as an empty mesh with a "degenerate" diagnostic.
+  const n = 100,
+    positions = [],
+    indices = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    positions.push(Math.cos(a), 0, -Math.sin(a));
+  }
+  for (let k = 1; k + 1 < n; k++) indices.push(0, k, k + 1);
+  const result = K.polygonMeshFromTriangles(
+    { positions, indices, faceSizes: [n], positionIndices: Array.from({ length: n }, (_, i) => i) },
+    { uv: 'unwrap' },
+  );
+  assert.ok(result.mesh.faces.length >= 2);
+  assert.ok(result.mesh.faces.every((face) => face.vertices.length <= 64));
+  assert.equal(result.mesh.vertices.length, n);
+  assert.ok(!result.diagnostics.some((line) => line.includes('dropped')));
+  assert.deepEqual([...new Set(Object.values(result.sourceFaces).flat())], [0]);
+  let area = 0;
+  for (const face of result.mesh.faces) {
+    const p = face.vertices.map((v) => result.mesh.vertices[v]);
+    for (let i = 1; i + 1 < p.length; i++)
+      area += (p[i][2] - p[0][2]) * (p[i + 1][0] - p[0][0]) - (p[i][0] - p[0][0]) * (p[i + 1][2] - p[0][2]);
+  }
+  assert.ok(Math.abs(Math.abs(area / 2) - (n / 2) * Math.sin((2 * Math.PI) / n)) < 1e-9);
+});

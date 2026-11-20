@@ -104,7 +104,7 @@ test('only variance clipping writes clipGamma into the resolve uniform', () => {
   const gammaOf = (options) => {
     const r = rig(options),
       log = r.gpu.record(() => r.frame()),
-      block = log.find((c) => c[0] === 'writeBuffer' && c[3].length === 52 * 8);
+      block = log.find((c) => c[0] === 'writeBuffer' && c[3].length === 56 * 8);
     return new Float32Array(Uint8Array.from(Buffer.from(block[3], 'hex')).buffer)[51];
   };
   assert.equal(gammaOf({}), 0);

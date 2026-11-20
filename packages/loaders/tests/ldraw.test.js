@@ -96,7 +96,8 @@ test('references search the library, fold case and back slashes, and read each f
   const asked = [];
   const resolve = library({ 'p/s/stud.dat': '0 BFC CERTIFY\n3 16 0 0 0 1 0 0 0 1 0\n' }, asked);
   const model = await parseLDraw(
-    '1 4 0 0 0 1 0 0 0 1 0 0 0 1 S\\STUD.DAT\n1 4 5 0 0 1 0 0 0 1 0 0 0 1 s/stud.dat\n',
+    // Certified, so the certified primitive culls (an uncertified caller would draw it on both sides).
+    '0 BFC CERTIFY\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 S\\STUD.DAT\n1 4 5 0 0 1 0 0 0 1 0 0 0 1 s/stud.dat\n',
     { ...file, resolve },
   );
   assert.equal(model.indices.length, 6);
@@ -164,6 +165,7 @@ test('an MPD pack finds its own files first and draws the first one', async () =
   const model = await parseLDraw(
     `0 FILE main.ldr
 0 Main model
+0 BFC CERTIFY
 1 4 0 0 0 1 0 0 0 1 0 0 0 1 Sub.ldr
 0 NOFILE
 0 FILE sub.ldr
@@ -189,11 +191,13 @@ test('BFC: certified winding is kept, CW reverses, a mirror and INVERTNEXT flip,
   assert.ok((await z(`0 BFC CERTIFY CCW\n${face}`)) > 0);
   assert.ok((await z(`0 BFC CERTIFY CW\n${face}`)) < 0);
   const resolve = library({ 'f.dat': `0 BFC CERTIFY CCW\n${face}` });
-  assert.ok((await z('1 4 0 0 0 1 0 0 0 1 0 0 0 1 f.dat\n', { resolve })) > 0);
+  // The referring file is certified too: the BFC spec passes culling down only through certified files.
+  const c = '0 BFC CERTIFY\n';
+  assert.ok((await z(`${c}1 4 0 0 0 1 0 0 0 1 0 0 0 1 f.dat\n`, { resolve })) > 0);
   // A mirror turns the corners over and the flip turns them back, so the face still looks along +z.
-  assert.ok((await z('1 4 0 0 0 -1 0 0 0 1 0 0 0 1 f.dat\n', { resolve })) > 0);
-  assert.ok((await z('0 BFC INVERTNEXT\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 f.dat\n', { resolve })) < 0);
-  assert.ok((await z('0 BFC INVERTNEXT\n1 4 0 0 0 -1 0 0 0 1 0 0 0 1 f.dat\n', { resolve })) < 0);
+  assert.ok((await z(`${c}1 4 0 0 0 -1 0 0 0 1 0 0 0 1 f.dat\n`, { resolve })) > 0);
+  assert.ok((await z(`${c}0 BFC INVERTNEXT\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 f.dat\n`, { resolve })) < 0);
+  assert.ok((await z(`${c}0 BFC INVERTNEXT\n1 4 0 0 0 -1 0 0 0 1 0 0 0 1 f.dat\n`, { resolve })) < 0);
   const open = await parseLDraw(face, file);
   assert.equal(open.indices.length, 6);
   assert.ok(normal(open, 0)[2] * normal(open, 1)[2] < 0);
@@ -320,4 +324,24 @@ test('a sub-model of an MPD is walked through, and the parts inside it instance'
     model = await parseLDraw(mpd, { instanced: true, resolve: library({ 'parts/brick.dat': brick }) });
   assert.equal(model.instances.length, 1);
   assert.equal(model.instances[0].matrices.length, 32);
+});
+
+test('BFC inheritance: NOCLIP covers the sub-files it references, and only parts cull under an uncertified caller', async () => {
+  const face = '3 4 0 0 0 1 0 0 0 1 0\n',
+    certified = `0 BFC CERTIFY CCW\n${face}`,
+    resolve = library({
+      'sub.dat': certified,
+      'parts/brick.dat': certified,
+      'tagged.dat': `0 !LDRAW_ORG Part UPDATE 2024-01\n${certified}`,
+      'parts/s/piece.dat': certified,
+    }),
+    count = async (text) => (await parseLDraw(text, { ...file, resolve })).indices.length;
+  // A certified sub-file referenced under NOCLIP is drawn on both sides; after CLIP it culls again.
+  assert.equal(await count('0 BFC CERTIFY\n0 BFC NOCLIP\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 sub.dat\n'), 6);
+  assert.equal(await count('0 BFC CERTIFY\n0 BFC NOCLIP\n0 BFC CLIP\n1 4 0 0 0 1 0 0 0 1 0 0 0 1 sub.dat\n'), 3);
+  // An uncertified model: a certified sub-file is not culled, a part (by folder or by !LDRAW_ORG) is; a subpart is not.
+  assert.equal(await count('1 4 0 0 0 1 0 0 0 1 0 0 0 1 sub.dat\n'), 6);
+  assert.equal(await count('1 4 0 0 0 1 0 0 0 1 0 0 0 1 brick.dat\n'), 3);
+  assert.equal(await count('1 4 0 0 0 1 0 0 0 1 0 0 0 1 tagged.dat\n'), 3);
+  assert.equal(await count('1 4 0 0 0 1 0 0 0 1 0 0 0 1 s/piece.dat\n'), 6);
 });

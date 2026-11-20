@@ -1,5 +1,8 @@
 import { defaultLimits, type FBXImportLimits } from './limits.js';
 import type { GeometryData } from '@margoengine/exporters';
+
+/** Exporters geometry data as the FBX importer builds it: always with normals (computed when the file has none). */
+export type NormalGeometryData = GeometryData & { normals: ArrayLike<number> };
 import { array, findChild, type FBXNode } from './document.js';
 
 const MAX_POLYGON = 4096;
@@ -225,7 +228,7 @@ function triangulate(
 }
 
 export interface BuiltGeometry {
-  primitives: { geometry: GeometryData; materialIndex: number }[];
+  primitives: { geometry: NormalGeometryData; materialIndex: number }[];
   controlPoints: Uint32Array[];
   vertexCount: number;
   /** The file's name of each UV set kept, in order. */
@@ -570,7 +573,7 @@ export function buildGeometry(
   for (const [materialIndex, list] of order)
     for (const id of list) {
       const out = outputs[id];
-      const geometry: GeometryData = { positions: out.positions, normals: out.normals, indices: out.indices };
+      const geometry: NormalGeometryData = { positions: out.positions, normals: out.normals, indices: out.indices };
       uvs.forEach((_, set) => (geometry[UV_KEYS[set]] = out.uvs[set]));
       if (tangent) geometry.tangents = out.tangents;
       colors.forEach((_, set) => (geometry[COLOR_KEYS[set]] = out.colors[set]));

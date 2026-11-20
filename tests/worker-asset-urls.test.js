@@ -15,8 +15,8 @@ function fileURL(path) {
 
 test('parser workers do not inline Draco or KTX2', () => {
   for (const path of [
-    'packages/gltf-pro/dist/workers/gltf.js',
-    'packages/gltf-pro/dist/workers/progressive.js',
+    'packages/gltf/dist/workers/gltf.js',
+    'packages/gltf/dist/workers/progressive.js',
     'packages/fbx/dist/workers/fbx.js',
     'packages/usdz/dist/workers/usdz.js',
     'packages/ifc/dist/workers/ifc.js',
@@ -25,16 +25,18 @@ test('parser workers do not inline Draco or KTX2', () => {
     const code = text(path);
     assert.doesNotMatch(code, /\{\}\.url|import\.meta/, path);
     assert.doesNotMatch(code, /data:application\/wasm|data:text\/javascript/, path);
-    assert.doesNotMatch(code, /@margoengine\/decoders(?!\/meshopt)/, path);
+    // An import of the decoders package (a classic worker cannot resolve it); a message that names an entry for the
+    // caller to load, such as TIFF's loadTIFFCodecs hint, is text, not an import.
+    assert.doesNotMatch(code, /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'`]@margoengine\/decoders(?!\/meshopt)/, path);
     assert.equal(existsSync(join(root, path, '..', 'decoder.worker.js')), false, path);
   }
-  assert.match(text('packages/gltf-pro/dist/workers/gltf.js'), /EXT_meshopt_compression/);
+  assert.match(text('packages/gltf/dist/workers/gltf.js'), /EXT_meshopt_compression/);
 });
 
 test('published worker URLs stay literal import.meta.url', () => {
   const expected = [
-    ['packages/gltf-pro/dist', './workers/gltf.js?no-inline'],
-    ['packages/gltf-pro/dist', './workers/progressive.js?no-inline'],
+    ['packages/gltf/dist', './workers/gltf.js?no-inline'],
+    ['packages/gltf/dist', './workers/progressive.js?no-inline'],
     ['packages/ifc/dist', './workers/ifc.js?no-inline'],
     ['packages/fbx/dist', './workers/fbx.js?no-inline'],
     ['packages/loaders/dist', './workers/usd.js?no-inline'],
@@ -53,12 +55,12 @@ test('published worker URLs stay literal import.meta.url', () => {
   }
 });
 
-// Regression (2026-11-10): 8412c0f14 put gltf-pro's Node image fallback, a runtime import of
+// Regression (2026-11-10): 8412c0f14 put gltf/pbr's Node image fallback, a runtime import of
 // @margoengine/decoders/image, inside asset.ts, so the gltf, progressive and fbx parser workers carried a decoder
 // specifier that an IIFE cannot resolve. The fallback lives in its own module, which the worker build swaps for a stub.
-test("gltf-pro's Node image fallback is its own module, and parser workers get a stub that says why", async () => {
-  assert.doesNotMatch(text('packages/gltf-pro/src/asset.ts'), /@margoengine\/decoders\/image/);
-  assert.match(text('packages/gltf-pro/src/node-image-decode.ts'), /'@margoengine\/decoders\/image'/);
+test("gltf/pbr's Node image fallback is its own module, and parser workers get a stub that says why", async () => {
+  assert.doesNotMatch(text('packages/gltf/src/asset.ts'), /@margoengine\/decoders\/image/);
+  assert.match(text('packages/gltf/src/node-image-decode.ts'), /'@margoengine\/decoders\/image'/);
   const { decodeWithoutBrowser } = await import('../scripts/worker-node-image-stub.js');
   await assert.rejects(decodeWithoutBrowser(new Uint8Array(4)), /createImageBitmap is not available in this worker/);
 });

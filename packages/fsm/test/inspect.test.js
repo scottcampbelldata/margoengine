@@ -107,3 +107,31 @@ test('parallel regions show their separate active paths and history', () => {
   assert.match(view.element.shadowRoot.textContent, /root\/p\/legs: walk/);
   dom.window.close();
 });
+
+test('dispose removes the refresh and filter listeners from the controls it created', () => {
+  const dom = new JSDOM('<body></body>'),
+    { HTMLElement } = dom.window,
+    live = new Map(),
+    add = HTMLElement.prototype.addEventListener,
+    remove = HTMLElement.prototype.removeEventListener;
+  HTMLElement.prototype.addEventListener = function (type, listener, ...rest) {
+    live.set(`${this.tagName}:${type}`, (live.get(`${this.tagName}:${type}`) ?? 0) + 1);
+    return add.call(this, type, listener, ...rest);
+  };
+  HTMLElement.prototype.removeEventListener = function (type, listener, ...rest) {
+    live.set(`${this.tagName}:${type}`, (live.get(`${this.tagName}:${type}`) ?? 0) - 1);
+    return remove.call(this, type, listener, ...rest);
+  };
+  try {
+    const m = new StateMachine({ a: {}, b: {} }, 'a', {}, [{ from: 'a', to: 'b', event: 'go' }]);
+    const view = new MachineView(m, { parent: dom.window.document.body, live: false });
+    assert.deepEqual([...live].sort(), [['BUTTON:click', 1], ['INPUT:input', 1]]);
+    view.dispose();
+    view.dispose();
+    assert.deepEqual([...live].sort(), [['BUTTON:click', 0], ['INPUT:input', 0]]);
+  } finally {
+    HTMLElement.prototype.addEventListener = add;
+    HTMLElement.prototype.removeEventListener = remove;
+    dom.window.close();
+  }
+});

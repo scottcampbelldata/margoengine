@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openNativeOracle as openNative } from './support/native-oracle.mjs';
 import { openBrowser as openFirefox } from './support/firefox-bidi.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 export function differences(a, b, tolerance, path = '', out = []) {
   if (out.length >= 8) return out;
@@ -52,90 +51,85 @@ if (requested?.some((name) => !fixtures.includes(name))) throw new Error('Unknow
 const reportFile = requested
   ? 'test-results/firefox-compat-cases-selected.json'
   : 'test-results/firefox-compat-cases.json';
-const release = await acquire({ owner: 'firefox-compat-reference', max: 5 });
-try {
-  for (const fixture of requested ?? fixtures) {
-    console.log(`Starting native oracle: ${fixture}`);
-    const startPath = `/packages/webgl2-compat/test/${fixture}`;
-    const options = { startPath, port: 'free', compat: false, plugins: [strictPolicy] };
-    const cell = { fixture, cases: [], errors: [], policyDiagnostics: [] };
-    report.cells.push(cell);
-    const oracle = new Map();
-    let browser = await openNative(options);
-    try {
-      cell.nativeHardware = browser.hardware;
-      await browser.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
-      const names = await browser.page.evaluate(() => window.check.names());
-      for (const name of names) {
-        console.log(`Native oracle: ${fixture}/${name}`);
-        const result = await browser.page.evaluate((name) => window.check.run(name), name);
-        assert.equal(result.native.thrown, null, `${fixture}/${name}: native oracle threw`);
-        assert.deepEqual(result.native.errors, []);
-        oracle.set(name, { reference: result.native, tier: result.compat.result?.tier });
-      }
-    } finally {
-      await browser.close();
+for (const fixture of requested ?? fixtures) {
+  console.log(`Starting native oracle: ${fixture}`);
+  const startPath = `/packages/webgl2-compat/test/${fixture}`;
+  const options = { startPath, port: 'free', compat: false, plugins: [strictPolicy] };
+  const cell = { fixture, cases: [], errors: [], policyDiagnostics: [] };
+  report.cells.push(cell);
+  const oracle = new Map();
+  let browser = await openNative(options);
+  try {
+    cell.nativeHardware = browser.hardware;
+    await browser.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    const names = await browser.page.evaluate(() => window.check.names());
+    for (const name of names) {
+      console.log(`Native oracle: ${fixture}/${name}`);
+      const result = await browser.page.evaluate((name) => window.check.run(name), name);
+      assert.equal(result.native.thrown, null, `${fixture}/${name}: native oracle threw`);
+      assert.deepEqual(result.native.errors, []);
+      oracle.set(name, { reference: result.native, tier: result.compat.result?.tier });
     }
-    browser = await openFirefox(options);
-    console.log(`Starting Firefox compatibility cases: ${fixture}`);
-    try {
-      cell.firefoxHardware = browser.hardware;
-      browser.page.on('pageerror', (error) => cell.errors.push(error.message));
-      browser.page.on('console', (message) => {
-        if (message.type() !== 'error') return;
-        if (
-          fixture.endsWith('?strict') &&
-          message.text().startsWith('Content-Security-Policy:') &&
-          /unsafe-eval/.test(message.text())
-        )
-          cell.policyDiagnostics.push(message.text());
-        else cell.errors.push(message.text());
-      });
-      await browser.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
-      const names = await browser.page.evaluate(() => window.check.names());
-      assert.deepEqual(names, [...oracle.keys()], 'execute the entire original case list');
-      for (const name of names) {
-        const got = await browser.page.evaluate((name) => window.check.runCompat(name), name);
-        const { reference: expected, tier } = oracle.get(name),
-          compute = fixture.startsWith('compute');
-        const tolerance = compute ? (got.result?.tolerance ?? 1e-6) : 1e-6;
-        const diff = differences(
-          compute ? expected.result?.values : expected.result,
-          compute ? got.result?.values : got.result,
-          tolerance,
-        );
-        if (compute && got.result?.tier !== tier) diff.push(`tier ${got.result?.tier} versus ${tier}`);
-        const result = {
-          name,
-          expected: expected.result,
-          actual: got.result,
-          tolerance,
-          differences: diff,
-          thrown: got.thrown,
-          errors: got.errors,
-          gl: got.gl,
-          tier: got.result?.tier,
-          ok: got.thrown === null && got.errors.length === 0 && got.gl === 0 && diff.length === 0,
-        };
-        cell.cases.push(result);
-        await writeFile(reportFile, JSON.stringify(report, null, 2) + '\n');
-        console.log(`${fixture}/${name}: ${result.ok ? 'PASS' : 'DIFFERENCE'} ${got.thrown ?? diff.join('; ')}`);
-      }
-      if (fixture.endsWith('?strict')) {
-        cell.interpreter = await browser.page.evaluate(() =>
-          performance.getEntriesByType('resource').some((entry) => /\/interpret-[^/]*\.js/.test(entry.name)),
-        );
-        assert.equal(cell.interpreter, true, 'strict policy must execute the interpreter');
-        assert.equal(cell.policyDiagnostics.length, 1, 'one explicit new Function capability probe is blocked');
-      }
-    } finally {
-      await browser.close();
-    }
+  } finally {
+    await browser.close();
   }
-  await writeFile(reportFile, JSON.stringify(report, null, 2) + '\n');
-  process.exitCode = report.cells.every((cell) => cell.errors.length === 0 && cell.cases.every((result) => result.ok))
-    ? 0
-    : 1;
-} finally {
-  release();
+  browser = await openFirefox(options);
+  console.log(`Starting Firefox compatibility cases: ${fixture}`);
+  try {
+    cell.firefoxHardware = browser.hardware;
+    browser.page.on('pageerror', (error) => cell.errors.push(error.message));
+    browser.page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+      if (
+        fixture.endsWith('?strict') &&
+        message.text().startsWith('Content-Security-Policy:') &&
+        /unsafe-eval/.test(message.text())
+      )
+        cell.policyDiagnostics.push(message.text());
+      else cell.errors.push(message.text());
+    });
+    await browser.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    const names = await browser.page.evaluate(() => window.check.names());
+    assert.deepEqual(names, [...oracle.keys()], 'execute the entire original case list');
+    for (const name of names) {
+      const got = await browser.page.evaluate((name) => window.check.runCompat(name), name);
+      const { reference: expected, tier } = oracle.get(name),
+        compute = fixture.startsWith('compute');
+      const tolerance = compute ? (got.result?.tolerance ?? 1e-6) : 1e-6;
+      const diff = differences(
+        compute ? expected.result?.values : expected.result,
+        compute ? got.result?.values : got.result,
+        tolerance,
+      );
+      if (compute && got.result?.tier !== tier) diff.push(`tier ${got.result?.tier} versus ${tier}`);
+      const result = {
+        name,
+        expected: expected.result,
+        actual: got.result,
+        tolerance,
+        differences: diff,
+        thrown: got.thrown,
+        errors: got.errors,
+        gl: got.gl,
+        tier: got.result?.tier,
+        ok: got.thrown === null && got.errors.length === 0 && got.gl === 0 && diff.length === 0,
+      };
+      cell.cases.push(result);
+      await writeFile(reportFile, JSON.stringify(report, null, 2) + '\n');
+      console.log(`${fixture}/${name}: ${result.ok ? 'PASS' : 'DIFFERENCE'} ${got.thrown ?? diff.join('; ')}`);
+    }
+    if (fixture.endsWith('?strict')) {
+      cell.interpreter = await browser.page.evaluate(() =>
+        performance.getEntriesByType('resource').some((entry) => /\/interpret-[^/]*\.js/.test(entry.name)),
+      );
+      assert.equal(cell.interpreter, true, 'strict policy must execute the interpreter');
+      assert.equal(cell.policyDiagnostics.length, 1, 'one explicit new Function capability probe is blocked');
+    }
+  } finally {
+    await browser.close();
+  }
 }
+await writeFile(reportFile, JSON.stringify(report, null, 2) + '\n');
+process.exitCode = report.cells.every((cell) => cell.errors.length === 0 && cell.cases.every((result) => result.ok))
+  ? 0
+  : 1;

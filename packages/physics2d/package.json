@@ -27,7 +27,8 @@
   "scripts": {
     "build": "node scripts/build.js",
     "test": "npm run build && node --test tests/*.test.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:kernel-browsers": "cd ../.. && npm run test:physics2d-kernel-browsers"
   },
   "sideEffects": false,
   "exports": {

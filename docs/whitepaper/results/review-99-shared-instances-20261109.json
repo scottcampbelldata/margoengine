@@ -5043,8 +5043,8 @@
     }
   },
   "queueReceipts": {
-    "networkFirstAttempt": "outer 180 s guard expired while queued, no GPU test executed; failed step completed with queue-inclusive guard and unchanged 1-minute real GPU lease",
-    "readmeFirstAttempt": "outer 300 s guard expired while queued; no README example executed; replacement retains original 20 s example deadline and 4-minute real GPU lease"
+    "networkFirstAttempt": "outer 180 s guard expired while queued, no GPU test executed; failed step completed with queue-inclusive guard and unchanged 1-minute real the GPU run",
+    "readmeFirstAttempt": "outer 300 s guard expired while queued; no README example executed; replacement retains original 20 s example deadline and 4-minute real the GPU run"
   },
   "readmeExample": [
     {

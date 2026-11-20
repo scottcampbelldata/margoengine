@@ -39,7 +39,7 @@ or `new Texture(await ktx2.transcode(bytes))`, which uploads the transcoded mips
 
 ## Meshopt
 
-`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, written from the two extension specifications, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit, with one deliberate difference: a TRIANGLES or INDICES stream decoded into a 16-bit index buffer (byteStride 2) that holds an index past 65,535 fails as damaged, where the reference keeps the low 16 bits and so joins the wrong vertices. Attribute streams of vertex codec version 0 (the only one `EXT_meshopt_compression` defines) and version 1 (added by `KHR_meshopt_compression`) are both decoded, whichever extension names the bufferView; any other version is rejected with a clear error. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged.
+`decodeMeshoptBuffer(source, count, stride, mode, filter)` decodes one `EXT_meshopt_compression` or `KHR_meshopt_compression` bufferView (ATTRIBUTES, TRIANGLES or INDICES, with the OCTAHEDRAL, QUATERNION, EXPONENTIAL and COLOR filters) and returns a `Uint8Array`. It is pure TypeScript, written from the two extension specifications, synchronous and needs no Wasm. Output matches the meshoptimizer reference decoder bit for bit, with one deliberate difference: a TRIANGLES or INDICES stream decoded into a 16-bit index buffer (byteStride 2) that holds an index past 65,535 fails as damaged, where the reference keeps the low 16 bits and so joins the wrong vertices. Index streams the specification makes invalid (a FIFO entry read before it was written, a codeaux table with a 0xf nibble or non-zero last two bytes, a varint longer than 5 bytes) fail as damaged too. Attribute streams of vertex codec version 0 (the only one `EXT_meshopt_compression` defines) and version 1 (added by `KHR_meshopt_compression`) are both decoded, whichever extension names the bufferView; any other version is rejected with a clear error. `MeshoptDecoder` has the members of the meshoptimizer project's own decoder object (`supported`, `ready`, `decodeGltfBuffer`), so glTF loaders written against that interface work unchanged.
 
 ## Meshopt on Wasm SIMD (`@margoengine/decoders/meshopt-simd`)
 
@@ -140,7 +140,7 @@ Checked against dwebp 1.4.0, run as an outside tool, on 139 real files: the Y, U
 
 ## Any image to pixels (`@margoengine/decoders/image`, `/bc`)
 
-`decodeImage(bytes, {signal, maxPixels})` turns a PNG, WebP, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `maxPixels` (default 2^26, 8192 squared) bounds PNG, WebP, JPEG and AVIF before their pixels are allocated: a larger image throws `RangeError`. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
+`decodeImage(bytes, {signal, maxPixels})` turns a PNG, JPEG, WebP, AVIF, DDS, KTX or KTX2 file into RGBA8 rows, whichever it is: the file's signature picks the reader, and each reader loads only when a file needs it. `maxPixels` (default 2^26, 8192 squared) bounds PNG, WebP, JPEG and AVIF before their pixels are allocated: a larger image throws `RangeError`. `imageFormat(bytes)` names the format. `textureFileToRGBA(file)` does it for a parsed `TextureFile`. `decodeBC(format, blocks, width, height)` from `/bc` decodes BC1 to BC7 on the CPU. Basis Universal KTX2 goes through a worker in a browser and through the shipped Wasm in the calling thread in Node.
 
 ```ts
 import {decodeImage, imageFormat} from 'margoengine/decoders/image';
@@ -151,14 +151,27 @@ const {width, height, data} = await decodeImage(file);
 console.log(width, height, data.length); // 1 1 4
 ```
 
-A JPEG and AVIF are refused with code `unsupported`, as are native ETC, EAC and ASTC blocks. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
+A JPEG reads the same way; this one is written by `@margoengine/headless/formats` `encodeJPEG` and read back:
+
+```ts
+import {encodeJPEG} from 'margoengine/headless/formats';
+import {decodeImage, imageFormat} from 'margoengine/decoders/image';
+
+const orange = new Uint8Array(4 * 4).map((_, i) => [200, 120, 40, 255][i % 4]);
+const jpeg = encodeJPEG({width: 2, height: 2, data: orange}, {quality: 90});
+console.log(imageFormat(jpeg)); // jpeg
+const {width, height, data} = await decodeImage(jpeg);
+console.log(width, height, Array.from(data.slice(0, 4))); // 2 2 [201, 120, 39, 255]
+```
+
+Native ETC, EAC and ASTC blocks are refused with code `unsupported`. Signed formats map -1..1 to 0..255, as a normal map held in an unsigned image does. Float formats clamp to 0..1 and come out sRGB encoded.
 
 In Node, which has no Web Worker for `KTX2Decoder`, pass `nodeKTX2` as the `ktx2` option of `loadGLTF` to load a Basis Universal model. Install the `webgpu` binding (`npm install webgpu`, tested with 0.6.2) and `@margoengine/headless` alongside Margo. It transcodes to RGBA8, four times the bytes of a GPU format, so a large model needs a larger `maxDownloadBytes`, which sets the decoded budget too. This example loads the complete CC0 FlightHelmet by Gary Hsu and Microsoft from a pinned Khronos sample revision:
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {nodeKTX2} from 'margoengine/decoders/image';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {createHeadlessCanvas, installGPU} from 'margoengine/headless';
 import {create} from 'webgpu';
 
@@ -171,12 +184,12 @@ using model = await loadGLTF(engine,
 console.log(model.primitives.length); // 6
 ```
 
-After building a clone and fetching its pinned inputs with `node scripts/reference-rendering/fetch-skip-assets.mjs`, run `node scripts/gpu-lock.mjs run --owner=readme-node -- node packages/decoders/scripts/test-node-gltf.mjs`. It executes this Node setup and glTF load, checks every decoded mip and the complete geometry counts, and reads back the rendered model without GPU validation errors. This is integration evidence for that asset; it does not compare decoded pixels against an independent Basis decoder or establish rendering quality or speed.
+After building a clone and fetching its pinned inputs with `node scripts/reference-rendering/fetch-skip-assets.mjs`, run `node scripts/run-with-timeout.mjs -- node packages/decoders/scripts/test-node-gltf.mjs`. It executes this Node setup and glTF load, checks every decoded mip and the complete geometry counts, and reads back the rendered model without GPU validation errors. This is integration evidence for that asset; it does not compare decoded pixels against an independent Basis decoder or establish rendering quality or speed.
 
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the
-Draco and meshopt modules, for code that uploads textures a `KTX2Decoder` already transcoded. gltf-pro imports these
+Draco and meshopt modules, for code that uploads textures a `KTX2Decoder` already transcoded. gltf/pbr imports these
 from here and loads the root only when a file needs decoding.
 
 ## Brotli (`@margoengine/decoders/brotli`)
@@ -224,8 +237,10 @@ console.log(fromBzip2.length, fromXz.length);
 Concatenated streams read as one. Every bzip2 block and stream CRC is checked. `decodeBzip2(bytes, { stopAt })` returns
 exactly the first `stopAt` bytes and decodes nothing past them, for containers such as NRRD whose header gives the size and
 whose data may run on; the CRC of the block holding the last of those bytes is then not checked. In `.xz`, the CRC32s of the headers, index and
-footer are checked, and each block's own CRC32, CRC64 or SHA-256. `.lzma` has no
-check, so damage shows only as a broken stream. Only the LZMA2 filter is read: BCJ and delta filters throw `unsupported`, and so
+footer are checked, and each block's own CRC32, CRC64 or SHA-256; the sizes in block headers, the index records and the
+footer's index size and flags must match the stream, as the format requires. `.lzma` has no check, so damage shows only as a
+broken stream. `.xz` blocks are LZMA2, with any number of Delta filters before it (`xz --delta`). The branch/call/jump filters
+for executables (`xz --x86` and the like) throw `unsupported`: the format specification names them but gives no algorithm. So
 do bzip2's randomised blocks, which nothing has written since 1999. A stream that breaks the format, ends early or passes
 `maxBytes` throws a `MargoError` with code `failed`. The tests read files from the outside libbzip2 and liblzma.
 
@@ -259,11 +274,30 @@ Four small synchronous readers, each its own entry and each written from its pub
   types 1, 2, 3 and their RLE forms 9, 10, 11; 8-, 15-, 16-, 24- and 32-bit pixels; colour maps of 15 to 32 bits;
   any origin corner; alpha from the descriptor bits, with a TGA 2.0 extension area's "no alpha" honoured and
   premultiplied alpha divided out.
-- `parseTIFF(bytes, {maxPixels?})` reads the first image: little- or big-endian, strips or tiles, uncompressed, LZW
-  (with Predictor 2 at 8 and 16 bits), PackBits or Deflate; grey (either polarity), RGB and palette at 1, 2, 4, 8 or 16 bits per
-  sample, chunky or planar, with an associated or unassociated alpha extra sample. Integer images come out as
-  `{width, height, format: 'rgba8unorm', data: Uint8Array}` (16-bit samples scale to 0-255), 32-bit float images as
-  `{format: 'rgba32float', data: Float32Array}`. JPEG, CMYK, YCbCr, signed samples and the float predictor are refused.
+- `parseTIFF(bytes, {maxPixels?, codecs?})` reads the first image: little- or big-endian, strips or tiles,
+  uncompressed, LZW (with Predictor 2 at 8 and 16 bits), PackBits, Deflate, LZMA, Zstandard and WebP (lossless and
+  lossy, 8-bit RGB or RGBA; these three through `codecs`, see `loadTIFFCodecs` below) as libtiff writes them, CCITT
+  bilevel coding (Modified Huffman, Group 3 one- and two-dimensional with or without byte-aligned EOLs, Group 4, the
+  T.4 uncompressed mode, FillOrder 2 fax captures) and JPEG (Compression 7 with shared JPEGTables, chunky or planar,
+  and old-style Compression 6 through its JPEGInterchangeFormat datastream); grey (either polarity), RGB and palette
+  at 1, 2, 4, 8 or 16 bits per sample, CMYK at 8 or 16 bits (with DotRange), YCbCr at 8 bits (subsampled 1, 2 or 4
+  each way, centred or cosited chroma filtered up linearly, YCbCrCoefficients and ReferenceBlackWhite applied; a file
+  without ReferenceBlackWhite reads as JFIF) and CIE or ICC L*a*b* at 8 bits (D65 white, to sRGB), chunky or planar,
+  with an associated or unassociated alpha extra sample. CMYK converts without a colour profile, as R = (1 - C)(1 -
+  K). Integer images come out as `{width, height, format: 'rgba8unorm', data: Uint8Array}` (16-bit samples scale to
+  0-255), 16, 32 and 64-bit float images (16-bit is the OpenEXR half) as `{format: 'rgba32float', data:
+  Float32Array}`, with or without the floating point predictor (Predictor 3, Adobe Photoshop TIFF Technical Note 3,
+  2005), as GIS and Photoshop heightmaps use it. Signed samples, 24-bit floats, inks other than CMYK, ITU L*a*b*,
+  lossless and 12-bit JPEG are refused, and so is LERC (Compression 34887), which has no public bitstream
+  specification.
+- `openTIFF(bytes, {maxPixels?, codecs?})` lists every page (BigTIFF too) and `read(index)` returns its stored samples
+  with every codec above, FillOrder 2 bilevel data included; JPEG pages keep their stored components (no colour
+  conversion), and subsampled YCbCr outside JPEG is refused there, since its data units have no per-pixel layout.
+- `loadTIFFCodecs(bytes?, {signal?})` (`@margoengine/decoders/tiff-codecs`) resolves the LZMA, Zstandard and WebP
+  decoders a file uses, each a separate chunk loaded with `import()` only when one of the file's pages needs it (all
+  three without `bytes`); pass the result as `codecs`. Without it (default none) a page in one of those codes throws
+  `MargoError` `failed` naming `loadTIFFCodecs`, so a reader of the other codes never pays for them. The FBX
+  importer's worker decodes embedded TIFF textures without them.
 - `parseDDS(bytes)` and `parseKTX(bytes)` return a `TextureFile`: `{width, height, layers, dimension, mipmaps, format,
   feature?, target, srgb, hasAlpha}` with every mip level, each level holding all its layers (cube faces in WebGPU
   order +X, -X, +Y, -Y, +Z, -Z) back to back. Block-compressed data passes through untouched: BC1 to BC7 (sRGB, BC4 and
@@ -273,8 +307,9 @@ Four small synchronous readers, each its own entry and each written from its pub
   10-bit and shared-exponent formats pass through. 2D textures, cube maps and arrays of either; volume and 1D textures
   are refused. KTX padding rules (row, cube and mip) are followed, big-endian files are swapped, and key/value data
   is skipped, so `KTXorientation` is not applied and rows come out as stored.
-  KTX `COMPRESSED_RGB_S3TC_DXT1` (and its sRGB form) has no alpha, so `hasAlpha` is false: WebGPU samples a
-  three-colour block's black texel with alpha 0, which an opaque material must ignore.
+  KTX `COMPRESSED_RGB_S3TC_DXT1` and KTX2 `VK_FORMAT_BC1_RGB_UNORM_BLOCK` (and their sRGB forms) have no alpha, so
+  `hasAlpha` is false: WebGPU samples a three-colour block's black texel with alpha 0, which an opaque material must
+  ignore.
 - `uploadTexture(device, file, {label?, usage?})` (on both `/dds` and `/ktx`) creates the GPUTexture and writes every
   level and layer. On a device without the feature (`texture-compression-bc`, `-etc2` or `-astc`) it throws
   `MargoError` `unsupported` naming the feature to request in `requestDevice`.
@@ -284,7 +319,8 @@ Broken files throw `MargoError` `failed` naming the problem; a non-`Uint8Array` 
 
 ```ts
 import {parseTGA} from 'margoengine/decoders/tga';
-import {parseTIFF} from 'margoengine/decoders/tiff';
+import {openTIFF, parseTIFF} from 'margoengine/decoders/tiff';
+import {loadTIFFCodecs} from 'margoengine/decoders/tiff-codecs';
 import {parseDDS, uploadTexture} from 'margoengine/decoders/dds';
 const device = await (await navigator.gpu.requestAdapter())!.requestDevice();
 const tgaBytes = new Uint8Array(await (await fetch('/image.tga')).arrayBuffer());
@@ -292,7 +328,10 @@ const tiffBytes = new Uint8Array(await (await fetch('/image.tiff')).arrayBuffer(
 const ddsBytes = new Uint8Array(await (await fetch('/texture.dds')).arrayBuffer());
 
 const decal = parseTGA(tgaBytes); // {width, height, data: RGBA8}
-const heightMap = parseTIFF(tiffBytes); // rgba8unorm or rgba32float
+const codecs = await loadTIFFCodecs(tiffBytes); // loads LZMA, Zstandard or WebP only if the file uses them
+const heightMap = parseTIFF(tiffBytes, {codecs}); // rgba8unorm or rgba32float
+const pages = openTIFF(tiffBytes, {codecs}); // every page, stored samples at full precision
+const elevation = pages.read(pages.length - 1).samples; // e.g. a Zstandard float GeoTIFF band
 const sky = parseDDS(ddsBytes); // e.g. a BC6H cube map
 if (sky.feature && !device.features.has(sky.feature)) console.warn(`${sky.format} needs ${sky.feature}`);
 const texture = uploadTexture(device, sky);
@@ -304,8 +343,45 @@ data images. A DDS or KTX result that is one 2D layer in `rgba8unorm`, `bc7-rgba
 cube maps and arrays go through `uploadTexture` and are handed to materials as a GPUTexture.
 
 `tests/tga.test.js`, `dds.test.js`, `ktx.test.js` and `tiff.test.js` build every supported variant with the encoders in
-`tests/support/texture-encoders.js` and check decoded pixels exactly. `scripts/texture-fixtures.mjs` uses the same
+`tests/support/texture-encoders.js` and check decoded pixels exactly. `tests/tiff-libtiff.test.js` reads CCITT, JPEG
+and CMYK files written by the libtiff 4.7 tools (`tests/generate-tiff-libtiff.mjs`): CCITT exactly, JPEG within 3 of
+tiff2rgba and djpeg (their integer inverse DCT and chroma rounding differ from this decoder's), CMYK within 1. `scripts/texture-fixtures.mjs` uses the same
 encoders to write the 64x64 demo checkerboards in `examples/assets/texture-formats/`.
+
+## GeoTIFF georeference and no-data (`@margoengine/decoders/geotiff`)
+
+`openTIFF(bytes).read(i)` also keeps the ASCII tags a GIS writes in `page.ascii` (GeoAsciiParams 34737, GDAL_METADATA
+42112, GDAL_NODATA 42113 and ImageDescription 270). `readGeoTIFF(page)` turns a page into where its pixels lie: the
+raster-to-model transform (from ModelPixelScale with ModelTiepoint, or ModelTransformation), the pixel size, `box` (the
+outer edges of the cells, in model units) and `sampleBox` (the first and last sample centres), whether the raster is
+`'area'` or `'point'`, the coordinate system (`crs.model`, the EPSG code, the file's own name for it), the vertical
+units, and the GDAL_NODATA value (NaN for `nan`). A page with no georeference tags still gives `noData`, with the
+georeference fields null; several tie points and no scale come back in `tiepoints`, not interpolated. It reads no pixels
+and needs no codecs, so it is a few hundred bytes next to `openTIFF`.
+
+```ts
+import {openTIFF} from 'margoengine/decoders/tiff';
+import {readGeoTIFF} from 'margoengine/decoders/geotiff';
+import {gridHeightField} from 'margoengine/terrain/height-grid';
+const bytes = new Uint8Array(await (await fetch('/dem.tif')).arrayBuffer()); // a USGS 3DEP or SRTM tile
+const page = openTIFF(bytes).read(0);
+const info = readGeoTIFF(page);
+console.log(info.crs.epsg, info.box, info.pixel, info.noData);
+// A projected grid in metres: its cells are the ground size, no-data becomes the nearest valid height.
+if (info.box && info.crs.model === 'projected')
+  gridHeightField({
+    width: page.width,
+    height: page.height,
+    heights: page.samples,
+    size: [info.box[2] - info.box[0], info.box[3] - info.box[1]],
+    registration: info.raster,
+    noData: info.noData ?? undefined,
+  });
+```
+
+A geographic grid (degrees) has to be converted to metres by you before it is a ground size. Sources: OGC GeoTIFF
+Standard 1.1 (OGC 19-008r4), the tie point, pixel scale and transformation tags and the GeoKey ids; the GDAL GeoTIFF
+driver for the GDAL_NODATA text. `tests/geotiff.test.js` builds each case by hand.
 
 ## PCX (`@margoengine/decoders/pcx`)
 
@@ -425,6 +501,12 @@ WebGPU wants that of level 0; `bytes()` and `usedBytes` report what the streams 
 
 `open` takes `offset` and `length` for a KTX2 file inside a larger file, such as an image in a GLB's binary chunk, and `colorViews` for a loader that picks sRGB or linear by how a texture is used: every texture it makes then allows views in the format's twin (`colorTwin(format)`).
 
+### Streamed textures after a device restore
+
+`StreamedKTX2.texture` is made, replaced and copied by the streamer on the device you gave `KTX2Streamer`. It is never a texture you pass in. After
+that device is lost, make a new `KTX2Streamer` with the replacement device and open the file again; the new stream makes its textures there and
+touches nothing of the lost device.
+
 ## Basis on the GPU (`@margoengine/decoders/ktx2-gpu`)
 
 `KTX2GPUDecoder` transcodes Basis Universal KTX2 files with compute shaders, so a page that only needs textures skips the Wasm
@@ -452,13 +534,13 @@ matters more than the download. Texture video, HDR files and files that store a 
 - **Zero-copy results.** Every decoded array owns its own buffer and returns through `postMessage` transfer lists. KTX2 mip levels are views into one transferred buffer and go straight to `device.queue.writeTexture`. Inputs are copied by default so the caller keeps its buffer; pass `{transfer: true}` to move a whole `ArrayBuffer` instead.
 - **Memory release.** The worker destroys every Draco decoder, buffer and mesh handle and frees every heap allocation after each decode, including on errors. KTX2 files are closed and deleted the same way.
 - **Hardware format negotiation.** `getSupportedTranscodeFormat(device)` checks `texture-compression-bc`, then `-astc`, then `-etc2`, and falls back to `rgba8`. A device only reports these features when they were requested in `requestDevice`, so an engine that requests none always gets RGBA8. Compressed targets fall back to RGBA8 when level 0 is not a multiple of 4 pixels. sRGB files get the `-srgb` format variant.
-- **Bundler and SSR safety.** Workers run the prebuilt classic script `decoder.worker.js`, found by `new URL('./decoder.worker.js?no-inline', import.meta.url)`, and the Wasm decoders are referenced the same way. Vite, webpack 5 and Next.js therefore emit them as assets. Nothing touches `window`, `Worker` or `navigator` at import time, so construction is safe during SSR. Decoding on the server rejects with a clear error.
+- **Bundler and SSR safety.** Workers run the prebuilt classic script `decoder.worker.js`, found by `new URL('./decoder.worker.js?no-inline', import.meta.url)`, and the Wasm decoders are referenced the same way. Vite, webpack 5 and Next.js therefore emit them as assets. Nothing touches `window`, `Worker` or `navigator` at import time, so construction is safe during SSR. Draco decodes on a server too (see "Draco in Node" below); `KTX2Decoder` on the server rejects with a clear error (use `nodeKTX2`).
 
 ## Options
 
 | Option | Decoder | Default |
 | --- | --- | --- |
-| `decoderPath` | Draco | Bundled copy. Point at a CDN folder holding `draco_wasm_wrapper.js` and `draco_decoder.wasm`, e.g. `https://www.gstatic.com/draco/versioned/decoders/1.5.7/` |
+| `decoderPath` | Draco | Bundled copy. Point at a CDN folder holding `draco_wasm_wrapper.js` and `draco_decoder.wasm`, e.g. `https://www.gstatic.com/draco/versioned/decoders/1.5.7/`. In Node it is a folder on disk (a path or a `file:` URL); a web address is refused with `unsupported` |
 | `transcoderPath` | KTX2 | Bundled copy. Folder holding `basis_transcoder.js` and `basis_transcoder.wasm` |
 | `workerLimit` | both | Hardware threads, capped at 4 (allowed range 1 to 16) |
 | `device` | KTX2 | None. Picks the target and is required by `createTexture` |
@@ -496,7 +578,7 @@ until it ends or times out, so no new decode queues behind it unknowingly.
 
 ## Limits
 
-`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. `DracoDecoder` reads meshes; a point cloud goes through `@margoengine/decoders/draco-points`. `@margoengine/gltf-pro` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. The pro async loaders also load KTX2/Basis textures; supply `nodeKTX2` in Node as above. The basic `@margoengine/gltf` loader is unchanged.
+`KTX2Decoder` reads one 2D texture; cube maps and arrays go through `@margoengine/decoders/ktx2-layers`. HDR files go through `@margoengine/decoders/ktx2-hdr`. `DracoDecoder` reads meshes; a point cloud goes through `@margoengine/decoders/draco-points`. `@margoengine/gltf/pbr` automatically uses Draco and meshopt through `loadGLTF` and `parseGLTFAsync`; `parseGLTF` stays synchronous for uncompressed and meshopt assets. Its async loaders dispose their temporary Draco decoder after success, failure or cancellation. A supplied reusable `draco` hook remains owned by its caller. The pro async loaders also load KTX2/Basis textures; supply `nodeKTX2` in Node as above. The basic `@margoengine/gltf` loader is unchanged.
 
 ## Tests
 
@@ -506,6 +588,28 @@ fails with the exact file path; run `git lfs pull` from the repository root to f
 `npm test` in `packages/decoders` runs Node checks with mock and real Wasm: SSR safety, target negotiation, row pitch, mip upload, pool limits and recovery, transfer instead of copy, handle and heap release, the Khronos Box, Avocado and AnisotropyBarnLamp assets, meshopt vectors produced by the meshoptimizer 1.1.1 reference encoder and decoder, and round trips through the repository's own test encoder (`tests/support/meshopt-encode.js`, written from the extension specifications). It also covers a real normalized UV/color triangle and index promotion at 65,535, 65,536 and 65,537 vertices. The triangle was generated with pinned `draco3d@1.5.7`; `tests/generate-normalized-fixture.mjs` regenerates it from an external encoder installation without adding a runtime dependency. `npm run test:browser` adds module workers in Chromium, a 64-decode burst, a compressed upload with no validation errors, byte-identical RGBA8 GPU readback, and a production Vite consumer build that must emit the worker and decoders as assets.
 
 The Draco and Basis Universal binaries are Apache-2.0. See `vendor/NOTICE.md`.
+
+## Draco in Node
+
+Node has no Web Worker, so every Draco decoder here (`DracoDecoder`, `DracoPointsDecoder` and the `draco-native` pair)
+decodes in the calling thread there, with the same Wasm and the same decode functions the browser workers run, so a
+file gives the same geometry. `loadGLTF` from `@margoengine/gltf/pbr` therefore reads Draco models in Node with no
+option. Limits, `signal` and `decoderPath` (a folder on disk) work as in a browser; `timeout` does not apply, since a
+decode in this thread cannot be stopped part way, and `transfer` detaches nothing. The Wasm loads once per process and
+folder. Another runtime without workers (an edge function) still rejects with `unsupported`.
+
+```ts
+import {DracoDecoder} from 'margoengine/decoders';
+import {readFile} from 'node:fs/promises';
+
+const file = 'Avocado.drc'; // the compressed bufferView of Khronos Avocado
+const bytes = await readFile(file).catch(() => undefined);
+if (bytes) {
+  using draco = new DracoDecoder();
+  const geometry = await draco.decode(bytes, {attributeIds: {POSITION: 3, NORMAL: 1, TEXCOORD_0: 0}});
+  console.log(geometry.vertexCount, geometry.indices?.length);
+}
+```
 
 ## Optional clean-room Draco (`@margoengine/decoders/draco-native`)
 

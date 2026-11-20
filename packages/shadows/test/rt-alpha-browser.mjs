@@ -9,7 +9,7 @@ browser.page.on('pageerror', e => errors.push(e.message));
 await runSuite(async () => {
   const report = await browser.page.evaluate(async () => {
     const { Engine } = await import('/packages/core/dist/index.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { MeshBVH, Raycaster } = await import('/packages/bvh/dist/index.js');
     const { AlphaRaycaster, modelAlphaMasks } = await import('/packages/bvh/dist/alpha.js');
     const { alphaWorldTriangles } = await import('/packages/bvh/dist/alpha-triangles.js');

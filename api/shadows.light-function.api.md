@@ -21,8 +21,14 @@ export interface LightFunction<Options, Context = unknown> extends ShadowEffect<
     readonly options: Options;
 }
 
+export interface LightPattern<Context = unknown> extends LightFunction<LightPatternOptions, Context> {
+    setTexture(texture: Borrowable<GPUTextureView>): void;
+    readonly time: number;
+    advanceTime(delta: number): void;
+}
+
 export interface LightPatternOptions {
-    texture: GPUTextureView;
+    texture: Borrowable<GPUTextureView>;
     size?: number;
     offset?: readonly [number, number];
     speed?: readonly [number, number];
@@ -35,9 +41,11 @@ export function cloudShadows<Context extends {
 
 export function lightPattern<Context extends {
     device: GPUDevice;
-}>(options: LightPatternOptions): LightFunction<LightPatternOptions, Context>;
+}>(options: LightPatternOptions): LightPattern<Context>;
 
 // Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 
 interface ShadowEffect<Context = unknown> {
     wgsl(group: number, binding: number): string;
@@ -45,7 +53,10 @@ interface ShadowEffect<Context = unknown> {
     readonly call?: string;
     readonly style?: string;
     resources?(): readonly GPUBindingResource[];
+    readonly revision?: number;
+    rebind?(): boolean;
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
+    advanceTime?(delta: number): void;
     update?(frame: ShadowEffectFrame<Context>): void;
     dispose?(): void;
 }
@@ -61,5 +72,9 @@ interface ShadowEffectMap {
     width: number;
     height: number;
     layers: number;
+    engine?: {
+        readonly gpu: GPUDevice | null;
+        onError(error: unknown): void;
+    };
 }
 ```

@@ -91,10 +91,24 @@ export function weatherAudioMix(state: WeatherState, o: Partial<WeatherAudioOpti
   };
 }
 
-/** Uniform random numbers in -1..1 from a seed (a 32-bit linear congruential generator). */
-function noise(length: number, seed: number): Float32Array {
+/** A 32-bit integer finaliser (MurmurHash3's fmix32): a bijection that spreads neighbouring inputs apart. */
+function mix32(x: number): number {
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b);
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+/** The start state of stream `stream` of `seed`: a hash of both, so neighbouring seeds never share a stream. */
+function streamSeed(seed: number, stream: number): number {
+  return mix32(mix32(seed >>> 0) ^ Math.imul(stream + 1, 0x9e3779b9));
+}
+
+/**
+ * Uniform random numbers in -1..1 from stream `stream` of a seed (a 32-bit linear congruential generator; it has full
+ * period, so every start state, 0 included, runs the whole cycle).
+ */
+function noise(length: number, seed: number, stream: number): Float32Array {
   const out = new Float32Array(length);
-  let s = seed >>> 0 || 1;
+  let s = streamSeed(seed, stream);
   for (let i = 0; i < length; i++) {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
     out[i] = s / 2147483648 - 1;
@@ -113,8 +127,8 @@ export function weatherNoise(
   seconds = 6,
 ): { rain: Float32Array; wind: Float32Array; thunder: Float32Array } {
   const n = Math.round(rate * 2),
-    rain = noise(n, seed),
-    white = noise(n, seed + 1),
+    rain = noise(n, seed, 0),
+    white = noise(n, seed, 1),
     wind = new Float32Array(n);
   // Brown noise for the wind, made periodic by removing the drift between the ends so it loops cleanly.
   let level = 0,
@@ -125,7 +139,7 @@ export function weatherNoise(
   for (let i = 0; i < n; i++) wind[i] /= peak || 1;
   const m = Math.round(rate * seconds),
     thunder = new Float32Array(m),
-    source = noise(m, seed + 2);
+    source = noise(m, seed, 2);
   level = 0;
   peak = 0;
   for (let i = 0; i < m; i++) {
@@ -137,6 +151,11 @@ export function weatherNoise(
   }
   for (let i = 0; i < m; i++) thunder[i] /= peak || 1;
   return { rain, wind, thunder };
+}
+
+// The engine call the sounds make on dispose: they leave the scene they joined (`sceneOf`), never the active one.
+interface AudioEngine {
+  sceneOf?(plugin: object): { removePlugin(name: string): void } | undefined;
 }
 
 /**
@@ -159,6 +178,7 @@ export class WeatherAudio {
   private readonly rumbles = new Set<Audio>();
   private thunderBuffer?: AudioBuffer;
   private disposed = false;
+  private engine?: AudioEngine;
 
   constructor(
     readonly listener: AudioListener,
@@ -213,7 +233,10 @@ export class WeatherAudio {
   }
 
   /** Engine plugin hooks: attach with `engine.use(sounds)` and the layers follow the weather every frame. */
-  setup(): void {}
+  setup(engine?: AudioEngine): void {
+    if (this.disposed) throw new MargoError('disposed', 'WeatherAudio is disposed; create a new WeatherAudio');
+    this.engine = engine;
+  }
   onPreUpdate(): void {
     this.update();
   }
@@ -240,7 +263,7 @@ export class WeatherAudio {
       rate = 1;
     if (buffer) rate = Math.min(4, Math.max(0.25, buffer.duration / seconds));
     else {
-      const data = weatherNoise(context.sampleRate, (this.options.seed ?? 1) + this.rumbles.size + 7, seconds).thunder;
+      const data = weatherNoise(context.sampleRate, streamSeed(this.options.seed ?? 1, 3 + this.rumbles.size), seconds).thunder;
       buffer = context.createBuffer(1, data.length, context.sampleRate);
       buffer.getChannelData(0).set(data);
     }
@@ -262,10 +285,12 @@ export class WeatherAudio {
     return this.rumbles.size;
   }
 
-  /** Stops and disposes every sound. */
+  /** Stops and disposes every sound, and leaves the scene it was attached to. */
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.engine?.sceneOf?.(this)?.removePlugin(this.name);
+    this.engine = undefined;
     for (const sound of this.rumbles) sound.dispose();
     this.rumbles.clear();
     this.rainSound.dispose();

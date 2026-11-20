@@ -31,6 +31,26 @@ function references(object: JSONObject, visit: (info: JSONObject, color: boolean
   }
 }
 
+// RFC 2397 data without ";base64": each %XX escape is one octet (RFC 3986 2.1), so binary image bytes such as %89 are
+// read as bytes, not as UTF-8 text; any other character stands for its UTF-8 bytes.
+function percentBytes(text: string): Uint8Array {
+  const out: number[] = [],
+    utf8 = new TextEncoder();
+  for (let i = 0; i < text.length; ) {
+    if (text[i] === '%') {
+      const hex = text.slice(i + 1, i + 3);
+      if (!/^[0-9A-Fa-f]{2}$/.test(hex)) throw new TypeError('Texture data URI has a bad % escape; use %XX with two hex digits');
+      out.push(Number.parseInt(hex, 16));
+      i += 3;
+    } else {
+      const character = String.fromCodePoint(text.codePointAt(i)!);
+      for (const byte of utf8.encode(character)) out.push(byte);
+      i += character.length;
+    }
+  }
+  return Uint8Array.from(out);
+}
+
 async function bytesOf(image: JSONObject, json: JSONObject, bin: Uint8Array | null, options: TransformTexturesOptions): Promise<Uint8Array> {
   if (image.bufferView !== undefined) {
     const view = json.bufferViews?.[image.bufferView], offset = view?.byteOffset ?? 0;
@@ -43,10 +63,10 @@ async function bytesOf(image: JSONObject, json: JSONObject, bin: Uint8Array | nu
   if (uri.startsWith('data:')) {
     const comma = uri.indexOf(',');
     if (comma < 0) throw new TypeError('Texture data URI is malformed; supply a complete data URI');
-    return uri.slice(0, comma).endsWith(';base64') ? Uint8Array.from(atob(uri.slice(comma + 1)), c => c.charCodeAt(0)) : Uint8Array.from(decodeURIComponent(uri.slice(comma + 1)), c => c.charCodeAt(0));
+    return uri.slice(0, comma).endsWith(';base64') ? Uint8Array.from(atob(uri.slice(comma + 1)), c => c.charCodeAt(0)) : percentBytes(uri.slice(comma + 1));
   }
   if (!options.resolveImage)
-    throw new MargoError('unsupported', `External texture ${uri} needs resolveImage; supply a URI resolver. https://margoengine.com/docs/exporters#textures`);
+    throw new MargoError('unsupported', `External texture ${uri} needs resolveImage; supply a URI resolver. https://margoengine.com/llms/docs/exporter-textures.md`);
   return options.resolveImage(uri, options.signal);
 }
 

@@ -36,6 +36,8 @@ const migrations = new Migrations(2).register(1, (old) => ({ ...old, version: 2 
 const loaded = await loadGame(storage, 'slot-1', { migrations }); // decoded, migrated, validated; null when empty
 ```
 
+`indexedDBStorage()` keeps one database connection open while the storage is in use. Call `await storage.close()` (or declare it with `using`) when you are done with saving; it is safe to call twice, and the next call opens the database again.
+
 ## The document
 
 `{format: 'margo-save', version, entities, prefabs?, meta?}`. `version` is your schema version. Each entity has a
@@ -50,8 +52,8 @@ A prefab is a list of entities with ids local to it; its `root` (default the fir
 with `prefab: 'door'` expands to the prefab's entities: the root merged into the instance (the instance's own
 components, name, transform and parent win), and the others as `gate/handle`, `gate/...`, with their parents and
 local references re-pointed at the copies. `overrides` change the copies by prefab-local id as JSON Merge Patches
-(RFC 7386: objects merge, other values replace, `null` removes a key); `null` for a whole entity removes it and its
-children. Prefabs may contain instances of other prefabs (ids like `cart/load/lid`), without cycles, up to 32
+(RFC 7386: objects merge, other values replace, `null` removes a key), and a `parent` or `$ref` inside an override
+names a prefab-local id, like the override's key; `null` for a whole entity removes it and its children. Prefabs may contain instances of other prefabs (ids like `cart/load/lid`), without cycles, up to 32
 deep.
 
 ```ts
@@ -163,7 +165,9 @@ console.log(weather.rain); // 0.5
 ```
 
 A plugin in the save and not in the scene needs `type` in its binding (`{ type: Sky }`), which attaches it with the
-saved options; without one the save is refused before anything changes.
+saved options; without one the save is refused before anything changes. So is a damaged `meta.engine`: a camera the
+engine would refuse each frame (fov outside 0 to 180, near at 0 or below, far not past near, position at the target,
+up along the view), lighting arrays of another length than the scene's, or a background that is not a string or null.
 
 With `scene`, factories receive the real engine inside that scene's setup scope, so `use`, `createMesh`, lighting
 and passes belong to the target scene. State callbacks and rollback run in the same scope. A factory that throws
@@ -380,7 +384,8 @@ server.close();
 ```
 
 With no `authorize`, anyone who reaches the handler can read and write every save, so a public server needs it. Other
-options: `allowHeaders` for CORS and `maxBytes`, default 64 MiB. Any other server works when it sends strong ETags and
+options: `allowHeaders` for CORS and `maxBytes`, default 64 MiB, which a body is read only up to, sent with a length or
+without one. Any other server works when it sends strong ETags and
 honours `If-Match` and `If-None-Match`, and `keys()` needs its JSON list. Apache with mod_dav was tested: it sends no ETag
 with a PUT, so a GET follows, and for about a second after a change it gives a weak tag, so a second write inside that
 second is refused.
@@ -411,12 +416,16 @@ share one interface, `read`, `write`,
 | --- | --- | --- |
 | `memoryStorage()` | a Map (tests, servers, undo snapshots) | yes |
 | `webStorage(storage = localStorage, prefix = 'margo-save:')` | Web Storage, base64; about 5 MB per origin | one `setItem` |
-| `indexedDBStorage({database, store, factory})` | IndexedDB, binary, large | one transaction |
-| `fileStorage(directory, {maxBytes})` from `margoengine/save/node` | one file per key | temporary file, made exclusively, renamed into place; a read refuses a file past `maxBytes` (default 256 MiB) from its size, before reading it; one writer per folder; on Windows a save another program has open cannot be replaced, so the write rejects and the old save stands |
+| `indexedDBStorage({database, store, factory})` | IndexedDB, binary, large; several stores in one database each get theirs (the database is opened one version up to add a store, and a connection closes when another needs a newer version) | one transaction |
+| `fileStorage(directory, {maxBytes})` from `margoengine/save/node` | one file per key | temporary file, made exclusively, renamed into place; a read refuses a file past `maxBytes` (default 256 MiB) from its size, before reading it; one writer per folder; `keys()` lists only file names it writes; on Windows a save another program has open cannot be replaced, so the write rejects and the old save stands |
 
 A full Web Storage or a failed transaction throws `MargoError` `'failed'` and keeps the previous save; a missing
 API throws `'unsupported'`. `saveGame` never writes an invalid document.
 
-Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots`, `/safe` and `/remote` need none of them), with `@margoengine/gltf-pro` and `@margoengine/animation` loaded when a save holds a model.
+Apache-2.0. Optional, tree-shakable package. Only `/engine` uses core, as an optional peer (`/slots`, `/safe` and `/remote` need none of them), with `@margoengine/gltf/pbr` and `@margoengine/animation` loaded when a save holds a model.
 
 Build and unit tests: npm test --workspace @margoengine/save. Real GPU, models, thumbnails, IndexedDB and cross-origin fetch: npm run test:gpu --workspace @margoengine/save
+
+### Scene of the result
+
+`restoreScene`'s default model loader loads each model into the `scene` being restored, not into whichever scene is active when the load finishes. An abort or a failure leaves nothing in either scene.

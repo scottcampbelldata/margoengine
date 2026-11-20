@@ -32,16 +32,18 @@ const extent = (g) => {
 const pair = (mesh) => (mesh.canopy ? mesh : { canopy: mesh, trunk: null });
 
 // Digests of the meshes on main before the detail option existed (sha256 of positions, normals, uvs, tangents, indices).
+// The palm, birch and acacia trunks were re-pinned when their taper was fixed to run from a wide root to a narrow tip
+// (plants.test.js 'trunks and limbs taper'); their canopies are unchanged.
 const MAIN = {
   'conifer.trunk': '04ab2a4b2f292c24',
   'conifer.canopy': '3e0725ca5b286b2c',
   'broadleaf.trunk': '48a2ce39f2ab7962',
   'broadleaf.canopy': 'e158a9ac0d934fd8',
-  'palm.trunk': '816d38c027f410c1',
+  'palm.trunk': '0371247f1d1e1854',
   'palm.canopy': '64f0392387ee3f2f',
-  'birch.trunk': 'e5e71f7d16b4ccfe',
+  'birch.trunk': 'aab5137e2610cf1c',
   'birch.canopy': '2477f80b9dac288e',
-  'acacia.trunk': '1ae333a4a6b263bb',
+  'acacia.trunk': '4a3eb2c3b585caa5',
   'acacia.canopy': '10dc5a0e4cb949db',
   shrub: '95a71c0db1e1bff0',
   tundra: '65ccbe3206104cd5',
@@ -171,7 +173,7 @@ test('detail 0 stays under 600 canopy triangles for every species and keeps unit
   }
 });
 
-test('a far tree is 12 triangles and fits the full mesh within 10 percent of its height and width', async () => {
+test('a far tree is 14 triangles and fits the full mesh within 10 percent of its height and width', async () => {
   const { generateTreeStandIn } = await import('../dist/standin.js');
   const full = {
     broadleaf: generateTreeMesh('broadleaf', { detail: 2 }),
@@ -189,7 +191,7 @@ test('a far tree is 12 triangles and fits the full mesh within 10 percent of its
   };
   for (const [kind, mesh] of Object.entries(full)) {
     const s = generateTreeStandIn(kind);
-    assert.equal(s.indices.length, 36, kind);
+    assert.equal(s.indices.length, 42, kind);
     const a = box(s.positions),
       b = box(mesh.canopy.positions);
     for (let i = 0; i < 3; i++)
@@ -197,4 +199,35 @@ test('a far tree is 12 triangles and fits the full mesh within 10 percent of its
     assert.ok(s.indices.every((v) => v < s.positions.length / 3));
   }
   assert.throws(() => generateTreeStandIn('fir'), RangeError);
+  // An inherited key is not a kind (before, 'constructor' passed and gave NaN positions).
+  for (const kind of ['constructor', 'toString', '__proto__']) assert.throws(() => generateTreeStandIn(kind), RangeError);
+});
+test('a tree stand-in faces out everywhere: a single-sided material shows trunk and crown from every side', async () => {
+  const { generateTreeStandIn } = await import('../dist/standin.js');
+  for (const kind of ['broadleaf', 'conifer', 'palm']) {
+    const { positions: p, normals: n, indices } = generateTreeStandIn(kind),
+      at = (i) => [p[i * 3], p[i * 3 + 1], p[i * 3 + 2]],
+      faces = [];
+    for (let t = 0; t < indices.length; t += 3) {
+      const [a, b, c] = [indices[t], indices[t + 1], indices[t + 2]],
+        [A, B, C] = [at(a), at(b), at(c)],
+        u = B.map((v, k) => v - A[k]),
+        w = C.map((v, k) => v - A[k]),
+        f = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+      // Counter-clockwise from outside (core culls back faces with front face 'ccw'): the winding agrees with every
+      // vertex normal of the triangle. Before, the eight canopy triangles wound the other way.
+      for (const v of [a, b, c])
+        assert.ok(f[0] * n[v * 3] + f[1] * n[v * 3 + 1] + f[2] * n[v * 3 + 2] > 0, `${kind} triangle ${t / 3} faces in`);
+      faces.push({ f, trunk: Math.max(A[1], B[1], C[1]) <= p[6 * 3 + 1] && Math.min(A[1], B[1], C[1]) === 0 });
+    }
+    // Seen level from any of 32 directions, some trunk triangle faces the eye (before, the two-quad cross showed its
+    // back from half of them).
+    for (let k = 0; k < 32; k++) {
+      const eye = [Math.cos((k * Math.PI) / 16), 0, Math.sin((k * Math.PI) / 16)];
+      assert.ok(
+        faces.some(({ f, trunk }) => trunk && f[0] * eye[0] + f[2] * eye[2] > 0),
+        `${kind}: no trunk face toward ${eye.map((v) => v.toFixed(2))}`,
+      );
+    }
+  }
 });

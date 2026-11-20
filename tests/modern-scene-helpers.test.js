@@ -2,8 +2,8 @@ import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { parseGLTF as parseBasicGLTF } from '@margoengine/gltf';
-import { parsePreparedPBR } from '@margoengine/gltf-pro';
-import { getSceneBounds, fitScene, gatherSceneBuffers } from '@margoengine/gltf-pro/scene';
+import { parsePreparedPBR } from '@margoengine/gltf/pbr';
+import { getSceneBounds, fitScene, gatherSceneBuffers } from '@margoengine/gltf/scene';
 import { headlessEngine } from '../packages/exporters/tests/helpers.js';
 import { loadedPBRFixtures, loadedPBREngine, serveLoadedPBRFixtures } from './support/loaded-pbr-fixtures.js';
 

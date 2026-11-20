@@ -1,6 +1,6 @@
 {
   "date": "2026-11-09",
-  "command": "node scripts/gpu-lock.mjs run --owner=codex-readme5 -- npm run check:readme-run -- --packages=react,stage,text,worker",
+  "command": "npm run check:readme-run -- --packages=react,stage,text,worker",
   "scope": "Runtime examples only; no cross-browser or speed claim",
   "examples": [
     {

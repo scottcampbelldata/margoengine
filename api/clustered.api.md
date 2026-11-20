@@ -24,6 +24,7 @@ export class Clustered implements EnginePlugin {
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
     readonly maxLights: number;
+    get shadowSlots(): number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -44,9 +45,12 @@ export class Clustered implements EnginePlugin {
     set layers(hook: ClusteredLightTerm | undefined);
     get contact(): ClusteredLightTerm | undefined;
     set contact(hook: ClusteredLightTerm | undefined);
+    get bounce(): ClusteredBounce | undefined;
+    set bounce(hook: ClusteredBounce | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
+    get isDisposed(): boolean;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
     setLights(lights: readonly (PointLight | SpotLight)[]): this;
     hasReceiver(receiver: ClusteredReceiver): boolean;
@@ -79,16 +83,29 @@ export interface ClusteredArea {
     shadowLights?(): readonly AreaShadowLight[];
 }
 
+export interface ClusteredBounce {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 export interface ClusteredDirectional {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     shadowLights?(): readonly DirectionalShadowLight[];
 }
 
+export interface ClusteredLightRecord {
+    readonly position: readonly number[];
+    readonly direction?: readonly number[];
+    readonly cosOuter?: number;
+}
+
 export interface ClusteredLightTerm {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     readonly term: string;
+    emission?(index: number, light: ClusteredLightRecord, position: readonly number[]): readonly [number, number, number];
+    readonly revision?: number;
 }
 
 export interface ClusteredLighting {
@@ -133,6 +150,10 @@ export interface ClusteredSamplingHooks {
     contact?: {
         declarations(group: number): string;
         readonly term: string;
+    };
+    sized?: boolean;
+    bounce?: {
+        declarations(group: number): string;
     };
 }
 
@@ -214,6 +235,7 @@ export interface LocalShadowPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    hashed?: (code: string) => string;
 }
 
 export interface LocalShadowSource {
@@ -232,6 +254,8 @@ export interface PointLight {
     decay?: number;
     shadow?: boolean | LocalLightShadow;
     castShadow?: boolean;
+    radius?: number;
+    bounce?: boolean;
 }
 
 export interface SpotLight extends PointLight {
@@ -249,5 +273,5 @@ export function clusteredSampling(group: number, shadow?: boolean | {
     readonly shapeShadow?: string;
 }, area?: {
     declarations(group: number, shadow?: string): string;
-}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic, contact }?: ClusteredSamplingHooks): string;
+}, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic, contact, sized, bounce }?: ClusteredSamplingHooks): string;
 ```

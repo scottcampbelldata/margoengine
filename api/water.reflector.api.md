@@ -44,6 +44,12 @@ interface FogLike {
   readonly enabled?: boolean;
 }
 
+interface TerrainHeights {
+    readonly data: ArrayLike<number>;
+    readonly width: number;
+    readonly height: number;
+}
+
 class Water implements EnginePlugin {
     readonly options: WaterOptions;
     readonly name: string;
@@ -53,9 +59,19 @@ class Water implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
-    setWhitecaps(amount: number): this;
+    setWhitecaps(amount: number | null): this;
+    get wind(): Readonly<WaterWind> | undefined;
+    setColor(color: readonly [number, number, number]): this;
+    setSeaLevel(y: number): this;
+    get seaLevel(): number;
+    setGlitterRoughness(roughness: number): this;
+    setFoamSoftness(amount: number): this;
+    setShallow(color: readonly [number, number, number], depth: number): this;
+    setFoamDistance(distance: number): this;
     setChop(amount: number): this;
-    setWaveHeight(height: number): this;
+    breakerLine(): [number, number][][];
+    setWind(wind: number | WaterWind): this;
+    setWaveHeight(height: number | null): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     setCapture(hook: WaterCapture): () => void;
@@ -64,6 +80,9 @@ class Water implements EnginePlugin {
         backend: 'webgpu';
     }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    setTime(seconds: number): this;
     onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -85,6 +104,7 @@ interface WaterOptions {
     segments?: number;
     height?: number;
     waves?: readonly Wave[];
+    wind?: number | WaterWind;
     color?: readonly [number, number, number];
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
@@ -95,6 +115,7 @@ interface WaterOptions {
     sceneColor?: () => GPUTexture | undefined;
     lights?: readonly WaterLight[];
     spray?: boolean;
+    sprayCount?: number;
     horizon?: boolean;
     shadows?: WaterShadowSource;
     whitecaps?: number;
@@ -112,6 +133,13 @@ interface WaterTerrain {
     heightmap: () => GPUTexture | undefined;
     origin: readonly [number, number];
     size: readonly [number, number];
+    heights?: TerrainHeights;
+}
+
+interface WaterWind {
+    speed: number;
+    fetch?: number;
+    direction?: readonly [number, number];
 }
 
 interface Wave {

@@ -26,7 +26,7 @@ not certify physical lower-tier hardware. No timing or performance claim.
 
 Reproduce after `npm run build:packages`: run `node --test --test-timeout=120000
 packages/dof/tests/*.test.js packages/post/test/*.test.js`, then
-`node scripts/gpu-lock.mjs run --owner=review5-restore --gpu=actual-device-tier-restoration --max=5 --wait-max=60 -- node packages/dof/tests/gpu/restore-tier-check.mjs`.
+`node scripts/run-with-timeout.mjs --max=5 -- node packages/dof/tests/gpu/restore-tier-check.mjs`.
 Run the packages' existing GPU suites on native WebGPU and WebGL2 as well.
 
 Research compared Kai Ninomiya, Brandon Jones and Jim Blandy (editors), *WebGPU*

@@ -6,8 +6,8 @@
 // An example that needs hardware no test machine has (an XR headset) is skipped by id, with the hardware named
 // (scripts/support/readme-run-skip.json); the report counts it as skipped, never as passed.
 // A step of check:merge, whole in the full check, never in verify or a gate before the push; verify's
-// tests/run-readme-examples.test.js does check that every known entry still names an example, as a README edit renames one. It holds one
-// shared GPU slot, and the GPU lock ends its whole process tree at LIMIT_MINUTES.
+// tests/run-readme-examples.test.js does check that every known entry still names an example, as a README edit renames one. A
+// whole run is ended at LIMIT_MINUTES.
 //   npm run check:readme-run                       the check; needs a build, and uses the GPU
 //   npm run check:readme-run -- --only=biomes      the examples whose id holds that text
 //   npm run check:readme-run -- --packages=a,b     the examples of those packages (check:merge on a narrowed run)
@@ -27,7 +27,8 @@ import {
 import { basename, dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createServer, transformWithOxc } from 'vite';
-import { acquire } from './gpu-lock.mjs';
+import { noFileWatcher } from './support/no-file-watcher.js';
+import { eachAtOnce } from './support/each-at-once.mjs';
 import { reportSpeedPhase } from './support/speed-phase.mjs';
 import { chromiumLaunchOptions, launchBrowser } from './lib/browser.mjs';
 import { exampleIds, packageMarkdown, readmeEntries } from './support/readme-types.mjs';
@@ -39,7 +40,7 @@ import { writeReadmeRigs } from './support/readme-humanoid.mjs';
 import { finishLiveExample, observeLiveExample, serveLiveLink, usesLiveLink } from './support/readme-live.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
-  // Each run writes only its own folder: the lock gives a run one shared GPU slot, so two runs in one checkout can overlap,
+  // Each run writes only its own folder: two runs in one checkout can overlap,
   // and one that cleared a shared folder deleted the other's example files mid-run (its page then failed to import them).
   scratchBase = join(root, 'test-results/readme-run'),
   scratch = join(scratchBase, `run-${process.pid}`),
@@ -51,7 +52,8 @@ const root = resolve(import.meta.dirname, '..'),
   PAGE_LIMIT = 20_000,
   SETTLE = 500,
   NODE_JOBS = 8,
-  // A whole run took 5 minutes on the RTX A6000 (2026-11-07) and about 25 when first measured; the limit is well past both.
+  // A whole run took 5 minutes on the RTX A6000 (2026-11-07), about 25 when first measured and up to 14 in local CI; the
+  // limit is well past all of them.
   LIMIT_MINUTES = 60;
 
 /** True while the process `pid` lives. */
@@ -433,7 +435,7 @@ for (const selector of JSON.parse(query.get('elements'))) {
 if (!document.querySelector('canvas')) document.body.append(document.createElement('canvas'));
 try {
   if (query.has('live')) {
-    const { PBRModel } = await import('/@fs/${fileURLToPath(import.meta.resolve('@margoengine/gltf-pro/model')).replaceAll('\\', '/')}');
+    const { PBRModel } = await import('/@fs/${fileURLToPath(import.meta.resolve('@margoengine/gltf/pbr-model')).replaceAll('\\', '/')}');
     const { Camera } = await import('/@fs/${fileURLToPath(import.meta.resolve('@margoengine/core')).replaceAll('\\', '/')}');
     (${observeLiveExample.toString()})(PBRModel, Camera);
   }
@@ -462,7 +464,7 @@ async function startPages(samples, examples) {
       include: readmeReactDependencies,
     },
     oxc: { jsx: { runtime: 'automatic' } },
-    plugins: [
+    plugins: [noFileWatcher(),
       {
         name: 'readme-samples',
         configureServer(vite) {
@@ -607,16 +609,7 @@ export function nodeTurns(examples) {
   return turns;
 }
 
-async function eachLimited(items, jobs, work) {
-  let next = 0;
-  await Promise.all(
-    Array.from({ length: jobs }, async () => {
-      while (next < items.length) await work(items[next++]);
-    }),
-  );
-}
-
-/** A run holds one GPU slot: finish and close one page before starting the next example. */
+/** Finish and close one page before starting the next example. */
 export async function eachPage(items, work) {
   for (const item of items) await work(item);
 }
@@ -665,7 +658,7 @@ async function run() {
   samples.staticModel = await staticModel(join(scratch, 'static.glb'));
   // The rigging examples' characters, made here (scripts/support/readme-humanoid.mjs), found by their file names.
   for (const [name, path] of await writeReadmeRigs(scratch)) samples.byName.set(name, { path, size: 0 });
-  await eachLimited(nodeTurns(runnable.filter(({ code }) => placeOf(code) !== 'page')), NODE_JOBS, async (turn) => {
+  await eachAtOnce(nodeTurns(runnable.filter(({ code }) => placeOf(code) !== 'page')), NODE_JOBS, async (turn) => {
     for (const example of turn) results.set(example.id, await runInNode(example, samples));
   });
   const forPage = runnable.filter(({ id, code }) => placeOf(code) !== 'node' && results.get(id)?.result !== 'pass');
@@ -716,11 +709,16 @@ async function run() {
 
 async function main() {
   reportSpeedPhase('check:readme-run');
-  const release = await acquire({ owner: 'check-readme-run', max: LIMIT_MINUTES });
+  // wall-clock: the whole run's hard limit; each example has its own (NODE_LIMIT, PAGE_LIMIT).
+  const stop = setTimeout(() => {
+    console.error(`check:readme-run: over ${LIMIT_MINUTES} min, stopped`);
+    process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
+  }, LIMIT_MINUTES * 60_000);
+  stop.unref();
   try {
     await run();
   } finally {
-    release();
+    clearTimeout(stop);
   }
 }
 

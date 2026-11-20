@@ -2,8 +2,8 @@ import { Engine } from '../packages/core/dist/extension.js';
 import type { PassContext } from '../packages/core/dist/extension.js';
 import { Material, Texture, createMesh, createInstancedMesh, StencilBuffer } from '../packages/materials/dist/index.js';
 import type { MaterialOptions, MeshGeometry } from '../packages/materials/dist/index.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { PBRModel, PBRRenderState } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { PBRModel, PBRRenderState } from '../packages/gltf/dist/pbr.js';
 import { SceneTarget } from '../packages/shared/msaa.js';
 import { viewMatrix } from '../packages/shared/view.js';
 

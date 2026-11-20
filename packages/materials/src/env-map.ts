@@ -101,13 +101,13 @@ function edit(code: string, from: string | RegExp, to: string): string {
   if (next === code)
     throw new MargoError(
       'unsupported',
-      'Material envMap requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and materials versions',
+      'Material envMap requires the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and materials versions',
     );
   return next;
 }
 const surfaces = new Map<string, string>(),
   lit = new Map<string, string>();
-// gltf-pro evaluates an ambient term on changed surfaces for these two: the thin film's Fresnel, the anisotropic bent normal.
+// gltf/pbr evaluates an ambient term on changed surfaces for these two: the thin film's Fresnel, the anisotropic bent normal.
 const layeredLobes = (code: string) => code.includes('fn margoBent(') || code.includes('fn margoIridescence(');
 /**
  * `code` (a material's shader before lighting effects) reading the environment map: standard shading's ambient (and a

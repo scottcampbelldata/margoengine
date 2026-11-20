@@ -53,6 +53,7 @@ const keys: Record<keyof VFXOptions, true> = {
   bounce: true,
   turbulence: true,
   frequency: true,
+  wind: true,
   angularVelocity: true,
   emissionExtent: true,
   intensity: true,
@@ -191,7 +192,13 @@ export function serializeEffect(
     }
   };
   const isEffect = 'options' in source,
-    preset: VFXPreset = { version: 1, options: isEffect ? source.options : source, fog: isEffect ? source.fog : null };
+    raw = isEffect ? source.options : source,
+    // `shadows.buffer` is the feature's output (its light list on the GPU, set at attach), not a setting.
+    authored =
+      raw.shadows && 'buffer' in raw.shadows
+        ? { ...raw, shadows: Object.fromEntries(Object.entries(raw.shadows).filter(([key]) => key !== 'buffer')) }
+        : raw,
+    preset: VFXPreset = { version: 1, options: authored, fog: isEffect ? source.fog : null };
   if (preset.fog && !options.references?.has(preset.fog)) {
     const fog: Record<string, unknown> = {};
     for (const key of ['color', 'near', 'far', 'density', 'heightFalloff', 'height', 'enabled'] as const)

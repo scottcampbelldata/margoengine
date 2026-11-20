@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MToon } from '../dist/mtoon.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 async function fixture(definitions = [{ specVersion: '1.0' }], modes = definitions.map(() => 'OPAQUE'), image) {
   const gpu = optionalGPU(),
@@ -171,22 +171,69 @@ test('all material validation completes before earlier records or scene ownershi
     f.engine.dispose();
   }
 });
-test('authored queue offsets respect opaque, mask and both blend ranges', async () => {
-  for (const [mode, writing, offset] of [
-    ['OPAQUE', false, 1],
-    ['MASK', false, -1],
-    ['BLEND', false, 1],
-    ['BLEND', true, -1],
+test('authored queue offsets respect both blend ranges; opaque and mask offsets are ignored', async () => {
+  // VRMC_materials_mtoon 1.0: "renderQueueOffsetNumber only works when alphaMode is BLEND" (audit p4 R20).
+  for (const [mode, writing, offset, refused] of [
+    ['OPAQUE', false, 1, false],
+    ['MASK', false, -1, false],
+    ['BLEND', false, 1, true],
+    ['BLEND', true, -1, true],
   ]) {
     const f = await fixture(
       [{ specVersion: '1.0', transparentWithZWrite: writing, renderQueueOffsetNumber: offset }],
       [mode],
     );
     try {
-      assert.throws(() => MToon.attach(f.model), RangeError);
+      if (refused) assert.throws(() => MToon.attach(f.model), RangeError);
+      else {
+        MToon.attach(f.model);
+        f.frame();
+      }
     } finally {
       f.engine.dispose();
     }
+  }
+});
+test('expression texture moves leave the matcap alone and an absent matcap samples black (audit p4 R17, R18)', async () => {
+  const image = { width: 2, height: 2, data: new Uint8Array(16).fill(127) };
+  const f = await fixture(
+    [{ specVersion: '1.0', shadeMultiplyTexture: { index: 0 }, matcapTexture: { index: 0 } }],
+    ['OPAQUE'],
+    image,
+  );
+  const expressions = {
+    evaluate: () => ({
+      morphs: [],
+      colors: [],
+      transforms: [{ material: 0, parts: [{ value: 1, scale: [2, 2], offset: [0.5, 0.25] }] }],
+    }),
+  };
+  try {
+    const mtoon = MToon.attach(f.model, { expressions });
+    f.frame();
+    const v = mtoon.states[0].values,
+      rowOf = (k) => Array.from(v.subarray((8 + k * 3) * 4, (8 + k * 3) * 4 + 8));
+    assert.deepEqual(rowOf(0), [2, 0, 0.5, 0, -0, 2, 0.25, 0], 'the shade map moves');
+    assert.deepEqual(rowOf(2), [1, 0, 0, 0, -0, 1, 0, 0], 'the matcap keeps its own transform');
+  } finally {
+    f.engine.dispose();
+  }
+  const g = await fixture([{ specVersion: '1.0' }]),
+    writes = [],
+    queue = g.engine.gpu.queue,
+    write = queue.writeTexture;
+  queue.writeTexture = (to, bytes, layout, size) => {
+    writes.push(Array.from(bytes));
+    write.call(queue, to, bytes, layout, size);
+  };
+  try {
+    MToon.attach(g.model);
+    g.frame();
+    // Six 1x1 stand-ins: shading shift and matcap black, the multiply maps and the mask white.
+    assert.equal(writes.filter((w) => w.join() === '0,0,0,255').length, 2);
+    assert.equal(writes.filter((w) => w.join() === '255,255,255,255').length, 4);
+  } finally {
+    g.engine.dispose();
   }
 });
 test('blended MToon queues draw across models by renderQueueOffsetNumber, then in model order (KB5289a)', async () => {
@@ -276,4 +323,77 @@ test('blended MToon queues draw across models by renderQueueOffsetNumber, then i
     for (const effect of effects) effect.dispose();
     engine.dispose();
   }
+});
+
+// The MToon UV animation as the shaders evaluate it in float32 (mtAnimate and shared/caster.js margoAnimatedUV), for a
+// mask value m: phase x m + period x fract(k x m), periods 2, 2 and 1 turn.
+const f32 = Math.fround;
+const animated = (phase, k, period, m) => {
+  const km = f32(k * m);
+  return f32(f32(phase * m) + f32(f32(km - Math.floor(km)) * period));
+};
+test('MToon UV animation keeps 1/60 s steps after a day of running (audit p4 R22)', async () => {
+  const f = await fixture(
+    [
+      {
+        specVersion: '1.0',
+        uvAnimationScrollXSpeedFactor: 0.1,
+        uvAnimationScrollYSpeedFactor: -0.25,
+        uvAnimationRotationSpeedFactor: 0.5,
+      },
+    ],
+    ['MASK'],
+  );
+  try {
+    const mtoon = MToon.attach(f.model);
+    f.frame();
+    mtoon.onPreUpdate(86_400);
+    const frames = [];
+    for (let i = 0; i < 4; i++) {
+      mtoon.onPreUpdate(1 / 60);
+      f.frame();
+      const v = mtoon.states[0].values,
+        cast = mtoon.states[0].castValues;
+      frames.push({
+        x: animated(v[24], v[23], 2, 1),
+        y: animated(v[25], v[30], 2, 1),
+        turns: animated(v[26], v[31], 1, 1),
+        cast: cast && [animated(cast[0], cast[3], 2, 1), animated(cast[1], cast[11], 2, 1), animated(cast[2], cast[19], 1, 1)],
+      });
+    }
+    for (let i = 1; i < frames.length; i++) {
+      const [a, b] = [frames[i - 1], frames[i]];
+      const step = (from, to, period) => (((to - from) % period) + period) % period;
+      assert.ok(Math.abs(step(a.x, b.x, 2) - 0.1 / 60) < 1e-6, `scroll x steps ${step(a.x, b.x, 2)}`);
+      assert.ok(Math.abs(step(a.y, b.y, 2) - (2 - 0.25 / 60)) < 1e-6, `scroll y steps ${step(a.y, b.y, 2)}`);
+      assert.ok(Math.abs(step(a.turns, b.turns, 1) - 0.5 / 60 / (2 * Math.PI)) < 1e-7, 'rotation steps');
+      assert.ok(b.cast, 'a MASK material hands its casters the motion');
+      assert.deepEqual(b.cast, [b.x, b.y, b.turns], 'shadow cut-outs move with the colour pass');
+    }
+  } finally {
+    f.engine.dispose();
+  }
+});
+
+test('MToon UV animation phases wrap scroll by 2 only where every map samples the same texel', async () => {
+  const { scrollWraps, uvAnimationPhases } = await import('../src/mtoon-data.ts');
+  const out = new Float64Array(6);
+  uvAnimationPhases(out, [0.1, -0.25, Math.PI], 86_400.5, true, false);
+  assert.ok(Math.abs(out[0] + 2 * out[3] - 8_640.05) < 1e-9 && out[0] >= 0 && out[0] < 2);
+  assert.deepEqual([out[1], out[4]], [-0.25 * 86_400.5, 0], 'an unwrapped axis keeps the whole scroll');
+  assert.ok(Math.abs(out[2] - 0.25) < 1e-9 && out[5] === 43_200, 'half a turn a second');
+  // A fractional mask keeps the exact product: m x s = m x phase + 2 m k, and 2 fract(m k) differs from 2 m k by an even number.
+  const m = 0.37,
+    s = 0.1 * 86_400.5;
+  const wrapped = (animated(out[0], out[3], 2, m) - ((m * s) % 2) + 4) % 2;
+  assert.ok(Math.min(wrapped, 2 - wrapped) < 1e-3, `fractional mask ${wrapped}`);
+  assert.equal(scrollWraps(undefined, [undefined, undefined], 0), true);
+  assert.equal(scrollWraps({ index: 0 }, [undefined, undefined], 0), true, 'REPEAT, no transform');
+  assert.equal(scrollWraps({ index: 0 }, [33648, 33648], 1), true, 'MIRRORED_REPEAT');
+  assert.equal(scrollWraps({ index: 0 }, [33071, undefined], 0), false, 'a clamped axis the scroll reaches');
+  assert.equal(scrollWraps({ index: 0 }, [33071, undefined], 1), true, 'a clamped axis the scroll does not reach');
+  const half = { index: 0, extensions: { KHR_texture_transform: { scale: [0.5, 2] } } };
+  assert.equal(scrollWraps(half, [undefined, undefined], 0), false, 'a half scale');
+  assert.equal(scrollWraps(half, [undefined, undefined], 1), true, 'a whole scale');
+  assert.equal(scrollWraps({ index: 0 }, [undefined, undefined], 0, [{ value: 1, scale: [0.5, 1], offset: [0, 0] }]), false);
 });

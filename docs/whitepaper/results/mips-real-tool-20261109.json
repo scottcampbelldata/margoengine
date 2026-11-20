@@ -8,7 +8,7 @@
     "size": 9928,
     "trackedSHA256": "fce87d983f3dfa995faf3df1d3dd60b1c8ba12cd52c1a6baccff20e905357fdb"
   },
-  "command": "node scripts/gpu-lock.mjs run --owner=codex-missing -- node packages/materials/test/features-browser.mjs mips",
+  "command": "node packages/materials/test/features-browser.mjs mips",
   "oracle": "Independent ktx v4.4.2 extract --raw --all hashes in packages/decoders/tests/fixtures/ktx2-layers/records.json",
   "readback": "Texture bound by UnlitMaterial; every texel textureLoad from allowed rgba8unorm view, pack4x8unorm into storage",
   "result": {

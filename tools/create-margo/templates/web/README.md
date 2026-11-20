@@ -19,7 +19,7 @@ file needs `'unsafe-eval'`.
 
 ## Three things to try next
 
-1. **Your model.** `const model = await loadGLTF(engine, '/model.glb')` with `loadGLTF` from `margoengine/gltf-pro`;
+1. **Your model.** `const model = await loadGLTF(engine, '/model.glb')` with `loadGLTF` from `margoengine/gltf/pbr`;
    put the file in `public/`.
 2. **Your HDR.** Replace `studio()` with `await loadEnvironmentImage('/studio.hdr')` from `margoengine/environment`.
 3. **Glow.** `Bloom.attach(engine, { strength: 0.5 })` with `Bloom` from `margoengine/post/bloom`.

@@ -45,22 +45,33 @@ async function collect(stream: ReadableStream<Uint8Array>, options: SpecIOOption
   const abort = () => {
     void reader.cancel(options.signal?.reason);
   };
-  let size = 0;
+  let size = 0,
+    // Set once the stream has ended or errored; only a stream left open mid-way is cancelled (cancelling an errored
+    // stream rejects with its stored error, which would replace the coded one).
+    ended = false;
   options.signal?.addEventListener('abort', abort, { once: true });
   try {
     options.signal?.throwIfAborted();
     while (true) {
-      const { done, value } = await reader.read();
+      let read: ReadableStreamReadResult<Uint8Array>;
+      try {
+        read = await reader.read();
+      } catch (cause) {
+        // A cancelled read resolves as done, so a rejected read is malformed compressed data.
+        ended = true;
+        throw Object.assign(typeError('Corrupt share fragment; use the original link', 'sciviz'), { cause });
+      }
+      ended = read.done;
       options.signal?.throwIfAborted();
-      if (done) break;
-      size += value.length;
+      if (read.done) break;
+      size += read.value.length;
       if (size > limit(options))
         throw rangeError('Share exceeds maxBytes; use less data or an explicit larger limit', 'sciviz');
-      chunks.push(value);
+      chunks.push(read.value);
     }
   } finally {
     options.signal?.removeEventListener('abort', abort);
-    await reader.cancel();
+    if (!ended) await reader.cancel();
     reader.releaseLock();
   }
   const bytes = new Uint8Array(size);
@@ -145,7 +156,7 @@ export async function createShareURL(
 /** Decode with a streaming allocation bound. Unknown versions and malformed views reject before rendering. */
 export async function readShareURL(url: string | URL, options: ShareOptions = {}): Promise<SharedFigure> {
   options.signal?.throwIfAborted();
-  const hash = String(url).startsWith('#') ? String(url) : new URL(url).hash;
+  const hash = String(url).startsWith('#') ? String(url) : (URL.parse(String(url))?.hash ?? '');
   const encoded = hash.slice(7);
   if (!hash.startsWith('#margo=') || !/^[\w-]+$/.test(encoded) || encoded.length % 4 === 1)
     throw typeError('Expected a versioned Margo share fragment', 'sciviz');
@@ -160,15 +171,20 @@ export async function readShareURL(url: string | URL, options: ShareOptions = {}
     new Blob([Uint8Array.from(bytes)]).stream().pipeThrough(new DecompressionStream('deflate')),
     options,
   );
-  const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(decoded)) as SharedFigure & {
-    data?: SpecValue[];
-  };
+  let payload: SharedFigure & { data?: SpecValue[] };
+  try {
+    payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(decoded));
+  } catch (cause) {
+    throw Object.assign(typeError('Corrupt share fragment; use the original link', 'sciviz'), { cause });
+  }
+  if (!payload || typeof payload !== 'object')
+    throw typeError('Corrupt share fragment; use the original link', 'sciviz');
+  if (payload.version !== 1) throw typeError('Unsupported share version; use version 1', 'sciviz');
   const result = {
     version: payload.version,
     spec: payload.data ? unpack(payload.spec, payload.data) : payload.spec,
     view: payload.view,
   };
-  if (result?.version !== 1) throw typeError('Unsupported share version; use version 1', 'sciviz');
   validateFigureSpec(result.spec);
   validateView(result.spec, result.view);
   return result;
@@ -191,6 +207,7 @@ export async function openShare(
 }
 /** Apply a validated camera and exact time step to an existing recorded figure. */
 export async function applyShareView(figure: Figure, view: ShareView): Promise<void> {
+  if (!view || typeof view !== 'object') throw typeError('Share view must be an object', 'sciviz');
   const timeline = recordedTimeline(figure);
   if (view.timeIndex !== undefined) {
     if (

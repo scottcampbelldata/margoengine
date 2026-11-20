@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 async function ownerEngine(t) {
@@ -68,7 +68,7 @@ test('secondary scene ownership releases skin players and callbacks when the own
  scene.use({name:'create-hand',setup(){},onUpdate(){}});
  // Parse explicitly in the selected scene, independently of the default scene.
  const bytes=await readFile(new URL('./fixtures/hands/left.glb',import.meta.url));
- const {GLTFAsset,PBRModel}=await import('../../gltf-pro/dist/index.js');
+ const {GLTFAsset,PBRModel}=await import('../../gltf/dist/pbr.js');
  scene.use({name:'load-hand',setup(){model=parseGLTF(f.engine,bytes);}});
  const hands=await SkinnedHands.create(f.host,{left:model});f.step();scene.dispose();
  assert.equal(f.listeners.size,0);assert.equal(scene.plugins.size,0);assert.doesNotThrow(()=>hands.dispose());

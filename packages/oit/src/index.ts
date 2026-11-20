@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Weighted blended order-independent transparency (McGuire and Bavoil, JCGT 2013) for gltf-pro BLEND primitives and
-// @margoengine/materials transparent meshes, through gltf-pro's transparency hook (no shader text search).
+// Weighted blended order-independent transparency (McGuire and Bavoil, JCGT 2013) for gltf/pbr BLEND primitives and
+// @margoengine/materials transparent meshes, through gltf/pbr's transparency hook (no shader text search).
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
 import { applyView } from '../../shared/view-rect.js';
@@ -125,11 +125,11 @@ const over: GPUBlendState = {
 };
 
 /**
- * Order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf-pro) or a transparent
+ * Order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf/pbr) or a transparent
  * materials mesh into an accumulation (rgba16float, additive) and a revealage (rg16float, multiplicative) target, depth
  * tested against the opaque scene, then composites them over it, so overlapping transparent parts no longer pop as the
  * camera moves. Materials with `blendSpace: 'linear'` go in too: on a display-encoded target the pixels they touch
- * composite in linear light from the native glass snapshot (from the frame after one first draws; README "Linear-light layers"). Models not added keep gltf-pro's sorted blending. WebGPU only.
+ * composite in linear light from the native glass snapshot (from the frame after one first draws; README "Linear-light layers"). Models not added keep gltf/pbr's sorted blending. WebGPU only.
  * @throws RangeError from the constructor when `order` is not > 0 or `depthScale` not a positive number.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'state'` from `add` before
  * `attach`.
@@ -181,7 +181,7 @@ export class OIT extends TransparentPass {
     super.setup(engine);
     this.uniform = engine.gpu!.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   declarations(group: number): string {
     return groupCode(this.code, group, (g) => this.surface(g) + pbrLayer);
   }
@@ -189,11 +189,11 @@ export class OIT extends TransparentPass {
   surface(group: number): string {
     return groupCode(this.surfaceCode, group, this.blends ? surfaceBlended : surface);
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   bindings(): GPUBindGroupEntry[] {
     return [{ binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } }];
   }
-  /** @internal gltf-pro transparency hook: the accumulation pass, begun on the first transparent draw of the frame. */
+  /** @internal gltf\/pbr transparency hook: the accumulation pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
     const c = this.context!,

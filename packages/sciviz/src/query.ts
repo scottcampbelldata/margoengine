@@ -72,7 +72,13 @@ export class QuerySelection {
   /** Independent typed storage, with dictionaries, exact int64, units and validity preserved. */
   extract(): ColumnarTable { return this.table.take(this.rows()); }
   series(time: string, value: string): SelectionSeries {
-    this.check(); this.table.column(time); this.table.column(value);
+    this.check();
+    for (const name of [time, value]) {
+      // int64 is never rounded and categories are not numbers; filtering their rows out would return an empty series.
+      const col = this.table.column(name);
+      if (col.categories || col.values instanceof BigInt64Array || col.values instanceof BigUint64Array)
+        throw rangeError('Query series needs numeric columns; convert int64 or categorical columns to Float64Array first', 'sciviz');
+    }
     const rows = this.rows().filter((i) => typeof this.table.value(time, i) === 'number' && Number.isFinite(this.table.value(time, i)) && typeof this.table.value(value, i) === 'number' && Number.isFinite(this.table.value(value, i)));
     rows.sort((a, b) => Number(this.table.value(time, a)) - Number(this.table.value(time, b)) || a - b);
     return { rows, rowIds: Array.from(rows, (i) => this.rowIds[i]), time: Float64Array.from(rows, (i) => Number(this.table.value(time, i))), values: Float64Array.from(rows, (i) => Number(this.table.value(value, i))) };
@@ -96,7 +102,7 @@ export interface SpreadsheetOptions {
   /** Show selected rows only, default false. */ readonly selectedOnly?: boolean;
   /** Aborts listeners and removes the view. */ readonly signal?: AbortSignal;
 }
-/** A virtualised, sortable read-only data spreadsheet. Click/Space selects; modifiers use the shared algebra. */
+/** A virtualised, sortable read-only data spreadsheet. Click/Space selects; modifiers use the shared algebra. ArrowUp from the first row reaches the column headers, where Enter/Space sorts like a click. */
 export class Spreadsheet {
   readonly element: HTMLDivElement;
   readonly #query: QuerySelection;
@@ -130,17 +136,22 @@ export class Spreadsheet {
     root.addEventListener('scroll', () => this.render(), { signal });
     query.selection.addEventListener('change', () => this.refresh(), { signal });
     root.addEventListener('keydown', (event) => {
-      if (!this.#order.length) return;
-      if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); this.#pick(this.#focus, event); return; }
+      // Row -1 is the header row: Enter/Space there sorts the active column like a click on its button.
       const n = this.#order.length;
+      if (event.key === ' ' || event.key === 'Enter') {
+        if (this.#focus < 0) this.#toggleSort(this.#columns[this.#column]);
+        else if (n) this.#pick(this.#focus, event);
+        else return;
+        event.preventDefault(); return;
+      }
       if (event.key === 'ArrowDown') this.#focus = Math.min(n - 1, this.#focus + 1);
-      else if (event.key === 'ArrowUp') this.#focus = Math.max(0, this.#focus - 1);
+      else if (event.key === 'ArrowUp') this.#focus = Math.max(-1, this.#focus - 1);
       else if (event.key === 'ArrowRight') this.#column = Math.min(this.#columns.length - 1, this.#column + 1);
       else if (event.key === 'ArrowLeft') this.#column = Math.max(0, this.#column - 1);
-      else if (event.key === 'Home') { this.#column = 0; if (event.ctrlKey) this.#focus = 0; }
+      else if (event.key === 'Home') { this.#column = 0; if (event.ctrlKey) this.#focus = Math.min(0, n - 1); }
       else if (event.key === 'End') { this.#column = this.#columns.length - 1; if (event.ctrlKey) this.#focus = n - 1; }
       else return;
-      event.preventDefault(); root.scrollTop = this.#focus * this.#rowHeight; root.scrollLeft = this.#column * this.#columnWidth; this.render();
+      event.preventDefault(); root.scrollTop = Math.max(0, this.#focus) * this.#rowHeight; root.scrollLeft = this.#column * this.#columnWidth; this.render();
     }, { signal });
     this.#resize = new ResizeObserver(() => this.render()); this.#resize.observe(root);
     options.signal?.addEventListener('abort', () => this.dispose(), { once: true, signal });
@@ -149,6 +160,7 @@ export class Spreadsheet {
   get rows(): Uint32Array { return this.#order.slice(); }
   set selectedOnly(value: boolean) { this.#selectedOnly = value; this.element.scrollTop = 0; this.refresh(); }
   sort(column: string, descending = false): void { this.#query.table.column(column); this.#sort = { column, descending }; this.refresh(); }
+  #toggleSort(name: string): void { this.sort(name, this.#sort?.column === name && !this.#sort.descending); }
   #pick(index: number, event: MouseEvent | KeyboardEvent): void {
     this.#focus = index; this.#query.selection.select([this.#query.rowIds[this.#order[index]]], { source: 'spreadsheet', operation: selectionOperation(event) });
   }
@@ -163,7 +175,7 @@ export class Spreadsheet {
         return (x! < y! ? -1 : x! > y! ? 1 : 0) * (descending ? -1 : 1) || a - b;
       });
     }
-    this.#focus = Math.max(0, Math.min(this.#focus, this.#order.length - 1)); this.render();
+    this.#focus = Math.max(this.#focus < 0 ? -1 : 0, Math.min(this.#focus, this.#order.length - 1)); this.render();
   }
   /** Refresh visible cells only. At most viewport rows/columns plus overscan exist in the DOM. */
   render(): void {
@@ -175,7 +187,8 @@ export class Spreadsheet {
     const header = document.createElement('div'); header.setAttribute('role', 'row'); header.setAttribute('aria-rowindex', '1'); header.style.cssText = `position:sticky;top:0;height:${h}px;z-index:1;background:Canvas;color:CanvasText`;
     for (let c = first; c < last; c++) {
       const name = this.#columns[c], cell = document.createElement('button'); cell.type = 'button'; cell.tabIndex = -1; cell.textContent = name; cell.setAttribute('role', 'columnheader'); cell.setAttribute('aria-colindex', String(c + 1)); cell.setAttribute('aria-sort', this.#sort?.column === name ? this.#sort.descending ? 'descending' : 'ascending' : 'none'); cell.style.cssText = `position:absolute;left:${c * w}px;width:${w}px;height:${h}px;overflow:hidden`;
-      cell.onclick = (event) => { event.stopPropagation(); this.sort(name, this.#sort?.column === name && !this.#sort.descending); }; header.append(cell);
+      if (this.#focus < 0 && c === this.#column) { cell.id = this.#activeId; root.setAttribute('aria-activedescendant', cell.id); cell.style.outline = '1px solid #718096'; }
+      cell.onclick = (event) => { event.stopPropagation(); this.#focus = -1; this.#column = c; root.focus(); this.#toggleSort(name); }; header.append(cell);
     }
     this.#body.append(header);
     for (let i = start; i < end; i++) {

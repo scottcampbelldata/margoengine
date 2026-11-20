@@ -12,28 +12,47 @@ function descendant(scene: Scene, mesh: EngineMesh, root: EngineMesh): boolean {
 // The frozen stage keeps worldBounds private. Use its vertex/world-matrix
 // calculation here, with PBRModel.bounds for geometry owned by loader plugins.
 export function sceneWorldBounds(scene: Scene, root: EngineMesh, output = new Float32Array(6)): Float32Array | null {
+  return gather(scene, root, output, null);
+}
+/**
+ * Bounds of `root`'s descendants carried through `inverse` (world to the wanted space, multiplied on the left by
+ * `multiply`), or in world space when it is null. Null when there is no geometry.
+ */
+export function gather(
+  scene: Scene,
+  root: EngineMesh,
+  output: Float32Array,
+  inverse: ArrayLike<number> | null,
+  multiply?: (a: ArrayLike<number>, b: ArrayLike<number>) => ArrayLike<number>,
+): Float32Array | null {
   scene.engine.store.tick(false);
   output.fill(Infinity, 0, 3);
   output.fill(-Infinity, 3);
+  const add = (m: ArrayLike<number>, x: number, y: number, z: number) => {
+    for (let axis = 0; axis < 3; axis++) {
+      const value = m[axis] * x + m[axis + 4] * y + m[axis + 8] * z + m[axis + 12];
+      output[axis] = Math.min(output[axis], value);
+      output[axis + 3] = Math.max(output[axis + 3], value);
+    }
+  };
   for (const mesh of scene.engine.meshes.values()) {
     if (!mesh.geometry || !descendant(scene, mesh, root)) continue;
     const vertices = mesh.geometry.vertices,
-      m = mesh.matrix;
-    for (let i = 0; i < vertices.length; i += 6)
-      for (let axis = 0; axis < 3; axis++) {
-        const value =
-          m[axis] * vertices[i] + m[axis + 4] * vertices[i + 1] + m[axis + 8] * vertices[i + 2] + m[axis + 12];
-        output[axis] = Math.min(output[axis], value);
-        output[axis + 3] = Math.max(output[axis + 3], value);
-      }
+      m = inverse ? multiply!(inverse, mesh.matrix) : mesh.matrix;
+    for (let i = 0; i < vertices.length; i += 6) add(m, vertices[i], vertices[i + 1], vertices[i + 2]);
   }
   for (const model of scene.resources.models)
     if (!model.disposed && descendant(scene, model.root, root)) {
-      const bounds = model.bounds;
-      for (let axis = 0; axis < 3; axis++) {
-        output[axis] = Math.min(output[axis], bounds[axis]);
-        output[axis + 3] = Math.max(output[axis + 3], bounds[axis + 3]);
-      }
+      const b = model.bounds;
+      if (inverse)
+        // The model's world box, carried into root's space by its eight corners.
+        for (let corner = 0; corner < 8; corner++)
+          add(inverse, b[corner & 1 ? 3 : 0], b[corner & 2 ? 4 : 1], b[corner & 4 ? 5 : 2]);
+      else
+        for (let axis = 0; axis < 3; axis++) {
+          output[axis] = Math.min(output[axis], b[axis]);
+          output[axis + 3] = Math.max(output[axis + 3], b[axis + 3]);
+        }
     }
   return Number.isFinite(output[0]) ? output : null;
 }
@@ -102,7 +121,7 @@ function CenterBinding({
   return null;
 }
 /** Recenter descendants while retaining the outer group's declared transform. */
-export const Center = forwardRef<MeshRef, CenterProps>(function Center(
+export const Center = /* @__PURE__ */ forwardRef<MeshRef, CenterProps>(function Center(
   { disableX, disableY, disableZ, children, ...props },
   ref,
 ) {

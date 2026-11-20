@@ -1,6 +1,6 @@
-// Real-GPU check of live reflection capture in @margoengine/environment/probes (AC power, GPU lock, after
+// Real-GPU check of live reflection capture in @margoengine/environment/probes (AC power, after
 // npm run build:packages):
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/probes-live-gpu.mjs [--bench]
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/probes-live-gpu.mjs [--bench]
 // probes-live.html: a room of six walls each radiating its linear colour, one 128 px reflection probe at the centre in
 // live mode, and a magenta box moved into and out of the probe's +x view.
 // 1. Latency: for 1, 2 and 6 faces per frame, and for every point of the 6-face refresh cycle, the frames until the

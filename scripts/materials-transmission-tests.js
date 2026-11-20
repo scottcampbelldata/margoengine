@@ -3,14 +3,18 @@ import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { openBrowser } from './browser.js';
 import { transmissionQuads } from '../tests/support/transmission-fixture.js';
+import { sheenAlbedoWGSL } from '../packages/shared/sheen.js';
+import { wgslModule } from '../tests/support/wgsl-eval.js';
 
 /** Hardware-backed regression checks for the Step 3 material extension. */
 export async function transmissionBrowserChecks(page) {
-  const fixture = transmissionQuads();
+  const fixture = transmissionQuads(),
+    // E(1, 0.5) of the shipped sheen albedo table, evaluated here (the page cannot import the test evaluator).
+    sheenWhite = wgslModule(sheenAlbedoWGSL('E')).call('E', 1, 0.5);
   return page.evaluate(
-    async ({ doc, buffers }) => {
+    async ({ doc, buffers, sheenWhite }) => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF } = await import('/packages/gltf/dist/pbr.js');
       const { SceneTarget } = await import('/packages/shared/msaa.js');
       const materials = await import('/packages/materials/dist/index.js');
       const assert = (ok, message) => {
@@ -274,7 +278,7 @@ export async function transmissionBrowserChecks(page) {
         );
         // The light behind against the Khronos layering: transmitted light is in fresnel_mix's base, under sheen and
         // clearcoat. White transmissive quad, unlit, normal incidence, against the float background. Sheen albedo
-        // E(1, 0.5) = 0.0413 by Margo's fit, itself checked against an integration (materials/test/sheen-albedo-fit).
+        // E(1, 0.5) from Margo's table (0.0260), itself checked against an integration (materials/test/sheen-albedo-fit).
         const halfFloat = (lo, hi) => {
           const h = lo | (hi << 8),
             e = (h >> 10) & 31,
@@ -309,7 +313,7 @@ export async function transmissionBrowserChecks(page) {
             ['specular factor 0.5', { KHR_materials_specular: { specularFactor: 0.5 } }, 0.98],
             ['specular colour 2,1,1', { KHR_materials_specular: { specularColorFactor: [2, 1, 1] } }, 0.92],
             ['specular colour 25,25,25', { KHR_materials_specular: { specularColorFactor: [25, 25, 25] } }, 0],
-            ['sheen white', { KHR_materials_sheen: sheenLobe }, 0.96 * (1 - 0.0413)],
+            ['sheen white', { KHR_materials_sheen: sheenLobe }, 0.96 * (1 - sheenWhite)],
             ['clearcoat 1', { KHR_materials_clearcoat: { clearcoatFactor: 1 } }, 0.96 * 0.96],
           ]) {
             const share = centreRed(await render({ ...extensions(1, 1.5), ...lobe }, () => {}, true, 1, true)) / behind;
@@ -511,6 +515,7 @@ export async function transmissionBrowserChecks(page) {
     },
     {
       doc: fixture.doc,
+      sheenWhite,
       buffers: fixture.buffers.map((buffer) => [
         ...new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
       ]),

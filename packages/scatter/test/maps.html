@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Scatter texture maps check</title><style>body{margin:0}canvas{display:block;width:256px;height:256px}</style></head><body><canvas width="256" height="256"></canvas>
+<script type="module">
+// Real-GPU proof of `textures` (maps.browser.mjs reads the canvas): one upright 4 x 4 m card in the YZ plane (normal +X)
+// on a flat floor, the sun 45 degrees up from +X, so the card's shadow falls on x -4..0. Its base colour map is four
+// texels along z: the two at z < 0 have alpha 0 (cut out), the two at z > 0 are opaque green. A cut-out card shows the
+// floor and casts no shadow on its z < 0 half. A normal map of (1, 0, 0) turns the normal along +z (the u direction),
+// away from the sun, so the card darkens. Drawn as a `Scatter` and as a `ScatterTiles` record.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Scatter} from '/packages/scatter/dist/index.js';
+import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{camera:{position:[14,3,0],target:[0,2,0],near:0.5,far:200}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([1,1,0]);
+const floor=engine.createMesh().setGeometry(box(40,0.1,40)).setPosition([0,-0.05,0]);
+floor.material.set({color:[0.6,0.6,0.6]});
+const shadows=Shadows.attach(engine,{distance:60});
+shadows.add(floor,{castShadow:false});
+const card=new Geometry([0,0,-2, 0,0,2, 0,4,2, 0,4,-2],[1,0,0, 1,0,0, 1,0,0, 1,0,0],[0,2,1, 0,3,2]);
+const uvs=[0,1, 1,1, 1,0, 0,0];
+const base={width:4,height:1,data:new Uint8Array([40,200,40,0, 40,200,40,0, 40,200,40,255, 40,200,40,255])};
+const tilted={width:1,height:1,data:new Uint8Array([255,128,128,255])};
+const record=new Uint8Array(new Uint32Array([32768|(32768<<16),128<<8]).buffer);
+let scatter,remove;
+window.check={
+  async show(kind,maps,view){
+    if(view==='top'){engine.camera.position=[6,30,0];engine.camera.target=[-2,0,0];}else{engine.camera.position=[14,3,0];engine.camera.target=[0,2,0];}
+    remove?.();remove=undefined;scatter?.dispose();
+    device.pushErrorScope('validation');
+    const material=new PbrMaterial({color:[1,1,1],roughness:0.9}),
+      options={material,lodFade:0,...(maps?{textures:{uvs,baseColor:base,...(maps==='tilted'?{normal:tilted}:{})}}:{})};
+    if(kind==='scatter')scatter=Scatter.attach(engine,card,{count:1,area:[0.001,0.001],scale:[1,1],...options});
+    else{scatter=ScatterTiles.attach(engine,card,{bounds:[-20,-20,20,20],...options});scatter.setTile('0,0',[-20,-20],40,record);}
+    // The colour checks leave the card out of the casters, so it is lit by the sun and not by its own shadow map.
+    if(view==='top')remove=shadows.add(scatter);
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+  pixel([x,y,z]){const m=engine.camera.matrix,cx=m[0]*x+m[4]*y+m[8]*z+m[12],cy=m[1]*x+m[5]*y+m[9]*z+m[13],w=m[3]*x+m[7]*y+m[11]*z+m[15];return [cx/w*0.5+0.5,0.5-cy/w*0.5];},
+};
+window.ready=true;
+</script></body></html>

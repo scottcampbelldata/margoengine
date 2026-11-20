@@ -51,6 +51,52 @@ export function segmentIndices(mode: LineMode, count: number, i: number): Segmen
 }
 
 /**
+ * Index of each point's nearest distinct neighbour on either side, written as floats (prev, next) two per point:
+ * `out[2 i]` is the last point before `i` at another position and `out[2 i + 1]` the first one after it, or -1 where
+ * the line ends first. A loop (3 or more points) wraps. Repeated points share one position, so a join across them
+ * joins the nearest distinct points, as the HTML canvas path rules prune zero-length segments. `points` holds
+ * `stride` floats per point, of which the first `dims` are compared exactly. Segment lists have no joins: all -1.
+ */
+export function distinctNeighbours(
+  points: ArrayLike<number>,
+  count: number,
+  mode: LineMode,
+  out: Float32Array = new Float32Array(count * 2),
+  stride = 4,
+  dims = 3,
+): Float32Array {
+  out.fill(-1, 0, count * 2);
+  if (mode === 'segments' || count < 2) return out;
+  const same = (i: number, j: number) => {
+    for (let k = 0; k < dims; k++) if (points[i * stride + k] !== points[j * stride + k]) return false;
+    return true;
+  };
+  const loop = mode === 'loop' && count >= 3;
+  if (!loop) {
+    for (let i = 1; i < count; i++) out[i * 2] = same(i, i - 1) ? out[(i - 1) * 2] : i - 1;
+    for (let i = count - 2; i >= 0; i--) out[i * 2 + 1] = same(i, i + 1) ? out[(i + 1) * 2 + 1] : i + 1;
+    return out;
+  }
+  // A loop starts its walk at a point whose predecessor differs; if there is none, every point is one position.
+  let start = -1;
+  for (let i = 0; i < count && start < 0; i++) if (!same(i, (i + count - 1) % count)) start = i;
+  if (start < 0) return out;
+  for (let k = 0; k < count; k++) {
+    const i = (start + k) % count,
+      before = (i + count - 1) % count;
+    out[i * 2] = k > 0 && same(i, before) ? out[before * 2] : before;
+  }
+  // Walking back from the point before `start`, whose successor (start) differs.
+  const end = (start + count - 1) % count;
+  for (let k = 0; k < count; k++) {
+    const i = (end - k + count) % count,
+      after = (i + 1) % count;
+    out[i * 2 + 1] = k > 0 && same(i, after) ? out[after * 2 + 1] : after;
+  }
+  return out;
+}
+
+/**
  * Cumulative distance along the line, written into the w component of `points` (stride 4: x, y, z, distance).
  * Distances are measured after applying `matrix` (world space) when given. Segment lists accumulate across
  * segments. Returns the total length, which for a loop
@@ -188,9 +234,19 @@ export function expandLine(points: ArrayLike<number>, options: ExpandLineOptions
       len = Math.hypot(dx, dy);
     return [len > 1e-4 ? [dx / len, dy / len] : [1, 0], len];
   };
+  const near = distinctNeighbours(points, count, mode, undefined, 2, 2);
   for (let i = 0, segments = segmentCount(mode, count); i < segments; i++) {
-    const s = segmentIndices(mode, count, i),
-      sa = pt(s.a),
+    const s = segmentIndices(mode, count, i);
+    if (mode !== 'segments') {
+      // A segment between two copies of one point draws nothing; its neighbours join across it. Only a line that is
+      // all one point keeps its zero-length segments, which draw the caps a zero-length subpath gets in SVG 2.
+      const prev = near[s.a * 2],
+        next = near[s.a * 2 + 1];
+      if (next !== s.b && (prev >= 0 || next >= 0)) continue;
+      s.prev = prev;
+      s.next = near[s.b * 2 + 1];
+    }
+    const sa = pt(s.a),
       sb = pt(s.b),
       [dir, len] = along(sa, sb),
       nrm: V2 = [-dir[1], dir[0]];

@@ -3,7 +3,7 @@ import { geometryData, type GeometryData } from '@margoengine/geometry/utils';
 import { type OutlineCommand, type OutlineFillRule, outlineShapes } from './outline.js';
 import { LoaderError } from './types.js';
 import { type BinaryInput, toBytes } from './util.js';
-import { decodeXML, readXMLTree, type XMLElement } from './xml.js';
+import { decodeXML, readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 
 export type { OutlineCommand, OutlineFillRule } from './outline.js';
 
@@ -882,6 +882,23 @@ const NOT_RENDERED = new Set(
 );
 const SHAPES = new Set('path rect circle ellipse line polyline polygon'.split(' '));
 
+/**
+ * Whether a fill, stroke or color value parses (SVG 2 section 13.2 paint, CSS Color 4): none, currentColor, a colour,
+ * a url() reference with an optional fallback, or inherit. `color` takes no none or references.
+ */
+function validPaint(value: string, property: string): boolean {
+  const text = value.trim().toLowerCase();
+  if (text === 'inherit' || text === 'currentcolor') return true;
+  if (property === 'color') return readColour(text) !== null;
+  if (text === 'none') return true;
+  const reference = /^url\(\s*(['"]?)[^'")]*\1\s*\)\s*(.*)$/.exec(text);
+  if (reference) {
+    const fallback = reference[2];
+    return !fallback || fallback === 'none' || fallback === 'currentcolor' || readColour(fallback) !== null;
+  }
+  return readColour(text) !== null;
+}
+
 /** A computed style: the parent's inheritable values, overridden by the element's own declarations except `inherit`. */
 function inherit(parent: Props, declared: Props): Props {
   const style: Props = Object.assign(Object.create(null), parent);
@@ -909,9 +926,9 @@ function inherit(parent: Props, declared: Props): Props {
  * @throws LoaderError `'syntax'` for malformed XML, `'header'` when there is no `<svg>` root, and `'limit'` when one
  * path or the whole document has more than 4,000,000 commands.
  */
-export function parseSVG(input: string | BinaryInput): LoadedSVG {
+export function parseSVG(input: string | BinaryInput, options: XMLExternalOptions = {}): LoadedSVG {
   const text = typeof input === 'string' ? input : decodeXML(toBytes(input, F));
-  const root = readXMLTree(text, F).children.find((element) => localName(element.name) === 'svg');
+  const root = readXMLTree(text, F, { external: options.external }).children.find((element) => localName(element.name) === 'svg');
   if (!root) throw new LoaderError(F, 'header', 'the document has no <svg> root element; pass an SVG file');
   const paths: DrawnPath[] = [],
     warnings: string[] = [],
@@ -953,8 +970,18 @@ export function parseSVG(input: string | BinaryInput): LoadedSVG {
   const declare = (element: XMLElement, name: string): Props => {
     const attributes = element.attributes,
       out: Props = Object.create(null);
+    // CSS Syntax 3 section 5.4.5 and SVG 2 section 6.7: a declaration whose value does not parse is dropped, so the
+    // cascade falls back to the one before it or to inheritance. The colour properties are checked here; the others
+    // already fall back to their initial value when unreadable.
+    const set = (property: string, value: string) => {
+      if ((property === 'fill' || property === 'stroke' || property === 'color') && !validPaint(value, property)) {
+        warn(`${property} "${value.slice(0, 40)}" is not a colour; the declaration is ignored`);
+        return;
+      }
+      out[property] = value;
+    };
     for (const property of PROPERTIES)
-      if (attributes[property] !== undefined) out[property] = attributes[property].trim();
+      if (attributes[property] !== undefined) set(property, attributes[property].trim());
     const classes = (attributes.class ?? '').split(/\s+/);
     for (const rule of rules)
       if (
@@ -962,9 +989,9 @@ export function parseSVG(input: string | BinaryInput): LoadedSVG {
         (rule.id === undefined || rule.id === attributes.id) &&
         rule.classes.every((c) => classes.includes(c))
       )
-        for (const [property, value] of rule.declarations) out[property] = value;
+        for (const [property, value] of rule.declarations) set(property, value);
     const inline = readDeclarations(attributes.style ?? '');
-    for (const [property, value] of inline) if (PROPERTIES.has(property)) out[property] = value;
+    for (const [property, value] of inline) if (PROPERTIES.has(property)) set(property, value);
     for (const property of UNAPPLIED) {
       const value = attributes[property] ?? inline.find(([p]) => p === property)?.[1];
       if (value !== undefined && value.trim() !== 'none')
@@ -1012,8 +1039,9 @@ export function parseSVG(input: string | BinaryInput): LoadedSVG {
       y = symbol ? 0 : readLength(a.y, refHeight, 0);
     const vb = numbers(a.viewBox);
     if (vb.length !== 4 || !(vb[2] > 0) || !(vb[3] > 0)) return shift(x, y);
-    const width = readLength(size?.width ?? a.width, refWidth, vb[2]),
-      height = readLength(size?.height ?? a.height, refHeight, vb[3]);
+    // SVG 2 sections 5.6 and 8.2: an absent (auto) width or height of a nested svg or a symbol is 100%.
+    const width = readLength(size?.width ?? a.width, refWidth, refWidth),
+      height = readLength(size?.height ?? a.height, refHeight, refHeight);
     const words = (a.preserveAspectRatio ?? '').trim().split(/\s+/);
     if (words[0] === 'defer') words.shift();
     const align = words[0] || 'xMidYMid';

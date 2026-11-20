@@ -1,5 +1,5 @@
 // GPU cost of the precise f32 functions against the WGSL builtins (AC power, after npm run build:packages, GPU alone):
-//   node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/precise-math-gpu.mjs
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/precise-math-gpu.mjs
 // Part one: every element-wise function of @margoengine/compute on 16,777,216 values, createCompute() against
 // createCompute({ fastMath: true }), the package's own dispatch and shader, timed by GPU timestamps on the compute pass.
 // Part two: the path tracer's panorama and fisheye rays, a whole traced sample as shipped against the same page with

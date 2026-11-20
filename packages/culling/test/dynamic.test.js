@@ -329,6 +329,54 @@ test('`world` is built only for what reads it: once per cull, on the shadow pass
   assert.equal(passes, 3, 'each cull needs its own fill');
 });
 
+// Regression (2026-11-15, batch 273): on the WebGL2 layer the CPU route loads lazily, so the first frame culls on the GPU
+// route and the route can land before the first pick. `fill` skipped whenever `this.route` was set, so that pick (and a
+// shadow pass) read a `world` nothing had written, and DynamicInstances.pick answered null over an instance.
+test('a route that loads after a GPU cull still gets `world` built for the pick and shadows of that cull', async () => {
+  const h = harness(),
+    crowd = make();
+  h.engine.use(crowd);
+  crowd.addInstance(translate(0, 0, 0));
+  h.run();
+  // The lazy compatibility import resolving between the first frame and the first pick.
+  crowd['route'] = dynamicRoute(1024);
+  const fills = [];
+  h.engine.gpu.createCommandEncoder = () => ({
+    beginComputePass: () => {
+      fills.push('pick');
+      return { setBindGroup() {}, setPipeline() {}, dispatchWorkgroups() {}, end() {} };
+    },
+    beginRenderPass: () => ({
+      setPipeline() {},
+      setBindGroup() {},
+      setVertexBuffer() {},
+      setIndexBuffer() {},
+      drawIndexed() {},
+      end() {},
+    }),
+    copyTextureToBuffer() {},
+    finish: () => ({}),
+  });
+  await crowd.pick(32, 32);
+  assert.deepEqual(fills, ['pick'], 'the pick builds `world` for the GPU cull it reads');
+  const encoder = h.context.encoder,
+    begin = encoder.beginComputePass;
+  let passes = 0;
+  encoder.beginComputePass = function (...args) {
+    passes++;
+    return begin.apply(this, args);
+  };
+  crowd.prepareShadow({ context: h.context });
+  assert.equal(passes, 0, 'built once per cull: the pick already filled it');
+  h.run();
+  const afterRoute = passes;
+  crowd.prepareShadow({ context: h.context });
+  await crowd.pick(32, 32);
+  assert.equal(passes, afterRoute, 'a cull of the CPU route wrote `world` itself: no fill pass');
+  assert.deepEqual(fills, ['pick']);
+  crowd.dispose();
+});
+
 test('a failed retain in setup releases nothing, and the error reaches the caller', () => {
   const h = harness();
   h.engine.retain = () => {

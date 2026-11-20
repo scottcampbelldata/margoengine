@@ -145,3 +145,55 @@ test('options are checked', () => {
   ticks.dispose();
   assert.throws(() => ticks.tick(), { code: 'disposed' });
 });
+
+test('a scheduled update that throws leaves the others of its tick waiting, and pending counts them', () => {
+  const { world, ids } = setup(),
+    ran = [];
+  let fail = true;
+  const ticks = VoxelTicks.attach(world, {
+    randomTicks: 0,
+    rules: {
+      marker: {
+        scheduled({ x }) {
+          if (x === 1 && fail) throw new Error('rule failed');
+          ran.push(x);
+        },
+      },
+    },
+  });
+  world.setBlocks([1, 0, 0, ids.marker, 2, 0, 0, ids.marker]);
+  ticks.tick();
+  ticks.schedule(1, 0, 0, 1);
+  ticks.schedule(2, 0, 0, 1);
+  assert.throws(() => ticks.tick(), /rule failed/);
+  assert.equal(ticks.pending, 1, 'the second update still waits');
+  fail = false;
+  for (let i = 0; i < 3 && ticks.pending; i++) ticks.tick();
+  assert.deepEqual(ran, [2]);
+  assert.equal(ticks.pending, 0);
+  ticks.dispose();
+});
+
+test('a placed hook that throws leaves the later changes of its tick waiting', () => {
+  const { world, ids } = setup(),
+    placed = [];
+  let fail = true;
+  const ticks = VoxelTicks.attach(world, {
+    randomTicks: 0,
+    rules: {
+      marker: {
+        placed({ x }) {
+          if (x === 5 && fail) throw new Error('rule failed');
+          placed.push(x);
+        },
+      },
+    },
+  });
+  world.setBlocks([5, 0, 0, ids.marker, 6, 0, 0, ids.marker]);
+  assert.throws(() => ticks.tick(), /rule failed/);
+  assert.ok(ticks.pending > 0, 'the later changes still wait');
+  fail = false;
+  for (let i = 0; i < 3 && ticks.pending; i++) ticks.tick();
+  assert.deepEqual(placed, [6], 'the change after the throwing hook still runs its placed hook');
+  ticks.dispose();
+});

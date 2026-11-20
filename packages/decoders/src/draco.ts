@@ -1,6 +1,7 @@
 import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit } from './pool.js';
 import type { DecodedDracoGeometry, DracoRequest } from './protocol.js';
 import { validatedDracoLimits } from './protocol.js';
+import { dracoHere, inThread } from './node-thread.js';
 
 /** Options of a DracoDecoder: where the Wasm lives, the worker count and the per-decode time limit. */
 export interface DracoOptions {
@@ -24,7 +25,11 @@ export interface DracoDecodeOptions extends DracoRequest {
   transfer?: boolean;
 }
 
-/** Worker-pooled Google Draco decoder. Construction is free and SSR-safe; workers and Wasm start on the first decode. */
+/**
+ * Worker-pooled Google Draco decoder. Construction is free and SSR-safe; workers and Wasm start on the first decode. In
+ * Node, which has no Web Worker, it decodes in the calling thread with the same Wasm, so `loadGLTF` reads Draco models
+ * there too.
+ */
 export class DracoDecoder {
   readonly workerLimit: number;
   private readonly decoderPath?: string;
@@ -40,11 +45,21 @@ export class DracoDecoder {
   /** Decode a Draco buffer, such as a KHR_draco_mesh_compression bufferView, into transferable typed arrays. */
   decode(data: ArrayBuffer | ArrayBufferView, options: DracoDecodeOptions = {}): Promise<DecodedDracoGeometry> {
     try {
-      requireWorkers('DracoDecoder');
+      const here = inThread();
+      if (!here) requireWorkers('DracoDecoder');
       if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const limits = validatedDracoLimits(options.limits);
       const buffer = payload(data, options.transfer ?? false),
         { attributeIds, componentTypes } = options;
+      if (here)
+        return dracoHere(
+          this.decoderPath,
+          () => new URL(this.urls().wrapperURL),
+          buffer,
+          { attributeIds, componentTypes, limits },
+          options.signal,
+          false,
+        );
       this.pool ??= new WorkerPool(this.workerLimit);
       return this.pool.run<DecodedDracoGeometry>(
         { type: 'draco', buffer, request: { attributeIds, componentTypes, limits }, ...this.urls() },

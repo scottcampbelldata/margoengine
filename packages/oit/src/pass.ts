@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // What every order-independent pass shares: the models it took over, its frame graph place and its life cycle.
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
-import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRTransparency } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import type { SurfaceTransparency } from '../../shared/pass.js';
 
@@ -69,7 +69,7 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
     if (!Number.isFinite(order) || order <= 0) throw new RangeError('OIT order must be > 0');
     this.order = order;
   }
-  /** Draws a gltf-pro model's BLEND primitives (or a transparent materials mesh) order-independently. Returns a remover. */
+  /** Draws a gltf\/pbr model's BLEND primitives (or a transparent materials mesh) order-independently. Returns a remover. */
   add(model: PBRModel): () => void {
     this.ready();
     let release = this.models.get(model);
@@ -115,21 +115,21 @@ export abstract class TransparentPass implements EnginePlugin, PBRTransparency, 
     });
   }
   /**
-   * @internal gltf-pro transparency hook: a `blendSpace: 'linear'` layer drew this frame; `scene` copies the colour drawn
+   * @internal gltf/pbr transparency hook: a `blendSpace: 'linear'` layer drew this frame; `scene` copies the colour drawn
    * so far into the native glass snapshot and returns it (absent until the capture joins the frame graph).
    */
   linearLayers(scene?: () => GPUTextureView): void {
     if (scene) this.scene = scene;
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   abstract declarations(group: number): string;
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   abstract bindings(): GPUBindGroupEntry[];
   /** @internal Effect hook: the declarations without what only a PBR surface has. */
   abstract surface(group: number): string;
   /** @internal Effect hook. */
   abstract readonly layout: readonly GPUBindGroupLayoutEntry[];
-  /** @internal gltf-pro transparency hook: this frame's transparent pass, begun on the first transparent draw. */
+  /** @internal gltf\/pbr transparency hook: this frame's transparent pass, begun on the first transparent draw. */
   abstract begin(): GPURenderPassEncoder;
   protected abstract render(c: Context): void;
   /** Whether nothing was added. */

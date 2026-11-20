@@ -15,14 +15,14 @@ registerHooks({
 });
 const disposed = [],
   bounds = new Float32Array([-1, 0, -2, 1, 2, 2]);
-mock.module('@margoengine/gltf-pro', {
+mock.module('@margoengine/gltf/pbr', {
   namedExports: { loadGLTF: async () => ({ bounds, dispose: () => disposed.push('model') }) },
 });
 const { addViewer } = await import('@margoengine/stage/viewer');
 
 for (const [name, options] of [
   ['@margoengine/environment', { environment: false, shadows: false, tonemap: false }],
-  ['@margoengine/staging', { environment: false, background: false, tonemap: false }],
+  ['@margoengine/studio', { environment: false, background: false, tonemap: false }],
   ['@margoengine/shadows', { environment: false, background: false, shadows: 'cascaded', tonemap: false }],
   ['@margoengine/tonemap', { environment: false, background: false, shadows: false }],
 ])

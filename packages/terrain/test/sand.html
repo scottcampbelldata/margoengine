@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Terrain sand surface check</title><style>body{margin:0}canvas{display:block;width:960px;height:540px}</style></head><body><canvas width="960" height="540"></canvas>
+<script type="module">
+// Real-GPU check for TerrainColors sandSurface (sand.browser.mjs reads the results). Sand ground: flat for x below 40 m,
+// then one transverse dune across the wind (+x): a 10 degree windward (stoss) side up to 7 m and a 30 degree lee slip
+// face, flat again past it. The sun is 40 degrees up, across the wind, with sky light. Each call attaches TerrainColors
+// with the given options on a fresh mesh, renders from `view` once every pipeline is ready and keeps the pixels.
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {TerrainColors,heightfield} from '/packages/terrain/dist/index.js';
+import {applyTerrainSettings,TERRAIN_LIVE_SETTINGS} from '/packages/terrain/dist/settings.js';
+const W=960,H=540,canvas=document.querySelector('canvas'),errors=[],kept=new Map();
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,1.6,0],target:[10,0,0],fov:50,near:0.1,far:3000}}),device=engine.gpu;
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+// Counts of the GPU objects made after this point, for the rule that a live row costs none of them.
+const made={pipelines:0,buffers:0,textures:0};
+for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){
+  const real=device[method];
+  if(real)device[method]=function(...a){made[key]++;return real.apply(this,a);};
+}
+engine.lighting.direction.set([0.1,0.64,0.76,3]);engine.lighting.radiance.set([1,1,1,0.35]);engine.scene.background='#b8c4d0';
+const T10=Math.tan(10*Math.PI/180),T30=Math.tan(30*Math.PI/180),crest=40+7/T10;
+const height=(x)=>x<40?0:x<crest?(x-40)*T10:Math.max(0,7-(x-crest)*T30);
+// `near`: standing on the flat, looking down the wind at the ground 2 to 20 m ahead. `stoss`: the windward face from
+// the flat. `lee`: the slip face from downwind. `far`: low over the flat toward ground 60 to 400 m away.
+const views={near:{position:[0,1.6,0],target:[6,0,0.5]},stoss:{position:[20,2.5,0],target:[60,5,0]},lee:{position:[106,2.5,0],target:[crest+6,3.5,0]},far:{position:[-400,2.5,0],target:[-100,0,0]}};
+window.check={
+  // `options` null: no options at all (the defaults). `settings`: values written with applyTerrainSettings after the attach (a sweep of every live row when 'sweep').
+  async show(name,options,view,settings){
+    const v=views[view];engine.camera.position=[...v.position];engine.camera.target=[...v.target];
+    device.pushErrorScope('validation');
+    const mesh=engine.createMesh().setGeometry(heightfield((x)=>height(x),{size:[1200,400],origin:[-700,-200],resolution:1024}))
+      .setMaterial(new PbrMaterial({color:[0.52,0.46,0.35],roughness:0.92}));
+    const colors=TerrainColors.attach(engine,mesh,options===null?{}:{sand:[0.52,0.46,0.35],shore:[80,90],stoneNormal:[0.2,0.25],...options});
+    if(settings&&settings!=='sweep')applyTerrainSettings(colors,settings);
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    let counts;
+    if(settings==='sweep'){
+      // 60 frames, every live row written each frame between a value away from its default and another.
+      const fixed=new Set(['shore.start','wet.heightStart','stone.normalStart']);
+      const at=(t)=>Object.fromEntries(TERRAIN_LIVE_SETTINGS.filter(r=>!fixed.has(r.name)&&r.default!==null).map(r=>[r.name,r.kind==='color'?r.default.map(x=>x*(0.5+0.5*t)):r.name==='shore.end'?1.5+t:r.name==='wet.heightEnd'?0.4+t:r.name==='stone.normalEnd'?0.85+0.1*t:r.default+(Math.min(r.max,r.default+(r.max-r.default)*0.1)-r.default)*t]));
+      applyTerrainSettings(colors,at(0));engine.render({delta:0});await device.queue.onSubmittedWorkDone();
+      const before={...made};
+      // fixed-wait: 60 deliberate frames, each with new row values (no readiness is awaited): the sweep counts what they create.
+      for(let i=0;i<60;i++){applyTerrainSettings(colors,at(i/59));engine.render({delta:0});}
+      await device.queue.onSubmittedWorkDone();
+      counts={before,after:{...made}};kept.set('sweepValues',at(1));window.sweepValues=at(1);
+    }
+    engine.render({delta:0});const c=new OffscreenCanvas(W,H).getContext('2d');c.drawImage(canvas,0,0);kept.set(name,c.getImageData(0,0,W,H).data);
+    colors.dispose();mesh.dispose();
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return counts?[errors.splice(0),counts]:errors.splice(0);
+  },
+  // Pixels of kept image a that differ from kept image b at all, and the largest difference.
+  diff(a,b){const x=kept.get(a),y=kept.get(b);let changed=0,max=0;for(let p=0;p<x.length;p++){const d=Math.abs(x[p]-y[p]);if(d)changed++;max=Math.max(max,d);}return {changed,max};},
+  sweepValues:()=>window.sweepValues,
+  // sRGB luma of a kept image over the rectangle [x0, y0, x1, y1) as fractions: mean, deviation and the mean
+  // difference between horizontal neighbours (pixel-scale shimmer).
+  stats(name,[x0,y0,x1,y1]){
+    const d=kept.get(name),luma=(x,y)=>{const k=(y*W+x)*4;return 0.2126*d[k]+0.7152*d[k+1]+0.0722*d[k+2];};
+    let sum=0,sq=0,step=0,n=0;
+    for(let y=Math.floor(y0*H);y<Math.floor(y1*H);y++)for(let x=Math.floor(x0*W);x<Math.floor(x1*W)-1;x++){const v=luma(x,y);sum+=v;sq+=v*v;step+=Math.abs(luma(x+1,y)-v);n++;}
+    const mean=sum/n;return {mean,deviation:Math.sqrt(Math.max(0,sq/n-mean*mean)),step:step/n};
+  },
+  async png(name){const c=new OffscreenCanvas(W,H),g=c.getContext('2d');g.putImageData(new ImageData(new Uint8ClampedArray(kept.get(name)),W,H),0,0);const b=await c.convertToBlob();const a=new Uint8Array(await b.arrayBuffer());let s='';for(let i=0;i<a.length;i+=32768)s+=String.fromCharCode(...a.subarray(i,i+32768));return 'data:image/png;base64,'+btoa(s);},
+};
+window.ready=true;
+</script></body></html>

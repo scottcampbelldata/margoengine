@@ -140,8 +140,42 @@ test('view applies to an owned figure and invalid cameras cannot mutate it', asy
   await assert.rejects(applyShareView(fig, { camera: { ...camera, far: -1 } }), /camera/);
   await assert.rejects(applyShareView(fig, { timeIndex: 0 }), /timeIndex/);
   fig.dispose();
-  for (const origin of ['*', 'null', 'https://example.test/', 'file:///tmp/a']) {
-    assert.throws(() => connectEmbed({ origin }), /origin|URL/i);
-    assert.throws(() => serveEmbed({}, { origin }), /origin|URL/i);
+  await assert.rejects(applyShareView(fig, null), /Share view must be an object; see https:\/\/margoengine\.com\/errors#sciviz/);
+  for (const origin of ['*', 'null', 'https://example.test/', 'file:///tmp/a', 42]) {
+    // Every origin refusal is the coded one, including text that is not a URL at all.
+    const coded = /Embed requires an exact HTTP\(S\) origin without a path; see https:\/\/margoengine\.com\/errors#sciviz/;
+    assert.throws(() => connectEmbed({ origin }), coded);
+    assert.throws(() => serveEmbed({}, { origin }), coded);
+  }
+});
+test('a corrupt or foreign share link rejects with a coded error', async () => {
+  const coded = /; see https:\/\/margoengine\.com\/errors#sciviz$/;
+  const deflate = async (text) =>
+    '#margo=' +
+    Buffer.from(
+      await new Response(
+        new Blob([new TextEncoder().encode(text)]).stream().pipeThrough(new CompressionStream('deflate')),
+      ).arrayBuffer(),
+    ).toString('base64url');
+  // Not deflate data, deflate of text that is not JSON, deflate of JSON null, and a string that is not a URL.
+  for (const link of ['#margo=AAAAAAAA', await deflate('{bad'), await deflate('null'), 'not a url']) {
+    const error = await readShareURL(link).catch((e) => e);
+    assert.match(error.message, coded, link);
+  }
+  // The version is checked before the shared array table is read.
+  await assert.rejects(readShareURL(await deflate('{"version":2,"spec":{},"data":7}')), /Unsupported share version/);
+});
+test('an embed request timeout past the timer range rejects instead of firing at once', async () => {
+  const saved = globalThis.window;
+  globalThis.window = new EventTarget();
+  try {
+    const client = connectEmbed({ origin: 'https://a.test', peer: { postMessage() {} } });
+    for (const timeout of [2 ** 31, 0, -1, Infinity, NaN])
+      await assert.rejects(client.request('getState', undefined, { timeout }), /Embed timeout must be 1 to 2147483647 ms/);
+    const pending = client.request('getState', undefined, { timeout: 2 ** 31 - 1 });
+    client.dispose();
+    await assert.rejects(pending, /disposed/);
+  } finally {
+    globalThis.window = saved;
   }
 });

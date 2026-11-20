@@ -5,7 +5,7 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export class MToon implements EnginePlugin {
     readonly model: PBRModel;
@@ -17,6 +17,8 @@ export class MToon implements EnginePlugin {
     static attach(model: PBRModel, options?: MToonOptions): MToon;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -227,7 +229,7 @@ interface VRMAvatar {
     firstPerson?: {
         meshAnnotations?: {
             node: number;
-            type: string;
+            type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly';
         }[];
         [field: string]: unknown;
     };

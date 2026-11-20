@@ -584,8 +584,12 @@ export class LineBatches implements EnginePlugin {
     this.pipelines.clear();
   }
 
-  /** Releases every GPU resource. Batches stay registered, so the plugin can be used again. */
+  /** Leaves its scene and releases every GPU resource. Batches stay members, so the plugin can be attached again. */
   dispose(): void {
+    // Leaves its scene first, as engine.removePlugin does, so no pass or registration outlives the plugin; removal
+    // deletes the registration before it calls dispose, so this runs once. A structural engine with no scenes has no
+    // registration to leave.
+    this.engine?.sceneOf?.(this)?.removePlugin(this.name);
     this.releaseGpu();
     this.engine = undefined;
   }

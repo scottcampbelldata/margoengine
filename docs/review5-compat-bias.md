@@ -16,7 +16,7 @@ cover 1D, 2D, array, 3D and cube textures. This is a fixture result on this GPU,
 not a universal bit-equality guarantee for every GPU, texture or sampler state.
 
 Reproduce after `npm run build:packages`: run the package CPU tests, then
-`node scripts/gpu-lock.mjs run --owner=review5-bias --max=5 --wait-max=60 -- node packages/webgl2-compat/test/bias-browser.mjs`.
+`node scripts/run-with-timeout.mjs --max=5 -- node packages/webgl2-compat/test/bias-browser.mjs`.
 The registered `test:gpu:bias` writes hardware details and all words to
 `test-results/review5-bias-bits.json`. Native runs in a separate browser on the
 same adapter because Windows Chromium may expose no native WebGPU adapter when

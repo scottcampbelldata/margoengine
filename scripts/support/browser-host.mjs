@@ -56,7 +56,10 @@ async function pollGone(pids, waitMs) {
  * still present at the bound.
  */
 export function endOwned(server, children, { reapMs = REAP_MS, end = endTree, settle = process.platform === 'win32' ? waitSignaled : pollGone, log = console.error } = {}) {
+  // The wall clock start goes to `settle`, which compares it with process start times; the bound itself is measured on
+  // the monotonic clock (KB-BH-REAP1).
   const begun = Date.now();
+  const started = performance.now();
   const child = server.process?.();
   const pid = child?.pid;
   const running = child && child.exitCode === null && child.signalCode === null;
@@ -86,7 +89,17 @@ export function endOwned(server, children, { reapMs = REAP_MS, end = endTree, se
   for (const pipe of child?.stdio ?? []) pipe?.destroy();
   const settled = (async () => {
     let timer;
-    const late = new Promise((resolve) => (timer = setTimeout(resolve, reapMs, 'late')));
+    // A timer is whole milliseconds and may fire before `reapMs` has passed on the monotonic clock: it is re-armed for
+    // the time still left, so the bound never resolves early (KB-BH-REAP1).
+    const late = new Promise((resolve) => {
+      const arm = (waitMs) =>
+        (timer = setTimeout(() => {
+          const left = reapMs - (performance.now() - started);
+          if (left > 0) arm(Math.ceil(left));
+          else resolve('late');
+        }, waitMs));
+      arm(reapMs);
+    });
     // One bound for all of them, waited for side by side: the browser's exit, the listed children's handles, the tree.
     const [browserGone, children, tree] = await Promise.all([
       Promise.race([exited.then(() => 'gone'), late]),
@@ -130,8 +143,8 @@ export async function hostBrowser({
   }
   const pid = server.process?.()?.pid ?? null;
   await say({ ready: true, wsEndpoint: server.wsEndpoint(), pid });
+  const lines = createInterface({ input });
   const request = await new Promise((resolve) => {
-    const lines = createInterface({ input });
     lines.on('line', (line) => {
       let message;
       try {
@@ -144,6 +157,8 @@ export async function hostBrowser({
     lines.once('close', () => resolve({ children: null }));
     input.once?.('error', () => resolve({ children: null }));
   });
+  // Nothing more is read: the input is let go, so it does not hold this process open (KB-OWN-EXIT2).
+  lines.close();
   const begun = Date.now();
   const { listed, settled } = endOwned(server, request.children, { reapMs, end, settle, log });
   await say({ terminated: { browser: pid, children: listed } });
@@ -196,5 +211,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   // Nothing of the browser's is waited for past the result: the process handle is unreferenced, so a browser the
   // kernel is still tearing down cannot hold this host open either.
   child.current?.unref();
-  process.exit(process.exitCode);
+  // With a survivor, Playwright's server (its WebSocket listener) was never asked to clean up, because that waits on
+  // the browser's exit; otherwise everything is closed and the host ends by its event loop.
+  if (process.exitCode === 3) process.exit(3); // process.exit: a survivor's Playwright server cannot be closed
 }

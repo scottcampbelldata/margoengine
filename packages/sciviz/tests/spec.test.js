@@ -41,14 +41,28 @@ test('all numeric storage kinds preserve exact bytes, offsets, nonfinite values 
     assert.equal(output.constructor, ctor);
     assert.deepEqual(new Uint8Array(output.buffer), new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
   }
-  for (const value of [NaN, Infinity, -Infinity, undefined])
-    assert.ok(Object.is(value, await decodeFigureValue(await encodeFigureValue(value))));
+  for (const value of [NaN, Infinity, -Infinity, -0, 0, undefined])
+    assert.ok(Object.is(value, await decodeFigureValue(JSON.parse(JSON.stringify(await encodeFigureValue(value))))));
+  // JSON writes -0 as 0, so a scalar -0 is tagged like the nonfinite values; inside a typed array its bytes keep it.
+  assert.deepEqual(await encodeFigureValue(-0), { $number: '-0' });
+  assert.ok(
+    Object.is((await decodeFigureValue(JSON.parse(JSON.stringify(await encodeFigureValue({ x: [-0] }))))).x[0], -0),
+  );
+  await assert.rejects(decodeFigureValue({ $number: '0' }), /Invalid tagged number/);
   assert.deepEqual(await decodeFigureValue(await encodeFigureValue(new Float32Array())), new Float32Array());
 });
 
 test('hashes, aggregate limits, reserved tags and executable values reject', async () => {
   const data = await encodeFigureValue(new Float32Array([1, 2]));
   await assert.rejects(decodeFigureValue({ ...data, sha256: '0'.repeat(64) }), /hash mismatch/);
+  // An unknown dtype is named as such before the bytes are decoded or hashed, so a bad hash or base64 cannot mask it.
+  for (const dtype of ['BigInt64Array', 'Array', 'toString', 7]) {
+    await assert.rejects(
+      decodeFigureValue({ ...data, $array: dtype, sha256: '0'.repeat(64) }),
+      /Unsupported figure dtype/,
+    );
+    await assert.rejects(decodeFigureValue({ ...data, $array: dtype, bytes: '%' }), /Unsupported figure dtype/);
+  }
   await assert.rejects(encodeFigureValue(new Float32Array(2), { maxBytes: 4 }), /maxBytes/);
   await assert.rejects(encodeFigureValue([new Float32Array(2), new Uint8Array(1)], { maxBytes: 8 }), /maxBytes/);
   await assert.rejects(decodeFigureValue(JSON.parse('{"__proto__":{}}')), /unsafe/);
@@ -367,4 +381,53 @@ test('URL saves verify the plotted array still matches its pinned source', async
 test('URL arrays type-check as numeric inputs without casts', () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   execFileSync(process.execPath, ['node_modules/typescript/bin/tsc', '--noEmit', '--strict', '--skipLibCheck', '--target', 'es2022', '--lib', 'es2022,dom,esnext.disposable', '--module', 'esnext', '--moduleResolution', 'bundler', 'packages/sciviz/tests/spec-types.ts'], {cwd:root,timeout:30000,stdio:'pipe',windowsHide:true});
+});
+test('malformed timelines and mutations reject with coded errors, frames included, and the schema matches 4 or 6 limits', () => {
+  const valid = {
+    version: 1,
+    options: {},
+    camera: { position: [1, 2, 3], target: [0, 0, 0], up: [0, 1, 0], fov: 60, near: 0.1, far: 100 },
+    limits: [0, 1, 0, 1, 0, 1],
+    dragMode: 'orbit',
+    resources: [],
+    layers: [],
+  };
+  for (const changed of [
+    { time: { times: [0], index: 0 } },
+    { time: { times: [0], index: 0, frames: 'x' } },
+    { time: { times: [0], index: 0, frames: [{ ...valid, dragMode: 'spin' }] } },
+    { time: { times: [0], index: 0, frames: [null] } },
+    { resources: [{ id: 'a', kind: 'surface', args: [], state: {}, updates: [null] }] },
+    { camera: null },
+  ])
+    assert.throws(
+      () => validateFigureSpec({ ...valid, ...changed }),
+      (e) => e instanceof TypeError && /Invalid|Unknown/.test(e.message) && /margoengine\.com\/errors/.test(e.message),
+      JSON.stringify(changed),
+    );
+  validateFigureSpec({ ...valid, time: { times: [0], index: 0, frames: [valid] } });
+  const limits = figureSchema.properties.limits,
+    lengths = (limits.anyOf ?? [limits]).map((s) => [s.minItems, s.maxItems]);
+  assert.deepEqual(lengths, [[4, 4], [6, 6]]);
+});
+test('malformed transfer, date and colour-map tags reject with coded errors', async () => {
+  const table = await encodeFigureValue(new Float64Array(1024)),
+    colours = await encodeFigureValue(new Float32Array(1024));
+  for (const value of [
+    { $transfer: table },
+    { $transfer: table, range: [0, Infinity] },
+    { $transfer: table, range: [0, 1, 2] },
+    { $date: 5 },
+    { $colormap: 'viridis', table: colours },
+    { $colormap: 'viridis', kind: 'spiral', table: colours },
+    { $colormap: 7, kind: 'sequential', table: colours },
+  ])
+    await assert.rejects(
+      decodeFigureValue(value),
+      (e) => e instanceof TypeError && /margoengine\.com\/errors/.test(e.message),
+      JSON.stringify(Object.keys(value)),
+    );
+  const transfer = await decodeFigureValue({ $transfer: table, range: [0, 1] });
+  assert.deepEqual(transfer.evaluate(0.5), [0, 0, 0, 0]);
+  assert.equal((await decodeFigureValue({ $date: '2026-01-02T03:04:05.000Z' })).getTime(), Date.UTC(2026, 0, 2, 3, 4, 5));
 });

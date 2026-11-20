@@ -1,7 +1,12 @@
 // Color transforms from the references in ../NOTICE.md.
 // ACEScg (AP1, D60) to linear sRGB: derived from the ACES S-2014-004 AP1 and BT.709 primaries with Bradford D60 to
 // D65 adaptation. sRGB <-> Display P3: derived from the SMPTE EG 432-1 (D65) and BT.709 primaries. 3D LUT: Adobe Cube
-// LUT Specification 1.0, trilinear lookup. Exposure exp2(stops); contrast about 18% grey (Margo's form). sRGB:
+// LUT Specification 1.0, trilinear lookup. Exposure exp2(stops). Contrast is a power about 18% grey,
+// 0.18 (x / 0.18)^k: a slope of k in log2 exposure about the pivot, as contrast works in the log grading space ACEScc
+// (Academy S-2014-003), so it never clips black. Until 2026-11-14 it was linear, (x - 0.18) k + 0.18, which sent every
+// channel below 0.18 (1 - 1/k) to 0 (sRGB code 30 and under at k = 1.08): crushed, banded flat runs at night. Contrast
+// 0 is flat 0.18, black included, as 0.18 * (x / 0.18) ** 0 is in JavaScript and IEEE 754 pow (x^0 = 1 for every x):
+// pow(0, 0) itself is undefined in WGSL and GLSL ES 3.00, so it is never evaluated. sRGB:
 // IEC 61966-2-1. HDR rolloff: Khronos PBR Neutral's compression aimed at the display peak (Margo derivation).
 import { agxShader } from '../../shared/agx.js';
 import { acesShader } from '../../shared/aces.js';
@@ -10,6 +15,7 @@ import { cleanShader } from '../../shared/finite.js';
 const common = `
 struct Params {grade:vec4f,domainMin:vec4f,domainMax:vec4f,settings:vec4f}
 @group(0) @binding(0) var<uniform> p:Params;
+fn margoContrast(c:vec3f,k:f32)->vec3f {if(k==1.0){return c;}if(k==0.0){return vec3f(0.18);}return 0.18*pow(max(c,vec3f(0))/0.18,vec3f(k));}
 @group(0) @binding(1) var scene:texture_2d<f32>;
 @group(0) @binding(2) var lut:texture_3d<f32>;
 fn acescgToSRGB(v:vec3f)->vec3f {
@@ -37,7 +43,7 @@ export const tonemapShader =
   if(p.settings.x==1.0){hdr=acescgToSRGB(hdr);}
   hdr=max(hdr,vec3f(0))*exp2(p.grade.x);
   var color:vec3f;if(p.grade.z==1.0){color=aces(hdr);}else if(p.grade.z==2.0){color=pbrNeutral(hdr);}else{color=agx(hdr);}
-  color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(1));
+  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(1));
   if(p.grade.w==1.0){color=sampleLUT(color);}
   color=clamp(color,vec3f(0),vec3f(1));
   return vec4f(select(color*12.92,1.055*pow(color,vec3f(1.0/2.4))-0.055,color>=vec3f(0.0031308)),source.a);
@@ -71,7 +77,7 @@ fn linearOutput(pos:vec4f)->vec4f {
     if(p.grade.z==1.0){color=aces(positive);}else{color=agx(positive);}
     if(m>=0.76){color*=rolloff(m,white)/rolloff(m,1.0);}
   }
-  color=clamp((color-0.18)*p.grade.y+0.18,vec3f(0),vec3f(white));
+  color=clamp(margoContrast(color,p.grade.y),vec3f(0),vec3f(white));
   if(p.grade.w==1.0){color=sampleLUT(min(color,vec3f(1)))+max(color-1.0,vec3f(0));}
   color=clamp(color,vec3f(0),vec3f(white));
   if(m>0.0){color+=min(hdr,vec3f(0))*(max(color.r,max(color.g,color.b))/m);}
@@ -108,4 +114,56 @@ export function classicShader(code: string): string {
   return code
     .replace('}else{color=agx(hdr);}', classic('hdr'))
     .replace('}else{color=agx(positive);}', classic('positive'));
+}
+
+/**
+ * White point, toe and shoulder, compiled in only when one is set (the shaders above stay byte-identical without them).
+ * After the display curve and before contrast: the curve output is divided by the curve's own value at the white point
+ * `W` (`p.domainMin.w`, 0 = off), so scene-linear `W` lands on exactly 1 and brighter values clip, as in Hable's
+ * filmic curve (J. Hable, "Filmic Tonemapping Operators", filmicworlds.com, 2010: the page scales the curve by
+ * 1 / curve(W)). The Reinhard curve takes the paper's own white point instead (Reinhard et al. 2002, Eq. 4,
+ * Ld = L (1 + L / Lwhite^2) / (1 + L), written on the curve output c = L / (1 + L) as c (1 + c / ((1 - c) W^2))),
+ * which is not the same curve as dividing x / (1 + x) by its value at W; then the cubic Hermite spline through (0, 0)
+ * and (1, 1) whose slope at black is `toe` and whose slope at white is `shoulder` (`p.domainMax.w` and `p.settings.w`
+ * hold each minus 1, so unset is 0). Monotone for both slopes in 0..3 (the slopes over the secant 1 are the alpha and beta of Fritsch and Carlson,
+ * "Monotone Piecewise Cubic Interpolation", SIAM J. Numer. Anal. 17(2), 1980, https://doi.org/10.1137/0717021, whose
+ * square 0..3 by 0..3 keeps a cubic monotone; tests/shape.test.js checks the derivative over the whole square).
+ * `shapeCurve` is its CPU twin.
+ */
+export function shapeShader(code: string): string {
+  const call = 'color=clamp(margoContrast(color,p.grade.y),';
+  if (!code.includes(call) || !code.includes('fn margoContrast'))
+    throw new RangeError('Tonemap shader has no contrast step to shape before; pass tonemapShader or outputShader.');
+  return code.replace('fn margoContrast', shape + 'fn margoContrast').split(call).join('color=margoShape(color);\n  ' + call);
+}
+const shape = `fn margoCurveAt(x:vec3f)->vec3f {
+  if(p.grade.z==1.0){return aces(x);}
+  if(p.grade.z==2.0){return pbrNeutral(x);}
+  if(p.grade.z==3.0){return x/(1.0+x);}
+  if(p.grade.z==4.0){let f=max(x-0.004,vec3f(0));return pow(f*(6.2*f+0.5)/(f*(6.2*f+1.7)+0.06),vec3f(2.2));}
+  if(p.grade.z==5.0){return min(x,vec3f(1));}
+  return agx(x);
+}
+fn margoShape(c:vec3f)->vec3f {
+  var x=c;
+  let white=p.domainMin.w;
+  if(white>0.0){
+    if(p.grade.z==3.0){let w=max(white,0.01);x=x*(1.0+x/(max(vec3f(1)-x,vec3f(0.000001))*w*w));}
+    else{x=x/max(margoCurveAt(vec3f(max(white,0.01))),vec3f(0.000001));}
+  }
+  x=clamp(x,vec3f(0),vec3f(1));
+  let a=1.0+p.domainMax.w;let b=1.0+p.settings.w;
+  if(a!=1.0||b!=1.0){let x2=x*x;let x3=x2*x;x=(x3-2.0*x2+x)*a+(3.0*x2-2.0*x3)+(x3-x2)*b;}
+  return x;
+}
+`;
+/**
+ * The toe and shoulder spline of the display for one channel in 0..1: the cubic Hermite through (0, 0) and (1, 1) with
+ * slope `toe` at 0 and `shoulder` at 1, each 0 to 3 (1 and 1 is the identity), as the shader evaluates it. Monotone for
+ * every slope in that range (Fritsch and Carlson 1980).
+ */
+export function shapeCurve(x: number, toe = 1, shoulder = 1): number {
+  const x2 = x * x,
+    x3 = x2 * x;
+  return (x3 - 2 * x2 + x) * toe + (3 * x2 - 2 * x3) + (x3 - x2) * shoulder;
 }

@@ -27,6 +27,8 @@ export class PaletteQuantize implements EnginePlugin {
     static attach(instance: EngineKernel, options: PaletteQuantizeOptions): PaletteQuantize;
     setPalette(palette: readonly PaletteColor[], swap?: readonly PaletteColor[]): void;
     setSwap(swap: readonly PaletteColor[]): void;
+    setSource(source: GPUTexture | (() => GPUTexture)): void;
+    setTarget(target: GPUTexture | (() => GPUTexture)): void;
     setup(engine: Engine): void;
     onDeviceRestored(): void;
     dispose(): void;

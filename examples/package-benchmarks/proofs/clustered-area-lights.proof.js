@@ -1,7 +1,7 @@
 // Proof that rectangle area lights (`@margoengine/clustered/area`) change nothing for apps without area lights: clustered's
-// root gained an `area` hook (shader composition and bind group join). A 9-frame story (lights set, moved, a gltf-pro model
+// root gained an `area` hook (shader composition and bind group join). A 9-frame story (lights set, moved, a gltf/pbr model
 // added and removed, intensity scale changed, MSAA 1x/4x, device restored) records every GPU call, descriptor, shader
-// module and buffer write of clustered (core-mesh shader patch and compute pass) and of a gltf-pro model it lights:
+// module and buffer write of clustered (core-mesh shader patch and compute pass) and of a gltf/pbr model it lights:
 // identical at `ref` and in the working tree, both without the entry and with an AreaLights attached whose list is empty
 // (it creates its buffer and hook only once it has lights).
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/clustered-area-lights.proof.js [ref] [pin] [--current]
@@ -11,11 +11,11 @@ import { refs, versions, entryAt, golden } from './compare.js';
 import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
-const { ref, pin } = refs('67e0172', 'dab9633', '1fdb559080');
+const { ref, pin } = refs('67e0172', 'dab9633', '8c71da0556');
 const { baseline, candidate } = await versions('clustered', ref, undefined, pin);
-const gltf = await entryAt('gltf-pro', 'src/index.ts', pin),
+const gltf = await entryAt('gltf', 'src/pbr.ts', pin),
   { AreaLights } = await entryAt('clustered', 'src/area.ts', pin);
 const point = { position: [0, 2, 1], range: 6, color: [1, 0.5, 0.2], intensity: 9 },
   spot = { position: [1, 3, 0], range: 8, direction: [0, -1, 0.2], outerAngle: 0.6, innerAngle: 0.3, intensity: 20 };
@@ -86,7 +86,7 @@ for (const samples of [1, 4]) {
   assert.ok(
     expected.some((e) => e[0] === 'module' && /clusterLighting\(/.test(e[2].code)) &&
       expected.some((e) => e[0] === 'context' && /clusterLighting\(i\.clip/.test(e[1])),
-    "story must light the gltf-pro model and patch core's shader",
+    "story must light the gltf/pbr model and patch core's shader",
   );
   assert.deepEqual(await story(candidate, false, samples), expected, `clustered GPU calls differ at ${samples}x`);
   assert.deepEqual(

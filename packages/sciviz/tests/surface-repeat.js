@@ -46,3 +46,14 @@ window.repeat = async ({ shape, opacity, frames = 24 }) => {
   return { shape, opacity, differing, of: frames - 1, mostBytes, drawn };
 };
 window.ready = true;
+// Gaps: one capture of a tilted surface with the heights at `cells` set to `hole` (NaN, Infinity or -Infinity). The
+// figure keeps the same range so the captures are comparable; non-finite heights are gaps, as vectorGeometry has them.
+window.gap = async (hole) => {
+  figure?.dispose?.();
+  figure = await Figure.create(canvas, { axes: false, aspect: [1, 1, 0.6] });
+  figure.engine.stop();
+  const h = heights('tilted');
+  for (let j = 40; j < 56; j++) for (let i = 40; i < 56; i++) h[j * n + i] = hole;
+  figure.surface(h, { nx: n, ny: n, x: [-1, 1], y: [-1, 1], colormap: 'viridis', contours: 0, range: [-0.5, 0.5] });
+  return [...new Uint8Array(await (await figure.toPNG({ overlays: false })).arrayBuffer())];
+};

@@ -2,22 +2,21 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
 /** Real loader handles, native contact-shadow pixels, and captured GPU draw ownership. */
 export async function pbrConsumerBrowserChecks(page) {
   return page.evaluate(async () => {
     const { EngineKernel, PbrMaterial, box } = await import('/packages/core/dist/index.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { loadFBX } = await import('/packages/fbx/dist/index.js');
-    const { ContactShadows } = await import('/packages/staging/dist/index.js');
+    const { ContactShadows } = await import('/packages/studio/dist/index.js');
     const { FrameDebugger } = await import('/packages/inspector/dist/frame.js');
     const check = (condition, message) => {
       if (!condition) throw new Error(message);
     };
     const fixtures = [
-        { name: 'gltf-pro', path: '/packages/exporters/tests/fixtures/Box.glb', load: loadGLTF },
+        { name: 'gltf/pbr', path: '/packages/exporters/tests/fixtures/Box.glb', load: loadGLTF },
         { name: 'FBX', path: '/packages/fbx/test/fixtures/blender-rig.fbx', load: loadFBX },
       ],
       results = [];
@@ -171,7 +170,6 @@ export async function pbrConsumerBrowserChecks(page) {
 
 export async function runPBRConsumerTests() {
   await mkdir('test-results', { recursive: true });
-  const release = await acquire({ owner: 'pbr-consumer-tests' });
   let browser;
   try {
     browser = await openBrowser({ startPath: '/tests/modern-extension.html', port: 5224 });
@@ -190,7 +188,6 @@ export async function runPBRConsumerTests() {
     console.log(JSON.stringify(result, null, 2));
   } finally {
     await browser?.close();
-    release();
   }
 }
 

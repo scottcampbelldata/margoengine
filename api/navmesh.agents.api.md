@@ -116,6 +116,12 @@ interface CrowdAgentOptions {
 
 type CrowdAgentState = 'idle' | 'moving' | 'offmesh' | 'arrived' | 'unreachable';
 
+interface CrowdDensityOptions {
+    gamma?: number;
+    jam?: number;
+    radius?: number;
+}
+
 interface CrowdEventMap {
     arrive: CrowdAgent;
     unreachable: CrowdAgent;
@@ -131,6 +137,7 @@ interface CrowdOptions {
     neighborDistance?: number;
     maxNeighbors?: number;
     timeHorizon?: number;
+    density?: boolean | CrowdDensityOptions;
 }
 
 interface Edge {

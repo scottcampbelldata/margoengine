@@ -1,7 +1,7 @@
-// glTF-pro models on a WebGPU-less engine (no engine.use, whose setup needs a device), for CPU-side animation tests.
+// glTF PBR models on a WebGPU-less engine (no engine.use, whose setup needs a device), for CPU-side animation tests.
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../../gltf/dist/pbr.js';
 
 export async function engine(capacity = 256) {
   return new Engine(

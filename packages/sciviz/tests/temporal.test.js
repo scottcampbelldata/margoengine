@@ -105,6 +105,14 @@ test('numbered grouping covers leading/trailing numbers, suffixes, directories, 
   assert.equal(groups.length, 6); assert.equal(names[0], 'a/f010.vtu');
   for (const n of [['f1.vtk', 'f01.vtk'], ['a.vtk', 'a.vtk'], ['f999999999999999999999.vtk']]) assert.throws(() => groupFileSeries(n));
   assert.throws(() => groupFileSeries(['f1'], { step: 0 }));
+  // A digit in the extension is not the step number: HDF5, NetCDF-4 and gzip-compressed steps group by the number
+  // before it, as named sequences of these formats are written.
+  const h5 = groupFileSeries(['out/data_011.h5', 'out/data_010.h5', 'scan_003.nii.gz', 'scan_001.nii.gz', 'run.nc4']);
+  assert.deepEqual(h5.map((g) => [g.pattern, g.files.map((f) => [f.name, f.time])]), [
+    ['out/data_*.h5', [['out/data_010.h5', 0], ['out/data_011.h5', 1]]],
+    ['run.nc*', [['run.nc4', 0]]],
+    ['scan_*.nii.gz', [['scan_001.nii.gz', 0], ['scan_003.nii.gz', 2]]],
+  ]);
 });
 test('.series JSON preserves irregular physical times, resolves relative names and feeds a cancellable reader', async () => {
   const series = parseFileSeries(JSON.stringify({ 'file-series-version': '1.0', files: [{ name: 'f2.vtu', time: 8 }, { name: 'f1.vtu', time: -2 }] }),

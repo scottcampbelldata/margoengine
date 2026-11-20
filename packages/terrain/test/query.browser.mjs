@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/query.browser.mjs
 // `@margoengine/terrain/query` answers the surface the clipmap's vertex shader samples. On real elevation (Mount
 // Rainier, a Terrarium tile from the Terrain Tiles on AWS open data set; USGS 3DEP, GMTED2010 and SRTM data) this page

@@ -13,7 +13,9 @@ import {
 import { IDENTITY, transformPoint, type V3, type Q4 } from './math.js';
 import { rollFrame, project, type Basis } from './view.js';
 import { OverlayRenderer, tessellate } from './overlay.js';
+import { viewSize } from '../../shared/view-rect.js';
 import type { Prim, RGBA } from './gizmo.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 
 /** A corner scale handle or an edge rotation handle, in world coordinates. */
 export interface BoxHandle {
@@ -67,7 +69,7 @@ const validateOptions = (handleSize: number, scaleSnap: number | null, rotationS
     handleSize <= 0 ||
     [scaleSnap, rotationSnap].some((v) => v !== null && (!Number.isFinite(v) || v <= 0))
   )
-    throw new RangeError('BoxGizmo options must be positive finite numbers; use null to disable snapping');
+    throw rangeError('BoxGizmo options must be positive finite numbers; use null to disable snapping', 'controls-arguments');
 };
 const corner = (i: number, lo: V3, hi: V3): V3 => [i & 1 ? hi[0] : lo[0], i & 2 ? hi[1] : lo[1], i & 4 ? hi[2] : lo[2]];
 
@@ -133,7 +135,7 @@ export class BoxGizmo extends Controls {
     if (this.dead) throw new MargoError('disposed', 'BoxGizmo is disposed; create a new gizmo');
     const runtime = engineRuntime(this.engine!);
     if (runtime.meshes.get(meshRuntime(mesh).id) !== mesh || !mesh.geometry?.vertices.length)
-      throw new TypeError('BoxGizmo needs a live mesh with geometry from its engine; attach such a mesh');
+      throw typeError('BoxGizmo needs a live mesh with geometry from its engine; attach such a mesh', 'controls-arguments');
     this.detach();
     this.mesh = mesh;
     this.refreshBounds();
@@ -254,19 +256,20 @@ export class BoxGizmo extends Controls {
       const axis = [0, 0, 0] as V3;
       axis[handle.axis!] = 1;
       const aw = normalize(sub(this.world(add(pivot, axis), pose), anchor)),
-        tangent = cross(aw, sub(handle.position, anchor));
-      const q = project(
-        basis,
-        add(handle.position, normalize(Math.hypot(...tangent) > 1e-9 ? tangent : basis.up)),
-        width,
-        height,
-      );
+        tangent = cross(aw, sub(handle.position, anchor)),
+        // |aw x (handle - anchor)| is the handle's distance from the axis through the anchor.
+        radius = Math.hypot(...tangent);
+      const q = project(basis, add(handle.position, normalize(radius > 1e-9 ? tangent : basis.up)), width, height);
       dx = q.x - p.x;
       dy = q.y - p.y;
+      // Pixels per radian: pixels per world unit along the tangent times the radius, so the handle follows the
+      // pointer at any box size or camera distance.
       length = Math.hypot(dx, dy);
+      if (radius > 1e-9) length *= radius;
     }
-    if (length < 1e-6) return false;
-    this.grab = { handle, pose, pivot, anchor, x, y, dx: dx / length, dy: dy / length, length, basis, width, height };
+    const pixels = Math.hypot(dx, dy);
+    if (pixels < 1e-6) return false;
+    this.grab = { handle, pose, pivot, anchor, x, y, dx: dx / pixels, dy: dy / pixels, length, basis, width, height };
     this.dispatchEvent({ type: 'start', handle: handle.id });
     this.dispatchEvent({ type: 'dragging-changed', value: true });
     return true;
@@ -278,7 +281,7 @@ export class BoxGizmo extends Controls {
     if (!g || !mesh || !this.enabled) return false;
     this.validate();
     if (!Number.isFinite(x) || !Number.isFinite(y))
-      throw new RangeError('Drag coordinates must be finite; pass CSS pixels');
+      throw rangeError('Drag coordinates must be finite; pass CSS pixels', 'controls-arguments');
     let q = g.pose.quaternion,
       s = [...g.pose.scale] as V3;
     const travel = (x - g.x) * g.dx + (y - g.y) * g.dy;
@@ -300,7 +303,7 @@ export class BoxGizmo extends Controls {
         s[a] *= Math.max(1e-4, ratio);
       }
     } else {
-      let angle = travel / Math.max(40, g.length);
+      let angle = travel / g.length;
       if (this.rotationSnap) angle = Math.round(angle / this.rotationSnap) * this.rotationSnap;
       const axis = [0, 0, 0] as V3;
       axis[g.handle.axis!] = 1;
@@ -424,7 +427,8 @@ export class BoxGizmo extends Controls {
       }
       prims.push({ kind: 'triangles', points: pts, color: handle.kind === 'scale' ? white : yellow });
     }
-    this.overlay.draw(ctx, tessellate(prims, ctx.camera.matrix, ctx.width, ctx.height, ctx.width / width));
+    const [viewWidth, viewHeight] = viewSize(ctx);
+    this.overlay.draw(ctx, tessellate(prims, ctx.camera.matrix, viewWidth, viewHeight, ctx.width / width));
   };
   override dispose(): void {
     if (this.dead) return;

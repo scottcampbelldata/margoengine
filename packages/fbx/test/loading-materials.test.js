@@ -1,6 +1,8 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { convertFBX, parseFBX, loadFBX } from '../dist/index.js';
+import { animationLayers } from '../dist/layers.js';
 import { rigFixture, readGLB } from './native-scene-helper.js';
 
 const bitmapDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'createImageBitmap');
@@ -26,9 +28,12 @@ const JPEG = Buffer.from(
   '/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKpAB//Z',
   'base64',
 );
+const real = (name) => readFileSync(new URL(`./fixtures/real/${name}`, import.meta.url)),
+  missing = async () => new Response('', { status: 404 });
 const scalar = (name, value) => `P: "${name}", "double", "Number", "", ${value}`;
 const color = (name, values) => `P: "${name}", "ColorRGB", "Color", "", ${values.join(',')}`;
-const quote = (value) => JSON.stringify(value);
+// An FBX text string: backslashes raw, as Autodesk's own files write paths, and a quote as &quot;.
+const quote = (value) => `"${String(value).replace(/"/g, '&quot;')}"`;
 const close = (actual, expected) => {
   assert.equal(actual.length, expected.length);
   for (let i = 0; i < actual.length; i++)
@@ -105,8 +110,9 @@ test('native Phong properties become dielectric PBR with opacity taking preceden
 });
 
 test('TransparencyFactor supplies alpha and shininess respects roughness limits', async () => {
+  // Transparency is TransparentColor x TransparencyFactor; the colour's default is black (FbxSurfaceLambert's template).
   for (const [properties, alpha, roughness] of [
-    [[scalar('TransparencyFactor', 0.6), scalar('Shininess', 0)].join('\n'), 0.4, 1],
+    [[color('TransparentColor', [1, 1, 1]), scalar('TransparencyFactor', 0.6), scalar('Shininess', 0)].join('\n'), 0.4, 1],
     [[scalar('Opacity', 1), scalar('TransparencyFactor', 1), scalar('Shininess', 1e12)].join('\n'), 1, 0.045],
   ]) {
     const { doc } = readGLB(await convertFBX(fixture({ properties }))),
@@ -130,6 +136,40 @@ test('Phong shininess maps to roughness like @margoengine/materials ((2/(n+2))^(
     const actual = doc.materials[0].pbrMetallicRoughness.roughnessFactor;
     assert.ok(Math.abs(actual - roughness) < 1e-7, `shininess ${n}: ${actual} != ${roughness}`);
   }
+});
+
+test('Phong roughness reads ShininessExponent, which is all 3ds Max writes', async () => {
+  // Both files hold ShininessExponent 675.587890625 and no Shininess.
+  for (const name of ['max_pbr_metal_rough_material_7700_ascii.fbx', 'max_physical_material_properties_7500_ascii.fbx']) {
+    const { doc } = readGLB(await convertFBX(real(name), { fetch: missing, resourcePath: 'https://assets.example/' }));
+    const actual = doc.materials[0].pbrMetallicRoughness.roughnessFactor;
+    assert.ok(Math.abs(actual - (2 / 677.587890625) ** 0.25) < 1e-6, `${name}: ${actual}`);
+  }
+  // ShininessExponent wins over the older Shininess name.
+  const { doc } = readGLB(
+    await convertFBX(fixture({ properties: [scalar('ShininessExponent', 30), scalar('Shininess', 510)].join('\n') })),
+  );
+  assert.ok(Math.abs(doc.materials[0].pbrMetallicRoughness.roughnessFactor - 0.5) < 1e-7);
+});
+
+test('transparency is TransparentColor x TransparencyFactor: Maya lambert1 at factor 1 with no colour is opaque', async () => {
+  // lambert1 writes TransparencyFactor 1 and leaves TransparentColor at the template's black; its Opacity 1 is removed.
+  const text = new TextDecoder().decode(real('maya_mixed_inherit_mode_7700_ascii.fbx')),
+    stripped = text.replace('P: "Opacity", "double", "Number", "",1', '');
+  assert.notEqual(stripped, text);
+  const { doc } = readGLB(await convertFBX(new TextEncoder().encode(stripped), { extensions: [animationLayers] }));
+  assert.ok(doc.materials.length > 0);
+  for (const material of doc.materials) {
+    assert.equal(material.pbrMetallicRoughness.baseColorFactor[3], 1, material.name);
+    assert.equal(material.alphaMode ?? 'OPAQUE', 'OPAQUE');
+  }
+  // A grey colour at full factor lets half through.
+  const half = readGLB(
+    await convertFBX(
+      fixture({ properties: [color('TransparentColor', [0.5, 0.5, 0.5]), scalar('TransparencyFactor', 1)].join('\n') }),
+    ),
+  ).doc.materials[0];
+  assert.ok(Math.abs(half.pbrMetallicRoughness.baseColorFactor[3] - 0.5) < 1e-7);
 });
 
 test('unassigned material -1 uses the default without fetching connected unused textures', async (t) => {
@@ -221,6 +261,23 @@ test('a full path from the writer\'s PC looks beside the file, by its file name'
   });
   assert.deepEqual(asked, ['https://assets.example/models/wood.png']);
   assert.equal(readGLB(glb).doc.images.length, 1);
+});
+
+test("a relative path that climbs above the server root to the writer's PC looks beside the file, by its file name", async () => {
+  // Character Creator 4 writes the images it made while exporting this way, from its own temporary folder.
+  const asked = [],
+    climb = '../../../../../../Users/artist/AppData/Local/Temp/CharacterCreator5Temp/FbxWorkingDirectory/tear.png';
+  const glb = await convertFBX(fixture({ textures: [{ path: climb }, { path: '../normals/normal.png', slot: 'NormalMap' }] }), {
+    resourcePath: 'https://assets.example/models/robot/',
+    allowedURLs: ['https://assets.example/models/normals/'],
+    fetch: async (url) => {
+      asked.push(String(url));
+      return new Response(PNG);
+    },
+  });
+  // A climb the app allows still goes where it says.
+  assert.deepEqual(asked, ['https://assets.example/models/robot/tear.png', 'https://assets.example/models/normals/normal.png']);
+  assert.equal(readGLB(glb).doc.images.length, 2);
 });
 
 test('an image in a format the base reader cannot use leaves the model, and the material names it', async () => {
@@ -374,4 +431,40 @@ test('a texture whose fetch redirects out of the model directory is refused unle
     /FBX texture URI redirected to https:\/\/evil\.example\/image\.png, which leaves the model's directory; add its prefix to allowedURLs/,
   );
   await convertFBX(input, { resourcePath, allowedURLs: ['https://evil.example/'] });
+});
+
+test('a TransparentColor map is opacity as Max, Blender and Character Creator write it, transparency at Maya factor 1', async () => {
+  const { pbrMaterials } = await import('../dist/pbr.js');
+  const { encodePNG } = await import('@margoengine/exporters/capture');
+  const { decodePNG } = await import('@margoengine/decoders/png');
+  // A grey opacity map with no alpha of its own, as Character Creator embeds Boxers_Opacity.png: two texels kept, two cut.
+  const grey = (values) => {
+    const data = new Uint8Array(values.length * 4);
+    values.forEach((v, i) => data.set([v, v, v, 255], i * 4));
+    return encodePNG({ width: 2, height: 2, data });
+  };
+  const alphas = async (properties, values) => {
+    const result = await convertFBX(
+        fixture({
+          properties,
+          textures: [
+            { bytes: await grey([200, 200, 200, 200]), path: 'boxers_diffuse.png' },
+            { bytes: await grey(values), path: 'boxers_opacity.png', slot: 'TransparentColor' },
+          ],
+        }),
+        { extensions: [pbrMaterials] },
+      ),
+      { doc, bytes } = embeddedImage(result),
+      material = doc.materials[doc.meshes[0].primitives[0].material],
+      image = decodePNG(new Uint8Array(bytes));
+    return { mode: material.alphaMode ?? 'OPAQUE', alpha: [0, 1, 2, 3].map((k) => image.data[k * 4 + 3]) };
+  };
+  // Character Creator: Opacity 1 and no TransparencyFactor (the template's 0). The white texels stay.
+  assert.deepEqual(await alphas(scalar('Opacity', 1), [255, 0, 255, 0]), { mode: 'MASK', alpha: [255, 0, 255, 0] });
+  // Its brow base card: Opacity 0.9 with TransparencyFactor 0.316; still an opacity map.
+  assert.deepEqual((await alphas([scalar('Opacity', 0.9), scalar('TransparencyFactor', 0.316)].join('\n'), [255, 0, 255, 0])).alpha, [255, 0, 255, 0]);
+  // Maya: TransparencyFactor 1 makes the map the transparency itself, white clear.
+  assert.deepEqual(await alphas([scalar('Opacity', 1), scalar('TransparencyFactor', 1)].join('\n'), [255, 0, 255, 0]), { mode: 'MASK', alpha: [0, 255, 0, 255] });
+  // A map with no hole cuts nothing: the material stays opaque.
+  assert.equal((await alphas(scalar('Opacity', 1), [255, 255, 255, 255])).mode, 'OPAQUE');
 });

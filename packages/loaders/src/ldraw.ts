@@ -96,6 +96,10 @@ interface Reference {
   matrix: Matrix;
   file: string;
   invert: boolean;
+  /** Culling was on (`CLIP`) at this line: a reference made under `NOCLIP` is never culled. */
+  clip: boolean;
+  /** The referring file is BFC certified. */
+  certified: boolean;
 }
 interface Shape {
   kind: 2 | 3 | 4 | 5;
@@ -109,6 +113,8 @@ interface Shape {
 interface Part {
   commands: (Reference | Shape)[];
   title?: string;
+  /** An official or unofficial part (`0 !LDRAW_ORG Part`, or found in a `parts/` folder outside `parts/s/`). */
+  part?: boolean;
 }
 
 const key = (name: string): string => name.trim().replaceAll('\\', '/').toLowerCase();
@@ -240,6 +246,9 @@ function readFile(
       if (skipping) continue;
       if (!current) open(name);
       if (word === '!COLOUR') readColour(words, palette);
+      else if (word === '!LDRAW_ORG') {
+        if (/^(Unofficial_)?(Part|Shortcut)$/i.test(words[2] ?? '')) current!.part = true;
+      }
       else if (word === '!TEXMAP' || word === '!:') warn('texture maps are not read');
       else if (word === 'BFC') {
         for (const option of words.slice(2))
@@ -267,6 +276,8 @@ function readFile(
         matrix: [a, b, c, d, e, f, g, h, i, x, y, z],
         file,
         invert: invertNext,
+        clip,
+        certified,
       });
       invertNext = false;
     } else if (type === 2 || type === 3 || type === 4 || type === 5) {
@@ -330,7 +341,8 @@ export function resolveFromURL(
   const folder = new URL(String(base).replace(/\/*$/, '/'), globalThis.location?.href);
   return async (path) => {
     const response = await get(new URL(path, folder), { signal });
-    if (!response.ok) throw new LoaderError(F, 'unsupported', `${path}: HTTP ${response.status}`);
+    if (!response.ok)
+      throw new LoaderError(F, 'unsupported', `${path}: HTTP ${response.status}`, { status: response.status });
     return new Uint8Array(await response.arrayBuffer());
   };
 }
@@ -407,14 +419,19 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     throwIfAborted(signal, F);
     for (const file of wanted) {
       tried.add(key(file));
-      let found: string | undefined;
-      for (const folder of searchPaths) {
+      let found: string | undefined,
+        folder = '';
+      for (folder of searchPaths) {
         found = await read(resolvePath('', `${folder}${key(file)}`));
         throwIfAborted(signal, F);
         if (found !== undefined) break;
       }
       if (found === undefined) missing.add(key(file));
-      else readFile(found, file, parts, palette, warn);
+      else {
+        readFile(found, file, parts, palette, warn);
+        const loaded = parts.get(key(file));
+        if (loaded && /(^|\/)parts\/$/.test(folder) && !key(file).startsWith('s/')) loaded.part = true;
+      }
     }
   }
 
@@ -462,11 +479,12 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
       m[3] * p[at] + m[4] * p[at + 1] + m[5] * p[at + 2] + m[10],
       m[6] * p[at] + m[7] * p[at + 1] + m[8] * p[at + 2] + m[11],
     );
-  const polygon = (shape: Shape, m: Matrix, inverted: boolean, parent: number): void => {
+  const polygon = (shape: Shape, m: Matrix, inverted: boolean, parent: number, cull: boolean): void => {
     const entry = color(shape.code, parent),
       corners = shape.kind === 3 ? 3 : 4,
       base = out.positions.length / 3,
-      count = (corners - 2) * (shape.both ? 2 : 1);
+      both = shape.both || !cull,
+      count = (corners - 2) * (both ? 2 : 1);
     if (base + corners > maxVertices)
       throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${maxVertices}`);
     out.triangles += count;
@@ -478,8 +496,8 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     used.set(entry.code, entry);
     const flip = shape.reverse !== inverted;
     for (let c = 1; c + 1 < corners; c++) {
-      if (shape.both || !flip) bucket.push3(base, base + c, base + c + 1);
-      if (shape.both || flip) bucket.push3(base, base + c + 1, base + c);
+      if (both || !flip) bucket.push3(base, base + c, base + c + 1);
+      if (both || flip) bucket.push3(base, base + c + 1, base + c);
     }
   };
   const line = (shape: Shape, m: Matrix, parent: number): void => {
@@ -498,7 +516,19 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
     lineColors.push3(r, g, b);
     lineColors.push3(r, g, b);
   };
-  const walk = (part: Part, m: Matrix, inverted: boolean, parent: number, depth: number): void => {
+  /**
+   * `clipped`: no reference above was made under `NOCLIP`. `certified`: every file above is certified, or the nearest
+   * part above is reached through certified files only (the BFC spec lets a certified part cull under any caller).
+   */
+  const walk = (
+    part: Part,
+    m: Matrix,
+    inverted: boolean,
+    parent: number,
+    depth: number,
+    clipped: boolean,
+    certified: boolean,
+  ): void => {
     if (depth > maxDepth) throw new LoaderError(F, 'limit', `sub-files nest deeper than ${maxDepth}`);
     if (visiting.has(part)) throw new LoaderError(F, 'syntax', 'a sub-file refers to itself');
     visiting.add(part);
@@ -511,16 +541,18 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
         const flips = determinant(command.matrix) < 0,
           next = multiply(m, command.matrix),
           turned = inverted !== flips !== command.invert,
-          code = command.code === MAIN ? parent : command.code === EDGE ? color(EDGE, parent).code : command.code;
+          code = command.code === MAIN ? parent : command.code === EDGE ? color(EDGE, parent).code : command.code,
+          clips = clipped && command.clip,
+          certifies = child.part === true || (certified && command.certified);
         // A mirrored placement stays in the main mesh: a renderer's winding would not follow a mirrored matrix.
         if (instanced && out === whole && key(command.file).endsWith('.dat') && determinant(next) > 0) {
-          const id = `${key(command.file)}|${code}|${turned}`;
+          const id = `${key(command.file)}|${code}|${turned}|${clips}|${certifies}`;
           let place = placed.get(id);
           if (!place) {
             place = { file: command.file, code, into: sink(), matrices: [] };
             placed.set(id, place);
             out = place.into;
-            walk(child, IDENTITY, turned, code, depth + 1);
+            walk(child, IDENTITY, turned, code, depth + 1, clips, certifies);
             out = whole;
           }
           place.matrices.push(
@@ -529,14 +561,14 @@ export async function parseLDraw(input: BinaryInput | string, options: LDrawOpti
             next[2], next[5], next[8], 0,
             next[9], next[10], next[11], 1,
           );
-        } else walk(child, next, turned, code, depth + 1);
-      } else if (command.kind === 3 || command.kind === 4) polygon(command, m, inverted, parent);
+        } else walk(child, next, turned, code, depth + 1, clips, certifies);
+      } else if (command.kind === 3 || command.kind === 4) polygon(command, m, inverted, parent, clipped && certified);
       else if (edges) line(command, m, parent);
     }
     visiting.delete(part);
   };
   const root: Matrix = options.units === 'file' ? IDENTITY : [LDU, 0, 0, 0, -LDU, 0, 0, 0, -LDU, 0, 0, 0];
-  walk(parts.get(main)!, root, false, mainColor, 0);
+  walk(parts.get(main)!, root, false, mainColor, 0, true, true);
 
   const finish = (from: ReturnType<typeof sink>) => {
     const indices = new Uint32Array(from.triangles * 3),

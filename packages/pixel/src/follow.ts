@@ -71,6 +71,7 @@ export class PixelFollow extends ScreenPass {
   #position: [number, number];
   #published: [number, number];
   #flash?: Effect;
+  #elapsed = 0;
   #fade?: Effect;
   #shake?: { elapsed: number; duration: number; amplitude: readonly [number, number]; seed: number };
   #rgba = [0, 0, 0, 0];
@@ -115,7 +116,14 @@ export class PixelFollow extends ScreenPass {
     this.#texture.value?.destroy();
     this.#createTexture();
   }
-  override onPreUpdate(delta: number): void { super.onPreUpdate(delta); this.update(delta); }
+  /** Seconds of frame updates the rig has run. */
+  get time(): number { return this.#elapsed; }
+  /**
+   * One frame of the rig with no draw: {@link PixelFollow.update} (camera follow, shake, flash and fade). Each frame
+   * update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly while film code moves the target on the way.
+   */
+  advanceTime(delta: number): void { this.update(delta); this.#elapsed += delta; }
+  override onPreUpdate(delta: number): void { super.onPreUpdate(delta); this.advanceTime(delta); }
   /**
    * Advances by nonnegative seconds. Keep the fractional tracking state internally to avoid rounding stalls.
    * Manual camera edits reset tracking from that position. An attached rig is updated by the engine instead.

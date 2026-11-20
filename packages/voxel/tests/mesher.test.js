@@ -455,7 +455,7 @@ test('merged quads expand to exactly the naive mesh: seeded random chunks with b
   assert.ok(merged < unit * 0.2, `greedy kept ${merged} of ${unit} opaque faces`);
 });
 
-test('uniform chunks (boundary-only and empty fast paths) match the oracle and merge to whole sides', () => {
+test('uniform chunks (boundary-only and empty fast paths) match the oracle; opaque ones merge to whole sides', () => {
   const next = random(5);
   for (const s of [STONE, GLASS, LEAVES, blockState(WATER, 2), LAVA, FLOWER, BARRIER, 0]) {
     for (const scattered of [false, true]) {
@@ -469,10 +469,16 @@ test('uniform chunks (boundary-only and empty fast paths) match the oracle and m
       const m = meshChunk(input(g, true)),
         oracle = naive(g);
       for (const layer of LAYER_NAMES) assert.deepEqual(unitFaces(m[layer]), oracle[layer], `${s} ${layer}`);
-      if (!scattered && (s === STONE || s === GLASS))
+      if (!scattered && s === STONE)
         assert.deepEqual(
-          quads(m[s === STONE ? 'opaque' : 'translucent']).map((f) => f.w * f.h),
+          quads(m.opaque).map((f) => f.w * f.h),
           [1024, 1024, 1024, 1024, 1024, 1024],
+        );
+      // Translucent faces stay one per cell face, so sortQuads has one cell per quad to order by.
+      if (!scattered && s === GLASS)
+        assert.deepEqual(
+          quads(m.translucent).map((f) => f.w * f.h),
+          new Array(6 * 1024).fill(1),
         );
     }
   }

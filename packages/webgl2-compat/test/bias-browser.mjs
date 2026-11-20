@@ -4,6 +4,7 @@
 // SwiftShader, which openBrowser refuses, so each platform names its own (lane L, 2026-11-10).
 // A backend whose raw WebGL2 mip blend is compressed (AMD under ANGLE D3D11) is compared as Scott ruled on 2026-11-10
 // (test/blend-check.mjs): the same LOD as native by nearest-mip sweeps and the driver's own blend at it, bit for bit.
+// A backend whose raw WebGL2 blend equals native's at every probed LOD (ANGLE Metal) is held to exact equality.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -12,7 +13,7 @@ import { classifyBlend, compressedFailures } from './blend-check.mjs';
 const path = '/packages/webgl2-compat/test/features.html';
 const report = { native: null, backends: [] };
 const native = await openBrowser({ startPath: path, port: 'free', compat: false, args: [] });
-let oracle, nativeProbe;
+let oracle, nativeProbe, nativeWhiteBlack;
 try {
   await native.page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   const result = await native.page.evaluate(() => window.check.run('implicitFootprint'));
@@ -20,6 +21,7 @@ try {
   assert.deepEqual(result.native.errors, []);
   oracle = result.native.result;
   nativeProbe = await native.page.evaluate(() => window.check.blendProbe([0, 255, 64, 0, 255], 'linear'));
+  nativeWhiteBlack = (await native.page.evaluate(() => window.check.blendProbe([255, 0, 255, 0, 255], 'linear'))).native;
   report.native = native.hardware;
 } finally {
   await native.close();
@@ -49,7 +51,7 @@ for (const [backend, renderer] of backends) {
     assert.equal(result.thrown, null);
     assert.deepEqual(result.errors, []);
     assert.equal(result.gl, 0);
-    const { blend } = classifyBlend((await context.page.evaluate(() => window.check.blendProbe([255, 0, 255, 0, 255], 'linear', false))).gl);
+    const { blend } = classifyBlend((await context.page.evaluate(() => window.check.blendProbe([255, 0, 255, 0, 255], 'linear', false))).gl, nativeWhiteBlack);
     const keys = Object.keys(oracle);
     if (blend === 'compressed') {
       const gl = (await context.page.evaluate(() => window.check.blendProbe([0, 255, 64, 0, 255], 'linear', false))).gl;
@@ -60,7 +62,7 @@ for (const [backend, renderer] of backends) {
     } else assert.deepEqual(result.result, oracle, `${backend}: biased samples match native IEEE-754 bits`);
     assert.deepEqual(errors, []);
     report.backends.push({ backend, hardware: context.hardware, blend, bits: result.result });
-    console.log(`${backend}: ${keys.length} footprint probes, mip blend ${blend}: ${blend === 'compressed' ? 'same LOD as native (sweeps), blend exactly the driver curve' : 'f32 words identical to native'}, no GPU errors`);
+    console.log(`${backend}: ${keys.length} footprint probes, mip blend ${blend}: ${blend === 'compressed' ? 'same LOD as native (sweeps), blend exactly the driver curve' : `${blend === 'native' ? 'WebGL2 blend equal to native, ' : ''}f32 words identical to native`}, no GPU errors`);
   } finally {
     await context.close();
   }

@@ -13,6 +13,8 @@ declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
 
 type LinkedLayer = ScatterLayer | LineLayer | RectsLayer;
 type NativeTarget = ScatterLayer['cloud'] | LineLayer['line'];
+/** A press that travels further than this (CSS px) before release is a drag, not a click on a bin. */
+const CLICK_PX = 6;
 const views = new WeakMap<Figure, Map<SelectionStore, Set<SelectionBinding>>>();
 /** Row mapping, aggregate membership and display policy for a linked layer. */
 export interface SelectionBindingOptions {
@@ -162,9 +164,12 @@ export class SelectionBinding implements Drawable {
       { signal },
     );
     const canvas = (figure.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
+    // Where the press began: a click ending a pan or a box or lasso drag is not a bin click.
+    let pressed: { x: number; y: number } | undefined;
     canvas?.addEventListener(
       'pointerdown',
       (e) => {
+        pressed = { x: e.clientX, y: e.clientY };
         this.#operation = e.shiftKey ? 'toggle' : e.altKey ? 'intersect' : e.ctrlKey || e.metaKey ? 'union' : 'replace';
       },
       { signal },
@@ -172,7 +177,7 @@ export class SelectionBinding implements Drawable {
     canvas?.addEventListener(
       'click',
       (e) => {
-        if (!this.#groups) return;
+        if (!this.#groups || (pressed && Math.hypot(e.clientX - pressed.x, e.clientY - pressed.y) > CLICK_PX)) return;
         const r = canvas.getBoundingClientRect(),
           hit = figure.pick(e.clientX - r.left, e.clientY - r.top);
         if (hit?.layer === layer)

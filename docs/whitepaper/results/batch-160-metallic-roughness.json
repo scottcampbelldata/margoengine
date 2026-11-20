@@ -156,5 +156,52 @@
     "commit": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
     "model": "MetalRoughSpheresNoTextures",
     "license": "CC0-1.0"
+  },
+  "likeForLike": {
+    "domain": "RGB bytes after Khronos PBR Neutral and pow(x, 1/2.2), one sample per pixel; all pixels, black background",
+    "sceneSha256": "73d907f9178f978995547645a7f29a537e41a14033bceb3f437fb4aafa0451d0",
+    "referenceSha256": "f8750fc708ebbdf1de530aa2632ca84f6f0721d0e175a22efaafde3ccf642a32",
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.46",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "margo": {
+      "adapter": {},
+      "backend": "webgpu",
+      "draws": 123,
+      "primitives": 123,
+      "width": 512,
+      "height": 512
+    },
+    "transfer": {
+      "rewrittenEncodes": 3,
+      "samples": 1
+    },
+    "metrics": {
+      "pixels": 262144,
+      "absolute": 7268,
+      "square": 465094,
+      "max": 254,
+      "mae": 0.009241739908854166,
+      "rmse": 0.7690237989508937,
+      "foreground": 40277,
+      "foregroundAbsolute": 7268,
+      "foregroundMae": 0.06015012703693588,
+      "changed": 1536
+    }
   }
 }

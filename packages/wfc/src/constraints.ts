@@ -38,7 +38,7 @@ const offsets = [
   [0, 0, 1],
   [0, 0, -1],
 ] as const;
-const help = 'Help: https://margoengine.com/docs/wfc';
+const help = 'Help: https://margoengine.com/llms/packages/wfc.md';
 /** CPU WFC with domain propagation, count bounds, reachability pruning and bounded chronological backtracking. */
 export class ConstrainedWFC {
   /** Copied grid dimensions. */ readonly dimensions: CellPosition;

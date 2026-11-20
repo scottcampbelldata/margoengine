@@ -180,6 +180,7 @@ type SRGB = readonly [number, number, number];
 
 class SciRenderer implements EnginePlugin {
     samplingScale: number;
+    exportScale: number | undefined;
     cpuIsosurface?: (data: Float32Array, level: number, options: {
         dims: readonly [number, number, number];
         maxTriangles: number;
@@ -215,6 +216,7 @@ class SciRenderer implements EnginePlugin {
         depth: GPUTextureFormat;
         multisample?: GPUMultisampleState;
     }) => GPURenderPipelineDescriptor): GPURenderPipeline;
+    cssScale(width: number): number;
     dispose(): void;
     [Symbol.dispose](): void;
 }

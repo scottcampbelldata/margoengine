@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 import { SpringBones } from '../dist/springs.js';
@@ -475,4 +475,21 @@ test('a model disposed first takes the avatar with it, and dispose after that do
   animation.dispose();
   model.dispose();
   assert.doesNotThrow(() => vrm.dispose());
+});
+
+// KB-OWN-RIG2: an avatar whose plugin its scene removed (removePlugin, scene or engine disposal) stayed live and kept
+// the model disposal listener until dispose().
+test('an avatar whose scene removed its plugin ends, and its dispose leaves a same-name plugin alone', async (t) => {
+  const { engine, model, animation, doc } = await setup(t, seed),
+    listeners = model.cleanupCallbacks.size,
+    vrm = addVRM(animation, readVRM(doc), { springs: false }),
+    name = [...engine.plugins.keys()].find((key) => key.startsWith('vrm:'));
+  assert.equal(model.cleanupCallbacks.size, listeners + 1);
+  engine.removePlugin(name);
+  assert.equal(model.cleanupCallbacks.size, listeners, 'the model disposal listener is gone');
+  assert.throws(() => vrm.addPoseSource(() => {}), { code: 'disposed' });
+  const replacement = { name, setup() {} };
+  engine.use(replacement);
+  vrm.dispose();
+  assert.equal(engine.plugins.get(name), replacement);
 });

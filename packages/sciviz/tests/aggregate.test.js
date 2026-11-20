@@ -15,7 +15,10 @@ const table = (values, xy = 0.5) =>
   });
 test('density spreading stops at the first occupied-neighbour footprint instead of the maximum radius', async () => {
   const result = await aggregateRaster(table([1], 4.5), {
-    ...options, bounds: [0, 9, 0, 9], width: 9, height: 9,
+    ...options,
+    bounds: [0, 9, 0, 9],
+    width: 9,
+    height: 9,
   });
   const counts = result.count.slice();
   const footprint = (pixels) => [...pixels.keys()].filter((i) => pixels[i]);
@@ -28,17 +31,44 @@ test('density spreading stops at the first occupied-neighbour footprint instead 
 test('density spreading retains dense and empty images and clips growth to raster edges', async () => {
   const result = await aggregateRaster(table([1], 0.5), { ...options, bounds: [0, 9, 0, 9], width: 9, height: 9 });
   const pixels = shadeAggregate(result, { spread: 4, density: 0.5 });
-  assert.deepEqual([...pixels.keys()].filter((i) => pixels[i]), [0, 1, 9]);
+  assert.deepEqual(
+    [...pixels.keys()].filter((i) => pixels[i]),
+    [0, 1, 9],
+  );
   const empty = await aggregateRaster(table([], 0.5), options);
   assert.deepEqual([...shadeAggregate(empty, { spread: 4, density: 0.5 })], [0, 0, 0, 0]);
   const denseTable = new ColumnarTable({
-    x: Float64Array.from({ length: 9 }, (_, i) => i % 3 + 3.5),
+    x: Float64Array.from({ length: 9 }, (_, i) => (i % 3) + 3.5),
     y: Float64Array.from({ length: 9 }, (_, i) => Math.floor(i / 3) + 3.5),
   });
-  const dense = await aggregateRaster(denseTable, { ...options, value: undefined, bounds: [0, 9, 0, 9], width: 9, height: 9 });
+  const dense = await aggregateRaster(denseTable, {
+    ...options,
+    value: undefined,
+    bounds: [0, 9, 0, 9],
+    width: 9,
+    height: 9,
+  });
   assert.deepEqual(shadeAggregate(dense, { spread: 4, density: 0.5 }), shadeAggregate(dense));
   const single = await aggregateRaster(table([1]), { ...options, width: 1, height: 1 });
   assert.deepEqual(shadeAggregate(single, { spread: 4, density: 1 }), shadeAggregate(single));
+});
+test('overlapping spread discs take the highest shaded level, independent of scan order', async () => {
+  const row = (low, high) =>
+    new ColumnarTable({ x: Float64Array.of(low, high), y: Float64Array.of(0.5, 0.5), v: Float64Array.of(1, 9) });
+  const shade = (t) =>
+    aggregateRaster(t, { ...options, bounds: [0, 5, 0, 1], width: 5, height: 1 }).then((r) =>
+      shadeAggregate(r, { reduction: 'sum', transform: 'linear', spread: 2 }),
+    );
+  // The high bin first in scan order, then the high bin last: the shared pixel 2 shows the high colour both times.
+  const highFirst = await shade(row(3.5, 1.5));
+  const highLast = await shade(row(1.5, 3.5));
+  assert.notEqual(highFirst[1], highFirst[3]);
+  assert.equal(highFirst[2], highFirst[1]);
+  assert.equal(highLast[2], highLast[3]);
+  assert.deepEqual([...highLast], [...highFirst].reverse());
+  const dense = await aggregateRaster(row(1.5, 3.5), { ...options, bounds: [0, 5, 0, 1], width: 5, height: 1 });
+  const grown = shadeAggregate(dense, { reduction: 'sum', transform: 'linear', spread: 2, density: 1 });
+  assert.equal(grown[2], grown[3]);
 });
 test('binary64 sums and means are exact across cancellation, overflow, subnormals, ties and chunk boundaries', async () => {
   const cases = [
@@ -207,4 +237,36 @@ test('original TLC and GBIF observations retain source hashes, coordinates, lice
         assert.match(row.license, source.file.includes('CC0') ? /publicdomain\/zero\/1\.0/ : /licenses\/by\/4\.0/);
       }
   }
+});
+
+test('a refused raster shading leaves the binding on its last good shading', async () => {
+  const { bindRasterAggregate } = await import('../dist/aggregate.js');
+  globalThis.GPUBufferUsage ??= { COPY_DST: 8, VERTEX: 32, UNIFORM: 64, STORAGE: 128 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  const standIn = () =>
+    new Proxy(function () {}, { get: (_, key) => (key === 'then' ? undefined : standIn()), apply: () => standIn() });
+  const listeners = new Map(),
+    canvas = {
+      addEventListener: (type, f) => listeners.set(type, f),
+      removeEventListener: (type) => listeners.delete(type),
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    },
+    layers = [],
+    figure = {
+      is2d: true,
+      engine: { canvas },
+      renderer: { device: standIn(), add() {}, remove() {} },
+      bounds: [0, 2, 0, 2, -1, 1],
+      setLimits() {},
+      addChartLayer: (layer) => layers.push(layer),
+      remove() {},
+      render() {},
+    };
+  const binding = await bindRasterAggregate(figure, table([1, 2]), { ...options, tooltip: false });
+  assert.throws(() => binding.shade({ spread: 99 }), RangeError);
+  // The refused options were kept, so every pan or zoom refresh after it failed in shading.
+  await binding.refresh();
+  assert.equal(binding.error, undefined);
+  assert.equal(layers.length, 2);
+  binding.dispose();
 });

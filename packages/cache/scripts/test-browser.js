@@ -1,5 +1,6 @@
+// MARGO_COMPAT not applicable: the page exercises IndexedDB, fetch and byte ranges and makes no GPU calls.
 // RangeCache and the eviction index on a real browser: real IndexedDB, real fetch, a real HTTP server that answers
-// byte ranges with an ETag, and the browser's own offline mode. gltf-pro's progressive streaming code reads a real
+// byte ranges with an ETag, and the browser's own offline mode. gltf/pbr's progressive streaming code reads a real
 // Khronos sample through RangeCache, again after a reload with the browser offline, and once more online, when it
 // revalidates with one conditional request. Writes test-results/cache-browser.json.
 //   npm run test:browser --workspace=@margoengine/cache        MARGO_BROWSER=chromium for Playwright's Chromium
@@ -9,6 +10,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
@@ -22,10 +24,10 @@ const packageRoot = fileURLToPath(new URL('..', import.meta.url)),
   sha = (bytes) => createHash('sha256').update(bytes).digest('hex'),
   json = glb.readUInt32LE(12),
   bin = glb.subarray(28 + json, 28 + json + glb.readUInt32LE(20 + json)),
-  stream = readdirSync(resolve(root, 'packages/gltf-pro/dist')).find((name) => /^stream-.*\.js$/.test(name));
+  stream = readdirSync(resolve(root, 'packages/gltf/dist')).find((name) => /^stream-.*\.js$/.test(name));
 // A limit per page call, far past what one takes; the run as a whole is bounded by the check that starts it.
 const CALL_LIMIT = 180_000;
-assert.ok(stream, 'gltf-pro is built (npm run build --workspace=@margoengine/gltf-pro)');
+assert.ok(stream, 'gltf/pbr is built (npm run build --workspace=@margoengine/gltf)');
 
 /** The files the page fetches, and every request that reached the server. */
 const files = {
@@ -58,7 +60,7 @@ const server = await createServer({
   cacheDir: resolve(results, '.vite'),
   server: { port: 0, host: '127.0.0.1', hmr: false, watch: null, fs: { allow: [root] } },
   optimizeDeps: { noDiscovery: true, include: [] },
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'cache-files',
       configureServer(vite) {
@@ -111,7 +113,7 @@ const server = await createServer({
 });
 await server.listen();
 const origin = `http://127.0.0.1:${server.httpServer.address().port}`,
-  pageURL = `${origin}/packages/cache/test/browser.html?stream=${encodeURIComponent(`/packages/gltf-pro/dist/${stream}`)}`;
+  pageURL = `${origin}/packages/cache/test/browser.html?stream=${encodeURIComponent(`/packages/gltf/dist/${stream}`)}`;
 
 let browser;
 try {
@@ -299,6 +301,10 @@ try {
   // Prefetcher's timer fallback ran there); a service worker never has one.
   assert.equal(report.prefetchWindow.idleAPI, await page.evaluate(() => typeof requestIdleCallback));
   assert.equal(report.prefetchWorker.idleAPI, 'undefined');
+  // Routing disables the browser's HTTP cache, and Chromium then hands the service worker every page request with
+  // `cache: 'reload'`, which RangeCache honours by going to the network (Fetch request cache modes). A page with no
+  // routing sends `default`, so the route goes before the service worker proof.
+  await context.unroute('**/cache-files/**');
   before = log.length;
   const serviceCold = await call('serviceWorkerRange', 'bytes=1000-2999');
   assert.equal(serviceCold.status, 206);

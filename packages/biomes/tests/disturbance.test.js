@@ -299,7 +299,7 @@ test('invalid inputs name the required replacement and reject cyclic drainage', 
 
 test('entry import in a fresh process adds no globals', () => {
   const script = `const before = Reflect.ownKeys(globalThis); await import('./dist/disturbance.js');
-    const after = Reflect.ownKeys(globalThis); if (after.some(k => !before.includes(k))) process.exit(1);`;
+    const after = Reflect.ownKeys(globalThis); if (after.some(k => !before.includes(k))) process.exitCode = 1;`;
   execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: packageDir, timeout: 10000 });
 });
 
@@ -334,4 +334,49 @@ test('disturbance guide example runs verbatim with literal public imports', { ti
   });
   assert.match(output, /age.*flood.*stage/);
   assert.ok(!/[\u2013\u2014]/.test(section));
+});
+
+test('disturbanceStates marks a plant state map from a history: fresh burn, old char, the flood line', async () => {
+  const { disturbanceStates } = await import('../dist/disturbance.js');
+  const nx = 8,
+    nz = 8,
+    grid = { nx, nz, step: 10000, height: new Int32Array(nx * nz) },
+    world = { region: grid, bounds: [0, 0, 70, 70], tileSize: 70, resolution: 10 },
+    d = {
+      ...grid,
+      height: grid.height.slice(),
+      seed: 0,
+      years: 50,
+      age: new Uint16Array(nx * nz).fill(65535),
+      flood: new Uint16Array(nx * nz),
+      stage: new Uint8Array(nx * nz),
+    };
+  d.age[0] = 0; // corner (0, 0): burnt this year
+  d.age[1] = 12; // corner (1, 0): burnt 12 years ago
+  d.age[2] = 40; // corner (2, 0): past charYears
+  d.flood[8] = 10; // corner (0, 1): reached by the 10-year flood
+  d.flood[9] = 100; // corner (1, 1): only the 100-year flood
+  d.flood[10] = 1; // corner (2, 1): open water
+  const cells = new Map();
+  disturbanceStates(world, d, { markEach: (at) => { for (const [x, z] of [[1, 1], [11, 1], [21, 1], [1, 11], [11, 11], [21, 11], [35, 35]]) cells.set(`${x},${z}`, at(x, z)); } }, { intensity: 1000 });
+  const fresh = cells.get('1,1'),
+    scorch = (4.665 * 1000 ** (7 / 6)) / (35 * Math.sqrt(1000 + 38.7 * 8));
+  assert.ok(Math.abs(fresh.scorch - scorch) < 1e-9, `Van Wagner's scorch ${fresh.scorch}`);
+  assert.ok(Math.abs(fresh.char - 0.0775 * 1000 ** 0.46) < 1e-9, "Byram's flame length as the char");
+  assert.equal(fresh.intensity, 1);
+  assert.equal(fresh.ash, 1);
+  assert.deepEqual(Object.keys(cells.get('11,1')), ['char'], 'an older burn keeps only its char');
+  assert.equal(cells.get('21,1'), undefined, 'past charYears nothing shows');
+  assert.deepEqual(cells.get('1,11'), { water: 0.5 }, 'the 10-year flood line');
+  assert.equal(cells.get('11,11'), undefined, 'the 100-year flood is past floodPeriod');
+  assert.equal(cells.get('21,11'), undefined, 'open water carries no plants');
+  assert.equal(cells.get('35,35'), undefined);
+  const fn = new Map();
+  disturbanceStates(world, d, { markEach: (at) => fn.set('a', at(1, 1)) }, { intensity: (x) => 500 + x, floodMark: 1, burnYears: 20 });
+  assert.equal(fn.get('a').intensity, 0.501);
+  assert.throws(() => disturbanceStates(world, d, { markEach: () => {} }, { burnYears: 0 }), RangeError);
+  assert.throws(() => disturbanceStates(world, d, { markEach: () => {} }, { charYears: 0, burnYears: 5 }), RangeError);
+  assert.throws(() => disturbanceStates(world, d, {}), TypeError);
+  assert.throws(() => disturbanceStates({ ...world, region: { ...grid, nx: 4 } }, d, { markEach: () => {} }), RangeError);
+  assert.throws(() => disturbanceStates(world, d, { markEach: (at) => at(1, 1) }, { intensity: () => 0 }), RangeError);
 });

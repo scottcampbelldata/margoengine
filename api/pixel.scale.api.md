@@ -48,6 +48,8 @@ abstract class ScreenPass implements EnginePlugin {
     readonly name: string;
     fit: PixelFit;
     protected constructor(options: ScreenPassOptions, label: string, code: string, bytes: number, name: string);
+    setSource(source: TextureSource): void;
+    setTarget(target: TextureSource | undefined): void;
     protected abstract fill(values: ArrayBuffer, rect: readonly number[], source: GPUTexture): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;

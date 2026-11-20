@@ -1,0 +1,96 @@
+{
+  "name": "@margoengine/studio",
+  "version": "1.0.0",
+  "description": "Product-shot studio: soft ground contact shadows (shadow-catcher plane), accumulated and path-traced shots, caustics and a cyclorama backdrop for core meshes and glTF models.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "studio"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/studio"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./accumulate": {
+      "types": "./dist/accumulate.d.ts",
+      "import": "./dist/accumulate.js"
+    },
+    "./pathtrace": {
+      "types": "./dist/pathtrace.d.ts",
+      "import": "./dist/pathtrace.js"
+    },
+    "./ground": {
+      "types": "./dist/ground.d.ts",
+      "import": "./dist/ground.js"
+    },
+    "./pathtrace-materials": {
+      "types": "./dist/pathtrace-materials.d.ts",
+      "import": "./dist/pathtrace-materials.js"
+    },
+    "./accumulate-ambient": {
+      "types": "./dist/accumulate-ambient.d.ts",
+      "import": "./dist/accumulate-ambient.js"
+    },
+    "./caustics": {
+      "types": "./dist/caustics.d.ts",
+      "import": "./dist/caustics.js"
+    },
+    "./backdrop": {
+      "types": "./dist/backdrop.d.ts",
+      "import": "./dist/backdrop.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/voxel-pathtracer": "^1.0.0",
+    "@margoengine/bvh": "^1.0.0",
+    "@margoengine/environment": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js studio",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm run build",
+    "test:gpu": "cd ../.. && node packages/studio/test/browser-check.mjs --no-record && node packages/studio/test/ground-browser.mjs && node packages/studio/test/ground-browser.mjs --studio && node packages/studio/test/ground-browser.mjs --studio --compat && node packages/studio/test/accumulate-browser.mjs && node packages/studio/test/accumulate-browser.mjs --compat && node packages/studio/test/pathtrace-browser.mjs && node packages/studio/test/orientation-browser.mjs && node packages/studio/test/orientation-browser.mjs --compat && node packages/studio/test/floor-browser.mjs && node packages/studio/test/floor-browser.mjs --compat && node packages/studio/test/hdr-shadow-browser.mjs && node packages/studio/test/hdr-shadow-browser.mjs --compat",
+    "test:gpu:materials": "cd ../.. && node packages/studio/test/pathtrace-materials-browser.mjs",
+    "test:gpu:ambient": "cd ../.. && node packages/studio/test/accumulate-ambient-browser.mjs && node packages/studio/test/sky-occlusion-browser.mjs && node packages/studio/test/sky-occlusion-browser.mjs --compat",
+    "test:gpu:caustics": "cd ../.. && node packages/studio/test/caustics-browser.mjs",
+    "test:gpu:backdrop": "cd ../.. && node packages/studio/test/backdrop-browser.mjs"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/voxel-pathtracer": {
+      "optional": true
+    },
+    "@margoengine/bvh": {
+      "optional": true
+    },
+    "@margoengine/environment": {
+      "optional": true
+    }
+  }
+}

@@ -5,6 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { BindGroups, TextureOption, viewOf } from './resources.js';
 import {
   type Point2D,
   type LightKind2D,
@@ -342,7 +343,10 @@ export function heightLightAt(
 
 /** Options for the {@link HeightLighting2D} plugin. */
 export interface HeightLighting2DOptions {
-  /** Target texture or function returning target texture. */
+  /**
+   * Target texture, or a function read each frame. A plain texture lost at a device restore skips the pass, reported
+   * once, until {@link HeightLighting2D.setTarget} gives a new one.
+   */
   target?: GPUTexture | (() => GPUTexture);
   /** Receiver ground elevation. Default 0. */
   elevation?: number;
@@ -605,13 +609,15 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   #uniformBuffer: GPUBuffer | null = null;
   #sum: GPUTexture | null = null;
   #show: GPURenderPipeline | null = null;
+  #showLayout: GPUBindGroupLayout | null = null;
+  readonly #groups = new BindGroups();
   #storageBuffer: GPUBuffer | null = null;
   #bindGroupLayout: GPUBindGroupLayout | null = null;
   #device: GPUDevice | null = null;
   #format: string | null = null;
   #masks = new MaskData();
   #disposed = false;
-  #target?: GPUTexture | (() => GPUTexture);
+  readonly #target: TextureOption;
   declare receiverElevation: number;
   declare layer: number;
   declare camera: { x: number; y: number; zoom: number };
@@ -619,7 +625,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
   constructor(options: HeightLighting2DOptions = {}) {
     this.name = options.name ?? `height-lighting2d-${++heightPluginCount}`;
     this.order = options.order ?? 15;
-    this.#target = options.target;
+    this.#target = new TextureOption(options.target, 'HeightLighting2D target', 'setTarget');
     this.receiverElevation = options.elevation ?? 0;
     this.layer = options.layer ?? 0xffffffff;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
@@ -655,13 +661,23 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       );
     }
     this.#engine = engine;
+    this.#target.fix(engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
       execute: (c: PassContext) => {
-        if (c.backend === 'webgpu') this.render(this.#target, c.encoder);
+        // A plain target lost with its device skips the pass (reported once) until setTarget gives a new one.
+        if (c.backend === 'webgpu' && engine.gpu) this.render(this.#target.get(engine.gpu, engine), c.encoder);
       },
     });
+  }
+
+  /**
+   * Replaces the texture the attached pass draws to, from the next frame: a texture, a function read each frame, or
+   * undefined for none. After a device restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: GPUTexture | (() => GPUTexture) | undefined): void {
+    this.#target.set(target, this.#engine?.gpu);
   }
 
   /** Adds a light to the height lighting pass. */
@@ -749,6 +765,8 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
         vertex: { module, entryPoint: 'vs_main' },
         fragment: { module, entryPoint: 'present', targets: [{ format: target.format }] },
       });
+      // getBindGroupLayout makes a new object each call: kept, so the show group can be kept too.
+      this.#showLayout = this.#show.getBindGroupLayout(1);
     }
 
     const count = this.#occluders.length;
@@ -804,7 +822,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
-          view: this.#sum.createView(),
+          view: viewOf(this.#sum),
           loadOp: 'clear',
           clearValue: [0, 0, 0, 1],
           storeOp: 'store',
@@ -815,6 +833,12 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
 
     const values = new Float32Array(uniformSize / 4);
     let index = 0;
+    // One group for every light (each takes its own dynamic offset), kept while the three buffers are the same objects.
+    const bindGroup = this.#groups.get(device, 'lights', this.#bindGroupLayout!, [
+      { binding: 0, resource: { buffer: this.#uniformBuffer, size: 144 } },
+      { binding: 1, resource: { buffer: this.#storageBuffer } },
+      { binding: 2, resource: { buffer: this.#masks.buffer! } },
+    ]);
 
     for (const light of this.#lights) {
       const mask = this.#masks.fields[index];
@@ -857,16 +881,6 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
       else if (light.kind === 'directional') kindCode = 2;
       uniformU32.set([kindCode, light.shadows ? 1 : 0, count, this.layer, light.layers, 0, 0, 0], 20);
       uniformFloats.set(mask, 28);
-
-      const bindGroup = device.createBindGroup({
-        layout: this.#bindGroupLayout!,
-        entries: [
-          { binding: 0, resource: { buffer: this.#uniformBuffer, size: 144 } },
-          { binding: 1, resource: { buffer: this.#storageBuffer } },
-          { binding: 2, resource: { buffer: this.#masks.buffer! } },
-        ],
-      });
-
       pass.setBindGroup(0, bindGroup, [offset]);
       pass.draw(3);
     }
@@ -874,16 +888,10 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     pass.end();
     device.queue.writeBuffer(this.#uniformBuffer, 0, values);
     const show = encoder.beginRenderPass({
-      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
+      colorAttachments: [{ view: viewOf(target), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
     });
     show.setPipeline(this.#show);
-    show.setBindGroup(
-      1,
-      device.createBindGroup({
-        layout: this.#show.getBindGroupLayout(1),
-        entries: [{ binding: 0, resource: this.#sum.createView() }],
-      }),
-    );
+    show.setBindGroup(1, this.#groups.get(device, 'show', this.#showLayout!, [{ binding: 0, resource: viewOf(this.#sum) }]));
     show.draw(3);
     show.end();
     if (!commandEncoder) {
@@ -911,7 +919,8 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
 
   #release(): void {
     this.#sum?.destroy();
-    this.#sum = this.#show = null;
+    this.#sum = this.#show = this.#showLayout = null;
+    this.#groups.clear();
     this.#masks.dispose();
     this.#uniformBuffer?.destroy();
     this.#storageBuffer?.destroy();

@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, EnginePlugin, Mesh } from "@margoengine/core";
-import { PBRModel, PBRPrimitive } from "@margoengine/gltf-pro";
+import { PBRModel, PBRPrimitive } from "@margoengine/gltf/pbr";
 
 export interface FeatureImage {
     readonly width: number;

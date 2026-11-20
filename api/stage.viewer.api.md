@@ -5,9 +5,9 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh, PbrMaterial, Scene, Vec3 } from "@margoengine/core";
 import { ColorBackground, EnvironmentLighting, EnvironmentLoadOptions, EnvironmentSource } from "@margoengine/environment";
-import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf/pbr";
 import { ShadowOptions, Shadows } from "@margoengine/shadows";
-import { ContactShadowOptions, ContactShadows } from "@margoengine/staging";
+import { ContactShadowOptions, ContactShadows } from "@margoengine/studio";
 import { Tonemap, TonemapOptions } from "@margoengine/tonemap";
 
 export interface TurntableOptions {

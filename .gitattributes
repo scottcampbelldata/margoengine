@@ -38,7 +38,7 @@ packages/bvh/tests/fixtures/*.obj -text
 packages/fbx/test/fixtures/real/* -text
 
 # Shader text whose SHA-256 the tests pin
-packages/gltf-pro/tests/fixtures/*.wgsl text eol=lf
+packages/gltf/test/fixtures/*.wgsl text eol=lf
 packages/decoders/vendor/draco/* -text
 packages/decoders/vendor/basis/* -text
 packages/decoders/vendor/jxl/* -text
@@ -108,3 +108,7 @@ packages/sciviz/tests/fixtures/tensor/** -text
 
 # Preserve downloaded standard molecule coordinate bytes and recorded hashes.
 packages/sciviz/tests/fixtures/molecule/** -text
+
+# Licensed test cases are redistributed verbatim (CC BY-ND 4.0); never translate their bytes.
+packages/ifc/tests/fixtures/bcf/** -text
+packages/ifc/tests/fixtures/ids/** -text

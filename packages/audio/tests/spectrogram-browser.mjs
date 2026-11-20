@@ -1,5 +1,5 @@
 // The GPU path of audio/spectrogram on the real GPU, native WebGPU and the WebGL2 compatibility layer (one GPU job):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/audio/tests/spectrogram-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/audio/tests/spectrogram-browser.mjs
 // A file over 2^20 samples is transformed in frame batches through compute/fft and compared with the CPU path.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';

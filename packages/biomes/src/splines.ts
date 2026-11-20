@@ -19,9 +19,12 @@ export type PathCurve = 'polyline' | 'catmull-rom' | 'b-spline';
 export interface PathCarve {
   /**
    * `'flatten'` levels the ground across the path to a bed that follows the ground along it, averaged over `grade`;
-   * `'cut'` lowers the ground by `depth`. Default `'flatten'`.
+   * `'cut'` lowers the ground by `depth`; `'level'` levels it to the world height `top`, raising or lowering it (a sea
+   * wall, a breakwater mound, a quay apron or a levee, its sides sloping across the edge). Default `'flatten'`.
    */
-  readonly mode?: 'flatten' | 'cut';
+  readonly mode?: 'flatten' | 'cut' | 'level';
+  /** World height in metres the ground is levelled to (`'level'` only), -1,000..9,000. Default 0 (sea level). */
+  readonly top?: number;
   /** Metres below the bed (`'flatten'`) or the ground (`'cut'`), 0..100. Default 0. */
   readonly depth?: number;
   /** Metres along the path over which the bed averages the ground, 0..2,000: longer gives a gentler grade. Default 24. */
@@ -66,7 +69,7 @@ export interface Path {
 
 const CURVES = ['polyline', 'catmull-rom', 'b-spline'],
   FALLOFFS = ['smooth', 'linear', 'constant'],
-  CARVES = ['flatten', 'cut'];
+  CARVES = ['flatten', 'cut', 'level'];
 /** Longest piece of a sampled line, mm: keeps a segment's squared length times Q16 below 2^53. */
 const MAX_SEGMENT = 256_000;
 /** Most samples of one path, and most curve samples of one span. */
@@ -133,9 +136,14 @@ function settings(path: PathOptions): PathOptions {
     carve === null ||
     !CARVES.includes(carve.mode ?? 'flatten') ||
     !inRange(carve.depth ?? 0, 0, 100) ||
-    !inRange(carve.grade ?? 24, 0, 2000)
+    !inRange(carve.grade ?? 24, 0, 2000) ||
+    !inRange(carve.top ?? 0, -1000, 9000) ||
+    (carve.top !== undefined && carve.mode !== 'level')
   )
-    throw rangeError("A path carve is { mode: 'flatten' or 'cut', depth: 0..100 m, grade: 0..2,000 m }", 'biomes');
+    throw rangeError(
+      "A path carve is { mode: 'flatten', 'cut' or 'level', depth: 0..100 m, grade: 0..2,000 m, top: -1,000..9,000 m with level }",
+      'biomes',
+    );
   return deepFreeze({
     points: points.map((p) => [p[0], p[1]] as const),
     curve,
@@ -147,7 +155,13 @@ function settings(path: PathOptions): PathOptions {
     strength,
     ...(path.biome === undefined ? {} : { biome: path.biome }),
     ...(mask === undefined ? {} : { mask }),
-    carve: { mode: carve.mode ?? 'flatten', depth: carve.depth ?? 0, grade: carve.grade ?? 24 },
+    carve: {
+      mode: carve.mode ?? 'flatten',
+      depth: carve.depth ?? 0,
+      grade: carve.grade ?? 24,
+      // Only a level path holds a top, so the settings of flatten and cut paths keep their bytes.
+      ...(carve.mode === 'level' ? { top: carve.top ?? 0 } : {}),
+    },
   });
 }
 
@@ -349,7 +363,8 @@ function indexOf(paths: readonly Path[], bed?: (path: number) => Float64Array | 
     edge: Float64Array.from(paths, (p) => mm(p.options.edge!)),
     depth: Float64Array.from(paths, (p) => mm(p.options.carve!.depth!)),
     falloff: paths.map((p) => p.options.falloff!),
-    flatten: paths.map((p) => p.options.carve!.mode === 'flatten'),
+    // A level path is a flatten path whose bed is its top at every line point.
+    flatten: paths.map((p) => p.options.carve!.mode !== 'cut'),
     bucket,
     cells,
     stamp: new Int32Array(n),
@@ -507,11 +522,13 @@ function carve(base: Heights, paths: readonly PathOptions[], origin: readonly [n
     throw typeError('A carved height takes { carve: [paths], base?: height source }', 'biomes');
   const defined = paths.map(definePath);
   if (!defined.length) return base;
-  const ix = indexOf(defined, (i) =>
-      defined[i].options.carve!.mode === 'flatten'
+  const ix = indexOf(defined, (i) => {
+      const c = defined[i].options.carve!;
+      if (c.mode === 'level') return new Float64Array(defined[i].line.length >> 1).fill(mm(c.top!));
+      return c.mode === 'flatten'
         ? bedOf(defined[i], (x, z) => base.grid(x - origin[0], z - origin[1], 1, 1, 1)[0])
-        : undefined,
-    ),
+        : undefined;
+    }),
     list: number[] = [];
   return {
     ...(base.relief ? { relief: base.relief } : {}),

@@ -1,16 +1,16 @@
-// Simplifies gltf-pro's packed 20-float vertices (position, normal, tangent, UV0, UV1, colour) with mesh-edit's
+// Simplifies gltf/pbr's packed 20-float vertices (position, normal, tangent, UV0, UV1, colour) with mesh-edit's
 // quadric collapses. A collapse keeps one end of an edge, so every level is a subset of the source's own vertices:
 // each one keeps its normal, tangent, UVs and colour exactly, and nothing has to be interpolated.
 import type { MutableVec2, MutableVec3 } from '@margoengine/math';
 import type { meshLODChain } from '@margoengine/mesh-edit/modeling';
 
-/** Packed triangles: 20 floats per vertex, gltf-pro's layout. */
+/** Packed triangles: 20 floats per vertex, gltf/pbr's layout. */
 export interface PackedGeometry {
   vertices: Float32Array;
   indices: Uint32Array;
   /** On a simplified level: the source vertex each vertex is. Absent when the level is the source itself. */
   sources?: Uint32Array;
-  /** TEXCOORD_2 and 3, four floats a vertex, as gltf-pro keeps them when a material reads either. */
+  /** TEXCOORD_2 and 3, four floats a vertex, as gltf\/pbr keeps them when a material reads either. */
   uvs?: Float32Array;
 }
 /** What the simplifying needs from `@margoengine/mesh-edit/modeling`. */

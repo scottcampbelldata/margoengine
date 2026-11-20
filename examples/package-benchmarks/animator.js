@@ -1,4 +1,4 @@
-import { parseGLTF } from '../../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../../packages/gltf/dist/pbr.js';
 import { Animation } from '../../packages/animation/dist/index.js';
 import { fetchBytes } from '../../packages/loaders/dist/index.js';
 import { controls } from './ui-scene.js';

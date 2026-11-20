@@ -185,7 +185,7 @@ function surface(read: SurfaceRead): USDSurface | undefined {
 export function previewSurface(): USDExtension {
   const hook: ExtensionHooks = {
     name: 'preview-surface',
-    decoders: async () => ({ materials: (await import('@margoengine/gltf-pro/extended')).extendedMaterials }),
+    decoders: async () => ({ materials: (await import('@margoengine/gltf/extended-materials')).extendedMaterials }),
     surface,
     created: attachPreviewOpacity,
     prepare({ specs }) {

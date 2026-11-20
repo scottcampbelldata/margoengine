@@ -65,7 +65,7 @@ export async function scatterLODs(source: Geometry, options: ScatterLODOptions =
   if (count > 200_000)
     throw rangeError('scatterLODs takes up to 200000 vertices; split the mesh or decimate it offline first', 'scatter');
   const packed = new Float32Array(count * STRIDE);
-  // gltf-pro's packed layout (lod/auto): position at 0, normal at 4 (float 3 is padding).
+  // gltf/pbr's packed layout (lod/auto): position at 0, normal at 4 (float 3 is padding).
   for (let i = 0; i < count; i++) {
     packed.set(source.vertices.subarray(i * 6, i * 6 + 3), i * STRIDE);
     packed.set(source.vertices.subarray(i * 6 + 3, i * 6 + 6), i * STRIDE + NORMAL);

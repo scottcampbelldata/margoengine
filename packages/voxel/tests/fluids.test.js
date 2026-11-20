@@ -111,4 +111,24 @@ test('options and calls are checked', () => {
   assert.throws(() => fluids.update(-1), RangeError);
   fluids.dispose();
   assert.throws(() => fluids.tick(), { code: 'disposed' });
+  assert.throws(() => fluids.update(0.01), { code: 'disposed' }); // under a tick's time, as documented
+});
+
+test('a liquid with reach r runs exactly r cells sideways on flat ground, for every r from 1 to 7', () => {
+  for (let reach = 1; reach <= 7; reach++) {
+    const blocks = new BlockTypes(),
+      stone = blocks.define('stone'),
+      goo = blocks.define('goo', { shape: 'liquid', liquid: true, solid: false }),
+      world = new VoxelWorld({ blocks });
+    world.addChunk(0, 0, 0);
+    const floor = [];
+    for (let z = 0; z < 32; z++) for (let x = 0; x < 32; x++) floor.push(x, 10, z, stone);
+    world.setBlocks(floor);
+    const fluids = VoxelFluids.attach(world, { fluids: [{ block: goo, reach, delay: 1 }] });
+    world.setBlock(16, 11, 16, goo);
+    fluids.settle();
+    let run = 0;
+    while (blockId(world.getBlock(17 + run, 11, 16)) === goo) run++;
+    assert.equal(run, reach, `reach ${reach}`);
+  }
 });

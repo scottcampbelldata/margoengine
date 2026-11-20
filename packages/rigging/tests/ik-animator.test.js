@@ -3,11 +3,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { Animator } from '../../animator/dist/index.js';
 import { addIKChain } from '../dist/ik.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 // Joint (node 1) -> Upper (2) -> Lower (3) -> Hand (4); the Wave clip turns Upper about z.
 function skeleton() {

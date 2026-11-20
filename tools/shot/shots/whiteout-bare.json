@@ -1,0 +1,86 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            4.6,
+            1.7,
+            30
+          ],
+          "target": [
+            0.5,
+            1.5,
+            0
+          ],
+          "fov": 34
+        },
+        {
+          "time": 8,
+          "position": [
+            4.3,
+            1.68,
+            28.8
+          ],
+          "target": [
+            0.5,
+            1.5,
+            0
+          ],
+          "fov": 34,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "whiteout-bare",
+    "seed": 57,
+    "size": [
+      1080,
+      1920
+    ],
+    "fps": 60,
+    "seconds": 8,
+    "tier": "high",
+    "kit": "whiteout",
+    "msaa": 1,
+    "supersample": 1.5,
+    "shutter": 180,
+    "warmup": 90,
+    "probes": {
+      "open": 0,
+      "mid": 4,
+      "end": 7.9
+    },
+    "lookBounds": {
+      "skyClip": 0.5,
+      "speckle": 400,
+      "banding": 1,
+      "flat": 20,
+      "crush": 3
+    },
+    "page": {
+      "path": "examples/whiteout-pass/index.html",
+      "query": {
+        "ui": 0,
+        "fog": 0,
+        "snow": 0,
+        "exposure": 0.0083333
+      },
+      "css": "h1,#hint,nav,#status,#error{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "whiteoutPass.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

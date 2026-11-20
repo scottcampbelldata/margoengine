@@ -146,3 +146,47 @@ test('Floating-origin rebase during a grab preserves its global anchor and relea
   assert.equal(el.listenerCount, 0);
   assert.equal(el.captured.size, 0);
 });
+
+const tiltAngle = (cam, hit, n) => {
+  const e = cam.position.map((v, i) => v - hit[i]);
+  return Math.acos(e.reduce((s, v, i) => s + v * n[i], 0) / Math.hypot(...e));
+};
+// The view's real screen up (camera.up made perpendicular to the view), dotted with a normal.
+const skyUp = (cam, n) => {
+  const f = cam.target.map((v, i) => v - cam.position[i]),
+    d = f.reduce((s, v) => s + v * v, 0),
+    u = cam.up.map((v, i) => v - (f[i] * cam.up.reduce((s, w, j) => s + w * f[j], 0)) / d);
+  return u.reduce((s, v, i) => s + v * n[i], 0) / Math.hypot(...u);
+};
+test('Tilt pitch moves a sky-up oblique camera the right way and clamps to [0, maxTilt]', () => {
+  for (const [pitch, expected] of [
+    [-1, 0],
+    [-0.2, Math.PI / 4 - 0.2],
+    [0.2, Math.PI / 4 + 0.2],
+    [10, null],
+  ]) {
+    const cam = camera({ position: [0, -4, 6], target: [0, 0, 2], up: [0, 1, 0] }),
+      control = new GlobeControls(cam, new FakeElement(), { radii: [2, 2, 2], minAltitude: 0.01 }),
+      hit = [0, 0, 2],
+      n = control.normal(hit);
+    close(tiltAngle(cam, hit, n), Math.PI / 4, 1e-12);
+    control.tilt(hit, 0, pitch);
+    close(tiltAngle(cam, hit, n), expected ?? control.maxTilt, 1e-9, `pitch ${pitch}`);
+    assert.ok(tiltAngle(cam, hit, n) <= control.maxTilt + 1e-9, `pitch ${pitch} passed maxTilt`);
+    assert.ok(skyUp(cam, n) >= -1e-9, `pitch ${pitch} turned the horizon upside down`);
+    control.dispose();
+  }
+});
+test('A right-drag down from a top-down north-up view tilts with the sky up', () => {
+  const { cam, el, control } = rig([2, 2, 2]);
+  const hit = control.pick(400, 300),
+    n = control.normal(hit);
+  pointer(el, 'pointerdown', 400, 300, { button: 2 });
+  pointer(el, 'pointermove', 400, 400, { button: 2 });
+  pointer(el, 'pointerup', 400, 400, { button: 2 });
+  close(tiltAngle(cam, hit, n), (100 * Math.PI) / 600, 1e-9);
+  assert.ok(skyUp(cam, n) > 0.1, `screen up . normal = ${skyUp(cam, n)}`);
+  // The eye moved south of the point, so the view looks north with north still at the top of the screen.
+  assert.ok(cam.position[1] < hit[1]);
+  control.dispose();
+});

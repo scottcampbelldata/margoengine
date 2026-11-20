@@ -57,6 +57,7 @@ const DIRS = [
 interface Fluid {
   id: number;
   step: number;
+  last: number; // the level of the cell `reach` steps out: reach * step
   delay: number;
   infinite: boolean;
   mixes: { touches: number; source: number; flowing: number }[];
@@ -123,6 +124,7 @@ export class VoxelFluids {
       this.#fluids.set(f, {
         id: f,
         step: Math.floor(7 / reach),
+        last: reach * Math.floor(7 / reach),
         delay: whole('delay', fluid.delay ?? 5, 1, 1 << 20),
         infinite: !!fluid.infinite,
         mixes: [],
@@ -177,6 +179,7 @@ export class VoxelFluids {
    * @throws RangeError for negative or non-finite seconds; MargoError `disposed` after `dispose()`.
    */
   update(seconds: number): number {
+    if (this.#disposed) throw new MargoError('disposed', 'VoxelFluids is disposed; attach a new one');
     if (typeof seconds !== 'number' || !(seconds >= 0) || !Number.isFinite(seconds))
       throw new RangeError(`VoxelFluids.update seconds is ${seconds}; pass the frame's seconds, 0 or more`);
     this.#time = Math.min(this.#time + seconds * this.#rate, 10);
@@ -278,7 +281,7 @@ export class VoxelFluids {
       let want: number;
       if (f.infinite && sources >= 2 && grounded) want = blockState(f.id, 0);
       else if ((w.getBlock(x, y + 1, z) & 0xffff) === f.id) want = blockState(f.id, FLUID_FALLING);
-      else if (feed + f.step <= 7) want = blockState(f.id, feed + f.step);
+      else if (feed + f.step <= f.last) want = blockState(f.id, feed + f.step);
       else want = 0;
       if (want !== s) return void w.setBlock(x, y, z, want); // the change wakes this cell again
       level = data & FLUID_FALLING ? 0 : data & 7;
@@ -289,8 +292,8 @@ export class VoxelFluids {
     const below = this.world.getBlock(x, y - 1, z);
     if ((below & 0xffff) === f.id && below >>> 16 !== 0) return;
     const next = level + f.step;
-    if (next > 7) return;
-    const reach = Math.min(4, Math.floor(7 / f.step)),
+    if (next > f.last) return;
+    const reach = Math.min(4, f.last / f.step),
       // Distances count through cells it already flows in, so a way taken stays the way to take.
       dist = DIRS.map(([dx, , dz]) =>
         this.#passes(x + dx, y, z + dz, f) ? this.#drop(x + dx, y, z + dz, dx, dz, reach, f) : Infinity,

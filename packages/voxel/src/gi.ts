@@ -11,6 +11,8 @@ import { engineRuntime } from '@margoengine/core/extension';
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import type { VoxelWorld } from './world.js';
+import type { VoxelOrigin } from './render.js';
+import { originPoint, wrap } from './origin.js';
 import { unitLight } from '../../shared/unit-light.js';
 
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; UNIFORM: number };
@@ -158,12 +160,15 @@ const DECLARATIONS = (group: number) => /* wgsl */ `
 @group(${group}) @binding(${BINDING + 2}) var voxelGiB:texture_3d<f32>;
 @group(${group}) @binding(${BINDING + 3}) var voxelGiSunVolume:texture_3d<f32>;
 @group(${group}) @binding(${BINDING + 4}) var voxelGiSampler:sampler;
-@group(${group}) @binding(${BINDING + 5}) var<uniform> voxelGiWindow:vec4f;
-// Window corner in world cells and the strength; outside it no bounce light and full sun.
+struct VoxelGiFrame {corner:vec4f,wrap:vec4f}
+@group(${group}) @binding(${BINDING + 5}) var<uniform> voxelGiWindow:VoxelGiFrame;
+// p is in engine cells (world minus the renderer's origin). corner: the window's corner in engine cells and the
+// strength; wrap: the origin mod 64, so (p + wrap) / 64 finds world cell p + origin in the wrapping volume while every
+// value stays small. Outside the window no bounce light and full sun.
 fn voxelGiAt(p:vec3f,n:vec3f)->vec4f {
- let q=p+n*0.5;let l=q-voxelGiWindow.xyz;
+ let q=p+n*0.5;let l=q-voxelGiWindow.corner.xyz;
  if(any(l<vec3f(0.5))||any(l>vec3f(63.5))){return vec4f(-1.0);}
- return vec4f(q/64.0,1.0);
+ return vec4f((q+voxelGiWindow.wrap.xyz)/64.0,1.0);
 }
 // Bounce light on a face with normal n: L1 irradiance in n from the open cells around the point half a cell in front
 // (trilinear over coefficients times openness, divided by openness), times the surface colour over pi.
@@ -172,7 +177,7 @@ fn voxelGiLight(p:vec3f,n:vec3f,base:vec3f)->vec3f {
  let open=textureSampleLevel(voxelGiSunVolume,voxelGiSampler,at.xyz,0.0).y;if(open<0.002){return vec3f(0.0);}
  let y=vec4f(3.14159265*0.282095,2.0943951*0.488603*n.y,2.0943951*0.488603*n.z,2.0943951*0.488603*n.x);
  let e=vec3f(dot(textureSampleLevel(voxelGiR,voxelGiSampler,at.xyz,0.0),y),dot(textureSampleLevel(voxelGiG,voxelGiSampler,at.xyz,0.0),y),dot(textureSampleLevel(voxelGiB,voxelGiSampler,at.xyz,0.0),y));
- return base*max(e/open,vec3f(0.0))/3.14159265*voxelGiWindow.w;
+ return base*max(e/open,vec3f(0.0))/3.14159265*voxelGiWindow.corner.w;
 }
 // Soft sun visibility in front of the face, 0 to 1.
 fn voxelGiSun(p:vec3f,n:vec3f)->f32 {
@@ -202,11 +207,12 @@ const isColor = (v: unknown): v is Vec3 =>
 /**
  * Ray-traced bounce light and soft sun shadows for a `VoxelRenderer`, from the world's blocks themselves: add it to the
  * renderer and call {@link VoxelGI.update} each frame. The light follows the engine's directional light
- * (`engine.lighting`) and works inside a 64 x 64 x 64 window of cells around the camera.
+ * (`engine.lighting`) and works inside a 64 x 64 x 64 window of cells around the camera. Added with
+ * {@link VoxelGI.add}, it follows the renderer's `origin` (worlds far from zero).
  */
 export class VoxelGI {
   readonly world: VoxelWorld;
-  /** Bounce light strength, 0 to 8. */
+  /** Bounce light strength, 0 to 8. Live; update() throws RangeError for any other value. */
   strength: number;
   /** Engine this effect belongs to (the renderer checks it). */
   readonly owner: Engine;
@@ -217,6 +223,7 @@ export class VoxelGI {
   #rays: number;
   #range: number;
   #gpu?: Gpu;
+  #voxels?: { readonly origin?: VoxelOrigin | null };
   #origin?: [number, number, number];
   #dirty = true;
   #updates = 0;
@@ -269,9 +276,17 @@ export class VoxelGI {
     return new VoxelGI(engine, options);
   }
 
-  /** Adds the effect to a `VoxelRenderer` (its `addLighting`). Returns the remover. */
+  /**
+   * Adds the effect to a `VoxelRenderer` (its `addLighting`) and follows that renderer's `origin` from then on: the
+   * window is placed around the camera's world cell and the shading reads it in engine space. Returns the remover.
+   */
   add(voxels: { addLighting(effect: VoxelGI): () => void }): () => void {
-    return voxels.addLighting(this);
+    const remove = voxels.addLighting(this);
+    this.#voxels = voxels as { readonly origin?: VoxelOrigin | null };
+    return () => {
+      remove();
+      if (this.#voxels === voxels) this.#voxels = undefined;
+    };
   }
 
   /** Lowest corner of the window in world cells, once the first update placed it. */
@@ -283,12 +298,23 @@ export class VoxelGI {
    * Follows the camera (the window moves in steps of 32 cells), uploads the window's blocks when they changed, and
    * traces the next `cells` cells of the window. Call it once a frame, before rendering. Returns the cells traced.
    * @throws MargoError `disposed` after `dispose()`.
+   * @throws RangeError when the renderer's origin holds a value that is not a finite number, or `strength` is not
+   * from 0 to 8.
    */
   update(): number {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelGI is disposed; attach a new one');
-    const gpu = (this.#gpu ??= this.#create()),
+    // Live: the shader scales the bounce light by it.
+    if (typeof this.strength !== 'number' || !(this.strength >= 0 && this.strength <= 8))
+      throw new RangeError(`VoxelGI strength is ${String(this.strength)}; pass from 0 to 8`);
+    // After a device loss the engine restores a new device: the volumes and buffers are made again there, and the
+    // window, albedo and blocks uploaded again.
+    this.#live();
+    // The window is placed in world cells (camera plus the renderer's origin, in float64); the shading works in engine
+    // cells, so the uniform holds the corner minus the origin and the origin mod 64 for the wrapping volume.
+    const shift = originPoint(this.#voxels?.origin, 'VoxelGI'),
+      gpu = (this.#gpu ??= this.#create()),
       eye = this.#engine.camera.position,
-      origin: [number, number, number] = [0, 1, 2].map((a) => Math.round(eye[a] / 32) * 32 - 32) as [
+      origin: [number, number, number] = [0, 1, 2].map((a) => Math.round((eye[a] + shift[a]) / 32) * 32 - 32) as [
         number,
         number,
         number,
@@ -316,7 +342,20 @@ export class VoxelGI {
     u.set([this.#updates++, count, this.#cursor, 40503], 12);
     f.set([this.#traced < CELLS ? 1 : 1 / 8, this.#softness, this.#range, this.#rays], 16);
     device.queue.writeBuffer(gpu.params, 0, params);
-    device.queue.writeBuffer(gpu.window, 0, new Float32Array([...origin, this.strength]));
+    device.queue.writeBuffer(
+      gpu.window,
+      0,
+      Float32Array.of(
+        origin[0] - shift[0],
+        origin[1] - shift[1],
+        origin[2] - shift[2],
+        this.strength,
+        wrap(shift[0], SIZE),
+        wrap(shift[1], SIZE),
+        wrap(shift[2], SIZE),
+        0,
+      ),
+    );
     const encoder = device.createCommandEncoder(),
       pass = encoder.beginComputePass();
     pass.setPipeline(gpu.pipeline);
@@ -358,7 +397,7 @@ export class VoxelGI {
         addressModeV: 'repeat',
         addressModeW: 'repeat',
       }),
-      window = buffer(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+      window = buffer(32, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
     const gpu: Gpu = {
       device,
       pipeline,
@@ -437,9 +476,12 @@ export class VoxelGI {
     this.#dirty = false;
   }
 
-  /** The renderer's lighting hooks: bounce light and the soft sun term. Undefined until the first `update()`. */
+  /**
+   * The renderer's lighting hooks: bounce light and the soft sun term. Undefined until the first `update()`, and again
+   * after a device restore until the next `update()` makes the volumes on the new device.
+   */
   pbr(group: number): { declarations: string; light: string; direct(d: string): string } | undefined {
-    if (!this.#gpu || this.#disposed) return undefined;
+    if (!this.#live() || this.#disposed) return undefined;
     let hook = this.#hooks.get(group);
     if (!hook) {
       hook = {
@@ -452,9 +494,26 @@ export class VoxelGI {
     return hook;
   }
 
-  /** Bind group entries of the hooks: the four volumes, their sampler and the window. */
+  /**
+   * Bind group entries of the hooks: the four volumes, their sampler and the window. Empty while `pbr` is undefined,
+   * so a frame drawn after a device restore and before the next `update()` binds nothing of the lost device.
+   */
   bindings(): GPUBindGroupEntry[] {
-    return this.#gpu?.entries ?? [];
+    return this.#live()?.entries ?? [];
+  }
+
+  // The GPU state when it was made on the engine's current device. After a device loss the engine restores a new
+  // device: the old state is freed here (whoever asks first, update or the renderer) and update makes the volumes and
+  // buffers again there, uploading the window, albedo and blocks again.
+  #live(): Gpu | undefined {
+    if (this.#gpu && this.#gpu.device !== engineRuntime(this.#engine).gpu) {
+      this.#free(this.#gpu);
+      this.#gpu = undefined;
+      this.#origin = undefined;
+      this.#tableLength = -1;
+      this.#updates = 0;
+    }
+    return this.#gpu;
   }
 
   /** Stops following the world and frees the GPU resources. */
@@ -462,12 +521,13 @@ export class VoxelGI {
     if (this.#disposed) return;
     this.#disposed = true;
     for (const off of this.#off) off();
-    const gpu = this.#gpu;
-    if (gpu) {
-      for (const t of gpu.textures) t.destroy();
-      for (const b of [gpu.cells, gpu.albedo, gpu.params, gpu.acc, gpu.window]) b.destroy();
-    }
+    if (this.#gpu) this.#free(this.#gpu);
     this.#gpu = undefined;
+  }
+
+  #free(gpu: Gpu): void {
+    for (const t of gpu.textures) t.destroy();
+    for (const b of [gpu.cells, gpu.albedo, gpu.params, gpu.acc, gpu.window]) b.destroy();
   }
 
   [Symbol.dispose](): void {

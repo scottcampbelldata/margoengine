@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { pbrShader } from '../../gltf-pro/src/shader.ts';
+import { pbrShader } from '../../gltf/src/shader.ts';
 import {
   Material,
   LambertMaterial,
@@ -53,9 +53,9 @@ test('clipping planes are validated, normalised, live and carried by clone and c
   assert.throws(() => (m.clippingPlanes = [[0, 0, 0, 1]]), { name: 'TypeError', message: /non-zero normal/ });
   assert.throws(() => (m.clippingPlanes = [[0, 1, 0]]), { name: 'TypeError', message: /four finite numbers/ });
   assert.throws(() => (m.clippingPlanes = [[0, 1, 0, Number.NaN]]), TypeError);
-  assert.throws(() => (m.clippingPlanes = new Array(7).fill([0, 1, 0, 0])), {
+  assert.throws(() => (m.clippingPlanes = new Array(17).fill([0, 1, 0, 0])), {
     name: 'RangeError',
-    message: /at most 6/,
+    message: /at most 16/,
   });
   assert.throws(() => (m.clippingPlanes = 'up'), TypeError);
   assert.throws(() => (m.clipShadows = 1), TypeError);
@@ -93,7 +93,7 @@ test('every material class gets the clip in its fragments and binds the plane un
     const entry = shading.bindings().find((e) => e.binding === 199),
       data = new Float32Array(entry.resource.buffer.data);
     assert.deepEqual(Array.from(data.subarray(0, 4)), [0, 1, 0, -0.25]);
-    assert.equal(data[24], 1, 'plane count');
+    assert.equal(data[64], 1, 'plane count');
     mesh.dispose();
   }
 });
@@ -130,9 +130,9 @@ test('clipIntersection: union by default, intersection on request, in the unifor
   assert.ok(sites >= 2, 'fragments and the shared surface read the mode');
   assert.equal(code.split('materialClip.settings.x').length - 1, sites, 'every clip site reads the mode');
   const data = () => new Float32Array(shading.bindings().find((e) => e.binding === 199).resource.buffer.data);
-  assert.deepEqual([data()[24], data()[25]], [2, 0]);
+  assert.deepEqual([data()[64], data()[65]], [2, 0]);
   material.clipIntersection = true;
-  assert.deepEqual([data()[24], data()[25]], [2, 1], 'live: the mode is a uniform value');
+  assert.deepEqual([data()[64], data()[65]], [2, 1], 'live: the mode is a uniform value');
   assert.equal(shading.shader(pbrShader, 2), code, 'switching the mode compiles nothing new');
   assert.equal(
     mesh.shadowPrimitives[0].clip.buffer,
@@ -142,4 +142,23 @@ test('clipIntersection: union by default, intersection on request, in the unifor
   assert.equal(new Material({ clipIntersection: true }).clipIntersection, true);
   assert.equal(material.clone().clipIntersection, true, 'clone keeps the mode');
   assert.throws(() => (material.clipIntersection = 'all'), { name: 'TypeError', message: /clipIntersection/ });
+});
+
+// A section box is 6 planes; a BCF viewpoint or a CAD section view may carry more. The material held 6 and refused a
+// seventh, so an IFC scene could not apply such a viewpoint.
+test('a material holds up to 16 planes: all reach the uniform and every clip site', async () => {
+  const { engine } = await world(),
+    planes = Array.from({ length: 16 }, (_, i) => [Math.cos(i), Math.sin(i), 0, 2 + i]),
+    material = new Material({ clippingPlanes: planes }),
+    mesh = createMesh(engine, triangle, material),
+    shading = mesh.primitives[0].material.shading;
+  assert.equal(material.clippingPlanes.length, 16);
+  const code = shading.shader(pbrShader, 2);
+  assert.match(code, /struct materialClipPlanes \{planes:array<vec4f,16>,settings:vec4f\}/);
+  const entry = shading.bindings().find((e) => e.binding === 199),
+    data = new Float32Array(entry.resource.buffer.data);
+  assert.equal(data.length, 68, '16 planes and the settings');
+  assert.ok(Math.abs(data[15 * 4 + 3] - 17) < 1e-5, 'the sixteenth plane is written');
+  assert.deepEqual([data[64], data[65]], [16, 0]);
+  assert.equal(mesh.shadowPrimitives[0].clip.buffer, entry.resource.buffer, 'casters bind the same 16-plane uniform');
 });

@@ -60,11 +60,11 @@ export class Font implements TextMeasurer {
   readonly style: string;
   readonly face?: FontFace;
   /** Base rasterization size in pixels; glyph quads scale from it. */
-  readonly size = SDF_DEFAULTS.size;
+  readonly size: number = SDF_DEFAULTS.size;
   /** Empty texels around each glyph, enough for the SDF ramp, outlines and soft shadows. */
-  readonly buffer = SDF_DEFAULTS.buffer;
-  readonly radius = SDF_DEFAULTS.radius;
-  readonly cutoff = SDF_DEFAULTS.cutoff;
+  readonly buffer: number = SDF_DEFAULTS.buffer;
+  readonly radius: number = SDF_DEFAULTS.radius;
+  readonly cutoff: number = SDF_DEFAULTS.cutoff;
   private context?: Context2D;
   private readonly advances = new Map<string, number>();
   /** Kerning by left cluster, then right cluster. */
@@ -151,7 +151,7 @@ export class Font implements TextMeasurer {
       if (!canvas)
         throw new MargoError(
           'unsupported',
-          'Text measurement needs OffscreenCanvas or a DOM canvas; run in a browser or worker, or lay out with your own TextMeasurer',
+          'Text measurement needs OffscreenCanvas or a DOM canvas; in Node or a worker without one, load the font file with GlyphFieldFont from @margoengine/text/outline, or lay out with your own TextMeasurer. Help: https://margoengine.com/llms/packages/text.md',
         );
       if (!offscreen) {
         canvas.width = 128;

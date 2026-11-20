@@ -10,8 +10,8 @@ import {
 } from '../packages/materials/dist/index.js';
 import type { MaterialOptions, MeshGeometry } from '../packages/materials/dist/index.js';
 import { NodeMaterial, vec3 } from '../packages/shader/dist/index.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Picking } from '../packages/selection/dist/index.js';
 import { Raycaster } from '../packages/bvh/dist/index.js';
 import { Transmission } from '../packages/materials/dist/transmission.js';

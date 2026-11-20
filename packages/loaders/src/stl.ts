@@ -17,6 +17,45 @@ export interface STLOptions extends ParseLimits {
   weld?: boolean;
   /** Aborts the parse; it then throws a `LoaderError` with code `'aborted'`. Checked every 16,384 triangles. */
   signal?: AbortSignal;
+  /**
+   * Which binary colour extension the 16-bit facet attributes use. `'auto'` (default): Materialise Magics when the
+   * 80-byte header holds `COLOR=`, otherwise VisCAM / SolidView. `'viscam'`: bit 15 set marks a facet colour, red in
+   * bits 10 to 14 and blue in 0 to 4. `'materialise'`: bit 15 clear marks a facet colour, red in bits 0 to 4 and blue
+   * in 10 to 14, and a set bit 15 takes the part colour of the header; use it for a Magics file without `COLOR=`.
+   */
+  colorVariant?: 'auto' | 'viscam' | 'materialise';
+}
+
+/** An RGBA colour from a Materialise header, each channel 0 to 1 (the file's bytes divided by 255). */
+export type STLColor = [r: number, g: number, b: number, a: number];
+
+/** The part colour and material a Materialise Magics header (`COLOR=` and `,MATERIAL=`) declares. */
+export interface STLMaterialise {
+  /** `COLOR=`: the whole part's colour, used by facets whose bit 15 is set when no material is given. */
+  color?: STLColor;
+  /** `,MATERIAL=` diffuse colour; preferred over `color` for the part colour, as Magics does. */
+  diffuse?: STLColor;
+  /** `,MATERIAL=` specular highlight colour. */
+  specular?: STLColor;
+  /** `,MATERIAL=` ambient colour. */
+  ambient?: STLColor;
+}
+
+/** What parseSTL returns: the mesh and, for a Materialise colour file, its header colours. */
+export interface STLGeometry extends LoadedGeometry {
+  /** Set when the file was read as Materialise Magics colour (`colorVariant`), with the header's part colours. */
+  materialise?: STLMaterialise;
+}
+
+/** Reads `key` and the RGBA bytes after it from the 80-byte header, or undefined when absent or cut off. */
+function headerColors(bytes: Uint8Array, key: string, count: number, from = 0): STLColor[] | undefined {
+  const header = latin1(bytes, 0, 80),
+    at = header.indexOf(key, from);
+  if (at < 0 || at + key.length + 4 * count > 80) return undefined;
+  const out: STLColor[] = [];
+  for (let c = 0, i = at + key.length; c < count; c++, i += 4)
+    out.push([bytes[i] / 255, bytes[i + 1] / 255, bytes[i + 2] / 255, bytes[i + 3] / 255]);
+  return out;
 }
 
 /** Writes the flat normal of the triangle at `positions[at..at+8]` onto its three corners, (0, 0, 1) if degenerate. */
@@ -67,11 +106,23 @@ function setNormal(
   }
 }
 
-function parseBinary(bytes: Uint8Array, count: number, options: STLOptions): LoadedGeometry {
+function parseBinary(bytes: Uint8Array, count: number, options: STLOptions): STLGeometry {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const positions = new Float32Array(count * 9),
     normals = new Float32Array(count * 9);
-  let colors: Float32Array | undefined;
+  const variant = options.colorVariant ?? 'auto';
+  // Materialise Magics: "COLOR=" and four RGBA bytes, then ",MATERIAL=" and diffuse, specular and ambient RGBA.
+  const color = headerColors(bytes, 'COLOR=', 1)?.[0];
+  const materialise = variant === 'materialise' || (variant === 'auto' && color !== undefined);
+  let header: STLMaterialise | undefined;
+  if (materialise) {
+    header = {};
+    if (color) header.color = color;
+    const material = headerColors(bytes, 'MATERIAL=', 3);
+    if (material) [header.diffuse, header.specular, header.ambient] = material;
+  }
+  const part = header?.diffuse ?? header?.color;
+  let colors: Float32Array | undefined = part && fillColors(count, part);
   for (let t = 0, offset = 84; t < count; t++, offset += 50) {
     if ((t & (ABORT_STEP - 1)) === 0) throwIfAborted(options.signal, F);
     const at = t * 9;
@@ -122,13 +173,16 @@ function parseBinary(bytes: Uint8Array, count: number, options: STLOptions): Loa
     normals[at] = normals[at + 3] = normals[at + 6] = nx;
     normals[at + 1] = normals[at + 4] = normals[at + 7] = ny;
     normals[at + 2] = normals[at + 5] = normals[at + 8] = nz;
-    // VisCAM / SolidView color extension: bit 15 set means a color follows; red bits 10-14, green 5-9, blue 0-4.
+    // VisCAM / SolidView: bit 15 set means a facet colour, red bits 10-14, green 5-9, blue 0-4. Materialise Magics:
+    // bit 15 clear means a facet colour, red bits 0-4, green 5-9, blue 10-14; set takes the part colour already filled.
     const attribute = view.getUint16(offset + 48, true);
-    if (attribute & 0x8000) {
-      colors ??= new Float32Array(count * 9).fill(0.8);
-      const r = ((attribute >> 10) & 31) / 31,
+    if (materialise ? (attribute & 0x8000) === 0 : attribute & 0x8000) {
+      colors ??= fillColors(count, [0.8, 0.8, 0.8, 1]);
+      const low = (attribute & 31) / 31,
         g = ((attribute >> 5) & 31) / 31,
-        b = (attribute & 31) / 31;
+        high = ((attribute >> 10) & 31) / 31,
+        r = materialise ? low : high,
+        b = materialise ? high : low;
       for (let c = 0; c < 9; c += 3) {
         colors[at + c] = r;
         colors[at + c + 1] = g;
@@ -136,7 +190,20 @@ function parseBinary(bytes: Uint8Array, count: number, options: STLOptions): Loa
       }
     }
   }
-  return finish(positions, normals, colors, options);
+  const result: STLGeometry = finish(positions, normals, colors, options);
+  if (header) result.materialise = header;
+  return result;
+}
+
+/** A colour per corner for `count` triangles, all `rgb`. */
+function fillColors(count: number, rgb: readonly number[]): Float32Array {
+  const colors = new Float32Array(count * 9);
+  for (let i = 0; i < colors.length; i += 3) {
+    colors[i] = rgb[0];
+    colors[i + 1] = rgb[1];
+    colors[i + 2] = rgb[2];
+  }
+  return colors;
 }
 
 function parseASCII(bytes: Uint8Array, options: STLOptions, limit: Limits): LoadedGeometry {
@@ -287,20 +354,31 @@ function finish(
  * - `positions`: three vertices per triangle, in file order (Float32).
  * - `normals`: the facet normal from the file repeated on the triangle's corners; a facet whose stored normal is zero
  *   or not finite (many writers leave it zero) gets the flat normal computed from its corners.
- * - `colors`: only for binary files using the VisCAM / SolidView color extension (bit 15 of the 16-bit attribute
- *   set), as sRGB 0 to 1; facets without a color get 0.8 gray. ASCII files and uncolored binary files have none.
+ * - `colors`: for binary files using a colour extension, as sRGB 0 to 1. VisCAM / SolidView (bit 15 of the 16-bit
+ *   attribute set marks a facet colour; facets without one get 0.8 gray) or Materialise Magics, read when the header
+ *   holds `COLOR=` or `colorVariant` says so (bit 15 clear marks a facet colour; the others take the header's part
+ *   colour, the `,MATERIAL=` diffuse before `COLOR=`, or 0.8 gray). ASCII files and uncolored binary files have none.
+ * - `materialise`: the header's `COLOR=` and `,MATERIAL=` colours (RGBA 0 to 1) of a Materialise file.
  * - `indices`: 0, 1, 2, ... (or the weld's indices with `weld: true`).
  *
  * @throws LoaderError with code `'header'` (too short to be STL), `'truncated'` (binary data shorter than its
  * triangle count, or an ASCII file cut inside a facet), `'syntax'` (a malformed ASCII facet or number), `'limit'`
- * (past `maxTriangles` or `maxVertices`; raise them) or `'aborted'` (the `signal` fired); `'range'` for a bad limit.
+ * (past `maxTriangles` or `maxVertices`; raise them) or `'aborted'` (the `signal` fired); `'range'` for a bad limit or
+ * `colorVariant`.
  * @example
  * const mesh = parseSTL(await (await fetch('/part.stl')).arrayBuffer());
  * mesh.positions.length / 9; // triangles
  */
-export function parseSTL(input: BinaryInput, options: STLOptions = {}): LoadedGeometry {
+export function parseSTL(input: BinaryInput, options: STLOptions = {}): STLGeometry {
   const bytes = toBytes(input, F),
-    limit = limits(options, F);
+    limit = limits(options, F),
+    variant = options.colorVariant;
+  if (variant !== undefined && variant !== 'auto' && variant !== 'viscam' && variant !== 'materialise')
+    throw new LoaderError(
+      F,
+      'range',
+      `colorVariant must be 'auto', 'viscam' or 'materialise', not ${String(variant).slice(0, 40)}`,
+    );
   throwIfAborted(options.signal, F);
   if (bytes.length < 15)
     throw new LoaderError(

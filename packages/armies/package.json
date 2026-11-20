@@ -1,0 +1,76 @@
+{
+  "name": "@margoengine/armies",
+  "version": "1.0.0",
+  "description": "Armies of hundreds: soldiers and riders drawn at every distance (instanced skinning near, a vertex animation of a simplified mesh far, culled and budgeted), following navmesh formations, keeping step, riding horses on the saddle the horse crowd draws; any person source plugs in.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "armies",
+    "crowds",
+    "soldiers",
+    "formations",
+    "cavalry"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/armies"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js armies",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu": "cd ../.. && node packages/armies/test/armies-check.mjs"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./bake": {
+      "types": "./dist/bake.d.ts",
+      "import": "./dist/bake.js"
+    },
+    "./lod": {
+      "types": "./dist/lod.d.ts",
+      "import": "./dist/lod.js"
+    },
+    "./riders": {
+      "types": "./dist/riders.d.ts",
+      "import": "./dist/riders.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/horses": "^1.0.0",
+    "@margoengine/lod": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/navmesh": "^1.0.0"
+  }
+}

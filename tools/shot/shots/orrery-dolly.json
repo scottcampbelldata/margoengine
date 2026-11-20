@@ -1,0 +1,39 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "dolly",
+      "path": "linear",
+      "keys": [
+        { "time": 0, "position": [1.38, 0.98, 0.82], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 8, "position": [0.62, 0.42, 0.78], "target": [0.02, 0.24, 0.04], "fov": 30, "ease": "smoothstep" }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "orrery-dolly",
+    "seed": 11,
+    "size": [1080, 1920],
+    "fps": 60,
+    "seconds": 8,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1.5,
+    "warmup": 60,
+    "probes": { "open": 0, "mid": 4, "close": 7.9 },
+    "lookBounds": { "skyClip": 2, "lights": [2, 9], "crush": 4.1 },
+    "page": {
+      "path": "examples/orrery/index.html",
+      "query": { "ui": 0, "date": "2026-11-14" },
+      "css": "#status,#error,#readout{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "orrery.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

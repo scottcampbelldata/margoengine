@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { runBuild } from './run-build.mjs';
 import { copyFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 if (process.argv.includes('--test')) {
   await runBuild('cargo', ['test', '--locked', '--manifest-path', root + 'caves-kernel/Cargo.toml']);
@@ -17,7 +18,7 @@ if (process.argv.includes('--test')) {
       '--manifest-path',
       root + 'caves-kernel/Cargo.toml',
     ],
-    { ...process.env, RUSTFLAGS: '-C target-feature=+simd128' },
+    blueprintRustEnv(root + 'caves-kernel', '-C target-feature=+simd128'),
   );
   const artifact = root + 'caves-kernel/target/wasm32-unknown-unknown/release/margo_procedural_caves.wasm';
   assert.ok(WebAssembly.validate(readFileSync(artifact)));

@@ -40,8 +40,7 @@ const names = [
     'gltf',
     'react',
     'creative',
-    'scenery',
-    'gltf-pro',
+    'sky',
     'animation',
     'post',
     'shadows',
@@ -444,12 +443,12 @@ import { Animation } from '@margoengine/react/animation';
 import { OrbitControls } from '@margoengine/react/controls';
 import { Environment } from '@margoengine/react/environment';
 import { Box } from '@margoengine/react/geometry';
-import { Gltf, Model } from '@margoengine/react/gltf-pro';
+import { Gltf, Model } from '@margoengine/react/gltf';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 import { Shadows } from '@margoengine/react/shadows';
 import {GPUParticles,PostProcessing,ToonShading,HDRRenderTarget} from '@margoengine/creative';
 import {PostStack,Bloom} from '@margoengine/post';
-import {SkyMoon,type SkyMoonConfig} from '@margoengine/scenery';
+import {SkyMoon,type SkyMoonConfig} from '@margoengine/sky/night-preset';
 import {Stage,createStage,sphere,type LoadedModel} from 'margoengine';
 import {renderToString} from 'react-dom/server';
 const device=(pass:PassContext)=>pass.backend==='webgpu'?pass.device:null;
@@ -532,7 +531,7 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
       }
     }
     reactTests.sort();
-    await mkdir(join(supportRoot, '@margoengine/gltf-pro/src'), { recursive: true });
+    await mkdir(join(supportRoot, '@margoengine/gltf/src'), { recursive: true });
     await mkdir(join(supportRoot, 'docs'), { recursive: true });
     // Vite sets NODE_ENV while building. Keep that tool state out of the consumer/test child environment.
     execFileSync(
@@ -541,8 +540,8 @@ console.log('Standalone package imports, WebGPU declarations, Wasm and React 18 
         '--input-type=module',
         '--eval',
         "import {writeFile} from 'node:fs/promises'; import {bundleBytes} from './scripts/measure-size.js'; await writeFile(process.argv[2], await bundleBytes(process.argv[1]));",
-        resolve('packages/gltf-pro/src/shader.ts'),
-        join(supportRoot, '@margoengine/gltf-pro/src/shader.js'),
+        resolve('packages/gltf/src/shader.ts'),
+        join(supportRoot, '@margoengine/gltf/src/shader.js'),
       ],
       { stdio: 'inherit', timeout: 120000 },
     );

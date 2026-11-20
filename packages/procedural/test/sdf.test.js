@@ -199,3 +199,189 @@ test('hostile SDF inputs, pre-abort, cycles, bounds and owned outputs after disp
     (e) => e.code === 'disposed',
   );
 });
+
+// A dual quad is rarely planar or convex. Split along the wrong diagonal, one triangle folds back over its neighbour
+// and faces inward (shaded dark or culled). Each of these unions of two spheres folded 3 to 10 triangles at the seam
+// before the split chose the diagonal that keeps both triangles facing along the quad's edge. A triangle on a union
+// surface faces outward from at least one of the two spheres at its centroid.
+const seams = [
+  {
+    shape: {
+      type: 'union',
+      a: {
+        type: 'sphere',
+        center: [-0.26199426501989365, 0.23208573437295854, -0.2569248783402145],
+        radius: 0.7117692363914103,
+      },
+      b: {
+        type: 'sphere',
+        center: [-0.2626143062246508, 0.07310519558206915, -0.5123909463246201],
+        radius: 0.46095314977775903,
+      },
+    },
+    resolution: 32,
+    bounds: [
+      [-1.8685296385083348, -1.3840769103495405, -1.9067383931949735],
+      [1.4024261499522255, 1.8469239980913699, 1.4275978075573221],
+    ],
+  },
+  {
+    shape: {
+      type: 'union',
+      a: {
+        type: 'sphere',
+        center: [0.18462033197283745, 0.3941450600977987, -0.45777273876592517],
+        radius: 0.540844172751531,
+      },
+      b: {
+        type: 'sphere',
+        center: [0.39590141554434083, 0.30027436921261846, -0.5858696861191175],
+        radius: 0.3738280504972704,
+      },
+    },
+    resolution: 43,
+    bounds: [
+      [-1.4358993286732584, -1.2175986799178646, -2.1302291078493],
+      [1.8459756335942075, 2.051183168310672, 1.2229070915142075],
+    ],
+  },
+  {
+    shape: {
+      type: 'union',
+      a: {
+        type: 'sphere',
+        center: [0.12092800438404083, -0.07743468158878386, 0.27269640238955617],
+        radius: 0.629153269296512,
+      },
+      b: {
+        type: 'sphere',
+        center: [-0.08353337477044961, 0.11380410236055352, 0.27013829839410125],
+        radius: 0.414622591480612,
+      },
+    },
+    resolution: 36,
+    bounds: [
+      [-1.5238361111376435, -1.6904302104143427, -1.3335287580266595],
+      [1.7796766030369326, 1.557344820443541, 1.9469235548982398],
+    ],
+  },
+  {
+    shape: {
+      type: 'union',
+      a: {
+        type: 'sphere',
+        center: [0.17696866393089294, 0.0013975424226373434, 0.48036901326850057],
+        radius: 0.7807272342499345,
+      },
+      b: {
+        type: 'sphere',
+        center: [0.04158198386761816, -0.25924282330422044, 0.22756072415715628],
+        radius: 0.47209038552541766,
+      },
+    },
+    resolution: 26,
+    bounds: [
+      [-1.444618973741308, -1.6848055748967454, -1.1870938295498492],
+      [1.7890176745830104, 1.604460055474192, 2.1335129494080323],
+    ],
+  },
+  {
+    shape: {
+      type: 'union',
+      a: {
+        type: 'sphere',
+        center: [-0.45566918328404427, 0.4887620990630239, -0.030989147257059813],
+        radius: 0.5154379492159933,
+      },
+      b: {
+        type: 'sphere',
+        center: [-0.6328851734250197, 0.3302474058938901, -0.15414119745421584],
+        radius: 0.3094147210259931,
+      },
+    },
+    resolution: 36,
+    bounds: [
+      [-2.1300825084093957, -1.174848974007182, -1.6759981287643315],
+      [1.242881005140953, 2.1647570145316424, 1.6292880518594757],
+    ],
+  },
+  {
+    shape: {
+      type: 'union',
+      a: {
+        type: 'sphere',
+        center: [0.07628672942519188, 0.40436444035731256, -0.043846271466463804],
+        radius: 0.5126331543084234,
+      },
+      b: {
+        type: 'sphere',
+        center: [0.2786720954618269, 0.5605986375630876, -0.14836431227074032],
+        radius: 0.32315693321103633,
+      },
+    },
+    resolution: 33,
+    bounds: [
+      [-1.5241551170591265, -1.2837616669712588, -1.676254159025848],
+      [1.7389333105413245, 2.0284035679884256, 1.6086807040730493],
+    ],
+  },
+];
+test('no folded triangles: every triangle at a two-sphere seam faces away from one of its spheres', async () => {
+  using modeler = await createSdfModeler();
+  for (const { shape, resolution, bounds } of seams) {
+    const mesh = modeler.mesh(shape, { resolution, bounds }),
+      { positions: p, indices: ix } = mesh;
+    topology(mesh);
+    let folded = 0;
+    for (let i = 0; i < ix.length; i += 3) {
+      const [a, b, c] = [0, 1, 2].map((k) => [0, 1, 2].map((j) => p[ix[i + k] * 3 + j]));
+      const u = b.map((v, k) => v - a[k]),
+        v = c.map((v, k) => v - a[k]),
+        face = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
+        centroid = a.map((x, k) => (x + b[k] + c[k]) / 3),
+        facing = (centre) => face.reduce((sum, f, k) => sum + f * (centroid[k] - centre[k]), 0);
+      if (Math.max(facing(shape.a.center), facing(shape.b.center)) < 0) folded++;
+    }
+    assert.equal(folded, 0, `resolution ${resolution}`);
+  }
+});
+
+test('a surface through grid points: no zero-area triangles and no two vertices on one point', async () => {
+  // The default bounds put a radius-0.8 sphere's poles on grid points at every resolution that is a multiple of 12. The
+  // field there rounds to about -1e-16, so the pole counted as inside, each edge from it crossed on the pole itself and
+  // the tangent edges 1e-8 away: every cell around it placed a vertex on top of its neighbours' (30 of 3,708 triangles
+  // had zero area at 24). A box whose faces lie on grid planes samples exactly zero along them.
+  using modeler = await createSdfModeler();
+  const cases = [12, 24, 36].map((resolution) => ({ shape: { type: 'sphere', radius: 0.8 }, options: { resolution } }));
+  for (const resolution of [12, 24])
+    cases.push({
+      shape: { type: 'box', halfSize: [0.5, 0.5, 0.5] },
+      options: {
+        resolution,
+        bounds: [
+          [-1, -1, -1],
+          [1, 1, 1],
+        ],
+      },
+    });
+  for (const { shape, options } of cases) {
+    const label = `${shape.type} at ${options.resolution}`,
+      mesh = modeler.mesh(shape, options),
+      { positions: p, indices: ix } = mesh;
+    let flat = 0;
+    for (let i = 0; i < ix.length; i += 3) {
+      const [a, b, c] = [0, 1, 2].map((k) => [0, 1, 2].map((j) => p[ix[i + k] * 3 + j]));
+      const u = b.map((v, k) => v - a[k]),
+        v = c.map((v, k) => v - a[k]);
+      if (Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) <= 1e-14) flat++;
+    }
+    assert.equal(flat, 0, `${label}: zero-area triangles`);
+    topology(mesh);
+    const count = p.length / 3;
+    for (let i = 0; i < count; i++)
+      for (let j = i + 1; j < count; j++) {
+        const gap = Math.hypot(p[i * 3] - p[j * 3], p[i * 3 + 1] - p[j * 3 + 1], p[i * 3 + 2] - p[j * 3 + 2]);
+        assert.ok(gap > 1e-6, `${label}: vertices ${i} and ${j} are ${gap} apart`);
+      }
+  }
+});

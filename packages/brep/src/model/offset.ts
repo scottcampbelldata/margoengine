@@ -14,8 +14,10 @@
 import { add, cross, dot, length, scale, sub, unit, type XYZ } from '../geometry/vec.js';
 import { boolean } from './boolean.js';
 import { checkBody } from './check.js';
-import { frameOf, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
+import { curveEvaluator, frameOf, sliceCurve, type CurveDef, type Frame, type SurfaceDef } from './geometry.js';
+import { intersectSurfaces } from './intersect.js';
 import { Body, Edge, Face, Vertex, type History, type Name } from './topology.js';
+import { edgeParameters } from './validate.js';
 
 /** A face's plane with its outward normal: points x with n . x = c. */
 interface Plane {
@@ -308,10 +310,58 @@ function resurface(name: Name, body: Body, surfaceFor: (face: Face) => SurfaceDe
       `${operation}: edge ${e.name} would shrink to nothing or turn round; the offset would change the body's topology`,
     );
   const newEdge = new Map<Edge, Edge>();
+  /** The new edge from a to b on its two faces' new surfaces, where it is no line or circle: traced, as a Boolean does. */
+  const retrace = (e: Edge, a: Vertex, b: Vertex): { curve: CurveDef; sense: boolean; inside: XYZ[] } | undefined => {
+    const [f1, f2] = facesOf.get(e) ?? [];
+    if (!f1 || !f2 || f1 === f2) return undefined;
+    const s1 = moved.get(f1)!,
+      s2 = moved.get(f2)!,
+      old = curveEvaluator(e.curve),
+      along = edgeParameters(e, 32).map((t) => old.at(t).slice(0, 3) as XYZ),
+      // The new curve lies within a few times the faces' moves of the old one, where its surfaces cross at an angle.
+      shift = Math.max(
+        length(sub(a.point, e.start.point)),
+        length(sub(b.point, e.end.point)),
+        ...along.flatMap((p) => [Math.abs(distanceFrom(s1, p)), Math.abs(distanceFrom(s2, p))]),
+      ),
+      pad = 4 * shift + tolerance,
+      min = [0, 1, 2].map((k) => Math.min(...along.map((p) => p[k]), a.point[k], b.point[k]) - pad) as XYZ,
+      max = [0, 1, 2].map((k) => Math.max(...along.map((p) => p[k]), a.point[k], b.point[k]) + pad) as XYZ,
+      met = intersectSurfaces(s1, s2, { min, max }, tolerance);
+    if (met.kind !== 'curves') return undefined;
+    const middle = along[16],
+      ahead = sub(along[1], along[0]);
+    let best: { curve: CurveDef; sense: boolean; off: number } | undefined;
+    for (const curve of met.curves) {
+      const c = curveEvaluator(curve),
+        ta = c.parameter(a.point),
+        tb = e.closed ? ta : c.parameter(b.point, ta);
+      if (length(sub(c.at(ta).slice(0, 3) as XYZ, a.point)) > tolerance) continue;
+      if (length(sub(c.at(tb).slice(0, 3) as XYZ, b.point)) > tolerance) continue;
+      const sense = dot(c.at(ta).slice(3, 6) as XYZ, ahead) > 0,
+        off = length(sub(c.at(c.parameter(middle)).slice(0, 3) as XYZ, middle));
+      if (!best || off < best.off) best = { curve, sense, off };
+    }
+    if (!best) return undefined;
+    let { curve } = best;
+    const c = curveEvaluator(curve);
+    // A traced curve may run past the edge's ends (out of the box, or round a loop): only the edge's own stretch.
+    if (!e.closed && curve.kind === 'spline') {
+      const ta = c.parameter(a.point),
+        tb = c.parameter(b.point, ta);
+      if ((tb > ta) !== best.sense) return undefined;
+      curve = sliceCurve(curve, Math.min(ta, tb), Math.max(ta, tb));
+    }
+    const edge = new Edge(e.name, curve, a, b, best.sense, e.tolerance),
+      inside = edgeParameters(edge, 4)
+        .slice(1, -1)
+        .map((t) => curveEvaluator(curve).at(t).slice(0, 3) as XYZ);
+    return { curve, sense: best.sense, inside };
+  };
   for (const e of body.edges) {
     const a = newVertex.get(e.start)!,
       b = newVertex.get(e.end)!;
-    let curve: CurveDef, inside: XYZ[];
+    let curve: CurveDef | undefined, inside: XYZ[] = [];
     if (e.curve.kind === 'line') {
       const along = sub(b.point, a.point),
         d = unit(along);
@@ -337,26 +387,36 @@ function resurface(name: Name, body: Body, surfaceFor: (face: Face) => SurfaceDe
         },
         before = turnOf(f0, e.start.point, e.end.point),
         after = turnOf(frame, a.point, b.point);
-      if (
-        Math.abs(length(sub(b.point, center)) - radius) > tolerance ||
-        Math.abs(after - before) >= Math.PI / 2 ||
-        after * radius <= tolerance
-      )
-        throw changed(e);
-      curve = { kind: 'circle', frame, radius };
-      const t0 = angleOf(frame, a.point),
-        sign = e.sameSense ? 1 : -1;
-      inside = [0.25, 0.5, 0.75].map((t) => {
-        const u = t0 + sign * after * t;
-        return add(center, add(scale(f0.x, radius * Math.cos(u)), scale(f0.y, radius * Math.sin(u))));
-      });
-    } else throw new RangeError(`${operation}: edge ${e.name} is a ${e.curve.kind}; offsets support lines and circles`);
-    for (const f of facesOf.get(e) ?? [])
-      if (inside.some((q) => Math.abs(distanceFrom(moved.get(f)!, q)) > tolerance))
-        throw new RangeError(
-          `${operation}: edge ${e.name} would leave face ${f.name} (it would become another kind of curve): not supported; offset a face whose edges stay lines or circles`,
-        );
-    newEdge.set(e, new Edge(e.name, curve, a, b, e.sameSense, e.tolerance));
+      // Its new end off the circle through its new start: the edge becomes another curve, traced below.
+      if (Math.abs(length(sub(b.point, center)) - radius) <= tolerance) {
+        if (Math.abs(after - before) >= Math.PI / 2 || after * radius <= tolerance) throw changed(e);
+        curve = { kind: 'circle', frame, radius };
+        const t0 = angleOf(frame, a.point),
+          sign = e.sameSense ? 1 : -1;
+        inside = [0.25, 0.5, 0.75].map((t) => {
+          const u = t0 + sign * after * t;
+          return add(center, add(scale(f0.x, radius * Math.cos(u)), scale(f0.y, radius * Math.sin(u))));
+        });
+      }
+    }
+    const off = (points: readonly XYZ[]) =>
+      (facesOf.get(e) ?? []).find((f) => points.some((q) => Math.abs(distanceFrom(moved.get(f)!, q)) > tolerance));
+    let sense = e.sameSense,
+      leaves = curve ? off(inside) : undefined;
+    // A line or circle that no longer lies on both faces (a plane moved off a torus's axis cuts it in no circle), and
+    // an edge on another curve (a spline a Boolean traced): the new faces' own intersection between the new ends.
+    if (!curve || leaves) {
+      const traced = retrace(e, a, b);
+      if (traced) {
+        ({ curve, sense } = traced);
+        leaves = off(traced.inside);
+      }
+    }
+    if (!curve || leaves)
+      throw new RangeError(
+        `${operation}: edge ${e.name} would leave face ${(leaves ?? (facesOf.get(e) ?? [])[0])?.name} and no curve of its faces' new surfaces runs between its new ends; the offset would change the body's topology`,
+      );
+    newEdge.set(e, new Edge(e.name, curve, a, b, sense, e.tolerance));
   }
   const out = new Body(name, 'solid');
   for (const shell of body.shells) {

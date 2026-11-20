@@ -18,6 +18,8 @@ export class SplatSequence extends Player {
     static attach(engine: EngineKernel, cloud: Splats, frames: readonly SplatData[], options?: SplatSequenceOptions): SplatSequence;
     get length(): number;
     get duration(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     sample(time?: number): {
         from: number;
         to: number;

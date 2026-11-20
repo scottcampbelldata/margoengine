@@ -2,6 +2,7 @@
 // packages/voxel-net/DESIGN.md, "Transport"). Binary messages only: a text frame closes the connection with 1003. The
 // server side accepts an upgrade request; the client side (bots, tests) connects to a ws:// or wss:// URL. No
 // extensions.
+import { isUtf8 } from 'node:buffer';
 import { createHash, randomBytes, randomFillSync } from 'node:crypto';
 import { type IncomingMessage, request } from 'node:http';
 import { request as requestTls } from 'node:https';
@@ -144,8 +145,14 @@ export class WebSocketConnection {
    */
   close(code = 1000, reason = ''): void {
     if (this.#sentClose || this.#closed) return;
-    const text = Buffer.from(reason.slice(0, 120)),
-      body = Buffer.allocUnsafe(2 + text.length);
+    // A control frame carries at most 125 bytes (RFC 6455 5.5): the reason is cut to 123 bytes on a whole character.
+    let text = Buffer.from(reason);
+    if (text.length > 123) {
+      let n = 123;
+      while ((text[n] & 0xc0) === 0x80) n--;
+      text = text.subarray(0, n);
+    }
+    const body = Buffer.allocUnsafe(2 + text.length);
     body.writeUInt16BE(code, 0);
     text.copy(body, 2);
     this.#frame(CLOSE, body);
@@ -288,7 +295,11 @@ export class WebSocketConnection {
     else if (opcode === CLOSE) {
       if (payload.length === 1) return this.#fail(1002, 'close frame of one byte');
       const code = payload.length ? payload.readUInt16BE(0) : 1005,
-        reason = payload.subarray(2).toString('utf8');
+        text = payload.subarray(2);
+      // RFC 6455 7.4: 1005, 1006 and 1015 never go in a frame, and the rest below 3000 are taken only as registered.
+      if (payload.length && !sendable(code)) return this.#fail(1002, `close code ${code} may not be sent`);
+      if (!isUtf8(text)) return this.#fail(1007, 'close reason is not UTF-8');
+      const reason = text.toString('utf8');
       if (!this.#sentClose) {
         this.#frame(CLOSE, payload.length ? payload.subarray(0, 2) : EMPTY);
         this.#sentClose = true;
@@ -301,10 +312,13 @@ export class WebSocketConnection {
 }
 
 const ignore = (): void => {};
+/** Close codes a peer may put in a close frame: RFC 6455 7.4.1 and the IANA registry (1012 to 1014), and 3000 to 4999. */
+const sendable = (code: number): boolean =>
+  (code >= 1000 && code <= 1003) || (code >= 1007 && code <= 1014) || (code >= 3000 && code <= 4999);
 
-const bad = (socket: Duplex, status: string, message = ''): undefined => {
+const bad = (socket: Duplex, status: string, message = '', headers = ''): undefined => {
   socket.end(
-    `HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\n` +
+    `HTTP/1.1 ${status}\r\nConnection: close\r\n${headers}Content-Type: text/plain; charset=utf-8\r\n` +
       `Content-Length: ${Buffer.byteLength(message)}\r\n\r\n${message}`,
   );
   return undefined;
@@ -357,11 +371,13 @@ export function acceptWebSocket(
     req.method !== 'GET' ||
     upgrade !== 'websocket' ||
     !connection.split(/\s*,\s*/).includes('upgrade') ||
-    req.headers['sec-websocket-version'] !== '13' ||
     typeof key !== 'string' ||
     Buffer.from(key, 'base64').length !== 16
   )
     return bad(socket, '400 Bad Request');
+  // RFC 6455 4.4: another version is answered with 426 and the version this server speaks.
+  if (req.headers['sec-websocket-version'] !== '13')
+    return bad(socket, '426 Upgrade Required', 'WebSocket version 13 only', 'Sec-WebSocket-Version: 13\r\n');
   if (!originAllowed(req, options.origins)) {
     const origin = req.headers.origin ?? '(none)';
     return bad(

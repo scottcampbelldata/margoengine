@@ -73,7 +73,7 @@ function callEnd(code: string, from: number): { end: number; commas: number[] } 
     else if (c === ')' && --depth === 0) return { end: k, commas };
     else if (c === ',' && depth === 1) commas.push(k);
   }
-  throw new TypeError('stochasticTiling found an unfinished texture read; use matching gltf-pro and materials versions');
+  throw new TypeError('stochasticTiling found an unfinished texture read; use matching gltf/pbr and materials versions');
 }
 /** The material map a read of texture `map` at `uv` serves, if any. */
 const slotOf = (map: string, uv: string) => named[map] ?? (mapSlots[+(physical.exec(uv)?.[1] ?? -1)] as StochasticMap);

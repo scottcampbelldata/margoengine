@@ -1,4 +1,4 @@
-// Regression (KB6016, 2026-11-11): KB5875a moved core, its WebGL2 twin and gltf-pro to the height-correlated Smith G2
+// Regression (KB6016, 2026-11-11): KB5875a moved core, its WebGL2 twin and gltf/pbr to the height-correlated Smith G2
 // (Heitz 2014, JCGT 3(2), eq. 99), but clustered, materials, terrain, lod imposters, animation VAT, post material decals
 // and voxel still wrote the separable G1 G1 of the shared `smithG` (and `ggxNamed`), so a clustered light and the sun
 // shaded one surface with different masking. Every PBR direct light now writes G2; the separable text is gone.

@@ -6,7 +6,7 @@ browser.page.on('pageerror', (e) => errors.push(e.message));
 try {
   const result = await browser.page.evaluate(async () => {
     const { Engine } = await import('/packages/core/dist/index.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { AnimationMixer, LoopOnce } = await import('/packages/animation/dist/mixer.js');
     const { BooleanKeyframeTrack, StringKeyframeTrack, createDiscreteClip } = await import(
       '/packages/animation/dist/discrete-tracks.js'

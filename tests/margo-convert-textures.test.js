@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseDDS } from '@margoengine/decoders/dds';
 import { decodePNG } from '@margoengine/decoders/png';
-import { parseGLTFAsync } from '@margoengine/gltf-pro';
+import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { build } from '../tools/margo-convert/pipeline/build.js';
 import { optimizeModel } from '../tools/margo-convert/pipeline/optimize.js';
 import { preset } from '../tools/margo-convert/pipeline/presets.js';

@@ -254,9 +254,17 @@ export class FFTOcean implements EnginePlugin {
     this.dirty = true;
     return this;
   }
-  onPreUpdate(delta: number): void {
+  /**
+   * Moves the wave clock by `delta` seconds without drawing (a delta of 0 or less moves nothing); each frame update runs
+   * it, so `seek` from `@margoengine/cutscene/seek` replays the waves exactly. Foam is history on the GPU: a replayed
+   * span decays it over the whole span at the next draw, as a forward `setTime` does.
+   */
+  advanceTime(delta: number): void {
     this.live();
     if (delta > 0) this.setTime(this.elapsed + delta);
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   setup(engine: Engine): void {
     this.live();

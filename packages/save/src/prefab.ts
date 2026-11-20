@@ -118,7 +118,10 @@ export function expandSave(document: SaveDocument): ResolvedEntity[] {
         }
         copies = copies.map((copy) => {
           if (copy.id !== id) return copy;
-          const merged = mergePatch(entityJson(copy), remap(patch, map)) as Record<string, Json>;
+          // The patch names prefab-local ids, in its parent as in its references.
+          const local = remap(patch, map);
+          if (isRecord(local) && typeof local.parent === 'string') local.parent = map(local.parent);
+          const merged = mergePatch(entityJson(copy), local) as Record<string, Json>;
           const next: ResolvedEntity = { id: copy.id, components: (merged.components as Record<string, Json>) ?? {} };
           if (typeof merged.name === 'string') next.name = merged.name;
           if (typeof merged.parent === 'string') next.parent = merged.parent;

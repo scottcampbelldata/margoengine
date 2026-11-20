@@ -1,6 +1,6 @@
 # J6 product viewer integration
 
-The product scene composes gltf-pro, materials clearcoat, environment lighting,
+The product scene composes gltf/pbr, materials clearcoat, environment lighting,
 contact shadows, PostStack, DOF, tonemap, TAA, selection, ViewCube and a React
 Canvas/mesh mount through public optional entries. Khronos ToyCar and the
 existing HDR fixture supply actual model and environment input.
@@ -14,8 +14,8 @@ For the three-backend stored-bit trace, run
 colour attachment/resolve target and bound compute storage texture at its centre,
 immediately after that pass, before later passes overwrite it. It records shader
 and uniform-byte hashes and sampler descriptors. It changes no shader or sampler.
-The original assertions still run. One shared GPU slot and a 150 second scene
-limit bound each backend run.
+The original assertions still run. A 150 second scene
+limit bounds each backend run.
 
 Four scene draws and all four RGBA8 probes survive actual device destruction and
 replacement exactly. The centre is [121,33,32,255] on native WebGPU, ANGLE D3D11

@@ -1,5 +1,197 @@
 # Clean room
 
+### Spruce crown top and leader (procedural, KB-CABIN-LEADER1, 2026-11-16)
+
+The crown top in `generateTreeMesh` (`packages/procedural/src/foliage.ts`: the youngest whorl, the upright leader blades
+of `sprayWhorl` and `branchShoots`, the coarse short-spray width) is Margo-written from these sources; no engine's or
+tool's source was read. F. Hallé, R. A. A. Oldeman and P. B. Tomlinson, Tropical Trees and Forests: An Architectural
+Analysis, Springer 1978 (rhythmic monopodial growth units and tiered branching); M. Fabrika et al., "Crown architecture
+and structural development of young Norway spruce trees (Picea abies Karst.): a basis for more realistic growth
+modelling", BioResources 2019, https://bioresources.cnr.ncsu.edu/resources/crown-architecture-and-structural-development-of-young-norway-spruce-trees-picea-abies-karst-a-basis-for-more-realistic-growth-modelling/
+(growth units, branching angles 40 to 70 degrees); R. Pokorný and I. Tomášková 2007 (7.0 m at 20 years, for the 0.5 m
+annual leader). Compared: a solid cone (the old leader: no gaps, normals that took no snow), a stack of ever smaller
+whorls to a point, and a leader shoot over the youngest whorl (chosen, the botanical form). Margo's own: the 0.5 m
+leader length, the reach closing linearly from the last tier to the tip, the crown-cone normal at the apex, and the
+tenth-by-tenth range test.
+
+### Spruce level of detail, stem and crown density (procedural, KB-CABIN-FGTREE3, 2026-11-16)
+
+The coarse shoot level (`shoots: 'coarse'`, `ShootSpacing.coarse` in `packages/procedural/src/foliage.ts`), the
+`breastDiameter` option, and `spruceDiameter`, `SPRUCE_HEIGHT_CURVE` and the `diameter` option in
+`packages/procedural/src/tree.ts` are Margo-written from these sources; no engine's or tool's source was read. Level of
+detail for aggregate foliage: R. L. Cook, J. Halstead, M. Planck and D. Ryu, "Stochastic simplification of aggregate
+detail", SIGGRAPH 2007, ACM Transactions on Graphics 26(3) (a coarser level keeps the expected projected area,
+fewer elements each scaled up); D. Lacewell, B. Edwards, P. Shirley and W. B. Thompson, "Stochastic billboard clouds for
+interactive foliage rendering", Journal of Graphics Tools 11(1), 2006; E. Bruneton and F. Neyret, "Real-time realistic
+rendering and lighting of forests", Computer Graphics Forum 31(2), Eurographics 2012 (a level keeps view-dependent
+coverage and the normal distribution that sets shading); O. Deussen, C. Colditz, M. Stamminger and G. Drettakis,
+"Interactive visualization of complex plant ecosystems", IEEE Visualization 2002 (points and lines for distant plants
+sized to keep the plant's area). Compared: a solid impostor per spray (the plain sprays, coverage 1), a stochastic
+pruning of laterals with widening (chosen), and alpha-tested cards (core has no textures). Stem: L. Näslund 1936 height
+curve as fitted for Norway spruce by J. Siipilehto, "A comparison of two parameter prediction methods for stand
+structure in Finland", Silva Fennica 34(4), 2000, https://doi.org/10.14214/sf.617 (power 3, mean a 1.811, b 0.308);
+R. Pokorný and I. Tomášková, "Allometric relationships for surface area and dry mass of young Norway spruce aboveground
+organs", Journal of Forest Science 53(12), 2007, https://doi.org/10.17221/2166-JFS (7.0 m, 8.4 cm, needle area,
+crown 6.5 by 2.5 m). Crown gaps: T. Nilson, "A theoretical analysis of the frequency of gaps in plant stands",
+Agricultural Meteorology 8, 1971 (Poisson gap law); H. Smolander and P. Stenberg 2003 (shoot recollision 0.47, STAR =
+(1 - p) / 4); D. Schraik, A. Hovi and M. Rautiainen, "Crown level clumping in Norway spruce from terrestrial laser
+scanning measurements", Agricultural and Forest Meteorology 296, 2021 (clumping at 10 to 25 cm in young spruce crowns,
+which raises gaps above the random-shoot value). Margo's own: the 1.5 spacing and 1.55 width factors (found by measuring
+coverage and luminance from 32 views), the 0.075 m near lateral spacing, the 45 degree turn tolerance, and the curve's
+2 to 25 m hold with proportional ends.
+
+### Near spruce shoots and butt flare (procedural, KB-CABIN-FGTREE2, 2026-11-16)
+
+`branchShoots`, `flaredTrunk` and the `shoots`, `flare` and `breastHeight` options in
+`packages/procedural/src/foliage.ts`, and the `shootDistance` switch and shared tree geometry in
+`packages/procedural/src/tree.ts`, are Margo-written from these sources; no engine's or tool's source was read.
+Branch structure: J. Weber and J. Penn, "Creation and Rendering of Realistic Trees", SIGGRAPH 1995,
+https://doi.org/10.1145/218380.218427 (child stems along a parent with their down angle and rotation, length ratios);
+O. Deussen and B. Lintermann, Digital Design of Nature, Springer 2005, ch. 6 (conifer branch systems). Shoot and needle
+scale: H. Smolander and P. Stenberg, "A method to account for shoot scale clumping in coniferous canopy reflectance
+models", Remote Sensing of Environment 88, 2003 (a shoot's silhouette is its projected outline, not its needles');
+A. Farjon, A Handbook of the World's Conifers,
+Brill 2010 (Picea abies needles 10 to 25 mm). Near-foliage options compared: alpha-tested leaf and needle cards
+(A. Kharlamov, I. Cantlay and Y. Stepanenko, "Next-Generation SpeedTree Rendering", GPU Gems 3, ch. 4, 2007; X.
+Decoret, F. Durand, F. Sillion and J. Dorsey, "Billboard Clouds for Extreme Model Simplification", SIGGRAPH 2003),
+normal maps for needle tufts, and fringe geometry; core materials carry no UVs or textures, so the fringe is geometry
+with per-vertex needle tilt, which also keeps early depth rejection (no alpha test). Distance level of detail: D.
+Luebke, M. Reddy, J. Cohen, A. Varshney, B. Watson and R. Huebner, Level of Detail for 3D Graphics, Morgan Kaufmann
+2002 (switch by projected size, hysteresis against popping back and forth). Butt flare: J. Repola, "Biomass equations
+for Scots pine and Norway spruce in Finland", Silva Fennica 43(4), 2009, https://doi.org/10.14214/sf.184 (stump
+diameter 2 + 1.25 d in cm at a stump 1 percent of the tree's height, Laasasenaho's 1982 approximation, which Repola
+reads as a transformation rather than an estimate); E. H. Wharton, "Predicting diameter at breast height from stump diameters for northeastern
+tree species", USDA Forest Service Research Note NE-322, 1984 (spruce and fir: d.b.h. = 0.966 + 0.797 stump diameter
+inside bark, inches, 337 trees). Margo's own: the two-ranked lateral layout inside the plain spray's outline, the band
+and tooth widths (twig plus 30 to 34 mm needles, a tooth every 6 cm), the 0.1 m lateral spacing, the 30 m default
+switch, the exponential swell over 0.2 m solved for the ratio at 1.3 m of the placed tree, and the 1.3 default.
+
+### Log walls on a sill (procedural, KB-CABIN-SIDEWALL-LEAK1, 2026-11-16)
+
+The sill course and ground chinking of `generateLogWall` in `packages/procedural/src/cabin.ts` are Margo-written; no
+engine's source was read. Sources: B. Allan Mackie, "Building with Logs", 1971 (the half-log starter course under the
+walls that notched corners raise half a log), and B. D. Bomberger, "The Preservation and Repair of Historic Log
+Buildings", NPS Preservation Brief 26, 1991 (sill logs bedded on the foundation, chinking between courses).
+
+### Log walls cut exactly at their openings (procedural, KB-CABIN-DOORLEAK1, 2026-11-16)
+
+`cutLog` and the notched courses of `generateLogWall` in `packages/procedural/src/cabin.ts` are Margo-written; no
+engine's source was read. The cut log is the log's own faceted cross-section clipped against the opening's edge line
+with I. E. Sutherland and G. W. Hodgman, "Reentrant Polygon Clipping", Communications of the ACM 17(1), 1974,
+https://doi.org/10.1145/360767.360802, extruded along the log.
+
+### Directional hard shadows on the receiver plane (clustered, KB-SUNSHADOW-OFFSET1, 2026-11-16)
+
+`clusterDirectionalShadow` and the `behind` test of `localShadowPCF` in `packages/clustered/src/shadows.ts`, and the
+directional checks in `scripts/clustered-shadow-gpu-check.js`, are Margo-written from the papers of the next section
+(Reeves, Salesin and Cook 1987; Isidoro 2006; Dou, Yan, Kerzner, Dai and Wyman 2014; Holbert 2011), plus cascaded shadow
+maps after W. Engel, "Cascaded Shadow Maps", ShaderX5, 2006, and R. Dimitrov, "Cascaded Shadow Maps", NVIDIA, 2007, and
+the receiver-plane filter for large kernels in C. Schuler, "Multisampling Extension for Gradient Shadow Maps", ShaderX5,
+2006. No engine's source was read. Margo's own: leaving out texels whose stored depth lies behind the receiver's plane
+by more than its offsets plus one texel (a search for a paper stating it found none; the receiver-plane literature
+notes leaks where the receiver is not planar and caps the bias instead), and the edge test that moves the map's grid
+through every rounding phase.
+
+### LocalShadows hard edges on the receiver plane (clustered, KB-LOCALSHADOW-OFFSET1, 2026-11-16)
+
+`localShadowPCF` in `packages/clustered/src/shadows.ts` (point, spot and directional hard shadows of `LocalShadows`) and
+its checks in `scripts/clustered-shadow-gpu-check.js` are Margo-written from these papers; no engine's source was read.
+W. T. Reeves, D. H. Salesin and R. L. Cook, "Rendering Antialiased Shadows with Depth Maps", SIGGRAPH 1987,
+Computer Graphics 21(4), https://doi.org/10.1145/37402.37435 (percentage-closer filtering: the 3x3 bilinear taps, here
+read as their 4x4 texels with weights (1 - f, 1, 1, f) / 3 per axis). J. R. Isidoro, "Shadow Mapping: GPU-based Tips and
+Techniques", ATI Research, Game Developers Conference 2006 (receiver-plane depth bias: the receiver's tangent plane
+mapped into the light's projection gives the reference depth at each filter tap; the area and PCSS paths already used
+it). H. Dou, Y. Yan, E. Kerzner, Z. Dai and C. Wyman, "Adaptive Depth Bias for Shadow Maps", ACM I3D 2014 and Journal
+of Computer Graphics Techniques 3(4), 2014, https://www.aminer.org/pub/53e9a154b7602d9702a430af/adaptive-depth-bias-for-shadow-maps
+(the bias taken per shadow texel from where that texel's ray meets the receiver's tangent plane). D. Holbert, "Saying
+Goodbye to Shadow Acne", Game Developers Conference 2011 poster (normal offset, scaled by the slope, 1 - N.L: measured
+here, it barely shrinks the leak at 58 degrees). Margo's own: lifting only the texels nearer the light, never below the
+receiver's own depth; the 1 + `slopeBias` multiple of the plane's rise (default 0, the exact plane; 2 for normal maps
+at grazing light); the defaults 1 and 0.25 texels; directional cascades kept on the flat compare and 1.5 texels; the edge test that averages 16 light positions over every rounding phase of
+the rasterized edge; the tilted-normal and pebble checks.
+
+### PostStack changes after setup (post, GAP-POST-ADD1, 2026-11-15)
+
+`addEffect`, `removeEffect`, `moveEffect` and `PostStack.join` in `packages/post/src/stack.ts` are Margo-written. The
+API conventions were taken from the rivals' public documentation only; no rival source was read. Sources: three.js
+manual, EffectComposer (`addPass`, `insertPass`, `removePass`, `passes`), https://threejs.org/docs/pages/EffectComposer.html;
+pmndrs postprocessing API docs, EffectComposer (`addPass(pass, index)` "optionally at a specific index", `removePass`),
+https://pmndrs.github.io/postprocessing/public/docs/class/src/core/EffectComposer.js~EffectComposer.html; PlayCanvas
+API reference, PostEffectQueue (`addEffect`, `removeEffect`), https://api.playcanvas.com/engine/classes/PostEffectQueue.html,
+and the custom post effect tutorial, https://developer.playcanvas.com/tutorials/custom-posteffect/; Babylon.js
+documentation, "How To Use A Post Process Render Pipeline" (`addEffect`),
+https://doc.babylonjs.com/features/featuresDeepDive/postProcesses/postProcessRenderPipeline. No papers apply (an API
+shape, not an algorithm).
+
+### Sample Viewer like-for-like display (batch 160, KB3267, 2026-11-15)
+
+`scripts/reference-rendering/viewer-transfer.mjs` and the `--like-for-like` option of run.mjs are Margo-written. The
+viewer's transfer and sample count were measured from its downloaded PNG only (probe spheres and an emissive probe
+read as numbers); its source, shaders and modules were not read. Sources: IEC 61966-2-1:1999 (sRGB; not read,
+paywalled, constants as in CSS Color 4); W3C CSS Color Module Level 4, https://www.w3.org/TR/css-color-4/; W3C WebGPU,
+`-srgb` texture formats and multisample state, https://www.w3.org/TR/webgpu/; Khronos glTF 2.0 Specification,
+section 3.9, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; K. Akeley, "Reality Engine Graphics",
+SIGGRAPH 1993, https://doi.org/10.1145/166117.166131.
+
+### Stochastic tiling and hair shading (materials, 2026-11-15)
+
+Read Heitz and Neyret, "High-Performance By-Example Noise using a Histogram-Preserving Blending Operator" (HPG 2018,
+talk slides with speaker notes; the paper PDF was not reachable), Mikkelsen, "Practical Real-Time Hex-Tiling" (JCGT 11(2),
+2022), Marschner, Jensen, Cammarano, Worley and Hanrahan, "Light Scattering from Human Hair Fibers" (SIGGRAPH 2003) and
+Scheuermann, "Hair Rendering and Shading" (GDC 2004 slides) for `packages/materials/src/stochastic.ts` and `hair.ts`.
+No companion code or external implementation was read.
+
+### Hair fibre lobes, crowd density and walkers (materials, navmesh, humans, sheet row 15, 2026-11-18)
+
+Read Marschner, Jensen, Cammarano, Worley and Hanrahan, "Light Scattering from Human Hair Fibers" (ACM TOG 22(3), SIGGRAPH
+2003, https://doi.org/10.1145/882262.882345: the R, TT and TRT decomposition, lobe shifts and widths, Eq. 8's azimuth of a
+smooth fibre), d'Eon, Francois, Hill, Letteri and Aubry, "An Energy-Conserving Hair Reflectance Model" (Computer Graphics
+Forum 30(4), EGSR 2011, https://doi.org/10.1111/j.1467-8659.2011.01976.x: the white furnace and the melanin absorption
+coefficients), Chiang, Bitterli, Tappan and Burley, "A Practical and Controllable Hair and Fur Model for Production Path
+Tracing" (Computer Graphics Forum 35(2), 2016, https://doi.org/10.1111/cgf.12830: the sum of paths past TRT and the colour
+to absorption fit) and Zinke, Yuksel, Weber and Keyser, "Dual Scattering Approximation for Fast Multiple Scattering in
+Hair" (ACM TOG 27(3), 2008, read for what the diffuse stands in for) for `packages/materials/src/hair.ts`. Weidmann,
+"Transporttechnik der Fussgaenger" (ETH Zurich, IVT Schriftenreihe 90, 1993: the speed and density fit), Helbing,
+Johansson and Al-Abideen, "Dynamics of Crowd Disasters: An Empirical Study" (Physical Review E 75, 2007,
+https://doi.org/10.1103/PhysRevE.75.046109: the Gaussian density measure), Chraibi, Seyfried and Schadschneider,
+"Generalized Centrifugal-Force Model for Pedestrian Dynamics" (Physical Review E 82, 2010,
+https://doi.org/10.1103/PhysRevE.82.046111: only the people ahead count) and Fruin, "Pedestrian Planning and Design"
+(1971: levels of service) for `packages/navmesh/src/crowd.ts` and its test. The five-point Gauss-Legendre rule is the
+textbook one. No companion code or external implementation was read.
+
+### Light through thin skin (materials, 2026-11-15)
+
+Read Jimenez, Whelan, Sundstedt and Gutierrez, "Real-Time Realistic Skin Translucency" (IEEE Computer Graphics and
+Applications 30(4), 2010, http://www.iryoku.com/translucency/) for `skinTransmittance` and the backlit term in
+`packages/materials/src/skin.ts`; the transmittance is derived again from d'Eon and Luebke's Gaussians (the slab integral
+gives e^(-d^2 / 2v)). Babylon.js was consulted through the descriptions in its published type declarations only
+(PBRSubSurfaceConfiguration's translucency and thickness properties), never its shader or source.
+
+### Skin from melanin and blood (materials, sheet row 15, 2026-11-18)
+
+Read for `packages/materials/src/skin-spectrum.ts` and `packages/materials/test/skin-measured.test.js`: Donner and
+Jensen, "A Spectral BSSRDF for Shading Human Skin" (EGSR 2006, https://cseweb.ucsd.edu/~henrik/papers/skin_bssrdf/),
+Eq. 3 to 8 and section 3.5; Donner and Jensen, "Light Diffusion in Multi-Layered Translucent Materials" (SIGGRAPH 2005)
+for the multipole and the adding of layers; Jensen, Marschner, Levoy and Hanrahan, "A Practical Model for Subsurface
+Light Transport" (SIGGRAPH 2001, https://graphics.stanford.edu/papers/bssrdf/), Figure 5(b) and the Rd formula;
+Christensen, "An Approximate Reflectance Profile for Efficient Subsurface Scattering" (SIGGRAPH 2015 Talks, with Burley in
+Pixar Technical Memo 15-04), Eq. 1 and 2 and its cdf; d'Eon and Luebke, "Advanced Techniques for Realistic Real-Time Skin
+Rendering" (GPU Gems 3, 2007) for the Gaussian basis; Wyman, Sloan and Shirley, "Simple Analytic Approximations to the
+CIE XYZ Color Matching Functions" (JCGT 2(2), 2013, https://jcgt.org/published/0002/02/01/), Table 1; IEC 61966-2-1 for
+the sRGB matrix; Lawson and Hanson, *Solving Least Squares Problems* (1974), ch. 23, for non-negative least squares;
+Abramowitz and Stegun 9.4.4 and 9.4.6 for J1 in the test. Data: Prahl's hemoglobin table (THIRD-PARTY-NOTICES.md) and
+the ColorChecker skin patches' manufacturer sRGB (McCamy, Marcus and Davidson 1976). The frequency-domain closed form
+(a source at depth z sends 1/2 exp(-|z| sqrt(sigma_tr^2 + k^2)) of its light through a plane) was derived here from the
+point-source diffusion Green function. No companion code or engine source was read.
+
+### Eye optics and tear film (materials, sheet row 15, 2026-11-18)
+
+Read for `packages/materials/src/eye.ts`: Atchison and Smith, *Optics of the Human Eye* (Butterworth-Heinemann, 2000),
+the Le Grand full theoretical eye (cornea front radius 7.8 mm, pupil 3.6 mm behind the apex, aqueous 1.336, entrance
+pupil magnification 1.133); Craig, Simmons, Patel and Tomlinson, "Refractive index and osmolality of human tears"
+(Optometry and Vision Science 72(10), 1995) for the tear film's 1.337; the paraxial single-surface refraction is the
+textbook one. No companion code or engine source was read.
+
 ### Batch 170 vfx work counts (2026-11-10)
 
 Read the W3C *WebGPU* `writeBuffer` and compute pass sections. [Title, link and counts](whitepaper/batch-170-vfx.md).
@@ -783,7 +975,7 @@ must be integral full turns, rather than silently erasing physical spin to close
 
 The existing TypeScript sweep is reused, not rebuilt. New CPU work is bounded input/scalar adaptation and
 an optional indexed-to-triangle conversion, not a replacement geometry kernel. No measured Wasm or speed
-gain is claimed. No benchmark, timing assertion or GPU lease is used for this CPU checkpoint.
+gain is claimed. No benchmark, timing assertion or GPU work is used for this CPU checkpoint.
 
 Mesh ownership audit before adding the renderer adapter found that MeshLayer constructor allocation/update
 failures and meshLayer figure-publication failures leaked resources/renderer registration. Regression tests
@@ -875,7 +1067,7 @@ Dominant tracing/convolution loops run on the GPU; bounded CPU copying needs no 
 Independently written uint32 hash noise is interpolated bilinearly. Trilinear field sampling ignores
 zero-weight missing neighbours and masks weighted NaNs. Common velocity scaling in float64 before float32
 packing preserves tiny finite directions. The demo reuses the frozen public-domain NOAA data and hashes.
-No wall-clock speed claim or exclusive GPU lease is introduced.
+No wall-clock speed claim is introduced.
 
 Validation checkpoint: Node lifecycle/input tests pass. Independent analytical GPU box convolution error is
 1.4725853414443435e-7; exact circular-arc reference error is 1.1380660922433172e-5. Sign symmetry, anisotropic
@@ -1146,9 +1338,9 @@ and register no plugin now return undefined from sceneOf. No terrain algorithm,
 map resolution, provider output or tolerance changes. The class source guard
 covers every EnginePlugin implementing TerrainLighting in verify/check:merge.
 
-The GPU mutex lookup repair's research comparison, reviewed scope and independent implementation are recorded
-in [gpu-mutex-target.md](quality/gpu-mutex-target.md): Bishop/Dilger 1996, Herlihy/Wing 1990 and Node/POSIX
-link-lookup contracts. No foreign implementation was read.
+A link-lookup repair compared Bishop/Dilger 1996, Herlihy/Wing 1990 and the Node/POSIX
+link-lookup contracts. No foreign implementation was read. Its note was removed on
+2026-11-16 (KB-GPULOCK-ALL).
 
 ## Batch 171 moving-flow continuation (2026-11-10)
 
@@ -1724,7 +1916,7 @@ carry the same citation as a one-line comment in the code.
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| AN1 | VAT crowd lighting: copy of gltf-pro GGX + hemisphere ambient + Neutral | animation/src/vat.ts | as VX5-VX7 |
+| AN1 | VAT crowd lighting: copy of gltf/pbr GGX + hemisphere ambient + Neutral | animation/src/vat.ts | as VX5-VX7 |
 
 ### bvh
 
@@ -1774,12 +1966,15 @@ carry the same citation as a one-line comment in the code.
 | C18 | custom local shadow casters (`drawLocalShadow`): per-layer hook in the reversed-depth layer pass, terrain's reversed-depth pipeline variant with one uniform set per ring and layer | clustered/src/shadows.ts, terrain/src/index.ts | Margo-own: Margo design choice (follows the maps' existing reversed-depth convention; no paper read for this job) |
 | C21 | contact shadows per local light (`ContactLights`): screen-space march toward each light against the previous frame's depth with a thickness test, interleaved gradient noise start offset; depth copied by compute into a storage buffer | clustered/src/contact.ts | McGuire & Mara 2014, "Efficient GPU Screen-Space Ray Tracing" (JCGT 3(4)); Jimenez 2014, "Next Generation Post Processing in Call of Duty: Advanced Warfare" (SIGGRAPH course); the same method as `@margoengine/post` ContactShadows, applied per light in the clustered loop. Papers not reread for this job |
 | C22 | paged light buffers (`ClusteredOptions.maxLights`, `AreaLightOptions.maxLights`): CPU copies and the GPU light buffer grow in whole pages of 1,024 lights, rebinding on growth; the area light array sized by the option | clustered/src/index.ts, clustered/src/area.ts | Margo-own: engineering of the existing clustered layout (Olsson, Billeter & Assarsson 2012 already cited for the culling); no paper read for this job |
+| C23 | line lights (`lineLights`): point lights at the n-point Gauss-Legendre nodes of a segment carrying intensity x w_i / 2 (nodes by Newton's method on the Legendre three-term recurrence from cos(pi (i - 1/4) / (n + 1/2)), weights 2 / ((1 - x^2) P_n'(x)^2)); default shadow radius max(L / 2n, widest node gap / (2 x 1.374)) so neighbouring PCSS penumbrae merge | clustered/src/line.ts, scripts/clustered-line-gpu-check.js | Abramowitz & Stegun 1964, *Handbook of Mathematical Functions*, NBS AMS 55, 25.4.29 and Table 25.4 (rule, weights, tabulated nodes the unit test checks); Golub & Welsch 1969, "Calculation of Gauss Quadrature Rules", Math. Comp. 23(106), https://doi.org/10.2307/2004418 (the rule's exactness to degree 2n - 1); NIST DLMF 3.5(v), https://dlmf.nist.gov/3.5.v; Karis 2013, "Real Shading in Unreal Engine 4" (SIGGRAPH course; a line source as an integral along its length); Fernando 2005, "Percentage-Closer Soft Shadows" (the penumbra the merge rule uses, as C17). No code from any of them; papers and tables only |
+| C24 | light groups (`LightGroups`): named sub-lists merged in creation order into one `setLights`, changes inside frame callbacks deferred to the plugin's pre-update, a failed merge reverts every group to its last good list | clustered/src/groups.ts, clustered/src/flicker.ts | Margo-own: list bookkeeping on the existing `setLights` contract; no paper |
+| C25 | one bounce from point, spot and opening lights (`@margoengine/clustered/bounce`): reflective-shadow-map capture, Morton-seeded k-means into virtual point lights, disc form-factor gather, imperfect shadow maps of surfels with an adaptive receiver-plane bias, Lambert polygon irradiance of an opening, the opening counted once | clustered/src/bounce-math.ts, clustered/src/bounce.ts, clustered/src/shader.ts | Dachsbacher & Stamminger 2005, "Reflective Shadow Maps", https://doi.org/10.1145/1053427.1053460; Keller 1997, "Instant Radiosity", https://doi.org/10.1145/258734.258769; Prutkin, Kaplanyan & Dachsbacher 2012, "Reflective Shadow Map Clustering for Real-Time Global Illumination", https://doi.org/10.2312/conf/EG2012/short/009-012; Wallace, Elmquist & Haines 1989, "A Ray Tracing Algorithm for Progressive Radiosity", https://doi.org/10.1145/74334.74366; Ritschel, Grosch, Kim, Seidel, Dachsbacher & Kautz 2008, "Imperfect Shadow Maps for Efficient Computation of Indirect Illumination", https://doi.org/10.1145/1409060.1409082; Brabec, Annen & Seidel 2002, "Shadow Mapping for Hemispherical and Omnidirectional Light Sources" (CGI 2002, the paraboloid map); Pfister, Zwicker, van Baar & Gross 2000, "Surfels: Surface Elements as Rendering Primitives", https://doi.org/10.1145/344779.344936; Dou, Yan, Kerzner, Dai & Wyman 2014, "Adaptive Depth Bias for Shadow Maps", JCGT 3(4), https://jcgt.org/published/0003/04/08/; Arvo 1994, "The Irradiance Jacobian for Partially Occluded Polyhedral Sources", https://doi.org/10.1145/192161.192250; Duff et al. 2017, "Building an Orthonormal Basis, Revisited", JCGT 6(1), https://jcgt.org/published/0006/01/01/; Howell, "A Catalog of Radiation Heat Transfer Configuration Factors" (the test's element-to-rectangle factor). Papers only, no code; the count-once rule against `openingLight` is Margo's own derivation (README "Counting the room's light once") |
 
 ### core
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| P1 | Core / WebGL2 / gltf-pro direct light: GGX D, height-correlated Smith G2 (separable until 2026-11-11, KB5875a), Schlick F, Lambert | core/src/shaders.ts, webgl2-compat/src/preview.ts, gltf-pro/src/shader.ts, shared/light-terms.js `smithGCorrelated` | glTF 2.0 spec Appendix B (B.3.2-B.3.5, current revision); Walter 2007 eq. 33; Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), eq. 72 and 99, https://jcgt.org/published/0003/02/03/; Karis 2013, "Real Shading in Unreal Engine 4" (SIGGRAPH course notes, the visibility form); Schlick 1994 |
+| P1 | Core / WebGL2 / gltf/pbr direct light: GGX D, height-correlated Smith G2 (separable until 2026-11-11, KB5875a), Schlick F, Lambert | core/src/shaders.ts, webgl2-compat/src/preview.ts, gltf/src/shader.ts, shared/light-terms.js `smithGCorrelated` | glTF 2.0 spec Appendix B (B.3.2-B.3.5, current revision); Walter 2007 eq. 33; Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs", JCGT 3(2), eq. 72 and 99, https://jcgt.org/published/0003/02/03/; Karis 2013, "Real Shading in Unreal Engine 4" (SIGGRAPH course notes, the visibility form); Schlick 1994 |
 | P46 | Core display curve: Khronos PBR Neutral (F90 0.04, Ks 0.76, Kd 0.15, f = x - x^2 / (4 F90) below 2 F90), then the sRGB encoding | core/src/shaders.ts | **Read in full (batch 132 audit, 2026-11-10):** Khronos PBR Neutral specification (KhronosGroup/ToneMapping, PBR_Neutral/README.md, specification text only); glTF 2.0 Appendix B in its 2021 revision (separable Smith G, `c_diff = lerp(baseColor, black, metallic)`), which the code follows; the current revision of that appendix uses the height-correlated Smith G instead, so P1 cites the 2021 text. sRGB transfer constants (0.0031308, 12.92, 1.055, 2.4) checked against CSS Color 4 sample code; IEC 61966-2-1 itself not read (paywalled) |
 | P42 | Default ambient strength | core/src/engine.ts | Margo-own: Margo design choice |
 
@@ -1859,7 +2054,7 @@ Batch 132 audit (lane N, 2026-11-10). "Read" means the PDF or specification text
 | E24 | box-projected (parallax-corrected) reflection probes | environment/src/probes.ts | Bjorke, GPU Gems ch. 19 (2004); Lagarde & Zanuttini 2012 |
 | E25 | analytic environment BRDF when no Environment is bound | environment/src/probes.ts | published engine standard: Karis 2014, "Physically Based Shading on Mobile" (after Lazarov 2013) |
 | E26 | probe GGX prefilter (sampled and direct convolution, weight D nl / r^3) | environment/src/probes.ts | Walter 2007; Karis 2013 |
-| E27 | fallback hemisphere ambient for glTF-pro without an Environment | environment/src/probes.ts | Margo-own: mirrors gltf-pro's own ambient |
+| E27 | fallback hemisphere ambient for glTF PBR without an Environment | environment/src/probes.ts | Margo-own: mirrors gltf/pbr's own ambient |
 | E28 | capture near/far 0.05 / 1000 | environment/src/probes.ts, environment/src/cube-camera.ts | Margo-own: Margo design choice |
 | E29 | hemisphere light mix(ground, sky, n.y/2 + 1/2) | environment/src/hemisphere.ts | Margo-own: classical hemisphere lighting |
 | E30 | planar reflector/refractor: projective lookup, normal-map offset, mip blur | environment/src/planar.ts | Margo-own: Segal et al. 1992 (projective texturing) |
@@ -1903,6 +2098,8 @@ Batch 132 audit (lane N, 2026-11-10). "Read" means the PDF or specification text
 | BR8 | JT container, scene graph, codecs and mesh topology decoder | brep/src/jt | the JT File Format Reference 9.5 and ISO 14306, under Siemens' published licence terms (docs/jt-licensing.md) |
 | BR9 | LZMA, LZMA2 and XZ decoding | brep/src/jt/lzma.ts | Igor Pavlov's LZMA specification; Lasse Collin's .xz file format |
 | BR10 | Modelling: sewing within a tolerance, face offset, shell and draft re-solved by Gauss-Newton, sweep in a rotation-minimising frame, ruled loft | brep/src/model/sew.ts, brep/src/model/offset.ts, brep/src/model/sweep.ts, brep/src/model/loft.ts | Pappus and Guldin for the swept volume; Piegl and Tiller, The NURBS Book (2nd ed.) for ruled and rational surfaces; textbook Gauss-Newton and solid geometry. No source of another CAD kernel is read; the tests hold each result to exact closed forms |
+| BR11 | Crossings of a curve with a surface by interval halving: an interval is dropped only when bounds prove it holds no crossing (the distance at its ends more than the curve's speed can cover, or more than the second derivative's bound k can bend it back by, k w^2 / 8), and taken as lying on the surface only when it is on it at both ends and the middle and k w^2 / 8 is within the resolution; three points on the surface alone are not proof (a circle starting on a plane through its centre). Booleans classify the faces cut along such degenerate lines by the same boundary evaluation | brep/src/model/distance.ts, brep/src/model/boolean.ts | **Read (abstracts and method descriptions):** Kalra and Barr, "Guaranteed ray intersections with implicit surfaces", SIGGRAPH 1989, Computer Graphics 23(3), 297-306, doi:10.1145/74333.74364 (bounds on the function's and its gradient's rate of change so no root is missed); Snyder, "Interval analysis for computer graphics", SIGGRAPH 1992, Computer Graphics 26(2), 121-130, doi:10.1145/133994.134024 (inclusion functions, branch and bound); Requicha and Voelcker, "Boolean operations in solid modeling: boundary evaluation and merging algorithms", Proceedings of the IEEE 73(1), 30-44, 1985, doi:10.1109/proc.1985.13108 (boundary evaluation, set membership classification). No source of another CAD kernel is read |
+| BR12 | Tolerant topology in the body check and in a face's loops: a vertex's tolerance is a ball round its point and an edge's a tube round its curve; two entities touch when they come within their tolerances (the body check keeps its margin of ten times each), so an edge is taken as touching a face within its own tolerance along its length and within a vertex's only inside that vertex's ball, and a crossing inside the ball is the edge meeting its neighbours; the curves bounding a face meet only within their vertices' balls, so a loop's sense is taken with each curve's end put in where it is apart from the next curve's start | brep/src/model/check.ts, brep/src/model/faces.ts | **Read:** D. J. Jackson, "Boundary representation modelling with local tolerances", Proceedings of the Third ACM Symposium on Solid Modeling and Applications (SMA '95), 247-254, 1995, doi:10.1145/218013.218067 (section 3: a tolerant vertex is a sphere, a tolerant edge a tube, entities intersect when within the sum of their tolerances, the curves of a face need not meet end to end but must end inside the vertex sphere, and where the tubes of two edges meet, each part must meet a common vertex); M. Segal, "Using tolerances to guarantee valid polyhedral modeling results", SIGGRAPH 1990, Computer Graphics 24(4), 105-114, doi:10.1145/97880.97891 (abstract and method: tolerances kept per entity rather than one epsilon, so topological decisions stay consistent); ISO 10303-43, uncertainty_measure_with_unit and global_uncertainty_assigned_context (one distance for the whole representation, the only tolerance a STEP file states; local tolerances are measured on import, BR10). No source of another CAD kernel is read |
 
 ### cad
 
@@ -1940,7 +2137,7 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | PK21 | Warm starting across steps: a new point takes the impulses of the old point with its id, else of the nearest old point on body A within 2 cm, each old point used once. The impulse carries as one world vector and is split along the new normal, and scales with the substep's length, as an impulse is a force times a substep. A deterministic tangent with no trigonometry, from the normal's two larger components | physics/kernel/src/contact.rs | **Read:** Catto, "Iterative Dynamics with Temporal Coherence", GDC 2005, and his 2006 slides, in full, for warm starting and feature ids; Gregorius 2015 for coherent features. Own derivation for the world-vector split and the substep ratio |
 | PK22 | Four points of many: the deepest, the farthest from it, the largest triangle on that edge, then the point adding the most area outside the triangle, with signed areas and no square roots. The third point is taken by size with the edge turned to suit, where the talk takes it by sign. Persistence: last step's ids and feature win ties, 5 percent on area and distance, 1 mm on depth and on the face test | physics/kernel/src/narrow.rs, sat.rs | **Read:** Gregorius, GDC 2015, in full with its notes, for the reduction and for coherent features. Own choice of the hysteresis numbers, measured in tests/reduce.rs |
 | PK23 | The contact solver: soft step (substeps with a soft bias pass, a relax pass, warm starting), the soft constraint in implicit form, speculative points, friction before the normal in a circular cone. Anchored friction as a world-vector drift pulled back in the soft pass and tallied once the poses have moved, from the speeds they moved with, kept at the cone's edge when the cone saturates. As many relax passes as soft ones; the relax pass solves the normal first. A manifold's normal rows swept to convergence within a pass (block Gauss-Seidel: Gauss-Seidel over pairs, each pair's rows solved to its own fixed point), each sweep the one-point update on the points' speeds through the manifold's J M^-1 J^T, the soft rows being Gauss-Seidel on K plus the diagonal K_ii / a2, own derivation from the soft constraint's form. A manifold of four points ends each sweep with the exact minimum of the rows' quadratic along the one impulse pattern that moves no body (sum zero, no turn about either body: the four-dimensional cross product of the rows of ones and of the points' turn arms along two tangents), cut to the bounds, as Gauss-Seidel settles that pattern only through the leak; own derivation, from J having rank 3 for points of one plane. Restitution after relaxing from the approach speed of a point struck in that substep, above two substeps of gravity; a point struck across an open gap takes the speed it meets the surface with, v^2 = v0^2 + 2 a d under gravity alone (constant-acceleration kinematics). Inside the slop a biased pass treats the point as speculative toward the slop's depth, bias (gap + slop) / h on a rigid row, the soft row only past it, as Catto's Solver2D post describes the soft step's separation plus linear slop. A ball's or capsule's gap read from its core segment's nearest point plus its radius along the normal, as a round shape's surface point toward a plane is (own, from the geometry), the lever arm left at the step's contact point. Own, from measurement: the manifold's first point turns each substep, as from a fixed first point a 1:1000 stack walks 3.8 mm; contact stiffness capped at a quarter of the substep rate; at one pass a substep a pair of two dynamic bodies, neither dominating, capped at an eighth while it carries under 50 times the lighter body's weight, as one pass left a 20-row pile rocking at a quarter at every damping ratio from 1 to 40 (the eighth from Catto's Solver2D post, which keeps the stiffness well below the step rate, 30 Hz for a 60 Hz step; a stiffness per kind of pair as Rapier's documentation describes for static contacts, its documented behaviour only, read on docs.rs; the load bound in the spirit of setting a contact's stiffness from the overlap it may take under load, Cundall and Strack 1979; Box2D v3 and Rapier run only as black boxes on our own scenes, outputs read); 8 substeps and 2 passes | physics/kernel/src/solver.rs | **Read:** Catto, Solver2D post, 2024, in full (the end of its performance text was cut off); Catto, "Soft Constraints", GDC 2011, skimmed by lines; Muller et al., "Detailed Rigid Body Simulation with Extended Position Based Dynamics", 2020, in full; Catto, "Continuous Collision", GDC 2013, in full; Catto, "Understanding Constraints", GDC 2014, in full. Where the code differs from Muller: it works on velocities with soft constraints, not on positions, so it freezes each normal for a step where the paper finds it again for every projection; it takes one friction coefficient, not static and dynamic; its static friction adds up the slip as a drift, where the paper cancels one substep's slip and lets go past the cone; the bounce threshold, two substeps of gravity, and the restitution of a point from its approach speed are the paper's equation 34. The speculative point's two costs named by Catto 2013 are met as follows: the restitution needing special handling is the relax rule in `solve_contacts`; ghost collisions off a point the body never reaches are open (`docs/limits.md`). No other solver's source |
-| PK24 | Joints: one six-axis row with each axis locked, limited, driven or free. Locks along a path of joints by block Cholesky of a block tridiagonal J M^-1 J^T, in doubles, the sparsity Baraff 1996 uses; bias of the whole error, then a velocity projection on rows from the new pose, the two stages of RATTLE. Motors and springs as soft rows in implicit form, stiffness and damping per unit of effective mass in the acceleration model. Hinge alignment by a1 x a2, angle read along the axis, unwrapped by a tally; shortest arc to a joint's axis. Own, from derivation and measurement: the pushing pass, the one rule that keeps a rigid row with a warm start stable. Take one mode of J M^-1 J^T that a pass shrinks by g, with share s, error e, y = h J v and p = h a lambda the memory. Remembering every impulse gives p' = y' - y, so as g nears 1 the substep's matrix nears a Jordan block of three, e from y from p, and the only feedback is the error, of size (1 - g) s. Then mu^3 = -(1 - g) s, two of whose roots have a positive real part: the mode grows at any share, as a triple integrator does under position feedback alone. Measured on the 8 by 8 grid: speed triples each 10 steps from step 30, gap 1.5 m, 100 m/s; with 8 passes in place of 2 the same matrix gives 1e-5 m, so the singular matrix is not the cause; without warm starting 8e-4 m. Keeping the bias out of the memory removes the feedback path from the error to the memory, and the model's spectral radius falls under 1 for every g and s tried; measured 1.8e-4 m at 8 by 8 and 9.5e-4 m at 30 by 30. Soft rows have a way out of their own, as gamma lifts the slowest mode. Limits are rigid up to their edge and soft past it, the contact's Soft Step row (Catto 2011 form, per unit of effective mass), measured: with a rigid push a limb on a floor past its cone moved at 0.40 m/s for good, with the soft one it sleeps. A limit's row is the Schur complement of its joint's own locks, t M^-1 t^T - c^T K^-1 c with c = J M^-1 t^T, and it reads the speed those locks leave, own derivation; without it a rod came off its stop at a quarter of its speed, since the locks take back most of each impulse on the free body and the warm start remembers what the passes did not settle. A rope and a spring: a joint's first axis made the line between the anchors, reading their distance, with a limit row or a motor row in the force model; Muller et al. 2020 Eq 25 for the maximum distance, Catto 2011 for the spring. A spherical motor: three motor rows on the rotation vector left to the target, the target being frame A moved onto the rotation asked for; Tan, Liu and Turk 2011 ask the same of a PD servo, the control force from the next state, (M + Kd dt)^-1 in their Eq 11, of which this row's gamma is the scalar form, and their stability condition Kd >= Kp dt does not bind here, as the row is implicit in position too. Their M is the joint-space inertia, which a limit's Schur complement stands for here; a motor's free-body row lands within 0.0006 rad of the closed form as measured, because the passes converge on the row's fixed point, so motors stayed as they were. A cone: swing and twist split of the frame turn, q = swing twist (Dobrowolski 2015), twist 2 atan2(q.x, q.w) with its rate (a1 + a2) . w / (2 (x^2 + w^2)) from differentiating that angle, swing as an ellipse of the rotation vector's Y and Z parts, the row along the gradient measuring the first-order distance past the edge, own derivation. The share of 0.2 for paths that meet by Gauss-Seidel is a measured choice with room: 0.05 to 0.7 all hold a 30 by 30 grid. Rows that depend on each other: K = J M^-1 J^T is not formed; with F F^T = M^-1 per body (the roots of the inverse masses, the Cholesky factor of the inverse inertia), K = A^T A for A = F^T J^T, and Householder QR of A with column pivoting gives R, K's Cholesky factor with complete pivoting (Higham 1990, section 5.2, his (5.2.2)), solved as R^T y = b, R x = y (Higham 2008). Along a path A is block banded, so it is factored front by front: a joint's front is what the joint before left free on the body they share, compressed by a QR of those rows' parts on that body to at most six, and the six rows of its other body; its pivot is the column with the most of its own squared length left, complete pivoting on the matrix scaled to a unit diagonal, as linear and turning rows share no unit; the stop is Higham 1990's test (4.3) at his suggested n u, n the rows of the path, u f32's epsilon, as the rows are f32. The reflection's sign is the one that does not cancel. Why not K: eliminating it joint by joint puts W^T E W into each Schur complement (his Lemma 2.1, W = K11^-1 K12), and with no pivoting across joints W has any size; measured on joint web seed 1, a 13-row path on 12 freedoms with a 43 m spherical joint, the last pivot read 4e-7 of its size where the f32 rows give exactly 0 in rationals (so not the f32 inputs), 4.8e6 rad/s; seed 18 before it, 10 rows on 6 freedoms, Schur noise 1e-7, 3.8e8 m/s. The front by front order and the compression are our own arrangement of banded QR; the stop at n u in place of u alone is Higham's suggestion, and it also drops rows within about sqrt(n u) radians of depending. A push near such a pose: Buss and Kim 2005's bound gamma = min(1, N / M) gamma_max, from their section 4, with N what a path asks, M the fastest any body would go at its centre plus its arm, on the rise in a body's turn and in its centre over its arm. Where the code differs: they work per singular vector and bound the change itself, this cuts the whole path, as a path solve has no decomposition, and takes gamma_max 0.2 for their pi / 4, measured (taut chain 39 m/s at pi / 4; the chain of fifty first cut at 0.1). A first version bounded speed alone, at N, and it acted on 99 percent of a plain pendulum's substeps, cutting pushes to 0.37: the counters showed it, `a_small_gap_closes_in_one_push` holds that. A cut on the push alone left a limit's kick standing with the locks' answer to it cut, 1,000 times the energy, seen as a NaN at step 2,690 of one seed, so the cut reads the rise and not the gain. The bias cap is their ClampMag, its turning term their D_max,i = d_i + D_max, and r w h covers the r (h w)^2 / 2 a turn opens up to a turn of 2 radians. The warm start's line search is our own, the exact minimum of f(a) = a m^T J v + a^2 m^T K m / 2, with m^T K m read off as what the memory did to its own rows; a load that is right has its minimum at 1. An always-on search broke a light link and a chain on limits, so it runs only past one push's energy, a threshold set by measurement. | physics/kernel/src/joints.rs | **Read:** Baraff, "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996, in full, as extracted text; Hairer, Geometric Numerical Integration notes, section V.5 only, for RATTLE (Andersen 1983, not read itself); Catto, "Soft Constraints", GDC 2011, in full; Muller et al. 2020, in full, their Eq 20, Eq 21 and Algorithm 3; Dobrowolski, "Swing-twist decomposition in Clifford algebra", 2015, in full, Proposition 2 for the shortest arc and the split a cone uses; Wang, Servin and Berglund, "Warm starting the projected Gauss-Seidel algorithm for granular matter simulation", 2015, in full. Where the code differs: Baraff factors bodies and constraints together for trees and treats loops as auxiliary rows, while this code factors only serial paths and leaves branches and loops to Gauss-Seidel; Wang et al. take 85 percent of the last multiplier, found best by trial with no stability analysis, and a fraction was measured here too (0.9 holds 8 by 8 but left a 30 by 30 grid moving at 1.6 m/s), so the memory stays whole and the bias stays out of it. Tan, Liu and Turk, "Stable Proportional-Derivative Controllers", IEEE CG&A 2011, in full, as extracted text; Higham, "Analysis of the Cholesky Decomposition of a Semi-Definite Matrix", 1990 (MIMS EPrint 2008.56), in full, as extracted text, read again 2026-11-08 for Lemma 2.1, section 4 and section 5.2; Higham, "Cholesky Factorization", 2009 (MIMS EPrint 2008.116), in full; the Wikipedia article "Householder transformation", its QR section, for the reflection and its sign; Buss, "Introduction to Inverse Kinematics with Jacobian Transpose, Pseudoinverse and Damped Least Squares methods", 2009, in full; Buss and Kim, "Selectively Damped Least Squares for Inverse Kinematics", 2005, in full, the paper and not its source code. Andrews, Teichmann and Kry, "Geometric Stiffness for Real-time Constrained Multibody Dynamics", Computer Graphics Forum 36(2) 2017, in full as extracted text, for the cause of the level chain's stretch in `docs/known-bugs.md` (a pull's turning read explicitly, their section 1.2 and the stability bound h^2 k / m < 4 of their section 4.1); nothing of it is built, and its adaptive damping is claimed by US patent 10,713,400 B2. **Not read:** Golub and Van Loan, Matrix Computations, and Higham, Accuracy and Stability of Numerical Algorithms (books not to hand; nothing here rests on them beyond what the two Higham papers state); Householder 1958 and Businger and Golub 1965, known by citation only; Tournier, Nesme, Gilles and Faure, "Stable Constrained Dynamics", 2015, known through Andrews et al. only; Tomcin, Sibbing and Kobbelt 2014, whose PDF could not be fetched; Cline and Pai 2003 on post-stabilization, likewise; no text on trust regions as such. Nothing here rests on them. No engine source |
+| PK24 | Joints: one six-axis row with each axis locked, limited, driven or free. Locks along a path of joints by block Cholesky of a block tridiagonal J M^-1 J^T, in doubles, the sparsity Baraff 1996 uses; bias of the whole error, then a velocity projection on rows from the new pose, the two stages of RATTLE. Motors and springs as soft rows in implicit form, stiffness and damping per unit of effective mass in the acceleration model. Hinge alignment by a1 x a2, angle read along the axis, unwrapped by a tally; shortest arc to a joint's axis. Own, from derivation and measurement: the pushing pass, the one rule that keeps a rigid row with a warm start stable. Take one mode of J M^-1 J^T that a pass shrinks by g, with share s, error e, y = h J v and p = h a lambda the memory. Remembering every impulse gives p' = y' - y, so as g nears 1 the substep's matrix nears a Jordan block of three, e from y from p, and the only feedback is the error, of size (1 - g) s. Then mu^3 = -(1 - g) s, two of whose roots have a positive real part: the mode grows at any share, as a triple integrator does under position feedback alone. Measured on the 8 by 8 grid: speed triples each 10 steps from step 30, gap 1.5 m, 100 m/s; with 8 passes in place of 2 the same matrix gives 1e-5 m, so the singular matrix is not the cause; without warm starting 8e-4 m. Keeping the bias out of the memory removes the feedback path from the error to the memory, and the model's spectral radius falls under 1 for every g and s tried; measured 1.8e-4 m at 8 by 8 and 9.5e-4 m at 30 by 30. Soft rows have a way out of their own, as gamma lifts the slowest mode. Limits are rigid up to their edge and soft past it, the contact's Soft Step row (Catto 2011 form, per unit of effective mass), measured: with a rigid push a limb on a floor past its cone moved at 0.40 m/s for good, with the soft one it sleeps. A limit's row is the Schur complement of its joint's own locks, t M^-1 t^T - c^T K^-1 c with c = J M^-1 t^T, and it reads the speed those locks leave, own derivation; without it a rod came off its stop at a quarter of its speed, since the locks take back most of each impulse on the free body and the warm start remembers what the passes did not settle. A rope and a spring: a joint's first axis made the line between the anchors, reading their distance, with a limit row or a motor row in the force model; Muller et al. 2020 Eq 25 for the maximum distance, Catto 2011 for the spring. A spherical motor: three motor rows on the rotation vector left to the target, the target being frame A moved onto the rotation asked for; Tan, Liu and Turk 2011 ask the same of a PD servo, the control force from the next state, (M + Kd dt)^-1 in their Eq 11, of which this row's gamma is the scalar form, and their stability condition Kd >= Kp dt does not bind here, as the row is implicit in position too. Their M is the joint-space inertia, which a limit's Schur complement stands for here; a motor's free-body row lands within 0.0006 rad of the closed form as measured, because the passes converge on the row's fixed point, so motors stayed as they were. A cone: swing and twist split of the frame turn, q = swing twist (Dobrowolski 2015), twist 2 atan2(q.x, q.w) with its rate (a1 + a2) . w / (2 (x^2 + w^2)) from differentiating that angle, swing as an ellipse of the rotation vector's Y and Z parts, the row along the gradient measuring the first-order distance past the edge, own derivation. The share of 0.2 for paths that meet by Gauss-Seidel is a measured choice with room: 0.05 to 0.7 all hold a 30 by 30 grid. Rows that depend on each other: K = J M^-1 J^T is not formed; with F F^T = M^-1 per body (the roots of the inverse masses, the Cholesky factor of the inverse inertia), K = A^T A for A = F^T J^T, and Householder QR of A with column pivoting gives R, K's Cholesky factor with complete pivoting (Higham 1990, section 5.2, his (5.2.2)), solved as R^T y = b, R x = y (Higham 2008). Along a path A is block banded, so it is factored front by front: a joint's front is what the joint before left free on the body they share, compressed by a QR of those rows' parts on that body to at most six, and the six rows of its other body; its pivot is the column with the most of its own squared length left, complete pivoting on the matrix scaled to a unit diagonal, as linear and turning rows share no unit; the stop is Higham 1990's test (4.3) at his suggested n u, n the rows of the path, u f32's epsilon, as the rows are f32. The reflection's sign is the one that does not cancel. Why not K: eliminating it joint by joint puts W^T E W into each Schur complement (his Lemma 2.1, W = K11^-1 K12), and with no pivoting across joints W has any size; measured on joint web seed 1, a 13-row path on 12 freedoms with a 43 m spherical joint, the last pivot read 4e-7 of its size where the f32 rows give exactly 0 in rationals (so not the f32 inputs), 4.8e6 rad/s; seed 18 before it, 10 rows on 6 freedoms, Schur noise 1e-7, 3.8e8 m/s. The front by front order and the compression are our own arrangement of banded QR; the stop at n u in place of u alone is Higham's suggestion, and it also drops rows within about sqrt(n u) radians of depending. A push near such a pose: Buss and Kim 2005's bound gamma = min(1, N / M) gamma_max, from their section 4, with N what a path asks, M the fastest any body would go at its centre plus its arm, on the rise in a body's turn and in its centre over its arm. Where the code differs: they work per singular vector and bound the change itself, this cuts the whole path, as a path solve has no decomposition, and takes gamma_max 0.2 for their pi / 4, measured (taut chain 39 m/s at pi / 4; the chain of fifty first cut at 0.1). A first version bounded speed alone, at N, and it acted on 99 percent of a plain pendulum's substeps, cutting pushes to 0.37: the counters showed it, `a_small_gap_closes_in_one_push` holds that. A cut on the push alone left a limit's kick standing' answer to it cut, 1,000 times the energy, seen as a NaN at step 2,690 of one seed, so the cut reads the rise and not the gain. The bias cap is their ClampMag, its turning term their D_max,i = d_i + D_max, and r w h covers the r (h w)^2 / 2 a turn opens up to a turn of 2 radians. The warm start's line search is our own, the exact minimum of f(a) = a m^T J v + a^2 m^T K m / 2, with m^T K m read off as what the memory did to its own rows; a load that is right has its minimum at 1. An always-on search broke a light link and a chain on limits, so it runs only past one push's energy, a threshold set by measurement. | physics/kernel/src/joints.rs | **Read:** Baraff, "Linear-Time Dynamics using Lagrange Multipliers", SIGGRAPH 1996, in full, as extracted text; Hairer, Geometric Numerical Integration notes, section V.5 only, for RATTLE (Andersen 1983, not read itself); Catto, "Soft Constraints", GDC 2011, in full; Muller et al. 2020, in full, their Eq 20, Eq 21 and Algorithm 3; Dobrowolski, "Swing-twist decomposition in Clifford algebra", 2015, in full, Proposition 2 for the shortest arc and the split a cone uses; Wang, Servin and Berglund, "Warm starting the projected Gauss-Seidel algorithm for granular matter simulation", 2015, in full. Where the code differs: Baraff factors bodies and constraints together for trees and treats loops as auxiliary rows, while this code factors only serial paths and leaves branches and loops to Gauss-Seidel; Wang et al. take 85 percent of the last multiplier, found best by trial with no stability analysis, and a fraction was measured here too (0.9 holds 8 by 8 but left a 30 by 30 grid moving at 1.6 m/s), so the memory stays whole and the bias stays out of it. Tan, Liu and Turk, "Stable Proportional-Derivative Controllers", IEEE CG&A 2011, in full, as extracted text; Higham, "Analysis of the Cholesky Decomposition of a Semi-Definite Matrix", 1990 (MIMS EPrint 2008.56), in full, as extracted text, read again 2026-11-08 for Lemma 2.1, section 4 and section 5.2; Higham, "Cholesky Factorization", 2009 (MIMS EPrint 2008.116), in full; the Wikipedia article "Householder transformation", its QR section, for the reflection and its sign; Buss, "Introduction to Inverse Kinematics with Jacobian Transpose, Pseudoinverse and Damped Least Squares methods", 2009, in full; Buss and Kim, "Selectively Damped Least Squares for Inverse Kinematics", 2005, in full, the paper and not its source code. Andrews, Teichmann and Kry, "Geometric Stiffness for Real-time Constrained Multibody Dynamics", Computer Graphics Forum 36(2) 2017, in full as extracted text, for the cause of the level chain's stretch in `docs/known-bugs.md` (a pull's turning read explicitly, their section 1.2 and the stability bound h^2 k / m < 4 of their section 4.1); nothing of it is built, and its adaptive damping is claimed by US patent 10,713,400 B2. **Not read:** Golub and Van Loan, Matrix Computations, and Higham, Accuracy and Stability of Numerical Algorithms (books not to hand; nothing here rests on them beyond what the two Higham papers state); Householder 1958 and Businger and Golub 1965, known by citation only; Tournier, Nesme, Gilles and Faure, "Stable Constrained Dynamics", 2015, known through Andrews et al. only; Tomcin, Sibbing and Kobbelt 2014, whose PDF could not be fetched; Cline and Pai 2003 on post-stabilization, likewise; no text on trust regions as such. Nothing here rests on them. No engine source |
 | PK25 | Events and filters: a pair's touching is compared with what it found last step and each change listed, two words an event; groups are the root entry's own `collisionGroups` packing, 16 bits of memberships and 16 of filter, a pair meeting when each one's memberships cross the other's filter; a sensor pair only finds whether it overlaps; dominance is a bit on the pair read where its two bodies are fetched, between dynamic bodies only; a disabled body or collider leaves every pair and returns with its state | physics/kernel/src/events.rs, narrow.rs | **Read:** none; bookkeeping with no paper behind it, written from the root entry's own documented behaviour in `packages/physics/README.md` |
 | PK26 | Convex hulls from points: Quickhull, each point in the outside set of a face it lies above, the farthest point of a set added next, the faces it sees replaced by a fan to their horizon (the paper's simplified Beneath-Beyond, Theorem 2.1), the first tetrahedron from axis extremes. Fat planes and the horizon as a depth first walk that yields one counter-clockwise loop, from Gregorius. Own: a face counts as seen when the eye spans a positive volume with its three corners, past Shewchuk's stage A bound on that volume's rounding, (7e + 56e^2) times the permanent of the same expansion with e = 2^-53 (until 2026-11-07 an own, wider bound of 45 ulp of the product of the three L1 lengths, which called a point a hair above a wide face not above it), so neighbouring faces agree on what the eye sees; until 2026-11-07 a face counted as seen unless the eye was clearly below its rounded plane, which folded the fan over a face it kept on Thingi10K meshes 40261 and 41940 and left hulls that were not convex. An eye on the line of a horizon edge takes the face beyond it too. Two faces merge only where their outlines meet along one run of edges, so no merged face is pinched at a corner; triangles merge after the build, grown from the largest over neighbours within a quarter of the kernel's FLAT of its supporting plane, which leaves no holes as a convex surface under a supporting plane is bounded from below by its edge, a triangle touching only at a corner waiting for a second shared edge; then neighbours the kernel calls one plane merge in independent sets sorted by angle, the paper's order. The kernel now calls two faces one plane only when every corner lies within half of FLAT of the other's plane, as an angle alone refused real creases of random clouds | physics/src/next/hull.ts; physics/kernel/src/hull.rs | **Read:** Barber, Dobkin and Huhdanpaa, "The Quickhull Algorithm for Convex Hulls", ACM TOMS 22(4) 1996, in full as extracted text, except its Figure 1 outline, which is a picture the extraction lost; Gregorius, "Implementing Quickhull", GDC 2014, the speaker notes in full as extracted text, not the slide pictures, so none of its code snippets. Where the code differs: the paper and Gregorius merge during the build, this code builds triangles with fat planes and merges after, and keeps every corner at a given point rather than moving planes. Shewchuk, "Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates", Discrete and Computational Geometry 18(3) 1997, sections 1 and 4.4 of the short paper, and Tables 1 and 3 of the long technical report (CMU-CS-96-140, robust-arithmetic.ps from the Quake project papers), as extracted text, for filtering a determinant's sign by a bound on its rounding; the ORIENT3D stage A bound of Table 3 is used as given, and no exact arithmetic is used, so a volume within the bound counts as none. Not read: the qhull program and the Java implementation Gregorius names; no engine source |
 | PK27 | Body kinds, a body's own solid and extra passes: the own solid added to the colliders by the parallel axis theorem, m (\|d\|^2 E - d d^T), and its principal moments rotated in as R D R^T, both already in `mass.rs`; a body made fixed leaves its fixed pairs and one made moving finds them by one walk over the sorted ends; an island asking for e extra passes takes the last iterations + e of iterations + the most asked, so the pushing pass stays the last for all and the island runs as that world would, bit for bit. The generic joint is the six-axis row PK24 already solves, its locks, limits and motors named by axis | physics/kernel/src/mass.rs, island.rs, integrate.rs; physics/src/next/body.ts, joint.ts | **Read:** none new; the parallel axis theorem is textbook mechanics, the rest is bookkeeping written from the root entry's documented behaviour in `packages/physics/README.md` and from Rapier's outputs through its npm API (mass, centre and inertia after each call), never its source |
@@ -2012,24 +2209,25 @@ The own solver's kernel (`packages/physics/kernel`, Rust, no dependencies). Noth
 | EX14 | FBX physically based materials and layered textures: the property names real files carry, the specular to metallic sum | fbx/src/pbr.ts | Autodesk's public help on the Max Physical and PBR materials, the Stingray PBS shader and Arnold Standard Surface; the FBX SDK class reference (FbxLayeredTexture); the published glTF notes on KHR_materials_pbrSpecularGlossiness conversion. Read from real files; no code of any importer read. |
 | EX15 | FBX curve records: the NURBS fields real files carry and the wrapped points of a periodic form | fbx/src/curves.ts | FbxNurbsCurve class reference, real Maya and 3ds Max files; the evaluation is Piegl and Tiller, The NURBS Book, in geometry/nurbs |
 | EX16 | In-between weights and blended skin share | fbx/src/deformers.ts, fbx/src/skin.ts | FbxBlendShapeChannel, FbxSkin and FbxCluster class references; piecewise linear stops and the share measured against OBJ frames Maya wrote |
+| EX18 | Character Creator material json: layout, texture slots, eye occlusion and tear line shells | fbx/src/character-creator.ts | Read from the structure of a json Character Creator wrote (no published spec, no reader source read); glTF 2.0 section 3.9 channel layout; the lid shadow as ambient occlusion of the eyeball (Zhukov, Iones and Kronin, EGWR 1998; Jimenez, von der Pahlen et al., "Next-Generation Character Rendering", GDC 2013), its numbers read by their names; sRGB transfer of IEC 61966-2-1 |
 | EX17 | FBX camera and light properties on export, and the turn from -Z to +X and -Y | fbx/src/export.ts | FbxCamera and FbxLight class references; thin lens field of view; checked by reading the file in Blender as a user |
 | EX4 | Euler XYZ to and from quaternion, slerp, Hermite sampling of glTF cubic keys | fbx/src/export.ts | Textbook rotation algebra (Shoemake 1985 for slerp); glTF 2.0 specification, appendix C, for the cubic spline |
 
-### gltf-pro
+### gltf/pbr
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| P9 | Sheen roughness floor | gltf-pro/src/shader.ts | Margo-own: documented in comment (peak D bound) |
-| P14 | Built-in hemisphere ambient (ground-to-sky gradient) and crude ambient specular | gltf-pro/src/shader.ts, gltf-pro/src/pbr-hooks.js, gltf-pro/src/lobe-shader.ts | Margo-own: hemisphere ambient colours and weights are a Margo design choice |
-| P15 | Minimum perceptual roughness | gltf-pro/src/shader.ts, core/src/engine.ts, core/src/geometry.ts | published engine standard: minimum perceptual roughness of the Filament design document |
-| P16 | Dielectric F0 from IOR times specular colour/factor | gltf-pro/src/shader.ts | KHR_materials_ior, KHR_materials_specular |
-| P17 | Clearcoat Fresnel and layering | gltf-pro/src/shader.ts, materials/src/shader.ts | KHR_materials_clearcoat (F0 0.04 for IOR 1.5; mix by clearcoat x fresnel) |
-| P18 | Thin-film Fresnel | gltf-pro/src/shader.ts, materials/src/iridescence.ts | KHR_materials_iridescence; Belcour & Barla 2017 |
-| P19 | Anisotropic GGX D and visibility; direction rotation | gltf-pro/src/shader.ts, gltf-pro/src/lobe-shader.ts | KHR_materials_anisotropy "Implementation"; Burley 2012; Heitz 2014 (separable G1 in lobe-shader, cites pbr-book) |
-| P20 | Anisotropic bent normal for IBL | gltf-pro/src/shader.ts | KHR_materials_anisotropy "Image-based lighting" (spec text gives this heuristic) |
-| P21 | Isotropic V term, diffuse transmission back lobe | gltf-pro/src/shader.ts | glTF Appendix B; KHR_materials_diffuse_transmission |
-| P22 | Ambient layering (iridescence/diffuse-transmission split of an IBL hook) | gltf-pro/src/shader.ts | Margo-own: Margo derivation (documented, "ponytail" note) |
-| P44 | F0 to IOR guard | gltf-pro/src/shader.ts | Margo-own: Margo guard (documented) |
+| P9 | Sheen roughness floor | gltf/src/shader.ts | Margo-own: documented in comment (peak D bound) |
+| P14 | Built-in hemisphere ambient (ground-to-sky gradient) and crude ambient specular | gltf/src/shader.ts, gltf/src/pbr-hooks.js, gltf/src/lobe-shader.ts | Margo-own: hemisphere ambient colours and weights are a Margo design choice |
+| P15 | Minimum perceptual roughness | gltf/src/shader.ts, core/src/engine.ts, core/src/geometry.ts | published engine standard: minimum perceptual roughness of the Filament design document |
+| P16 | Dielectric F0 from IOR times specular colour/factor | gltf/src/shader.ts | KHR_materials_ior, KHR_materials_specular |
+| P17 | Clearcoat Fresnel and layering | gltf/src/shader.ts, materials/src/shader.ts | KHR_materials_clearcoat (F0 0.04 for IOR 1.5; mix by clearcoat x fresnel) |
+| P18 | Thin-film Fresnel | gltf/src/shader.ts, materials/src/iridescence.ts | KHR_materials_iridescence; Belcour & Barla 2017 |
+| P19 | Anisotropic GGX D and visibility; direction rotation | gltf/src/shader.ts, gltf/src/lobe-shader.ts | KHR_materials_anisotropy "Implementation"; Burley 2012; Heitz 2014 (separable G1 in lobe-shader, cites pbr-book) |
+| P20 | Anisotropic bent normal for IBL | gltf/src/shader.ts | KHR_materials_anisotropy "Image-based lighting" (spec text gives this heuristic) |
+| P21 | Isotropic V term, diffuse transmission back lobe | gltf/src/shader.ts | glTF Appendix B; KHR_materials_diffuse_transmission |
+| P22 | Ambient layering (iridescence/diffuse-transmission split of an IBL hook) | gltf/src/shader.ts | Margo-own: Margo derivation (documented, "ponytail" note) |
+| P44 | F0 to IOR guard | gltf/src/shader.ts | Margo-own: Margo guard (documented) |
 
 ### lightmap
 
@@ -2062,7 +2260,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| LD1 | imposter relight: GGX/Schlick sun + gltf-pro hemisphere ambient or flat; Neutral | lod/src/imposter.ts | as VX5/VX6/VX7 |
+| LD1 | imposter relight: GGX/Schlick sun + gltf/pbr hemisphere ambient or flat; Neutral | lod/src/imposter.ts | as VX5/VX6/VX7 |
 | LD2 | octahedral view grid, 3-view blend with one parallax step | lod/src/imposter.ts | octahedral map: Praun & Hoppe 2003; Cigolle et al. 2014. Imposter idea: Brucks 2018 "Octahedral Impostors" (blog; technique only, no numbers used) |
 | LD3 | coverage cross-fade 0.25-0.75 and IGN dither | lod/src/imposter.ts | Jimenez 2014 |
 
@@ -2070,7 +2268,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| P8 | Sheen albedo scaling of the base layer | materials/src/lobe-shader.ts, gltf-pro/src/shader.ts | KHR_materials_sheen "Albedo-scaling technique" |
+| P8 | Sheen albedo scaling of the base layer | materials/src/lobe-shader.ts, gltf/src/shader.ts | KHR_materials_sheen "Albedo-scaling technique" |
 | P23 | Specular-extension Fresnel mix, diffuse x (1-max F) | materials/src/lobe-shader.ts | KHR_materials_specular (dielectric_brdf / albedo scaling) |
 | P24 | L2 SH irradiance evaluation | materials/src/env-map.ts | Ramamoorthi & Hanrahan 2001 (real SH basis constants) |
 | P25 | Split-sum environment BRDF, analytic | materials/src/env-map.ts | published engine standard: Karis 2014, "Physically Based Shading on Mobile" (after Lazarov 2013) |
@@ -2126,6 +2324,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | P-02 | Luma for the Karis weight | post/src/bloom.ts | ITU-R BT.709 |
 | P-03 | Threshold: keep the part of the brightest channel above `threshold` | post/src/bloom.ts | Margo-own: Margo design (hard knee), public default threshold 1 |
 | P-04 | Level weights for `radius` | post/src/bloom.ts | Margo-own: Margo design, documented in `BloomOptions.radius` |
+| P-04b | `fireflies: 'temporal'` (default): the top level keeps both the linear filter and the Karis average and gives back the light the average took, up to the linear luma the 3 x 3 coarsest texels held the frame before (carried down the chain in alpha) times the top texels each covers; energy conservation of the glow | post/src/bloom.ts | Spencer, Shirley, Zimmerman and Greenberg, SIGGRAPH 1995 (glare PSF integrates to the scattered share); Karis, SIGGRAPH 2014 Advances (the 1/(1+luma) average); Nehab et al., Graphics Hardware 2007 (temporal stability test); Salvi, GDC 2016 (neighbourhood bounds). Combination and the coarse-level budget are Margo-own (KB-CABIN-BLOOM1) |
 | P-05 | Triangular dither of up to one 8-bit step | post/src/bloom.ts | Gjøl & Svendsen, "INSIDE", GDC 2016 (cited). The hash is Chris Wellons' published "lowbias32" ("Prospecting for Hash Functions", 2018, public domain) seeded with the golden-ratio and MurmurHash3 fmix constants. The hash is not cited in the code |
 | P-06 | SSAO: normal-oriented hemisphere kernel, range check | post/src/shaders.ts | Mittring, "Finding Next Gen: CryEngine 2", SIGGRAPH 2007 course; J. Chapman, "SSAO Tutorial" (2013, blog): hemisphere kernel, 4x4 rotation noise, range check |
 | P-07 | 32-sample kernel | post/src/ssao.ts | Golden-angle spiral (Vogel 1979); the length falloff lerp(0.1, 1, s^2) is Chapman's tutorial |
@@ -2207,7 +2406,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | SH11 | cloud shadow: the sky's own coverage remap and erosion along the ray to the sun, Beer-Lambert opacity | shadows/src/light-function.ts | Schneider 2015, "The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn" (as the sky's clouds) |
 | SH13 | variance shadow map: two moments, separable tent blur, Chebyshev upper bound | shadows/src/vsm.ts | Donnelly and Lauritzen 2006, "Variance Shadow Maps", I3D |
 | SH14 | light bleeding reduction: the bound remapped from an amount to 1 | shadows/src/vsm.ts | Lauritzen 2007, "Summed-Area Variance Shadow Maps", GPU Gems 3, chapter 8 |
-| SH15 | light through a thin surface: factor times colour, the back lit by the opposite-hemisphere BTDF | shadows/src/transmission.ts, gltf-pro/src/shader.ts | Khronos KHR_materials_diffuse_transmission specification |
+| SH15 | light through a thin surface: factor times colour, the back lit by the opposite-hemisphere BTDF | shadows/src/transmission.ts, gltf/src/shader.ts | Khronos KHR_materials_diffuse_transmission specification |
 | SH16 | share of a scattering sheet at a distance: size^2 / (size^2 + d^2) | shadows/src/transmission.ts | Differential element to parallel disc configuration factor: Siegel and Howell, "Thermal Radiation Heat Transfer" |
 | SH17 | far shadows: a horizon elevation per height field point, found by sampling along the line towards the sun, compared with the sun's elevation; the sample of greatest elevation from the point's ground is kept with its distance for SH18 (ranking by height over the sun's ray instead picked a near rise over a higher far horizon) | shadows/src/distance.ts | Stewart 1996, "Fast Horizon Computation for Accurate Terrain Rendering", University of Toronto TR 349, read in full; later in IEEE TVCG 4(1), 1998. Its sections II and VI give the method of Max 1988 ("Horizon mapping: shadows for bump-mapped surfaces", The Visual Computer 4(2)) and the undersampling of one line. Max's own paper is paywalled and was not read |
 | SH18 | far penumbra: the share of the sun's disc above a horizon taken as level across the disc, by the area of a circular segment | shadows/src/distance.ts | The fraction rule as Stewart 1996 reports it of Max; the level horizon as Fritsch et al. 2025, "Fast Planetary Shadows using Fourier-Compressed Horizon Maps", HPG talk slides, read in full; segment area is textbook geometry |
@@ -2225,8 +2424,8 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | P3 | Khronos PBR Neutral + sRGB encode | shared/display.js, core/src/shaders.ts, shader/src/raw.ts | Khronos PBR Neutral spec (2024); IEC 61966-2-1 |
 | P4 | Light distance window and spot cone | shared/light-terms.js | Karis 2013 eq. 9 (window); floor is Margo's (documented: ball of radius 1/64) |
 | P5 | clustered per-light BRDF text | shared/light-terms.js | glTF Appendix B |
-| P6 | Charlie sheen D and Neubelt visibility | shared/sheen.js | Estevez & Kulla 2017; KHR_materials_sheen (visibility 1/(4(nl+nv-nl nv))) |
-| P7 | Sheen directional albedo fit E(mu,r) | shared/sheen.js | Margo-own: fitted by Margo, scripts/sheen-albedo-fit.mjs (numerical integration of P6) |
+| P6 | Charlie sheen D and Estevez and Kulla visibility | shared/sheen.js | Estevez & Kulla 2017 (eq. 3, Table 1); KHR_materials_sheen "Sheen visibility" (KB3297c, 2026-11-15) |
+| P7 | Sheen directional albedo table E(mu,r) | shared/sheen.js | Margo-own: 16 x 16 table of ln(E R) fitted by Margo, scripts/sheen-albedo-fit.mjs (tanh-sinh integration of P6; layout and comparison under KB3297c) |
 | P10 | Linear and exp2 fog with height falloff | shared/fog.js | OpenGL 1.x fixed-function fog equations (linear, EXP2); height term is a plain exponential |
 | P11 | Margo ACES-style fit | shared/aces.js | Margo-own: least-squares fit of its own functional form to sampled curve outputs (clean room) |
 | P12 | Narkowicz ACES curve | shared/aces.js | Narkowicz 2016 blog (published formula) |
@@ -2272,8 +2471,8 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | S28 | sky light for the clouds: the reflection map cosine-weighted over the upper hemisphere and averaged over the horizon band | sky/src/volumetric-clouds.ts | Margo-own: reuses the sky's reflection map (S19) |
 | S29 | volumetric cloud shadow: the clouds' own density field marched from the receiver to the sun at midpoints, Beer-Lambert transmittance; exit distance as the stable positive root | sky/src/cloud-shadows.ts | Beer-Lambert; the field is S23 (Schneider 2015); roots as S27 (Press et al.) |
 | S30 | Earth's air: Rayleigh (5.802, 13.558, 33.1)e-3 /km, scale height 8 km; Mie scattering 3.996e-3 and absorption 4.44e-3 /km, 1.2 km, g 0.8; ozone (0.650, 1.881, 0.085)e-3 /km as a tent at 25 km, half width 15 km; ground albedo 0.3 | sky/src/atmosphere-luts.ts | Hillaire 2020, "A Scalable and Production Ready Sky and Atmosphere Rendering Technique", EGSR, Table 1; ozone tent and albedo from Bruneton 2017, "Precomputed Atmospheric Scattering: a New Implementation" |
-| S31 | transmittance table mapping (x_mu over the distance to the top, x_r over the horizon distance) and its inverse; 40-step integration | sky/src/atmosphere-luts.ts | Bruneton 2017 sec. 2.3 (mapping); Hillaire 2020 sec. 5.1 |
-| S32 | multiple scattering table: L2 and f_ms over 64 directions, 20 steps each, Psi = L2 / (1 - f_ms), Lambert ground | sky/src/atmosphere-luts.ts | Hillaire 2020 sec. 5.5.2, eq. 5 to 9 |
+| S31 | transmittance table mapping (x_mu over the distance to the top, x_r over the horizon distance) and its inverse; 40-step integration over the far root -r mu + sqrt(r^2 mu^2 - (r - t)(r + t)) to the top | sky/src/atmosphere-luts.ts | Bruneton 2017 sec. 2.3 (mapping, distance to the top boundary); Hillaire 2020 sec. 5.1 |
+| S32 | multiple scattering table: L2 and f_ms over 64 directions, 20 steps each, Psi = L2 / (1 - f_ms), Lambert ground; texel (i, j) at sun cosine i / 31 x 2 - 1 and height j / 31, the grid its 0.5/32 + u x 31/32 lookup reads | sky/src/atmosphere-luts.ts | Hillaire 2020 sec. 5.5.2, eq. 5 to 9 |
 | S33 | in-scattering with the sun's transmittance and the planet's shadow plus sigma_s Psi; per-step analytic integral; Rayleigh phase 3/(16 pi)(1 + nu^2), Cornette-Shanks Mie phase | sky/src/atmosphere-luts.ts | Hillaire 2020 eq. 1, 10, 11; Hillaire 2016 (step integral); Cornette and Shanks 1992, Applied Optics 31(16) |
 | S34 | aerial perspective volume: 32 x 32 columns, 32 slices at reach * ((k + 1) / 32)^2, read by sqrt(d / reach); scene times transmittance then plus in-scatter, two blended draws | sky/src/aerial.ts | Hillaire 2020 sec. 5.3 (camera volume); square-root slice spacing and the two-draw blend are Margo's |
 | S35 | default sun illuminance 10 with the Preetham sky: its horizon at noon, turbidity 2, is 1.9 to 2.2 times dimmer than this air at 20 | sky/src/aerial.ts | Margo-own: measured on the GPU (features-check.mjs aerial) |
@@ -2286,7 +2485,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | S42 | splash slots: each lands once a period at a hashed place on the topmost surface the map holds, a crown ring and four droplets on parabolic arcs | sky/src/weather-fx.ts | Margo-own: hashed placement as the weather's own particles (PCG, Jarzynski and Olano 2020) |
 | S43 | lens wetness approaching the rain's amount (4 s) in the open by the map at the camera and drying (25 s) under cover; drops on a hashed schedule, one in three running down | sky/src/weather-fx.ts | Margo-own; first-order approach as the weather's own wetness |
 | S44 | sleet: the weather's own rain and snow drawn together, each with its share of the particle count, the snow on a salted hash seed; wetness and snow cover approach their goals times their shares; `skyWeather` turns rain and snow amounts into a total and a snow share | sky/src/weather.ts, weather/src/sky-settings.ts | Margo-own |
-| S45 | astronomical sky: Julian Day, Delta T, mean and apparent sidereal time, short-series nutation, rigorous precession, the sun's low-accuracy place, the moon's chapter 47 series with parallax and its phase angle and lit fraction, planetary magnitudes; Keplerian planets from tabulated elements with light time and the Earth from the Earth-Moon barycentre; refraction, air mass and extinction; star colour from B-V; the BSC5 fixed-width record layout | sky/src/astro.ts | Meeus, "Astronomical Algorithms", 2nd ed. 1998 (ch. 7, 12, 21, 22, 25, 41, 47, 48); Standish, "Keplerian Elements for Approximate Positions of the Major Planets", JPL Solar System Dynamics (Table 1); Espenak and Meeus, "Polynomial Expressions for Delta T", NASA 2006; Saemundsson, Sky and Telescope 72, 1986 (refraction); Kasten and Young, Applied Optics 28, 1989 (air mass); Ballesteros, EPL 97, 2012 (B-V to temperature); Hoffleit and Warren, BSC5 ReadMe (CDS V/50) |
+| S45 | astronomical sky: Julian Day, Delta T, mean and apparent sidereal time, short-series nutation, rigorous precession, the sun's low-accuracy place, the moon's chapter 47 series with parallax and its phase angle and lit fraction, planetary magnitudes; Keplerian planets from tabulated elements with light time and the Earth from the Earth-Moon barycentre; refraction, air mass and extinction; star colour from B-V; the BSC5 fixed-width record layout | sky/src/astro.ts | Meeus, "Astronomical Algorithms", 2nd ed. 1998 (ch. 7, 12, 21, 22, 25, 41, 47, 48); Standish, "Keplerian Elements for Approximate Positions of the Major Planets", JPL Solar System Dynamics (Table 1); Espenak and Meeus, "Polynomial Expressions for Delta T", NASA 2006, https://eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html (fetched and read 2026-11-14: every range from -500 to 2150; the lunar secular acceleration correction there is for the Canon's ephemeris and is not applied); Saemundsson, Sky and Telescope 72, 1986 (refraction, down to the apparent horizon); US Naval Observatory, Astronomical Applications Department, "Rise, Set, and Twilight Definitions" (34 arcminutes of refraction at the horizon; civil, nautical and astronomical twilight at geometric -6, -12 and -18 degrees; read through secondary summaries, the page itself not fetched): the lift below the apparent horizon fades linearly from Saemundsson's 34.4 arcminutes to none at -6 degrees, a Margo join that meets both; Kasten and Young, Applied Optics 28, 1989 (air mass); Ballesteros, EPL 97, 2012 (B-V to temperature); Hoffleit and Warren, BSC5 ReadMe (CDS V/50); A. Mallama and J. L. Hilton, "Computing Apparent Planetary Magnitudes for The Astronomical Almanac", Astronomy and Computing 25, 2018, arXiv:1808.01973 (fetched and read: section 3.6 Eq. 10 and section 4.6, Saturn with its rings; section 3.4 Eq. 6 and its Stirling interpolation, Mars); Mars' two correction tables of A. Mallama, "The magnitude and albedo of Mars", Icarus 192, 2007 (closed access, not read), recovered by a least-squares fit to JPL Horizons Mars magnitudes (US government, public domain; https://ssd.jpl.nasa.gov/api/horizons.api; derivation in docs/limits.md, Mars magnitude tables) and checked against A. Mallama, "The absolute magnitude and albedo of the planets" (2017), arXiv:1609.05048, Tables A-4.4 and A-4.6 (fetched and read); Mars' pole and prime meridian and Saturn's pole from the IAU WGCCRE reports (Archinal et al., Celestial Mechanics and Dynamical Astronomy, 2011 and 2018; not fetched) |
 | S46 | ground albedo feedback: Lambertian ground radiance albedo / pi x E; E the direct sun (20 x T x mu_s) for the first bounce, then the previous order's sky cosine-weighted over 32 upper-hemisphere directions, in a 64-entry table over mu_s; added to the scattering density for directions that end on the ground, times T(ground, up) / T(eye, up); order n reads the ground lit by order n - 2 | sky/src/bruneton.ts | Bruneton & Neyret 2008, "Precomputed Atmospheric Scattering", EGSR, sec. 2 (ground reflection R[L] from the irradiance E) and sec. 4 (per-order algorithm); albedo guide values (fresh snow about 0.8, sand 0.3 to 0.4, grass and forest 0.1 to 0.25) from Coakley 2003, "Reflectance and Albedo, Surface", Encyclopedia of Atmospheric Sciences |
 | S47 | planet presets: Mars radius 3389.5 km, 6.36 mb, 214 K, scale height 11 km, Bond albedo 0.25, sunlight 0.431 of Earth's; Rayleigh = CO2 cross section 12.4e-27 cm^2 at 532 nm x (532 / lambda)^4 x p / kT at 680, 550, 440 nm; dust extinction = optical depth / 11 km, grey, single scattering albedo 0.975 / 0.94 / 0.90 (R, G, B), asymmetry 0.67; Mie scattering and absorption per channel in the Hillaire medium | sky/src/presets.ts, sky/src/atmosphere-luts.ts | NASA NSSDCA Mars Fact Sheet (Williams); Sneep & Ubachs 2005, "Direct measurement of the Rayleigh scattering cross section in various gases", JQSRT 92; Wolff et al. 2009, "Wavelength dependence of dust aerosol single scattering albedo as observed by CRISM", JGR 114 E00D04 (red 0.975 as applied by Chen-Chen et al. 2019; green the MGS/TES solar band 0.93 to 0.94 quoted in Wolff et al. 2008, MAMO abstract 9125; blue Margo's reading); Chen-Chen, Perez-Hoyos & Sanchez-Lavega 2019, Icarus 330 (g = 0.673); Lemmon et al. 2015, Icarus 251 (clear-day optical depth) |
 | S48 | puddles: wet ground darker by up to 25% and smoother to 35% of its roughness (as `surfaceResponse`); standing water where a three-octave value-noise relief lies below a level read from its measured quantiles, on surfaces within about 15 degrees of flat, with roughness 0.03, no metal and an up normal; rain rings as the slope of a travelling Gaussian bump, one drop per cell of two offset grids | weather/src/puddles.ts, weather/src/scene-patch.ts | Margo-own (wet surfaces as darker, smoother layers after Lagarde 2013, "Water drop 3b: physically based wet surfaces", the published article only) |
@@ -2316,7 +2515,7 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | S72 | UI drawing on WebGL2: instanced quads with per-instance attributes (`vertexAttribDivisor` 1), each run drawn with its attribute offsets moved to its first instance, glyph atlases as 2D array textures written with `texSubImage3D`, clip regions as scissor boxes in bottom-up window rows | ui/src/gl.ts | Khronos OpenGL ES 3.0.6 specification, sections 2.9.3 (instanced arrays and the divisor), 3.8.3 and 3.8.5 (array textures, `TexStorage3D`, `TexSubImage3D`) and 4.1.2 (scissor test in window coordinates); Khronos WebGL 2.0 specification, section 3.7 (`UNPACK_FLIP_Y_WEBGL`, `UNPACK_PREMULTIPLY_ALPHA_WEBGL`) |
 | S74 | virtual lists: of n rows of height h and gap g in a view of height V scrolled by s, build rows floor(s / (h + g)) - k to ceil((s + V) / (h + g)) + k (k the overscan), and size two spacers to the rows before and after so the content height is n h + (n - 1) g | ui/src/virtual.ts | Margo-own: the arithmetic follows from rows of one height; W3C WAI-ARIA 1.2, `listbox` and `option` roles, and `aria-setsize` and `aria-posinset` for a list whose rows are not all in the DOM |
 | S75 | UI markup and style sheets: elements, attributes in quotes, comments, processing instructions skipped, the five predefined entities and decimal and hexadecimal character references; type, id and class selectors with descendant and child combinators, specificity counted as (ids, classes, types) and compared in that order, later rules winning ties | ui/src/markup.ts | W3C Extensible Markup Language (XML) 1.0, Fifth Edition, sections 2.4 (character data), 2.5 (comments), 3.1 (start tags, end tags, attributes) and 4.1 (character and entity references) and 4.6 (predefined entities); W3C Selectors Level 3, sections 6.1, 6.5, 6.6, 8.1, 8.2 and 9 (specificity); W3C CSS Cascading and Inheritance Level 4, section 6.4 (order of appearance) |
-| S73 | biome settlements: village sites scored by flatness, nearness to water and lowness; roads as least-cost grid paths whose step cost grows with the grade, with river cells priced as bridges and built roads cheaper to reuse; a network of a minimum spanning tree plus links where the tree's detour is long; A* with a straight-distance bound; Douglas-Peucker thinning; houses on lots facing their street | biomes/src/settlements.ts | Galin, Peytavie, Marechal and Guerin, "Procedural Generation of Roads", Computer Graphics Forum (Eurographics) 2010; Galin, Peytavie, Guerin and Benes, "Authoring Hierarchical Road Networks", Computer Graphics Forum (Pacific Graphics) 2011; Hart, Nilsson and Raphael, IEEE Transactions on Systems Science and Cybernetics, 1968; Prim, Bell System Technical Journal, 1957; Douglas and Peucker, The Canadian Cartographer, 1973; Borgefors, "Distance transformations in digital images", CVGIP 1986; Parish and Muller, "Procedural Modeling of Cities", SIGGRAPH 2001 |
+| S73 | biome settlements: village sites scored by flatness, nearness to water and lowness; roads as least-cost grid paths whose step cost grows with the grade, with river cells priced as bridges and built roads cheaper to reuse; a network of a minimum spanning tree plus links where the tree's detour is long; A* with a straight-distance bound; Douglas-Peucker thinning; houses on lots facing their street; a grid pattern (blocks between straight streets cut into stretches by wet, low or steep ground, lots in two rows facing the street beside them, only stretches joined to the main street to the quay kept), house pads (level carve paths) and driveways | biomes/src/settlements.ts | Galin, Peytavie, Marechal and Guerin, "Procedural Generation of Roads", Computer Graphics Forum (Eurographics) 2010; Galin, Peytavie, Guerin and Benes, "Authoring Hierarchical Road Networks", Computer Graphics Forum (Pacific Graphics) 2011; Hart, Nilsson and Raphael, IEEE Transactions on Systems Science and Cybernetics, 1968; Prim, Bell System Technical Journal, 1957; Douglas and Peucker, The Canadian Cartographer, 1973; Borgefors, "Distance transformations in digital images", CVGIP 1986; Parish and Muller, "Procedural Modeling of Cities", SIGGRAPH 2001 |
 | S76 | label decluttering: point-feature labels taken greedily in rank order, each tried at a fixed list of candidate positions around its point (above right preferred, then the other corners, then the sides) and kept at the first that overlaps no label already placed, else dropped; placed boxes bucketed in a uniform grid so each test reads only neighbouring cells | labels/src/declutter.ts | Christensen, Marks and Shieber, "An Empirical Study of Algorithms for Point-Feature Label Placement", ACM Transactions on Graphics 14(3), 1995 (greedy placement, the four- and eight-position candidate models and, read for batch 132, the Figure 1 ranking the position lists follow: above right, above left, below left, below right, right, above, left, below); Imhof, "Positioning Names on Maps", The American Cartographer 2(2), 1975 (preference for the upper right position); Margo-own: the grid buckets and the tie order |
 | S78 | CSS 3D near-plane cut: signed distances of a rectangle's corners from the camera near plane, affine over the rectangle, and one-plane Sutherland-Hodgman clipping of the rectangle into a CSS polygon in element pixels | labels/src/renderer.ts | Sutherland and Hodgman, "Reentrant Polygon Clipping", Communications of the ACM 17(1), 1974; W3C CSS Masking Module Level 1 (`clip-path`, `polygon()`); W3C CSS Transforms Module Level 2 (perspective, grouping properties) |
 | S79 | leader lines: a straight segment from a label's projected point to the nearest point of its axis-aligned box (the point clamped to the box), drawn when longer than a minimum, with a dot on the point | labels/src/callouts.ts | W3C Scalable Vector Graphics (SVG) 2 (`line`, `circle`, presentation attributes); Margo-own: the wrapped-layout recording and the change-only attribute writes |
@@ -2333,7 +2532,15 @@ CIE match. Faces that are not parallelograms are snapped with `p2 = p1 + p3 - p0
 | S90 | UI colour checks: WCAG 2 relative luminance and contrast ratio; colour-vision simulation by the severity 1.0 protanopia, deuteranopia and tritanopia matrices applied in linear sRGB; CIE76 difference in CIELAB from sRGB through XYZ (D65 white 0.95047, 1, 1.08883; epsilon 216 / 24389, kappa 24389 / 27) | ui/src/color.ts | W3C WCAG 2.2, definitions of relative luminance and contrast ratio; Machado, Oliveira and Fernandes, "A Physiologically-based Model for Simulation of Color Vision Deficiency", IEEE TVCG 15(6) 2009, Table 1 on the authors' page (all three severity 1.0 matrices checked digit by digit in batch 132); IEC 61966-2-1 (sRGB transfer and primaries); CIE 15:2004 (CIELAB) |
 | S91 | curved world panels: a cylinder or sphere patch whose arc lengths are the panel size, the centre tangent to local z = 0; rays meet the analytic surface by the quadratic in t, roots taken by the cancellation-free form q = -(b + sign(b) sqrt(b^2 - 4ac)) / 2, t = q / a and c / q; u from the azimuth atan2(x, z) r / width, v from the elevation (sphere) or height (cylinder); a hit whose surface normal faces along the ray is the back side, mirrored in u | ui/src/curved.ts | Shirley and Marschner, Fundamentals of Computer Graphics, ray and implicit surface (sphere) intersection; Press, Teukolsky, Vetterling and Flannery, Numerical Recipes, section 5.6 (quadratic roots without cancellation) |
 | S92 | frame debugger texture memory: per mip level, ceil(width / block width) x ceil(height / block height) blocks (1 x 1 for uncompressed formats, 4 x 4 for BC, ETC2 and EAC, the ASTC footprint from the format name) times layers or 3D depth, block bytes, and samples | inspector/src/frame.ts | W3C WebGPU specification, section 26.1 texel formats (block sizes and bytes per block) and the physical miplevel-specific texture extent (each level rounded up to whole blocks) |
+| S93 | scene kits: snow night visibility by snow intensity band, light at 5/8 statute mile or more, moderate from 5/16 to 5/8, heavy at 5/16 or less (1,600, 750 and 350 m taken inside the bands); fog density = 3.912 / visibility (2% contrast); a wood fire glow near 1,900 K as linear RGB normalised to its largest channel; the rest Margo design values | scenery/src/kits.ts | Office of the Federal Coordinator for Meteorology, Federal Meteorological Handbook No. 1, Surface Weather Observations and Reports (FCM-H1), intensity of snow based on visibility; Koschmieder 1924, "Theorie der horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12; Planck blackbody radiation (CIE 15:2018 colorimetry) |
+| S94 | whiteout kit: a blizzard as sustained wind or frequent gusts of 35 mph (15.6 m/s) or more with falling or blowing snow leaving a quarter mile (402 m) or less of visibility; the kit's visibility moves evenly in log distance between the lull and the storm with the smoothstep ease; the fog density for a visibility by Koschmieder (3.912 / visibility, 2% contrast) solved for the state fog of WeatherDrive's `fogDensity`; the rest Margo design values | scenery/src/kits.ts | US National Weather Service, Glossary, "Blizzard" (https://forecast.weather.gov/glossary.php?word=blizzard); Koschmieder 1924, "Theorie der horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12 |
+| S95 | snow exposure: each flake drawn as the capsule it sweeps over the shutter time along its velocity (wind, fall and the sway's derivative), its opacity scaled by the disc's share of the capsule's coverage so the time-averaged light is kept (a falloff-weighted area of 1.596 for the disc and 1.4 per radius of sweep); sub-frames take each their share of the shutter so their sweeps join | sky/src/weather.ts | Garg and Nayar 2006, "Photorealistic Rendering of Rain Streaks", ACM TOG 25(3) (SIGGRAPH), https://doi.org/10.1145/1141911.1141985 (a falling drop's streak is its time average over the exposure, brightness by the share of the exposure it covers a pixel); McGuire, Hennessy, Bukowski and Osman 2012, "A Reconstruction Filter for Plausible Motion Blur", I3D, https://doi.org/10.1145/2159616.2159639 (blur as coverage spread along screen-space velocity over the shutter); Cook, Porter and Carpenter 1984, "Distributed Ray Tracing", SIGGRAPH, https://doi.org/10.1145/964965.808590 (motion blur as an integral over the shutter, the sub-frame sum) |
+| S96 | the eye's radius kept at least max(1 m, 2^-22 R) above the ground; the volumetric clouds' coverage map drift wrapped at its own repeat scale / 0.17; a splash's hash key slot x 32768 + landing mod 32768 | sky/src/atmosphere-luts.ts, sky/src/volumetric-clouds.ts, sky/src/weather-fx.ts | IEEE 754-2019 binary32 (24-bit significand: a step at radius R is at most R 2^-23); Margo-own arithmetic |
 | S87 | package object editor: objects found by their documented shapes (a plugin's `list`, `options`, a PBR record's packed factor arrays), own writable fields and class accessors with a setter read through property descriptors, values checked against documented ranges and recorded as undo steps that restore an unset option by deleting it; colour inputs converted between sRGB and linear with the IEC 61966-2-1 transfer function | inspector/src/packages.ts, inspector/src/color.ts | ECMAScript (Object.getOwnPropertyDescriptors, prototype chain); IEC 61966-2-1 sRGB; the packages' own READMEs and option docs; Margo-own: shape discovery and unset-on-undo |
+| S97 | a fire from one call (`Fire`): the kit's flame line (0.62 m, 0.3 m over the fuel top) as `lineLights` points sharing the kit's intensity, each with a PCSS shadow radius of half the flame length over the sample count (`lineShadowRadius`), scaled with the fire's width; one flicker seed for the whole line; light intensity and the flames' and embers' radiance scaled together by `power`; soft particles fade 0.08 m when the scene depth is given | scenery/src/fire.ts, scenery/src/kits.ts | Karis 2013, "Real Shading in Unreal Engine 4" (SIGGRAPH course; a line source as an integral along its length); Abramowitz & Stegun 1964, NBS AMS 55, 25.4.29 (the Gauss-Legendre rule, as C23); Fernando 2005, "Percentage-Closer Soft Shadows" (the penumbra, as C17); Lorach 2007, "Soft Particles" (NVIDIA whitepaper; the depth fade). The fire's sizes are Margo design values for the Cabin Hearth look, not a measured fire |
+| S98 | heliocentric ephemeris: Standish Table 1 elements at J2000 plus rate x Julian centuries; mean anomaly L - varpi; Kepler E - e sin E = M by Newton from M (from pi above e 0.8) to 1e-12 rad; orbital plane to the J2000 ecliptic by the argument of perihelion, node and inclination; the Moon's six-term low-precision longitude of date minus IAU 2006 general precession 5028.796195 arcsec per century; Earth calendar ticks at 0h UTC | sky/src/ephemeris.ts | E. M. Standish, "Keplerian Elements for Approximate Positions of the Major Planets", JPL Solar System Dynamics (https://ssd.jpl.nasa.gov/planets/approx_pos.html); The Astronomical Almanac, section D, low-precision formulae for the Moon; Capitaine, Wallace and Chapront 2003, "Expressions for IAU 2000 precession quantities", A&A 412, 567 (https://doi.org/10.1051/0004-6361:20031539). Accuracy measured against JPL Horizons DE441 vectors (public-domain data, test fixture). Moved from the Orrery demo, written clean room there |
+| S99 | biome fuel map: a fuel model name per grid corner from the species and open ground each biome names, taking the species with most crown cover (density x crown area x stands x suitability, as canopyCover) from a crown share of 0.3 and the open ground's fuel below it; no fuel under the sea, near water or on rock; roads and footprints clear it and patches set it. The northern Rockies conifer presets: species by habitat type (cedar, white pine and grand fir moist, Douglas-fir and larch dry, bunchgrass and brush on the driest south slopes) and each one's fuel model as Anderson's descriptions name it (8 closed timber litter of white pine, fir and larch; 10 timber with heavy dead-down fuel; 1 grass; 2 open stands over grass; 5 green low shrub fields; 12 medium slash) | biomes/src/fuel.ts, biomes/src/presets.ts | Anderson, "Aids to determining fuel models for estimating fire behavior", USDA Forest Service General Technical Report INT-122, 1982 (text read from the Forest Service scan: model descriptions on pages 4, 5, 8, 11, 13 and 15; the model values are not copied, they live in vfx/fire-front); Pfister, Kovalchik, Arno and Presby, "Forest habitat types of Montana", INT-34, 1977, and Cooper, Neiman and Roberts, "Forest habitat types of northern Idaho: a second approximation", INT-GTR-236, 1991 (which species stand on moist and dry ground); J. H. Scott and R. E. Burgan, "Standard fire behavior fuel models: a comprehensive set for use with Rothermel's surface fire spread model", USDA Forest Service General Technical Report RMRS-GTR-153, 2005 (the later fuel model set, not used here); Arno, "Forest fire history in the northern Rockies", Journal of Forestry 78(8), 460-465, 1980 (the fire regimes of the forests of these presets). Chosen here, not from the papers: the 0.3 timber share, the 50 degree rock slope, the 2 m water margin, every crown radius, density and climate envelope of the presets, cedar stands taking model 10 for their deadfall |
+| S100 | biome mountain valley: a fixed base-level floor that falls to one outlet, the rest of the border closed; Priority-Flood with a 1 mm rise and rho8 receivers (a hashed 2 - r divisor on diagonal drops) over a noise-warped starting ramp, the receivers-first stack order and drainage area; steady-state detachment-limited stream power (n = 1, m / n = 0.5) for channel cells, ks / sqrt(A) per unit length above the receiver, in one base-level-first pass; cells whose stream-power slope passes the critical angle left as hillslope and raised by a lowest-first pass over 16 neighbours (runs 1, sqrt 2, sqrt 5) to a critical angle varied over the world; convex cells lowered to the 3 x 3 mean for rounded crests; a soft cap; a 1 mm rise over each receiver and the two cells beside a diagonal step lowered until the square's mean is no higher than the cell (no bilinear dam); an exact level floor, creek bed and rail bed | biomes/src/mountain-valley.ts, biomes/src/relief.ts | Howard, "A detachment-limited model of drainage basin evolution", Water Resources Research 30(7), 1994; Whipple and Tucker, "Dynamics of the stream-power river incision model", Journal of Geophysical Research 104(B8), 1999; Braun and Willett, "A very efficient O(n), implicit and parallel method to solve the stream power equation governing fluvial incision and landscape evolution", Geomorphology 180-181, 2013; Cordonnier, Braun, Cani, Benes, Galin, Peytavie and Guerin, "Large Scale Terrain Generation from Tectonic Uplift and Fluvial Erosion", Computer Graphics Forum 35(2), 2016; Genevaux, Galin, Guerin, Peytavie and Benes, "Terrain generation using procedural models based on hydrology", ACM Transactions on Graphics 32(4), 2013; Kirby and Whipple, "Expression of active tectonics in erosional landscapes", Journal of Structural Geology 44, 2012; Burbank et al., Nature 379, 1996, and Montgomery and Brandon, Earth and Planetary Science Letters 201, 2002 (threshold hillslopes); Gilbert, "The convexity of hilltops", Journal of Geology 17(4), 1909, and Roering, Kirchner and Dietrich, Water Resources Research 35(3), 1999 (rounded crests); Barnes, Lehman and Mulla, Computers and Geosciences 62, 2014 (Priority-Flood and its epsilon variant); Fairfield and Leymarie, "Drainage networks from grid digital elevation models", Water Resources Research 27(5), 1991 (rho8); Deitschman, INT-GTR-11, 1973 (slopes of 50 to 65 percent on the Coeur d'Alene National Forest); the Milwaukee Road's 1.7 percent over St. Paul Pass (Welsh, Trains, as cited by the St. Paul Pass Tunnel article). Chosen here, not from the papers: every default but the wall angle and the rail grade, the starting ramp, noise wavelengths, the creek and rail placement, the soft cap and the wall detail. No other engine's or model's code was read |
 
 ### splats
 
@@ -2419,7 +2626,7 @@ The batch 168 timing drives `@mkkellogg/gaussian-splats-3d` 0.4.7 as a black box
 
 | id | formula | file | source |
 | --- | --- | --- | --- |
-| UZ1 | USD composition: layer stacks, list edits, arc strength, implied classes, variant selection, path mapping, time offsets | usdz/src/stage.ts, usdz/src/layer.ts | **Written basis:** AOUSD USD Core Specification v1.1.0 (e8f44c0, 2026-08-13), Composition chapter: Composition Arcs, Inherits, Specializes, Strength Ordering, Namespace Mappings, Time Codes Per Second, published at github.com/aousd/specifications-public under CC-BY-ND-4.0 (read, cited, not copied into this repository); v1.0.1 compared; the USD Glossary at openusd.org (Index, Inherits, Specializes, LIVERPS Strength Ordering). **Observed only, the specification does not settle them:** two rules marked in stage.ts, taken from running OpenUSD 26.08 on our own stages and reading its public `GetPrimStack`, `GetPropertyStack` and prim index dump output: a site an authored arc reaches gives no opinions through an implied arc; specializes arcs order by the depth of the stage prim they first reach, a repeated class site counting once through the later arc; and (KB1942, 2026-11-11, OpenUSD 26.11 from the usd-core wheel run where it lives, public `Usd.Stage` and `Sdf` calls only) within one specializes family the implied copies rank first unless the authored arc sits under a variant or reference whose prim is shallower than the stage prim holding the outermost reference; and (KB1942b, same setup) a class arc implied from an ancestor's inherit keeps that ancestor's own pair, mapped by the arcs above where they can, so a path maps by the longest matching pair and must map back by the same pair or it drops. **History, not hidden:** OpenUSD's source was never opened. Job 1 of batch 44 was debugged using remembered OpenUSD internals as hypotheses (inert implied nodes, origin-based arc order), then confirmed by black-box runs. Memory is not a source, so both were taken out on 2026-11-07 and the code rebuilt from the documents above. The sample implementations in aousd/core-spec-supplemental-public are code and were not read. A web search for the specification returned snippets of a third-party USD project's roadmap; they were not opened or used. |
+| UZ1 | USD composition: layer stacks, list edits, arc strength, implied classes, variant selection, path mapping, time offsets | usdz/src/stage.ts, usdz/src/layer.ts | **Written basis:** AOUSD USD Core Specification v1.1.0 (e8f44c0, 2026-08-13), its text grammar (VariantSetStatement: one or more variants, so `layer.ts` refuses an empty variant set, `packages/usdz/tests/layer-text.test.js`) and its Composition chapter: Composition Arcs, Inherits, Specializes, Strength Ordering, Namespace Mappings, Time Codes Per Second, published at github.com/aousd/specifications-public under CC-BY-ND-4.0 (read, cited, not copied into this repository); v1.0.1 compared; the USD Glossary at openusd.org (Index, Inherits, Specializes, LIVERPS Strength Ordering). **Observed only, the specification does not settle them:** rules marked in stage.ts, taken from running OpenUSD 26.08 on our own stages and reading its public `GetPrimStack`, `GetPropertyStack` and prim index dump output: specializes arcs order by the depth of the stage prim they first reach (until KB1942c part 6 also: a site an authored arc reaches gives no opinions through an implied arc, and a repeated class site counts once through the later arc); and (KB1942, 2026-11-11, OpenUSD 26.11 from the usd-core wheel run where it lives, public `Usd.Stage` and `Sdf` calls only) within one specializes family the implied copies rank first unless the authored arc sits under a variant or reference whose prim is shallower than the stage prim holding the outermost reference; and (KB1942b, same setup) a class arc implied from an ancestor's inherit keeps that ancestor's own pair, mapped by the arcs above where they can, so a path maps by the longest matching pair and must map back by the same pair or it drops; (KB1942c, same setup, 10 stages in `packages/usdz/tests/fixtures/internal-chain-targets.json`) through a chain of arcs a target maps once by the composed map function, each internal arc carrying the root identity its own pairs shadow: an inner pair goes on through the outer function and an outer pair comes back through the inner one. The specification's Namespace Mappings section describes one arc's mapping, not a chain's; (KB1942c part 2, same setup, 6 stages in `packages/usdz/tests/specializes-specifier.test.js`, read with `Usd.Prim.GetSpecifier()` and the public prim index dump `Usd.Prim.GetPrimIndex().DumpToString()`) a class reached through a specializes arc keeps the prim a class before a weaker `def`, where a class reached by an inherit gives way to it. (KB1942c part 3, same setup, 12 stages in `packages/usdz/tests/implied-class-stops.test.js`, read with `Usd.Prim.GetChildren()` and the public prim index dump) an implied class arc stops at a node of its own stack that already holds its site, and a specializes arc whose site an inherit of the same stack already reaches implies nothing upstream unless its node has another class arc of its own. The specification's Inherits section says an implied arc goes to every upstream layer stack, not where it stops. (KB1942c part 4, same setup, 4 stages in `packages/usdz/tests/carried-class-site.test.js`) a class site that a class arc carried down from the parent prim already holds keeps that arc's place, and an arc placed for the prim on the same site of the same stack gives no opinions; the Strength Ordering section ranks arcs, not two arcs to one site. (KB1942c part 5) a variant set ranks by the depth of the prim that holds it in its own stack, so a set on a class site beats one carried down from its parent: that is the Strength Ordering rule for arcs authored deeper in namespace, checked on 3 stages in `packages/usdz/tests/variant-set-depth.test.js`. (KB1942c part 6, 2026-11-15, OpenUSD 26.11 from the usd-core wheel, public `Usd.Stage`, `Usd.Attribute.Get()`, `Usd.Prim.GetPrimStack()` and `Usd.Prim.GetPrimIndex()` node fields only; 29 stages in `packages/usdz/tests/fixtures/prim-index-queue.json`) a prim index is one list of tasks: references, payloads, inherits and specializes, a higher kind always first and nodes in the order they were queued, then implied class arcs strongest node first, then one variant set at a time; an arc to a root prim is a bare node whose arcs the index follows, one to a deeper prim that prim's index composed alone; the first live node made for a site holds it (a later inherit makes no node, a later specializes an inert placeholder); a specializes arc below the index root leaves an inert placeholder that implies its arc upward and its node goes under the root, ranking from the placeholder. (KB1942c part 7, 2026-11-15, same setup, 15 stages in `packages/usdz/tests/fixtures/ancestral-variants.json`) a specializes node carried down from an ancestor inside a grafted index goes under the root as its site composed alone, so only the class's own sites select its ancestral variants; an implied class arc that stands for an arc carried down from prim A sets its ancestral variants with the selections of A in context, then its own (part 8, 27 stages in all): below the index root, the site that authored the arc into the stack it joins, at the path A maps to there, and the nodes of other stacks in the index of the stage prim A maps to; at the index root, A's own index in that stack when the stack holds the layer that authored the arc, but for the node that stands for the same arc. (Part 9, 7 stages in `packages/usdz/tests/fixtures/specializes-family-grafts.json`) whether a specializes family's implied arcs rank before or after its authored arc (part 10, 9 stages) is decided per implied arc, by the outermost reference or payload around the authored arc up to the node the implied arc hangs from, that node itself counting from the prim that authored it; (part 11, 6 stages in `held-specializes-grafts.json`) a specializes arc authored on a graft's root whose site the index already holds leaves an inert placeholder that implies its arc upward even where an inherit of its stack reaches the site; the Strength Ordering section ranks specializes after all else, not the members of one family against each other; (part 12, 3 stages in `held-class-implied.json`) a grafted index that leaves out a class node because the index it joins holds its site leaves out the class arcs implied from that node too; (part 13, 5 stages in `carried-placeholder-reimplied.json`) a reference carried down to a child prim that gets a class arc of its own there implies the specializes placeholders carried down with it again, and on the index root such an arc takes its site from an implied arc carried down for another arc; (part 14, 4 stages in `ancestral-chain.json`) an implied inherit standing for another implied arc, the chain ending in an arc carried down from an ancestor, reads its class's ancestral selections at the class's parent in the other stacks of the chain; (part 15, 4 stages in `specializes-variant-hop.json`) a specializes arc authored in a variant first implies a placeholder on the node that holds the variant, in the same stack, and within each side of the authored arc the arcs implied further up rank against that placeholder before the stacks' order; (part 16, 3 stages in `reference-namespace-depth.json`) a reference or payload ranks by the depth of its prim in the stack that authors it, the PcpNodeRef class text's namespace depth of the node that introduced it, not by the depth of the stage prim; class arcs keep the stage prim's depth (the same change for them breaks other stress stages); (part 17, 2 stages in `grafted-specializes-late.json`) a specializes arc carried in by a graft (a reference to a prim below a root prim, composed alone) moves under the index root only after the specializes arcs of the index's own nodes, so where both reach one site, an arc of a weaker branch made in this index holds it and implies the family; the Specializes section and the Pcp overview say specializes are weakest and propagate to the root, not which of two arcs to one site goes first; (part 18, 2 stages in `specializes-variant-anchor.json`) an implied specializes arc that hangs from a variant held by a node of the same stack implies a placeholder on that node (OpenUSD's prim index shows it), and the arcs implied above it rank against it as against the authored arc, after the ranking against the authored arc's own placeholder; (part 19, 2 stages in `specializes-root-rank.json`) then each implied arc ranks before the arc implied into the root stack when the node it hangs from has a smaller namespace depth (PcpNodeRef's namespace depth, as OpenUSD's prim index reports it) than the node the root stack's arc stands for, above that node's same-stack variants, and after it otherwise; (part 20, 2 stages in `held-inherit-specializes.json`) an inherit a grafted index leaves out, because the index it joins already holds its site, no longer holds that site for its own prim's specializes arc to it, so that arc leaves an inert placeholder (the prim index dump shows it inert and culled) which implies a specializes arc upward, placed weakest as the Glossary's LIVERPS Strength Ordering entry places specializes, and the implied inherit above then finds the site held; (part 21, 2 stages in `specializes-hang-depth.json`) after those rankings the implied arcs of a family order by the namespace depth of the node each hangs from (PcpNodeRef's namespace depth, as the prim index dump reports it), smaller first, and only on a tie by the strength of the stacks that hold them; (part 22, 2 stages in `implied-origin-order.json`) two implied class arcs on one node, of one kind and namespace depth, rank as the arcs they were implied from do (the prim index dump's origin nodes), an arc implied from deeper in the same stack ranking where the placeholder it passes on the way up would sit; (part 24, 6 stages in `carried-implied-again.json`) at a child prim, the implied inherits carried down from the parent prim below the index root are implied again, strongest carried authored arc first: a carried class arc that implies one of their sites first takes it, and the carried inherit goes with the arcs implied from it; an arc placed for the child prim takes no site from them, and a carried specializes placeholder that made no family at the parent prim takes only the sites of carried inherits made before it (none when its site has no specs at the child or its node authors a specializes arc there); (part 23, 2 stages in `implied-reference-depth.json`) below the index root, sibling class arcs rank by the namespace depth the prim index dump reports for them: an arc authored at its node counts from that node's prim in its own stack, and one implied from an arc under a reference or payload of the same prim counts from that reference's depth; the Inherits section says where an implied arc goes, not when it is withdrawn. The Variants section says selections are evaluated once the arcs that can author them are in, not which index an implied arc's ancestral sets read. Written basis for the parts the documents do say: the Composition chapter's Overview and Outline (an index is built by evaluating arcs), Inherits, Specializes, Variants (selections are evaluated once the arcs that can author them are in), Strength Ordering and Namespace Mappings sections of the AOUSD USD Core Specification v1.1.0 (https://github.com/aousd/specifications-public); Pixar, USD Terms and Concepts, OpenUSD 26.11 (Index, Inherits, Specializes, LIVERPS Strength Ordering, https://openusd.org/release/glossary.html); the Pcp overview text (https://openusd.org/release/api/pcp_page_front.html) and the PcpNodeRef class text (https://openusd.org/release/api/class_pcp_node_ref.html), prose read, no code. One web search for a paper on building a prim index (2026-11-15) found none, only overviews of the strength order; the Rust `openusd` crate a search turns up is code and was not opened. The specification's Specifiers section (AOUSD USD Core Specification v1.1.0, Composition chapter) and the USD Glossary entries Def, Class and Over (openusd.org) say a `def` or `class` beats an `over`, not how a class and a `def` from two class arcs combine. **History, not hidden:** OpenUSD's source was never opened. Job 1 of batch 44 was debugged using remembered OpenUSD internals as hypotheses (inert implied nodes, origin-based arc order), then confirmed by black-box runs. Memory is not a source, so both were taken out on 2026-11-07 and the code rebuilt from the documents above. The sample implementations in aousd/core-spec-supplemental-public are code and were not read. A web search for the specification returned snippets of a third-party USD project's roadmap; they were not opened or used. |
 | UZ2 | UsdSkel: joint hierarchy from joint paths, skinning equation, `geomBindTransform`, binding inheritance, blend shapes and in-betweens; slerp of quaternion samples | usdz/src/skel.ts, usdz/src/clip.ts | OpenUSD's public documentation: UsdSkel Schemas, Skinning and Intro pages at openusd.org. AOUSD USD Core Specification v1.1.0, Interpolation, for slerp, and Time Codes Per Second. Results compared with OpenUSD's public `UsdSkel` Python API on real files and our own stages; no source read, no remembered internals used |
 | UZ3 | Time samples: value at a time, held ends, linear blend, slerp of quaternions, blocked samples, visibility; keys split into translation, rotation and scale | usdz/src/anim.ts, usdz/src/clip.ts | AOUSD USD Core Specification v1.1.0, Value Resolution and the note on quaternions. Observed on our own test stage through OpenUSD's public Python API, and marked so in anim.ts: matrices blend element by element, a sample before a block holds, a blocked op drops out. glTF 2.0 and KHR_animation_pointer for channels; the sub-key dip bound is plain trigonometry. No source read, no remembered internals used |
 | UZ4 | Subdivision: Catmull-Clark and Loop refinement, sharp and semi-sharp creases and corners with the blended transition, face-varying boundaries and their linear modes, hole faces, concave polygons | usdz/src/subdiv.ts | Catmull and Clark, Recursively generated B-spline surfaces on arbitrary topological meshes, 1978. Loop, Smooth subdivision surfaces based on triangles, 1987. DeRose, Kass and Truong, Subdivision surfaces in character animation, SIGGRAPH 1998. OpenUSD's public UsdGeomMesh schema page. OpenSubdiv's published documentation, Subdivision Surfaces page at opensubdiv.org/docs, for what each linear mode sharpens and that values cannot be smoother than points. Observed black box on our own stages through Blender 5.3's modifier, and marked so in subdiv.ts: what counts as a concave corner in cornersPlus2, crease weight 10*w^2. No source read. |
@@ -2435,7 +2642,7 @@ The batch 168 timing drives `@mkkellogg/gaussian-splats-3d` 0.4.7 as a black box
 | VX2 | per-corner vertex AO level 0-3 from two edge cells and the diagonal; triangle-diagonal flip; level to light factor | voxel/src/mesher.ts, voxel/src/render.ts, voxel-edit/src/mesh.ts | Lysenko 2013, 0fps.net (ambient occlusion for voxel worlds) (rule and diagonal flip; no brightness values given) |
 | VX3 | ambient occlusion term = ao x (floor + skyLight x daylight) | voxel/src/render.ts | Margo-own: Margo design choice |
 | VX4 | sun visibility = sky^2 without a shadow map; fade back to sky^2 over last 10% of shadow range | voxel/src/render.ts | Margo-own: Margo design choice |
-| VX5 | hemisphere ambient with a spec-ish f0 term | voxel/src/render.ts | Margo-own: f0 0.04: glTF 2.0 App. B. The rest is hand-picked; copies gltf-pro's ambient (also lod/src/imposter.ts:639, animation/src/vat.ts:283, 293) |
+| VX5 | hemisphere ambient with a spec-ish f0 term | voxel/src/render.ts | Margo-own: f0 0.04: glTF 2.0 App. B. The rest is hand-picked; copies gltf/pbr's ambient (also lod/src/imposter.ts:639, animation/src/vat.ts:283, 293) |
 | VX6 | GGX D, height-correlated Smith, Schlick F, shared `clusterBrdf` | voxel/src/render.ts | Walter et al. 2007; Heitz 2014; Schlick 1994; glTF 2.0 App. B |
 | VX7 | roughness floor | voxel/src/render.ts, lod/src/imposter.ts, animation/src/vat.ts | published engine standard: minimum perceptual roughness of the Filament design document |
 | VX8 | sRGB decode/encode | voxel/src/render.ts, voxel/src/textures.ts | IEC 61966-2-1 |
@@ -2492,6 +2699,7 @@ The batch 168 timing drives `@mkkellogg/gaussian-splats-3d` 0.4.7 as a black box
 | PT20 | SVGF-style a-trous on demodulated radiance, variance, history reprojection | voxel-pathtracer/src/shaders.ts, voxel-pathtracer/src/tracer.ts | Dammertz et al. 2010 (a-trous, B3 kernel); Schied et al. 2017 (SVGF weights eqs. 3-5, published sigma 1/128/4, variance prefilter); Rousselle et al. 2012 (per-pixel error selection); Salvi 2016 GDC "An Excursion in Temporal Supersampling" (variance clipping); Cigolle et al. 2014 (octahedral normals) |
 | PT21 | Khronos PBR Neutral on CPU | voxel-pathtracer/src/tracer.ts | Khronos PBR Neutral spec |
 | PT22 | sRGB or pure-gamma display encode; Narkowicz ACES option | voxel-pathtracer/src/shaders.ts, voxel-pathtracer/src/tracer.ts | IEC 61966-2-1; Narkowicz 2015 blog |
+| PT23 | two-level voxel walk (bricks of 8^3, then cells) as one loop with the same visiting order, and the hierarchy walk running a leaf's instances in its own loop, so no loop of a caller nests around the walk on the WebGL2 layer (KB-D3D11-NEST) | voxel-pathtracer/src/shaders.ts | John Amanatides and Andrew Woo, "A Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987, https://www.cse.yorku.ca/~amana/research/grid.pdf (the incremental tMax/tDelta step at each level); Samuli Laine and Tero Karras, "Efficient Sparse Voxel Octrees", I3D 2010, https://research.nvidia.com/publication/2010-02_efficient-sparse-voxel-octrees (a hierarchical walk kept as one loop with an explicit state, there a stack, rather than recursion); Cyril Crassin, Fabrice Neyret, Sylvain Lefebvre and Elmar Eisemann, "GigaVoxels: Ray-Guided Streaming for Efficient and Detailed Voxel Rendering", I3D 2009, https://doi.org/10.1145/1507149.1507152 (brick pools under a node tree, the two-level layout); Microsoft, "for Statement" (HLSL reference), https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for (the compiler simulates loops to unroll them). Papers and documentation only; no companion or engine source read. The flattening with an inCell flag is Margo-own |
 | MV-A | MagicaVoxel `_atm` sky: single-scattering atmosphere baked to a map, sun transmittance, below-horizon fill | voxel-pathtracer/src/atmosphere.ts | model form public (Nishita et al. 1993; Rayleigh phase; Cornette & Shanks 1992). Every constant is a black-box fit to MagicaVoxel 0.99.7 panoramas (file header; fitting scripts in packages/voxel-pathtracer/tests/magicavoxel/atm*.cjs, panos.cjs); fitted to observed MagicaVoxel output |
 | MV-B | palette and surface/light colours to linear by the film gamma's power (default 2.2); fog colour left un-decoded | voxel-pathtracer/src/magicavoxel.ts | the power itself is generic; external black-box 0.99.7.2 sunlight measurements at gamma 1, 1.8 and 5 give exact display bytes 20, 46 and 89; gamma-1 coloured sky gives 64. Record: docs/whitepaper/results/batch-99-parity-gamma-20261109.json. No implementation read or copied |
 | MV-C | inverse of Narkowicz ACES + gamma, background as display colour | voxel-pathtracer/src/magicavoxel.ts | Narkowicz 2016 ACES fit (published formula); its use as the film curve is fitted to observed MagicaVoxel output |
@@ -2646,6 +2854,7 @@ File formats written from their public descriptions; no reader of another projec
 | id | formula | file | source |
 | --- | --- | --- | --- |
 | LF1 | BVH HIERARCHY and MOTION; Euler channels multiplied in listed order | loaders/src/mocap.ts | Meredith and Maddock, "Motion Capture File Formats Explained", University of Sheffield, 2001 |
+| LF1b | Acclaim ASF 1.10 skeleton and AMC motion: `:units`, `:root` order and axis, `:bonedata` direction, length, axis with its Euler order, dof and limits, `:hierarchy`; a bone's motion M applied in its own frame C as C M C^-1, the dof's Euler axes applied first listed first; CMU lengths in units of 0.45 inch | loaders/src/acclaim.ts | Jeff Lander, "Working with Motion Capture File Formats", Game Developer, January 1998; Acclaim Entertainment, "Acclaim Skeleton File definition v1.10" (1994), as reproduced in the University of Wisconsin CS 838 notes, https://research.cs.wisc.edu/graphics/Courses/cs-838-1999/Jeff/ASF-AMC.html; Meredith and Maddock 2001 as LF1, section on ASF/AMC; Carnegie Mellon University Graphics Lab Motion Capture Database, http://mocap.cs.cmu.edu/ (FAQ: units and frame rate). Test data: trimmed CMU trial 35_01, see packages/loaders/tests/fixtures/SOURCES.txt. No reader of another project was read |
 | LF2 | VRML97 grammar and nodes; Transform as T * C * R * SR * S * -SR * -C | loaders/src/vrml.ts | ISO/IEC 14772-1:1997 |
 | LF3 | X3D XML encoding, DEF and USE attributes, containerField | loaders/src/vrml.ts | ISO/IEC 19776-1 |
 | LF4 | G0, G1, G90, G91, M82, M83, G92, G20, G21, G28 | loaders/src/gcode.ts | RepRap wiki, "G-code" |
@@ -2742,13 +2951,15 @@ Maya, Pinocchio, libigl, three.js, Babylon, Godot, Unity, Unreal and the like) w
 | Shortest-arc rotations, quaternion from a matrix | Quaternion algebra from W. R. Hamilton's definition; S. W. Shepperd, "Quaternion from rotation matrix", J. Guidance and Control 1(3), 1978 (through `@margoengine/math/quat`) |
 | Root motion (`animator`) | Integration of a sampled track over an interval split into whole loop cycles and partial ones (elementary); `smoothing`, a centred moving average of that track, carried on by whole laps for a loop and by point reflection through the ends of a clip that stops (elementary); the travel carried through the node hierarchy's local rotations and scales (glTF 2.0 section 3.5.3, transformations) |
 | Look-at and aim (`animator`) | Shortest-arc turns of the look axis toward the target shared along a bone chain, a roll about the look axis taking the up axis's projection to world up's (vector rejection), and slerp (K. Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985) for weights |
-| Retarget presets (`rigging/retarget`) | Bone names from public documentation only: the VRM 1.0 humanoid bone list (VRM Consortium specification, `VRMC_vrm` humanoid), Godot's documented `SkeletonProfileHumanoid` bone names, Roblox's documented R15 body parts, and the bone names visible in Mixamo-exported files; rest-pose alignment is a shortest-arc turn per bone (quaternion algebra above), parents first |
+| Retarget presets (`rigging/retarget`) | Bone names from public documentation only: the VRM 1.0 humanoid bone list (VRM Consortium specification, `VRMC_vrm` humanoid), Godot's documented `SkeletonProfileHumanoid` bone names, Roblox's documented R15 body parts, and the bone names visible in Mixamo-exported files; the CMU preset from the joint names of the CMU Graphics Lab Motion Capture Database's ASF skeletons (http://mocap.cs.cmu.edu/); rest-pose alignment is a shortest-arc turn per limb bone (quaternion algebra above), parents first, leaving the trunk, neck and collarbones at the target's own rest |
 | Spring bones (`rigging/springs`) | The VRMC_springBone 1.0 specification (VRM Consortium), its fields and its non-normative algorithm section; L. Verlet, "Computer experiments on classical fluids", Physical Review 159, 1967; the time-corrected step and the damped spring are elementary mechanics |
 | VRM avatars (`rigging/vrm`) | The VRMC_vrm 1.0 and VRMC_springBone 1.0 specifications (VRM Consortium) and the glTF 2.0 binary container specification (Khronos); the two sample avatars are data, read and never studied for code |
+| VRM first person (`rigging/vrm-first-person`, `xr.layers`) | VRM Consortium, VRMC_vrm 1.0 specification, firstPerson.md, the meshAnnotation schema and lookAt.md, 2022, https://github.com/vrm-c/vrm-specification/tree/master/specification/VRMC_vrm-1.0 (the four annotation types, `auto` as the default, the head split by skin weights, `offsetFromHeadBone`); Khronos Group, glTF 2.0 Specification, 2021, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (accessors, sparse, primitive modes, skinning); M. Slater, B. Spanlang, M. V. Sanchez-Vives, O. Blanke, "First Person Experience of Body Transfer in Virtual Reality", PLoS ONE 5(5) e10564, 2010, https://doi.org/10.1371/journal.pone.0010564, and B. Spanlang et al., "How to Build an Embodiment Lab", Frontiers in Robotics and AI 1, 2014, https://doi.org/10.3389/frobt.2014.00009 (the body seen from the eyes and whole in a mirror); three-vrm compared by its documented API only; the sample avatars are data, read and never studied for code |
 | Voxel weights (`rigging/voxel-weights`) | O. Dionne and M. de Lasa, "Geodesic voxel binding for production character meshes", SCA 2013; the fill vote for open meshes is ours |
 | Automatic rig (`rigging/autorig`) | I. Baran and J. Popović, "Automatic rigging and animation of 3D characters", ACM SIGGRAPH 2007 (the idea of finding a skeleton from the solid inside a mesh; their embedding is not used, the placement by paths and cuts is ours); D. Winter, "Biomechanics and Motor Control of Human Movement" (body segment lengths); voxel grid as in the row above |
 | Corrective shapes (`rigging/correctives`) | J. P. Lewis, M. Cordner and N. Fong, "Pose space deformation", SIGGRAPH 2000, for the radial basis interpolation; the single-joint reading is plain rotation-vector projection |
 | Weight transfer (`rigging/transfer`) | R. Abdrashitov, K. Raichstat, J. Monsen and D. Hill, "Robust skin weights transfer via weight inpainting", SIGGRAPH Asia 2023 Technical Communications, for matching by distance and normal; the fill is a plain weighted average, not its inpainting solve |
+| Hands (`rigging/hands`) | H. Rijpkema and M. Girard, "Computer animation of knowledge-based human grasping", SIGGRAPH 1991, https://doi.org/10.1145/127719.127748 (fingers close joint by joint until contact, DIP about 2/3 of PIP); G. ElKoura and K. Singh, "Handrix: animating the human hand", SCA 2003, https://doi.org/10.2312/SCA03/110-119 (coupled joints, postures between keyed grasps); M. Santello, M. Flanders and J. F. Soechting, "Postural hand synergies for tool use", J. Neuroscience 18(23), 1998, https://doi.org/10.1523/JNEUROSCI.18-23-10105.1998 (flexion grows from index to little); T. Feix, J. Romero, H.-B. Schmiedmayer, A. M. Dollar and D. Kragic, "The GRASP taxonomy of human grasp types", IEEE THMS 46(1), 2016, https://doi.org/10.1109/THMS.2015.2470657; S. Joerg, J. Hodgins and A. Safonova, "Data-driven finger motion synthesis for gesturing characters", SIGGRAPH Asia 2012, https://doi.org/10.1145/2366145.2366208 (flat finger tracks read as dead hands); N. Wheatland, Y. Wang, H. Song, M. Neff, V. Zordan and S. Joerg, "State of the art in hand and finger modeling and animation", CGF 34(2), 2015, https://doi.org/10.1111/cgf.12595 (joint ranges, rest posture); the MPFB preset from the bone names visible in MPFB-exported files; the capsule contact solve is ours |
 | Face tracking (`rigging/face`) | Apple's published `ARFaceAnchor.BlendShapeLocation` names, Google's MediaPipe Face Landmarker output format and the VRM 1.0 expression presets; no tracker's code was read |
 
 ## Game AI: `@margoengine/behavior`
@@ -2780,7 +2991,7 @@ separation behaviour, and no wander. The library source was not opened.
 | XR through the engine (`xr` `createXREngine`, `EyeViews`) | WebXR/WebGPU binding draft (xrCompatible adapters, getViewSubImage, getViewDescriptor, projection depth range [0, 1] with depthNear at 0), read in full; WebXR Device API XRView and XRRigidTransform sections |
 | XR device runs (`xr/device-check`) | W3C WebXR Device API (XRSession.enabledFeatures, XRViewerPose.views, XRPose.emulatedPosition, XRInputSource) and the WebXR Hand Input Module (XRInputSource.hand), read for those interfaces; the WebXR/WebGPU binding draft, read in full |
 
-## Snapshot playback: `@margoengine/net`
+## Snapshot playback: `@margoengine/netcode/interpolation`
 
 Written clean room from the papers and specifications below. No source of a networking library, engine or audio tool was read.
 
@@ -2841,7 +3052,7 @@ Written clean room from the specifications and papers below. No source code of 3
 | Octahedral normals (NORMAL_OCT16P, OCT32P) | Z. H. Cigolle, S. Donow, D. Evangelakos, M. Mara, M. McGuire and Q. Meyer, "A survey of efficient representations for independent unit vectors", JCGT 3(2), 2014 |
 | Quaternion from a rotation matrix | S. W. Shepperd, "Quaternion from rotation matrix", J. Guidance and Control 1(3), 1978 |
 | Oriented-box frustum and distance tests | Separating-axis projection of a box onto a plane normal (C. Ericson, "Real-Time Collision Detection", 2005, ch. 5) |
-| Gaussian splat tiles (`tiles/splats`) | Khronos KHR_gaussian_splatting README (ratified); 3D Tiles 1.1 glTF content and `3DTILES_content_gltf`; the splats are read by gltf-pro and drawn by @margoengine/splats, both Margo's own |
+| Gaussian splat tiles (`tiles/splats`) | Khronos KHR_gaussian_splatting README (ratified); 3D Tiles 1.1 glTF content and `3DTILES_content_gltf`; the splats are read by gltf/pbr and drawn by @margoengine/splats, both Margo's own |
 | Quantized-mesh terrain (`tiles/terrain`) | CesiumGS/quantized-mesh README (quantized-mesh-1.0: header, zig-zag deltas, high-water-mark indices, edge lists, extensions 1, 2 and 4, layer.json, tms and EPSG:4326); OSGeo Tile Map Service specification; Web Mercator (EPSG:3857) as XYZ tile servers lay it out; skirts along tile edges are Margo's own way to hide level cracks |
 | S2 cell volumes (`tiles/s2`) | CesiumGS/3d-tiles, `3DTILES_bounding_volume_S2` README (cell IDs, tokens, quadratic projection, extrusion, implicit subdivision and its availability figure); the S2 cell hierarchy guide, s2geometry.io/devguide/s2cell_hierarchy (faces, Hilbert curve, odd faces mirrored); D. Hilbert, "Ueber die stetige Abbildung einer Linie auf ein Flaechenstueck", Math. Annalen 38, 1891. No S2 library source was read |
 | Hosted tileset sign-in and credits (`tiles/ion`) | Cesium ion REST API reference (GET /v1/assets/{id}/endpoint, bearer tokens, `attributions` with `collapsible`); Google Map Tiles API documentation for photorealistic 3D Tiles (`key` and `session` parameters, showing the visible tiles' copyright by frequency); Khronos glTF 2.0 `asset.copyright`; one refresh on HTTP 401 (RFC 6750) is Margo's own |
@@ -3130,6 +3341,29 @@ Written from the WebGPU specification (GPUCanvasContext, the 256-byte `copyTextu
 of `GPUBufferUsage` and its siblings) and the W3C PNG specification. No other project's headless code or binding source
 was read. The real-GPU test compares the bytes with a screenshot of the same scene on a page canvas.
 
+The video containers (`video-mux.ts`, re-read line by line 2026-11-15) follow RFC 9559 (Matroska) and the Matroska codec
+mappings (https://www.matroska.org/technical/codec_specs.html: A_OPUS CodecPrivate, CodecDelay, SeekPreRoll and
+SamplingFrequency; V_VP9 CodecPrivate feature list), the Matroska AV1 mapping (IETF CELLAR, codec/av1.md), ISO/IEC
+14496-12 (boxes, edit list, sample groups, track and movie durations), ISO/IEC 14496-15 (AVCDecoderConfigurationRecord),
+the AV1 Codec ISO Media File Format Binding (AOMedia, https://aomediacodec.github.io/av1-isobmff/: the `av01` brand,
+`av1C`, OBUs not to store), the VP Codec ISO Media File Format Binding (https://www.webmproject.org/vp9/mp4/), Encapsulation
+of Opus in ISO Base Media File Format 0.6.8 (opus-codec.org: 48000 sample entry rate, edit list trimming, `roll`
+groups), RFC 7845 (OpusHead), the WebCodecs AV1 registration (a chunk's temporal delimiter is optional), the AV1
+Bitstream and Decoding Process Specification 5.3 (OBU header) and 4.10.5 (leb128), and RFC 6381 (codecs parameter).
+No muxer source (mp4-muxer, webm-muxer, Mediabunny, ffmpeg, GPAC) was read. Alpha video (2026-11-15) follows RFC 9559
+5.1.3.5 to 5.1.3.5.5 (BlockGroup, Block, BlockAdditions, BlockMore, BlockAddID, BlockAdditional, ReferenceBlock),
+5.1.4.1.16 (MaxBlockAdditionID) and 5.1.4.1.28.4 (AlphaMode), and the Matroska codec specifications
+(draft-ietf-cellar-codec-14, S. Lhomme, M. Bunkus and D. Rice, https://www.ietf.org/archive/id/draft-ietf-cellar-codec-14.txt:
+V_VP8 and V_VP9 Codec BlockAdditions, a single-channel encoding of the alpha with BlockAddID 1). Chromium and ffmpeg
+9.0.2 ran as black boxes to read the files back.
+
+The colour of the video samples (2026-11-15) follows ITU-R BT.709-6 items 3.2 to 3.5 (matrix and limited range), ITU-T
+H.273 (07/2024; TransferCharacteristics 1 and 13, chroma_sample_loc_type and its figure of the six locations), ITU-T
+H.264 and H.265 Annex E (chroma_sample_loc_type defaults to 0 when the VUI leaves it out), IEC 61966-2-1 (sRGB), the
+VP Codec ISO Media File Format Binding (`vpcC` chromaSubsampling 0 and 1) and RFC 9559 (Matroska ChromaSitingHorz and
+ChromaSitingVert). The 1, 2, 1 column weights are the tent filter of a sample centred on an even column, written here.
+ffmpeg 9.0.2 ran as a black box (`scale` out_chroma_loc, `setparams`), its source not read.
+
 ## bzip2 and xz: `@margoengine/decoders/bzip2`, `/xz`
 
 Written from Igor Pavlov's LZMA specification (2015), Lasse Collin and Igor Pavlov's *The .xz File Format* version 1.2.1,
@@ -3137,6 +3371,12 @@ Joe Tsai's bzip2 format notes, and Burrows and Wheeler, *A Block-sorting Lossles
 Research Report 124, 1994). No source of libbzip2, liblzma, XZ Utils, the LZMA SDK or any other decoder was read. The two
 real libraries ran only as black boxes, through Python's `bz2` and `lzma` modules, to write the test files in
 `packages/decoders/tests/fixtures/archives`; VTK and pynrrd ran the same way to write the loader fixtures.
+
+The Delta filter and the block header, index and footer checks (2026-11-15) follow sections 2.1.2.2, 2.1.2.3, 3.1.3,
+3.1.4, 3.1.6, 4.2, 4.3 and 5.3.3 of *The .xz File Format* 1.2.1 (L. Collin and I. Pavlov, 2024-04-08,
+https://tukaani.org/xz/xz-file-format.txt). The `xz` command of XZ Utils 5.8.4 ran as a black box to write the Delta,
+multi-block and x86 test files. The branch/call/jump filters are not written: section 5.3.2 gives their IDs, alignments
+and start offset rule but no conversion algorithm, and no other public description was read for them.
 
 ## Particle features: `@margoengine/vfx`
 
@@ -3823,7 +4063,7 @@ Read standards and research prose only; no companion code.
 - Samuli Laine, Tero Karras, Timo Aila, Megakernels Considered Harmful: Wavefront Path Tracing on GPUs (HPG 2013), https://research.nvidia.com/sites/default/files/pubs/2013-07_Megakernels-Considered-Harmful/laine2013hpg_paper.pdf . Separating divergent shading stages reduces register pressure and divergence, but is a larger restructuring than a capture submission bug repair and needs independent output proof. Do not treat this paper as evidence that a particular row bound fixes TDR.
 - Matt Pharr, Wenzel Jakob, Greg Humphreys, Physically Based Rendering, fourth edition (2023), section 15.1 prose, https://www.pbr-book.org/4ed/Wavefront_Rendering_on_GPUs/Mapping_Path_Tracing_to_the_GPU . Work queues and specialized kernels address throughput; throughput alone does not prove bounded packet duration.
 
-Synthesis for the pending watchdog job: preserve all pixels, samples and partial-sum order. The earlier <=65536-path row-band draft still lost AMD and is unvalidated. Must investigate command-buffer/packet boundaries and shader termination/access invariants; do not claim that awaiting onSubmittedWorkDone ensures a preemptible OS packet. Scott defers speed measurements and all exclusive locks. No new GPU diagnostic was run by this continuation.
+Synthesis for the pending watchdog job: preserve all pixels, samples and partial-sum order. The earlier <=65536-path row-band draft still lost AMD and is unvalidated. Must investigate command-buffer/packet boundaries and shader termination/access invariants; do not claim that awaiting onSubmittedWorkDone ensures a preemptible OS packet. Scott defers speed measurements. No new GPU diagnostic was run by this continuation.
 
 ### Batch 99: nonblocking guiding example initialization
 
@@ -4327,7 +4567,7 @@ and Google Chrome Developers,
 [WebGPU troubleshooting tips (2023)](https://developer.chrome.com/docs/web-platform/webgpu/troubleshooting-tips)
 allow a null adapter when unavailable; they do not establish which workload
 caused a driver reset. The original failure and event XML are retained. A fresh
-post-change package GPU/README sequence is queued once, shared, wait-max 60;
+post-change package GPU/README sequence is run once;
 its result is recorded separately. No engine retry, fallback, assertion change
 or unproven driver-cause claim is added.
 
@@ -4565,7 +4805,7 @@ native and full compatibility, so check:merge's package GPU selection covers
 both. Each passes every original assertion, with 47,234 lit pixels and exact
 trimmed/untrimmed RGBA equality. Materials unit tests: 402/402 pass. Package
 runtime entries are unchanged. Full landing gates are recorded separately.
-LOD's earlier bounded diagnostic reached row 15 before the lock killed its
+LOD's earlier bounded diagnostic reached row 15 before the hard limit ended its
 process tree at 3.5 minutes; it remains an unresolved failure, not a busy pass.
 
 ### Batch 273 landing gate: inherited compute GPU registration
@@ -4638,7 +4878,7 @@ prioritization: a survey* (2012), https://doi.org/10.1002/stvr.430 (summary).
 The former treats safety as retaining affected tests; the latter distinguishes
 selection from minimization and ordering. Inference: a manually passing owner
 proof is insufficient if the package plan cannot reach it. Add the package
-script, retain shared correctness scheduling and assert its real planned command.
+script, run it as a correctness check and assert its real planned command.
 The script changes to the repository root before starting its server; the first
 package-context attempt returned HTTP failure because that root was absent.
 No implementation from either paper or another repository was read or used.
@@ -4765,8 +5005,8 @@ implementation, new fence strategy or speed measurement was used.
 The owned batch-273-back-side-probe.mjs preserves the entire original case grid
 and every assertion, adding await markers only. It completes the 4-sample work
 and reaches the 1-sample transmission cases: 116 render starts, 131 completed
-reads and 38 returned explicit/automatic pick calls. The shared lock kills its
-process tree at the 1.25-minute hard limit. Its last marker is the 1-sample
+reads and 38 returned explicit/automatic pick calls. The hard limit ends its
+process tree at 1.25 minutes. Its last marker is the 1-sample
 back-transmission-HDR-scalar-instances-back render start. This disproves a
 permanent initial-scene await, but does not locate the accumulated cost or prove
 pixel conformance: the fixture accumulates comparisons until its final assert,
@@ -4860,7 +5100,7 @@ The owned batch-273-render-state-probe.mjs is generated from the complete
 canonical leaf. Imports resolve back to the original scripts; only ready,
 render/read labels and evaluate start/return markers are added. All case grids,
 optional legacy-baseline logic, pixel/arithmetic checks and resource/restore
-assertions are retained. A shared 75-second GPU hold gives the prior 60-second
+assertions are retained. A 75-second limit gives the prior 60-second
 failure a bounded observation margin. No runtime repair, timeout waiver or
 rendering pass is inferred from a marker. No companion/rival code was read.
 
@@ -5265,7 +5505,7 @@ Compared Kelsey Gilbert/Khronos, *WebGL2 Specification*, June2026 editor draft,
 selected compressed-texture and framebuffer sections:
 https://registry.khronos.org/webgl/specs/latest/2.0/ . Format tokens, complete
 block byte lengths, extension gating and integer render/readback follow these
-standards. CPU normative sample references are prepared outside the GPU lock.
+standards. CPU normative sample references are prepared on the CPU.
 The extension specifically says browsers should not advertise decompression
 fallbacks. The OpenGL launch selected SwiftShader and was refused; selecting
 D3D11 gives the real NVIDIA RTX A6000 and its exact render/readback control,
@@ -5455,40 +5695,18 @@ getters and same-frame projection reads. A copied callback or a frame-lagged pro
 
 ## GPU queue observer exit ordering (2026-11-10)
 
-Research before repair compared these primary sources, without reading any
-foreign implementation or companion repository:
+A repair to the observer of the GPU scheduler's queue compared these primary sources, without reading any foreign
+implementation or companion repository. The scheduler and its observer were removed on 2026-11-16 (KB-GPULOCK-ALL).
 
-- Leslie Lamport, *Time, Clocks and the Ordering of Events in a Distributed
-  System* (1978), author's publication discussion:
+- Leslie Lamport, *Time, Clocks and the Ordering of Events in a Distributed System* (1978):
   https://www.microsoft.com/en-us/research/publication/time-clocks-ordering-events-distributed-system/ .
-  Observation order matters: terminal publication precedes owner exit; an
-  earlier status snapshot need not include that publication.
-- Leslie Lamport, *On Concurrent Reading and Writing* (1977), author's
-  publication discussion:
+- Leslie Lamport, *On Concurrent Reading and Writing* (1977):
   https://www.microsoft.com/en-us/research/publication/concurrent-reading-writing/ .
-  Compared safe publication with overlapping reads. Immutable files already
-  prevent replacement conflicts, but cannot make separate observations atomic.
-- Maurice P. Herlihy and Jeannette M. Wing, *Linearizability: A Correctness
-  Condition for Concurrent Objects* (1990), abstract and introduction:
+- Maurice P. Herlihy and Jeannette M. Wing, *Linearizability: A Correctness Condition for Concurrent Objects* (1990):
   https://www.cs.columbia.edu/~wing/publications/HerlihyWing90.pdf .
-  Motivates testing legal interleavings and checking observable results, rather
-  than relying on repeated runs to expose one scheduling outcome.
-- Node.js contributors, *Process*, process.kill documentation (2026):
-  https://nodejs.org/api/process.html#processkillpid-signal . A zero signal
-  probes existence and throws when the PID is absent; it carries no ticket state.
+- Node.js contributors, *Process*, process.kill documentation (2026): https://nodejs.org/api/process.html#processkillpid-signal .
 - Microsoft, *Process.GetProcessById*, API documentation (2026 accessed):
   https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.getprocessbyid .
-  Compared native lookup failure and the existing handle-drain path; the latter
-  remains required even after a terminal ticket is observed.
-
-Combined inference: probe liveness first, then read the authoritative revision
-before classifying a vanished owner. This uses the existing one probe and one
-status read per iteration, without retrying either. Terminal results retain
-the common handle-drain path. Deterministic tests publish a final revision at
-the liveness boundary for passed and failed jobs, and leave another owner
-genuinely incomplete. The two terminal tests fail before and pass after the
-repair; the incomplete owner continues to fail. The historical lane-S assertion
-did not preserve its wait stderr, so the exact historical exception is not known.
 
 ### Batch 268 XR selection pointers
 
@@ -6359,7 +6577,7 @@ Research: Khronos 3D Formats Working Group, glTF 2.0.1 Specification (2021), htt
 
 ## Batch 267 job 2: CC0 asset tools
 Compared Paul Groth and Luc Moreau (editors), PROV-Overview (W3C, 2013), https://www.w3.org/TR/prov-overview/ (source/entity/activity records); Saltzer and Schroeder, The Protection of Information in Computer Systems (1975), https://web.mit.edu/saltzer/www/publications/protection/ (allow-listed network/file capabilities); Khronos 3D Formats Working Group, glTF 2.0 Specification v2.0.1 (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (relative buffer/image URIs); Poly Haven, public API and terms (2026), https://polyhaven.com/llms.txt; Lennart Demes/ambientCG, API v3 assets and licence (2026), https://docs.ambientcg.com/api/v3/assets/ and https://docs.ambientcg.com/license/; Khronos, glTF Sample Assets metadata/index (2026), https://github.khronos.org/glTF-Assets/ (per-model legal records). No engine source or companion implementation was read.
-Combined design: search official catalogues with provider credit, accept Khronos only when every legal record is CC0, enumerate exact variants, fetch bounded complete dependencies, validate provider redirects/checksums, safely unpack ambientCG using loaders/common, and write source/licence/SHA-256 manifests. Server fixes the output directory and public URL; wire_asset accepts only downloads owned by that library. Browser-only assets-page uses lazy existing gltf-pro, environment and materials APIs to install resources; no new kernel or CPU numeric loops. Models/HDRIs/textures retain their real assets and licences in ignored test-results/mcp-assets-proof, with a reproducible CPU-only preparation script; no downloaded source file is committed. Exact-id search ranks ahead of substring matches. GPU fixture isolates small real models from the test surface so it cannot occlude them; pipelines settle by their completion state, never fixed delays.
+Combined design: search official catalogues with provider credit, accept Khronos only when every legal record is CC0, enumerate exact variants, fetch bounded complete dependencies, validate provider redirects/checksums, safely unpack ambientCG using loaders/common, and write source/licence/SHA-256 manifests. Server fixes the output directory and public URL; wire_asset accepts only downloads owned by that library. Browser-only assets-page uses lazy existing gltf/pbr, environment and materials APIs to install resources; no new kernel or CPU numeric loops. Models/HDRIs/textures retain their real assets and licences in ignored test-results/mcp-assets-proof, with a reproducible CPU-only preparation script; no downloaded source file is committed. Exact-id search ranks ahead of substring matches. GPU fixture isolates small real models from the test surface so it cannot occlude them; pipelines settle by their completion state, never fixed delays.
 
 ## Batch 237: hexagonal topologies
 Compared Amit Patel, Hexagonal Grids (2013, updated 2026), https://www.redblobgames.com/grids/hexagons/ (coordinate theory only, no implementation source); D. Lee, H. C. Tien, C. P. Luo and H.-N. Luk, Hexagonal grid methods with applications to partial differential equations (2014), https://doi.org/10.1080/00207160.2013.864392 (six-neighbor lattice structure); Alan K. Mackworth, Consistency in Networks of Relations (1977), https://www.cs.ubc.ca/~mack/Publications/b2hd-AI77.html (arc consistency). Combined axial/staggered coordinate transforms, paired side directions and bounded graph search. Hex prisms add vertical reciprocal edges. Socket orientation is derived from geometric face vectors, validated independently against cell-center transforms; tiny graphs are compared with exhaustive assignments. No rival source, companion code or third-party asset used; no demo added.
@@ -6400,7 +6618,7 @@ Evidence: packages/ecs/test/serialize.test.js proves binary round trips, real de
 
 ## Batch 267 job 2: CC0 asset tools
 Compared Paul Groth and Luc Moreau (editors), PROV-Overview (W3C, 2013), https://www.w3.org/TR/prov-overview/ (source/entity/activity records); Saltzer and Schroeder, The Protection of Information in Computer Systems (1975), https://web.mit.edu/saltzer/www/publications/protection/ (allow-listed network/file capabilities); Khronos 3D Formats Working Group, glTF 2.0 Specification v2.0.1 (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (relative buffer/image URIs); Poly Haven, public API and terms (2026), https://polyhaven.com/llms.txt; Lennart Demes/ambientCG, API v3 assets and licence (2026), https://docs.ambientcg.com/api/v3/assets/ and https://docs.ambientcg.com/license/; Khronos, glTF Sample Assets metadata/index (2026), https://github.khronos.org/glTF-Assets/ (per-model legal records). No engine source or companion implementation was read.
-Combined design: search official catalogues with provider credit, accept Khronos only when every legal record is CC0, enumerate exact variants, fetch bounded complete dependencies, validate provider redirects/checksums, safely unpack ambientCG using loaders/common, and write source/licence/SHA-256 manifests. Server fixes the output directory and public URL; wire_asset accepts only downloads owned by that library. Browser-only assets-page uses lazy existing gltf-pro, environment and materials APIs to install resources; no new kernel or CPU numeric loops. A standard CC0 test-data subset is frozen under packages/mcp/tests/fixtures, with source/licence/hash records in its index.json and THIRD-PARTY-NOTICES.md. This is the standard-test-asset exception, not foreign implementation code. The CPU-only preparation script can reproduce complete downloads under ignored test-results/mcp-assets-proof. Exact-id search ranks ahead of substring matches. GPU fixture isolates small real models from the test surface so it cannot occlude them; pipelines settle by their completion state, never fixed delays.
+Combined design: search official catalogues with provider credit, accept Khronos only when every legal record is CC0, enumerate exact variants, fetch bounded complete dependencies, validate provider redirects/checksums, safely unpack ambientCG using loaders/common, and write source/licence/SHA-256 manifests. Server fixes the output directory and public URL; wire_asset accepts only downloads owned by that library. Browser-only assets-page uses lazy existing gltf/pbr, environment and materials APIs to install resources; no new kernel or CPU numeric loops. A standard CC0 test-data subset is frozen under packages/mcp/tests/fixtures, with source/licence/hash records in its index.json and THIRD-PARTY-NOTICES.md. This is the standard-test-asset exception, not foreign implementation code. The CPU-only preparation script can reproduce complete downloads under ignored test-results/mcp-assets-proof. Exact-id search ranks ahead of substring matches. GPU fixture isolates small real models from the test surface so it cannot occlude them; pipelines settle by their completion state, never fixed delays.
 
 ## Batch 267 job 3: Streamable HTTP
 Compared MCP contributors, Transports and Authorization (2025-11-25 and 2026-07-28), https://modelcontextprotocol.io/specification/2025-11-25/basic/transports and https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization (single POST objects, JSON reply mode, era-specific cancellation and metadata: https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http and https://modelcontextprotocol.io/specification/2026-07-28/basic/index); JSON-RPC Working Group, JSON-RPC 2.0 Specification (2010, updated 2013), https://www.jsonrpc.org/specification (request/notification/response classification); Saltzer and Schroeder, The Protection of Information in Computer Systems (1975), https://web.mit.edu/saltzer/www/publications/protection/ (per-session principal binding, fail-closed origin/host/authentication checks and independent request identities); Roy Fielding, Architectural Styles and the Design of Network-based Software Architectures (2000), https://ics.uci.edu/~fielding/pubs/dissertation/top.htm (transport separation and explicit resource lifecycle). No SDK/engine implementation source was read.
@@ -6488,7 +6706,7 @@ The final rebase added an existing exporters/sparse entry whose generated umbrel
 ## Batch 249 job 5: worker-parallel shared ECS systems
 Research compared Arthur J. Bernstein, Analysis of Programs for Parallel Processing (1966), https://doi.org/10.1109/PGEC.1966.264565 (read/write independence); A. B. Kahn, Topological sorting of large networks (1962), https://doi.org/10.1145/368996.369025 (acyclic dependency order); WHATWG contributors, HTML Workers (2026), https://html.spec.whatwg.org/multipage/workers.html; ECMA International, SharedArrayBuffer and Atomics (2026), https://tc39.es/ecma262/multipage/structured-data.html; and Last Olive Games, Becsy Systems/Queries/Components (2026 public documentation), https://lastolivegames.github.io/becsy/guide/architecture/systems, https://lastolivegames.github.io/becsy/guide/architecture/queries and https://lastolivegames.github.io/becsy/guide/architecture/components. Combined design: explicit dependency layers, stable ordering for hazards, and concurrent worker dispatch only when write buffers are disjoint from other reads/writes. Accesses are compared by physical shared-buffer identity, so aliased registration names cannot race. This is orchestration, not an engine numerical loop; user systems remain independent modules. No rival source or companion code read, no external demo data and no speed claim.
 SharedWorld allocates shared numeric fields/membership; SharedComponent maintains generation-checked shared sparse rows before observers run. Main-thread structural operations reject during dispatch. ParallelSchedule owns bounded workers, exposes only declared components, preserves asynchronous module completion, joins termination on abort/failure, never replays a system, and notifies change trackers once per physical written component after success. A failed host termination keeps structural storage locked rather than release memory a live worker may still use. Defaults: two workers, 30000 ms per system, default module export, no explicit order or accesses. Browser isolation is required; Node embedders provide an endpoint factory. Public APIs support typed stores and asynchronous disposal.
-Evidence: packages/ecs/test/parallel.test.js uses real Node workers, a separate atomic rendezvous to prove independent systems overlap without timing assertions, different dense layouts, conflict graphs, shared aliases, structural guards, abort, module errors, worker exit, deadline and failed-host cleanup. packages/ecs/test/parallel-browser.test.js loads the actual packaged worker in an isolated browser, observes shared writes, and rejects the unisolated surface. That browser fixture disables GPU and performs no GPU rendering/compute; it is a CPU correctness test and takes no GPU slot. packages/ecs/test/objects-types.ts verifies public type composition. No speed budget changed.
+Evidence: packages/ecs/test/parallel.test.js uses real Node workers, a separate atomic rendezvous to prove independent systems overlap without timing assertions, different dense layouts, conflict graphs, shared aliases, structural guards, abort, module errors, worker exit, deadline and failed-host cleanup. packages/ecs/test/parallel-browser.test.js loads the actual packaged worker in an isolated browser, observes shared writes, and rejects the unisolated surface. That browser fixture disables GPU and performs no GPU rendering/compute; it is a CPU correctness test and uses no GPU. packages/ecs/test/objects-types.ts verifies public type composition. No speed budget changed.
 Worker disposal reentry regression: compared ECMA International, Promise.prototype.then and promise jobs (2026 living specification), https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise.prototype.then, and TC39, Explicit Resource Management (2026 specification), https://tc39.es/proposal-explicit-resource-management/. Publish the one stop promise before invoking host termination callbacks, using a promise job for cleanup. A deterministic custom endpoint previously terminated twice when its termination callback reentered stop; parallel.test.js now requires one termination and the identical promise. No error is suppressed or retried.
 ## Batch 199 job 1: GPU hit details
 Compared W3C GPU for the Web Working Group, *WebGPU* (2026), https://www.w3.org/TR/webgpu/ (MRT formats and aligned texture readbacks); Alan Baker, Mehmet Oguz Derin and David Neto (editors), *WebGPU Shading Language* (2026), https://www.w3.org/TR/WGSL/ (fragment position, perspective interpolation and vertex interfaces); Richard Hartley and Andrew Zisserman, *Multiple View Geometry in Computer Vision*, second edition (2004), https://www.robots.ox.ac.uk/~vgg/hzbook/ (homogeneous inverse projection); and Morgan McGuire, Tobias Enderton, Peter Shirley and David Luebke, *Subpixel Reconstruction Antialiasing for Deferred Shading* (I3D 2011), https://research.nvidia.com/publication/2011-02_subpixel-reconstruction-antialiasing-deferred-shading (keeping depth and surface attributes coherent at raster samples). Public behaviour reference: Babylon.js contributors, *Mesh Picking* (2026 documentation), https://doc.babylonjs.com/features/featuresDeepDive/mesh/interactions/picking_collisions . No rival or companion source was read.
@@ -6685,7 +6903,7 @@ this native failure. Caching hints, shader restructuring and the separate
 WebGL2 wavefront investigation therefore cannot be claimed as a repair here.
 The clean-room test supervisor tracks these operations separately on the host,
 preserves the failing phase and kills its own child tree within the existing
-lease. This is diagnostics and timeout correctness, not a speed experiment.
+time limit. This is diagnostics and timeout correctness, not a speed experiment.
 No foreign engine, paper companion implementation or browser compiler source
 was read. The native compiler root remains unresolved in known-bugs.
 
@@ -6769,7 +6987,7 @@ Compared W3C editors Brian Birtles, Robert Flack, Stephen McGruer and Antoine Qu
 Sources read before implementation: Khronos 3D Formats Working Group, *glTF 2.0.1 Specification* (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (local TRS, node forest, skin transform and sampled animation rules); Ken Shoemake, *Animating Rotation with Quaternion Curves* (SIGGRAPH 1985), https://www.cs.cmu.edu/~kiranb/animation/p245-shoemake.pdf (unit quaternions and spherical interpolation); Blender Foundation, *Object Python API* (5.3, 2026), https://docs.blender.org/api/5.3/bpy.types.Object.html (public matrix_world/evaluated_get and matrix_local bone-parent warning, search extract only, full-page fetch unavailable); Blender Foundation, *Layered Actions* (2026), https://developer.blender.org/docs/features/animation/animation_system/layered/ (per-ID slots, search extract only); Soft8Soft, *Animation Puzzles Reference* (2026), https://www.soft8soft.com/docs/manual/en/puzzles/Animation.html (rival object clip playback contract, documentation only).
 Combine evaluated child and parent worlds into local matrices, retaining ancestor nodes; validate local TRS rather than sheared composed worlds. Sample object owners through the existing action pipeline, preserving active/NLA slots and restoring subframes. Existing quaternion sign continuity and runtime spherical interpolation are reused. No external code, engine source or paper companion code read. CC0 Margo-authored Blender scene and truth generated by tools/blender-addon/tests/blender_objects.py; no external demo asset.
 
-Batch 207 own-landing gate repair: modern-blender-tests used the shared fixed port 5193, making concurrent GPU suites idle with a slot held. Use the existing harness free-port mode and derive viewer navigation from the loaded page origin. Sources: M. Larsen and F. Gont, Recommendations for Transport-Protocol Port Randomization, RFC 6056 (2011), https://www.rfc-editor.org/rfc/rfc6056 ; Node.js contributors, Net server.listen documentation (2026), https://nodejs.org/api/net.html (OS-assigned unused ports). No harness internals changed. Regression: packages/blender/tests/browser-port.test.js.
+Batch 207 own-landing gate repair: modern-blender-tests used the shared fixed port 5193, making concurrent GPU suites idle. Use the existing harness free-port mode and derive viewer navigation from the loaded page origin. Sources: M. Larsen and F. Gont, Recommendations for Transport-Protocol Port Randomization, RFC 6056 (2011), https://www.rfc-editor.org/rfc/rfc6056 ; Node.js contributors, Net server.listen documentation (2026), https://nodejs.org/api/net.html (OS-assigned unused ports). No harness internals changed. Regression: packages/blender/tests/browser-port.test.js.
 
 
 ## Batch 209 job 1: tiled supersampling
@@ -6783,7 +7001,7 @@ Combines Unicode Consortium, *UTS #35: Unicode Common Locale Data and Rules* (20
 ### Batch 243 job 1: mesh PBR channels
 Research combined: Khronos 3D Formats Working Group, glTF 2.0.1 Specification (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html (channel encodings, metallic/roughness, cutout, UV transforms); Eric Heitz, Sampling the GGX Distribution of Visible Normals (2018), https://jcgt.org/published/0007/04/01/ (retain Margo's VNDF transport); Eric Veach, Robust Monte Carlo Methods for Light Transport Simulation (1997), https://graphics.stanford.edu/papers/veach_thesis/ (geometric versus shading normal responsibilities); Morten S. Mikkelsen, Bump Mapping Unparametrized Surfaces on the GPU (2010), https://mmikk.github.io/papers3d/mm_sfgrad_bump.pdf and Surface Gradient-Based Bump Mapping Framework (2020), https://jcgt.org/published/0009/03/04/ (UV surface frames). No companion implementation or rival source was read.
 The new optional entry combines the standard channel contract with existing Margo traversal/transport. Four coordinate sets and explicit affine texture rows select nearest or linear-light bilinear samples. Tangents transform as directions; normals retain inverse-transpose transforms and geometric hemisphere/offset guards. Cutout participates before any closest-hit commit, including shadows. Mesh material ids use a dense table independent of voxel palette ids. The glTF adapter consumes a structural subset of the loaded model and snapshots geometry, instances and material definitions before image waits; its borrowed images stay owned by the model.
-Tests execute the actual specialized WGSL on Margo's CPU interpreter against independent analytic channel expectations, plus snapshot, invalid-update and glTF interoperability cases. The rendering fixture reuses the existing licensed Khronos metadata Box and its notice in packages/gltf-pro/tests/fixtures/metadata/NOTICE.md; no external code or new model file is copied.
+Tests execute the actual specialized WGSL on Margo's CPU interpreter against independent analytic channel expectations, plus snapshot, invalid-update and glTF interoperability cases. The rendering fixture reuses the existing licensed Khronos metadata Box and its notice in packages/gltf/test/fixtures/metadata/NOTICE.md; no external code or new model file is copied.
 
 Async ownership also follows WHATWG, DOM Standard section 3, Aborting ongoing activities (living standard, accessed 2026-11-09), https://dom.spec.whatwg.org/ and Ecma International, ECMAScript 2026 Promise reactions, https://tc39.es/ecma262/2026/multipage/control-abstraction-objects.html. A cancelled caller rejects promptly while the loaded model keeps its own readback/image lifetime. The pending-readback regression times out against the first build and passes with the feature wait helper; no engine or shared harness change is needed.
 ## Batch 233 job 1: road intersection design
@@ -6832,7 +7050,7 @@ No external asset or implementation file was added. No new demo is introduced.
 ### Batch 243 learned denoiser (2026-11-09)
 Research compared: Steve Bako et al., *Kernel-Predicting Convolutional Networks for Denoising Monte Carlo Renderings* (2017), https://jannovak.info/publications/KPCN/index.html; Thijs Vogels et al., *Denoising with Kernel Prediction and Asymmetric Loss Functions* (2018), https://jannovak.info/publications/KPAL/index.html; Jaakko Lehtinen et al., *Noise2Noise: Learning Image Restoration without Clean Data* (2018), https://proceedings.mlr.press/v80/lehtinen18a.html. No companion code, foreign model or training dataset was used.
 A repository-authored 10->16->8->1 MLP scores nine neighbors, followed by positive normalized kernel reconstruction. Inputs are spatial offset, HDR-normalized color difference and variance, albedo difference, normal agreement, tone-mapped center/neighbor luminance, coverage difference, inverse square-root sample count and radius conditioning. Supervised targets come from authored analytic patch families with albedo/normal boundaries, lighting changes, highlights and coverage. Independent training/validation seeds are 24301/24302, 24000/4000 patches, 800 Adam steps. Variance is augmented independently of sample count with log noise power [-8,0]; variance-balanced normalized MSE prevents over-blurring low-variance MIS/area-light input. This repaired an observed real-image regression: the original fixed-variance training increased the Box holdout MSE from 0.0002043207 to 0.0003075558. Balanced training lowers it to 0.0001771820, under the same strict improvement assertion. Training script, final weight hash, NumPy version and validation report are retained in the package tests.
-The GPU holdout reuses the unmodified Khronos metadata Box fixture (CC-BY-4.0, The Khronos Group), already recorded in THIRD-PARTY-NOTICES.md and packages/gltf-pro/tests/fixtures/metadata/NOTICE.md. Its scene/camera/light/sample seeds are absent from training. Compatibility reconstructs exactly the same native-produced raw image and AOVs, avoiding a second renderer as an uncontrolled input difference.
+The GPU holdout reuses the unmodified Khronos metadata Box fixture (CC-BY-4.0, The Khronos Group), already recorded in THIRD-PARTY-NOTICES.md and packages/gltf/test/fixtures/metadata/NOTICE.md. Its scene/camera/light/sample seeds are absent from training. Compatibility reconstructs exactly the same native-produced raw image and AOVs, avoiding a second renderer as an uncontrolled input difference.
 
 
 ## Batch 209 job 2: GPU-free stage
@@ -7012,7 +7230,7 @@ Batch 206 API-index repair research: Ecma International, ECMA-262 13th edition (
 
 ## Batch 232 textured moon (2026-11-10)
 
-Clean-room implementation in `packages/scenery/src/moon.ts`, with no rival code read.
+Clean-room implementation in `packages/sky/src/moon.ts`, with no rival code read.
 Sources compared: P. K. Seidelmann et al., *Report of the IAU/IAG Working Group on
 cartographic coordinates and rotational elements: 2006* (2007),
 https://doi.org/10.1007/s10569-007-9072-y; Ernie Wright and Noah Petro,
@@ -7047,7 +7265,7 @@ Metadata-only face groups preserve the prior whole-mesh vertex-color average in 
 
 ## Batch 213 job 2: authored MToon rendering
 
-The [source comparison](rigging-mtoon.md#sources-compared) combines the Consortium material specification, Lake et al. (2000), Raskar and Cohen (1999), the Consortium migration guide, glTF and WebGPU. The colour band and geometric hull remain separate layers on the existing PBR renderer. Version-pinned current public material fields were observed on real and controlled Alicia inputs outside this repository; no rival or companion source was opened or copied. Only numeric observations are retained. Native source/replica adapters and image-alternative queries are written in the owning optional gltf-pro package. No core/stage feature or speed claim.
+The [source comparison](rigging-mtoon.md#sources-compared) combines the Consortium material specification, Lake et al. (2000), Raskar and Cohen (1999), the Consortium migration guide, glTF and WebGPU. The colour band and geometric hull remain separate layers on the existing PBR renderer. Version-pinned current public material fields were observed on real and controlled Alicia inputs outside this repository; no rival or companion source was opened or copied. Only numeric observations are retained. Native source/replica adapters and image-alternative queries are written in the owning optional gltf/pbr package. No core/stage feature or speed claim.
 
 ## Batch 211 job 2: nested/direct/Cartesian/directional trees
 
@@ -7178,7 +7396,7 @@ Compared Michael Potmesil and Indranil Chakravarty, *A lens and aperture camera 
 ## Batch 207 job 4: live Blender socket graphs
 Research before implementation: Ken Perlin, *Improving Noise*, 2002, https://www.cs.cmu.edu/~jkh/462_s07/paper445.pdf (full paper: C2 quintic lattice interpolation); J. P. Lewis, *Algorithms for Solid Noise Synthesis*, 1989, https://www.scribblethink.org/Work/Crunge/crunge.pdf (model-directed evaluation and controllable octave spectra, considered against a baked 3D lattice). The live path uses procedural gradient evaluation at shading points, quintic interpolation, fractional octaves and independent domain warps; it never builds a baked volume. The hash and gradient ordering are Margo's own, so exact stochastic texels differ from Blender. No companion code or engine source was read or copied.
 Blender Foundation, *Blender Manual: Math Node, Mix Node, Color Ramp Node, Noise Texture Node*, 2026/current, https://docs.blender.org/manual/en/5.3/render/shader_nodes/utilities/math/math.html ; https://docs.blender.org/manual/en/4.2/render/shader_nodes/color/mix.html ; https://docs.blender.org/manual/en/4.2/render/shader_nodes/converter/color_ramp.html ; https://docs.blender.org/manual/en/4.2/render/shader_nodes/textures/noise.html (manual search extracts; full fetch returned 402). Combined with independent Blender 5.3 black-box export and Cycles emission measurements, not implementation source. Socket IDs and enums are inspected through bpy's public runtime API.
-Web rival scope: Soft8Soft, *Verge3D for Blender: Shader Nodes Reference*, 2026, https://www.soft8soft.com/docs/manual/en/blender/Shader-Nodes-Reference.html (documentation only). It lists scalar Math operations and RGB Mix; ramp RGB Linear/Constant; noise 3D without W. This entry covers those node families, plus Float/Vector Mix, five ramp interpolations with RGB/HSV/HSL and 1D..4D noise with live W. This is a node-family coverage comparison, not a claim to support that rival's entire material graph or pixel-identical noise. Cycles is the export target oracle, not the rival bar. Runtime lowering uses the existing gltf-pro MaterialExtension contract; no core/stage API, third-party shader code, CPU codec loop or new Wasm bundle.
+Web rival scope: Soft8Soft, *Verge3D for Blender: Shader Nodes Reference*, 2026, https://www.soft8soft.com/docs/manual/en/blender/Shader-Nodes-Reference.html (documentation only). It lists scalar Math operations and RGB Mix; ramp RGB Linear/Constant; noise 3D without W. This entry covers those node families, plus Float/Vector Mix, five ramp interpolations with RGB/HSV/HSL and 1D..4D noise with live W. This is a node-family coverage comparison, not a claim to support that rival's entire material graph or pixel-identical noise. Cycles is the export target oracle, not the rival bar. Runtime lowering uses the existing gltf/pbr MaterialExtension contract; no core/stage API, third-party shader code, CPU codec loop or new Wasm bundle.
 
 
 ### KB5339c: Blender Elastic easing, fitted black box (2026-11-11)
@@ -7186,6 +7404,14 @@ Sources: Robert Penner, *Robert Penner's Programming Macromedia Flash MX*, chapt
 Measured: Blender 5.3.0 Beta `fcurve.evaluate` on two-key Elastic spans, run as a black box. 84 cases (4 easings x 7 amplitude/period pairs x 3 key pairs, 65 sub-frame samples), then 176 dense cases (401 samples: amplitude 0 to 3 against change 0.5 to 2 of both signs, periods 0 to 30, spans 7 to 80 frames), 33 edge cases (equal keys, negative amplitude and period, half-frame span, period 0.5, amplitude 0.999 and 1e6) and 108 negative-period cases. Penner's equations as published miss by up to 4.3.
 Derivation, each step read off the data: (1) Ease-out equals the point mirror of Blender's own ease-in, out(t) = b + c - (in(d - t) - b), in all 21 key and setting pairs to 1.2e-7; AUTO equals ease-out exactly. In-out is point symmetric about its middle, which sits at b + c / 2. So only ease-in and in-out's first half need a form. (2) Ease-in with amplitude a >= |c| equals Penner's easeInElastic to float error, both signs of c. (3) For a < |c| the miss from Penner's a = c branch grows exactly linearly in |c| - a (0.3731, 0.2798, 0.1865, 0.0373 at a = 0, 0.25, 0.5, 0.9, c = 1). (4) At a = 0 the curve is b until s = p / 4 frames before the end key (first non-zero sample at 37 for p = 12, 39 for p = 4, 32.6 for p = 30, 74 for d = 80 with the default p = 24), and inside that window the ratio to Penner's a = c curve is 1 - (d - t) / s to 1e-6 in every case. (5) Steps 3 and 4 combine into one scale on Penner's a = c curve, r + (1 - r) w with r = a / |c| and w = clamp(1 - (d - t) / s, 0, 1); equal keys with a = 0 stay flat. (6) In-out: a least-squares fit of the first half to -A 2^(10u) sin((u d - S) 2 pi / p), u = 2t / d - 1, gives A = a / 2 and sin(2 pi S / p) = c / a for a > |c|, A = c / 2 and S = p / 4 at a = |c|, with the window of step 4 measured in the same doubled time (first non-zero 2.25, 0.75 and 1.875 frames before the middle for p = 18, 6, 15). So the first half is b + in(2t) / 2 with the in-out default period 0.45 d. (7) A negative period: Blender keeps it (a negative amplitude it stores as 0). With a > |c| Penner's formula with the signed p fits; with a < |c| the oscillation term sin(2 pi u d / p - pi / 2) is even in p, and the window is |p| / 4 long. Using the signed p with a window of |s| fits both.
 Fit: all 401 measured cases, 122,497 samples, agree within Blender's single-precision rounding: at most 1.6e-5 of max(1, |value|, amplitude x 2^(10(x - 1))), where the worst points are the steepest samples (period 0.5 or 4 frames near the end key; amplitude 1e6 near a zero of the sine), which is the error of rounding the frame time and the sine argument to 32 bits times the local slope: evaluated at the float32-rounded frame, the model stays within 0.41 of a bound of one float32 step of the frame times the local slope plus four steps of the value in every case but amplitude 1e6, whose largest miss, 0.39 on a swing of 8.7e5, is 4.5e-7 of it. Times and periods enter only as t / d and p / d (spans of 7, 20, 40, 80 and 100 frames agree), so the exporter writes the period in seconds. Regression: `packages/blender/tests/nodes.test.js` (KB5339c) pins 135 of these cases from `packages/blender/tests/fixtures/elastic-probe.json`, written by `tools/blender-addon/tests/blender_elastic.py`.
+### KB5339d: Blender F-curve Noise modifier, carried as Blender's own samples (2026-11-11)
+
+Problem: a live-node socket F-curve with a Noise modifier kept frame samples and was interpolated linearly, so a seek between frames missed Blender (up to 0.078 on the fixture). Blender's noise hash is not in a published description, an integer hash cannot be fitted from samples like a smooth curve, and reading Blender's source to reimplement it is barred by the clean-room rule. Coordinator's ruling: carry the values, not the model.
+
+Method: the add-on calls Blender's documented Python API inside Blender, `FCurve.evaluate(frame)` (Blender Python API reference, bpy.types.FCurve, https://docs.blender.org/api/current/bpy.types.FCurve.html), which applies the curve's modifiers; measured against the scene's evaluated socket value at eighth-frame steps it agreed exactly (0 difference) on a Noise curve. The sample step is an eighth of a frame, halved while the finest noise octave, `scale / lacunarity^depth` frames (bpy.types.FModifierNoise, https://docs.blender.org/api/current/bpy.types.FModifierNoise.html), is shorter than 8 steps, down to 1/1024 frame; steps are powers of two so every key time is exact in binary and every eighth frame is a sampled step. Samples become LINEAR keys, then a greedy pass keeps a sample only when linear interpolation from the last kept key cannot give back every sample in between within one float32 step (IEEE 754-2019, binary32). The pass grows each span with the slope-cone test of swinging-door trending (E. H. Bristol, "Swinging Door Trending: Adaptive Trend Recording?", ISA National Conference Proceedings, 1990) and confirms it with the reader's own double-precision formula. Compared: Douglas and Peucker's split method (D. H. Douglas, T. K. Peucker, "Algorithms for the reduction of the number of points required to represent a digitized line or its caricature", Cartographica 10(2), 1973, https://doi.org/10.3138/FM57-6770-U75U-7727) bounds the error but not the key count; Imai and Iri's shortest path over feasible spans (H. Imai, M. Iri, "Polygonal approximation of a curve: formulations and algorithms", Computational Morphology, North-Holland, 1988) gives the minimum key count at quadratic cost. The greedy pass is linear in practice and reaches the minimum when feasible spans nest; it is not proven minimal in general. On the fixture, the ramp outside a restricted noise range reduces 385 samples to 207 keys; unrestricted noise keeps every sample.
+
+Result: at every sampled step the reader gives Blender's value within one float32 step (exact on 3 of 4 noise channels); between steps, at most 5.9e-4 off (docs/limits.md). Regression: `packages/blender/tests/nodes.test.js` (KB5339d) on `packages/blender/tests/fixtures/node-noise.json`, written by `tools/blender-addon/tests/blender_node_noise.py`, which fails on the old export.
+
 ### Batch 261 job 4: crossing-free elbow callouts
 Research compared Michael A. Bekos, Michael Kaufmann, Antonios Symvonis and Alexander Wolff, Boundary Labeling: Models and Efficient Algorithms for Rectangular Maps (2007; revised manuscript 2006), https://www1.pub.informatik.uni-wuerzburg.de/pub/wolff/pub/bksw-blmea-06.pdf; Prosenjit Bose, Paz Carmi, J. Mark Keil, Saeed Mehrabi and Debajyoti Mondal, Boundary Labeling for Rectangular Diagrams (2018), https://arxiv.org/abs/1803.10812; Marko Savic and Milos Stojakovic, Structural Properties of Bichromatic Non-crossing Matchings (2018/2022), https://arxiv.org/abs/1802.06301; and Jonathan Richard Shewchuk, Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates (1997), https://people.eecs.berkeley.edu/~jrs/papers/robustr.pdf. Boundary-label models motivate separated ports and reordered labels; bichromatic matching motivates balanced partitions; robust-predicate research motivates exact signs. Margo's clean-room construction uses an extreme-source balanced angular split on arbitrary projected sources, not the convex-position optimization of Savic/Stojakovic or a copied boundary-label solver. Its leaders have an angled segment plus a horizontal elbow. Exact fallback uses native BigInt integers at binary64's common 2^-1074 unit, not Shewchuk's expansion implementation. The separation argument and limits are in docs/labels-callouts-route.md. Independent rational intersection tests cover 80 integer and 30 fractional clouds, coincident/collinear anchors and extreme scales. No companion/rival code, assets or new demo copied.
 
@@ -7274,7 +7500,7 @@ Research compared Markus Schuetz, *Potree: Rendering Large Point Clouds in Web B
 Sources compared: Chris Hand, *A Survey of 3D Interaction Techniques* (1997), https://doi.org/10.1111/1467-8659.00194 (selection, manipulation and feedback); Ken Hinckley, Joe Tullio, Randy Pausch, Dennis Proffitt and Neal Kassell, *Usability Analysis of 3D Rotation Techniques* (1997), https://www.microsoft.com/en-us/research/publication/usability-analysis-of-3d-rotation-techniques/ (direct rotation controls and precision); Brian Birtles, Shane Stephens and the CSS/SVG Working Groups, *Web Animations* (2023), https://www.w3.org/TR/web-animations-1/ (property-specific keys and timing); Theatre.js contributors, *Working with Sequences* (2026 retrieval), https://www.theatrejs.com/docs/latest/manual/sequences (key authoring). We combine the existing inspector's pick/gizmo interaction with explicit playhead key insertion, rather than introducing a second manipulation model. No rival source or companion code was read. The existing engine transform store provides exact local quaternion values, avoiding an Euler round trip. Fixtures are original mathematical test scenes, with no external demo artwork.
 ### Batch 222 job 2: MSFT_lod materials (2026-11-10)
 Compared Microsoft contributors Saurabh Bhatia, Gary Hsu, Adam Gritt, John Copic, Marc Appelsmeier and Dag Frommhold, *MSFT_lod* (2017, current specification), https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/MSFT_lod/README.md ; Khronos Group, *glTF 2.0 Specification* (2017, current maintenance), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html ; Jonathan Cohen, Marc Olano and Dinesh Manocha, *Appearance-preserving simplification* (SIGGRAPH 1998), https://doi.org/10.1145/280814.280832 ; Hugues Hoppe, *View-dependent refinement of progressive meshes* (SIGGRAPH 1997), https://hhoppe.com/proj/vdrpm/ . Standards determine ordered material ids and TEXCOORD_n binding; papers motivate independent appearance/geometry levels and view-dependent control. No texture baking result, companion or rival source was used.
-The optional lod/msft entry validates all material chains and decreasing screen hints, with iterative cycle checking. It selects a material per primitive from projected bounds and hysteresis, retaining geometry/deformation arrays. Node MSFT_lod continues through LOD.fromModel. A missing live material-index API was built in its owner, gltf-pro: setPrimitiveMaterials validates every edit before applying it and refreshes texture bindings. Later UV preparation follows MSFT material references; arbitrary material edits can prepare UV streams lazily. Defaults: hysteresis 0.1, bias 1, thresholds 0.25 halved per level. No new dependency, heavy geometry loop or benchmark.
+The optional lod/msft entry validates all material chains and decreasing screen hints, with iterative cycle checking. It selects a material per primitive from projected bounds and hysteresis, retaining geometry/deformation arrays. Node MSFT_lod continues through LOD.fromModel. A missing live material-index API was built in its owner, gltf/pbr: setPrimitiveMaterials validates every edit before applying it and refreshes texture bindings. Later UV preparation follows MSFT material references; arbitrary material edits can prepare UV streams lazily. Defaults: hysteresis 0.1, bias 1, thresholds 0.25 halved per level. No new dependency, heavy geometry loop or benchmark.
 The real browser case reuses FlightHelmet mobile (Gary Hsu / Microsoft, CC0-1.0; examples/assets/ATTRIBUTION.md), retaining geometry/maps while authoring three test material levels and a lower-level TEXCOORD_2 reference. It checks rendered colour changes, unchanged vertex buffers and restoration on both backends. CPU fixtures cover invalid references/hints, long chains, cycles, per-primitive quality, orthographic zoom, hysteresis and atomic edit validation.
 - Batch 213 VRMA: clean-room specification/paper comparison, authors, years and links in [rigging-vrma](rigging-vrma.md#clean-room-sources). Reuses Margo accessor, sampling and retarget APIs; no rival implementation read.
 ## Batch 248 job 2: selection rectangles (2026-11-10)
@@ -7293,7 +7519,7 @@ The parity row is full-sphere equirectangular export, as exposed by cube-to-equi
 Research combined Francesco Carucci, *Inside Geometry Instancing*, GPU Gems 2 chapter 3 (2005), https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-3-inside-geometry-instancing ; W3C GPU for the Web Working Group, *WebGPU Shading Language* (2026), https://www.w3.org/TR/WGSL/ (instance_index and host-shareable structure layout); and Khronos Group, *EXT_mesh_gpu_instancing* (2021), https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_mesh_gpu_instancing/README.md (per-instance scalar/vector custom parameters).
 The clean-room implementation keeps fixed geometry/material/wind records intact, adds one per-batch storage binding indexed by instance_index, aligns each custom scalar/vector to vec4f, and updates only the changed row. One appearance function consumes custom values in colour and shadow vertex stages. No rival implementation or companion code was read. GPU evidence uses the existing clean-room Utah Teapot geometry; provenance is in THIRD-PARTY-NOTICES.md.
 ### Batch 206 PreviewSurface (2026-11-10)
-Compared Pixar Animation Studios, UsdPreviewSurface Specification v2.5 (2019, maintained), https://openusd.org/release/spec_usdpreviewsurface.html; AOUSD/Pixar, UsdGeomPrimvar and UsdGeomPrimvarsAPI references (2026), https://openusd.org/release/api/class_usd_geom_primvar.html and https://openusd.org/release/api/class_usd_geom_primvars_a_p_i.html; Khronos Group, glTF 2.0.1 (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; W3C GPU for the Web Working Group, WebGPU (2026), https://www.w3.org/TR/webgpu/; W3C, Compositing and Blending Level 1 (2024), https://www.w3.org/TR/compositing-1/. Combined straight alpha and shader-reader fallbacks with topology-aware indexed interpolation and independent texture coordinates. Separate triangle identity and barycentric coordinates carried by later UV streams interpolate arbitrary scalar/vector primvars from a bounded storage buffer, avoiding channel-count-dependent vertex-layout changes. Sources were compared for interpolation, alpha meaning, color encoding and resource validation. No companion or rival source read. The external-copy validation rule requires COPY_DST and RENDER_ATTACHMENT; the existing gltf-pro uploadImage missed the latter. Regression: packages/gltf-pro/tests/upload-image.test.js plus real preview texture upload/render.
+Compared Pixar Animation Studios, UsdPreviewSurface Specification v2.5 (2019, maintained), https://openusd.org/release/spec_usdpreviewsurface.html; AOUSD/Pixar, UsdGeomPrimvar and UsdGeomPrimvarsAPI references (2026), https://openusd.org/release/api/class_usd_geom_primvar.html and https://openusd.org/release/api/class_usd_geom_primvars_a_p_i.html; Khronos Group, glTF 2.0.1 (2021), https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html; W3C GPU for the Web Working Group, WebGPU (2026), https://www.w3.org/TR/webgpu/; W3C, Compositing and Blending Level 1 (2024), https://www.w3.org/TR/compositing-1/. Combined straight alpha and shader-reader fallbacks with topology-aware indexed interpolation and independent texture coordinates. Separate triangle identity and barycentric coordinates carried by later UV streams interpolate arbitrary scalar/vector primvars from a bounded storage buffer, avoiding channel-count-dependent vertex-layout changes. Sources were compared for interpolation, alpha meaning, color encoding and resource validation. No companion or rival source read. The external-copy validation rule requires COPY_DST and RENDER_ATTACHMENT; the existing gltf/pbr uploadImage missed the latter. Regression: packages/gltf/test/upload-image.test.js plus real preview texture upload/render.
 
 ## Job 0: tracked conflict-marker hygiene (2026-11-10)
 Compared Bowen Shen, Cihan Xiao, Na Meng and Fei He, *Automatic Detection and Resolution of Software Merge Conflicts: Are We There Yet?* (2021), https://arxiv.org/abs/2102.11307 ; Benedikt Schesch, Ryan Featherman, Kenneth J. Yang, Ben R. Roberts and Michael D. Ernst, *Evaluation of Version Control Merge Tools* (2024), https://arxiv.org/abs/2410.09934 ; and Git contributors, *git-diff*, *git-ls-files* and *git-check-attr* manuals (2026 retrieval), https://git-scm.com/docs/git-diff , https://git-scm.com/docs/git-ls-files , https://git-scm.com/docs/git-check-attr . The papers distinguish textual from semantic conflicts and use tests to evaluate integration correctness. Combine a full tracked-working-text scan (rather than diff-only detection) with Git attribute exclusions, NUL-byte binary detection and exact line-start checks. This guards retained textual markers only; it does not claim semantic merge correctness. Shared docs retain every real line from both sides. No external implementation read or copied.
@@ -7338,7 +7564,7 @@ The landing gate exposed an export-ordering defect: Figure.toPNG rendered then s
 
 ### Batch 243 glTF extension lobes (2026-11-09)
 Research: Khronos 3D Formats Working Group, *KHR_materials_clearcoat* and *KHR_materials_sheen* (2020), *KHR_materials_specular* (2021) and *KHR_materials_iridescence* (2022), the specification documents at https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos; Alejandro Conty Estevez and Christopher Kulla, *Production Friendly Microfacet Sheen BRDF* (2017), https://blog.selfshadow.com/publications/s2017-shading-course/imageworks/s2017_pbs_imageworks_sheen.pdf; Laurent Belcour and Pascal Barla, *A Practical Extension to Microfacet Theory for the Modeling of Varying Iridescence* (2017), https://belcour.github.io/blog/research/publication/2017/05/01/brdf-thin-film.html; Eric Heitz, *Sampling the GGX Distribution of Visible Normals* (2018), https://jcgt.org/published/0007/04/01/; Eric Veach and Leonidas J. Guibas, *Optimally Combining Sampling Techniques for Monte Carlo Rendering* (1995), https://graphics.stanford.edu/papers/combine/.
-The optional PBR path combines the normative clearcoat view-Fresnel layering (including emission), RGB dielectric Fresnel and diffuse energy reduction, Charlie sheen with Margo's already fitted directional-albedo scaling, and the existing Margo thin-film Fourier/Gaussian sensitivity fit. The unchanged thin-film WGSL moved from gltf-pro shader.ts to shared/iridescence.js, so the raster and trace paths reuse one implementation; no foreign code was copied. A complete mixture PDF combines visible-normal GGX, cosine diffuse and uniform-hemisphere sheen proposals, with smooth delta mass handled separately and geometric rejection retaining its null probability. Native/compat tests use the already licensed Khronos metadata Box plus independent analytic equations and repository-authored channel inputs.
+The optional PBR path combines the normative clearcoat view-Fresnel layering (including emission), RGB dielectric Fresnel and diffuse energy reduction, Charlie sheen with Margo's already fitted directional-albedo scaling, and the existing Margo thin-film Fourier/Gaussian sensitivity fit. The unchanged thin-film WGSL moved from gltf/pbr shader.ts to shared/iridescence.js, so the raster and trace paths reuse one implementation; no foreign code was copied. A complete mixture PDF combines visible-normal GGX, cosine diffuse and uniform-hemisphere sheen proposals, with smooth delta mass handled separately and geometric rejection retaining its null probability. Native/compat tests use the already licensed Khronos metadata Box plus independent analytic equations and repository-authored channel inputs.
 
 ### Batch 243 lobe compiler work and inclusive bounds (2026-11-10)
 Research compared: Samuli Laine, Tero Karras and Timo Aila, *Megakernels Considered Harmful: Wavefront Path Tracing on GPUs* (2013), https://research.nvidia.com/sites/default/files/pubs/2013-07_Megakernels-Considered-Harmful/laine2013hpg_paper.pdf; W3C GPU for the Web Working Group, *WebGPU* and *WebGPU Shading Language* (2026), https://www.w3.org/TR/webgpu/ and https://www.w3.org/TR/WGSL/; Khronos WebGL Working Group, *KHR_parallel_shader_compile* (2019), https://registry.khronos.org/webgl/extensions/KHR_parallel_shader_compile/. Readiness and link completion do not prove first-draw completion. The implemented reductions retain one transport pipeline, use invocation-private layer state with a pure emitter reader, avoid unused reflective texture reads and reuse identical Fresnel values; this is not a wavefront implementation or a measured speed claim. Extra cold-cache diagnostics remain unresolved and explicitly tracked.
@@ -7536,7 +7762,7 @@ Research compared the finite local spherical integral, directional occlusion and
 - Frida Hernell, Patric Ljung and Anders Ynnerman, *Local Ambient Occlusion in Direct Volume Rendering* (2010), IEEE TVCG 16:548-559, https://doi.org/10.1109/TVCG.2009.45, paper https://www.diva-portal.org/smash/get/diva2:321233/FULLTEXT01.pdf. Integrate transmittance over finite-radius sphere directions, rather than gradient-only darkening. Our Fibonacci angular quadrature evaluates the classified extinction directly, avoiding an expensive precomputed volume after classifier edits.
 - Mathias Schott, Vincent Pegoraro, Charles Hansen, Kevin Boulanger and Kadi Bouatouch, *A Directional Occlusion Shading Model for Interactive Direct Volume Rendering* (2009), https://diglib.eg.org/items/90433cc3-3b04-42eb-b2ba-a959c15c08e6, paper https://cgl.ethz.ch/teaching/scivis_common/Literature/Schott2009.pdf. Use directional radiative attenuation, with Beer-Lambert integration toward a distant light. We evaluate rays, rather than reproduce its slice-propagated cone implementation; the directional-light limit has an independent homogeneous-slab solution.
 - Thomas Kroes, Frits H. Post and Charl P. Botha, *Exposure Render: An Interactive Photo-Realistic Volume Rendering Framework* (2012), PLOS ONE 7:e38586, https://pmc.ncbi.nlm.nih.gov/articles/PMC3388083/. Combine stochastic optical-depth collisions, next-event directional lighting, sampled scattering paths and progressive linear-radiance accumulation. Piecewise-constant per-segment extinction inverts cumulative optical depth directly, without a guessed density majorant or null-collision bias. Russian roulette preserves energy after the third event.
-- Louis G. Henyey and Jesse L. Greenstein, *Diffuse radiation in the Galaxy* (1941), Astrophysical Journal 93:70, https://doi.org/10.1086/144246; NIST phase-function definition https://pages.nist.gov/SCATMECH/docs/phase.htm. Derive the normalized HG phase and inverse CDF; use its isotropic limit near g=0. Positive g samples forward along propagation. The direct-light estimator uses 4*pi*p; environment escape uses the sampled phase PDF cancellation.
+- Louis G. Henyey and Jesse L. Greenstein, *Diffuse radiation in the Galaxy* (1941), Astrophysical Journal 93:70, https://doi.org/10.1086/144246; NIST phase-function definition https://pages.nist.gov/SCATMECH/docs/phase.htm. Derive the normalized HG phase and inverse CDF; use its isotropic limit near g=0. Positive g samples forward along propagation. The direct-light estimator uses p normalised over the sphere, as Pharr, Jakob and Humphreys, *Physically Based Rendering*, 4th ed. (2023), section 11.3, https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions (read 2026-11-15), defines it (isotropic 1/(4 pi)); the single-scatter march uses the same isotropic 1/(4 pi), so both paths treat `light` as the irradiance of the distant light (default 8.8, the old 0.7 times 4 pi, so the default image is unchanged). Until 2026-11-15 the estimator used 4*pi*p and the march an implicit phase of 1. Environment escape uses the sampled phase PDF cancellation.
 - Kitware, *Cinematic Volume Rendering in Your Web Browser* (2022), https://www.kitware.com/cinematic-volume-rendering/, and *vtk.js VolumeMapper API*, https://kitware.github.io/vtk-js/api/Rendering_Core_VolumeMapper.html (accessed 2026-11-10). Compared public behaviour: independently enabled local occlusion and volumetric shadows, volume opacity participating in light attenuation. Margo additionally exposes progressive multiple scattering, camera-rest reset and exact work counters. This is a comparison of the requested lighting row, not a full vtk.js feature claim or measured rival timing.
 - EMDB, *Map format*, https://files.wwpdb.org/pub/emdb/doc/Map-format/current/EMDB_map_format.pdf; PDBe public-data statement https://www.ebi.ac.uk/pdbe/about/public-data-access-statement. The offline EMD-8117 reducer reads orthogonal XYZ mode-2 maps from the specification, retains stride-3 original samples and records source/output hashes. No general MRC API is claimed. Dataset CC0 and the reused TCIA CC BY 3.0 data stay separately attributed in the demo and source records.
 
@@ -7627,7 +7853,7 @@ Research: Laura Inozemtseva and Reid Holmes, Coverage Is Not Strongly Correlated
 
 Research before implementation: Mark Callow (editor), Khronos Group, *KTX File Format Specification*, version 2.0.4 (2025), https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html ; Andrew Garrard, *Khronos Data Format Specification*, v1.3.1 (2019), https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html ; Ravi Ramamoorthi and Pat Hanrahan, *An Efficient Representation for Irradiance Environment Maps* (SIGGRAPH 2001), https://graphics.stanford.edu/papers/envmap/envmap.pdf ; Brian Karis, *Real Shading in Unreal Engine 4* (SIGGRAPH 2013 course notes), https://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf . KTX supplies the cube/level container and linear RGBA16F descriptor; SH and split-sum research explain which precomputed resources must survive rather than recomputing them. Public rival behavior: Babylon.js documentation, *HDR Environment*, https://doc.babylonjs.com/features/featuresDeepDive/materials/using/HDREnvironment/ describes prefiltered .env cubes with irradiance. Margo saves the complete source cube, roughness mips, SH and BRDF LUT losslessly and loads by upload only. No rival or paper companion implementation was read or copied.
 
-Job 1 already matches the requested IBL compensation: commit 8b4c3e924 implements Carmelo J. Fdez-Aguera, *A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting* (JCGT 2019), https://jcgt.org/published/0008/01/03/paper.pdf , equations 11 and 13 and its diffuse energy partition. Existing tests/environment-browser.js checks rough/smooth white metals and dielectric furnace energy, including KHR_materials_specular zero. It applies through EnvironmentLighting's core and glTF-pro hooks and probes' shared IBL helper. No replacement optional entry is necessary.
+Job 1 already matches the requested IBL compensation: commit 8b4c3e924 implements Carmelo J. Fdez-Aguera, *A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting* (JCGT 2019), https://jcgt.org/published/0008/01/03/paper.pdf , equations 11 and 13 and its diffuse energy partition. Existing tests/environment-browser.js checks rough/smooth white metals and dielectric furnace energy, including KHR_materials_specular zero. It applies through EnvironmentLighting's core and glTF PBR hooks and probes' shared IBL helper. No replacement optional entry is necessary.
 
 KTX metadata contract: key margoEnvironmentIBL, NUL terminated (20 bytes), version 1 little endian: u32 version, source edge, source mip count, BRDF edge; f32 rotation and intensity; 27 radiance and 27 irradiance f32 coefficients; BRDF edge squared packed u32; every source cube RGBA16F mip down to 1x1, largest first. The standard image level index references GGX specular mips, smallest first in the file. Face order +X,-X,+Y,-Y,+Z,-Z and top-left origin rd. This retains full source-background quality as well as lighting.
 ### Batch 184: shell fur (2026-11-10)
@@ -8230,7 +8456,7 @@ The container stage validates configuration/header/spatial/pixel-depth agreement
 
 The public worker lifecycle covers AbortSignal, transfer, timeout, disposal/restart, malformed files, bounded padded workspace and lazy /image dispatch. Browser GPU tests verify 4,762,292 uploaded/read-back bytes per backend on native WebGPU and WebGL2 compatibility. This is still-image/intra decoding, not animated or progressive inter-frame playback, encrypted/external items, tone mapping or automatic ICC display management. No timing claim is made.
 
-Batch 203 landing integration: main 3d7dd74c9 selects gltf-pro from Stage/gltf, while the size recorder still searched for the legacy gltf chunk. Research: Vite contributors, Backend Integration (Vite 4 documentation, retrieved 2026), https://v4.vite.dev/guide/backend-integration , defines imports, dynamicImports and assets; WHATWG contributors, HTML Standard module graph fetching (2026), https://html.spec.whatwg.org/multipage/webappapis.html , separates static descendant loading from dynamic import calls. The owned graph walker uses visited sets, pins exact static request closure, records deferred codec assets belonging to the selected loader, rejects unrelated emitted packs and still rejects every fetched decoder/worker/Wasm. Original regressions cover cycles, shared imports, deferred/unrelated assets and missing edges. No README fixture, stage runtime or protected browser helper changed.
+Batch 203 landing integration: main 3d7dd74c9 selects gltf/pbr from Stage/gltf, while the size recorder still searched for the legacy gltf chunk. Research: Vite contributors, Backend Integration (Vite 4 documentation, retrieved 2026), https://v4.vite.dev/guide/backend-integration , defines imports, dynamicImports and assets; WHATWG contributors, HTML Standard module graph fetching (2026), https://html.spec.whatwg.org/multipage/webappapis.html , separates static descendant loading from dynamic import calls. The owned graph walker uses visited sets, pins exact static request closure, records deferred codec assets belonging to the selected loader, rejects unrelated emitted packs and still rejects every fetched decoder/worker/Wasm. Original regressions cover cycles, shared imports, deferred/unrelated assets and missing edges. No README fixture, stage runtime or protected browser helper changed.
 
 
 
@@ -8407,7 +8633,7 @@ Batch 274 job 5 continuation (2026-11-10), research and partial-build evidence:
 
 These are build notes for an incomplete importer, not an ONNX/ONNX Runtime parity or completion claim. Remaining operators and conformance cases must be built and tested before job 5 can land.
 
-Further batch 274 job 5 conformance evidence (2026-11-10): 96 pinned, original analytic cases agree with unmodified ONNX Runtime 1.31.1 CPUExecutionProvider, ONNX 1.23.2 and NumPy 2.5.4; graph optimizations are disabled and both runtime thread counts are one. The external runtime lives in ../margoengine-onnx-oracle-batch274, outside this repository. Only its public Python API was invoked; no implementation file was opened, copied or adapted. Two additional requested comparisons (float64 Det and int64 Binarizer) are unavailable in that provider and have independent analytic regressions instead. This is coverage evidence for these cases, not full importer parity. The same pinned references run in Node and Chromium without that runtime installed. Source and versions are in packages/compute/tests/fixtures/onnx/operators-reference.json; original fixture generator, external runner and recorder are packages/compute/scripts/onnx-oracle-{cases.mjs,record.mjs} and onnx-oracle.py.
+Further batch 274 job 5 conformance evidence (2026-11-10): 96 pinned, original analytic cases agree with unmodified ONNX Runtime 1.31.1 CPUExecutionProvider, ONNX 1.23.2 and NumPy 2.5.4; graph optimizations are disabled and both runtime thread counts are one. The external runtime lives in ../../Tools/margo-oracles/onnx-batch274 from the checkout (the workstation's tools folder), outside this repository. Only its public Python API was invoked; no implementation file was opened, copied or adapted. Two additional requested comparisons (float64 Det and int64 Binarizer) are unavailable in that provider and have independent analytic regressions instead. This is coverage evidence for these cases, not full importer parity. The same pinned references run in Node and Chromium without that runtime installed. Source and versions are in packages/compute/tests/fixtures/onnx/operators-reference.json; original fixture generator, external runner and recorder are packages/compute/scripts/onnx-oracle-{cases.mjs,record.mjs} and onnx-oracle.py.
 
 The comparison exposed and now covers three specification details: StringSplit removes trailing whitespace from its unsplit whitespace suffix; RoiAlign mode=max takes the maximum weighted corner contributions as in ONNX's published mode-max conformance data (not the average mode's sum); MelWeightMatrix first quantizes inverse-Mel boundaries to frequency bins and uses the published example's bins+2 interval convention. Small and wider matrices both test coincident boundaries and fractional ramps. Spectral window scalar coefficients use f32 constants (Blackman from alpha=0.16) before promotion, matching the tested runtime's construction. Relevant published examples are on the StringSplit, RoiAlign and MelWeightMatrix schema pages cited above. No tests or numerical tolerances were weakened.
 
@@ -8837,6 +9063,15 @@ J. W. Tukey, "An Algorithm for the Machine Calculation of Complex Fourier Series
 real transform is the standard identity for packing two real signals into one complex FFT. Laroche and Dolson (1999) phase
 vocoder time stretch and pitch shift were considered and not built.
 
+
+## Audio WAV files (2026-11-16)
+
+`@margoengine/audio/wav` is written from the specifications only, no other library's code read: Microsoft and IBM,
+"Multimedia Programming Interface and Data Specifications 1.0" (August 1991; RIFF chunks, WAVE `fmt ` and `data`,
+unsigned 8-bit and signed wider PCM); Microsoft, "Multiple Channel Audio Data and WAVE Files" (2001; WAVE_FORMAT_EXTENSIBLE,
+channel mask, SubFormat GUIDs); mmreg.h tag values (WAVE_FORMAT_PCM 1, IEEE_FLOAT 3, EXTENSIBLE 0xFFFE); EBU Tech 3285,
+"Specification of the Broadcast Wave Format" (2011); EBU Tech 3306, "RF64: an extended File Format for Audio" (2009), read
+only to refuse it by name. Output was checked against ffmpeg 9 and Python's `wave` module.
 ## Lague plan 1: particle liquid surface (2026-11-10)
 
 water/liquid is written from W. J. van der Laan, S. Green and M. Sainz, Screen Space Fluid Rendering with Curvature Flow, I3D 2009, https://doi.org/10.1145/1507149.1507164 (sphere sprites to eye depth, additive thickness, normals from the smaller one-sided difference); N. Truong and C. Yuksel, A Narrow-Range Filter for Screen-Space Fluid Rendering, Proc. ACM Comput. Graph. Interact. Tech. 1(1) 2018, https://www.cemyuksel.com/research/papers/narrowrangefilter.pdf (equations 1 to 9 and the separable passes with a 5 x 5 clean-up); the Beer-Lambert law and the exact Fresnel equations for an unpolarised dielectric. Also read and compared: F. Oliveira and A. Paiva, Narrow-Band Screen-Space Fluid Rendering, Computer Graphics Forum 41(6) 2022, https://doi.org/10.1111/cgf.14510 (its narrow band, built 2026-11-11 from Algorithm 1 and equation 3 in packages/water/src/liquid-band.ts; the oracle packages/water/test/liquid-band-reference.js was written from the paper alone); M. Ihmsen, N. Akinci, G. Akinci and M. Teschner, Unified spray, foam and air bubbles for particle-based fluids, The Visual Computer 28(6-8) 2012 (whitewater, planned); S. Green, Screen Space Fluid Rendering for Games, GDC 2010 (parameter sanity). Ruled out for now: Yu and Turk's anisotropic kernels (TOG 2013, a solver-side neighbour PCA) and Muller's screen-space meshes (2007, per-frame triangulation). No engine or companion code was read; the float64 oracle (packages/water/test/liquid-reference.js) was written from the paper alone.
@@ -8901,10 +9136,1824 @@ times 1 minus the dielectric Fresnel; weighting it by 1 minus the mixed Fresnel 
 an identity. The Sample Viewer was used only as a black-box picture; its source was not
 read. No other engine's code was read.
 
-## KB3240b: the same diffuse weight outside gltf-pro (2026-11-12)
+## KB3240b: the same diffuse weight outside gltf/pbr (2026-11-12)
 
 Sources as KB3240 above (glTF 2.0 Appendix B, Schlick 1994), and for the coloured F0 Khronos Group,
 *KHR_materials_specular* (https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_specular/README.md),
 whose dielectric Fresnel mix weighs the layer under it by 1 minus the largest channel of the Fresnel. Since the F90 is
 one number, that largest channel is mix(max channel of F0, F90, (1 - vh)^5). Applied to clustered's shared per-light
 BRDF and to the VAT, imposter, material decal, voxel and WebGL2 preview direct lights. No other engine's code was read.
+
+## Shot tool capture: accumulation, area filter, blue-noise dither (tools/shot, 2026-11-14)
+
+Written from the papers and the standard, no code read: P. Haeberli and K. Akeley, "The accumulation buffer:
+hardware support for high-quality rendering", SIGGRAPH 1990 (https://doi.org/10.1145/97880.97913), for sub-frames
+spread over the shutter and averaged; G. Wolberg, *Digital Image Warping*, IEEE Computer Society Press 1990, chapter 5,
+for area (box) resampling by footprint share; IEC 61966-2-1:1999 for the sRGB transfer functions; R. Ulichney, "The
+void-and-cluster method for dither array generation", Proc. SPIE 1913, 1993 (https://doi.org/10.1117/12.152707), for
+the dither array (Gaussian energy on a torus, the tightest cluster and the largest void, phases 1 to 3), and R. Ulichney,
+"Dithering with blue noise", Proc. IEEE 76(1), 1988 (https://doi.org/10.1109/5.3288), for adding the array as a dither
+of under one level before rounding. Compared with an ordered Bayer dither (Bayer 1973) and white noise: Bayer leaves a
+visible cross-hatch in flat night gradients and white noise clumps, so blue noise was chosen. The MSAA override reads
+only Margo's own core and quality sources. No other engine's code was read.
+
+## headless/look: look checks for shot probe frames (shorts P4, 2026-11-14)
+
+Research compared before building. Image difference against a reference: Z. Wang, A. C. Bovik, H. R. Sheikh and E. P.
+Simoncelli, Image Quality Assessment: From Error Visibility to Structural Similarity, IEEE TIP 13(4) (2004),
+https://doi.org/10.1109/TIP.2003.819861 (SSIM, already in headless/compare: luma only, no viewing distance); Z. Wang,
+E. P. Simoncelli and A. C. Bovik, Multiscale structural similarity for image quality assessment, Asilomar (2003),
+https://doi.org/10.1109/ACSSC.2003.1292216; X. Zhang and B. A. Wandell, A spatial extension of CIELAB for digital
+color image reproduction, SID Journal 5(1) (1997), https://doi.org/10.1889/1.1985127 (S-CIELAB); G. Sharma, W. Wu and
+E. N. Dalal, The CIEDE2000 color-difference formula, Color Research and Application 30(1) (2005),
+https://doi.org/10.1002/col.20070 (per pixel, no spatial filtering); R. Mantiuk, K. J. Kim, A. G. Rempel and W.
+Heidrich, HDR-VDP-2, ACM TOG 30(4) (2011), https://doi.org/10.1145/2010324.1964935 and R. Mantiuk et al.,
+ColorVideoVDP, ACM TOG 43(4) (2024), https://doi.org/10.1145/3658144 (calibrated display models, far heavier);
+R. Zhang, P. Isola, A. A. Efros, E. Shechtman and O. Wang, The Unreasonable Effectiveness of Deep Features as a
+Perceptual Metric (LPIPS), CVPR (2018), https://arxiv.org/abs/1801.03924 (needs a trained network: excluded). Chosen:
+P. Andersson, J. Nilsson, T. Akenine-Moller, M. Oskarsson, K. Astrom and M. D. Fairchild, FLIP: A Difference Evaluator
+for Alternating Images, Proc. ACM Comput. Graph. Interact. Tech. 3(2) (2020), https://doi.org/10.1145/3406183 (author
+copy https://research.nvidia.com/sites/default/files/node/3260/FLIP_Paper.pdf): built for rendered
+frames flipped against a reference, colour aware, viewing distance in pixels per degree, one error map, no learned
+weights. Implemented from the paper's text only (CSF Gaussians b 0.0047, 0.0053, two for blue-yellow; YyCxCz from
+T. J. Flohr et al., Model-based color image quantization, SPIE 1913 (1993), https://doi.org/10.1117/12.152701; Hunt
+adjustment; HyAB from S. Abasi, M. Amani Tehran and M. D. Fairchild, Distance metrics for very large color
+differences, Color Research and Application 45(2) (2020), https://doi.org/10.1002/col.22451; power 0.7 and the 0.4 /
+0.95 compression; edge and point features at sigma 0.5 x 0.082 degrees, power 0.5). The paper's companion code was not
+read; the feature input is the achromatic channel scaled to 0..1, which is Y over the white's.
+
+Per-check sources: noise, J. Immerkaer, Fast Noise Variance Estimation, CVIU 64(2) (1996),
+https://doi.org/10.1006/cviu.1996.0060; isolated pixels, H. Hwang and R. A. Haddad, Adaptive median filters: new
+algorithms and results, IEEE TIP 4(4) (1995), https://doi.org/10.1109/83.370679 (order statistics of the neighbours);
+banding, P. Tandon, M. Afonso, J. Sole and L. Krasula, CAMBI: Contrast-aware Multiscale Banding Index, PCS (2021),
+https://arxiv.org/abs/2102.00079 and Z. Tu, J. Lin, Y. Wang, B. Adsumilli and A. C. Bovik, BBAND index, ICASSP
+(2020), https://arxiv.org/abs/2002.11891 (both look for small steps between flat areas; Margo counts flat runs split
+by a step that skips a code, which is the histogram gap of an 8-bit gradient); blocks, Z. Wang, A. C. Bovik and B. L.
+Evans, Blind measurement of blocking artifacts in images, ICIP (2000), https://doi.org/10.1109/ICIP.2000.899622 and Z.
+Wang, H. R. Sheikh and A. C. Bovik, No-reference perceptual quality assessment of JPEG compressed images, ICIP (2002),
+https://doi.org/10.1109/ICIP.2002.1038064 (a step signal at a known period; Margo tests the phase per tile and period
+so one object's edges are no pattern); edge hardness, P. Marziliano, F. Dufaux, S. Winkler and T. Ebrahimi, A
+no-reference perceptual blur metric, ICIP (2002), https://doi.org/10.1109/ICIP.2002.1038902 (edge width between
+extrema); light discs, A. Rosenfeld and J. L. Pfaltz, Sequential operations in digital picture processing, JACM
+13(4) (1966), https://doi.org/10.1145/321356.321357 (connected components); flicker, B. Guthier, S. Kopf, M. Eble and
+W. Effelsberg, Flicker reduction in tone mapped high dynamic range video, SPIE 7866 (2011),
+https://doi.org/10.1117/12.872449 and G. Eilertsen, R. Wanat, R. K. Mantiuk and J. Unger, Evaluation of tone mapping
+operators for HDR-video, CGF 32(7) (2013), https://doi.org/10.1111/cgf.12198 (frame mean brightness against its
+neighbours); luma, ITU-R BT.709-6 (2015), https://www.itu.int/rec/R-REC-BT.709; sRGB, IEC 61966-2-1 (1999). The horizon
+is the vanishing line of horizontal planes, the cross product of the images of two horizontal directions (R. Hartley
+and A. Zisserman, Multiple View Geometry, 2nd ed. (2004), section 8.6). No other engine's or tool's code was read; the
+contact sheet font is Margo's own 5 x 7 bitmap.
+
+## Shot master encode checks: CIEDE2000, the MP4 colr box, the proxy detail measure (tools/shot, 2026-11-14)
+
+Written from the papers and standards, no code read: G. Sharma, W. Wu and E. N. Dalal, "The CIEDE2000 color-difference
+formula: implementation notes, supplementary test data, and mathematical observations", Color Research and Application
+30(1), 2005 (https://doi.org/10.1002/col.20070), for the formula and the test pairs in tests/shot-encode.test.js;
+CIE 15:2004 for CIELAB; IEC 61966-2-1:1999 for sRGB to XYZ; ITU-R BT.709-6 for the Y'CbCr matrix and limited range;
+ISO/IEC 14496-12 (box structure, the visual sample entry), ISO/IEC 14496-15 (avc1) and ISO/IEC 23091-2 (the nclx
+code points) for tools/shot/mp4.mjs. The proxy check's fine-detail share projects the copy's luma Laplacian on the
+original's (a least-squares gain of the high band), chosen over the ratio of Laplacian energies because blocking and
+ringing raise a re-encode's energy (measured: 1.08 to 1.27 kept at 8 Mbps on a spark field by energy, 0.91 to 0.96 by
+projection). ffmpeg is driven by its documented options only. No other engine's code was read.
+
+## Black hole: Kerr geodesics, Page-Thorne disk, jet and lensed stars (shader/black-hole, 2026-11-14)
+
+Written from the papers, no code read (the companion code of the papers was not opened): O. James, E. von Tunzelmann,
+P. Franklin and K. S. Thorne, "Gravitational lensing by spinning black holes in astrophysics, and in the movie
+Interstellar", CQG 32, 065001 (2015), https://arxiv.org/abs/1502.03808 (geodesic equations A.15, camera frame A.9 to
+A.12, ray bundles and point stars); J. M. Bardeen, W. H. Press and S. A. Teukolsky, ApJ 178, 347 (1972),
+https://ui.adsabs.harvard.edu/abs/1972ApJ...178..347B (horizon, ISCO, photon orbit, circular orbits); D. N. Page and
+K. S. Thorne, ApJ 191, 499 (1974), https://ui.adsabs.harvard.edu/abs/1974ApJ...191..499P (disk flux, eq. 15n);
+J.-P. Luminet, A&A 75, 228 (1979), https://ui.adsabs.harvard.edu/abs/1979A&A....75..228L (observed flux g^4 F);
+K. Asada and M. Nakamura, ApJL 745, L28 (2012), https://ui.adsabs.harvard.edu/abs/2012ApJ...745L..28A (parabolic
+jet); M. L. Lind and R. D. Blandford, ApJ 295, 358 (1985), https://ui.adsabs.harvard.edu/abs/1985ApJ...295..358L
+(beaming D^(2 + alpha)); H. Igehy, "Tracing ray differentials", SIGGRAPH 1999,
+https://graphics.stanford.edu/papers/trd/ (pixel footprint); A. Norton, A. P. Rockwood and P. T. Skolmoski,
+"Clamping", SIGGRAPH 1982, https://doi.org/10.1145/965145.801274 (octave fade); F. Neyret, "Advected textures", SCA
+2003, https://hal.inria.fr/inria-00537472 (two crossfaded phases); B. Kang, O. Moon, C. Hong, H. Lee, B. Cho and Y.
+Kim, J. Korean Physical Society 41, 865 (2002) (Planckian locus fits). Compared and combined: James et al.'s ray
+bundles over plain point sampling (dashed stars) and over a sky texture blur (no magnification); Neyret's two phases
+over a single advected phase (unbounded winding) and over a static disk (no shear). The negated-division fault was
+found with a minimal WGSL repro written here; WGSL's atan2 definition and accuracy are from the W3C WGSL
+specification. No other engine's or renderer's code was read.
+
+## KB3297 and KB3240f: sheen punctual scaling, lobe diffuse weight (2026-11-12)
+
+Sources: Khronos Group, *KHR_materials_sheen* extension specification (ratified), sections "Sheen distribution",
+"Sheen visibility" and "Sheen layering: Albedo-scaling technique" (punctual form min(1 - max3(sheenColor) E(VdotN),
+1 - max3(sheenColor) E(LdotN)) and its simplified VdotN form), https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_sheen;
+A. Estevez and C. Kulla, "Production Friendly Microfacet Sheen BRDF", Sony Pictures Imageworks technical report, 2017
+(Charlie distribution, cited for the distribution already in use and for the open visibility row); Khronos Group,
+*glTF 2.0 Specification*, version 2.0.1, Appendix B "BRDF Implementation" (the dielectric diffuse weight used by
+@margoengine/materials' anisotropy-only branch, as for KB3240). The Sample Viewer was used only as a black-box picture
+reference (scripts/reference-rendering, case sheen); no other engine's code was read.
+
+KB3297b (2026-11-15): @margoengine/clustered `physicalLobes` takes the same punctual form for each clustered light,
+from the same KHR_materials_sheen section; no other source.
+
+
+## KB3297c: sheen visibility and its albedo table (2026-11-15)
+
+Sources: Khronos Group, *KHR_materials_sheen* extension specification (ratified, 2020), sections "Sheen visibility"
+(the Charlie shadowing 1 / ((1 + Lambda(VdotN) + Lambda(LdotN)) 4 VdotN LdotN) as the default; the simpler form noted
+as not energy conserving with albedo scaling) and "Albedo-scaling technique" ("The values E(x) can be looked up in a
+table", lookup by VdotN and sheenRoughness), https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_sheen;
+A. Conty Estevez and C. Kulla, *Production Friendly Microfacet Sheen BRDF*, SIGGRAPH 2017 Physically Based Shading
+course, https://blog.selfshadow.com/publications/s2017-shading-course/imageworks/s2017_pbs_imageworks_sheen.pdf
+(eq. 3 and Table 1: L(x) = a / (1 + b x^c) + d x + e and its interpolation by (1 - r)^2, r the distribution's own
+roughness, alpha = sheenRoughness^2 here); Dassault Systemes, *Enterprise PBR Shading Model* 2022x, section 6.2.3
+(sheen albedo scaling from a precomputed 2D table of E over view cosine and roughness),
+https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2022x.md.html; C. Kulla and A. Conty,
+*Revisiting Physically Based Shading at Imageworks*, SIGGRAPH 2017 course notes (directional albedo tables for
+energy compensation), https://blog.selfshadow.com/publications/s2017-shading-course/; M. Ashikhmin and S. Premoze,
+*Distribution-based BRDFs*, 2007 (the simpler visibility the spec attributes, not used); D. Neubelt and M. Pettineo,
+*Crafting a Next-Gen Material Pipeline for The Order: 1886*, SIGGRAPH 2013 course (the clamped form Margo used before,
+replaced); C. Kelemen and L. Szirmay-Kalos, *A Microfacet Based Coupled Specular-Matte BRDF Model with Importance
+Sampling*, Eurographics 2001 short papers (albedo of a microfacet lobe as a function of the view cosine);
+T. Zeltner, B. Burley and M. J.-Y. Chiang, *Practical Multiple-Scattering Sheen Using Linearly Transformed Cosines*,
+SIGGRAPH 2022 talks (a fitted table over cosine and
+roughness for a sheen lobe, cited for the table idea; its lobe is a different one); C. L. Lawson, *Contributions
+to the Theory of Linear Least Maximum Approximation*, PhD thesis, UCLA, 1961 (reweighting least squares toward the
+minimax fit); H. Takahasi and M. Mori, *Double Exponential Formulas for Numerical Integration*, Publ. RIMS Kyoto
+Univ. 9, 1974, https://doi.org/10.2977/prims/1195192451 (the tanh-sinh quadrature of the albedo integral).
+
+Combined here: the spec's Charlie distribution and its default visibility from the paper's own table; for the base
+darkening 1 - max3(sheenColor) E and the ambient sheen, a table of E as the spec and Enterprise PBR suggest, but laid
+out on what the integral measures (scripts/sheen-albedo-fit.mjs): for small r, E is (1 / r) g(mu / r), so the table
+holds ln(E R) (R = max(r, 1e-4)) over u = (mu (R + 0.1) / (R + 0.1 mu))^0.45 and v = sqrt(r), 16 x 16, bilinear, and
+E = clamp(exp(T) / R, 0, 1). Nodes are weighted least squares plus Lawson reweighting against the tanh-sinh integral,
+stored at 2 decimals. Measured on 9,323 validation points against min(E, 1): max 0.04109 (at n.v 0.00056 and r 1e-4),
+mean 0.00205, 0.03070 for n.v 0.01 and up, 0.01426 for r 0.03 and up, 835 B gzip of WGSL. Compared: the same table
+at 3 decimals (max 0.04153, mean 0.00199, 990 B), its nodes sampled without the fit (max 0.07675), the Enterprise PBR
+layout of 16 x 16 samples of min(E, 1) in (mu, alpha) (max 0.98646, mean 0.06058: E is a cliff in mu at small r), and
+the closed form exp(b - x (c1 + x c2)) used before, refitted to the new lobe (max 0.30, not monotonic), which needed
+271 B. The Sample Viewer was used only as a black-box picture reference (scripts/reference-rendering, case sheen):
+its base darkening measures as 1 - sheenColor sRGB_encode(E), an encode of its albedo lookup that the spec does not
+ask for; it is recorded as an accepted difference (docs/known-bugs.md, KB3297c) and not copied. No other engine's or
+renderer's code was read, and no paper's companion code.
+## Batch 228 job 2: point attribute filters and style expressions (2026-11-15)
+Research compared the OGC 3D Tiles 1.0 Community Standard, OGC 18-053r2, *Declarative Styling* (Patrick Cozzi, Sean Lilley, Gabby Getz, 2019), https://docs.ogc.org/cs/18-053r2/18-053r2.html , and 3D Tiles 1.1, OGC 22-025r4 (2023), https://docs.ogc.org/cs/22-025r4/22-025r4.html , for the point cloud style properties (show, color, pointSize), the POSITION, POSITION_ABSOLUTE, COLOR and NORMAL semantics, conditions, defines and type rules; Markus Schuetz, *Potree: Rendering Large Point Clouds in Web Browsers* (2016), https://www.cg.tuwien.ac.at/research/publications/2016/SCHUETZ-2016-POT/ , for attribute-driven display of scans (classification, return number, GPS time, point source, intensity); the ASPRS *LAS Specification 1.4 R15* (2019), https://www.asprs.org/wp-content/uploads/2019/07/LAS_1_4_r15.pdf , for the attribute meanings and ranges; and Vaughan R. Pratt, *Top Down Operator Precedence* (POPL 1973), https://doi.org/10.1145/512927.512931 , for the expression parser. Margo combines the 3D Tiles language (unchanged semantics, including the rule that a define reads the column of its own name) with Potree's inclusive range and class filters, evaluated per point on the CPU over typed-array columns, and applies the result through the existing selection mask (filter mode), per-point colours and sizes, a subset cloud, or per-node octree loading. The interpreter that tiles/style already used (clean room, its own record above) moved unchanged into packages/shared/style-expression.js so both packages share one copy; only its error prefix changed from "Tile style:" to "Style:". No rival or companion source was read. Fixtures: generated columns, written LAS files and the existing USGS 3DEP tile (public domain, packages/points/tests/fixtures/NOTICE.md).
+
+## TIFF CCITT, JPEG, YCbCr, CMYK and CIE L*a*b* (`@margoengine/decoders/tiff`, 2026-11-15)
+
+Written from the specifications below, fetched and read in the parts named; no TIFF, JPEG or fax implementation was
+read. The CCITT code tables were typed from T.4 Tables 2 and 3 (the TIFF 6.0 copy misprints white run 26 as "6") and
+checked by decoding Group 3 and Group 4 files from libtiff's `tiffcp`, run as a program, against their sources bit for
+bit. JPEG, CMYK and old-style JPEG were compared against the outputs of `tiff2rgba` and `djpeg` only.
+- Aldus Corporation, *TIFF Revision 6.0* (1992), Sections 10, 11, 16, 20 (ReferenceBlackWhite), 21 and 23, read in
+  full: https://www.itu.int/itudoc/itu-t/com16/tiff-fx/docs/tiff6.pdf
+- ITU-T Recommendation T.4 (07/2003), sections 4.1 and 4.2 (one- and two-dimensional coding, Table 5 uncompressed
+  mode), read in full: https://www.itu.int/rec/T-REC-T.4-200307-I
+- ITU-T Recommendation T.6 (11/1988), section 2 (basic coding scheme, EOFB), read in full:
+  https://www.itu.int/rec/T-REC-T.6-198811-I
+- *DRAFT TIFF Technical Note #2* (17 March 1995): the replacement TIFF/JPEG specification and its changes to Section 21
+  (odd image sizes, planar chroma strips, full-size extra samples), read in full:
+  https://libtiff.gitlab.io/libtiff/specification/technote2.html
+- W3C, *CSS Color Module Level 4*, sample code for the D65 white and the XYZ to linear sRGB matrix and transfer
+  (from the record, not re-read).
+
+Combined: the decoder keeps each line as its changing elements (T.4 4.2.1.3.1), so the reference line, pass mode and
+b1 search are one ordered list walk; a run of length 0 removes the change it would add. Section 21 chroma is filtered
+up linearly from the positions YCbCrPositioning gives (centred or cosited), where libtiff replicates each chroma sample
+over its group. JPEG chroma is upsampled by the shared JPEG decoder (centred, as JFIF), as Technical Note 2 puts
+subsampling inside the codec for chunky files.
+
+LZMA (34925), Zstandard (50000) and WebP (50001) strips and tiles were added later the same day. No public document
+specifies these three TIFF codes beyond their numbers, so the layout was read from the files libtiff 4.7.2 `tiffcp`
+writes (run as a program, checked with `tiffinfo` and the bytes themselves): each LZMA strip or tile is a whole .xz
+stream (magic FD 37 7A 58 5A 00), each Zstandard one a whole frame (28 B5 2F FD), each WebP one a whole RIFF WebP file
+of the strip or tile's size. They are decoded by Margo's own xz (The .xz File Format 1.2.1), RFC 8878 Zstandard and
+RFC 9649 WebP readers, then the TIFF predictor is applied as for every other codec. Those readers load on demand:
+`loadTIFFCodecs` imports each one only when a page of the file uses its code, and the synchronous readers take them as
+the `codecs` option, so the TIFF entry does not carry them. LERC (34887) stays refused: Esri's
+public explainer (doc/MORE.md in its LERC project, read 2026-11-15) gives no bitstream layout, and the layout is
+defined only by source code, which this rule forbids reading.
+
+## Parity 245.4: DragonBones reader (2026-11-15)
+
+`packages/sprites/src/dragonbones.ts` and `dragonbones-data.ts` read DragonBones 5.x JSON and convert each armature
+into the skeletal JSON document the existing `sprites/spine` runtime poses, so both formats share one rig, skinning,
+IK solver and draw path. Written from these public descriptions only; no DragonBones runtime (DragonBonesJS, the C++,
+Unity or other runtimes), editor or other engine source was read.
+
+- DragonBones team, *DragonBones 5.5 JSON format* (English and Chinese pages), DragonBones Tools documentation, published
+  in the dragonbones-tools 0.1.2 npm package, accessed 2026-11-15:
+  https://cdn.jsdelivr.net/npm/dragonbones-tools@0.1.2/doc/dragonbones_json_format_5.5.md and
+  https://cdn.jsdelivr.net/npm/dragonbones-tools@0.1.2/doc/dragonbones_json_format_5.5-zh_CN.md (the same text as
+  https://github.com/DragonBones/Tools/blob/master/doc/dragonbones_json_format_5.5.md). Source of the document layout,
+  defaults, transform fields, slot colour transform, display types, mesh fields, IK chain and bend direction, z-order
+  offsets, rotation direction (`clockwise`), tween easing (0 linear, null no tween), curves, FFD offsets and actions.
+- DragonBones team, *DragonBones 5.1 binary data format* (Chinese), same package, accessed 2026-11-15:
+  https://cdn.jsdelivr.net/npm/dragonbones-tools@0.1.2/doc/dragonbones_bin_format_1.0-zh_CN.md . It lists the header
+  and array blocks but leaves the timeline tags and several frame layouts as "...", so a faithful `.dbbin` reader cannot
+  be written from it; the reader refuses binary data with a coded error instead of guessing.
+- h1ve2, *pixi-dragonbones-runtime: data format guide* (a copy of the same 5.5 format text), accessed 2026-11-15:
+  https://h1ve2.github.io/pixi-dragonbones-runtime/guide/dataformat . Read as documentation only; its code was not read.
+- Enigma Engine, *Sparrow v2 animation texture atlas format*, accessed 2026-11-15:
+  https://enigmaengine.github.io/docs/animation-format , for the `frameX`, `frameY`, `frameWidth`, `frameHeight`
+  trim fields that the DragonBones `_tex.json` atlas shares with Sparrow atlases.
+
+Readings made here where the pages are silent, each pinned by a test in packages/sprites/tests/dragonbones.test.js and
+listed in docs/limits.md: rotation and skew values are degrees (every exported file uses degrees, the page says radians);
+`skY` is the x axis angle and `skX` the y axis angle, so a bone's matrix is [scX cos skY, scX sin skY, -scY sin skX,
+scY cos skX] in y-down space (checked against the exported bind matrices of a real file); weighted vertices are in
+slot space, bound through `slotPose` and each bone's `bonePose`; FFD offsets are per vertex in mesh space (all 59
+keys of the sample file fit that reading); a non-zero `tweenEasing` e in -1..1 is the quadratic blend
+f(t) = t + e t (1 - t) and 1..2 blends towards smoothstep (derived here, not published); `clockwise` N turns at least
+N - 1 full rings beyond the remainder; booleans may be the strings "true" and "false", as exported files write them.
+
+Test data: MIT-licensed sample exports from the DragonBonesJS demo resources, pinned in
+packages/sprites/tests/fixtures/dragonbones/SOURCE.txt with hashes; JSON only.
+
+## Job 185.1 push 2: GLSL ES 3.00 input in the shared GLSL front end (2026-11-15)
+
+Sources: Robert J. Simpson (editor), *The OpenGL ES Shading Language 3.00*, revision 6 (Khronos, 2016),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf (4.1 types and literals, 4.3
+qualifiers, 5.4 constructors, 5.9 and 5.10 operators and matrix products, 6.2 switch, 8 built-in functions and 8.8
+texture lookups); Robert J. Simpson (editor), *The OpenGL ES Shading Language 1.00*, revision 17 (Khronos, 2009),
+https://registry.khronos.org/OpenGL/specs/es/2.0/GLSL_ES_Specification_1.00.pdf (what 1.00 leaves out); Alan Baker,
+Mehmet Oguz Derin and David Neto (editors), *WebGPU Shading Language* (W3C, 2026), https://www.w3.org/TR/WGSL/ (switch
+without fall through, shift operand types, bitcast, modf, pack built-ins, const-expression overflow); Bastien Lecoeur,
+Hasan Mohsin and Alastair F. Donaldson, *Program Reconditioning: Avoiding Undefined Behaviour When Finding and
+Reducing Compiler Bugs* (PLDI 2023), https://doi.org/10.1145/3591294 (fixtures free of undefined behaviour so two
+compilers can be compared); Alastair F. Donaldson, Hugues Evrard, Andrei Lascu and Paul Thomson, *Automated Testing of
+Graphics Shader Compilers* (OOPSLA 2017), https://doi.org/10.1145/3133917 (the same shader through two compilers must
+draw the same image). The specifications set the semantics; the papers set the test method: each fixture runs as GLSL
+in the browser's own compiler and as Margo's WGSL, with the pixels compared. The fall-through lowering (each WGSL case
+holds the statements it falls into), the bit-pattern isnan and isinf, the adjugate inverse and the switch-continue flag
+in the WebGL2 layer were derived here from the specifications. No compiler, translator or engine source was read;
+all fixtures are original.
+
+## Job 185.1 push 3: glslFn, glslToWGSL and toGLSL (`@margoengine/shader/glsl`, 2026-11-15)
+
+Sources: Robert J. Simpson (editor), *The OpenGL ES Shading Language 3.00*, revision 6 (Khronos, 2016),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf (3.3 version directive, 4.3 storage
+qualifiers, 6.1 function definitions and parameter qualifiers, 7 built-in variables, 8.8 lookups and their implicit
+derivatives); Robert J. Simpson (editor), *The OpenGL ES Shading Language 1.00*, revision 17 (Khronos, 2009),
+https://registry.khronos.org/OpenGL/specs/es/2.0/GLSL_ES_Specification_1.00.pdf; Alan Baker, Mehmet Oguz Derin and
+David Neto (editors), *WebGPU Shading Language* (W3C, 2026), https://www.w3.org/TR/WGSL/ (uniformity analysis and
+diagnostic filters on functions, module-scope names, texture built-ins); Khronos, *WebGL 2.0 Specification*,
+https://registry.khronos.org/webgl/specs/latest/2.0/ (the oracle's compile and link); Michael McCool, Stefanus Du
+Toit, Tiberiu Popa, Bryan Chan and Kevin Moule, *Shader Algebra* (SIGGRAPH 2004), https://doi.org/10.1145/1015706.1015801
+and Morgan McGuire, George Stathis, Hanspeter Pfister and Shriram Krishnamurthi, *Abstract Shade Trees* (I3D 2006),
+https://doi.org/10.1145/1111411.1111425 (a function in one language as a typed node of a graph); John Kessenich, *An
+Introduction to SPIR-V* (Khronos, 2015), https://registry.khronos.org/SPIR-V/papers/WhitePaper.pdf and Yong He, Kayvon
+Fatahalian and Tim Foley, *Slang: language mechanisms for extensible real-time shading systems* (SIGGRAPH 2018),
+https://research.nvidia.com/publication/2018-08_slang-language-mechanisms-extensible-real-time-shading-systems (one
+typed form between front and back ends, here WGSL); Alastair F. Donaldson, Hugues Evrard, Andrei Lascu and Paul
+Thomson, *Automated Testing of Graphics Shader Compilers* (OOPSLA 2017), https://doi.org/10.1145/3133917 and Bastien
+Lecoeur, Hasan Mohsin and Alastair F. Donaldson, *Program Reconditioning* (PLDI 2023), https://doi.org/10.1145/3591294
+(the browser's compiler as the oracle, fixtures free of undefined behaviour); Lukas Bernhard, Nico Schiller, Moritz
+Schloegel, Nils Bars and Thorsten Holz, *DarthShader: Fuzzing WebGPU Shader Translators and Compilers* (CCS 2024),
+https://arxiv.org/abs/2409.01824 (why the translator bounds hostile input). The prefixing of module-scope names, the
+paired texture and sampler arguments, the per-stage translation and the shared texture resource were derived here. No
+compiler, translator or engine source was read; the fixtures are original.
+
+## Job 185.1 GLSL raw materials push 1: ShaderMaterial and glslProgramToWGSL (`@margoengine/shader/glsl-material`, 2026-11-15)
+
+Sources: Robert J. Simpson (editor), *The OpenGL ES Shading Language 1.00*, revision 17 (Khronos, 2009),
+https://registry.khronos.org/OpenGL/specs/es/2.0/GLSL_ES_Specification_1.00.pdf (4.3 attribute, uniform and varying
+qualifiers, 7 built-in variables and constants, 7.4 the gl_Max minimums); Robert J. Simpson (editor), *The OpenGL ES
+Shading Language 3.00*, revision 6 (Khronos, 2016),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf (4.3 in, out and flat, 4.6 invariant,
+7 built-in variables, 4.3.6 output variables); Jon Leech and Benj Lipchak (editors), *OpenGL ES Version 3.0.6* (Khronos,
+2019), https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf (2.8 generic vertex attributes and their
+(0, 0, 0, 1) default, 2.12 the clip volume and depth range, 2.18 the provoking vertex, 3.9.2 shader inputs and
+gl_FragCoord, 4.1.2 window coordinates); Khronos, *WebGL 1.0 Specification* and *WebGL 2.0 Specification*,
+https://registry.khronos.org/webgl/specs/latest/1.0/ and https://registry.khronos.org/webgl/specs/latest/2.0/
+(UNPACK_FLIP_Y_WEBGL, the oracle's compile and link, linking rules for varyings and uniforms); Kai Ninomiya, Brandon
+Jones and Jim Blandy (editors), *WebGPU* (W3C, 2026), https://www.w3.org/TR/webgpu/ (clip space with z from 0 to 1,
+framebuffer y down, depth compare); Alan Baker, Mehmet Oguz Derin and David Neto (editors), *WebGPU Shading Language*
+(W3C, 2026), https://www.w3.org/TR/WGSL/ (position built-in with w as 1/w, front_facing, frag_depth, interpolation
+and its flat default of first, uniform buffer layout); three.js contributors, *RawShaderMaterial* and *ShaderMaterial*
+documentation pages (2026), https://threejs.org/docs/#api/en/materials/RawShaderMaterial and
+https://threejs.org/docs/#api/en/materials/ShaderMaterial (the public API to match: `{value}` uniforms, `defines`,
+`needsUpdate`, `glslVersion`); Alastair F. Donaldson, Hugues Evrard, Andrei Lascu and Paul Thomson, *Automated Testing
+of Graphics Shader Compilers* (OOPSLA 2017), https://doi.org/10.1145/3133917 and Bastien Lecoeur, Hasan Mohsin and
+Alastair F. Donaldson, *Program Reconditioning* (PLDI 2023), https://doi.org/10.1145/3591294 (the browser's compiler as
+the oracle, fixtures free of undefined behaviour); Lukas Bernhard, Nico Schiller, Moritz Schloegel, Nils Bars and
+Thorsten Holz, *DarthShader: Fuzzing WebGPU Shader Translators and Compilers* (CCS 2024),
+https://arxiv.org/abs/2409.01824 (bounded hostile input, front and back end tested apart). The GL to WebGPU mappings
+(clip z to reversed depth, gl_FragCoord from the WebGPU position, gl_FragDepth as 1 - d, dFdy negated, the attribute
+widening, the varying locations in vertex declaration order, the uniform storage per GLSL type) were derived here from
+the specifications. Only rival documentation pages were read; no engine, translator or compiler source and no paper
+companion code. All fixtures are original.
+
+## Job 185.1 GLSL raw materials push 2: built-in names, shaderMesh, includes and the raw depth state (`@margoengine/shader/glsl-material`, `@margoengine/shader/raw`, 2026-11-15)
+
+Written clean room. Research first: the built-in names of each convention were taken from the engines' public
+documentation pages only, never their source: three.js contributors, *WebGLProgram* documentation page (2026),
+https://threejs.org/docs/#api/en/renderers/webgl/WebGLProgram (the uniforms and attributes a ShaderMaterial program
+gets: modelMatrix, modelViewMatrix, projectionMatrix, viewMatrix, normalMatrix, cameraPosition, isOrthographic,
+position, normal, uv, the instancing attributes) and *ShaderChunk* usage in the ShaderMaterial page,
+https://threejs.org/docs/#api/en/materials/ShaderMaterial (the tonemapping and colorspace chunk names); Babylon.js
+contributors, *Putting Shader Code in a Material* (2026),
+https://doc.babylonjs.com/features/featuresDeepDive/materials/shaders/shaderMaterial (world, view, projection,
+worldView, worldViewProjection, position, normal, uv, uv2, color); PlayCanvas contributors, *Shaders* user manual
+(2026), https://developer.playcanvas.com/user-manual/graphics/shaders/ (matrix_model, matrix_viewProjection,
+matrix_normal, view_position, camera_params, screen_size, vertex_position, vertex_normal). The conventions are named
+in packages/** by their signature uniform only; the engine names live in docs/porting-glsl.md.
+
+Specifications: Khronos, *The OpenGL ES Shading Language 1.00 and 3.00* (2009, 2016),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf (the preprocessor, which has no
+`#include`, so includes expand before it runs; generic attribute defaults, matrix attributes over consecutive locations); Khronos,
+*OpenGL ES 3.0.6 Specification* (2019), https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf (section 3.6.5
+polygon offset: o = m factor + r units, mapped onto WebGPU's slope scale and constant bias with the sign flipped for
+reversed depth; section 4.1.3 sample coverage from alpha); W3C, *WebGPU* (2026), https://www.w3.org/TR/webgpu/
+(depthBias, depthBiasSlopeScale and depthBiasClamp only for triangle topologies, alphaToCoverageEnabled only with a
+sample count above 1, depth texture bindings with a comparison sampler); W3C, *WebGPU Shading Language* (2026),
+https://www.w3.org/TR/WGSL/ (texture_depth_* and textureSampleCompare); Khronos 3D Formats Working Group, *Khronos PBR
+Neutral Tone Mapper* specification (2024), https://github.com/KhronosGroup/ToneMapping/blob/main/PBR_Neutral/README.md
+(the formula of the tonemapping chunk, written from the specification text); IEC 61966-2-1:1999 (the sRGB transfer of
+the colorspace chunk and the output decode).
+
+Papers: E. Lapidous and G. Jiao, *Optimal Depth Buffer for Low-Cost Graphics Hardware* (HWWS 1999),
+https://doi.org/10.1145/311534.311579, and P. Upchurch and M. Desbrun, *Tightening the Precision of Perspective
+Rendering* (Journal of Graphics Tools 2012), https://doi.org/10.1080/2151237X.2012.649987 (why Margo keeps reversed
+float depth and converts GL clip z per projection column, z' = w - 2z, rather than rendering GL depth); K. Akeley,
+*RealityEngine Graphics* (SIGGRAPH 1993), https://doi.org/10.1145/166117.166131 (coverage from alpha on multisampled
+targets); K. Turkowski, *Properties of Surface-Normal Transformations* (Graphics Gems, 1990) (the normal matrix as the
+inverse transpose; Margo's mesh block already carries it, so normalMatrix is the view's rotation times it). The GPU
+oracle computes the same engine values in double precision from those formulas. Only documentation pages and
+specifications were read; no engine source and no paper companion code. All fixtures are original.
+
+## Job 185.1 GLSL raw materials push 3: blocks, structs, arrays, sampler kinds, points, flat varyings and wireframe (`@margoengine/shader/glsl-material`, `@margoengine/shader/raw`, 2026-11-15)
+
+Written clean room from the specifications only. Sources: Robert J. Simpson (editor), Khronos, *The OpenGL ES Shading Language 3.00, revision 6* (2016), https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf, sections 4.1.7 (samplers, the integer and shadow sampler types, where samplers may appear), 4.1.8 and 4.1.9 (structures and arrays), 4.3.7 (interface blocks: no samplers, instance names), 4.3.9 (interpolation, `flat`) and 8.8 (texture lookup functions, the shadow forms and their reference component); Benj Lipchak (editor), Khronos, *OpenGL ES Version 3.0.6* (2019), https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf, sections 2.18 (the provoking vertex of flat shading, the last of each primitive), 3.4 (points: a square of the point size in pixels centred on the vertex, a point whose centre is clipped is discarded, `gl_PointCoord` from the upper left), 3.8.16 (depth compare) and 2.12.6 (uniform names of struct and array members, `name[k].field`); Robert J. Simpson (editor), Khronos, *The OpenGL ES Shading Language 1.00, revision 17* (2009), https://registry.khronos.org/OpenGL/specs/es/2.0/GLSL_ES_Specification_1.00.pdf, appendix A (sampler arrays indexed by loop indices); W3C, *WebGPU Shading Language* (Candidate Recommendation Draft 2026), https://www.w3.org/TR/WGSL/ (depth textures, textureSampleCompare and textureSampleCompareLevel, textureLoad, the uniform address space layout rules that make each struct leaf its own member, `select`); W3C, *WebGPU* (Candidate Recommendation Draft 2026), https://www.w3.org/TR/webgpu/ (one-pixel point-list primitives, primitive restart in strips, comparison samplers, the first-vertex provoking rule). Compared for points: instanced quads, geometry expanded on the CPU, and a storage-buffer vertex pull; the instanced quad keeps the attributes the program declares and needs no new buffer. Compared for flat varyings: rotating each primitive's index (kept) against duplicating vertices; rotation keeps the vertex count and the winding. All fixtures are original; no engine, translator or compiler source and no paper companion code was read.
+
+## Job 185.1 GLSL raw materials push 4a and KB-GLSLP1: ShaderPass and view-sized points (`@margoengine/shader/glsl-pass`, `@margoengine/shader/raw`, 2026-11-15)
+
+Written clean room. Research first: the post-pass conventions come from the engines' public documentation pages only,
+never their source: three.js contributors, *EffectComposer* and *ShaderPass* documentation (2026),
+https://threejs.org/docs/#examples/en/postprocessing/EffectComposer (a pass built from `{uniforms, vertexShader,
+fragmentShader}`, the input texture uniform `tDiffuse` by default, uv in `vUv`); Babylon.js contributors, *How to Use
+Post Processes* (2026), https://doc.babylonjs.com/features/featuresDeepDive/postProcesses/usePostProcesses (custom
+post processes read `textureSampler` at `vUV`); PlayCanvas contributors, *Post Effects* user manual (2026),
+https://developer.playcanvas.com/user-manual/graphics/posteffects/ (`uColorBuffer`, `vUv0` and the `aPosition` full-screen
+attribute). The conventions are named in packages/** by these uniform and varying names only; the engine names live in
+docs/porting-glsl.md. Specifications: Khronos, *OpenGL ES 3.0.6 Specification* (2019),
+https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf (section 2.12.1, the viewport transform from normalized
+device to window coordinates, and section 3.4, a point's size in window pixels: why a point is sized against the view
+it is drawn in, KB-GLSLP1); W3C, *WebGPU* (2026), https://www.w3.org/TR/webgpu/ (a render pipeline without a depth
+attachment, setViewport); Khronos, *The OpenGL ES Shading Language 1.00 and 3.00* (2009, 2016),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf (gl_FragCoord window coordinates).
+Testing follows A. F. Donaldson, H. Evrard, A. Lascu and P. Thomson, *Automated Testing of Graphics Shader Compilers*
+(OOPSLA 2017), https://doi.org/10.1145/3133917: the browser's own WebGL compiler is the black-box oracle, and every
+fixture is original. The full-screen triangle (one triangle past the corners in place of two) is the standard
+construction of the WebGPU and GL clip volume, written from the clip-space rules above. No engine source and no paper
+companion code were read.
+
+## Job 185.1 GLSL raw materials push 6: lights, fog and motion vectors for GLSL programs (`@margoengine/shader/glsl-material`, 2026-11-15)
+
+Written clean room. Research first, and three.js chunk text was never read: the uniform names and their meaning are
+Margo's own, from its sun, ambient, Clustered lights and environment Fog. Fog: Khronos, *OpenGL ES Common/Common-Lite
+Profile Specification, Version 1.1.12* (2008), https://registry.khronos.org/OpenGL/specs/es/1.1/es_full_spec_1.1.pdf,
+section 3.8 (fog factors LINEAR, EXP and EXP2 from the eye distance), and M. Segal and K. Akeley, *The OpenGL
+Graphics System, Version 2.1* (2006), https://registry.khronos.org/OpenGL/specs/gl/glspec21.pdf, section 3.10 (the
+same equations); Margo's Fog takes the linear and squared exponential forms with a height falloff. Lights: B. Karis,
+*Real Shading in Unreal Engine 4* (SIGGRAPH 2013 Physically Based Shading course notes),
+https://blog.selfshadow.com/publications/s2013-shading-course/ (the windowed inverse-square falloff Clustered uses);
+O. Olsson, M. Billeter and U. Assarsson, *Clustered Deferred and Forward Shading* (HPG 2012),
+https://doi.org/10.2312/EGGH/HPG12/087-096 (the light list a forward shader loops over). Motion vectors: D. Nehab,
+P. V. Sander, J. Lawrence, N. Tatarchuk and J. R. Isidoro, *Accelerating Real-Time Shading with Reverse Reprojection
+Caching* (Graphics Hardware 2007), https://doi.org/10.2312/EGGH/EGGH07/025-036 (each vertex placed with last frame's
+transforms gives the reprojection); B. Karis, *High Quality Temporal Supersampling* (SIGGRAPH 2014 Advances in
+Real-Time Rendering), https://advances.realtimerendering.com/s2014/ (velocity from the previous frame's vertex
+positions, including animated ones); L. Yang, S. Liu and M. Salvi, *A Survey of Temporal Antialiasing Techniques*
+(Computer Graphics Forum 39(2), 2020), https://doi.org/10.1111/cgf.14018 (why motion the velocity buffer misses leaves
+trails). Compared: per-vertex previous positions in a buffer, a second shading of the vertex stage, and depth-only
+reprojection; the second run needs no buffer and follows any motion of the stage's own uniforms, so it was kept.
+W3C, *WebGPU Shading Language* (2026), https://www.w3.org/TR/WGSL/ (the `@invariant` attribute: both entries give the
+same position, so TAA's 'equal' depth test holds). The rival's public docs only: three.js contributors,
+*ShaderMaterial* documentation (2026), https://threejs.org/docs/#api/en/materials/ShaderMaterial (the `lights` and
+`fog` flags). Testing as push 1 (Donaldson, Evrard, Lascu and Thomson, OOPSLA 2017): the browser's WebGL compiler
+draws the same programs with the scene values worked out on their own; every fixture is original. No engine source
+and no paper companion code were read.
+
+## Job 185.1 GLSL raw materials push 7: Shadertoy Cube A, mainVR and mainSound (`@margoengine/shader/shadertoy`, 2026-11-15)
+
+Written clean room. Research first: the three entry points and their arguments, `mainCubemap(out vec4 fragColor, in
+vec2 fragCoord, in vec3 rayOri, in vec3 rayDir)`, `mainVR(out vec4 fragColor, in vec2 fragCoord, in vec3 fragRayOri,
+in vec3 fragRayDir)` and `vec2 mainSound(int samp, float time)` (with the older `vec2 mainSound(float time)`), the
+Cube A tab read as a cube channel and a stereo sample from -1 to 1 at iSampleRate, come from Shadertoy's public
+documentation (https://www.shadertoy.com/howto and the editor's tab and channel panels) and P. Jeremias and I. Quilez,
+*Shadertoy: Learn to Create Everything in a Fragment Shader* (SIGGRAPH Asia 2014 Courses),
+https://doi.org/10.1145/2659467.2659474; never Shadertoy's site code, and no engine source. Cube faces: Khronos,
+*OpenGL ES 3.0.6 Specification* (2019), https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf, Table 3.21
+(the major axis picks the face and sc, tc, ma give s and t), inverted to turn a texel centre back into a direction;
+section 3.8.10 (only the base level is read unless the min filter names mipmaps, which also fixed the channels' samplers
+here); section 4.4 (a framebuffer texture's window rows count from its first row). Rays: the inverse of the camera's
+view-projection maps a pixel's normalized device coordinates on the near plane back to the world (OpenGL ES 3.0.6
+section 2.13, coordinate transformations); W3C, *WebXR Device API* (2025), https://www.w3.org/TR/webxr/ (one view per
+eye, each with its own projection and transform). Sound: W3C, *Web Audio API* (2021), https://www.w3.org/TR/webaudio/
+(`AudioBuffer`, `createBuffer`, `copyToChannel`, sample values from -1 to 1); W3C, *WebGPU* (2026),
+https://www.w3.org/TR/webgpu/ (`copyTextureToBuffer` with 256-byte row alignment, `mapAsync` once the commands are
+submitted, rgba16float as a filterable render format, `copyTextureToTexture` into a layer); Khronos,
+*EXT_color_buffer_float* (the oracle's RGBA16F and RGBA32F targets). The rivals' public docs were re-read for the gap:
+the ShaderToyLite.js README leaves out sound, VR and cube maps; three.js, Babylon.js and PlayCanvas document no
+Shadertoy runner. Testing as push 4b (Donaldson, Evrard, Lascu and Thomson, OOPSLA 2017; Lecoeur, Mohsin and Donaldson,
+*Program Reconditioning*, PLDI 2023, https://doi.org/10.1145/3591294, so the fixtures keep implicit-derivative lookups in
+uniform control flow and away from cube seams, where GL leaves the level to the GPU): the browser's WebGL2 runs the
+same wrapped programs as the oracle, Cube A through an RGBA16F atlas blitted into a cube, sound into RGBA32F read with
+readPixels; the Cube A faces are also held against the directions the image asks for, which tests the face layout
+against the browser's own cube lookups. Every fixture is original.
+
+## Job 185.1 GLSL raw materials push 5: Shadertoy multipass (`@margoengine/shader/shadertoy`, 2026-11-15)
+
+Written clean room. Research first: the tabs (Common, Buffer A to D, Image), the buffer order and their reading of
+each other, and the keyboard (256 x 3: down, pressed, toggled), sound (512 x 2: spectrum, waveform) and video inputs
+come from Shadertoy's public documentation (https://www.shadertoy.com/howto and the editor's channel panel) and P.
+Jeremias and I. Quilez, *Shadertoy: Learn to Create Everything in a Fragment Shader* (SIGGRAPH Asia 2014 Courses),
+https://doi.org/10.1145/2659467.2659474; never Shadertoy's site code, and no engine source. Filtering: Khronos,
+*OpenGL ES 3.0.6 Specification* (2019), https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf, section
+3.8.10 (texture minification: the scale factor rho, lambda = log2(rho) plus bias, LINEAR as the weighted four texels
+around u - 1/2, v - 1/2, LINEAR_MIPMAP_LINEAR as two levels blended by frac(lambda)), 3.8.11 (mipmap generation is
+implementation defined) and 3.8.9 (REPEAT and CLAMP_TO_EDGE wrapping); L. Williams, *Pyramidal Parametrics*
+(SIGGRAPH 1983), https://doi.org/10.1145/800059.801126 (the mip pyramid and trilinear blend); P. S. Heckbert,
+*Survey of Texture Mapping* (IEEE CG&A 1986), https://doi.org/10.1109/MCG.1986.276672 (the footprint estimate).
+W3C, *WebGPU* (2026), https://www.w3.org/TR/webgpu/ (the optional `float32-filterable` feature, `unfilterable-float`
+bindings, `copyExternalImageToTexture`) and *WGSL* (2026), https://www.w3.org/TR/WGSL/ (`textureLoad`, `dpdx`).
+Web Audio API, W3C (2021), https://www.w3.org/TR/webaudio/ (AnalyserNode byte data). Khronos, *EXT_color_buffer_float*
+and *OES_texture_float_linear* extension specifications (the oracle's float buffers). The rivals' public docs were
+re-read for the gap: the ShaderToyLite.js README lists Image and Buffers A to D and leaves out sound, VR and cube
+maps; three.js, Babylon.js and PlayCanvas document no Shadertoy runner. Testing as push 4b (Donaldson, Evrard, Lascu
+and Thomson, OOPSLA 2017): the browser's WebGL2 with RGBA32F buffers runs the same wrapped programs frame by frame as
+the oracle; every fixture is original.
+
+## Job 185.1 GLSL raw materials push 4b: Shadertoy single pass (`@margoengine/shader/shadertoy`, 2026-11-15)
+
+Written clean room. Research first: the program form and its inputs come from Shadertoy's documented input list (the
+editor's "Shader Inputs" panel and https://www.shadertoy.com/howto: `iResolution`, `iTime`, `iTimeDelta`,
+`iFrameRate`, `iFrame`, `iChannelTime[4]`, `iChannelResolution[4]`, `iMouse`, `iDate`, `iSampleRate`, `iChannel0..3`,
+`mainImage(out vec4 fragColor, in vec2 fragCoord)`) and P. Jeremias and I. Quilez, *Shadertoy: Learn to Create
+Everything in a Fragment Shader* (SIGGRAPH Asia 2014 Courses), https://doi.org/10.1145/2659467.2659474. Never
+Shadertoy's site code, and no engine source. Specifications: Khronos, *The OpenGL ES Shading Language 3.00.6* (2016),
+https://registry.khronos.org/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf (out parameters, precision of
+sampler3D, which has no default precision in a fragment shader); Khronos, *OpenGL ES 3.0.6 Specification* (2019),
+https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf (section 3.5 window coordinates of gl_FragCoord,
+section 3.8.13 the opaque black an unbound or incomplete texture unit reads); W3C, *WebGPU* (2026),
+https://www.w3.org/TR/webgpu/ (cube and 3D texture views). The rivals' public documentation was read for the gap:
+three.js, Babylon.js and PlayCanvas document no Shadertoy helper; the ShaderToyLite.js README lists Image and buffers.
+Testing follows A. F. Donaldson, H. Evrard, A. Lascu and P. Thomson, *Automated Testing of Graphics Shader Compilers*
+(OOPSLA 2017), https://doi.org/10.1145/3133917: the browser's own WebGL2 compiler runs the same wrapped program as the
+oracle; every fixture is original.
+
+## KB3297d: sheen at a silhouette, roughness 0 and back-facing shading normals (2026-11-15)
+
+Sources: Khronos Group, *KHR_materials_sheen* extension specification (ratified, 2020), section "Sheen" (sheenRoughness
+default 0, no floor) and the non-normative "Sheen distribution" (alpha_g = sheenRoughness^2, inv_r = 1 / alpha_g),
+https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Khronos/KHR_materials_sheen; A. Conty Estevez and C. Kulla,
+*Production Friendly Microfacet Sheen BRDF*, SIGGRAPH 2017 Physically Based Shading course,
+https://blog.selfshadow.com/publications/s2017-shading-course/imageworks/s2017_pbs_imageworks_sheen.pdf (the Charlie
+distribution concentrates on the tangent plane as alpha goes to 0); E. Heitz, *Understanding the Masking-Shadowing
+Function in Microfacet-Based BRDFs*, JCGT 3(2), 2014, https://jcgt.org/published/0003/02/03/ (the BRDF is defined for
+directions above the shading normal); A. Reshetov, A. Soupikov and W. R. Mark, *Consistent Normal Interpolation*, ACM
+Transactions on Graphics 29(6), 142, SIGGRAPH Asia 2010, https://dblp.org/rec/journals/tog/ReshetovSM10 (interpolated
+vertex normals that face away from the viewer on a silhouette, and why a normal is bent rather than flipped);
+A. Keller, C. Wachter, M. Raab, D. Seibert, D. van Antwerpen, J. Korndorfer and L. Kettner, *The Iray Light Transport
+Simulation and Rendering System*, 2017, https://arxiv.org/abs/1705.01263 (shading normals bent toward the geometric
+side so the evaluated configuration exists); V. Schussler, E. Heitz, J. Hanika and C. Dachsbacher, *Microfacet-based
+Normal Mapping for Robust Monte Carlo Path Tracing*, ACM Transactions on Graphics 36(6), SIGGRAPH Asia 2017
+(the failure of shading normals at grazing, considered; its microfacet
+replacement is a different model).
+
+Combined here: the sheen keeps the spec's range, roughness 0 to 1 with no floor (shared/sheen.js raises it only to
+1e-4 so 1/alpha stays finite in f32). The lobe is evaluated at one configuration: n.v raised to 1e-4 as before and
+n.h = (n.v + n.l) / |v + l| from the same clamped cosines (`sheenHalfWGSL`), the identity for h = (v + l) / |v + l|,
+so a normal that faces away is treated as one bent to face the viewer. Which side was right at the two silhouette
+pixels was decided by integrating the BRDF over the pixel on the analytic sphere, not by the viewer, which was used
+only as a black box (its saved picture). No other renderer's code was read.
+
+## Hashed alpha shadow casters (2026-11-15)
+
+Source: Chris Wyman and Morgan McGuire, *Hashed Alpha Testing* (I3D 2017), https://cwyman.org/papers/i3d17_hashedAlpha.pdf ,
+the same paper the colour pass (`packages/shared/alpha-hash.js`, moved from `packages/materials/src/alpha-hash.ts`)
+was built from; it was not re-read for this change. A caster with `hashed: true` compares alpha against the colour
+pass's object-space hash instead of the cutoff (`hashedDepth` in `packages/shared/caster.js`), with one hash cell per
+shadow-map texel, so a surface at opacity a keeps about a share a of its caster texels and its shadow fades with it.
+Used by `Shadows`, `VirtualShadows`, clustered `LocalShadows` and integrated maps and staging's contact shadows. No
+engine source was read; the shader edits and tests are original.
+
+## Exact voxel translucent order (`@margoengine/voxel` `sortQuads`, 2026-11-15)
+
+Sources: Gideon Frieder, Dan Gordon and R. Anthony Reynolds, *Back-to-Front Display of Voxel-Based Objects*, IEEE
+Computer Graphics and Applications 5(1), 1985, pp. 52-60, https://doi.org/10.1109/MCG.1985.276273 (fetched and read:
+an occluder's indices lie between the eye and the occluded voxel on every axis, so traversing each axis away from
+the farthest corner draws back to front, for an orthographic view from outside the array); M. E. Newell, R. G.
+Newell and T. L. Sancha, *A Solution to the Hidden Surface Problem*, Proceedings of the ACM Annual Conference 1972,
+pp. 443-450, https://doi.org/10.1145/800193.569954 (a summary of the method read; the full text was not reachable:
+general polygons need pairwise overlap tests and splitting, which the grid avoids). Derived here: for a perspective
+eye anywhere in the grid, a ray from the eye crosses cells whose per-axis index distance from the eye's cell never
+falls, so their L1 (grid) distance rises by one at every face crossed; a quad on a cell face is keyed by twice the
+farther cell's grid distance less one, a quad inside a cell by twice its cell's, and keys draw in descending order.
+The same argument orders chunks. The key changes only by a constant while the eye stays on one side of a chunk's
+span on each axis, which is when a renderer must sort again. No engine source was read; the ray test is original.
+
+## Voxel origin rebasing (`@margoengine/voxel` renderer and effects `origin`, 2026-11-15)
+
+Sources: Chris Thorne, *Using a Floating Origin to Improve Fidelity and Performance of Large, Distributed Virtual
+Worlds*, 4th International Conference on Cyberworlds (CW 2005), IEEE, pp. 263-270 (not read: no open copy was
+reachable; its abstract was read: spatial jitter grows with distance from the origin, and moving the origin with the
+viewpoint keeps fidelity constant); Deron Ohlarik, *Precisions, Precisions*, AGI Insight3D blog, 2008,
+https://help.agi.com/AGIComponents/html/BlogPrecisionsPrecisions.htm (fetched and read: float32 keeps 1 cm steps only
+up to 131,071 m; relative to centre puts the object-to-eye translation, found in float64 on the CPU, into the matrix
+and keeps vertices local; relative to eye subtracts the eye per vertex, on the CPU or as split high and low floats on
+the GPU); Emil Persson, *Creating Vast Game Worlds: Experiences from Avalanche Studios*, SIGGRAPH 2012 talk,
+https://www.humus.name/Articles/Persson_CreatingVastGameWorlds.pdf (fetched and read: adding numbers of very
+different size is the main loss; merge the large translations of world and view before they reach float32, or centre
+the view-projection on the camera; a growing float timer makes animation jerky over hours); Kevin Ring and Patrick
+Cozzi, *3D Engine Design for Virtual Globes*, CRC Press, 2011, chapter 5 (not read here; cited by the terrain record
+above). Margo combines relative to centre at chunk granularity with a floating origin: chunks keep 12-byte quads in
+chunk cells and an integer chunk origin, written relative to a base snapped to 1,024 cells so it stays an exact
+integer; the remaining fraction is merged into the camera matrix in float64 (Persson's merged translations), so no
+float32 value on the GPU exceeds about 1,500 cells. The effects follow the same rule: windows are placed from the
+world eye in float64 and their uniforms hold world minus origin, and a wrapping volume is addressed with the origin
+taken mod its size in float64 (Ohlarik's relative to centre applied to the window). No rival or companion source was
+read.
+
+## Smooth far levels and skirts (`@margoengine/voxel/smooth-lod`, 2026-11-15)
+
+Sources: Eric Lengyel, *Voxel-Based Terrain for Real-Time Virtual Simulations*, PhD dissertation, University of
+California, Davis, 2010, https://transvoxel.org/Lengyel-VoxelTerrain.pdf (fetched and read: section 2.1.1 "Crack
+Filling Strategies", Figure 2.1 (e) skirts and (f) flanges hung from the higher-detail mesh, and section 4.3 "Transition
+Cells", Figure 4.5, a large hole where a low-resolution surface is nearly tangent to the shared block face, and the
+transition cell, which takes its nine full-resolution samples on one face and is triangulated by a Marching Cubes
+style table). Tao Ju, Frank Losasso, Scott Schaefer and Joe Warren, *Dual Contouring of Hermite Data*, SIGGRAPH 2002,
+ACM TOG 21(3), https://www.cs.rice.edu/~jwarren/papers/dualcontour.pdf (fetched and read: section 3, a polygon per
+minimal edge of a signed octree with a sign change, which joins cells of different sizes with no crack patching).
+Thatcher Ulrich, *Rendering Massive Terrains using Chunked Level of Detail Control*, SIGGRAPH 2002 course notes,
+http://tulrich.com/geekstuff/sig-notes.pdf (fetched, not read: the PDF's fonts carry no text map, so no text could be
+extracted; the skirt method used here is the one Lengyel describes in section 2.1.1). Ivan E. Sutherland and Gary W.
+Hodgman, *Reentrant Polygon Clipping*, CACM 17(1), 1974 (not fetched: the clip of a convex polygon by one plane at a
+time, as taught in graphics texts). Sarah F. F. Gibson, *Constrained Elastic Surface Nets*, MICCAI 1998 (the mesher,
+already recorded for `@margoengine/voxel/smooth`).
+
+Choice: Transvoxel's transition cells are built for Marching Cubes (vertices on cell edges); Margo's smooth terrain uses
+Surface Nets (a vertex inside each cell), so its tables do not apply. Octree dual contouring joins levels exactly but
+needs every node to know its neighbours' levels and to mesh again when they change. Skirts need neither, so each node is
+meshed once from the density field alone.
+
+Method as built: a node of level L samples the field every 2^L blocks over 35 samples per axis (one before its corner,
+two past its far faces), divides the density by 2^L and clamps it to -1..1, so it stays about the distance in cells.
+Surface Nets makes one vertex per cell the surface crosses and one quad per sign-change edge whose four cells can reach
+into the node; each quad's two triangles are clipped to the node's box one face plane at a time, a cut point being
+computed from the edge's two ends ordered by vertex key and given the face coordinate exactly, so two triangles sharing
+an edge share its cut point and two nodes of one level meet on their shared face. Every edge used by one triangle and
+lying on a face gets a skirt: two triangles in the face plane, from the edge toward the solid side (the vertex normal
+projected into the plane and reversed, kept inside the box), facing out of the box, `skirt` cells deep (default 4),
+shaded with the edge's normals. Level 1 leaves out its octants over loaded real chunks (clipped to the remaining
+octants, no skirt between two kept octants); the real chunks drawn with `SmoothTerrainView` option `skirt` are clipped
+to their box with skirts on the faces with no loaded neighbour. Node choice and handover follow `@margoengine/voxel/lod`
+(split at `radius` child sizes, which keeps neighbours within one level for `radius` >= 2; an old node stays until no
+missing node overlaps it).
+
+Bound: Surface Nets puts each vertex inside its cell, so where the surface crosses a face at angle a to the face plane
+the two levels' borders are apart by at most about (1 + 2) sqrt(3) cells of the finer level / sin a; 4 cells of each
+side cover a >= 30 degrees for the finer side's depth plus the coarser side's twice that. Nearly tangent crossings
+(Lengyel's Figure 4.5) can open wider gaps; docs/limits.md records it.
+
+Tests: `packages/voxel/tests/smooth-lod.test.js` casts 6,000 rays from the air into the ground (two thirds aimed at
+node border planes within 0.3 blocks of the ground) through real chunks and three far levels: none passes with skirts,
+37 pass without, so the test sees cracks; surface points of each level within one cell of the true ground; level-1
+octants empty over loaded real chunks; handover with no hole; origin. `smooth-lod-browser-check.mjs` draws the scene on
+the GPU (native and the WebGL2 compatibility layer) against a magenta sky: no sky pixel through the ground with skirts,
+11 without.
+
+### Caps in place of skirts (2026-11-16)
+
+Sources: Eric Lengyel, *Voxel-Based Terrain for Real-Time Virtual Simulations*, 2010 (above; read again: section 2.1.1
+crack-filling strategies and Figure 4.5, the hole where a surface is nearly tangent to the shared block face). Raimund
+Seidel, *A simple and fast incremental randomized algorithm for computing trapezoidal decompositions and for
+triangulating polygons*, Computational Geometry: Theory and Applications 1(1), 1991, 51-64 (fetched and read: sections 1
+and 2, the trapezoidal decomposition of noncrossing segments by rays from every endpoint, and how a triangulation follows
+from it). David P. Dobkin and Richard J. Lipton, *Multidimensional searching problems*, SIAM Journal on Computing 5(2),
+1976 (not fetched: the slab method, cutting the plane at every vertex coordinate). Jarek Rossignac, Abe Megahed and
+Bengt-Olaf Schneider, *Interactive inspection of solids: cross-sections and interferences*, SIGGRAPH 1992,
+https://doi.org/10.1145/133994.134092 (abstract only, the paper was not reachable: a solid clipped by a plane shown
+closed by its cross-section). Gary H. Meisters, *Polygons have ears*, American Mathematical Monthly 82(6), 1975 (not
+fetched: every simple polygon with more than three vertices has an ear to cut off).
+
+Finding: the 4-cell skirts did leave cracks. A seeded search over grounds within half a block of the face y = 128 shared
+by a level-1 and a level-2 node found sky through the seam (169 of 32,009 straight-down rays). Node faces lie on sample
+planes and the coarse samples are among the fine ones, so the two levels disagree only within about a coarse cell of a
+fine border; but where the ground is nearly tangent to the face its normal projected into the plane is short and points
+anywhere, and the strip hung along it misses the region between the borders.
+
+Method as built: every flagged face is closed by a cap, the solid part of its plane, so each box's mesh bounds a closed
+solid and a segment from where every level has air to where any level has solid crosses a triangle, whatever the levels
+disagree on. A face's border segments are the open mesh edges lying in it, each with its solid side (the edge direction
+crossed with the outward face normal, which points into the solid for a triangle wound counterclockwise from the air).
+The face is cut into slabs at every border vertex u (values within 1e-9 cells share one slab line); in each slab the
+segments crossing it are sorted along v, and every span between two of them, or between one and the face's edge, that
+lies on a segment's solid side becomes a trapezoid. A slab no segment crosses is all solid or all air: the nearest
+segment crossing a line of constant v through it (a line through no vertex) says which; a face with no border takes the
+sign of its centre sample. To keep the surface closed with no T-junction: a trapezoid corner on a border edge splits that
+edge's triangle; the trapezoids on both sides of a slab line share its points; points within 1e-9 cells of a box face are
+put on it; vertices are merged by position; every edge along a box edge (of either face's cap, the mesh, or the next
+octant box of a part-masked node) takes all the points on that line between its ends; and rings are cut into triangles
+by clipping ears whose chord passes through no other ring point. `skirt` stays the cap's reach in cells from the border;
+its default is now 32, the whole face.
+
+Tests: `smooth-lod.test.js` "near-parallel seam" (the field above: 169 rays through with 4-cell skirts, none with caps),
+"closed" (every edge used twice in opposite directions for whole nodes at levels 1 to 3, three part-masked level-1
+nodes, near-parallel nodes and a lone real chunk with `skirt: 32`), the 6,000-ray scene with caps, and
+`smooth-lod-browser-check.mjs` with `skirt: 32` on the GPU, native and the WebGL2 compatibility layer: 0 sky pixels
+through the ground, 11 without caps.
+
+Caps by winding number (2026-11-16, KB-VOX-CAP1). Finding: with fine 3D noise (caves and overhangs, wavenumbers up to
+0.3 per block, levels 1 and 2) 15 of 120 seeded nodes had edges used once, all on or beside a box edge. Each face had
+decided its cap alone, from the solid sides of its own border segments, and where the surface folds inside one cell at a
+box edge the two faces meeting there disagreed about which stretch of the edge was solid. Method as built: the clipped
+mesh is a 2-chain whose border (each edge's uses counted with direction, so an edge a fold uses twice the same way counts
+2) lies on the box's surface; every point of that surface has a winding number about the surface (Jacobson, Kavan and
+Sorkine-Hornung 2013: integer valued, stepping by one across the surface, counting overlaps beyond 0 and 1), and the cap
+covers each region of a face as many times as its number, turned over where it is negative, so the mesh and its caps use
+every edge as often in each direction. Each box edge's numbers are found once per box: a border edge lying on a box edge
+is counted in one of its two faces (a capped one, else the lower), the numbers step at the other face's border points
+on it by each segment's count (up where the segment's solid side points along the edge), and the base is set by the
+density samples on the edge away from border points, a sample's number being its solid flag (the Surface Nets surface
+passes each sample on the side its sign says, as each quad stays in the 2 x 2 x 1 cells around its sample edge); both
+faces start from those numbers and carry them up their slabs. Points cut by different routes to the same place on the
+boxes' surfaces are made equal over all boxes of the call (coordinates within 1e-9 cells, a box face's preferred), and
+the ear clipper calls points in line by the triangle's least height (1e-11 cells), not its angle. Sources: Alec
+Jacobson, Ladislav Kavan and Olga Sorkine-Hornung, *Robust inside-outside segmentation using generalized winding
+numbers*, ACM Transactions on Graphics 32(4) (SIGGRAPH 2013), https://doi.org/10.1145/2461912.2461916 (fetched; sections
+1 to 4 read: the winding number of closed curves and surfaces, its jump across the surface, overlap regions); Kai
+Hormann and Alexander Agathos, *The point in polygon problem for arbitrary polygons*, Computational Geometry 20(3), 2001
+(not fetched: the publisher page and the author's copy did not serve the PDF; winding numbers by signed crossings).
+Tests: `smooth-lod.test.js` "closed for any field" (40 seeded cave and overhang nodes, 10 part-masked: 6 had open edges
+before) and "rays along box edges" (11,520 segments between neighbouring box-edge samples, 1,324 of them with a sign change, moved about 0.001 cells
+into the box, each crossing the surface by its end samples' difference; the old gaps had almost no area and this test
+passed before too); 450 further seeded nodes closed in a sweep; GPU check native and WebGL2 compatibility unchanged
+(0 holes with caps, 11 without).
+
+## Fire step 5: stone, soot and brick close-ups (`@margoengine/procedural/textures-pbr`, 2026-11-15)
+
+Written from the papers only, no other engine's code read.
+
+- `stone`: Worley, "A Cellular Texture Basis Function", SIGGRAPH 1996, https://dl.acm.org/doi/10.1145/237170.237267.
+  F1 picks the stone, (F2 - F1) / 2 stands for the distance to the mortar line; the 3 x 3 search, the jitter range
+  0.1 to 0.9, the per-stone height 0.8 to 1 and the seeded tint are Margo's choices.
+- `soot`: Morton, Taylor and Turner, "Turbulent gravitational convection from maintained and instantaneous sources",
+  Proc. R. Soc. A 234 (1956), https://doi.org/10.1098/rspa.1956.0011: a buoyant plume's width grows linearly with
+  height and its centreline concentration falls as (b0 / b)^(5/3). The UV constants (b0 0.2, growth 0.13) and the
+  streak noise are Margo's.
+- `tint` and `chip` on bricks and tiles: Lefebvre and Poulin, "Analysis and synthesis of structural textures",
+  Graphics Interface 2000 (cells of a structural tiling); the per-cell hash, the smoothstep bevel and the noise-broken
+  edge are Margo's.
+
+## Fire step 6: soot and material presets (`@margoengine/materials/soot`, `/presets`, 2026-11-15)
+
+Written from the papers only, no other engine's code read.
+
+- `soot`: Morton, Taylor and Turner, "Turbulent gravitational convection from maintained and instantaneous sources",
+  Proc. R. Soc. A 234 (1956), https://doi.org/10.1098/rspa.1956.0011: a plume's half-width grows as 6 alpha z / 5
+  (alpha about 0.1, so 0.12 per metre) and its axis concentration falls as (b0 / b)^(5/3). The Gaussian profile across
+  the plume, the floor patch below the fire's base, the starting half-width width / 2, strength 0.85 and the decal's
+  1.5 plume widths are Margo's.
+- `presets`: copper and iron F0 from Hoffman, "Background: Physics and Math of Shading", SIGGRAPH 2013 course,
+  https://blog.selfshadow.com/publications/s2013-shading-course/hoffman/s2013_pbs_physics_math_notes.pdf. The other
+  values (tarnished copper, cast iron, soot, hearthstone, weathered wood, brick) are art defaults, marked as such in
+  the README.
+## DP1: demo features moved into packages (2026-11-14)
+
+Scott, 2026-11-14: "add what's in the demo only to the engine, nothing should ever be demo only." The Orrery's maths
+moved into packages unchanged in its numbers; it was written clean room in the demo (see S98 for the ephemeris).
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| DP1-1 | spur wheel radii: pitch m z / 2, tip one addendum (1 m) out, root one dedendum (1.25 m) in, base pitch cos(pressure angle 20 degrees); involute outline: tooth half angle at radius rho is pi / 2z + inv(alpha) - inv(acos(r_b / rho)), inv(a) = tan a - a, radial below the base circle, a root point mid-gap | procedural/src/gears.ts | ISO 53:1998, "Cylindrical gears for general and heavy engineering: standard basic rack tooth profile"; ISO 21771:2007, "Gears: cylindrical involute gears and gear pairs, concepts and geometry" (tooth thickness at a radius); D. W. Dudley, "Handbook of Practical Gear Design", McGraw-Hill 1984, ch. 1 |
+| DP1-2 | meshing phase: driven angle = toward + pi - pi / z_driven + (toward - driver) z_driver / z_driven, so a driver tooth on the line of centres faces a driven gap; two-stage compound train ratio a c / (b d); exhaustive search over a, b, c with the two nearest d, within a tolerance the coarsest finer module wins; fit checks of tips against arbors and the output bundle | procedural/src/gears.ts | Margo-own (rolling contact of pitch circles: Dudley 1984, ch. 1); written for the Orrery demo |
+
+## Text outline SDF (GAP-FILM-TEXT, `@margoengine/text/outline`, 2026-11-16)
+
+Glyph signed distance fields built on the CPU from the font file's outlines, so text renders the same in a page and in Node, with kerning and ligatures read from the file. Written from the papers, books and specifications below; no implementation of any of them, and no other engine's or library's text code, was read. The citation list was checked on 2026-11-16 against the publishers' pages, Crossref and the papers' first pages (the planner had listed it from memory; Green's is a course-notes chapter, and the Chlumsky 2018, Manson 2013 and Catmull 1978 entries gained their volumes and DOIs).
+
+| id | formula | file | source |
+| --- | --- | --- | --- |
+| FT-1 | field byte = round(255 - 255 (d / radius + cutoff)) clamped, d the signed distance in pixels (negative inside), cutoff 0.25, the encoding `alphaToSdf` already used, so the shader's outline and shadow layers read it unchanged | text/src/outline-sdf.ts | C. Green, "Improved Alpha-Tested Magnification for Vector Textures and Special Effects", SIGGRAPH 2007 Course 28 (Advanced Real-Time Rendering in 3D Graphics and Games), chapter 2, https://www.advances.realtimerendering.com/s2007/Green-Improved_Alpha-Tested_Magnification_for_Vector_Textures_and_Special_Effects(Siggraph07%20Course%20Notes).pdf |
+| FT-2 | flattening: a quadratic split uniformly into n pieces strays at most abs(P0 - 2 P1 + P2) / (4 n^2) from its chords, a cubic at most 0.75 max(abs second difference) / n^2; n is the smallest integer meeting a quarter byte step (at most 1/64 px), computed as ceil(sqrt(...)) | text/src/outline-sdf.ts | J. Gravesen, "Adaptive subdivision and the length and energy of Bezier curves", Computational Geometry 8(1) 13-31, 1997, https://doi.org/10.1016/0925-7721(95)00054-2 ; R. Goldman, "Pyramid Algorithms", Morgan Kaufmann, 2003 (the second-difference bound, cited through secondary sources: the book was not opened) |
+| FT-3 | inside = nonzero winding number, counted per texel row at texel centres from the crossings of the closed pieces, half-open in y so a shared end counts once | text/src/outline-sdf.ts | K. Hormann and A. Agathos, "The point in polygon problem for arbitrary polygons", Computational Geometry 20(3) 131-144, 2001, https://doi.org/10.1016/S0925-7721(01)00012-8 |
+| FT-4 | magnitude = exact distance from the texel centre to the nearest piece (closest point on a segment, t clamped to [0, 1]), each piece evaluated only over its box grown by the field's reach ceil(radius max(cutoff, 1 - cutoff)) + 1, so cost follows outline length | text/src/outline-sdf.ts | C. Ericson, "Real-Time Collision Detection", Morgan Kaufmann, 2005, chapter 5 (closest point on a segment); P. J. Schneider, "Solving the Nearest-Point-on-Curve Problem", Graphics Gems, 1990, https://doi.org/10.1016/b978-0-08-050753-8.50131-5 , read for the exact curve distance and not used (it needs a degree-5 root finder; flattening within a quarter level keeps only + - * / sqrt) |
+| FT-5 | overlapping and abutting contours: every piece is split into parts of at most 1/4 px, and a part is kept for the distance only when the winding (counted over the pieces of its pixel row) a 1/32 px step to one side of its middle is 0; a piece whose parts all pass stays whole, so edges with ink on both sides leave no seam and other glyphs are unchanged (own method; the plan's distance-transform guard was not needed) | text/src/outline-sdf.ts | own, from FT-3 |
+| FT-6 | determinism: only + - * / and sqrt on fractional values (each correctly rounded by IEEE 754-2019 section 5.4), integer floor, ceil and round, so a page and Node give the same bytes; no cbrt, hypot, trig or pow on the field path | text/src/outline-sdf.ts | IEEE 754-2019, https://doi.org/10.1109/IEEESTD.2019.8766229 |
+| FT-7 | pair kerning: GPOS lookup type 2 format 1 (pair sets by second glyph, binary search) and format 2 (ClassDef 1 and 2, class 0 default), through type 9 extension subtables, the first subtable of each `kern` lookup that covers the first glyph; value = the first glyph's ValueRecord XAdvance; feature list of the character's script (latn, grek, cyrl, else DFLT, then latn); legacy `kern` version 0 format 0 horizontal subtables when GPOS has no `kern` feature (override bit honoured) | text/src/outline-shape.ts | Microsoft and Adobe, OpenType Specification 1.9.1 (May 2024), https://learn.microsoft.com/en-us/typography/opentype/spec/ : chapters gpos, kern, chapter2 (OpenType Layout common table formats: ScriptList, FeatureList, LookupList, Coverage formats 1 and 2, ClassDef formats 1 and 2); ISO/IEC 14496-22:2019 Open Font Format, 4th edition |
+| FT-8 | ligatures: GSUB lookup type 4 (LigatureSet per covered first glyph, ligatures tried in their listed order, components must follow exactly), type 7 extension, each `liga` lookup over the run in lookup order | text/src/outline-shape.ts | OpenType Specification 1.9.1, chapter gsub |
+| FT-9 | clusters normalised to NFC first when the font has every NFC code point; default-ignorable code points dropped | text/src/outline.ts | Unicode UAX #15 Normalization Forms, revision 58, https://www.unicode.org/reports/tr15/ ; UAX #29 Text Segmentation, revision 49, https://www.unicode.org/reports/tr29/ (clusters, already used by layout) |
+| FT-10 | compared and not used: sampled distance transforms (P. F. Felzenszwalb and D. P. Huttenlocher, Theory of Computing 8(19) 415-428, 2012, https://doi.org/10.4086/toc.2012.v008a019 , already used by `Font`; S. F. Frisken, R. N. Perry, A. P. Rockwood and T. R. Jones, "Adaptively Sampled Distance Fields", SIGGRAPH 2000, https://doi.org/10.1145/344779.344899), which lose the sub-texel edge the outline gives; exact coverage rasterisation (E. Catmull, "A Hidden-Surface Algorithm with Anti-Aliasing", SIGGRAPH 1978, Computer Graphics 12(3) 6-11, https://doi.org/10.1145/965139.807360 ; J. Manson and S. Schaefer, "Analytic Rasterization of Curves with Polynomial Filters", Computer Graphics Forum 32(2) 499-507, 2013, https://doi.org/10.1111/cgf.12070 ; E. Lengyel, JCGT 6(2) 31-47, 2017, https://jcgt.org/published/0006/02/02/), kept as the plan's fallback and not needed; GPU jump flooding (G. Rong and T.-S. Tan, I3D 2006, https://doi.org/10.1145/1111411.1111431), whose results differ per backend | none | as listed |
+| FT-11 | follow-up GAP-FILM-MSDF: multi-channel fields keep sharp corners on large titles | none yet | V. Chlumsky, "Shape Decomposition for Multi-channel Distance Fields", master's thesis, Czech Technical University in Prague, 2015; V. Chlumsky, J. Sloup and I. Simecek, "Improved Corners with Multi-Channel Signed Distance Fields", Computer Graphics Forum 37(1) 273-287, 2018, https://doi.org/10.1111/cgf.13265 |
+
+Caption sizes: WCAG 2.2 (W3C Recommendation, 12 December 2024, https://www.w3.org/TR/WCAG22/) success criteria 1.4.3 (text contrast 4.5:1, large text 3:1) and 1.4.11 (non-text contrast 3:1) are why the default radius leaves room for an outline plus a soft shadow (0.17 em together). The BBC Subtitle Guidelines (https://bbc.github.io/subtitle-guidelines/) were looked for and their current version could not be confirmed, so no figure here rests on them.
+
+## Film time seek (GAP-FILM-TIME, `@margoengine/cutscene/seek`, 2026-11-16)
+
+Written from the papers and articles below; no other engine's or project's code was read.
+
+| Id | What | Where | Source |
+|---|---|---|---|
+| FS-1 | a seek replays the same `advanceTime(1 / fps)` steps a continuous run made instead of setting a closed-form time: a sum of n rounded additions of 1/fps is not n x (1/fps) rounded once, so only the same sequence of operations gives the same bits | cutscene/src/seek.ts | D. Goldberg, "What Every Computer Scientist Should Know About Floating-Point Arithmetic", ACM Computing Surveys 23(1) 5-48, 1991, https://doi.org/10.1145/103162.103163 ; IEEE 754-2019, https://doi.org/10.1109/IEEESTD.2019.8766229 (each basic operation correctly rounded, so the same operations in the same order repeat exactly) |
+| FS-2 | fixed steps, separate from drawing, make a simulation repeatable at any frame rate; the seek is the same steps with the draws left out | cutscene/src/seek.ts | G. Fiedler, "Fix Your Timestep!", 2004, https://gafferongames.com/post/fix_your_timestep/ |
+| FS-3 | view history (TAA) settles after n frames with w^n under one level, and is reset at a camera cut on purpose; the seek leaves it to the scene's warm-up frames | plan bounds, later commits | L. Yang, S. Liu and M. Salvi, "A Survey of Temporal Antialiasing Techniques", Computer Graphics Forum 39(2) 607-621, 2020, https://doi.org/10.1111/cgf.14018 ; B. Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014 course Advances in Real-Time Rendering in Games, https://advances.realtimerendering.com/s2014/ |
+| FS-4 | shader `time` and `deltaTime` read one per-engine `ShaderClock` that sums the frame deltas of each update, so a shader draws film time, not the wall clock, and a seek replays it | shader/src/clock.ts | G. Fiedler, "Fix Your Timestep!", 2004, and D. Goldberg, 1991 (both above): the clock adds the same deltas in the same order as a continuous run |
+| FS-5 | an update with a delta of 0 is the same instant drawn again (a planar or cube capture inside the frame), so a per-frame counter (TAA's 8-phase Halton jitter, grain, particle seeds) moves once per frame, not once per render; TAA's still-view settle compares a phase with the same phase one cycle ago, which needs one phase per frame | taa/src/index.ts, taa/src/upscale.ts, tonemap/src/index.ts, vfx/src/base.ts | B. Karis, 2014, and L. Yang, S. Liu and M. Salvi, 2020 (both above): one jitter offset per frame from a short low-discrepancy sequence; C. Schied, C. Peters and C. Dachsbacher, "Gradient Estimation for Real-Time Adaptive Temporal Filtering", HPG 2018, https://doi.org/10.1145/3233301 (a temporal gradient compares a sample with the one made with the same random sequence before) |
+| FS-6 | the volumetric clouds' march start counts timed updates only; a draw after a zero-delta update (a capture drawn before the frame's own update, a still frame drawn again) takes one more step for that draw only, dropped at the next timed update (KB-FILM-CLOUDPHASE1) | sky/src/volumetric-clouds.ts | as FS-5, and A. Schneider, "The Real-time Volumetric Cloudscapes of Horizon Zero Dawn", SIGGRAPH 2015 course notes (a march offset per frame for temporal reuse) |
+
+The plan's citations were checked: all four are as listed (Goldberg's survey through its Oracle reprint and the DOI;
+Fiedler's article, 2004; the survey's DOI resolves to Computer Graphics Forum 39(2)).
+
+## Film engine gaps (Film Studio row 27, 2026-11-16)
+
+Written from the standards and papers below; rivals' features were read from their documentation only, and no other
+engine's or project's code was read.
+
+| Id | What | Where | Source |
+|---|---|---|---|
+| FE-1 | a raw RGBA8 texture is limited by the device's maxTextureDimension2D per side, checked at upload; construction checks sizes and data length apart (KB-MATERIALS-TEXCAP1) | materials/src/built-material.ts | W3C, "WebGPU", section "Limits" (maxTextureDimension2D, default 8192), https://www.w3.org/TR/webgpu/ |
+| FE-2 | guarded fetches: schemes, hosts named as this computer or a private network, redirects followed by hand and checked per hop, media type essence (KB-LOADERS-FETCHGUARD1) | loaders/src/load.ts | RFC 1918, RFC 3927, RFC 4193, RFC 4291, RFC 6598, RFC 6761 (address ranges and localhost); WHATWG Fetch (redirect mode "manual", opaque-redirect responses) and WHATWG URL (host parsing), https://fetch.spec.whatwg.org/ , https://url.spec.whatwg.org/ ; RFC 9110 section 8.3 and WHATWG MIME Sniffing (type essence) |
+| FE-3 | a video overlay's source crop and CSS object-fit placement (KB-VIDEO-CROP1) | video/src/index.ts | W3C, "CSS Images Module Level 3", section 5.5 "Sizing Objects: the object-fit property", https://www.w3.org/TR/css-images-3/#the-object-fit |
+| FE-4 | a glTF report without a GPU: counts, world bounds by node transform (T x R x S), triangle modes, image sizes from headers, closed-mesh orientation by signed volume, cut-out bounds by texture alpha (GAP-FILM-GLTFREPORT) | gltf/src/report.ts | Khronos, "glTF 2.0 Specification", 2021, sections 3.5, 3.6, 3.7.2.1, 3.9.4, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html ; W3C PNG (2003) IHDR; ITU-T T.81 (JPEG) SOFn; RFC 9649 (WebP); Khronos KTX 2.0 header; C. Zhang and T. Chen, "Efficient feature extraction for 2D/3D objects in mesh representation", ICIP 2001, https://doi.org/10.1109/ICIP.2001.958278 (signed volume as a sum of signed tetrahedra; taken in mesh space, since section 3.7.4 makes a negative-determinant node's front face clockwise); rivals' documentation: glTF-Transform `inspect`, the Khronos glTF Validator issue list, the Babylon.js sandbox inspector |
+| FE-5 | finished video files through ffmpeg: hardware and software H.264 encoder arguments with the engine's colour tags and a VUI rewrite, join by stream copy with avc1 or avc3, sound under a copied picture, a checked stream-copy cut of a recorded span, and clips laid over rendered frames in one filter graph (GAP-FILM-FFMPEG, GAP-FILM-STREAMCOPY, GAP-FILM-LAYERS) | headless/src/ffmpeg-files.ts, ffmpeg-colour.ts, ffmpeg.ts | ITU-T H.273 (2021) colour code points, https://www.itu.int/rec/T-REC-H.273 ; ITU-T H.264 (2021) Annex E VUI, https://www.itu.int/rec/T-REC-H.264 ; ISO/IEC 14496-12:2022 (ISO base media file format) sections 4.2, 8.6.1 to 8.6.6, 8.8; ISO/IEC 14496-15:2022 sections 5.3 and 5.4 (avc1 and avc3 sample entries); ffmpeg documentation (ffmpeg-formats concat demuxer and mov muxer, ffmpeg-bitstream-filters h264_metadata, ffmpeg-filters overlay, tpad, trim, scale (in_color_matrix and in_range, whose default reads an untagged file as BT.601), crop, pad, fps (round=near), ffmpeg-utils colour syntax, ffmpeg-codecs libx264, h264_nvenc, h264_amf, h264_qsv), https://ffmpeg.org/documentation.html ; untagged layer colour (KB-FILM-LAYERS2): ITU-R BT.709-6 (2015) HD matrix, https://www.itu.int/rec/R-REC-BT.709 ; ITU-R BT.601-7 (2011) SD matrix, https://www.itu.int/rec/R-REC-BT.601 ; ITU-T H.273 matrix code 2 (unspecified: left to the application); SMPTE ST 296 (1280x720) and ST 274 (1920x1080) use BT.709 colorimetry; ITU-T T.871 (2011) JFIF: BT.601 at full range ; rivals' documentation: the Remotion renderer's codec and concat options, the WebCodecs-based mp4 muxers' fragment options, and the ffmpeg front ends people script (their docs only, no code) |
+| FE-6 | a streamed SHA-256 for files too large to hold whole, the same hex as `crypto.subtle` (GAP-FILM-STREAMHASH) | cache/src/hashed.ts | NIST FIPS 180-4 (2015), "Secure Hash Standard", sections 4.1.2, 4.2.2, 5.1.1, 5.3.3 and 6.2, https://doi.org/10.6028/NIST.FIPS.180-4 ; the example vectors of FIPS 180-2 appendix B |
+
+## Procedural marchingCubes: axis-edge Marching Cubes and exact edge roots (2026-11-16)
+- William E. Lorensen and Harvey E. Cline, "Marching Cubes: A High Resolution 3D Surface Construction Algorithm", SIGGRAPH 1987, https://doi.org/10.1145/37402.37422 . Vertices on cube edges by linear interpolation. Primary text not read; the method as widely described.
+- Gregory M. Nielson and Bernd Hamann, "The Asymptotic Decider: Resolving the Ambiguity in Marching Cubes", IEEE Visualization 1991, 83-91, https://doi.org/10.1109/VISUAL.1991.175782 . Primary text read (2026-11-16, the authors' 9-page scan, sections 1 to 3). Section 2: over a face as the unit square the bilinear interpolant's asymptotes cross at (S, T), and the test is "if alpha > B(S, T)" join the corners below alpha across the face, else join the corners above it, so a tie joins the upper pair. `extract` matches it: corners below the level are inside, the decider joins them when (v0 v2 - v1 v3) / (v0 + v2 - v1 - v3) < 0 with v the samples minus the level, which is B(S, T) - alpha, and a tie (0) leaves them apart. The paper prints the saddle value's numerator as B00 B11 + B10 B01; the interpolant at (S, T) gives B00 B11 - B01 B10 (check: B00 = B11 = 2, B01 = B10 = 1 has 1.5 at the centre, the minus form gives 1.5 and the printed one 2.5), and `extract` uses the minus. One convention differs: the paper marks F > alpha, `extract` treats F >= alpha as outside, so a sample exactly at the level sides with the upper corners; the surface passes through such a point either way (it is snapped to it). Section 3's per-configuration triangulations are not used: `extract` traces each cube's polygons on its faces with the face decisions, which gives the same separations. Regression: `packages/procedural/test/procedural.test.js` ("the asymptotic decider joins an alternating face as the paper does"), which fails with the printed + and with the tie turned.
+- Evgeni V. Chernyaev, "Marching Cubes 33: Construction of Topologically Correct Isosurfaces", CERN CN/95-17, 1995. Interior (body) ambiguities and tunnels; not resolved here, stated in the README. Not read.
+- Jules Bloomenthal, "Polygonization of Implicit Surfaces", Computer Aided Geometric Design 5(4), 1988, 341-355, https://doi.org/10.1016/0167-8396(88)90013-1 , and "An Implicit Surface Polygonizer", Graphics Gems IV, 1994. Converge vertices on the known function along the edge; build the cube polygons by tracing them on the faces. Not read in full.
+- M. Dowell and P. Jarratt, "A Modified Regula Falsi Method for Computing the Root of an Equation", BIT 11, 1971, 168-174, https://doi.org/10.1007/BF01934364 . The Illinois step. Not read in full; a bisection safeguard keeps the bracket shrinking.
+- Graham Treece, Richard Prager and Andrew Gee, "Regularised Marching Tetrahedra", CUED/F-INFENG/TR 333, 1998: the corner snapping kept from the earlier extractor.
+Compared: true Marching Cubes against keeping the tetrahedra and moving vertices onto the surface. Tetrahedra cannot be fixed for grid input (no field between samples, and diagonal edges stray up to 1.229 times the radius against 1.073 on axis edges for the same metaball), so both were combined: axis edges for every input, exact roots when the field is known. No implementation source was read.
+
+## IFC property write-back (`@margoengine/ifc/write`, 2026-11-16)
+
+Written from the standards and from web-ifc's public API and typings (`web-ifc-api.d.ts`, `ifc-schema.d.ts`: `CreateIfcEntity`, `CreateIfcType`, `WriteLine`, `DeleteLine`, `SaveModel`, `Handle`) only, with web-ifc's behaviour observed by running it; no web-ifc, That Open, xeokit or IfcOpenShell source was read. Sources:
+- buildingSMART International, IFC 4.3 ADD2 (ISO 16739-1:2024) documentation, https://ifc43-docs.standards.buildingsmart.org/ : IfcGloballyUniqueId, IfcOwnerHistory (CorrectChangeAction: ADDED and MODIFIED need LastModifiedDate), IfcChangeActionEnum, IfcRelDefinesByProperties, IfcTypeObject.HasPropertySets, IfcPropertySet (HasProperties is SET [1:?], so an emptied set is removed), IfcPropertySingleValue, IfcPropertyEnumeratedValue, IfcPropertyListValue, IfcElementQuantity, IfcPhysicalSimpleQuantity subtypes (WR21: values not negative), IfcSIUnit, IfcLabel (STRING(255)). IFC4 ADD2 TC1 and IFC2x3 TC1 documentation for the same entities (IFC2x3: OwnerHistory required on every IfcRoot). Read from the HTML documentation in earlier IFC work; not fetched again.
+- buildingSMART International, "IFC GUID" implementation guidance, https://technical.buildingsmart.org/resources/ifcimplementationguidance/ifc-guid/ : the 128-bit number as 22 base-64 digits `0-9A-Za-z_$`, the first holding 2 bits. Not fetched in this pass.
+- K. Davis, B. Peabody and P. Leach, RFC 9562, "Universally Unique IDentifiers (UUIDs)", 2024, https://www.rfc-editor.org/rfc/rfc9562 : version 4 random UUIDs (version and variant bits).
+- ISO 10303-21:2016, Industrial automation systems, clear text encoding of the exchange structure: the REAL token needs a decimal point before any exponent, `*` only for derived (redeclared) attributes, `$` for unset optional ones. Not fetched; the grammar as used by `src/step.ts`.
+- Rival feature lists, documentation only: That Open Engine docs (docs.thatopen.com, IFC editing and export with web-ifc), xeokit SDK docs (xeokit.io, metadata only, no IFC write-back), IfcOpenShell `ifcopenshell.api` documentation (pset.edit_pset, pset.remove_pset, attribute.edit_attributes, owner history handling) as a reference for what BIM editors offer; not a web rival and none of its code read.
+Compared: editing a shared property set in place (every element using it changes, as a plain WriteLine of the set does) against copy on write (only the element edited changes). Copy on write was chosen, at three levels (relationship, set, property), so per-element edits are exact, and the type object's own ID remains the way to change every occurrence. Observed web-ifc 0.0.78 behaviour the code relies on or corrects: an attribute left undefined is written as `*`, so every new entity sets each attribute ($ when unset) and leaves only IfcSIUnit.Dimensions derived; a single reference must be web-ifc's Handle class, so references are made with the constructor of one the model holds; a value object not made by CreateIfcType silently drops its whole line, so every value goes through CreateIfcType; reals with an exponent are written without a decimal point, which `saveIFC` corrects; DeleteLine leaves the line in GetLineIDsWithType, so this package's readers skip lines it deleted.
+
+## Puff clouds: vfx/clouds and react/clouds (2026-11-16)
+
+Written from the papers and documentation below; drei's Clouds and Cloud were read from their public documentation
+page only (props, defaults and behaviour notes), never their source, and no other engine's or project's code was read.
+
+- Mark J. Harris, "Real-Time Cloud Rendering for Games", Game Developers Conference 2002 Proceedings (based on Harris
+  and Lastra 2001), https://aurora.cs.uaf.edu/~olawlor/academic/thesis/ref/RTCloudsForGames_HarrisGDC2002.pdf . Read
+  in full. Used: clouds as particles drawn as screen-oriented splats sorted far to near with source 1, destination
+  1 - alpha blending (section 2.3 and figure 4); the light reaching a particle as the product of the transmittances of
+  the particles nearer the light (equation 4, here without the multiple forward scattering term); the Rayleigh phase
+  3/4 (1 + cos^2) for the light scattered toward the eye (sections 2.1 and 2.2.3); an ambient term for the light the
+  approximation loses (section 2.3.1). The Gaussian overlap weight of a puff off another's light ray is Margo's
+  stand-in for his per-pixel read back.
+- Mark J. Harris and Anselmo Lastra, "Real-Time Cloud Rendering", Computer Graphics Forum 20(3), 2001,
+  https://doi.org/10.1111/1467-8659.00500 . Abstract only (paywalled); the GDC paper above restates it.
+- Tristan Lorach, "Soft Particles", NVIDIA whitepaper, January 2007,
+  https://developer.download.nvidia.com/whitepapers/2007/SDK10/SoftParticles_hi.pdf . Read in full. Used: fading a
+  sprite by the gap between its depth and the scene depth behind it, read with a texel load at the fragment's window
+  position, and the symmetric contrast curve 0.5 (2x)^p (p = 2) mirrored about 0.5 that keeps the fade smooth at both
+  ends. The particle billboard keeps its linear fade; both share one WGSL function (vfx/src/soft.ts `softDepthWgsl`).
+- Niniane Wang, "Realistic and Fast Cloud Rendering", Journal of Graphics Tools 9(3), 2004, 21-40. Abstract only
+  (textured particle splats for many cloud types); not read. The near-camera fade is drei's documented `fade`.
+- W. T. Reeves, "Particle Systems: a Technique for Modeling a Class of Fuzzy Objects", SIGGRAPH 1983, and L. Westover,
+  "Footprint Evaluation for Volume Rendering", SIGGRAPH 1990/1991 (splatting): as Harris cites them; not read.
+- T. Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984: the premultiplied over operator; from the record.
+- C. Gribb and K. Hartmann, "Fast Extraction of Viewing Frustum Planes from the World-View-Projection Matrix", 2001:
+  the side planes as row 4 plus or minus rows 1 and 2, and z <= w (row 4 minus row 3) as the near plane under reversed
+  Z; from the record.
+- IEC 61966-2-1 (sRGB): mips of the puff texture are averaged in linear light and encoded again; from the record.
+
+Compared: the vfx particle system (GPU-simulated, sorted on the GPU) against a CPU-laid-out instanced batch. Cloud
+puffs are few (drei's default limit is 200) and fixed by seed and time, so the layout, light and sort run on the CPU
+each frame (a few hundred puffs cost microseconds) and one instance buffer write feeds one draw; the soft-depth code
+is shared with the particles rather than copied.
+
+
+## Wind-blown sand: vfx/blown-sand (2026-11-17)
+
+Written from the papers and books below, read as text; no other engine's or project's code was read.
+
+- R. A. Bagnold, "The Physics of Blown Sand and Desert Dunes", Methuen, London, 1941 (book, from the record). Used: the
+  fluid threshold shear velocity u*t = A sqrt(((rho_s - rho_a) / rho_a) g d) with A = 0.1, the logarithmic wind profile
+  above the bed, and the flow separating at a dune brink so grains blown over it fly out over the slip face.
+- J. F. Kok, E. J. R. Parteli, T. I. Michaels and D. B. Karam, "The physics of wind-blown sand and dust", Reports on
+  Progress in Physics 75(10), 106901, 2012, https://doi.org/10.1088/0034-4885/75/10/106901 . Used: the flux law
+  q ~ u*^3 (1 - u*t^2 / u*^2), saltation confined to the lowest decimetres with the flux falling about exponentially
+  with height, grain speeds of a few metres a second, and intermittent transport near the threshold.
+- P. R. Owen, "Saltation of uniform grains in air", J. Fluid Mech. 20(2), 225-242, 1964, and S. Kawamura, "Sand
+  movement by wind" (1951), as the flux law of the review above; not read, cited through Kok et al. 2012.
+- R. S. Anderson and P. K. Haff, "Simulation of eolian saltation", Science 241(4867), 820-823, 1988,
+  https://doi.org/10.1126/science.241.4867.820 . Used: saltation answers a change of wind within about a second, so
+  each streak follows the wind of the moment it is born.
+- G. Sauermann, K. Kroy and H. J. Herrmann, "Continuum saltation model for sand dunes", Phys. Rev. E 64, 031305, 2001,
+  https://doi.org/10.1103/PhysRevE.64.031305 , and K. Kroy, G. Sauermann and H. J. Herrmann, "Minimal model for sand
+  dunes", Phys. Rev. Lett. 88, 054301, 2002. Used: the shear stress over a dune is the flat value times
+  1 + A (H[h'] + B h'), H the Hilbert transform of the slope along the wind. The values A = 3 and B = 0.3 are chosen
+  here for the look of a crest, they are not the values of the papers.
+- P. S. Jackson and J. C. R. Hunt, "Turbulent wind flow over a low hill", Q. J. R. Meteorol. Soc. 101, 929-955, 1975:
+  the source of the Hilbert transform form above; from the record.
+- O. Duran and H. J. Herrmann, "Modelling of saturated sand flux", J. Stat. Mech. P07011, 2006,
+  https://doi.org/10.1088/1742-5468/2006/07/P07011 . Used: the flux saturates over metres, so a streak is metres long.
+- A. C. W. Baas and D. J. Sherman, "Formation and behavior of aeolian streamers", J. Geophys. Res. 110, F03011, 2005,
+  https://doi.org/10.1029/2004JF000270 . Used: streamers about 0.2 m wide and 1 m apart, carried by gusts and swept
+  downwind with them (here a gust and streamer field frozen in the mean flow, G. I. Taylor's hypothesis).
+- N. Lancaster, "Variations in wind velocity and sand transport on the windward flanks of desert sand dunes",
+  Sedimentology 32, 581-593, 1985: crest speed-up of about 1.1 to 2 over the upwind flat. D. J. Sherman and E. J.
+  Farrell, "Aerodynamic roughness lengths over movable beds", J. Geophys. Res. 113, F02S08, 2008: a rippled bed at rest
+  has a roughness length of order 0.1 mm.
+- W. T. Reeves, "Particle systems", ACM TOG 2(2), 1983 (particles as functions of their age); N. Tatarchuk,
+  "Artist-directable real-time rain rendering in city environments", SIGGRAPH 2006 course (streaks placed by a pure
+  function of time and a seed, cycled in a region that follows the camera); T. Lorach, "Soft Particles", NVIDIA 2007
+  (the depth fade, shared with vfx/clouds).
+- L. G. Henyey and J. L. Greenstein, "Diffuse radiation in the Galaxy", Astrophys. J. 93, 70-83, 1941, and H. N.
+  Russell, "On the albedo of the planets and their satellites", Astrophys. J. 43, 173-196, 1916: the grain phase
+  function as half a forward diffraction lobe and half a Lambert sphere.
+- B. Hapke, "Bidirectional reflectance spectroscopy 1. Theory", J. Geophys. Res. 86(B4), 3039-3054, 1981: the single
+  scattering albedo of a grain from the bed's colour, r = (1 - g) / (1 + g) with g = sqrt(1 - w).
+
+Compared: the vfx particle system (GPU-simulated) against grains laid out as pure functions of time and a seed. Sand
+blown by wind is a field of many short-lived streaks tied to where the ground is exposed, so each particle's place is
+computed in the vertex shader from its seed, the clock and a downwind profile of the ground, with no simulation state:
+the same time draws the same sand, a seek costs nothing, and a device loss loses nothing.
+
+
+## Heat haze: post/heat-haze (2026-11-18)
+
+Written from the papers and books below, read as text; no other engine's or project's code was read (KB-FLAME-HEATHAZE1).
+Compared: a screen-space distortion texture scrolled over the flame (the common game trick; no physical size, bends the
+foreground as well), a refraction pass in the flame's own volume march (would need the scene colour inside the flame
+pass), and a per-pixel march of the view ray through a physical refractive field in a post pass against the scene depth.
+The last is built: it alone gives the size of the bend from the gas temperature and leaves a surface in front of the
+plume alone.
+
+- J. H. Gladstone and T. P. Dale, "Researches on the refraction, dispersion, and sensitiveness of liquids", Phil. Trans.
+  R. Soc. 153, 317-343, 1863, https://doi.org/10.1098/rstl.1863.0014; W. Merzkirch, Flow Visualization, 2nd ed.,
+  Academic Press, 1987 (K = 2.26e-4 m^3/kg for air and visible light). Used: n - 1 = K rho, with the ideal gas, so
+  n - 1 falls as 1 / T; 2.72e-4 at 20 C and sea level.
+- G. S. Settles, Schlieren and Shadowgraph Techniques, Springer, 2001, https://doi.org/10.1007/978-3-642-56640-0. Used:
+  the bend of a ray is the integral along it of the gradient of n across it.
+- M. Raffel, "Background-oriented schlieren (BOS) techniques", Experiments in Fluids 56, 60, 2015,
+  https://doi.org/10.1007/s00348-015-1927-5. Used: a bend eps at distance t shifts a background at tb by eps (tb - t),
+  seen from the camera as eps (1 - t / tb).
+- B. J. McCaffrey, "Purely Buoyant Diffusion Flames: Some Experimental Results", NBSIR 79-1910, National Bureau of
+  Standards, 1979, https://doi.org/10.6028/NBS.IR.79-1910. Used: the centreline temperature rise in the continuous flame,
+  intermittent flame and plume, 2 g dT / T0 = (kappa / 0.9)^2 (z / Q^(2/5))^(2 eta - 1) with (6.8, 1/2), (1.9, 0) and
+  (1.1, -1/3); the least of the three is taken, which joins them without a step.
+- G. Heskestad, "Fire Plumes, Flame Height, and Air Entrainment", SFPE Handbook of Fire Protection Engineering, 5th ed.,
+  2016, and Fire Safety Journal 5(2), 103-108, 1983. Used: L = 0.235 Q^(2/5) - 1.02 D to put McCaffrey's height in flame
+  lengths, the virtual origin 0.083 Q^(2/5) - 1.02 D, and the Gaussian half-width 0.12 (Tc / T0)^(1/2) (z - z0).
+- W. K. George, R. L. Alpert and F. Tamanini, "Turbulence measurements in an axisymmetric buoyant plume", Int. J. Heat
+  Mass Transfer 20(11), 1145-1154, 1977, https://doi.org/10.1016/0017-9310(77)90123-9. Used: the rms temperature
+  fluctuation on the axis, about 0.4 of the mean rise (the `turbulence` default).
+- G. I. Taylor, "The spectrum of turbulence", Proc. R. Soc. A 164, 476-490, 1938, https://doi.org/10.1098/rspa.1938.0032;
+  J. G. Quintiere, Fire Safety Journal 15(1), 3-29, 1989. Used: the eddies are a frozen field carried up at the flame's
+  buoyant rise speed 0.5 sqrt(g L).
+
+## Flame volumes: vfx/flame (2026-11-17)
+
+Written from the papers below, read as text; no other engine's or project's code was read.
+
+- D. Q. Nguyen, R. Fedkiw and H. W. Jensen, "Physically Based Modeling and Animation of Fire", ACM Trans. Graph. 21(3)
+  (SIGGRAPH 2002), https://doi.org/10.1145/566654.566643. Used: a flame's colour is the blackbody radiance of its gas,
+  from the reaction zone's temperature down to the cooler soot, shown through an exposure rather than added up.
+- M. Planck, Annalen der Physik 309(3), 553-563, 1901 (spectral radiance); C. Wyman, P.-P. Sloan and P. Shirley, "Simple
+  Analytic Approximations to the CIE XYZ Color Matching Functions", JCGT 2(2), 2013, http://jcgt.org/published/0002/02/01/
+  (the multi-lobe fits of the observer); IEC 61966-2-1 (XYZ to linear sRGB). The chromaticity of 1,000 to 6,500 K
+  is tested against the published Planckian locus within 0.012.
+- G. M. Byram, "Combustion of forest fuels", in Forest Fire: Control and Use, McGraw-Hill, 1959 (flame length 0.0775 I^0.46);
+  G. Heskestad, "Luminous heights of turbulent diffusion flames", Fire Safety Journal 5(2), 103-108, 1983 (0.235 Q^(2/5) -
+  1.02 D); J. G. Quintiere, "Scaling applications in fire research", Fire Safety Journal 15(1), 3-29, 1989 (speeds go as
+  sqrt(g L)).
+
+- B. M. Cetegen and T. A. Ahmed, "Experiments on the periodic instability of buoyant plumes and pool fires", Combustion
+  and Flame 93(1-2), 157-184, 1993, https://doi.org/10.1016/0010-2180(93)90090-P. Used: a pool fire D metres across
+  puffs at f = 1.5 D^(-1/2) Hz; the flame's zone necks and bulges in a wave of that frequency rising with the flow.
+- E. E. Zukoski, B. M. Cetegen and T. Kubota, "Visible structure of buoyant diffusion flames", Twentieth Symposium
+  (International) on Combustion, 361-366, 1985, https://doi.org/10.1016/S0082-0784(85)80522-1. Used: the intermittent
+  region runs from about half to one and a half of the mean flame height, flame present half the time at the mean.
+- S. Chandrasekhar, Radiative Transfer, Dover, 1960. Used: emission and absorption in local thermodynamic equilibrium (a
+  ray collects the integral of sigma B(T) e^(-tau), never more than the hottest B along it).
+
+Chosen here, not from the papers (2026-11-17, the volume replacing the first billboard flames): the flame zone tapers
+to nothing at 1.35 L with exponent 0.6, the box reaches 1.7 L, the turbulent noise (value noise in five octaves, one
+domain warp, stretched 2.6 times upward, tongues 0.22 L across), the puff amplitude 0.3 of the zone's width, the heat
+mapping, the absorption 9 per flame length weighted toward hot gas, 64 ray steps with a per-pixel dither, the camera
+shoulder gain 4 (capped so the core's weakest channel stays under 1 - e^(-2) of the peak), the puffing diameter (a
+circle of the footprint's area, at most twice its narrower side), the lights (up to four, a third of the way up, at half
+the silhouette times the peak radiance), the default core 2,200 K and edge 1,000 K, the building's vent share 0.1 of its
+floor, and a building's heat as its fuel load over its burn time. The rise speed constant 0.5 stays.
+
+Added 2026-11-17 (KB-FLAME-FRONTEMBERS1, the front flames' look against USFS photos):
+
+- B. Sun, R. Ramamoorthi, S. G. Narasimhan and S. K. Nayar, "A Practical Analytic Single Scattering Model for Real Time
+  Rendering", ACM Trans. Graph. 24(3) (SIGGRAPH 2005), 1040-1049, https://doi.org/10.1145/1073204.1073309. Used: the
+  light a point source scatters into a viewing ray through a thin medium in closed form over the ray's closest approach
+  h, (atan((t1 - tc) / h) - atan((t0 - tc) / h)) / h without attenuation, times sigma / (4 pi) for isotropic scattering.
+- B. W. Butler et al., "Measurements of radiant emissive power and temperatures in crown fires", Canadian Journal of
+  Forest Research 34(8), 1577-1587, 2004, https://doi.org/10.1139/x04-060. Used: the emissive power peaks low in the
+  flame, over the burning fuel.
+- F. A. Albini, "A model for the wind-blown flame from a line fire", Combustion and Flame 43, 155-174, 1981. Used: a
+  line fire's flame stands on the fuel bed and its tips are separate tongues around the mean length.
+- N. Sardoy et al. 2007 (above, fire fronts). Used: embers loft with the plume, whose speeds go as sqrt(g L), so the
+  launch speed of the front's embers grows as sqrt(L).
+- J. H. Lambert, Photometria, 1760. Used: the ground's irradiance from a point source, I cos / d^2, reflected as albedo / pi.
+
+Chosen here: the glow sources at 0.35 L along 0.8 of the footprint (as the light's points), a softening a = L / 4,
+the kernel 1 / (r^2 + a^2) - 1 / (R^2 + a^2) so the glow falls to 0 at R = 3 L, the haze 0.0005 per metre for a bare
+flame and 0.003 for a front, the ground albedo 0.15, the hot base (heat + 0.25 below 0.15 L), the tongue heights 0.7 to
+1.3 L with a 0.8 L wavelength along the line, the depth written where the transmittance falls below 0.5, the front's
+embers from the hearth kit at a nominal 20 m, a third of the flame up, rate times the stretch's length in flame lengths
+(1 to 4).
+
+
+## Smoke column: vfx/smoke (2026-11-17)
+
+Written from the papers below, read as text; no other engine's or project's code was read.
+
+- B. R. Morton, G. I. Taylor and J. S. Turner, "Turbulent gravitational convection from maintained and instantaneous
+  sources", Proc. R. Soc. Lond. A 234(1196), 1-23, 1956, https://doi.org/10.1098/rspa.1956.0011 (the publisher page
+  refused the fetch; its results used here as Briggs 1969 restates them, eq. 4.22). Used: entrainment at alpha w with
+  alpha 0.093; from the volume, momentum and buoyancy fluxes the similarity plume b = (6/5) alpha z,
+  w = (25 F / (48 alpha^2))^(1/3) z^(-1/3), derived here from those equations.
+- G. A. Briggs, "Plume Rise", USAEC Critical Review Series TID-25075, 1969, https://www.osti.gov/biblio/4743102 (the
+  report read in full text). Used: F = g Q_H / (pi c_p rho T) (eq. 4.20); the bent-over plume's radius gamma z,
+  gamma about 0.5 (eq. 4.23); the "2/3 law" 1.6 F^(1/3) U^(-1) x^(2/3) (eq. 4.31); the final rises 5.0 F^(1/4)
+  s^(-3/8) (calm, eq. 4.25) and 2.9 (F / (U s))^(1/3) (wind, eq. 5.7), s = (g / T) dtheta/dz.
+
+Chosen here, not from the papers: the column follows the lower of the calm and bent-over rises (a plume rises off its
+source and bends over), each from a virtual origin where its radius is the source radius; the column stops at the
+final rise rather than overshooting. Drawn as `VFX` particles whose speed and size over life are those curves.
+
+
+Glow from below and the front's columns (KB-VFX-SMOKEROPE1, 2026-11-17), read as text: D. Drysdale, An Introduction to
+Fire Dynamics, 3rd ed., Wiley, 2011, chapter 2 (a flame radiates 0.2 to 0.4 of its heat release); K. B. McGrattan, H. R.
+Baum and A. Hamins, "Thermal radiation from large pool fires", NISTIR 6546, 2000 (about 0.3, falling for very large
+fires); the irradiance of a point source P / (4 pi d^2). Chosen here, not from the sources: the radiant fraction 0.3, the
+point at the column's source softened over its radius, the 1,000 W/m^2 to sun-intensity-pi scale, a 1 s fade-in, and the
+front's column defaults (300 s life, 16 puffs a second, stability 1.5e-4 / s^2, colour [0.24, 0.22, 0.2] at 0.6, the
+source radius of the burning ground clamped to 2 to 60 m, the source at the flame tops).
+
+## Avalanche: weather/avalanche (2026-11-17)
+
+Written from the papers' text and equations only; no other engine's or tool's code was read. Sources: S. B. Savage
+and K. Hutter, J. Fluid Mech. 199, 177-215, 1989, https://doi.org/10.1017/S0022112089000340 (depth-averaged granular
+flow on a slope, earth pressure k); A. Voellmy, Schweizerische Bauzeitung 73, 1955 (the friction mu g cos + g U^2 /
+(xi h) and its steady speed); B. Salm, A. Burkard and H. Gubler, EISLF Mitteilung 47, 1990 (the run-out on the flat);
+M. Christen, J. Kowalski and P. Bartelt, Cold Regions Sci. Technol. 63, 1-14, 2010,
+https://doi.org/10.1016/j.coldregions.2010.04.005 (the Voellmy fluid on terrain, k = 1, entrainment by speed, the
+stopping rule); P. Bartelt, B. Salm and U. Gruber, J. Glaciology 45(150), 242-254, 1999 (mu and xi ranges); B. Sovilla,
+P. Burlando and P. Bartelt, J. Geophys. Res. 111, F03007, 2006, https://doi.org/10.1029/2005JF000391 (frontal
+entrainment and growth); P. Beghin, E. J. Hopfinger and R. E. Britter, J. Fluid Mech. 107, 407-422, 1981,
+https://doi.org/10.1017/S0022112081001821 (the semi-elliptic thermal on a slope); M. Rastello and E. J. Hopfinger, J.
+Fluid Mech. 509, 181-206, 2004, https://doi.org/10.1017/S0022112004009279 (snow entrainment above a threshold speed;
+the abstract and later citations only, as both hosts refused the full text, so the pick-up law is a documented model
+choice); D. M. McClung and P. A. Schaerer, The Avalanche Handbook, 3rd ed., 2006 (impact pressures of the size
+classes, 1 kPa size 1 where plants start to bend and 100 kPa size 3 where trees break); B. Sovilla, J. N. McElwaine and M. Y.
+Louge, "The structure of powder snow avalanches", Comptes Rendus Physique 16(1), 97-104, 2015,
+https://doi.org/10.1016/j.crhy.2014.11.005, open access, read in full (the core erupts most of its snow just behind its front
+and the dilute front region travels ahead of the denser slide: the cloud's head is fed at the core's front); H. C. van de Hulst, Light Scattering by Small Particles, 1957 (extinction efficiency 2); E. Audusse et al.,
+SIAM J. Sci. Comput. 25(6), 2050-2065, 2004 (why the cover and deposit steps are left out of the flow's bed). Gaume et
+al. 2018 (Nature Communications 9, 3047, the anticrack release) is not built: the release is the SnowDrift slide state
+or a rectangle.
+
+## Eruption column: weather/eruption (2026-11-17)
+
+Written from the papers' text and equations only; no other engine's or tool's code was read. Sources: B. R. Morton,
+G. I. Taylor and J. S. Turner, Proc. R. Soc. Lond. A 234, 1-23, 1956, https://doi.org/10.1098/rspa.1956.0011
+(entrainment at alpha times the plume's speed); A. W. Woods, Bull. Volcanol. 50, 169-193, 1988,
+https://doi.org/10.1007/BF01079681 (the top-hat column of gas and pyroclasts, its density from the gas fraction,
+temperature and pressure, the gas-thrust region turning buoyant or collapsing); R. S. J. Sparks, Bull. Volcanol. 48,
+3-15, 1986, https://doi.org/10.1007/BF01073509 (the neutral level below the top, where the umbrella spreads); M. J.
+Woodhouse, A. J. Hogg, J. C. Phillips and R. S. J. Sparks, J. Geophys. Res. 118, 92-109, 2013,
+https://doi.org/10.1029/2012JB009592 (the bent-over plume, wind entrainment beta, the wind's momentum taken in); L. G.
+Mastin et al., J. Volcanol. Geotherm. Res. 186, 10-21, 2009, https://doi.org/10.1016/j.jvolgeores.2009.01.008 (the
+height and rate fit, M = 2500 (H / 2)^4.15, and its factor-of-four band), read as tabled in A. Costa et al., J.
+Volcanol. Geotherm. Res. 326, 2-25, 2016, https://doi.org/10.1016/j.jvolgeores.2016.01.017, open access, read in full
+(the fit, the weak and strong test eruptions, the heat capacities and gas constants); A. W. Woods and J. Kienle, J.
+Volcanol. Geotherm. Res. 62, 273-299, 1994, https://doi.org/10.1016/0377-0273(94)90037-X, and Y. J. Suzuki and T.
+Koyaguchi, J. Geophys. Res. 114, B03209, 2009, https://doi.org/10.1029/2007JB005369 (the umbrella's gravity-current
+spread, lambda about 0.2); S. Carey and R. S. J. Sparks, Bull. Volcanol. 48, 109-125, 1986,
+https://doi.org/10.1007/BF01046546 (a clast leaves the column where its speed falls under the clast's fall speed); C.
+Bonadonna, G. G. J. Ernst and R. S. J. Sparks, J. Volcanol. Geotherm. Res. 81, 173-187, 1998,
+https://doi.org/10.1016/S0377-0273(98)00007-9 (fall speeds by Reynolds number), and C. Bonadonna et al., J. Geophys.
+Res. 110, B03203, 2005, https://doi.org/10.1029/2003JB002896 (each class landing as a Gaussian diffused over its fall
+time); S. R. McNutt and E. R. Williams, Bull. Volcanol. 72, 1153-1167, 2010, https://doi.org/10.1007/s00445-010-0393-4,
+and S. A. Behnke et al., J. Volcanol. Geotherm. Res. 259, 214-234, 2013, https://doi.org/10.1016/j.jvolgeores.2011.12.010
+(vent discharges and plume lightning); ICAO Doc 7488, 1993 (the standard atmosphere); H. C. van de Hulst, 1957
+(extinction efficiency 2). The front speed share, the diffusion and the lightning rate are documented model choices;
+the abstracts only were read of Woods 1988, Woodhouse 2013, Suzuki and Koyaguchi 2009 and the lightning papers.
+
+## Lava flows and bombs: weather/lava (2026-11-18)
+
+Written from the papers' text and equations only; no other engine's or tool's code was read. Sources: R. W.
+Griffiths, Annu. Rev. Fluid Mech. 32, 477-518, 2000, https://doi.org/10.1146/annurev.fluid.32.1.477 (lava as a
+viscous, yield-strength fluid set by slope, supply and surface cooling; channels, crusts with hot cracks,
+cooling-limited stops); H. Jeffreys, Phil. Mag. 49, 793-807, 1925, https://doi.org/10.1080/14786442508634662 (the mean
+speed of a sheet on a slope); G. Hulme, Geophys. J. R. Astr. Soc. 39, 361-383, 1974,
+https://doi.org/10.1111/j.1365-246X.1974.tb05460.x (the Bingham plug and its correction of the mean speed); M. Dragoni,
+Bull. Volcanol. 51, 88-95, 1989, https://doi.org/10.1007/BF01081978 (viscosity and yield strength rising exponentially
+as the lava cools; abstract read, the constants b 0.04 and c 0.08 per kelvin as later works quote them, kept as
+sliders); A. Harris and S. Rowland, Bull. Volcanol. 63, 20-44, 2001, https://doi.org/10.1007/s004450000120 (the core's
+heat budget down a channel: radiation, forced convection with C_H 0.0036, crystallisation's latent heat, stopping at
+the solidus); J. Crisp and S. Baloga, J. Geophys. Res. 95(B2), 1255-1270, 1990, https://doi.org/10.1029/JB095iB02p01255
+(crust and hot-crack thermal components); H. Pinkerton and L. Wilson, Bull. Volcanol. 56, 108-120, 1994,
+https://doi.org/10.1007/BF00304106 (abstract, with the Graetz stop near 300 as Wilson, Pinkerton, Head and Roberts 1993
+cite it); the form Gz = u d_e^2 / (kappa x) as A. Harris and S. Rowland, "Effusion rate controls on lava flow length and the role of heat loss: a review", Geol. Soc. London Spec. Publ. 2009 (Studies in Volcanology: The Legacy of George Walker), write it (eq. 7), full text read, with the Calvari and Pinkerton 1998 Etna law L = 10^3.11 TADR^0.47 the test fits; the full text of Harris and Rowland 2001 read for the crust cover 0.9 exp(-0.16 V) (eq. 8), the hot component T_core - (0 to 140 K) (eq. 9), the basal crust (10 percent, 700 C) and the constant-depth widening (eq. 1), and its three cases (Mauna Loa 1984, Pu'u 'O'o 1997, Etna 1998) as mapped lengths; A. Harris et al., Bull. Volcanol. 60, 52-71, 1998 (Etna 1983 and 1985 effusion rates and lengths); H. S. Carslaw and J. C. Jaeger, "Conduction of Heat in Solids", 2nd ed., Oxford, 1959 (the slab with fixed faces and the contact of two half-spaces) for the core after the vent stops; K. Hon,
+J. Kauahikaua, R. Denlinger and K. Mackay, GSA Bulletin 106, 351-370, 1994 (crust 0.0779 sqrt(hours) metres to the
+1,070 C isotherm, the test bound); D. L. Turcotte and G. Schubert, Geodynamics, 2nd ed., 2002, section 4-17 (the Stefan
+problem of a lava lake); L. Keszthelyi and R. Denlinger, Bull. Volcanol. 58, 5-18, 1996,
+https://doi.org/10.1007/s004450050121 (a surface cooling by radiation and convection in seconds to minutes); H. E.
+Huppert, J. Fluid Mech. 121, 43-58, 1982, https://doi.org/10.1017/S0022112082001797 (the axisymmetric pond, R = 0.715
+(g Q^3 / 3 nu)^(1/8) t^(1/2), and the shape (1 - (r/R)^2)^(1/3) of his similarity solution for a fixed volume, used
+here as the pond's cap at every time with its height set so the cap holds the volume fed, Q t, exactly; the fed
+current's own profile differs from it by a few percent near the edge, which the volume, not the shape, is tested on);
+G. Hulme, Geophys. J. R. Astr. Soc. 39, 361-383, 1974 (scanned full text not machine-readable here; the levee as the
+margin thinner than h_c = tau / (rho g sin theta) of a Bingham sheet, the relation later works quote) for the levee
+height; H. R. Dietterich and K. V. Cashman, "Channel networks within lava flows: formation, evolution, and implications for
+flow behavior", J. Geophys. Res. Earth Surface 119, 1704-1724, 2014, https://doi.org/10.1002/2014JF003103, and H.
+Dietterich's 2014 University of Oregon dissertation (open text read: flows branch where they thin and part round ground
+they cannot overtop, branching slows and shortens flows; their flux order splits evenly, here the flux is shared by
+the drops instead, since at one thickness a Jeffreys sheet's flux per width goes as the slope; their mapped networks
+also rejoin downstream, which `joinDistance` follows: the half-widths test, the clear-first rule, the flux-weighted
+mixing temperature and the solve cap are model choices; so is braiding, arms side by side under their levees: an arm
+alongside another within 45 degrees of its way and below the other's levee crest runs beside it and steps no further
+over its edge than where it came alongside); the 45 degree
+separation, the divide (a drop under half the branch's own between the two lines) and the two-widths spacing are
+documented model choices. Lava tubes: L. Keszthelyi, "A preliminary thermal budget for lava tubes on the Earth and
+planets", J. Geophys. Res. 100(B10), 20411-20420, 1995, https://doi.org/10.1029/95JB01965 (abstract read: conduction,
+convection, rain and radiation against viscous heating and latent heat, about 1 K/km in the Waha'ula tube); R. T.
+Helz, C. Heliker, K. Hon and M. Mangan, "Thermal efficiency of lava tubes in the Pu'u 'O'o-Kupaianaha eruption",
+USGS Professional Paper 1676, 2003, https://pubs.usgs.gov/pp/pp1676/ (7 K over the 12 km Kupaianaha tubes, about 0.6
+K/km); D. W. Peterson, R. T. Holcomb, R. I. Tilling and R. L. Christiansen, "Development of lava tubes in the light of
+observations at Mauna Ulu, Kilauea Volcano, Hawaii", Bull. Volcanol. 56, 343-360, 1994,
+https://doi.org/10.1007/BF00326461 (tubes form as steady channels on gentle ground crust over; cited for the idea, the 4
+degree and one day defaults are model choices; the ground's roof, a crust grown in from the levees to their crests, is
+our own drawing of it); J. Kauahikaua, K. V. Cashman, T. N. Mattox, C. C. Heliker, K. A. Hon, M. T. Mangan and C. R.
+Thornber, "Observations on basaltic lava streams in tubes from Kilauea Volcano, island of Hawai'i", J. Geophys. Res.
+103(B11), 27303-27323, 1998, https://doi.org/10.1029/97JB03576 (skylights: openings in tube roofs through which the
+stream is seen and measured) and R. Greeley, "The role of lava tubes in Hawaiian volcanoes", USGS Professional Paper
+1350, 1589-1602, 1987, https://pubs.usgs.gov/pp/1987/1350/ (roof collapses along tubes) for the skylights; their 200 m
+spacing, size, three-in-four share and seeded places are model choices; S. Calvari and H. Pinkerton, "Formation of lava tubes and extensive
+flow field during the 1991-1993 eruption of Mount Etna", J. Geophys. Res. 103(B11), 27291-27301, 1998,
+https://doi.org/10.1029/97JB03388 (abstract read: lava supplied little cooled through tubes reached 3 km past the
+longest channel-fed flow, from ephemeral vents at flow fronts) for the tube-fed run-on; the front waiting for the last
+roof behind it, the run-on starting at the tube's temperature with a fresh surface and its Graetz length counted from
+the mouth, and the `maxRunOns` budget are model choices. Breakouts: K. Hon, J. Kauahikaua, R. Denlinger and K.
+Mackay, "Emplacement and inflation of pahoehoe sheet flows: observations and measurements of active lava flows on
+Kilauea Volcano, Hawaii", GSA Bulletin 106, 351-370, 1994, https://doi.org/10.1130/0016-7606(1994)106<0351:EAIOPS>2.3.CO;2
+(sheets inflate as lava is injected under their crust and break out at their margins); R. P. Hoblitt, M. R. Orr, C.
+Heliker, R. P. Denlinger, K. Hon and P. F. Cervelli, "Inflation rates, rifts, and bands in a pahoehoe sheet flow",
+Geosphere 8(1), 179-195, 2012, https://doi.org/10.1130/GES00656.1 (inflation rates measured on a fed sheet); the
+inflation as Q t over the sluggish stretch (Graetz under twice `stopGraetz`), the rupture at the lowest ground one
+width outside the levee and the lobe's depth (the sheet's where it ruptures) are model choices; the breakout's core
+is the channel's at the head of the stretch carried on under the crust by the same conduction-only budget as a tube
+(R. T. Helz, C. Heliker, K. Hon and M. Mangan, "Thermal efficiency of lava tubes in the Pu'u 'O'o-Kupaianaha
+eruption", USGS Professional Paper 1676, 2003, https://pubs.usgs.gov/pp/pp1676/ : tube lava loses 0.6 K/km).
+Breakout lobe lengths: M. P. Poland, T. R. Orr, J. P. Kauahikaua and others, "The 2014-2015 Pahoa lava flow crisis at
+Kilauea Volcano, Hawai'i: Disaster avoided and lessons learned", GSA Today 26(2), 4-10, 2016,
+https://www.geosociety.org/gsatoday/archive/26/2/article/i1052-5173-26-2-4.htm (breakout lobes advancing beside the
+stalled ones); USGS Hawaiian Volcano Observatory Kilauea photo chronology and updates, 13 to 23 January 2015
+(lobes broke out 0.7 and 2 km upslope of the stalled tip; the first advanced about 350 m in two days and about 45 m a
+day for a week more, then stalled). Blocked tubes: J. Kauahikaua, K. V. Cashman, T. N. Mattox, C. C. Heliker, K. A. Hon, M. T. Mangan
+and C. R. Thornber, "Observations on basaltic lava streams in tubes from Kilauea Volcano, island of Hawai'i", J.
+Geophys. Res. 103(B11), 27303-27323, 1998, https://doi.org/10.1029/97JB03576 (abstract read: streams 1 to 2 m deep in
+tubes about 5 m high upslope, tubes in inflated sheets completely filled); the roof's hold rho g d + 2 sigma d^2 / w^2
+is a beam clamped at both ends under a uniform load (D. L. Turcotte and G. Schubert, "Geodynamics", 2nd ed.,
+Cambridge, 2002, chapter 3); the 1 MPa default sits at the low end of the 0.5 to 9 MPa in-situ tensile strengths of
+rock (A. Gudmundsson, "Rock Fractures in Geological Processes", Cambridge, 2011), the roof being hot; tumuli burst at
+0.2 to 1 MPa (L. Rossi and A. Gudmundsson, "The morphology and formation of flow-lobe tumuli on Icelandic shield
+volcanoes", J. Volcanol. Geotherm. Res. 72, 291-308, 1996). The head room
+as high as the levees, the level rising with the stalled stretch's inflation and the first roof to give way are model
+choices. The roof as thick as the crust grown in `tubeTime` and the floor as a
+half-space heated for as long (Carslaw and Jaeger 1959) are our own conduction-only budget. Dragoni 1989 has no open
+full text (Springer, paywalled; only an unofficial mirror exists, not used), so b 0.04 and c 0.08 stay as the abstract
+and later works give them. M. Favalli, M. T. Pareschi, A. Neri and I. Isola, Geophys. Res. Lett. 32, L03305, 2005,
+https://doi.org/10.1029/2004GL021718 (steepest descent over a jittered ground); L. Wilson and J. W. Head, J. Geophys.
+Res. 86(B4), 2971-3001, 1981, https://doi.org/10.1029/JB086iB04p02971 (fountain height U^2 / 2g); L. G. Mastin, USGS
+Open-File Report 01-45, 2001, https://pubs.usgs.gov/of/2001/0045/ (ballistic blocks with quadratic drag through thinning
+air, Cd about 0.6 to 1; a constant Cd here, no reduced-drag zone); ICAO Doc 7488, 1993 (air density); C. Wyman, P.-P.
+Sloan and P. Shirley, JCGT 2(2), 1-11, 2013, http://jcgt.org/published/0002/02/01/ (the multi-lobe fits of the CIE 1931
+functions), Planck's law, 683 lm/W and IEC 61966-2-1 (XYZ to linear sRGB); C. Wellons, "Prospecting for Hash
+Functions" (lowbias32). The crack closing time, the crack floor, the fountain's clot speeds and the glowing area of the
+fountain light are documented model choices. The crust is our own implicit finite-difference solve (apparent heat
+capacity across the melting range, Newton-linearised radiating surface).
+
+## Crown fire: vfx/fire-front (2026-11-17, KB-FIRE-CROWN1)
+
+Written from the papers and reports below, read as text; no other engine's or project's code was read.
+
+- C. E. Van Wagner, "Conditions for the start and spread of crown fire", Canadian Journal of Forest Research 7(1),
+  23-34, 1977. Used: the critical surface intensity I0 = (C z h)^1.5 with C = 0.010, z the canopy base height (m) and
+  h = 460 + 25.9 M (kJ/kg, M the foliar moisture in percent); the critical mass flow 3 kg/m^2/min, so an active crown
+  fire needs R >= 3 / CBD m/min; foliage heat of combustion 18,000 kJ/kg.
+- R. C. Rothermel, "Predicting behavior and size of crown fires in the Northern Rocky Mountains", USDA Forest Service
+  Research Paper INT-438, 1991. Used: the crown fire rate 3.34 times fuel model 10's rate with the midflame wind at 0.4
+  of the 20 ft wind; Thomas's flame length for crown fire intensity; the crown fire length-to-breadth 1 + 0.125 U20 (mi/h).
+- P. H. Thomas, "The size of flames from natural fires", 9th Symposium (International) on Combustion, 844-859, 1963:
+  flame length 0.0266 I^(2/3) m for I in kW/m.
+- Forestry Canada Fire Danger Group, "Development and structure of the Canadian Forest Fire Behavior Prediction System",
+  Information Report ST-X-3, 1992: the crown fraction burned 1 - exp(-0.23 (R - R0)), R and R0 in m/min.
+- J. H. Scott and E. D. Reinhardt, "Assessing crown fire potential by linking models of surface and crown fire behavior",
+  USDA Forest Service Research Paper RMRS-RP-29, 2001: the passive rate R_s + CFB (R_active - R_s), the surface rate at
+  which the critical intensity is reached (I0 over the heat per unit area I / R), and the conditional crown fire (a crown
+  fire entering a stand that meets the active criterion but not the initiation one continues as active).
+- M. G. Cruz, M. E. Alexander and R. H. Wakimoto, "Development and testing of models for predicting crown fire rate of
+  spread in conifer forest stands", Canadian Journal of Forest Research 35(7), 1626-1639, 2005
+  (https://doi.org/10.1139/x05-085): the active model 11.02 U10^0.90 CBD^0.19 exp(-0.17 EFFM), used only as a cross-check
+  in the tests. M. G. Cruz and M. E. Alexander, "Assessing crown fire potential in coniferous forests of western North
+  America: a critique of current approaches and recent simulation studies", International Journal of Wildland Fire 19(4),
+  377-398, 2010: Rothermel 1991's rate runs under observed crown fires. M. G. Cruz, M. E. Alexander and R. H. Wakimoto,
+  "Assessing canopy fuel stratum characteristics in crown fire prone fuel types of western North America", International
+  Journal of Wildland Fire 12(1), 39-50, 2003: the ranges the default stands sit in. H. E. Anderson, "Sundance fire: an
+  analysis of fire phenomena", USDA Forest Service Research Paper INT-56, 1968: the Sundance run, about 16 miles in 9 hours.
+- C. A. Turner and B. D. Lawson, "Weather in the Canadian forest fire danger rating system", Report BC-X-177, 1978: the
+  20 ft wind as the 10 m wind over 1.15.
+
+Chosen here, not from the papers: the stands of FM8 (base 4 m, 0.12 kg/m^3, 20 m), FM9 (6 m, 0.08, 22 m) and FM10 (2 m,
+0.15, 20 m); the wind and slope factors of fuel model 10 added as vectors for the crown rate, as for the surface; the
+crown burns into a neighbour only where that neighbour has crowns (else the surface fire carries on); a cell's crown fire
+heat per unit area adds CFB times 18,000 kJ/kg times CBD times the crown depth; the length-to-breadth ratio blends from
+the surface ratio to the crown ratio by the crown fraction; burning crowns draw as torching trees 6 m apart.
+
+## Plant states: scatter/states (2026-11-17)
+
+Written from the papers and reports below, read as text or as their published equations; no other engine's or
+project's code was read. Searched 2026-11-17 (Google Scholar, FRAMES, Forest Service Research Station records).
+
+- C. E. Van Wagner, "Height of crown scorch in forest fires", Canadian Journal of Forest Research 3(3), 373-378, 1973,
+  https://doi.org/10.1139/x73-055 (record at https://www.frames.gov/catalog/17532). Used: scorch height grows with the
+  2/3 power of fireline intensity, falls with wind and rises with air temperature (lethal 60 deg C less ambient). The
+  coefficients are its English-unit form hs = 63 / (140 - T) I^(7/6) / (I + U^3)^(1/2) (ft, Btu/ft/s, mi/h, deg F) as
+  carried by F. A. Albini, "Estimating wildfire behavior and effects", USDA FS GTR INT-30, 1976, converted to SI here:
+  hs = 4.665 I^(7/6) / ((60 - T) (I + 38.7 U^3)^(1/2)) (m, kW/m, m/s, deg C); the test checks the conversion.
+- G. M. Byram, "Combustion of forest fuels", in K. P. Davis (ed.), Forest Fire: Control and Use, McGraw-Hill, 1959.
+  Used: flame length 0.0775 I^0.46 (m, kW/m), taken as the char height on stems.
+- C. E. Van Wagner, "Conditions for the start and spread of crown fire", Canadian Journal of Forest Research 7(1),
+  23-34, 1977, https://doi.org/10.1139/x77-004. Used: the initiation intensity (0.010 CBH (460 + 25.9 FMC))^1.5 kW/m.
+- N. Kouwen and R.-M. Li, "Biomechanics of vegetative channel linings", Journal of the Hydraulics Division (ASCE)
+  106(6), 1085-1103, 1980; N. Kouwen, "Field estimation of the biomechanical properties of grass", Journal of
+  Hydraulic Research 26(5), 559-568, 1988. Used: the critical shear velocity that lays a stem of rigidity MEI flat,
+  min(0.028 + 6.33 MEI^2, 0.23 MEI^0.106) m/s.
+- V. T. Chow, Open-Channel Hydraulics, McGraw-Hill, 1959. Used: Manning's friction slope, giving u* = n V sqrt(g) / h^(1/6).
+- C. J. Baker, J. M. Berry, P. M. Spink, R. Sylvester-Bradley, J. M. Griffin, R. K. Scott and R. W. Clare, "A method
+  for the assessment of the risk of wheat lodging", Journal of Theoretical Biology 194, 587-603, 1998. Used: a lodged
+  stem turns as a whole about its base (stem and root lodging), so a flattened plant is a rigid turn about its root.
+- M. Ramsbottom, P. Floyd and E. Penning-Rowsell (HR Wallingford, Middlesex University), "Flood risks to people,
+  Phase 2", Defra/Environment Agency R&D Technical Report FD2321/TR1 and TR2, 2006. Used: the hazard rating
+  d (v + 0.5), with 0.75 where flood debris starts to matter and 2 where it is extreme, as the share of debris caught.
+- Ours: the linear ramps from each critical value to twice it, the colours, the stain line and the use of the mesh's
+  radius from its axis to split stem from crown.
+- Marks (`mark`, `markEach`, 2026-11-17) take the same quantities from the CPU and add no formula.
+
+## Beaufort thrash: scatter wind speed (2026-11-17)
+
+Written from the tables and papers below, read as text; no other engine's or project's code was read. Searched
+2026-11-17 (Google Scholar, Annual Reviews, JFM, WMO library).
+
+- World Meteorological Organization, Manual on Codes, WMO-No. 306, Beaufort scale table (also the speed limits in
+  `@margoengine/weather` `beaufort`). Used: 5.4 m/s, the top of force 3 (gentle breeze), as the speed up to which a
+  plant keeps its own sway, and the forces quoted in the docs (6 from 10.8, 8 from 17.2, 12 from 32.7 m/s).
+- E. de Langre, "Effects of wind on plants", Annual Review of Fluid Mechanics 40, 141-168, 2008,
+  https://doi.org/10.1146/annurev.fluid.40.111406.102135. Used: plants sway near their natural frequency in light
+  wind and are driven by the turbulence of the flow as it rises; a plant's motion is set by the ratio of the flow's
+  time scale to its own.
+- M. R. Raupach, J. J. Finnigan and Y. Brunet, "Coherent eddies and turbulence in vegetation canopies: the mixing-layer
+  analogy", Boundary-Layer Meteorology 78, 351-382, 1996, https://doi.org/10.1007/BF00120941. Used: the canopy's
+  dominant eddies pass at a frequency proportional to the mean wind over the canopy height (U / h).
+- C. Py, E. de Langre and B. Moulia, "A frequency lock-in mechanism in the interaction between wind and crop canopies",
+  Journal of Fluid Mechanics 568, 425-449, 2006, https://doi.org/10.1017/S0022112006002667. Used: the waves over a
+  crop field come at a frequency that grows with the wind until it meets the plants' own.
+- Ours: the clock rate max(1, U / 5.4) applied to the existing sway and leaf terms (both frequencies scale together),
+  the bend strength left to `windBend` of `@margoengine/weather`.
+
+## Fire front: vfx/fire-front (2026-11-17)
+
+Written from the reports and papers below, read as text; no other engine's or project's code was read.
+
+- R. C. Rothermel, "A mathematical model for predicting fire spread in wildland fuels", USDA Forest Service Research
+  Paper INT-115, 1972 (the report read in full text). Used: the rate R = I_R xi (1 + phi_w + phi_s) / (rho_b eps Q_ig),
+  the reaction intensity from the optimum reaction velocity, the moisture and mineral damping coefficients, the propagating
+  flux ratio, the wind factor C U^B (beta / beta_op)^(-E), the slope factor 5.275 beta^(-0.3) tan^2 phi and the heat
+  of pre-ignition 250 + 1,116 M Btu/lb.
+- F. A. Albini, "Estimating wildfire behavior and effects", USDA Forest Service General Technical Report INT-30, 1976.
+  Used: weighting the size classes of a dead and a live category by surface area, the characteristic
+  surface-area-to-volume ratio, and the live fuel moisture of extinction 2.9 W (1 - M_dead / M_x) - 0.226.
+- H. E. Anderson, "Aids to determining fuel models for estimating fire behavior", USDA Forest Service General Technical
+  Report INT-122, 1982. Used: the loads, depths, surface-area-to-volume ratios and moisture of extinction of fuel models
+  1 to 6 and 8 to 10, and the rates of spread it publishes at 5 mi/h midflame wind, which the tests compare against.
+- H. E. Anderson, "Predicting wind-driven wild land fire size and shape", USDA Forest Service Research Paper INT-305,
+  1983: the length-to-breadth ratio 0.936 exp(0.1147 U) + 0.461 exp(-0.0692 U) - 0.397 of a fire from the midflame wind
+  U in mi/h. G. D. Richards, "An elliptical growth model of forest fire fronts and its numerical solution", Int. J.
+  Numer. Methods Eng. 30(6), 1163-1179, 1990: the rate at an angle from the head for a fire at the focus of its ellipse.
+- G. M. Byram, "Combustion of forest fuels", in K. P. Davis (ed.), Forest Fire: Control and Use, McGraw-Hill, 1959: fireline
+  intensity I = H w R and the flame length 0.0775 I^0.46. H. E. Anderson, "Forest fuel ignitibility", Fire Technology 5(4),
+  1969: the flame residence time 384 / sigma minutes. F. A. Albini and B. J. Baughman, "Estimating windspeeds for predicting
+  wildland fire behavior", INT-221, 1979: the midflame wind as a fraction of the open wind.
+- F. A. Albini, "Spot fire distance from burning trees: a predictive model", INT-56, 1979; N. Sardoy, J.-L. Consalvi, B.
+  Porterie and A. C. Fernandez-Pello, "Modeling transport and combustion of firebrands from burning trees", Combustion
+  and Flame 150(3), 151-169, 2007: embers loft with the flame, fall at a terminal speed and land at a lognormal distance.
+  J. D. Cohen and B. W. Butler, "Modeling potential structure ignitions from flame radiation exposure with implications for
+  wildland/urban interface fire management", 13th Conference on Fire and Forest Meteorology, 1998, and J. D. Cohen,
+  "Preventing disaster: home ignitability in the wildland-urban interface", J. Forestry 98(3), 15-21, 2000: a building
+  ignites from flame within a few flame lengths and from embers.
+
+- Southern California chaparral presets (`chaparralPresets`, `chaparralWorld`): which plants stand where from the chapters
+  of M. G. Barbour, T. Keeler-Wolf and A. A. Schoenherr (eds.), *Terrestrial Vegetation of California*, 3rd edition,
+  University of California Press, 2007: J. E. Keeley and F. W. Davis, "Chaparral"; P. W. Rundel, "Sage scrub"; B. H.
+  Allen-Diaz, R. Standiford and R. D. Jackson, "Oak woodlands and forests"; and the surface fuel model of each from H. E.
+  Anderson, INT-GTR-122, 1982 (model 4 mature chaparral p. 7, 6 brush p. 9, 2 open timber over grass p. 5, 1 grass p. 4, 9
+  hardwood litter p. 12). Climate envelopes, densities and crown radii are ours. The plant marks of a fire (`disturbanceStates`):
+  C. E. Van Wagner, "Height of crown scorch in forest fires", Can. J. For. Res. 3(3), 373-378, 1973 (doi:10.1139/x73-055);
+  Van Wagner, "Conditions for the start and spread of crown fire", Can. J. For. Res. 7(1), 23-34, 1977
+  (doi:10.1139/x77-004); Byram 1959 (above).
+
+Chosen here, not from the papers: the grid carries the front by 16 neighbours, each with its own travel (rate times time
+over distance, reaching 1 when it lights the neighbour), so it is the minimum-time spread of Richards ellipses and the
+flame's short residence does not cut a slow backing fire short; the 10 and 100 hour fuel hold 0.01 and 0.02 more moisture
+than the 1 hour fuel; the embers' loft is 3 flame lengths, their fall 4 m/s, their number 0.02 a second per 1,000 kW/m
+of intensity over 1,000 per burning cell, and their landing spread sigma 0.7; a building's exposure radius is 1.5 flame
+lengths from its edge; the smoke's heat is 0.7 of the reaction intensity over the burning cells. Checked on 2026-11-17 against the
+reports themselves (official copies from the Forest Service, read as text): the loads, depths and moistures of extinction
+against table 1 of INT-GTR-122 (printed page 3) and the surface-area-to-volume ratios against table 7 of INT-30 (pages 91 and 92); the
+published rates and flame lengths against the grass, shrub, timber litter and slash
+group texts of INT-122 (printed pages 6, 10, 13 and 16); the nomograph conditions against INT-30 appendix III (pages 88 to 90: every dead class at the
+1-hour moisture except models 6 and 7, 0.89 / 0.09 / 0.02, and slash 0.76 / 0.18 / 0.06; live foliage only; wind at
+midflame is half the 20 ft wind; Byram's flame length 0.45 I^0.46 in feet (page 86) and Btu/ft/s, the same as 0.0775 I^0.46 in
+metres and kW/m). The check found four typed values wrong (FM2's 1-hour surface-area-to-volume ratio 3,500 for 3,000, FM9's
+1-hour load 2.9 for 2.92, and the loads of FM3, FM4 and FM10 printed 3.01, 5.01 and 4.01), fixed; the 0.9 I_R wind limit is
+Andrews 1986's, not Albini's (it does not bind in these rows). The Rothermel 1972 constants (INT-115) used above were
+re-read in the same pass.
+A second pass read Albini 1976's charts 5 and 7 (FM5 and FM7, low windspeeds) off the scanned pages by pixel (axis frames,
+curve crossings and the wind lines found from the chart origin): FM5's chart reproduces ours within 4.5 percent at three
+moisture pairs, FM7's chart runs 0.78 to 0.80 of ours at equal reaction intensity (settled in the fourth pass below). The
+same pass found the dead and live damping moisture taken as Frandsen's fine-fuel mean; Rothermel 1972's table of equations
+for a heterogeneous bed gives (Mf)i = sum f_ij (Mf)ij, the surface-area weighted mean, now used (the fine mean only enters
+the live moisture of extinction, Albini 1976 appendix III item 3).
+A third pass (2026-11-17) set the published-rate test to Albini's convention (appendix III, "Nomograph Organization": one
+"dead fuel moisture" on every dead class; the 0.89 / 0.09 / 0.02 and 0.76 / 0.18 / 0.06 blends only convert observed
+1, 10 and 100 hour moistures to it) and read chart 13 (FM13) and the wind lines of chart 2 (FM2) by pixel: FM2's wind
+lines match ours within 1 percent; chart 13's reaction intensity matches within 1 percent but its 1 + phi is 0.85 of
+ours and its no-wind rate 1.29 times ours (settled with FM7 in the fourth pass).
+A fourth pass (2026-11-18, KB-FIRE-FM7) read P. L. Andrews, "The Rothermel surface fire spread model and associated
+developments: a comprehensive explanation", USDA Forest Service RMRS-GTR-371, 2018
+(https://www.fs.usda.gov/rm/pubs_series/rmrs/gtr/rmrs_gtr371.pdf), as text, and R. C. Rothermel, "How to predict the
+spread and intensity of forest and range fires", USDA Forest Service INT-GTR-143, 1983
+(https://www.fs.usda.gov/rm/pubs_int/int_gtr143.pdf), whose appendix A nomograms were read by pixel. Andrews 2018
+gives the same equations (sections 3 and 4) and computed values the model reproduces: table 8b's characteristic
+surface-area-to-volume ratio, bulk density and relative packing ratio for the 13 models and table 22's wind factors for
+FM2 and FM9. Its table 8a gives FM7's live surface-area-to-volume ratio as 1,500 1/ft (characteristic 1,552) where
+INT-30 table 7 prints 1,550; FUEL_MODELS.FM7 now holds 1,500. INT-143's nomograms are INT-30's curves reprinted with
+midflame wind labels, not a recomputation; their wind lines (1 + phi at 5 mi/h: FM2 15.7, FM5 17.2 to 18.3, FM7 17.6
+to 19.3, against ours 15.67, 21.6 and 21.3) and FM7's heat per unit area axis (residence time at sigma = 1,584 +- 2
+percent) show the 1974 FIREMODS run differs from Rothermel 1972 as published in its wind factor and propagating flux,
+not in particle size. The 1974 values (Albini 1976, Anderson 1982) are kept as an accepted reference difference
+(`docs/limits.md`) and compared with FM7 at INT-30's 1,550 1/ft.
+
+## Smoke: weather/smoke (2026-11-17)
+
+Written from the papers below, read as text; no other engine's or project's code was read.
+
+- J. S. Reid, R. Koppmann, T. F. Eck and D. P. Eleuterio, "A review of biomass burning emissions part III: intensive
+  optical properties of biomass burning particles", Atmospheric Chemistry and Physics 5, 827-849, 2005,
+  https://doi.org/10.5194/acp-5-827-2005 (the paper read in full text). Used: the mass scattering efficiency (2.8 to 4.2
+  m2/g, mean 3.6, 3.7 for forest fires) and the absorption efficiency (0.2 to 1.1 m2/g) that make 4 m2/g of extinction; the
+  single-scattering albedo of smoke (0.84 to 0.94, falling toward the blue); the asymmetry parameter 0.62 for aged smoke.
+- T. F. Eck, B. N. Holben, J. S. Reid, O. Dubovik, A. Smirnov, N. T. O'Neill, I. Slutsker and S. Kinne, "Wavelength dependence
+  of the optical depth of biomass burning, urban, and desert dust aerosols", Journal of Geophysical Research 104(D24),
+  31333-31349, 1999, https://doi.org/10.1029/1999JD900923 (abstract and results as published; the Angstrom exponents of
+  smoke are high and vary with wavelength). Used: the optical depth following lambda^-1.8, so blue goes first.
+- S. K. Akagi, R. J. Yokelson, C. Wiedinmyer, M. J. Alvarado, J. S. Reid, T. Karl, J. D. Crounse and P. O. Wennberg,
+  "Emission factors for open and domestic biomass burning for use in atmospheric models", Atmospheric Chemistry and Physics
+  11, 4039-4072, 2011, https://doi.org/10.5194/acp-11-4039-2011, table 1 (the PM2.5 row, extratropical forest, 15 g/kg with a
+  variation of 7.5). Used: the fine smoke a kilogram of fuel gives. Checked on 2026-11-17 against the typeset table (table 1
+  continued, page 4046, read as an image): PM2.5 is 15.3 (5.9) for boreal, 12.7 (7.5) for temperate and 15.0 (7.5) for
+  extratropical forest, so the default 15 stands.
+- Koschmieder's visibility law (3.912 over the extinction, as for fog and dust) and Beer-Lambert's law for the sun through a
+  layer; the air mass of a flat layer 1 / sin(elevation).
+
+Chosen here, not from the papers: PM2.5 of 5,000 micrograms per cubic metre at `smoke` 1, rising as smoke^2; the 2 km layer
+depth; the 3 degree floor on the air mass; the channel albedos 0.89, 0.87 and 0.84 (inside Reid's range); the 2 km mixing
+width of the box model Q / (U H W); the fog colour switching at half the air's extinction (as dust does).
+
+
+## Ash and sea spray: weather/air (2026-11-17)
+
+Written from the works below, read as text; no other engine's or project's code was read.
+
+- H. C. van de Hulst, "Light Scattering by Small Particles", Wiley, 1957, chapter 8. Used: the extinction efficiency 2 of
+  particles much larger than the wavelength, so b = 3 C / (2 rho r_eff) and the Angstrom exponent is 0.
+- F. Waquet, F. Peers, P. Goloub, F. Ducos, F. Thieuleux, Y. Derimian, J. Riedi, M. Chami and D. Tanre, "Retrieval of the
+  Eyjafjallajokull volcanic aerosol optical and microphysical properties from POLDER/PARASOL measurements", Atmos. Chem.
+  Phys. 14, 1755-1768, 2014, https://doi.org/10.5194/acp-14-1755-2014. Used: the coarse-mode effective radius of about
+  1.75 micrometres in the fresh plume, its Angstrom exponent near 0, the single-scattering albedo of 0.92 to 0.98.
+- C. Toledano and others, with A. M. de Frutos, "Aerosol properties of the Eyjafjallajokull ash derived from sun photometer
+  and satellite observations over the Iberian Peninsula", Atmos. Environ. 48, 22-32, 2012,
+  https://doi.org/10.1016/j.atmosenv.2011.09.072. Used: the single-scattering albedo near 0.95 at 440 nm, nearly flat
+  and a little lower toward the red, for `ashColor`.
+- A. Ansmann and others, "Ash and fine-mode particle mass profiles from EARLINET-AERONET observations over central Europe
+  after the eruptions of the Eyjafjallajokull volcano in 2010", J. Geophys. Res. 116, D00U02, 2011,
+  https://doi.org/10.1029/2010JD015567. Used: the distal ash peak of about 1,500 micrograms per cubic metre as a scale
+  check (ash 0.12) and the grain density near 2.6 g/cm3 beside `Eruption`'s 2,500 kg/m3.
+- R. F. Lovett, "Quantitative measurement of airborne sea-salt in the North Atlantic", Tellus 30(4), 358-364, 1978,
+  https://doi.org/10.3402/tellusa.v30i4.10354. Used: ln m = 0.16 U + 1.45 for the open-sea salt load.
+- G. de Leeuw, F. P. Neele, M. Hill, M. H. Smith and E. Vignati, "Production of sea spray aerosol in the surf zone",
+  J. Geophys. Res. 105(D24), 29397-29409, 2000, https://doi.org/10.1029/2000JD900549. Used: one to two orders of
+  magnitude more spray downwind of the surf zone at winds up to 9 m/s, reaching at least 25 km, for the surf factor.
+- E. R. Lewis and S. E. Schwartz, "Sea Salt Aerosol Production: Mechanisms, Methods, Measurements and Models", AGU
+  Geophysical Monograph 152, 2004. Used: the wet radius at 80 percent humidity of twice the dry radius and the dry
+  density of 2,165 kg/m3.
+- H. Koschmieder, "Theorie der horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12, 1924 (as for fog, dust and
+  smoke): the visibility 3.912 over the extinction.
+
+Chosen, not from the works: the full scales (100,000 micrograms of ash, 5,000 of dry salt), the squared response, the
+3 km ash and 500 m spray layers, the surf factor 30 and its 2 km reach, the ash asymmetry 0.7 and the spray's 0.75.
+
+## The light on the haze under smoke, ash and spray: weather/air hazeLight (2026-11-17, KB-AIR-HAZELIGHT1)
+
+Written from the works below, read as text; no other engine's or project's code was read.
+
+- H. Koschmieder, "Theorie der horizontalen Sichtweite", Beitr. Phys. freien Atmos. 12, 33-53 and 171-181, 1924; and
+  W. E. K. Middleton, "Vision through the Atmosphere", University of Toronto Press, 1952, chapter 4. Used: the airlight
+  law L = L_h (1 - exp(-b d)) + L_0 exp(-b d), whose horizon brightness L_h is the single-scattered light of the air, the
+  scattering albedo times the light that falls on the air; so a layer that takes the light takes the haze's brightness.
+- J. W. Meador and W. R. Weaver, "Two-stream approximations to radiative transfer in planetary atmospheres: a unified
+  description of existing methods and a new improvement", J. Atmos. Sci. 37, 630-643, 1980,
+  https://doi.org/10.1175/1520-0469(1980)037<0630:TSATRT>2.0.CO;2. Used: the hemispheric-mean coefficients
+  g1 = 2 - w (1 + g), g2 = w (1 - g) and the transmission of a slab over a black ground,
+  2k / ((k + g1) e^(k tau) + (k - g1) e^(-k tau)), k = sqrt(g1^2 - g2^2).
+- C. F. Bohren, "Multiple scattering of light and some of its observable consequences", Am. J. Phys. 55, 524-533, 1987,
+  https://doi.org/10.1119/1.15109. Used: the conservative limit 1 / (1 + (1 - g) tau) as the check that a white layer
+  still passes light as it thickens while an absorbing one goes dark exponentially.
+- H. C. van de Hulst, "Multiple Light Scattering", Academic Press, 1980: the diffusion albedo the haze colours already use,
+  consistent with g1 and g2 above (its semi-infinite reflection (1 - s) / (1 + s)).
+
+Chosen here, not from the works: the light on the haze is the direct sun through the layers plus the scattered rest
+times the slab's transmission, t + (1 - t) T (the scattered light treated as entering at the top of the slab, so a lower
+bound), with the smoke, ash and spray optical depths, albedos and asymmetries mixed by optical depth; dust stays out,
+as it stays out of `sunTransmittance`.
+
+## The sky under smoke, ash and spray: sky atmosphere.scatteredLight and the drive (2026-11-18, KB-AIR-SKYLIGHT1)
+
+Written from the works below, read as text; no other engine's or project's code was read.
+
+- J. W. Meador and W. R. Weaver, 1980 (above). Used: the slab's diffuse transmission T, so the light a layer passes down
+  of the sun's beam it takes out of the direct share is (1 - t) T, `hazeLight` less t.
+- P. Moon and D. E. Spencer, "Illumination from a non-uniform sky", Illuminating Engineering 37, 707-726, 1942. Used: a
+  sky under a closed layer is the layer's own radiance, near even over the dome; for an even (Lambertian) sky of
+  radiance L the light on level ground is pi L, so a layer passing irradiance E down shines E / pi.
+- D. G. Erbs, S. A. Klein and J. A. Duffie, "Estimation of the diffuse radiation fraction for hourly, daily and
+  monthly-average global radiation", Solar Energy 28(4), 293-302, 1982, https://doi.org/10.1016/0038-092X(82)90302-4
+  (as the sky's light units already use). Used: the clear sky's share of the light on level ground, the scale the layer
+  light is set against (the zenith sun on the ground in the sky's own units).
+
+Chosen here, not from the works: the dome under a load is the clear dome times the direct share t (through `sunColor`)
+plus one even glow, the sun's scattered light (1 - t) T times the sine of its elevation, so a thin load keeps the clear
+dome's shape and a thick one turns it to the layer's glow; the clear sky's own light through the layer is not added
+again (it is small beside the sun's under a thick layer); the drive makes an `atmosphere` only on a sky that takes it.
+
+## The breaker line on the CPU: water/breaker (2026-11-17)
+
+Written from the works below, read as text; no other engine's or project's code was read. The shoaling, local
+wavenumber and depth limit are the surf shader's (surf.ts, KB-WATER-SURF1): Dean and Dalrymple 1991 ch. 4, Fenton and
+McKee 1990, McCowan 1894.
+
+- M. S. Longuet-Higgins, "On the statistical distribution of the heights of sea waves", J. Mar. Res. 11(3), 245-266,
+  1952. Used: components of independent phases sum to a Rayleigh envelope whose mean square is the sum of the squared
+  amplitudes, so the root-mean-square height 2 sqrt(sum a^2).
+- W. E. Lorensen and H. E. Cline, "Marching cubes: a high resolution 3D surface construction algorithm", SIGGRAPH 1987,
+  https://doi.org/10.1145/37402.37422. Used: the cell-by-cell contour in two dimensions (marching squares), crossings by
+  linear interpolation, the ambiguous saddle split by the cell's mean.
+
+Chosen here, not from the works: the line is where the root-mean-square envelope reaches 0.78 of the depth (the
+middle of the shader's breaking ramp), the deepest such depth found by stepping in from deep water and bisecting to a
+millimetre, and the field from the train with the most height.
+
+## Dead fuel moisture from the weather: weather/fuel-moisture (2026-11-17)
+
+Written from reports read as text, no code read: J. D. Cohen and J. E. Deeming, "The National Fire-Danger Rating System:
+basic equations", USDA Forest Service GTR PSW-82, 1985 (Simard's EMC regressions 1a to 1c with RH in percent and T in F,
+the fuel-level corrections of +25/+19/+12/+5 F and x0.75/0.83/0.92/1 by state of weather, MC1 = 35 percent while it rains,
+the 100-hour boundary 0.5 d + 41 percent for d hours of rain); L. S. Bradshaw, J. E. Deeming, R. E. Burgan and
+J. D. Cohen, "The 1978 National Fire-Danger Rating System: technical documentation", USDA Forest Service GTR INT-169,
+1983 (the sky cover of each state of weather, table 6, and Fosberg's response mc = mc0 + (EMC - mc0)(1 - exp(-t / tau)),
+equation 25); M. A. Fosberg and J. E. Deeming, Research Note RM-207, 1971 (the 1, 10 and 100 hour timelags); A. J. Simard,
+Information Report FF-X-14, 1968 (the regressions, as quoted by Cohen and Deeming). The state's new `humidity` and
+`temperature` take their preset values from the ICAO Standard Atmosphere (15 C at sea level, ICAO Doc 7488/3) and the
+rain-snow transition of A. Dai, Geophys. Res. Lett. 35, L12802, 2008 (snow mostly below about 1 C); a METAR's dew point
+gives the humidity by the Magnus form of O. A. Alduchov and R. E. Eskridge, J. Appl. Meteor. 35(4), 601-609, 1996. Chosen
+here: the 10-hour fuel wets toward the 1-hour 35 percent in rain, rain is "occurring" when `rain` is above 0, the fair-day
+humidity 0.5. Nelson 2000 (a physical stick model) was considered and left for later: it needs solar radiation and
+rainfall amounts the state does not hold.
+
+## headless/look: clean-frame checks T1 to T8 (look family animatedFeature, 2026-11-17)
+
+Written from the papers' text only, no companion code read. Aliasing and temporal stability: L. Yang, S. Liu and M. Salvi,
+A Survey of Temporal Antialiasing Techniques, Computer Graphics Forum 39(2) (2020), https://doi.org/10.1111/cgf.14018
+(reprojection of the previous frame by the depth and the two view-projections, the basis of `shimmerMoving` and
+`reprojectionMotion`). Banding: Tandon et al., CAMBI: Contrast-aware Multiscale Banding Index, PCS (2021),
+https://arxiv.org/abs/2102.00079 (the family bound for `banding` is 0.2 percent). Difference to a reference: FLIP,
+Andersson et al. (2020), https://doi.org/10.1145/3406183 (the family bound is 0.04). Lightness and chroma: CIE 15:2004
+(CIE 1976 L*a*b*) with the D65 white of IEC 61966-2-1 for `silhouette`, `silhouetteShape`, `shadowTint` and
+`colourEdges`; the 4:2:0 chroma halving behind `colourEdges` is part of ITU-T H.264 (2021) and ITU-R BT.601/709. Edge
+width as a blur measure: P. Marziliano, F. Dufaux, S. Winkler and T. Ebrahimi, A no-reference perceptual blur metric, ICIP
+(2002), https://doi.org/10.1109/ICIP.2002.1038902 (`motionBlur` measures the 10 to 90 percent width along the motion
+against the half travel of a 180 degree shutter). Chosen here, not from the papers: the stair test (a step with no value
+between its plateaus in the 3 x 4 window of its two pixels, on an edge that is not straight along a pixel row or column), the 24 code strong
+step, the 15 L* outline contrast, the three-value shape at 320 x 180, the 5 percent allowance of `motionBlur`.
+
+## Gunfire: vfx/gunfire (2026-11-18)
+
+Written from the papers and books below, read as text; no other engine's or project's code was read.
+
+- A. Noble and F. A. Abel, "Researches on explosives. Fired gunpowder", Phil. Trans. R. Soc. Lond. 165, 49-155, 1875,
+  https://doi.org/10.1098/rstl.1875.0002, as quoted by T. L. Davis, The Chemistry of Powder and Explosives, Wiley 1941,
+  ch. II. Used: service powder burns to 42.98% permanent gas, 55.91% solids (the white smoke) and 1.11% water; 718.1 cal
+  and 271.3 cm^3 of gas at 0 C and 760 mm a gram, near 2,200 C (`BLACK_POWDER`, `powderProducts`, `muzzleFlash`).
+- G. Klingenberg and J. M. Heimerl, Gun Muzzle Blast and Flash, AIAA Progress in Astronautics and Aeronautics 139,
+  1992, https://doi.org/10.2514/4.866166. Used: the secondary flash is the fuel-rich gas burning again in the air past
+  the Mach disc, milliseconds to tens of milliseconds long. The shutter average of a flash shorter than a frame
+  (`flashExposure`) and the 0.04 s fade are ours.
+- J. M. Richards, "Puff motions in unstratified surroundings", J. Fluid Mech. 21(1), 97-106, 1965,
+  https://doi.org/10.1017/S0022112065000071; R. S. Scorer, "Experiments on convection of isolated masses of buoyant
+  fluid", J. Fluid Mech. 2(6), 583-594, 1957, https://doi.org/10.1017/S0022112057000397; B. R. Morton, G. I. Taylor and
+  J. S. Turner, "Turbulent gravitational convection from maintained and instantaneous sources", Proc. R. Soc. A 234,
+  1-23, 1956, https://doi.org/10.1098/rspa.1956.0011. Used: a puff's radius is about 0.25 of the distance it has
+  travelled; a momentum puff keeps its momentum, a thermal gains it at its buoyancy, and stable air takes the buoyancy
+  away at N^2 times the volume flux (`PowderPuff`).
+- G. K. Batchelor, "Diffusion in a field of homogeneous turbulence II", Proc. Camb. Phil. Soc. 48(2), 345-362, 1952,
+  https://doi.org/10.1017/S0305004100027705; J. P. L. C. Salazar and L. R. Collins, "Two-particle dispersion in
+  isotropic turbulent flows", Annu. Rev. Fluid Mech. 41, 405-432, 2009,
+  https://doi.org/10.1146/annurev.fluid.40.111406.102224; W. G. Large and S. Pond, "Open ocean momentum flux
+  measurements in moderate to strong winds", J. Phys. Oceanogr. 11, 324-336, 1981,
+  https://doi.org/10.1175/1520-0485(1981)011<0324:OOMFMI>2.0.CO;2. Used: Richardson's law sigma^2 = g_R eps t^3 with
+  g_R about 0.5, at the surface layer's dissipation u*^3 / (kappa z) with u* = sqrt(1.2e-3) U (`smokeDispersion`).
+- S. F. Hoerner, Fluid-Dynamic Drag, 1965, ch. 16. Used: a sphere's drag coefficient against Mach number (`sphereDrag`,
+  a piecewise fit of ours through his values).
+- K. Kawagoe, "Fire behaviour in rooms", Building Research Institute Report 27, Tokyo, 1958, and D. Drysdale, An
+  Introduction to Fire Dynamics, 3rd ed., Wiley 2011, ch. 10; M. Law, "Fire safety of external building elements",
+  AISC Engineering Journal 15(2), 59-74, 1978; G. Heskestad, "Luminous heights of turbulent diffusion flames", Fire
+  Safety J. 5(2), 103-108, 1983, https://doi.org/10.1016/0379-7112(83)90002-9. Used: 0.09 A sqrt(H) kg/s through an
+  opening, the flame 12.8 (R / w)^(2/3) - H above it, and deck flame lengths (`ventBurningRate`, `ventFlameHeight`,
+  `HullFire`). The spread along the hull, the 24 sections and the burn-out curve are ours.
+- G. W. Mulholland and C. Croarkin, "Specific extinction coefficient of flame generated smoke", Fire and Materials 24,
+  227-230, 2000, https://doi.org/10.1002/1099-1018(200009/10)24:5<227::AID-FAM742>3.0.CO;2-9. Used: soot 8.7 m^2/g at
+  a single-scattering albedo near 0.25, against 3 m^2/g and 0.97 for the white salts (our values) (`smokeColor`).
+- R. L. McCoy, Modern Exterior Ballistics, Schiffer 1999, ch. 8. Used: drag on the velocity relative to the air, and
+  the lag-time rule W (T - X / u0) for the crosswind drift that the tests compare against (`shotPath` `wind`).
+- J. A. Conkling and C. J. Mocella, Chemistry of Pyrotechnics, 3rd ed., CRC 2019, ch. 4 and 7. Used: black powder
+  burns layer by layer from its surface (Piobert's law) at a linear rate of the order of 1 cm/s at one atmosphere, and
+  pressed grains are 1.7 to 1.8 g/cm^3 (`POWDER_BURN_RATE`, `GRAIN_DENSITY`, `powderGrains`). The 2% of a charge
+  that leaves the bore alight, the cone of the sparks and their drawn size are ours.
+- J.-V. Poncelet's resistance law as W. Johnson, Impact Strength of Materials, Arnold 1972, ch. 9, and M. J. Forrestal
+  and D. Y. Tzou, "A spherical cavity-expansion penetration model for concrete targets", Int. J. Solids Struct.
+  34(31), 4127-4146, 1997, https://doi.org/10.1016/S0020-7683(97)00017-6, write it: a strength term and an inertial
+  term rho v^2 / 2 on the projectile's section, and the stopping depth and exit speed that follow
+  (`woodPenetration`, `woodExitSpeed`). Forest Products Laboratory, Wood Handbook, FPL-GTR-190, 2010, table 5-3a:
+  white oak's specific gravity 0.68 and compressive strength across the grain 7.4 MPa (`OAK`). The inertial
+  coefficient 1, the ricochet test (a ball that cannot sink a radius in glances off), the 0.8 and 0.3 kept along and
+  off the side, the hand-sized splinters and their speed are ours.
+- EN 1995-1-2:2004, Eurocode 5: Design of timber structures, Part 1-2: Structural fire design, 3.4.2 and table 3.1.
+  Used: one-dimensional char rates beta_0 of 0.65 mm/min for softwood and 0.50 mm/min for hardwood (`charRate`,
+  `charDepth`). The flame zones on the hull (1.5 m down from the deck edge, the port plume widening 0.12 per metre after
+  Morton, Taylor and Turner 1956) and the half millimetre that reads black are ours.
+- G. Varieschi and K. Kamiya, "Toy models for the falling chimney", Am. J. Phys. 71(10), 1025-1031, 2003,
+  https://doi.org/10.1119/1.1576401. Used: a rigid rod pivoting on its foot topples as theta'' = (3 g / 2 L) sin theta
+  and turns at sqrt(3 g (cos theta_0 - cos theta) / L) (`mastTopple`). The 0.02 rad starting lean and the 600 s a
+  fire takes to burn a mast's stays are ours.
+
+## Shot splashes: water/splash (2026-11-18)
+
+Written from the papers and reports below, read as text; no other engine's or project's code was read.
+
+- S. F. Hoerner, Fluid-Dynamic Drag, 1965, ch. 16, and R. L. McCoy, Modern Exterior Ballistics, Schiffer 1999, ch. 8.
+  Used: a sphere's drag coefficient against Mach number (`sphereDragCoefficient`, the same piecewise fit as
+  vfx/gunfire's) on the velocity relative to the wind between grazes (`skipFlight`), the quadratic-drag closed form and
+  the lag-time rule the tests compare against.
+- The splash sheet's speed (Logvinovich, May below) is relative to the water it leaves, so a wave's surface velocity is
+  added to the spray it throws (`ShotSplash.surface`, `waveLift`).
+
+- G. Birkhoff, G. D. Birkhoff, W. E. Bleick, E. H. Handler, F. D. Murnaghan and T. L. Smith, "Ricochet off water", AMP
+  Memo 42.4M, Applied Mathematics Panel, 1944, as used by W. Johnson and S. R. Reid, "Ricochet of spheres off water",
+  J. Mech. Eng. Sci. 17(2), 71-81, 1975, https://doi.org/10.1243/JMES_JOUR_1975_017_011_02, and I. M. Hutchings, "The
+  ricochet of spheres and cylinders from the surface of water", Int. J. Mech. Sci. 18, 243-248, 1976. Used: the
+  pressure 1/2 rho (U . n)^2 on the advancing wetted cap (`birkhoffContact`, integrated on a 40 by 40 grid of ours) and
+  the critical angle 18 degrees / sqrt(sigma) the tests compare against (`ricochetAngle`).
+- A. May, "Water entry and the cavity-running behavior of missiles", NAVSEA Hydroballistics Advisory Committee
+  Technical Report 75-2, 1975, and G. V. Logvinovich, Hydrodynamics of Free-Boundary Flows, 1969, ch. 6, as May
+  describes it. Used: the cavity drag coefficient 0.3, the cavity-running path and the sheet speed U sqrt(C_D / 2)
+  (`entryDepth`, the crown). The slant factor sqrt(sin angle) is ours.
+- J. W. Glasheen and T. A. McMahon, "Vertical water entry of disks at low Froude numbers", Phys. Fluids 8(8),
+  2078-2083, 1996, https://doi.org/10.1063/1.869010; V. Duclaux, F. Caille, C. Duez, C. Ybert, L. Bocquet and C. Clanet,
+  "Dynamics of transient cavities", J. Fluid Mech. 591, 1-19, 2007, https://doi.org/10.1017/S0022112007007343; J. M.
+  Aristoff and J. W. M. Bush, "Water entry of small hydrophobic spheres", J. Fluid Mech. 619, 45-78, 2009,
+  https://doi.org/10.1017/S0022112008004382. Used: the deep seal 2.3 sqrt(R / g) after entry and the pinch halfway
+  down (`cavitySeal`, the column).
+- R. Gunn and G. D. Kinzer, "The terminal velocity of fall for water droplets in stagnant air", J. Meteorol. 6(4),
+  243-248, 1949, https://doi.org/10.1175/1520-0469(1949)006<0243:TTVOFF>2.0.CO;2. Used: 6.5 and 9.1 m/s for 2 and 5 mm
+  drops, and the rise against quadratic drag (`dragLimitedHeight`). The foam ring's shape and the particle counts are
+  ours.
+
+## Buildings, harbour pieces and their sliders: procedural/building-rules, procedural/harbour, procedural/building-settings (2026-11-18)
+
+Written from the papers, standards and reports below, read as text; no other engine's or project's code was read, and
+no CC0 model was copied (the japan-2011-coast asset folder was read for what a scene still needs, nothing more).
+
+- P. Wonka, M. Wimmer, F. Sillion and W. Ribarsky, "Instant Architecture", ACM TOG 22(3), 669-677, 2003,
+  https://doi.org/10.1145/882262.882324. Used: split grammars that divide a facade into floors and tiles
+  (`generateBuilding`: storeys, bays, wall, window and door tiles).
+- P. Mueller, P. Wonka, S. Haegler, A. Ulmer and L. Van Gool, "Procedural Modeling of Buildings", ACM TOG 25(3),
+  614-623, 2006, https://doi.org/10.1145/1141911.1141931. Used: the mass -> component split (facades, roof) -> floors
+  -> repeated tiles -> window, door and wall order of rules, and style sets as rule parameters.
+- O. Aichholzer, F. Aurenhammer, D. Alberts and B. Gaertner, "A Novel Type of Skeleton for Polygons", J. UCS 1(12),
+  752-761, 1995, https://doi.org/10.3217/jucs-001-12-0752. Used: the straight skeleton gives a rectangle's hip roof a
+  ridge of length L - d and four hips at the roof pitch; we write that case in closed form.
+- T. Kelly and P. Wonka, "Interactive Architectural Modeling with Procedural Extrusions", ACM TOG 30(2), 2011,
+  https://doi.org/10.1145/1944846.1944854. Used: roofs as sloped extrusions of footprint edges, gables as vertical
+  edges, and the hip-and-gable changing from sloped to vertical at a height (`gableInset`).
+- Y. Parish and P. Mueller, "Procedural Modeling of Cities", SIGGRAPH 2001, https://doi.org/10.1145/383259.383292.
+  Used: one building to a lot, facing its street (`townBuildings`).
+- Japan, Building Standard Law Enforcement Order, arts. 21, 22 and 126 (2.1 m ceilings, wooden floors 45 cm over the
+  ground, 1.1 m balcony railings); JIS A 5208 (clay roof tiles, J-shape 53A about 265 by 235 mm a tile, laid at 4 sun
+  or steeper). International Code Council, International Residential Code 2021, R311.7.5 and R1003.9 (risers, treads
+  and chimney height). US National Park Service, Preservation Brief 11, "Rehabilitating Historic Storefronts" (1910
+  storefronts: bulkhead, display glass, transom). The style sets' sizes, materials and colours are ours, inside these.
+- US Army Corps of Engineers, Shore Protection Manual, 4th ed., 1984, vol. II ch. 7. Used: tetrapod V = 0.28 H^3,
+  armour layer thickness n k_D (W / w)^(1/3), units per area n k_D (1 - P / 100) (w / W)^(2/3) with k_D 1.04 and P 50 %
+  (`generateTetrapod`, `placeTetrapods`). The leg proportions (centre radius 0.4, tip radius 0.25 of the leg length,
+  0.3 behind the centre) are ours, fitted so the four legs' union holds 0.28 H^3.
+- Period vehicles (`@margoengine/procedural/vehicles`, 2026-11-18). F. M. Whyte's wheel arrangement notation (American
+  Engineer and Railroad Journal, 1900). Master Car Builders' Association wheel and track gauge standards and coupler
+  height (standard gauge 1,435 mm, back-to-back 1,356 mm, flange 1 in, coupler 32 1/2 to 34 1/2 in; later AAR S-2001)
+  and the 1910 standard box car (36 ft by 8 ft 6 in by 8 ft inside); AAR Plate B clearance (10 ft 8 in by 15 ft 6 in).
+  M. N. Forney (ed.), Locomotive Dictionary, Railroad Gazette, 1906, and Baldwin Locomotive Works record cards
+  1905-1912 (Consolidation 50 to 57 in drivers, boiler centre near 9 ft, stack near 15 ft, tenders on arch bar trucks
+  with 33 in wheels). Ford Motor Company, Model T specifications 1909-1910 (100 in wheelbase, 56 in track, 30 in
+  wheels, 30 by 3 and 30 by 3 1/2 in tyres). Japan, Road Transport Vehicle Act enforcement regulations, kei class from
+  1998 (3.40 by 1.48 by 2.00 m), and the Suzuki Carry truck DA63T catalogue (3,395 by 1,475 by 1,765 mm, wheelbase
+  1,900 mm, bed 1,940 by 1,410 mm at 650 mm, 290 mm drop sides, 145R12 tyres). US Access Board, ADA Standards 2010,
+  308.2.1 (forward reach 15 to 48 in). Used: those sizes, measured on the geometry by the tests. Ours: every shape,
+  the part split, the details (domes, rods, crossheads, trucks, truss rods, fenders, grilles, louvres) and the colours;
+  no other engine's model, code or drawing.
+- Settled tetrapod armour (`placeTetrapods` `placement: 'settled'`, 2026-11-18). G. D. Visscher and M. Bolsterli,
+  "Random packing of equal and unequal spheres in two and three dimensions", Nature 239, 504-507, 1972,
+  https://doi.org/10.1038/239504a0, and W. S. Jodrey and E. M. Tory, "Computer simulation of close random packing of
+  equal spheres", Phys. Rev. A 32, 2347, 1985, https://doi.org/10.1103/PhysRevA.32.2347. Used: random sequential
+  deposition, each body lowered onto those already placed, keeping the lowest of several tries. B. Mirtich, Impulse-based
+  Dynamic Simulation of Rigid Body Systems, PhD thesis, UC Berkeley, 1996. Used: conservative advancement (move by the
+  least clearance, which no contact can be nearer than). CIRIA, CUR and CETMEF, The Rock Manual (C683), 2007, ch. 6 and
+  9. Used: armour placed layer by layer from the toe up. Ours: the two placing attitudes and four turns about the
+  vertical leg, five small shifts at each spot, the contact shapes (exact flat-ended frustums against the bed, sphere-swept
+  cones one tip radius short of the tip face between units), the closed-form point to cone least and the golden-section
+  search over the other leg, and the thickness and porosity measures checked against the Shore Protection Manual.
+- US Army Corps of Engineers, Coastal Engineering Manual EM 1110-2-1100, 2002, part VI ch. 5. Used: rubble mound
+  sections (core under the armour, crown wall) and seawalls with a recurved wave return (`generateBreakwater`,
+  `generateSeaWall`).
+- P. Danel, "Tetrapods", Proc. 4th Conference on Coastal Engineering, 1953, https://doi.org/10.9753/icce.v4.28. Used:
+  the unit as four truncated cone legs on tetrahedral axes.
+- O. Gulbrandsen, Fishing Boat Designs: 2. V-bottom Boats of Planked and Plywood Construction, FAO Fisheries Technical
+  Paper 134 rev. 2, 2004, and J. Fyson (ed.), Design of Small Fishing Vessels, FAO / Fishing News Books, 1985. Used:
+  V-bottom lines with deadrise rising toward the bow, flare, transom stern and length to beam of 3 to 4.5
+  (`generateFishingBoat`). The line functions are ours.
+
+## Joined building plans, dormers, towers and interiors: procedural/building-plans, procedural/building-rules (2026-11-18)
+
+Written from the papers, codes and trade references below, read as text; no other engine's or project's code was read.
+
+- O. Aichholzer, F. Aurenhammer, D. Alberts and B. Gaertner, "A Novel Type of Skeleton for Polygons", J. UCS 1(12),
+  752-761, 1995, https://doi.org/10.3217/jucs-001-12-0752. Used: equal pitch roofs over a plan as its straight
+  skeleton; on an L or T plan of two rectangles that roof is the upper envelope of the rectangles' own roofs, which
+  `generateBuildingPlan` builds by cutting each block by the others.
+- T. Kelly and P. Wonka, "Interactive Architectural Modeling with Procedural Extrusions", ACM TOG 30(2), 2011,
+  https://doi.org/10.1145/1944846.1944854. Used: valleys and hips as the intersections of roof planes of joined masses.
+- P. Mueller, P. Wonka, S. Haegler, A. Ulmer and L. Van Gool, "Procedural Modeling of Buildings", ACM TOG 25(3),
+  614-623, 2006, https://doi.org/10.1145/1141911.1141931. Used: mass models as unions of volumes, the parts of one
+  volume hidden inside another removed.
+- I. E. Sutherland and G. W. Hodgman, "Reentrant Polygon Clipping", CACM 17(1), 32-42, 1974,
+  https://doi.org/10.1145/360767.360802. Used: clipping each triangle by the planes of a convex solid, keeping the
+  pieces outside it.
+- J. van Dongen, "Interior Mapping: A new technique for rendering realistic buildings", Computer Graphics
+  International 2008. Used: the room cell behind each window (back wall, floor, ceiling, two sides) that the `cells`
+  interior builds as geometry; the shader form of the paper is not built.
+- W. H. Wagner, "Modern Carpentry", Goodheart-Willcox, 1983, and the framing square's hip and valley table: equal
+  pitch roofs at right angles meet in a valley at 45 degrees in plan with 16.97 in of valley run per 12 in of common
+  run (a test bound).
+- International Code Council, International Residential Code 2021: R304.1 and R304.2 (habitable rooms at least
+  70 sq ft and 7 ft each way), R305.1 (ceilings 7 ft), R310.2.1 (escape openings 5.7 sq ft net, 24 in high, 20 in
+  wide: the dormer window), R905.2.8.3 (step flashing 4 in up the cheek: the dormer sill), R905.3.2, R905.7.2 and
+  R905.10.2 (minimum slopes of tile, wood shingle and metal roofs).
+- Japan Building Standard Law Enforcement Order art. 21 (habitable ceiling height 2.1 m) and the Edo-ma tatami of
+  0.88 by 1.76 m (rooms two ken wide; a 4.5 jo room is the smallest living room).
+
+## Northern Rockies conifers: procedural/conifer-species, procedural/conifers, procedural/conifer-settings (2026-11-18)
+
+Written from the reports and papers below, read as text; no other engine's or project's code was read. The FVS overview
+was read as a PDF (its tables only), never the FVS source.
+
+- K. Wykoff, N. Crookston and A. Stage, "User's guide to the Stand Prognosis Model", USDA Forest Service INT-GTR-133,
+  1982, and C. Keyser (comp.), "Inland Empire (IE) Variant Overview, Forest Vegetation Simulator", USDA Forest Service
+  FMSC, https://www.fs.usda.gov/fmsc/ftp/fvs/docs/overviews/FVSie_Overview.pdf. Used: the logistic height-diameter
+  equation HT = 4.5 + exp(B1 + B2 / (DBH + 1)) with Table 4.1.1's B1 and B2 for WP, WL, DF, GF and RC; the bark ratios
+  of Table 4.1.2; Crookston's 2003 crown width equation {4.4.3} with Table 4.4.1's coefficients (codes 11903, 07303,
+  20203, 01703, 24203).
+- R. Burns and B. Honkala (tech. coords.), "Silvics of North America, Vol. 1, Conifers", USDA Agriculture Handbook 654,
+  1990 (chapters on Pinus monticola, Larix occidentalis, Thuja plicata, Pseudotsuga menziesii, Abies grandis). Used:
+  growth forms (crown shapes, whorled or spiralled branching, cedar's drooping branches and nodding leader), bark
+  descriptions, heights at 50 and 100 years and old-growth sizes that bound the growth curves.
+- D. Minore, "Comparative autecological characteristics of northwestern tree species: a literature review", USDA Forest
+  Service PNW-GTR-87, 1979. Used: shade tolerance ranking, which orders the live crown ratios.
+- A. Kozak, "A variable-exponent taper equation", Canadian Journal of Forest Research 18(11), 1363-1368, 1988,
+  https://doi.org/10.1139/x88-213. Used: stem form between paraboloid and cone (we use a fixed exponent 0.75).
+- F. Richards, "A flexible growth function for empirical use", Journal of Experimental Botany 10(2), 290-301, 1959,
+  https://doi.org/10.1093/jxb/10.2.290. Used: the Chapman-Richards height-age form; rates are ours.
+- F. Hallé, R. Oldeman and P. Tomlinson, "Tropical Trees and Forests: An Architectural Analysis", Springer, 1978. Used:
+  rhythmic growth, one growth unit and one branch whorl a year.
+- X. Décoret, F. Durand, F. Sillion and J. Dorsey, "Billboard clouds for extreme model simplification", ACM TOG 22(3),
+  689-696, 2003, https://doi.org/10.1145/882262.882326; D. Lacewell, D. Edwards, P. Shirley and W. Thompson,
+  "Stochastic billboard clouds for interactive foliage rendering", Journal of Graphics Tools 11(1), 2006. Used: the far
+  level as a few textured planes holding the near mesh's projected look (three crossed cards with one baked view).
+
+### Horses, gaits and the rider seat (horses, 2026-11-18)
+
+`packages/horses/src/anatomy.ts`, `gaits.ts`, `model.ts`, `seat.ts`, `crowd.ts` and `index.ts` are Margo-written from
+these sources; no engine's, tool's or model's source was read, and the mesh is built in code.
+
+- J. M. Carroll and P. J. Huntington, "Body condition scoring and weight estimation of horses", Equine Veterinary
+  Journal 20(1), 41-45, 1988. Used: weight as girth squared times length over 11,880.
+- H. H. F. Buchner, H. H. C. M. Savelberg, H. C. Schamhardt and A. Barneveld, "Inertial properties of Dutch Warmblood
+  horses", Journal of Biomechanics 30(6), 653-658, 1997; S. A. Brooks et al., "Morphological variation in the horse:
+  defining complex traits of body size and shape", Animal Genetics 41 s2, 159-165, 2010; M. Holmström, L. Magnusson and
+  S. Philipsson, "Variation in conformation of Swedish Warmblood horses", Equine Veterinary Journal 22(3), 186-193, 1990.
+  Used: segment lengths and heights as ratios of withers height for each build.
+- M. Hildebrand, "Symmetrical gaits of horses", Science 150, 701-708, 1965, and "Analysis of asymmetrical gaits",
+  Journal of Mammalogy 58(2), 131-156, 1977. Used: footfall phases and duty factors.
+- R. McN. Alexander and A. S. Jayes, "A dynamic similarity hypothesis for the gaits of quadrupedal mammals", Journal of
+  Zoology 201, 135-152, 1983; R. McN. Alexander, "Optimization and gaits in the locomotion of vertebrates",
+  Physiological Reviews 69(4), 1199-1227, 1989. Used: stride length 2.3 h Fr^0.3 and gait change by Froude number.
+- D. F. Hoyt and C. R. Taylor, "Gait and the energetics of locomotion in horses", Nature 292, 239-240, 1981;
+  N. C. Heglund, C. R. Taylor and T. A. McMahon, "Scaling stride frequency and gait to animal size", Science 186,
+  1112-1113, 1974. Used: preferred speeds within each gait.
+- H. M. Clayton, "The extended canter: a comparison of some kinematic variables in horses trained for dressage and for
+  racing", Acta Anatomica 146, 183-187, 1993, and "Comparison of the stride kinematics of the collected, working, medium
+  and extended trot in horses", Equine Veterinary Journal 26(3), 230-234, 1994; W. Back and H. M. Clayton, Equine
+  Locomotion, 2nd ed., Saunders 2013. Used: stance durations, fetlock extension under load, hoof breakover in the last
+  fifth of stance.
+- H. H. F. Buchner, H. H. C. M. Savelberg, H. C. Schamhardt and A. Barneveld, "Head and trunk movement adaptations in
+  horses with experimentally induced fore- or hindlimb lameness", Equine Veterinary Journal 28(1), 71-76, 1996. Used:
+  trunk vertical motion, two oscillations a stride at the symmetrical gaits and one at the asymmetrical.
+- D. A. Winter, Biomechanics and Motor Control of Human Movement, 4th ed., Wiley 2009. Used: rider segment lengths.
+- A. Byström et al., "Kinematics of saddle and rider in high-level dressage horses performing collected walk", Equine
+  Veterinary Journal 41(3), 280-284, 2009; A. Münz, F. Eckardt and K. Witte, "Horse-rider interaction in dressage
+  riding", Human Movement Science 33, 227-237, 2014. Used: the rider pelvis follows the saddle with a small lag, modelled
+  as a damped spring.
+- J. T. Kajiya and T. L. Kay, "Rendering fur with three dimensional textures", SIGGRAPH 1989. Used through
+  `@margoengine/materials/hair` for the coat, mane and tail.
+- Compared for the legs: playing keyed joint angles (feet slide when speed changes), full-body IK (heavier than needed
+  for a side-plane chain), and per-leg two-bone IK over the scapula or pelvis with the stride phase taken from distance
+  (chosen: stance hooves stay put at any speed). Margo's own: the per-build ratio tables, the breakover and fetlock-sink
+  curves, the swing-height curve, the coat atlas and the 1/240 s film clock.
+
+### Formations (navmesh, 2026-11-18)
+
+`packages/navmesh/src/formations.ts` and `formation-settings.ts` are Margo-written from these sources; no engine's or
+tool's source was read.
+
+- C. W. Reynolds, "Flocks, herds and schools: a distributed behavioral model", SIGGRAPH 1987, and "Steering behaviors
+  for autonomous characters", Game Developers Conference 1999. Used: arrival and offset pursuit of a moving slot.
+- J. van den Berg, S. J. Guy, M. Lin and D. Manocha, "Reciprocal n-body collision avoidance", Robotics Research,
+  Springer STAR 70, 3-19, 2011. Used: this package's ORCA for neighbour avoidance.
+- M. Müller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position based dynamics", Journal of Visual Communication and
+  Image Representation 18(2), 109-118, 2007; T. Weiss, A. Litteneker, C. Jiang and D. Terzopoulos, "Position-based
+  multi-agent dynamics for real-time crowd simulation", MIG 2017. Used: a mass-weighted position projection between
+  bodies after each step.
+- A. Treuille, S. Cooper and Z. Popović, "Continuum crowds", SIGGRAPH 2006. Used: marching down a direction field (the
+  `@margoengine/behavior/flowfield` field).
+- U.S. War Department, Infantry Drill Regulations, 1911; U.S. Army FM 3-21.5, Drill and Ceremonies, 2003. Used: spacing,
+  quick and double time.
+- Compared: ORCA alone (bodies overlap when a column meets a line: ORCA keeps velocities apart, not shapes), a social
+  force model (D. Helbing and P. Molnár, "Social force model for pedestrian dynamics", Physical Review E 51, 1995:
+  springy, ranks wobble), and ORCA plus position projection (chosen). Margo's own: the slot layouts, the wheel about a
+  flank and the fixed clock with logged orders.
+### Armies (armies, sheet row 27, 2026-11-18)
+
+`packages/armies/src/bake.ts`, `lod.ts`, `riders.ts`, `index.ts` and `settings.ts` are Margo-written from these sources;
+no engine's, tool's or model's source was read, and the test body is built in code.
+
+- C. W. Reynolds, "Flocks, herds and schools: a distributed behavioral model", SIGGRAPH 1987; J. van den Berg, S. J.
+  Guy, M. Lin and D. Manocha, "Reciprocal n-body collision avoidance", Robotics Research, Springer STAR 70, 3-19, 2011;
+  A. Treuille, S. Cooper and Z. Popović, "Continuum crowds", SIGGRAPH 2006. Used through `@margoengine/navmesh/formations`:
+  the members this package draws.
+- B. Dudash, "Animated crowd rendering", GPU Gems 3, chapter 2, Addison-Wesley 2007. Used: bone matrices in a texture,
+  one instanced draw skinning every near member (`@margoengine/animation/instanced-skin`).
+- A. Beacco, N. Pelechano and C. Andujar, "A survey of real-time crowd rendering", Computer Graphics Forum 35(8),
+  32-50, 2016, https://doi.org/10.1111/cgf.12774. Used: levels by projected size, pre-skinned vertex animation for the
+  far level, a budget of members and vertices a frame.
+- M. Garland and P. S. Heckbert, "Surface simplification using quadric error metrics", SIGGRAPH 1997. Used through
+  `@margoengine/lod/auto` for the far mesh, with a skin signature so vertices that deform apart never weld.
+- A. Thorstensson and H. Roberthson, "Adaptations to changing speed in human locomotion: speed of transition between
+  walking and running", Acta Physiologica Scandinavica 131, 211-214, 1987. Used: the walk-run change at about 2 m/s.
+- P. M. Visscher, "Sizing up human height variation", Nature Genetics 40, 489-490, 2008. Used: a height spread of about
+  4 percent of the mean.
+- G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", Annals of Mathematical
+  Statistics 29, 610-611, 1958. Used: seeded normal heights.
+- U.S. War Department, Infantry Drill Regulations, 1911. Used: 30 inch quick-time and 36 inch double-time steps as the
+  default strides.
+- A. Byström et al., "Kinematics of saddle and rider in high-level dressage horses performing collected walk", Equine
+  Veterinary Journal 41(3), 280-284, 2009. Used: a crowd rider follows the saddle rigidly, the lag left out a few mm.
+- Compared for the far level: billboards or impostors (cheapest, but turn flat in a moving camera and cannot carry a
+  hand-over without a pop), skinning every member (no far saving), and a vertex animation of the simplified mesh posed
+  on the CPU from the near level's own bone rows (chosen: skinning is linear in the matrices, so the two levels match to
+  the float and the hand-over shows nothing). Margo's own: the per-member level plan, the skin-signature weld guard,
+  the rider frame from the saddle and the stride-locked gait phase.
+
+### Fitting the cast kit to a loaded rig (humans/fit, sheet row 15, 2026-11-18)
+
+Written from the papers and standard below; no other engine's, library's or paper's companion code was read.
+
+- R. Brouet, A. Sheffer, L. Boissieux and M.-P. Cani, "Design Preserving Garment Transfer", ACM TOG 31(4), article 36,
+  SIGGRAPH 2012, https://doi.org/10.1145/2185520.2185532. Used: a garment moved to a new body keeps its design
+  (proportions, the gap to the body) and is resolved against the body; here the design is the cast kit's spec (hem,
+  sleeve length, ease, thickness) and the fit is kept as the ease over the measured body.
+- R. Abdrashitov, K. Raichstat, J. Monsen and D. Hill, "Robust Skin Weights Transfer via Weight Inpainting", SIGGRAPH
+  Asia 2023 Technical Communications, https://doi.org/10.1145/3610543.3626180. Used: closest-point weight matching
+  with a distance test and the 30 degree normal test, the unmatched weights inpainted by minimising the Dirichlet energy
+  with the matched ones fixed. Here on a lattice over each body part (uniform graph Laplacian, solved by successive
+  over-relaxation), with a 15 mm distance test, so every layer reads the same weights.
+  Over the shoulders a row crosses the trunk, the shoulder's cap (weighted to the upper arm) and the neck, so no one
+  part's lattice holds it; those rows take the weights of the closest body point to their anchors (the paper's
+  closest-point match, every layer sharing the anchor) so the yoke turns with the deltoid (KB-HUMANS-WILBURSUIT1).
+- N. Magnenat-Thalmann, R. Laperriere and D. Thalmann, "Joint-dependent local deformations for hand animation and object
+  grasping", Graphics Interface 1988: linear blend skinning for the penetration measure. L. Kavan, S. Collins, J. Zara
+  and C. O'Sullivan, "Geometric Skinning with Approximate Dual Quaternion Blending", ACM TOG 27(4), 2008: the skinning
+  the dressed person draws with (@margoengine/animation/dqs).
+- ISO 8559-1:2017, "Size designation of clothes, Part 1: Anthropometric definitions for body measurement": a girth is
+  read by a tape held taut, which spans hollows; the body slice's convex hull. Also its neck girth (round the neck
+  square to its axis, just below the larynx) and neck base girth (over the cervicale, the side neck points and the
+  jugular notch): the fit slices the neck square to the neck-to-head joint line and takes the narrowest ring between the
+  clavicle line and the jaw, and the neck base as the lowest ring within 12 % of it.
+- S. S. Gordon, "The American Coat, Vest and Trousers System", John J. Mitchell, New York, 1895 (public domain;
+  Library of Congress scan, https://archive.org/details/americancoatvest00gord). Used, read as text and redrawn from the
+  description: the sack coat is measured "fairly close over the vest" and drafted with its own ease over that (each
+  layer stands its own ease off the layer beneath); the single-breasted sack coat's 30 inch full length on a 17 inch
+  natural waist length (its hem near the crotch); the shoulder seam from the side neck point to the shoulder point and
+  the neck gorge round the neck base; "2 1/4 inch for width of lapel"; diagram XXXIII's trouser measures, seat 37,
+  knee 19 and bottom 18 inches (the knee 19/37 of the seat, the bottom an inch under the knee).
+- Library of Congress, "Wilbur Wright and canoe attachment", 1909, https://www.loc.gov/resource/cph.3b25549 (public
+  domain photograph, looked at only): straight sack coats ending at the seat, white collars, trousers hanging straight
+  and narrow over the shoe. The Library's Wright brothers negatives catalogue describes Wilbur at Governors Island in
+  1909 in a gray-vested suit with a white collar and tie, and elsewhere in a grey business suit with a high collar.
+- D. Rohmer, T. Popa, M.-P. Cani, S. Hahmann and A. Sheffer, "Animation Wrinkling: Augmenting Coarse Cloth Simulations
+  with Realistic-Looking Wrinkles", ACM TOG 29(6), article 157, SIGGRAPH Asia 2010,
+  https://doi.org/10.1145/1882261.1866183. Used: folds run across the direction the cloth is compressed and stand as
+  high as the spare length allows, laid over a coarse shape as a displacement. Here cut into the cloth at rest, not
+  driven by a simulation: vertical flutes round a sack coat's sides and back below the chest (where it hangs wider than
+  the body), creases across the inside of the elbow and the back of the knee, a sleeve's gathers over the cuff and the
+  trouser break over the boot, each a raised-cosine profile moved out along the ring (both faces, so the layer gap
+  holds). Sizes are set so the steepest slope (pi x height / spacing) reaches about 30 degrees for creases and the
+  break, which a medium shot shows in shading, and are compared by eye with the Library of Congress photographs below.
+- A. M. Andrew, "Another efficient algorithm for convex hulls in two dimensions", Information Processing Letters 9(5),
+  216-219, 1979. C. Ericson, "Real-Time Collision Detection", Morgan Kaufmann 2005, section 5.1.5 (closest point on a
+  triangle) and chapter 7 (uniform grids).
+
+### Period cast kit (humans/cast, sheet row 15, 2026-11-18)
+
+Written from the papers, tables and archive records below; no other engine's or library's code was read.
+
+- I. Sadeghi, O. Bisker, J. De Deken and H. W. Jensen, "A Practical Microcylinder Appearance Model for Cloth Rendering",
+  ACM TOG 32(2), article 14, 2013 (UCSD technical report version, June 2011, https://escholarship.org/uc/item/6v11p5b0).
+  Used: thread scattering Eq. 2 to 4, the fabric sum Eq. 5, 6 and 13, masking Eq. 7 to 9, reweighting Eq. 11, 12,
+  Table 2 thread parameters and Table 3 tangent curves (the polyester satin back face left out: its printed row does
+  not close; linen's lost minus sign restored from section 3.2.1).
+- R. Estevez and C. Kulla, "Production Friendly Microfacet Sheen BRDF", Sony Pictures Imageworks, 2017, through
+  Khronos KHR_materials_sheen: the lobe the fitted materials are drawn with (packages/shared/sheen.js).
+- W. Jakob, A. Arbree, J. T. Moon, K. Bala and S. Marschner, "A Radiative Transfer Framework for Rendering Materials
+  with Anisotropic Structure", SIGGRAPH 2010, https://doi.org/10.1145/1778765.1778790: the microflake phase function
+  and projected area, used for single scattering in the fibre-end layer over the weave (KB-HUMANS-SHEENZERO1).
+  T. Zeltner, B. Burley and M. J.-Y. Chiang, "Practical Multiple-Scattering Sheen Using Linearly Transformed Cosines",
+  SIGGRAPH 2022 Talks, https://doi.org/10.1145/3532836.3536240: sheen as a volumetric layer of fibres (the idea; their
+  LTC fit is not used). P. Irawan and S. Marschner, "Specular Reflection from Woven Cloth", ACM TOG 31(1), 2012: a
+  woven model alone has threads only, so the loose fibre ends are added as their own layer. Fibre-end depths are
+  estimates from typical yarn hairiness (Uster H), fibre diameter and yarn counts, not measurements of one cloth.
+- S. M. Burkinshaw, "Physico-chemical Aspects of Textile Coloration", SDC/Wiley, 2016, Table 1.5: cotton n 1.578 and
+  1.532. S. Marschner, H. W. Jensen, M. Cammarano, S. Worley and P. Hanrahan, "Light Scattering from Human Hair
+  Fibers", ACM TOG 22(3), 2003, Table 1: keratin 1.55 (wool).
+- AIST/HQL 3D Anthropometric Database 2003, Statistics, young male (N 49) and young female (N 48),
+  https://www.airc.aist.go.jp/dhrt/fbodydb/2003_Statistics.pdf; AIST Japanese Head Dimension Database 2001,
+  https://www.airc.aist.go.jp/dhrt/head/ (head girth 575.9 and 551.1 mm).
+- C. B. Davenport and A. G. Love, "Army Anthropology", Medical Department of the US Army in the World War, vol. XV,
+  GPO, 1921, https://archive.org/details/medicaldepartmen15unituoft: Table 117 (blouse group 4m), Table 119 (breeches
+  group 5m), the hip breadth as twice the thigh girth over pi.
+- F. J. Harmon, "What Should Foresters Wear? The Forest Service's Seventy-Five-Year Search for a Uniform", Journal of
+  Forest History, https://foresthistory.org/wp-content/uploads/2017/01/foresterswear.pdf; Tucker and Fitzpatrick,
+  Region 3 history, ch. 7, https://npshistory.com/publications/usfs/region/3/tucker-fitzpatrick/chap7.htm; Levi Strauss
+  & Co., "History of Levi's 501 Jeans"; University of Northern Colorado, Colorado miners' clothing; Filson blog (1925
+  Forest Service testimony, weak); Japan Ministry of the Environment press release 13775 (Super Cool Biz 2011);
+  Fisheries Agency, life jacket guide for fishers; Boston Children's Museum Japanese House collection records;
+  nippon.com school uniform column.
+- Superellipse cross-sections: G. Lamé's curve, fitted per section so its perimeter equals the measured girth.
+- Derby (bowler) crowns: Vintage Dancer, "1900s Men's Hat Styles" and "1910s Men's Hat Styles"
+  (https://vintagedancer.com/1900s/1900s-mens-hat-styles-edwardian-era/,
+  https://vintagedancer.com/1900s/1910s-mens-hat-styles-and-history/), summarising the period catalogues: stiff felt
+  derbies with 2 inch brims and crowns 4 1/2 to 5 1/2 inches. A secondary source; the townsman's 5 1/4 inch crown,
+  2 inch brim and a crown rounding over from 0.6 of its height (`GarmentSpec.dome`) are read from it and from the
+  Library of Congress photographs of the Wrights in town.

@@ -69,5 +69,11 @@ interface WeatherState {
     cloud: number;
     fog: number;
     lightning: number;
+    dust: number;
+    smoke: number;
+    ash: number;
+    spray: number;
+    humidity: number;
+    temperature: number;
 }
 ```

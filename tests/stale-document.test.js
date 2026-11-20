@@ -22,8 +22,16 @@ window.marks = (window.marks ?? []).concat(location.search);
 window.ready = true;
 </script>`;
 
+// The page's folder lies under test-results/, outside every folder another root test walks: made inside tests/, it
+// vanished under gpu-package-tests' tree walk (tests/voxel-pathtracer-gpu-split.test.js) when the two ran side by side
+// and that walk failed with ENOENT (KB-ROOT-RED18).
+const dir = `test-results/stale-document-${process.pid}`;
+
+test('the page folder is outside the trees the root tests walk', () => {
+  for (const walked of ['tests/', 'scripts/', 'packages/']) assert.ok(!dir.startsWith(walked), dir);
+});
+
 async function withPage(run) {
-  const dir = `tests/.stale-document-${process.pid}`;
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'page.html'), page);
   const context = await openBrowser({ startPath: `/${dir}/page.html`, port: 'free', softwareAdapterOk: true });

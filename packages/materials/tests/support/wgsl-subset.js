@@ -1,5 +1,6 @@
-// A small CPU evaluator for the straight-line WGSL these tests run: `fn` declarations, let/var, assignment, if/else,
-// return, and scalar/vector arithmetic rounded to f32 after every operation. Matrices are arrays of four columns.
+// A small CPU evaluator for the straight-line WGSL these tests run: `fn` declarations, module-scope `const` and
+// var<private> values (arrays read with a runtime index included), let/var, assignment, if/else, return, and
+// scalar/vector arithmetic rounded to f32 after every operation. Matrices are arrays of four columns.
 // It exists so tests execute the shader text itself instead of a hand-written JavaScript copy of it.
 
 const f32 = Math.fround;
@@ -28,6 +29,11 @@ const builtins = {
   vec4f: vector(4, f32),
   vec2i: vector(2, toInt),
   f32: (x) => f32(x),
+  // f32 to u32 or i32 truncates toward zero; u32 saturates at 0 (WGSL "Conversion" built-ins).
+  u32: (x) => Math.max(0, Math.trunc(x)),
+  i32: (x) => Math.trunc(x),
+  array: (...v) => v,
+  sqrt: (a) => map1(a, (x) => f32(Math.sqrt(x))),
   floor: (a) => map1(a, Math.floor),
   abs: (a) => map1(a, Math.abs),
   log2: (a) => map1(a, (x) => f32(Math.log2(x))),
@@ -38,12 +44,15 @@ const builtins = {
   step: (edge, x) => map2(edge, x, (e, v) => (v < e ? 0 : 1)),
   clamp: (a, lo, hi) => map2(map2(a, lo, Math.max), hi, Math.min),
   pow: (a, b) => map2(a, b, (x, y) => f32(x ** y)),
+  // Scalar a and b are mixed directly: pairing them first would make a two-lane vector of the pair.
   mix: (a, b, t) =>
-    map2(
-      map2(a, b, (x, y) => [x, y]),
-      t,
-      ([x, y], s) => f32(x + f32(f32(y - x) * s)),
-    ),
+    !Array.isArray(a) && !Array.isArray(b)
+      ? map1(t, (s) => f32(a + f32(f32(b - a) * s)))
+      : map2(
+          map2(a, b, (x, y) => [x, y]),
+          t,
+          ([x, y], s) => f32(x + f32(f32(y - x) * s)),
+        ),
   select: (no, yes, c) => (Array.isArray(c) ? c.map((k, i) => (k ? at(yes, i) : at(no, i))) : c ? yes : no),
   dot,
   length,
@@ -153,6 +162,8 @@ export function wgslModule(source, environment = {}) {
       return (s) => !inner(s);
     } else if (token.t === 'id') {
       const name = token.v;
+      // A typed array constructor, array<f32,4>(...): the template is only a type here.
+      if (name === 'array' && peek('<')) while (take().v !== '>');
       if (name === 'true' || name === 'false') node = () => name === 'true';
       else if (peek('(')) {
         take('(');
@@ -308,6 +319,16 @@ export function wgslModule(source, environment = {}) {
       }
       take(';');
       globals[name] = value;
+      continue;
+    }
+    if (peek('const')) {
+      // const name(:type) = value;
+      take('const');
+      const name = take().v;
+      if (peek(':')) while (!peek('=')) take();
+      take('=');
+      globals[name] = expression()({});
+      take(';');
       continue;
     }
     if (!peek('fn')) {

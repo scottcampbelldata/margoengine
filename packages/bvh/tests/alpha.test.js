@@ -79,7 +79,7 @@ test('a transform maps the uv before sampling, and the factor scales the alpha',
   assert.equal(sampleAlpha(halves({ factor: 0.25 }), 0.25, 0.25), 0.25);
 });
 
-// What gltf-pro gives: settings[0] is the alpha mode index, settings[1] the cutoff, base[3] the factor.
+// What gltf/pbr gives: settings[0] is the alpha mode index, settings[1] the cutoff, base[3] the factor.
 const material = (extra = {}) => ({ base: [1, 1, 1, 1], settings: [1, 0.5, 0], maps: [{ index: 0 }], ...extra });
 const loaded = (materials, doc = {}, images = [halves()]) => ({
   primitives: materials.map((m) => ({ material: m })),
@@ -150,7 +150,7 @@ test('what cannot be read picks solid and is listed with why', async () => {
   assert.equal(source({ primitiveIndex: 0 }), null);
 });
 
-test('a decoded webp or basisu source wins over the fallback, as gltf-pro takes it', async () => {
+test('a decoded webp or basisu source wins over the fallback, as gltf/pbr takes it', async () => {
   const model = loaded([material()], { textures: [{ source: 0, extensions: { EXT_texture_webp: { source: 1 } } }] }, [
       null,
       halves(),

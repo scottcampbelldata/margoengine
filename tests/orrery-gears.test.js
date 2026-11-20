@@ -5,7 +5,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PLANETS, centuries, meanMotion, planetPosition, J2000, FITTED_SPAN } from '../examples/orrery/ephemeris.ts';
+import {
+  HELIOCENTRIC_PLANETS as PLANETS,
+  centuries,
+  meanMotion,
+  planetPosition,
+  J2000,
+  FITTED_SPAN,
+} from '@margoengine/sky/ephemeris';
 import {
   CLEARANCE,
   DRIVE_RATE,

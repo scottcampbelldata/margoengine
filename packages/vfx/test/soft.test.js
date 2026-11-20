@@ -43,8 +43,9 @@ test('softness patches only the billboard, binds the depth and fades by the view
   const code = billboards(h)[0];
   assert.match(code, /@location\(6\) viewDepth:f32/);
   assert.match(code, /texture_depth_2d/);
-  assert.match(code, /clamp\(gap\/soft\.softness\.x,0\.0,1\.0\)/);
-  assert.match(code, /if\(d<=0\.0\)\{return c;\}/, 'empty depth leaves the particle alone');
+  assert.match(code, /return \(dot\(soft\.plane\.xyz,w\.xyz\/w\.w\)\+soft\.plane\.w-viewDepth\)\/soft\.softness\.x;/);
+  assert.match(code, /c\.a\*clamp\(softGap\(i\.clip,i\.viewDepth\),0\.0,1\.0\)/);
+  assert.match(code, /if\(d<=0\.0\)\{return 2\.0;\}/, 'empty depth leaves the particle alone (the clamp makes it 1)');
   const group = h.groups.findLast((g) => g.entries.some((e) => e.binding === 12)),
     buffer = group.entries.find((e) => e.binding === 11).resource.buffer;
   assert.deepEqual(group.entries.find((e) => e.binding === 12).resource, { view: { aspect: 'depth-only' } });

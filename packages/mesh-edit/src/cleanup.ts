@@ -6,6 +6,7 @@ import { positionKey } from './quantize.js';
 import { clonePolygonMesh, createMeshEditResult, identityVertexMap } from './result.js';
 import type { PaintTexture } from './paint-types.js';
 import type { PolygonMesh, MeshEditResult } from './types.js';
+import { greatestOf, leastOf } from './least.js';
 
 /** One mesh for {@link cleanupPolygonMeshes}, with its world matrix and what cleanup may do with it. */
 export interface PolygonCleanupInput {
@@ -299,10 +300,10 @@ export function isAtlasOpaque(mesh: PolygonMesh, texture: PaintTexture): boolean
   for (const face of mesh.faces) {
     const us = face.uv.map((uv) => uv[0]),
       vs = face.uv.map((uv) => uv[1]),
-      left = Math.max(0, Math.min(width - 1, Math.floor(Math.min(...us) * width + 1e-8))),
-      top = Math.max(0, Math.min(height - 1, Math.floor(Math.min(...vs) * height + 1e-8))),
-      right = Math.min(width, Math.max(left + 1, Math.ceil(Math.max(...us) * width - 1e-8))),
-      bottom = Math.min(height, Math.max(top + 1, Math.ceil(Math.max(...vs) * height - 1e-8)));
+      left = Math.max(0, Math.min(width - 1, Math.floor(leastOf(us) * width + 1e-8))),
+      top = Math.max(0, Math.min(height - 1, Math.floor(leastOf(vs) * height + 1e-8))),
+      right = Math.min(width, Math.max(left + 1, Math.ceil(greatestOf(us) * width - 1e-8))),
+      bottom = Math.min(height, Math.max(top + 1, Math.ceil(greatestOf(vs) * height - 1e-8)));
     for (let y = top; y < bottom; y++)
       for (let x = left; x < right; x++) if (pixels[(y * width + x) * 4 + 3] !== 255) return false;
   }

@@ -1,8 +1,8 @@
 // Firefox (d), bug sweep L3a (2026-11-11): Firefox 157's copyExternalImageToTexture throws a TypeError for an
 // HTMLVideoElement or VideoFrame source. Packages that may pass a video go through packages/shared/copy-external.js
-// (materials, points, xr), which draws such a frame on a canvas first. The bug sweep row named voxel and video as well:
-// voxel makes no external copies, and video imports its frames with importExternalTexture, never copying them. This
-// test pins that: every direct queue.copyExternalImageToTexture call in a package's source is listed here with the
+// (materials, points, shader's Shadertoy media channels, xr), which draws such a frame on a canvas first. The bug
+// sweep row named voxel and video as well: voxel makes no external copies, and video imports its frames with
+// importExternalTexture, never copying them. This test pins that: every direct queue.copyExternalImageToTexture call in a package's source is listed here with the
 // kinds of source it takes, none of them a video, so a new call (a video one above all) has to be looked at.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,7 +15,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 /** Each package source file that calls copyExternalImageToTexture itself, and what its calls copy. */
 const DIRECT = {
   'packages/creative/src/planet-pass.ts': 'decoded images',
-  'packages/gltf-pro/src/model.ts': 'glTF images (ImageBitmap)',
+  'packages/gltf/src/model.ts': 'glTF images (ImageBitmap)',
   'packages/gltf/src/textured.ts': 'glTF images (ImageBitmap)',
   'packages/html/src/texture.ts': 'an HTML element drawn on a canvas',
   'packages/inspector/src/frame.ts': 'the name only, in its list of queue calls it counts',
@@ -30,7 +30,12 @@ const DIRECT = {
 };
 
 test('the packages that take videos copy through shared/copy-external.js', () => {
-  for (const file of ['packages/materials/src/built-material.ts', 'packages/points/src/plugin.ts', 'packages/xr/src/layers.ts'])
+  for (const file of [
+    'packages/materials/src/built-material.ts',
+    'packages/points/src/plugin.ts',
+    'packages/shader/src/shadertoy.ts',
+    'packages/xr/src/layers.ts',
+  ])
     assert.match(readFileSync(join(root, file), 'utf8'), /shared\/copy-external\.js/, file);
 });
 

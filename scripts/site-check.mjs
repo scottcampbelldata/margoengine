@@ -48,6 +48,9 @@ for (let attempt = 1; ; attempt++) {
     break;
   }
   console.error(`site-check attempt ${attempt}: ${failures.length} problems\n  ${failures.slice(0, 20).join('\n  ')}`);
-  if (attempt === 6) process.exit(1);
+  if (attempt === 6) {
+    process.exitCode = 1;
+    break;
+  }
   await new Promise((done) => setTimeout(done, 10_000));
 }

@@ -1,5 +1,6 @@
+// MARGO_COMPAT not applicable: the pages install the layer and its tiers themselves, which is what this check tests.
 // Real preview refusals, /auto escalation, glTF + selection pixels and procedural compute on both complete tiers.
-// node scripts/gpu-lock.mjs run --owner=<you> --max=15 -- node packages/webgl2-compat/test/package-tiers-browser.mjs
+// node scripts/run-with-timeout.mjs --max=10 -- node packages/webgl2-compat/test/package-tiers-browser.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -15,7 +16,7 @@ try {
   const scene = async (page) =>
     page.evaluate(async () => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const { Selection } = await import('/packages/selection/dist/index.js');
       const { createTextureBaker } = await import('/packages/procedural/dist/textures.js');
       const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
@@ -87,7 +88,7 @@ try {
     const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const { autoEngine } = await import('/packages/webgl2-compat/dist/auto.js');
     const { Selection } = await import('/packages/selection/dist/index.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { VATCrowd } = await import('/packages/animation/dist/vat.js');
     const { MorphWeightPlayer } = await import('/packages/animation/dist/morph-gpu.js');
     const { Lines } = await import('/packages/lines/dist/index.js');
@@ -139,7 +140,7 @@ try {
       }
     const attaches = [
       ['selection', (e) => Selection.attach(e, { algorithm: 'morphological' })],
-      ['gltf-pro', (e) => loadGLTF(e, '/packages/webgl2-compat/test/fixtures/preview-triangle.gltf')],
+      ['gltf/pbr', (e) => loadGLTF(e, '/packages/webgl2-compat/test/fixtures/preview-triangle.gltf')],
       [
         'VATCrowd',
         (e) => {

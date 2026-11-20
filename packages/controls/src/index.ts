@@ -30,6 +30,7 @@ export type {
   TransformPivot,
   TransformMode,
   HandleName,
+  GizmoColor,
 } from './transform.js';
 export { buildDelta, buildGizmo, pickHandle } from './gizmo.js';
 export type { GizmoDelta, GizmoFrame, Handle, Prim } from './gizmo.js';

@@ -66,10 +66,6 @@
  },
  "gate": {
   "ac": true,
-  "lock": {
-   "held": "by the wrapping gpu-lock run",
-   "dir": "<main checkout>/test-results/gpu.lock"
-  },
   "quiet": {
    "ac": true,
    "cpuLoadPercent": 1,

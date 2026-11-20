@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { compute } from '../../shared/gpu.js';
+import { ShaderClock } from './clock.js';
 import { Let, push, statement, write } from './control.js';
 import {
   FIXED,
@@ -622,6 +623,7 @@ export class ComputePass implements EnginePlugin {
     if (!engine.gpu)
       throw new MargoError('unsupported', 'ComputePass requires WebGPU; see https://margoengine.com/errors#webgpu');
     this.engine = engine;
+    ShaderClock.hold(engine, this);
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -633,7 +635,12 @@ export class ComputePass implements EnginePlugin {
     });
   }
   private dispatch(c: Context): void {
-    this.encode(c.device, c.encoder, { width: c.width, height: c.height, delta: c.delta });
+    this.encode(c.device, c.encoder, {
+      width: c.width,
+      height: c.height,
+      time: ShaderClock.find(this.engine)?.time ?? 0,
+      delta: c.delta,
+    });
   }
   /** @internal Records one dispatch of every invocation into `encoder`, uploading uniforms and storage first. */
   encode(device: GPUDevice, encoder: GPUCommandEncoder, host: Host): void {
@@ -658,6 +665,7 @@ export class ComputePass implements EnginePlugin {
     const engine = this.engine;
     this.engine = undefined;
     this.onDeviceRestored();
+    ShaderClock.release(engine, this);
     engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;

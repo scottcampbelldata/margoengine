@@ -185,7 +185,7 @@ function makeModel(engine, asset = { doc: { images: [] } }) {
   models.push(model);
   return model;
 }
-mock.module('@margoengine/gltf-pro', {
+mock.module('@margoengine/gltf/pbr', {
   namedExports: {
     PBRModel: class {
       constructor(engine, asset) {
@@ -257,7 +257,7 @@ mock.module('@margoengine/environment', {
     IBL_WGSL: 'fn iblShade() {}',
     iblBindGroupEntries: (environment) =>
       [4, 5, 6, 7, 8].map((binding) => ({ binding, resource: { version: environment.version } })),
-    // EnvironmentLighting's contract: a plugin and a gltf-pro lighting effect whose bindings follow the environment's
+    // EnvironmentLighting's contract: a plugin and a gltf/pbr lighting effect whose bindings follow the environment's
     // version, whose shader() patches the PBR source, and whose dispose() detaches it.
     EnvironmentLighting: class {
       constructor(environment) {
@@ -904,7 +904,7 @@ test('Shadows turns the Canvas shadows on, applies live options and restores rem
   assert.equal(effect.owner, engine);
   assert.deepEqual(effect.options, { distance: 40, bias: 0.001, filter: 'pcf' });
   assert.equal(effect.added.source, caster);
-  assert.deepEqual(effect.added.options, { castShadow: true, receiveShadow: true });
+  assert.deepEqual(effect.added.options, { castShadow: true, receiveShadow: true, static: false });
   view.rerender(
     tree([
       React.createElement(Shadows, { key: 'shadows', distance: 80 }),

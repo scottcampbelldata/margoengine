@@ -1,4 +1,4 @@
-// Real-GPU check of PbrMaterial.set (run on AC power, holding the GPU lock, after npm run build:packages):
+// Real-GPU check of PbrMaterial.set (run on AC power, after npm run build:packages):
 //   node examples/package-benchmarks/material-setters-gpu.mjs
 // A red box is drawn, then material.set({color: blue}); the very next frame must show blue with no pipeline or bind
 // group created in between. Frames go to test-results/material-setters-*.png.

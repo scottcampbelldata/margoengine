@@ -4,6 +4,7 @@ import { useLoader } from './hooks.js';
 import { report, useResourceEffect, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
 import { textureLoaders, identity, own } from './texture-cache.js';
+import { typeError } from '../../shared/errors.js';
 export { MappedPbrMaterial, TextureMaterial, TextureProvider } from './texture-material.js';
 export type { TextureMaterialProps } from './texture-material.js';
 /** URLs accepted by the image and compressed-image hooks. */
@@ -74,7 +75,7 @@ export function useVideoTexture(src: string | MediaStream, options: VideoTexture
         await new Promise<void>((resolve, reject) => {
           const cleanup = () => { video.removeEventListener(unsuspend, ready); video.removeEventListener('error', failed); signal.removeEventListener('abort', aborted); };
           const ready = () => { cleanup(); resolve(); };
-          const failed = () => { cleanup(); reject(video.error ?? new TypeError('Video failed to load; check its URL and browser codec support.')); };
+          const failed = () => { cleanup(); reject(video.error ?? typeError('Video failed to load; check its URL and browser codec support', 'react-arguments')); };
           const aborted = () => { cleanup(); reject(signal.reason); };
           signal.throwIfAborted();
           video.addEventListener(unsuspend, ready, { once: true });

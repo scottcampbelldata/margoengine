@@ -135,10 +135,16 @@ is named `/resampled`, not ReSTIR; it was `/restir` before 2026-11-11. Each pixe
 progressive accumulation stays unbiased and samples stay independent. It only changes
 emissive surface lighting; camera emission, delta paths, sun, area lights and the environment retain their treatment.
 Every valid candidate evaluates visibility, and directional proposals also trace an intersection. Increasing the
-candidate count costs work; no wall-time speedup or universal variance reduction is claimed. Native WebGL2 reports
+candidate count costs work; no wall-time speedup or universal variance reduction is claimed. Each proposal is one pass
+of the light loop (on the WebGL2 layer one `sample`, `shadow` and `gather` draw each), so no compiled program holds
+more than one scene traversal: with all proposals in one program, ANGLE Direct3D 11's cold compile took 610 s
+(KB-L5a-3); now 176 s for every program of the variant. The proposals, their random numbers and the image are the same
+as before, bit for bit on WebGPU. Native WebGL2 reports
 `unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer); the WebGL2 compatibility layer runs
 the variant. The GPU regression keeps a 2x squared-error reduction requirement on its fixed 1,024-emitter ceiling
-scene at 32 samples against an 8,192-sample baseline reference. See `tests/resampled-browser.mjs`.
+scene at 32 samples against an 8,192-sample baseline reference, and compares rough metal, plastic coat and scattering
+media receivers with the root tracer (16 batches each, within six standard errors). See `tests/resampled-browser.mjs`.
+`maxBounces` counts scattering events at surfaces and in media alike: no light is sampled at a vertex past it.
 
 ## Caustic path guiding
 
@@ -197,6 +203,9 @@ claimed. Native WebGL2 gives `unsupported` with [setup help](https://margoengine
 the WebGL2 compatibility layer runs the guide. `tests/guiding-browser.mjs` requires 2x lower squared
 RGB error on its fixed small-glass caustic scene, checks energy against independent baseline tracing,
 overlapping-bound unit-furnace values, empty/huge bounds, disposal and real device restoration.
+Its convergence reference is the root `VoxelPathTracer` (no guide, 65,536 samples in 8 seeds), never the
+guided tracer itself, and each coverage scene compares 16 batch means of both tracers: the difference stays under
+0.02 and under six standard errors of that scene's own noise.
 
 ## Scene data
 
@@ -426,9 +435,56 @@ throwing: every invalid option with the error `setOptions` would throw for it, a
 against `textures` when given).
 
 Accumulation also restarts on any change of the camera (matrix, position, target, up, projection), the drawing-buffer
-size, the scene (`setScene`), `reset()`, turning `enabled` back on, and a GPU device change. Equal seed, scene, camera and
+size (a view's rectangle size), the scene (`setScene`), `reset()`, turning `enabled` back on, and a GPU device change. A temporal pass's
+sub-pixel raster jitter (TAA's Halton offset) is not a camera change: the tracer keys, traces and reprojects with the
+source camera TAA wraps and jitters its own pixels, so a still view keeps accumulating with TAA on. Equal seed, scene,
+camera and
 options give the same image on the same GPU and driver (measured bit-identical on the RTX A6000); other GPUs may differ
 by floating-point rounding, which changes individual paths, not the converged image.
+
+Every view keeps its own image. A frame that draws several views (an XR session's two eyes, or split-screen views from
+`engine.render({ views })`) accumulates, denoises and restarts each one on its own, keyed by the view's `id` (the plain
+full-canvas frame counts as a view), so one view's camera never restarts another's. Each image is traced at the size of
+its view's rectangle and drawn into that rectangle. `stats` describes the view drawn last; `gpuBytes` counts every
+view. A view not drawn for 4 engine frames is released with its buffers: an XR session's eye images are freed soon
+after it ends, and the desktop image, released during the session, starts again after it. Each view costs its own
+image memory and its own samples: two eyes trace twice the work of one canvas for the same sample count. Sharing samples
+between eyes (reprojecting one eye's paths into the other) is a separate speed-up the papers below measure, with
+errors on specular and refractive surfaces; the tracer keeps each eye's estimate its own. Sources: Philippi, Frisvad and
+Jensen, "Practical temporal and stereoscopic filtering for real-time ray tracing", EGSR 2023
+(https://doi.org/10.2312/sr.20231129); Yang, Liu and Salvi, "A Survey of Temporal Antialiasing
+Techniques", Computer Graphics Forum 39(2), 2020 (https://doi.org/10.1111/cgf.14018), on keeping and invalidating
+history per view; Scherzer et al., "Temporal Coherence Methods in Real-Time Rendering", Computer Graphics Forum 31(8),
+2012 (https://doi.org/10.1111/j.1467-8659.2012.03075.x); W3C, "WebXR Device API" (https://www.w3.org/TR/webxr/), whose
+views each carry their own pose and projection.
+
+```ts
+import { VoxelPathTracer, type VoxelTraceScene } from 'margoengine/voxel-pathtracer';
+import { Camera, Engine } from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const scene: VoxelTraceScene = {
+  revision: 1,
+  models: [{ id: 'block', revision: 1, size: [4, 4, 4], voxels: new Uint8Array(64).fill(1) }],
+  instances: [{ id: 'block-1', modelId: 'block', matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -2, 0, -2, 1] }],
+  materials: [{ id: 1, color: [0.8, 0.75, 0.7], type: 'diffuse' }],
+};
+const tracer = VoxelPathTracer.attach(engine, { scene, maxSamples: 64 });
+await tracer.ready;
+engine.stop(); // this example draws its own frames
+// Two side-by-side views of one scene: each accumulates its own image.
+const left = new Camera({ position: [12, 8, 12], target: [0, 1, 0] });
+const right = new Camera({ position: [-12, 8, 12], target: [0, 1, 0] });
+for (let frame = 0; frame < 8; frame++)
+  engine.render({
+    delta: 1 / 60,
+    views: [
+      { id: 'left', camera: left, viewport: [0, 0, 0.5, 1] },
+      { id: 'right', camera: right, viewport: [0.5, 0, 0.5, 1] },
+    ],
+  });
+console.log(tracer.stats.samples, tracer.stats.width); // the right view's samples and its half-width image
+tracer.dispose();
+```
 
 ## Viewport, readiness, devices, disposal
 
@@ -504,15 +560,25 @@ then per loop iteration `hit`, `vertex`, `surface`, and `sample`, `shadow` and `
 `post`, and `finish`, which writes four `rgba32float` sums that a small kernel adds to the image. No program holds more
 than one traversal. Every statement runs once, in the same order and with the same random numbers; against the
 single-kernel route on ANGLE Vulkan, 345 of the 18,432 values of the `determinism` render differ, by 1 or 2 units in
-the last place (at most 2.0e-7 relative). The path's state lives between programs in `rgba32uint` pages, about 200 MB
-for a part of 131,072 paths. The CPU drives the loop: each part runs 8 iterations a submission, and after each a
+the last place (at most 2.0e-7 relative). The path's state lives between programs in `rgba32uint` pages, about 205 MB
+for a part of 131,072 paths; a page holds 7 layers, so no program writes fragment output location 7, which ANGLE's
+Vulkan back end on an NVIDIA RTX A6000 writes wrong for about 0.3 s at a time (docs/known-bugs.md, KB-VPT-GUIDE-COMPAT). The CPU drives the loop: each part runs 8 iterations a submission, and after each a
 census marks the paths that finished an iteration before in a stencil, which every later program tests, so finished
 paths cost no fragment work. A census is counted with an occlusion query; reading one back takes the browser about a
 frame (15 ms measured in Chromium, whatever the work), so only the first dispatch of a tracer reads one after every
 window; later dispatches run each part for the iterations the dispatch before needed and read all their parts' last
 censuses at once, and a part with a path still running there makes the dispatch run again the first way. Recording every
 iteration instead gives the same image bit for bit (`determinism`; `device.passes` in `@margoengine/webgl2-compat`
-counts the passes replayed). A tracer made again on the same device reuses the layer's compiled programs. The route is a lazy chunk
+counts the passes replayed). A light kind the frame switches off (the sun, the environment map, area lights or emitters
+when the scene has none, distant lights under uniform fog) draws none of its three programs: its first statement is a `continue` that only the frame uniform decides, before
+any random number, so leaving its passes out changes no value (`determinism` also renders with every kind drawn and
+compares bit for bit). A dispatch is cut into round(paths / 131,072) parts of even size, at most 1.5 times that many
+paths and 307 MB of state a part, so a 480 x 300 sample is one part (226 MB) where it was two. Together these take a
+480 x 300 sample of the base tracer from 1,527 passes to 443 (no distant light) or 523 (with the sun), counted on the
+CPU by `tests/route-work.test.js`; a 480 x 300 reference at 16384 samples went from about 555 s to about 449 s on
+Direct3D 11 (busy machine, diagnostic), so the fragment work of the passes left, not their fixed cost, is most of what
+remains (docs/known-bugs.md, KB-L5a-10). A tracer made again on the same device reuses the layer's compiled programs.
+The route is a lazy chunk
 (`src/compat.ts`) only the layer downloads, and the `trace` module stays the one source of the maths.
 
 Both ANGLE backends on Windows run it. On an RTX A6000 PC, ANGLE Direct3D 11 (the default) passes `npm run
@@ -522,7 +588,10 @@ values identical for the same seed, and ANGLE Vulkan runs the same rows. The who
 check (25 cases, 757 s of case time) passes on Direct3D 11 too: the `coverage` kernel of transparent renders takes its
 64-ray bound from the frame uniform, because with a constant bound around a traversal the driver's compiler unrolled the
 loop and its first compile never finished in 22 minutes; `transparent` now takes 89.4 s, most of it that compile, with
-the same image hashes as before. On this route the quick preview
+the same image hashes as before. For the same compiler the scene walk and the voxel walk are each one loop, with the
+same visiting order and values, because its time grows several times over for every loop nested around a traversal:
+the `hit` program went from 35.1 s to 9.3 s of compiler CPU time and `shadow` from 23.1 s to 5.4 s (docs/known-bugs.md,
+KB-D3D11-NEST). On this route the quick preview
 kernel is not compiled (on Direct3D 11 it took longer than the whole staged tracer), so frames show the raster image
 until `ready`. Disposing the engine while the programs still compile waits for the driver to finish the one it is on
 (30.8 s measured, `test:gpu:d3d11-dispose`); `docs/limits.md` has the numbers.
@@ -597,7 +666,7 @@ RTX A6000 (Ampere), Windows 11, Edge 155 (headless, WebGPU, D3D12), 2026-10-20, 
 | Same, denoised (no glass, metal or glossy coat: no caustic chain) | 14.42-14.61 ms | 256 MiB |
 | Same, 4 samples per frame | 42.07-42.40 ms | 98 MiB |
 
-Committed run, 2026-10-31, same PC (RTX A6000, Edge 156, one exclusive run of all five GPU scripts and the timing case, every check passed; every number, the adapter and the commit are in `bench/results.json`, written by `bench/run.mjs`): material scene 19.92 ms and 95 MiB, denoised 28.05 ms and 348 MiB; dense 256^3 model 14.35 ms and 98 MiB, denoised 18.35 ms and 256 MiB, 4 samples per frame 61.54 ms and 98 MiB. These rows run slower than the table above, which was measured on 2026-10-20; compare rows from one run only.
+Committed run, 2026-10-31, same PC (RTX A6000, Edge 156, one run, with nothing else on the GPU, of all five GPU scripts and the timing case, every check passed; every number, the adapter and the commit are in `bench/results.json`, written by `bench/run.mjs`): material scene 19.92 ms and 95 MiB, denoised 28.05 ms and 348 MiB; dense 256^3 model 14.35 ms and 98 MiB, denoised 18.35 ms and 256 MiB, 4 samples per frame 61.54 ms and 98 MiB. These rows run slower than the table above, which was measured on 2026-10-20; compare rows from one run only.
 
 The same day, before the viewport denoiser kept history, the denoised material scene took 20.97-21.23 ms and 285 MiB;
 before the caustic chain was skipped for scenes without focusing materials, the denoised dense scene took 18.74-19.01
@@ -652,7 +721,7 @@ Numbers on other GPUs are not measured.
   naming the model's table); large and sparse models (dense voxels and the same cells as blocks give identical
   voxel buffers and picks, a sparse 2048 x 64 x 2048 world, emissive faces past cell 255, block and size errors). A
   recording fake device stands in for WebGPU.
-- `tests/browser-check.mjs` (real WebGPU, run under `scripts/gpu-lock.mjs`) on the RTX A6000:
+- `tests/browser-check.mjs` (real WebGPU) on the RTX A6000:
   - shaders compile with no diagnostics; no WebGPU validation errors anywhere;
   - GPU first hits equal `raycast` on all 19,200 pixels of a scene of rotated, scaled, sheared and mirrored instances,
     perspective and orthographic, distances within 2.6e-6 relative; also panorama (12,800 pixels), equisolid 200-degree

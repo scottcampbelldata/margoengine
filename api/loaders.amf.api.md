@@ -11,7 +11,7 @@ export interface AMFModel extends LoadedGeometry {
     warnings: string[];
 }
 
-export interface AMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
+export interface AMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     signal?: AbortSignal;
 }
@@ -29,6 +29,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -45,6 +46,12 @@ interface LoadedGroup {
 interface ParseLimits {
     maxVertices?: number;
     maxTriangles?: number;
+}
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
 }
 
 interface ZipOptions {

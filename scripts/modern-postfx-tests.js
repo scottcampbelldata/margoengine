@@ -22,7 +22,9 @@ page.on('console', (message) => {
 });
 try {
   const pixels = await page.evaluate(async () => {
-    const { cocShader, coarseShader, bokehShader } = await import('/packages/dof/src/shaders.ts');
+    const { cocShader, coarseShader, bokehShader, nearShader, nearDownShader, NEAR_LEVELS } = await import(
+      '/packages/dof/src/shaders.ts'
+    );
     const { tonemapShader } = await import('/packages/tonemap/src/shaders.ts');
     const adapter = await navigator.gpu.requestAdapter(),
       device = await adapter.requestDevice();
@@ -72,7 +74,16 @@ try {
       pass.dispatchWorkgroups(Math.ceil(w / 8), Math.ceil(h / 8));
       pass.end();
     };
+    // Every pixel check reads through read() or readAE(), so a validation error (a bind group that no longer matches a
+    // package shader's layout invalidates the whole submit) fails there with its own message, never as a wrong pixel
+    // (KB-POSTFX-DOFSTALE1: twice a stale DOF binding read back as zeros and failed 'Near CoC sign/clamp').
+    const validated = async () => {
+      const error = await device.popErrorScope();
+      device.pushErrorScope('validation');
+      check(!error, `GPU validation error before a read back: ${error?.message}`);
+    };
     async function read(texture, bytesPerPixel, half = false) {
+      await validated();
       const row = Math.ceil((texture.width * bytesPerPixel) / 256) * 256,
         size = row * texture.height;
       const b = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
@@ -115,7 +126,9 @@ try {
     {
       const cocPipeline = await compute(cocShader),
         bokehPipeline = await compute(bokehShader),
-        coarsePipeline = await compute(coarseShader);
+        coarsePipeline = await compute(coarseShader),
+        nearPipeline = await compute(nearShader),
+        nearDownPipeline = await compute(nearDownShader);
       const w = 64,
         h = 32;
       const scene = texture(w, h, 'rgba32float', T.TEXTURE_BINDING | T.COPY_DST),
@@ -124,6 +137,22 @@ try {
         output = texture(w, h, 'rgba16float', T.STORAGE_BINDING | T.COPY_SRC),
         tiles = texture(w / 8, h / 8, 'r32float', T.TEXTURE_BINDING | T.STORAGE_BINDING),
         coarse = texture(w / 2, h / 2, 'rgba16float', T.TEXTURE_BINDING | T.STORAGE_BINDING);
+      // The near gather's tap source as DOF builds it (packages/dof/src/index.ts targets()): three rgba16float mip chains
+      // (taps, shapes, plain scene), level 0 by nearShader, each level above by nearDownShader, read by the bokeh pass
+      // through a trilinear sampler.
+      const levels = Math.min(NEAR_LEVELS, Math.floor(Math.log2(Math.max(w, h))) + 1),
+        chain = [0, 1, 2].map(() => {
+          const t = device.createTexture({
+            size: [w, h],
+            format: 'rgba16float',
+            usage: T.TEXTURE_BINDING | T.STORAGE_BINDING,
+            mipLevelCount: levels,
+          });
+          owned.push(t);
+          return t;
+        }),
+        level = (k) => chain.map((t) => t.createView({ baseMipLevel: k, mipLevelCount: 1 })),
+        nearSampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
       const color = new Float32Array(w * h * 4);
       for (let y = 0; y < h; y++)
         for (let x = 0; x < w; x++) {
@@ -159,13 +188,26 @@ try {
           output.createView(),
           tiles.createView(),
           coarse.createView(),
+          nearSampler,
+          ...chain.map((t) => t.createView()),
         ]),
+        nearGroup = group(nearPipeline, [{ buffer: uniform }, scene.createView(), coc.createView(), ...level(0)]),
+        nearDownGroups = Array.from({ length: levels - 1 }, (_, k) =>
+          group(nearDownPipeline, [...level(k), ...level(k + 1)]),
+        ),
         coarseGroup = group(coarsePipeline, [
           { buffer: uniform },
           scene.createView(),
           coc.createView(),
           coarse.createView(),
         ]);
+      // DOF's pass order (blur() in packages/dof/src/index.ts): the near chain, the coarse far blocks, then the gather.
+      const gather = (encoder) => {
+        dispatch(encoder, nearPipeline, nearGroup, w, h);
+        nearDownGroups.forEach((g, k) => dispatch(encoder, nearDownPipeline, g, w >> (k + 1), h >> (k + 1)));
+        dispatch(encoder, coarsePipeline, coarseGroup, w / 2, h / 2);
+        dispatch(encoder, bokehPipeline, bokehGroup, w, h);
+      };
       let encoder = device.createCommandEncoder(),
         pass = encoder.beginRenderPass({
           colorAttachments: [],
@@ -180,8 +222,7 @@ try {
       pass.draw(3);
       pass.end();
       dispatch(encoder, cocPipeline, cocGroup, w, h);
-      dispatch(encoder, coarsePipeline, coarseGroup, w / 2, h / 2);
-      dispatch(encoder, bokehPipeline, bokehGroup, w, h);
+      gather(encoder);
       device.queue.submit([encoder.finish()]);
       const co = await read(coc, 8),
         blur = await read(output, 8, true),
@@ -190,8 +231,36 @@ try {
       check(Math.abs(co[24 * 2]) < 0.001, 'Focus CoC');
       check(Math.abs(co[40 * 2] - 7) < 0.001, 'Far CoC/depth reconstruction');
       check(at(24, 16, 1) > 0.999 && at(24, 16, 0) < 0.001 && at(24, 16, 2) < 0.001, 'Focused color changed');
-      check(at(8, 16, 0) > 0.999 && at(8, 16, 2) < 0.001, 'Background leaked onto foreground');
-      check(at(18, 16, 0) > 0 && at(18, 16, 2) < 0.001, 'Near-field spread missing or contaminated');
+      // The near field (red, x < 16, CoC -8) over the in-focus green: by the thin-lens partial-occlusion model (Kraus &
+      // Strengert 2007; the near layer as in Jimenez 2014) a pixel shows the foreground by the share of its own 8 px
+      // disk that the foreground covers, over the sharp background seen past the edge. The gather has 64 taps on the
+      // golden-angle spiral (Vogel 1979), each a sixty-fourth of the disk, and the share of those taps on one side of
+      // this edge differs from the disk's area share by up to 1.64 taps (x 11 and 22); so every pixel of the ramp must
+      // match the area share within two taps (plus the 0.001 used above for 16-bit output). A pixel whose disk does not
+      // reach the edge is pure foreground, and the far blue never appears in front of the far edge.
+      const rgbAt = (x, y) => [0, 1, 2].map((c) => at(x, y, c)).join(', '),
+        radius = 8,
+        segment = (d) => radius * radius * Math.acos(d / radius) - d * Math.sqrt(radius * radius - d * d),
+        foreground = (x) => {
+          const d = 16 - (x + 0.5),
+            outside = Math.abs(d) >= radius ? 0 : segment(Math.abs(d)) / (Math.PI * radius * radius);
+          return d >= 0 ? 1 - outside : outside;
+        };
+      for (let x = 0; x < 24; x++) {
+        check(at(x, 16, 2) < 0.001, `Background leaked onto foreground at x ${x}: ${rgbAt(x, 16)}`);
+        if (x + 0.5 + radius <= 16)
+          check(at(x, 16, 0) > 0.999 && at(x, 16, 1) < 0.001, `Focus leaked onto foreground at x ${x}: ${rgbAt(x, 16)}`);
+        else
+          check(
+            Math.abs(at(x, 16, 0) - foreground(x)) < 2 / 64 + 0.001 &&
+              Math.abs(at(x, 16, 1) - (1 - foreground(x))) < 2 / 64 + 0.001,
+            `Near-field edge at x ${x} is ${rgbAt(x, 16)}, the disk share is ${foreground(x).toFixed(4)}`,
+          );
+      }
+      check(
+        at(18, 16, 0) > 0 && at(18, 16, 2) < 0.001,
+        `Near-field spread missing or contaminated: ${rgbAt(18, 16)}`,
+      );
       let litNeighbors = 0;
       for (let y = 9; y < 24; y++)
         for (let x = 39; x < 54; x++) if ((x !== 46 || y !== 16) && at(x, y, 0) > 0) litNeighbors++;
@@ -211,8 +280,7 @@ try {
       device.queue.writeBuffer(uniform, 0, params);
       encoder = device.createCommandEncoder();
       dispatch(encoder, cocPipeline, cocGroup, w, h);
-      dispatch(encoder, coarsePipeline, coarseGroup, w / 2, h / 2);
-      dispatch(encoder, bokehPipeline, bokehGroup, w, h);
+      gather(encoder);
       device.queue.submit([encoder.finish()]);
       const sharp = await read(output, 8, true);
       check(
@@ -328,7 +396,7 @@ try {
       grade[12] = 0;
       grade[2] = 2;
       grade[0] = 0;
-      const fx = buffer(64),
+      const fx = buffer(128),
         ae = device.createBuffer({
           size: 8,
           usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
@@ -352,9 +420,27 @@ try {
           { buffer: fx },
           { buffer: ae },
         ]);
-      const setFx = (v) => device.queue.writeBuffer(fx, 0, new Float32Array(v));
-      // gain.xyz, vignette | radius, softness, grain, aberration | rect | seed
-      const neutralFx = [1, 1, 1, 0, 0.5, 0.5, 0, 0, -0.5, -0.5, 1, 1, 0, 0, 0, 0];
+      // The Fx uniform as Tonemap writes it (applyEffects in packages/tonemap/src/index.ts): the white-balance matrix
+      // as three vec4 columns (the first column's w is the vignette amount), radius, softness, grain and aberration,
+      // the view rect, the grain frame, the vignette colour and blend, and its centre, roundness and dither step.
+      const setFx = ({
+        balance = [1, 1, 1],
+        vignette = 0,
+        radius = 0.5,
+        softness = 0.5,
+        grain = 0,
+        aberration = 0,
+        seed = 0,
+      } = {}) => {
+        const f = new Float32Array(32);
+        balance.forEach((g, i) => (f[4 * i + i] = g));
+        f[3] = vignette;
+        f.set([radius, softness, grain, aberration], 12);
+        f.set([-0.5, -0.5, 1, 1], 16);
+        f[20] = seed;
+        f.set([0.5, 0.5], 28);
+        device.queue.writeBuffer(fx, 0, f);
+      };
       async function toneWith(pipeline, bind, rgb) {
         device.queue.writeTexture({ texture: hdr }, new Float32Array([...rgb, 1]), { bytesPerRow: 16 }, [1, 1]);
         device.queue.writeBuffer(gradeUniform, 0, grade);
@@ -376,35 +462,35 @@ try {
         );
       const rgb = [0.2, 0.4, 0.6],
         base = await tone(rgb);
-      setFx(neutralFx);
+      setFx();
       near(
         await toneWith(fxPipe, fxGroup, rgb),
         base,
         0.00002,
         'Neutral effects variant must equal the default shader',
       );
-      setFx([2, 1, 0.5, 0, ...neutralFx.slice(4)]);
+      setFx({ balance: [2, 1, 0.5] });
       near(
         await toneWith(fxPipe, fxGroup, rgb),
         neutral([0.4, 0.4, 0.3]).map(srgb),
         0.00002,
         'White balance gain applies before the curve',
       );
-      setFx([1, 1, 1, 0.5, 0.1, 0.1, 0, 0, -0.5, -0.5, 1, 1, 0, 0, 0, 0]);
+      setFx({ vignette: 0.5, radius: 0.1, softness: 0.1 });
       near(
         await toneWith(fxPipe, fxGroup, rgb),
         neutral(rgb).map((v) => srgb(v * 0.5)),
         0.00002,
         'Vignette darkens by its intensity at the corner',
       );
-      setFx([1, 1, 1, 0, 0.5, 0.5, 1, 0, -0.5, -0.5, 1, 1, 5, 0, 0, 0]);
+      setFx({ grain: 1, seed: 5 });
       const grain = await toneWith(fxPipe, fxGroup, rgb);
       check(
         grain.slice(0, 3).every((v) => v >= 0 && v <= 1 && Number.isFinite(v)),
         'Grain stays in range',
       );
       check(Math.abs(grain[0] - base[0]) > 1e-4 && Math.abs(grain[0] - base[0]) < 0.15, 'Grain perturbs the picture');
-      setFx([1, 1, 1, 0, 0.5, 0.5, 0, 0.02, -0.5, -0.5, 1, 1, 0, 0, 0, 0]);
+      setFx({ aberration: 0.02 });
       near(await toneWith(fxPipe, fxGroup, rgb), base, 0.00002, 'Aberration clamps at the texture edge');
       {
         // Metering: log-average luminance of a flat field drives the adapted stops toward 18% grey. The uniform and
@@ -427,6 +513,7 @@ try {
             [64, 64],
           );
         const readAE = async () => {
+          await validated();
           const out = device.createBuffer({ size: 8, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
           const e = device.createCommandEncoder();
           e.copyBufferToBuffer(ae, 0, out, 0, 8);
@@ -464,7 +551,7 @@ try {
       }
       const state = new Float32Array([2, 1]);
       device.queue.writeBuffer(ae, 0, state);
-      setFx(neutralFx);
+      setFx();
       const autoOut = await toneWith(autoPipe, autoGroup, rgb);
       grade[0] = 2;
       near(autoOut, await tone(rgb), 0.00002, 'Adapted stops add to exposure');

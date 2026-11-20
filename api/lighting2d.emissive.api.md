@@ -33,6 +33,7 @@ export class EmissiveLighting2D implements EnginePlugin, Disposable {
     constructor(options?: EmissiveLighting2DOptions);
     static attach(instance: EngineKernel, options?: EmissiveLighting2DOptions): EmissiveLighting2D;
     setup(engine: Engine): void;
+    setTarget(target: GPUTexture | (() => GPUTexture) | undefined): void;
     addSprite(options?: EmissiveSpriteItem2D): EmissiveSprite2D;
     removeSprite(sprite: EmissiveSprite2D): boolean;
     connectBloom(create: () => EmissiveBloom2D): void;

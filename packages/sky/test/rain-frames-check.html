@@ -1,0 +1,44 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Rain frames</title><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style></head><body><canvas width="1280" height="720"></canvas>
+<script type="module">
+// A film's rain shot (sunlit bruneton sky with clouds, AgX tone mapping, shadows, the Weather rain driven by a
+// WeatherMachine) drawn one film frame at a time at 1/30 s, reporting a digest of every frame. Driven by
+// rain-frames-check.mjs. `read=headless` (default) draws on createHeadlessCanvas and reads the frame with readPixels;
+// `read=canvas` draws on the page canvas and copies it with drawImage in the same task as engine.render.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {createHeadlessCanvas,readPixels} from '/packages/headless/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {degrees,sunlitSky} from '/packages/sky/dist/sun.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+import {WeatherMachine} from '/packages/weather/dist/index.js';
+import {WeatherDrive} from '/packages/weather/dist/drive.js';
+const W=1280,H=720,params=new URLSearchParams(location.search),onCanvas=params.get('read')==='canvas',errors=[];
+const canvas=onCanvas?document.querySelector('canvas'):createHeadlessCanvas({width:W,height:H});
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,1.6,6],target:[0,1,0],near:0.05,far:5000}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const drive=WeatherDrive.attach(engine,{weather:new WeatherMachine('rain',{seed:3})});
+drive.options.sky=Sky.attach(engine,{...sunlitSky({elevation:degrees(32),azimuth:degrees(130)}),model:'bruneton',clouds:{coverage:0.42,speed:6}});
+drive.options.precipitation=Weather.attach(engine,{fadeSeconds:0});
+Tonemap.attach(engine,{curve:'agx',exposure:0});
+const shadows=Shadows.attach(engine,{resolution:1024,distance:50});
+const ground=engine.createMesh().setGeometry(box(60,0.2,60)).setMaterial(new PbrMaterial({color:'#5d7a3a',roughness:0.95})).setPosition([0,-0.1,0]);
+shadows.add(ground,{static:true});
+const copy=onCanvas?Object.assign(document.createElement('canvas'),{width:W,height:H}).getContext('2d',{willReadFrequently:true}):null;
+const fnv=(d,h=2166136261)=>{for(let i=0;i<d.length;i++)h=Math.imul(h^d[i],16777619)>>>0;return h;};
+async function frame(){
+  engine.render({delta:1/30});
+  let data;
+  if(copy){
+    // Same task as the render: the canvas's current texture is still the frame just drawn. After an await the canvas
+    // gives the last frame the browser presented instead, which lags by a number of frames that differs per process.
+    copy.drawImage(canvas,0,0);
+    data=copy.getImageData(0,0,W,H).data;
+    await device.queue.onSubmittedWorkDone();
+  }else data=(await readPixels(engine)).data;
+  return fnv(data).toString(16).padStart(8,'0');
+}
+window.check={async run(count){const frames=[];for(let i=0;i<count;i++)frames.push(await frame());return {errors,frames};}};
+window.ready=true;
+</script></body></html>

@@ -28,6 +28,7 @@ export type { VFXOverLife } from './over-life.js';
 export type { VFXSpace } from './space.js';
 export type {
   VFXOptions,
+  VFXWind,
   VFXObstacle,
   VFXTexture,
   VFXCurves,

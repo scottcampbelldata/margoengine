@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky ambient beside EnvironmentLighting</title><style>body{margin:0}canvas{display:block;width:320px;height:180px}</style></head><body><canvas width="320" height="180"></canvas>
+<script type="module">
+// KB-ENV-AMBIENT-DUP1: a sunlit sky that lights the scene (lighting.ambient) with a core box on the left and a glTF box
+// of the same grey, roughness 1, on the right. `?mode=sky`: the sky lights both (the glTF box through sky.add).
+// `?mode=env`: an EnvironmentLighting from an HDR beside the sky: it owns the ambient of core's shader and of the glTF box
+// (env.add); the sky still drives the sun. `?mode=auto`: no sky.add, the glTF box joins its scene's sky by itself
+// (KB-GLTF-SCENESKY1). `?mode=off`: no sky.add and model.sceneSky false, the built-in ambient. Driven by
+// sky-environment-check.mjs. Reports each box's top face as displayed.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {degrees,sunlitSky} from '/packages/sky/dist/sun.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {EnvironmentLighting} from '/packages/environment/dist/index.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const q=new URLSearchParams(location.search),mode=q.get('mode')??'sky';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,4,3.2],target:[0,0,0],near:0.05,far:5000}}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+device.lost.then(i=>errors.push('lost: '+i.message));
+const sky=Sky.attach(engine,{...sunlitSky({elevation:degrees(50),azimuth:degrees(160)}),model:'bruneton'});
+// A one-metre box of grey 0.5 (linear), metallic 0, roughness 1, as a glTF binary.
+function glb(){
+ const P=[],N=[],I=[];
+ for(const [ax,s] of [[0,1],[0,-1],[1,1],[1,-1],[2,1],[2,-1]]){
+  const n=[0,0,0];n[ax]=s;const u=[0,0,0],v=[0,0,0];u[(ax+1)%3]=1;v[(ax+2)%3]=1;const b=P.length/3;
+  for(const [a,c] of [[-1,-1],[1,-1],[1,1],[-1,1]]){for(let k=0;k<3;k++){P.push(0.5*(n[k]+a*u[k]+c*v[k]));N.push(n[k]);}}
+  if(s>0)I.push(b,b+1,b+2,b,b+2,b+3);else I.push(b,b+2,b+1,b,b+3,b+2);
+ }
+ const pos=new Float32Array(P),nor=new Float32Array(N),idx=new Uint16Array(I),bin=new Uint8Array(pos.byteLength+nor.byteLength+idx.byteLength+4);
+ bin.set(new Uint8Array(pos.buffer),0);bin.set(new Uint8Array(nor.buffer),pos.byteLength);bin.set(new Uint8Array(idx.buffer),pos.byteLength+nor.byteLength);
+ const json={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],
+  meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0}]}],
+  materials:[{pbrMetallicRoughness:{baseColorFactor:[0.5,0.5,0.5,1],metallicFactor:0,roughnessFactor:1}}],
+  buffers:[{byteLength:bin.byteLength}],
+  bufferViews:[{buffer:0,byteOffset:0,byteLength:pos.byteLength},{buffer:0,byteOffset:pos.byteLength,byteLength:nor.byteLength},{buffer:0,byteOffset:pos.byteLength+nor.byteLength,byteLength:idx.byteLength}],
+  accessors:[{bufferView:0,componentType:5126,count:24,type:'VEC3',min:[-0.5,-0.5,-0.5],max:[0.5,0.5,0.5]},{bufferView:1,componentType:5126,count:24,type:'VEC3'},{bufferView:2,componentType:5123,count:36,type:'SCALAR'}]};
+ let text=new TextEncoder().encode(JSON.stringify(json));const pad=(4-text.length%4)%4;text=new Uint8Array([...text,...Array(pad).fill(32)]);
+ const total=12+8+text.length+8+bin.byteLength,out=new Uint8Array(total),d=new DataView(out.buffer);
+ d.setUint32(0,0x46546c67,true);d.setUint32(4,2,true);d.setUint32(8,total,true);
+ d.setUint32(12,text.length,true);d.setUint32(16,0x4e4f534a,true);out.set(text,20);
+ d.setUint32(20+text.length,bin.byteLength,true);d.setUint32(24+text.length,0x004e4942,true);out.set(bin,28+text.length);
+ return out;
+}
+engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color:[0.5,0.5,0.5],roughness:1,metallic:0})).setPosition([-0.9,0,0]);
+const bytes=glb(),model=await loadGLTF(engine,'/virtual/grey-box.glb',{fetch:async()=>new Response(bytes)});
+model.root.position.set(0.9,0,0);
+let env;
+if(mode==='env'){env=await EnvironmentLighting.load(engine,'/examples/assets/skinning-ik-workshop.hdr');env.add(model);}
+else if(mode==='off')model.sceneSky=false;
+else if(mode!=='auto')sky.add(model);
+async function frame(){
+ const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+ engine.render({delta:0});
+ if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();
+ g.drawImage(canvas,0,0);
+ const d=g.getImageData(0,0,c.width,c.height).data;
+ // The top faces' middles (left: core box, right: glTF box), mean of each channel.
+ const mean=(x0,y0)=>{const m=[0,0,0];let n=0;for(let y=y0;y<y0+8;y++)for(let x=x0;x<x0+16;x++){const k=(y*320+x)*4;for(let i=0;i<3;i++)m[i]+=d[k+i];n++;}return m.map(v=>v/n);};
+ let h=2166136261;for(let i=0;i<d.length;i++)h=Math.imul(h^d[i],16777619)>>>0;
+ return {digest:h.toString(16),core:mean(122,74),gltf:mean(182,74)};
+}
+window.check={async run(count=4){const frames=[];for(let i=0;i<count;i++)frames.push(await frame());await device.queue.onSubmittedWorkDone();return {mode,errors,frames};}};
+window.ready=true;
+</script></body></html>

@@ -1,5 +1,5 @@
 // Real-GPU check for clustered directional and area-light shadows (fixture tests/clustered-shadow-browser.ts).
-// node scripts/gpu-lock.mjs run --owner=clustered-shadow -- node scripts/clustered-shadow-gpu-check.js [--baseline]
+// node scripts/run-with-timeout.mjs -- node scripts/clustered-shadow-gpu-check.js [--baseline]
 // --baseline records the shadow-off scenes (images, lit shader text, probe radiance) with the build in dist; a later run
 // requires them to be identical. That proof is for a change, against the build from before it, so with no baseline on disk
 // the run says so and goes on. It always checks the shadowed scenes against analytic occlusion. Each backend keeps its own
@@ -10,13 +10,11 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
-import { acquire } from './gpu-lock.mjs';
 import { compatRun } from './support/compat-shim.js';
 
 const folder = 'test-results/clustered-shadow',
   baseline = process.argv.includes('--baseline'),
-  recordFile = `${folder}/baseline${compatRun() ? '-compat' : ''}.json`,
-  release = await acquire({ owner: 'clustered-shadow-gpu-check' });
+  recordFile = `${folder}/baseline${compatRun() ? '-compat' : ''}.json`;
 const hash = (text) => createHash('sha256').update(text).digest('hex');
 let browser;
 try {
@@ -260,6 +258,246 @@ try {
     // to 0.5) and floor. The hard edge falls at x = 0.5 H / (H - 1.5). Blocker depth H - 1.5, receiver depth H, so the
     // penumbra's half width on the floor is R s with s = 1.5 / (H - 1.5), and a disc light's 10-90% rise (the visible
     // share past offset t of a disc is (acos(t / R) - (t / R) sqrt(1 - (t / R)^2)) / pi) is 1.374 R s wide.
+    // KB-LOCALSHADOW-OFFSET1: hard point and spot shadow edges stay on their casters. A light at height 2 over the bar
+    // (top face y 1.525, x -0.5 to 0.5) casts the bar's far top edge onto the floor about 3.8 m away at 58 degrees from
+    // the floor's normal, with 256 px maps as the Cabin Hearth's lantern. The edge falls where the ray over the corner
+    // (0.5, 1.525) meets the floor. Across it the receiver's visibility rises from 0 to 1, and its 50% crossing is the
+    // filtered edge. A rasterized edge lands on texel centres, so one crossing is off the true edge by up to half a texel
+    // on the floor whichever bias is used: the light steps 16 times over 4 cm of x (the edge moves about 2.3 texels
+    // through every rounding phase), and the mean of the crossings is the biases' own shift. A normal offset of k
+    // texels moves an edge k tan(theta) texels toward the light (the depth offsets move none), so the default 0.25
+    // puts it 0.4 texel (1.2 cm) out; the mean must sit within a quarter texel of that. The old offsets (1 texel toward
+    // the light and 1.5 along the normal) put it 2.8 texels (7.1 cm) out for the point light and 2.4 (3.9 cm) for the spot.
+    const hardEdges = {};
+    for (const kind of ['point', 'spot']) {
+      // The spot keeps one direction, at the first edge, so the edge sweeps across its map as the light moves.
+      const shifts = [],
+        expected = [],
+        texels = [],
+        aim = [(0.78 * 2) / 0.475, -2, 0].map((v, _i, a) => v / Math.hypot(...a));
+      for (let k = 0; k < 16; k++) {
+        const lx = -0.28 + k * 0.0025,
+          H = 2,
+          edge = lx + ((0.5 - lx) * H) / (H - 1.525),
+          ramp3 = line(0, 0, [0, 1, 0], edge - 0.3, edge + 0.3, 0.0025),
+          distance = Math.hypot(edge - lx, H),
+          light = {
+            position: [lx, H, 0],
+            range: 20,
+            intensity: 5,
+            castShadow: true,
+            shadow: { far: 20 },
+            ...(kind === 'spot' ? { direction: aim, outerAngle: 0.5 } : {}),
+          },
+          { values } = await visibility({ meshes: ['floor', 'bar'], local: { resolution: 256 }, points: [light] }, ramp3),
+          i = values.findIndex((v, j) => j > 0 && values[j - 1] < 0.5 && v >= 0.5),
+          x50 = ramp3[i - 1][0] + ((0.5 - values[i - 1]) / (values[i] - values[i - 1])) * 0.0025,
+          // The texel size the shader offsets by: a 90-degree cube face, or the spot's cone with its 2-texel margins,
+          // over 256 texels per unit distance, times the distance.
+          texel = ((kind === 'spot' ? (2 * Math.tan(0.5) * 256) / 252 : 2) / 256) * distance;
+        // Positive: the lit side runs past the geometric edge into the shadow (toward the light).
+        shifts.push(edge - x50);
+        expected.push(0.25 * texel * ((edge - lx) / H));
+        texels.push(texel);
+      }
+      const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length,
+        texel = mean(texels),
+        off = mean(shifts) - mean(expected);
+      hardEdges[kind] = {
+        leakCm: +(mean(shifts) * 100).toFixed(2),
+        normalOffsetCm: +(mean(expected) * 100).toFixed(2),
+        texelCm: +(texel * 100).toFixed(2),
+        crossingsCm: shifts.map((s) => +(s * 100).toFixed(2)),
+      };
+      check(
+        `${kind} 256 px hard edge at 58 degrees: the mean 50% crossing within a quarter texel of the 0.25-texel normal offset's shift`,
+        Math.abs(off) < 0.25 * texel,
+        hardEdges[kind],
+      );
+    }
+    console.log(JSON.stringify({ hardEdges }));
+    // No acne at grazing angles: a light 0.4 above the floor lights it at 80 to 85 degrees from its normal, where a
+    // texel's footprint on the floor is 6 to 11 texels long and a depth compare against the receiver's own depth fails
+    // half way across it (the old offsets: visibility down to 0.87), and a light 2 above at 49 to 66 degrees. Nothing
+    // casts onto the floor, so every point must be fully lit, within float rounding. A shading normal is often off the
+    // true surface (normal maps, smooth vertex normals): the floor with normals tilted 10 degrees toward, away from and
+    // across the light must stay lit at 49 to 66 degrees with the defaults, and at 80 to 85 degrees with slopeBias 2
+    // (with 0 the plane from a normal tilted toward so grazing a light rises a third as fast as the floor: documented
+    // in docs/limits.md). A normal turned past the light is skipped.
+    const tilt = (10 * Math.PI) / 180,
+      tilted = [
+        [Math.sin(tilt), Math.cos(tilt), 0],
+        [-Math.sin(tilt), Math.cos(tilt), 0],
+        [0, Math.cos(tilt), Math.sin(tilt)],
+      ],
+      floorLine = (normals) => {
+        const out = [];
+        for (const normal of normals)
+          for (let z = -0.6; z <= 0.6 + 1e-9; z += 0.3) out.push(...line(+z.toFixed(2), 0, normal, -1.2, 1.05, 0.0125));
+        return out;
+      };
+    for (const kind of ['point', 'spot'])
+      for (const [label, height, normals, options] of [
+        ['true normals at 80 to 85 degrees', 0.4, [[0, 1, 0]], {}],
+        ['true normals at 49 to 66 degrees', 2, [[0, 1, 0]], {}],
+        ['normals tilted 10 degrees at 49 to 66 degrees', 2, tilted, {}],
+        ['normals tilted 10 degrees at 80 to 85 degrees, slopeBias 2', 0.4, tilted, { slopeBias: 2 }],
+      ]) {
+        const grazing = floorLine(normals),
+          toward = [3.5, -height, 0].map((v, _i, a) => v / Math.hypot(...a)),
+          lamp = {
+            position: [-3.5, height, 0],
+            range: 20,
+            intensity: 5,
+            castShadow: true,
+            shadow: { far: 20 },
+            ...(kind === 'spot' ? { direction: toward, outerAngle: 0.7 } : {}),
+          },
+          { values } = await visibility(
+            { meshes: ['floor'], local: { resolution: 256, ...options }, points: [lamp] },
+            grazing,
+          );
+        let darkest = 1,
+          at,
+          checked = 0;
+        values.forEach((v, i) => {
+          if (Number.isNaN(v)) return;
+          checked++;
+          if (v < darkest) {
+            darkest = v;
+            at = grazing[i].map((c) => +c.toFixed(3));
+          }
+        });
+        check(`${kind} 256 px: a lit floor has no acne, ${label}`, darkest >= 0.999 && checked > grazing.length / 2, {
+          darkest,
+          at,
+          checked,
+          points: grazing.length,
+        });
+      }
+    // No peter-panning: the 0.1-high pebble (x -0.2 to 0.2) on the floor, lit from (-3.5, 2, 0), shades the floor from its
+    // far side at x 0.2 to x 0.2 + 0.1 tan(theta), 0.385 at 62 degrees. A depth bias lifted too far toward the light
+    // (or a normal offset) lights the floor next to the pebble: the floor from x 0.23 to 0.355 must stay dark.
+    const behind = line(0, 0, [0, 1, 0], 0.21, 0.35, 0.005);
+    for (const kind of ['point', 'spot']) {
+      const lamp = {
+          position: [-3.5, 2, 0],
+          range: 20,
+          intensity: 5,
+          castShadow: true,
+          shadow: { far: 20 },
+          ...(kind === 'spot' ? { direction: [3.7, -2, 0].map((v, _i, a) => v / Math.hypot(...a)), outerAngle: 0.5 } : {}),
+        },
+        { values } = await visibility({ meshes: ['floor', 'pebble'], local: { resolution: 1024 }, points: [lamp] }, behind),
+        brightest = Math.max(...values);
+      check(`${kind} 1024 px: the floor behind a 0.1-high pebble stays in its shadow (no peter-panning)`, brightest <= 0.001, {
+        brightest,
+        at: behind[values.indexOf(brightest)][0],
+        values: values.map((v) => +v.toFixed(3)),
+      });
+    }
+    // KB-SUNSHADOW-OFFSET1: directional hard shadow edges stay on their casters too. A sun at 58 degrees from the floor's
+    // normal (travelling +x, down) casts the bar's far top corner (0.5, 1.525) onto the floor at 0.5 + 1.525 tan(theta),
+    // with a 256 px map over the bounds x -4 to 4, y -0.2 to 2, z -1 to 1: a texel is (8 cos + 2.2 sin) / 252 m, 2.42 cm.
+    // The bounds step 16 times along x over two texels' worth of the map's grid (the grid moves cos(theta) per unit x),
+    // so the edge lands at every rounding phase, and the mean of the 50% crossings is the biases' own shift: the
+    // 0.25-texel normal offset's 0.25 tan(theta) texels, within a quarter texel. The old filter (flat compare, 1.5 texels
+    // along the normal) put it 2.4 texels (5.82 cm) out, the leak the KB row measured.
+    const sunEdge = { shifts: [], expected: [], texels: [] },
+      theta = (58 * Math.PI) / 180,
+      sunTexel = (8 * Math.cos(theta) + 2.2 * Math.sin(theta)) / 252,
+      sunEdgeX = 0.5 + 1.525 * Math.tan(theta),
+      ramp4 = line(0, 0, [0, 1, 0], sunEdgeX - 0.3, sunEdgeX + 0.3, 0.0025);
+    for (let k = 0; k < 16; k++) {
+      const dx = (k * 2 * sunTexel) / (16 * Math.cos(theta)),
+        sunLight = {
+          direction: [Math.sin(theta), -Math.cos(theta), 0],
+          intensity: 3,
+          castShadow: true,
+          shadow: { bounds: { min: [-4 + dx, -0.2, -1], max: [4 + dx, 2, 1] } },
+        },
+        { values } = await visibility({ meshes: ['floor', 'bar'], local: { resolution: 256 }, suns: [sunLight] }, ramp4),
+        i = values.findIndex((v, j) => j > 0 && values[j - 1] < 0.5 && v >= 0.5),
+        x50 = ramp4[i - 1][0] + ((0.5 - values[i - 1]) / (values[i] - values[i - 1])) * 0.0025;
+      sunEdge.shifts.push(sunEdgeX - x50);
+      sunEdge.expected.push(0.25 * sunTexel * Math.tan(theta));
+      sunEdge.texels.push(sunTexel);
+    }
+    {
+      const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length,
+        texel = mean(sunEdge.texels),
+        off = mean(sunEdge.shifts) - mean(sunEdge.expected);
+      hardEdges.directional = {
+        leakCm: +(mean(sunEdge.shifts) * 100).toFixed(2),
+        normalOffsetCm: +(mean(sunEdge.expected) * 100).toFixed(2),
+        texelCm: +(texel * 100).toFixed(2),
+        crossingsCm: sunEdge.shifts.map((s) => +(s * 100).toFixed(2)),
+      };
+      check(
+        'directional 256 px hard edge at 58 degrees: the mean 50% crossing within a quarter texel of the 0.25-texel normal offset\'s shift',
+        Math.abs(off) < 0.25 * texel,
+        hardEdges.directional,
+      );
+      console.log(JSON.stringify({ directionalHardEdge: hardEdges.directional }));
+    }
+    // Directional acne at grazing angles: a sun at 80 and 85 degrees, and at 49 and 66, from the floor's normal, nothing
+    // casting, so every floor point must be fully lit; the floor with normals tilted 10 degrees with the defaults at 49 and
+    // 66 degrees, and with slopeBias 2 at 80 and 85 (as for point and spot lights above). The flat compare with 0.25
+    // texels along the normal shows acne at all of them.
+    for (const [label, angles, normals, options] of [
+      ['true normals at 80 and 85 degrees', [80, 85], [[0, 1, 0]], {}],
+      ['true normals at 49 and 66 degrees', [49, 66], [[0, 1, 0]], {}],
+      ['normals tilted 10 degrees at 49 and 66 degrees', [49, 66], tilted, {}],
+      ['normals tilted 10 degrees at 80 and 85 degrees, slopeBias 2', [80, 85], tilted, { slopeBias: 2 }],
+    ]) {
+      const grazing = floorLine(normals);
+      let darkest = 1,
+        at,
+        checked = 0;
+      for (const angle of angles) {
+        const a = (angle * Math.PI) / 180,
+          { values } = await visibility(
+            {
+              meshes: ['floor'],
+              local: { resolution: 256, ...options },
+              suns: [{ direction: [Math.sin(a), -Math.cos(a), 0], intensity: 3, castShadow: true, shadow: { bounds: { min: [-2, -0.2, -1], max: [2, 0.2, 1] } } }],
+            },
+            grazing,
+          );
+        values.forEach((v, i) => {
+          if (Number.isNaN(v)) return;
+          checked++;
+          if (v < darkest) {
+            darkest = v;
+            at = [angle, ...grazing[i].map((c) => +c.toFixed(3))];
+          }
+        });
+      }
+      check(`directional 256 px: a lit floor has no acne, ${label}`, darkest >= 0.999 && checked > grazing.length, {
+        darkest,
+        at,
+        checked,
+        points: grazing.length * angles.length,
+      });
+    }
+    // Directional peter-panning: a sun at 60 degrees from (-3.5, 2, 0), the 0.1-high pebble shades the floor from x 0.2 to
+    // 0.2 + 0.1 tan(theta), 0.375; with a 1024 px map over 2 m the floor from x 0.23 to 0.355 must stay dark.
+    {
+      const { values } = await visibility(
+          {
+            meshes: ['floor', 'pebble'],
+            local: { resolution: 1024 },
+            suns: [{ direction: [3.5, -2, 0], intensity: 3, castShadow: true, shadow: { bounds: { min: [-1, -0.2, -1], max: [1, 0.3, 1] } } }],
+          },
+          behind,
+        ),
+        brightest = Math.max(...values);
+      check('directional 1024 px: the floor behind a 0.1-high pebble stays in its shadow (no peter-panning)', brightest <= 0.001, {
+        brightest,
+        at: behind[values.indexOf(brightest)][0],
+        values: values.map((v) => +v.toFixed(3)),
+      });
+    }
     const softWidths = {};
     for (const [kind, R, H] of [
       ['point', 0.2, 3],
@@ -323,6 +561,93 @@ try {
       softWidths['point radius 0.4 at height 3'].measured > 1.5 * softWidths['point radius 0.4 at height 4.5'].measured,
       softWidths,
     );
+    // KB-PCSS-BLOCK1: no stair steps inside a penumbra. The bar's straight edge seen from a light of radius rho (on the
+    // floor) has visibility 1 - seg((x - edge) / rho), seg(u) = (acos(u) - u sqrt(1 - u^2)) / pi. One tap pattern
+    // shared by every pixel drew that ramp as 24 shifted hard shadows: treads at whole multiples of 1/24, each step
+    // one shadow texel wide, which a close camera (a texel about 2.5 pixels here) shows as blocks. On a tread the mean
+    // over a strip of pixels along the edge (z, 381 rows 1.1 pixels apart) is a whole number of taps, so wherever the
+    // curve passes between two multiples the mean is half a tap (1/48) or more off it. With each pixel's spiral turned
+    // and its rings moved by its screen noise, the mean follows the curve within 1/48 once shifted by the receiver's
+    // bias (fitted, at most 0.02, under three texels): measured 0.053 to 0.058 before, 0.009 to 0.012 after. The step
+    // between neighbouring columns is logged, not bounded: per-pixel noise left in a 381-row mean makes it 0.012 to
+    // 0.016 either way. The area light's taps fill an ellipse of its half extents, so rho = W / 2.
+    await call('camera', [1, 0.75, 0.25], [1, 0, 0]);
+    const pixel = (0.79 * Math.tan((25 * Math.PI) / 180)) / 128,
+      strip = [];
+    for (let k = -190; k <= 190; k++) strip.push(+(k * 1.1 * pixel).toFixed(5));
+    const steps = {};
+    for (const [label, light, edge, rho] of [
+      [
+        'point radius 0.4 at height 3',
+        {
+          points: [
+            { position: [0, 3, 0], range: 20, intensity: 5, castShadow: true, shadow: { radius: 0.4, far: 20 } },
+          ],
+        },
+        1,
+        0.4,
+      ],
+      [
+        'point radius 0.2 at height 3',
+        {
+          points: [
+            { position: [0, 3, 0], range: 20, intensity: 5, castShadow: true, shadow: { radius: 0.2, far: 20 } },
+          ],
+        },
+        1,
+        0.2,
+      ],
+      [
+        'area 1.2 wide',
+        {
+          areas: [
+            {
+              position: [0, 3, 0],
+              direction: [0, -1, 0],
+              width: 1.2,
+              height: 0.4,
+              intensity: 5,
+              castShadow: true,
+              shadow: { far: 20 },
+            },
+          ],
+        },
+        1,
+        0.6,
+      ],
+    ]) {
+      const xs = [];
+      for (let x = edge - rho - 0.03; x <= edge + rho + 0.03 + 1e-9; x += pixel) xs.push(+x.toFixed(5));
+      const points = xs.flatMap((x) => strip.map((z) => [x, 0, z, 0, 1, 0])),
+        { values } = await visibility({ meshes: ['floor', 'bar'], local: { resolution: 1024 }, ...light }, points),
+        mean = xs.map((_, i) => strip.reduce((sum, _z, k) => sum + values[i * strip.length + k], 0) / strip.length),
+        seg = (u) => (u >= 1 ? 0 : u <= -1 ? 1 : (Math.acos(u) - u * Math.sqrt(1 - u * u)) / Math.PI);
+      let step = 0,
+        stepAt,
+        fit = { distance: Infinity };
+      mean.forEach((v, i) => {
+        if (i && Math.abs(v - mean[i - 1]) > step) {
+          step = Math.abs(v - mean[i - 1]);
+          stepAt = xs[i];
+        }
+      });
+      for (let shift = -0.02; shift <= 0.02 + 1e-9; shift += 0.0005) {
+        let distance = 0;
+        mean.forEach((v, i) => (distance = Math.max(distance, Math.abs(v - (1 - seg((xs[i] - edge - shift) / rho))))));
+        if (distance < fit.distance) fit = { distance, shift: +shift.toFixed(4) };
+      }
+      steps[label] = { largestStep: step, at: stepAt, fit };
+      check(
+        `${label}: the strip mean follows the exact disc-light penumbra within half a tap (1/48)`,
+        fit.distance <= 1 / 48,
+        {
+          ...fit,
+          bound: 1 / 48,
+        },
+      );
+    }
+    console.log(JSON.stringify({ penumbraSteps: steps }));
+    await call('camera', [0, 8, 8]);
     // twoSided: the back face shadows the ceiling (y 6) through a bar at y 4.5, as the front face shadows the floor.
     const twoSided = {
         meshes: ['floor', 'bar', 'ceiling', 'topBar'],
@@ -528,5 +853,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.clusteredShadowFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

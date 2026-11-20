@@ -95,7 +95,7 @@ const finalStage = /*@__PURE__*/ stage({
 const refuse = (what: string): never => {
   throw new MargoError(
     'unsupported',
-    `LightingMaterial requires the standard gltf-pro PBR shader (${what} is missing); use matching @margoengine/gltf-pro and shader versions`,
+    `LightingMaterial requires the standard gltf/pbr shader (${what} is missing); use matching @margoengine/gltf/pbr and shader versions`,
   );
 };
 const indent = (lines: string[]) => lines.map((l) => '  ' + l + '\n').join('');

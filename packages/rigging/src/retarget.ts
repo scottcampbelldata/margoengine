@@ -1,9 +1,10 @@
-// Retarget presets: the bone names of common skeletons (Mixamo, Godot's humanoid profile, Roblox R15 and Margo's own
+// Retarget presets: the bone names of common skeletons (Mixamo, Godot's humanoid profile, Roblox R15, MPFB's default rig and Margo's own
 // humanoid) mapped onto one humanoid vocabulary, so a clip made for one plays on another with
 // `@margoengine/animation`'s Retarget; plus rest-pose alignment, which turns the target's reference pose to match the
 // source's (an A-pose character driven by T-pose clips) bone by bone.
-import { multiplyQuaternions, normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
+import { multiplyQuaternions, normalizeQuaternion } from '@margoengine/math/quat';
 import { rotationBetween } from './ik.js';
+import { parentOrder, worldFrames } from './rig.js';
 
 /** Humanoid bones, by the names this package maps every preset to. */
 export type HumanoidBone =
@@ -28,7 +29,7 @@ export type HumanoidBone =
       | `${'Index' | 'Middle' | 'Ring' | 'Little'}${'Proximal' | 'Intermediate' | 'Distal'}`}`;
 
 /** Skeleton naming conventions with a preset. */
-export type SkeletonPreset = 'mixamo' | 'godot' | 'roblox' | 'margo' | 'humanoid';
+export type SkeletonPreset = 'mixamo' | 'godot' | 'roblox' | 'margo' | 'cmu' | 'mpfb' | 'characterCreator' | 'humanoid';
 
 const SIDES = ['left', 'right'] as const;
 const FINGERS = ['Index', 'Middle', 'Ring', 'Little'] as const;
@@ -80,6 +81,13 @@ const AIM: Partial<Record<HumanoidBone, readonly HumanoidBone[]>> = {
   ),
 };
 
+/**
+ * Bones whose rest direction is the body's layout, not a pose: the trunk, neck and collarbones. Rest alignment leaves
+ * them as the target has them (aiming them along a motion-capture skeleton's leaning trunk or rising collarbones would
+ * hunch and shrug the target); it turns the limbs, hands and fingers, where T-pose and A-pose rigs differ.
+ */
+const LAYOUT: ReadonlySet<HumanoidBone> = new Set(['hips', 'spine', 'chest', 'upperChest', 'neck', 'leftShoulder', 'rightShoulder']);
+
 /** Each preset's name for each humanoid bone it has (others are absent). */
 const PRESETS: Record<SkeletonPreset, Partial<Record<HumanoidBone, string>>> = {
   humanoid: Object.fromEntries(HUMANOID_BONES.map((b) => [b, b])),
@@ -114,10 +122,11 @@ const PRESETS: Record<SkeletonPreset, Partial<Record<HumanoidBone, string>>> = {
   ]),
   // Godot's SkeletonProfileHumanoid bone names (its Root is not a humanoid bone and stays at rest).
   godot: Object.fromEntries(HUMANOID_BONES.map((b) => [b, capital(b)])),
-  // Roblox R15: LowerTorso and UpperTorso for the trunk, no neck, shoulders, toes or fingers.
+  // Roblox R15: LowerTorso and UpperTorso for the trunk, no neck, shoulders, toes or fingers. UpperTorso is the spine:
+  // VRM 1.0 (humanoid.md) requires spine and makes chest optional, so the one trunk bone above the hips is spine.
   roblox: Object.fromEntries([
     ['hips', 'LowerTorso'],
-    ['chest', 'UpperTorso'],
+    ['spine', 'UpperTorso'],
     ['head', 'Head'],
     ...SIDES.flatMap((s) => {
       const S = capital(s);
@@ -128,6 +137,94 @@ const PRESETS: Record<SkeletonPreset, Partial<Record<HumanoidBone, string>>> = {
         [`${s}UpperLeg`, `${S}UpperLeg`],
         [`${s}LowerLeg`, `${S}LowerLeg`],
         [`${s}Foot`, `${S}Foot`],
+      ];
+    }),
+  ]),
+  // The CMU Graphics Lab motion capture skeleton (Acclaim ASF, as `@margoengine/loaders/mocap`'s parseASF names its
+  // joints: each at its bone's start). root is the pelvis; lowerback, upperback and thorax the trunk; lowerneck the
+  // neck's base (upperneck stays at rest); lwrist the hand at the wrist and lfingers the knuckles it aims at. Thumbs are
+  // one bone in CMU files and are left at rest.
+  cmu: Object.fromEntries([
+    ['hips', 'root'],
+    ['spine', 'lowerback'],
+    ['chest', 'upperback'],
+    ['upperChest', 'thorax'],
+    ['neck', 'lowerneck'],
+    ['head', 'head'],
+    ...SIDES.flatMap((s) => {
+      const c = s[0];
+      return [
+        [`${s}Shoulder`, `${c}clavicle`],
+        [`${s}UpperArm`, `${c}humerus`],
+        [`${s}LowerArm`, `${c}radius`],
+        [`${s}Hand`, `${c}wrist`],
+        [`${s}MiddleProximal`, `${c}fingers`],
+        [`${s}UpperLeg`, `${c}femur`],
+        [`${s}LowerLeg`, `${c}tibia`],
+        [`${s}Foot`, `${c}foot`],
+        [`${s}Toes`, `${c}toes`],
+      ];
+    }),
+  ]),
+  // MPFB's (MakeHuman for Blender) default rig: root at the pelvis, spine05 up to spine01, neck01 to neck03, clavicle,
+  // shoulder01 and upperarm01/02 (the second a twist bone), lowerarm01/02, wrist; fingerN-1 to -3 with finger1 the
+  // thumb (metacarpal, proximal, distal) and finger2 to finger5 index to little; upperleg01, lowerleg01, foot, toe1-1.
+  // Sides are the .L and .R suffixes.
+  mpfb: Object.fromEntries([
+    ['hips', 'root'],
+    ['spine', 'spine05'],
+    ['chest', 'spine03'],
+    ['upperChest', 'spine01'],
+    ['neck', 'neck01'],
+    ['head', 'head'],
+    ...SIDES.flatMap((s) => {
+      const S = s === 'left' ? 'L' : 'R';
+      return [
+        [`${s}Shoulder`, `clavicle.${S}`],
+        [`${s}UpperArm`, `upperarm01.${S}`],
+        [`${s}LowerArm`, `lowerarm01.${S}`],
+        [`${s}Hand`, `wrist.${S}`],
+        [`${s}ThumbMetacarpal`, `finger1-1.${S}`],
+        [`${s}ThumbProximal`, `finger1-2.${S}`],
+        [`${s}ThumbDistal`, `finger1-3.${S}`],
+        ...FINGERS.flatMap((f, n) => PHALANGES.map((p, i) => [`${s}${f}${p}`, `finger${n + 2}-${i + 1}.${S}`])),
+        [`${s}UpperLeg`, `upperleg01.${S}`],
+        [`${s}LowerLeg`, `lowerleg01.${S}`],
+        [`${s}Foot`, `foot.${S}`],
+        [`${s}Toes`, `toe1-1.${S}`],
+      ];
+    }),
+  ]),
+  // Character Creator's CC3+ skeleton (CC3, CC4 and CC5 export it; an Unreal or Unity export keeps the names):
+  // CC_Base_Hip carries the body, CC_Base_Pelvis under it only the legs; Waist, Spine01 and Spine02 the trunk;
+  // NeckTwist01 the neck; Thumb1 to 3 and Index, Mid, Ring, Pinky 1 to 3 the fingers. The twist and share bones
+  // follow their limb in the file's own skin and stay at rest here.
+  characterCreator: Object.fromEntries([
+    ['hips', 'CC_Base_Hip'],
+    ['spine', 'CC_Base_Waist'],
+    ['chest', 'CC_Base_Spine01'],
+    ['upperChest', 'CC_Base_Spine02'],
+    ['neck', 'CC_Base_NeckTwist01'],
+    ['head', 'CC_Base_Head'],
+    ['jaw', 'CC_Base_JawRoot'],
+    ...SIDES.flatMap((s) => {
+      const S = `CC_Base_${s === 'left' ? 'L' : 'R'}_`;
+      return [
+        [`${s}Eye`, `${S}Eye`],
+        [`${s}Shoulder`, `${S}Clavicle`],
+        [`${s}UpperArm`, `${S}Upperarm`],
+        [`${s}LowerArm`, `${S}Forearm`],
+        [`${s}Hand`, `${S}Hand`],
+        [`${s}ThumbMetacarpal`, `${S}Thumb1`],
+        [`${s}ThumbProximal`, `${S}Thumb2`],
+        [`${s}ThumbDistal`, `${S}Thumb3`],
+        ...FINGERS.flatMap((f) =>
+          PHALANGES.map((p, i) => [`${s}${f}${p}`, `${S}${f === 'Little' ? 'Pinky' : f === 'Middle' ? 'Mid' : f}${i + 1}`]),
+        ),
+        [`${s}UpperLeg`, `${S}Thigh`],
+        [`${s}LowerLeg`, `${S}Calf`],
+        [`${s}Foot`, `${S}Foot`],
+        [`${s}Toes`, `${S}ToeBase`],
       ];
     }),
   ]),
@@ -192,14 +289,14 @@ function exactCase(names: readonly string[], preset: SkeletonPreset, found: Map<
 
 /**
  * The preset whose bone names match the most of `names` (Mixamo with any `mixamorig` prefix, Godot's humanoid profile,
- * Roblox R15, Margo's humanoidJoints, or the humanoid names themselves), or null when none finds hips and a head.
+ * Roblox R15, Margo's humanoidJoints, the CMU motion capture skeleton, MPFB, Character Creator's CC3+ skeleton, or the humanoid names themselves), or null when none finds hips and a head.
  */
 export function detectSkeleton(names: readonly string[]): SkeletonMatch | null {
   let best: SkeletonMatch | null = null,
     bestExact = -1;
   // Specific presets first, so a tie keeps the specific one; Godot's names are the humanoid ones capitalised, so
   // between equal counts the preset whose case the names use wins.
-  for (const preset of ['mixamo', 'roblox', 'godot', 'margo', 'humanoid'] as const) {
+  for (const preset of ['mixamo', 'roblox', 'godot', 'margo', 'cmu', 'mpfb', 'characterCreator', 'humanoid'] as const) {
     const found = humanoidBones(names, preset);
     if (!found.has('hips') || !found.has('head')) continue;
     const exact = exactCase(names, preset, found);
@@ -228,8 +325,10 @@ export interface PrepareRetargetOptions {
   /** The target's naming; detected when omitted. */
   to?: SkeletonPreset;
   /**
-   * Turn the target's reference pose so each mapped bone points the way its source bone does at rest (default true):
-   * a T-pose source then drives an A-pose target into the same T-pose. False keeps the target's own rest pose.
+   * Turn the target's reference pose so each mapped limb bone (arms, hands, fingers, legs, feet) points the way its source
+   * bone does at rest (default true): a T-pose source then drives an A-pose target into the same T-pose. The trunk, neck
+   * and collarbones keep the target's own rest, since their directions are body layout, not pose. False keeps the
+   * target's whole rest pose.
    */
   alignRest?: boolean;
 }
@@ -268,11 +367,11 @@ export function prepareRetarget(
     to = options.to ?? detectSkeleton(target.names)?.preset;
   if (!from)
     throw new RangeError(
-      'Retarget source naming is not recognised; pass from (mixamo, godot, roblox, margo or humanoid)',
+      'Retarget source naming is not recognised; pass from (mixamo, godot, roblox, margo, cmu or humanoid)',
     );
   if (!to)
     throw new RangeError(
-      'Retarget target naming is not recognised; pass to (mixamo, godot, roblox, margo or humanoid)',
+      'Retarget target naming is not recognised; pass to (mixamo, godot, roblox, margo, cmu or humanoid)',
     );
   const sourceBones = humanoidBones(source.names, from),
     targetBones = humanoidBones(target.names, to),
@@ -302,39 +401,34 @@ function checkRetargetRig(rig: RetargetRigData, label: string): void {
     if (!Number.isInteger(p) || p < -1 || p >= n || p === i)
       throw new RangeError(`Retarget ${label} bone ${i} parent ${p} is invalid; use -1 or another bone's index`);
   });
+  parentOrder(rig.parents, `Retarget ${label}`);
 }
 
-/** World rotation, position and scale of every bone of a local pose (10 per bone). */
+/** World rotation and position of every bone of a local pose (10 per bone), full matrices as glTF 2.0 3.5.3. */
 function worldPose(rig: RetargetRigData, local: Float64Array) {
   const n = rig.names.length,
+    frames = worldFrames(rig.parents, local, parentOrder(rig.parents, 'Retarget rig')),
     rotation: number[][] = new Array(n),
-    position: number[][] = new Array(n),
-    scale: number[][] = new Array(n),
-    done = new Uint8Array(n);
-  const visit = (b: number): void => {
-    if (done[b]) return;
-    const p = rig.parents[b],
-      l = b * 10,
-      q = [local[l + 3], local[l + 4], local[l + 5], local[l + 6]],
-      s = [local[l + 7], local[l + 8], local[l + 9]];
-    if (p < 0) {
-      rotation[b] = q;
-      position[b] = [local[l], local[l + 1], local[l + 2]];
-      scale[b] = s;
-    } else {
-      visit(p);
-      const o = rotateByQuaternion(
-        [local[l] * scale[p][0], local[l + 1] * scale[p][1], local[l + 2] * scale[p][2]],
-        rotation[p],
-      );
-      rotation[b] = multiplyQuaternions(rotation[p], q);
-      position[b] = [position[p][0] + o[0], position[p][1] + o[1], position[p][2] + o[2]];
-      scale[b] = [scale[p][0] * s[0], scale[p][1] * s[1], scale[p][2] * s[2]];
-    }
-    done[b] = 1;
-  };
-  for (let b = 0; b < n; b++) visit(b);
-  return { rotation, position };
+    position: number[][] = new Array(n);
+  for (let b = 0; b < n; b++) {
+    rotation[b] = Array.from(frames.rotation.subarray(b * 4, b * 4 + 4));
+    position[b] = Array.from(frames.position.subarray(b * 3, b * 3 + 3));
+  }
+  return { rotation, position, linear: frames.linear };
+}
+
+/** `v` taken back through bone `b`'s 3x3 world part (column-major in `linear`), or null when it is singular. */
+function unapply(linear: Float64Array, b: number, v: readonly number[]): number[] | null {
+  const m = linear.subarray(b * 9, b * 9 + 9),
+    det = (a: readonly number[], c: readonly number[], d: readonly number[]) =>
+      a[0] * (c[1] * d[2] - c[2] * d[1]) - c[0] * (a[1] * d[2] - a[2] * d[1]) + d[0] * (a[1] * c[2] - a[2] * c[1]),
+    x = [m[0], m[1], m[2]],
+    y = [m[3], m[4], m[5]],
+    z = [m[6], m[7], m[8]],
+    whole = det(x, y, z);
+  // Cramer's rule.
+  if (!(Math.abs(whole) > 1e-300)) return null;
+  return [det(v, y, z) / whole, det(x, v, z) / whole, det(x, y, v) / whole];
 }
 
 /**
@@ -351,6 +445,7 @@ function alignRestPose(
     sourceWorld = worldPose(source, source.rest),
     order = HUMANOID_BONES.filter((bone) => targetBones.has(bone));
   for (const bone of order) {
+    if (LAYOUT.has(bone)) continue;
     const aim = (AIM[bone] ?? []).find((child) => targetBones.has(child) && sourceBones.has(child));
     if (!aim || !sourceBones.has(bone)) continue;
     const t = targetBones.get(bone)!,
@@ -361,12 +456,17 @@ function alignRestPose(
       have = [0, 1, 2].map((c) => world.position[tc][c] - world.position[t][c]),
       want = [0, 1, 2].map((c) => sourceWorld.position[sc][c] - sourceWorld.position[s][c]);
     if (Math.hypot(...have) < 1e-9 || Math.hypot(...want) < 1e-9) continue;
-    const turned = multiplyQuaternions(rotationBetween(have, want), world.rotation[t]),
-      p = target.parents[t],
-      parent = p < 0 ? [0, 0, 0, 1] : world.rotation[p];
+    // Turn the bone in its parent's frame, before the parent's stretch: the child's offset there is the bone's local
+    // rotation times a vector the rotation does not change, so turning it from `have` to `want` (both taken back
+    // through the parent's full world matrix, glTF 2.0 3.5.3) aims the child exactly, uneven parent scales included.
+    const p = target.parents[t],
+      from = p < 0 ? have : unapply(world.linear, p, have),
+      to = p < 0 ? want : unapply(world.linear, p, want);
+    if (!from || !to) continue; // a flat parent scale: nothing below it can be aimed
+    const l = t * 10 + 3;
     rest.set(
-      normalizeQuaternion(multiplyQuaternions([-parent[0], -parent[1], -parent[2], parent[3]], turned)),
-      t * 10 + 3,
+      normalizeQuaternion(multiplyQuaternions(rotationBetween(from, to), [rest[l], rest[l + 1], rest[l + 2], rest[l + 3]])),
+      l,
     );
   }
   return { names: target.names, parents: target.parents, rest };

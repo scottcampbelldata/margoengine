@@ -1,4 +1,3 @@
-import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
@@ -50,9 +49,8 @@ test('parity smoke rejects repeated runs before creating a browser', () => {
 });
 
 test('standard smoke rejects unknown suites and engines before creating a browser', () => {
-  const env = { ...process.env, MARGO_GPU_LOCK_NESTED: 'test-only' };
   const run = (...args) =>
-    execFileSync(process.execPath, ['scripts/parity-smoke-browser.mjs', ...args], { timeout: 30_000, env, stdio: 'pipe' });
+    execFileSync(process.execPath, ['scripts/parity-smoke-browser.mjs', ...args], { timeout: 30_000, stdio: 'pipe' });
   assert.throws(() => run('--standard=no-such-suite'), /Unknown standard suite/);
   assert.throws(
     () => run('--standard=react', '--engines=margo,no-such-engine', '--engine-bench=test-results/no-engine-bench'),

@@ -233,7 +233,7 @@ interface PointsMaterialOptions extends BaseMaterialOptions {
     edl?: boolean;
 }
 
-type PointsTextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
+type PointsTextureSource = GPUTexture | ((device: GPUDevice) => GPUTexture) | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
 
 abstract class SelectionMasked {
   abstract readonly count: number;

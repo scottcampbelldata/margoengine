@@ -68,6 +68,7 @@ class Clustered implements EnginePlugin {
     readonly grid: readonly [number, number, number];
     intensityScale: number | (() => number);
     readonly maxLights: number;
+    get shadowSlots(): number;
     get shadow(): ClusteredShadow | undefined;
     set shadow(hook: ClusteredShadow | undefined);
     get area(): ClusteredArea | undefined;
@@ -88,9 +89,12 @@ class Clustered implements EnginePlugin {
     set layers(hook: ClusteredLightTerm | undefined);
     get contact(): ClusteredLightTerm | undefined;
     set contact(hook: ClusteredLightTerm | undefined);
+    get bounce(): ClusteredBounce | undefined;
+    set bounce(hook: ClusteredBounce | undefined);
     get list(): readonly (PointLight | SpotLight)[];
     constructor(options?: ClusteredOptions);
     get owner(): Engine | undefined;
+    get isDisposed(): boolean;
     static attach(instance: EngineKernel, options?: ClusteredOptions): Clustered;
     setLights(lights: readonly (PointLight | SpotLight)[]): this;
     hasReceiver(receiver: ClusteredReceiver): boolean;
@@ -123,16 +127,29 @@ interface ClusteredArea {
     shadowLights?(): readonly AreaShadowLight[];
 }
 
+interface ClusteredBounce {
+    declarations(group: number): string;
+    bindings(): GPUBindGroupEntry[];
+}
+
 interface ClusteredDirectional {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     shadowLights?(): readonly DirectionalShadowLight[];
 }
 
+interface ClusteredLightRecord {
+    readonly position: readonly number[];
+    readonly direction?: readonly number[];
+    readonly cosOuter?: number;
+}
+
 interface ClusteredLightTerm {
     declarations(group: number): string;
     bindings(): GPUBindGroupEntry[];
     readonly term: string;
+    emission?(index: number, light: ClusteredLightRecord, position: readonly number[]): readonly [number, number, number];
+    readonly revision?: number;
 }
 
 interface ClusteredLighting {
@@ -227,6 +244,8 @@ interface LocalShadowOptions {
     resolution?: number;
     bias?: number;
     normalBias?: number;
+    receiverPlane?: boolean;
+    slopeBias?: number;
 }
 
 interface LocalShadowPrimitive {
@@ -260,6 +279,7 @@ interface LocalShadowPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    hashed?: (code: string) => string;
 }
 
 interface LocalShadowPrimitive {
@@ -294,6 +314,7 @@ interface LocalShadowPrimitive {
         readonly sampler: GPUSampler;
     };
     vertexAlpha?: boolean;
+    hashed?: (code: string) => string;
     bounds?: ArrayLike<number>;
 }
 
@@ -351,6 +372,8 @@ interface PointLight {
     decay?: number;
     shadow?: boolean | LocalLightShadow;
     castShadow?: boolean;
+    radius?: number;
+    bounce?: boolean;
 }
 
 interface SpotLight extends PointLight {

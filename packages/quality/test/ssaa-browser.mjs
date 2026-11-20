@@ -1,15 +1,13 @@
-// Real-GPU check of supersample, built packages. Takes the GPU lock itself around the browser.
+// Real-GPU check of supersample, built packages.
 // node packages/quality/test/ssaa-browser.mjs
 // The reference is the same scene drawn 8 times wider and taller and box-filtered in linear light: what supersampling
 // should reach. A plain frame and a 64-sample still are each compared with it by PSNR.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
-const release = await acquire({ owner: 'quality-ssaa' });
 setTimeout(() => {
   console.error('ssaa-browser: stopped at its time limit');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 180_000).unref();
 const context = await openBrowser({ startPath: '/packages/quality/test/ssaa-browser.html', port: 5212 }),
   { page } = context,
@@ -175,5 +173,4 @@ try {
   console.log('ssaa browser check passed');
 } finally {
   await context.close();
-  await release();
 }

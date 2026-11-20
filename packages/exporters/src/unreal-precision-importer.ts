@@ -26,6 +26,7 @@ export interface UnrealPrecisionImporterOptions {
   checkMasterAtlas: string;
 }
 
+const lineEnded = (source: string): string => (source.endsWith('\n') ? source : source + '\n');
 const hook = (value: unknown, label: string, start: string): string => {
   if (typeof value !== 'string' || !value.startsWith(start) || value.includes('`'))
     throw new TypeError(`${label} must be Python source starting with "${start}"; pass the application's hook`);
@@ -56,7 +57,8 @@ export function createUnrealPrecisionImporter(options: UnrealPrecisionImporterOp
     materialName: options.materialName,
     validateMaster: hook(options.validateMaster, 'validateMaster', 'def validate_master(project, manifest):'),
     atlasPayload: hook(options.atlasPayload, 'atlasPayload', 'def atlas_payload(manifest, master, source_sha):'),
-    checkMasterAtlas: hook(options.checkMasterAtlas, 'checkMasterAtlas', '    '),
+    // Placed straight before the next statement, so it must end its own last line.
+    checkMasterAtlas: lineEnded(hook(options.checkMasterAtlas, 'checkMasterAtlas', '    ')),
   };
   return String.raw`"""${n.name} app-owned bounded static Unreal integration.
 
@@ -260,6 +262,9 @@ def original_accessor(g, binary, index):
     packed = struct.calcsize(fmt)
     start, length, offset, count = view.get("byteOffset", 0), view.get("byteLength"), accessor.get("byteOffset", 0), accessor.get("count")
     stride = view.get("byteStride", packed)
+    # glTF 2.0 3.6.2.4 and 5.11.4: a stride is 4 to 252 in steps of 4; an index view has none (3.6.1.1).
+    need("byteStride" not in view or (accessor["type"] != "SCALAR" and type(stride) is int and 4 <= stride <= 252 and stride % 4 == 0),
+         "Original buffer view stride outside glTF rules")
     need(all(type(value) is int for value in (start, length, offset, count, stride))
          and min(start, offset) >= 0 and count > 0 and stride >= packed and length >= packed
          and start + length <= len(binary) and offset + (count - 1) * stride + packed <= length,
@@ -268,6 +273,14 @@ def original_accessor(g, binary, index):
         value = struct.unpack_from(fmt, binary, start + offset + item * stride)
         need(all(math.isfinite(part) for part in value), "Nonfinite original physical accessor")
         yield value
+
+
+def original_indices(g, binary, index, vertex_count):
+    # glTF 2.0 3.7.2.1: every index names a vertex, and none is its type's primitive restart value, the type's maximum.
+    restart = {5121: 255, 5123: 65535, 5125: 4294967295}.get(array_item(g.get("accessors"), index).get("componentType"))
+    need(restart is not None, "Complete original triangle indices required")
+    for value in original_accessor(g, binary, index):
+        need(0 <= value[0] < vertex_count and value[0] != restart, "Actual original index references missing vertex or restart value")
 
 
 ${o.validateMaster}
@@ -385,8 +398,7 @@ def source_inventory(g, manifest, binary, rgba):
                     if name == "COLOR_0":
                         need(value == (1, 1, 1, 1), "Initial unlit profile requires exact white original corner RGBA")
             need(len({stream["count"] for stream in streams}) == 1, "Associated original vertex streams must be complete")
-            for value in original_accessor(g, binary, primitive["indices"]):
-                need(0 <= value[0] < streams[0]["count"], "Actual original index references missing vertex")
+            original_indices(g, binary, primitive["indices"], streams[0]["count"])
     need(triangles > 0 and triangles == manifest.get("triangles"), "Complete original triangle total required")
     return {"parents": parents, "byIndex": by_index, "triangles": triangles}
 

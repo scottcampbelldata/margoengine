@@ -7,17 +7,23 @@
 //   api          TSDoc on public exports; throws follow docs/conventions.md (via npm run hygiene)
 //   clean-room   no three.js / Babylon / other engines in packages/**; no unlisted third-party dependency
 //   shader-comments  comment text inside the shader strings of any package dist (scripts/shader-comments.mjs)
+// and one strict step with no baseline:
+//   readme-types  every README and guide example of every package type-checks (scripts/check-readme-types.mjs). It runs
+//                 here, in every fast gate, because a change to one package can break another package's example, and
+//                 a lane runs only its own package tests (2026-11-18: ten such errors reached main, caught only by the
+//                 full verify after the push). Its known list shrinks only (npm run check:readmes -- --shrink).
 // Needs `npm run build:packages` and current api/ reports (sizes, api and shader-comments read dist/).
 // Options: --gate=a,b (run some), --update (write shrunk baselines), --update --reason="..." (accept growth, logged),
 // --summary (print the biggest offenders), --details (write test-results/quality.json with every item and block).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { readmeTypeProblems } from './check-readme-types.mjs';
 import { stalePackages } from './package-stamps.mjs';
 import { apiGate } from './quality/api.js';
 import { cleanRoomGate } from './quality/clean-room.js';
 import { duplicatesGate } from './quality/duplicates.js';
 import { packageList, repoFiles } from './quality/packages.js';
-import { compare, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
+import { compare, frozenItems, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
 import { shaderCommentsGate } from './quality/shader-comments.js';
 import { sizesGate } from './quality/sizes.js';
 import { testsGate } from './quality/tests-floor.js';
@@ -57,7 +63,8 @@ const GATES = {
   },
   'shader-comments': {
     run: shaderCommentsGate,
-    about: 'comments left inside shader strings of a package dist; each literal the build strip leaves whole counts one',
+    about:
+      'comments left inside shader strings of a package dist; each literal the build strip leaves whole counts one',
     fix: 'rebuild (npm run build:packages strips them); a literal left whole has a comment running into an interpolation or the end of the string, so move that comment into the JavaScript beside the string',
   },
 };
@@ -65,82 +72,107 @@ const GATES = {
 const only = arg('gate')?.split(',');
 // A bare gate name used to be ignored, so `sizes --update --reason=x` wrote every gate's baseline and accepted any failure.
 const stray = process.argv.slice(2).find((a) => !a.startsWith('--'));
-if (stray) {
-  console.error(`quality: unknown argument ${stray}; name a gate with --gate=${stray}`);
-  process.exit(2);
-}
-if (reason && !only) {
-  console.error('quality: --reason accepts growth, so it needs one gate; add --gate=<gate>');
-  process.exit(2);
-}
-const started = performance.now();
-const files = repoFiles(root);
-const packages = packageList(root, files);
-const report = {};
-let failed = 0;
-for (const [gate, def] of Object.entries(GATES)) {
-  if (only && !only.includes(gate)) continue;
-  const t0 = performance.now();
-  const result = await def.run({ root, files, packages });
-  const baseline = readBaseline(root, gate);
-  const { worse, better } = compare(result.items, baseline, result.allowance);
-  const ms = Math.round(performance.now() - t0);
-  const count = Object.keys(result.items).length;
-  report[gate] = { count, worse, better, items: result.items, ...result.details };
-  if (process.argv.includes('--summary') && result.summary)
-    console.log(`quality ${gate} biggest:\n${result.summary().join('\n')}`);
-  if (update) {
-    // Bug (2026-11-11): a lane rebased onto other lanes' size growth, kept its old dist of those packages, and
-    // `--update` shrank their freshly raised budgets to the stale sizes (video/record 1,996 to 1,460), which failed
-    // main for everyone. Budgets of packages whose dist does not match the checked-out sources stay as recorded.
-    const stale = result.owner ? new Set(stalePackages(root)) : new Set();
-    const frozen = (key) => stale.has(result.owner(key));
-    const { grown } = updateBaseline(root, gate, def.about, result.items, baseline, {
-      allowance: result.allowance,
-      reason,
-      frozen,
-    });
-    const kept = Object.keys(result.items).filter(frozen).length;
-    console.log(
-      `quality ${gate}: baseline written, ${count} items${grown.length ? `, ${grown.length} grown` : ''}` +
-        (kept
-          ? `; ${kept} items of ${stale.size} stale package build(s) kept as recorded (rebuild to update them)`
-          : ''),
-    );
-    continue;
+const usage = stray
+  ? `quality: unknown argument ${stray}; name a gate with --gate=${stray}`
+  : reason && !only
+    ? 'quality: --reason accepts growth, so it needs one gate; add --gate=<gate>'
+    : undefined;
+// A usage error sets the exit code and lets the event loop end: process.exit can hold the exit for ever (KB-OWN-EXIT2).
+if (usage) {
+  console.error(usage);
+  process.exitCode = 2;
+} else await runGates();
+
+async function runGates() {
+  const started = performance.now();
+  const files = repoFiles(root);
+  const packages = packageList(root, files);
+  const report = {};
+  let failed = 0;
+  for (const [gate, def] of Object.entries(GATES)) {
+    if (only && !only.includes(gate)) continue;
+    const t0 = performance.now();
+    const result = await def.run({ root, files, packages });
+    const baseline = readBaseline(root, gate);
+    const { worse, better } = compare(result.items, baseline, result.allowance);
+    const ms = Math.round(performance.now() - t0);
+    const count = Object.keys(result.items).length;
+    report[gate] = { count, worse, better, items: result.items, ...result.details };
+    if (process.argv.includes('--summary') && result.summary)
+      console.log(`quality ${gate} biggest:\n${result.summary().join('\n')}`);
+    if (update) {
+      // Bug (2026-11-11): a lane rebased onto other lanes' size growth, kept its old dist of those packages, and
+      // `--update` shrank their freshly raised budgets to the stale sizes (video/record 1,996 to 1,460), which failed
+      // main for everyone. Budgets of packages whose dist does not match the checked-out sources stay as recorded.
+      const stale = result.owner ? new Set(stalePackages(root)) : new Set();
+      const frozen = frozenItems(result.owner, stale);
+      const { grown } = updateBaseline(root, gate, def.about, result.items, baseline, {
+        allowance: result.allowance,
+        reason,
+        frozen,
+      });
+      const kept = Object.keys(result.items).filter(frozen).length;
+      console.log(
+        `quality ${gate}: baseline written, ${count} items${grown.length ? `, ${grown.length} grown` : ''}` +
+          (kept
+            ? `; ${kept} items of ${stale.size} stale package build(s) kept as recorded (rebuild to update them)`
+            : ''),
+      );
+      continue;
+    }
+    const sum = staleTotal(baseline);
+    if (sum !== undefined) {
+      failed++;
+      console.error(
+        `quality ${gate}: FAIL, the baseline total ${baseline.total} is not the sum of its items, ${sum} (a hand-settled merge). Fix: npm run quality -- --gate=${gate} --update.`,
+      );
+    }
+    if (worse.length) {
+      failed++;
+      console.error(`quality ${gate}: FAIL, ${worse.length} new or worse (${count} items, ${ms} ms). Fix: ${def.fix}.`);
+      for (const w of worse.slice(0, 25))
+        console.error(`  ${w.key}: ${w.value}${w.limit === null ? ' (new)' : ` > ${w.limit}`}`);
+      if (worse.length > 25) console.error(`  ... ${worse.length - 25} more (--details lists all)`);
+      for (const w of worse.slice(0, 5))
+        if (result.sides && w.key.includes(' | ')) console.error(`  ${w.key}: ${result.sides(w.key).join(' ~ ')}`);
+    } else console.log(`quality ${gate}: ok, ${count} baselined items (${ms} ms)`);
+    // Counts are exact, so an improvement must be locked in; byte budgets only suggest it.
+    if (better.length && gate !== 'sizes') {
+      failed++;
+      console.error(
+        `quality ${gate}: ${better.length} item(s) improved (${better
+          .slice(0, 3)
+          .map((b) => b.key)
+          .join('; ')}); lock it in: npm run quality -- --gate=${gate} --update`,
+      );
+    } else if (better.length)
+      console.log(`quality ${gate}: ${better.length} budgets can shrink (npm run quality -- --gate=${gate} --update)`);
   }
-  const sum = staleTotal(baseline);
-  if (sum !== undefined) {
-    failed++;
-    console.error(
-      `quality ${gate}: FAIL, the baseline total ${baseline.total} is not the sum of its items, ${sum} (a hand-settled merge). Fix: npm run quality -- --gate=${gate} --update.`,
-    );
+  // Strict steps: no baseline and no --update; any problem fails.
+  const STRICT = {
+    'readme-types': {
+      run: () => readmeTypeProblems(root).problems,
+      fix: 'fix the example, or the package type it shows is wrong; npm run check:readmes prints the same list',
+    },
+  };
+  for (const [gate, def] of Object.entries(STRICT)) {
+    if ((only && !only.includes(gate)) || update) continue;
+    const t0 = performance.now();
+    const problems = def.run();
+    const ms = Math.round(performance.now() - t0);
+    report[gate] = { count: problems.length, problems };
+    if (problems.length) {
+      failed++;
+      console.error(`quality ${gate}: FAIL, ${problems.length} problem(s) (${ms} ms). Fix: ${def.fix}.`);
+      for (const line of problems.slice(0, 25)) console.error(`  ${line}`);
+      if (problems.length > 25) console.error(`  ... ${problems.length - 25} more (npm run check:readmes lists all)`);
+    } else console.log(`quality ${gate}: ok (${ms} ms)`);
   }
-  if (worse.length) {
-    failed++;
-    console.error(`quality ${gate}: FAIL, ${worse.length} new or worse (${count} items, ${ms} ms). Fix: ${def.fix}.`);
-    for (const w of worse.slice(0, 25))
-      console.error(`  ${w.key}: ${w.value}${w.limit === null ? ' (new)' : ` > ${w.limit}`}`);
-    if (worse.length > 25) console.error(`  ... ${worse.length - 25} more (--details lists all)`);
-    for (const w of worse.slice(0, 5))
-      if (result.sides && w.key.includes(' | ')) console.error(`  ${w.key}: ${result.sides(w.key).join(' ~ ')}`);
-  } else console.log(`quality ${gate}: ok, ${count} baselined items (${ms} ms)`);
-  // Counts are exact, so an improvement must be locked in; byte budgets only suggest it.
-  if (better.length && gate !== 'sizes') {
-    failed++;
-    console.error(
-      `quality ${gate}: ${better.length} item(s) improved (${better
-        .slice(0, 3)
-        .map((b) => b.key)
-        .join('; ')}); lock it in: npm run quality -- --gate=${gate} --update`,
-    );
-  } else if (better.length)
-    console.log(`quality ${gate}: ${better.length} budgets can shrink (npm run quality -- --gate=${gate} --update)`);
+  if (process.argv.includes('--details')) {
+    mkdirSync(join(root, 'test-results'), { recursive: true });
+    writeFileSync(join(root, 'test-results/quality.json'), JSON.stringify(report, null, 2) + '\n');
+    console.log('Details: test-results/quality.json');
+  }
+  console.log(`quality: ${Math.round(performance.now() - started)} ms`);
+  if (failed) process.exitCode = 1;
 }
-if (process.argv.includes('--details')) {
-  mkdirSync(join(root, 'test-results'), { recursive: true });
-  writeFileSync(join(root, 'test-results/quality.json'), JSON.stringify(report, null, 2) + '\n');
-  console.log('Details: test-results/quality.json');
-}
-console.log(`quality: ${Math.round(performance.now() - started)} ms`);
-if (failed) process.exitCode = 1;

@@ -10,53 +10,24 @@
 // Ground layer rules use the same Wendland bands as biome envelopes (define.ts); materials are generated textures.
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Terrain, TerrainColorOptions } from '@margoengine/terrain';
+import type { WetGround, WetGroundLook } from '@margoengine/terrain/wet-ground';
 import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
 import { clampInt, divFloor, hash3, ONE, wendland } from '@margoengine/biomes/toolkit';
+import { horizonHeights } from './horizon.js';
+export { horizonHeights, HORIZON_SKIRT, type HorizonHeights, type HorizonSource } from './horizon.js';
+import type { PlantStates, PlantStateSource } from '@margoengine/scatter/states';
+import type { DisturbanceStatesOptions } from './disturbance.js';
 import type { PlacedTile } from './placement.js';
 import type { BiomeSample } from './sample.js';
 import type { BiomeSeasons } from './seasons.js';
 import type { BiomeTile, BiomeWorld } from './world.js';
 
-/** The look of a ground material: sRGB colour 0..1, the contrast of its generated detail 0..1 and its relief. */
-export interface MaterialLook {
-  readonly color: readonly [number, number, number];
-  /** Default 0.25. */
-  readonly detail?: number;
-  /**
-   * Relief from the generated detail, 0 to 1: the terrain's `TerrainLayer.bump` (the shading normal follows the
-   * texture's light and dark, up to 2 m of relief at 1). Default 0.
-   */
-  readonly bump?: number;
-  /**
-   * Large-scale light and dark, 0 to 1: the terrain's `TerrainLayer.macro` (a second sample of the texture at 96 m
-   * scales the colour, so far slopes are not one flat tone). Default 0.
-   */
-  readonly macro?: number;
-}
-
-/** Built-in material looks, by key (the materials the presets use). Unknown keys get a neutral grey-brown. */
-export const MATERIALS: Readonly<Record<string, MaterialLook>> = Object.freeze({
-  grass: { color: [0.4, 0.55, 0.2], detail: 0.4, bump: 0.3, macro: 0.35 },
-  meadow: { color: [0.56, 0.62, 0.28], detail: 0.4, bump: 0.3, macro: 0.35 },
-  'leaf-litter': { color: [0.52, 0.37, 0.2], detail: 0.4, bump: 0.3, macro: 0.2 },
-  needles: { color: [0.46, 0.32, 0.18], detail: 0.35, bump: 0.3, macro: 0.2 },
-  moss: { color: [0.32, 0.5, 0.2], detail: 0.4, bump: 0.3, macro: 0.2 },
-  mud: { color: [0.4, 0.31, 0.21], detail: 0.25, bump: 0.3, macro: 0.2 },
-  sand: { color: [0.9, 0.8, 0.58], detail: 0.15, bump: 0.25, macro: 0.3 },
-  'red-sand': { color: [0.82, 0.5, 0.3], detail: 0.2, bump: 0.3, macro: 0.2 },
-  'dry-grass': { color: [0.78, 0.67, 0.38], detail: 0.35, bump: 0.3, macro: 0.2 },
-  laterite: { color: [0.68, 0.38, 0.22], detail: 0.25, bump: 0.3, macro: 0.2 },
-  rock: { color: [0.54, 0.51, 0.47], detail: 0.45, bump: 1, macro: 0.5 },
-  scree: { color: [0.64, 0.61, 0.57], detail: 0.4, bump: 0.8, macro: 0.6 },
-  gravel: { color: [0.6, 0.57, 0.52], detail: 0.4, bump: 0.6, macro: 0.5 },
-  snow: { color: [0.95, 0.96, 0.99], detail: 0.1, bump: 0.35, macro: 0.15 },
-  tundra: { color: [0.54, 0.5, 0.34], detail: 0.35, bump: 0.3, macro: 0.2 },
-  heather: { color: [0.52, 0.36, 0.4], detail: 0.35, bump: 0.3, macro: 0.2 },
-  canopy: { color: [0.12, 0.2, 0.08], detail: 0.3, bump: 0.2, macro: 0.4 },
-});
+export { BIOME_LOOKS, MATERIALS, biomeMaterials, type BiomeLookName, type BiomeLookValues, type MaterialLook } from './looks.js';
+import { MATERIALS, type MaterialLook } from './looks.js';
 
 /** Settings of {@link BiomeView.attach}. */
 export interface BiomeViewOptions {
@@ -95,6 +66,14 @@ export interface BiomeViewOptions {
   /** Milliseconds per frame the page may spend streaming: sending tile jobs to the world's workers and copying
    * arrived tiles in, nearest first (one always goes in). Default 0.25. */
   readonly budget?: number;
+  /**
+   * Streaming steps a frame may take, a work count: the same tiles go in on the same frame on any machine, so a film
+   * frame is the same on every run (draw after `await view.whenIdle()` and every arrived tile is in, whatever the
+   * count). When set it replaces the millisecond `budget`; 1 or more, Infinity for every arrived tile. Default unset.
+   */
+  readonly maxSteps?: number;
+  /** Clock in milliseconds for the `budget` and the idle check. Default `performance.now`; pass a simulation clock for replay. */
+  readonly clock?: () => number;
   /** Most bytes of detail density maps (`BiomeObjects` `detailBudget`); the view coarsens detail maps to fit. Default
    * 128 MiB. */
   readonly detailBudget?: number;
@@ -113,6 +92,15 @@ export interface BiomeViewOptions {
    */
   readonly water?: boolean | 'auto' | BiomeWaterSettings;
   /**
+   * Far ground past the world's edge out to the horizon (`horizonHeights`): the edge's own relief carried outward,
+   * a valley leaving the world keeps going, fading over up to 3 km into ridged mountains as high as the world's relief,
+   * in the world's own edge materials with rock on the steep. It reaches 3 world sizes (at most 48 km) past each edge,
+   * a texel about a 64th of the world, and casts no shadow and holds no plants; the scene's fog or aerial perspective
+   * hazes it. `'auto'`: drawn when every edge of the world stands over the sea (a coast keeps its sea horizon).
+   * Default `'auto'`.
+   */
+  readonly horizon?: boolean | 'auto';
+  /**
    * A `Sky` from `@margoengine/sky`: the sea reflects its sky (`reflectionTexture`) and its sun and moon glint on the
    * waves (`lights`). Without one the sea reflects a plain sky gradient under the engine light. `water` settings with
    * their own `reflection` or `lights` win. Default none.
@@ -128,6 +116,84 @@ export interface BiomeViewOptions {
    * repaints its rectangle. Default none: the view draws exactly what it draws without seasons.
    */
   readonly seasons?: BiomeSeasons;
+  /**
+   * Roads, rails, creeks, yards and building lots where no object is placed (`PlacementOptions.exclusions`, such as
+   * `layoutSettlements(...).exclusions` and `pathExclusions(paths)`). Default none.
+   */
+  readonly exclusions?: readonly import('./placement.js').Exclusion[];
+  /**
+   * Meshes by key drawn in place of the procedural ones (`BiomeObjectsOptions.meshes`): library plants and rocks drawn
+   * by the key their species name. Default none.
+   */
+  readonly meshes?: import('./objects.js').BiomeObjectsOptions['meshes'];
+  /** Burnt and flooded plant states of each part (`BiomeObjectsOptions.states`). Default none. */
+  readonly states?: import('./objects.js').BiomeObjectsOptions['states'];
+  /**
+   * A fire and flood history (`disturbanceOf(world, ...)` of `@margoengine/biomes/disturbance`), or `{ history, ...settings }`
+   * with the `disturbanceStates` settings: the view makes a `PlantStates` map over the world (`@margoengine/scatter/states`,
+   * a cell every `cell` metres, default 8, at most 1,024 a side), marks it from the history and gives every plant part a
+   * response for its mesh (bark charred, conifer and broadleaf crowns above a crown base, shrubs and grass burning
+   * whole), so recently burnt and flooded ground shows burnt and mud-lined plants by itself. A `states` option given too
+   * answers first for each part it returns a response for. The map is `view.plantStates`: add a live fire or flood with
+   * its `setSources`. Default none.
+   */
+  readonly disturbance?: import('./disturbance.js').Disturbance | BiomeDisturbanceSettings;
+  /**
+   * Wet ground and wet plants where a flood has been: a wetting record such as `Flood.wetTexture` of
+   * `@margoengine/water/flood`. The terrain draws it darker and glossier, drying back over time (`WetGround` of
+   * `@margoengine/terrain/wet-ground`, `view.wetGround`), and the plants below the high-water mark are mud coated with a
+   * stain line above it, flattened downstream where the current (`velocity`) was strong (`PlantStates` of
+   * `@margoengine/scatter/states`, `view.plantStates`, a cell every 2 m over the record, at most 1,024 a side; with
+   * `disturbance` its map takes the flood). Ground and plants dry over the same `dryTime`. Both entries are loaded with
+   * import() only when this is given. Default none: the view draws exactly what it draws without it.
+   */
+  readonly wetness?: BiomeWetness;
+}
+
+/** `BiomeViewOptions.wetness`: a wetting record over a world rectangle and the look of wet ground. */
+export interface BiomeWetness extends WetGroundLook {
+  /**
+   * The wetting record, asked every frame (borrowed, never destroyed): rgba32float, red the deepest depth in m, green the
+   * seconds since the texel was last wet, blue 1 once it has been wet, as `() => flood.wetTexture`. Undefined draws dry.
+   */
+  readonly record: () => GPUTexture | undefined;
+  /** The current over the same rectangle (u, v, speed m/s, depth m), as `() => flood.velocityTexture`. Default none:
+   * the water marks and wetness show, no plant is flattened and no debris is caught. */
+  readonly velocity?: () => GPUTexture | undefined;
+  /** World [x, z] of the record's first texel's corner (a Flood's `origin`). */
+  readonly origin: readonly [number, number];
+  /** World [width, depth] the record covers (a Flood's `size`). */
+  readonly size: readonly [number, number];
+}
+
+/** `BiomeViewOptions.disturbance` with settings: the history, the marks' settings and the map's cell size. */
+export interface BiomeDisturbanceSettings extends DisturbanceStatesOptions {
+  readonly history: import('./disturbance.js').Disturbance;
+  /** Metres a map cell, 0.5 to 1,000. Default 8. */
+  readonly cell?: number;
+}
+
+/**
+ * The plant response `BiomeView` gives a part of a procedural mesh under a disturbance (`PlantResponse` of
+ * `@margoengine/scatter/states`), by mesh key and part kind; undefined for stone. Bark is all stem; conifer and snag
+ * crowns start 4 m up with wet needles (Van Wagner 1977's crown initiation needs a hotter fire there), broadleaf crowns
+ * 3 m up, shrubs and grass burn whole and bend in a flow as their stems do (Kouwen and Li 1980). `conifer` gives a
+ * northern Rockies conifer key (`parseConiferKey` of `@margoengine/procedural/conifer-species`) its own crown base,
+ * the height of its lowest live branch in metres (`coniferForm(...).crownBase`); the view passes it for those keys.
+ */
+export function disturbanceResponse(
+  key: string,
+  kind: 'bark' | 'foliage' | 'stone',
+  conifer?: { readonly crownBase: number },
+): Readonly<Record<string, number>> | undefined {
+  if (kind === 'stone') return undefined;
+  const mesh = key.slice(key.indexOf(':') + 1);
+  if (kind === 'bark') return { crownBase: 0, trunkRadius: 1000, stiffness: 2e5 };
+  if (conifer) return { crownBase: conifer.crownBase, foliarMoisture: 110, trunkRadius: 0, stiffness: 2e5, flatten: 1.2 };
+  if (mesh === 'conifer' || mesh === 'snag') return { crownBase: 4, foliarMoisture: 110, trunkRadius: 0, stiffness: 2e5, flatten: 1.2 };
+  if (mesh === 'broadleaf') return { crownBase: 3, foliarMoisture: 120, trunkRadius: 0, stiffness: 1e5, flatten: 1.2 };
+  if (mesh === 'shrub') return { crownBase: 0, foliarMoisture: 70, trunkRadius: 0, stiffness: 5 };
+  return { crownBase: 0, trunkRadius: 0, stiffness: 0.02, flatten: 1.5 };
 }
 
 /** Ground materials that are bare ground, not plant cover: seasons leave them alone. */
@@ -650,6 +716,8 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 const BAND = 4096;
 /** Views attached so far (each registers a uniquely named per-frame plugin). */
 let views = 0;
+/** Seconds wet plants take to dry to 1/e when `wetness` gives none: WetGround's default `dryTime`, so both dry together. */
+const WET_DRY_TIME = 10800;
 
 /**
  * A biome world drawn as terrain: heights and ground materials from the world, streamed around the camera at full
@@ -684,6 +752,8 @@ export class BiomeView implements Disposable {
   readonly #signal: AbortSignal;
   readonly #lookahead: number;
   readonly #budget: number;
+  readonly #maxSteps: number | undefined;
+  readonly #clock: () => number;
   /** Distance within which small plants, rocks and props are drawn (BiomeObjects' near radius). */
   readonly #near: number;
   #textures?: { device: GPUDevice; height: GPUTexture; weights: GPUTexture[]; tint?: GPUTexture };
@@ -740,10 +810,21 @@ export class BiomeView implements Disposable {
   readonly tileTimes: number[] = [];
   readonly frameTimes: number[] = [];
   #objects?: import('@margoengine/biomes/objects').BiomeObjects;
+  #plantStates?: PlantStates;
+  /** The wet ground made for the `wetness` option. */
+  #wetGround?: WetGround;
+  #statesOf?: import('./objects.js').BiomeObjectsOptions['states'];
   #water?: Water;
-  #river?: { dispose(): void };
+  #river?: { dispose(): void; readonly options: { fill(x: number, z: number): number | undefined } };
+  #paint?: typeof import('@margoengine/biomes/rivers').paintRiverbed;
   #rivers?: { dispose(): void };
   #disposed = false;
+  #horizon?: Terrain;
+  #makeHorizon?: () => Terrain | undefined;
+  /** The far ground past the world (option `horizon`), made once the world's ground weights are in, or undefined. */
+  get horizon(): Terrain | undefined {
+    return this.#horizon;
+  }
 
   private constructor(
     engine: EngineKernel,
@@ -760,6 +841,11 @@ export class BiomeView implements Disposable {
     this.#radius = options.radius ?? 1000;
     this.#lookahead = options.lookahead ?? 3;
     this.#budget = options.budget ?? 0.25;
+    this.#maxSteps = options.maxSteps;
+    this.#clock = options.clock ?? (() => performance.now());
+    if (this.#maxSteps !== undefined && !(this.#maxSteps >= 1))
+      throw rangeError('BiomeView maxSteps must be 1 or more', 'biomes');
+    if (typeof this.#clock !== 'function') throw typeError('BiomeView clock must be a function returning milliseconds', 'biomes');
     this.#near = Math.min(this.#radius, 300);
     if (!(this.#lookahead >= 0) || !(this.#budget > 0))
       throw rangeError('BiomeView lookahead must be 0 or more seconds and budget above 0 ms', 'biomes');
@@ -775,7 +861,13 @@ export class BiomeView implements Disposable {
     this.#depth = Math.round((z1 - z0) / texel) + 1; // float division
     this.#cover = cover;
     this.#canopy = canopy;
-    this.materials = Object.freeze([...groundMaterials(world.biomes), ...(canopy ? ['canopy'] : [])]);
+    const wet = typeof options.water === 'object' && !!(options.water.rivers || options.water.lakes);
+    this.materials = Object.freeze([
+      ...groundMaterials(world.biomes),
+      // The canopy stays last: `canopyCorners` and the cover writes put it at the last index.
+      ...(wet ? ['riverbed'] : []),
+      ...(canopy ? ['canopy'] : []),
+    ]);
     checkMaterialCount(this.materials);
     const looks = this.materials.map((key) => look(key, options.materials)),
       // The terrain needs 4 to 16 layers: repeat the last material when there are fewer.
@@ -883,6 +975,11 @@ export class BiomeView implements Disposable {
         return { heightmap: height, layers, weights, ...(tint ? { tint } : {}) };
       },
     });
+    const horizon = options.horizon ?? 'auto';
+    if (horizon !== true && horizon !== false && horizon !== 'auto')
+      throw typeError("BiomeView horizon must be true, false or 'auto'", 'biomes');
+    // The ring takes the world's edge weights, so it is made when the overview weights are in.
+    if (horizon) this.#makeHorizon = () => this.#horizonTerrain(world, horizon, terrainModule, layerKeys, looks, pixels);
     // A world change repaints the tint over its rectangle too (the world's region fields are rebuilt before it tells
     // listeners, and reading them there is allowed); each `seasons.set` repaints all of it.
     this.#off = world.onChange((rect) => {
@@ -941,6 +1038,30 @@ export class BiomeView implements Disposable {
         'BiomeView sky must be a Sky from @margoengine/sky (it reads reflectionTexture and lights)',
         'biomes',
       );
+    let disturbance: BiomeDisturbanceSettings | undefined;
+    if (options.disturbance !== undefined) {
+      const given = options.disturbance as BiomeDisturbanceSettings & import('./disturbance.js').Disturbance;
+      if (typeof given !== 'object' || given === null)
+        throw typeError('BiomeView disturbance must be a history or { history, ...settings } of @margoengine/biomes/disturbance', 'biomes');
+      disturbance = given.history ? given : { history: given };
+      const cell = disturbance.cell ?? 8;
+      if (!(typeof cell === 'number' && cell >= 0.5 && cell <= 1000))
+        throw rangeError('BiomeView disturbance cell must be metres from 0.5 to 1000', 'biomes');
+    }
+    const wetness = options.wetness;
+    if (wetness !== undefined) {
+      const pair = (p: unknown, positive: boolean) =>
+        Array.isArray(p) && p.length === 2 && p.every((v) => typeof v === 'number' && Number.isFinite(v) && (!positive || v > 0));
+      if (typeof wetness?.record !== 'function' || (wetness.velocity !== undefined && typeof wetness.velocity !== 'function'))
+        throw typeError('BiomeView wetness needs record: () => flood.wetTexture (and velocity, if given, a function too)', 'biomes');
+      if (!pair(wetness.origin, false) || !pair(wetness.size, true))
+        throw rangeError('BiomeView wetness needs a finite [x, z] origin and a positive finite [width, depth] size', 'biomes');
+      for (const [key, lo, hi] of [['darkening', 0, 1], ['gloss', 0, 1], ['dryTime', 1, 604800]] as const) {
+        const v = wetness[key];
+        if (v !== undefined && !(typeof v === 'number' && v >= lo && v <= hi))
+          throw rangeError(`BiomeView wetness ${key} must be a number from ${lo} to ${hi}`, 'biomes');
+      }
+    }
     const seasons = options.seasons;
     if (seasons !== undefined && (typeof seasons?.tintAt !== 'function' || seasons.world !== world))
       throw typeError('BiomeView seasons must be a BiomeSeasons attached to the same world', 'biomes');
@@ -951,16 +1072,63 @@ export class BiomeView implements Disposable {
           'biomes',
         );
     if (options.signal?.aborted) throw options.signal.reason;
+    // The scene attached from: every part registers there, whichever scene is active once the imports are in.
+    const held = captureScene(engine);
     const terrainModule = await import('@margoengine/terrain');
     if (options.signal?.aborted) throw options.signal.reason;
     const limit = (engine as unknown as { gpu?: GPUDevice }).gpu?.limits.maxTextureDimension2D ?? 8192;
     const canopy = options.canopy ?? ((options.objects ?? true) ? 0.6 : 0),
       cover = canopy === 0 ? undefined : await import('@margoengine/biomes/cover'),
-      view = new BiomeView(engine, world, options, terrainModule, limit, cover, cover?.canopyShare(world, canopy)),
+      view = held.run(
+        () => new BiomeView(engine, world, options, terrainModule, limit, cover, cover?.canopyShare(world, canopy)),
+      ),
       // The overview runs while the objects load: on the workers off this thread, or here when there are none.
       overview = view.#overview(options.signal);
     // A failed attach must not leave the overview's rejection unhandled; it is awaited below.
     overview.catch(() => {});
+    // Everything built from here on is disposed again if any step fails or the signal aborts, then the error goes on.
+    try {
+    if ((disturbance || wetness) && (options.objects ?? true)) {
+      const { history, cell = 8, ...marks } = disturbance ?? ({ cell: 2 } as Partial<BiomeDisturbanceSettings>);
+      const [{ PlantStates }, { disturbanceStates }] = await Promise.all([
+        import('@margoengine/scatter/states'),
+        import('@margoengine/biomes/disturbance'),
+      ]);
+      if (options.signal?.aborted) throw options.signal.reason;
+      // A history's map covers the world; a flood's alone covers its record. The flood's wetness dries as its ground does.
+      const flood = wetness && {
+          wet: wetness.record,
+          ...(wetness.velocity ? { velocity: wetness.velocity } : {}),
+          bounds: [wetness.origin[0], wetness.origin[1], wetness.origin[0] + wetness.size[0], wetness.origin[1] + wetness.size[1]] as const,
+        },
+        [x0, z0, x1, z1] = history ? world.bounds : flood!.bounds,
+        side = (a: number, b: number) => Math.min(1024, Math.max(1, Math.ceil((b - a) / cell))), // float division: cells
+        states = PlantStates.attach(engine, {
+          bounds: [x0, z0, x1, z1],
+          resolution: [side(x0, x1), side(z0, z1)],
+          ...(flood ? { flood, dryTime: wetness!.dryTime ?? WET_DRY_TIME } : {}),
+        });
+      view.#plantStates = states;
+      if (history) disturbanceStates(world, history, states, marks);
+      const made = new Map<string, PlantStateSource>(),
+        own = options.states,
+        // A conifer key's crown starts at its own lowest live branch.
+        { parseConiferKey, coniferForm } = await import('@margoengine/procedural/conifer-species'),
+        crownOf = (key: string) => {
+          const c = parseConiferKey(key);
+          return c ? { crownBase: coniferForm(c.species, { age: c.age }).crownBase } : undefined;
+        };
+      view.#statesOf = (key, kind) => {
+        const mine = own?.(key, kind);
+        if (mine) return mine;
+        const response = disturbanceResponse(key, kind, crownOf(key));
+        if (!response) return undefined;
+        const name = JSON.stringify(response);
+        let source = made.get(name);
+        if (!source) made.set(name, (source = states.plant(response)));
+        return source;
+      };
+    }
     if (options.objects ?? true) {
       // Placement and its drawing are their own entries, loaded only for a view that draws objects.
       const [{ BiomePlacement }, { BiomeObjects, detailFits }] = await Promise.all([
@@ -969,14 +1137,15 @@ export class BiomeView implements Disposable {
         ]),
         t = view.textureResolution / 2,
         [x0, z0, x1, z1] = world.bounds;
-      const placement = BiomePlacement.attach(world),
+      const placement = BiomePlacement.attach(world, options.exclusions ? { exclusions: options.exclusions } : {}),
         bounds = [x0 - t, z0 - t, x1 + t, z1 + t] as const;
       view.#placement = placement;
       // Detail maps start at the terrain's texel and coarsen by halves until they fit the budget and the device.
       let detail = view.textureResolution;
       while (!detailFits(bounds, detail, placement.details.length, limit, options.detailBudget)) detail *= 2;
       view.#detailStep = Math.round(detail / world.resolution); // float division: exact multiple
-      view.#objects = await BiomeObjects.attach(engine, placement, {
+      view.#objects = await held.run(() =>
+        BiomeObjects.attach(engine, placement, {
         heightmap: () => view.#textures?.height,
         // Height texels sit on the world's grid corners: the rectangle their centres cover is half a texel wider.
         bounds,
@@ -985,17 +1154,22 @@ export class BiomeView implements Disposable {
         detailResolution: detail,
         detailBudget: options.detailBudget,
         ...(seasons ? { seasons } : {}),
+        ...(options.meshes ? { meshes: options.meshes } : {}),
+        ...(view.#statesOf ? { states: view.#statesOf } : options.states ? { states: options.states } : {}),
         ...(options.far === false || (!options.far && view.#radius >= 2500)
           ? {}
           : { far: { radius: 2500, ...options.far, world } }),
-      });
+      }),
+      );
       view.#offObjects = placement.onChange((rect) => view.#dirty(rect, 'p'));
     }
-    try {
-      await overview;
-    } catch (error) {
-      view.dispose();
-      throw error;
+    await overview;
+    // The far ground takes the overview's edge weights, and registers in the scene the view was attached from.
+    if (view.#makeHorizon && !view.#disposed) view.#horizon = held.run(() => view.#makeHorizon!());
+    if (wetness && !view.#disposed) {
+      const { WetGround } = await import('@margoengine/terrain/wet-ground');
+      // The look and the dry time are the ones the plants were given; the record stays borrowed.
+      if (!view.#disposed) view.#wetGround = held.run(() => WetGround.attach(engine, view.terrain, { ...wetness }));
     }
     if (shadows)
       for (const source of [view.terrain, ...(view.#objects?.casters ?? [])])
@@ -1005,9 +1179,10 @@ export class BiomeView implements Disposable {
       const { Water } = await import('@margoengine/water'),
         [x0, z0, x1, z1] = world.bounds,
         side = (a: number, b: number) => Math.min(100000, 2 * Math.max(Math.abs(a), Math.abs(b))),
+        still = rivers || lakes ? await import('@margoengine/biomes/rivers') : undefined,
         river =
-          rivers || lakes
-            ? await (await import('@margoengine/biomes/rivers')).viewWater(
+          still
+            ? await still.viewWater(
                 world,
                 { rivers, lakes },
                 {
@@ -1023,8 +1198,12 @@ export class BiomeView implements Disposable {
             : undefined;
       // The water surface is sized to cover the whole world from the origin; the horizon rows reach out past it.
       view.#river = river;
+      view.#paint = still?.paintRiverbed;
+      // Paint the ground under the rivers and lakes now that their surface is known.
+      if (river && view.materials.includes('riverbed')) view.#upload(0, 0, view.#width, view.#depth);
       if (!view.#disposed)
-        view.#water = Water.attach(engine, {
+        view.#water = held.run(() =>
+          Water.attach(engine, {
           ...SEA,
           ...(sky ? { reflection: () => sky.reflectionTexture, lights: sky.lights } : {}),
           ...waterSettings,
@@ -1033,7 +1212,8 @@ export class BiomeView implements Disposable {
           size: [side(x0, x1), side(z0, z1)],
           height: sea,
           horizon: true,
-        });
+        }),
+        );
       if (flow && river?.lines.length && view.#water && !view.#disposed) {
         const [{ Rivers }, { riverSources }] = await Promise.all([
             import('@margoengine/water/rivers'),
@@ -1042,10 +1222,12 @@ export class BiomeView implements Disposable {
           cell = Math.max(x1 - x0, z1 - z0) / Math.max(view.#width, view.#depth); // float division: metres per cell
         // dispose() may have run while the solver loaded; the water it disposed takes no Rivers.
         if (!view.#disposed)
-          view.#rivers = Rivers.attach(view.#water, {
-            sources: riverSources(river.lines, (x, z) => world.heightAt(x, z), discharge, cell).slice(0, 16),
-            ...(substeps !== undefined ? { substeps } : {}),
-          });
+          view.#rivers = held.run(() =>
+            Rivers.attach(view.#water!, {
+              sources: riverSources(river.lines, (x, z) => world.heightAt(x, z), discharge, cell).slice(0, 16),
+              ...(substeps !== undefined ? { substeps } : {}),
+            }),
+          );
       }
     }
     if (options.signal?.aborted) {
@@ -1053,10 +1235,21 @@ export class BiomeView implements Disposable {
       throw options.signal.reason;
     }
     // Streaming runs before every frame; `ready` resolves once the tiles around the camera are in.
-    view.#plugin = { name: `biomes-view:${++views}`, setup() {}, onPreUpdate: (delta) => view.#frame(delta) };
-    engine.use(view.#plugin);
+    // Removed by its scene (removePlugin, scene or engine disposal), the view ends with it: no streaming job, listener
+    // or texture outlives the registration.
+    view.#plugin = {
+      name: `biomes-view:${++views}`,
+      setup() {},
+      onPreUpdate: (delta) => view.#frame(delta),
+      dispose: () => view.dispose(),
+    };
+    held.run(() => engine.use(view.#plugin!));
     view.#plan(true);
     return view;
+    } catch (error) {
+      view.dispose();
+      throw error;
+    }
   }
 
   /**
@@ -1096,15 +1289,9 @@ export class BiomeView implements Disposable {
       if (this.#disposed) return;
       for (const band of bands) band.weights.forEach((data, i) => this.#weights[i].set(data, band.v0 * width * 4));
     }
-    const t = this.#textures;
-    if (!t || this.#disposed) return;
-    for (let i = 0; i < t.weights.length; i++)
-      t.device.queue.writeTexture(
-        { texture: t.weights[i] },
-        this.#weights[i] as Uint8Array<ArrayBuffer>,
-        { bytesPerRow: width * 4 },
-        [width, depth],
-      );
+    if (this.#disposed) return;
+    // Through #upload, so the ground under the rivers keeps its riverbed.
+    this.#upload(0, 0, width, depth);
   }
 
   #placement?: import('@margoengine/biomes/placement').BiomePlacement;
@@ -1123,7 +1310,7 @@ export class BiomeView implements Disposable {
    */
   #frame(delta: number): void {
     if (this.#disposed) return;
-    this.#lastFrame = performance.now();
+    this.#lastFrame = this.#clock();
     const p = this.#engine.camera.position,
       eye: [number, number] = [p[0], p[2]];
     if (this.#eye && delta > 0) {
@@ -1139,7 +1326,7 @@ export class BiomeView implements Disposable {
       this.#inFrame = false;
     }
     if ((this.#waited = plan && !this.#waited)) return;
-    this.#apply(this.#budget);
+    this.#apply(this.#budget, this.#maxSteps);
   }
 
   /**
@@ -1354,7 +1541,7 @@ export class BiomeView implements Disposable {
   #drain = (): void => {
     this.#drainTimer = undefined;
     if (!this.#arrived.length || this.#disposed) return;
-    if (performance.now() - this.#lastFrame > 100) this.#apply(Infinity);
+    if (this.#clock() - this.#lastFrame > 100) this.#apply(Infinity);
     else this.#drainTimer = setTimeout(this.#drain, 100);
   };
 
@@ -1404,27 +1591,34 @@ export class BiomeView implements Disposable {
    * copying over four times as many frames. A send starts only when the budget left covers what a send that reached a
    * worker took lately: waking a worker thread costs many copy steps on a laptop.
    */
-  #apply(budget: number): void {
-    const start = performance.now(),
+  #apply(budget: number, maxSteps?: number): void {
+    const now = this.#clock,
+      start = now(),
       workers = this.#world.workers;
     let n = 0;
     while (this.#arrived.length) {
       let best = 0;
       for (let i = 1; i < this.#arrived.length; i++)
         if (this.#arrived[i].priority < this.#arrived[best].priority) best = i;
-      if (n && performance.now() - start + (this.#arrived[best].send ? this.#sendCost : 0) >= budget) break;
+      if (
+        n &&
+        (maxSteps === undefined
+          ? now() - start + (this.#arrived[best].send ? this.#sendCost : 0) >= budget
+          : n >= maxSteps)
+      )
+        break;
       const [next] = this.#arrived.splice(best, 1),
         posts = workers?.posts,
-        t0 = performance.now();
+        t0 = now();
       next.apply();
       n++;
       if (next.send) {
         // Only a send that reached a worker counts: one queued behind busy workers (or cancelled) costs nothing, and
         // counting those let the estimate fade until a send that woke a worker started late in a frame.
-        if (workers?.posts !== posts) this.#sendCost = Math.max(performance.now() - t0, this.#sendCost * 0.8);
+        if (workers?.posts !== posts) this.#sendCost = Math.max(now() - t0, this.#sendCost * 0.8);
         continue;
       }
-      const spent = (this.#work.get(next.key) ?? 0) + performance.now() - t0;
+      const spent = (this.#work.get(next.key) ?? 0) + now() - t0;
       if (next.last) {
         this.#work.delete(next.key);
         this.tileTimes.push(spent);
@@ -1432,7 +1626,7 @@ export class BiomeView implements Disposable {
       } else this.#work.set(next.key, spent);
     }
     if (n && Number.isFinite(budget)) {
-      this.frameTimes.push(performance.now() - start);
+      this.frameTimes.push(now() - start);
       if (this.frameTimes.length > 600) this.frameTimes.shift();
     }
     this.#settled();
@@ -1553,6 +1747,129 @@ export class BiomeView implements Disposable {
     } else this.#upload(u0, v0 + j0, cw, end - j0);
   }
 
+  /**
+   * Ground under river and lake water takes the material `riverbed`, in full 0.3 m under the surface and fading to
+   * nothing at the waterline: the terrain's coarse rings point-sample the heights and cover a narrow channel's water far
+   * off, so this draws the stream there, one line as wide as its water at any distance (a texel-space material, sampled
+   * per pixel). Only the uploaded copy changes; the CPU weights stay the world's own.
+   */
+  #wet(u: number, v: number, w: number, d: number, packed: Uint8Array[]): void {
+    const index = this.materials.indexOf('riverbed'),
+      fill = this.#river?.options.fill;
+    if (index < 0 || !fill || !this.#paint) return;
+    const [x0, z0] = this.#world.bounds,
+      texel = this.textureResolution;
+    const world = this.#world;
+    this.#paint({
+      fill,
+      origin: [x0 + u * texel, z0 + v * texel],
+      texel,
+      width: w,
+      depth: d,
+      heightAt: (x, z) => world.heightAt(x, z),
+      weights: packed,
+      index,
+    });
+  }
+
+  // The far ground of option `horizon`: its own terrain over a ring around the world, the world's material layers, each
+  // corner the weights of the world's edge texel it continues with rock taking the steep (slope 0.7 to 1.2), and a hole
+  // over the world's own ground.
+  // The layers keep the world's relief and macro amounts but repeat once per ring texel (the world's repeat 4 m), so the
+  // macro tone (24 repeats) spans hundreds of metres where the ring is seen, kilometres off, as the world's 96 m tone
+  // does at its own distances; at 4 m it mips to one flat tone there.
+  #horizonTerrain(
+    world: BiomeWorld,
+    choice: true | 'auto',
+    terrainModule: typeof import('@margoengine/terrain'),
+    layerKeys: readonly string[],
+    looks: readonly MaterialLook[],
+    pixels: readonly Uint8Array[][],
+  ): Terrain | undefined {
+    const sea = world.climate.sea / 1000, // float division: mm to metres
+      w = this.#width,
+      d = this.#depth,
+      h = this.#heights;
+    if (choice === 'auto') {
+      for (let u = 0; u < w; u++) if (h[u] <= sea || h[(d - 1) * w + u] <= sea) return undefined;
+      for (let v = 0; v < d; v++) if (h[v * w] <= sea || h[v * w + w - 1] <= sea) return undefined;
+    }
+    const far = horizonHeights({ bounds: world.bounds, heights: h, width: w, depth: d, seed: world.seed }),
+      rock = this.materials.indexOf('rock'),
+      arrays = this.#weights.length,
+      weights = Array.from({ length: arrays }, () => new Uint8Array(far.width * far.depth * 4)),
+      holes = new Uint8Array((far.width - 1) * (far.depth - 1));
+    for (let j = 0; j < far.depth; j++)
+      for (let i = 0; i < far.width; i++) {
+        const c = j * far.width + i,
+          n = far.nearest[c];
+        for (let a = 0; a < arrays; a++) weights[a].set(this.#weights[a].subarray(n * 4, n * 4 + 4), c * 4);
+        if (rock < 0) continue;
+        const left = far.heights[j * far.width + Math.max(0, i - 1)],
+          right = far.heights[j * far.width + Math.min(far.width - 1, i + 1)],
+          up = far.heights[Math.max(0, j - 1) * far.width + i],
+          down = far.heights[Math.min(far.depth - 1, j + 1) * far.width + i],
+          slope = Math.hypot(right - left, down - up) / (2 * far.texel), // float division: rise over run
+          share = Math.round(255 * Math.min(1, Math.max(0, (slope - 0.7) / 0.5))); // float division: 0.7 to 1.2
+        if (!share) continue;
+        let sum = 0;
+        for (const out of weights)
+          for (let k = 0; k < 4; k++) {
+            out[c * 4 + k] = Math.floor((out[c * 4 + k] * (255 - share)) / 255); // float division: the rest scaled down
+            sum += out[c * 4 + k];
+          }
+        weights[rock >> 2][c * 4 + (rock & 3)] += 255 - sum;
+      }
+    for (let c = 0; c < holes.length; c++) holes[c] = far.inside[c] ? 0 : 255;
+    const levels = Math.max(1, Math.min(12, Math.ceil(Math.log2(Math.max(...far.size) / (8 * 64))) + 1));
+    return terrainModule.Terrain.attach(this.#engine as never, {
+      origin: far.origin,
+      size: far.size,
+      heightScale: 1,
+      cellSize: 8,
+      resolution: 64,
+      levels,
+      layers: layerKeys.map((_, i) => {
+        const { bump = 0, macro = 0 } = looks[Math.min(i, looks.length - 1)];
+        const scale = 1 / far.texel; // float division: one repeat per ring texel
+        return { height: [-1e6, 1e6] as const, slope: [0, 1] as const, scale, bump, macro };
+      }),
+      textures(device) {
+        const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          size = [far.width, far.depth],
+          heightmap = device.createTexture({ size, format: 'r32float', usage }),
+          painted = weights.map(() => device.createTexture({ size, format: 'rgba8unorm', usage })),
+          hole = device.createTexture({ size: [far.width - 1, far.depth - 1], format: 'r8unorm', usage }),
+          layers = device.createTexture({
+            size: [256, 256, layerKeys.length],
+            format: 'rgba8unorm-srgb',
+            usage,
+            mipLevelCount: 9,
+          });
+        device.queue.writeTexture({ texture: heightmap }, far.heights as Float32Array<ArrayBuffer>, { bytesPerRow: far.width * 4 }, size);
+        painted.forEach((texture, i) =>
+          device.queue.writeTexture({ texture }, weights[i] as Uint8Array<ArrayBuffer>, { bytesPerRow: far.width * 4 }, size),
+        );
+        device.queue.writeTexture({ texture: hole }, holes as Uint8Array<ArrayBuffer>, { bytesPerRow: far.width - 1 }, [
+          far.width - 1,
+          far.depth - 1,
+        ]);
+        pixels.forEach((levels, layer) =>
+          levels.forEach((data, mip) => {
+            const s = 256 >> mip;
+            device.queue.writeTexture(
+              { texture: layers, mipLevel: mip, origin: [0, 0, layer] },
+              data as Uint8Array<ArrayBuffer>,
+              { bytesPerRow: s * 4, rowsPerImage: s },
+              [s, s, 1],
+            );
+          }),
+        );
+        return { heightmap, layers, weights: painted, holes: hole };
+      },
+    });
+  }
+
   /** Uploads a texel rectangle of the CPU copies (kept for device restoration). */
   #upload(u: number, v: number, w: number, d: number): void {
     const t = this.#textures;
@@ -1575,6 +1892,7 @@ export class BiomeView implements Disposable {
         { bytesPerRow: w * 4 },
         [w, d],
       );
+    this.#wet(u, v, w, d, packed);
     write(t.height, rows);
     t.weights.forEach((texture, i) => write(texture, packed[i]));
     // The terrain calls `textures` while it attaches, before `this.terrain` is set.
@@ -1584,6 +1902,19 @@ export class BiomeView implements Disposable {
   /** The sea surface the view draws (option `water`), or undefined without one. */
   get water(): Water | undefined {
     return this.#water;
+  }
+
+  /**
+   * The plant state map made for the `disturbance` or `wetness` option, or undefined without either. Its `setSources`
+   * adds a live fire, flood or changed ground over the history's marks (a key left out removes that source).
+   */
+  get plantStates(): PlantStates | undefined {
+    return this.#plantStates;
+  }
+
+  /** The wet ground effect made for the `wetness` option (its `setLook` changes the look live), or undefined without one. */
+  get wetGround(): WetGround | undefined {
+    return this.#wetGround;
   }
 
   /** The stored objects and detail the view draws (`count`, `gpuBytes`, `dropped`), or undefined with `objects: false`. */
@@ -1619,8 +1950,11 @@ export class BiomeView implements Disposable {
     clearTimeout(this.#drainTimer);
     // The engine's removePlugin acts on the active scene, which may have changed since attach.
     if (this.#plugin) this.#engine.sceneOf(this.#plugin)?.removePlugin(this.#plugin.name);
+    this.#wetGround?.dispose();
     this.terrain.dispose();
+    this.#horizon?.dispose();
     this.#objects?.dispose();
+    this.#plantStates?.dispose();
     this.#rivers?.dispose();
     this.#water?.dispose();
     this.#river?.dispose();

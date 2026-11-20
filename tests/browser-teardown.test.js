@@ -8,8 +8,17 @@ import { execFile, execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createServer, request } from 'node:http';
-import { launchBrowser, withBoundedClose } from '../scripts/lib/browser.mjs';
-import { closeAll, endTree, runSuite, taskkillPids, taskkillTree, waitSignaled } from '../scripts/support/shutdown.mjs';
+import { fileURLToPath } from 'node:url';
+import { CLOSE_KILL_MS, CLOSE_LIMIT_HELP, CLOSE_LIMIT_MS, launchBrowser, withBoundedClose } from '../scripts/lib/browser.mjs';
+import {
+  closeAll,
+  endTree,
+  runSuite,
+  SHUTDOWN_BUDGET_MS,
+  taskkillPids,
+  taskkillTree,
+  waitSignaled,
+} from '../scripts/support/shutdown.mjs';
 
 const root = new URL('..', import.meta.url);
 
@@ -527,7 +536,8 @@ test('owned close timeout names its stalled listing, termination or client step'
         newBrowserCDPSession: async () => ({ send: () => (hung === 'listing' ? release.promise : Promise.resolve({ processInfo: [] })) }),
         close: () => (hung === 'client' ? release.promise : Promise.resolve()),
       },
-      { host, budgetMs: 50 },
+      // A fake host's pids are not processes of this test: the kill at the limit is recorded, not run.
+      { host, budgetMs: 50, kill: async () => [] },
     );
     const expected = { listing: /Chromium process listing/, termination: /Chromium process termination/, client: /Playwright client close/ };
     try {
@@ -541,4 +551,98 @@ test('owned close timeout names its stalled listing, termination or client step'
       release.resolve({ processInfo: [] });
     }
   }
+});
+
+// KB-P3h: nodes-browser (compat) printed its passing result beside two busy GPU suites and then did not exit for over
+// 20 minutes. A hosted close past its budget threw SHUTDOWN_TIMEOUT but left the host and its browser running and the
+// host's pipes referenced: a suite that went on after the error (scripts/visual-regression.js does) could never end, the
+// host waiting for an end request and the suite for the host. Past the limit the close now kills both trees.
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+};
+
+test('the close limit and its kill fit inside the shared shutdown budget, so the coded error arrives first', () => {
+  assert.ok(CLOSE_LIMIT_MS + CLOSE_KILL_MS < SHUTDOWN_BUDGET_MS);
+  assert.equal(CLOSE_LIMIT_HELP, 'docs/limits.md#browser-close-limit');
+  assert.match(readFileSync(new URL('docs/limits.md', root), 'utf8'), /^#+ Browser close limit\r?$/m, 'the help link names a heading');
+});
+
+test('a hosted close past its limit kills the host and the browser, releases the host, and fails with the coded error', { timeout: 5000 }, async () => {
+  const host = fakeHost({ ack: () => new Promise(() => {}) });
+  const killed = [];
+  const browser = withBoundedClose(
+    { newBrowserCDPSession: async () => ({ send: async () => ({ processInfo: [] }) }), close: () => new Promise(() => {}) },
+    { host, budgetMs: 100, killMs: 1234, kill: async (pids, waitMs) => (killed.push([pids, waitMs]), []) },
+  );
+  await assert.rejects(browser.close(), (error) => {
+    assert.equal(error.code, 'SHUTDOWN_TIMEOUT');
+    assert.deepEqual(error.killed, [999, 10]);
+    assert.deepEqual(error.survivors, []);
+    assert.ok(error.open.some((name) => /Chromium process termination/.test(name)), error.open.join(', '));
+    assert.match(error.message, /passed its 100 ms limit/);
+    assert.match(error.message, /killed browser host 999 and browser 10 with their process trees; see docs\/limits\.md#browser-close-limit$/);
+    return true;
+  });
+  assert.deepEqual(killed, [[[999, 10], 1234]]);
+  assert.deepEqual(host.calls.at(-1), ['release']);
+});
+
+test('a kill that leaves a process running says which, and the close still fails coded', { timeout: 5000 }, async () => {
+  const host = fakeHost({ ack: () => new Promise(() => {}) });
+  const browser = withBoundedClose({ close: () => new Promise(() => {}) }, { host, budgetMs: 50, listMs: 10, killMs: 77, kill: async () => [10] });
+  await assert.rejects(browser.close(), (error) => {
+    assert.equal(error.code, 'SHUTDOWN_TIMEOUT');
+    assert.deepEqual(error.survivors, [10]);
+    assert.match(error.message, /but 10 still ran 77 ms later/);
+    return true;
+  });
+});
+
+test('a normal hosted close and a hosted close that fails on its own never take the kill path', async () => {
+  for (const [ack, expected] of [
+    [async () => ({}), 'closed'],
+    [() => Promise.reject(Object.assign(new Error('gone'), { code: 'HOST_GONE' })), 'HOST_GONE'],
+  ]) {
+    const host = fakeHost({ ack });
+    let kills = 0;
+    const browser = withBoundedClose(listingBrowser([]), { host, budgetMs: 2000, kill: async () => (kills++, []) });
+    const outcome = await browser.close().then(
+      () => 'closed',
+      (error) => error.code,
+    );
+    assert.equal(outcome, expected);
+    assert.equal(kills, 0);
+    assert.deepEqual(host.calls.at(-1), ['release']);
+  }
+});
+
+test('a real stuck close is killed at its limit: host and browser gone, and the suite exits on its own', { timeout: 90_000 }, async () => {
+  const suite = spawn(process.execPath, [fileURLToPath(new URL('fixtures/stuck-close-suite.mjs', import.meta.url)), '1000'], {
+    stdio: ['ignore', 'pipe', 'inherit'],
+    windowsHide: true,
+  });
+  let out = '';
+  suite.stdout.on('data', (chunk) => (out += chunk));
+  // The hang bound: a suite still running 45 s after its 1,000 ms limit is the bug; it is ended so the test reports it.
+  let timer;
+  const code = await Promise.race([
+    new Promise((resolve) => suite.once('exit', resolve)),
+    new Promise((resolve) => (timer = setTimeout(resolve, 45_000, 'still running'))),
+  ]);
+  clearTimeout(timer);
+  const [pids, outcome] = out.trim().split('\n').map((line) => JSON.parse(line));
+  if (code === 'still running') await endTree(suite.pid, { waitMs: 10_000 });
+  for (const pid of [pids?.host, pids?.browser]) if (pid && alive(pid)) await endTree(pid, { waitMs: 10_000 });
+  assert.equal(code, 0, `the suite did not end after its close: ${out}`);
+  assert.equal(outcome.code, 'SHUTDOWN_TIMEOUT');
+  assert.deepEqual(outcome.killed, [pids.host, pids.browser]);
+  assert.deepEqual(outcome.survivors, []);
+  assert.match(outcome.message, /passed its 1000 ms limit/);
+  assert.equal(alive(pids.host), false, 'the host is gone');
+  assert.equal(alive(pids.browser), false, 'the browser under it is gone');
 });

@@ -92,15 +92,18 @@ export async function createLiveHost(options: LiveHostOptions): Promise<LiveHost
     }
     if (req.url === '/result' && req.method === 'POST') {
       try {
-        let body = '';
-        for await (const chunk of req) {
-          body += chunk.toString();
-          if (Buffer.byteLength(body) > 17_000_000) {
+        // Bytes first, decoded once: a UTF-8 character may straddle two chunks.
+        const chunks: Buffer[] = [];
+        let size = 0;
+        for await (const chunk of req as AsyncIterable<Buffer>) {
+          size += chunk.length;
+          if (size > 17_000_000) {
             res.writeHead(413).end();
             return;
           }
+          chunks.push(chunk);
         }
-        const result = JSON.parse(body);
+        const result = JSON.parse(Buffer.concat(chunks, size).toString('utf8'));
         const item = pending.get(result.id);
         if (item) {
           if (typeof result.error === 'string') item.reject(fault('failed', result.error, 'mcp'));

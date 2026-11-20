@@ -15,7 +15,7 @@ and [main.ts](main.ts) drives it.
 
 | Feature | Package |
 | --- | --- |
-| Brass, steel and stone PBR, walnut and leather with clearcoat, loaded from glTF with Draco geometry | `@margoengine/gltf-pro`, `@margoengine/decoders` |
+| Brass, steel and stone PBR, walnut and leather with clearcoat, loaded from glTF with Draco geometry | `@margoengine/gltf/pbr`, `@margoengine/decoders` |
 | Reflections and bounce light baked from the study itself: a box probe for the room, one for the mechanism, an irradiance volume | `@margoengine/environment/probes` |
 | The glass dome, two surfaces thick, order independent | `@margoengine/oit` |
 | Window sunlight with soft cascaded shadows, contact shadows | `@margoengine/shadows`, `@margoengine/post/contact-shadows` |
@@ -43,7 +43,7 @@ npm run dev:examples
 # http://127.0.0.1:5173/examples/orrery/index.html
 ```
 
-Checks: `node --test tests/orrery-ephemeris.test.js tests/orrery-gears.test.js` (no GPU) and `npm run test:orrery`
+Checks: `node --test packages/sky/test/ephemeris.test.js tests/orrery-gears.test.js` (no GPU) and `npm run test:orrery`
 (a real browser, add `-- --compat` for the WebGL2 layer): the page loads with no console error and a picture that is
 not blank, every arm sits at its planet's computed longitude and every wheel at its train angle for two dates, a
 planet flies in, time plays, reduced motion holds it still, the phone layout fits and a missing model is reported.
@@ -51,7 +51,7 @@ planet flies in, time plays, reduced motion holds it still, the phone layout fit
 ## The astronomy
 
 Each planet's heliocentric ecliptic longitude comes from published mean orbital elements solved with Kepler's
-equation ([ephemeris.ts](ephemeris.ts)):
+equation, by `@margoengine/sky/ephemeris` ([its README section](../../packages/sky/README.md#ephemeris-the-planets-round-the-sun-for-orreries-and-tours)):
 
 - Elements: E. M. Standish, "Keplerian Elements for Approximate Positions of the Major Planets", JPL Solar System
   Dynamics, Table 1, fitted to DE405 over 1800 to 2050, mean ecliptic and equinox of J2000
@@ -64,7 +64,7 @@ equation ([ephemeris.ts](ephemeris.ts)):
 
 Accuracy, measured against an independent reference: JPL Horizons state vectors (ephemeris DE441, retrieved
 2026-11-13) at 51 dates five years apart from 1800 to 2050, in the same frame
-([reference/horizons.json](reference/horizons.json), fetched by [reference/fetch-horizons.mjs](reference/fetch-horizons.mjs)).
+([horizons.json](../../packages/sky/test/fixtures/horizons/horizons.json), fetched by [fetch-horizons.mjs](../../packages/sky/test/fixtures/horizons/fetch-horizons.mjs)).
 Largest error over those dates, in arcminutes of longitude:
 
 | Mercury | Venus | Earth | Mars | Jupiter | Saturn | Uranus | Neptune | Moon |
@@ -72,17 +72,17 @@ Largest error over those dates, in arcminutes of longitude:
 | 0.38 | 0.42 | 0.33 | 1.15 | 7.6 | 11.9 | 1.7 | 0.98 | 16.8 |
 
 Jupiter and Saturn are worst because their mutual pull is not in a Keplerian orbit; on the model a 12 arcminute error
-is a fraction of a millimetre. `tests/orrery-ephemeris.test.js` holds every planet to these figures. The dates are
+is a fraction of a millimetre. `packages/sky/test/ephemeris.test.js` holds every planet to these figures. The dates are
 TDB; a UTC date differs by about a minute, far below these errors. Outside 1800 to 2050 the table is not fitted, so the
 dial stops there.
 
 ## The clockwork
 
-[gears.ts](gears.ts) designs the trains and [layout.ts](layout.ts) holds every dimension. The planets' tubes turn on
+[gears.ts](gears.ts) gives `@margoengine/procedural/gears` ([its README section](../../packages/procedural/README.md#gears-and-gear-trains-margoengineproceduralgears-19-kb-mingzip)) this frame and each planet's wanted ratio, and [layout.ts](layout.ts) holds every dimension. The planets' tubes turn on
 the central axis; a fixed stud arbor stands 78 mm from it and the drive arbor 62 mm from that, turning once every three
 Earth years. Each planet has a two-stage train: a wheel on the drive arbor meshes a wheel on the stud arbor, a second
-wheel on the same sleeve meshes the wheel on the planet's tube. The tooth counts (15 to 140) are found by an exhaustive
-search for the ratio closest to the planet's rate of mean longitude over the drive's, among trains whose wheels fit the
+wheel on the same sleeve meshes the wheel on the planet's tube. The tooth counts (15 to 140) are found by the package's exhaustive
+search (`designCompoundTrain`) for the ratio closest to the planet's rate of mean longitude over the drive's, among trains whose wheels fit the
 frame and clear every arbor and tube they do not mesh with:
 
 | Planet | a | b | c | d | Ratio error |

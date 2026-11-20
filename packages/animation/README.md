@@ -6,7 +6,7 @@ Optional WebGPU skeletal animation and morph targets, isolated from core and sta
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
 const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
@@ -24,7 +24,7 @@ default `loop: true`) it wraps at the clip's end, so a scrub bar can show it as 
 
 Parses glTF skins, joint hierarchies and inverse bind matrices. Samples STEP, LINEAR (quaternion slerp), and CUBICSPLINE tracks. Animation advances in seconds before the engine updates world matrices. A compute pass blends position/normal/tangent morphs before skinning and writes the vertex draw buffer. Bone matrices use read-only storage buffers, bounded by the GPU's storage limits rather than a fixed bone count.
 
-Every skinned or morphed primitive of a device, across all its Animations, lives in a few shared storage buffers and deforms in one compute dispatch per buffer page and influence format (100 morphed models with two primitives each: one dispatch, not 200). Copies of one asset primitive (`cloneModel`) share one copy of its bind-pose vertices, morph deltas and skin influences; only the deformed output, weights and bones are per copy, and a copy's output starts as a GPU copy of the bind pose, so a hundred characters upload their vertices once. A primitive's deformed vertices start `primitive.deformedOffset` bytes (a multiple of 256) into `primitive.deformed`; gltf-pro, shadows, TAA, selection and picking read them there, and a custom reader binds or copies from that offset.
+Every skinned or morphed primitive of a device, across all its Animations, lives in a few shared storage buffers and deforms in one compute dispatch per buffer page and influence format (100 morphed models with two primitives each: one dispatch, not 200). Copies of one asset primitive (`cloneModel`) share one copy of its bind-pose vertices, morph deltas and skin influences; only the deformed output, weights and bones are per copy, and a copy's output starts as a GPU copy of the bind pose, so a hundred characters upload their vertices once. A primitive's deformed vertices start `primitive.deformedOffset` bytes (a multiple of 256) into `primitive.deformed`; gltf/pbr, shadows, TAA, selection and picking read them there, and a custom reader binds or copies from that offset.
 
 Use `animation.setMorph(nodeIndex, targetIndex, weight)` for manual expressions. Play a clip by name/index; set `loop:false` for one-shot playback. Up to eight influences per vertex are supported through paired `JOINTS_0`/`WEIGHTS_0` and optional `JOINTS_1`/`WEIGHTS_1`. Higher sets reject explicitly. No blending between clips is included.
 
@@ -41,7 +41,7 @@ selection and its existing hot path.
 
 ```ts
 import {Engine} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {Animation} from '@margoengine/animation';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadGLTF(engine, '/robot-expressive.glb');
@@ -78,6 +78,10 @@ After building the packages, run `node --test packages/animation/tests/*.test.js
 
 ## Hidden models and shared skeletons
 
+A scale key of 0 on any axis plays like any other (glTF 2.0 section 3.5.3): pop-in animations that grow a node from
+zero work as exported, and CPU poses (`skin.pose`, `bakeVAT`) give a flattened vertex a finite normal.
+
+
 A model whose primitives are all hidden skips its GPU deformation: its clips keep running, its joints keep moving, and its deformed vertices wait at the last pose shown. They catch up in the first frame it shows, before anything draws it. `GPUDynamicBVH` and `readPickingGeometry` on a hidden model read that last pose.
 
 `skeleton` plays a model on the joints of another model of the same file, so the two can never drift apart. It has no clips of its own, and `@margoengine/lod/auto` uses it for the levels of a skinned model:
@@ -85,7 +89,7 @@ A model whose primitives are all hidden skips its GPU deformation: its clips kee
 ```ts
 import { Animation } from '@margoengine/animation';
 import { cloneModel } from '@margoengine/animation/skeleton-utils';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import {Engine} from '@margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 
@@ -143,7 +147,7 @@ Validation rejects bad indices and counts, repeated names, parent cycles and any
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {
   Animation,
   Skeleton,
@@ -190,12 +194,12 @@ and scale between keys are `(1 - f) * a + f * b`, finite for all finite keys (ke
 `'delta'`'s b - a overflows to NaN). Rotations slerp the same way in both. `'weighted'` reproduces Margo Voxel Studio's
 saved vector-track evaluation bit for bit (`tests/keyframes-blend.test.js`).
 
-Code clips also drive glTF-pro models: pass the model's `Animation` instead of a skeleton. Tracks then name model nodes
+Code clips also drive glTF PBR models: pass the model's `Animation` instead of a skeleton. Tracks then name model nodes
 (the first node with that name); transform tracks set the node's local transform and `weights` tracks set every morph
 weight through `animation.setMorph`, so expressions authored in code play on loaded characters. Pause the model's own
 clip (`animation.playing = false`) while a code clip drives it. A `weights` track whose width differs from the node's
 morph target count throws `RangeError`; a `Skeleton` skips `weights` tracks. `bakeKeyframeClip` writes `weights`
-tracks as glTF `weights` channels, which gltf-pro and `Animation` play back (`tests/keyframes-weights.test.js` checks
+tracks as glTF `weights` channels, which gltf/pbr and `Animation` play back (`tests/keyframes-weights.test.js` checks
 the round trip through `exportGLB`).
 
 ```ts
@@ -210,7 +214,7 @@ applyKeyframeClip(blink, animation, t); // node 'Face' has two morph targets
 `skin.pose()` runs the GPU pass's maths on the CPU (linear blend of the four bone matrices; normals by the cofactor
 matrix, flipped under mirroring scales) and returns Float32 positions and normals in the mesh's space.
 `tests/raw-rig-roundtrip.test.js` writes a raw rig and clip with `@margoengine/exporters` `exportGLB` (bones as export
-nodes under the mesh node, `skeleton.inverseBindMatrices`, `bakeKeyframeClip`), reads it back through gltf-pro and
+nodes under the mesh node, `skeleton.inverseBindMatrices`, `bakeKeyframeClip`), reads it back through gltf/pbr and
 `Animation`, and matches `skin.pose()` within 1e-4 at frame and key times.
 `node scripts/animation-skin-browser-tests.js` (real WebGPU, after building the packages) reads back the deformed
 buffer of a skinned `createMesh` strip and matches `skin.pose()` positions and normals within 1e-5 after posing, a
@@ -275,7 +279,7 @@ out (glTF nodes have no such paths); `AnimationGroup` and `retarget` ignore them
 Transmission can start at `0` (or its omitted default) and animate to a positive
 factor. Seeking back to `0` restores the opaque path. Volume attenuation and native
 capture follow the transition; the source document stays unchanged. The
-[self-contained triangle example](../gltf-pro/README.md#animate-an-opaque-material-into-glass)
+[self-contained triangle example](../gltf/README.md#animate-an-opaque-material-into-glass)
 builds this channel without a downloaded model.
 
 Volume pointer writes update attenuation and optical depth together. Optical depth
@@ -285,7 +289,7 @@ volume and the sampled keys.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF, viewGLTFCamera} from 'margoengine/gltf-pro';
+import {loadGLTF, viewGLTFCamera} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {pointerChannels} from 'margoengine/animation/pointer';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
@@ -297,7 +301,7 @@ animation.seek(1.5);
 viewGLTFCamera(model, 0); // cameras and lights are data: hand them on after each update
 ```
 
-Pointer playback is opt-in, like gltf-pro's optional decoders: import `pointerChannels` from
+Pointer playback is opt-in, like gltf/pbr's optional decoders: import `pointerChannels` from
 `@margoengine/animation/pointer` and pass it as the `pointers` option, so apps whose files have no pointer channels do
 not ship it. Without it, `Animation` skips every pointer channel (still counting it in the clip's duration) and lists
 it in `animation.warnings` with the fix. With it, `Animation` plays a clip's `KHR_animation_pointer` channels with its
@@ -320,20 +324,22 @@ ordinary ones, at the same time, speed and loop, with glTF's STEP, LINEAR and CU
 Values are written to copies the model owns, never to `model.asset.doc`, and bound on the clip's first playback.
 Pointers that break the glTF rules throw: malformed or out-of-range indices, properties animations may not change
 (`/materials/0/name`), a repeated pointer, a node property animated both by pointer and by an ordinary channel,
-accessors of the wrong type or count, and booleans that are not STEP unsigned bytes. Valid pointers this player cannot
+accessors of the wrong type or count, booleans that are not STEP unsigned bytes, and an IOR sampler with a key below 1
+(`KHR_materials_ior` keeps 0 as a mode set in the file, never an animated value). Valid pointers this player cannot
 drive are skipped and listed in `animation.warnings`: other extensions (iridescence, anisotropy and diffuse
 transmission factors, unknown extensions), `extras`, `texCoord`, textures of extended materials, properties the file
-leaves undefined (a camera without `zfar`, a light without `range`), factors gltf-pro did not load (physical factors
-without the materials decoder, transmission on a material loaded without it) and targets no scene node or primitive
-uses.
+leaves undefined (a camera without `zfar`, a light without `range`), factors gltf/pbr did not load (physical factors
+without the materials decoder, transmission on a material loaded without it), the IOR of a material whose file sets it to
+0 (the extension ignores updates of that mode) and targets no scene node or primitive uses. A cubic IOR spline that dips
+below 1 between its keys writes 1.
 
 ## Behaviour graphs (`@margoengine/animation/interactivity`)
 
-A glTF file can carry its own behaviour: on a click, play this clip, turn that material green. `GLTFInteractivity` runs the `KHR_interactivity` graph of a loaded model on the engine's frame loop, so the file behaves with no code of the app's. The graph itself lives in [`@margoengine/gltf-pro/interactivity`](../gltf-pro/README.md#behaviour-graphs-in-gltf-interactivity); this entry reaches the engine, and sits in this package because it plays clips and writes the same live properties as `KHR_animation_pointer`.
+A glTF file can carry its own behaviour: on a click, play this clip, turn that material green. `GLTFInteractivity` runs the `KHR_interactivity` graph of a loaded model on the engine's frame loop, so the file behaves with no code of the app's. The graph itself lives in [`@margoengine/gltf/interactivity`](../gltf/README.md#behaviour-graphs-in-gltf-interactivity); this entry reaches the engine, and sits in this package because it plays clips and writes the same live properties as `KHR_animation_pointer`.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {GLTFInteractivity} from 'margoengine/animation/interactivity';
 
 const stage = await createStage('#viewport', {backend: 'webgpu'});
@@ -346,7 +352,7 @@ behaviour.graph?.on('checkout', ({variant}) => console.log(variant));
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `pointer` | `true` | Turns pointer input on the canvas into select and hover events. Attaches `Picking` of `@margoengine/selection`, an optional peer loaded on first use, unless the engine has a picker. |
-| `physics` | none | The `GLTFPhysics` of `@margoengine/gltf-pro/physics`, for `rigid_body/*` operations and trigger events. |
+| `physics` | none | The `GLTFPhysics` of `@margoengine/gltf/physics`, for `rigid_body/*` operations and trigger events. |
 | `shareCamera` | `true` | Reports the viewer's camera to the graph. `false` makes `activeCamera` read as NaN, for a file you do not trust with where the viewer looks. |
 | `log` | none | Receives `debug/log` text. |
 | `maxActivations` | 1,000,000 | Node activations one step may run before the graph halts. |
@@ -356,13 +362,13 @@ A file's clips start only when its graph says so, so do not also play them with 
 
 ## Groups: one clip for many models
 
-`AnimationGroup` is one clip and one clock for a crowd. Members are glTF-pro models'
+`AnimationGroup` is one clip and one clock for a crowd. Members are glTF PBR models'
 `Animation`s playing a glTF clip they all have (by name or index), or, for a code-authored `KeyframeClip`, `Skeleton`s
 and `Animation`s whose bones or nodes the tracks name. Each member can run ahead or behind by an offset in seconds.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation, AnimationGroup} from 'margoengine/animation';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const walkers = await Promise.all([0, 1, 2].map(() => loadGLTF(stage.engine, '/RobotExpressive.glb')));
@@ -384,7 +390,7 @@ nodes and morph weights once, in `add`, and group playback creates no typed arra
 ## Sampling (`@margoengine/animation/sampling`)
 
 `sampleTrack` and `sampleTrackInto` (also on the root) without the deformation pipeline or
-gltf-pro, for code that samples tracks itself (`@margoengine/animator` does).
+gltf/pbr, for code that samples tracks itself (`@margoengine/animator` does).
 
 ```ts
 import {sampleTrack} from 'margoengine/animation/sampling';
@@ -446,7 +452,7 @@ each frame, so the CPU writes 16 bytes a frame however many faces play.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {MorphWeightPlayer} from 'margoengine/animation/morph-gpu';
 import {cloneModel} from 'margoengine/animation/skeleton-utils';
@@ -478,7 +484,7 @@ it would have been.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {AnimationLOD} from 'margoengine/animation/lod';
 import {cloneModel} from 'margoengine/animation/skeleton-utils';
@@ -552,7 +558,7 @@ arithmetic per vertex on the GPU.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {dualQuaternionSkinning} from 'margoengine/animation/dqs';
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
@@ -581,7 +587,7 @@ per frame. The texture is also far smaller: three texels per bone per frame, wha
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {SkinnedCrowd, bakeBones} from 'margoengine/animation/instanced-skin';
 const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
@@ -606,8 +612,22 @@ up to eight influences per vertex; an unskinned part becomes a bone of its own. 
 state are restored. A member takes `VATCrowd`'s `matrix`, `clip`, `offset`, `speed` and `uvTransform`, and adds
 `blendClip` (default 0), `blendOffset` (default 0), `blendSpeed` (default 1) and `blend` (0 to 1, default 0, all of the
 first clip). Clips mix as matrices, and bones blend linearly. Everything else follows `VATCrowd`: one material, opaque,
-`shadows.add(crowd)` and `lighting.add(crowd)`, no CPU culling. `poseBones(bake, member, time, out?)` is the shader's CPU
-twin, for bounds and picking. Morph targets stay at the weights they had when baked.
+`shadows.add(crowd)` and `lighting.add(crowd)`, no CPU culling. One vertex entry draws colour and shadow, its position `@invariant` (WGSL 12.10) as every Margo shadow caster's is, so another program drawing the same surface writes the same depth bit for bit. `poseBones(bake, member, time, out?)` is the shader's CPU
+twin, for bounds and picking. `poseBone(bake, member, bone, time, out?)` is the twin for one bone: its skinning matrix as
+the 12 numbers of its 3x4 rows, both clips and the blend applied, for what follows a member (a rider on a horse's back,
+a rifle in a hand):
+
+```ts
+import {poseBone} from 'margoengine/animation/instanced-skin';
+const bake = {bones: 1, rows: 2, width: 2048, texels: new Float32Array(2048 * 4), vertexCount: 0, vertices: new Float32Array(0),
+  joints: new Uint32Array(0), weights: new Float32Array(0), indices: new Uint32Array(0), uvs: new Float32Array(0),
+  clips: [{name: 'still', start: 0, frames: 1, duration: 1, loop: true}]};
+for (const row of [0, 1]) bake.texels.set([1, 0, 0, 0, 0, 1, 0, 2, 0, 0, 1, 0], row * 12); // lifted 2 m
+const m = poseBone(bake, {clip: 0}, 0, 0.5);
+console.log(m[7]); // 2: a point on this bone rides 2 m up
+```
+
+Morph targets stay at the weights they had when baked.
 
 ## Geometry caches (`@margoengine/animation/geometry-cache`)
 
@@ -692,7 +712,7 @@ Cloning skinned models and retargeting poses and clips between skeletons, in the
 import {Animation, Skeleton, createKeyframeClip, applyKeyframeClip} from 'margoengine/animation';
 import {Retarget, cloneModel, retargetRig} from 'margoengine/animation/skeleton-utils';
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 // Copy this repository's CC0 RobotExpressive asset to the same public URL in your app.
 const robot = await loadGLTF(stage.engine, '/examples/assets/robot-expressive.glb');
@@ -751,6 +771,36 @@ state), into a target `KeyframeClip` with a rotation track per mapped bone and a
 characters' model spaces must face the same way; morph weight tracks are not carried over.
 `tests/retarget.test.js` checks analytic poses (bone directions, lengths, scaled hip motion, unmapped bones) across
 renamed rigs with different bone axes, and models driven by their `Animation`.
+
+### Scene of the result
+
+`cloneModel` makes the copy in the scene of its source model (the scene the source is registered in), so a clone of a model in a second scene stays beside it, whichever scene is active when you call it. An abort or a failure leaves nothing in either scene.
+
+## Film time: seeking animation to a cut
+
+`Animation`, `PlaybackAnimation`, `AnimationGroup`, `AnimationMixer`, `AnimationLOD`, `MorphWeightPlayer`, `VATCrowd`
+and `GeometryCachePlayer` have `advanceTime(delta)`, the CPU part of their frame update, and a `time` that reads 0 on a
+fresh clock. A replayed step moves the clip clock (loops, ends, fades, warps, start times, LOD turns) and poses nothing;
+the next frame update poses the place reached. So `seek` from `@margoengine/cutscene/seek` lands a fresh scene on the
+pose a continuous run shows there, bit for bit to 54,000 steps (`tests/seek.test.js`, `tests/geometry-cache.test.js`).
+A replayed `PlaybackAnimation` sends no `loop` or `finished` event (a replayed end still settles `finished`).
+`AnimationLOD` gives the same turns when the camera is where the continuous run had it. `GeometryCachePlayer` waits for a
+chunk it does not hold only in a live update, so seek a cache whose file is held in memory (`await player.done`).
+Behaviour graphs (`interactivity`) have no `advanceTime`: they fire listeners and random nodes, so `seek` lists them in
+`unseekable` and they start at the cut.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {seek} from 'margoengine/cutscene/seek';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const hero = await loadGLTF(stage.engine, '/hero.glb');
+const walk = Animation.attach(hero, {speed: 1.2});
+// The scene starts 95 s into the film: replay the clocks, then the first frame poses what a continuous run poses there.
+const {clocks, unseekable} = await seek(stage.engine, 95, {fps: 60});
+console.log(walk.time, clocks, unseekable);
+```
 
 ## Preview tier contract
 

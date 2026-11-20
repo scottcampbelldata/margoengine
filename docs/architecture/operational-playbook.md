@@ -1,3 +1,798 @@
+### Section 5 evidence: scatter texture maps, cut-out shadows and the cotangent frame (KB-SCATTER-TEX1, 2026-11-17)
+
+`ScatterOptions.textures` patches core's lit fragment stage (base colour, alpha MASK, occlusion-roughness-metal, a
+normal map through a cotangent frame from screen derivatives) and scatter's depth-only shadow stage (a fragment stage
+dropping cut texels). The frame is divided by the sign of its determinant: WebGPU's dpdy grows downward, the opposite of
+the GLSL convention the source note assumes, and without the sign the map tilted normals the wrong way (found by the
+check). Evidence: `packages/scatter/test/maps.browser.mjs` passes on WebGPU and on the WebGL2 layer (cut half not drawn
+and casting no shadow, opaque half green and shadowing, a (1, 0, 0) normal darkening a sunlit card), for `Scatter` and
+`ScatterTiles`; `packages/scatter/test/maps.test.js` (32-byte vertices, mip chains with kept alpha coverage). Missing:
+no measured cost of the three texture reads a pixel on a forest scene (speed phase deferred).
+
+### Section 5 evidence: the flood solver on the GPU, WebGPU and the WebGL2 layer (water/flood push 3, 2026-11-17)
+
+`@margoengine/water/flood` (`packages/water/src/flood.ts`, `flood-shaders.ts`) runs the reference's scheme as one WGSL
+compute kernel per SSP Runge-Kutta stage. Each invocation reads a cross of cells two out along each axis and writes only
+its own texel of two rgba32float targets, state (h, bed, foam, breaker) and momentum (0, hu, 0, hv), the layout Water's
+spray and queries already read, so the WebGL2 layer runs it on its Fragment tier (3.3; a two-target rgba32float gather
+was proven there first). Three state and three momentum textures (0 and 1 between steps, 2 for U1) and two r32float inputs (obstacles, fill), 27 MB at 512 x 512;
+the first state is one more gather pass. The flood runs in place of Water's coastal flow through the solver bridge
+(`waterSolvers`, query-state.ts). Walls raise the bed of every cell their segment touches (a slab test of the segment
+against the cell square grown by half the wall's width, Kay and Kajiya 1986, SIGGRAPH, https://doi.org/10.1145/15886.15916),
+a 4-connected line with no gap at a diagonal; a breach lowers the crest to the ground; buildings stand on the ground as
+blocks read once from `obstacles(x, z)` (Schubert and Sanders 2012, https://doi.org/10.1016/j.advwatres.2012.02.012).
+The step is fixed, 1 / (120 m) s with m from Courant 0.25 at `maxDepth` and `maxSpeed`.
+
+How the GPU is compared with the reference, and the root cause of the gap push 2 left: the kernel matched the reference
+to f32 rounding for 10 steps, then the gap grew to 1.5e-3 m by step 200 against the plan's 1e-4. It was not float32
+sensitivity: one f32 ulp on every wet cell of the reference stays under 5e-7 m over 200 steps. A one-step check (each
+GPU step taken again by the reference from the GPU's own state) found a 2.5% momentum gap in the two cells next to a
+wall, and a plain JavaScript port of the kernel matched the GPU there to 7e-7. The reference was wrong: at the second
+Runge-Kutta stage its wall ghost mirrored the state at the step's start instead of U1, so the edge cell's limited slopes
+were taken against a stale neighbour. Fixed in the reference; regression `a wall is the mirror of the flow beside it at
+both Runge-Kutta stages` (flood-bounds.test.js: a walled half equals its mirrored whole; fails on the old ghost at the
+east wall). After it, GPU against reference after 200 steps: 1.7e-6 m and 9.0e-6 m^2/s on WebGPU, 1.8e-6 and 9.5e-6 on
+the WebGL2 layer, and 2.1e-5 m and 4.6e-5 m^2/s after 1,000 steps, inside 1e-4 with no bound widened. The plan's bounds
+on the GPU itself, both back ends (`packages/water/test/flood.browser.mjs`): Ritter at 400 cells (dam depth and speed
+within 3%, front behind 2 sqrt(g h0) t, L1 0.22% of h0), walls at exactly 0 straight and diagonal and a breach that lets
+water through, lake at rest over steps and an island under 5e-6 m/s after 10,000 steps, a closed town 1.7e-6 volume
+drift over 20,000 steps with no water in a block, Courant 0.021 and 0 capped cells, inflow volume within 1e-5.
+Push 4 (below) added the film clock and the sea; missing still: foam and spray from the flood (push 7), a wave maker for
+swell and a swell on the open sea inside the map.
+
+### Section 5 evidence: the flood's white water, current and wetting record (water/flood push 7, 2026-11-17)
+
+GPU maths change in `packages/water/src/flood-shaders.ts`, both backends from one WGSL source. The stage carries foam x
+depth as a fourth conserved quantity on each face's mass flux, upwind, with a 3 s e-folding loss (Callaghan et al. 2012),
+and writes the breaker (Ihmsen et al. 2012 ramps on Froude, speed and a front, Chentanez and Muller 2010) into the
+state's fourth channel; foam is never under it. A new gather pass a tick (`floodRecord`) writes the current (u, v, speed,
+depth) and the wetting record (deepest depth, seconds since wet, ever wet) into two rgba32float ping-pong pairs, so the
+WebGL2 layer runs it on its Fragment tier like the stage. Depth and momentum are unchanged: `test/flood.browser.mjs`
+still meets the reference within 1e-4 and `test/flood-film.browser.mjs` stays bit for bit across 30 and 60 fps, seeks and
+restores. Evidence: `test/flood-foam.browser.mjs` (RTX A6000, WebGPU and `MARGO_COMPAT=1` agree): foam and breaker 0
+on a lake at rest, a dam-break front (Froude 1.6) white with 25 m^2 of foam falling under 0.03 after 60 s, the current
+texture equal to the reading within 2.4e-7, and a bore run-up of 0.89 m under Shen and Meyer's U0^2 / 2g = 1.02 m. Cost:
+one more dispatch a tick and 32 B a cell; Water's spray now spawns from the breaker at any depth (the coast flow's breaker
+is 0 past 1.8 m, so its spray is unchanged).
+
+### Section 5 evidence: cliffs, overhangs and sea rocks over the heightfield (terrain/rocks, 2026-11-18)
+
+The clipmap terrain stays a heightfield; rock it cannot hold (overhangs, stacks, notches) comes as closed meshes from
+`@margoengine/terrain/rocks`: signed distance fields polygonized once on the CPU by procedural's `marchingCubes` in
+blocks of at most 127 cells, vertices welded across blocks and normals from the field's central differences, so a
+piece has no seam. `RockSurface` (`/rock-surface`) is one more patch of core's standard fragment shader through the
+shared mesh block (`mesh-patch.ts`), ordered at -0.5: after `TerrainColors` and `TerrainBlend` (-1), before core's main
+pass (0), so its code opens first in the block and the blend's fade is laid over the rock. It costs one group-0 binding
+(a storage buffer of five shared rows and three per mesh id) and about twenty value-noise reads on an added mesh's
+pixels; octaves fade by the pixel footprint (`dpdx`/`dpdy` of the position, taken at the top of the block in uniform
+control flow). Evidence: `packages/terrain/test/rocks.test.js` (CPU shape bounds, closed meshes across blocks) and
+`packages/terrain/test/rocks.browser.mjs` (RTX A6000, WebGPU and `MARGO_COMPAT=1` give the same figures: 3.0 times the
+plain mesh's close-up detail, rain 0.69, tide band 0.61, the blend's foot 40 of 255 from bare ground against 96, far
+shimmer 0.17 against 0.15). Missing: shading cost, other GPUs.
+
+### Section 5 evidence: the flood's film clock and the sea, WebGPU and the WebGL2 layer (water/flood push 4, 2026-11-17)
+
+The clock: the flood runs in ticks of 1 / 120 s of m steps each. Inputs are a log of snapshots (sources, walls with their
+breaches, roughness, wind stress, rain, the surge ramp, the tsunamis, the Water's base level) stamped with the tick they
+begin at (a setter at flood time t takes effect at tick ceil(120 t)); a breach, surge or tsunami is a function of the
+tick's own time. Each tick prepares its uniform (written to a slice pair of a 256-pair ring, 1 KiB apart, only when it
+differs from the last tick's) and the stage groups bind the ring by offset (lazily cached, at most 1,024); a frame records
+at most 240 ticks into Water's own encoder, `settle()` records the rest in chunks of its own and awaits the queue. The old
+code wrote one uniform per frame batch (a breach moved per batch, so 30 fps and 60 fps differed) and replayed a restore
+with the current inputs. Proof the test fails without it: with the uniform taken once per frame (first tick for every
+tick) `flood-film.browser.mjs` fails `1,200 frames at 60 fps equal 600 at 30 fps`. On both back ends two 600-frame runs at
+30 fps, 1,200 frames at 60 fps, a seek (fresh flood, 1,200 `advanceTime` calls, one frame, `settle()`) and a device restore
+(`rebootDevice`, replay at 240 ticks a frame) give depths, beds and velocities identical bit for bit (FNV hash of the
+float bits), Courant 0.083 at the end and under 0.094 throughout, 0 capped cells, 60 steady frames add no bind group and
+no ring write. Float32 uniform writes make a WebGPU run and a WebGL2-layer run differ in the last digits (volume 4209.3067
+and 4209.3053); each is exact against itself.
+
+The sea: a side marked 'sea' is Flather's (1976, no open link) boundary in its nonlinear form, the Riemann invariants
+u +/- 2 sqrt(g h) (Stoker 1957; Blayo and Debreu 2005, https://doi.org/10.1016/j.ocemod.2004.07.001, Flather is the
+incoming invariant linearised; Toro 2001, ch. 4): the incoming invariant is the outer sea's (its surface sea level + surge
++ tsunamis + swell over the edge bed, its current the incoming wave's simple-wave current 2 (sqrt(g h) - sqrt(g h0))),
+the outgoing one the edge cell's. Supercritical inflow (a dry or bared edge) takes the outer sea as the ghost, so the
+Riemann solver makes the flood front (at most 2 sqrt(g h), Ritter 1892); supercritical outflow copies the edge cell. Until
+push 7 the ghost held the outer depth, and the HLL flux then sent back a third of a leaving wave (KB-FLATHER-GHOST1; now
+0.01%); then the inside depth with the linear current sqrt(g/h_inside) (eta - eta_out), which grew without bound as the
+edge cell dried (57 m/s on a land edge under a 7 m crest, 513 cells capped, KB-FLATHER-DRY1), and a dry edge was a wall. The N-wave is eta = H tau sech^2(tau) / 0.447743 with tau = 9 (t - at) / period
+- 4.5 (Tadepalli and Synolakis 1994, https://doi.org/10.1098/rspa.1994.0050), the solitary wave H sech^2(1.5 tau)
+(Synolakis 1987). Wind stress rho_air Cd U^2 (Garratt 1977, held above 26 m/s after Powell et al. 2003) is added to the
+momentum of wet cells as stress / rho_water and, with `surge` null, sets the sea up by stress x shelf length / (rho g shelf
+depth) (0.2 m at 18 m/s, 1.2 m at 40 m/s). Rain is a depth rate on every cell. Water's own `seaLevel` follows the flood's
+(a level set meanwhile is the new base). Bounds on the GPU (`packages/water/test/flood-sea.browser.mjs`, both back ends):
+a sea side holds a lake at rest (0 m/s and 0 m native, 5e-6 m/s on the layer); a 0.3 m hump leaves 0.00015 m behind
+(0.05%, bound 5%; 0.0071 m before KB-FLATHER-GHOST1); an N-wave of 0.2 m at 101 m has its height within 8% and its trough and crest within 1.5 s of x / sqrt(g d);
+a 1 m, 10 minute trough-first wave on a 1 : 20 beach bares 23 m (bound 10 m) before the crest floods 51 m past the shore;
+Synolakis's solitary wave H / d = 0.0185 on 1 : 19.85 runs up to 0.0860 d against 0.0860 d (bound 5%); 30 m/s over a closed
+basin of 400 m x 2 m tilts it 0.0563 m against 0.0560 m (bound 5%, the time mean over three seiches); 100 mm/h for 60 s is
+1.6666 mm against 1.6667 mm (bound 1%); a 0.5 m surge fills a closed basin to 0.4996 .. 0.4997 m (bound 0.46 .. 0.54);
+a 7 m trough-first tsunami at a sea side half channel (10 m) and half land (1.7 m over the sea) floods the land edge 6.0 m
+deep at 15.7 m/s at most and no cell capped (57 m/s and 513 capped before KB-FLATHER-DRY1), and a 6 m crest floods a dry
+land edge 4.3 m deep at 13.0 m/s (the old dry edge stayed dry).
+
+Waves (push 7). The swell: the Water's trains (its uniform's 8 floats a train, read each frame into the tick log, times
+`swell`) ride in the flood uniform with a swell clock (the Water's wave time when the flood began plus the tick time); a
+sea face adds each component's a sin(phase) (the shared `swellAt` of swell-wgsl.ts, filtered to the cell) to the outer
+surface and to the incoming wave, weighted clamp(4 d . n_in, 0, 1), so components leaving or running along the side are the
+inside's. The wave makers: up to 4 bands, each (position, unit direction) and (signal at the tick's middle, omega, width,
+half length) in the uniform; a wet cell adds depth f = s(t) c / I exp(-beta r^2), I = sqrt(pi / beta) exp(-k^2 / (4 beta)),
+k = omega / c, c = sqrt(g h) of the cell, and c f along the direction on the momentum (Wei, Kirby and Sinha 1999,
+https://doi.org/10.1016/S0378-3839(99)00009-5; one-way because q - c eta gets no source, Stoker 1957; Larsen and Dancy
+1983, https://doi.org/10.1016/0378-3839(83)90022-4, for the source line). Default beta = 80 / (0.25 L^2), never under 1.5
+cells. The uniform grew to 1,264 B (ring stride 1,280 B, 640 KB for 256 pairs). Bounds on the GPU
+(`packages/water/test/flood-waves.browser.mjs`, both back ends, 2 m cells over 10 m of water): a 0.1 m, 8 s train 19 m
+ahead 0.0984 m (bound 3%) and 8.000 s (bound 1%), 4e-5 m behind (bound 3%); a wall's reflection 11 m behind the band is
+0.981 of it 11 m in front (bound 3%); the sea side sends back 0.01% (bound 3%); the swell's rms in the first cell is 1.003
+of the train's at the face, correlation 0.997; `swell: 0` leaves 0. Minmod damps a 40-cells-a-wavelength wave about 3%
+per 50 m. Not done: dispersion and refraction of the swell (shallow-water model), run-up of a bore (Shen and Meyer 1963)
+measured against a Boussinesq reference.
+
+### Section 5 evidence: the flood solver's CPU reference meets the disaster-water bounds (water/flood push 2, 2026-11-17)
+
+`packages/water/test/flood-reference.js` is the finite-volume shallow-water scheme `@margoengine/water/flood` will run
+on the GPU, written plainly in JavaScript with float32 storage: hydrostatic reconstruction in the form of Chen and
+Noelle 2017 with Audusse et al. 2004's second-order bed source, the HLL flux with Kurganov and Petrova's one-sided speeds
+and desingularised velocity, minmod slopes, SSP Runge-Kutta 2 and semi-implicit Manning friction (Chertock et al. 2015).
+`packages/water/test/flood-analytic.js` holds the exact solutions, and `packages/water/test/flood-bounds.test.js` checks
+every bound of the plan in node (no package bytes): Ritter and Stoker dam breaks, bore speed and reflected depth,
+Belanger's standing jump, Synolakis's solitary run-up (NOAA canonical case), the trough-first N-wave drawback, bore
+run-up under U0^2 / 2g, Thacker's planar surface in a paraboloid, lake at rest over steps and an island, volume over
+20,000 steps with buildings, a dam break into streets, inflow and rain volumes, a one-cell wall holding water exactly,
+Manning uniform flow and wind set-up with Garratt's drag (held at its 26 m/s value, Powell et al. 2003).
+
+Root cause found on the way: the desingularised velocity used a fixed eps of 1e-12, so every sheet thinner than 1 mm
+moved at a fraction of hu / h (0.1 mm at 2 m/s moved at 0.028 m/s). At a moving shoreline that is a drag that does not
+shrink with the cell: Thacker's bowl lost 7.6% of its amplitude in 3 periods at 200 x 200 cells and 10.2% at 100 x 100,
+against a 5% bound. With eps = DRY^4 (1e-24, so the velocity is hu / h in every cell above the 1e-6 m dry depth) the
+loss is 0.16%, 0.72% and 1.29% after 1, 2 and 3 periods at 200 x 200, with no negative depth. Tried and not kept: a less
+diffusive limiter (generalised minmod, theta 1.3 and 2: 9.6% and 8.9% at 100 x 100, so the limiter was not the cause),
+and the wet/dry front reconstruction of Bollermann, Chen, Kurganov and Noelle 2013 (J. Sci. Comput. 56(2) 267-290,
+https://doi.org/10.1007/s10915-012-9677-5) over the cells' limited bed slope, which cut the Thacker loss further but
+let a bore run up 6% past U0^2 / 2g, because its flat-lake surface in a part-flooded cell holds more water at the wet face
+than the cell owns. Regression: the `sheet above the dry depth keeps its speed` test fails on the old eps.
+Missing: the same bounds on the GPU, WebGPU and the WebGL2 layer (push 3).
+
+### Section 5 evidence: flood waves keep their height, fifth-order faces in the wet interior (KB-FLOOD-DAMP1, 2026-11-18)
+
+The flood scheme (reference and GPU kernel alike) lost about 3% of a 40-cells-a-wavelength wave's height per 50 m: minmod
+slopes are 0 at every crest, so crests were first order. Measured on the reference with a simple wave (whose crest keeps
+its height exactly until it breaks; Stoker 1957): 27.2% lost in 500 m with minmod, 15.7% and 9.4% with generalised
+minmod at theta 1.3 and 2, 8.5% with Koren's limiter, 22.8% and 15.9% with WENO3 and WENO3-Z, 3.0% with unlimited
+third-order faces, 0.65% with fifth-order WENO-Z (Borges et al. 2008; Castro, Costa, Don 2011's power 2). The time step
+was not the cause. Kept: WENO-Z on h, w, u and v where all five stencil cells hold more than 1 cm and both depth faces
+are non-negative, minmod elsewhere, so wet/dry fronts keep the positivity-preserving second-order faces and every
+existing bound (Ritter, Stoker, bores, jumps, run-up, Thacker, lake at rest, volume, walls) passes unchanged; the
+hydrostatic reconstruction stays well balanced for any reconstruction (Audusse et al. 2004; Noelle, Xing, Shu 2007). The
+GPU stage now reads a cross three cells out (walls mirror two cells). Proof: `flood-bounds.test.js` (the simple wave,
+1% over 500 m; fails at 100 m on the old scheme), `flood-waves.browser.mjs` (a solitary tsunami's crest within 1% over
+500 m, measured 0.16%; the maker's train 0.26% per 50 m) and the cell-for-cell GPU-against-reference check of
+`flood.browser.mjs`, on WebGPU and the WebGL2 layer. Missing: a quiet-machine cost of the wider stencil (build phase).
+
+### Section 5 evidence: the sky's ground light and an overcast floor under it (KB-SKY-FLOOR1, 2026-11-18)
+
+The sky's nine diffuse coefficients now carry the ground's light: the projection (`packages/sky/src/project.ts` and its
+WebGL2 route in `compat.ts`) drops the map's dark lower half and adds a level Lambertian ground of albedo
+`lighting.ground` (default 0.2), radiance rho (E_sky + E_sun) / pi, to the first two coefficients (2 pi and -pi of it).
+E_sky is summed from the map's upper half in the same pass; E_sun / pi comes from the engine light in row 10 of the
+light buffer (176 bytes; the shaders' uniform still binds the first 160). The overcast day floor fell from 0.26 to 0.03,
+under that light: above the sky's own zenith on the dune coast it had made the light the same from every side.
+Evidence (RTX A6000, WebGPU): `night-check.mjs day-presets` reads a ceiling's underside at 0.18 to 0.21 of the ground in
+all four presets (0.04 noon and 0.69 overcast before); a probe that drew Wilbur's eye white with one term at a time read
+the sky's irradiance equal toward up, down and forward before, and 0.29 / 0.13 / 0.036 (up / forward / down, display
+linear) after, the lower white 0.81 and 0.60 of its middle (1.02 and 0.80 before; CC0 photographs 0.58 and 0.49).
+Missing: reflections still see the dark ground; the ground's own colour and shadows do not reach its light.
+
+### Section 5 evidence: whitecap coverage, glitter width and a night sea from the wind (elements step 4, 2026-11-17)
+
+Water's shader had three numbers tied to nothing. Foam passed a crest threshold `mix(0.42, 0.16, amount)` whatever the sea;
+the glint lobe had a fixed roughness; the body was lit by the engine's ambient whatever the sky above the sea. With
+`wind` set: (1) `whitecaps` defaults from it and the threshold is the swell's own crest spread (a sum of sines of known
+amplitudes, read from the uniform) times a score from a measured table (`FOAM_Y`, `FOAM_Z`, Margo calibration of the
+foam that reaches half white against the Gaussian score of Monahan and O'Muircheartaigh's W = 3.84e-6 U^3.41); (2) the
+glint lobe takes Cox and Munk's mean square slope 0.003 + 0.00512 U less the swell's and ripples' as extra GGX alpha
+squared (times 2.6); (3) the body ambient is `eye.w` times `skyAmbient()`, the sky's luminance over a clear day's 0.02,
+clamped to 1, so a night sky lights the sea only as much as it lights the sky the sea reflects. Evidence (NVIDIA RTX
+A6000, WebGPU and the WebGL2 layer, `node scripts/run-with-timeout.mjs -- node packages/water/test/<name>.browser.mjs`):
+`whitecap-coverage` (foam at least half white over 40 wave clocks of a top-down 200 m view, 640 px: 0.012% at U 3, 0.45% at 8,
+4.0% at 15, 24% at 25, the same at chop 0 and 1, none at 2.9), `glitter` (half width 4.5 and 10.4 degrees at U 2 and 12
+against Cox and Munk's 5.2 and 10.2), `night-sea` (the night sea 1.5e-3 against the sky 1.8e-3 in linear light; the
+fixed-ambient body gave 4.6e-3 and failed). Missing: foam over a coast and under a different view distance follows the
+same threshold but its `detail` thinning is not part of the bound (docs/limits.md).
+
+### Section 5 evidence: directional hard shadows on the receiver plane (KB-SUNSHADOW-OFFSET1, 2026-11-16)
+
+Shadow maths, `@margoengine/clustered/shadows`. `clusterDirectionalShadow` now calls the same `localShadowPCF` as point
+and spot lights with the cascade's own matrix and texel size (so the plane and the offsets hold per cascade), the shared
+`normalBias` (settings.z, default 0.25; the sun's own 1.5 is gone) and the receiver-plane lift 1 + `slopeBias` in the
+spare `w` of each `sun` vec4 (0 with `receiverPlane: false`, the old flat compare). New in the filter, directional only
+(`behind` 0 keeps point and spot exactly as before): a texel whose stored depth lies farther from the light than the
+receiver's true plane by more than the receiver's own offsets (bias + normalBias / max(N.L, 0.05) texels) plus one
+texel shows no part of the receiver, so it is left out and the others renormalized (all out: lit). Without it the plane
+lit the Cornell box's red wall through texels past its 80-degree contact with the zero-thickness ceiling (575,408
+against the recorded 567,377). Frame size, bindings and the steady-frame work (one more matrix row dot per cascade
+lookup, 16 texel loads as for point and spot) are otherwise unchanged.
+
+Evidence (`scripts/clustered-shadow-gpu-check.js`, RTX A6000, native WebGPU and the WebGL2 layer, the same figures):
+a bar's edge cast by a sun at 58 degrees with a 256 px map (2.42 cm texels), averaged over 16 positions of the map's
+grid, sits 0.98 cm out (the 0.25-texel normal offset's own 0.97 cm), against 5.82 cm before; a floor lit at 49, 66, 80
+and 85 degrees reads 1 with true normals and with normals tilted 10 degrees at 49 and 66 (at 80 and 85 with
+`slopeBias` 2); the floor behind a 0.1-high pebble at 1024 px stays at 0; all 87 checks pass in both modes. The
+directional Cornell box against Mitsuba hard visibility (`cornell.mjs`) went from absolute 567,377 to 478,366 (square
+44,838,153 to 29,281,138, max 165 to 143; 478,365 on the WebGL2 layer), re-recorded with its decomposition (2048 map
+now 53.5 % of the residual, 4096 57.8 %); the point Cornell still measures 597,154. Ruled out by measurement: the plane
+alone (575,408), the margin fixed at 1 texel over the offset plane (1,001,000: the receiver's own offsets put the
+surface behind it), the full plane on texels away from the light (515,659: more darkening at lit-box contacts). Missing:
+other GPUs; the contact strip on zero-thickness quads at about 80 degrees (about 4 px on the Cornell red wall, wider
+than the old filter's); whether point and spot lights gain from the same texel test, not measured yet (row KB-LOCALSHADOW-CONTACT1).
+
+### Section 5 evidence: LocalShadows hard edges on the receiver plane (KB-LOCALSHADOW-OFFSET1, 2026-11-16)
+
+Shadow maths, `@margoengine/clustered/shadows`. The hard point and spot filter (`localShadowPCF` in
+`packages/clustered/src/shadows.ts`) reads the 4x4 texels behind its 3x3 bilinear taps (Reeves, Salesin and Cook 1987;
+weights (1 - f, 1, 1, f) / 3 per axis) with `textureLoad` and compares each with the depth of the receiver's tangent
+plane on that texel's ray (Isidoro 2006; per texel as Dou, Yan, Kerzner, Dai and Wyman 2014). The plane comes from the
+shading normal, mapped through the layer's matrix at two tangent points (planes stay planes under the projection).
+Texels nearer the light are lifted by 1 + `slopeBias` (default 0, the exact plane) times the plane's rise, and none
+drops below the receiver's own depth. Defaults: `bias` 1 texel toward the light,
+`normalBias` 0.25 texel along the normal (was 1.5), `receiverPlane` true (false restores the old flat compare through
+the comparison sampler, which keeps binding 16 in every layout). The flag and lift travel in the spare `w` of each
+slot's `lights` vec4, and the directional normal offset (`normalBias`, default 1.5 as before) in the spare `w` of each
+`sun` vec4, so no binding or frame size changed. Directional cascades keep the flat compare: on the Cornell box the
+plane let light past the 80-degree wall contact (MAE 697,572 at `slopeBias` 2 and 575,408 at 0 with 0.25 texels,
+against the recorded 567,377). PCSS and area paths are unchanged apart from the new `normalBias` default.
+
+Evidence (`scripts/clustered-shadow-gpu-check.js`, RTX A6000, Edge 157, native WebGPU and the WebGL2 layer, the same
+figures on both): a bar's edge from 3.8 m at 58 degrees with 256 px maps, averaged over 16 light positions, sits
+1.14 cm (point) and 0.58 cm (spot) out, the 0.25-texel normal offset's own 1.18 and 0.66 cm, against 7.09 and 3.85 cm
+before; a floor lit at 49 to 85 degrees with true normals, and at 49 to 66 degrees with normals tilted 10 degrees three ways,
+reads 1 everywhere (before: 0.87 at 80 to 85 degrees), and tilted normals at 80 to 85 degrees read 1 with `slopeBias` 2
+(about 0.51 at the default 0, a documented limit); the floor behind a 0.1-high pebble at 1024 px stays at 0. Directional, area, PCSS,
+terrain, contact, atlas, line, light-render, stochastic and cutout-caster GPU checks pass in both modes. The point Cornell
+box against Mitsuba hard visibility (`cornell.mjs --point`) went from absolute 730,273 to 597,154 (square 19,557,045 to
+14,188,684, max 156 to 135; 730,276 to 597,155 on the WebGL2 layer), re-recorded with its decomposition (range window
+now 43.7 % of the residual, 2048 map 15.0 %); the directional Cornell still measures its recorded 567,377. Ruled out by
+measurement: Holbert's (1 - N.L) normal-offset scaling, and a lift along the light by k / N.L in place of the normal
+offset (neither cures normals tilted toward a grazing light). Missing: other GPUs; normal-mapped receivers in a real
+scene (the probe tilts the normal uniformly); the Cabin Hearth's cross-bar patch re-measured with its per-pixel physics.
+
+### Section 5 evidence: film time seek replays the clocks, bit for bit (GAP-FILM-TIME, 2026-11-16)
+
+`@margoengine/cutscene/seek` brings a fresh world to film time T by running `Math.round(T * fps)` steps of every
+clock's `advanceTime(1 / fps)` (plugins of each scene in attach order, then extra clocks), with no draw; `onPreUpdate`
+of each time-driven package runs the same `advanceTime`, so a replayed step and a live frame do the same float sums in
+the same order. Evidence: CPU, packages/cutscene/tests/seek.test.js (seek to n plus one live frame deep-equals n + 1
+live frames for n = 1, 600 and 54,000, with a wind changed on the way and one seeded draw per step; steps x clocks
+calls). Class check: scripts/check-film-time.mjs (report mode) lists package fields that add up deltas with no
+`advanceTime` and wall-clock or unseeded random calls. Sky (commit 2): `Sky`, `HillaireSky`, `VolumetricClouds`,
+`AstroSky` and `Weather` have `advanceTime` and `time`; CPU, packages/sky/test/seek.test.js (every field of the five
+equal after a replay of n plus one live frame against n + 1 live frames, n = 1, 600 and 54,000, a wind change at
+step 300, over 100 seeded strikes, none heard twice); GPU, packages/sky/test/seek-check.mjs (sheet clouds and stars
+at dusk, temporal volumetric clouds, rain with lightning: the HDR scene capture after a seek equals the continuous run's
+float for float at n = 1 and 600, and a fresh start differs, on the RTX A6000 natively and on the WebGL2 layer; both
+runs shared the GPU with other lanes' jobs, KB-FILM-GPUSHARE1 did not show). The `VolumetricClouds` march start now
+counts updates, not draws, and `Weather.listener` follows the engine camera at update, not the draw pass. Weather
+(commit 3): `WeatherMachine` (silent: a replayed transition calls no listener), `WeatherDrive` (steps its weather with
+`advanceTime` and writes the same targets, so it stays in attach-order lockstep with the sky `Weather` and `Hail` it
+feeds), `Hail`, `Puddles`, `GLTFWeather`, `LensDrops` and `WeatherRegions` have `advanceTime` and `time`; CPU,
+packages/weather/tests/seek.test.js (every field equal for n = 1, 600 and 54,000 with a looping schedule, a random walk,
+a moving camera and a wind aloft change at step 300; 286 transitions and 40 strikes of the sky Weather it feeds,
+none heard twice);
+GPU, packages/weather/tests/seek-check.mjs (drive, hail and puddle rings: the HDR capture after a seek equals the
+continuous run's float for float at n = 1 and 600, a fresh start differs, natively and on the WebGL2 layer; both runs
+shared the GPU with other lanes' jobs). Scatter and water (commit 4): `Scatter` (and its subclasses),
+`ScatterInstances`, `Water`, `FFTOcean`, `WaterFlow` and `WaterRain` have `advanceTime` and `time`; `Water`'s clock moved
+from its draw pass to its update (hidden water keeps time; two views in a frame move it once). CPU,
+packages/scatter/test/seek.test.js and packages/water/test/seek.test.js (clocks and the uniforms the next draw uploads
+equal for n = 1, 600 and 54,000, a wind change at step 300); GPU, packages/scatter/test/seek-check.mjs (boxes, blades
+and wind-bent instances) and packages/water/test/seek-check.browser.mjs (Gerstner waves with flow and rain rings, an
+FFT ocean with foam off): the HDR capture after a seek equals the continuous run's float for float at n = 1 and 600, a
+fresh start differs, natively and on the WebGL2 layer. Class B, from the scene's warm-up: the trample field, `Ripples`,
+rain splashes, FFT foam and coastal flow (scripts/film-time-reviewed.json). Vfx, taa and tonemap (commit 5): `VFX`
+counts its clock, birth remainder, step seeds, bursts and schedule cursor in `advanceTime` (its update) and the simulate
+pass runs the counted step once a frame; `Tonemap` moves its grain frame and `TAA` and `TAAUpscale` their jitter phase in
+`advanceTime`. CPU, packages/vfx/test/seek.test.js, packages/tonemap/tests/seek.test.js and
+packages/taa/test/seek.test.js (the uniform each next draw uploads equal for n = 1, 600 and 54,000). History bounds,
+GPU, natively and on the WebGL2 layer with the GPU to itself: packages/vfx/test/seek-check.mjs (after a seek and 150
+warm-up frames, births per step equal and the live count within 5 % of a continuous run on a 2,000 particle effect:
+0.4 and 2.0 % measured), packages/taa/test/seek-check.mjs (historyWeight 0.9, 53 warm-up frames: at most 1 level of 255,
+0.016 measured; 41 levels without the seek, whose phase differs), packages/tonemap/tests/seek-browser.mjs (auto exposure
+snaps on the first metered frame, then keeps e^(-1.5 P) of the gap after P seconds, measured at that bound). Animation
+(commit 5b), shadows and dof (commit 6, wall clock to frame time) and the sweep (commit 7: every package clock found by
+scripts/check-film-time.mjs, which now fails the gate; shader time reads one `ShaderClock` per engine, so raw, node and
+compute shaders and TAA's camera block see film time) have the same CPU `seek.test.js` proofs; `renderCutscene` and
+`cutsceneFrames` from a time after 0 seek first (commit 8, packages/cutscene/tests/render.test.js). The check's delta rule also finds a field set from an expression that reads it and a delta (a clamp, an ease
+toward a goal, a countdown; KB-FILM-SCANGAP1, 2026-11-18): Stylize gained `advanceTime` (packages/post/test/
+stylize-seek.test.js), ten files are reviewed, and `CameraBrain` is still no clock (KB-FILM-BRAIN1). Zero-delta updates
+(KB-FILM-TAAPHASE1): a `Reflector`, `Refractor` or `CubeCamera` capture renders with a delta of 0 and runs every
+`onPreUpdate`; that update now moves no counter (TAA, TAAUpscale and Tonemap step at the next frame when no timed
+update came), which the environment mirror check proved (p99 5 to 0 for "TAA mirror after a move under history equals
+a fresh history", WebGPU and the WebGL2 layer). Missing: the Film Studio cut test (margo-videohub), GAP-FILM-VFXSEED,
+GAP-FILM-FOAM and GAP-FILM-RESET.
+
+### Section 5 evidence: glyph fields from font outlines on the CPU, the same in a page and in Node (GAP-FILM-TEXT, 2026-11-16)
+
+`@margoengine/text/outline` (`GlyphFieldFont`) builds single-channel glyph distance fields on the CPU from the font file's
+outlines (packages/text/src/outline-sdf.ts): curves cut into straight pieces by the second-difference bound (within
+min(1/64 px, radius / 1020)), the sign from nonzero winding by scanline crossings at texel centres, the magnitude from
+the exact distance to the nearest piece inside each piece's box grown by the field's reach, and edges with ink on both
+sides (overlapping or abutting contours) left out. Only + - * / and sqrt touch fractional values, so every IEEE 754
+machine builds the same bytes; the encoding is `alphaToSdf`'s, so the shader, atlas and `TextRenderer` are unchanged.
+Kerning comes from GPOS pair adjustment (or the legacy kern table), ligatures from GSUB liga. Evidence: CPU,
+packages/text/tests/outline.test.js (every sampled texel within one level of a 4,096-point-per-curve brute-force
+reference for TrueType, CFF, a variable instance and CJK at 32, 64 and 128 px; a pinned SHA-256 of the fields; touching
+and overlapping squares; kerning equal to a Chromium reference on 20 pairs; ligatures; the glyph cache round trip);
+GPU, packages/text/tests/outline-node-gpu.mjs (a title with outline and shadow, a kerned caption and small text drawn
+in a page and in Node on the `webgpu` binding: byte-identical fields, largest channel difference 0 and 0 pixels off by
+more than 1 against both the native WebGPU page and the WebGL2 compatibility layer page, RTX A6000). Missing: the same
+comparison on Apple silicon and another GPU vendor; multi-channel fields (GAP-FILM-MSDF). Found there: UiRenderer
+throws in headless Node with its default input and mirror (bug-sweep KB-FILM-UI-NODE).
+
+### Section 5 evidence: voxel origin rebasing (2026-11-15)
+
+GPU maths changed: with `origin` set, packages/voxel/src/render.ts draws chunks in an integer frame, world cells
+minus a base snapped to 1,024 cells near the origin: the chunk origins table holds exact integers, and the camera
+the shaders read is M S(s) T(-shift) with inverse T(shift) S(1 / s) M^-1, folded in float64 before the float32
+write (shift = origin minus base, within 512 cells; `Frame.shift`, the frame uniform grew from 272 to 288 bytes).
+The shared shading end subtracts the shift first, so the eye, the sun's shadow map and lighting hooks see engine
+positions. Shadow casters draw with the light matrix times T(-shift); bevel vertices are chunk-local and take their
+chunk's origin as a per-instance vertex buffer (the origins table). Ripple and wind phases add the base's place in
+each wave, reduced in float64. Without `origin` every written value is unchanged (shift 0, base 0). Evidence: CPU,
+packages/voxel/tests/render.test.js ("origin: ...": the same origins table, frame and pool bytes at 2^24 blocks as
+near zero; a fractional origin keeps chunk origins integers under 1,600 and maps world cells to the engine clip
+position) and packages/voxel/tests/wind.test.js; the twelve voxel GPU leaves on WebGPU and the WebGL2 compatibility
+layer on Apple silicon. Missing: a pixel comparison of a block world at 2^24 blocks against the same world near zero.
+
+Effects (2026-11-15, KB-VOX-ORIGIN1 fixed): `/gi` and `/light-rgb` read the origin of the renderer they were added to;
+their shading uniforms (now 32 bytes: the window corner minus the origin, and the origin mod the volume size, so
+`(p + wrap) / size` samples the wrapping volume at small numbers) are computed in float64. The smooth view, objects,
+model chunks (now chunk-local positions) and debris place meshes at world minus origin in float64. Evidence: the
+"origin:" tests of gi, light-rgb, smooth, objects, models and debris (same uniforms and meshes at 2^24 blocks as near
+zero) and models-browser-check (a model panel at 2^24 blocks draws the same pixels as near zero; a moved origin draws
+what the panel one block over draws), with the twelve voxel GPU leaves on both backends. Open: debris with physics
+(KB-VOX-ORIGIN2, physics simulates world coordinates).
+
+### Section 5 evidence: the voxel renderer clock after days of play (2026-11-15)
+
+GPU maths changed: packages/voxel/src/render.ts no longer writes its clock into the frame uniform as one float32
+that grows without bound (at 1e5 s a float32 second steps by 0.0078 s, at 1e6 s by 0.0625 s, so liquid waves, wind
+bending and animated textures stepped after a day of play). The clock stays float64 on the CPU. The frame and
+shadow uniforms (`Frame.time`, `Frame.waves`, `VoxelShadow.time`; the frame buffer grew from 240 to 272 bytes) carry
+the time within a 256 s period, the count of whole periods as u32 bits, the liquid rise phase and the three ripple
+phases, each reduced to one turn in float64 before the float32 write. `voxelLayer` takes a texture animation's
+frame as (periods * rate + floor(t * rate / 256)) mod frames in u32, exact for any play time; `voxelRise` and
+`voxelRipple` read the reduced phases. packages/voxel/src/wind.ts uploads one reduced phase per distinct speed
+(`WindFrame.phase`, the slot in each material's config) instead of a float32 time; bevels and shadow casters read the
+same vec4. Evidence: CPU, packages/voxel/tests/render.test.js ("clock: after a day of play ...") and
+packages/voxel/tests/wind.test.js ("a large clock reaches the shader ..."); all twelve voxel GPU leaves pass on
+WebGPU and the WebGL2 compatibility layer on Apple silicon. Missing: a pixel check at a clock of 1e6 s
+against the same scene at its reduced time.
+
+### Section 5 evidence: caller GPU objects across a device restore (KB-RESTORE-BORROWED1, 2026-11-15)
+
+A `GPUTexture`, view, sampler or buffer the caller passes in belongs to the device that made it (W3C WebGPU 3.2.1,
+3.5.2). Before this rule one restore stopped the frame loop (sprites and tilemap threw; most options handed the old
+object to the new device and core threw its validation error), points and shader/raw warned in the console, and the
+rest said nothing. The one rule is docs/conventions.md, "Borrowed GPU objects", built on `packages/shared/borrowed.js`
+(CPU proof `tests/borrowed.test.js`). The quality gate `tests/borrowed-gpu.test.js` reads every `api/*.api.md`, finds
+each member that can hold one of the four GPU types and holds it to `scripts/borrowed-registry.json`: `ruled`,
+`exempt` with a reason, or `pending`; the pending count only falls. The scan throws on a report line it cannot read
+(2026-11-15: a head with a type parameter default and a comment line had each hidden the declarations after them). Restore evidence per package (a plain object, a
+restore, three frames with no throw and one report, a new object through the setter, then the function form with no
+report) is added as each package rules its rows, on WebGPU and MARGO_COMPAT=1 (RTX A6000):
+- sprites: packages/sprites/tests/browser-check.mjs (SpriteLayer atlas, target, normals), billboard-check.mjs and
+  skeletal-check.mjs (their atlases); each fails on the old code, where the first frame after the restore threw.
+- tilemap: packages/tilemap/test/browser-check.mjs (TileMap atlas, target and function atlas), iso-check.mjs
+  (GridTileMap atlas, target, setAtlas with a function) and objects-check.mjs (ObjectTileMap image with no size of
+  its own, target, function atlas); each fails on the old code (no report, the map stays lost after its setter).
+- points: packages/points/tests/points-browser.js section 10b (a plain map draws untextured and is reported once, a
+  function map comes back, at 1 and 4 samples); it fails on the old code (the function form was refused, the plain
+  map only warned in the console).
+- shadows: packages/shadows/test/light-function-browser.mjs, `window.check.restore` for Shadows and VirtualShadows (a
+  plain lightPattern mask is dropped and reported once while the sun goes on unmasked, `setTexture` brings it back, a
+  function mask is made again on the new device); it fails on the old code (the receivers bound the lost view, a
+  validation error on the new device, and the function form was refused).
+- voxel (2026-11-16, KB-RESTORE-VOXGI1 and KB-RESTORE-VOXMESH1, objects that hold a device rather than borrowed
+  options): packages/voxel/tests/restore-browser-check.mjs (a VoxelRenderer with a caller's GpuVoxelMesher and VoxelGI;
+  frames before the next `VoxelGI.update()` bind nothing of the lost device, the renderer moves the mesher with
+  `setDevice` and meshes every chunk again, and the settled picture equals the one before); it fails on the old code
+  with 3 validation errors and 3 lost-device mapAsync reports, and the world never draws again.
+- voxel lightmap (2026-11-16, VoxelLightmapOptions.texture, VoxelLightmap.texture): packages/voxel/tests/
+  lightmap-restore-browser-check.mjs (a plain atlas is dropped after the restore, the floor draws live-lit, one report,
+  a new `voxelLightmap` brings the baked chart back; a function atlas is made once per device and draws the baked
+  chart after a second restore with no report), CPU case in render.test.js; on the old code the plain atlas stayed
+  bound to the new device (the CPU case fails) and the function form was refused.
+- post (2026-11-16, DecalOptions.atlas, Decals.atlas, MaterialDecalsOptions.atlas, LensFlareElement.texture,
+  LensOptions.dirt): packages/post/test/borrowed-restore-browser.mjs (per effect: a plain image is dropped after
+  `engine.rebootDevice()` and the frame equals the one without the image exactly, one report, no validation error; a
+  new image brings the first picture back; a function image is made once per device and draws it again after a second
+  restore with no report), CPU cases in borrowed-restore.test.js and decals.test.js; on the old code a restore left the
+  lost texture bound to the new device (a validation error from the next frame) and the function form was refused.
+- shader Shadertoy (2026-11-16, ShadertoyChannel.texture, ShadertoyPassSource.iChannel0 to iChannel3):
+  packages/shader/test/shadertoy-restore-browser-check.mjs (a toy.pass() adds a plain red 2D channel to a green 3D
+  channel made by a function: yellow; after the restore the lost channel reads opaque black, green is left, one report
+  naming iChannel0, no validation error; `toy.setChannel` brings red back, a 2D function is made once per device and
+  both functions draw yellow after a second restore with no report), CPU cases in shadertoy-restore.test.js (also: a
+  steady frame makes no view, sampler or bind group). On the old code the lost texture read white with no report (the
+  toy's passes have no engine of their own to report to), nothing could replace a channel, a function channel had no
+  iChannelResolution and a 3D or cube one threw at construction (a function's own `bind` read as a materials Texture's),
+  and the blank of each unbound channel made a view, a sampler and so a bind group every frame.
+- shader raw (2026-11-16, RawShaderMaterialOptions.textures, RawTexture.texture, RawStorage.buffer, ShaderUniform.value):
+  packages/shader/test/raw-restore-browser-check.mjs (a red texture plus a green storage buffer draw yellow; after the
+  restore plain ones read white plus zero, no validation error, one report each; new ones and function forms draw yellow
+  again, the texture function made once per device), CPU case in raw.test.js; on the old code the lost texture was
+  warned about in the console only and the lost buffer stayed bound to the new device.
+  The check's first texture is given at construction (KB-COMPAT-RAWFIRST1, 2026-11-16): on MARGO_COMPAT=1 the old code
+  took the layer's texture, which keeps its GL texture as `texture`, for a `{texture}` option and every frame threw "Bind
+  group entry 1 is not a resource of this device"; options objects are now told apart by prototype (`isOptionObject`,
+  shared/borrowed.js) in RawShaderMaterial, GLSL sampler uniforms and Shadertoy channels, CPU cases in raw.test.js,
+  glsl-material.test.js and shadertoy.test.js, and test:gpu runs the check on both backends.
+- vfx (2026-11-16, VFXFeatures.soft and .sort, VFXShadows.buffer, VFXSkinnedPrimitive.deformed, VFXState.*): all
+  exempt under rule 6, none is a caller's object. packages/vfx/test/restore.test.js (CPU, fake devices) attaches an
+  effect with softness, sort, shadows and a skinned primitive, restores onto a second device and checks that no bind
+  group is made on the old device, every bound or copied buffer is the new device's, VFXState and the light list are
+  made again and the old ones destroyed, the deformer's buffer is never destroyed, and its new record is copied on the
+  next frame. It fails when the soft runtime outlives the restore or the skinned emitter stops reading `deformed`.
+- lighting2d (2026-11-16, Lighting2D, Cookie, GI, Height and Emissive `target` and `normals`, SDFScene2D `source` and `emission`):
+  packages/lighting2d/tests/restore.test.js (CPU, fake devices) restores each of the six passes, and GI with a painted scene,
+  onto a second device: a plain texture is dropped and reported once through `engine.onError`, a function is read each frame
+  with no report, `setTarget` and `setNormals` bring a new texture back, and the pass never binds a lost one. Steady-frame work
+  counts: 0 bind groups and 0 texture views made over 3 steady frames for each of the six kinds and for GI with a painted scene
+  (bind groups are now made again only when what they bind changes). 17 cases fail on the old code (the lost texture stayed
+  bound, no setters, a bind group and views made every frame).
+- terrain, procedural, sciviz, weather, decoders, react, loaders (2026-11-17, 21 rows, all exempt under rule 6, none is a caller's plain object): terrain takes its textures only from `textures(device)` (called once per device, old set destroyed); the procedural baker makes its maps on its own device and ends when it is lost; sciviz's section buffer, depth view and layer report are the renderer's own and made again in restore(); weather's map and cover texture are the capture's outputs read live; a streamed KTX2 texture is the streamer's own; a React render target is made again in onDeviceRestored; the MaterialX hook's result goes to the graph unchanged and `@margoengine/materials` holds it. Pinned by packages/terrain/test/borrowed-restore.test.js, packages/procedural/test/borrowed-restore.test.js, and one case each in packages/decoders/tests/ktx2-stream.test.js, packages/weather/tests/cover.test.js and packages/loaders/tests/materialx.test.js, with packages/react/tests/portals.test.js and the sciviz reboot checks already in place. None of these tests fails on old code: they pin behaviour that was already right.
+- pixel (2026-11-17, PixelScale, CRT and PaletteQuantize `source` and `target`, Render3D `target`): one `TextureOption` (packages/shared/texture-option.js, also used by lighting2d). A plain texture is held by the borrowed-object rule and a function is a per-frame getter (rule 6). A lost one is reported once and the pass draws nothing until `setSource` or `setTarget`; Render3D puts the picture in its own `output`. packages/pixel/tests/restore.test.js (CPU, two fake devices; 6 of its 10 cases fail on the old code) and packages/pixel/tests/pixel-restore-check.mjs (real GPU, WebGPU and the compatibility layer: live picture, restore, no validation error, two reports, setters bring the picture back, function pair draws with no report) pin it.
+Still missing: every row marked pending in the registry.
+
+### Section 5 evidence: fragment output location 7 on ANGLE Vulkan (KB-VPT-GUIDE-COMPAT, 2026-11-15)
+
+The guided voxel tracer's coverage cases failed by more than 6 standard errors on the WebGL2 layer over ANGLE Vulkan
+(RTX A6000, NVIDIA 617.42) and passed natively. Per-dispatch readbacks showed 2 to 7 consecutive dispatches (about
+0.3 s) adding almost nothing, a few seconds after the layer moved from one tracer's programs to another's; every other
+image matched native to 7 or more digits, so the estimator and the test's statistics were right. With no GL object
+deleted and no program linked in those windows, it is the location 7 fault of docs/known-bugs.md. Rule for programs the
+layer runs: write at most 7 fragment outputs (locations 0 to 6) on a path that must hold values on ANGLE Vulkan. The
+voxel tracer's state pages hold 7 layers since this change: 0 dark images in 512 against 1 to 7 in each earlier run of
+64 to 96, the same values, 6.9 percent more layer passes. Pinned by `packages/voxel-pathtracer/tests/compat-staged.test.js`
+"never write fragment output location 7" and the guiding GPU test's own WebGL2 leg. Missing: a self-contained driver
+repro; Firefox, Safari, ANGLE Metal and other GPUs not run.
+
+### Section 5 evidence: repeated frames on the WebGL2 layer over Direct3D 11 (KB-WATER-SETTINGS-COMPAT1, 2026-11-17)
+
+On the RTX A6000 (NVIDIA 617.42, Edge 157) a still water frame drawn every 300 ms through the WebGL2 layer on ANGLE
+Direct3D 11 moves 3 pixels by one code a few seconds in, at 4x and 1 sample, while every WebGL2 call and uploaded byte
+of the frame stays the same (`tests/support/gl-stream.js` records them, numbering ping-ponged textures by first use).
+ANGLE Vulkan, ANGLE Direct3D 11 WARP and native WebGPU stay exact. A check that needs two frames seconds apart to be
+equal on the layer compares their WebGL2 calls on every back end and their pixels everywhere but ANGLE Direct3D 11
+(`packages/water/test/frame-repeat.browser.mjs`, `settings.browser.mjs`). Missing: another vendor's Direct3D 11 driver,
+and which driver step replaces the binary.
+
+### Section 5 evidence: loops nested around a traversal on Direct3D's shader compiler (KB-D3D11-NEST, 2026-11-15)
+
+On ANGLE's Direct3D 11 back end every WebGL2 program is compiled by fxc, which inlines every call; its time grows several
+times over for each loop nested around a traversal, more than for the code inside them. Measured on the HLSL ANGLE emits
+for the voxel path tracer's staged programs (fxc.exe 10.0.26100, ps_5_0, CPU seconds, RTX A6000 PC, busy): with the
+hierarchy walk running a leaf's instances in its own loop, `hit` 35.1 to 13.3 s, `shadow` 23.1 to 8.3 s, the
+compute kernel 24.7 to 6.7 s; with the voxel walk stepping bricks and cells in one loop too, `hit` 15.1 to 9.3 s and
+`shadow` 10.0 to 5.4 s, and the compute kernel 9.1 to 3.8 s (paired again after the rebase, vs_5_0). `[loop]`, `[fastopt]`, `/Od` and a single-exit walk do not help. Rule for shaders the
+layer compiles: flatten a nested walk into one loop with the same visiting order (a state flag and the inner indices
+kept across turns), so the values stay the same on every backend. Every call site is a copy too: since 2026-11-19 a
+cut-out shaped cell takes one half-block walk and one texel read a step in a loop whose bound fxc cannot count (8 walks
+and 8 reads to 2 and 3 in `hit`, 6 and 8 to 1 and 3 in `shadow`, counted by `scripts/support/wgsl-inline.mjs`; fxc 7.4
+to 5.6 s and 6.5 to 5.1 s, paired, KB-L5a-10). The same day `localX`'s last case stopped
+inlining `worldX`'s TRS path, which it never reaches, so each instance transform holds one motion rotation (`surface` 8
+copies to 5; the eight loop programs 23.1 to 19.6 s of fxc). Later the same day `surface` turned its hit point into the model point once (`faceTexel` and
+`edgeBand` take it), the mesh features' triangle-only paths call the triangle normals directly, and `meshClosest` has
+one `meshBlas` call site: `localX` copies in `surface` 3 to 1 (9 with mesh PBR), fxc `surface` 5.3 to 3.1 s on the base
+tracer and, with every feature, `hit` 14.1 to 10.4 s. Then `instX` gave an instance's world and model transforms from one
+motion rotation where a call site needs both, and the guided bounce built its guide boxes in one loop: with every
+feature `sample` 7 to 4 motion rotations (fxc 30.6 to 25.3 s) and `post` 2 to 1 `guideBox` copies (4.5 to 2.3 s). Pinned by
+`packages/voxel-pathtracer/tests/compat-staged.test.js`. Missing: another vendor's D3D11 driver, and the run time of
+the staged route on Direct3D 11 (a 480 x 300 reference at 16384 samples about 555 s against 14 s on WebGPU, KB-L5a-10;
+449 s since 2026-11-16, when a light kind the frame switches off stopped drawing passes and 480 x 300 became one part:
+1,527 to 443 passes a sample, counted on the CPU by `packages/voxel-pathtracer/tests/route-work.test.js`; what is left
+is mostly the passes' fragment work). Sources for the pass cuts: Samuli Laine, Tero Karras, Timo Aila, "Megakernels
+Considered Harmful: Wavefront Path Tracing on GPUs", HPG 2013, https://doi.org/10.1145/2492045.2492060 ; Dietger van
+Antwerpen, "Improving SIMD Efficiency for Parallel Monte Carlo Light Transport on the GPU", HPG 2011,
+https://doi.org/10.1145/2018323.2018330 ; Khronos, OpenGL ES 3.0.6 and WebGL 2.0 specifications (occlusion queries,
+multiple render targets).
+Sources: Microsoft, "for Statement" (HLSL reference; the compiler simulates loops to unroll them),
+https://learn.microsoft.com/windows/win32/direct3dhlsl/dx-graphics-hlsl-for ; John Amanatides and Andrew Woo, "A
+Fast Voxel Traversal Algorithm for Ray Tracing", Eurographics 1987, https://www.cse.yorku.ca/~amana/research/grid.pdf .
+
+### Section 5 evidence: one call site per costly function in layer-compiled kernels (KB-COMPAT-FXCTIME1, 2026-11-18)
+
+fxc (ANGLE's Direct3D 11 back end) inlines every call and unrolls every loop it can count, so a kernel's compile cost
+follows its call sites multiplied down the call graph and by unrolled trips, not its source size. Rule for kernels the
+WebGL2 layer compiles: each costly function (a traversal, a GJK, a field read, an inverse map) has one call site,
+reached through a loop whose bound the shader reads (a record word or a uniform that is always 0) where the source
+had several sites; the same operations in the same order keep every value. Applied in robot-planning's clearance
+kernel, lightmap's bake and sciviz's mapped volume: cold links 80.9 to 89.5 s to 6.3 to 7.2 s, 48.4 to 6.7 s and
+38.3 to 11.9 s (RTX A6000, busy), outputs bit-identical (CPU WGSL interpreter, WebGPU floats, pixels). Measured by
+`scripts/support/wgsl-inline.mjs` (a call-graph walk that inlines every call and unrolls loops of constant start and
+bound up to 64 trips) and pinned for every corpus kernel by `packages/webgl2-compat/test/corpus-inline.test.js`
+(250,000 characters of inlined body, 2 copies of a function with an open loop and an array). Missing: the
+link-time model is a proxy (terrain's surface links in 0.7 s at 228,000 characters, the bake took 48 s at 40,480), so
+the class check bounds both size and walk copies; another vendor's Direct3D 11 driver is unmeasured.
+Sources: Microsoft, "Function Declaration Syntax" (HLSL `inline` is the default: one copy of the body per call),
+https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-function-syntax ; Microsoft, "for
+Statement" (`unroll` copies the body, `loop` keeps flow control; with neither the compiler unrolls a loop it can
+count), https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/dx-graphics-hlsl-for ; Robert W. Scheifler, "An
+Analysis of Inline Substitution for a Structured Programming Language", CACM 20(9), 1977,
+https://doi.org/10.1145/359810.359830 (code grows with the call sites of each callee, multiplied down the call
+graph); Jack J. Dongarra and A. R. Hinds, "Unrolling Loops in Fortran", Software: Practice and Experience 9(3), 1979,
+https://doi.org/10.1002/spe.4380090307 (an unrolled body is copied once per trip); Google, ANGLE project, "ANGLE"
+(GLSL ES translated to HLSL and compiled with the D3D compiler on Direct3D 11),
+https://chromium.googlesource.com/angle/angle/+/main/README.md .
+
+### Section 5 evidence: sheen without a roughness floor, n.h from the clamped cosines (KB3297d, 2026-11-15)
+
+GPU maths changed: packages/shared/sheen.js `sheenHalfWGSL` gives the sheen lobe n.h = (n.v + n.l) / |v + l| from
+the clamped cosines (gltf/pbr, materials, clustered), equal to dot(n, h) wherever the shading normal faces the
+viewer, so a back-facing interpolated normal no longer lands on the Charlie peak; gltf/pbr no longer raises sheen
+roughness to 0.03 (KHR_materials_sheen, materials and voxel-pathtracer have no floor). Evidence: CPU,
+packages/gltf/test/sheen.test.js, packages/materials/tests/sheen-backfacing.test.js and
+packages/clustered/test/clustered.test.js; SheenTestGrid reference (RTX A6000, both backends draw the same picture):
+max 171 to 119, absolute 1,056,434 to 1,057,125, square 32,408,128 to 32,409,491; like for like max 205 to 103,
+absolute 217,478 to 218,842, square 3,061,310 to 2,944,566. The absolute rise is the viewer's encoded albedo ring
+(accepted difference beside KB3297c, docs/limits.md) that the floor had hidden; re-pinned once on Scott's yes.
+Missing: other GPUs; ambient sheen at a back-facing normal still reads E(n.v = 1e-4).
+
+### Section 5 evidence: sheen visibility and its albedo table (KB3297c, 2026-11-15)
+
+GPU maths changed: packages/shared/sheen.js (inlined by gltf/pbr, materials and voxel-pathtracer) shades the Charlie
+sheen distribution with the Estevez and Kulla 2017 shadowing 1 / ((1 + Lambda(n.v) + Lambda(n.l)) 4 n.l n.v), the
+KHR_materials_sheen default, in place of the Neubelt form clamped to 1. The albedo E behind the base darkening
+1 - max3(sheen) E and the ambient sheen is a 16 x 16 module-scope `const` table of ln(E R) over
+u = (mu (R + 0.1) / (R + 0.1 mu))^0.45 and v = sqrt(r), read bilinearly (scripts/sheen-albedo-fit.mjs fits and
+measures it; docs/clean-room.md compares it with three other forms). Evidence: CPU, the WGSL evaluated in double and
+f32 (packages/gltf/test/sheen.test.js: lobe within 1e-7 of the paper's form; packages/materials/test/sheen-albedo-fit.test.js:
+table within 0.015 of the integral for roughness 0.03 and up, 0.0411 anywhere); GPU, `test:gpu:sheen-albedo`
+(RTX A6000: the table on the GPU at most 0.04108 from the integral, 1.9e-6 from the CPU evaluation; largest linear
+change from the old albedo 0.0632 at roughness 1, also on Apple silicon, the old closed form pinned in
+scripts/sheen-albedo-fit.mjs and swapped into the current shader alone, so later sheen changes do not move it; sheen off bit-identical within one compiled
+program: no lobes against the old albedo, and black sheen, alone and over specular, at five sheen roughness values
+with only the factors changing, on WebGPU and the WebGL2 layer of Apple silicon; black sheen is not compared across
+the two albedo programs, which WGSL 15.7.5 lets round differently, KB3297e); SheenTestGrid reference, absolute
+1,086,074 to 1,056,434 on WebGPU and 1,088,183 to 1,056,434 on the WebGL2 layer (the two now draw the same picture),
+and the first sheen like-for-like row, MAE 0.2765 (0.3410 before). Missing: other GPUs. The two silhouette pixels
+where the viewer is dark and Margo drew a bright rim are KB3297d, fixed above; the viewer's sRGB-encoded albedo lookup is an
+accepted difference (docs/limits.md).
+
+### Section 5 evidence: Sample Viewer like for like, display transfer and antialiasing (KB3267, 2026-11-15)
+
+Quality gate added: `scripts/reference-rendering/run.mjs --like-for-like` measures a batch 160 case with the Khronos
+Sample Viewer's own display, pow(x, 1/2.2) and one sample per pixel, and is gated by the case's pinned `likeForLike`
+row (tests/reference-rendering.test.js). GPU maths unchanged: Margo keeps the exact IEC 61966-2-1 sRGB encode and 4x
+MSAA. Evidence (RTX A6000, native WebGPU, 512 x 512, all pixels): clearcoat MAE 1.682 to 0.0553 and metallic-roughness
+0.700 to 0.0092 once both pictures share the viewer's display, so those two BRDFs carry no measurable residual; the
+rest is recorded as an accepted difference in docs/limits.md. Anisotropy (1.032 to 0.200) and iridescence (0.780 to
+0.348) leave under 0.03 levels a channel over flat areas; what remains sits on sub-pixel highlight arcs and on the
+alpha-weighted mips of the iridescence guides texture, also accepted. Missing: the WebGL2 layer (the rewrite acts on
+WGSL modules only) and other GPUs. The sheen row was added on 2026-11-15 (KB3297c, above).
+
+### Section 5 evidence: GLSL program uniforms of every shape, points, flat varyings and wireframe (2026-11-15)
+
+GLSL raw materials push 3 extends the program linker (`packages/shader/src/glsl/program.ts`) and the shared front end:
+uniform blocks, structs and arrays are flattened into one raw member per leaf and rebuilt per invocation; sampler arrays
+bind one texture per element (a `select` chain for a dynamic index); integer samplers read with `textureLoad` and
+shadow samplers with `textureSampleCompare` against depth textures; sized points are instanced squares; flat varyings
+follow GL's last provoking vertex by reordering the index; `RawShaderMaterial.wireframe` draws unique edges as a line
+list. Bug fixed on the way: `RawShaders` ignored a view's viewport and scissor in a multi-view frame (it now calls
+`applyView`), found by the new owner fixture `packages/shader/test/owner-lifetime.fixture.js`, which is its
+regression test. Evidence: `packages/shader/test/glsl-material-check.mjs` natively and with `--compat` (RTX A6000,
+Chrome, ANGLE Direct3D 11): the seven data programs equal the browser's WebGL compile within 1 level (maximum 0, the
+flat list 1, mean 0.019); `raw-check.mjs` proves GLSL casters, discards, picking and TAA (edge row equal to WGSL's);
+`check:owners -- --packages=shader` 26 passed on both backends. KB-GLSLP1 (fixed 2026-11-15): raw's camera block
+(240 bytes) carries the drawn view's rectangle as `viewport`, so sized points and `viewport_size` follow the view;
+`glsl-material-check.mjs` draws one point in each of two side by side views against the browser's WebGL with two
+`gl.viewport` calls, 0 levels on both legs. Missing: ANGLE Metal and Vulkan, other vendors, Firefox and Safari.
+
+### Section 5 evidence: GLSL lights, fog and motion vectors (2026-11-15)
+
+`@margoengine/shader/glsl-material` push 6: `lights: true` and `fog: true` fill uniforms of Margo's names from
+`engine.lighting` and `shaderScene(raw)` once a pass; `velocity` adds a vertex entry that runs the translated stage
+twice (this frame's values, then last frame's world matrix, view-projection, time and named uniforms), with both
+positions `@invariant` so TAA's 'equal' depth test holds. The scene code is only in `glsl/scene.ts` and the entry,
+reached through link hooks, so ShaderPass, Shadertoy and shader/raw carry none of it
+(`packages/shader/test/glsl-scene-split.test.js` checks the bundles). Evidence: `glsl-material-check.mjs` natively
+and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11): the two scene programs at 0 levels, first and after a
+changed scene, 23 programs per leg; `glsl-velocity-check.mjs` both legs: worst velocity 1.00 half-float step, worst
+previous depth 4.28e-8 against a WGSL velocity entry. Missing: other vendors, ANGLE Metal and Vulkan, Firefox and
+Safari; a skinned or morphed GLSL program under velocity.
+
+### Section 5 evidence: Shadertoy Cube A, mainVR and mainSound (2026-11-15)
+
+`@margoengine/shader/shadertoy` push 7. GPU maths: Cube A is one draw into a 3 x 2 rgba16float atlas of the faces,
+each texel's direction from the inverse of OpenGL ES 3.0.6 Table 3.21, with gl_FragCoord counting rows from the
+target's first row (clipSpace 'webgpu') so the faces hold GL's texels; six copies into the cube a frame, and with a
+mipmap channel the atlas's box levels copied level by level. mainVR's pass rays unproject the pixel at the near plane
+(z 1 in Margo's reversed depth) through the inverse of the drawing camera's view-projection, inverted on the CPU once a
+draw. The Sound tab draws 512 x 512 samples a frame into rgba32float, copied to a buffer and mapped on the next frame.
+Channels that are not mipmapped now clamp the sampler to the base level, as GL. Evidence:
+`packages/shader/test/shadertoy-check.mjs` natively and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11): 48
+images and sounds per leg; Cube A with feedback and mip levels within 1 level and its faces against the browser's cube
+lookups within 1 level; mainVR from a fixed pair of eyes at 0 levels; 342,050 samples within 1 step of 1/32767.
+Missing: a real XR device and pose (Scott set XR device testing aside), other vendors, ANGLE Metal and Vulkan, Firefox
+and Safari.
+
+### Section 5 evidence: Shadertoy multipass (2026-11-15)
+
+`@margoengine/shader/shadertoy` push 5 adds Common, Buffer A to D (rgba32float, two textures per buffer taking turns),
+keyboard, video and audio channels and the mipmap filter. GPU maths: a buffer channel filtered linearly reads its
+texels with `textureLoad` and filters them as OpenGL ES 3.0.6 section 3.8.10 (bilinear per level, lambda from the
+screen-space footprint, two levels blended), so no device needs `float32-filterable`; mip levels come from a 2 x 2
+box render pass. Evidence: `packages/shader/test/shadertoy-check.mjs` natively (default device, without
+`float32-filterable`) and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11): 37 images per leg, the 8-frame
+feedback program over A to D with every filter as pass, texture and mesh within 1 level of the browser's WebGL2 with
+RGBA32F buffers and GL's own filtering and generateMipmap; keyboard, audio and video at 0 levels.
+`check:owners -- --packages=shader` holds the attached toy. Missing: other vendors (whose hardware filtering may
+differ from the GL formula by more), ANGLE Metal and Vulkan, Firefox and Safari, a real `<video>` file in the GPU check
+(a canvas stands in; the copy is the same call).
+
+### Section 5 evidence: Shadertoy single pass (2026-11-15)
+
+`@margoengine/shader/shadertoy` (GLSL raw materials push 4b) wraps a Shadertoy Image source as a GLSL ES 3.00 program
+and draws it as a ShaderPass, into an rgba8unorm texture before the scene, or as a ShaderMaterial on a mesh. Evidence:
+`packages/shader/test/shadertoy-check.mjs` natively and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11): 32
+images per leg (six sources, three targets, two input sets), at most 1 level against the browser's WebGL2.
+`check:owners -- --packages=shader` holds an attached Shadertoy with its texture. Missing: multipass, other vendors,
+ANGLE Metal and Vulkan, Firefox and Safari.
+
+### Section 5 evidence: GLSL post passes (2026-11-15)
+
+`@margoengine/shader/glsl-pass` (GLSL raw materials push 4a) runs a full-screen GLSL program as a PostStack stage: a
+`ShaderMaterial` over one triangle with an identity camera block, drawn by raw's pipeline builder, which now builds a
+colour-only pipeline (no depth attachment, compiled at once) for a context without depth. Evidence:
+`packages/shader/test/glsl-pass-check.mjs` natively and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11): six
+programs, 0 levels against the browser's WebGL on both legs; `check:owners -- --packages=shader` holds a PostStack with a
+ShaderPass. Missing: HDR passes against an oracle, ANGLE Metal and Vulkan, other vendors, Firefox and Safari.
+
+### Section 5 evidence: whole GLSL programs as raw materials (2026-11-15)
+
+`@margoengine/shader/glsl-material` (GLSL raw materials push 1) links a GLSL ES 1.00 or 3.00 vertex and fragment
+program through the shared GLSL front end (`packages/shader/src/glsl/program.ts`) into the two WGSL stages of a
+RawShaderMaterial. GPU maths it fixes: GL clip z (-w..w) maps to Margo's reversed depth as z' = (w - z) / 2;
+`gl_FragCoord` is (x, height - y, 1 - z, 1/w) from the WebGPU position; `gl_FragDepth` d is written as 1 - d, clamped;
+`dFdy` is negated so it runs along GL window y; 2D lookups and `texelFetch` flip v under `flipY`, matching a GL upload
+with UNPACK_FLIP_Y_WEBGL of Margo's top-row-first images. The front end gained two optional `GLSLHost` hooks
+(`samplerOf`, how a sampler argument names its sampler; `yUp`, the dFdy sign apart from the y flip) and reads
+`attribute`, `varying` and a global `invariant` statement; transitions and shader/glsl keep their WGSL (their pinned
+snapshots are unchanged). Backends: one source for native WebGPU and the WebGL2 layer. Evidence:
+`packages/shader/test/glsl-material-check.mjs` natively and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11):
+eight original programs (every uniform type, GLSL ES 1.00 attributes and varyings with texture2D and a perspective w, gl_FragCoord, gl_FrontFacing and derivatives on both faces, gl_FragDepth with the depth test and a flat int varying, discard and defines, a vertex-stage lookup with a uniform both stages share, attribute widening and absent attributes, gl_FragData with mat3 and int uniforms, a loop and a sampler helper) over 32 x 32 pixels, with their first uniform values and defines and again after a live change, equal the browser's own WebGL compile (WebGL 1 for 1.00, WebGL 2 for 3.00) within the bound of 1 level: 15 of the 16 draws differ by 0 levels on both legs, and the perspective-w program differs by 1 level in one channel of one pixel (mean 0.0003) on both legs; uniform changes translated nothing and the defines change translated once. Missing: ANGLE Metal and Vulkan, other GPU vendors, Firefox and Safari.
+
+### Section 5 evidence: GLSL functions in node graphs and the GLSL a graph becomes (2026-11-15)
+
+`@margoengine/shader/glsl` (job 185.1 push 3) adds GLSL input to the shader nodes: `glslFn` runs the shared GLSL front
+end (`packages/shader/src/glsl`) once per source, options and stage and declares the WGSL in the graph's module, each
+translation under its own name prefix, with a sampler parameter passed as a texture and its sampler (the same
+resource `texture()` binds). Translated functions turn WGSL's derivative uniformity diagnostic off unless `strict`.
+`toGLSL` hands a NodePass's or a drawn NodeMaterial's WGSL to the layer's `translateWGSL`; no second GLSL emitter
+exists. Backends: one source for native WebGPU and the WebGL2 layer. Evidence: `packages/shader/test/glsl-check.mjs`
+natively and with `--compat` (RTX A6000, Chrome, ANGLE Direct3D 11): five fixtures equal the browser's own WebGL2
+compiler at every pixel (0 levels, bound 1), NodeMaterial twins equal, six toGLSL programs link; `glsl.test.js` pins
+the WGSL and the hostile-input bounds. Missing: ANGLE Metal and Vulkan, other GPU vendors, Firefox and Safari's
+acceptance of `@diagnostic` on functions.
+
+### Section 5 evidence: a continue inside a switch on the WebGL2 layer, and GLSL ES 3.00 input (2026-11-15)
+
+ANGLE's Direct3D 11 back end (Chrome 157, RTX A6000) fails to compile a GLSL `continue` inside a `switch` ("Error
+compiling dynamic pixel executable") and loses the context. Native GLSL hit it in the GLSL ES 3.00 transition oracle,
+and so did any WGSL `continue` in a `switch` inside a loop, which the layer's translator passed through. The layer's
+GLSL (`packages/webgl2-compat/src/glsl/emit.ts`, KB-SW1) now sets a flag, breaks out of the switch and continues after
+it; a nested switch hands the flag outwards, and a switch without a continue is emitted as before. A case that falls
+into a non-empty case compiles there. Evidence: `packages/webgl2-compat/test/glsl.test.js` (no `continue` left in any
+switch body), and the seven GLSL ES 3.00 fixtures of `packages/transitions/test/glsl-es3-fixtures.js`, whose pixels
+match the browser's own GLSL compiler within one level per channel natively and on the layer. The shared GLSL front
+end (`packages/shader/src/glsl`) reads GLSL ES 3.00 (The OpenGL ES Shading Language 3.00.6): uint and bit operators,
+switch with fall through (WGSL cases never fall through, so each holds the bodies it falls into), non-square matrices,
+array constructors and equality, the ES 3.00 lookups, inverse, outerProduct, bit casts and pack functions; docs/limits.md
+"Batch 218 GLSL transition import". Missing: ANGLE Metal and Vulkan, other GPU vendors.
+
+### Section 5 evidence: reproducible Wasm blueprints (2026-11-15)
+
+Quality gate: every committed Wasm blueprint is built through `scripts/rust-wasm-env.mjs` (path remaps onto forward
+slashes for each source folder, Cargo and rustup variables from the shell dropped, the target folder pinned), and every
+record hashes that file. Hygiene refuses a blueprint holding a host-specific Rust path. `npm run check:wasm-repro`
+rebuilds all 24 blueprints and fails when a committed file differs; verify runs it before the package build where the
+pinned Rust toolchain is installed. Evidence: on the Windows dev PC (rustc 1.99.0) the 19 modules that held `src\...rs`
+paths were rebuilt and differ only in those separators; a second full rebuild matched all 24 byte for byte. Missing: the
+same rebuild on Linux or macOS has not been run yet, so cross-system equality rests on the removed causes, not on a
+second system's bytes. Regression: tests/wasm-blueprints.test.js.
+
+### Section 5 evidence: derivatives stay where WGSL takes them on the WebGL2 layer (KB-W2-deriv, 2026-11-15)
+
+The GLSL back end pins every derivative-made value of a fragment (dpdx, dpdy and fwidth in every form, and the
+textureSample, textureSampleBias, textureSampleCompare and textureSampleGrad results) into a vec4 `_dk` that each
+output's never-taken select on `gl_FragCoord.w > 0.0` carries (`glsl/emit.ts` `pin`). Without it ANGLE's Direct3D 11
+compile on the RTX A6000 moved a derivative used only inside a later per-pixel branch into that branch and read 0
+(docs/known-bugs.md). Evidence: features.html `derivativeBranch` (15 variants, native against the layer, failed on all
+before the fix), glsl.test.js on the emitted shape, and the black hole's pre-f0596dd265 shader passing its star check on
+MARGO_COMPAT=1. Cost: one add per derivative or implicit sample, no change to draws, buffers or bindings, no change to
+any output. Missing: the case on another vendor's D3D11 driver and on ANGLE Metal.
+
+### Section 5 evidence: sky layers on the WebGL2 layer, cancellation and capture rounding (2026-11-15)
+
+The Milky Way and the aurora (`@margoengine/sky`) are compared with native WebGPU on the WebGL2 layer value by
+value in Bloom's half-float capture (`packages/sky/test/compat-gpu.mjs`). A bisection that wrote each shader's
+intermediate values as float bits to an rgba32uint target on both devices found the interpolated NDC identical and
+the ray through it one rounding of the matrix product's terms apart: the two compilers (Tint and DXC natively, the
+layer's GLSL through ANGLE and FXC) fuse and order the multiply-adds differently, which WGSL section 15.7.5 and GLSL ES
+3.00 section 4.5.1 both allow. Three formulas then cancelled that rounding up to hundreds of ULPs: the pixel's solid
+angle from differences of nearly equal edge rays, the aurora's shell root -b + sqrt(b^2 - |c|^2 + r^2), and the height
+|p + R up| - R. They are now `pixelSolidAngle` (the direction's Jacobian from the matrix columns,
+`packages/sky/src/night-backdrop.ts`), `shell` (the root that adds same-signed terms, Haines et al. 2019) and `height`
+in `packages/sky/src/aurora.ts`; float64 errors fell from 4.3e-5 to 5.7e-7, 8.7e-6 to 2.2e-7 and 5.8e-4 km to
+6.6e-5 km, and the differing capture values from 667 and 673 to 25 to 38 and 153 of 196,608. The capture keeps a
+two-step bound: Direct3D converts a shader output to a smaller float format toward zero (D3D11.3 functional spec,
+section 3.2.2), so outputs one float32 ULP apart across a half float differ by a half step before the blend and by two
+after a tie in the sum; the test's blend pair shows exactly that on both devices. Evidence: compat-gpu.mjs with
+`packages/sky/test/precision-check.html` (fails before the fix at 4.4e-5), docs/limits.md "Sky layers on the
+WebGL2 layer". Missing: other GPU vendors and ANGLE back ends (Metal, Vulkan), where the conversion may round to
+nearest instead.
+
+### Section 5 evidence: invariant shadow caster positions (2026-11-14)
+
+Two programs that draw the same surface into a shadow map must write the same depth: `@margoengine/culling`'s
+instances and parts are checked against core meshes frame for frame. WGSL lets an implementation reassociate and fuse
+float operations per program (W3C WGSL, section 15.7.5 "Reassociation and Fusion"), so the same `light*model*p` from
+a storage matrix in one shader and a vertex-attribute matrix in another differed by one or a few ulps on 37% of the
+covered texels on an Apple M6 (Chromium, Metal), and one receiver pixel shaded a level apart. `@invariant` on the
+position output (WGSL section 12.10: equal data and control flow give equal positions across programs; GLSL
+`invariant`, HLSL `precise`) is now on every caster of `@margoengine/shadows` (`batchDepth`, `shadowDepth` and its
+variants) and `@margoengine/culling` (dynamic instances, parts, per-cascade lists). Evidence: the culling
+`dynamic-check.mjs` and `parts-check.mjs` read both engines' shadow maps (`test/gpu/shadow-maps.js`) and require
+every texel equal at every step; 0 of 4,194,304 differ with the attribute, 378,118 without. Every other package's
+custom caster now declares it too: scatter (cascade caster and its per-cascade list variant, fixed instances), lod
+imposters, terrain (one vertex entry for colour, occluder, cascade and local shadows), voxel (chunks and bevels),
+vfx, splats, animation VAT, raw shaders (`MargoVelocity`, drawn with `depthCompare: 'equal'` against the colour
+pass), clustered local shadows (both caster shaders), staging contact occluders and the culling occluder and
+pyramid prepass. `tests/invariant-casters.test.js` (run by verify, the first step of check:merge) fails when a
+shadow or depth caster's position lacks it, so the class cannot return unseen. Missing: those packages have no GPU
+pair that draws the same surface through two programs with the same expression (the scatter list variant is the one
+candidate), so their evidence is the shader-text guard, not a texel comparison.
+
+Depth-equal replays of core meshes (2026-11-15): core's colour vertex (`Output` in `packages/core/src/shaders.ts`)
+now declares its clip position `@invariant`, as do shared's `meshVertex` (the selection mask) and TAA's
+object-velocity `Out`, whose core-mesh path now computes `camera*(model*p)` in the colour vertex's order (the
+guarantee covers the same expression, not an algebraically equal one). SSAO's ambient, SSGI's and SSR's replays take
+core's shader text and inherit it. Core 22,220 to 22,226 B gzip, core + stage 24,837 to 24,843 B. Evidence:
+`tests/invariant-casters.test.js` fails when any file building a `depthCompare: 'equal'` pipeline does not name the
+vertices it relies on, or one lacks the attribute (it failed on seven before the change);
+`packages/core/tests/depth-equal.browser.mjs` (core's test:gpu) draws 320 overlapping core boxes from 3 to 160 units
+away and replays them with core's vertex and `depthCompare: 'equal'`: 24,122 covered pixels, 0 missed, on WebGPU and
+on the WebGL2 layer (RTX A6000). Missing: no mismatch was ever observed on the A6000, so the GPU check is not a
+failing-first proof there (the shader-text guard is); it guards the wiring and would catch a driver that compiles the
+two programs apart. gltf/pbr's colour vertex (the standard and extended PBR `Out`, replayed by SSAO's occlusion draw
+and TAA's PBR velocity, which already computes `camera*(model*p)`) declares it too since 2026-11-15 (KB-INV-GLTF); the
+same guard names it for both replays and failed on its four positions before that change. A failing-first GPU
+proof exists on an Apple M6 (Chromium, Metal): `packages/taa/test/far-velocity-browser.mjs` (TAA's test:gpu and
+test:gpu:compat) moves a 2 m box 1e4 m from the origin under TAA; before these changes a core mesh got its motion on
+13,463 of 32,512 pixels on WebGPU and Box.glb through gltf/pbr on 26,734 of 32,261 on the WebGL2 layer, now every
+pixel for both on both backends.
+
+### Section 5 evidence: Kerr ray integrator in the black hole, and a D3D12 division fault on the 680M (2026-11-14)
+
+`@margoengine/shader/black-hole` traces each pixel's ray back through Kerr spacetime in the fragment shader: Boyer-
+Lindquist null geodesics (James et al. 2015, eq. A.15) by fourth-order Runge-Kutta with a step that shrinks near the
+horizon (times clamp(4 Delta / r^2, 0.1, 1)) and at the poles, theta reflected over the spin axis, at most `steps` (260)
+steps. The CPU twin `traceGeodesic` runs the same steps. Evidence: `packages/shader/test/black-hole.test.js` (horizon,
+ISCO and photon orbit against Bardeen, Press and Teukolsky 1972; the Page-Thorne flux peak at 9.55 M for a = 0; the
+shadow edges 3 sqrt(3) M, 2 M and 7 M; |H| under 1e-5 on escaping rays; the pole and inner-rim regressions) and
+`black-hole-check.mjs` on WebGPU and the WebGL2 layer (camera frame, round stars, the jet side on, disk detail at 1 s
+and 120 s). Hardware: the Radeon 680M's D3D12 compiler drops the sign of a negated component of a constant-scaled
+vector in a division or atan2 (docs/known-bugs.md); the camera frame avoids the pattern and
+`negated-division-check.mjs` asserts every formulation Margo's shaders use, on every adapter. On the WebGL2 layer
+under ANGLE Direct3D 11 (RTX A6000) a derivative used only inside a per-pixel branch read 0 (docs/known-bugs.md,
+2026-11-15): the layer now pins every derivative-made value of a fragment into its outputs' never-taken select
+(`glsl/emit.ts` `pin`), held by features.html `derivativeBranch` against native and by glsl.test.js on the emitted
+shape; the black hole also keeps its ray differentials in uniform control flow ("no ray-dependent branch is the only
+user of a derivative") and its star check runs on MARGO_COMPAT=1. Missing: the derivativeBranch case on another
+vendor's D3D11 driver. Missing: the integrator's
+accuracy near the photon orbit is bounded only by the step budget (docs/limits.md); no GPU twin comparison of whole
+images against `traceGeodesic` yet.
+
 ### Section 5 evidence: README runner test character and hardware skips (bug sweep L6b, KB1867c, 2026-11-11)
 
 check:readme-run makes an original humanoid character per run (`scripts/support/readme-humanoid.mjs`, written from the
@@ -6,6 +801,60 @@ written and find bones by name. An example that needs hardware no test machine h
 `scripts/support/readme-run-skip.json` with a reason that must start `hardware:`; the runner counts it as skipped,
 never as passed, and a skip that names no example fails a whole run. Evidence: tests/readme-humanoid.test.js,
 tests/run-readme-examples.test.js. Missing: the AR hit-testing example on a real headset (KB1867b).
+
+### Section 5 evidence: VolumetricFog's far air past range, clear air by default (KB-STORM-HORIZON1, 2026-11-16)
+
+GPU maths. The froxel grid still integrates the near air out to `range` (shafts, noise, clustered lights, volumes).
+Past it the composite adds the smooth medium in closed form along each opaque pixel's ray from the `range` plane to
+the surface, or to infinity for the sky: the optical depth of sigma(y) = density exp(-falloff max(y - height, 0)) is the
+exponential integral of Wenzel (2006) and Quilez (2010), split at `height` for the flat layer under it, with the
+uniform case (falloff 0) as density times length. The tail's light is the medium's equilibrium radiance, the albedo
+times the ambient plus the sun's Henyey-Greenstein phase (and the multiple-scattering series of Hillaire 2020 when
+`multipleScattering` is set), and opacity is 1 - T_froxel T_tail, so the two parts join at `range` without a step.
+`visibility` is Koschmieder's law, extinction 3.912 / V; with no density the default is clear air, 23 km at ground with
+a 1.2 km scale height (LOWTRAN 7 "clear", Kneizys et al. 1988). With a Sky and no `ambient` the fog's ambient, near and
+far, is the sky map's last row above the horizon in the view azimuth (Hillaire 2020; Bruneton and Neyret 2008), so a
+fully fogged far sea is the fogged sky above it. Without a sky the froxel shader text is byte-identical to before.
+Work count: one closed-form tail and one sky-map sample per composite pixel (per sample at 4x); no new pass, draw,
+texture or buffer write; the uniform keeps its size (the composite WGSL hash and the two default-air floats are the
+only GPU-tape changes, volumetric-workcount.test.js). Evidence (RTX A6000, WebGPU and the WebGL2 layer):
+`npm run test:fog-far:browser` (every sea and sky pixel within 0.01 of exp(-optical depth) integrated on the CPU, in
+uniform 1 km and 10 km fog and height fog with the camera above and inside the layer; Koschmieder 2.09% at V; the
+sea 3 km out 0.3101 against 0.3092; the luma step at `range` -0.01 codes; the fully fogged far sea 0.00% from the
+fogged sky above it and 10.8% from the unfogged dusk sky 0.3 to 0.7 degrees up; the old fog fails it at 0.1287).
+Transparents added with `fog.add` take the same far air past `range` (KB-FOG-FAR-TRANSPARENT, fixed 2026-11-17: a
+pane on the sea within 0.01 of the integral, and with a Sky within 1% of the fogged sea under it; the old shader is off
+by 0.095). Missing: a run on a laptop iGPU and on Metal.
+
+### Section 5 evidence: clustered lights integrated over each froxel slice (KB-FOG-BEAM1, 2026-11-15)
+
+VolumetricFog took each clustered light at four points per slice on each froxel's centre ray, so a spot cone narrower
+than their spacing in depth, or than a froxel row across, lit only the froxels whose points fell inside it: the Storm
+Light beam drew as a row of separate blocks (temporal off, beam bearing 0.3, climb camera: 15 gaps along the right beam,
+worst dip 0.98 of its level). Now each slice is split in four parts with a cluster lookup each; per light the part's
+chord inside the range sphere and the outer cone is solved exactly (Eberly 2000), the inverse-square term is the
+closed form (atan(b) - atan(a)) / h (Sun, Ramamoorthi, Narasimhan and Nayar 2005; Pegoraro and Parker 2009) and the
+smooth rest is taken at 2 jittered equiangular points (Kulla and Fajardo 2012); a cone thinner than the froxel is
+widened by the froxel's size seen from the light with its energy kept (footprint prefiltering after Toksvig 2005 and
+Kaplanyan, Hill, Patney and Lefohn 2016). Work count: 8 light evaluations per froxel per light (4 parts x 2 points)
+where it was 4; 8 points per part gave the same results within run noise at 32. Evidence (RTX A6000, WebGPU and the
+WebGL2 layer): `npm run test:fog-beam-continuity:browser` (a beam 0.2 m across in froxels 0.4 m wide and 1.3 m tall:
+each column 0.762 to 1.186 of its true light, L1 0.140; the old code 0 to 0.511), `npm run test:fog-beam:browser`
+(reference now averaged over each froxel's area: beam L1 0.044, bulb 0.004, limit 0.05 unchanged),
+`scripts/clustered-falloff-gpu-check.js` (14 lights, falloff and cone match the definition). Storm Light probe after
+the fix, bearings 0.3, 0.6 and 0.9: 0 gaps, worst dip at most 0.205. Missing: a run on a laptop iGPU and on Metal.
+
+### Section 5 evidence: the water surf field's sweeps on the WebGL2 layer's GPU (KB-WATER-SURFCPU1, 2026-11-18)
+
+The surf field's build (water `SurfFieldBuilder`) kept its deepest-edge `atomicMax` and its relaxation sweeps in one
+module over `array<atomic<u32>>`, and the layer sends any entry point that touches an atomic to its CPU tier: every one
+of the width + height sweeps ran in JavaScript, 421 s for the first frame of a 512 x 82 coastal grid (RTX A6000, ANGLE
+D3D11). The sweeps and the sources now read and write plain words in a second module over the same buffer (each
+invocation its own cell, from one field to the other), which plans to the scatter tier; only the deepest edge stays on
+the CPU. Work count: CPU-tier dispatches in that first frame from 596 (the 594 sweeps, the sources and the deepest edge,
+by construction) to 3 (measured, layer counters); first frame 4.0 s on a loaded
+machine; the surf check's breaking depths, heights and run-up read the same on both backends. Proof:
+`MARGO_COMPAT=1 node packages/water/test/surf.browser.mjs`. Missing: a run on a laptop iGPU and on Metal.
 
 ### Section 5 evidence: volumetric fog integration on the WebGL2 layer's GPU (bug sweep L6b, KB5663a, 2026-11-11)
 
@@ -22,6 +871,27 @@ WebGPU; on the layer the GPU route and the CPU-tier column agree within one half
 check on the layer, which now ends with every knob restored (fog step saved 11.8 ms where it saved about 1,050 ms).
 Missing: a run on a real laptop iGPU on the layer.
 
+### Section 5 evidence: WebGL2 layer waits (KB-COMPAT-POSTTASK1, KB-COMPAT-GETERROR1, 2026-11-18)
+
+The layer's fence polls (`onSubmittedWorkDone`, `mapAsync`) yield a port task and then a 1 ms timer set from it, never
+`scheduler.postTask` with a delay, which Chrome on Windows runs on the 15.6 ms system timer tick (15.1 ms against 2.0 ms
+a poll, Chrome 157). Allocation errors are read with one `getError` for every allocation since the last read, in a task
+of its own or at an `out-of-memory` or `internal` scope boundary, with each error still in the scope it was raised in.
+Evidence: `packages/webgl2-compat/test/task-polling.test.js` and `device.test.js`; water's owner/lifetime cases on the
+layer made 13,255 `getError` calls in place of 61,489, and its check:owners took 344 s in place of 505 s (WebGL2 case
+time 2.0 times native, was 2.9; RTX A6000, ANGLE Direct3D 11, loaded workstation). Measure page waits with GL call
+counters and timer latencies, not under a CPU profile: the V8 sampler raises the Windows timer resolution and hid the
+tick. Still missing: the same counts on Firefox and on ANGLE Metal; per-context program compiles remain (WebGL2 has no
+program binaries).
+
+check:owners CPU runs (2026-11-18): the CPU model runs one package per process, each under its own 120 s limit
+(`cpuRuns` and `CPU_LIMIT_MS` in `scripts/support/owner-lifetime-registry.mjs`), and a timeout names the case still
+running (`package/fixture/target/lifetime`). One process for all 75 fixtures summed about 160 s under one 120 s limit
+(biomes alone about 90 s: each of its 52 cases attaches a BiomeView that builds its ground texture tiles on the CPU), so
+a full run always timed out and read as a hang; there was no hang. Evidence: `tests/owner-lifetime.test.js` ("one
+package per run", "names each case"); a full `check:owners -- --cpu-only` passes. Still missing: per-attach ground
+tiles are rebuilt for every BiomeView (a speed item for the speed phase, not a correctness one).
+
 ### Section 5 evidence: WebGL2 layer resources in Firefox and in one draw (bug sweep L3a, 2026-11-11)
 
 The layer writes zeros into every new texture level and layer at allocation (clears for renderable formats, whole-level
@@ -34,18 +904,27 @@ block-compressed texture's sRGB twin view is filled from its kept blocks: `featu
 
 ### Section 5 evidence: height-correlated Smith in core's direct light (2026-11-11)
 
-Core's WGSL direct light, its WebGL2 twin and gltf-pro (base, coat lobe, extended isotropic path) use the
+Core's WGSL direct light, its WebGL2 twin and gltf/pbr (base, coat lobe, extended isotropic path) use the
 height-correlated Smith-GGX G2 = 1 / (1 + Lambda(v) + Lambda(l)) (Heitz 2014, JCGT 3(2), eq. 99; glTF 2.0 Appendix
 B.3.2, current revision) in place of the separable G1 G1 (KB5875a). Evidence: `packages/core/tests/smith.test.js`,
-`packages/gltf-pro/tests/smith.test.js` and `packages/webgl2-compat/test/smith.test.js` evaluate each shader's own
+`packages/gltf/test/smith.test.js` and `packages/webgl2-compat/test/smith.test.js` evaluate each shader's own
 text against Heitz's Lambda over 150 (nl, nv, roughness) points (1e-12); G2 is never below G1 G1 and gains over 25
-percent rough and grazing. gltf-pro's naming proof fixture follows the same line (re-recorded). Since KB6016 every
+percent rough and grazing. gltf/pbr's naming proof fixture follows the same line (re-recorded). Since KB6016 every
 other PBR direct light (clustered, materials, terrain, lod imposters, animation VAT, post material decals, voxel) takes
 the same `smithGCorrelated`, and the separable `smithG` export is gone; `tests/smith-shaders.test.js` evaluates each
 user and scans every package's source for a separable product. Its guard is max(den, 1e-30) (KB-G2guard, 2026-11-12):
 the denominator is never below 2 nl nv, and the old 1e-4 floor cut G2 to 0.02 of 0.71 on smooth grazing surfaces; the
-same test evaluates every G2 text down to nl = 1e-5, a2 = 1e-10. Core's copy follows in a core commit. Missing: environment's split-sum DFG table still
+same test evaluates every G2 text down to nl = 1e-5, a2 = 1e-10. Core's copy takes the same 1e-30 floor since 2026-11-14 (`packages/core/tests/smith.test.js` checks its text at a2 = 1e-6, nl = nv = 0.001). Missing: environment's split-sum DFG table still
 integrates the separable G (KB6016b, docs/known-bugs.md, open); no multiple-scattering compensation in direct light.
+
+### Section 5 evidence: dielectric Fresnel diffuse weight in core's direct light (2026-11-14)
+
+Core's WGSL direct light weights its Lambert lobe by 1 minus the dielectric Fresnel (F0 0.04), as glTF 2.0 Appendix B
+mixes a dielectric BRDF with a metal one: w = 1 - (1 - vh)^5, F = 1 - (1 - F0) w and the diffuse weight 0.96 w, in
+place of 1 minus the Fresnel at the metal-mixed F0 (KB3240b, the packages outside core since 2026-11-12). Evidence:
+`packages/core/tests/metal-mix.test.js` evaluates core's own shader text on the CPU against the specification's mix
+(head on at base 0.5, metal 0.5: 0.0978817, against 0.0795775 before). Missing: part-metal visual baselines re-recorded
+on the workstation (baselines are per machine).
 
 ### Section 5 evidence: allocation-free changed-row uploads (2026-11-11)
 
@@ -68,7 +947,7 @@ camera's target distance. Evidence: `packages/shadows/test/scale-browser.mjs` re
 100 m and 1 km plus the Khronos BoomBox, native WebGPU and the WebGL2 layer, RTX A6000 Edge 157, with the same umbra
 and lit pixel counts at every scale (4,626 umbra, 335,079 lit, none darkened); every other shadows GPU test passes in
 both modes. Steady-frame GPU calls and written bytes are unchanged in the deformed-shadows, quality-presets and
-gltf-pro-lighting-hooks proofs; only uniform values and shader text differ. `VirtualShadows` followed on 2026-11-11: receivers move a quarter
+gltf-pbr-lighting-hooks proofs; only uniform values and shader text differ. `VirtualShadows` followed on 2026-11-11: receivers move a quarter
 texel of the page they read along the normal, the depth bias is 2^-20 of a range that follows the reach (a whole
 texel lifted deep shade off the coarsest level before feedback), and an unset reach scales with the camera's target distance in octaves
 (`reachScale`); the same scene passes `scale-browser.mjs --virtual` at every scale in both modes, and
@@ -83,8 +962,8 @@ virtual-feedback-browser.mjs keeps its recorded pages per level (normal path: sa
 native WebGPU 12 buffers and 4 textures both times, the same picture; the WebGL2 layer 12 and 6, the extra two
 being the canvas texture and the shadows route's nearest-depth level. That level went missing in about one restore in
 seven until the route was kept once loaded (docs/known-bugs.md, fixed 2026-11-11); since then 400 restores kept 6.
-The soak names each live texture by format and size when counts differ. Standalone, run by hand in a shared GPU slot; no check
-runs it yet. Missing: gltf-pro models in the scene, other GPUs.
+The soak names each live texture by format and size when counts differ. Standalone, run by hand; no check
+runs it yet. Missing: gltf/pbr models in the scene, other GPUs.
 
 ### Section 5 evidence: exact vector glyph coverage (lague plan 2, 2026-11-10)
 
@@ -105,23 +984,23 @@ device restore with core meshes, culling, lod, shadows and environment attached,
 `tests/support/gpu-faults.js` and follows it with a clean restore. RTX A6000, Edge 157: 40 calls on native WebGPU and
 42 on the WebGL2 layer, each failure reported, and after the clean restore 28 buffers, 7 (native) or 9 (layer)
 textures and the same picture every time. A failure in core, shadows or culling still stops the engine until that
-restore (docs/known-bugs.md, open). Standalone, run by hand in a shared GPU slot. Missing: gltf-pro models, other GPUs.
+restore (docs/known-bugs.md, open). Standalone, run by hand. Missing: gltf/pbr models, other GPUs.
 
 ### Section 5 evidence: alpha-tested mip coverage (2026-11-10)
 
-`packages/shared/alpha-mips.js` builds the mips of `MASK` base colour maps (gltf-pro, gltf/textured) on the GPU: an
+`packages/shared/alpha-mips.js` builds the mips of `MASK` base colour maps (gltf/pbr, gltf/textured) on the GPU: an
 area filter of the level above with alpha-weighted linear colour, then the alpha scale whose passing share is nearest
 to level 0's (64-candidate bisection, exact 64-bit share comparisons, unscaled state fed to the next level). Evidence:
-`packages/gltf-pro/scripts/test-mask-mips-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: every level's
+`packages/gltf/scripts/test-mask-mips-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: every level's
 passing texel count equals a float64 CPU reference, alpha within 0 bytes and colour within 1; the plain chain kept 40
 of 1,024 texels at level 1 (259 expected) and none below. Missing: other GPU vendors, build time per map.
 
 ### Section 5 evidence: exact vertex alpha at an alpha cutoff (2026-11-10)
 
 Perspective-correct interpolation of a constant stage output of 1 is not exact (0.99999994 in some pixels); a
-constant 0 is. MASK colour pipelines in gltf-pro (`exactAlphaShader`) and the `vertexAlpha: false` caster path
+constant 0 is. MASK colour pipelines in gltf/pbr (`exactAlphaShader`) and the `vertexAlpha: false` caster path
 (`solidVertexDepth`, shared by shadows, selection, clustered, staging and taa) hand on 1 - alpha. Evidence:
-`packages/gltf-pro/scripts/test-mask-alpha-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: alpha exactly at
+`packages/gltf/scripts/test-mask-alpha-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: alpha exactly at
 the cutoff keeps all 77,822 grid pixels (40,257 cut before), 64 of 64 picks (56 before) and the same 7,974 shadow
 texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still interpolates in the plain path.
 
@@ -129,8 +1008,9 @@ texels as a 0.49 cutoff. Missing: other GPU vendors; instance tint alpha still i
 
 A MASK material whose UVs move (MToon UV animation) is cut in its casters and in picking at the same animated UV as
 its colour pass: shared/caster.js `animatedDepth` carries the raw UVs to the fragment and evaluates the MToon motion
-(per-texel time from the mask's blue channel, rotation about 0.5, scroll, then the base map's affine rows) from an
-80-byte uniform at bindings 7 to 9. Cascades, virtual shadows, clustered local and cube maps, staging contact shadows and
+(rotation about 0.5, scroll, then the base map's affine rows, each motion phase x m + period x fract(k x m) with m the
+mask's blue channel and the float64 phases and whole counts k of rigging's `uvAnimationPhases`, so it keeps its steps
+after days of uptime; 2026-11-15, evidence packages/rigging/tests/mtoon.test.js) from an 80-byte uniform at bindings 7 to 9. Cascades, virtual shadows, clustered local and cube maps, staging contact shadows and
 selection picking use it, and TAA object velocity reads the same function at bindings 9 to 11; such casters redraw
 every frame. Evidence: `packages/rigging/tests/mtoon-uv-shadow.browser.mjs` on the RTX A6000,
 WebGPU and WebGL2 compat: the shadow half and the picked half swap after half a texture of scroll, and stay put
@@ -146,13 +1026,13 @@ shows it; a renamed copy of the function reads right). The layer's translator (`
 
 ### Section 5 evidence: mip chains at odd sizes and for blended colour (2026-11-11)
 
-`packages/shared/mipmaps.js` (gltf-pro, gltf, materials, lines, points, rigging, sprites and ui mips) builds every level
+`packages/shared/mipmaps.js` (gltf/pbr, gltf, materials, lines, points, rigging, sprites and ui mips) builds every level
 with an area filter (every source texel weighted by its overlap, as `alpha-mips.js`): the 2x2 box at even sizes, and at
 odd sizes, where the old single bilinear fetch at the centre of a 2.5-texel footprint skipped a texel, the full overlap.
 One texel-load path for both sizes needs no sampler and keeps the shader smaller than two paths. `alpha: 'weighted'`
-averages colour weighted by alpha and is used for gltf-pro `BLEND` base colour maps. Evidence:
-`packages/gltf-pro/scripts/test-mipmaps-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: every level of
-plain, sRGB, weighted and gltf-pro chains within 0.68 colour and 0.54 alpha codes of a float64 area filter of the level
+averages colour weighted by alpha and is used for gltf/pbr `BLEND` base colour maps. Evidence:
+`packages/gltf/scripts/test-mipmaps-browser.mjs` on the RTX A6000, WebGPU and WebGL2 compat: every level of
+plain, sRGB, weighted and gltf/pbr chains within 0.68 colour and 0.54 alpha codes of a float64 area filter of the level
 above (38 and 95 codes before on odd sizes; the red last column of a 5 x 5 image now keeps 102 of 255 at level 1).
 
 ### Section 5 evidence: non-finite HDR input stays local in Bloom and Tonemap (2026-11-10)
@@ -296,7 +1176,11 @@ The optional entry observes only opted-in spec figures and preserves successful 
 
 ### Section 5 evidence: native display glass, fixes K2 job 1
 
-The internal materials native-glass adapter owns the scene capture, snapshots and transfer-function shader. gltf-pro acquires it for native transmissive models and copies the current scene before each primitive, after settling the renderer's deferred clear and closing the preceding draw pass. The shader decodes both stored light contributions, multiplies the linear transmission share (including the existing Fresnel, coat, sheen and Beer terms), adds, then encodes. Native HDR blending is unchanged. Shared capture ownership ends with the last model; resize and device restoration rebuild its resources. Core and stage are unchanged.
+The internal materials native-glass adapter owns the scene capture, snapshots and transfer-function shader. gltf/pbr acquires it for native transmissive models and copies the current scene before each primitive, after settling the renderer's deferred clear and closing the preceding draw pass. The shader decodes both stored light contributions, multiplies the linear transmission share (including the existing Fresnel, coat, sheen and Beer terms), adds, then encodes. Native HDR blending is unchanged. Shared capture ownership ends with the last model; resize and device restoration rebuild its resources. Core and stage are unchanged.
+
+**Scene captures nest (GAP-FILM-LATE, 2026-11-15).** A pass that redirects `c.color` and later restores it is a capture, and captures nest: the one that begins first ends last. The HDR captures begin at -65 to -50 (PostStack -65, SSAO and Bloom -60, DOF -55, Tonemap -50) and end from 30; the native glass capture begins at -40 and presents at 29, inside every one of them, so under an HDR capture it sees the linear target and keeps the linear blend. At -64 it began outside SSAO, Bloom, DOF and Tonemap, presented its own colour at 29 before they wrote this frame into it, and every frame read the one before (a fresh engine's first frame black). The new begin stays below -25, where environment probes (`scenePasses`) skip captures. Still crossing: the shared scene depth capture (`acquireDepth`, -15 to 10000) and sciviz volume depth (-0.001 to 39) begin inside the glass capture and end after it by order; no picture fault is reproduced yet (the bug-sweep list, KB-FILM-NEST2). Evidence: `packages/materials/tests/native-glass-nesting.test.js` (Tonemap and Bloom fail on the old order, PostStack passes on both), `packages/materials/test/native-glass-browser.mjs` `hdrNesting` (native WebGPU and the WebGL2 layer, 1x and 4x: one frame after a background change reads the new frame). Sources: W3C WebGPU, https://www.w3.org/TR/webgpu/, section 3.4.1 (timelines: work submitted to a queue runs in submission order, and `mapAsync` maps only after the GPU's use of the buffer ends) and 17.1.1.3 (load and store operations), which rule out a readback ordering fault: the copy ran after the frame, the frame had drawn the wrong texture; O'Donnell 2017, "FrameGraph: Extensible Rendering Architecture in Frostbite", GDC (passes declared by order, resources by lifetime).
+
+**Sky light follows this frame's camera (GAP-FILM-LATE, GAP-FILM-READY, 2026-11-15).** The sun's colour and strength (`sunlight`, the transmittance from the eye's altitude, Bruneton and Neyret 2008, "Precomputed Atmospheric Scattering", EGSR, https://doi.org/10.1111/j.1467-8659.2008.01245.x) are set in `onPreUpdate` from the engine camera's altitude. They read the altitude the sky passes stored in the frame before, so a frame was lit by the previous camera (1 level on 0.06 % of a 2560x1440 film) and a fresh sky's first frame from sea level. Evidence: `packages/sky/test/eye-altitude.test.js`. With both fixes the Film Studio bench film draws its final pixels on the first `render()` of a fresh process; pipelines a package compiles asynchronously are warmed with `warmUp` from `@margoengine/quality`.
 
 Evidence: packages/materials/tests/native-glass.test.js checks shared ownership, per-surface copies, attachment restoration, HDR bypass and the shader arithmetic. packages/materials/test/native-glass-browser.mjs compares one and two overlapping surfaces against an independent IEC transfer-function sum at 1x and 4x, on native WebGPU and compatibility. It fails on the old two-draw path. No wall-clock claim; other GPU vendors remain unmeasured.
 
@@ -306,15 +1190,15 @@ K2 dependent CPU gate repair: OIT assertions retain every geometry/OIT pass and 
 
 ### Section 5 evidence: native display glass in caller-owned passes (KB2281)
 
-`PBRDeviceRenderer.draw(context, pass, view, options)` (gltf-pro `createRenderer`) takes `options.snapshot(pass, target)`. On a display-encoded target the renderer installs an external native-glass source for the draw (materials `externalNativeGlass`, one context-sized single-sample snapshot texture per renderer, released with it), so the same native glass shader and binding apply. Before each glass surface the caller's hook ends the pass, writes the colour so far into the snapshot and returns the reopened pass, which `draw` hands back. `@margoengine/xr` lends the hook from its eye loop when a drawn model has a native glass material (`nativeGlassMaterial`, shared with gltf-pro) on a display-encoded layer: the eye pass then stores its 4x samples, and the hook resolves them into the snapshot with a resolve-only pass (XR layer textures may lack COPY_SRC) and reopens the eye pass with `load` and the eye viewport (KB2281-xr, packages/xr/tests/xr.test.js). `rgba16float` targets and draws without the hook keep the native blend. Evidence: packages/gltf-pro/tests/external-glass.test.js (one snapshot per surface, pass ownership, HDR bypass, refusal of a hook that returns no pass); packages/materials/test/native-glass-browser.mjs `externalGlass` (rgba8unorm, 128 grey: 143, 155, 165 with the hook against the IEC sum 143, 154, 165; 197, 221, 239 without), native WebGPU and compatibility. Same sources as K2 job 1 above.
+`PBRDeviceRenderer.draw(context, pass, view, options)` (gltf/pbr `createRenderer`) takes `options.snapshot(pass, target)`. On a display-encoded target the renderer installs an external native-glass source for the draw (materials `externalNativeGlass`, one context-sized single-sample snapshot texture per renderer, released with it), so the same native glass shader and binding apply. Before each glass surface the caller's hook ends the pass, writes the colour so far into the snapshot and returns the reopened pass, which `draw` hands back. `@margoengine/xr` lends the hook from its eye loop when a drawn model has a native glass material (`nativeGlassMaterial`, shared with gltf/pbr) on a display-encoded layer: the eye pass then stores its 4x samples, and the hook resolves them into the snapshot with a resolve-only pass (XR layer textures may lack COPY_SRC) and reopens the eye pass with `load` and the eye viewport (KB2281-xr, packages/xr/tests/xr.test.js). `rgba16float` targets and draws without the hook keep the native blend. Evidence: packages/gltf/test/external-glass.test.js (one snapshot per surface, pass ownership, HDR bypass, refusal of a hook that returns no pass); packages/materials/test/native-glass-browser.mjs `externalGlass` (rgba8unorm, 128 grey: 143, 155, 165 with the hook against the IEC sum 143, 154, 165; 197, 221, 239 without), native WebGPU and compatibility. Same sources as K2 job 1 above.
 
 ### Section 5 evidence: opt-in linear-light blending (KB3148b)
 
-`blendSpace: 'linear'` (materials `Material.blendSpace`, gltf-pro `PBRRenderState.blendSpace`) gives a plain BLEND material on a display-encoded target the native glass path: the draw ends the pass, the capture snapshots the colour so far, and `linearBlendShader` rewrites only the main fragment entry's return to encode(a * lin(src) + (1 - a) * lin(dst)) with alpha a + dst.a * (1 - a), pipeline blending off. The draw context (`DrawFrame.glass`) records whether a capture lends the snapshot, so a derivation made before the capture began is never reused after it; a model that first draws the option without a capture acquires one between frames (`wantGlass`, plugins cannot join a running frame graph), in the scene that drew. Linear-blend derivations are not batchable. Default 'display' unchanged, so no picture and no steady-frame work count moves unless the option is set. Evidence: packages/materials/test/native-glass-browser.mjs `linearBlend` (native WebGPU and the WebGL2 layer, 1x and 4x, materials and glTF, set before and after the first frame), packages/materials/test/render-state.test.js. Source: IEC 61966-2-1 sRGB transfer; Porter and Duff 1984, "Compositing Digital Images" (SIGGRAPH), over operator in linear values.
+`blendSpace: 'linear'` (materials `Material.blendSpace`, gltf/pbr `PBRRenderState.blendSpace`) gives a plain BLEND material on a display-encoded target the native glass path: the draw ends the pass, the capture snapshots the colour so far, and `linearBlendShader` rewrites only the main fragment entry's return to encode(a * lin(src) + (1 - a) * lin(dst)) with alpha a + dst.a * (1 - a), pipeline blending off. The draw context (`DrawFrame.glass`) records whether a capture lends the snapshot, so a derivation made before the capture began is never reused after it; a model that first draws the option without a capture acquires one between frames (`wantGlass`, plugins cannot join a running frame graph), in the scene that drew. Linear-blend derivations are not batchable. Default 'display' unchanged, so no picture and no steady-frame work count moves unless the option is set. Evidence: packages/materials/test/native-glass-browser.mjs `linearBlend` (native WebGPU and the WebGL2 layer, 1x and 4x, materials and glTF, set before and after the first frame), packages/materials/test/render-state.test.js. Source: IEC 61966-2-1 sRGB transfer; Porter and Duff 1984, "Compositing Digital Images" (SIGGRAPH), over operator in linear values.
 
 ### Section 5 evidence: linear-light layers in weighted OIT (KB3148d)
 
-glTF Pro hands a BLEND material whose `renderState` holds only `blendSpace: 'linear'` to a transparency hook that declares `linearLayers` (`PBRTransparency`); on a display-encoded target its pipeline sets `margoLinear`, which clears a per-pixel mark (OIT's revealage `.g`, now `rg16float`, or an `r8unorm` fourth target with `blending`). Once per draw holding such a surface glTF Pro passes the hook a function that copies the colour so far into the native glass snapshot; OIT calls it after its accumulation pass, keeps its display composite unchanged, then draws the marked pixels again with blending off: encode(decode(average) * (1 - R) + decode(scene) * R), mixed with the display result by the mark at MSAA edges. No mark, copy or draw on an HDR target or when no linear layer drew; the display path's draws, bind groups and buffer writes are unchanged, its revealage target 2 bytes per pixel larger. KB3148e: the hook moved to the shared `TransparentPass`, so `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` take linear layers too. The per-layer passes (`ExactOIT`, `PeelOIT`) store a linear layer's alpha negated and, only in a frame where one drew, resolve one layer index per render pass far to near: a snapshot copy, the display layers of that index with the hardware blend, then its linear ones with blending off, over(decode) per layer; frames without one keep the single instanced or looped resolve. `MomentOIT` marks in its optical target's free `.a` (additive, so a 4x edge mark is the mean count per sample), `PreciseOIT` in a revealage `.g` (`rg16float`), and both redraw the marked pixels after their composite as `OIT` does. `PeelOIT` now peels in the frame's own context with `depth` and `descriptor` swapped and restored, so per-context lookups (the native glass capture) see the frame. Evidence: the same linear-check.mjs, now over all six passes (100 cases native, 82 on the WebGL2 layer), and the KB3148e test in oit.test.js. Sources as above, plus Yang, Hensley, Grun and Thibieroz 2010 (per-pixel linked lists), Everitt 2001 (depth peeling), Muenstermann, Krumpen, Klein and Peters 2018 (moment-based OIT), Wyman 2016, "Exploring and Expanding the Continuum of OIT Algorithms", HPG, https://research.nvidia.com/publication/2016-06_exploring-and-expanding-continuum-oit-algorithms (collect, then resolve: a per-layer resolve composites layer by layer), Maule, Comba, Torchelsen and Bastos 2011, "A survey of raster-based transparency techniques", Computers and Graphics 35(6), https://doi.org/10.1016/j.cag.2011.07.006. Evidence: packages/oit/test/gpu/linear-check.mjs (native WebGPU and the WebGL2 layer, 1x and 4x, plain and `blending`, materials and glTF, before and after the first frame: 137 and 165, display 94 and 141), packages/oit/test/oit.test.js (KB3148d tests). Sources: McGuire and Bavoil 2013, "Weighted Blended Order-Independent Transparency", JCGT 2(2), https://jcgt.org/published/0002/02/09/; Porter and Duff 1984, "Compositing Digital Images", SIGGRAPH; IEC 61966-2-1:1999 sRGB transfer; Gritz and d'Eon 2007, "The Importance of Being Linear", GPU Gems 3, chapter 24.
+glTF PBR hands a BLEND material whose `renderState` holds only `blendSpace: 'linear'` to a transparency hook that declares `linearLayers` (`PBRTransparency`); on a display-encoded target its pipeline sets `margoLinear`, which clears a per-pixel mark (OIT's revealage `.g`, now `rg16float`, or an `r8unorm` fourth target with `blending`). Once per draw holding such a surface glTF PBR passes the hook a function that copies the colour so far into the native glass snapshot; OIT calls it after its accumulation pass, keeps its display composite unchanged, then draws the marked pixels again with blending off: encode(decode(average) * (1 - R) + decode(scene) * R), mixed with the display result by the mark at MSAA edges. No mark, copy or draw on an HDR target or when no linear layer drew; the display path's draws, bind groups and buffer writes are unchanged, its revealage target 2 bytes per pixel larger. KB3148e: the hook moved to the shared `TransparentPass`, so `ExactOIT`, `MomentOIT`, `PeelOIT` and `PreciseOIT` take linear layers too. The per-layer passes (`ExactOIT`, `PeelOIT`) store a linear layer's alpha negated and, only in a frame where one drew, resolve one layer index per render pass far to near: a snapshot copy, the display layers of that index with the hardware blend, then its linear ones with blending off, over(decode) per layer; frames without one keep the single instanced or looped resolve. `MomentOIT` marks in its optical target's free `.a` (additive, so a 4x edge mark is the mean count per sample), `PreciseOIT` in a revealage `.g` (`rg16float`), and both redraw the marked pixels after their composite as `OIT` does. `PeelOIT` now peels in the frame's own context with `depth` and `descriptor` swapped and restored, so per-context lookups (the native glass capture) see the frame. Evidence: the same linear-check.mjs, now over all six passes (100 cases native, 82 on the WebGL2 layer), and the KB3148e test in oit.test.js. Sources as above, plus Yang, Hensley, Grun and Thibieroz 2010 (per-pixel linked lists), Everitt 2001 (depth peeling), Muenstermann, Krumpen, Klein and Peters 2018 (moment-based OIT), Wyman 2016, "Exploring and Expanding the Continuum of OIT Algorithms", HPG, https://research.nvidia.com/publication/2016-06_exploring-and-expanding-continuum-oit-algorithms (collect, then resolve: a per-layer resolve composites layer by layer), Maule, Comba, Torchelsen and Bastos 2011, "A survey of raster-based transparency techniques", Computers and Graphics 35(6), https://doi.org/10.1016/j.cag.2011.07.006. Evidence: packages/oit/test/gpu/linear-check.mjs (native WebGPU and the WebGL2 layer, 1x and 4x, plain and `blending`, materials and glTF, before and after the first frame: 137 and 165, display 94 and 141), packages/oit/test/oit.test.js (KB3148d tests). Sources: McGuire and Bavoil 2013, "Weighted Blended Order-Independent Transparency", JCGT 2(2), https://jcgt.org/published/0002/02/09/; Porter and Duff 1984, "Compositing Digital Images", SIGGRAPH; IEC 61966-2-1:1999 sRGB transfer; Gritz and d'Eon 2007, "The Importance of Being Linear", GPU Gems 3, chapter 24.
 
 ### Section 5 evidence: K2 React packed tests
 
@@ -432,8 +1316,7 @@ change. Their optional DOM bridge keeps native editing controls and only
 mirrors state into those draw commands; imports of the UI root do not load it.
 The registered ui/test:browser:input gate exercises actual rendered pixels,
 canvas pointer focus, selection/undo, clipboard, Tab, multiline and browser
-IME through DevTools Input. Run it natively and with --compat under one shared
-GPU slot. CPU tests cover deterministic state, password masking, composition
+IME through DevTools Input. Run it natively and with --compat. CPU tests cover deterministic state, password masking, composition
 and cleanup. Pixel evidence is correctness evidence, not a speed measurement;
 human screen-reader and mobile OS input-method testing remains unmeasured.
 
@@ -448,11 +1331,10 @@ viewcube stand-in ownership failures are repaired by main d15e46fd2; the fourth
 is the lazy table registration order repaired here. Current-base focused checks
 pass 33 viewcube/browser-source cases and all nine size-page cases.
 
-Decoder, glTF and glTF-pro CPU checks pass. The decoder browser/production
-consumer, actual Node glTF rendering, glTF browser and glTF-pro material GPU
+Decoder, glTF and glTF PBR CPU checks pass. The decoder browser/production
+consumer, actual Node glTF rendering, glTF browser and glTF PBR material GPU
 checks pass. All 21 decoder/umbrella runtime README examples pass, including
-the final rebased build. Every GPU step uses one shared slot and wait-max 60;
-no speed campaign or exclusive hold runs. Genuine entry/network records share
+the final rebased build. No speed campaign runs. Genuine entry/network records share
 the same clean package revision; core plus stage is 23,950 B after the inherited
 mainline unit-light repair. The native
 Wasm remains 122,685 raw / 47,360 gzip bytes. Full/default replacement, warm
@@ -460,8 +1342,8 @@ losses and remaining feature inventory remain open. Evidence and log hashes:
 [landing receipt](../whitepaper/results/batch-133-landing.json).
 
 The final rebase inherits main's uniform-only light normalization repair, with
-no owned core/stage edits. Its 22 core/viewcube cases and the complete glTF-pro
-CPU suite pass. The glTF-pro material GPU and README checks are refreshed for
+no owned core/stage edits. Its 22 core/viewcube cases and the complete glTF PBR
+CPU suite pass. The glTF PBR material GPU and README checks are refreshed for
 that shader change; the native decoder source and artifact remain unchanged.
 
 Final batch 171 job 3 integration: genuine entry/network records both name da96932cb, packages clean.
@@ -522,7 +1404,7 @@ No runtime asset, table behavior, measurement or tolerance changes.
 The package CPU gate parses every non-test JavaScript fixture/support module
 before GPU execution. Its regression rejects the duplicate optional Draco/HDR
 lexical binding and passes after a Draco-only rename. verify includes it, so
-check:merge covers this class without a GPU hold. No engine source, rendering
+check:merge covers this class without any GPU work. No engine source, rendering
 math, deadline or tolerance changes. Research is recorded in clean-room.md.
 
 The same parser gate enforces literal fixture asset URLs for Vite. It rejects
@@ -542,8 +1424,8 @@ images still need hardware proof. Transport is not sampled-pixel acceptance.
 
 The native harness retains the GPU via the existing installGPU lifetime
 owner through completion; an earlier harness lost that native context during
-collection and terminated mid-corpus. One shared GPU slot, only actual copy/
-readback commands, wait-max60; no CPU memory or fuzz command holds the lock.
+collection and terminated mid-corpus. Only actual copy/
+readback commands use the GPU; no CPU memory or fuzz command does.
 Memory's 173 fresh-process pairs retain identical image/byte work counts:
 all Wasm high-water bars pass but 25 process-RSS bars fail. The TS adapter's
 materialized Zstd level plus Wasm copy is extra storage. The same-payload
@@ -749,7 +1631,31 @@ decoder browser, decoder Node/glTF and glTF GPU gates pass after the repair.
 The voxel README gate passes with its unchanged five known failures (18 of 23
 examples successful). No shutdown deadline, rendering assertion or performance
 budget was relaxed. The full verify run found only an excluded-workspace link
-in the GPU coordination report; its existing regression guards that repair.
+in a report removed on 2026-11-16 with the GPU scheduler (KB-GPULOCK-ALL); its existing regression guards that repair.
+
+## GPU work runs directly (Scott, 2026-11-16)
+
+GPU work runs at once, as many jobs as are started, and every command keeps a hard timeout. `scripts/run-with-timeout.mjs` starts a command and ends its whole process tree after `--max` minutes (default 10), exiting 124. Nothing queues, nothing is refused and nothing records usage, and a shot does not pause: it renders from its first frame to its last. The one pause that remains is the heat pause of `scripts/gpu-package-tests.mjs`, which waits for the machine to cool. Speed measurement stays deferred by `scripts/speed-phase.json` (`bench/cli.mjs` prints SPEED DEFERRED). Proof: `tests/run-with-timeout.test.js` (2, 5 and 20 runs start together; a hung command ends at its timeout).
+
+## The WGSL corpus draw runs in parts (2026-11-18, KB-COMPAT-CORPUSTIME1)
+
+`webgl2-compat test:browser` drew every recorded corpus pipeline in one step and needed 487 to 510 s for the draw
+alone, past the 10 minute GPU step limit once robot-planning's clearance kernels (90 s or more each in ANGLE's
+Direct3D compiler) joined the corpus. The draw now runs as five package scripts, `test:browser` (render pipelines),
+`test:browser:compute` and `test:browser:compute-robot-planning-1` to `-3` (one clearance kernel each, 90 to 200 s),
+chosen by `--part` in
+`packages/webgl2-compat/test/corpus-draw-parts.mjs`. Every pipeline still runs in full; the step limit is not raised.
+`test/corpus-draw-parts.test.js` fails when a part drops a pipeline, holds one twice, is empty or has no script. A
+package whose compute kernels take the compiler minutes goes in `OWN_COMPUTE_PART` with its kernel count, one part
+per kernel; a kernel recorded beyond the count fails the test and the run.
+
+## A new package brings its records (fast gate, 2026-11-16)
+
+`npm run hygiene` (every push) now runs `assertPackageRecordsCurrent` (scripts/support/package-records.mjs): every stated package count matches docs/catalog.json, margoengine.com/sizes.html can be built from entry-sizes.json and basic-scene-network.json (every catalog package measured, both records from one build), THIRD-PARTY-NOTICES.md is what scripts/supply-chain.mjs renders, and every examples/ folder holding TypeScript belongs to a type-check project. Each problem names the command that fixes it. `npm run catalog:build` now restates every package count (restatePackageCount in scripts/support/public-truth.mjs) instead of only the generated lists. Evidence: @margoengine/scenes landed with four pages stating 104 packages, no entry-sizes row, a stale notices file and examples/dune-coast in no project, and only local CI's full root tests failed; tests/package-records.test.js rebuilds that state in a temporary folder and gets the three reports, and the check run on origin/main's files at 3050f3bcc6 reports all of them. The size scan of tests/public-size-claims.test.js now reads meta descriptions and "core plus the high-level stage", which kept the white paper at 24,843 B and 61,059 B after the measured 24,841 B and 61,046 B.
+
+## The fast gate checks changed files' format (2026-11-19)
+
+`npm run lint` (scripts/lint.mjs) runs `biome lint` over the tree as before, then `biome check --error-on-warnings` on the files changed since the merge base with origin/main (committed, uncommitted and untracked; noExplicitAny stays with hygiene gate 3's allowlist). `biome lint` alone never checked formatting and passed on warnings, and hygiene scores format in warn mode over about 2,800 files Biome would reformat, so packages/netcode/tests/browser/signal.mjs and scripts/publish-rehearsal.mjs landed unformatted and tools/shot/cli.mjs with an unused import. The changed files only are held to the rule, so the step costs well under a second beyond the tree lint; a file touched by a change is formatted whole. tests/lint-changed.test.js checks the wiring and that an unformatted file and an unused import fail.
 
 ## Build-phase speed deferral (section 5 supplement)
 
@@ -757,27 +1663,9 @@ Scott's 2026-11-10 ruling defers benchmarks, paired wall-clock A/B measurements
 and timing-only assertions until everything is built. `scripts/speed-phase.json`
 is the single checked-in default (`deferred`). No gate enables speed work.
 Verify, check:merge, check:readme-run and the GPU package runner print the phase.
-The three shared GPU slots remain available for correctness. Classified timing
-CLI requests are refused and logged before creating a child, holder or ticket;
-direct exclusive GPU APIs refuse with `ERR_SPEED_PHASE_DEFERRED`. The only build-
-phase exception is an exact, unexpired entry in `scripts/gpu-exclusive-allow.json`
-(command, reason, approvedBy, expiry). Only the coordinator adds entries, with
-Scott's OK; this change adds none. Approved uses are logged and retain the hold
-cap. Incorrect
-exclusive requests still fail the independent timing-purpose check.
+Correctness GPU commands run directly. Classified timing
+commands are refused before they start with `ERR_SPEED_PHASE_DEFERRED`.
 
-Classifying a command as timing (KB-L3b-bench, 2026-11-11): an npm script named
-`bench*` and any script under `bench/`, `benchmarks/` or `*-benchmarks/` counts
-as speed work unless the script declares itself a correctness check on a whole
-line in its first 40 lines: `// gpu-lock: correctness` (never times anything) or
-`// gpu-lock: correctness with --no-timing` (correctness only when the command
-passes `--no-timing`). A declared script runs in a shared slot during the build
-phase; an undeclared or unreadable one stays exclusive and is refused while
-`scripts/speed-phase.json` defers speed work. Declared today:
-`post-effects-gpu.mjs`, and with `--no-timing` `volumetric-gpu.mjs`,
-`ssr-gpu.mjs`, `ssr-models-gpu.mjs` (all in `examples/package-benchmarks/`).
-Before this, every script in that folder was refused, so their correctness checks
-could not run at all. Test: `tests/gpu-lock-bench-correctness.test.js`.
 
 The named `npm run test:speed` suite retains the budgets in
 `scripts/speed/budgets.mjs`, speed test registrations and standalone drivers,
@@ -788,9 +1676,9 @@ output rather than skipped tests or passing substitute numbers. Repeated EXR,
 USDZ and polygon comparisons do no timing work in the build phase. The million-
 voxel paste scene keeps its equality checks in correctness without best-of rounds.
 
-Biome flythrough and object-camera correctness use shared holds. Separate
+Biome flythrough and object-camera correctness run as ordinary GPU checks. Separate
 `flythrough-speed.mjs` and `objects-frame-speed.mjs` retain the original speed
-scenes, sampling, baselines and assertions under short exclusive holds. The
+scenes, sampling, baselines and assertions. The
 flythrough's worker scheduling, send/copy counts, clock monotonicity and GPU
 validation stay in correctness. Visual compatibility's 50 ms timing-only step
 defers while the pixel comparison still runs. Quickstart keeps all pixel and
@@ -806,19 +1694,11 @@ Every listed scene and budget must pass before release, as must busy-retests.
 The phase is not permission to weaken a budget, change a scene or publish busy-
 machine speed numbers. External rival fixtures remain outside this repository.
 
-Evidence: `tests/speed-phase.test.js` uses fabricated readings and fake lock
-folders to prove unchanged boundary failures, deferred comparison callbacks,
-and no child/holder/ticket creation. GPU planning tests pin separate shared and
-exclusive drivers; the lock/queue tests use CPU-only fixtures. No GPU speed run
-or new speed claim is part of this change. The queue uses the common process
-limiter, so affected-step closure now selects views/depth when that limiter changes;
-the regression checks both the dependency and the selected checks.
+Evidence: `tests/speed-phase.test.js` uses fabricated readings to prove unchanged
+boundary failures and deferred comparison callbacks. No GPU speed run
+or new speed claim is part of this change.
 
 ## Moving-flow transport (batch 171, section 5 supplement)
-
-The gate also exposed a CPU scheduler junction-observation race. The backing target is now read once before
-PID/token validation; an absent/non-link name is not reclaimable. Live-owner and permission failures retain
-their previous semantics. [Mutex target evidence](../quality/gpu-mutex-target.md) records the regression.
 
 The optional flow entry now also holds GPU-resident RK4 particles and a fixed-size per-particle history ring.
 Velocities/positions are normalised by domain widths, never by speed. Missing samples use a separate validity
@@ -946,18 +1826,7 @@ client; issue reports of taskkill.exe exhausting WMI on Windows desktops
 Windows grandchild pipe inheritance discussion ([libuv PR 343](https://github.com/joyent/libuv/pull/343)).
 Only documentation and issue text were read, no other project's source.
 
-## GPU exclusive class check (section 5 supplement)
-
-Verify runs `node scripts/check-gpu-policy.mjs` before the package build. It checks
-tracked production JavaScript/TypeScript launchers and package scripts for
-exclusive CLI flags, enabled `MARGO_GPU_EXCLUSIVE` settings and calls through
-imported `acquire` aliases. Requests must be benchmark-classified or belong to
-the checked-in speed inventory; CLI callers may state a logged `--timing` reason.
-Only the lock/queue implementation, synthetic unit fixtures and historical
-whitepaper result files are outside this production syntax check. Runtime
-policy still applies to every caller, including historical reproduction scripts.
-This is a syntax check, not whole-program evaluation of computed command strings;
-runtime refusal remains the final check before any holder or ticket is created.
+## Documentation encoding check (section 5 supplement)
 
 `tests/docs-encoding.test.js` rejects common UTF-8-as-single-byte artifacts in
 the limits guide and generated LLM copy. Conflict resolution reads/writes UTF-8
@@ -965,44 +1834,7 @@ explicitly; a valid UTF-8 round trip alone cannot catch already corrupted text.
 Encoding reference: Unicode Consortium, *The Unicode Standard 17.0*, 2025,
 [chapter 3, conformance and encoding forms](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/).
 
-Evidence: `tests/gpu-policy-check.test.js` plants CLI, environment and aliased API
-regressions and exercises regex/interpolated-template scanning. The whole tracked
-repository is checked without a GPU. `tests/check-merge-affected.test.js` pins the
-new verify step. Research: Murugiah Souppaya, Karen Scarfone and Donna Dodson,
-*Secure Software Development Framework (SSDF) Version 1.1*, NIST SP 800-218,
-2022, [PW.7, source review and analysis](https://csrc.nist.gov/pubs/sp/800/218/final).
-We combine an early static policy check with the reader/writer runtime admission
-rules cited below; no companion implementation was read.
-
-## GPU mutex ownership and scheduling research (section 5 supplement)
-
-The GPU lock publishes its mutex as a directory junction on Windows (a directory
-symlink elsewhere) to a unique, already populated owner directory. Publication
-cannot replace an anonymous mutex held by a legacy client. A live PID is never
-reclaimed just because its mutex aged. An independent worker refreshes that
-directory every second while the owning JavaScript thread is paused, so older
-reader/writer clients still see a fresh mutex. Anonymous legacy mutexes have no
-proof of a dead owner and must be released by their owner; a bounded wait names
-this condition with `ERR_GPU_MUTEX_WAIT_TIMEOUT`.
-
-Dead-owner reclamation pins the unique backing path before claiming its owner
-metadata. A delayed reclaimer therefore cannot rename a later live owner's
-metadata through the reusable mutex name. Release still retires the mutex name
-before deleting it, preserving the Windows delete-pending repair. Only the
-claimed dead owner's backing directory is removed. No GPU holder/waiter format
-changes and no engine package changes are involved.
-
-Evidence: `tests/gpu-lock-owner.test.js` pauses a live requester at publication,
-ages the mutex past the old ten-second cutoff, checks identity and exclusion,
-then resumes it successfully. It also proves heartbeat renewal independently of
-the blocked owning thread and safe waiting for an anonymous legacy mutex.
-`tests/gpu-lock-integration.test.js` covers dead-owner recovery and a delayed
-reclaimer racing a replacement live owner. The complete seven-file lock group
-passes 50 CPU-only tests on isolated folders; no real GPU run is used. Dead
-reclaimer recovery is included: a crashed metadata claimant does not strand the
-mutex, and a live claimant is allowed to finish without interference.
-
-Research guiding the remaining queue and phase work, read before implementation:
+## HTML blend aperture, sciviz picking and save capture evidence (section 5 supplement)
 
 HTMLBlend now derives explicit aperture camera/viewport/scissor state from its
 inherited DOM view, including canvas-pixel views drawn into scaled targets.
@@ -1042,21 +1874,8 @@ This follows Kai Ninomiya, Brandon Jones and Jim Blandy, [WebGPU, queue completi
 callback alone does not establish completion of prior queue submissions. The
 three protected browser/shutdown support files remain unchanged.
 
-GPU package-suite requests now derive their owner prefix from SHA-256 of the
-canonical worktree identity, shared by serial and parallel paths. A suite label
-follows the prefix so labels cannot merge unrelated worktrees into the old
-generic `check` lane. Existing worktree exclusion, FIFO and shared/exclusive
-policy stay intact. `tests/gpu-suite-owner.test.js` executes actual runner
-admission without GPU work: the parent incorrectly shares a lane with another
-worktree's generic owner, while the repair separates them and retains same-tree
-exclusion across labels and subdirectories. This applies the separation between
-resource allocation and job identity in SchedMD's [Generic Resource Scheduling
-documentation (2026)](https://slurm.schedmd.com/gres.html), compared with John M.
-Mellor-Crummey and Michael L. Scott's [Scalable Reader-Writer Synchronization for
-Shared-Memory Multiprocessors
-(1991)](https://www.cs.rochester.edu/u/scott/papers/1991_PPoPP_read_write.pdf).
-The hash uses the Node.js contributors' [Crypto API
-(2026)](https://nodejs.org/api/crypto.html). No external implementation is used.
+## Heat containment chains evidence (section 5 supplement)
+
 The dependent heat-containment fixture also retains strict full-chain command
 and ID equality for all twelve current voxel GPU leaves, including models,
 objects and wind added after its former nine-leaf expectation. No suite command,
@@ -1069,262 +1888,7 @@ Toon's full four-command chain includes screen outlines and model hatching as
 well as the original models and hatch checks. Every updated comparison remains
 an exact ordered-array comparison with explicit expected commands.
 
-The 2026-11-10 known-bugs sweep reproduced a stale-capacity FIFO fixture:
-three holders did not fill the new five-slot default, so its queue observation
-could never complete. The CPU-only regression now fills `gpu.slots()` and checks
-tied-ticket ordering at capacities one, three and five, with a 30-second bound.
-No actual GPU allocation or scheduler behavior changes. Research compared
-Leslie Lamport, [A New Solution of Dijkstra's Concurrent Programming Problem
-(1974)](https://lamport.azurewebsites.net/pubs/bakery.pdf), on arrival ordering,
-with Nhat Minh Le, Adrien Guatto, Albert Cohen and Antoniu Pop,
-[Correct and Efficient Bounded FIFO Queues
-(2013)](https://www.irif.fr/~guatto/publications/sbac13.pdf), on capacity-dependent
-queue state. The fixture uses the existing filesystem scheduler, not either
-paper's implementation. The Node.js contributors' [Test runner documentation
-(2026)](https://nodejs.org/api/test.html) distinguishes test cancellation from
-termination of outstanding activity; the diagnostic also had an outer process
-tree deadline. No external implementation source was read or copied.
-
-- [Mellor-Crummey and Scott, reader/writer synchronization (1991)](https://www.cs.rochester.edu/u/scott/papers/1991_PPoPP_read_write.pdf)
-  distinguishes preference from fairness. Writer preference blocks incoming
-  readers, explaining why an unnecessary exclusive waiter stalls free slots.
-- [Their scalable synchronization paper (1991)](https://www.cs.rochester.edu/u/scott/papers/1991_TOCS_synch.pdf)
-  motivates explicit ordered request state and reduced contention. Margo uses
-  sleeping filesystem clients, not the paper's shared-memory spin algorithms.
-- [Slurm GRES scheduling](https://slurm.schedmd.com/gres.html) separates counted
-  GPU sharing from exclusive allocation; a slot is scheduling capacity rather
-  than performance isolation. Margo's three correctness slots provide no speed
-  measurement guarantee.
-- [Bazel test execution and sharding](https://bazel.build/reference/test-encyclopedia)
-  emphasizes hermetic resources and explicit shard support. Correctness and
-  speed work need explicit suite ownership, with every deferred budget retained.
-
-## Queue GPU gates early, keep working (section 5 supplement)
-
-Push gates default to a 60-minute admission wait, including direct `acquire()`
-and `run`. Correctness uses a shared slot. To reserve a place without blocking
-the agent's CPU work, submit the actual bounded command early:
-
-```powershell
-node scripts/gpu-lock.mjs enqueue --owner=lane-G --wait-max=60 --max=20 -- node scripts/run-readme-examples.mjs
-# Copy the ticket field from the JSON result. Continue independent CPU work.
-node scripts/gpu-lock.mjs wait <ticket>
-```
-
-The detached owner queues and runs the command when a slot becomes available;
-`wait` observes its result and prints its log. The command retains the submitter's
-working directory, and logs stay in that worktree's `test-results/gpu-queue/`.
-Waiting as an observer never surrenders a ticket. Its optional wait limit can
-expire while the queued command continues; the same ticket can be observed
-again. A default observer bound covers the command's admission wait plus hold
-limit and one minute of shutdown allowance. The command itself retains its
-independent hard limit and process-tree termination.
-
-Section 5 evidence, queue observer exit ordering (2026-11-10): `wait` samples
-owner liveness before reading the current immutable status revision. A running
-snapshot taken before an owner publishes completion and exits cannot establish
-`ERR_GPU_QUEUE_OWNER_GONE`. The ordered observation retains terminal command
-output and exit status, still drains the owner, and still rejects an owner that
-exits without publishing completion. `tests/gpu-queue-publication.test.js`
-forces all three outcomes without sleeps or retries; its passed and failed
-cases fail on the former reader. These CPU tests are included in verify and
-therefore check:merge. The existing detached-failure test now includes stderr
-in its output assertion diagnostic. The lane-S failure retained 17 command-log
-bytes but did not retain wait stderr, so its exact exception is unavailable;
-the deterministic regression proves the stale-status defect on current main.
-Standalone current-main runs passed both normally and with verify's recorder.
-No lock policy, deadline, assertion tolerance or engine package changes.
-See [the research comparison](../clean-room.md#gpu-queue-observer-exit-ordering-2026-11-10).
-
-Detached owner stdout and stderr persist in `<command log>.owner.log`, separately
-from the command log. An owner exiting before admission reports
-`ERR_GPU_QUEUE_OWNER_EXIT`, its exit/signal, log path and original stderr; only an
-owner still running after the unchanged 30-second startup deadline is a startup
-timeout. Initial ticket-read errors retain their original exception rather than
-attempting to replace an unreadable ticket. Lane-C's 707.6 ms failure was on
-7289abf3b, before the immutable publication repair b7af6646a: a Windows observer
-could pin the status name and make replacement fail with EPERM. That root repair
-and the retained bootstrap diagnostics are CPU-only regressions in
-`tests/gpu-queue-publication.test.js`. The failed queue step passes with verify's
-read recorder enabled; no second full verify or GPU run is needed for this repair.
-Research: Microsoft, [Creating a Child Process with Redirected Input and Output](https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output)
-(2025 documentation), informs persistent inherited output handles. Gray and
-Cheriton, [Leases: An Efficient Fault-Tolerant Mechanism for Distributed File Cache Consistency](https://www.cs.cmu.edu/afs/cs.cmu.edu/academic/class/15712-s12/www/papers/gray89.pdf)
-(1989), separates lease expiry from owner failure; our startup deadline does not
-stand in for a child exit. No external implementation source was used.
-
-Queue status is published as immutable numbered JSON revisions beside the initial
-ticket record. An observer reads the newest published revision; old single-file
-records still read as revision zero. A Windows reader can pin a published name,
-so replacing that name with `rename` is unsafe: under verify's read recorder,
-the fast failing-command test reproduced `EPERM` at replacement, and a second
-failed replacement could end the owner before acknowledgement. New revisions
-are renamed only to unused names, leaving every reader's previous record valid.
-`tests/gpu-queue-publication.test.js` deterministically pins all published names
-and fails on the former writer. The real detached-failure regression remains.
-An owner that exits without publishing admission reports `ERR_GPU_QUEUE_OWNER_EXIT`,
-including exit/signal details, separately from the unchanged 30-second deadline.
-Research: Microsoft, [MoveFileExW function](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw)
-and [CreateFileW function, sharing modes](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
-(2026 documentation); immutable version publication avoids the sharing conflict
-rather than retrying or hiding a refused replacement. Only status metadata
-changes; shared/exclusive holder and FIFO lock entry formats stay unchanged.
-
-Job 6 admission applies to `run` and `enqueue` before any ticket or holder is
-created: CPU aggregators (verify, lint, hygiene, unit tests, builds, tsc and
-shell wrappers) fail with `ERR_GPU_COMMAND_NOT_GPU`. GPU npm leaves
-`test:gpu`, `test:browser`, `test:xr`, `check:readme-run`, and named GPU/browser/
-pixel/capture/render/XR scripts are recognized, and so is any node script that
-opens a browser: it imports `playwright`, `scripts/browser.js`,
-`scripts/lib/browser.mjs` or `scripts/support/browser-host.mjs`, itself or
-through its own relative imports up to three files deep
-(`opensBrowser` in `scripts/support/gpu-command.mjs`, KB-GL1, 2026-11-11:
-browser checks such as `csp-check.mjs` were refused and ran outside the slot cap;
-`tests/gpu-command.test.js` runs three such scripts on two slots and checks the
-third waits). An unclassified GPU leaf needs
-`--gpu=<reason>`, recorded in `gpu-lock-reasons.log`; that flag cannot override
-a known CPU command. Imported GPU suites keep calling `acquire` themselves.
-
-New holders and tickets record their canonical worktree and owner lane prefix.
-At most one slot is held for either identity. Requests from an occupied lane
-queue while unrelated eligible lanes fill the other two slots. FIFO applies
-among eligible requests and within a lane; a blocked same-lane ticket does not
-block unrelated work. Legacy entries still participate using their owner
-prefix when present; an old client with no worktree metadata cannot enforce the
-new rule itself. Nested acquisition in the same held lock remains a no-op.
-
-A holder entry is stale only when its pid is gone, its heartbeat (the entry
-file's mtime) is older than the lease, or it is past its hold limit. Holders
-release without the scheduler mutex, so a waiter can read an entry and then
-find the file gone: that entry counts as released, is not logged and nothing
-is removed. Any other failure to read the mtime leaves the pid check alone to
-decide, so a live, beating holder is never removed on a transient Windows
-stat error (`tests/gpu-lock-stale.test.js`; before 2026-11-10 a failed stat
-read as a beat at time 0).
-
-An independent heartbeat samples the complete Windows WDDM GPU Engine raw
-counter set and Win32_Process identities every 30 seconds, outside the mutex.
-RunningTime and Timestamp_Sys100NS remain uint64 strings and are compared with
-BigInt over the holder's process tree, retaining known descendants after an
-intermediate exits. The provider has a 45-second hard limit and a 5-second
-tree-kill bound. Missing providers, errors, empty/incomplete samples, counter
-resets, PID reuse and gaps beyond 90 seconds reset the idle window to unknown.
-By default, three minutes of stable complete samples with no increasing GPU counter trigger
-an identity-confirming second observation, process-tree termination and an
-`ERR_GPU_IDLE_RECLAIM` record in `gpu-lock-idle.log`. Only that lease token is
-released after successful termination. Birth times use CIM's microsecond
-representation, including the native termination check; handles stay open during
-taskkill and the bounded exit wait so PIDs cannot be reused during termination.
-CPU shader compilation can leave those GPU counters unchanged. A command may set
-`MARGO_GPU_IDLE_MIN` from its measured runtime plus margin; acquisition validates
-and records that window for the independent heartbeat, capped by the existing
-hard hold limit. Both the wrapper and heartbeat still enforce `--max`. For Bug 45,
-the earlier full D3D11 render took 143.698 s, but a later CPU-active run lost its
-readback to idle reclamation after 194.050 s. Use an eight-minute hold and a
-four-minute idle window for the instrumented full parity leaf, with its existing
-eight-minute test limit unchanged. The first-hit diagnostic completed in 73.376 s
-with 448 exact albedo, normal and depth words; that is not full transport proof.
-`tests/gpu-idle-window.test.js` simulates the old reclaim interval and checks
-eventual reclaim, unchanged defaults, invalid values and the hard-limit cap;
-`tests/gpu-lock.test.js` checks the actual published lease. This implements the
-distinction between pipeline-creation work and queue execution described by the
-W3C GPU for the Web Working Group, [WebGPU](https://www.w3.org/TR/webgpu/#dom-gpudevice-createcomputepipelineasync)
-(2026). It does not change Windows' watchdog or any correctness deadline.
-On Windows the heartbeat is started through a starter process that exits at once,
-so `taskkill /T` on the holder cannot reach it, and it ends an overrunning holder
-only after the starter has gone. Since 2026-11-11 (KB-FL1) it learns that from the
-end of a stdin pipe the starter alone writes, not from the starter's pid: Windows
-reuses pids within seconds when many processes start, and a stranger at that pid
-held the kill back for a minute (`tests/gpu-lock-limits.test.js`). Root tests of the
-lock import `tests/support/gpu-lock-env.js` first, so the lane's own `MARGO_GPU_`
-settings never reach them and a fixture without a lock of its own never touches
-the real one (`tests/gpu-lock-env.test.js`).
-The heartbeat knows its holder the same way (KB-FL4): the holder gives it a pipe
-it alone writes, as the heartbeat's fd 3 (the Windows starter passes it on). The
-pipe's end is the holder's exit, so a dead holder's entry is dropped at once and
-nothing is killed, even when a new process has taken the holder's pid; before,
-the heartbeat kept such an entry fresh to the hold limit and then ran
-`taskkill /T` on that stranger (`tests/gpu-lock-limits.test.js`).
-The detached heartbeat uses the checkout cwd, and ticket completion waits for
-the owner to close its Windows handles before returning, so a command's temporary
-directory can be removed after completion (30-second owner drain bound).
-Withdrawal removes its ticket and closes wait accounting under the mutex, with
-a separate 30-second cleanup bound. An incomplete first append is unpublished;
-the next writer discards only the unfinished tail under the mutex before appending.
-failed confirmation telemetry is observed/published as unknown and resets idle.
-
-`status` reports holder lane, command, heldMinutes, and GPU busy/idle/unknown,
-plus slotsUsed/slots (default 3). Activity logs are append-only sidecars and do
-not rewrite a released holder. `usage.freeSlotWaitMs` is elapsed time with at
-least one free slot while requests wait; `freeSlotWaitSlotMs` sums free slots
-over that time. Both integrate scheduler-observed transitions, including
-same-lane ineligibility, rather than continuous GPU occupancy or legacy events.
-A 3/3 count means admitted leases, not hardware saturation. Sampled counters
-can miss GPU children born and exited between snapshots; this is not continuous
-tracing. Other platforms report unknown and retain the existing hold timeout.
-
-Evidence: CPU fake-lock tests in `tests/gpu-admission.test.js` and
-`tests/gpu-activity.test.js` and `tests/gpu-monitor-edges.test.js`, plus existing mixed-client, queue, timeout and
-nested regressions. The native Windows terminator test uses owned CPU sleepers,
-including a deliberately mismatched birth identity. No benchmark or second
-GPU-heavy proof run was started. Research compared Mellor-Crummey and Scott's
-reader/writer fairness with Mahajan et al., [Themis: Fair and Efficient GPU Cluster Scheduling](https://arxiv.org/abs/1907.01484)
-(2019), and Yu and Chowdhury, [Salus: Fine-Grained GPU Sharing Primitives for Deep Learning Applications](https://arxiv.org/abs/1902.04610)
-(2019): eligible CI lanes use shared capacity; their ML allocation algorithms
-are not imported. Telemetry follows Steve Pronovost, posted by Bryan Langley,
-[GPUs in the Task Manager](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/)
-(2017), and Microsoft, [Collecting Performance Data](https://learn.microsoft.com/en-us/windows/win32/perfctrs/collecting-performance-data)
-(2021). NVIDIA, [nvidia-smi documentation](https://docs.nvidia.com/deploy/nvidia-smi/index.html)
-(2026), limits pmon to Linux; unsupported Windows metrics are never zero.
-Microsoft, [PROCESS_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-process_information)
-(2024) and [CIM_DATETIME](https://learn.microsoft.com/en-us/windows/win32/wmisdk/cim-datetime)
-(2021), specify process-object lifetime and six-digit fractional timestamps.
-No companion code or other repository source was read.
-
-All new shared and exclusive requests keep FIFO tickets in the existing
-`gpu.lock-waiting/` format. Shared admission requires a free slot and the head
-eligible ticket; it does not wait for other shared holders to finish. Old reader/writer
-clients conservatively treat these tickets as exclusive waiters, preserving
-exclusion but not providing FIFO guarantees for old clients. Old one-holder
-clients also retain their own ordering. Worktrees must rebase to get the new
-admission policy. Never remove another owner's entry to advance a queue.
-
-CPU-only proof: `tests/gpu-queue.test.js` fills three fake slots, queues two
-detached commands, times out an observer, then checks exact FIFO admission ahead
-of a later ordinary request while two original holders stay live. Completed
-results and logs survive the submitting process, and malformed tickets are
-rejected before filesystem access. Existing mutex/legacy/limit tests remain
-required; this adds no GPU performance claim.
-
-## Purpose and authority
-
-### GPU exclusive request policy
-
-`scripts/gpu-lock.mjs` refuses correctness requests for exclusive GPU access,
-including `MARGO_GPU_EXCLUSIVE` requests. Existing benchmark classification
-(`bench*` npm scripts and benchmark paths) authorizes measurement; other speed
-commands must give `--timing=<reason>` (API `timing`), logged in
-`test-results/gpu-lock-timing.log`. Refusals append structured coded records to
-`test-results/gpu-lock-refusals.log` before any lock wait or nested admission.
-Exclusive holds default to and cannot exceed 20 minutes; oversize requests fail
-with `ERR_GPU_EXCLUSIVE_LIMIT`. Other explicitly named locks retain their
-30-minute default. Correctness requests use the three shared GPU slots (the default of `slots()`; it was five from 2026-11-10 until six NVIDIA driver resets, nvlddmkm event 153, between 00:09 and 09:23 on 2026-11-11 put it back to three, as AGENTS.md requires; MARGO_GPU_SLOTS still overrides).
-
-Cap evidence is existing run history, not a new loaded-machine measurement:
-the three JSON records under `benchmarks/records/` took 88.4, 113.3 and 184.4
-seconds total. The valid official compute/viz run took 184.4 seconds, with
-74.3/74.9-second suites. Twenty minutes leaves more than six times that longest
-recorded total while bounding interference. This sample does not establish a
-limit for every future benchmark; longer matrices must select bounded suites
-and release between them rather than increase the exclusive hold. The previous
-130-minute benchmark wrapper is capped too. No performance number is newly
-published. `tests/gpu-lock-policy.test.js` proves refusal, recorded reasons,
-benchmark admission and the cap on isolated CPU-only lock folders.
-
-The biome prefetch correctness proof now uses shared access with a 60-minute
-wait. Mixed biome timing suites, the visual frame budget and dynamically
-scheduled GPU timing steps identify their measurement reasons explicitly;
-their correctness/speed split and build-phase deferral remain separate work.
+## Sciviz fallback foundation (section 5 supplement)
 
 Sciviz fallback foundation (2026-11-10, section 5 evidence supplement): the optional `/fallback` entry owns one
 lazy Rust/Wasm marching-cubes module. It receives the existing clean-room derived case table; core and stage
@@ -1336,6 +1900,8 @@ oracle, row tails, chunk boundaries, cancellation and the real head MRI. A local
 used the same 1,403,223 MRI cells and identical full vertex hashes, establishing a classification gain under load;
 no public speed ratio or end-to-end rendering claim follows. The 21,851-byte Wasm has a 24,000-byte test ceiling.
 Direct WebGL2 Figure integration and native/compatibility/preview pixel comparisons are still missing.
+
+## Purpose and authority
 
 This document preserves the engine-specific technical design, validation model, measured limits, and known gaps that
 were previously mixed with repository coordination instructions. It does not define task assignment, branches,
@@ -1470,7 +2036,8 @@ A tick proceeds as follows:
 8. Set initial visibility from local and inherited hidden state, then optionally cull.
 
 Parent composition uses the parent's scratch matrix, which always contains its last computed value. Local TRS is
-validated for finite values, nonzero scale, and nonzero quaternion. Quaternion normalization and affine composition
+validated for finite values and a nonzero quaternion; a zero scale is valid (glTF 2.0 section 3.5.3, KB-GLTFA B1)
+and gives a zero matrix column, with shaders turning normals by the cofactor matrix and guarding a zero result. Quaternion normalization and affine composition
 accumulate in f64 and publish f32. The final matrix and transformed sphere must be finite.
 
 World-sphere centers are transformed normally. Radius uses `r * sqrt(norm1 * normInfinity)` of the world matrix's
@@ -1776,11 +2343,13 @@ Backend evidence and its remaining scope are recorded in section 5.
 
 ## 3. Rendering backends and hardware tiers
 
-`@margoengine/vfx/shadows` and `@margoengine/vfx/nodes` run on WebGPU and on the WebGL2 compatibility layer from the same shaders. WebGL2 has no compute stage; the particle simulation uses the existing GPU point-draw route in `vfx/src/compat.ts`, and the shadow depth pass is a fragment shader. Disposal removes the point lights that effect published into its clustered list, and a dispose or device restore during the light read-back settles the cancelled map.
+`@margoengine/vfx` wind (2026-11-17): each particle's horizontal velocity relaxes toward the wind by the exact step of dv/dt = (u - v) / tau, v += (u - v)(1 - exp(-dt / tau)) with tau 0.25 s (Stokes drag on a parcel that moves with the air; Crowe et al., Multiphase Flows with Droplets and Particles, CRC 2011), stable at any frame time. The wind is two half floats in control.w of the 224-byte frame block (0 means no wind), so a steady frame still uploads 224 bytes. Smoke rising at w in a wind U then leans atan(U / w); `packages/vfx/test/features-check.mjs` (checkWind) measures it within 0.07 degrees at U 0.5 to 20 m/s on WebGPU and, with the same numbers, on the WebGL2 route (`shadows-nodes-webgl2.mjs`).
+
+`@margoengine/vfx/shadows` and `@margoengine/vfx/nodes` run on WebGPU and on the WebGL2 compatibility layer from the same shaders. WebGL2 has no compute stage; the particle simulation uses the existing GPU point-draw route in `vfx/src/compat.ts`, and the shadow depth pass is a fragment shader. Every route kernel must plan as a point draw: an invocation never reads back a buffer it stored to (a point draw reads its inputs as they were before the draw). So over-life reads its stored life into locals first (KB-VFX-EMBERCPU1), and `events` keeps a raised event in private memory and stores it once `update` returns, with the slot's generation in a local (KB-VFX-EVENTS-CPU, 2026-11-18; evidence: `packages/vfx/test/route-loading.test.js` counts 0 CPU-tier dispatches a frame for death and collision events, 1 before). Disposal removes the point lights that effect published into its clustered list, and a dispose or device restore during the light read-back settles the cancelled map.
 
 **Area light integrals (2026-11-05).** `@margoengine/clustered/area` returns early from a quad with nothing to clip; the clip's own result, by the same operations. Evidence: `packages/clustered/test/ltc-edge.test.js` (bit for bit in float32) and `examples/package-benchmarks/area-lights-gpu.mjs` as the package's `test:gpu:area` (11 frames byte-equal, RTX A6000 only).
 
-gltf-pro trims each pipeline to the vertex inputs its finished shader reads (`packages/gltf-pro/src/vertex-inputs.ts`), after
+gltf/pbr trims each pipeline to the vertex inputs its finished shader reads (`packages/gltf/src/vertex-inputs.ts`), after
 every shader patch. Evidence: `packages/materials/test/vertex-inputs-browser.mjs` (no pixel differs, RTX A6000 only).
 
 A frame is one colour render pass when only a package draws. The main pass with nothing to draw leaves its clear to a next
@@ -1795,10 +2364,10 @@ guard. `@margoengine/worker` gives the canvas `clientWidth` and `clientHeight` a
 (WebGPU and the WebGL2 fallback in a real worker), RTX A6000 on Chromium only.
 
 **Per-device sharing (2026-11-05).** Three caches hold GPU objects by count and free them with their last holder: `Environment`'s BRDF LUT
-per device, size and sample count (a failed create drops its count, and nothing joins that LUT again); gltf-pro's textures per
+per device, size and sample count (a failed create drops its count, and nothing joins that LUT again); gltf/pbr's textures per
 device, image and format (100 `cloneModel` copies of `p-morph` hold 7 textures, not 700); `@margoengine/shader/raw` buffers per
 set of equal bytes, with copy on write. Evidence: `packages/environment/tests/brdf-share.test.js`,
-`packages/gltf-pro/tests/model-runs.test.js`, `packages/shader/test/raw.test.js`, and the two browser checks they pair with, RTX
+`packages/gltf/test/model-runs.test.js`, `packages/shader/test/raw.test.js`, and the two browser checks they pair with, RTX
 A6000 only.
 
 **Textured meshes on the light path (2026-11-06).** `@margoengine/gltf/textured` keeps a mesh a core mesh, claims its batch and draws it
@@ -1810,6 +2379,18 @@ the code unchanged for every other material. `@margoengine/shader/lighting` read
 lights, the ambient light and the environment as the attached effects worked them out. Rectangle and disc area lights are not
 covered. Evidence: `packages/shader/test/lighting.test.js` and `packages/shader/test/lighting-check.mjs` on a real GPU, a graph
 Lambert equal to the Lambert shading.
+
+**TAA history fetched by the motion alone (2026-11-16, KB-TAA-CLAMP1).** Both of TAA's matrices carry the Halton jitter,
+so every velocity holds the jitter difference as well as the motion (`taa.velocity.jitter`, kept as the public contract);
+the resolve now adds that difference back (`Temporal.offset`, 16 B more uniform) and fetches history at the pixel's
+unjittered centre. Before, a still view's history was resampled up to 0.8 px away every frame, blurred, and the
+neighbourhood clamp cut it back only in part: 8 px stripes converged 10.5 sRGB levels above their mean. The min/max box
+itself was ruled out: a 1D model of the resolve with the history fetched in place converges on the mean with the clamp
+on. TAAUpscale already reprojected with unjittered matrices. Evidence: `packages/taa/test/converge-browser.mjs`
+(per-frame resolve within 1 level of the settled mean, every rejection mode, RTX A6000) and
+`packages/taa/test/converge.test.js`.
+
+**TAA settles a still view (2026-11-16, KB-TAA-STILL1).** With the camera still, a jittered resolve blends one of 8 sample positions a frame into a history clamped to that sample's neighbourhood, so thin wires and highlights changed by up to 189 sRGB levels forever (0.23% to 0.36% of pixels on the Orrery, 2.4% on the bare-TAA fixture). A colour range learned from the jitter cannot tell that from a moving object, but the Halton sequence repeats every 8 frames, so the render pixel's sample in phase k must equal its sample in phase k one cycle ago bit for bit unless the scene changed (the temporal gradient of Schied et al., HPG 2018, with the repeating jitter as the re-shaded sample). A compute pass at render size hashes each sample (pcg4d, Jarzynski and Olano 2020) into 8-bit slots (3 phases a 32-bit word, the count of matching frames in the fourth byte) and copies the word into the phase's layer. A pixel whose 3x3 render footprint has matched for a whole cycle takes the equal-weight running mean of the next cycle's samples (Yang et al. 2009), shows it and keeps it; a mismatch, a camera move, a reset or a reactive pixel hands it back to the clamped history in the same frame. Cost: four textures (slots, word and two means), a 16-byte uniform written every frame, one compute pass and one copy; the resolve gains a second bind group and its uniform 208 to 224 B. The detect hash is 8 bits, so a change is missed only if every pixel of its footprint collides (1 in 256 each). Evidence: `packages/taa/test/still-browser.mjs` (0% of pixels change, largest difference 0), `settle-reactive-browser.mjs` (trail -1.33 against a bound of 3), `converge-browser.mjs`, `rejection-browser.mjs` (settled line 123 every frame, stripes 0 and 0), `packages/taa/test/settle.test.js`; every taa GPU test passes with settle on (13 of 13 native, 5 of 5 on the WebGL2 layer); no visual baseline compares a TAA view. The `--current` call proof `taa-velocity` advanced to `f3ed2ccc73` (docs/whitepaper/claims.md).
 
 **Motion vectors without the resolve (2026-11-05).** TAA's `velocityOnly` leaves out jitter, capture, history and resolve, so `MotionBlur`
 no longer pays for them, and the blur runs inside the `PostStack`. It reads the depth and scene target another plugin made, so a
@@ -1846,6 +2427,15 @@ canvas dimensions, disables resizing, and forces one sample.
 **Device destroy (2026-11-06).** A frame on the page is an ImageBitmap of the device's own WebGL2 context, so `destroy()` copies it
 into a 2D context of the page before it loses the context. Chrome 157 on macOS crashed the tab otherwise. Evidence:
 `packages/webgl2-compat/test/destroy-frame-browser.mjs` in `test:gpu`, run on the Apple M6 in Chrome and WebKit and on the RTX A6000 in Edge.
+
+**No garbage per frame on the layer (2026-11-18, KB-COMPAT-FRAMEALLOC1).** The layer's steady frame allocates no more
+JavaScript heap than native WebGPU: its replay of draws, passes, queue writes, copies and compute dispatches allocates
+nothing (commands are a pooled tape, `src/device/tape.ts`), and the objects WebGPU returns per call are a browser
+wrapper's size or near it (labels default on the prototype, the device is reached through `TapePool.device`, a view
+made with no descriptor shares its texture's `ViewRange`). Evidence: `MARGO_COMPAT=1 npm run test:frame-alloc:browser`
+holds the layer to the native floors (median frames basic 252, instanced 228, shadowed 800, post 1,464, dynamic 264 B
+against 340, 292, 860, 1,528 and 396; Edge 156, RTX A6000), and `packages/webgl2-compat/test/replay-alloc.test.js`
+counts bytes per call on Node. Missing: the same browser check on other GPUs and browsers.
 
 **Native compatibility level (2026-11-05).** `allowCompatibilityAdapters` in `@margoengine/webgl2-compat/adapter` adds a
 rung between native WebGPU and the layers: `navigator.gpu.requestAdapter` retries with `featureLevel: 'compatibility'`
@@ -1925,7 +2515,8 @@ clipmap levels is 6 GL draws and 48 GL calls (Radeon 680M, ANGLE on Direct3D 11,
 layer, other GPUs and back ends, and the terrain entries with compute passes (`sculpt`, `deform`, `displace`).
 
 `install()` returns without changes when real WebGPU has an adapter, unless forced. Otherwise it probes WebGL2,
-requires highp fragment floats/ints and `EXT_color_buffer_float`, defines a `CompatGPU` at `navigator.gpu`, patches
+requires highp fragment floats/ints (a HIGH_INT report short of the GLSL ES 3.00 32 bits, as Firefox on macOS gives,
+is measured by a one-pixel 32-bit integer draw read back exact) and `EXT_color_buffer_float`, defines a `CompatGPU` at `navigator.gpu`, patches
 only `getContext('webgpu')`, and installs missing WebGPU flag constants. `uninstall()` reverses those changes. Lower
 half-float and LDR capability tiers are detected but not accepted because the engine depends on HDR and float-data
 targets.
@@ -2043,10 +2634,33 @@ against 8,483 passes with every iteration recorded, the same values; 345 of 18,4
 25.5 s, bug 45); `tests/compat-staged.test.js`, `packages/webgl2-compat/test/passes.test.js` and
 `packages/webgl2-compat/test/gl-objects.test.js` on the CPU; the C2 tracer rows on the
 default Direct3D 11 backend; the whole `MARGO_COMPAT=1 test:gpu` check on Direct3D 11 (25 cases, 757 s of case time,
-2026-11-11). No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
+2026-11-11). Missing (KB-L5a-10, docs/known-bugs.md): `MARGO_COMPAT=1` `test:gpu:denoise`, `:denoise-materials`,
+`:denoise-caustics`, the resampled lifecycle case and the steps whose first render waits for cold compiles (`:media`,
+`:sky`, `:mesh-lights`, `:mesh-pbr`, `:mesh-pbr-lobes`, `:mesh-attributes`, `:denoise-ml`, `:stall`, `:guiding`, and
+`:mesh-instances` under load) do not finish inside their limits on Direct3D 11, on main as on the L5a stack (paired
+runs, 2026-11-15, each step listed in the entry): a 480 x 300, 16384-sample reference takes about 555 s there against 14 s on WebGPU. Since 2026-11-16 (fewer passes a sample, the same values) `:media`, `:sky`, `:guiding`,
+`:mesh-attributes`, `:denoise-ml`, `:mesh-instances` and the resampled lifecycle case pass there (21 of the 29
+scripts), and the reference takes about 449 s; the denoise steps, `:stall`, `:mesh-lights`, `:mesh-pbr` and
+`:mesh-pbr-lobes` still did not. Since 2026-11-18 (KB-VPT-LOBES-COMPAT) an async render pipeline with more than one
+colour target on ANGLE Direct3D resolves only after one rasterizer-discard draw into its own targets: that back end
+compiles the pixel shader at link for the first output only and again at the first MRT draw, on the GPU thread, which
+had put 206 s of compiles inside the first 8 x 8 image of the staged tracer. `:mesh-pbr-lobes` now passes there in
+3 min 53 s (420 s limit); `:mesh-pbr` (376 s) and `:mesh-lights` (383 s) pass their checks but still run past their
+300 s step limits on the cold compiles themselves. No layer-compiled kernel may hold a loop with a constant bound around a traversal: fxc unrolls it, and the
 `coverage` kernel's 64-ray loop around `closest()` never finished its first compile in 22 minutes (89.4 s for the whole
 `transparent` case with the bound read from the frame uniform, the same image hashes); `tests/compat-staged.test.js`
-checks every layer-compiled kernel for it. Tracers watch `device.lost` once per device, so a disposed tracer is
+checks every layer-compiled kernel for it, and since KB-L5a-3 every staged program too, and that no staged program
+reaches more than one traversal call: the resampled tracer's proposal loop held `closest()` (directional proposals) and
+`shadow()` in its `sample` program, which ANGLE Direct3D 11 linked in 254 s and compiled again for 356 s at its first
+draw, so an idle rule ended each `MARGO_COMPAT=1` run of `test:gpu:resampled`. Each proposal is now a pass of light
+kind 1 (`const KIND_REPEAT=vec2u(1u,P)` in the kernel; `StagedTrace.steps` repeats kind 1's `sample`, `shadow` and
+`gather` draws P times; the reservoir is private state carried in the path pages): 49 s link and 127 s at first draw
+for all nine programs, the same image bit for bit on WebGPU (10 scenes, 2 to 64 proposals) and on ANGLE Vulkan but 78
+of 768 values 1 unit in the last place apart for 2 proposals (the driver's own contraction). ANGLE Direct3D 11 compiles
+every program with two or more colour outputs twice: at link for one active draw buffer, and again at the first draw
+for the real ones (probe, 1,500-step program: 3.0 s link and 3.1 to 4.4 s first draw with 2, 4 or 8 outputs, uint or
+float; 1 output or only draw buffer 0 active, no second compile). Binding the target framebuffer before
+`linkProgram` does not change it. The staged programs write 7 targets, so each costs both compiles. Tracers watch `device.lost` once per device, so a disposed tracer is
 collected while its device lives. Speed: a paired A/B of the old and new route builds in one page (per-round minimums,
 the same image hash every round) measured a 320 x 240, 4-sample viewport batch 123 to 135 ms against 894 to 979 ms
 on ANGLE Vulkan and a 1500 x 1100, 64-sample capture 43.0 s against 299.8 s (busy machine, `docs/limits.md`). Sources:
@@ -2091,10 +2705,10 @@ strictly behind the farthest occluder depth in its footprint, so the image is co
 frustum and screen size. Evidence: `packages/culling/test/gpu/meshes-occlusion-check.mjs`, 0 differing pixels against
 core through camera and occluder changes, 9 of 1,509 instances drawn behind a wall, RTX A6000.
 
-`CulledModels` (`@margoengine/culling/models`) runs the same cull on `PBRInstances` rows, world = node matrix x row. gltf-pro
+`CulledModels` (`@margoengine/culling/models`) runs the same cull on `PBRInstances` rows, world = node matrix x row. gltf/pbr
 reads `primitive.redirect` as core reads `Batch.redirect`, so its colour and depth replays draw the kept rows; casters and
 picking keep every row. Evidence: `packages/culling/test/gpu/models-cull-check.mjs`, 0 differing pixels with and without
-shadows, RTX A6000. A primitive without instances gets one 20-byte indirect record from one dispatch and gltf-pro draws it
+shadows, RTX A6000. A primitive without instances gets one 20-byte indirect record from one dispatch and gltf/pbr draws it
 through `primitive.culled`, so a culled one still costs its draw call on the CPU (WebGPU has no multi-draw). With
 `occlusion` both tests also read the shared pyramid, built each frame from `addOccluder` surfaces drawn with this frame's
 camera, as for `CulledInstances`. Evidence: `packages/culling/test/gpu/models-plain-check.mjs`, 0 differing pixels on the
@@ -2245,7 +2859,7 @@ curve's shoulder: until then only full shadow was measured, and partial values o
 `packages/shadows/test/outside/check.mjs`, a real image as `lightPattern` against a real sheet of it across the sun in Cycles,
 overlap 0.996, mean difference 0.0074, 0.71 and 0.26 for the same mask shifted; `packages/shadows/test/light-function-browser.mjs`,
 ground and the sky's own render along the sun ray agree on all 256 points, before and after 2,400 m of drift, against 0.64 for
-the old ground and the new sky, and core meshes, materials, gltf-pro, terrain and voxels go dark under a black pattern in both
+the old ground and the new sky, and core meshes, materials, gltf/pbr, terrain and voxels go dark under a black pattern in both
 classes. Missing: other GPUs; a real cloud photograph over real ground is not the claim, the claim is agreement with the sky.
 
 `VolumetricClouds` (`@margoengine/sky/volumetric-clouds`) ray marches a layer between two shells around the planet in one
@@ -2281,7 +2895,7 @@ held at 65,504 so an rgba16float capture never takes an infinity. The multiple s
 what leaves each direction (final throughput plus what the medium absorbs, an exact telescoping of the step
 integrals) rather than 1 minus a sum, and keeps both that sum and L2 as v x exp(-e), e an optical depth, added
 log-sum-exp style (Blanchard, Higham and Higham 2021; Milakov and Gimelshein 2018), so a nearly closed medium whose
-throughput leaves f32's range still gives the exact ratio (KB3454). Evidence: `features-check.mjs` hillaire on a Radeon 680M
+throughput leaves f32's range still gives the exact ratio (KB3454). Texel (i, j) of the multiple scattering table is built at sun cosine i / 31 x 2 - 1 and height j / 31 of the air, the grid its lookup reads with 0.5/32 + u x 31/32, so the ground row is the ground and the last column a sun overhead; on that row a direction below the horizon meets the ground at distance 0. Both tables' marches take the far root to the top sphere (`distanceToTop`), never `sphereHit` from a point on it, whose |o| can round above the radius. Evidence: `features-check.mjs` hillaire reads five multiple scattering texels back against a CPU build at the same (r, mu) with a 400-step transmittance march (within 0.2%) and five transmittance texels against a 4,000-step march (within 0.003), on Apple M-series Metal WebGPU and MARGO_COMPAT=1. Evidence: `features-check.mjs` hillaire on a Radeon 680M
 at 4x and 1x: blue noon, orange sunset, ozone's bluer twilight zenith, the ground, limb and black space from 1,000 km, and
 the table and the march within 0.05% on one ray across the top; the CPU sun transmittance against the closed-form vertical
 optical depth to 1e-4; a nearly closed conservative atmosphere (2 /km extinction under a 100,000 km scale height,
@@ -2295,6 +2909,61 @@ the air between, for directions that end on the ground. At 0 the sky runs the pa
 the recorded traces stand; a change of albedo rebuilds the scattering once, not the transmittance. Evidence:
 `features-check.mjs` albedo on a Radeon 680M at 4x and 1x (snow +113% at the horizon, sand +49%, albedo 0 bit for
 bit). Missing: other GPUs, a reference sky, timing.
+
+The `look` and `atmosphere` options of `Sky` (`@margoengine/sky/look`, 2026-11-16) are compiled only while one is
+set: `extendSky` rewrites the composed WGSL (the `Frame` struct gains a 72-float block at byte 256; Rayleigh becomes
+`betaR()`, Mie a per-channel scattering with grey extinction, the Cornette-Shanks asymmetry is read from the uniform,
+and an ozone tent 25 km up and 15 km wide absorbs, Hillaire 2020 Table 1), and the day and night skies are wrapped in
+the look (luma-preserving tints, an up to eight-stop gradient, a horizon glow, the sun disc and the cloud sheet). The
+transmittance and Bruneton passes compile through the same rewrite and refill when the air changes; the CPU
+`sunlight()` takes the same air, ozone included, so the engine light matches the drawn sun. A sky without the options
+keeps its 256-byte uniform and its programs: `test/defaults-unchanged.test.js` pins the SHA-256 of every shader and
+upload of 17 configurations to figures recorded before the change, and the recorded traces stand. Evidence:
+`features-check.mjs look` on an RTX A6000, native and `MARGO_COMPAT=1`, 4x and 1x: `look: {}` with `atmosphere: {}`
+and the cleared sky differ from the plain one by 0 under both models; a green `rayleighColor` turns the Bruneton high
+sky from (0.077, 0.168, 0.341) to (0.127, 0.341, 0.087); `sunDiscSize` 4 takes the disc from 4 to 32 bright pixels.
+Missing: other GPUs, a reference renderer for the non-Earth air, timing.
+
+`@margoengine/sky/settings` (2026-11-17) is a table of 51 sky, air, cloud, fog, tint, gradient, disc, glow, exposure,
+Tonemap and Grade controls and eleven named looks made only of its values; `applySkySettings` writes them, leaving a
+sky option unset at its default (and removing `look` and `atmosphere` when all their values are at default), so it
+adds no GPU work of its own. Evidence: `test/settings.test.js` pins a sky with every default written to the recorded
+`default` fingerprint and every `look` and `atmosphere` row default to the 72-float block written with the field
+absent; `features-check.mjs settings` on an RTX A6000, native and `MARGO_COMPAT=1`, 4x and 1x, displayed 8-bit frames
+through Tonemap and Grade: the defaults written differ from the plain frame by 0, each of the 51 rows moves at least
+600 pixels by 2 levels or more from a base state, the time rows hold the frame exactly at 0, and all eleven looks draw
+with no GPU error. Missing: other GPUs. Found while judging the stills: the Bruneton table's 8 linear `nu` samples
+put a visible edge on the Mie aureole about 45 degrees from the sun (docs/known-bugs.md, KB-SKY-NU-EDGE1), fixed the
+same day: single scattering is kept without its phase functions, Rayleigh and Mie apart in rows 256 to 767 of the
+table the sky reads (128 x 768, about 0.5 MB more), and the phases are applied per pixel and per direction in the
+first density and ground irradiance passes (Bruneton and Neyret 2008 sec. 4; Elek 2009; Hillaire 2020). The first
+ground irradiance pass has an explicit layout holding the uniform, which the look's Mie `g` reads. The sky's per-pixel
+Mie phase reads `g` from the Frame's free `clouds.w` in both the plain and the look program: a literal `g` folded at
+compile time rounded one half-float step away from the uniform's under the WebGL2 layer. Evidence: the glow
+beside a sun 40 degrees up changes its slope by at most 1.10 levels a degree (5.69 at 44 degrees before), native and
+`MARGO_COMPAT=1`; only the three Bruneton fingerprint configurations draw differently, the others send byte-identical
+render programs and buffer writes. Missing: a comparison against a reference aureole profile.
+
+`@margoengine/weather/settings` (2026-11-17) is the master weather panel: 11 live rows (storm level, wind speed, direction
+and gust, rain rate in mm/h, snow, hail, visibility, fog, cloud, lightning) and nine looks. `applyWeatherSettings` writes
+a `WeatherMachine`; a visibility becomes the fog that leaves it (`fogForVisibility`, the inverse of Koschmieder's law in
+`air.ts`) and a rain rate becomes `rain = (R / 80)^(1/3)`. `WeatherDrive` gained one target, the sea: a `Water` built with
+a `wind` option gets `setWind` with the state's mean wind when it changes. Evidence: `tests/settings.test.js` (ranges and
+errors, defaults equal the clear preset, the visibility asked is the one `visibility()` returns within 1e-6 over 200 to
+20,000 m, the looks' Beaufort forces, and the vane test: with every package at its default the sea, grass, scatter, rain,
+smoke, fire and fog follow one wind slider, directions within 5 degrees of the field's); `tests/settings-check.mjs` on an
+RTX A6000, native and `MARGO_COMPAT=1`: 60 frames of every row, each swept between two values off its default, made no
+pipeline, buffer or texture and no GPU error. Missing: other GPUs, a dust or sand row, the sea's follow of a gust.
+
+`@margoengine/vfx/settings` (2026-11-17) is the table of the particle options an effect reads every frame: 24 live rows
+(rate, spread, emission box, velocity, gravity, turbulence, frequency, bounce, ground, spin, wind, size, lifetime, colour,
+alpha, intensity). `applyVfxSettings` writes an effect's options and leaves one unset at its defaults, so an untouched
+effect is byte for byte what it was; the wind rows are null by default and the weather drive then writes the wind, while
+a number overrides it (`WeatherDrive` skips an effect whose wind it did not write). Evidence: `test/settings.test.js`
+(defaults change nothing, every row writes and clears an option, both ends of every range pass the effect's validation,
+the Fire kit's flames, embers and steam round trip) and `weather/tests/settings.test.js` (the override); `test/settings-check.mjs`
+on an RTX A6000, native and `MARGO_COMPAT=1`: 60 frames of every row made no pipeline, buffer or texture and no GPU error.
+Missing: other GPUs, a frame-exact comparison of the defaults, rows for the feature entries' structured options.
 
 `@margoengine/sky/presets` holds other worlds for the Hillaire model (`EARTH`, `MARS`, `marsAtmosphere`). To colour
 Martian dust the medium now reads Mie scattering and absorption per channel: two vec4s at the end of the `Atmosphere`
@@ -2330,6 +2999,14 @@ each with its own uniform buffer (one uploaded buffer holds one draw's values wi
 hash seed, so the two never share spots. Evidence: `features-check.mjs` sleet on a Radeon 680M at 4x and 1x against
 each kind drawn alone. Missing: other GPUs, timing.
 
+Snow fall speed (KB-SNOW-FALLSPEED1, 2026-11-16): each flake falls at Locatelli and Hobbs's 0.8 D^0.16 m/s for its own
+size, as an integer k of 1/512 m/s. Its fall needs no per-flake state: the uniform's drift.y holds the fall phase,
+seconds over 512 box heights as an exact 24-bit count in a float, and the vertex stage takes flake k's share of the box
+as (k times the count) mod 2^24 in u32, exact for every k and continuous when the count wraps (rain keeps its float
+drift at 9 m/s). The streak takes the same speed. Evidence: sky weather.test.js (law per flake, mean at the kit, streak),
+`features-check.mjs` weather and sleet and the Cabin Hearth browser test on the dev PC, native and compat. Missing:
+other GPUs.
+
 Puddles (`@margoengine/weather/puddles`, 2026-11-07) is a hook into core's mesh shader at frame graph order -1, like
 `ShaderEffect`: it renames the fragment input and works on a copy named `i`, setting its colour, roughness, metalness
 and normal before core lights it, so every later hook (sky ambient, environment lighting, fog) reads the wet surface.
@@ -2343,6 +3020,76 @@ world normal it computes the same way core does, before the clip position. A ver
 replaced has no such line, and the snow there is colour and grain only. One 48-byte uniform at group 0 binding 161.
 Evidence: `browser-check.mjs` snow on a Radeon 680M at 4x and 1x (the plate's edge rises where the camera projects
 it, snow with puddles on one shader). Missing: other GPUs, timing, the slit on split-normal meshes.
+
+Snow drift field (`@margoengine/weather/snow-drift` with `Snow` `field`, 2026-11-17): the drift is CPU JavaScript (a
+deterministic height-field step, no GPU state of its own); `Snow` uploads its ground and depth per sample to an
+rg32float texture at group 0 binding 165 (read with `textureLoad` and blended by hand, as rg32float is not filterable on
+every device) with a 32-byte uniform at binding 164, only when the drift's `version` changes. The vertex lift and the
+fragment cover take the field's depth where the point lies on its ground, else the plain snow; the fragment's tests read
+the world position through a varying of their own interpolated at the centroid (a covered sample, so a point on the
+triangle), since a multisampled edge pixel runs at its centre off the triangle and a surface seen edge on extrapolates
+far (an empty field whitened 246 pixels of a ridge's edge with the centre position; a two-pixel `fwidth` slack hid that
+but counted a surface up to two pixels' worth of metres above the ground as on it, so it was replaced). Evidence:
+`browser-check.mjs snow-drift` on an RTX A6000, native WebGPU and the WebGL2 layer, 4x and 1x (WGSL against JavaScript
+to 1.2e-6, an empty field changes no pixel, the skyline rises by the lee drift and not on the bare crest, a later time
+re-uploads, the cornice mesh draws). Missing: other GPUs, timing, glTF PBR models (the field draws on core meshes only).
+
+Avalanche (`@margoengine/weather/avalanche`, 2026-11-17): CPU JavaScript with no GPU state but the plant maps; a
+depth-averaged Voellmy-fluid solve (Savage and Hutter 1989; Voellmy 1955; Christen et al. 2010) in horizontal grid
+coordinates with first-order Rusanov fluxes, CFL 0.4 substeps, implicit friction, entrainment proportional to speed and
+RAMMS's momentum stopping rule; a powder cloud of thermal parcels (Beghin et al. 1981; Rastello and Hopfinger 2004) whose head is fed at the
+core's front (Sovilla, McElwaine and Louge 2015), and plants that bend along the flow before they break.
+`Snow` draws it through the snow field path (bindings 164 and 165); `AvalancheScatter` uploads an r32float snow
+surface and an r8unorm plants-kept map when the avalanche's `version` changes. Evidence: `tests/avalanche.test.js`
+(Voellmy steady speed to 3 percent, Voellmy-Salm run-out bounds, the cloud's front at or ahead of the core's through
+the track and 200 m past it on the run-out, plants bending before they break, budget to 1e-9, determinism, every
+slider row read)
+and `browser-check.mjs avalanche` on an RTX A6000, native WebGPU and the WebGL2 layer, 4x and 1x (the cover, scar and
+core draw, the plant maps equal the avalanche to the byte, the cloud draws). Missing: other GPUs, timing, a measured
+event to compare a run-out with, glTF PBR models.
+
+Eruption column (`@margoengine/weather/eruption`, 2026-11-17): CPU JavaScript with no GPU state; a steady top-hat
+column (Woods 1988) bent over by the wind (Woodhouse et al. 2013), solved per mass rate by fourth-order Runge-Kutta
+through the ICAO atmosphere and cached; the umbrella's gravity-current spread (Suzuki and Koyaguchi 2009); ash fall per
+grain class (Carey and Sparks 1986; Bonadonna et al. 1998, 2005); hashed plume lightning fired through the sky's
+`Weather.strike`; `drawPlume` into vfx `Clouds`. Evidence: `tests/eruption.test.js` (heights within Mastin et al.'s 2009
+band from 1e4 to 1e9 kg/s, Costa et al.'s 2016 strong plume within 15 percent, the neutral level, collapse, the
+umbrella's t^(2/3), ash mass on the ground to 10 percent, determinism, every slider row read) and `browser-check.mjs
+eruption` on an RTX A6000, native WebGPU and the WebGL2 layer. Missing: other GPUs, timing, a humid atmosphere, a
+dispersal model compared with a mapped deposit.
+
+Lava (`@margoengine/weather/lava`, 2026-11-18): CPU JavaScript with no GPU state of its own; a steepest-descent path
+over the caller's ground (jittered, hollows filled), a Bingham sheet per step (Jeffreys 1925; Hulme 1974) whose core
+cools by FLOWGO's budget (Harris and Rowland 2001: radiation and forced convection from a speed-broken crust and hot
+cracks 120 K below the core, conduction through a basal crust; Crisp and Baloga 1990) and widens at its vent depth as
+it slows, until the Graetz rule u d_e^2 / (kappa x) (Pinkerton and Wilson 1994) or the solidus stops it; after the
+vent stops its core cools as a slab between the air and the lava-ground contact temperature (Carslaw and Jaeger 1959); an implicit finite-difference crust under a
+radiating surface; clots and bombs integrated by fourth-order Runge-Kutta with drag (Mastin 2001), cached per launch;
+glow from Planck's law through the CIE 1931 fits (Wyman et al. 2013). It draws through `GroundChange` (a lava event now
+takes per-point `arrival`, `widths`, `thicknesses` and `glows`, and a Huppert 1982 `pond` a ponded flow fills, its
+volume kept to 1 percent in `packages/terrain/test/ground-change.test.js` and its glow checked on both backends in
+`ground-change.browser.mjs`), per-point `levees` that rise to Hulme's (1974) yield height of the cooling crust, and
+one event per arm of a flow that splits past a divide (Dietterich and Cashman 2014; `branches()`, the flux shared by
+the drops; arms that meet again below an island end there and the other carries both on, `joinDistance`, with the
+end fluxes of the arms not joined summing to the effusion rate, Node test on a diamond island; GPU: the joined channel
+glows wider in `tests/lava-check.html`; arms that come alongside under their levees braid side by side, 1.8 km in the
+Node test and two glowing channels against one joined on both backends), breakouts of a stalled, still-fed front through its levee once it inflates
+`breakoutHeight` (Hon et al. 1994; off by default; the lobe carries the fluid core fed under the crust, 1.2 km in the
+Node test against a 0.7 to 0.8 km lobe on Kilauea in 2015, USGS HVO and Poland et al. 2016, and glows on both backends; a stalled front blocks the tube behind it and the backed-up
+lava bursts the first roof whose weight and beam strength, `roofStrength`, its head beats: 320 m behind the front at 21
+kPa in the Node test, a glowing lobe on both backends), lava tubes that roof gentle stretches and keep the core hot by a
+conduction-only budget (1.3 K/km against Helz et al. 2003 and Keszthelyi 1995's 0.6 to 1 K/km, an open channel 7
+K/km) and feed a cooled front on once roofed (Calvari and Pinkerton 1998; 1 m^3/s down 1 degree runs 35 km against
+7.1 km open, checked glowing past the open stop on both backends) and draw as a crust grown in from the levees over the
+channel (`roofs` on the lava event, dark on both backends in `ground-change.browser.mjs`, with skylights glowing through it until `drains`), instanced spheres and `Clustered` point lights.
+Evidence: `tests/lava.test.js` (2042 K luminance within 1 percent of 600,000 cd/m^2, illuminant A chromaticity within
+0.003, crust within 30 percent of Hon et al. 1994 from 1 to 24 hours and the Stefan case within 6 percent, Jeffreys and
+Hulme exact, the Graetz stop, lengths within 2 times of mapped Mauna Loa 1984, Pu'u 'O'o 1997 and Etna 1998 flows and
+of Calvari and Pinkerton's 1998 Etna law, Q = w d u along the widening channel, the stagnant core's crossing of the crust
+isotherm between the Stefan and Hon et al. bounds, Huppert's pond, U^2 / 2g without drag, vacuum ballistics to 1e-6 and terminal speed with
+drag, determinism, every slider row read) and `browser-check.mjs lava` on an RTX A6000, native WebGPU and the WebGL2
+layer. Missing: other GPUs, timing, flows that branch or widen with the ground, a flow length compared with mapped
+flows.
 
 Hail lighting and splashes (2026-11-07): `Hail` reads `engine.lighting` each frame into its uniform (now 240 bytes) and
 shades each stone in its fragment stage as a ball, its normal built from the place across the streak; splash chips are
@@ -2370,7 +3117,7 @@ grain 0.00023 against 0.0033 for PCSS; `check.mjs`, the real plant under a soft 
 0.0088, PCSS 0.97 and 0.0010. RTX A6000. Missing: other GPUs, and any timing.
 
 A surface lit from behind has to look up its shadow on the side facing the light: `shadowVisibility` offsets along the normal,
-which on a leaf's far side lands behind the leaf. A shader that declares `margoLightSide` (gltf-pro with diffuse transmission)
+which on a leaf's far side lands behind the leaf. A shader that declares `margoLightSide` (gltf/pbr with diffuse transmission)
 gets that normal through the `direct` hook's second argument, and every other shader's text is unchanged. `transmission`
 moves what `transmits` to the tint map, and its effect's `tint` expression scales the light by the disc form factor over the
 gap to the caster, read from the tint depth. Evidence: `packages/shadows/test/transmission-browser.mjs`, from under the real
@@ -2378,7 +3125,7 @@ plant leaves keep 0.34 of the light through them, 0.06 without the fix; `check.m
 translucent BSDF 0.0023 on the plant, 0.05 for light going straight on, 0.04 and 0.004 on the Teacup. RTX A6000. Missing: other
 GPUs, transmission textures, more than one scatter.
 
-Past `shadowReach()` the depth maps end, and `distanceShadows` takes over from a height field. A compute pass marches each cell towards the sun and keeps the highest plane `height - d * tan(elevation)` and its distance `d`, so one `vec2f` per cell answers for that sun: a receiver below the plane is behind the ridge. The light is the segment of the sun's disc above that horizon, with `d * sunSize` as the disc's height. The storage buffer costs no sampled texture, and gltf-pro already uses all 16 per stage. The march reruns only after the sun moves `sunStep` degrees. Each step spans the shorter cell side, so the step count scales with the cell's aspect. Evidence: `check.mjs`, real Rainier elevation with `distance` 30, overlap 0.85 and mean difference 0.016 against Cycles on both shadow classes, overlap 0 without it; `packages/shadows/test/distance-browser.mjs`, the disc share within 0.003 of the formula at three distances. RTX A6000. Missing: other GPUs, and any timing.
+Past `shadowReach()` the depth maps end, and `distanceShadows` takes over from a height field. A compute pass marches each cell towards the sun and keeps the highest plane `height - d * tan(elevation)` and its distance `d`, so one `vec2f` per cell answers for that sun: a receiver below the plane is behind the ridge. The light is the segment of the sun's disc above that horizon, with `d * sunSize` as the disc's height. The storage buffer costs no sampled texture, and gltf/pbr already uses all 16 per stage. The march reruns only after the sun moves `sunStep` degrees. Each step spans the shorter cell side, so the step count scales with the cell's aspect. Evidence: `check.mjs`, real Rainier elevation with `distance` 30, overlap 0.85 and mean difference 0.016 against Cycles on both shadow classes, overlap 0 without it; `packages/shadows/test/distance-browser.mjs`, the disc share within 0.003 of the formula at three distances. RTX A6000. Missing: other GPUs, and any timing.
 
 An effect with `style` wraps the light's whole shadow in `shadowLit`: `direct*style(vec3f(1)*visibility*tint*calls)`, so it sees the map, tinted casters and the other effects as one. With no style the text of `shadowLit` is unchanged. `shadowStyle` is `mix(floor,1,shade)` with `floor` from `intensity` and `color` on the CPU. Evidence: `check.mjs`, the real plant against two Cycles suns, one casting and one not, whose colours sum to white: 0.283 against 0.287 in red, 0.684 against 0.684 in blue, 0.292 under `VirtualShadows`, 0.003 with no style. RTX A6000. Missing: other GPUs, and any timing.
 
@@ -2391,16 +3138,29 @@ the WebGL2 layer every shown instance draws the first level. Evidence: `packages
 pixels against core meshes with levels worked out on the CPU, RTX A6000. Still missing: a timed run.
 
 `MeshletMesh` (`@margoengine/culling/meshlets`) splits one mesh into clusters of up to 64 vertices and 124 triangles, grown
-breadth first over shared vertices. One workgroup per cluster tests its sphere against the frustum and, on a single-sided
-batch under a perspective camera with a positive determinant, its normal cone against the camera, then appends its indices
-to the part's region of a kept index buffer that the main pass draws, one indirect draw per part. `'occlusion'` culling adds the
-Hi-Z test between the two, and each shadow cascade runs the same kernel against its light box into lists of its own in
-`prepareShadow`. Core's shader takes vertices as attributes, so no vertex pulling: a region per part is what keeps it one
-draw each. The cone test is in the mesh's own space: which side of a plane a point is on
-survives any affine map of positive determinant, so uneven scale needs no wider cone. It drops only triangles the back-face
-discard would drop. Evidence: `packages/culling/test/gpu/meshlets-check.mjs`, 0 differing pixels against a core mesh, RTX
-A6000, for one part, three parts, Hi-Z and a shadow cascade. Still missing: a timed run, and occluders from last frame's clusters
-instead of whole parts.
+breadth first over shared vertices, and draws it as up to 65,535 instances (parts), each with its own matrix. Four kernels
+run per frame over every cluster of every slot: `test` checks the part cull's visible word, the cluster's sphere against the
+frustum, with `'occlusion'` the Hi-Z pyramid, and on a single-sided batch under a perspective camera with a positive
+determinant its normal cone against the eye (Shirman and Abi-Ezzi 1993); `scan` gives each kept cluster its place in its part's
+list (Hillis and Steele 1986); `place` gives each part its list's start in one shared pool by an exclusive scan over the
+parts in slot order (Blelloch 1990), and a part past the pool's end draws its whole mesh from the indices at the start of the
+same buffer, so a small pool costs draws, never pixels; `copy` writes the kept clusters' indices. There are no atomics, so the
+kept order, and with it every depth tie, repeats frame to frame. Core's shader takes vertices as attributes, so no vertex
+pulling: one indirect draw per part, its record bound by buffer offset. Lists are kept per slot, so two-pass occlusion (Haar
+and Aaltonen 2015, Wihlidal 2016, Karis, Stubbe and Thomas 2021, on the Hi-Z of Greene, Kass and Miller 1993) needs no extra
+list: the clusters each shown part drew last frame are drawn depth-only, at this frame's matrices and camera, into the
+occluder target before the pyramid is built, and then every cluster is tested against it, so a cluster that comes into view
+draws that frame. Any set of real geometry is a valid occluder set, so motion only makes it hide less. Each shadow cascade
+runs the same kernels against its light box into a pool of its own in `prepareShadow`. The cone test is in the mesh's own
+space: which side of a plane a point is on survives any affine map of positive determinant, so uneven scale needs no wider
+cone. It drops only triangles the back-face discard would drop. On the WebGL2 layer, which has no workgroup memory, the
+frustum and cone tests run on the CPU in double precision and each run of neighbouring kept clusters is one `drawIndexed`;
+no Hi-Z there. Evidence: `packages/culling/test/gpu/meshlets-check.mjs`, 0 differing pixels against core meshes on WebGPU and
+under `MARGO_COMPAT=1`, RTX A6000, for one part, three parts, Hi-Z, a shadow cascade, a pool too small for every part, and a
+wall of 1,536 tiles under `occluderSize` hiding 640 more (all 640 dropped: 786,432 of 1,114,112 triangles drawn, where the
+whole-part occluders dropped none); the CPU route keeps the same triangle counts as the kernels on every camera step.
+`packages/culling/test/meshlets.test.js` pins the CPU route's work count (8,493 of 36,864 triangles in 8 draws for sixteen
+balls). Still missing: a timed run.
 
 `DynamicInstances` builds kept records from the rows in its scatter; a `fill` kernel writes `world` once per cull, only for what reads it,
 `prepareShadow` and `pick`. A scene with shadows pays what it paid before and the compatibility route is unchanged. Evidence:
@@ -2513,14 +3273,19 @@ creation. `redrawAfterRestore` schedules two animation-frame renders for on-dema
 count, which live in the renderer's private descriptor, so core gained one read-only getter, `Engine.renderTarget` (44 B gzip, Scott's
 exception of 2026-11-05, `docs/conventions.md`). It is opt-in: at every load it would compile twice in a scene that adds lights
 or effects afterwards. The wait moves rather than disappears: first frame 100 to 17 ms, build 54 to 108-126 ms, 11 to 29 ms saved in
-all, busy machine, diagnostic. Evidence: `packages/gltf-pro/tests/model-runs.test.js` and `tests/core-timestamp-feature.test.js`
+all, busy machine, diagnostic. Evidence: `packages/gltf/test/model-runs.test.js` and `tests/core-timestamp-feature.test.js`
 (after a device restore too).
 
 `PipelineCompiles` (`@margoengine/stats/compile`) records every shader and pipeline create call on a device, follows restored devices,
 and links a slow frame to the compiles in it or the frame before, blocking calls first. Evidence:
 `packages/stats/test/compile.test.js` and a real-device check in `scripts/test-stats-browser.mjs`.
 
-Core treats `device.lost` and relevant frame-time DOM exceptions as loss. Recovery is deduplicated by one shared
+Core takes `device.lost` as the only sign of a loss: an InvalidStateError or OperationError thrown in a frame is that
+call's failure and is reported once like any other frame error (B2, 2026-11-15; before, it was taken as a loss, the
+healthy device stopped drawing and was replaced, and the error was never reported). Setting a renderer's `onLost` hook
+attaches its own `device.lost` reaction, so a device lost before the engine watched it (during `Engine.create`, or
+during a restore before the swap) still restores, and a loss met while a restore is in flight waits for it, then
+restores the watched device if it is still the current one (B3, 2026-11-15; before, both losses were never restored). Recovery is deduplicated by one shared
 promise, creates a new adapter/device/renderer with the same features and samples, re-adds every geometry batch from
 CPU copies, configures the canvas for the new device, swaps renderers, rearms the watcher, and calls every plugin's restore hook in its scene. CPU-side Wasm
 transforms and instance arrays survive. Frames skip rendering during recovery, and accessing geometry buffers reports
@@ -2532,6 +3297,19 @@ kept every disposed object alive as long as its device (the path tracer reached 
 
 Tests destroy devices and GPU processes during lifecycle checks, compare every visual demo before and after loss,
 exercise scenes and multi-view water, restore compatibility devices, and include restore events in proof stories.
+
+Packages after a device restore (2026-11-15, KB-OWN-LIGHTMAP1): a WebGPU object is valid only with the device that
+made it, and losing a device makes it and everything made from it unusable (W3C WebGPU Candidate Recommendation Draft,
+2026-09-15, https://www.w3.org/TR/webgpu/, section 3.2.1 "valid to use with" and section 3.5.2 "lose the device").
+So nothing a package hands to another package or binds in a later frame may be a fixed view, sampler or texture of the
+attach-time device: it is resolved for the device drawing now, as `DensityBrush.texture(device)` (scatter) and the
+materials `Texture` (one GPU copy per device) do. `applyLightmap` on a glTF PBR model reads its material extension's
+texture binding per device (a CPU bake uploads again from its pixels; a live `GPULightmapBaker` texture went with its
+device, so a restored model draws no baked light). BiomeObjects' detail maps and FarForest's cover maps are remade the
+same way (KB-OWN-BIOMES3, packages/biomes/tests/objects.test.js and the biomes owner fixture). Evidence: packages/lightmap/tests/apply.test.js (two fake devices),
+packages/lightmap/tests/gpu.browser.mjs (`engine.rebootDevice()`, same pixels within one 8-bit step, no validation
+error, native WebGPU and the WebGL2 layer) and the lightmap owner/lifetime fixture (78 leaves, loss-attached included).
+The owner/lifetime CPU model's inert textures report `mipLevelCount` as real ones do. Missing: other GPUs.
 
 A step that can throw runs before any state changes (2026-11-07). `Engine.retain` makes the instance array and calls `Renderer.add`
 first, then swaps the array, counts the reference and registers the batch; `Renderer.add` frees a held geometry's old buffers only after
@@ -2583,23 +3361,31 @@ Known rendering gaps:
 
 **Native glass tint (2026-11-05).** A loaded transmissive material's multiply draw reads the full surface (`surfaceTintPBR`): base colour, transmission, metal, specular, sheen, clearcoat and thin film, maps included; the tint lanes hold the volume attenuation alone. Evidence: `packages/materials/tests/transmission-layers.test.js` and `node scripts/material-dispersion-gpu-check.js` on the native path. Missing: a measured cost of the second textured pass.
 
-**Transmission on display-encoded targets (2026-11-05).** `materialTransmissionAdd` decodes the lit colour and the light behind, adds them in linear light and encodes the sum (encoded 0.5 + 0.5 reads 0.69, no longer 1.0); with an HDR scene target both are linear and add directly. gltf-pro's native two-draw path still adds encoded (`docs/known-bugs.md`). Evidence: `packages/materials/tests/transmission-shader.test.js`.
+**Transmission on display-encoded targets (2026-11-05).** `materialTransmissionAdd` decodes the lit colour and the light behind, adds them in linear light and encodes the sum (encoded 0.5 + 0.5 reads 0.69, no longer 1.0); with an HDR scene target both are linear and add directly. gltf/pbr's native two-draw path still adds encoded (`docs/known-bugs.md`). Evidence: `packages/materials/tests/transmission-shader.test.js`.
 
-**Native coat and sheen lobes in shadow (2026-11-05).** `layers()` multiplies its sun light by `margoDirectVisible`, so a `direct` hook reaches the clearcoat and sheen lobes of physical shaders. The hook is asked about `margoLit(s,l,direct)`, zero where neither the base nor a lobe has light, so `shadowLit` skips the same fragments on uncoated surfaces and adds lookups only where a coat or sheen faces the light and the base does not. Evidence: `scripts/materials-clearcoat-tests.js` on the GPU (full shadow reads exactly 0, half shadow half) and `packages/gltf-pro/tests/extensions.test.js`. Missing: a measured frame cost on a coated scene.
+**Native coat and sheen lobes in shadow (2026-11-05).** `layers()` multiplies its sun light by `margoDirectVisible`, so a `direct` hook reaches the clearcoat and sheen lobes of physical shaders. The hook is asked about `margoLit(s,l,direct)`, zero where neither the base nor a lobe has light, so `shadowLit` skips the same fragments on uncoated surfaces and adds lookups only where a coat or sheen faces the light and the base does not. Evidence: `scripts/materials-clearcoat-tests.js` on the GPU (full shadow reads exactly 0, half shadow half) and `packages/gltf/test/extensions.test.js`. Missing: a measured frame cost on a coated scene.
 
-**Clearcoat over opaque materials through `install` (2026-11-05).** `MaterialExtension.coat` scales direct, local, ambient and emitted light by `1 - clearcoat * F(n.v)` and adds the coat's own light on top, so `install(model)` follows KHR_materials_clearcoat as gltf-pro's native `layers()` does. `lightPBR` then evaluates a `direct` hook once on `vec3f(1)` (`margoDirectVisible`), so such hooks must scale the light they wrap. Evidence: `scripts/materials-clearcoat-tests.js` on the GPU (clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; ambient 0.0782 where the unfixed shader read 0.0674; SSAO's replay equals the beauty) and `packages/materials/tests/clearcoat.test.js`.
+**Sheen punctual albedo scaling (2026-11-12, KB3297).** The fragment hands `layers()` its sun light as `margoSheenSun` (times `margoDirectVisible` there, so a shadow hook still applies); that part of the layer under the sheen is scaled by the KHR_materials_sheen punctual form min(1 - max3(sheen) E(n.v), 1 - max3(sheen) E(n.l)), the rest (ambient, local lights, emission, transmission) by the ambient form 1 - max3(sheen) E(n.v), as `@margoengine/materials` already did for its direct light. Capture entries leave it at zero, so their k stays affine. Evidence: `packages/gltf/test/sheen.test.js` (CPU, WGSL evaluated), the SheenTestGrid reference case on both backends (absolute 1,119,468 to 1,086,074 native). Clustered point, spot and extra directional lights take the punctual form too under `physicalLobes` (2026-11-15, KB3297b): each light takes max3(sheen) max(E(n.l) - E(n.v), 0) of its base off beside the ambient form `layers()` applies; evidence `packages/clustered/test/clustered.test.js` (shader text) and materials `test:gpu:features` `lobes` (sheenOver: clustered directional equals the sun to the 8-bit step on WebGPU and the WebGL2 layer, one step brighter before). The Charlie visibility the spec recommends with albedo scaling is in since KB3297c (2026-11-15, top of this file). Missing: area and shaped lights keep the ambient form.
+
+**Clearcoat over opaque materials through `install` (2026-11-05).** `MaterialExtension.coat` scales direct, local, ambient and emitted light by `1 - clearcoat * F(n.v)` and adds the coat's own light on top, so `install(model)` follows KHR_materials_clearcoat as gltf/pbr's native `layers()` does. `lightPBR` then evaluates a `direct` hook once on `vec3f(1)` (`margoDirectVisible`), so such hooks must scale the light they wrap. Evidence: `scripts/materials-clearcoat-tests.js` on the GPU (clearcoat 1 keeps 0.96 of emission at normal incidence and 0.73 at n.v 0.25; ambient 0.0782 where the unfixed shader read 0.0674; SSAO's replay equals the beauty) and `packages/materials/tests/clearcoat.test.js`.
 
 **Stochastic tiling (2026-11-06).** `stochasticTiling` (`@margoengine/materials/stochastic`) rewrites a material's `textureSample` reads into three `textureSampleGrad` reads at random per-corner offsets of a triangle grid, keeping the unshifted UV's derivatives so an edge never picks another mip, and scales the blend about the 1 x 1 mip by 1 / sqrt(sum w^2) (Heitz and Neyret 2018), held inside the three reads. It binds nothing, so steady batches keep their fast path. Evidence: real-texture correlation, contrast, register and solid-mip checks in `packages/materials/test/features-browser.mjs` on an RTX A6000; WebGL2 layer, tile-based GPUs and the cost are unmeasured.
 
-**Hair, eye and skin models (2026-11-06).** `hair`, `eye` and `skin` (`@margoengine/materials/hair`, `/eye`, `/skin`) are `MaterialFeature`s built on one helper, `character-light.ts`: each is a WGSL function `light(n, v, l, base)`, the response to one light with its cosine included, put in place of the body of `direct_light` for the sun and of the `clusterBrdf` term in the clustered loops through the `lit` hook, so a mesh answers a directional or point light as it answers the sun; the `character` GPU job fails if the hook is removed. Area lights, ambient and environment reflections keep the plain model, and a material with `fn margoDirect(` (anisotropy, thin film) throws. Hair is Kajiya and Kay's fibre with Marschner's two shifted lobes as tangent-shifted lobes (Scheuermann 2004). Skin is d'Eon and Luebke's six Gaussians integrated around a circle into a 64 by 64 half-float table (Penner and Borshukov 2011), row the square root of curvature in 1 / mm, read with |dN| / |dP| from screen derivatives. The eye refracts view and light at the cornea by Snell's law onto an iris plane. Skin takes group bindings 130-131 and the eye 132-134, because clustered holds 141-143 and environment 144. Evidence: hair, skin against the table and the pupil against a Snell trace are measured on an RTX A6000, the last on a stand-in sphere; the only model in the repository with eyes has a shallow iris plate, so the real-mesh eye run proves position and opening, not refraction. Cost is not timed.
+**Hair, eye and skin models (2026-11-06).** `hair`, `eye` and `skin` (`@margoengine/materials/hair`, `/eye`, `/skin`) are `MaterialFeature`s built on one helper, `character-light.ts`: each is a WGSL function `light(n, v, l, base)`, the response to one light with its cosine included, put in place of the body of `direct_light` for the sun and of the `clusterBrdf` term in the clustered loops through the `lit` hook, so a mesh answers a directional or point light as it answers the sun; the `character` GPU job fails if the hook is removed. Area lights, ambient and environment reflections keep the plain model, and a material with `fn margoDirect(` (anisotropy, thin film) throws. Hair is Marschner's fibre (2003) with R, TT and TRT plus every longer path summed into TRT (Chiang et al. 2016), each lobe a longitudinal Gaussian divided by the mean of cos^2 theta_r under it, Fresnel averaged over the fibre's width by five-point Gauss-Legendre and absorption across the fibre's middle from the colour (Chiang's fit) or melanin (d'Eon et al. 2011); since 2026-11-18 (sheet row 15) its CPU twin `hairScattering` passes a white furnace within 0.95 to 1.03 up to 0.8 rad and the GPU rows match it within a row and two 8-bit steps, lit from the front and from behind, on WebGPU and the WebGL2 layer. The light between fibres stays a Kajiya and Kay diffuse; no dual scattering yet. Skin is d'Eon and Luebke's six Gaussians integrated around a circle into a 64 by 64 half-float table (Penner and Borshukov 2011), row the square root of curvature in 1 / mm, read with |dN| / |dP| from screen derivatives. The eye refracts view and light at the cornea by Snell's law onto an iris plane. Skin takes group bindings 130-131, the eye 132-134 and hair with `follow` 135, because clustered holds 141-143 and environment 144. On a skinned primitive the eye and a mesh-axis hair direction follow one joint through `follow`, a skin matrix uploaded per draw (KB-MODELFEAT-JOINTS1, 2026-11-18); a UV hair direction reads the deformed tangents, so it follows every joint per vertex. Evidence: hair, skin against the table and the pupil against a Snell trace are measured on an RTX A6000, the last on a stand-in sphere; the only model in the repository with eyes has a shallow iris plate, so the real-mesh eye run proves position and opening, not refraction. Cost is not timed.
 
 **Output dithering (2026-11-06).** Materials' `dithering` option (feature letter `q`) adds triangular noise (Gjol 2016) to the display-encoded colour just before it leaves the fragment shader, scaled by each channel's distance to 0 and 1 so black and white stay exact and nothing clips. The noise is the one `Bloom` and `Sky` already used, now shared from `packages/shared/dither.js`; it hashes the pixel, so a frame repeats exactly. A float scene target (`settings.w`) skips the step, as the presenting pass owns the 8-bit output there, and data shadings (`normal`, `depth`, `distance`) never get it. Evidence: an RTX A6000 run of the `dithering` GPU job in `packages/materials/test/features-browser.mjs`.
 
-**Hardware clip distances (2026-11-06).** On a device with 'clip-distances' (asked for through core's existing `options.features`, so core is unchanged) `MaterialShading.shader` skips `clipShader` and marks the text; gltf-pro's one `createShaderModule` then runs `markedClipDistances` (`packages/shared/section.js`) after every other stage edit, because `vertexInputs` and the instanced stage still need `->Out {`. The vertex stage returns `MargoClipped`, a copy of `Out` with `@builtin(clip_distances)`, since a fragment stage cannot read them, and a plane past the count gets 1. `clipIntersection` stays on discard, as the maximum of the distances is not linear across a triangle. So does a material whose outputs reach location 13: six distances take two of `maxInterStageShaderVariables`, and instancing passes `margoK` at the next location. Cascaded casters take the same route through `clippedDepth(..., hardware)` and `clipHardware` on the primitive; TAA velocity, contact shadows, picking and local shadows stay on discard. Evidence: an RTX A6000 run of the `clip` GPU job, with and without the feature. No other device has run it, and its speed is not timed.
+**Hardware clip distances (2026-11-06).** On a device with 'clip-distances' (asked for through core's existing `options.features`, so core is unchanged) `MaterialShading.shader` skips `clipShader` and marks the text; gltf/pbr's one `createShaderModule` then runs `markedClipDistances` (`packages/shared/section.js`) after every other stage edit, because `vertexInputs` and the instanced stage still need `->Out {`. The vertex stage returns `MargoClipped`, a copy of `Out` with `@builtin(clip_distances)`, since a fragment stage cannot read them, and a plane past the count gets 1. `clipIntersection` stays on discard, as the maximum of the distances is not linear across a triangle. So does a material whose outputs reach location 13: six distances take two of `maxInterStageShaderVariables`, and instancing passes `margoK` at the next location. Cascaded casters take the same route through `clippedDepth(..., hardware)` and `clipHardware` on the primitive; TAA velocity, contact shadows, picking and local shadows stay on discard. Evidence: an RTX A6000 run of the `clip` GPU job, with and without the feature. No other device has run it, and its speed is not timed.
 
 **Prefiltered cube maps (2026-11-06).** `prefilterCube` (`@margoengine/materials/prefilter`) resamples any `CubeTexture` to linear float faces in a compute pass, reads them back and hands them to `Environment.create`, so one GGX filter serves both; the CPU copy is what `restore` rebuilds from after a lost device. Evidence: `packages/materials/test/features-browser.mjs` (`prefilter`) reads the stored levels against a GGX integral worked out in the test, on an RTX A6000 only; `envMap` now refuses a 32-bit float cube on a device without `float32-filterable`, which used to fail WebGPU validation (`packages/materials/test/env-map.test.js`). Missing: a rough real sky compared with another renderer.
 
-**Soft point and spot shadows (2026-11-09).** A castShadow point or spot light with `shadow.radius` above 0 switches `LocalShadows` (`@margoengine/clustered/shadows`) to a third WGSL variant beside the directional and area ones: the frame grows by two vec4f per slot after the area data (UV extent at unit depth, guard band; near, far, radius), the light's maps widen to tangent 1.25 times its cone (a point light's faces as an area light's), and `clusterShadow` hands such a slot to `clusterSoftShadow`, the area lights' PCSS with the light's radius as its extent. Radius 0 everywhere keeps the shader text, frame size and uploads byte for byte (unit test, and the GPU check's shadow-off scenes against a pre-change baseline). Evidence: `scripts/clustered-shadow-gpu-check.js` on an Apple silicon Mac (Metal) puts the 10-90% penumbra within 2% of a disc light's analytic width at two radii, two blocker ratios and on a spot. Missing: other GPUs, timing, and the integrated maps (`ClusteredOptions.shadows`), which keep the 3x3 filter.
+**Directional PCSS counts and focus (2026-11-16).** `Shadows`' `'soft'` filter reads its blocker-search count, comparison-tap count and `focus` from a new `soft` vec4f of the frame uniform (before `nearest`; the uniform grows from 384 to 400 bytes and the nearest-depth copy moves to offset 384) instead of WGSL constants 16 and 32, so `samples`, `blockerSamples` and `focus` are live options; the penumbra estimate takes |gap - focus| (focus 0 is Fernando's). Defaults keep 16 and 32, so the images are as before; only the shader text and the uniform layout changed (proof goldens advanced). React's `SoftShadows` maps drei's size, samples and focus onto them. Evidence: shadows test/sampling.test.js (uniform values, validation, shader loops); the GPU suites run on WebGPU and the WebGL2 layer. Sources: Fernando 2005 (https://developer.download.nvidia.com/shaderlibrary/docs/shadow_PCSS.pdf); Bavoil 2008, GDC "Advanced Soft Shadow Mapping Techniques" (https://developer.download.nvidia.com/presentations/2008/GDC/GDC08_SoftShadowMapping.pdf). Missing: timing for low and high counts.
+
+**Virtual PCSS counts and focus (2026-11-16).** `VirtualShadows`' `'soft'` filter now runs the same PCSS body as `Shadows` (`pcss` in shadows/src/shader.ts: one blocker-search loop, one penumbra estimate with |gap - focus|, one comparison loop; each entry gives only its map read, its tap and its clamp) and both entries check `samples`, `blockerSamples` and `focus` with one function (`checkSoft`). Its frame uniform gains the same `soft` vec4f after `inverse` (528 to 544 bytes, nearest-depth copy at 480). The defaults keep 16 and 32 with focus 0, so the images are as before (the `Shadows` shader text is byte for byte unchanged). Evidence: shadows test/virtual-soft.test.js (shared loops, uniform values, validation); the GPU suites on WebGPU and the WebGL2 layer. Sources as above. Missing: timing for low and high counts.
+
+**Accumulated shadow modes (2026-11-16).** `AccumulatedShadows` (studio/accumulate) gains `temporal: false` (every remaining sample in the first frame, each but the last in its own command encoder submitted before the next sample's queue.writeBuffer values, so queue order keeps each sample exact without extra buffers) and `blend` (the sum shader mixes sample n in with weight 1 / min(n + 1, blend), stored in the state uniform's y; the plane's coverage scale is 1 in that mode; moving casters keep the history; `frames: Infinity` allowed with it). Evidence: studio test/accumulate.test.js (submit order, weights, resets) and test/accumulate-browser.mjs (one-frame burst equals 64 frames texel for texel; blend within 0.00098 of the recurrence) on WebGPU and the WebGL2 layer. Sources: Heckbert and Herf 1997, CMU-CS-97-104, "Simulating Soft Shadows with Graphics Hardware" (averaging hard-shadow images of light samples into a receiver texture; stochastic samples over a grid), http://www.cs.cmu.edu/~ph/shadow104.bw.ps.gz. Missing: timing of a 1024-sample burst.
+
+**Soft point and spot shadows (2026-11-09).** A castShadow point or spot light with `shadow.radius` above 0 switches `LocalShadows` (`@margoengine/clustered/shadows`) to a third WGSL variant beside the directional and area ones: the frame grows by two vec4f per slot after the area data (UV extent at unit depth, guard band; near, far, radius), the light's maps widen to tangent 1.25 times its cone (a point light's faces as an area light's), and `clusterShadow` hands such a slot to `clusterSoftShadow`, the area lights' PCSS with the light's radius as its extent. Radius 0 everywhere keeps the shader text, frame size and uploads byte for byte (unit test, and the GPU check's shadow-off scenes against a pre-change baseline). Evidence: `scripts/clustered-shadow-gpu-check.js` on an Apple silicon Mac (Metal) puts the 10-90% penumbra within 2% of a disc light's analytic width at two radii, two blocker ratios and on a spot. Missing: other GPUs, timing, and the integrated maps (`ClusteredOptions.shadows`), which keep the 3x3 filter. **Per-pixel taps (KB-PCSS-BLOCK1, 2026-11-15).** The PCSS of point, spot and area lights (and AreaShapes, which shares it) used one Vogel spiral for every pixel, so a wide penumbra was 24 shifted hard shadows: treads at whole multiples of 1/24 one shadow texel wide and radial streaks behind thin casters, seen up close in the Cabin Hearth kettle shot. Each lookup now turns both spirals by an angle and moves each tap within its own equal-area ring by a second value, both interleaved gradient noise of the fragment's screen pixel rebuilt from the clustered camera (stratified over angle and ring, an unbiased estimate of the disc; blocker tap 0 stays on the receiver's texel). Work per lookup is unchanged: 16 depth loads and 24 comparisons, no new pass or binding; the 40 sine and cosine pairs of the old taps become one pair, one matrix product and two noise values. Evidence: `scripts/clustered-shadow-gpu-check.js` ("within half a tap") on an RTX A6000, native WebGPU and the WebGL2 layer, with a close camera (a shadow texel about 2.5 pixels): the mean over 381 pixel rows along a straight edge lies within 0.009 to 0.012 of a disc light's exact penumbra (fitted to the receiver bias), against 0.053 to 0.058 before, for point radii 0.4 and 0.2 and a 1.2 wide area light. Sources: Fernando 2005, "Percentage-Closer Soft Shadows" (https://developer.download.nvidia.com/shaderlibrary/docs/shadow_PCSS.pdf); Vogel 1979, "A better way to construct the sunflower head", Mathematical Biosciences 44 (https://doi.org/10.1016/0025-5564(79)90080-4); Cook 1986, "Stochastic Sampling in Computer Graphics", ACM TOG 5(1) (https://doi.org/10.1145/7529.8927); Jimenez 2014, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH Advances in Real-Time Rendering (https://www.iryoku.com/next-generation-post-processing-in-call-of-duty-advanced-warfare). Missing: other GPUs, timing.
 
 **Textured area lights (2026-11-10).** `AreaLights.texture` takes an `AreaLightTexture` hook (`AreaLightTextures`, `@margoengine/clustered/area-texture`); with it each lobe's LTC integral is multiplied by `clusterAreaTexture(j, m, c, r, u, side)`, the light's image read trilinearly from a half-float box-filtered chain in one storage buffer (binding 153, no sampled texture) at the point where the lobe-space rectangle's vector form factor meets its plane, at the level of the clamped cosine's half-peak footprint. Evidence: CPU mirror (one-colour exact to 2^-11, lookup symmetry, level ordering) and the real-WebGPU `scripts/clustered-light-images-gpu-check.js`; missing: a path-traced reference for detailed images (LIM-650).
 **Terrain as a local shadow caster (2026-11-09).** `LocalShadowSource` gains an optional `drawLocalShadow({context, pass, matrix, layer})` hook (`@margoengine/clustered/shadows`): `LocalShadows` calls it once per re-rendered layer inside that layer's depth pass, after the mesh casters, with the layer's reversed-depth world to clip matrix. Terrain implements it with a `greater` variant of its shadow pipeline (built on first use) and one uniform buffer per ring and layer, since every layer's `writeBuffer` lands before the encoder runs; its standard-depth `drawShadow` for `@margoengine/shadows` is unchanged. A hook source without `shadowVersion` re-renders every map every frame. Evidence: unit tests in both packages, and `scripts/clustered-shadow-gpu-check.js` on an Apple silicon Mac (Metal): a ridge shadows the ground behind it from a spot and a point light. Missing: other GPUs, timing, and the integrated maps (`ClusteredOptions.shadows`), which still reject `drawShadow` sources.
@@ -2616,24 +3402,50 @@ Known rendering gaps:
 
 **Sphere, disc and tube lights (2026-11-10).** `Clustered.shapes` (`@margoengine/clustered/shapes`, binding 150) adds `clusterShapeLighting` to the light loop's result beside `clusterAreaLighting`; with no shaped lights the composed text is unchanged. Every shape goes through the rectangle lights' LTC frame and table: a disc becomes an elliptic cone under the inverse LTC matrix, whose form factor comes in closed form from the smallest eigenvalue of its quadric (computed from the Gram matrix of the quadric's rows so it stays precise in float32 for far, small lights); a sphere is its silhouette disc; a tube is the convex hull of its end spheres' silhouette discs, integrated as a polygon with the rectangle lights' clipped edge sum (`ltc-wgsl.ts`, shared with `area.ts`, whose WGSL text is unchanged). Across the horizon, a disc's visible rim arc is integrated as polygons. The rim is parameterised without `atan2`: on Metal a signed zero in one rim axis turned `atan2` to the hidden side and made a clipped sliver 100 times too bright (found by `scripts/shape-lights-gpu-check.js`, which now covers it). Evidence: CPU quadrature of the real shapes and of the LTC distribution (`test/shapes.test.js`), GPU against the float64 mirror on the Apple silicon Mac. Missing: shadows, GPU timing.
 
+**Line lights and light groups (2026-11-15).** `lineLights` (`@margoengine/clustered/line`) is CPU only: a segment becomes point lights at its n-point Gauss-Legendre nodes (1 to 8, default 2) with intensity x w_i / 2, each with a PCSS `shadow.radius` of max(L / 2n, widest gap / (2 x 1.374)) so the separate points' shadows merge; no shader changes and no new bindings. `LightGroups` (`@margoengine/clustered/groups`) is a plugin that merges named sub-lists into one `Clustered.setLights` (deferred to its `onPreUpdate` when set from a frame callback, so `animateFlicker` on several groups costs one upload a frame). Evidence: `packages/clustered/test/line.test.js` and `groups.test.js` (quadrature against Abramowitz and Stegun Table 25.4, exactness to degree 2n - 1, the merge rule for every sample count, one shared flicker, group isolation and rollback); `scripts/clustered-line-gpu-check.js` on the RTX A6000, WebGPU and the WebGL2 compatibility layer (largest step of the row-averaged floor shadow 0.055 of the lit side for the default radius, 0.52 for two hard points, within 0.035 of two analytic disc lights). Each point also gets that radius as its `PointLight.radius` (sphere lights, below), so a metal near the line has a bounded highlight; `line.test.js` pins it. Missing: a measurement on a second GPU vendor.
+
+**Sphere lights: `PointLight.radius` (2026-11-15).** A point or spot light's `radius` makes its specular a sphere light's, so a highlight is bounded by the sphere's radiance. Maths, in the clustered light loop: the specular light direction is Karis 2013's representative point (centerToRay = (L . r) r - L, closestPoint = L + centerToRay saturate(radius / |centerToRay|), r the reflection of the view), and GGX D there (original alpha) is scaled by alpha^2 / (alpha_x alpha_y), alpha_x = max(min(alpha + s, 1), s) and alpha_y the same of s / (v.h), s = radius / (2 distance). At normal incidence this is Karis's (alpha / alpha')^2; the anisotropic alpha_y is Margo's, from the half-vector Jacobian dl = 4 (v.h) dh (Walter et al. 2007, eq. 14: in the plane of incidence the sphere's angle maps to half of it over v.h), and keeps grazing views bounded (an isotropic alpha' let the 1 / (n.v) of the BRDF lift the Cabin Hearth kettle spout to about 4 times the sphere's radiance); the floor alpha_x, alpha_y >= s holds the bound inside the source. Where h = n the specular is G F I / (4 pi alpha_x alpha_y (n.v) d^2) <= F I / (pi r^2). Falloff window, cone and the per-light terms keep the centre. The loop's `d`, `g` and `fresnel` hold the representative point's terms. **Diffuse (KB-FIRE-WALLHOT1, 2026-11-16):** the loop's `nl` is the sphere's irradiance written as an effective cosine: the cosine-weighted solid angle of the cap of angular radius sigma (sin sigma = r / d) over pi sin^2 sigma, which is the clamped centre cosine while the cap is above the horizon (cos^2 theta >= sin^2 sigma) and Snyder's horizon form (cos theta acos(y) - x sin theta sqrt(1 - y^2)) sin^2 sigma + atan2(sin theta sqrt(1 - y^2), x), x = cot sigma, y = -x cot theta, where it crosses it; inside the sphere (d < r) sin sigma = 1 (the hemisphere it is at the surface) and `nl` is also multiplied by max(d^2, 2^-12) / r^2, so nl x falloff = E / I <= 1 / r^2 = pi L / I. Every BRDF that multiplies `nl` (clustered's GGX, materials' Lambert and Phong) gets the sphere's irradiance; the specular's nl / (4 nl nv) still cancels and its G takes the representative point's cosine, so the specular now follows that point's horizon instead of the centre's. Before, the point light's 1 / d^2 lit the Cabin Hearth firebox back, 0.09 m from flame spheres of 0.634 m, about 50 times past pi L, brighter than the flames. Radius 0 (and every light outside its sphere with the cap above the horizon) takes exactly the old `nl`, through a select. Layout: while some light has a radius the light records grow from 16 to 20 floats (`size:vec4f`, x the radius), the culling pass switches to a second pipeline made once, and `clusteredSampling` takes `{sized: true}`; LocalShadows reads the record stride from Clustered, and `shadow.radius` defaults to `radius`. Radius 0 everywhere keeps records, culling and every shader byte for byte (unit tests and the GPU check; a radius-0 light beside a sized one also shades bit for bit on the GPU, 0 ulps). Evidence: `scripts/clustered-sphere-light-gpu-check.js` on an RTX A6000, WebGPU and the WebGL2 layer: peak at most 1.00001 of F I / (pi r^2) over radius 0.155 and 0.02, distance 0.25 to 40 radii, roughness 0 to 0.6 and views 0 to 85 degrees; the centre matches the closed form within 0.1%; a point light at one radius' distance gives 60,966 times the bound. Kettle spout (Cabin Hearth geometry, probe of the production loop): peak linear luminance 814 as two points, 16.2 with radius 0.155. Diffuse evidence (same script, both backends): a Lambert plane with F0 = F90 = 0 tilted 0 to 170 degrees off the light at a tenth of the radius to 10 radii (radius 0.634, 0.155, 0.02) matches the closed form within 1e-4 (measured at most 1.5e-5, the closed form taken over d (1 +- 2^-21) because x = cot sigma has an infinite slope at d = r) and peaks at exactly 1 / r^2 (the closed form) where a point light gives 100 times it at a tenth of the radius; `packages/clustered/test/sphere-lights.test.js` checks the reference against a 160,000-direction Monte Carlo within 0.4% of pi sin^2 sigma and the shader text. Cabin Hearth, lane B's flame-base method (kettle-shot camera, five lines over the log tops, flames on minus off, display levels): bloom on, peaks 98 to 141 against 17 to 70 with inverse-square diffuse (45 to 65 on main before step 8), 10-90% rise 25.4 px (38.6 before the fix, 21.8 before step 8); bloom off 23.4 px (3.8 before): the darker wall makes the flames' soft lower edge over the logs visible, and that is the flame-base work of fire plan step 3, not the light. Sources: Karis 2013, "Real Shading in Unreal Engine 4", SIGGRAPH Physically Based Shading course (https://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf), sphere lights, eq. 10, 11, 14; Walter, Marschner, Li and Torrance 2007, "Microfacet Models for Refraction through Rough Surfaces", EGSR (https://doi.org/10.2312/EGWR/EGSR07/195-206), eq. 14; Snyder 1996, "Area Light Sources for Real-Time Graphics", Microsoft Research MSR-TR-96-11 (https://www.microsoft.com/en-us/research/wp-content/uploads/1996/03/arealights.pdf), subhemispherical sources; Lagarde and de Rousiers 2014, "Moving Frostbite to Physically Based Rendering 3.0", SIGGRAPH Physically Based Shading course, section 4.7 (area lights) (https://seblagarde.wordpress.com/wp-content/uploads/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf); Howell, "A Catalog of Radiation Heat Transfer Configuration Factors", factor B-43 (https://thermalradiation.net/sectionb/B-43.html). Missing: timing, a second GPU vendor, the integrated maps honouring the radius for shadows (fire plan step 9), toon and the physical lobes (clearcoat, sheen) still lit by the centre's inverse square.
+
+**Heat haze (2026-11-18, KB-FLAME-HEATHAZE1).** `HeatHaze` (`@margoengine/post/heat-haze`) is an HDR `PostStack` stage, no core change: one full-screen pass reads the stack's scene capture, its 1x depth (reverse-Z, 0 is the sky) and a 2,208-byte uniform (view-projection, its inverse, strength, turbulence, the air's refractivity and temperature, and up to 32 plume records of four vec4f: base and length, yaw and half footprint, lean in the footprint's axes with Heskestad's virtual origin and the eddy size, the eddies' rise with the box margin, least half-width and top). Maths, per pixel: the view ray (the near-plane point and the direction to the 0.5-depth point) is taken into each plume's footprint axes with the lean sheared out (a linear map, so t is kept), clipped to the plume's box and to the depth, and marched at the midpoints of at least `steps` and up to 4 x `steps` segments (two a half-width at the ray's lowest height). The field is n - 1 change = -(n0 - 1) dT / (T0 + dT) (Gladstone-Dale with the ideal gas, written without cancellation) for dT McCaffrey's least of three laws times a Gaussian round the footprint shrunk with height (half-width 0.12 (Tc / T0)^(1/2) (z - z0)), plus the eddies' linear part -(n0 - 1) T0 / T^2 0.4 dT N, N a frozen two-octave value noise of unit rms rising at 0.5 sqrt(g L). Central differences (a quarter of the least half-width or eddy size) give the gradient, taken back to world axes by the transpose of the map; its part across the ray times ds times 1 - t / tb is the bend (the eddies' part scaled by sqrt(min(1, l / ds)) so an undersampled path adds as a random walk). The pixel reads the scene, bilinear, at its own position plus the difference of the projections of o + d s and o + d s + strength bend s (s the depth or 1e6), so no bend moves no pixel; a landing on a surface nearer than the first plume entry keeps the pixel. `Flame.plume` (vfx) hands over base, length, footprint as drawn, world lean and the flame's clock (seek-exact eddies). Evidence: `packages/post/test/heat-haze.test.js` (refractivity 2.72e-4 at 20 C; McCaffrey's laws continuous; the CPU twin `plumeBend` within 3% of a 20,000-step quadrature at three heights; 1 - t / tb; noise rms 1); `heat-haze-browser.mjs` on an RTX A6000, WebGPU and the WebGL2 layer (bars behind a 3 m plume move, 2,268 pixels by over 4 codes at strength 1; none outside the box or on a box in front; strength 0 equals off exactly). Sources: Gladstone and Dale 1863 (https://doi.org/10.1098/rstl.1863.0014); Settles 2001 (https://doi.org/10.1007/978-3-642-56640-0); Raffel 2015 (https://doi.org/10.1007/s00348-015-1927-5); McCaffrey 1979 (https://doi.org/10.6028/NBS.IR.79-1910); Heskestad 1983 and SFPE 2016; George, Alpert and Tamanini 1977 (https://doi.org/10.1016/0017-9310(77)90123-9); Taylor 1938 (https://doi.org/10.1098/rspa.1938.0032). Missing: timing (build phase), a line-fire plume law (the front's stretches use the axisymmetric one), a second GPU vendor.
+
+**A fire from one call (2026-11-15).** `Fire` (`@margoengine/vfx/fire`) builds a fire from a kit's `hearth` data: `lineLights` points (`hearth.light.length`, `height`, `radius`) with `animateFlicker`, placed in a `LightGroups` group of their own or a given `Clustered` or `LightGroup`, plus the `fire`, `embers` and `steam` `VFX` effects; it is CPU wiring of existing packages, no shader or binding of its own. With `castShadow` it requires `LocalShadows` on the `Clustered` (MargoError `'state'`). Evidence: `packages/vfx/test/fire.test.js` (the kit radius equals `lineShadowRadius`, Gauss spacing, intensity shared, groups taken and released, `power` on light and particles, soft particles only with depth, errors); the shadows' GPU evidence is `scripts/clustered-line-gpu-check.js`. The kit's `light.height` is the flames' radiance centroid over the fuel top (0.14 m; `fire.test.js` recomputes it from the kit's rise, life, alpha, size and colour), and each point casts a shadow of `light.radius` through `lineLights`. Energy tie (2026-11-16): `Fire` sizes each point's sphere (`PointLight.radius`) so its radiance, I / (pi r^2), equals the flames' brightest radiance (intensity x brightest colour, Rec. 709 luminance), so clustered's sphere bound (specular <= F0 x I / (pi r^2)) keeps any reflection of the fire under F0 x the flames; default hearth 0.634 m (kit 0.155 m spheres were 17x the flames). Evidence: `fire.test.js` (sphere radiance <= flames at powers 0.5 to 3, 1 to 5 samples); GPU: Cabin Hearth spout peak linear luminance 10.44 -> 0.887 against the bound 0.92 (F0 of tarnishedCopper for the firelight's colour, 0.453, x 2.03), clustered-shadow fixture. Its diffuse is the sphere's irradiance since KB-FIRE-WALLHOT1 (sphere lights, above): the room outside the spheres is lit as before, the firebox back inside them at most pi times the flames' radiance. Cabin Hearth builds its fire with `Fire` (fire plan step 8). Missing: TAA reactive mask registration (no registry on main yet) and the hearth's textured close-up (stone and soot on materials meshes: KB-TRIPLANAR-SIDES1 is fixed, KB-FIRE-RECEIVER1 in docs/known-bugs.md waits on a decision).
+
+**Bounce light, step 1: maths and hook (2026-11-16, KB-CABIN-SNOWBOUNCE1).** `Clustered.bounce` is a new lit-shader hook: while set, `clusteredSampling` declares its WGSL and adds `clusterBounceLighting(position,n,base,metal)` beside the area and shape lights before `clusterFrame.intensity.x`; unset, the shader text is byte for byte the old one (the hash tests in local-shadows.test.js hold). Binding 164 (bindings.test.js keeps hook bindings unique). `@margoengine/clustered/bounce` holds the CPU half: capture views, reduction to VPLs (Morton strata seeding a k-means in position and normal), imperfect shadow maps of surfels compared at the receiver's plane, the packed storage-buffer layout and its JS twin `bounceIrradiance`, and the opening rule that counts a room's light once against `openingLight` (README "Counting the room's light once"). Evidence: `packages/clustered/test/bounce.test.js` (Howell form factor against quadrature to 1e-5; texel solid angles sum to 4 pi; Lambert polygon irradiance with horizon clipping against quadrature; a synthetic spot-lit patch through the whole chain within 5% of the form factor; flux conserved to 1e-6; two rooms under 2%; under a table within 20% of a brute-force trace and within 10% of the same VPLs traced; both glazings counted once). Missing: the GPU capture and the shader run on a device (step 2), the Cabin Hearth figures (step 3).
+
+**Bounce light, step 2: the GPU capture (2026-11-16, KB-CABIN-SNOWBOUNCE1).** `LightBounce` (plugin `clustered:bounce`) captures each bouncing source at frame-graph order -0.5, after every shader patch and before the main draw (as LightProbes): core's draw with the frame's own lit shader, its `frame` rebound to the capture's Frame at binding 165 and its tone-mapped tail replaced by albedo and distance (`packages/shared/frame-capture.js`, a source module bundled into the entry that imports it; core does not import it), into a 6-layer `rgba16float` target and a depth texture of the scene's own depth format (core's draw sets stencil operations from it: `depth32float-stencil8` where the device has it). Each view is copied to a buffer and read back with `mapAsync`; changed texels rebuild the VPLs and visibility maps on the CPU, then one storage buffer (binding 164). A larger buffer replaces the old one only next frame (this frame's bind groups still hold it). Light colours and intensities are rewritten every frame into that buffer, so a flicker has no lag. Evidence: scripts/clustered-bounce-gpu-check.js (`npm run test:gpu:bounce -w @margoengine/clustered`), RTX A6000, WebGPU and the WebGL2 layer: patch to wall -1.19% and +0.53% of the form factor, the GPU equal to the JS twin to 1e-7, two rooms 0 of unblocked, half the light half the bounce on the next frame; check:owners for clustered (52 cases with LightBounce, real device loss and recovery). Missing: the Cabin Hearth figures (step 3); a laptop iGPU.
+
+**Bounce light, step 3: Cabin Hearth (2026-11-16, KB-CABIN-SNOWBOUNCE1).** The cabin attaches `LightBounce` with its window as an opening (`bounce=0` turns it off; the direct-light physics checks run so). Three bugs fixed on the way, each with its test: the capture now draws under a post stack's linear tail and TAA's jittered clip (`packages/shared/frame-capture.js`, test at the end of packages/clustered/test/bounce.test.js), and LightProbes moved onto the same helper (it drew TAA's main camera into every probe face, KB-PROBES-TAA1, packages/environment/tests/probes.test.js); VolumetricFog's froxel pass keeps every light hook binding statically used (`packages/shared/keep-bindings.js`; any unread hook stopped the fog, KB-FOG-HOOK-BINDINGS1, packages/environment/tests/volumetric.test.js and the hook case of tests/volumetric-beam-browser.js); VPLs are lifted to their cluster's top along the normal (a drift's centroid lay under the snow and its own surfels hid it: 0.0020 R at the log crest instead of 0.11, KB-BOUNCE-VPL-BURIED1, the convex mound test in bounce.test.js). Evidence (RTX A6000, WebGPU and the WebGL2 layer, scripts/cabin-hearth-browser-test.mjs): at the log crest the lantern's bounce through clear glazing is 2.8% under a quadrature over the snow (bound 15%), the frame within 2% of the JS twin; behind the frosted pane the lantern bounces nothing outside and the window's bounce is 2.0% under the quadrature of the opening's own model (the snow its centre sees, lit by the bare rectangle; bound 15%), between the shaded (physics, which the model exceeds by 42%) and unshaded quadratures; the hearth view's mean luminance rises 4.3% (WebGPU) and 5.6% (WebGL2 layer), the rug 15%. Missing: IES, projector and layer terms, materials, gltf-pro and terrain in the capture; GPU-culled instances.
+
+**Bounce light visibility: the scene's triangles are occluders (2026-11-17, KB-BOUNCE-SHADOWSNOW1 cause 3).** `LightBounce` passes every instance of the frame's unclaimed batches to `sampleSurfaces`, which keeps a triangle whose circumradius reaches the cell size 2^floor(log2(2 d / visibility)) (d to the nearest VPL in front of it) as itself, drawn into each map by a ray/triangle test per texel (Moller and Trumbore 1997), and merges smaller ones per cell and normal axis into one covering surfel; the detail follows each VPL's solid angle (view-adaptive imperfect shadow maps, Ritschel et al. 2011; ManyLoDs, Hollander et al. 2011; Christensen 2008). Triangle depths under 0.02 m are a VPL's own patch. The shader and its twin's receiver test are unchanged. Work per rebuild: every drawn triangle's vertices transformed and visited once, at most 16,384 pieces (Cabin Hearth: 15,026 from 1,169,052 triangles), each piece's texels tested per VPL; `stats.occluders` reports the count. Evidence: packages/clustered/test/bounce.test.js (a table-by-the-wall room under 2% of unblocked at five receivers, 5.9% to 8.2% with captures alone; merged surfels cover far small triangles); scripts/clustered-bounce-gpu-check.js on WebGPU and the WebGL2 layer; Cabin Hearth's crest checks unchanged and the snow at (-1.2, 0.05, 4.0) at 0.00245 R, the 0.00246 R an exact cast from every VPL gives (0.0032 R before), the shadowed-snow check moved to (-2.0, 0.05, 3.2), bound 0.0005. Missing: the concave-corner receiver plane (0.7 to 1.2 mR within 0.3 m of a wall's foot in Cabin Hearth; docs/known-bugs.md), surfaces a vertex hook moves, a laptop iGPU.
+
+**Bounce light visibility: elliptical surfels and plane-true normals (2026-11-17, KB-BOUNCE-SHADOWSNOW1).** `buildVisibility` splats each capture point as the ellipse of its texel's footprint (1 / cos longer along the capture ray's projection, Heckbert 1989; Zwicker et al. 2001; Botsch et al. 2005) instead of a disc of its area, and `reduceBounce` takes a texel's tangents from the side whose next two texels run straight on, so a wall's foot no longer takes the floor's tilt. Same point count and the same texel loop per point (the bounding square grows to the long semi-axis); work unchanged in kind. Evidence: packages/clustered/test/bounce.test.js (three VPL maps of a grazing wall with no hole, 4, 15 and 3 before; every wall texel within 2 degrees of the wall, 108 of 2270 tilted up to 38.7 degrees before); scripts/clustered-bounce-gpu-check.js passes on WebGPU and the WebGL2 layer (RTX A6000); Cabin Hearth's shadowed snow 0.0030 R to 0.0026 R on both backends. Missing: occluders on surfaces no source sees, the capture-point subset's gaps and the concave-corner receiver plane (docs/known-bugs.md, KB-BOUNCE-SHADOWSNOW1), so that check still fails.
+
+**Area lights set back in a wall (2026-11-16, KB-BOUNCE-REVEAL1).** `RectAreaLight.recess` and `sill` (`@margoengine/math`; `openingLight` passes them on) pack into the light record's two spare words (right.w, up.w). While some light has one, `AreaLights`' light loop clips each such rectangle, before the LTC integrals, to the part the fragment sees through the opening: the outline `recess` in front projected from the fragment (scale z / (z - recess) about its foot) and the sill's front edge `recess + sill` in front bounding the lower edge; the result stays an axis-aligned rectangle, so both integrals stay exact. A fragment inside the opening keeps the whole light, one beside it behind the wall's face or under the sill gets none. Without such a light the shader text is the old one. `LightBounce`'s `rectIrradiance` applies the same clip (`apertureWindow`, the JS twin). Evidence: packages/clustered/test/area.test.js and test/bounce.test.js against a traced wall and sill (boxes, slab test) within 1%; examples/package-benchmarks/area-lights-gpu.mjs, RTX A6000, WebGPU and the WebGL2 layer: GPU equal to the CPU mirror within 1/255, the reveal shading all 89 lit samples. Missing: Cabin Hearth passes the window's recess and sill once the bounce clustering holds (see the bug list); a laptop iGPU.
+
+**Bounce clusters keep to one surface (2026-11-16, KB-BOUNCE-CLUSTER1).** The reduction's Lloyd distance adds 8 x ((p - c).m)^2, the offset from the cluster's plane (the L2 proxy metric of Cohen-Steiner, Alliez and Desbrun 2004), so parallel surfaces at different heights (a sill over snow) form separate clusters and the lift to a cluster's highest member stays on its own surface. Evidence: packages/clustered/test/bounce.test.js on Cabin Hearth's GPU captures (fixture), 32 VPLs within 15% of one VPL per texel at the log crest (0.92 window, 0.94 lantern; 0.55 and 0.83 before); scripts/clustered-bounce-gpu-check.js passes on WebGPU and the WebGL2 layer, RTX A6000. Missing: a laptop iGPU.
+
+**Shaped lamps bounce their shape (2026-11-16, KB-BOUNCE-TERMS1).** The CPU twins of the built-in light terms' WGSL factors live in `packages/clustered/src/bounce-terms.ts`, imported only by the bounce entry (10,895 B, from 9,345; the term entries unchanged), and read the very words `IESLights`, `ProjectorLights`, `CubeProjectorLights` and `LightLayers` upload (unorm16 IES grid with the shader's bilinear filter and rotation, rgba8 projector texels with sRGB decode and alpha, the cube's face-crossing filter, the layer mask against core meshes' layer 0); `ClusteredLightTerm.emission` and `revision` let a term of one's own do the same. `LightBounce.select` builds each light's source with `bounceLightSource` (its position, range, decay, the cone of every light given a direction, and `emission` from `lightEmission`), keys it with each term's packed words (new on every set call), and `reduceBounce` weighs each texel's flux by the emission toward it, as a reflective shadow map's texel flux is the light's intensity into its solid angle (Dachsbacher and Stamminger 2005). No shader or GPU work changes: the weighting is CPU work per changed capture, one call per lit texel per term. Evidence: `packages/clustered/test/bounce-terms.test.js` (four quadratures, each failing on the old code) and the projector case of `scripts/clustered-bounce-gpu-check.js` on WebGPU and the WebGL2 layer (red 0.02470 and blue 0.01239 at x 0.5, the twin to 1e-7; white 0.03709 in every channel on the old code). Missing: an IES lamp on a real GPU (the fixture has no IES hook; the CPU twin is the shader's mirror, checked by the CPU test).
+
+**An opening's capture looks out from its mouth (2026-11-16, KB-BOUNCE-CAPEYE1).** `BounceOpeningLight` takes the window's `lites` and `barDepth` (as `openingLight` takes them, checked); with bars, the rect source gets `front`, half the bar depth plus the capture camera's near distance, and `bounceViews` moves an opening's eye out along its normal by `front` or `recess`, whichever is further. At the rectangle's centre the eye stood inside the crossing of the bars; the near plane clipped the faces round it and the capture, which draws back faces, took the bars' inner faces for lit texels. No shader changes: the eye of five capture views moves. Evidence: `packages/clustered/test/bounce.test.js` (the bars case and the options cases fail on the old code); `scripts/clustered-bounce-gpu-check.js` passes on WebGPU and the WebGL2 layer, RTX A6000; Cabin Hearth's crest, the window's bounce 0.1087 R against 0.1031 for the quadrature of the opening's model from the mouth (5.4%, within the check's 15%), the same on both backends. Missing: a laptop iGPU.
+
 **Stochastic many-light shadows (2026-11-10).** `Clustered.stochastic` (`@margoengine/clustered/stochastic`, uniform binding 151) replaces the point and spot loop only in shaders with local-light shadows (`Clustered.shadow` or the integrated maps); without it, or without shadows, the composed text is byte-identical. Every light's unshadowed term is still the loop's own `result+=` line, so material BRDF rewrites and physical lobes apply; a light that casts a shadow adds that term to a sum instead. `samples` weighted reservoirs (Chao's streaming rule, as in Bitterli et al. 2020 Alg. 2) pick shadowed lights in proportion to the luminance of their term, and only the picks' shadows are looked up; per channel, the sum is scaled by sum(c V) / sum(c) over the picks (c the pick's chroma), the ratio estimator of Heitz, Hill and McGuire 2018: biased for a finite count, consistent, exact when the picks share a visibility or a colour. Up to `samples` shadowed lights are shaded exactly. The two sums are added over each 2 x 2 quad with `dpdxFine`/`dpdyFine` inside a function marked `@diagnostic(off,derivative_uniformity)`; the cluster lookup's early return is moved after that sum so every lane of a quad is live. A shader that calls `clusterLighting` outside a fragment stage needs `quad: false`. Evidence: `scripts/stochastic-lights-gpu-check.js` on the Apple silicon Mac (Metal): 12 shadowed lights around nine casters, 2 lookups per pixel, mean error 2.89 of 255 in one frame and 0.89 over 64 frames against the exact picture (shadows take 5.7 on average), 6 lights with 8 samples equal the exact picture; the float64 mirror (`packages/clustered/test/stochastic-reference.js`) for convergence and the quad's spread. Missing: GPU timing, temporal reservoir reuse, sampling of the unshadowed loop itself.
 
 **Dielectric Fresnel ends in lighting hooks (2026-11-05).** Ambient and local-light hooks read `s.f0` and `s.sw` (F0 and F90 of `KHR_materials_ior` and `KHR_materials_specular`); `lightPBR` writes the glTF defaults into shaders whose `Surface` has no such fields, so plain materials keep their numbers. Evidence: `tests/specular-ambient.test.js` and the `environment` browser check (specular 0 on a black dielectric reflects exactly 0 under an IBL).
-**UV sets 2 and 3 (2026-11-06).** The 80-byte vertex holds two UV sets and many packages read it, so TEXCOORD_2 and 3 ride in a second vertex buffer at slot 2, location 11, passed on as `Out.uvs`. Only a primitive whose material or variant reads them gets it. `laterUVShader` (`packages/gltf-pro/src/vertex-inputs.ts`) rewrites the two-way UV select into `margoUVSet`, so every map, transform and extended slot follows without a shader of its own, and the pipeline key and draw memo gain a flag. Depth passes keep two sets: a cut-out on a later set casts uncut (docs/limits.md). Evidence: `tests/texcoord-later.test.js` and the `uv:` checks of `scripts/test-extensions-browser.js` on a Blender 5.3 file, on an RTX A6000 only; no speed measurement.
+**UV sets 2 and 3 (2026-11-06).** The 80-byte vertex holds two UV sets and many packages read it, so TEXCOORD_2 and 3 ride in a second vertex buffer at slot 2, location 11, passed on as `Out.uvs`. Only a primitive whose material or variant reads them gets it. `laterUVShader` (`packages/gltf/src/vertex-inputs.ts`) rewrites the two-way UV select into `margoUVSet`, so every map, transform and extended slot follows without a shader of its own, and the pipeline key and draw memo gain a flag. Depth passes keep two sets: a cut-out on a later set casts uncut (docs/limits.md). Evidence: `tests/texcoord-later.test.js` and the `uv:` checks of `scripts/test-extensions-browser.js` on a Blender 5.3 file, on an RTX A6000 only; no speed measurement.
 
-**Texture mip streaming (2026-11-06).** `textures` of `@margoengine/gltf-pro/progressive` reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream` and adds what a model needs from it: a `GLTFStreamedImage` in the model's image list, which hands `bindMaterial` the current view in the colour space of each map slot (the texture allows its sRGB or linear twin through `viewFormats`), and `rebindStreamed`, which binds a draw again the moment its texture is replaced, in the same turn as the old texture's `destroy`, so no frame can see it. A texture's level follows its size on screen: `packages/shared/texture-density.js` measures the local length one whole texture spans (square root of surface over UV area, up to 4,096 triangles), and that length times the pixels a world unit covers at the nearest point of the bounding sphere is what `want` receives. The range reader in `stream.ts` leaves a KTX2 view unfetched and marks it received, so a GLB's texture bytes stay on the server; those bytes stay zero in `asset.buffers`, and nothing else reads an image view. Evidence: the real FlightHelmet and a real 1,024 px KTX2 file on an RTX A6000, pixel equal to the plain loader close up. Missing: timing on a quiet machine and a real network, a skinned model's posed bounds.
+**Texture mip streaming (2026-11-06).** `textures` of `@margoengine/gltf/progressive` reuses `KTX2Streamer` of `@margoengine/decoders/ktx2-stream` and adds what a model needs from it: a `GLTFStreamedImage` in the model's image list, which hands `bindMaterial` the current view in the colour space of each map slot (the texture allows its sRGB or linear twin through `viewFormats`), and `rebindStreamed`, which binds a draw again the moment its texture is replaced, in the same turn as the old texture's `destroy`, so no frame can see it. A texture's level follows its size on screen: `packages/shared/texture-density.js` measures the local length one whole texture spans (square root of surface over UV area, up to 4,096 triangles), and that length times the pixels a world unit covers at the nearest point of the bounding sphere is what `want` receives. The range reader in `stream.ts` leaves a KTX2 view unfetched and marks it received, so a GLB's texture bytes stay on the server; those bytes stay zero in `asset.buffers`, and nothing else reads an image view. Evidence: the real FlightHelmet and a real 1,024 px KTX2 file on an RTX A6000, pixel equal to the plain loader close up. Missing: timing on a quiet machine and a real network, a skinned model's posed bounds.
 
-**Behaviour graphs in glTF (2026-11-06).** `@margoengine/gltf-pro/interactivity` adds no shader and no render path: it compiles the ratified `KHR_interactivity` graph of a document and runs it on a clock moved by `tick`, with no engine. `@margoengine/animation/interactivity` binds it to a model: it ticks on `onPreUpdate`, writes through `pointerWriter`, the writers of `KHR_animation_pointer`, and picks through `Picking` of `@margoengine/selection`, attached on first use without per-frame capture. It lives in animation because gltf-pro cannot peer on animation (animation already peers on gltf-pro, and `scripts/package-order.js` refuses the cycle). Evidence: 1,155 of 1,156 conformance sub-tests and 187 of 187 invalid graphs, and a GPU check that a real click reaches the graph and the screen. Missing: no timing of a large graph, and no real file that drives skins and physics together on a GPU.
+**Behaviour graphs in glTF (2026-11-06).** `@margoengine/gltf/interactivity` adds no shader and no render path: it compiles the ratified `KHR_interactivity` graph of a document and runs it on a clock moved by `tick`, with no engine. `@margoengine/animation/interactivity` binds it to a model: it ticks on `onPreUpdate`, writes through `pointerWriter`, the writers of `KHR_animation_pointer`, and picks through `Picking` of `@margoengine/selection`, attached on first use without per-frame capture. It lives in animation because gltf/pbr cannot peer on animation (animation already peers on gltf/pbr, and `scripts/package-order.js` refuses the cycle). Evidence: 1,155 of 1,156 conformance sub-tests and 187 of 187 invalid graphs, and a GPU check that a real click reaches the graph and the screen. Missing: no timing of a large graph, and no real file that drives skins and physics together on a GPU.
 
-**Rigid bodies in glTF (2026-11-06).** `@margoengine/gltf-pro/physics` adds no shader and no render path: it reads `KHR_physics_rigid_bodies` and `KHR_implicit_shapes` (drafts) from the document and builds bodies in `@margoengine/physics`, which gained a `generic` joint for the draft's joints, built of limits and drives, with frames on each body. Evidence: five committed real samples held to their mechanics on real Rapier, seven unlicensed ones run by hand through `MARGO_SPLAT_SAMPLES`, one GPU check that a loaded node moves on the engine loop. Missing: no conformance suite exists for a draft, and the combine rule order, soft limits and multi-axis ranges differ from it by what Rapier offers (`docs/limits.md`).
+**Rigid bodies in glTF (2026-11-06).** `@margoengine/gltf/physics` adds no shader and no render path: it reads `KHR_physics_rigid_bodies` and `KHR_implicit_shapes` (drafts) from the document and builds bodies in `@margoengine/physics`, which gained a `generic` joint for the draft's joints, built of limits and drives, with frames on each body. Evidence: five committed real samples held to their mechanics on real Rapier, seven unlicensed ones run by hand through `MARGO_SPLAT_SAMPLES`, one GPU check that a loaded node moves on the engine loop. Missing: no conformance suite exists for a draft, and the combine rule order, soft limits and multi-axis ranges differ from it by what Rapier offers (`docs/limits.md`).
 
-**XMP metadata in glTF (2026-11-06).** `@margoengine/gltf-pro/metadata` adds no shader and no render work: it reads `KHR_xmp_json_ld` from the document after load, and a broken packet never stops a model loading. Launch gate 11a gains the `gltf-pro/metadata` fuzz target over the published files that carry the extension. Evidence: real files for author, licence and copyright; the Creative Commons and `xmpRights` licence order has built documents only, as no published file found uses them.
+**XMP metadata in glTF (2026-11-06).** `@margoengine/gltf/metadata` adds no shader and no render work: it reads `KHR_xmp_json_ld` from the document after load, and a broken packet never stops a model loading. Launch gate 11a gains the `gltf/metadata` fuzz target over the published files that carry the extension. Evidence: real files for author, licence and copyright; the Creative Commons and `xmpRights` licence order has built documents only, as no published file found uses them.
 
-**Fixture and image lights in glTF (2026-11-06).** `@margoengine/gltf-pro/lights` adds no shader: an `EXT_lights_ies` fixture is a clustered point light whose profile is resampled for its node's aim, and an `EXT_lights_image_based` cube goes through `Environment`. `parseIES` gains type B, resampled to a type C grid, and stops reading the 2002 and 2019 field after the ballast factor as a photometric factor, which had raised the real 2019 sample's peak from 8,500 to 9,350 cd. Evidence: the real Example wall within 3 percent of Lambert's law on the RTX A6000. Type B axes are now held to a real report: its planes meet at H = 90 and it integrates to its stated lumens only with H as the latitude. Missing: the sign of V, which no file shows, and any reference for what `irradianceCoefficients` mean.
+**Fixture and image lights in glTF (2026-11-06).** `@margoengine/gltf/lights` adds no shader: an `EXT_lights_ies` fixture is a clustered point light whose profile is resampled for its node's aim, and an `EXT_lights_image_based` cube goes through `Environment`. `parseIES` gains type B, resampled to a type C grid, and stops reading the 2002 and 2019 field after the ballast factor as a photometric factor, which had raised the real 2019 sample's peak from 8,500 to 9,350 cd. Evidence: the real Example wall within 3 percent of Lambert's law on the RTX A6000. Type B axes are now held to a real report: its planes meet at H = 90 and it integrates to its stated lumens only with H as the latitude. Missing: the sign of V, which no file shows, and any reference for what `irradianceCoefficients` mean.
 
-**Scattering in glTF volumes (2026-11-06).** `KHR_materials_volume_scatter` (draft) adds map slots 19 (multi-scatter colour, sRGB) and 20 (volume thickness) and two rows to the extended Frame, which grows from 284 to 308 floats (1,232 B), so UV rows reach 42 and physical rows start at 272. `packages/shared/volume-scatter.js` holds the one WGSL text, `margoScatterShares`, and its JavaScript reference. Sigma_t and the albedo mapping are the spec's; the rest is a Margo reading: scattering over the depth x is 1 - exp(-min(sigma_s (1 - g), sigma_t) x), and that share of the entering light leaves as a diffuse lobe of the multi-scatter colour (`s.sc` in the extended shader, `materialScatterLobe` in `@margoengine/materials`, added to direct light and to the ambient hooks). Specular transmission keeps Beer-Lambert, which already counts scattering, and diffuse transmission takes exp(-(sigma_a + s) x). The lobe plus either straight term never passes the light that entered (`packages/gltf-pro/tests/volume-scatter.test.js`). Evidence: real-GPU checks in `packages/gltf-pro/scripts/test-extensions-browser.js` on the RTX A6000 only, among them the whole Khronos ScatteringSkull. Missing: any comparison with a path tracer's picture of the same file, light spreading under the surface, any other GPU, and speed.
+**Scattering in glTF volumes (2026-11-06).** `KHR_materials_volume_scatter` (draft) adds map slots 19 (multi-scatter colour, sRGB) and 20 (volume thickness) and two rows to the extended Frame, which grows from 284 to 308 floats (1,232 B), so UV rows reach 42 and physical rows start at 272. `packages/shared/volume-scatter.js` holds the one WGSL text, `margoScatterShares`, and its JavaScript reference. Sigma_t and the albedo mapping are the spec's; the rest is a Margo reading: scattering over the depth x is 1 - exp(-min(sigma_s (1 - g), sigma_t) x), and that share of the entering light leaves as a diffuse lobe of the multi-scatter colour (`s.sc` in the extended shader, `materialScatterLobe` in `@margoengine/materials`, added to direct light and to the ambient hooks). Specular transmission keeps Beer-Lambert, which already counts scattering, and diffuse transmission takes exp(-(sigma_a + s) x). The lobe plus either straight term never passes the light that entered (`packages/gltf/test/volume-scatter.test.js`). Evidence: real-GPU checks in `packages/gltf/scripts/test-extensions-browser.js` on the RTX A6000 only, among them the whole Khronos ScatteringSkull. Missing: any comparison with a path tracer's picture of the same file, light spreading under the surface, any other GPU, and speed.
 
-**Bump maps in glTF (2026-11-06).** `EXT_materials_bump` adds map slot 18 and a `bump` row to the extended Frame, which grows from 272 to 284 floats (1,136 B), so physical rows start at 256. The normal comes from `margoBumpGradient` in `packages/shared/bump.js`, the Mikkelsen surface gradient `@margoengine/materials` `bumpMap` also uses. gltf-pro feeds it forward differences of the map a pixel away, three reads, where materials takes `dpdx` of one read. A node-space height scales by |transpose(M) n|, the node's stretch along the surface normal: a point moved d along the mesh normal moves that far along the world normal. Evidence: real-GPU checks in `packages/gltf-pro/scripts/test-extensions-browser.js`, on the RTX A6000 only. Missing: a file from an art tool (none found) and any other GPU.
+**Bump maps in glTF (2026-11-06).** `EXT_materials_bump` adds map slot 18 and a `bump` row to the extended Frame, which grows from 272 to 284 floats (1,136 B), so physical rows start at 256. The normal comes from `margoBumpGradient` in `packages/shared/bump.js`, the Mikkelsen surface gradient `@margoengine/materials` `bumpMap` also uses. gltf/pbr feeds it forward differences of the map a pixel away, three reads, where materials takes `dpdx` of one read. A node-space height scales by |transpose(M) n|, the node's stretch along the surface normal: a point moved d along the mesh normal moves that far along the world normal. Evidence: real-GPU checks in `packages/gltf/scripts/test-extensions-browser.js`, on the RTX A6000 only. Missing: a file from an art tool (none found) and any other GPU.
 
 **Flat splats (2026-11-06).** `splatsFromAttributes` keeps an axis variance at 2^-20 of the largest. Float32 rounding of a covariance moves an eigenvalue by up to 3 x 2^-24 of the largest, so a flatter splat rounded to a matrix `validateSplats` refused and one such splat stopped a whole real capture (CesiumJS tower.glb). Evidence: `packages/splats/test/splat-edit.test.js`. Projection adds 0.3 px^2 to every ellipse, so the lifted axis does not show at any distance Margo tests; no render comparison against an unlifted cloud exists, as Float32 cannot hold one.
 
@@ -2682,18 +3494,22 @@ This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they d
 | API and parity | `npm run api:check`, `npm run check:parity` | Generated API and parity contracts remain current. |
 | API coverage and locks | `npm run api:check` after final rebase; `tests/api-lock.test.js` | Exports maps require resolved TypeScript reports; core/stage breaks require a one-shot Scott-approved old-declaration hash in `api/breaks.json`. Other reported packages warn in Day 0 watch mode. Update preflights before writes. Regression evidence covers overloads, members, optional parameters, approvals, coverage and parsing every report; TSDoc remains at zero in quality's API gate. No runtime/GPU change. See `docs/conventions.md#api-lock`. |
 | Unit tests | root and package tests | Functional and regression evidence. |
-| Lock file | `npm run hygiene` (fast gate) through `scripts/support/lock-sync.mjs`; `tests/package-lock-sync.test.js` | package-lock.json lists every workspace with the dependencies, peers and optional peer flags of its package.json. Before 2026-11-11 only verify ran the check, so a peer added without the lock (29b4a5cea) reached main and every fresh `npm install` rewrote the lock. |
+| Forced compatibility runs | `tests/gpu-compat-honoured.test.js`; `scripts/support/compat-owed.json` | Every file a GPU or browser check runs that opens a browser page itself installs the WebGL2-layer shim under MARGO_COMPAT=1 (`compatShim`, `compatRun()`, `installCompat`) or names why not (`MARGO_COMPAT not applicable: <reason>`); the 46 files that did neither on 2026-11-16 are listed and owed (KB-SKY-COMPATCHECK1). Evidence: the static scan over every package GPU script and the root browser suites. Missing: the shim in the 46 owed files. |
+| Lock file | `npm run hygiene` (fast gate) through `scripts/support/lock-sync.mjs`; `tests/package-lock-sync.test.js` | package-lock.json lists every workspace with the dependencies, peers and optional peer flags of its package.json. Before 2026-11-11 only verify ran the check, so a peer added (29b4a5cea) reached main and every fresh `npm install` rewrote the lock. |
+| Document readers | `npm run hygiene` (fast gate) through `scripts/support/unit-readers.mjs`; `tests/unit-readers.test.js` | An edit to a document (any .md file, a site page, a record) runs every root test (`tests/*.test.js`) whose source names it in code, so docs/limits.md and docs/whitepaper/claims.md run `tests/claims-file.test.js`, `public-truth`, `public-size-claims` and the rest that read them. A lane gate runs the tests of the packages a change touches and a document is in none, so two broken claims files reached main (80ca93fe2c, f7a229b5ad) with their test red (KB-GATE-DOCREADERS1). Not found: a test that builds the path at run time from parts; name the path once in code. |
 | Documentation | `npm run docs:links`, generated-site checks | Links and generated public material remain coherent. |
-| README examples | `npm run check:readmes`, a step of `verify` | Every `ts`, `tsx` and `js` example of every package README and guide compiles against the built packages, each as its own module. An error off `scripts/support/readme-types-known.json` fails, and so does a fixed entry left on it; the list only shrinks and must be empty before release.. No example may `declare` a value: such a line passes the compiler and holds nothing at run time, so the check refuses it. A closing code fence with text after it ("``` More prose.") fails too: a viewer keeps that block open and shows the rest of the document as code |
+| README examples | `npm run check:readmes`, run by `npm run quality` (step `readme-types`) in every fast gate since 2026-11-18 | Every `ts`, `tsx` and `js` example of every package README and guide compiles against the built packages, each as its own module. An error off `scripts/support/readme-types-known.json` fails, and so does a fixed entry left on it; the list only shrinks and must be empty before release.. No example may `declare` a value: such a line passes the compiler and holds nothing at run time, so the check refuses it. A closing code fence with text after it ("``` More prose.") fails too: a viewer keeps that block open and shows the rest of the document as code |
 | Dev servers | `npm run check:dev-servers`, a step of `verify` | Every server a newcomer can start from this checkout starts clean: each Vite `dev` script (root, apps, examples, packages), Next.js (`next dev`, then `next build` and `next start`) and each plain Node server (`dev:lan`, the voxel `server`; a new one needs a row in the script). Each runs on a port the operating system reports free at that moment (never a fixed one: other lanes' dev servers and GPU suites hold fixed ports, and local CI on 2a4eb62dbe failed 16 servers that way), with a fresh dependency cache and a hard limit; a server that is no longer running when its probe ends fails, so answers from another process on its port never pass. It serves its first page and every module it loads with HTTP 200, and prints no warning or error line. Every start command in a fenced block of any Markdown file must map to a checked server, or the check fails and lists it. The root `vite.config.mjs` keeps the rival comparison pages, which import engines that are not installed here, and every top-level folder git ignores (read from `git ls-files --ignored` when the config loads, so no tracked file names a local-only folder) out of the dependency scan |
 | Template servers | `npm run check:templates`, a step of `check:merge` | Each `create-margo` template is scaffolded by the packed CLI, installed from locally packed tarballs, built, and its `dev`, `preview` and `start` scripts are started and probed the same way (200 on the first page and its modules, no warning or error line in the build or server output). Heavy because of five installs from the registry, so it runs in the full check on main, not in `verify`. Scaffolded apps are removed afterwards in a detached process |
 | Current proofs | `npm run proofs -- --current` (verify); each package's own `npm test` through `examples/package-benchmarks/proofs/package-guard.mjs` | Ongoing golden-output guarantees match stored outputs. Every package an ongoing proof compares or composes runs that proof in its own tests (`examples/package-benchmarks/proofs/ongoing.js`; `tests/proof-guards.test.js` keeps the list and the 30 test scripts complete), so the fast gate's changed-package tests catch a moved GPU call log before the push: on 2026-11-10, 16 of the 20 broke on main one package change at a time because only verify ran them. The guard is not a `*.test.js` file, so verify's test globs do not run a proof twice. |
 | Fresh checkout | `npm run check:fresh-clone` | Validation and current proofs do not depend on local history or artifacts. |
 | Site and visual checks | site build, `visual:check`, compatibility visual budget | Built demos render against the correct per-hardware evidence. A baseline is re-recorded (`npm run visual:update -- --only=<views> --runs=4`) only for views whose change is bisected to a deliberate renderer commit, each step shown to move only the views and pixels that commit should move; `docs/limits.md` ("Visual baselines re-recorded") lists every re-record, its commits and its proof. |
 | Package build lock | `scripts/support/build-lock.mjs`; `tests/build-lock.test.js` | `scripts/build-modern.js` (every `build:packages` and every `--only` rebuild) holds `test-results/package-build.lock` while it builds, and `scripts/api-report.js` decides what is stale and rebuilds it under the same lock, so two builds never delete each other's dist. A holder whose process is gone, or past 30 minutes, is reclaimed; a waiter stops at 30 minutes with `MARGO_BUILD_LOCK_TIMEOUT`. After building, build-modern stops when any built package lacks a file its `exports` declares (`scripts/package-export-targets.mjs`, also `tests/package-exports.test.js`). |
-| Owner/lifetime | `npm run check:owners` (`scripts/check-owner-lifetime-gate.mjs`): in the fast gate with `-- --packages=<changed>`, and a scoped step of `check:merge` after verify | Every package with `test(s)/owner-lifetime.fixture.js` runs each fixture through `tests/support/owner-lifetime.js` on two engines, the default and a second scene, two views and six lifetimes (dispose, detach, scene and engine disposal, device loss attached and detached): registration identity, frame-graph removal, listeners and GPU buffers, textures and query sets released, neighbours and the other engine untouched, viewport and scissor restored at every draw. CPU model first (no GPU slot), then one GPU slot per package on native WebGPU and on the WebGL2 compatibility layer with real device loss; a fixture that exports `leafPerEntry` (post, whose 31 entries took 208 s on the WebGL2 layer of a Radeon 680M, and culling, 30 entries past 180 s there) runs one leaf per entry instead, each inside the leaf's 180 s limit, which never rises. An async factory owns everything it does until it settles (before 2026-11-10 work after its first await escaped the owner). Fixtures never shim a device: the CPU model's missing browser members are filled in by `tests/support/owner-lifetime-node.js` only, so the GPU leaf builds real resources (2026-11-11). On the WebGL2 layer an imported external texture's copy is the layer's own storage, as the browser's is on native WebGPU: it expires when the importing task ends and returns to at most two spares per device that the next same-size import reuses (`packages/webgl2-compat/src/device/externals.ts`), so steady video allocates nothing and no copy lives as long as its source object. A selected package with no fixture is printed as pending, never passed; core and physics are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`. |
-| GPU/package checks | `check:views`, `check:gpu-packages`, `check:depth`, `check:wgsl`, `check:no-webgpu` | Scoped rendering, shader, package, depth, fallback, and view behavior. `check:gpu-packages` refuses to plan while a `scripts/*-gpu-check.js` file is named by no command, unless `LOOSE_CHECKS` states why: on 2026-11-07 twenty-two such files ran by hand only and five had rotted. The list is empty since 2026-11-11, when `scripts/ssao-gpu-check.js` joined post as `test:gpu:ssao` (KB1900). A check that compares with an earlier build (`--baseline`) says so and goes on when no baseline is on disk, since that proof belongs to one change. |
-| README examples run | `npm run check:readme-run`, a step of `check:merge` after a build, GPU, 296 s on 2026-11-07 (about 25 minutes when first measured). Whole in the full check after a push; on a narrowed run, the examples of the affected packages, or all of them when a file the step runs changed. In no gate before the push and not in `verify`. Holds one shared GPU slot; the GPU lock ends its process tree at 60 minutes. An example's id is the heading above it and a hash of its code, never its place in the file, so the known list survives a new example above a listed one. A README edit renames the example it changes, so `tests/run-readme-examples.test.js`, in `verify`, fails while the known list names an example no README holds: 8 such entries went unseen until this step ran on 2026-11-07 | Runs every example of every package README and guide as a reader would paste it: in Node when it can, else in a real Chromium page with WebGPU, the elements it asks for and a real sample file of the format it fetches. Passes when nothing threw, no promise was left rejected and the GPU reported no validation error; a Node example still going at 30 s passes, as a server does. A failure off `scripts/support/readme-run-known.json` fails, and so does an entry left on it that passes or names an example that is gone. Examples that listen on one port take turns. Each page example launches and closes its own browser, GPU process included, inside its 20 s deadline: closing only the page left the previous example's shader-compile teardown in a shared GPU process, which stalled the next example's adapter request (2026-11-11). 641 of 767 ran on 2026-11-07; the 126 left are in docs/known-bugs.md. |
+| Package builds never leave a dist missing (KB-BUILD-ATOMIC1) | `scripts/support/dist-dir.mjs`; `tests/build-dist-swap.test.js` | `build:packages` builds each package into `packages/<name>/dist-next` (every build script and helper resolves its output through `distDir`, and `tsc` runs on `tsconfigFor`, which keeps the package's own entry names pointing at its sources) and then moves it into `dist` one file at a time with `rename()`, the modules before the `exports` entries, removing files the new build dropped last and leaving byte-identical files alone. A process reading the checkout during a build (an app's tests importing `packages/core/dist`) sees each file whole, old or new, and never missing: POSIX rename() replaces in one step (IEEE Std 1003.1-2017) and Node's rename on Windows is MoveFileEx with MOVEFILE_REPLACE_EXISTING (Microsoft Learn, "Alternatives to using Transactional NTFS"); the write-then-rename idiom is the one Pillai et al., "All File Systems Are Not Created Equal" (OSDI 2014), recommend. Windows cannot replace a file another process has open at that instant, so the swap waits for that reader's handle to close, up to 30 s, then stops with `MARGO_DIST_FILE_BUSY` naming the file; the old file stays whole. A folder is not renamed as one step because Windows refuses a folder rename while any file in it is open. A package's own `npm run build` outside build:packages still writes `dist` in place. A full build:packages also removes what a package left behind when it left the workspace (renamed or folded into another): its ignored `dist`, `dist-next` and the LICENSE and NOTICE copies, and the folder once empty; sources or anything else stay (KB-IMPORTMAP-STALE1, `scripts/support/stale-packages.mjs`, `tests/stale-packages.test.js`). The CDN import map (`margoengine/dist/importmap.json`) lists only folders with a package.json. |
+| Owner/lifetime | `npm run check:owners` (`scripts/check-owner-lifetime-gate.mjs`): in the fast gate with `-- --packages=<changed>`, and a scoped step of `check:merge` after verify | Every package with `test(s)/owner-lifetime.fixture.js` runs each fixture through `tests/support/owner-lifetime.js` on two engines, the default and a second scene, two views and six lifetimes (dispose, detach, scene and engine disposal, device loss attached and detached): registration identity, frame-graph removal, listeners and GPU buffers, textures and query sets released, neighbours and the other engine untouched, viewport and scissor restored at every draw. CPU model first (no GPU), then one GPU run per package on native WebGPU and on the WebGL2 compatibility layer with real device loss; a fixture that exports `leafPerEntry` (post, whose 31 entries took 208 s on the WebGL2 layer of a Radeon 680M, and culling, 30 entries past 180 s there) runs one leaf per entry instead, each inside the leaf's 180 s limit, which never rises; a fixture that exports `leafCases` (water, 104: eight entries a leaf) packs its entries in order into leaves of at most that many cases, since one leaf per entry paid a dev server, a browser and the shared shader compiles per entry and water's 70 leaves ran past the gate's 10 minutes on 2026-11-18 (`tests/owner-lifetime.test.js` holds the packing). An async factory owns everything it does until it settles (before 2026-11-10 work after its first await escaped the owner). Fixtures never shim a device: the CPU model's missing browser members are filled in by `tests/support/owner-lifetime-node.js` only, so the GPU leaf builds real resources (2026-11-11). On the WebGL2 layer an imported external texture's copy is the layer's own storage, as the browser's is on native WebGPU: it expires when the importing task ends and returns to at most two spares per device that the next same-size import reuses (`packages/webgl2-compat/src/device/externals.ts`), so steady video allocates nothing and no copy lives as long as its source object. A selected package with no fixture is printed as pending, never passed; core and physics are excluded with reasons in `scripts/support/owner-lifetime-registry.mjs`. React (2026-11-16): `packages/react/tests/owner-lifetime.fixture.js` mounts a tree (mesh, geometry, material, glTF model, Environment, OrbitControls, Bloom, Html label) into the harness's engine with the test renderer and unmounts it; on the CPU a jsdom page stands in, whose `EventTarget` the fixture names (`eventTargets`) so its listeners are watched too, and the leaf starts on `packages/react/tests/owner-lifetime.html` so the dev server bundles React before the page loads. Two harness additions, each scoped to the fixture that uses it: `app(fn)` runs a synchronous call outside any owner, for what the application owns (the React root, whose delegated listeners React DOM never removes), and `detachedNodes` (a reason) stops counting listeners on DOM nodes the fixture's objects took out of the page (React DOM's listeners on the Html label's portal element). It found that an HTML overlay replaced the shared scene depth plugin on every device restore (fixed in `@margoengine/html`, regression in `packages/html/test/html.test.js`). Not covered: the `Canvas` component's own engine creation (the harness supplies the engine), which `packages/react/tests/react.test.js` covers. HTML (2026-11-16): `packages/html/test/owner-lifetime.fixture.js` attaches, draws and disposes `HTML` (scene-depth occlusion and fade, `new` and `attach`), `HTMLBlend`, `HTMLTexture`, `HTMLTextureGL` and an `HTMLTexture` prepared by `resourceInliner` (inline), 78 cases on the CPU, native WebGPU and the WebGL2 compatibility layer; each also checks that the overlay roots, surface holders and given elements leave the page, the canvas style `HTMLBlend` changed is restored and nothing reaches `engine.onError`. On the CPU a jsdom page stands in (no 2D canvas or image decoding there), so a texture's preparation holds until its surface is removed: the CPU proves that disposal aborts a raster in flight; the browser leaves draw for real. `HTMLTextureGL`'s WebGL2 route draws only on the WebGL2 preview backend, which the harness does not create; `packages/html/test/html-browser.js` covers it. |
+| Core and stage stress | `npm run check:core-stress` (`scripts/core-stress.mjs`, 1,000 seeds a family), a CPU step of `check:merge` after verify; the same files in the core and stage package tests (40 and 30 seeds), so the fast gate runs them whenever core or stage changes | Seeded runs of the real built `Engine`, `FrameGraph`, `GPURenderer` and `Stage` on a fake WebGPU device and frame queue check lifecycle, async and error-path invariants: one frame loop, no GPU call after dispose or on a destroyed device, every error reported once (engine errors with a code), every pick settled with the right mesh, a lost device restored, no unhandled rejection. A failure prints its seed; `MARGO_STRESS_SEED=<seed>` replays it. See "Core and stage stress check" below. |
+| GPU/package checks | `check:views`, `check:gpu-packages`, `check:depth`, `check:wgsl`, `check:no-webgpu` | Scoped rendering, shader, package, depth, fallback, and view behavior. `check:gpu-packages` refuses to plan while a `scripts/*-gpu-check.js` file is named by no command, unless `LOOSE_CHECKS` states why: on 2026-11-07 twenty-two such files ran by hand only and five had rotted. The list is empty since 2026-11-11, when `scripts/ssao-gpu-check.js` joined post as `test:gpu:ssao` (KB1900). A check that compares with an earlier build (`--baseline`) says so and goes on when no baseline is on disk, since that proof belongs to one change. Since 2026-11-16 (KB-GPURUN-HOLD60) `check:gpu-packages` has no whole-run limit, so a long `--select` run is not ended with nothing hung: each suite keeps its own limit, covering its run and one rerun after a driver reset, and its builds, heat pauses and the gaps between suites are not limited. Since 2026-11-18 (KB-POSTFX-DOFSTALE1) a root suite that checks one package's own shaders or kernels is listed in `ROOT_OWNERS` with its owners, and each owner runs it from its own GPU script (`"test:gpu:postfx": "cd ../.. && npm run modern:test:postfx:browser"` in dof and tonemap; sky, usdz, decoders and gltf, and physics2d likewise), so the fast gate's changed-package GPU tests run it on WebGPU and with `MARGO_COMPAT=1`; `plan()` folds those scripts into the one root test (`--only=<package>` and `--select=<package>/<script>` reach it), so a full or affected run still runs it once. `tests/gpu-root-owners.test.js` fails on an owner with no such script and on a root suite whose files import `/packages/<name>/src/` without that package among its owners. The postfx suite's hand-built DOF and tonemap bindings went stale on 2026-11-15 and no push ran it. |
+| README examples run | `npm run check:readme-run`, a step of `check:merge` after a build, GPU, 296 s on 2026-11-07 (about 25 minutes when first measured). Whole in the full check after a push; on a narrowed run, the examples of the affected packages, or all of them when a file the step runs changed. In no gate before the push and not in `verify`. An example's id is the heading above it and a hash of its code, never its place in the file, so the known list survives a new example above a listed one. A README edit renames the example it changes, so `tests/run-readme-examples.test.js`, in `verify`, fails while the known list names an example no README holds: 8 such entries went unseen until this step ran on 2026-11-07 | Runs every example of every package README and guide as a reader would paste it: in Node when it can, else in a real Chromium page with WebGPU, the elements it asks for and a real sample file of the format it fetches. Passes when nothing threw, no promise was left rejected and the GPU reported no validation error; a Node example still going at 30 s passes, as a server does. A failure off `scripts/support/readme-run-known.json` fails, and so does an entry left on it that passes or names an example that is gone. Examples that listen on one port take turns. Each page example launches and closes its own browser, GPU process included, inside its 20 s deadline: closing only the page left the previous example's shader-compile teardown in a shared GPU process, which stalled the next example's adapter request (2026-11-11). 641 of 767 ran on 2026-11-07; the 126 left are in docs/known-bugs.md. |
 | Consumer packaging | `modern:test:packages`, bundler matrix, quickstart | Packed declarations, docs examples (the same examples as `check:readmes`, against the tarballs, with no known list), browser packages, bundlers, licenses, and documented first use work. |
 | Release rehearsal | `publish:rehearsal` (in `publish:dry-run` and the publish workflow) | Every tarball audited, then the one-line install, every entry imported and type-checked, and every template built, from a stand-in registry that refuses writes. |
 | Public truth | `tests/public-truth.test.js` | Structured license and package-count statements match their canonical sources. |
@@ -2850,7 +3666,7 @@ scope matters. So does the audit of 2026-11-06: the 44 B of `Engine.renderTarget
 `docs/limits.md`, while 11 other files kept 22,815 B or older, `claims.md` among them, and a replace of the current figure had
 rewritten the dated 22,189 B of the 2026-10-30 cleanup in `docs/limits.md`. Core alone read 21,134 B there; it is 21,285 B.
 
-The benchmarking protocol uses AC power, a shared GPU-resource lock, a whole-machine idle gate, warmup, repeated
+The benchmarking protocol uses AC power, a whole-machine idle gate, warmup, repeated
 measurements, between-case load checks, fixed browser/canvas conditions, and a spread validity limit. Defaults at the
 snapshot were one warmup, five measured runs, 300 frames after 60 warmup frames, at most 10% spread, and a 5%
 regression threshold (1% for bytes). Report median; with five runs p95 is the slowest sample.
@@ -2879,6 +3695,7 @@ slower baseline is invalid; compare the run's baseline against the recorded base
 | GPU driver reset produced a misleading code failure | One evidence-backed retry with explicit result annotation. |
 | Public generated records or prose drifted | Revision-stamped generation, public-truth checks, and whitepaper evidence. |
 | A number field declared in a class started as `undefined`, so each write of a fraction allocated | `tests/class-fields.test.js`. |
+| Lifecycle, async and error-path bugs in core that each test missed alone: a pick answering null while other meshes changed (B1), a pass's exception taken as a device loss (B2), a loss before the watcher started heard by nobody (B3), one validation error stopping every later frame (B4), two frame loops after `stop()` and `start()` in a callback (B6), all found by the 2026-11-11 core audit | `npm run check:core-stress` and the core and stage package tests (`tests/deep-core-stress.test.js`, `packages/stage/tests/stress.test.js`, harness `tests/support/core-stress.js`). |
 | A GPU script nothing ran failed unseen (`area-lights-gpu.mjs` still mirrored a display curve core left on 2026-10-17) | The script runs in `test:gpu:area` of `packages/clustered`, and a correctness run no longer overwrites the bench record. |
 | A pass other than the colour pass drew a material's whole surface | `packages/materials/test/cutout-passes-browser.mjs` (picking, contact shadows, TAA velocity) and `packages/shadows/test/cutout-casters-browser.mjs` (every shadow map pass, virtual included) read pixels and velocities through a cut-out, a displaced surface and a clipping plane. |
 | A node graph's vertex offset and discards reached only the colour pass | `packages/shader/test/passes-check.mjs` compares a moved caster with a plain mesh placed there in `Shadows`, `VirtualShadows`, `LocalShadows` and integrated clustered shadows, and a cut caster with a half-sized one. Depth passes take the graph through the `displacement` record of a primitive (`CasterDisplacement` in `packages/shared/caster.d.ts`), so caster caches treat it as moving. Still missing: TAA velocity for such a surface (docs/limits.md). |
@@ -2919,6 +3736,62 @@ Evidence limits: one family, two formats, one Windows GPU/browser, no speed clai
 CID CFF/CFF2, variations and shaping remain outside this entry; severe bevels throw instead of intersecting.
 The all-glyph test covers unbeveled solids; synthetic cases cover rounded/chamfered bevels, holes and invalid offsets.
 
+### Core and stage stress check (2026-11-11)
+
+The 2026-11-11 audit of core and the stage (docs/work-lists/core-stage-audit-plan.md) found five lifecycle bugs that
+no test caught, each in a path a test drives only in one order. The stress check drives those paths in many orders.
+`tests/support/core-stress.js` installs a fake WebGPU binding (adapter, device, queue, encoders, canvas context, a
+`device.lost` promise and `uncapturederror` events the run controls) and a fake `requestAnimationFrame` queue, then
+runs the real built core and stage on them, on the CPU. Each run takes one seed (mulberry32) that decides every step;
+nothing reads the clock, and the only timer is a 10 s hard limit per run that fails a run that hangs.
+
+Families (core: `tests/deep-core-stress.test.js`; stage: `packages/stage/tests/stress.test.js`):
+
+- Picks while meshes change (B1 class): picks wait on their readback while other meshes are created and removed and
+  the mesh under the cursor is disposed and its slot reused. A pick must answer the mesh the readback saw when that
+  mesh is still alive, and null otherwise. Through the stage too, with `stage.box` and `stage.sphere`.
+- Errors in every pass (B2, B4 class): an ordinary error, a `DOMException` InvalidStateError or OperationError on a
+  healthy device, a real loss (the device is lost, then the pass throws), an uncaptured validation error and an
+  out-of-memory error, thrown in turn from plugin `onPreUpdate`, plugin passes, a pass with no plugin, core's main pass
+  and an `onFrame` callback. A non-loss error must reach `onError` exactly once and keep the device, and a frame (the
+  loop restarted as an app would) must draw within five refreshes; a loss must restore and draw.
+- Device loss at every startup step (B3 class): the device lost at `requestDevice` (an already lost device), at either
+  pipeline compile, at `getContext`, at `configure`, just after `Engine.create` resolves, and at the same steps of the
+  first automatic restore and just after it. The engine (and `createStage`) must restore and draw again.
+- Re-entry (B6 class): `stop()`, `start()` and `dispose()`, alone, twice and in pairs, from `onFrame` (`stage.onTick`),
+  `pace`, plugin `onPreUpdate`, passes (stop and start only) and `onError`. After every refresh: at most one frame
+  waiting, one only while running, none after dispose, at most one frame drawn per refresh, every plugin disposed once.
+- Dispose during async work: while picks wait, while an automatic restore waits at any of its steps, during startup
+  (an aborted `signal` at each async step) and, for the stage, while feature loads (`attachPlugin`) wait. Every pick
+  settles, every load rejects with AbortError and attaches nothing, `stage.signal` aborts and the canvas leaves.
+
+Every run ends with the same checks: every device destroyed after dispose, no GPU work after dispose or on a destroyed
+device (destroy, unmap and unconfigure are allowed), each injected error reported once, every other reported error a
+coded MargoError, nothing reported after dispose, no unhandled rejection, every pick settled. Seeds per family: 40
+(core) and 30 (stage) in the package tests, 1,000 in `npm run check:core-stress`, which therefore proves seeds the fast
+gate never reaches. `MARGO_STRESS_SEED=<seed>` replays one seed, `MARGO_STRESS_RUNS=<n>` sets the count, and
+`MARGO_STRESS_ALL=1` keeps going and lists every failing seed per violation (the proof runs below used it).
+
+Proof on origin/main 5cec694949, before the fixes: every family failed. First failing seeds: B1 177 (core) and
+2654437218 (stage); B2 2654435939 (OperationError in a pass) and 387277095 (InvalidStateError); B3 179 (lost at
+requestDevice), 186 (lost in the first restore) and 1460 (createStage); B4 178; B6 182 (core) and 1462 (stage). A
+leave-one-out run with local stand-ins for every fix but one failed only the families of the one left out, each time.
+The same runs found three more defects, recorded in docs/known-bugs.md: a restore that keeps building on a new device
+after dispose, dispose inside `onPreUpdate` reporting "Transforms disposed", and `stop()` inside `pace` leaving a
+second loop (the pace path of B6).
+
+Proof after the fixes (2026-11-15): with B1 to B4 and B6 on main and the three found here fixed in core (KB-STRESS-1
+to 3, docs/known-bugs.md), `npm run check:core-stress` passes all 26 tests, 1,000 seeds a family, in 30 s on the dev
+PC, and the seeds that failed (182, 2654435943, 3668340200; stage 1462) pass. Each of the three has its own focused test
+in `packages/core/tests` (pace-stop, pre-update-dispose, restore-dispose) that fails without its fix.
+
+What it does not cover: real GPU timing and a browser's real event order (the fake device decides when a loss or a
+readback lands, at points a browser could reach); `dispose()` inside a frame-graph pass (audit row B10, open, so passes
+only stop and start the loop); pick re-entry from `onPreUpdate` (B7), subtree depth (B5), class-instance passes (B8),
+scene leaks (B9), target-view textures (B12) and the suspected rows B13 to B19; the WebGL2 compatibility renderer;
+stage feature entries past `attachPlugin` (glTF, sky, particles). No GPU-browser version is needed: every fault here
+is one a fake device can raise.
+
 ## 5. Current evidence gaps
 
 Batch 182 volume: [clean-room controls](../sciviz-rivals.md) expose public GPU counts and exact repeated frames without smoke timing. The allocation regression removes two transient matrices per prepare with identical uniform bytes, including singular transforms and restoration. Scene-depth capture and multisample composition remain supported and counted; equal shader work and quiet rival timing remain unproven.
@@ -2944,19 +3817,25 @@ Missing: no GPU test draws a mesh at 2^24 yet.
 
 ### 5. glTF primitives of any size as parts (2026-11-10)
 
-gltf-pro packs a primitive with more vertices than `maxPartVertices` (default 262,144, 20 MiB of 80-byte vertices) as
-parts (`packages/gltf-pro/src/parts.ts`): Morton order of element centroids (30-bit keys, three 10-bit radix passes),
+gltf/pbr packs a primitive with more vertices than `maxPartVertices` (default 262,144, 20 MiB of 80-byte vertices) as
+parts (`packages/gltf/src/parts.ts`): Morton order of element centroids (30-bit keys, three 10-bit radix passes),
 then a greedy cut with a per-part vertex remap, so every part's vertex buffer fits the storage binding of a default
 WebGPU device (128 MiB) and of the WebGL2 layer on a 2048 context (64 MiB). Up to 2^24 vertices a primitive, as index
 accessors decode through float32. Each part is its own PBRPrimitive, uploaded, culled and picked on its own and kept out
-of static batches; an upload over the device binding throws naming `maxPartVertices`. Evidence: [parts.test.js](../../packages/gltf-pro/tests/parts.test.js)
+of static batches; an upload over the device binding throws naming `maxPartVertices`. Evidence: [parts.test.js](../../packages/gltf/test/parts.test.js)
 (1,001,000 vertices: 4 parts, identical triangle multiset, 0.37% copied, BLEND order, points and lines, worker and prepared
 paths, refusals), exporters [split-primitive.test.js](../../packages/exporters/tests/split-primitive.test.js) and the lod
-autoLOD part test. Missing: GPU pixel equality against a pre-split reference and the 10M-triangle frame time on the
-A6000 and an iGPU (the speed-phase inventory). Progressive loads (2026-11-11) stream a split primitive part by part:
+autoLOD part test. GPU evidence (2026-11-14): [test-parts-browser.mjs](../../packages/gltf/scripts/test-parts-browser.mjs)
+draws a 10M-triangle field split at 2^16, 2^18 and 2^20 vertices with exactly the multisample samples, draws and
+triangles of a reference pre-split at export into the same parts in the same order (natively; resolved pixels on the
+WebGL2 layer), with a mutation leg (a part dropped, two index lists swapped, a part drawn twice must each fail), and
+with exactly the coverage of a 20-row-band reference. Coverage only for the row bands: on the Apple M6 the samples of a
+multi-million-triangle frame depend on the draw order (docs/known-bugs.md). Run on the A6000 and the Radeon 680M
+against the row bands (2026-11-11) and on the Apple M6 in its current form. Missing: the 10M-triangle frame time on
+the A6000 and an iGPU (the speed-phase inventory). Progressive loads (2026-11-11) stream a split primitive part by part:
 the worker posts one message per part as it packs it, the first part replaces the placeholder box and each later one is
 inserted after the previous part on every node that uses the mesh (`PBRModel.insertPart`), so `complete` equals
-`loadGLTF` byte for byte ([progressive.test.js](../../packages/gltf-pro/tests/progressive.test.js), grids and a textured
+`loadGLTF` byte for byte ([progressive.test.js](../../packages/gltf/test/progressive.test.js), grids and a textured
 helmet at `maxPartVertices` 1,024, main thread and worker, with and without range requests). Steady-frame work is
 unchanged: one draw per part, as a plain load.
 
@@ -2985,7 +3864,7 @@ explicitly installs a page-wide layer; no install or Wasm fetch occurs on import
 core/stage, rendering math, browser shutdown infrastructure or timing gate changes.
 
 
-The assigned batch-273 fragment-unit overflow is repaired in gltf-pro by packing five base maps into RGBA32F layers for high-resource physical/extended permutations. The original composed pipeline test still asserts no shader or pipeline errors. CPU regressions retain every extension binding and each base-map sampling path; a 360-case actual-device sampler oracle checks distinct sizes, mips, sRGB, HDR, all filter/wrap modes on both backends. Native fixed-precision interpolation differences are reported separately from the continuous sampling oracle. Array allocation/upload cost is explicit in limits; core and compatibility translator are untouched.
+The assigned batch-273 fragment-unit overflow is repaired in gltf/pbr by packing five base maps into RGBA32F layers for high-resource physical/extended permutations. The original composed pipeline test still asserts no shader or pipeline errors. CPU regressions retain every extension binding and each base-map sampling path; a 360-case actual-device sampler oracle checks distinct sizes, mips, sRGB, HDR, all filter/wrap modes on both backends. Native fixed-precision interpolation differences are reported separately from the continuous sampling oracle. Array allocation/upload cost is explicit in limits; core and compatibility translator are untouched.
 
 Batch 201 DDS: per-device native BC or CPU RGBA/linear RGBA16F fallback, retained mip bytes and device-restoration upload are covered by CPU tests and native/fallback GPU pixel comparisons on WebGPU and compatibility. Signed/HDR fallback is owned by decoders/bc; DDS container parsing remains decoders/dds. Float32 filtering needs the enabled device feature. No core/stage change or speed claim.
 
@@ -3000,7 +3879,7 @@ Batch 136 moves default Draco encoding into one optional clean-room Rust/Wasm SI
 
 Batch 193 export-cube: the CPU bake evaluates the live Grade uniform snapshot, including both stages of curve lookup. Five grade configurations compare against native and full-compatibility WGSL at 729 lattice nodes within 0.000003 (packages/tonemap/tests/export-cube-browser.mjs). No GPU readback or new rendering pass is needed by the exporter. Off-lattice interpolation error depends on the authored grade and export resolution; no general bound is claimed.
 
-Batch 194 job 3 adds model/material hatching through optional material-draw adapters, sharing validated pattern controls and WGSL with the core effect. Linear ink precedes tone/display/output hooks. The blocking gltf-pro bug deferred run batches beyond the adapter record lifetime; each explicit adapter layer now encodes before its synchronous draw returns. CPU regression fails without the change. Independent native/compatibility pixel masks and real Fox restoration prove model coverage; gltf-pro own GPU suites and dependent CPU suites cover the owner fix. No core/stage or speed change claimed. Primary-sun tone and screen-fixed strokes remain the documented pattern limits. See toon-parity.md.
+Batch 194 job 3 adds model/material hatching through optional material-draw adapters, sharing validated pattern controls and WGSL with the core effect. Linear ink precedes tone/display/output hooks. The blocking gltf/pbr bug deferred run batches beyond the adapter record lifetime; each explicit adapter layer now encodes before its synchronous draw returns. CPU regression fails without the change. Independent native/compatibility pixel masks and real Fox restoration prove model coverage; gltf/pbr own GPU suites and dependent CPU suites cover the owner fix. No core/stage or speed change claimed. Primary-sun tone and screen-fixed strokes remain the documented pattern limits. See toon-parity.md.
 Batch 240 job 3 adds an optional voxel vertex-motion port shared by colour, depth, shadows and surface-capture construction. Animated faces stay unit-sized, detailed shapes use the established CPU mesher path, and culling bounds include maximum displacement. CPU evidence covers bounded/rooted/world-continuous motion and resource lifetime; native/compatibility pixel evidence covers clock repeatability, zero wind, live removal, plain/chamfer geometry, shadow and depth binding. A separate moving surface-capture pixel check is still a fix-phase quality follow-up. Core and stage remain untouched.
 
 
@@ -3013,6 +3892,8 @@ Batch 194 job 2 adds optional toon/screen-outline with no core/stage change. It 
 
 Batch 193 hue: HueGrade patches Grade in its existing Tonemap presentation pass, preserving HDR excess. Native WebGPU and full WebGL2 compatibility float-target swatches cover identity, positive/negative primary cycles, circular selective offsets and neutral colours; see packages/tonemap/tests/hue-browser.mjs. No extra pass or core/stage change. Luminance is not preserved by HSV rotation; no perceptual-uniformity claim.
 
+2026-11-16 grade primaries: `Grade` gains lift, gamma and gain per channel and saturation, `(gain (x + lift (1 - x)))^(1 / gamma)` then saturation about Rec. 709 luma (ASC Color Decision List v1.2, American Society of Cinematographers, 2009; ITU-R BT.709-6), first in `gradeColor`, and the CPU bake (`bake.ts`) follows them so an exported LUT holds them. The code and three more uniform vec4s are compiled only while one is away from its default (`key` turns `grade:tone`), so a Grade without them sends the GPU the program and data it did before: packages/tonemap/tests/grade.test.js checks the SHA-256 of key, patched shader and values against figures recorded at 3050f3bcc6 for Grade and HueGrade. Evidence: grade-browser.mjs on this PC's RTX A6000 (native and MARGO_COMPAT=1), lift 0.2 raises the darks 105 levels and the brights 10, gain 0.5 lowers the brights 56 and the darks 9, gamma 2 lifts the red box's green 52, saturation 0 greys every pixel, 2 widens the red box's red-blue gap 165 to 222, and the defaults again give the default frame exactly. Missing: no GPU cost figure (speed phase).
+
 Batch 238 job 4 adds two optional modifier compute passes around splat projection. Pre-pass writes canonical-space position/opacity before sorting; post-pass edits evaluated SH/fog colour before relighting. CPU canonical snapshots guarantee non-accumulation and restoration. Both-backend GPU evidence covers degree-4 analytic colour, extended opacity, seek identity, disable/setRest/restoration callbacks, ownership and pixel-exact restoration of the existing real capture. No covariance deformation, learned field or timing claim. Core/stage stay unchanged.
 
 Batch 190 job 1 adds optional oit/peel without core/stage changes. Private depth32float selection and R32F previous-depth sampling peel nearest distinct depths without storage buffers or float32 blending, then resolve far to near against opaque scene depth. Both native WebGPU and the full WebGL2 compatibility layer pass analytic crossing/occlusion/order/post/alpha checks and a real CC0 Khronos PBR asset. CPU recording covers multiview resize, restoration and disposal. Transparent edges are pixel-centre sampled even when the opaque scene is multisampled; coplanar surfaces share one depth. No speed claim or timing gate was added.
@@ -3022,7 +3903,7 @@ Batch 203 JPEG: the decoder and exporter use one shared clean-room CPU implement
 Batch 206 clips: OpenUSD public-API pose/topology oracles cover composed clip values. Direct and worker models render the same pose; the managed player changes caches and releases prior frames on both backends. Clip metadata provenance is opt-in and stays within optional usdz composition. The frame player preserves arbitrary topology with full model replacement; reuse timing is deferred to the speed phase.
 
 
-Batch 206 PreviewSurface: independent alpha sampling and numeric primvar storage use existing PBR material shading hooks and later-UV input. Indexed/topology and geometry-budget regressions run on CPU; native/compatibility direct-worker GPU tests exercise upload, interpolation and disposal. uploadImage now declares the WebGPU external-copy destination usages, tested in its owning gltf-pro package. No core/stage feature.
+Batch 206 PreviewSurface: independent alpha sampling and numeric primvar storage use existing PBR material shading hooks and later-UV input. Indexed/topology and geometry-budget regressions run on CPU; native/compatibility direct-worker GPU tests exercise upload, interpolation and disposal. uploadImage now declares the WebGPU external-copy destination usages, tested in its owning gltf/pbr package. No core/stage feature.
 
 
 Batch 238 job 3 adds optional streamed SOG and extends splats GPU SH projection through degree 4. Native and compatibility checks read analytic Y(4,0) and opacity 1.5625 and compare an 8,385-record streamed capture pixel-for-pixel against a resident pool. Structural branches refine unconditionally and allocate no slots. CPU regressions cover uneven-node slot exhaustion, environment, shared cancellation and degree-4 rotation. Core/stage remain unchanged. Whole-chunk decoding and existing first-order display/linear SH mapping remain accepted limits; see limits.md.
@@ -3036,14 +3917,14 @@ Batch 206 curves: CPU basis/cardinality/width tests plus direct and worker GPU c
 
 Batch 238 formats: the CPU container readers reuse existing normalized quaternion covariance and linear SH conversion. Independent packed-word tests cover all compressed PLY fields; real KSplat getter samples cover all three compression levels. formats-check.mjs renders real derivatives and a PLY export on WebGPU and compatibility, without adding GPU mathematics or passes. No speed or memory reduction proof is claimed.
 
-Batch 232 lunar GPU maths: `scenery/moon` uses ray/sphere intersection at the far
+Batch 232 lunar GPU maths: `sky/moon` uses ray/sphere intersection at the far
 plane with read-only reversed-Z depth, sRGB texture decoding, world-space lunar
 north and a Lambert terminator plus complementary Earth phase. CPU and GPU
 regressions cover lifecycle, orientation, phases and occlusion at 1x/4x sampling.
 It uses the same optional backdrop on native WebGPU and full WebGL2 compatibility;
 core and stage are unchanged. It makes no calibrated lunar photometry claim.
 
-Batch 231 textured scatter reuses gltf-pro PBR instancing and its MASK depth casters rather than adding a renderer. Native WebGPU and full WebGL2 compatibility compare two real licensed Khronos plants to independent model copies, byte-identical at 1x/4x MSAA, with normal/mask/shadow controls and device restoration. CPU coverage includes affine conjugation with non-dyadic node scales, nested instances, tint/UV retention and disposal. Core/stage and their GPU math are unchanged.
+Batch 231 textured scatter reuses gltf/pbr instancing and its MASK depth casters rather than adding a renderer. Native WebGPU and full WebGL2 compatibility compare two real licensed Khronos plants to independent model copies, byte-identical at 1x/4x MSAA, with normal/mask/shadow controls and device restoration. CPU coverage includes affine conjugation with non-dyadic node scales, nested instances, tint/UV retention and disposal. Core/stage and their GPU math are unchanged.
 
 Batch 246 job 3: tilemap/plane composes the active core camera with a map-pixel affine basis and loads/stores the existing reversed-Z scene depth. It adds no core or stage path. Independent all-pixel ray-plane proofs cover perspective, camera movement, ordinary mesh occlusion, alpha holes and distinct view cameras on WebGPU and WebGL2 compatibility. CPU tests validate matrix order, mutation and depth controls. No speed or picking evidence is claimed.
 
@@ -3061,7 +3942,7 @@ Batch 207 meshopt: section-exact round trips cover seven file variants, plus bou
 
 Batch 261 labels/gpu owns screen-space glyph expansion, SDF coverage and a single instanced draw, with priority-grid layout on CPU. Real WebGPU, native WebGL2 and compatibility WebGL2 evidence covers 100k labels, constant 87 by 30 pixel text at 5 and 50 units, behind-camera culling, cleanup and zero WebGPU validation errors. Atlas and buffer bounds are explicit; terrain occlusion and incremental upload are outside this entry. Core/stage stay unchanged.
 
-Batch 209 headless/null uses the existing renderer injection API with a no-op renderer. Core/stage code and GPU math stay unchanged. CPU evidence proves real hierarchy matrices, multi-scene plugin isolation, animation sampling, disposal and no GPU request. No GPU rendering work is introduced or claimed, so this entry needs no GPU slot.
+Batch 209 headless/null uses the existing renderer injection API with a no-op renderer. Core/stage code and GPU math stay unchanged. CPU evidence proves real hierarchy matrices, multi-scene plugin isolation, animation sampling, disposal and no GPU request. No GPU rendering work is introduced or claimed, so this entry needs no GPU.
 Batch 205 large: input/decoded/array/scene/geometry/texture/output budgets are per import and remain
 cumulative before allocation. CPU proof covers 200 MiB input and 2,500,002 complete expanded vertices.
 GPU/worker proof enforces a deliberately small vertex cap before a successful textured draw on both backends.
@@ -3075,7 +3956,7 @@ Batch 207 object actions: local hierarchy is checked against Blender evaluated w
 
 Batch 209 headless/tiles: optional capture crops a copied view-projection in clip space and reads bounded WebGPU tiles. CPU coverage includes cancellation and alpha-aware linear accumulation. tiles-gpu.mjs checks exact full-frame equivalence, four-sample coverage, canvas restoration and output wider than the real GPU limit; WebGL2 refusal is explicit. Nonlocal or temporal effects remain outside tiled still correctness. No core or stage code changes.
 
-Batch 208 cache browser evidence now includes prefetch and throttle in native window/service worker realms and exact offline RangeCache bytes from a replacement worker instance. Tests scope registration changes to their origin and use respondWith/waitUntil for lifetime. The existing test:browser command owns this storage-only proof; no GPU slot or rendering backend check is needed. Real throughput remains in the deferred speed-phase list.
+Batch 208 cache browser evidence now includes prefetch and throttle in native window/service worker realms and exact offline RangeCache bytes from a replacement worker instance. Tests scope registration changes to their origin and use respondWith/waitUntil for lifetime. The existing test:browser command owns this storage-only proof; no GPU or rendering backend check is needed. Real throughput remains in the deferred speed-phase list.
 Batch 205 textures: exact embedded/external TGA, DDS, TIFF and BMP pixels are checked in CPU conversion tests.
 `packages/fbx/test/textures-browser.mjs` renders all four on the page and in the FBX worker through the real PBR pipeline and reads back red pixels
 on WebGPU and the WebGL2 compatibility layer. Raw DDS pixel conversion has its own decoder entry to avoid
@@ -3083,13 +3964,13 @@ pulling unrelated Basis/KTX2/image decoders into the classic FBX worker. No core
 
 Batch 208 cache/decoded adds a 4,540 B gzip ceiling (4,284 B measured, previously absent) for a coherent typed-result cache over the existing transactional storage. Browser proof uses real shipped Draco/KTX2 workers and the attributed Box/Rib_N assets, then verifies all array hashes and metadata across reload without a second decode. CPU tests cover key partitions, cancellation, storage failure and eviction; this path does not submit GPU work.
 
-Batch 208 cache/stream: the optional entry has a 3,654 B gzip ceiling for pull-driven network bodies and complete-body IndexedDB commits. Node tests exercise cancellation, abort, failed bodies and storage budgets; the cache browser check holds the attributed SheenChair response open until its prefix is received, then checks exact SHA-256 storage equality. This storage-only browser proof needs no GPU slot; no rendering backend behavior or timing claim changes.
+Batch 208 cache/stream: the optional entry has a 3,654 B gzip ceiling for pull-driven network bodies and complete-body IndexedDB commits. Node tests exercise cancellation, abort, failed bodies and storage budgets; the cache browser check holds the attributed SheenChair response open until its prefix is received, then checks exact SHA-256 storage equality. This storage-only browser proof needs no GPU; no rendering backend behavior or timing claim changes.
 
 Batch 257 job 3: native Chromium pointer lock is proved across the canvas bridge with a trusted click, worker PointerLockControls rotation and worker-requested native exit. Six CPU cases cover state, exact deltas, permission/error paths, cancellation and ownership/disposal. This changes input forwarding only; rendering backends and core/stage remain unchanged.
 
 Batch 257 job 2: automatic worker/page selection is proved with one shared scene module and six rendered worker/page/fallback cases across WebGPU and WebGL2. Capability/module preparation precedes irreversible canvas transfer. Worker runtime failures propagate; cleanup is acknowledged over RPC before termination. Native Firefox/Safari evidence is the separate batch job 4.
 
-Batch 253 input evidence: `packages/input/test/input-browser.mjs` acquires native pointer lock from a click, drives a mesh transform through vector and locked mouse action channels, checks rendered pixel movement, then checks return after release. WebGPU and WebGL2 compatibility both pass. The package's `test:browser` registers this rendering proof in the GPU suite; changed-package GPU checks use a shared slot only. Physical XR controllers, hand tracking and raw mouse fidelity still need hardware acceptance; CPU fixtures cover their action/replay contracts and raw capability negotiation. No new rendering algorithm or speed claim.
+Batch 253 input evidence: `packages/input/test/input-browser.mjs` acquires native pointer lock from a click, drives a mesh transform through vector and locked mouse action channels, checks rendered pixel movement, then checks return after release. WebGPU and WebGL2 compatibility both pass. The package's `test:browser` registers this rendering proof in the GPU suite; changed-package GPU checks run for correctness only. Physical XR controllers, hand tracking and raw mouse fidelity still need hardware acceptance; CPU fixtures cover their action/replay contracts and raw capability negotiation. No new rendering algorithm or speed claim.
 Batch 257 job 1: worker RPC adds typed task dispatch and fixed FIFO pools without renderer changes. CPU proof covers actual worker transfer, cancellation, concurrency and transport errors; the worker GPU fixture also checks browser RPC. Existing thread-independence timing budgets are deferred by speedEnabled() during the build phase, with their original bars in the speed-phase inventory. Render, pick, sizing and input assertions still run on both backends.
 
 Batch 273 array-layer repair separates adapter capacity from the unrequested
@@ -3166,6 +4047,51 @@ derivative checks and lifecycle invalidation. No CPU FFT or geometry build,
 implicit readback, core/stage change or speed claim. Other GPUs/browsers and
 release throughput remain unmeasured.
 
+KB-WATER-SURF1 water surf (2026-11-16): terrain-coupled open sea gets analytic breaking surf by default
+(packages/water/src/surf.ts). When the coastal flow starts, a compute pass seeds deep-water source cells and relaxes an
+8-neighbour eikonal (Jacobi ping-pong, width plus height sweeps) for each open-sea cell's travel time and source point,
+stored after the connectivity words (32 B a cell). The vertex and fragment shaders read it bilinearly: each swell
+component takes the phase it had at its source tau seconds earlier, the travel-time gradient as its wavevector (Snell),
+the Fenton and McKee depth wavenumber, linear shoaling and a 0.78 depth cap on the components' combined phasor, with
+the Abreu 2010 waveform (Ruessink 2012 skewness and asymmetry) and closed-form roller and trail foam. The relaxation
+zone (0.9 to 0.35 m) drives the flow's height and flux toward it; the flow keeps the inner surf and swash. Evidence:
+packages/water/test/surf.browser.mjs on WebGPU and the WebGL2 layer (shoaling, breaking depth, no offshore breaking or
+foam, the run-up below) and dune-coast stills judged by eye. Missing: other GPUs, timing (build phase).
+
+KB-WATER-SWASH1 coast flow (2026-11-18): Water's own coast flow (packages/water/src/coastal.ts) is no longer a virtual
+pipe (each outflow driven by its own cell's depth, no momentum carried, a 0.12 /s decay: the NOAA solitary wave ran up
+0.0129 of 0.0861, the surf test's swash 0.014 m). Maths: on the same staggered grid (depth at cells, discharge q at
+faces, stored as each cell's four outflows, which the integrate kernel, spray and queries read unchanged), each face
+takes q' = q - dt [d(q u)/dx + d(q v)/dy] - dt g hp dzeta/dx, the momentum-conservative q-form of Stelling and
+Duinmeijer 2003 (https://doi.org/10.1002/fld.537): along the face, the mean discharges of the two cells beside it carry
+u* (their upwind face's velocity, Koren-limited second order); across it, the corner discharges carry the neighbouring
+face's velocity, first order. u = q / h with h the local inertial flow depth (higher surface over higher bed; Bates et al.
+2010, https://doi.org/10.1016/j.jhydrol.2010.03.027), which also stops a dry face; hp, the pressure depth, is the mean
+of the two cells' depths over the face's bed, so on a flat bed g hp dzeta is the difference of g h^2 / 2 (with h alone a
+Stoker bore ran 5.6% fast). Manning n = 0.02, semi-implicit (Chertock et al. 2015 form); the face speed is capped at half
+a cell per step. Each cell works out its four faces in one loop and the face's neighbours' velocities in another, so an
+inlining compiler makes one copy of the face function (KB-WATER-SURFCOMPILE1). The surf's sea drive of the open-sea
+outflows is masked to wet faces by the same flow depth (test/flow.browser.mjs: the spin-up leaves an enclosed pond at
+the still level and no water crosses high ground). Spin-up: the surf's clock lives in two
+words after the surf field in the `connected` buffer (shift, step); one-invocation kernels set it to -40 s and 1/45 s,
+advance it every three steps and clear it, and the flow kernels read their step and the surf's time shift from it, so
+the first frame records 600 frames of 3 steps (3,600 flow dispatches and 602 clock dispatches) before its own. Evidence:
+packages/water/test/coast-runup.test.js on a float64 twin (test/coast-reference.js) whose defining lines are pinned to
+the kernel: NOAA solitary run-up 0.0874 against 0.0861 (Synolakis 1987), a wet dam-break bore 2.950 m/s against Stoker's
+2.958 with the middle depth exact, a lake at rest over steps and an island exact, volume kept to 1e-12;
+packages/water/test/surf.browser.mjs on WebGPU and the WebGL2 layer: 0.126 m run-up in the first wave period and over
+31 s later, within 30% of Hunt's 0.155 m (Stockdon et al. 2006 significant 0.238 m); rivers.test.js keeps the KB5736a
+fall under free fall. Missing: run-up at Stockdon's significant value needs finer cells or a second-order front; no wave
+setup; other GPUs; timing (build phase; the first frame cost is in docs/limits.md, Water surf).
+
+KB-WATER-SURFCOMPILE1 water shader copies (2026-11-17): a shader compiler inlines every function call (HLSL has no
+real calls; the WebGL2 layer's ANGLE D3D11 backend hands its HLSL to FXC), so a stage that calls a large function at
+three sites compiles it three times. Caustics' beams and range and the surface capture's field and probe stages now
+take their three triangle corners from one call to `surface()` in a loop. Evidence: packages/water/test/surface-copies.browser.mjs
+counts the inlined copies per entry point from the WGSL (static, any machine); on this PC's A6000 (ANGLE D3D11) the
+first frame of Water, Caustics and Underwater went from 22 to 26 s of compile to 13.7 s. Missing: other GPUs and
+drivers; FXC's own per-copy cost is measured, not documented by Microsoft.
+
 Batch 234 water `/fft`: a separate GPU spectrum/evolution/2D-FFT/folding-foam
 pass owns all of its buffers and writes surface colour and depth at order 4.
 Core and stage are untouched. The [batch record](../water-fft.md) defines the
@@ -3226,7 +4152,7 @@ resolve it. A raw WebGL2 OffscreenCanvas, using just the exact captured shader
 pair and compile/link/context-loss calls, also hangs; its simple-shader control
 links and loses context successfully. No texture, framebuffer, compute state or
 Margo module is needed for the raw failure. All failing process trees are killed
-at the unchanged 180 s limit, one shared slot at a time. The known monolithic
+at the unchanged 180 s limit, one at a time. The known monolithic
 D3D11 compilation defect and this context-loss interaction remain open. There is
 no runtime repair, native WebGPU failure claim or new speed measurement. A staged
 route must retain identical tracing work and output; its correctness is unproved.
@@ -3350,8 +4276,8 @@ Sciviz review validation closed (2026-11-10): after main's cf699846f and 20375ea
 teardown repairs, the review-only tree passes 143 scoped CPU tests, 30 base GPU,
 13 bricks, 10 entry, 6 replacement/cancellation and 28 demo cases. All 18 README
 examples finish inside the existing 20-second page budget and browser teardown
-succeeds. One shared slot runs the browser and README commands serially; no
-exclusive GPU hold or speed assertion ran. All eight head/star captures at both
+succeeds. The browser and README commands run serially; no
+speed assertion ran. All eight head/star captures at both
 required viewports/backends were visually reviewed, retaining 8 CSS-pixel spacing.
 
 The prior full verify's only failure was a stale paired size/network record.
@@ -3394,18 +4320,13 @@ compares axes, scatter, line and label volumes with native WebGPU on the layer a
 and LDR (mean 0.00004/255 at most, no pixel over 8/255, identical tick text), beside the existing surface, slice,
 volume, CPU isosurface, bars and heatmap cases. No GPU maths, kernel or core/stage change; WebGPU steady-frame work
 counts are unchanged because the removed branches ran only on the preview backend. Core + stage stays 24,812 B.
-No exclusive lock, benchmark, paired wall-clock measurement or timing assertion is part of this piece.
+No benchmark, paired wall-clock measurement or timing assertion is part of this piece.
 
 
 Half-float conversion retains the same source samples and output words while
 removing two temporary views per voxel. tests/f16-allocation.test.js checks all
 half words, signed ties and 574,992 fewer allocations for the default brick.
 No wall-clock speed claim is made.
-
-GPU coordination on Windows (2026-11-10): a real delete-pending directory handle reproduces `EPERM` on the
-shared lock's parent or mutex name. `makeLockDirectory` handles this as bounded acquisition contention (10 seconds
-per name), including older clients' in-place deletion; live ownership is never changed. Native Windows and
-deterministic tests in `tests/gpu-lock-mutex.test.js` also require permanent permission failures to remain visible.
 
 ### Voxel streaming budget admission (2026-11-09)
 
@@ -3421,7 +4342,7 @@ Batch 56 review repairs add a constant-size SH radiance-moment directional recei
 in optional staging/ground; ray-plane projection retains caster-height clipping.
 No core or stage change. Scene-target draws must call applyView; full local targets
 must declare why their viewport is local. The verify unit suite's
-`tests/environment-staging-view-state.test.js` checks every render-pass start in
+`tests/environment-studio-view-state.test.js` checks every render-pass start in
 environment/staging and tests the detector with missing-view and false-local inputs.
 Temporary TAA/TAAUpscale wrappers retain their unjittered source across optional
 bundle boundaries. The still controller supplies it at orders 19..21 and restores
@@ -3490,12 +4411,10 @@ unrequested climate fields; paired classifier outputs reduce export tile request
 to 1,024. Bounded worker batches have exact serial parity, including edits and cropped tiles,
 and settle every started job on failure. These are deterministic work/output proofs, not speed results.
 
-One runtime README GPU slot now owns one complete page lifecycle at a time; three concurrent
-pages previously competed inside that slot and the terrain-view example hit its unchanged
-20 s deadline. The gate still fails incomplete examples and preserves partial results. GPU mutex
-cleanup retires its reusable directory name before deletion. The native Windows regression
-holds a real delete-pending directory and reproduces the original EPERM, alongside portable
-contention/permission models and the existing legacy lock tests. Cross-device timing and
+The runtime README gate now runs one complete page lifecycle at a time; three concurrent
+pages previously competed with one another and the terrain-view example hit its unchanged
+20 s deadline. The gate still fails incomplete examples and preserves partial results.
+Cross-device timing and
 headset/phone/input-device gaps remain open; held physics sources are unchanged.
 
 BiomeView streaming and prefetch now share one raw generation per tile/revision, with independent
@@ -3685,7 +4604,7 @@ primitives, matched embedded camera/sun, neutral display transform and every pix
 PNG output. RTX A6000 RGB MAE 1.837511698404948 on WebGPU and 1.837506612141927 through WebGL2
 compatibility (1.7865498860677083 and 1.7865447998046875 since the height-correlated Smith G of 2026-11-11, whose
 budgets were re-recorded with Scott's ruling; docs/limits.md lists every moved batch 160 budget; 0.6997248331705729 and
-0.7010663350423177 since KB3240 of 2026-11-12, which weights gltf-pro's base direct diffuse by the dielectric Fresnel
+0.7010663350423177 since KB3240 of 2026-11-12, which weights gltf/pbr's base direct diffuse by the dielectric Fresnel
 of glTF Appendix B's metal/dielectric mix instead of the metal-mixed Fresnel, with the budgets lowered to match); native WebGL2 explicitly rejects PBR. See whitepaper/results/batch-160-metallic-roughness.json
 and scripts/reference-rendering/run.mjs. The remaining picture loss is open in known-bugs; other material
 families and the independent path-traced IBL/Cornell controls are still unmeasured. No core change.
@@ -3735,8 +4654,8 @@ shaping and arbitrary bevel topology changes are not proved by those checks.
 13. Only the upper core-stage bound is enforced; there is intentionally no lower bound.
 14. Public-truth checks cover license and package count, not every size or performance number, so a size figure in a guide or
     package README can go stale with no check failing (section 4.7).
-    README examples are held by `check:readmes` in `verify` since 2026-11-06, but 328 known errors remain (docs/known-bugs.md), so
-    those examples are not yet evidence that their package's types are right.
+    README examples are held by `check:readmes` since 2026-11-06, in every fast gate through `npm run quality` since 2026-11-18;
+    the known list is empty, so every example type-checks against its package's built types.
 15. Remote workflow configuration is not proof that a workflow actually ran.
 16. The quality classifier must keep a conservative full-mode fallback for genuinely unclassifiable or shared
     changes, while ordinary package changes remain affected-only.
@@ -3777,10 +4696,10 @@ shaping and arbitrary bevel topology changes are not proved by those checks.
       `verify`'s stage 2 (API reports, quality, parity table, sandboxes, root unit tests, docs links, README checks, size,
       proofs), `test:kernel`, `test:physics-kernel` and `test:physics2d-kernel` (since 2026-11-08).
     - Full set at 10:00: the CPU set (reused from an earlier run on the same commit), then every `check:merge:steps` step
-      after `verify` but `check:rust-kernels` (its kernels are in the CPU set), one at a time, each through the GPU lock as one shared slot (exclusive for its timing tests). No GPU
+      after `verify` but `check:rust-kernels` (its kernels are in the CPU set), one at a time (a timing test runs last, with nothing else of its run beside it). No GPU
       step starts from 12:00 to 20:00 (benchmarks); one that would is recorded as deferred.
     - Weekly quiet hour, Sunday 06:00 to 07:00: waits up to 20 minutes for the whole machine under 10 percent CPU, else
-      records "not quiet"; then, holding the GPU alone, Margo's two columns of the physics comparison harness (defaults
+      records "not quiet"; then, with nothing else on the GPU, Margo's two columns of the physics comparison harness (defaults
       and equal cost) and the three.js parity matrix (`bench/cli.mjs parity`, without the report that rewrites docs).
     Every step has a hard limit and a hang kills its process tree; nothing is retried, pushed or edited in tracked files.
     One run at a time (a lock with a heartbeat, reclaimed when dead). Results stay on the workstation, in the main checkout's git-excluded
@@ -4188,7 +5107,7 @@ The tracer agrees with the independent projected-solid-angle integral; blank ren
 caster/background/shadow checks. Across 15,472 exposed-ground pixels the darkness MAE is 0.048174.
 The fixed-blur nearness field does not reproduce broad hemispherical occlusion. Accepted difference
 (KB3193, 2026-11-11): the default is a footprint cue by design; AmbientShadows with `ambient: 1` measures MAE
-0.001561 on the same scene and reference, both backends (`packages/staging/test/sky-occlusion-browser.mjs`).
+0.001561 on the same scene and reference, both backends (`packages/studio/test/sky-occlusion-browser.mjs`).
 No runtime/core/stage changes and no speed or directional-light parity claim.
 
 
@@ -4228,7 +5147,7 @@ It uses single-mip 2D attachment views for cube/array and a 3D view with depthSl
 No core or stage changes. Unit checks reject invalid dimensions, memory, mips, layers and colors before recording.
 Real WebGPU full texel readback covers 78 generated subresources across rgba8unorm/rgba16float, partial draws
 with load, shrinking volume mips, explicit device loss and redraw on a replacement device. A real native WebGL2
-engine gets unsupported with help link. Reproduce with packages/creative/scripts/test-targets.js under gpu-lock.
+engine gets unsupported with help link. Reproduce with packages/creative/scripts/test-targets.js.
 No scene capture, depth, MSAA, automatic mip generation, other-device or speed proof. Entry 4027 B gzip.
 
 ### Adaptive music evidence (batch 110, section 5)
@@ -4321,8 +5240,9 @@ The optional CPU constraints solver combines arc consistency, group lower/upper 
 Batch 160 job 3 extends outside evidence to all 20 SheenTestGrid primitives, at 512 x 512
 with no IBL and a matched camera/sun. Both WebGPU and actual compatibility WebGL2 have frozen
 all-pixel budgets; native WebGL2 rejects PBR. The sheen BRDF is shared by materials and
-gltf-pro, but this picture measures default glTF import only. The unresolved image loss,
-simplified visibility and albedo/roughness choices are recorded separately in known-bugs.
+gltf/pbr, but this picture measures default glTF import only. The unresolved image loss
+and the albedo/roughness choices are recorded separately in known-bugs (the simplified visibility was replaced by
+the spec's Estevez and Kulla shadowing in KB3297c, 2026-11-15).
 No core or shader math was changed and batch 168 measurements were not repeated.
 
 ### Scatter tile validation evidence (batch 77, section 5)
@@ -4361,11 +5281,13 @@ Chromium checks use a loopback Playwright launchServer and a connected client. T
 
 ### Batch 160 GPU teardown regression (section 5, 2026-11-09)
 
-The material-suite shutdown uses the owned Chromium server repair in c1646e3ec. Native process termination alone did not settle the Playwright launch-client cleanup promise; it was driver ownership, rather than an outstanding BRDF readback or shader report. tests/browser-teardown.test.js now holds client cleanup pending until its owner kills the server, so the former external-termination path fails within a shortened test budget. The production shutdown limit remains 30,000 ms. The material GPU suite uses runSuite so teardown cannot replace a failed check; tests/gltf-pro-materials-lifecycle.test.js injects both failures and requires the original error plus a teardown diagnostic.
+The material-suite shutdown uses the owned Chromium server repair in c1646e3ec. Native process termination alone did not settle the Playwright launch-client cleanup promise; it was driver ownership, rather than an outstanding BRDF readback or shader report. tests/browser-teardown.test.js now holds client cleanup pending until its owner kills the server, so the former external-termination path fails within a shortened test budget. The production shutdown limit remains 30,000 ms. The material GPU suite uses runSuite so teardown cannot replace a failed check; tests/gltf-pbr-materials-lifecycle.test.js injects both failures and requires the original error plus a teardown diagnostic.
 
 ### Batch 99 emissive resampling: section 5 evidence
 
 The optional `voxel-pathtracer/resampled` subclass replaces only the emissive direct-light integral. Light proposals and cosine/phase directional proposals use balance weights in the same solid-angle measure. Visibility is in the reservoir target; continued non-delta paths do not count the same emitter integral again. Directional searches pass media, whose transmittance is then evaluated by the existing shadow walk. The endpoint is offset outside the source voxel to prevent self-occlusion. The root tracer now also retains the last scattering position for emissive and area-light MIS: transparent medium boundaries must not shorten the distance used to convert area PDFs to solid angle. Independent quadrature of a square light through an absorbing half-block slab guards this correction. Core and stage are unchanged.
+
+Bounce limit (KB-L5a-1, 2026-11-11): a surface vertex samples light only while fewer than `maxBounces` scattering events lie behind it, the rule a medium vertex already followed. Before, the root kernel added the light-sampled MIS share of a path one event past the limit while the limit cut its BSDF share, and RIS, whose proposals cover the whole integral, added all of it: 0.2729 against 0.2469 at scattering media vertices. The RIS weights were checked against Talbot et al. 2005, Bitterli et al. 2020 (sections 2 and 3), Wyman et al. 2023 (section 3.3) and Veach and Guibas 1995, and the depth rule against Pharr, Jakob and Humphreys 2023 (section 13.4); with the root fixed the two agree at 1, 2 and 4 bounces. Evidence: `tests/browser-check.mjs` `bouncelimit` (exactly black at one bounce), `tests/resampled-browser.mjs` rough metal, plastic coat and media receivers against the root tracer within six standard errors.
 
 `tests/resampled.test.js` covers bounds, inherited identity, one-candidate source identity, disposal, replacement-device compilation and retention of helpers in the compatibility fragment route. `tests/resampled-browser.mjs` retains the 2x squared-error bar against the fixed 8,192-sample reference, checks native WebGL2's coded refusal/help, and runs real device restoration. Native WebGPU and WebGL2 compatibility on RTX A6000 reduce the fixed ceiling scene's squared error from 2.884096 to 0.919089 at 32 samples, with zero shader compilation errors. This is independent RIS with full visibility per candidate, no spatial/temporal reuse and no measured wall-time benefit. Generated scenes are stand-ins, not outside reference images.
 
@@ -4395,7 +5317,7 @@ Live Doppler uses monotonic frame time, resets on context state changes and trea
 
 ### Heartbeat gate startup evidence (section 5, 2026-11-09)
 
-The slow-start heartbeat test now observes a marker from its injected worker preload, then a subsequent heartbeat. A file metadata change alone was not a startup acknowledgement: the failing 5.5-second run could not include both the Windows two-process injected startup and the unchanged four-second lease observation. A deterministic regression changes metadata before readiness and requires the helper to keep waiting. The production lock, two-second test lease, four-second observation and thirty-second readiness bound are unchanged. This strengthens the existing check:merge/verify gate rather than granting a timing waiver.
+The slow-start heartbeat test covered the heartbeat of the GPU scheduler; the scheduler and its tests were removed on 2026-11-16 (KB-GPULOCK-ALL).
 
 ### Quiet crowd resume gate (section 5, 2026-11-09)
 
@@ -4534,6 +5456,14 @@ physics and physics2d packages remain held. No hardware or performance claim is 
 worktrees does not exist, so its verify failed on the first outside asset. It now hands the clone this
 checkout's resolved cache (`MARGO_SPLAT_SAMPLES`, `verifyEnv` in scripts/fresh-clone-check.mjs); the clone still
 proves it needs no local history. Regression: tests/fresh-clone-check.test.js.
+
+`check:fresh-clone` (2026-11-15) failed check:dev-servers in the nightly on 16 servers. Two causes in the check's own
+setup, none in the servers: (1) os.tmpdir() here is a short 8.3 path, and Vite compares its allow list (the folder it
+starts in, as given) with each file's real path, so every Vite server in the clone answered 403; the clone now goes
+under the temporary folder's real path (`scratchFolder`). (2) The clone's third-party node_modules were junctions into
+this checkout, so their real paths lay outside the clone and Next.js's Turbopack, which reads only inside the project
+root, could not find next or @swc/helpers; they are now hard links (`linkTree`, a copy across volumes), linked in about
+12 s. With both, all 17 servers start clean in a clone. Regression: tests/fresh-clone-check.test.js.
 
 ### Texture mask transitions: section 5 evidence (batch 76, job 2)
 
@@ -4723,7 +5653,7 @@ Core and the stage root are unchanged. No new rendering or framing feature.
 
 ### Physical-map resource pressure: section 5 evidence (batch 56 audit)
 
-An actual FlightHelmet viewer on WebGL2 compatibility exposed gltf-pro's eager eight missing-map
+An actual FlightHelmet viewer on WebGL2 compatibility exposed gltf/pbr's eager eight missing-map
 fallback bindings. Native physical shader variants now key on the eight authored-map bits and
 substitute absent extension-map samples with their exact one-texel constants. Binding generation
 omits those same slots. The five core slots and material-hook paths keep their resource contracts.
@@ -5096,21 +6026,21 @@ for its mainline repair and the catalog/prefetch confirmations.
 The full follow-up verify passes 13,497/13,498 tests, zero skips, including both
 API gates and all README ownership regressions. Its sole failure exposed prefetch
 registration outside the standard biome test-entry contract. The proof now lives
-in tests/prefetch-check.mjs and keeps runSuite/watchExit, an exclusive GPU hold and
+in tests/prefetch-check.mjs and keeps runSuite/watchExit and
 a 300 s subprocess deadline; the documented script forwards to it. Existing
-chain/plan/exclusive-refusal checks catch the original gap and pass after repair.
+chain/plan checks catch the original gap and pass after repair.
 The earlier catalog teardown failure remains pending batch 160 despite this run's
-passing catalog test. Real README validation is queued, not claimed passed.
+passing catalog test. Real README validation is pending, not claimed passed.
 
 
 The prefetch-plan follow-up also exposed an eval-import guard defect in the GPU
 planner: pathToFileURL(undefined) threw before exported plan() was usable. Its CLI
 guard now checks for argv[1], just as the llms guard does. The actual eval-process
-regression fails before repair and passes afterwards; all 12 chain/plan/lock/import
+regression fails before repair and passes afterwards; all 12 chain/plan/import
 tests pass. No scheduling or GPU logic changes. The full biomes CPU suite passes
-476 tests, zero failures/skips. The initial package-GPU request also expired in
-the queue without starting any test; it is rescheduled with a 20-minute queue
-allowance and separate shared/exclusive groups, preserving each registered test's
+476 tests, zero failures/skips. The initial package-GPU request also expired
+without starting any test; it is rescheduled with a 20-minute
+allowance, preserving each registered test's
 budget. The stale ownership-gpu-package-results.json from the unsuccessful request
 is not evidence for this group; use the rescheduled logs/results only.
 
@@ -5127,19 +6057,19 @@ a package defect. All 476 biome and 311 effect-package CPU tests pass. The final
 verify disables only shadow-cache bookkeeping (MARGO_RESULT_CACHE=off); every
 normal build/check/test runs and no result is served or test omitted.
 
-Real README and registered package-GPU validation remain queued, each supervised
-with hard limits and unchanged per-test/page budgets. The initial two queue
-expirations ran zero tests. These CPU results alone do not satisfy landing requirements:
+Real README and registered package-GPU validation remain to be run, each supervised
+with hard limits and unchanged per-test/page budgets. The initial two
+expired requests ran zero tests. These CPU results alone do not satisfy landing requirements:
 batch 160's browser repair must arrive on main, then catalog/prefetch must be
 confirmed, and the over-2x 7.4 ms diagnostic frame still needs attribution. No
 quiet-machine speed number, busy exemption or new accepted limit is claimed.
 
 
 GPU follow-up: the registered shadows/test:gpu:cutout-casters test passes in
-22.5 s under its exclusive hold (302.4 s supervisor including queue), with no
+22.5 s (302.4 s supervisor including the wait before it started), with no
 driver-reset rerun. Its rescheduled result file is current and contains exactly
-that selected test. The remaining 15 shared package scripts and the two README
-requests are still supervised and queued; none is claimed passed.
+that selected test. The remaining 15 package scripts and the two README
+requests are still supervised and not yet run; none is claimed passed.
 
 
 ### Missing-items landing confirmation (2026-11-09)
@@ -5201,16 +6131,16 @@ corpus (558 pipelines, 1,238 entries, 733 draws), the full GPU suite (327.1 s),
 and all 12 runtime README examples. Removing fractional weights fails the
 unchanged native/compatibility comparison (0.875 versus 1), with its mutation
 marker retained. Core plus stage remains 23,924 B; compatibility entry remains
-within its unchanged 102,814 B ceiling. No benchmark or exclusive hold ran.
+within its unchanged 102,814 B ceiling. No benchmark ran.
 
 
-Batch 160 job 4 restores the optional gltf-pro native volume absorption repair.
+Batch 160 job 4 restores the optional gltf/pbr native volume absorption repair.
 Shipped shader math now crosses the mesh-space slab along a refracted world
 ray, retaining transforms and instancing. CPU analytic regressions and twenty
 exact GPU slab pixels per backend cover it; no core/stage code or export change.
 Frozen full-scene viewer/Cycles budgets remain independent gates. Actual AMD
-three-process repeat proofs are required after the main teardown repair, with
-one shared GPU slot per lane. Unresolved transport and numerical limits remain
+three-process repeat proofs are required after the main teardown repair, one lane
+at a time. Unresolved transport and numerical limits remain
 listed in known-bugs.md/limits.md; no new speed measurement is claimed.
 
 
@@ -5225,10 +6155,10 @@ Durable proof paths, report hashes, decoded RGBA hashes and all metrics are in
 results/batch-160-amd-transmission.json and batch-160-amd-volume.json (relative
 to docs/whitepaper). The full volume ceiling remains 13,792,000.
 The analytic GPU test passes twenty exact slab pixels on each backend; all 47
-gltf-pro/materials runtime README examples pass with zero exceptions.
+gltf/materials runtime README examples pass with zero exceptions.
 The complete changed-package CPU run passes 783 tests with zero failures/skips.
 Earlier completed package browser/GPU steps are retained, not blindly rerun:
-gltf-pro shader/extensions/materials/viewer/native-volume, all materials steps
+gltf/pbr shader/extensions/materials/viewer/native-volume, all materials steps
 with dispersion/cutout-casters completed by job4-material-remaining12.
 The unrelated voxel denoise-materials AMD watchdog remains an open investigation;
 these proofs do not classify it as a driver fault or close the batch.
@@ -5239,7 +6169,7 @@ tests with zero failures/skips (449.7 s). API reports match 887 entries and
 8,638 exports; core plus stage remains 23,924 B. The four frozen viewer/transport
 JSONs are byte-identical to the parked originals after line-ending normalization.
 Every fresh AMD proof, native-volume regression and runtime README gate passes.
-No benchmark, exclusive hold, tolerance increase or skipped test is included.
+No benchmark, tolerance increase or skipped test is included.
 
 ### Guiding README initialization evidence (Batch 99)
 
@@ -5330,13 +6260,13 @@ regenerating entries also exposed the coupled network record's older commit in
 sizes-page.test.js. Both real measurements were regenerated, preserving the
 unchanged assertions: the basic scene fetches five files, 36,353 transferred
 bytes, and no unused built file. Its gate retains the real renderer and network
-assertions; a lane-local acquisition wrapper only tightens its shared GPU hold
+assertions; a lane-local wrapper only tightens its limit
 to one minute. API reports retain 887 entries and 8,638 exports. No exports,
 core/stage source, benchmark scene, error tolerance or size ceiling changed.
 
 
-Final rebased integration: lint and hygiene pass. Full verify runs without an
-outer GPU lock, with speed deferred, and passes all non-unit stages including
+Final rebased integration: lint and hygiene pass. Full verify runs with speed
+deferred, and passes all non-unit stages including
 GPU policy, API, size, quality, docs and examples. Of 13,633 unit tests, 13,632
 pass with zero skips; the sole failure is the upstream GPU report's untracked
 coordination-path pointer. The pointer is reworded in its owning report, retaining
@@ -5389,8 +6319,8 @@ elapsed-time comparison is claimed. See perf-history's batch 108 follow-up.
 ### Batched picking pre-rebase validation (2026-11-09)
 
 Lint, hygiene, API, quality, proofs and full verify pass: 13,669 tests, zero
-failures or skips (440.5 s supervisor). All 83 selection CPU cases pass. One
-shared GPU slot passes picking, all three captured/MSAA/micro batch comparisons,
+failures or skips (440.5 s supervisor). All 83 selection CPU cases pass. The
+GPU checks pass picking, all three captured/MSAA/micro batch comparisons,
 real-model perspective/orthographic checks and x-ray, plus all six executable
 README examples (36.9 s combined). No --time loop or benchmark was run.
 The historical 83 vs 67 ms remains an open loss for the deferred speed phase.
@@ -5398,14 +6328,13 @@ Fresh genuine entry/network records share commit 1d7571281 and dirty=false;
 the actual basic scene fetches five requests and no extra file. API generation
 follows measurement. Selection is 20,808 B gzip, previously 20,745 B (+63),
 below its unchanged ceiling; core + stage stays 23,924 B under 25,000 B.
-The short network capture now explicitly limits its shared hold to one minute
-and waits at least 60 minutes, with the existing regression expanded.
+The short network capture now has an explicit one-minute limit, with the existing regression expanded.
 Evidence: test-results/skip-gaps/item3-*.log; research in skip-gaps-research.md.
 
 Final main rebase: inherited preview error-link and compatibility changes. Rebuilt
 all packages and regenerated genuine entry/network records together from
 375b56d0b, dirty=false, then API and llms. Lint, hygiene, API, all 83 selection
-cases and 21 record/document regressions pass. The fresh shared-slot selection
+cases and 21 record/document regressions pass. The fresh selection
 GPU suite and all six README examples pass (20.2 s combined); the GPU suite
 includes captured/MSAA/micro counts and real-model perspective/orthographic
 equivalence. Earlier full verify remains the 13,669-test pre-rebase result; no
@@ -5499,7 +6428,7 @@ interactor. No core/stage change. Copy-paste terrain chunks and LOD guidance is
 in scatter's README, linked from creative. No huge-area or frame-rate claim.
 
 Item 4 final proof: all ten registered scatter GPU suites and all 14 README
-examples pass in one shared slot (70.2 s combined). The package CPU regressions,
+examples pass (70.2 s combined). The package CPU regressions,
 lint and hygiene pass. Entry and basic-scene records genuinely measure
 419b34508 with dirty=true, the same source state; five network requests, no extra
 files. API generation follows measurement. Completed full verify evidence is
@@ -5522,8 +6451,7 @@ fields plus valid zero, positive and inclusive upper boundaries. Optional
 ceilings retain the full diagnostics; core plus stage stays at 23924 B. Research
 and before/after measurements are in size-restore.md and limits.md. The real GPU
 suite passes 236 pixel checks with zero wrong pixels or validation errors, and
-11 shader modules compile. All nine README examples run as written. Execution
-uses one shared GPU slot per worktree and wait-max 60.
+11 shader modules compile. All nine README examples run as written.
 
 ### Section 5 evidence: optional ordered erosion
 
@@ -5543,7 +6471,7 @@ README examples and all three umbrella examples.
 Item 1 final proof: 477 package CPU tests, lint, hygiene and focused metadata
 checks pass. All eight existing biomes GPU suites, the new production erosion
 browser proof, all 36 biomes README examples and all three umbrella examples
-pass. A combined five-minute lease interrupted flythrough after three completed
+pass. A combined five-minute limit interrupted flythrough after three completed
 suites; the orchestration was split, completed suites preserved, and only the
 interrupted/pending steps ran. Flythrough passes in 243.2 s; no assertion or
 package deadline was changed. This is gate duration, not a speed claim.
@@ -5628,7 +6556,7 @@ existing ceiling. Logs: test-results/skip-gaps/item2-*.log.
 ### Section 5 evidence: named TRS results
 
 Size-restoration finding 6 restores the math/quat ok-discriminated named result
-and migrates exporters, gltf, gltf-pro, loaders, rigging and scene together.
+and migrates exporters, gltf, gltf/pbr, loaders, rigging and scene together.
 The finite TRS calculations and caller shear tolerances are unchanged. Infinite
 column lengths/determinants now produce the documented singular result before
 normalization. Named-shape, rotated/reflected recomposition, shear, singularity
@@ -5675,8 +6603,7 @@ Batch 56 reflection-shapes fixture follow-up: the complete environment GPU gate
 exposed TypeError (sceneOf missing) in the shader-only fixture, after its GPU
 comparisons had passed. That fixture now uses the real engine already created
 by the page and asserts registration plus detachment in both blend modes. The
-unchanged sphere/box comparisons and real room bake pass under the shared GPU
-lock. The red and green logs are test-results/56fix/resume-gpu-environment-test-
+unchanged sphere/box comparisons and real room bake pass. The red and green logs are test-results/56fix/resume-gpu-environment-test-
 reflection-shapes-browser-10.log and resume-reflection-shapes-green.log.
 The complete environment acceptance still requires the remaining package GPU
 and runtime README gates; this fixture repair changes no rendering algorithm.
@@ -5727,7 +6654,7 @@ backend and kind diagnostics retain their remedies within the effects entry's
 existing ceiling. Core plus stage is 23,924 B from main's approved reference fix;
 this lane changes neither core nor stage. The CPU-only hold has ended: main includes teardown repairs cf699846f and
 20375ea56. Full verify passed on dfd006c47 over f13245ca3: 13,675 tests, no
-failures/skips, 308.8 seconds, without an outer GPU lock. Main now separates
+failures/skips, 308.8 seconds, without a wrapper. Main now separates
 speed assertions from correctness. Lint/hygiene pass; physical GPU/README
 acceptance is still pending as detailed below.
 
@@ -5748,11 +6675,11 @@ the full local branch passes and retains 97 GL calls/readback diagnostics.
 These passing diagnostic checkpoints do not clear the earlier 2^-12 failure:
 no differing texel or causal commit has yet been reproduced. After autosquashing
 the reflection-shapes fixture repair and rebasing onto 9b62132bb, a new 64-pair
-diagnostic reached its 105-second shared-lock limit, was killed and released
-the slot. It has no completed result and cannot support acceptance. The limit
+diagnostic reached its 105-second limit and was killed.
+It has no completed result and cannot support acceptance. The limit
 is not a speed budget; no existing assertion, tolerance or gate was changed.
 Fresh post-rebase CPU checks and remaining package GPU/README gates are still
-required. No core/stage edit, exclusive hold or push is included.
+required. No core/stage edit or push is included.
 
 
 The bounded follow-up now reproduces the wrong value in 1/12 pairs, with raw
@@ -5832,6 +6759,14 @@ example passes. Combined-build entry/network evidence measures the retained
 8b5c04aab implementation commit, followed by API/llms generation; merged size,
 record/API and documentation checks pass. No native Unity or speed claim is added.
 
+### Section 5 evidence: native Unity companion check
+
+`npm run test:unity` in packages/exporters (opt-in, scripts/test-unity.mjs) is the first native Unity run of the
+companion: Unity 6000.6.7f1 in batch mode, glTFast 6.20.0, one mesh and one clip. It checks
+main-object names against file names, a forced reimport (files, .meta, `IsCurrent`) and the controller state
+name. It skips with a printed reason without an Editor or licence; it is not part of verify or the GPU check.
+Evidence missing: native playback, skins, pixels, restart and other bundles.
+
 ### Review 99 composition and section 5 evidence
 
 Optional tracer entries now export validated feature factories. /compose owns
@@ -5847,9 +6782,9 @@ shader equivalence, atomic replacement, caller-array isolation, disposal and
 replacement-device specialization. The registered test:gpu:compose-native and test:gpu:compose-compat suites add
 analytic camera attenuation for all 32 subsets and interacting RGB RIS shadow
 sampling. The failed-only WebGL2/Vulkan continuation now passes all 32 subsets,
-IDs, RGB RIS shadows and atomic replacement within the unchanged 12-minute lease.
+IDs, RGB RIS shadows and atomic replacement within the unchanged 12-minute limit.
 Since 2026-11-10 the page builds 8 subsets at once so native trace pipelines (about 17 s each on Dawn/D3D12)
-compile side by side; the native suite passes in 146 s under the same lease (docs/known-bugs.md, review 99).
+compile side by side; the native suite passes in 146 s under the same limit (docs/known-bugs.md, review 99).
 Native transport/AOV proofs are retained without repetition. The old timeout has
 no phase record; it cannot be attributed to ANGLE D3D11. An isolated resampled
 README diagnostic runs on Dawn and passes its unchanged 20-second deadline;
@@ -5885,7 +6820,7 @@ pending until their receipts are recorded. No core/stage or timing claim.
 
 ### Section 5 evidence: reachable ComputeFrame owner gate
 
-The real GPU plan includes compute/test:browser:scene-owner in a shared slot.
+The real GPU plan includes compute/test:browser:scene-owner.
 Its package command establishes the repository server root. All 1,024 values
 are checked after each of four exact dispatches on native and compatibility
 backends. Complete compute browser acceptance remains 132 checks / 413 shader
@@ -5924,8 +6859,7 @@ full verify run or a GPU execution claim.
 
 Final stats integration onto main 449dd9676 preserves its materials and other
 owner checkpoints, compute native opt-out and subset-enumeration explanation.
-The queued compute/test:gpu:owners command passes both backends and releases its
-shared slot; elapsed time includes its FIFO wait. The earlier proof ran without
+The compute/test:gpu:owners command passes both backends. The earlier proof ran without
 an outer compatibility shim, so the explicit native opt-out retains its setup.
 No runtime stats/core/compute source changes in this last rebase.
 
@@ -6159,8 +7093,8 @@ change touches core/stage, the public entry or either shipped prebuilt.
 The first full verify reached 13,475 tests: 13,473 passed, two failed on stale
 generated site text and inaccessible cache pointers in public records. Both
 causes were repaired and the unchanged focused regressions pass. GPU attempts
-failed before executing tests: bounded queue expiry and Windows mutex mkdir
-EPERM under cross-session contention. Those are unresolved gates, not passing
+failed before executing tests: bounded request expiry and Windows EPERM
+creating the scheduler's folder under cross-session contention. Those are unresolved gates, not passing
 GPU evidence. Full final verify, GPU/README, paired per-file performance, true
 cold-process startup/RSS and all feature/lifecycle integration remain required.
 
@@ -6191,7 +7125,7 @@ the prebuilt default while warm losses remain. Public integration, historical
 predictor 3, other feature/conversion/lifecycle checks and complete cold/RSS
 targets are still open. No shipping or full performance gate is closed here.
 
-The final owned exclusive GPU session passes decoder browser and Node/glTF checks, glTF browser, glTF-pro materials, and all 17 decoder README examples (3 Node, 14 page). These still exercise the unchanged public prebuilt paths; they do not prove pending Rust public integration. The prior queued/EPERM attempts remain diagnostic evidence. The paired cold process tree was intentionally ended at the context handoff, with no surviving owned measurement processes; its code 1 records interruption, not a completed gate.
+The final owned GPU session passes decoder browser and Node/glTF checks, glTF browser, glTF PBR materials, and all 17 decoder README examples (3 Node, 14 page). These still exercise the unchanged public prebuilt paths; they do not prove pending Rust public integration. The prior queued/EPERM attempts remain diagnostic evidence. The paired cold process tree was intentionally ended at the context handoff, with no surviving owned measurement processes; its code 1 records interruption, not a completed gate.
 
 ### Batch 133 optional landing evidence: section 5
 
@@ -6211,9 +7145,9 @@ new regression fails before registration and passes after, also checking the
 smaller Wasm and absence from the default entry. The full unit run is 13,539
 passes / one missing-lazy-catalog failure / zero skips. Both assets are now
 registered and sizes regenerated; its matching network record and focused rerun
-remain blocked on GPU acquisition. The 20-minute exclusive queue expired before
+remain blocked on the GPU. The 20-minute GPU request expired before
 test startup. Lint, hygiene, quality, 888 API entries / 8,646 exports and explicit
-decoders/glTF/glTF-pro CPU suites pass. No GPU, README runtime or push is claimed.
+decoders/glTF/glTF PBR CPU suites pass. No GPU, README runtime or push is claimed.
 Evidence: whitepaper/results/batch-133-landing.json.
 
 Batch 133 E21 correctness evidence: decoders entry tests add 1,445 frozen opaque
@@ -6305,7 +7239,7 @@ Resource acceptance also rejects a changed opaque variant on resume and
 returns a failing status for every retained RSS loss without taking another
 sample. Both paths have before/after regressions. Dedicated dist readers
 must start after verify finishes its build; the repaired own driver enforces
-that barrier after transient gltf-pro/README import failures.
+that barrier after transient gltf/README import failures.
 
 ### Section 5 evidence: Chromium teardown phase tracing, recurrence open
 
@@ -6389,6 +7323,14 @@ native waiter took a pid whose start time it could not read (gone between lookup
 and read, or taken by a service this user cannot query) for one of ours. It now
 skips such a pid; two regressions in `tests/browser-teardown.test.js` (2026-11-10).
 Missing: a run on the laptop and the Apple silicon Mac, and the cause of the kernel's delay.
+Close limit (KB-P3h, 2026-11-15): a hosted close still open after `CLOSE_LIMIT_MS`
+(20,000 ms) kills the host and browser trees, releases the host and fails with
+`SHUTDOWN_TIMEOUT` listing `open`, `killed` and `survivors` (docs/limits.md, "Browser
+close limit"). Before, the budget threw but left both running and the host referenced,
+so a suite that caught the error could not end. Evidence: `tests/browser-teardown.test.js`
+(a real stuck host is killed and its suite exits; old code: still running at 45 s).
+Missing: the exact path of the one nodes-browser hang that raised it (not reproduced in
+12 loaded runs).
 
 #### Batch 197 globe control evidence
 
@@ -6420,7 +7362,7 @@ intact volume topology feed the existing volume and grid renderers; core/stage, 
 are unchanged. Analytical byte-layout tests plus 200 pinned NOAA samples cover six owner-written files.
 The formats-browser leaf exercises both backends and compares identical-source image hashes by renderer kind.
 HDF5, oriented-image resampling and general solver rendering remain outside the claim; see docs/limits.md.
-No GPU lock is taken for parsing/building or CPU tests. Runtime rendering uses the lane's single shared slot.
+No GPU is used for parsing/building or CPU tests.
 
 Batch 171 integration evidence remains incomplete: all 30 root GPU assertions pass, but the shared
 Chromium launcher waits past its unchanged 30 s deadline for process/stdio close after native
@@ -6516,7 +7458,7 @@ HTMLTextureGL in html/texture-gl shares rasterization and interaction with HTMLT
 The optional XR package now provides an eye callback after scene/depth rendering and before submission on its separate and engine routes. The comfort overlay uses each projection and viewport with load/store blending and no depth writes. CPU coverage proves stable view indices, ordering, unsubscribe and disposal during a callback; a stereo pixel comparison exercises both backends/routes/eyes. Physical headset evidence remains absent. No core or stage changes or speed claims accompany this feature.
 
 ### Section 5 evidence: batch 267 live inspection
-Optional mcp/live and mcp/live-host add a development-only page/Node boundary without core or stage changes. Inspector owns property discovery/validation. Canvas capture renders then uses origin-clean PNG serialization; WebGPU and compatibility each pass scene/edit/pixel/error tool proof in packages/mcp/tests/live-browser.mjs. Uncaught page/rejection/GPU errors feed a bounded ring. The host binds loopback and validates bearer, Host and exact Origin. No server-side evaluation or production auto-activation. GPU test uses a shared slot only during browser execution.
+Optional mcp/live and mcp/live-host add a development-only page/Node boundary without core or stage changes. Inspector owns property discovery/validation. Canvas capture renders then uses origin-clean PNG serialization; WebGPU and compatibility each pass scene/edit/pixel/error tool proof in packages/mcp/tests/live-browser.mjs. Uncaught page/rejection/GPU errors feed a bounded ring. The host binds loopback and validates bearer, Host and exact Origin. No server-side evaluation or production auto-activation. GPU test uses the GPU only during browser execution.
 
 ### Section 5 evidence: sprite picking (batch 245 job 3)
 The optional CPU picker reuses the float32 transform packer and mask conversion
@@ -6635,11 +7577,11 @@ linear SH retained exactly and a linear point fallback. Independent CPU loader
 round-trips and the existing native/compat exporter GPU suites are the evidence;
 no renderer, backend or core math changes are added. [Contract](../exporter-splats.md).
 
-Optional exporter optimization uses accessor-backed `EXT_mesh_gpu_instancing` TRS batches, preserving each retained parent's transform and splitting reflection signs. CPU evidence covers exact emitted transforms, animation exclusion and glTF validation. The exporters browser and capture runners now accept the existing `MARGO_COMPAT=1` shim so the package's own checks exercise native WebGPU and the WebGL2 compatibility layer through one shared GPU slot. No core, stage or backend implementation changes are involved. Animation reduction and resource pruning remain CPU operations without the GPU lock.
+Optional exporter optimization uses accessor-backed `EXT_mesh_gpu_instancing` TRS batches, preserving each retained parent's transform and splitting reflection signs. CPU evidence covers exact emitted transforms, animation exclusion and glTF validation. The exporters browser and capture runners now accept the existing `MARGO_COMPAT=1` shim so the package's own checks exercise native WebGPU and the WebGL2 compatibility layer. No core, stage or backend implementation changes are involved. Animation reduction and resource pruning remain CPU operations.
 
 
 ### Section 5 evidence: batch 267 asset wiring
-mcp/assets performs only bounded network/filesystem preparation; no GPU lock during real downloads. mcp/assets-page lazily delegates GPU loading to existing gltf-pro/environment/materials APIs. Both backends exercise real CC0 scene assets; GPU pipeline readiness uses completion state. No new GPU maths, core/stage feature or benchmark.
+mcp/assets performs only bounded network/filesystem preparation; no GPU use during real downloads. mcp/assets-page lazily delegates GPU loading to existing gltf/environment/materials APIs. Both backends exercise real CC0 scene assets; GPU pipeline readiness uses completion state. No new GPU maths, core/stage feature or benchmark.
 
 
 #### 5. Batch273 scenery capture evidence
@@ -6652,7 +7594,7 @@ The optional tiles/properties entry keeps semantic data queries outside renderin
 
 The optional bvh/parallel entry reuses existing SAH construction in a coordinator plus bounded nested module-worker pool. Original face order, global depth and packed traversal topology survive subtree relocation. Numeric planning/build/merge work is off the page thread; input normalization/structured-clone and result validation remain caller-thread costs. Real worker-thread tests cover shared/cloned positions, one-million-triangle serial byte parity, queries, refit, precision, cancellation and worker/deadline failures. The production Vite consumer verifies both nested worker assets and exact serial output alongside bvh's existing WebGPU/WebGL2 checks. No GPU algorithm or core/stage change, and no benchmark/speed claim. Quiet-machine worker startup/transfer/build measurements remain owed. Existing builders already preserve editor face/index order by default; index-order.test.js validates that row with no duplicate indirect entry.
 
-Section 5 batch 267 CI follow-through: the live/native, live/full-compat and real-assets leaves are registered by package script name. Frozen standard CC0 fixture bytes and license/provenance hashes make GPU execution independent of external catalogue availability. CPU preparation and network refresh never hold a GPU slot.
+Section 5 batch 267 CI follow-through: the live/native, live/full-compat and real-assets leaves are registered by package script name. Frozen standard CC0 fixture bytes and license/provenance hashes make GPU execution independent of external catalogue availability. CPU preparation and network refresh never use the GPU.
 ### Section 5 evidence: scientific pipeline (batch 172 job 1)
 
 The optional sciviz/pipeline entry changes no GPU math or rendering backend. Its gate adds a real NASA FUN3D source/filter/layer demo on WebGPU and WebGL2 compatibility: coloured output, downstream-only call counts and owned layer removal. CPU tests cover lazy diamonds, inherited/independent times, serialization, exact abort reasons, stale work rejection, JSON validation and reverse resource release. Cancellation requires operators to observe AbortSignal; no external callback can be forcibly preempted. No speed evidence or full volume-mesh demo is asserted. See docs/sciviz-analysis.md.
@@ -6691,7 +7633,7 @@ ImageBitmap is cropped into a drawable canvas before GL pixel-store transforms b
 The incoming inspector isolation blocker is independently repaired by main61b17b70d, retaining its own implementation and regressions. No duplicate inspector code lands with the bitmap fix.
 
 ## ECS shared-worker evidence (section 5 supplement, batch 249)
-Parallel storage and scheduling are confined to ecs/parallel. CPU correctness covers real worker overlap with an atomic rendezvous, physical buffer hazards/aliases, dense-row/generation lookup, bounded abort/deadline, worker crashes and termination ownership. Structure stays locked if a host cannot prove its worker terminated. A GPU-disabled browser fixture proves shipped asset URLs, cross-origin isolation, SAB writes and unisolated rejection; it is part of ECS CPU tests and does not take a GPU slot. Core/stage and rendering backends are unchanged. Throughput measurement remains for the quiet speed phase; no performance result is claimed.
+Parallel storage and scheduling are confined to ecs/parallel. CPU correctness covers real worker overlap with an atomic rendezvous, physical buffer hazards/aliases, dense-row/generation lookup, bounded abort/deadline, worker crashes and termination ownership. Structure stays locked if a host cannot prove its worker terminated. A GPU-disabled browser fixture proves shipped asset URLs, cross-origin isolation, SAB writes and unisolated rejection; it is part of ECS CPU tests and does not use the GPU. Core/stage and rendering backends are unchanged. Throughput measurement remains for the quiet speed phase; no performance result is claimed.
 ### Section 5 evidence: selection GPU hit details, batch 199
 HitDetails supplies optional surface attachments through Picking's package-local extension contract. Core, model and caster replay share the selected pixel's depth, normal and UV; decode snapshots the cropped camera and eye before mapping. ID-only picks retain capture and original staging sizes. Proof: selection/test/hit-details.browser.mjs checks core, the attributed Khronos Box, UV0, reflected nonuniform transforms and orthographic inverse projection. Existing picking/model/xray suites remain the correctness coverage for deformation, cutouts, visibility, multisample outlines and resource disposal. Both native and full compatibility backends run the same package browser command. No core or stage code and no timing claim.
 #### Section 5 evidence: UI curved surfaces (batch 259)
@@ -6722,6 +7664,11 @@ licensed tree animation and exact backwards seek. Physics is data-only, warns
 per named constraint and awaits the physics phase. Broader exporter/high-curvature
 path polish remains private. No speed gate or timing benchmark was added.
 
+The optional sprites/dragonbones reader (parity 245.4) adds no runtime of its own: it validates DragonBones 5.x
+JSON and converts each armature, nested armatures flattened, into the skeletal JSON document above, then poses it
+with the same SpineSkeleton, Skeleton2D, SkinnedMesh and SkeletalLayer. No GPU maths, backend or quality gate
+changed. Evidence: sprites dragonbones.test.js and dragonbones-check.mjs on native and compatibility devices.
+
 ### Section 5 evidence: optional pulsing x-ray selection
 Batch 199 job 2 reuses the existing whole-selection and equal-depth masks, without new rendering maths or a second mask renderer. Pulse time advances once per frame, including multiple views. selection/test/pulse.test.js covers validation and time ownership; pulse.browser.mjs compares actual hidden/visible outline pixels at bright and dim phases using both morphology and JFA on an attributed real Box fixture. Existing xray browser evidence continues to prove hidden dash runs and PBR/core depth behaviour. No new hardware or speed claim.
 
@@ -6751,7 +7698,7 @@ Evidence: both new regressions fail on the preceding Wasm and pass after repair;
 144 package tests pass, then the expanded regression file passes all three tests
 including 512 independent BigInt classifications. Five Rust tests pass. A gap-ray
 fixture visits three node bounds instead of the median tree's five; this is a
-deterministic work count only. The initial queue was cancelled before start; the continuation passes the complete mesh suite on native and WebGL2/Vulkan and its exact README example. Additional composed native acceptance fails at the unchanged 12-minute lease; the separate compatibility run passes all 32 subsets, reflected RIS and atomic updates. No full-scene closure is claimed: UVs,
+deterministic work count only. The initial queue was cancelled before start; the continuation passes the complete mesh suite on native and WebGL2/Vulkan and its exact README example. Additional composed native acceptance fails at the unchanged 12-minute limit; the separate compatibility run passes all 32 subsets, reflected RIS and atomic updates. No full-scene closure is claimed: UVs,
 smooth normals, shared BLAS/instance transforms and triangle NEE/RIS remain.
 
 ### Review 99 checkpoint validation and section 5 evidence
@@ -6760,7 +7707,7 @@ The complete mesh suite passes on native WebGPU and WebGL2/Vulkan, including
 skipped counts, stable original IDs, mixed transport, exact predicates and
 disabled/restored/disposed raster equality. The exact triangle-mesh README
 example passes its unchanged 20-second deadline. Composed native validation
-fails its unchanged 12-minute lease at subset 31 readiness; no retry was run.
+fails its unchanged 12-minute limit at subset 31 readiness; no retry was run.
 The retained pipeline markers and process tree distinguish accumulated native
 pipeline construction from the earlier unattributed WebGL2 timeout. Both are
 bugs until repaired; the separate compatibility run passes all 32 subsets, reflected RIS and atomic updates. See known-bugs
@@ -6791,7 +7738,7 @@ after the build completes. Full-scene and native-timeout findings remain open.
 
 The updated attribute shader also passes all 32 composed WebGL2/Vulkan subsets,
 triangle markers, reflected RGB RIS shadows and atomic scene replacement at
-the unchanged twelve-minute lease. The native failure was not retried, and
+the unchanged twelve-minute limit. The native failure was not retried, and
 this compatibility proof does not repair or attribute it. The local attribute
 receipt retains the complete backend results. Shared BLAS/instances, triangle
 NEE/RIS and the P3 findings still block full-scene closure and pushing this work.
@@ -6800,7 +7747,7 @@ also requires the unchanged release gates, including the package README check.
 
 ### Review 99 timeout diagnostics and section 5 evidence
 
-Retained native evidence isolates the lease exhaustion to cumulative trace
+Retained native evidence isolates the timeout to cumulative trace
 pipeline creation: subsets 0..30 finish, and subset 31 has only trace outstanding.
 The device exists and renderImage has not begun; no readback or disposal has
 started for that subset. Internal Dawn/compiler/driver attribution is missing.
@@ -6810,7 +7757,7 @@ per-backend JSON snapshots. Pipeline completions have operation IDs, so preview
 completion cannot hide a pending trace. Shader reports, queue completion,
 readback, device loss and browser teardown have distinct evidence. At 690 seconds
 it reports the current phase and begins terminating only its owned child tree;
-the remaining 30 seconds belong to the unchanged 720-second total lease.
+the remaining 30 seconds belong to the unchanged 720-second total limit.
 The CPU regression is included in normal package tests and therefore verify and
 check:merge. No assertion, feature subset or numerical bound is relaxed. No
 native acceptance rerun or compiler repair is claimed. Scott's current request
@@ -6984,7 +7931,7 @@ The root API scope tests now check every committed package row, including the un
 ### 5. Native 3MF and material evidence (batch 202)
 Optional parsing hooks belong to loaders and leave core/stage untouched. Source native geometry retains double precision and full affine instances; preview triangles use the existing render path. Tests cover source construction parameters, slice references/precedence and bounded expansion. Shared material equations now compose linear RGB and opacity rather than sRGB channel values, with spec-based regression expectations; the browser fixture renders the resulting source preview on each backend. Native construction data preserves clipping relations for consuming applications.
 
-Batch 213 job 2: MToon uses a synchronous per-model material adapter in optional gltf-pro, inherited by live isolated renderers and scoped to the actual draw. Delegation bypasses only its immediate call, so nested views still adapt. Per-view uniform writes retain the caller context; body and outline layouts bind only statically used resources. Source, replica, HDR colour, G-buffer replay and two-distance hull proofs are described in [rigging-mtoon.md](../rigging-mtoon.md). Original materials and caller ownership are restored on disposal. Cross-model queue ordering and animated alpha-shadow integration remain explicit limits. No core/stage edits or speed claim.
+Batch 213 job 2: MToon uses a synchronous per-model material adapter in optional gltf/pbr, inherited by live isolated renderers and scoped to the actual draw. Delegation bypasses only its immediate call, so nested views still adapt. Per-view uniform writes retain the caller context; body and outline layouts bind only statically used resources. Source, replica, HDR colour, G-buffer replay and two-distance hull proofs are described in [rigging-mtoon.md](../rigging-mtoon.md). Original materials and caller ownership are restored on disposal. Cross-model queue ordering and animated alpha-shadow integration remain explicit limits. No core/stage edits or speed claim.
 
 ### Section 5 evidence: rich animator trees (batch 211 job 2)
 
@@ -7014,7 +7961,7 @@ picking/shadows. Only package-owned code changed; no core/stage hooks were added
 Sorting lifecycle CPU tests also pin per-owner release across all views and a
 fresh allocation if the same owner is later encoded again. The GPU fixtures
 exercise enable/disable transitions while cullers continue to update their lists.
-Batch 266 section 5 evidence: React controls-extra adds no rendering math. Its shared-lock browser proof runs keyboard and native scroll input plus spring group rotation and snap-back on native WebGPU and WebGL2 compatibility, with the existing Cesium Box licensed fixture. HTML scrolling is hosted in a sticky zero-height overlay so native scroll does not apply the damped translation twice.
+Batch 266 section 5 evidence: React controls-extra adds no rendering math. Its browser proof runs keyboard and native scroll input plus spring group rotation and snap-back on native WebGPU and WebGL2 compatibility, with the existing Cesium Box licensed fixture. HTML scrolling is hosted in a sticky zero-height overlay so native scroll does not apply the damped translation twice.
 
 Batch 266 additional correctness: scroll mesh extent reads an installed camera projection for orthographic cameras, with a deterministic 4-world-unit fixture. Product-local pointer presses include live descendants in the existing controls BVH pick, with a detached-mesh regression. No rendering backend or core math changed.
 Section 5 evidence, batch 205 legacy FBX: the optional pre-index normalization hook shares the existing bounded parser and scene pipeline, then the same PBR geometry, skins, morphs and animation. Real ASCII/binary paired accessors and validator are CPU evidence; legacy-browser renders actual binary 6.1 cube pixels in page/worker modes on native WebGPU and WebGL2 compatibility. Core and stage source remain untouched; base gzip is 24,209 B after the full package build.
@@ -7097,10 +8044,10 @@ The optional culling/depth API owns the existing Pyramid and OccluderList, inclu
 Batch 244 follow overlay evidence (section 5): `pixel/follow` uses the shared ScreenPass view/scissor and scene ownership logic, with a 1x1 white texture and a premultiplied uniform color. Fades compose before flashes, at order 100 by default. The rig keeps fractional world coordinates separate from its published snapped position, clamps full viewport extents and adds seeded integer-pixel shake without feeding shake back into tracking. `follow.test.js` supplies CPU traces; `follow-check.mjs` checks native WebGPU and full WebGL2 readback for flash/fade, layer-masked split views and disposal. Timing and other hardware remain unmeasured; no broader GPU claim.
 
 ## Imported weather evidence (section 5 supplement, batch 236 job 1)
-GLTFWeather attaches a group-2 uniform through gltf-pro.addLighting, leaving authored material extensions in group 3. It shares the existing Puddles/Snow WGSL, preserving texture samples, alpha and emission. Native WebGPU and compatibility tests render wetness, puddles, rings and snow, test a zero-effect identity, and require exact restoration on disposal. Native evidence: wetness 35,747 pixels; puddles 20,751; rings 5,633; snow 29,160. Both backends report zero validation errors. CPU tests cover model removal, uniform updates and device-resource recreation. Core and stage untouched, 24,209 B gzip.
+GLTFWeather attaches a group-2 uniform through gltf/pbr.addLighting, leaving authored material extensions in group 3. It shares the existing Puddles/Snow WGSL, preserving texture samples, alpha and emission. Native WebGPU and compatibility tests render wetness, puddles, rings and snow, prove zero weather inside the weather program (with wetness and snow cover 0, thirteen other weather inputs move and the picture stays bit-identical, no new shader module or pipeline; a 0.0007 colour term scaled by puddle coverage fails it on 107,241 values), and require bit-identical restoration on disposal. The plain-against-weather picture is not compared: two programs may round f32 differently (WGSL 15.7.5, 12.10), and on Apple silicon Metal it differs at 2 values with no weather term reaching them. Native evidence: wetness 35,747 pixels; puddles 20,751; rings 5,559; snow 29,160. Both backends report zero validation errors. CPU tests cover model removal, uniform updates and device-resource recreation. Core and stage untouched, 24,209 B gzip.
 Batch 274 job 1 section 5 evidence: compute/shape composes fused logical indices with existing gather/scatter backends. The same thirty exact cases pass on CPU, native WebGPU and WebGL2 compatibility, including 561-element reverse-transposed inputs, mirrors, empty outputs and unsigned values above f32 exact range. No new rendering math, WGSL kernel, backend, core or stage path. Shape browser proof is registered as compute test:browser:shape.
 
-Batch 274 landing-gate repairs section 5: precise fused inputs retain an f32 boundary before argument reduction, including preservation of nonfinite bit patterns. Existing 1.5-ulp exp CPU parity exposed compiler contraction in the compatibility path. GPU-plan discovery distinguishes browser helper declarations from launch calls, and explicit scripts register existing nested MToon, headless GIF/tiles and worker matrix cases. The registration unit regression checks executable coverage without exempting any test. The stale gltf-pro/material-draw API report is refreshed to match its existing PreparedGeometry interpolation flag.
+Batch 274 landing-gate repairs section 5: precise fused inputs retain an f32 boundary before argument reduction, including preservation of nonfinite bit patterns. Existing 1.5-ulp exp CPU parity exposed compiler contraction in the compatibility path. GPU-plan discovery distinguishes browser helper declarations from launch calls, and explicit scripts register existing nested MToon, headless GIF/tiles and worker matrix cases. The registration unit regression checks executable coverage without exempting any test. The stale gltf/material-draw API report is refreshed to match its existing PreparedGeometry interpolation flag.
 
 Batch 274 gate repair: sprite picking uses an allocated free port rather than the depth merge-check port 5297. tests/parallel-check.test.js retains the existing port-collision regression. Autotune correctness uses the same device for every candidate: supported sizes run every existing integer/order assertion; larger sizes must reject with the device-limit RangeError. No size or error bound is reduced.
 
@@ -7117,9 +8064,9 @@ The optional points/clip entry transforms local records into world space for cen
 
 Viewport keying reads the existing transform store through core/extension and reuses InspectorGizmo for scene manipulation. Real browser proofs exercise selection plus all three transform modes on WebGPU and the WebGL2 compatibility layer. Keys preserve local quaternions without decomposition. No GPU math, shader, rendering backend or core implementation changed.
 ### Section 5 evidence: MSFT material levels (batch 222 job 2)
-Metadata/selection stay in lod/msft; gltf-pro owns material-index edits, texture refresh and later UV preparation. CPU tests cover chains, iterative traversal, per-primitive coverage, hysteresis, orthographic depth independence, UV2, restoration and disposal. The real msft-check verifies pixels and unchanged vertex buffers on native and full compatibility. No core/stage, hardware tier or timing claim.
+Metadata/selection stay in lod/msft; gltf/pbr owns material-index edits, texture refresh and later UV preparation. CPU tests cover chains, iterative traversal, per-primitive coverage, hysteresis, orthographic depth independence, UV2, restoration and disposal. The real msft-check verifies pixels and unchanged vertex buffers on native and full compatibility. No core/stage, hardware tier or timing claim.
 ### Batch 213 VRMA evidence (section 5)
-Optional rigging owns clip input ordering: VRM pose sources precede gaze, expression evaluation and spring solving. Sampling/retargeting reuse optional animation, accessor decoding uses lazy gltf-pro/asset. Real Seed-san motion plays on two licensed avatars, with GPU skinning and MToon, both backends; changed pixels and exact restoration are checked by `packages/rigging/tests/vrma.browser.mjs`. CPU cases cover interpolation, arbitrary rest frames, lifecycle and malformed input. No core/stage or backend feature change and no speed evidence claimed.
+Optional rigging owns clip input ordering: VRM pose sources precede gaze, expression evaluation and spring solving. Sampling/retargeting reuse optional animation, accessor decoding uses lazy gltf/asset. Real Seed-san motion plays on two licensed avatars, with GPU skinning and MToon, both backends; changed pixels and exact restoration are checked by `packages/rigging/tests/vrma.browser.mjs`. CPU cases cover interpolation, arbitrary rest frames, lifecycle and malformed input. No core/stage or backend feature change and no speed evidence claimed.
 
 Batch 244 xBR-style scale maths and section 5 evidence: `xbr3`/`xbr4` reconstruct a virtual grid through four rotated 5x5 contour-continuity tests. Integer weighted RGBA distances stabilize directional decisions on both backends. Coverage blends inside each grid cell and the existing sharp-bilinear integral handles fractional screen scaling. Equal-distance colors average, avoiding orientation bias; isolated pixels and checkerboards remain intact. No new texture or pass is allocated. `xbr.test.js` proves analytic contours and invariants; six added `scale-check.mjs` readbacks cover integer/fractional factors and fallback on both native WebGPU and full WebGL2. These checks do not establish universal perceptual superiority or a timing result.
 
@@ -7134,6 +8081,8 @@ Every GGX D now writes its denominator as |n x h|^2 + a2 nh^2 instead of nh^2 (a
 ### Section 5 evidence: WGSL return paths on every browser (KB-FF1b)
 Firefox's WGSL front end rejects a value-returning function that does not end in a return on every path, a stricter rule than the spec's behavior analysis that Chromium and the WebGL2 layer follow (KB-FF1: water's coastal `root` ended in a `loop` left only by `return`). The rule is a quality gate in three layers: `npm run hygiene` reads every `.wgsl` file and every WGSL function written out whole in the package sources (scripts/support/wgsl-returns.mjs, fatal); `npm run check:wgsl` runs the same token-level analyzer on every shader builder output, fragments included; the WGSL guard every browser check installs reports a gap in any module a page creates as a `[wgsl] error`, so assembled shaders are checked as the GPU gets them. A function must end in `return`, an `if`/`else` returning on both sides, or a `switch` whose clauses all return; `loop`, `for` and `while` never end one. Regression: tests/wgsl-returns.test.js. Evidence still missing: a full Firefox GPU run of every package suite (only the biomes suite has run there).
 ### Section 5 evidence: tracked conflict-marker hygiene (Job 0)
+`npm run hygiene` also rejects a `process.exit(` call in tracked JavaScript or TypeScript (KB-OWN-EXIT2, scripts/support/process-exit.mjs, fatal). `process.exit` shuts V8's platform down while the isolate lives, so a background task waiting on a main-thread collection can hold the exit for ever (KB-OWN-EXIT1, nodejs/node#54918); a script sets `process.exitCode` and lets its event loop end. A line may keep the call only with `// process.exit: <reason>` (a watchdog ending a hung run, an interrupt). The files still owed are listed, exactly, in scripts/support/exit-owed.json, which shrinks to empty: the check fails on a new file and on a listed file that no longer calls it. Regression: tests/process-exit-check.test.js (also runs the fixed gate scripts through tests/support/end-recorder.js). Evidence still missing: the files on the owed list.
+
 `npm run hygiene` rejects retained conflict lines before its scored gates, including warn and quick modes. It scans all tracked docs and md/ts/js/json/mjs/wgsl/glsl working files, excludes LFS and binary content, and reports path plus line. `tests/hygiene-conflict-markers.test.js` covers all extensions, docs text, CRLF, unchanged tracked inputs, binary attributes/bytes, LFS, untracked content and safe near-matches. This also protects check:merge through its existing hygiene step; semantic conflicts still require package tests.
 ### 5. Batch 248 job 3: true MSDF evidence
 The text shader distinguishes scalar SDF, premultiplied colour, and RGB MSDF glyphs. It samples RGB before median and derives footprint width from the RGBA atlas dimensions. A two-texel diagnostic has scalar medians 40/255 at both ends but an interpolated RGB median 140/255 at the midpoint; the pixel check must show the interior that scalar reduction loses. CPU tests preserve the raw uploads on restore and the scalar fallback, and verify lossless MTSDF PNG loading at zero alpha. Both native and full WebGL2 run the text suite. Core and stage are untouched.
@@ -7158,13 +8107,15 @@ PNG export now awaits figure/drawable restoration, encodes a COPY_SRC canvas-to-
 
 
 ### 5. Batch 243 trace extension-lobe ownership
-Optional mesh-pbr expands its private material packet; the common Mat carries only a PBR marker. A WGSL invocation-private PBRLayer is prepared once per current surface, with cached view Fresnel. The sampled-emitter reader is pure and cannot overwrite receiver layer state; a regression interleaves distinct receiver/emitter materials. The engine facade and core remain unchanged. Evaluation and sampling use the same full mixture density; perfectly smooth components have delta mass and zero continuous density. Geometric hemisphere rejection retains its null probability. Shared thin-film text is byte-preserved from gltf-pro and its existing random-input Khronos-reference tests still run. Six new CPU/WGSL cases verify channels, independent GGX/Fresnel, spectral reference, emission layering, hemisphere energy and glTF snapshots; mesh-pbr-lobes-browser.mjs checks both backends and logs create/ready/image phases.
+Optional mesh-pbr expands its private material packet; the common Mat carries only a PBR marker. A WGSL invocation-private PBRLayer is prepared once per current surface, with cached view Fresnel. The sampled-emitter reader is pure and cannot overwrite receiver layer state; a regression interleaves distinct receiver/emitter materials. The engine facade and core remain unchanged. Evaluation and sampling use the same full mixture density; perfectly smooth components have delta mass and zero continuous density. Geometric hemisphere rejection retains its null probability. Shared thin-film text is byte-preserved from gltf/pbr and its existing random-input Khronos-reference tests still run. Six new CPU/WGSL cases verify channels, independent GGX/Fresnel, spectral reference, emission layering, hemisphere energy and glTF snapshots; mesh-pbr-lobes-browser.mjs checks both backends and logs create/ready/image phases.
+
+KB5451 (2026-11-11): `pbrMaterial` reads its texture slots through one `pbrTexture` call in a loop bounded by the record's slot count (word 3), so fxc, which inlines every HLSL call, keeps one filter body: 42 to 20 inlined copies over the tracer's entries, the same Direct3D 11 image hash; other staged programs still compile for minutes cold (docs/known-bugs.md).
 
 Batch 243 final evidence: mesh, instances, attributes, mesh-pbr, mesh-pbr-lobes and mesh-lights GPU fixtures all pass native WebGPU and WebGL2/Vulkan after the final Wasm build. The lobe suite keeps its 120000 ms image signal and 1e-5 bound. Emitter-only reading evaluates four texture slots instead of fourteen, and continuous BSDF sampling reuses view Fresnel (two evaluations instead of three); independent CPU/WGSL output assertions remain unchanged. Light-family count resides in scene data, preserving proposal order, PDFs and RNG draws. The tagged padded-BLAS input distinguishes actual geometry limits from acceleration bounds: validation recovers only the known one-ULP padding, and TLAS construction still transforms the full conservative box. Ten Rust tests and the exact +/-1e8 emissive-triangle regression pass. The extra cache-disabled compiler defect is tracked, not waived as machine slowness. Receipt: whitepaper/results/batch243-mesh-lobes-20261110.json.
 
 
 ## Lens post-pass evidence (section 5 supplement, batch 236 job 3)
-weather/lens uses the existing PostStack stage protocol and shared fullscreen, display and viewport helpers. Seeded stationary drops and downward streaks distort captured HDR scene colour before display encoding; no changes to core, stage or post are needed. Native and compatibility GPU tests compare 4,400 pure field cases against JavaScript below 0.0001, require wet drops, motion, streak removal and seed changes to alter the image, and require exact identity for dry/disabled and repeated-time frames. Native counts: wet 4,469, motion 6,836, streaks 985, seed 6,630 pixels; both backends report zero shader/validation errors. CPU lifecycle tests cover one-time stack ownership, resource recreation and idempotent disposal. weather/cover (batch 236 job 2) reuses the WeatherFX top-down depth map at graph order -3 and patches core (group 0) and gltf-pro (group 2) weather calls with one depth test that takes the highest occluder of the four texels around the receiver. GPU evidence on both backends (parity-browser.mjs cover): map probes [0,1,1,1,0,0,0], 0 of 11,564 sheltered pixels change while 11,443 exposed pixels change, rain occlusion 656 pixels, no validation errors. The earlier red gate had two causes: the fixture shelter lay outside the camera-centred map (radius 8 map spanned z 0 to 16), and a single-texel lookup left a half-texel band inside shelter edges exposed (167 pixels). Still missing: MSAA edge pixels are shaded at the pixel centre (see docs/limits.md).
+weather/lens uses the existing PostStack stage protocol and shared fullscreen, display and viewport helpers. Seeded stationary drops and downward streaks distort captured HDR scene colour before display encoding; no changes to core, stage or post are needed. Native and compatibility GPU tests compare 4,400 pure field cases against JavaScript below 0.0001, require wet drops, motion, streak removal and seed changes to alter the image, and require exact identity for dry/disabled and repeated-time frames. Native counts: wet 4,469, motion 6,836, streaks 985, seed 6,630 pixels; both backends report zero shader/validation errors. CPU lifecycle tests cover one-time stack ownership, resource recreation and idempotent disposal. weather/cover (batch 236 job 2) reuses the WeatherFX top-down depth map at graph order -3 and patches core (group 0) and gltf/pbr (group 2) weather calls with one depth test that takes the highest occluder of the four texels around the receiver. GPU evidence on both backends (parity-browser.mjs cover): map probes [0,1,1,1,0,0,0], 0 of 11,564 sheltered pixels change while 11,443 exposed pixels change, rain occlusion 656 pixels, no validation errors. The earlier red gate had two causes: the fixture shelter lay outside the camera-centred map (radius 8 map spanned z 0 to 16), and a single-texel lookup left a half-texel band inside shelter edges exposed (167 pixels). Still missing: MSAA edge pixels are shaded at the pixel centre (see docs/limits.md).
 
 
 ### Section 5 evidence: batch 266 React test/offscreen entries
@@ -7172,7 +8123,7 @@ weather/lens uses the existing PostStack stage protocol and shared fullscreen, d
 Ordinary React DOM component mounts run against the headless null stage; frame and pointer helpers reuse the existing bindings dispatch. OffscreenCanvas delegates scene placement, capability probing, resize, input forwarding and worker cleanup to worker/auto, with React/DOM remaining on the page. No renderer or core change. CPU tests cover real scenes, updates, frame counts, synthetic bubbling/capture, ownership, StrictMode, fallback and errors. The new browser fixture compares component/headless and shared native scene pixels on WebGPU and compatibility, and exercises worker, page, auto, absent transfer, absent workers, interactive React state and cleanup. Equal light-tier settings make page and worker sampling comparable. Existing React GPU scripts remain in the changed-package gate; dependents receive CPU tests only.
 
 ### Section 5 evidence: batch 214 chain avoidance
-CPU cases cover N-link CCD/FABRIK, capsule/hull/SDF obstacles, fixed lengths/endpoints, unreachable and occluded requests, invalid custom query outputs and full-body atomic rollback. The Animator optional fbik entry accepts a per-limb avoidance hook without importing the constraint package. packages/animator/test/avoidance-browser.mjs renders the existing licensed RiggedFigure on both WebGPU and WebGL2 and independently measures the two accepted link gaps. No core, stage, rigging, physics solver or shader math changed. GPU planner registration gaps on main are tracked in known-bugs.md; direct changed-package leaves retain the shared lock and hard limit.
+CPU cases cover N-link CCD/FABRIK, capsule/hull/SDF obstacles, fixed lengths/endpoints, unreachable and occluded requests, invalid custom query outputs and full-body atomic rollback. The Animator optional fbik entry accepts a per-limb avoidance hook without importing the constraint package. packages/animator/test/avoidance-browser.mjs renders the existing licensed RiggedFigure on both WebGPU and WebGL2 and independently measures the two accepted link gaps. No core, stage, rigging, physics solver or shader math changed. GPU planner registration gaps on main are tracked in known-bugs.md; direct changed-package leaves retain their hard limit.
 
 
 ### Section 5 evidence: batch 217 nested editor
@@ -7195,7 +8146,7 @@ Viewcube local/world direction hooks allow optional UpViewCube to reuse all exis
 The integration regression also checks Z-up front screen up and the exact pole with an attached CameraProjection. Its owning camera suite runs on both backends; CPU dependents are cinematic, lighting2d, pixel, ui, react and the umbrella aliases. CameraProjection no longer substitutes a Y-pole screen up when the view is valid under a custom world-up direction.
 
 ### Section 5 evidence: batch 201 spec/gloss
-The optional material reader converts legacy spec/gloss after texture sampling into the existing metal/rough surface. Its additive material-conversion hook and implemented-extension list belong to gltf-pro; core and stage are unchanged. CPU tests cover defaults, required-extension selection, factors, UV routing, input immutability, numeric endpoints and malformed values. The GPU fixture independently renders dielectric, metal and rough endpoints against authored metal/rough controls and draws Microsoft's real SpecGlossVsMetalRough sample on WebGPU and compatibility WebGL2, with zero endpoint channel difference and no validation errors. The existing unrelated 16-sampler physical-composition compatibility limit remains documented in known-bugs; this feature adds no binding to that fixture.
+The optional material reader converts legacy spec/gloss after texture sampling into the existing metal/rough surface. Its additive material-conversion hook and implemented-extension list belong to gltf/pbr; core and stage are unchanged. CPU tests cover defaults, required-extension selection, factors, UV routing, input immutability, numeric endpoints and malformed values. The GPU fixture independently renders dielectric, metal and rough endpoints against authored metal/rough controls and draws Microsoft's real SpecGlossVsMetalRough sample on WebGPU and compatibility WebGL2, with zero endpoint channel difference and no validation errors. The existing unrelated 16-sampler physical-composition compatibility limit remains documented in known-bugs; this feature adds no binding to that fixture.
 ### 5. Batch 269 dome projection evidence
 The optional video/dome surface feature reuses external texture import and sRGB conversion. It adds angular remapping and a black rear mask for 180 degrees, plus both stereo rectangle orientations with half-texel clamping. RTX A6000/Edge pixel checks cover all twelve combinations on native WebGPU and full WebGL2 compatibility. Core/stage are untouched, 24209 B gzip. No headset or additional hardware/browser result exists. Preview refusal and source ownership follow video/material; generated sectors are independent analytic checks, no timing assertions.
 ## Batch 173 fusion (section 5 supplement)
@@ -7269,10 +8220,13 @@ Batch 184 landing regression: materials owns the KTX2 upload decision. Compatibi
 The new optional multi-goal entry keeps its dense numerical solver off core and stage. CPU evidence covers simultaneous goals, multiple closed loops, full spatial transforms, hard revolute/prismatic bounds, exact pi rotations, singular/unreachable failures and retained outputs. The mixed-joint closed chain renders on native WebGPU and WebGL2 compatibility; existing package browser and limit tests pass on both. This is kinematic pose correctness, with no global-convergence, collision-path, timing or GPU-compute claim. The optional entry has its own gzip ceiling.
 
 ### 5. Batch 271 anisotropic filtering evidence
-Creative /paint-aniso owns three passes: RGB tensor, horizontal tensor smoothing, and vertical smoothing plus oriented-sector filtering. Explicit unfilterable-float layouts allow rgba32float without requesting float32-filterable. An independent scalar oracle checks 7396 channels, at most one RGB code apart, exact centre alpha and exact bypass; cases cover radii 1/3/8, circles, anisotropy, sharpness, blend, tiny/flat images, split viewports, BGRA/4x targets and exact replacement-device equality. The circular case is a regression for finite-weight hard ellipse cutoffs; the C2 support envelope fixes the numerical cause. Shared GPU runs cover native and compatibility. CPU controls, resize, restore and terminal lifecycle also pass. No timing assertion or speed claim.
+Creative /paint-aniso owns three passes: RGB tensor, horizontal tensor smoothing, and vertical smoothing plus oriented-sector filtering. Explicit unfilterable-float layouts allow rgba32float without requesting float32-filterable. An independent scalar oracle checks 7396 channels, at most one RGB code apart, exact centre alpha and exact bypass; cases cover radii 1/3/8, circles, anisotropy, sharpness, blend, tiny/flat images, split viewports, BGRA/4x targets and exact replacement-device equality. The circular case is a regression for finite-weight hard ellipse cutoffs; the C2 support envelope fixes the numerical cause. GPU runs cover native and compatibility. CPU controls, resize, restore and terminal lifecycle also pass. No timing assertion or speed claim.
 ### Section 5 evidence: batch 192 velocity temporal upscaling
 The optional taa/upscale-velocity entry composes the existing low-resolution upscaler with TAA's velocity-only passes: capture -70, motion camera capture -69, object motion 9, motion bookkeeping 38, upscale/present 39. Histories are local to each RenderView.id; capture uses a local render rectangle and presentation restores the caller viewport/scissor/target dimensions and source camera. No core/stage modification. Two perspective-interpolated object clip positions avoid false motion from raster fragment quantization; a 16-byte viewport scale/offset extends only TAA's private GPU camera block. The public custom-source camera block stays 36 floats.
 Evidence: upscale-velocity.test.js checks independent motion/history resources, stable allocation counts, spatial/temporal transitions, resets, scale changes, restoration, disposal and failed resolve cleanup. upscale-velocity-browser.mjs checks isolated/stereo and offset/shared-target byte identity, visible parallax and translating/stopped thin-object vectors on both GPU backends. Existing TAA GPU suites cover animated/alpha/custom motion providers reused by this path. No speed result asserted.
+
+### Section 5 evidence: TAAUpscale silhouette stability (2026-11-15, lane OF2)
+The temporal upscale resolve (shared by taa/upscale-velocity) now rejects history only when the reprojected nearest depth lies outside the min/max of a 3x3 history depth footprint, taps one render pixel apart; before, it compared one history texel, which at a silhouette changed surface with the jitter (both depths are 3x3 dilated at render size) and rejected history every few frames while the camera moved. Nine extra r32float loads per output pixel; no new resources, no core or stage change. Evidence: packages/taa/test/stability-browser.mjs, WebGPU and the WebGL2 layer on the RTX A6000 (dev PC): edge alternation 0.195 and 0.201 luma levels (bound 0.25, and at most twice the slow-camera figure) against 0.361 (WebGPU) and 0.200 (the layer, whose resolve already reads each depth as the nearest of five texels) with the one-texel test; a box crossing the wall leaves no trail. The residue (0.16 with the camera still) is the jittered accumulation's own. Missing: GPU cost not timed (build phase), other GPUs not run. Sources in packages/taa/README.md (Karis 2014; Nehab et al. 2007; Yang, Liu and Salvi 2020).
 
 ### Section 5 evidence: pixelation and geometric edges
 Batch 191 Pixelate keeps scene capture unchanged and samples the LDR result on a fixed integer cell grid. The existing SceneTargets pass supplies shading normals; the stack supplies resolved depth. Relative linear distance handles perspective and orthographic reversed Z, while angular signed-normal differences distinguish creases from silhouettes. A supplied normal texture bypasses the owned replay. Tests inspect constant cells, independent edge contributions, disabled identity, validation, restoration and both resource owners. No core or stage change.
@@ -7286,7 +8240,7 @@ Staging's optional pathtrace-materials composes the existing PBR mesh transport 
 compute/decomp uses one optional Rust SIMD Wasm feature, without core, stage or backend changes. CPU and both real-device suites exercise the same 67 analytic/reconstruction/orthogonality cases, including pivoting, strided inputs, broadcast batches, wide/full/empty/rank-deficient factors and tiny singular values. Validation covers failure status, aborts, concurrent instance ownership and bounded ABI access. SIMD conformance compares inner products exactly with scalar left-to-right products/additions and verifies the emitted f64x2.mul opcode. Each pair replaces two scalar product instructions with one SIMD product instruction while retaining scalar addition order; no wall-clock claim is made. Native device decomposition throughput and large-matrix quality beyond these fixtures remain unmeasured.
 Batch 274 capture evidence: the basic-scene caller now retires its browser owner after early close, avoiding a second host end request from finally. A strict one-close regression and the real five-request capture pass. Existing BVH/ECS/navmesh/scene-worker assets are included in the lazy-size inventory; no runtime or browser-host changes accompany those records.
 ### 5. Batch 270 recurring GPU gate registration
-The VFX package test:gpu command now runs parity.mjs --all on native WebGPU and again with --compat, after the existing suite. The root GPU-package runner already discovers that command, so scheduled CI exercises space, lifetime dynamics, shape statistics, prewarm and JSON state/pixel roundtrips. gpu-registration.test.js rejects a missing backend, missing parity command or a command that omits --all. The --all command was exercised under the shared GPU lock; no root runner or browser lifecycle file changed.
+The VFX package test:gpu command now runs parity.mjs --all on native WebGPU and again with --compat, after the existing suite. The root GPU-package runner already discovers that command, so scheduled CI exercises space, lifetime dynamics, shape statistics, prewarm and JSON state/pixel roundtrips. gpu-registration.test.js rejects a missing backend, missing parity command or a command that omits --all. The --all command was exercised; no root runner or browser lifecycle file changed.
 ### Section 5 evidence: batch 184 shell fur
 The optional materials/fur entry runs shell extrusion, quadratic gravity and deterministic wind in the vertex shader and seeded strand-volume cuts in the fragment shader. FurMaterial uses the existing caster displacement contract for the same vertex move and UV mask in shadows/depth/selection. All new rendering stays in materials. The native and WebGL2 compatibility fixture covers 1x and 4x MSAA, density, length, gravity, time updates, pixel-exact reset and device restore, a pinned real CC0 colour image and rendered caster shadows. A two-shell regression catches an empty tip-only outer layer. No speed claim; steady uniform draws write zero bytes, proven by the CPU device recorder.
 ### Section 5 evidence: full-screen print screens
@@ -7303,7 +8257,7 @@ Evidence on both WebGPU and WebGL2 compatibility: volume-depth-browser.mjs gives
 
 ### 5. Demand rendering evidence (batch 195 job 1)
 Optional quality/demand owns one RAF request and an engine-scoped lifecycle plugin. Unit tests cover coalescing, nested animation ownership, restoration, load rejection, idle app-clock reset, bounded damping bootstrap, delta cap, reentrant invalidation and abort/dispose. demand-browser.mjs renders original box geometry on WebGPU and WebGL2, drives attached orbit damping to rest, proves idle frame counts remain unchanged and wakes after load. No core/stage changes; app onFrame callbacks migrate to options.update because manual render runs plugin updates rather than continuous-loop callbacks. No battery number is claimed.
-The VFX package test:gpu:parity command runs parity.mjs --all on native WebGPU and again with --compat, alongside the existing test:gpu suite. The root GPU-package runner discovers both commands, so scheduled CI exercises space, lifetime dynamics, shape statistics, prewarm and JSON state/pixel roundtrips. gpu-registration.test.js rejects a missing backend, missing parity command or a command that omits --all. The --all command was exercised under the shared GPU lock; no root runner or browser lifecycle file changed.
+The VFX package test:gpu:parity command runs parity.mjs --all on native WebGPU and again with --compat, alongside the existing test:gpu suite. The root GPU-package runner discovers both commands, so scheduled CI exercises space, lifetime dynamics, shape statistics, prewarm and JSON state/pixel roundtrips. gpu-registration.test.js rejects a missing backend, missing parity command or a command that omits --all. The --all command was exercised; no root runner or browser lifecycle file changed.
 ### Section 5 evidence: batch 186 shaped shadows
 
 AreaShapes composes the existing LTC disk/sphere integrator with LocalShadows, leaving core and stage untouched. Four shape slots follow four rectangle slots in the extended uniform and depth-array layers; point-only layout and shadow-off shader hashes remain pinned. The uniform is 13,200 bytes when extended, within WebGPU's minimum uniform binding limit. Disk frames match their emitting plane; sphere filter footprints face the receiver. CPU allocation/cache/receiver tests and production-shader GPU probes establish bounded PCSS visibility. Exact distributed area visibility, cross-vendor evidence and speed measurements are not claimed.
@@ -7356,7 +8310,7 @@ The existing quality reading browser fixture now initializes the selected backen
 
 ## Batch 136 replacement proof (section 5 supplement)
 
-The 76-row external-oracle matrix includes every source corner and attribute error at four settings. Both decoders agree; all recorded streams meet the old encoder size and error bars. The actual selected prediction-degree descriptor has a public-ABI decoder regression, and Rust regressions cover circular modular normal cost and sparse high-precision RAW coding. Shared-slot native/compat exporter browser rendering and all changed/dependent CPU suites remain the landing evidence. Optional gzip is 91,248 B; core plus stage stays 24,209 B. No GPU maths or backend changed; timing remains owed.
+The 76-row external-oracle matrix includes every source corner and attribute error at four settings. Both decoders agree; all recorded streams meet the old encoder size and error bars. The actual selected prediction-degree descriptor has a public-ABI decoder regression, and Rust regressions cover circular modular normal cost and sparse high-precision RAW coding. Native/compat exporter browser rendering and all changed/dependent CPU suites remain the landing evidence. Optional gzip is 91,248 B; core plus stage stays 24,209 B. No GPU maths or backend changed; timing remains owed.
 ### 5. Batch 173 mapped volume evidence
 Curvilinear/spherical integration lives entirely in sciviz/curvilinear, never core/stage. Float32 node coordinates and a stackless cell-bounds texture locate trilinear cells; exact spherical inverse with binary searched nonuniform axes avoids polar cell singularities. Original scalar/classifier textures remain owned by the hidden VolumeLayer, shared by the march and coordinate sections. An independent node-validity texture prevents missing values becoming material. Physical reference distances control extinction under anisotropic bounds. Scene-depth snapshots terminate the same rays as ordinary volumes. curvilinear-browser.mjs covers analytical cubes/shells, classifier changes, opaque interior, warped affine fields, masks, both-backend actual device reboot and real NOAA demo content. No timing evidence is claimed; very distorted-grid conditioning and higher-order curved-slice tessellation remain quality refinements, not missing domain features.
 
@@ -7366,7 +8320,7 @@ One optional storage buffer augments the existing projector light factor, with m
 
 
 ### 5. View-driven raster geography (batch 180 job 1)
-Optional sciviz/geo-lod owns its quadtree, bounded cache, loading signals and retained CPU tile payloads. No core/stage or existing renderer modifications. WGS84 globe/flat meshes share the geographic projection, a metre height grid and downward edge skirts. prepare reads the current camera times figure model with physical viewport size; view selection does not depend on a camera preset. Coarse-first alpha-blended draw order retains fallback through child fades; requests that finish after cancellation cannot enter residency. GPU resources restore from retained pixels and mesh arrays. CPU tests check exact adjacent edge coordinates, quadtree coverage/budget, signals, failures, missing tiles and cache lifecycle; GPU tests use real AWS elevation, camera changes and identical retained-data restore on WebGPU and webgl2-compat. No exclusive GPU use or speed assertion.
+Optional sciviz/geo-lod owns its quadtree, bounded cache, loading signals and retained CPU tile payloads. No core/stage or existing renderer modifications. WGS84 globe/flat meshes share the geographic projection, a metre height grid and downward edge skirts. prepare reads the current camera times figure model with physical viewport size; view selection does not depend on a camera preset. Coarse-first alpha-blended draw order retains fallback through child fades; requests that finish after cancellation cannot enter residency. GPU resources restore from retained pixels and mesh arrays. CPU tests check exact adjacent edge coordinates, quadtree coverage/budget, signals, failures, missing tiles and cache lifecycle; GPU tests use real AWS elevation, camera changes and identical retained-data restore on WebGPU and webgl2-compat. No speed assertion.
 
 Sciviz browser commands launch through scripts/browser-root.mjs so every suite serves repository fixtures when invoked by npm from packages/sciviz. The package CPU regression executes the bootstrap from that directory and checks all browser commands. This corrects the calc/atmosphere 404 gate failure without changing shared browser lifecycle code.
 
@@ -7376,7 +8330,7 @@ Review 2 (2026-11-10): UI browser driver CPU probes now invoke every driver from
 
 The prebuilt Draco encoder is removed only after the 76-row no-worse ratio/error and independent-decoder proof. Package builds copy the single owned SIMD artifact; default Node/browser loading and shared native/compat render gates work without old vendor/dist folders. Supply-chain regeneration now retains existing asset-notice addenda and validates the generated inventory independently. Existing supply-chain tests plus the new retention regression protect both. Core plus stage remains 24,209 B; timing is still deferred. No rendering-backend code changed.
 
-Landing metadata check: the inherited gltf-pro audio entry had current API reports but a stale aggregate count and root gzip cell in docs/api-surface.md. Rebasing onto main's regenerated summary resolves it; api:update leaves no selected diff and api:check verifies the result. No API implementation or export changes belong to encoder removal.
+Landing metadata check: the inherited gltf/pbr audio entry had current API reports but a stale aggregate count and root gzip cell in docs/api-surface.md. Rebasing onto main's regenerated summary resolves it; api:update leaves no selected diff and api:check verifies the result. No API implementation or export changes belong to encoder removal.
 
 ### 5. Batch 274 NN-extra evidence
 
@@ -7392,13 +8346,13 @@ The all-package discovery regression also catches packages that add their first 
 
 ### Section 5 evidence: typed table GPU aggregation (batch 174 job 2)
 
-The optional sciviz/table entry classifies rows and applies immutable filter snapshots on the CPU, then dispatches one independent invocation per 256-row tile through ComputeContext. Each invocation owns its bin counters and numeric accumulators. No global float atomic, race-dependent sum or per-bin repeated scan exists. Bounded chunks return partial counts/sums/min/max for a float64 host merge; the same order defines the CPU fallback. Tests cover actual WebGPU and the WebGL2 compatibility device, including rendered filtered histogram/heatmap pixels and 10,000,000 physical rows, exact independent per-bin comparisons, 39 dispatches and 1,250,016 partial bins. No timing assertions or exclusive lock. Existing renderer/core/stage implementations are unchanged. File-format fixtures come from an opaque PyArrow writer; CRC, truncation, null, integer precision and allocation-limit checks are CPU regressions. Limits and deferred timing are in limits.md and the speed-phase inventory.
+The optional sciviz/table entry classifies rows and applies immutable filter snapshots on the CPU, then dispatches one independent invocation per 256-row tile through ComputeContext. Each invocation owns its bin counters and numeric accumulators. No global float atomic, race-dependent sum or per-bin repeated scan exists. Bounded chunks return partial counts/sums/min/max for a float64 host merge; the same order defines the CPU fallback. Tests cover actual WebGPU and the WebGL2 compatibility device, including rendered filtered histogram/heatmap pixels and 10,000,000 physical rows, exact independent per-bin comparisons, 39 dispatches and 1,250,016 partial bins. No timing assertions. Existing renderer/core/stage implementations are unchanged. File-format fixtures come from an opaque PyArrow writer; CRC, truncation, null, integer precision and allocation-limit checks are CPU regressions. Limits and deferred timing are in limits.md and the speed-phase inventory.
 ### Section 5 evidence: scientific PDF and math
 Batch 178 job 2 keeps PDF/math optional. The ordinary figure export overlay registry retains formula paths across HTML, PNG, SVG and PDF and disposes them with the figure. Font outlines come from the existing loader, with exact quadratic-to-cubic conversion for PDF. No core/stage or GPU shader change. Both rendering backends produce an entirely vector 3441-sample LIGO figure; independent MuPDF opens all six PDF fixtures without repair and confirms paths, raster alpha, clipping, gradient and image orientation. Scope, tests and remaining font-specific math appearance differences are in docs/sciviz-publication.md.
 
 ## Section 5 evidence: batch 176 engineering import
 Engineering parsing stays in six optional sciviz entries, with no renderer/core/stage changes. HDF5 owner-writer regressions exercise earliest, 1.8, 1.10 and HDF5 2.0 metadata, selected chunk reads, variable strings, sparse fills, paged fixed/extensible indexes and non-leading unlimited axes. NASA ADF grids were losslessly converted by CGNS CGIO. Xdmf2 and Exodus library outputs plus SEACAS can, OpenFOAM blockMesh/foamFormatConvert ascii/binary output and Ansys EnSight aircraft data validate format ownership. The scientific grid/mesh renderer consumes the resulting datasets without a new rendering path. engineering-browser.mjs renders NASA CGNS (816 cells) and SEACAS Exodus (7152 cells) on WebGPU and the WebGL2 compatibility layer. Both routes show 71394 and 36920 foreground pixels respectively; native CGNS hash -1440303796, compatibility CGNS 1415886156, Exodus 733478083 on both. Hash differences between GPU backends are accepted pixel differences, not a scientific data difference. CPU tests check exact samples and topology. Additional semantic format limits are recorded in limits.md. No speed evidence is claimed during build phase.
-Batch 183 job 1 evidence (section 5): stage/gltf delegates PBR textures/materials to gltf-pro and skin/morph preparation to animation. The entry waits for optional imports with the combined stage/caller signal, retires the loaded model on attachment/fit/abort failure and preserves primitive mesh handles for bounds. Real-GPU wrapper/direct pixel equality covers texture, skin and morph on native and compatibility devices. Core/stage root remains 24,209 B gzip; native preview WebGL2 without a compatibility device remains outside PBR support.
+Batch 183 job 1 evidence (section 5): stage/gltf delegates PBR textures/materials to gltf/pbr and skin/morph preparation to animation. The entry waits for optional imports with the combined stage/caller signal, retires the loaded model on attachment/fit/abort failure and preserves primitive mesh handles for bounds. Real-GPU wrapper/direct pixel equality covers texture, skin and morph on native and compatibility devices. Core/stage root remains 24,209 B gzip; native preview WebGL2 without a compatibility device remains outside PBR support.
 Review 4 clustered composition (2026-11-10): cube cookies reserve storage binding 152, separate from stochastic shadow uniform 151. The package CPU regression composes both hooks and checks shader and resource binding uniqueness; clustered-cube-projector-gpu.mjs exercises core rendering, compute probes and exact one-light equivalence with both hooks on native WebGPU and WebGL2 compatibility. This closes the previously untested combined-hook failure without a core change.
 
 Review 4 LTC accuracy: use an owned octant-folded half-angle arctangent for area/shaped-light edge terms. The WebGL2 backend atan2 exceeded the existing shaped-light mirror bar after cancellation; replacing that operation alone closes the failing 54-case comparison. CPU coverage retains all previous edge/quadrature bars and adds a full angular sweep. Core/stage and the compatibility implementation are unchanged; no performance claim.
@@ -7488,7 +8442,7 @@ Review 3 T1 evidence: optional GLSL transition lowering now preserves the source
 List 3 batch 66 job 8: water/rivers swaps Water's coastal flow and integrate kernels through an internal WeakMap bridge (query-state.ts riverKernels); CoastalFlow rebuilds when the attached kernels change, so attach and dispose each restart the flow from the terrain. Sources are a 272 B uniform at binding 5, rewritten each frame. The integrate kernel is one template (integrateShader) shared by both solvers.
 
 ## Section 5 evidence: batch 176 astronomy and microscopy import
-Optional sciviz/fits, /mrc and /ometiff use owning-package decoders/tiff for quantitative TIFF samples. No core/stage change or new renderer shader. CPU proofs cover FITS binary cells and WCSLIB sky axes, cell-axis transforms, gzip HTTP Content-Encoding, bounded/cancelled requests, BigTIFF addressing and exact signed/unsigned/floating TIFF predictors. astronomy-browser.mjs checks the actual three real-data uploads and visible pixels on native WebGPU and WebGL2 compatibility; source and output hashes are pinned in the fixture manifest. Its GPU hold is shared and bounded to four minutes. Generic renderer grids are axis-aligned storage envelopes, not affine/celestial resampling. Rare projection algorithms, vendor headers and TIFF pyramid/companion refinements remain explicitly delimited in limits.md. Build-phase CPU work is not timed for performance; no benchmark run or speed claim.
+Optional sciviz/fits, /mrc and /ometiff use owning-package decoders/tiff for quantitative TIFF samples. No core/stage change or new renderer shader. CPU proofs cover FITS binary cells and WCSLIB sky axes, cell-axis transforms, gzip HTTP Content-Encoding, bounded/cancelled requests, BigTIFF addressing and exact signed/unsigned/floating TIFF predictors. astronomy-browser.mjs checks the actual three real-data uploads and visible pixels on native WebGPU and WebGL2 compatibility; source and output hashes are pinned in the fixture manifest. Its GPU run is bounded to four minutes. Generic renderer grids are axis-aligned storage envelopes, not affine/celestial resampling. Rare projection algorithms, vendor headers and TIFF pyramid/companion refinements remain explicitly delimited in limits.md. Build-phase CPU work is not timed for performance; no benchmark run or speed claim.
 
 Review 2 weather lifetime evidence (section 5): GLTFWeather and PrecipitationCover use the registered scene identity for removal after local disposal. packages/weather/tests/owner.test.js exercises the real Engine, secondary-scene ownership, same-name default-scene decoys, frame-pass removal and repeated/scene-initiated disposal. GPU algorithms and shader output are unchanged.
 ### 5. Batch 174 job 4: query and spreadsheet evidence
@@ -7504,7 +8458,7 @@ Review 2 caustics evidence (section 5): beam and conservative range passes recei
 
 An optional decoders/avif entry owns its lazy Rust SIMD binary, browser/Node module workers and bounded AV1 intra/HEIF composition pipeline. Core/stage and rendering backends are unchanged. Native and actual Wasm match 14,828,077 independent full-precision YUV samples across 16 files; a separate 912-case transform probe checks SIMD instructions and rounding. Tool-count assertions prevent palette/copy/restoration corpus claims from relying on unused tools. Exact worker/GPU upload and readback covers 4,762,292 bytes on each native WebGPU and WebGL2 backend. Production consumer tests pin separate asset emission. Device diversity and quiet speed measurements remain missing; animated/progressive playback is outside the still-image job.
 
-Batch 203 size-record integration: the basic-scene recorder follows main's selected PBR loader. Its exact network request set and no-fetched-decoder/worker/Wasm assertions remain enforced. Emitted codec assets are accepted only inside the selected loader's declared transitive asset graph; unrelated packs still reject. The legacy gltf module-name assumption was obsolete after main 3d7dd74c9. The graph regression and real shared-GPU capture provide current evidence; the README fixture and stage runtime are unchanged.
+Batch 203 size-record integration: the basic-scene recorder follows main's selected PBR loader. Its exact network request set and no-fetched-decoder/worker/Wasm assertions remain enforced. Emitted codec assets are accepted only inside the selected loader's declared transitive asset graph; unrelated packs still reject. The legacy gltf module-name assumption was obsolete after main 3d7dd74c9. The graph regression and real GPU capture provide current evidence; the README fixture and stage runtime are unchanged.
 
 
 
@@ -7522,9 +8476,9 @@ sciviz/annotate uses camera-clip times physical data-to-scene matrices and raw c
 
 ## Batch 120 install isolation (section 5 supplement)
 
-Batch 120 adds standalone @margoengine/game, /web, /viz and /react-kit install profiles. Root forwarding entries measure 740, 321, 578 and 158 B min+gzip respectively, previously absent (0 B); their strict quality ceilings are 996, 577, 834 and 485 B. Member alias entries reuse the original package implementation and bytes. The core + stage root remains 24,209 B min+gzip before and after. Model loading is installed but exposed through /gltf-pro, so a root-only app emits no decoder files. Packed native installs contain 70/40/42/42 engine packages versus 98 for the umbrella; React additionally installs its explicit React and React DOM peers. Exact dated installed/packed byte snapshots and closure definitions are in docs/guides/kit-install-sizes.json and docs/guides/kits.md; these are file-byte measurements, not speed claims. Optional third-party peers and the optional WebGL2 backend are not part of a plain profile install.
+Batch 120 adds standalone @margoengine/game, /web, /viz and /react-kit install profiles. Root forwarding entries measure 740, 321, 578 and 158 B min+gzip respectively, previously absent (0 B); their strict quality ceilings are 996, 577, 834 and 485 B. Member alias entries reuse the original package implementation and bytes. The core + stage root remains 24,209 B min+gzip before and after. Model loading is installed but exposed through /gltf/pbr, so a root-only app emits no decoder files. Packed native installs contain 70/40/42/42 engine packages versus 98 for the umbrella; React additionally installs its explicit React and React DOM peers. Exact dated installed/packed byte snapshots and closure definitions are in docs/guides/kit-install-sizes.json and docs/guides/kits.md; these are file-byte measurements, not speed claims. Optional third-party peers and the optional WebGL2 backend are not part of a plain profile install.
 
-Evidence: tests/kit-boundaries.test.js fails if core gains any required dependency or stage gains one other than core; every generated kit alias is checked for declared dependency and binding identity in packages/*/tests/kit.test.js through tests/kit-support.js. Local CI verifies clean tarball installs with scripts/kit-install-check.mjs; this CPU step never takes a GPU slot. scripts/kit-browser-check.mjs runs separately under a shared GPU slot and proves native first frames, the four profiles on full WebGL2, and overlapping profiles in one application. No new rendering feature, GPU maths or browser lifecycle code was added. README examples remain owed in the build phase.
+Evidence: tests/kit-boundaries.test.js fails if core gains any required dependency or stage gains one other than core; every generated kit alias is checked for declared dependency and binding identity in packages/*/tests/kit.test.js through tests/kit-support.js. Local CI verifies clean tarball installs with scripts/kit-install-check.mjs; this CPU step never uses the GPU. scripts/kit-browser-check.mjs runs separately and proves native first frames, the four profiles on full WebGL2, and overlapping profiles in one application. No new rendering feature, GPU maths or browser lifecycle code was added. README examples remain owed in the build phase.
 ## Section 5 evidence: batch 176 AMR
 The optional sciviz/amr entry owns block snapshots, finer-level cell masks, a boundary-decomposed k-d tree, solver-format readers and direct ray integration. A single fullscreen draw traverses disjoint leaves, preserving native block resolution; packed scalar and hierarchy textures are recreated after device replacement. Existing scene-depth capture and transfer resources are reused. Core and stage are unchanged. CPU proofs compare every Nyx scalar byte and child mask with independent yt output, check ray length and slice area conservation, reject ambiguous overlapping levels and malformed refinement, and compare owner-library HDF5 fixtures for Enzo/FLASH. The browser suite exercises real licensed four-level data, density, MIP, clipping, hiding and resource restoration on both native WebGPU and the compatibility layer. Missing evidence is a quiet-machine speed suite, additional vendor plotfile variants and higher-order boundary reconstruction; none is claimed.
 
@@ -7537,20 +8491,20 @@ AMR rebase integration: the shared colour entry now supplies encoded rgba32float
 ### Section 5 evidence: batch 175 exact aggregation
 Optional sciviz/aggregate assigns one GPU invocation per bin and exhaustively rasterises chunk rows. Two unsigned 134-word superaccumulators preserve binary64 sums without float atomics, f32 value coercion or ordering races. Positive/negative partials merge exactly and sum/mean round once. Both WebGPU and WebGL2 pass all five glyph/reduction comparisons; WebGL2 reports 15 GPU and zero CPU compute dispatches. The 100M physical-row WebGPU check matches the independent original-coordinate/integer-cent oracle with 8442384 B staging, 17920 B partial output, 1526 dispatches and all 100M votes. Input arrays total 2400000000 B. This repeats 4096 original TLC observations; no unique-trip or wall-clock speed claim. Full contract, sources and evidence: [sciviz-aggregate.md](../sciviz-aggregate.md). Core/stage source unchanged; combined gzip 24209 B.
 
-Batch 175 landing gate ownership: the multi-demo browser suite requests an available OS port through the existing launcher, so concurrent lanes do not occupy a GPU slot waiting on fixed port 5267. The configuration regression is packages/sciviz/tests/browser-root.test.js. Protected browser/support modules are unchanged. Fixture SHA-256 checks and LF attributes preserve original retained observation bytes on Windows checkouts.
+Batch 175 landing gate ownership: the multi-demo browser suite requests an available OS port through the existing launcher, so concurrent lanes do not wait on fixed port 5267. The configuration regression is packages/sciviz/tests/browser-root.test.js. Protected browser/support modules are unchanged. Fixture SHA-256 checks and LF attributes preserve original retained observation bytes on Windows checkouts.
 ### Section 5 evidence: batch 174 linked views
 sciviz/views composes several existing figures and leaves core/stage unchanged. Camera links retain independent aspect ratios while copying pose/projection settings; range links convert physical units through each scale without echoing recipient updates. VolumeQuad uses nearest original samples for three orthographic planes, a physical crosshair and matching 3D slice fractions. Isotropic 2D projection and resize preserve physical shape rather than stretching the anatomy. views.test.js checks geometry, provenance, date origins, links, graph isolation and cleanup; views-browser.mjs proves real T1/NOAA output, linked pointer panning, actual camera copies, physical isotropy before/after resize and all four changed views on WebGPU and WebGL2. Shared GPU-resource reuse, oblique medical reslicing and clinical validation are not claimed. Every view owns its engine; only optional sciviz entries load.
 
 
 ### 5. Condition-based browser check readiness (2026-11-10)
 
-The fixed-wait gate follows lexically scoped frame helpers with explicit simulation deltas, bounded condition polls and process-kill deadlines. Playwright Promise-valued predicates are valid. Regression coverage is in `tests/check-fixed-waits.test.js`, including zero-delta waits, misleading callback names, unbounded polls and lexical shadowing. The baseline only decreases. Scientific volume checks accumulate to their public sample counters with a hard deadline; progressive-rendering checks await full refinement and cinematic accumulation; voxel model and inspector shader checks await pipeline and submitted-work completion. Inspector relay checks await delivered state, React checks await the requested dimensions/factor and compiled pipelines, and Stats awaits populated CPU/GPU/memory/pass histories. The CPU-load diagnostic samples real browser setup work.
+The fixed-wait gate follows lexically scoped frame helpers with explicit simulation deltas (a helper that renders with its own parameter as the delta steps time when the call passes a number above 0, KB-GLTF-FIXEDWAIT1), bounded condition polls and process-kill deadlines. Playwright Promise-valued predicates are valid. Regression coverage is in `tests/check-fixed-waits.test.js`, including zero-delta waits, misleading callback names, unbounded polls and lexical shadowing. The baseline only decreases. Scientific volume checks accumulate to their public sample counters with a hard deadline; progressive-rendering checks await full refinement and cinematic accumulation; voxel model and inspector shader checks await pipeline and submitted-work completion. Inspector relay checks await delivered state, React checks await the requested dimensions/factor and compiled pipelines, and Stats awaits populated CPU/GPU/memory/pass histories. The CPU-load diagnostic samples real browser setup work.
 
 Clean-room sources compared: W3C GPU for the Web Working Group, *WebGPU*, 2026, https://www.w3.org/TR/webgpu/ (queue completion does not replace asynchronous pipeline completion); Microsoft Playwright contributors, *Page.waitForFunction*, 2026, https://playwright.dev/docs/api/class-page#page-wait-for-function (Promise predicates are awaited); Node.js contributors, *Child process*, 2026, https://nodejs.org/api/child_process.html (exit events versus kill deadlines). These standards and API contracts determine readiness; no external implementation was read or used. No rendering feature, API or timing claim changes.
 
 ## Batch 120 starter proof (section 5 supplement)
 
-The CLI and all five starters are installed from packed tarballs via the loopback registry, with exact engine dependency closure checks and production builds, then rendered under one shared slot. Counts are web/game/viz/React/Next = 40/70/42/42/42. Native first frames, startup errors and game/viz HUD state pass; the profile job separately covers both backends. Next readiness uses its actual server-ready event, never a fixed render wait. The release workflow now consumes a tested dependency order with profile members first and the umbrella last; this change does not execute publication. The import, kits and migration guide snippets pass; the unrelated React offscreen guide fence mismatch is recorded in known-bugs. No speed assertion or README example work was run.
+The CLI and all five starters are installed from packed tarballs via the loopback registry, with exact engine dependency closure checks and production builds, then rendered. Counts are web/game/viz/React/Next = 40/70/42/42/42. Native first frames, startup errors and game/viz HUD state pass; the profile job separately covers both backends. Next readiness uses its actual server-ready event, never a fixed render wait. The release workflow now consumes a tested dependency order with profile members first and the umbrella last; this change does not execute publication. The import, kits and migration guide snippets pass; the unrelated React offscreen guide fence mismatch is recorded in known-bugs. No speed assertion or README example work was run.
 #### Section 5 evidence addition: batch 179 sharing
 Share restores the existing Figure/spec rendering path without core or stage changes. The optional offline runtime contains lazy binary and worker assets and the WebGL2 compatibility device. The MRI browser regression checks both backends, actual deep-link navigation, file viewing without HTTP(S), exact-origin/source command ownership and explicit cleanup. CPU bounds cover compressed input and inflated bytes. This is correctness evidence, with no timing claim.
 ### Section 5 evidence: batch 178 accessible scientific figures
@@ -7608,7 +8562,7 @@ Scientific reader sessions own dedicated workers through worker/rpc. Transfer li
 
 ### Section 4.1 gate: C2 composition
 
-check:gpu-packages ROOT includes test:composition:browser. Generated page imports register the composition footprint in affected-gpu.mjs. One shared GPU slot runs both backends and 1x/4x MSAA; no timing assertions. Generator drift and binary tuple coverage have CPU regressions.
+check:gpu-packages ROOT includes test:composition:browser. Generated page imports register the composition footprint in affected-gpu.mjs. It runs both backends and 1x/4x MSAA; no timing assertions. Generator drift and binary tuple coverage have CPU regressions.
 
 API record file classes: api/lock.json and api/breaks.json are explicitly inert
 for GPU selection, with mandatory api:check unchanged. tests/file-classes.test.js
@@ -7694,7 +8648,7 @@ numbers: [dof-tier-requirement.md](../dof-tier-requirement.md).
 
 ## Native volume range repair (section 5 evidence, 2026-11-10)
 
-The optional gltf-pro native tint retains natural optical depth until its
+The optional gltf/pbr native tint retains natural optical depth until its
 existing refracted mesh slab is transformed into world length. The additive
 PBRMaterial.opticalDepth field preserves parsed extinction information while
 legacy attenuation-only materials remain supported. CPU regressions cover
@@ -7733,10 +8687,10 @@ Throughput and peak-memory comparisons remain owed in the deferred speed phase;
 no wall-clock performance claim is made. Legacy bundled encoder files are removed.
 
 ### Section 5 evidence: AVIF review regression discovery (2026-11-10)
-The optional decoders CPU pipeline now discovers avif-native.test.js, which runs the existing bounded test-avif-native.mjs suite. This closes the native/avif discovery gap in the generic Rust kernel finder and makes check:merge/local CI exercise final unsized sample OBUs, strict av1C sizes, chroma positions 0/1/2 and ignored OBU reserved bits, alongside exact independent native/Wasm YUV and transform references. The package test script invokes that suite once through Node discovery. The new wrapper has a 600 s hard process-tree limit; each native suite stage retains its 180 s limit. No GPU, backend, core or stage code changed, so no GPU slot is required. Device diversity and quiet speed evidence remain outstanding as before. Sources, authored fixtures and failure-before-fix evidence are in docs/avif-review-fixes.md.
+The optional decoders CPU pipeline now discovers avif-native.test.js, which runs the existing bounded test-avif-native.mjs suite. This closes the native/avif discovery gap in the generic Rust kernel finder and makes check:merge/local CI exercise final unsized sample OBUs, strict av1C sizes, chroma positions 0/1/2 and ignored OBU reserved bits, alongside exact independent native/Wasm YUV and transform references. The package test script invokes that suite once through Node discovery. The new wrapper has a 600 s hard process-tree limit; each native suite stage retains its 180 s limit. No GPU, backend, core or stage code changed, so no GPU run is required. Device diversity and quiet speed evidence remain outstanding as before. Sources, authored fixtures and failure-before-fix evidence are in docs/avif-review-fixes.md.
 ### Section 5 evidence: Node glTF pixel sources
 
-The gltf-pro loader selects its existing lazy clean-room image decoder only when createImageBitmap is absent. No core, stage or backend code changes. Model/material/MToon byte uploads preserve normal mip generation; React cache copies own their RGBA rows. Six PNG/JPEG CPU source cases fail without the repair, and restoration reuploads the retained bytes. The real Node WebGPU binding compares primary textures exactly with uniform base colours. The package GPU check compares bitmap and pixel PNG rendering/restoration on native WebGPU and WebGL2. Other runtime/codec combinations remain bounded by the existing decoder support; no speed claim is made.
+The gltf/pbr loader selects its existing lazy clean-room image decoder only when createImageBitmap is absent. No core, stage or backend code changes. Model/material/MToon byte uploads preserve normal mip generation; React cache copies own their RGBA rows. Six PNG/JPEG CPU source cases fail without the repair, and restoration reuploads the retained bytes. The real Node WebGPU binding compares primary textures exactly with uniform base colours. The package GPU check compares bitmap and pixel PNG rendering/restoration on native WebGPU and WebGL2. Other runtime/codec combinations remain bounded by the existing decoder support; no speed claim is made.
 Lane C landing gate uses main's duplicate-import repair in the two navmesh CPU regressions; their eight original geometry/worker assertions execute. No navmesh runtime or GPU code changed in this job.
 The worker build postprocessor now removes @vite-ignore only from new URL worker annotations and preserves it on runtime imports. A regression fails on the old global removal. This keeps Node-only codec discovery out of browser consumers before tree shaking.
 
@@ -7791,7 +8745,7 @@ Animation updates derived attenuation and optical depth as well as tint and hook
 
 ### Section 5 evidence: transmission activation from zero (2026-11-10)
 
-The physical glTF parser now separates transmission capability from active tint. An authored transmission extension reserves medium state even at factor zero; pointer writes toggle tint and capture activity without changing the document. No extra tint draw at zero. The CPU regression first renders the opaque material to populate its memo, then samples 0.5, 1, 0 and 1 with empty, ordinary and underflowing optical depths. The native slab suite adds zero-to-one animation for instanced and ordinary, reflected and positive-scale primitives on both backends. Reproduce after build with `node --test packages/animation/tests/volume-pointer.test.js packages/gltf-pro/tests/beer-distance.test.js` and `npm run test:gpu:native-volume --workspace @margoengine/gltf-pro`. Existing exact-pixel assertions remain unchanged.
+The physical glTF parser now separates transmission capability from active tint. An authored transmission extension reserves medium state even at factor zero; pointer writes toggle tint and capture activity without changing the document. No extra tint draw at zero. The CPU regression first renders the opaque material to populate its memo, then samples 0.5, 1, 0 and 1 with empty, ordinary and underflowing optical depths. The native slab suite adds zero-to-one animation for instanced and ordinary, reflected and positive-scale primitives on both backends. Reproduce after build with `node --test packages/animation/tests/volume-pointer.test.js packages/gltf/test/beer-distance.test.js` and `npm run test:gpu:native-volume --workspace @margoengine/gltf`. Existing exact-pixel assertions remain unchanged.
 
 ### Review 5: refused HDR restoration (2026-11-10)
 
@@ -7845,7 +8799,7 @@ The optional WebGL2 backend detaches a VAO element buffer before binding a diffe
 ### Section 5 evidence: batch 163 line work
 
 Lines omits identical frame uploads using exact Uint32 word comparison and invalidates on GPU buffer recreation. Independent butt/square segments omit only endpoint-degenerate fan triangles. CPU tests assert work counts and exact uniform bytes; package GPU tests compare every pixel against forced original work at 1x/4x MSAA. No core, stage or shared implementation change. [Method](../whitepaper/bp-163-workcounts.md#job-3-line-and-skeleton-draw-work).
-Batch 159 round 2 corrects EXT/KHR meshopt fallback handling in gltf-pro, including
+Batch 159 round 2 corrects EXT/KHR meshopt fallback handling in gltf/pbr, including
 the async resolver's download decision. Synthetic compressed triangle accessors
 match byte for byte under both names; hostile fallback references and dual names
 reject. The previous snapshot inventory remains historical, with current readiness
@@ -7884,7 +8838,11 @@ multivolume scene-depth clipping (docs/known-bugs.md, "Fixed 2026-11-11: sciviz 
 both backends. Quality gate change: the one-brick check of `tests/bricks-browser.js` compares whole and bricked under a
 test-only exact float trilinear filter (pipeline constant `filterMode`; the normal path builds the hardware branch
 only) at 1 of 255, and bounds each hardware march by an 8-bit filter-weight model (measured worst 6 within the model's
-8); docs/limits.md, "Sciviz volume filtering precision". Still missing: the same measurement on an AMD or Intel GPU.
+8); docs/limits.md, "Sciviz volume filtering precision". Since 2026-11-15 the model's sign is exact integer arithmetic
+(pcg3d of the position on the 1/256 sub-texel grid, Jarzynski and Olano 2020) instead of a `sin` hash, whose accuracy
+WGSL leaves open outside [-pi, pi], and the bound is the worst of 16 seeded patterns; a check requires the GPU to draw
+the CPU's sign at all 262,144 probe positions. Evidence: Apple M6 native and WebGL2 layer identical per pattern (bound
+8, hardware 4). Still missing: the same measurement on an AMD or Intel GPU since this change.
 
 Opacity 1 (KB5700a, 2026-11-11): the per-step opacity correction of the scalar, bricked, multi-volume, quality and
 curvilinear marches, and of GPU volume picking, takes alpha exactly 1 when the classified opacity is 1 and the step is
@@ -7916,3 +8874,319 @@ removed. Each new check has a deliberate-defect test in `tests/owner-lifetime.te
 a package makes once per device on first use (materials' 1x1 default textures) sets `warmUp` to its reason: the
 harness uses that set up once per device before measuring and after a device loss, never a waiver for a leak per
 attach. Details and the revert proofs: docs/integration-fixtures.md.
+
+Packages whose public objects are not engine plugins but hold a lifetime (listeners, timers, workers, storage handles,
+signal subscriptions) tie the object to a plugin registration with `ownedByEngine` (`tests/support/owner-shell.js`), so
+the harness sees the object's own listeners and releases it through the same six lifetimes; `watchTimers` there adds
+the timer check the harness lacks, `tests/support/owner-dom.js` gives a panel its document (the page's own in a
+browser leaf, jsdom in the CPU leaf, where listeners on jsdom nodes are not observed). Batch owners-b1 (2026-11-15)
+gated math, fsm, tween, ecs, save, cache, behavior, input, wfc and splines: eight with fixtures (fsm, tween, ecs,
+save, cache, behavior, input, wfc) and two excluded because their source holds nothing with a lifetime (math, splines;
+`tests/owner-exclusions.test.js` reads that source and fails if it gains a listener, timer, worker, storage handle, GPU
+resource or engine registration). Gated now: 42 packages with fixtures, 6 excluded (core, physics, physics2d, ragdoll
+by ruling; math, splines audited), 59 still pending (it was 69 before this batch). Leaks the fixtures found: cache `Prefetcher` left
+its abort listener on an app signal after `dispose()`; input `Gyro.dispose()` left a pending `calibrate()` timer and
+signal listener; save `indexedDBStorage` had no way to close its database connection (now `close()` and
+`using`). Batch owners-b3 (2026-11-15) added fixtures for worker and gltf (its async loads build in the scene they
+started in since KB-OWN-GLTF1) and audited and excluded kinematics-constraints (solvers on numbers and typed arrays):
+44 packages with fixtures, 7 excluded, 56 pending on its own; with batch owners-b2 and the usdz fixture beside it, 49 with
+fixtures, 7 excluded and 51 pending. Batch owners-b7 (2026-11-15) added fixtures for fbx, mixer and rigging: 52
+packages with fixtures, 7 excluded, 48 pending. What they found: fbx `loadFBX`, `parseFBXInWorker` and
+`loadFBXInWorker` built their model in the scene active when they finished (KB-OWN-FBX1); rigging `addPoseTracking`
+and `playVRMA` stayed live when their scene removed their plugin, and their later `dispose()` removed a same-name
+plugin (KB-OWN-RIG1). mixer holds Web Audio graphs, which no runtime lets a page list, so its entries run on a recording
+context in both leaves and check every edge, started source and worklet port themselves. Batch owners-b9 (2026-11-15)
+added fixtures for loaders and exporters: with the batches landed beside it, 58 packages with fixtures, 7
+excluded, 42 pending. What it found: rigging
+`addFace` and `addVRM` stayed live when their scene removed their plugin (KB-OWN-RIG2); loaders `loadOBJ` kept its
+materials and textures after its scene removed the mesh (KB-OWN-LOAD1); and, writing the blender fixture, the .margo
+parse and load functions built in the scene active when they finished (KB-OWN-BLEND1; components and lightmap
+followed in batch owners-b10 as KB-OWN-BLEND2, with glTF physics attaching and the physics wrapper disposing its world
+in the active scene instead of the model's). Batch owners-b10 (2026-11-15) added the blender fixture (7 entries, 91
+cases, its components entry runs the real physics world and lights) and the tiles fixture (TilesRenderer with a GLB,
+a points and a decorated root tile, and TileFeatures; 52 cases) and the tonemap fixture (8 entries, 104 cases): 61
+packages with fixtures, 7 excluded, 39 pending. The tonemap fixture found that a removed Tonemap kept its LocalExposure
+textures (KB-OWN-TONE1). Exporters register nothing; their entries check that a call leaves no signal listener, GPU object or
+mesh behind. Asynchronous disposal (same batch): a handle whose `dispose` returns a promise, or that has
+only `Symbol.asyncDispose`, and a plugin whose `dispose` returns one, are awaited before any release is asserted, each
+with a hard limit of 5,000 ms (`DISPOSE_LIMIT_MS` in `tests/support/owner-lifetime.js`); a disposal that never
+settles fails the entry by name, one that rejects fails with its own error, and one that settles holding a listener
+fails as a leak (`tests/owner-lifetime-async.test.js`). With it ecs `ParallelSchedule` (`stop()` and
+`Symbol.asyncDispose`, with a stand-in worker; in the CPU leaf only, since `SharedArrayBuffer` needs a cross-origin
+isolated page and the browser owner page is not one) and cache `LoadingManager` (a request aborted in flight, one with
+the app's own signal, one read to its end) have fixture entries. Still not covered: the real Worker of ecs
+`ParallelSchedule` (`packages/ecs/test/parallel.test.js` covers its termination) and of wfc `WFCWorkerSolve` (a
+stand-in worker is used; `packages/wfc/test/worker-host.mjs` runs the real one). Batch owners-b12 (2026-11-15) added the xr fixture (recording `navigator.xr`; XR.create, XR.attach, an inline session and XRModels, 52 cases each leaf), the ifc fixture (78 cases), the cad fixture (52 CPU, 65 browser) and the robot-planning fixture (52), and excluded brep as pure: 69 packages with fixtures, 8 excluded, 30 pending. It found that XRModels built its models in whichever scene was active when a frame arrived (KB-OWN-XR1), that the WebGL2 compatibility device left its context-loss listener on the canvas after destroy (KB-OWN-COMPAT1, a backend fix), that cad's loadCAD, parseCADAsync and PartInstancer built in or stayed in the wrong scene (KB-OWN-CAD1, CAD2) and that the part pack drew outside its view's scissor (KB-OWN-CAD3).
+
+Batch owners-b2 (2026-11-15) gated lines, viewcube, toon and water: 46 packages with fixtures, 6 excluded and 55
+pending. Its fixtures found five defects, each fixed with a regression test: Lines and LineBatches `dispose()` left the
+plugin and its draw pass registered (packages/lines/tests/dispose-registration.test.js); Water released and retook the
+shared scene-depth capture on a device restore, replacing its registration (packages/water/test/restore-depth.test.js);
+water spray drew without the view's viewport and scissor (packages/water/test/spray-view.test.js); ParticleLiquid built
+its narrow band and whitewater on the device of the frame that started their lazy import, a dead device after a restore
+in between (packages/water/test/liquid-restore-load.test.js); a single-sample `SceneTarget` (packages/shared/msaa.js) had
+no depth source, so Caustics' depth copy threw on a real device (tests/deep-shared-targets.test.js).
+
+Batch owners-b6 (2026-11-15) gated tilemap, terrain and scenery: with the batches landed beside it, 56 packages with
+fixtures, 7 excluded and 44 pending (107 packages; road follows below). The lightmap fixture landed with KB-OWN-LIGHTMAP1, and the biomes one with KB-OWN-BIOMES3 (its detail and far-forest density maps are made for the device drawing now), which leaves 42 pending. terrain's 25 entries run one leaf per entry (`leafPerEntry`). The CPU model's stand-in core
+shader now carries core's own `let linear=` line (sky's ambient anchors on it; `tests/owner-lifetime.test.js` compares
+the two), and its command encoder has `copyTextureToBuffer`, as a real one does. The biomes fixture (CPU model) found two defects, each fixed with a regression test
+(packages/biomes/tests/view-scene.test.js): BiomeView, BiomeObjects and FarForest registered their plugins after
+awaiting their imports, so one attached from a second scene's setup landed in the default scene (now
+`captureScene`, packages/shared/scene-scope.js); and BiomeView's own plugin had no `dispose`, so a scene that removed
+it (removePlugin, scene or engine disposal) left the view streaming, with its terrain, textures and abort listeners.
+
+Batch owners-b8 (2026-11-15) gated road: 59 packages with fixtures, 7 excluded and 41 pending. `roadGraph` returns a
+caller-owned GPU `CsrMatrix` (compute buffers), so road is gated, not excluded. The fixture `packages/road/test/owner-lifetime.fixture.js`
+plays the caller: a compute context on the engine's device (the fixture's dependency, ended at cleanup), the graph, a
+`shortestPaths` run and the disposal of the matrix and both results by the owner. Leaving out the matrix or either result
+fails the leaf (checked by mutation on the CPU model); the real device passes native and on the WebGL2 layer with device loss
+attached and detached. It found no leak in road. Batch owners-b8 also ran mixer one leaf per entry (`leafPerEntry`: its 17
+entries are 221 cases, past the 208 a leaf may hold, which `tests/owner-lifetime.test.js` fails) and moved the biomes
+scene fix (KB-OWN-BIOMES1/2) onto main.
+
+## Shot look checks (shorts P4, section 5 supplement, 2026-11-14)
+
+`@margoengine/headless/look` is the review gate for rendered shots, not an engine gate: CPU functions over probe frames,
+masks and float frames, bounded by each shot file's `lookBounds`, giving a table and a contact sheet. Evidence: each
+check fails a synthetic defect and passes a clean frame (packages/headless/tests/look.test.js); run on the Storm Light
+tour probes from tools/shot it flagged two light discs (lamp and marker post, both real lights, so the shot's bound
+must say 2) and 3 % crushed rock in the opening frame. Missing: the inputs the shot tool does not write yet (float
+frame, view-projection, compat and 16-sample reference frames, still-camera runs, foam and dark masks), so those checks
+have no evidence on real shots; bounds are not calibrated against viewers. No rendering backend, kernel or tier code
+changes.
+
+Empty masks (2026-11-15, KB-HEARTH-CLIP1 part 1): `skyClip`, and `grain` and `lights` given a mask, set `empty` on a
+row measured over a mask with no pixels in it and the report prints `pass (measured 0 sky pixels)`, so a shot with no
+sky in view never passes silently. Evidence: packages/headless/tests/look.test.js and tests/shot-look.test.js. Missing:
+a sky derived by the shot tool for every page. A view target's depth is not the scene's depth on a page with a
+PostStack (it draws into its own target), measured on cabin-window-snow: the derived mask read 100 % sky.
+
+Sky coverage (2026-11-15, KB-HEARTH-CLIP1 part 2): `@margoengine/sky`'s opt-in `coverage` option records where the sky
+drew into `coverageTexture` (r8unorm, resolved from the frame's samples): its full-screen triangle again, at the same
+depth with the same `greater-equal` test against the frame's depth, so it is exact under a PostStack. Off by default
+(no pass, no allocation); on, one render pass a frame. No core or stage change (`npm run measure:size` unchanged);
+`@margoengine/sky/base` grew from 6,912 to 7,270 B gzip and `@margoengine/headless/look` from 10,814 to 11,036 B. The
+shot tool reads it as `sky-coverage` on probe frames when a shot has no `sky` mask, and `skyClip` alone measures
+inside it; `grain`, `lights` and `horizonSeam` keep the page's mask, and the 0.5 bound is unchanged. Evidence:
+packages/sky/test/features-check.mjs `coverage` (A6000, WebGPU and compat, 4x and 1x MSAA: 0 of 9,360 wall pixels and
+9,360 of 9,360 open sky pixels, HDR scene identical with the record on), packages/sky/test/sky.test.js,
+packages/headless/tests/look.test.js, tests/shot-look.test.js, tools/shot/test/determinism-check.mjs (case 7) and
+tools/shot/test/sky-coverage-check.mjs. Measured on the A6000 at full size: cabin-hearth-kettle `skyClip` over the
+whole frame 1.294, 2.159 and 4.779 % (fail), inside the coverage 0 sky pixels (pass); cabin-window-snow sky share
+18.1, 15.0 and 11.6 %, `skyClip` 0; orrery-dolly unchanged (no sky). Missing: Mac and laptop runs.
+
+Weather cover slope bias (section 5, 2026-11-14, lane SC6): PrecipitationCover's receiver test adds sqrt(2) texels times the receiver's slope to its bias for surfaces facing up (normal y 0.5 or more), so a sloped shelter no longer shelters its own top in texel-spaced stripes (Williams 1978; Dou et al. 2014, JCGT). Evidence: the slope probes of packages/weather/tests/cover-check.html on the 680M (WebGPU; the cover is WebGPU-only), 24 of 24 exposed with the fix and 3 of 24 without; walls and flat receivers unchanged.
+
+Contrast as a power about grey (section 5, 2026-11-14, lanes SC7 and SC10): Tonemap (display-linear, `margoContrast`) and creative's PostProcessing (scene-linear) apply contrast k as 0.18 (x / 0.18)^k, a slope of k in log2 exposure (ACEScc, Academy S-2014-003; ASC CDL v1.2 power), instead of (x - 0.18) k + 0.18 clamped at 0, which clipped every channel below 0.18 (1 - 1/k) to black and left flat banded runs. Evidence on the 680M: the contrast 1.08 frames of packages/tonemap/tests/curves-browser.mjs (1,456,524 dark channels black before, 0 after) and packages/creative/tests/post-contrast-browser.mjs at 1.2 (695,400 of 698,258 visible dark channels black before, 0 after, 2.43 levels from the power). Missing: A6000 and Mac runs of both. Contrast 0 (lane SC13) is flat 0.18, black included, returned before the power, because pow(0, 0) is undefined in WGSL (exp2(y log2 x)) and GLSL ES 3.00 (8.2); evidence on the 680M, WebGPU and compat: packages/tonemap/tests/contrast-zero-browser.mjs and packages/creative/tests/post-contrast-zero-browser.mjs (every pixel the flat grey; without it 115,920 and 230,400 channels black on WebGPU).
+
+### 5. Batch 228 job 2: point style evidence
+The optional points/style entry evaluates attribute filters and OGC 3D Tiles point styles on the CPU and draws through existing GPU paths only: per-point colours and sizes, the selection mask in filter mode (vertex-stage discard, unpickable), a subset PointCloud, or per-node octree data. No shader, pipeline or backend changed. Evidence: packages/points/tests/style.test.js (CPU, real USGS tile included) and styleFilters in packages/points/tests/features-browser.js on WebGPU and the WebGL2 compatibility layer. The 3D Tiles interpreter moved from tiles into packages/shared/style-expression.js, covered by both packages' style tests.
+
+WebGL2 layer on Apple silicon (section 5, 2026-11-15): Metal under ANGLE and Dawn is one sampler (explicit LOD snapped to 1/64, footprint LOD about 1/256), so the mip blend checks (test/blend-check.mjs) hold the layer to native bit for bit when the raw WebGL2 probe equals native's; the driver-blend comparison stays for a WebGL2 blend that differs (AMD D3D11). The inverse trigonometry probe includes signed-zero atan2 inputs, which Metal gets a half turn wrong, so the layer uses its own acos, asin, atan and atan2 there (docs/known-bugs.md, "Metal mip blend" and "atan2 with x = -0"). Evidence: features-browser.mjs and bias-browser.mjs pass on an Apple M6; native Metal atan2 at x = -0 stays open below Margo.
+
+### Clean-frame look bar (headless/look, 2026-11-17, quality gates)
+
+The look gate gained the clean-frame checks T1 to T8 and the `animatedFeature` look family (a shot file's `lookFamily`).
+Evidence: packages/headless/tests/look-clean.test.js fails each defect on a synthetic frame (hard against resolved edges,
+a shifted pattern warped by `reprojectionMotion`, a sharp against a smeared mover, outline contrast, shape, bounce and
+b*). Missing: probes at supersample 2 with 8 sub-frames, which the roadmap bounds assume.
+
+**Real masks (KB-LOOK-SHADOWMASK1, 2026-11-17).** `SceneTargets` (`@margoengine/post/mrt`) gains the sun's shadow
+visibility as `t.shadow`: in the core replay the term a shadow plugin wrapped around `direct` in `let linear=` is kept
+live with `direct` set to 1 (Rec. 709 luminance of a coloured result); gltf/pbr, materials and terrain captures call
+`shadowLit(vec3f(1), position, normal)` when their lit code has it. Built-in `penumbra`, `litGround`, `shadedGround` and
+`subject` values draw the look masks; the targets pass moves from order -5 to -4.5, after every -5 shader patch and the
+shadow-map render whatever the attach order (before, a SceneTargets attached ahead of Shadows read last frame's maps
+and an unpatched shader). The shot tool writes those masks through `aovs`, so T1 penumbra, T5 and T6 run on real
+shots. Evidence: post test/scene-targets.test.js (replay text, order, formats, subject and terrain hooks),
+test/scene-targets-shadow-browser.mjs (WebGPU and the WebGL2 layer: terrain and core floor shadows, visibility 0.0002
+shaded against 0.99999 lit, the frame darker inside the shaded mask, 1 everywhere with Shadows removed),
+tools/shot/test/look-masks-check.mjs (every mask check runs on a real shot). Missing: local lights' shadows in the
+visibility, core meshes as the subject.
+
+**Sky occlusion (KB-LOOK-POST-SKYOCC1, 2026-11-17, GPU maths).** GTAO's kernel gains `sky()`: with `skyRadius` above 0
+(frame `size.zw` = reach and steps, both 0 when off) the slices search their horizons again out to the reach, samples
+spaced by the square of their index from 1 pixel out (4 before KB-GTAO-OPENFLOOR1), each sample slid into the slice, and the
+visible arc is clamped to the normal's hemisphere and the sky half of the slice (world up projected into it, angle u).
+The visible share of the sky arc, by the paper's closed form made signed (`skyArc(h) = sign(h) arc(h)`), over the open
+sky arc multiplies the occlusion. Off, the sky term returns 1 before any work and the multiply by 1 is exact: the
+occlusion values matched the previous build value for value (81 values on three scenes, RTX A6000). Evidence: post
+test/gtao.test.js (uniform, validation, the shader's own arc giving an infinite slot's view factor to 1e-4 over 3600
+slices), test/settings.test.js (rows and the animatedFeature value), test/gtao-sky-browser.mjs (WebGPU and the WebGL2
+layer: open floor 0.998, slope 0.9998, slot 0.471 against 0.447). Found: the plain GTAO reads 0.980 on an open floor
+seen 53 degrees off its normal (samples 1 to 3 pixels out lift its horizon; KB-GTAO-OPENFLOOR1). Missing: timing,
+other GPUs.
+
+**GTAO samples slid into their slice (KB-GTAO-OPENFLOOR1, 2026-11-17, GPU maths).** Cause: each horizon sample reads the
+pixel nearest its point on the slice's screen line, up to half a pixel off it, so 1 to 3 pixels out its screen direction
+turns by up to 45 degrees; a tilted plane's horizon depends on that direction, so an open floor seen 53 degrees off its
+normal read 0.980 (a float64 CPU replica of the kernel gives 0.980 too: rounding, not depth precision; exact sub-pixel
+positions give 1). Fix: both the GTAO and the sky terms move each sample back into the slice along the surface's tangent
+plane, `delta - slide (axis . delta)` with `slide = w / (axis . w)` and `w` the slice axis minus its part along n. The
+sample's height above the tangent plane, the quantity that occludes, is kept and a sample already in the slice is
+unchanged; projecting along the slice axis changes that height and does not help. The falloff keeps the true distance,
+and the sky search now starts 1 pixel out. Evidence (RTX A6000, WebGPU and the WebGL2 layer, post
+test/gtao-sky-browser.mjs, failing on the old kernel at 0.977): the plain GTAO reads 0.99996 to 1.00004 on the open
+floor and slope; a 90 degree crease of floor and wall stays near 0.5 (0.674 after the blur at its darkest pixel, 0.690
+before); the wedge proof (`post-effects-gpu.mjs --only=gtao`, record results/gtao-gpu.json) moves 0.525 to 0.520, 0.267
+to 0.268, 0.783 to 0.783 against 0.5, 0.25, 0.75, and the orthographic open floor 0.998 to 1.000. Sources: Jimenez,
+Wu, Pesce and Jarabo 2016 (slices and the arc integral); Bavoil, Sainz and Dimitrov 2008 (horizon search in image
+space); Max 1988 (a horizon over a height field, the height above the tangent plane as what occludes). Missing: other
+GPUs.
+
+**SSAO's ambient replay binds every pass binding (KB-POST-GTAO-TERRAINLOOK1, 2026-11-18, GPU behaviour).** The replay
+that gives SSAO and GTAO the ambient light to darken cut the lit shader from `let direct=` and bound a hand-picked
+subset of the pass bindings (TAA's camera 18, sky ambient 8, the hemisphere light 144). A plugin binding read above
+`let direct=` stayed in the replay's automatic layout but not in its bind group: TerrainColors' look uniform (41) gave
+an invalid bind group and command buffer every frame. The replay now keeps the whole lit shader, the lighting in a dead
+`if(false)` block (live with `margoAmbient`), and binds all of `c.bindings`, as SSGI's, SSR's and SceneTargets'
+replays do; the output is the same ambient term. tests/shader-contracts.test.js fails on any package that filters a
+pass context's bindings. Evidence (RTX A6000, WebGPU and the WebGL2 layer, post test/replay-bindings-browser.mjs, 12
+and 13 errors per case on the old code): a test plugin with a uniform above and one below `let direct=` under SSAO,
+GTAO, SSGI, SSR, SceneTargets and a PostStack of GTAO, SSGI and SSR, and TerrainColors under GTAO, draw with no GPU
+error; the scenes look-family check draws the terrain under the GTAO again. Missing: the replay's cost of the dead
+code is left to the shader compiler (not measured; speed phase deferred).
+
+## Cloud light: two-stream in the volumetric clouds (KB-CLOUD-DECKLIGHT1, section 5 evidence, 2026-11-17)
+
+GPU maths change in `packages/sky/src/volumetric-clouds.ts`, both backends from one WGSL source. The source at each
+cloud sample was three octaves of exp(-b od) (Wrenninge et al. 2013); it is now first-order scattering (forward
+Henyey-Greenstein lobe on the delta-Eddington scaled beam, Joseph, Wiscombe and Weinman 1976; back lobe on the
+unscattered beam) plus the two-stream diffuse field of a slab along the light (Meador and Weaver 1980; Bohren 1987) in
+Eddington's angular form, from the optical depth toward the light and a three-sample column down to the base. Sky light
+is a two-sided diffuse two-stream from the map's upper and lower halves plus the ground (`groundAlbedo` times the deck
+share), summed so an even surround returns its own radiance; the cloud-shadows check, which needs exactly that, holds
+its 0.006 bound. The deck now writes a second map, `Sky.environmentLightLayer`, which the sky's lighting reads, so the
+sun the engine light already carries under `dimLight` is not added twice. Evidence: the `cloud-bounds` browser check
+(RTX A6000, WebGPU and `MARGO_COMPAT=1` agree to 1e-3) measures hemispheric fluxes from the deck map against the
+independent-column two-stream of the deck's own columns (Cahalan et al. 1994) at tau 5, 20 and 80, and the block under
+stratus against the deck share; numbers in docs/known-bugs.md and docs/whitepaper/claims.md. Cost: three more
+base-shape samples per lit cloud sample (frame times diagnostic only: 373, 7.8 and 12.0 ms ground, inside and above
+against 354, 10.3 and 11.0 before, on a loaded machine). Missing: 3D transport (side leakage from finite clouds), a
+reference renderer or photograph, and one unit for the sky map and the engine sun (KB-SKY-SUNUNITS1).
+
+## Sky light in the sun's units (KB-SKY-SUNUNITS1, section 5 evidence, 2026-11-17)
+
+GPU maths change in `packages/sky/src/lighting.ts` (and the one `BlownSand` read of the sky map), both backends from one
+WGSL source. The sky's light map was used in the sky model's own radiance units beside an engine sun in
+`lighting.intensity`'s, so a clear sky lit level ground 1.3 to 1.5 times as much as the sun. `Sky.lightScale` (intensity
+over the zenith sun on the ground in sky units: Preetham 4 pi x 0.55, Bruneton 20 x the zenith transmittance from
+`zenithTransmittance` in atmosphere.ts) rides in the last float of the 160 B light buffer (`skyLight[9].w`) and scales
+the harmonics and the reflection samples, never the ambient floor. Evidence: `packages/sky/test/sky-light-units-check.mjs`
+(RTX A6000, WebGPU and `MARGO_COMPAT=1` agree to 1e-4): the sky's share of a level plate's light at 60 degrees is 0.184
+(Preetham, bound 0.1 to 0.2, Erbs, Klein and Duffie 1982) and 0.064 (Bruneton, bound 0.04 to 0.1, Bird and Hulstrom
+1981), within 0.01 from intensity 1 to 3. Cost: no new pass, buffer or binding; one float in an existing upload.
+
+## Overcast deck on the sky cloud sheet (KB-SKY-OVERCAST1, section 5 evidence, 2026-11-17)
+
+GPU maths change in `packages/sky/src/clouds.ts`, both backends from one WGSL source. At full cover the 2D sheet kept
+its noise holes, 1 - exp(-3 density) let the sun disc and its glow through, and past 40 km of haze it returned the
+clear sky (a brown band at the horizon). From 80 to 100 percent cover the sheet now closes into `cloudDeck`: the CIE
+overcast gradation (Moon and Spencer 1942; CIE S 011/E:2003 type 1) of the two-stream transmission
+1 / (1 + 0.075 depth) (Meador and Weaver 1980; Bohren 1987) of the sun on its top, in the sky model's units (Preetham
+4 pi x 0.55, Bruneton 20 x the zenith transmittance), carried in the free `moonColor.w` float of the Frame uniform. The
+engine sun fades by the same smoothstep (`overcastShare`). Evidence: `features-check.mjs overcast` on an RTX A6000,
+WebGPU and `MARGO_COMPAT=1` alike, every pixel within 0.92 to 1.09 of the CPU twin `overcastDeck`. Cost: one more
+branch and four noise lookups per sky pixel above 80 percent cover; no new pass, buffer or binding.
+
+## Hurricanes in the volumetric clouds, and haze by the air crossed (section 5 evidence, 2026-11-17)
+
+GPU maths change in `packages/sky/src/volumetric-clouds.ts`, both backends from one WGSL source. The `Clouds` uniform
+grew from 64 to 96 floats (`CLOUD_FLOATS`; the clouds, their shadows and shafts share it) with eight `storm` vectors.
+While a storm is set (`hurricane` option or `type: 'hurricane'`), `cloudDensityAt` takes `cloudStormDensity`: the
+storm's cover (`cloudStormCover`: eye, eyewall leaning out at `eyeSlope`, moat, outer eyewall, log-spiral bands,
+shield, canopy, each with its own top) replaces the coverage map's, and the base noise is read twice, at the point
+turned back about the storm centre by the Holland gradient wind over radius times each of two flow-map phases half a
+`flowPeriod` apart (Vlachos 2010), cross-faded, and carried with the storm's travel. The CPU twin is
+`hurricaneCover` in `packages/sky/src/hurricane.ts` (the same formulas, used by `Hurricane.coverAt`, `windAt`,
+`rainAt`, `weatherAt` and the deck's dimming over the camera). The haze on cloud light changed for every layer: it was
+exp(-t / 40 km) of the ray's length; it is exp(-A / 40 km) with A the sea-level-equivalent air the ray crosses, its
+length times the mean of exp(-height / 8 km) between the eye and the sample (straight-ray air mass of an exponential
+atmosphere); a ground camera's near cloud is hazed within a few percent of before, an aircraft's far cloud far less.
+Evidence: `features-check.mjs hurricane` on an RTX A6000, WebGPU and `MARGO_COMPAT=1`: every pixel whose ray the CPU
+field says crosses no cloud stays at the background, every one crossing solid eyewall or band is lit, from 40 km and
+90 km up and from sea level in the eye; the 90 km view keeps over 0.8 of the 40 km view's light (0.91 measured; about a
+quarter with the old haze); the eye moves 6 km in 600 s at 10 m/s within 1.5 km. Cost while a storm is drawn: one more
+shape read per sample and one more erosion read per view sample. Missing: a reference renderer or satellite image
+comparison, storm motion asymmetry in the wind, mesovortices and polygonal eyes.
+
+## Tornadoes: funnel, wall cloud and debris (section 5 evidence, 2026-11-18)
+
+`@margoengine/sky/tornado` holds the CPU model (`Tornado`: Burgers-Rott or modified Rankine wind, cyclostrophic pressure, the condensation
+funnel's radius at each height by bisection on the deficit, the debris edge, the path, the spin-up, the weather and the damage path) and
+`TornadoCloud`, a full-screen pass at frame-graph order 3.5 (after the clouds, before the aerial perspective). Its WGSL lives in
+`packages/sky/src/tornado-shader.ts` and loads by import() at the first frame (`scripts/lazy-files.js` records the split). The pass
+marches each view ray through a vertical cylinder round the storm with a distance-based step (small near the funnel's axis, large in the
+wall cloud), reads the funnel's radius from a 32-height table the CPU fills each frame from the same `funnelRadius`, takes three density
+reads toward the sun per lit sample, and writes premultiplied light and transmittance (dst times alpha plus src), so it composes over the
+scene and the cloud deck. With `depth` the march stops at the scene.
+
+Evidence: `features-check.mjs tornado` on an RTX A6000, WebGPU and `MARGO_COMPAT=1`, 4x and 1x: rays that come near nothing of the storm
+stay exactly at the background, rays deep inside the CPU funnel are lit (tenth percentile above 0.8 of the sun's units), the funnel's
+width 150 m up within a quarter of the CPU's for a rope (4 px against 3.3), a strong funnel (10 against 10.6) and a wedge (38 against
+36.8), the funnel 395 m along a 400 m path, and a 45 hPa funnel hanging at 201 m over black ground. Missing: no comparison with a
+photograph or a reference renderer; the look is judged on whole-scene frames by the films.
+
+## Skin from melanin and blood (section 5 evidence, 2026-11-18)
+
+`@margoengine/materials/skin` gains the two-layer spectral skin of Donner and Jensen 2006 (`skin-spectrum.ts`): absorption
+from melanin and hemoglobin (Prahl's measured spectra), multipole diffusion per layer added in the frequency domain, the
+spectrum to linear sRGB, and its profile fitted by non-negative least squares with d'Eon and Luebke's six Gaussians plus
+two narrower ones. `skin({ melanin, ... })` builds its pre-integrated table and its through-the-part term from that fit;
+without the four numbers nothing changes. Evidence: `skin-measured.test.js` (Jensen 2001 measured Rd within 0.012, the
+hemoglobin bands, the ColorChecker skin patches within 8.6 and 6.1 CIELAB, the fit within 0.025 of the Bessel-transformed
+model profile, the published fit within a factor of 2 for fair skin and more than five times too wide at melanin 0.3,
+Christensen and Burley 2015 within a factor of 2.5); `features-browser.mjs skin` on an RTX A6000, WebGPU and the WebGL2
+layer, a 5 mm sphere at melanin 0.3 within an 8-bit step and 1% of its own table. Missing: a comparison with measured
+face skin spectra or a photograph; single scattering and the oil layer.
+
+## Eye optics and tear film (section 5 evidence, 2026-11-18)
+
+`@margoengine/materials/eye` refracts the view and light rays on the cornea's own sphere (`corneaRadius`, default 0.65 of
+the globe, 7.8 mm of 12, apex on the mesh's) to an iris plane 3.6 mm behind the apex (`depth` 0.3), and lays a tear film
+(index 1.337) over the whole front: over the cornea it is the front's index, over the white a smooth GGX coat with the
+cornea's roughness that takes its Fresnel share from the rough lobe below (`wetness`, live). Evidence:
+`features-browser.mjs eye`, RTX A6000, WebGPU and the WebGL2 layer: Le Grand's entrance pupil magnification 1.133 within
+0.015 by the trace the frame matches within 2.5 pixels, and a point-like catchlight on the white at the mirror point.
+Slider rows: `@margoengine/materials/settings`. Missing: a comparison with a photograph of a living eye, the corneal bulge
+in silhouette, and a measured limbus.
+
+## Scene sky on glTF and FBX models (KB-GLTF-SCENESKY1, section 5 evidence, 2026-11-18)
+
+Core meshes take a lighting `Sky`'s ambient through the scene shader patch (`sky:environment`), but a glTF or FBX model
+(`@margoengine/gltf/pbr` `PBRModel`, which FBX, `stage/gltf` and the CC reader all produce) drew its own shader with the
+flat built-in sky and ground gradient unless the caller wrote `sky.add(model)`. Nothing in the films did, so outfits, the
+flyer and every prop read warm and flat beside the sky-lit ground (the cause of Wilbur's orange skin, fixed for people
+alone in 6a604a13cc). `PBRModel` now joins its scene's `'sky'` plugin before each draw (`sceneSky`, default true) once
+the sky has an ambient, through the same `sky.add` path, and leaves when the sky goes, the model is disposed or the model
+is given its own ambient (`environment.add`, light probes, another sky), keeping one ambient term per shader as core's
+patch does. Core and stage are untouched (24,841 B gzip). Evidence, RTX A6000, WebGPU and `MARGO_COMPAT=1`:
+`sky-environment-check.mjs` (a glTF box with no `sky.add` draws the same frames as with it and matches the core box
+within 0 of 255; `sceneSky` false keeps the old warm 157, 155, 152 against 157, 157, 161; the HDR environment still owns
+an `env.add` model), `sky-add-gltf-check.mjs` (no `sky.add` draws the `sky.add` frames from frame 0, still and in rain),
+`person-still.mjs` (under the overcast preset, roughness 0.3 against 0.8 changes 7,690 pixels of an outfit and 1,265 of
+the Lantern prop with no `sky.add`, 0 with `sceneSky` false). Missing: `VoxelRenderer`, the other target of `sky.add`, still needs
+the call; no comparison of a sky-lit prop with a photograph yet (the films judge it on whole-scene frames).
+
+## Lid shadow anchored to the visible lid margin (section 5 evidence, 2026-11-18)
+
+`@margoengine/fbx/character-creator` draws Character Creator's eye occlusion shell (`RLEyeOcclusion`) as a lid shadow
+from the shader's numbers, measured down from the shell's top edge. That edge tucks under the lid skin, so the darkest
+part lay where no camera sees it. The reader's `scene` hook now finds the margin the head's skin leaves visible: a ray
+from each shell vertex along the shell's area-weighted outward normal against the `RLHead` skin triangles (Moller and
+Trumbore, "Fast, Minimum Storage Ray-Triangle Intersection", JGT 1997, https://doi.org/10.1080/10867651.1997.10487468),
+bisection on the shell edges between hidden and seen vertices, and a per-u remap of the shell's v so the margin is v 0.
+Why darkest at the margin: ambient occlusion by the lid and lashes (Zhukov, Iones and Kronin, "An Ambient Light
+Illumination Model", EGWR 1998; Jimenez, von der Pahlen et al., "Next-Generation Character Rendering", GDC 2013). No
+published measurement of upper-sclera darkening was found (Wood et al., "Rendering of Eyes for Eye-Shape Registration
+and Gaze Estimation", ICCV 2015, and the GDC talk give none), so it was measured on a CC0 photograph of a frontal eye
+(Wikimedia Commons, "A human male brown eye.jpg", Bobbyphotographer 2025; asset library references/eyes/LABEL.md, never
+in git): sclera luminance over its middle at 0.15 in the first twentieth under the margin, 0.25, 0.42, 0.55, 0.69 and
+0.80 in the next five (41 columns, linear Rec. 709). Evidence: `packages/fbx/test/eye-margin.test.js` (margin within
+0.01 of the shell; the shadow at the margin 0.620 against Character Creator's 0.624, 0.064 before; never darker than
+the photograph's 25th percentile from the margin down; at least half its margin darkening). On Wilbur's FBX the
+margin sits at v 0.03 to 0.09 across the eye, at the corners 0.16 to 0.5; after the remap the margin measures within
+0.01 of v 0 across the middle 16 of 24 columns. Missing: the corner bins keep up to 0.46 (the top shadow narrows to nothing there
+by its Arc); the rest of the photograph's darkening (the ball's own shading, the lashes) is left to the eye material
+and the lash cards, judged on the film's frames.

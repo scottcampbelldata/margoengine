@@ -17,6 +17,7 @@ export interface ScreenSelectionOptions extends GridLimits {
     modelMatrix?: ArrayLike<number>;
     visibleOnly?: boolean;
     signal?: AbortSignal;
+    backend?: 'webgpu' | 'webgl2';
 }
 
 export type ScreenShape = {

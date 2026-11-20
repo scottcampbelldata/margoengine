@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { PBRModel, PBRDeformationContext } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRDeformationContext } from '@margoengine/gltf/pbr';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import type { Mat4, MutableVec3, Quat, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
@@ -243,7 +243,7 @@ export class Skeleton {
 const pipelines = new WeakMap<GPUDevice, GPUComputePipeline>();
 let serial = 0;
 /**
- * Up to four bone influences per vertex over a {@link Skeleton}, deforming a `createMesh` mesh (or any gltf-pro model
+ * Up to four bone influences per vertex over a {@link Skeleton}, deforming a `createMesh` mesh (or any gltf/pbr model
  * whose primitives share one vertex array) on the GPU once attached. Weights are normalised to sum 1 as they are set;
  * a vertex whose weights sum to zero follows the root bone.
  */
@@ -342,24 +342,25 @@ export class Skin implements EnginePlugin {
       }
       for (let r = 0; r < 3; r++) out[i + r] = m[r] * p[i] + m[4 + r] * p[i + 1] + m[8 + r] * p[i + 2] + m[12 + r];
       if (!n || !outNormals) continue;
-      // Cofactor columns (determinant times the inverse transpose), flipped for a mirroring blend, as the shader does.
+      // Cofactor columns (determinant times the inverse transpose), flipped for a mirroring blend, as the shader does;
+      // a blend flattened by a zero scale counts as not mirrored, and a normal it maps to zero becomes +Y.
       const a = [m[5] * m[10] - m[6] * m[9], m[6] * m[8] - m[4] * m[10], m[4] * m[9] - m[5] * m[8]],
         b = [m[9] * m[2] - m[10] * m[1], m[10] * m[0] - m[8] * m[2], m[8] * m[1] - m[9] * m[0]],
         c = [m[1] * m[6] - m[2] * m[5], m[2] * m[4] - m[0] * m[6], m[0] * m[5] - m[1] * m[4]],
-        sign = Math.sign(m[0] * a[0] + m[1] * a[1] + m[2] * a[2]),
+        sign = m[0] * a[0] + m[1] * a[1] + m[2] * a[2] < 0 ? -1 : 1,
         x = (a[0] * n[i] + b[0] * n[i + 1] + c[0] * n[i + 2]) * sign,
         y = (a[1] * n[i] + b[1] * n[i + 1] + c[1] * n[i + 2]) * sign,
         z = (a[2] * n[i] + b[2] * n[i + 1] + c[2] * n[i + 2]) * sign,
-        length = Math.hypot(x, y, z) || 1;
-      outNormals[i] = x / length;
-      outNormals[i + 1] = y / length;
-      outNormals[i + 2] = z / length;
+        length = Math.hypot(x, y, z);
+      outNormals[i] = length > 0 ? x / length : 0;
+      outNormals[i + 1] = length > 0 ? y / length : 1;
+      outNormals[i + 2] = length > 0 ? z / length : 0;
     }
     return outNormals ? { positions: out, normals: outNormals } : { positions: out };
   }
   /**
    * A skin that deforms `mesh` on the GPU from now on, as a plugin of the mesh's engine. `mesh` is a `createMesh` mesh
-   * (or any gltf-pro model whose primitives share one vertex array) with one vertex per four influences.
+   * (or any gltf/pbr model whose primitives share one vertex array) with one vertex per four influences.
    */
   static attach(mesh: PBRModel, skeleton: Skeleton, joints: ArrayLike<number>, weights: ArrayLike<number>): Skin {
     const skin = new Skin(skeleton, joints, weights),

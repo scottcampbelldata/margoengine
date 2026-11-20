@@ -4,7 +4,7 @@
 
 ```ts
 import { Vec3 } from "@margoengine/core";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { Mat4, MutableVec3, Quat } from "@margoengine/math";
 
 export class Retarget {

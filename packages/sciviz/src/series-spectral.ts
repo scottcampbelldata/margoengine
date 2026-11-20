@@ -80,12 +80,16 @@ export async function seriesSpectrogram(gpu: ComputeContext, values: ArrayLike<n
 export async function addSpectrumView(figure: Figure, spectrum: SeriesSpectrum): Promise<LineLayer> {
   return figure.line({ x: spectrum.frequency, y: spectrum.power }, { name: 'Power spectral density' });
 }
-/** Plot STFT PSD as dB relative to one physical value squared/Hz. Half-cell bounds retain true window-centre coordinates. */
+/**
+ * Plot STFT PSD as dB relative to one physical value squared/Hz. Each cell is centred on its window centre and frequency
+ * bin, one hop wide and one bin tall; a single window is drawn as the heatmap's one column, 1 s wide.
+ */
 export async function addSpectrogramView(figure: Figure, spectrum: SeriesSpectrogram, options: HeatmapLayerOptions = {}): Promise<RectsLayer> {
   if (!spectrum.times.length || !spectrum.frequency.length) throw rangeError('Compute at least one spectrogram window before drawing', 'sciviz');
   return figure.heatmap(Float32Array.from(spectrum.power, (v) => 10 * Math.log10(Math.max(Number.MIN_VALUE, v))), {
     name: 'Spectrogram (dB / Hz)', colormap: 'inferno', ...options, nx: spectrum.times.length, ny: spectrum.frequency.length,
-    x: [spectrum.times[0] - spectrum.hopSeconds / 2, spectrum.times.at(-1)! + spectrum.hopSeconds / 2],
-    y: [spectrum.frequency[0] - spectrum.binHz / 2, spectrum.frequency.at(-1)! + spectrum.binHz / 2],
+    // Heatmap x and y name the first and last cell centres, so cells extend half a hop and half a bin past them.
+    x: [spectrum.times[0], spectrum.times.at(-1)!],
+    y: [spectrum.frequency[0], spectrum.frequency.at(-1)!],
   });
 }

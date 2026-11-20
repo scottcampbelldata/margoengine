@@ -9,7 +9,7 @@ declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: numb
 export { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy } from '../../shared/model.js';
 export const hidden = (e: Engine, id: number): boolean => hiddenInTree(e.store, id);
 
-/** Attached gltf-pro models (engine plugins with `root` and `primitives`), rescanned only when the frame graph, mesh count or a model's liveness changes. */
+/** Attached gltf/pbr models (engine plugins with `root` and `primitives`), rescanned only when the frame graph, mesh count or a model's liveness changes. */
 export class Models {
   list: ModelLike[] = [];
   starts: number[] = []; /** Primitives over all models: pick slots after them belong to pick proxies. */
@@ -64,7 +64,7 @@ export function sphere(p: ModelPrimitiveLike): Float64Array {
   return s;
 }
 
-/** Same world and clip transform as gltf-pro's vertex shader. info: id, side (front 0, double 1, back 2), front sign. */
+/** Same world and clip transform as gltf/pbr's vertex shader. info: id, side (front 0, double 1, back 2), front sign. */
 export const modelCode = (fragment: string) => `
 struct Draw {model:mat4x4f,info:vec4u}
 @group(0) @binding(0) var<uniform> camera:mat4x4f;

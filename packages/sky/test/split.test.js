@@ -16,6 +16,11 @@ const entries = Object.fromEntries(
 const fixtures = JSON.parse(await readFile(new URL('./fixtures/traces.json', import.meta.url), 'utf8'));
 const pick = (names) => Object.fromEntries(names.map((name) => [name, entries[name]]));
 
+// afterlight and meadow light the scene: recorded again with KB-SKY-SUNUNITS1 (2026-11-17, the light map scaled into the
+// sun's units, same commands); every other trace is unchanged. All recorded again with KB-SKY-OVERCAST1 (2026-11-17):
+// the cloud WGSL gained the overcast deck and the clouds' uniform its transmission; the same commands in every trace.
+// afterlight and meadow recorded again with KB-SKY-FLOOR1 (2026-11-18): the light buffer gained the ground row and the
+// projection the ground's light; the same commands in every trace.
 test('the full Sky records exactly the GPU work, WGSL and uploads of the recorded traces', () => {
   for (const name of Object.keys(configs)) {
     const h = trace(Sky, name);

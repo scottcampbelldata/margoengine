@@ -99,3 +99,61 @@ test('the generated module type-checks under strict TypeScript', async (t) => {
 test('generateTypeScript checks its argument', () => {
   assert.throws(() => generateTypeScript({}), /defineSchema/);
 });
+
+test('structs named like the globals and runtime classes the module uses still generate code that type-checks', async (t) => {
+  const { defineSchema } = await import('../dist/index.js');
+  // A game may well call a struct Map; the module's own Map, Uint8Array, DataView, Writer and Reader types must not
+  // be shadowed by it.
+  const named = defineSchema({
+    types: {
+      Map: { width: 'uint', tiles: { type: 'bytes', maxLength: 64 } },
+      Writer: { name: { type: 'string', maxLength: 16 } },
+      Reader: { page: 'u16' },
+      DataView: { at: 'f32' },
+      Uint8Array: { n: 'u8' },
+      RangeError: { code: 'u8' },
+      State: {
+        maps: { type: 'map', of: 'Map', maxSize: 4 },
+        writer: 'Writer',
+        reader: 'Reader',
+        view: 'DataView',
+        small: 'Uint8Array',
+        error: 'RangeError',
+      },
+    },
+  });
+  const dir = mkdtempSync(join(tmpdir(), 'netcode-generate-')),
+    file = join(dir, 'protocol.ts');
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(file, generateTypeScript(named));
+  writeFileSync(
+    join(dir, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', noEmit: true, lib: ['ES2022', 'DOM'], types: [] },
+      include: ['protocol.ts'],
+    }),
+  );
+  const run = spawnSync(process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '-p', dir], {
+    encoding: 'utf8',
+    timeout: 120_000,
+  });
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  const module = await import(pathToFileURL(file).href),
+    value = {
+      maps: new Map([[3, { width: 9, tiles: new Uint8Array([1, 2]) }]]),
+      writer: { name: 'w' },
+      reader: { page: 7 },
+      view: { at: 0.5 },
+      small: { n: 4 },
+      error: { code: 2 },
+    };
+  assert.ok(equalBytes(module.encodeState(value), named.encode('State', value)));
+  assert.deepEqual(module.decodeState(named.encode('State', value)), named.decode('State', named.encode('State', value)));
+});
+
+test('generateTypeScript refuses two structs whose generated function names collide', async () => {
+  const { defineSchema } = await import('../dist/index.js');
+  const clash = defineSchema({ types: { Player: { x: 'f32' }, PlayerDelta: { y: 'f32' } } });
+  // encodePlayerDelta would be both the delta encoder of Player and the encoder of PlayerDelta.
+  assert.throws(() => generateTypeScript(clash), (error) => error instanceof TypeError && /PlayerDelta/.test(error.message));
+});

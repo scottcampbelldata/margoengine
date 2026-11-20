@@ -7,11 +7,11 @@ export const maxBytes = 64 * 1024 * 1024,
   maxVertices = 1_000_000,
   maxIndices = 3_000_000;
 /** RangeError for a file over a CAD cap (docs/limits.md). The message names the cap and the way past it: a GLB, which
- * @margoengine/gltf-pro loads without these caps (a B-rep file is tessellated offline with @margoengine/brep and written as GLB with
+ * @margoengine/gltf/pbr loads without these caps (a B-rep file is tessellated offline with @margoengine/brep and written as GLB with
  * @margoengine/exporters). */
 export function capError(limit: string, format: string): RangeError {
   const way = format === 'stl' || format === 'obj' ? 'export it as GLB' : 'tessellate it offline with @margoengine/brep, export it as GLB with @margoengine/exporters';
-  return new RangeError(`${limit}; ${way} and load it with @margoengine/gltf-pro`);
+  return new RangeError(`${limit}; ${way} and load it with @margoengine/gltf/pbr`);
 }
 // A corner welds only with the same Float32 point, the value Geometry stores: its key is the Float32 bit pattern, with
 // -0 folded into 0. A rounding grid (1e-5) merged distinct corners a few micrometres apart and collapsed real triangles.

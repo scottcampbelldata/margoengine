@@ -1,4 +1,4 @@
-// Exact repeat regression, including separate browser processes. Run with the GPU lock held.
+// Exact repeat regression, including separate browser processes. Run.
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

@@ -21,6 +21,8 @@ the orientation. These are cell-local boxes, not arbitrary triangle collision.
 materials renderer. Install the matching `@margoengine/materials` peer from the
 private build when using model drawing. Call update after lighting, before rendering.
 It streams changed chunks without consuming the main renderer's light-dirty queue.
+When a chunk's mesh fails to build (`update` throws), the meshes made for it are kept and the chunk stays pending,
+so the next `update` replaces them.
 The default material uses block colour/PBR factors; a per-type/texture override is
 caller-owned. Disposal removes model meshes/subscriptions, preserving caller textures
 and materials. Cancellation retains its exact reason.
@@ -84,7 +86,9 @@ floor. Animated faces keep unit quads so shared liquid edges meet; liquid side/b
 constraints differ from free foliage bending. This is display motion, not fluid or
 collision simulation. Direction is XZ, default [1,0]; length below one scales motion,
 zero stops it and longer vectors normalize. Explicit time is seconds within +/-1e6;
-undefined restores the renderer clock. `sampleVoxelWind` gives the deterministic CPU
+undefined restores the renderer clock. The clock stays float64 on the CPU and reaches
+the shader as phases reduced to one turn, so foliage, water and animated textures move
+as smoothly after days of play as at the start. `sampleVoxelWind` gives the deterministic CPU
 offset used by tools/seam checks. Bounds padding covers maximum displacement, and
 beauty, capture and shadow shaders share motion. The optional feature composes with
 the mesher rather than adding work to static worlds. Dispose wind before its renderer;
@@ -105,7 +109,7 @@ pipeline readiness and submitted work before reading pixels; a frame count alone
 does not establish readiness. The focused browser commands are
 `node packages/voxel/tests/models-browser-check.mjs`,
 `node packages/voxel/tests/objects-browser-check.mjs` and
-`node packages/voxel/tests/wind-browser-check.mjs`, under the repository GPU lock.
+`node packages/voxel/tests/wind-browser-check.mjs`.
 
 ```ts
 import { BlockTypes, VoxelWorld, VoxelChunk, blockState, blockId, blockData } from 'margoengine/voxel';
@@ -161,7 +165,8 @@ worker.onmessage = ({ data }) => world.addChunk(0, 1, 0, VoxelChunk.unpack(data)
   its back side, `facing` `'+x'`, `'-x'`, `'+z'` or `'-z'` naming that side; upside down puts the slab on top).
   `connectStairs(world, x, y, z)` turns the stairs in that cell and beside it into the corners their neighbours call
   for: outer when a stair's back meets the side of another stair of the same half (toward that stair's back), inner
-  when its front does; a `corner` given to `stairState` (`'straight'`, `'inner+z'`, `'outer-x'`, ...) is kept.
+  when its front does, unless the cell on the far side of that turn holds a stair of the same facing and half (the
+  stair then continues that straight run); a `corner` given to `stairState` (`'straight'`, `'inner+z'`, `'outer-x'`, ...) is kept.
   `waterlogState(state)` waterlogs a slab or stair: the liquid its type names (`waterlog`, a defined liquid's id or
   name) fills the rest of the cell, meshed, lit and swum in like that liquid, while the block keeps colliding.
   `shapeOctants(type, state)` gives the half cells a state fills as an 8-bit mask (bit `x + 2y + 4z`, 255 for a cube).
@@ -489,6 +494,9 @@ render.diagnostics; // { kind: 'malformed' | 'unsupported', id, chunk, message }
   NOTE, IMAP, META, MATT, future ones) stays as bytes in `scene.chunks`, which also records the file's chunk order, so
   `writeVox(parseVox(file))` is the file byte for byte. Typed fields are decoded from each dictionary's `attributes`;
   on write a typed field replaces its key only when its value changed, so untouched text keeps its exact form.
+  Dictionary text is UTF-8; text that is not (names saved in a Windows code page) reads as windows-1252 and is written
+  back in windows-1252 while unchanged, so such files also round-trip byte for byte; a value set since goes out as
+  UTF-8.
 - **Render settings.** `readVoxRenderDictionaries(scene, {maxBytes, maxEntries})` decodes the kept rOBJ chunks (a
   DICT each) and rCAM chunks (an int32 camera id, then a DICT) without changing them, so `writeVox` still gives the
   file back byte for byte. Strings decode like the typed dictionaries (UTF-8, else windows-1252) and a repeated key is
@@ -664,9 +672,15 @@ mesher.dispose(); // every pending job resolves null; the workers stop
   delivered. The `MeshInput` is built with `meshInput` when a worker takes the job, so it holds the world's latest
   blocks and a queued job holds no copy; its buffers and the mesh's arrays move between the threads without copies.
 - **Translucent order.** Pass the camera's world position as `eye` and the worker returns `translucent` sorted back to
-  front by quad centre distance. `sortQuads(words, localEye)` does the same on any thread (to re-sort a near chunk after
-  the camera moves; `localEye` is the world position minus 32 times the chunk coordinates). Large merged quads beside
-  small ones can still sort wrong: centre distance is a common order, not an exact one.
+  front. `sortQuads(words, localEye)` does the same on any thread (to re-sort a chunk after the camera moves;
+  `localEye` is the world position minus 32 times the chunk coordinates). The order is exact for every quad on a cell
+  face: along a ray from the eye, the grid distance of the cells it crosses rises at every face, so quads keyed by
+  their cell's grid distance from the eye's cell draw farthest first (Frieder, Gordon and Reynolds 1985). Translucent
+  faces are not merged, one quad per cell face, so each has one cell. Quads inside one cell (a lowered or waving liquid
+  top, an inset slab face, a stair's parts) draw by centre distance; a cross block's two quads cut each other.
+- **Border.** `mesh(world, key, priority, eye, true)` also returns `mesh.border`: one u32 per whole cube, slab or
+  stair face of the chunk's one-cell shell that touches the chunk (local cell + 1 in bits 0-5, 6-11 and 12-17, face
+  18-20, render layer 21-22), the faces its neighbours mesh along the seams. A beveled `VoxelRenderer` asks for it.
 - **Failures.** A worker that crashes rejects its job's promise and is replaced for the next job.
 
 Measured with Node 24 worker threads on the development laptop (8 logical cores) while other jobs kept the whole machine
@@ -781,7 +795,7 @@ Size: `./render` is 21,798 B gzip (18,931 before bevels and maps). The extra byt
 use: about 1.0 KB draws beveled blocks (quad split, glass and liquid triangles sorted together, the triangle pipelines
 in the beauty, shadow and post passes), about 0.6 KB the material table with normal, roughness and emissive maps,
 transmission and texture layers up to 2,047, about 0.3 KB the lightmap hooks, and the rest multi-view. The bevel
-builder and shader are in `./bevel` (2,201 B) and baked light in `./lightmap` (2,506 B), so plain worlds do not load them.
+builder and shader are in `./bevel` (4,154 B) and baked light in `./lightmap` (2,506 B), so plain worlds do not load them.
 
 ```ts
 import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
@@ -808,13 +822,14 @@ world.setBlock(x, y, z, stone); // drawn two frames later
 textures.set(3, canvas); // live
 voxels.daylight = 0.3; // dusk: sky light dims, block light (torches) does not
 voxels.stats; // {chunks, visible, quads, triangles, bytes, draws, compiling, pending} of the last frame
-voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
+voxels.dispose(); // workers and GPU buffers; textures.dispose() separately (their GPU copy goes with the last renderer)
 ```
 
 - **Meshing.** Each frame the renderer takes the keys in `world.dirty` (it is their consumer), sends loaded chunks to a
   `VoxelMesher` (option `workers`) nearest first and frees removed ones at once. Finished meshes are uploaded nearest
-  first, about 4 MiB per frame. Translucent quads come back sorted from the camera; chunks within 64 blocks are sorted
-  again on the CPU after the camera moves 4 blocks, and translucent chunks draw back to front.
+  first, about 4 MiB per frame. Translucent quads come back sorted from the camera; a chunk is sorted again on the CPU
+  when the eye's cell changes against it (only which side of the chunk the eye is on counts outside its span), at most
+  4 chunks a frame, nearest first, and translucent chunks draw by descending grid distance from the eye's chunk.
 - **GPU memory.** One storage buffer holds every quad (12 bytes) in pages of 64; a chunk layer takes a run of pages
   (first fit, reused in place while it still fits). The buffer starts at 4 MiB and doubles up to `maxQuadBytes`
   (default and most: the device's storage binding limit, or its `maxBufferSize` when smaller, in whole pages: 128 MiB,
@@ -862,7 +877,7 @@ voxels.dispose(); // workers and GPU buffers; textures.dispose() separately
   throws `RangeError` for sizes and layers, `MargoError` `'unsupported'` for an image without OffscreenCanvas,
   `'failed'` when `load` gets an HTTP error, `'disposed'` after `dispose()`.
 
-Checked on the Arc 140V (`node scripts/gpu-lock.mjs run --owner=you -- node packages/voxel/tests/render-browser-check.mjs`):
+Checked on the Arc 140V (`node scripts/run-with-timeout.mjs -- node packages/voxel/tests/render-browser-check.mjs`):
 no T-junction cracks at 4x and 1x MSAA, greedy and one-quad-per-face images equal outside edge samples on the canvas
 format and rgba16float, glass and cutout composites to their exact linear values, an edit drawn two frames later, the
 same image after `engine.rebootDevice()`, no validation errors. Rough timing (`--timing`, machine not quiet, timestamp
@@ -910,7 +925,7 @@ engine.onFrame(() => (voxels.daylight = 1 - sky.nightFactor)); // a Sky drives e
 voxels.blockLightColor = [1, 0.7, 0.45]; // torches warmer
 ```
 
-- **Effects.** `addLighting(effect)` takes any object with glTF-pro's lighting hooks (`pbr(group)`, `bindings()`):
+- **Effects.** `addLighting(effect)` takes any object with glTF PBR's lighting hooks (`pbr(group)`, `bindings()`):
   `Shadows`, `Clustered`, `Fog` and `EnvironmentLighting` call it from their `add`. The shader is composed again and
   compiled in the background; until it is ready the previous pipelines keep drawing (`stats.compiling` is true
   meanwhile). The last four compositions stay compiled, so taking out the effect added last, or putting one back,
@@ -919,7 +934,7 @@ voxels.blockLightColor = [1, 0.7, 0.45]; // torches warmer
 - **Shadows.** `drawShadow` draws the opaque and cutout chunks inside each cascade (CPU-culled per cascade) into the
   map, cutout blocks alpha tested at their texture's level 0; translucent blocks cast none. Every quad reaches 1/64
   block past its edges in the map, so T-junction slivers cannot let light through and merged and unit quads cast the
-  same shadow. It returns false while its pipelines still compile (the first call starts them). With `{static: true}` the map is redrawn only when `shadowVersion` changes (chunks with opaque or cutout
+  same shadow. The caster declares its position `@invariant` (WGSL 12.10) as every Margo shadow caster's is, so another program drawing the same surface writes the same depth bit for bit. It returns false while its pipelines still compile (the first call starts them). With `{static: true}` the map is redrawn only when `shadowVersion` changes (chunks with opaque or cutout
   quads arriving, changing or leaving inside the last map's cascades, new textures or buffers) or the cascades move.
 - **Sun and sky.** Without a shadow map the sun reaches a face as far as the open sky does (sky light squared, so
   caves stay dark). Inside a shadow map's range the map decides alone (an overhang's shadow is the map's, not a dimmed
@@ -932,7 +947,7 @@ voxels.blockLightColor = [1, 0.7, 0.45]; // torches warmer
   liquid above) rise and fall together by 0.04 blocks (`0.04 sin(1.6 t)`) and ripple: the top's shading normal follows
   three travelling waves of world x and z, so neighbouring quads and chunks match.
 
-Checked on the NVIDIA RTX A6000 (2026-10-19, `node scripts/gpu-lock.mjs run --owner=you -- node
+Checked on the NVIDIA RTX A6000 (2026-10-19, `node scripts/run-with-timeout.mjs -- node
 packages/voxel/tests/render-lighting-browser-check.mjs`; linear HDR radiance at projected world points, 4x and 1x MSAA):
 with the sun straight down and no ambient, the floor under a 4 x 4 slab and under a cutout block's opaque square is 0
 while the floor beside them and under the square's transparent border keeps its unshadowed value (0.9272); five still
@@ -947,15 +962,76 @@ A water cell's side top edge moves 6 rows at 4x and 5 at 1x between crest and tr
 one-quad-per-face with soft shadows, a point light, fog and the waving pool: 141-267 differing edge pixels of 76,800 at
 4x, 34-74 at 1x, never a 2 x 2 block. No validation errors.
 
+### Far from the origin
+
+A float32 position steps by about a centimetre at 100 km, so a world drawn in world coordinates far from zero shakes
+and opens seams. Pass `origin` to each `VoxelRenderer` (a `FloatingOrigin` of `@margoengine/cameras/origin`, or any
+object whose `origin` is the float64 world point at engine zero, read every frame). Chunks stay at their world
+cells; the camera works in engine space (world minus origin). The GPU draws chunks relative to a base snapped to
+1,024 cells near the origin, so chunk origins stay exact integers, and the rest of the origin is folded into the
+camera and shadow matrices in float64: every float32 value the GPU reads stays within about 1,500 cells of zero,
+wherever the world is. Lighting hooks see engine positions; liquid ripples and wind keep their phase across a rebase.
+Tested at 2^24 blocks. Default null: world and engine space are the same.
+
+```ts
+import { FloatingOrigin } from 'margoengine/cameras/origin';
+import { Engine } from 'margoengine/core';
+import { BlockTypes, VoxelWorld } from 'margoengine/voxel';
+import { BlockTextures, VoxelRenderer } from 'margoengine/voxel/render';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const blocks = new BlockTypes();
+const stone = blocks.define('stone');
+const world = new VoxelWorld({ blocks });
+const textures = new BlockTextures({ images: [{ width: 1, height: 1, data: new Uint8Array([140, 140, 140, 255]) }] });
+const origin = FloatingOrigin.attach(engine);
+const far = 16_000_000; // blocks (metres) from zero
+world.setBlock(far, 64, far, stone);
+origin.lookAt([far - 10, 70, far - 10], [far, 64, far]); // float64 world camera; the origin follows it
+const voxels = VoxelRenderer.attach(engine, { world, textures, origin });
+const eye = origin.cameraPosition; // world blocks, float64: for streamers and VoxelLod.update
+voxels.origin = null; // live: back to world = engine space
+```
+
+Give the same `origin` to every far level of `@margoengine/voxel/lod` and pass streamers and `VoxelLod.update` the
+world eye (`origin.cameraPosition`). Bounce light (`/gi`) and RGB light (`/light-rgb`) follow the origin of the
+renderer they were added to with their `add(voxels)`: their windows sit around the camera's world cell and the shading
+reads them in engine space. `SmoothTerrainView`, `VoxelObjects`, `VoxelModelRenderer` and `VoxelDebris` take the same
+`origin` option (a live field): their meshes sit at world minus origin, computed in float64, and move when the origin
+moves. Debris with `physics` takes no origin (physics simulates in world coordinates; docs/known-bugs.md).
+
+```ts
+import { FloatingOrigin } from 'margoengine/cameras/origin';
+import { Engine, PbrMaterial } from 'margoengine/core';
+import { VoxelWorld, BlockTypes } from 'margoengine/voxel';
+import { VoxelObjects } from 'margoengine/voxel/objects';
+import { VoxelModelRenderer } from 'margoengine/voxel/models';
+import { VoxelDebris } from 'margoengine/voxel/debris';
+import { SmoothTerrain, SmoothTerrainView } from 'margoengine/voxel/smooth';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const origin = FloatingOrigin.attach(engine);
+const world = new VoxelWorld({ blocks: new BlockTypes() });
+const objects = VoxelObjects.attach(engine, world, { origin });
+const models = await VoxelModelRenderer.create(engine, world, { origin });
+const debris = new VoxelDebris(world, { engine, origin });
+const smooth = SmoothTerrainView.attach(engine, { terrain: new SmoothTerrain(), materials: [new PbrMaterial({ color: '#7a6a55' })], origin });
+```
+
 ## Bevels and baked light (`./render`)
 
 `VoxelRenderer.attach(engine, { world, textures, bevel: voxelBevel(0.15) })` (`voxelBevel` from `./bevel`, its own
-entry: worlds without a bevel carry none of it) chamfers exposed cube faces by 0.15 blocks: each chunk layer's cube
-faces become a triangle mesh (`bevelQuads`, one 48-byte vertex buffer and an index buffer per layer), lit by the same shader end as the quads (sky light, sun, AO, block light, maps and lighting
+entry: worlds without a bevel carry none of it) chamfers exposed cube faces by 0.15 blocks along the cells'
+silhouette: every convex or concave crease of the block surface becomes a 45 degree strip and every corner a small
+polygon, while faces that go on in the same plane stay flat however the mesher merged or split them, so the surface
+stays closed. Each chunk layer's cube faces become a triangle mesh (`bevelQuads`, one 48-byte vertex buffer and an index buffer per layer), lit by the same shader end as the quads (sky light, sun, AO, block light, maps and lighting
 effects), cast into shadow maps and replayed by post (gbuffer, ambient, occlusion, capture; `draw` returns false until
 the replay's pipelines, compiled in the background on its first call, are ready). Crosses and liquids stay
 quads (a chamfer has no lowered liquid top). Translucent chamfers and quads of a chunk are sorted together, back to
-front, within the same distance and per-frame budget as quads. Without `bevel` nothing changes.
+front, within the same distance and per-frame budget as quads. Without `bevel` nothing changes. Chunks meet as one
+mesh would: with a bevel the renderer asks its mesher for each chunk's `border` (the whole faces of the one-cell shell
+that touch the chunk, which the neighbouring chunks mesh) and passes them to `bevelQuads(faces, amount, context)`, so
+an edge or corner on a seam is chamfered from the faces on both sides and both chunks put their vertices at the same
+points along it, however each merged its quads. A mesher that ignores `border` (one written before it) gives sharp
+seams, as before.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -973,12 +1049,16 @@ const atlas = await bakeLightmap(
   { positions, albedo: new Float32Array([0.8, 0.8, 0.8, 1]) },
   { texelsPerUnit: 4, lights: [{ type: 'directional', direction: [0.3, 1, 0.2], intensity: 2 }] },
 );
-const texture = engine.gpu!.createTexture({
-  size: [atlas.width, atlas.height],
-  format: 'rgba8unorm',
-  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-});
-engine.gpu!.queue.writeTexture({ texture }, atlas.textures.lightmap, { bytesPerRow: atlas.width * 4 }, [atlas.width, atlas.height]);
+// Called once per device, so the baked light comes back by itself after a device restore.
+const texture = (device: GPUDevice) => {
+  const made = device.createTexture({
+    size: [atlas.width, atlas.height],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture({ texture: made }, atlas.textures.lightmap, { bytesPerRow: atlas.width * 4 }, [atlas.width, atlas.height]);
+  return made;
+};
 voxels.lightmap = voxelLightmap({ texture, positions, uv: atlas.uv, scale: atlas.lightmapScale, radiometry: 'physical' });
 voxels.lightmap = undefined; // live lighting again
 ```
@@ -988,10 +1068,17 @@ voxels.lightmap = undefined; // live lighting again
 covering 1,048,576 cell faces). Fragments on a chart use the atlas's light times the diffuse
 colour instead of the sun and ambient terms; emission still adds and the rest stay live. `radiometry: 'physical'`
 (the bake's physical irradiance) divides by pi once. Positions and UVs are copied; the texture is borrowed, never
-destroyed (upload it again on a new device). A hash index finds a fragment's chart in at most 16 probes per cell.
+destroyed. Pass it as `(device) => GPUTexture` and the renderer makes it once per device, so it is back after a device
+restore. A plain `GPUTexture` is lost with its device: the renderer draws with live lighting, reports it once through
+`engine.onError` (`'state'`, [#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), and assigning a new
+`voxelLightmap` brings the baked light back. A hash index finds a fragment's chart in at most 16 probes per cell.
 
-GPU check (physical GPU, under the shared lock): `node packages/voxel/tests/bevel-browser-check.mjs`: bevel silhouettes,
+GPU check (physical GPU): `node packages/voxel/tests/bevel-browser-check.mjs`: bevel silhouettes,
 texture layers 256 and 2047, maps, glass and liquid sorting, four views, lightmaps, bevel replay, shadows and AO.
+
+Multi-view: `engine.render({ views })` draws the world once per view (split screen, picture in picture, a minimap).
+Each view's faces are shaded from rays through that view's own rectangle, so a view at any `viewport` draws the same
+pixels as the full target would at that size (`render-browser-check.mjs` checks two side-by-side views of one camera).
 
 ## Far levels of detail (`@margoengine/voxel/lod`)
 
@@ -1149,7 +1236,8 @@ colored.setColor('lamp', [0.2, 1, 0.3]); // live
   times `strength`. Beyond the box there is no coloured light.
 - **Cost.** Three copies of every loaded chunk's blocks and light, and three floods per change.
 - **Errors.** `TypeError` for a wrong engine, world or option type, `RangeError` for colours outside 0..1, an `extent`
-  that is not three multiples of 32 up to 1,024, or `setColor` of an undefined type; `MargoError` `'disposed'` after
+  that is not three multiples of 32 up to 1,024, a `strength` that is not a finite number >= 0 (at attach, and at
+  `update()` for a value set later), or `setColor` of an undefined type; `MargoError` `'disposed'` after
   `dispose()`.
 
 GPU check (`node packages/voxel/tests/light-rgb-browser-check.mjs`, in `test:gpu`): a closed room with a red torch and
@@ -1185,7 +1273,8 @@ world.setBlock(0, 64, 0, water); // a source: it flows
 
 - **Levels.** A liquid cell's state data is its level: 0 a source (full), 1 to 7 flowing (the mesher lowers its top
   by that many eighths), `FLUID_FALLING` (8) falling, full, fed from above. A liquid with `reach` r steps
-  `floor(7 / r)` levels a cell (water 1, lava 2).
+  `floor(7 / r)` levels a cell (water 1, lava 2) and runs r cells: a cell past level `r * floor(7 / r)` dries up,
+  so a reach of 4 runs levels 1 to 4.
 - **Steps.** Any change schedules the cell and its six neighbours `delay` ticks later. A due flowing cell first
   settles: with the same liquid above it falls, else its level is the lowest beside it plus the step, and past 7 it
   dries up; with `infinite`, two sources beside it on solid ground or a source make it one. Then it flows: down into
@@ -1236,7 +1325,8 @@ engine.onFrame((_, delta) => ticks.update(delta)); // 20 ticks a second
   (`randomTicks` cells per loaded chunk, default 24, picked by a seeded generator, chunks in load order), then the
   `placed` hook of every cell changed since the last tick and the `neighbor` hooks of its six neighbours. Changes the
   hooks make run next tick, so a chain never recurses. At most `maxUpdates` scheduled and neighbour updates a tick.
-  The same seed, world and edits give the same result.
+  The same seed, world and edits give the same result. A hook that throws ends the tick with its error; the updates
+  after it wait for the next tick and stay counted in `pending`.
 - **Hooks** get `{world, x, y, z, state, tick, random(), schedule(delay)}`; `schedule` runs the cell's `scheduled`
   hook later (for whatever block is there then).
 - **Built-in rules.** `fallingRule(delay)`: falls a cell every `delay` ticks while the cell below is open (air or not
@@ -1276,7 +1366,8 @@ console.log(mesh?.opaque.length, mesher.stats); // 3 words per quad; { gpu, cpu,
 
 - **Same output.** Faces, ambient occlusion, smooth light, greedy merges, cross blocks, liquid levels and visibility
   match `meshChunk` word for word (checked on every chunk of a lit test terrain on the Apple silicon Mac's Metal GPU).
-- **Batches.** `mesh(world, key, priority, eye)` works like `VoxelMesher.mesh`: calls made in the same task go out
+- **Batches.** `mesh(world, key, priority, eye, border)` works like `VoxelMesher.mesh` (the border is read on the
+  page from the same shell): calls made in the same task go out
   together, up to `batch` chunks per dispatch (default 8, 1 to 32), lowest priority first; a newer call for a key
   supersedes the older one (null), `cancel(key)` drops one. Each batch slot takes about 3.5 MB of GPU memory.
 - **On this thread.** A chunk with a slab or stair within a cell of it is meshed by `meshChunk` on the page
@@ -1284,6 +1375,11 @@ console.log(mesh?.opaque.length, mesher.stats); // 3 words per quad; { gpu, cpu,
   finds which chunk faces see each other, then waits for two GPU round trips per batch.
 - **Renderer.** `VoxelRendererOptions.mesher` takes this mesher (or any object with `mesh`, `cancel` and `dispose`);
   the renderer does not dispose a mesher it was given.
+- **Device restore.** The mesher belongs to the device it was made with. When that device is lost its jobs wait (none
+  runs on the lost device), and `setDevice(device)` moves it to a new one, where they run and the pipelines and scratch
+  are made again. A `VoxelRenderer` given the mesher calls `setDevice(engine.gpu)` from its own restore hook and meshes
+  every chunk again, so nothing is needed; a page meshing chunks itself calls it after `await engine.rebootDevice()`.
+  A mesher of your own that holds GPU objects implements `setDevice` the same way.
 - **Errors.** `TypeError` without a `GPUDevice`, `RangeError` for a `batch` out of range or over the device's binding
   limit and for wrong keys, priorities or eyes; a mesh rejects with `MargoError` `'failed'` when the GPU reports a
   validation error; `MargoError` `'disposed'` after `dispose()` (also `[Symbol.dispose]`).
@@ -1313,6 +1409,31 @@ engine.onFrame(() => view.update()); // meshes up to 4 dirty chunks a frame, nea
 engine.start();
 ```
 
+Textured ground: pass `createMesh` instead of `materials` and draw each chunk part with any renderer. A triplanar
+`PbrMaterial` of `@margoengine/materials` projects its maps from world space, so the Surface Nets mesh needs no UVs:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh, loadTexture } from 'margoengine/materials';
+import { SmoothTerrain, SmoothTerrainView } from 'margoengine/voxel/smooth';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const terrain = new SmoothTerrain();
+terrain.addChunk(0, 0, 0, (x, y, z) => 10 + 3 * Math.sin(x / 6) - y, (x, y, z) => (y > 8 ? 0 : 1));
+const [grass, rock] = await Promise.all(['/grass.png', '/rock.png'].map((url) => loadTexture(url)));
+const looks = [grass, rock].map((map) => new PbrMaterial({ map, triplanar: true, triplanarScale: 0.25 }));
+const view = SmoothTerrainView.attach(engine, {
+  terrain,
+  createMesh(part, material, origin) {
+    const mesh = createMesh(engine, part, looks[material] ?? looks[0]);
+    mesh.root.position.set(origin[0], origin[1], origin[2]);
+    return { dispose: () => mesh.destroy() };
+  },
+});
+engine.onFrame(() => view.update());
+engine.start();
+```
+
 - **Density.** `addChunk(cx, cy, cz, density, material)` samples `density(x, y, z)` at each cell (positive inside, about
   the signed distance in blocks near the surface, stored clamped to -1..1 in 1/127ths) and `material` (0 to 255). Chunks
   load and unload in any order; `removeChunk` unloads one. `sculpt(center, radius, strength, material)` moves every cell
@@ -1320,15 +1441,76 @@ engine.start();
 - **Meshing.** One surface point per net cell the surface crosses, at the mean of its edge crossings, one quad per pair
   of neighbouring samples across the surface, normals from the density gradient (the method of
   `@margoengine/voxel-edit/smooth`, over densities instead of filled cells). Samples past the chunk come from its loaded
-  neighbours, so chunks join without seams; past an unloaded neighbour the border repeats (the surface stays open there,
-  no wall). Each quad takes its solid sample's material; `meshSmoothChunk` returns one part per material.
+  neighbours, so chunks join without seams; past an unloaded neighbour the border repeats along that axis (the surface
+  stays open there, no wall). With `skirt` (blocks, on `meshSmoothChunk` or `SmoothTerrainView`) each chunk mesh is
+  clipped to its box and its faces with no loaded neighbour are closed by caps reaching that far from the border (32
+  closes them whole), to join far levels of `./smooth-lod` with no crack. Each quad takes its solid sample's material; `meshSmoothChunk` returns one
+  part per material.
 - **Dirty chunks.** Every change puts the chunks that read the changed cells in `terrain.dirty` (a chunk and the
   neighbours sharing its border cells); `view.update()` meshes up to `budget` of them (default 4) on this thread, nearest
   the camera first, and swaps their core meshes (one per chunk and material, placed at the chunk's corner).
-- **Errors.** `TypeError` for a wrong engine, terrain, field or materials list; `RangeError` for chunk coordinates
+- **Custom meshes.** `createMesh(part, material, origin)` (optional; default: a core mesh with `materials[material]`)
+  gets each part's positions, normals and indices in the chunk's own blocks and the chunk's corner in world blocks; it
+  returns an object with `dispose()`, which the view calls when the chunk is meshed again or unloaded and on
+  `view.dispose()`. `materials` may then be left out.
+- **Errors.** `TypeError` for a wrong engine, terrain, field or materials list, a `createMesh` that is not a function or
+  returns no `dispose()`; `RangeError` for chunk coordinates
   outside the y range (`minChunkY` -4, `maxChunkY` 7 by default), a NaN density, a material outside 0 to 255, or sculpt
   arguments out of range; `MargoError` `'disposed'` after `view.dispose()` (also `[Symbol.dispose]`), which removes its
   meshes.
+
+## Smooth far levels (`@margoengine/voxel/smooth-lod`)
+
+`SmoothLod` draws a smooth terrain out to kilometres: coarse Surface Nets meshes of the same density field around the
+eye, each level's cells twice the size of the one before, chosen like `VoxelLod` (a level reaches `radius` of its nodes
+before the next coarser one takes over). Level 1 leaves out the 32-block boxes of the loaded real chunks, and every mesh
+is clipped to its box with its faces closed by caps, so the levels and the real terrain join with no cracks.
+
+```ts
+import { Engine, PbrMaterial } from 'margoengine/core';
+import { SmoothTerrain, SmoothTerrainView } from 'margoengine/voxel/smooth';
+import { SmoothLod } from 'margoengine/voxel/smooth-lod';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const height = (x: number, z: number) => 24 + 14 * Math.sin(x / 53) * Math.cos(z / 41);
+const density = (x: number, y: number, z: number) => height(x, z) - y;
+const material = (x: number, y: number, z: number) => (y > height(x, z) - 2 ? 0 : 1);
+const materials = [new PbrMaterial({ color: '#3fae3a' }), new PbrMaterial({ color: '#8a6f5a' })];
+const terrain = new SmoothTerrain();
+for (let cx = -2; cx < 2; cx++)
+  for (let cz = -2; cz < 2; cz++) for (let cy = 0; cy < 2; cy++) terrain.addChunk(cx, cy, cz, density, material);
+const view = SmoothTerrainView.attach(engine, { terrain, materials, skirt: 32 }); // real chunks with closed faces
+const far = SmoothLod.attach(engine, { terrain, density, material, materials }); // 4 levels, 4,096 blocks
+engine.onFrame(() => {
+  view.update();
+  far.update(); // eye: the camera (plus `origin`); meshes up to 8 nodes a frame, nearest first
+});
+engine.start();
+```
+
+- **Levels.** `levels` (1 to 12, default 4) far levels; level L samples `density` every 2^L blocks, so one node of 32
+  samples per axis covers 32 x 2^L blocks. `radius` (2 to 32, default 8) nodes of a level before the next one: the view
+  reaches `radius * 32 * 2^levels` blocks. `minY` and `maxY` (default -64 and 255) bound the levels in y. Keep the real
+  chunks inside level 1 (`2 * radius` above the streamed distance in chunks + 1).
+- **Seams.** Each node's triangles are clipped to its box, so two nodes of one level meet exactly on their shared face;
+  every face is closed by a cap, the part of the face plane inside the ground, so each node mesh bounds a closed solid
+  and no ray from the air passes between two levels, even where the ground runs nearly parallel to a node face or
+  folds inside a cell (caves, overhangs): the two faces meeting at a box edge take what is solid there from the same
+  samples.
+  `skirt` (0 to 32, default 32) is how many cells the cap reaches from the border; below 32 a near-parallel seam can
+  open. Draw the real terrain with `SmoothTerrainView` option `skirt: 32` (blocks) so its border with level 1 is closed
+  the same way.
+- **Real terrain.** Level-1 octants over loaded real chunks are left out and meshed again when a chunk loads or unloads.
+  Sculpted edits show only in the real chunks: far levels sample `density`.
+- **Handover.** `update(eye?)` meshes up to `budget` (default 8, or `Infinity`) missing nodes nearest first and drops a
+  node no longer wanted once no missing node overlaps it, so moving never opens a hole. `stats` gives nodes on show per
+  level, pending nodes and meshes.
+- **Meshes.** One core mesh per node and material with `materials[material]`, or `createMesh(part, material, origin,
+  level)` returning an object with `dispose()`. `meshSmoothLodNode(density, level, x, y, z, {material, skirt, mask})`
+  returns a node's parts without drawing. `origin` takes a `FloatingOrigin` like `SmoothTerrainView`.
+- **Errors.** `TypeError` for a wrong engine, terrain, field, `createMesh` or materials list, or an eye that is not three
+  finite numbers; `RangeError` for an option out of range, `minY` above `maxY`, a NaN density or a material outside 0 to
+  255; `MargoError` `'disposed'` after `dispose()` (also `[Symbol.dispose]`), which removes every node mesh.
 
 ## Ray-traced bounce light (`@margoengine/voxel/gi`)
 
@@ -1378,8 +1560,11 @@ engine.start();
   there. Outside the window there is no bounce light and the sun is unshadowed.
 - **Cost.** About 26 MB of GPU memory (the 1 MB grid, 16 MB of sums and four 2 MB volumes); the trace cost grows with
   `cells x rays`. Changing blocks or the block table re-uploads the window's blocks (on this thread, 262,144 cells).
-- **Errors.** `TypeError` for a wrong engine or world, `RangeError` for options out of range or an albedo that is not
-  [r, g, b] in 0..1, `MargoError` `'unsupported'` without WebGPU, `'disposed'` after `dispose()` (also
+- **Device restore.** After a device loss the engine's restored device gets new volumes at the next `update()`, which
+  traces the window from its first sweep again. Frames drawn before that `update()` draw without the effect, as before
+  the first one: `pbr` is undefined and `bindings()` empty, so nothing of the lost device is bound.
+- **Errors.** `TypeError` for a wrong engine or world, `RangeError` for options out of range, an albedo that is not
+  [r, g, b] in 0..1 or (at `update()`) a `strength` set outside 0 to 8, `MargoError` `'unsupported'` without WebGPU, `'disposed'` after `dispose()` (also
   `[Symbol.dispose]`).
 
 ## Destruction: loose pieces break off (`@margoengine/voxel/debris`)
@@ -1438,3 +1623,7 @@ console.log(debris.pieces[0].body!.position[1] < 5); // true: the beam fell onto
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+## Film time
+
+`VoxelRenderer.advanceTime(delta)` moves the renderer's clock (`renderer.time`: water waves, voxel motion) in the frame update; before 2026-11-16 the prepare pass moved it. `seek` from `@margoengine/cutscene/seek` replays it.

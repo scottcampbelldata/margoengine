@@ -7,7 +7,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRTransparency } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { Transmission, type TransmissionPassOptions } from './transmission.js';
 import { alphaBlend } from '../../shared/pass.js';

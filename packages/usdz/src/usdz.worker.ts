@@ -1,7 +1,7 @@
 // Worker script for @margoengine/usdz/worker (bundled to dist/workers/usdz.js): fetch, archive, USD parse, texture
-// decoding and gltf-pro's prepare step (accessors, packed vertices) off the main thread.
-import { GLTFAsset } from '@margoengine/gltf-pro/asset';
-import { prepareAsset } from '@margoengine/gltf-pro/prepare';
+// decoding and gltf/pbr's prepare step (accessors, packed vertices) off the main thread.
+import { GLTFAsset } from '@margoengine/gltf/asset';
+import { prepareAsset } from '@margoengine/gltf/prepare';
 import { fetchBytes } from '@margoengine/loaders/common';
 import { serve } from '../../shared/worker.js';
 import { parseUSDZ, type USDExtension, type USDOptions } from './index.js';

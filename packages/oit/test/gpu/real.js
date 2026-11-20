@@ -7,8 +7,8 @@ import {
   EnvironmentLighting,
   loadEnvironmentImage,
 } from '../../../environment/dist/index.js';
-import { loadGLTF } from '../../../gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../../gltf-pro/dist/extended.js';
+import { loadGLTF } from '../../../gltf/dist/pbr.js';
+import { extendedMaterials } from '../../../gltf/dist/extended.js';
 import { PostStack, FXAA } from '../../../post/dist/index.js';
 import { VFX } from '../../../vfx/dist/index.js';
 import { OIT } from '../../dist/index.js';

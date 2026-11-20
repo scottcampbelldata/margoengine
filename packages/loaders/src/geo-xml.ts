@@ -20,7 +20,7 @@ function xml(input: BinaryInput | string, options: GeoOptions): XMLElement {
   throwIfAborted(options.signal, GEO);
   const source = typeof input === 'string' ? geoText(input, options) : decodeXML(toBytes(input, GEO));
   geoText(typeof input === 'string' ? input : toBytes(input, GEO), options);
-  const root = readXMLTree(source, GEO);
+  const root = readXMLTree(source, GEO, { external: options.external });
   if (root.children.length !== 1)
     throw new LoaderError(GEO, 'syntax', 'vector XML requires exactly one document element');
   return root.children[0];

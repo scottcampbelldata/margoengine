@@ -13,6 +13,8 @@ export interface UVKey {
 /** One material's part of a UV clip. */
 export interface UVClip {
   clip: string;
+  /** Index of the clip in `scene.materialAnimations`: two clips may share a name. */
+  animation: number;
   material: MaterialData;
   materialName: string;
   /** Slash-joined node names from the scene root, of every node that draws the material. */
@@ -45,6 +47,7 @@ export function uvClips(scene: ExportScene): UVClip[] {
       users.set(material as MaterialData, paths);
     }
   });
+  const unnamed = new Map<MaterialData, string>();
   return animations.flatMap((animation, a) => {
     const clip = animation.name ?? `clip${a}`,
       byMaterial = new Map<MaterialData, MaterialAnimationData['channels'][number][]>();
@@ -60,7 +63,9 @@ export function uvClips(scene: ExportScene): UVClip[] {
       byMaterial.set(channel.material, list);
     }
     return [...byMaterial].map(([material, channels]): UVClip => {
-      const materialName = material.name ?? `material${a}`,
+      // One fallback name a material, so two unnamed materials of one clip stay apart.
+      if (material.name === undefined && !unnamed.has(material)) unnamed.set(material, `material${unnamed.size}`);
+      const materialName = material.name ?? unnamed.get(material)!,
         paths = users.get(material);
       if (!paths)
         throw new TypeError(
@@ -76,6 +81,7 @@ export function uvClips(scene: ExportScene): UVClip[] {
         };
       return {
         clip,
+        animation: a,
         material,
         materialName,
         paths,
@@ -83,6 +89,24 @@ export function uvClips(scene: ExportScene): UVClip[] {
       };
     });
   });
+}
+
+/**
+ * A namer for files and assets made from clip and material names. Runs of characters outside A-Z, a-z, 0-9, _ and -
+ * become one _, so no name holds a path separator or a character Unity, Unreal, Roblox or Windows refuses; a Windows
+ * device name (CON, NUL, COM1 and the like) takes a leading _; and a name met before, ignoring case as Windows and
+ * Unreal do, takes _2, _3 and so on.
+ */
+export function uniqueNamer(): (name: string) => string {
+  const taken = new Set<string>();
+  return (name) => {
+    let base = name.replace(/[^A-Za-z0-9_-]+/g, '_') || '_';
+    if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/i.test(base)) base = `_${base}`;
+    let out = base;
+    for (let n = 2; taken.has(out.toLowerCase()); n++) out = `${base}_${n}`;
+    taken.add(out.toLowerCase());
+    return out;
+  };
 }
 
 /** A node whose name carries a collision suffix. */

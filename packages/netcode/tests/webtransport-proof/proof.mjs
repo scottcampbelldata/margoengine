@@ -28,7 +28,7 @@ const server = spawn(python, [join(here, 'server.py'), String(port), keys], { st
 const limit = setTimeout(() => {
   server.kill();
   console.error('proof timed out');
-  process.exit(1);
+  process.exit(1); // process.exit: the hard limit; a session that never opens would hold the process for ever
 }, 60_000);
 const hash = await new Promise((resolve, reject) => {
   server.stdout.on('data', (data) => {
@@ -111,4 +111,4 @@ try {
   await closeAll({ browser, servers: [web] });
   rmSync(keys, { recursive: true, force: true, maxRetries: 5 });
 }
-process.exit(failed ? 1 : 0);
+process.exitCode = failed ? 1 : 0;

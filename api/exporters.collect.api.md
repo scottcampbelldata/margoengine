@@ -80,6 +80,7 @@ export interface Geo {
     faceSizes?: Uint8Array;
     joints?: Uint16Array;
     weights?: Float32Array;
+    widths?: Float32Array;
     morphs?: {
         name?: string;
         positions: Float32Array;
@@ -87,6 +88,7 @@ export interface Geo {
         tangents?: Float32Array;
     }[];
     base?: Geo;
+    topology?: 'points' | 'lines';
 }
 
 export interface LightData {
@@ -111,15 +113,15 @@ export interface Mat {
     alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
-    baseColorTextureTransform?: {
-        offset: Vec2;
-        scale: Vec2;
-        rotation?: number;
-    };
+    baseColorTextureTransform?: TextureTransform;
     metallicRoughnessTexture?: TextureData;
+    metallicRoughnessTextureTransform?: TextureTransform;
     normalTexture?: TextureData;
+    normalTextureTransform?: TextureTransform;
     occlusionTexture?: TextureData;
+    occlusionTextureTransform?: TextureTransform;
     emissiveTexture?: TextureData;
+    emissiveTextureTransform?: TextureTransform;
     unlit?: boolean;
     shading: 'standard' | 'lambert' | 'phong';
     specular: number[];
@@ -130,6 +132,11 @@ export interface Mat {
     transmission: number;
     ior: number;
     extras?: Extras;
+    width?: {
+        value: number;
+        units: 'pixels' | 'world';
+        kind: 'points' | 'lines';
+    };
 }
 
 export interface Node {
@@ -151,6 +158,11 @@ export interface Node {
         extras?: Extras;
     }[];
     primitivesKey?: object;
+    lines?: {
+        geometry: Geo;
+        material?: Mat;
+        extras?: Extras;
+    }[];
     camera?: CameraData;
     light?: LightData;
     matrix?: number[];
@@ -171,6 +183,7 @@ export interface SceneOptions {
     geometryData?: Lookup<Geometry, GeometryData>;
     materialData?: Lookup<PbrMaterial, MaterialData>;
     pixelArt?: boolean | PixelArtSampling;
+    onWarning?: (warning: ExportWarning) => void;
 }
 
 export interface TextureData {
@@ -188,7 +201,7 @@ export interface TextureData {
 
 export function cameraDefinition(camera: CameraData): GLTFCameraDefinition;
 
-export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels): Node[];
+export function collect(source: ExportSource, options?: SceneOptions, plan?: (bytes: number) => void, loaded?: LoadedModels, writes?: readonly ('points' | 'lines')[]): Node[];
 
 export function lightDefinition(light: LightData): GLTFLightDefinition;
 
@@ -220,7 +233,15 @@ interface ExportPrimitive {
     geometry: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
     indices?: ArrayLike<number>;
+    mode?: PrimitiveMode;
     extras?: Extras;
+}
+
+interface ExportWarning {
+    code: 'unsupported';
+    message: string;
+    node: Mesh | ExportNode | null;
+    item?: object;
 }
 
 type Extras = {
@@ -369,7 +390,7 @@ interface GLTFTextureTransform {
 
 interface GeometryData {
     positions: ArrayLike<number>;
-    normals: ArrayLike<number>;
+    normals?: ArrayLike<number>;
     uvs?: ArrayLike<number>;
     uvs1?: ArrayLike<number>;
     uvs2?: ArrayLike<number>;
@@ -424,21 +445,21 @@ interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
-    baseColorTextureTransform?: {
-        offset: Vec2;
-        scale: Vec2;
-        rotation?: number;
-    };
+    baseColorTextureTransform?: TextureTransform;
     metallicRoughnessTexture?: TextureData;
+    metallicRoughnessTextureTransform?: TextureTransform;
     normalTexture?: TextureData;
+    normalTextureTransform?: TextureTransform;
     unlit?: boolean;
     shading?: 'standard' | 'lambert' | 'phong';
     specular?: readonly number[];
     shininess?: number;
     normalScale?: number;
     occlusionTexture?: TextureData;
+    occlusionTextureTransform?: TextureTransform;
     occlusionStrength?: number;
     emissiveTexture?: TextureData;
+    emissiveTextureTransform?: TextureTransform;
     emissiveStrength?: number;
     transmission?: number;
     ior?: number;
@@ -457,11 +478,19 @@ interface PixelArtSampling {
     wrap?: 'repeat' | 'clamp' | 'mirror';
 }
 
+type PrimitiveMode = 'POINTS' | 'LINES' | 'LINE_LOOP' | 'LINE_STRIP' | 'TRIANGLES' | 'TRIANGLE_STRIP' | 'TRIANGLE_FAN' | 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
 interface SkinData {
     name?: string;
     joints: readonly ExportNode[];
     inverseBindMatrices: ArrayLike<number>;
     skeleton?: ExportNode;
     extras?: Extras;
+}
+
+interface TextureTransform {
+    offset: Vec2;
+    scale: Vec2;
+    rotation?: number;
 }
 ```

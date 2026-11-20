@@ -20,3 +20,23 @@ export interface JPEGDecodeOptions {
  * JPEG, 12-bit samples and four-component CMYK files.
  */
 export declare function decodeJPEG(bytes: Uint8Array, options?: JPEGDecodeOptions): DecodedJPEG;
+/** One decoded frame's components, before colour conversion. */
+export interface JPEGComponents {
+  width: number;
+  height: number;
+  /** Component ids in frame order. */
+  ids: number[];
+  /** The Adobe APP14 colour transform byte, or -1 when the file has no Adobe marker. */
+  adobeTransform: number;
+  /** Per component, its sample at full image size (subsampled components filtered up linearly, centred). */
+  planes: ((x: number, y: number) => number)[];
+}
+/**
+ * Decodes JPEG bytes to their components without colour conversion. `counts` lists the component counts accepted
+ * (default 1 and 3); any other count throws MargoError `unsupported`.
+ */
+export declare function decodeJPEGComponents(
+  bytes: Uint8Array,
+  options?: JPEGDecodeOptions,
+  counts?: readonly number[],
+): JPEGComponents;

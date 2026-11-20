@@ -4,7 +4,7 @@
 
 ```ts
 import { Mesh, Vec3 } from "@margoengine/core";
-import { Texture } from "@margoengine/materials";
+import { EnvMapSource, Texture } from "@margoengine/materials";
 import { ColorInput } from "@margoengine/math";
 import { React, ReactNode, RefAttributes } from "react";
 
@@ -92,6 +92,8 @@ interface PbrMaterialProps {
     emissiveMap?: Texture | TextureSource | null;
     emissive?: string | readonly number[];
     emissiveIntensity?: number;
+    envMap?: EnvMapSource | null;
+    envMapIntensity?: number;
 }
 
 interface PointerHandlers {

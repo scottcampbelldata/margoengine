@@ -50,7 +50,7 @@ export class ChunkedWFC {
     if (this.busy)
       throw new MargoError(
         'failed',
-        `WFC chunk solve already active; await it before solving or clearing. Help: https://margoengine.com/docs/wfc`,
+        `WFC chunk solve already active; await it before solving or clearing. Help: https://margoengine.com/llms/packages/wfc.md`,
       );
     const key = coord.join(',');
     const cached = this.chunks.get(key);
@@ -98,7 +98,7 @@ export class ChunkedWFC {
     if (this.busy)
       throw new MargoError(
         'failed',
-        'WFC chunk solve already active; await it before clearing. Help: https://margoengine.com/docs/wfc',
+        'WFC chunk solve already active; await it before clearing. Help: https://margoengine.com/llms/packages/wfc.md',
       );
     this.chunks.clear();
   }

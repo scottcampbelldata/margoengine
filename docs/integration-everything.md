@@ -5,12 +5,12 @@ J6 composes public calls from package READMEs in `examples/integration/`, with e
 The build phase defers README edits and Works with lines to the README-owed list.
 
 Run `npm run build:packages`, then `npm run test:integration:browser -- --scene=game`.
-The runner takes one shared GPU slot, with a 150 second limit per scene and a 60 second pipeline readiness limit.
+The runner has a 150 second limit per scene and a 60 second pipeline readiness limit.
 `check:gpu-packages` includes it, so check:merge selects it from each page's import footprint.
 `npm run check:examples-types -- --projects=integration-game` checks its own TypeScript project.
 Results go to `test-results/integration-game.json`. This suite has no speed assertion.
 
-The game composes gltf, gltf-pro, animation, physics, navmesh, shadows, post, audio, input, controls, ui and save.
+The game composes gltf, gltf/pbr, animation, physics, navmesh, shadows, post, audio, input, controls, ui and save.
 It uses the Margo-authored tentacle rig, a clean-room static triangle, a falling rigid body, a moving crowd agent,
 positional audio, a health meter and a save round trip. The calls are from the first examples in those READMEs
 (post uses its PostStack example, ui its meter API). The harness supplies deterministic frame deltas and teardown.

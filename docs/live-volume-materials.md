@@ -21,7 +21,7 @@ existing finite shader marker for infinite depth. No tolerances or floors change
 
 Progressive loading preserves material property descriptors in its temporary
 factor-only material. In-place channel edits and precise depth survive the later texture swap.
-These changes are confined to gltf-pro/model, gltf-pro/progressive and
+These changes are confined to gltf/pbr-model, gltf/progressive and
 animation/pointer. No core, stage, unrelated entry dependency or backend code is
 added. The existing mesh-slab estimate and the range limits documented in
 [native-volume-range.md](native-volume-range.md) still apply.
@@ -56,16 +56,15 @@ length is known. Neither is evidence of a speed improvement.
 
 After npm run build:packages, run with node --test --test-timeout=120000:
 packages/animation/tests/volume-pointer.test.js,
-packages/gltf-pro/tests/attenuation-live.test.js,
-packages/gltf-pro/tests/beer-distance.test.js and
-packages/gltf-pro/tests/progressive.test.js. The first two fail on the parent for
+packages/gltf/test/attenuation-live.test.js,
+packages/gltf/test/beer-distance.test.js and
+packages/gltf/test/progressive.test.js. The first two fail on the parent for
 the reported stale attenuation and stale optical-depth values. They check all
 three volume pointer properties, backward seeks, black/white, zero thickness,
 underflow, channel edits, array replacement and actual tint uniform lanes.
 
-Run packages/gltf-pro/scripts/test-native-volume.mjs with node, then again with
---compat, under scripts/gpu-lock.mjs run --gpu=volume-slab-pixel-readback, using
---wait-max=10 and --max=8. Its unchanged 28 slab cases plus 20 live edit/animation
+Run packages/gltf/scripts/test-native-volume.mjs with node, then again with
+--compat. Its unchanged 28 slab cases plus 20 live edit/animation
 cases compare 1x1 RGBA pixels exactly to an independent Beer/sRGB oracle, on both
 instancing paths and both mirrors. New cases cover attenuation edits, animated
 color, thickness and distance, and animated thickness 1200 shortened by scale

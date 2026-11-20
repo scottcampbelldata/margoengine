@@ -5,7 +5,7 @@ const errors = [];
 c.page.on('pageerror', (e) => errors.push(e.message));
 const timer = setTimeout(() => {
   console.error('imposter fade exceeded 2 minutes');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120000);
 try {
   await c.page.waitForFunction(() => window.ready, null, { timeout: 60000 });

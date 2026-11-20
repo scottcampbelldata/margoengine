@@ -8,9 +8,12 @@ import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
 import { restoreWorkerUrls } from '../../../scripts/build-workers.js';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
 await copyLegal(root);
 // One self-contained build per entry, so the optional entries share no chunk with (and never change) the root; the
 // image decoders alone are one file every entry imports (dist/loaders.js).
@@ -29,9 +32,11 @@ for (const [entry, emptyOutDir] of [
   ['ground', false],
   ['gi', false],
   ['fog-volumes', false],
+  ['settings', false],
   ['studio', false],
   ['prefiltered', false],
   ['reflector-pbr', false],
+  ['lightformer', false],
   ['exr-codecs', false],
   ['exr-codecs-worker', false],
 ])
@@ -41,7 +46,7 @@ for (const [entry, emptyOutDir] of [
     publicDir: false,
     logLevel: 'warn',
     build: {
-      outDir: resolve(root, 'dist'),
+      outDir: dist,
       emptyOutDir,
       target: 'es2022',
       lib: {
@@ -65,7 +70,7 @@ for (const [entry, emptyOutDir] of [
   });
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
@@ -73,13 +78,13 @@ await packageDeclarations(root);
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);
-await mkdir(resolve(root, 'dist/vendor/exr-codecs'), { recursive: true });
+await mkdir(resolve(dist, 'vendor/exr-codecs'), { recursive: true });
 for (const name of ['exrview.js', 'exrview.wasm', 'LICENSE.txt', 'ThirdPartyNotices.txt'])
-  await copyFile(resolve(root, 'vendor/exr-codecs', name), resolve(root, 'dist/vendor/exr-codecs', name));
-await copyFile(resolve(root, 'vendor/exr-codecs/exrview.js'), resolve(root, 'dist/vendor/exr-codecs/exrview.cjs'));
+  await copyFile(resolve(root, 'vendor/exr-codecs', name), resolve(dist, 'vendor/exr-codecs', name));
+await copyFile(resolve(root, 'vendor/exr-codecs/exrview.js'), resolve(dist, 'vendor/exr-codecs/exrview.cjs'));
 // ESM export adapter around unchanged prebuilt decoder glue for module workers.
 await writeFile(
-  resolve(root, 'dist/vendor/exr-codecs/exrview.mjs'),
+  resolve(dist, 'vendor/exr-codecs/exrview.mjs'),
   (await readFile(resolve(root, 'vendor/exr-codecs/exrview.js'), 'utf8')) + '\nexport default createExrViewModule;\n',
 );
-await restoreWorkerUrls(resolve(root, 'dist'));
+await restoreWorkerUrls(dist);

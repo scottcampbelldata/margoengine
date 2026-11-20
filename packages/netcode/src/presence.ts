@@ -284,7 +284,8 @@ export async function openSqlitePresence(
       },
       async keys(prefix, signal) {
         signal?.throwIfAborted();
-        return keys.all(prefix.length, prefix, Date.now()).map((row) => row.key as string);
+        // substr() on TEXT counts characters (code points), not the UTF-16 units of prefix.length.
+        return keys.all([...prefix].length, prefix, Date.now()).map((row) => row.key as string);
       },
       async take(key, signal) {
         signal?.throwIfAborted();

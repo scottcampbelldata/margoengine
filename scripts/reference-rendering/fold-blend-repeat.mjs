@@ -1,10 +1,10 @@
 // KB5700f: runs the standalone folded blend repeat page (fold-blend-repeat.html, raw WebGPU and raw WebGL2, no Margo
 // code) and prints each case's repeat counts. Not a gate: docs/upstream-reports/KB5700f/report.md quotes its output, and
 // the sciviz regression (packages/sciviz/tests/surface-repeat-browser.mjs) pins Margo's stable cases. From the repository
-// root, with the GPU lock held:
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/reference-rendering/fold-blend-repeat.mjs [--frames=24]
-// The workstation's AMD iGPU: MARGO_GPU=amd GPU_POWER=low-power node scripts/gpu-lock.mjs run --owner=<you>
-//   --gpu=render-correctness -- node scripts/reference-rendering/fold-blend-repeat.mjs
+// root:
+//   node scripts/run-with-timeout.mjs -- node scripts/reference-rendering/fold-blend-repeat.mjs [--frames=24]
+// The workstation's AMD iGPU: MARGO_GPU=amd GPU_POWER=low-power node scripts/run-with-timeout.mjs -- node
+//   scripts/reference-rendering/fold-blend-repeat.mjs
 import { openBrowser } from '../browser.js';
 import { runSuite } from '../support/shutdown.mjs';
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
-import { EdgesHelper, featureEdges, gradientColors } from '@margoengine/lines/edges';
+import { EdgesHelper, featureEdges, gradientColors, wireframeEdges } from '@margoengine/lines/edges';
 
 // Two triangles sharing the edge (0,0,0)-(1,0,0), folded by `degrees` from flat; `split` gives each its own vertices.
 function fold(degrees, split = false) {
@@ -94,4 +94,18 @@ test('gradientColors in segments mode runs over each pair, and stops place the c
   assert.deepEqual([...stepped.subarray(3, 6)], [1, 0, 0]);
   assert.throws(() => gradientColors([], ['#fff']), /two or more/);
   assert.throws(() => gradientColors([], ['#fff', '#000'], { stops: [1, 0] }), /rising/);
+});
+
+test('wireframeEdges draws each triangle edge once, welding split vertices, and skips degenerate triangles', () => {
+  // A box: 12 edges plus one diagonal per face, though every corner is split three ways by its normals.
+  assert.equal(edges(wireframeEdges(box(2, 2, 2))), 18);
+  const { vertices, indices, stride } = fold(0, true);
+  assert.equal(
+    edges(wireframeEdges({ vertices, indices }, { stride })),
+    5,
+    'two flat triangles: 4 sides and the shared one',
+  );
+  assert.equal(edges(wireframeEdges({ vertices: [0, 0, 0, 1, 0, 0], indices: [0, 1, 1] }, { stride: 3 })), 0);
+  assert.throws(() => wireframeEdges({ vertices: [0, 0, 0], indices: [0, 1, 2] }, { stride: 3 }), RangeError);
+  assert.throws(() => wireframeEdges({ vertices: [], indices: [] }, { tolerance: 0 }), RangeError);
 });

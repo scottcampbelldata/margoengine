@@ -594,7 +594,7 @@ def Mesh "Late"
         { engineRuntime } = await import('/packages/core/dist/extension.js'),
         { parseUSDFiles } = await import('/packages/usdz/dist/compose.js'),
         { lights } = await import('/packages/usdz/dist/lux.js'),
-        { applyGLTFLights, viewGLTFCamera } = await import('/packages/gltf-pro/dist/index.js');
+        { applyGLTFLights, viewGLTFCamera } = await import('/packages/gltf/dist/pbr.js');
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 256;
       canvas.style.cssText = 'width:256px;height:256px';

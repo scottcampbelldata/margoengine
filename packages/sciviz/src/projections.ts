@@ -151,7 +151,10 @@ export function climateProjection(
         lambert
           ? Math.abs(p - (n / Math.abs(n)) * half) < 1e-14
             ? 0
-            : a * c * t(p) ** n
+            : // The far pole diverges; tan(pi/2) is a finite 1.6e16 in doubles, so name it here.
+              Math.abs(p + (n / Math.abs(n)) * half) < 1e-14
+              ? Infinity
+              : a * c * t(p) ** n
           : (a * Math.sqrt(Math.max(0, c - n * q(p)))) / n,
       r0 = rho(lat0 * rad),
       sign = Math.sign(n);

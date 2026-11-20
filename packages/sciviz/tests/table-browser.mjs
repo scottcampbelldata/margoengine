@@ -54,6 +54,18 @@ for (const compat of [false, true]) {
       }
       check(actual.work.rows === rows && actual.work.passes > 0, 'GPU processes ten million physical rows');
       check(work.rowsVisited < rows, 'incremental range update does not rescan the table');
+      // The largest call, 4096 bins (64 x 64 or 4096 x 1), against the CPU path: a kernel that keeps a private array
+      // per bin (80 KB at 4096 bins) passes WGSL's 8192-byte function-variable limit and the WebGL2 layer's registers.
+      const big = 70000, bx = new Float32Array(big), by = new Float32Array(big), bv = new Float32Array(big);
+      for (let i = 0; i < big; i++) { bx[i] = (i * 7919 % 100003) / 100003 * 64; by[i] = (i * 104729 % 99991) / 99991 * 64; bv[i] = i % 97 === 0 ? NaN : Math.fround(Math.sin(i) * 1000); }
+      const bigTable = new ColumnarTable({ x: bx, y: by, v: bv });
+      for (const shape of [{ x: { column: 'x', bins: 64, range: [0, 64] }, y: { column: 'y', bins: 64, range: [0, 64] } }, { x: { column: 'x', bins: 4096, range: [0, 64] } }]) {
+        const before = demo.gpu.device.dispatches ? { ...demo.gpu.device.dispatches } : undefined;
+        const cpu = await aggregateTable(bigTable, { ...shape, value: 'v' }), gpu = await aggregateTable(bigTable, { ...shape, value: 'v', gpu: demo.gpu });
+        if (before) check(demo.gpu.device.dispatches.cpu === before.cpu, '4096-bin compatibility reduction runs on the GPU');
+        check(cpu.count.reduce((a, b) => a + b, 0) === big && gpu.work.passes > 0, '4096-bin call reduces every row on the GPU');
+        for (const key of ['count', 'valid', 'sum', 'mean', 'min', 'max']) check([...cpu[key]].every((v, i) => Object.is(v, gpu[key][i])), `4096-bin GPU ${key} matches the CPU path`);
+      }
       const result = { rows, selected: filter.count, demoSelected: selected, work, aggregation: actual.work, sums: [...actual.sum], backend: demo.gpu.backend, routes };
       demo.bars.dispose(); demo.cells.dispose(); demo.distance.dispose(); demo.filter.dispose(); demo.gpu.dispose(); demo.histogram.dispose(); demo.heatmap.dispose();
       return result;

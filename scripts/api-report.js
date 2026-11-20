@@ -27,6 +27,7 @@ import { isUmbrellaAlias } from './umbrella.mjs';
 import { OUTPUT as ALL_ENTRIES, entriesSource } from './generate-all-entries.mjs';
 import {
   ENTRY_SIZES,
+  foreignWorkspaceLinks,
   gzipCell,
   mergeScopedApiSurface,
   packageMatchesApiReportScope,
@@ -34,9 +35,7 @@ import {
   refreshSurfaceGzip,
 } from './api-report-scope.mjs';
 import { createGlobalReports } from './api-report-globals.mjs';
-import { stalePackages } from './package-stamps.mjs';
-import { BUILD_LOCK_ENV, acquireBuildLock } from './support/build-lock.mjs';
-import { execFileSync } from 'node:child_process';
+import { rebuildStalePackages } from './support/fresh-dist.mjs';
 import { assessChange, checkCoverage, classify, enrollWatch, readLock } from './api-lock.mjs';
 
 // The canonical path: the checker reports files by their real long path, so a checkout reached through a Windows 8.3
@@ -55,22 +54,7 @@ const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 // (scripts/package-stamps.mjs); a current build is left alone.
 // Stale packages are found and rebuilt under the build lock (scripts/support/build-lock.mjs): two reports at once (two
 // root tests in one CI run) both rebuilt the same packages side by side and deleted each other's dist (KB-RM4).
-const releaseBuild = acquireBuildLock(root);
-try {
-  const stale = stalePackages(root);
-  if (stale.length) {
-    console.error(
-      `API report: rebuilding ${stale.length} package(s) whose dist does not match their sources: ${stale.join(', ')}`,
-    );
-    execFileSync(process.execPath, ['scripts/build-modern.js', '--precompiled', `--only=${stale.join(',')}`], {
-      cwd: root,
-      stdio: ['ignore', 'inherit', 'inherit'],
-      env: { ...process.env, [BUILD_LOCK_ENV]: String(process.pid) },
-    });
-  }
-} finally {
-  releaseBuild();
-}
+rebuildStalePackages(root, { label: 'API report' });
 
 // Packages and their entries, in directory order.
 const packages = [];
@@ -97,6 +81,20 @@ for (const dir of readdirSync(join(root, 'packages')).sort(byText)) {
   if (entries.length)
     packages.push({ dir, name: manifest.name, home: key(join(root, 'packages', dir)) + '/', entries });
 }
+// A checkout that borrows another checkout's node_modules reads that checkout's packages for every cross-package
+// import, so its reports lose their import lines and say `from "undefined"` (KB-API-FOREIGN1): stop before writing any.
+const foreign = foreignWorkspaceLinks(root, packages);
+if (foreign.length)
+  throw new Error(
+    `API report: ${foreign.length} workspace package link(s) in node_modules resolve outside this checkout, so the ` +
+      `checker would read another checkout's declarations: ${foreign
+        .slice(0, 3)
+        .map(({ name, target }) => `${name} -> ${target}`)
+        .join(
+          ', ',
+        )}${foreign.length > 3 ? ', ...' : ''}. Link node_modules/@margoengine/* to this checkout's packages ` +
+      `(npm install here, or a node_modules whose @margoengine entries are junctions to packages/ of this checkout).`,
+  );
 const scopedPackage = packageSelector
   ? packages.find((pkg) => packageMatchesApiReportScope(packageSelector, pkg.dir, pkg.name))
   : undefined;
@@ -209,8 +207,12 @@ async function report({ program, checker }, pkg, entry, globals) {
     if (declarations[0].kind === SyntaxKind.SourceFile)
       return `${indent}export namespace ${symbol.name} {\n${await renderModule(target, indent + '    ')}\n${indent}}`;
     const rename = target.name === symbol.name ? '' : `${target.name} as `;
-    if (!local(declarations[0].path))
-      return `${indent}export { ${rename}${symbol.name} } from "${ownerOf(declarations[0].path)}";`;
+    if (!local(declarations[0].path)) {
+      const owner = ownerOf(declarations[0].path);
+      if (!owner)
+        throw new Error(`API report: ${entry.specifier} re-exports ${symbol.name} from a file no package owns`);
+      return `${indent}export { ${rename}${symbol.name} } from "${owner}";`;
+    }
     queue.push(...declarations);
     const texts = (await renderDeclarations(declarations)).map(
       (text) => indent + (rename ? '' : 'export ') + text.replaceAll('\n', '\n' + indent),
@@ -426,91 +428,97 @@ for (const file of selection) {
   if (decision.lines.length) console.log(decision.lines.join('\n'));
   if (decision.fail && update) lockProblems.push(...decision.lines);
 }
+// A failure sets the exit code and lets the event loop end: process.exit can hold the exit for ever (KB-OWN-EXIT2).
 if (lockProblems.length) {
   console.error(lockProblems.join('\n'));
-  process.exit(1);
-}
-const summary = scopedPackage
-  ? refreshSurfaceGzip(
-      mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
-        packageName: scopedPackage.name,
-        row: surfaceRow(reports[0]),
-        entries: reports[0].length,
-        exports: reports[0].reduce((sum, item) => sum + item.counts.exports, 0),
-      }),
-      entrySizes(),
-    )
-  : surface();
-if (update) {
-  mkdirSync(apiDir, { recursive: true });
-  writeIfChanged(
-    join(apiDir, 'lock.json'),
-    JSON.stringify(
-      enrollWatch(
-        lock,
-        selectedReports.map((item) => item.pkg.name),
-      ),
-      null,
-      2,
-    ) + '\n',
-  );
-  if (!scopedPackage)
-    for (const file of readdirSync(apiDir))
-      if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));
-  for (const [file, text] of expected) writeIfChanged(join(apiDir, file), text);
-  writeIfChanged(join(root, 'docs', 'api-surface.md'), summary);
-  // The all-entries type project imports every public entry (scripts/generate-all-entries.mjs): it follows the exports maps.
-  writeIfChanged(join(root, ALL_ENTRIES), entriesSource(root));
-  console.log(
-    scopedPackage
-      ? `API reports: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name} written without changing other packages.`
-      : `API reports: ${expected.size} entries, ${total('exports')} exports written to api/ and docs/api-surface.md.`,
-  );
-} else {
-  const problems = [];
-  if (!scopedPackage) {
-    const present = existsSync(apiDir) ? readdirSync(apiDir).filter((f) => f.endsWith('.api.md')) : [];
-    for (const file of present)
-      if (!expected.has(file) && !watchedFiles.has(file)) problems.push(`api/${file}: entry no longer exists`);
-  }
-  for (const [file, text] of expected) {
-    const path = join(apiDir, file);
-    if (!existsSync(path)) {
-      problems.push(`api/${file}: new entry, no report yet`);
-      continue;
-    }
-    const old = readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
-    if (old !== text && !watchedFiles.has(file)) problems.push(`api/${file} changed:\n${diff(old, text)}`);
-  }
-  // Both modes compare the summary: the full check once skipped it, so a scoped update that wrote a wrong row passed.
-  const surfacePath = join(root, 'docs', 'api-surface.md');
-  const oldSurface = existsSync(surfacePath) ? readFileSync(surfacePath, 'utf8').replaceAll('\r\n', '\n') : '';
-  if (oldSurface !== summary) {
-    if (watchedFiles.size && !problems.length)
-      console.log('would fail: docs/api-surface.md changed with watched reports; run api:update');
-    else problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
-  }
-  const allEntriesPath = join(root, ALL_ENTRIES);
-  if (
-    (existsSync(allEntriesPath) ? readFileSync(allEntriesPath, 'utf8').replaceAll('\r\n', '\n') : '') !==
-    entriesSource(root)
-  )
-    problems.push(`${ALL_ENTRIES} no longer matches the exports maps (scripts/generate-all-entries.mjs)`);
-  if (problems.length) {
-    console.error(problems.join('\n\n'));
-    const updateCommand = scopedPackage
-      ? `node scripts/api-report.js --update --package=${scopedPackage.dir}${entrySelector ? ` --entry=${entrySelector}` : ''}`
-      : 'npm run api:update';
-    console.error(
-      `\nPublic API changed in ${problems.length} report(s). If intended, run \`${updateCommand}\` and commit the selected API diff.`,
+  process.exitCode = 1;
+} else writeOrCompare();
+
+function writeOrCompare() {
+  const summary = scopedPackage
+    ? refreshSurfaceGzip(
+        mergeScopedApiSurface(readFileSync(join(root, 'docs', 'api-surface.md'), 'utf8'), {
+          packageName: scopedPackage.name,
+          row: surfaceRow(reports[0]),
+          entries: reports[0].length,
+          exports: reports[0].reduce((sum, item) => sum + item.counts.exports, 0),
+        }),
+        entrySizes(),
+      )
+    : surface();
+  if (update) {
+    mkdirSync(apiDir, { recursive: true });
+    writeIfChanged(
+      join(apiDir, 'lock.json'),
+      JSON.stringify(
+        enrollWatch(
+          lock,
+          selectedReports.map((item) => item.pkg.name),
+          packages.map((pkg) => pkg.name),
+        ),
+        null,
+        2,
+      ) + '\n',
     );
-    process.exit(1);
+    if (!scopedPackage)
+      for (const file of readdirSync(apiDir))
+        if (file.endsWith('.api.md') && !expected.has(file)) rmSync(join(apiDir, file));
+    for (const [file, text] of expected) writeIfChanged(join(apiDir, file), text);
+    writeIfChanged(join(root, 'docs', 'api-surface.md'), summary);
+    // The all-entries type project imports every public entry (scripts/generate-all-entries.mjs): it follows the exports maps.
+    writeIfChanged(join(root, ALL_ENTRIES), entriesSource(root));
+    console.log(
+      scopedPackage
+        ? `API reports: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name} written without changing other packages.`
+        : `API reports: ${expected.size} entries, ${total('exports')} exports written to api/ and docs/api-surface.md.`,
+    );
+  } else {
+    const problems = [];
+    if (!scopedPackage) {
+      const present = existsSync(apiDir) ? readdirSync(apiDir).filter((f) => f.endsWith('.api.md')) : [];
+      for (const file of present)
+        if (!expected.has(file) && !watchedFiles.has(file)) problems.push(`api/${file}: entry no longer exists`);
+    }
+    for (const [file, text] of expected) {
+      const path = join(apiDir, file);
+      if (!existsSync(path)) {
+        problems.push(`api/${file}: new entry, no report yet`);
+        continue;
+      }
+      const old = readFileSync(path, 'utf8').replaceAll('\r\n', '\n');
+      if (old !== text && !watchedFiles.has(file)) problems.push(`api/${file} changed:\n${diff(old, text)}`);
+    }
+    // Both modes compare the summary: the full check once skipped it, so a scoped update that wrote a wrong row passed.
+    const surfacePath = join(root, 'docs', 'api-surface.md');
+    const oldSurface = existsSync(surfacePath) ? readFileSync(surfacePath, 'utf8').replaceAll('\r\n', '\n') : '';
+    if (oldSurface !== summary) {
+      if (watchedFiles.size && !problems.length)
+        console.log('would fail: docs/api-surface.md changed with watched reports; run api:update');
+      else problems.push(`docs/api-surface.md changed:\n${diff(oldSurface, summary)}`);
+    }
+    const allEntriesPath = join(root, ALL_ENTRIES);
+    if (
+      (existsSync(allEntriesPath) ? readFileSync(allEntriesPath, 'utf8').replaceAll('\r\n', '\n') : '') !==
+      entriesSource(root)
+    )
+      problems.push(`${ALL_ENTRIES} no longer matches the exports maps (scripts/generate-all-entries.mjs)`);
+    if (problems.length) {
+      console.error(problems.join('\n\n'));
+      const updateCommand = scopedPackage
+        ? `node scripts/api-report.js --update --package=${scopedPackage.dir}${entrySelector ? ` --entry=${entrySelector}` : ''}`
+        : 'npm run api:update';
+      console.error(
+        `\nPublic API changed in ${problems.length} report(s). If intended, run \`${updateCommand}\` and commit the selected API diff.`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(
+      scopedPackage
+        ? `API reports match: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name}.`
+        : `API reports match: ${expected.size} entries, ${total('exports')} exports.`,
+    );
   }
-  console.log(
-    scopedPackage
-      ? `API reports match: ${expected.size} selected ${expected.size === 1 ? 'entry' : 'entries'} for ${scopedPackage.name}.`
-      : `API reports match: ${expected.size} entries, ${total('exports')} exports.`,
-  );
 }
 
 function writeIfChanged(path, text) {

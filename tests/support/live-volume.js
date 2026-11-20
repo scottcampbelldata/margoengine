@@ -1,8 +1,8 @@
 import { Engine, TransformStore } from '../../packages/core/dist/extension.js';
-import { parseGLTF } from '../../packages/gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../packages/gltf-pro/dist/extended.js';
+import { parseGLTF } from '../../packages/gltf/dist/pbr.js';
+import { extendedMaterials } from '../../packages/gltf/dist/extended.js';
 import { mockGPU, context } from '../../examples/package-benchmarks/proofs/gpu-recorder.js';
-import { animatedTriangle } from './gltf-pro-fixture.js';
+import { animatedTriangle } from './gltf-pbr-fixture.js';
 
 export async function liveVolume(t, volume = {}, channel) {
   const gpu = mockGPU(),

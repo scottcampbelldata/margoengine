@@ -98,12 +98,18 @@ export interface GLTFSkinSource {
     readonly nodes: readonly Mesh[];
 }
 
+export interface GridFade {
+    near: number;
+    far: number;
+}
+
 export class GridHelper extends Line {
     constructor(options?: {
         size?: number;
         divisions?: number;
         color1?: ColorInput;
         color2?: ColorInput;
+        fade?: GridFade;
     } & HelperOptions);
 }
 
@@ -265,6 +271,9 @@ export class Lines implements EnginePlugin {
     add<T extends Line>(line: T): T;
     remove(line: Line): void;
     clear(): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
@@ -313,6 +322,7 @@ export class PolarGridHelper extends Line {
         divisions?: number;
         color1?: ColorInput;
         color2?: ColorInput;
+        fade?: GridFade;
     } & HelperOptions);
 }
 
@@ -383,6 +393,8 @@ export class VertexNormalsHelper extends Line {
 }
 
 export function computeLineDistances(points: Float32Array, count: number, mode: LineMode, matrix?: Mat4 | null): number;
+
+export function distinctNeighbours(points: ArrayLike<number>, count: number, mode: LineMode, out?: Float32Array, stride?: number, dims?: number): Float32Array;
 
 export function expandLine(points: ArrayLike<number>, options?: ExpandLineOptions): Float32Array;
 

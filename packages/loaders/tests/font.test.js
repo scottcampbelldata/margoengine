@@ -466,10 +466,11 @@ test('TTF: collections, unsupported flavours and malformed files throw LoaderErr
   assert.equal(parseTTF(collection).unitsPerEm, 1000);
   assert.equal(parseTTF(collection, { fontIndex: 1 }).unitsPerEm, 2048);
   assert.throws(() => parseTTF(collection, { fontIndex: 2 }), isLoaderError('range'));
+  // CFF outlines are read (tests/font-opentype.test.js); this one stops at its missing 'head' table.
   const cff = sfnt({ 'CFF ': new Uint8Array(8) }, 0x4f54544f);
   assert.throws(
     () => parseTTF(cff),
-    (e) => isLoaderError('unsupported')(e) && /CFF/.test(e.message),
+    (e) => isLoaderError('header')(e) && /'head'/.test(e.message),
   );
   assert.throws(() => parseTTF(new Writer().tag('wOF2').u32(0).u32(0).result()), isLoaderError('unsupported'));
   assert.throws(() => parseTTF(new Uint8Array(4)), isLoaderError('truncated'));
@@ -484,4 +485,18 @@ test('TTF: collections, unsupported flavours and malformed files throw LoaderErr
   const broken = parseTTF(font);
   assert.equal(broken.generateShapes('O', 10).length, 1);
   assert.throws(() => broken.generateShapes('H', 10), isLoaderError('range'));
+});
+
+test('OpenType glyf composite flag USE_MY_METRICS (0x200): the composite takes that component advance', () => {
+  const bytes = buildFont();
+  // The composite H's first component (flags 0x0023, glyph 3) becomes flags 0x0223 on glyph 2, O (advance 600).
+  let at = -1;
+  for (let i = 0; i + 4 <= bytes.length && at < 0; i++)
+    if (bytes[i] === 0x00 && bytes[i + 1] === 0x23 && bytes[i + 2] === 0x00 && bytes[i + 3] === 0x03) at = i;
+  assert.ok(at >= 0);
+  const plain = parseTTF(bytes);
+  assert.equal(plain.glyph('H').advance, 200, 'without the flag: the last hmtx advance');
+  const patched = bytes.slice();
+  patched.set([0x02, 0x23, 0x00, 0x02], at);
+  assert.equal(parseTTF(patched).glyph('H').advance, 600);
 });

@@ -4,7 +4,7 @@ import { resolve, join } from 'node:path';
 
 export const consumerRoot = resolve(import.meta.dirname, '../../../test-results/biomes-erosion-consumer');
 
-// CPU preparation, deliberately outside the browser suite's GPU lease.
+// CPU preparation, outside the browser suite.
 export async function buildErosionConsumer() {
   mkdirSync(consumerRoot, { recursive: true });
   writeFileSync(join(consumerRoot, 'index.html'), '<canvas></canvas><script type="module" src="/main.js"></script>');

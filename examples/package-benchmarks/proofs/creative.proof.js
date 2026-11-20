@@ -23,7 +23,7 @@ function scene(module, samples, options) {
     view.begin(index);
     try {
       run(view.c);
-    } catch (error) {
+    } catch {
       gpu.note('throw');
     }
     view.end();

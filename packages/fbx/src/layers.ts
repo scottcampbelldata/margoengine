@@ -57,7 +57,12 @@ function attributes(node: FBXNode, count: number): { flags: Int32Array; data: Fl
   return { flags, data, bits };
 }
 
-/** Kochanek-Bartels slopes of a key, per second. */
+/**
+ * Kochanek-Bartels slopes of a key, per second, arriving and leaving (Kochanek and Bartels 1984,
+ * doi:10.1145/964965.808575, eq. 9 to 12). The arriving tangent weighs the chord before by (1 - c)(1 + b), so
+ * continuity -1 makes a corner along both chords. Each tangent is for a unit parameter step; eq. 11 and 12 scale it by
+ * 2 N / (N_before + N_after) for its own span N, which over seconds is 2 / (N_before + N_after) for both sides.
+ */
 function tcb(times: number[], values: ArrayLike<number>, i: number, data: Float32Array): [number, number] {
   if (i === 0 || i === times.length - 1) return [0, 0];
   const t = data[i * 4],
@@ -65,11 +70,10 @@ function tcb(times: number[], values: ArrayLike<number>, i: number, data: Float3
     b = data[i * 4 + 2],
     before = values[i] - values[i - 1],
     after = values[i + 1] - values[i],
-    leftTime = times[i] - times[i - 1],
-    rightTime = times[i + 1] - times[i],
-    out = ((1 - t) * (1 - c) * (1 + b) * before + (1 - t) * (1 + c) * (1 - b) * after) / 2,
-    into = ((1 - t) * (1 + c) * (1 + b) * before + (1 - t) * (1 - c) * (1 - b) * after) / 2;
-  return [into / leftTime, out / rightTime];
+    span = times[i + 1] - times[i - 1],
+    into = ((1 - t) * (1 - c) * (1 + b) * before + (1 - t) * (1 + c) * (1 - b) * after) / 2,
+    out = ((1 - t) * (1 + c) * (1 + b) * before + (1 - t) * (1 - c) * (1 - b) * after) / 2;
+  return [(2 * into) / span, (2 * out) / span];
 }
 
 /** An auto key's slope: the cardinal spline's, flat at the ends and, when clamped, at a turning point. */

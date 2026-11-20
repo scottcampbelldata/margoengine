@@ -625,3 +625,44 @@ test('fuzz: random bus operations keep the graph connected to the destination an
     mixer.dispose();
   }
 });
+
+test('a removed bus takes the sends to it along; Send.remove and the route undo are idempotent (KB-P3e)', () => {
+  const context = new FakeContext(),
+    mixer = new Mixer(context),
+    music = mixer.createBus('music'),
+    verb = mixer.createBus('verb', { soloSafe: true }),
+    post = music.send('verb', { gain: -6 }),
+    pre = music.send(verb, { pre: true });
+  assert.ok(reaches(music.output, verb.input) && reaches(music.preTap, verb.input));
+  mixer.removeBus('verb');
+  assert.ok(!reaches(music.output, verb.input), 'the post-fader send is gone with its target');
+  assert.ok(!reaches(music.preTap, verb.input), 'the pre-fader send is gone with its target');
+  assert.equal(music.sendsTo(verb), false);
+  // Web Audio throws InvalidAccessError on a second disconnect; removing an already-removed send does nothing.
+  post.remove();
+  pre.remove();
+  const again = music.send(mixer.createBus('verb'));
+  again.remove();
+  again.remove();
+  const source = new FakeNode(context, 'source'),
+    undo = mixer.route(source, 'music');
+  undo();
+  undo();
+  assert.equal(source.outputs.size, 0);
+});
+
+test('setListenerPose keeps up at right angles to forward, so the right axis is never zero (KB-P3f)', () => {
+  const context = new FakeContext(),
+    up = () => ['upX', 'upY', 'upZ'].map((k) => context.listener[k].last().value),
+    close = (actual, expected) =>
+      assert.ok(actual.every((v, i) => Math.abs(v - expected[i]) < 1e-12), `${actual} against ${expected}`);
+  setListenerPose(context, { position: [0, 10, 0], forward: [0, -1, 0] });
+  close(up(), [0, 0, -1]);
+  setListenerPose(context, { position: [0, 0, 0], forward: [0, 3, 0] });
+  close(up(), [0, 0, 1]);
+  setListenerPose(context, { position: [0, 0, 0], forward: [1, 1, 0] });
+  close(up(), [-Math.SQRT1_2, Math.SQRT1_2, 0]);
+  setListenerPose(context, { position: [0, 0, 0], forward: [0, 0, -1], up: [0, 2, 0] });
+  close(up(), [0, 1, 0]);
+  assert.throws(() => setListenerPose(context, { position: [0, 0, 0], forward: [0, 0, -1], up: [0, 0, 0] }), RangeError);
+});

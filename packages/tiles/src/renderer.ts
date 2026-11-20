@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Draws a streaming 3D Tiles tileset with the engine: glTF / GLB / b3dm content becomes @margoengine/gltf-pro models,
+// Draws a streaming 3D Tiles tileset with the engine: glTF / GLB / b3dm content becomes @margoengine/gltf/pbr models,
 // pnts content becomes @margoengine/points clouds; both are optional peers loaded with import() on the first tile
 // that needs them. Tileset coordinates (ECEF, z-up, float64) map to the engine's y-up float32 world through a
 // float64 frame matrix; see the README's "Coordinates and precision".
@@ -19,6 +19,7 @@ import {
 } from './matrix.js';
 import { type TilesetTile, type TileRenderable, Tileset, type TilesetOptions, type TilesFrame } from './tileset.js';
 import { cartographicToEcef, eastNorthUpToEcef } from './wgs84.js';
+import { captureScene, sceneScope } from '../../shared/scene-scope.js';
 
 /** Optional content decoration owned and disposed with its tile. Bytes are added to the tile budget. */
 export interface TilesContentDecoration {
@@ -58,7 +59,7 @@ export interface TilesOrigin {
   readonly cameraPosition: Vec3;
 }
 
-/** The part of a gltf-pro model the renderer uses. */
+/** The part of a gltf/pbr model the renderer uses. */
 export interface TilesModel {
   readonly root: Mesh;
   dispose(): void;
@@ -132,7 +133,7 @@ export interface TilesRendererOptions extends Omit<TilesetOptions, 'content'> {
   frame?: 'enu' | 'local' | ArrayLike<number>;
   /** A floating origin; placed meshes follow it, and selection reads the camera from it. */
   origin?: TilesOrigin;
-  /** Loads one glTF / GLB into the engine. Default: gltf-pro's `parseGLTFAsync`. */
+  /** Loads one glTF / GLB into the engine. Default: gltf/pbr's `parseGLTFAsync`. */
   loadModel?: (engine: EngineKernel, gltf: Uint8Array, signal: AbortSignal) => Promise<TilesModel>;
   /**
    * What `memoryBudget` counts: `'gpu'` (default) the GPU memory each tile's model takes (vertex, index and uv buffers,
@@ -203,12 +204,14 @@ export class TilesRenderer implements EnginePlugin {
     options: TilesRendererOptions = {},
   ): Promise<TilesRenderer> {
     let renderer: TilesRenderer | undefined;
-    const tileset = await Tileset.load(url, {
+    // The renderer joins the scene this call started in, not the one active after the fetch.
+    const scope = captureScene(engine),
+      tileset = await Tileset.load(url, {
       ...options,
       content: (content, tile, signal) => renderer!.createContent(content, tile, signal),
     });
     renderer = new TilesRenderer(tileset, options);
-    engine.use(renderer);
+    scope.run(() => engine.use(renderer!));
     return renderer;
   }
   /** The same as `load`, under the name every engine feature has: fetches the tileset and attaches the renderer. */
@@ -230,8 +233,10 @@ export class TilesRenderer implements EnginePlugin {
     this.loadModel =
       options.loadModel ??
       (async (engine, gltf, signal) => {
-        const { parseGLTFAsync } = await import('@margoengine/gltf-pro');
-        return parseGLTFAsync(engine, gltf, { signal });
+        // Called inside `own`: the model is built after the import, in the scene this started in.
+        const scope = captureScene(engine);
+        const { parseGLTFAsync } = await import('@margoengine/gltf/pbr');
+        return scope.run(() => parseGLTFAsync(engine, gltf, { signal }));
       });
     const frame = options.frame ?? 'enu';
     if (typeof frame === 'string' && frame !== 'enu' && frame !== 'local')
@@ -341,9 +346,13 @@ export class TilesRenderer implements EnginePlugin {
               'unsupported',
               "Gaussian splat tiles (KHR_gaussian_splatting) need their drawer: import { splats } from '@margoengine/tiles/splats' and pass { splats } to TilesRenderer.load",
             );
-          return this.splats((this.host ??= this.contentHost(engine)), content, tile, signal);
+          const draw = this.splats,
+            host = (this.host ??= this.contentHost(engine)),
+            found = content;
+          return this.own(() => draw(host, found, tile, signal));
         }
-        const model = await this.loadModel(engine, content.gltf, signal);
+        const gltf = content.gltf,
+          model = await this.own(() => this.loadModel(engine, gltf, signal));
         if (signal.aborted) {
           model.dispose();
           signal.throwIfAborted();
@@ -396,7 +405,7 @@ export class TilesRenderer implements EnginePlugin {
           signal.throwIfAborted();
         }
         const { host, PointCloud } = await (this.points ??= this.loadPoints(engine));
-        const anchor = engine.createMesh();
+        const anchor = this.own(() => engine.createMesh());
         this.place(anchor, this.contentMatrix(tile, content.rtcCenter, false));
         // pnts colour precedence: RGBA, RGB, RGB565 (all in `colors`), then CONSTANT_RGBA for every point.
         const constant = content.constantColor,
@@ -483,7 +492,10 @@ export class TilesRenderer implements EnginePlugin {
             'unsupported',
             "i3dm instanced content needs its drawer: import { i3dm } from '@margoengine/tiles/i3dm' and pass { i3dm } to TilesRenderer.load",
           );
-        return this.i3dm((this.host ??= this.contentHost(engine)), content, tile, signal);
+        const drawInstances = this.i3dm,
+          host = (this.host ??= this.contentHost(engine)),
+          found = content;
+        return this.own(() => drawInstances(host, found, tile, signal));
     }
   }
   /** Calls `listener` after every selection update (tile visibility set, `last` current); returns the unsubscribe. */
@@ -495,6 +507,14 @@ export class TilesRenderer implements EnginePlugin {
   measure(model: TilesModel, fileBytes: number): number {
     return this.budget === 'gpu' ? (modelGpuBytes(model as MeasurableModel) ?? fileBytes) : fileBytes;
   }
+  /**
+   * Runs `work` in this renderer's own scene. Tile content is made after fetches and imports, when the active scene is the
+   * default one again, wherever the renderer went: its meshes, models and plugins belong with it.
+   */
+  private own<T>(work: () => T): T {
+    const engine = this.engine;
+    return sceneScope(engine, typeof engine?.sceneOf === 'function' ? engine.sceneOf(this) : undefined).run(work);
+  }
   private contentHost(engine: EngineKernel): TilesContentHost {
     return {
       decorate: (context) => this.decorate?.(context),
@@ -502,7 +522,7 @@ export class TilesRenderer implements EnginePlugin {
       measure: (model, fileBytes) => this.measure(model, fileBytes),
       engine,
       url: this.tileset.url,
-      loadModel: (gltf, signal) => this.loadModel(engine, gltf, signal),
+      loadModel: (gltf, signal) => this.own(() => this.loadModel(engine, gltf, signal)),
       place: (mesh, matrix) => this.place(mesh, matrix),
       forget: (mesh) => this.origin?.forget(mesh),
       contentMatrix: (tile, rtc, gltf) => this.contentMatrix(tile, rtc, gltf),

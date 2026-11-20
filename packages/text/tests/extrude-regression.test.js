@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { closed, volume } from './extrude-assertions.js';
-import { parseFontOutlines, extrudeText, triangulatePolygon, classifyLoops, polygonArea } from '../dist/extrude.js';
+import { parseFontOutlines as parseLean, extrudeText as extrudeLean, triangulatePolygon, classifyLoops, polygonArea } from '../dist/extrude.js';
+import { openType } from '@margoengine/loaders/font-opentype';
+// These tests read CFF and variable fonts, so they pass the OpenType readers; tests/opentype-optin.test.js covers the
+// lean TrueType path without them.
+const parseFontOutlines = (bytes, options = {}) => parseLean(bytes, { openType, ...options });
+const extrudeText = (text, options) => extrudeLean(text, { openType, ...options });
 import { tables, sfnt, ttf, otf, simple, composite, component, program, u16, u32 } from './extrude-fixtures.js';
 
 const square = [
@@ -17,10 +22,16 @@ const fontLike = (loops) => ({
   glyphAdvance: () => 1,
   getGlyphContours: () => loops,
 });
-const coded = (error) => error.code === 'failed' && error.message.includes('Help: https://margoengine.com/docs/text');
+// Malformed fonts throw the loaders parser's coded LoaderError (since 2026-11-16 the one font parser); layout and
+// subdivision limits of this entry throw MargoError 'failed' with the text help link.
+const coded = (error) =>
+  (error.code === 'failed' && error.message.includes('Help: https://margoengine.com/llms/packages/text.md')) ||
+  (error.name === 'LoaderError' && error.message.startsWith('TTF: ') && error.message.includes('https://margoengine.com/errors#loader-'));
 const quad = simple(square.map(([x, y]) => [x * 1000, y * 1000, true]));
 
-test('F1 hostile and invalid cmap ranges fail with bounded coded errors', () => {
+test('F1 hostile and invalid cmap ranges stay bounded: lookups never name a glyph outside the font', () => {
+  // The loaders parser reads cmap lazily, as FreeType and browsers do: a group that points past the font or runs
+  // backwards maps those code points to .notdef instead of refusing the whole font.
   for (const [start, end, glyph] of [
     [0, 0xffffffff, 0],
     [20, 19, 1],
@@ -28,7 +39,12 @@ test('F1 hostile and invalid cmap ranges fail with bounded coded errors', () => 
   ]) {
     const entries = tables(ttf([[], quad]));
     entries.get('cmap').set([...u32(start), ...u32(end), ...u32(glyph)], 28);
-    assert.throws(() => parseFontOutlines(sfnt(entries)), coded);
+    const font = parseFontOutlines(sfnt(entries));
+    for (const cp of [0, 1, 19, 20, 65, 100, 0x1f600, 0x10ffff]) {
+      const index = font.glyphIndex(cp);
+      assert.ok(Number.isInteger(index) && index >= 0 && index < font.glyphCount, `U+${cp.toString(16)} -> ${index}`);
+    }
+    assert.equal(font.glyphIndex(65), 0);
   }
 });
 test('F2 TrueType composite cycles and depth are bounded', () => {
@@ -185,8 +201,17 @@ test('F11 unbeveled acute contours do not require an offset miter', () => {
 });
 test('F12 every truncated sfnt/table/glyph/CFF span throws a coded error', () => {
   const bytes = ttf([quad]);
+  // A cut that loses only tables the outlines do not need may still parse; then the glyph must come out whole.
+  const whole = parseFontOutlines(bytes).getGlyphContours(0);
   for (let length = 0; length < bytes.length; length++) {
-    assert.throws(() => parseFontOutlines(bytes.subarray(0, length)).getGlyphContours(0), coded);
+    let contours;
+    try {
+      contours = parseFontOutlines(bytes.subarray(0, length)).getGlyphContours(0);
+    } catch (error) {
+      assert.ok(coded(error), `length ${length}: ${error}`);
+      continue;
+    }
+    assert.deepEqual(contours, whole, `length ${length}`);
   }
   const entries = tables(bytes);
   entries.set('glyf', entries.get('glyf').slice(0, 12));
@@ -314,7 +339,15 @@ test('F12 malformed table offsets, format 4 pointers, glyph spans and CFF tokens
     for (const field of [8, 12]) {
       const copy = bytes.slice();
       copy.set(u32(0xffffffff), 12 + i * 16 + field);
-      assert.throws(() => parseFontOutlines(copy), coded);
+      // A table record pointing past the file drops that table: a required one throws, any other is ignored.
+      let contours;
+      try {
+        contours = parseFontOutlines(copy).getGlyphContours(0);
+      } catch (error) {
+        assert.ok(coded(error), `table ${i} field ${field}: ${error}`);
+        continue;
+      }
+      assert.deepEqual(contours, parseFontOutlines(bytes).getGlyphContours(0), `table ${i} field ${field}`);
     }
   }
   const entries = tables(bytes);
@@ -339,7 +372,8 @@ test('F12 malformed table offsets, format 4 pointers, glyph spans and CFF tokens
     ...u16(65534),
     ...u16(0),
   ]);
-  assert.throws(() => parseFontOutlines(sfnt(entries)), coded);
+  // A format 4 glyph pointer past the data maps the character to .notdef; the font itself still reads.
+  assert.equal(parseFontOutlines(sfnt(entries)).glyphIndex(65), 0);
   const brokenPrograms = [[28], [255, 0, 0], [139, 139, 21, 139, 5, 14], [139, 139, 21, 19, 255], [139, 139, 21, 12]];
   for (const p of brokenPrograms) assert.throws(() => parseFontOutlines(otf([p])).getGlyphContours(0), coded);
 });

@@ -1,5 +1,5 @@
-// Runs tests/gpu-browser.js on a real GPU in a real browser, from the repository root after building packages, holding
-// the GPU lock: npm run test:gpu -w packages/robot-planning (MARGO_COMPAT=1 runs it on the WebGL2 compatibility layer).
+// Runs tests/gpu-browser.js on a real GPU in a real browser, from the repository root after building packages:
+// npm run test:gpu -w packages/robot-planning (MARGO_COMPAT=1 runs it on the WebGL2 compatibility layer).
 import { openBrowser } from '../../../scripts/browser.js';
 
 const app = await openBrowser({ startPath: '/tests/modern-game.html', port: 'free' });

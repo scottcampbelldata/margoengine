@@ -10,12 +10,10 @@
 //   lights' per-light `shadow.resolution` (integrated maps and LocalShadows); a directional frustum shadows only inside
 //   its box and before its far; a local light's `shadow.far` drops casters past it; full-size options render
 //   pixel-identical frames.
-// Run after npm run build:packages: node scripts/light-render-gpu-check.js (takes the GPU lock).
+// Run after npm run build:packages: node scripts/light-render-gpu-check.js.
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-const release = await acquire({ owner: 'light-render-gpu-check' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5234 });
@@ -482,5 +480,4 @@ try {
   );
 } finally {
   await browser?.close();
-  release();
 }

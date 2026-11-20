@@ -10,6 +10,7 @@ export interface MRCMap extends ScientificImage {
   readonly mode: number;
   readonly components: 1 | 2;
   readonly starts: readonly number[];
+  /** Header ORIGIN as stored: angstroms for real modes, phase origin in pixels for complex modes. */
   readonly origin: readonly number[];
   readonly axisOrder: readonly number[];
   readonly cell: readonly number[];
@@ -54,7 +55,10 @@ export function parseMRC(bytes: Uint8Array, options: FileOptions = {}): MRCMap {
     sampling = [i(28), i(32), i(36)],
     cell = [f(40), f(44), f(48)],
     angles = [f(52), f(56), f(60)],
-    axisOrder = [i(64), i(68), i(72)];
+    axisOrder = [i(64), i(68), i(72)],
+    // IMOD stamp (MRC2014 word 39) and its flags (word 40): 1 signed bytes, 4 MRC2014 origin sign. Without the
+    // stamp every flag reads as set (-1), so the file follows MRC2014.
+    imod = i(152) === 1146047817 ? i(156) : -1;
   if (
     !modes.includes(mode) ||
     dims.some((n) => n <= 0) ||
@@ -84,7 +88,9 @@ export function parseMRC(bytes: Uint8Array, options: FileOptions = {}): MRCMap {
       p = start + (mode === 101 ? Math.floor(n / dims[0]) * rowBytes + (x >> 1) : Math.floor(n * bpp));
     data[n] =
       mode === 0
-        ? v.getInt8(p)
+        ? imod & 1
+          ? v.getInt8(p)
+          : bytes[p]
         : mode === 1 || mode === 3
           ? v.getInt16(p, little)
           : mode === 6
@@ -110,9 +116,16 @@ export function parseMRC(bytes: Uint8Array, options: FileOptions = {}): MRCMap {
   ];
   const origin = [f(196), f(200), f(204)];
   if (origin.some((n) => !Number.isFinite(n))) bad('nonfinite origin');
+  // ORIGIN and START both place the first sample (Cheng et al. 2015, 4.6), so only one applies: a real-space
+  // ORIGIN in angstroms (IMOD files without flag 4 store it negated), else START in grid steps. Complex modes
+  // keep ORIGIN as a phase origin in pixels, which is not a position.
+  const shift = components === 1 && origin.some((n) => n !== 0) ? (imod & 4 ? 1 : -1) : 0,
+    first = shift ? [0, 0, 0] : starts;
   const world = (index: readonly number[]) => {
     if (index.length < 3 || index.some((n) => !Number.isFinite(n))) bad('incomplete map index');
-    return origin.map((o, j) => o + axisOrder.reduce((sum, a, k) => sum + (index[k] + starts[k]) * basis[a - 1][j], 0));
+    return origin.map(
+      (o, j) => shift * o + axisOrder.reduce((sum, a, k) => sum + (index[k] + first[k]) * basis[a - 1][j], 0),
+    );
   };
   const labels = Array.from({ length: Math.max(0, Math.min(10, i(220))) }, (_, n) =>
     new TextDecoder().decode(bytes.subarray(224 + n * 80, 304 + n * 80)).replace(/[\0 ]+$/, ''),

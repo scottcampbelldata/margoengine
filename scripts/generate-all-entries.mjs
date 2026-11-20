@@ -61,7 +61,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const have = existsSync(path) ? readFileSync(path, 'utf8').replace(/\r\n/g, '\n') : '';
     if (have !== want) {
       console.error(`${OUTPUT} is stale: run node scripts/generate-all-entries.mjs`);
-      process.exit(1);
+      process.exitCode = 1;
     }
   } else writeFileSync(path, want);
 }

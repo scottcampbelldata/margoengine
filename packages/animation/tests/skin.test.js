@@ -285,3 +285,39 @@ test('CPU skinning bends a two-bone arm, blends weights, follows the root on zer
   assert.throws(() => skin.pose([0, 0, 0]), { name: 'TypeError', message: /Skin positions needs 9 numbers/ });
   assert.throws(() => skin.pose(positions, [0, 0, Number.NaN, 0, 0, 0, 0, 0, 0]), RangeError);
 });
+
+test('KB-GLTFA B1: a bone flattened by a zero scale poses finite unit normals, +1 handedness at det 0', () => {
+  const skeleton = new Skeleton([{ name: 'only', parent: -1 }]),
+    skin = new Skin(skeleton, [0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 1, 0, 0, 0]),
+    positions = [1, 2, 3, -1, 0.5, 2],
+    // In the flattened plane (maps to zero under scale (1,0,1)), and across it.
+    normals = [1, 0, 0, 0, 0.6, 0.8];
+  const cases = [
+    [
+      [1, 0, 1],
+      [0, 1, 0, 0, 1, 0],
+    ],
+    [
+      [1, 0, 0],
+      [0, 1, 0, 0, 1, 0],
+    ],
+    [
+      [0, 0, 0],
+      [0, 1, 0, 0, 1, 0],
+    ],
+    [
+      [1e-25, 1e-25, 1e-25],
+      [1, 0, 0, 0, 0.6, 0.8],
+    ],
+    [
+      [-1, 0, 1],
+      [0, 1, 0, 0, -1, 0],
+    ],
+  ];
+  for (const [scale, expected] of cases) {
+    skeleton.setPose(0, { scale });
+    const posed = skin.pose(positions, normals);
+    assert.ok(posed.normals.every(Number.isFinite), `scale ${scale}: ${posed.normals}`);
+    close(Array.from(posed.normals), expected, 1e-6, `scale ${scale}`);
+  }
+});

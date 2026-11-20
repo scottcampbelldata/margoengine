@@ -254,8 +254,43 @@ export function layoutGLB(
   return { glb, stats };
 }
 
+/**
+ * Repack every sparse accessor of a GLB as an ordinary dense accessor, keeping each accessor index, component type,
+ * normalized flag, bounds and logical value (an implicit sparse zero becomes a stored zero). A GLB with no sparse
+ * accessor is returned unchanged. Used where a reader carries only ordinary accessors, such as the Godot bundle.
+ * @throws {TypeError} For malformed GLB accessor data; repair the input.
+ */
+export function denseGLB(bytes: Uint8Array): Uint8Array {
+  const parts = splitGLB(bytes),
+    json = parts.json as JSONObject,
+    fresh: NewViews = new Map();
+  let changed = false;
+  for (const [index, accessor] of (json.accessors ?? []).entries()) {
+    if (!accessor.sparse) continue;
+    changed = true;
+    if (!SET[accessor.componentType]) throw new TypeError(`glTF accessor ${index} has an unknown componentType; repair the GLB`);
+    const { values } = readAccessor(parts, index),
+      { bytes: width } = shape(accessor),
+      data = new Uint8Array(accessor.count * width),
+      view = new DataView(data.buffer);
+    for (let row = 0; row < accessor.count; row++) element(view, row * width, accessor, values, row);
+    delete accessor.sparse;
+    delete accessor.byteOffset;
+    accessor.bufferView = addView(json, fresh, data);
+  }
+  return changed ? joinGLB(packGLB(parts, fresh)) : bytes;
+}
+
 /** Write an engine or data scene directly to a GLB with the requested sparse/interleaved accessor layout. */
 export function exportSparseGLB(source: ExportSource, options: SparseExportOptions = {}): Uint8Array {
   options.signal?.throwIfAborted();
-  return layoutGLB(exportGLB(source, { ...options, maxBytes: undefined }), options).glb;
+  // `sparse: false` asks for no sparse accessor at all, so the writer keeps its morph targets dense too.
+  return layoutGLB(
+    exportGLB(source, {
+      ...options,
+      maxBytes: undefined,
+      sparseMorphs: options.sparse === false ? false : options.sparseMorphs,
+    }),
+    options,
+  ).glb;
 }

@@ -87,15 +87,24 @@ export class SceneFade implements EnginePlugin {
   private readonly values = new Float32Array(4);
   private started?: number;
   private disposed = false;
-  constructor(readonly duration = 180) {
+  /**
+   * @param duration Fade length in milliseconds, 0 to 1000. Default 180.
+   * @param clock Milliseconds clock for the fade. Default `performance.now`; pass a simulation clock so a film frame
+   * does not depend on how fast the machine renders.
+   */
+  constructor(
+    readonly duration = 180,
+    private readonly clock: () => number = () => performance.now(),
+  ) {
+    if (typeof clock !== 'function') throw new TypeError('Invalid scene fade clock; pass a function returning milliseconds.');
     if (!Number.isFinite(duration) || duration < 0 || duration > 1000)
       throw new RangeError('Invalid scene fade duration; pass a finite number of milliseconds from 0 to 1000.');
     this.finished = new Promise((resolve) => {
       this.finish = resolve;
     });
   }
-  static attach(instance: EngineKernel, duration = 180): SceneFade {
-    const fade = new SceneFade(duration);
+  static attach(instance: EngineKernel, duration = 180, clock?: () => number): SceneFade {
+    const fade = new SceneFade(duration, clock);
     engineRuntime(instance).use(fade);
     return fade;
   }
@@ -189,7 +198,7 @@ export class SceneFade implements EnginePlugin {
         this.disposed ? 'disposed' : 'state',
         'Warm a live SceneFade before starting; await warm() first',
       );
-    this.started ??= performance.now();
+    this.started ??= this.clock();
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -206,7 +215,7 @@ export class SceneFade implements EnginePlugin {
       this.started === undefined
         ? 0
         : this.duration
-          ? Math.min(1, (performance.now() - this.started) / this.duration)
+          ? Math.min(1, (this.clock() - this.started) / this.duration)
           : 1;
     this.values.set([c.width, c.height, 1 - t * t * (3 - 2 * t), 0]);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);

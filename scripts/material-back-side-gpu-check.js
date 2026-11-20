@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-// Parallel worktrees must supply the shared adapter lock using MARGO_GPU_LOCK.
-const release = await acquire({ owner: 'material-back-side-gpu-check' }),
-  output = 'test-results/material-back-side',
+const output = 'test-results/material-back-side',
   report = { checks: [], failures: [], captures: [] },
   points = [
     [80, 120],
@@ -369,5 +366,4 @@ try {
   );
   await browser?.page.evaluate(() => window.backSideFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

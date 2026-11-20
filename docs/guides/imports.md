@@ -3,7 +3,7 @@
 Choose core/stage alone, a domain profile, or the full engine. The packages are not on npm yet: until 1.0.0 is
 published, the install commands on this page work only with the local tarballs from the
 [README](../../README.md#install) (Route 2), and `npm create margo` and the CDN import map do not work. Core requires no
-other engine package; stage adds only core. `npm install @margoengine/web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
+other engine package; stage adds only core. `npm install @margoengine/kit-web` (or `game`, `viz`, `react-kit`) installs just that domain's member packages.
 The [kits guide](kits.md) lists the contents and measured install sizes. A new app can use
 `npm create margo@latest my-app -- --template web`; each template installs its profile rather than the umbrella.
 
@@ -16,7 +16,7 @@ npm i margoengine
 Then import what you use. Every package is a subpath of `margoengine`: `margoengine/shadows` is the package
 `@margoengine/shadows`, the same module and the same classes. An app bundles only what it imports, however many
 packages are installed. The legacy `margoengine/game`, `/viz` and `/web` imports remain part of the full install.
-Independent profiles instead use `@margoengine/web` for common names or `@margoengine/web/controls/orbit` for a
+Independent profiles instead use `@margoengine/kit-web` for common names or `@margoengine/kit-web/controls/orbit` for a
 member entry. To use a capability outside the profile, install its scoped package at the same release version.
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
@@ -43,7 +43,7 @@ stage.onTick((delta) => {
 | --- | --- |
 | Show a scene with orbit controls | `createStage` from `margoengine` |
 | Use the engine without the stage | `Engine` from `margoengine` (or `margoengine/core`) |
-| Load a glTF/GLB model with PBR materials | `loadGLTF` from `margoengine/gltf-pro` |
+| Load a glTF/GLB model with PBR materials | `loadGLTF` from `margoengine/gltf/pbr` |
 | Load a static glTF model, smallest code | `loadGLTF` from `margoengine/gltf` |
 | Load FBX, USDZ, OBJ, STL, PLY, Collada ... | `margoengine/fbx`, `margoengine/usdz`, `margoengine/loaders` |
 | Export glTF, STL, OBJ, USDZ | `margoengine/exporters` |
@@ -76,7 +76,7 @@ Every package and entry is in the [package catalog](../README.md); each package'
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {EnvironmentLighting} from 'margoengine/environment';
 import {Shadows} from 'margoengine/shadows';
 
@@ -106,7 +106,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,677 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (2,938 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -127,6 +127,19 @@ copy it into the page, or only the lines your imports reach:
   stage.box({color: '#84d6bd'});
 </script>
 ```
+
+From your own origin instead of the CDN (a dev server, a local tool, a render job), `margoengine/importmap` writes the
+same map for a local base. The files are the ones of your install, served as `<base><package>/<path>`:
+
+```ts
+import {localImportMap} from 'margoengine/importmap';
+
+const map = await localImportMap('/node_modules/', {only: ['margoengine', 'margoengine/shadows', '@margoengine/']});
+console.log(Object.keys(map.imports).length > 0);
+```
+
+`only` keeps a specifier, or a prefix ending in `/` with its subpaths. Details and errors:
+[margoengine README](../../packages/margoengine/README.md) and [errors#import-map](https://margoengine.com/errors#import-map).
 
 `scripts/bundler-matrix.mjs` loads the packed packages this way in a browser, and builds the same app with Vite,
 webpack, esbuild, Rollup and Next.js (webpack and Turbopack), checking each bundle holds only the packages it imports.

@@ -11,7 +11,7 @@ import {
 import { Animation } from '@margoengine/animation';
 import type { Vec3 } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import {
   AvoidanceSolver,
   ConvexHullVolume,

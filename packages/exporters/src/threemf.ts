@@ -1,6 +1,7 @@
 // 3MF writer, from the 3MF core specification (1.3) and its materials extension: the format slicers prefer over STL, because
 // it holds units, colours and one object placed many times. Printers need closed meshes, so vertices that share a position
 // are written once whatever else differs between them.
+import { MargoError } from '@margoengine/math/errors';
 import { encodeZIP } from './archive.js';
 import { sceneOfGLB } from './glb-scene.js';
 import {
@@ -175,8 +176,8 @@ function itemTransform(placed: readonly number[], scale: number): string {
  * const file = await export3MF(source, { unit: 'millimeter', title: 'Bracket' });
  * ```
  *
- * @throws RangeError for an unknown `unit` or `upAxis`, a scene with no triangles to print, a singular node transform or a
- * position outside Float32 range in this unit.
+ * @throws RangeError for an unknown `unit` or `upAxis`, a scene with no triangles to print or a position outside Float32
+ * range in this unit; MargoError `'unsupported'` for a node scaled to 0 on an axis (a solid to print needs a volume).
  * @throws TypeError for bytes that are not a GLB or that need decompressing; what the scene collector throws for a bad source;
  * the signal's reason on an abort.
  */
@@ -191,12 +192,18 @@ export async function export3MF(
   const scale = 1 / UNITS[unit],
     zUp = upAxis === 'y',
     fallback = normalizeMaterial({}),
-    items = drawables(collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options, undefined, 'shape')),
+    items = drawables(
+      collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options, undefined, 'shape'),
+    ),
     materials = new Map<string, number>(),
     objects: string[] = [],
     groups: string[] = [],
     build: string[] = [],
-    merged: { vertices: string[]; faces: string[]; pindex: number; name?: string } = { vertices: [], faces: [], pindex: -1 },
+    merged: { vertices: string[]; faces: string[]; pindex: number; name?: string } = {
+      vertices: [],
+      faces: [],
+      pindex: -1,
+    },
     together = assembly && items.length > 1,
     shared = new Map<string, number>(),
     seen = new Map<Geo, number>(),
@@ -231,7 +238,9 @@ export async function export3MF(
     }
     const plain = pindex === undefined ? '' : ` pid="1" p1="${pindex}"`;
     for (let t = 0; t < triangles.length; t += 3) {
-      const colour = corners ? ` pid="${group}" p1="${corners[t]}" p2="${corners[t + 1]}" p3="${corners[t + 2]}"` : plain;
+      const colour = corners
+        ? ` pid="${group}" p1="${corners[t]}" p2="${corners[t + 1]}" p3="${corners[t + 2]}"`
+        : plain;
       faces.push(
         `<triangle v1="${triangles[t] + first}" v2="${triangles[t + 1] + first}" v3="${triangles[t + 2] + first}"${colour}/>`,
       );
@@ -252,11 +261,22 @@ export async function export3MF(
       world = mirrored ? item.world.map((v, i) => (i < 3 ? -v : v)) : item.world,
       pindex = materialIndex(material),
       key = `${geometries(geometry)} ${pindex} ${mirrored}`;
-    if (!determinant || !Number.isFinite(determinant))
-      throw new RangeError('3MF needs a transform with a non-zero determinant; give the node a nonzero scale');
+    if (!Number.isFinite(determinant)) throw new RangeError('3MF needs a finite transform');
+    // glTF and the other writers keep a zero scale; a 3MF item is a solid to print, and a flattened one has no volume.
+    if (!determinant)
+      throw new MargoError(
+        'unsupported',
+        '3MF holds solids to print, and a node scaled to 0 on an axis has no volume; give it a nonzero scale or leave it out',
+      );
     const colors = vertexColors(geometry, material);
     if (together) {
-      const shape = shapeOf(moved(geometry.positions, upright(item.world, zUp)), geometry.indices, colors, scale, mirrored);
+      const shape = shapeOf(
+        moved(geometry.positions, upright(item.world, zUp)),
+        geometry.indices,
+        colors,
+        scale,
+        mirrored,
+      );
       if (!shape.triangles.length) return;
       if (merged.pindex < 0) Object.assign(merged, { pindex, name: title === undefined ? name : String(title) });
       append(shape, merged.vertices, merged.faces, pindex === merged.pindex ? undefined : pindex);
@@ -264,7 +284,9 @@ export async function export3MF(
     }
     let at = shared.get(key);
     if (at === undefined) {
-      const positions = mirrored ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) : geometry.positions,
+      const positions = mirrored
+          ? moved(geometry.positions, [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+          : geometry.positions,
         shape = shapeOf(positions, geometry.indices, colors, scale, mirrored);
       if (!shape.triangles.length) return;
       const vertices: string[] = [],
@@ -275,7 +297,8 @@ export async function export3MF(
     build.push(`<item objectid="${at}" transform="${itemTransform(upright(world, zUp), scale)}"/>`);
   };
   for (const item of items) placed(item, item.material ?? fallback);
-  if (merged.faces.length) build.push(`<item objectid="${object(merged.vertices, merged.faces, merged.pindex, merged.name)}"/>`);
+  if (merged.faces.length)
+    build.push(`<item objectid="${object(merged.vertices, merged.faces, merged.pindex, merged.name)}"/>`);
   if (!build.length) throw new RangeError('3MF requires at least one mesh with triangles');
   const base = [...materials.keys()].map((color) => `<base name="${color}" displaycolor="${color}"/>`).join(''),
     model =

@@ -1,5 +1,5 @@
 // Real-GPU check of the order-independent passes on real files: Khronos sample models with BLEND and transmission parts,
-// from eight sides. Takes a GPU slot itself. From the repository root, after building packages:
+// from eight sides. From the repository root, after building packages:
 // node packages/oit/test/gpu/real-check.mjs [folder for pictures]
 // Under MARGO_COMPAT=1 ExactOIT refuses by design (README "Exact (ExactOIT)": `setup` throws 'unsupported'; use OIT).
 // Each model's 'exact' run then asserts that coded refusal, the particles run goes through the documented fallback
@@ -8,7 +8,6 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
@@ -22,8 +21,7 @@ const models = [
 ];
 const angles = [0, 45, 90, 135, 180, 225, 270, 315];
 const folder = process.argv[2];
-const compat = compatRun(),
-  release = await acquire({ owner: 'oit-real' });
+const compat = compatRun();
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/real.html', port: 5290 }),
   { page } = context;
 /** Pixels of two pictures apart by more than 2 of 255 in any channel, of all; the mean and worst channel gap among them. */
@@ -152,5 +150,4 @@ try {
   console.log('oit real file check passed');
 } finally {
   await context.close();
-  release();
 }

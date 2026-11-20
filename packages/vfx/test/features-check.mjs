@@ -1,6 +1,6 @@
 // Real-GPU checks of the features added after the first seven (run from the repository root after building packages,
 // one GPU job at a time):
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node packages/vfx/test/features-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/vfx/test/features-check.mjs
 // Ribbons: a particle flying at a known speed leaves a ribbon whose alpha along its centre row matches the head-to-tail
 // and width fades computed here, at 1x and 4x MSAA, recording every frame or every second frame; a particle that dies
 // and is born again starts a new ribbon that never reaches back into its old life.
@@ -26,6 +26,8 @@
 // Shadows: the first two live slots of four (a dead slot between them) pack as point lights, and one sphere at the
 // origin writes the orthographic sphere depth into a 64 x 64 map. The same numbers on the WebGL2 route are
 // shadows-nodes-webgl2.mjs.
+// Wind: smoke rising at w in a wind U leans atan(U / w) within 0.5 degrees, in any direction, and follows the exact
+// relaxation step; with no wind option it flies straight.
 // Nodes: one particle with velocity (1, 0, 0), force (0, 2, 0) and drag 0.5 matches four steps of 0.05 s of
 // velocity += (force - drag * velocity) * dt, then position += velocity * dt. The same numbers on the WebGL2
 // route are shadows-nodes-webgl2.mjs.
@@ -227,6 +229,14 @@ try {
     console.log(
       `ok ${name}: at ${r.got.at.map((v) => v.toFixed(5)).join(',')} v ${r.got.v.map((v) => v.toFixed(5)).join(',')}`,
     );
+  }
+  {
+    const name = 'wind',
+      r = await page.evaluate(() => window.checkWind());
+    report.results[name] = r;
+    clean(r, name);
+    assert.deepEqual(r.mismatches, [], name);
+    console.log(`ok ${name}: ${r.rows.map((row) => `U ${row.U} lean ${row.want.toFixed(2)} worst ${row.worst.toFixed(3)} deg (${row.n})`).join('; ')}`);
   }
   {
     const name = 'node norm',

@@ -1,12 +1,10 @@
 // Real-GPU check for OIT's `blending` option: additive, multiply and transmissive surfaces against the formula, against
-// the sorted path, and in any order. Takes a GPU slot itself. From the repository root, after building packages:
+// the sorted path, and in any order. From the repository root, after building packages:
 // node packages/oit/test/gpu/blending-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'oit-blending' });
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/blending.html', port: 5287 }),
   { page } = context;
 const biggest = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
@@ -83,5 +81,4 @@ try {
   console.log('oit blending check passed');
 } finally {
   await context.close();
-  release();
 }

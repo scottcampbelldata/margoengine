@@ -6,5 +6,5 @@ globalThis.modularFeatures = {
   post: () => import('@margoengine/creative/post'),
   grass: () => import('@margoengine/creative/grass'),
   planet: () => import('@margoengine/creative/planet'),
-  sky: () => import('@margoengine/scenery/sky'),
+  sky: () => import('@margoengine/sky/night-preset'),
 };

@@ -43,9 +43,9 @@
     },
     {
       "path": "evidence/design.md",
-      "bytes": 5697,
-      "sha256": "6517a6739fdec1773e8a2f3fa310e38449ff94cea73afd19be32d148848bb493",
-      "normalizedLfSha256": "6517a6739fdec1773e8a2f3fa310e38449ff94cea73afd19be32d148848bb493"
+      "bytes": 5708,
+      "sha256": "8285592afa40cc925f5a7b6f7cf4d462a42a4224999261fb8ede2e8d9fdf36e7",
+      "normalizedLfSha256": "8285592afa40cc925f5a7b6f7cf4d462a42a4224999261fb8ede2e8d9fdf36e7"
     },
     {
       "path": "evidence/handoff.json",
@@ -169,9 +169,9 @@
     },
     {
       "path": "job-run.mjs",
-      "bytes": 2271,
-      "sha256": "18b81fa1d63a3de324806b0b395ebcc4b1297ce4294849033ee3c861d966ab93",
-      "normalizedLfSha256": "18b81fa1d63a3de324806b0b395ebcc4b1297ce4294849033ee3c861d966ab93"
+      "bytes": 2297,
+      "sha256": "c4bd2b8b71b05515ee5a197edbd20766cba9757da8699bb1bdf64a65cab79e1f",
+      "normalizedLfSha256": "c4bd2b8b71b05515ee5a197edbd20766cba9757da8699bb1bdf64a65cab79e1f"
     },
     {
       "path": "patch-encoding-validation.json",
@@ -199,15 +199,15 @@
     },
     {
       "path": "README.md",
-      "bytes": 6505,
-      "sha256": "5a98833e3a04d7be1d4c81c9f70f3bec0357397561d9f4a8c474253ce8e3f82e",
-      "normalizedLfSha256": "5a98833e3a04d7be1d4c81c9f70f3bec0357397561d9f4a8c474253ce8e3f82e"
+      "bytes": 6713,
+      "sha256": "754bad8987ae38cd0e3564ecd9cd1e9682b3eb35f32267fb52d0aff62a484d12",
+      "normalizedLfSha256": "754bad8987ae38cd0e3564ecd9cd1e9682b3eb35f32267fb52d0aff62a484d12"
     },
     {
       "path": "reproduce.mjs",
-      "bytes": 4199,
-      "sha256": "b0b8edec643f2f4991d04d4e9290a77c601303292c0b296bee9adb40a010f4cc",
-      "normalizedLfSha256": "b0b8edec643f2f4991d04d4e9290a77c601303292c0b296bee9adb40a010f4cc"
+      "bytes": 4320,
+      "sha256": "f904d496633983e22b6b30c254c52ae3412fb69bb3ed85dd10232089e1ca8429",
+      "normalizedLfSha256": "f904d496633983e22b6b30c254c52ae3412fb69bb3ed85dd10232089e1ca8429"
     },
     {
       "path": "source-equivalence.json",
@@ -247,15 +247,15 @@
     },
     {
       "path": "templates/run-v2.mjs",
-      "bytes": 9857,
-      "sha256": "cc9a663c0cfb00386e26d3faf57ad757e6c721fd3a91fb0f64993d5564d0d47a",
-      "normalizedLfSha256": "cc9a663c0cfb00386e26d3faf57ad757e6c721fd3a91fb0f64993d5564d0d47a"
+      "bytes": 9654,
+      "sha256": "e8977ee2e3e5cf727263a1d81f8e47132c7dff6929b223e3b613facf8fa54d2a",
+      "normalizedLfSha256": "e8977ee2e3e5cf727263a1d81f8e47132c7dff6929b223e3b613facf8fa54d2a"
     },
     {
       "path": "templates/run.mjs",
-      "bytes": 9771,
-      "sha256": "93e2aeb891e35bf47be01166dcad1840ae9a81a582d9e29890edfeabc9ce482b",
-      "normalizedLfSha256": "93e2aeb891e35bf47be01166dcad1840ae9a81a582d9e29890edfeabc9ce482b"
+      "bytes": 9568,
+      "sha256": "189896b710071c0d451985e3abf3a30fed54672bd60a010afb25b11310405f37",
+      "normalizedLfSha256": "189896b710071c0d451985e3abf3a30fed54672bd60a010afb25b11310405f37"
     },
     {
       "path": "templates/summarize.mjs",
@@ -287,5 +287,17 @@
     "sourceAndMeasurementsChanged": false,
     "buildsRun": false,
     "timingsRun": false
+  },
+  "editsAfterFreeze": {
+    "files": [
+      "evidence/design.md",
+      "job-run.mjs",
+      "README.md",
+      "reproduce.mjs",
+      "templates/run-v2.mjs",
+      "templates/run.mjs"
+    ],
+    "reason": "Repository-wide sweeps edited these bundle files after packaging: the GPU lock sweep (KB-GPULOCK-ALL: 5bacdb0a8e, 251adc5cc6, cdf3bf69fd) removed lock instructions from the README, design notes and run templates, and the process.exit sweep (KB-OWN-EXIT2: 498fc3cc2f, then this change) made job-run.mjs and reproduce.mjs end by their event loop. Their hashes are restated here; the source equivalence, the encoded patch and every measurement are unchanged, and tests/physics2d-bundle-verify.test.js now runs verify.mjs so an edit that skips this list fails.",
+    "sourceAndMeasurementsChanged": false
   }
 }

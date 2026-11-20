@@ -25,7 +25,7 @@ let measuring = false,
 
 // Play every bot at 60 updates per second.
 let last = performance.now();
-setInterval(() => {
+const play = setInterval(() => {
   const now = performance.now(),
     dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -33,7 +33,7 @@ setInterval(() => {
 }, 16);
 
 // Progress for the coordinator: how many have spawned and loaded their whole view.
-setInterval(() => {
+const progress = setInterval(() => {
   process.send({
     type: 'progress',
     joined: bots.length,
@@ -87,8 +87,11 @@ process.on('message', (message) => {
       receipts,
     });
   } else if (message.type === 'exit') {
+    // Stop both timers so the process ends by its event loop once the channel to the coordinator closes.
+    clearInterval(play);
+    clearInterval(progress);
     for (const bot of bots) bot.close();
-    setTimeout(() => process.exit(0), 200);
+    setTimeout(() => process.disconnect(), 200);
   }
 });
 

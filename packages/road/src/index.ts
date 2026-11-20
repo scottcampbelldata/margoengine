@@ -27,6 +27,44 @@ export interface RoadMesh {
   section: readonly (readonly [number, number])[];
 }
 
+/** Options of {@link roadPath}: the road's own options, plus a clear margin each side. */
+export interface RoadPathOptions extends Pick<RoadOptions, 'width' | 'curbWidth' | 'crossSection' | 'segments'> {
+  /** Extra ground kept clear on each side, world units, 0 or more. Default 0.5. */
+  margin?: number;
+}
+
+/**
+ * A road's centreline as XZ points with the width it covers (both curbs and `margin` each side), the shape
+ * `Scatter`'s `paths` option from `@margoengine/scatter` takes, so grass, trees and rocks keep off the road:
+ * `Scatter.attach(engine, tree, { paths: [roadPath(curve, { width: 6 })] })`. Sampled by arc length like `road`;
+ * an asymmetric `crossSection` keeps its wider side clear on both.
+ */
+export function roadPath(
+  curve: Spline,
+  { width = 6, curbWidth = 0.2, crossSection, segments = 128, margin = 0.5 }: RoadPathOptions = {},
+): { points: [number, number][]; width: number } {
+  if (
+    ![width, curbWidth, curve.length].every((v) => Number.isFinite(v) && v > 0) ||
+    !(Number.isFinite(margin) && margin >= 0) ||
+    !Number.isInteger(segments) ||
+    segments < 1 ||
+    segments > 4096 ||
+    (crossSection !== undefined &&
+      (crossSection.length < 2 || crossSection.some((p) => p.length !== 2 || !p.every(Number.isFinite))))
+  )
+    throw new RangeError(
+      'Road path width, curbWidth and the curve length must be finite and above 0, margin 0 or more, segments an integer from 1 to 4096 and crossSection finite [x, y] points; fix the options.',
+    );
+  const half = crossSection ? Math.max(...crossSection.map((p) => Math.abs(p[0]))) : width / 2 + curbWidth,
+    at = new Float64Array(3),
+    points: [number, number][] = [];
+  for (let i = 0; i <= segments; i++) {
+    curve.atDistance((curve.length * i) / segments, at);
+    points.push([at[0], at[2]]);
+  }
+  return { points, width: 2 * (half + margin) };
+}
+
 /** Sweep lateral offset/height pairs along an arc-length sampled, Y-up spline. */
 export function road(
   curve: Spline,

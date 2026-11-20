@@ -13,6 +13,7 @@ import {
 } from '@margoengine/sciviz/maths';
 
 // Data units straight to clip space: data x, y in [-1, 1] cover a 100 x 100 canvas, y up.
+const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
 test('pointInPolygon follows the even-odd rule, concave shapes included', () => {
@@ -42,6 +43,19 @@ test('CPU point-depth ties choose the point nearer a real perspective camera in 
   camera.update(1, true);
   assert.equal(nearestPoint(camera.matrix, [0, 0, 0, 0, 0, 3], 100, 100, 50, 50, 8).index, 1);
   assert.equal(nearestPoint(camera.matrix, [0, 0, 3, 0, 0, 0], 100, 100, 50, 50, 8).index, 0);
+});
+
+test('nearestPoint ties do not chain past half a pixel of the closest point', () => {
+  // Five points 0.45 px apart along x, each nearer the eye than the last (larger reversed clip z). Each is within half a
+  // pixel of the previous one, so a pass that compared with the running best walked to the last, 1.8 px away.
+  const positions = [];
+  for (let k = 0; k < 5; k++) positions.push(((100 + k * 0.45) / 200) * 2 - 1, 0, 0.1 + k * 0.2);
+  const hit = nearestPoint(IDENTITY, positions, 200, 200, 100, 100, 10);
+  assert.equal(hit.index, 1, 'the nearest-eye point within 0.5 px of the closest (0 px) is the one at 0.45 px');
+  near(hit.distance, 0.45);
+  const reversed = [];
+  for (let k = 4; k >= 0; k--) reversed.push(...positions.slice(k * 3, k * 3 + 3));
+  assert.equal(nearestPoint(IDENTITY, reversed, 200, 200, 100, 100, 10).index, 3, 'the same point in reverse order');
 });
 
 test('selectPoints keeps the points inside a box or a lasso', () => {

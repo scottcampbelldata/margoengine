@@ -1,12 +1,12 @@
 // Builds examples/orrery with Vite and checks it in a real browser: the page loads without console errors, renders a
-// picture that is not blank, puts each planet's arm and wheel where ephemeris.ts and gears.ts say for a date, flies to
+// picture that is not blank, puts each planet's arm and wheel where @margoengine/sky/ephemeris and gears.ts say for a date, flies to
 // a planet, plays time forward, honours reduced motion, lays out on a phone and reports a missing model.
 // `npm run test:orrery` (WebGPU); `npm run test:orrery -- --compat` runs it on the WebGL2 compatibility layer.
 import assert from 'node:assert/strict';
 import { build } from 'vite';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
-import { PLANETS, julianDay, planetPosition } from '../examples/orrery/ephemeris.ts';
+import { HELIOCENTRIC_PLANETS as PLANETS, julianDay, planetPosition } from '@margoengine/sky/ephemeris';
 import { designTrains, driveAngle, wheelAngles } from '../examples/orrery/gears.ts';
 
 const compat = process.argv.includes('--compat');

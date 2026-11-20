@@ -73,3 +73,23 @@ test('malformed settings, radii, joint inputs and zero lengths reject',()=>{
   assert.throws(()=>new ChainAvoidanceSolver().solve([[0,0,0],[0,0,0]],[0,0,0]));
   assert.throws(()=>new ChainAvoidanceSolver().solve(initial,[NaN,0,0]));
 });
+test('swivel candidates are spaced evenly around the root-target axis, from the reached pose',()=>{
+  // A two-link limb whose elbow can swing on a circle. Every candidate is rejected, so each tried pose is recorded.
+  for (const algorithm of ['ccd','fabrik']) for (const candidates of [8,12]) {
+    const azimuths=[];
+    const limb=[[0,0,0],[0.6,0.8,0],[1.2,0,0]];
+    new ChainAvoidanceSolver([],{algorithm,candidates,acceptPose:p=>{
+      const e=p[1];
+      azimuths.push(Math.atan2(e[2],e[1]));
+      return false;
+    }}).solve(limb,[1.2,0,0]);
+    assert.equal(azimuths.length,candidates);
+    // Each candidate turns by 2 pi / candidates from the one before, starting at the reached pose.
+    for (let k=1;k<candidates;k++) {
+      let step=azimuths[k]-azimuths[k-1];
+      step=Math.atan2(Math.sin(step),Math.cos(step));
+      const expected=Math.atan2(Math.sin(2*Math.PI/candidates),Math.cos(2*Math.PI/candidates));
+      assert.ok(Math.abs(step-expected)<1e-6,`${algorithm} ${candidates}: step ${k} is ${step}, not ${expected}`);
+    }
+  }
+});

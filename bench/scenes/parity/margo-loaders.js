@@ -3,7 +3,7 @@
 // counts that show both engines did the same job.
 import { engineFor } from '../margo.js';
 
-/** A camera for engineFor: task scenes draw nothing, but gltf-pro models need an engine to attach to. */
+/** A camera for engineFor: task scenes draw nothing, but gltf/pbr models need an engine to attach to. */
 const CAMERA = { fov: 50, near: 0.1, far: 100, at: () => [0, 1, 3], target: [0, 0, 0] };
 
 const fetchBytes = async (url) => {
@@ -104,7 +104,7 @@ function stripTextures(doc) {
   return doc;
 }
 
-/** Counts of a gltf-pro model: primitives (three: one Mesh each), packed vertices (20 floats each), triangles. */
+/** Counts of a gltf/pbr model: primitives (three: one Mesh each), packed vertices (20 floats each), triangles. */
 function modelCounts(model, extra = {}) {
   const doc = model.asset.doc;
   let vertices = 0,
@@ -133,7 +133,7 @@ async function gltfTask(canvas, bytes, marks, { decoders, animate } = {}) {
   const engine = await engineFor(canvas, CAMERA, 4096, marks),
     s = performance.now(),
     [{ parseGLTFAsync }, animation] = await Promise.all([
-      import('@margoengine/gltf-pro'),
+      import('@margoengine/gltf/pbr'),
       animate ? import('@margoengine/animation') : undefined,
     ]);
   marks.buildMs = +(performance.now() - s).toFixed(1);
@@ -195,7 +195,7 @@ export const builders = {
   async 'p-draco'(canvas, data, marks) {
     const bytes = await packGLB(data.url, stripTextures),
       { DracoDecoder } = await import('@margoengine/decoders'),
-      draco = new DracoDecoder(); // created once, warm across calls (gltf-pro leaves a supplied decoder open)
+      draco = new DracoDecoder(); // created once, warm across calls (gltf/pbr leaves a supplied decoder open)
     return gltfTask(canvas, bytes, marks, { decoders: { draco } });
   },
 

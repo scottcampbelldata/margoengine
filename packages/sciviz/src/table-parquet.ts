@@ -3,7 +3,7 @@ import { decodeColumnarBlock, type ColumnarCodec } from '@margoengine/decoders/s
 import { collectBatches } from './table-batches.js';
 import { crc32 } from '../../shared/crc32.js';
 import { ColumnarTable, type TableColumn, type TableValue } from './table.js';
-import { invalidTable as bad, scalarColumn, tableLimits, type TableReadOptions } from './table-read.js';
+import { half, invalidTable as bad, scalarColumn, tableLimits, type TableReadOptions } from './table-read.js';
 
 type MetaValue = number | bigint | boolean | Uint8Array | MetaValue[] | Meta;
 interface Meta { [key: number]: MetaValue; }
@@ -65,6 +65,7 @@ function hybrid(cursor: Cursor, count: number, width: number): number[] {
     else {
       let value = 0; const bytes = cursor.take(Math.ceil(width / 8)); for (let i = 0; i < bytes.length; i++) value += bytes[i] * 2 ** (8 * i);
       if (value >= 2 ** width) bad('Parquet RLE value exceeds bit width');
+      if (run > count - out.length) bad('Parquet RLE run exceeds value count');
       for (let i = 0; i < run; i++) out.push(value);
     }
   }
@@ -84,9 +85,11 @@ function delta(cursor: Cursor, expected?: number): bigint[] {
 function lengths(cursor: Cursor, count: number): Uint8Array[] {
   return delta(cursor, count).map((size) => { if (size < 0n || size > BigInt(cursor.bytes.length)) bad('Parquet delta byte length is invalid'); return cursor.take(Number(size)); });
 }
-interface Field { name: string; type: number; optional: boolean; width: number; utf8: boolean; unsigned: boolean; unit?: string; decimal: boolean; }
+interface Field { name: string; type: number; optional: boolean; width: number; utf8: boolean; unsigned: boolean; unit?: string; decimal: boolean; float16: boolean; uuid: boolean; }
 function bytesValue(bytes: Uint8Array, field: Field): TableValue {
   if (field.utf8) return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  if (field.float16) return half(bytes[0] | bytes[1] << 8);
+  if (field.uuid) return Array.from(bytes, (b, i) => ([4, 6, 8, 10].includes(i) ? '-' : '') + b.toString(16).padStart(2, '0')).join('');
   if (field.decimal) { let n = 0n; for (const b of bytes) n = (n << 8n) | BigInt(b); if (bytes[0] & 128) n -= 1n << BigInt(bytes.length * 8); return bytes.length > 8 ? n.toString() : n; }
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -104,7 +107,9 @@ function plain(cursor: Cursor, field: Field, count: number): TableValue[] {
   });
 }
 function values(cursor: Cursor, field: Field, count: number, encoding: number, dictionary: TableValue[] | undefined): TableValue[] {
-  if (!count) return [];
+  // Zero values (an all-null page) arrive either as an empty payload or as the encoding's own header, such as a
+  // dictionary bit-width byte or a delta block header; the decoders below read that header and no values.
+  if (!count && cursor.at === cursor.bytes.length) return [];
   if (encoding === 0) return plain(cursor, field, count);
   if (encoding === 2 || encoding === 8) {
     if (!dictionary) bad('Parquet dictionary indices precede dictionary');
@@ -134,10 +139,15 @@ function field(meta: Meta): Field {
   if (type === 3) unit = 'timestamp:ns';
   const decimal = converted === 5 || !!logical[5];
   if (decimal) unit = 'decimal:' + number(logical[5] ? object(logical[5])[1] : meta[7]);
-  const utf8 = converted === 0 || !!logical[1];
-  if ((type === 6 || type === 7) && !utf8 && !decimal) unit = 'binary:hex';
+  // LogicalTypes.md: STRING (1), ENUM (4) and JSON (12) and converted UTF8 (0), ENUM (4) and JSON (19) are UTF-8 text;
+  // FLOAT16 (15) is a little-endian binary16 in FIXED[2]; UUID (14) is FIXED[16], big-endian.
+  const utf8 = (type === 6 || type === 7) && (converted === 0 || converted === 4 || converted === 19 || !!logical[1] || !!logical[4] || !!logical[12]);
+  const float16 = type === 7 && !!logical[15], uuid = type === 7 && !!logical[14];
+  if ((logical[15] || logical[14]) && (type !== 7 || meta[2] !== (logical[15] ? 2 : 16))) bad(`Parquet ${logical[15] ? 'FLOAT16' : 'UUID'} column must be a FIXED_LEN_BYTE_ARRAY(${logical[15] ? 2 : 16})`);
+  if (uuid) unit = 'uuid';
+  else if ((type === 6 || type === 7) && !utf8 && !decimal && !float16) unit = 'binary:hex';
   if (meta[5] || number(meta[3]) === 2) bad('Parquet table columns must be flat, non-repeated scalars; flatten nested data first');
-  return { name: text(meta[4]), type, optional: number(meta[3]) === 1, width: meta[2] === undefined ? 0 : number(meta[2]), utf8, unsigned: integer ? !object(logical[10])[2] : converted >= 11 && converted <= 14, unit, decimal };
+  return { name: text(meta[4]), type, optional: number(meta[3]) === 1, width: meta[2] === undefined ? 0 : number(meta[2]), utf8, unsigned: integer ? !object(logical[10])[2] : converted >= 11 && converted <= 14, unit, decimal, float16, uuid };
 }
 
 /** @internal Footer-driven row groups; projected column chunks are fetched independently. */

@@ -2,7 +2,7 @@
 // stays inside [0, duration] (found in the school pilot, docs/guides/animation.md step 5).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../dist/index.js';
 import { skinnedStrip } from '../test/fixture.js';
 import { ownerEngine } from './owner-lifetime.fixture.js';

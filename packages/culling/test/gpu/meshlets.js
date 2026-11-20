@@ -141,7 +141,7 @@ async function occlusion() {
   await draw();
   await draw();
   await draw();
-  return { label: 'behind a wall', kept: await mesh.readTriangles(), total: frustum, clusters: mesh.meshlets.count, part: geometry.indices.length / 3 };
+  return { label: 'behind a wall', occlusion: true, kept: await mesh.readTriangles(), total: frustum, clusters: mesh.meshlets.count, part: geometry.indices.length / 3 };
 }
 // A ball casting on a floor: the shadow frame keeps only clusters in each cascade, and the picture is core's.
 async function shadowed() {
@@ -178,7 +178,94 @@ async function shadowed() {
     clusters: mesh.meshlets.count, part: geometry.indices.length / 3,
   };
 }
+// A square plate facing +z, 16 x 16 quads from -0.5 to 0.5, in a few clusters.
+function plate(side = 16) {
+  const positions = [],
+    normals = [],
+    indices = [];
+  for (let y = 0; y <= side; y++)
+    for (let x = 0; x <= side; x++) {
+      positions.push(x / side - 0.5, y / side - 0.5, 0);
+      normals.push(0, 0, 1);
+    }
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) {
+      const p = y * (side + 1) + x,
+        q = p + side + 1;
+      indices.push(p, p + 1, q, q, p + 1, q + 1);
+    }
+  return new Geometry(positions, normals, indices);
+}
+// Two-pass occlusion: a wall of 1,536 small tiles (each about 6 pixels in radius, under occluderSize, so no tile was ever
+// drawn as a whole-part occluder) in front of a second wall of 640 tiles that it hides. The clusters the front tiles
+// drew last frame are this frame's Hi-Z occluders, so the hidden tiles drop; the old cull kept them all.
+async function twoPass() {
+  await fresh();
+  const tile = plate(),
+    material = new PbrMaterial({ color: '#b07040', roughness: 0.6, doubleSided: false }),
+    matrices = [];
+  for (let y = 0; y < 32; y++)
+    for (let x = 0; x < 48; x++) matrices.push([0.25, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 1, 0, -5.875 + x * 0.25, -3.875 + y * 0.25, 0, 1]);
+  for (let y = 0; y < 20; y++)
+    for (let x = 0; x < 32; x++) matrices.push([0.25, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 1, 0, -3.875 + x * 0.25, -2.375 + y * 0.25, -2, 1]);
+  const transforms = new Float32Array(matrices.flat()),
+    frustum = MeshletMesh.attach(a, [{ geometry: tile, material, transforms }]);
+  for (const m of matrices)
+    b.createMesh()
+      .setGeometry(tile)
+      .setMaterial(material)
+      .setPosition([m[12], m[13], m[14]])
+      .setScale([m[0], m[5], m[10]]);
+  again = MeshletMesh.attach(r, [{ geometry: tile, material, transforms }], { culling: 'occlusion' });
+  look([0, 0, 10]);
+  await draw();
+  await draw();
+  const plain = await frustum.readTriangles();
+  a.removePlugin(frustum.name);
+  frustum.dispose?.();
+  mesh = MeshletMesh.attach(a, [{ geometry: tile, material, transforms }], { culling: 'occlusion' });
+  await draw();
+  await draw();
+  await draw();
+  return {
+    label: 'two-pass behind small tiles',
+    occlusion: true,
+    front: 1536 * (tile.indices.length / 3),
+    kept: await mesh.readTriangles(),
+    total: plain,
+    clusters: mesh.meshlets.count,
+    part: tile.indices.length / 3,
+  };
+}
+// Three balls sharing a pool that holds about one ball's kept clusters: the parts past it draw their whole mesh, and
+// the picture is still core's.
+async function overflow() {
+  await fresh();
+  const material = new PbrMaterial({ color: '#58a860', roughness: 0.5, doubleSided: false }),
+    places = [spot(-4, 0), spot(0, -2), spot(4, 0)],
+    transforms = new Float32Array(places.flat()),
+    full = MeshletMesh.attach(a, [{ geometry, material, transforms }]);
+  for (const m of places) b.createMesh().setGeometry(geometry).setMaterial(material).setPosition([m[12], m[13], m[14]]);
+  again = MeshletMesh.attach(r, [{ geometry, material, transforms }], { maxKeptTriangles: 30000 });
+  look([0, 2, 11]);
+  await draw();
+  await draw();
+  const unlimited = await full.readTriangles();
+  a.removePlugin(full.name);
+  full.dispose?.();
+  mesh = MeshletMesh.attach(a, [{ geometry, material, transforms }], { maxKeptTriangles: 30000 });
+  await draw();
+  await draw();
+  return {
+    label: 'a pool too small for every part',
+    kept: await mesh.readTriangles(),
+    unlimited,
+    total: (geometry.indices.length / 3) * 3,
+    clusters: mesh.meshlets.count,
+    part: geometry.indices.length / 3,
+  };
+}
 // The same frame again with nothing changed: the kept clusters must come out in the same order, so the pixels repeat.
 const redraw = () => draw();
-window.check = { setup, step, steps: steps.length, errors, instances, occlusion, shadowed, redraw };
+window.check = { setup, step, steps: steps.length, errors, instances, occlusion, shadowed, twoPass, overflow, redraw };
 window.ready = true;

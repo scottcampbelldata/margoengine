@@ -195,8 +195,12 @@ test('DAE: Y-up polylist quads, triangles, two materials bound through symbols, 
     { id: 'red', name: 'Red', shading: 'lambert', diffuse: { color: [1, 0, 0, 1] } },
   ]);
   assert.deepEqual(dae.images, ['../textures/tile a.png']);
+  // The <lines> pair is read into vertices of its own: <vertices> entries 0 and 1, with no COLOR input.
+  assert.deepEqual([...mesh.lines.positionIndices], [0, 1]);
+  assert.deepEqual([...mesh.lines.indices], [0, 1]);
+  assert.deepEqual(mesh.lines.groups, [{ start: 0, count: 2 }]);
+  assert.equal(mesh.lines.colors, undefined);
   assert.deepEqual(dae.warnings, [
-    'geometry "mesh": <lines> are not imported (only polygons)',
     'instance_controller "#skin" names no imported <controller>, so its node has no mesh',
   ]);
   // Hierarchy: translate * rotate * scale, a row-major <matrix>, and the instance_node copy.

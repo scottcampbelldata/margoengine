@@ -25,9 +25,10 @@
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && node --test --test-timeout=240000 tests/curve.test.js tests/renderer-dispose.test.js tests/msdf.test.js tests/selection.test.js tests/fit.test.js tests/text.test.js tests/layout-workcount.test.js tests/sdf.test.js tests/compose.test.js tests/rich.test.js tests/animate.test.js tests/extrude*.test.js tests/vector.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
+    "test": "npm run build && node --test --test-timeout=240000 tests/curve.test.js tests/renderer-dispose.test.js tests/msdf.test.js tests/selection.test.js tests/fit.test.js tests/text.test.js tests/layout-workcount.test.js tests/sdf.test.js tests/compose.test.js tests/rich.test.js tests/animate.test.js tests/extrude*.test.js tests/vector.test.js tests/outline.test.js tests/opentype-optin.test.js tests/captions.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-vector-browser.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:outline": "cd ../.. && node packages/text/tests/outline-node-gpu.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -66,6 +67,14 @@
     "./vector": {
       "types": "./dist/vector.d.ts",
       "import": "./dist/vector.js"
+    },
+    "./outline": {
+      "types": "./dist/outline.d.ts",
+      "import": "./dist/outline.js"
+    },
+    "./captions": {
+      "types": "./dist/captions.d.ts",
+      "import": "./dist/captions.js"
     }
   },
   "files": [
@@ -76,7 +85,8 @@
     "@margoengine/core": "^1.0.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/decoders": "^1.0.0"
+    "@margoengine/decoders": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
   }
 }

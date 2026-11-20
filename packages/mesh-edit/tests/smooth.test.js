@@ -117,3 +117,45 @@ test('bad options and abort', () => {
   assert.throws(() => smoothMesh(cube, { signal: {} }), TypeError);
   assert.throws(() => smoothMesh(cube, { signal: AbortSignal.abort(new RangeError('stop')) }), { message: 'stop' });
 });
+
+test('Taubin rejects a factor whose filter amplifies the top frequency instead of blowing the mesh up', () => {
+  // Taubin (1995): f(k) = (1 - lambda k)(1 - mu k) must stay within [-1, 1] up to k = 2. At factor 1 and the default
+  // pass band, |f(2)| = 3.2, and 50 passes grew a 0.006 noise field to 36 units before the check.
+  const n = 12,
+    vertices = [],
+    faces = [];
+  let seed = 1;
+  const noise = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 0.02;
+  for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) vertices.push([x / n, y / n, noise()]);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const a = y * (n + 1) + x;
+      faces.push(
+        {
+          id: `a${a}`,
+          vertices: [a, a + 1, a + n + 2],
+          uv: [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+          ],
+        },
+        {
+          id: `b${a}`,
+          vertices: [a, a + n + 2, a + n + 1],
+          uv: [
+            [0, 0],
+            [1, 1],
+            [0, 1],
+          ],
+        },
+      );
+    }
+  const grid = { vertices, faces };
+  assert.throws(() => smoothMesh(grid, { factor: 1, iterations: 50 }), RangeError);
+  assert.throws(() => smoothMesh(grid, { factor: 0.75, iterations: 50 }), RangeError);
+  const { mesh } = smoothMesh(grid, { factor: 0.69, iterations: 50 });
+  assert.ok(mesh.vertices.every((p) => Math.abs(p[2]) < 0.01));
+  // Laplacian steps alone never amplify: |1 - k| <= 1 for every factor up to 1.
+  assert.doesNotThrow(() => smoothMesh(grid, { factor: 1, iterations: 5, method: 'laplacian' }));
+});

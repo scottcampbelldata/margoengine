@@ -3,8 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { loadGLTF } from '@margoengine/gltf-pro';
-import { instancing, PBRInstances } from '@margoengine/gltf-pro/instancing';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+import { instancing, PBRInstances } from '@margoengine/gltf/pbr-instancing';
 import { exportModel } from '../dist/model.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 import { readGLB, validate, validator } from './helpers.js';

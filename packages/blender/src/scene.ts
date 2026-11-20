@@ -8,7 +8,7 @@ import { checkCount } from "../../shared/limits.js";
 import type {
   GLTFDocument,
   PreparedGeometry,
-} from "@margoengine/gltf-pro/model";
+} from "@margoengine/gltf/pbr-model";
 import { validatePreparedGeometry } from "../../shared/prepared-geometry.js";
 import type { MargoAsset } from "./index.js";
 

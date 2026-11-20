@@ -4,6 +4,7 @@ import type { Mesh } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { CADModel } from './cad.js';
 import { capError, maxBytes } from './cad-parser.js';
+import { captureScene } from '../../shared/scene-scope.js';
 const cadFormats: readonly string[] = ['stl', 'obj', 'step', 'iges', 'sat', 'xt', 'jt'];
 /**
  * A file format `parseCADAsync` and `loadCAD` read: STL and OBJ triangles, or a B-rep file read and meshed by Margo's
@@ -113,6 +114,8 @@ export function parseCADAsync(
   const { importer } = options;
   if (importer !== undefined && typeof importer !== 'function') throw new TypeError('importer must be a function');
   if (importer && format !== 'stl' && format !== 'obj') return importer(instance, buffer, format, options);
+  // The worker's parts arrive in later tasks, with any scene active: they belong to the scene this call was made in.
+  const scope = captureScene(engine);
   const workerURL = new URL(/* @vite-ignore */ './workers/cad-runtime.js?no-inline', import.meta.url);
   return new Promise((resolve, reject) => {
     const worker = new Worker(workerURL),
@@ -197,7 +200,7 @@ export function parseCADAsync(
           return;
         }
         if (!root) {
-          root = engine.createMesh();
+          root = scope.run(() => engine.createMesh());
           root.visible = false;
           created.push(root);
         }
@@ -222,7 +225,7 @@ export function parseCADAsync(
             : meshes[part.reuse]?.geometry;
         if (!geometry)
           throw new MargoError('failed', 'CAD worker reused a part that does not exist; try loading the file again.');
-        const mesh = engine.createMesh(root);
+        const mesh = scope.run(() => engine.createMesh(root));
         created.push(mesh);
         mesh.name = part.name;
         mesh.setGeometry(geometry).setMaterial(material(part.color));

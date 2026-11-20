@@ -11,7 +11,7 @@ import {
   type HeadlessReadOptions,
   type InstalledGPU,
 } from './index.js';
-import { fault, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** Options of {@link createHeadlessStage}: engine options, less `backend`, which is always WebGPU, plus these. */
 export interface HeadlessStageOptions extends Omit<EngineOptions, 'backend'> {
@@ -53,6 +53,7 @@ function acquire(gpu: GPUBinding, globals: HeadlessStageOptions['globals']): () 
 export class HeadlessStage extends Stage {
   readonly #ticks = new Set<(delta: number) => void>();
   readonly #frames = new Set<Parameters<Stage['engine']['onFrame']>[0]>();
+  #stepping = false;
 
   constructor(engine: Stage['engine']) {
     super(engine);
@@ -75,15 +76,30 @@ export class HeadlessStage extends Stage {
     return () => void this.#ticks.delete(callback);
   }
 
-  /** Runs `onTick` and `engine.onFrame` callbacks, then draws a frame that advances plugins and animation by `delta` seconds. Default 0. */
+  /**
+   * Runs `onTick` and `engine.onFrame` callbacks, then draws a frame that advances plugins and animation by `delta`
+   * seconds, 0 to 1 as `engine.render` takes it. Default 0. A delta outside that range, or a step from inside a step,
+   * throws before any callback runs.
+   */
   step(delta = 0): void {
-    for (const tick of this.#ticks) tick(delta);
-    for (const frame of this.#frames) frame(this.engine, delta);
-    this.engine.render({ delta });
+    // engine.render checks the delta too, but only after the callbacks have already acted on it.
+    if (typeof delta !== 'number' || !(delta >= 0 && delta <= 1))
+      throw rangeError('Stage step delta must be 0 to 1 seconds', 'headless');
+    if (this.#stepping) throw fault('state', 'Stage step is already running', 'headless');
+    this.#stepping = true;
+    try {
+      for (const tick of this.#ticks) tick(delta);
+      for (const frame of this.#frames) frame(this.engine, delta);
+      this.engine.render({ delta });
+    } finally {
+      this.#stepping = false;
+    }
   }
 
-  /** Sets the image size. The next frame uses it. */
+  /** Sets the image size, whole numbers from 1 as in {@link createHeadlessStage}. The next frame uses it. */
   resize(width: number, height: number): void {
+    for (const size of [width, height])
+      if (!Number.isInteger(size) || size < 1) throw rangeError('Stage size must be whole numbers from 1', 'headless');
     const { canvas } = this;
     canvas.width = width;
     canvas.height = height;

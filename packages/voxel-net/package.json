@@ -90,7 +90,6 @@
   },
   "dependencies": {
     "@margoengine/math": "^1.0.0",
-    "@margoengine/net": "^1.0.0",
     "@margoengine/netcode": "^1.0.0",
     "@margoengine/voxel": "^1.0.0"
   },

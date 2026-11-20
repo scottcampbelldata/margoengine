@@ -6,7 +6,7 @@ import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {NodeMaterial,positionLocal,storage,uv,vec3} from '/packages/shader/dist/index.js';
 import {morphing,skinning,skinningFromModel,worldNormal} from '/packages/shader/dist/deform.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {Animation} from '/packages/animation/dist/index.js';
 const stage=await createStage('#host',{backend:'webgpu',autoStart:false,controls:false,camera:{position:[0,0,4],target:[0,0,0]}});
 const engine=stage.engine,device=engine.gpu,errors=[];

@@ -1009,6 +1009,14 @@ export class Environment implements EnginePlugin {
     }
   }
 
+  /**
+   * True from `refresh()` until its promise settles. Meanwhile the textures, SH buffer and `sh` are part old, part
+   * new, so `savePrefilteredEnvironment` rejects with MargoError `state`; await the refresh first.
+   */
+  get refreshPending(): boolean {
+    return this.refreshing !== undefined;
+  }
+
   setup(engine: EngineKernel): void {
     if (this.disposed) throw new MargoError('disposed', 'Environment is disposed; create a new Environment');
     const device = engineRuntime(engine).gpu;

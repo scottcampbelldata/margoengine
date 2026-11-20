@@ -6,10 +6,44 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export const MOON_EXTINCTION = 0.172;
+
+export const MOON_PHASES: Readonly<Record<MoonPhaseName, {
+    readonly phase: number;
+    readonly waning: boolean;
+}>>;
+
+export type MoonBrightnessName = 'bright' | 'dim';
+
+export type MoonColorName = 'blood' | 'reddened';
+
+export interface MoonLook {
+    light: number;
+    size: number;
+    disc: [number, number, number];
+    source: [number, number, number] | undefined;
+}
+
+export type MoonPhase = number | MoonPhaseName;
+
+export type MoonPhaseName = 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'lastQuarter' | 'waningCrescent' | 'half' | 'quarter';
+
+export interface Moonlight {
+    illuminance: number;
+    color: [number, number, number];
+    intensity: number;
+}
+
+export const SUN_ILLUMINANCE: number;
+
 export class Sky implements EnginePlugin {
     readonly options: SkyOptions;
     readonly name: string;
     environmentLayer: GPUTexture | undefined;
+    environmentLightLayer: GPUTexture | undefined;
+    lightScale: number;
+    deck: ((up: number) => number) | undefined;
+    get airControls(): boolean;
     readonly sun: Float32Array<ArrayBuffer>;
     readonly moon: Float32Array<ArrayBuffer>;
     get cloudLayer(): {
@@ -18,6 +52,7 @@ export class Sky implements EnginePlugin {
         drift: number;
         height: number;
     } | undefined;
+    get coverageTexture(): GPUTexture | undefined;
     get reflectionTexture(): GPUTexture | undefined;
     get nightFactor(): number;
     readonly lights: readonly [{
@@ -27,6 +62,14 @@ export class Sky implements EnginePlugin {
         readonly direction: Float32Array<ArrayBuffer>;
         readonly radiance: Float32Array<ArrayBuffer>;
     }];
+    readonly moonUnderClouds: {
+        direction: Float32Array<ArrayBuffer>;
+        radiance: Float32Array<ArrayBuffer>;
+    };
+    readonly twilightLight: {
+        direction: Float32Array<ArrayBuffer>;
+        radiance: Float32Array<ArrayBuffer>;
+    };
     constructor(options?: SkyOptions, features?: SkyFeatures);
     add(target: SkyLightingTarget): () => void;
     pbr(group: number): {
@@ -37,16 +80,31 @@ export class Sky implements EnginePlugin {
     static attach(engine: EngineKernel, options?: SkyOptions, features?: SkyFeatures): Sky;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
+export interface SkyAtmosphereOptions {
+    sunIntensity?: number;
+    sunColor?: Vec3;
+    rayleigh?: number;
+    rayleighColor?: Vec3;
+    mie?: number;
+    mieColor?: Vec3;
+    mieAnisotropy?: number;
+    ozone?: number;
+    scatteredLight?: Vec3;
+}
+
 export interface SkyCloudOptions {
     coverage?: number;
     speed?: number;
     height?: number;
+    depth?: number;
 }
 
 export interface SkyFeatures {
@@ -56,7 +114,14 @@ export interface SkyFeatures {
     bruneton?: {
         readonly phase: string;
         readonly tail: string;
-        create(device: GPUDevice, uniform: GPUBufferBinding, transmission: GPUTextureView, owned: Owned): SkyTables;
+        readonly sky: string;
+        create(device: GPUDevice, uniform: GPUBufferBinding, transmission: GPUTextureView, owned: Owned, extend?: (code: string) => string): SkyTables;
+    };
+    look?: {
+        extend(code: string, full: boolean): string;
+        validate(options: SkyOptions): void;
+        air(options: SkyOptions, out: Float32Array): Float32Array;
+        write(out: Float32Array, options: SkyOptions, air: Float32Array, zenith?: number): void;
     };
     clouds?: {
         readonly wgsl: string;
@@ -88,8 +153,9 @@ export interface SkyFeatures {
             update(target: Lights, sky: Sky, lighting: SkyLightingOptions | undefined, ambient: {
                 readonly day: Vec3;
                 readonly night: Vec3;
-            } | undefined, night: number): void;
+            } | undefined, night: number, scale: number): void;
             pass(c: SkyPassContext, layer?: GPUTexture): void;
+            patch(c: SkyPassContext): void;
             recode(code: string, entries: GPUBindGroupEntry[]): void;
             pbr(group: number): {
                 readonly declarations: string;
@@ -109,6 +175,11 @@ export interface SkyFogOptions {
     color?: Vec3;
 }
 
+export interface SkyGradientStop {
+    elevation: number;
+    color: Vec3;
+}
+
 export interface SkyLightingOptions {
     intensity?: number;
     minimum?: number;
@@ -116,12 +187,21 @@ export interface SkyLightingOptions {
     sunset?: Vec3;
     moon?: {
         intensity?: number;
+        brightness?: number | MoonBrightnessName;
+        color?: Vec3 | MoonColorName;
+        extinction?: number;
+        cloudCover?: number;
+    };
+    twilight?: false | {
+        brightness?: number;
+        cloudCover?: number;
         color?: Vec3;
     };
     ambient?: {
         day: Vec3;
         night: Vec3;
     };
+    ground?: number;
 }
 
 export interface SkyLightingTarget {
@@ -134,13 +214,35 @@ export interface SkyLightingTarget {
     }): () => void;
 }
 
+export interface SkyLookOptions {
+    zenithColor?: Vec3;
+    zenithStrength?: number;
+    horizonColor?: Vec3;
+    horizonStrength?: number;
+    groundColor?: Vec3;
+    groundStrength?: number;
+    gradient?: readonly SkyGradientStop[];
+    gradientStrength?: number;
+    gradientIntensity?: number;
+    sunDiscSize?: number;
+    sunDiscColor?: Vec3;
+    sunDiscIntensity?: number;
+    sunDiscSoftness?: number;
+    glowColor?: Vec3;
+    glowStrength?: number;
+    glowWidth?: number;
+    glowSunward?: number;
+    cloudColor?: Vec3;
+    cloudDensity?: number;
+}
+
 export interface SkyNightOptions {
     zenithColor?: Vec3;
     horizonColor?: Vec3;
     moonColor?: Vec3;
     moonDirection?: Vec3;
     moonSize?: number;
-    moonPhase?: number;
+    moonPhase?: MoonPhase;
     moonLitBySun?: boolean;
     glowIntensity?: number;
     starIntensity?: number;
@@ -160,13 +262,33 @@ export interface SkyOptions {
     turbidity?: number;
     exposure?: number;
     lighting?: SkyLightingOptions;
+    atmosphere?: SkyAtmosphereOptions;
+    look?: SkyLookOptions;
     environment?: boolean;
+    coverage?: boolean;
 }
 
 export interface SkyTables {
     view: GPUTextureView;
     run(c: SkyPassContext, albedo?: Readonly<ArrayLike<number>>): void;
+    recode?(extend: ((code: string) => string) | undefined, uniform: GPUBufferBinding): void;
 }
+
+export function cloudTransmittance(cover: number): number;
+
+export function moonAirmass(up: number): number;
+
+export function moonLook(brightness?: number | MoonBrightnessName, color?: MoonColorName | ArrayLike<number>, up?: number, extinction?: number): MoonLook;
+
+export function moonPhase(phase: MoonPhase): number;
+
+export function moonWaning(phase: MoonPhase): boolean;
+
+export function moonlight(phase: number, direction: ArrayLike<number>, extinction?: number, out?: Moonlight): Moonlight;
+
+export function moonlightColor(illuminance: number, out?: [number, number, number], source?: ArrayLike<number>): [number, number, number];
+
+export function overcastShare(coverage: number): number;
 
 export const skyEnvironmentFloor: {
     readonly day: Vec3;
@@ -177,7 +299,13 @@ export function sunDirection(hours: number, out?: Float32Array<ArrayBuffer>): Fl
 
 export function sunDirectionFromAngles(azimuth: number, elevation: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
-export function sunlight(mu: number, altitude: number, turbidity: number, out?: Float32Array<ArrayBuffer>): Float32Array;
+export function sunlight(mu: number, altitude: number, turbidity: number, out?: Float32Array<ArrayBuffer>, air?: Readonly<ArrayLike<number>>): Float32Array;
+
+export function twilightColor(depression: number, out?: [number, number, number]): [number, number, number];
+
+export function twilightIlluminance(elevation: number): number;
+
+export function twilightLightColor(depression: number, illuminance: number, out?: [number, number, number]): [number, number, number];
 
 // Not exported from this entry, but used by the exports above:
 

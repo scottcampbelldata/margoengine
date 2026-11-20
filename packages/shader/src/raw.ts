@@ -11,11 +11,14 @@ import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine
 import { beginPickPass } from '../../shared/pick-base.js';
 import { viewMatrix } from '../../shared/view.js';
 import { neutralShader } from '../../shared/display.js';
+import { borrow, type BorrowSlot, isOptionObject, lend } from '../../shared/borrowed.js';
 import type { BindableTexture } from './texture.js';
 import { alphaBlend } from '../../shared/pass.js';
-declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; COPY_DST: number };
+import { applyView, viewRect } from '../../shared/view-rect.js';
+import { ShaderClock } from './clock.js';
+declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; COPY_DST: number; STORAGE: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 type RawPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** WGSL types of a {@link RawMesh} attribute: 32-bit scalars and 2-4 component vectors of f32, i32 or u32. */
@@ -70,7 +73,12 @@ export interface RawUniform {
  * is, so a compute pass can fill what a mesh draws.
  */
 export interface RawStorage {
-  /** A buffer with STORAGE usage on the engine's device, or a function that gives one for a device. Live. */
+  /**
+   * A buffer with STORAGE usage on the engine's device, or a function that gives one for a device (called each time the
+   * material's bind group is checked, so it should return the same buffer until it means to change). Live. A plain
+   * buffer is lost with its device: the material binds a zeroed stand-in, `engine.onError` hears of it once (`'state'`,
+   * #borrowed-lost), and assigning a new buffer brings it back; a function is called again on the new device.
+   */
   buffer: GPUBuffer | ((device: GPUDevice) => GPUBuffer);
   /** WGSL element type: a built-in type, or a struct your code declares in every stage that reads the buffer. */
   readonly type: string;
@@ -84,19 +92,33 @@ export interface RawStorage {
 export type RawBindGroup = (device: GPUDevice) => { layout: GPUBindGroupLayout; group: GPUBindGroup };
 /** A texture a raw shader samples: a GPUTexture or view on the engine's device, or a `@margoengine/materials` Texture. */
 export type RawTextureSource = GPUTexture | GPUTextureView | BindableTexture;
-/** A named texture binding: `<name>` and `<name>Sampler` in WGSL. `texture` and `sampler` are live; the rest is fixed. */
+/** What a raw texture binding takes: a texture source, or `(device) => GPUTexture | GPUTextureView`, called once per device. */
+export type RawTextureInput = RawTextureSource | ((device: GPUDevice) => GPUTexture | GPUTextureView);
+/**
+ * A named texture binding: `<name>` and `<name>Sampler` in WGSL. `texture` and `sampler` are live; the rest is fixed.
+ * Written as a plain object; any class instance (a GPUTexture or view on either backend, a materials Texture) is taken
+ * as the texture itself.
+ */
 export interface RawTexture {
-  /** Opaque white (zero for integer textures) while null. */
-  texture: RawTextureSource | null;
+  /**
+   * Opaque white (zero for integer textures) while null. A function `(device) => texture` is called once per device, so
+   * the texture is back after a device restore. A plain GPUTexture or view is lost with its device: the binding reads
+   * opaque white, `engine.onError` hears of it once (`'state'`, #borrowed-lost), and assigning a new texture brings it back.
+   */
+  texture: RawTextureInput | null;
   /** Sampler for a GPUTexture or view (default linear, clamp to edge); a materials Texture brings its own unless this is set. */
   sampler?: GPUSamplerDescriptor;
   /** Default `'2d'`. */
   dimension?: '2d' | '2d-array' | 'cube' | '3d';
-  /** Default `'float'` (filterable). Integer textures read with textureLoad. */
-  sampleType?: 'float' | 'unfilterable-float' | 'sint' | 'uint';
+  /**
+   * Default `'float'` (filterable). Integer textures read with textureLoad. `'depth'` binds a depth texture
+   * (`texture_depth_2d`, `_cube` or `_2d_array`) with a comparison sampler (`sampler_comparison`, for
+   * `textureSampleCompare`); its `sampler.compare` defaults to `'less-equal'`.
+   */
+  sampleType?: 'float' | 'unfilterable-float' | 'sint' | 'uint' | 'depth';
 }
 /** Colour blending of a {@link RawShaderMaterial}: a named preset or a WebGPU blend state. */
-export type RawBlending = 'none' | 'normal' | 'additive' | 'multiply' | 'premultiplied' | GPUBlendState;
+export type RawBlending = 'none' | 'normal' | 'additive' | 'subtractive' | 'multiply' | 'premultiplied' | GPUBlendState;
 /** Options for `new RawShaderMaterial(options)`. Render state fields stay live on the material. */
 export interface RawShaderMaterialOptions {
   /** WGSL with a `@vertex fn` (and the `@fragment fn` too when `fragmentShader` is omitted). */
@@ -110,7 +132,7 @@ export interface RawShaderMaterialOptions {
   /** Named live uniforms, read as `uniforms.<name>` in WGSL. */
   uniforms?: Record<string, RawUniform>;
   /** Named textures, read as `<name>` with `<name>Sampler` in WGSL. */
-  textures?: Record<string, RawTextureSource | RawTexture | null>;
+  textures?: Record<string, RawTextureInput | RawTexture | null>;
   /** Named storage buffers, read as `<name>[i]` in WGSL. */
   storage?: Record<string, RawStorage>;
   /** At most two extra bind groups, at `@group(2)` and `@group(3)`. */
@@ -125,8 +147,10 @@ export interface RawShaderMaterialOptions {
    * A `@vertex fn` of the vertex code that returns `margoVelocity(position, positionBefore)`: where the vertex is now and
    * where it was last frame, both before `mesh.world`. Drawn when the RawShaders is added to TAA (`taa.add(raw)`), it gives
    * TAA the motion of a shape the shader moves, so the shape leaves no ghost trail. It reads `margoBefore.time` (last
-   * frame's `camera.time`) and `margoBefore.world`; keep last frame's value of any uniform the move reads beside it. A
-   * mesh without it gets TAA's camera motion only, from its depth. Default none.
+   * frame's `camera.time`) and `margoBefore.world`; keep last frame's value of any uniform the move reads beside it. It
+   * draws with `depthCompare: 'equal'` against the vertex entry's depth: compute that position as `margoVelocity` does
+   * and declare it `@invariant`, as `MargoVelocity` is. A mesh without it gets TAA's camera motion only, from its depth.
+   * Default none.
    */
   velocityEntry?: string;
   /** Draw after the opaque scene, sorted back to front, with blending. Default false. */
@@ -135,12 +159,30 @@ export interface RawShaderMaterialOptions {
   blending?: RawBlending;
   /** Reversed-Z `greater-equal` test against the scene depth. Default true. */
   depthTest?: boolean;
+  /**
+   * The depth test's comparison while `depthTest` is true, in Margo's reversed Z (nearer is greater). Default
+   * `'greater-equal'`.
+   */
+  depthCompare?: GPUCompareFunction;
+  /**
+   * Constant depth bias in units of the depth format's smallest step, as WebGPU's `depthBias`; positive values move
+   * the surface nearer in reversed Z. Triangles only. Default 0.
+   */
+  depthBias?: number;
+  /** Depth bias per unit of depth slope, as WebGPU's `depthBiasSlopeScale`. Triangles only. Default 0. */
+  depthBiasSlopeScale?: number;
+  /** Alpha to coverage: the fragment's alpha masks MSAA samples. Only acts on multisampled targets. Default false. */
+  alphaToCoverage?: boolean;
   /** Default true. */
   depthWrite?: boolean;
   /** Faces to cull, counter-clockwise front. Default `'back'`. */
   cull?: 'back' | 'front' | 'none';
   /** Write colour (false: depth only, e.g. an occluder). Default true. */
   colorWrite?: boolean;
+  /**
+   * Draw a triangle mesh's edges as a line list, each edge once (lines are 1 pixel wide in WebGPU). Live. Default false.
+   */
+  wireframe?: boolean;
   /** Debug and error-message name. Default `'raw:<n>'`. */
   name?: string;
 }
@@ -179,7 +221,7 @@ const roundUp = (x: number, step: number): number => Math.ceil(x / step) * step;
 const helpers = `${neutralShader.replace('pbrNeutral', 'margoNeutral')}fn margoSRGB(x:vec3f)->vec3f {return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}
 fn margoDisplay(c:vec4f)->vec4f {if(camera.encoding==0.0){return c;}let x=margoNeutral(max(c.rgb,vec3f(0)));if(camera.encoding==2.0){return vec4f(x,c.a);}return vec4f(margoSRGB(x),c.a);}
 fn margoEncode(c:vec4f)->vec4f {if(camera.encoding!=1.0){return c;}return vec4f(margoSRGB(max(c.rgb,vec3f(0))),c.a);}
-struct MargoCamera { view:mat4x4f, projection:mat4x4f, viewProjection:mat4x4f, position:vec3f, time:f32, resolution:vec2f, deltaTime:f32, encoding:f32 }
+struct MargoCamera { view:mat4x4f, projection:mat4x4f, viewProjection:mat4x4f, position:vec3f, time:f32, resolution:vec2f, deltaTime:f32, encoding:f32, viewport:vec4f }
 struct MargoMesh { world:mat4x4f, normal:mat3x3f, pickId:u32 }
 @group(0) @binding(0) var<uniform> camera:MargoCamera;
 @group(0) @binding(1) var<uniform> mesh:MargoMesh;
@@ -189,7 +231,7 @@ fn margoGBuffer(normal:vec3f,position:vec3f,ambient:vec3f)->MargoGBuffer {return
 // that writes TAA's motion (current minus previous position in uv, and the previous depth) as its own pass does.
 const velocityPrelude = `struct MargoBefore { viewProjection:mat4x4f, world:mat4x4f, time:f32, valid:f32 }
 @group(0) @binding(2) var<uniform> margoBefore:MargoBefore;
-struct MargoVelocity { @builtin(position) clip:vec4f, @location(0) previous:vec4f }
+struct MargoVelocity { @builtin(position) @invariant clip:vec4f, @location(0) previous:vec4f }
 fn margoVelocity(position:vec3f,before:vec3f)->MargoVelocity {return MargoVelocity(camera.viewProjection*mesh.world*vec4f(position,1),margoBefore.viewProjection*margoBefore.world*vec4f(before,1));}
 `;
 const velocityFragment = `
@@ -245,7 +287,9 @@ const frameLayouts = new WeakMap<GPUDevice, GPUBindGroupLayout>(),
   velocityLayouts = new WeakMap<GPUDevice, GPUBindGroupLayout>(),
   samplers = new WeakMap<GPUDevice, Map<string, GPUSampler>>(),
   views = new WeakMap<GPUTexture, Map<string, GPUTextureView>>(),
-  owners = new WeakMap<object, GPUDevice>(),
+  slots = new WeakMap<object, BorrowSlot<GPUTexture | GPUTextureView>>(),
+  buffers = new WeakMap<object, BorrowSlot<GPUBuffer>>(),
+  standIns = new WeakMap<GPUDevice, GPUBuffer>(),
   fallbacks = new WeakMap<GPUDevice, Map<string, GPUTextureView>>();
 const visibility = () => GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
 function frameLayout(device: GPUDevice, velocity = false): GPUBindGroupLayout {
@@ -283,14 +327,30 @@ function fallback(device: GPUDevice, t: RawTexture): GPUTextureView {
   if (!view) {
     const layers = dimension === 'cube' ? 6 : 1,
       integer = type === 'sint' || type === 'uint',
+      depth = type === 'depth',
       texture = device.createTexture({
         label: 'shader:raw:white',
         size: [1, 1, layers],
         dimension: dimension === '3d' ? '3d' : '2d',
-        format: integer ? (type === 'sint' ? 'rgba8sint' : 'rgba8uint') : 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        format: depth ? 'depth32float' : integer ? (type === 'sint' ? 'rgba8sint' : 'rgba8uint') : 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | (depth ? GPUTextureUsage.RENDER_ATTACHMENT : GPUTextureUsage.COPY_DST),
       });
-    if (!integer)
+    if (depth) {
+      const encoder = device.createCommandEncoder();
+      for (let layer = 0; layer < layers; layer++)
+        encoder
+          .beginRenderPass({
+            colorAttachments: [],
+            depthStencilAttachment: {
+              view: texture.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }),
+              depthClearValue: 1,
+              depthLoadOp: 'clear',
+              depthStoreOp: 'store',
+            },
+          })
+          .end();
+      device.queue.submit([encoder.finish()]);
+    } else if (!integer)
       device.queue.writeTexture(
         { texture },
         new Uint8Array(4 * layers).fill(255),
@@ -301,33 +361,43 @@ function fallback(device: GPUDevice, t: RawTexture): GPUTextureView {
   }
   return view;
 }
-let warned = false;
-function bindTexture(device: GPUDevice, t: RawTexture): [GPUTextureView, GPUSampler] {
-  const source = t.texture,
-    filter = (t.sampleType ?? 'float') === 'float';
+// The buffer to bind for a storage entry: a function's result, a plain buffer while its device is the one in use, else a
+// zeroed stand-in (reads give zero, writes land nowhere) with one report through `engine.onError`.
+function bindStorage(device: GPUDevice, s: RawStorage, engine?: { onError(error: unknown): void }): GPUBuffer {
+  if (typeof s.buffer === 'function') return s.buffer(device);
+  let slot = buffers.get(s.buffer);
+  if (!slot) buffers.set(s.buffer, (slot = borrow<GPUBuffer>(s.buffer, 'RawShaderMaterial storage buffer', 'assign a new buffer', device)));
+  const buffer = lend(slot, device, engine);
+  if (buffer) return buffer;
+  let standIn = standIns.get(device);
+  if (!standIn) standIns.set(device, (standIn = device.createBuffer({ label: 'shader:raw:storage-stand-in', size: 256, usage: GPUBufferUsage.STORAGE })));
+  return standIn;
+}
+function bindTexture(device: GPUDevice, t: RawTexture, engine?: { onError(error: unknown): void }): [GPUTextureView, GPUSampler] {
+  const type = t.sampleType ?? 'float',
+    filter = type === 'float';
   // Integer and unfilterable textures need a non-filtering sampler whatever the descriptor or the Texture says.
   const own = (s?: GPUSampler) =>
-    !filter
+    type === 'depth'
+      ? sampler(device, { compare: 'less-equal', ...t.sampler })
+      : !filter
       ? sampler(device, { ...t.sampler, magFilter: 'nearest', minFilter: 'nearest', mipmapFilter: 'nearest' })
       : t.sampler || !s
         ? sampler(device, t.sampler)
         : s;
-  if (source && typeof (source as BindableTexture).bind === 'function') {
+  let source = t.texture;
+  if (source && typeof source !== 'function' && typeof (source as BindableTexture).bind === 'function') {
     const bound = (source as BindableTexture).bind(device, true);
     return bound ? [bound[0], own(bound[1])] : [fallback(device, t), own()];
   }
   if (!source) return [fallback(device, t), own()];
-  const owner = owners.get(source);
-  if (owner && owner !== device) {
-    if (!warned) {
-      warned = true;
-      console.warn(
-        '@margoengine/shader/raw: a texture belongs to a lost GPU device; assign one made on engine.gpu after onDeviceRestored. Drawing white.',
-      );
-    }
-    return [fallback(device, t), own()];
-  }
-  owners.set(source, device);
+  // A caller's texture belongs to the device it was first bound on (a function: made once per device); after a restore
+  // a plain one reads white and is reported once.
+  let slot = slots.get(source);
+  if (!slot)
+    slots.set(source, (slot = borrow<GPUTexture | GPUTextureView>(source as GPUTexture, 'RawShaderMaterial texture', 'assign a new texture', device)));
+  source = lend(slot, device, engine) ?? null;
+  if (!source) return [fallback(device, t), own()];
   let view = source as GPUTextureView;
   if (typeof (source as GPUTexture).createView === 'function') {
     const texture = source as GPUTexture,
@@ -345,6 +415,11 @@ const blends: Record<string, GPUBlendState | undefined> = {
     color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
     alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
   },
+  // The destination minus the source weighted by its alpha; alpha is kept.
+  subtractive: {
+    color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'reverse-subtract' },
+    alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+  },
   multiply: {
     color: { srcFactor: 'zero', dstFactor: 'src', operation: 'add' },
     alpha: { srcFactor: 'zero', dstFactor: 'src-alpha', operation: 'add' },
@@ -359,16 +434,20 @@ let materials = 0;
 /**
  * Raw shader material for WebGPU: your own WGSL vertex and fragment entry points, drawn by {@link RawShaders} in
  * the scene's colour and depth pass. A prelude in front of your code declares what you can read: `camera` (view,
- * projection, viewProjection, position, time, resolution, deltaTime), `mesh` (world, normal), `uniforms.<name>`, each
+ * projection, viewProjection, position, time, resolution, deltaTime, viewport: the view drawn as x, y, width and
+ * height in target pixels), `mesh` (world, normal), `uniforms.<name>`, each
  * texture `<name>` with `<name>Sampler`, each storage buffer `<name>`, the `Attributes` struct of the drawn RawMesh, and
  * `margoDisplay(c)` / `margoEncode(c)` to output linear colour like the rest of the scene. Fragment output is written as
  * returned.
  * WGSL errors are reported (`error`, `onError`, else console.error) and that draw is skipped; other draws continue.
  */
-export class RawShaderMaterial {
+export class RawShaderMaterial<U extends { value: unknown } = RawUniform> {
   readonly name: string;
-  /** Live values; names and types are fixed at construction. */
-  readonly uniforms: Record<string, RawUniform>;
+  /**
+   * Live values; names and types are fixed at construction. `U` is the entry a subclass shows (ShaderMaterial of
+   * `@margoengine/shader/glsl-material` shows its GLSL uniforms); a RawShaderMaterial holds RawUniforms.
+   */
+  readonly uniforms: Record<string, U>;
   /** Live `texture` and `sampler`; names, dimension and sample type are fixed at construction. */
   readonly textures: Record<string, RawTexture>;
   /** Live `buffer`; names, types and access are fixed at construction. */
@@ -376,9 +455,15 @@ export class RawShaderMaterial {
   transparent: boolean;
   blending: RawBlending;
   depthTest: boolean;
+  depthCompare: GPUCompareFunction;
+  depthBias: number;
+  depthBiasSlopeScale: number;
+  alphaToCoverage: boolean;
   depthWrite: boolean;
   cull: 'back' | 'front' | 'none';
   colorWrite: boolean;
+  /** Draws triangle meshes as their edges. */
+  wireframe: boolean;
   /** Called with a MargoError `'failed'` naming the stage, line and WGSL message when a pipeline does not compile. */
   onError?: (error: Error) => void;
   /** The latest compile error, or undefined. */
@@ -406,9 +491,14 @@ export class RawShaderMaterial {
     this.transparent = options.transparent ?? false;
     this.blending = options.blending ?? 'normal';
     this.depthTest = options.depthTest ?? true;
+    this.depthCompare = options.depthCompare ?? 'greater-equal';
+    this.depthBias = options.depthBias ?? 0;
+    this.depthBiasSlopeScale = options.depthBiasSlopeScale ?? 0;
+    this.alphaToCoverage = options.alphaToCoverage ?? false;
     this.depthWrite = options.depthWrite ?? true;
     this.cull = options.cull ?? 'back';
     this.colorWrite = options.colorWrite ?? true;
+    this.wireframe = options.wireframe ?? false;
     this.gbufferName = options.gbufferEntry;
     this.velocityName = options.velocityEntry;
     this.groups = options.groups ?? [];
@@ -419,7 +509,8 @@ export class RawShaderMaterial {
     this.setCode(options.vertexShader, options.fragmentShader);
     const members: Member[] = [];
     let end = 0;
-    this.uniforms = {};
+    const uniforms: Record<string, RawUniform> = {};
+    this.uniforms = uniforms as unknown as Record<string, U>;
     for (const [name, u] of Object.entries(options.uniforms ?? {})) {
       identifier(name, 'RawShaderMaterial uniform');
       if (!u || typeof u !== 'object' || !('value' in u))
@@ -446,7 +537,7 @@ export class RawShaderMaterial {
           offset = roundUp(end, 16);
         members.push({ name, type: 'Raw_' + name, offset, count, stride, fields });
         end = offset + stride * (count ?? 1);
-        this.uniforms[name] = u;
+        uniforms[name] = u;
         continue;
       }
       if (count !== undefined) {
@@ -463,7 +554,7 @@ export class RawShaderMaterial {
         const offset = roundUp(end, 16);
         members.push({ name, type: element, offset, count, stride });
         end = offset + stride * count;
-        this.uniforms[name] = u;
+        uniforms[name] = u;
         continue;
       }
       const v = u.value,
@@ -483,7 +574,7 @@ export class RawShaderMaterial {
       const offset = Math.ceil(end / alignOf(type)) * alignOf(type);
       members.push({ name, type, offset });
       end = offset + bytesOf(type);
-      this.uniforms[name] = u.type ? u : Object.assign(u, { type });
+      uniforms[name] = u.type ? u : Object.assign(u, { type });
     }
     this.members = members;
     this.size = members.length ? Math.ceil(end / 16) * 16 : 0;
@@ -493,17 +584,19 @@ export class RawShaderMaterial {
     for (const [name, t] of Object.entries(options.textures ?? {})) {
       identifier(name, 'RawShaderMaterial texture');
       const value: RawTexture =
-        t && typeof t === 'object' && 'texture' in t ? (t as RawTexture) : { texture: t as RawTextureSource | null };
+        isOptionObject(t) && 'texture' in t ? (t as RawTexture) : { texture: t as RawTextureInput | null };
       if (value.dimension !== undefined && !['2d', '2d-array', 'cube', '3d'].includes(value.dimension))
         throw new TypeError(`RawShaderMaterial texture ${name} dimension must be 2d, 2d-array, cube or 3d`);
       if (value.dimension && value.dimension !== '2d' && typeof (value.texture as BindableTexture)?.bind === 'function')
         throw new TypeError(
           `RawShaderMaterial texture ${name}: a materials Texture is 2d; pass a GPUTexture for ${value.dimension}`,
         );
-      if (value.sampleType !== undefined && !['float', 'unfilterable-float', 'sint', 'uint'].includes(value.sampleType))
+      if (value.sampleType !== undefined && !['float', 'unfilterable-float', 'sint', 'uint', 'depth'].includes(value.sampleType))
         throw new TypeError(
-          `RawShaderMaterial texture ${name} sampleType must be float, unfilterable-float, sint or uint`,
+          `RawShaderMaterial texture ${name} sampleType must be float, unfilterable-float, sint, uint or depth`,
         );
+      if (value.sampleType === 'depth' && value.dimension === '3d')
+        throw new TypeError(`RawShaderMaterial texture ${name}: depth textures are 2d, 2d-array or cube; use one of those dimensions`);
       this.textures[name] = value;
     }
     this.storage = {};
@@ -581,9 +674,10 @@ export class RawShaderMaterial {
         `struct Uniforms {\n${this.members.map((m) => `  ${m.name}:${m.count === undefined ? m.type : `array<${m.type},${m.count}>`},`).join('\n')}\n}\n@group(1) @binding(0) var<uniform> uniforms:Uniforms;`,
       );
     Object.entries(this.textures).forEach(([name, t], i) => {
-      const s = { float: 'f32', 'unfilterable-float': 'f32', sint: 'i32', uint: 'u32' }[t.sampleType ?? 'float'];
+      const s = { float: 'f32', 'unfilterable-float': 'f32', sint: 'i32', uint: 'u32', depth: '' }[t.sampleType ?? 'float'],
+        d = (t.dimension ?? '2d').replace('-', '_');
       out.push(
-        `@group(1) @binding(${1 + 2 * i}) var ${name}:texture_${(t.dimension ?? '2d').replace('-', '_')}<${s}>;\n@group(1) @binding(${2 + 2 * i}) var ${name}Sampler:sampler;`,
+        `@group(1) @binding(${1 + 2 * i}) var ${name}:texture_${s ? d + '<' + s + '>' : 'depth_' + d};\n@group(1) @binding(${2 + 2 * i}) var ${name}Sampler:sampler${s ? '' : '_comparison'};`,
       );
     });
     const first = 1 + 2 * Object.keys(this.textures).length;
@@ -608,7 +702,7 @@ export class RawShaderMaterial {
   /** @internal The render-state part of a pipeline key. */
   state(): string {
     const b = this.blending;
-    return `${this.transparent}|${typeof b === 'string' ? b : JSON.stringify(b)}|${this.depthTest}|${this.depthWrite}|${this.cull}|${this.colorWrite}|${this.revision}`;
+    return `${this.transparent}|${typeof b === 'string' ? b : JSON.stringify(b)}|${this.depthTest}|${this.depthCompare}|${this.depthBias}|${this.depthBiasSlopeScale}|${this.alphaToCoverage}|${this.depthWrite}|${this.cull}|${this.colorWrite}|${this.revision}`;
   }
   /** @internal */
   blend(): GPUBlendState | undefined {
@@ -616,12 +710,15 @@ export class RawShaderMaterial {
     if (typeof b !== 'string') return b;
     if (!(b in blends) && b !== 'none')
       throw new TypeError(
-        `RawShaderMaterial ${this.name} blending must be none, normal, additive, multiply, premultiplied or a GPUBlendState`,
+        `RawShaderMaterial ${this.name} blending must be none, normal, additive, subtractive, multiply, premultiplied or a GPUBlendState`,
       );
     return b === 'normal' && !this.transparent ? undefined : blends[b];
   }
+  /** @internal The RawShaders that drew this material last: the scene values of `ShaderMaterial` lights and fog come from it. */
+  drawnBy?: RawShaders;
   /** @internal Uploads changed uniforms and (re)builds the material bind group, once per plugin pass. */
-  prepare(device: GPUDevice, pass: number): MaterialGpu {
+  prepare(device: GPUDevice, pass: number, owner?: RawShaders): MaterialGpu {
+    if (owner) this.drawnBy = owner;
     let gpu = this.gpu.get(device);
     if (!gpu) {
       const textures = Object.values(this.textures),
@@ -638,7 +735,7 @@ export class RawShaderMaterial {
           {
             binding: 2 + 2 * i,
             visibility: visibility(),
-            sampler: { type: type === 'float' ? 'filtering' : 'non-filtering' },
+            sampler: { type: type === 'float' ? 'filtering' : type === 'depth' ? 'comparison' : 'non-filtering' },
           },
         );
       });
@@ -686,9 +783,10 @@ export class RawShaderMaterial {
     if (gpu.layout) {
       const bound: unknown[] = this.size ? [gpu.buffer] : [];
       const textures = Object.values(this.textures);
-      for (const t of textures) bound.push(...bindTexture(device, t));
+      const engine = (owner as unknown as { engine?: { onError(error: unknown): void } } | undefined)?.engine;
+      for (const t of textures) bound.push(...bindTexture(device, t, engine));
       const storage = Object.values(this.storage);
-      for (const s of storage) bound.push(typeof s.buffer === 'function' ? s.buffer(device) : s.buffer);
+      for (const s of storage) bound.push(bindStorage(device, s, engine));
       if (!gpu.group || bound.some((x, i) => x !== gpu!.bound[i])) {
         gpu.bound = bound;
         const entries: GPUBindGroupEntry[] = [];
@@ -707,7 +805,7 @@ export class RawShaderMaterial {
     return gpu;
   }
   private write(m: Member): void {
-    const v = this.uniforms[m.name]?.value;
+    const v = (this.uniforms[m.name] as RawUniform | undefined)?.value;
     if (m.count === undefined && !m.fields) return this.put(m.type, m.offset, v, m.name);
     const size = components(m.type),
       list = v as ArrayLike<unknown>,
@@ -763,8 +861,8 @@ export class RawShaderMaterial {
     kind: RawPass,
     c: RawPassContext | undefined,
     compare: GPUCompareFunction,
-  ): { entry?: string; targets: GPUColorTargetState[]; depthStencil: GPUDepthStencilState } {
-    const format = c?.descriptor.depthStencil!.format as GPUTextureFormat;
+  ): { entry?: string; targets: GPUColorTargetState[]; depthStencil?: GPUDepthStencilState } {
+    const format = c?.descriptor.depthStencil?.format as GPUTextureFormat;
     if (kind === 'shadow')
       return {
         // A fragment only matters to a shadow when it can cut the shape, and its outputs then go nowhere.
@@ -779,7 +877,8 @@ export class RawShaderMaterial {
         depthStencil: {
           format: 'depth32float',
           depthWriteEnabled: true,
-          depthCompare: this.depthTest ? 'greater-equal' : 'always',
+          depthCompare: this.depthTest ? this.depthCompare : 'always',
+          ...this.bias(),
         },
       };
     if (kind === 'velocity')
@@ -798,12 +897,18 @@ export class RawShaderMaterial {
     return {
       entry: this.fragmentName,
       targets: [{ format: c!.format, ...(blend ? { blend } : {}), writeMask: this.colorWrite ? 0xf : 0 }],
-      depthStencil: {
+      // A context without depth (a full-screen pass of shader/glsl-pass) draws colour alone.
+      depthStencil: format && {
         format,
         depthWriteEnabled: this.depthWrite,
-        depthCompare: this.depthTest ? 'greater-equal' : 'always',
+        depthCompare: this.depthTest ? this.depthCompare : 'always',
+        ...this.bias(),
       },
     };
+  }
+  // WebGPU takes a depth bias on triangle topologies only (pipeline validation).
+  private bias(): Partial<GPUDepthStencilState> {
+    return this.depthBias || this.depthBiasSlopeScale ? { depthBias: this.depthBias, depthBiasSlopeScale: this.depthBiasSlopeScale } : {};
   }
   /** @internal The pipeline for `key`, compiling it on first use; undefined while pending or after a failure. */
   pipeline(
@@ -815,10 +920,11 @@ export class RawShaderMaterial {
     c?: RawPassContext,
     compare: GPUCompareFunction = 'equal',
   ): GPURenderPipeline | undefined {
-    const strip = mesh.topology.endsWith('strip') && mesh.indexFormat,
+    const topology = mesh.drawTopology,
+      strip = topology.endsWith('strip') && mesh.indexFormat,
       samples = c?.descriptor.multisample?.count ?? 1,
-      depth = c?.descriptor.depthStencil!.format,
-      key = `${kind}|${mesh.layoutKey}|${mesh.topology}|${strip || ''}|${c?.format}|${samples}|${depth}|${compare}|${this.state()}`;
+      depth = c?.descriptor.depthStencil?.format,
+      key = `${kind}|${mesh.layoutKey}|${topology}|${strip || ''}|${c?.format}|${samples}|${depth}|${compare}|${this.state()}`;
     let e = gpu.pipelines.get(key);
     if (e) return e.pipeline;
     e = { state: 'pending' };
@@ -861,16 +967,17 @@ export class RawShaderMaterial {
         },
         ...(fragmentEntry ? { fragment: { module: fragment, entryPoint: fragmentEntry, targets } } : {}),
         primitive: {
-          topology: mesh.topology,
+          topology,
           // A light sees either side, as in the depth pipeline of `Shadows`; TAA's velocity draws both, as its own do.
           cullMode: kind === 'shadow' || velocity ? 'none' : this.cull,
           ...(strip ? { stripIndexFormat: strip } : {}),
         },
-        depthStencil,
-        multisample: { count: samples },
+        ...(depthStencil && { depthStencil: topology.startsWith('triangle') ? depthStencil : { ...depthStencil, depthBias: 0, depthBiasSlopeScale: 0 } }),
+        multisample: { count: samples, ...(kind === 'color' && samples > 1 && this.alphaToCoverage ? { alphaToCoverageEnabled: true } : {}) },
       };
     const entry = e;
-    if (typeof device.createRenderPipelineAsync !== 'function') {
+    // A pass without depth compiles at once, as a post stage must draw its first frame.
+    if (typeof device.createRenderPipelineAsync !== 'function' || (c && !depth)) {
       entry.pipeline = device.createRenderPipeline(descriptor);
       entry.state = 'ready';
       this.compiled++;
@@ -1061,6 +1168,8 @@ class Stream {
 }
 interface MeshGpu {
   device: GPUDevice;
+  /** The index buffer holds the wireframe's edges. */
+  wire?: boolean;
   object: GPUBuffer;
   written?: Float32Array;
   vertex?: HeldBuffer;
@@ -1091,10 +1200,12 @@ export interface RawShadowContext {
   /** Cascade index, 0-3. */
   cascade: number;
 }
+/** Any raw material: a RawShaderMaterial or a subclass such as ShaderMaterial. */
+export type AnyRawShaderMaterial = RawShaderMaterial<{ value: unknown }>;
 /** Options for `new RawMesh(options)`. */
-export interface RawMeshOptions {
+export interface RawMeshOptions<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
   /** The material that draws it; assignable later (`mesh.material = other`). */
-  material: RawShaderMaterial;
+  material: M;
   /** Named attributes; shader locations follow this order (the prelude's `Attributes` struct names them). At most 16. */
   attributes?: Record<string, RawAttribute>;
   /** Triangle (or line/point) indices; omit to draw vertices in order. */
@@ -1127,8 +1238,9 @@ const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
  * an instance count. Add it to a {@link RawShaders} plugin to draw it.
  * Per-vertex and per-instance attributes are each interleaved into one vertex buffer; `setAttribute` updates are live.
  */
-export class RawMesh {
-  material: RawShaderMaterial;
+export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
+  /** The material that draws it; `mesh.material.uniforms` keeps that material's uniform types. */
+  material: M;
   readonly matrix: Float32Array;
   /** Core mesh to follow, or null. */
   mesh: Mesh | null;
@@ -1155,7 +1267,7 @@ export class RawMesh {
   private sphere: readonly number[] | null | undefined;
   private readonly world = new Float32Array(16);
   private readonly object = new Float32Array(28);
-  constructor(options: RawMeshOptions) {
+  constructor(options: RawMeshOptions<M>) {
     if (!(options?.material instanceof RawShaderMaterial))
       throw new TypeError('RawMesh needs {material: new RawShaderMaterial(...)}');
     this.material = options.material;
@@ -1172,6 +1284,37 @@ export class RawMesh {
     for (const [name, a] of Object.entries(options.attributes ?? {})) this.define(name, a);
     this.restructure();
     if (options.index) this.setIndex(options.index);
+  }
+  /** @internal What the pipeline draws: a triangle topology as a line list while the material is a wireframe. */
+  get drawTopology(): GPUPrimitiveTopology {
+    return this.material.wireframe && this.topology.startsWith('triangle') ? 'line-list' : this.topology;
+  }
+  private wire?: [unknown, number, GPUPrimitiveTopology, Uint32Array];
+  // The edges of the triangles drawn, each once in the order first met (a strip's restart index ends a run).
+  private edges(count: number): Uint32Array {
+    const index = this.indices,
+      w = this.wire;
+    if (w && w[0] === index && w[1] === count && w[2] === this.topology && !this.indexDirty) return w[3];
+    const n = index ? index.length : count,
+      at = (i: number) => (index ? index[i]! : i),
+      restart = index instanceof Uint16Array ? 0xffff : 0xffffffff,
+      strip = this.topology === 'triangle-strip',
+      seen = new Set<string>(),
+      out: number[] = [];
+    const add = (a: number, b: number) => {
+      const key = a < b ? `${a},${b}` : `${b},${a}`;
+      if (a !== b && !seen.has(key)) seen.add(key), out.push(a, b);
+    };
+    for (let i = 0; i + 2 < n; i += strip ? 1 : 3) {
+      const a = at(i),
+        b = at(i + 1),
+        c = at(i + 2);
+      if (strip && (a === restart || b === restart || c === restart)) continue;
+      add(a, b), add(b, c), add(c, a);
+    }
+    const edges = Uint32Array.from(out);
+    this.wire = [index, count, this.topology, edges];
+    return edges;
   }
   /** Attributes in location order. */
   get layout(): readonly { name: string; type: RawAttributeType; step: 'vertex' | 'instance' }[] {
@@ -1481,7 +1624,10 @@ export class RawMesh {
     }
     g.vertex = this.streams.vertex.upload(device, g.vertex);
     g.instance = this.streams.instance.upload(device, g.instance);
-    const index = this.indices;
+    const wire = this.drawTopology !== this.topology,
+      vertices = this.streams.vertex.attributes.length ? Math.min(this.streams.vertex.count, this.vertexCount ?? Infinity) : (this.vertexCount ?? 0),
+      index = wire ? this.edges(vertices) : this.indices;
+    if (g.wire !== wire) (g.wire = wire), (this.indexDirty = true);
     if (!index) {
       dropBuffer(device, g.index);
       g.index = undefined;
@@ -1524,7 +1670,7 @@ export class RawMesh {
     }
     if (instance && bound.slots[slot] !== instance) pass.setVertexBuffer(slot, (bound.slots[slot] = instance));
     if (index) {
-      const format = this.indexFormat!;
+      const format = g.wire ? 'uint32' : this.indexFormat!;
       if (bound.index !== index || bound.format !== format)
         pass.setIndexBuffer((bound.index = index), (bound.format = format));
       pass.drawIndexed(count, instances, first);
@@ -1581,7 +1727,7 @@ function drawList(pass: GPURenderPassEncoder, draws: readonly Draw[]): void {
 export interface RawShadersOptions {
   /** Plugin name, unique per engine. Default `'shader:raw'`. */
   name?: string;
-  /** Frame-graph order of opaque raw meshes: after core meshes (0), before gltf-pro and materials meshes (1). Default 0.5. */
+  /** Frame-graph order of opaque raw meshes: after core meshes (0), before gltf\/pbr and materials meshes (1). Default 0.5. */
   opaqueOrder?: number;
   /** Order of transparent raw meshes: after water (4), sky (5) and particles (6), before OIT (8) and lines (20). Default 7. */
   transparentOrder?: number;
@@ -1609,12 +1755,20 @@ export class RawShaders implements EnginePlugin {
   private shadowPass = 0;
   private readonly shadowWritten: (GPUCommandEncoder | undefined)[] = [];
   private passes = 0;
-  private readonly cameraData = new Float32Array(56);
+  private readonly cameraData = new Float32Array(60);
   private readonly view = new Float64Array(16);
   private readonly inverse = new Float64Array(16);
   /** TAA velocity state per TAA view: its camera block, last frame's time and each mesh's last world matrix. */
   private readonly velocityStates = new Map<object, VelocityState>();
   private readonly beforeData = new Float32Array(36);
+  /** @internal The latest pass token (see `nextPass`). */
+  get pass(): number {
+    return this.passes;
+  }
+  /** @internal The engine whose lighting scene values read. */
+  get kernel(): EngineKernel | undefined {
+    return this.engine as unknown as EngineKernel | undefined;
+  }
   /** Same as `engine.use(new RawShaders(...))`; returns the plugin. */
   static attach(engine: EngineKernel, options?: RawShadersOptions): RawShaders {
     const value = new RawShaders(options);
@@ -1633,7 +1787,7 @@ export class RawShaders implements EnginePlugin {
    * Draws `mesh` from the next frame on; returns it.
    * @throws MargoError `'attached'` when it belongs to another RawShaders, `'disposed'` after `mesh.dispose()`.
    */
-  add(mesh: RawMesh): RawMesh {
+  add<T extends RawMesh>(mesh: T): T {
     if (!(mesh instanceof RawMesh)) throw new TypeError('RawShaders.add needs a RawMesh');
     if (mesh.owner && mesh.owner !== this)
       throw new MargoError('attached', 'RawMesh already belongs to another RawShaders; remove it there first');
@@ -1674,6 +1828,7 @@ export class RawShaders implements EnginePlugin {
       throw new MargoError('unsupported', 'RawShaders requires WebGPU; see https://margoengine.com/errors#webgpu');
     this.engine = engine;
     this.device = engine.gpu ?? undefined;
+    ShaderClock.hold(engine, this);
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({ name: this.name + ':opaque', order: this.opaqueOrder, execute: (c) => this.execute(c, false) });
@@ -1692,6 +1847,7 @@ export class RawShaders implements EnginePlugin {
     const engine = this.engine;
     this.release();
     this.engine = this.device = undefined;
+    ShaderClock.release(engine, this);
     engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
@@ -1716,7 +1872,7 @@ export class RawShaders implements EnginePlugin {
   private cameraBuffer(device: GPUDevice): GPUBuffer {
     return device.createBuffer({
       label: 'shader:raw:camera',
-      size: 224,
+      size: 240,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
   }
@@ -1727,11 +1883,14 @@ export class RawShaders implements EnginePlugin {
     device.queue.writeBuffer(
       this.camera,
       0,
-      this.cameraBlock(c.camera, c.camera.matrix, c.width, c.height, c.delta, encoding),
+      this.cameraBlock(c.camera, c.camera.matrix, c.width, c.height, c.delta, encoding, viewRect(c)),
     );
     return this.camera;
   }
-  /** @internal The camera block of `camera` seen through view-projection `m`. */
+  /**
+   * @internal The camera block of `camera` seen through view-projection `m`: `resolution` is the target's size and
+   * `viewport` the drawn view's rectangle in target pixels (the whole target without a view).
+   */
   cameraBlock(
     camera: PassContext['camera'],
     m: ArrayLike<number>,
@@ -1739,6 +1898,7 @@ export class RawShaders implements EnginePlugin {
     height: number,
     delta: number,
     encoding: number,
+    view?: ArrayLike<number>,
   ): Float32Array<ArrayBuffer> {
     const f = this.cameraData,
       v = viewMatrix(this.view as unknown as Float32Array, camera),
@@ -1760,11 +1920,13 @@ export class RawShaders implements EnginePlugin {
           m[12 + r] * inv[col * 4 + 3];
     f.set(m, 32);
     f.set(camera.position, 48);
-    f[51] = performance.now() / 1000;
+    f[51] = ShaderClock.find(this.engine)?.time ?? 0;
     f[52] = width;
     f[53] = height;
     f[54] = delta;
     f[55] = encoding;
+    if (view) f.set(view, 56);
+    else f.set([0, 0, width, height], 56);
     return f;
   }
   /** @internal The next pass token: a material uploads its uniforms once per token. */
@@ -1795,7 +1957,7 @@ export class RawShaders implements EnginePlugin {
     }
     const call = mesh.upload(device, camera, world);
     if (!call) return;
-    const gpu = material.prepare(device, this.shadowPass),
+    const gpu = material.prepare(device, this.shadowPass, this),
       pipeline = material.pipeline(this, gpu, device, mesh, 'shadow');
     if (pipeline) drawList(pass, [{ mesh, pipeline, gpu, call, distance: 0 }]);
   }
@@ -1827,7 +1989,7 @@ export class RawShaders implements EnginePlugin {
       camera ??= this.writeCamera(c);
       const call = mesh.upload(device, camera, world);
       if (!call) continue;
-      const gpu = material.prepare(device, token),
+      const gpu = material.prepare(device, token, this),
         pipeline = material.pipeline(this, gpu, device, mesh, 'gbuffer', c, external.depthCompare);
       if (pipeline) draws.push({ mesh, pipeline, gpu, call, distance: 0 });
     }
@@ -1860,7 +2022,7 @@ export class RawShaders implements EnginePlugin {
       const world = mesh.worldMatrix(engine);
       if (!world || mesh.culled(world, now)) continue;
       if (time === undefined) {
-        const block = this.cameraBlock(c.camera, now, c.width, c.height, c.delta, 0);
+        const block = this.cameraBlock(c.camera, now, c.width, c.height, c.delta, 0, viewRect(c));
         time = block[51];
         device.queue.writeBuffer(state.camera, 0, block);
       }
@@ -1897,7 +2059,7 @@ export class RawShaders implements EnginePlugin {
       device.queue.writeBuffer(m.before, 0, d);
       m.world.set(world);
       m.frame = state.frame;
-      const gpu = material.prepare(device, token),
+      const gpu = material.prepare(device, token, this),
         pipeline = material.pipeline(this, gpu, device, mesh, 'velocity', c);
       if (pipeline) draws.push({ mesh, pipeline, gpu, call, group: m.group });
     }
@@ -1942,7 +2104,7 @@ export class RawShaders implements EnginePlugin {
       camera ??= this.writeCamera(c);
       const call = mesh.upload(device, camera, world);
       if (!call) continue;
-      const gpu = material.prepare(device, token),
+      const gpu = material.prepare(device, token, this),
         pipeline = material.pipeline(this, gpu, device, mesh, 'color', c);
       // A pick's pipeline starts compiling with the colour one, so the first pick after `ready()` finds it.
       if (this.watchers.size) material.pipeline(this, gpu, device, mesh, 'pick');
@@ -1966,6 +2128,8 @@ export class RawShaders implements EnginePlugin {
           ...(stencil ? { stencilReadOnly: true } : {}),
         },
       });
+    // A view of a multi-view frame draws inside its own rectangle, as core's scene pass does.
+    applyView(pass, c);
     drawList(pass, draws);
     this.stats.meshes += draws.length;
     this.stats.drawCalls += draws.length;
@@ -2067,7 +2231,7 @@ export class RawPicking {
       if (!world || mesh.culled(world, c.matrix)) continue;
       const call = mesh.upload(device, camera, world);
       if (!call) continue;
-      const gpu = material.prepare(device, token),
+      const gpu = material.prepare(device, token, raw),
         pipeline = material.pipeline(raw, gpu, device, mesh, 'pick');
       if (!pipeline) continue;
       this.id[0] = c.firstId + this.hits.length;

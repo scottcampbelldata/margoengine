@@ -1,15 +1,15 @@
 import type { PassContext } from '@margoengine/core/extension';
 import { compute, group } from '../../shared/gpu.js';
 import { overlayPass } from '../../shared/pass.js';
-import { oceanWaves, waterFrame, type CoastalFlow } from './coastal.js';
+import { oceanWaves, waterFrame } from './coastal.js';
+import type { WaterSolver } from './query-state.js';
 import { fogWgsl } from '../../shared/fog.js';
 import { margoError } from '../../shared/errors.js';
 import { perSample } from '../../shared/msaa.js';
+import { applyView } from '../../shared/view-rect.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
-/** Droplets in the fixed GPU pool. */
-const POOL = 4096;
 // random(): the xxHash32 avalanche finaliser (Y. Collet, xxHash specification): primes 2246822519 = 0x85EBCA77 and
 // 3266489917 = 0xC2B2AE3D with shifts 16 / 13 / 16.
 const particles = `struct Particle {position:vec4f,velocity:vec4f}
@@ -25,6 +25,12 @@ fn random(value:u32)->f32 {var x=value;x=(x^(x>>16u))*2246822519u;x=(x^(x>>13u))
 // Review of Fluid Mechanics 35) and back off it; clumps are 0.08 to 0.35 m across and grow as they rise and thin, many of
 // them, each a thin mist holding a speckle of fine drops, so a burst reads as a cloud of spray and no clump as a white
 // ball.
+// The flow drives a wall the same way (flood and surge water running at a wall, any wet cell, not only open sea): its
+// drive is the speed into the wall of the water one cell out from it, (east - west, north - south) outflow / depth, and
+// the larger of the two drives throws the jet.
+// Breaker spray takes off wherever the solver's breaker channel passes 0.08, at any depth: the coast flow's breaker is 0
+// beyond 1.8 m already, and a flood's bores and fronts break white over deep water too (until 2026-11-17 a depth cap of
+// 1.8 m, plus 4 m under whitecaps, kept a flood's spray off every front deeper than that).
 // Rates, thresholds and clump sizes are Margo tuning.
 // impact() returns the wall's direction from open water at the pixel (xy, unit) and the swell's drive into it in m/s (z),
 // z 0 when there is no wall. A droplet's velocity.w of 2 to 3 marks an impact clump (and sets its size); a breaker
@@ -40,7 +46,8 @@ const simulate =
 @group(0) @binding(3) var<storage,read_write> droplets:array<Particle>;
 @group(0) @binding(4) var<storage,read> connected:array<u32>;
 fn impact(pixel:vec2i,size:vec2i,water:vec4f)->vec3f {
- if(water.x<0.5||connected[u32(pixel.y*size.x+pixel.x)+1u]!=0u){return vec3f(0);}
+ let sea=water.x>=0.5&&connected[u32(pixel.y*size.x+pixel.x)+1u]==0u;
+ if(!sea&&water.x<0.05){return vec3f(0);}
  var n=vec2f(0);
  for(var o=0u;o<8u;o++){
   let dir=vec2f(cos(f32(o)*0.78539816),sin(f32(o)*0.78539816));
@@ -49,13 +56,17 @@ fn impact(pixel:vec2i,size:vec2i,water:vec4f)->vec3f {
  if(dot(n,n)<0.01){return vec3f(0);}
  n=normalize(n);
  let xz=frame.coast.xy+(vec2f(pixel)+0.5)/vec2f(size)*frame.coast.zw;var drive=0.0;
- for(var j=0u;j<u32(frame.settings.w);j++){
-  for(var c=0u;c<3u;c++){let s=swell(frame.waves[j],xz,c,length(frame.flow.yz));drive+=s.amplitude*sqrt(9.81*max(0.0,dot(s.gradient,s.direction)))*sin(s.phase)*dot(s.direction,n);}
+ if(sea){
+  for(var j=0u;j<u32(frame.settings.w);j++){
+   for(var c=0u;c<3u;c++){let s=swell(frame.waves[j],xz,c,length(frame.flow.yz));drive+=s.amplitude*sqrt(9.81*max(0.0,dot(s.gradient,s.direction)))*sin(s.phase)*dot(s.direction,n);}
+  }
  }
+ let out=clamp(pixel-vec2i(round(n)),vec2i(0),size-1);let behind=textureLoad(coast,out,0).x;let q=textureLoad(flux,out,0);
+ if(behind>0.05){drive=max(drive,dot(vec2f(q.y-q.x,q.w-q.z)/behind,n));}
  return vec3f(n,max(0.0,drive));
 }
 @compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u){
- let index=id.x;if(index>=${POOL}u){return;}
+ let index=id.x;if(index>=arrayLength(&droplets)){return;}
  let size=vec2i(textureDimensions(coast));let dt=min(0.05,frame.cameraData.z);var p=droplets[index];
  p.position.w-=dt;
  if(p.position.w>0){
@@ -66,7 +77,7 @@ fn impact(pixel:vec2i,size:vec2i,water:vec4f)->vec3f {
   let clock=u32(frame.settings.x*60.0);let caps=frame.grid.z;let seed=index*73856093u+clock*19349663u;
   for(var i=0u;i<4u;i++){
    let key=seed+i*83492791u;let pixel=vec2i(vec2f(random(key),random(key+1u))*vec2f(size-1));let water=textureLoad(coast,pixel,0);
-   if(water.x>0.01&&water.x<1.8+4.0*caps&&water.w>0.08&&random(key+2u)<min(0.9,dt*45.0*water.w*(1.0+3.0*caps))){
+   if(water.x>0.01&&water.w>0.08&&random(key+2u)<min(0.9,dt*45.0*water.w*(1.0+3.0*caps))){
     let q=textureLoad(flux,pixel,0);let velocity=clamp(vec2f(q.y-q.x,q.w-q.z)/max(0.04,water.x),vec2f(-4),vec2f(4));
     let xz=frame.coast.xy+(vec2f(pixel)+vec2f(random(key+3u),random(key+4u)))/vec2f(size)*frame.coast.zw;
     p.position=vec4f(xz.x,water.x+water.y+0.03,xz.y,0.4+random(key+5u)*0.5);
@@ -161,7 +172,8 @@ function foggedRender(): string {
   return code + fogWgsl(0, 5);
 }
 
-/** Fixed GPU pool, born where shallow flow is actively breaking and where swell crests hit walls. */
+/** Fixed GPU pool of `count` droplets, born where shallow flow is actively breaking and where swell crests or the flow
+ * hit walls. */
 export class Spray {
   readonly buffer: GPUBuffer;
   private readonly simulation: GPUComputePipeline;
@@ -182,9 +194,10 @@ export class Spray {
   constructor(
     device: GPUDevice,
     private readonly uniform: GPUBuffer,
-    private readonly coast: CoastalFlow,
+    private readonly coast: WaterSolver,
+    private readonly count = 4096,
   ) {
-    this.buffer = device.createBuffer({ size: POOL * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
+    this.buffer = device.createBuffer({ size: count * 32, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC });
     try {
       this.simulation = compute(device, simulate);
       for (let i = 0; i < 2; i++)
@@ -206,7 +219,7 @@ export class Spray {
     const pass = encoder.beginComputePass(this.descriptor);
     pass.setPipeline(this.simulation);
     pass.setBindGroup(0, this.simulationGroups[this.coast.current]);
-    pass.dispatchWorkgroups(POOL / 64);
+    pass.dispatchWorkgroups(this.count / 64);
     pass.end();
   }
   /** Draws the droplets over the water; `fog` is Water's fog uniform while it has a fog. */
@@ -291,10 +304,12 @@ export class Spray {
     this.color.view = c.color;
     this.depth.view = view;
     const pass = c.encoder.beginRenderPass(this.presentation);
+    // The drops stay inside the drawn view's rectangle and scissor, as the water surface under them does.
+    applyView(pass, c);
     for (let i = 0; i < this.renders.length; i++) {
       pass.setPipeline(this.renders[i]);
       pass.setBindGroup(0, this.renderGroups[i]);
-      pass.draw(6, POOL);
+      pass.draw(6, this.count);
     }
     pass.end();
   }

@@ -7,18 +7,24 @@ import { Engine, PbrMaterial, Vec3 } from "@margoengine/core";
 
 export type DensityField = (x: number, y: number, z: number) => number;
 
+export interface MeshSmoothChunkOptions {
+    skirt?: number;
+}
+
 export interface SmoothChunk {
     readonly density: Int8Array;
     readonly material: Uint8Array;
 }
 
 export interface SmoothChunkMesh {
-    parts: Map<number, {
-        positions: Float32Array;
-        normals: Float32Array;
-        indices: Uint32Array;
-    }>;
+    parts: Map<number, SmoothMeshPart>;
     triangles: number;
+}
+
+export interface SmoothMeshPart {
+    positions: Float32Array;
+    normals: Float32Array;
+    indices: Uint32Array;
 }
 
 export class SmoothTerrain {
@@ -42,6 +48,7 @@ export interface SmoothTerrainOptions {
 
 export class SmoothTerrainView {
     readonly terrain: SmoothTerrain;
+    origin: VoxelOrigin | null;
     private constructor();
     static attach(engine: Engine, options: SmoothTerrainViewOptions): SmoothTerrainView;
     get stats(): {
@@ -56,9 +63,20 @@ export class SmoothTerrainView {
 
 export interface SmoothTerrainViewOptions {
     terrain: SmoothTerrain;
-    materials: readonly PbrMaterial[];
+    materials?: readonly PbrMaterial[];
+    createMesh?: (part: SmoothMeshPart, material: number, origin: Vec3) => {
+        dispose(): void;
+    };
     budget?: number;
+    origin?: VoxelOrigin | null;
+    skirt?: number;
 }
 
-export function meshSmoothChunk(terrain: SmoothTerrain, key: string): SmoothChunkMesh | undefined;
+export function meshSmoothChunk(terrain: SmoothTerrain, key: string, options?: MeshSmoothChunkOptions): SmoothChunkMesh | undefined;
+
+// Not exported from this entry, but used by the exports above:
+
+interface VoxelOrigin {
+    readonly origin: ArrayLike<number>;
+}
 ```

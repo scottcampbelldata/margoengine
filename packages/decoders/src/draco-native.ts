@@ -1,5 +1,7 @@
 import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit } from './pool.js';
 import { validatedDracoLimits } from './protocol.js';
+import { inThread, nodeFolder, nodeInstance } from './node-thread.js';
+import { isDecoderCrash } from './errors.js';
 import type { DecodedDracoGeometry, DecodedDracoPoints } from './protocol.js';
 import type { DracoOptions, DracoDecodeOptions } from './draco.js';
 import type { DracoPointsOptions, DracoPointsDecodeOptions } from './draco-points.js';
@@ -7,6 +9,9 @@ import type { DracoPointsOptions, DracoPointsDecodeOptions } from './draco-point
 export type { DracoOptions, DracoDecodeOptions } from './draco.js';
 export type { DracoPointsOptions, DracoPointsDecodeOptions } from './draco-points.js';
 export type { DecodedDracoGeometry, DecodedDracoPoints } from './protocol.js';
+
+// The package's own Wasm, named once so a bundler copies it once.
+const bundledWasm = (): URL => new URL('./draco-native.wasm', import.meta.url);
 
 class NativePool {
   readonly workerLimit: number;
@@ -18,14 +23,22 @@ class NativePool {
   }
   run<T>(data: ArrayBuffer | ArrayBufferView, options: DracoDecodeOptions, points: boolean): Promise<T> {
     try {
-      requireWorkers('Clean-room Draco decoder');
+      const here = inThread();
+      if (!here) requireWorkers('Clean-room Draco decoder');
       if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const limits = validatedDracoLimits(options.limits);
       const buffer = payload(data, options.transfer ?? false);
       const path = this.options.decoderPath;
+      if (here)
+        return this.here<T>(
+          buffer,
+          { attributeIds: options.attributeIds, componentTypes: options.componentTypes, limits },
+          options.signal,
+          points,
+        );
       const wasmURL =
         path === undefined
-          ? new URL('./draco-native.wasm', import.meta.url).href
+          ? bundledWasm().href
           : new URL('draco-native.wasm', new URL(path.endsWith('/') ? path : path + '/', globalThis.location?.href))
               .href;
       this.pool ??= new WorkerPool(
@@ -54,6 +67,28 @@ class NativePool {
   dispose(): void {
     this.pool?.dispose();
     this.pool = undefined;
+  }
+  /** Node has no Web Worker: decode in this thread with the same Wasm and decode functions the worker runs. */
+  private async here<T>(
+    buffer: ArrayBuffer,
+    request: import('./protocol.js').DracoRequest,
+    signal: AbortSignal | undefined,
+    points: boolean,
+  ): Promise<T> {
+    const file = new URL('draco-native.wasm', await nodeFolder(this.options.decoderPath, bundledWasm)),
+      [exports, codec] = await Promise.all([nodeInstance.load(file), import('./draco-native-codec.js')]),
+      module = exports as unknown as Parameters<typeof codec.decodeNativeDraco>[0];
+    signal?.throwIfAborted();
+    try {
+      return (
+        points
+          ? codec.decodeNativePoints(module, new Uint8Array(buffer), request)
+          : codec.decodeNativeDraco(module, new Uint8Array(buffer), request)
+      ) as T;
+    } catch (error) {
+      if (isDecoderCrash(error)) nodeInstance.drop(file);
+      throw error;
+    }
   }
 }
 

@@ -26,7 +26,9 @@ const LIST_FIELDS: Record<string, string> = {
   clipSets: 'clipSets',
 };
 const WORD = /[\p{L}\p{N}_:.!|-]/u;
-const isSpace = (c: number) => c === 32 || c === 9 || c === 10 || c === 13;
+/** Single-letter escapes; any other escaped character stands for itself. */
+const ESCAPES: Record<string, string> = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v' };
+const isSpace =(c: number) => c === 32 || c === 9 || c === 10 || c === 13;
 const isDigitStart = (c: number) => (c >= 48 && c <= 57) || c === 45 || c === 43 || c === 46;
 
 /** One absolute path from a path as written, which may be relative to the prim that holds it. */
@@ -110,18 +112,27 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
       if (i >= end) fail('syntax', 'unterminated string');
       if (text[i] === '\\') {
         out += text.slice(from, i);
-        const e = text[i + 1];
-        const escapes: Record<string, string> = {
-          n: '\n',
-          t: '\t',
-          r: '\r',
-          '\\': '\\',
-          '"': '"',
-          "'": "'",
-          '0': '\0',
-        };
-        out += escapes[e] ?? e;
-        i += 2;
+        // C string escapes as TfEscapeString reads them: \xHH (one or two hex digits) and \ooo (one to three octal
+        // digits) are bytes, so a run of them is decoded together as UTF-8.
+        const bytes: number[] = [];
+        for (;;) {
+          const hex = text[i + 1] === 'x' ? /^[0-9a-fA-F]{1,2}/.exec(text.slice(i + 2, i + 4))?.[0] : undefined,
+            octal = /^[0-7]{1,3}/.exec(text.slice(i + 1, i + 4))?.[0];
+          if (hex !== undefined) {
+            bytes.push(parseInt(hex, 16));
+            i += 2 + hex.length;
+          } else if (octal !== undefined) {
+            bytes.push(parseInt(octal, 8) & 255);
+            i += 1 + octal.length;
+          } else break;
+          if (text[i] !== '\\') break;
+        }
+        if (bytes.length) out += new TextDecoder().decode(new Uint8Array(bytes));
+        else {
+          const e = text[i + 1];
+          out += ESCAPES[e] ?? e;
+          i += 2;
+        }
         from = i;
       } else if (text.startsWith(mark, i)) {
         out += text.slice(from, i);
@@ -216,13 +227,16 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
       return peek() === '<' ? { assetPath, primPath: absolutePath(pathValue(), owner) } : { assetPath };
     }
     if (c === '<') return { path: absolutePath(pathValue(), owner) };
-    if (isDigitStart(text.charCodeAt(at)) && !text.startsWith('-inf', at)) return number();
+    if (text.startsWith('-inf', at)) {
+      at += 4;
+      return -Infinity;
+    }
+    if (isDigitStart(text.charCodeAt(at))) return number();
     const name = word();
     if (name === 'None') return null;
     if (name === 'true' || name === 'True') return true;
     if (name === 'false' || name === 'False') return false;
     if (name === 'inf') return Infinity;
-    if (name === '-inf') return -Infinity;
     if (name === 'nan') return NaN;
     return name;
   }
@@ -365,8 +379,22 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
         fields.subLayerOffsets = items.map(({ offset, scale }) => ({ offset, scale }));
       } else if (key in LIST_FIELDS) edit(fields, LIST_FIELDS[key], list, listOf(plain(value(owner))));
       else if (key === 'variants') fields.variantSelection = value(owner);
+      else if (key === 'relocates') relocates();
       else fields[key] = plain(value(owner));
       accept(';');
+    }
+  }
+  /** `{ <source>: <target>, ... }`: read past and dropped, as the Crate reader drops its relocates value. */
+  function relocates() {
+    expect('{');
+    while (!accept('}')) {
+      if (at >= end) fail('syntax', 'unterminated relocates');
+      if (peek() !== '<') fail('syntax', `expected a path at offset ${at}`);
+      pathValue();
+      expect(':');
+      if (peek() !== '<') fail('syntax', `expected a path at offset ${at}`);
+      pathValue();
+      accept(',');
     }
   }
   /** The `( ... )` of a property. */
@@ -469,6 +497,8 @@ export function readTextLayer(text: string, maxDepth: number, signal?: AbortSign
         const set = string();
         expect('=');
         expect('{');
+        // Core Specification, the text grammar's VariantSetStatement: one or more variants between the braces.
+        if (accept('}')) fail('syntax', `variant set "${set}" on ${prim} has no variants`);
         const owner = spec(prim, 6);
         (owner.variantSetChildren ??= [] as string[]) as string[];
         while (!accept('}')) {

@@ -78,6 +78,8 @@ export class Lighting2D implements EnginePlugin {
     addLight(options?: Light2DOptions): Light2D;
     removeLight(light: Light2D): void;
     setOccluders(occluders: readonly Occluder2D[]): void;
+    setTarget(target: GPUTexture | (() => GPUTexture)): void;
+    setNormals(normals: GPUTexture | (() => GPUTexture) | undefined): void;
     setup(engine: Engine): void;
     onDeviceRestored(): void;
     dispose(): void;

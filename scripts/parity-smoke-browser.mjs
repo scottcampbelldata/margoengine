@@ -1,5 +1,5 @@
 // Correctness preflight for tonight's matrix. No timing samples or speed-phase override.
-// node scripts/gpu-lock.mjs run --owner=parity-smoke --max=30 -- node scripts/parity-smoke-browser.mjs --runs=1
+// node scripts/run-with-timeout.mjs --max=10 -- node scripts/parity-smoke-browser.mjs --runs=1
 // --standard=<suite> runs that suite's standard cases (bench/scenes/catalog.js STANDARD) instead of the parity cases,
 // against Margo and any black-box adapter named in engine-bench/margo-bench/engines.json.
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -23,7 +23,6 @@ const { values: o } = parseArgs({
   },
 });
 if (o.runs !== '1') throw new RangeError('Correctness preflight requires --runs=1; use bench/cli.mjs for timing');
-if (!process.env.MARGO_GPU_LOCK_NESTED) throw new Error('Run through scripts/gpu-lock.mjs run');
 const engines = o.engines.split(',');
 if (o.standard !== undefined && !Object.hasOwn(STANDARD, o.standard))
   throw new RangeError(`Unknown standard suite ${o.standard}`);

@@ -9,7 +9,13 @@ try {
   console.log(name,JSON.stringify(result));
   assert.deepEqual(errors,[]);assert.deepEqual(result.errors,[]);assert.equal(result.validation,null);
   if(name==='gltf'){
-    assert.equal(result.unchanged,0);assert.equal(result.restored,0);
+    // Zero weather inside the weather program: every other input moved, the picture bit-identical and nothing recompiled.
+    // The plain-to-weather comparison crosses programs (WGSL 15.7.5, 12.10) and is only printed.
+    assert.ok(result.weatherProgram.pipelines>0,`the weather program was not counted: ${JSON.stringify(result.weatherProgram)}`);
+    assert.ok(Object.keys(result.zeroWeather).length>=13,JSON.stringify(result.zeroWeather));
+    for(const [key,changed] of Object.entries(result.zeroWeather))assert.equal(changed,0,`zero weather, ${key} moved: ${changed} values changed`);
+    assert.deepEqual(result.recompiled,{modules:0,pipelines:0});
+    assert.equal(result.restored,0);
     for(const key of ['wet','puddles','rings','snow'])assert.ok(result[key]>20,`${key}: ${result[key]}`);
   }
   if(name==='lens'){
@@ -19,7 +25,9 @@ try {
     for(const key of ['wet','moved','streaks','seeded'])assert.ok(result[key]>100,`${key}: ${result[key]}`);
   }
   if(name==='cover'){
-    assert.deepEqual(result.exposed,[0,1,1,1,0,0,0]);
+    // Flat probes; a 30 degree roof's own surface at 24 points across its texels is exposed (no self-shelter
+    // stripes); a sloped receiver under the flat roof stays sheltered.
+    assert.deepEqual(result.exposed,[0,1,1,1,0,0,0,...Array(24).fill(1),0]);
     assert.ok(result.protectedPixels>1000);assert.equal(result.protectedChanged,0);
     assert.ok(result.exposedChanged>1000);assert.ok(result.rain>20);assert.ok(result.wet>1000);
   }

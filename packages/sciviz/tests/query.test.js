@@ -37,3 +37,12 @@ test('keyed shared selection, undo, copied extraction and sorted series preserve
   q.dispose(); assert.throws(() => q.rows()); selection.clear(); assert.equal(selection.rowIds.length, 3);
   assert.throws(() => new QuerySelection(table, { rowIds: [1, 1, 2] }));
 });
+
+test('a series over an int64 or categorical column rejects instead of returning no rows', () => {
+  using q = new QuerySelection(new ColumnarTable({ t: new BigInt64Array([1n, 2n]), v: new Float64Array([3, 4]), c: { values: new Uint32Array([0, 1]), categories: ['a', 'b'] } }));
+  q.select('v > 0');
+  const coded = (e) => e instanceof RangeError && /^Query series needs numeric columns/.test(e.message);
+  assert.throws(() => q.series('t', 'v'), coded);
+  assert.throws(() => q.series('v', 'c'), coded);
+  assert.deepEqual([...q.series('v', 'v').values], [3, 4]);
+});

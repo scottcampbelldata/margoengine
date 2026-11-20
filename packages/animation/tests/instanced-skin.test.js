@@ -2,13 +2,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../dist/index.js';
 import {
   SKINNED_CROWD_STRIDE,
   SkinnedCrowd,
   bakeBones,
   boneTexel,
+  poseBone,
   poseBones,
   skinnedCrowdVertex,
 } from '../dist/instanced-skin.js';
@@ -107,6 +108,33 @@ test('a member has its own clips, offsets, speeds and blend', async () => {
     1e-5,
     'blend half',
   );
+});
+
+test('poseBone gives one bone of a member as the shader poses it: what a rider or a held rifle follows', async () => {
+  const { animation, positions } = await strip({ extraClip: true }),
+    bake = bakeBones(animation, { fps: 16 }),
+    apply = (m, [x, y, z]) => [m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7], m[8] * x + m[9] * y + m[10] * z + m[11]];
+  // Every vertex of the strip's far half follows joint 1 alone: poseBone(1) carries its bind position where poseBones puts it.
+  for (const [instance, time] of [
+    [{ clip: 0 }, 0.3],
+    [{ clip: 1, offset: 0.25, speed: 2 }, 0.7],
+    [{ clip: 0, blendClip: 1, blendOffset: 0.5, blend: 0.4 }, 0.55],
+  ]) {
+    const all = poseBones(bake, instance, time),
+      bone = poseBone(bake, instance, 1, time);
+    let checked = 0;
+    for (let v = 0; v < bake.vertexCount; v++) {
+      if (bake.weights[v * 8] !== 1 || bake.joints[v * 8] !== 1) continue;
+      near(apply(bone, [...bake.vertices.subarray(v * 6, v * 6 + 3)]), [...all.subarray(v * 3, v * 3 + 3)], 1e-5, `vertex ${v}`);
+      checked++;
+    }
+    assert.ok(checked > 0, 'some vertices follow joint 1 alone');
+  }
+  // At the bend's half time joint 1 has turned 45 degrees about +Z at (1, 0, 0).
+  near(apply(poseBone(bake, { clip: 0 }, 1, 0.5), [2, 0, 0]), bent([2, 0], 45), 1e-5, 'bend');
+  assert.throws(() => poseBone(bake, {}, 2, 0), /bone below bake.bones/);
+  assert.throws(() => poseBone(bake, { clip: 7 }, 0, 0), /clips from bake.clips/);
+  assert.ok(positions.length > 0);
 });
 
 test('a clip that does not loop holds its last frame', async () => {

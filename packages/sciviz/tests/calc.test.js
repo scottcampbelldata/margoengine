@@ -117,3 +117,52 @@ test('empty inputs, cancellation, pipeline adapter and float bounds', async () =
   close(r.values, [2, 3, 4]);
   assert(r.floatBound.every(Number.isFinite));
 });
+
+test('a named array is never hidden by the built-in value, coords or x/y/z variables', async () => {
+  for (const name of ['value', 'coords', 'x', 'y', 'z'])
+    await assert.rejects(
+      calcGrid(
+        { ...tetra, pointArrays: { [name]: [10, 20, 30, 40] } },
+        { kind: 'expression', expression: '`' + name + '`' },
+      ),
+      (error) => error instanceof RangeError && error.message.includes(`'${name}'`) && /rename/.test(error.message),
+    );
+  // Only expressions read named arrays: elevation and the other operations take such a grid as it is.
+  close(
+    (
+      await calcGrid(
+        { ...tetra, pointArrays: { coords: [10, 20, 30, 40], x: [1, 2, 3, 4] } },
+        { kind: 'elevation', low: [0, 0, 0], high: [1, 0, 0] },
+      )
+    ).values,
+    [0, 1, 0, 0],
+  );
+  // Constants stay reachable as arrays through backticks.
+  close(
+    (await calcGrid({ ...tetra, pointArrays: { pi: [9, 9, 9, 9] } }, { kind: 'expression', expression: '`pi`-pi*0' }))
+      .values,
+    [9, 9, 9, 9],
+  );
+});
+test('quality signs a quad corner Jacobian by the centre normal, so a concave corner is negative (Verdict 5.6)', async () => {
+  // Dart: corner 3 at (1.5, 0.5) is reflex. Verdict alpha_k = n_c . N_k with n_c = X1 x X2: alpha = [1, 4, 1, -2].
+  const dart = {
+    points: [0, 0, 0, 2, 0, 0, 2, 2, 0, 1.5, 0.5, 0],
+    connectivity: [0, 1, 2, 3],
+    offsets: [4],
+    types: [9],
+  };
+  assert.equal((await calcGrid(dart, { kind: 'quality' })).values[2], -2);
+  // The same dart tilted out of the plane keeps its signed corner area.
+  const c = Math.cos(0.7),
+    s = Math.sin(0.7),
+    tilted = { ...dart, points: dart.points.map((v, i, a) => (i % 3 === 1 ? v * c : i % 3 === 2 ? a[i - 1] * s : v)) };
+  close([(await calcGrid(tilted, { kind: 'quality' })).values[2]], [-2]);
+  // A convex quad and a reversed (clockwise) one stay positive: the centre normal follows the vertex order.
+  const square = { ...dart, points: [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0] };
+  assert.equal((await calcGrid(square, { kind: 'quality' })).values[2], 1);
+  assert.equal((await calcGrid({ ...square, connectivity: [3, 2, 1, 0] }, { kind: 'quality' })).values[2], 1);
+  // A symmetric bow tie has no centre normal (X2 = 0), so Verdict sets every corner area to 0.
+  const bow = { ...dart, points: [0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0] };
+  assert.equal((await calcGrid(bow, { kind: 'quality' })).values[2], 0);
+});

@@ -1,12 +1,10 @@
 // Real-GPU check for MomentOIT against sorted blending worked out by hand and against weighted blending on the same
-// scene. Takes a GPU slot itself. From the repository root, after building packages:
+// scene. From the repository root, after building packages:
 // node packages/oit/test/gpu/moments-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'oit-moments' });
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/exact.html', port: 5286 }),
   { page } = context;
 const biggest = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
@@ -134,5 +132,4 @@ try {
   console.log('oit moments check passed');
 } finally {
   await context.close();
-  release();
 }

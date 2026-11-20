@@ -2,10 +2,10 @@
 import { FXAA } from '@margoengine/post';
 import { Toon } from '@margoengine/toon';
 import { Transitions } from '@margoengine/transitions';
-import { Moon } from '@margoengine/scenery/moon';
+import { Moon } from '@margoengine/sky/moon';
 import { VoxelPathTracer } from '@margoengine/voxel-pathtracer';
 import { expose } from './harness.ts';
 expose(
-  { 'id': 'c2-003', 'members': ['post', 'toon', 'transitions', 'scenery', 'voxel-pathtracer'] },
-  { 'post': FXAA, 'toon': Toon, 'transitions': Transitions, 'scenery': Moon, 'voxel-pathtracer': VoxelPathTracer },
+  { 'id': 'c2-003', 'members': ['post', 'toon', 'transitions', 'moon', 'voxel-pathtracer'] },
+  { 'post': FXAA, 'toon': Toon, 'transitions': Transitions, 'moon': Moon, 'voxel-pathtracer': VoxelPathTracer },
 );

@@ -72,6 +72,13 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   // The four shader-text hashes include that deliberate math change; binding and upload hashes stay unchanged.
   // Core's mesh shader hash recorded again at edcb6debb7 (KB5875a, height-correlated Smith G2 in core's direct light,
   // Scott's approved core change), and all four recorded again for KB6016 (the same G2 in the clustered light loop).
+  // Core's mesh shader hash recorded again for KB-G2guard (G2 floor 1e-30) and KB3240b (dielectric diffuse weight),
+  // and when core's clip position became @invariant (2026-11-15; with the attribute removed the old hash holds).
+  // The shader text and declaration hashes recorded again for KB-LOCALSHADOW-OFFSET1 (point and spot hard shadows on
+  // the receiver plane, 2026-11-16), and the frame upload for its new defaults (normal offset 0.25, the per-slot plane
+  // lift, the sun's own 1.5 texel offset); the binding hashes stay unchanged. The shader text and declaration hashes
+  // recorded again for KB-SUNSHADOW-OFFSET1 (2026-11-16: the shared filter's texels behind the receiver plane, directional
+  // only); with no directional shadow the frame upload and every image and probe value stay the same.
   const h = harness(),
     lights = new Clustered({ grid: [2, 2, 2] });
   h.engine.use(lights);
@@ -90,27 +97,54 @@ test('without castShadow, directional and area lights leave the pre-shadow shade
   ]);
   h.frame();
   h.frame();
-  assert.equal(hash(h.context.shader), '45c8e62509896208a6e140af164cc0a0c77089eef3ada327ec15eeb241adb519');
-  assert.equal(hash(lights.pbr(2).declarations), '2297e07ffbde8a96225fee226867516fcb85c2a42ec1661568a47395bc5ece1e');
+  assert.equal(hash(h.context.shader), '2ac6caacd7b3840c65a2adfaef3af875898d7fd9c84240a9e9bb7485697876b3');
+  assert.equal(hash(lights.pbr(2).declarations), 'd54458c9540ca7e8bbc4ce3d075a2107e94a32c5cdfa6c85c2f4e504ee4d615e');
   assert.equal(
     hash(lights['unshadowed'].pbr(2).declarations),
     'c4c37452df893a9ab004772ead261aff4ad268ff789cb614b2e465eeef06c87b',
   );
   assert.equal(
     hash(clusteredSampling(0, local, area, false, false, true, { directional: sun })),
-    '2576fc4fa6a40ad4f3b787c187b29719c56576178a48018b2178ccbd821dece2',
+    'bdfac89808c1d507a7e35572ddfed1e37715f04fbfdca4118cf913d85a96dd6d',
   );
-  assert.equal(hash(local.declarations(2)), '961f6b98277b21a35fb25375081db417e5364bb85c5b1ef39d54d879d1e76c6d');
+  assert.equal(hash(local.declarations(2)), 'f09f0983e4e08f5b645aa889688dfa562f5c1a985494898802c21852ca4e9760');
   assert.deepEqual(
     lights.bindings().map((e) => e.binding),
     [4, 5, 6, 7, 14, 15, 16, 17, 141],
   );
   const buffer = local.bindings()[0].resource.buffer;
   assert.equal(buffer.size, FRAME_BYTES);
-  assert.equal(hash(new Uint8Array(buffer.data)), '471f172a430a6e5e77150781ebc9ab1f61f14f286d2807f057f1a61310f5fe2b');
+  assert.equal(hash(new Uint8Array(buffer.data)), '16a88ea95825e00c3724d7284659cdf87c3ae97e883c161f152eea909c844d3e');
   assert.equal(local.directionalShadow, undefined);
   assert.equal(local.areaShadow, undefined);
   for (const plugin of [lights, local, sun, area]) plugin.dispose();
+});
+
+test('a directional light takes the receiver-plane lift and normal offset of the local shadow options (KB-SUNSHADOW-OFFSET1)', () => {
+  for (const [options, normalBias, lift] of [
+    [{}, 0.25, 1],
+    [{ slopeBias: 2, normalBias: 0.5 }, 0.5, 3],
+    [{ receiverPlane: false, normalBias: 1.5 }, 1.5, 0],
+  ]) {
+    const h = harness(),
+      lights = Clustered.attach(h.engine, { grid: [2, 2, 2] }),
+      local = LocalShadows.attach(h.engine, { lights, resolution: 64, ...options }),
+      sun = DirectionalLights.attach(h.engine, { lights });
+    local.add(caster(h.engine));
+    sun.setLights([
+      {
+        direction: [0.3, -1, 0],
+        intensity: 2,
+        castShadow: true,
+        shadow: { bounds: { min: [-2, 0, -2], max: [2, 2, 2] } },
+      },
+    ]);
+    h.frame();
+    const v = frameData(local);
+    assert.equal(v[2], normalBias, 'settings.z: the normal offset every hard filter uses');
+    assert.equal(v[SUN + 3], lift, 'sun[0].w: 1 + slopeBias, 0 for the flat compare');
+    for (const plugin of [sun, local, lights]) plugin.dispose();
+  }
 });
 
 test('a castShadow directional light with bounds: one orthographic map, a shadow factor in the loop, cached', () => {
@@ -138,7 +172,24 @@ test('a castShadow directional light with bounds: one orthographic map, a shadow
   );
   assert.equal(local.bindings()[0].resource.buffer.size, EXTENDED_BYTES);
   const v = frameData(local);
-  assert.deepEqual([...v.subarray(SUN, SUN + 4)], [0, 1, 1, 0], 'layer 0, slot 1, one map');
+  // KB-SUNSHADOW-OFFSET1: the directional filter compares on the receiver plane (lift 1 + slopeBias, as point and spot
+  // lights) with the shared normalBias (settings.z, 0.25 texels), and leaves out texels behind that plane.
+  assert.deepEqual([...v.subarray(SUN, SUN + 4)], [0, 1, 1, 1], 'layer 0, slot 1, one map, receiver-plane lift 1');
+  assert.match(
+    h.context.shader,
+    /let p=position\+n\*\(cascade\.x\*localShadowFrame\.settings\.z\)\+l\*\(cascade\.x\*localShadowFrame\.settings\.y\);/,
+  );
+  assert.match(
+    h.context.shader,
+    /return localShadowPCF\(m,p,n,uv,clip\.z,i32\(info\.x\)\+i32\(k\),cascade\.x\*4\.0,info\.w,behind\);/,
+  );
+  // KB-LOCALSHADOW-CONTACT1: point and spot lights keep every texel (behind 0). The same test in each face's perspective
+  // depth moved the point Cornell box from 597,154 to 597,285 (worse) and left their edge, acne and pebble checks as
+  // they were, so it is not paid per pixel there (docs/known-bugs.md).
+  assert.match(
+    h.context.shader,
+    /return localShadowPCF\(localShadowFrame\.matrices\[layer\],p,n,uv,ndc\.z,i32\(layer\),texel\*4\.0,info\.w,0\.0\);/,
+  );
   // The box's top (nearest the light) is depth 1, its floor 0; its corners sit two texels inside the map.
   const top = project(v, [-2, 2, -2], SUN_MATRICES),
     floor = project(v, [2, 0, 2], SUN_MATRICES);
@@ -182,7 +233,7 @@ test('camera-fitted cascades: one layer each, re-fitted when the camera moves; s
   assert.equal(h.frame(), 6 + 1 + 3, 'six point faces, a spot, then three cascades');
   assert.deepEqual(
     [...frameData(local).subarray(SUN, SUN + 4)],
-    [7, 1, 3, 0],
+    [7, 1, 3, 1],
     'cascades follow the point and spot layers',
   );
   assert.equal(h.frame(), 0);
@@ -344,7 +395,7 @@ test('directional and area shadows compose with point lights in one map array; s
   ]);
   assert.equal(h.frame(), 6 + 2 + 1 + 5);
   const v = frameData(local);
-  assert.deepEqual([...v.subarray(SUN, SUN + 12)], [0, 0, 0, 0, 6, 1, 2, 0, 8, 2, 1, 0], 'per list index');
+  assert.deepEqual([...v.subarray(SUN, SUN + 12)], [0, 0, 0, 0, 6, 1, 2, 1, 8, 2, 1, 1], 'per list index');
   assert.deepEqual(
     [...v.subarray(AREA, AREA + 8)].slice(0, 6).map((x) => +x.toFixed(3)),
     [0, 0, 0, 0, 9, 1],

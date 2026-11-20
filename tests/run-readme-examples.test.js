@@ -31,7 +31,7 @@ import { join } from 'node:path';
 
 const samples = { byName: new Map(), byExtension: new Map() };
 
-test('one GPU slot runs every complete page lifecycle in order without overlapping examples', async () => {
+test('one run runs every complete page lifecycle in order without overlapping examples', async () => {
   const started = [],
     finished = [];
   let release,
@@ -360,7 +360,7 @@ test('the static fixture follows the imported loader, including Stage and umbrel
     assert.equal(usesMinimalGLTF(`import { load } from '${name}';`), true);
     assert.equal(usesMinimalGLTF(`await import('${name}');`), true);
   }
-  for (const name of ['@margoengine/gltf-pro', 'margoengine/gltf-pro', 'margoengine/stage/viewer'])
+  for (const name of ['@margoengine/gltf/pbr', 'margoengine/gltf/pbr', 'margoengine/stage/viewer'])
     assert.equal(usesMinimalGLTF(`import { load } from '${name}';`), false);
 });
 

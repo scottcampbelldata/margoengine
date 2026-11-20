@@ -13,19 +13,21 @@
 // counted and left out. The check fails when a scene's median frame (its steady-state frame) allocates more than its
 // floor in FLOORS below; the mean, which also carries the odd frame with a timer or an idle task in it, is reported.
 //
+// MARGO_COMPAT=1 (scripts/support/compat-shim.js) draws every scene on the WebGL2 compatibility layer, against the same
+// floors (KB-COMPAT-FRAMEALLOC1): the layer may allocate no more a frame than a browser's own WebGPU does.
 // Options: --scenes=basic,instanced,shadowed,post,dynamic (default all), --frames=<n>, --warmup=<n>, --late=<ms> (the
 // late warm-up frame's stall, default 200; 0 leaves it out, diagnosis only),
 // --profile (adds a V8 sampling heap profile of the recorded frames, through CDP HeapProfiler.startSampling, and prints
 // the functions that allocate per frame; diagnosis only, not part of the check), --no-check (print, never fail).
-// Results go to test-results/frame-alloc.json. Takes one shared slot of the GPU lock, around the browser only.
+// Results go to test-results/frame-alloc.json.
 import assert from 'node:assert/strict';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'vite';
-import { acquire } from './gpu-lock.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { compatBuild, compatRun, compatShim } from './support/compat-shim.js';
 import { browserLabel, launchBrowser } from './lib/browser.mjs';
 
 const root = resolve(import.meta.dirname, '..'),
@@ -161,13 +163,14 @@ async function main() {
     logLevel: 'warn',
     // A profile names functions, so its build is not minified and, with --source, bundles the packages' TypeScript
     // sources instead of their minified dist (diagnosis only: the check always measures the dist an app installs).
-    build: { outDir: out, emptyOutDir: true, target: 'es2022', minify: !profile },
+    // MARGO_COMPAT=1: the layer is built beside the page as compat.js and every scene draws on it, against the same
+    // floors as native WebGPU (KB-COMPAT-FRAMEALLOC1).
+    build: { outDir: out, emptyOutDir: true, target: 'es2022', minify: !profile, ...compatBuild(join(fixture, 'index.html')) },
     plugins: args.includes('--source') ? [sourcePackages()] : [],
   });
   assert.ok(existsSync(join(out, 'index.html')), `built ${page}`);
 
-  const release = await acquire({ owner: 'frame-alloc', poll: 2000 }),
-    server = await serve(out),
+  const server = await serve(out),
     results = {},
     sites = {};
   let browser, adapter, version;
@@ -183,6 +186,7 @@ async function main() {
       const context = await browser.newContext({ viewport: { width: 800, height: 600 } }),
         tab = await context.newPage(),
         errors = [];
+      if (compatRun()) await tab.addInitScript(compatShim, '/compat.js');
       tab.on('pageerror', (error) => errors.push(error.message));
       tab.on('console', (message) => message.type() === 'error' && errors.push(message.text()));
       const url = `http://127.0.0.1:${server.address().port}/?scene=${scene}&frames=${frames}&warmup=${warmup}&late=${late}${profile ? '&profile' : ''}`;
@@ -229,24 +233,20 @@ async function main() {
           console.log(`  ${String(s.perFrame).padStart(7)} B/frame  ${s.name} ${s.url}:${s.line}:${s.column}`);
     }
   } finally {
-    try {
-      // Browser first, then the server's connections and the server, in one time budget (bug 70).
-      await closeAll({ browser, servers: [server] });
-    } finally {
-      release();
-    }
+    // Browser first, then the server's connections and the server, in one time budget (bug 70).
+    await closeAll({ browser, servers: [server] });
   }
   mkdirSync(resolve(root, 'test-results'), { recursive: true });
   writeFileSync(
     resolve(root, 'test-results/frame-alloc.json'),
-    `${JSON.stringify({ browser: `${browserLabel()} ${version} headless`, adapter, frames, warmup, late, results, ...(profile && { sites }) }, null, 2)}\n`,
+    `${JSON.stringify({ browser: `${browserLabel()} ${version} headless`, adapter, device: compatRun() ? 'webgl2-layer' : 'webgpu', frames, warmup, late, results, ...(profile && { sites }) }, null, 2)}\n`,
   );
   const failures = overFloor(results);
-  if (failures.length && check) {
-    for (const failure of failures) console.error(`FAIL ${failure}`);
-    process.exit(1);
-  }
-  console.log(`frame-alloc: ${Object.keys(results).length} scenes within their floors`);
+  // With --no-check the run never fails, but it says which scenes are over their floors (it once printed "within").
+  for (const failure of failures) console.error(`${check ? 'FAIL' : 'over'} ${failure}`);
+  // The exit code, then the event loop's end: process.exit can hold the exit for ever (KB-OWN-EXIT2).
+  if (failures.length && check) process.exitCode = 1;
+  if (!failures.length) console.log(`frame-alloc: ${Object.keys(results).length} scenes within their floors`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await main();

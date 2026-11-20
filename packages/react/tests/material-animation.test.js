@@ -2,7 +2,7 @@ import test, { afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import React, { StrictMode, Suspense, createRef } from 'react';
 import { render, act, flush, close } from './physics-xr-support.js';
-const { PBRModel: NativeModel, GLTFAsset } = await import('../../gltf-pro/dist/index.js');
+const { PBRModel: NativeModel, GLTFAsset } = await import('../../gltf/dist/pbr.js');
 const { Animation: NativeAnimation } = await import('../../animation/dist/index.js');
 const { Animator: NativeAnimator } = await import('../../animator/dist/index.js');
 const models = [],
@@ -102,7 +102,7 @@ function makeModel(engine, asset = { doc: { images: [] } }, geometry) {
   models.push(model);
   return model;
 }
-mock.module('@margoengine/gltf-pro', {
+mock.module('@margoengine/gltf/pbr', {
   namedExports: {
     PBRModel: class {
       constructor(engine, asset) {
@@ -209,6 +209,7 @@ mock.module('@margoengine/animator', {
         this.parameters = { ...options.parameters };
         this.layers = new Set();
         this.time = 0;
+        this.clipRate = 1;
         this.transitions = [];
         this.steps = [];
         this.disposals = 0;
@@ -229,7 +230,8 @@ mock.module('@margoengine/animator', {
         return this;
       }
       onPreUpdate(delta) {
-        this.time += delta;
+        // The native Animator scales state time by the Animation's options.speed.
+        this.time += delta * (this.animation.options.speed ?? 1) * this.clipRate;
         this.steps.push(delta);
       }
       dispose() {
@@ -296,7 +298,7 @@ mock.module('@margoengine/selection', {
   },
 });
 const { Canvas, Mesh, BoxGeometry, PbrMaterial } = await (await import('./entries.js')).allEntries();
-const { Model } = await import('../dist/gltf-pro.js');
+const { Model } = await import('../dist/gltf.js');
 const { Animation } = await import('../dist/animation.js');
 const { MeshTransmissionMaterial } = await import('../dist/materials.js');
 const h = React.createElement,
@@ -389,6 +391,27 @@ test('blend delegates transitions to the native Animator and respects playing pl
   assert.equal(animator.time, 2);
   assert.deepEqual(animation.seeks, [2]);
 });
+test('a non-looping blended clip at a speed other than 1 stops at its end in clip time, not in frame time', async () => {
+  const view = render(tree(animated('/blended-speed.gltf', { blend: 0.3 })));
+  await flush();
+  const animation = animations.at(-1),
+    animator = animators.at(-1);
+  view.rerender(tree(animated('/blended-speed.gltf', { clip: 'Run', blend: 0.4, loop: false, speed: 0.5 })));
+  await flush();
+  animator.onPreUpdate(3);
+  assert.equal(animator.time, 1.5, '3 s at half speed is 1.5 s of the 2 s clip');
+  assert.deepEqual(animation.seeks, [], 'the clip has not ended yet');
+  animator.onPreUpdate(2);
+  assert.equal(animator.time, 2);
+  assert.deepEqual(animation.seeks, [2]);
+  view.rerender(tree(animated('/blended-speed.gltf', { clip: 'Run', blend: 0.4, loop: false, speed: 4, time: 0 })));
+  await flush();
+  animator.onPreUpdate(0.25);
+  assert.equal(animator.time, 1, 'a quarter second at four times speed is one second of clip');
+  animator.onPreUpdate(1);
+  assert.equal(animator.time, 2, 'fast playback stops at the end instead of running past it');
+  assert.deepEqual(animation.seeks, [2, 2]);
+});
 test('enabling and disabling blend retains the running Animation and transitions through one lazy native Animator', async () => {
   const start = animators.length,
     view = render(tree(animated('/toggle-blend.gltf', { blend: 0 })));
@@ -440,9 +463,10 @@ test('enabling blend after native clip playback crossfades from the current pose
     'Attaching the mixer must retain the running visual pose',
   );
   animator.onPreUpdate(0.15);
+  // Half way through the 0.3 s fade: Walk (x = 0.4 t) plays on to 0.65 s while the untracked Run is the rest pose.
   assert.ok(
-    Math.abs(model.nodes[1].position.x - 0.1) < 1e-7,
-    'The untracked Run clip must blend toward the original rest pose',
+    Math.abs(model.nodes[1].position.x - 0.5 * 0.4 * 0.65) < 1e-7,
+    'The untracked Run clip must blend toward the original rest pose while Walk plays on',
   );
   view.rerender(tree(animated('/native-toggle-blend.gltf', { clip: 'Walk', blend: 0 })));
   await flush();

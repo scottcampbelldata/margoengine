@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel-edit/gpu (run from the repository root after building packages, one GPU job at
-// a time: node scripts/gpu-lock.mjs run --owner=voxel-edit-gpu -- node packages/voxel-edit/tests/gpu-browser-check.mjs):
+// a time: node scripts/run-with-timeout.mjs -- node packages/voxel-edit/tests/gpu-browser-check.mjs):
 // a chain of fills, booleans and filters on a GpuGrid gives exactly the cells of the same chain of CPU operations, on
 // 37 x 29 x 41 and on 256 x 256 x 256 (16.7 million cells); a ShaderBrush runs on the resident grid; write, read and
 // remap round-trip; a brush from another device and a disposed grid are refused; no WebGPU validation errors.
@@ -29,6 +29,9 @@ try {
   assert.ok(r.big.clipped[0] > 0, 'the big chain clips part of its tool');
   // An 8-cubed grid: the cells with a coordinate 0 are 512 - 7^3.
   assert.equal(r.brush, 512 - 343);
+  assert.equal(r.farSphere, 0, 'a sphere or box far outside the grid filled cells');
+  assert.equal(r.edgeSphere, 0, 'a sphere half outside the grid differs from sphereCells');
+  assert.equal(r.paramClamp, 512, 'param(17) does not read param(15)');
   assert.equal(r.roundTrip, 0);
   assert.equal(r.remap, r.threes);
   assert.match(r.otherDevice, /another device/);

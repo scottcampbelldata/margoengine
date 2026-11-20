@@ -1,10 +1,10 @@
 import { createContext, useContext, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { ScrollControls as Controller, ScrollArea, ScrollControlOptions } from '@margoengine/controls/presentation';
-import { MargoError } from '@margoengine/math/errors';
 import { Group, useFrame, type MeshRef } from './components.js';
 import { useCommit, useCreated, useScene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { fault } from '../../shared/errors.js';
 
 /** Scroll options plus ownership of the native scroll area. */
 export interface ScrollControlsProps extends Omit<ScrollControlOptions, 'element'> {
@@ -27,7 +27,7 @@ export interface ScrollState {
   visible(from: number, length: number, margin?: number): boolean;
 }
 type Value = { area: ScrollArea; control: Controller; state: ScrollState; overlay: HTMLDivElement };
-const ScrollContext = createContext<Value | null>(null);
+const ScrollContext = /* @__PURE__ */ createContext<Value | null>(null);
 /** Create an accessible native scroller and expose smoothed progress to descendants. */
 export function ScrollControls({ children, enabled = true, prepend, style, onError, ...options }: ScrollControlsProps) {
   const scene = useScene(), { pages = 1, distance = 1, horizontal = false, infinite, damping, maxSpeed, eps } = options;
@@ -63,7 +63,7 @@ export function ScrollControls({ children, enabled = true, prepend, style, onErr
 }
 function useValue(): Value {
   const value = useContext(ScrollContext);
-  if (!value) throw new MargoError('state', 'Scroll helpers require ScrollControls; wrap the component in it.');
+  if (!value) throw fault('state', 'Scroll helpers require ScrollControls; wrap the component in it', 'react-usage');
   return value;
 }
 /** Read the live scroll state without scheduling React renders each frame. */

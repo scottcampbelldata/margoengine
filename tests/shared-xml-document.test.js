@@ -84,4 +84,7 @@ test('XML reader keeps markup-shaped file text as data and prefixes such as __pr
   const p = parseXMLDocument('<a xmlns:__proto__="urn:p"><__proto__:b/></a>').documentElement.children[0];
   assert.equal(p.namespaceURI, 'urn:p');
   assert.equal(escapeXML(`&<>"'`), '&amp;&lt;&gt;&quot;&apos;');
+  // Characters XML 1.0 forbids even escaped (C0 controls but tab, LF and CR; lone surrogates; U+FFFE, U+FFFF)
+  // become U+FFFD, so a label read from data cannot make the written document unparsable.
+  assert.equal(escapeXML('a\u0001b\ud800c\udfffd\ufffee\uffff\t\n\r\ud83d\ude00'), 'a\ufffdb\ufffdc\ufffdd\ufffde\ufffd\t\n\r\ud83d\ude00');
 });

@@ -114,11 +114,14 @@ test('a world that moves everything costs one bulk write a group', async (t) => 
     transform.fields.sy[row] = 2;
   }
   assert.equal(bridge.sync(), 60);
-  assert.deepEqual(calls.map(({ fields, from, count }) => [fields[0], from, count]), [
-    ['positions', 0, 60],
-    ['quaternions', 0, 60],
-    ['scales', 0, 60],
-  ]);
+  assert.deepEqual(
+    calls.map(({ fields, from, count }) => [fields[0], from, count]),
+    [
+      ['positions', 0, 60],
+      ['quaternions', 0, 60],
+      ['scales', 0, 60],
+    ],
+  );
 });
 
 test('only the runs of rows that moved are written', async (t) => {
@@ -126,10 +129,13 @@ test('only the runs of rows that moved are written', async (t) => {
     calls = counted(t);
   for (const i of [1, 2, 6]) transform.fields.y[transform.index(links[i].entity)] = i;
   bridge.sync();
-  assert.deepEqual(calls.map(({ from, count }) => [from, count]), [
-    [1, 2],
-    [6, 1],
-  ]);
+  assert.deepEqual(
+    calls.map(({ from, count }) => [from, count]),
+    [
+      [1, 2],
+      [6, 1],
+    ],
+  );
   links.forEach(({ mesh }, i) => assert.equal(mesh.position.y, [1, 2, 6].includes(i) ? i : 0));
 });
 
@@ -182,7 +188,13 @@ test('the bulk result is what the setters give, bit for bit', async () => {
   for (const { entity, mesh } of links) {
     const row = transform.index(entity),
       f = transform.fields,
-      values = { x: next() * 9, y: next() * 9, z: next() * 9, q: [next(), next(), next(), next() + 2], s: [next() + 2, next() + 2, next() + 2] };
+      values = {
+        x: next() * 9,
+        y: next() * 9,
+        z: next() * 9,
+        q: [next(), next(), next(), next() + 2],
+        s: [next() + 2, next() + 2, next() + 2],
+      };
     [f.x[row], f.y[row], f.z[row]] = [values.x, values.y, values.z];
     [f.qx[row], f.qy[row], f.qz[row], f.qw[row]] = values.q;
     [f.sx[row], f.sy[row], f.sz[row]] = values.s;
@@ -195,8 +207,14 @@ test('the bulk result is what the setters give, bit for bit', async () => {
   bridge.sync();
   for (const { mesh } of links) {
     const { twin } = mesh;
-    assert.deepEqual([mesh.position.x, mesh.position.y, mesh.position.z], [twin.position.x, twin.position.y, twin.position.z]);
-    assert.deepEqual([mesh.rotation.x, mesh.rotation.y, mesh.rotation.z], [twin.rotation.x, twin.rotation.y, twin.rotation.z]);
+    assert.deepEqual(
+      [mesh.position.x, mesh.position.y, mesh.position.z],
+      [twin.position.x, twin.position.y, twin.position.z],
+    );
+    assert.deepEqual(
+      [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],
+      [twin.rotation.x, twin.rotation.y, twin.rotation.z],
+    );
     assert.deepEqual([mesh.scale.x, mesh.scale.y, mesh.scale.z], [twin.scale.x, twin.scale.y, twin.scale.z]);
   }
 });
@@ -330,8 +348,12 @@ test('values the mesh refuses throw the mesh error', async () => {
   transform.fields.x[row] = Number.NaN;
   assert.throws(() => bridge.sync(), RangeError);
   transform.fields.x[row] = 0;
-  transform.fields.sx[row] = 0;
+  transform.fields.sx[row] = Number.POSITIVE_INFINITY;
   assert.throws(() => bridge.sync(), RangeError);
+  // A zero scale is a valid transform (glTF 2.0 section 3.5.3): it syncs and flattens the mesh.
+  transform.fields.sx[row] = 0;
+  bridge.sync();
+  assert.equal(mesh.scale.x, 0);
   transform.fields.sx[row] = 1;
   transform.fields.qw[row] = 0;
   assert.throws(() => bridge.sync(), RangeError);
@@ -345,9 +367,15 @@ test('link refuses stale entities, disposed meshes and a mesh another entity hol
     b = world.create(),
     dead = world.create();
   world.destroy(dead);
-  assert.throws(() => bridge.link(dead, mesh), (error) => error.code === 'state');
+  assert.throws(
+    () => bridge.link(dead, mesh),
+    (error) => error.code === 'state',
+  );
   bridge.link(a, mesh);
-  assert.throws(() => bridge.link(b, mesh), (error) => error instanceof TypeError && /;/.test(error.message));
+  assert.throws(
+    () => bridge.link(b, mesh),
+    (error) => error instanceof TypeError && /;/.test(error.message),
+  );
   bridge.link(a, mesh);
   bridge.link(a, other);
   assert.equal(bridge.meshOf(a), other);

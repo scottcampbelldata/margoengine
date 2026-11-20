@@ -1,6 +1,7 @@
 // Type-checks the examples of the package READMEs and guides as a reader would paste them, against the built packages.
-// Three callers: `npm run check:readmes` (scripts/check-readme-types.mjs, a step of `npm run verify`, so nothing lands
-// without it), modern-package-tests.js (the same examples against the packed tarballs) and the scene and worker tests.
+// Three callers: `npm run check:readmes` (scripts/check-readme-types.mjs, run by `npm run quality` in every fast gate,
+// so nothing lands without it), modern-package-tests.js (the same examples against the packed tarballs) and the scene
+// and worker tests.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';

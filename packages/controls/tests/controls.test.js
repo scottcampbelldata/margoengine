@@ -537,6 +537,25 @@ test('transform: a view gizmo uses its camera, picks and drags only inside its r
   engine.dispose();
 });
 
+test('transform: handle picks follow a rolled camera.up (arcball and trackball roll the view)', async () => {
+  const { engine } = await engineWith();
+  const mesh = engine.createMesh().setGeometry(box()),
+    gizmo = new TransformControls(engine);
+  gizmo.attach(mesh);
+  engine.camera.up = [1, 0, 0]; // world +X is up on screen, +Y points left
+  engine.render();
+  const s = gizmo.frame().size;
+  for (const [name, point] of [
+    ['X', [0.5 * s, 0, 0]],
+    ['Y', [0, 0.5 * s, 0]],
+  ]) {
+    const [x, y] = toPixel(engine.camera, point);
+    assert.equal(gizmo.pick(x, y), name, `${name} where it is drawn (${x.toFixed(1)}, ${y.toFixed(1)})`);
+  }
+  gizmo.dispose();
+  engine.dispose();
+});
+
 test('transform: constant screen size, picking and drags under an orthographic camera (@margoengine/cameras)', async () => {
   const { engine, canvas } = await engineWith();
   const projection = new CameraProjection({ mode: 'orthographic', height: 2 });

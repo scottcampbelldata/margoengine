@@ -1,0 +1,67 @@
+// Catalogue data of the dune-coast scene, shared by the catalogue root and the scene entry (no imports: listing the
+// catalogue loads no package).
+import type { SceneInfo } from './index.js';
+
+/** The catalogue entry of this scene. */
+export const duneCoastInfo: SceneInfo = {
+  name: 'dune-coast',
+  title: 'Dune coast (Kill Devil Hills, 17 December 1903)',
+  about:
+    'A winter barrier-island coast: bare sand flat, hummocks with sparse grass, a big dune, board sheds, a launch rail, the foredune and Atlantic surf, under a grey sky.',
+  entry: '@margoengine/scenes/dune-coast',
+  settings: {
+    date: { default: '1903-12-17', about: 'calendar date, YYYY-MM-DD' },
+    hour: { default: 10.6, range: [0, 24], unit: 'h', about: 'local solar time' },
+    latitude: { default: 36.02, range: [-90, 90], unit: 'deg', about: 'latitude north' },
+    weather: { default: 'overcast', options: ['overcast', 'clear'], about: 'grey diffuse sky or sun and cloud' },
+    visibility: { default: 6000, range: [500, 50000], unit: 'm', about: 'haze distance' },
+    wind: { default: 11, range: [0, 25], unit: 'm/s', about: 'wind speed' },
+    windFrom: { default: 0, range: [0, 360], unit: 'deg', about: 'compass direction the wind blows from' },
+    sand: { default: [0.52, 0.46, 0.35], about: 'dry sand albedo, linear RGB' },
+    grass: { default: 0.5, range: [0, 1], about: 'share of ground in grass patches' },
+    grassColor: { default: [0.36, 0.31, 0.16], about: 'dune grass albedo, linear RGB' },
+    grassHeight: { default: 0.8, range: [0.2, 2], unit: 'm', about: 'tallest dune grass leaf' },
+    grassBlades: { default: 30, range: [4, 64], about: 'leaves to a grass clump' },
+    grassVariety: { default: 0.035, range: [0, 0.2], about: 'hue spread between grass clumps' },
+    grassTranslucency: { default: 0, range: [0, 1], about: 'sunlight seen through the grass leaves' },
+    grassWidth: { default: 0.016, range: [0.004, 0.05], unit: 'm', about: 'grass leaf width at the root' },
+    hill: { default: 30, range: [0, 40], unit: 'm', about: 'big dune crest height' },
+    crest: { default: 0, range: [0, 1], about: 'sharpness of the big dune brink' },
+    sandBands: { default: 0, range: [0, 1], about: 'broad scour bands along the wind on the sand' },
+    surf: { default: 1.2, range: [0, 3], unit: 'm', about: 'swell height at the beach' },
+    camp: { default: true, about: 'camp sheds and launch rail' },
+    boards: { default: [0.258, 0.205, 0.147], about: 'shed wall boards and rail timber albedo, linear RGB' },
+    roof: { default: [0.258, 0.205, 0.147], about: 'shed roof boards albedo, linear RGB' },
+    shedOverhang: { default: 0.2, range: [0, 1], unit: 'm', about: 'shed roof overhang' },
+    shedWeathering: { default: 0.5, range: [0, 1], about: 'how weathered the shed boards are' },
+    shedWindows: { default: false, about: 'windows in the hangar back wall and the shed ends' },
+    occlusion: { default: 1.5, range: [0, 10], unit: 'm', about: 'ambient occlusion reach (GTAO), 0 for none' },
+    blownSand: { default: 0, range: [0, 1], about: 'sand blowing off the crests and over the dry sand, 0 (none) to 1' },
+    quality: { default: 'film', options: ['film', 'preview'], about: 'ground and grass detail' },
+    seed: { default: 1903, about: 'seed of hummocks and small dunes' },
+  },
+  presets: {
+    'first-flight': {},
+    'clear-morning': { weather: 'clear', visibility: 20000 },
+    'calm-summer': {
+      date: '1903-07-15',
+      hour: 15,
+      weather: 'clear',
+      wind: 3,
+      windFrom: 225,
+      surf: 0.5,
+      visibility: 25000,
+    },
+  },
+  anchors: ['rail', 'camp', 'flightLine', 'bigHill', 'beach'],
+  views: [
+    'first-flight',
+    'camp-buildings',
+    'killdevil-from-flat',
+    'flyer-on-rail',
+    'killdevil-back',
+    'landing-rail-view',
+    'surf',
+    'crest',
+  ],
+};

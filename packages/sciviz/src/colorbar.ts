@@ -24,6 +24,8 @@ export class ColorBar {
   /** @internal The gradient element, for export. */
   readonly bar: HTMLDivElement;
   #disposed = false;
+  /** @internal The figure's hook: it stops exporting the bar and gives back the room it made for it. */
+  onDispose: (() => void) | undefined;
 
   /** @internal Use `figure.colorbar()`. */
   constructor(
@@ -88,6 +90,7 @@ export class ColorBar {
     if (this.#disposed) return;
     this.#disposed = true;
     this.element.remove();
+    this.onDispose?.();
   }
 
   /** Same as `dispose()`, for `using`. */

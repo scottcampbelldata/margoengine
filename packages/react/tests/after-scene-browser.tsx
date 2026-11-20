@@ -5,10 +5,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Canvas, PbrMaterial, useMargo, type MeshRef, type MargoContextValue } from '@margoengine/react';
 import { Animation } from '@margoengine/react/animation';
 import { Box } from '@margoengine/react/geometry';
-import { Gltf } from '@margoengine/react/gltf-pro';
+import { Gltf } from '@margoengine/react/gltf';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 import type { Engine, Mesh as RuntimeMesh } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Animator } from '@margoengine/animator';
 import { activePlugins } from './plugin-state.mjs';
 
@@ -231,7 +231,7 @@ function active(prefix: string) {
   return activePlugins(current?.engine, prefix);
 }
 function model() {
-  return active('gltf-pro:').find((plugin) => (plugin as PBRModel).root === modelRoot) as PBRModel | undefined;
+  return active('gltf/pbr:').find((plugin) => (plugin as PBRModel).root === modelRoot) as PBRModel | undefined;
 }
 function animator() {
   return active('animator:')[0] as Animator | undefined;
@@ -273,7 +273,7 @@ function snapshot() {
     assetAborts,
     fallbackMounts,
     pendingPicks,
-    models: active('gltf-pro:').length,
+    models: active('gltf/pbr:').length,
     animations: active('animation:').length,
     animators: active('animator:').length,
     clip: mixer?.state,
@@ -391,7 +391,7 @@ async function remove() {
   if (
     active('animation:').length ||
     active('animator:').length ||
-    active('gltf-pro:').length ||
+    active('gltf/pbr:').length ||
     active('materials:').length
   )
     throw new Error('Removing scene features leaked an optional plugin');

@@ -159,7 +159,7 @@ test('loops, select, Fn and wgslFn emit functions and scoped statements', async 
   assert.throws(() => fade(1, 2), /takes 1 arguments/);
 });
 
-test('NodeMaterial draws through materials and gltf-pro with node bindings; uniforms update without recompiling', async () => {
+test('NodeMaterial draws through materials and gltf/pbr with node bindings; uniforms update without recompiling', async () => {
   const h = optionalGPU(),
     device = h.engine.gpu,
     store = await TransformStore.create(64);
@@ -247,8 +247,8 @@ test('NodeMaterial draws through materials and gltf-pro with node bindings; unif
   }
 });
 
-test('node overrides patch compact, extended and physical gltf-pro shader variants', async () => {
-  const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
+test('node overrides patch compact, extended and physical gltf/pbr shader variants', async () => {
+  const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf/src/shader.ts');
   const m = new NodeMaterial({
     colorNode: vec3(1, 0, 0),
     positionNode: positionLocal.mul(2),
@@ -274,9 +274,9 @@ test('node overrides patch compact, extended and physical gltf-pro shader varian
   );
 });
 
-test('the shader patch fails loudly on an unknown gltf-pro shader and caches per source', () => {
+test('the shader patch fails loudly on an unknown gltf/pbr shader and caches per source', () => {
   const m = new NodeMaterial({ colorNode: vec3(1) });
-  assert.throws(() => m.shader('fn other() {}', 2), /standard gltf-pro PBR shader|Materials require/);
+  assert.throws(() => m.shader('fn other() {}', 2), /standard gltf\/pbr shader|Materials require/);
 });
 
 /** Engine stand-in over the recording mock GPU, as in @margoengine/post's stack tests. */
@@ -587,5 +587,14 @@ test('importing a colour node and NodeMaterial leaves post, compute and textures
   // then 18,500 B and a minimal 8,700 B with the input table of the stages (view space, tangents, matrices, instances),
   // then a minimal 9,000 B with the main camera in depth passes and the velocity variant, which NodeMaterial holds.
   // Scott's version-guard allowance: only the whole entry ceiling gains the final 191 B core guard cost.
-  assert.ok(minimal.gzip < 9000 && all.gzip < 18691, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
+  // Then 18,802 B (from 18,691 B; whole 18,664 B to 18,775 B): NodePass draws inside the view of a multi-view frame and
+  // keeps the views drawn before it (KB-NODEPASS-VIEW), with the shared view helpers every other stack stage uses.
+  // Then 18,994 B (whole 18,775 B to 18,967 B): NodePass.attach runs the pass in a PostStack of its own, loading
+  // @margoengine/post/stack only when called, with its signal and the owned stack's disposal (KB-NODEPASS-ATTACH).
+  // Then 9,300 B and 19,250 B (minimal 8,924 B to 9,259 B, whole 18,917 B to 19,193 B): shader `time` reads the
+  // engine's frame clock, ShaderClock, in place of performance.now() (GAP-FILM-TIME), so a frame drawn twice or a film
+  // scene started by a seek draws the same picture. NodeMaterial holds it because a material is the first to read
+  // `time` on an engine with no shader plugin; the plugin carries the core version guard. A split would leave
+  // NodeMaterial time on the wall clock, which is the bug.
+  assert.ok(minimal.gzip < 9300 && all.gzip < 19250, `size budget: minimal ${minimal.gzip}, whole ${all.gzip}`);
 });

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
 const output = 'test-results/selection-loaded-child',
@@ -12,8 +11,7 @@ const output = 'test-results/selection-loaded-child',
     match[1].includes('function selectModel('),
   )?.[1];
 assert.ok(example, 'README must contain the selectModel TypeScript example');
-const release = await acquire({ owner: 'selection-loaded-child' }),
-  report = { readmePath, cases: [], checks: [] };
+const report = { readmePath, cases: [], checks: [] };
 let browser;
 const outline = (image, x, y) => {
   const i = (y * image.width + x) * 4;
@@ -202,12 +200,8 @@ try {
   );
   assert.equal(report.checks.filter((check) => !check.passed).length, 0, 'README pixel-picking selection regressions');
 } finally {
-  try {
-    if (browser) {
-      await browser.page.evaluate(() => window.selectionLoadedChild?.dispose()).catch(() => {});
-      await browser.close();
-    }
-  } finally {
-    release();
+  if (browser) {
+    await browser.page.evaluate(() => window.selectionLoadedChild?.dispose()).catch(() => {});
+    await browser.close();
   }
 }

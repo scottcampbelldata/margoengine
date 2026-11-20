@@ -49,11 +49,35 @@ const FIXED = [
   14 * DAY,
 ];
 const CALENDAR_MONTHS = [1, 2, 3, 6];
+// A Date holds 1e8 days either side of 1970 (ECMA-262, section 21.4.1, time values and time range).
+const DATE_LIMIT = 8.64e15;
+
+/** The first of month `m` (months since year 0, UTC) in milliseconds: any year, 0 to 99 and before 0 included. */
+const monthStart = (m: number): number => {
+  const year = Math.floor(m / 12),
+    date = new Date(0);
+  date.setUTCFullYear(year, m - year * 12, 1);
+  return date.getTime();
+};
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
 /** A tick label for a date (milliseconds since 1970, UTC) at a step of `step` milliseconds (or `months`). */
 export function formatDate(ms: number, step: number, months = 0): string {
+  if (!months && step < SECOND) {
+    // Below a second: HH:MM:SS and as many decimals as the step needs (three for a single tick). The fraction is
+    // rounded (a tick at a large time is a double near its decimal value), and one that rounds up to a whole second
+    // carries into the seconds, so 59.9996 s never reads as a 60th second.
+    let whole = Math.floor(ms / SECOND) * SECOND;
+    const digits = step > 0 ? Math.max(1, Math.ceil(-Math.log10(step / SECOND) - 1e-9)) : 3,
+      scale = 10 ** digits;
+    let fraction = Math.round(((ms - whole) / SECOND) * scale);
+    if (fraction >= scale) {
+      whole += SECOND;
+      fraction = 0;
+    }
+    return `${formatDate(whole, SECOND)}.${String(fraction).padStart(digits, '0')}`;
+  }
   const d = new Date(ms);
   if (months >= 12) return String(d.getUTCFullYear());
   if (months) return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
@@ -64,14 +88,24 @@ export function formatDate(ms: number, step: number, months = 0): string {
 
 /**
  * About `count` date ticks in [min, max] (milliseconds since 1970, UTC) at whole seconds, minutes, hours, days,
- * weeks (from Monday), months or years.
+ * weeks (from Monday), months or years; a range under about `count` seconds gets 1, 2 or 5 times a power of ten
+ * milliseconds, and a zero-width range one tick. The range must lie within a Date's ±8.64e15 ms.
  */
 export function dateTicks(min: number, max: number, count = 6): Ticks {
   if (!Number.isFinite(min) || !Number.isFinite(max))
     throw rangeError(`Date tick range must be finite, got [${min}, ${max}]`, 'sciviz');
+  if (Math.abs(min) > DATE_LIMIT || Math.abs(max) > DATE_LIMIT)
+    throw rangeError(`Date tick range must lie within a Date's ±8.64e15 ms, got [${min}, ${max}]`, 'sciviz');
   if (min > max) [min, max] = [max, min];
   const span = max - min,
     values: number[] = [];
+  const linear = ticks(min, max, count);
+  if (linear.step < SECOND)
+    return {
+      values: [...linear.values],
+      step: linear.step,
+      labels: linear.values.map((v) => formatDate(v, linear.step)),
+    };
   const fixed = FIXED.find((s) => span / s <= count);
   if (fixed !== undefined) {
     // Days and longer start at UTC midnight; weeks on a Monday (1970-01-05 was one).
@@ -89,8 +123,9 @@ export function dateTicks(min: number, max: number, count = 6): Ticks {
   const start = new Date(min),
     month0 = start.getUTCFullYear() * 12 + start.getUTCMonth();
   for (let m = Math.ceil(month0 / step) * step; ; m += step) {
-    const t = Date.UTC(Math.floor(m / 12), m % 12, 1);
-    if (t > max) break;
+    const t = monthStart(m);
+    // Past the last Date (NaN) ends the ticks too.
+    if (!(t <= max)) break;
     if (t >= min) values.push(t);
   }
   return { values, step: step * 30.44 * DAY, labels: values.map((v) => formatDate(v, 0, step)) };

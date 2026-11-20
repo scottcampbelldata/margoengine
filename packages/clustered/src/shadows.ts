@@ -61,10 +61,30 @@ export interface LocalShadowOptions {
   resolution?: number;
   /** Receiver offset toward the light, in shadow-map texels at the receiver (default 1). */
   bias?: number;
-  /** Receiver offset along its normal, in shadow-map texels at the receiver (default 1.5). */
+  /**
+   * Receiver offset along its normal, in shadow-map texels at the receiver (default 0.25 for point, spot and directional
+   * lights; 1.5 before 2026-11-16). One texel moves a hard shadow edge tan(angle to the light) texels toward the light,
+   * so keep it small; 0.25 covers shading normals tilted 10 degrees off the surface (normal maps, smooth vertex normals)
+   * at up to 66 degrees from the light.
+   */
   normalBias?: number;
+  /**
+   * Point, spot and directional hard shadows compare each texel of their 3x3 filter with the depth of the receiver's
+   * tangent plane on that texel's ray (default true), so a flat receiver needs no slope offset at any angle to the
+   * light; directional cascades also leave out texels whose surface lies behind that plane (the receiver ends there).
+   * False compares every texel with the receiver's own depth, as before 2026-11-16, which needs `normalBias` about 1.5
+   * against acne on sloped receivers. PCSS and area light shadows always use the tangent plane.
+   */
+  receiverPlane?: boolean;
+  /**
+   * With `receiverPlane`: how far beyond the tangent plane each texel nearer the light is lifted toward it, in multiples
+   * of the plane's own rise there (default 0, the exact plane). About 2 removes acne from normal-mapped receivers lit at
+   * 80 to 85 degrees, whose tilted normals give a plane rising slower than the surface; casters within the extra lift,
+   * about 2 slopeBias sin(angle to the light) texels, then lose their shadow.
+   */
+  slopeBias?: number;
 }
-/** A caster primitive: gltf-pro `shadowPrimitives` (80-byte vertices, optional alpha mask and `PBRInstances`). */
+/** A caster primitive: gltf/pbr `shadowPrimitives` (80-byte vertices, optional alpha mask and `PBRInstances`). */
 export interface LocalShadowPrimitive {
   primitive?: object;
   alphaTransform?: Float32Array;
@@ -98,6 +118,12 @@ export interface LocalShadowPrimitive {
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
   /**
+   * Cuts against hashed noise instead of `cutoff` while `cutoff` is above 0: the caster shader edit of materials
+   * `alphaHash()` (its record's `castHashed`, shared/alpha-hash.js `hashedDepth`), so only an app that imports
+   * `alphaHash` carries the hash WGSL. Default none.
+   */
+  hashed?: (code: string) => string;
+  /**
    * Bounding sphere of the vertices in the node's local space: centre x, y, z and radius (core `Geometry.bounds`).
    * With it, each shadow map draws the caster only when the sphere reaches its light's frustum; without it (and for
    * instanced or displaced casters) every map draws it. Core meshes added with `add` get theirs from their geometry.
@@ -121,7 +147,7 @@ export interface LocalShadowDraw {
    */
   readonly layer: number;
 }
-/** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf-pro model, materials mesh or terrain. */
+/** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf/pbr model, materials mesh or terrain. */
 export interface LocalShadowSource {
   /** Casters drawn into each shadowed light's maps. */
   readonly shadowPrimitives?: readonly LocalShadowPrimitive[];
@@ -193,8 +219,41 @@ const SUN_LIST = 16,
   noAreas: readonly AreaShadowLight[] = [];
 // Reversed depth (near 1, far 0) for float precision. lights[k]: first layer, point (1) or spot (0), texel size per unit distance.
 // A point light picks the cube face by the major axis of the offset receiver, so faces need no seam filtering.
-// 3x3 PCF (Reeves, Salesin & Cook 1987) with slope and normal offsets (Holbert 2011); the default bias 1 and
-// normalBias 1.5 texels are Margo's.
+// Hard point and spot edges: 3x3 PCF (Reeves, Salesin & Cook 1987), each tap bilinear over its 2x2 texels, so 4x4
+// texels with separable weights (1 - f, 1, 1, f) / 3. Each texel is compared with the depth of the receiver's tangent
+// plane on that texel's centre ray: the receiver-plane depth bias of Isidoro 2006 (GDC), taken per texel as the
+// adaptive depth bias of Dou, Yan, Kerzner, Dai and Wyman 2014 (I3D; JCGT 3(4)) does. A plane stays a plane under the
+// light's projection, so the reference is exact for a flat receiver at any angle. Only texels nearer the light are
+// lifted, never below the receiver's own depth (the old compare), by 1 + slopeBias times the plane's rise (default 1:
+// exact; more covers shading normals tilted toward a grazing light, at the cost of light past grazing contacts). The
+// old constant offsets (1 texel toward the light, 1.5 along the normal) moved every hard edge 1.5 tan(theta) texels
+// toward the light (KB-LOCALSHADOW-OFFSET1: 7 cm at 3.8 m from a 256 px cube face at 58 degrees), which the sin(theta)
+// or (1 - N.L) scaling of Holbert 2011 (GDC, normal offset) barely reduces at that angle, and still left acne on a
+// floor lit at 80 to 85 degrees. Defaults now: 1 texel toward the light (float error, gentle concave curvature) and
+// 0.25 along the normal (normals tilted 10 degrees at up to 66 degrees, scripts/clustered-shadow-gpu-check.js).
+// lights[k].w and sun[j].w: 1 + slopeBias with receiverPlane, 0 for the old flat compare through the comparison sampler.
+// `behind` (directional only, 0 elsewhere): a texel whose stored depth lies farther from the light than the receiver's
+// true plane by more than this shows no part of the receiver (its surface ended at a contact or an edge), so it is left
+// out and the rest renormalized; all left out is lit. A thin occluder meeting the receiver at a grazing contact (the
+// Cornell box's ceiling over its red wall, 80 degrees) otherwise lit the receiver through texels past the contact
+// (KB-SUNSHADOW-OFFSET1). The test is Margo's own; no paper found states it.
+const pcf = /* wgsl */ `fn localShadowPCF(m:mat4x4f,p:vec3f,n:vec3f,uv:vec2f,z:f32,layer:i32,step:f32,plane:f32,behind:f32)->f32 {
+  var lit=0.0;var total=0.0;
+  if(plane<0.5){for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+vec2f(f32(x),f32(y))*localShadowFrame.settings.w,layer,z);}}return lit/9.0;}
+  let t1=normalize(cross(n,select(vec3f(1,0,0),vec3f(0,1,0),abs(n.x)>0.9)))*step;let t2=cross(n,t1);
+  let c1=m*vec4f(p+t1,1);let c2=m*vec4f(p+t2,1);var slope=vec2f(0);
+  if(c1.w>0&&c2.w>0){let d1=vec3f(c1.xy/c1.w*vec2f(0.5,-0.5)+0.5-uv,c1.z/c1.w-z);let d2=vec3f(c2.xy/c2.w*vec2f(0.5,-0.5)+0.5-uv,c2.z/c2.w-z);
+    let det=d1.x*d2.y-d1.y*d2.x;if(abs(det)>1e-12){slope=vec2f(d1.z*d2.y-d2.z*d1.y,d1.x*d2.z-d2.x*d1.z)/det;}}
+  let size=vec2f(textureDimensions(localShadowMap));let f=uv*size-0.5;let base=floor(f);let w=f-base;
+  for(var y=-1;y<=2;y++){let wy=select(select(1.0,w.y,y==2),1.0-w.y,y==-1);
+    for(var x=-1;x<=2;x++){let wx=select(select(1.0,w.x,x==2),1.0-w.x,x==-1);let t=base+vec2f(f32(x),f32(y));
+      let stored=textureLoad(localShadowMap,vec2i(clamp(t,vec2f(0),size-1)),layer,0);
+      let rise=dot(slope,(t+0.5)/size-uv);if(behind>0&&stored<z+rise-behind){continue;}total+=wx*wy;
+      lit+=select(0.0,wx*wy,z+max(rise,0.0)*plane>=stored);}}
+  if(behind>0){return select(1.0,lit/total,total>0);}
+  return lit/9.0;
+}
+`;
 const sampling = (group: number, sun = false, area = false, soft = false) =>
   /* wgsl */ `
 struct LocalShadowFrame {settings:vec4f,lights:array<vec4f,${MAX_LIGHTS}>,matrices:array<mat4x4f,${LAYERS}>${sun || area || soft ? extendedFrame : ''}${soft ? `,soft:array<vec4f,${MAX_LIGHTS * 2}>` : ''}}
@@ -210,30 +269,31 @@ fn clusterShadow(light:ClusterLight,position:vec3f,n:vec3f)->f32 {
     if(a.x>=a.y&&a.x>=a.z){layer+=select(1u,0u,d.x>0);}else if(a.y>=a.z){layer+=select(3u,2u,d.y>0);}else{layer+=select(5u,4u,d.z>0);}}
   let clip=localShadowFrame.matrices[layer]*vec4f(p,1);if(clip.w<=0){return 1.0;}
   let ndc=clip.xyz/clip.w;let uv=ndc.xy*vec2f(0.5,-0.5)+0.5;if(any(uv<vec2f(0))||any(uv>vec2f(1))||ndc.z<=0){return 1.0;}
-${soft ? '  if(localShadowFrame.soft[slot*2u-2u].x>0){return clusterSoftShadow(slot-1u,localShadowFrame.matrices[layer],p,n,clip.w,uv,ndc.z,i32(layer),distance);}\n' : ''}  var lit=0.0;
-  for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+vec2f(f32(x),f32(y))*localShadowFrame.settings.w,i32(layer),ndc.z);}}
-  return lit/9.0;
+${soft ? '  if(localShadowFrame.soft[slot*2u-2u].x>0){return clusterSoftShadow(slot-1u,localShadowFrame.matrices[layer],p,n,clip.w,uv,ndc.z,i32(layer),distance);}\n' : ''}  return localShadowPCF(localShadowFrame.matrices[layer],p,n,uv,ndc.z,i32(layer),texel*4.0,info.w,0.0);
 }
 ` +
+  pcf +
   (sun ? sunShadow : '') +
   (area || soft ? shadowTap : '') +
   (area ? areaShadow : '') +
   (soft ? softShadow : '');
 const extendedFrame = `,sun:array<vec4f,${SUN_LIST}>,sunCascades:array<vec4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,sunMatrices:array<mat4x4f,${MAX_DIRECTIONAL_SHADOWS * 4}>,area:array<vec4f,${AREA_LIST}>,areaSlots:array<vec4f,${AREA_SHADOW_SLOTS}>,areaMatrices:array<mat4x4f,${AREA_SHADOW_SLOTS * 6}>`;
-// Directional light j: sun[j] is (first layer, slot + 1, cascades); per cascade, the world size of a texel and the UV box
-// whose 3x3 filter stays inside the map. The finest cascade holding the receiver shades it; outside all of them it is lit.
-// Cascaded shadow maps after Engel 2006 and Dimitrov 2007.
+// Directional light j: sun[j] is (first layer, slot + 1, cascades, receiver-plane lift as lights[k].w); per cascade, the
+// world size of a texel and the UV box whose 3x3 filter stays inside the map. The finest cascade holding the receiver
+// shades it; outside all of them it is lit. Cascaded shadow maps after Engel 2006 and Dimitrov 2007. Each cascade maps
+// the receiver's tangent plane through its own matrix and offsets by its own texel (KB-SUNSHADOW-OFFSET1: the old flat
+// compare and 1.5 texels along the normal put a hard edge 1.5 tan(theta) texels toward the sun). `behind` is the
+// receiver's own depth margin over its surface (bias + normalBias / N.L texels) plus one texel, in the cascade's depth.
 const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n:vec3f,l:vec3f)->f32 {
   let info=localShadowFrame.sun[j];if(info.y<0.5){return 1.0;}
   let first=(u32(info.y)-1u)*4u;
   for(var k=0u;k<u32(info.z);k++){
     let cascade=localShadowFrame.sunCascades[first+k];
     let p=position+n*(cascade.x*localShadowFrame.settings.z)+l*(cascade.x*localShadowFrame.settings.y);
-    let clip=localShadowFrame.sunMatrices[first+k]*vec4f(p,1);let uv=clip.xy*vec2f(0.5,-0.5)+0.5;
+    let m=localShadowFrame.sunMatrices[first+k];let clip=m*vec4f(p,1);let uv=clip.xy*vec2f(0.5,-0.5)+0.5;
     if(any(uv<vec2f(cascade.w))||any(uv>cascade.yz)||clip.z<=0||clip.z>1){continue;}
-    var lit=0.0;
-    for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+vec2f(f32(x),f32(y))*localShadowFrame.settings.w,i32(info.x)+i32(k),clip.z);}}
-    return lit/9.0;
+    let behind=abs(dot(vec3f(m[0].z,m[1].z,m[2].z),l))*cascade.x*(localShadowFrame.settings.y+localShadowFrame.settings.z/max(dot(n,l),0.05)+1.0);
+    return localShadowPCF(m,p,n,uv,clip.z,i32(info.x)+i32(k),cascade.x*4.0,info.w,behind);
   }
   return 1.0;
 }
@@ -243,9 +303,23 @@ const sunShadow = /* wgsl */ `fn clusterDirectionalShadow(j:u32,position:vec3f,n
 // -n). PCSS (Fernando 2005): blockers found within the light's footprint give the penumbra, the light's half extents
 // at the receiver times (receiver - blocker) / blocker depth, filtered over a disk of comparisons. The receiver's
 // tangent plane mapped into the face (planes stay planes under a projection) is the reference depth at every tap.
-// Taps on a Vogel 1979 spiral (golden angle 2.39996323); receiver-plane depth bias after Isidoro 2006 (GDC). The 16
-// blocker / 24 filter taps, the x3 reach and the 0.01 x distance tangent are Margo tuning.
-const shadowTap = /* wgsl */ `fn localShadowTap(i:u32,count:u32)->vec2f {let a=f32(i)*2.39996323;return vec2f(cos(a),sin(a))*sqrt(f32(i)/f32(count));}
+// Taps on a Vogel 1979 spiral (golden angle 2.39996323, one localShadowGolden turn per tap), receiver-plane depth
+// bias after Isidoro 2006 (GDC). Each pixel turns both spirals by its own angle and moves every tap within its own
+// ring of equal area (tap i at radius sqrt((i + jitter) / n); blocker tap 0 stays on the receiver's texel), from two
+// interleaved gradient noise values of its screen pixel (Jimenez 2014; the second from the transposed pixel, as
+// @margoengine/shadows does), rebuilt from the clustered camera, so no fragment input. One pattern shared by every
+// pixel drew the penumbra as 24 shifted copies of the hard shadow: steps of 1/24 one shadow texel wide, and radial
+// streaks behind thin casters (KB-PCSS-BLOCK1). Fixed rings also left a kink where a blocker ring stopped reaching the
+// caster. Stratified over angle and ring, the taps are an unbiased estimate of the disc: fine noise whose local mean
+// follows the disc light's penumbra. No time term: the same view renders the same pixels every frame. The 16 blocker
+// / 24 filter taps, the x3 reach and the 0.01 x distance tangent are Margo tuning.
+const shadowTap = /* wgsl */ `const localShadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);
+fn localShadowTurn(position:vec3f)->vec3f {
+  let eye=clusterFrame.view*vec4f(position,1);let ortho=clusterFrame.intensity.w>0.5;
+  let pixel=floor(eye.xy/select(max(-eye.z,0.000001),1.0,ortho)*(0.5*clusterFrame.screen.y/clusterFrame.screen.z));
+  let magic=vec2f(0.06711056,0.00583715);let noise=fract(52.9829189*fract(vec2f(dot(pixel,magic),dot(pixel.yx,magic))));
+  let a=6.2831853*noise.x;return vec3f(cos(a),sin(a),noise.y);
+}
 `;
 const areaShadow = /* wgsl */ `fn localAreaVisibility(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f,sphere:bool)->f32 {
   let info=localShadowFrame.area[j];if(info.y<0.5){return 1.0;}
@@ -267,15 +341,15 @@ const areaShadow = /* wgsl */ `fn localAreaVisibility(j:u32,position:vec3f,n:vec
     let right=normalize(cross(hint,axis))*length(r);let up=cross(axis,right);
     extent=(abs((m*vec4f(right,0)).xy)+abs((m*vec4f(up,0)).xy))*0.5/clip.w;}
   let size=vec2f(textureDimensions(localShadowMap));let reach=min(extent*3.0,vec2f(s.y));
-  var blockers=0.0;var depth=0.0;
+  let turn=localShadowTurn(position);var direction=turn.xy;var blockers=0.0;var depth=0.0;
   for(var i=0u;i<16u;i++){
-    let o=localShadowTap(i,16u)*reach;let stored=textureLoad(localShadowMap,vec2i(clamp((uv+o)*size,vec2f(0),size-1)),layer,0);
+    let o=direction*select(sqrt((f32(i)+turn.z)/16.0),0.0,i==0u)*reach;direction=localShadowGolden*direction;let stored=textureLoad(localShadowMap,vec2i(clamp((uv+o)*size,vec2f(0),size-1)),layer,0);
     if(stored>z+dot(slope,o)){blockers+=1.0;depth+=info.z*info.w/(stored*(info.w-info.z)+info.z);}
   }
   if(blockers<0.5){return 1.0;}
   let blocker=depth/blockers;let radius=clamp(extent*max(clip.w-blocker,0.0)/blocker,vec2f(s.z),vec2f(s.y));
-  var lit=0.0;
-  for(var i=0u;i<24u;i++){let o=localShadowTap(i,24u)*radius;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
+  var lit=0.0;direction=turn.xy;
+  for(var i=0u;i<24u;i++){let o=direction*sqrt((f32(i)+turn.z)/24.0)*radius;direction=localShadowGolden*direction;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
   return lit/24.0;
 }
 fn clusterAreaShadow(j:u32,position:vec3f,n:vec3f,c:vec3f,r:vec3f,u:vec3f)->f32 {if(j>=64u){return 1.0;}return localAreaVisibility(j,position,n,c,r,u,false);}
@@ -295,15 +369,15 @@ const softShadow = /* wgsl */ `fn clusterSoftShadow(k:u32,m:mat4x4f,p:vec3f,n:ve
   let det=d1.x*d2.y-d1.y*d2.x;
   let slope=select(vec2f(0),vec2f(d1.z*d2.y-d2.z*d1.y,d1.x*d2.z-d2.x*d1.z)/det,abs(det)>1e-12);
   let extent=s.xy/w;let size=vec2f(textureDimensions(localShadowMap));let reach=min(extent*3.0,vec2f(s.z));
-  var blockers=0.0;var depth=0.0;
+  let turn=localShadowTurn(p);var direction=turn.xy;var blockers=0.0;var depth=0.0;
   for(var i=0u;i<16u;i++){
-    let o=localShadowTap(i,16u)*reach;let stored=textureLoad(localShadowMap,vec2i(clamp((uv+o)*size,vec2f(0),size-1)),layer,0);
+    let o=direction*select(sqrt((f32(i)+turn.z)/16.0),0.0,i==0u)*reach;direction=localShadowGolden*direction;let stored=textureLoad(localShadowMap,vec2i(clamp((uv+o)*size,vec2f(0),size-1)),layer,0);
     if(stored>z+dot(slope,o)){blockers+=1.0;depth+=d.x*d.y/(stored*(d.y-d.x)+d.x);}
   }
   if(blockers<0.5){return 1.0;}
   let blocker=depth/blockers;let radius=clamp(extent*max(w-blocker,0.0)/blocker,vec2f(smallest),vec2f(max(s.z,smallest)));
-  var lit=0.0;
-  for(var i=0u;i<24u;i++){let o=localShadowTap(i,24u)*radius;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
+  var lit=0.0;direction=turn.xy;
+  for(var i=0u;i<24u;i++){let o=direction*sqrt((f32(i)+turn.z)/24.0)*radius;direction=localShadowGolden*direction;lit+=textureSampleCompareLevel(localShadowMap,localShadowSampler,uv+o,layer,z+dot(slope,o));}
   return lit/24.0;
 }
 `;
@@ -315,7 +389,7 @@ struct Frame {model:mat4x4f,alpha:vec4f${transformed ? ',alphaUV0:vec4f,alphaUV1
 @group(1) @binding(1) var alphaMap:texture_2d<f32>;
 @group(1) @binding(2) var alphaSampler:sampler;
 struct In {@location(0) position:${pbr ? 'vec4f,@location(3) uv:vec4f,@location(4) color:vec4f' : 'vec3f'}}
-struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
 @vertex fn vertex(i:In)->Out {var o:Out;o.clip=camera*f.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,f.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}${transformed ? 'let sourceUV=o.uv;o.uv=vec2f(dot(f.alphaUV0.xy,sourceUV)+f.alphaUV0.z,dot(f.alphaUV1.xy,sourceUV)+f.alphaUV1.z);' : ''}return o;}
 @fragment fn fragment(i:Out){if(textureSampleLevel(alphaMap,alphaSampler,i.uv,0).a*f.alpha.x*i.alpha<f.alpha.y){discard;}}
 `;
@@ -331,9 +405,9 @@ const axes = [
 const frameFloats = (sun: boolean, area: boolean, soft: boolean) =>
   soft ? SOFT_FLOATS : sun || area ? EXTENDED_FLOATS : FRAME_FLOATS;
 /** A castShadow light's `shadow.radius` (validated by `Clustered.setLights`), 0 when unset. */
-function shadowRadius(light: { shadow?: boolean | { radius?: number } } | undefined): number {
+function shadowRadius(light: { shadow?: boolean | { radius?: number }; radius?: number } | undefined): number {
   const shadow = light?.shadow;
-  return (shadow && typeof shadow === 'object' && shadow.radius) || 0;
+  return (shadow && typeof shadow === 'object' ? shadow.radius : undefined) ?? light?.radius ?? 0;
 }
 function lightMatrix(
   out: Float32Array,
@@ -537,13 +611,14 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       max > MAX_LIGHTS ||
       !Number.isInteger(size) ||
       size < 16 ||
-      [o.bias ?? 1, o.normalBias ?? 1.5].some((v) => !Number.isFinite(Math.fround(v)) || v < 0)
+      [o.bias ?? 1, o.normalBias ?? 0.25, o.slopeBias ?? 0].some((v) => !Number.isFinite(Math.fround(v)) || v < 0) ||
+      (o.receiverPlane !== undefined && typeof o.receiverPlane !== 'boolean')
     )
       throw new RangeError(
-        'Invalid local shadow options; set resolution to an integer of 16 or more and bias and normalBias to finite numbers of 0 or more',
+        'Invalid local shadow options; set resolution to an integer of 16 or more, bias, normalBias and slopeBias to finite numbers of 0 or more and receiverPlane to a boolean',
       );
   }
-  /** Adds a caster: a core mesh, or a gltf-pro model / materials mesh (`shadowPrimitives`). `dynamic` re-renders its lights every frame (skinned or morphing geometry). */
+  /** Adds a caster: a core mesh, or a gltf\/pbr model / materials mesh (`shadowPrimitives`). `dynamic` re-renders its lights every frame (skinned or morphing geometry). */
   add(source: LocalShadowSource | MeshHandle, { dynamic = false }: { dynamic?: boolean } = {}): () => void {
     if (this.disposed || !source || typeof dynamic !== 'boolean')
       throw new TypeError('Invalid shadow caster; add a mesh or model before dispose(), with a boolean dynamic');
@@ -729,6 +804,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       size = o.resolution ?? 512,
       max = o.maxLights ?? 4,
       data = this.lights['data'],
+      stride = this.lights['stride'],
       cameras = this.lights['shadowCameras'],
       count = this.lights['lightCount'],
       slots = this.slots,
@@ -749,7 +825,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       for (let j = 0; j < count; j++) radii[j] = shadowRadius(lightList[j]);
     }
     for (let j = 0; j < count; j++) {
-      const at = j * 16,
+      const at = j * stride,
         slot = data[at + 14] - 1;
       if (slot < 0 || slot >= max) continue;
       used = Math.max(used, slot + 1);
@@ -781,7 +857,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     this.extend(sunCount > 0, areaCount > 0, soft);
     if (layers > this.layers) this.allocate(layers);
     for (let j = 0; j < count; j++) {
-      const at = j * 16,
+      const at = j * stride,
         slot = data[at + 14] - 1;
       if (slot < 0 || slot >= max) continue;
       // The light's `shadow` map size and near/far (Clustered.setLights), 0 where unset.
@@ -823,6 +899,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         small = Math.min(width, height);
       values[4 + slot * 4] = base;
       values[5 + slot * 4] = point ? 1 : 0;
+      values[7 + slot * 4] = o.receiverPlane === false ? 0 : 1 + (o.slopeBias ?? 0);
       values[6 + slot * 4] =
         radius > 0 ? (2 * tan) / (small - (scaled ? 4 : 0)) : scaled ? (2 * cone) / (small - 4) : (2 * tan) / size;
       const q = SOFT + slot * 8;
@@ -861,7 +938,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     if (this.sunShadows || this.areaShadows) this.extras(c, suns, sunCount, areas, areaCount, size);
     values[0] = used;
     values[1] = o.bias ?? 1;
-    values[2] = o.normalBias ?? 1.5;
+    values[2] = o.normalBias ?? 0.25;
     values[3] = 1 / size;
     values.set(this.sampled.subarray(0, pointLayers * 16), 4 + MAX_LIGHTS * 4);
     c.device.queue.writeBuffer(
@@ -1045,7 +1122,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           // Only casters whose bounds reach this map's frustum (light range and face, cascade or spot cone).
           if (outside(planes, d.sphere)) continue;
           const p = d.p!;
-          pass.setPipeline(this.pipeline(d.key, d.displacement));
+          pass.setPipeline(this.pipeline(d.key, d.displacement, p.hashed));
           pass.setBindGroup(1, d.group);
           if (d.displaced) pass.setBindGroup(2, d.displaced);
           pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
@@ -1129,7 +1206,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         values[SUN_CASCADES + cascade * 4 + 2] = (height - 2) / size;
         values[SUN_CASCADES + cascade * 4 + 3] = 2 / size;
       });
-      values.set([base, s + 1, boxes.length, 0], SUN + light.index * 4);
+      values.set([base, s + 1, boxes.length, this.options.receiverPlane === false ? 0 : 1 + (this.options.slopeBias ?? 0)], SUN + light.index * 4);
     }
     for (let s = 0; s < areaCount; s++) {
       const light = areas[s],
@@ -1200,7 +1277,9 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       displacement = p.displacement,
       opacity = p.opacity,
       animation = p.animation,
-      key = `${animation ? 'v' : ''}${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 || displacement?.cuts ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}${p.stride === 80 && p.vertexAlpha === false ? 'a' : ''}${displacement?.key ?? ''}`;
+      // Pipeline flags, then after '|' the displacement's own key: pipeline() reads the flags alone, so a displacement
+      // key's letters (materials fur's 'fur:1:map') never turn a flag on.
+      key = `${animation ? 'v' : ''}${p.stride}${p.instances ? 'i' : ''}${(p.cutoff ?? 0) > 0 || displacement?.cuts ? 'm' : ''}${transform ? 't' : ''}${p.topology === 'line-list' ? 'l' : ''}${displacement ? 'd' : ''}${opacity ? 'o' : ''}${p.stride === 80 && p.vertexAlpha === false ? 'a' : ''}${p.hashed && (p.cutoff ?? 0) > 0 ? 'h' : ''}|${displacement?.key ?? ''}`;
     if (opacity && p.stride !== 80) throw new RangeError('Opacity-mapped shadow casters need 80-byte vertices');
     if (animation && p.stride !== 80) throw new RangeError('UV-animated shadow casters need 80-byte vertices');
     if (displacement && p.stride !== 80) throw new RangeError('Displaced shadow casters need 80-byte vertices');
@@ -1307,19 +1386,25 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       ],
     }));
   }
-  private pipeline(key: string, displacement: LocalShadowPrimitive['displacement']): GPURenderPipeline {
+  private pipeline(
+    key: string,
+    displacement: LocalShadowPrimitive['displacement'],
+    hashed?: LocalShadowPrimitive['hashed'],
+  ): GPURenderPipeline {
     let pipeline = this.pipelines.get(key);
     if (pipeline) return pipeline;
-    const pbr = key.replace(/^v/, '').startsWith('80'),
-      displaced = key.includes('d'),
-      plain = depth(pbr, key.includes('t')),
-      opacity = key.includes('o'),
-      animation = key.startsWith('v'),
+    const flags = key.slice(0, key.indexOf('|')),
+      pbr = flags.replace(/^v/, '').startsWith('80'),
+      displaced = flags.includes('d'),
+      plain = depth(pbr, flags.includes('t')),
+      opacity = flags.includes('o'),
+      animation = flags.startsWith('v'),
       code = displaced ? displacedDepth(plain, 2, displacement) : plain,
-      instanced = key.includes('i') ? instancedDepth(code) : code,
-      placed = key.includes('a') ? solidVertexDepth(instanced) : instanced,
+      instanced = flags.includes('i') ? instancedDepth(code) : code,
+      placed = flags.includes('a') ? solidVertexDepth(instanced) : instanced,
       lit = opacity ? opacityDepth(placed, 1) : placed,
-      module = this.device!.createShaderModule({ code: animation ? animatedDepth(lit, 1) : lit });
+      moved = animation ? animatedDepth(lit, 1) : lit,
+      module = this.device!.createShaderModule({ code: hashed && flags.includes('h') ? hashed(moved) : moved });
     pipeline = this.device!.createRenderPipeline({
       layout: this.device!.createPipelineLayout({
         bindGroupLayouts: [
@@ -1331,11 +1416,11 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       vertex: {
         module,
         entryPoint: 'vertex',
-        buffers: casterBuffers(pbr ? 80 : 24, displaced, key.includes('i')),
+        buffers: casterBuffers(pbr ? 80 : 24, displaced, flags.includes('i')),
       },
       // Opaque casters need no fragment stage, which keeps early depth testing.
-      ...(key.includes('m') ? { fragment: { module, entryPoint: 'fragment', targets: [] } } : {}),
-      ...(key.includes('l') ? { primitive: { topology: 'line-list' as const } } : {}),
+      ...(flags.includes('m') ? { fragment: { module, entryPoint: 'fragment', targets: [] } } : {}),
+      ...(flags.includes('l') ? { primitive: { topology: 'line-list' as const } } : {}),
       depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
     });
     this.pipelines.set(key, pipeline);

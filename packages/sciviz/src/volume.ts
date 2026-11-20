@@ -134,18 +134,28 @@ fn colourLookup(table:texture_2d<f32>, value:f32)->vec4f {
  * option: 0 the hardware trilinear filter (the default; the branch folds away when the pipeline is built), 1 exact
  * float trilinear from eight `textureLoad`s, 2 the same with every axis weight one full 8-bit step (1/256) off, its
  * sign picked by a hash of the position: a model of hardware filter-weight precision (tests/bricks-browser.js).
+ * The pipeline constant `filterSeed` picks one sign pattern of the model. The sign is exact integer arithmetic, so
+ * every GPU draws the same pattern: the position is floored to the 1/256 sub-texel grid (a power-of-two scale, exact
+ * in float) and hashed with pcg3d (Jarzynski and Olano 2020, JCGT 9(3)), whose wrapping u32 maths WGSL and GLSL ES
+ * 3.00 both specify exactly. A `sin` hash would not do: WGSL bounds `sin` only inside [-pi, pi].
  * `x` is in texels of `texture`, voxel centres at i + 0.5.
  */
 export const filterModeWGSL = (texture: string): string => /* wgsl */ `
 override filterMode: u32 = 0u;
+override filterSeed: u32 = 0u;
+fn filterSign(x: vec3f) -> vec3f {
+  var v = bitcast<vec3u>(vec3i(floor(x * 256.0))) ^ vec3u(filterSeed * 0x9e3779b9u);
+  v = v * 1664525u + 1013904223u;
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  v ^= v >> vec3u(16u);
+  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+  return vec3f(v >> vec3u(31u)) * 2.0 - 1.0;
+}
 fn trilinear(x: vec3f) -> f32 {
   let b = x - 0.5;
   let base = floor(b);
   var f = b - base;
-  if (filterMode == 2u) {
-    let h = fract(sin(vec3f(dot(x, vec3f(12.9898, 78.233, 37.719)), dot(x, vec3f(39.346, 11.135, 83.155)), dot(x, vec3f(73.156, 52.235, 9.151)))) * 43758.5453);
-    f = clamp(f + select(vec3f(-1.0), vec3f(1.0), h > vec3f(0.5)) / 256.0, vec3f(0.0), vec3f(1.0));
-  }
+  if (filterMode == 2u) { f = clamp(f + filterSign(x) / 256.0, vec3f(0.0), vec3f(1.0)); }
   let i = vec3i(base);
   let last = vec3i(textureDimensions(${texture})) - 1;
   var s = 0.0;

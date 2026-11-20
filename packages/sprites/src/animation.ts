@@ -161,6 +161,19 @@ export class SpriteAnimation {
    * @throws RangeError for a `dt` that is negative or not finite.
    */
   update(dt: number): this {
+    return this.#step(dt, true);
+  }
+
+  /**
+   * Advances by `dt` seconds (times `speed`) as `update` does, firing no event: the frames entered stay silent. Pass
+   * the animation as an `extra` clock to `seek` from `@margoengine/cutscene/seek`, so a film scene starts on the frame a
+   * continuous run shows. @throws RangeError for a `dt` that is negative or not finite.
+   */
+  advanceTime(dt: number): void {
+    this.#step(dt, false);
+  }
+
+  #step(dt: number, events: boolean): this {
     const c = this.#current;
     if (!Number.isFinite(dt) || dt < 0) throw badRange();
     if (!c || this.finished) return this;
@@ -177,7 +190,7 @@ export class SpriteAnimation {
         slot = c.ends.findIndex((end) => within < end);
       target = cycles * length + (slot < 0 ? length - 1 : slot);
     }
-    for (let s = this.#slot + 1; s <= target; s++) this.#fire(c, s);
+    if (events) for (let s = this.#slot + 1; s <= target; s++) this.#fire(c, s);
     this.#slot = target;
     return this;
   }

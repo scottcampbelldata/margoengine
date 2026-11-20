@@ -89,7 +89,7 @@
       },
       "gzipDelta": 823
     },
-    "gltf-pro": {
+    "gltf/pbr": {
       "before": {
         "raw": 42633,
         "gzip": 13606

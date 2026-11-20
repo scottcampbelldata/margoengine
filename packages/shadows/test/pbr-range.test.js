@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Shadows } from '../dist/index.js';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
 test('static PBR casters tighten cascade distance; transforms update it and deformation keeps the safe range', async () => {

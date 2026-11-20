@@ -32,7 +32,8 @@ async function main() {
     const result = await runLimited(`node ${step}`, { cwd: root, limitMs, label: `modern:test:extensions ${step}` });
     if (!result.ok) {
       console.error(result.message ?? `modern:test:extensions: ${step} failed after ${result.seconds} s`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     console.log(`modern:test:extensions: ${step} passed in ${result.seconds} s`);
   }

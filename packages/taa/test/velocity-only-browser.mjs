@@ -1,20 +1,21 @@
-// Real-GPU check of TAA's velocityOnly with MotionBlur in a PostStack at 4x MSAA, built packages. Takes the GPU lock itself
+// Real-GPU check of TAA's velocityOnly with MotionBlur in a PostStack at 4x MSAA, built packages.
 // around the browser. A moving box must blur with the vectors and stay sharp without the blur, and a still view must not
 // shimmer: with no jitter its frames are the same bytes.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-velocity-only' });
 const timer = setTimeout(() => {
   console.error('velocity-only-browser: timed out after 120 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-velocity-only/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -26,6 +27,8 @@ const browser = await launchBrowser({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 640, height: 480 }, deviceScaleFactor: 1 }),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
@@ -119,5 +122,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

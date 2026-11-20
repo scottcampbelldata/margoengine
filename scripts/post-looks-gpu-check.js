@@ -1,5 +1,5 @@
 // Real-GPU check of post's SMAA, Glitch and Afterimage (tests/post-looks.html), on the built packages. Run from the
-// repository root with the GPU lock:  node scripts/gpu-lock.mjs run --owner=post-looks -- node scripts/post-looks-gpu-check.js
+// repository root:  node scripts/run-with-timeout.mjs -- node scripts/post-looks-gpu-check.js
 // Writes test-results/post-looks/gpu.json and the screenshots it compares.
 //
 // smaa: a black/white half-plane whose edge has slope 1/8 (and 8, each mirrored) drawn aliased (pixel centres) by a
@@ -18,10 +18,8 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
 import { decodePNG } from '../tests/support/png.js';
-import { acquire } from './gpu-lock.mjs';
 
-const release = await acquire({ owner: 'post-looks-gpu-check' }),
-  port = 5301,
+const port = 5301,
   folder = 'test-results/post-looks',
   checks = [],
   failures = [];
@@ -532,5 +530,4 @@ try {
   assert.deepEqual(failures, [], 'post looks GPU checks failed');
 } finally {
   await browser?.close();
-  release();
 }

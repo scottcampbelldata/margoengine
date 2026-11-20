@@ -129,7 +129,8 @@ export class VoxelBot {
       async () => {
         const mine = ++opening,
           next = await connectWebSocket(options.url, { headers: options.headers, tls: options.tls });
-        if (mine !== opening) {
+        // A bot closed while this try was opening keeps no socket either: the stopped try never attaches it.
+        if (mine !== opening || this.#closing) {
           next.close();
           throw new RangeError('This connection came after its try was over; the next try makes its own');
         }

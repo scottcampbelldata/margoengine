@@ -10,7 +10,6 @@ import { endTree } from './shutdown.mjs';
 
 /** A line that names a problem. The lines of a clean Vite, Next.js or Node server never match. */
 export const BAD_LINE = /\(!\)|\berror\b|\bwarn(ing)?\b|⚠|failed|cannot find|could not resolve|not found|no matching export|deprecat/i;
-const MAX_URLS = 200;
 
 export function killTree(child) {
   if (child.exitCode !== null || child.pid === undefined) return;
@@ -90,7 +89,8 @@ export async function probe({ command, args, cwd, env = process.env, page, tcpPo
   child.stdout.on('data', onData);
   child.stderr.on('data', onData);
   child.on('error', (error) => problems.push(`could not start: ${error.message}`));
-  const deadline = setTimeout(() => killTree(child), limitMs);
+  let outOfTime = false;
+  const deadline = setTimeout(() => ((outOfTime = true), killTree(child)), limitMs);
   try {
     const started = Date.now();
     for (;;) {
@@ -103,16 +103,24 @@ export async function probe({ command, args, cwd, env = process.env, page, tcpPo
       await new Promise((r) => setTimeout(r, 300));
     }
     if (page) {
+      // The crawl follows the app's whole module graph, however large. It used to stop and fail at a fixed 200 URLs: the
+      // gameplay sandbox loads 204 real modules (its own, core's source and the built packages it imports), so a correct
+      // server failed once a package it imports gained a module, and modules past the 200th went unchecked. A server
+      // that keeps naming new URLs is still caught: the crawl runs inside the probe's hard limit and reports it.
       const queue = [page];
       const seen = new Set(queue);
-      while (queue.length && seen.size <= MAX_URLS) {
+      const unfinished = () =>
+        new Error(`the crawl from ${page} did not finish within ${limitMs / 1000} s (${seen.size} URLs reached, ${queue.length} still queued)`);
+      while (queue.length) {
+        if (outOfTime) throw unfinished();
         const url = queue.shift();
-        const answer = await get(url, { insecure });
+        const answer = await get(url, { insecure }).catch((error) => {
+          throw outOfTime ? unfinished() : error;
+        });
         if (answer.status !== 200) problems.push(`${url} answered ${answer.status}`);
         else if (/html|javascript|css/.test(answer.type))
           for (const next of referencedUrls(answer.body, url, /html/.test(answer.type))) if (!seen.has(next)) (seen.add(next), queue.push(next));
       }
-      if (seen.size > MAX_URLS) problems.push(`more than ${MAX_URLS} URLs reachable from ${page}; the crawl stopped`);
     }
     // The dependency scan and pre-bundling report after the first request; give them time to settle.
     await new Promise((r) => setTimeout(r, settleMs));

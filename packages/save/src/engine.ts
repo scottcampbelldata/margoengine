@@ -5,6 +5,7 @@
 import { Geometry, type EngineKernel, type EnginePlugin, type Mesh, type Scene } from '@margoengine/core';
 import type { Mesh as RuntimeMesh } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { sceneScope } from '../../shared/scene-scope.js';
 import {
   type Json,
   type SaveDocument,
@@ -18,7 +19,7 @@ import type { Migrations } from './migrations.js';
 import { type ResolvedEntity, expandSave } from './prefab.js';
 import { fromBase64, toBase64 } from './storage.js';
 
-/** The part of a glTF model the binding reads; `PBRModel` of `@margoengine/gltf-pro` is one. */
+/** The part of a glTF model the binding reads; `PBRModel` of `@margoengine/gltf/pbr` is one. */
 export interface ModelLike extends EnginePlugin {
   readonly root: Mesh;
   readonly nodes: readonly Mesh[];
@@ -86,7 +87,7 @@ export interface RestoreOptions extends ValidateOptions {
   filter?(mesh: Mesh): boolean;
   /** Called once per entity after all exist, for your own components. A throw undoes the whole restore. */
   onEntity?(mesh: Mesh, entity: ResolvedEntity, get: (id: string) => Mesh): void;
-  /** Loads a model. Default `loadGLTF` of `@margoengine/gltf-pro`. */
+  /** Loads a model. Default `loadGLTF` of `@margoengine/gltf/pbr`. */
   load?(url: string, options: { signal?: AbortSignal }): Promise<ModelLike>;
   /** Makes another copy of a loaded model, for a URL used twice. Default `cloneModel` of `@margoengine/animation`. */
   clone?(model: ModelLike): Promise<ModelLike>;
@@ -409,8 +410,8 @@ function readGeometry(saved: unknown, index: number): Geometry {
   return new Geometry(positions, normals, new Uint32Array(words(saved.indices)));
 }
 
-/** Refuses a damaged `meta.engine` before anything is built. */
-function readState(document: SaveDocument): EngineState {
+/** Refuses a damaged `meta.engine` before anything is built, with what the commit and every later frame check. */
+function readState(document: SaveDocument, scene: Scene): EngineState {
   const state = (document.meta?.engine ?? {}) as unknown as EngineState,
     wrong = (text: string): TypeError => new TypeError(`meta.engine.${text}`);
   if (!record(state)) throw wrong('must be what captureScene wrote');
@@ -423,11 +424,28 @@ function readState(document: SaveDocument): EngineState {
       numbers(camera.up, 3) &&
       [camera.fov, camera.near, camera.far].every(Number.isFinite);
     if (!ok) throw wrong('camera: { fov, near, far, position, target, up }');
+    // Camera.update throws on these every frame once they are in.
+    const { fov, near, far, position: p, target: t, up: u } = camera as NonNullable<EngineState['camera']>,
+      z = [p[0] - t[0], p[1] - t[1], p[2] - t[2]];
+    if (
+      !(fov > 0 && fov < 180 && near > 0 && far > near) ||
+      !(z[0] || z[1] || z[2]) ||
+      !(u[1] * z[2] - u[2] * z[1] || u[2] * z[0] - u[0] * z[2] || u[0] * z[1] - u[1] * z[0])
+    )
+      throw wrong('camera: 0 < fov < 180, 0 < near < far, position off target and up off the view');
   }
   if (lighting !== undefined) {
-    const ok = record(lighting) && numbers(lighting.direction) && numbers(lighting.radiance) && numbers(lighting.ambient);
-    if (!ok) throw wrong('lighting: { direction, radiance, ambient } as numbers');
+    // The lengths the scene's arrays have, so the commit's set() cannot throw after the plugins took their state.
+    const { direction, radiance, ambient } = scene.lighting,
+      ok =
+        record(lighting) &&
+        numbers(lighting.direction, direction.length) &&
+        numbers(lighting.radiance, radiance.length) &&
+        numbers(lighting.ambient, ambient.length);
+    if (!ok) throw wrong('lighting: { direction, radiance, ambient } as the scene has them');
   }
+  if (state.background !== undefined && state.background !== null && typeof state.background !== 'string')
+    throw wrong('background: a colour string or null');
   if (geometries !== undefined && !Array.isArray(geometries)) throw wrong('geometries: an array');
   if (plugins !== undefined && !record(plugins)) throw wrong('plugins: state by plugin name');
   return state;
@@ -519,9 +537,15 @@ function applyPlugins(
   }
 }
 
-const loadDefault = async (engine: EngineKernel, url: string, options: { signal?: AbortSignal }): Promise<ModelLike> => {
-  const { loadGLTF } = await import('@margoengine/gltf-pro');
-  return loadGLTF(engine, url, options) as unknown as ModelLike;
+const loadDefault = async (
+  engine: EngineKernel,
+  url: string,
+  options: { signal?: AbortSignal },
+  scene: Scene,
+): Promise<ModelLike> => {
+  const { loadGLTF } = await import('@margoengine/gltf/pbr');
+  // The scene being restored, which is not the active one after the import when the restore targets another scene.
+  return sceneScope(engine, scene).run(() => loadGLTF(engine, url, options)) as unknown as ModelLike;
 };
 const cloneDefault = async (model: ModelLike): Promise<ModelLike> => {
   const { cloneModel } = await import('@margoengine/animation/skeleton-utils');
@@ -542,13 +566,13 @@ export async function restoreScene(
   options: RestoreOptions = {},
 ): Promise<RestoredScene> {
   const { scene = engine.scene, migrations, clear = true, camera = true, plugins, filter, onEntity, signal } = options,
-    { load = (url, how) => loadDefault(engine, url, how), clone = cloneDefault, components, strictComponents } = options,
+    { load = (url, how) => loadDefault(engine, url, how, scene), clone = cloneDefault, components, strictComponents } = options,
     checks: LoadOptions = { components, strictComponents, signal };
   signal?.throwIfAborted();
   const shaped = parseSave(document, {}),
     current = migrations ? (migrations.migrate(shaped) as SaveDocument) : shaped,
     entities = expandSave(parseSave(current, { components, strictComponents })),
-    state = readState(current),
+    state = readState(current, scene),
     geometries = (state.geometries ?? []).map(readGeometry);
   for (const entity of entities) {
     const { geometry, mesh } = entity.components;

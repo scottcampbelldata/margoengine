@@ -214,7 +214,9 @@ const STEPS = [
 /**
  * Turns the stairs at cell (x, y, z) of `world` and beside it on x and z into the corners their neighbours call for:
  * a stair whose back meets the side of another stair of the same half becomes an outer corner toward that stair's
- * back, else one whose front meets such a stair becomes an inner corner toward it, else straight. Stairs placed with
+ * back, else one whose front meets such a stair becomes an inner corner toward it, else straight. A turn is refused
+ * when the cell on the far side of the turn (away from the back neighbour's back, toward the front neighbour's back)
+ * holds a stair of the same facing and half, so a straight run stays straight. Stairs placed with
  * an explicit corner ({@link stairState}) keep it. Call it after placing or removing a block; it edits only cells that
  * change, through `world.setBlocks`.
  * @throws TypeError when `world` is not a VoxelWorld. @throws RangeError when a coordinate is not a 32-bit integer.
@@ -236,13 +238,19 @@ export function connectStairs(world: VoxelWorld, x: number, y: number, z: number
     if (table[state & 0xffff]?.shape !== 'stair' || data & STAIR_FIXED) continue;
     const facing = data & 3,
       [bx, bz] = STEPS[facing],
-      back = stair(cx + bx, cz + bz, data & 4),
-      front = stair(cx - bx, cz - bz, data & 4),
-      // Outer toward the back neighbour's back, else inner toward the front neighbour's back.
+      half = data & 4,
+      back = stair(cx + bx, cz + bz, half),
+      front = stair(cx - bx, cz - bz, half),
+      // A turn toward side `toward` (step sign `sign`) is refused when the cell that way holds a stair of this facing
+      // and half: this stair continues that straight run.
+      free = (toward: number, sign: number) =>
+        stair(cx + sign * STEPS[toward][0], cz + sign * STEPS[toward][1], half) !== facing,
+      // Outer toward the back neighbour's back (checked on the side away from it), else inner toward the front
+      // neighbour's back (checked on that side).
       corner =
-        back >= 0 && back >> 1 !== facing >> 1
+        back >= 0 && back >> 1 !== facing >> 1 && free(back, -1)
           ? 16 | (back % 2 === 0 ? 32 : 0)
-          : front >= 0 && front >> 1 !== facing >> 1
+          : front >= 0 && front >> 1 !== facing >> 1 && free(front, 1)
             ? 8 | (front % 2 === 0 ? 32 : 0)
             : 0,
       next = ((data & ~STAIR_CORNER) | corner) >>> 0;

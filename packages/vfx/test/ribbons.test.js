@@ -47,6 +47,30 @@ test('an interval longer than a frame records every few frames without catching 
   effect.dispose();
 });
 
+test('reset clears the recorded points and restarts the recording clock, so a seek draws the ribbons of a fresh start', () => {
+  const { h, effect } = attach({ capacity: 4, initialCount: 4, ribbons: { points: 3, interval: 0.25 } });
+  const history = h.resources.find((r) => r.size === 4 * 2 * 16 && !r.destroyed),
+    made = () => new Uint32Array(ribbonUniform(h).data)[0],
+    run = () => {
+      const out = [];
+      for (const delta of [0.1, 0.1, 0.1, 0.1]) {
+        h.context.delta = delta;
+        h.frame();
+        out.push(made());
+      }
+      return out;
+    };
+  const fresh = run();
+  // Stand-in for points recorded before the seek: replayed births reuse their birth angles, so old points would match.
+  new Float32Array(history.data).fill(1);
+  h.context.delta = 0.1;
+  h.frame();
+  effect.reset();
+  assert.ok(new Uint8Array(history.data).every((byte) => byte === 0), 'no point from before the reset is left');
+  assert.deepEqual(run(), fresh, 'the same recording frames as from the start');
+  effect.dispose();
+});
+
 test('effects without ribbons compile no ribbon code; heads: false leaves the billboards out', () => {
   const plain = attach({ capacity: 8 });
   plain.h.frame();

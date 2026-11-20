@@ -1,13 +1,13 @@
 // Depth-only caster drawing shared by @margoengine/shadows (cascades), @margoengine/clustered (local and clustered
-// shadow maps), @margoengine/staging (contact shadows) and @margoengine/selection (picking): the vertex layout of core
-// (24-byte) and gltf-pro (80-byte) geometry, the displacement bind group, the per-draw uniform and the draw itself.
+// shadow maps), @margoengine/studio (contact shadows) and @margoengine/selection (picking): the vertex layout of core
+// (24-byte) and gltf/pbr (80-byte) geometry, the displacement bind group, the per-draw uniform and the draw itself.
 import { instanceLayout } from './instances.js';
 import { clipDeclaration, clipDistances, sectionShader } from './section.js';
 import { meshRuntime } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 
 /**
- * Vertex buffers of a caster with `stride` 24 (core: position) or 80 (gltf-pro: position, uv for `displaced`,
+ * Vertex buffers of a caster with `stride` 24 (core: position) or 80 (gltf/pbr: position, uv for `displaced`,
  * skin joints and weights), plus the per-instance matrices when `instanced`.
  */
 export function casterBuffers(stride, displaced = false, instanced = false) {
@@ -129,17 +129,20 @@ export const opacityEntries = (opacity, first = 4) => [
 /**
  * WGSL of a cut-out whose base UV moves (VRMC_materials_mtoon 1.0 UV animation): the uniform, mask view and sampler at
  * bindings `first` to `first` + 2 of `group`, and `margoAnimatedUV` of both raw UV sets. The uniform holds the motion
- * (scroll x, scroll y, rotation in radians per second, time in seconds), the base map's affine rows (set in row 0's w)
- * and the mask's affine rows (set in row 0's w). The mask's blue channel scales time per texel; a white mask moves all.
+ * (the float64 phases of rigging's `uvAnimationPhases`: scroll x and y in UV units, rotation in turns, then the whole
+ * count k of scroll x), the base map's affine rows (set in row 0's w, k of scroll y in row 1's w) and the mask's affine
+ * rows (set in row 0's w, k of turns in row 1's w). The mask's blue channel m scales each motion per texel as
+ * phase x m + period x fract(k x m), periods 2, 2 and 1 turn, so the numbers stay small after any uptime.
  */
 export const animationCode = (group, first = 7) => `struct MargoAnimation {motion:vec4f,base:array<vec4f,2>,mask:array<vec4f,2>}
 @group(${group}) @binding(${first}) var<uniform> margoAnimation:MargoAnimation;
 @group(${group}) @binding(${first + 1}) var margoAnimationMask:texture_2d<f32>;
 @group(${group}) @binding(${first + 2}) var margoAnimationSampler:sampler;
 fn margoAnimatedUV(raw:vec4f)->vec2f {let a=margoAnimation; let m=vec3f(select(raw.xy,raw.zw,a.mask[0].w>0.5),1);
-let t=a.motion.w*textureSampleLevel(margoAnimationMask,margoAnimationSampler,vec2f(dot(a.mask[0].xyz,m),dot(a.mask[1].xyz,m)),0.0).b;
-let r=a.motion.z*t; let c=cos(r); let s=sin(r); let q=select(raw.xy,raw.zw,a.base[0].w>0.5)-0.5;
-let p=vec3f(vec2f(c*q.x+s*q.y,-s*q.x+c*q.y)+0.5+a.motion.xy*t,1); return vec2f(dot(a.base[0].xyz,p),dot(a.base[1].xyz,p));}
+let mk=textureSampleLevel(margoAnimationMask,margoAnimationSampler,vec2f(dot(a.mask[0].xyz,m),dot(a.mask[1].xyz,m)),0.0).b;
+let t=a.motion.xyz*mk+fract(vec3f(a.motion.w,a.base[1].w,a.mask[1].w)*mk)*vec3f(2,2,1);
+let r=6.2831853*t.z; let c=cos(r); let s=sin(r); let q=select(raw.xy,raw.zw,a.base[0].w>0.5)-0.5;
+let p=vec3f(vec2f(c*q.x+s*q.y,-s*q.x+c*q.y)+0.5+t.xy,1); return vec2f(dot(a.base[0].xyz,p),dot(a.base[1].xyz,p));}
 `;
 
 /**
@@ -166,7 +169,7 @@ export const animationEntries = (animation, first = 7) => [
 
 /**
  * A caster shader that leaves vertex alpha out of its cut-out, for a primitive with `vertexAlpha: false` (materials
- * `vertexColors: false`, whose colour pass reads white, or gltf-pro vertices whose colour alpha is all 1). An instance's
+ * `vertexColors: false`, whose colour pass reads white, or gltf/pbr vertices whose colour alpha is all 1). An instance's
  * tint still counts. Apply it after `instancedDepth`. The stage hands on 1 - alpha and the fragment reads 1 minus that:
  * interpolating a constant 0 is exact on every rasterizer, a constant 1 is not (0.99999994 in some pixels), which cut
  * texels whose alpha equals the cutoff (glTF 2.0 3.9.4 keeps them). Code writing `o.alpha` more than once keeps the plain
@@ -188,11 +191,11 @@ export const depthPassDescriptor = () => ({
  * Writes one caster draw's uniform (`values`: 36 floats, 44 with an alpha `transform`): the light's `view` matrix, the
  * node matrix, alpha, cutoff and texture coordinate set, then uploads it to `uniform` and draws primitive `p`.
  */
-export function drawCaster(pass, device, pipeline, group, uniform, values, view, p, transform, displaced, instances) {
+export function drawCaster(pass, device, pipeline, group, uniform, values, view, p, transform, displaced, instances, floor = 0) {
   values.set(view);
   values.set(p.node.matrix, 16);
   values[32] = p.alpha ?? 1;
-  values[33] = p.cutoff ?? 0;
+  values[33] = Math.max(p.cutoff ?? 0, floor);
   values[34] = p.texCoord ?? 0;
   if (transform) values.set(transform, 36);
   device.queue.writeBuffer(uniform, 0, values);

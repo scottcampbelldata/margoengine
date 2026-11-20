@@ -3,7 +3,7 @@ import test from 'node:test';
 import { Skeleton, createKeyframeClip, Animation } from '../dist/index.js';
 import { AnimationMixer, LoopOnce, LoopRepeat, LoopPingPong, AdditiveAnimationBlendMode } from '../dist/mixer.js';
 import { ownerEngine } from './owner-lifetime.fixture.js';
-import { PBRModel, GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { PBRModel, GLTFAsset } from '../../gltf/dist/pbr.js';
 import { skinnedStrip } from '../test/fixture.js';
 
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);

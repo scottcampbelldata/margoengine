@@ -9,6 +9,7 @@ import {
   decomposeTRS,
   fbxLocalTransform,
   multiply,
+  pvector,
   rotationAndScale,
   transformPoint,
   type TransformOverrides,
@@ -35,6 +36,7 @@ export interface InheritBinding {
 /** A node at a moment: its FBX world matrix, and for a node with a helper, what the helper and it hold. */
 export interface Placement {
   world: Float64Array;
+  /** The signed Lcl Scaling at that moment, which a type 2 child takes away; a decomposed scale moves signs into rotation. */
   localScale: number[];
   helper?: Pick<TRS, 'translation' | 'scale'>;
   own?: Pick<TRS, 'rotation' | 'scale'>;
@@ -62,15 +64,18 @@ export function place(
   if (known) return known;
   ctx.budget.sample(64);
   const model = ctx.models.get(key)!,
-    local = fbxLocalTransform(model, read(key)),
+    overrides = read(key),
+    local = fbxLocalTransform(model, overrides),
     parts = decomposeTRS(local),
+    // FbxTransform eInheritRrs drops the parent's Lcl Scaling itself, signs included.
+    lcl = Array.from(overrides?.scale ?? lclScaling(model)),
     parent = ctx.parents.get(key),
     type = inheritType(model);
   let out: Placement;
-  if (parent === undefined) out = { world: local, localScale: parts.scale };
+  if (parent === undefined) out = { world: local, localScale: lcl };
   else {
     const up = place(ctx, parent, read, memo);
-    if (type === RSrs) out = { world: multiply(up.world, local), localScale: parts.scale };
+    if (type === RSrs) out = { world: multiply(up.world, local), localScale: lcl };
     else if (type === Rrs) {
       const helper = {
           translation: parts.translation,
@@ -79,7 +84,7 @@ export function place(
         own = { rotation: parts.rotation, scale: parts.scale };
       out = {
         world: multiply(up.world, multiply(composeTRS(helper.translation, [0, 0, 0, 1], helper.scale), composeTRS([0, 0, 0], own.rotation, own.scale))),
-        localScale: parts.scale,
+        localScale: lcl,
         helper,
         own,
       };
@@ -92,7 +97,7 @@ export function place(
           multiplyQuaternions(above.rotation, parts.rotation),
           scale,
         ),
-        localScale: parts.scale,
+        localScale: lcl,
         helper: { translation: parts.translation, scale: above.scale.map((v) => 1 / v) },
         own: { rotation: parts.rotation, scale },
       };
@@ -102,16 +107,25 @@ export function place(
   return out;
 }
 
-/** Models whose local scale changes in some clip: a curve on it that moves further than Float32 noise. */
+const lclScaling = (model: FBXNode): number[] => pvector(model, 'Lcl Scaling', [1, 1, 1]);
+
+/**
+ * Models whose local scale differs from the rest scale in some clip: a curve on it that moves further than Float32
+ * noise, or that holds a value other than the rest one, which a constant curve does.
+ */
 function animatedScale(ctx: SceneContext): Set<bigint> {
   const out = new Set<bigint>();
   ctx.budget.work(ctx.document.connections.length);
   for (const link of ctx.document.connections) {
     if (link.kind !== 'OP' || link.property !== 'Lcl Scaling' || !ctx.models.has(link.parent)) continue;
+    const rest = lclScaling(ctx.models.get(link.parent)!);
     for (const c of ctx.incoming.get(link.child) ?? []) {
       const source = ctx.document.objects.get(c.child)!;
       if (source.name !== 'AnimationCurve' || !findChild(source, 'KeyValueFloat')) continue;
-      const values = array(source, 'KeyValueFloat');
+      const values = array(source, 'KeyValueFloat'),
+        axis = ['d|X', 'd|Y', 'd|Z'].indexOf(c.property ?? ''),
+        // A curve on no named axis is compared with every rest component.
+        restValues = axis < 0 ? rest : [rest[axis]];
       ctx.budget.work(values.length);
       let low = Infinity,
         high = -Infinity;
@@ -119,7 +133,9 @@ function animatedScale(ctx: SceneContext): Set<bigint> {
         low = Math.min(low, values[i]);
         high = Math.max(high, values[i]);
       }
-      if (high - low > SAME) out.add(link.parent);
+      const off = (v: number, r: number) => Math.abs(v - r) > SAME * Math.max(1, Math.abs(r)),
+        away = restValues.some((r) => off(low, r) || off(high, r));
+      if (high - low > SAME || (values.length && away)) out.add(link.parent);
     }
   }
   return out;
@@ -211,6 +227,8 @@ export function applyInheritance(ctx: SceneContext): void {
       binding: ExportNode = {
         name: `${node.name ?? 'Node'} inherit`,
         translation: helper!.translation,
+        // A negative parent scale undone leaves a half turn in the decomposed helper.
+        rotation: helper!.rotation,
         scale: helper!.scale,
         children: [node],
       };

@@ -8,8 +8,8 @@
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { extendedShader, pbrShader, surfaceTintPBR, transmissiveShader } from '../../gltf-pro/src/shader.ts';
-import { materialExtensionShader } from '../../gltf-pro/src/material-extension.ts';
+import { extendedShader, pbrShader, surfaceTintPBR, transmissiveShader } from '../../gltf/src/shader.ts';
+import { materialExtensionShader } from '../../gltf/src/material-extension.ts';
 import { sheenAlbedoWGSL } from '../../shared/sheen.js';
 import { dielectricFresnelWGSL } from '../../shared/pbr-fresnel.js';
 import { clearcoat, materialLobes, nodeMaterial } from '../dist/index.js';
@@ -193,7 +193,7 @@ test('the transmitted share is applied in linear light on a display-encoded targ
   );
 });
 
-/** gltf-pro's native tint draw (no materials install) with the same layers, from the material's factors. */
+/** gltf/pbr's native tint draw (no materials install) with the same layers, from the material's factors. */
 function tint({ nv = 1, ior = 1.5, factor = 1, color = [1, 1, 1], sheen, sheenRoughness = 0, coat = 0, hdr = true }) {
   const code = transmissiveShader(),
     start = code.indexOf('fn margoTintShare('),
@@ -242,7 +242,7 @@ test('KHR_materials_specular on the native paths: the weight scales F90 and the 
   assert.ok(code.includes('((1-margoFresnelPeak(margoDielectricFresnel(s.f0,s.sw,vh)))*(1-s.metal)'), 'direct light base');
 });
 
-/** gltf-pro's surface tint (loaded materials): what is left of the light behind, read from the sampled surface. */
+/** gltf/pbr's surface tint (loaded materials): what is left of the light behind, read from the sampled surface. */
 function surfaceTint({ nv = 1, metal = 0, sheen = [0, 0, 0], coat = 0, ir, code = transmissiveShader() }) {
   const start = code.indexOf('fn margoTintFresnel('),
     end = code.indexOf('@fragment fn margoTint(');

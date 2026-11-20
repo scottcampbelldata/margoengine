@@ -1,6 +1,6 @@
 // Regression (KB-RM4, 2026-11-11): in the 15:00 full CI run two root tests ran api:check side by side; both found the same
 // six packages stale and rebuilt them at once. build-modern removes a dist before writing it, so one build died on
-// ENOTEMPTY in game/dist and packages/web/dist stayed missing, failing check:examples-types, build:site and a dozen
+// ENOTEMPTY in game/dist and packages/kit-web/dist stayed missing, failing check:examples-types, build:site and a dozen
 // root tests. Package builds in one checkout now take scripts/support/build-lock.mjs.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -69,7 +69,7 @@ test('two builds at once both leave a complete dist', async (t) => {
   const builder = `
     import { acquireBuildLock } from ${JSON.stringify(lock)};
     import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
-    const root = ${JSON.stringify(root)}, dist = root + '/packages/web/dist';
+    const root = ${JSON.stringify(root)}, dist = root + '/packages/kit-web/dist';
     const release = acquireBuildLock(root, { pollMs: 10, log: () => {} });
     rmSync(dist, { recursive: true, force: true });
     for (let i = 0; i < 40; i++) {
@@ -80,7 +80,7 @@ test('two builds at once both leave a complete dist', async (t) => {
     writeFileSync(dist + '/index.js', 'export {};');
     const whole = existsSync(dist + '/index.js') && existsSync(dist + '/part0/index.js');
     release();
-    process.exit(whole ? 0 : 3);
+    process.exitCode = whole ? 0 : 3;
   `;
   const run = () =>
     new Promise((done) => {
@@ -89,13 +89,16 @@ test('two builds at once both leave a complete dist', async (t) => {
     });
   const codes = await Promise.all([run(), run(), run()]);
   assert.deepEqual(codes, [0, 0, 0]);
-  assert.ok(existsSync(join(root, 'packages/web/dist/index.js')));
+  assert.ok(existsSync(join(root, 'packages/kit-web/dist/index.js')));
 });
 
 test('build-modern and the API report rebuild under the build lock', () => {
   const build = readFileSync(new URL('../scripts/build-modern.js', import.meta.url), 'utf8');
   assert.match(build, /acquireBuildLock\(/, 'build-modern takes the build lock');
+  // The API report rebuilds through scripts/support/fresh-dist.mjs (KB-API-SURFACE-CHURN1), which holds the lock.
   const report = readFileSync(new URL('../scripts/api-report.js', import.meta.url), 'utf8');
-  assert.match(report, /acquireBuildLock\(/, 'the API report decides what is stale while it holds the lock');
-  assert.match(report, /\[BUILD_LOCK_ENV\]/, 'and hands the lock to the rebuild it starts');
+  assert.match(report, /rebuildStalePackages\(/, 'the API report rebuilds stale packages through fresh-dist');
+  const fresh = readFileSync(new URL('../scripts/support/fresh-dist.mjs', import.meta.url), 'utf8');
+  assert.match(fresh, /acquireBuildLock\(/, 'fresh-dist decides what is stale while it holds the lock');
+  assert.match(fresh, /\[BUILD_LOCK_ENV\]/, 'and hands the lock to the rebuild it starts');
 });

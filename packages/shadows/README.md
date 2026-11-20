@@ -23,6 +23,8 @@ engine.start();
 // removeCharacter() when unloading; engine.dispose() releases attached plugins.
 ```
 
+`'soft'` takes `blockerSamples` blocker-search reads (default 16) and `samples` comparison taps (default 32) per lit pixel, each a whole number from 1 to 128: fewer cost less and give noisier penumbrae (Fernando 2005, "Percentage-Closer Soft Shadows"; Bavoil 2008, GDC "Advanced Soft Shadow Mapping Techniques"). `focus` (default 0, world units) is the caster-to-receiver distance at which the penumbra is sharpest; the estimate takes the distance from there, so 0 is Fernando's, sharp where a caster touches. All three are live: `shadows.options.samples = 12`.
+
 `filter` picks the edge: `'soft'` (default) is the PCSS above; `'pcf'` takes four hardware comparison taps half a texel apart (each is the sampler's own 2x2 bilinear comparison, together a smooth edge about three texels wide) with no blocker search and no spiral, for phones and light tiers; `'hard'` takes one tap. `cascades` (1-4, default 4) renders fewer layers: fewer depth passes per frame, coarser texels over the same `distance`; `bounds` always uses one map. `@margoengine/quality` sets `filter:'pcf'` on its light and phone tiers and `cascades:2` on phones when the app leaves them unset.
 
 The defaults cost more than one fixed-filter map: SciFiHelmet takes 0.33 ms of GPU time a frame with them and 0.074 ms with `Shadows.attach(engine, {filter:'pcf', cascades:1})` (RTX A6000, diagnostic). [docs/limits.md](../../docs/limits.md#rendering) has the split.
@@ -57,7 +59,7 @@ covering a square region, so a non-square map there just gives the two axes diff
 
 Any model scale works with the defaults, from a 1 mm part to a 1 km site: every receiver moves a quarter texel along its normal and compares one texel nearer the light, both measured in its own cascade's texels, so the offsets shrink and grow with the scene (Holbert 2011, "Normal Offset Shadows"; Dou, Yan, Kerzner, Dai and Wyman 2014, "Adaptive Depth Bias for Shadow Maps", JCGT 3(4)). `bias` (normalized depth) and `normalBias` (world distance), default 0, add to those. Without `distance`, the cascades fit the casters' bounds when every caster is a core mesh or a model with no skin, morph targets, instances or displacement (what `loadGLTF` and `createMesh` give), their depth reaches the farthest caster towards the light (Lauritzen, Salvi and Lefohn 2011, "Sample Distribution Shadow Maps"), and the shadowed range is 500 units or 20 times the camera's distance to its target, whichever is farther. `casterMargin`, when set, extends every cascade's depth that far towards the light instead (100 when a caster's bounds are unknown). A skinned, morphed, instanced or custom-drawn caster has no fixed bounds, so its cascades cover the camera's near plane to `distance`: a model of that kind a few centimetres across needs `distance` set near its size (docs/limits.md).
 
-Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff, and a materials mesh's `map` and `alphaMap` under its `alphaTest`, the threshold its colour pass uses; blended casters are omitted. Opaque casters keep their plain draw. A `triplanar` material's map follows world space, which a caster's UVs cannot, so it casts its whole surface. A map still loading casts as white; a caster added with `static: true` needs `invalidate()` once it has loaded, others redraw by themselves. A caster with an `alphaMap` redraws every frame.
+Core meshes receive shadows automatically. `shadows.add(pbrModel)` or `shadows.add(loadedMesh)` adds the owning model's lighting hook and reads current stride-80 buffers after animation compute. Registering both draws each primitive once; a dynamic registration takes precedence over a cached registration. Removing one registration preserves the remaining lighting hook. Alpha-masked PBR casters honor their base map, vertex alpha, UV set, texture transform and cutoff, and a materials mesh's `map` and `alphaMap` under its `alphaTest`, the threshold its colour pass uses; a materials `alphaHash()` mesh (caster `hashed: true`) cuts by the colour pass's object-space noise instead, one cell per shadow-map texel, so a 30% surface casts about 30% of its shadow; blended casters are omitted. Opaque casters keep their plain draw. A `triplanar` material's map follows world space, which a caster's UVs cannot, so it casts its whole surface. A map still loading casts as white; a caster added with `static: true` needs `invalidate()` once it has loaded, others redraw by themselves. A caster with an `alphaMap` redraws every frame.
 
 ```ts
 import { Engine, box } from 'margoengine/core';
@@ -74,9 +76,28 @@ leaf.root.setPosition([0, 2, 0]);
 Shadows.attach(engine).add(leaf); // the shadow has the leaf's outline, not the quad's
 ```
 
+A group casts every mesh below it. `shadows.add(group)` takes a mesh with no geometry of its own, such as a `loadGLTF` model's `root`, and casts each mesh with geometry that is parented under it, however deep, and each glTF PBR model once, with the options you gave. A mesh parented to the group later casts from the next frame, a mesh moved out of it stops, and the remover (or disposing the group) takes them all out. A mesh that has geometry casts itself and every mesh with geometry below it the same way (a car body that parents its wheels), so one `add` is enough; a child you add by hand as well is cast once, and stays cast through its parent when you remove your own add. `VirtualShadows.add` does the same. Both `loadGLTF` functions return `root`, `nodes` and `meshes`, so a loop over `model.meshes` works with either.
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { Shadows } from 'margoengine/shadows';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box(10, 0.1, 10));
+const shadows = Shadows.attach(engine);
+const car = engine.createMesh().setPosition([0, 1, 0]); // a group: it draws nothing itself
+engine.createMesh(car).setGeometry(box(2, 0.5, 1));
+const removeCar = shadows.add(car);
+engine.createMesh(car).setGeometry(box(1, 0.4, 0.9)).setPosition([0, 0.45, 0]); // added after: casts too
+const body = engine.createMesh().setGeometry(box(2, 0.5, 1)).setPosition([4, 1, 0]); // a mesh with geometry that parents others
+engine.createMesh(body).setGeometry(box(0.5, 0.5, 0.2)).setPosition([0.6, -0.4, 0.5]); // a wheel: casts with the body
+shadows.add(body);
+// For a model: shadows.add((await loadGLTF(engine, '/car.glb')).root);
+```
+
 `npm run test:gpu:outside --workspace packages/shadows` holds this against Blender Cycles, a path tracer that shares no code with Margo: the real DiffuseTransmissionPlant and AlphaBlendModeTest models, the ground's light with the model over the ground's light without it. `test/outside/reference.py` makes the references and `test/outside/cases.mjs` holds the bounds; the check needs no Blender.
 
- A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`.
+ A caster primitive with `displacement` (materials meshes with a `displacementMap`) is drawn displaced along its normals, as its beauty pass is, and redraws every frame so live scale and bias edits show. No duplicate core geometry is created. `shadows.add(clipmapTerrain)` uses its GPU height sampling for depth and its lighting hook for reception. Custom sources can implement `drawShadow(ShadowContext)`. Shadows' own casters declare their position `@invariant`, as every Margo package's caster does (`tests/invariant-casters.test.js` fails on one that does not); a custom caster that draws the same surfaces as a core mesh (instances, parts) should declare it too, `->@builtin(position) @invariant vec4f`, so both write the same depth bit for bit (WGSL lets each program reorder and fuse its float operations otherwise).
 
 A custom source may also implement `prepareShadow(ShadowPrepareContext)`. Shadows calls it once per frame, before any
 cascade's depth pass opens and only on frames the source draws, with every cascade's light matrix (`matrices`, 16
@@ -105,7 +126,7 @@ shadows.add({
 engine.start();
 ```
 
-Per object, as Crocotile's Cast Shadows and Receive Shadows (both default on): `shadows.add(source, {castShadow: false})` lights the object with the shadow map but leaves it out of the map, and `{receiveShadow: false}` draws it into the map but keeps its own lighting unshadowed (no lighting hook is added). Receiving is per object for sources with their own lighting hook (glTF-pro models, materials meshes, clipmap terrain) and for core meshes: `receiveShadow: false` on a core mesh sets core's `mesh.receiveShadow = false` and the remover restores the earlier value. Setting `mesh.receiveShadow` directly works too, for meshes added or not:
+Per object, as Crocotile's Cast Shadows and Receive Shadows (both default on): `shadows.add(source, {castShadow: false})` lights the object with the shadow map but leaves it out of the map, and `{receiveShadow: false}` draws it into the map but keeps its own lighting unshadowed (no lighting hook is added). Receiving is per object for sources with their own lighting hook (glTF PBR models, materials meshes, clipmap terrain) and for core meshes: `receiveShadow: false` on a core mesh sets core's `mesh.receiveShadow = false` and the remover restores the earlier value. Setting `mesh.receiveShadow` directly works too, for meshes added or not:
 
 ```ts
 const groundTile = engine.createMesh().setGeometry(box());
@@ -138,7 +159,7 @@ shadows.add(pane, {tint: [1, 0.1, 0.1]});
 engine.start();
 ```
 
-A gltf-pro model added to such a `Shadows` casts this way by itself: its transmissive and blended primitives (`model.tintPrimitives`) tint with their transmission colour or their base colour weighed by alpha. Any other source can give `tintPrimitives`.
+A gltf/pbr model added to such a `Shadows` casts this way by itself: its transmissive and blended primitives (`model.tintPrimitives`) tint with their transmission colour or their base colour weighed by alpha. Any other source can give `tintPrimitives`.
 
 Off by default, and off the receivers' shaders and the frame are unchanged. On, it costs an `rgba8unorm` and a `depth32float` array of the map's size, three more bindings (27 to 29, two textures) on every receiver, and two draws per cascade for each tinting caster, every frame.
 
@@ -146,7 +167,7 @@ Limits: the tint's edge is bilinear, with no penumbra, under every filter. The t
 
 ## Cloud shadows and light patterns
 
-`@margoengine/shadows/light-function` shapes the sun between the sky and the ground. Give its effects to `Shadows` or `VirtualShadows`; every receiver takes them (core meshes, materials, gltf-pro models, terrain, voxels).
+`@margoengine/shadows/light-function` shapes the sun between the sky and the ground. Give its effects to `Shadows` or `VirtualShadows`; every receiver takes them (core meshes, materials, gltf/pbr models, terrain, voxels).
 
 ```ts
 import {EngineKernel, box} from 'margoengine/core';
@@ -171,10 +192,13 @@ import {EngineKernel, box} from 'margoengine/core';
 import {Shadows} from 'margoengine/shadows';
 import {lightPattern} from 'margoengine/shadows/light-function';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
-const device = engine.gpu!;
-const mask = device.createTexture({size: [2, 2], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
-device.queue.writeTexture({texture: mask}, new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255]), {bytesPerRow: 8}, [2, 2]);
-const pattern = lightPattern({texture: mask.createView(), size: 6, speed: [0.02, 0]});
+// A function makes the mask on each device, so it comes back by itself after a device restore.
+const checker = (device: GPUDevice) => {
+  const mask = device.createTexture({size: [2, 2], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+  device.queue.writeTexture({texture: mask}, new Uint8Array([255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255]), {bytesPerRow: 8}, [2, 2]);
+  return mask.createView();
+};
+const pattern = lightPattern({texture: checker, size: 6, speed: [0.02, 0]});
 const shadows = Shadows.attach(engine, {effects: [pattern]});
 shadows.add(engine.createMesh().setGeometry(box(30, 1, 30)));
 engine.start();
@@ -182,13 +206,30 @@ engine.start();
 
 | `lightPattern` option | Default | Meaning |
 | --- | --- | --- |
-| `texture` | required | Any filterable 2D view. Read when receivers bind; the rest are live on `pattern.options`. |
+| `texture` | required | Any filterable 2D view, or `(device) => view`, called once per device. Read when receivers bind; the rest are live on `pattern.options`. `pattern.setTexture(view)` replaces it at any time. |
 | `size` | 10 | World units of one repeat, on a surface facing the sun. |
 | `offset` | [0, 0] | Repeats it has moved, along u and v. |
-| `speed` | [0, 0] | Repeats per second it scrolls, along u and v. |
+| `speed` | [0, 0] | Repeats per second of frame time it scrolls, along u and v. |
 | `strength` | 1 | How much of the mask applies, 0 to 1. |
 
-The mask lies across the light and travels along it. Its right is world up crossed with the sun, and image up is world up as the sun sees it. It adds one sampled texture and one sampler to every receiver, and gltf-pro's richest materials already use all 16 sampled textures of a stage, so such a material names the limit in an error; `cloudShadows` adds one uniform buffer and no texture.
+The scroll follows frame time, not the wall clock: `Shadows` and `VirtualShadows` move every effect's `advanceTime(delta)` in their frame update (`shadows.time`, `pattern.time`), never in a pass, so two views of one frame draw the same place, an offline render that takes seconds per frame scrolls as a live one does, and `seek` from `margoengine/cutscene/seek` replays it:
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Shadows} from 'margoengine/shadows';
+import {lightPattern} from 'margoengine/shadows/light-function';
+import {seek} from 'margoengine/cutscene/seek';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
+const leaves = lightPattern({texture: (device) => device.createTexture({size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING}).createView(), speed: [0.05, 0]});
+Shadows.attach(engine, {effects: [leaves]});
+// The scene starts 40 s into the film: the mask is where a continuous run has it.
+await seek(engine, 40, {fps: 30});
+console.log(leaves.time); // 40
+```
+
+A plain view belongs to the device that made it. After a device restore the sun goes on unmasked, `engine.onError` hears of it once (code `'state'`, help `borrowed-lost`), and `pattern.setTexture(view)` with a view made on `engine.gpu` brings the mask back; the function form needs none of that.
+
+The mask lies across the light and travels along it. Its right is world up crossed with the sun, and image up is world up as the sun sees it. It adds one sampled texture and one sampler to every receiver, and gltf/pbr's richest materials already use all 16 sampled textures of a stage, so such a material names the limit in an error; `cloudShadows` adds one uniform buffer and no texture.
 
 The `effects` array is fixed at construction. With none, the receivers' shaders and the frame are unchanged. An effect is any object with `wgsl(group, binding)` and `call` or `style`, eight bindings from 40, resources named `shadowFx...`: see `ShadowEffect` in the types.
 
@@ -220,11 +261,11 @@ The blur runs only when the map changes, and its cost follows the map's texels, 
 
 ## Light through leaves
 
-`@margoengine/shadows/transmission` lets thin surfaces pass light on. Any primitive whose gltf-pro material has `KHR_materials_diffuse_transmission` tints the light behind it instead of blocking it; everything else casts as before.
+`@margoengine/shadows/transmission` lets thin surfaces pass light on. Any primitive whose gltf/pbr material has `KHR_materials_diffuse_transmission` tints the light behind it instead of blocking it; everything else casts as before.
 
 ```ts
 import {EngineKernel, box} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Shadows} from 'margoengine/shadows';
 import {transmission} from 'margoengine/shadows/transmission';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend: 'webgpu'});
@@ -241,7 +282,7 @@ engine.start();
 | `size` | 0.05 | World radius of a leaf or sheet. A thin surface scatters what it passes, so a receiver `d` behind it takes `size^2 / (size^2 + d^2)` of it: leaves touching other leaves pass light on, and the ground far below gets little, as it does in a path tracer. Live. |
 | `scale` | 1 | Multiplies the light through, to stand for a transmission texture: Margo reads the material's factor and colour factor, not their textures. Live. |
 
-The side of a leaf away from the sun also keeps its glow under any `Shadows` or `VirtualShadows`, with or without this entry: gltf-pro asks for the shadow lookup on the side facing the light.
+The side of a leaf away from the sun also keeps its glow under any `Shadows` or `VirtualShadows`, with or without this entry: gltf/pbr asks for the shadow lookup on the side facing the light.
 
 `leaves.effect` spreads the light behind every tint caster of those shadows, so coloured glass in the same `Shadows` fades with distance too. It reads the tint depth directly, which a device at the compatibility level cannot do.
 
@@ -350,7 +391,7 @@ engine.start();
 // pages.stats.residentPages and pages.stats.pagesRendered show the page work of the last frame.
 ```
 
-Options and defaults: `poolSize` 4096 (texels a side of the page pool, 32 x 32 pages of 128 texels; a multiple of 256, 2048 for phones), `levels` 8 (each level's pages are twice the size of the one before), `distance` (unset: 500 while the camera is 1 to 25 units from its target, halved per octave closer and doubled per octave farther, so it is at least 20 times that distance), `budgetPages` the pool's page count, `lightSize` 0.02, `bias` 0 and `normalBias` 0 (both world units, unlike the root's `bias`, added to the receiver's own offsets), `casterMargin` (unset: 100, scaled with the default `distance`; world units towards the light for off-screen casters), `filter` `'soft'`. Any model scale works with the defaults, from a 1 mm part to a 1 km site: every receiver moves a quarter texel of the page it reads along its normal (Holbert 2011, as `Shadows` does with its cascades) and compares 2^-20 of the depth range nearer the light, with the receiver-plane slope term reading the same texel (Isidoro 2006), and the default reach and pages follow the camera's distance to its target in powers of two, so pages keep their addresses while the camera moves within an octave and all redraw once when it crosses one. A first-person camera keeps its target distance, so its reach stays 500 unless that distance is under 1. `filter` takes the same three edges as `Shadows`; each `'pcf'` and `'soft'` tap reads the page table for its own position, so an edge crossing a page edge reads the neighbouring page. The `'soft'` search and penumbra stop at one page.
+Options and defaults: `poolSize` 4096 (texels a side of the page pool, 32 x 32 pages of 128 texels; a multiple of 256, 2048 for phones), `levels` 8 (each level's pages are twice the size of the one before), `distance` (unset: 500 while the camera is 1 to 25 units from its target, halved per octave closer and doubled per octave farther, so it is at least 20 times that distance), `budgetPages` the pool's page count, `lightSize` 0.02, `samples` 32, `blockerSamples` 16 and `focus` 0 (the `'soft'` filter's live counts and focus, as `Shadows` takes them: `pages.options.samples = 12`), `bias` 0 and `normalBias` 0 (both world units, unlike the root's `bias`, added to the receiver's own offsets), `casterMargin` (unset: 100, scaled with the default `distance`; world units towards the light for off-screen casters), `filter` `'soft'`. Any model scale works with the defaults, from a 1 mm part to a 1 km site: every receiver moves a quarter texel of the page it reads along its normal (Holbert 2011, as `Shadows` does with its cascades) and compares 2^-20 of the depth range nearer the light, with the receiver-plane slope term reading the same texel (Isidoro 2006), and the default reach and pages follow the camera's distance to its target in powers of two, so pages keep their addresses while the camera moves within an octave and all redraw once when it crosses one. A first-person camera keeps its target distance, so its reach stays 500 unless that distance is under 1. `filter` takes the same three edges as `Shadows`; each `'pcf'` and `'soft'` tap reads the page table for its own position, so an edge crossing a page edge reads the neighbouring page. The `'soft'` search and penumbra stop at one page.
 
 A frame draws the camera's view at half size per axis to find the pages it needs, one frame late; a page not yet resident reads the next coarser level, so a new view starts softer and sharpens, with no holes. Once the view settles a still scene renders no pages. A caster that moves redraws the resident pages its bounds reach; a caster whose bounds the effect cannot know (a node that is not a core mesh, a dynamic, instanced or displaced primitive) redraws every resident page every frame. `invalidate()` redraws them all; so does a change of light direction.
 
@@ -409,7 +450,7 @@ from those same positions and indices, then pack the masks:
 
 ```ts
 import { Engine, box } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { MeshBVH } from '@margoengine/bvh';
 import { modelAlphaMasks } from '@margoengine/bvh/alpha';
 import { alphaWorldTriangles } from '@margoengine/bvh/alpha-triangles';

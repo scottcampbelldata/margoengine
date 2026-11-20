@@ -246,3 +246,41 @@ test("attach refuses patches whose vertex buffer passes the device's maxBufferSi
   assert.equal(made[0], 2992 * (65 * 65 + 4 * 65) * 20);
   assert.ok(made[0] <= 268435456);
 });
+
+test('KB-FILM-CLOCK1: with maxBuilds a slow machine builds and draws the same patches as a fast one', () => {
+  const run = (cost) => {
+    const real = performance.now.bind(performance);
+    let t = 0;
+    performance.now = () => (t += cost);
+    try {
+      const p = new PlanetTerrain({ maxBuilds: 3 }),
+        camera = look([0, 0, 1.5 * R], [0, 0, 0], 100),
+        frames = [];
+      for (let i = 0; i < 6; i++) {
+        const stats = p.update(camera, [800, 800]);
+        frames.push(JSON.stringify([stats, p.patches.map((q) => [q.face, q.level, q.x, q.y])]));
+      }
+      return frames;
+    } finally {
+      performance.now = real;
+    }
+  };
+  // 0.001 ms a read is a fast machine, 50 ms a read a very slow one; the old millisecond budget built 1 patch a frame on the slow one.
+  assert.deepEqual(run(50), run(0.001));
+  assert.equal(JSON.parse(run(50)[1])[0].built, 3);
+});
+
+test('KB-FILM-CLOCK1: the clock option decides the millisecond budget; maxBuilds is validated', () => {
+  const frame = (clock) => {
+    const p = new PlanetTerrain({ budget: 4, clock });
+    return p.update(look([0, 0, 1.5 * R], [0, 0, 0], 100), [800, 800]).built;
+  };
+  let a = 0,
+    b = 0;
+  const fast = frame(() => (a += 0.001)),
+    slow = frame(() => (b += 100));
+  assert.ok(fast > slow, `fast clock built ${fast}, slow clock built ${slow}`);
+  assert.equal(slow, 7); // the six roots and one more
+  assert.throws(() => new PlanetTerrain({ maxBuilds: 0 }), RangeError);
+  assert.throws(() => new PlanetTerrain({ clock: 3 }), TypeError);
+});

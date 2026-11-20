@@ -45,13 +45,13 @@ export function readAccessor(
     if (!accepts(a))
       throw new MargoError(
         'unsupported',
-        'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or load it with @margoengine/gltf-pro',
+        'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or use @margoengine/gltf/pbr',
       );
     const count = integer(a.count, 'accessor count', 1);
     if (count > 1_000_000)
       throw new MargoError(
         'unsupported',
-        'glTF accessor holds over one million values, the limit of the light loader; load it with @margoengine/gltf-pro',
+        'glTF accessor holds over one million values, the limit of the light loader; use @margoengine/gltf/pbr',
       );
     return index ? new Uint32Array(count) : new Float32Array(count * components);
   }
@@ -60,7 +60,7 @@ export function readAccessor(
   if (!buffer || a.sparse || !accepts(a))
     throw new MargoError(
       'unsupported',
-      'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or load it with @margoengine/gltf-pro',
+      'Unsupported glTF accessor; use float positions and unsigned integer indices, add @margoengine/gltf/quantized for quantized meshes, or use @margoengine/gltf/pbr',
     );
   const size: number = COMPONENT_BYTES[a.componentType],
     count = integer(a.count, 'accessor count', 1),
@@ -71,7 +71,7 @@ export function readAccessor(
   if (count > 1_000_000)
     throw new MargoError(
       'unsupported',
-      'glTF accessor holds over one million values, the limit of the light loader; load it with @margoengine/gltf-pro',
+      'glTF accessor holds over one million values, the limit of the light loader; use @margoengine/gltf/pbr',
     );
   if (
     start + length > buffer.length ||

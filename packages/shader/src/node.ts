@@ -833,6 +833,9 @@ export function uniform<T extends Type>(
 export interface Host {
   width: number;
   height: number;
+  /** Seconds on the engine's frame clock (`ShaderClock`): the `time` frame value. Default 0. */
+  time?: number;
+  /** Seconds since the last frame: the `deltaTime` frame value. Default 0. */
   delta?: number;
   /** Values of frame members that are neither time nor size, by member name: a depth pass's camera. */
   frames?: Readonly<Record<string, ArrayLike<number>>>;
@@ -881,7 +884,7 @@ export class Program {
   private block?: { resource: Resource; name: string; binding: number };
   /** @internal The uniform block per device; TAA reads last frame's `bytes`. */ readonly buffers = new WeakMap<
     GPUDevice,
-    { buffer: GPUBuffer; view: DataView; bytes: Uint8Array; last: number }
+    { buffer: GPUBuffer; view: DataView; bytes: Uint8Array }
   >();
   constructor(
     readonly base = 0,
@@ -926,7 +929,6 @@ export class Program {
   }
   private upload(device: GPUDevice, host: Host): GPUBuffer {
     let u = this.buffers.get(device);
-    const now = performance.now() / 1000;
     if (!u) {
       const data = new ArrayBuffer(this.size);
       u = {
@@ -937,7 +939,6 @@ export class Program {
         }),
         view: new DataView(data),
         bytes: new Uint8Array(data),
-        last: now,
       };
       this.buffers.set(device, u);
     }
@@ -948,15 +949,14 @@ export class Program {
       }
       const v =
         m.frame === 'time'
-          ? [now]
+          ? [host.time ?? 0]
           : m.frame === 'deltaTime'
-            ? [host.delta ?? now - u.last]
+            ? [host.delta ?? 0]
             : m.frame === 'resolution'
               ? [host.width, host.height]
               : (host.frames?.[m.frame!] ?? []);
       for (let i = 0; i < v.length; i++) u.view.setFloat32(m.offset + i * 4, v[i], true);
     }
-    u.last = now;
     device.queue.writeBuffer(u.buffer, 0, u.bytes as Uint8Array<ArrayBuffer>);
     return u.buffer;
   }

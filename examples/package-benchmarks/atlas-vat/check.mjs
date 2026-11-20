@@ -1,7 +1,7 @@
-// Real-GPU check of texture atlases and vertex animation textures (serial, under the GPU lock, on AC power).
+// Real-GPU check of texture atlases and vertex animation textures (serial, on AC power).
 // Run from the repository root after building packages: node examples/package-benchmarks/atlas-vat/check.mjs
 //  - separate vs merged: 64 boxes with their own checker textures, then one atlas-mapped merged mesh: same image, 64 -> 1 draws.
-//  - gltf vs vat1: RobotExpressive at Walking 0.37 s through gltf-pro + GPU skinning, then one VATCrowd instance at the same
+//  - gltf vs vat1: RobotExpressive at Walking 0.37 s through gltf/pbr + GPU skinning, then one VATCrowd instance at the same
 //    time: the silhouettes must match (proves bake rows, texel indexing and frame interpolation on the GPU).
 //  - crowd: 1,024 walking robots in one draw, per-instance clip time and atlas tint; frame times recorded.
 import assert from 'node:assert/strict';

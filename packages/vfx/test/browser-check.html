@@ -16,7 +16,7 @@ for(let y=0;y<8;y++)for(let x=0;x<8;x++)data.set([...colors[(y>>2)*2+(x>>2)],255
 const hash=v=>{let x=v>>>0;x=Math.imul(x^(x>>>16),0x7feb352d)>>>0;x=Math.imul(x^(x>>>15),0x846ca68b)>>>0;return(x^(x>>>16))>>>0;};
 const project=(x,y)=>{const m=camera.matrix,w=m[3]*x+m[7]*y+m[15];return[Math.floor(((m[0]*x+m[4]*y+m[12])/w*0.5+0.5)*size),Math.floor((0.5-(m[1]*x+m[5]*y+m[13])/w*0.5)*size)];};
 window.check=async(frames,samples)=>{
- const effect=new VFX({capacity:n,rate:0,gravity:[0,0,0],velocity:[0,0,0],spread:0,turbulence:0,ground:-100,size:sprite,texture:{width:8,height:8,data,atlas:{columns:2,rows:2,frames}}});
+ const effect=new VFX({capacity:n,rate:0,gravity:[0,0,0],velocity:[0,0,0],spread:0,turbulence:0,ground:-100,size:sprite,texture:{width:8,height:8,data,...(frames==='plain'?{}:{atlas:{columns:2,rows:2,frames}})}});
  // Split layout: position/life and velocity/size of every particle, then colour and rotation (angle, spin, initial life).
  const records=new Float32Array(n*16),bits=new Uint32Array(records.buffer),expected=[];
  for(let i=0;i<n;i++){
@@ -47,8 +47,12 @@ window.check=async(frames,samples)=>{
  // the neighbouring frame if sampling were not kept inside the cell.
  const mismatches=[],histogram=[0,0,0,0];let checked=0,largest=0;
  for(const [i,p] of expected.entries()){
-  histogram[p.frame]++;const cs=Math.cos(p.angle),sn=Math.sin(p.angle),want=colors[p.frame].map(c=>Math.round(c*p.alpha));
+  histogram[p.frame]++;const cs=Math.cos(p.angle),sn=Math.sin(p.angle),wantFrame=colors[p.frame].map(c=>Math.round(c*p.alpha));
   for(const [u,v] of [[0,0],[0.85,0.85],[-0.85,0.85],[0.85,-0.85],[-0.85,-0.85]]){
+   // 'plain': the whole texture is the sprite, so each corner shows its own quadrant (top row red, green); the centre
+   // sits where four quadrants meet and is not probed.
+   if(frames==='plain'&&!u)continue;
+   const want=frames==='plain'?colors[(v>0?0:2)+(u>0?1:0)]:wantFrame;
    const [px,py]=project(p.x+(u*cs-v*sn)*sprite*0.5,p.y+(u*sn+v*cs)*sprite*0.5),at=(py*size+px)*4,got=[...image.subarray(at,at+3)];
    const difference=Math.max(...got.map((c,k)=>Math.abs(c-want[k])));checked++;largest=Math.max(largest,difference);
    if(difference>2)mismatches.push({particle:i,frame:p.frame,u,v,want,got});

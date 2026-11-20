@@ -3,7 +3,8 @@
 // view back to front, so tiles taller than their cell cover the ones behind them, with exact texels.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
-import { atlasTexture } from '../../shared/atlas-texture.js';
+import { borrowedAtlas } from '../../shared/atlas-texture.js';
+import { type BorrowSlot, borrow, fix, lend } from '../../shared/borrowed.js';
 import { texelVarying } from '../../shared/texel-varying.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
@@ -163,7 +164,10 @@ export function visibleCells(
  * Draws a {@link TileMapData} of any orientation (orthogonal, isometric, staggered or hexagonal), the cells in view
  * back to front, one draw per run of tiles from the same tileset. Tiles bigger than the cell sit on its bottom left, as
  * Tiled draws them. WebGPU only.
- * @throws MargoError `'unsupported'` on WebGL, `'disposed'` after `dispose()`, `'state'` for a missing atlas.
+ * @throws MargoError `'unsupported'` on WebGL, `'disposed'` after `dispose()`, `'state'` for a missing atlas. A plain
+ * `GPUTexture` atlas or target held at a device restore is reported once through `engine.onError` (`'state'`, help
+ * `borrowed-lost`) and the frame goes on without it until {@link GridTileMap.setAtlas} or {@link GridTileMap.setTarget}
+ * gives a new one.
  */
 export class GridTileMap implements EnginePlugin {
   readonly name: string;
@@ -179,10 +183,12 @@ export class GridTileMap implements EnginePlugin {
   readonly stats: TileMapStats = { draws: 0, uploadedBytes: 0 };
   private readonly order: number;
   private readonly layerMask: number;
-  private readonly target?: TileTarget;
+  private target?: TileTarget;
+  private targetSlot!: BorrowSlot<GPUTexture, GPUTexture>;
   private readonly clear?: readonly [number, number, number, number] | false;
   private readonly names?: readonly string[];
   private atlases: { [tileset: string]: TileAtlas };
+  private readonly slots = new Map<string, BorrowSlot<GPUTexture, TileAtlas>>();
   private data!: TileMapData;
   private sets: SetRun[] = [];
   private engine?: Engine;
@@ -218,7 +224,7 @@ export class GridTileMap implements EnginePlugin {
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.snap = options.snap ?? true;
     this.parallax = options.parallax ?? true;
-    this.target = options.target;
+    this.setTarget(options.target);
     this.clear = options.clear;
     this.order = order;
     this.layerMask = checkLayers(options.layers ?? 1, 'GridTileMap layers');
@@ -247,9 +253,23 @@ export class GridTileMap implements EnginePlugin {
         frames: new Map((set.tiles ?? []).filter((t) => t.animation?.length).map((t) => [t.id, t.animation!])),
       }));
   }
+  /**
+   * Replaces the map's own target: a texture, a function read each frame, or undefined for the frame's colour target.
+   * After a device restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: TileTarget | undefined): void {
+    this.target = target;
+    this.targetSlot = borrow(
+      typeof target === 'function' ? undefined : target,
+      'GridTileMap target',
+      'setTarget',
+      this.engine?.gpu,
+    );
+  }
   /** Swaps one tileset's atlas from the next frame. */
   setAtlas(tileset: string, atlas: TileAtlas): void {
     this.atlases[tileset] = atlas;
+    this.slots.set(tileset, borrow(atlas, 'GridTileMap atlas', 'setAtlas', this.engine?.gpu));
     for (const run of this.sets)
       if (run.set.name === tileset) {
         if (run.atlas?.owned) run.atlas.texture.destroy();
@@ -264,6 +284,8 @@ export class GridTileMap implements EnginePlugin {
         this.disposed ? 'disposed' : 'webgpu',
       );
     this.engine = engine;
+    fix(this.targetSlot, engine.gpu);
+    for (const slot of this.slots.values()) fix(slot, engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
@@ -272,11 +294,16 @@ export class GridTileMap implements EnginePlugin {
       },
     });
   }
+  /**
+   * Moves the tile animation clock (`time`, in milliseconds) by `delta` seconds without drawing (a delta of 0 or less
+   * moves nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.time += delta * 1000;
+  }
   onPreUpdate(delta: number): void {
-    if (delta > 0) {
-      this.time += delta * 1000;
-      this.states.prune();
-    }
+    this.advanceTime(delta);
+    if (delta > 0) this.states.prune();
   }
   onDeviceRestored(): void {
     this.releaseDevice();
@@ -407,11 +434,16 @@ export class GridTileMap implements EnginePlugin {
     }
     return runs;
   }
-  private group(device: GPUDevice, run: SetRun): GPUBindGroup {
+  /** The bind group of a tileset's atlas; undefined while a caller's atlas is lost with the device. */
+  private group(device: GPUDevice, run: SetRun): GPUBindGroup | undefined {
     if (run.group) return run.group;
-    const source = this.atlases[run.set.name];
-    if (!source) throw fault('state', `No atlas for tileset ${run.set.name}`, 'tilemap-options');
-    run.atlas ??= atlasTexture(device, source, () => rangeError('Invalid tile pixels', 'tilemap-options'));
+    const name = run.set.name,
+      source = this.atlases[name];
+    if (!source) throw fault('state', `No atlas for tileset ${name}`, 'tilemap-options');
+    let slot = this.slots.get(name);
+    if (!slot) this.slots.set(name, (slot = borrow(source, 'GridTileMap atlas', 'setAtlas', this.engine?.gpu)));
+    run.atlas ??= borrowedAtlas(slot, device, this.engine, () => rangeError('Invalid tile pixels', 'tilemap-options'));
+    if (!run.atlas) return undefined;
     run.group = device.createBindGroup({
       layout: this.atlasLayout!,
       entries: [{ binding: 0, resource: run.atlas.texture.createView() }],
@@ -421,7 +453,9 @@ export class GridTileMap implements EnginePlugin {
   private draw(c: GridPassContext): void {
     const view = c.view;
     if (view?.layers !== undefined && !(view.layers & this.layerMask)) return;
-    const own = this.target && (typeof this.target === 'function' ? this.target() : this.target);
+    const target = this.target,
+      own = typeof target === 'function' ? target() : target && lend(this.targetSlot, c.device, this.engine);
+    if (target && typeof target !== 'function' && !own) return;
     if (own && view?.index) return;
     const device = c.device,
       camera = this.camera;
@@ -493,7 +527,9 @@ export class GridTileMap implements EnginePlugin {
       pass.setPipeline(this.pipeline(device, format, samples));
       pass.setBindGroup(0, state.group);
       for (let r = 0; r < runs.length; r += 3) {
-        pass.setBindGroup(1, this.sets[runs[r]].group!);
+        const group = this.sets[runs[r]].group;
+        if (!group) continue;
+        pass.setBindGroup(1, group);
         pass.draw(4, runs[r + 2], 0, runs[r + 1]);
         this.stats.draws++;
       }

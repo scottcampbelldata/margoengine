@@ -1,20 +1,24 @@
-// Real-GPU check of ContactShadows, built packages. Takes the GPU lock itself around the browser.
+// Real-GPU check of ContactShadows, built packages.
 // A box floats just above a floor. Contact shadows darken the floor under the box's sunward side and nothing far away;
-// disabled, a far pixel keeps its value.
+// disabled, a far pixel keeps its value. Then the box leaves and the light grazes the bare floor: no pixel may darken.
+// The march once took the 1x depth's own error inside a pixel for a contact (dithered acne on every lit slope), and
+// which sample the 1x depth holds differs on the WebGL2 layer (MARGO_COMPAT=1 runs this page there), so the acne
+// differed between the two (the Orrery's `visual:compat` row).
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'post-contact-shadows' });
 const timer = setTimeout(() => {
   console.error('contact-shadows-browser: timed out after 120 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/post-contact-shadows/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -26,6 +30,7 @@ const browser = await launchBrowser({ headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 320, height: 240 }, deviceScaleFactor: 1 }),
     errors = [];
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
@@ -44,7 +49,7 @@ try {
       .setGeometry(box(20, 0.1, 20))
       .setPosition([0, -0.05, 0])
       .setMaterial(white);
-    engine
+    const cube = engine
       .createMesh()
       .setGeometry(box(1, 1, 1))
       .setPosition([0, 0.55, 0])
@@ -55,6 +60,7 @@ try {
       engine,
       effect,
       stack,
+      cube,
       frame: () => (engine.render({ delta: 1 / 60 }), engine.gpu.queue.onSubmittedWorkDone()),
     };
   });
@@ -75,13 +81,31 @@ try {
   }
   const corner = 4 * (on.width * 8 + 8);
   console.log(JSON.stringify({ darker, brighter, corner: [on.data[corner], off.data[corner]] }));
+  // The bare floor under a grazing light (about 7 degrees up), seen at a slant: nothing occludes it, so nothing darkens.
+  await page.evaluate(() => {
+    const t = window.t;
+    t.cube.setPosition([0, -50, 0]);
+    t.engine.lighting.direction.set([0.9, 0.12, 0.42]);
+    t.effect.options.enabled = false;
+    return t.frame();
+  });
+  const bare = await shot();
+  await page.evaluate(() => {
+    window.t.effect.options.enabled = true;
+    return window.t.frame();
+  });
+  const grazed = await shot();
+  let acne = 0;
+  for (let i = 0; i < bare.data.length; i += 4)
+    if (Math.max(...[0, 1, 2].map((c) => bare.data[i + c] - grazed.data[i + c])) > 2) acne++;
+  console.log(JSON.stringify({ compat: compatRun(), acne }));
   await page.evaluate(() => window.t.engine.dispose());
   assert.deepEqual(errors, []);
   assert.ok(darker > 200, `contacts darken pixels: ${darker}`);
   assert.equal(brighter, 0, 'contact shadows only darken');
   assert.ok(Math.abs(on.data[corner] - off.data[corner]) <= 2, 'a far pixel with no occluder is unchanged');
+  assert.equal(acne, 0, `a bare floor under a grazing light keeps every pixel: ${acne} darkened`);
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

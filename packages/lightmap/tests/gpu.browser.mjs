@@ -1,12 +1,14 @@
 // GPU progressive baking (./gpu) on a real WebGPU device, checked against the CPU baker (./mesh) and an exact
-// form factor; then ./apply drawing a bake on materials, glTF-pro and core meshes. Run with `npm run test:gpu` (after the package build); it takes a GPU lock slot through gpu-package-tests.
+// form factor; then ./apply drawing a bake on materials, glTF PBR and core meshes. Run with `npm run test:gpu` (after the package build) slot through gpu-package-tests.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('../../..', import.meta.url)),
   results = join(root, 'test-results');
@@ -18,7 +20,7 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'lightmap-gpu-page',
       configureServer(s) {
@@ -36,6 +38,8 @@ try {
   browser = await launchBrowser();
   const page = await browser.newPage(),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   await page.goto(server.resolvedUrls.local[0] + 'lightmap-gpu');
@@ -203,12 +207,12 @@ try {
   assert.deepEqual(r.uncovered, { width: 4, height: 4, samples: 0, peak: 0, progress: 4 }, 'uncovered mesh bake ends');
   console.log('lightmap GPU bake: ok', JSON.stringify(r));
 
-  // ./apply: one lightmap drawn on a materials mesh, a loaded glTF-pro model, a core mesh and from the live GPU baker,
+  // ./apply: one lightmap drawn on a materials mesh, a loaded glTF PBR model, a core mesh and from the live GPU baker,
   // with every live light off, so all the light on screen is the lightmap's.
   const drawn = await page.evaluate(async () => {
     const { Engine, Geometry, PbrMaterial: CoreMaterial } = await import('/packages/core/dist/index.js');
     const { PbrMaterial, createMesh } = await import('/packages/materials/dist/index.js');
-    const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { parseGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { applyLightmap } = await import('/packages/lightmap/dist/apply.js');
     const { GPULightmapBaker } = await import('/packages/lightmap/dist/gpu.js');
     const size = 64,
@@ -268,7 +272,7 @@ try {
     app.dispose();
     out.meshBack = await halves();
     mesh.destroy();
-    // The same quad as a glTF file with TEXCOORD_1, loaded by glTF-pro.
+    // The same quad as a glTF file with TEXCOORD_1, loaded by glTF PBR.
     const bytes = new Float32Array([...positions, ...normals, ...uv1]),
       index = new Uint16Array(indices),
       buffer = new Uint8Array(bytes.byteLength + index.byteLength);
@@ -309,6 +313,30 @@ try {
     app.dispose();
     out.modelRestored = model.primitives[0].material === own;
     out.modelBack = await halves();
+    // KB-OWN-LIGHTMAP1: a device restore (engine.rebootDevice) gives the engine a new GPUDevice. The lit model draws the
+    // same pixels on it with no validation error; a live bake's texture went with the old device, so the model draws
+    // no baked light there.
+    const watch = () => engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
+    app = applyLightmap(model, baked);
+    out.restoreBefore = await halves();
+    await engine.rebootDevice();
+    watch();
+    out.restoreAfter = await halves();
+    app.dispose();
+    const restoredBaker = await GPULightmapBaker.create(
+      engine.gpu,
+      { positions: new Float32Array(positions), uv1: new Float32Array(uv1), indices: new Uint32Array(indices) },
+      { width: 16, lights: [{ type: 'directional', direction: [-1, 0, 1], intensity: 1 }] },
+    );
+    await restoredBaker.step(8);
+    app = applyLightmap(model, restoredBaker);
+    out.liveModel = await halves();
+    await engine.rebootDevice();
+    watch();
+    out.liveModelLost = await halves();
+    app.dispose();
+    restoredBaker[Symbol.dispose]();
+    out.restoreBack = await halves();
     model.destroy();
     // A core mesh: core geometry has no UV1, so a materials stand-in draws it.
     const core = engine.createMesh(),
@@ -353,20 +381,28 @@ try {
   console.log('apply', JSON.stringify(drawn));
   assert.deepEqual(drawn.errors, []);
   // With no live light every target is black but where the lightmap lights it.
-  for (const k of ['meshOff', 'meshBack', 'modelOff', 'modelBack', 'coreOff', 'coreBack'])
+  for (const k of ['meshOff', 'meshBack', 'modelOff', 'modelBack', 'coreOff', 'coreBack', 'restoreBack', 'liveModelLost'])
     assert.ok(drawn[k][0] < 1 && drawn[k][1] < 1, `${k} is dark: ${drawn[k]}`);
   // The lit left half shows, the dark right half adds nothing.
   for (const k of ['meshOn', 'modelOn', 'coreOn']) {
     assert.ok(drawn[k][0] > 40, `${k} shows the lightmap: ${drawn[k]}`);
     assert.ok(drawn[k][1] < 1, `${k} adds nothing where the lightmap is dark: ${drawn[k]}`);
   }
-  // The glTF-pro hook adds the light Material.lightMap adds: same pixels within one 8-bit step.
+  // The glTF PBR hook adds the light Material.lightMap adds: same pixels within one 8-bit step.
   assert.ok(
     Math.abs(drawn.modelOn[0] - drawn.meshOn[0]) <= 1,
-    `glTF-pro ${drawn.modelOn} vs materials ${drawn.meshOn}`,
+    `glTF PBR ${drawn.modelOn} vs materials ${drawn.meshOn}`,
   );
   assert.ok(Math.abs(drawn.coreOn[0] - drawn.meshOn[0]) <= 1, `core ${drawn.coreOn} vs materials ${drawn.meshOn}`);
   assert.ok(drawn.modelCopied && drawn.modelRestored, 'the model draws a copy and gets its own record back');
+  // After a device restore the lit model draws the same pixels (within one 8-bit step), from the new device.
+  assert.ok(drawn.restoreBefore[0] > 40, `the model is lit before the restore: ${drawn.restoreBefore}`);
+  for (const h of [0, 1])
+    assert.ok(
+      Math.abs(drawn.restoreAfter[h] - drawn.restoreBefore[h]) <= 1,
+      `restored ${drawn.restoreAfter} vs before ${drawn.restoreBefore}`,
+    );
+  assert.ok(drawn.liveModel[0] > 5 && drawn.liveModel[1] > 5, `the live bake lights the model: ${drawn.liveModel}`);
   assert.ok(drawn.coreHidden && drawn.coreRestored, 'the core mesh draws nothing while lit and gets its geometry back');
   assert.ok(
     drawn.coreMoved[1] > 40 && drawn.coreMoved[0] < drawn.coreOn[0] - 40,

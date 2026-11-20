@@ -5,7 +5,7 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { Mat4, MutableVec3, Quat } from "@margoengine/math";
 
 export class Animation implements EnginePlugin {
@@ -27,6 +27,7 @@ export class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -49,6 +50,7 @@ export class AnimationGroup implements EnginePlugin {
     setOffset(target: AnimationGroupMember, offset: number): this;
     seek(time: number): this;
     update(delta: number): this;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     dispose(): void;

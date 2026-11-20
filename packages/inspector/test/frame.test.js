@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 import { EngineKernel, box } from '@margoengine/core';
 import { Stats } from '@margoengine/stats';
 import { FrameDebugger, textureBytes } from '../dist/frame.js';
-import { parseGLTF, parsePreparedPBR } from '@margoengine/gltf-pro';
+import { parseGLTF, parsePreparedPBR } from '@margoengine/gltf/pbr';
 import { parseFBX } from '@margoengine/fbx';
 
 // Tracing fake WebGPU (tests/support/gpu-trace.js pattern): every command a pass encoder receives is appended to
@@ -507,7 +507,7 @@ test('capture waits for the next rendered frame and dispose restores every devic
 });
 
 for (const fixture of [
-  { name: 'gltf-pro', file: '../../exporters/tests/fixtures/Box.glb', parse: parseGLTF },
+  { name: 'gltf/pbr', file: '../../exporters/tests/fixtures/Box.glb', parse: parseGLTF },
   { name: 'FBX', file: '../../fbx/test/fixtures/blender-rig.fbx', parse: parseFBX },
 ])
   test(`capture names ${fixture.name} loader draws without core Geometry`, async (t) => {

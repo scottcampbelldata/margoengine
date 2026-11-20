@@ -9,11 +9,11 @@ export async function sceneHelperBrowserChecks(page) {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { webglRenderer } = await import('/packages/webgl2-compat/dist/preview.js');
     const { engineRuntime } = await import('/packages/core/dist/extension.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { loadGLTF: loadBasicGLTF } = await import('/packages/gltf/dist/index.js');
     const { loadFBX } = await import('/packages/fbx/dist/index.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
-    const { getSceneBounds, fitScene, gatherSceneBuffers } = await import('/packages/gltf-pro/dist/scene.js');
+    const { getSceneBounds, fitScene, gatherSceneBuffers } = await import('/packages/gltf/dist/scene.js');
     const { Stage } = await import('/packages/stage/dist/index.js');
     const { loadedModel, worldBounds } = await import('/packages/stage/dist/model.js');
     const check = (value, message) => {
@@ -566,7 +566,7 @@ export async function sceneHelperBrowserChecks(page) {
       );
       return {
         sources: [
-          'real Box.glb via gltf-pro',
+          'real Box.glb via gltf/pbr',
           'real blender-rig.fbx via fbx',
           'real Box.glb via minimal gltf at X=12',
           'shared core Geometry at X=15',

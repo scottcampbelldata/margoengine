@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Fire front check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body>
+<script type="module">
+// The fire front on a real GPU (WebGPU, or the WebGL2 layer under MARGO_COMPAT=1), driven by fire-front-check.mjs:
+// - the burn texture (rgba32float, one texel per cell) read back from the GPU equals the CPU grid exactly, and holds
+//   unburnt, burning and burnt cells together;
+// - the smoke columns: after `ready`, each column stands on one of the hottest segments with that segment's heat, at the top of its flames (height + max(2, flame length)), and
+//   they draw over an empty scene;
+// - writing every live fire row each frame for 60 frames (applyFireSettings) makes no pipeline, buffer or texture and no GPU error.
+import {Engine} from '/packages/core/dist/index.js';
+import {FireFront} from '/packages/vfx/dist/fire-front.js';
+import {FIRE_LIVE_SETTINGS,applyFireSettings,fireSettingDefaults} from '/packages/vfx/dist/settings.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const W=256,H=192;
+async function scene(){
+ const c=document.createElement('canvas');c.width=W;c.height=H;document.body.append(c);
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,120,420],target:[0,40,0],near:0.5,far:4000}});
+ e.stop();
+ const errs=[];e.gpu.addEventListener('uncapturederror',x=>errs.push(x.error.message));
+ return {c,e,errs};
+}
+async function step(e,dt){e.render({delta:dt});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();}
+const options=(extra={})=>({size:[256,256],cell:4,fuel:'FM4',moisture:0.04,wind:[8,0],spotting:0,ignitions:[{at:[-80,0],radius:10}],columns:4,flames:0,buildingFlames:0,smoke:{lifetime:20,rate:10,prewarm:false},...extra});
+window.check={
+ async texture(){
+  const {e,errs}=await scene(),front=FireFront.attach(e,options({columns:0}));
+  for(let f=0;f<90*30;f++){e.render({delta:1/30});if(f%300===0)await step(e,0);}
+  await step(e,0);
+  const w=front.width,h=front.height,bytes=w*16,copy=e.gpu.createBuffer({size:bytes*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),enc=e.gpu.createCommandEncoder();
+  enc.copyTextureToBuffer({texture:front.texture},{buffer:copy,bytesPerRow:bytes},[w,h]);e.gpu.queue.submit([enc.finish()]);
+  await copy.mapAsync(GPUMapMode.READ);const gpu=new Float32Array(copy.getMappedRange().slice(0));copy.destroy();
+  const cpu=front.read();let differing=0,burning=0,burnt=0,unburnt=0;
+  for(let i=0;i<cpu.length;i++)if(cpu[i]!==gpu[i])differing++;
+  for(let i=3;i<cpu.length;i+=4){if(cpu[i]===1)burning++;else if(cpu[i]===2)burnt++;else if(cpu[i]===0)unburnt++;}
+  e.dispose();return {differing,floats:cpu.length,burning,burnt,unburnt,errors:errs};
+ },
+ async smoke(){
+  const {c,e,errs}=await scene(),front=FireFront.attach(e,options());
+  await front.ready;
+  for(let f=0;f<120*30;f++){e.render({delta:1/30});if(f%300===0)await step(e,0);}
+  await step(e,1/30);
+  const segs=front.segments(),cols=front.smokeColumns;let hot=0,worstHeat=0,worstOff=0;
+  cols.forEach((col,k)=>{const s=segs[k];if(!s)return;hot++;worstHeat=Math.max(worstHeat,Math.abs(col.options.heat-s.heat));const p=col.options.position;worstOff=Math.max(worstOff,Math.abs(p[0]-s.x),Math.abs(p[2]-s.z),Math.abs(p[1]-(s.y+Math.max(2,s.flameLength))));});
+  const shot=new OffscreenCanvas(W,H),g=shot.getContext('2d',{willReadFrequently:true});g.drawImage(c,0,0);const d=g.getImageData(0,0,W,H).data;
+  const bg=[d[0],d[1],d[2]];let lit=0;for(let i=0;i<d.length;i+=4)if(Math.abs(d[i]-bg[0])+Math.abs(d[i+1]-bg[1])+Math.abs(d[i+2]-bg[2])>12)lit++;
+  const out={columns:cols.length,hot,worstHeat,worstOff,lit,errors:errs};e.dispose();return out;
+ },
+ async live(){
+  const {e,errs}=await scene(),made={pipelines:0,buffers:0,textures:0},front=FireFront.attach(e,options({columns:0}));
+  for(let f=0;f<3;f++)await step(e,1/30);
+  for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){const real=e.gpu[method];if(real)e.gpu[method]=function(...a){made[key]++;return real.apply(this,a);};}
+  const live=FIRE_LIVE_SETTINGS.filter(r=>r.kind==='number');
+  for(let f=0;f<60;f++){
+   const t=f/59,v={...fireSettingDefaults()};
+   for(const r of live)v[r.name]=r.name==='wind.x'?2+6*t:r.name==='wind.z'?-3*t:r.name==='moisture'?0.03+0.05*t:r.min+(r.max-r.min)*(0.1+0.3*t);
+   applyFireSettings(front,v);await step(e,1/30);
+  }
+  e.dispose();return {made,errors:errs,rows:FIRE_LIVE_SETTINGS.length};
+ },
+};
+window.ready=true;
+</script></body></html>

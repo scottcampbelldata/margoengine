@@ -4,7 +4,7 @@
 
 ```ts
 import { Geometry, Mesh, PbrMaterial, Vec3 } from "@margoengine/core";
-import { ReactNode } from "react";
+import { ReactNode, forwardRef } from "react";
 
 export const Instance: import("react").ForwardRefExoticComponent<InstanceProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
 
@@ -20,6 +20,22 @@ export interface InstancesProps extends MeshProps {
     range?: number;
     geometry?: Geometry;
     material?: Material;
+}
+
+export function Merged<T extends readonly MergedSource[] | Record<string, MergedSource>>({ meshes, limit, range, children }: MergedProps<T>): import("react").JSX.Element;
+
+export type MergedInstance = ReturnType<typeof forwardRef<MeshRef, InstanceProps>>;
+
+export interface MergedProps<T extends readonly MergedSource[] | Record<string, MergedSource>> {
+    meshes: T;
+    limit?: number;
+    range?: number;
+    children: (...components: T extends readonly MergedSource[] ? MergedInstance[] : [Record<keyof T & string, MergedInstance>]) => ReactNode;
+}
+
+export interface MergedSource {
+    geometry: Geometry | null;
+    material?: Material | null;
 }
 
 // Not exported from this entry, but used by the exports above:
@@ -53,6 +69,8 @@ interface MeshProps extends PointerHandlers {
     layers?: number;
     children?: ReactNode;
 }
+
+type MeshRef = MeshHandle;
 
 interface PointerHandlers {
     onClick?: (event: MargoPointerEvent<MouseEvent>) => void;

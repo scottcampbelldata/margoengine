@@ -127,15 +127,17 @@ fn directLight(p: vec3f, n: vec3f, own: u32) -> vec3f {
     }
     let lambert = dot(n, dir);
     if (!(lambert > 0.0 && scale > 0.0)) { continue; }
-    var blocked: BVHHit;
+    // Directional: a ray from just off the surface. Point and spot: the segment to the light from the surface itself,
+    // skipping the receiving triangle. One bvhAny call for both, so the traversal is one copy.
+    var start = p;
+    var near = params.bias;
+    skipFace = own;
     if (kind == 1u) {
+      start = p + n * params.bias;
+      near = 0.0;
       skipFace = BVH_MISS;
-      blocked = bvhAny(p + n * params.bias, dir, 0.0, far, 0u);
-    } else {
-      // Point and spot: the segment to the light from the surface itself, skipping the receiving triangle.
-      skipFace = own;
-      blocked = bvhAny(p, dir, params.bias, far, 0u);
     }
+    let blocked = bvhAny(start, dir, near, far, 0u);
     if (blocked.face == BVH_MISS) { e += l.rgb.xyz * scale * lambert; }
   }
   return e;
@@ -163,31 +165,45 @@ fn bake(@builtin(global_invocation_id) id: vec3u) {
   let n = b.xyz;
   let own = bitcast<u32>(a.w);
   rng = pcg(i ^ pcg(params.frame ^ pcg(params.seed)));
-  var light = directLight(p, n, own);
-  // One cosine-weighted path: its first segment is the AO ray; each bounce adds the light reflected at the hit.
-  skipFace = BVH_MISS;
-  var dir = hemisphere(n);
-  let first = bvhClosest(p + n * params.bias, dir, 0.0, 3.4e38, 0u);
-  let open = select(1.0, 0.0, first.face != BVH_MISS && first.distance < params.aoDistance);
-  if (params.physical == 0u) { light *= open; }
-  var hit = first;
-  var origin = p + n * params.bias;
+  // One cosine-weighted path: its first segment is the AO ray; each bounce adds the light reflected at the hit. Vertex
+  // 0 is the texel, vertex k the k-th hit: one directLight and one bvhClosest call for all of them, so Direct3D's
+  // compiler, which inlines every call, keeps one copy of each traversal (KB-COMPAT-FXCTIME1).
+  var light = vec3f(0.0);
+  var open = 1.0;
+  var x = p;
+  var hn = n;
+  var face = own;
   var throughput = vec3f(1.0);
-  for (var bounce = 0u; bounce < params.bounces; bounce++) {
-    if (hit.face == BVH_MISS) { break; }
-    let t0 = triangles[hit.face * 3u];
-    let t1 = triangles[hit.face * 3u + 1u];
-    let t2 = triangles[hit.face * 3u + 2u];
-    let x = origin + dir * hit.distance;
-    var hn = normalize(cross(t1.xyz - t0.xyz, t2.xyz - t0.xyz));
-    if (dot(hn, dir) > 0.0) { hn = -hn; }
-    // Cosine sampling cancels cos / pi: the estimate of irradiance is pi * radiance = albedo * irradiance at the hit.
-    throughput *= vec3f(t0.w, t1.w, t2.w);
-    light += throughput * directLight(x, hn, hit.face);
+  var hit: BVHHit;
+  var origin = p;
+  var dir = n;
+  for (var bounce = 0u; bounce <= params.bounces; bounce++) {
+    if (bounce > 0u) {
+      if (hit.face == BVH_MISS) { break; }
+      let t0 = triangles[hit.face * 3u];
+      let t1 = triangles[hit.face * 3u + 1u];
+      let t2 = triangles[hit.face * 3u + 2u];
+      x = origin + dir * hit.distance;
+      hn = normalize(cross(t1.xyz - t0.xyz, t2.xyz - t0.xyz));
+      if (dot(hn, dir) > 0.0) { hn = -hn; }
+      // Cosine sampling cancels cos / pi: the estimate of irradiance is pi * radiance = albedo * irradiance at the hit.
+      throughput *= vec3f(t0.w, t1.w, t2.w);
+      face = hit.face;
+    }
+    let direct = directLight(x, hn, face);
+    if (bounce == 0u) {
+      light = direct;
+    } else {
+      light += throughput * direct;
+    }
     origin = x + hn * params.bias;
     dir = hemisphere(hn);
     skipFace = BVH_MISS;
     hit = bvhClosest(origin, dir, 0.0, 3.4e38, 0u);
+    if (bounce == 0u) {
+      open = select(1.0, 0.0, hit.face != BVH_MISS && hit.distance < params.aoDistance);
+      if (params.physical == 0u) { light *= open; }
+    }
   }
   let sum = sums[i] + vec4f(light, open);
   sums[i] = sum;

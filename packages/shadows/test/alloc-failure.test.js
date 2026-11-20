@@ -107,7 +107,7 @@ test('Shadows: the first frame after attach draws the depth passes and binds the
 
 for (const [what, method, select] of [
   ['the combined depth map', 'createTexture', (d) => d.format === 'depth32float' && d.size?.[0] === 64],
-  ['the shadow uniform', 'createBuffer', (d) => d.size === 384],
+  ['the shadow uniform', 'createBuffer', (d) => d.size === 400],
 ]) {
   test(`Shadows: an out-of-memory ${what} is reported once and core's device rebuild gives working shadows (KB6434b)`, async () => {
     const h = await harness(),
@@ -148,7 +148,7 @@ for (const [what, method, select] of [
 // so receivers bind them at once; an out-of-memory one is recovered by core's device rebuild.
 for (const [what, method, select] of [
   ['page pool', 'createTexture', (d) => d.format === 'depth32float' && d.size?.[0] === 1024],
-  ['uniform', 'createBuffer', (d) => d.size === 528],
+  ['uniform', 'createBuffer', (d) => d.size === 544],
 ]) {
   test(`VirtualShadows: an out-of-memory ${what} is reported once and core's device rebuild gives a working pool (KB6434d)`, async () => {
     const h = await harness(),

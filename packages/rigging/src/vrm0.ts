@@ -2,7 +2,7 @@
 // Geometry, inverse binds and animation buffers stay in their original local spaces.
 // A parent turn normalizes model forward; extension vectors have their own legacy handedness.
 import type { EngineKernel } from '@margoengine/core';
-import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf-pro';
+import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf/pbr';
 import type { Vec3 } from '@margoengine/math';
 import { fault } from '../../shared/errors.js';
 import { GLB_JSON, GLB_MAGIC, glbChunks } from '../../shared/glb.js';
@@ -268,7 +268,12 @@ export function convertVRM0(source: Uint8Array | VRMDocument): VRM0Conversion {
         meshNodes(a.mesh).map((node) => ({
           node,
           type:
-            { Auto: 'auto', Both: 'both', FirstPersonOnly: 'firstPersonOnly', ThirdPersonOnly: 'thirdPersonOnly' }[
+            (
+              { Auto: 'auto', Both: 'both', FirstPersonOnly: 'firstPersonOnly', ThirdPersonOnly: 'thirdPersonOnly' } as Record<
+                string,
+                'auto' | 'both' | 'firstPersonOnly' | 'thirdPersonOnly'
+              >
+            )[
               a.firstPersonFlag ?? 'Auto'
             ] ?? 'auto',
         })),
@@ -478,7 +483,7 @@ export function convertVRM0Bytes(source: Uint8Array): Uint8Array {
 
 /**
  * Loads a VRM 0.x URL/bytes as a PBRModel with a normalized 1.0 avatar in `model.asset.doc`.
- * Uses gltf-pro's bounded fetch and decoder options; `signal` cancels downloads and image decoding.
+ * Uses gltf/pbr's bounded fetch and decoder options; `signal` cancels downloads and image decoding.
  * Geometry keeps the file's glTF material fallback until the optional MToon renderer is attached.
  */
 export async function loadVRM0(
@@ -500,7 +505,7 @@ export async function loadVRM0(
         });
   if (bytes.byteLength > limit) throw bad('download exceeds maxDownloadBytes');
   const converted = convertVRM0Bytes(bytes),
-    { parseGLTFAsync } = await import('@margoengine/gltf-pro');
+    { parseGLTFAsync } = await import('@margoengine/gltf/pbr');
   options.signal?.throwIfAborted();
   return parseGLTFAsync(engine, converted, options);
 }

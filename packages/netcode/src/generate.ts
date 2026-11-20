@@ -23,7 +23,7 @@ const RANGES: Record<string, [number, number, string, string]> = {
 const RUNTIME = `const utf8 = new TextEncoder(),
   text = new TextDecoder('utf-8', { fatal: true });
 const unzigzag = (z: number): number => (z % 2 ? -(z + 1) / 2 : z / 2);
-class Writer {
+class Wire_Writer {
   bytes = new Uint8Array(64);
   view = new DataView(this.bytes.buffer);
   at = 0;
@@ -63,24 +63,24 @@ class Writer {
     for (; v > 127; v >>>= 7) this.bytes[this.at++] = (v & 127) | 128;
     this.bytes[this.at++] = v;
   }
-  raw(b: Uint8Array): void {
+  raw(b: globalThis.Uint8Array): void {
     this.room(b.length);
     this.bytes.set(b, this.at);
     this.at += b.length;
   }
-  done(): Uint8Array {
+  done(): globalThis.Uint8Array {
     return this.bytes.slice(0, this.at);
   }
 }
-class Reader {
+class Wire_Reader {
   at = 0;
-  bytes: Uint8Array;
-  view: DataView;
-  constructor(bytes: Uint8Array) {
+  bytes: globalThis.Uint8Array;
+  view: globalThis.DataView;
+  constructor(bytes: globalThis.Uint8Array) {
     this.bytes = bytes;
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
-  fail(problem: string): RangeError {
+  fail(problem: string): globalThis.RangeError {
     return new RangeError(\`Schema bytes \${problem}; pass bytes the matching encoder returned\`);
   }
   need(n: number): void {
@@ -142,7 +142,7 @@ class Reader {
     if (this.at !== this.bytes.length) throw this.fail(\`have \${this.bytes.length - this.at} bytes past the end\`);
   }
 }
-const writeIds = (w: Writer, list: number[]): void => {
+const writeIds = (w: Wire_Writer, list: number[]): void => {
   for (let i = 0, last = -1; i < list.length; last = list[i++]) w.varint(list[i] - last - 1);
 };
 const integer = (p: string, v: unknown, min: number, max: number): number => {
@@ -155,7 +155,7 @@ const number = (p: string, v: unknown): number => {
   if (typeof v !== 'number') throw new TypeError(\`\${p} must be a number\`);
   return v;
 };
-const sameBytes = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
+const sameBytes = (a: globalThis.Uint8Array, b: globalThis.Uint8Array): boolean => a.length === b.length && a.every((v, i) => v === b[i]);
 `;
 
 const ident = (name: string): string => name.replace(/[^A-Za-z0-9]/g, '_');
@@ -184,6 +184,12 @@ export function generateTypeScript(
     hash = (schema as { hash?: number })?.hash;
   if (!json?.types || typeof hash !== 'number')
     throw new TypeError('generateTypeScript needs a schema from defineSchema; pass defineSchema({ types })');
+  // Struct X's delta functions are encodeXDelta and decodeXDelta, which are also the plain ones of a struct XDelta.
+  for (const name of Object.keys(json.types))
+    if (name.endsWith('Delta') && json.types[name.slice(0, -5)])
+      throw new TypeError(
+        `generateTypeScript: structs ${name.slice(0, -5)} and ${name} would both define encode${name}; rename one`,
+      );
   const out: string[] = [],
     helpers: string[] = [];
   const type = (f: NormalizedField): string => {
@@ -193,7 +199,7 @@ export function generateTypeScript(
       case 'string':
         return 'string';
       case 'bytes':
-        return 'Uint8Array';
+        return 'globalThis.Uint8Array';
       case 'enum':
         return f.values.map((v) => JSON.stringify(v)).join(' | ');
       case 'array':
@@ -201,7 +207,7 @@ export function generateTypeScript(
       case 'optional':
         return type(f.of);
       case 'map':
-        return `Map<number, ${type(f.of)}>`;
+        return `globalThis.Map<number, ${type(f.of)}>`;
       case 'struct':
         return f.name;
       default:
@@ -230,13 +236,13 @@ export function generateTypeScript(
       case 'bool':
         fn(
           names.w,
-          'w: Writer, v: boolean, p: string',
+          'w: Wire_Writer, v: boolean, p: string',
           'void',
           `  if (typeof v !== 'boolean') throw new TypeError(\`\${p} must be a boolean\`);\n  w.u8(v ? 1 : 0);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           'boolean',
           `  const b = r.u8();\n  if (b > 1) throw r.fail(\`hold a boolean byte of \${b} at byte \${r.at - 1}\`);\n  return b === 1;`,
         );
@@ -245,21 +251,21 @@ export function generateTypeScript(
       case 'f32':
         fn(
           names.w,
-          'w: Writer, v: number, p: string',
+          'w: Wire_Writer, v: number, p: string',
           'void',
           `  if (!Number.isFinite(Math.fround(number(p, v)))) throw new RangeError(\`\${p} is \${v}, not a finite 32-bit float; pass a finite number\`);\n  w.f32(v);`,
         );
-        fn(names.r, 'r: Reader', 'number', '  return r.f32();');
+        fn(names.r, 'r: Wire_Reader', 'number', '  return r.f32();');
         fn(names.s, 'a: number, b: number', 'boolean', '  return Math.fround(a) === Math.fround(b);');
         break;
       case 'f64':
         fn(
           names.w,
-          'w: Writer, v: number, p: string',
+          'w: Wire_Writer, v: number, p: string',
           'void',
           `  if (!Number.isFinite(number(p, v))) throw new RangeError(\`\${p} is \${v}, not a finite number; pass a finite number\`);\n  w.f64(v);`,
         );
-        fn(names.r, 'r: Reader', 'number', '  return r.f64();');
+        fn(names.r, 'r: Wire_Reader', 'number', '  return r.f64();');
         fn(names.s, 'a: number, b: number', 'boolean', '  return a === b;');
         break;
       case 'quantized': {
@@ -271,13 +277,13 @@ export function generateTypeScript(
         fn(`q_${id}`, 'v: number', 'number', `  return ${q};`);
         fn(
           names.w,
-          'w: Writer, v: number, p: string',
+          'w: Wire_Writer, v: number, p: string',
           'void',
           `  const x = number(p, v);\n  if (!(x >= ${lit(f.min)} && x <= ${lit(f.max)})) throw new RangeError(\`\${p} is \${v}, outside its quantized range ${f.min}..${f.max}; widen the range\`);\n  const n = q_${id}(x);\n  for (let i = 0; i < ${size}; i++) w.u8(Math.floor(n / 2 ** (8 * i)) & 255);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           'number',
           `  let n = 0;\n  for (let i = 0; i < ${size}; i++) n += r.u8() * 2 ** (8 * i);\n  if (n > ${steps}) throw r.fail(\`hold quantized step \${n} over its top step ${steps} at byte \${r.at - ${size}}\`);\n  return ${lit(f.min)} + ${lit(span)} * (n / ${steps});`,
         );
@@ -287,13 +293,13 @@ export function generateTypeScript(
       case 'string':
         fn(
           names.w,
-          'w: Writer, v: string, p: string',
+          'w: Wire_Writer, v: string, p: string',
           'void',
           `  if (typeof v !== 'string') throw new TypeError(\`\${p} must be a string\`);\n  const bytes = utf8.encode(v);\n  if (bytes.length > ${f.maxLength}) throw new RangeError(\`\${p} is \${bytes.length} UTF-8 bytes, over its limit of ${f.maxLength}; shorten it\`);\n  w.varint(bytes.length);\n  w.raw(bytes);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           'string',
           `  const n = r.count(${f.maxLength}),\n    at = r.at;\n  r.need(n);\n  r.at += n;\n  try {\n    return text.decode(r.bytes.subarray(at, at + n));\n  } catch {\n    throw r.fail(\`hold text that is not UTF-8 at byte \${at}\`);\n  }`,
         );
@@ -302,30 +308,30 @@ export function generateTypeScript(
       case 'bytes':
         fn(
           names.w,
-          'w: Writer, v: Uint8Array, p: string',
+          'w: Wire_Writer, v: globalThis.Uint8Array, p: string',
           'void',
           `  if (!(v instanceof Uint8Array)) throw new TypeError(\`\${p} must be a Uint8Array\`);\n  if (v.length > ${f.maxLength}) throw new RangeError(\`\${p} is \${v.length} bytes, over its limit of ${f.maxLength}; shorten it\`);\n  w.varint(v.length);\n  w.raw(v);`,
         );
         fn(
           names.r,
-          'r: Reader',
-          'Uint8Array',
+          'r: Wire_Reader',
+          'globalThis.Uint8Array',
           `  const n = r.count(${f.maxLength});\n  r.need(n);\n  r.at += n;\n  return r.bytes.slice(r.at - n, r.at);`,
         );
-        fn(names.s, 'a: Uint8Array, b: Uint8Array', 'boolean', '  return sameBytes(a, b);');
+        fn(names.s, 'a: globalThis.Uint8Array, b: globalThis.Uint8Array', 'boolean', '  return sameBytes(a, b);');
         break;
       case 'enum': {
         const values = JSON.stringify(f.values);
         helpers.push(`const values_${id}: readonly (${T})[] = ${values};`);
         fn(
           names.w,
-          `w: Writer, v: ${T}, p: string`,
+          `w: Wire_Writer, v: ${T}, p: string`,
           'void',
           `  const i = values_${id}.indexOf(v);\n  if (i < 0) throw new RangeError(\`\${p} is \${String(v)}; use one of ${f.values.join(', ')}\`);\n  w.varint(i);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           T,
           `  const i = r.varint();\n  if (i >= ${f.values.length}) throw r.fail(\`hold enum index \${i} of only ${f.values.length} values\`);\n  return values_${id}[i];`,
         );
@@ -336,13 +342,13 @@ export function generateTypeScript(
         const item = field(`${id}_i`, f.of);
         fn(
           names.w,
-          `w: Writer, v: ${T}, p: string`,
+          `w: Wire_Writer, v: ${T}, p: string`,
           'void',
           `  if (!Array.isArray(v)) throw new TypeError(\`\${p} must be an array\`);\n  if (v.length > ${f.maxLength}) throw new RangeError(\`\${p} has \${v.length} items, over its limit of ${f.maxLength}; send fewer or raise maxLength in the schema\`);\n  w.varint(v.length);\n  for (let i = 0; i < v.length; i++) ${item.w}(w, v[i], \`\${p}[\${i}]\`);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           T,
           `  const n = r.count(${f.maxLength}),\n    out: ${T} = new Array(n);\n  for (let i = 0; i < n; i++) out[i] = ${item.r}(r);\n  return out;`,
         );
@@ -358,13 +364,13 @@ export function generateTypeScript(
         const inner = field(`${id}_v`, f.of);
         fn(
           names.w,
-          `w: Writer, v: ${T} | undefined, p: string`,
+          `w: Wire_Writer, v: ${T} | undefined, p: string`,
           'void',
           `  if (v === undefined) return w.u8(0);\n  w.u8(1);\n  ${inner.w}(w, v, p);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           `${T} | undefined`,
           `  const flag = r.u8();\n  if (flag > 1) throw r.fail(\`hold an optional flag of \${flag} at byte \${r.at - 1}\`);\n  return flag ? ${inner.r}(r) : undefined;`,
         );
@@ -388,13 +394,13 @@ export function generateTypeScript(
         );
         fn(
           names.w,
-          `w: Writer, v: ${T}, p: string`,
+          `w: Wire_Writer, v: ${T}, p: string`,
           'void',
           `  const keys = ids_${id}(v, p);\n  w.varint(keys.length);\n  writeIds(w, keys);\n  for (const id of keys) ${item.w}(w, v.get(id) as ${V}, \`\${p}(\${id})\`);`,
         );
         fn(
           names.r,
-          'r: Reader',
+          'r: Wire_Reader',
           T,
           `  const n = r.count(${max}),\n    keys: number[] = [];\n  r.ids(n, keys);\n  return new Map(keys.map((id) => [id, ${item.r}(r)]));`,
         );
@@ -406,13 +412,13 @@ export function generateTypeScript(
         );
         fn(
           names.dw as string,
-          `w: Writer, v: ${T}, base: ${T}, p: string`,
+          `w: Wire_Writer, v: ${T}, base: ${T}, p: string`,
           'void',
           `  const keys = ids_${id}(v, p);\n  const removed = [...base.keys()].filter((id) => !v.has(id)).sort((x, y) => x - y);\n  const changed = keys.filter((id) => !base.has(id) || !${item.s}(v.get(id) as ${V}, base.get(id) as ${V}));\n  w.varint(removed.length);\n  writeIds(w, removed);\n  w.varint(changed.length);\n  writeIds(w, changed);\n  for (const id of changed) {\n    const value = v.get(id) as ${V};\n    ${item.dw ? `if (base.has(id)) ${item.dw}(w, value, base.get(id) as ${V}, \`\${p}(\${id})\`);\n    else ` : ''}${item.w}(w, value, \`\${p}(\${id})\`);\n  }`,
         );
         fn(
           names.dr as string,
-          `r: Reader, base: ${T}`,
+          `r: Wire_Reader, base: ${T}`,
           T,
           `  const removed: number[] = [],\n    changed: number[] = [];\n  r.ids(r.count(base.size), removed);\n  for (const id of removed) if (!base.has(id)) throw r.fail(\`remove entity \${id}, which the baseline lacks\`);\n  r.ids(r.count(${max}), changed);\n  const gone = new Set(removed),\n    out = new Map(base);\n  for (const id of removed) out.delete(id);\n  for (const id of changed) {\n    if (gone.has(id)) throw r.fail(\`both remove and change entity \${id}\`);\n    out.set(id, ${item.dr ? `out.has(id) ? ${item.dr}(r, out.get(id) as ${V}) : ` : ''}${item.r}(r));\n  }\n  if (out.size > ${max}) throw r.fail(\`leave \${out.size} entries, over the map limit of ${max}\`);\n  return new Map([...out].sort((x, y) => x[0] - y[0]));`,
         );
@@ -422,11 +428,11 @@ export function generateTypeScript(
         const [min, max, write, read] = RANGES[f.type];
         fn(
           names.w,
-          'w: Writer, v: number, p: string',
+          'w: Wire_Writer, v: number, p: string',
           'void',
           `  integer(p, v, ${lit(min)}, ${lit(max)});\n  ${write};`,
         );
-        fn(names.r, 'r: Reader', 'number', `  return ${read};`);
+        fn(names.r, 'r: Wire_Reader', 'number', `  return ${read};`);
         fn(names.s, 'a: number, b: number', 'boolean', '  return a === b;');
       }
     }
@@ -448,8 +454,8 @@ export function generateTypeScript(
     const codecs = entries.map(([key, f]) => [key, f, field(`${ident(name)}_${key}`, f)] as const),
       maskBytes = Math.ceil(entries.length / 8);
     structs.push(
-      `function w_${name}(w: Writer, v: ${name}, p: string): void {\n  if (!v || typeof v !== 'object' || Array.isArray(v) || v instanceof Map) throw new TypeError(\`\${p} must be a ${name} object\`);\n${codecs.map(([key, , c]) => `  ${c.w}(w, v.${key}, \`\${p}.${key}\`);`).join('\n')}\n}`,
-      `function r_${name}(r: Reader): ${name} {\n  const out = {} as ${name};\n${codecs
+      `function w_${name}(w: Wire_Writer, v: ${name}, p: string): void {\n  if (!v || typeof v !== 'object' || Array.isArray(v) || v instanceof Map) throw new TypeError(\`\${p} must be a ${name} object\`);\n${codecs.map(([key, , c]) => `  ${c.w}(w, v.${key}, \`\${p}.${key}\`);`).join('\n')}\n}`,
+      `function r_${name}(r: Wire_Reader): ${name} {\n  const out = {} as ${name};\n${codecs
         .map(([key, f, c]) =>
           f.type === 'optional'
             ? `  {\n    const value = ${c.r}(r);\n    if (value !== undefined) out.${key} = value;\n  }`
@@ -457,7 +463,7 @@ export function generateTypeScript(
         )
         .join('\n')}\n  return out;\n}`,
       `/** Whether two ${name} values encode to the same bytes. */\nexport function same${name}(a: ${name}, b: ${name}): boolean {\n  if (!a || typeof a !== 'object' || !b || typeof b !== 'object') return false;\n  return ${codecs.map(([key, , c]) => `${c.s}(a.${key}, b.${key})`).join(' && ')};\n}`,
-      `function dw_${name}(w: Writer, v: ${name}, base: ${name}, p: string): void {\n  if (!v || typeof v !== 'object' || Array.isArray(v) || v instanceof Map) throw new TypeError(\`\${p} must be a ${name} object\`);\n  const mask = new Uint8Array(${maskBytes});\n${codecs.map(([key, , c], i) => `  if (!${c.s}(v.${key}, base.${key})) mask[${i >> 3}] |= ${1 << (i & 7)};`).join('\n')}\n  w.raw(mask);\n${codecs
+      `function dw_${name}(w: Wire_Writer, v: ${name}, base: ${name}, p: string): void {\n  if (!v || typeof v !== 'object' || Array.isArray(v) || v instanceof Map) throw new TypeError(\`\${p} must be a ${name} object\`);\n  const mask = new Uint8Array(${maskBytes});\n${codecs.map(([key, , c], i) => `  if (!${c.s}(v.${key}, base.${key})) mask[${i >> 3}] |= ${1 << (i & 7)};`).join('\n')}\n  w.raw(mask);\n${codecs
         .map(([key, f, c], i) => {
           const write =
             c.dw && f.type !== 'optional'
@@ -466,7 +472,7 @@ export function generateTypeScript(
           return `  if (mask[${i >> 3}] & ${1 << (i & 7)}) ${write};`;
         })
         .join('\n')}\n}`,
-      `function dr_${name}(r: Reader, base: ${name}): ${name} {\n  r.need(${maskBytes});\n  const mask = r.bytes.slice(r.at, r.at + ${maskBytes});\n  r.at += ${maskBytes};\n${entries.length & 7 ? `  if (mask[${maskBytes - 1}] >> ${entries.length & 7}) throw r.fail('set a change bit past the ${entries.length} fields of ${name}');\n` : ''}  const out = {} as ${name};\n${codecs
+      `function dr_${name}(r: Wire_Reader, base: ${name}): ${name} {\n  r.need(${maskBytes});\n  const mask = r.bytes.slice(r.at, r.at + ${maskBytes});\n  r.at += ${maskBytes};\n${entries.length & 7 ? `  if (mask[${maskBytes - 1}] >> ${entries.length & 7}) throw r.fail('set a change bit past the ${entries.length} fields of ${name}');\n` : ''}  const out = {} as ${name};\n${codecs
         .map(([key, f, c], i) => {
           const read = c.dr && f.type !== 'optional' ? `${c.dr}(r, base.${key})` : `${c.r}(r)`;
           return f.type === 'optional'
@@ -474,10 +480,10 @@ export function generateTypeScript(
             : `  out.${key} = mask[${i >> 3}] & ${1 << (i & 7)} ? ${read} : base.${key};`;
         })
         .join('\n')}\n  return out;\n}`,
-      `/** Bytes of a ${name}. */\nexport function encode${name}(value: ${name}): Uint8Array {\n  const w = new Writer();\n  w_${name}(w, value, '${name}');\n  return w.done();\n}`,
-      `/** The ${name} in \`bytes\`; RangeError for truncated or malformed bytes. */\nexport function decode${name}(bytes: Uint8Array): ${name} {\n  const r = new Reader(bytes),\n    value = r_${name}(r);\n  r.end();\n  return value;\n}`,
-      `/** Bytes of a ${name} as a change from \`baseline\`. */\nexport function encode${name}Delta(value: ${name}, baseline: ${name}): Uint8Array {\n  const w = new Writer();\n  dw_${name}(w, value, baseline, '${name}');\n  return w.done();\n}`,
-      `/** The ${name} that \`encode${name}Delta(value, baseline)\` described. */\nexport function decode${name}Delta(bytes: Uint8Array, baseline: ${name}): ${name} {\n  const r = new Reader(bytes),\n    value = dr_${name}(r, baseline);\n  r.end();\n  return value;\n}`,
+      `/** Bytes of a ${name}. */\nexport function encode${name}(value: ${name}): globalThis.Uint8Array {\n  const w = new Wire_Writer();\n  w_${name}(w, value, '${name}');\n  return w.done();\n}`,
+      `/** The ${name} in \`bytes\`; RangeError for truncated or malformed bytes. */\nexport function decode${name}(bytes: globalThis.Uint8Array): ${name} {\n  const r = new Wire_Reader(bytes),\n    value = r_${name}(r);\n  r.end();\n  return value;\n}`,
+      `/** Bytes of a ${name} as a change from \`baseline\`. */\nexport function encode${name}Delta(value: ${name}, baseline: ${name}): globalThis.Uint8Array {\n  const w = new Wire_Writer();\n  dw_${name}(w, value, baseline, '${name}');\n  return w.done();\n}`,
+      `/** The ${name} that \`encode${name}Delta(value, baseline)\` described. */\nexport function decode${name}Delta(bytes: globalThis.Uint8Array, baseline: ${name}): ${name} {\n  const r = new Wire_Reader(bytes),\n    value = dr_${name}(r, baseline);\n  r.end();\n  return value;\n}`,
     );
   }
   return `${out.join('\n')}\n${RUNTIME}\n${helpers.join('\n\n')}\n\n${structs.join('\n\n')}\n`;

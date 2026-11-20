@@ -78,7 +78,7 @@ once, so these are lower bounds. The survey script is reproducible: it reads `gi
 | Package | Vertex | Fragment | Compute | Storage (read) | Storage (read-write) | Atomics | Storage textures | Indirect | Readback |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | core | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 4 | 1 |
-| gltf-pro | 5 | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| gltf/pbr | 5 | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
 | materials | 3 | 11 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | shadows | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | clustered | 2 | 2 | 1 | 8 | 2 | 0 | 0 | 0 | 0 |
@@ -220,7 +220,7 @@ Expected result per package on WebGL2. "Same" means the same pixels within the p
 | Package | Plan | Expected result |
 | --- | --- | --- |
 | core | Render shaders, indirect from shadow copies, `pick` readback | Same |
-| gltf-pro, materials | Render shaders; check texture-unit counts (16 per stage is the WebGL2 minimum) | Same; a material whose maps exceed the units drops its least important lobes on compat, listed per material |
+| gltf/pbr, materials | Render shaders; check texture-unit counts (16 per stage is the WebGL2 minimum) | Same; a material whose maps exceed the units drops its least important lobes on compat, listed per material |
 | shadows | Depth arrays with comparison (`sampler2DArrayShadow`) | Same |
 | clustered | Light binning on the CPU (tier B, at most 1,024 lights); light lists as data textures | Same, more CPU time with many lights |
 | animation | Skinning and morphs by transform feedback (A2); CPU skinning (`Skin.pose`) as fallback | Same |
@@ -248,7 +248,7 @@ Relative sizes are planning guesses, not measurements: S (days), M (one to two w
 | M0 | Decisions and corpus | S | Package name, support matrix and tiers agreed; the WGSL corpus recorder lands and the corpus covers every package with shaders. |
 | M1 | WGSL front end and IR | L | The whole corpus parses and type-checks; errors point at the right line; unit tests per language feature. |
 | M2 | GLSL back end for render shaders + core | L | Core's basic scene, instancing, MSAA, picking and device loss run unmodified on the layer; forced-compat pixels match native WebGPU within tolerance (max channel error and mean error set in M0) on the basic-scene and PBR checks. |
-| M3 | Textures, samplers, render targets, copies, readback | M | gltf-pro, materials, shadows, tonemap and environment backgrounds pass their GPU checks in forced-compat mode. |
+| M3 | Textures, samplers, render targets, copies, readback | M | gltf/pbr, materials, shadows, tonemap and environment backgrounds pass their GPU checks in forced-compat mode. |
 | M4 | Storage-as-data-texture | M | clustered (with CPU binning), points, lines, text, voxel and lod pass in forced-compat mode. |
 | M5 | Compute tiers A1, A2, B | L | environment IBL, post effects, sky, taa, selection, water surface and animation skinning pass; tier-B budget measured and written into `docs/limits.md`. |
 | M6 | Package compat paths (tier C) | L | vfx, creative particles, splats, culling, scatter and DOF have their compat routes; each refusal message is tested. |
@@ -461,7 +461,11 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   background checks, which need splitting from their compute parts or the animation compat path first.
   A page a check opens with `compat: false` stays on native WebGPU in such a run, and `openBrowser` then prints
   `MARGO_COMPAT=1 not applied to <page>` (`tests/compat-ignored.test.js`): that page is no layer result unless the
-  script runs a layer leg of its own. The biomes GPU-backend hardware proofs (`test:gpu:backend-placement` and the
+  script runs a layer leg of its own. A script that opens a page with a browser of its own never gets the init script:
+  `tests/gpu-compat-honoured.test.js` scans every file a GPU or browser check runs and fails on one that opens a page
+  without `compatShim`, `compatRun()` or `installCompat`, or a line `MARGO_COMPAT not applicable: <reason>`
+  (KB-SKY-COMPATCHECK1). The 46 such files found on 2026-11-16 are listed in `scripts/support/compat-owed.json`; the
+  test keeps that list exact. The biomes GPU-backend hardware proofs (`test:gpu:backend-placement` and the
   `gpu-*-check.mjs` tools) are WebGPU only; no check yet runs a biomes `backend: 'gpu'` world on a layer device.
 - **Bugs found and fixed, each with a regression test in `features-browser.mjs`.** (1) An upload while another texture
   unit was active went to that unit's texture: `GLState.scratch` selected unit 0 only when its binding changed (the
@@ -548,7 +552,7 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   - *C (package paths)*: no recorded shader needs one; packages whose kernels would be slow on the CPU tier take a
     route of their own (M6, [below](#package-routes-m6-2026-10-29)).
 - **Lazy loading.** The device keeps only what `getBindGroupLayout` needs (default layouts from the IR); planning,
-  translation and the CPU tier load with the compute entry, the first time a page creates a compute pipeline.
+  translation and the CPU tier load with the compute entry, when `requestDevice` answers (KB-COMPAT-FIRSTTASK1).
   `createComputePipeline` before that returns at once and is planned at its first dispatch; command buffers with
   compute passes wait in the queue until the entry has loaded, and later queue operations wait behind them in order.
   `createComputePipelineAsync` loads it first and rejects on a refusal.
@@ -605,9 +609,27 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
 - **Writes.** `writeTexture` and `copyBufferToTexture` upload whole blocks with `compressedTexSubImage2D/3D` (a mip
   level smaller than a block takes the level's own size). Sampling and `textureLoad` decode as on WebGPU: the features
   check compares BC1 (two mip levels) and BC4 blocks with native WebGPU, bit for bit.
-- **Accepted differences.** WebGL2 cannot read compressed texels back or attach them: `copyTextureToBuffer`,
-  `copyTextureToTexture` and sRGB views of a compressed texture (which the layer would copy) are refused with
-  MargoError code `unsupported`.
+- **Views of another dimension (KB-COMPAT-DECODERS1, 2026-11-16).** WebGPU lets any 2D texture, compressed or not, be
+  viewed as `2d-array`, as `cube` when it has 6 square layers, and as `2d` of one layer (WebGPU "createView()",
+  "GPUTextureViewDescriptor" validation). GL fixes a texture object's target and can neither copy compressed blocks
+  between texture objects nor render into them, so such a view of a compressed texture reads a decoded copy: a draw
+  fetches every texel of the blocks through the GPU's own decoder (a cube source at each texel centre's direction, at
+  an exact level through the nearest sampler) into `rgba32float` storage, which holds the decoded values exactly
+  (`rgba16float` where 32-bit floats cannot be filtered). The copy follows later block writes like any other view copy.
+  The features check reads a 2d-array view of a BC1 cube texture (both levels), of a 1-layer texture, a 2d view of one
+  face and a cube view of array storage, before and after a later block write, equal to native WebGPU bit for bit.
+- **Copies (KB-COMPAT-DECODERS1, 2026-11-16).** WebGPU copies compressed texels block for block, to another texture of
+  the same format or its sRGB twin and into a buffer, from a texture made with `COPY_SRC` (WebGPU
+  "copyTextureToTexture()", "copyTextureToBuffer()"). WebGL2 can neither read compressed texels back nor copy them
+  between texture objects (it has no `glCopyImageSubData`), so a compressed texture made with `COPY_SRC` keeps the
+  bytes of its blocks in memory, every level and layer, updated by each block write; both copies read them, and a copy
+  into a compressed texture is a block write of its own (so the destination's kept blocks and sRGB twin follow). The
+  features check `compressedCopies` copies a region of a layer, and a whole level into three cube faces in the sRGB
+  twin format, reads them back at padded rows and images (and a level smaller than a block), and samples them, equal
+  to native WebGPU bit for bit. Encoder copies whose `bytesPerRow` is not a multiple of 256 are validation errors, as
+  on WebGPU; the layer used to accept them.
+- **Accepted differences.** None left in this area: sRGB twin views are served since KB1042d, views of another
+  dimension and copies since KB-COMPAT-DECODERS1. A compressed texture without `COPY_SRC` keeps nothing extra.
 
 ## Per-target blend states without OES_draw_buffers_indexed (M3, second part, 2026-10-28)
 
@@ -759,6 +781,48 @@ the browser offers it, the layer, and for the basic scene the milestone M2 layer
   three sanity bytes an Intel Arc 140V rounds one level differently (both natively and on the layer); those now
   allow two levels, and the exact comparison with native on the same adapter stays.
 
+- **Compressed views of another dimension (KB-COMPAT-DECODERS1, 2026-11-16).** A `2d-array` view of a compressed cube
+  texture (decoders' KTX2 faces read in a compute pass) threw `unsupported`: the layer copies such a view, and only a
+  renderable format could be copied. It now decodes the blocks into a float copy (see "Compressed textures"). The
+  decoders check then waited for ever in its stream check: `KTX2Streamer` grows a BC7 texture by
+  `copyTextureToTexture`, which the layer refused, and the stream's failed level reached only `onError`. Compressed
+  textures made with `COPY_SRC` now keep their blocks for copies (see "Copies"), and the check fails at once on a
+  level that does not load.
+
+- **Audits see the layer's classes (KB-COMPAT-AUDIT1, 2026-11-16).** A check's init script that counts GPU work by
+  patching `GPUDevice.prototype` runs before the layer exists, so in a forced-compatibility run it patched the
+  browser's classes and counted nothing. `compatShim` now runs the patches queued on `globalThis.__margoOnLayer` once,
+  right after `installCompat`, when `GPUDevice` and the other interfaces are the layer's; creative's earth audit and
+  margo-module-tests' phone MSAA audit use it and assert they saw real work on both backends
+  (tests/compat-on-layer.test.js).
+
+- **Layouts and bind groups as WebGPU checks them (KB-COMPAT-PHONY1, 2026-11-16).** A render pipeline's 'auto'
+  layout comes from each stage's checked WGSL entry point (WebGPU "default pipeline layout": every resource the entry
+  point statically uses, phony assignments included, WGSL section 7.7, with its declared binding type, so a
+  `texture_external` is an `externalTexture` entry), then the GLSL tables. `createBindGroup` checks the entries against
+  the layout (WebGPU "createBindGroup(descriptor)": the same count, each binding once and declared, each resource of
+  its entry's kind), so a group that a device refuses is refused on the layer too.
+
+- **No garbage per frame (KB-COMPAT-FRAMEALLOC1, 2026-11-16 to 2026-11-18, done).** The frame-alloc check
+  (`scripts/frame-alloc-browser.mjs`) draws its scenes on the layer under `MARGO_COMPAT=1` and holds them to the
+  native floors. Routes that replace compute kernels on the layer run on the CPU once a frame, so they allocate
+  nothing: culling's (src/compat.ts) copy records by a loop, take lengths as `Math.sqrt` of the sum of squares and get
+  the shape test with its vertices instead of a closure (packages/culling/test/compat-alloc.test.js). The layer's
+  replay of a steady draw allocates nothing (part 2): `GLState` (src/device/gl.ts) caches numeric state in slots
+  (`S`) and blend state per draw buffer, a pipeline holds its target state as numbers (`targetGL`, `sameTargets`),
+  and the per-draw texture plan uses reused arrays (packages/webgl2-compat/test/replay-alloc.test.js, 1,352 B a draw
+  before). A stencil readback forgets every blend slot it changes (test/readback-blend.test.js pins it with
+  OES_draw_buffers_indexed). Passes allocate nothing (part 3): the replay caches each subresource it attaches,
+  finds a framebuffer by the identity of its subresources (no key string per pass), reuses one pass state and its
+  bind group, vertex and index slots, and clears without arrays; `queue.writeBuffer` passes a range of the caller's
+  array to `bufferSubData` and `submit` checks its buffers without closures. Rare paths that make a closure live in
+  methods of their own, since V8 allocates the closure context on every call of a function that makes one. Command
+  recording (part 4) is a tape, an opcode and its numbers in typed arrays and its objects in an array, replayed by two
+  cursors (`src/device/tape.ts`); the tape, the use list and the pass descriptor snapshots return to the device's pool
+  when the command buffer has replayed (a command buffer submits once). `submit` and the canvas present queue keep their lists between frames (part 5: a one-draw frame allocates only the
+  encoder, pass encoder and command buffer objects, 188 B on Node 26). A compute pass is on the tape, with its dispatch draws' uniforms kept as fields and its views cached (part 6, 202 B for a
+  pass of one dispatch). A sampled multisampled texture's resolved-copy subresource is made once (the post scene rebuilt a framebuffer's attachments every frame without making a GL object), and a mip level's size is read without an array (part 7: post 5,892 to 2,176 B a frame; packages/webgl2-compat/test/framebuffers-browser.mjs). Encoder copies are tape opcodes, and the callbacks and iterators that cost a context or an object a call are gone from the canvas, the compute word textures and the shadows route (part 8: shadowed 2,136 to 988 B, post 2,128 B; packages/webgl2-compat/test/replay-alloc.test.js, packages/shadows/test/compat-alloc.test.js). Part 9 hands float clears a reused `Float32Array`, keeps a buffer's last write window and reads indirect words from the CPU copy. Part 10 (2026-11-18) makes the objects WebGPU returns per call as small as a browser's: a label is the prototype's `''` unless given, an encoder and a compute pass reach the device through the tape's pool and a compute pass keeps its pipeline flag on the tape, a view made with no descriptor shares its texture's `ViewRange` (80 B to 16 B), a texture's copies are found by a scan instead of a key string, and the pass state's stand-in list keeps its length. Every scene is within its native floor (basic 252, instanced 228, shadowed 800, post 1,464, dynamic 264 B a frame, Edge 156, RTX A6000), and `scripts/frame-alloc-browser.mjs` installs the layer itself under `MARGO_COMPAT=1`, so its compatibility leg holds the layer to those floors.
+
 ## Demos, docs and release (M8, 2026-10-29)
 
 Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL2, Dawn for WebGPU).
@@ -803,7 +867,7 @@ Measured on this PC (NVIDIA RTX A6000, Edge 156 with ANGLE Direct3D 11 for WebGL
   the frame budget of `visual:compat:budget`).
 - **Frame budget.** `visual:compat:budget` (a check:merge step of its own that holds the GPU exclusively, in chunks
   of 8 demos) fails a demo whose median frame on the layer costs more than 50 ms of main-thread work and more than
-  twice its native frame (`--budget=<ms>`). It was part of `visual:compat`, in a shared GPU slot, until a landing
+  twice its native frame (`--budget=<ms>`). It was part of `visual:compat`, until a landing
   failed on khronos-NodePerformanceTest at 86 ms beside other GPU suites (2026-10-30). The run on an integrated GPU
   (AMD Radeon 680M) is still to be recorded. On the RTX A6000 gameplay-sandbox passes at 2.9 ms of main-thread work a
   frame on the layer (3,748 ms before its routes); the frame interval there is 66.6 ms, GPU time, which this budget does not cover.

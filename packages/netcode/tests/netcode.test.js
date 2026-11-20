@@ -9,7 +9,7 @@ import {
   LoopbackNetwork,
   ENVELOPE_VERSION,
 } from '../dist/index.js';
-import { AdaptiveDelay } from '@margoengine/net/delay';
+import { AdaptiveDelay } from '@margoengine/netcode/interpolation-delay';
 import { arena, game, schema } from './arena.js';
 
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);

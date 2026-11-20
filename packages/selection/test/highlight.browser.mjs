@@ -14,7 +14,7 @@ try {
   await page.waitForFunction(() => window.modern);
   await page.evaluate(async () => {
     const { Engine, box } = await import('/packages/core/dist/extension.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { CameraProjection } = await import('/packages/cameras/dist/index.js');
     const { Highlight } = await import('/packages/selection/dist/highlight.js');
     const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');

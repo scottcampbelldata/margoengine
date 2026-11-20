@@ -20,6 +20,11 @@ export interface USDZOptions extends SceneOptions {
   height?: number;
   /** Moves the model up or down so its rest pose's lowest point is on the floor, y = 0. Default false. */
   ground?: boolean;
+  /**
+   * The width, in the scene's units, written for a loaded model's points (their diameter, UsdGeomPoints `widths`) and
+   * lines (UsdGeomBasisCurves `widths`), which glTF draws one pixel wide and gives no size. Default 0.01 (1 cm).
+   */
+  lineWidth?: number;
 }
 
 /** An axis-aligned box in metres. */
@@ -129,6 +134,12 @@ const st = (uvs: Float32Array): Float64Array => Float64Array.from(uvs, (v, i) =>
  * extra field in its local header), as the USDZ package rules require.
  */
 export function storedZIP(entries: readonly (readonly [string, Uint8Array])[]): Uint8Array {
+  // The end record counts entries in 16 bits (APPNOTE 4.4.21, 4.4.22); more needs ZIP64 records, which the USDZ
+  // package rules do not name, so refuse rather than write a count that wraps.
+  if (entries.length > 0xffff)
+    throw new RangeError(
+      `USDZ holds ${entries.length} files, over the ZIP32 limit of 65,535; export fewer materials or textures`,
+    );
   const encoder = new TextEncoder(),
     plan = entries.map(([name, data]) => ({ name: encoder.encode(name), data, crc: crc32(data), at: 0, extra: 0 }));
   let at = 0;
@@ -324,7 +335,7 @@ export class USDMaterials {
       const { wrapS, wrapT } = samplerOf(texture);
       let coordinates = uv(texture.texCoord ?? 0);
       if (name === 'BaseColorTexture' && material.baseColorTextureTransform) {
-        // KHR_texture_transform in glTF uv space (v down): uv' = O + R S uv, R = [[c, s], [-s, c]] (gltf-pro's
+        // KHR_texture_transform in glTF uv space (v down): uv' = O + R S uv, R = [[c, s], [-s, c]] (gltf/pbr's
         // reading: the uvs turn counter-clockwise as seen with v down, the image clockwise). With st = F uv + (0, 1),
         // F = diag(1, -1): st' = (F R F) S st + F O + F R S (0, 1) + (0, 1). F R F = [[c, -s], [s, c]] is
         // UsdTransform2d's counter-clockwise rotation (t up) by the same angle, so the sign is kept; the translation
@@ -512,4 +523,89 @@ export function meshPrim(
     '}',
   );
   shared.push(...materialLines);
+}
+
+/**
+ * Writes drawable `i`, a point or line list, into `lines` as a `UsdGeomPoints` prim (one point per index) or a linear
+ * `UsdGeomBasisCurves` prim (each polyline one curve, `curveVertexCounts` giving its vertex count), with a constant
+ * `widths`, its material binding and colour, and the node's transform; its Material prim goes into `shared`.
+ * `geometry` lists its vertices in that order already ({@link listedVertices}).
+ */
+export function curvesPrim(
+  lines: string[],
+  shared: string[],
+  i: number,
+  name: string | undefined,
+  geometry: Geo,
+  counts: readonly number[] | undefined,
+  width: number,
+  { path, lines: materialLines, appearance }: BoundMaterial,
+  transform: readonly string[],
+): void {
+  const kind = counts ? 'BasisCurves' : 'Points',
+    { min, max } = shapeOf(geometry.positions, geometry.normals, geometry.indices),
+    // A plugin stroke's or cloud's per-point multipliers make the widths vary per vertex.
+    widths = geometry.widths ? Array.from(geometry.widths, (v) => v * width) : [width],
+    widest = widths.reduce((a, b) => (b > a ? b : a), 0),
+    // A Gprim's extent holds what it draws: half a width beyond each point.
+    extent = [...min.map((v) => v - widest / 2), ...max.map((v) => v + widest / 2)];
+  lines.push(
+    path ? `def ${kind} "${kind}_${i}" (apiSchemas = ["MaterialBindingAPI"]) {` : `def ${kind} "${kind}_${i}" {`,
+    `    string displayName = ${JSON.stringify(name ?? `${kind} ${i}`)}`,
+    ...transform,
+    ...(counts
+      ? [
+          '    uniform token type = "linear"',
+          '    uniform token wrap = "nonperiodic"',
+          `    int[] curveVertexCounts = [${counts.join(', ')}]`,
+        ]
+      : []),
+    `    float3[] extent = ${tuples(extent, 3)}`,
+    `    point3f[] points = ${tuples(geometry.positions, 3)}`,
+    `    float[] widths = [${widths.map(num).join(', ')}] (interpolation = "${geometry.widths ? 'vertex' : 'constant'}")`,
+    ...appearance,
+    ...(path ? [`    rel material:binding = <${path}>`] : []),
+    '}',
+  );
+  shared.push(...materialLines);
+}
+
+/**
+ * The `widths` of a point or line prim under `world`: a plugin line's or cloud's own width when it is in world units
+ * (USD widths are in the prim's space, so divided by the matrix's mean scale), else `fallback` (pixel widths have no
+ * USD form).
+ */
+export function primWidth(material: Mat | undefined, fallback: number, world: ArrayLike<number>): number {
+  if (material?.width?.units !== 'world') return fallback;
+  const m = world,
+    det =
+      m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]),
+    scale = Math.cbrt(Math.abs(det)),
+    width = material.width.value / (scale > 0 ? scale : 1);
+  return Number.isFinite(width) && width > 0 ? width : fallback;
+}
+
+/** `geometry`'s vertices taken in `order` (a vertex may repeat), as a point or line list's prim lists them. */
+export function listedVertices(geometry: Geo, order: ArrayLike<number>): Geo {
+  const pick = (values: Float32Array | undefined, size: number): Float32Array | undefined => {
+    if (!values) return undefined;
+    const out = new Float32Array(order.length * size);
+    for (let i = 0; i < order.length; i++) out.set(values.subarray(order[i] * size, order[i] * size + size), i * size);
+    return out;
+  };
+  return {
+    ...geometry,
+    positions: pick(geometry.positions, 3)!,
+    normals: pick(geometry.normals, 3)!,
+    uvs: pick(geometry.uvs, 2),
+    uvs1: pick(geometry.uvs1, 2),
+    colors: pick(geometry.colors, geometry.colorSize),
+    widths: pick(geometry.widths, 1),
+    indices: Uint32Array.from({ length: order.length }, (_, i) => i),
+    count: order.length,
+    joints: undefined,
+    weights: undefined,
+    morphs: undefined,
+    base: undefined,
+  };
 }

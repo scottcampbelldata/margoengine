@@ -1,17 +1,15 @@
-// Real-GPU check of @margoengine/tiles (from the repository root after building packages; takes a shared GPU slot):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/tiles/tests/tiles-browser.mjs
-// tiles-browser.ts streams a generated city-scale tileset (1365 b3dm tiles over 8 km, in ECEF) through gltf-pro and
+// Real-GPU check of @margoengine/tiles (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/tiles/tests/tiles-browser.mjs
+// tiles-browser.ts streams a generated city-scale tileset (1365 b3dm tiles over 8 km, in ECEF) through gltf/pbr and
 // the engine; this script checks selection, drawing, placement precision, eviction and disposal. Every case has a
 // time limit. Results go to test-results/tiles-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const CASE_TIMEOUT = 120_000;
-const release = await acquire({ owner: 'tiles-browser' });
 const context = await openBrowser({ startPath: '/packages/tiles/tests/tiles.html', port: 5253 });
 const { page, hardware } = context,
   pageErrors = [],
@@ -210,5 +208,4 @@ try {
   await writeFile('test-results/tiles-browser.json', JSON.stringify({ hardware, results, checks }, null, 2));
 } finally {
   await context.close();
-  release();
 }

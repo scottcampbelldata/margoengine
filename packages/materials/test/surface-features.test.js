@@ -276,3 +276,46 @@ test('clone and copy carry the surface options and share their maps', () => {
   assert.equal(source.parallaxScale, 0.3, 'independent values');
   assert.throws(() => source.setUVTransform({}, 'heightMap'), TypeError);
 });
+
+// KB-TRIPLANAR-SIDES1: the Cabin Hearth's stone and brick (procedural maps in a Texture of default options) drew
+// streaks on their sides and tops under triplanar: the projection reads the map at the world position times the
+// scale, far past [0, 1], and the default clamp smeared the edge texels across the face. Triplanar now samples each
+// projected map with repeat on every axis whose wrap is unset; a wrap the texture sets, a map on UV1 and the
+// matcap keep their sampler.
+test('triplanar tiles a map whose wrap is unset instead of clamping its edges (KB-TRIPLANAR-SIDES1)', async () => {
+  const s = await scene(),
+    map = solid(200),
+    mirror = new Texture({ data: new Uint8Array(16).fill(128), width: 2, height: 2 }, { mipmaps: false, wrapS: 'mirror' }),
+    material = new PbrMaterial({ map, normalMap: mirror, aoMap: map, triplanar: true }),
+    mesh = createMesh(s.engine, quad, material);
+  const address = () => {
+    const made = new Map(s.history.filter((e) => e[0] === 'sampler').map((e) => [e[1], e[2]])),
+      group = s.history.filter((e) => e[0] === 'group' && e[2].entries.some((x) => x.binding === 33)).at(-1)[2];
+    return Object.fromEntries(
+      [33, 37, 39].map((b) => {
+        const d = made.get(group.entries.find((x) => x.binding === b).resource);
+        return [b, [d.addressModeU, d.addressModeV]];
+      }),
+    );
+  };
+  s.frame();
+  assert.deepEqual(address(), {
+    33: ['repeat', 'repeat'],
+    37: ['mirror-repeat', 'repeat'],
+    39: ['repeat', 'repeat'],
+  });
+  // UV1 keeps its UVs under triplanar, and so its clamp.
+  material.setUVTransform({ texCoord: 1 }, 'aoMap');
+  s.frame();
+  assert.deepEqual(address()[39], ['clamp-to-edge', 'clamp-to-edge']);
+  // Off, every map samples as its texture says.
+  material.triplanar = false;
+  s.frame();
+  assert.deepEqual(address(), {
+    33: ['clamp-to-edge', 'clamp-to-edge'],
+    37: ['mirror-repeat', 'clamp-to-edge'],
+    39: ['clamp-to-edge', 'clamp-to-edge'],
+  });
+  mesh.destroy();
+  s.engine.dispose();
+});

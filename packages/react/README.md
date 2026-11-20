@@ -5,11 +5,11 @@ frame callbacks. There is no custom reconciler: `<Canvas>` creates one engine, a
 components that edit it.
 
 Import it as `margoengine/react` (from the `margoengine` package, the bindings in one import; `Model`, `Fbx`, `Animation`,
-the `materials` components and physics come from `margoengine/react/gltf-pro`, `/fbx`, `/animation`, `/materials` and
+the `materials` components and physics come from `margoengine/react/gltf`, `/fbx`, `/animation`, `/materials` and
 `/physics`, so a page without them builds without the Draco and Basis Wasm) or from this package
 alone: `@margoengine/react` holds the bindings that need no optional package (`Canvas`, `Mesh`, geometry, materials,
 hooks, views, `Sun`, `Center`), and a binding that needs `@margoengine/<name>` comes from `@margoengine/react/<name>`
-(`OrbitControls` from `/controls` with `@margoengine/controls` installed, `Gltf` from `/gltf-pro`, `Shadows` from
+(`OrbitControls` from `/controls` with `@margoengine/controls` installed, `Gltf` from `/gltf/pbr`, `Shadows` from
 `/shadows`; the full list is in [SCENE.md](SCENE.md)). Optional parts load only when a component needs them, so an
 unused feature costs nothing.
 
@@ -189,8 +189,336 @@ export function Both() {
 ```
 
 Use `Box`, `Sphere` and `Plane` for floors, blocks and prototypes with a plain colour or one texture. Use `Mesh` with
-children when you need a material component other than the standard one (as above) or a geometry other than a box,
-sphere or plane.
+children when you need a material component other than the standard one (as above).
+
+### Every primitive
+
+`@margoengine/react/geometry` has a one-element component and a geometry child for every builder in
+`@margoengine/geometry`, under the names developers already search for: `Box`, `Sphere`, `Plane`,
+`Cylinder`, `Cone`, `Capsule`, `Circle`, `Ring`, `Torus`, `TorusKnot`, `Tetrahedron`, `Octahedron`, `Icosahedron`,
+`Dodecahedron`, `Polyhedron`, `Lathe`, `Tube`, `Shape`, `Extrude` and `RoundedBox`, and `CylinderGeometry`,
+`TorusKnotGeometry`, `RoundedBoxGeometry` and the rest for a `<Mesh>` with its own material. `args` are the builder's
+parameters in order, each with the builder's default (`Polyhedron`, `Tube`, `Shape` and `Extrude` need their first).
+Numbers, arrays and plain objects in `args` count by value, so inline literals do not rebuild the geometry on every
+render; a `Shape` or curve object counts by identity, so make it once (`useMemo`) and pass a new one to rebuild.
+
+```tsx
+import { useMemo } from 'react';
+import { Mesh } from '@margoengine/react';
+import { Cylinder, Extrude, Lathe, RoundedBox, TorusKnot, TorusKnotGeometry } from '@margoengine/react/geometry';
+import { MeshTransmissionMaterial } from '@margoengine/react/materials';
+import { Shape } from '@margoengine/geometry';
+
+export function Primitives() {
+  const star = useMemo(() => {
+    const shape = new Shape();
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2,
+        radius = i % 2 ? 0.2 : 0.5;
+      if (i) shape.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      else shape.moveTo(radius, 0);
+    }
+    return shape;
+  }, []);
+  return (
+    <>
+      <RoundedBox args={[1, 1, 1, 4, 0.15]} color="#84d6bd" position={[-3, 0.5, 0]} />
+      <Cylinder args={[0.3, 0.5, 1, 32]} color="#e45630" position={[-1.5, 0.5, 0]} />
+      <Lathe args={[[[0, 0], [0.4, 0.1], [0.3, 0.6], [0.1, 1]], 32]} color="#f2c14e" position={[0, 0, 0]} />
+      <Extrude args={[star, { depth: 0.2 }]} color="#5b8def" position={[1.5, 0.5, 0]} />
+      <TorusKnot args={[0.35, 0.1, 128, 16]} color="#c86bfa" position={[3, 0.5, 0]} />
+      <Mesh position={[0, 0.5, -2]}>
+        <TorusKnotGeometry args={[0.35, 0.1, 128, 16, 3, 5]} />
+        <MeshTransmissionMaterial />
+      </Mesh>
+    </>
+  );
+}
+```
+
+### Extruded 3D text
+
+`Text3D` from `@margoengine/react/text` extrudes its string children with a TTF or OTF font, as drei's Text3D does with a typeface JSON: `extrudeText` of `@margoengine/text/extrude` with `size`, `depth` (or drei's `height`), `curveSegments`, `bevelEnabled`, `bevelThickness`, `bevelSize`, `bevelOffset`, `bevelSegments`, `steps`, `letterSpacing`, `lineHeight`, `align` and font variations. `font` is a URL (fetched once per URL and shared by every Text3D using it), the font's bytes, parsed `FontOutlines` or a `FontLike`. Other children, such as a material, go inside the mesh; `color`, `roughness` and `metalness` are a shortcut for a plain one. `smooth` (drei's, a distance within which positions count as one) averages the normals around each position so the edges shade round, and `smoothAngle` (default 180) keeps faces further apart than that sharp. The geometry is rebuilt only when the text, the font or an option changes; `onBuild` gets its bounding box and a failed load goes to `onError`. Wrap it in `<Center>` to centre it.
+
+```tsx
+import { Canvas, PbrMaterial } from '@margoengine/react';
+import { Text3D } from '@margoengine/react/text';
+
+export function Title() {
+  return (
+    <Canvas>
+      <Text3D font="/fonts/SourceSans3-Regular.ttf" size={0.6} height={0.15} bevelEnabled bevelSize={0.01} bevelThickness={0.01}>
+        Margo
+        <PbrMaterial color="#e0a96a" metalness={0.6} roughness={0.3} />
+      </Text3D>
+    </Canvas>
+  );
+}
+```
+
+### SVG drawings
+
+`Svg` from `@margoengine/react/geometry` draws an SVG file as flat meshes, as drei's Svg: each path's fill and stroke is one mesh in a group, built by `parseSVG` of `@margoengine/loaders/svg` (install `@margoengine/loaders`), in the drawing's own units with y down (`flipY` turns it upright). `src` is a URL or SVG markup. Fills and strokes are unlit and transparent with their SVG colour and opacity, painted in document order; `fillMaterial` and `strokeMaterial` take any `@margoengine/materials` option over those defaults, `fillMeshProps` and `strokeMeshProps` go to every part's mesh, and `skipFill` and `skipStrokes` leave a kind out. `curveSegments` (default 12) and `strokeDivisions` (default 12) set how finely curves are cut. `onLoad` gets the parsed drawing with its viewBox and warnings; a failed load goes to `onError`. Gradients draw in their average colour and dashes solid. On the small WebGL2 preview (`backend: 'webgl2'`), which draws only core meshes with core's lit material, each part is a lit, opaque core mesh in its SVG colour (`color`, `roughness` and `metalness` of `fillMaterial` and `strokeMaterial` apply; opacity does not), and document order is kept by placing each later part a step nearer +z (1/1000 of the drawing's extent, the whole stack within 5% of it), so view it from +z there. On WebGPU and on the full WebGL2 compatibility layer it draws as described above.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+import { Svg } from '@margoengine/react/geometry';
+
+const logo = '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#e45630" stroke="#222222" stroke-width="6"/></svg>';
+
+export function Logo() {
+  return (
+    <Canvas>
+      <Svg src={logo} flipY scale={[0.02, 0.02, 0.02]} position={[-1, 1, 0]} />
+    </Canvas>
+  );
+}
+```
+
+### Backdrop
+
+`Backdrop` from `@margoengine/react/geometry` is drei's Backdrop: a studio cyclorama, a floor that bends up into a
+wall with exact normals, built by `backdropGeometry` of `@margoengine/studio/backdrop` (install
+`@margoengine/studio`). The floor's front edge is at +z and the wall at -z. Shape props, all optional: `width`
+(default 8), `depth` (5), `height` (4), `radius` (the bend, 1; below depth and height) and `segments` (bend
+subdivisions, 32). It receives shadows; `color` (default `'#b8b8b8'`) sets its matte default, and a material child
+replaces that (UVs run across the width and along the sweep, so `TextureMaterial` maps fit it). Every Mesh prop applies.
+
+```tsx
+import { Canvas, PbrMaterial } from '@margoengine/react';
+import { Backdrop, Sphere } from '@margoengine/react/geometry';
+export function Studio() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Backdrop position={[0, -1, 0]} width={10} radius={1.5} segments={24}>
+        <PbrMaterial color="#353540" roughness={0.9} />
+      </Backdrop>
+      <Sphere position={[0, 0, 0]} color="#d04040" />
+    </Canvas>
+  );
+}
+```
+
+### MarchingCubes
+
+`MarchingCubes`, `MarchingCube` and `MarchingPlane` from `@margoengine/react/marching-cubes` are drei's metaballs: a surface
+of the `MarchingCube` balls and `MarchingPlane` planes inside, extracted by `marchingCubes` of
+`@margoengine/procedural` (install it) over the mesh's -1..1 cube (scale the mesh to size it) and rebuilt only on
+frames where a ball or plane changed. `MarchingCubes` takes the Mesh props plus `resolution` (grid samples per axis,
+3..128, default 28), `isolation` (the surface's field value, default 80), `color` (its matte default, `'#ffffff'`,
+which a material child replaces), `maxPolyCount` (most triangles kept, default 10000; the rest of an extraction is
+dropped), `enableUvs` (default false: no uvs; true writes the vertex x and z mapped to 0..1) and `enableColors`
+(default false: no vertex colours). These defaults are drei's. Each ball adds `strength / d^2 - subtract` where that is positive, `d` measured in
+units of the cube's width: `position` (-1..1 on each axis, default the centre), `strength` (default 0.5) and
+`subtract` (default 12), so a lone default ball has radius `2 * sqrt(0.5 / 92)`, about 0.15. `color` on a ball blends
+into the vertex colours by field weight when `enableColors` is set (before 2026-11-16 they were always written when a
+ball had a colour; add `enableColors` to keep them); a `TextureMaterial` child shows them. `MarchingPlane` adds the same field along
+one low face: `planeType` `'x'` (default), `'y'` (a floor) or `'z'`. Refs are live handles: write `position`,
+`strength`, `subtract` or `color` in place (in `useFrame`) and the surface follows. Normals are the field's exact gradient
+at each vertex. Positions use the linear edge interpolation of marching cubes, so a ball spanning few cells comes out
+larger than its exact radius (up to 7.3% for a lone default ball at resolution 28); raise `resolution` for a truer
+shape. Sources: Lorensen and Cline, "Marching Cubes" (SIGGRAPH 1987); Wyvill, McPheeters and Wyvill, "Data
+structure for soft objects" (The Visual Computer, 1986); drei's MarchingCubes docs. The falloff is drei's, not
+Wyvill's zero-slope polynomial, so a ball's field ends with a kink in its slope ([limits](../../docs/limits.md)).
+
+```tsx
+import { useRef } from 'react';
+import { Canvas, useFrame } from '@margoengine/react';
+import { MarchingCube, MarchingCubes, MarchingPlane, type MarchingCubeHandle } from '@margoengine/react/marching-cubes';
+import { TextureMaterial } from '@margoengine/react/textures';
+
+function Blob() {
+  const ball = useRef<MarchingCubeHandle>(null);
+  useFrame(() => {
+    if (ball.current) ball.current.position[0] = Math.sin((performance.now() / 1000) * 1.5) * 0.4;
+  });
+  return <MarchingCube ref={ball} strength={0.6} color="#e45630" />;
+}
+export function Lava() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <MarchingCubes scale={[2, 2, 2]} resolution={40} enableColors>
+        <Blob />
+        <MarchingCube position={[0.2, 0.1, 0]} color="#f2c14e" />
+        <MarchingPlane planeType="y" />
+        <TextureMaterial color="#ffffff" roughness={0.4} />
+      </MarchingCubes>
+    </Canvas>
+  );
+}
+```
+
+### Caustics
+
+`Caustics` from `@margoengine/react/caustics` is drei's: light focused through its transparent children onto a floor
+beneath them, by the photon-traced catcher of `@margoengine/studio/caustics` (install `@margoengine/studio`). The
+children's world triangles go into a GPU BVH; photons from the light refract in and out of them (`ior` 1.5,
+`backsideIOR` = `ior`, `backside` true traces the exit and internal reflections, `maxEvents` 8) and land in a floor
+map drawn on the floor. Floor: `floor` (its centre in world units, default the group's world position), `size` (4),
+`height` of the emission plane above it (3). Light: `lightDirection` toward a distant source (default straight up,
+`[0, 1, 0]`) or `lightPosition` for a point source. Quality: `photonSide` (128, squared photons per update),
+`resolution` of the map (128), `frames` of updates (1; `Infinity` keeps tracing), `worldRadius`. Look: `intensity` (1)
+and `color` (linear rgb, white). It re-traces when a child moves or changes, and an option change restarts the map.
+`onReady` gets the native catcher (`readMap`, `stats`, `invalidate`). Every Mesh prop applies to the group. Needs
+WebGPU or the WebGL2 compatibility layer.
+
+```tsx
+import { Canvas, Mesh } from '@margoengine/react';
+import { Caustics } from '@margoengine/react/caustics';
+import { SphereGeometry } from '@margoengine/react/geometry';
+import { MeshTransmissionMaterial } from '@margoengine/react/materials';
+
+export function Glass() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Caustics size={4} lightDirection={[0.3, 1, 0.2]} ior={1.5} intensity={1.5} frames={8}>
+        <Mesh position={[0, 1, 0]}>
+          <SphereGeometry args={[0.6, 48, 24]} />
+          <MeshTransmissionMaterial />
+        </Mesh>
+      </Caustics>
+    </Canvas>
+  );
+}
+```
+
+### AccumulativeShadows
+
+`AccumulativeShadows` and `RandomizedLight` from `@margoengine/react/accumulative-shadows` are drei's: a ground plane
+under the group that averages the shadows of every `castShadow` mesh and model in the Canvas (the binding adds them
+itself, and follows them as they mount, unmount or are rebuilt) from its `RandomizedLight` children, so the shadows
+get soft penumbrae from each light's disk plus sky occlusion. It is `AmbientShadows` of
+`@margoengine/studio/accumulate-ambient` (install `@margoengine/studio`). The group's world position and up axis place
+the plane. Props, with drei's defaults: `frames` (40; each frame takes every `amount` sample of every light, at most
+1024 samples in all, then the plane holds; `Infinity` keeps sampling as a moving average over `blend` frames, 100, up
+to `limit` frames, Infinity), `temporal` (false: every frame in the first rendered frame; true: one frame, every
+light's `amount`, per rendered frame), `scale` (10, the plane side), `opacity` (1), `color` (black; hex, `[r, g, b]`
+linear or `color(...)`), `colorBlend` (2, the scale of `color`), `toneMapped` (true: the plane colour is tone mapped
+like a lit surface; false: clamped like unlit output), `alphaTest` (0.65: caster fragments with lower alpha, a glass
+at opacity 0.3, cast nothing), `resolution` (1024). `RandomizedLight`: `position` (its direction from the group sets
+the light, as drei's directional lights), `radius` (5, the jiggle at `position`), `amount` (8), `intensity` (1, the
+weight against the other lights), `ambient` (0.5, the share of samples from the whole sky), `castShadow` (true) and
+drei's shadow camera: `size` (10, half side of the window around the group; outside it the light casts nothing),
+`mapSize` (512 texels across that window, filtered 2 x 2 as percentage-closer filtering), `near` (0.5) and `far` (500) from the light, and `bias` (0,
+in normalized depth). The ref has drei's `getMesh()` (the group), `reset()` and `update(frames)` (restart for that
+many frames), and `shadows` (the native catcher, also handed to `onReady`). Needs WebGPU or the WebGL2 compatibility layer.
+
+```tsx
+import { Canvas, Mesh, PbrMaterial } from '@margoengine/react';
+import { SphereGeometry } from '@margoengine/react/geometry';
+import { AccumulativeShadows, RandomizedLight } from '@margoengine/react/accumulative-shadows';
+
+export function Product() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <AccumulativeShadows temporal frames={100} scale={10} color="#316d39" colorBlend={0.5} opacity={0.8} alphaTest={0.9}>
+        <RandomizedLight amount={8} radius={4} ambient={0.5} position={[5, 5, -10]} size={8} mapSize={1024} />
+      </AccumulativeShadows>
+      <Mesh castShadow position={[0, 0.5, 0]}>
+        <SphereGeometry />
+        <PbrMaterial color="#ffffff" />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
+### Clouds
+
+`Clouds` and `Cloud` from `@margoengine/react/clouds` are drei's: soft billboard clouds, every `<Cloud>` inside one
+`<Clouds>` drawn back to front in a single instanced draw by `@margoengine/vfx/clouds` (install `@margoengine/vfx`).
+`<Clouds>` takes `limit` (200 puffs), `range` (draw only the first ones), `texture` (a URL, fetched and decoded before
+anything is drawn, pixels or an image; default a generated puff), `frustumCulled` (true), `material` (`'scatter'`,
+the default, lights each puff by the light reaching it through the cloud; `'unlit'` draws the colour as it is),
+`lightDirection`, `lightColor`, `ambient`, `density`, `fog` and `softness` (world units over which puffs fade into the
+surfaces behind them; it adds the scene depth of `@margoengine/post/depth`). `<Cloud>` takes `seed`, `segments` (20),
+`bounds` ([5, 1, 1]), `concentrate` (`'inside'`), `volume` (6), `smallestVolume` (0.25), `distribute`, `growth` (4),
+`speed` (0), `fade` (10), `opacity` (1) and `color` (white). A Cloud with no seed keeps one shape for its place in the
+tree; a Cloud outside any Clouds makes its own. Every Mesh prop (position, rotation, scale) applies to the group;
+`onReady` on Clouds gets the native `Clouds`. Needs WebGPU or the WebGL2 compatibility layer.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+import { Cloud, Clouds } from '@margoengine/react/clouds';
+
+export function Sky() {
+  return (
+    <Canvas style={{ height: 400 }} camera={{ position: [0, 2, 18], target: [0, 4, 0] }}>
+      <Clouds limit={400} lightDirection={[0.4, 1, 0.3]}>
+        <Cloud seed={1} segments={40} bounds={[10, 2, 2]} volume={8} position={[0, 5, -4]} speed={0.2} />
+        <Cloud seed={2} segments={20} bounds={[6, 1, 1]} volume={5} color="#ffd9c4" position={[-6, 3, 0]} />
+      </Clouds>
+    </Canvas>
+  );
+}
+```
+
+### Outlines
+
+`Outlines` from `@margoengine/react/outlines` is drei's: an inverted-hull outline around the enclosing mesh, drawn by
+`MeshOutline` of `@margoengine/toon/outline` (install `@margoengine/toon`). Props, with drei's defaults: `color`
+(`#rgb`/`#rrggbb` or linear rgb numbers, black), `thickness` (0.05 world units; drawing-buffer pixels with
+`screenspace`), `screenspace` (false: the line keeps its pixel width at every distance and zoom), `opacity` (1, used
+when `transparent`), `transparent` (false), `toneMapped` (true: the colour is tone mapped like a lit surface),
+`polygonOffset` and `polygonOffsetFactor` (false, 0: push the hull's depth back by its slope), `renderOrder` (0, draw
+order among outlines) and `angle` (the crease angle, pi: copies of a vertex whose normals differ by less are averaged,
+so pi closes the hull over hard edges and 0 lets it part at every crease). It follows the mesh's transform, geometry
+and visibility, and a mirrored scale. Inside `<Instances>` (drei's instancedMesh parent) every drawn instance gets its
+own outline, following instances as they mount, unmount, hide or pass `limit`. `onReady` gets each native outline. Needs WebGPU or the WebGL2 compatibility
+layer. Instanced and skinned parents are not outlined yet (docs/known-bugs.md); a loaded model takes
+`ModelOutlines` of `@margoengine/toon/models`.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+import { Box } from '@margoengine/react/geometry';
+import { Outlines } from '@margoengine/react/outlines';
+
+export function Outlined() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Box args={[1, 1, 1]}>
+        <Outlines thickness={4} screenspace color="#1d4ed8" />
+      </Box>
+    </Canvas>
+  );
+}
+```
+
+### Mask
+
+`Mask` and `useMask` from `@margoengine/react/materials` are drei's: the `Mask`'s geometry child writes its `id` (an
+integer 1..255) into the stencil buffer where it covers the screen, invisible by default (`colorWrite` and
+`depthWrite` default to false), and draws before the other material meshes. `useMask(id)` returns the stencil options
+that limit a `TextureMaterial` to the inside of that mask; `useMask(id, true)` limits it to the outside. The stencil
+buffer of `@margoengine/materials` (install it) is attached while a `Mask` is mounted. WebGPU and the WebGL2
+compatibility layer.
+
+```tsx
+import { Canvas, Mesh } from '@margoengine/react';
+import { CircleGeometry, PlaneGeometry } from '@margoengine/react/geometry';
+import { Mask, useMask } from '@margoengine/react/materials';
+import { TextureMaterial } from '@margoengine/react/textures';
+
+function Picture() {
+  const stencil = useMask(1);
+  return (
+    <Mesh position={[0, 0, -0.5]}>
+      <PlaneGeometry args={[4, 4]} />
+      <TextureMaterial color="#e45630" {...stencil} />
+    </Mesh>
+  );
+}
+export function Porthole() {
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Mask id={1}>
+        <CircleGeometry args={[1, 64]} />
+      </Mask>
+      <Picture />
+    </Canvas>
+  );
+}
+```
 
 ### Textured Box, Sphere and Plane
 
@@ -367,7 +695,7 @@ A model, its lighting and the orbit controls, directly under the canvas:
 'use client';
 import { Suspense } from 'react';
 import { MargoCanvas, Environment, OrbitControls, Shadows } from 'margoengine/react';
-import { Model } from 'margoengine/react/gltf-pro';
+import { Model } from 'margoengine/react/gltf';
 
 export default function App() {
   return <MargoCanvas backend="webgpu" camera={{ position: [0, 2, 5] }} style={{ height: 400 }}>
@@ -381,17 +709,182 @@ export default function App() {
 }
 ```
 
-`Model` loads glTF/GLB through `@margoengine/gltf-pro`. Position, Euler rotation (radians), scale and named material overrides update the existing model; removing an override restores the loaded material. Supported shallow overrides are `baseColor` (linear RGB or RGBA), `roughness`, `metalness`, `emissive`, `normalScale`, `occlusionStrength`, `alphaCutoff` and `doubleSided`. `onLoad(mesh)` receives the model's root mesh after initial props have been applied. Only changing `src` selects another asset. Unmount unregisters lighting and shadows and disposes the instance's PBR plugin, meshes, textures and buffers.
+`Model` loads glTF/GLB through `@margoengine/gltf/pbr`. Position, Euler rotation (radians), scale and named material overrides update the existing model; removing an override restores the loaded material. Supported shallow overrides are `baseColor` (linear RGB or RGBA), `roughness`, `metalness`, `emissive`, `normalScale`, `occlusionStrength`, `alphaCutoff` and `doubleSided`. `onLoad(mesh)` receives the model's root mesh after initial props have been applied. Only changing `src` selects another asset. Unmount unregisters lighting and shadows and disposes the instance's PBR plugin, meshes, textures and buffers.
 
 Wrap `Model` and file-backed `Environment` components in React `Suspense` to show a fallback while loading. Loads begin after the first commit so unmount cleanup can abort an unfinished load. The canvas caches pending promises and resolved CPU source data by URL; concurrent mounts and remounts reuse that source while owning independent model transforms, materials and disposable GPU resources. The last pending consumer unmount aborts its request. Canvas teardown releases the cache. Load failures reach the component's optional `onError` and the canvas's `onError`/accessible alert.
 
 `Model.preload(src)` (also `Gltf.preload`), `Fbx.preload(src)` and `Environment.preload(src)` warm the same cache on active canvases; each belongs to the component that loads that kind of file, so a page that preloads only models never reaches the FBX or environment loaders. Before a canvas is ready, the returned promise queues until an engine exists, since the optional glTF loader requires an engine. Render the canvas before awaiting a queued preload. A preloaded asset remains hidden until mounted.
 
-`Environment` loads HDR/EXR through `@margoengine/environment` and attaches diffuse/specular IBL to sibling `Model` components, regardless of loading order. Exposure is a nonnegative linear lighting multiplier; it also controls HDR background intensity. `background` defaults to true and only affects an HDR background. Without `src`, the component configures neutral studio directional and ambient lighting; teardown restores the previous lighting. Exposure and background changes do not reload the map. Use one `Environment` per canvas.
+`Environment` loads HDR/EXR through `@margoengine/environment` and attaches diffuse/specular IBL to sibling `Model` components, regardless of loading order. Exposure is a nonnegative linear lighting multiplier; it also controls HDR background intensity. `background` defaults to true and only affects an HDR background. Without `src` and without children, the component configures neutral studio directional and ambient lighting; teardown restores the previous lighting. Exposure and background changes do not reload the map. Use one `Environment` per canvas.
 
 `Html` dynamically imports optional `@margoengine/html` and `react-dom` peers and projects React DOM children into a shared overlay. Nested inside a `Mesh` or `Group`, its `position` is a local offset; otherwise it is a world position. It accepts `className`, `style`, and an `occlude` boolean (true by default), and removes its label and overlay resources on unmount.
 
 `<Shadows />` (`margoengine/react/shadows`, or `@margoengine/react/shadows` with `@margoengine/shadows` installed) turns the canvas shadows on; mesh and model casting and receiving are independently opt-in and draw nothing without it. PBR models, HDR IBL and shadows require WebGPU; legacy meshes and neutral studio lighting support the WebGL fallback.
+
+Add `<BakeShadows />` from the same entry for a scene that does not move, as drei's: while it is mounted every caster
+(meshes, shapes, models and batches with `castShadow`) is a static caster, drawn into the shadow map once instead of
+every frame. A caster that moves later keeps its old shadow; the map still redraws when the cascades follow the camera
+or the light turns. Unmount it to make the casters dynamic again.
+
+```tsx
+import {Canvas} from '@margoengine/react';
+import {BakeShadows, Shadows} from '@margoengine/react/shadows';
+import {Box, Plane} from '@margoengine/react/geometry';
+
+export function StillLife() {
+  return (
+    <Canvas>
+      <Shadows />
+      <BakeShadows />
+      <Box castShadow position={[0, 0.5, 0]} />
+      <Plane rotation={[-Math.PI / 2, 0, 0]} scale={[10, 10, 1]} />
+    </Canvas>
+  );
+}
+```
+
+### CubeCamera reflections
+
+`<CubeCamera>` (from `@margoengine/react/environment`, with `@margoengine/environment` installed) renders the scene
+around its position into a cube texture every frame, as drei's, and hands it to its children, a render function, for
+a material's `envMap`. What the children draw is left out of the cube, so a mirror ball reflects the room and not its
+own inside. `resolution` (default 256, a power of two from 8 to 2048), `near` (0.1), `far` (1000), `frames` (default
+`Infinity`; `frames={1}` captures once for a still scene), `mips` (default false; a box-filtered mip chain for rough
+materials), `layers` and the group props `position`, `rotation` and `scale` set it up. `PbrMaterial` and
+`MappedPbrMaterial` take `envMap` (a six-layer GPUTexture such as this one, a cube Texture, an Environment or a cube
+render target) and `envMapIntensity` (default 1); like the maps, `envMap` needs `TextureProvider` or
+`MappedPbrMaterial`. WebGPU and the WebGL2 compatibility layer.
+
+As in drei, `envMap` and `fog` change what the faces see while the main view keeps its own. `envMap` (an .hdr or .exr,
+loaded through the Canvas cache like `<Environment src>`; default none) is drawn as the faces' background in place of
+the scene's; the faces wait for it to load, so `frames={1}` never captures without it. `fog` (`<Fog>`'s options, each
+left-out option at its `<Fog>` default, or `false` for no fog; default the scene's fog) replaces the scene's `<Fog>`
+in the faces only; with no `<Fog>` in the scene the CubeCamera keeps a private fog that is off in the main view. An
+Environment-only app does not pay for CubeCamera: with the package's `sideEffects: false`, importing `Environment`
+alone bundles 2,304 B gzip against 5,507 B for the whole entry.
+
+```tsx
+import { Canvas, Mesh } from '@margoengine/react';
+import { CubeCamera, Fog } from '@margoengine/react/environment';
+import { SphereGeometry } from '@margoengine/react/geometry';
+import { MappedPbrMaterial } from '@margoengine/react/textures';
+
+export function ChromeInFog() {
+  return (
+    <Canvas backend="webgpu">
+      <Fog color="#c0d0e0" near={5} far={30} />
+      <CubeCamera envMap="/sky.hdr" fog={{ color: '#ffffff', near: 2, far: 10 }}>
+        {(texture) => (
+          <Mesh>
+            <SphereGeometry args={[1, 64, 32]} />
+            <MappedPbrMaterial metalness={1} roughness={0} envMap={texture} />
+          </Mesh>
+        )}
+      </CubeCamera>
+    </Canvas>
+  );
+}
+```
+
+```tsx
+import { Canvas, Mesh } from '@margoengine/react';
+import { CubeCamera } from '@margoengine/react/environment';
+import { Box, SphereGeometry } from '@margoengine/react/geometry';
+import { MappedPbrMaterial } from '@margoengine/react/textures';
+
+export function MirrorBall() {
+  return (
+    <Canvas backend="webgpu">
+      <Box position={[2, 0, 0]} />
+      <CubeCamera resolution={256} position={[0, 1, 0]}>
+        {(texture) => (
+          <Mesh>
+            <SphereGeometry args={[1, 64, 32]} />
+            <MappedPbrMaterial metalness={1} roughness={0} envMap={texture} />
+          </Mesh>
+        )}
+      </CubeCamera>
+    </Canvas>
+  );
+}
+```
+
+### Lightformer and Environment children
+
+As in drei, `<Environment>` takes children: they are drawn into a cube around the Environment's origin, over its `src`
+environment (or black without one), and that cube becomes the environment the scene is lit by and shows as its
+background; the children themselves are hidden in the main view. `resolution` (default 256, a power of two from 8 to
+2048), `frames` (default 1, captured once; `Infinity` for every frame, a positive integer for that many), `near` (1)
+and `far` (1000) set the capture. A capture waits until every `<Lightformer>` inside has attached, so `frames={1}`
+never misses one; later captures refresh the environment in place. The capture code loads on demand, the first time
+an `<Environment>` has children, so an app without them does not download it.
+
+`<Lightformer>` (also from `@margoengine/react/environment`) is a studio light card: `form` (`'rect'` 1 x 1, the
+default, `'circle'` 1 across, `'ring'` 1 across with its inner half open, or `'box'` 1 x 1 x 1), `intensity` (default
+1; it emits `color x intensity`, unlit), `color` (default white), `scale` (a number, `[width, height]` or `[x, y, z]`;
+default 1), `position`, `rotation` and `target` (a point in the same space as `position` that the card's front turns
+to face, up kept toward +Y; it replaces `rotation`). Outside an `<Environment>` it is drawn in the main view as a
+bright unlit shape. WebGPU and the WebGL2 compatibility layer.
+
+```tsx
+import { Canvas, Mesh } from '@margoengine/react';
+import { Environment, Lightformer } from '@margoengine/react/environment';
+import { SphereGeometry } from '@margoengine/react/geometry';
+import { MappedPbrMaterial } from '@margoengine/react/textures';
+
+export function StudioBall() {
+  return (
+    <Canvas backend="webgpu">
+      <Environment resolution={256}>
+        <Lightformer form="rect" intensity={4} position={[0, 5, -2]} scale={[10, 2]} target={[0, 0, 0]} />
+        <Lightformer form="ring" intensity={2} color="#ffd0a0" position={[-5, 1, 2]} scale={3} target={[0, 0, 0]} />
+        <Lightformer form="circle" intensity={1} position={[5, 1, 2]} scale={2} target={[0, 0, 0]} />
+      </Environment>
+      <Mesh>
+        <SphereGeometry />
+        <MappedPbrMaterial color="#ffffff" roughness={0.15} metalness={1} />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
+### MeshReflectorMaterial
+
+`<MeshReflectorMaterial>` (from `@margoengine/react/materials`, with `@margoengine/environment` installed) is drei's
+reflective floor: the mesh keeps its own lit `PbrMaterial` (it takes the same props: `color`, `roughness`,
+`metalness`, the maps, `envMap`) and a planar reflection is drawn over it. The weight is the Fresnel reflectance of the
+material (0.04 for a dielectric, its colour for a metal), raised toward 1 by `mirror` (0 to 1, default 0), times
+`mixStrength` (default 1), clamped to 1. `blur` (one number or [x, y], in capture pixels; default 0) box-blurs the
+reflection and `mixBlur` (default 1) times `roughness` sets how much of the blur shows. `depthScale` (default 0, off)
+fades and blurs the reflection with a reflected point's distance from the plane, from `minDepthThreshold` (0.9) to
+`maxDepthThreshold` (1), with `depthToBlurRatioBias` (0.25) of blur kept at the contact; depth is distance times
+`depthScale` in world units, not drei's depth-buffer value. `mixContrast` (1), `reflectorOffset` (0, moves the mirror
+plane along the normal), `distortion` (0.03, screen fraction per unit) with `distortionMap` (a normal map:
+`(device) => GPUTexture`, made again after a device restore, a GPUTexture, dropped and reported once after a
+restore, or RGBA8 pixels), `resolution` (capture pixels along the canvas's longer side, 8 to 4096, default 256) and `layers`
+complete it. The geometry must be flat in the mesh's local XY plane, as `<PlaneGeometry>` is; turn the mesh to lay it
+down. WebGPU and the WebGL2 compatibility layer.
+
+```tsx
+import { BoxGeometry, Canvas, Mesh } from '@margoengine/react';
+import { PlaneGeometry } from '@margoengine/react/geometry';
+import { MeshReflectorMaterial } from '@margoengine/react/materials';
+
+export function ShinyFloor() {
+  return (
+    <Canvas backend="webgpu" camera={{ position: [0, 2, 6] }}>
+      <Mesh position={[0, 0.5, 0]}>
+        <BoxGeometry />
+      </Mesh>
+      <Mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <PlaneGeometry args={[20, 20]} />
+        <MeshReflectorMaterial color="#202020" roughness={1} resolution={1024} blur={[300, 100]} mixStrength={2} depthScale={1} />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
 
 ## Batching, views, lights and voxels
 
@@ -439,12 +932,12 @@ export function SplitScreen() {
 }
 ```
 
-Lights: `<Sun direction color intensity>` sets the directional sun light every mesh, model and shadow uses (any backend; inside a `<Scene>`, that scene's). `<AmbientLight color intensity>` and `<HemisphereLight sky ground intensity>` light core meshes and models from every direction, and `<Fog color near far density heightFalloff height>` fogs them in their shaders, transparent models included; all three come from `@margoengine/environment`, take live props and need WebGPU. `<Environment>` also takes `rotation` (radians about +Y, lighting and background together) and `blur` (background, 0 to 1). `<Html>` takes the label options `anchor`, `distanceScale`, `sort`, `frustumCulling`, `followVisibility`, `visible` and `pointerEvents`, all live.
+Lights: `<Sun direction color intensity>` sets the directional sun light every mesh, model and shadow uses (any backend; inside a `<Scene>`, that scene's). `<AmbientLight color intensity>` and `<HemisphereLight sky ground intensity>` light core meshes and models from every direction, and `<Fog color near far density heightFalloff height>` fogs them in their shaders, transparent models included; all three come from `@margoengine/environment`, take live props and need WebGPU. Inside a `<Scene>` they light and fog that scene's meshes only. `<Environment>` also takes `rotation` (radians about +Y, lighting and background together) and `blur` (background, 0 to 1). `<Html>` takes the label options `anchor`, `distanceScale`, `sort`, `frustumCulling`, `followVisibility`, `visible` and `pointerEvents`, all live.
 
 ```tsx
 import { Canvas, Sun } from '@margoengine/react';
 import { HemisphereLight, Fog } from '@margoengine/react/environment';
-import { Model } from '@margoengine/react/gltf-pro';
+import { Model } from '@margoengine/react/gltf';
 
 export function Valley() {
   return (
@@ -562,12 +1055,35 @@ export function Everything({ hp }: { hp: number }) {
 }
 ```
 
+`<SoftShadows />` from the same entry is drei's SoftShadows: percentage-closer soft shadows (Fernando 2005) whose
+penumbrae are sharp where a caster touches the ground and widen with the distance between them. It turns the shadows on
+as `<Shadows>` does, with the `'soft'` filter, and maps drei's props: `size` (default 25) is the light size, Shadows'
+`lightSize` being `size / 1250` so 25 is Shadows' own 0.02; `samples` (default 10, 1 to 128) is both the comparison
+taps and the blocker-search reads per lit pixel; `focus` (default 0) is the caster-to-receiver distance, world units,
+at which the shadow is sharpest. Every prop is live, and unmounting restores the options it set.
+
+```tsx
+import {Canvas} from '@margoengine/react';
+import {SoftShadows} from '@margoengine/react/shadows';
+import {Box, Plane} from '@margoengine/react/geometry';
+
+export function SoftScene() {
+  return (
+    <Canvas>
+      <SoftShadows size={40} samples={16} focus={0.2} />
+      <Box castShadow position={[0, 1, 0]} />
+      <Plane rotation={[-Math.PI / 2, 0, 0]} scale={[10, 10, 1]} />
+    </Canvas>
+  );
+}
+```
+
 A component outside its parent (`Sprite` outside `SpriteLayer`, a plot outside `Figure`, a positional `Sound` outside a
 `Mesh`) throws a `MargoError` (code `state`) that names the parent to add.
 
 ## Controls
 
-`OrbitControls`, `MapControls`, `CadControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
+`OrbitControls`, `MapControls`, `CadControls`, `CameraControls` and `ArcballControls` bind the active camera and canvas, update from the Canvas frame loop (so `frameloop="demand"` and `invalidate()` move them too), and remove their listeners on unmount. Every public field of the controls is a prop (`enableDamping`, `dampingFactor`, `rotateSpeed`, `zoomToCursor`, `minDistance`, `maxPolarAngle`, ...); a prop removed again restores the controls' default. `target` sets the orbit point when it changes. `onChange`, `onStart` and `onEnd` receive the controls' events, and the ref is the live controls object. `CadControls` navigates like a CAD tool: `profile` is `'margo'` (default), `'solidworks'`, `'autocad'`, `'inventor'`, `'fusion'`, `'blender'`, `'maya'`, `'onshape'` or `'rhino'`, and keyboard shortcuts are on (`keyEvents={false}` turns them off). `OrbitControls` takes the same `profile` and `keyEvents` props.
 
 ```tsx
 import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
@@ -588,7 +1104,100 @@ export function Part({ onViewChanged }: { onViewChanged: () => void }) {
 }
 ```
 
-`<Shadows>` turns on the Canvas's cascaded shadows while it is mounted and sets their live options (`resolution`, `distance`, `lambda`, `lightSize`, `bias`, `normalBias`, `casterMargin`, `filter`, `bounds` or `frustum`). `<Mesh castShadow>` (and `receiveShadow={false}`) adds a mesh to them, like `Box`, `Sphere`, `Plane` and `Model`.
+`FlyControls`, `FirstPersonControls` and `TrackballControls` load only their own entry of `@margoengine/controls` (`/fly`, `/first-person`, `/trackball`), update from the frame loop and take every live field as a prop in the same way (`movementSpeed`, `rollSpeed`, `enableRoll`, `dragToLook`; `lookSpeed`, `constrainVertical`, `verticalMin`; `rotateSpeed`, `staticMoving`, `dynamicDampingFactor`, `minDistance`, ...). Keys are read from the canvas's document unless you pass `keyTarget` (read once; changing it recreates the controls). The ref is the native controls object.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { FlyControls } from '@margoengine/react/controls';
+
+export function Flight() {
+  return (
+    <Canvas>
+      <FlyControls movementSpeed={10} rollSpeed={0.5} dragToLook />
+      <Mesh>
+        <BoxGeometry />
+        <PbrMaterial color="#e0b16a" />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
+`DragControls` lets the pointer, mouse or touch drag its children as one group (`@margoengine/controls/drag`): on the plane facing the camera by default, on another `plane`, along `axisLock` (`'x'`, `'y'`, `'z'` or a direction), or turning them with `mode="rotate"`. `dragLimits` holds the group's position on each axis between a minimum and a maximum in its parent's space (`undefined` leaves an axis free). `onDragStart` gets the starting position, `onDrag` the position after the limits, and `onDragEnd` and `onHover` report the rest; the ref is the native `DragControls`. A press on the group stops canvas listeners added after it; turn camera controls added before it off in `onDragStart`.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { DragControls } from '@margoengine/react/controls';
+
+export function Slider() {
+  return (
+    <Canvas>
+      <DragControls axisLock="x" dragLimits={[[-3, 3], undefined, undefined]} onDrag={([x]) => console.log(x)}>
+        <Mesh>
+          <BoxGeometry />
+          <PbrMaterial color="#6aa7e0" />
+        </Mesh>
+      </DragControls>
+    </Canvas>
+  );
+}
+```
+
+`PivotControls` moves, turns and scales its children as one group from one gizmo, as drei's does: move arrows, plane sliders, a free-move centre, rotation rings and scale handles together (the `all` mode of `@margoengine/controls/transform`, in the group's own axes unless `space="world"`). `matrix` places the group (column-major, applied when it changes); with `autoTransform={false}` the group stays at `matrix` and `onDrag(local, deltaLocal, world, deltaWorld)` says where it would go. `scale` sizes the gizmo, which keeps a constant size on screen. `activeAxes`, `disableAxes`, `disableSliders`, `disableRotations`, `disableScaling` and `disableCenter` leave handles out; `translationLimits`, `rotationLimits` (Euler radians) and `scaleLimits` hold the group per axis; `depthTest` hides the gizmo behind scene geometry; `onDragStart` gets the `component` (`Arrow`, `Slider`, `Rotator`, `Scale` or `Center`), `axis`, `origin` and `directions`. `anchor` puts the gizmo on the children's bounding box in the group's own space (each axis -1, 0 or 1, or between; it follows the box as children load or change), and `offset` moves it from there; moves, turns and scales then go about that point. `scale` is the gizmo's length in world units, as in drei; `fixed` keeps it a constant size on screen instead, `scale` then multiplying that size. `axisColors`, `hoveredColor` (`'#rgb'`, `'#rrggbb'`, `'#rrggbbaa'` or `[r, g, b(, a)]` in 0..1; default red, green, blue and yellow) and `lineWidth` (default 2.5 CSS pixels) style it. `annotations` shows a label at the gizmo during a drag with the distance moved along an arrow (or from the start for a slider or the centre), the degrees turned or the scale factor, styled by `annotationsClass`; it loads `<Html>` and `@margoengine/html` only when on. The ref is the native `TransformControls`. `TransformControls` itself also takes `mode="all"`, and its `pivot`, `flipAxes`, `showDelta`, `occlude`, `occluder`, `hide`, `offset`, `fixed`, `axisColors`, `hoveredColor` and `lineWidth` props follow every rerender.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import { PivotControls } from '@margoengine/react/controls';
+
+export function Editor() {
+  return (
+    <Canvas>
+      <PivotControls
+        disableScaling
+        anchor={[0, -1, 0]}
+        annotations
+        lineWidth={4}
+        translationLimits={[[-2, 2], undefined, undefined]}
+        onDragEnd={() => console.log('placed')}
+      >
+        <Mesh>
+          <BoxGeometry />
+          <PbrMaterial color="#e0a96a" />
+        </Mesh>
+      </PivotControls>
+    </Canvas>
+  );
+}
+```
+
+`CameraControls` is `OrbitControls` with damping on by default and a ref that moves the camera from code, smoothly over `duration` seconds (default 0.6) or at once with `false` as the last argument: `setLookAt`, `setPosition`, `setTarget`, `rotate` and `rotateTo` (azimuth and polar in radians, within the angle limits), `dolly` and `dollyTo` (within `minDistance` and `maxDistance`), `truck` (slide along the screen), `fitToBox` and `fitToSphere` (a box, a sphere or a mesh, with its children and loaded models), `saveState`, `reset` and `cancel`. Each move starts from the view at the call and returns a promise: true when it arrives, false when a drag, a key, `cancel()` or a newer move interrupts it. `ref.current.controls` is the native controls object.
+
+```tsx
+import { useRef } from 'react';
+import { Canvas, Mesh, BoxGeometry, PbrMaterial, type MeshRef } from '@margoengine/react';
+import { CameraControls, type CameraControlsHandle } from '@margoengine/react/controls';
+
+export function Viewer() {
+  const camera = useRef<CameraControlsHandle>(null),
+    part = useRef<MeshRef>(null);
+  return (
+    <>
+      <button onClick={() => part.current && camera.current?.fitToBox(part.current)}>Frame part</button>
+      <button onClick={() => camera.current?.rotate(Math.PI / 4, 0)}>Turn 45 degrees</button>
+      <button onClick={() => camera.current?.reset()}>Reset</button>
+      <Canvas>
+        <CameraControls ref={camera} maxDistance={50} />
+        <Mesh ref={part}>
+          <BoxGeometry />
+          <PbrMaterial color="#84d6bd" />
+        </Mesh>
+      </Canvas>
+    </>
+  );
+}
+```
+
+`<Shadows>` turns on the Canvas's cascaded shadows while it is mounted and sets their live options (`resolution`, `distance`, `lambda`, `lightSize`, `samples`, `blockerSamples`, `focus`, `bias`, `normalBias`, `casterMargin`, `filter`, `bounds` or `frustum`); unmounting restores the options it set. `<Mesh castShadow>` (and `receiveShadow={false}`) adds a mesh to them, like `Box`, `Sphere`, `Plane` and `Model`.
 
 Hooks: `useEngine()` returns the Canvas engine and `useCamera()` its camera. `useLoader(loader, url)` loads any file and suspends until it is ready: the loader is `(url, { engine, signal, fetch }) => Promise<T>`, each Canvas shares one load per loader and URL, and a failed load throws to the nearest error boundary (call `clearLoader(loader, url)` before retrying). `useProgress()` reports `{ active, loaded, total, progress, item, errors }` across `Model`, `Fbx`, `Environment` and `useLoader` loads for a loading bar; it needs the optional `@margoengine/cache`.
 
@@ -879,6 +1488,153 @@ export function App() {
   their engine replaces the frame of a tail call: give the mesh a `name`, or assign the element first
   (`const mesh = <Mesh ... />; return mesh;`).
 
+- `Stats` is the readout alone, the drop-in for a stats panel: `<Stats />` (from `@margoengine/react/devtools`) shows
+  frame time and draw calls in every build because you placed it, and takes the `@margoengine/stats` options
+  (`parent`, default document.body; `samples`, default 120; `profiling`) plus `enabled` (default true) and `onError`.
+
+### Cursor, viewport, cover sizing and camera shake
+
+```tsx
+import {useRef, useState} from 'react';
+import {Canvas} from '@margoengine/react';
+import {CameraShake, useAspect, useCursor, useViewport, type CameraShakeRef} from '@margoengine/react/helpers';
+import {Box, Plane} from '@margoengine/react/geometry';
+
+function Backdrop() {
+  // A 16:9 plane that covers the view at the camera target, like CSS background-size: cover.
+  return <Plane scale={useAspect(16, 9)} position={[0, 0, -0.01]} />;
+}
+
+function Button({shake}: {shake: React.RefObject<CameraShakeRef | null>}) {
+  const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
+  const {width} = useViewport();
+  return (
+    <Box
+      position={[width / 4, 0, 0]}
+      onPointerOver={() => setHovered(true)}
+      onPointerOut={() => setHovered(false)}
+      onClick={() => shake.current?.setIntensity(1)}
+    />
+  );
+}
+
+export function App() {
+  const shake = useRef<CameraShakeRef>(null);
+  return (
+    <Canvas>
+      <Backdrop />
+      <Button shake={shake} />
+      <CameraShake ref={shake} intensity={0} decay maxYaw={0.05} maxPitch={0.05} maxRoll={0.05} yawFrequency={4} pitchFrequency={4} rollFrequency={4} />
+    </Canvas>
+  );
+}
+```
+
+- `useCursor(hovered, over = 'pointer', out = 'auto')` sets the canvas cursor, not the page's, so it never leaks past
+  the canvas; it puts `out` back when `hovered` turns false or the component unmounts.
+- `useViewport()` gives the view's `width` and `height` in world units at the camera target, `aspect`, `distance`,
+  `factor` (CSS pixels per unit) and `size`; the component renders again when the canvas changes size, not when the
+  camera moves (read `useEngine().camera` in `useFrame` for that). `viewportAt(camera, size, distance?)` is the same
+  sum for any depth.
+- `useAspect(width, height, factor = 1)` returns a `scale` that covers the view at the target with that aspect.
+- `CameraShake` turns the view about the camera position with smooth noise, after controls and your frame callbacks
+  have placed it, and puts the camera back on unmount. Defaults: `maxYaw`, `maxPitch` and `maxRoll` 0.1 rad, each
+  frequency 0.1, `intensity` 1, `decay` false, `decayRate` 0.65 per second. Angles scale with intensity squared, so a
+  decaying shake eases out. Each frame it restores the target and up it set unless something else changed them, so it
+  works with every controls component. The ref has `getIntensity()` and `setIntensity(0..1)`.
+
+### Visible in the view: useIntersect
+
+```tsx
+import {useRef} from 'react';
+import {Canvas, useFrame} from '@margoengine/react';
+import {useIntersect} from '@margoengine/react/helpers';
+import {Box} from '@margoengine/react/geometry';
+
+function Spinner({x}: {x: number}) {
+  const inView = useRef(false);
+  const angle = useRef(0);
+  const ref = useIntersect((visible) => {
+    inView.current = visible;
+  });
+  // Spins only while the camera sees it.
+  useFrame((_, delta) => {
+    if (!inView.current || !ref.current) return;
+    angle.current += delta;
+    ref.current.setRotation([0, angle.current, 0]);
+  });
+  return <Box ref={ref} position={[x, 0, 0]} />;
+}
+
+export function App() {
+  return (
+    <Canvas>
+      {[-40, -2, 2, 40].map((x) => (
+        <Spinner key={x} x={x} />
+      ))}
+    </Canvas>
+  );
+}
+```
+
+- `useIntersect(onChange)` returns a ref for a mesh or group and calls `onChange(true)` when it comes into the camera's
+  view and `onChange(false)` when it leaves, by the engine's frustum culling of the last drawn frame. It starts as not
+  visible. A group counts while any mesh with geometry, or loaded model, under it is in view; hidden meshes do not
+  count. Like drei's, it does not test occlusion.
+
+### Warm-up: Preload
+
+```tsx
+import {Canvas} from '@margoengine/react';
+import {Preload} from '@margoengine/react/helpers';
+import {Box} from '@margoengine/react/geometry';
+
+export function App() {
+  return (
+    <Canvas>
+      <Box position={[0, 0, -50]} />
+      <Preload all />
+    </Canvas>
+  );
+}
+```
+
+- `Preload` draws the whole scene once with frustum culling off when it mounts, and again on the next frame after
+  loading settles with a new model in the Canvas, so pipelines compile and buffers and textures upload before the
+  camera turns to them. `all` (default false) draws hidden meshes too and hides them again. Place it after the content.
+
+### Copies: Clone
+
+```tsx
+import {useState} from 'react';
+import {Canvas, Mesh, type MeshRef} from '@margoengine/react';
+import {Clone} from '@margoengine/react/helpers';
+import {Box, Sphere} from '@margoengine/react/geometry';
+
+export function App() {
+  const [tree, setTree] = useState<MeshRef | null>(null);
+  return (
+    <Canvas>
+      <Mesh ref={setTree}>
+        <Box />
+        <Sphere position={[0, 1, 0]} />
+      </Mesh>
+      {[2, 4, 6].map((x) => (
+        <Clone key={x} object={tree} position={[x, 0, 0]} />
+      ))}
+    </Canvas>
+  );
+}
+```
+
+- `Clone` copies a mesh, group or model root (`object`, a mesh or a ref) with everything under it into a group placed
+  by its own `position`, `rotation`, `scale` and events. Plain meshes share the source's geometry and material, as
+  drei's `<Clone>` does. Models under it (a `<Model>` root from `onLoad`) are independent copies through `cloneModel`
+  of `@margoengine/animation` (install it), so each can play its own animation; they share the source's GPU buffers
+  and textures and take its current material values.
+- The copy starts at the source's local transforms, visibility and render layers at the time it is made and does not
+  follow later changes; pass another `object` to copy again. A Clone inside the object it copies is an error.
 
 Strict consumers can use `skipLibCheck: false` with optional engine peers absent.
 Declaration packaging keeps parameter annotations while removing implementation
@@ -897,7 +1653,7 @@ GPU-only attachments refuse the small WebGL2 preview during setup with `MargoErr
 
 Import each binding from its own optional subpath. Install the native peer named in the table. These wrappers use
 native package objects, including their validation, device recovery and disposal. Refs become null on unmount;
-imports resolving after unmount create nothing. Line, Points, Outline and Splat attach to the enclosing Scene.
+imports resolving after unmount create nothing. Line, Points, Outline, Splat, AmbientLight, HemisphereLight and Fog attach to the enclosing Scene.
 
 | Entry | Component | Native peer | Defaults and updates |
 | --- | --- | --- | --- |
@@ -926,6 +1682,30 @@ The capture is the Niantic MIT sample excerpt documented in ../splats/test/fixtu
 import { Line } from '@margoengine/react/lines';
 export function Route() {
   return <Line points={[[0,0,0],[1,1,0],[2,0,0]]} color="#60c0ff" lineWidth={3} dashed dashSize={0.2} />;
+}
+```
+
+### Segments
+
+`<Segments>` (also from `/lines`) is drei's Segments: every `<Segment start end color>` inside it is drawn by one
+native, antialiased line in segment mode, so many segments cost one draw. Props are the `<Line>` material and
+transform (`lineWidth`, `color`, `dashed`, `worldUnits`, `matrix`, `mesh`, ...) plus `limit` (default 1000: the most
+segments drawn, in mount order). A `<Segment>`'s `color` defaults to white and multiplies the line colour. Its ref is
+a live `{ start, end, color }` record (linear rgb): write it in place in `useFrame` and the batch redraws, uploading
+only on frames where a value changed.
+
+```tsx
+import { useRef } from 'react';
+import { useFrame } from '@margoengine/react';
+import { Segments, Segment, type SegmentHandle } from '@margoengine/react/lines';
+export function Spokes() {
+  const tip = useRef<SegmentHandle>(null);
+  useFrame(() => { if (tip.current) tip.current.end[1] = Math.sin(performance.now() / 500); });
+  return <Segments lineWidth={2}>
+    <Segment ref={tip} start={[0, 0, 0]} end={[1, 0, 0]} color="#ff4040" />
+    <Segment start={[0, 0, 0]} end={[0, 1, 0]} color="#40ff40" />
+    <Segment start={[0, 0, 0]} end={[0, 0, 1]} color="#4080ff" />
+  </Segments>;
 }
 ```
 
@@ -1019,7 +1799,7 @@ that exact licensed fixture at the same URL.
 import { Suspense, useEffect, useState } from 'react';
 import { Canvas, useEngine } from '@margoengine/react';
 import { XR } from '@margoengine/react/xr';
-import { Gltf } from '@margoengine/react/gltf-pro';
+import { Gltf } from '@margoengine/react/gltf';
 import { XRPointerEvents } from '@margoengine/react/xr-pointer';
 import { Picking } from '@margoengine/selection';
 import { SpatialPicking } from '@margoengine/selection/spatial';
@@ -1081,7 +1861,71 @@ native mesh. Use one plain PBR material and one core geometry per provider; rich
 the native materials instancing API. Named Scenes and RenderViews preserve scene ownership and pointer identity.
 A shared geometry can merge with other same-geometry meshes in the same scene; the total draw count is still one.
 
-Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 24,844 B gzip.
+### Sampler
+
+`Sampler` and `useSurfaceSampler` from `@margoengine/react/sampler` are drei's: `count` random points (default 16) on the surface of
+`mesh` (a ref to a `<Mesh>` or shape, a native mesh or a core geometry), by `MeshSurfaceSampler` of
+`@margoengine/geometry/sample`: even over the area, or by `weights` (one density per vertex); `colors` (per vertex)
+and `seed` (default 1, so the same mesh gives the same points) are optional. `Sampler` draws its geometry and material
+children once per point as one `Instances` draw (every Instances prop but `limit` and `range`). Each instance sits at
+its point, upright and scale 1, unless `transform(point)` returns its `position`, `rotation`, `scale` or `color`; the
+point has `index`, `position`, `normal`, `uv`, `color` and `rotation`, the Euler angles that stand an instance's +Y on
+the normal. The points are in the mesh's own space, so give the Sampler the mesh's transform. `useSurfaceSampler(mesh,
+count, options)` returns the flat arrays (`positions`, `normals`, `uvs`, `colors`, `triangles`) or null until the
+geometry is there; it follows a replaced geometry.
+
+```tsx
+import { useRef } from 'react';
+import { Canvas, PbrMaterial, type MeshRef } from '@margoengine/react';
+import { Sphere, ConeGeometry } from '@margoengine/react/geometry';
+import { Sampler } from '@margoengine/react/sampler';
+
+export function Spiky() {
+  const ball = useRef<MeshRef>(null);
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Sphere ref={ball} args={[1, 32, 16]} color="#5b8def" />
+      <Sampler
+        mesh={ball}
+        count={300}
+        transform={({ position, rotation }) => ({ position, rotation, scale: [0.05, 0.2, 0.05] })}
+      >
+        <ConeGeometry />
+        <PbrMaterial color="#f2c14e" />
+      </Sampler>
+    </Canvas>
+  );
+}
+```
+
+### Merged
+
+`Merged`, also from `@margoengine/react/instances`, is drei's Merged: give it meshes (mounted native meshes, or
+`{ geometry, material }`) and its children function receives one component per mesh; each rendered component is one
+`<Instance>` of that mesh, so every mesh is one instanced draw however many copies you place. An array of meshes gives
+the components as arguments in order, a record gives a record of components. `limit` and `range` apply to each mesh
+(defaults 1000 and all). A mesh without a material draws in white PBR; the material is shared and stays live.
+
+```tsx
+import { Canvas } from '@margoengine/react';
+import { Merged } from '@margoengine/react/instances';
+import { box, PbrMaterial } from '@margoengine/core/extension';
+import { sphereGeometry, toGeometry } from '@margoengine/geometry';
+const cube = { geometry: box(), material: new PbrMaterial({ color: '#d0d0d0' }) };
+const ball = { geometry: toGeometry(sphereGeometry(0.5)) };
+export function MergedScene() {
+  return <Canvas style={{height: 300}} camera={{position: [0, 2, 8]}}>
+    <Merged meshes={{ Cube: cube, Ball: ball }}>
+      {({ Cube, Ball }) => <>
+        {[-2, 0, 2].map(x => <Cube key={x} position={[x, 0, 0]} color="#ff8040" />)}
+        <Ball position={[0, 1.5, 0]} onClick={event => console.log(event.object)} />
+      </>}
+    </Merged>
+  </Canvas>;
+}
+```
+
+Optional entry byte counts (bare peers external): @margoengine/react/instances 0 -> 2672 B gzip, ceiling 2928 B; margoengine/react/instances 0 -> 62 B gzip, ceiling 318 B. The bytes retain native refs, per-instance lifecycle, tints, range control and existing Mesh pointer routing; splitting that lifecycle would require another shared context. Core + stage stays 24,797 B gzip.
 
 
 ## Frame priorities and adaptive resolution
@@ -1094,7 +1938,7 @@ During an XR frame a manual full-scene draw uses the current eye views. Do not s
 
 ```tsx
 import { Canvas, Mesh, BoxGeometry, PbrMaterial, useFrame } from '@margoengine/react';
-import { PerformanceMonitor, AdaptiveDpr, usePerformanceMonitor } from '@margoengine/react/performance';
+import { PerformanceMonitor, AdaptiveDpr, AdaptiveEvents, usePerformanceMonitor } from '@margoengine/react/performance';
 
 function Draw() {
   const { factor } = usePerformanceMonitor();
@@ -1104,7 +1948,7 @@ function Draw() {
 }
 export function AdaptiveScene() {
   return <Canvas style={{ height: 400 }}>
-    <PerformanceMonitor><AdaptiveDpr /><Draw /></PerformanceMonitor>
+    <PerformanceMonitor><AdaptiveDpr /><AdaptiveEvents /><Draw /></PerformanceMonitor>
   </Canvas>;
 }
 ```
@@ -1132,6 +1976,10 @@ frame time. This is a quality controller, not a benchmark or a GPU timestamp que
 uses the same defaults: call `sample(milliseconds)`, read `state`, and release `subscribe`/`observe` subscriptions.
 `clear()` drops incomplete measurements, `reset()` also resets quality and fallback, and `dispose()` or `using`
 ends its lifetime.
+
+`AdaptiveEvents` pauses hover picking (pointer over, out, enter, leave and move) while the monitor's `factor` is
+below 1 and resumes it at 1, as drei's does; presses, clicks, double clicks and the wheel keep picking, so a click is
+never lost. It creates a monitor if none encloses it.
 
 `AdaptiveDpr` defaults to `min=0.5`, `max=1`, `pixelated=false` (linear presentation filtering).
 It maps quality into that fraction of native Canvas resolution, lowers resolution on decline and restores it
@@ -1216,7 +2064,9 @@ export function ScrollScene() {
 }
 ```
 
-Keyboard entries require `name` and `keys` (matching key or code); `up=true` clears on release,
+Keyboard entries require `name` and `keys` (matching key or code). A one-character key matches in either
+case, so `'w'` stays held while Shift or Caps Lock is down; name digits and symbols by code (`'Digit1'`), since
+Shift turns `'1'` into `'!'` on most layouts. `up=true` clears on release,
 `up=false` latches until focus loss. `domElement` defaults to window, `onChange` to absent.
 The selector hook rerenders on changes; the no-argument hook returns `[subscribe, get]` for frame-loop reads.
 `subscribe(selector, listener)` returns an unsubscribe function. Blur, hidden pages and unmount clear held keys.
@@ -1239,6 +2089,46 @@ Presentation defaults are `enabled=true`, `cursor=true`, no rotation override, c
 `speed=1`, `snap=false`, `zoom=1`, `global=false`, and spring stiffness 170, damping 26, precision 0.000001.
 No `onError` callback is installed by default. It rotates its child group, updates in the Canvas loop,
 restores the cursor and removes controls/listeners on unmount.
+
+### MotionPathControls
+
+`MotionPathControls` and `useMotion` from `/controls-extra` are drei's: they move the Canvas camera (or the `<Mesh>` in
+`object`) along `curves`, any 3D curves of `@margoengine/geometry` (`CatmullRomCurve3`, `CubicBezierCurve3`,
+`LineCurve3`, ...) joined end to end, by arc length. It looks along the path, or at `focus` (a point or a `<Mesh>` ref),
+eased by `focusDamping` (seconds, default 0.1); a mesh turns its +Z to the look-at point. Set `offset` (0..1) and
+`current` eases there with the time constant `damping` (seconds, default 0.2; 0 jumps), or leave it out and write
+`current` yourself through `useMotion()` or the ref (from a scroll position, in `useFrame`, ...). `loop` (default
+true) wraps progress past 1 and eases the short way round. The state also has `point`, `tangent` and `focus` of this
+frame. Needs no package beyond the curves.
+
+```tsx
+import { useMemo } from 'react';
+import { Canvas, Mesh, BoxGeometry, useFrame } from '@margoengine/react';
+import { MotionPathControls, useMotion } from '@margoengine/react/controls-extra';
+import { CatmullRomCurve3 } from '@margoengine/geometry';
+
+function Fly() {
+  const motion = useMotion();
+  useFrame((_, delta) => {
+    motion.current += delta * 0.05;
+  });
+  return null;
+}
+export function Tour() {
+  const curves = useMemo(
+    () => [new CatmullRomCurve3([[6, 2, 6], [-6, 3, 6], [-6, 2, -6], [6, 3, -6]], true)],
+    [],
+  );
+  return (
+    <Canvas style={{ height: 400 }}>
+      <Mesh><BoxGeometry /></Mesh>
+      <MotionPathControls curves={curves} focus={[0, 0, 0]}>
+        <Fly />
+      </MotionPathControls>
+    </Canvas>
+  );
+}
+```
 
 ## Render textures and HUDs
 
@@ -1276,6 +2166,67 @@ Hud defaults to `renderPriority=1` (must be positive), drawing after the main vi
 without clearing its colour. React 18/19 StrictMode replay creates fresh owners and releases old targets,
 views and Scenes; refs and callbacks refer to the current owner.
 
+### useFBO
+
+`useFBO(width?, height?, options?)` (or `useFBO(options)`), also from `/portals`, is drei's useFBO: a render target
+the component owns, null until the materials peer has loaded. Draw into it with a `RenderView` whose `target` is
+`fbo.target`, and sample `fbo.texture` in a material. Without `width` and `height` it has the Canvas's drawing-buffer
+size and follows its resizes; it is recreated after device restoration and freed on unmount, and each new target is a
+new object, so components using it re-render. Options: `format` (default `'rgba8unorm'`), `depth` (default false: a
+depth texture in the scene's depth format and sample count, which views then draw into, as drei's `depthBuffer` with
+a readable depth texture) and `onError` (default Canvas reporting). Like RenderTexture it needs a WebGPU device,
+native or compatibility.
+
+```tsx
+import { Canvas, Scene, RenderView, Mesh, BoxGeometry } from '@margoengine/react';
+import { TextureMaterial } from '@margoengine/react/textures';
+import { useFBO } from '@margoengine/react/portals';
+
+function Screen() {
+  const fbo = useFBO(512, 512);
+  return <>
+    {fbo && <RenderView scene="inside" target={fbo.target} />}
+    <Mesh><BoxGeometry /><TextureMaterial map={fbo?.texture ?? null} /></Mesh>
+  </>;
+}
+export function FBOScreen() {
+  return <Canvas style={{ height: 400 }}>
+    <Scene name="inside" background="#204060"><Mesh><BoxGeometry /></Mesh></Scene>
+    <Screen />
+  </Canvas>;
+}
+```
+
+### useDepthBuffer
+
+`useDepthBuffer({ size, frames, onError })`, also from `/portals`, is drei's useDepthBuffer: the scene's depth seen
+from the Canvas camera, drawn into a depth texture the component owns before the main view. `size` is its width and
+height in texels (default 256); `frames` is how many frames it draws (default `Infinity`, every frame; 1 for a scene
+that does not move, after which the texture keeps that depth); `onError` defaults to Canvas reporting. It returns the
+`GPUTexture`, or null until it exists, in the scene's depth format and sample count (one sample on the light tier and
+phones, else four); a new texture after a device restore. Bind it with `createView({ aspect: 'depth-only' })` as a
+`texture_depth_2d` (`texture_depth_multisampled_2d` at four samples). Reverse-Z: 0 is the far clear value, nearer is
+larger. Like useFBO it needs a WebGPU device, native or compatibility.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, useFrame } from '@margoengine/react';
+import { useDepthBuffer } from '@margoengine/react/portals';
+
+function DepthUser() {
+  const depth = useDepthBuffer({ size: 256, frames: 1 });
+  useFrame(() => {
+    if (depth) console.log('depth texture', depth.width, depth.height, depth.format);
+  });
+  return null;
+}
+export function DepthScene() {
+  return <Canvas style={{ height: 400 }}>
+    <Mesh><BoxGeometry /></Mesh>
+    <DepthUser />
+  </Canvas>;
+}
+```
+
 ## Stars, sparkles, trails, edges and decals
 
 `/effects-extra` loads native points, lines or geometry only when the corresponding component mounts.
@@ -1284,7 +2235,7 @@ Install `@margoengine/points` for fields, `@margoengine/lines` for trails/edges 
 
 ```tsx
 import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
-import { Stars, Sparkles, Trail, Edges, Decal } from '@margoengine/react/effects-extra';
+import { Stars, Sparkles, Trail, Edges, Decal, Wireframe } from '@margoengine/react/effects-extra';
 
 export function Effects() {
   return <Canvas style={{ height: 400 }}>
@@ -1294,6 +2245,9 @@ export function Effects() {
       <Edges threshold={15} />
       <Decal position={[0, 0, 0.5]} scale={0.5} color="#ff8800" />
     </Mesh></Trail>
+    <Mesh position={[2, 0, 0]}><BoxGeometry /><PbrMaterial color="#202020" />
+      <Wireframe color="#40ff80" width={1.5} />
+    </Mesh>
   </Canvas>;
 }
 ```
@@ -1321,11 +2275,47 @@ and no fixed normal (camera-facing). Inherited line styling and defaults are in 
 [native lines guide](../lines/README.md). Unmount disposes the trail and its plugin.
 Edges uses its enclosing mesh unless `mesh` is explicit, threshold 15 degrees and automatic welding tolerance;
 it accepts the same native line styling. Replacing geometry refreshes extracted edges.
+Wireframe draws every triangle edge of its enclosing (or `mesh`) mesh once, welding split-normal seams, with the
+same line styling (`color`, `width`, `opacity`, dashes, `depthTest`); `simplify` leaves out the edges between flat
+neighbours, such as quad diagonals. The mesh's own material is the fill (drei's `fill` and `fillOpacity`), and a
+mesh with no visible fill shows the wireframe alone.
 
 Decal projects in the target mesh's local coordinates, inheriting its parent transform. It defaults to
 the enclosing mesh, retained source geometry, position/rotation `[0,0,0]`, scale 1, offset `min(scaleX, scaleY) / 1000` and `backfaces=false`. Supply `geometry` for an explicit UV-bearing source;
 `mesh` selects an explicit target. Root PBR map props and material children use TextureProvider internally.
 React 18/19 StrictMode replay reattaches to the current mesh and releases the old material owner.
+
+### Full-screen shaders
+
+`ScreenQuad` from `@margoengine/react/effects-extra` draws one triangle over the whole screen with a GLSL material, as drei's ScreenQuad: for backgrounds, shader art and overlays. Give it a `fragmentShader` (with `uniforms` and any other `ShaderMaterial` option of `@margoengine/shader/glsl-material`; install `@margoengine/shader`) and it builds the material with `screenQuadVertexShader`, which hands the fragment stage `vUv` from 0 to 1, or pass your own `material`, whose vertex stage reads `position` (x and y from -1 to 3) and `uv`. A uniform's value is copied in when the prop's value changes, and the ref's `material.uniforms` are live, so a clock advanced in `useFrame` is not put back by a later render; `renderOrder` and `visible` are live. Depth and blending are the material's. The ref is the RawMesh.
+
+```tsx
+import { useRef, type ComponentRef } from 'react';
+import { Canvas, useFrame } from '@margoengine/react';
+import { ScreenQuad } from '@margoengine/react/effects-extra';
+
+const fragmentShader = `precision highp float;
+uniform float time;
+varying vec2 vUv;
+void main() { gl_FragColor = vec4(vUv, 0.5 + 0.5 * sin(time), 1.0); }`;
+
+function Background() {
+  const quad = useRef<ComponentRef<typeof ScreenQuad>>(null);
+  // The ref's uniforms are live: no render per frame.
+  useFrame((_, delta) => {
+    if (quad.current) (quad.current.material.uniforms.time.value as number) += delta;
+  });
+  return <ScreenQuad ref={quad} fragmentShader={fragmentShader} uniforms={{ time: { value: 0 } }} depthWrite={false} />;
+}
+
+export function ShaderArt() {
+  return (
+    <Canvas>
+      <Background />
+    </Canvas>
+  );
+}
+```
 
 ## Component tests and offscreen scenes
 

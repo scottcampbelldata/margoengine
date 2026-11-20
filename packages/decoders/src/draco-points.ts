@@ -3,6 +3,7 @@
 import { WorkerPool, jobTimeout, payload, requireWorkers, timeLimit, workerLimit } from './pool.js';
 import type { DecodedDracoPoints, DracoPointsRequest } from './protocol.js';
 import { validatedDracoLimits } from './protocol.js';
+import { dracoHere, inThread } from './node-thread.js';
 
 export type { DecodedDracoPoints, DracoPointsAttribute, DracoPointsRequest } from './protocol.js';
 
@@ -48,14 +49,24 @@ export class DracoPointsDecoder {
    * Decodes a `.drc` point cloud into transferable typed arrays.
    *
    * @throws RangeError when the cloud is over `limits`.
-   * @throws MargoError `failed` for a mesh or a damaged file, `unsupported` without Web Workers.
+   * @throws MargoError `failed` for a mesh or a damaged file, `unsupported` without Web Workers outside Node.
    */
   decode(data: ArrayBuffer | ArrayBufferView, options: DracoPointsDecodeOptions = {}): Promise<DecodedDracoPoints> {
     try {
-      requireWorkers('DracoPointsDecoder');
+      const here = inThread();
+      if (!here) requireWorkers('DracoPointsDecoder');
       if (options.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
       const limits = validatedDracoLimits(options.limits),
         buffer = payload(data, options.transfer ?? false);
+      if (here)
+        return dracoHere(
+          this.decoderPath,
+          () => new URL(this.urls().wrapperURL),
+          buffer,
+          { limits },
+          options.signal,
+          true,
+        );
       this.pool ??= new WorkerPool(this.workerLimit);
       return this.pool.run<DecodedDracoPoints>(
         { type: 'draco-points', buffer, request: { limits }, ...this.urls() },

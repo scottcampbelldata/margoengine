@@ -68,3 +68,35 @@ test('Scene presentation invalidates destination sampling and remains stable aft
     for (const r of h.resources) r.destroy();
   }
 });
+
+// Found by water's owner/lifetime fixture on a real device: Caustics copies the scene depth with copyDepth, and a
+// single-sample target had no depth source, so the copy's bind group got an undefined resource and WebGPU threw
+// "Required member is undefined". The single-sample source is the resolved depth itself, read as a plain 2D depth.
+test('copyDepth from a single-sample target reads its resolved depth', () => {
+  const h = gpuHarness(),
+    device = h.engine.gpu,
+    scene = target(h, 1),
+    out = device.createTexture({ size: [128, 96], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+  const groups = [], codes = [], make = device.createBindGroup, compile = device.createShaderModule;
+  device.createBindGroup = function (descriptor) {
+    groups.push(descriptor);
+    return make.call(this, descriptor);
+  };
+  device.createShaderModule = function (descriptor) {
+    codes.push(descriptor.code);
+    return compile.call(this, descriptor);
+  };
+  try {
+    scene.copyDepth(h.context.encoder, out.createView(), 1, 'depth32float');
+    assert.ok(groups.length > 0, 'the copy binds its source');
+    for (const g of groups) for (const e of g.entries) assert.notEqual(e.resource, undefined, 'every bound resource exists');
+    // The source has one sample: a multisampled binding fails WebGPU validation on a real device.
+    assert.ok(codes.length > 0 && codes.every((code) => code.includes('texture_depth_2d') && !code.includes('multisampled')));
+  } finally {
+    device.createBindGroup = make;
+    device.createShaderModule = compile;
+    scene.dispose();
+    out.destroy();
+    for (const r of h.resources) r.destroy();
+  }
+});

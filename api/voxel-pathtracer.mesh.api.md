@@ -281,6 +281,7 @@ class VoxelPathTracer implements EnginePlugin {
     invalidateModels(ids?: Iterable<string>): void;
     whenIdle(): Promise<void>;
     reset(): void;
+    onPreUpdate(delta: number): void;
     raycast(origin: TraceVec3, direction: TraceVec3, maxDistance?: number): VoxelTraceHit | null;
     capture(options: VoxelTraceCaptureOptions): Promise<Blob>;
     renderImage(options: VoxelTraceRenderOptions): Promise<VoxelTraceImage>;

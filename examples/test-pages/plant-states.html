@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Plant states - Margo Engine Test</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 16px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 70vh; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  button { font: inherit; padding: 6px 10px; }
+  #status { padding: 0 8px 8px; }
+</style>
+<canvas id="view"></canvas>
+<div id="controls">
+  <button id="btnFire">Run the fire to the end</button>
+  <button id="btnGround">Ground change at 400 s</button>
+  <button id="btnPaint">Paint drought</button>
+  <button id="btnConifer">Conifer look rows</button>
+  <button id="btnReset">Reset the map</button>
+</div>
+<div id="status"></div>
+<script type="module" src="./plant-states.ts"></script></html>

@@ -9,6 +9,8 @@ import { lightVersion } from './chunk.js';
 import { meshBlockModels } from './model-mesh.js';
 export { meshBlockModels, type BlockModelSurface } from './model-mesh.js';
 import { chunkKey, type VoxelWorld } from './world.js';
+import type { VoxelOrigin } from './render.js';
+import { checkOrigin, originPoint } from './origin.js';
 
 export type { ModelBox, ModelOrientation } from './model-data.js';
 /** A box of a custom block. Coordinates are in its unit cell. */
@@ -142,6 +144,14 @@ export function modelState(id: number, orientation = 0): number {
 export interface VoxelModelRendererOptions {
   /** Override the material per type and texture layer; default block colour/PBR factors. Materials remain caller owned. */
   material?: (type: BlockType, texture: number) => Material;
+  /**
+   * Origin rebasing for worlds far from zero, as `VoxelRendererOptions.origin` (pass the same object): an object whose
+   * `origin` is the float64 world point (blocks) drawn at engine zero, such as a `FloatingOrigin` of
+   * `@margoengine/cameras/origin`; read every update. Chunk meshes hold chunk-local positions and sit at their corner
+   * minus the origin in float64, so their float32 positions stay small wherever the world is. Default null (world and
+   * engine space are the same).
+   */
+  origin?: VoxelOrigin | null;
 }
 
 /** Chunk-streamed textured model meshes. Call update after lighting, before engine.render. */
@@ -165,12 +175,16 @@ export class VoxelModelRenderer {
   private disposed = false;
   private readonly versions = new Map<string, number>();
   private readonly owned = new Set<Material>();
+  private placed: [number, number, number] = [0, 0, 0];
+  /** Live {@link VoxelModelRendererOptions.origin}; null for none. */
+  origin: VoxelOrigin | null;
   private constructor(
     private readonly engine: Engine,
     readonly world: VoxelWorld,
     private readonly options: VoxelModelRendererOptions = {},
     private readonly runtime: typeof import('@margoengine/materials'),
   ) {
+    this.origin = checkOrigin(options?.origin, 'VoxelModelRenderer');
     this.off.push(world.onChunk((cx, cy, cz) => this.mark(cx, cy, cz)));
     this.off.push(world.onChange((x, y, z) => this.mark(x >> 5, y >> 5, z >> 5)));
   }
@@ -188,9 +202,21 @@ export class VoxelModelRenderer {
       if (next.every((n) => (n << 5) >> 5 === n)) this.pending.add(chunkKey(next[0], next[1], next[2]));
     }
   }
-  /** Rebuilds changed chunks. Dirty lighting keys are observed without consuming the main renderer's queue. */
+  /**
+   * Moves every chunk mesh when the origin moved, then rebuilds changed chunks. Dirty lighting keys are observed
+   * without consuming the main renderer's queue.
+   * @throws RangeError when the origin holds a value that is not a finite number.
+   */
   update(): void {
     if (this.disposed) throw new MargoError('disposed', 'Model renderer is disposed; create a new VoxelModelRenderer');
+    const shift = originPoint(this.origin, 'VoxelModelRenderer');
+    if (shift.some((v, a) => v !== this.placed[a])) {
+      this.placed = shift;
+      for (const [key, list] of this.meshes) {
+        const corner = this.corner(key, shift);
+        for (const m of list) m.root.setPosition(corner);
+      }
+    }
     for (const key of this.world.dirty) {
       const [cx, cy, cz] = key.split(',').map(Number),
         chunk = this.world.getChunk(cx, cy, cz);
@@ -202,32 +228,43 @@ export class VoxelModelRenderer {
       this.versions.delete(key);
       const [cx, cy, cz] = key.split(',').map(Number),
         made: MaterialMesh[] = [];
-      for (const surface of meshBlockModels(this.world, cx, cy, cz)) {
-        const t = surface.type,
-          k = `${t.id}:${surface.texture}`;
-        let material = this.materials.get(k);
-        if (!material)
-          this.materials.set(
-            k,
-            (material =
-              this.options.material?.(t, surface.texture) ??
-              new this.runtime.Material({
-                color: [...t.color],
-                roughness: t.roughness,
-                metalness: t.metalness,
-                emissive: [...t.color].map((c) => c * t.emissive) as [number, number, number],
-                transparent: t.layer === 'translucent',
-                alphaTest: t.layer === 'cutout' ? 0.5 : 0,
-              })),
-          );
-        if (!this.options.material) this.owned.add(material);
-        made.push(this.runtime.createMesh(this.engine, surface, material));
+      try {
+        for (const surface of meshBlockModels(this.world, cx, cy, cz, false, true)) {
+          const t = surface.type,
+            k = `${t.id}:${surface.texture}`;
+          let material = this.materials.get(k);
+          if (!material)
+            this.materials.set(
+              k,
+              (material =
+                this.options.material?.(t, surface.texture) ??
+                new this.runtime.Material({
+                  color: [...t.color],
+                  roughness: t.roughness,
+                  metalness: t.metalness,
+                  emissive: [...t.color].map((c) => c * t.emissive) as [number, number, number],
+                  transparent: t.layer === 'translucent',
+                  alphaTest: t.layer === 'cutout' ? 0.5 : 0,
+                })),
+            );
+          if (!this.options.material) this.owned.add(material);
+          const mesh = this.runtime.createMesh(this.engine, surface, material);
+          made.push(mesh);
+          mesh.root.setPosition(this.corner(key, shift));
+        }
+      } finally {
+        // Meshes made before a throw stay owned, so the retry (the chunk stays pending) replaces them.
+        if (made.length) this.meshes.set(key, made);
       }
-      if (made.length) this.meshes.set(key, made);
       const chunk = this.world.getChunk(cx, cy, cz);
       if (chunk) this.versions.set(key, lightVersion(chunk));
+      this.pending.delete(key);
     }
-    this.pending.clear();
+  }
+  // A chunk's corner minus the origin, in float64.
+  private corner(key: string, shift: readonly number[]): [number, number, number] {
+    const [cx, cy, cz] = key.split(',').map(Number);
+    return [cx * 32 - shift[0], cy * 32 - shift[1], cz * 32 - shift[2]];
   }
   /** Releases all chunk meshes and subscriptions; caller materials and textures stay alive. */
   dispose(): void {

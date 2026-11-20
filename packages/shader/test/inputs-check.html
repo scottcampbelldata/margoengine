@@ -48,9 +48,9 @@ const scenarios={
 window.check={
   async run(name){device.pushErrorScope('validation');const model=await scenarios[name]();window.current=model;engine.render();await device.queue.onSubmittedWorkDone();engine.render();await device.queue.onSubmittedWorkDone();const e=await device.popErrorScope();return {errors:[...(e?[e.message]:[]),...errors.splice(0)]};},
   clear(){window.current?.destroy();window.current=null;engine.render();},
-  // Instanced draws: the same graph without instances, then through gltf-pro's instancing.
+  // Instanced draws: the same graph without instances, then through gltf/pbr's instancing.
   async instanced(){
-    const {instancedShader,rowsShader}=await import('/packages/gltf-pro/src/instanced-shader.ts'),{pbrShader}=await import('/packages/gltf-pro/src/shader.ts');
+    const {instancedShader,rowsShader}=await import('/packages/gltf/src/instanced-shader.ts'),{pbrShader}=await import('/packages/gltf/src/shader.ts');
     const m=new NodeMaterial({emissiveNode:instanceColor.rgb.mul(instanceUV.x).add(instanceIndex.toFloat()),positionNode:instanceMatrix.mul(vec4(positionLocal,1)).xyz});
     const out=[],code=m.shader(pbrShader,2);
     for(const text of [code,instancedShader(code),rowsShader(instancedShader(code),64)]){const info=await device.createShaderModule({code:text}).getCompilationInfo();out.push(info.messages.filter(x=>x.type==='error').map(x=>x.message));}

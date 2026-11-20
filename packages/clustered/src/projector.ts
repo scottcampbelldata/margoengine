@@ -91,7 +91,8 @@ export class ProjectorLights implements EnginePlugin, ClusteredLightTerm {
   protected device?: GPUDevice;
   private buffer?: GPUBuffer;
   private entries: GPUBindGroupEntry[] = [];
-  private words = new Uint32Array(HEADER_WORDS);
+  /** @internal The packed words the shader reads; LightBounce's CPU twin reads them too (bounce-terms.ts). */
+  words = new Uint32Array(HEADER_WORDS);
   private tail?: Uint32Array;
   private listValue: readonly (ProjectorImage | ProjectorEntry | null | undefined)[] = Object.freeze([]);
   private active = false;

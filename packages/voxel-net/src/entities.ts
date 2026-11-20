@@ -5,7 +5,7 @@
 // with a hashed grid only as the index). States go as EntityCodec deltas against what the player last got.
 // The client side, VoxelEntityView, decodes them and interpolates each entity as the client does other players.
 import type { MutableVec3, Vec3 } from '@margoengine/math';
-import { createSnapshot, type Snapshot, SnapshotBuffer } from '@margoengine/net';
+import { createSnapshot, type Snapshot, SnapshotBuffer } from '@margoengine/netcode/interpolation';
 import type { VoxelWorld } from '@margoengine/voxel';
 import { EntityCodec, type EntityState, type PreparedEntity } from '@margoengine/voxel/codec';
 import { VoxelCharacter, type VoxelCharacterOptions, type VoxelMoveIntent } from '@margoengine/voxel/query';

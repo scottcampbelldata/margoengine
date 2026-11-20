@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export function parseApiReportArguments(arguments_) {
@@ -116,4 +116,27 @@ function rowCounts(row) {
 
 function packageName(row) {
   return row.split('|')[1]?.trim() ?? '';
+}
+
+/**
+ * The workspace packages whose node_modules link resolves outside this checkout, as `{ name, dir, target }`.
+ * A worktree that borrows another checkout's node_modules (one junction to the main checkout's folder) resolves every
+ * `@margoengine/*` import to that checkout's packages: the checker read the other checkout's declarations, no file
+ * matched a package of this one, and every cross-package re-export came out as `from "undefined"` with its import lines
+ * gone, so api:check failed on 15 reports nobody changed (KB-API-FOREIGN1). `packages` holds `{ name, dir }` with `dir`
+ * the folder under packages/; a package with no link (not installed) is not listed.
+ */
+export function foreignWorkspaceLinks(root, packages) {
+  const real = (path) => {
+    const p = realpathSync.native(path).replaceAll('\\', '/');
+    return process.platform === 'win32' ? p.toLowerCase() : p;
+  };
+  const foreign = [];
+  for (const { name, dir } of packages) {
+    const link = join(root, 'node_modules', ...name.split('/'));
+    if (!existsSync(link)) continue;
+    const target = realpathSync.native(link);
+    if (real(link) !== real(join(root, 'packages', dir))) foreign.push({ name, dir, target });
+  }
+  return foreign;
 }

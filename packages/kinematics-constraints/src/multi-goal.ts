@@ -171,7 +171,9 @@ export class MultiGoalIKSolver {
   /** Copies topology, rest transforms, bounds and settings; rejects cyclic parent graphs. */
   constructor(joints: readonly IKJoint[], options: MultiGoalIKOptions={}) {
     if(!Array.isArray(joints) || joints.length<1 || joints.length>256) fail('Expected 1..256 joints');
-    this.options={iterations:128,candidates:4,positionTolerance:1e-5,orientationTolerance:1e-5,damping:0.01,maxStep:0.25,...options};
+    // Per key, so an option passed as undefined takes its documented default, as an omitted one does.
+    this.options={iterations:options?.iterations??128,candidates:options?.candidates??4,positionTolerance:options?.positionTolerance??1e-5,
+      orientationTolerance:options?.orientationTolerance??1e-5,damping:options?.damping??0.01,maxStep:options?.maxStep??0.25};
     const o=this.options;
     if(!Number.isInteger(o.iterations) || o.iterations<1 || o.iterations>4096 ||
       !Number.isInteger(o.candidates) || o.candidates<1 || o.candidates>64 ||

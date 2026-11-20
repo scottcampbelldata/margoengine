@@ -1,5 +1,5 @@
 // Real-GPU jitter of a 10 mm flange 0 m / 1 km / 100 km / 6,000 km from the origin, core alone vs FloatingOrigin.
-// Run on AC power holding the GPU lock, after npm run build:packages (timing part: node scripts/quiet-gate.mjs first):
+// Run on AC power, after npm run build:packages (timing part: node scripts/quiet-gate.mjs first):
 //   node examples/package-benchmarks/large-coordinates-gpu.mjs [--cost]
 // Each (kind, mode, distance) renders the same 40-frame orbit + dolly; every frame is compared with the same kind
 // rendered by core near the origin. Per frame: silhouette centroid offset (px, sub-pixel) and pixels whose coverage

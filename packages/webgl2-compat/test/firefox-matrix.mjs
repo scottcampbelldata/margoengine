@@ -46,11 +46,11 @@ if (leaf) {
   for (const name of plan) {
     const logFile = `test-results/firefox-matrix-${name}.log`;
     const minutes = name === 'corpus-draw-browser.mjs' ? 4 : 3;
-    const command = `node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=${minutes} --gpu=Firefox-canonical-correctness -- node "${fileURLToPath(import.meta.url)}" --leaf=${name}`;
+    const command = `node scripts/run-with-timeout.mjs --max=${minutes} -- node "${fileURLToPath(import.meta.url)}" --leaf=${name}`;
     const result = await runLimited(command, {
       cwd: process.cwd(),
       env: process.env,
-      limitMs: (62 + minutes) * 60000,
+      limitMs: (12 + minutes) * 60000,
       logFile,
     });
     report.results.push({ name, ...result, logFile });

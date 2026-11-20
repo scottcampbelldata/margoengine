@@ -42,5 +42,17 @@
   "text.lc.lzma": {
     "bytes": 225000,
     "sha256": "28961612a13fd58f370caa822737f227f33ee0f2d6f64ae29d9af28e666f6aa5"
+  },
+  "floats.delta4.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "floats.delta2x.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
+  },
+  "floats.blocks.xz": {
+    "bytes": 1600000,
+    "sha256": "3e7ad4812a318414293fe11e9bc65999b2c21a75844f716718c07bf3c3a85f11"
   }
 }

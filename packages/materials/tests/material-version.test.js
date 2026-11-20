@@ -1,5 +1,5 @@
 // p-uv-transform of the speed matrix (4,096 boxes, one material each) drew 4,096 draws and read every material's rows
-// and bindings every frame (36-42 ms of CPU; perf-history entry 24). Now a material reports a change stamp (gltf-pro
+// and bindings every frame (36-42 ms of CPU; perf-history entry 24). Now a material reports a change stamp (gltf/pbr
 // `PBRMaterialShading.version`) so a steady one is reused whole, meshes of materials that share a pipeline and group 2
 // draw as one instanced draw whose instances read their own uniform block, and every material record and live colour
 // keeps one hidden class. CPU recording only: the fake pass records the draws.

@@ -88,10 +88,11 @@ export class Caustics implements EnginePlugin {
     this.resolution = options.resolution ?? 256;
     this.layers = options.layers ?? 12;
   }
-  /** Attach alone; to combine effects add new Caustics(options) to a PostStack. */
+  /** Adds a new Caustics to the scene's PostStack after its last HDR effect, or to a new PostStack when the scene has
+   * none; disposing the effect takes it out, and a stack made for it goes with it. */
   static attach(engine: EngineKernel, options: CausticsOptions): Caustics {
     const effect = new Caustics(options);
-    effect.stack = PostStack.attach(engine, [effect]);
+    effect.stack = PostStack.join(engine, effect);
     return effect;
   }
   private validate(): void {
@@ -439,7 +440,7 @@ export class Caustics implements EnginePlugin {
     this.engine = undefined;
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
-    this.stack?.dispose();
+    this.stack?.removeEffect(this);
     this.stack = undefined;
   }
   declare [Symbol.dispose]: () => void;

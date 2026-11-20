@@ -58,6 +58,14 @@
       "types": "./dist/erosion.d.ts",
       "import": "./dist/erosion.js"
     },
+    "./valley": {
+      "types": "./dist/valley.d.ts",
+      "import": "./dist/valley.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    },
     "./relief": {
       "types": "./dist/relief.d.ts",
       "import": "./dist/relief.js"
@@ -130,6 +138,10 @@
       "types": "./dist/settlements.d.ts",
       "import": "./dist/settlements.js"
     },
+    "./fuel": {
+      "types": "./dist/fuel.d.ts",
+      "import": "./dist/fuel.js"
+    },
     "./graph": {
       "types": "./dist/graph.d.ts",
       "import": "./dist/graph.js"
@@ -189,6 +201,9 @@
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/biomes/tests/browser-check.mjs && node packages/biomes/tests/water-check.mjs",
     "test:gpu:objects": "cd ../.. && node packages/biomes/tests/objects-check.mjs",
+    "test:gpu:conifers": "cd ../.. && node packages/biomes/tests/conifers-check.mjs",
+    "test:gpu:disturbance": "cd ../.. && node packages/biomes/tests/disturbance-check.mjs",
+    "test:gpu:wetness": "cd ../.. && node packages/biomes/tests/wetness-check.mjs",
     "test:gpu:shadows": "cd ../.. && node packages/biomes/tests/shadows-check.mjs",
     "test:gpu:flythrough": "cd ../.. && node packages/biomes/tests/flythrough-check.mjs",
     "test:gpu:objects-frame": "cd ../.. && node packages/biomes/tests/objects-frame-check.mjs",

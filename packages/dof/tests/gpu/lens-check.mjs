@@ -1,11 +1,9 @@
-// Real-GPU check for Autofocus and DOFLens. Takes a GPU slot itself. From the repository root, after building packages:
+// Real-GPU check for Autofocus and DOFLens. From the repository root, after building packages:
 //   node packages/dof/tests/gpu/lens-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'dof-lens' });
 const context = await openBrowser({ startPath: '/packages/dof/tests/gpu/lens.html', port: 5283 }),
   { page } = context;
 try {
@@ -137,7 +135,12 @@ try {
       outside = 0;
     for (let x = 0; x < 256; x++) inside += off(x);
     for (let x = 256; x < sharp.width; x++) outside += off(x);
-    return { inside, outside, card: sharp.data[(y * sharp.width + 100) * 4], sky: sharp.data[(y * sharp.width + 400) * 4] };
+    return {
+      inside,
+      outside,
+      card: sharp.data[(y * sharp.width + 100) * 4],
+      sky: sharp.data[(y * sharp.width + 400) * 4],
+    };
   };
   for (const near of [false, true]) {
     const s = await spread(near),
@@ -150,6 +153,36 @@ try {
       `${what} blur spreads about evenly: ${s.inside} in, ${s.outside} out`,
     );
   }
+
+  // Known-bugs "DOF near field: stepped blocks along a bright surface far in front of focus": a white strip's slanted
+  // edge on a dark floor that recedes from just in front of the camera to the focus, maxRadius 32. Row by row, the
+  // column where red first falls below 128 must move smoothly: its largest second difference stays within 3 px (the
+  // sharp picture gives 1; on the Radeon 680M the near gather over its mip chain gives 3, in the frame's last rows,
+  // where taps below the frame are skipped, and 2 above them; the 64 single-pixel taps it replaced gave 5).
+  const steps = (image) => {
+    const edges = [];
+    for (let y = 0; y < image.height; y++) {
+      let e = -1;
+      for (let x = 1; x < image.width; x++)
+        if (image.data[(y * image.width + x) * 4] < 128 && image.data[(y * image.width + x - 1) * 4] >= 128) {
+          e = x;
+          break;
+        }
+      if (e > 0) edges.push([y, e]);
+    }
+    let max = 0;
+    for (let k = 2; k < edges.length; k++)
+      if (edges[k][0] - edges[k - 2][0] === 2)
+        max = Math.max(max, Math.abs(edges[k][1] - 2 * edges[k - 1][1] + edges[k - 2][1]));
+    return { rows: edges.length, max };
+  };
+  await page.evaluate(() => window.check.receding(false));
+  const floorSharp = steps(await shot());
+  await page.evaluate(() => window.check.receding(true));
+  const floorBlurred = steps(await shot());
+  console.log('receding floor', JSON.stringify({ sharp: floorSharp, blurred: floorBlurred }));
+  assert.ok(floorSharp.rows >= 200 && floorBlurred.rows >= 200, 'the edge crosses the lower half of the frame');
+  assert.ok(floorBlurred.max <= 3, `the blurred edge moves in steps of up to ${floorBlurred.max} px from row to row`);
 
   // Temporal DOF: the half-resolution gather against the full one. Mean absolute difference over all channels of the
   // 512 x 512 frame; the box in focus (the middle 40 x 40) must be untouched, byte for byte.
@@ -197,7 +230,6 @@ try {
   assert.deepEqual(pageErrors, []);
   console.log('dof lens check passed');
 } finally {
-  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hold the GPU slot past 15 s
+  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hang past 15 s
   await Promise.race([context.close(), new Promise((resolve) => setTimeout(resolve, 15000).unref())]);
-  await release();
 }

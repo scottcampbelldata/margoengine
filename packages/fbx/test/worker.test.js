@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { rigFixture } from './native-scene-helper.js';
 import assert from 'node:assert/strict';
 import { parseFBX } from '../dist/index.js';
-import { modelFromPrepared } from '../../gltf-pro/dist/worker.js';
+import { modelFromPrepared } from '../../gltf/dist/worker.js';
 import { ascii, binary, grid, rich, L } from './fixtures.js';
 import { runParseWorker, assertSameBytes } from '../../../tests/support/parse-worker.js';
 import { headless, headlessModels, snapshot } from '../../../tests/support/pbr-snapshot.js';

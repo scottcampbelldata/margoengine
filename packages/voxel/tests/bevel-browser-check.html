@@ -8,7 +8,7 @@ import { Camera } from '/packages/core/dist/camera.js';
 import { Bloom } from '/packages/post/dist/bloom.js';
 import { sceneSamples } from '/packages/core/dist/quality.js';
 import { BlockTypes, VoxelWorld, blockState } from '/packages/voxel/dist/index.js';
-import { meshChunk, meshInput } from '/packages/voxel/dist/mesher.js';
+import { VoxelMesher, meshChunk, meshInput } from '/packages/voxel/dist/mesher.js';
 import { BlockTextures, VoxelRenderer } from '/packages/voxel/dist/render.js';
 import { voxelLightmap } from '/packages/voxel/dist/lightmap.js';
 import { voxelBevel } from '/packages/voxel/dist/bevel.js';
@@ -144,6 +144,7 @@ async function glassOrder(cells, positions) {
   return { pixels, background };
 }
 const LIT = blocks.define('baked diffuse', {textures: 0});
+const LIT_BLUE = blocks.define('baked diffuse blue', {textures: 0, color: [0.3, 0.5, 1]});
 const project = p => { const m=engine.camera.matrix,x=m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12], y=m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13], w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15]; return [Math.floor((x/w*.5+.5)*canvas.width),Math.floor((.5-y/w*.5)*canvas.height)]; };
 async function gapLightmap(bevel,offset=0,withHooks=false) {
  lightsOff(); const post=Bloom.attach(engine,{strength:0,exposure:0}),{world,keys}=worldOf([[offset,0,0,LIT]]);
@@ -282,6 +283,29 @@ window.check = {
       views: { red: dom(tl, 0), green: dom(tr, 1), blue: dom(bl, 2), white: br[0] > 180 && br[1] > 180 && br[2] > 180, pixels: { tl, tr, bl, br } },
     };
   },
+};
+// A lump of two lit blocks around `at`: the same cells wherever it sits.
+function lump(at){
+ const cells=[];let seed=99;const next=()=>((seed=(seed*1103515245+12345)>>>0)>>>8)/16777216;
+ for(let x=-4;x<4;x++)for(let y=-4;y<4;y++)for(let z=-4;z<4;z++){const r=next(),n=next();if(Math.hypot(x+.5,y+.5,z+.5)<=3.4+r*.9)cells.push([at[0]+x,at[1]+y,at[2]+z,n<.5?LIT:LIT_BLUE]);}
+ return cells;
+}
+// The lump lit by the sun at `at`, beveled, in the given chunks (sky light in every cell), seen from the same offset.
+async function lumpShot(at,chunks,context=true){
+ lighting().direction=[.45,.8,.4,1];lighting().radiance=[2,2,2,.3];
+ const world=new VoxelWorld({blocks});for(const [x,y,z] of chunks){world.addChunk(x,y,z);world.getChunk(x,y,z).fillLight(0xf0);}
+ world.setBlocks(lump(at).flat());
+ const keys=chunks.map((c)=>c.join()),renderer=attachVoxels({world,textures,workers:1,bevel:.15,...(context?{}:{mesher:unbordered()})});
+ look([at[0]+5.5,at[1]+4.5,at[2]+7.5],at);await ready(renderer,world,keys,true);const img=await shot();renderer.dispose();lightsOff();return img;
+}
+// A worker mesher that never returns borders, as one written before them: the seams then bevel without context.
+const unbordered=()=>{const m=new VoxelMesher({workers:1});return {mesh:(w,k,p,e)=>m.mesh(w,k,p,e),cancel:(k)=>m.cancel(k),dispose:()=>m.dispose()};};
+const differing=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.max(Math.abs(a[i]-b[i]),Math.abs(a[i+1]-b[i+1]),Math.abs(a[i+2]-b[i+2]))>24)n++;return n;};
+window.check.seams=async()=>{
+ const corner=[[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]];
+ const one=await lumpShot([16,16,16],[[0,0,0]]),eight=await lumpShot([32,32,32],corner),bare=await lumpShot([32,32,32],corner,false);
+ let lit=0;for(let i=0;i<one.length;i+=4)if(one[i]+one[i+1]+one[i+2]>60)lit++;
+ return {lit,differ:differing(one,eight),without:differing(one,bare),errors:errors.splice(0)};
 };
 window.check.gaps=async()=>{
  const lightmap=[];for(const bevel of [0,.15])lightmap.push(await gapLightmap(bevel));lightmap.push(await gapLightmap(.15,-33));lightmap.push(await gapLightmap(.15,0,true));const partial=await gapPartialAtlas();

@@ -177,6 +177,7 @@ interface AnimatorState {
         duration: number;
         from: string;
         fromTime?: number;
+        live?: boolean;
     };
 }
 

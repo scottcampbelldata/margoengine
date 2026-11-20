@@ -13,6 +13,7 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
+import { Settle, settleResolve } from './settle.js';
 import {
   fullscreen,
   cameraVelocity,
@@ -90,6 +91,13 @@ export interface TAAOptions {
    * shown, never the history. Fixed at construction. Default none.
    */
   present?: TAAPresent;
+  /**
+   * Settle a still view: with the camera and a pixel's surroundings unchanged for a whole jitter cycle (8 frames, each
+   * phase's sample bit-equal to the one a cycle before), the pixel shows the mean of the next 8 phases and keeps it, so
+   * the picture stops moving; any change hands the pixel back to the clamped history the same frame. Costs 32 bytes per
+   * pixel (66 MB at 1920 x 1080). False keeps the per-frame resolve alone. Fixed at construction. Default true.
+   */
+  settle?: boolean;
 }
 /**
  * A step run in TAA's present pass ({@link TAAOptions.present}): `code` rewrites the present shader once per pipeline,
@@ -101,7 +109,7 @@ export interface TAAPresent {
   /** This frame's uniform, 4 floats; may throw RangeError for an invalid setting before any GPU command. */
   values(): Float32Array;
 }
-/** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf-pro meshes. */
+/** A drawable whose per-vertex motion TAA tracks: the `shadowPrimitives` contract of core and gltf/pbr meshes. */
 export interface VelocityPrimitive extends CasterCutout {
   /** The source primitive: keys TAA's per-draw record; static PBR sources keep their CPU `vertices` on it. */
   primitive?: object;
@@ -129,7 +137,7 @@ export interface VelocityPrimitive extends CasterCutout {
   cutoff?: number;
   /** UV set of `alphaTexture`, 0 or 1. */
   texCoord?: number;
-  /** Instanced (gltf-pro PBRInstances) primitives get no object motion: camera reprojection covers static instances. */
+  /** Instanced (gltf\/pbrInstances) primitives get no object motion: camera reprojection covers static instances. */
   instances?: unknown;
 }
 /** TAA's motion vectors and resolved frame ({@link TAA.velocity}), for effects such as `MotionBlur` (@margoengine/post). */
@@ -171,7 +179,7 @@ export interface TAAVelocityPass {
   drawVelocity(pass: GPURenderPassEncoder, frame: TAAVelocityFrame): void;
   releaseVelocity?(key: object): void;
 }
-/** What `taa.add` takes: a model exposing its primitives (a gltf-pro `PBRModel`); dropped once `disposed` is true. */
+/** What `taa.add` takes: a model exposing its primitives (a gltf/pbr `PBRModel`); dropped once `disposed` is true. */
 export interface VelocitySource {
   /** Primitives read every frame (after skinning and morphing). */
   readonly shadowPrimitives: readonly VelocityPrimitive[];
@@ -208,7 +216,7 @@ interface Draw {
   frame: number;
 }
 /**
- * Temporal anti-aliasing: Halton (2,3) sub-pixel jitter, a velocity buffer (core meshes automatic, gltf-pro models via
+ * Temporal anti-aliasing: Halton (2,3) sub-pixel jitter, a velocity buffer (core meshes automatic, gltf/pbr models via
  * `taa.add`), depth-tested history reprojection with YCoCg neighbourhood clamping; resolves at frame-graph order 40.
  * `TAA.attach(engine, options)`; call `reset()` after a camera cut. WebGPU only.
  * @throws RangeError when an option is out of range; TypeError for an invalid velocity source or primitive (wrong
@@ -278,7 +286,7 @@ export class TAA implements EnginePlugin {
   private whiteTexture?: GPUTexture;
   private whiteView?: GPUTextureView;
   private whiteSampler?: GPUSampler;
-  private readonly values = new Float32Array(52);
+  private readonly values = new Float32Array(56);
   private readonly jittered = new Float32Array(16);
   private readonly previous = new Float32Array(16);
   private readonly workspace = new Float64Array(52);
@@ -299,6 +307,13 @@ export class TAA implements EnginePlugin {
   private cameraView?: Context['camera'];
   private frame = 0;
   private sample = 0;
+  /** Frame updates seen (`advanceTime`); once there is one, the jitter phase follows them instead of the draws. */
+  private steps = 0;
+  private phase = 0;
+  private clocked = false;
+  /** A zero-delta update (a capture's render, a redraw) came since the last step: the next resolved frame steps. */
+  private pending = false;
+  private seconds = 0;
   private front = 0;
   private valid = false;
   private disposed = false;
@@ -312,6 +327,10 @@ export class TAA implements EnginePlugin {
   private readonly locked: boolean;
   /** Thin-feature lock textures (r32float), read and written in turn like the histories. */
   private lockTextures: GPUTexture[] = [];
+  /** Still-view settling (settle.ts); made with the histories unless `settle` is false. */
+  private settle?: Settle;
+  /** The unjittered camera of the last resolved frame: a still view has it again, bit for bit. */
+  private readonly lastCamera = new Float32Array(16);
   constructor(readonly options: TAAOptions = {}) {
     this.validate();
     this.masked = !!options.reactive;
@@ -346,6 +365,8 @@ export class TAA implements EnginePlugin {
       throw new RangeError('Invalid TAA clipGamma; pass a number from 0.5 to 4.');
     if (o.locks !== undefined && typeof o.locks !== 'boolean')
       throw new TypeError('Invalid TAA locks; pass true or false.');
+    if (o.settle !== undefined && typeof o.settle !== 'boolean')
+      throw new TypeError('Invalid TAA settle; pass true or false.');
     if (o.present !== undefined && (typeof o.present?.code !== 'function' || typeof o.present.values !== 'function'))
       throw new TypeError(
         'Invalid TAA present; pass a present step such as new Sharpen() from @margoengine/taa/sharpen.',
@@ -370,7 +391,7 @@ export class TAA implements EnginePlugin {
       );
   }
   /**
-   * Draws `source`'s motion every frame: a model's primitives (a gltf-pro `PBRModel`), or a {@link TAAVelocityPass} that
+   * Draws `source`'s motion every frame: a model's primitives (a gltf/pbr `PBRModel`), or a {@link TAAVelocityPass} that
    * draws its own (`RawShaders`, for raw meshes with a `velocityEntry`). Returns a function that removes it.
    */
   add(source: VelocitySource | TAAVelocityPass): () => void {
@@ -419,6 +440,32 @@ export class TAA implements EnginePlugin {
   }
   onPreUpdate(delta: number): void {
     if (delta > 0) this.views.prune();
+    this.advanceTime(delta);
+  }
+  /** Seconds on the jitter clock: the sum of the frame deltas its updates moved it by. */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the Halton jitter one phase on, and the clock by `delta` seconds: the CPU part of its frame update, which a
+   * seek from `@margoengine/cutscene/seek` replays, so a cut lands on the jitter phase a continuous run has there. With
+   * an update, the phase follows frame updates (a `reset()` restarts the history, not the phase); a TAA no update
+   * reaches steps its phase at each resolved frame and restarts it at `reset()`. A `delta` of 0 is the same instant
+   * drawn again (a Reflector, Refractor or CubeCamera capture renders the scene with one inside the frame), so it moves
+   * nothing at once: the next resolved frame steps the phase if no timed update came first (KB-FILM-TAAPHASE1). The
+   * history itself is view history: a cut starts it empty and the scene's prewarm settles it, to 1 level of 255 after
+   * 53 frames at historyWeight 0.9 (docs/limits.md, class C).
+   */
+  advanceTime(delta: number): void {
+    if (this.disposed) return;
+    this.clocked = true;
+    if (!(delta > 0)) {
+      this.pending = true;
+      return;
+    }
+    this.seconds += delta;
+    this.phase = this.steps++ % 8;
+    this.pending = false;
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -431,7 +478,7 @@ export class TAA implements EnginePlugin {
     requireCompatTier(engine.gpu, 'TAA history', 'half-float');
     this.engine = engine;
     this.device = engine.gpu;
-    this.uniform = this.device.createBuffer({ size: 208, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = this.device.createBuffer({ size: 224, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     // Renderers cache bind groups by resource identity; only restoration replaces this buffer.
     this.cameraBinding = { binding: 18, resource: { buffer: this.uniform, size: 64 } };
     const compute = (code: string) =>
@@ -495,6 +542,11 @@ export class TAA implements EnginePlugin {
         this.reset();
         this.projection = projection;
       }
+      if (this.clocked) {
+        if (this.pending) this.phase = this.steps++ % 8;
+        this.pending = false;
+        this.sample = this.phase;
+      }
       if (!only) {
         const [width, height] = viewSize(c);
         jitterProjection(this.jittered, this.originalCamera!.matrix, this.sample, width, height);
@@ -519,9 +571,18 @@ export class TAA implements EnginePlugin {
         ],
         48,
       );
+      if (this.settle) {
+        const m = this.originalCamera!.matrix,
+          still = this.valid && this.lastCamera.every((x, i) => x === m[i]);
+        this.settle.write(this.sample, still);
+        this.lastCamera.set(m);
+      }
       const jitter = this.vectors.jitter;
       jitter[0] = this.valid ? this.offset[0] - this.lastOffset[0] : 0;
       jitter[1] = this.valid ? this.offset[1] - this.lastOffset[1] : 0;
+      // The resolve fetches history by the motion alone (shader.ts `offset`, KB-TAA-CLAMP1).
+      this.values[52] = jitter[0];
+      this.values[53] = jitter[1];
       c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
       if (only) return;
       // Core uploads its frame before extension passes; use the jittered matrix through an existing shader binding.
@@ -553,6 +614,8 @@ export class TAA implements EnginePlugin {
     this.captureReady = false;
     this.captureTarget?.dispose();
     for (const t of this.textures) t.destroy();
+    this.settle?.destroy();
+    this.settle = undefined;
     this.textures = [];
     this.histories = [];
     this.historyDepths = [];
@@ -590,6 +653,10 @@ export class TAA implements EnginePlugin {
         this.histories.push(texture('rgba16float', GPUTextureUsage.STORAGE_BINDING));
         this.historyDepths.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
         if (this.locked) this.lockTextures.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
+      }
+      if (this.options.settle ?? true) {
+        this.settle = new Settle(c.device, [c.width, c.height], [c.width, c.height], 8);
+        this.settle.bind(this.resolvePipeline!);
       }
       this.captureTarget = new SceneTarget(c.device, this.scene!, this.depth!, samples);
       this.colorView = this.scene!.createView();
@@ -673,17 +740,23 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
   }
   private motion(c: Context): void {
     resolveMSAA(c);
-    const depth = this.captureTarget && c.depth === this.captureTarget.depth ? this.depth : this.options.depth?.();
+    // The scene drew into TAA's own capture: its depth. Else a given `depth`, else the depth of the capture the scene
+    // drew into (a standalone Tonemap begins after TAA, at order -50), just resolved to one sample.
+    const depth =
+      this.captureTarget && c.depth === this.captureTarget.depth
+        ? this.depth
+        : (this.options.depth?.() ?? sceneTarget(c)?.resolvedDepth);
     if (
       !depth ||
       depth.width !== c.width ||
       depth.height !== c.height ||
+      depth.sampleCount !== 1 ||
       !(depth.usage & GPUTextureUsage.TEXTURE_BINDING) ||
       !depth.format.startsWith('depth')
     )
       throw new MargoError(
         'state',
-        'TAA needs the current sampleable scene depth; provide options.depth for an HDR/SSAO capture',
+        'TAA needs the current sampleable single-sample scene depth; provide options.depth for an HDR/SSAO capture',
       );
     if (this.masked) {
       const mask = this.options.reactive?.();
@@ -832,7 +905,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     const code = this.options.stochastic ? stochasticResolve() : resolve;
     const masked = this.masked ? reactiveResolve(code) : code,
       clipped = this.variance ? varianceResolve(masked) : masked;
-    return this.locked ? lockResolve(clipped) : clipped;
+    const locked = this.locked ? lockResolve(clipped) : clipped;
+    return (this.options.settle ?? true) ? settleResolve(locked, 'p', 'vec2i(size)-1') : locked;
   }
   /** This frame's reactive mask, or a 1 by 1 black one (nothing reactive). */
   private reactiveView(device: GPUDevice): GPUTextureView {
@@ -1166,9 +1240,11 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       const only = this.options.velocityOnly;
       if (!only) {
         this.captureTarget!.resolve(c.encoder, true);
+        this.settle?.run(c.encoder, this.colorView!);
         const compute = c.encoder.beginComputePass();
         compute.setPipeline(this.resolvePipeline!);
         compute.setBindGroup(0, this.resolveGroups[this.front]);
+        if (this.settle) compute.setBindGroup(1, this.settle.group(this.front));
         compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
         compute.end();
         const next = 1 - this.front;
@@ -1234,6 +1310,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     this.blackTexture?.destroy();
     this.blackTexture = this.blackView = this.reactiveSource = undefined;
     for (const t of this.textures) t.destroy();
+    this.settle?.destroy();
+    this.settle = undefined;
     for (const records of this.draws.values())
       for (const r of records.values()) {
         r.uniform.destroy();

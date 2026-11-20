@@ -62,7 +62,7 @@ function story(module, samples) {
       view.c.bindings.push({ binding: 1, resource: taa.resource }, taa);
       try {
         run(view.c);
-      } catch (error) {
+      } catch {
         gpu.note('throw');
       }
       view.end();

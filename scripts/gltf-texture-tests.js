@@ -54,7 +54,7 @@ export async function textureBrowserChecks(page) {
       [0, 0, 1, 1],
       [0, 0, -1, -1],
     ]) {
-      // A zero tangent has no direction: gltf-pro packs it with sign 0 and the shader takes the frame from the UV
+      // A zero tangent has no direction: gltf/pbr packs it with sign 0 and the shader takes the frame from the UV
       // derivatives, as for a primitive without tangents (0d128071b), so its reference has none. A tangent along the
       // normal keeps its sign and the shader picks a direction across the normal: (0, 1, 0) for this quad.
       const zero = tangent.slice(0, 3).every((value) => value === 0),
@@ -102,7 +102,7 @@ export async function textureBrowserChecks(page) {
   return page.evaluate(
     async (payload) => {
       const { Engine, TransformStore } = await import('/packages/core/dist/extension.js');
-      const { parseGLTF, loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF, loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const { Shadows } = await import('/packages/shadows/dist/index.js');
       const materials = await import('/packages/materials/dist/index.js');
       const assert = (value, message) => {
@@ -154,7 +154,7 @@ export async function textureBrowserChecks(page) {
         pipelines.push({ value, descriptor, code: modules.get(descriptor.vertex.module) });
         return value;
       };
-      // The pipelines a render binds: gltf-pro shares a pipeline across models with the same shader, so a render can
+      // The pipelines a render binds: gltf/pbr shares a pipeline across models with the same shader, so a render can
       // draw with one created before it.
       const setPipeline = GPURenderPassEncoder.prototype.setPipeline;
       let bound = [];
@@ -335,7 +335,7 @@ export async function textureBrowserChecks(page) {
         // The source itself, not a hash of it: a pinned hash went stale at the next deliberate shader edit, in a suite no
         // check ran. An ordinary material must compile the plain PBR shader (with its constant face and alpha
         // tests and its per-view block), with nothing a texture transform adds.
-        const { compactTests, pbrShader, viewShader } = await import('/packages/gltf-pro/src/shader.ts');
+        const { compactTests, pbrShader, viewShader } = await import('/packages/gltf/src/shader.ts');
         assert(ordinary.pipeline.code === viewShader(compactTests(pbrShader)), 'Ordinary PBR shader changed');
         assert(ordinary.pipeline.code === identity.pipeline.code, 'Identity transform changed the PBR shader');
         const results = [];

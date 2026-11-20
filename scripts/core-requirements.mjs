@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { distDir } from './support/dist-dir.mjs';
 
 const marker = '// @margo/core-built ';
 const key = (node) => node?.key?.name ?? node?.key?.value;
@@ -68,7 +69,7 @@ export function declareCoreRequirement(code, version, filename = 'package.js') {
 }
 
 /** Apply after emission, so custom and TypeScript builds publish the same exact-version declarations. */
-export async function declarePackageCore(root) {
+export async function declarePackageCore(root, dist = distDir(root)) {
   const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   const version = JSON.parse(await readFile(new URL('../packages/core/package.json', import.meta.url), 'utf8')).version;
   const source = await readFile(new URL('../packages/core/src/version.ts', import.meta.url), 'utf8');
@@ -86,5 +87,5 @@ export async function declarePackageCore(root) {
       }
     }
   }
-  await visit(join(root, 'dist'));
+  await visit(dist);
 }

@@ -162,6 +162,29 @@ for (const compat of [false, true]) {
         v = tetrahedralVolume(f, { ...grid, pointData: missing }, opts);
         const mask = center(await pixels());
         v.dispose();
+        // Node values past the classifier range: the field is the linear interpolation of the given values (-1 at
+        // x = 0, 1 at x = 1, so 0 through the centre), not of values first clamped to the range (0.5 there).
+        v = tetrahedralVolume(
+          f,
+          { ...grid, pointData: points.filter((_, i) => i % 3 === 0).map((x) => 2 * x - 1) },
+          { ...rampOpts, mode: 'mip', opacity: () => 1 },
+        );
+        const beyond = center(await pixels());
+        v.dispose();
+        // A colour scale's float table: values below its domain take its under colour, with no GPU validation error.
+        const { colorScale } = await import('/packages/sciviz/dist/colormaps.js');
+        v = tetrahedralVolume(
+          f,
+          { ...grid, pointData: new Float32Array(8).fill(-2) },
+          {
+            range: [0, 1],
+            mode: 'mip',
+            shading: false,
+            colormap: colorScale('coolwarm', { domain: [0, 1], under: '#00ff00', over: '#ff0000' }),
+          },
+        );
+        const encoded = center(await pixels());
+        v.dispose();
         f.dispose();
         return {
           scaled,
@@ -177,6 +200,8 @@ for (const compat of [false, true]) {
           rmse: Math.sqrt(squared / count),
           max,
           mask,
+          beyond,
+          encoded,
           gpuErrors,
         };
       },
@@ -196,6 +221,11 @@ for (const compat of [false, true]) {
     assert.deepEqual(report.cell, report.cube);
     assert.ok(Math.abs(report.gap[0] - 25) <= 1);
     assert.deepEqual(report.mask, [0, 0, 0]);
+    assert.ok(Math.max(...report.beyond) <= 2, JSON.stringify(report.beyond));
+    assert.ok(
+      report.encoded[1] > 100 && report.encoded[0] < 30 && report.encoded[2] < 30,
+      JSON.stringify(report.encoded),
+    );
     assert.ok(report.rmse <= 1 && report.max <= 2, JSON.stringify(report));
 
     await browser.page.goto(new URL('/examples/sciviz-tetvolume.html', browser.page.url()).href);

@@ -4,6 +4,8 @@
 // their own scripts, never by Vite) and local test output, so the scan failed and pre-bundling was skipped for every
 // Margo page. `npm run check:dev-servers` keeps this honest.
 import { execFileSync } from 'node:child_process';
+import { createReadStream, realpathSync, statSync } from 'node:fs';
+import { extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -12,14 +14,45 @@ import { defineConfig } from 'vite';
  * lane scratch folders and local-only folders. Their names are read from git, so no tracked file has to spell out a
  * local-only folder. The root dev servers run from a git checkout.
  */
-export function ignoredRootFolders() {
-  return execFileSync(
-    'git',
-    ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '--no-empty-directory'],
-    { cwd: fileURLToPath(new URL('.', import.meta.url)), encoding: 'utf8' },
-  )
+export function ignoredRootFolders(run = execFileSync) {
+  let listed;
+  try {
+    listed = run(
+      'git',
+      ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '--no-empty-directory'],
+      { cwd: fileURLToPath(new URL('.', import.meta.url)), encoding: 'utf8' },
+    );
+  } catch (error) {
+    throw gitListError(error);
+  }
+  return listed
     .split('\n')
     .filter((path) => /^[^/]+\/$/.test(path));
+}
+
+/**
+ * The coded error for a git that could not list the ignored folders (KB-L5a-6). Exit status 0xC0000142
+ * (STATUS_DLL_INIT_FAILED, 3221225794) means Windows could not start the git process at all: it failed while loading
+ * its DLLs, which happens when the session runs out of desktop heap with many processes open. It is not a git or Vite
+ * error, so the message says so instead of the bare "Command failed". Nothing retries it: the dev server stops.
+ */
+export function gitListError(error) {
+  const status = error?.status;
+  const cause =
+    status === 3221225794
+      ? 'Windows could not start git (exit 0xC0000142, STATUS_DLL_INIT_FAILED: a process failed to initialise, usually ' +
+        'because the desktop heap ran out with many processes open; close some browsers or GPU tests and start again)'
+      : error?.code === 'ENOENT'
+        ? 'git is not on PATH'
+        : `git exited with status ${status ?? 'none'}${error?.stderr ? `: ${String(error.stderr).trim()}` : ''}`;
+  return Object.assign(
+    new Error(
+      `ERR_DEV_SERVER_GIT_LIST: the root Vite config could not list the git-ignored folders: ${cause}. ` +
+        'See docs/known-bugs.md (KB-L5a-6).',
+      { cause: error },
+    ),
+    { code: 'ERR_DEV_SERVER_GIT_LIST' },
+  );
 }
 
 /**
@@ -96,10 +129,84 @@ export const rootToQuickstart = {
   },
 };
 
+/**
+ * Film and example assets (Blender builds, downloaded CC0 scans) never go into git (Scott, 2026-11-16): they live in a
+ * library folder beside the checkouts, `MARGO_ASSET_LIBRARY` or else `../../Assets/blender-library` from the
+ * repository (the development root's Assets folder). This serves that folder read-only at
+ * `/asset-library/` on every dev server the root config starts, the shot tool's included, so a page loads
+ * `/asset-library/kitty-hawk/flyer-1903/flyer-1903.glb` without the files being copied into the repository. Paths
+ * that leave the folder answer 403 and missing files 404 (never Vite's HTML fallback, which would hand a loader a page).
+ */
+export const ASSET_LIBRARY_PREFIX = '/asset-library/';
+
+const ASSET_TYPES = {
+  '.glb': 'model/gltf-binary',
+  '.gltf': 'model/gltf+json',
+  '.bin': 'application/octet-stream',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.ktx2': 'image/ktx2',
+  '.hdr': 'image/vnd.radiance',
+  '.exr': 'image/x-exr',
+  '.json': 'application/json',
+  '.md': 'text/markdown; charset=utf-8',
+};
+
+export function assetLibraryRoot(env = process.env) {
+  return resolve(env.MARGO_ASSET_LIBRARY || resolve(fileURLToPath(new URL('.', import.meta.url)), '../../Assets/blender-library'));
+}
+
+export function assetLibrary({ root = assetLibraryRoot() } = {}) {
+  return {
+    name: 'margo-asset-library',
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (!request.url?.startsWith(ASSET_LIBRARY_PREFIX)) return next();
+        const send = (status, text) => {
+          response.statusCode = status;
+          response.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          response.end(text);
+        };
+        if (request.method !== 'GET' && request.method !== 'HEAD') return send(405, 'read only');
+        let name;
+        try {
+          name = decodeURIComponent(request.url.slice(ASSET_LIBRARY_PREFIX.length).split(/[?#]/)[0]);
+        } catch {
+          return send(400, 'bad path');
+        }
+        let base;
+        try {
+          base = realpathSync.native(root);
+        } catch {
+          return send(404, `no asset library at ${root} (set MARGO_ASSET_LIBRARY)`);
+        }
+        const file = resolve(base, name),
+          rel = relative(base, file);
+        if (!name || rel.startsWith('..') || isAbsolute(rel) || rel.split(sep).includes('..')) return send(403, 'outside the asset library');
+        let stat;
+        try {
+          stat = statSync(file);
+        } catch {
+          return send(404, `not in the asset library: ${name}`);
+        }
+        if (!stat.isFile()) return send(404, `not a file: ${name}`);
+        response.statusCode = 200;
+        response.setHeader('Content-Type', ASSET_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream');
+        response.setHeader('Content-Length', String(stat.size));
+        response.setHeader('Cache-Control', 'no-cache');
+        if (request.method === 'HEAD') return response.end();
+        createReadStream(file).pipe(response);
+      });
+    },
+  };
+}
+
 const servedOnly = servedFilesWatch();
 
 export default defineConfig({
-  plugins: [servedOnly.plugin, rootToQuickstart],
+  plugins: [servedOnly.plugin, rootToQuickstart, assetLibrary()],
   optimizeDeps: {
     entries: [
       '**/*.html',

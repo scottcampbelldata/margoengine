@@ -16,7 +16,7 @@ try {
       const { SpatialPicking } = await import('/packages/selection/dist/spatial.js');
       const { XRController } = await import('/packages/xr/dist/index.js');
       const { XRPointerEvents } = await import('/packages/xr/dist/pointer.js');
-      const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const canvas = document.createElement('canvas');
       canvas.style.cssText = 'width:128px;height:128px';
       document.body.append(canvas);

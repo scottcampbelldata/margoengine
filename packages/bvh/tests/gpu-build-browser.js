@@ -5,7 +5,7 @@ import { GPUDynamicBVH } from '@margoengine/bvh/gpu-build';
 import { Animation } from '@margoengine/animation';
 import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import foxURL from '../../../examples/assets/khronos/Fox/Fox.glb?url';
 
 const assert = (condition, message) => {
@@ -173,7 +173,7 @@ const storage = (device, data, extra = 0) => {
 };
 
 /** Runs every check on one device; pushes a line per check into `report.checks`. */
-// A real skin: Fox.glb through gltf-pro and Animation, the tree on the deformed output, against a CPU tree of the same
+// A real skin: Fox.glb through gltf/pbr and Animation, the tree on the deformed output, against a CPU tree of the same
 // pose read back from the GPU, at three times of the clip.
 async function skinnedChecks() {
   const canvas = document.createElement('canvas');

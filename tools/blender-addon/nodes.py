@@ -1,9 +1,15 @@
 """Clean-room live socket graph serialization. No shader code or texture baking."""
 import math
+import struct
+
+from .bake import render_uv
 
 # F-curve keys of one live parameter, in seconds from the scene start, when Blender's own evaluation can be reproduced
 # exactly between frames: CONSTANT, LINEAR, BEZIER and every easing (ELASTIC with its amplitude, and its period in seconds),
-# with no modifier, driver, NLA or mute. Anything else keeps the per-frame samples alone.
+# with no modifier, driver, NLA or mute. An F-curve that carries a Noise modifier is sampled by Blender's own evaluation
+# (fcurve.evaluate) at power-of-two subframe steps and written as LINEAR keys, reduced greedily, that give every sample back
+# within single-precision rounding (KB5339d): the reader plays those values and has no noise model. Anything else keeps the per-frame
+# samples alone.
 EXACT_INTERPOLATIONS = {"CONSTANT", "LINEAR", "BEZIER", "SINE", "QUAD", "CUBIC", "QUART", "QUINT", "EXPO", "CIRC", "BACK", "BOUNCE",
                         "ELASTIC"}
 
@@ -20,7 +26,77 @@ def _fcurves(animation):
     return list(action.fcurves)
 
 
-def exact_curves(animation, path, width, start, fps):
+def _float32(v):
+    return struct.unpack("f", struct.pack("f", v))[0]
+
+
+def _ulp32(v):
+    """The gap from float32 v to the next float32 away from zero (Blender evaluates curves in single precision)."""
+    bits = struct.unpack("<I", struct.pack("<f", abs(v)))[0]
+    return struct.unpack("<f", struct.pack("<I", bits + 1))[0] - abs(v)
+
+
+def within_rounding(got, sample):
+    """True when got, rounded to float32, is the sample or one of its float32 neighbours."""
+    return abs(_float32(got) - sample) <= _ulp32(sample)
+
+
+def _reduce(times, values):
+    """Indices of the samples a greedy pass keeps so that linear interpolation between kept neighbours, computed as the
+    reader computes it in double precision, rounds to every dropped sample's float32 value or a float32 neighbour of it."""
+    def gives_back(a, b):
+        ta, tb, va, vb = times[a], times[b], values[a], values[b]
+        return all(within_rounding(va + (vb - va) * ((times[m] - ta) / (tb - ta)), values[m]) for m in range(a + 1, b))
+
+    kept, a, n = [0], 0, len(times)
+    while a < n - 1:
+        b = a + 1
+        # Grow the span while a line from its first sample still reaches every sample's float32 rounding interval
+        # (one float32 step either side), then confirm the span exactly; shrink it if the bound was loose.
+        low, high, c = -math.inf, math.inf, a + 1
+        while c < n:
+            dt = times[c] - times[a]
+            tol = _ulp32(values[c])
+            low, high = max(low, (values[c] - tol - values[a]) / dt), min(high, (values[c] + tol - values[a]) / dt)
+            if low > high:
+                break
+            b, c = c, c + 1
+        while b > a + 1 and not gives_back(a, b):
+            b -= 1
+        kept.append(b)
+        a = b
+    return kept
+
+
+def noise_step(fcurve, coarsen=0):
+    """Sampling step in frames for a Noise-modified F-curve: an eighth of a frame, finer when the finest noise octave is
+    shorter (8 samples per octave length scale / lacunarity^depth), a power of two from 1/1024 up to one frame."""
+    finest = min((m.scale / (getattr(m, "lacunarity", 2.0) ** m.depth) for m in fcurve.modifiers if m.type == "NOISE" and m.scale > 0),
+                 default=1.0)
+    step = 1 / 8
+    while step > 1 / 1024 and step > finest / 8:
+        step /= 2
+    return min(1.0, step * 2 ** coarsen)
+
+
+def noise_keys(fcurve, start, end, fps, coarsen=0):
+    step = noise_step(fcurve, coarsen)
+    count = round((end - start) / step)
+    frames = [start + i * step for i in range(count + 1)]
+    times = [(f - start) / fps for f in frames]
+    values = [fcurve.evaluate(f) for f in frames]
+    if any(not math.isfinite(v) for v in values):
+        return None
+    keys = [{"t": times[i], "v": values[i], "l": [times[i], values[i]], "r": [times[i], values[i]], "i": "LINEAR", "e": "AUTO", "b": 0.0}
+            for i in _reduce(times, values)]
+    return {"extrapolation": "CONSTANT", "keys": keys}
+
+
+def has_noise(fcurve):
+    return any(m.type == "NOISE" for m in fcurve.modifiers)
+
+
+def exact_curves(animation, path, width, start, fps, end=None, coarsen=0):
     if path is None or animation.nla_tracks or any(d.data_path == path for d in animation.drivers):
         return None
     fcurves = _fcurves(animation)
@@ -34,6 +110,12 @@ def exact_curves(animation, path, width, start, fps):
             continue
         fcurve = found[0]
         points = fcurve.keyframe_points
+        if not fcurve.mute and end is not None and has_noise(fcurve):
+            curve = noise_keys(fcurve, start, end, fps, coarsen)
+            if curve is None or len(curve["keys"]) > 65536:
+                return None
+            curves.append(curve)
+            continue
         if fcurve.mute or len(fcurve.modifiers) or not len(points) or fcurve.extrapolation not in {"CONSTANT", "LINEAR"}:
             return None
         if any(k.interpolation not in EXACT_INTERPOLATIONS for k in points[:-1]):
@@ -126,7 +208,7 @@ def graph(context, material, owner):
                 data["inputs"][0] = {"link": coordinate("generated")}
         elif t in {"UVMAP", "TEX_COORD"}:
             mode = "uv" if t == "UVMAP" or out.name == "UV" else out.name.lower()
-            if mode not in {"uv", "generated", "object", "normal"} or t == "UVMAP" and node.uv_map and node.uv_map != owner.data.uv_layers.active.name or t == "TEX_COORD" and node.object:
+            if mode not in {"uv", "generated", "object", "normal"} or t == "UVMAP" and node.uv_map and node.uv_map != getattr(render_uv(owner.data), "name", None) or t == "TEX_COORD" and node.object:
                 fail(node, "unsupported coordinate source")
             data.update(op=mode, inputs=[])
         elif t in {"SEPXYZ", "SEPRGB", "SEPARATE_COLOR"}:
@@ -180,12 +262,24 @@ def graph(context, material, owner):
         finally:
             scene.frame_set(frame, subframe=subframe)
         result["times"] = [(f - start) / fps for f in range(start, end + 1)]
-        for k, values in samples.items():
-            if any(v != values[0] for v in values[1:]):
-                parameters[k]["samples"] = values
-                curves = exact_curves(animation, paths[k], len(values[0]), start, fps)
+        animated = [k for k, values in samples.items() if any(v != values[0] for v in values[1:])]
+        for k in animated:
+            parameters[k]["samples"] = samples[k]
+        # Noise-sampled keys count toward the reader's 262144 samples: coarsen their step, never past one frame, until
+        # the file fits; a parameter that still does not fit keeps its frame samples alone.
+        for coarsen in range(11):
+            total = len(animated) * len(result["times"])
+            for k in animated:
+                curves = exact_curves(animation, paths[k], len(samples[k][0]), start, fps, end, coarsen)
+                parameters[k].pop("curves", None)
                 if curves:
                     parameters[k]["curves"] = curves
+                    total += sum(len(c["keys"]) for c in curves if c)
+            if total <= 262144:
+                break
+        else:
+            for k in animated:
+                parameters[k].pop("curves", None)
     return result
 
 

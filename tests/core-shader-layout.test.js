@@ -13,7 +13,7 @@ test('the display curve survives a package replacing the vertex stage', () => {
   assert.match(replaced, /pbrNeutral\(max\(linear/);
 });
 
-// f1f54092c: the curve's local was `var color=`, so glTF-pro's variants held the hook point twice.
+// f1f54092c: the curve's local was `var color=`, so glTF PBR's variants held the hook point twice.
 test('the curve does not use the name of the lighting hook point', () => {
   for (const curve of [neutralShader, /fn pbrNeutral\([^\n]+/.exec(wgsl)[0]]) {
     assert.match(curve, /var v=/);

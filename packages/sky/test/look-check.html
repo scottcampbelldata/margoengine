@@ -1,0 +1,101 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky look check</title><style>body{margin:0}canvas{display:block;width:128px;height:96px}</style></head><body><canvas width="128" height="96"></canvas>
+<script type="module">
+// The sky's look and atmosphere options on a real GPU, read from Bloom's HDR scene capture as mean linear RGB over
+// three bands of the view: high (60 to 80 degrees up), mid (about 30 degrees) and horizon (0 to 8 degrees), with the
+// camera looking north 40 degrees up and the sun 15 degrees up in the east. Driven by features-check.mjs ("look").
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/index.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,-1],fov:80,near:0.5,far:100000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0}),rad=Math.PI/180;
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function image(){
+ engine.render({delta:0});
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();
+ return {w,h,v};
+}
+const aim=(elevation,azimuth=0)=>{const e=elevation*rad,a=azimuth*rad;engine.camera.target=[Math.sin(a)*Math.cos(e)*1000,2+Math.sin(e)*1000,-Math.cos(a)*Math.cos(e)*1000];};
+// Mean RGB of rows a..b (fractions of the height) and the whole image; the second frame, as the sky settles in one.
+async function bands(){
+ await image();const {w,h,v}=await image(),band=(a,b)=>{const s=[0,0,0];let n=0;for(let y=Math.floor(a*h);y<Math.ceil(b*h);y++)for(let x=0;x<w;x++,n++)for(let c=0;c<3;c++)s[c]+=v[(y*w+x)*4+c];return s.map(x=>x/n);};
+ return {high:band(0,0.12),mid:band(0.42,0.5),horizon:band(0.9,1),all:band(0,1),pixels:v};
+}
+const maxDiff=(a,b)=>{let m=0;for(let i=0;i<a.length;i++)if(i%4!==3)m=Math.max(m,Math.abs(a[i]-b[i])/Math.max(1e-4,Math.abs(b[i])));return m;};
+const strip=(r)=>{const {pixels,...rest}=r;return rest;};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const sun=[Math.cos(15*rad),Math.sin(15*rad),0],out={};
+  const sky=Sky.attach(engine,{timeScale:0,sunDirection:sun});
+  aim(40);
+  const shot=async(name,set)=>{set(sky.options);out[name]=await bands();return out[name];};
+  for(const model of ['preetham','bruneton']){
+   const m=(o)=>{for(const k of ['look','atmosphere','clouds'])delete o[k];o.model=model;};
+   const plain=await shot(model,m);
+   // The options set with nothing moved: the physical sky again, within float rounding of the rewritten program.
+   const neutral=await shot(model+'Neutral',o=>{m(o);o.look={};o.atmosphere={};});
+   out[model+'NeutralDiff']=maxDiff(neutral.pixels,plain.pixels);
+   await shot(model+'Zenith',o=>{m(o);o.look={zenithColor:[0.2,1,0.2],zenithStrength:1};});
+   await shot(model+'Horizon',o=>{m(o);o.look={horizonColor:[1,0.15,0.1],horizonStrength:1};});
+   await shot(model+'Gradient',o=>{m(o);o.look={gradientStrength:1,gradientIntensity:2,gradient:[{elevation:0,color:[1,0.5,0]},{elevation:90,color:[0.5,0,1]}]};});
+   await shot(model+'Glow',o=>{m(o);o.look={glowStrength:2,glowWidth:10,glowSunward:0};});
+   await shot(model+'SunIntensity',o=>{m(o);o.atmosphere={sunIntensity:2};});
+   await shot(model+'SunColor',o=>{m(o);o.atmosphere={sunColor:[1,0.5,0.25]};});
+   // Removed again: the exact program and data of the plain sky, so the exact frame.
+   const back=await shot(model+'Back',m);
+   out[model+'BackDiff']=maxDiff(back.pixels,plain.pixels);
+  }
+  const b=(o)=>{for(const k of ['look','atmosphere','clouds'])delete o[k];o.model='bruneton';};
+  await shot('rayleighGreen',o=>{b(o);o.atmosphere={rayleighColor:[0.3,1,0.2]};});
+  await shot('rayleighNone',o=>{b(o);o.atmosphere={rayleigh:0.1};});
+  await shot('rayleighThick',o=>{b(o);o.atmosphere={rayleigh:3};});
+  await shot('mieHaze',o=>{b(o);o.atmosphere={mie:15};});
+  await shot('mieRed',o=>{b(o);o.atmosphere={mie:15,mieColor:[1,0.3,0.1]};});
+  await shot('ozone',o=>{b(o);o.atmosphere={ozone:5};});
+  aim(15,90);
+  await shot('mieForward',o=>{b(o);o.atmosphere={mie:10,mieAnisotropy:0.2};});
+  await shot('mieForwardTight',o=>{b(o);o.atmosphere={mie:10,mieAnisotropy:0.9};});
+  // The glow's shape, with the sun at the centre of the view: mean luminance of the 4 x 4 pixels round the sun (within
+  // about 2 degrees) and of the mid band's pixels 40 or more columns to either side (beyond about 30 degrees).
+  for(const name of ['mieForward','mieForwardTight']){
+   const v=out[name].pixels,w=128,lum=(i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2],mean=(cells)=>cells.reduce((s,i)=>s+lum(i),0)/cells.length,near=[],far=[];
+   for(let y=46;y<50;y++)for(let x=62;x<66;x++)near.push((y*w+x)*4);
+   for(let y=40;y<48;y++)for(let x=0;x<w;x++)if(Math.abs(x+0.5-64)>=40)far.push((y*w+x)*4);
+   out[name+'Shape']={near:mean(near),far:mean(far)};
+  }
+  // Toward the sun: the disc's size and colour.
+  const discPixels=(r,limit)=>{let n=0;for(let i=0;i<r.pixels.length;i+=4)if(r.pixels[i]+r.pixels[i+1]+r.pixels[i+2]>limit)n++;return n;};
+  const sunPlain=await shot('sunPlain',b),limit=0.5*Math.max(...Array.from({length:sunPlain.pixels.length/4},(_,i)=>sunPlain.pixels[4*i]+sunPlain.pixels[4*i+1]+sunPlain.pixels[4*i+2]));
+  const sunBig=await shot('sunBig',o=>{b(o);o.look={sunDiscSize:4};});
+  const sunRed=await shot('sunRed',o=>{b(o);o.look={sunDiscColor:[1,0.1,0.1]};});
+  out.disc={plain:discPixels(sunPlain,limit),big:discPixels(sunBig,limit)};
+  const peak=(r)=>{let best=0,at=0;for(let i=0;i<r.pixels.length;i+=4){const s=r.pixels[i]+r.pixels[i+1]+r.pixels[i+2];if(s>best){best=s;at=i;}}return Array.from(r.pixels.subarray(at,at+3));};
+  out.sunPeak={plain:peak(sunPlain),red:peak(sunRed)};
+  // The cloud sheet: colour and density, looking up into it.
+  aim(60);
+  await shot('cloudPlain',o=>{b(o);o.clouds={coverage:0.6};});
+  await shot('cloudRed',o=>{b(o);o.clouds={coverage:0.6};o.look={cloudColor:[1,0.3,0.3]};});
+  await shot('cloudThin',o=>{b(o);o.clouds={coverage:0.6};o.look={cloudDensity:0.2};});
+  await shot('cloudClear',o=>{b(o);});
+  // Below the horizon: the ground tint.
+  aim(-30);
+  await shot('groundPlain',b);
+  await shot('groundTint',o=>{b(o);o.look={groundColor:[0.1,0.2,1],groundStrength:1};});
+  sky.dispose();
+  const error=await device.popErrorScope();
+  const result={error:error?.message??null,errors:errors.splice(0)};
+  for(const [k,v] of Object.entries(out))result[k]=v&&v.pixels?strip(v):v;
+  return result;
+ }};
+window.ready=true;
+</script></body></html>

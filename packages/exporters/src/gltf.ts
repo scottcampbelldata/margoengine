@@ -9,6 +9,7 @@ import {
   determinant3,
   drawables,
   normalMatrix,
+  unitNormal,
   isObject,
   samplerOf,
   pixelArtOf,
@@ -28,6 +29,7 @@ import {
   type SceneOptions,
   type SkinData,
   type TextureData,
+  type TextureTransform,
 } from './scene.js';
 import { cameraDefinition, lightDefinition } from './scene-metadata.js';
 
@@ -42,6 +44,13 @@ export interface GLTFOptions extends SceneOptions {
   flatten?: boolean;
   /** `asset.generator`. Default 'Margo Engine exporters'. */
   generator?: string;
+  /**
+   * Write each morph target's POSITION, NORMAL and TANGENT deltas as a sparse accessor (glTF 2.0 section 3.6.2.3)
+   * when its moved vertices' indices and values take fewer bytes than the dense array, and a target that moves
+   * nothing as an accessor with no buffer view (all zeros, section 3.6.2.1). Either decodes to the same floats bit
+   * for bit. `false` writes every target dense, for a reader without sparse support. Default true.
+   */
+  sparseMorphs?: boolean;
 }
 
 /**
@@ -86,10 +95,12 @@ export interface GLTFJsonResult {
 }
 
 const FLOAT = 5126,
+  UNSIGNED_BYTE = 5121,
   UNSIGNED_SHORT = 5123,
   UNSIGNED_INT = 5125,
   ARRAY_BUFFER = 34962,
-  ELEMENT_ARRAY_BUFFER = 34963;
+  ELEMENT_ARRAY_BUFFER = 34963,
+  SPARSE_JSON_BYTES = 128;
 const GLB_LIMIT = 0xffffffff,
   // The 12-byte GLB header plus the JSON and BIN chunk headers: the least a GLB with binary data adds to its BIN.
   HEADERS = 28;
@@ -130,6 +141,8 @@ class Writer {
   length = 0;
   /** Pixel-art sampling applied to every texture (SceneOptions.pixelArt). */
   pixelArt?: PixelArtSampling;
+  /** GLTFOptions.sparseMorphs. */
+  sparseMorphs = true;
   /** BIN bytes the collected scene is known to need (vertex attributes, images) before they are written. */
   private planned = 0;
 
@@ -230,6 +243,69 @@ class Writer {
     return this.list('accessors', accessor);
   }
 
+  /**
+   * One morph target's VEC3 float deltas. With `sparseMorphs`, a target is sparse (glTF 2.0 section 3.6.2.3) when
+   * the moved rows' indices (8, 16 or 32 bits, by the last moved row) and values with the JSON of the extra buffer
+   * view take fewer bytes than the dense array; a target that moves nothing has no buffer view (section 3.6.2.1).
+   * A row moves when any component's bits are not +0, so a -0 delta is kept and every implicit zero reads as +0:
+   * the decoded floats equal the dense ones bit for bit. Sparse index and value views have no target (5.11.4).
+   */
+  private deltaAccessor(data: Float32Array, bounds: boolean): number {
+    if (!this.sparseMorphs) return this.floatAccessor(data, 3, 'VEC3', bounds);
+    const count = data.length / 3,
+      bits = new Uint32Array(data.buffer, data.byteOffset, data.length);
+    let moved = 0,
+      last = 0;
+    for (let row = 0; row < count; row++)
+      if (bits[row * 3] | bits[row * 3 + 1] | bits[row * 3 + 2]) {
+        moved++;
+        last = row;
+      }
+    const indexType = last <= 255 ? UNSIGNED_BYTE : last <= 65535 ? UNSIGNED_SHORT : UNSIGNED_INT,
+      indexSize = indexType === UNSIGNED_BYTE ? 1 : indexType === UNSIGNED_SHORT ? 2 : 4;
+    // The sparse block and its second buffer view add about this many JSON bytes over a dense accessor.
+    if (moved && align4(moved * indexSize) + moved * 12 + SPARSE_JSON_BYTES >= count * 12)
+      return this.floatAccessor(data, 3, 'VEC3', bounds);
+    const accessor: Record<string, unknown> = { componentType: FLOAT, count, type: 'VEC3' };
+    if (moved) {
+      const indices =
+          indexType === UNSIGNED_BYTE
+            ? new Uint8Array(moved)
+            : indexType === UNSIGNED_SHORT
+              ? new Uint16Array(moved)
+              : new Uint32Array(moved),
+        values = new Uint32Array(moved * 3);
+      for (let row = 0, i = 0; i < moved; row++)
+        if (bits[row * 3] | bits[row * 3 + 1] | bits[row * 3 + 2]) {
+          indices[i] = row;
+          values[i * 3] = bits[row * 3];
+          values[i * 3 + 1] = bits[row * 3 + 1];
+          values[i * 3 + 2] = bits[row * 3 + 2];
+          i++;
+        }
+      accessor.sparse = {
+        count: moved,
+        indices: {
+          bufferView: this.view(new Uint8Array(indices.buffer, 0, indices.byteLength)),
+          componentType: indexType,
+        },
+        values: { bufferView: this.view(new Uint8Array(values.buffer)) },
+      };
+    }
+    if (bounds) {
+      const min = [Infinity, Infinity, Infinity],
+        max = [-Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < data.length; i++) {
+        const c = i % 3;
+        if (data[i] < min[c]) min[c] = data[i];
+        if (data[i] > max[c]) max[c] = data[i];
+      }
+      accessor.min = min.map((v) => (v === 0 ? 0 : v));
+      accessor.max = max.map((v) => (v === 0 ? 0 : v));
+    }
+    return this.list('accessors', accessor);
+  }
+
   private primitive(geo: Geo): PrimitiveData {
     let cached = this.geometryCache.get(geo);
     if (cached) return cached;
@@ -238,10 +314,11 @@ class Writer {
     let shared = this.attributeCache.get(owner);
     const fresh = !shared;
     if (!shared) {
-      const attributes: Record<string, number> = {
-        POSITION: this.floatAccessor(owner.positions, 3, 'VEC3', true),
-        NORMAL: this.floatAccessor(owner.normals, 3, 'VEC3'),
-      };
+      const attributes: Record<string, number> = { POSITION: this.floatAccessor(owner.positions, 3, 'VEC3', true) };
+      // A point or line without normals keeps none: glTF normals are unit length, and such a primitive is drawn unlit
+      // (glTF 2.0 section 3.7.2.1).
+      if (!owner.topology || unitNormals(owner.normals))
+        attributes.NORMAL = this.floatAccessor(owner.normals, 3, 'VEC3');
       if (owner.tangents) attributes.TANGENT = this.floatAccessor(owner.tangents, 4, 'VEC4');
       if (owner.uvs) attributes.TEXCOORD_0 = this.floatAccessor(owner.uvs, 2, 'VEC2');
       if (owner.uvs1) attributes.TEXCOORD_1 = this.floatAccessor(owner.uvs1, 2, 'VEC2');
@@ -255,6 +332,8 @@ class Writer {
           owner.colors1Size!,
           owner.colors1Size === 3 ? 'VEC3' : 'VEC4',
         );
+      // A per-point width multiplier: an application-specific attribute (glTF 2.0 section 3.7.2.1, `_` prefix).
+      if (owner.widths) attributes._WIDTH = this.floatAccessor(owner.widths, 1, 'SCALAR');
       if (owner.joints) {
         const data = owner.joints;
         attributes.JOINTS_0 = this.list('accessors', {
@@ -281,9 +360,9 @@ class Writer {
     });
     if (fresh && owner.morphs)
       shared.targets = owner.morphs.map((morph) => {
-        const target: Record<string, number> = { POSITION: this.floatAccessor(morph.positions, 3, 'VEC3', true) };
-        if (morph.normals) target.NORMAL = this.floatAccessor(morph.normals, 3, 'VEC3');
-        if (morph.tangents) target.TANGENT = this.floatAccessor(morph.tangents, 3, 'VEC3');
+        const target: Record<string, number> = { POSITION: this.deltaAccessor(morph.positions, true) };
+        if (morph.normals) target.NORMAL = this.deltaAccessor(morph.normals, false);
+        if (morph.tangents) target.TANGENT = this.deltaAccessor(morph.tangents, false);
         return target;
       });
     cached = { attributes: shared.attributes, indices };
@@ -293,10 +372,20 @@ class Writer {
   }
 
   /** A textureInfo: the texture, its UV set and `more` (scale, strength) when given. */
-  private info(texture: TextureData, more?: Record<string, number>): Record<string, unknown> {
+  private info(
+    texture: TextureData,
+    more?: Record<string, number>,
+    transform?: TextureTransform,
+  ): Record<string, unknown> {
     const out: Record<string, unknown> = { index: this.texture(texture) };
     if (texture.texCoord) out.texCoord = texture.texCoord;
-    return more ? { ...out, ...more } : out;
+    if (more) Object.assign(out, more);
+    if (transform) {
+      out.extensions = { KHR_texture_transform: transform };
+      this.used.add('KHR_texture_transform');
+      this.required.add('KHR_texture_transform');
+    }
+    return out;
   }
 
   texture(texture: TextureData): number {
@@ -340,27 +429,31 @@ class Writer {
       roughnessFactor: mat.roughness,
     };
     if (mat.baseColorTexture) {
-      pbr.baseColorTexture = this.info(mat.baseColorTexture);
-      if (mat.baseColorTextureTransform) {
-        (pbr.baseColorTexture as Record<string, unknown>).extensions = {
-          KHR_texture_transform: mat.baseColorTextureTransform,
-        };
-        this.used.add('KHR_texture_transform');
-        this.required.add('KHR_texture_transform');
-      }
+      pbr.baseColorTexture = this.info(mat.baseColorTexture, undefined, mat.baseColorTextureTransform);
     }
-    if (mat.metallicRoughnessTexture) pbr.metallicRoughnessTexture = this.info(mat.metallicRoughnessTexture);
+    if (mat.metallicRoughnessTexture)
+      pbr.metallicRoughnessTexture = this.info(
+        mat.metallicRoughnessTexture,
+        undefined,
+        mat.metallicRoughnessTextureTransform,
+      );
     const out: Record<string, unknown> = {};
     if (mat.name) out.name = mat.name;
     out.pbrMetallicRoughness = pbr;
     if (mat.normalTexture)
-      out.normalTexture = this.info(mat.normalTexture, mat.normalScale !== 1 ? { scale: mat.normalScale } : undefined);
+      out.normalTexture = this.info(
+        mat.normalTexture,
+        mat.normalScale !== 1 ? { scale: mat.normalScale } : undefined,
+        mat.normalTextureTransform,
+      );
     if (mat.occlusionTexture)
       out.occlusionTexture = this.info(
         mat.occlusionTexture,
         mat.occlusionStrength !== 1 ? { strength: mat.occlusionStrength } : undefined,
+        mat.occlusionTextureTransform,
       );
-    if (mat.emissiveTexture) out.emissiveTexture = this.info(mat.emissiveTexture);
+    if (mat.emissiveTexture)
+      out.emissiveTexture = this.info(mat.emissiveTexture, undefined, mat.emissiveTextureTransform);
     if (mat.emissive.some((v) => v !== 0)) out.emissiveFactor = mat.emissive.slice();
     if (mat.alphaMode !== 'OPAQUE') out.alphaMode = mat.alphaMode;
     if (mat.alphaCutoff !== undefined) out.alphaCutoff = mat.alphaCutoff;
@@ -393,10 +486,12 @@ class Writer {
 
   /** The mesh of a hierarchy node: shared by nodes with the same geometry or primitives, name and mesh extras. */
   nodeMesh(node: Node): number | undefined {
-    const items: MeshItem[] | undefined =
-      node.primitives ?? (node.geometry ? [{ geometry: node.geometry, material: node.material }] : undefined);
-    if (!items) return undefined;
-    const key = node.primitivesKey ?? (node.primitives ? undefined : node.geometry);
+    const triangles: MeshItem[] =
+        node.primitives ?? (node.geometry ? [{ geometry: node.geometry, material: node.material }] : []),
+      // Points and lines follow the triangles in one mesh (glTF 2.0 section 3.7.2.1).
+      items = node.lines ? [...triangles, ...node.lines] : triangles;
+    if (!items.length) return undefined;
+    const key = node.primitivesKey ?? (node.primitives || node.lines ? undefined : node.geometry);
     if (!key) return this.meshPrimitives(items, node.name);
     if (!node.primitivesKey && node.meshName === undefined && !node.meshExtras)
       return this.mesh(node.geometry!, node.material, node.name);
@@ -424,7 +519,11 @@ class Writer {
           );
       }
       const { attributes, indices, targets } = this.primitive(geometry),
-        primitive: Record<string, unknown> = { attributes, indices, mode: 4 };
+        primitive: Record<string, unknown> = {
+          attributes,
+          indices,
+          mode: geometry.topology === 'points' ? 0 : geometry.topology === 'lines' ? 1 : 4,
+        };
       if (targets) primitive.targets = targets;
       if (material) primitive.material = this.material(material);
       const extras = copyExtras(source, 'Primitive extras');
@@ -588,7 +687,8 @@ class Writer {
       const node = resolve(channel.node),
         path = channel.path,
         interpolation = channel.interpolation ?? 'LINEAR';
-      if (lookup.get(channel.node)?.matrix && path !== 'weights')
+      // glTF 2.0 3.5.3: a node an animation targets, for any path, weights included, must not have matrix.
+      if (lookup.get(channel.node)?.matrix)
         throw new TypeError('An animated node needs translation, rotation and scale, not matrix');
       if (
         !['translation', 'rotation', 'scale', 'weights'].includes(path) ||
@@ -641,8 +741,43 @@ class Writer {
   }
 }
 
-/** Bakes a sheared world transform into a copy of the geometry. */
-function bake(geo: Geo, m: Float64Array): Geo {
+/** True when every normal is unit length (normalizeGeometry leaves an unset point or line normal zero). */
+function unitNormals(normals: Float32Array): boolean {
+  for (let i = 0; i < normals.length; i += 3) if (!normals[i] && !normals[i + 1] && !normals[i + 2]) return false;
+  return true;
+}
+
+/** Triangle indices with each triangle's last two corners swapped, for a mirroring bake. */
+function flipped(indices: Uint32Array): Uint32Array {
+  const out = indices.slice();
+  for (let i = 0; i < out.length; i += 3) {
+    const b = out[i + 1];
+    out[i + 1] = out[i + 2];
+    out[i + 2] = b;
+  }
+  return out;
+}
+
+/**
+ * The geometry with `m` written into its vertices. A primitive cut from a shared geometry (`base`) bakes that base
+ * once per matrix, through `bases`, and keeps its own indices, so its owner is the baked base, never the unbaked one.
+ */
+function bake(geo: Geo, m: Float64Array, bases?: Map<Geo, [Float64Array, Geo][]>): Geo {
+  if (geo.base) {
+    const known = bases?.get(geo.base) ?? [];
+    let base = known.find(([matrix]) => matrix.every((v, i) => v === m[i]))?.[1];
+    if (!base) {
+      base = bake(geo.base, m);
+      known.push([m, base]);
+      bases?.set(geo.base, known);
+    }
+    return {
+      ...base,
+      indices: determinant3(m) < 0 && !geo.topology ? flipped(geo.indices) : geo.indices,
+      faceSizes: geo.faceSizes,
+      base,
+    };
+  }
   const n = normalMatrix(m),
     positions = new Float32Array(geo.positions.length),
     normals = new Float32Array(geo.normals.length);
@@ -654,9 +789,11 @@ function bake(geo: Geo, m: Float64Array): Geo {
     const nx = geo.normals[i * 3],
       ny = geo.normals[i * 3 + 1],
       nz = geo.normals[i * 3 + 2];
-    const v = [n[0] * nx + n[3] * ny + n[6] * nz, n[1] * nx + n[4] * ny + n[7] * nz, n[2] * nx + n[5] * ny + n[8] * nz],
-      l = Math.hypot(v[0], v[1], v[2]) || 1;
-    for (let r = 0; r < 3; r++) normals[i * 3 + r] = v[r] / l;
+    unitNormal(
+      [n[0] * nx + n[3] * ny + n[6] * nz, n[1] * nx + n[4] * ny + n[7] * nz, n[2] * nx + n[5] * ny + n[8] * nz],
+      normals,
+      i * 3,
+    );
   }
   const out: Geo = { ...geo, positions, normals };
   if (geo.tangents) {
@@ -672,14 +809,8 @@ function bake(geo: Geo, m: Float64Array): Geo {
     }
     out.tangents = tangents;
   }
-  if (determinant3(m) < 0) {
-    out.indices = geo.indices.slice();
-    for (let i = 0; i < out.indices.length; i += 3) {
-      const b = out.indices[i + 1];
-      out.indices[i + 1] = out.indices[i + 2];
-      out.indices[i + 2] = b;
-    }
-  }
+  // A point or line has no winding to keep.
+  if (determinant3(m) < 0 && !geo.topology) out.indices = flipped(geo.indices);
   return out;
 }
 
@@ -688,13 +819,17 @@ function document(
   options: GLTFOptions,
   writer = new Writer(),
   prepare?: (roots: Node[]) => void,
+  writes: readonly ('points' | 'lines')[] = ['points', 'lines'],
 ): Writer {
   const flatten = options.flatten ?? false,
     generator = options.generator ?? 'Margo Engine exporters';
   if (typeof flatten !== 'boolean') throw new TypeError('flatten must be boolean');
   if (typeof generator !== 'string') throw new TypeError('generator must be a string');
+  if (options.sparseMorphs !== undefined && typeof options.sparseMorphs !== 'boolean')
+    throw new TypeError('sparseMorphs must be boolean');
+  writer.sparseMorphs = options.sparseMorphs ?? true;
   writer.pixelArt = pixelArtOf(options.pixelArt);
-  const roots = collect(source, options, (bytes) => writer.plan(bytes));
+  const roots = collect(source, options, (bytes) => writer.plan(bytes), 'refuse', writes);
   prepare?.(roots);
   const json = writer.json,
     sceneNodes: number[] = [];
@@ -736,7 +871,8 @@ function document(
       throw new TypeError(
         'Flatten does not support skins, morphs or animation; export without flatten, or remove skins, morphs and animation first',
       );
-    for (const item of drawables(roots)) {
+    const bases = new Map<Geo, [Float64Array, Geo][]>();
+    for (const item of drawables(roots, writes.length > 0)) {
       const parts = decompose(item.world);
       const node = parts
         ? writer.node(item.name, parts.t, parts.r, parts.s, writer.mesh(item.geometry, item.material, item.name))
@@ -745,7 +881,7 @@ function document(
             [0, 0, 0],
             [0, 0, 0, 1],
             [1, 1, 1],
-            writer.mesh(bake(item.geometry, item.world), item.material, item.name),
+            writer.mesh(bake(item.geometry, item.world, bases), item.material, item.name),
           );
       (json.nodes ??= []).push(node);
       sceneNodes.push(json.nodes.length - 1);
@@ -973,10 +1109,11 @@ export function writeGLB(
   options: GLBOptions,
   prepare?: (roots: Node[]) => void,
   finish?: (writer: Writer) => void,
+  writes?: readonly ('points' | 'lines')[],
 ): Uint8Array {
   const maxBinary = limit(options.maxBinaryBytes, 'maxBinaryBytes'),
     maxFile = limit(options.maxBytes, 'maxBytes'),
-    writer = document(source, options, new Writer(maxBinary, maxFile), prepare);
+    writer = document(source, options, new Writer(maxBinary, maxFile), prepare, writes);
   finish?.(writer);
   const json = JSON.stringify(writer.json),
     jsonLength = align4(utf8Length(json)),

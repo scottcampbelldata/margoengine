@@ -2,7 +2,9 @@
 // Grade options change nothing (within one level of rounding). A blue shadows offset lifts the blue of the dark pixels
 // and leaves the bright ones; a red highlights cut lowers the red of the bright pixels by what the wheel weights give
 // (a CPU oracle) and leaves the dark ones; hue saturation 0 everywhere makes every pixel grey; a flat master curve at
-// 0.5 makes every pixel sRGB 0.5 (188).
+// 0.5 makes every pixel sRGB 0.5 (188). Lift raises the darks most, gain lowers the brights most,
+// gamma 2 brightens the midtones, saturation 0 greys and 2 deepens colour, and back at their defaults the frame is the
+// default Grade's.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { postBrowser } from '../../post/test/post-browser.mjs';
@@ -52,6 +54,14 @@ await postBrowser(
     const flat = await frame(
       '(o, g) => { g.options.hueSaturation = undefined; g.options.curves = { master: [[0, 0.5], [1, 0.5]] }; }',
     );
+    // The primaries (lift, gamma, gain, saturation): lift raises the darks more than the brights, gain lowers the brights
+    // more than the darks, gamma 2 brightens the red box's midtone green, saturation 0 greys and 2 deepens the red box.
+    const lift = await frame('(o, g) => { g.options.curves = undefined; g.options.lift = [0.2, 0.2, 0.2]; }'),
+      gain = await frame('(o, g) => { g.options.lift = undefined; g.options.gain = [0.5, 0.5, 0.5]; }'),
+      gamma = await frame('(o, g) => { g.options.gain = undefined; g.options.gamma = [2, 2, 2]; }'),
+      desaturated = await frame('(o, g) => { g.options.gamma = undefined; g.options.saturation = 0; }'),
+      saturated = await frame('(o, g) => { g.options.saturation = 2; }'),
+      reset = await frame('(o, g) => { g.options.saturation = 1; }');
     const pixels = (img) =>
       Array.from({ length: img.width * img.height }, (_, i) => [...img.data.subarray(4 * i, 4 * i + 3)]);
     const p0 = pixels(plain),
@@ -72,13 +82,36 @@ await postBrowser(
     const decode = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
       encode = (v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055),
       smooth = (a, b, x) => ((x = Math.min(1, Math.max(0, (x - a) / (b - a)))), x * x * (3 - 2 * x));
+    const r_primaries = {};
     let oracle = 0;
     for (const i of bright) {
       const [R, G, B] = p0[i].map(decode),
         w = smooth(0.5, 1, 0.2126 * R + 0.7152 * G + 0.0722 * B);
       oracle = Math.max(oracle, Math.abs(encode(Math.max(0, R - 0.2 * w)) - highlights.data[4 * i]));
     }
+    let resetDiff = 0,
+      desaturatedDiff = 0;
+    for (let i = 0; i < p0.length; i++)
+      for (let c = 0; c < 3; c++) {
+        resetDiff = Math.max(resetDiff, Math.abs(reset.data[4 * i + c] - identity.data[4 * i + c]));
+        desaturatedDiff = Math.max(desaturatedDiff, Math.abs(desaturated.data[4 * i + c] - desaturated.data[4 * i + 1]));
+      }
+    const redBox = p0.map((p, i) => (p[0] > 120 && p[1] < 90 ? i : -1)).filter((i) => i >= 0),
+      chroma = (img, set) => set.reduce((s, i) => s + img.data[4 * i] - img.data[4 * i + 2], 0) / set.length;
+    Object.assign(r_primaries, {
+      liftDark: mean(lift, dark, 1),
+      liftBright: mean(lift, bright, 1),
+      gainBright: mean(gain, bright, 1),
+      gainDark: mean(gain, dark, 1),
+      gammaRedGreen: mean(gamma, redBox, 1),
+      redChroma: chroma(plain, redBox),
+      saturatedChroma: chroma(saturated, redBox),
+      desaturatedDiff,
+      resetDiff,
+      redBox: redBox.length,
+    });
     const r = {
+      ...r_primaries,
       oracle,
       dark: dark.length,
       bright: bright.length,
@@ -104,5 +137,13 @@ await postBrowser(
     assert.ok(oracle <= 2, `the red of every bright pixel is where the wheel math puts it: ${oracle} levels`);
     assert.ok(greyDiff <= 1, `saturation 0 makes every pixel grey: ${greyDiff}`);
     assert.ok(flatDiff <= 1, `a flat curve at 0.5 gives sRGB 188 everywhere: ${flatDiff}`);
+    assert.ok(r.redBox > 500, 'the red box on screen');
+    // Lift weighs on the darks (1 - x), gain on the brights (x): each moves its end at least twice as far as the other.
+    assert.ok(r.liftDark > 20 && r.liftDark > 2 * r.liftBright, `lift raises the darks most: ${JSON.stringify(r)}`);
+    assert.ok(r.gainBright < -40 && 2 * Math.abs(r.gainDark) < -r.gainBright, `gain lowers the brights most: ${JSON.stringify(r)}`);
+    assert.ok(r.gammaRedGreen > 10, `gamma 2 brightens the midtones: ${r.gammaRedGreen}`);
+    assert.ok(r.desaturatedDiff <= 1, `saturation 0 greys every pixel: ${r.desaturatedDiff}`);
+    assert.ok(r.saturatedChroma > r.redChroma + 5, `saturation 2 deepens the red: ${JSON.stringify(r)}`);
+    assert.ok(r.resetDiff <= 0, `back at the defaults the frame is the default Grade's: ${r.resetDiff}`);
   },
 );

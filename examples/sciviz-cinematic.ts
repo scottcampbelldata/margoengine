@@ -49,7 +49,7 @@ function change(): void {
   const mode = element<HTMLSelectElement>('mode').value;
   const options: CinematicOptions =
     mode === 'ao'
-      ? { ambientOcclusion: { directions: 6, steps: 6 }, ambient: [0.8, 0.8, 0.8], light: [0.2, 0.2, 0.2] }
+      ? { ambientOcclusion: { directions: 6, steps: 6 }, ambient: [0.8, 0.8, 0.8], light: [2.5, 2.5, 2.5] }
       : mode === 'shadow'
         ? { shadows: { steps: 24 } }
         : mode === 'path'

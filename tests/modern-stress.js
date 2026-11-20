@@ -9,8 +9,8 @@ import { Shadows } from '/packages/shadows/dist/index.js';
 import { Clustered } from '/packages/clustered/dist/index.js';
 import { TAA } from '/packages/taa/dist/index.js';
 import { Animation } from '/packages/animation/dist/index.js';
-import { parseGLTF } from '/packages/gltf-pro/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { parseGLTF } from '/packages/gltf/dist/pbr.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 const assert = (ok, message) => {
   if (!ok) throw new Error(message);

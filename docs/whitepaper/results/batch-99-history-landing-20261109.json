@@ -21,7 +21,7 @@
       "seconds": 23.585,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -59,7 +59,7 @@
       "seconds": 59.7,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -86,7 +86,7 @@
       "seconds": 78.249,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",
@@ -121,7 +121,7 @@
       "seconds": 52.284,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-99",
         "--wait-max=60",

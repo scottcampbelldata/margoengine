@@ -1,0 +1,403 @@
+import { borrow, lend } from '../../shared/borrowed.js';
+import { retire } from '../../shared/frame-resources.js';
+import { margoError } from '../../shared/errors.js';
+import { transmissionWeight } from '../../shared/pbr-transmission.js';
+import { directVisibility } from '../../shared/pbr-hooks.js';
+
+/**
+ * Caller-owned, filterable 2D texture and optional filtering sampler. Each is a plain object or `(device) => object`,
+ * called once per device and again after a device restore, so nothing is lost. A plain view or sampler belongs to the
+ * device that made it: after a restore it is dropped and reported once through `engine.onError` (`'state'`, help
+ * `borrowed-lost`), and the surface reads a 1 x 1 white texture and a linear sampler in its place until the material is
+ * given a new `MaterialExtension`.
+ */
+export interface MaterialExtensionTexture {
+  view: GPUTextureView | ((device: GPUDevice) => GPUTextureView);
+  sampler?: GPUSampler | ((device: GPUDevice) => GPUSampler);
+}
+
+type Slot = ReturnType<typeof borrow>;
+/** The slots of one texture entry, kept for as long as the caller keeps the entry. */
+const held = new WeakMap<object, { view: Slot; sampler?: Slot; from: unknown; samplerFrom: unknown }>();
+/** What a lost view or sampler reads as on a device: white, with linear filtering. */
+const stand = new WeakMap<GPUDevice, { view: GPUTextureView; sampler: GPUSampler }>();
+
+function standIn(device: GPUDevice) {
+  let made = stand.get(device);
+  if (!made) {
+    const texture = device.createTexture({
+      size: [1, 1],
+      format: 'rgba8unorm',
+      usage: 4 /* TEXTURE_BINDING */ | 2 /* COPY_DST */,
+    });
+    device.queue.writeTexture({ texture }, new Uint8Array([255, 255, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
+    made = { view: texture.createView(), sampler: device.createSampler({ magFilter: 'linear', minFilter: 'linear' }) };
+    stand.set(device, made);
+  }
+  return made;
+}
+
+/** The view and sampler an entry binds on `device`. */
+function textureOn(
+  device: GPUDevice,
+  texture: MaterialExtensionTexture,
+  index: number,
+  engine?: { onError(error: unknown): void },
+): { view: GPUTextureView; sampler?: GPUSampler } {
+  let slots = held.get(texture);
+  // The caller may point the entry at another view or sampler at any time: borrow the new one.
+  if (!slots || slots.from !== texture.view || slots.samplerFrom !== texture.sampler) {
+    const setter = 'give the material a new MaterialExtension';
+    slots = {
+      view: borrow(texture.view, `MaterialExtension textures[${index}].view`, setter),
+      sampler: texture.sampler ? borrow(texture.sampler, `MaterialExtension textures[${index}].sampler`, setter) : undefined,
+      from: texture.view,
+      samplerFrom: texture.sampler,
+    };
+    held.set(texture, slots);
+  }
+  const view = lend(slots.view, device, engine) as GPUTextureView | undefined,
+    sampler = slots.sampler ? (lend(slots.sampler, device, engine) as GPUSampler | undefined) : undefined;
+  return {
+    view: view ?? standIn(device).view,
+    sampler: slots.sampler ? (sampler ?? standIn(device).sampler) : undefined,
+  };
+}
+
+/** True when every view and sampler of the extension is a `(device) => object`, so another device can use it. */
+export function extensionTexturesPortable(extension: MaterialExtension | undefined): boolean {
+  return (extension?.textures ?? []).every(
+    (t) => typeof t.view === 'function' && (t.sampler === undefined || typeof t.sampler === 'function'),
+  );
+}
+
+/** Optional material slot. Group 3 is permanently reserved; lighting stays in group 2. */
+export interface MaterialExtension {
+  /**
+   * Draw the beauty pass after the opaque phase (for example to read an opaque-scene capture), keeping the material's
+   * authored alpha mode, cutoff, blending and depth writes. Such primitives cast no opaque shadows. Default false.
+   */
+  afterOpaque?: boolean;
+  /** The extension supplies physical lobes in place of imported built-in physical shading. */
+  replacesPhysical?: boolean;
+  /**
+   * WGSL f32 expression (evaluated after `wgsl`) of the share of light this surface transmits, for an extension that
+   * composites its own transmission in `output`: diffuse and ambient light scale by 1 minus it, as on the native
+   * transmission path, so reflections keep their strength. The value is in `s.tr`.
+   */
+  transmission?: string;
+  /**
+   * WGSL f32 expression (evaluated after `wgsl`) of the surface's index of refraction (KHR_materials_ior; 0 is the
+   * extension's infinite index, F0 1, and other values below 1 count as 1): the dielectric F0 of direct and ambient
+   * light becomes ((ior - 1) / (ior + 1))^2 in place of 0.04 (IOR 1.5), as on the native physical path, so IOR 1 reflects nothing. The value is in `s.f0`. Default: F0 0.04.
+   */
+  ior?: string;
+  /** Statements after surface(i,front), in every fragment entry point. May mutate s. */
+  wgsl?: string;
+  /** Beauty-only statements after directional direct lighting, before lighting effects. */
+  direct?: string;
+  /** Statements after hemispherical ambient lighting; may mutate materialAmbient. */
+  ambient?: string;
+  /**
+   * A layer over all the surface's light, as KHR_materials_clearcoat defines it: direct, local, ambient and emissive
+   * light keep the share `keep`, then the layer's own directional and ambient light add on top. The ambient light is
+   * `(1 - keep) x margoCoatAmbient(s, v)`, the same function native physical materials use, so lighting effects light it
+   * (PBRHooks `coat`). SSAO's ambient replay returns the same sum for its ambient part.
+   */
+  coat?: MaterialCoatLayer;
+  /** Beauty-only statements after output encoding, before the final return. */
+  output?: string;
+  /** Disable optional lighting bindings for a caller-managed surface. */
+  lighting?: boolean;
+  /** Module-scope WGSL helpers, in addition to the generated resource declarations. */
+  declarations?: string;
+  /** One or more packed vec4 factors, exposed as materialFactors[index]. */
+  factors?: Float32Array;
+  /** materialTextureN / materialSamplerN, at bindings 1+2*N / 2+2*N. */
+  textures?: readonly MaterialExtensionTexture[];
+}
+
+/** WGSL expressions, evaluated after `wgsl`, of a `MaterialExtension.coat` layer. */
+export interface MaterialCoatLayer {
+  /** f32: the share of the light under the layer that it leaves, 1 - factor x Fresnel(v.n). */
+  keep: string;
+  /** vec3f: the layer's own directional light, before shadows. Shadow visibility applies to it as to the base. */
+  direct: string;
+  /** vec3f: the layer's unit normal, in `s.cn`. */
+  normal: string;
+  /** f32: the layer's roughness, in `s.cr`. */
+  roughness: string;
+}
+
+declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+interface ExtensionGroup {
+  entries: GPUBindGroupEntry[];
+  group: GPUBindGroup;
+  gap?: GPUBindGroup;
+}
+function validateDeclarations(declarations: unknown): void {
+  if (declarations !== undefined && typeof declarations !== 'string')
+    throw new TypeError('Invalid material extension WGSL; pass WGSL source that follows the documented hook');
+  if (typeof declarations === 'string' && /@\s*(?:group|binding)\b/.test(declarations))
+    throw new TypeError('Material extension declarations cannot declare @group or @binding; use factors and textures');
+}
+export interface MaterialExtensionResource {
+  uniform?: GPUBuffer;
+  bytes: number;
+  entries: GPUBindGroupEntry[];
+  groups: Map<GPURenderPipeline, ExtensionGroup>;
+}
+
+export function prepareMaterialExtension(
+  device: GPUDevice,
+  extension: MaterialExtension,
+  previous?: MaterialExtensionResource,
+  engine?: { onError(error: unknown): void },
+): MaterialExtensionResource {
+  if (
+    !extension ||
+    typeof extension !== 'object' ||
+    (extension.wgsl !== undefined && typeof extension.wgsl !== 'string') ||
+    (extension.direct !== undefined && typeof extension.direct !== 'string') ||
+    (extension.coat !== undefined &&
+      !['keep', 'direct', 'normal', 'roughness'].every((key) => typeof extension.coat?.[key as 'keep'] === 'string')) ||
+    (extension.ambient !== undefined && typeof extension.ambient !== 'string') ||
+    (extension.output !== undefined && typeof extension.output !== 'string') ||
+    (extension.transmission !== undefined && typeof extension.transmission !== 'string') ||
+    (extension.ior !== undefined && typeof extension.ior !== 'string') ||
+    (extension.lighting !== undefined && typeof extension.lighting !== 'boolean') ||
+    (extension.declarations !== undefined && typeof extension.declarations !== 'string')
+  )
+    throw new TypeError('Invalid material extension WGSL; pass WGSL source that follows the documented hook');
+  if (extension.afterOpaque !== undefined && typeof extension.afterOpaque !== 'boolean')
+    throw new TypeError('Material extension afterOpaque must be a boolean; pass true or false');
+  validateDeclarations(extension.declarations);
+  const { factors, textures = [] } = extension;
+  if (
+    factors !== undefined &&
+    (!(factors instanceof Float32Array) ||
+      !factors.length ||
+      factors.length % 4 ||
+      factors.some((v) => !Number.isFinite(v)))
+  )
+    throw new TypeError('Material extension factors require finite vec4 values');
+  const bytes = factors?.byteLength ?? 0;
+  if (bytes > Math.min(device.limits.maxUniformBufferBindingSize ?? Infinity, device.limits.maxBufferSize))
+    throw new RangeError(
+      'Material extension factors exceed device limit; load a smaller model, or reduce its textures and meshes',
+    );
+  if (!Array.isArray(textures) || textures.some((t) => !t?.view))
+    throw new TypeError('Invalid material extension textures; pass the documented texture bindings');
+  if (
+    textures.length + 5 > (device.limits.maxSampledTexturesPerShaderStage ?? Infinity) ||
+    textures.filter((texture) => texture.sampler).length + 5 > (device.limits.maxSamplersPerShaderStage ?? Infinity)
+  )
+    throw new RangeError(
+      'Material extension textures exceed device binding limits; load a smaller model, or reduce its textures and meshes',
+    );
+  if ((bytes || textures.length) && (device.limits.maxBindGroups ?? 4) < 4)
+    throw new RangeError('Material extensions require bind group 3');
+  const resource: MaterialExtensionResource = previous ?? { bytes: 0, entries: [], groups: new Map() };
+  if (bytes !== resource.bytes) {
+    // Allocate first so a failed allocation leaves the previous resource usable.
+    const uniform = bytes
+      ? device.createBuffer({ size: bytes, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+      : undefined;
+    retire(device, resource.uniform);
+    resource.uniform = uniform;
+    resource.bytes = bytes;
+    resource.groups.clear();
+  }
+  try {
+    if (factors) device.queue.writeBuffer(resource.uniform!, 0, factors as Float32Array<ArrayBuffer>);
+  } catch (error) {
+    if (!previous) resource.uniform?.destroy();
+    throw error;
+  }
+  resource.entries = resource.uniform ? [{ binding: 0, resource: { buffer: resource.uniform } }] : [];
+  textures.forEach((texture, i) => {
+    const bound = textureOn(device, texture, i, engine);
+    resource.entries.push({ binding: 1 + i * 2, resource: bound.view });
+    if (bound.sampler) resource.entries.push({ binding: 2 + i * 2, resource: bound.sampler });
+  });
+  return resource;
+}
+
+/** The phony assignments that keep an extension's group-3 resources in an auto layout (WGSL 9.2.3). */
+function extensionAccess(extension: MaterialExtension): string {
+  let access = extension.factors ? '_ = materialFactors;\n' : '';
+  (extension.textures ?? []).forEach((texture, i) => {
+    access += `_ = materialTexture${i};\n`;
+    if (texture.sampler) access += `_ = materialSampler${i};\n`;
+  });
+  return access;
+}
+
+/**
+ * Applies the extension's surface edits (and the phony assignments that keep its bindings) wherever an entry point
+ * still builds the plain surface: after materialExtensionShader, an entry appended later (SSAO's occlusion fragment)
+ * gets them too, so its layout keeps group 3 and its surface matches the beauty pass.
+ */
+export function materialExtensionSurface(code: string, extension: MaterialExtension): string {
+  return code.replaceAll(
+    'let s=surface(i,front);',
+    () =>
+      `var s=surface(i,front);\n${extensionAccess(extension)}${extension.wgsl ?? ''}\n` +
+      (extension.transmission ? `s.tr=clamp(${extension.transmission},0.0,1.0);\n` : '') +
+      (extension.coat ? `s.cn=${extension.coat.normal};s.cr=${extension.coat.roughness};\n` : '') +
+      (extension.ior
+        ? `{let materialIorRatio=select((max(${extension.ior},1.0)-1.0)/(max(${extension.ior},1.0)+1.0),1.0,${extension.ior}==0.0);s.f0=vec3f(materialIorRatio*materialIorRatio);}\n`
+        : ''),
+  );
+}
+
+/**
+ * `code` with a per-surface dielectric F0 (`s.f0`, set from the extension's `ior` in the surface hook) in place of the
+ * fixed 0.04 in every metal/rough F0, as gltf/pbr's native physical shader does. Throws when the shader has no Surface
+ * struct or no F0 to replace, so a changed base shader cannot silently keep 0.04.
+ */
+function dielectricIor(code: string): string {
+  if (code.includes(' f0:vec3f')) return code;
+  const fixed = 'mix(vec3f(0.04),s.base.rgb,s.metal)',
+    struct = /struct Surface \{([^}]*)\}/;
+  if (!struct.test(code) || !code.includes(fixed))
+    throw margoError(
+      'unsupported',
+      'PBR shader IOR target missing: the Surface struct or its 0.04 F0; use matching @margoengine/gltf/pbr and materials versions',
+    );
+  // The direct diffuse keeps 1 - the dielectric Fresnel (glTF Appendix B), whose F0 the IOR sets too.
+  return code
+    .replace(struct, 'struct Surface {$1, f0:vec3f}')
+    .replaceAll(fixed, 'mix(s.f0,s.base.rgb,s.metal)')
+    .replaceAll('let dielectric=vec3f(0.04);', 'let dielectric=s.f0;');
+}
+
+/**
+ * `code` with what a coat layer reads: the Surface's coat normal and roughness and the default coat ambient light, which
+ * native physical shaders already have, and the shadow visibility `lightPBR` fills in for the coat's directional light.
+ */
+function coatLayer(code: string): string {
+  const struct = /struct Surface \{([^}]*)\}/;
+  if (!struct.test(code))
+    throw margoError(
+      'unsupported',
+      'PBR shader coat target missing: the Surface struct; use matching @margoengine/gltf/pbr and materials versions',
+    );
+  if (!code.includes(' cn:vec3f')) code = code.replace(struct, 'struct Surface {$1, cn:vec3f, cr:f32}');
+  // Ambient 0.5 and the hemisphere are the native layers' own, written so that lightPBR can replace them.
+  if (!code.includes('fn margoCoatAmbient('))
+    code += `\nfn margoCoatAmbient(s:Surface,v:vec3f)->vec3f {return 0.5*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.cn.y*0.5+0.5,0.0,1.0))*f.radiance.w*s.occlusion;}\n`;
+  // A physical shader declares it already, and its margoLit knows only the native coat: this one has light of its own.
+  return code.includes(directVisibility)
+    ? code.replace(/fn margoLit\([^}]*\}/, 'fn margoLit(s:Surface,l:vec3f,direct:vec3f)->vec3f {return vec3f(1);}')
+    : `${directVisibility}\n${code}`;
+}
+
+/** `under`, an expression of ambient light, as the coat layer of `extension` leaves it. */
+export function coatedAmbient(extension: MaterialExtension | undefined, under: string): string {
+  const keep = extension?.coat?.keep;
+  return keep ? `(${under})*(${keep})+(1.0-(${keep}))*margoCoatAmbient(s,v)` : under;
+}
+
+export function materialExtensionShader(source: string, extension: MaterialExtension): string {
+  validateDeclarations(extension.declarations);
+  // Even an empty extension has a distinct pipeline signature.
+  let declarations = '// Material extension: group 3\n';
+  if (extension.factors)
+    declarations += `@group(3) @binding(0) var<uniform> materialFactors:array<vec4f,${extension.factors.length / 4}>;\n`;
+  (extension.textures ?? []).forEach((texture, i) => {
+    declarations += `@group(3) @binding(${1 + i * 2}) var materialTexture${i}:texture_2d<f32>;\n`;
+    if (texture.sampler) declarations += `@group(3) @binding(${2 + i * 2}) var materialSampler${i}:sampler;\n`;
+  });
+  // Phony assignments retain the resource interface even for factors-only slots,
+  // without texture samples or changes to the surface (WGSL 9.2.3).
+  let code = extension.transmission ? transmissionWeight(source) : source;
+  if (extension.ior) code = dielectricIor(code);
+  if (extension.coat) code = coatLayer(code);
+  if (extension.direct)
+    code = code.replace('let direct=', 'var direct=').replace('var color=', () => `${extension.direct}\n  var color=`);
+  if (extension.output)
+    code = code.replace(
+      '  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));',
+      () => `  ${extension.output}\n  return vec4f(color,select(1.0,s.base.a,f.settings.x>1.5));`,
+    );
+  code = materialExtensionSurface(code, extension);
+  return declarations + (extension.declarations ?? '') + '\n' + code;
+}
+
+/** Apply after optional lighting effects have matched their standard lighting call sites. */
+export function materialExtensionAmbientShader(source: string, extension: MaterialExtension): string {
+  const { ambient, coat } = extension;
+  if (!ambient && !coat) return source;
+  const entry = (name: string, rewrite: (code: string) => string) => {
+    const start = source.indexOf('@fragment fn ' + name + '(');
+    if (start < 0) return;
+    const next = source.indexOf('@fragment', start + 1),
+      end = next < 0 ? source.length : next;
+    source = source.slice(0, start) + rewrite(source.slice(start, end)) + source.slice(end);
+  };
+  if (ambient) {
+    entry('fragment', (code) =>
+      code
+        .replace('var color=', () => `var materialAmbient=ambient(s);\n${ambient}\n  var color=`)
+        .replace('ambient(s)+s.emissive', 'materialAmbient+s.emissive'),
+    );
+    entry('ambientFragment', (code) =>
+      code.replace(
+        'return vec4f(ambient(s),',
+        () => `var materialAmbient=ambient(s);\n${ambient}\n  return vec4f(materialAmbient,`,
+      ),
+    );
+  }
+  if (coat) {
+    // Every light is in `color` once this statement ends: what runs after it (native layers, transmission) is on top.
+    entry('fragment', (code) =>
+      code.replace(
+        /var color=[^;]*\+s\.emissive[^;]*;/,
+        (sum) => `${sum}\n  color=${coatedAmbient(extension, 'color')}+(${coat.direct})*margoDirectVisible;`,
+      ),
+    );
+    entry('ambientFragment', (code) =>
+      code.replace(
+        /return vec4f\((materialAmbient|ambient\(s\)),/,
+        (_, under) => `let v=normalize(f.eye.xyz-i.position);\n  return vec4f(${coatedAmbient(extension, under)},`,
+      ),
+    );
+  }
+  return source;
+}
+
+export function bindMaterialExtension(
+  device: GPUDevice,
+  pass: GPURenderPassEncoder,
+  pipeline: GPURenderPipeline,
+  resource: MaterialExtensionResource,
+  lighting: boolean,
+): void {
+  const { entries } = resource;
+  if (!entries.length) return;
+  let cached = resource.groups.get(pipeline);
+  if (
+    !cached ||
+    entries.length !== cached.entries.length ||
+    entries.some((entry, i) => {
+      const old = cached!.entries[i].resource,
+        value = entry.resource;
+      return (
+        entry.binding !== cached!.entries[i].binding ||
+        !(value === old || ('buffer' in value && 'buffer' in old && value.buffer === old.buffer))
+      );
+    })
+  ) {
+    const group = device.createBindGroup({ layout: pipeline.getBindGroupLayout(3), entries });
+    // Auto layouts include the empty group 2 when group 3 is used without lighting.
+    const gap = lighting ? undefined : device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: [] });
+    cached = { entries, group, gap };
+    resource.groups.set(pipeline, cached);
+  }
+  if (!lighting) {
+    cached.gap ??= device.createBindGroup({ layout: pipeline.getBindGroupLayout(2), entries: [] });
+    pass.setBindGroup(2, cached.gap);
+  }
+  pass.setBindGroup(3, cached.group);
+}

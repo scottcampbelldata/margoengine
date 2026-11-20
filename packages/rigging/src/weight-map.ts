@@ -90,7 +90,9 @@ export class WeightMap {
 
   /**
    * The strongest `max` weights per vertex (default 4, glTF's JOINTS_0 / WEIGHTS_0), renormalised to sum to 1, sorted
-   * strongest first; unused slots are joint 0 with weight 0. Ties keep the lower bone index.
+   * strongest first; unused slots are joint 0 with weight 0. Ties keep the lower bone index. Negative weights count
+   * as 0, as in {@link normalize}.
+   * @throws RangeError for a NaN or infinite weight (glTF holds finite weights only): call normalize() or fix it.
    */
   toInfluences(max = 4): VertexInfluences {
     if (!Number.isInteger(max) || max < 1 || max > 16) throw new RangeError('Influences per vertex must be 1 to 16');
@@ -105,6 +107,10 @@ export class WeightMap {
       let kept = 0;
       for (let bone = 0; bone < b; bone++) {
         const w = v[row + bone];
+        if (!Number.isFinite(w))
+          throw new RangeError(
+            `Vertex ${vertex} bone ${bone} weight ${w} is not finite; call normalize() or set a finite weight`,
+          );
         if (!(w > 0)) continue;
         // Insertion into the sorted top list: stronger first, the lower index first on ties.
         let at = kept < max ? kept++ : max;

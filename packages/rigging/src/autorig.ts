@@ -752,13 +752,19 @@ export async function autoRig(mesh: WeightMesh, options: AutoRigOptions = {}): P
     throw new RangeError("autoRig weights must be 'voxel' or 'none'");
   const upLength = up && length(up);
   if (!(upLength > 0) || !Number.isFinite(upLength)) throw new RangeError('autoRig up must be a nonzero vector');
-  const forwardGiven = options.forward;
-  if (forwardGiven !== undefined && !(length(forwardGiven) > 0))
-    throw new RangeError('autoRig forward must be a nonzero vector');
+  const forwardGiven = options.forward,
+    yAxis = unit(up);
+  if (forwardGiven !== undefined) {
+    const size = length(forwardGiven);
+    if (!(size > 0) || !Number.isFinite(size)) throw new RangeError('autoRig forward must be a nonzero vector');
+    // Only forward's part across up gives a facing; along up it has none (and the frame would turn NaN).
+    const along = dot(forwardGiven, yAxis);
+    if (!(Math.sqrt(Math.max(0, size * size - along * along)) > 1e-6 * size))
+      throw new RangeError('autoRig forward must not be parallel to up; give the direction the figure faces');
+  }
   signal?.throwIfAborted();
   // A frame with y along up. The mesh goes in turned, the joints come out turned back.
-  const yAxis = unit(up),
-    seed: Vec3 = Math.abs(yAxis[1]) < 0.9 ? [0, 1, 0] : [0, 0, 1],
+  const seed: Vec3 = Math.abs(yAxis[1]) < 0.9 ? [0, 1, 0] : [0, 0, 1],
     source = weld(mesh, options.weld);
   let xAxis = unit(cross(yAxis, seed)),
     zAxis = cross(xAxis, yAxis);

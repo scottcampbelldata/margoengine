@@ -77,11 +77,11 @@ const env = {
 const report = { version, cases: [] };
 try {
   for (const [name, kit] of Object.entries({
-    web: 'web',
+    web: 'kit-web',
     game: 'game',
-    viz: 'viz',
-    react: 'react-kit',
-    next: 'react-kit',
+    viz: 'kit-viz',
+    react: 'kit-react',
+    next: 'kit-react',
   })) {
     const app = join(work, name);
     await run('npm', ['create', `margo@${version}`, name, ...args, '--yes', '--', '--template', name], {

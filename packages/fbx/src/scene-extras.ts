@@ -7,7 +7,13 @@ import { decomposeTRS } from './math.js';
 import { children, type SceneContext } from './scene.js';
 
 const RADIANS = Math.PI / 180,
-  INCH_MM = 25.4;
+  INCH_MM = 25.4,
+  // FbxCamera class defaults: a 35 mm lens on a 0.816 x 0.612 inch gate, which is a 25.115 degree vertical view.
+  // The SDK leaves a property that equals its default out of the object, so these stand in for a missing one.
+  FOV = 25.115,
+  FOCAL = 34.89327,
+  FILM_W = 0.816,
+  FILM_H = 0.612;
 
 /**
  * Reads a number from the object, else the class default of the SDK reference; a value of the wrong kind is the default.
@@ -51,16 +57,17 @@ function perspective(read: ReturnType<typeof reader>, aspect: number): number {
   const half = (degrees: number) => Math.tan((degrees * RADIANS) / 2),
     mode = read('ApertureMode', 2),
     fit = read('GateFit', 0),
-    film = (inches: number) => (inches * INCH_MM) / (2 * read('FocalLength', 0)),
-    filmY = film(read('FilmHeight', 0)),
-    filmX = film(read('FilmWidth', 0));
+    film = (inches: number) => (inches * INCH_MM) / (2 * read('FocalLength', FOCAL)),
+    filmY = film(read('FilmHeight', FILM_H)),
+    filmX = film(read('FilmWidth', FILM_W));
   let tangent: number;
   // Film and lens decide the view in focal length mode, and a gate fit says which side of the film the image fills.
   if (mode === 3) tangent = fit === 2 && aspect > 0 && filmX > 0 ? filmX / aspect : filmY;
-  else if (mode === 1) tangent = half(read('FieldOfView', 0)) / (aspect > 0 ? aspect : 1);
-  else if (mode === 0) tangent = half(read('FieldOfViewY', read('FieldOfView', 0)));
-  else tangent = half(read('FieldOfView', 0));
-  if (!(tangent > 0) || !Number.isFinite(tangent)) tangent = filmY;
+  else if (mode === 1) tangent = half(read('FieldOfView', FOV)) / (aspect > 0 ? aspect : 1);
+  else if (mode === 0) tangent = half(read('FieldOfViewY', read('FieldOfView', FOV)));
+  else tangent = half(read('FieldOfView', FOV));
+  // A field of view the file sets to nothing usable falls back to the film it writes, never to the class default film.
+  if (!(tangent > 0) || !Number.isFinite(tangent)) tangent = film(read('FilmHeight', 0));
   if (!(tangent > 0) || !Number.isFinite(tangent))
     throw new RangeError('Invalid FBX camera field of view; re-export the file, it looks damaged');
   return 2 * Math.atan(tangent);

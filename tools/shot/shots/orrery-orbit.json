@@ -1,0 +1,51 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 60,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "orbit",
+      "path": "catmull-rom",
+      "keys": [
+        { "time": 0, "position": [1.386, 0.98, 0.8], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 10, "position": [0, 0.72, 1.6], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 20, "position": [-1.386, 0.98, 0.8], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 30, "position": [-1.386, 0.72, -0.8], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 40, "position": [0, 0.98, -1.6], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 50, "position": [1.386, 0.72, -0.8], "target": [-0.02, 0.2, 0.02], "fov": 30 },
+        { "time": 60, "position": [1.386, 0.98, 0.8], "target": [-0.02, 0.2, 0.02], "fov": 30 }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "orrery-orbit",
+    "kind": "long",
+    "seed": 11,
+    "seconds": 60,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1.5,
+    "warmup": 60,
+    "probes": {
+      "open": 0,
+      "quarter": 15,
+      "half": 30,
+      "late": 45,
+      "end": 59.9
+    },
+    "page": {
+      "path": "examples/orrery/index.html",
+      "query": {
+        "ui": 0,
+        "date": "2026-11-14"
+      },
+      "css": "#status,#error,#readout{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "orrery.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

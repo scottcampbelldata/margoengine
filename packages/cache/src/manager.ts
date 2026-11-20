@@ -48,7 +48,7 @@ interface Item {
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 
 /**
- * Counts loading work across loaders: pass `manager.fetch` as any loader's `fetch` option (gltf, gltf-pro, loaders,
+ * Counts loading work across loaders: pass `manager.fetch` as any loader's `fetch` option (gltf, gltf/pbr, loaders,
  * fbx, usdz, blender, environment, audio, ...), and every file it requests, including external
  * buffers and textures the loader resolves, is one item. A batch starts when an item starts while none is pending
  * and ends with `onLoad`. Failed items call `onError` and then count as done, so `onLoad` still follows.

@@ -39,7 +39,7 @@ export interface CinematicOptions {
   readonly lightDirection?: readonly [number, number, number];
   /** Ambient environment radiance, default [0.3,0.3,0.3]. */
   readonly ambient?: readonly [number, number, number];
-  /** Distant light radiance, default [0.7,0.7,0.7]. */
+  /** Distant light irradiance on a plane facing it, scattered by the phase normalised over the sphere (an isotropic scatterer returns light / (4 pi)). Default [8.8,8.8,8.8]. */
   readonly light?: readonly [number, number, number];
 }
 /** Exact shader work in the most recent transport pass, excluding the display pass. */
@@ -92,7 +92,7 @@ function checked(options: CinematicOptions): CinematicOptions {
     !d.every(Number.isFinite) ||
     Math.hypot(...d) === 0 ||
     !rgb(o.ambient ?? [0.3, 0.3, 0.3]) ||
-    !rgb(o.light ?? [0.7, 0.7, 0.7])
+    !rgb(o.light ?? [8.8, 8.8, 8.8])
   )
     throw rangeError('Lighting needs a finite nonzero direction and nonnegative finite RGB radiance', 'sciviz');
   return o;
@@ -283,7 +283,7 @@ export class CinematicVolume implements Drawable {
     ]);
     v.set([0, pt ? (pt.anisotropy ?? 0) : 0, pt ? (pt.bounces ?? 8) : 0, pt ? (pt.albedo ?? 0.9) : 0], 72);
     v.set([...(o.ambient ?? [0.3, 0.3, 0.3]), 0], 76);
-    v.set([...(o.light ?? [0.7, 0.7, 0.7]), 0], 80);
+    v.set([...(o.light ?? [8.8, 8.8, 8.8]), 0], 80);
     v.set([context.width, context.height, pt ? (pt.seed ?? 1) : 0, pt ? 1 : 0], 84);
     v.fill(0, 88);
     volume.clip.forEach((p, k) => v.set([...p.normal, p.offset], 88 + k * 4));
@@ -433,6 +433,9 @@ export class CinematicVolume implements Drawable {
 }
 /** Light an existing figure volume, sharing its transfer function and data texture. */
 export function cinematicVolume(figure: Figure, volume: VolumeLayer, options: CinematicOptions = {}): CinematicVolume {
+  // A volume this figure does not hold is removed (it draws nothing) or another figure's, on another device.
+  if (!figure.layers.includes(volume))
+    throw fault('state', 'Cinematic lighting needs a volume layer of the same, undisposed figure', 'sciviz');
   const layer = new CinematicVolume(figure.renderer, volume, options);
   figure.renderer.add(layer);
   return trackSpecLayer(figure, 'cinematic', [volume, options], layer);

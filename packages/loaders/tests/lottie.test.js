@@ -687,3 +687,29 @@ test('fill and stroke colours of a file from before Bodymovin 4.1.9 run from 0 t
   const [middle] = one([shapeLayer([rect(), { ty: 'fl', c: animated, o: k(100) }])], 5, { v: '4.0.0' });
   near(middle.fill[0], 0.5);
 });
+
+test('regression: a precomposition clips its layers to its w by h rect (Lottie spec, precomposition layer)', () => {
+  const inner = [{ id: 'in', layers: [shapeLayer([rect(40, 40), fill()])] }];
+  const assets = [
+    ...inner,
+    { id: 'out', layers: [{ ty: 0, refId: 'in', ks: { p: k([5, 0, 0]) }, ip: 0, op: 60, st: 0, w: 4, h: 3 }] },
+  ];
+  const layer = { ty: 0, refId: 'out', ks: { p: k([100, 0, 0]), s: k([200, 200, 100]) }, ip: 0, op: 60, st: 0, w: 20, h: 10 };
+  const [item] = one([layer], 0, { assets });
+  assert.equal(item.clip.length, 2, 'one rect per precomposition, outermost first');
+  assert.deepEqual(box({ commands: item.clip[0] }), [100, 0, 140, 20]);
+  assert.deepEqual(box({ commands: item.clip[1] }), [110, 0, 118, 6]);
+  const [plain] = one([{ ...layer, w: undefined, h: undefined, refId: 'in' }], 0, { assets });
+  assert.equal(plain.clip, undefined, 'no size, no clip');
+  const animation = parseLottie(JSON.stringify(anim([layer], { assets }))),
+    calls = [],
+    context = recorder(calls);
+  context.clip = (...args) => calls.push(['clip', ...args]);
+  animation.draw(context, 0);
+  const names = calls.map((call) => call[0]);
+  assert.equal(names.filter((name) => name === 'clip').length, 2);
+  assert.ok(names.indexOf('clip') < names.indexOf('fill'), 'the clip is set before the paint');
+  assert.equal(names.filter((name) => name === 'save').length, names.filter((name) => name === 'restore').length);
+  assert.equal(names.at(-1), 'restore');
+  refuses(() => animation.draw(recorder([]), 0), 'unsupported');
+});

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { FrameGraph } from '@margoengine/core/extension';
 import { parseGLTF } from '@margoengine/gltf';
-import { parseGLTF as parsePBR } from '@margoengine/gltf-pro';
+import { parseGLTF as parsePBR } from '@margoengine/gltf/pbr';
 import { Inspector } from '@margoengine/inspector';
 import { BoxHelper, VertexNormalsHelper } from '@margoengine/lines';
 import { loadedPBRFixtures, loadedPBREngine, serveLoadedPBRFixtures } from './support/loaded-pbr-fixtures.js';

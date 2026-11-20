@@ -6,6 +6,8 @@
 // when a raw WebGL2 probe shows the driver compresses the blend between two mip levels (AMD under ANGLE D3D11), the
 // linear-mip rows of implicitFootprint and the footprint rows of mipFiltering must instead pick the same LOD as
 // native (equal nearest-mip sweeps) and equal, bit for bit, the driver's own blend at that LOD (test/blend-check.mjs).
+// A driver whose raw WebGL2 blend equals native's at every probed LOD (Metal on Apple silicon, docs/known-bugs.md,
+// "Metal mip blend") has nothing to excuse and keeps the exact comparison.
 // A deliberately wrong LOD on the layer must fail either way.
 // WebGPU 7.1.1 does not guarantee exact hardware-filter weights (see features.html); explicit assertions stay exact.
 // Integers and bytes must be equal; floats equal within 1e-6 (both paths read the same stored values, so
@@ -16,7 +18,8 @@
 // two regressions (an upload on the wrong texture unit; depth writes after a multisample resolve), sampling nested in
 // another sampling call's coordinates (ANGLE D3D11 read the inner texture for both, KB5289b), and a depth texture
 // sampled by the pass it is attached to read-only, and 3D texture slices drawn beside a depth attachment (ANGLE's
-// Direct3D 11 back end drops such draws; the layer draws them in a 2D stand-in).
+// Direct3D 11 back end drops such draws; the layer draws them in a 2D stand-in), and derivatives used only inside a
+// later per-pixel branch (ANGLE Direct3D 11 moved them into it and read 0; the layer pins them into its outputs).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 import { classifyBlend, compressedFailures } from './blend-check.mjs';
@@ -95,9 +98,9 @@ try {
   await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
   const probe = (bytes, filter) => page.evaluate(([b, f]) => window.check.blendProbe(b, f), [bytes, filter]);
   const whiteBlack = await probe([255, 0, 255, 0, 255], 'linear');
-  const { blend, worst } = classifyBlend(whiteBlack.gl);
+  const { blend, worst } = classifyBlend(whiteBlack.gl, whiteBlack.native);
   const compressed = blend === 'compressed';
-  lines.push(`mip blend: WebGL2 ${blend} (largest weight error ${worst.error.toFixed(5)} at LOD ${worst.k}/256), native ${classifyBlend(whiteBlack.native).blend}`);
+  lines.push(`mip blend: WebGL2 ${blend === 'native' ? 'equal to native' : blend} (largest weight error ${worst.error.toFixed(5)} at LOD ${worst.k}/256)`);
   const probes = compressed
     ? {
         footprint: await probe([0, 255, 64, 0, 255], 'linear'),
@@ -192,6 +195,30 @@ try {
         Array(4).fill([true, 77, 77, true]).flat(),
         'msaaAspects: depth and stencil, each through its own binding',
       );
+    if (name === 'compressedViews' && !r.missing) {
+      // Each view reads the blocks: face 0's top-left texel is colour 0 (red), and every layer or face differs.
+      assert.deepEqual(r.cubeArray0.slice(0, 4), [1, 0, 0, 1], 'compressedViews: texel (0, 0) of face 0 is colour 0');
+      const faces = [0, 1, 2, 3, 4, 5].map((n) => r.cubeArray0.slice(n * 256, n * 256 + 256).join());
+      assert.equal(new Set(faces).size, 6, 'compressedViews: the six faces differ');
+      assert.deepEqual(r.cubeFace3, r.cubeArray0.slice(3 * 256, 4 * 256), 'compressedViews: the 2d view of face 3 is layer 3');
+      assert.deepEqual(r.stackCube.slice(0, 6 * 256), r.cubeArray0, 'compressedViews: a cube view of array storage reads its layers');
+      assert.notDeepEqual(r.cubeArrayAfter, r.cubeArray0, 'compressedViews: a later write reaches the 2d-array view');
+      assert.notDeepEqual(r.flatArrayAfter, r.flatArray, 'compressedViews: a later write reaches a 1-layer 2d-array view');
+      assert.notDeepEqual(r.stackCubeAfter, r.stackCube, 'compressedViews: a later write reaches the cube view');
+    }
+    if (name === 'compressedCopies' && !r.missing) {
+      // Block bytes read back as written: layer 1's second block (texel row 0, x 4) at the padded row and image pitch.
+      const second = (layer) => [(0xf800 | (layer << 6) | 1) & 255, (0xf800 | (layer << 6) | 1) >> 8, (0x001f | (1 << 11)) & 255, (0x001f | (1 << 11)) >> 8, 0xe5, 0xe5 ^ 0x5a, 0xe5, 0xe5 ^ 0xa5];
+      assert.deepEqual(r.srcLevel0.slice(256 * 3 + 8, 256 * 3 + 16), second(1), 'compressedCopies: copyTextureToBuffer writes the blocks at bytesPerRow and rowsPerImage');
+      assert.deepEqual(r.srcLevel0.slice(16, 256), Array(240).fill(0xcd), 'compressedCopies: the row padding keeps the buffer');
+      assert.deepEqual(r.srcLevel2.slice(0, 2), [0x1f, 0x00], 'compressedCopies: a level smaller than one block reads as its one block');
+      // Face 2's bottom-left block is layer 1's top-right block; faces 0, 1 and the rest of 2 stay zero.
+      assert.deepEqual(r.dstLevel0.slice(2 * 512 + 256, 2 * 512 + 264), second(1), 'compressedCopies: copyTextureToTexture moves the block');
+      assert.deepEqual(r.dstLevel0.slice(2 * 512, 2 * 512 + 16), Array(16).fill(0), 'compressedCopies: untouched blocks stay zero');
+      assert.deepEqual([3, 4, 5].flatMap((face) => r.dstLevel1.slice(face * 256, face * 256 + 8)), [0, 1, 2].flatMap((layer) => [(0x07e0 | (layer << 1)) & 255, (0x07e0 | (layer << 1)) >> 8, 0x10, 0, 0x1b, 0x1b ^ 0x5a, 0x1b, 0x1b ^ 0xa5]), 'compressedCopies: a whole level copies into three faces');
+      assert.notDeepEqual(r.dstSampled0.slice(2 * 256 + 128, 2 * 256 + 144), Array(16).fill(0), 'compressedCopies: the copied block samples');
+      assert.equal(r.unaligned, 'validation error', 'compressedCopies: an encoder copy with bytesPerRow 8 is invalid');
+    }
     if (name === 'compressedSrgbView' && !r.missing) {
       assert.notDeepEqual(r.srgb, r.unorm, 'compressedSrgbView: the sRGB view decodes');
       assert.notDeepEqual(r.srgbAfter, r.srgb, 'compressedSrgbView: a later write reaches the sRGB view');

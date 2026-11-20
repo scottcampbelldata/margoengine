@@ -412,7 +412,7 @@ families.push({
   },
 });
 
-// --- packages/shared/math.js (pivoted invert + finiteVector) moved to math: animation, creative, gltf-pro, a
+// --- packages/shared/math.js (pivoted invert + finiteVector) moved to math: animation, creative, gltf/pbr, a
 // package since removed, post, sky, taa (invert); animator, clustered, creative, shadows, sky, terrain, vfx (finiteVector) ---
 async function sharedAtRef() {
   const { mkdir, writeFile } = await import('node:fs/promises'),

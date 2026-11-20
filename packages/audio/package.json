@@ -80,6 +80,22 @@
     "./spectrogram": {
       "types": "./dist/spectrogram.d.ts",
       "import": "./dist/spectrogram.js"
+    },
+    "./wav": {
+      "types": "./dist/wav.d.ts",
+      "import": "./dist/wav.js"
+    },
+    "./scan": {
+      "types": "./dist/scan.d.ts",
+      "import": "./dist/scan.js"
+    },
+    "./resample": {
+      "types": "./dist/resample.d.ts",
+      "import": "./dist/resample.js"
+    },
+    "./stretch": {
+      "types": "./dist/stretch.d.ts",
+      "import": "./dist/stretch.js"
     }
   },
   "files": [

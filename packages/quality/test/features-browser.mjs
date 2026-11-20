@@ -1,16 +1,14 @@
-// Real-GPU check of watchFeatures, built packages. Takes the GPU lock itself around the browser.
+// Real-GPU check of watchFeatures, built packages.
 // node packages/quality/test/features-browser.mjs
 // The fake knobs in features.test.js cannot show that a real effect takes a change while running. This drives Shadows,
 // VolumetricFog and SSAO through every level with a budget no GPU meets, and reads what changed on the GPU: pictures, and
 // validation.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
-const release = await acquire({ owner: 'quality-features' });
 setTimeout(() => {
   console.error('features-browser: stopped at its time limit');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000).unref();
 const context = await openBrowser({ startPath: '/packages/quality/test/ssaa-browser.html', port: 5213 }),
   { page } = context,
@@ -144,5 +142,4 @@ try {
   console.log('features browser check passed');
 } finally {
   await context.close();
-  await release();
 }

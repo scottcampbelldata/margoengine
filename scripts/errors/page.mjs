@@ -63,7 +63,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (process.argv.includes('--check')) {
     if (readFileSync(path, 'utf8').replace(/\r\n/g, '\n') !== html) {
       console.error('site/errors.html is out of date: run node scripts/errors/page.mjs');
-      process.exit(1);
+      process.exitCode = 1;
     }
   } else writeFileSync(path, html);
 }

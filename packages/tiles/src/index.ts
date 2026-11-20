@@ -1,5 +1,5 @@
 // @margoengine/tiles: streaming OGC 3D Tiles 1.1 for engineering, GIS and digital-twin scenes. The Tileset is
-// engine-free (selection, fetch queue, cache, events); TilesRenderer draws it through @margoengine/gltf-pro and
+// engine-free (selection, fetch queue, cache, events); TilesRenderer draws it through @margoengine/gltf/pbr and
 // @margoengine/points, both optional peers loaded on first use. Core is not modified.
 export {
   Tileset,

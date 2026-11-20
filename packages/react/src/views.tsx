@@ -1,7 +1,7 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Camera, RenderView as CoreView } from '@margoengine/core/extension';
-import { MargoError } from '@margoengine/math/errors';
 import { Context, useCommit, useScene, type World } from './internal.js';
+import { fault } from '../../shared/errors.js';
 
 /** Props of `<Scene>`. */
 export interface SceneProps {
@@ -13,8 +13,9 @@ export interface SceneProps {
 }
 /**
  * A separate set of meshes drawn only by the `<RenderView>`s that name it: a HUD overlay, an item preview, a picture in
- * picture (core's `engine.createScene`). `<Mesh>`, `Box`, `Sphere`, `Plane` and `Group` inside are created in it.
- * Plugins and models stay in the default scene for now. Disposed with its meshes on unmount.
+ * picture (core's `engine.createScene`). `<Mesh>`, `Box`, `Sphere`, `Plane` and `Group` inside are created in it;
+ * `<Sun>`, the lights, Fog, Line, Points, Outline and Splat inside apply to it. Models and other plugins stay in the
+ * default scene. Disposed with its meshes on unmount.
  */
 export function Scene({ name, background, children }: SceneProps) {
   const parent = useScene(),
@@ -22,7 +23,7 @@ export function Scene({ name, background, children }: SceneProps) {
     [world, setWorld] = useState<World | null>(null);
   useCommit(() => {
     if (views.scenes.has(name))
-      throw new MargoError('attached', `Two <Scene name="${name}">s in one Canvas; give each its own name`);
+      throw fault('attached', `Two <Scene name="${name}">s in one Canvas; give each its own name`, 'react-usage');
     const created = engine.createScene(name);
     views.scenes.set(name, created);
     views.revision++;
@@ -111,10 +112,7 @@ export function RenderView({
       queueMicrotask(() => {
         if (views.entries.has(key) && !views.scenes.has(scene) && !engine.disposed)
           engine.onError(
-            new MargoError(
-              'state',
-              `<RenderView scene="${scene}"> names no <Scene name="${scene}"> in this Canvas; add that <Scene>`,
-            ),
+            fault('state', `<RenderView scene="${scene}"> names no <Scene name="${scene}"> in this Canvas; add that <Scene>`, 'react-usage'),
           );
       });
       return;

@@ -1,6 +1,6 @@
 import { Engine } from '../../core/dist/extension.js';
 import { createPBRMeshes } from '../dist/render.js';
-import { parsePreparedPBR } from '../../gltf-pro/dist/index.js';
+import { parsePreparedPBR } from '../../gltf/dist/pbr.js';
 import { SceneTarget } from '../../shared/msaa.js';
 
 globalThis.margoLow = new URLSearchParams(location.search).get('samples') === '1' ? 1 : undefined;

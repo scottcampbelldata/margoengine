@@ -439,6 +439,51 @@ async function clipVolumes() {
   return 'Box and polygon extraction draws only retained records, preserving colours and budget';
 }
 
+async function styleFilters() {
+  const { PointCloud } = await import('../dist/index.js');
+  const { bindPointStyle, createStyledCloud } = await import('../dist/style.js');
+  const { engine, frame, end } = await rig();
+  const points = PointsPlugin.attach(engine);
+  const table = { classification: new Uint8Array([2, 7, 6]), intensity: new Uint16Array([100, 200, 60000]) };
+  const cloud = points.add(
+    new PointCloud({
+      positions: [-2, 0, 0, 0, 0, 0, 2, 0, 0],
+      colors: [1, 1, 1, 1, 1, 1, 1, 1, 1],
+      material: { size: 24 },
+    }),
+  );
+  const binding = bindPointStyle(cloud, table, {
+    filter: { classification: [2, 6] },
+    color: {
+      conditions: [
+        ['${intensity} > 30000', "color('#ff0000')"],
+        ['true', "color('#0000ff')"],
+      ],
+    },
+  });
+  let image = await frame();
+  assert(image.at(84, 128)[2] > 200 && image.at(84, 128)[0] < 40, `class 2 draws blue: ${image.at(84, 128)}`);
+  assert(image.at(172, 128)[0] > 200 && image.at(172, 128)[2] < 40, `bright point draws red: ${image.at(172, 128)}`);
+  assert(!lit(image.at(128, 128)), 'filtered class 7 never draws');
+  binding.update({ filter: { ranges: { intensity: [150, 250] } } });
+  image = await frame();
+  assert(lit(image.at(128, 128)) && !lit(image.at(84, 128)), 'an update moves the filter to the middle point');
+  binding.dispose();
+  image = await frame();
+  assert(
+    [84, 128, 172].every((x) => image.at(x, 128)[0] > 200 && image.at(x, 128)[2] > 200),
+    'dispose restores white',
+  );
+  points.remove(cloud);
+  const styled = createStyledCloud(cloud, table, { show: '${classification} !== 2', pointSize: '12.0' });
+  points.add(styled.cloud);
+  image = await frame();
+  assert(!lit(image.at(84, 128)) && lit(image.at(128, 128)) && lit(image.at(172, 128)), 'extraction keeps two points');
+  assert(points.stats.pointsDrawn === 2, `extracted points alone take the budget: ${points.stats.pointsDrawn}`);
+  await end();
+  return 'Attribute filters and style expressions hide, recolour, update, restore and extract points on the GPU';
+}
+
 window.runFeatures = async () => {
   const checks = [];
   for (const check of [
@@ -451,6 +496,7 @@ window.runFeatures = async () => {
     hdrColors,
     mipmaps,
     clipVolumes,
+    styleFilters,
   ])
     checks.push(await check());
   return checks;

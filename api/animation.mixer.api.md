@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export type ActionClip = Animation['clips'][number] | KeyframeClip | DiscreteClip;
 
@@ -48,7 +48,8 @@ export class AnimationAction {
     stopWarping(): this;
     crossFadeTo(action: AnimationAction, duration: number, warp?: boolean): this;
     crossFadeFrom(action: AnimationAction, duration: number, warp?: boolean): this;
-    advance(delta: number): void;
+    step(delta: number): void;
+    contribute(): void;
     uses(binding: Binding): boolean;
     usesDiscrete(binding: DiscreteBinding): boolean;
     rewind(): void;
@@ -70,6 +71,7 @@ export class AnimationMixer implements EnginePlugin {
     existingAction(clip: ActionClip | string | number, root?: object): AnimationAction | null;
     getRoot(): MixerRoot;
     update(delta: number): this;
+    advanceTime(delta: number): void;
     setTime(time: number): this;
     stopAllAction(): this;
     uncacheAction(clip: ActionClip | string | number, root?: object): void;
@@ -114,6 +116,7 @@ class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

@@ -5,7 +5,7 @@ import { Clustered } from '@margoengine/clustered';
 import { TAA } from '@margoengine/taa';
 import { XR } from '@margoengine/xr';
 import { Animation } from '@margoengine/animation';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { wgsl } from '../packages/core/dist/shaders.js';
 import { optionalGPU } from './support/optional-gpu.js';
 import { loadedPBRFixtures, serveLoadedPBRFixtures } from './support/loaded-pbr-fixtures.js';
@@ -335,7 +335,7 @@ for (const fixture of loadedPBRFixtures) {
         const changed = draw(left);
         assert.match(changed.pipeline.vertex.module.code, /0\.125,0\.25,0\.5/);
         primitive.extension = { textures: [{ view: {} }] };
-        assert.throws(() => left.prepare(context), /recreating caller-owned material extension textures/);
+        assert.throws(() => left.prepare(context), /material extension textures given as \(device\) => view or sampler/);
         primitive.extension = undefined;
         draw(left);
         assert.throws(() => left.prepare({ ...context, device: engine.gpu }), /another GPU device/);
@@ -377,7 +377,7 @@ for (const fixture of loadedPBRFixtures) {
       try {
         taa = TAA.attach(engine);
         h.frame();
-        // TAA's compute group: two storage buffers (gltf-pro's group 0 also binds two buffers, its uniforms).
+        // TAA's compute group: two storage buffers (gltf/pbr's group 0 also binds two buffers, its uniforms).
         const snapshot = groups.find(
           (group) =>
             group.entries.length === 2 &&

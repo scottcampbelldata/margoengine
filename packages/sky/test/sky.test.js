@@ -3,6 +3,48 @@ import assert from 'node:assert/strict';
 import { Sky, sunDirection, sunlight } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { wgsl } from '../../core/src/shaders.ts';
+
+const luminance = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+/**
+ * The engine light is the sun's beam plus the twilight sky (KB-TWILIGHT1), summed as irradiance vectors: with E the
+ * luminance-weighted intensity (direction[3] x luminance(radiance)) of each, the light's vector is E1 d1 + E2 d2, so a
+ * surface of normal n that both reach gets n . (E1 d1 + E2 d2), their sum as in reality. Checks the engine light is that
+ * vector, which lies in the sun's vertical plane on the sun's side, and returns its elevation's sine.
+ */
+function assertSolar(light, sky) {
+  const sun = sky.lights[0],
+    dusk = sky.twilightLight,
+    e1 = sun.direction[3] * luminance(sun.radiance),
+    e2 = dusk.direction[3] * luminance(dusk.radiance),
+    sum = [0, 1, 2].map((i) => e1 * sun.direction[i] + e2 * dusk.direction[i]),
+    length = Math.hypot(...sum),
+    d = light.direction;
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(d[i] - sum[i] / length) < 1e-6, `direction ${i}: ${d[i]}`);
+  assert.ok(Math.abs((d[3] * luminance(light.radiance)) / length - 1) < 1e-5, 'the two lights summed');
+  // In the sun's vertical plane, on its side: the light never crosses the sky between sun and twilight.
+  const across = [sky.sun[2], 0, -sky.sun[0]],
+    span = Math.hypot(...across) || 1;
+  assert.ok(Math.abs(d[0] * across[0] + d[2] * across[2]) / span < 1e-6, "in the sun's vertical plane");
+  assert.ok(d[0] * sky.sun[0] + d[2] * sky.sun[2] >= 0, "on the sun's side");
+  return d[1];
+}
+/**
+ * Deep in the night with no moon the sun has no beam and the twilight sky, USNO C171's sky term (Janiczek and
+ * DeYoung 1987) times the night blend of 1, is under 1e-20 lux (1e-24 lux with the sun 88.5 degrees down), so the
+ * engine light holds `minimum`, from the twilight's side 45 degrees up, in the twilight's colour, which at that level
+ * the eye's night shift (Jensen et al. 2000) has made the night's blue (KB-TWILIGHT1). Until twilight it held
+ * `minimum` from the sun's direction below the ground, in white.
+ */
+function assertNightFloor(light, sky, minimum) {
+  const dusk = sky.twilightLight;
+  assert.ok(sky.lights[0].direction[3] === 0 && dusk.direction[3] > 0 && dusk.direction[3] < 1e-20);
+  for (let i = 0; i < 3; i++) {
+    assert.ok(Math.abs(light.direction[i] - dusk.direction[i]) < 1e-6, `direction ${i}`);
+    assert.ok(Math.abs(light.radiance[i] - dusk.radiance[i]) < 1e-6, `colour ${i}`);
+  }
+  assert.ok(Math.abs(dusk.direction[1] - Math.SQRT1_2) < 1e-6 && dusk.direction[0] * sky.sun[0] >= 0);
+  assert.equal(light.direction[3], Math.fround(minimum));
+}
 test('retained reflection lights track actual sun and moon directions through dusk', () => {
   const h = optionalGPU();
   h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
@@ -14,7 +56,11 @@ test('retained reflection lights track actual sun and moon directions through du
   h.engine.use(sky);
   const lights = sky.lights;
   h.frame();
-  assert.deepEqual(h.engine.lighting.direction.slice(0, 3), sky.sun, 'At dusk the light keeps the sun until it sets');
+  // At 17.9 h the sun is 1.5 degrees up. The sky's night blend starts with the sun 4.6 degrees up, and the twilight
+  // glow carries the share of the sky's light the environment hands over (night factor 0.18 here, so 0.18 x USNO C171's
+  // 1,480 lux sky = 2.6% of the beam), so the light is the beam plus that glow, from the sun's side; no moon.
+  assert.ok(sky.twilightLight.direction[3] > 0 && sky.lights[1].direction[3] === 0);
+  assert.ok(assertSolar(h.engine.lighting, sky) > sky.sun[1], 'a little above the sun, toward the glow');
   for (const hours of [12, 17 + 49 / 60, 17.7, 17.9, 18, 18.1, 18.3, 21, 0, 5.9, 6.1]) {
     sky.options.hours = hours;
     h.frame();
@@ -450,8 +496,8 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
     h.engine.frameGraph.execute(h.context);
   };
   h.frame();
-  // Nine SH coefficients (GPU-written) then the ambient floor at vec4 9 (CPU-written).
-  const ambient = () => h.resources.find((r) => !r.destroyed && r.size === 160),
+  // Nine SH coefficients (GPU-written), the ambient floor at vec4 9 and the ground row at 10 (CPU-written).
+  const ambient = () => h.resources.find((r) => !r.destroyed && r.size === 176),
     values = () => new Float32Array(ambient().data).subarray(36);
   assert.equal(sky.nightFactor, 0);
   assert.equal(h.engine.lighting.direction[3], 6);
@@ -484,23 +530,42 @@ test('moonlight, ambient color and the reflected night sky share a continuous cl
   h.frame();
   assert.ok(sky.nightFactor > 0 && sky.nightFactor < 1);
   const created = { ...h.counts };
+  // Derivation (KB-TWILIGHT1). Until the moon takes over, the engine light is the sun's beam plus the twilight sky
+  // summed as irradiance vectors (assertSolar), both from the sun's vertical plane: as the beam goes out over the two
+  // minutes the disc takes to set, that sum turns upward in the plane from the sun toward the glow 45 degrees up, with
+  // the light on every surface the exact sum of the two, so no step in it. A step that leaves the plane is a change of
+  // body, to the moon: it happens once, while both are nearly off, as the sun-to-moon switch did before twilight.
   let previous,
     previousStrength = 0,
-    switches = 0;
+    previousRise = -1,
+    wasSolar = false,
+    switches = 0,
+    turns = 0;
   for (let i = 0; i <= 200; i++) {
     options.hours = 17.5 + i / 200;
     h.frame();
     const direction = h.engine.lighting.direction.slice(0, 3),
-      strength = h.engine.lighting.direction[3];
-    // Sun and moon cross-fade: the light only changes body while both are nearly off, never sweeping between them.
+      strength = h.engine.lighting.direction[3],
+      solar = !(sky.moonUnderClouds.direction[3] > 0 && direction.every((v, j) => v === sky.moon[j]));
+    if (solar) {
+      const rise = assertSolar(h.engine.lighting, sky);
+      // Once the sun is down its beam only weakens, so the light only rises toward the glow.
+      if (sky.sun[1] < 0) assert.ok(rise >= previousRise - 1e-7, `the light rises after sunset: ${rise}`);
+      previousRise = rise;
+    }
     if (previous && direction.reduce((sum, v, j) => sum + v * previous[j], 0) < 0.995) {
-      switches++;
-      assert.ok(Math.max(strength, previousStrength) < 0.05, `switched at strength ${strength}`);
+      if (solar && wasSolar) turns++;
+      else {
+        switches++;
+        assert.ok(Math.max(strength, previousStrength) < 0.05, `switched at strength ${strength}`);
+      }
     }
     previous = direction;
     previousStrength = strength;
+    wasSolar = solar;
     assert.ok(direction.every(Number.isFinite));
   }
+  assert.ok(turns > 0, 'the beam hands over to the glow inside the sun plane');
   assert.equal(switches, 1, 'One switch from sun to moon');
   assert.equal(h.counts.groups, created.groups);
   assert.equal(h.counts.buffers, created.buffers);
@@ -636,14 +701,14 @@ test('opt-in sunlight synchronizes before rendering and reverse clocks wrap at m
   sky.options.timeScale = -1;
   sky.onPreUpdate(0.1);
   assert.ok(Math.abs(sky.options.hours - 23.9) < 1e-8);
-  assert.ok(Math.abs(direction[3] - 0.15) < 1e-6);
-  assert.deepEqual(radiance, colors);
+  assertNightFloor(h.engine.lighting, sky, 0.15);
+  assert.equal(radiance[3], colors[3], 'the ambient level is left alone');
   const hours = sky.options.hours;
   h.engine.frameGraph.execute(h.context);
   assert.equal(sky.options.hours, hours);
   sky.onDeviceRestored(h.engine);
   sky.onPreUpdate(0);
-  assert.deepEqual(direction.slice(0, 3), sky.sun);
+  assertNightFloor(h.engine.lighting, sky, 0.15);
   sky.dispose();
   for (const lighting of [{ intensity: -1 }, { minimum: NaN }, null])
     assert.throws(() => new Sky({ lighting }), /options/);
@@ -660,8 +725,8 @@ test('sky clock wraps midnight and synchronizes sun and lighting once before ren
     const uniform = h.resources.find((r) => r.size === 256),
       values = new Float32Array(uniform.data);
     assert.deepEqual([...values.subarray(20, 23)], [...effect.sun]);
-    assert.deepEqual([...h.engine.lighting.direction.subarray(0, 3)], [...sunDirection(effect.options.hours)]);
-    assert.equal(h.engine.lighting.direction[3], 0.25);
+    assert.deepEqual([...effect.sun], [...sunDirection(effect.options.hours)]);
+    assertNightFloor(h.engine.lighting, effect, 0.25);
     const hours = effect.options.hours;
     h.engine.frameGraph.execute(h.context);
     assert.equal(effect.options.hours, hours);
@@ -747,7 +812,7 @@ test('a sky with environment lights PBR meshes as a fallback environment, withou
     /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/,
   );
   assert.ok(h.context.bindings.some((e) => e.binding === 10) && h.context.bindings.some((e) => e.binding === 11));
-  const ambient = h.resources.find((r) => !r.destroyed && r.size === 160),
+  const ambient = h.resources.find((r) => !r.destroyed && r.size === 176),
     floor = new Float32Array(ambient.data).subarray(36, 39);
   assert.deepEqual(Array.from(floor), skyEnvironmentFloor.day.map(Math.fround));
   // The environment is a fallback, not a light: the engine's sun is untouched.
@@ -779,6 +844,64 @@ test('a sky with environment lights PBR meshes as a fallback environment, withou
   sky.dispose();
   assert.throws(() => new BaseSky({ environment: true }), /lighting from @margoengine\/sky\/lighting/);
   assert.throws(() => new Sky({ environment: 1 }), RangeError);
+});
+test("lighting.ambient yields core's ambient to an explicit environment: one margoAmbient per shader (KB-ENV-AMBIENT-DUP1)", () => {
+  const h = optionalGPU();
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.18]) };
+  const sky = new Sky({ hours: 12, timeScale: 0, lighting: { ambient: { day: [0.1, 0.1, 0.1], night: [0, 0, 0] } } });
+  h.engine.use(sky);
+  // EnvironmentLighting's own patch at its own order (-1): the IBL term named margoAmbient on core's `let linear=`.
+  let explicit = true;
+  h.engine.frameGraph.add({
+    name: 'test:environment-lighting',
+    order: -1,
+    execute: (c) => {
+      if (!explicit) return;
+      c.shader = c.shader.replace(
+        /let linear=([^;]+);/,
+        (_, terms) => `let margoAmbient=iblShade(n,v);let linear=${terms.replace('frame.radiance.w', '0.0')}+margoAmbient;`,
+      );
+      c.bindings.push({ binding: 40, resource: {} });
+    },
+  });
+  const frame = () => {
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  };
+  for (let i = 0; i < 2; i++) {
+    frame();
+    // Two declarations of margoAmbient do not compile (WGSL redeclaration) and the GPU was lost.
+    assert.equal(h.context.shader.split('let margoAmbient=').length, 2, 'exactly one margoAmbient');
+    assert.match(h.context.shader, /let margoAmbient=iblShade\(n,v\);/, 'the explicit environment owns the ambient');
+    assert.doesNotMatch(h.context.shader, /skyLighting\(n,v/);
+    assert.deepEqual(
+      h.context.bindings.map((e) => e.binding),
+      [40],
+      "no sky ambient bindings beside the environment's (an unused binding fails the auto layout)",
+    );
+  }
+  // The sky still drives the sun under the explicit environment.
+  assert.ok(h.engine.lighting.direction[3] > 0);
+  explicit = false;
+  frame();
+  assert.equal(h.context.shader.split('let margoAmbient=').length, 2);
+  assert.match(h.context.shader, /let margoAmbient=skyLighting\(n,v,i\.color,i\.material\.y,i\.material\.x,vec3f\(0\.04\),1\.0\);/);
+  assert.deepEqual(h.context.bindings.map((e) => e.binding).sort((a, b) => a - b), [8, 10, 11]);
+  // A HemisphereLight (also order -1) puts its sky term where core's constant ambient was: the sky's light joins it,
+  // as when the sky patched first.
+  h.engine.frameGraph.add({
+    name: 'test:hemisphere',
+    order: -1,
+    execute: (c) => {
+      c.shader = c.shader.replace(/\*frame\.radiance\.w\*frame\.ambient\.rgb/, '*margoSkyLight(n)');
+    },
+  });
+  frame();
+  assert.match(h.context.shader, /\*margoSkyLight\(n\)[^;]*\+margoAmbient;/);
+  assert.match(h.context.shader, /let margoAmbient=skyLighting\(/);
+  sky.dispose();
 });
 test('cloudLayer gives the cloud field, height and clock to what must match the clouds', () => {
   assert.equal(new Sky({ hours: 12 }).cloudLayer, undefined);
@@ -847,11 +970,11 @@ test('KB2224a: the sky compiles only the day model in use; a live switch recompi
       // No branch between the models: WebKit's Apple compile rounds by the branch's shape (one half-float step).
       assert.doesNotMatch(body, /settings\.x|if\(|else/, `${entry}: ${model} without a model branch`);
       if (model === 'bruneton') {
-        assert.match(body, /color=lookup\(scattering,/, `${entry} reads the Bruneton tables`);
+        assert.match(body, /color=brunetonSky\(scattering,/, `${entry} reads the Bruneton tables`);
         assert.doesNotMatch(body, /preetham\(/, `${entry} leaves Preetham out`);
       } else {
         assert.match(body, /color=preetham\(w,s\);/, `${entry} evaluates Preetham`);
-        assert.doesNotMatch(body, /lookup\(/, `${entry} leaves the Bruneton lookup out`);
+        assert.doesNotMatch(body, /lookup\(|brunetonSky\(/, `${entry} leaves the Bruneton lookup out`);
       }
     }
   };
@@ -878,4 +1001,162 @@ test('KB2224a: the sky compiles only the day model in use; a live switch recompi
     depth.destroy();
   }
   assert.ok(h.resources.every((r) => r.destroyed));
+});
+
+test('KB6171a: the stylized night is compiled only while options.night is set; setting or clearing it recompiles', () => {
+  const h = optionalGPU(),
+    depth = Object.assign(
+      h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
+      { depthOrArrayLayers: 1 },
+    );
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array(4) };
+  const sky = new Sky({
+    hours: 16,
+    timeScale: 0,
+    fog: { depth: () => depth, density: 0.01 },
+    lighting: { ambient: { day: [0.1, 0.1, 0.1], night: [0.01, 0.01, 0.01] } },
+  });
+  h.engine.use(sky);
+  h.frame = () => {
+    sky.onPreUpdate(h.context.delta);
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+  };
+  const texture = sky.reflectionTexture;
+  const code = (entry) => {
+    const pipeline = h.pipelines.findLast((p) => (p.fragment ?? p.compute)?.entryPoint === entry);
+    return (pipeline.fragment ?? pipeline.compute).module.code;
+  };
+  const check = (stylized) => {
+    for (const entry of ['fragment', 'fogFragment', 'reflectSky', 'renderLight']) {
+      const text = code(entry);
+      if (stylized) {
+        assert.match(text, /fn stylizedNight\(/, `${entry} holds the stylized night`);
+        assert.match(text, /if\(frame\.sunlight\.w>0\.5\)\{return stylizedNight\(/, `${entry} calls it`);
+      } else {
+        // Under ANGLE Metal the dead branch alone moved two cloud pixels of a sky without a night (KB6171a).
+        assert.doesNotMatch(text, /stylizedNight|nightPcg|hash21/, `${entry} leaves the unused night out`);
+      }
+    }
+  };
+  try {
+    h.frame();
+    check(false);
+    const steady = h.pipelines.length;
+    h.frame();
+    assert.equal(h.pipelines.length, steady, 'Steady frames compile nothing');
+    sky.options.night = {};
+    h.frame();
+    check(true);
+    const set = h.pipelines.length;
+    assert.ok(set > steady, 'Setting a night recompiles');
+    h.frame();
+    assert.equal(h.pipelines.length, set, 'One recompile per change');
+    assert.equal(sky.reflectionTexture, texture, 'The borrowed reflection texture survives the change');
+    delete sky.options.night;
+    h.frame();
+    check(false);
+  } finally {
+    sky.dispose();
+    depth.destroy();
+  }
+  assert.ok(h.resources.every((r) => r.destroyed));
+});
+test('coverage records the pixels the sky draws only while asked, at the frame size, and frees them (KB-HEARTH-CLIP1)', () => {
+  assert.throws(() => new Sky({ coverage: 1 }), RangeError);
+  const h = optionalGPU(),
+    begin = h.context.encoder.beginRenderPass,
+    passes = [];
+  h.context.encoder.beginRenderPass = (descriptor) => (passes.push(descriptor), begin(descriptor));
+  globalThis.GPUTextureUsage = { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+  const sky = new Sky({ hours: 12, timeScale: 0 });
+  h.engine.use(sky);
+  h.frame();
+  const plain = passes.splice(0).length;
+  assert.equal(sky.coverageTexture, undefined, 'nothing is recorded without the option');
+  sky.options.coverage = true;
+  h.frame();
+  assert.equal(passes.length, plain + 1, 'the record is one render pass more');
+  const texture = sky.coverageTexture,
+    record = passes.at(-1);
+  assert.equal(texture.format, 'r8unorm');
+  assert.deepEqual([texture.width, texture.height], [h.context.width, h.context.height]);
+  // The frame is multisampled (4): drawn into a 4-sample target resolved into the record, against the frame's depth.
+  assert.equal(record.colorAttachments[0].resolveTarget.texture, texture);
+  assert.equal(record.colorAttachments[0].view.texture.sampleCount, 4);
+  assert.equal(record.colorAttachments[0].loadOp, 'clear');
+  assert.equal(record.depthStencilAttachment.view, h.context.depth);
+  assert.equal(record.depthStencilAttachment.depthReadOnly, true);
+  const many = record.colorAttachments[0].view.texture;
+  passes.length = 0;
+  h.frame();
+  assert.equal(sky.coverageTexture, texture, 'kept while the size holds');
+  sky.options.coverage = false;
+  passes.length = 0;
+  h.frame();
+  assert.equal(passes.length, plain);
+  assert.equal(sky.coverageTexture, undefined);
+  assert.ok(texture.destroyed && many.destroyed, 'clearing the option frees both textures');
+  sky.options.coverage = true;
+  h.frame();
+  const again = sky.coverageTexture;
+  sky.dispose();
+  assert.ok(again.destroyed, 'dispose frees the record');
+  h.cleanup();
+});
+
+// KB-SKY-SUNUNITS1: the light map is in the sky's own units and the engine sun is lighting.intensity times its share
+// of the zenith sun on the ground, so clear sky lit level ground 1.3 to 1.5 times as much as the sun (real skies give
+// 0.1 to 0.2 of the light: Erbs, Klein and Duffie 1982) and a brighter sun only diluted it. One factor a frame,
+// Sky.lightScale, takes the map into the sun's units: intensity over Preetham's 4 pi 0.55 or over Bruneton's 20 times
+// the zenith transmittance; the shader reads it from skyLight[9].w. The share itself is measured on a real GPU
+// (test/sky-light-units-check.mjs).
+test('the sky light map is taken into the engine sun units, in proportion to lighting.intensity (KB-SKY-SUNUNITS1)', () => {
+  // The zenith transmittance at sea level through Earth's air at turbidity 2: the sky's own 64-step table definition.
+  const zenith = (km) => {
+    const r = 6360 + km,
+      step = (6460 - r) / 64,
+      mie = (0.003996 * 0.5) / 0.9;
+    let rayleigh = 0,
+      aerosol = 0;
+    for (let i = 0; i < 64; i++) {
+      const h = r + (i + 0.5) * step - 6360;
+      rayleigh += Math.exp(-h / 8) * step;
+      aerosol += Math.exp(-h / 1.2) * step;
+    }
+    return [0.005802, 0.013558, 0.0331].reduce(
+      (sum, beta, i) => sum + [0.2126, 0.7152, 0.0722][i] * Math.exp(-(beta * rayleigh + mie * aerosol)),
+      0,
+    );
+  };
+  for (const [model, unit] of [
+    ['preetham', 4 * Math.PI * 0.55],
+    ['bruneton', 20 * zenith(0.001)],
+  ])
+    for (const intensity of [1, 3]) {
+      const h = optionalGPU();
+      h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.18]) };
+      const sky = new Sky({ hours: 12, timeScale: 0, model, lighting: { intensity, ambient: { day: [0, 0, 0], night: [0, 0, 0] } } });
+      h.engine.use(sky);
+      sky.onPreUpdate(h.context.delta);
+      h.context.shader = wgsl;
+      h.context.bindings = [];
+      h.engine.frameGraph.execute(h.context);
+      assert.ok(Math.abs(sky.lightScale - intensity / unit) < 1e-6 * sky.lightScale, `${model} ${intensity}: ${sky.lightScale}`);
+      // The 160-byte light buffer carries it in its last float, beside the ambient floor.
+      const buffer = h.context.bindings.find((e) => e.binding === 8).resource.buffer;
+      assert.equal(new Float32Array(buffer.data)[39], Math.fround(sky.lightScale), `${model} ${intensity}: skyLight[9].w`);
+      assert.match(h.context.shader, /n\.x\*n\.x-n\.y\*n\.y\)\)\*skyLight\[9\]\.w,skyLight\[9\]\.rgb\)/, 'diffuse scaled, floor not');
+      assert.match(h.context.shader, /rough\*3\.0\)\.rgb\*skyLight\[9\]\.w\*specular/, 'reflections scaled');
+      sky.dispose();
+    }
+  // The environment fallback drives no sun: its sky is the light of the engine's own sun, here core's default 3.
+  const h = optionalGPU();
+  h.engine.lighting = { direction: new Float32Array([0, 1, 0, 3]), radiance: new Float32Array([1, 1, 1, 0.18]) };
+  const fallback = new Sky({ hours: 12, timeScale: 0, environment: true });
+  h.engine.use(fallback);
+  fallback.onPreUpdate(h.context.delta);
+  assert.ok(Math.abs(fallback.lightScale - 3 / (4 * Math.PI * 0.55)) < 1e-6, String(fallback.lightScale));
+  fallback.dispose();
 });

@@ -6,8 +6,8 @@ import type { EngineKernel } from '@margoengine/core';
 import type { ComputeContext } from '@margoengine/compute';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { overlayDepthPass } from '../../shared/pass.js';
-import { applyView } from '../../shared/view-rect.js';
-import { fault } from '../../shared/errors.js';
+import { applyView, viewRect, viewSize } from '../../shared/view-rect.js';
+import { fault, rangeError } from '../../shared/errors.js';
 import { VolumeDepthCapture, VolumeDepthSnapshot } from './volume-depth.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; STORAGE: number; VERTEX: number; INDIRECT: number };
@@ -44,8 +44,11 @@ export interface Drawable {
 /** WGSL every sciviz pipeline shares: the frame uniform and the output encoding. */
 export const frameWGSL = /* Shader notes kept outside the uploaded source:
  * Linear light to the canvas: sRGB-encoded unless the target format encodes it already (viewport.z).
+ * viewport.xy is the size of the view being drawn and origin.xy its top-left pixel in the target, so pixel sizes and
+ * @builtin(position) read in the view's own pixels in a multi-view frame. origin.z is the target's pixels per CSS
+ * pixel (SciRenderer.cssScale), which turns sizes given in CSS pixels into target pixels.
  * A key light from over the viewer's shoulder plus a soft fill, so shapes read without a scene light set-up.
- */ /* wgsl */ `struct Frame { clip: mat4x4f, inverse: mat4x4f, eye: vec4f, viewport: vec4f }
+ */ /* wgsl */ `struct Frame { clip: mat4x4f, inverse: mat4x4f, eye: vec4f, viewport: vec4f, origin: vec4f }
 @group(0) @binding(0) var<uniform> frame: Frame;
 fn toOutput(c: vec3f) -> vec3f {
   if (frame.viewport.z < 0.5) { return c; }
@@ -70,6 +73,11 @@ let serial = 0;
 export class SciRenderer implements EnginePlugin {
   /** @internal Per-frame ray integration multiplier, owned by the optional progressive controller. Default 1. */
   samplingScale = 1;
+  /**
+   * @internal Target pixels per CSS pixel while a tiled export draws (its image width over the canvas CSS width);
+   * undefined otherwise, when frames take the drawn target's width over the canvas CSS width, as lines do.
+   */
+  exportScale: number | undefined;
   /** @internal Optional CPU extractor, installed only by sciviz/fallback. */
   cpuIsosurface?: (data: Float32Array, level: number, options: {
     dims: readonly [number, number, number]; maxTriangles: number; signal: AbortSignal;
@@ -90,7 +98,7 @@ export class SciRenderer implements EnginePlugin {
   #depthCapture: VolumeDepthCapture | undefined;
   readonly #depthSnapshot = new VolumeDepthSnapshot();
   #frameBuffer: GPUBuffer | undefined;
-  readonly #frame = new Float32Array(40);
+  readonly #frame = new Float32Array(44);
   readonly #inverse = new Float32Array(16);
   readonly #drawables = new Set<Drawable>();
   readonly #pipelines = new Map<string, GPURenderPipeline>();
@@ -232,6 +240,17 @@ export class SciRenderer implements EnginePlugin {
     return pipeline;
   }
 
+  /**
+   * @internal Target pixels per CSS pixel of a frame drawn to a target `width` pixels wide: the one place sizes in CSS pixels
+   * (graph nodes and edges) become target pixels. A tiled export's scale while it draws, else `width` over the canvas
+   * CSS width, which follows the backing store the engine chose (it caps window.devicePixelRatio under 4x MSAA).
+   */
+  cssScale(width: number): number {
+    if (this.exportScale !== undefined) return this.exportScale;
+    const canvas = this.#engine?.canvas;
+    return canvas?.clientWidth ? width / canvas.clientWidth : 1;
+  }
+
   #execute(context: PassContext): void {
     if (this.#restoreError) throw this.#restoreError;
     if (this.#disposed || !this.#drawables.size) return;
@@ -242,18 +261,25 @@ export class SciRenderer implements EnginePlugin {
       f = this.#frame,
       clip = camera.matrix;
     f.set(clip, 0);
-    if (invertMatrix(clip, this.#inverse)) f.set(this.#inverse, 16);
+    // Volume, slice and atmosphere rays are rebuilt from the inverse; a singular custom `Camera.project` has none, and
+    // keeping the previous frame's inverse would march rays for another camera.
+    if (!invertMatrix(clip, this.#inverse))
+      throw rangeError('Camera matrix must be invertible; give Camera.project a nonsingular projection', 'sciviz');
+    f.set(this.#inverse, 16);
     f.set([camera.position[0], camera.position[1], camera.position[2], 1], 32);
-    const orthographic = !(clip[3] || clip[7] || clip[11]);
+    const orthographic = !(clip[3] || clip[7] || clip[11]),
+      [width, height] = viewSize(context),
+      rect = viewRect(context);
     f.set(
       [
-        context.width,
-        context.height,
+        width,
+        height,
         context.format.endsWith('-srgb') || context.format.includes('float') ? 0 : 1,
         orthographic ? 1 : 0,
       ],
       36,
     );
+    f.set([rect?.[0] ?? 0, rect?.[1] ?? 0, this.cssScale(context.width), 0], 40);
     this.device!.queue.writeBuffer(this.#frameBuffer!, 0, f);
     const depth = visible.some((d) => d.needsSceneDepth);
     for (const d of visible) if (!depth || !d.transparent) d.prepare?.(context, this);

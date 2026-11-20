@@ -33,3 +33,11 @@
   on the Mac with a fresh export. The cube is now 0.65 m, every face between centres (315 active voxels, 7 rows in z),
   and both files were exported again. Only the volume changed: the fresh curves, points and their truth matched the old
   files exactly. Not yet re-run with Blender 5.2.3 on Windows.
+- `node-noise.json`: exported for this project by Blender 5.3.0 Beta (hash ecaf39c37b28, Windows, 2026-11-11) from
+  `tools/blender-addon/tests/blender_node_noise.py`: live socket F-curves carrying Noise modifiers (KB5339d) with
+  Blender's own socket values at eighth-frame and off-step times (Apache-2.0, as this repository). Regenerate the same
+  way and copy the file here.
+- `node-probes.json`: exported for this project by Blender 5.3.0 Beta (hash ecaf39c37b28, Windows, 2026-11-15) from
+  `tools/blender-addon/tests/blender_node_probes.py` (KB-P3d): a Cycles bake and a Geometry Nodes read of a colour wired
+  into a float socket, and socket F-curves with LINEAR extrapolation from every end-key kind with Blender's own values
+  before and after their keys (Apache-2.0, as this repository). Regenerate the same way and copy the file here.

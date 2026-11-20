@@ -217,7 +217,7 @@ export function transformNormal(m: ArrayLike<number>, x: number, y: number, z: n
   return [nx / length, ny / length, nz / length];
 }
 
-function pvector(node: FBXNode, name: string, fallback = [0, 0, 0]): number[] {
+export function pvector(node: FBXNode, name: string, fallback = [0, 0, 0]): number[] {
   return vector(property(node, name, fallback) as ArrayLike<number>, name);
 }
 export interface TransformOverrides {

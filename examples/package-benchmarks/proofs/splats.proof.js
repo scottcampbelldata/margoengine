@@ -39,7 +39,7 @@ function scene(module, samples, count, bands) {
     view.begin(index);
     try {
       run(view.c);
-    } catch (error) {
+    } catch {
       gpu.note('throw');
     }
     view.end();

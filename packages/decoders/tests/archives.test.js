@@ -102,10 +102,20 @@ test('stopAt returns exactly the first bytes of a stream and decodes no further'
   }
 });
 
-test('a wrong header is named, and an xz filter that is not LZMA2 is unsupported', () => {
+test('a wrong header is named, and an xz branch/call/jump filter is unsupported', () => {
   assert.throws(() => decodeBzip2(new TextEncoder().encode('not bzip2 data')), /no BZh header/);
   assert.throws(() => decodeXz(new TextEncoder().encode('not an xz file, at all')), /no xz header/);
-  // Hand-made: one block header naming the delta filter (0x03), with its CRC32.
+  // XZ Utils' --x86 filter (0x04): the format specification names it but gives no algorithm.
+  assert.throws(
+    () => decodeXz(read('floats.x86.xz')),
+    (e) => e.code === 'unsupported' && /filter 0x4/.test(e.message),
+  );
+});
+
+// xz format 1.2.1: block header sizes (3.1.3, 3.1.4), header padding (3.1.6), the index records (4.2, 4.3) and the
+// footer's backward size and flags (2.1.2.2, 2.1.2.3) MUST match what the stream holds. Each damage below keeps every
+// CRC valid, so only those rules can catch it.
+test('xz sizes in block headers, the index and the footer must match the stream (format 1.2.1 MUST rules)', () => {
   const crc = (bytes) => {
       let c = ~0;
       for (const b of bytes) {
@@ -114,14 +124,39 @@ test('a wrong header is named, and an xz filter that is not LZMA2 is unsupported
       }
       return ~c >>> 0;
     },
-    word = (v) => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, v >>> 24],
-    flags = [0, 1],
-    head = [0x02, 0, 0x03, 0x01, 0, 0, 0, 0],
-    file = Uint8Array.from([
-      0xfd, 0x37, 0x7a, 0x58, 0x5a, 0, ...flags, ...word(crc(flags)), ...head, ...word(crc(head)),
-    ]);
-  assert.throws(
-    () => decodeXz(file),
-    (e) => e.code === 'unsupported' && /filter 0x3/.test(e.message),
+    put = (file, at, value) => new DataView(file.buffer).setUint32(at, value, true),
+    whole = read('floats.delta4.xz'),
+    headerSize = (whole[12] + 1) * 4,
+    reseal = (file) => put(file, 12 + headerSize - 4, crc(file.subarray(12, 12 + headerSize - 4))),
+    damage = (change) => {
+      const file = whole.slice();
+      change(file);
+      return file;
+    };
+  assert.equal(decodeXz(whole).length, 1_600_000);
+  // Block header: flags 0xc0 (both sizes), then compressed size, uncompressed size 1,600,000 (0x80 0xd4 0x61).
+  assert.equal(whole[13] & 0xc0, 0xc0);
+  const sizes = 14,
+    unpacked = sizes + (whole[sizes] & 0x80 ? 2 : 1);
+  assert.deepEqual([...whole.subarray(unpacked, unpacked + 3)], [0x80, 0xd4, 0x61]);
+  const cases = [
+    ['an uncompressed size one too large', (f) => ((f[unpacked] = 0x81), reseal(f)), /sizes its header states/],
+    ['a compressed size one too small', (f) => (f[sizes]--, reseal(f)), /sizes its header states/],
+    ['a nonzero header padding byte', (f) => ((f[12 + headerSize - 5] = 1), reseal(f)), /header padding/],
+  ];
+  // Index: the 0x00 indicator follows the last block; footer is the last 12 bytes.
+  const footer = whole.length - 12,
+    backward = (new DataView(whole.buffer).getUint32(footer + 4, true) + 1) * 4,
+    index = footer - backward,
+    resealIndex = (f) => put(f, footer - 4, crc(f.subarray(index, footer - 4))),
+    resealFooter = (f) => put(f, footer, crc(f.subarray(footer + 4, footer + 10)));
+  assert.equal(whole[index], 0);
+  cases.push(
+    ['an index record off by one', (f) => (f[index + 2]++, resealIndex(f)), /index differs/],
+    ['an index with two records', (f) => ((f[index + 1] = 2), resealIndex(f)), /lists 2 blocks/],
+    ['a footer backward size one too large', (f) => (f[footer + 4]++, resealFooter(f)), /another index size/],
+    ['footer flags naming another check', (f) => ((f[footer + 9] = 4), resealFooter(f)), /footer flags differ/],
   );
+  for (const [what, change, message] of cases)
+    assert.throws(() => decodeXz(damage(change)), (e) => e.code === 'failed' && message.test(e.message), what);
 });

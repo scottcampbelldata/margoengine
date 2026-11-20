@@ -1,6 +1,10 @@
 // Optional renderers reuse the existing uniform of a scene's `section` plugin (a plugin that patches core's mesh
 // shader and owns the binding named `section`); its patch and ownership stay unchanged. Per-material clipping planes (@margoengine/materials
-// `clippingPlanes`) use the same layout under another name, so one shader can carry both.
+// `clippingPlanes`) use the same layout under another name, with room for 16 planes, so one shader can carry both.
+/** How many planes uniform `name` holds: a scene's `section` plugin 6, a material's (any other name) 16. */
+export const planeCapacity = (name) => (name === 'section' ? 6 : 16);
+/** The most planes a device cuts in the rasterizer: WGSL's clip_distances array holds at most 8. */
+export const hardwarePlanes = 8;
 const bindingPattern = /@group\(0\) @binding\((\d+)\) var<uniform> section:Section;/;
 const cache = new Map();
 // The section binding of the last shader read: draws call this per model, and a frame keeps one core shader.
@@ -32,18 +36,20 @@ export function clipStatement(name, position = 'i.position') {
 }
 /** The planes uniform `name` of a material or caster, at `binding` of `group`. */
 export const clipDeclaration = (group, binding, name) =>
-  `struct ${name}Planes {planes:array<vec4f,6>,settings:vec4f}\n@group(${group}) @binding(${binding}) var<uniform> ${name}:${name}Planes;\n`;
+  `struct ${name}Planes {planes:array<vec4f,${planeCapacity(name)}>,settings:vec4f}\n@group(${group}) @binding(${binding}) var<uniform> ${name}:${name}Planes;\n`;
 /**
  * `code` cutting away the union of uniform `name`'s planes in the rasterizer, before the fragment stage, through WGSL's
  * `clip_distances` (the device needs the 'clip-distances' feature). The vertex stage returns a copy of `Out` that adds the
  * distances, as a fragment stage cannot read them; `position` is the world point, in scope at the stage's `return o;`.
- * A plane past the count gets 1, which cuts nothing. Apply it last: nothing can patch `->Out {` afterwards.
+ * A plane past the count gets 1, which cuts nothing; the caller keeps the count at `hardwarePlanes` or fewer. Apply it
+ * last: nothing can patch `->Out {` afterwards.
  */
 export function clipDistances(code, name, position = 'o.position') {
+  const n = Math.min(hardwarePlanes, planeCapacity(name));
   const head = /@vertex\s+fn\s+\w+\([\s\S]*?\)->Out\s*\{/.exec(code),
     end = head ? code.indexOf('return o;', head.index) : -1;
   if (end < 0) throw new TypeError('Hardware clip distances need a vertex stage that returns Out; use clippingPlanes without the feature');
-  const fill = `for(var margoP=0u;margoP<6u;margoP++){o.margoClip[margoP]=select(1.0,dot(${name}.planes[margoP].xyz,${position})+${name}.planes[margoP].w,margoP<u32(${name}.settings.x));}`;
+  const fill = `for(var margoP=0u;margoP<${n}u;margoP++){o.margoClip[margoP]=select(1.0,dot(${name}.planes[margoP].xyz,${position})+${name}.planes[margoP].w,margoP<u32(${name}.settings.x));}`;
   return (
     'enable clip_distances;\n' +
     (code.slice(0, end) + fill + code.slice(end))
@@ -51,7 +57,7 @@ export function clipDistances(code, name, position = 'o.position') {
       .replace('var o:Out;', 'var o:MargoClipped;')
       .replace(
         /struct Out \{([^}]*)\}/,
-        (whole, fields) => `${whole}\nstruct MargoClipped {${fields.trimEnd().replace(/,$/, '')},@builtin(clip_distances) margoClip:array<f32,6>}`,
+        (whole, fields) => `${whole}\nstruct MargoClipped {${fields.trimEnd().replace(/,$/, '')},@builtin(clip_distances) margoClip:array<f32,${n}>}`,
       )
   );
 }
@@ -95,7 +101,7 @@ export function sectionShader(source, group, binding, name = 'section') {
     cursor = signature.lastIndex = end;
   }
   code =
-    `struct ${type} {planes:array<vec4f,6>,settings:vec4f}\n@group(${group}) @binding(${binding}) var<uniform> ${name}:${type};\n` +
+    `struct ${type} {planes:array<vec4f,${planeCapacity(name)}>,settings:vec4f}\n@group(${group}) @binding(${binding}) var<uniform> ${name}:${type};\n` +
     code +
     source.slice(cursor);
   if (cache.size >= 64) cache.clear();

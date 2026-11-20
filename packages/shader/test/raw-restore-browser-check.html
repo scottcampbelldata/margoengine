@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Raw shader restore browser check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas></canvas>
+<script type="module">
+// Real-GPU proof of the borrowed-object rule for RawShaderMaterial textures and storage buffers (KB-RESTORE-BORROWED1),
+// driven by raw-restore-browser-check.mjs. A quad shows its texture's colour plus its storage buffer's colour: red and
+// green make yellow. A plain texture and buffer are lost with their device: after engine.rebootDevice() the frames raise
+// no validation error, the quad reads white (the texture's stand-in) plus zero (the buffer's), and engine.onError hears
+// of each once. New ones bring yellow back; a (device) => texture and buffer are made again with no report. The first
+// texture is given at construction: on the WebGL2 layer, whose texture keeps its GL texture as `texture`, it was once
+// taken for a {texture} option and every frame threw (KB-COMPAT-RAWFIRST1).
+import {Engine} from '/packages/core/dist/index.js';
+import {RawMesh,RawShaderMaterial,RawShaders} from '/packages/shader/dist/raw.js';
+const canvas=document.querySelector('canvas'),errors=[],reported=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,3],target:[0,0,0]}});
+engine.onError=(e)=>reported.push(`${e?.code??''} ${e?.message??e}`);
+const watch=(device)=>device.addEventListener('uncapturederror',(e)=>errors.push(e.error.message));
+watch(engine.gpu);
+const texture=(device,rgba)=>{const t=device.createTexture({size:[1,1],format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+ device.queue.writeTexture({texture:t},new Uint8Array(rgba),{bytesPerRow:4},[1,1]);return t;};
+const buffer=(device,rgba)=>{const b=device.createBuffer({size:16,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(b,0,new Float32Array(rgba));return b;};
+let made=0;
+const code=`struct Out {@builtin(position) clip:vec4f}
+@vertex fn vertex(a:Attributes)->Out {return Out(camera.viewProjection*(mesh.world*vec4f(a.position,1)));}
+@fragment fn fragment(i:Out)->@location(0) vec4f {return margoEncode(vec4f(textureSampleLevel(map,mapSampler,vec2f(0.5),0.0).rgb+items[0].rgb,1));}`;
+const draw=()=>{try{engine.render({delta:0});}catch(error){errors.push(`render threw: ${error?.message??error}`);}};
+async function frames(){for(let i=0;i<30;i++){draw();await engine.gpu.queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,20));}}
+async function restore(){const previous=engine.gpu;previous.destroy();await previous.lost;await engine.rebootDevice();watch(engine.gpu);await frames();return engine.gpu!==previous;}
+let material;
+const build=async()=>{
+material=new RawShaderMaterial({vertexShader:code,textures:{map:texture(engine.gpu,[255,0,0,255])},storage:{items:{buffer:buffer(engine.gpu,[0,1,0,1]),type:'vec4f'}}});
+await engine.gpu.queue.onSubmittedWorkDone();
+const raw=RawShaders.attach(engine);
+raw.add(new RawMesh({material,attributes:{position:{data:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],type:'vec3f'}},index:[0,1,2,0,2,3]}));
+};
+window.check={
+ errors:()=>errors,reported:()=>reported,frames,made:()=>made,
+ shot:async()=>{await frames();return true;},
+ async step(name){
+  if(name==='build')await build();
+  if(name==='plain'){material.textures.map.texture=texture(engine.gpu,[255,0,0,255]);}
+  if(name==='restore')return restore();
+  if(name==='fresh'){material.textures.map.texture=texture(engine.gpu,[255,0,0,255]);material.storage.items.buffer=buffer(engine.gpu,[0,1,0,1]);}
+  if(name==='function'){made=0;material.textures.map.texture=(d)=>(made++,texture(d,[255,0,0,255]));material.storage.items.buffer=(d)=>((buffers.get(d)??buffers.set(d,buffer(d,[0,1,0,1])).get(d)));}
+  await frames();return true;
+ },
+};
+const buffers=new Map();
+window.ready=true;
+</script></body></html>

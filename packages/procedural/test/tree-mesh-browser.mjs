@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { build, preview } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatBuild, compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
 // All generated files stay in this worktree. Synthetic geometry is a correctness fixture, not measured botanical data.
 const dir = fileURLToPath(new URL('../../../test-results/batch230-tree-browser/', import.meta.url));
@@ -15,7 +16,12 @@ await writeFile(
 );
 let browser, server;
 try {
-  await build({ root: dir, configFile: false, logLevel: 'error', build: { outDir: dir + '/dist' } });
+  await build({
+    root: dir,
+    configFile: false,
+    logLevel: 'error',
+    build: { outDir: dir + '/dist', ...compatBuild(dir + '/index.html') },
+  });
   server = await preview({
     root: dir,
     configFile: false,
@@ -26,6 +32,8 @@ try {
   browser = await launchBrowser();
   const page = await browser.newPage(),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim, '/compat.js');
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0]);
   await page.waitForFunction(() => window.make);

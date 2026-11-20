@@ -159,6 +159,9 @@ scenarios.parallax=()=>{const m=createMesh(engine,planeGeometry(2,2),new Materia
 // triplanarUp: the image's top half red, repeating every unit up y (V up, as the UVs).
 const repeating=(data,width,height)=>new Texture({data:new Uint8Array(data),width,height},{magFilter:'nearest',minFilter:'nearest',mipmaps:false,wrapS:'repeat',wrapT:'repeat'});
 scenarios.triplanar=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:repeating([255,0,0,255,0,0,255,255],2,1),triplanar:true}));return {destroy(){m.destroy();},step(){m.material.triplanar=false;}};};
+// triplanarDefaultWrap: the same plane with a map of default options (no wrap set, so clamp elsewhere): triplanar
+// repeats it, as the world projection reads past [0, 1] (KB-TRIPLANAR-SIDES1: the clamp smeared its edge texels).
+scenarios.triplanarDefaultWrap=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:new Texture({data:new Uint8Array([255,0,0,255,0,0,255,255]),width:2,height:1},{magFilter:'nearest',minFilter:'nearest',mipmaps:false}),triplanar:true}));return {destroy(){m.destroy();},step(){m.material.triplanar=false;}};};
 scenarios.triplanarUp=()=>{const m=createMesh(engine,planeGeometry(2,2),new Material({shading:'basic',map:new Texture(flip,{magFilter:'nearest',minFilter:'nearest',mipmaps:false,wrapS:'repeat',wrapT:'repeat'}),triplanar:true}));return {destroy(){m.destroy();},step(){m.material.triplanar=false;}};};
 // A triplanar normal map tilts the normal in the projection's own frame (U along +x on a +z face), as the UV frame
 // does: a Lambert plane lit from (1, 0, 1) shows the same value with triplanar on (first) and off (the step).

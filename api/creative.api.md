@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel, Vec3, VectorRef } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { VFXObstacle, VFXTexture } from "@margoengine/vfx";
+import { VFXObstacle, VFXOptions, VFXTexture } from "@margoengine/vfx";
 import { VFX } from "@margoengine/vfx/base";
 
 export interface AtmosphereOptions {
@@ -18,7 +18,7 @@ export interface AtmosphereOptions {
 
 export class GPUParticles extends VFX {
     readonly name = "gpu-particles";
-    static attach(engine: EngineKernel, options?: ParticleOptions): GPUParticles;
+    static attach(engine: EngineKernel, options?: ParticleOptions | VFXOptions): GPUParticles;
     constructor(options?: ParticleOptions);
     get count(): number;
 }
@@ -34,6 +34,24 @@ export class GrassField implements EnginePlugin {
     set windSpeed(value: number);
     get windStrength(): number;
     set windStrength(value: number);
+    get windDirection(): readonly [number, number];
+    set windDirection(value: readonly [number, number]);
+    get bladeHeight(): number;
+    set bladeHeight(value: number);
+    get drawDistance(): number;
+    set drawDistance(value: number);
+    get density(): number;
+    set density(value: number);
+    get rootColor(): readonly [number, number, number];
+    set rootColor(value: readonly [number, number, number]);
+    get tipColor(): readonly [number, number, number];
+    set tipColor(value: readonly [number, number, number]);
+    get tipVariantColor(): readonly [number, number, number];
+    set tipVariantColor(value: readonly [number, number, number]);
+    get translucencyColor(): readonly [number, number, number];
+    set translucencyColor(value: readonly [number, number, number]);
+    get translucency(): number;
+    set translucency(value: number);
     get windTime(): number;
     set windTime(value: number);
     setup(engine: Engine): void;
@@ -149,6 +167,9 @@ export class PostProcessing implements EnginePlugin {
     constructor(options?: PostOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { screenSelection, rectangleSelection, lassoSelection, colorSelection } from '../dist/select.js';
 import { SparseGrid } from '../dist/sparse.js';
+import { pickRay } from '../dist/pick.js';
 import { cellAt, cellIndex } from '../dist/index.js';
 
 // Independent orthographic camera: X/Y [0,4] to [-1,1], Z [0,4] to reverse depth [1,0].
@@ -157,4 +158,25 @@ test('malformed shapes, matrices, palettes, options, budgets and cancellation re
     () => screenSelection(grid, camera, full, { signal: AbortSignal.abort(reason) }),
     (e) => e === reason,
   );
+});
+
+// An OpenGL-depth perspective (engine.camera.matrix on the WebGL2 backend): 90 degrees, near 1, far 3, camera at the
+// origin looking down -z. NDC depth is negative from the near plane to 1.5 units away.
+const glCamera = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -2, -1, 0, 0, -3, 0];
+
+test('pickRay and screen selection read a WebGL2 camera matrix with its own depth range', () => {
+  const ray = pickRay(glCamera, 0, 0, { backend: 'webgl2' });
+  assert.deepEqual(
+    ray.origin.map((v) => Math.round(v * 1e9) / 1e9),
+    [0, 0, -1],
+  );
+  assert.deepEqual(ray.direction, [0, 0, -1]);
+  assert.throws(() => pickRay(glCamera, 0, 0, { backend: 'webgl' }), /backend is unknown/);
+  // One cell centred 1.2 units in front: its NDC depth is negative, which the WebGPU depth test once refused.
+  const grid = { size: [1, 1, 1], voxels: Uint8Array.of(4) },
+    modelMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.5, -0.5, -1.7, 1],
+    whole = { type: 'rectangle', min: [-1, -1], max: [1, 1] };
+  for (const visibleOnly of [false, true])
+    assert.deepEqual([...screenSelection(grid, glCamera, whole, { modelMatrix, backend: 'webgl2', visibleOnly })], [0]);
+  assert.throws(() => screenSelection(grid, glCamera, whole, { backend: 'gl' }), TypeError);
 });

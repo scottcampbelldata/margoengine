@@ -58,3 +58,85 @@ test("dispose removes an installed model from its own scene, not the active scen
   assert.equal(kept.disposed, 0);
   assert.equal(engine.scene.plugins.has(name), false, 'the installed model stayed in its scene');
 });
+
+// KB-OWN-ASYNC3: the installer built models and environments after its awaits, when the default scene is active again.
+async function rig(t, respond) {
+  const h = optionalGPU(),
+    pass = new Proxy({}, { get: () => () => {} });
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  Object.assign(h.engine.gpu, {
+    limits: { ...h.engine.gpu.limits, maxTextureDimension2D: 4096 },
+    pushErrorScope() {},
+    popErrorScope: async () => null,
+    createCommandEncoder: () => new Proxy({ finish: () => ({}) }, { get: (o, k) => o[k] ?? (() => pass) }),
+  });
+  const engine = new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(64), {
+      backend: 'webgpu',
+      gpu: h.engine.gpu,
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    }),
+    fetch = globalThis.fetch;
+  globalThis.fetch = async () => respond();
+  t.after(() => {
+    globalThis.fetch = fetch;
+    engine.dispose();
+    h.cleanup();
+  });
+  return engine;
+}
+const owned = (scene) => [...scene.plugins.keys()].filter((name) => name !== 'probe');
+const model = () =>
+  new Response(JSON.stringify(triangle()), { headers: { 'content-type': 'model/gltf+json' } });
+const hdr = () => {
+  const head = new TextEncoder().encode('#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 2 +X 2\n'),
+    bytes = new Uint8Array(head.length + 16);
+  bytes.set(head);
+  for (let i = 0; i < 4; i++) bytes.set([128, 128, 128, 129], head.length + i * 4);
+  return new Response(bytes);
+};
+const inSecondScene = (engine, start) => {
+  const other = engine.createScene('other');
+  let pending;
+  other.use({ name: 'probe', setup: () => (pending = start()) });
+  return { other, pending };
+};
+test('a model load that starts in a second scene installs the model there', async (t) => {
+  const engine = await rig(t, model),
+    installer = new AssetInstaller(engine),
+    { other, pending } = inSecondScene(engine, () =>
+      installer.load({ kind: 'model', url: 'http://app.test/t.gltf' }, new AbortController().signal),
+    );
+  const { plugin } = await pending;
+  assert.ok(other.plugins.has(plugin), 'the model is not in the second scene');
+  assert.deepEqual(owned(engine.scene), [], 'a plugin landed in the default scene');
+  installer.dispose();
+  assert.deepEqual(owned(other), []);
+});
+test('an hdri load that starts in a second scene installs its environment and lighting there', async (t) => {
+  const engine = await rig(t, hdr),
+    installer = new AssetInstaller(engine),
+    { other, pending } = inSecondScene(engine, () =>
+      installer.load({ kind: 'hdri', url: 'http://app.test/s.hdr' }, new AbortController().signal),
+    );
+  const { plugin } = await pending;
+  assert.ok(other.plugins.has(plugin), 'the lighting is not in the second scene');
+  assert.equal(owned(other).length, 2, 'the environment and the lighting belong to the second scene');
+  assert.deepEqual(owned(engine.scene), [], 'a plugin landed in the default scene');
+  installer.dispose();
+  assert.deepEqual(owned(other), []);
+});
+test('an aborted load that starts in a second scene leaves nothing in either scene', async (t) => {
+  const engine = await rig(t, model),
+    installer = new AssetInstaller(engine),
+    controller = new AbortController(),
+    { other, pending } = inSecondScene(engine, () =>
+      installer.load({ kind: 'model', url: 'http://app.test/t.gltf' }, controller.signal),
+    );
+  controller.abort(new Error('stop'));
+  await assert.rejects(pending, /stop/);
+  assert.deepEqual(owned(engine.scene), []);
+  assert.deepEqual(owned(other), []);
+});

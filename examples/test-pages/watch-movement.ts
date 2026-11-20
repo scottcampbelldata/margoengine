@@ -9,7 +9,7 @@ import { PostStack } from '@margoengine/post/stack';
 import { paceEngine } from '@margoengine/quality';
 import { Picking, Selection } from '@margoengine/selection';
 import { RawMesh, RawShaderMaterial, RawShaders } from '@margoengine/shader/raw';
-import { ContactShadows } from '@margoengine/staging';
+import { ContactShadows } from '@margoengine/studio';
 import { Tonemap } from '@margoengine/tonemap';
 import { createStage } from 'margoengine';
 

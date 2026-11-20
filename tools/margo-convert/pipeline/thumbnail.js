@@ -1,7 +1,7 @@
 // @ts-check
 // `margo-convert thumbnail`: renders a model to PNG files with no page, through a WebGPU binding the user installs
 // (this tool ships none: a binding is a large download that runs code when installed). Images decode with sharp, since
-// Node has no createImageBitmap, and reach gltf-pro as raw pixels. Draco and KTX2 need Workers, so they are refused.
+// Node has no createImageBitmap, and reach gltf/pbr as raw pixels. Draco and KTX2 need Workers, so they are refused.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path';
@@ -61,7 +61,7 @@ function assertLoadable(doc) {
 }
 
 /**
- * Every image in the model as raw RGBA, in the shape gltf-pro uploads directly.
+ * Every image in the model as raw RGBA, in the shape gltf/pbr uploads directly.
  * @param {any} doc @param {Uint8Array[]} buffers @param {string} file @param {any} sharp
  */
 async function decodeImages(doc, buffers, file, sharp) {
@@ -127,7 +127,7 @@ export async function thumbnail({ input, out, size = 512, views = ['iso'], gpu =
     binding = await loadBinding(gpu),
     [{ Camera, Engine }, { parseGLTFAsync }, { createHeadlessCanvas, installGPU, toPNG }] = await Promise.all([
       import('@margoengine/core'),
-      import('@margoengine/gltf-pro'),
+      import('@margoengine/gltf/pbr'),
       import('@margoengine/headless'),
     ]),
     installed = installGPU({ gpu: binding.gpu, globals: binding.globals });

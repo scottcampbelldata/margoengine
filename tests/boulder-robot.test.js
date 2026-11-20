@@ -1,6 +1,6 @@
 // The Boulder climber (examples/assets/boulder-robot.glb): the Light Keeper robot with a hip and two legs. Checks the
 // shipped file: Khronos validation, the joint hierarchy and rest positions, hinge axes, clean skin weights at the hips,
-// link hull sizes for rigging's jointHulls, the size budget, and that gltf-pro loads it. The build script's
+// link hull sizes for rigging's jointHulls, the size budget, and that gltf/pbr loads it. The build script's
 // optimize-and-validate step is run on a small stand-in GLB so the test needs no Blender.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convexGeometry } from '@margoengine/geometry/extras';
-import { GLTFAsset, parseGLTFAsync } from '@margoengine/gltf-pro';
+import { GLTFAsset, parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { buildBoulderAssets } from '../scripts/build-boulder-assets.mjs';
 import { CHARACTER } from '../examples/boulder/rig.ts';
 import { headless, headlessModels } from './support/pbr-snapshot.js';
@@ -251,7 +251,7 @@ test('every link has a hull that jointHulls can take: corners per joint, all red
   for (const name of ['LeftFootTarget', 'RightFootTarget', 'Root']) assert.equal(perJoint[index(name)].length, 0);
 });
 
-test('gltf-pro loads Boulder with its skin, the idle clip and meshopt-compressed geometry', async () => {
+test('gltf/pbr loads Boulder with its skin, the idle clip and meshopt-compressed geometry', async () => {
   assert.ok(doc.extensionsUsed.includes('EXT_meshopt_compression'));
   assert.equal(doc.animations.length, 1);
   assert.equal(doc.animations[0].name, 'Boulder idle');

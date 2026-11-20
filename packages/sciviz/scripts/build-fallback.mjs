@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, readFileSync } from 'node:fs';
 import { endTree } from '../../../scripts/support/shutdown.mjs';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const manifest = new URL('../kernel/Cargo.toml', import.meta.url);
 const { fileURLToPath } = await import('node:url');
@@ -19,7 +20,9 @@ const args = testing
 const child = spawn('cargo', args, {
   stdio: 'inherit',
   windowsHide: true,
-  env: { ...process.env, ...(!testing && { RUSTFLAGS: '-C target-feature=+simd128' }) },
+  env: testing
+    ? process.env
+    : blueprintRustEnv(fileURLToPath(new URL('../kernel', import.meta.url)), '-C target-feature=+simd128'),
 });
 let timedOut = false;
 let ended;

@@ -76,9 +76,9 @@ window.check={
   readField:()=>readBack(field,Float32Array),
   readFlow:()=>readBack(flow,Uint32Array),
   async readAtomics(){const first=(await readBack(kept,Uint32Array)).slice(0,500).sort((a,b)=>a-b);return {counter:await readBack(counter,Uint32Array),evens:first.every((v,k)=>v===k*2)};},
-  // Both gltf-pro variants (standard and KHR physical) with node overrides, including a vertex offset and a varying, must compile.
+  // Both gltf/pbr variants (standard and KHR physical) with node overrides, including a vertex offset and a varying, must compile.
   async variants(){
-    const {pbrShader,physicalShader}=await import('/packages/gltf-pro/src/shader.ts');
+    const {pbrShader,physicalShader}=await import('/packages/gltf/src/shader.ts');
     const m=new NodeMaterial({colorNode:discard(uv().y.greaterThan(0.9),mix(tint,texture(solid(0,0,255)).rgb,uv().x)),positionNode:positionLocal.add(normalLocal.mul(sin(time).mul(0.1))),emissiveNode:normalLocal.mul(0.1),roughnessNode:0.5});
     const out=[];for(const source of [pbrShader,physicalShader()]){const info=await device.createShaderModule({code:m.shader(source,2)}).getCompilationInfo();out.push(info.messages.filter(x=>x.type==='error').map(x=>x.message));}
     return out;

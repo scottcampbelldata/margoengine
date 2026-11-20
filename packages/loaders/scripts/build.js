@@ -8,15 +8,18 @@ import { build } from 'vite';
 import { buildWorkers } from '../../../scripts/build-workers.js';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 // Plain TypeScript emit: one ES module per loader, so a bundler keeps only the parsers an app imports.
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
-await rm(resolve(root, 'dist'), { recursive: true, force: true });
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
+await rm(dist, { recursive: true, force: true });
 await copyLegal(root);
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
@@ -27,7 +30,7 @@ await build({
   publicDir: false,
   logLevel: 'warn',
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: dist,
     emptyOutDir: false,
     target: 'es2022',
     minify: false,
@@ -35,7 +38,7 @@ await build({
     rollupOptions: { external: (id) => /^\.\/[\w-]+\.js$/.test(id) },
   },
 });
-await rm(resolve(root, 'dist/usd.worker.js'));
+await rm(resolve(dist, 'usd.worker.js'));
 await buildWorkers(root);
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);

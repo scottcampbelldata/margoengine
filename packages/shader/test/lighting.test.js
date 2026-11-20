@@ -14,7 +14,7 @@ import {
 import { lightPBR } from '../../shared/pbr-hooks.js';
 import { clusterBrdf } from '../../shared/light-terms.js';
 
-const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
+const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf/src/shader.ts');
 const sources = [pbrShader, extendedPBRShader, physicalShader()];
 const hooks = {
   declarations: '',

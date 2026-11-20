@@ -20,11 +20,16 @@ export function nodeExamples(readme) {
   return examples;
 }
 
-/** What an example needs that the check must bring: ffmpeg on the path, or a reference picture to compare against. */
+/**
+ * What an example needs that the check must bring (ffmpeg on the path, or a reference picture to compare against), and
+ * whether it writes a picture or video the check reads back.
+ */
 export function needs(code) {
   return {
     ffmpeg: code.includes("from '@margoengine/headless/ffmpeg'"),
     reference: code.includes('compareImages('),
+    // The example writes files (writeFile, or an encoder's `output`), so the check expects a picture or video.
+    writes: /\bwriteFile\(|\boutput:/.test(code),
   };
 }
 

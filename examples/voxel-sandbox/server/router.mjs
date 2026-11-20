@@ -893,11 +893,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.on(signal, () => {
       if (stopping) return;
       stopping = true;
+      // close() ends every shard, listener and timer, so the process ends by its event loop.
       router.close().then(
-        () => process.exit(0),
+        () => {
+          process.exitCode = 0;
+        },
         (error) => {
           console.error(error);
-          process.exit(1);
+          process.exitCode = 1;
         },
       );
     });

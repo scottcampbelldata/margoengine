@@ -8,13 +8,13 @@ import {
   materialLobes,
 } from '../packages/materials/dist/index.js';
 import type { MeshGeometry } from '../packages/materials/dist/index.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { MaterialExtension, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { MaterialExtension, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { planeGeometry, computeTangents } from '../packages/geometry/dist/index.js';
 import { exportDAE, exportGLB, exportOBJ } from '../packages/exporters/dist/index.js';
 import { exportModel } from '../packages/exporters/dist/model.js';
 import { parseDAE, parseOBJ, flattenDAE } from '../packages/loaders/dist/index.js';
-import { parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTFAsync } from '../packages/gltf/dist/pbr.js';
 
 // Which way a normal map's +Y (green) bends the surface, on the GPU. A normal map's +Y is up the image (glTF 2.0
 // material.schema.json normalTexture: "+X is right and +Y is up. +Z points toward the viewer"). Where image-up lands

@@ -24,7 +24,7 @@ export interface WorldTriangles {
 }
 
 /**
- * World-space triangles of core meshes and gltf-pro models (`PBRModel`, @margoengine/materials meshes), merged into one
+ * World-space triangles of core meshes and gltf/pbr models (`PBRModel`, @margoengine/materials meshes), merged into one
  * vertex and index array, for a physics trimesh (`{shape: 'trimesh', ...worldTriangles(engine, [level])}`) or a navmesh
  * (`Navigation.create(t.vertices, t.indices)`). Every node, instance and scale transform is applied; skinned and morphed
  * primitives are read in their bind pose. Core meshes without geometry and disposed meshes or models are skipped.

@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>GPU load</title></head><body>
+<script type="module">
+// A plain WebGPU compute load in a page of its own, so a second process shares the GPU with a shot drawn in another
+// browser (rain-frames-check.mjs, KB-FILM-GPUSHARE1). No engine code. `window.dispatched` counts finished dispatches.
+const adapter=await navigator.gpu.requestAdapter(),device=await adapter.requestDevice();
+const n=1<<22,buffer=device.createBuffer({size:n*4,usage:GPUBufferUsage.STORAGE});
+const module=device.createShaderModule({code:`@group(0) @binding(0) var<storage,read_write> a:array<f32>;
+@compute @workgroup_size(256) fn main(@builtin(global_invocation_id) id:vec3u){var x=f32(id.x)*0.001;for(var i=0;i<4000;i++){x=sin(x)*1.0001+cos(x*1.3);}a[id.x]=x;}`});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+const bind=device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer}}]});
+let stop=false;window.dispatched=0;window.stopLoad=()=>{stop=true;};window.ready=true;
+(async()=>{while(!stop){const e=device.createCommandEncoder(),p=e.beginComputePass();p.setPipeline(pipeline);p.setBindGroup(0,bind);p.dispatchWorkgroups(n/256);p.end();device.queue.submit([e.finish()]);await device.queue.onSubmittedWorkDone();window.dispatched++;}})();
+</script></body></html>

@@ -116,7 +116,7 @@ async function load(kind, engine, src, { signal }) {
   engine.use(result);
   return result;
 }
-mock.module('@margoengine/gltf-pro', {
+mock.module('@margoengine/gltf/pbr', {
   namedExports: {
     PBRModel: class {
       constructor(engine, asset) {
@@ -138,7 +138,7 @@ globalThis.ResizeObserver = class {
 const { render, act, cleanup } = await import('@testing-library/react');
 const { Canvas } = await import('@margoengine/react');
 const { Fbx } = await import('@margoengine/react/fbx');
-const { Gltf, Model } = await import('@margoengine/react/gltf-pro');
+const { Gltf, Model } = await import('@margoengine/react/gltf');
 const tree = (child) =>
   React.createElement(
     StrictMode,

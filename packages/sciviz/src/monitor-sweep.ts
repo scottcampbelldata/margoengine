@@ -32,7 +32,8 @@ export interface SweepOptions {
   readonly frameBudgetMs?: number;
   readonly warmupFrames?: number;
   readonly sampleFrames?: number;
-  /** Per-size hard limit, default 120000 ms. Cancellation uses the supplied reason. */
+  /** Per-size hard limit in ms, in (0, 2147483647], the largest delay every host timer honours. Default 120000.
+   * Cancellation uses the supplied reason. */
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
   readonly format?: string;
@@ -72,13 +73,14 @@ export async function sweepLimits(options: SweepOptions): Promise<SweepReport> {
   if (!sizes.length || sizes.some((n, i) => !Number.isSafeInteger(n) || n <= 0 || (i > 0 && n <= sizes[i - 1])))
     throw rangeError('Sweep sizes must be strictly increasing positive safe integers', 'sciviz');
   if (
-    !(budget > 0 && Number.isFinite(budget) && timeout > 0 && Number.isFinite(timeout)) ||
+    // Node and browsers fire a setTimeout delay above 2^31 - 1 ms after 1 ms, so a longer deadline is refused.
+    !(budget > 0 && Number.isFinite(budget) && timeout > 0 && timeout <= 0x7fffffff) ||
     !Number.isSafeInteger(warmup) ||
     warmup < 0 ||
     !Number.isSafeInteger(samples) ||
     samples < 1
   )
-    throw rangeError('Invalid sweep budget, sample count or timeout', 'sciviz');
+    throw rangeError('Invalid sweep budget, sample count or timeout; timeoutMs must be in (0, 2147483647]', 'sciviz');
   if (!Number.isFinite(metadata.cpuLoad) || metadata.cpuLoad < 0 || metadata.cpuLoad > 1)
     throw rangeError('Sweep CPU load must be a fraction in [0, 1]', 'sciviz');
   const rows: SweepRow[] = [];

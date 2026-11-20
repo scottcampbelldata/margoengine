@@ -164,3 +164,20 @@ test('progressive sampling changes shader integration counts without changing so
   assert.equal(layer.samples, 1, 'incompatible sample history is discarded');
   layer.dispose();
 });
+test('cinematicVolume lights only a volume its figure holds, and refuses another before hiding it or allocating', async () => {
+  const { cinematicVolume } = await import('../dist/cinematic.js');
+  const f = fixture(),
+    added = [],
+    figure = { renderer: { ...f.renderer, add: (d) => added.push(d) }, layers: [] };
+  // A volume removed from the figure (or held by another figure, on another device) drew nothing or failed GPU validation.
+  assert.throws(() => cinematicVolume(figure, f.volume), { code: 'state' });
+  assert.equal(f.volume.visible, true);
+  assert.equal(f.resources.length, 2);
+  assert.equal(added.length, 0);
+  figure.layers = [f.volume];
+  const layer = cinematicVolume(figure, f.volume);
+  assert.deepEqual(added, [layer]);
+  assert.equal(f.volume.visible, false);
+  layer.dispose();
+  assert.equal(f.volume.visible, true);
+});

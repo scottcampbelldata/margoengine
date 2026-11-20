@@ -530,5 +530,7 @@ export function decodeBrotli(input: Uint8Array, options: BrotliOptions = {}): Ui
     bits.check();
   }
   bits.check();
+  // Sections 9.2 and 9.3: the bits after the last meta-block, up to the byte boundary, are zero.
+  bits.align();
   return out.subarray(0, pos);
 }

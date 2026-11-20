@@ -33,6 +33,22 @@ test('keyboard aliases, simultaneous keys, keyup with changed modifiers, latch a
   const count = changes.length; await key('keydown', 'KeyW', 'w'); assert.equal(changes.length, count); cleanup();
 });
 
+test('a letter key stays held when Shift changes its key value, with or without a code', async () => {
+  const map = [{ name: 'forward', keys: ['w'] }, { name: 'sprint', keys: ['Shift'] }];
+  let api;
+  function Poll() { api = useKeyboardControls(); return null; }
+  const key = async (type, code, value, repeat = false) => act(async () => window.dispatchEvent(new window.KeyboardEvent(type, { code, key: value, repeat })));
+  const view = render(React.createElement(KeyboardControls, { map }, React.createElement(Poll)));
+  await key('keydown', 'KeyW', 'w'); await key('keydown', 'ShiftLeft', 'Shift');
+  await key('keydown', 'KeyW', 'W', true); assert.deepEqual(api[1](), { forward: true, sprint: true });
+  await key('keyup', 'KeyW', 'W'); assert.equal(api[1]().forward, false);
+  await key('keydown', 'KeyW', 'W'); assert.equal(api[1]().forward, true);
+  await key('keyup', 'KeyW', 'W'); await key('keyup', 'ShiftLeft', 'Shift');
+  await key('keydown', '', 'w'); await key('keydown', '', 'Shift'); await key('keyup', '', 'W'); await key('keyup', '', 'Shift');
+  assert.deepEqual(api[1](), { forward: false, sprint: false });
+  await act(async () => view.unmount()); cleanup();
+});
+
 test('native scroller, HTML portal and presentation group survive StrictMode and release their resources', async () => {
   const canvas = document.createElement('canvas'), host = document.createElement('div'); host.append(canvas); document.body.append(host);
   const engine = await Engine.create(canvas, { backend: 'webgl2', fallback: () => ({ backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} }) });

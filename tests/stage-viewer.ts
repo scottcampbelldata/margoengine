@@ -78,7 +78,7 @@ const page: Page = {
   restored() {
     return viewer.environment!.environment.device === app.engine.gpu;
   },
-  // A saved scene with a real model under a moved parent: addScene's parenting on a real gltf-pro model.
+  // A saved scene with a real model under a moved parent: addScene's parenting on a real gltf/pbr model.
   async scene() {
     app = await createStage('#scene', { backend: 'webgpu', onError: (error) => gpuErrors.push(String(error)) });
     const level = await addScene(

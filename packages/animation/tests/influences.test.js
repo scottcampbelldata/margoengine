@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Animation, sampleTrack } from '../dist/index.js';
 import { batchedDeformationShader, deformationShader, deformationShader8 } from '../src/shader.ts';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -118,7 +118,7 @@ test('four-influence WGSL remains exact and eight influences use a separate lazy
   // The per-primitive shader stays as Skin's; Animation dispatches the batched one.
   assert.equal(
     createHash('sha256').update(deformationShader).digest('hex'),
-    '4999897148b945ab319d961eeb44383ca5e80a9921806564dd315a5c0b9b85fc',
+    'b3bba8d413468c05aa676a33c38878e3e9575792a37f00c09a18be1e479f6160',
   );
   assert.match(deformationShader8, /jointsExtra:vec4u,weightsExtra:vec4f/);
   assert.match(batchedDeformationShader(true), /let jointsExtra=influences\[at\+2u\]/);

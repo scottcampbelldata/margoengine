@@ -5,7 +5,7 @@ declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: numb
 
 /** Most triangles of a skinned emitter (16 bytes each on the GPU, beside the 80-byte vertices). */
 export const MAX_SKINNED_TRIANGLES = 262_144;
-/** Floats a vertex in a deformer's output (gltf-pro's layout), position first. */
+/** Floats a vertex in a deformer's output (gltf/pbr's layout), position first. */
 const STRIDE = 20;
 
 const origin =
@@ -88,7 +88,7 @@ export const skinned: VFXExtension<VFXSkinned> = {
     const { vertices, indices } = s.primitive;
     if (!(vertices instanceof Float32Array) || vertices.length < STRIDE * 3 || vertices.length % STRIDE)
       throw new TypeError(
-        'VFX skinned primitive.vertices must be a Float32Array of 20 floats a vertex (gltf-pro layout)',
+        'VFX skinned primitive.vertices must be a Float32Array of 20 floats a vertex (gltf/pbr layout)',
       );
     if (!indices || typeof indices.length !== 'number' || indices.length < 3 || indices.length % 3)
       throw new TypeError('VFX skinned primitive.indices must be triangle triples');

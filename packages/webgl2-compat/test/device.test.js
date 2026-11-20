@@ -70,6 +70,10 @@ test('an adapter only on a full-tier context; below it, null and the context is 
   assert.equal(gpu.getPreferredCanvasFormat(), 'rgba8unorm');
 });
 
+/** A stand-in pipeline's per-program cache, the shape CompatRenderPipeline.cache has. */
+const programCache = () => ({ baseVertex: -1, baseInstance: -1, element: -1, pointerBuffers: [], pointerOffsets: [],
+  levels: new Map(), sizes: new Map(), mips: new Map(), modes: new Map(), info: new Map() });
+
 // Exercise the actual replay/cache with a recording GL context, without compiling or drawing on a GPU.
 async function offsetDevice(withClamp) {
   const calls = [], requested = [];
@@ -93,7 +97,7 @@ async function offsetDevice(withClamp) {
   const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth' } } } } } };
   const apply = (bias, slope, clamp) => {
     device.replayer.applyPipeline({
-      program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [],
+      program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [], targetGL: [], sameTargets: true,
       depthStencil: { depthBias: bias, depthBiasSlopeScale: slope, depthBiasClamp: clamp },
     }, pass);
   };
@@ -126,7 +130,7 @@ test('indexed replay detaches the old element binding before selecting a replace
 test('stencil replay masks uint32 references before GL signed clamping and caches both faces by effective value', async () => {
   const { device, gl, calls } = await offsetDevice(false);
   const pass = { desc: { depth: { view: { texture: { info: { kind: 'depth-stencil' } } } } } };
-  const pipeline = { program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [],
+  const pipeline = { program: null, vao: null, cull: 0, frontFace: gl.CW, targets: [], targetGL: [], sameTargets: true,
     depthStencil: { stencilFront: { compare: 'equal', passOp: 'replace' },
       stencilBack: { compare: 'not-equal', passOp: 'replace' }, stencilReadMask: 0xf3 } };
   try {
@@ -753,7 +757,8 @@ test('texture replay selects stencil aspects, restores depth and isolates simult
   gl.DEPTH_COMPONENT = 0x1902;
   gl.texParameteri = (_target, pname, value) => modes.push([pname, value]);
   device.ext.stencilTexturing = { DEPTH_STENCIL_TEXTURE_MODE_WEBGL: 0x90ea, STENCIL_INDEX_WEBGL: 0x1901 };
-  const stores = [0, 1].map((id) => ({ gl: { id }, target: gl.TEXTURE_2D, levels: '0:0' }));
+  // levels 0: base and max level already 0 (levelRange(0, 0)).
+  const stores = [0, 1].map((id) => ({ gl: { id }, target: gl.TEXTURE_2D, levels: 0 }));
   const texture = {
     info: { kind: 'depth-stencil' }, renderbuffer: null,
     sampled(_view, alias = 0) { aliases.push(alias); return stores[alias]; },
@@ -761,7 +766,7 @@ test('texture replay selects stencil aspects, restores depth and isolates simult
   };
   const view = (aspect) => ({ texture, aspect, baseMipLevel: 0, mipLevelCount: 1, baseArrayLayer: 0, arrayLayerCount: 1 });
   const bind = (aspects) => {
-    const pipeline = { program: {}, finish() {}, uniforms: [], storage: [], attributes: [],
+    const pipeline = { program: {}, finish() {}, uniforms: [], storage: [], attributes: [], cache: programCache(),
       textures: aspects.map((_a, binding) => ({ group: 0, binding, unit: binding, modes: [], sizes: [], levels: [] })) };
     device.replayer.pass = { pipeline, desc: {}, groups: [{ group: {
       layout: { dynamic: [] }, entries: new Map(aspects.map((aspect, i) => [i, { kind: 'view', view: view(aspect) }])) },
@@ -861,6 +866,145 @@ test('pipelines whose WGSL differs only in binding numbers share a GL program bu
   }
 });
 
+// KB-COMPAT-PHONY1: WGSL counts a phony assignment (`_ = u;`) as a static use, so the resource joins the entry point's
+// resource interface (WGSL section 7.7 "Phony Assignment"; section 13.3 "Resource Interface"), and WebGPU's default
+// pipeline layout keeps its binding (WebGPU "default pipeline layout" algorithm, "for each resource resource statically
+// used by entryPoint"). The layer built its 'auto' layout from the GLSL it emitted, which drops the pure phony value, so
+// the binding was missing: a bind group carrying it then failed on a device but not on the layer (KB-OWN-TONE3).
+test("a binding reached only through a phony assignment stays in the 'auto' layout and in explicit layout checks", async () => {
+  const { device } = await offsetDevice(false);
+  try {
+    const module = device.createShaderModule({
+      code: `
+struct P { params: vec4f }
+@group(0) @binding(5) var<uniform> curve: P;
+@group(0) @binding(6) var<storage, read> rows: array<vec4f>;
+@group(1) @binding(0) var tex: texture_2d<f32>;
+@group(1) @binding(1) var smp: sampler;
+@vertex fn v()->@builtin(position) vec4f { _ = rows; return vec4f(0,0,0,1); }
+@fragment fn f()->@location(0) vec4f { _ = curve; _ = tex; _ = smp; return vec4f(1); }`,
+    });
+    const descriptor = (layout) => ({
+      layout,
+      vertex: { module, entryPoint: 'v' },
+      fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+    });
+    const pipeline = device.createRenderPipeline(descriptor('auto'));
+    const entries = (i) =>
+      pipeline
+        .getBindGroupLayout(i)
+        .entries.map((e) => ({
+          binding: e.binding,
+          visibility: e.visibility,
+          kind: e.buffer ? e.buffer.type : e.texture ? 'texture' : e.sampler ? 'sampler' : '?',
+        }))
+        .sort((a, b) => a.binding - b.binding);
+    assert.deepEqual(entries(0), [
+      { binding: 5, visibility: 2, kind: 'uniform' },
+      { binding: 6, visibility: 1, kind: 'read-only-storage' },
+    ]);
+    assert.deepEqual(entries(1), [
+      { binding: 0, visibility: 2, kind: 'texture' },
+      { binding: 1, visibility: 2, kind: 'sampler' },
+    ]);
+    // An explicit layout without the phony-read uniform fails as on WebGPU (every statically used resource declared).
+    const layout = device.createPipelineLayout({
+      bindGroupLayouts: [
+        device.createBindGroupLayout({ entries: [{ binding: 6, visibility: 1, buffer: { type: 'read-only-storage' } }] }),
+        device.createBindGroupLayout({
+          entries: [
+            { binding: 0, visibility: 2, texture: {} },
+            { binding: 1, visibility: 2, sampler: {} },
+          ],
+        }),
+      ],
+    });
+    device.pushErrorScope('validation');
+    device.createRenderPipeline(descriptor(layout));
+    assert.match((await device.popErrorScope())?.message ?? '', /layout omits group 0 binding 5/);
+  } finally {
+    device.destroy();
+  }
+});
+
+// Found with KB-COMPAT-PHONY1 (features-browser.mjs 'external' under the new createBindGroup checks): the 'auto' layout
+// typed a texture_external binding as a plain texture, so the group WebGPU code makes for it (an external texture from
+// importExternalTexture) did not match. WebGPU's default layout gives it an externalTexture entry.
+test("a texture_external binding is an externalTexture entry of the 'auto' layout", async () => {
+  const { device } = await offsetDevice(false);
+  try {
+    const module = device.createShaderModule({
+      code: `
+@group(0) @binding(0) var t: texture_external;
+@group(0) @binding(1) var s: sampler;
+@vertex fn v()->@builtin(position) vec4f { return vec4f(0,0,0,1); }
+@fragment fn f()->@location(0) vec4f { return textureSampleBaseClampToEdge(t, s, vec2f(0.5)); }`,
+    });
+    const pipeline = device.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module, entryPoint: 'v' },
+      fragment: { module, entryPoint: 'f', targets: [{ format: 'rgba8unorm' }] },
+    });
+    const entry = pipeline.getBindGroupLayout(0).entries.find((e) => e.binding === 0);
+    assert.deepEqual(entry.externalTexture, {});
+    assert.equal(entry.texture, undefined);
+  } finally {
+    device.destroy();
+  }
+});
+
+// KB-COMPAT-PHONY1: WebGPU's createBindGroup validates the entries against the layout (WebGPU section "createBindGroup":
+// descriptor.entries.length equals the layout's entry count; each entry's binding is unique and names exactly one layout
+// entry; its resource is of the kind that layout entry declares). The layer bound whatever it was given, so a group with an
+// entry the layout lacks passed on the layer and failed on a device (why KB-OWN-TONE3 passed under MARGO_COMPAT=1).
+test('createBindGroup refuses entries the layout does not declare, missing or repeated entries and the wrong resource kind', async () => {
+  const gl = new Proxy(fakeContext(), { get: (context, key) => (key in context ? context[key] : () => ({})) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  try {
+    const layout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: 2, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: 2, sampler: {} },
+      ],
+    });
+    const buffer = device.createBuffer({ size: 64, usage: 0x40 | 0x8 }),
+      sampler = device.createSampler();
+    const errorOf = async (entries) => {
+      device.pushErrorScope('validation');
+      const group = device.createBindGroup({ layout, entries });
+      const error = await device.popErrorScope();
+      return { message: error?.message ?? null, invalid: group.invalid };
+    };
+    const extra = await errorOf([
+      { binding: 0, resource: { buffer } },
+      { binding: 1, resource: sampler },
+      { binding: 5, resource: { buffer } },
+    ]);
+    assert.match(extra.message ?? '', /binding index 5 not present in the bind group layout/i);
+    assert.ok(extra.invalid);
+    const missing = await errorOf([{ binding: 0, resource: { buffer } }]);
+    assert.match(missing.message ?? '', /number of entries \(1\) did not match the number of entries \(2\)/i);
+    const twice = await errorOf([
+      { binding: 0, resource: { buffer } },
+      { binding: 0, resource: { buffer } },
+    ]);
+    assert.match(twice.message ?? '', /binding 0 .*more than once/i);
+    const kind = await errorOf([
+      { binding: 0, resource: sampler },
+      { binding: 1, resource: sampler },
+    ]);
+    assert.match(kind.message ?? '', /binding 0 .*buffer/i);
+    const fine = await errorOf([
+      { binding: 1, resource: sampler },
+      { binding: 0, resource: { buffer } },
+    ]);
+    assert.deepEqual(fine, { message: null, invalid: null });
+  } finally {
+    device.destroy();
+  }
+});
+
 // WebGL2 reports a store the driver could not make only through getError (GL_OUT_OF_MEMORY), and the buffer or texture
 // then reads as empty: the layer never asked, so a failed allocation drew silently (docs/known-bugs.md, the path
 // tracer's analytic lows). It is now an out-of-memory error, as WebGPU reports one, to its scope or uncapturederror.
@@ -893,11 +1037,76 @@ test('an allocation the driver refuses is an out-of-memory error, to its scope o
   assert.equal(uncaptured.length, 1);
   assert.equal(uncaptured[0].name, 'GPUOutOfMemoryError');
   assert.match(uncaptured[0].message, /texture 'big'/);
-  // A clean allocation reports nothing, and costs one getError.
+  // A clean allocation reports nothing, and costs one getError, read when its scope closes.
   device.pushErrorScope('out-of-memory');
   const n = calls;
   device.createBuffer({ size: 256, usage: 0x80 | 0x8 });
-  assert.equal(calls - n, 1);
   assert.equal(await device.popErrorScope(), null);
+  assert.equal(calls - n, 1);
   assert.ok(calls > before);
+});
+
+// getError waits for the GPU process (0.34 ms a call on the RTX A6000 under ANGLE Direct3D 11), and the layer read it
+// after every allocation: 61,489 calls, 21 s of water's owner/lifetime cases on the WebGL2 layer (KB-COMPAT-GETERROR1).
+// One getError now checks every allocation since the last check, and each error still reaches the scope it was raised
+// in, before the errors of later calls.
+test('allocations share one getError per task or out-of-memory scope, each error in its own scope and order', async () => {
+  const errors = [];
+  let calls = 0;
+  const context = Object.assign(fakeContext(), {
+    RGBA8: 0x8058,
+    TEXTURE_2D: 0x0de1,
+    getError: () => (calls++, errors.shift() ?? 0),
+    isContextLost: () => false,
+  });
+  const gl = new Proxy(context, { get: (c, key) => (key in c ? c[key] : () => ({})) });
+  const adapter = await createCompatGPU({ createContext: () => gl }).requestAdapter();
+  const device = await adapter.requestDevice();
+  await task();
+  // Twenty allocations in one task: one getError, in a task of its own.
+  let n = calls;
+  for (let i = 0; i < 10; i++) {
+    device.createBuffer({ size: 256, usage: 0x80 | 0x8 });
+    device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: 0x4 });
+  }
+  assert.equal(calls - n, 0);
+  await task();
+  assert.equal(calls - n, 1);
+  // An out-of-memory scope gets the allocations made inside it, never those made before it opened.
+  const uncaptured = [];
+  device.addEventListener('uncapturederror', (event) => (event.preventDefault(), uncaptured.push(event.error)));
+  errors.push(0x0505);
+  device.createBuffer({ label: 'before', size: 256, usage: 0x80 | 0x8 });
+  device.pushErrorScope('out-of-memory');
+  device.createBuffer({ label: 'inside', size: 256, usage: 0x80 | 0x8 });
+  assert.equal(await device.popErrorScope(), null);
+  await task();
+  assert.deepEqual(uncaptured.map((e) => e.message), ["WebGL2 is out of memory for buffer 'before' (256 bytes)"]);
+  errors.push(0x0505);
+  device.pushErrorScope('out-of-memory');
+  device.createBuffer({ label: 'a', size: 256, usage: 0x80 | 0x8 });
+  device.createBuffer({ label: 'b', size: 256, usage: 0x80 | 0x8 });
+  const caught = await device.popErrorScope();
+  assert.equal(caught?.name, 'GPUOutOfMemoryError');
+  assert.match(caught.message, /one of 2 allocations \(buffer 'a' .*, buffer 'b' /);
+  // A validation scope neither takes nor forces the check.
+  n = calls;
+  device.pushErrorScope('validation');
+  device.createBuffer({ size: 256, usage: 0x80 | 0x8 });
+  assert.equal(await device.popErrorScope(), null);
+  assert.equal(calls - n, 0);
+  await task();
+  assert.equal(calls - n, 1);
+  // An uncaptured allocation error reaches listeners before the error of a later call that used the object.
+  uncaptured.length = 0;
+  errors.push(0x0505);
+  device.createBuffer({ label: 'late', size: 256, usage: 0x80 | 0x8 });
+  const encoder = device.createCommandEncoder();
+  encoder.finish();
+  encoder.finish();
+  await task();
+  await task();
+  assert.equal(uncaptured[0]?.name, 'GPUOutOfMemoryError');
+  assert.deepEqual(uncaptured.map((e) => e.name), ['GPUOutOfMemoryError', 'GPUValidationError']);
+  device.destroy();
 });

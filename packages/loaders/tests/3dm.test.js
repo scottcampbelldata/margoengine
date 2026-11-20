@@ -125,6 +125,19 @@ test('a plain number unit, and a file with no known unit, both read', () => {
   assert.equal(none.positions[3], 1000);
 });
 
+test('unit numbers follow RhinoCommon UnitSystem: 6 microinches, 7 mils, 12 angstroms, 13 nanometres, 19 yards', () => {
+  const at = (unit) => parse3DM(runtime({ objects: [{ mesh: TRIANGLE }], unit }), BYTES).metersPerUnit;
+  assert.equal(at(6), 2.54e-8);
+  assert.equal(at(7), 2.54e-5);
+  assert.equal(at(12), 1e-10);
+  assert.equal(at(13), 1e-9);
+  assert.equal(at(14), 0.1);
+  assert.equal(at(19), 0.9144);
+  assert.equal(at(22), 1852);
+  assert.equal(at(23), 149597870700);
+  assert.equal(at(11), undefined);
+});
+
 test('attributes, user strings, layers and draw colours reach the group', () => {
   const model = parse3DM(
     runtime({

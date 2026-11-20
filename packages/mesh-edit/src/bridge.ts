@@ -2,6 +2,7 @@ import { MargoError, type MutableVec3 } from '@margoengine/math';
 import { componentEdgeResult } from './components.js';
 import { assertOptions } from './edit-support.js';
 import { assertPolygonMesh, collectPolygonEdges } from './polygon.js';
+import { leastOf } from './least.js';
 import { loopFaces } from './polygon-split.js';
 import { meshTileUV } from './primitives.js';
 import { clonePolygonMesh, createMeshEditResult, faceIdFactory, identityFaceMap, identityVertexMap } from './result.js';
@@ -35,7 +36,7 @@ function boundaryPath(mesh: PolygonMesh, ids: unknown, label: string): { vertice
   const heads = [...next.keys()].filter((v) => !incoming.has(v));
   if (heads.length > 1) throw new TypeError(`${label} is not one connected chain; select one loop or chain.`);
   const closed = heads.length === 0,
-    start = closed ? Math.min(...next.keys()) : heads[0],
+    start = closed ? leastOf(next.keys()) : heads[0],
     vertices = [start];
   let at = start;
   while (next.has(at)) {

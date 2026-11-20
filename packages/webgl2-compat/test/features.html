@@ -426,6 +426,169 @@ const cases = {
   },
 
   /**
+   * KB-COMPAT-DECODERS1: views of another dimension of block-compressed textures, which WebGL2 cannot copy: a 2d-array
+   * view of a 6-layer cube texture (both levels) and of a 1-layer texture, a 2d view of one face, and a cube view of a
+   * 6-layer texture stored as an array, each read again after a later block write. BC1, four colours per block.
+   */
+  async compressedViews(device) {
+    if (!device.features.has('texture-compression-bc')) return { missing: 'texture-compression-bc' };
+    const block = (c0, c1, index) => [c0 & 255, c0 >> 8, c1 & 255, c1 >> 8, index, index, index, index];
+    const blocks = (n, f) => Uint8Array.from(Array.from({ length: n }, (_, b) => f(b)).flat());
+    const make = (layers, hint) => {
+      const t = device.createTexture({
+        size: [8, 8, layers],
+        format: 'bc1-rgba-unorm',
+        mipLevelCount: 2,
+        usage: U.TEXTURE_BINDING | U.COPY_DST,
+        ...(hint && { textureBindingViewDimension: hint }),
+      });
+      for (let layer = 0; layer < layers; layer++) {
+        device.queue.writeTexture({ texture: t, origin: [0, 0, layer] }, blocks(4, (b) => block(0xf800 | (layer << 6) | b, 0x001f | (b << 11), 0xe4)), { bytesPerRow: 16, rowsPerImage: 2 }, [8, 8]);
+        device.queue.writeTexture({ texture: t, mipLevel: 1, origin: [0, 0, layer] }, Uint8Array.from(block(0x07e0 | (layer << 1), 0x0010, 0x1b)), { bytesPerRow: 8 }, [4, 4]);
+      }
+      return t;
+    };
+    const cube = make(6), flat = make(1), stack = make(6, '2d-array');
+    const sampler = device.createSampler({ minFilter: 'nearest', magFilter: 'nearest', mipmapFilter: 'nearest' });
+    const array = (t, level, layers) =>
+      shade(device, {
+        w: 8 >> level,
+        h: (8 >> level) * layers,
+        code: `@group(0) @binding(0) var a: texture_2d_array<f32>;
+          @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+            let i = vec2u(p.xy);
+            return textureLoad(a, vec2u(i.x, i.y % ${8 >> level}u), i.y / ${8 >> level}u, ${level});
+          }`,
+        entries: [{ binding: 0, resource: t.createView({ dimension: '2d-array' }) }],
+      });
+    const face = (t, layer) =>
+      shade(device, {
+        w: 8,
+        h: 8,
+        code: `@group(0) @binding(0) var a: texture_2d<f32>;
+          @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f { return textureLoad(a, vec2u(p.xy), 0); }`,
+        entries: [{ binding: 0, resource: t.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }) }],
+      });
+    // A cube view read at each texel's centre of every face, level 0 then level 1, through the nearest sampler.
+    const faces = (t) =>
+      shade(device, {
+        w: 8,
+        h: 72,
+        code: `@group(0) @binding(0) var c: texture_cube<f32>;
+          @group(0) @binding(1) var s: sampler;
+          @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+            let i = vec2u(p.xy);
+            let level = select(1u, 0u, i.y < 48u);
+            let size = 8u >> level;
+            let row = select(i.y - 48u, i.y, i.y < 48u);
+            let n = row / size;
+            let q = (vec2f(f32(i.x % size), f32(row % size)) + 0.5) / f32(size) * 2.0 - 1.0;
+            var d = vec3f(-q.x, -q.y, -1.0);
+            if (n == 0u) { d = vec3f(1.0, -q.y, -q.x); }
+            if (n == 1u) { d = vec3f(-1.0, -q.y, q.x); }
+            if (n == 2u) { d = vec3f(q.x, 1.0, q.y); }
+            if (n == 3u) { d = vec3f(q.x, -1.0, -q.y); }
+            if (n == 4u) { d = vec3f(q.x, -q.y, 1.0); }
+            return textureSampleLevel(c, s, d, f32(level));
+          }`,
+        entries: [
+          { binding: 0, resource: t.createView({ dimension: 'cube' }) },
+          { binding: 1, resource: sampler },
+        ],
+      });
+    const out = {
+      cubeArray0: await array(cube, 0, 6),
+      cubeArray1: await array(cube, 1, 6),
+      flatArray: await array(flat, 0, 1),
+      cubeFace3: await face(cube, 3),
+      stackCube: await faces(stack),
+    };
+    // A later block write reaches the views already read.
+    const later = Uint8Array.from(block(0x001f, 0xf800, 0x55));
+    for (const t of [cube, flat, stack]) device.queue.writeTexture({ texture: t, origin: [4, 0, 0] }, later, { bytesPerRow: 8 }, [4, 4]);
+    out.cubeArrayAfter = await array(cube, 0, 6);
+    out.flatArrayAfter = await array(flat, 0, 1);
+    out.stackCubeAfter = await faces(stack);
+    for (const t of [cube, flat, stack]) t.destroy();
+    return out;
+  },
+
+  /**
+   * KB-COMPAT-DECODERS1: compressed texels copied block for block, as WebGPU copies them: copyTextureToTexture into
+   * another texture (a region of a layer, and a whole small level into a cube's faces, into the sRGB twin format) and
+   * copyTextureToBuffer (padded rows and images, and a level smaller than one block), then the copies sampled.
+   */
+  async compressedCopies(device) {
+    if (!device.features.has('texture-compression-bc')) return { missing: 'texture-compression-bc' };
+    const block = (c0, c1, index) => [c0 & 255, c0 >> 8, c1 & 255, c1 >> 8, index, index ^ 0x5a, index, index ^ 0xa5];
+    const blocks = (n, f) => Uint8Array.from(Array.from({ length: n }, (_, b) => f(b)).flat());
+    const src = device.createTexture({
+      size: [8, 8, 3],
+      format: 'bc1-rgba-unorm',
+      mipLevelCount: 3,
+      usage: U.TEXTURE_BINDING | U.COPY_DST | U.COPY_SRC,
+    });
+    for (let layer = 0; layer < 3; layer++) {
+      device.queue.writeTexture({ texture: src, origin: [0, 0, layer] }, blocks(4, (b) => block(0xf800 | (layer << 6) | b, 0x001f | (b << 11), 0xe4 ^ b)), { bytesPerRow: 16, rowsPerImage: 2 }, [8, 8]);
+      device.queue.writeTexture({ texture: src, mipLevel: 1, origin: [0, 0, layer] }, Uint8Array.from(block(0x07e0 | (layer << 1), 0x0010, 0x1b)), { bytesPerRow: 8 }, [4, 4]);
+      device.queue.writeTexture({ texture: src, mipLevel: 2, origin: [0, 0, layer] }, Uint8Array.from(block(0x001f | (layer << 11), 0x07e0, 0x93)), { bytesPerRow: 8 }, [4, 4]);
+    }
+    const dst = device.createTexture({
+      size: [8, 8, 6],
+      format: 'bc1-rgba-unorm-srgb',
+      mipLevelCount: 2,
+      usage: U.TEXTURE_BINDING | U.COPY_DST | U.COPY_SRC,
+    });
+    const e = device.createCommandEncoder();
+    // The top-right 4 x 4 of layer 1 into the bottom-left of face 2, then all of level 1 into faces 3 to 5.
+    e.copyTextureToTexture({ texture: src, origin: [4, 0, 1] }, { texture: dst, origin: [0, 4, 2] }, [4, 4, 1]);
+    e.copyTextureToTexture({ texture: src, mipLevel: 1 }, { texture: dst, mipLevel: 1, origin: [0, 0, 3] }, [4, 4, 3]);
+    device.queue.submit([e.finish()]);
+    const bytes = async (texture, level, size, bytesPerRow, rowsPerImage) => {
+      const buffer = device.createBuffer({ size: bytesPerRow * rowsPerImage * size[2], usage: B.MAP_READ | B.COPY_DST });
+      device.queue.writeBuffer(buffer, 0, new Uint8Array(buffer.size).fill(0xcd));
+      const e = device.createCommandEncoder();
+      e.copyTextureToBuffer({ texture, mipLevel: level }, { buffer, bytesPerRow, rowsPerImage }, size);
+      device.queue.submit([e.finish()]);
+      await buffer.mapAsync(1);
+      const out = Array.from(new Uint8Array(buffer.getMappedRange()));
+      buffer.unmap();
+      buffer.destroy();
+      return out;
+    };
+    const array = (t, level, layers) =>
+      shade(device, {
+        w: 8 >> level,
+        h: (8 >> level) * layers,
+        code: `@group(0) @binding(0) var a: texture_2d_array<f32>;
+          @fragment fn f(@builtin(position) p: vec4f) -> @location(0) vec4f {
+            let i = vec2u(p.xy);
+            return textureLoad(a, vec2u(i.x, i.y % ${8 >> level}u), i.y / ${8 >> level}u, ${level});
+          }`,
+        entries: [{ binding: 0, resource: t.createView({ dimension: '2d-array' }) }],
+      });
+    const out = {
+      srcLevel0: await bytes(src, 0, [8, 8, 3], 256, 3),
+      srcLevel2: await bytes(src, 2, [4, 4, 3], 256, 1),
+      dstLevel0: await bytes(dst, 0, [8, 8, 6], 256, 2),
+      dstLevel1: await bytes(dst, 1, [4, 4, 6], 256, 1),
+      dstSampled0: await array(dst, 0, 6),
+      dstSampled1: await array(dst, 1, 6),
+    };
+    // An encoder copy's bytesPerRow is a multiple of 256 (WebGPU "validating GPUTexelCopyBufferInfo").
+    const unaligned = device.createBuffer({ size: 256, usage: B.COPY_DST });
+    device.pushErrorScope('validation');
+    const bad = device.createCommandEncoder();
+    bad.copyTextureToBuffer({ texture: src, mipLevel: 2 }, { buffer: unaligned, bytesPerRow: 8 }, [4, 4]);
+    device.queue.submit([bad.finish()]);
+    out.unaligned = (await device.popErrorScope()) ? 'validation error' : 'none';
+    unaligned.destroy();
+    src.destroy();
+    dst.destroy();
+    return out;
+  },
+
+  /**
    * KB1042d: the sRGB view of a block-compressed texture whose viewFormats name it, sampled beside the texture's own
    * view, before and after a later write of one block. BC1, every index 0 (colour 0) in each block.
    */
@@ -1379,6 +1542,46 @@ struct V { @builtin(position) p: vec4f, @location(0) @interpolate(flat) i: u32 }
         ],
       });
     for (const t of [a, b]) t.destroy();
+    return results;
+  },
+  /**
+   * A derivative taken in uniform control flow and used only inside a later per-pixel branch whose body loops is
+   * defined in WGSL ("Derivatives"), so the layer returns native's differences (docs/known-bugs.md, "a derivative used
+   * only inside a per-pixel branch"). The branch splits every 2x2 quad (a checkerboard set inside a loop). ANGLE's
+   * Direct3D 11 compile on the RTX A6000 moved the derivative into the branch and read 0 there.
+   */
+  async derivativeBranch(device) {
+    const texture = device.createTexture({ size: [16, 16], format: 'rgba8unorm', mipLevelCount: 5, usage: U.TEXTURE_BINDING | U.COPY_DST });
+    for (let m = 0; m < 5; m++) {
+      const n = 16 >> m;
+      device.queue.writeTexture({ texture, mipLevel: m }, new Uint8Array(n * n * 4).fill(m * 60), { bytesPerRow: n * 4 }, [n, n]);
+    }
+    const sampler = device.createSampler({ minFilter: 'nearest', magFilter: 'nearest', mipmapFilter: 'nearest' });
+    const head = `var r = 0.5 * p.x * p.x + 1.5 * p.y * p.y;
+      var esc = false;
+      for (var i = 0u; i < 4u; i++) { if (i == 2u && (u32(p.x) + u32(p.y)) % 2u == 0u) { esc = true; } }`;
+    const branch = (value, use) => `if (esc) {
+        var a = 0.0;
+        for (var k = 0u; k <= u32(p.x) % 3u; k++) { a += ${use}; }
+        return vec4f(${value}, a, 1.0);
+      }
+      return vec4f(-1.0);`;
+    const bodies = {};
+    for (const fn of ['dpdx', 'dpdy', 'fwidth', 'dpdxFine', 'dpdyFine', 'fwidthFine', 'dpdxCoarse', 'dpdyCoarse', 'fwidthCoarse'])
+      bodies[fn] = `let d = ${fn}(r); ${branch('d, 0.0', 'd')}`;
+    bodies.vector = `let d = dpdx(vec3f(r, 2.0 * r, p.y * p.y)); ${branch('d.y, d.z', 'd.x')}`;
+    bodies.helper = `let d = slope(r); ${branch('d.x, d.y', 'd.x')}`;
+    bodies.sample = `let c = textureSample(t, s, p.xy * 0.25); ${branch('c.x, 0.0', 'c.x')}`;
+    bodies.bias = `let c = textureSampleBias(t, s, p.xy * 0.25, 1.0); ${branch('c.x, 0.0', 'c.x')}`;
+    const results = {};
+    for (const [name, body] of Object.entries(bodies))
+      results[name] = await shade(device, { w: 8, h: 4,
+        code: `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+          fn slope(v:f32)->vec2f { return vec2f(dpdx(v), dpdy(v)); }
+          @fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f { ${head} ${body} }`,
+        entries: body.includes('texture') ? [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: sampler }] : [],
+      });
+    texture.destroy();
     return results;
   },
 };

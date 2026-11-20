@@ -117,7 +117,7 @@ node examples/voxel-sandbox/measure.mjs --live   # per-pass GPU times, frame CPU
 node examples/voxel-sandbox/bench.mjs   # options --distances=8,16 --loads=3 --no-quiet; npm run bench:voxel runs it in the bench tool
 ```
 
-It holds the GPU lock, waits for `scripts/quiet-gate.mjs` (numbers from a busy machine are labelled DIAGNOSTIC), loads
+It waits for `scripts/quiet-gate.mjs` (numbers from a busy machine are labelled DIAGNOSTIC), loads
 `?view=overview` at render distance 8 and 16 in headless Edge at 1920 x 1080 with the high tier (4x MSAA), and writes
 `test-results/voxel-sandbox-bench.json`: spawn time (median of 3 loads after a warm-up load), frame CPU while the world
 fills (median, p95 and worst over the 3 loads), frame CPU median and p95 over 300 still frames, voxel GPU time median
@@ -237,7 +237,7 @@ With a second box, the first stays the only front door. Each box runs its own ro
 
 ```sh
 npm run test --workspace examples/voxel-sandbox     # Node: textures, block ids, public imports, the Plaza server
-node scripts/gpu-lock.mjs run --owner=you -- node examples/voxel-sandbox/test/play.browser.mjs
+node scripts/run-with-timeout.mjs -- node examples/voxel-sandbox/test/play.browser.mjs
 ```
 
 The browser play test (real GPU, headless Edge) spawns on dry ground, takes pointer lock, flies up and forward, lands,

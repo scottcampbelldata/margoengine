@@ -1,0 +1,134 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Lava browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas id="a"></canvas>
+<script type="module">
+// Real-GPU proof for @margoengine/weather/lava at night: the flow's lavaEvent draws as glowing lava on a GroundChange
+// heightfield and grows down the slope over film time; the fountain's clots and the bombs draw as glowing instances; the
+// glow lights brighten the ground through Clustered; the same frame twice is the same, a seek back draws the earlier
+// lava again, and clearing everything leaves the picture as it was; a tube-fed front glows on past the open stop.
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {heightfieldGeometry} from '/packages/terrain/dist/index.js';
+import {GroundChange} from '/packages/terrain/dist/ground-change.js';
+import {toGeometry} from '/packages/geometry/dist/utils.js';
+import {sphereGeometry} from '/packages/geometry/dist/index.js';
+import {Material,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LightGroups} from '/packages/clustered/dist/groups.js';
+import {LavaFlow} from '/packages/weather/dist/lava.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const errors=[];
+const canvas=document.querySelector('#a');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,140,-260],target:[0,40,120],near:1,far:4000}});engine.stop();
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0.3,0.5,0.2,0.02]);engine.lighting.radiance.set([0.6,0.7,1,0.004]);
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const ground=(x,z)=>100-0.12*z+3*Math.sin(x*0.03);
+const grid={size:[400,400],origin:[-200,-200],resolution:200};
+const mesh=engine.createMesh().setGeometry(toGeometry(heightfieldGeometry(ground,grid))).setMaterial(new PbrMaterial({color:'#3a3634',roughness:0.95}));
+const device=engine.gpu;
+async function read(texture){
+ const pipeline=device.createComputePipeline({layout:'auto',compute:{module:device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'}),entryPoint:'main'}});
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+async function shot(){engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);}
+const count=(a,b)=>{let n=0;for(let p=0;p<a.length;p+=4)if(Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2])>1e-4)n++;return n;};
+// Pixels that glow orange-red: red well above green, green above blue.
+const glowing=(a)=>{let n=0;for(let p=0;p<a.length;p+=4)if(a[p]>0.05&&a[p]>1.5*a[p+1]&&a[p+1]>=a[p+2])n++;return n;};
+// Ground pixels (not glowing in `ref`) that the lights brighten by a fifth or more.
+const brightened=(a,ref)=>{let n=0;for(let p=0;p<a.length;p+=4)if(!(ref[p]>0.02)&&a[p]+a[p+1]+a[p+2]>1.2*(ref[p]+ref[p+1]+ref[p+2]))n++;return n;};
+// Light falling on the ground: the sum over the pixels that do not glow themselves in `ref`.
+const sum=(a,ref=a)=>{let s=0;for(let p=0;p<a.length;p+=4)if(!(ref[p]>0.02))s+=a[p]+a[p+1]+a[p+2];return s;};
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const lava=new LavaFlow({vent:[0,ground(0,-150),-150],ground,rise:1,duration:3600,effusionRate:30,maxLength:600,seed:2,bombRate:20,bombsPerBurst:30,bombSpeed:40,bombLife:30,clotSize:1.5,bombSize:3});
+  const bare=await shot();
+  const change=GroundChange.attach(engine,mesh,{grid,events:[lava.lavaEvent()]});
+  // The flow down the slope.
+  lava.seek(120);change.setTime(120);const early=await shot();out.flowChanged=count(bare,early);out.glowEarly=glowing(early);
+  out.sameTwice=count(early,await shot());
+  lava.seek(300);change.setTime(300);const later=await shot();out.grew=count(early,later);out.glowLater=glowing(later);out.front=lava.front().distance;
+  lava.seek(120);change.setTime(120);out.seekBack=count(early,await shot());
+  // Clots and bombs as glowing instances.
+  lava.seek(300);change.setTime(300);
+  const sphere=sphereGeometry(1,12,8),basic=new Material({shading:'basic',color:[1,1,1]});
+  const clots=createInstancedMesh(engine,sphere,basic,2000),bombs=createInstancedMesh(engine,sphere,basic,2000);
+  out.clots=lava.drawClots(clots.instances);out.bombs=lava.drawBombs(bombs.instances);
+  const thrown=await shot();out.blobsChanged=count(later,thrown);out.glowBlobs=glowing(thrown)-glowing(later);
+  clots.instances.count=0;bombs.instances.count=0;out.blobsCleared=count(later,await shot());
+  // The glow lights through Clustered.
+  try{
+   const clustered=Clustered.attach(engine),groups=LightGroups.attach(engine,clustered),group=groups.group('lava');
+   lava.options.lights=group;lava.seek(300);out.lights=group.lights.length;out.lightList=JSON.stringify(group.lights.map(l=>[+l.intensity.toFixed(3),...l.position.map(v=>Math.round(v))]));
+   const lit=await shot();out.litGain=sum(lit,later)/sum(later,later);out.lit20=brightened(lit,later);out.litChanged=count(later,lit);
+   lava.options.glow=4;lava.seek(300);out.brighter=sum(await shot(),later)>sum(lit,later);lava.options.glow=1;
+   lava.dispose();out.lightsCleared=count(later,await shot());
+   groups.dispose();clustered.dispose();
+  }catch(e){out.lightsError=String(e.message);}
+  change.dispose();clots.destroy();bombs.destroy();
+  out.cleared=count(bare,await shot());
+  // A tube-fed run-on: past the open channel's stop, ten minutes after the last roof behind it closes, the ground glows with
+  // the tube's fresh lava where the same flow without tubes lies dark under a day-old crust.
+  const runOpts={vent:[0,ground(0,-150),-150],ground,rise:1,duration:4*86400,effusionRate:1,width:30,maxWidth:30,temperature:1400,crustTemperature:1340,solidus:1250,stopGraetz:3000,tubeSlope:10,maxLength:600,seed:2};
+  const fed=new LavaFlow(runOpts),open=new LavaFlow({...runOpts,tubeSlope:0}),fp=fed.path(),mouth=fp.findIndex((x,i)=>i&&x.distance===fp[i-1].distance),tRun=fed.arrival(mouth)+600;
+  out.runOn=[open.length,fed.length,mouth];
+  const drawAt=async(flow)=>{const c=GroundChange.attach(engine,mesh,{grid,events:flow.lavaEvents()});c.setTime(tRun);const s=await shot();c.dispose();return s;};
+  engine.camera.position=[-130,150,-40];engine.camera.target=[-54,80,60];
+  const shotOpen=await drawAt(open),shotFed=await drawAt(fed);out.glowOpen=glowing(shotOpen);out.glowFed=glowing(shotFed);out.runDiff=count(shotOpen,shotFed);
+  // A breakout: the same open flow, stalled and still fed, inflates 2 m and breaks out through its levee; ten minutes after
+  // the breakout the new lobe glows beside the old one, which lies dark under its crust either way.
+  const burst=new LavaFlow({...runOpts,tubeSlope:0,breakoutHeight:2}),lobe=burst.branches().find(b=>b.breakout);
+  out.breakout=lobe?[lobe.parent,lobe.at,lobe.path.length]:null;
+  if(lobe){
+   const tBurst=burst.supplyTime(lobe.path[0].travel)+600,drawBurst=async(flow)=>{const c=GroundChange.attach(engine,mesh,{grid,events:flow.lavaEvents()});c.setTime(tBurst);const s=await shot();c.dispose();return s;};
+   engine.camera.position=[-130,150,-40];engine.camera.target=[-54,80,60];
+   const shotStill=await drawBurst(open),shotBurst=await drawBurst(burst);out.glowStill=glowing(shotStill);out.glowBurst=glowing(shotBurst);out.burstDiff=count(shotStill,shotBurst);
+  }
+  // A blocked tube: no run-ons, roofs closing 20,000 s after the front passes and a levee that holds 20 m; the backed-up
+  // lava bursts a roof behind the stalled front, and ten minutes on its lobe glows where the same flow without
+  // breakouts lies dark under its roofs and crust.
+  const shutOpts={...runOpts,tubeTime:20000,maxRunOns:0},shut=new LavaFlow(shutOpts),roofed=new LavaFlow({...shutOpts,breakoutHeight:20}),roofLobe=roofed.branches().find(b=>b.breakout);
+  out.roofBurst=roofLobe?[roofLobe.parent,roofLobe.at,roofed.branches()[0].path.length,roofed.roofTime(roofLobe.at,roofLobe.parent)<=roofed.supplyTime(roofLobe.path[0].travel)]:null;
+  if(roofLobe){
+   const tRoof=roofed.supplyTime(roofLobe.path[0].travel)+600,drawRoof=async(flow)=>{const c=GroundChange.attach(engine,mesh,{grid,events:flow.lavaEvents()});c.setTime(tRoof);const s=await shot();c.dispose();return s;};
+   engine.camera.position=[-130,150,-40];engine.camera.target=[-54,80,60];
+   const shotShut=await drawRoof(shut),shotRoof=await drawRoof(roofed);out.glowShut=glowing(shotShut);out.glowRoof=glowing(shotRoof);out.roofDiff=count(shotShut,shotRoof);
+  }
+  // Braided arms: a ridge parts the flow (a ground of its own, 2 km to the other side) into two valleys closing in to
+  // troughs 11 m apart, narrower than the 12 m channels; under their levees the arms run on side by side and glow as two
+  // channels, where without levees the second ends in the first.
+  const braid=(x,z)=>{const u=x+2000,c=z<0?60:Math.max(5.5,60-0.3*z);return 100-0.05*z+0.1*Math.abs(Math.abs(u)-c);};
+  const braidGrid={size:[400,1000],origin:[-2200,-250],resolution:200};
+  const braidMesh=engine.createMesh().setGeometry(toGeometry(heightfieldGeometry(braid,braidGrid))).setMaterial(new PbrMaterial({color:'#3a3634',roughness:0.95}));
+  const braidOpts={vent:[-2000,braid(-2000,-200),-200],ground:braid,wander:0,width:12,maxWidth:12,duration:7200,maxLength:900,seed:2};
+  const braided=new LavaFlow(braidOpts),unleveed=new LavaFlow({...braidOpts,leveeMax:0});
+  out.braids=braided.branches().map(b=>b.stop);out.bareStops=unleveed.branches().map(b=>b.stop);
+  const drawBraid=async(flow)=>{const c=GroundChange.attach(engine,braidMesh,{grid:braidGrid,events:flow.lavaEvents()});c.setTime(3000);const s=await shot();c.dispose();return s;};
+  engine.camera.position=[-2000,320,250];engine.camera.target=[-2000,60,420];
+  const shotBraid=await drawBraid(braided),shotBare=await drawBraid(unleveed);
+  out.glowBraid=glowing(shotBraid);out.glowBare=glowing(shotBare);out.braidDiff=count(shotBraid,shotBare);
+  braidMesh.dispose?.();
+  // Arms that part round a diamond island in a valley (a ground of its own, 2 km aside) run together below it: the arm
+  // carrying both draws as one glowing channel, wider than either arm laid apart over the same ground.
+  const isle=(x,z)=>{const u=x-2000;return 100-0.05*z+0.03*Math.abs(u)+Math.max(0,30-0.4*(Math.abs(u)+Math.abs(z-100)));};
+  const isleGrid={size:[800,800],origin:[1600,-200],resolution:200};
+  const isleMesh=engine.createMesh().setGeometry(toGeometry(heightfieldGeometry(isle,isleGrid))).setMaterial(new PbrMaterial({color:'#3a3634',roughness:0.95}));
+  const isleOpts={vent:[2000,isle(2000,-200),-200],ground:isle,wander:0,duration:7200,maxLength:2000,seed:2};
+  const merged=new LavaFlow(isleOpts),apart=new LavaFlow({...isleOpts,joinDistance:0});
+  out.joins=merged.branches().map(b=>b.stop);out.apartStops=apart.branches().map(b=>b.stop);
+  const drawIsle=async(flow)=>{const c=GroundChange.attach(engine,isleMesh,{grid:isleGrid,events:flow.lavaEvents()});c.setTime(1000);const s=await shot();c.dispose();return s;};
+  engine.camera.position=[2000,420,140];engine.camera.target=[2000,60,330];
+  const shotMerged=await drawIsle(merged),shotApart=await drawIsle(apart);
+  out.glowMerged=glowing(shotMerged);out.glowApart=glowing(shotApart);out.joinDiff=count(shotMerged,shotApart);
+  isleMesh.dispose?.();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }
+};
+window.ready=true;
+</script></body></html>

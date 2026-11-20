@@ -9,7 +9,7 @@ try{
  await page.waitForFunction(()=>window.modern);
  const report=await page.evaluate(async()=>{
   const {Engine,box}=await import('/packages/core/dist/extension.js');
-  const {loadGLTF}=await import('/packages/gltf-pro/dist/index.js');
+  const {loadGLTF}=await import('/packages/gltf/dist/pbr.js');
   const {CameraProjection}=await import('/packages/cameras/dist/index.js');
   const {AreaPicking}=await import('/packages/selection/dist/area.js');
   const assert=(ok,message)=>{if(!ok)throw new Error(message)};

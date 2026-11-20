@@ -10,9 +10,12 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { interfaceHash } from '../../shared/bindgen-wasm.js';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
 await copyLegal(root);
 // Rapier's JavaScript is bundled from @dimforge/rapier3d into the lazy solver chunk; its Wasm is copied beside it as
 // dist/rapier3d.wasm. Rapier's glue imports the Wasm as an ES module, which needs bundler set-up an app should not
@@ -52,7 +55,7 @@ await build({
   logLevel: 'warn',
   plugins: [rapierWasm],
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: dist,
     emptyOutDir: true,
     target: 'es2022',
     lib: {
@@ -67,11 +70,11 @@ await build({
     rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
   },
 });
-await copyFile(resolve(rapierDir, 'rapier_wasm3d_bg.wasm'), resolve(root, 'dist/rapier3d.wasm'));
+await copyFile(resolve(rapierDir, 'rapier_wasm3d_bg.wasm'), resolve(dist, 'rapier3d.wasm'));
 // Rapier ships inside this package, so its licence and a notice of what was taken ship beside it.
-await copyFile(resolve(rapierDir, 'LICENSE'), resolve(root, 'dist/LICENSE-Apache-2.0.txt'));
+await copyFile(resolve(rapierDir, 'LICENSE'), resolve(dist, 'LICENSE-Apache-2.0.txt'));
 await writeFile(
-  resolve(root, 'dist/THIRD-PARTY-NOTICE.md'),
+  resolve(dist, 'THIRD-PARTY-NOTICE.md'),
   `# Third-party notice
 
 This package bundles Rapier (\`@dimforge/rapier3d\` ${rapierVersion}, https://rapier.rs, by Dimforge),
@@ -84,7 +87,7 @@ licensed under the Apache License 2.0 (\`LICENSE-Apache-2.0.txt\` beside this fi
 );
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.

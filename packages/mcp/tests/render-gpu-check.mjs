@@ -1,5 +1,5 @@
 // Real-GPU proof of render_snippet in Node, with no browser (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/mcp/tests/render-gpu-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/mcp/tests/render-gpu-check.mjs
 // Renders one scene through the tool on the repository's own webgpu binding and @margoengine/headless, and checks the
 // PNG it answers with: the size asked for, and the green box drawn in the middle of the frame. A snippet that adds nothing
 // draws one colour, and the tool says nothing is in view. MARGO_NODE_GPU=<adapter name> picks an adapter.

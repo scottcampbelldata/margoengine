@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/biomes/tests/water-check.mjs
 // Biome look plan item 5: the wetland preset world runs down to a sea floor 40 m below sea level on its west side, and
 // main drew no water there (shot 06: a dark shelf to the horizon). The default view (`water: 'auto'`) now draws the sea:

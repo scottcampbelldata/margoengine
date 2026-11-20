@@ -13,7 +13,7 @@ export interface AddGLTFOptions {
 }
 
 /**
- * Loads plain static geometry with `@margoengine/gltf`; textures and advanced features use `@margoengine/gltf-pro`.
+ * Loads plain static geometry with `@margoengine/gltf`; textures and advanced features use `@margoengine/gltf/pbr`.
  * Skins, morphs and clips also require `@margoengine/animation`. Only the selected packages load, on first use.
  * A missing package rejects with a coded feature-specific error. Aborting adds nothing.
  * @example const model = await addGLTF(stage, '/model.glb');
@@ -40,9 +40,9 @@ export async function addGLTF(
     );
   }
   const { loadGLTF } = await gltfPackage(
-      '@margoengine/gltf-pro',
+      '@margoengine/gltf',
       route.feature,
-      () => import('@margoengine/gltf-pro'),
+      () => import('@margoengine/gltf/pbr'),
       abort,
     ),
     animation = route.animation

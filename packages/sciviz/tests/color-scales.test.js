@@ -74,6 +74,9 @@ test('Machado author matrix, linear-light multiplication and all severities of e
         }
   assert.throws(() => simulateCVD([1, 0, 0], 'protan', 2));
   assert.throws(() => simulateCVD([NaN, 0, 0], 'protan'));
+  // Inherited object keys are not CVD types: each is the coded unknown-type error, never a crash in the lookup.
+  for (const type of ['constructor', 'toString', '__proto__', 'hasOwnProperty'])
+    assert.throws(() => cvdMatrix(type), (e) => e instanceof TypeError && /Unknown CVD type/.test(e.message));
 });
 
 test('Tol defaults match author data and categories never interpolate', () => {
@@ -163,6 +166,12 @@ test('HTML legend, SVG hard stops and polygons keep exact encoding geometry and 
     const boxes = swatches([legend.element], { left: 0, top: 0 });
     assert.match(svgSwatches(boxes), /<circle.*r="4"/);
     assert.match(svgSwatches(boxes), /<polygon points="12,0 24,24 0,24"/);
+    // A legend the page hides (visibility, or a hidden ancestor) exported its swatches without their text.
+    legend.element.style.visibility = 'hidden';
+    assert.deepEqual(swatches([legend.element], { left: 0, top: 0 }), []);
+    legend.element.style.visibility = '';
+    spans[0].parentElement.hidden = true;
+    assert.equal(swatches([legend.element], { left: 0, top: 0 }).length, 1);
     legend.dispose();
     assert.equal(legend.element.isConnected, false);
     legend.dispose();

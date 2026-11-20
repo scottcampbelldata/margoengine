@@ -108,6 +108,12 @@ const positive = (what: string, v: number): number => {
 // costs a distance test, since every candidate is measured.
 const hash = (x: number, y: number, z: number): number =>
   (Math.imul(x, 73856093) ^ Math.imul(y, 19349663) ^ Math.imul(z, 83492791)) | 0;
+/**
+ * Cell indices are clamped to +-2^30: past 2^53 a float index plus one is itself, so the scan over neighbour cells would
+ * never end, and Math.imul wraps above 2^31. Clamping moves no two points further apart in cells (|clamp(a) - clamp(b)|
+ * is at most |a - b|), so every entity within the radius still sits in a scanned cell; far ones only share buckets.
+ */
+const CELL_LIMIT = 2 ** 30;
 
 /**
  * Picks what each client of a `GameServer` sees. Pass {@link InterestManager.view} as the server's `view`.
@@ -175,7 +181,7 @@ export class InterestManager<State, Input = unknown> {
   }
 
   private cellOf(v: number): number {
-    return Math.floor(v / this.cell);
+    return Math.min(CELL_LIMIT, Math.max(-CELL_LIMIT, Math.floor(v / this.cell)));
   }
 
   private index(state: State): void {

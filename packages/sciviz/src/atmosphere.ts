@@ -70,7 +70,7 @@ const skyShader=`${frameWGSL}
 struct Out { @builtin(position) clip:vec4f }
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {var out:Out;out.clip=vec4f(select(-1.0,3.0,i==1u),select(-1.0,3.0,i==2u),0,1);return out;}
 @fragment fn fragment(in:Out)->@location(0) vec4f {
- let uv=in.clip.xy/frame.viewport.xy;let clip=vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);
+ let uv=(in.clip.xy-frame.origin.xy)/frame.viewport.xy;let clip=vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);
  let h=frame.inverse*vec4f(clip,0.0001,1);let world=h.xyz/h.w;
  return vec4f(toOutput(planetSky(world-frame.eye.xyz)),1);
 }
@@ -175,10 +175,11 @@ export class GlobeAtmosphere implements Drawable {
 export async function globeAtmosphere(figure:Figure,options:GlobeAtmosphereOptions={}):Promise<GlobeAtmosphere>{
  options.signal?.throwIfAborted();const globe=new GlobeAtmosphere(figure,options);
  try{
-  figure.renderer.add(globe);figure.addLayer(globe);
+  // The figure takes the globe before the renderer draws it; a refused globe (a 2D chart) is freed below.
+  figure.addLayer(globe);figure.renderer.add(globe);
   globe.ground=await tileLayer(figure,{tiles:async()=>new ImageData(new Uint8ClampedArray([45,85,105,255]),1,1),...options.tiles,projection:'globe',appearance:globe.appearance,signal:options.signal??options.tiles?.signal});
   trackSpecLayer(figure, 'globe', [options], globe);
   trackSpecLayer(figure, 'globe.ground', [globe], globe.ground);
   return globe;
- }catch(error){figure.remove(globe);throw error;}
+ }catch(error){figure.remove(globe);globe.dispose();throw error;}
 }

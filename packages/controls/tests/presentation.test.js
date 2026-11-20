@@ -316,3 +316,68 @@ test('path: vertical tangent, repeated points, loop seams, invalid samples and d
   assert.throws(() => bad.update(), RangeError);
   bad.dispose();
 });
+
+test('scroll: setProgress in infinite mode takes the short way round the loop', () => {
+  const el = new FakeElement(100, 100),
+    loop = new ScrollControls(camera(), { element: el, infinite: true, damping: 0 });
+  el.dispatch('wheel', { deltaY: 225, deltaMode: 0 });
+  loop.update();
+  close(loop.offset, 0.25, 1e-12);
+  loop.setProgress(0.25);
+  assert.equal(loop.update(), false, 'already there: no travel');
+  assert.equal(loop.delta, 0);
+  loop.setProgress(0.3);
+  loop.update();
+  close(loop.delta, 0.05, 1e-12, 'a short step forward');
+  loop.setProgress(0.1);
+  loop.update();
+  close(loop.delta, -0.2, 1e-12, 'a short step back');
+  loop.setProgress(0.9);
+  loop.update();
+  close(loop.delta, -0.2, 1e-12, 'back through the seam');
+  close(loop.offset, 0.9, 1e-12);
+  loop.setProgress(2.95, true);
+  close(loop.offset, 0.95, 1e-12, 'any whole number of loops names the same place');
+  loop.dispose();
+});
+
+test('path: update reports a change only when the camera or mesh moved', async () => {
+  const cam = camera(),
+    path = new PathControls(cam, { at: (t) => [t * 10, 0, 0] }, { loop: false, damping: 0 });
+  let changes = 0;
+  path.addEventListener('change', () => changes++);
+  assert.equal(path.update(1 / 60), true, 'moves onto the path');
+  assert.equal(changes, 1);
+  for (let i = 0; i < 4; i++) assert.equal(path.update(1 / 60), false, `settled, update ${i}`);
+  assert.equal(changes, 1, 'no change events while settled');
+  path.current = 0.5;
+  assert.equal(path.update(1 / 60), true);
+  assert.equal(changes, 2);
+  path.dispose();
+
+  const { engine, mesh, control } = await rig();
+  control.dispose();
+  const driven = new PathControls(engine, { at: (t) => [t * 4, 0, 0] }, { object: mesh, loop: false, damping: 0 });
+  let moves = 0;
+  driven.addEventListener('change', () => moves++);
+  driven.current = 0.5;
+  assert.equal(driven.update(0), true, 'mesh placed on the path');
+  assert.equal(driven.update(0), false, 'mesh settled');
+  assert.equal(moves, 1);
+  driven.dispose();
+  engine.dispose();
+});
+
+test('scroll: a horizontal page wheel step is one element width (UI Events DOM_DELTA_PAGE)', () => {
+  for (const [deltaX, deltaY] of [
+    [1, 0],
+    [0, 1],
+  ]) {
+    const el = new FakeElement(200, 100),
+      c = new ScrollControls(camera(), { element: el, horizontal: true, pages: 3, damping: 0 });
+    el.dispatch('wheel', { deltaX, deltaY, deltaMode: 2 });
+    c.update();
+    close(c.offset, 0.5, 1e-12, `one page of the two along the width (deltaX ${deltaX})`);
+    c.dispose();
+  }
+});

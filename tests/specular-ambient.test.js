@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { lightPBR } from '../packages/shared/pbr-hooks.js';
-import { pbrShader, physicalShader, transmissiveShader } from '../packages/gltf-pro/src/shader.ts';
+import { pbrShader, physicalShader, transmissiveShader } from '../packages/gltf/src/shader.ts';
 
 const hooks = { declarations: '', ambient: 'hook(s.base.rgb,s.f0,s.sw)', light: 'local(s.f0,s.sw)' };
 const source = (path) => readFileSync(new URL('../packages/' + path, import.meta.url), 'utf8');

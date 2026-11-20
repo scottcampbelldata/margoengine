@@ -4,7 +4,7 @@ import { NodeMaterial, positionLocal, storage, vec3 } from '../dist/index.js';
 import { morphing, skinning, skinningFromModel, worldNormal } from '../dist/deform.js';
 import { displacedDepth } from '../../shared/displacement.js';
 
-const { pbrShader } = await import('../../gltf-pro/src/shader.ts');
+const { pbrShader } = await import('../../gltf/src/shader.ts');
 const { shadowDepth } = await import('../../shadows/src/shader.ts');
 
 const skin = () =>
@@ -69,7 +69,7 @@ test('a skinned depth pass draws the same deformation, reading the vertex index'
   assert.equal(code.split('var<storage, read>').length, 4);
 });
 
-// A model of two joints on one node, in the shape gltf-pro gives it.
+// A model of two joints on one node, in the shape gltf/pbr gives it.
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
   shift = (x, y = 0, z = 0) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1],
   skinned = ({ attributes = { JOINTS_0: 1, WEIGHTS_0: 2 }, skin = 0, inverseBind = 3 } = {}) => {
@@ -103,6 +103,14 @@ test('skinningFromModel reads the joints, the weights and the bind pose of a loa
   const m = new NodeMaterial({ positionNode: skin.position(), positionNormals: 'keep' });
   m.shader(pbrShader, 2);
   assert.ok(m.vertexCode.includes('i.ndVertex'));
+});
+
+test('a part of a primitive gltf/pbr split reads the joints and weights of its own vertices', () => {
+  // The part holds the file's vertex 1, then vertex 0 (part.vertexMap); before the fix it read vertices 0 and 1.
+  const { model, primitive } = skinned(),
+    skin = skinningFromModel(model, { ...primitive, part: { vertexMap: new Uint32Array([1, 0]) } });
+  assert.deepEqual([...skin.joints.data], [1, 0, 0, 0, 0, 1, 0, 0]);
+  assert.deepEqual([...skin.weights.data], [1, 0, 0, 0, 0.5, 0.5, 0, 0]);
 });
 
 test('the palette is each joint times its inverse bind matrix, and update follows the nodes', () => {

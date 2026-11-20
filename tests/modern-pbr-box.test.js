@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { loadGLTF, parseGLTF, PBRModel } from '@margoengine/gltf-pro';
+import { loadGLTF, parseGLTF, PBRModel } from '@margoengine/gltf/pbr';
 import { parseGLTF as parseBasicGLTF } from '@margoengine/gltf';
 import { Physics } from '@margoengine/physics';
 import { exportGLB } from '@margoengine/exporters';
@@ -16,7 +16,7 @@ import { loadedPBREngine, primitivePositions, positionBounds } from './support/l
 
 // This gate loads Box by itself through the published build entry. The separate
 // FBX fixture is deliberately not read or preflighted before these assertions.
-assert.match(import.meta.resolve('@margoengine/gltf-pro'), /\/dist\/index\.js$/);
+assert.match(import.meta.resolve('@margoengine/gltf/pbr'), /\/gltf\/dist\/pbr\.js$/);
 const box = await readFile(new URL('../packages/exporters/tests/fixtures/Box.glb', import.meta.url));
 await RAPIER.init();
 const server = createServer((_request, response) => {
@@ -129,7 +129,7 @@ function embeddedBoxDocument() {
   return json;
 }
 
-test('built gltf-pro Box preserves all three null-Geometry nodes and registers only its genuine primitive', async () => {
+test('built gltf/pbr Box preserves all three null-Geometry nodes and registers only its genuine primitive', async () => {
   await withBox(({ engine, model, primitive, mesh }) => {
     assert.equal(engine.meshes.size, 3);
     assert.equal(model.nodes.length, 2);

@@ -18,7 +18,7 @@ export interface OrthographicCameraOptions extends Omit<VirtualCameraOptions, 'o
 const positive = (value: number, name: string): void => {
   if (!(value > 0 && Number.isFinite(value)))
     throw new RangeError(
-      `Invalid orthographic ${name}; pass a finite value above 0. https://margoengine.com/docs/limits#cinematic-orthographic`,
+      `Invalid orthographic ${name}; pass a finite value above 0. https://margoengine.com/llms/packages/cinematic.md`,
     );
 };
 const heightOf = (pose: CameraPose): number => {

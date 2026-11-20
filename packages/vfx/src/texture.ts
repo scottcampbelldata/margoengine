@@ -25,7 +25,6 @@ const atlas = (billboard: string, { width, height, atlas }: VFXTexture): string 
         : '') + 'struct Out',
     )
     .replace('@location(1) color:vec4f}', '@location(1) color:vec4f,@location(2) @interpolate(flat) cell:vec2f}')
-    .replace('vec2f(-1.7320509,-1),vec2f(1.7320509,-1)', 'vec2f(-3,-1),vec2f(3,-1)')
     .replace(
       'o.uv=corner;',
       `o.uv=corner;let atlasFrame=${frame};o.cell=vec2f(f32(atlasFrame%${columns}u),f32(atlasFrame/${columns}u));`,
@@ -80,6 +79,8 @@ export const textureFeature: NonNullable<VFXFeatures['texture']> = {
           'struct Out',
           '@group(0) @binding(3) var sprite:texture_2d<f32>;\n@group(0) @binding(4) var spriteSampler:sampler;\nstruct Out',
         )
+        // The soft disc's triangle holds the unit circle only; a sprite fills the square, so its triangle holds that.
+        .replace('vec2f(-1.7320509,-1),vec2f(1.7320509,-1)', 'vec2f(-3,-1),vec2f(3,-1)')
         .replace(
           'let radius=dot(i.uv,i.uv);if(radius>1){discard;}return vec4f(i.color.rgb,i.color.a*(1-radius)*(1-radius));',
           `let t=${sample};if(t.a<0.02||any(abs(i.uv)>vec2f(1))){discard;}return vec4f(i.color.rgb*t.rgb,i.color.a*t.a);`,

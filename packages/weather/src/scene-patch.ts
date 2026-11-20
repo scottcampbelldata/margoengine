@@ -120,6 +120,16 @@ export abstract class SurfaceHook implements EnginePlugin {
   protected variant(): string {
     return '';
   }
+  /** The WGSL declarations this frame (by default the ones given at construction). */
+  protected shaderDeclarations(): string {
+    return this.declarations;
+  }
+  /** Group 0 entries besides the uniform this frame (a subclass's textures). */
+  protected extraBindings(_device: GPUDevice): GPUBindGroupEntry[] {
+    return [];
+  }
+  /** Frees a subclass's own GPU resources (device restore and disposal). */
+  protected releaseExtra(): void {}
 
   /** Checks the options and the frame's `delta` (the engine calls this each frame). */
   onPreUpdate(delta: number): void {
@@ -162,16 +172,17 @@ export abstract class SurfaceHook implements EnginePlugin {
     if (code === undefined) {
       const patched = this.patch(c.shader);
       if (patched === c.shader) unsupportedShader(this.label);
-      code = `${patched.includes('fn weather_noise(') ? '' : noiseWGSL}${this.declarations}
+      code = `${patched.includes('fn weather_noise(') ? '' : noiseWGSL}${this.shaderDeclarations()}
 ${patched}`;
       if (this.shaders.size >= 32) this.shaders.clear();
       this.shaders.set(key, code);
     }
     c.shader = code;
-    c.bindings.push({ binding: this.binding, resource: { buffer: this.uniform } });
+    c.bindings.push({ binding: this.binding, resource: { buffer: this.uniform } }, ...this.extraBindings(c.device));
   }
 
   private release(): void {
+    this.releaseExtra();
     this.uniform?.destroy();
     this.uniform = undefined;
     this.shaders.clear();

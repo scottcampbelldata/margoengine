@@ -1,8 +1,8 @@
 // Compute pipelines and passes of the compatibility device (W3C WebGPU specification sections 11 and 16). This part
 // stays small and in the device: the default bind group layouts come from the checked WGSL at once, so
 // getBindGroupLayout works synchronously, while the planning, translation and running of compute (the tiers of the
-// roadmap's compute plan) load lazily with the compute entry, the first time a page creates a compute pipeline. A
-// render-only page never downloads them.
+// roadmap's compute plan) load lazily with the compute entry, before `requestDevice` answers. A
+// (KB-COMPAT-FIRSTTASK1: loaded on first use, the first compute submit waited in the queue).
 import type { IREntryPoint, IRGlobalVar } from '../wgsl/ir.js';
 import { sizeOf, type TextureType } from '../wgsl/types.js';
 import type { CompatDevice } from './device.js';
@@ -16,6 +16,7 @@ import {
   type Uses,
 } from './resources.js';
 import type { Replayer } from './render.js';
+import { OP, type Tape, type TapePool } from './tape.js';
 
 /** What the compute entry builds for a pipeline (opaque to the device). */
 export interface ComputeBuilt {
@@ -37,51 +38,55 @@ export type BoundGroup = { readonly group: CompatBindGroup; readonly offsets: re
 
 const STORAGE_ACCESS: Record<string, string> = { write: 'write-only', read: 'read-only', read_write: 'read-write' };
 
+/**
+ * The layout entry WebGPU's default pipeline layout makes for a resource an entry point statically uses (WebGPU "default
+ * pipeline layout": its binding type follows the variable's address space and type), with the given stage visibility.
+ */
+export function layoutEntry(v: IRGlobalVar, visibility: number): LayoutEntry | null {
+  const base = { binding: v.binding as number, visibility };
+  if (v.space === 'uniform' || v.space === 'storage')
+    return {
+      ...base,
+      buffer: {
+        type: v.space === 'uniform' ? 'uniform' : v.access === 'read' ? 'read-only-storage' : 'storage',
+        hasDynamicOffset: false,
+        minBindingSize: sizeOf(v.type),
+      },
+    };
+  if (v.type.kind === 'sampler') return { ...base, sampler: { type: v.type.comparison ? 'comparison' : 'filtering' } };
+  if (v.type.kind !== 'texture') return null;
+  const t = v.type as TextureType,
+    viewDimension = t.dimension.replace('_', '-');
+  if (t.shape === 'storage')
+    return {
+      ...base,
+      storageTexture: { format: t.format as string, access: STORAGE_ACCESS[t.access ?? 'write'], viewDimension },
+    };
+  if (t.shape === 'external') return { ...base, externalTexture: {} };
+  return {
+    ...base,
+    texture: {
+      sampleType:
+        t.shape === 'depth' || t.shape === 'depth_multisampled'
+          ? 'depth'
+          : t.sampled?.name === 'i32'
+            ? 'sint'
+            : t.sampled?.name === 'u32'
+              ? 'uint'
+              : 'float',
+      viewDimension,
+      multisampled: t.shape === 'multisampled' || t.shape === 'depth_multisampled',
+    },
+  };
+}
+
 /** The default ("auto") bind group layouts of a compute entry point, from the resources it reaches. */
 function autoLayouts(entry: IREntryPoint): CompatBindGroupLayout[] {
   const groups: LayoutEntry[][] = [];
   for (const g of entry.globals) {
     if (g.kind !== 'var' || g.group === undefined || g.binding === undefined) continue;
-    const v = g as IRGlobalVar,
-      list = (groups[v.group as number] ??= []);
-    const base = { binding: v.binding as number, visibility: 4 };
-    if (v.space === 'uniform' || v.space === 'storage')
-      list.push({
-        ...base,
-        buffer: {
-          type: v.space === 'uniform' ? 'uniform' : v.access === 'read' ? 'read-only-storage' : 'storage',
-          hasDynamicOffset: false,
-          minBindingSize: sizeOf(v.type),
-        },
-      });
-    else if (v.type.kind === 'sampler')
-      list.push({ ...base, sampler: { type: v.type.comparison ? 'comparison' : 'filtering' } });
-    else if (v.type.kind === 'texture') {
-      const t = v.type as TextureType,
-        viewDimension = t.dimension.replace('_', '-');
-      if (t.shape === 'storage')
-        list.push({
-          ...base,
-          storageTexture: { format: t.format as string, access: STORAGE_ACCESS[t.access ?? 'write'], viewDimension },
-        });
-      else if (t.shape === 'external') list.push({ ...base, externalTexture: {} });
-      else
-        list.push({
-          ...base,
-          texture: {
-            sampleType:
-              t.shape === 'depth' || t.shape === 'depth_multisampled'
-                ? 'depth'
-                : t.sampled?.name === 'i32'
-                  ? 'sint'
-                  : t.sampled?.name === 'u32'
-                    ? 'uint'
-                    : 'float',
-            viewDimension,
-            multisampled: t.shape === 'multisampled' || t.shape === 'depth_multisampled',
-          },
-        });
-    }
+    const e = layoutEntry(g as IRGlobalVar, 4);
+    if (e) (groups[g.group as number] ??= []).push(e);
   }
   const out: CompatBindGroupLayout[] = [];
   for (let i = 0; i < Math.max(groups.length, 1); i++) {
@@ -198,20 +203,26 @@ export class CompatComputePipeline {
   }
 }
 
-/** A GPUComputePassEncoder: records dispatches with the pipeline and bind groups current at each. */
+/** A GPUComputePassEncoder: records the pass's pipeline, bind groups and dispatches on the command buffer's tape. */
 export class CompatComputePassEncoder {
-  private pipeline: CompatComputePipeline | null = null;
-  private groups: BoundGroup[] = [];
+  /** The label: '' (the prototype's) unless one is given, so an unlabelled one, which a frame makes many of, has one field fewer. */
+  declare label: string;
   constructor(
-    private readonly ops: ((r: Replayer) => void)[],
-    private readonly device: CompatDevice,
-    public label: string,
-    /** The command buffer's list of what it uses. */
-    private readonly uses: Uses = [],
-  ) {}
+    /**
+     * The command buffer's tape: the commands and what they use go onto it, and it holds whether this pass has set a
+     * pipeline and reaches the device (its pool's), so the pass encoder WebGPU hands back per pass is one field.
+     */
+    private readonly tape: Tape,
+    label: string,
+  ) {
+    if (label) this.label = label;
+    tape.computePipeline = false;
+    tape.op(OP.COMPUTE_BEGIN);
+  }
 
   setPipeline(pipeline: CompatComputePipeline): void {
-    this.pipeline = pipeline;
+    this.tape.computePipeline = true;
+    this.tape.obj(OP.COMPUTE_PIPELINE, pipeline);
   }
   setBindGroup(
     index: number,
@@ -220,30 +231,33 @@ export class CompatComputePassEncoder {
     start = 0,
     length?: number,
   ): void {
-    const list = offsets ? [...(offsets as Iterable<number>)] : [];
-    const dynamic = offsets instanceof Uint32Array ? list.slice(start, start + (length ?? list.length - start)) : list;
-    // An invalid group (its error was reported at createBindGroup) binds nothing, so the dispatch is skipped.
-    this.groups[index] = group && !group.invalid ? { group, offsets: dynamic } : null;
-    if (group) this.uses.push(group.uses);
+    if (group) this.tape.use(group.uses);
+    // An invalid group (its error was reported at createBindGroup) binds nothing, so the dispatch is skipped (the
+    // replay's bindCompute checks it).
+    if (!offsets) this.tape.bindGroup(index, group, undefined, 0, 0, OP.COMPUTE_BIND);
+    else if (offsets instanceof Uint32Array)
+      this.tape.bindGroup(index, group, offsets, start, length ?? offsets.length - start, OP.COMPUTE_BIND);
+    else if (Array.isArray(offsets)) this.tape.bindGroup(index, group, offsets, 0, offsets.length, OP.COMPUTE_BIND);
+    else {
+      const list = [...offsets];
+      this.tape.bindGroup(index, group, list, 0, list.length, OP.COMPUTE_BIND);
+    }
   }
   dispatchWorkgroups(x: number, y = 1, z = 1): void {
-    this.record(() => [x, y, z]);
+    if (!this.tape.computePipeline) return this.noPipeline();
+    this.tape.n3(OP.DISPATCH, x, y, z);
   }
   dispatchWorkgroupsIndirect(buffer: CompatBuffer, offset: number): void {
-    this.uses.push(buffer);
-    this.record((r) => [...new Uint32Array(r.indirect(buffer, offset, 12))]);
+    if (!this.tape.computePipeline) return this.noPipeline();
+    this.tape.use(buffer);
+    this.tape.objNum(OP.DISPATCH_INDIRECT, buffer, offset);
   }
-  private record(count: (r: Replayer) => number[]): void {
-    const pipeline = this.pipeline,
-      groups = [...this.groups];
-    if (!pipeline) {
-      this.device.validationError('dispatchWorkgroups without a compute pipeline; call setPipeline first');
-      return;
-    }
-    this.ops.push((r) => r.dispatch(pipeline, groups, count(r)));
+  private noPipeline(): void {
+    (this.tape.pool as TapePool).device.validationError('dispatchWorkgroups without a compute pipeline; call setPipeline first');
   }
   end(): void {}
   pushDebugGroup(): void {}
   popDebugGroup(): void {}
   insertDebugMarker(): void {}
 }
+CompatComputePassEncoder.prototype.label = '';

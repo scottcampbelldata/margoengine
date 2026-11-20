@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine, EnginePlugin, Vec3 } from "@margoengine/core";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { MutableVec2, MutableVec3 } from "@margoengine/math";
 
 export class SculptView implements EnginePlugin {

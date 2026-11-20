@@ -35,6 +35,13 @@ window.check={samples:sceneSamples,
   out.rainChanged=changed(clear,rain);out.pixels=clear.length/4;
   weather.options.precipitation='snow';weather.options.brightness=1;weather.options.opacity=1;
   await shot();const snow=await shot();out.snowChanged=changed(clear,snow);
+  // Exposure: in a gale the same flakes, held still (delta 0), drawn as discs and then swept over 1/60 s. The swept
+  // flakes spread over more pixels with about the same light, as a camera's time average records them.
+  weather.options.wind=[18,0];weather.options.particles=3000;await shot();
+  const still=await shot(0);weather.options.exposure=1/60;const swept=await shot(0);
+  out.stillPixels=changed(clear,still);out.sweptPixels=changed(clear,swept);
+  out.stillLight=sum(still)-sum(clear);out.sweptLight=sum(swept)-sum(clear);
+  weather.options.exposure=0;weather.options.wind=[4,0];weather.options.particles=30000;
   weather.options.precipitation='none';await shot();
   out.afterNone=changed(clear,await shot());
   weather.options.precipitation='rain';weather.options.intensity=0;await shot();

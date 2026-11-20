@@ -40,16 +40,22 @@
     "test:studio:browser": "npm run build && node scripts/test-browser.js --page=studio",
     "test:prefiltered:browser": "npm run build && node scripts/test-browser.js --page=prefiltered",
     "test:reflector-pbr:browser": "npm run build && node scripts/test-browser.js --page=reflector-pbr",
+    "test:mesh-reflector:browser": "npm run build && node scripts/test-browser.js --page=mesh-reflector",
+    "test:lightformer:browser": "npm run build && node scripts/test-browser.js --page=lightformer",
     "test:exr-codecs:browser": "npm run build && node scripts/test-browser.js --page=exr-codecs",
     "test:exr-codecs-bundled:browser": "node tests/exr-codecs-bundled-browser.mjs",
     "test:probe-capture:browser": "npm run build && node scripts/test-browser.js --page=probe-capture",
+    "test:sky-occlusion:browser": "npm run build && node scripts/test-browser.js --page=sky-occlusion",
     "test:fog-transparent:browser": "npm run build && node scripts/test-browser.js --page=volumetric-transparent",
     "test:fog-route:browser": "npm run build && node scripts/test-browser.js --page=volumetric-route",
     "test:fog-beam:browser": "npm run build && node scripts/test-browser.js --page=volumetric-beam",
+    "test:fog-beam-continuity:browser": "npm run build && node scripts/test-browser.js --page=volumetric-beam-continuity && node scripts/test-browser.js --page=volumetric-beam-continuity --compat",
     "test:reflection-shapes:browser": "npm run build && node scripts/test-browser.js --page=reflection-shapes",
     "test:bright:browser": "npm run build && node scripts/test-browser.js --page=bright",
     "test:gpu:mirror": "cd ../.. && node scripts/env-mirror-gpu-check.js && node scripts/env-mirror-gpu-check.js --compat && node packages/environment/tests/review56-browser.mjs && node packages/environment/tests/review56-browser.mjs --compat && node packages/environment/tests/capture-stability-browser.mjs && node packages/environment/tests/capture-stability-browser.mjs --compat",
-    "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js"
+    "test:gpu:fog-all": "cd ../.. && node scripts/fog-all-gpu-check.js",
+    "test:fog-far:browser": "npm run build && cd ../.. && node packages/environment/tests/volumetric-far.browser.mjs && node packages/environment/tests/volumetric-far.browser.mjs --compat",
+    "test:settings:browser": "npm run build && cd ../.. && node packages/environment/tests/settings.browser.mjs && node packages/environment/tests/settings.browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
@@ -101,6 +107,10 @@
       "types": "./dist/fog-volumes.d.ts",
       "import": "./dist/fog-volumes.js"
     },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    },
     "./studio": {
       "types": "./dist/studio.d.ts",
       "import": "./dist/studio.js"
@@ -112,6 +122,10 @@
     "./reflector-pbr": {
       "types": "./dist/reflector-pbr.d.ts",
       "import": "./dist/reflector-pbr.js"
+    },
+    "./lightformer": {
+      "types": "./dist/lightformer.d.ts",
+      "import": "./dist/lightformer.js"
     },
     "./exr-codecs": {
       "types": "./dist/exr-codecs.d.ts",

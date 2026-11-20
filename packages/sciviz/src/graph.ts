@@ -1,4 +1,4 @@
-import { colorLookupWGSL } from './color-lookup.js';
+import { colorLookupWGSL, rangeUniform } from './color-lookup.js';
 import { trackSpecLayer } from './spec-hooks.js';
 // Force-directed graph layout and drawing for networks with millions of edges. The forces are those of T. M. J.
 // Fruchterman and E. M. Reingold, "Graph drawing by force-directed placement", Software: Practice and Experience
@@ -13,7 +13,8 @@ import { trackSpecLayer } from './spec-hooks.js';
 // edges as GPU lines read from a storage buffer by index, nodes as screen-space discs coloured through a colour map.
 import { hexColor, SRGBToLinear } from '@margoengine/math/color';
 import { rangeError, typeError } from '../../shared/errors.js';
-import { colormapTexture, resolveColormap, type Bounds, type ColormapSource } from './layer.js';
+import { colormapTexture, rangeOption, resolveColormap, type Bounds, type ColormapSource } from './layer.js';
+import { extent } from './extent.js';
 import { frameWGSL, type Drawable, type GpuContext, type SciRenderer } from './render.js';
 import type { Colormap } from './colormaps.js';
 import type { Figure } from './figure.js';
@@ -28,6 +29,16 @@ export interface Graph {
   readonly edges: ArrayLike<number>;
   /** Weight per edge (pull strength). Default 1 each. */
   readonly weights?: ArrayLike<number>;
+}
+
+// A graph's edges as node indices, each a whole number below the node count, or a RangeError naming the first that is not.
+function edgesOf(graph: Graph, n: number): Uint32Array {
+  if (graph.edges.length % 2) throw rangeError('Graph edges hold two node indices per edge', 'sciviz');
+  const edges = Uint32Array.from(graph.edges);
+  for (let i = 0; i < edges.length; i++)
+    if (edges[i] >= n || edges[i] !== graph.edges[i])
+      throw rangeError(`Graph edge ${i >> 1} names node ${graph.edges[i]} of ${n}`, 'sciviz');
+  return edges;
 }
 
 /** Options of {@link ForceLayout}. */
@@ -116,14 +127,13 @@ export class ForceLayout {
   constructor(graph: Graph, options: ForceLayoutOptions = {}) {
     const n = graph.nodes;
     if (!Number.isInteger(n) || n < 1) throw rangeError(`A graph needs a whole number of nodes, got ${n}`, 'sciviz');
-    if (graph.edges.length % 2) throw rangeError('Graph edges hold two node indices per edge', 'sciviz');
-    this.#edges = Uint32Array.from(graph.edges as ArrayLike<number>);
-    for (let i = 0; i < this.#edges.length; i++)
-      if (this.#edges[i] >= n || this.#edges[i] !== graph.edges[i])
-        throw rangeError(`Graph edge ${i >> 1} names node ${graph.edges[i]} of ${n}`, 'sciviz');
+    this.#edges = edgesOf(graph, n);
     if (graph.weights && graph.weights.length * 2 !== this.#edges.length)
       throw rangeError('Graph weights hold one value per edge', 'sciviz');
     this.#weights = graph.weights ? Float32Array.from(graph.weights) : undefined;
+    // A NaN or infinite weight turned both ends' positions to NaN; a negative one pushed them apart.
+    if (this.#weights?.some((w) => !(w >= 0 && w < Infinity)))
+      throw rangeError('Graph weights must be finite and at least 0', 'sciviz');
     this.nodes = n;
     this.dimensions = options.dimensions ?? 2;
     if (this.dimensions !== 2 && this.dimensions !== 3)
@@ -135,15 +145,17 @@ export class ForceLayout {
     this.#gravity = options.gravity ?? 0.01;
     this.#simmer = (options.simmer ?? 0.05) * this.#k;
     this.#temperature = options.temperature ?? Math.max(1, side * 0.1) * this.#k;
+    // Every option finite: an infinite length, gravity or simmer, or a NaN temperature, made every position NaN.
     if (
-      !(this.#k > 0) ||
+      !(this.#k > 0 && this.#k < Infinity) ||
       !(this.#theta >= 0) ||
       !(this.#cooling > 0 && this.#cooling <= 1) ||
-      !(this.#gravity >= 0) ||
-      !(this.#simmer >= 0)
+      !(this.#gravity >= 0 && this.#gravity < Infinity) ||
+      !(this.#simmer >= 0 && this.#simmer < Infinity) ||
+      !(this.#temperature >= 0 && this.#temperature < Infinity)
     )
       throw rangeError(
-        'Graph layout length > 0, theta >= 0, cooling in (0, 1], gravity >= 0 and simmer >= 0',
+        'Graph layout length > 0, theta >= 0, cooling in (0, 1], and finite gravity, simmer and temperature >= 0',
         'sciviz',
       );
     this.positions = new Float32Array(n * 3);
@@ -151,6 +163,8 @@ export class ForceLayout {
       if (options.positions.length !== n * 3)
         throw rangeError(`Graph start positions need xyz for ${n} nodes`, 'sciviz');
       this.positions.set(options.positions);
+      if (this.positions.some((v) => !Number.isFinite(v)))
+        throw rangeError('Graph start positions must be finite', 'sciviz');
       // A 2D layout lies on z = 0: a given z would count in the distances but never move.
       if (this.dimensions === 2) for (let i = 0; i < n; i++) this.positions[i * 3 + 2] = 0;
     } else {
@@ -472,7 +486,7 @@ export interface GraphLayerOptions {
 
 const graphShader = /* wgsl */ `${frameWGSL}
 ${colorLookupWGSL}
-struct Graph { model: mat4x4f, style: vec4f, edge: vec4f, scale: vec4f }
+struct Graph { model: mat4x4f, style: vec4f, edge: vec4f, range: vec4f }
 @group(1) @binding(0) var<uniform> graph: Graph;
 @group(1) @binding(1) var<storage, read> nodes: array<f32>;
 @group(1) @binding(2) var<storage, read> edges: array<u32>;
@@ -503,7 +517,7 @@ struct NodeOut { @builtin(position) clip: vec4f, @location(0) corner: vec2f, @lo
 @fragment fn nodeFragment(in: NodeOut) -> @location(0) vec4f {
   let r = dot(in.corner, in.corner);
   if (r > 1.0) { discard; }
-  let t = (in.value - graph.style.x) / max(graph.style.y - graph.style.x, 1e-30);
+  let t = colourFraction(in.value, graph.range);
   let albedo = colourLookup(colours, t).rgb;
   // A darker rim so touching nodes stay apart.
   let rim = select(1.0, 0.55, r > 0.6);
@@ -559,28 +573,22 @@ export class GraphLayer implements Drawable {
   constructor(renderer: SciRenderer, graph: Graph, positions: Float32Array, options: GraphLayerOptions = {}) {
     this.#renderer = renderer;
     const n = graph.nodes;
+    if (!Number.isInteger(n) || n < 1) throw rangeError(`A graph needs a whole number of nodes, got ${n}`, 'sciviz');
     if (positions.length !== n * 3) throw rangeError(`Graph positions need xyz for ${n} nodes`, 'sciviz');
-    if (graph.edges.length % 2) throw rangeError('Graph edges hold two node indices per edge', 'sciviz');
+    // An edge naming a node past the last would have the GPU read a vertex outside the position buffer.
+    const edges = edgesOf(graph, n);
     this.nodes = n;
-    this.edges = graph.edges.length / 2;
+    this.edges = edges.length / 2;
     let values = options.values;
     if (!values) {
       const degree = new Float32Array(n);
-      for (let i = 0; i < graph.edges.length; i++) degree[graph.edges[i]]++;
+      for (let i = 0; i < edges.length; i++) degree[edges[i]]++;
       values = degree;
     }
     if (values.length !== n) throw rangeError(`Graph values need one value per node (${n})`, 'sciviz');
-    let min = Infinity,
-      max = -Infinity;
-    for (let i = 0; i < n; i++) {
-      if (values[i] < min) min = values[i];
-      if (values[i] > max) max = values[i];
-    }
-    this.#range = options.range
-      ? [options.range[0], options.range[1]]
-      : min < max
-        ? [min, max]
-        : [min - 0.5, min + 0.5];
+    // Finite values only: one infinite value made the range infinite, so every other node took one end colour.
+    const [min, max] = extent(values);
+    this.#range = rangeOption(options.range, 'Graph range') ?? (min < max ? [min, max] : [min - 0.5, min + 0.5]);
     this.colormap = resolveColormap(options.colormap);
     const rgb = hexColor(options.edgeColor ?? '#7f8ea3'),
       opacity = options.edgeOpacity ?? 0.35;
@@ -588,10 +596,11 @@ export class GraphLayer implements Drawable {
     if (!(opacity >= 0 && opacity <= 1)) throw rangeError('Graph edgeOpacity must be in [0, 1]', 'sciviz');
     this.#edge = [SRGBToLinear(rgb[0]), SRGBToLinear(rgb[1]), SRGBToLinear(rgb[2]), opacity];
     this.#size = options.nodeSize ?? 4;
-    if (!(this.#size > 0)) throw rangeError('Graph nodeSize must be above 0', 'sciviz');
+    if (!(this.#size > 0) || !Number.isFinite(this.#size))
+      throw rangeError(`Graph nodeSize must be a finite number above 0, got ${this.#size}`, 'sciviz');
     this.#bounds = options.bounds ?? boundsOf(positions);
     this.#positions = positions.slice();
-    this.#edges = Uint32Array.from(graph.edges);
+    this.#edges = edges;
     this.#nodeValues = Float32Array.from(values);
     this.#build();
   }
@@ -599,8 +608,11 @@ export class GraphLayer implements Drawable {
   #build(): void {
     const device = this.#renderer.device!,
       limit = device.limits.maxStorageBufferBindingSize;
-    if (this.#edges.byteLength > limit)
-      throw rangeError(`Graph of ${this.edges} edges is over this GPU's storage limit of ${limit} bytes`, 'sciviz');
+    if (Math.max(this.#edges.byteLength, this.#positions.byteLength, this.#nodeValues.byteLength) > limit)
+      throw rangeError(
+        `Graph of ${this.nodes} nodes and ${this.edges} edges is over this GPU's storage limit of ${limit} bytes`,
+        'sciviz',
+      );
     const storage = (bytes: number) =>
       device.createBuffer({
         size: Math.max(16, Math.ceil(bytes / 16) * 16),
@@ -680,13 +692,13 @@ export class GraphLayer implements Drawable {
   }
 
   /** @internal */
-  prepare(context: GpuContext): void {
-    const v = this.#values,
-      ratio = (globalThis as { devicePixelRatio?: number }).devicePixelRatio ?? 1;
+  prepare(context: GpuContext, renderer: SciRenderer): void {
+    const v = this.#values;
     v.set(this.#model, 0);
-    v.set([this.#range[0], this.#range[1], this.#size * (Number.isFinite(ratio) && ratio > 0 ? ratio : 1), 0], 16);
+    // Node size in CSS pixels: the target's pixels per CSS pixel, never window.devicePixelRatio (SciRenderer.cssScale).
+    v.set([0, 0, this.#size * renderer.cssScale(context.width), 0], 16);
     v.set(this.#edge, 20);
-    v.set([0, 0, 0, 0], 24);
+    v.set([...rangeUniform(this.#range), 0], 24);
     this.#renderer.device!.queue.writeBuffer(this.#uniform, 0, v);
   }
 
@@ -760,6 +772,8 @@ export function boundsOf(positions: ArrayLike<number>): Bounds {
   for (let i = 0; i < positions.length; i += 3)
     for (let a = 0; a < 3; a++) {
       const v = positions[i + a];
+      // A position past the largest float32 is infinite once stored; framing it left nothing drawable.
+      if (!Number.isFinite(v)) continue;
       if (v < b[a * 2]) b[a * 2] = v;
       if (v > b[a * 2 + 1]) b[a * 2 + 1] = v;
     }
@@ -778,6 +792,13 @@ export function graphLayer(
   options: GraphLayerOptions = {},
 ): GraphLayer {
   const layer = new GraphLayer(figure.renderer, graph, positions, options);
+  // The figure takes the layer before the renderer draws it: a refused layer (a 2D chart, a disposed figure) is freed.
+  try {
+    figure.addLayer(layer);
+  } catch (error) {
+    layer.dispose();
+    throw error;
+  }
   figure.renderer.add(layer);
-  return trackSpecLayer(figure, 'graph', [graph, positions, options], figure.addLayer(layer));
+  return trackSpecLayer(figure, 'graph', [graph, positions, options], layer);
 }

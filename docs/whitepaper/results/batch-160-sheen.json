@@ -15,7 +15,7 @@
     },
     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
     "browserName": "chromium",
-    "browserVersion": "157.0.4341.42",
+    "browserVersion": "157.0.4341.46",
     "requestedChannel": "msedge",
     "launchArgs": [],
     "powerPreference": "high-performance",
@@ -23,6 +23,7 @@
     "headless": true
   },
   "margo": {
+    "adapter": {},
     "backend": "webgpu",
     "draws": 19,
     "primitives": 20,
@@ -31,19 +32,19 @@
   },
   "nativeWebGL2": {
     "code": "unsupported",
-    "message": "PBRModel requires WebGPU; use a browser that supports it"
+    "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
   },
   "metrics": {
     "pixels": 262144,
-    "absolute": 1119468,
-    "square": 33899646,
-    "max": 167,
-    "mae": 1.4234771728515625,
-    "rmse": 6.565487717396565,
-    "foreground": 60922,
-    "foregroundAbsolute": 1119468,
-    "foregroundMae": 6.125143626276222,
-    "changed": 53834
+    "absolute": 1057125,
+    "square": 32409491,
+    "max": 119,
+    "mae": 1.3442039489746094,
+    "rmse": 6.4195637623854696,
+    "foreground": 60921,
+    "foregroundAbsolute": 1057125,
+    "foregroundMae": 5.7841302670671855,
+    "changed": 53833
   },
   "compat": {
     "family": "sheen",
@@ -57,12 +58,12 @@
         "vendor": "margo-webgl2",
         "architecture": "webgl2",
         "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-        "description": "WebGL2 compatibility layer on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
         "fallback": false
       },
       "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
       "browserName": "chromium",
-      "browserVersion": "157.0.4341.42",
+      "browserVersion": "157.0.4341.46",
       "requestedChannel": "msedge",
       "launchArgs": [],
       "powerPreference": "high-performance",
@@ -71,6 +72,12 @@
       "compat": true
     },
     "margo": {
+      "adapter": {
+        "vendor": "margo-webgl2",
+        "architecture": "webgl2",
+        "device": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "description": "WebGL2 compatibility layer (full) on ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)"
+      },
       "backend": "webgpu",
       "draws": 19,
       "primitives": 20,
@@ -79,19 +86,19 @@
     },
     "nativeWebGL2": {
       "code": "unsupported",
-      "message": "PBRModel requires WebGPU; use a browser that supports it"
+      "message": "PBRModel requires WebGPU; use a browser that supports it; see https://margoengine.com/errors#webgpu"
     },
     "metrics": {
       "pixels": 262144,
-      "absolute": 1119468,
-      "square": 33899646,
-      "max": 167,
-      "mae": 1.4234771728515625,
-      "rmse": 6.565487717396565,
-      "foreground": 60922,
-      "foregroundAbsolute": 1119468,
-      "foregroundMae": 6.125143626276222,
-      "changed": 53834
+      "absolute": 1057125,
+      "square": 32409491,
+      "max": 119,
+      "mae": 1.3442039489746094,
+      "rmse": 6.4195637623854696,
+      "foreground": 60921,
+      "foregroundAbsolute": 1057125,
+      "foregroundMae": 5.7841302670671855,
+      "changed": 53833
     }
   },
   "viewer": {
@@ -150,5 +157,52 @@
     "commit": "8f492390ddc7a2ae221a1369ef560589cf8c70fb",
     "model": "SheenTestGrid",
     "license": "CC0-1.0, Eric Chadwick, 2023"
+  },
+  "likeForLike": {
+    "domain": "RGB bytes after Khronos PBR Neutral and pow(x, 1/2.2), one sample per pixel; all pixels, black background",
+    "sceneSha256": "3e100588e56f29983c3db08cf62128495c2a2f6ddf633488e85884f5754cb240",
+    "referenceSha256": "240715ff0a53416190448056a5aa7eeb767a0d7b2f52aa0a0a77e4ca17dc529a",
+    "hardware": {
+      "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "webgpu": {
+        "vendor": "nvidia",
+        "architecture": "ampere",
+        "device": "",
+        "description": "",
+        "fallback": false
+      },
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "browserName": "chromium",
+      "browserVersion": "157.0.4341.46",
+      "requestedChannel": "msedge",
+      "launchArgs": [],
+      "powerPreference": "high-performance",
+      "hostPlatform": "win32",
+      "headless": true
+    },
+    "margo": {
+      "adapter": {},
+      "backend": "webgpu",
+      "draws": 19,
+      "primitives": 20,
+      "width": 512,
+      "height": 512
+    },
+    "transfer": {
+      "rewrittenEncodes": 3,
+      "samples": 1
+    },
+    "metrics": {
+      "pixels": 262144,
+      "absolute": 218842,
+      "square": 2944566,
+      "max": 103,
+      "mae": 0.27827199300130206,
+      "rmse": 1.9349959404481398,
+      "foreground": 59693,
+      "foregroundAbsolute": 218842,
+      "foregroundMae": 1.2220416687607145,
+      "changed": 18753
+    }
   }
 }

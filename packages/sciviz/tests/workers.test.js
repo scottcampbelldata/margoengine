@@ -194,3 +194,31 @@ test('pre-abort, running abort, deadlines, errors and disposal release dedicated
   assert.equal(session.disposed, true);
   await assert.rejects(session.value.read(), { code: 'state' });
 });
+
+test('cyclic reader arguments reject with a coded error instead of overflowing the stack', async () => {
+  const input = await file('../../../examples/assets/sciviz/head.nrrd'),
+    options2 = { resolve: async () => new Uint8Array() };
+  options2.self = options2;
+  let created = 0;
+  await assert.rejects(
+    readInWorker('loadNRRD', [input, options2], {
+      ...options,
+      worker: () => {
+        created++;
+        return worker();
+      },
+    }),
+    (error) =>
+      error instanceof RangeError && /contain themselves/.test(error.message) && /errors#sciviz/.test(error.message),
+  );
+  // A shared, acyclic object is copied, not refused.
+  const shared = { a: 1 },
+    { readerBuffers, encodeReader } = await import('../src/reader-wire.ts');
+  assert.deepEqual(readerBuffers([shared, shared, input]), [input.buffer]);
+  assert.equal(encodeReader([shared, shared], new Map()).items.length, 2);
+  const loop = [];
+  loop.push(loop);
+  assert.throws(() => readerBuffers(loop), /contain themselves/);
+  assert.throws(() => encodeReader(loop, new Map()), /contain themselves/);
+  assert.ok(created <= 1);
+});

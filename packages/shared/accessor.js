@@ -1,4 +1,4 @@
-// glTF 2.0 accessor tables and the one component read (specification section 3.6.2), shared by the gltf and gltf-pro
+// glTF 2.0 accessor tables and the one component read (specification section 3.6.2), shared by the gltf and gltf/pbr
 // loaders and the exporters GLB readers. Null-prototype tables, so an untrusted type name never finds an inherited key.
 
 /** Components per element, keyed by accessor `type`. */

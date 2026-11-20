@@ -17,7 +17,11 @@ test('HTML shares rendered depth, projects anchors, bounds capacity and removes 
   assert.throws(() => overlay.add(dom.window.document.createElement('span')), /capacity/);
   overlay.remove(label);
   assert.equal(label.element.isConnected, false);
+  // The shared scene depth restores itself: a restored overlay keeps its lease, so the plugin it shares stays the same.
+  const depth = h.engine.plugins.get('optional:scene-depth');
+  assert.ok(depth);
   overlay.onDeviceRestored();
+  assert.equal(h.engine.plugins.get('optional:scene-depth'), depth, 'device restore replaced the shared scene depth');
   h.frame();
   await new Promise((resolve) => setImmediate(resolve));
   overlay.dispose();

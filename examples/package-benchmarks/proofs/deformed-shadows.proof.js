@@ -5,10 +5,11 @@
 //  - shadows: core-mesh casters with `distance` set, and core meshes plus a custom `drawShadow` source with no `distance`,
 //    record every GPU call of @margoengine/shadows: identical. Only core meshes and no `distance` is the intended change
 //    (cascades fitted to the meshes' bounding sphere); the proof checks it differs and reports the fitted last split.
-// Skinned and morphed gltf-pro casters needed no change (Shadows reads `primitive.deformed`); gltf-pro-lighting-hooks.proof.js
-// still records gltf-pro + shadows identical, and gltf-pro now takes lightPBR from packages/shared.
+// Skinned and morphed gltf/pbr casters needed no change (Shadows reads `primitive.deformed`); gltf-pbr-lighting-hooks.proof.js
+// still records gltf/pbr + shadows identical, and gltf/pbr now takes lightPBR from packages/shared.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/deformed-shadows.proof.js [ref] [pin] [--current]
-// Pinned: 38d448e against 282e751, the commit that made this claim. --current: 667d1a26 against the working tree (2cd81c1
+// --current advanced to 8c71da0556 (67e90fef9d before core's vertex stage kept a finite normal at a zero determinant, KB-GLTFA B1; 1bfb44bdd before Shadows' soft filter read its tap counts and focus from the frame uniform).
+// Pinned: 38d448e against 282e751, the commit that made this claim. --current: 1bfb44bdd against the working tree (7588d9dd25 before the VAT entry's position was @invariant; 1fdb559080 before shadow casters' positions were @invariant; 667d1a26 and 2cd81c1
 // before the PCSS search spanned to the nearest caster, claims.md); 56ee987 changed VAT to PBR Neutral; a126213/43aa191 changed shadow sampling and its pixel-scale uniform (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, current, golden } from './compare.js';
@@ -16,7 +17,7 @@ import { mockGPU, context, passes } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { box } from '../../../packages/core/dist/index.js';
 
-const { ref, pin } = refs('38d448e', '282e751', '1fdb559080'); // 38d448e: the commit before 5l.j
+const { ref, pin } = refs('38d448e', '282e751', '8c71da0556'); // 38d448e: the commit before 5l.j
 async function rig() {
   const gpu = mockGPU(),
     store = await TransformStore.create(32),

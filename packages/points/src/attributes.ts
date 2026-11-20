@@ -2,7 +2,10 @@
 // ramps, 16-bit RGB to 8-bit, and distance / path / area / height measures between picked points. Plain data in,
 // RGBA bytes out (pass them as `colors` with `colorComponents: 4`).
 
-/** ASPRS standard point classes (LAS 1.4 R15, table 17), by class number. */
+/**
+ * ASPRS standard point classes, by class number: LAS 1.4 R15 table 17 (point formats 6 to 10), which adds 19 to 22,
+ * with 8 and 12 named as table 9 (formats 0 to 5) names them; formats 6 to 10 reserve those two and flag overlap apart.
+ */
 export const ASPRS_CLASSES: Readonly<Record<number, string>> = {
   0: 'Created, never classified',
   1: 'Unclassified',
@@ -23,6 +26,10 @@ export const ASPRS_CLASSES: Readonly<Record<number, string>> = {
   16: 'Wire-structure connector (insulator)',
   17: 'Bridge deck',
   18: 'High noise',
+  19: 'Overhead structure',
+  20: 'Ignored ground',
+  21: 'Snow',
+  22: 'Temporal exclusion',
 };
 
 /** Default classification colours (sRGB), by class; classes without one are grey. */
@@ -46,6 +53,10 @@ export const CLASSIFICATION_COLORS: Readonly<Record<number, readonly [number, nu
   16: [120, 220, 220],
   17: [150, 100, 70],
   18: [255, 40, 160],
+  19: [200, 140, 220],
+  20: [130, 100, 70],
+  21: [235, 245, 255],
+  22: [110, 110, 140],
 };
 
 /** Options of `classificationColors`. */

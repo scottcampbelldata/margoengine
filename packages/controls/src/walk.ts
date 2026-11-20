@@ -16,6 +16,7 @@ import { clamp } from '@margoengine/math/mathutils';
 import {
   Controls,
   documentOf,
+  windowOf,
   type ControlElement,
   type EventTargetLike,
   type InputEventListener,
@@ -26,11 +27,12 @@ import { MAX_PITCH, turn } from './steer.js';
 import { basis } from './view.js';
 import type { V3 } from './math.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 
 // The base class and the dollhouse orbit class, typed from this entry too.
 export type { Controls, OrbitControls };
 
-/** A core mesh or a gltf-pro `PBRModel` (also @margoengine/materials meshes) the walker collides with. */
+/** A core mesh or a gltf/pbr `PBRModel` (also @margoengine/materials meshes) the walker collides with. */
 export type WalkCollider = Mesh | ModelLike;
 /** `walk` is first-person walking with collision; `dollhouse` is an orbit view over the whole scene. */
 export type WalkMode = 'walk' | 'dollhouse';
@@ -40,7 +42,7 @@ export interface WalkControlsOptions {
   element?: ControlElement | null;
   /** Keyboard target. Default: the element's document. */
   keyTarget?: EventTargetLike | null;
-  /** What the walker collides with. Default: every visible core mesh and every attached gltf-pro model. */
+  /** What the walker collides with. Default: every visible core mesh and every attached gltf\/pbr model. */
   colliders?: readonly WalkCollider[] | null;
   /** Ride whatever the walker stands on as it moves and turns, and collide with this frame's transforms. Default true. */
   carry?: boolean;
@@ -68,6 +70,7 @@ interface Candidate {
 
 const HEAD = 0.1; // top of the head above the eye
 const SKIN = 1e-4; // extra clearance left after a push
+const TERMINAL = 50; // fastest fall, m/s
 const STEP_SLACK = 1e-3; // float tolerance on the step height
 const RING = 0.9; // ground rays sit on a ring at 0.9 x radius around the centre
 const MOUSE = 0.0022,
@@ -92,7 +95,7 @@ const deadzone = (v: number | undefined): number =>
 
 /**
  * Kinematic first-person walker for architectural walkthroughs and simple games, Wasm-free: collision runs on the CPU
- * against the cached @margoengine/bvh trees of core meshes and gltf-pro models (the Raycaster's own caches).
+ * against the cached @margoengine/bvh trees of core meshes and gltf/pbr models (the Raycaster's own caches).
  * Eye height is held by nine vertical ground rays (centre + a ring at 0.9 x radius), steps up to `stepHeight` are
  * climbed and eased, steeper than `maxSlope` is not walkable, and a capsule from `stepHeight` to the top of the head
  * slides along walls, counters and glass in sub-steps of at most half the radius (no tunnelling).
@@ -135,7 +138,7 @@ export class WalkControls extends Controls {
   dollhouseElevation = 0.9;
   /** Flat world bounds [minX, minY, minZ, maxX, maxY, maxZ] the dollhouse frames (e.g. `model.bounds`). Default: the colliders. */
   dollhouseBounds: ArrayLike<number> | null = null;
-  /** What the walker collides with; null (default) is every visible core mesh and attached gltf-pro model. */
+  /** What the walker collides with; null (default) is every visible core mesh and attached gltf\/pbr model. */
   colliders: readonly WalkCollider[] | null;
   /**
    * Ride whatever the walker stands on: its move and turn since the last update carry the feet and the heading, and a
@@ -207,7 +210,7 @@ export class WalkControls extends Controls {
 
   constructor(engine: EngineKernel, options: WalkControlsOptions = {}) {
     super(engine, options.element);
-    if (!this.engine) throw new TypeError('WalkControls needs an Engine');
+    if (!this.engine) throw typeError('WalkControls needs an Engine', 'controls-arguments');
     this.keyTarget = options.keyTarget ?? null;
     this.colliders = options.colliders ?? null;
     this.carry = options.carry ?? true;
@@ -238,15 +241,18 @@ export class WalkControls extends Controls {
     const doc = documentOf(element),
       keys = this.keyTarget ?? doc;
     this.doc = doc;
-    return [
-      [element, 'pointerdown', this.onDown],
-      [element, 'pointermove', this.onMove],
-      [element, 'pointerup', this.onUp],
-      [element, 'pointercancel', this.onUp],
-      [doc, 'pointerlockchange', this.onLockChange],
-      [keys, 'keydown', this.onKeyDown],
-      [keys, 'keyup', this.onKeyUp],
-    ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+    const view = windowOf(keys, element),
+      bindings = [
+        [element, 'pointerdown', this.onDown],
+        [element, 'pointermove', this.onMove],
+        [element, 'pointerup', this.onUp],
+        [element, 'pointercancel', this.onUp],
+        [doc, 'pointerlockchange', this.onLockChange],
+        [keys, 'keydown', this.onKeyDown],
+        [keys, 'keyup', this.onKeyUp],
+      ] as Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+    if (view) bindings.push([view, 'blur', this.onBlur]);
+    return bindings;
   }
   protected override onDisconnect(): void {
     this.pressed.clear();
@@ -279,7 +285,7 @@ export class WalkControls extends Controls {
   /** Eases to the dollhouse orbit view (framing `dollhouseBounds` or the colliders) or back to the saved walk pose. */
   setMode(mode: WalkMode): this {
     if (mode !== 'walk' && mode !== 'dollhouse')
-      throw new RangeError(`Unknown walk mode ${mode}; use 'walk' or 'dollhouse'`);
+      throw rangeError(`Unknown walk mode ${mode}; use 'walk' or 'dollhouse'`, 'controls-arguments');
     if (mode === this.modeValue) return this;
     const c = this.camera,
       from = this.current();
@@ -288,7 +294,7 @@ export class WalkControls extends Controls {
       this.saved = this.anim ? this.anim.to : from;
       const b = this.dollhouseBounds ?? this.bounds();
       if (b && (b.length !== 6 || !Array.from(b).every(Number.isFinite)))
-        throw new RangeError('dollhouseBounds must be 6 finite numbers');
+        throw rangeError('dollhouseBounds must be 6 finite numbers', 'controls-arguments');
       const centre: V3 = b ? [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2] : ([...c.position] as V3);
       const radius = b ? Math.max(Math.hypot(b[3] - b[0], b[4] - b[1], b[5] - b[2]) / 2, 1) : 10;
       const half = (c.fov * Math.PI) / 360,
@@ -573,8 +579,9 @@ export class WalkControls extends Controls {
         this.transitionTime,
       ].every(Number.isFinite);
     if (!ok)
-      throw new RangeError(
+      throw rangeError(
         'Invalid WalkControls settings (heights, radius and speeds must be finite and >= 0, crouchHeight <= eyeHeight, maxSlope in [0, PI/2], dollhouseElevation in (0, PI/2))',
+        'controls-arguments',
       );
   }
   private current(): Pose {
@@ -863,16 +870,30 @@ export class WalkControls extends Controls {
       this.grounded_ = false;
       v[1] = 0;
     }
-    v[1] = Math.max(v[1] - this.gravity * h, -50);
-    let next = feet + v[1] * h;
-    if (v[1] > 0) {
-      const head = feet + this.height + HEAD,
-        ceiling = this.probe(x, z, head, next + this.height + HEAD, true);
+    // Exact constant-acceleration step (y += v h - g h^2 / 2, v -= g h), split where the fall reaches its terminal
+    // speed, so a jump's apex v^2 / 2g and its air time do not depend on the frame rate.
+    const g = this.gravity,
+      v0 = v[1];
+    let next: number;
+    if (v0 <= -TERMINAL) {
+      v[1] = -TERMINAL;
+      next = feet - TERMINAL * h;
+    } else {
+      const free = g > 0 ? Math.min(h, (v0 + TERMINAL) / g) : h;
+      next = feet + v0 * free - (g * free * free) / 2 - TERMINAL * (h - free);
+      v[1] = free < h ? -TERMINAL : v0 - g * free;
+    }
+    if (v0 > 0) {
+      // Rising at the start of the step: the head may meet a ceiling at the apex inside it, not only at its end.
+      const top = g > 0 && v0 < g * h ? feet + (v0 * v0) / (2 * g) : next,
+        head = feet + this.height + HEAD,
+        ceiling = this.probe(x, z, head, top + this.height + HEAD, true);
       if (ceiling < Infinity) {
         next = Math.max(feet, ceiling - this.height - HEAD - SKIN);
         v[1] = 0;
+        return next;
       }
-      return next;
+      if (v[1] > 0) return next;
     }
     // Land only on floors crossed during this sub-step (a fall beside a slab must not land on its underside), except on the
     // first update, which also lifts a camera placed up to a step too low onto the floor.
@@ -1022,6 +1043,10 @@ export class WalkControls extends Controls {
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     this.pressed.delete(event.code);
   };
+  /** Keys held when the window loses focus never send keyup: let them all go. */
+  private readonly onBlur = (): void => {
+    this.pressed.clear();
+  };
 }
 
 interface RuntimeMesh {
@@ -1029,7 +1054,7 @@ interface RuntimeMesh {
   geometry: { vertices: Float32Array; indices: Uint32Array; bounds: Float32Array } | null;
 }
 
-/** Local box of interleaved positions (stride 6 for core geometry, 20 for gltf-pro), cached per geometry. */
+/** Local box of interleaved positions (stride 6 for core geometry, 20 for gltf/pbr), cached per geometry. */
 function localBounds(key: object, v: Float32Array, stride: number, cache: number): Float64Array {
   let box = cache ? localBoxes.get(key) : undefined;
   if (!box) {

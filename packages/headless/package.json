@@ -36,6 +36,10 @@
       "types": "./dist/ffmpeg.d.ts",
       "import": "./dist/ffmpeg.js"
     },
+    "./ffmpeg-files": {
+      "types": "./dist/ffmpeg-files.d.ts",
+      "import": "./dist/ffmpeg-files.js"
+    },
     "./stage": {
       "types": "./dist/stage.d.ts",
       "import": "./dist/stage.js"
@@ -59,6 +63,10 @@
     "./gif": {
       "types": "./dist/gif.d.ts",
       "import": "./dist/gif.js"
+    },
+    "./look": {
+      "types": "./dist/look.d.ts",
+      "import": "./dist/look.js"
     }
   },
   "files": [
@@ -78,7 +86,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js headless",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:real-ffmpeg": "npm run build && node scripts/test-real-ffmpeg.mjs",
+    "test:real-ffmpeg": "npm run build && node scripts/test-real-ffmpeg.mjs && node scripts/test-real-ffmpeg-files.mjs",
     "test:gpu": "cd ../.. && node packages/headless/tests/browser-check.mjs && node packages/headless/tests/node-check.mjs",
     "prepack": "npm run build",
     "test:gpu:gif": "cd ../.. && node packages/headless/tests/gif-gpu.mjs",
@@ -94,5 +102,8 @@
     "@margoengine/exporters": {
       "optional": true
     }
+  },
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
   }
 }

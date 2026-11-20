@@ -1,7 +1,7 @@
 // Hemisphere and ambient light, a ShaderEffect like Fog: sky colour above,
 // ground colour below, mixed by the surface normal's height, times an intensity. It takes the place of the built-in
-// ambient: core's flat `lighting.ambient` x `lighting.radiance[3]` on core meshes and terrain, and gltf-pro's fixed
-// sky gradient (its hemisphere ambient, clearcoat and sheen defaults and a light probe's fallback, through gltf-pro's
+// ambient: core's flat `lighting.ambient` x `lighting.radiance[3]` on core meshes and terrain, and gltf/pbr's fixed
+// sky gradient (its hemisphere ambient, clearcoat and sheen defaults and a light probe's fallback, through gltf/pbr's
 // `sky` lighting hook) on models, materials meshes and VAT crowds. Where image-based light (EnvironmentLighting, an
 // environment behind LightProbes, sky ambient) replaces the built-in ambient, the hemisphere adds to it;
 // LightProbes without an environment use it outside their volumes.
@@ -13,7 +13,7 @@ import { linearColor, type ColorInput } from './color.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
-/** Binding of the hemisphere uniform in core's group 0 and gltf-pro's group 2. */
+/** Binding of the hemisphere uniform in core's group 0 and gltf/pbr's group 2. */
 export const HEMISPHERE_BINDING = 144;
 /** The core-shader term the hemisphere writes (`n`: the shaded normal); LightProbes and SSAO recognise it. */
 export const HEMISPHERE_TERM = 'margoSkyLight(n)';
@@ -42,8 +42,8 @@ const builtIn = /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?|\*skyAmbient\.rg
 /**
  * Hemisphere light: ambient light of `sky` colour from above and `ground` colour from below,
  * blended by `0.5 + 0.5 n.y` and scaled by `intensity`. `engine.use(light)` lights core meshes and terrain and owns the
- * GPU uniform; `light.add(model)` adds gltf-pro models, materials meshes and VAT crowds. It replaces the built-in
- * ambient (core's `lighting.ambient` x `radiance[3]`, gltf-pro's fixed sky gradient); with EnvironmentLighting, an
+ * GPU uniform; `light.add(model)` adds gltf/pbr models, materials meshes and VAT crowds. It replaces the built-in
+ * ambient (core's `lighting.ambient` x `radiance[3]`, gltf/pbr's fixed sky gradient); with EnvironmentLighting, an
  * environment behind LightProbes or sky ambient it adds to their light; LightProbes without an environment use it
  * outside their volumes. Colours and intensity are live (a uniform write, no recompile). One per engine.
  */

@@ -8,12 +8,14 @@ import { GeometryData } from "@margoengine/geometry";
 import { DecalGeometryOptions } from "@margoengine/geometry/extras";
 import { LineOptions } from "@margoengine/lines";
 import { Trail, TrailOptions } from "@margoengine/lines/trail";
-import { Texture } from "@margoengine/materials";
+import { EnvMapSource, Texture } from "@margoengine/materials";
 import { ColorInput } from "@margoengine/math";
 import { PointCloud } from "@margoengine/points";
+import { ShaderMaterial, ShaderMaterialOptions, ShaderUniform } from "@margoengine/shader/glsl-material";
+import { RawMesh } from "@margoengine/shader/raw";
 import { ReactNode } from "react";
 
-export function Decal(_arg1: DecalProps): import("react").JSX.Element | null;
+export function Decal(_arg2: DecalProps): import("react").JSX.Element | null;
 
 export interface DecalProps extends PbrMaterialProps, DecalGeometryOptions {
     mesh?: MeshHandle;
@@ -30,6 +32,16 @@ export function Edges(_arg0: EdgesProps): import("react").JSX.Element | null;
 export interface EdgesProps extends Omit<LineOptions, 'positions' | 'mode'> {
     threshold?: number;
     tolerance?: number;
+    onError?: (error: unknown) => void;
+}
+
+export const ScreenQuad: import("react").ForwardRefExoticComponent<ScreenQuadProps & import("react").RefAttributes<RawMesh<ShaderMaterial>>>;
+
+export interface ScreenQuadProps extends Partial<Omit<ShaderMaterialOptions, 'uniforms'>> {
+    material?: ShaderMaterial;
+    uniforms?: Record<string, ShaderUniform>;
+    renderOrder?: number;
+    visible?: boolean;
     onError?: (error: unknown) => void;
 }
 
@@ -54,6 +66,16 @@ export interface TrailProps extends TrailOptions {
     children?: ReactNode;
     onError?: (error: unknown) => void;
 }
+
+export function Wireframe(_arg1: WireframeProps): import("react").JSX.Element | null;
+
+export interface WireframeProps extends Omit<LineOptions, 'positions' | 'mode'> {
+    simplify?: boolean;
+    tolerance?: number;
+    onError?: (error: unknown) => void;
+}
+
+export const screenQuadVertexShader = "attribute vec3 position;\nattribute vec2 uv;\nvarying vec2 vUv;\nvoid main() {\n  vUv = uv;\n  gl_Position = vec4(position.xy, 0.0, 1.0);\n}";
 
 // Not exported from this entry, but used by the exports above:
 
@@ -84,6 +106,8 @@ interface PbrMaterialProps {
     emissiveMap?: Texture | TextureSource | null;
     emissive?: string | readonly number[];
     emissiveIntensity?: number;
+    envMap?: EnvMapSource | null;
+    envMapIntensity?: number;
 }
 
 type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;

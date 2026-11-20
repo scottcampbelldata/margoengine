@@ -87,3 +87,22 @@ test('scientific grids reject rotated, sheared, permuted and nonlinear sample tr
     assert.equal(calls, 0);
   }
 });
+
+test('scientific grids reject zero-extent multi-sample axes and malformed dimensions', { timeout: 1000 }, () => {
+  const wcs = fitsWCS({ CRPIX1: 1, CRPIX2: 1, CRPIX3: 1, CDELT1: 0, CDELT2: 1, CDELT3: 1 }, 3);
+  assert.throws(
+    () => fitsGrid({ data: new Float32Array(12), dims: [3, 2, 2], world: (p) => wcs.world(p) }),
+    (e) => e instanceof RangeError && /^Scientific grid axis with several samples has zero physical extent/.test(e.message),
+  );
+  for (const dims of [
+    [2.5, 2, 1],
+    [0, 1, 1],
+    [-1, -5, 1],
+    [5, 1],
+  ])
+    assert.throws(
+      () => mrcGrid({ data: new Float32Array(5), dims, world: (p) => p }),
+      (e) => e instanceof RangeError && /^Scientific grid dimensions must be three positive integers/.test(e.message),
+    );
+  assert.deepEqual(mrcGrid({ data: [1, 2], dims: [2, 1, 1], world: (p) => p }).bounds, [0, 1, 0, 1, 0, 1]);
+});

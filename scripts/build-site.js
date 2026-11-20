@@ -3,14 +3,14 @@
 // voxel sandbox under /voxel/ and the example pages) each under their own folder.
 // Run `npm run build:packages` first. Deploy the folder with `npx wrangler pages deploy site/dist`.
 // `npm run build:site` measures every package (entry-sizes.mjs) and a basic glTF scene's network log
-// (basic-scene-network.mjs, which takes the GPU lock only around its browser) first, for /sizes.html.
+// (basic-scene-network.mjs) first, for /sizes.html.
 import { execFileSync } from 'node:child_process';
 import { cp, rm, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { readSizesInputs, sizesPage } from './build-sizes.js';
 import { writeSitePages } from './build-llms.mjs';
 import { buildGallery, buildVoxel, site } from './site-gallery.mjs';
-import { scientificPages } from './support/sciviz-site-pages.mjs';
+import { demoExampleFolders, demoPackageFolders, demoPages } from './support/site-routes.mjs';
 
 const out = resolve('site/dist');
 await rm(out, { recursive: true, force: true });
@@ -34,28 +34,11 @@ else
   console.warn(
     `sizes.html left out: ${stale.map(([file, record]) => `${file} measured ${record.commit}`).join(', ')}, HEAD is ${head} (npm run build:site measures first)`,
   );
+// The page lists live in scripts/support/site-routes.mjs, which scripts/check-site-links.mjs reads too.
 // A relative base lets each demo run from its subfolder.
 await site({ root: 'examples/gameplay-sandbox', base: './', build: { outDir: `${out}/gameplay-sandbox` } });
 await buildVoxel(out);
-const pages = [
-  'character-animation',
-  'robot-expressive',
-  'flight-helmet',
-  'windy-meadow',
-  'split-screen',
-  'minimap',
-  'batched-mesh',
-  'clipping-planes',
-  'scene-targets',
-  'depth-texture',
-  'animation-formats',
-  'texture-formats',
-  'compute-lab',
-  ...scientificPages,
-  'ui-game',
-  'weather',
-  'dual-viewport',
-];
+const pages = demoPages;
 await site({
   configFile: false,
   root: 'examples',
@@ -75,7 +58,7 @@ await site({
   base: './',
   build: { outDir: `${out}/demos/earth`, target: 'es2022' },
 });
-for (const name of ['dof', 'tonemap', 'animator'])
+for (const name of demoPackageFolders)
   await site({
     configFile: false,
     root: `packages/${name}/examples`,
@@ -83,7 +66,7 @@ for (const name of ['dof', 'tonemap', 'animator'])
     publicDir: false,
     build: { outDir: `${out}/demos/${name}`, target: 'es2022' },
   });
-for (const name of ['orrery', 'storm-light', 'molten-words', 'cathedral-light', 'biomes'])
+for (const name of demoExampleFolders)
   await site({
     configFile: false,
     root: `examples/${name}`,

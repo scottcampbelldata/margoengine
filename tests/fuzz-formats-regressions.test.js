@@ -10,10 +10,10 @@ import { isNamed } from '../scripts/fuzz/harness.js';
 import { headless, margoWithScene, toGLB } from '../scripts/fuzz/formats.js';
 import { fakeJPEG, ultraSeeds, wasm } from '../scripts/fuzz/targets-formats.js';
 import { parseGLTF as parseLight } from '../packages/gltf/dist/index.js';
-import { parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
-import { prepareGLTF } from '../packages/gltf-pro/dist/prepare.js';
-import { modelFromPrepared } from '../packages/gltf-pro/dist/worker.js';
-import { instancing } from '../packages/gltf-pro/dist/instancing.js';
+import { parseGLTFAsync } from '../packages/gltf/dist/pbr.js';
+import { prepareGLTF } from '../packages/gltf/dist/prepare.js';
+import { modelFromPrepared } from '../packages/gltf/dist/worker.js';
+import { instancing } from '../packages/gltf/dist/pbr-instancing.js';
 import { parseMargo } from '../packages/blender/dist/index.js';
 import { decodeMeshoptBuffer } from '../packages/decoders/dist/index.js';
 import { decodeDraco, isDecoderCrash, transcodeKTX2 } from '../packages/decoders/dist/codec.js';
@@ -53,7 +53,7 @@ function triangle(edit = () => {}, bin = new Uint8Array(Float32Array.of(0, 0, 0,
   edit(doc);
   return toGLB(doc, bin);
 }
-/** gltf-pro on the main thread and through its parse-worker job (prepareGLTF, cloned like postMessage, then the model). */
+/** gltf/pbr on the main thread and through its parse-worker job (prepareGLTF, cloned like postMessage, then the model). */
 async function bothPaths(bytes, pattern, options = {}) {
   await named(() => parseGLTFAsync(kernel, bytes.slice(), options), pattern);
   await named(async () => {

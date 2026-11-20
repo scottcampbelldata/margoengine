@@ -25,8 +25,10 @@ export class GridTileMap implements EnginePlugin {
     static attach(instance: EngineKernel, options: GridTileMapOptions): GridTileMap;
     get map(): TileMapData;
     setMap(map: TileMapData): void;
+    setTarget(target: TileTarget | undefined): void;
     setAtlas(tileset: string, atlas: TileAtlas): void;
     setup(engine: Engine): void;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
     dispose(): void;

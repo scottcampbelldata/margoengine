@@ -1,34 +1,28 @@
 // WGSL of the virtual shadow map. Receivers project a world position into light space, walk the clipmap from the level
 // the pixel's footprint asks for to the first level whose page is resident, and compare in the physical pool. Comments
 // stay out of the WGSL: they would ship.
-import { effectDeclarations, effectLight, type ShadowEffect, type ShadowFilter } from './shader.js';
+import { effectDeclarations, effectLight, pcss, type ShadowEffect, type ShadowFilter } from './shader.js';
 
 // Each filter's last step, after the level walk (found: pool uv, texel size, level) and the receiver-plane bias, as in the
 // root's shader.ts: the same taps, in world units of light space, each tap reading the page table for its own position,
 // so a tap across a page edge reads the neighbouring page. PCSS: Fernando 2005; PCF: Reeves, Salesin & Cook 1987; noise:
-// Jimenez 2014. The search and the penumbra stop at one page.
+// Jimenez 2014. The search and the penumbra stop at one page. The loops, tap counts and focus are the root's (shader.ts
+// `pcss`, `samples`, `blockerSamples` and `focus` in the frame's soft vec4f).
 const filters: Record<ShadowFilter, string> = {
-  soft: /* wgsl */ `
-  let noise=shadowNoise(position);let angle=noise*6.2831853;let turn=vec2f(cos(angle),sin(angle));
+  soft: pcss({
+    start: /* wgsl */ `let noise=shadowNoise(position);let angle=noise*6.2831853;let turn=vec2f(cos(angle),sin(angle));
   let size=shadowFrame.levels[level].w;let lightSize=shadowFrame.settings.x;
   let search=clamp(lightSize*max(reference-shadowFrame.nearest[level/4u][level%4u],0.0)*range,found.z,size);
-  let dimensions=vec2f(textureDimensions(shadowMap));
-  var blockers=0.0;var sum=0.0;var direction=turn;
-  for(var j=0u;j<16u;j++){
-    let offset=direction*sqrt(f32(j)/16.0)*search;direction=shadowGolden*direction;
-    let page=shadowPage(light.xy+offset,level);
+  let dimensions=vec2f(textureDimensions(shadowMap));`,
+    read: /* wgsl */ `let page=shadowPage(light.xy+offset,level);
     if(page.x<0){continue;}
     let d=textureLoad(shadowMap,vec2i(page.xy*dimensions),0);
     let plane=min(dot(offset,slope),0.0)/range;
-    if(d<reference+plane){sum+=d-plane;blockers+=1;}
-  }
-  if(blockers==0){return 1;}
-  let radius=clamp(lightSize*(reference-sum/blockers)*range,found.z,size);var visibility=0.0;direction=turn;
-  for(var j=0u;j<32u;j++){
-    let offset=direction*sqrt((f32(j)+0.5)/32.0)*radius;direction=shadowGolden*direction;
-    visibility+=shadowTap(light.xy+offset,level,reference+min(dot(offset,slope),0.0)/range);
-  }
-  return visibility/32.0;`,
+    if(d<reference+plane){sum+=d-plane;blockers+=1;}`,
+    penumbra: (gap) => `lightSize*${gap('range')}`,
+    radius: 'clamp(penumbra,found.z,size)',
+    tap: 'visibility+=shadowTap(light.xy+offset,level,reference+min(dot(offset,slope),0.0)/range);',
+  }),
   pcf: /* wgsl */ `
   let h=vec2f(found.z*0.5);let a=vec2f(h.x,-h.y);
   return (shadowTap(light.xy-h,level,reference-dot(h,slope)/range)+shadowTap(light.xy+h,level,reference+dot(h,slope)/range)+shadowTap(light.xy-a,level,reference-dot(a,slope)/range)+shadowTap(light.xy+a,level,reference+dot(a,slope)/range))*0.25;`,
@@ -47,7 +41,7 @@ const filters: Record<ShadowFilter, string> = {
 const NORMAL_TEXELS = 0.25,
   DEPTH_STEP = '0.00000095367431640625';
 const frame =
-  'struct ShadowFrame {view:mat4x4f,right:vec4f,up:vec4f,forward:vec4f,settings:vec4f,info:vec4f,levels:array<vec4f,16>,inverse:mat4x4f,nearest:array<vec4f,4>}\nfn shadowReach()->f32 {return shadowFrame.info.w;}';
+  'struct ShadowFrame {view:mat4x4f,right:vec4f,up:vec4f,forward:vec4f,settings:vec4f,info:vec4f,levels:array<vec4f,16>,inverse:mat4x4f,soft:vec4f,nearest:array<vec4f,4>}\nfn shadowReach()->f32 {return shadowFrame.info.w;}';
 const soft = /* wgsl */ `const shadowGolden=mat2x2f(-0.737368878,0.675490294,-0.675490294,-0.737368878);
 fn shadowNoise(position:vec3f)->f32 {
   let eye=shadowFrame.view*vec4f(position,1);let pixel=eye.xy/max(-eye.z,0.000001)*shadowFrame.settings.w;

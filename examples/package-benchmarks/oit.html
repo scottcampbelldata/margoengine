@@ -1,14 +1,14 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>OIT GPU check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body>
 <script type="module">
 // Driven by oit-gpu.mjs. Two scenes, each built on a fresh engine and canvas:
-// - 'housing': a 50% translucent housing (gltf-pro BLEND, double-sided, subdivided box) over two opaque gears and one 55%
-//   translucent gear, all from parsePreparedPBR. mode 'sorted' = gltf-pro's per-primitive back-to-front path, 'oit' =
+// - 'housing': a 50% translucent housing (gltf/pbr BLEND, double-sided, subdivided box) over two opaque gears and one 55%
+//   translucent gear, all from parsePreparedPBR. mode 'sorted' = gltf/pbr's per-primitive back-to-front path, 'oit' =
 //   OIT.attach + oit.add(model), 'reference' = the translucent parts split into one node per triangle (centroid
-//   translation), so gltf-pro's sort becomes a per-triangle sort: the reference for popping and colour.
+//   translation), so gltf/pbr's sort becomes a per-triangle sort: the reference for popping and colour.
 // - 'layers': `count` unlit (materials 'basic') translucent planes facing the camera, front to back, over an opaque grey
 //   plane, so colours can be checked against analytic blending. Optional ortho camera, PostStack, TransparentCanvas.
 import {Engine} from '/packages/core/dist/index.js';
-import {parsePreparedPBR} from '/packages/gltf-pro/dist/index.js';
+import {parsePreparedPBR} from '/packages/gltf/dist/pbr.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {planeGeometry,boxGeometry,extrudeGeometry,Shape} from '/packages/geometry/dist/index.js';
 import {OIT} from '/packages/oit/dist/index.js';

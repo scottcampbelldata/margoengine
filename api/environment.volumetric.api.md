@@ -6,6 +6,8 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export const CLOUD_ALBEDO = 0.8;
+
 export interface FoggedEffect {
     setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
     drawTransparent(c: Context, hook: SurfaceTransparency): void;
@@ -24,8 +26,12 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     constructor(options?: VolumetricFogOptions);
     static attach(engine: EngineKernel, options?: VolumetricFogOptions): VolumetricFog;
     get texture(): GPUTexture | undefined;
+    get extinction(): number;
+    get falloff(): number;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     add(target: FoggedModel | FoggedEffect): () => void;
     declarations(group: number): string;
@@ -38,9 +44,19 @@ export class VolumetricFog implements EnginePlugin, SurfaceTransparency {
     [Symbol.dispose]: () => void;
 }
 
+export interface VolumetricFogLightning {
+    light: {
+        readonly position: ArrayLike<number>;
+        readonly color: ArrayLike<number>;
+        readonly intensity: number;
+    };
+    albedo?: number;
+}
+
 export interface VolumetricFogOptions {
     enabled?: boolean;
     density?: number;
+    visibility?: number;
     heightFalloff?: number;
     height?: number;
     color?: Vec3;
@@ -51,12 +67,16 @@ export interface VolumetricFogOptions {
     noiseScale?: number;
     wind?: Vec3;
     range?: number;
+    sky?: {
+        readonly reflectionTexture?: GPUTexture | undefined;
+    } | null;
     grid?: readonly [number, number, number];
     temporal?: number;
     shadows?: VolumetricLightSource;
     lights?: VolumetricLightSource;
     depth?: () => GPUTexture | undefined;
     volumes?: VolumetricMediumSource;
+    lightning?: VolumetricFogLightning;
 }
 
 export interface VolumetricLightSource {

@@ -7,6 +7,8 @@ import { Mesh, Vec3 } from "@margoengine/core";
 import { ShadowOptions } from "@margoengine/shadows";
 import { ReactNode } from "react";
 
+export function BakeShadows(): null;
+
 export const ContactShadows: import("react").ForwardRefExoticComponent<ContactShadowsProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
 
 export interface ContactShadowsProps extends MeshProps, ErrorProps, ContactGroundOptions {
@@ -15,6 +17,14 @@ export interface ContactShadowsProps extends MeshProps, ErrorProps, ContactGroun
 export function Shadows(props: ShadowsProps): null;
 
 export type ShadowsProps = Omit<ShadowOptions, 'cascades'>;
+
+export function SoftShadows(_arg0: SoftShadowsProps): null;
+
+export interface SoftShadowsProps {
+    size?: number;
+    samples?: number;
+    focus?: number;
+}
 
 // Not exported from this entry, but used by the exports above:
 

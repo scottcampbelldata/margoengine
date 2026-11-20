@@ -4,7 +4,7 @@ import { parseUSDA } from '../dist/index.js';
 import { curves } from '../dist/curves.js';
 import { composition } from '../dist/compose.js';
 import { pointInstancers } from '../dist/instancer.js';
-import { GLTFAsset } from '@margoengine/gltf-pro/asset';
+import { GLTFAsset } from '@margoengine/gltf/asset';
 const parse = (body, options = {}) =>
   parseUSDA('#usda 1.0\n(metersPerUnit=1 upAxis="Y")\n' + body, { extensions: [curves({ segments: 2 })], ...options });
 const part = (asset) => {

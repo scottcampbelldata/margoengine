@@ -32,17 +32,29 @@ export interface OMETIFFStack {
 const bad = (s: string): never => {
   throw rangeError(`OME-TIFF: ${s}; check OME-XML and companion files`, 'sciviz');
 };
+/** OME UnitsLength symbols in metres (OME Data Model 2016-06, UnitsLength; SI prefixes and the inch-based units). */
+const metres: Record<string, number> = { Å: 1e-10, thou: 2.54e-5, li: 0.0254 / 12, in: 0.0254, ft: 0.3048, yd: 0.9144 };
+Object.assign(metres, { mi: 1609.344, ua: 149597870700, ly: 9460730472580800, pc: 3.0856775814913673e16, pt: 0.0254 / 72 });
+'Y Z E P T G M k h da _ d c m µ n p f a z y'.split(' ').forEach((prefix, i) => {
+  const scale = [24, 21, 18, 15, 12, 9, 6, 3, 2, 1, 0, -1, -2, -3, -6, -9, -12, -15, -18, -21, -24][i];
+  metres[(prefix === '_' ? '' : prefix) + 'm'] = 10 ** scale;
+});
+metres['μm'] = metres['µm'];
 const child = (e: XMLElement, n: string) => e.children.find((c) => c.name === n);
 const positive = (s: string | undefined, d = 1) => {
   const n = Number(s ?? d);
   if (!Number.isSafeInteger(n) || n < 1) bad('invalid dimension');
   return n;
 };
-/** Opens classic TIFF or BigTIFF OME stacks. TiffData overrides DimensionOrder, including multi-file UUIDs. */
+/**
+ * Opens classic TIFF or BigTIFF OME stacks. TiffData overrides DimensionOrder, including multi-file UUIDs. LZMA,
+ * Zstandard and WebP planes load their decoders on demand.
+ */
 export async function readOMETIFF(input: FileInput, options: OMETIFFOptions = {}): Promise<OMETIFFStack> {
+  const { loadTIFFCodecs } = await import('@margoengine/decoders/tiff-codecs');
   const bytes = await whole(input, options),
     maxPixels = Math.floor((options.maxBytes ?? 64 * 1024 * 1024) / 8),
-    file = openTIFF(bytes, { maxPixels }),
+    file = openTIFF(bytes, { maxPixels, codecs: await loadTIFFCodecs(bytes, options) }),
     xml = file.descriptions[0];
   const root = readXMLTree(xml, 'OME-TIFF'),
     ome = root.children.find((c) => c.name === 'OME');
@@ -95,6 +107,17 @@ export async function readOMETIFF(input: FileInput, options: OMETIFFOptions = {}
   };
   const mapping = new Map<number, { ifd: number; name?: string }>(),
     files = new Map<string, Promise<TIFFFile>>();
+  const getFile = (name: string): Promise<TIFFFile> => {
+    if (!files.has(name))
+      files.set(
+        name,
+        (async () => {
+          const bytes = await whole(await resource(name, input, options), options);
+          return openTIFF(bytes, { maxPixels, codecs: await loadTIFFCodecs(bytes, options) });
+        })(),
+      );
+    return files.get(name)!;
+  };
   const tiffData = pixels!.children.filter((c) => c.name === 'TiffData');
   if (!tiffData.length) bad('no TiffData');
   for (const td of tiffData) {
@@ -106,44 +129,43 @@ export async function readOMETIFF(input: FileInput, options: OMETIFFOptions = {}
     if (![z, c, time].every((n, i) => Number.isInteger(n) && n >= 0 && n < [size.Z, effectiveC, size.T][i]))
       bad('TiffData origin outside dimensions');
     const base = encode({ Z: z, C: c, T: time }),
-      count = Number(
-        t.PlaneCount ?? (t.IFD !== undefined ? 1 : Math.min(file.length, size.Z * effectiveC * size.T - base)),
-      ),
       uuid = child(td, 'UUID'),
-      name = uuid?.attributes.FileName;
+      name = uuid?.attributes.FileName,
+      sameUUID = uuid?.text.trim() === ome!.attributes.UUID;
+    if (uuid && !sameUUID && !name) bad('external UUID needs FileName for resource resolution');
+    // PlaneCount defaults to every IFD of the file this TiffData names, or 1 when IFD is given (OME TiffData).
+    const named = name && !sameUUID ? name : undefined,
+      count = Number(
+        t.PlaneCount ??
+          (t.IFD !== undefined
+            ? 1
+            : Math.min((named ? await getFile(named) : file).length, size.Z * effectiveC * size.T - base)),
+      );
     if (
       ![ifd, base, count].every((n) => Number.isSafeInteger(n) && n >= 0) ||
       base + count > size.Z * effectiveC * size.T
     )
       bad('invalid TiffData range');
-    const sameUUID = uuid?.text.trim() === ome!.attributes.UUID;
-    if (uuid && !sameUUID && !name) bad('external UUID needs FileName for resource resolution');
     for (let j = 0; j < count; j++) {
       if (mapping.has(base + j)) bad('duplicate plane mapping');
-      mapping.set(base + j, { ifd: ifd + j, name: name && !sameUUID ? name : undefined });
+      mapping.set(base + j, { ifd: ifd + j, name: named });
     }
   }
   const spacing = ['X', 'Y', 'Z'].map((k) => Number(a[`PhysicalSize${k}`] ?? 1)),
     units = ['X', 'Y', 'Z'].map((k) => a[`PhysicalSize${k}Unit`] ?? 'µm');
   if (spacing.some((n) => !Number.isFinite(n) || n <= 0)) bad('invalid physical spacing');
-  const getFile = (name: string): Promise<TIFFFile> => {
-    if (!files.has(name))
-      files.set(
-        name,
-        (async () => openTIFF(await whole(await resource(name, input, options), options), { maxPixels }))(),
-      );
-    return files.get(name)!;
+  /** The Channel holding sample index c, and that channel's first sample index. */
+  const channelOf = (c: number): [number, number] => {
+    let channel = 0,
+      offset = 0;
+    while (c >= offset + channels[channel].samplesPerPixel) offset += channels[channel++].samplesPerPixel;
+    return [channel, offset];
   };
   const plane = async (z = 0, c = 0, t = 0): Promise<TIFFSamples> => {
     options.signal?.throwIfAborted();
     if (![z, c, t].every((n, i) => Number.isInteger(n) && n >= 0 && n < [size.Z, size.C, size.T][i]))
       bad('plane selection outside dimensions');
-    let channel = 0,
-      offset = 0;
-    while (c >= offset + channels[channel].samplesPerPixel) {
-      offset += channels[channel].samplesPerPixel;
-      channel++;
-    }
+    const [channel, offset] = channelOf(c);
     const map = mapping.get(encode({ Z: z, C: channel, T: t }));
     if (!map) bad('plane is not mapped');
     const source = map!.name ? await getFile(map!.name) : file,
@@ -183,14 +205,24 @@ export async function readOMETIFF(input: FileInput, options: OMETIFFOptions = {}
       if (!Number.isSafeInteger(n) || n * 8 > (options.maxBytes ?? 64 * 1024 * 1024)) bad('volume exceeds maxBytes');
       const data = new Float64Array(n);
       for (let z = 0; z < size.Z; z++) data.set(await plane(z, c, t), z * size.X * size.Y);
-      const planes = pixels!.children.filter((p) => p.name === 'Plane'),
-        firstPlane = planes.find(
+      // Plane TheC counts Channels, not samples. A length Position converts to the PhysicalSize unit; a
+      // 'reference frame' (the default) or 'pixel' position is used as written.
+      const channel = channelOf(c)[0],
+        firstPlane = pixels!.children.find(
           (p) =>
+            p.name === 'Plane' &&
             Number(p.attributes.TheZ ?? 0) === 0 &&
-            Number(p.attributes.TheC ?? 0) === c &&
+            Number(p.attributes.TheC ?? 0) === channel &&
             Number(p.attributes.TheT ?? 0) === t,
         ),
-        origin = ['X', 'Y', 'Z'].map((k) => Number(firstPlane?.attributes[`Position${k}`] ?? 0));
+        origin = ['X', 'Y', 'Z'].map((k, i) => {
+          const at = firstPlane?.attributes,
+            value = Number(at?.[`Position${k}`] ?? 0),
+            from = metres[at?.[`Position${k}Unit`] ?? ''],
+            to = metres[units[i]];
+          if (!Number.isFinite(value)) bad('invalid Plane position');
+          return from && to ? (value * from) / to : value;
+        });
       return { data, dims: [size.X, size.Y, size.Z], world: (p) => p.map((v, i) => origin[i] + v * spacing[i]) };
     },
   };

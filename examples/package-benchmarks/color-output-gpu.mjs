@@ -1,6 +1,6 @@
 // Real-GPU check of ColorOutput (Display P3 / HDR canvas) from @margoengine/environment, after npm run build:packages,
-// on AC power, holding the GPU lock. Headed by default so matchMedia reports the real display (HEADLESS=1 to skip):
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/color-output-gpu.mjs
+// on AC power. Headed by default so matchMedia reports the real display (HEADLESS=1 to skip):
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/color-output-gpu.mjs
 // MARGO_BROWSER=chrome for Chrome (default Edge on Windows, see docs/benchmarking.md). Writes examples/package-benchmarks/results/color-output-gpu-<channel>.json.
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';

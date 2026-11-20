@@ -624,7 +624,7 @@ export function extrudeText(text: string, options: ExtrudeTextOptions): Extruded
   let font: FontLike =
     options.font instanceof FontOutlines || typeof (options.font as any).getGlyphContours === 'function'
       ? (options.font as FontLike)
-      : parseFontOutlines(options.font as ArrayBuffer | ArrayBufferView);
+      : parseFontOutlines(options.font as ArrayBuffer | ArrayBufferView, { openType: options.openType });
   if (options.variations) {
     if (!font.withVariations) fontError('custom font has no withVariations provider');
     font = font.withVariations(options.variations);

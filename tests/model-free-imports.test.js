@@ -1,6 +1,6 @@
 // Pay only for what you import: `Material` (@margoengine/materials) and `Animation` (@margoengine/animation) name
-// gltf-pro's model module, but an app that imports only one of them must not bundle the glTF model class or its file
-// reading (the accessor reader and the meshopt decoder). A mesh drawn with a Material does bundle them: gltf-pro's
+// gltf/pbr's model module, but an app that imports only one of them must not bundle the glTF model class or its file
+// reading (the accessor reader and the meshopt decoder). A mesh drawn with a Material does bundle them: gltf/pbr's
 // PBRModel is the renderer that draws it, so the third case checks the markers find that code when it is there.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { build } from 'vite';
 
 // A message only PBRModel's constructor holds, and one only GLTFAsset's accessor reader holds.
 const MODEL = 'give each node one parent and valid child indices';
-const ASSET = /gltf-pro\/dist\/asset-[\w-]+\.js$/;
+const ASSET = /gltf\/dist\/asset-[\w-]+\.js$/;
 // The meshopt decoder loads by a dynamic import, only for a glTF whose buffer views declare a meshopt extension.
 const MESHOPT = /decoders\/dist\/(meshopt[\w-]*|index)\.js$/;
 

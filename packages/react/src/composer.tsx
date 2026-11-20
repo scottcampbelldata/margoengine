@@ -17,7 +17,7 @@ import type { Afterimage as AfterimageEffect, AfterimageOptions } from '@margoen
 import type { PostStack } from '@margoengine/post/stack';
 import { useScene, useCommit, useResourceEffect, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
-import { MargoError } from '@margoengine/math/errors';
+import { fault, typeError } from '../../shared/errors.js';
 
 // Stack order: HDR effects, the display effect, then LDR effects (PostStack's rule); TAA attaches on its own, last.
 const order = [
@@ -122,6 +122,11 @@ interface RecordEntry {
   options: Options;
   lut?: CubeLUT | string | null;
   sources: Map<Model, SourceBinding>;
+  /**
+   * The quality-tier preset values the native constructor filled in for options the props left unset. A prop change
+   * keeps them, and a removed prop goes back to its preset value.
+   */
+  base?: Options;
   /** Owned by the composer's PostStack, which detaches it. */
   stacked?: boolean;
 }
@@ -137,6 +142,8 @@ export interface EffectClass {
 const priority = Object.fromEntries(order.map((kind, index) => [kind, index])) as Record<Kind, number>;
 // Effects that add each PBR model as a source.
 const modelKinds = new Set<Kind>(['ssao', 'gtao', 'ssr', 'ssgi', 'taa']);
+// Effects whose constructor fills unset options from the quality-tier preset of the same key (shared/preset.js).
+const presetReaders = new Set<Kind>(['ssao', 'gtao', 'ssr', 'ssgi']);
 declare const GPUBufferUsage: { VERTEX: number; STORAGE: number; COPY_DST: number };
 
 // Native static glTF vertex buffers are VERTEX-only. TAA's snapshot compute
@@ -184,10 +191,7 @@ function velocitySource(scene: Scene, model: Model) {
           input.deformed ||
           input.vertices.byteLength !== primitive.vertex.size
         )
-          throw new MargoError(
-            'state',
-            'TAA requires matching static PBR vertex data or a storage-capable deformed buffer; remove TAA or use static meshes.',
-          );
+          throw fault('state', 'TAA requires matching static PBR vertex data or a storage-capable deformed buffer; remove TAA or use static meshes', 'react-usage');
         used.add(primitive.vertex);
         let copy = copies.get(primitive.vertex);
         if (copy && copy.vertices !== input.vertices) {
@@ -245,7 +249,9 @@ function velocitySource(scene: Scene, model: Model) {
 
 // A lifecycle coordinator over the native plugins. One effect (plus TAA) attaches on its own; two or more share one
 // HDR scene capture through a PostStack, in stack order, so any combination works (one display effect, one of SMAA
-// and FXAA). A change in which effects are present rebuilds the stack; option changes update the live effects.
+// and FXAA). While two or more stay, a change in which effects are present goes through the live stack's removeEffect
+// and addEffect, so only an added effect is built and compiles; going between one effect and two rebuilds, since a
+// lone effect attaches on its own. Option changes update the live effects.
 function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
   const passes = new Set<Pass>(),
     records = new Map<Kind, RecordEntry>();
@@ -253,7 +259,7 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     revision = 0,
     scheduled = false,
     queue = Promise.resolve(),
-    stack: { key: string; plugin: PostStack } | null = null;
+    stack: PostStack | null = null;
   const live = (current = lease) =>
     !!current && current === lease && current.active && !current.closed && !scene.engine.disposed;
   const report = (failure: unknown, pass?: Pass) => {
@@ -269,7 +275,7 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
   // The stack detaches its effects first; their own dispose then frees what they hold.
   const clearStack = () => {
     if (!stack) return;
-    stack.plugin.dispose();
+    stack.dispose();
     stack = null;
     for (const [kind, record] of [...records].reverse())
       if (record.stacked) {
@@ -283,7 +289,7 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     records.clear();
   };
   const depth = () => {
-    if (stack) return stack.plugin.depthTexture;
+    if (stack) return stack.depthTexture;
     const record = records.get('dof') ?? records.get('ssao') ?? records.get('bloom');
     return record ? (record.effect as DepthOfFieldEffect | SSAOEffect | BloomEffect).depthTexture : undefined;
   };
@@ -326,18 +332,15 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     const kinds = new Set<Kind>();
     for (const pass of desired) {
       if (kinds.has(pass.kind))
-        throw new MargoError(
-          'state',
-          `EffectComposer cannot attach duplicate ${pass.kind} passes; keep one of each kind.`,
-        );
+        throw fault('state', `EffectComposer cannot attach duplicate ${pass.kind} passes; keep one of each kind`, 'react-usage');
       kinds.add(pass.kind);
     }
     if (kinds.has('smaa') && kinds.has('fxaa'))
-      throw new TypeError('EffectComposer takes one anti-aliasing effect; keep <SMAA> or <FXAA>, not both');
+      throw typeError('EffectComposer takes one anti-aliasing effect; keep <SMAA> or <FXAA>, not both', 'react-arguments');
     if (kinds.has('ssao') && kinds.has('gtao'))
-      throw new TypeError('EffectComposer takes one ambient occlusion effect; keep <SSAO> or <GTAO>, not both');
+      throw typeError('EffectComposer takes one ambient occlusion effect; keep <SSAO> or <GTAO>, not both', 'react-arguments');
     if (desired.some((pass) => pass.kind === 'motionBlur' && !pass.options.velocity) && !kinds.has('taa'))
-      throw new TypeError('MotionBlur reads TAA motion vectors; add <TAA> to the same EffectComposer or pass velocity');
+      throw typeError('MotionBlur reads TAA motion vectors; add <TAA> to the same EffectComposer or pass velocity', 'react-arguments');
   };
   const update = (record: RecordEntry, pass: Pass, options: Options) => {
     record.pass = pass;
@@ -345,8 +348,11 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     if (changed) {
       // FXAA has no options, so FXAA props never change here.
       const target = (record.effect as unknown as { options: Options }).options;
-      for (const key of Object.keys(target)) if (!(key in options)) delete target[key];
-      Object.assign(target, options);
+      const base = record.base ?? {};
+      for (const key of Object.keys(target)) if (!(key in options) && !(key in base)) delete target[key];
+      Object.assign(target, base, options);
+      // As the constructor's preset fill does: an option left undefined takes the preset value.
+      for (const key of Object.keys(base)) target[key] ??= base[key];
       record.options = options;
       if (pass.kind === 'taa') (record.effect as TAAEffect).reset();
     }
@@ -356,6 +362,11 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     }
   };
   const created = (record: RecordEntry) => {
+    // The values the native constructor took from the tier preset (shared/preset.js), read at the same moment.
+    const preset = presetReaders.has(record.pass.kind)
+      ? (globalThis as { margoPreset?: Record<string, Options | undefined> }).margoPreset?.[record.pass.kind]
+      : undefined;
+    if (preset) record.base = { ...preset };
     records.set(record.pass.kind, record);
     if (record.pass.kind === 'tonemap' && record.pass.lut !== undefined) {
       (record.effect as TonemapEffect).setLUT(record.pass.lut);
@@ -370,10 +381,7 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     let attaching: Pass | undefined;
     try {
       if (desired.length && (scene.engine.backend !== 'webgpu' || !scene.engine.gpu))
-        throw new MargoError(
-          'unsupported',
-          'EffectComposer requires WebGPU; use an engine created with a WebGPU backend.',
-        );
+        throw fault('unsupported', 'EffectComposer requires WebGPU; use an engine created with a WebGPU backend', 'react-usage');
       validate(desired);
       const effects = desired.filter((pass) => pass.kind !== 'taa'),
         stacked = effects.length > 1;
@@ -401,18 +409,43 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
         ...(pass.kind === 'taa' && !pass.options.depth && kinds.size > 1 ? { depth } : {}),
         ...(pass.kind === 'motionBlur' && !pass.options.velocity ? { velocity } : {}),
       });
-      // Effects whose stack (or lack of one) no longer matches go first; TAA is kept unless its pass changed.
-      const key = stacked ? effects.map((pass) => pass.kind).join() : '';
-      if (stack && (stack.key !== key || effects.some((pass) => records.get(pass.kind)?.pass !== pass))) clearStack();
-      for (const [kind, record] of [...records].reverse()) {
+      // Tonemap reads `source` once, when it is created, so a new source means a new Tonemap.
+      const replaced = (kind: Kind, record: RecordEntry) => {
         const next = desired.find((pass) => pass.kind === kind);
-        // Tonemap reads `source` once, when it is created.
-        const source = kind === 'tonemap' && next && record.options.source !== optionsFor(next).source;
-        if (!record.stacked && (!next || next !== record.pass || source || (stacked && kind !== 'taa'))) {
+        return !next || next !== record.pass || (kind === 'tonemap' && record.options.source !== optionsFor(next).source);
+      };
+      // With one effect or none left the stack goes. A live stack that stays drops, through removeEffect, each effect
+      // whose pass left or changed; the others keep their pipelines and targets.
+      if (stack && !stacked) clearStack();
+      for (const [kind, record] of [...records].reverse())
+        if (stack && record.stacked && replaced(kind, record)) {
+          stack.removeEffect(record.effect);
           dispose(record);
           records.delete(kind);
         }
-      }
+      // Effects attached on their own go when replaced or when a stack takes them; TAA stays beside a stack.
+      for (const [kind, record] of [...records].reverse())
+        if (!record.stacked && (replaced(kind, record) || (stacked && kind !== 'taa'))) {
+          dispose(record);
+          records.delete(kind);
+        }
+      // New effects join the live stack at their place in stack order. The stack holds the kept effects in that order,
+      // so each new one goes at its index in `effects`.
+      if (stacked && stack)
+        for (let index = 0; index < effects.length; index++) {
+          const pass = effects[index];
+          if (records.has(pass.kind)) continue;
+          attaching = pass;
+          const options = optionsFor(pass),
+            effect = new (classes.get(pass.kind)!)(options as never);
+          try {
+            stack.addEffect(effect, index);
+          } catch (failure) {
+            effect.dispose();
+            throw failure;
+          }
+          created({ pass, effect, options, sources: new Map(), stacked: true });
+        }
       if (stacked && !stack) {
         const made: RecordEntry[] = [];
         try {
@@ -423,13 +456,10 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
             made.push({ pass, effect: new Effect(options as never), options, sources: new Map(), stacked: true });
           }
           attaching = undefined;
-          stack = {
-            key,
-            plugin: Stack!.attach(
-              scene.engine as unknown as EngineKernel,
-              made.map((r) => r.effect),
-            ),
-          };
+          stack = Stack!.attach(
+            scene.engine as unknown as EngineKernel,
+            made.map((r) => r.effect),
+          );
         } catch (failure) {
           for (const record of made) record.effect.dispose();
           throw failure;
@@ -488,7 +518,7 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
 }
 
 type Composer = ReturnType<typeof composer>;
-const Context = createContext<Composer | null>(null);
+const Context = /* @__PURE__ */ createContext<Composer | null>(null);
 /** The effect composer component. */
 export function EffectComposer({ children, enabled = true, onError }: EffectComposerProps) {
   const scene = useScene(),
@@ -507,7 +537,7 @@ export function usePass<T extends Effect>(
   lut?: CubeLUT | string | null,
 ) {
   const manager = useContext(Context);
-  if (!manager) throw new MargoError('state', 'Post effects require <EffectComposer>; render them inside one.');
+  if (!manager) throw fault('state', 'Post effects require <EffectComposer>; render them inside one', 'react-usage');
   const pass = useMemo<Pass>(() => ({ kind, load, options: {} }), [manager, kind]);
   pass.load = load;
   pass.options = options;

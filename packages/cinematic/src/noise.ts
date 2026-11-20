@@ -172,12 +172,21 @@ export class CameraNoise {
       return packed;
     });
   }
-  /** Stage hook. @throws RangeError when `gain` or `speed` was set out of range. */
-  update(pose: CameraPose, delta: number): void {
-    const { gain, speed, values, view } = this;
+  /**
+   * Moves the noise clock by `delta` seconds times `speed` without touching a pose. The stage hook runs it; pass the
+   * noise to `seek` from `@margoengine/cutscene/seek` as an `extra` clock to start a film scene on the shake a continuous
+   * run shows. @throws RangeError when `gain` or `speed` was set out of range.
+   */
+  advanceTime(delta: number): void {
+    const { gain, speed } = this;
     if (!(gain >= 0 && gain < Infinity) || !(speed >= 0 && speed < Infinity))
       throw new RangeError('Invalid camera noise; pass a gain and speed of 0 or more');
     this.time += delta * speed;
+  }
+  /** Stage hook. @throws RangeError when `gain` or `speed` was set out of range. */
+  update(pose: CameraPose, delta: number): void {
+    this.advanceTime(delta);
+    const { gain, values, view } = this;
     for (let axis = 0; axis < 6; axis++) {
       const bands = this.bands[axis];
       let sum = 0;

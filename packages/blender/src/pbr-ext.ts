@@ -1,11 +1,12 @@
-// @margoengine/blender/pbr-ext: a static .margo scene drawn with glTF Pro's physical material shader, so the
+// @margoengine/blender/pbr-ext: a static .margo scene drawn with glTF PBR's physical material shader, so the
 // Principled BSDF's transmission, IOR, coat, sheen and subsurface that the add-on writes as glTF material extensions
 // (KHR_materials_transmission, _ior, _clearcoat, _sheen, _diffuse_transmission, _volume and _volume_scatter) draw as
 // authored. `loadMargo` keeps the plain PBR shader and ignores them; this entry pulls in the physical shader's WGSL
 // only for apps that import it.
 import type { EngineKernel } from "@margoengine/core";
-import { GLTFAsset, PBRModel } from "@margoengine/gltf-pro/model";
+import { GLTFAsset, PBRModel } from "@margoengine/gltf/pbr-model";
 import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
 import { decodeImages, maxBytes } from "./container.js";
 import { decodeMargo, type MargoOptions } from "./index.js";
 
@@ -27,8 +28,8 @@ export interface MargoPBROptions extends MargoOptions {
 }
 
 /**
- * Decodes `.margo` bytes and attaches the scene to `engine` as a glTF Pro `PBRModel` drawn with the physical material
- * shader (`@margoengine/gltf-pro/extended`), which reads the extensions in margoMaterialExtensions. A scene without
+ * Decodes `.margo` bytes and attaches the scene to `engine` as a glTF PBR `PBRModel` drawn with the physical material
+ * shader (`@margoengine/gltf/extended-materials`), which reads the extensions in margoMaterialExtensions. A scene without
  * them draws as with parseMargo. WebGPU only.
  *
  * @example
@@ -40,10 +41,12 @@ export async function parseMargoPBR(
   { signal, maxNodes }: MargoPBROptions = {},
 ): Promise<PBRModel> {
   signal?.throwIfAborted();
-  const asset = decodeMargo(input, { maxNodes });
+  // The model is built after the awaits below: it goes in the scene this call started in.
+  const scope = captureScene(engine),
+    asset = decodeMargo(input, { maxNodes });
   // Both settle before either error is thrown: images decoded while the shader import fails must still be closed.
   const [shader, decoded] = await Promise.allSettled([
-    import("@margoengine/gltf-pro/extended"),
+    import("@margoengine/gltf/extended-materials"),
     decodeImages(asset.images, signal),
   ]);
   if (shader.status === "rejected") {
@@ -58,8 +61,8 @@ export async function parseMargoPBR(
   try {
     signal?.throwIfAborted();
     const gltf = new GLTFAsset(asset.document, [], undefined, { materials: extendedMaterials }, undefined, maxNodes);
-    model = new PBRModel(engine, gltf, images, asset.geometry);
-    engine.use(model);
+    model = scope.run(() => new PBRModel(engine, gltf, images, asset.geometry));
+    scope.run(() => engine.use(model!));
     return model;
   } catch (error) {
     model?.dispose();
@@ -80,7 +83,8 @@ export async function loadMargoPBR(
   { fetch: get = globalThis.fetch, ...options }: MargoPBROptions & { fetch?: typeof fetch } = {},
 ): Promise<PBRModel> {
   options.signal?.throwIfAborted();
-  const target = new URL(url, globalThis.location?.href);
+  const scope = captureScene(engine),
+    target = new URL(url, globalThis.location?.href);
   if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
       ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoPBR",
@@ -90,5 +94,6 @@ export async function loadMargoPBR(
     signal: options.signal,
     label: ".margo download",
   });
-  return parseMargoPBR(engine, bytes, options);
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(() => parseMargoPBR(engine, bytes, options));
 }

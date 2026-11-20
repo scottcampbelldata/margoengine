@@ -8,6 +8,7 @@ import { BiomeWorld, defineBiome } from '../dist/index.js';
 import { presets, presetWorlds } from '../dist/presets.js';
 import {
   BiomeView,
+  disturbanceResponse,
   MATERIALS,
   MAX_GROUND_MATERIALS,
   clipmapLevels,
@@ -20,7 +21,7 @@ import {
   terrainColorsFor,
   viewTile,
 } from '../dist/view.js';
-import { riverWater, riverWaterOptions } from '../dist/rivers.js';
+import { paintRiverbed, riverWater, riverWaterOptions } from '../dist/rivers.js';
 import { canopyCorners, canopyCover, canopyShare, CANOPY_KINDS, darkenTile } from '../dist/cover.js';
 
 test('ground materials are the unique ground layers in first-use order, all of them', () => {
@@ -771,7 +772,21 @@ test('dispose removes the streaming plugin from its own scene, not the active sc
   const world = await BiomeWorld.create({ size: [256, 256], biomes: [presets.temperate], climate: { latitude: 45 } }),
     calls = [];
   let streaming;
-  const own = { removePlugin: (name) => calls.push(['own scene', name]) },
+  // A scene as core's for scene scopes: use() registers, then runs a scope's setup (attach learns its scene there and
+  // registers inside it). This mock has no GPU, so the terrain's own setup does not run, as before.
+  const owned = new Set(),
+    register = (plugin) => {
+      owned.add(plugin);
+      if (plugin.name.startsWith('biomes-view:')) streaming = plugin;
+      if (plugin.name.startsWith('scene-scope:')) plugin.setup(engine);
+    },
+    own = {
+      use: register,
+      removePlugin: (name) => {
+        for (const p of owned) if (p.name === name) owned.delete(p);
+        calls.push(['own scene', name]);
+      },
+    },
     engine = {
       backend: 'webgpu',
       gpu: {
@@ -780,13 +795,124 @@ test('dispose removes the streaming plugin from its own scene, not the active sc
         queue: { writeTexture() {} },
       },
       camera: { position: [0, 0, 0] },
-      use(plugin) {
-        streaming = plugin;
-      },
+      use: register,
       removePlugin: (name) => calls.push(['active scene', name]),
-      sceneOf: (plugin) => (plugin === streaming ? own : undefined),
+      sceneOf: (plugin) => (owned.has(plugin) ? own : undefined),
     },
     view = await BiomeView.attach(engine, world, { objects: false, water: false, radius: 1, textureResolution: 16 });
+  // The scene probes of captureScene (packages/shared/scene-scope.js) come and go in the scene active at attach.
+  const before = calls.length;
   view.dispose();
-  assert.deepEqual(calls, [['own scene', streaming.name]]);
+  assert.deepEqual(calls.slice(before), [['own scene', streaming.name]]);
+});
+
+test('regression KB-BIOMES-RIVERSTEP1: a creek fills its carved channel under the banks, one smooth falling surface', () => {
+  // A level floor falling 1.2 percent east, a creek 8 m wide and 1.5 m deep with 3 m banks at z = 256, and its line
+  // drawn as 16 m chords that wander 2 m off the channel (as a relief's lines do). Main stood the water 1.5 m over the
+  // bed sampled on the line: flush with the floor, so it flooded the floor 48 m each side (z-fighting it into broken
+  // stepped bits) and stepped up wherever a chord crossed a bank.
+  const floor = (x) => 20 - 0.012 * x,
+    heightAt = (x, z) => {
+      const d = Math.abs(z - 256);
+      return floor(x) - (d <= 4 ? 1.5 : d < 7 ? 1.5 * (1 - (d - 4) / 3) : 0); // float division: bank slope
+    },
+    width = 129,
+    heights = new Float32Array(width * width);
+  for (let j = 0; j < width; j++) for (let i = 0; i < width; i++) heights[j * width + i] = heightAt(i * 4, j * 4);
+  const points = [];
+  for (let x = 0; x <= 512; x += 16) points.push(x * 1000, (256 + (x % 32 ? 2 : -2)) * 1000);
+  const river = riverWater({
+      bounds: [0, 0, 512, 512],
+      heights,
+      width,
+      depth: width,
+      lines: [Int32Array.from(points)],
+      heightAt,
+      sea: -100,
+    }),
+    cell = 512 / river.width; // float division: metres per cell
+  let last = Infinity;
+  for (let x = 8; x <= 504; x += cell) {
+    const level = river.fill(x, 256);
+    assert.ok(level !== undefined, `water at x ${x}`);
+    assert.ok(level < floor(x) - 0.2 && level > floor(x) - 1.5, `x ${x}: surface ${level} under the floor ${floor(x)}`);
+    assert.ok(level <= last + 1e-6, `x ${x}: the surface never rises downstream (${level} after ${last})`);
+    // Each cell takes its nearest sample of the wandering line, up to 3 m along the course from its own x: 4 cm of fall.
+    if (last !== Infinity) assert.ok(last - level <= 0.012 * cell + 0.05, `x ${x}: no step (${last} to ${level})`);
+    last = level;
+    // The floor 24 m off the line stands over the water: the surface is cut there, not drawn flush with the floor.
+    const i = Math.floor(x / cell), // float division
+      j = Math.floor(280 / cell); // float division
+    assert.ok(river.ground[j * river.width + i] > river.fill(x, 280) + 0.2, `x ${x}: the floor is dry`);
+  }
+});
+
+test('regression KB-BIOMES-RIVERSTEP1: the ground under a creek takes the riverbed material, so far off it is one line', () => {
+  // Main left the ground under the water its own grass: where the terrain's coarse rings point-sampled the 8 m channel
+  // away, the creek drew as broken bits from the air. A surface at 9.9 over ground 9.0 (0.9 m deep), 9.8 (0.1 m), 10.
+  const heights = Float32Array.from([9, 9.8, 10, 12]),
+    weights = [Uint8Array.from([255, 0, 0, 0, 200, 55, 0, 0, 255, 0, 0, 0, 0, 255, 0, 0]), new Uint8Array(16)];
+  paintRiverbed({
+    fill: (x) => (x < 3 ? 9.9 : undefined),
+    origin: [0, 0],
+    texel: 1,
+    width: 4,
+    depth: 1,
+    heightAt: (x) => heights[x],
+    weights,
+    index: 5,
+  });
+  const share = (t) => weights[1][t * 4 + 1];
+  assert.equal(share(0), 255, 'in full 0.9 m under the water');
+  assert.ok(share(1) > 60 && share(1) < 110, `a third of the way in at 0.1 m: ${share(1)}`);
+  assert.equal(share(2), 0, 'none at or over the waterline');
+  assert.equal(share(3), 0, 'none past the water');
+  for (let t = 0; t < 4; t++) {
+    let sum = 0;
+    for (const out of weights) for (let c = 0; c < 4; c++) sum += out[t * 4 + c];
+    assert.equal(sum, 255, `texel ${t} still sums to 255`);
+  }
+});
+
+// `disturbance`: burnt and flooded plants by themselves. The response each kind of part gets, and the refusals.
+test('disturbanceResponse: bark is all stem, conifer and broadleaf crowns start above a base, shrubs and grass burn whole, stone is left alone', () => {
+  assert.equal(disturbanceResponse('procedural:rock', 'stone'), undefined);
+  assert.deepEqual(disturbanceResponse('procedural:conifer', 'bark'), { crownBase: 0, trunkRadius: 1000, stiffness: 2e5 });
+  assert.equal(disturbanceResponse('procedural:conifer', 'foliage').crownBase, 4);
+  // A northern Rockies conifer key's crown starts at its own lowest live branch (scenes plan M8).
+  assert.equal(disturbanceResponse('procedural:douglas-fir/pole', 'foliage', { crownBase: 6 }).crownBase, 6);
+  assert.equal(disturbanceResponse('procedural:douglas-fir/pole', 'bark', { crownBase: 6 }).crownBase, 0);
+  assert.equal(disturbanceResponse('procedural:snag', 'foliage').crownBase, 4);
+  assert.equal(disturbanceResponse('procedural:broadleaf', 'foliage').crownBase, 3);
+  assert.equal(disturbanceResponse('procedural:shrub', 'foliage').crownBase, 0);
+  assert.equal(disturbanceResponse('procedural:shrub', 'foliage').trunkRadius, 0);
+  const grass = disturbanceResponse('procedural:grass', 'foliage');
+  assert.ok(grass.stiffness < disturbanceResponse('procedural:shrub', 'foliage').stiffness, 'grass bends in a flow more than a shrub');
+});
+
+test('disturbance: a cell size outside 0.5 to 1000 is refused before anything loads', async () => {
+  const world = await BiomeWorld.create({ size: [512, 512] }),
+    history = {
+      nx: 2, nz: 2, step: 512, height: new Int32Array(4), seed: 0, years: 10,
+      age: new Uint16Array(4).fill(65535), flood: new Uint16Array(4), stage: new Uint8Array(4),
+    };
+  for (const cell of [0, 0.1, 5000, NaN])
+    await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { disturbance: { history, cell } }), RangeError);
+});
+
+test('wetness: a record that is not a function, a bad rectangle or a look out of range is refused before anything loads', async () => {
+  const world = await BiomeWorld.create({ size: [512, 512] }),
+    record = () => undefined,
+    good = { record, origin: [-256, -256], size: [512, 512] };
+  for (const [wetness, kind] of [
+    [{ ...good, record: 'flood.wetTexture' }, TypeError],
+    [{ ...good, velocity: 3 }, TypeError],
+    [{ ...good, origin: [0] }, RangeError],
+    [{ ...good, size: [512, 0] }, RangeError],
+    [{ ...good, size: [Infinity, 512] }, RangeError],
+    [{ ...good, darkening: 1.5 }, RangeError],
+    [{ ...good, gloss: -0.1 }, RangeError],
+    [{ ...good, dryTime: 0 }, RangeError],
+  ])
+    await assert.rejects(BiomeView.attach({ backend: 'webgpu' }, world, { wetness }), kind, JSON.stringify(wetness));
 });

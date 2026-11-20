@@ -18,13 +18,23 @@ import { CORE_STAGE_GZIP_LIMIT } from '../../scripts/core-budget.js';
 import { LAZY_FILES, LAZY_SPLITS } from '../../scripts/lazy-files.js';
 import { refreshApiSurfaceGzip } from '../../scripts/api-report-scope.mjs';
 import { bundleBytes as bundle, bundleSplit, measureCoreStage } from '../../scripts/measure-size.js';
+import { rebuildStalePackages } from '../../scripts/support/fresh-dist.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 
 const size = async (entry) => ((code) => ({ raw: code.length, gzip: gzipSync(code).length }))(await bundle(entry));
 
-/** Core + stage, every package entry and worker, and every lazily loaded file, measured as described above. */
-export async function measureEntries({ log = console.log } = {}) {
+/**
+ * Core + stage, every package entry and worker, and every lazily loaded file, measured as described above.
+ * The dist is first made to match the sources (`ensureFresh`, default: rebuild the packages whose stamp is stale), so the
+ * figures depend on the source and not on which build a tree last held (KB-API-SURFACE-CHURN1: two lanes at one commit
+ * wrote different Gzip columns into docs/api-surface.md and every push conflicted on it).
+ */
+export async function measureEntries({
+  log = console.log,
+  ensureFresh = () => rebuildStalePackages(root, { label: 'Entry sizes' }),
+} = {}) {
+  await ensureFresh();
   const { raw, gzip } = await measureCoreStage();
   const report = {
     method: 'vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level',

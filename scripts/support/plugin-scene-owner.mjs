@@ -21,10 +21,7 @@ const PHYSICS = 'docs/known-bugs.md, "plugin scene owner (physics)": physics is 
 const SCIVIZ = 'docs/known-bugs.md, "plugin scene owner (sciviz)": sciviz is held out of list 5';
 /** Every open site the check lets through, each by file, exact call text and the known-bugs entry. */
 export const OPEN = [
-  { file: 'packages/physics/src/physics.ts', call: 'engine.removePlugin(this.name)', bug: PHYSICS },
   { file: 'packages/physics/src/next/physics.ts', call: 'engine.removePlugin(this.name)', bug: PHYSICS },
-  { file: 'packages/physics2d/src/physics.ts', call: 'engine.removePlugin(this.name)', bug: PHYSICS },
-  { file: 'packages/ragdoll/src/ragdoll.ts', call: 'engine.removePlugin(this.name)', bug: PHYSICS },
   { file: 'packages/sciviz/src/progressive.ts', call: 'this.#engine?.removePlugin(this.name)', bug: SCIVIZ },
   { file: 'packages/sciviz/src/render.ts', call: 'engine?.removePlugin(this.name)', bug: SCIVIZ },
 ];

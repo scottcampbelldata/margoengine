@@ -1,4 +1,4 @@
-// CPU/network preparation. Run before taking a GPU slot; all real CC0 data stays in ignored test-results.
+// CPU/network preparation. Runs on the CPU; all real CC0 data stays in ignored test-results.
 import { writeFile, mkdir } from 'node:fs/promises';
 import { AssetLibrary } from '../dist/assets.js';
 const root = 'test-results/mcp-assets-proof';

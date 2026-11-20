@@ -4,9 +4,9 @@
 
 ```ts
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
-import { BehaviorGraph, BehaviorGraphOptions } from "@margoengine/gltf-pro/interactivity";
-import { GLTFPhysics } from "@margoengine/gltf-pro/physics";
+import { BehaviorGraph, BehaviorGraphOptions } from "@margoengine/gltf/interactivity";
+import { PBRModel } from "@margoengine/gltf/pbr";
+import { GLTFPhysics } from "@margoengine/gltf/physics";
 
 export class GLTFInteractivity implements EnginePlugin {
     readonly name: string;

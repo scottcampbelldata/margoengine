@@ -1,4 +1,4 @@
-import { SnapshotBuffer, createSnapshot } from '../../packages/net/dist/index.js';
+import { SnapshotBuffer, createSnapshot } from '../../packages/netcode/dist/interpolation.js';
 import { grid } from './layout.js';
 
 export function createWorkload(count = 256) {

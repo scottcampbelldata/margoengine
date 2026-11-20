@@ -243,6 +243,14 @@ export class Puddles extends SurfaceHook {
   }
 
   override onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+
+  /**
+   * Moves the ring clock by `delta` seconds without drawing: all of a frame update. `seek` from
+   * `@margoengine/cutscene/seek` replays these steps, so the rings are where a continuous run has them.
+   */
+  advanceTime(delta: number): void {
     super.onPreUpdate(delta);
     // Wraps after an hour so the rings keep float precision on the GPU; their phases repeat then.
     this.clock = (this.clock + delta) % 3600;

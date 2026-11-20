@@ -69,7 +69,49 @@ test('partition volume and ordered ray lengths count fine regions once, with par
     traceAMR(data, [2, 0.2, 0.2], [-1, 0, 0]).reduce((s, h) => s + (h.exit - h.enter), 0),
     1,
   );
-  assert.deepEqual(traceAMR(data, [-1, 1, 0.2], [1, 0, 0]), []);
+  // Cell-centred convention: each cell owns [lo, hi) and the last cell on an axis also owns the domain's upper
+  // face (index floor((x - lo) / dx) clamped to n - 1), so the hierarchy box is closed and every interior face has
+  // exactly one owner, the upper one. sampleAMR and traceAMR both follow it, so a ray lying in a face meets exactly
+  // the cells sampleAMR returns along it.
+  for (const [origin, direction] of [
+    [
+      [-1, 1, 0.2],
+      [1, 0, 0],
+    ],
+    [
+      [0.2, -1, 1],
+      [0, 1, 0],
+    ],
+    [
+      [1, 0.2, -1],
+      [0, 0, 1],
+    ],
+    [
+      [-1, 0.5, 0.2],
+      [1, 0, 0],
+    ],
+    [
+      [-1, 1, 1],
+      [1, 0, 0],
+    ],
+  ]) {
+    const hits = traceAMR(data, origin, direction);
+    close(
+      hits.reduce((s, h) => s + (h.exit - h.enter), 0),
+      1,
+    );
+    for (const h of hits)
+      for (const t of [h.enter + 1e-9, (h.enter + h.exit) / 2, h.exit - 1e-9])
+        assert.equal(
+          sampleAMR(
+            data,
+            origin.map((o, k) => o + t * direction[k]),
+          ),
+          data.blocks[h.block].values[0],
+        );
+  }
+  assert.deepEqual(traceAMR(data, [-1, 1.0000001, 0.2], [1, 0, 0]), []);
+  assert.ok(Number.isNaN(sampleAMR(data, [0.5, 1.0000001, 0.2])));
   const holes = createAMR([constant(0, [0, 1, 0, 1, 0, 1], 1), constant(0, [2, 3, 0, 1, 0, 1], 2)]);
   assert.ok(Number.isNaN(sampleAMR(holes, [1.5, 0.5, 0.5])));
   assert.deepEqual(
@@ -142,6 +184,15 @@ test('cross-level contours share a covering lattice and obey explicit sampling b
   assert.ok(result.triangles.cells.length > 0);
   for (let i = 0; i < result.triangles.positions.length; i += 3) close(result.triangles.positions[i], 0.3, 4e-8);
   await assert.rejects(() => contourAMR(hierarchy(), [1], { maxPoints: 8 }), /exceeds maxPoints/);
+  // A lattice needs one sample count per axis: two or four counts are a RangeError, not a TypeError mid-sampling.
+  for (const dims of [
+    [4, 4],
+    [4, 4, 4, 4],
+  ])
+    await assert.rejects(
+      () => contourAMR(hierarchy(), [1], { dims }),
+      (e) => e instanceof RangeError && /three sample counts/.test(e.message),
+    );
 });
 test('real two-level Nyx plotfile matches yt native scalar bytes, bounds and child masks', async () => {
   const expected = JSON.parse(await fixture('expected.json')),
@@ -262,4 +313,66 @@ test('licensed AMReX demonstration preserves all source block IDs and pinned uns
   const data = createAMR(blocks);
   assert.equal(new Set(data.blocks.map((b) => b.level)).size, 4);
   assert.ok(data.nodes.length > 4);
+});
+
+// A GPU device stand-in: every member is a callable that returns another stand-in.
+const standIn = () =>
+  new Proxy(function () {}, {
+    get: (_, key) => (key === 'maxTextureDimension2D' ? 8192 : key === 'then' ? undefined : standIn()),
+    apply: () => standIn(),
+  });
+const stubFigure = (refuse = false) => {
+  globalThis.GPUBufferUsage ??= { COPY_DST: 8, UNIFORM: 64 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2 };
+  globalThis.GPUTextureUsage ??= { COPY_DST: 2, TEXTURE_BINDING: 4, RENDER_ATTACHMENT: 16 };
+  const live = new Set(),
+    layers = new Set(),
+    drawn = new Set(),
+    device = new Proxy(standIn(), {
+      get: (t, key) =>
+        key === 'createTexture' || key === 'createBuffer'
+          ? () => {
+              const object = { destroy: () => live.delete(object) };
+              live.add(object);
+              return object;
+            }
+          : t[key],
+    }),
+    figure = {
+      renderer: { device, add: (l) => drawn.add(l), remove: (l) => drawn.delete(l) },
+      volume() {
+        const source = { range: [1, 3], model: new Float32Array(16), visible: true, dispose() {} };
+        layers.add(source);
+        return source;
+      },
+      addLayer(layer) {
+        if (refuse) throw new TypeError('This layer needs a 3D figure');
+        layers.add(layer);
+        return layer;
+      },
+      remove(layer) {
+        if (layers.delete(layer)) layer.dispose();
+      },
+      dispose() {
+        for (const layer of [...layers]) figure.remove(layer);
+      },
+    };
+  return { figure, live, layers, drawn };
+};
+test('amrVolume is a figure layer: listed, refused before drawing and freed with the figure', () => {
+  const held = stubFigure(),
+    layer = amrVolume(held.figure, hierarchy());
+  assert.ok(held.layers.has(layer));
+  assert.ok(held.layers.has(layer.source));
+  assert.ok(held.drawn.has(layer));
+  assert.equal(typeof layer.setModel, 'function');
+  held.figure.dispose();
+  assert.equal(held.layers.size, 0);
+  assert.equal(held.drawn.size, 0);
+  assert.equal(held.live.size, 0);
+  const refused = stubFigure(true);
+  assert.throws(() => amrVolume(refused.figure, hierarchy()), TypeError);
+  assert.equal(refused.drawn.size, 0);
+  assert.equal(refused.layers.size, 0);
+  assert.equal(refused.live.size, 0);
 });

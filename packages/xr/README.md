@@ -25,6 +25,27 @@ if(await XR.isSupported('immersive-vr')) {
 engine.start();
 ```
 
+`layers` (an option of `XR.create` and `XR.attach`, and a property you can change at any time) is the render layer mask both eyes draw, on either route, as `RenderView.layers` is for a desktop view; unset draws every layer. A mesh whose mask (`setRenderLayers` from `margoengine/cameras/layers`) shares no bit with it is drawn in neither eye. This is how a first-person avatar hides its own head in the headset (`addVRMFirstPerson` from `margoengine/rigging/vrm-first-person`):
+
+```ts
+import {Engine,box} from 'margoengine/core';
+import {setRenderLayers} from 'margoengine/cameras/layers';
+import {XR} from 'margoengine/xr';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+engine.createMesh().setGeometry(box()).setPosition([0,1.5,-2]); // layer 0: seen in the headset
+const hidden=engine.createMesh().setGeometry(box()).setPosition([0,1.6,0]);
+setRenderLayers(hidden,1<<30); // on layer 30 only
+if(await XR.isSupported('immersive-vr')) {
+  const xr=await XR.create(engine,{layers:~(1<<30)>>>0}); // every layer but 30
+  const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+  enter.onclick=()=>void xr.requestSession('immersive-vr').catch(engine.onError);
+  // xr.layers=undefined draws every layer again; a mask outside 0 to 0xffffffff throws a RangeError.
+}
+engine.start();
+```
+
 `XRManager` is an alias for `XR`. `useXRSession(manager, mode, options)` is a framework-neutral request helper; prepare the manager before the user gesture and dispose it with the owning engine. It adds no React dependency.
 
 `requestSession` supports `immersive-vr`, `immersive-ar`, and `inline`. Immersive sessions require native `XRGPUBinding`, require `webgpu`, and default to `local` space. On the WebGL2 compatibility layer the layer's `installXR()` takes the binding's place and the session runs on an `XRWebGLLayer` instead, without `webgpu` ([its README](../webgl2-compat/README.md#xr-margoenginewebgl2-compatxr)). Inline sessions use `viewer` space and track poses/inputs while the desktop canvas continues rendering. The [WebGPU XR draft](https://immersive-web.github.io/webxr-webgpu-binding/#feature-descriptor) prohibits WebGPU inline layers and mixing `XRWebGLLayer` with WebGPU sessions. Missing immersive bindings leave desktop rendering active. Reference-space and feature options are forwarded. AR clears transparently. Failed initialization closes the session and frees its layer. Engine disposal ends XR and frees buffers/device. Device loss ends the session; recreate the manager to recover.
@@ -33,7 +54,7 @@ Use HTTPS or localhost and call `requestSession` from a user gesture. `isSupport
 
 Immersive XR stops the engine RAF after entry and automatically restarts it on exit/disconnection. Update animation in XR `onFrame`; engine `onFrame` and React `useFrame` belong to the window RAF. Core plugin `onPreUpdate` runs once per immersive XR frame. Inline tracking leaves the window RAF active.
 
-Core geometry/materials use the shared base shader, per-eye uniforms, native [0,1] projections, viewports and texture-array descriptors. Loader-owned PBR models are discovered through the optional triangle registry and use their PBR shader in both eyes. The canvas mirror and XR buffers use separate devices; each eye owns independent PBR resources and deformation kernels, sharing current CPU pose data without advancing playback twice. Late animation attachment/removal and extension replacements synchronize before drawing. Glass (`KHR_materials_transmission`) on a display-encoded layer adds its light to the light behind it in linear values, as on the canvas: when a drawn model has glass, the eye pass keeps its samples and gltf-pro's snapshot hook resolves them before each glass surface (one extra resolve pass and one reopened eye pass per surface); scenes without glass draw one pass per eye as before. Caller-owned material extension texture views require recreation for the XR device and report an explicit error. That separate route draws no package passes or post effects; an engine from `createXREngine` draws them all (below).
+Core geometry/materials use the shared base shader, per-eye uniforms, native [0,1] projections, viewports and texture-array descriptors. Loader-owned PBR models are discovered through the optional triangle registry and use their PBR shader in both eyes. The canvas mirror and XR buffers use separate devices; each eye owns independent PBR resources and deformation kernels, sharing current CPU pose data without advancing playback twice. Late animation attachment/removal and extension replacements synchronize before drawing. Glass (`KHR_materials_transmission`) on a display-encoded layer adds its light to the light behind it in linear values, as on the canvas: when a drawn model has glass, the eye pass keeps its samples and gltf/pbr's snapshot hook resolves them before each glass surface (one extra resolve pass and one reopened eye pass per surface); scenes without glass draw one pass per eye as before. Caller-owned material extension texture views require recreation for the XR device and report an explicit error. That separate route draws no package passes or post effects; an engine from `createXREngine` draws them all (below).
 
 `XRController` reuses target-ray/grip matrices, 32 button triplets (value/pressed/touched), 16 axes, and 25 hand joint matrices/tracking flags when granted. Controllers change on `inputsourceschange`. Frame state, input arrays and existing controller buffers retain identity; copy to retain a past frame. Browser-owned poses and GPU descriptors may allocate; this is not a whole-runtime zero-GC guarantee.
 
@@ -92,7 +113,7 @@ document.querySelector('button')!.onclick = async () => {
 
 ## Package passes and post effects in XR
 
-Create the engine with `createXREngine` instead of `Engine.create` and XR draws through the engine's own frame graph on its own GPU device: lines, point clouds, terrain, shadows, sky and post effects appear in both eyes as they do on the desktop. `xr.route` is `'engine'`. An engine from `Engine.create` keeps the older `'separate'` route, which draws core meshes and glTF-pro models only.
+Create the engine with `createXREngine` instead of `Engine.create` and XR draws through the engine's own frame graph on its own GPU device: lines, point clouds, terrain, shadows, sky and post effects appear in both eyes as they do on the desktop. `xr.route` is `'engine'`. An engine from `Engine.create` keeps the older `'separate'` route, which draws core meshes and glTF PBR models only.
 
 ```ts
 import {box} from 'margoengine/core';
@@ -112,7 +133,7 @@ Each eye is a view of `engine.render({views})` drawn into a texture, then copied
 
 ## Controller and hand models
 
-`XRModels` from `@margoengine/xr/models` draws every input source the session has: a controller at its grip, whose trigger swings, squeeze sinks and thumbstick leans as they are used and turn blue while pressed (on a gamepad with the `xr-standard` mapping; other mappings leave the parts at rest), and each tracked hand as a sphere per joint (sized by the joint radius WebXR reports) and a cylinder per bone. The models are core meshes and need no files. A source whose `skipRendering` is true (the system draws it) is hidden.
+`XRModels` from `@margoengine/xr/models` draws every input source the session has: a controller at its grip, whose trigger swings, squeeze sinks and thumbstick leans as they are used and turn blue while pressed (on a gamepad with the `xr-standard` mapping; other mappings leave the parts at rest), and each tracked hand as a sphere per joint (sized by the joint radius WebXR reports) and a cylinder per bone. The models are core meshes and need no files. A source whose `skipRendering` is true (the system draws it) is hidden. The models are made in the scene the XR is in, whichever scene is active when a frame arrives, and are disposed with that scene.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -248,7 +269,7 @@ that exact licensed fixture at the same URL.
 
 ```ts
 import { Engine } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Picking } from '@margoengine/selection';
 import { SpatialPicking } from '@margoengine/selection/spatial';
 import { XR } from '@margoengine/xr';
@@ -293,3 +314,7 @@ browser checks do not replace the still-missing physical device runs.
 package plan and check:merge, with a 3 minute hard limit. Pass `-- --compat` for
 the WebGL2 implementation. The dedicated compatibility XR bridge suite remains
 packages/webgl2-compat/test/xr-browser.mjs.
+
+### Attaching from a second scene
+
+`XR.create` remembers the scene that is active when you call it, before its first await, and joins that scene when it finishes. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.

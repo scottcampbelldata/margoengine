@@ -2,6 +2,15 @@ import { createHash } from 'node:crypto';
 import { AudioListener, PositionalAudio } from '../dist/index.js';
 import { FakeAudioContext, FakeParam } from './fake-web-audio.js';
 
+// A point on the unit circle from basic arithmetic only (the rational parametrisation with t = tan(a / 2) taken as
+// a / 2), so the inputs are the same bits on every machine. Math.cos and Math.sin are not correctly rounded, and the
+// x64 machine that first recorded the hash and an arm64 Mac disagree in the last bit of some of them.
+const circle = (a) => {
+  const t = a / 2,
+    d = 1 + t * t;
+  return [(1 - t * t) / d, (2 * t) / d];
+};
+
 export function audioReplay() {
   const hash = createHash('sha256');
   let iterators = 0, events = 0;
@@ -32,12 +41,14 @@ export function audioReplay() {
     };
     for (let k = 0; k < 100; k++) {
       const angle = k * 0.005;
-      listener.setPose([Math.cos(angle) * 2, 1.6, Math.sin(angle) * 2], [-Math.cos(angle), 0, -Math.sin(angle)]);
+      const [c, s] = circle(angle);
+      listener.setPose([c * 2, 1.6, s * 2], [-c, 0, -s]);
       flush(context.listener);
       for (let j = 0; j < sources.length; j++) {
         const a = j * 0.098 + k * 0.01;
-        sources[j].setPosition(Math.cos(a) * (5 + j % 8), 1 + j % 4 * 0.5, Math.sin(a) * (5 + j % 8));
-        sources[j].setDirection([-Math.sin(a), 0, Math.cos(a)]);
+        const [ca, sa] = circle(a);
+        sources[j].setPosition(ca * (5 + j % 8), 1 + j % 4 * 0.5, sa * (5 + j % 8));
+        sources[j].setDirection([-sa, 0, ca]);
         flush(sources[j].panner);
         hash.update(Buffer.from(sources[j].worldPosition.buffer));
         hash.update(Buffer.from(sources[j].worldDirection.buffer));

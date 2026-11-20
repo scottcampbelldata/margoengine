@@ -6,7 +6,7 @@ are done. This takes about five minutes.
 ![The Flight Helmet model standing on a floor and casting a shadow](../images/guide-gltf.webp)
 
 glTF is the standard 3D format for the web. A `.glb` file holds the geometry, the textures and the materials in one
-file. Margo loads it with `@margoengine/gltf-pro`, which draws the metallic-roughness materials glTF defines
+file. Margo loads it with `@margoengine/gltf/pbr`, which draws the metallic-roughness materials glTF defines
 (base colour, metal and roughness, normal, occlusion and emissive maps).
 
 ## 1. Get a model
@@ -22,7 +22,7 @@ This guide uses the Flight Helmet from the Khronos sample models (CC0, 5.5 MB). 
 
 ```ts
 import { createStage } from 'margoengine';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 
 const status = document.querySelector('#status')!;
 const stage = await createStage('#scene', { camera: { position: [0, 1.2, 3], target: [0, 0.5, 0] } });
@@ -80,7 +80,7 @@ window.addEventListener('pagehide', () => stage.dispose(), { once: true });
 
 `addGLTF(stage, url)` (from `@margoengine/stage/gltf`) fits the camera for you. Plain static opaque constant-colour
 triangles use `@margoengine/gltf`. Textures, transparency, emission, vertex colours, points/lines, extensions and
-other advanced geometry use `@margoengine/gltf-pro`. Skins, morph targets and animation clips additionally require
+other advanced geometry use `@margoengine/gltf/pbr`. Skins, morph targets and animation clips additionally require
 `@margoengine/animation`; the returned player starts paused. Install only the packages your files need. A missing
 package rejects with `code: 'state'`, naming the file feature and the package to install, before adding scene nodes.
 The basic path has no `model.pbr`; advanced models expose it. See [loader selection](../stage-gltf-routing.md).
@@ -94,7 +94,7 @@ The basic path has no `model.pbr`; advanced models expose it. See [loader select
   image-based lighting from the [environment](../../packages/environment/README.md) package for glossy models.
 - **A 404 or "Unexpected token <".** The URL is wrong and the server sent an HTML page. Files in Vite's `public/`
   folder are served from `/`, so `public/models/a.glb` is `/models/a.glb`.
-- **Loading blocks for seconds on a big file.** Use `loadGLTFInWorker` from `margoengine/gltf-pro/worker`, which parses in a worker.
+- **Loading blocks for seconds on a big file.** Use `loadGLTFInWorker` from `margoengine/gltf/worker`, which parses in a worker.
 - **Leaks after navigation.** Call `stage.dispose()` or `model.destroy()`.
 
 ## Next

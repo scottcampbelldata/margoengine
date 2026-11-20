@@ -2,7 +2,7 @@ import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } 
 import { limits, throwIfAborted, toBytes, type BinaryInput } from './util.js';
 import { readZipDirectory, readZipEntry, type ZipOptions } from './zip.js';
 import { computeVertexNormals } from './normals.js';
-import { multiplyMatrices } from '@margoengine/math/mat4';
+import { invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { LinearToSRGB } from '@margoengine/math/color';
 
 const F = 'USD';
@@ -43,6 +43,8 @@ export interface USDAReadOptions {
 function fail(code: 'syntax' | 'unsupported' | 'range' | 'limit', message: string): never {
   throw new LoaderError(F, code, message);
 }
+/** Single-letter string escapes; any other escaped character stands for itself. */
+const ESCAPES: Record<string, string> = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v' };
 const identity = (): Float64Array => new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 function numbers(value: Value | undefined, size?: number): number[] {
   if (
@@ -149,28 +151,59 @@ function transform(prim: Prim, parent: Float64Array, base: Float64Array): Float6
   const reset = (order as string[]).lastIndexOf('!resetXformStack!'),
     inherited = reset < 0 ? parent : base;
   let local = identity();
-  for (const name of (order as string[]).slice(reset + 1)) {
+  for (const entry of (order as string[]).slice(reset + 1)) {
+    // UsdGeomXformOp: an op attribute is xformOp:<type>[:<suffix>]; a "!invert!" entry applies that op's inverse.
+    const invert = entry.startsWith('!invert!'),
+      name = invert ? entry.slice(8) : entry,
+      type = name.split(':')[1] ?? '',
+      value = prim.attrs.get(name);
+    if (!name.startsWith('xformOp:')) fail('syntax', `invalid xformOpOrder entry ${entry}`);
+    if (value === undefined) fail('syntax', `xformOpOrder names ${name}, which is not authored`);
     let matrix = identity();
-    const value = prim.attrs.get(name);
-    if (name === 'xformOp:transform') {
+    if (type === 'transform') {
       if (!Array.isArray(value) || value.length !== 4) fail('syntax', 'expected a 4x4 transform');
       matrix = new Float64Array((value as Value[]).flatMap((row) => numbers(row, 4)));
       if (matrix[3] !== 0 || matrix[7] !== 0 || matrix[11] !== 0 || matrix[15] !== 1)
         fail('unsupported', 'only affine transforms are supported');
-    } else if (name === 'xformOp:translate') matrix.set(numbers(value, 3), 12);
-    else if (name === 'xformOp:scale') {
+    } else if (type === 'translate') matrix.set(numbers(value, 3), 12);
+    else if (type === 'scale') {
       const v = numbers(value, 3);
       matrix[0] = v[0];
       matrix[5] = v[1];
       matrix[10] = v[2];
-    } else if (name === 'xformOp:rotateXYZ') {
-      const angles = numbers(value, 3).map((v) => (v * Math.PI) / 180);
-      for (let axis = 0; axis < 3; axis++) {
-        const rotation = identity(),
+    } else if (type === 'orient') {
+      // A quaternion written (real, i, j, k); normalized as UsdGeomXformOp does.
+      const [w, x, y, z] = numbers(value, 4),
+        length = Math.hypot(w, x, y, z);
+      if (!length) fail('range', 'orient quaternion has zero length');
+      const [qw, qx, qy, qz] = [w / length, x / length, y / length, z / length];
+      matrix.set([
+        1 - 2 * (qy * qy + qz * qz),
+        2 * (qx * qy + qw * qz),
+        2 * (qx * qz - qw * qy),
+        0,
+        2 * (qx * qy - qw * qz),
+        1 - 2 * (qx * qx + qz * qz),
+        2 * (qy * qz + qw * qx),
+        0,
+        2 * (qx * qz + qw * qy),
+        2 * (qy * qz - qw * qx),
+        1 - 2 * (qx * qx + qy * qy),
+        0,
+      ]);
+    } else if (/^rotate([XYZ]|XYZ|XZY|YXZ|YZX|ZXY|ZYX)$/.test(type)) {
+      // rotateABC turns about A first, then B, then C (degrees); rotateX, rotateY and rotateZ take one angle.
+      const axes = type.slice(6),
+        angles = axes.length === 1 ? [typeof value === 'number' ? value : numbers(value, 1)[0]] : numbers(value, 3);
+      if (!angles.every(Number.isFinite)) fail('syntax', `invalid ${name} angle`);
+      for (let k = 0; k < axes.length; k++) {
+        const axis = 'XYZ'.indexOf(axes[k]),
+          angle = (angles[k] * Math.PI) / 180,
+          rotation = identity(),
           a = (axis + 1) % 3,
           b = (axis + 2) % 3,
-          c = Math.cos(angles[axis]),
-          s = Math.sin(angles[axis]);
+          c = Math.cos(angle),
+          s = Math.sin(angle);
         rotation[a * 4 + a] = c;
         rotation[b * 4 + b] = c;
         rotation[a * 4 + b] = s;
@@ -178,6 +211,7 @@ function transform(prim: Prim, parent: Float64Array, base: Float64Array): Float6
         matrix = multiplyMatrices(rotation, matrix, new Float64Array(16));
       }
     } else fail('unsupported', `unsupported transform ${name}`);
+    if (invert) matrix = invertMatrix(matrix) ?? fail('range', `${name} cannot be inverted`);
     local = multiplyMatrices(local, matrix, new Float64Array(16));
   }
   return multiplyMatrices(inherited, local, new Float64Array(16));
@@ -189,7 +223,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
   if (!Number.isSafeInteger(maxDepth) || maxDepth < 1 || maxDepth > 64) fail('range', 'maxDepth must be 1..64');
   if (!text.startsWith('#usda 1.0')) fail('syntax', 'expected #usda 1.0');
   const token =
-    /\s+|#[^\n]*|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|<[^>]*>|@[\s\S]*?@|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_!][\w:!.]*|[{}()[\]=,;]/y;
+    /\s+|#[^\n]*|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|<[^>]*>|@[\s\S]*?@|[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[A-Za-z_!][\w:!.]*|[{}()[\]=,;]/y;
   let offset = 0,
     cached: { text: string; newLine: boolean } | undefined,
     numbers = 0;
@@ -215,15 +249,41 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
     cached = undefined;
     return value;
   };
-  // A quoted token: triple-quoted text as is, else JSON escapes; a bad escape is a named syntax error.
+  // A quoted token (single, double or triple quotes) with C escapes as OpenUSD reads them (TfEscapeString): \xHH (one
+  // or two hex digits) and \ooo (one to three octal digits) are bytes, a run of them decoded together as UTF-8; \a \b
+  // \f \n \r \t \v name their control characters and any other escaped character stands for itself.
   const string = (word: string): string => {
-    if (word.startsWith('"""') || word.startsWith("'''")) return word.slice(3, -3);
-    try {
-      return JSON.parse(word);
-    } catch {
-      fail('syntax', 'invalid string escape');
+    const mark = word.startsWith('"""') || word.startsWith("'''") ? 3 : 1,
+      body = word.slice(mark, -mark);
+    let out = '',
+      from = 0,
+      i: number;
+    while ((i = body.indexOf('\\', from)) >= 0) {
+      out += body.slice(from, i);
+      const bytes: number[] = [];
+      for (;;) {
+        const hex = body[i + 1] === 'x' ? /^[0-9a-fA-F]{1,2}/.exec(body.slice(i + 2, i + 4))?.[0] : undefined,
+          octal = /^[0-7]{1,3}/.exec(body.slice(i + 1, i + 4))?.[0];
+        if (hex !== undefined) {
+          bytes.push(parseInt(hex, 16));
+          i += 2 + hex.length;
+        } else if (octal !== undefined) {
+          bytes.push(parseInt(octal, 8) & 255);
+          i += 1 + octal.length;
+        } else break;
+        if (body[i] !== '\\') break;
+      }
+      if (bytes.length) out += new TextDecoder().decode(new Uint8Array(bytes));
+      else {
+        const escaped = body[i + 1] ?? '\\';
+        out += ESCAPES[escaped] ?? escaped;
+        i += 2;
+      }
+      from = i;
     }
+    return out + body.slice(from);
   };
+  const quoted = (word: string) => word[0] === '"' || word[0] === "'";
   const expect = (word: string) => {
     if (take() !== word) fail('syntax', `expected ${word}`);
   };
@@ -275,7 +335,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
       }
       return '';
     }
-    if (word.startsWith('"')) return string(word);
+    if (quoted(word)) return string(word);
     if (word.startsWith('<')) return { path: word.slice(1, -1) };
     if (word.startsWith('@')) {
       if (!options.assets) fail('unsupported', 'external assets and textures are unsupported');
@@ -293,14 +353,15 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
       let key = take();
       if (!key) fail('syntax', 'unterminated metadata');
       if (['prepend', 'append', 'add', 'delete', 'reorder'].includes(key)) key = take();
-      if (key.startsWith('"')) {
+      if (quoted(key)) {
         out.set('doc', string(key));
         continue;
       }
       if (key === 'references') {
         // Internal references only: a prim of this layer, composed below. Files and lists are composition this reader lacks.
         expect('=');
-        if (!peek().text.startsWith('<')) fail('unsupported', 'USD composition references to other files is unsupported');
+        if (!peek().text.startsWith('<'))
+          fail('unsupported', 'USD composition references to other files is unsupported');
         out.set(key, value());
         if (peek().text === ',' || peek().text === ';') take();
         continue;
@@ -314,6 +375,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
           'inherits',
           'specializes',
           'instanceable',
+          'relocates',
         ].includes(key)
       )
         fail('unsupported', `USD composition ${key} is unsupported`);
@@ -332,8 +394,8 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
     if (specifier !== 'def' && specifier !== 'class' && !(options.skipOver && specifier === 'over'))
       fail('unsupported', 'only defined static prims are supported');
     let type = take();
-    const name = type.startsWith('"') ? string(type) : value();
-    if (type.startsWith('"')) type = 'Xform';
+    const name = quoted(type) ? string(type) : value();
+    if (quoted(type)) type = 'Xform';
     if (typeof name !== 'string') fail('syntax', 'prim name must be a string');
     const path = `${parent}/${name}`,
       attrs = new Map<string, Value>(),
@@ -354,8 +416,7 @@ export function readUSDA(text: string, options: USDAReadOptions = {}): USDALayer
         continue;
       }
       if (!first) fail('syntax', 'unterminated prim');
-      if (first === 'over' || first === 'variantSet')
-        fail('unsupported', `USD composition ${first} is unsupported`);
+      if (first === 'over' || first === 'variantSet') fail('unsupported', `USD composition ${first} is unsupported`);
       const header: string[] = [];
       while (peek().text !== '=') {
         if (header.length >= 2 && (peek().newLine || peek().text === '}' || peek().text === '(')) break;
@@ -438,9 +499,15 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
     indices: number[] = [],
     groups: LoadedGroup[] = [],
     appearance: { count: number; rgb: ColorChannel; opacity: ColorChannel }[] = [];
-  function visit(node: Prim, parent: Float64Array, hidden = false): void {
-    hidden ||= node.attrs.get('visibility') === 'invisible' || node.metadata.get('active') === false;
+  function visit(node: Prim, parent: Float64Array, hidden = false, bound?: Value): void {
+    // UsdGeomImageable: visibility "invisible" and purpose "guide" hide the subtree; both inherit.
+    hidden ||=
+      node.attrs.get('visibility') === 'invisible' ||
+      node.attrs.get('purpose') === 'guide' ||
+      node.metadata.get('active') === false;
     if (hidden) return;
+    // UsdShadeMaterialBindingAPI: a binding applies to the prim's descendants; the nearest one wins.
+    bound = node.attrs.get('material:binding') ?? bound;
     const world = transform(node, parent, base);
     if (node.type === 'Mesh') {
       if ((node.attrs.get('subdivisionScheme') ?? 'catmullClark') !== 'none')
@@ -525,7 +592,7 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
       }
       if (cursor !== faces.length) fail('syntax', 'faceVertexCounts does not match indices');
       let color: LoadedGroup['color'], rgb: ColorChannel | undefined, opacity: ColorChannel | undefined;
-      const binding = node.attrs.get('material:binding');
+      const binding = bound;
       if (binding && typeof binding === 'object' && !Array.isArray(binding) && 'path' in binding) {
         const material = prims.get(binding.path),
           surface = material?.attrs.get('outputs:surface.connect');
@@ -559,7 +626,7 @@ export function parseUSDA(input: string | BinaryInput, options: USDOptions = {})
       });
     } else if (!['Xform', 'Scope', 'Material', 'Shader'].includes(node.type))
       fail('unsupported', `unsupported USD prim type ${node.type}`);
-    for (const child of node.children) visit(child, world, hidden);
+    for (const child of node.children) visit(child, world, hidden, bound);
   }
   for (const root of roots) visit(root, base);
   if (!indices.length) fail('unsupported', 'stage contains no polygon meshes');

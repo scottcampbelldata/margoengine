@@ -41,7 +41,13 @@ try {
       const adapter = await navigator.gpu.requestAdapter();
       const gpu = await adapter.requestDevice();
       gpu.pushErrorScope('validation');
-      const frame = new Float32Array(132);
+      // Sized from the Frame struct itself (every member is 16-byte aligned), so a field added to it cannot leave
+      // this buffer short of the uniform's minimum binding size again (the shallow row grew it from 544 to 560 B).
+      const floats = { mat4x4f: 16, vec4f: 4, Wave: 8, Light: 8 };
+      const body = waterFrame.match(/struct Frame \{([^}]*)\}/)[1];
+      const members = [...body.matchAll(/\w+:(?:array<(\w+),(\d+)>|(\w+))/g)];
+      const size = members.reduce((sum, [, item, count, type]) => sum + (item ? floats[item] * Number(count) : floats[type]), 0);
+      const frame = new Float32Array(size);
       frame[20 + 1] = 0; // still level
       frame[20 + 3] = amplitudes.length;
       amplitudes.forEach((a, j) => (frame[32 + j * 8 + 2] = a));

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 import { decodePNG } from '../tests/support/png.js';
 await mkdir('test-results', { recursive: true });
 const browser = await openBrowser({ startPath: '/tests/modern-game.html' }),
@@ -22,7 +22,7 @@ try {
     async ({ doc, buffers }) => {
       const { EngineKernel } = await import('/packages/core/dist/index.js'),
         { box, engineRuntime } = await import('/packages/core/dist/extension.js');
-      const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+      const { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
         { Animation } = await import('/packages/animation/dist/index.js');
       const { SSAO } = await import('/packages/post/dist/index.js');
       const { Shadows } = await import('/packages/shadows/dist/index.js'),

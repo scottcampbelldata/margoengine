@@ -4,11 +4,15 @@
 // (the vertex shader negates y and front faces swap), and only the canvas present flips back.
 import { fault } from '../../../shared/errors.js';
 import { translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
+import type { IREntryPoint, IRGlobalVar, IRModule } from '../wgsl/ir.js';
 import type { TextureType } from '../wgsl/types.js';
 import { type FormatInfo, glTexelBytes, hasDepth, hasStencil, VERTEX_FORMATS } from './formats.js';
-import type { CompatDevice } from './device.js';
+import type { CompatDevice, FramebufferRecord } from './device.js';
+import { S } from './gl.js';
+import { fence, fenceDone } from './tasks.js';
 import { drawnClear } from './fresh-clears.js';
-import { type BoundGroup, CompatComputePassEncoder, type CompatComputePipeline } from './compute.js';
+import { type BoundGroup, CompatComputePassEncoder, type CompatComputePipeline, layoutEntry } from './compute.js';
+import { ColorSnap, OP, Tape, type TapePool } from './tape.js';
 import {
   type BlockWrite,
   type Bound,
@@ -21,12 +25,13 @@ import {
   type CompatTexture,
   type CompatTextureView,
   type LayoutEntry,
+  levelRange,
   type TextureStorage,
   type Usable,
+  twins,
   type Uses,
 } from './resources.js';
 
-type Op = (r: Replayer) => void;
 
 const BLEND_FACTORS: Record<string, string> = {
   zero: 'ZERO',
@@ -114,6 +119,22 @@ interface TargetState {
   readonly blend?: GPUBlendState;
   readonly writeMask: number;
 }
+/**
+ * A colour target's blend and write mask as the replay sets them, worked out once per pipeline (applyTargets made
+ * these strings, closures and enum lookups at every pipeline change before KB-COMPAT-FRAMEALLOC1).
+ */
+interface TargetGL {
+  /** The blend state as a key ('off' for none), compared with GLState.blendChanged. */
+  readonly key: string;
+  readonly mask: number;
+  readonly blend: boolean;
+  readonly colorOp: number;
+  readonly alphaOp: number;
+  readonly colorSrc: number;
+  readonly colorDst: number;
+  readonly alphaSrc: number;
+  readonly alphaDst: number;
+}
 
 /** The blend and write-mask state of a colour target as one string ('' blend for none). */
 function targetKey(t: TargetState | null): string {
@@ -126,6 +147,9 @@ function targetKey(t: TargetState | null): string {
 
 /** Idle programs (no live pipeline uses them) a device keeps for pipelines made again with the same GLSL. */
 export const IDLE_PROGRAMS = 64;
+
+/** Buffer ids of the warm draws' uniform buffers (LinkedProgram.warmed): below 0, so no real buffer's id matches. */
+let warmIds = 0;
 
 /**
  * A GL program and VAO shared by every pipeline of the device with the same GLSL and vertex attributes (the device's
@@ -152,20 +176,29 @@ export class LinkedProgram {
     baseVertex: -1,
     baseInstance: -1,
     element: -1,
-    pointers: [] as string[],
+    /** Per attribute: the id of the buffer and the byte offset its pointer was last set to (-1: never). */
+    pointerBuffers: [] as number[],
+    pointerOffsets: [] as number[],
     levels: new Map<WebGLUniformLocation, number>(),
-    sizes: new Map<WebGLUniformLocation, string>(),
-    modes: new Map<WebGLUniformLocation, string>(),
-    info: new Map<WebGLUniformLocation, string>(),
+    /** Three numbers a location: the size uniforms' width, height and depth or layers. */
+    sizes: new Map<WebGLUniformLocation, Float64Array>(),
+    /** Three numbers a location: mip filtering on (1) or off, lodMinClamp, lodMaxClamp. */
+    mips: new Map<WebGLUniformLocation, Float64Array>(),
+    /** The sampler address modes (CompatSampler.modes) last set at a location. */
+    modes: new Map<WebGLUniformLocation, Int32Array>(),
+    /** Three numbers a location: a storage buffer's row, size and row shift. */
+    info: new Map<WebGLUniformLocation, Float64Array>(),
   };
   // When the GLSL went to WebGL2 (device.programs.linkMs).
   private readonly handedOver = performance.now();
   private readonly shaders: WebGLShader[] = [];
+  /** The fence after the warm draw (see warmed()): undefined before it is drawn, null once nothing is left to wait for. */
+  private warmFence: WebGLSync | null | undefined;
 
   constructor(
     private readonly device: CompatDevice,
     private readonly glsl: GLSLProgram,
-    attributes: readonly Attribute[],
+    private readonly attributes: readonly Attribute[],
   ) {
     const gl = device.gl,
       program = (this.program = gl.createProgram() as WebGLProgram);
@@ -195,9 +228,102 @@ export class LinkedProgram {
     );
   }
 
+  /**
+   * True once the program can draw into `targets` without compiling again. ANGLE's Direct3D back end compiles a
+   * program's pixel shader at link for its first colour output only, and compiles it again, synchronously on the
+   * browser's one GPU thread, at the first draw into a framebuffer with more colour targets bound (Edge 157, RTX A6000:
+   * a 4-output program linked in 64 ms and its first draw took 67 ms more, a 1-output one 2 ms; the 26 programs of the
+   * staged voxel path tracer linked in 65 s and its first 8 x 8 image then took 206 s, KB-VPT-LOBES-COMPAT). A program
+   * with more than one colour target there draws once, rasterizer discard on, into 1 x 1 targets bound at the same
+   * attachment points its passes use, so that compile happens before an async pipeline resolves (WebGPU,
+   * createRenderPipelineAsync: the pipeline is ready to use without a stall). Nothing is rasterized, so no output or
+   * resource is read; the targets are deleted at once. Any other backend or program: true at once.
+   */
+  warmed(targets: readonly (TargetState | null)[]): boolean {
+    const device = this.device,
+      gl = device.gl;
+    if (this.warmFence === undefined) {
+      const colours = targets.flatMap((t, i) => (t ? [i] : [])),
+        outputs = this.glsl.fragment.outputs;
+      if (
+        this.refusal !== '' ||
+        device.destroyed ||
+        colours.length < 2 ||
+        outputs.length < 2 ||
+        !/Direct3D|D3D11/.test(device.adapter.capabilities.renderer)
+      ) {
+        this.warmFence = null;
+        return true;
+      }
+      this.warmFence = this.warmDraw(colours, targets.length);
+    }
+    if (this.warmFence && !fenceDone(gl, this.warmFence)) return false;
+    if (this.warmFence) gl.deleteSync(this.warmFence);
+    this.warmFence = null;
+    return true;
+  }
+
+  /** The draw warmed() makes, and the fence after it (null when the context is lost). */
+  private warmDraw(colours: readonly number[], count: number): WebGLSync | null {
+    const device = this.device,
+      gl = device.gl,
+      s = device.state,
+      outputs = this.glsl.fragment.outputs,
+      fbo = gl.createFramebuffer() as WebGLFramebuffer,
+      vao = gl.createVertexArray() as WebGLVertexArrayObject,
+      textures: WebGLTexture[] = [];
+    s.bindDrawFramebuffer(fbo);
+    for (const i of colours) {
+      // Only the base type must match the output's (WebGL 2.0, 5.40): the format is not part of the compiled shader.
+      const kind = outputs.find((o) => o.location === i)?.kind,
+        texture = gl.createTexture() as WebGLTexture;
+      s.scratch(gl.TEXTURE_2D, texture);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, kind === 'uint' ? gl.RGBA8UI : kind === 'sint' ? gl.RGBA8I : gl.RGBA8, 1, 1);
+      gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, texture, 0);
+      textures.push(texture);
+    }
+    const buffers: number[] = [];
+    for (let i = 0; i < count; i++) buffers.push(colours.includes(i) ? gl.COLOR_ATTACHMENT0 + i : gl.NONE);
+    gl.drawBuffers(buffers);
+    // Every uniform block gets a buffer of its size and every texture unit nothing (an incomplete texture reads 0), as
+    // the draw validation of WebGL 2.0 requires; a disabled attribute reads a constant of its own base type.
+    const size = this.uniforms.reduce((n, u) => Math.max(n, u.size), 0),
+      ubo = size ? (gl.createBuffer() as WebGLBuffer) : null;
+    if (ubo) {
+      gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
+      gl.bufferData(gl.UNIFORM_BUFFER, size, gl.STATIC_DRAW);
+      for (const u of this.uniforms) s.uniformBuffer(u.point, ubo, --warmIds, 0, u.size);
+    }
+    for (let i = 0; i < this.units; i++) s.unit(i, gl.TEXTURE_2D, null, null);
+    s.bindVertexArray(vao);
+    for (const a of this.attributes) {
+      if (!a.integer) gl.vertexAttrib4f(a.location, 0, 0, 0, 1);
+      else if (a.type === gl.UNSIGNED_BYTE || a.type === gl.UNSIGNED_SHORT || a.type === gl.UNSIGNED_INT)
+        gl.vertexAttribI4ui(a.location, 0, 0, 0, 0);
+      else gl.vertexAttribI4i(a.location, 0, 0, 0, 0);
+    }
+    s.useProgram(this.program);
+    s.enable(gl.RASTERIZER_DISCARD, true);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    s.enable(gl.RASTERIZER_DISCARD, false);
+    const sync = fence(gl);
+    s.bindVertexArray(null);
+    s.bindDrawFramebuffer(null);
+    gl.deleteVertexArray(vao);
+    gl.deleteFramebuffer(fbo);
+    for (const texture of textures) {
+      s.forgetTexture(texture);
+      gl.deleteTexture(texture);
+    }
+    if (ubo) gl.deleteBuffer(ubo);
+    return sync;
+  }
+
   /** Deletes the program and VAO (the device drops an idle program, or is destroyed). */
   free(): void {
     const { gl, state } = this.device;
+    if (this.warmFence) gl.deleteSync(this.warmFence);
+    this.warmFence = null;
     state.forgetProgram(this.program);
     state.forgetVertexArray(this.vao);
     gl.deleteProgram(this.program);
@@ -316,6 +442,10 @@ export class CompatRenderPipeline {
   readonly cull: number;
   readonly frontFace: number;
   readonly targets: readonly (TargetState | null)[];
+  /** Each target's GL blend and mask (a missing target writes nothing, blends nothing). */
+  readonly targetGL: readonly TargetGL[];
+  /** True when every target has the same blend and mask: one GL-wide state serves them. */
+  readonly sameTargets: boolean;
   readonly depthStencil?: GPUDepthStencilState;
   readonly alphaToCoverage: boolean;
   readonly sampleCount: number;
@@ -357,6 +487,26 @@ export class CompatRenderPipeline {
     this.sampleCount = descriptor.multisample?.count ?? 1;
     this.targets = [...(descriptor.fragment?.targets ?? [])].map((t) =>
       t ? { blend: t.blend, writeMask: t.writeMask ?? 0xf } : null,
+    );
+    this.targetGL = this.targets.map((t) => {
+      const b = t?.blend,
+        e = (name: string) => device.enum(name);
+      return {
+        key: b
+          ? `${b.color.operation ?? 'add'},${b.color.srcFactor ?? 'one'},${b.color.dstFactor ?? 'zero'},${b.alpha.operation ?? 'add'},${b.alpha.srcFactor ?? 'one'},${b.alpha.dstFactor ?? 'zero'}`
+          : 'off',
+        mask: t?.writeMask ?? 0,
+        blend: !!b,
+        colorOp: b ? e(BLEND_OPS[b.color.operation ?? 'add'] ?? 'ONE') : 0,
+        alphaOp: b ? e(BLEND_OPS[b.alpha.operation ?? 'add'] ?? 'ONE') : 0,
+        colorSrc: b ? e(BLEND_FACTORS[b.color.srcFactor ?? 'one'] ?? 'ONE') : 0,
+        colorDst: b ? e(BLEND_FACTORS[b.color.dstFactor ?? 'zero'] ?? 'ONE') : 0,
+        alphaSrc: b ? e(BLEND_FACTORS[b.alpha.srcFactor ?? 'one'] ?? 'ONE') : 0,
+        alphaDst: b ? e(BLEND_FACTORS[b.alpha.dstFactor ?? 'zero'] ?? 'ONE') : 0,
+      };
+    });
+    this.sameTargets = this.targetGL.every(
+      (x) => x.key === this.targetGL[0].key && x.mask === this.targetGL[0].mask,
     );
     if (!device.ext.indexed) {
       const groups = new Map<string, number[]>();
@@ -435,7 +585,14 @@ export class CompatRenderPipeline {
         },
       };
     }
-    const inferred = autoLayouts(this.glsl);
+    // The checked entry points name every resource each stage statically uses, phony assignments included (KB-COMPAT-PHONY1).
+    const reached: [IREntryPoint | undefined, number][] = prebuilt
+      ? []
+      : [
+          [stageEntry(vertexModule.ir, 'vertex', descriptor.vertex.entryPoint), 1],
+          [stageEntry(fragmentModule?.ir, 'fragment', descriptor.fragment?.entryPoint), 2],
+        ];
+    const inferred = autoLayouts(this.glsl, reached);
     // Prebuilt programs are internal compute lowerings: their layouts retain compute visibility.
     // Validate user render descriptors here, before any backend-specific lowering.
     if (explicit && !prebuilt) {
@@ -495,14 +652,22 @@ export class CompatRenderPipeline {
     if (!deferLink) this.finish();
   }
 
-  /** Resolves once the program has linked (at once without KHR_parallel_shader_compile). */
+  /**
+   * Resolves once the program has linked (at once without KHR_parallel_shader_compile) and can draw into the
+   * pipeline's targets without compiling again (LinkedProgram.warmed).
+   */
   whenLinked(): Promise<void> {
     return new Promise((resolve) => {
       const poll = () => {
-        if (this.device.destroyed || !this.linked || this.linked.done()) {
+        if (this.device.destroyed || !this.linked) {
           this.finish();
           resolve();
-        } else setTimeout(poll, 2);
+        } else if (!this.linked.done()) setTimeout(poll, 2);
+        else {
+          this.finish();
+          if (this.failure || this.linked.warmed(this.targets)) resolve();
+          else setTimeout(poll, 2);
+        }
       };
       poll();
     });
@@ -532,14 +697,43 @@ export class CompatRenderPipeline {
   }
 }
 
-/** The 'auto' bind group layouts of a translated program (WebGPU "default pipeline layout"). */
-function autoLayouts(glsl: GLSLProgram): CompatBindGroupLayout[] {
+/** The entry point of a stage the translation used (the named one, or the stage's only one). */
+function stageEntry(
+  module: IRModule | null | undefined,
+  stage: 'vertex' | 'fragment',
+  name: string | undefined,
+): IREntryPoint | undefined {
+  const candidates = module?.entryPoints.filter((e) => e.stage === stage) ?? [];
+  return name === undefined
+    ? candidates.length === 1
+      ? candidates[0]
+      : undefined
+    : candidates.find((e) => e.name === name);
+}
+
+/**
+ * The 'auto' bind group layouts of a translated program (WebGPU "default pipeline layout": one entry for each resource a
+ * stage's entry point statically uses, visible to the stages that use it). The GLSL binding tables give the resources the
+ * emitted code reads; the checked entry points add those WGSL uses statically that the GLSL drops, such as a phony
+ * assignment `_ = u;` (WGSL section 7.7 "Phony Assignment", KB-COMPAT-PHONY1).
+ */
+function autoLayouts(
+  glsl: GLSLProgram,
+  reached: readonly (readonly [IREntryPoint | undefined, number])[] = [],
+): CompatBindGroupLayout[] {
   const groups: Map<number, LayoutEntry & { binding: number }>[] = [];
   const add = (group: number, entry: LayoutEntry, stage: number) => {
     const g = (groups[group] ??= new Map());
     const known = g.get(entry.binding);
     g.set(entry.binding, { ...(known ?? entry), visibility: (known?.visibility ?? 0) | stage });
   };
+  // The checked WGSL first: it has each resource's declared type (a texture_external stays an external texture).
+  for (const [entry, bit] of reached)
+    for (const g of entry?.globals ?? []) {
+      if (g.kind !== 'var' || g.group === undefined || g.binding === undefined) continue;
+      const e = layoutEntry(g as IRGlobalVar, bit);
+      if (e) add(g.group, e, bit);
+    }
   for (const stage of [glsl.vertex, glsl.fragment]) {
     const bit = stage.stage === 'vertex' ? 1 : 2;
     for (const u of stage.uniforms)
@@ -643,19 +837,63 @@ const color = (c: GPUColor | undefined): number[] =>
       ? [...(c as number[])]
       : [(c as GPUColorDict).r, (c as GPUColorDict).g, (c as GPUColorDict).b, (c as GPUColorDict).a];
 
+/** Writes colour `c` into `out` (a pooled snapshot's own array), with `color`'s defaults. */
+function colorInto(out: number[], c: GPUColor | undefined): void {
+  if (c === undefined) out[0] = out[1] = out[2] = out[3] = 0;
+  else if (Array.isArray(c)) {
+    out[0] = (c as number[])[0];
+    out[1] = (c as number[])[1];
+    out[2] = (c as number[])[2];
+    out[3] = (c as number[])[3];
+  } else {
+    out[0] = (c as GPUColorDict).r;
+    out[1] = (c as GPUColorDict).g;
+    out[2] = (c as GPUColorDict).b;
+    out[3] = (c as GPUColorDict).a;
+  }
+}
+
 /** A GPUCommandBuffer: the recorded operations. */
 export class CompatCommandBuffer {
-  used = false;
+  /** Bit 1: submitted; 2: holds compute passes (their runtime loads before it replays); 4: holds a texture read-back. */
+  private flags: number;
+  /** The label: '' (the prototype's) unless one is given, so an unlabelled one, which a frame makes many of, has one field fewer. */
+  declare label: string;
   constructor(
-    readonly ops: readonly Op[],
-    public label: string,
-    /** True when it holds compute passes (their runtime loads before it replays). */
-    readonly compute = false,
-    readonly readback = false,
-    /** The buffers, textures and query sets its commands use: submit refuses it when one is destroyed. */
-    readonly uses: Uses = [],
-  ) {}
+    /** The recorded commands, which also hold the buffers, textures and query sets they use (submit refuses the buffer when one is destroyed). */
+    readonly ops: Tape,
+    label: string,
+    compute = false,
+    readback = false,
+  ) {
+    this.flags = (compute ? 2 : 0) | (readback ? 4 : 0);
+    if (label) this.label = label;
+  }
+  // The flags share one field: a field is 4 bytes of every command buffer a frame makes (WebGPU hands back one per call).
+  get used(): boolean {
+    return (this.flags & 1) !== 0;
+  }
+  set used(value: boolean) {
+    this.flags = value ? this.flags | 1 : this.flags & ~1;
+  }
+  get compute(): boolean {
+    return (this.flags & 2) !== 0;
+  }
+  get readback(): boolean {
+    return (this.flags & 4) !== 0;
+  }
+  get uses(): Uses {
+    return this.ops.uses;
+  }
+  get usesLength(): number {
+    return this.ops.usesLength;
+  }
+  /** Hands the tape to the next encoder; the replay calls it when this buffer has run. */
+  release(): void {
+    this.ops.pool?.give(this.ops);
+  }
 }
+CompatCommandBuffer.prototype.label = '';
 
 /**
  * A GPUQuerySet of type `occlusion`: one WebGL2 ANY_SAMPLES_PASSED query per index and use, so a result is 1 when any
@@ -735,63 +973,78 @@ export class CompatQuerySet {
   }
 }
 
+/** The descriptor a call without one gets, shared (a default `{}` is a new object each call). */
+export const NO_DESCRIPTOR: Readonly<{ label?: string }> = Object.freeze({});
+
 /** A GPUCommandEncoder. */
 export class CompatCommandEncoder {
-  private readonly ops: Op[] = [];
-  private readonly uses: Uses = [];
-  private finished = false;
-  private compute = false;
-  private readback = false;
-  constructor(
-    private readonly device: CompatDevice,
-    public label: string,
-  ) {}
+  private readonly tape: Tape;
+  /** Bit 1: finished; 2: holds compute passes; 4: holds a texture read-back (one field: 4 bytes of every encoder a frame makes). */
+  private flags = 0;
+  /** The label: '' (the prototype's) unless one is given, so an unlabelled one, which a frame makes many of, has one field fewer. */
+  declare label: string;
+  constructor(device: CompatDevice, label: string) {
+    this.tape = device.tapes.take();
+    if (label) this.label = label;
+  }
+  /** The device, through the tape's pool (a field of its own would be 4 bytes of every encoder a frame makes). */
+  private get device(): CompatDevice {
+    return (this.tape.pool as TapePool).device;
+  }
 
   beginRenderPass(d: GPURenderPassDescriptor): CompatRenderPassEncoder {
     if (d.timestampWrites) throw this.device.unsupported('timestamp queries');
-    // A snapshot: callers may change their descriptor object once the pass has begun.
-    const pass: PassDescriptor = {
-      colors: [...d.colorAttachments].map((a) =>
-        a
-          ? {
-              view: viewOf(a.view),
-              depthSlice: a.depthSlice ?? 0,
-              resolveTarget: a.resolveTarget ? viewOf(a.resolveTarget) : undefined,
-              clearValue: color(a.clearValue),
-              loadOp: a.loadOp,
-              storeOp: a.storeOp,
-            }
-          : null,
-      ),
-      depth: d.depthStencilAttachment
-        ? {
-            view: viewOf(d.depthStencilAttachment.view),
-            depthClearValue: d.depthStencilAttachment.depthClearValue ?? 0,
-            depthLoadOp: d.depthStencilAttachment.depthLoadOp,
-            depthStoreOp: d.depthStencilAttachment.depthStoreOp,
-            depthReadOnly: !!d.depthStencilAttachment.depthReadOnly,
-            stencilClearValue: d.depthStencilAttachment.stencilClearValue ?? 0,
-            stencilLoadOp: d.depthStencilAttachment.stencilLoadOp,
-            stencilStoreOp: d.depthStencilAttachment.stencilStoreOp,
-            stencilReadOnly: !!d.depthStencilAttachment.stencilReadOnly,
-          }
-        : undefined,
-      queries: (d.occlusionQuerySet as unknown as CompatQuerySet | undefined) ?? undefined,
-    };
-    for (const a of pass.colors) {
-      if (a) this.uses.push(a.view.texture);
-      if (a?.resolveTarget) this.uses.push(a.resolveTarget.texture);
+    const tape = this.tape,
+      attachments = d.colorAttachments as Iterable<GPURenderPassColorAttachment | null>,
+      list = Array.isArray(attachments) ? attachments : [...attachments],
+      // A copy of the descriptor: callers may change theirs once the pass has begun. The snapshot is the tape's own
+      // and goes back to the pool with it.
+      pass = tape.snapshot(list.length);
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (!a) {
+        pass.colors[i] = null;
+        continue;
+      }
+      const c = (pass.slots[i] ??= new ColorSnap());
+      c.view = viewOf(a.view);
+      c.depthSlice = a.depthSlice ?? 0;
+      c.resolveTarget = a.resolveTarget ? viewOf(a.resolveTarget) : undefined;
+      colorInto(c.clearValue, a.clearValue);
+      c.loadOp = a.loadOp;
+      c.storeOp = a.storeOp;
+      pass.colors[i] = c;
     }
-    if (pass.depth) this.uses.push(pass.depth.view.texture);
-    if (pass.queries) this.uses.push(pass.queries);
-    this.ops.push((r) => r.beginPass(pass));
-    return new CompatRenderPassEncoder(this.ops, d.label ?? '', this.uses);
+    const depth = d.depthStencilAttachment;
+    if (depth) {
+      const z = pass.depthSlot;
+      z.view = viewOf(depth.view);
+      z.depthClearValue = depth.depthClearValue ?? 0;
+      z.depthLoadOp = depth.depthLoadOp;
+      z.depthStoreOp = depth.depthStoreOp;
+      z.depthReadOnly = !!depth.depthReadOnly;
+      z.stencilClearValue = depth.stencilClearValue ?? 0;
+      z.stencilLoadOp = depth.stencilLoadOp;
+      z.stencilStoreOp = depth.stencilStoreOp;
+      z.stencilReadOnly = !!depth.stencilReadOnly;
+      pass.depth = z;
+    } else pass.depth = undefined;
+    pass.queries = (d.occlusionQuerySet as unknown as CompatQuerySet | undefined) ?? undefined;
+    for (let i = 0; i < list.length; i++) {
+      const a = pass.colors[i];
+      if (a) tape.use(a.view.texture);
+      if (a?.resolveTarget) tape.use(a.resolveTarget.texture);
+    }
+    if (pass.depth) tape.use(pass.depth.view.texture);
+    if (pass.queries) tape.use(pass.queries);
+    tape.obj(OP.BEGIN_PASS, pass);
+    return new CompatRenderPassEncoder(tape, d.label ?? '');
   }
 
-  beginComputePass(d: GPUComputePassDescriptor = {}): CompatComputePassEncoder {
+  beginComputePass(d: GPUComputePassDescriptor = NO_DESCRIPTOR): CompatComputePassEncoder {
     if (d.timestampWrites) throw this.device.unsupported('timestamp queries');
-    this.compute = true;
-    return new CompatComputePassEncoder(this.ops, this.device, d.label ?? '', this.uses);
+    this.flags |= 2;
+    return new CompatComputePassEncoder(this.tape, d.label ?? '');
   }
 
   copyBufferToBuffer(
@@ -801,36 +1054,58 @@ export class CompatCommandEncoder {
     c?: number,
     d?: number,
   ): void {
-    // Both overloads: (src, srcOffset, dst, dstOffset, size) and (src, dst, size?).
-    const [srcOffset, dst, dstOffset, size] =
-      typeof a === 'number'
-        ? [a, b as CompatBuffer, c as number, d ?? src.size - a]
-        : [0, a, 0, (b as number | undefined) ?? src.size];
-    this.uses.push(src, dst);
-    this.ops.push((r) => r.copyBuffer(src, srcOffset, dst, dstOffset, size));
+    // Both overloads: (src, srcOffset, dst, dstOffset, size) and (src, dst, size?). Plain variables: a destructured
+    // array literal is an array and an iterator a call.
+    let srcOffset = 0,
+      dstOffset = 0,
+      size: number;
+    let dst: CompatBuffer;
+    if (typeof a === 'number') {
+      srcOffset = a;
+      dst = b as CompatBuffer;
+      dstOffset = c as number;
+      size = d ?? src.size - a;
+    } else {
+      dst = a;
+      size = (b as number | undefined) ?? src.size;
+    }
+    this.tape.use(src);
+    this.tape.use(dst);
+    this.tape.copyBuffer(src, dst, srcOffset, dstOffset, size);
   }
   copyBufferToTexture(source: GPUTexelCopyBufferInfo, destination: GPUTexelCopyTextureInfo, size: GPUExtent3D): void {
+    if (!this.aligned('copyBufferToTexture', source)) return;
     const s = { ...source },
       d = { ...destination };
-    this.uses.push(s.buffer as unknown as Usable, d.texture as unknown as Usable);
-    this.ops.push((r) => r.copyBufferToTexture(s as never, d as never, size));
+    this.tape.use(s.buffer as unknown as Usable);
+    this.tape.use(d.texture as unknown as Usable);
+    this.tape.closure((r) => r.copyBufferToTexture(s as never, d as never, size));
   }
   copyTextureToBuffer(source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyBufferInfo, size: GPUExtent3D): void {
+    if (!this.aligned('copyTextureToBuffer', destination)) return;
     const s = { ...source },
       d = { ...destination };
-    this.uses.push(s.texture as unknown as Usable, d.buffer as unknown as Usable);
-    this.readback = true;
-    this.ops.push((r) => r.device.readback?.copyTextureToBuffer(r, s as never, d as never, extent(size)));
+    this.tape.use(s.texture as unknown as Usable);
+    this.tape.use(d.buffer as unknown as Usable);
+    this.flags |= 4;
+    this.tape.closure((r) => r.device.readback?.copyTextureToBuffer(r, s as never, d as never, extent(size)));
   }
   copyTextureToTexture(source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyTextureInfo, size: GPUExtent3D): void {
-    const s = { ...source },
-      d = { ...destination };
-    this.uses.push(s.texture as unknown as Usable, d.texture as unknown as Usable);
-    this.ops.push((r) => r.copyTextureToTexture(s as never, d as never, extent(size)));
+    const a = source.texture as unknown as CompatTexture,
+      b = destination.texture as unknown as CompatTexture;
+    this.tape.use(a);
+    this.tape.use(b);
+    this.tape.copyTextures(a, b, source, destination, size);
   }
   clearBuffer(buffer: CompatBuffer, offset = 0, size?: number): void {
-    this.uses.push(buffer);
-    this.ops.push(() => buffer.write(offset, new Uint8Array(size ?? buffer.size - offset)));
+    this.tape.use(buffer);
+    this.tape.closure(() => buffer.write(offset, new Uint8Array(size ?? buffer.size - offset)));
+  }
+  /** False, after a validation error, when an encoder copy's buffer rows are not 256-byte aligned (WebGPU requires it). */
+  private aligned(copy: string, layout: GPUTexelCopyBufferInfo): boolean {
+    if (layout.bytesPerRow === undefined || layout.bytesPerRow % 256 === 0) return true;
+    this.device.validationError(`${copy}: bytesPerRow ${layout.bytesPerRow} is not a multiple of 256`);
+    return false;
   }
   resolveQuerySet(
     querySet: CompatQuerySet,
@@ -845,33 +1120,42 @@ export class CompatCommandEncoder {
       );
       return;
     }
-    this.uses.push(querySet, destination);
-    this.ops.push((r) => r.resolveQueries(querySet, firstQuery, queryCount, destination, destinationOffset));
+    this.tape.use(querySet);
+    this.tape.use(destination);
+    this.tape.closure((r) => r.resolveQueries(querySet, firstQuery, queryCount, destination, destinationOffset));
   }
   pushDebugGroup(): void {}
   popDebugGroup(): void {}
   insertDebugMarker(): void {}
 
-  finish(descriptor: GPUCommandBufferDescriptor = {}): CompatCommandBuffer {
-    if (this.finished) this.device.validationError('finish() was already called on this command encoder');
-    this.finished = true;
-    return new CompatCommandBuffer(this.ops, descriptor.label ?? this.label, this.compute, this.readback, this.uses);
+  finish(descriptor: GPUCommandBufferDescriptor = NO_DESCRIPTOR): CompatCommandBuffer {
+    if (this.flags & 1) {
+      this.device.validationError('finish() was already called on this command encoder');
+      // The first command buffer owns the tape (it goes back to the pool when that one has replayed): this one is
+      // empty, as an invalid WebGPU command buffer is.
+      return new CompatCommandBuffer(new Tape(), descriptor.label ?? this.label);
+    }
+    this.flags |= 1;
+    return new CompatCommandBuffer(this.tape, descriptor.label ?? this.label, (this.flags & 2) !== 0, (this.flags & 4) !== 0);
   }
 }
+CompatCommandEncoder.prototype.label = '';
 
 const viewOf = (v: GPUTextureView | GPUTexture): CompatTextureView =>
   'createView' in (v as object) ? (v as unknown as CompatTexture).createView() : (v as unknown as CompatTextureView);
 
 /** The draw commands render passes and render bundles share; each call records one replay step. */
 class DrawRecorder {
+  /** The label: '' (the prototype's) unless one is given, so an unlabelled one, which a frame makes many of, has one field fewer. */
+  declare label: string;
   constructor(
-    protected readonly ops: Op[],
-    public label: string,
-    /** The command buffer's (or bundle's) list of what it uses. */
-    protected readonly uses: Uses,
-  ) {}
+    protected readonly tape: Tape,
+    label: string,
+  ) {
+    if (label) this.label = label;
+  }
   setPipeline(pipeline: CompatRenderPipeline): void {
-    this.ops.push((r) => r.setPipeline(pipeline));
+    this.tape.obj(OP.SET_PIPELINE, pipeline);
   }
   setBindGroup(
     index: number,
@@ -880,82 +1164,84 @@ class DrawRecorder {
     start = 0,
     length?: number,
   ): void {
-    const list = offsets ? [...(offsets as Iterable<number>)] : [];
-    const dynamic = offsets instanceof Uint32Array ? list.slice(start, start + (length ?? list.length - start)) : list;
-    if (group) this.uses.push(group.uses);
-    this.ops.push((r) => r.setBindGroup(index, group, dynamic));
+    if (group) this.tape.use(group.uses);
+    if (!offsets) this.tape.bindGroup(index, group, undefined, 0, 0);
+    else if (offsets instanceof Uint32Array)
+      this.tape.bindGroup(index, group, offsets, start, length ?? offsets.length - start);
+    else if (Array.isArray(offsets)) this.tape.bindGroup(index, group, offsets, 0, offsets.length);
+    else {
+      const list = [...offsets];
+      this.tape.bindGroup(index, group, list, 0, list.length);
+    }
   }
   setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset = 0, size?: number): void {
-    if (buffer) this.uses.push(buffer);
-    this.ops.push((r) => r.setVertexBuffer(slot, buffer, offset, size));
+    if (buffer) this.tape.use(buffer);
+    this.tape.objNums3(OP.SET_VERTEX, buffer, slot, offset, size ?? -1);
   }
   setIndexBuffer(buffer: CompatBuffer, format: GPUIndexFormat, offset = 0, size?: number): void {
-    this.uses.push(buffer);
-    this.ops.push((r) => r.setIndexBuffer(buffer, format, offset, size));
+    this.tape.use(buffer);
+    this.tape.indexBuffer(buffer, format, offset, size ?? -1);
   }
   draw(vertexCount: number, instanceCount = 1, firstVertex = 0, firstInstance = 0): void {
-    this.ops.push((r) => r.draw(vertexCount, instanceCount, firstVertex, firstInstance));
+    this.tape.n4(OP.DRAW, vertexCount, instanceCount, firstVertex, firstInstance);
   }
   drawIndexed(indexCount: number, instanceCount = 1, firstIndex = 0, baseVertex = 0, firstInstance = 0): void {
-    this.ops.push((r) => r.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance));
+    this.tape.n5(OP.DRAW_INDEXED, indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
   }
   drawIndirect(buffer: CompatBuffer, offset: number): void {
-    this.uses.push(buffer);
-    this.ops.push((r) => {
-      const a = new Uint32Array(r.indirect(buffer, offset, 16));
-      r.draw(a[0], a[1], a[2], a[3]);
-    });
+    this.tape.use(buffer);
+    this.tape.objNum(OP.DRAW_INDIRECT, buffer, offset);
   }
   drawIndexedIndirect(buffer: CompatBuffer, offset: number): void {
-    this.uses.push(buffer);
-    this.ops.push((r) => {
-      const bytes = r.indirect(buffer, offset, 20),
-        u = new Uint32Array(bytes),
-        i = new Int32Array(bytes);
-      r.drawIndexed(u[0], u[1], u[2], i[3], u[4]);
-    });
+    this.tape.use(buffer);
+    this.tape.objNum(OP.DRAW_INDEXED_INDIRECT, buffer, offset);
   }
   pushDebugGroup(): void {}
   popDebugGroup(): void {}
   insertDebugMarker(): void {}
 }
+DrawRecorder.prototype.label = '';
 
 /** A GPURenderPassEncoder. */
 export class CompatRenderPassEncoder extends DrawRecorder {
   setViewport(x: number, y: number, width: number, height: number, minDepth: number, maxDepth: number): void {
-    this.ops.push((r) => r.setViewport(x, y, width, height, minDepth, maxDepth));
+    this.tape.n6(OP.VIEWPORT, x, y, width, height, minDepth, maxDepth);
   }
   setScissorRect(x: number, y: number, width: number, height: number): void {
-    this.ops.push((r) => r.setScissor(x, y, width, height));
+    this.tape.n4(OP.SCISSOR, x, y, width, height);
   }
   setBlendConstant(c: GPUColor): void {
-    const v = color(c);
-    this.ops.push((r) => r.setBlendConstant(v));
+    if (Array.isArray(c)) this.tape.n4(OP.BLEND_CONSTANT, c[0], c[1], c[2], c[3]);
+    else {
+      const v = color(c);
+      this.tape.n4(OP.BLEND_CONSTANT, v[0], v[1], v[2], v[3]);
+    }
   }
   setStencilReference(reference: number): void {
-    this.ops.push((r) => r.setStencilReference(reference));
+    this.tape.num(OP.STENCIL_REFERENCE, reference);
   }
   beginOcclusionQuery(queryIndex: number): void {
-    this.ops.push((r) => r.beginQuery(queryIndex));
+    this.tape.num(OP.BEGIN_QUERY, queryIndex);
   }
   endOcclusionQuery(): void {
-    this.ops.push((r) => r.endQuery());
+    this.tape.op(OP.END_QUERY);
   }
   /** Runs the bundles' draws; the pass's pipeline, bind groups and buffers are reset before and after, as in WebGPU. */
   executeBundles(bundles: Iterable<CompatRenderBundle>): void {
     const list = [...bundles];
-    for (const b of list) this.uses.push(b.uses);
-    this.ops.push((r) => r.executeBundles(list));
+    for (const b of list) this.tape.use(b.uses);
+    this.tape.obj(OP.EXECUTE_BUNDLES, list);
   }
   end(): void {
-    this.ops.push((r) => r.endPass());
+    this.tape.op(OP.END_PASS);
   }
 }
 
 /** A GPURenderBundle: recorded draws a render pass replays with executeBundles. */
 export class CompatRenderBundle {
   constructor(
-    readonly ops: readonly Op[],
+    /** The recorded draws: a bundle replays many times, so its tape is its own and never pooled. */
+    readonly ops: Tape,
     public label: string,
     /** What its draws use, flattened so a pass that executes it adds one entry. */
     readonly uses: readonly Usable[] = [],
@@ -969,12 +1255,17 @@ export class CompatRenderBundleEncoder extends DrawRecorder {
     private readonly device: CompatDevice,
     readonly descriptor: GPURenderBundleEncoderDescriptor,
   ) {
-    super([], descriptor.label ?? '', []);
+    super(new Tape(), descriptor.label ?? '');
   }
-  finish(descriptor: GPURenderBundleDescriptor = {}): CompatRenderBundle {
+  finish(descriptor: GPURenderBundleDescriptor = NO_DESCRIPTOR): CompatRenderBundle {
     if (this.finished) this.device.validationError('finish() was already called on this render bundle encoder');
     this.finished = true;
-    return new CompatRenderBundle(this.ops, descriptor.label ?? this.label, this.uses.flat());
+    const tape = this.tape;
+    return new CompatRenderBundle(
+      tape,
+      descriptor.label ?? this.label,
+      tape.uses.slice(0, tape.usesLength).flat() as Usable[],
+    );
   }
 }
 
@@ -1006,27 +1297,71 @@ interface Sub {
   readonly info: FormatInfo;
   readonly level: number;
   attach(point: number): void;
+  /**
+   * The framebuffers made with this subresource first (Replayer.framebuffer): their attachments and the device's
+   * record, so a pass finds its framebuffer by the identity of its cached subresources, without a key string.
+   */
+  fbs?: Attachments[];
 }
 
+/** A framebuffer's attachments, as Replayer.framebuffer matches them, and the device's record of it. */
+interface Attachments {
+  readonly colors: readonly (Sub | null)[];
+  readonly depth: Sub | null;
+  readonly record: FramebufferRecord;
+}
+
+/** What a pass binds in one bind group slot (group null: nothing). Reused from pass to pass. */
+interface GroupSlot {
+  group: CompatBindGroup | null;
+  /** The slot's own list (setBindGroup copies the dynamic offsets into it), of which only the first `count` count. */
+  readonly offsets: readonly number[];
+  count: number;
+}
+/** What a pass binds in one vertex buffer slot (buffer null: nothing). Reused from pass to pass. */
+interface VertexSlot {
+  buffer: CompatBuffer | null;
+  offset: number;
+}
+/** The pass's index buffer (buffer null: none). Reused from pass to pass. */
+interface IndexSlot {
+  buffer: CompatBuffer | null;
+  type: number;
+  size: number;
+  offset: number;
+}
+
+/** The running render pass. One object per replayer, reset by beginPass, so a pass allocates no state of its own. */
 interface PassState {
-  readonly desc: PassDescriptor;
-  readonly fbo: WebGLFramebuffer;
+  desc: PassDescriptor;
+  fbo: WebGLFramebuffer;
   /** Per colour attachment: the 3D slice and the 2D stand-in drawn in its place (see Replayer.standIn), or null. */
-  readonly standIns: readonly ([Sub, Sub] | null)[];
-  readonly width: number;
-  readonly height: number;
+  readonly standIns: ([Sub, Sub] | null)[];
+  width: number;
+  height: number;
   pipeline: CompatRenderPipeline | null;
   applied: CompatRenderPipeline | null;
-  groups: ({ group: CompatBindGroup; offsets: number[] } | null)[];
-  vertex: ({ buffer: CompatBuffer; offset: number } | null)[];
-  index: { buffer: CompatBuffer; type: number; size: number; offset: number } | null;
+  readonly groups: (GroupSlot | undefined)[];
+  readonly vertex: (VertexSlot | undefined)[];
+  index: IndexSlot | null;
   stencilReference: number;
   /** The occlusion query running, if any. */
   query: boolean;
 }
 
+/** The most colour attachments a pass has (WebGPU maxColorAttachments, which the layer reports as 8). */
+const MAX_COLORS = 8;
+/** The offsets of a compute bind group with none (shared; never written). */
+const NO_OFFSETS: readonly number[] = [];
+
+/** The little-endian 32-bit word at byte `at` of `bytes` (an indirect argument: a copy of it would be a typed array and a buffer). */
+const word = (bytes: Uint8Array, at: number): number =>
+  (bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24)) >>> 0;
+/** The value a colour attachment that was never written loads as. */
+const NO_COLOR: readonly number[] = [0, 0, 0, 0];
+
 /** The internal programs the device draws with: full-target triangles that fetch texels (readbacks, copies). */
-interface Helper {
+export interface Helper {
   readonly program: WebGLProgram;
   readonly offset: WebGLUniformLocation | null;
   readonly value: WebGLUniformLocation | null;
@@ -1038,6 +1373,40 @@ const ZERO_BYTES_KEPT = 4 << 20;
 
 export class Replayer {
   private pass: PassState | null = null;
+  /** The pass state beginPass resets and reuses (`pass` while a pass runs). */
+  private readonly passState: PassState = {
+    desc: { colors: [] },
+    fbo: null as unknown as WebGLFramebuffer,
+    // MAX_COLORS long from the start, and never shortened: a pass of fewer attachments setting `length` trimmed the
+    // backing store, and the next pass of more grew a new one (KB-COMPAT-FRAMEALLOC1). Entries past a pass's
+    // attachment count are not read.
+    standIns: new Array<[Sub, Sub] | null>(MAX_COLORS).fill(null),
+    width: 1,
+    height: 1,
+    pipeline: null,
+    applied: null,
+    groups: [],
+    vertex: [],
+    index: null,
+    stencilReference: 0,
+    query: false,
+  };
+  /** beginPass's colour subresources (MAX_COLORS long); framebuffer() reads the first ones a pass has. */
+  private readonly colorSubs: (Sub | null)[] = new Array(MAX_COLORS).fill(null);
+  /** Cached subresources: by storage, then level, then layer (3D: depth slice); by texture for a renderbuffer. */
+  private readonly subs = new WeakMap<TextureStorage, (Sub | undefined)[][]>();
+  private readonly renderbufferSubs = new WeakMap<CompatTexture, Sub>();
+  private readonly resolvedSubs = new WeakMap<CompatTexture, { texture: WebGLTexture; sub: Sub }>();
+  private readonly stencilResolvedSubs = new WeakMap<CompatTexture, { texture: WebGLTexture; sub: Sub }>();
+  /** Clear values passed without an array a call. */
+  private readonly clearDepth = new Float32Array(1);
+  private readonly clearStencil = new Int32Array(1);
+  /** A float colour clear's value as a typed array: WebGL reads a JS array of doubles through one heap number each. */
+  private readonly clearFloat = new Float32Array(4);
+  private readonly clearUint = new Uint32Array(4);
+  private readonly clearInt = new Int32Array(4);
+  /** invalidateFramebuffer's attachment lists, one reused array per length (GL copies it). */
+  private readonly discards: number[][] = [];
   readonly gl: WebGL2RenderingContext;
   private readonly helpers = new Map<string, Helper>();
   private emptyVao: WebGLVertexArrayObject | null = null;
@@ -1045,11 +1414,172 @@ export class Replayer {
     this.gl = device.gl;
   }
 
-  run(ops: readonly Op[]): void {
-    for (const op of ops) {
+  /** Replays a tape: each command's numbers and objects come off the tape in the order the recorder wrote them. */
+  run(tape: Tape): void {
+    const codes = tape.codes,
+      nums = tape.nums,
+      objs = tape.objs,
+      count = tape.length;
+    let n = 0,
+      o = 0;
+    for (let i = 0; i < count; i++) {
       if (this.device.destroyed) return;
-      op(this);
+      switch (codes[i]) {
+        case OP.CLOSURE:
+          (objs[o++] as (r: Replayer) => void)(this);
+          break;
+        case OP.BEGIN_PASS:
+          this.beginPass(objs[o++] as PassDescriptor);
+          break;
+        case OP.COPY_BUFFER:
+          this.copyBuffer(objs[o++] as CompatBuffer, nums[n], objs[o++] as CompatBuffer, nums[n + 1], nums[n + 2]);
+          n += 3;
+          break;
+        case OP.COPY_TEXTURE:
+          this.copyTextures(
+            objs[o++] as CompatTexture,
+            objs[o++] as CompatTexture,
+            nums[n],
+            nums[n + 1],
+            nums[n + 2],
+            nums[n + 3],
+            nums[n + 4],
+            nums[n + 5],
+            nums[n + 6],
+            nums[n + 7],
+            nums[n + 8],
+            nums[n + 9],
+            nums[n + 10],
+          );
+          n += 11;
+          break;
+        case OP.SET_PIPELINE:
+          this.setPipeline(objs[o++] as CompatRenderPipeline);
+          break;
+        case OP.SET_BIND_GROUP: {
+          const length = nums[n + 1];
+          this.setBindGroup(nums[n], objs[o++] as CompatBindGroup | null, nums, n + 2, length);
+          n += 2 + length;
+          break;
+        }
+        case OP.SET_VERTEX:
+          this.setVertexBuffer(nums[n], objs[o++] as CompatBuffer | null, nums[n + 1]);
+          n += 3;
+          break;
+        case OP.SET_INDEX:
+          this.setIndexBuffer(objs[o++] as CompatBuffer, nums[n + 2] === 0 ? 'uint16' : 'uint32', nums[n]);
+          n += 3;
+          break;
+        case OP.DRAW:
+          this.draw(nums[n], nums[n + 1], nums[n + 2], nums[n + 3]);
+          n += 4;
+          break;
+        case OP.DRAW_INDEXED:
+          this.drawIndexed(nums[n], nums[n + 1], nums[n + 2], nums[n + 3], nums[n + 4]);
+          n += 5;
+          break;
+        case OP.DRAW_INDIRECT:
+          this.drawIndirect(objs[o++] as CompatBuffer, nums[n++]);
+          break;
+        case OP.DRAW_INDEXED_INDIRECT:
+          this.drawIndexedIndirect(objs[o++] as CompatBuffer, nums[n++]);
+          break;
+        case OP.VIEWPORT:
+          this.setViewport(nums[n], nums[n + 1], nums[n + 2], nums[n + 3], nums[n + 4], nums[n + 5]);
+          n += 6;
+          break;
+        case OP.SCISSOR:
+          this.setScissor(nums[n], nums[n + 1], nums[n + 2], nums[n + 3]);
+          n += 4;
+          break;
+        case OP.BLEND_CONSTANT:
+          this.setBlendConstant(nums[n], nums[n + 1], nums[n + 2], nums[n + 3]);
+          n += 4;
+          break;
+        case OP.STENCIL_REFERENCE:
+          this.setStencilReference(nums[n++]);
+          break;
+        case OP.BEGIN_QUERY:
+          this.beginQuery(nums[n++]);
+          break;
+        case OP.END_QUERY:
+          this.endQuery();
+          break;
+        case OP.EXECUTE_BUNDLES:
+          this.executeBundles(objs[o++] as readonly CompatRenderBundle[]);
+          break;
+        case OP.END_PASS:
+          this.endPass();
+          break;
+        case OP.COMPUTE_BEGIN:
+          this.beginCompute();
+          break;
+        case OP.COMPUTE_PIPELINE:
+          this.computePipeline = objs[o++] as CompatComputePipeline;
+          break;
+        case OP.COMPUTE_BIND: {
+          const length = nums[n + 1];
+          this.bindCompute(nums[n], objs[o++] as CompatBindGroup | null, nums, n + 2, length);
+          n += 2 + length;
+          break;
+        }
+        case OP.DISPATCH: {
+          const counts = this.counts;
+          counts[0] = nums[n];
+          counts[1] = nums[n + 1];
+          counts[2] = nums[n + 2];
+          n += 3;
+          if (this.computePipeline) this.dispatch(this.computePipeline, this.computeGroups, counts);
+          break;
+        }
+        case OP.DISPATCH_INDIRECT: {
+          const counts = this.counts,
+            bytes = (objs[o++] as CompatBuffer).bytes(),
+            at = nums[n++];
+          counts[0] = word(bytes, at);
+          counts[1] = word(bytes, at + 4);
+          counts[2] = word(bytes, at + 8);
+          if (this.computePipeline) this.dispatch(this.computePipeline, this.computeGroups, counts);
+          break;
+        }
+      }
     }
+  }
+
+  /** The compute pass running: its pipeline, bind groups (reused slots, so a pass allocates none) and workgroup counts. */
+  private computePipeline: CompatComputePipeline | null = null;
+  private readonly computeSlots: { group: CompatBindGroup; offsets: number[] }[] = [];
+  private readonly computeGroups: BoundGroup[] = [];
+  private readonly counts = [0, 0, 0];
+
+  /** A compute pass begins with no pipeline and no bind group. */
+  private beginCompute(): void {
+    this.computePipeline = null;
+    for (let i = 0; i < this.computeGroups.length; i++) this.computeGroups[i] = null;
+  }
+
+  /** Binds `group` for the compute pass's dispatches (null, or an invalid group, binds nothing). */
+  private bindCompute(index: number, group: CompatBindGroup | null, offsets: ArrayLike<number>, from: number, count: number): void {
+    if (!group || group.invalid) {
+      this.computeGroups[index] = null;
+      return;
+    }
+    const slot = (this.computeSlots[index] ??= { group, offsets: NO_OFFSETS as number[] });
+    slot.group = group;
+    // The offsets list has exactly the offsets bound, as the runtime reads it by index with 0 for a missing one.
+    if (slot.offsets.length !== count) slot.offsets = count === 0 ? (NO_OFFSETS as number[]) : new Array<number>(count);
+    for (let i = 0; i < count; i++) slot.offsets[i] = offsets[from + i];
+    this.computeGroups[index] = slot;
+  }
+
+  /** drawIndirect's draw: the four counts read from the buffer (a rare command; its array is the cost of reading). */
+  private drawIndirect(buffer: CompatBuffer, offset: number): void {
+    const bytes = buffer.bytes();
+    this.draw(word(bytes, offset), word(bytes, offset + 4), word(bytes, offset + 8), word(bytes, offset + 12));
+  }
+  private drawIndexedIndirect(buffer: CompatBuffer, offset: number): void {
+    const bytes = buffer.bytes();
+    this.drawIndexed(word(bytes, offset), word(bytes, offset + 4), word(bytes, offset + 8), word(bytes, offset + 12) | 0, word(bytes, offset + 16));
   }
 
   // ------------------------------------------------ new textures
@@ -1136,7 +1666,11 @@ export class Replayer {
       target === gl.TEXTURE_CUBE_MAP ? 6 : target === gl.TEXTURE_3D ? Math.max(1, d >> level) : d;
     const draw = point === gl.COLOR_ATTACHMENT0 && this.drawsClears(info, levels, layersAt(0)),
       // A view copy made at a draw zeroes its storage inside a pass: the pass's viewport comes back after the draws.
-      viewport = draw && this.pass ? s.value('viewport') : undefined;
+      keep = draw && !!this.pass,
+      vx = s.num(S.viewport),
+      vy = s.num(S.viewport + 1),
+      vw = s.num(S.viewport + 2),
+      vh = s.num(S.viewport + 3);
     let complete = true;
     for (let level = 0; level < levels && complete; level++)
       for (let layer = 0, n = layersAt(level); layer < n; layer++) {
@@ -1153,10 +1687,7 @@ export class Replayer {
           this.drawClear(0, [0, 0, 0, 0], Math.max(1, w >> level), Math.max(1, h >> level), [gl.COLOR_ATTACHMENT0]);
         else gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
       }
-    if (viewport) {
-      const [x, y, vw, vh] = viewport.split(',').map(Number);
-      s.set('viewport', viewport, () => gl.viewport(x, y, vw, vh));
-    }
+    if (keep && vx === vx) s.viewport(vx, vy, vw, vh);
     // Detach (a texture attached to no framebuffer can be deleted at once), and give a pass in replay (a view copy made
     // at a draw) its framebuffer and state back.
     attach(0, 0, null);
@@ -1243,6 +1774,13 @@ export class Replayer {
 
   /** A level and layer of a storage (for a 3D storage, `layer` is the depth slice). */
   sub(s: TextureStorage, level: number, layer: number): Sub {
+    let levels = this.subs.get(s);
+    if (!levels) this.subs.set(s, (levels = []));
+    const layers = (levels[level] ??= []);
+    return (layers[layer] ??= this.makeSub(s, level, layer));
+  }
+
+  private makeSub(s: TextureStorage, level: number, layer: number): Sub {
     const gl = this.gl;
     return {
       key: `s${s.id}.${level}.${layer}`,
@@ -1271,18 +1809,29 @@ export class Replayer {
     };
   }
 
-  /** What a render pass attaches for a view: its renderbuffer, or its level and layer (or 3D slice). */
-  private viewSub(v: CompatTextureView, slice?: number): Sub {
+  /** The subresource of a renderbuffer-backed texture, made once per texture. */
+  private renderbufferSub(t: CompatTexture): Sub {
+    return this.renderbufferSubs.get(t) ?? this.makeRenderbufferSub(t);
+  }
+
+  /** renderbufferSub()'s slow path, a method of its own: a function that makes a closure allocates its context on every call. */
+  private makeRenderbufferSub(t: CompatTexture): Sub {
     const gl = this.gl,
-      t = v.texture;
-    if (t.renderbuffer)
-      return {
+      sub: Sub = {
         key: `r${t.id}`,
         owner: t,
         info: t.storageInfo,
         level: 0,
         attach: (point) => gl.framebufferRenderbuffer(gl.DRAW_FRAMEBUFFER, point, gl.RENDERBUFFER, t.renderbuffer),
       };
+    this.renderbufferSubs.set(t, sub);
+    return sub;
+  }
+
+  /** What a render pass attaches for a view: its renderbuffer, or its level and layer (or 3D slice). */
+  private viewSub(v: CompatTextureView, slice?: number): Sub {
+    const t = v.texture;
+    if (t.renderbuffer) return this.renderbufferSub(t);
     return this.sub(t.attached(v), v.baseMipLevel, t.dimension === '3d' ? (slice ?? 0) : v.baseArrayLayer);
   }
 
@@ -1311,17 +1860,49 @@ export class Replayer {
     return info.kind === 'depth' ? this.gl.DEPTH_ATTACHMENT : this.gl.DEPTH_STENCIL_ATTACHMENT;
   }
 
-  /** A framebuffer of these colour subresources (null entries leave a draw buffer empty) and depth subresource. */
-  private framebuffer(colors: readonly (Sub | null)[], depth?: Sub): WebGLFramebuffer {
-    const gl = this.gl,
-      device = this.device;
-    const key = `${colors.map((c) => c?.key ?? '-').join(',')}|${depth?.key ?? ''}`;
-    const owners = [...colors.filter((c): c is Sub => !!c), ...(depth ? [depth] : [])].map((c) => c.owner);
-    return device.framebuffer(key, owners, (fbo, made) => {
+  /**
+   * A framebuffer of the first `count` colour subresources (null entries leave a draw buffer empty) and the depth
+   * subresource. One made before is found by the identity of its subresources (Sub.fbs; sub() and viewSub() cache
+   * them), so a steady pass builds nothing: the key string, owner list and attach function are made once.
+   */
+  private framebuffer(colors: readonly (Sub | null)[], count: number, depth: Sub | null): WebGLFramebuffer {
+    let lead = depth;
+    for (let i = 0; i < count; i++)
+      if (colors[i]) {
+        lead = colors[i];
+        break;
+      }
+    const list = lead?.fbs;
+    if (list)
+      for (let k = 0; k < list.length; k++) {
+        const a = list[k];
+        if (a.depth !== depth || a.colors.length !== count || a.record.dead) continue;
+        let same = true;
+        for (let i = 0; i < count && same; i++) same = a.colors[i] === colors[i];
+        if (same) return this.device.framebufferAgain(a.record);
+      }
+    return this.makeFramebuffer(colors, count, depth, lead);
+  }
+
+  /**
+   * framebuffer()'s slow path, once per set of attachments (not made yet, or deleted with one of its textures). A
+   * method of its own: its attach function captures the attachments, and a function that makes a closure allocates
+   * the closure's context on every call, the steady ones included.
+   */
+  private makeFramebuffer(colors: readonly (Sub | null)[], count: number, depth: Sub | null, lead: Sub | null): WebGLFramebuffer {
+    const list = lead?.fbs;
+    if (list) for (let k = list.length - 1; k >= 0; k--) if (list[k].record.dead) list.splice(k, 1);
+    const own = colors.slice(0, count),
+      gl = this.gl,
+      device = this.device,
+      buffers = own.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE)),
+      key = `${own.map((c) => c?.key ?? '-').join(',')}|${depth?.key ?? ''}`,
+      owners = [...own.filter((c): c is Sub => !!c), ...(depth ? [depth] : [])].map((c) => c.owner);
+    const record = device.framebuffer(key, owners, (fbo, made) => {
       device.state.bindDrawFramebuffer(fbo);
-      colors.forEach((c, i) => c?.attach(gl.COLOR_ATTACHMENT0 + i));
+      for (let i = 0; i < own.length; i++) own[i]?.attach(gl.COLOR_ATTACHMENT0 + i);
       if (depth) depth.attach(this.depthPoint(depth.info));
-      gl.drawBuffers(colors.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE)));
+      gl.drawBuffers(buffers);
       // Once, when made: the same attachments again keep their completeness (see CompatDevice.framebuffer).
       if (!made) return;
       const status = gl.checkFramebufferStatus(gl.DRAW_FRAMEBUFFER);
@@ -1330,11 +1911,19 @@ export class Replayer {
           `The render pass attachments do not form a complete WebGL2 framebuffer (status 0x${status.toString(16)})`,
         );
     });
+    if (lead) (lead.fbs ??= []).push({ colors: own, depth, record });
+    return record.fbo;
   }
 
   /** A framebuffer of one subresource, as colour or as depth and stencil by its format. */
   single(s: Sub): WebGLFramebuffer {
-    return hasDepth(s.info) || hasStencil(s.info) ? this.framebuffer([], s) : this.framebuffer([s]);
+    if (hasDepth(s.info) || hasStencil(s.info)) return this.framebuffer(this.colorSubs, 0, s);
+    const colors = this.colorSubs,
+      held = colors[0];
+    colors[0] = s;
+    const fbo = this.framebuffer(colors, 1, null);
+    colors[0] = held;
+    return fbo;
   }
 
   /**
@@ -1357,7 +1946,7 @@ export class Replayer {
     state.bindDrawFramebuffer(null);
     this.helperState(h, t.width, t.height);
     state.unit(0, p.target, p.gl, this.device.loadSampler);
-    const all = `0:${t.mipLevelCount - 1}`;
+    const all = levelRange(0, t.mipLevelCount - 1);
     if (p.levels !== all) {
       state.activeUnit(0);
       gl.texParameteri(p.target, gl.TEXTURE_BASE_LEVEL, 0);
@@ -1453,7 +2042,7 @@ export class Replayer {
         '}',
     );
     this.helperState(draw, w, h);
-    state.set('viewport', `${x},${y},${w},${h}`, () => gl.viewport(x, y, w, h));
+    state.viewport(x, y, w, h);
     state.unit(0, gl.TEXTURE_2D, held, this.device.loadSampler);
     state.unit(1, gl.TEXTURE_2D, straight, this.device.loadSampler);
     gl.uniform4i(draw.offset, x, y, flipY ? h : 0, (premultiplied ? 1 : 0) | (srgb ? 2 : 0));
@@ -1470,11 +2059,11 @@ export class Replayer {
   private openMasks(): void {
     const gl = this.gl,
       s = this.device.state;
-    s.set('colorMask', '1111', () => gl.colorMask(true, true, true, true));
-    for (let i = 0; i < 8; i++) s.forget(`colorMask${i}`);
-    s.set('depthMask', '1', () => gl.depthMask(true));
-    s.set('stencilMask', 'ff', () => gl.stencilMask(0xff));
-    for (const face of [gl.FRONT, gl.BACK]) s.forget(`stencilMask${face}`);
+    if (s.changed(S.colorMask, 1, 15)) gl.colorMask(true, true, true, true);
+    s.forget(S.colorMaskAt, 8);
+    if (s.changed(S.depthMask, 1, 1)) gl.depthMask(true);
+    if (s.changed(S.stencilMask, 1, 0xff)) gl.stencilMask(0xff);
+    s.forget(S.stencilMaskFront, 2);
     s.enable(gl.RASTERIZER_DISCARD, false);
     this.pass && (this.pass.applied = null);
   }
@@ -1494,9 +2083,8 @@ export class Replayer {
     s.enable(gl.SCISSOR_TEST, false);
     s.bindReadFramebuffer(read);
     s.bindDrawFramebuffer(draw);
-    const [lw, lh] = to.owner.levelSize(to.level);
-    w ??= lw;
-    h ??= lh;
+    w ??= to.owner.levelWidth(to.level);
+    h ??= to.owner.levelHeight(to.level);
     gl.blitFramebuffer(x, y, x + w, y + h, dx, dy, dx + w, dy + h, bits, gl.NEAREST);
   }
 
@@ -1568,11 +2156,14 @@ export class Replayer {
   /** Brings one subresource of storage `to` up to date from storage `from` (a texture's copies, see TextureStorage). */
   readonly sync = (from: TextureStorage, to: TextureStorage, level: number, layer: number): void => {
     const gl = this.gl,
-      [w, h, depth] = from.texture.levelSize(level);
+      w = from.texture.levelWidth(level),
+      h = from.texture.levelHeight(level),
+      depth = from.texture.levelDepth(level);
     const slices = from.target === gl.TEXTURE_3D ? depth : 1;
     for (let z = 0; z < slices; z++) {
       const a = from.target === gl.TEXTURE_3D ? z : layer;
-      if (this.tierCopy(from, to)) {
+      if (from.info.block) this.decodeBlocks(from, to, level, a);
+      else if (this.tierCopy(from, to)) {
         (this.device.readback as NonNullable<CompatDevice['readback']>).copyTierStorage(
           this,
           from,
@@ -1589,6 +2180,56 @@ export class Replayer {
     }
     this.rebind();
   };
+
+  /**
+   * Fills a level and layer of `to`, a decoded copy of a block-compressed texture (CompatTexture.copy), from the blocks
+   * as `to`'s view format reads them: a full-target draw that fetches each texel through the GPU's own decoder, so the
+   * copy holds what sampling the blocks returns (sRGB already decoded). GLSL ES 3.00 has no texelFetch for cube
+   * samplers, so a cube source is read at the direction of each texel's centre (OpenGL ES 3.0, section 3.8.10, table
+   * 3.21, inverted) at an exact level through the nearest sampler, which selects exactly that texel.
+   */
+  private decodeBlocks(from: TextureStorage, to: TextureStorage, level: number, layer: number): void {
+    const gl = this.gl,
+      state = this.device.state,
+      t = from.texture,
+      src = t.blocksIn(to.format),
+      w = t.levelWidth(level),
+      h = t.levelHeight(level);
+    const kind = src.target === gl.TEXTURE_CUBE_MAP ? 'cube' : src.target === gl.TEXTURE_2D_ARRAY ? 'array' : '2d';
+    const fetch =
+      kind === 'cube'
+        ? '  vec2 q = gl_FragCoord.xy / vec2(o.zw) * 2.0 - 1.0;\n' +
+          '  vec3 d = o.y == 0 ? vec3(1.0, -q.y, -q.x) : o.y == 1 ? vec3(-1.0, -q.y, q.x) : o.y == 2 ? vec3(q.x, 1.0, q.y)' +
+          ' : o.y == 3 ? vec3(q.x, -1.0, -q.y) : o.y == 4 ? vec3(q.x, -q.y, 1.0) : vec3(-q.x, -q.y, -1.0);\n' +
+          '  c = textureLod(t, d, float(o.x));\n'
+        : kind === 'array'
+          ? '  c = texelFetch(t, ivec3(ivec2(gl_FragCoord.xy), o.y), o.x);\n'
+          : '  c = texelFetch(t, ivec2(gl_FragCoord.xy), o.x);\n';
+    const sampler = kind === 'cube' ? 'samplerCube' : kind === 'array' ? 'sampler2DArray' : 'sampler2D';
+    const helper = this.helper(
+      `decode-${kind}`,
+      `uniform highp ${sampler} t;\nuniform ivec4 o;\nout highp vec4 c;\nvoid main() {\n${fetch}}`,
+    );
+    // A view copy made at a draw is decoded inside a pass: the pass's viewport comes back after the decode draw.
+    const keep = !!this.pass,
+      vx = state.num(S.viewport),
+      vy = state.num(S.viewport + 1),
+      vw = state.num(S.viewport + 2),
+      vh = state.num(S.viewport + 3);
+    state.bindDrawFramebuffer(this.single(this.sub(to, level, layer)));
+    this.helperState(helper, w, h);
+    state.unit(0, src.target, src.gl, this.device.loadSampler);
+    const all = levelRange(0, t.mipLevelCount - 1);
+    if (src.levels !== all) {
+      state.activeUnit(0);
+      gl.texParameteri(src.target, gl.TEXTURE_BASE_LEVEL, 0);
+      gl.texParameteri(src.target, gl.TEXTURE_MAX_LEVEL, t.mipLevelCount - 1);
+      src.levels = all;
+    }
+    gl.uniform4i(helper.offset, level, layer - src.layer, w, h);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    if (keep && vx === vx) state.viewport(vx, vy, vw, vh);
+  }
 
   private tierCopy(from: TextureStorage, to: TextureStorage): boolean {
     const policy = this.device.adapter.tierFormats;
@@ -1612,6 +2253,30 @@ export class Replayer {
   }
 
   /**
+   * The subresource of a multisampled texture's resolved copy (`own`: the stencil aspect's), made once while the copy is
+   * the same GL texture, so the framebuffer a blit into it uses is found by identity (a new one every frame made a
+   * key string, owner list and closures for every sampled multisampled texture, KB-COMPAT-FRAMEALLOC1).
+   */
+  private resolvedSub(t: CompatTexture, resolved: WebGLTexture, own: boolean): Sub {
+    const held = (own ? this.stencilResolvedSubs : this.resolvedSubs).get(t);
+    return held && held.texture === resolved ? held.sub : this.makeResolvedSub(t, resolved, own);
+  }
+
+  /** resolvedSub()'s slow path (a closure's context is allocated on every call of the function that makes it). */
+  private makeResolvedSub(t: CompatTexture, resolved: WebGLTexture, own: boolean): Sub {
+    const gl = this.gl,
+      sub: Sub = {
+        key: `q${own ? 's' : ''}${t.id}`,
+        owner: t,
+        info: t.storageInfo,
+        level: 0,
+        attach: (point) => gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, resolved, 0),
+      };
+    (own ? this.stencilResolvedSubs : this.resolvedSubs).set(t, { texture: resolved, sub });
+    return sub;
+  }
+
+  /**
    * Brings the resolved copy of a multisampled texture that a binding of aspect `stencil` reads up to date, and returns
    * it: a depth-stencil texture's stencil aspect has a copy of its own (CompatTexture.resolvedFor).
    */
@@ -1619,15 +2284,7 @@ export class Replayer {
     const resolved = t.resolvedFor(stencil),
       own = resolved !== t.resolved;
     if (!resolved || !(own ? t.staleStencil : t.stale)) return resolved;
-    const gl = this.gl;
-    const to: Sub = {
-      key: `q${own ? 's' : ''}${t.id}`,
-      owner: t,
-      info: t.storageInfo,
-      level: 0,
-      attach: (point) => gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, point, gl.TEXTURE_2D, resolved, 0),
-    };
-    this.blit(this.viewSub(t.createView()), to);
+    this.blit(this.renderbufferSub(t), this.resolvedSub(t, resolved, own));
     if (own) t.staleStencil = false;
     else t.stale = false;
     this.rebind();
@@ -1636,80 +2293,96 @@ export class Replayer {
 
   // ------------------------------------------------ passes
 
+  /** What an attachment writes, brought up to date first (a pass that loads, or draws over part of a level). */
+  private prepare(v: CompatTextureView, slice: number): Sub {
+    const t = v.texture;
+    if (t.primary) t.read(t.attached(v), v.baseMipLevel, 1, t.dimension === '3d' ? 0 : v.baseArrayLayer, 1, this.sync);
+    return this.viewSub(v, slice);
+  }
+
   beginPass(desc: PassDescriptor): void {
     const gl = this.gl,
-      s = this.device.state;
+      s = this.device.state,
+      pass = this.passState,
+      cs = desc.colors,
+      n = cs.length,
+      colors = this.colorSubs,
+      standIns = pass.standIns;
     this.device.passes.run++;
-    // What each attachment writes, brought up to date first (a pass that loads, or draws over part of a level).
-    const prepare = (v: CompatTextureView, slice: number): Sub => {
-      const t = v.texture;
-      if (t.primary)
-        t.read(t.attached(v), v.baseMipLevel, 1, t.dimension === '3d' ? 0 : v.baseArrayLayer, 1, this.sync);
-      return this.viewSub(v, slice);
-    };
-    const standIns = desc.colors.map((c): [Sub, Sub] | null =>
-      c && desc.depth && c.view.texture.dimension === '3d'
-        ? [prepare(c.view, c.depthSlice), this.standIn(c.view)]
-        : null,
-    );
-    const colors = desc.colors.map((c, i) => {
-      if (!c) return null;
-      const standIn = standIns[i];
-      if (!standIn) return prepare(c.view, c.depthSlice);
-      if (c.loadOp === 'load' && c.view.texture.initialized) this.blit(standIn[0], standIn[1]);
-      return standIn[1];
-    });
-    const depth = desc.depth ? prepare(desc.depth.view, 0) : undefined;
-    for (const c of desc.colors) if (c?.resolveTarget?.texture.primary) prepare(c.resolveTarget, 0);
-    const fbo = this.framebuffer(colors, depth);
-    const first = desc.colors.find((c) => c)?.view ?? desc.depth?.view;
-    const [width, height] = first ? first.texture.levelSize(first.baseMipLevel) : [1, 1];
-    this.pass = {
-      desc,
-      fbo,
-      standIns,
-      width,
-      height,
-      pipeline: null,
-      applied: null,
-      groups: [],
-      vertex: [],
-      index: null,
-      stencilReference: 0,
-      query: false,
-    };
+    for (let i = 0; i < n; i++) {
+      const c = cs[i];
+      standIns[i] =
+        c && desc.depth && c.view.texture.dimension === '3d' ? [this.prepare(c.view, c.depthSlice), this.standIn(c.view)] : null;
+    }
+    for (let i = 0; i < n; i++) {
+      const c = cs[i],
+        standIn = standIns[i];
+      if (!c) colors[i] = null;
+      else if (!standIn) colors[i] = this.prepare(c.view, c.depthSlice);
+      else {
+        if (c.loadOp === 'load' && c.view.texture.initialized) this.blit(standIn[0], standIn[1]);
+        colors[i] = standIn[1];
+      }
+    }
+    const depth = desc.depth ? this.prepare(desc.depth.view, 0) : null;
+    for (let i = 0; i < n; i++) {
+      const r = cs[i]?.resolveTarget;
+      if (r?.texture.primary) this.prepare(r, 0);
+    }
+    const fbo = this.framebuffer(colors, n, depth);
+    for (let i = 0; i < n; i++) colors[i] = null;
+    let first = desc.depth?.view;
+    for (let i = 0; i < n; i++) {
+      const c = cs[i];
+      if (c) {
+        first = c.view;
+        break;
+      }
+    }
+    const width = first ? Math.max(1, first.texture.width >> first.baseMipLevel) : 1,
+      height = first ? Math.max(1, first.texture.height >> first.baseMipLevel) : 1;
+    pass.desc = desc;
+    pass.fbo = fbo;
+    pass.width = width;
+    pass.height = height;
+    pass.pipeline = pass.applied = null;
+    pass.stencilReference = 0;
+    pass.query = false;
+    this.clearSlots(pass);
+    this.pass = pass;
     s.bindDrawFramebuffer(fbo);
     this.openMasks();
     s.enable(gl.SCISSOR_TEST, true);
-    s.set('scissor', `0,0,${width},${height}`, () => gl.scissor(0, 0, width, height));
-    s.set('viewport', `0,0,${width},${height}`, () => gl.viewport(0, 0, width, height));
-    s.set('depthRange', '0,1', () => gl.depthRange(0, 1));
-    s.set('blendColor', '0,0,0,0', () => gl.blendColor(0, 0, 0, 0));
-    const buffers = desc.colors.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE));
+    s.scissor(0, 0, width, height);
+    s.viewport(0, 0, width, height);
+    if (s.changed(S.depthRange, 2, 0, 1)) gl.depthRange(0, 1);
+    if (s.changed(S.blendColor, 4, 0, 0, 0, 0)) gl.blendColor(0, 0, 0, 0);
     let drew = false;
-    desc.colors.forEach((c, i) => {
-      if (!c) return;
+    for (let i = 0; i < n; i++) {
+      const c = cs[i];
+      if (!c) continue;
       const t = c.view.texture;
-      const clear = c.loadOp === 'clear' ? c.clearValue : !t.initialized ? [0, 0, 0, 0] : null;
-      if (!clear) return;
+      const clear = c.loadOp === 'clear' ? c.clearValue : !t.initialized ? NO_COLOR : null;
+      if (!clear) continue;
       if (this.drawsClears(t.info, t.mipLevelCount, t.depthOrArrayLayers)) {
         // Rounded to the target's steps first: the export may narrow the float otherwise than a clear (drawnClear).
-        this.drawClear(i, drawnClear(t.format, clear), width, height, buffers);
+        this.drawClear(i, drawnClear(t.format, clear), width, height, this.drawBuffersOf(cs));
         drew = true;
-      } else if (t.info.kind === 'uint')
-        gl.clearBufferuiv(
-          gl.COLOR,
-          i,
-          clear.map((x) => x >>> 0),
-        );
-      else if (t.info.kind === 'sint')
-        gl.clearBufferiv(
-          gl.COLOR,
-          i,
-          clear.map((x) => x | 0),
-        );
-      else gl.clearBufferfv(gl.COLOR, i, clear);
-    });
+      } else if (t.info.kind === 'uint') {
+        // Typed arrays convert as `>>> 0` and `| 0` do.
+        const v = this.clearUint;
+        for (let k = 0; k < 4; k++) v[k] = clear[k];
+        gl.clearBufferuiv(gl.COLOR, i, v);
+      } else if (t.info.kind === 'sint') {
+        const v = this.clearInt;
+        for (let k = 0; k < 4; k++) v[k] = clear[k];
+        gl.clearBufferiv(gl.COLOR, i, v);
+      } else {
+        const v = this.clearFloat;
+        for (let k = 0; k < 4; k++) v[k] = clear[k];
+        gl.clearBufferfv(gl.COLOR, i, v);
+      }
+    }
     // The clear draws keep the pass's viewport (the attachment size) but turn the scissor test off.
     if (drew) s.enable(gl.SCISSOR_TEST, true);
     const d = desc.depth;
@@ -1721,9 +2394,39 @@ export class Replayer {
       const depthValue = d.depthLoadOp === 'clear' ? d.depthClearValue : 0,
         stencilValue = d.stencilLoadOp === 'clear' ? d.stencilClearValue : 0;
       if (clearDepth && clearStencil) gl.clearBufferfi(gl.DEPTH_STENCIL, 0, depthValue, stencilValue);
-      else if (clearDepth) gl.clearBufferfv(gl.DEPTH, 0, [depthValue]);
-      else if (clearStencil) gl.clearBufferiv(gl.STENCIL, 0, [stencilValue]);
+      else if (clearDepth) {
+        this.clearDepth[0] = depthValue;
+        gl.clearBufferfv(gl.DEPTH, 0, this.clearDepth);
+      } else if (clearStencil) {
+        this.clearStencil[0] = stencilValue;
+        gl.clearBufferiv(gl.STENCIL, 0, this.clearStencil);
+      }
     }
+  }
+
+  /** The draw buffer list of a pass's colour attachments (a closure in beginPass would cost a context per pass). */
+  private drawBuffersOf(cs: readonly (ColorAttachment | null)[]): number[] {
+    const gl = this.gl;
+    return cs.map((a, k) => (a ? gl.COLOR_ATTACHMENT0 + k : gl.NONE));
+  }
+
+  /** Unbinds the pass's bind groups, vertex buffers and index buffer, keeping their slot objects. */
+  private clearSlots(pass: PassState): void {
+    for (let i = 0; i < pass.groups.length; i++) {
+      const g = pass.groups[i];
+      if (g) g.group = null;
+    }
+    for (let i = 0; i < pass.vertex.length; i++) {
+      const v = pass.vertex[i];
+      if (v) v.buffer = null;
+    }
+    if (pass.index) pass.index.buffer = null;
+  }
+
+  /** Marks what a pass wrote through view `v` as written. */
+  private wrote(v: CompatTextureView): void {
+    const t = v.texture;
+    if (t.primary) t.wrote(t.attached(v), v.baseMipLevel, 1, t.dimension === '3d' ? 0 : v.baseArrayLayer, 1);
   }
 
   endPass(): void {
@@ -1731,46 +2434,50 @@ export class Replayer {
     if (!pass) return;
     if (pass.query) this.endQuery();
     this.pass = null;
-    const gl = this.gl;
-    const discard: number[] = [];
-    const wrote = (v: CompatTextureView) => {
-      const t = v.texture;
-      if (t.primary) t.wrote(t.attached(v), v.baseMipLevel, 1, t.dimension === '3d' ? 0 : v.baseArrayLayer, 1);
-    };
-    pass.desc.colors.forEach((c, i) => {
-      if (!c) return;
+    const gl = this.gl,
+      cs = pass.desc.colors;
+    let discards = 0,
+      depthPoint = 0;
+    for (let i = 0; i < cs.length; i++) {
+      const c = cs[i];
+      if (!c) continue;
       const t = c.view.texture,
         standIn = pass.standIns[i];
       if (standIn && c.storeOp === 'store') this.blit(standIn[1], standIn[0]);
       t.initialized = true;
-      wrote(c.view);
+      this.wrote(c.view);
       if (t.renderbuffer && t.resolved) t.stale = t.staleStencil = true;
       if (c.resolveTarget) {
         this.blit(this.viewSub(c.view, c.depthSlice), this.viewSub(c.resolveTarget));
         c.resolveTarget.texture.initialized = true;
-        wrote(c.resolveTarget);
+        this.wrote(c.resolveTarget);
         this.presentIfCanvas(c.resolveTarget.texture);
       }
       if (c.storeOp === 'discard') {
-        discard.push(gl.COLOR_ATTACHMENT0 + i);
+        discards++;
         t.initialized = false;
       } else this.presentIfCanvas(t);
-    });
+    }
     const d = pass.desc.depth;
     if (d) {
       const t = d.view.texture;
       t.initialized = true;
-      if (!d.depthReadOnly || !d.stencilReadOnly) wrote(d.view);
+      if (!d.depthReadOnly || !d.stencilReadOnly) this.wrote(d.view);
       if (t.renderbuffer && t.resolved) t.stale = t.staleStencil = true;
       if (d.depthStoreOp === 'discard' && (!hasStencil(t.info) || d.stencilStoreOp === 'discard')) {
-        discard.push(this.depthPoint(t.info));
+        depthPoint = this.depthPoint(t.info);
+        discards++;
         t.initialized = false;
       }
     }
-    if (discard.length) {
-      this.device.state.bindDrawFramebuffer(pass.fbo);
-      gl.invalidateFramebuffer(gl.DRAW_FRAMEBUFFER, discard);
-    }
+    if (!discards) return;
+    // The attachments to invalidate, in attachment order, in the reused list of that length.
+    const list = (this.discards[discards] ??= new Array(discards).fill(0));
+    let k = 0;
+    for (let i = 0; i < cs.length; i++) if (cs[i]?.storeOp === 'discard') list[k++] = gl.COLOR_ATTACHMENT0 + i;
+    if (depthPoint) list[k++] = depthPoint;
+    this.device.state.bindDrawFramebuffer(pass.fbo);
+    gl.invalidateFramebuffer(gl.DRAW_FRAMEBUFFER, list);
   }
 
   private presentIfCanvas(t: CompatTexture): void {
@@ -1781,36 +2488,48 @@ export class Replayer {
   setPipeline(p: CompatRenderPipeline): void {
     if (this.pass) this.pass.pipeline = p;
   }
-  setBindGroup(index: number, group: CompatBindGroup | null, offsets: number[]): void {
+  /** Binds `group` at `index` with the `count` dynamic offsets at `offsets[from]` (copied into the slot's own list). */
+  setBindGroup(index: number, group: CompatBindGroup | null, offsets: ArrayLike<number>, from = 0, count = offsets.length): void {
+    const pass = this.pass;
+    if (!pass) return;
     // An invalid group (its error was reported at createBindGroup) binds nothing, so its draws are skipped.
-    if (this.pass) this.pass.groups[index] = group && !group.invalid ? { group, offsets } : null;
+    const bound = group && !group.invalid ? group : null,
+      slot = (pass.groups[index] ??= { group: null, offsets: [], count: 0 }),
+      list = slot.offsets as number[];
+    slot.group = bound;
+    slot.count = count;
+    for (let i = 0; i < count; i++) list[i] = offsets[from + i];
   }
   setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset: number, _size?: number): void {
-    if (this.pass) this.pass.vertex[slot] = buffer ? { buffer, offset } : null;
+    const pass = this.pass;
+    if (!pass) return;
+    const v = pass.vertex[slot];
+    if (v) {
+      v.buffer = buffer;
+      v.offset = offset;
+    } else pass.vertex[slot] = { buffer, offset };
   }
   setIndexBuffer(buffer: CompatBuffer, format: GPUIndexFormat, offset: number, _size?: number): void {
-    if (!this.pass) return;
-    const gl = this.gl;
-    this.pass.index = {
-      buffer,
-      type: format === 'uint16' ? gl.UNSIGNED_SHORT : gl.UNSIGNED_INT,
-      size: format === 'uint16' ? 2 : 4,
-      offset,
-    };
+    const pass = this.pass;
+    if (!pass) return;
+    const gl = this.gl,
+      ix = (pass.index ??= { buffer: null, type: 0, size: 0, offset: 0 });
+    ix.buffer = buffer;
+    ix.type = format === 'uint16' ? gl.UNSIGNED_SHORT : gl.UNSIGNED_INT;
+    ix.size = format === 'uint16' ? 2 : 4;
+    ix.offset = offset;
   }
   setViewport(x: number, y: number, w: number, h: number, near: number, far: number): void {
     const gl = this.gl,
       s = this.device.state;
-    s.set('viewport', `${x},${y},${w},${h}`, () => gl.viewport(x, y, w, h));
-    s.set('depthRange', `${near},${far}`, () => gl.depthRange(near, far));
+    s.viewport(x, y, w, h);
+    if (s.changed(S.depthRange, 2, near, far)) gl.depthRange(near, far);
   }
   setScissor(x: number, y: number, w: number, h: number): void {
-    const gl = this.gl;
-    this.device.state.set('scissor', `${x},${y},${w},${h}`, () => gl.scissor(x, y, w, h));
+    this.device.state.scissor(x, y, w, h);
   }
-  setBlendConstant(c: number[]): void {
-    const gl = this.gl;
-    this.device.state.set('blendColor', c.join(','), () => gl.blendColor(c[0], c[1], c[2], c[3]));
+  setBlendConstant(r: number, g: number, b: number, a: number): void {
+    if (this.device.state.changed(S.blendColor, 4, r, g, b, a)) this.gl.blendColor(r, g, b, a);
   }
   setStencilReference(reference: number): void {
     if (!this.pass) return;
@@ -1823,9 +2542,7 @@ export class Replayer {
     const pass = this.pass;
     if (!pass) return;
     pass.pipeline = null;
-    pass.groups = [];
-    pass.vertex = [];
-    pass.index = null;
+    this.clearSlots(pass);
   }
 
   executeBundles(bundles: readonly CompatRenderBundle[]): void {
@@ -1894,7 +2611,7 @@ export class Replayer {
     this.device.computeRuntime?.dispatch(this, p, groups, count);
   }
 
-  /** The bytes of an indirect argument block (from the CPU copy; a GPU-written buffer is read back, which stalls). */
+  /** The bytes of an indirect argument block (a copy: the replay itself reads the words in place, see `word`). */
   indirect(buffer: CompatBuffer, offset: number, size: number): ArrayBuffer {
     return buffer.bytes().slice(offset, offset + size).buffer;
   }
@@ -1910,8 +2627,8 @@ export class Replayer {
     if (pass.applied === p) return;
     pass.applied = p;
     s.enable(gl.CULL_FACE, p.cull !== 0);
-    if (p.cull) s.set('cullFace', String(p.cull), () => gl.cullFace(p.cull));
-    s.set('frontFace', String(p.frontFace), () => gl.frontFace(p.frontFace));
+    if (p.cull && s.changed(S.cullFace, 1, p.cull)) gl.cullFace(p.cull);
+    if (s.changed(S.frontFace, 1, p.frontFace)) gl.frontFace(p.frontFace);
     if (ext.depthClamp) s.enable(ext.depthClamp.DEPTH_CLAMP_EXT, p.unclippedDepth);
     const ds = p.depthStencil,
       d = pass.desc.depth;
@@ -1919,19 +2636,18 @@ export class Replayer {
     s.enable(gl.DEPTH_TEST, depthOn);
     if (depthOn && ds) {
       const func = this.device.compare(ds.depthCompare ?? 'always');
-      s.set('depthFunc', String(func), () => gl.depthFunc(func));
+      if (s.changed(S.depthFunc, 1, func)) gl.depthFunc(func);
       const write = !!ds.depthWriteEnabled && !d?.depthReadOnly;
-      s.set('depthMask', write ? '1' : '0', () => gl.depthMask(write));
+      if (s.changed(S.depthMask, 1, write ? 1 : 0)) gl.depthMask(write);
       const bias = ds.depthBias ?? 0,
         slope = ds.depthBiasSlopeScale ?? 0,
         clamp = ds.depthBiasClamp ?? 0;
       s.enable(gl.POLYGON_OFFSET_FILL, bias !== 0 || slope !== 0);
-      if (bias || slope)
-        s.set('polygonOffset', `${slope},${bias},${clamp}`, () => {
-          // The extension and WebGPU share signed min/max semantics; zero disables the clamp.
-          if (ext.polygonOffsetClamp) ext.polygonOffsetClamp.polygonOffsetClampEXT(slope, bias, clamp);
-          else gl.polygonOffset(slope, bias);
-        });
+      // The extension and WebGPU share signed min/max semantics; zero disables the clamp.
+      if ((bias || slope) && s.changed(S.polygonOffset, 3, slope, bias, clamp)) {
+        if (ext.polygonOffsetClamp) ext.polygonOffsetClamp.polygonOffsetClampEXT(slope, bias, clamp);
+        else gl.polygonOffset(slope, bias);
+      }
     } else s.enable(gl.POLYGON_OFFSET_FILL, false);
     const stencilOn = !!ds && !!d && hasStencil(d.view.texture.info);
     s.enable(gl.STENCIL_TEST, stencilOn);
@@ -1940,81 +2656,76 @@ export class Replayer {
       const ref = pass.stencilReference & 0xff,
         read = ds.stencilReadMask ?? 0xffffffff,
         write = d?.stencilReadOnly ? 0 : (ds.stencilWriteMask ?? 0xffffffff);
-      for (const [face, f] of [
-        [gl.FRONT, ds.stencilFront ?? {}],
-        [gl.BACK, ds.stencilBack ?? {}],
-      ] as const) {
-        const func = this.device.compare(f.compare ?? 'always');
-        const op = (o?: GPUStencilOperation) => this.device.enum(STENCIL_OPS[o ?? 'keep']);
-        s.set(`stencilFunc${face}`, `${func},${ref},${read}`, () => gl.stencilFuncSeparate(face, func, ref, read));
-        s.set(`stencilOp${face}`, `${f.failOp},${f.depthFailOp},${f.passOp}`, () =>
-          gl.stencilOpSeparate(face, op(f.failOp), op(f.depthFailOp), op(f.passOp)),
-        );
-        s.set(`stencilMask${face}`, String(write), () => gl.stencilMaskSeparate(face, write));
-      }
-      s.forget('stencilMask');
+      this.stencilFace(gl.FRONT, ds.stencilFront, ref, read, write, S.stencilFuncFront, S.stencilOpFront, S.stencilMaskFront);
+      this.stencilFace(gl.BACK, ds.stencilBack, ref, read, write, S.stencilFuncBack, S.stencilOpBack, S.stencilMaskBack);
+      s.forget(S.stencilMask);
     }
     s.enable(gl.SAMPLE_ALPHA_TO_COVERAGE, p.alphaToCoverage);
     this.applyTargets(p);
   }
 
-  private applyTargets(p: CompatRenderPipeline, only?: number): void {
+  /** One face's stencil test, operations and write mask, each cached at its slots (S). */
+  private stencilFace(
+    face: number,
+    f: GPUStencilFaceState | undefined,
+    ref: number,
+    read: number,
+    write: number,
+    funcAt: number,
+    opAt: number,
+    maskAt: number,
+  ): void {
     const gl = this.gl,
       s = this.device.state,
-      indexed = this.device.ext.indexed;
-    const states = p.targets.map((t) => {
-      const blend = t?.blend;
-      const key = blend
-        ? `${blend.color.operation ?? 'add'},${blend.color.srcFactor ?? 'one'},${blend.color.dstFactor ?? 'zero'},${blend.alpha.operation ?? 'add'},${blend.alpha.srcFactor ?? 'one'},${blend.alpha.dstFactor ?? 'zero'}`
-        : '';
-      return { key, blend, mask: t?.writeMask ?? 0 };
-    });
-    const uniform = states.every((x) => x.key === states[0]?.key && x.mask === states[0]?.mask);
-    const apply = (i: number | null, x: (typeof states)[number]) => {
-      const tag = i === null ? '' : String(i);
-      const m = x.mask;
-      const maskKey = `${+!!(m & 1)}${+!!(m & 2)}${+!!(m & 4)}${+!!(m & 8)}`;
-      s.set(`colorMask${tag}`, maskKey, () =>
-        i === null || !indexed
-          ? gl.colorMask(!!(m & 1), !!(m & 2), !!(m & 4), !!(m & 8))
-          : indexed.colorMaskiOES(i, !!(m & 1), !!(m & 2), !!(m & 4), !!(m & 8)),
-      );
-      const on = !!x.blend;
-      s.set(`blend${tag}`, on ? x.key : 'off', () => {
-        if (i === null || !indexed) {
-          if (on) gl.enable(gl.BLEND);
-          else gl.disable(gl.BLEND);
-        } else if (on) indexed.enableiOES(gl.BLEND, i);
-        else indexed.disableiOES(gl.BLEND, i);
-        if (!x.blend) return;
-        const b = x.blend,
-          e = (n?: string) => this.device.enum(n ?? 'ONE');
-        const ce = e(BLEND_OPS[b.color.operation ?? 'add']),
-          ae = e(BLEND_OPS[b.alpha.operation ?? 'add']);
-        const cs = e(BLEND_FACTORS[b.color.srcFactor ?? 'one']),
-          cd = e(BLEND_FACTORS[b.color.dstFactor ?? 'zero']),
-          as = e(BLEND_FACTORS[b.alpha.srcFactor ?? 'one']),
-          ad = e(BLEND_FACTORS[b.alpha.dstFactor ?? 'zero']);
-        if (i === null || !indexed) {
-          gl.blendEquationSeparate(ce, ae);
-          gl.blendFuncSeparate(cs, cd, as, ad);
-        } else {
-          indexed.blendEquationSeparateiOES(i, ce, ae);
-          indexed.blendFuncSeparateiOES(i, cs, cd, as, ad);
-        }
-      });
-    };
-    if (uniform || !indexed) {
+      device = this.device;
+    const func = device.compare(f?.compare ?? 'always');
+    if (s.changed(funcAt, 3, func, ref, read)) gl.stencilFuncSeparate(face, func, ref, read);
+    const fail = device.enum(STENCIL_OPS[f?.failOp ?? 'keep']),
+      depthFail = device.enum(STENCIL_OPS[f?.depthFailOp ?? 'keep']),
+      pass = device.enum(STENCIL_OPS[f?.passOp ?? 'keep']);
+    if (s.changed(opAt, 3, fail, depthFail, pass)) gl.stencilOpSeparate(face, fail, depthFail, pass);
+    if (s.changed(maskAt, 1, write)) gl.stencilMaskSeparate(face, write);
+  }
+
+  private applyTargets(p: CompatRenderPipeline, only?: number): void {
+    const s = this.device.state,
+      indexed = this.device.ext.indexed,
+      targets = p.targetGL;
+    if (p.sameTargets || !indexed) {
       // The GL-wide state: identical targets, or (without OES_draw_buffers_indexed) the group a split draw draws.
-      if (states.length) apply(null, states[only ?? 0]);
-      for (let i = 0; i < 8; i++) {
-        s.forget(`colorMask${i}`);
-        s.forget(`blend${i}`);
-      }
+      if (targets.length) this.applyTarget(-1, targets[only ?? 0]);
+      s.forget(S.colorMaskAt, 8);
+      for (let i = 0; i < 8; i++) s.forgetBlend(i);
     } else {
-      states.forEach((x, i) => apply(i, x));
-      s.forget('colorMask');
-      s.forget('blend');
+      for (let i = 0; i < targets.length; i++) this.applyTarget(i, targets[i]);
+      s.forget(S.colorMask);
+      s.forgetBlend(-1);
+    }
+  }
+
+  /** The blend and write mask of draw buffer `i` (-1: the GL-wide state) as target `x` asks. */
+  private applyTarget(i: number, x: TargetGL): void {
+    const gl = this.gl,
+      s = this.device.state,
+      indexed = i < 0 ? null : this.device.ext.indexed,
+      m = x.mask;
+    if (s.changed(i < 0 ? S.colorMask : S.colorMaskAt + i, 1, m)) {
+      if (indexed) indexed.colorMaskiOES(i, !!(m & 1), !!(m & 2), !!(m & 4), !!(m & 8));
+      else gl.colorMask(!!(m & 1), !!(m & 2), !!(m & 4), !!(m & 8));
+    }
+    if (!s.blendChanged(i, x.key)) return;
+    if (!indexed) {
+      if (x.blend) gl.enable(gl.BLEND);
+      else gl.disable(gl.BLEND);
+    } else if (x.blend) indexed.enableiOES(gl.BLEND, i);
+    else indexed.disableiOES(gl.BLEND, i);
+    if (!x.blend) return;
+    if (!indexed) {
+      gl.blendEquationSeparate(x.colorOp, x.alphaOp);
+      gl.blendFuncSeparate(x.colorSrc, x.colorDst, x.alphaSrc, x.alphaDst);
+    } else {
+      indexed.blendEquationSeparateiOES(i, x.colorOp, x.alphaOp);
+      indexed.blendFuncSeparateiOES(i, x.colorSrc, x.colorDst, x.alphaSrc, x.alphaDst);
     }
   }
 
@@ -2027,29 +2738,17 @@ export class Replayer {
     const gl = this.gl,
       s = this.device.state,
       device = this.device;
-    const lookup = (group: number, binding: number): { bound: Bound; dynamic: number } | null => {
-      const g = pass.groups[group];
-      const bound = g?.group.entries.get(binding);
-      if (!g || !bound) return null;
-      const di = g.group.layout.dynamic.indexOf(binding);
-      return { bound, dynamic: di >= 0 ? (g.offsets[di] ?? 0) : 0 };
-    };
-    const samplerAt = (at: { group: number; binding: number }): CompatSampler | null => {
-      const sb = lookup(at.group, at.binding);
-      if (sb?.bound.kind === 'sampler') return sb.bound.sampler;
-      device.validationError(`Draw: no sampler is bound at @group(${at.group}) @binding(${at.binding})`);
-      return null;
-    };
-    for (const u of p.uniforms) {
-      const found = lookup(u.group, u.binding);
-      if (!found || found.bound.kind !== 'buffer' || !found.bound.buffer.gl) {
+    for (let k = 0; k < p.uniforms.length; k++) {
+      const u = p.uniforms[k],
+        bound = this.boundAt(pass, u.group, u.binding);
+      if (!bound || bound.kind !== 'buffer' || !bound.buffer.gl) {
         device.validationError(`Draw: nothing usable is bound at @group(${u.group}) @binding(${u.binding})`);
         return false;
       }
-      const { buffer, offset, size } = found.bound;
-      const start = offset + found.dynamic,
+      const buffer = bound.buffer;
+      const start = bound.offset + this.dynamic,
         glSize = Math.max(16, Math.ceil(buffer.size / 16) * 16),
-        bind = Math.min(Math.max(size, u.size), glSize - start);
+        bind = Math.min(Math.max(bound.size, u.size), glSize - start);
       if (bind < u.size) {
         device.validationError(
           `Draw: the buffer at @group(${u.group}) @binding(${u.binding}) is smaller than its uniform block`,
@@ -2058,56 +2757,63 @@ export class Replayer {
       }
       s.uniformBuffer(u.point, buffer.gl as WebGLBuffer, buffer.id, start, bind);
     }
-    // Phase 1: what each unit will hold, with copies, resolves and uploads made now.
-    const plan: { unit: number; target: number; texture: WebGLTexture | null; sampler: WebGLSampler }[] = [];
-    const ranges = new Map<TextureStorage, string>();
-    for (const t of p.textures) {
-      const found = lookup(t.group, t.binding);
-      if (!found || found.bound.kind !== 'view') {
+    // Phase 1: what each unit will hold, with copies, resolves and uploads made now (kept in the replayer's plan arrays,
+    // reused by every draw).
+    this.rangeCount = 0;
+    this.planned = 0;
+    for (let k = 0; k < p.textures.length; k++) {
+      const t = p.textures[k],
+        found = this.boundAt(pass, t.group, t.binding);
+      if (!found || found.kind !== 'view') {
         device.validationError(`Draw: no texture view is bound at @group(${t.group}) @binding(${t.binding})`);
         return false;
       }
-      const view = found.bound.view,
+      const view = found.view,
         tex = view.texture,
         stencil = tex.info.kind === 'stencil' || view.aspect === 'stencil-only';
       if (t.unit >= 0 && stencil && !device.ext.stencilTexturing)
         throw device.unsupported('sampling a stencil aspect (this WebGL2 has no WEBGL_stencil_texturing)');
       let sampler: WebGLSampler = device.loadSampler;
       if (t.sampler) {
-        const samp = samplerAt(t.sampler);
+        const samp = this.samplerAt(pass, t.sampler);
         if (!samp) return false;
         const unfilterable =
           (hasDepth(tex.info) && !samp.comparison) || tex.info.kind === 'uint' || tex.info.kind === 'sint';
         sampler = unfilterable ? samp.nearest() : samp.sampler;
         if (t.mipFilters.length) {
-          const d = samp.d,
-            low = d.lodMinClamp ?? 0,
-            high = d.lodMaxClamp ?? 32,
+          const sd = samp.d,
+            low = sd.lodMinClamp ?? 0,
+            high = sd.lodMaxClamp ?? 32,
             enabled =
               !unfilterable &&
-              d.mipmapFilter === 'linear' &&
-              (d.minFilter === 'linear') === (d.magFilter === 'linear') &&
-              (d.maxAnisotropy ?? 1) === 1 &&
+              sd.mipmapFilter === 'linear' &&
+              (sd.minFilter === 'linear') === (sd.magFilter === 'linear') &&
+              (sd.maxAnisotropy ?? 1) === 1 &&
               Number.isInteger(low) &&
               Number.isInteger(high),
-            values = [+enabled, low, high],
-            key = values.join();
-          for (const loc of t.mipFilters)
-            if (p.cache.modes.get(loc) !== key) {
-              s.useProgram(p.program);
-              gl.uniform3fv(loc, values);
-              p.cache.modes.set(loc, key);
-            }
+            on = enabled ? 1 : 0;
+          for (let m = 0; m < t.mipFilters.length; m++) {
+            const loc = t.mipFilters[m];
+            let held = p.cache.mips.get(loc);
+            if (held && held[0] === on && held[1] === low && held[2] === high) continue;
+            if (!held) p.cache.mips.set(loc, (held = new Float64Array(3)));
+            held[0] = on;
+            held[1] = low;
+            held[2] = high;
+            s.useProgram(p.program);
+            gl.uniform3f(loc, on, low, high);
+          }
         }
       }
-      for (const m of t.modes) {
-        const samp = samplerAt(m);
+      for (let m = 0; m < t.modes.length; m++) {
+        const mode = t.modes[m],
+          samp = this.samplerAt(pass, mode);
         if (!samp) return false;
-        const key = samp.modes.join();
-        if (p.cache.modes.get(m.location) !== key) {
+        // A sampler's modes never change: the array itself says whether the uniform holds them.
+        if (p.cache.modes.get(mode.location) !== samp.modes) {
           s.useProgram(p.program);
-          gl.uniform4iv(m.location, samp.modes);
-          p.cache.modes.set(m.location, key);
+          gl.uniform4iv(mode.location, samp.modes);
+          p.cache.modes.set(mode.location, samp.modes);
         }
       }
       let levels = view.mipLevelCount;
@@ -2115,10 +2821,10 @@ export class Replayer {
         // Read for its size or level count only: nothing to bind.
       } else if (tex.renderbuffer) {
         levels = 1;
-        plan.push({ unit: t.unit, target: gl.TEXTURE_2D, texture: this.resolveForSampling(tex, stencil), sampler });
+        this.plan(t.unit, gl.TEXTURE_2D, this.resolveForSampling(tex, stencil), sampler);
       } else {
-        const range = `${view.baseMipLevel}:${view.baseMipLevel + levels - 1}`,
-          sampleState = `${range}:${stencil}`;
+        const range = levelRange(view.baseMipLevel, view.baseMipLevel + levels - 1),
+          sampleState = range * 2 + (stencil ? 1 : 0);
         let storage = tex.sampled(view),
           alias = 1;
         // WebGPU lets a pass sample the depth texture it has attached read-only; GL calls that a feedback loop and refuses
@@ -2127,8 +2833,12 @@ export class Replayer {
         if (attachment?.texture === tex && storage === tex.attached(attachment)) storage = tex.sampled(view, alias++);
         // GL keeps one base and max level per texture object: another range of a texture this draw already samples
         // (Bloom's last up step reads two levels of its down chain) reads a copy of its own.
-        while (ranges.has(storage) && ranges.get(storage) !== sampleState) storage = tex.sampled(view, alias++);
-        ranges.set(storage, sampleState);
+        for (let held = this.rangeOf(storage); held >= 0 && held !== sampleState; held = this.rangeOf(storage))
+          storage = tex.sampled(view, alias++);
+        if (this.rangeOf(storage) < 0) {
+          this.rangeStores[this.rangeCount] = storage;
+          this.rangeStates[this.rangeCount++] = sampleState;
+        }
         tex.read(storage, view.baseMipLevel, view.mipLevelCount, view.baseArrayLayer, view.arrayLayerCount, this.sync);
         if (storage.levels !== range) {
           s.scratch(storage.target, storage.gl);
@@ -2136,46 +2846,53 @@ export class Replayer {
           gl.texParameteri(storage.target, gl.TEXTURE_MAX_LEVEL, view.baseMipLevel + levels - 1);
           storage.levels = range;
         }
-        plan.push({ unit: t.unit, target: storage.target, texture: storage.gl, sampler });
+        this.plan(t.unit, storage.target, storage.gl, sampler);
       }
       // The sampling aspect belongs to the GL texture object, including resolved MSAA storage.
       // Restore depth on later draws; ordinary views use aliases above for simultaneous aspects.
       if (t.unit >= 0 && hasStencil(tex.info) && device.ext.stencilTexturing) {
         const ext = device.ext.stencilTexturing,
-          sampled = plan[plan.length - 1];
-        s.scratch(sampled.target, sampled.texture);
+          last = this.planned - 1;
+        s.scratch(this.planTargets[last], this.planTextures[last]);
         gl.texParameteri(
-          sampled.target,
+          this.planTargets[last],
           ext.DEPTH_STENCIL_TEXTURE_MODE_WEBGL,
           stencil ? ext.STENCIL_INDEX_WEBGL : gl.DEPTH_COMPONENT,
         );
       }
       if (t.sizes.length) {
-        const [w, h, d] = tex.levelSize(tex.renderbuffer ? 0 : view.baseMipLevel);
-        const depth = tex.dimension === '3d' ? d : tex.renderbuffer ? 1 : view.arrayLayerCount;
-        const key = `${w},${h},${depth}`;
-        for (const loc of t.sizes)
-          if (p.cache.sizes.get(loc) !== key) {
-            s.useProgram(p.program);
-            gl.uniform4i(loc, w, h, depth, 0);
-            p.cache.sizes.set(loc, key);
-          }
+        const level = tex.renderbuffer ? 0 : view.baseMipLevel,
+          w = Math.max(1, tex.width >> level),
+          h = Math.max(1, tex.height >> level),
+          depth =
+            tex.dimension === '3d'
+              ? Math.max(1, tex.depthOrArrayLayers >> level)
+              : tex.renderbuffer
+                ? 1
+                : view.arrayLayerCount;
+        for (let m = 0; m < t.sizes.length; m++) {
+          const loc = t.sizes[m];
+          let held = p.cache.sizes.get(loc);
+          if (held && held[0] === w && held[1] === h && held[2] === depth) continue;
+          if (!held) p.cache.sizes.set(loc, (held = new Float64Array(3)));
+          held[0] = w;
+          held[1] = h;
+          held[2] = depth;
+          s.useProgram(p.program);
+          gl.uniform4i(loc, w, h, depth, 0);
+        }
       }
-      for (const loc of t.levels)
+      for (let m = 0; m < t.levels.length; m++) {
+        const loc = t.levels[m];
         if (p.cache.levels.get(loc) !== levels) {
           s.useProgram(p.program);
           gl.uniform1i(loc, levels);
           p.cache.levels.set(loc, levels);
         }
+      }
     }
-    for (const b of p.storage) {
-      const setInfo = (location: WebGLUniformLocation, row: number, size: number, shift: number) => {
-        const key = `${row},${size},${shift}`;
-        if (p.cache.info.get(location) === key) return;
-        s.useProgram(p.program);
-        gl.uniform4i(location, row, size, shift, 0);
-        p.cache.info.set(location, key);
-      };
+    for (let k = 0; k < p.storage.length; k++) {
+      const b = p.storage[k];
       if (b.binding < 0) {
         // The bind group's shared data texture: every storage binding without a dynamic offset.
         const group = pass.groups[b.group]?.group,
@@ -2184,54 +2901,120 @@ export class Replayer {
           device.validationError(`Draw: no bind group with storage buffers is bound at @group(${b.group})`);
           return false;
         }
-        for (const i of b.info) {
-          const bound = group.entries.get(i.binding),
+        for (let m = 0; m < b.info.length; m++) {
+          const i = b.info[m],
+            bound = group.entries.get(i.binding),
             row = data.rows.get(i.binding);
           if (bound?.kind !== 'buffer' || row === undefined) {
             device.validationError(`Draw: no storage buffer is bound at @group(${b.group}) @binding(${i.binding})`);
             return false;
           }
-          setInfo(i.location, row, bound.size, data.shift);
+          this.storageInfo(p, i.location, row, bound.size, data.shift);
         }
-        plan.push({ unit: b.unit, target: gl.TEXTURE_2D, texture: data.texture, sampler: device.loadSampler });
+        this.plan(b.unit, gl.TEXTURE_2D, data.texture, device.loadSampler);
         continue;
       }
-      const found = lookup(b.group, b.binding);
-      if (!found || found.bound.kind !== 'buffer') {
+      const found = this.boundAt(pass, b.group, b.binding);
+      if (!found || found.kind !== 'buffer') {
         device.validationError(`Draw: no storage buffer is bound at @group(${b.group}) @binding(${b.binding})`);
         return false;
       }
-      const { buffer, offset, size } = found.bound;
-      const data = buffer.dataTexture();
+      const dynamic = this.dynamic,
+        data = found.buffer.dataTexture();
       if (!data) {
         device.validationError(
           `Draw: the buffer at @group(${b.group}) @binding(${b.binding}) has no GPU copy to read; give it STORAGE usage`,
         );
         return false;
       }
-      plan.push({ unit: b.unit, target: gl.TEXTURE_2D, texture: data.texture, sampler: device.loadSampler });
-      for (const i of b.info) setInfo(i.location, (offset + found.dynamic) >> 4, size, data.shift);
+      this.plan(b.unit, gl.TEXTURE_2D, data.texture, device.loadSampler);
+      for (let m = 0; m < b.info.length; m++)
+        this.storageInfo(p, b.info[m].location, (found.offset + dynamic) >> 4, found.size, data.shift);
     }
     // Phase 2: bind the units.
-    for (const u of plan) s.unit(u.unit, u.target, u.texture, u.sampler);
+    for (let k = 0; k < this.planned; k++)
+      s.unit(this.planUnits[k], this.planTargets[k], this.planTextures[k], this.planSamplers[k]);
     return true;
+  }
+
+  /** Dynamic offset of the binding boundAt found last. */
+  private dynamic = 0;
+  /**
+   * Storages a draw samples, with the level range and aspect each is set to (applyBindings), `rangeCount` long and
+   * emptied per draw: arrays, since Map.clear() makes a new table, a hundred and more bytes a draw.
+   */
+  private readonly rangeStores: TextureStorage[] = [];
+  private readonly rangeStates: number[] = [];
+  private rangeCount = 0;
+  /** The sample state rangeStores holds for `storage` this draw, -1 when the draw does not sample it yet. */
+  private rangeOf(storage: TextureStorage): number {
+    for (let i = 0; i < this.rangeCount; i++) if (this.rangeStores[i] === storage) return this.rangeStates[i];
+    return -1;
+  }
+  /** What applyBindings binds to each unit, `planned` entries long. */
+  private planned = 0;
+  private readonly planUnits: number[] = [];
+  private readonly planTargets: number[] = [];
+  private readonly planTextures: (WebGLTexture | null)[] = [];
+  private readonly planSamplers: WebGLSampler[] = [];
+
+  /** Adds a unit's binding to the plan. */
+  private plan(unit: number, target: number, texture: WebGLTexture | null, sampler: WebGLSampler): void {
+    const k = this.planned++;
+    this.planUnits[k] = unit;
+    this.planTargets[k] = target;
+    this.planTextures[k] = texture;
+    this.planSamplers[k] = sampler;
+  }
+
+  /** What the pass binds at (group, binding), with its dynamic offset in `dynamic`; undefined for nothing. */
+  private boundAt(pass: PassState, group: number, binding: number): Bound | undefined {
+    const g = pass.groups[group],
+      bound = g?.group?.entries.get(binding);
+    if (!g?.group || !bound) return undefined;
+    const di = g.group.layout.dynamic.indexOf(binding);
+    this.dynamic = di >= 0 && di < g.count ? g.offsets[di] : 0;
+    return bound;
+  }
+
+  private samplerAt(pass: PassState, at: { readonly group: number; readonly binding: number }): CompatSampler | null {
+    const bound = this.boundAt(pass, at.group, at.binding);
+    if (bound?.kind === 'sampler') return bound.sampler;
+    this.device.validationError(`Draw: no sampler is bound at @group(${at.group}) @binding(${at.binding})`);
+    return null;
+  }
+
+  /** Sets a storage buffer's row, size and shift uniform when they changed. */
+  private storageInfo(p: CompatRenderPipeline, location: WebGLUniformLocation, row: number, size: number, shift: number): void {
+    let held = p.cache.info.get(location);
+    if (held && held[0] === row && held[1] === size && held[2] === shift) return;
+    if (!held) p.cache.info.set(location, (held = new Float64Array(3)));
+    held[0] = row;
+    held[1] = size;
+    held[2] = shift;
+    this.device.state.useProgram(p.program);
+    this.gl.uniform4i(location, row, size, shift, 0);
   }
 
   /** Points the VAO at the bound vertex buffers; `base` is the base vertex, `instance` the first instance. */
   private applyVertex(p: CompatRenderPipeline, pass: PassState, base: number, instance: number): boolean {
-    const gl = this.gl;
-    for (const [i, a] of p.attributes.entries()) {
-      const vb = pass.vertex[a.slot];
-      if (!vb?.buffer.gl) {
+    const gl = this.gl,
+      buffers = p.cache.pointerBuffers,
+      offsets = p.cache.pointerOffsets;
+    for (let i = 0; i < p.attributes.length; i++) {
+      const a = p.attributes[i],
+        vb = pass.vertex[a.slot],
+        buffer = vb?.buffer;
+      if (!vb || !buffer?.gl) {
         this.device.validationError(`Draw: no vertex buffer at slot ${a.slot}`);
         return false;
       }
       const offset = vb.offset + a.offset + (a.instance ? instance : base) * a.stride;
       if (offset < 0) throw this.device.unsupported('a negative base vertex below the start of a vertex buffer');
-      const key = `${vb.buffer.id}:${offset}`;
-      if (p.cache.pointers[i] === key) continue;
-      p.cache.pointers[i] = key;
-      gl.bindBuffer(gl.ARRAY_BUFFER, vb.buffer.gl);
+      if (buffers[i] === buffer.id && offsets[i] === offset) continue;
+      buffers[i] = buffer.id;
+      offsets[i] = offset;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer.gl);
       if (a.integer) gl.vertexAttribIPointer(a.location, a.size, a.type, a.stride, offset);
       else gl.vertexAttribPointer(a.location, a.size, a.type, a.normalized, a.stride, offset);
     }
@@ -2268,52 +3051,75 @@ export class Replayer {
     if (!count || !instances) return;
     this.device.passes.draws++;
     const p = this.ready(0, firstInstance);
-    if (p) this.split(p, () => this.gl.drawArraysInstanced(p.mode, first, count, instances));
+    if (!p) return;
+    // Once, or once per target group of a split pipeline (see CompatRenderPipeline.splits), with no closure per draw.
+    const groups = p.splits && this.pass ? p.splits.length : 1;
+    for (let g = 0; g < groups; g++) {
+      this.splitGroup(p, g);
+      this.gl.drawArraysInstanced(p.mode, first, count, instances);
+    }
+    this.splitEnd(p);
   }
 
-  /** Runs a draw once, or once per target group of a split pipeline (see CompatRenderPipeline.splits). */
-  private split(p: CompatRenderPipeline, run: () => void): void {
+  /** Before draw `g` of a split pipeline (CompatRenderPipeline.splits): its group's draw buffers and target state. */
+  private splitGroup(p: CompatRenderPipeline, g: number): void {
     const pass = this.pass;
-    if (!p.splits || !pass) {
-      run();
-      return;
-    }
-    const gl = this.gl;
-    const all = pass.desc.colors.map((c, i) => (c ? gl.COLOR_ATTACHMENT0 + i : gl.NONE));
-    for (const group of p.splits) {
-      gl.drawBuffers(all.map((b, i) => (group.includes(i) ? b : gl.NONE)));
-      this.applyTargets(p, group[0]);
-      run();
-    }
-    gl.drawBuffers(all);
+    if (!p.splits || !pass) return;
+    const gl = this.gl,
+      group = p.splits[g],
+      colors = pass.desc.colors,
+      buffers = this.drawList;
+    buffers.length = colors.length;
+    for (let i = 0; i < colors.length; i++) buffers[i] = colors[i] && group.includes(i) ? gl.COLOR_ATTACHMENT0 + i : gl.NONE;
+    gl.drawBuffers(buffers);
+    this.applyTargets(p, group[0]);
+  }
+
+  /** After the draws of a split pipeline: every draw buffer back on. */
+  private splitEnd(p: CompatRenderPipeline): void {
+    const pass = this.pass;
+    if (!p.splits || !pass) return;
+    const gl = this.gl,
+      colors = pass.desc.colors,
+      buffers = this.drawList;
+    buffers.length = colors.length;
+    for (let i = 0; i < colors.length; i++) buffers[i] = colors[i] ? gl.COLOR_ATTACHMENT0 + i : gl.NONE;
+    gl.drawBuffers(buffers);
     pass.applied = null;
   }
+
+  /** A draw buffer list the replay fills and hands to drawBuffers (reused; GL copies it). */
+  private readonly drawList: number[] = [];
 
   drawIndexed(count: number, instances: number, firstIndex: number, baseVertex: number, firstInstance: number): void {
     if (!count || !instances) return;
     this.device.passes.draws++;
-    const index = this.pass?.index;
-    if (!index?.buffer.element) {
+    const index = this.pass?.index,
+      buffer = index?.buffer;
+    if (!index || !buffer?.element) {
       this.device.validationError('drawIndexed without an index buffer');
       return;
     }
     // Writes still waiting land in the element buffer first (a copyTextureToBuffer into it lands a task later). Before
     // ready(): landing one binds vertex array null to write the element buffer, which would undo the draw's vertex array.
-    index.buffer.drain();
+    buffer.drain();
     const p = this.ready(baseVertex, firstInstance);
     if (!p) return;
-    if (p.cache.element !== index.buffer.id) {
+    if (p.cache.element !== buffer.id) {
       // Unbind first: on Chromium (Metal, under load) a new index buffer bound to a vertex array that last held a
       // since-deleted index buffer kept drawing the deleted buffer's indices ("Vertex buffer is not big enough for
       // the draw call", sciviz glyphs drew nothing), and binding another buffer in between cleared it.
       // Raw GL replay also reproduces stale retired indices on ANGLE D3D11; detach preserves replacement bytes.
       this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, index.buffer.element);
-      p.cache.element = index.buffer.id;
+      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, buffer.element);
+      p.cache.element = buffer.id;
     }
-    this.split(p, () =>
-      this.gl.drawElementsInstanced(p.mode, count, index.type, index.offset + firstIndex * index.size, instances),
-    );
+    const groups = p.splits && this.pass ? p.splits.length : 1;
+    for (let g = 0; g < groups; g++) {
+      this.splitGroup(p, g);
+      this.gl.drawElementsInstanced(p.mode, count, index.type, index.offset + firstIndex * index.size, instances);
+    }
+    this.splitEnd(p);
   }
 
   // ------------------------------------------------ helper draws
@@ -2364,25 +3170,24 @@ export class Replayer {
     this.openMasks();
     s.useProgram(h.program);
     s.bindVertexArray((this.emptyVao ??= gl.createVertexArray()));
-    for (const cap of [
-      gl.CULL_FACE,
-      gl.DEPTH_TEST,
-      gl.STENCIL_TEST,
-      gl.POLYGON_OFFSET_FILL,
-      gl.SAMPLE_ALPHA_TO_COVERAGE,
-    ])
-      s.enable(cap, false);
+    s.enable(gl.CULL_FACE, false);
+    s.enable(gl.DEPTH_TEST, false);
+    s.enable(gl.STENCIL_TEST, false);
+    s.enable(gl.POLYGON_OFFSET_FILL, false);
+    s.enable(gl.SAMPLE_ALPHA_TO_COVERAGE, false);
     s.enable(gl.SCISSOR_TEST, false);
-    s.set('blend', 'off', () => gl.disable(gl.BLEND));
-    for (let i = 0; i < 8; i++) s.forget(`blend${i}`);
-    s.set('viewport', `0,0,${w},${ht}`, () => gl.viewport(0, 0, w, ht));
+    if (s.blendChanged(-1, 'off')) gl.disable(gl.BLEND);
+    for (let i = 0; i < 8; i++) s.forgetBlend(i);
+    s.viewport(0, 0, w, ht);
   }
 
   // ------------------------------------------------ copies
 
-  copyBuffer(src: CompatBuffer, srcOffset: number, dst: CompatBuffer, dstOffset: number, size: number): void {
-    if (!size) return;
-    const gl = this.gl;
+  /**
+   * copyBuffer() while a buffer still waits for query results: the copy lands after them, in order with the other
+   * writes. A method of its own, since a function that makes a closure allocates the closure's context on every call.
+   */
+  private copyBufferLater(src: CompatBuffer, srcOffset: number, dst: CompatBuffer, dstOffset: number, size: number): void {
     if (src.readbacks.length && !src.settle()) {
       // The source still waits for query results: the copy lands after them, in order with dst's other writes.
       dst.readbacks.push({
@@ -2392,13 +3197,19 @@ export class Replayer {
       });
       return;
     }
-    if (dst.readbacks.length && !dst.settle()) {
-      const bytes = src.bytes().slice(srcOffset, srcOffset + size);
-      dst.readbacks.push({ forcible: true, ready: () => true, apply: () => dst.land(dstOffset, bytes) });
+    const bytes = src.bytes().slice(srcOffset, srcOffset + size);
+    dst.readbacks.push({ forcible: true, ready: () => true, apply: () => dst.land(dstOffset, bytes) });
+  }
+
+  copyBuffer(src: CompatBuffer, srcOffset: number, dst: CompatBuffer, dstOffset: number, size: number): void {
+    if (!size) return;
+    const gl = this.gl;
+    if ((src.readbacks.length && !src.settle()) || (dst.readbacks.length && !dst.settle())) {
+      this.copyBufferLater(src, srcOffset, dst, dstOffset, size);
       return;
     }
     if (src.shadow && src.shadowValid) {
-      dst.write(dstOffset, src.shadow.subarray(srcOffset, srcOffset + size));
+      dst.writeRange(dstOffset, src.shadow, srcOffset, size);
       return;
     }
     if (src.gl && dst.gl) {
@@ -2433,26 +3244,65 @@ export class Replayer {
     destination: GPUTexelCopyTextureInfo & { texture: CompatTexture },
     [w, h, depth]: [number, number, number],
   ): void {
-    const a = source.texture as CompatTexture,
-      b = destination.texture as CompatTexture;
+    const [sx, sy, sz] = origin(source.origin),
+      [dx, dy, dz] = origin(destination.origin);
+    this.copyTextures(
+      source.texture,
+      destination.texture,
+      source.mipLevel ?? 0,
+      sx,
+      sy,
+      sz,
+      destination.mipLevel ?? 0,
+      dx,
+      dy,
+      dz,
+      w,
+      h,
+      depth,
+    );
+  }
+
+  /** copyTextureToTexture() with its regions as numbers, the form a tape records (no arrays or option objects). */
+  copyTextures(
+    a: CompatTexture,
+    b: CompatTexture,
+    fromLevel: number,
+    sx: number,
+    sy: number,
+    sz: number,
+    toLevel: number,
+    dx: number,
+    dy: number,
+    dz: number,
+    w: number,
+    h: number,
+    depth: number,
+  ): void {
     if (a.renderbuffer || b.renderbuffer) throw this.device.unsupported('copying a multisampled texture');
-    if (
-      a.format !== b.format &&
-      a.info.internal.replace('SRGB8_ALPHA8', 'RGBA8') !== b.info.internal.replace('SRGB8_ALPHA8', 'RGBA8')
-    )
+    if (a.format !== b.format && !twins(a.info, b.info))
       throw new TypeError(
         `copyTextureToTexture copies within one format or its sRGB twin (${a.format} to ${b.format}); use textures of matching formats`,
       );
+    if (a.info.block) {
+      // Blocks are copied as they are (WebGPU "copyTextureToTexture()"): read from the source's kept blocks and written
+      // into the destination as a writeTexture would, so its sRGB twin and kept blocks follow.
+      const block = a.info.block,
+        across = Math.ceil(w / block.w) * block.bytes,
+        down = Math.ceil(h / block.h),
+        tight = new Uint8Array(across * down * depth);
+      blocksOf(a, 'copyTextureToTexture').blockRegion(fromLevel, sx, sy, sz, w, h, depth, tight, false);
+      const destination = { texture: b, mipLevel: toLevel, origin: [dx, dy, dz] };
+      writeBlocks(this.device, b, destination, tight, { bytesPerRow: across, rowsPerImage: down }, [w, h, depth]);
+      this.rebind();
+      return;
+    }
     if (!a.info.renderable)
       throw this.device.unsupported(
         `copying between ${a.format} textures (WebGL2 cannot attach the format to copy it)`,
       );
-    const [sx, sy, sz] = origin(source.origin),
-      [dx, dy, dz] = origin(destination.origin);
     const from = a.primary as TextureStorage,
-      to = b.primary as TextureStorage,
-      fromLevel = source.mipLevel ?? 0,
-      toLevel = destination.mipLevel ?? 0;
+      to = b.primary as TextureStorage;
     const a3 = a.dimension === '3d',
       b3 = b.dimension === '3d';
     a.read(from, fromLevel, 1, a3 ? 0 : sz, a3 ? 1 : depth, this.sync);
@@ -2577,6 +3427,18 @@ export function writeTexture(
   if (!storage) afterUpload(t, level, z, depth);
 }
 
+/**
+ * The source of a copy out of a block-compressed texture, which reads the blocks the texture keeps (CompatTexture.blocks);
+ * WebGPU allows such a copy only from a texture made with COPY_SRC usage.
+ */
+export function blocksOf(t: CompatTexture, copy: string): CompatTexture {
+  if (!t.blocks)
+    throw new TypeError(
+      `${copy} reads a texture made with GPUTextureUsage.COPY_SRC; '${t.label}' (${t.format}) was made without it`,
+    );
+  return t;
+}
+
 /** writeTexture into a block-compressed texture: whole blocks, uploaded as they are (compressedTexSubImage). */
 function writeBlocks(
   device: CompatDevice,
@@ -2605,9 +3467,11 @@ function writeBlocks(
     }
   beforeUpload(device, t, level, z, depth);
   // A copy of whole blocks may run past a mip level smaller than one block; GL takes the level's own size there.
-  const [lw, lh] = t.levelSize(level);
+  const lw = t.levelWidth(level),
+    lh = t.levelHeight(level);
   const write: BlockWrite = { level, x, y, z, w: Math.min(w, lw - x), h: Math.min(h, lh - y), depth, bytes: tight };
   device.replayer.putBlocks(t.primary as TextureStorage, write);
+  if (t.blocks) t.blockRegion(level, x, y, z, w, h, depth, tight, true);
   if (t.blockTwin) device.replayer.putBlocks(t.blockTwin, write);
   else if (t.blockWrites) {
     const covers = (a: BlockWrite, b: BlockWrite) =>

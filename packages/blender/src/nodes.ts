@@ -1,7 +1,8 @@
 import type { EngineKernel } from '@margoengine/core';
-import { GLTFAsset, PBRModel, type MaterialExtension } from '@margoengine/gltf-pro/model';
+import { GLTFAsset, PBRModel, type MaterialExtension } from '@margoengine/gltf/pbr-model';
 import { margoError } from '../../shared/errors.js';
 import { readResponse } from '../../shared/loading.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { decodeImages, maxBytes } from './container.js';
 import { decodeMargo, type MargoOptions } from './index.js';
 import { mathExpressions, blendExpressions, nodeHelpers, noiseHelpers } from './nodes-wgsl.js';
@@ -109,16 +110,26 @@ function bezier(a: CurveKey, b: CurveKey, s: number): number {
   for (let n = 0; n < 64; n++) { const mid = (lo + hi) / 2; if (at(a.t, x1, x2, b.t, mid) < s) lo = mid; else hi = mid; }
   return at(a.v, y1, y2, b.v, (lo + hi) / 2);
 }
+/**
+ * Slope of LINEAR extrapolation beyond an end key, measured in Blender 5.3 (KB-P3d, tests/fixtures/node-probes.json): the
+ * end key's own interpolation decides it. CONSTANT holds the key's value, LINEAR continues the line to its neighbour,
+ * and Bezier and every easing (Elastic included) continue the key's outer handle; a handle at the key's own time is flat.
+ */
+function endSlope(end: CurveKey, neighbour: CurveKey, handle: number[], dv: number, dt: number): number {
+  if (end.i === 'CONSTANT') return 0;
+  if (end.i === 'LINEAR') return (neighbour.v - end.v) / (neighbour.t - end.t);
+  return handle[0] === end.t ? 0 : dv / dt;
+}
 function evaluateCurve(c: SocketCurve, s: number): number {
   const k = c.keys, first = k[0], last = k[k.length - 1];
   if (s <= first.t || k.length === 1) {
     if (c.extrapolation === 'CONSTANT' || k.length === 1) return first.v;
-    const slope = first.i === 'BEZIER' ? (first.t === first.l[0] ? 0 : (first.v - first.l[1]) / (first.t - first.l[0])) : (k[1].v - first.v) / (k[1].t - first.t);
+    const slope = endSlope(first, k[1], first.l, first.v - first.l[1], first.t - first.l[0]);
     return first.v + (s - first.t) * slope;
   }
   if (s >= last.t) {
     if (c.extrapolation === 'CONSTANT') return last.v;
-    const prev = k[k.length - 2], slope = last.i === 'BEZIER' ? (last.r[0] === last.t ? 0 : (last.r[1] - last.v) / (last.r[0] - last.t)) : (last.v - prev.v) / (last.t - prev.t);
+    const slope = endSlope(last, k[k.length - 2], last.r, last.r[1] - last.v, last.r[0] - last.t);
     return last.v + (s - last.t) * slope;
   }
   let lo = 0, hi = k.length - 1;
@@ -130,7 +141,10 @@ function evaluateCurve(c: SocketCurve, s: number): number {
   if (a.i === 'ELASTIC') return elastic(a, b, s);
   return a.v + (b.v - a.v) * eased(a.i, a.e, x, a.b);
 }
-const scalar = (e: string, type: string) => type === 'color' ? `dot(${e}.rgb,vec3f(0.3333333333))` : `${e}.x`;
+// Blender turns a colour wired into a float socket into its scene-linear Rec. 709 luminance, not the mean of R, G and B.
+// The weights are the ones a Cycles bake of RGB -> Math Add 0 gives in Blender 5.3 (KB-P3d, tests/fixtures/node-probes.json);
+// Geometry Nodes rounds them to 0.2126, 0.7152 and 0.0722 (ITU-R BT.709-6, 2015, item 3.2).
+const scalar = (e: string, type: string) => type === 'color' ? `dot(${e}.rgb,vec3f(0.2126391,0.7151691,0.0721927))` : `${e}.x`;
 
 /** A compiled GPU surface and its live uniform values. set and seek never recompile the shader or bake an image. */
 export class MargoNodeMaterial {
@@ -193,7 +207,7 @@ export class MargoNodeMaterial {
           e = `vec4f((bnLocal(i.position)-vec3f(${lo}))/vec3f(${extent}),1.0)`; break;
         }
         case 'math': {
-          const expression = mathExpressions[n.operation!]; if (!expression) reject(`math ${n.operation}`);
+          const expression = Object.hasOwn(mathExpressions, n.operation!) ? mathExpressions[n.operation!] : reject(`math ${n.operation}`);
           const a=get(0), b=get(1), c=get(2);
           let code = expression.replace(/\b[abc]\b/g, v => ({a,b,c})[v as 'a']);
           if (n.clamp) code = `clamp(${code},0.0,1.0)`;
@@ -207,7 +221,7 @@ export class MargoNodeMaterial {
           if (n.mode === 'FLOAT') e = `vec4f(mix(${get(1)},${get(2)},${t}))`;
           else if (n.mode === 'VECTOR') e = `vec4f(mix(${get(1,'vector')}.xyz,${get(2,'vector')}.xyz,${t}),1.0)`;
           else {
-            const blend=blendExpressions[n.blend!]; if(!blend) reject(`blend ${n.blend}`);
+            const blend=Object.hasOwn(blendExpressions,n.blend!)?blendExpressions[n.blend!]:reject(`blend ${n.blend}`);
             const a=get(1,'color'), b=get(2,'color');
             const code=blend.replace(/\b[ab]\b/g,v=>`(${v==='a'?a:b}.rgb)`);
             e=`vec4f(mix(${a}.rgb,${code},${t}),${a}.a)`;
@@ -321,15 +335,16 @@ export interface MargoNodes {
 /** Decode a .margo scene, validate graphs and attach live PBR surfaces. signal defaults to absent. */
 export async function parseMargoNodes(engine: EngineKernel, input: ArrayBuffer | ArrayBufferView, options: MargoOptions & {signal?: AbortSignal} = {}): Promise<MargoNodes> {
   options.signal?.throwIfAborted();
-  const asset=decodeMargo(input,options), materials=new Map<number,MargoNodeMaterial>();
+  // The model is built after the awaits below: it goes in the scene this call started in.
+  const scope=captureScene(engine), asset=decodeMargo(input,options), materials=new Map<number,MargoNodeMaterial>();
   asset.document.materials?.forEach((m,i)=>{const graph=(m.extras as Record<string,unknown> | undefined)?.['margo:nodes'];if(graph!==undefined)materials.set(i,new MargoNodeMaterial(graph as MargoNodeGraph));});
   const images=await decodeImages(asset.images,options.signal);
   let model:PBRModel|undefined;
   try {
     options.signal?.throwIfAborted();
-    model=new PBRModel(engine,new GLTFAsset(asset.document,[],undefined,undefined,undefined,options.maxNodes),images,asset.geometry);
+    model=scope.run(()=>new PBRModel(engine,new GLTFAsset(asset.document,[],undefined,undefined,undefined,options.maxNodes),images,asset.geometry));
     for(const p of model.primitives){const live=materials.get(p.definition.material??-1);if(live)p.extension=live.extension;}
-    engine.use(model);
+    scope.run(()=>engine.use(model!));
     const dispose=()=>model!.dispose();
     return {model,materials,seek(seconds){for(const m of materials.values())m.seek(seconds);},dispose,[Symbol.dispose]:dispose};
   } catch(error){model?.dispose();for(const image of images)image.close();throw error;}
@@ -338,7 +353,9 @@ export async function parseMargoNodes(engine: EngineKernel, input: ArrayBuffer |
 /** Fetch HTTP(S) .margo bytes with bounded loading, cancellation and optional fetch injection. */
 export async function loadMargoNodes(engine:EngineKernel,url:string|URL,{fetch:get=globalThis.fetch,...options}:MargoOptions & {signal?:AbortSignal;fetch?:typeof fetch}={}):Promise<MargoNodes> {
   options.signal?.throwIfAborted();
-  const target=new URL(url,globalThis.location?.href);
+  const scope=captureScene(engine), target=new URL(url,globalThis.location?.href);
   if(!['http:','https:'].includes(target.protocol))throw new TypeError('Live .margo URL must use HTTP(S); read local bytes and call parseMargoNodes');
-  return parseMargoNodes(engine,await readResponse(await get(target,{signal:options.signal}),{maxBytes,signal:options.signal,label:'.margo nodes download'}),options);
+  const bytes=await readResponse(await get(target,{signal:options.signal}),{maxBytes,signal:options.signal,label:'.margo nodes download'});
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(()=>parseMargoNodes(engine,bytes,options));
 }

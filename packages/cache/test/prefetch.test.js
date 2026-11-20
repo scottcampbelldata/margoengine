@@ -167,3 +167,15 @@ test('throttle caps the body bytes read per second over all requests through it'
   await background.flush();
   assert.equal((await new AssetCache({ name: 'p2', fetch: network }).usage()).files, 1);
 });
+
+test('dispose removes the abort listener from an app signal that outlives the prefetcher', async () => {
+  const { getEventListeners } = await import('node:events');
+  const controller = new AbortController(),
+    prefetch = new Prefetcher({ fetch: server(files(['a'])), signal: controller.signal, idle: false });
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 1);
+  prefetch.dispose();
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  prefetch.dispose();
+  controller.abort();
+  assert.deepEqual(await prefetch.add(base + 'a'), [{ url: base + 'a', status: 'cancelled', bytes: 0 }]);
+});

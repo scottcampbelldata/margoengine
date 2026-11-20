@@ -3,7 +3,8 @@ import { animationCode, opacityCode, solidVertexDepth } from '../../shared/caste
 import { displacementCode } from '../../shared/displacement.js';
 import { sectionShader } from '../../shared/section.js';
 
-const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f,settings:vec4f}
+// `offset.xy` is this frame's jitter minus the history frame's, in uv: the part of every velocity that is not motion.
+const frame = `struct Temporal {current:mat4x4f,previous:mat4x4f,inverse:mat4x4f,settings:vec4f,offset:vec4f}
 @group(0) @binding(0) var<uniform> temporal:Temporal;`;
 export const fullscreen = `struct Fullscreen {@builtin(position) clip:vec4f}
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Fullscreen {let p=array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3));var o:Fullscreen;o.clip=vec4f(p[i],0,1);return o;}`;
@@ -52,8 +53,8 @@ struct ObjectFrame {model:mat4x4f,previousModel:mat4x4f,settings:vec4f,alpha:vec
 @group(0) @binding(4) var<uniform> camera:ObjectCamera;
 ${pbr ? '@group(0) @binding(1) var<storage,read> previousVertices:array<vec4f>;\n@group(0) @binding(2) var alphaMap:texture_2d<f32>;\n@group(0) @binding(3) var alphaSampler:sampler;' : ''}
 struct Input {@location(0) position:${pbr ? 'vec4f' : 'vec3f'}${pbr ? ',@location(1) uv:vec4f,@location(2) color:vec4f' : ''}}
-struct Out {@builtin(position) clip:vec4f,@location(4) current:vec4f,@location(0) previous:vec4f${pbr ? ',@location(1) uv:vec4f,@location(2) alpha:f32' : ''}}
-@vertex fn vertex(i:Input,@builtin(vertex_index) index:u32)->Out {var o:Out;let p=vec4f(i.position.xyz,1);let valid=f.settings.z*camera.settings.z>0;${pbr ? 'let world=f.model*p;o.clip=camera.current*world;' : 'o.clip=camera.current*f.model*p;'}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(4) current:vec4f,@location(0) previous:vec4f${pbr ? ',@location(1) uv:vec4f,@location(2) alpha:f32' : ''}}
+@vertex fn vertex(i:Input,@builtin(vertex_index) index:u32)->Out {var o:Out;let p=vec4f(i.position.xyz,1);let valid=f.settings.z*camera.settings.z>0;let world=f.model*p;o.clip=camera.current*world;
   ${pbr ? 'let old=select(p,vec4f(previousVertices[index*5].xyz,1),valid);' : 'let old=p;'}
   o.current=o.clip;o.previous=camera.previous*f.previousModel*old;if(!valid){o.previous.w=-1;}
   ${pbr ? 'o.uv=i.uv;o.alpha=i.color.a;' : ''}return o;}
@@ -108,6 +109,14 @@ fn ycocg(c:vec3f)->vec3f {return vec3f(dot(c,vec3f(0.25,0.5,0.25)),(c.r-c.b)*0.5
 fn rgb(c:vec3f)->vec3f {return vec3f(c.x+c.y-c.z,c.x+c.z,c.x-c.y-c.z);}`;
 // Reprojection, 3x3 YCoCg neighbourhood clamp and history blend after B. Karis, "High Quality Temporal Supersampling"
 // (SIGGRAPH 2014 course); the depth rejection of history is Margo's.
+// History is kept at the unjittered pixel centres, so it is fetched by the motion alone: the velocity buffer holds the
+// jitter difference too (taa.velocity's documented contract), and the resolve takes it back out (`offset`). Fetching by
+// the whole vector moved a still view's history by the jitter difference, up to 0.8 px, through a bilinear tap every
+// frame: the history blurred and the clamp cut it back only in part, so 8 px stripes converged 10.5 sRGB levels off the
+// supersampled mean (KB-TAA-CLAMP1). Repeated resampling blur: L. Yang, D. Nehab, P. V. Sander, P. Sitthi-amorn,
+// J. Lawrence and H. Hoppe, "Amortized Supersampling" (ACM TOG 28(5), 2009); unjittered reprojection as in Karis 2014,
+// L. J. F. Pedersen, "Temporal Reprojection Anti-Aliasing in INSIDE" (GDC 2016) and the survey of L. Yang, S. Liu and
+// M. Salvi, "A Survey of Temporal Antialiasing Techniques" (Computer Graphics Forum 39(2), 2020).
 export const resolve =
   frame +
   color +
@@ -124,7 +133,7 @@ export const resolve =
   let size=textureDimensions(output);if(any(id.xy>=size)){return;}let p=vec2i(id.xy);let current=linear(textureLoad(scene,p,0).rgb);
   var lo=vec3f(1e30);var hi=vec3f(-1e30);for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
     let sample=ycocg(linear(textureLoad(scene,clamp(p+vec2i(x,y),vec2i(0),vec2i(size)-1),0).rgb));lo=min(lo,sample);hi=max(hi,sample);}}
-  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy;
+  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy+temporal.offset.xy;
   let previousDepth=textureLoad(expected,p,0).r;var result=current;
   if(temporal.settings.z>0&&previousDepth>=0&&previousDepth<=1&&all(uv>=vec2f(0))&&all(uv<vec2f(1))){
     let q=uv*vec2f(size)-0.5;let base=vec2i(floor(q));let fraction=fract(q);var old=vec3f(0);var total=0.0;
@@ -138,13 +147,13 @@ export const resolve =
 export const stochasticResolve = () =>
   resolve
     .replace(
-      `  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy;
+      `  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy+temporal.offset.xy;
   let previousDepth=textureLoad(expected,p,0).r;var result=current;
 `,
       `  var previousDepth=textureLoad(expected,p,0).r;var result=current;var far=previousDepth;var moved=p;
   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){let q=clamp(p+vec2i(x,y),vec2i(0),vec2i(size)-1);
     let d=textureLoad(expected,q,0).r;far=min(far,d);if(d>previousDepth){previousDepth=d;moved=q;}}}
-  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,moved,0).xy;
+  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,moved,0).xy+temporal.offset.xy;
 `,
     )
     .replace(
@@ -188,6 +197,7 @@ export function beforeMove(code: string, move: readonly string[], binding: numbe
  * (1 keeps none), for pixels that change in ways motion vectors cannot describe: particles, blended surfaces, splats.
  * The mask is read at the pixel's place scaled to its own size, so a lower-resolution mask works. History alpha carries
  * each frame's mask to the next, so the pixels an effect left (its trail) distrust history too: max(now, before).
+ * `reactAll` holds that share for the whole pixel, so settling (settle.ts) never holds a reactive pixel either.
  */
 export function reactiveResolve(code: string): string {
   const targets = [
@@ -207,13 +217,15 @@ export function reactiveResolve(code: string): string {
       scene,
       scene +
         'let maskSize=vec2f(textureDimensions(reactiveMask));' +
-        'let react=clamp(textureLoad(reactiveMask,vec2i(min((vec2f(id.xy)+0.5)/vec2f(size)*maskSize,maskSize-1.0)),0).r,0.0,1.0);',
+        'let react=clamp(textureLoad(reactiveMask,vec2i(min((vec2f(id.xy)+0.5)/vec2f(size)*maskSize,maskSize-1.0)),0).r,0.0,1.0);' +
+        'var reactAll=react;',
     )
     .replace(taps, taps + 'var oldReact=0.0;')
     .replace(tap, 'let h=textureLoad(history,pixel,0);old+=h.rgb*weight;oldReact+=h.a*weight;')
     .replace(
       blend,
-      'result=mix(current,rgb(clamp(ycocg(old/total),lo,hi)),temporal.settings.x*(1.0-max(react,oldReact/total)));',
+      'reactAll=max(react,oldReact/total);' +
+        'result=mix(current,rgb(clamp(ycocg(old/total),lo,hi)),temporal.settings.x*(1.0-max(react,oldReact/total)));',
     )
     .replace(store, 'textureStore(output,p,vec4f(max(result,vec3f(0)),react));');
 }

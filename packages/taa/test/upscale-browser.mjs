@@ -1,20 +1,20 @@
-// Real-GPU check of TAAUpscale, built packages. Takes the GPU lock itself around the browser.
+// Real-GPU check of TAAUpscale, built packages.
 // Compares each upscale against a full-size frame by PSNR, and a moving box's trail against a still background.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-upscale' });
 const timer = setTimeout(() => {
   console.error('upscale-browser: timed out after 180 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 180_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-upscale/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -160,5 +160,4 @@ try {
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

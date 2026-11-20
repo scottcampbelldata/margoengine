@@ -82,10 +82,10 @@ export function modelMeshLayers(mesh: Mesh, root: Mesh): number {
   return maskOf(mesh) ?? maskOf(root) ?? 1;
 }
 
-// gltf-pro's structural model shapes (active GPU deformation requires async intersectModel); `intersectEngine` finds
+// gltf/pbr's structural model shapes (active GPU deformation requires async intersectModel); `intersectEngine` finds
 // attached models itself.
 export { engineProxies, isModel, type ModelLike, type ModelPrimitiveLike, type PickProxy };
-/** Live gltf-pro models attached to an engine: its plugins that have `root` and `primitives`. */
+/** Live gltf/pbr models attached to an engine: its plugins that have `root` and `primitives`. */
 export function engineModels(engine: Engine): ModelLike[] {
   const out: ModelLike[] = [];
   // Structural engines (tests, tools) may have no plugin map.
@@ -148,7 +148,7 @@ export function boundingSphere(v: Float32Array, stride: number): Float64Array {
   return new Float64Array([cx, cy, cz, Math.sqrt(r)]);
 }
 
-/** @internal Material side of a model primitive: its `side`, else gltf-pro's settings[2] (2 back, >= 0.5 double). */
+/** @internal Material side of a model primitive: its `side`, else gltf/pbr's settings[2] (2 back, >= 0.5 double). */
 export const primitiveSide = (material: ModelPrimitiveLike['material']): Side =>
   material.side ?? (material.settings[2] === 2 ? 'back' : material.settings[2] >= 0.5 ? 'double' : 'front');
 /** @internal Material side of a core mesh: double-sided when material data[6] >= 0.5. */
@@ -208,7 +208,7 @@ export interface RaycasterHit {
   /**
    * Model hits only: the model, the primitive and its index in `model.primitives`, the glTF node index and TEXCOORD_0 at
    * the hit. `intersectModel` hits carry `uv` from the posed snapshot, and `primitiveIndex` and `nodeIndex` when the
-   * snapshot supplies them (gltf-pro's `PBRModel` does); they have no `model` or `primitive` object.
+   * snapshot supplies them (gltf/pbr's `PBRModel` does); they have no `model` or `primitive` object.
    */
   model?: ModelLike;
   primitive?: ModelPrimitiveLike;
@@ -246,7 +246,7 @@ export interface PickingGeometry {
   /** glTF node index of the primitive, captured with the snapshot and copied to hits as `nodeIndex`. Optional. */
   readonly nodeIndex?: number;
 }
-/** Structural interface implemented by gltf-pro's PBRModel, without a runtime or package dependency on gltf-pro. */
+/** Structural interface implemented by gltf/pbr's PBRModel, without a runtime or package dependency on gltf/pbr. */
 export interface DeformedPickingSource {
   readonly root: Mesh;
   readonly disposed: boolean;
@@ -328,7 +328,7 @@ export class Raycaster {
     return this.setFromCamera([(x / width) * 2 - 1, 1 - (y / height) * 2], runtime.camera, webgpu);
   }
 
-  /** Tests every visible core mesh with geometry, every attached gltf-pro model and every pick proxy (imposter levels). Hits are sorted by distance. */
+  /** Tests every visible core mesh with geometry, every attached gltf\/pbr model and every pick proxy (imposter levels). Hits are sorted by distance. */
   intersectEngine(engine: Engine, options?: IntersectOptions): RaycasterHit[] {
     const runtime = engine as unknown as RaycastRuntime;
     return this.intersect(runtime, runtime.meshes.values(), engineModels(engine), engineProxies(engine), options);
@@ -503,7 +503,7 @@ export class Raycaster {
     return this.intersectObjects(engine, meshes, options);
   }
 
-  /** Tests the given core meshes and gltf-pro models (`PBRModel`, @margoengine/materials meshes), and pick proxies whose anchor or model is given. */
+  /** Tests the given core meshes and gltf\/pbr models (`PBRModel`, @margoengine/materials meshes), and pick proxies whose anchor or model is given. */
   intersectObjects(engine: Engine, objects: Iterable<Mesh | ModelLike>, options?: IntersectOptions): RaycasterHit[] {
     const meshes: RuntimeMesh[] = [],
       models: ModelLike[] = [],

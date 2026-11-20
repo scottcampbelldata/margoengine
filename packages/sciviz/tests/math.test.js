@@ -91,3 +91,13 @@ test('security: math labels build MathML elements without parsing HTML, and host
   assert.equal(el.querySelector('mtext').namespaceURI, 'http://www.w3.org/1998/Math/MathML');
   assert.ok(mathML(String.raw`\text{${hostile}}`).includes('&quot;&gt;&lt;img src=x onerror=alert(1)&gt;'));
 });
+test('escaped delimiters after \\left and \\right are the delimiter itself, not a backslash and a brace', () => {
+  const texts = (n) => (n.kind === 'delimiter' ? [n.text] : n.children.flatMap(texts));
+  assert.deepEqual(texts(parseMath(String.raw`\left\{ x \right\}`)), ['{', '}']);
+  assert.deepEqual(texts(parseMath(String.raw`\left\| x \right\|`)), ['‖', '‖']);
+  assert.deepEqual(texts(parseMath(String.raw`\left\lbrace x \right.`)), ['{', '']);
+  assert.deepEqual(
+    [...mathML(String.raw`\left\{ x \right\}`).matchAll(/<mo>([^<]*)<\/mo>/g)].map((m) => m[1]),
+    ['{', '}'],
+  );
+});

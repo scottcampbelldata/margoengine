@@ -1,3 +1,4 @@
+// MARGO_COMPAT not applicable: the page probes WebGL2 itself (probeWebGL2, webgl2Capabilities) and makes no WebGPU calls.
 // Browser check (`npm run test:browser`, run by check:merge): probeWebGL2 and webgl2Capabilities from the built
 // package in the default test browser. The machine's WebGL2 must reach the `full` tier (every back end measured for
 // the roadmap does), the probe must leave no context behind, and an exact-pixel context stays exact-pixel.

@@ -8,7 +8,8 @@ export type CVDType = 'protan' | 'deutan' | 'tritan';
 
 /** Row-major linear-light RGB simulation matrix. Severity defaults to 1; intermediate author tables interpolate. */
 export function cvdMatrix(type: CVDType, severity = 1): readonly number[] {
-  const rows = CVD_MATRICES[type];
+  // Own keys only: an inherited name such as 'constructor' is not a deficiency type.
+  const rows = Object.hasOwn(CVD_MATRICES, type) ? CVD_MATRICES[type] : undefined;
   if (!rows) throw typeError('Unknown CVD type; choose protan, deutan or tritan', 'sciviz');
   if (!Number.isFinite(severity) || severity < 0 || severity > 1)
     throw rangeError('CVD severity must be finite in [0,1]; correct severity', 'sciviz');

@@ -4,6 +4,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import type { Kinematics } from './kinematics.js';
 import { machineryMemory } from './runtime.js';
+import { captureScene } from '../../shared/scene-scope.js';
 /** Options for {@link TelemetryChannel}: `delay` is the playback delay in milliseconds (default 100) that smooths network jitter, and `onError` receives errors from WebSocket frames (default: rethrow). */
 export interface TelemetryOptions {
   delay?: number;
@@ -45,8 +46,10 @@ export class TelemetryChannel implements EnginePlugin {
     kinematics: Kinematics,
     options?: TelemetryOptions,
   ): Promise<TelemetryChannel> {
-    const value = await TelemetryChannel.create(kinematics, options);
-    engine.use(value);
+    // The scene attach was called for, kept across the await.
+    const scope = captureScene(engine),
+      value = await TelemetryChannel.create(kinematics, options);
+    scope.run(() => engine.use(value));
     return value;
   }
   static async create(kinematics: Kinematics, options: TelemetryOptions = {}): Promise<TelemetryChannel> {

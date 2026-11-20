@@ -1,11 +1,11 @@
-// Real-GPU check of @margoengine/oit (run on AC power, holding the GPU lock, after npm run build:packages):
+// Real-GPU check of @margoengine/oit (run on AC power, after npm run build:packages):
 //   node examples/package-benchmarks/oit-gpu.mjs [--only=colours,transparent,post,popping,timing]
 // 1. Colours: 1, 2 and 4 unlit translucent planes (materials 'basic') over an opaque grey plane, MSAA 1x/4x, perspective
 //    and orthographic: OIT against analytic sorted blending (the WBOIT approximation error) and against the WBOIT formula
-//    (the implementation error); gltf-pro's sorted path against analytic blending as a control.
+//    (the implementation error); gltf/pbr's sorted path against analytic blending as a control.
 // 2. TransparentCanvas: OIT layers over an empty canvas give valid premultiplied alpha (frame over black and over white).
 // 3. PostStack (Bloom + FXAA, HDR capture): no GPU errors; one layer equals the sorted path.
-// 4. Popping: a 50% housing over two opaque gears and a 55% translucent gear (gltf-pro BLEND), orbited in 3 degree steps,
+// 4. Popping: a 50% housing over two opaque gears and a 55% translucent gear (gltf/pbr BLEND), orbited in 3 degree steps,
 //    sorted and OIT against a per-triangle sorted reference: error per frame, its largest frame-to-frame jump, and the
 //    pixels that change sharply between frames beyond what the reference itself changes (popping).
 // 5. GPU time (Stats timestamp profiler, median) at 1280x720 and 1920x1080, MSAA 4x: opaque only, sorted, OIT; after

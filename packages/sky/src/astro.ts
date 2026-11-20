@@ -1,8 +1,9 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // The sun, moon, planets and stars for a date, time and place, from published astronomy: Meeus, "Astronomical
 // Algorithms" (2nd ed., 1998) for time, sidereal time, nutation, precession, the sun (ch. 25), the moon (ch. 47 and 48)
-// and planet magnitudes (ch. 41); Standish, "Keplerian Elements for Approximate Positions of the Major Planets" (JPL
-// Solar System Dynamics) for the planets; Espenak and Meeus (NASA, 2006) for Delta T; Saemundsson (Sky and Telescope
+// and planet magnitudes (ch. 41; Mars and Saturn's rings from Mallama and Hilton, Astronomy and Computing 25, 2018);
+// Standish, "Keplerian Elements for Approximate Positions of the Major Planets" (JPL Solar System Dynamics) for the
+// planets; Espenak and Meeus (NASA, 2006) for Delta T; Saemundsson (Sky and Telescope
 // 72, 1986) for refraction; Kasten and Young (Applied Optics 28, 1989) for air mass; Ballesteros (EPL 97, 2012) for a
 // star's temperature from B-V. The star catalogue is read in the byte layout of the Yale Bright Star Catalogue, 5th
 // edition (Hoffleit and Warren, 1991, CDS V/50).
@@ -85,7 +86,7 @@ export type PlanetName = (typeof planetNames)[number];
 /** A planet's place and brightness. */
 export interface PlanetPosition extends CelestialPosition {
   name: PlanetName;
-  /** Visual magnitude (Meeus 41; Saturn without its rings). */
+  /** Visual magnitude (Meeus 41; Mars, Mallama and Hilton 2018 Eq. 6; Saturn with its rings, their Eq. 10). */
   magnitude: number;
   /** Unit geocentric vector in the J2000 mean equator and equinox, light time included: what {@link skyMatrix} maps. */
   j2000: Vec3;
@@ -118,8 +119,10 @@ export function julianDay(date: Date): number {
 
 /**
  * Terrestrial minus universal time in seconds for a date, from the polynomials of Espenak and Meeus (NASA, "Five
- * Millennium Canon of Solar Eclipses", 2006) between 1961 and 2150, and their long-term parabola outside. Past the
- * last measured year it is a prediction, uncertain by seconds.
+ * Millennium Canon of Solar Eclipses", 2006; eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html) between the years -500
+ * and 2150, and their long-term parabola outside. Their lunar secular acceleration correction is for the Canon's
+ * lunar ephemeris and is not applied. Past the last measured year it is a prediction, uncertain by seconds; before
+ * 1600 it is uncertain by minutes to hours (Morrison and Stephenson 2004).
  * @example deltaT(new Date('2026-01-01')); // about 72
  */
 export function deltaT(date: Date): number {
@@ -136,8 +139,53 @@ export function deltaT(date: Date): number {
     const t = y - 1975;
     return 45.45 + 1.067 * t - (t * t) / 260 - (t * t * t) / 718;
   }
-  const u = (y - 1820) / 100;
-  return y >= 2050 && y < 2150 ? -20 + 32 * u * u - 0.5628 * (2150 - y) : -20 + 32 * u * u;
+  if (y >= 2050 || y < -500) {
+    const u = (y - 1820) / 100;
+    return y < 2150 && y >= 2050 ? -20 + 32 * u * u - 0.5628 * (2150 - y) : -20 + 32 * u * u;
+  }
+  if (y >= 1941) {
+    const t = y - 1950;
+    return 29.07 + 0.407 * t - (t * t) / 233 + (t * t * t) / 2547;
+  }
+  if (y >= 1920) {
+    const t = y - 1920;
+    return 21.2 + t * (0.84493 + t * (-0.0761 + t * 0.0020936));
+  }
+  if (y >= 1900) {
+    const t = y - 1900;
+    return -2.79 + t * (1.494119 + t * (-0.0598939 + t * (0.0061966 - t * 0.000197)));
+  }
+  if (y >= 1860) {
+    const t = y - 1860;
+    return 7.62 + t * (0.5737 + t * (-0.251754 + t * (0.01680668 + t * (-0.0004473624 + t / 233174))));
+  }
+  if (y >= 1800) {
+    const t = y - 1800;
+    return (
+      13.72 +
+      t *
+        (-0.332447 +
+          t * (0.0068612 + t * (0.0041116 + t * (-0.00037436 + t * (0.0000121272 + t * (-0.0000001699 + t * 8.75e-10))))))
+    );
+  }
+  if (y >= 1700) {
+    const t = y - 1700;
+    return 8.83 + t * (0.1603 + t * (-0.0059285 + t * (0.00013336 - t / 1174000)));
+  }
+  if (y >= 1600) {
+    const t = y - 1600;
+    return 120 + t * (-0.9808 + t * (-0.01532 + t / 7129));
+  }
+  if (y >= 500) {
+    const u = (y - 1000) / 100;
+    return (
+      1574.2 +
+      u * (-556.01 + u * (71.23472 + u * (0.319781 + u * (-0.8503463 + u * (-0.005050998 + u * 0.0083572073)))))
+    );
+  }
+  const u = y / 100;
+  return 10583.6 +
+    u * (-1014.41 + u * (33.78311 + u * (-5.952053 + u * (-0.1798452 + u * (0.022174192 + u * 0.0090316521)))));
 }
 
 /** Julian Day in universal time and Julian centuries of terrestrial time from J2000.0. */
@@ -283,14 +331,24 @@ export function skyMatrix(date: Date, observer: Observer, options: AstroOptions 
   return mul(f.horizon, mul(f.nutate, precessionOf(f.t)));
 }
 
+// Saemundsson's lift in degrees for a true altitude in degrees; his constant 0.0019279 arcminutes makes it 0 at the zenith.
+const saemundsson = (h: number) => (1.02 / Math.tan((h + 10.3 / (h + 5.11)) * rad) + 0.0019279) / 60;
+// The true altitude Saemundsson's formula lifts to the apparent horizon (by 34.43 arcminutes, the 34 the almanacs use
+// for the refraction at the horizon), and that lift.
+const horizonAltitude = -0.5739141574,
+  horizonLift = saemundsson(horizonAltitude);
+
 /**
- * Raises a true altitude by the refraction of standard air (Saemundsson 1986, with his zenith constant), in degrees.
- * Applied above -1 degree, where the formula holds; anything lower is still below the horizon after it.
+ * Raises a true altitude by the refraction of standard air, in degrees: Saemundsson (1986, with his zenith constant)
+ * down to the apparent horizon, where a body at true altitude -0.574 degree is lifted to 0 by 34.4 arcminutes (the 34
+ * of the US Naval Observatory's rise and set). Below it nothing is seen; the lift fades linearly to none at -6 degrees,
+ * so a body's place stays continuous and keeps its order, every place below the horizon stays below it, and the
+ * geometric altitudes of twilight (USNO: civil -6, nautical -12, astronomical -18 degrees) stand as defined.
  */
 export function refract(altitude: number): number {
-  if (!(altitude > -1)) return altitude;
-  // Saemundsson's constant 0.0019279 arcminutes makes the refraction 0 at the zenith.
-  return Math.min(90, altitude + (1.02 / Math.tan((altitude + 10.3 / (altitude + 5.11)) * rad) + 0.0019279) / 60);
+  if (altitude >= horizonAltitude) return Math.min(90, altitude + saemundsson(altitude));
+  if (!(altitude > -6)) return altitude;
+  return altitude + (horizonLift * (altitude + 6)) / (horizonAltitude + 6);
 }
 
 /** A position from an apparent equatorial vector of date (unit) and its distance in km. */
@@ -494,15 +552,109 @@ const orbit = (k: number, t: number): Vec3 => {
 };
 
 // Meeus 41 (the Astronomical Almanac's formulas): magnitude at r = delta = 1 AU and the phase terms (i in degrees).
+// Saturn is Mallama and Hilton 2018, Eq. 10, with its rings (the entry here is its globe term, unused).
 const magnitudes: ((i: number) => number)[] = [
   (i) => -0.42 + i * (0.038 + i * (-0.000273 + i * 0.000002)),
   (i) => -4.4 + i * (0.0009 + i * (0.000239 - i * 0.00000065)),
-  (i) => -1.52 + 0.016 * i,
+  // Mars: Mallama and Hilton 2018, Eq. 6 (valid to 50 degrees; from the Earth it stays below 48), with marsTerms.
+  (i) => -1.601 + i * (0.02267 - 0.0001302 * i),
   (i) => -9.4 + 0.005 * i,
   () => -8.88,
   () => -7.19,
   () => -6.87,
 ];
+
+// Mars' V corrections in thousandths of a magnitude at 0, 10, ..., 350 degrees: L(effective sub-longitude, west), then
+// L(Ls), Mallama and Hilton 2018 Eq. 6. The 2007 paper that prints them is closed access, so they were recovered by
+// least squares from 14,800 JPL Horizons Mars magnitudes (US government, public domain) of 1990 to 2040, which follow
+// that equation, and checked on 3,986 more from 1985 to 2045: 0.0003 rms on both (Horizons' 0.001 rounding), every entry
+// within 0.00004 of a thousandth, and the eight values Mallama 2017 (arXiv:1609.05048, Tables A-4.4 and A-4.6, V)
+// prints at 100 degree steps match. Record: docs/limits.md, "Mars magnitude tables".
+// prettier-ignore
+const marsTable = [
+  36, 45, 38, 23, 15, 11, 0, -12, -18, -36, -44, -59, -60, -55, -43, -41, -41, -36, -36, -18, -38, -11, 2, 4, 18, 19, 35,
+  50, 35, 27, 37, 48, 25, 22, 24, 34, -29, -17, -14, -6, -18, -20, -14, -30, -8, -40, -24, -37, -36, -32, 10, 10, -1, 44,
+  25, -4, -16, -8, 29, -54, -33, 55, 17, 52, 6, 87, 6, 64, 30, 19, -30, -17,
+];
+
+/**
+ * One of Mars' tables at `x` degrees (`at` 0 or 36): Stirling's formula to fourth differences about the entry below x,
+ * which is the quartic through the two entries below and the three above (Explanatory Supplement, 3rd ed., 14.2.4).
+ * Horizons' magnitudes pick this centring: about the nearest entry instead leaves 0.0044 rms against 0.0003.
+ */
+const marsLookup = (x: number, at: number) => {
+  const u = turn(x) / 10,
+    k = Math.floor(u),
+    p = u - k;
+  let sum = 0;
+  for (let j = -2; j < 3; j++) {
+    let w = marsTable[at + ((k + j + 36) % 36)] / 1000;
+    for (let m = -2; m < 3; m++) if (m !== j) w *= (p - m) / (j - m);
+    sum += w;
+  }
+  return sum;
+};
+
+const cross = (a: Vec3, b: Vec3): Vec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ],
+  dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+/**
+ * Mars' L(effective sub-longitude) + L(Ls). `helio` is Mars from the Sun and `earth` the Earth from Mars, J2000
+ * ecliptic, at the light-time moment `t` (Julian centuries). Pole and prime meridian are the IAU's (Archinal et al.
+ * 2011): right ascension 317.68143 - 0.1061 T, declination 52.88650 - 0.0609 T, W = 176.630 + 350.89198226 d, so the
+ * J2000 ecliptic turns to Mars' body frame by R3(W) R1(90 - declination) R3(90 + right ascension) R1(-obliquity). The
+ * effective sub-longitude is the mean of the sub-Earth and sub-solar west longitudes; Ls is the Sun's longitude from
+ * Mars' northern spring equinox along its orbit.
+ */
+const marsTerms = (helio: Vec3, earth: Vec3, t: number) => {
+  const body = mul(
+      rot3(176.63 + 350.89198226 * t * 36525),
+      mul(rot1(37.1135 + 0.0609 * t), mul(rot3(47.68143 - 0.1061 * t), rot1(-23.4392911111))),
+    ),
+    pole: Vec3 = [body[6], body[7], body[8]],
+    r = Math.hypot(...helio),
+    sun: Vec3 = [-helio[0] / r, -helio[1] / r, -helio[2] / r],
+    // East longitude angles of the sub-Earth and sub-solar points; their mean longitude (not the 3D midpoint, whose
+    // longitude moves with the two latitudes) is the effective sub-longitude.
+    east = (v: Vec3) => {
+      const b = apply(body, v);
+      return Math.atan2(b[1], b[0]);
+    },
+    a = east(earth),
+    b = east(sun),
+    normal = cross(helio, orbit(3, t + 1e-3)),
+    spring = cross(pole, normal);
+  return (
+    marsLookup(-Math.atan2(Math.sin(a) + Math.sin(b), Math.cos(a) + Math.cos(b)) / rad, 0) +
+    marsLookup(Math.atan2(dot(normal, cross(spring, sun)) / Math.hypot(...normal), dot(spring, sun)) / rad, 36)
+  );
+};
+
+/**
+ * Saturn with its rings at r = delta = 1 AU: Mallama and Hilton, "Computing apparent planetary magnitudes for The
+ * Astronomical Almanac", Astronomy and Computing 25 (2018), Eq. 10, for phase angles below 6.5 degrees (all of them
+ * from the Earth). `earth` and `sun` are unit vectors from Saturn in the J2000 ecliptic; the ring plane is Saturn's
+ * equator, its pole the IAU's (WGCCRE: right ascension 40.589 - 0.036 T, declination 83.537 - 0.004 T degrees, J2000).
+ * The effective ring tilt is the geometric mean of the Earth's and the Sun's Saturnicentric latitudes when they share a
+ * sign, else 0 (the rings lit from the side the Earth does not see).
+ */
+const saturnRings = (i: number, earth: Vec3, sun: Vec3, t: number): number => {
+  const ra = 40.589 - 0.036 * t,
+    dec = 83.537 - 0.004 * t,
+    e = 23.4392911111,
+    y = cos(dec) * sin(ra),
+    z = sin(dec),
+    pole: Vec3 = [cos(dec) * cos(ra), y * cos(e) + z * sin(e), z * cos(e) - y * sin(e)],
+    latitude = (v: Vec3) => Math.asin(pole[0] * v[0] + pole[1] * v[1] + pole[2] * v[2]),
+    be = latitude(earth),
+    bs = latitude(sun),
+    tilt = be * bs > 0 ? Math.sqrt(be * bs) : 0;
+  return -8.914 - 1.825 * Math.sin(tilt) + 0.026 * i - 0.378 * Math.sin(tilt) * Math.exp(-2.25 * i);
+};
 
 /**
  * The seven planets' places and magnitudes for a moment and place, in the order of {@link planetNames}: Standish's
@@ -541,7 +693,17 @@ export function planetPositions(date: Date, observer: Observer, options: AstroOp
     return {
       ...strip(place(f, apply(toDate, j2000), delta * au)),
       name,
-      magnitude: magnitudes[index](i) + 5 * Math.log10(r * delta),
+      magnitude:
+        (name === 'saturn'
+          ? saturnRings(
+              i,
+              [-v[0] / delta, -v[1] / delta, -v[2] / delta],
+              [-helio[0] / r, -helio[1] / r, -helio[2] / r],
+              f.t,
+            )
+          : magnitudes[index](i) +
+            (name === 'mars' ? marsTerms(helio, [-v[0], -v[1], -v[2]], f.t - (0.0057755183 * delta) / 36525) : 0)) +
+        5 * Math.log10(r * delta),
       j2000,
     };
   });
@@ -734,8 +896,8 @@ struct O {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) c
  let s=stars[3u*i];let p=normalize(s.xyz+stars[3u*i+2u].xyz*u.eye.w);
  var d=normalize(vec3f(dot(u.sky0.xyz,p),dot(u.sky1.xyz,p),dot(u.sky2.xyz,p)));
  var h=degrees(asin(clamp(d.y,-1.0,1.0)));
- // Refraction (Saemundsson 1986) above -1 degree: the star rises along its vertical.
- if(u.params.z>0.5&&h>-1.0){h=min(90.0,h+(1.02/tan(radians(h+10.3/(h+5.11)))+0.0019279)/60.0);let level=length(d.xz);
+ // Refraction (Saemundsson 1986) down to the apparent horizon, as refract: the star rises along its vertical.
+ if(u.params.z>0.5&&h>=-0.5739141574){h=min(90.0,h+(1.02/tan(radians(h+10.3/(h+5.11)))+0.0019279)/60.0);let level=length(d.xz);
   if(level>1e-6){d=vec3f(d.x/level*cos(radians(h)),sin(radians(h)),d.z/level*cos(radians(h)));}}
  if(h<=0.0){return o;}
  // Air mass of Kasten and Young (1989) and the extinction it brings, in magnitudes.
@@ -784,6 +946,7 @@ export class AstroSky implements EnginePlugin {
   private engine?: Engine;
   private disposed = false;
   private clock: number;
+  private seconds = 0;
   private night = 0;
   /** The sun, moon and planets of the current moment, updated each frame. */
   sun: CelestialPosition;
@@ -809,10 +972,25 @@ export class AstroSky implements EnginePlugin {
     return new Date(this.clock);
   }
 
+  /** Seconds on this sky's frame clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
+  get time(): number {
+    return this.seconds;
+  }
+
   onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+
+  /**
+   * Moves the date clock by `delta` seconds of frame time (times `timeScale`) and places the sun, moon and planets,
+   * writing them to the attached sky's options; no GPU call. Each frame update runs it, so `seek` from
+   * `@margoengine/cutscene/seek` replays it exactly. Pass `date` for a film: the default is the wall clock's now.
+   */
+  advanceTime(delta: number): void {
     const o = this.options;
     validate(o);
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid AstroSky delta; pass seconds, 0 or more.');
+    this.seconds += delta;
     if (o.date !== undefined) {
       this.clock = o.date.getTime();
       o.date = undefined;

@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/lighting2d/tests/browser-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/lighting2d/tests/browser-check.mjs
 // Each light on a 32 x 16 target is within 1/255 of the CPU form per pixel, and shadow pixels are exactly the CPU's.
 // Results: test-results/lighting2d-browser.json.
 import assert from 'node:assert/strict';

@@ -196,3 +196,8 @@ test('ray helper refuses a picker registered in a different scene', async (t) =>
   await assert.rejects(spatial.ray([0, 0, 1], [0, 0, -1]), { code: 'attached', message: /errors#arguments$/ });
   spatial.dispose(); engine.removePlugin(picking.name);
 });
+test('rays ask the picker for the centre pixel only', async (t) => {
+  const { picker, calls } = await fixture(t);
+  await picker.ray([0, 0, 1], [0, 0, -1]);
+  assert.equal(calls[0][2][Symbol.for('margoengine.selection.exactPick')], true);
+});

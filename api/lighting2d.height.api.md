@@ -28,6 +28,7 @@ export class HeightLighting2D implements EnginePlugin, Disposable {
     constructor(options?: HeightLighting2DOptions);
     static attach(instance: EngineKernel, options?: HeightLighting2DOptions): HeightLighting2D;
     setup(engine: Engine): void;
+    setTarget(target: GPUTexture | (() => GPUTexture) | undefined): void;
     addLight(options?: HeightLight2DOptions): HeightLight2D;
     removeLight(light: HeightLight2D): boolean;
     setOccluders(occluders: readonly HeightOccluder2D[]): void;

@@ -332,7 +332,7 @@ export class OverlappingModel {
     }
     throw new MargoError(
       'failed',
-      'WFC contradicted within the backtrack and attempt budget; check pins/ground, raise backtracks or attempts, or try another seed. Help: https://margoengine.com/docs/wfc',
+      'WFC contradicted within the backtrack and attempt budget; check pins/ground, raise backtracks or attempts, or try another seed. Help: https://margoengine.com/llms/packages/wfc.md',
     );
   }
 

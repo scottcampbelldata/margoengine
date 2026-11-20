@@ -30,6 +30,20 @@ export function deferSpeed(label, log = console.log) {
   return true;
 }
 
+const listingFlags = ['--help', '-h', '--list'];
+
+/**
+ * True when the module at `url` was started as the entry (not imported), the run is no --help, -h or --list run, and the
+ * build phase defers its speed work (the deferral is announced under `label`). The entry wraps its body in
+ * `if (!deferSpeedEntry(url, label)) { ... }`, `url` being its own import.meta.url, so a deferred run ends by its event
+ * loop with exit code 0:
+ * process.exit can hang a Node process for ever (KB-OWN-EXIT1, KB-OWN-EXIT2), and a top-level await that never settles
+ * ends it with code 13.
+ */
+export function deferSpeedEntry(url, label, argv = process.argv) {
+  return isSpeedEntry(url) && !argv.some((arg) => listingFlags.includes(arg)) && deferSpeed(label);
+}
+
 export function reportSpeedPhase(gate) {
   console.log(
     `${gate}: speed phase ${speedPhase()}; ${speedEnabled() ? 'speed suite enabled' : 'benchmarks and timing assertions deferred'} (scripts/speed-phase.json)`,

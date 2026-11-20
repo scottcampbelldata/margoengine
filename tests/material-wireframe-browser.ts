@@ -1,8 +1,8 @@
 import { Engine } from '../packages/core/dist/extension.js';
 import { Material, Texture, createMesh, createInstancedMesh } from '../packages/materials/dist/index.js';
 import type { MaterialOptions, MeshGeometry } from '../packages/materials/dist/index.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { PBRModel } from '../packages/gltf/dist/pbr.js';
 import { SceneTarget } from '../packages/shared/msaa.js';
 
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_SRC: number };
@@ -320,7 +320,7 @@ const wireframeFixture = {
       stats = () => ({ ...effect.stats });
       shadowCleanup.push(() => engine.removePlugin(effect.name));
     } else if (kind === 'contact') {
-      const { ContactShadows } = await import('../packages/staging/dist/index.js'),
+      const { ContactShadows } = await import('../packages/studio/dist/index.js'),
         effect = ContactShadows.attach(engine, {
           static: true,
           resolution: 64,

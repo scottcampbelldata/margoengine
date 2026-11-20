@@ -10,6 +10,9 @@
 import { createCompatGPU } from '/packages/webgl2-compat/dist/device.js';
 
 const FORMAT = { float: 'rgba8unorm', 'unfilterable-float': 'rgba32float', depth: 'depth32float', sint: 'rgba32sint', uint: 'rgba32uint' };
+// An externalTexture layout entry (a texture_external binding) takes a 2D texture view as its stand-in: WebGPU's
+// createBindGroup accepts a GPUTextureView there as well as a GPUExternalTexture.
+const EXTERNAL = { sampleType: 'float', viewDimension: '2d', multisampled: false };
 const BLEND = { color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } };
 
 window.drawAll = async (records, sources) => {
@@ -57,7 +60,7 @@ window.drawAll = async (records, sources) => {
         const entries = layout.entries.map((e) => {
           if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: (e.buffer.type === 'uniform' ? 64 : 128) | 8 }) } };
           if (e.sampler) return { binding: e.binding, resource: device.createSampler(e.sampler.type === 'comparison' ? { compare: 'less' } : { magFilter: 'linear', minFilter: 'linear' }) };
-          const t = e.texture,
+          const t = e.texture ?? (e.externalTexture && EXTERNAL),
             dim = t.viewDimension;
           const tex = device.createTexture({
             size: [2, 2, dim === 'cube' ? 6 : dim === '2d-array' ? 2 : dim === '3d' ? 2 : 1],
@@ -171,7 +174,7 @@ window.dispatchAll = async (records, sources) => {
           if (e.buffer) return { binding: e.binding, resource: { buffer: device.createBuffer({ size: Math.ceil((e.buffer.minBindingSize + 256) / 256) * 256, usage: (e.buffer.type === 'uniform' ? 64 : 128) | 8 }) } };
           if (e.sampler) return { binding: e.binding, resource: device.createSampler(e.sampler.type === 'comparison' ? { compare: 'less' } : { magFilter: 'linear', minFilter: 'linear' }) };
           const st = e.storageTexture,
-            t = e.texture,
+            t = e.texture ?? (e.externalTexture && EXTERNAL),
             dim = st ? st.viewDimension : t.viewDimension;
           const tex = device.createTexture({
             size: [4, 4, dim === 'cube' ? 6 : dim === '2d-array' || dim === '3d' ? 2 : 1],

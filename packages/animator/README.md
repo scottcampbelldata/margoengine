@@ -2,11 +2,11 @@
 
 Import `margoengine/animator` from the `margoengine` package, or `@margoengine/animator` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade a captured pose into the destination. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
+Optional gameplay animation on the existing `@margoengine/animation` skinning pass. Named states select clips, 1D trees interpolate neighboring samples, and 2D trees use normalized inverse-square distance weights with exact sample reproduction. State transitions crossfade the state they leave, which keeps playing until its weight reaches 0, into the destination; a transition taken during a crossfade fades from the blended pose it cut in on, held still. Masked additive layers apply translation/scale/quaternion and morph deltas relative to a sampled reference pose. A zero reference scale component contributes an identity scale delta on that axis. Primitives sharing a node must have matching morph target counts, as required by glTF.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator, addCCDChain, type CCDChain} from 'margoengine/animator';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
@@ -93,7 +93,7 @@ Animator owns pose playback while attached: it pauses `Animation`, updates node 
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { Animator, addRootMotion } from 'margoengine/animator';
 
@@ -124,7 +124,7 @@ A transition starts the new state's travel at its time 0; during a crossfade the
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { Animator, addAimConstraint, addLookAt, type LookAt } from 'margoengine/animator';
 
@@ -156,7 +156,7 @@ Each bone in turn takes its share of what is left, so the last bone's axis ends 
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { Animator } from 'margoengine/animator';
 
@@ -201,7 +201,7 @@ own `when` predicates does not bundle it.
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { AnimatorGraph, type AnimatorGraphDocument } from 'margoengine/animator/graph';
 
@@ -264,7 +264,7 @@ graph.restoreState(saved); // the jump trigger is unset again
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -284,7 +284,7 @@ removeWave();
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { Animator, addFootPlacement } from 'margoengine/animator';
 
@@ -320,7 +320,7 @@ The placement object is read every frame, so poles, weight and the raycast may c
 ```ts
 import {Animator} from 'margoengine/animator';
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {addInertialization} from 'margoengine/animator/inertialize';
 
@@ -351,7 +351,7 @@ Clips of different lengths drift apart in a blend: at half weight a 1 s walk and
 ```ts
 import {Animator} from 'margoengine/animator';
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {addSyncGroup} from 'margoengine/animator/sync';
 
@@ -390,7 +390,7 @@ One walk cycle has to serve every speed and direction a game asks for. `addWarpi
 ```ts
 import {Animator, addRootMotion} from 'margoengine/animator';
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {addDistanceWarp, addWarping} from 'margoengine/animator/warping';
 
@@ -436,7 +436,7 @@ roll.distance = 3.5;                        // what is left to the mark, written
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import {addFullBodyIK, type FullBodyLimb} from 'margoengine/animator/fbik';
@@ -462,7 +462,7 @@ console.log(ik.result.reached, ik.result.distance, ik.result.balanced);
 
 Each limb takes `target`, `rotation`, `pole`, `weight` (default 1), `pinned` (holds its animated place with no target: default true for legs, false for arms) and `support` (counts for balance: default true for legs; set it on a hand that grips, for climbing). `head` takes `joint`, `target`, `rotation` and `weight`. The rig takes `balance` (default true), `supportRadius` (how far the centre of mass may stand outside the supports, default a tenth of the first leg's length), `maxBend` (radians a spine joint turns from the animated pose, default 0.8), `reach` (share of a limb's length the torso plans for, default 0.98), `iterations` (default 12), `tolerance` (default 0.001), `weight` (default 1) and `onSolve`. `ik.result` reports `reached`, `distance`, `balanced`, `imbalance` and `iterations`. The solve runs after foot IK and the solvers added before it.
 
-The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the centre of mass uses Winter's segment shares. A target past what the pinned feet allow leaves the arm straight toward it and `reached` false, with the feet still down. Balance is about world +Y, and a limb must be a direct chain of three joints.
+The torso is a damped Gauss-Newton solve (Levenberg 1944, Marquardt 1963); the centre of mass uses Winter's segment shares and centres (a whole arm's 0.530 of the way from shoulder to wrist, a whole leg's 0.447 from hip to ankle; Winter 2009, Table 4.1), and a limb with no target or pin is weighed where it rides with the body. Since 2026-11-15 a raised or reaching limb shifts the balanced pose by a few millimetres from earlier releases, which put every limb's mass half way down it and weighed a free arm at its animated place. A target past what the pinned feet allow leaves the arm straight toward it and `reached` false, with the feet still down. Balance is about world +Y, and a limb must be a direct chain of three joints.
 
 ## Motion matching (`margoengine/animator/motion-matching`)
 
@@ -470,7 +470,7 @@ Motion matching needs no state graph. `MotionDatabase.build` turns every frame o
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import {addMotionMatching, MotionDatabase, motionStates} from 'margoengine/animator/motion-matching';
@@ -509,7 +509,7 @@ The Animator needs one state per clip, named after it, and `motionStates(animati
 ```ts
 import {Animator} from 'margoengine/animator';
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {addMirror, mirrorPairs} from 'margoengine/animator/mirror';
 
@@ -535,7 +535,7 @@ Partners come from node names: `LeftArm` and `RightArm`, `arm.L` and `arm.R`, `l
 ```ts
 import {Animator} from 'margoengine/animator';
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {addSplineIK, type SplineIKChain} from 'margoengine/animator/spline-ik';
 
@@ -579,7 +579,7 @@ clean up the Animator.
 
 ```ts
 import {EngineKernel} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});

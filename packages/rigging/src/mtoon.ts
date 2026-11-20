@@ -1,25 +1,27 @@
 import { legacyMToon, type LegacyMToon } from './mtoon-legacy.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
-import { setMaterialDraw, type MaterialDrawCall } from '@margoengine/gltf-pro/material-draw';
-import type { PBRMaterial, PBRMaterialShading, PBRModel, PBRPrimitive, GLTFStreamedImage } from '@margoengine/gltf-pro';
-import { PBRDrawRun } from '@margoengine/gltf-pro/model';
+import { setMaterialDraw, type MaterialDrawCall } from '@margoengine/gltf/material-draw';
+import type { PBRMaterial, PBRMaterialShading, PBRModel, PBRPrimitive, GLTFStreamedImage } from '@margoengine/gltf/pbr';
+import { PBRDrawRun } from '@margoengine/gltf/pbr-model';
 import type { Engine, Scene, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { engineRuntime } from '@margoengine/core/extension';
 import { fault, rangeError } from '../../shared/errors.js';
 import { retire, writeUniform } from '../../shared/frame-resources.js';
 import type { VRMExpressions } from './vrm.js';
-import { normalizeMToon, type MToonDefinition, type MToonTextureInfo } from './mtoon-data.js';
+import {
+  fallbackTexel,
+  mapRows,
+  MTOON_MAP_FIELDS as fields,
+  normalizeMToon,
+  scrollWraps,
+  textureRows,
+  uvAnimationPhases,
+  type MToonDefinition,
+  type MToonTextureInfo,
+} from './mtoon-data.js';
 import { mtoonShader, mtoonLit } from './mtoon-shader.js';
 export type { MToonColor, MToonDefinition, MToonTextureInfo } from './mtoon-data.js';
 
-const fields = [
-  'shadeMultiplyTexture',
-  'shadingShiftTexture',
-  'matcapTexture',
-  'rimMultiplyTexture',
-  'outlineWidthMultiplyTexture',
-  'uvAnimationMaskTexture',
-] as const;
 type Definition = ReturnType<typeof normalizeMToon>;
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** Optional runtime expression input; when omitted, only authored material values apply. */
@@ -46,6 +48,8 @@ interface State {
   castBuffer?: GPUBuffer;
   castValues?: Float32Array<ArrayBuffer>;
   castAnimation?: NonNullable<PBRMaterial['castAnimation']>;
+  /** The UV animation's float64 phases of the current frame (`animationPhases`). */
+  phases?: Float64Array;
   body: PBRMaterialShading;
   outline: PBRMaterialShading;
 }
@@ -112,7 +116,7 @@ export class MToon implements EnginePlugin {
   get disposed(): boolean {
     return this.dead;
   }
-  private time = 0;
+  private clock = 0;
   private engine: Engine;
   private scene: Scene;
   private device?: GPUDevice;
@@ -153,13 +157,11 @@ export class MToon implements EnginePlugin {
         state = {} as State;
       const alpha = definitions[index].alphaMode ?? 'OPAQUE',
         offset = definition.renderQueueOffsetNumber;
-      if (
-        !converted &&
-        ((alpha !== 'BLEND' && offset !== 0) ||
-          (alpha === 'BLEND' && (definition.transparentWithZWrite ? offset < 0 : offset > 0)))
-      )
+      // VRMC_materials_mtoon 1.0: "renderQueueOffsetNumber only works when alphaMode is BLEND", so an opaque or mask
+      // material's offset is ignored (queue() never reads it); a blend offset must keep to its side of zero.
+      if (!converted && alpha === 'BLEND' && (definition.transparentWithZWrite ? offset < 0 : offset > 0))
         throw rangeError(
-          'MToon renderQueueOffsetNumber must be zero for opaque/mask, nonnegative for depth-writing blend, and nonpositive for ordinary blend',
+          'MToon renderQueueOffsetNumber must be nonnegative for depth-writing blend and nonpositive for ordinary blend',
           'material',
         );
       Object.assign(state, { index, definition, legacy: converted, values: new Float32Array(104) });
@@ -342,14 +344,25 @@ export class MToon implements EnginePlugin {
       this.only = undefined;
     }
   }
+  /** Seconds on the MToon UV animation clock. */
+  get time(): number {
+    return this.clock;
+  }
+  /**
+   * Moves the UV scroll and rotation clock by `delta` seconds without drawing (a delta of 0 or less moves nothing).
+   * Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.clock += delta;
+  }
   onPreUpdate(delta: number): void {
-    this.time += delta;
+    this.advanceTime(delta);
     this.applyExpressions();
     this.moveCastCutouts();
   }
   /**
    * Shadow cut-outs follow the UV animation (KB5289b). Each cut-out (MASK) material whose UVs move hands its casters
-   * (gltf-pro `castAnimation`, read by shadows and clustered through shared/caster.js `animatedDepth`) an 80-byte uniform,
+   * (gltf/pbr `castAnimation`, read by shadows and clustered through shared/caster.js `animatedDepth`) an 80-byte uniform,
    * written once per frame: scroll x, scroll y, rotation and time, the base map's affine rows and the mask's, and the
    * mask view, so a shadow texel cuts where the colour pass cuts. Static or uncut materials hand nothing.
    */
@@ -377,16 +390,18 @@ export class MToon implements EnginePlugin {
       const moves = evaluated?.transforms.find((t) => t.material === state.index)?.parts ?? [],
         out = (state.castValues ??= new Float32Array(32)),
         rows = castRows;
-      out[0] = d.uvAnimationScrollXSpeedFactor;
-      out[1] = d.uvAnimationScrollYSpeedFactor;
-      out[2] = d.uvAnimationRotationSpeedFactor;
-      out[3] = this.time;
+      // shared/caster.js animationCode: the phases in motion xyz, k x in motion w, k y in base[1].w, k turns in mask[1].w.
+      const phases = this.animationPhases(state, moves);
+      out.set(phases.subarray(0, 3), 0);
+      out[3] = phases[3];
       // The base map's rows as the colour pass applies them after mtAnimate (its KHR_texture_transform, expressions
       // already in body.maps), then the mask's as mtTransform(…, 5u) reads them.
-      this.transform(rows, 0, part.body.maps[0] as MToonTextureInfo | undefined, []);
+      textureRows(rows, 0, part.body.maps[0] as MToonTextureInfo | undefined, []);
       out.set(rows.subarray(0, 8), 4);
-      this.transform(rows, 0, d.uvAnimationMaskTexture, moves);
+      textureRows(rows, 0, d.uvAnimationMaskTexture, moves);
       out.set(rows.subarray(0, 8), 12);
+      out[11] = phases[4];
+      out[19] = phases[5];
       const buffer = (state.castBuffer ??= device.createBuffer({ size: 80, usage: 72 }));
       device.queue.writeBuffer(buffer, 0, out, 0, 20);
       const mask = resource.maps[5];
@@ -395,6 +410,41 @@ export class MToon implements EnginePlugin {
         state.castAnimation = { buffer, view: mask.view, sampler: mask.sampler };
       for (const p of this.parts) if (p.state === state) p.body.castAnimation = state.castAnimation;
     }
+  }
+  /**
+   * The UV animation's float64 phases at the current time (`uvAnimationPhases`): scroll wraps by 2 on an axis only when
+   * every map the animation moves samples the same texel after it (`scrollWraps`), the MToon maps with their
+   * expression `moves` and the host material's maps as drawn.
+   */
+  private animationPhases(state: State, moves: Parameters<typeof scrollWraps>[3]): Float64Array {
+    const d = state.definition,
+      out = (state.phases ??= new Float64Array(6)),
+      doc = this.model.asset.doc,
+      host = this.parts.find((p) => p.state === state)?.body.maps ?? [];
+    const wraps = (axis: 0 | 1) =>
+      fields.every(
+        (field) =>
+          field === 'matcapTexture' ||
+          field === 'uvAnimationMaskTexture' ||
+          scrollWraps(d[field], this.wrapOf(doc, d[field]), axis, moves),
+      ) && host.every((map) => scrollWraps(map as MToonTextureInfo | undefined, this.wrapOf(doc, map), axis));
+    uvAnimationPhases(
+      out,
+      [d.uvAnimationScrollXSpeedFactor, d.uvAnimationScrollYSpeedFactor, d.uvAnimationRotationSpeedFactor],
+      this.clock,
+      d.uvAnimationScrollXSpeedFactor !== 0 && wraps(0),
+      d.uvAnimationScrollYSpeedFactor !== 0 && wraps(1),
+    );
+    return out;
+  }
+  /** The glTF wrapS and wrapT of a texture lookup's sampler (undefined is REPEAT). */
+  private wrapOf(
+    doc: PBRModel['asset']['doc'],
+    map: { index: number } | undefined,
+  ): [number | undefined, number | undefined] {
+    const texture = map ? doc.textures?.[map.index] : undefined,
+      sampler = texture?.sampler === undefined ? undefined : doc.samplers?.[texture.sampler];
+    return [sampler?.wrapS, sampler?.wrapT];
   }
   private draw(call: MaterialDrawCall): void {
     const old = this.context,
@@ -563,10 +613,10 @@ export class MToon implements EnginePlugin {
         d.parametricRimLiftFactor,
         d.rimLightingMixFactor,
         d.outlineLightingMixFactor,
-        this.time,
-        d.uvAnimationScrollXSpeedFactor,
-        d.uvAnimationScrollYSpeedFactor,
-        d.uvAnimationRotationSpeedFactor,
+        0,
+        0,
+        0,
+        0,
         d.outlineWidthFactor,
       ],
       16,
@@ -585,7 +635,14 @@ export class MToon implements EnginePlugin {
       }
     }
     const moves = evaluated?.transforms.find((t) => t.material === state.index)?.parts ?? [];
-    for (let k = 0; k < fields.length; k++) this.transform(v, 8 + k * 3, d[fields[k]], moves);
+    mapRows(v, d, moves);
+    // The UV animation as float64 phases (KB: MToon UV animation steps after about a day): k x in row 5 w, the phases
+    // in row 6 xyz, k y and k turns in row 7 zw.
+    const phases = this.animationPhases(state, moves);
+    v[23] = phases[3];
+    v.set(phases.subarray(0, 3), 24);
+    v[30] = phases[4];
+    v[31] = phases[5];
     for (const map of resource.maps) if (map.readView) map.view = map.readView() ?? map.fallback!;
     const binding = writeUniform(
       device,
@@ -604,44 +661,6 @@ export class MToon implements EnginePlugin {
             ],
       ),
     ];
-  }
-  private transform(
-    v: Float32Array,
-    row: number,
-    map: MToonTextureInfo | undefined,
-    moves: readonly { scale: readonly number[]; offset: readonly number[]; value: number }[],
-  ): void {
-    const t = map?.extensions?.KHR_texture_transform,
-      offset = [...(t?.offset ?? [0, 0])],
-      scale = [...(t?.scale ?? [1, 1])],
-      angle = t?.rotation ?? 0,
-      c = Math.cos(angle),
-      s = Math.sin(angle);
-    for (let k = 0; k < 2; k++) {
-      const baseOffset = offset[k],
-        baseScale = scale[k];
-      for (const move of moves) {
-        offset[k] += (move.offset[k] - baseOffset) * move.value;
-        scale[k] += (move.scale[k] - baseScale) * move.value;
-      }
-    }
-    v.set(
-      [
-        c * scale[0],
-        s * scale[1],
-        offset[0],
-        t?.texCoord ?? map?.texCoord ?? 0,
-        -s * scale[0],
-        c * scale[1],
-        offset[1],
-        0,
-        map?.scale ?? 1,
-        +!!map,
-        0,
-        0,
-      ],
-      row * 4,
-    );
   }
   private resources(state: State, device: GPUDevice): Resource {
     const maps: Resource['maps'] = [],
@@ -670,7 +689,7 @@ export class MToon implements EnginePlugin {
             const fallback = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
             device.queue.writeTexture(
               { texture: fallback },
-              new Uint8Array(i === 1 ? [0, 0, 0, 255] : [255, 255, 255, 255]),
+              fallbackTexel(fields[i]),
               { bytesPerRow: 4 },
               [1, 1],
             );
@@ -713,7 +732,7 @@ export class MToon implements EnginePlugin {
           texture = device.createTexture({ size: [1, 1], format: 'rgba8unorm', usage: 6 });
           device.queue.writeTexture(
             { texture },
-            new Uint8Array(i === 1 ? [0, 0, 0, 255] : [255, 255, 255, 255]),
+            fallbackTexel(fields[i]),
             { bytesPerRow: 4 },
             [1, 1],
           );

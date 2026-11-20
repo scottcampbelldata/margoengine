@@ -1,3 +1,4 @@
+import { concaveTriangles } from './polygon.js';
 import { Reader, integerOf } from './vtk-reader.js';
 import { LoaderError, type LoadedGeometry, type ParseLimits } from './types.js';
 import { checkCount, latin1, limits, toBytes, uints, type BinaryInput } from './util.js';
@@ -8,9 +9,10 @@ export interface VTKOptions extends ParseLimits {}
 
 /**
  * Parses a legacy VTK file (`# vtk DataFile Version` 1.0 to 5.1, ASCII or BINARY) holding `DATASET POLYDATA`.
- * POLYGONS are fan-triangulated, TRIANGLE_STRIPS unrolled
+ * Convex POLYGONS are fanned and concave ones ear-clipped, TRIANGLE_STRIPS unrolled
  * with alternating winding, VERTICES and LINES ignored (a file with only those is returned as a point cloud).
- * Point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES and single-component SCALARS are read; cell data is skipped.
+ * Point NORMALS, COLOR_SCALARS, TEXTURE_COORDINATES (v turned so 0 is the image's top) and single-component SCALARS
+ * are read; cell data is skipped.
  */
 export function parseVTK(input: BinaryInput, options: VTKOptions = {}): LoadedGeometry {
   const bytes = toBytes(input, F),
@@ -60,7 +62,16 @@ export function parseVTK(input: BinaryInput, options: VTKOptions = {}): LoadedGe
     if (kind === 'POLYGONS') {
       if (size < 3) return;
       triangleLimit(size - 2);
-      for (let k = 2; k < size; k++) indices.push3(cell[start], cell[start + k - 1], cell[start + k]);
+      // vtkPolygon may be concave; its corners must index read points to be clipped (a bad index fails below).
+      const corners = Array.from({ length: size }, (_, k) => cell[start + k]),
+        clipped =
+          size > 3 && positions && corners.every((index) => index < pointCount)
+            ? concaveTriangles(positions, corners)
+            : null;
+      if (clipped)
+        for (let t = 0; t < clipped.length; t += 3)
+          indices.push3(corners[clipped[t]], corners[clipped[t + 1]], corners[clipped[t + 2]]);
+      else for (let k = 2; k < size; k++) indices.push3(cell[start], cell[start + k - 1], cell[start + k]);
     } else if (kind === 'TRIANGLE_STRIPS') {
       triangleLimit(Math.max(0, size - 2));
       for (let k = 0; k + 2 < size; k++) {
@@ -161,7 +172,11 @@ export function parseVTK(input: BinaryInput, options: VTKOptions = {}): LoadedGe
       if (dimension < 1 || dimension > 3)
         throw new LoaderError(F, 'range', `TEXTURE_COORDINATES dimension ${dimension} must be 1 to 3`);
       const values = reader.values(tokens[3] ?? 'float', sectionCount * dimension, what);
-      if (section === 'point' && dimension >= 2) uvs = toFloat32(values, dimension, 2);
+      if (section === 'point' && dimension >= 2) {
+        // VTK puts t = 0 at the image's bottom (OpenGL's convention); Margo puts v = 0 at the top.
+        uvs = toFloat32(values, dimension, 2);
+        for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i];
+      }
     } else if (key === 'TENSORS' || key === 'TENSORS6') {
       reader.values(tokens[2] ?? 'float', sectionCount * (key === 'TENSORS' ? 9 : 6), what);
     } else if (key === 'GLOBAL_IDS' || key === 'PEDIGREE_IDS') {

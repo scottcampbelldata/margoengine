@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/rvt.browser.mjs
 // The terrain virtual texture (`@margoengine/terrain/rvt`) on real elevation (the Mount Rainier tile in
 // packages/shadows/test/fixtures, 256 x 256 texels of 100 m) under four layers of real rock (Poly Haven Aerial Rocks

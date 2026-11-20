@@ -1,6 +1,6 @@
 // The compressed-blend comparison of test/blend-check.mjs on synthetic probes (the GPU run is features-browser.mjs):
-// a linear driver is classified linear, the AMD D3D11 curve compressed, and the comparison accepts only native's LOD
-// through the driver's own blend and equal sweeps.
+// a linear driver is classified linear, the AMD D3D11 curve compressed, a driver equal to native (Metal) native, and
+// the comparison accepts only native's LOD through the driver's own blend and equal sweeps.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { classifyBlend, compressedFailures, PROBE_LODS } from './blend-check.mjs';
@@ -17,13 +17,32 @@ const linear = (f) => f;
 /** The Radeon 680M curve under ANGLE D3D11 (measured 2026-11-10): weight clamp((f - 0.1) / 0.8, 0, 1) on a 1/64 grid. */
 const compressed = (f) => Math.floor(Math.min(Math.max((f - 0.1) / 0.8, 0), 1) * 64) / 64;
 
+/**
+ * Apple M-series Metal (measured 2026-11-15, Dawn and ANGLE Metal alike): an explicit LOD is snapped to 1/64 with
+ * steps at (q - 1/16)/64, while a gradient or implicit footprint LOD keeps about 1/256.
+ */
+const metal = (f) => Math.floor(f * 64 + 1 / 16) / 64;
+
 test('classifyBlend: a linear driver is linear, the AMD D3D11 curve compressed', () => {
-  assert.equal(classifyBlend(probe(linear)).blend, 'linear');
+  assert.equal(classifyBlend(probe(linear), probe(linear)).blend, 'linear');
   // NVIDIA-sized filter error (2^-19) stays linear.
-  assert.equal(classifyBlend(probe((f) => f + 2 ** -19)).blend, 'linear');
-  const amd = classifyBlend(probe(compressed));
+  assert.equal(classifyBlend(probe((f) => f + 2 ** -19), probe(linear)).blend, 'linear');
+  const amd = classifyBlend(probe(compressed), probe(linear));
   assert.equal(amd.blend, 'compressed');
   assert.ok(amd.worst.error >= 0.09, `worst weight error ${amd.worst.error}`);
+  assert.throws(() => classifyBlend(probe(compressed)), /needs native WebGPU probe bits/);
+});
+
+test('classifyBlend: a WebGL2 blend equal to native at every LOD is native, held to exact equality (Metal)', () => {
+  // The 1/64 explicit LOD is 3/256 off k/256, so the WebGL2 probe alone looks compressed; native returns the same
+  // bits, so no driver difference exists to excuse and the footprint rows must equal native exactly.
+  const apple = classifyBlend(probe(metal), probe(metal));
+  assert.equal(apple.blend, 'native');
+  assert.ok(apple.worst.error > 1 / 256, `worst weight error ${apple.worst.error}`);
+  // One LOD where the WebGL2 bits leave native's keeps the driver path.
+  const one = probe(metal);
+  one[100 * 4] ^= 1;
+  assert.equal(classifyBlend(one, probe(metal)).blend, 'compressed');
 });
 
 test('compressedFailures: only native LOD through the driver blend, and equal sweeps, pass', () => {

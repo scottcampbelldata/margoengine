@@ -1,6 +1,6 @@
 // @margoengine/tiles/splats: streams 3D Tiles whose glTF content holds Gaussian splats (KHR_gaussian_splatting, with or
 // without the SPZ payload of KHR_gaussian_splatting_compression_spz_2), the way photoreal captures are now published.
-// Pass `splats` to `TilesRenderer.load`; tilesets without splats never load this module. gltf-pro reads the splats and
+// Pass `splats` to `TilesRenderer.load`; tilesets without splats never load this module. gltf/pbr reads the splats and
 // @margoengine/splats draws them. Every visible tile's splats go into one cloud, rebuilt after an update that changed
 // which tiles show, so splats of neighbouring and overlapping tiles sort together instead of tile by tile. Written from
 // the 3D Tiles 1.1 specification (glTF content, tile transforms, REPLACE refinement) and the KHR_gaussian_splatting README.
@@ -12,6 +12,7 @@ import type { ModelContent } from './formats.js';
 import { type TileMatrix, multiply } from './matrix.js';
 import type { TilesContentHost, TilesModelDrawer, TilesContentDecoration } from './renderer.js';
 import type { TileRenderable, TilesetTile } from './tileset.js';
+import { captureScene } from '../../shared/scene-scope.js';
 
 /** Most splats one @margoengine/splats cloud takes; past it the visible splats start another cloud. */
 export const SPLATS_PER_CLOUD = 3_000_000;
@@ -247,16 +248,16 @@ async function scene(host: TilesContentHost): Promise<TileSplats> {
   return made;
 }
 
-/** The part of a gltf-pro model the drawer uses. */
+/** The part of a gltf/pbr model the drawer uses. */
 interface SplatModel {
   readonly root: Parameters<TilesContentHost['place']>[0];
   dispose(): void;
 }
 
 /**
- * Draws glTF tile content that holds Gaussian splats: its meshes as gltf-pro models, its splats in the renderer's one
+ * Draws glTF tile content that holds Gaussian splats: its meshes as gltf/pbr models, its splats in the renderer's one
  * splat cloud, placed by `frame x tile transform x RTC x y-up to z-up x node`. Pass it as `splats` to
- * `TilesRenderer.load`. The renderer's `loadModel` is not used for these tiles: gltf-pro reads them.
+ * `TilesRenderer.load`. The renderer's `loadModel` is not used for these tiles: gltf/pbr reads them.
  */
 export const splats: TilesModelDrawer = async (
   host: TilesContentHost,
@@ -264,16 +265,18 @@ export const splats: TilesModelDrawer = async (
   tile: TilesetTile,
   signal: AbortSignal,
 ): Promise<TileRenderable> => {
-  const [{ parseGLTFAsync }, { readGaussianSplats }] = await Promise.all([
-    import('@margoengine/gltf-pro'),
-    import('@margoengine/gltf-pro/splats'),
+  // The model is built after the imports: it goes in the scene this drawer was started in (the renderer's own).
+  const scope = captureScene(host.engine),
+    [{ parseGLTFAsync }, { readGaussianSplats }] = await Promise.all([
+    import('@margoengine/gltf/pbr'),
+    import('@margoengine/gltf/splats'),
   ]);
   const matrix: TileMatrix = host.contentMatrix(tile, content.type === 'b3dm' ? content.rtcCenter : undefined, true);
   const read: Promise<PlacedSplats>[] = [];
-  const model: SplatModel = await parseGLTFAsync(host.engine, content.gltf, {
+  const model: SplatModel = await scope.run(() => parseGLTFAsync(host.engine, content.gltf, {
     signal,
     decoders: {
-      // gltf-pro hands each splat primitive with its node's matrix in the model; the tile's float64 matrix goes first.
+      // gltf/pbr hands each splat primitive with its node's matrix in the model; the tile's float64 matrix goes first.
       splats: {
         async attach(_engine, asset, primitives, readSignal) {
           for (const { primitive, matrix: node } of primitives)
@@ -287,7 +290,7 @@ export const splats: TilesModelDrawer = async (
         },
       },
     },
-  });
+  }));
   let placed: PlacedSplats[];
   try {
     placed = await Promise.all(read);

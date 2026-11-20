@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TexturedScatter } from '../dist/textured.js';
-import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
-import { parseGLTF } from '../../gltf-pro/dist/model-entry.js';
+import { PBRInstances } from '../../gltf/dist/pbr-instancing.js';
+import { parseGLTF } from '../../gltf/dist/model-entry.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
 const identity = (x = 0, y = 0, z = 0) => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);

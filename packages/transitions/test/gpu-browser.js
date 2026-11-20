@@ -62,7 +62,7 @@ export async function transitionChecks() {
       use(effect) {
         graph.withOwner(effect.name, () => {
           effect.setup(engine);
-          effect.registerPasses(graph);
+          effect.registerPasses?.(graph);
         });
         plugins.set(effect.name, effect);
       },

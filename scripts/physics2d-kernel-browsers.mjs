@@ -10,7 +10,7 @@
 //      isolated so the browsers' timers resolve microseconds. BOX2D_WASM=<path to box2d3-pyramid.mjs> adds Box2D v3's
 //      Wasm build to the turns: a black box built outside the repository with the official emsdk (its own CMake
 //      project; the harness and build script are in physics-refs, docs/whitepaper/reproduce.md), served read-only.
-// The pages are WebGPU users, so the run takes the GPU lock. Writes test-results/physics2d-kernel-browsers.json.
+// Writes test-results/physics2d-kernel-browsers.json.
 // `npm run test:physics2d-kernel-browsers` (a ROOT suite of scripts/gpu-package-tests.mjs, so check:merge runs it) is
 // part 1 in the default browser, with no timing; the full run, Firefox and the timing too, is the script itself:
 //   [BOX2D_WASM=...] node scripts/physics2d-kernel-browsers.mjs [--browsers=default,firefox] [--rounds=8]
@@ -19,10 +19,11 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { createServer } from 'vite';
-import { acquire } from './gpu-lock.mjs';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { WASM_RUSTFLAGS, wasmBuildArgs, wasmModule } from './support/wasm-kernel.mjs';
 import { closeAll } from './support/shutdown.mjs';
+import { compatRun, compatShim } from './support/compat-shim.js';
 
 const root = resolve(import.meta.dirname, '..'),
   check = 'packages/physics2d/kernel/wasm-check/Cargo.toml',
@@ -38,8 +39,8 @@ const rapierVersion = JSON.parse(await readFile(join(root, 'node_modules/@dimfor
 const box2dPath = process.env.BOX2D_WASM ? resolve(process.env.BOX2D_WASM) : undefined;
 const box2d = box2dPath ? `/@fs/${box2dPath.replaceAll('\\', '/')}` : undefined;
 
-const release = await acquire({ owner: 'physics2d-kernel-browsers' });
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   root,
   logLevel: 'error',
@@ -75,6 +76,8 @@ try {
         }
         const tab = await browser.newPage(),
           errors = [];
+        // MARGO_COMPAT=1: the page's WebGPU leg runs on the WebGL2 compatibility layer (its webgl2 leg is WebGL2 already) (scripts/support/compat-shim.js).
+        if (compatRun() && backend === 'webgpu') await tab.addInitScript(compatShim);
         tab.on('pageerror', (error) => errors.push(error.message));
         await tab.goto(page);
         await tab.waitForFunction(() => typeof window.runKernel === 'function', null, { timeout: 60_000 });
@@ -115,6 +118,5 @@ try {
   await writeFile(join(root, 'test-results/physics2d-kernel-browsers.json'), JSON.stringify(report, null, 2));
 } finally {
   await closeAll({ servers: [server] });
-  await release();
 }
 process.exitCode = failed ? 1 : 0;

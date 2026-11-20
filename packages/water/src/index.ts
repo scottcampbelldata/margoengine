@@ -10,18 +10,23 @@ import {
 } from '@margoengine/core/extension';
 import { acquireDepth, group } from '../../shared/gpu.js';
 import { CoastalFlow, NO_FILL, waterFrame, oceanWaves } from './coastal.js';
+import { coastSurf, surfWaves } from './surf.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
 import { margoError, fault } from '../../shared/errors.js';
 import { MargoError } from '@margoengine/math/errors';
 import { checkFog, FOG_BYTES, fogWgsl, writeFog, type FogLike } from '../../shared/fog.js';
 export type { FogLike } from '../../shared/fog.js';
+import { breakerDepth, contourSegments, type TerrainHeights } from './breaker.js';
+export { BREAKER_GAMMA, breakerDepth, contourSegments, type BreakerWave, type TerrainHeights } from './breaker.js';
 import { applyView, ViewStates } from '../../shared/view-rect.js';
 import { ggxDenominator } from '../../shared/light-terms.js';
-import { queryStates, riverKernels, surfacePasses } from './query-state.js';
+import { queryStates, riverKernels, surfacePasses, waterSolvers, type WaterSolver } from './query-state.js';
 import { surfaceEffects } from './surface-effects.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { seaState, whitecapCoverage } from './sea-state.js';
+import { publishSurfaceDepth } from '../../shared/surface-depth.js';
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
 declare const GPUTextureUsage: {
   COPY_SRC: number;
@@ -30,6 +35,15 @@ declare const GPUTextureUsage: {
   TEXTURE_BINDING: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+/** Wind over open water: the sea it raises goes into the swell trains (see `@margoengine/water/sea-state`). */
+export interface WaterWind {
+  /** Speed at 10 m, m/s, 0 to 100. */
+  speed: number;
+  /** Fetch in metres, 1 to 1e7. Default 100,000. */
+  fetch?: number;
+  /** Direction the waves travel, XZ, nonzero. Default [1, 0.3]. */
+  direction?: readonly [number, number];
+}
 /** One swell train: three Gerstner components around this direction and wavelength. Invalid values throw RangeError. */
 export interface Wave {
   /** Travel direction in the XZ plane (any nonzero length). */
@@ -51,6 +65,11 @@ export interface WaterTerrain {
   origin: readonly [number, number];
   /** World XZ extent the heightmap covers, each 0-100,000 (exclusive of 0). */
   size: readonly [number, number];
+  /**
+   * The same heights on the CPU (`data` row by row along z, `width` x `height` texels, the size of the heightmap), for
+   * {@link Water.breakerLine}. Omitted: the breaker line is empty. Read when the line is asked for.
+   */
+  heights?: TerrainHeights;
 }
 /** A directional light record for glints and foam, such as an entry of `sky.lights`. */
 export interface WaterLight {
@@ -81,10 +100,20 @@ export interface WaterOptions {
   size?: readonly [number, number];
   /** Grid cells per side, an integer 1-512. Default 128. */
   segments?: number;
-  /** Mean sea level, world Y. Default 0. */
+  /** Mean sea level, world Y. Default 0. Live through `setSeaLevel`. */
   height?: number;
-  /** 1-8 swell trains. Default two trains along [1, 0.3] and [1, 0.6]. */
+  /**
+   * 1-8 swell trains. Default the eight trains of the sea of `wind`, which is 6 m/s when neither is given. Passing
+   * `waves` keeps exactly those trains (the old default was two trains along [1, 0.3] and [1, 0.6], amplitudes 0.3 and
+   * 0.15: pass them to get that sea back) and `setWind` then throws.
+   */
   waves?: readonly Wave[];
+  /**
+   * Wind at 10 m (m/s, or `{ speed, fetch, direction }`): the swell trains become the fetch-limited JONSWAP sea of that
+   * wind on eight fixed wavelengths, so `setWind` changes only their amplitudes, directions and steepness. Ignored when
+   * `waves` is given. Default 6 m/s (a gentle breeze: 0.17% of the sea under foam, no whitecaps option needed).
+   */
+  wind?: number | WaterWind;
   /** Deep-water colour, linear RGB 0..1. Default [0.01, 0.18, 0.25]. */
   color?: readonly [number, number, number];
   /** Shoreline foam width in world units, 0-100 (exclusive of 0). Default 1. */
@@ -110,8 +139,10 @@ export interface WaterOptions {
   sceneColor?: () => GPUTexture | undefined;
   /** Up to two directional lights for glints, e.g. `sky.lights`; read every frame. Default: the engine light. */
   lights?: readonly WaterLight[];
-  /** A 2,048-droplet GPU spray pool; needs `terrain`. Default false. */
+  /** A GPU spray pool of `sprayCount` droplets; needs `terrain`. Default false. */
   spray?: boolean;
+  /** Droplets in the spray pool, a multiple of 64 from 64 to 65,536 (32 B each). Default 4,096. Read at construction. */
+  sprayCount?: number;
   /** Open ocean: regular rows follow the camera, outer rows widen to 10 km, the last one to the horizon. Default false. */
   horizon?: boolean;
   /**
@@ -123,11 +154,48 @@ export interface WaterOptions {
    * Breaking whitecaps, 0-1: steep crests break white in patches, with long foam streaks down-wind toward 1 (a gale);
    * with `terrain`, foam lines ring the land and the breakers, and with `spray` the spray, grow with it; foam takes the
    * sky's light too. 0 (the default) keeps the gentle crest foam only. Live through `setWhitecaps`.
+   * With `wind` and no `whitecaps`, the foam follows the wind instead: it covers 3.84e-6 U^3.41 of the sea at U m/s
+   * (0.5% at 8, 4% at 15, 22% at 25; none below 3 m/s), whatever the chop (Monahan and O'Muircheartaigh 1980). Passing
+   * `whitecaps` sets the foam by hand (0 is none).
    */
   whitecaps?: number;
   /** Wind chop on the swell, 0-1: stronger ripples and a short wind-sea layer in the normals. Default 0. Live through `setChop`. */
   chop?: number;
 }
+// The foam that reaches half white covers fewer crests than pass the threshold (whitecap() thins and breaks them into
+// patches), so the threshold's standard score z sits below the score y of the share to cover. Measured on the WebGPU
+// path in a top-down 200 m view at U 4 to 25 (test/whitecap-coverage.browser.mjs): the pairs (y, z), ascending.
+const FOAM_Y = [0.26, 0.994, 1.65, 2.07, 2.4, 2.77, 2.93, 3.11, 3.33, 3.59, 4.2] as const;
+const FOAM_Z = [0.126, 0.806, 1.41, 1.79, 2.06, 2.36, 2.45, 2.54, 2.61, 2.63, 2.8] as const;
+// The standard deviation of the patch noise added to the crest, the lowest wind with foam (Beaufort 2 to 3) and the three
+// components (share of the amplitude, wavenumber scale) of every swell train, as in oceanWaves.
+const FOAM_NOISE = 0.025;
+const FOAM_MIN_WIND = 3;
+// The mean square slope of Water's ripple layers at chop 0, measured on the noise they are made of.
+const GLINT_RIPPLES = 0.003;
+// GGX's lobe falls to half at 0.64 alpha, a Gaussian slope density at sigma sqrt(2 ln 2); with alpha squared the mean
+// square slope 2 sigma squared that is a lobe 1.69 times too narrow in alpha squared. The sun's glint also falls with the
+// geometry terms across the lobe, which narrows it further: 2.6 puts its half width on Cox and Munk's at U 2 and 12
+// (test/glitter.browser.mjs).
+const GLINT_LOBE = 2.6;
+const SWELL_COMPONENTS = [
+  [0.4, 1],
+  [0.35, 0.84],
+  [0.25, 1.18],
+] as const;
+/** The score y with a standard normal above it for a share p in (0, 1): Abramowitz and Stegun 26.2.23 (error under 5e-4). */
+function upperScore(p: number): number {
+  if (p > 0.5) return -upperScore(1 - p);
+  const t = Math.sqrt(-2 * Math.log(p));
+  return t - (2.515517 + t * (0.802853 + t * 0.010328)) / (1 + t * (1.432788 + t * (0.189269 + t * 0.001308)));
+}
+/** The wind of a Water given neither `waves` nor `wind`, m/s at 10 m. */
+const DEFAULT_WIND = 6;
+const windOf = (wind: number | WaterWind): WaterWind => (typeof wind === 'number' ? { speed: wind } : wind);
+const seaOf = (wind: number | WaterWind) => {
+  const w = windOf(wind);
+  return seaState(w.speed, { fetch: w.fetch, direction: w.direction });
+};
 // Sources: Gerstner waves (Fournier & Reeves 1986; Tessendorf 2001 sec. 3); Schlick 1994 Fresnel with F0 0.02 =
 // ((1.33 - 1) / (1.33 + 1))^2; sun glint GGX D (Walter et al. 2007) with the Schlick-GGX k = (r + 1)^2 / 8 of Karis
 // 2013; roughness from normal variance after Toksvig 2005 and LEAN (Olano & Baker 2010); Lambert / pi foam; display
@@ -157,6 +225,7 @@ export interface WaterOptions {
 const shader =
   waterFrame +
   oceanWaves +
+  surfWaves +
   `
 const HORIZON=false;
 const STILL=false;
@@ -192,10 +261,21 @@ fn coastal(xz:vec2f)->CoastalSample {
  let dx=mix(h.y-h.x,h.w-h.z,t.y)/max(0.0001,frame.flow.y);let dz=mix(h.z-h.x,h.w-h.y,t.x)/max(0.0001,frame.flow.z);
  let depths=max(vec4f(0),vec4f(frame.settings.y)-vec4f(a.y,b.y,c.y,d.y));
  let indices=vec4u(u32(lo.y*size.x+lo.x),u32(lo.y*size.x+hi.x),u32(hi.y*size.x+lo.x),u32(hi.y*size.x+hi.x))+1u;
- let sea=smoothstep(vec4f(0.65),vec4f(2.4),depths)*vec4f(select(0.0,1.0,connected[indices.x]==0u),select(0.0,1.0,connected[indices.y]==0u),select(0.0,1.0,connected[indices.z]==0u),select(0.0,1.0,connected[indices.w]==0u));
+ // With the surf field the analytic surf runs into SURF_SWASH and the flow carries the inner surf and swash (surfSea).
+ let band=select(vec2f(0.65,2.4),SURF_SWASH,surfReady(u32(size.x*size.y)));
+ let sea=smoothstep(vec4f(band.x),vec4f(band.y),depths)*vec4f(select(0.0,1.0,connected[indices.x]==0u),select(0.0,1.0,connected[indices.y]==0u),select(0.0,1.0,connected[indices.z]==0u),select(0.0,1.0,connected[indices.w]==0u));
  let ocean=mix(mix(sea.x,sea.y,t.x),mix(sea.z,sea.w,t.x),t.y);let gradient=vec2f(mix(sea.y-sea.x,sea.w-sea.z,t.y)/frame.flow.y,mix(sea.z-sea.x,sea.w-sea.y,t.x)/frame.flow.z);let edge=coastBlend(xz);
  let blend=vec3f(edge.xy*(1.0-ocean)-edge.z*gradient,edge.z*(1.0-ocean));
  return CoastalSample(mix(mix(a,b,t.x),mix(c,d,t.x),t.y),normalize(vec3f(-dx,1,-dz)),surface,blend,ocean,mix(mix(signed.x,signed.y,t.x),mix(signed.z,signed.w,t.x),t.y));
+}
+struct SurfHere {surf:Surf,weight:f32}
+// The surf at a point of the coastal grid and how much of it shows (0 off the field and toward the grid's edge).
+fn surfHere(xz:vec2f,sampleWidth:f32,foam:bool)->SurfHere {
+ let size=vec2i(textureDimensions(coast));let field=surfField(xz,size);
+ if(STILL||field.weight<=0.0){return SurfHere(Surf(vec3f(0),vec3f(0),vec3f(0),0.0,0.0,vec2f(0),0.0,vec2f(0)),0.0);}
+ let uv=(xz-frame.coast.xy)/frame.coast.zw;let pixel=clamp(uv*vec2f(size)-0.5,vec2f(0),vec2f(size-1));let lo=vec2i(floor(pixel));let hi=min(lo+1,size-1);let t=fract(pixel);
+ let ground=mix(mix(textureLoad(coast,lo,0).y,textureLoad(coast,vec2i(hi.x,lo.y),0).y,t.x),mix(textureLoad(coast,vec2i(lo.x,hi.y),0).y,textureLoad(coast,hi,0).y,t.x),t.y);
+ return SurfHere(surfSample(xz,sampleWidth,frame.settings.y-ground,field,foam),field.weight*coastBlend(xz).z);
 }
 struct Surface {position:vec3f,normal:vec3f,crest:f32}
 fn surface(xz:vec2f,sampleWidth:f32)->Surface {
@@ -213,6 +293,23 @@ fn surface(xz:vec2f,sampleWidth:f32)->Surface {
   }
  }
  if(inCoast(xz)){
+  // p = mix(p, base + offset, w) = p (1 - w) + w base + A with A = w offset. The surf's offset and weight both change
+  // with depth, so their derivatives come from forward differences of A and w (1 cm) rather than the flat-bed ones.
+  // One loop over the three points keeps a single copy of the surf in the compiled shader (water/caustics and the
+  // capture recompile this function).
+  let e=0.01;let steps=array<vec2f,3>(vec2f(0),vec2f(e,0),vec2f(0,e));
+  var weights:array<f32,3>;var shifted:array<vec3f,3>;var offset=vec3f(0);var surfCrest=0.0;
+  for(var k=0u;k<3u;k++){
+   let here=surfHere(xz+steps[k],sampleWidth,false);weights[k]=here.weight;shifted[k]=here.surf.offset*here.weight;
+   if(k==0u){if(here.weight<=0.0){break;}offset=here.surf.offset;surfCrest=here.surf.crest;}
+  }
+  let w=weights[0];
+  if(w>0.0){
+   let base=vec3f(xz.x,frame.settings.y,xz.y);
+   let wx=(weights[1]-w)/e;let wz=(weights[2]-w)/e;let ax=(shifted[1]-shifted[0])/e;let az=(shifted[2]-shifted[0])/e;
+   tangent=tangent*(1.0-w)+vec3f(w,0,0)+(base-p)*wx+ax;binormal=binormal*(1.0-w)+vec3f(0,0,w)+(base-p)*wz+az;
+   p=mix(p,base+offset,w);crest=mix(crest,surfCrest,w);
+  }
   let v=coastal(xz);let blend=v.blend;let shore=vec3f(xz.x,v.surface,xz.y);let delta=shore-p;
   tangent=mix(tangent,vec3f(1,-v.normal.x/max(0.0001,v.normal.y),0),blend.z)+delta*blend.x;
   binormal=mix(binormal,vec3f(0,-v.normal.z/max(0.0001,v.normal.y),1),blend.z)+delta*blend.y;
@@ -274,7 +371,7 @@ fn whitecap(xz:vec2f,footprint:f32)->f32 {
  let w=frame.waves[0].wave.xy;let q=vec2f(dot(xz,w),dot(xz,vec2f(-w.y,w.x)));let t=frame.settings.x;
  let detail=1.0-smoothstep(0.3,1.5,footprint);
  let patches=noise(q*vec2f(0.32,0.7)+vec2f(-t*0.35,0)).x+noise(q*vec2f(1.3,2.9)+vec2f(-t*0.8,5.1)).x*0.5*detail;
- let threshold=mix(0.42,0.16,amount);
+ let threshold=select(mix(0.42,0.16,amount),frame.foam.x,frame.foam.x>0.0);
  let over=crest+patches*0.08-threshold;let core=smoothstep(-0.02,0.07,over);
  let bubbles=noise(q*vec2f(0.75,1.3)+vec2f(-t*0.6,2.3)).x+noise(q*vec2f(2.1,2.7)+vec2f(-t*0.9,7.7)).x*0.5;
  let streak=noise(q*vec2f(0.16,2.2)+vec2f(-t*0.45,3.7)).x;
@@ -287,7 +384,7 @@ fn directionalGlint(light:Light,n:vec3f,v:vec3f,rough:f32)->vec3f {
  if(light.direction.w<=0.0){return vec3f(0);}
  let l=light.direction.xyz;let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.001,1.0);
  let h=(v+l)/max(0.0001,length(v+l));let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
- let alpha=rough*rough;let a2=alpha*alpha;let denominator=${/* @__PURE__ */ ggxDenominator()};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
+ let alpha=rough*rough;let a2=alpha*alpha+frame.foam.y;let denominator=${/* @__PURE__ */ ggxDenominator()};let d=a2/(3.14159265*denominator*denominator);let k=(rough+1.0)*(rough+1.0)*0.125;
  let g=nv/(nv*(1.0-k)+k)*nl/max(0.001,nl*(1.0-k)+k);
  return light.radiance.rgb*light.direction.w*d*g*fresnel(vh)/max(0.004,4.0*nv);
 }
@@ -297,6 +394,14 @@ fn skyColor(direction:vec3f,rough:f32)->vec3f {
  let r=reflectionRay(direction);
  if(frame.color.w>0.5){let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,0.0,1.0))/3.14159265);let spread=vec2f(rough*0.035,0);return textureSampleLevel(environment,skySampler,uv,0).rgb*0.5+(textureSampleLevel(environment,skySampler,uv-spread,0).rgb+textureSampleLevel(environment,skySampler,uv+spread,0).rgb)*0.25;}
  return mix(vec3f(0.18,0.27,0.32),vec3f(0.035,0.10,0.20),sqrt(max(0.0,r.y)))*frame.radiance.rgb*(0.015+min(1.0,frame.sun.w*0.15));
+}
+// How much of a clear day's sky light the sky above the sea gives, 0 to 1: the luminance of the sky in two directions
+// (30 and 60 degrees up) over 0.02, what the default gradient gives them under a sun of intensity 1 and white light 1.
+// The sea's body is lit by this light, so a night sky, however its ambient is set, lights it only as much as it lights
+// the sky the sea reflects (a sea that glowed above the sky it mirrors was the night-sea bug).
+fn skyAmbient()->f32 {
+ let a=skyColor(vec3f(0.866,0.5,0),0.4);let b=skyColor(vec3f(0.5,0.866,0),0.4);
+ return clamp(dot((a+b)*0.5,vec3f(0.2126,0.7152,0.0722))/0.02,0.0,1.0);
 }
 fn foamSky()->vec3f {
  var sum=vec3f(0);
@@ -323,15 +428,33 @@ ${displayShader}
  let grainDetail=1.0-smoothstep(0.25,1.0,footprint*2.4);var grain=0.5;
  // Gradient noise is centred on zero with the same 0.21 spread as the former 0..1 value noise.
  if(grainDetail>0){grain=0.5+noise(i.world.xz*2.4+vec2f(frame.settings.x*0.22,0)).x*grainDetail;}
- let shore=1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08));
- let pattern=mix(0.45,1.0,grain);let caps=frame.grid.z;
+ // Breaking surf (surf.ts): rollers on the fronts and the lace they leave, a web of foam (ridges of drifting gradient
+ // noise) torn into patches. The breaking churns sand into the water (murk), and the surf's foam replaces the depth-only
+ // shoreline band, which on a gentle beach would whiten the whole surf zone.
+ var surfing=0.0;var surfFoam=0.0;var murk=0.0;
+ if(isCoast&&!river){
+  let here=surfHere(i.xz,footprint,true);surfing=here.weight*here.surf.breaking;
+  if(surfing>0.0){
+   let q=i.world.xz;let t=frame.settings.x;
+   let patches=noise(q*0.21+vec2f(t*0.03,0.0)).x+noise(q*0.63+vec2f(3.1,-t*0.05)).x*0.5;
+   let web=1.0-abs(noise(q*0.9+vec2f(-t*0.04,7.3)).x+noise(q*2.3+vec2f(1.7,t*0.06)).x*0.45*grainDetail);
+   let roller=here.surf.foam.x*smoothstep(-0.5,0.05,patches+here.surf.foam.x*0.7);
+   let trail=here.surf.foam.y*smoothstep(-0.3,0.3,patches+here.surf.foam.y*0.3)*mix(0.25,1.0,smoothstep(0.62,0.9,web))*0.9;
+   surfFoam=max(roller,trail)*here.weight;
+  }
+  murk=here.weight*max(here.surf.breaking,here.surf.stir);
+ }
+ let shore=(1.0-smoothstep(0.0,max(frame.settings.z*0.5,edge*2.0),max(0.0,gap+(grain-0.5)*0.08)))*(1.0-smoothstep(0.0,0.3,surfing));
+ let pattern=mix(mix(0.45,1.0,frame.foam.z),1.0,grain);let caps=frame.grid.z;
  let fresh=clamp((select(shore,0.0,river)*SHORE_FOAM+movement*(0.9+0.9*caps))*pattern,0.0,1.0);
- var foam=fresh;if(frame.flow.w<0.5){foam=max(fresh,textureLoad(history,pixel,0).r*exp(-frame.cameraData.z*3.0)*shore);}
+ var foam=max(fresh,surfFoam);if(frame.flow.w<0.5){foam=max(foam,textureLoad(history,pixel,0).r*exp(-frame.cameraData.z*3.0)*shore);}
  if(caps>0.0&&!river){
   var lines=0.0;
-  if(isCoast){let near=landNearby(i.world.xz);lines=smoothstep(0.04,0.3,near+(grain-0.5)*0.25+0.08*sin(frame.settings.x*1.3-near*9.0))*mix(0.55,1.0,grain);}
+  // Foam lines ring land the surf does not reach; on a breaking beach the surf's own foam takes their place.
+  if(isCoast){let near=landNearby(i.world.xz);lines=smoothstep(0.04,0.3,near+(grain-0.5)*0.25+0.08*sin(frame.settings.x*1.3-near*9.0))*mix(0.55,1.0,grain)*(1.0-smoothstep(0.0,0.3,surfing));}
   foam=max(foam,max(whitecap(i.world.xz,footprint)*open,lines*caps));
  }
+ var shown=foam;if(frame.foam.z>0.0){shown=pow(foam,1.0-0.4*frame.foam.z);}
  var ripple=vec3f(0);
  if(footprint<6.0){
  // Agitation, chop and two micro layers turned 11, -21, 30 and -41 degrees from the wind. Weights keep the former
@@ -343,26 +466,30 @@ ${displayShader}
  let chop=frame.grid.w;
  let windSea=rippleSlope(p,vec2f(0.99619,-0.08716),vec2f(0.11,0.075),vec2f(-0.3,0.05),vec2f(1.9,6.4))*0.5*(1.0-smoothstep(0.25,1.0,footprint*0.11));
  let agitated=slope*(1.0+3.0*chop)+windSea*chop;
- ripple=vec3f(-agitated.x,0,-agitated.y)*(1.0-foam);
+ ripple=vec3f(-agitated.x,0,-agitated.y)*(1.0-shown);
  }
  let n=normalize(i.normal+ripple);let v=normalize(frame.eye.xyz-i.world);let nv=clamp(dot(n,v),0.001,1.0);let reflection=fresnel(nv);
- let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-vec3f(0.38,0.10,0.045)*optical);
- var bottom=vec3f(0.28,0.25,0.17)*(frame.eye.w+frame.radiance.rgb*frame.sun.w*0.12);
+ // Sand the swell lifts off the bed hangs in the water: a grey, nearly flat extinction of up to 1.4 per metre over
+ // clear water's (murk, from surf.ts), so a surf zone reads as turbid green-grey water, not a clear lagoon over sand.
+ let optical=min(50.0,gap/max(0.15,abs(v.y)));let transmission=exp(-(vec3f(0.38,0.10,0.045)+vec3f(1.4,1.3,1.5)*murk)*optical);
+ let ambient=frame.eye.w*skyAmbient();
+ var bottom=vec3f(0.28,0.25,0.17)*(ambient+frame.radiance.rgb*frame.sun.w*0.12);
  if(frame.radiance.w>0.5){
   let size=vec2f(textureDimensions(opaque));let bent=refract(-v,n,0.75187970);let seen=frame.camera*vec4f(i.world+bent*(gap/max(0.05,-bent.y)),1);
   let q=clamp(vec2i((seen.xy/max(0.0001,seen.w)*vec2f(0.5,-0.5)+0.5)*size),vec2i(0),vec2i(size)-1);let d=textureLoad(depth,q,0);
   if(d>0&&d<=i.clip.z){bottom=mix(bottom,textureLoad(opaque,q,0).rgb,refraction);}
  }
- let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);let rough=clamp(0.12+normalWidth*0.6+footprint*0.025,0.12,0.4);
+ let nl=clamp(dot(n,frame.sun.xyz),0.0,1.0);let rough=clamp(max(frame.foam.w,0.12+normalWidth*0.6+footprint*0.025),frame.foam.w,max(0.4,frame.foam.w));
  let glint=directionalGlint(frame.lights[0],n,v,rough)+directionalGlint(frame.lights[1],n,v,rough);
  // Glints and foam lose the direct light in its shadow; the map is read only where either shows.
  var shade=1.0;if(foam>0.002||max(glint.x,max(glint.y,glint.z))>0.002){shade=waterShadow(i.world);}
- let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*0.12);
+ let shallowBand=select(0.0,1.0-smoothstep(0.0,frame.shallow.w,gap),frame.shallow.w>0.0);
+ let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*(ambient+frame.radiance.rgb*nl*frame.sun.w*0.12)+(frame.shallow.rgb-frame.color.rgb)*shallowBand*(vec3f(1)-transmission)*(ambient+frame.radiance.rgb*nl*frame.sun.w*0.12);
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
  // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
  // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
  var skyLight=vec3f(0);if(frame.grid.z>0.0){skyLight=foamSky();}
- color=mix(color,vec3f(0.72,0.77,0.74)*(frame.eye.w+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265+skyLight),foam*0.95);
+ color=mix(color,vec3f(0.72,0.77,0.74)*(ambient+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265+skyLight),shown*0.95);
  if(frame.cameraData.w<0.5){color=toDisplay(color);}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
@@ -377,7 +504,7 @@ function captureShader(code: string, declarations: string): string {
     .replace(captureHead, '@fragment fn fragment(i:Output)->MargoSSR{')
     .replace(
       captureTail,
-      'let keep=reflection*(1.0-0.95*foam);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));',
+      'let keep=reflection*(1.0-0.95*shown);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));',
     );
   if (!out.includes('->MargoSSR{') || !out.includes('return MargoSSR('))
     throw margoError('unsupported', 'Water capture needs the water fragment; its shader changed');
@@ -481,9 +608,14 @@ export class Water implements EnginePlugin {
     () => ({ foam: [], foamViews: [], current: 0, groups: [], resources: [], drawn: 0, built: -1, captureGroups: [] }),
     (view) => {
       for (const texture of view.foam) texture.destroy();
+      if (view === this.drawnView) this.drawnView = undefined;
     },
   );
+  // `view` is this frame's view, cleared at the start of each frame so the SSR capture draw only uses a view drawn this
+  // frame. `drawnView` is the view drawn last, which WaveQuery reads: it lives until a newer draw or its release, so a
+  // capture from a plugin's onPreUpdate (after this one's) still reads the frame on screen.
   private view?: WaterView;
+  private drawnView?: WaterView;
   private built = 0;
   private shaderCode = '';
   private effectBindings: GPUBindGroupEntry[] = [];
@@ -497,7 +629,9 @@ export class Water implements EnginePlugin {
   private shadowGroup?: GPUBindGroup;
   private shadowEntries?: GPUBindGroupEntry[];
   private sampledDepth?: GPUTexture;
-  private coastal?: CoastalFlow;
+  private coastal?: WaterSolver;
+  /** What the flow was built with: water/rivers' kernels and a `water/flood` solver factory. */
+  private coastalSource?: readonly [unknown, unknown];
   readonly name = 'water:' + ++instances;
   private engine?: Engine;
   private source?: () => GPUTexture | undefined;
@@ -508,13 +642,17 @@ export class Water implements EnginePlugin {
   private count = 0;
   private pipeline?: GPURenderPipeline;
   private format = '';
-  private time = 0;
-  private readonly values = new Float32Array(132);
+  private seconds = 0;
+  private readonly values = new Float32Array(140);
   private fogSource: FogLike | null = null;
   private fogBuffer?: GPUBuffer;
   private readonly fogData = new Float32Array(12);
   private readonly waveHeights = new Float32Array(8);
   private maxWaveHeight = 0;
+  /** The wind the swell trains follow (set with `options.wind`). */
+  private windSea?: { speed: number; fetch?: number; direction?: readonly [number, number] };
+  /** True while the foam follows the wind (`wind` set, `whitecaps` omitted or not yet set by hand). */
+  private foamFollowsWind = false;
   private disposed = false;
   private readonly positions: Float32Array;
   private readonly triangles: Uint32Array;
@@ -528,12 +666,13 @@ export class Water implements EnginePlugin {
       height = 0,
       color = [0.01, 0.18, 0.25],
       foamDistance = 1,
-      // Margo default swell trains.
-      waves = [
-        { direction: [1, 0.3], amplitude: 0.3, wavelength: 12.73, phase: 0.43 },
-        { direction: [1, 0.6], amplitude: 0.15, wavelength: 7.19, phase: 2.17 },
-      ],
+      // The calm real default: the sea of a 6 m/s wind (a gentle breeze, Beaufort 4), not two hand-set trains.
+      waves = seaOf(options.wind ?? DEFAULT_WIND).waves,
     } = options;
+    if (!options.waves) {
+      const w = windOf(options.wind ?? DEFAULT_WIND);
+      this.windSea = { speed: w.speed, fetch: w.fetch, direction: w.direction };
+    }
     if (
       size.length !== 2 ||
       size.some((v) => !Number.isFinite(Math.fround(v)) || v <= 0 || v > 100000) ||
@@ -555,17 +694,25 @@ export class Water implements EnginePlugin {
       );
     this.values.set([0, height, foamDistance, waves.length], 20);
     this.values.set(color, 24);
+    this.values[135] = 0.12;
+    this.values.set([0, 0.28, 0.3], 136);
     this.values.set([0.6, 0.8, 0, 3, 1, 0.9, 0.75, 0], 104);
     this.setWhitecaps(options.whitecaps ?? 0).setChop(options.chop ?? 0);
+    this.foamFollowsWind = options.whitecaps === undefined && !!this.windSea;
     if (
       (options.reflection !== undefined && typeof options.reflection !== 'function') ||
       (options.sceneColor !== undefined && typeof options.sceneColor !== 'function') ||
       (options.spray !== undefined && typeof options.spray !== 'boolean') ||
       (options.spray && !options.terrain) ||
+      (options.sprayCount !== undefined &&
+        (!Number.isInteger(options.sprayCount) ||
+          options.sprayCount < 64 ||
+          options.sprayCount > 65536 ||
+          options.sprayCount % 64 !== 0)) ||
       (options.horizon !== undefined && typeof options.horizon !== 'boolean')
     )
       throw new TypeError(
-        'Invalid water optics or spray options; reflection, sceneColor and horizon take functions or booleans, and spray needs options.terrain',
+        'Invalid water optics or spray options; reflection, sceneColor and horizon take functions or booleans, spray needs options.terrain, and sprayCount is a multiple of 64 from 64 to 65536',
       );
     if (
       options.shadows !== undefined &&
@@ -590,10 +737,20 @@ export class Water implements EnginePlugin {
         terrain.origin.length !== 2 ||
         terrain.origin.some((v) => !Number.isFinite(Math.fround(v))) ||
         terrain.size.length !== 2 ||
-        terrain.size.some((v) => !Number.isFinite(Math.fround(v)) || v <= 0 || v > 100000)
+        terrain.size.some((v) => !Number.isFinite(Math.fround(v)) || v <= 0 || v > 100000) ||
+        (terrain.heights !== undefined &&
+          (typeof terrain.heights !== 'object' ||
+            terrain.heights === null ||
+            !Number.isInteger(terrain.heights.width) ||
+            !Number.isInteger(terrain.heights.height) ||
+            terrain.heights.width < 2 ||
+            terrain.heights.height < 2 ||
+            terrain.heights.width > 512 ||
+            terrain.heights.height > 512 ||
+            terrain.heights.data?.length !== terrain.heights.width * terrain.heights.height))
       )
         throw new RangeError(
-          'Invalid water terrain; pass a heightmap function, a finite origin [x, z] and a size [x, z] from 0 to 100000',
+          'Invalid water terrain; pass a heightmap function, a finite origin [x, z], a size [x, z] from 0 to 100000 and heights of width x height values (2 to 512 a side)',
         );
       this.values.set(terrain.origin, 96);
       this.values.set(terrain.size, 98);
@@ -648,6 +805,7 @@ export class Water implements EnginePlugin {
       this.waveHeights[i] = w.amplitude;
       this.maxWaveHeight = Math.max(this.maxWaveHeight, w.amplitude);
     }
+    this.followWind();
     this.positions = new Float32Array((segments + 1) ** 2 * 3);
     this.triangles = new Uint32Array(segments ** 2 * 6);
     // Horizon rows: the central 75% of each axis keeps its regular cells and follows the camera (drawSurface); each
@@ -698,7 +856,7 @@ export class Water implements EnginePlugin {
       }
     this.count = this.triangles.length;
     queryStates.set(this, () =>
-      this.disposed || !this.engine?.gpu || !this.uniform || !this.view?.groups.length
+      this.disposed || !this.engine?.gpu || !this.uniform || !this.drawnView?.groups.length
         ? undefined
         : {
             kind: 'water',
@@ -709,7 +867,7 @@ export class Water implements EnginePlugin {
             shader: this.shaderCode.slice(0, this.shaderCode.indexOf('struct Output')),
             segments,
             positions: this.positions,
-            resources: this.view.resources[this.view.drawn],
+            resources: this.drawnView.resources[this.drawnView.drawn],
             coast: this.coastal,
             extraBindings: this.vertexBindings,
             extraVelocity: (surfaceEffects.get(this) ?? []).map((e) => e.velocity).filter((v): v is string => !!v),
@@ -746,9 +904,86 @@ export class Water implements EnginePlugin {
     this.fogSource = checkFog(fog);
     return this;
   }
-  /** Sets the breaking whitecaps, 0-1 (see `WaterOptions.whitecaps`); read every frame. Throws RangeError outside 0-1. */
-  setWhitecaps(amount: number): this {
+  /**
+   * Sets the breaking whitecaps, 0-1 (see `WaterOptions.whitecaps`); read every frame. `null` hands the foam back to the
+   * wind (a Water without `waves`) or turns it off (with `waves`), as a Water made without the option has it.
+   * Throws RangeError outside 0-1.
+   */
+  setWhitecaps(amount: number | null): this {
+    if (amount === null) {
+      this.values[130] = this.values[132] = 0;
+      this.foamFollowsWind = !!this.windSea;
+      this.followWind();
+      return this;
+    }
     this.values[130] = unit(amount, 'whitecaps');
+    this.values[132] = 0;
+    this.foamFollowsWind = false;
+    return this;
+  }
+  /** The wind of the sea (`speed` m/s, `fetch` m, `direction` XZ), or undefined with `options.waves`. A copy. */
+  get wind(): Readonly<WaterWind> | undefined {
+    const w = this.windSea;
+    return w && { speed: w.speed, fetch: w.fetch, direction: w.direction && [w.direction[0], w.direction[1]] };
+  }
+  /** Sets the deep-water colour, linear RGB 0-1 (see `WaterOptions.color`); read every frame. Throws RangeError otherwise. */
+  setColor(color: readonly [number, number, number]): this {
+    if (color.length !== 3 || color.some((v) => !Number.isFinite(v) || v < 0 || v > 1))
+      throw new RangeError('Invalid water color; use three numbers from 0 to 1');
+    this.values.set(color, 24);
+    return this;
+  }
+  /**
+   * Moves the mean sea level to world Y `y` (see `WaterOptions.height`), from -100,000 to 100,000; read every frame. With
+   * `terrain`, the flow's map edge and its open-sea cells follow it, so a slow rise floods the land below it and a fall
+   * drains it again (a storm surge or a tide); the open sea, the surf and the queries ride on it.
+   * @throws RangeError outside that range.
+   */
+  setSeaLevel(y: number): this {
+    if (this.disposed || typeof y !== 'number' || !Number.isFinite(Math.fround(y)) || Math.abs(y) > 100000)
+      throw new RangeError('Invalid water sea level; use a finite world Y from -100000 to 100000');
+    this.values[21] = y;
+    return this;
+  }
+  /** The mean sea level, world Y (`WaterOptions.height`, or the last `setSeaLevel`). */
+  get seaLevel(): number {
+    return this.values[21];
+  }
+  /**
+   * Sets the lowest roughness of the sun's glitter, 0.02 to 0.6 (0.12, the default, is the sea's own floor); a higher
+   * floor widens and smooths the glints, as an animated feature draws them. Read every frame; RangeError outside.
+   */
+  setGlitterRoughness(roughness: number): this {
+    if (!Number.isFinite(roughness) || roughness < 0.02 || roughness > 0.6)
+      throw new RangeError('Invalid water glitterRoughness; use a number from 0.02 to 0.6');
+    this.values[135] = roughness;
+    return this;
+  }
+  /**
+   * Sets how soft the foam's edges are, 0 (the physical foam) to 1: the foam's small-scale pattern fades and its edge
+   * widens into larger, softer shapes. Read every frame; RangeError outside 0-1.
+   */
+  setFoamSoftness(amount: number): this {
+    this.values[134] = unit(amount, 'foamSoftness');
+    return this;
+  }
+  /**
+   * Sets the shallow-water colour band: water over a bed less than `depth` metres below the surface takes `color`
+   * (linear RGB 0-1) instead of the deep colour, fading to it at `depth`; a depth of 0 turns the band off. Read every
+   * frame; RangeError for a colour outside 0-1 or a depth outside 0-100.
+   */
+  setShallow(color: readonly [number, number, number], depth: number): this {
+    if (color.length !== 3 || color.some((v) => !Number.isFinite(v) || v < 0 || v > 1) || !Number.isFinite(depth) || depth < 0 || depth > 100)
+      throw new RangeError('Invalid water shallow band; use a colour of three numbers from 0 to 1 and a depth from 0 to 100');
+    this.values.set(color, 136);
+    this.values[139] = depth;
+    return this;
+  }
+  /** Sets the shoreline foam width, above 0 to 100 world units (see `WaterOptions.foamDistance`); read every frame. */
+  setFoamDistance(distance: number): this {
+    if (!Number.isFinite(distance) || distance <= 0 || distance > 100)
+      throw new RangeError('Invalid water foamDistance; use a number above 0 and up to 100');
+    this.values[22] = distance;
     return this;
   }
   /** Sets the wind chop, 0-1 (see `WaterOptions.chop`); read every frame. Throws RangeError outside 0-1. */
@@ -756,8 +991,104 @@ export class Water implements EnginePlugin {
     this.values[131] = unit(amount, 'chop');
     return this;
   }
-  /** Scales the wave spectrum so its largest configured train has this amplitude in meters. */
-  setWaveHeight(height: number): this {
+  /**
+   * Where this sea's swell starts breaking on its coast: the contour of `terrain.heights` at the sea level less
+   * {@link breakerDepth} of the current trains (after `setWind` and `setWaveHeight`), as [x, z] segments, the line the
+   * surf shader's breakers sit on in the mean. Empty without `terrain.heights`, without waves, or where no ground is that
+   * deep. A `WeatherDrive` reads it to thicken the spray near the breakers. Kept until the depth or the sea level changes.
+   */
+  breakerLine(): [number, number][][] {
+    const terrain = this.options.terrain;
+    if (!terrain?.heights) return [];
+    const waves = [];
+    for (let i = 0; i < this.values[23]!; i++) waves.push({ amplitude: this.values[34 + i * 8]!, wavenumber: this.values[35 + i * 8]! });
+    const depth = breakerDepth(waves),
+      level = this.values[21]! - depth,
+      held = this.breakers;
+    if (held && held.level === level && held.data === terrain.heights.data) return held.lines;
+    const lines = depth > 0 ? contourSegments(terrain.heights, terrain.origin, terrain.size, level) : [];
+    this.breakers = { level, data: terrain.heights.data, lines };
+    return lines;
+  }
+  private breakers?: { level: number; data: ArrayLike<number>; lines: [number, number][][] };
+  /**
+   * Sets the wind, a speed in m/s at 10 m or `{ speed, fetch, direction }`, and retunes the eight swell trains to its sea
+   * (amplitudes, directions and steepness; the wavelengths stay). Read every frame; no fold at any speed.
+   * @throws TypeError with `options.waves` (the trains are then fixed); RangeError outside 0-100 m/s.
+   */
+  setWind(wind: number | WaterWind): this {
+    if (this.disposed || !this.windSea)
+      throw new TypeError('setWind needs a Water without options.waves; the trains you passed stay as they are');
+    // A fetch or direction left out, or given as undefined, keeps the held one: the sea is built from the merged wind, so
+    // it is the sea the Water then reports (a spread of `undefined` over the held values would build it from defaults).
+    const next = windOf(wind),
+      held = this.windSea;
+    this.windSea = {
+      speed: next.speed,
+      fetch: next.fetch ?? held.fetch,
+      direction: next.direction ?? held.direction,
+    };
+    const sea = seaOf(this.windSea);
+    this.maxWaveHeight = 0;
+    sea.waves.forEach((w, i) => {
+      const o = 32 + i * 8,
+        length = Math.hypot(w.direction[0], w.direction[1]);
+      this.values[o] = w.direction[0] / length;
+      this.values[o + 1] = w.direction[1] / length;
+      this.values[o + 2] = w.amplitude;
+      this.values[o + 4] = w.steepness ?? 0.5;
+      this.waveHeights[i] = w.amplitude;
+      this.maxWaveHeight = Math.max(this.maxWaveHeight, w.amplitude);
+    });
+    this.followWind();
+    return this;
+  }
+  /**
+   * Sets the foam from the wind (see `WaterOptions.whitecaps`): the fraction of the sea under foam is Monahan and
+   * O'Muircheartaigh's W = 3.84e-6 U^3.41, none below 3 m/s. A crest breaks where the swell's slope term of `whitecap()`
+   * (a sum of sines of known amplitudes) passes a threshold; with a Gaussian crest of standard deviation sigma, the
+   * threshold that a share p of the sea passes is sigma x z(p) (z from Abramowitz and Stegun 26.2.23). The foam that
+   * reaches half white is thinner than the crest that passes (FOAM_Y, FOAM_Z, measured). Nothing but the waves' own numbers is
+   * read, so the threshold follows the wind, the fetch and `setWaveHeight`, and the chop does not change it.
+   */
+  private followWind(): void {
+    if (!this.windSea) return;
+    let slopes = 0;
+    for (let i = 0; i < this.values[23]; i++) {
+      const o = 32 + i * 8,
+        slope = this.values[o + 2] * this.values[o + 3] * this.values[o + 7];
+      for (const [share, scale] of SWELL_COMPONENTS) slopes += 0.5 * 1.12 * (slope * share * scale) ** 2;
+    }
+    // Glitter: the sea's mean square slope is Cox and Munk's 0.003 + 0.00512 U (1954). The swell and the ripple layers
+    // (about 0.003) give some of it; the sun's glint lobe takes the rest as extra width (added to GGX's alpha squared).
+    this.values[133] = GLINT_LOBE * Math.max(0, 0.003 + 0.00512 * this.windSea.speed - slopes - GLINT_RIPPLES);
+    if (!this.foamFollowsWind) return;
+    const cover = whitecapCoverage(this.windSea.speed);
+    if (this.windSea.speed < FOAM_MIN_WIND || cover <= 0) {
+      this.values[130] = this.values[132] = 0;
+      return;
+    }
+    const variance = FOAM_NOISE * FOAM_NOISE + slopes;
+    // The standard score y of the covered share, then the threshold score z whose foam reaches it (FOAM_Y, FOAM_Z).
+    const y = upperScore(Math.min(0.9, cover));
+    let z = y - (FOAM_Y[0] - FOAM_Z[0]);
+    if (y >= FOAM_Y[FOAM_Y.length - 1]) z = y - (FOAM_Y[FOAM_Y.length - 1] - FOAM_Z[FOAM_Z.length - 1]);
+    else if (y > FOAM_Y[0])
+      for (let i = 1; i < FOAM_Y.length; i++)
+        if (y <= FOAM_Y[i]) {
+          const f = (y - FOAM_Y[i - 1]) / (FOAM_Y[i] - FOAM_Y[i - 1]);
+          z = FOAM_Z[i - 1] + f * (FOAM_Z[i] - FOAM_Z[i - 1]);
+          break;
+        }
+    this.values[130] = Math.min(1, cover / 0.25);
+    this.values[132] = Math.max(1e-4, Math.sqrt(variance) * z);
+  }
+  /**
+   * Scales the wave spectrum so its largest configured train has this amplitude in meters; `null` gives the trains back
+   * their own amplitudes (the wind's sea, or the `waves` you passed).
+   */
+  setWaveHeight(height: number | null): this {
+    if (height === null) height = this.maxWaveHeight;
     if (this.disposed || !Number.isFinite(height) || height < 0 || height > 100 || (!this.maxWaveHeight && height > 0))
       throw new RangeError(
         'Invalid water wave height; use 0 to 100 meters, and a wave train with an amplitude above 0 to scale',
@@ -774,6 +1105,7 @@ export class Water implements EnginePlugin {
     }
     for (let i = 0; i < this.values[23]; i++)
       this.values[34 + i * 8] = this.maxWaveHeight ? (height * this.waveHeights[i]) / this.maxWaveHeight : 0;
+    this.followWind();
     return this;
   }
   setup(engine: Engine): void {
@@ -783,7 +1115,9 @@ export class Water implements EnginePlugin {
         'Water requires WebGPU; attach a new Water to a WebGPU engine; see https://margoengine.com/errors#webgpu',
       );
     this.engine = engine;
-    this.shared = this.options.depth ? undefined : acquireDepth(engine);
+    // Kept across a device restore: the shared capture rebuilds its own textures, and releasing it there would replace
+    // its registration in the scene.
+    if (!this.options.depth) this.shared ??= acquireDepth(engine);
     this.source = this.options.depth ?? this.shared!.texture;
     // The uniform supplies the unused connectivity binding when there is no terrain.
     this.uniform = engine.gpu.createBuffer({
@@ -993,7 +1327,7 @@ export class Water implements EnginePlugin {
         this.foamMSAAView = this.foamMSAA.createView();
       }
     }
-    const view = (this.view = this.views.get(c));
+    const view = (this.view = this.drawnView = this.views.get(c));
     if (view.foam[0]?.width !== c.width || view.foam[0]?.height !== c.height) {
       for (const texture of view.foam) texture.destroy();
       view.foam = [];
@@ -1078,7 +1412,6 @@ export class Water implements EnginePlugin {
       this.built++;
       this.shadowEntries = undefined;
     }
-    this.time += c.delta;
     this.values.set(c.camera.matrix);
     this.values.set(c.camera.position, 16);
     if (this.horizon) {
@@ -1086,7 +1419,7 @@ export class Water implements EnginePlugin {
       this.values[128] = Math.round(c.camera.position[0] / x) * x;
       this.values[129] = Math.round(c.camera.position[2] / z) * z;
     }
-    this.values[20] = this.time;
+    this.values[20] = this.seconds;
     this.values[28] = c.camera.near;
     this.values[29] = c.camera.far;
     this.values[30] = c.delta;
@@ -1131,20 +1464,31 @@ export class Water implements EnginePlugin {
           'state',
           'Water terrain needs a sampleable 2D r32float heightmap, 2..512 cells per side; return one from options.terrain.heightmap',
         );
-      const river = riverKernels.get(this);
-      if (this.coastal?.terrain !== terrain || this.coastal?.river !== river) {
+      const river = riverKernels.get(this),
+        solver = waterSolvers.get(this);
+      if (
+        this.coastal?.terrain !== terrain ||
+        this.coastalSource?.[0] !== river ||
+        this.coastalSource?.[1] !== solver
+      ) {
         this.spray?.dispose();
         this.spray = undefined;
         this.coastal?.dispose();
-        this.coastal = new CoastalFlow(
-          c.device,
-          this.uniform!,
-          terrain,
-          this.fillCells(terrain),
-          this.options.still,
-          river,
-        );
-        if (this.options.spray) this.spray = new Spray(c.device, this.uniform!, this.coastal);
+        this.coastal = undefined;
+        this.coastal = solver
+          ? solver({ device: c.device, uniform: this.uniform!, terrain, fill: this.fillCells(terrain) })
+          : new CoastalFlow(
+              c.device,
+              this.uniform!,
+              terrain,
+              this.fillCells(terrain),
+              this.options.still,
+              river,
+              coastSurf,
+            );
+        this.coastalSource = [river, solver];
+        if (this.options.spray)
+          this.spray = new Spray(c.device, this.uniform!, this.coastal, this.options.sprayCount ?? 4096);
         this.values[101] = this.values[98] / terrain.width;
         this.values[102] = this.values[99] / terrain.height;
         this.built++;
@@ -1235,6 +1579,8 @@ export class Water implements EnginePlugin {
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
     pass.end();
+    // The capture's depth holds no water: a later pass that needs the sea's depth (VolumetricFog) reads this one.
+    publishSurfaceDepth(c, this.surfaceDepth!);
     this.spray?.draw(
       c,
       this.surfaceDepth!,
@@ -1360,6 +1706,7 @@ export class Water implements EnginePlugin {
     this.spray = undefined;
     this.coastal?.dispose();
     this.coastal = undefined;
+    this.coastalSource = undefined;
     this.surfaceDepth?.destroy();
     this.surfaceDepth = undefined;
     this.surfaceView = undefined;
@@ -1376,7 +1723,7 @@ export class Water implements EnginePlugin {
     this.fogBuffer?.destroy();
     this.fogBuffer = undefined;
     this.views.clear();
-    this.view = undefined;
+    this.view = this.drawnView = undefined;
     this.built++;
     this.shadowGroup = this.shadowEntries = undefined;
     this.sampledDepth = undefined;
@@ -1385,11 +1732,40 @@ export class Water implements EnginePlugin {
     this.format = '';
   }
   onDeviceRestored(engine: Engine): void {
+    const shared = this.shared;
+    this.shared = undefined;
     this.release();
+    this.shared = shared;
     this.setup(engine);
   }
-  /** Releases the foam of engine views that were not drawn in the last frame (once per frame, not on picks). */
+  /** Seconds on the wave clock: the sum of the frame deltas given to `advanceTime` (each frame update runs it). */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the wave clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
+   * runs it, so a seek from `@margoengine/cutscene/seek` replays the waves exactly. Until 2026-11-16 the draw pass
+   * moved the clock: hidden water stood still and two views in a frame moved it twice; now it keeps time either way.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.seconds += delta;
+  }
+  /**
+   * Sets the wave clock to `seconds` outright (0 to 1e9), as `FFTOcean.setTime` does; the next frame draws the waves
+   * there. Throws RangeError for any other value.
+   */
+  setTime(seconds: number): this {
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 1e9)
+      throw new RangeError('Invalid water time; pass seconds from 0 to 1e9.');
+    this.seconds = seconds;
+    return this;
+  }
+  /**
+   * Releases the foam of engine views that were not drawn in the last frame (once per frame, not on picks). The view
+   * drawn last stays readable for WaveQuery until the next draw.
+   */
   onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
     if (!(delta > 0)) return;
     this.views.prune();
     this.view = undefined;

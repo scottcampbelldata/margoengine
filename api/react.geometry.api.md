@@ -4,37 +4,169 @@
 
 ```ts
 import { Mesh, Vec3 } from "@margoengine/core";
-import { Texture } from "@margoengine/materials";
-import { ReactNode } from "react";
+import { LoadedSVG } from "@margoengine/loaders/svg";
+import { EnvMapSource, Material, MaterialOptions, MeshGeometry, Texture, TransmissionOptions } from "@margoengine/materials";
+import { BackdropShape } from "@margoengine/studio/backdrop";
+import { ForwardRefExoticComponent, PropsWithoutRef, ReactNode, RefAttributes } from "react";
 import * as GeometryModule from "@margoengine/geometry";
+import * as ExtrasModule from "@margoengine/geometry/extras";
 
-export const Box: import("react").ForwardRefExoticComponent<BoxProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+export const Backdrop: import("react").ForwardRefExoticComponent<BackdropProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+
+export interface BackdropProps extends MeshProps, BackdropShape {
+    color?: string | readonly number[];
+    onError?: (error: unknown) => void;
+}
+
+export const Box: ShapeComponent<'boxGeometry'>;
 
 export interface BoxProps extends ShapeProps {
     args?: Parameters<GeometryApi['boxGeometry']>;
 }
 
-export const Plane: import("react").ForwardRefExoticComponent<PlaneProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+export const Capsule: ShapeComponent<'capsuleGeometry'>;
 
-export function PlaneGeometry(_arg1: ShapeGeometryProps<'planeGeometry'>): import("react").JSX.Element;
+export const CapsuleGeometry: (props: ShapeGeometryProps<"capsuleGeometry">) => import("react").JSX.Element;
+
+export const Circle: ShapeComponent<'circleGeometry'>;
+
+export const CircleGeometry: (props: ShapeGeometryProps<"circleGeometry">) => import("react").JSX.Element;
+
+export const Cone: ShapeComponent<'coneGeometry'>;
+
+export const ConeGeometry: (props: ShapeGeometryProps<"coneGeometry">) => import("react").JSX.Element;
+
+export const Cylinder: ShapeComponent<'cylinderGeometry'>;
+
+export const CylinderGeometry: (props: ShapeGeometryProps<"cylinderGeometry">) => import("react").JSX.Element;
+
+export const Dodecahedron: ShapeComponent<'dodecahedronGeometry'>;
+
+export const DodecahedronGeometry: (props: ShapeGeometryProps<"dodecahedronGeometry">) => import("react").JSX.Element;
+
+export const Extrude: ShapeComponent<'extrudeGeometry'>;
+
+export const ExtrudeGeometry: (props: ShapeGeometryProps<"extrudeGeometry">) => import("react").JSX.Element;
+
+export const Icosahedron: ShapeComponent<'icosahedronGeometry'>;
+
+export const IcosahedronGeometry: (props: ShapeGeometryProps<"icosahedronGeometry">) => import("react").JSX.Element;
+
+export const Lathe: ShapeComponent<'latheGeometry'>;
+
+export const LatheGeometry: (props: ShapeGeometryProps<"latheGeometry">) => import("react").JSX.Element;
+
+export const Octahedron: ShapeComponent<'octahedronGeometry'>;
+
+export const OctahedronGeometry: (props: ShapeGeometryProps<"octahedronGeometry">) => import("react").JSX.Element;
+
+export const Plane: ShapeComponent<'planeGeometry'>;
+
+export const PlaneGeometry: (props: ShapeGeometryProps<"planeGeometry">) => import("react").JSX.Element;
 
 export interface PlaneProps extends ShapeProps {
     args?: Parameters<GeometryApi['planeGeometry']>;
 }
 
-export interface ShapeGeometryProps<K extends ShapeKind> extends ErrorProps {
-    args?: Parameters<GeometryApi[K]>;
+export const Polyhedron: ShapeComponent<'polyhedronGeometry'>;
+
+export const PolyhedronGeometry: (props: ShapeGeometryProps<"polyhedronGeometry">) => import("react").JSX.Element;
+
+export const Ring: ShapeComponent<'ringGeometry'>;
+
+export const RingGeometry: (props: ShapeGeometryProps<"ringGeometry">) => import("react").JSX.Element;
+
+export const RoundedBox: ShapeComponent<'roundedBoxGeometry'>;
+
+export const RoundedBoxGeometry: (props: ShapeGeometryProps<"roundedBoxGeometry">) => import("react").JSX.Element;
+
+export const Shape: ShapeComponent<'shapeGeometry'>;
+
+export type ShapeArgs<K extends ShapeKind> = [
+] extends Parameters<ShapeFactories[K]> ? {
+    args?: Parameters<ShapeFactories[K]>;
+} : {
+    args: Parameters<ShapeFactories[K]>;
+};
+
+export type ShapeComponent<K extends ShapeKind> = ForwardRefExoticComponent<PropsWithoutRef<ShapeComponentProps<K>> & RefAttributes<MeshRef>>;
+
+export type ShapeComponentProps<K extends ShapeKind> = ShapeProps & ShapeArgs<K>;
+
+export interface ShapeFactories {
+    boxGeometry: GeometryApi['boxGeometry'];
+    sphereGeometry: GeometryApi['sphereGeometry'];
+    planeGeometry: GeometryApi['planeGeometry'];
+    cylinderGeometry: GeometryApi['cylinderGeometry'];
+    coneGeometry: GeometryApi['coneGeometry'];
+    capsuleGeometry: GeometryApi['capsuleGeometry'];
+    circleGeometry: GeometryApi['circleGeometry'];
+    ringGeometry: GeometryApi['ringGeometry'];
+    torusGeometry: GeometryApi['torusGeometry'];
+    torusKnotGeometry: GeometryApi['torusKnotGeometry'];
+    tetrahedronGeometry: GeometryApi['tetrahedronGeometry'];
+    octahedronGeometry: GeometryApi['octahedronGeometry'];
+    icosahedronGeometry: GeometryApi['icosahedronGeometry'];
+    dodecahedronGeometry: GeometryApi['dodecahedronGeometry'];
+    polyhedronGeometry: GeometryApi['polyhedronGeometry'];
+    latheGeometry: GeometryApi['latheGeometry'];
+    tubeGeometry: GeometryApi['tubeGeometry'];
+    shapeGeometry: GeometryApi['shapeGeometry'];
+    extrudeGeometry: GeometryApi['extrudeGeometry'];
+    roundedBoxGeometry: (typeof ExtrasModule)['roundedBoxGeometry'];
 }
 
-export const Sphere: import("react").ForwardRefExoticComponent<SphereProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+export const ShapeGeometry: (props: ShapeGeometryProps<"shapeGeometry">) => import("react").JSX.Element;
 
-export function SphereGeometry(_arg0: ShapeGeometryProps<'sphereGeometry'>): import("react").JSX.Element;
+export type ShapeGeometryProps<K extends ShapeKind> = ErrorProps & ShapeArgs<K>;
+
+export const Sphere: ShapeComponent<'sphereGeometry'>;
+
+export const SphereGeometry: (props: ShapeGeometryProps<"sphereGeometry">) => import("react").JSX.Element;
 
 export interface SphereProps extends ShapeProps {
     args?: Parameters<GeometryApi['sphereGeometry']>;
 }
 
+export const Svg: import("react").ForwardRefExoticComponent<SvgProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+
+export type SvgMaterialProps = Omit<TextureMaterialProps, 'geometry' | 'onError' | 'renderOrder'>;
+
+export type SvgMeshProps = Omit<MeshProps, 'children'>;
+
+export interface SvgProps extends Omit<MeshProps, 'children'> {
+    src: string | URL;
+    skipFill?: boolean;
+    skipStrokes?: boolean;
+    fillMaterial?: SvgMaterialProps;
+    strokeMaterial?: SvgMaterialProps;
+    fillMeshProps?: SvgMeshProps;
+    strokeMeshProps?: SvgMeshProps;
+    flipY?: boolean;
+    curveSegments?: number;
+    strokeDivisions?: number;
+    onLoad?: (svg: LoadedSVG) => void;
+    onError?: (error: unknown) => void;
+    children?: ReactNode;
+}
+
+export const Tetrahedron: ShapeComponent<'tetrahedronGeometry'>;
+
+export const TetrahedronGeometry: (props: ShapeGeometryProps<"tetrahedronGeometry">) => import("react").JSX.Element;
+
 export type TextureSource = string | URL | Blob | ArrayBuffer | ArrayBufferView;
+
+export const Torus: ShapeComponent<'torusGeometry'>;
+
+export const TorusGeometry: (props: ShapeGeometryProps<"torusGeometry">) => import("react").JSX.Element;
+
+export const TorusKnot: ShapeComponent<'torusKnotGeometry'>;
+
+export const TorusKnotGeometry: (props: ShapeGeometryProps<"torusKnotGeometry">) => import("react").JSX.Element;
+
+export const Tube: ShapeComponent<'tubeGeometry'>;
+
+export const TubeGeometry: (props: ShapeGeometryProps<"tubeGeometry">) => import("react").JSX.Element;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -74,6 +206,8 @@ interface MeshProps extends PointerHandlers {
     children?: ReactNode;
 }
 
+type MeshRef = MeshHandle;
+
 interface PbrMaterialProps {
     color?: string | readonly number[];
     roughness?: number;
@@ -85,6 +219,8 @@ interface PbrMaterialProps {
     emissiveMap?: Texture | TextureSource | null;
     emissive?: string | readonly number[];
     emissiveIntensity?: number;
+    envMap?: EnvMapSource | null;
+    envMapIntensity?: number;
 }
 
 interface PointerHandlers {
@@ -102,9 +238,19 @@ interface PointerHandlers {
     onPointerMissed?: (event: MouseEvent) => void;
 }
 
-type ShapeKind = 'boxGeometry' | 'sphereGeometry' | 'planeGeometry';
+type ShapeKind = keyof ShapeFactories;
 
 interface ShapeProps extends MeshProps, ErrorProps, PbrMaterialProps {
     castShadow?: boolean;
+}
+
+interface TextureMaterialProps extends Omit<MaterialOptions, 'color'> {
+    color?: string | readonly number[];
+    material?: NativeMaterial;
+    roughnessMap?: Texture | null;
+    geometry?: MeshGeometry;
+    transmissionOptions?: TransmissionOptions;
+    renderOrder?: number;
+    onError?: (error: unknown) => void;
 }
 ```

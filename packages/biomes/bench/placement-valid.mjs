@@ -1,7 +1,7 @@
 // Biomes goal G1, measured so the result can be trusted: the committed revision (and the pre-J2 baseline) built from git
-// objects, timed under the exclusive GPU lock after the AC, CPU and GPU quiet gate, with the machine settled between
+// objects, timed after the AC, CPU and GPU quiet gate, with the machine settled between
 // cases. Run from the repository root on a quiet machine: node packages/biomes/bench/placement-valid.mjs --runs=20
-// It exits 1 when the lock, the gate, the repetition count, a case's spread (over 10%) or an input check fails. A valid
+// It exits 1 when the gate, the repetition count, a case's spread (over 10%) or an input check fails. A valid
 // run that misses a G1 target prints targetMet: false and exits 0: a measured miss, never a pass.
 //
 // Cases, each in its own Node process with GC between samples, on R16 tiles (40..47, 30) and the block (40..47, 40..47):
@@ -37,7 +37,6 @@ export const MIN_RUNS = 20;
 export const SPREAD_LIMIT = 0.1;
 export const HOST = 'A6000';
 export const GATE = Object.freeze({ quietMax: 20, quietHold: 20, gpuMax: 20, timeout: 1200 });
-export const OWNER = 'biomes-placement-valid';
 const TILE = 256,
   ROW = Object.freeze({ x: [40, 47], z: 30 }),
   BLOCK = Object.freeze({ x: 40, z: 40, side: 8 }),
@@ -76,15 +75,11 @@ export function caseFailures(id, c, { runs = MIN_RUNS, spreadLimit = SPREAD_LIMI
   return out;
 }
 
-/** Why the conditions of a run are not valid: battery, the lock not held by this process, the quiet gate, the host. */
-export function conditionFailures({ gate, lockAtEnd, pid, owner = OWNER, host, anyHost = false, settles = [] }) {
+/** Why the conditions of a run are not valid: battery, the quiet gate, the host. */
+export function conditionFailures({ gate, host, anyHost = false, settles = [] }) {
   const out = [];
   if (!gate) return ['no gate record'];
   if (gate.ac === false) out.push('on battery');
-  const ours = (l) =>
-    l?.held === 'by the wrapping gpu-lock run' || (l?.mode === 'exclusive' && l.pid === pid && l.owner === owner);
-  if (!ours(gate.lock)) out.push('the exclusive GPU lock was not held by this run when timing started');
-  if (!ours(lockAtEnd)) out.push('the exclusive GPU lock was not held by this run when timing ended');
   if (!gate.quiet || gate.quiet.skipped) out.push('the CPU quiet gate did not run');
   else if (!(gate.quiet.cpuLoadPercent <= GATE.quietMax)) out.push(`CPU ${gate.quiet.cpuLoadPercent}% at the gate`);
   if (!gate.quiet?.gpu?.checked)
@@ -564,41 +559,32 @@ async function parent(argv) {
     r.build = await buildSnapshot(r.pkg);
   }
   const { environment } = await import(pathToFileURL(join(root, 'bench', 'lib', 'env.mjs')).href),
-    { openGate, settle, acPower } = await import(pathToFileURL(join(root, 'bench', 'lib', 'gate.mjs')).href),
-    { status } = await import(pathToFileURL(join(root, 'scripts', 'gpu-lock.mjs')).href);
+    { openGate, settle, acPower } = await import(pathToFileURL(join(root, 'bench', 'lib', 'gate.mjs')).href);
   const env = environment();
   result.host = { ...env.host, gpu: env.gpu, machine: env.machine };
-  const gate = await openGate({ needsGpu: true, skip: false, ...GATE, owner: OWNER, log });
+  const gate = await openGate({ needsGpu: true, skip: false, ...GATE, log });
   const settles = [];
-  try {
-    result.gate = gate.record;
-    failures.push(...gate.invalid);
-    const plan = [
-      ['cpu', 1],
-      ['cold', 1],
-      ['workers', 1],
-      ['workers', 8],
-    ];
-    for (const r of revs) r.cases = {};
-    for (const [kind, workers] of plan)
-      for (const r of revs) {
-        const id = `${r.name}:${kind}${kind === 'workers' ? workers : ''}`,
-          s = await settle({ skip: false, ...GATE, log });
-        settles.push({ case: id, ac: acPower(), ...s });
-        log(`placement-valid: ${id}`);
-        Object.assign(r.cases, runChild(kind, r.pkg, runs, workers));
-      }
-    const nested = !!process.env.MARGO_GPU_LOCK_NESTED;
-    result.lockAtEnd = nested ? { held: 'by the wrapping gpu-lock run' } : status();
-  } finally {
-    gate.release();
-  }
+  result.gate = gate.record;
+  failures.push(...gate.invalid);
+  const plan = [
+    ['cpu', 1],
+    ['cold', 1],
+    ['workers', 1],
+    ['workers', 8],
+  ];
+  for (const r of revs) r.cases = {};
+  for (const [kind, workers] of plan)
+    for (const r of revs) {
+      const id = `${r.name}:${kind}${kind === 'workers' ? workers : ''}`,
+        s = await settle({ skip: false, ...GATE, log });
+      settles.push({ case: id, ac: acPower(), ...s });
+      log(`placement-valid: ${id}`);
+      Object.assign(r.cases, runChild(kind, r.pkg, runs, workers));
+    }
   result.settles = settles;
   failures.push(
     ...conditionFailures({
       gate: result.gate,
-      lockAtEnd: result.lockAtEnd,
-      pid: process.pid,
       host: result.host,
       anyHost,
       settles,

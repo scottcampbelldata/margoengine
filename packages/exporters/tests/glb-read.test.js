@@ -1,6 +1,7 @@
 // readAccessor reads glTF accessors back from GLB bytes as plain packed data: strided, matrix-padded, sparse and
 // view-less accessors, with bounds and finiteness checks.
 import test from 'node:test';
+import { validate } from './helpers.js';
 import assert from 'node:assert/strict';
 import { exportGLB, joinGLB, readAccessor, splitGLB } from '../dist/index.js';
 
@@ -140,4 +141,38 @@ test('readAccessor refuses bad accessors with the fix in the message', () => {
     ),
   );
   assert.throws(() => readAccessor(bad, 0), { name: 'RangeError', message: /non-finite/ });
+});
+
+test('a repack that leaves the BIN chunk empty drops its buffer instead of writing byteLength 0', async () => {
+  // glTF 2.0 5.10.2: buffer.byteLength has a minimum of 1. Buffer 0 holds only a view nothing reads; buffer 1 is kept.
+  const { packGLB } = await import('../dist/glb-pack.js'),
+    json = {
+      asset: { version: '2.0' },
+      buffers: [{ byteLength: 4 }, { byteLength: 4, uri: 'data:application/octet-stream;base64,AAAAAA==' }],
+      bufferViews: [
+        { buffer: 0, byteLength: 4 },
+        { buffer: 1, byteLength: 4 },
+      ],
+      accessors: [{ bufferView: 1, componentType: 5126, count: 1, type: 'SCALAR', min: [0], max: [0] }],
+    },
+    external = json.buffers[1],
+    packed = packGLB({ json, bin: new Uint8Array(4), chunks: [] });
+  assert.equal(packed.bin, null);
+  assert.deepEqual(packed.json.buffers, [external]);
+  assert.deepEqual(packed.json.bufferViews, [{ buffer: 0, byteLength: 4 }]);
+  assert.equal(packed.json.accessors[0].bufferView, 0);
+  const report = await validate(joinGLB(packed));
+  assert.equal(report.errors, 0, JSON.stringify(report.messages));
+});
+
+test('a document keeps every top-level key when its keys are put in order', async () => {
+  // glTF 2.0 5.17 lists extras among a glTF's own properties; finish() rebuilt the object from a list without it.
+  const { Bin } = await import('../dist/container.js'),
+    bin = new Bin();
+  bin.json.extras = { author: 'a' };
+  bin.json.asset = { version: '2.0' };
+  bin.json.futureKey = 1;
+  bin.finish();
+  assert.deepEqual(Object.keys(bin.json), ['asset', 'extras', 'futureKey']);
+  assert.deepEqual(bin.json.extras, { author: 'a' });
 });

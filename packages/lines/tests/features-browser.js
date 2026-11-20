@@ -1,6 +1,6 @@
 // Real-GPU checks of the optional line features, on a canvas of their own. Each check returns a line for the report.
 import { Engine, box } from '@margoengine/core';
-import { Lines, Line, ArrowHelper, PlaneHelper, SkeletonHelper } from '@margoengine/lines';
+import { Lines, Line, ArrowHelper, GridHelper, PlaneHelper, SkeletonHelper } from '@margoengine/lines';
 import { LinePicking } from '@margoengine/lines/pick';
 import { TexturedLine, LineTexture, loadLineTexture } from '@margoengine/lines/texture';
 import { DebugLines, ArcLine } from '@margoengine/lines/debug';
@@ -102,6 +102,34 @@ async function depthWrite() {
 
 /** Canvas pixel of a world point under the rig's camera. */
 const pixel = (x, y, z) => [128 + (x * 221.7) / (10 - z), 128 - (y * 221.7) / (10 - z)];
+
+/** GAP-FILM-GRIDFADE: a faded grid draws its centre line at full colour near the centre, half way through the band and
+ * not past `far`; the same grid without `fade` draws all three. The grid is turned into the view plane (y and z swap). */
+async function gridFade() {
+  const { lines, frame, done } = await rig(),
+    turned = (grid) => {
+      grid.matrix.set([1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1]);
+      return grid;
+    },
+    options = { size: 10, divisions: 10, color1: RED, color2: '#000000', width: 6 },
+    red = (image, y) => image.at(...pixel(0, y, 0).map(Math.round))[0];
+  const plain = lines.add(turned(new GridHelper(options)));
+  let image = await frame();
+  const full = [red(image, 0.5), red(image, 2.5), red(image, 4.5)];
+  assert(
+    full.every((v) => v > 200),
+    `A grid without fade draws its centre line everywhere: ${full}`,
+  );
+  lines.remove(plain);
+  lines.add(turned(new GridHelper({ ...options, fade: { near: 1, far: 4 } })));
+  image = await frame();
+  const faded = [red(image, 0.5), red(image, 2.5), red(image, 4.5)];
+  assert(faded[0] > 200, `Inside near the faded grid is full: ${faded}`);
+  assert(faded[1] > 40 && faded[1] < 220, `Half way through the band the line is part blended: ${faded}`);
+  assert(faded[2] < 20, `Past far the faded grid draws nothing: ${faded}`);
+  done();
+  return `Grid fade: full inside near, ${faded[1]} of 255 half way, nothing past far`;
+}
 
 async function picking() {
   for (const capture of [false, true]) {
@@ -639,8 +667,14 @@ async function renderWork() {
     const matrices = new Float32Array(32);
     matrices[28] = 2;
     lines.add(new SkeletonHelper({ parents: [-1, 0], matrices }, { width: 8 }));
-    const line = lines.add(new Line({ mode: 'segments', cap: 'butt', width: 12,
-      positions: [-3, -2, 0, 3, 2, 0, -2, 3, 9.95, 2, -3, 0, 1, 1, 0, 1, 1, 0] }));
+    const line = lines.add(
+      new Line({
+        mode: 'segments',
+        cap: 'butt',
+        width: 12,
+        positions: [-3, -2, 0, 3, 2, 0, -2, 3, 9.95, 2, -3, 0, 1, 1, 0, 1, 1, 0],
+      }),
+    );
     for (const cap of ['butt', 'square'])
       for (const depthWrite of [false, true])
         for (const dashed of [false, true]) {
@@ -651,10 +685,16 @@ async function renderWork() {
           lines.vertexCount = () => 78;
           lines.frameValid = false;
           const original = (await frame()).bytes;
-          assert(optimized.every((v, i) => v === original[i]), `Full fan pixel identity: ${cap}/${depthWrite}/${dashed}`);
+          assert(
+            optimized.every((v, i) => v === original[i]),
+            `Full fan pixel identity: ${cap}/${depthWrite}/${dashed}`,
+          );
           lines.vertexCount = vertexCount;
           const cached = (await frame()).bytes;
-          assert(cached.every((v, i) => v === original[i]), 'Resident uniform pixel identity');
+          assert(
+            cached.every((v, i) => v === original[i]),
+            'Resident uniform pixel identity',
+          );
         }
   } finally {
     lines.vertexCount = vertexCount;
@@ -666,6 +706,7 @@ async function renderWork() {
 window.runLineFeatures = async () => {
   const checks = [];
   for (const check of [
+    gridFade,
     depthWrite,
     picking,
     trail,

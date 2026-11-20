@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/shadow-cull.browser.mjs
 // Scatter culls its instances per shadow cascade (prepareShadow) without changing the shadows:
 // 1. Same output: for three scenes (LOD rings with fades, scales and wind; widened wind-bent grass blades; a tree trunk

@@ -3,14 +3,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { install, transmission as extension } from '../dist/index.js';
 import { transmissionQuads } from '../../../tests/support/transmission-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
-// gltf-pro's base shader since KB3240 (direct diffuse keeps the dielectric Fresnel weight); was bdf7de1e...834390 (KB6016c).
-const baselineShader = '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23';
+// gltf/pbr's base shader since KB-INV-GLTF (its clip position is @invariant); was 9429f501...4e9c23 (KB3240), bdf7de1e...834390 (KB6016c).
+const baselineShader = 'e910ac332ad107235b3ffade40139f9fac9ed8d30e480082de2f8da0befa977a';
 const transmission = (factor = 1, extra = {}) => ({
   KHR_materials_transmission: { transmissionFactor: factor },
   ...extra,

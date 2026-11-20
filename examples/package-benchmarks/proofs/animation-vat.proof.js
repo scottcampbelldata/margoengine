@@ -1,12 +1,12 @@
 import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // CPU cost per frame of a crowd of RobotExpressive characters (7,214 vertices, 19 primitives, 43 joints, Walking clip):
-//   skinned - one gltf-pro model + Animation each: track sampling, joint palettes and a compute dispatch per skinned
+//   skinned - one gltf/pbr model + Animation each: track sampling, joint palettes and a compute dispatch per skinned
 //             primitive, then one draw per primitive (the GPU-skinning path this package already had);
 //   vat     - bakeVAT once, then one VATCrowd: one instanced draw, per-frame CPU independent of the instance count;
 //   cpu     - CPU skinning every vertex every frame (bakeVAT's per-row cost times the crowd), for reference.
 // Timed on the silent mock GPU (CPU work only; medians of 20 frames). About 90 s and 1 GB for 1,000 skinned models.
 // Run: node examples/package-benchmarks/proofs/animation-vat.proof.js [counts, default 100,1000]
-// Pinned: gltf-pro and animation built at 700838e, the commit that recorded results/animation-vat.json (--current: the
+// Pinned: gltf/pbr and animation built at 700838e, the commit that recorded results/animation-vat.json (--current: the
 // working tree's builds).
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -19,10 +19,10 @@ import { mockGPU, context } from './gpu-recorder.js';
 const measure = speedEnabled();
 if (!measure) deferSpeed('animation-vat.proof CPU timing diagnostics');
 const pin = current ? undefined : '700838e';
-announce('gltf-pro + animation (measured, no baseline)', '-', pin);
+announce('gltf/pbr + animation (measured, no baseline)', '-', pin);
 const [{ GLTFAsset, PBRModel }, { Animation }, { bakeVAT, VATCrowd }] = await Promise.all(
   [
-    ['gltf-pro', 'src/index.ts'],
+    ['gltf', 'src/pbr.ts'],
     ['animation', 'src/index.ts'],
     ['animation', 'src/vat.ts'],
   ].map(([name, entry]) => entryAt(name, entry, pin)),

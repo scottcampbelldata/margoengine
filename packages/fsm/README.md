@@ -165,7 +165,7 @@ const text = JSON.stringify(saveMachine(machine, bindings));
 const again = loadMachine(JSON.parse(text), guard, bindings);
 ```
 
-- `validateMachine(value, bindings?)` takes anything, such as what `JSON.parse` gave, and lists every problem with its place, `[{path: 'transitions[2].to', message: '...'}]`, or nothing. Unknown keys are problems, so a typing slip does not pass quietly. With `bindings` each name must also have its function.
+- `validateMachine(value, bindings?)` takes anything, such as what `JSON.parse` gave, and lists every problem with its place, `[{path: 'transitions[2].to', message: '...'}]`, or nothing. Unknown keys are problems, so a typing slip does not pass quietly. Each problem is listed once, where it is: a parent that does not exist on the state naming it, a hierarchy cycle on the states in the cycle, a value that is not an object at `document`. With `bindings` each name must also have its function.
 - `loadMachine(document, context, bindings?)` builds the machine, or throws a `TypeError` listing every problem. A raised event no region takes goes to the machine holding the regions.
 - `saveMachine(machine, bindings?)` gives the document of any machine, also one built by hand: it finds each function's name in `bindings`, and throws a `TypeError` for one that has none. It saves the definition, not where the machine is now: for that see below.
 - A state with regions takes no hooks in a document; put them on its parent.

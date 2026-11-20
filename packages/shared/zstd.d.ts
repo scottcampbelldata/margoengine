@@ -21,3 +21,11 @@ export interface ZstdOptions {
  * const bytes = await decompressZstd(compressed, { maxOutputSize: 1 << 24 });
  */
 export function decompressZstd(input: Uint8Array, options?: ZstdOptions): Promise<Uint8Array<ArrayBuffer>>;
+
+/**
+ * {@link decompressZstd} without yielding to the event loop: the same output, limits and errors, for synchronous
+ * callers. The signal is checked between blocks.
+ * @example
+ * const bytes = decompressZstdSync(compressed, { maxOutputSize: 1 << 24 });
+ */
+export function decompressZstdSync(input: Uint8Array, options?: ZstdOptions): Uint8Array<ArrayBuffer>;

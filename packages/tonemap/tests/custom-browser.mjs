@@ -3,7 +3,9 @@
 // curve x / (x + k) with k = 1 from params, and a JavaScript curve x / (1 + x), must both match a CPU oracle of
 // x / (1 + x) on every such pixel: inside what the curve gives over the input's half-level 8-bit interval, plus one
 // level of output rounding (the sampled curve's log2 interpolation error is far below a level). A live params change (k = 0.25) moves the WGSL frame to x / (x + 0.25) without a
-// recompile. The WGSL curve also compiles and renders without a GPU error under an HDR ColorOutput.
+// recompile. The WGSL curve also compiles and renders without a GPU error under an HDR ColorOutput. A WGSL curve that
+// never reads curveParams, x / (x + 1), must draw without a validation error and match the same oracle (KB-OWN-TONE3:
+// the automatic layout dropped its unused uniform while the Tonemap still bound it).
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { postBrowser } from '../../post/test/post-browser.mjs';
@@ -35,11 +37,12 @@ await postBrowser(
           params: [1],
         }),
         sampled = new CustomCurve({ curve: (x) => x / (1 + x) }),
+        plain = new CustomCurve({ wgsl: 'fn reinhard(x: vec3f) -> vec3f { return x / (x + vec3f(1.0)); }' }),
         tonemap = Tonemap.attach(engine, { curve: 'linear' });
       window.t = {
         engine,
         tonemap,
-        curves: { none: [], wgsl: [wgsl], sampled: [sampled] },
+        curves: { none: [], wgsl: [wgsl], sampled: [sampled], plain: [plain] },
         wgsl,
         frame: () => (engine.render({ delta: 1 / 60 }), engine.gpu.queue.onSubmittedWorkDone()),
       };
@@ -53,11 +56,17 @@ await postBrowser(
     };
     const sets = [];
     for (let e = -4; e <= 1; e++)
-      sets.push([await frame('none', e), await frame('wgsl', e), await frame('sampled', e), await frame('wgsl', e, 0.25)]);
+      sets.push([
+        await frame('none', e),
+        await frame('wgsl', e),
+        await frame('sampled', e),
+        await frame('wgsl', e, 0.25),
+        await frame('plain', e),
+      ]);
     const decode = (v) => ((v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4),
       encode = (v) => 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
-    const r = { pixels: 0, wgsl: 0, sampled: 0, live: 0, spread: new Set() };
-    for (const [linear, wgsl, sampled, live] of sets)
+    const r = { pixels: 0, wgsl: 0, sampled: 0, live: 0, plain: 0, spread: new Set() };
+    for (const [linear, wgsl, sampled, live, plain] of sets)
       for (let i = 0; i < linear.data.length; i += 4)
         for (let c = 0; c < 3; c++) {
           const v = linear.data[i + c];
@@ -75,8 +84,18 @@ await postBrowser(
           r.wgsl = Math.max(r.wgsl, miss(reinhard, wgsl.data[i + c]));
           r.sampled = Math.max(r.sampled, miss(reinhard, sampled.data[i + c]));
           r.live = Math.max(r.live, miss((x) => x / (x + 0.25), live.data[i + c]));
+          r.plain = Math.max(r.plain, miss(reinhard, plain.data[i + c]));
         }
     r.spread = r.spread.size;
+    // The curve without curveParams draws without a validation error (the bind group matches its pipeline's layout).
+    r.plainError = await page.evaluate(async () => {
+      const { engine, tonemap, curves } = window.t;
+      tonemap.options.extensions = curves.plain;
+      engine.gpu.pushErrorScope('validation');
+      await window.t.frame();
+      const error = await engine.gpu.popErrorScope();
+      return error ? error.message : null;
+    });
     // Under an HDR ColorOutput the curve goes into the output shader: it must compile and draw without a GPU error.
     r.hdrError = await page.evaluate(async () => {
       const { ColorOutput } = await import('/packages/environment/dist/index.js'),
@@ -96,5 +115,7 @@ await postBrowser(
     assert.ok(r.sampled === 0, `the sampled JavaScript curve gives x / (1 + x): ${r.sampled} levels`);
     assert.ok(r.live === 0, `a live params change gives x / (x + 0.25): ${r.live} levels`);
     assert.equal(r.hdrError, null, 'the WGSL curve compiles under ColorOutput');
+    assert.equal(r.plainError, null, 'a WGSL curve that ignores curveParams binds and draws');
+    assert.ok(r.plain === 0, `the WGSL curve without curveParams gives x / (1 + x): ${r.plain} levels`);
   },
 );

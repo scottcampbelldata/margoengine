@@ -1,7 +1,7 @@
 // Repro for docs/known-bugs.md "4x MSAA blending is not repeatable": draws one still frame many times and reports
 // every frame that differs from the first. It exits 1 when any frame differs (it is a repro, not a check:merge gate).
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/msaa-blend-repeat-check.mjs [--frames=30] [--mask=7]
-//     [--grid=6] [--khronos[=ToyCar,IridescenceLamp]] [--captures=4] [--max-minutes=15]
+//   node scripts/run-with-timeout.mjs -- node scripts/msaa-blend-repeat-check.mjs [--frames=30] [--mask=7]
+//     [--grid=6] [--khronos[=ToyCar,IridescenceLamp]] [--captures=4] [--max-minutes=9]
 //     [--replay=LightsPunctualLamp --pixel=292,160 [--replay-frames=300] [--replay-mask=7] [--adapter=swiftshader]]
 // Part 1, plain WebGPU (scripts/support/msaa-blend-repeat.html, no Margo code): the same commands every frame, and the
 // multisampled colour copied before and after a blended pass that multiplies by one constant colour. Samples that are
@@ -18,8 +18,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createServer } from 'vite';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { decodePNG } from '../tests/support/png.js';
-import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
 
@@ -30,7 +30,7 @@ const arg = (name, fallback) => {
 };
 const frames = Number(arg('frames', 30)),
   captures = Number(arg('captures', 4)),
-  maxMinutes = Number(arg('max-minutes', 15)),
+  maxMinutes = Number(arg('max-minutes', 9)),
   khronos = arg('khronos'),
   models = khronos === undefined ? [] : (khronos || 'ToyCar,IridescenceLamp').split(',');
 const replayModel = arg('replay'),
@@ -40,16 +40,17 @@ const replayModel = arg('replay'),
   pixel = arg('pixel', '0,0').split(',').map(Number);
 const query = new URLSearchParams();
 for (const name of ['mask', 'grid', 'size']) if (arg(name) !== undefined) query.set(name, arg(name));
+// The run has a hard 10 minute timeout.
+if (!(maxMinutes > 0 && maxMinutes <= 9))
+  throw new RangeError('msaa-blend-repeat: --max-minutes must be above 0 and at most 9');
 if (!(frames >= 2) || !(captures >= 2))
   throw new RangeError('msaa-blend-repeat: --frames and --captures must be 2 or more');
 
-// Hard limit for the whole run: on timeout the exit handler releases the lock.
+// Hard limit for the whole run: a run past it is hung, and the browser it waits on may never answer.
 setTimeout(() => {
   console.error(`msaa-blend-repeat: over ${maxMinutes} min, stopped`);
-  process.exit(1);
+  process.exit(1); // process.exit: the hard limit; a hung browser or GPU wait would hold the process for ever
 }, maxMinutes * 60_000).unref();
-const release = await acquire({ owner: 'msaa-blend-repeat', mode: 'shared' });
-process.on('exit', () => release());
 let server,
   browser,
   failed = false;
@@ -146,6 +147,7 @@ async function replayKhronos(origin) {
 try {
   server = await (
     await createServer({
+      plugins: [noFileWatcher()],
       configFile: false,
       root,
       logLevel: 'error',
@@ -158,57 +160,55 @@ try {
   console.log(`${browserLabel()} ${browser.version()}`);
   if (replayModel) {
     failed = await replayKhronos(origin);
-    await closeAll({ browser, servers: [server] });
-    process.exit(failed ? 1 : 0);
-  }
-
-  const context = await browser.newContext(),
-    page = await context.newPage();
-  page.on('pageerror', (e) => console.error(`  pageerror: ${e.message}`));
-  await page.goto(`${origin}/scripts/support/msaa-blend-repeat.html?${query}`);
-  await page.waitForFunction('window.reproReady === true', null, { timeout: 60_000 });
-  const { gpu, rows } = await page.evaluate((n) => window.repeatFrames(n), frames);
-  await context.close();
-  const bad = rows.filter((r) => r.after || r.resolved);
-  console.log(
-    `plain WebGPU ${query.size ? `(${query}) ` : ''}on ${gpu}: ${frames} frames, ${bad.length} differ from frame 0`,
-  );
-  for (const r of bad.slice(0, 5))
+  } else {
+    const context = await browser.newContext(),
+      page = await context.newPage();
+    page.on('pageerror', (e) => console.error(`  pageerror: ${e.message}`));
+    await page.goto(`${origin}/scripts/support/msaa-blend-repeat.html?${query}`);
+    await page.waitForFunction('window.reproReady === true', null, { timeout: 60_000 });
+    const { gpu, rows } = await page.evaluate((n) => window.repeatFrames(n), frames);
+    await context.close();
+    const bad = rows.filter((r) => r.after || r.resolved);
     console.log(
-      `  frame ${r.frame}: samples before the blended pass ${r.before}, after it ${r.after}, resolved texels ${r.resolved}; ${r.example}`,
+      `plain WebGPU ${query.size ? `(${query}) ` : ''}on ${gpu}: ${frames} frames, ${bad.length} differ from frame 0`,
     );
-  if (bad.length) failed = true;
-  if (rows.some((r) => r.before))
-    console.log('  (the opaque pass differs too: the blended pass is not the only cause here)');
+    for (const r of bad.slice(0, 5))
+      console.log(
+        `  frame ${r.frame}: samples before the blended pass ${r.before}, after it ${r.after}, resolved texels ${r.resolved}; ${r.example}`,
+      );
+    if (bad.length) failed = true;
+    if (rows.some((r) => r.before))
+      console.log('  (the opaque pass differs too: the blended pass is not the only cause here)');
 
-  for (const model of models) {
-    const shots = [];
-    for (let i = 0; i < captures; i++) {
-      const c = await browser.newContext({ viewport: { width: 640, height: 480 }, reducedMotion: 'reduce' }),
-        p = await c.newPage();
-      await p.goto(`${origin}/examples/khronos-gallery.html?model=${model}`);
-      await p.waitForFunction("document.body.dataset.ready==='true'", null, { timeout: 120_000 });
-      const shot = () => p.screenshot({ animations: 'disabled' });
-      let last = Buffer.alloc(0),
-        next = await shot();
-      for (let k = 0; k < 6 && !next.equals(last); k++) {
-        await p.waitForTimeout(500); // fixed-wait: retakes the shot until two in a row match, as scripts/visual-compat.mjs
-        [last, next] = [next, await shot()];
+    for (const model of models) {
+      const shots = [];
+      for (let i = 0; i < captures; i++) {
+        const c = await browser.newContext({ viewport: { width: 640, height: 480 }, reducedMotion: 'reduce' }),
+          p = await c.newPage();
+        await p.goto(`${origin}/examples/khronos-gallery.html?model=${model}`);
+        await p.waitForFunction("document.body.dataset.ready==='true'", null, { timeout: 120_000 });
+        const shot = () => p.screenshot({ animations: 'disabled' });
+        let last = Buffer.alloc(0),
+          next = await shot();
+        for (let k = 0; k < 6 && !next.equals(last); k++) {
+          await p.waitForTimeout(500); // fixed-wait: retakes the shot until two in a row match, as scripts/visual-compat.mjs
+          [last, next] = [next, await shot()];
+        }
+        shots.push(await decodePNG(next));
+        await c.close();
       }
-      shots.push(await decodePNG(next));
-      await c.close();
+      const counts = shots.slice(1).map((b) => {
+        const a = shots[0];
+        let n = 0;
+        for (let k = 0; k < a.data.length; k += 4)
+          if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) n++;
+        return n;
+      });
+      console.log(`Khronos ${model}: captures 2..${captures} differ from capture 1 on ${counts.join(', ')} pixels`);
+      if (counts.some(Boolean)) failed = true;
     }
-    const counts = shots.slice(1).map((b) => {
-      const a = shots[0];
-      let n = 0;
-      for (let k = 0; k < a.data.length; k += 4)
-        if (a.data[k] !== b.data[k] || a.data[k + 1] !== b.data[k + 1] || a.data[k + 2] !== b.data[k + 2]) n++;
-      return n;
-    });
-    console.log(`Khronos ${model}: captures 2..${captures} differ from capture 1 on ${counts.join(', ')} pixels`);
-    if (counts.some(Boolean)) failed = true;
   }
 } finally {
   await closeAll({ browser, servers: [server] });
 }
-process.exit(failed ? 1 : 0);
+process.exitCode = failed ? 1 : 0;

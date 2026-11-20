@@ -1,4 +1,4 @@
-// GPU-only half of kit-install-check. Preparation holds no GPU slot.
+// GPU-only half of kit-install-check.
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -12,7 +12,7 @@ const report = JSON.parse(readFileSync(join(RESULTS, 'report.json'), 'utf8'));
 const browser = await launchBrowser(), frames = [];
 try {
   for (const row of report.cases) {
-    const variants = ['dist', ...(['game', 'web', 'viz', 'react-kit'].includes(row.name) ? ['dist-compat'] : [])];
+    const variants = ['dist', ...(['game', 'kit-web', 'kit-viz', 'kit-react'].includes(row.name) ? ['dist-compat'] : [])];
     for (const variant of variants) {
       const server = await preview({ root: row.app, configFile: false, logLevel: 'error',
         build: { outDir: variant }, preview: { host: '127.0.0.1', port: 0, strictPort: false } });

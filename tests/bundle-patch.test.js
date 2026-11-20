@@ -15,11 +15,11 @@ test('a pattern is counted over every chunk of a load', () => {
   assert.throws(() => assertPatchedOnce('none', pairs, new Map()), /must match the build once/);
 });
 
-test('tint-pass-gpu routes every gltf-pro dist chunk and its patterns match the built package once', () => {
+test('tint-pass-gpu routes every gltf/pbr dist chunk and its patterns match the built package once', () => {
   const script = readFileSync(new URL('../examples/package-benchmarks/tint-pass-gpu.mjs', import.meta.url), 'utf8');
-  assert.match(script, /packages\/gltf-pro\/dist\/\*\.js\*/);
+  assert.match(script, /packages\/gltf\/dist\/\*\.js\*/);
   assert.match(script, /assertPatchedOnce\(/);
-  const dist = new URL('../packages/gltf-pro/dist/', import.meta.url);
+  const dist = new URL('../packages/gltf/dist/', import.meta.url);
   const chunks = readdirSync(dist).filter((n) => n.endsWith('.js')); // built by npm run build:packages
   const all = chunks.map((n) => readFileSync(new URL(n, dist), 'utf8')).join('\n');
   assert.equal(all.match(/=([\w$]+)=>!!\1\.attenuation&&!\1\.shading/g)?.length, 1);

@@ -59,7 +59,10 @@ export class SpriteLayer implements EnginePlugin {
     remove(sprite: Sprite): boolean;
     clearSprites(): void;
     setAtlas(atlas: SpriteAtlas | readonly SpriteAtlas[]): void;
+    setTarget(target: SpriteTarget | undefined): void;
+    setNormals(normals: SpriteNormals): void;
     setup(engine: Engine): void;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
     dispose(): void;

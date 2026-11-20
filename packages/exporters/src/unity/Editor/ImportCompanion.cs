@@ -71,8 +71,16 @@ namespace MargoMesh.Unity.Editor {
         public static async Task<bool> GenerateAsync(string sourcePath, CancellationToken cancellationToken = default) {
             if (!ImportProfile.IsSourcePath(sourcePath) || !generating.Add(sourcePath))
                 return false;
-            var run = new Generation(sourcePath, cancellationToken);
-            cancellation.Add(sourcePath, run.linked);
+            Generation run = null;
+            try {
+                run = new Generation(sourcePath, cancellationToken);
+                cancellation.Add(sourcePath, run.linked);
+            } catch {
+                // Setup failed before the try below owns cleanup: release the path so a later import may run.
+                run?.linked.Dispose();
+                generating.Remove(sourcePath);
+                throw;
+            }
             try {
                 // Strict order: validate everything, import in isolation, write owned output, release
                 // temporaries, then verify the saved result before the report may say ready.

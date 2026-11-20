@@ -1,6 +1,6 @@
-// GPU cost of gltf-pro's native glass tint draw (AC power, after npm run build:packages, GPU alone):
-//   node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/tint-pass-gpu.mjs
-// The same page and scene run three ways, by patching the served gltf-pro build. The repository's code is not changed.
+// GPU cost of gltf/pbr's native glass tint draw (AC power, after npm run build:packages, GPU alone):
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/tint-pass-gpu.mjs
+// The same page and scene run three ways, by patching the served gltf/pbr build. The repository's code is not changed.
 //   surface   what ships: the tint draw reads the material's maps (surfaceTintPBR).
 //   constant  the tint draw reads factors only (margoTintShare), as it did before a1f778bdc. Wrong for mapped glass; it
 //             is here to price that fix.
@@ -26,7 +26,7 @@ const ROUNDS = Number(process.env.TINT_ROUNDS ?? 5),
     [1920, 1080],
   ],
   SCENES = ['factors', 'four', 'eight'].flatMap((material) => [1, 4, 16].map((layers) => ({ material, layers })));
-// Each pattern must match the built gltf-pro exactly once per page load, in whichever dist chunk holds it.
+// Each pattern must match the built gltf/pbr exactly once per page load, in whichever dist chunk holds it.
 const patches = {
   surface: [],
   constant: [[/=([\w$]+)=>!!\1\.attenuation&&!\1\.shading/g, '=$1=>!1']],
@@ -63,7 +63,7 @@ page.on('console', (m) => {
 });
 let arm = 'surface';
 const matched = new Map();
-await page.route('**/packages/gltf-pro/dist/*.js*', async (route) => {
+await page.route('**/packages/gltf/dist/*.js*', async (route) => {
   const response = await route.fetch();
   await route.fulfill({ response, body: patchChunk(await response.text(), patches[arm], matched) });
 });

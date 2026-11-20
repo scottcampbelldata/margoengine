@@ -315,7 +315,7 @@ belong. `ligatures: true` does the same for Latin words. Each text reads in the 
 
 ## Mouse, touch, keyboard and gamepad
 
-`UiRenderer.attach(engine, ui)` connects the engine's canvas for you (`{ input: false }` turns that off). Everything works
+`UiRenderer.attach(engine, ui)` connects the engine's canvas for you (`{ input: false }` turns that off; a headless canvas in Node has no pointer events, so it is left out and the UI only draws). Everything works
 with every device:
 
 | Input | What it does |
@@ -372,7 +372,7 @@ The interface is usable without a mouse, without sight and without colour vision
 
 - **Keyboard and gamepad:** every control can be reached and operated, the focus ring is always visible when the keyboard
   or gamepad moves focus, and a dialog traps focus. Tab never traps the keyboard: past the last widget it returns to the page.
-- **Screen readers:** `UiRenderer` also attaches a hidden DOM mirror (`attachMirror`) next to the canvas. It holds real
+- **Screen readers:** `UiRenderer` also attaches a hidden DOM mirror (`attachMirror`) next to the canvas (not on a headless canvas, which has no document). It holds real
   buttons, switches, range inputs, progress bars, listboxes, dialogs and text, laid over the widgets so touch exploration
   works, and it shares focus with the canvas: Tab or a screen reader moving to an element focuses its widget, and moving focus
   in the UI moves DOM focus so the reader announces it. Everything behind an open dialog is `inert`.
@@ -626,3 +626,7 @@ The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl
 Screen `UiRenderer` keeps its real preview renderer. `WorldPanels` requires a complete tier.
 
 `GlWorldPanels` (`@margoengine/ui/world-gl`) is a reviewed preview route in `scripts/check-preview-contract.mjs` (2026-11-10, 2 `backend` tests): on the small WebGL2 preview it draws world panels with raw WebGL2, on WebGPU it defers to `WorldPanels`. Pixel evidence: `tests/world-gl-browser.js`, run by `npm run test:browser:world-gl` (8 checks each for plane, cylinder and sphere on the preview, 7 each on WebGPU, also under `MARGO_COMPAT=1`). Unit evidence: `tests/world-gl.test.js`. No behaviour changed; the missing row kept `npm run verify` red.
+
+## Film time
+
+`UiRenderer.advanceTime(delta)` runs `ui.update(delta)` (transitions, toasts, tooltips, the caret blink) without drawing; the frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays the overlay's timing.

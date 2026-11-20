@@ -5,6 +5,9 @@ import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extens
 import { fullscreen, render } from '../../shared/gpu.js';
 import { neutralShader } from '../../shared/display.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
+import { ownStack, type OwnStack } from './own-stack.js';
+import { ShaderClock } from './clock.js';
+import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import {
   Node,
   Program,
@@ -53,6 +56,11 @@ export function inputDepth(coord?: NodeInput<'vec2f'>): Node<'f32'> {
   });
 }
 let passes = 0;
+/** Options for `NodePass.attach(engine, node, options)`. */
+export interface NodePassAttachOptions extends NodePassOptions {
+  /** Aborts the attach while `@margoengine/post` loads; the pass is then disposed and nothing attaches. */
+  signal?: AbortSignal;
+}
 /** Options for `new NodePass(node, options)`. */
 export interface NodePassOptions {
   /**
@@ -63,7 +71,10 @@ export interface NodePassOptions {
   /** Plugin and debug name. Default `'shader:pass:<n>'` (n counts passes). */
   name?: string;
 }
-/** A full-screen effect written as one node, run by `@margoengine/post`'s PostStack: `PostStack.attach(engine, [new Tonemap(), pass])`. */
+/**
+ * A full-screen effect written as one node, run by `@margoengine/post`'s PostStack: `PostStack.attach(engine, [new Tonemap(), pass])`,
+ * or alone in a stack of its own with `await NodePass.attach(engine, node)`.
+ */
 export class NodePass implements EnginePlugin {
   readonly name: string;
   readonly kind: 'hdr' | 'ldr';
@@ -72,6 +83,7 @@ export class NodePass implements EnginePlugin {
   private readonly value: string;
   private host?: StackHost;
   private engine?: Engine;
+  private stack?: OwnStack;
   private disposed = false;
   private format?: GPUTextureFormat;
   private samples?: number;
@@ -84,11 +96,23 @@ export class NodePass implements EnginePlugin {
   private sampler?: GPUSampler;
   private depthTexture?: GPUTexture;
   private depthView?: GPUTextureView;
-  /** Same as `engine.use(new NodePass(...))`; returns the NodePass. */
-  static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassOptions): NodePass {
-    const value = new NodePass(node, options);
-    engine.use(value);
-    return value;
+  /**
+   * Adds a new NodePass to the PostStack of the engine's scene, after the last effect of its kind, or runs it in a new
+   * PostStack when the scene has none (loads `@margoengine/post` when called). Disposing the pass removes it from that
+   * stack, and a stack made for it goes with it. `PostStack.join(engine, new NodePass(node), index)` places it yourself.
+   * @throws MargoError `'unsupported'` on a WebGL engine; the stack's errors (a repeated name, an HDR pass on the LDR
+   * tier); the signal's reason when aborted before the pass attaches.
+   */
+  static async attach(
+    engine: EngineKernel,
+    node: Node<'vec3f' | 'vec4f'>,
+    options: NodePassAttachOptions = {},
+  ): Promise<NodePass> {
+    const { signal, ...rest } = options;
+    signal?.throwIfAborted();
+    const pass = new NodePass(node, rest);
+    pass.stack = await ownStack(engine, pass, signal);
+    return pass;
   }
   constructor(
     readonly node: Node<'vec3f' | 'vec4f'>,
@@ -127,6 +151,7 @@ export class NodePass implements EnginePlugin {
     if (!engine.gpu)
       throw new MargoError('unsupported', 'NodePass requires WebGPU; use a WebGPU engine');
     this.engine = engine;
+    ShaderClock.hold(engine, this);
   }
   registerPasses(): void {}
   private render(c: Context, view: GPUTextureView, output: StageOutput): void {
@@ -148,6 +173,7 @@ export class NodePass implements EnginePlugin {
     const entries = this.program.entries(device, {
       width: c.width,
       height: c.height,
+      time: ShaderClock.find(this.engine)?.time ?? 0,
       delta: c.delta,
       input: view,
       sampler: this.sampler,
@@ -160,7 +186,10 @@ export class NodePass implements EnginePlugin {
         : undefined;
     }
     this.attachment.view = output.view;
+    // In a view of a multi-view frame: draw inside the view and keep the views drawn before it.
+    this.attachment.loadOp = viewLoadOp(c);
     const pass = c.encoder.beginRenderPass(this.descriptor);
+    applyView(pass, c);
     pass.setPipeline(this.pipeline!);
     if (this.group) pass.setBindGroup(0, this.group);
     pass.draw(3);
@@ -172,10 +201,15 @@ export class NodePass implements EnginePlugin {
     this.encoded = false;
     this.sampler = this.group = this.pipeline = this.depthTexture = this.depthView = undefined;
   }
+  /** Removes the pass, from the PostStack {@link NodePass.attach} joined too; safe to call twice. */
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
-    const engine = this.engine;
-    this.engine = undefined;
+    const engine = this.engine,
+      stack = this.stack;
+    this.engine = this.stack = undefined;
+    stack?.removeEffect(this);
+    ShaderClock.release(engine, this);
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.onDeviceRestored();
   }

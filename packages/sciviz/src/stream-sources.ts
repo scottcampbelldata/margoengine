@@ -236,6 +236,18 @@ async function* responseChunks(response: Response): AsyncGenerator<Uint8Array> {
 const checkResponse = (r: Response) => {
   if (!r.ok) throw fault('failed', `HTTP ${r.status}; check the live source endpoint`, 'sciviz');
 };
+// Fetch "extract a MIME type": the last comma-separated value that parses as type/subtype (MIME Sniffing: HTTP
+// whitespace may follow the subtype before its parameters) and is not */*, lower-cased.
+const token = "[!#$%&'*+.^_`|~0-9A-Za-z-]+",
+  mime = new RegExp(`^[\\t\\n\\r ]*(${token}/${token})[\\t\\n\\r ]*(?:;|$)`);
+const essence = (value: string) => {
+  let found = '';
+  for (const part of value.split(',')) {
+    const type = mime.exec(part)?.[1].toLowerCase();
+    if (type && type !== '*/*') found = type;
+  }
+  return found;
+};
 /** Fetch SSE with natural stream backpressure. Cancels fetch on abort or early iteration return. HTTP and parse errors propagate. */
 export async function* eventSource<T = unknown>(
   url: string | URL,
@@ -254,7 +266,7 @@ export async function* eventSource<T = unknown>(
     });
     checkResponse(response);
     if (response.status === 204) return;
-    if (!/^text\/event-stream(?:;|$)/i.test(response.headers.get('content-type') ?? ''))
+    if (essence(response.headers.get('content-type') ?? '') !== 'text/event-stream')
       throw fault('failed', 'Serve SSE with Content-Type text/event-stream', 'sciviz');
     yield* parseServerEvents(responseChunks(response), { ...options, signal });
   } finally {

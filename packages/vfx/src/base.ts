@@ -28,6 +28,8 @@ declare const GPUBufferUsage: {
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** The largest capacity the constructor accepts: 65,535 workgroups of 256 slots (the WebGPU default dispatch limit). */
 const MAX_CAPACITY = 65_535 * 256;
+/** The largest `intensity`: the largest finite half float, the HDR scene target's format. */
+const MAX_INTENSITY = 65_504;
 /** The largest capacity a device holds: 64-byte slots in one storage binding and one buffer, 256 slots a workgroup. */
 function deviceCapacity(limits: GPUSupportedLimits): number {
   return Math.min(
@@ -79,11 +81,21 @@ export interface VFXOptions {
   turbulence?: number;
   /** Spatial frequency of the curl field, per world unit, >= 0. Default 1. */
   frequency?: number;
+  /**
+   * The wind: `[x, z]` in metres per second, or anything with `sample(x, y, z, t)` returning `[x, y, z]` (a
+   * `WindField` of `@margoengine/weather` fits), read each frame at the emitter's position. Each particle's horizontal
+   * velocity relaxes toward the wind with a time constant of 0.25 s (the drag of a parcel of air that moves with the
+   * wind; Crowe et al., Multiphase Flows with Droplets and Particles, 2nd ed., CRC 2011, eq. 1.5), so smoke that rises
+   * at speed w in a wind U leans atan(U / w) from the vertical. The vertical velocity is left to gravity and the launch.
+   * Each component is limited to 1,000 m/s. Default undefined, and `[0, 0]`, give no wind force. Change it between
+   * frames with `setWind`.
+   */
+  wind?: VFXWind;
   /** Billboard spin in radians per second (each particle gets a random birth angle). Default 0. */
   angularVelocity?: number;
   /** Half extents of the box births are spread over, around `position`, each >= 0. Default [0, 0, 0] (a point). */
   emissionExtent?: Vec3;
-  /** RGB multiplier for HDR emission, 0-16. Default 1. */
+  /** RGB multiplier for HDR emission, 0 to 65,504 (the largest half float). Default 1. */
   intensity?: number;
   /** Up to 64 spheres/boxes that the flow bends around and particles bounce off. Contents are read each frame; pass an array (even `[]`) before attaching. */
   obstacles?: readonly VFXObstacle[];
@@ -140,7 +152,7 @@ export interface VFXOptions {
   nodes?: VFXNodes;
 }
 /**
- * What the skinned emitter reads of a primitive: an entry of `model.primitives` from `@margoengine/gltf-pro`, with a
+ * What the skinned emitter reads of a primitive: an entry of `model.primitives` from `@margoengine/gltf/pbr`, with a
  * deformer such as `Animation` from `@margoengine/animation` attached.
  */
 export interface VFXSkinnedPrimitive {
@@ -200,6 +212,38 @@ export interface VFXShadows {
   /** The light list on the GPU (a header, then up to 64 lights). Set by the feature at attach. */
   buffer?: GPUBuffer;
 }
+/** The wind of a particle effect: `[x, z]` in m/s, or a field sampled at the emitter. */
+export type VFXWind =
+  | readonly [number, number]
+  | { sample(x: number, y: number, z: number, t: number): readonly number[] };
+const halfView = new Float32Array(1);
+const halfBits = new Uint32Array(halfView.buffer);
+/** The IEEE half float bits of `value` (round to nearest; `value` is finite and under 65,504 in magnitude). */
+function toHalf(value: number): number {
+  halfView[0] = value;
+  const x = halfBits[0],
+    sign = (x >>> 16) & 0x8000,
+    exponent = ((x >>> 23) & 0xff) - 112;
+  let mantissa = x & 0x7fffff;
+  if (exponent <= 0) {
+    if (exponent < -10) return sign;
+    mantissa = (mantissa | 0x800000) >> (1 - exponent);
+    return sign | ((mantissa + 0x1000) >> 13);
+  }
+  return sign | ((exponent << 10) + ((mantissa + 0x1000) >> 13));
+}
+/** The two wind components as the two half floats the simulation unpacks (0 for no wind). */
+function packWind(x: number, z: number): number {
+  return ((toHalf(z) << 16) | toHalf(x)) >>> 0;
+}
+const windPair = (wind: VFXWind, at: Vec3, time: number): [number, number] => {
+  const v = 'sample' in wind ? wind.sample(at[0], at[1], at[2], time) : wind;
+  const x = v[0],
+    z = 'sample' in wind ? v[2] : v[1];
+  if (!(Math.abs(x) <= 1000 && Math.abs(z) <= 1000))
+    throw new RangeError('VFX wind must give finite x and z of at most 1,000 m/s; check the wind option.');
+  return [x, z];
+};
 /** One operator in a particle update graph. `force` and `drag` add acceleration and have no output. */
 export interface VFXNode {
   op:
@@ -307,6 +351,13 @@ export interface VFXLit {
   wrap?: number;
   /** Ambient light, linear RGB, each 0..16. Default the engine's: `lighting.radiance[3]` times `lighting.ambient`. */
   ambient?: readonly [number, number, number];
+  /**
+   * A fire's glow on the particles, read every frame: a point source radiating `power` watts at `position`, softened
+   * over `radius` metres (default 1), of `color` (default `GLOW_COLOR`, a flame's orange). Its irradiance
+   * P / (4 pi (d^2 + r^2)) lights a particle as the sun at intensity pi lights it with 1,000 W/m^2, so smoke over a fire
+   * is lit orange from below, by night with no other light. Default none.
+   */
+  glow?: { position: readonly [number, number, number]; power: number; radius?: number; color?: readonly [number, number, number] };
 }
 /**
  * Sub-emitters: a particle that dies (`on: 'death'`), or meets the ground faster than `speed` (`on: 'collision'`),
@@ -466,6 +517,12 @@ export interface VFXState {
   stats: { drawCalls: number };
   /** The engine the effect is attached to (its `lighting` is read every frame by `lit`). */
   engine: Engine;
+  /**
+   * Spin added where the angle is drawn, set by `overLife` at attach: WGSL declaring `fn drawnSpin(life:f32,left:f32)->f32`
+   * (radians the spin curve turned a particle of initial life `life` with `left` seconds left) and the bind group entry
+   * it reads. A feature with its own draw (`mesh`) reads it when it builds its pipeline.
+   */
+  spin?: { code: string; entry: GPUBindGroupEntry };
 }
 
 /** The GPU side of an added feature, made at attach and again after device restoration. */
@@ -482,6 +539,8 @@ export interface VFXRuntime {
   write?(c: Context): void;
   /** Extra dispatches at the end of the simulation pass. */
   run?(pass: GPUComputePassEncoder): void;
+  /** The sub-emitter event list (`events`): on the WebGL2 route the route lists the events into it and `run` is skipped. */
+  eventList?: GPUBuffer;
   /** Its own draw, after the billboards. */
   draw?(c: Context): void;
   /** True while the billboards are not drawn: the feature draws the particles itself. */
@@ -526,6 +585,13 @@ const extensions = [
 ] as const;
 /** One compute dispatch of the slot-order passes. */
 type Step = [GPUComputePipeline, GPUBindGroup];
+/** One simulation step's counters, worked out on the CPU by `advanceTime` and uploaded by the simulate pass. */
+interface Tick {
+  delta: number;
+  time: number;
+  budget: number;
+  frame: number;
+}
 /**
  * The optional parts of a particle effect. Pass the exports of the feature entries, for example `{sort}` from
  * `@margoengine/vfx/sort`; the shapes are internal. Effects without a feature compile the same WGSL as before.
@@ -650,10 +716,22 @@ export class VFX implements EnginePlugin {
   private readonly values = new Float32Array(56);
   private readonly ints = new Uint32Array(this.values.buffer);
   private readonly view = new Float32Array(16);
-  private time = 0;
+  private seconds = 0;
   private remainder = 0;
   private frames = 0;
   private burstCount = 0;
+  /** This frame's step, set by `advanceTime` and taken by the simulate pass (once, however many views draw). */
+  private readonly tick: Tick = { delta: 0, time: 0, budget: 0, frame: 0 };
+  /** The 0 s step of a simulate pass that has no counted step: a second view of a frame, or a pass with no update. */
+  private readonly still: Tick = { delta: 0, time: 0, budget: 0, frame: 0 };
+  private ticked = false;
+  /** A frame update reached the effect once; until then each simulate pass counts its own step from the frame delta. */
+  private clocked = false;
+  /** Prewarm steps a runtime asked for in `advanceTime`, simulated before the frame's step. */
+  private warm: Tick[] = [];
+  /** Steps taken while the WebGL2 route is still loading, run in order when it resolves (KB-VFX-EMBERCPU1). */
+  private held: Tick[] = [];
+  private routeLoading = false;
   private disposed = false;
   constructor(
     readonly options: VFXOptions = {},
@@ -688,8 +766,10 @@ export class VFX implements EnginePlugin {
         if (o.emissionExtent[i] < 0)
           throw new RangeError('Emission extent must be nonnegative; pass half-sizes of 0 or more.');
     }
-    if (!Number.isFinite(o.intensity ?? 1) || (o.intensity ?? 1) < 0 || (o.intensity ?? 1) > 16)
-      throw new RangeError('Particle intensity must be between 0 and 16; pass a value in range.');
+    // Up to the half-float maximum of the HDR target the billboards draw into: a fire's flames as bright as the light
+    // they give (`@margoengine/vfx/fire`, about 59) passed the old cap of 16 (KB-FIRE-RECEIVER1).
+    if (!Number.isFinite(o.intensity ?? 1) || (o.intensity ?? 1) < 0 || (o.intensity ?? 1) > MAX_INTENSITY)
+      throw new RangeError('Particle intensity must be between 0 and 65,504; pass a value in range.');
     if (
       !Number.isInteger(this.capacity) ||
       this.capacity < 1 ||
@@ -710,6 +790,11 @@ export class VFX implements EnginePlugin {
       const v = i === 0 ? (o.spread ?? 1) : i === 1 ? (o.turbulence ?? 0.5) : (o.frequency ?? 1);
       if (!Number.isFinite(Math.fround(v)) || v < 0)
         throw new RangeError('VFX spread, turbulence and frequency must be 0 or more; check the options.');
+    }
+    if (o.wind !== undefined) {
+      if (typeof o.wind !== 'object' || o.wind === null || (!('sample' in o.wind) && !Array.isArray(o.wind)))
+        throw new TypeError('VFX wind must be [x, z] in m/s or an object with sample(x, y, z, t); check the wind option.');
+      if (!('sample' in o.wind)) windPair(o.wind, defaultPosition, 0);
     }
     finiteVector(o.position ?? defaultPosition, 3, 'Emitter position');
     finiteVector(o.velocity ?? defaultVelocity, 3, 'Emitter velocity');
@@ -784,8 +869,13 @@ export class VFX implements EnginePlugin {
     this.fogSource = checkFog(fog);
     return this;
   }
+  /**
+   * Queues `count` births for the next frame, on top of `rate`.
+   * @throws RangeError when `count` is not a whole number from 0 to capacity; MargoError `'disposed'` after `dispose()`.
+   */
   burst(count: number): this {
-    if (this.disposed || !Number.isInteger(count) || count < 0 || count > this.capacity)
+    if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to burst it');
+    if (!Number.isInteger(count) || count < 0 || count > this.capacity)
       throw new RangeError('Particle burst must be a whole number up to capacity; pass a smaller count.');
     this.burstCount = Math.min(this.capacity, this.burstCount + count);
     return this;
@@ -797,7 +887,10 @@ export class VFX implements EnginePlugin {
    */
   reset(): this {
     if (this.disposed) throw new MargoError('disposed', 'VFX is disposed; attach a new VFX to reset it');
-    this.time = this.remainder = this.frames = this.burstCount = 0;
+    this.seconds = this.remainder = this.frames = this.burstCount = 0;
+    this.ticked = false;
+    this.warm = [];
+    this.held.length = 0;
     // Before attachment there is nothing to clear, and attaching adds initialCount itself.
     if (!this.device) return this;
     this.burstCount = this.options.initialCount ?? 0;
@@ -806,6 +899,21 @@ export class VFX implements EnginePlugin {
     for (const buffer of [this.indirect!, this.visible!])
       this.device.queue.writeBuffer(buffer, 0, new Uint32Array([3, 0, 0, 0, 0]));
     for (const r of this.runtimes) r.reset?.();
+    return this;
+  }
+  /**
+   * Sets the wind (see {@link VFXOptions.wind}); undefined or [0, 0] turns the wind force off. Takes effect on the next frame.
+   * @throws TypeError, RangeError for a wind that is not [x, z] or a sampler, or is out of range; the old wind stays.
+   */
+  setWind(wind: VFXWind | undefined): this {
+    const was = this.options.wind;
+    this.options.wind = wind;
+    try {
+      this.validate();
+    } catch (error) {
+      this.options.wind = was;
+      throw error;
+    }
     return this;
   }
   setup(engine: Engine): void {
@@ -893,28 +1001,22 @@ export class VFX implements EnginePlugin {
           }),
         ];
       };
+    // One state for every feature, so what one sets at attach (overLife's spin) reaches another's draw (mesh).
+    const state: VFXState = {
+      device: this.device!,
+      capacity: this.capacity,
+      uniform: u,
+      particles: this.particles!,
+      alive: this.alive!,
+      visible: this.visible!,
+      indirect: this.indirect!,
+      module,
+      options: o,
+      stats: this.engine!.stats,
+      engine: this.engine!,
+    };
     this.runtimes = added.flatMap(([feature, value]) =>
-      feature.create
-        ? [
-            feature.create(
-              {
-                device: this.device!,
-                capacity: this.capacity,
-                uniform: u,
-                particles: this.particles!,
-                alive: this.alive!,
-                visible: this.visible!,
-                indirect: this.indirect!,
-                module,
-                options: o,
-                stats: this.engine!.stats,
-                engine: this.engine!,
-              },
-              value,
-              this.owned,
-            ),
-          ]
-        : [],
+      feature.create ? [feature.create(state, value, this.owned)] : [],
     );
     const computeEntries = this.runtimes.flatMap((r) => r.compute ?? []);
     [this.simulation, this.computeGroup] = step(
@@ -947,8 +1049,12 @@ export class VFX implements EnginePlugin {
       );
     if (this.sprite) this.spriteEntries = f.texture!.create(this.device, this.sprite, this.owned);
     this.burst(this.options.initialCount ?? 0);
-    const particles = this.particles;
-    loadCompatRoute(this.device, () => import('./compat.js'))?.then((compat) => {
+    const particles = this.particles,
+      loading = loadCompatRoute(this.device, () => import('./compat.js'));
+    // Until the route resolves, the layer runs the WebGPU kernels of every step on its CPU tier (a prewarm of 600 steps
+    // took 95 s over the ember effects of one FireFront), so the steps of an effect with a prewarm wait for the route.
+    if (loading) this.routeLoading = true;
+    loading?.then((compat) => {
       if (this.particles !== particles) return;
       this.route = {
         kernels: new compat.SimulationRoute(
@@ -961,6 +1067,7 @@ export class VFX implements EnginePlugin {
             alive: this.alive!,
             indirect: this.indirect!,
             visible: this.visible!,
+            events: this.runtimes.find((r) => r.eventList)?.eventList,
           },
           [
             ...(o.obstacles ? [{ binding: 6, resource: { buffer: this.extra! } }] : []),
@@ -974,6 +1081,8 @@ export class VFX implements EnginePlugin {
       };
       this.renders.clear();
       this.renderGroups.clear();
+    }).finally(() => {
+      if (this.particles === particles) this.routeLoading = false;
     });
   }
   registerPasses(graph: FrameGraph): void {
@@ -992,24 +1101,100 @@ export class VFX implements EnginePlugin {
       },
     });
   }
-  private simulate(c: Context): void {
-    for (const runtime of this.runtimes)
-      runtime.warmup?.((delta) => {
-        const encoder = c.device.createCommandEncoder();
-        this.simulateStep({ ...c, delta, encoder });
-        c.device.queue.submit([encoder.finish()]);
-      });
-    this.simulateStep(c);
+  /** Seconds on the effect's clock: the sum of its frame deltas since it started or since `reset()`. */
+  get time(): number {
+    return this.seconds;
   }
-  private simulateStep(c: Context): void {
+  /**
+   * Moves the effect's clock by `delta` seconds: the time, the birth remainder, the step number that seeds births, the
+   * queued bursts and the `schedule` cursor, which its frame update runs before the simulate pass draws. With no draw
+   * (a seek from `@margoengine/cutscene/seek`, or a hidden view) the counters move and no particle is simulated, so the
+   * next drawn frame births what a continuous run births there; the particles alive then come from the scene's prewarm.
+   * A `delta` of 0 is the same instant drawn again (a Reflector, Refractor or CubeCamera capture renders the scene with
+   * one inside the frame) and counts nothing: a pass drawn after it takes the 0 s step a second view takes
+   * (KB-FILM-TAAPHASE1).
+   */
+  advanceTime(delta: number): void {
+    if (this.disposed) return;
     this.validate();
+    if (!(delta > 0)) {
+      this.clocked = true;
+      return;
+    }
+    // A step the pass did not take (nothing drew it) is dropped, as its particles are.
+    this.warm.length = 0;
+    for (const runtime of this.runtimes) runtime.warmup?.((step) => this.warm.push(this.countStep(step, {} as Tick)));
+    this.countStep(delta, this.tick);
+    this.ticked = this.clocked = true;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+  /** One step's counters on the CPU: the same arithmetic for a live frame, a prewarm step and a replayed step. */
+  private countStep(delta: number, into: Tick, still = false): Tick {
     const o = this.options;
-    this.time += c.delta;
-    const extraBirths = this.runtimes.reduce((sum, runtime) => sum + (runtime.emission?.(c.delta) ?? 0), 0);
-    const emissions = (o.rate ?? this.capacity / 2) * c.delta + this.remainder;
+    this.seconds += delta;
+    const extraBirths = this.runtimes.reduce((sum, runtime) => sum + (runtime.emission?.(delta) ?? 0), 0);
+    const emissions = (o.rate ?? this.capacity / 2) * delta + this.remainder;
     this.remainder = emissions % 1;
-    const budget = Math.min(this.capacity, Math.floor(emissions) + this.burstCount + extraBirths);
+    into.budget = Math.min(this.capacity, Math.floor(emissions) + this.burstCount + extraBirths);
     this.burstCount = 0;
+    into.delta = delta;
+    into.time = this.seconds;
+    // A 0 s step with no births seeds nothing, so it keeps the step number: a second view does not move a seek's seeds.
+    into.frame = still && !into.budget ? this.frames : this.frames++;
+    return into;
+  }
+  private simulate(c: Context): void {
+    this.validate();
+    if (!this.clocked) {
+      // No frame update reaches this effect (its passes are run directly): each pass counts its own step from the
+      // frame delta, prewarm included, as before the counters moved to advanceTime.
+      this.warm.length = 0;
+      for (const runtime of this.runtimes) runtime.warmup?.((step) => this.warm.push(this.countStep(step, {} as Tick)));
+      this.countStep(c.delta, this.tick);
+      this.ticked = true;
+    } else if (!this.ticked)
+      // The frame's step was taken by an earlier view: a 0 s step moves no particle but lists, culls and sorts them for
+      // this view's camera, and births a burst queued since the update.
+      this.countStep(0, this.still, true);
+    if (this.routeLoading && (this.warm.length || this.held.length)) {
+      // The route is on its way and a prewarm asks for hundreds of steps, which the layer would run on its CPU tier: keep
+      // this frame's steps (the prewarm and the live step, each as it was counted) and every later one until it loads,
+      // so they run in order. An effect with no prewarm keeps its WebGPU kernels until then, as `loadCompatRoute` says.
+      this.held.push(...this.warm);
+      this.warm.length = 0;
+      if (this.ticked) this.held.push({ ...this.tick });
+      else if (this.still.budget) this.held.push({ ...this.still });
+      this.ticked = false;
+      return;
+    }
+    if (this.held.length) {
+      this.warm.unshift(...this.held);
+      this.held.length = 0;
+    }
+    for (const tick of this.warm) {
+      const encoder = c.device.createCommandEncoder();
+      this.simulateStep({ ...c, delta: tick.delta, encoder }, tick);
+      c.device.queue.submit([encoder.finish()]);
+    }
+    this.warm.length = 0;
+    if (this.ticked) {
+      this.ticked = false;
+      this.simulateStep(c, this.tick);
+      return;
+    }
+    const delta = c.delta;
+    c.delta = 0;
+    try {
+      this.simulateStep(c, this.still);
+    } finally {
+      c.delta = delta;
+    }
+  }
+  private simulateStep(c: Context, tick: Tick): void {
+    const o = this.options,
+      budget = tick.budget;
     this.values.set(c.camera.matrix);
     viewMatrix(this.view, c.camera);
     for (let i = 0; i < 3; i++) {
@@ -1025,9 +1210,9 @@ export class VFX implements EnginePlugin {
       y = m[1] * m[20] + m[5] * m[21] + m[9] * m[22];
     m[23] = Math.sqrt(x * x + y * y) * c.height * 0.5;
     this.values.set(o.gravity ?? defaultGravity, 24);
-    this.values[27] = c.delta;
+    this.values[27] = tick.delta;
     this.values.set(o.position ?? defaultPosition, 28);
-    this.values[31] = this.time;
+    this.values[31] = tick.time;
     this.values.set(o.velocity ?? defaultVelocity, 32);
     this.values[35] = o.spread ?? 1;
     this.values.set(o.color ?? defaultColor, 36);
@@ -1043,7 +1228,11 @@ export class VFX implements EnginePlugin {
     this.values[51] = o.intensity ?? 1;
     this.ints[52] = this.capacity;
     this.ints[53] = budget;
-    this.ints[54] = this.frames++;
+    this.ints[54] = tick.frame;
+    if (o.wind) {
+      const [wx, wz] = windPair(o.wind, o.position ?? defaultPosition, tick.time);
+      this.ints[55] = packWind(wx, wz);
+    } else this.ints[55] = 0;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     if (this.extra) {
       const e = this.extraValues;
@@ -1077,7 +1266,7 @@ export class VFX implements EnginePlugin {
       step(compact, groups);
     }
     this.sorter?.run(pass);
-    for (const r of this.runtimes) r.run?.(pass);
+    for (const r of this.runtimes) if (!(this.route && r.eventList)) r.run?.(pass);
     pass.end();
   }
   /** The pipeline and group 0 of a draw into the frame, or with `hook` into its pass. */
@@ -1240,6 +1429,8 @@ export class VFX implements EnginePlugin {
     this.spriteEntries = [];
     this.curveRuntime = this.emitterRuntime = undefined;
     this.extra = this.sorter = this.route = undefined;
+    this.held.length = 0;
+    this.routeLoading = false;
     this.runtimes = [];
 
     this.uniform = this.particles = this.alive = this.indirect = this.visible = this.respawn = undefined;

@@ -32,12 +32,22 @@ test('a renderer set up before the first tile rebuilds its Frame once: layout, b
   const modules = log.filter((e) => e[0] === 'module').map((e) => e[2].code);
   assert.ok(modules.length >= 2);
   for (const code of modules) {
-    assert.equal(code.split('struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f,tile:vec4f}\nfn captureClip(').length, 2);
+    assert.equal(
+      code.split('struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f,tile:vec4f}\nfn captureClip(').length,
+      2,
+    );
     // Every vertex function crops its finished vertex, once, right before it returns.
-    assert.equal(code.match(/@vertex/g).length, code.match(/\n {2}o\.clip=captureClip\(o\.clip\);\n {2}return o;\n\}/g).length);
+    assert.equal(
+      code.match(/@vertex/g).length,
+      code.match(/\n {2}o\.clip=captureClip\(o\.clip\);\n {2}return o;\n\}/g).length,
+    );
   }
   assert.equal(log.filter((e) => e[0] === 'renderPipeline').length, 2, 'pipelines remade with the new layout');
-  assert.deepEqual(frame().filter((e) => e[0] === 'layout' || e[0] === 'module'), [], 'the rebuild happens once');
+  assert.deepEqual(
+    frame().filter((e) => e[0] === 'layout' || e[0] === 'module'),
+    [],
+    'the rebuild happens once',
+  );
   // Picking follows the Lines frame: its frame buffer and shaders take the tile row too.
   lines['engine'] = { canvas: { clientWidth: 64, width: 64 }, createMesh: () => ({ dispose() {} }) };
   const picking = LinePicking.attach({ addOverlay: () => () => {} }, lines),
@@ -76,7 +86,9 @@ test('capture frame uses the uncropped projection and full pixel density, with a
   assert.deepEqual([...captured.subarray(0, 16)], [...before.subarray(0, 16)]);
   assert.deepEqual([...captured.subarray(16, 19)], [256, 128, 4]);
   assert.equal(captured[21], 1);
-  assert.deepEqual([...captured.subarray(24)], [4, 2, 1, -1]);
+  // 2 over the viewport size, then the pixel offset from the image centre to the viewport centre: (256 - 128 - 64) / 2
+  // and (0 + 64 - 128) / 2. Every value is exact in float32.
+  assert.deepEqual([...captured.subarray(24)], [1 / 32, 1 / 32, 32, -32]);
   remove();
   remove();
   const after = frameUniform(frame());
@@ -90,13 +102,50 @@ test('invalid tile state rejects before publication, and an older remover cannot
   const { camera, lines, frame } = rig();
   lines.add(new Line({ positions: [0, 0, 0, 1, 1, 0] }));
   const tile = { matrix: camera.matrix, fullWidth: 256, fullHeight: 128, x: 64, y: 0, width: 64, height: 64 };
-  for (const change of [{ width: 0 }, { x: -1 }, { x: 240 }, { matrix: [] }, { fullHeight: Infinity }])
+  for (const change of [{ width: 0 }, { x: -1 }, { x: 256 }, { y: 128 }, { matrix: [] }, { fullHeight: Infinity }])
     assert.throws(() => setLineCameraTile(camera, { ...tile, ...change }), RangeError);
   const old = setLineCameraTile(camera, tile),
     current = setLineCameraTile(camera, { ...tile, x: 0 });
   old();
-  assert.equal(frameUniform(frame())[26], 3);
+  assert.equal(frameUniform(frame())[26], 96);
   current();
   assert.equal(frameUniform(frame())[21], 0);
+  lines.dispose();
+});
+
+// Apple Metal coloured 164 of 307,200 values 1 apart between 64 px tiles and one whole-image tile: the capture step
+// scaled the snapped vertex by tile over image size, which float32 rounds unless both are powers of two, so window
+// positions moved off the 1/256 pixel grid by different amounts per tile. Now every step is exact for a power-of-two
+// viewport, which a viewport may reach past the image's right and bottom edges to have.
+test('capture window positions of power-of-two viewports are the whole image pixels moved by whole pixels, exactly', () => {
+  const { camera, lines, frame } = rig();
+  lines.add(new Line({ positions: [0, 0, 0, 1, 1, 0] }));
+  const f = Math.fround,
+    fullWidth = 320,
+    fullHeight = 240;
+  // captureClip and the viewport transform in float32, for a snapped pixel (from the image centre, y up) and w = 1.
+  const window = ([sx, sy, ox, oy], [width, height], [px, py]) => [
+    f(f(f(f(px + ox) * sx) * f(width / 2)) + width / 2),
+    f(height / 2 - f(f(f(py + oy) * sy) * f(height / 2))),
+  ];
+  const whole = { matrix: camera.matrix, fullWidth, fullHeight, x: 0, y: 0, width: 512, height: 256 };
+  const remove = setLineCameraTile(camera, whole),
+    wholeRow = [...frameUniform(frame()).subarray(24)];
+  for (const [x, y] of [
+    [64, 0],
+    [256, 192],
+    [128, 64],
+  ]) {
+    setLineCameraTile(camera, { ...whole, x, y, width: 256, height: 256 });
+    const row = [...frameUniform(frame()).subarray(24)];
+    for (let i = 0; i < 2000; i++) {
+      // Grid points across the image and up to 2 image widths past its edges.
+      const pixel = [((i * 37.1234) % 1600) - 800, ((i * 0.731) % 1200) - 600].map((v) => Math.round(v * 256) / 256);
+      const [wx, wy] = window(wholeRow, [512, 256], pixel),
+        [tx, ty] = window(row, [256, 256], pixel);
+      assert.deepEqual([tx + x, ty + y], [wx, wy], `pixel ${pixel}`);
+    }
+  }
+  remove();
   lines.dispose();
 });

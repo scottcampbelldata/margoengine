@@ -15,7 +15,7 @@ class MissingHeap extends HeapWFC {
   }
 }
 const failed = (e) =>
-  e.name === 'MargoError' && e.code === 'failed' && /https:\/\/margoengine.com\/docs\/wfc/.test(e.message);
+  e.name === 'MargoError' && e.code === 'failed' && /https:\/\/margoengine.com\/llms\/packages\/wfc\.md/.test(e.message);
 
 test('network, body and local artifact failures have coded errors with the original cause', async (t) => {
   t.after(() => {

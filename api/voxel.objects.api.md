@@ -15,8 +15,9 @@ export type ObjectBlockSource = MeshHandle | {
 
 export class VoxelObjects {
     readonly world: VoxelWorld;
-    static attach(engine: EngineKernel, world: VoxelWorld): VoxelObjects;
-    constructor(engine: EngineKernel, world: VoxelWorld);
+    static attach(engine: EngineKernel, world: VoxelWorld, options?: VoxelObjectsOptions): VoxelObjects;
+    origin: VoxelOrigin | null;
+    constructor(engine: EngineKernel, world: VoxelWorld, options?: VoxelObjectsOptions);
     define(name: string, source: ObjectBlockSource, options?: ObjectBlockOptions): number;
     at(x: number, y: number, z: number): readonly MeshHandle[];
     get stats(): {
@@ -27,6 +28,10 @@ export class VoxelObjects {
     update(): void;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+export interface VoxelObjectsOptions {
+    origin?: VoxelOrigin | null;
 }
 
 export function objectState(id: number, turns?: number): number;
@@ -141,6 +146,10 @@ class VoxelChunk {
     get byteLength(): number;
     pack(): PackedChunk;
     static unpack(packed: PackedChunk): VoxelChunk;
+}
+
+interface VoxelOrigin {
+    readonly origin: ArrayLike<number>;
 }
 
 class VoxelWorld {

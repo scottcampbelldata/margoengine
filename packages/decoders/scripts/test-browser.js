@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { build, createServer, preview } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -46,7 +48,7 @@ assert.equal(
   `consumer build did not emit both Draco builds: ${emitted.join(', ')}`,
 );
 
-const server = await createServer({ configFile: config, logLevel: 'error', server: { port: 0 } });
+const server = await createServer({ plugins: [noFileWatcher()], configFile: config, logLevel: 'error', server: { port: 0 } });
 await server.listen();
 const productionServer = await preview({
   configFile: config,
@@ -63,6 +65,9 @@ try {
     args,
   });
   const page = await browser.newPage();
+  // A forced-compatibility run (MARGO_COMPAT=1) draws both pages on the WebGL2 layer, loaded from the dev server (it
+  // allows the production server's origin, another port on 127.0.0.1).
+  if (compatRun()) await page.addInitScript(compatShim, new URL(compatUrl(), server.resolvedUrls.local[0]).href);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {

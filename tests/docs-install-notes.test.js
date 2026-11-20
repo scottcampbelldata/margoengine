@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { documents } from '../scripts/docs-links.mjs';
-import { importMap } from '../scripts/umbrella.mjs';
+import { IMPORT_MAP_COUNT, importMap, umbrellaFiles } from '../scripts/umbrella.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -51,7 +51,19 @@ test('a page with a Margo install command says the packages are not published ye
 
 test('docs/guides/imports.md gives the import map its real entry count', () => {
   const count = Object.keys(importMap().imports).length;
-  const stated = /\(([\d,]+) of them\)/.exec(read('docs/guides/imports.md'));
+  const stated = IMPORT_MAP_COUNT.exec(read('docs/guides/imports.md'));
   assert.ok(stated, 'docs/guides/imports.md states how many entries the import map has');
-  assert.equal(Number(stated[1].replaceAll(',', '')), count, 'scripts/umbrella.mjs importMap() entry count');
+  assert.equal(
+    Number(stated[1].replaceAll(',', '')),
+    count,
+    'scripts/umbrella.mjs importMap() entry count; node scripts/umbrella.mjs writes it',
+  );
+});
+
+test('the import map entry count in docs/guides/imports.md is a generated figure (KB-DOCS-MAPCOUNT1)', () => {
+  // Lanes added entries and the hand-kept figure drifted (2,772 stated against 2,778, then 2,784). umbrellaFiles
+  // writes the guide with the rest of the generated files, from the same manifests importMap() reads.
+  const written = umbrellaFiles()['docs/guides/imports.md'];
+  assert.ok(written, 'scripts/umbrella.mjs writes docs/guides/imports.md');
+  assert.equal(Number(IMPORT_MAP_COUNT.exec(written)[1].replaceAll(',', '')), Object.keys(importMap().imports).length);
 });

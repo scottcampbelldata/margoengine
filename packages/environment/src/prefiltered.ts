@@ -420,7 +420,13 @@ export async function loadPrefilteredEnvironment(
   return new BakedEnvironment(data, deviceOf(target), options.name);
 }
 
-/** Read back source/specular mips, SH and BRDF LUT and save one lossless KTX2 file. No GPU prefiltering is repeated. */
+/**
+ * Read back source/specular mips, SH and BRDF LUT and save one lossless KTX2 file. No GPU prefiltering is repeated.
+ * The file holds the lighting as it is when this is called: the scalars and SH are copied and every texture and LUT
+ * copy is submitted in one command buffer before the first await, so a later `blend.t`, `update()`, `refresh()` or
+ * scalar change (queued after it) cannot reach the file. Rejects with MargoError `state` while `refreshPending` (its
+ * textures and SH are half written) or when the environment is restored or disposed before the readback ends.
+ */
 export async function savePrefilteredEnvironment(
   environment: Environment,
   options: Pick<PrefilteredOptions, 'signal'> = {},
@@ -429,61 +435,77 @@ export async function savePrefilteredEnvironment(
   signal?.throwIfAborted();
   const device = environment.device;
   if (!device) throw new MargoError('state', 'Environment is not ready; finish restoration before saving');
-  const read = async (size: number, record: (encoder: GPUCommandEncoder, buffer: GPUBuffer) => void) => {
-    signal?.throwIfAborted();
-    const buffer = device.createBuffer({ size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
-    const abort = () => buffer.destroy();
-    signal?.addEventListener('abort', abort, { once: true });
-    try {
-      const encoder = device.createCommandEncoder();
-      record(encoder, buffer);
-      device.queue.submit([encoder.finish()]);
-      await buffer.mapAsync(GPUMapMode.READ);
-      signal?.throwIfAborted();
-      return buffer.getMappedRange().slice(0);
-    } catch (error) {
-      signal?.throwIfAborted();
-      throw error;
-    } finally {
-      signal?.removeEventListener('abort', abort);
-      buffer.destroy();
-    }
-  };
-  const readMips = async (texture: GPUTexture) => {
-    const mips: Uint16Array[] = [];
-    for (let m = 0; m < texture.mipLevelCount; m++) {
-      const edge = texture.width >> m,
-        row = align(edge * 8, 256);
-      const raw = new Uint8Array(
-        await read(row * edge * 6, (encoder, buffer) =>
-          encoder.copyTextureToBuffer({ texture, mipLevel: m }, { buffer, bytesPerRow: row, rowsPerImage: edge }, [
-            edge,
-            edge,
-            6,
-          ]),
-        ),
-      );
-      const mip = new Uint16Array(edge * edge * 24),
-        dest = bytes(mip);
-      for (let y = 0; y < edge * 6; y++) dest.set(raw.subarray(y * row, y * row + edge * 8), y * edge * 8);
-      mips.push(mip);
-    }
-    return mips;
-  };
-  // Snapshot scalars before asynchronous readbacks; no frame or loader work mutates this file's metadata later.
+  if (environment.refreshPending)
+    throw new MargoError('state', 'Environment refresh is running; await environment.refresh() and save again');
+  // One snapshot, taken with no await in between: GPU work runs in submission order, so these copies read the
+  // textures as every earlier submit left them and none queued later.
   const rotation = environment.rotation,
     intensity = environment.intensity,
     radianceScale = environment.radianceScale;
   const version = environment.version;
   const radiance = environment.sh.radiance.slice(),
     irradiance = environment.sh.irradiance.slice();
-  const cube = await readMips(environment.cubeTexture),
-    specular = await readMips(environment.specularTexture);
   const lut = environment.brdfLut;
-  const brdf = new Uint32Array(
-    await read(lut.size, (encoder, buffer) => encoder.copyBufferToBuffer(lut, 0, buffer, 0, lut.size)),
-  );
-  signal?.throwIfAborted();
+  const buffers: GPUBuffer[] = [];
+  const target = (size: number) => {
+    const buffer = device.createBuffer({ size, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    buffers.push(buffer);
+    return buffer;
+  };
+  const encoder = device.createCommandEncoder({ label: 'environment save' });
+  type Level = { edge: number; row: number; buffer: GPUBuffer };
+  const plan = (texture: GPUTexture) => {
+    const levels: Level[] = [];
+    for (let m = 0; m < texture.mipLevelCount; m++) {
+      const edge = texture.width >> m,
+        row = align(edge * 8, 256),
+        buffer = target(row * edge * 6);
+      encoder.copyTextureToBuffer({ texture, mipLevel: m }, { buffer, bytesPerRow: row, rowsPerImage: edge }, [
+        edge,
+        edge,
+        6,
+      ]);
+      levels.push({ edge, row, buffer });
+    }
+    return levels;
+  };
+  const destroyAll = () => {
+    for (const buffer of buffers) buffer.destroy();
+  };
+  let cubeLevels: Level[], specularLevels: Level[], lutBuffer: GPUBuffer;
+  try {
+    cubeLevels = plan(environment.cubeTexture);
+    specularLevels = plan(environment.specularTexture);
+    lutBuffer = target(lut.size);
+    encoder.copyBufferToBuffer(lut, 0, lutBuffer, 0, lut.size);
+    device.queue.submit([encoder.finish()]);
+  } catch (error) {
+    destroyAll();
+    throw error;
+  }
+  signal?.addEventListener('abort', destroyAll, { once: true });
+  let cube: Uint16Array[], specular: Uint16Array[], brdf: Uint32Array;
+  try {
+    await Promise.all(buffers.map((buffer) => buffer.mapAsync(GPUMapMode.READ)));
+    signal?.throwIfAborted();
+    const mips = (levels: Level[]) =>
+      levels.map(({ edge, row, buffer }) => {
+        const raw = new Uint8Array(buffer.getMappedRange()),
+          mip = new Uint16Array(edge * edge * 24),
+          dest = bytes(mip);
+        for (let y = 0; y < edge * 6; y++) dest.set(raw.subarray(y * row, y * row + edge * 8), y * edge * 8);
+        return mip;
+      });
+    cube = mips(cubeLevels);
+    specular = mips(specularLevels);
+    brdf = new Uint32Array(lutBuffer.getMappedRange().slice(0));
+  } catch (error) {
+    signal?.throwIfAborted();
+    throw error;
+  } finally {
+    signal?.removeEventListener('abort', destroyAll);
+    destroyAll();
+  }
   if (environment.disposed || environment.version !== version)
     throw new MargoError('state', 'Environment changed during save; stop captures and save again after restoration');
   return encodePrefilteredIBL({

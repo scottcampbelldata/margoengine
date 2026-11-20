@@ -2,12 +2,10 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-// Real GPU: one browser suite at a time (part of check:merge; inside `gpu-lock run` this is a no-op).
-const release = await acquire({ owner: 'react-scene-browser' });
+// Real GPU (part of check:merge).
 const browser = await openBrowser({ port: 5197, startPath: '/packages/react/tests/scene-browser.html' }),
   { page, hardware } = browser;
 const errors = [];
@@ -90,6 +88,35 @@ try {
           colored,
           ...frame,
         });
+        if (mode === 'dof') {
+          // GAP-POST-ADD1-REACT: a Bloom added to and removed from the live DOF and Tonemap stack goes through
+          // PostStack.addEffect and removeEffect; the stack and its other effects are the same objects throughout.
+          const added = await page.evaluate(() => window.reactScene.restack(true));
+          assert.equal(added.same, true, 'the PostStack stays when Bloom joins');
+          assert.deepEqual(added.before, ['dof', 'tonemap']);
+          assert.deepEqual(added.after, ['dof', 'bloom', 'tonemap']);
+          assert.deepEqual(added.kept, ['dof', 'tonemap']);
+          assert.deepEqual(added.gpuErrors, []);
+          const bloomed = await decodePNG(
+            await page.locator('canvas').screenshot({ path: 'test-results/react-scene-dof-bloom.png' }),
+          );
+          let lit = 0;
+          for (let at = 0; at < bloomed.data.length; at += 4) {
+            const channels = [bloomed.data[at], bloomed.data[at + 1], bloomed.data[at + 2]];
+            if (Math.max(...channels) > 60 && Math.max(...channels) - Math.min(...channels) > 30) lit++;
+          }
+          assert.ok(lit > 100, `dof with Bloom did not present colored geometry (${lit})`);
+          const removed = await page.evaluate(() => window.reactScene.restack(false));
+          assert.equal(removed.same, true, 'the PostStack stays when Bloom leaves');
+          assert.deepEqual(removed.after, ['dof', 'tonemap']);
+          assert.deepEqual(removed.kept, ['dof', 'tonemap']);
+          assert.deepEqual(removed.gpuErrors, []);
+          result.checks.push({
+            name: 'post: Bloom joins and leaves the live DOF and Tonemap PostStack in place, real WebGPU validation',
+            colored: lit,
+            after: added.after,
+          });
+        }
       }
       const removed = await page.evaluate(() => window.reactScene.removeFeatures());
       assert.deepEqual(removed.errors, []);
@@ -151,5 +178,4 @@ try {
   throw error;
 } finally {
   await browser.close();
-  release();
 }

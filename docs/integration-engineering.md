@@ -10,7 +10,7 @@ is a trademark of Dassault Systemes; the profile implies no affiliation.
 Run `npm run build:packages`, then
 `npm run test:integration:browser -- --scene=engineering`.
 Types: `npm run check:examples-types -- --projects=integration-engineering`.
-The runner holds one shared GPU slot and limits each backend scene to 150 seconds.
+The runner limits each backend scene to 150 seconds.
 Evidence: `docs/whitepaper/results/integration-j6-cad.json`.
 
 The STL round trip keeps all 20 triangles, USDZ creates two rendered primitives,

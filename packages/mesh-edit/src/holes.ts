@@ -4,6 +4,7 @@ import { FaceSink } from './face-sink.js';
 import { assertPolygonMesh, collectPolygonEdges, newellNormal } from './polygon.js';
 import { faceIdFactory } from './result.js';
 import type { MeshEditOptions, MeshEditResult, PolygonMesh } from './types.js';
+import { leastOf } from './least.js';
 
 /** Options for {@link fillMeshHoles}. */
 export interface FillHolesOptions extends MeshEditOptions {
@@ -247,7 +248,7 @@ function refineTriangles(
         changed = true;
         continue;
       }
-      if (Math.min(...sides) > limit) {
+      if (leastOf(sides) > limit) {
         const m = vertices.length;
         vertices.push(
           [0, 1, 2].map((k) => (vertices[t[0]][k] + vertices[t[1]][k] + vertices[t[2]][k]) / 3) as MutableVec3,
@@ -305,9 +306,16 @@ function planarUV(points: readonly Vec3[]): (p: Vec3) => MutableVec2 {
       p[0] * u[0] + p[1] * u[1] + p[2] * u[2],
       p[0] * v[0] + p[1] * v[1] + p[2] * v[2],
     ],
-    all = points.map(project),
-    lo = [Math.min(...all.map((q) => q[0])), Math.min(...all.map((q) => q[1]))],
-    hi = [Math.max(...all.map((q) => q[0])), Math.max(...all.map((q) => q[1]))];
+    lo = [Infinity, Infinity],
+    hi = [-Infinity, -Infinity];
+  // A loop, not Math.min(...values): a border of over about 125,000 vertices overflows the call stack as arguments.
+  for (const p of points) {
+    const q = project(p);
+    for (const k of [0, 1]) {
+      if (q[k] < lo[k]) lo[k] = q[k];
+      if (q[k] > hi[k]) hi[k] = q[k];
+    }
+  }
   return (p) => {
     const [x, y] = project(p);
     return [
@@ -394,6 +402,15 @@ export function fillMeshHoles(mesh: PolygonMesh, options: FillHolesOptions = {})
     sink = new FaceSink(mesh, vertices),
     normals = new Map<string, MutableVec3>(),
     rings: number[][] = mesh.vertices.map(() => []),
+    linked = new Set<string>(),
+    // A set of joined pairs, not rings[v].includes(w): that scan made a vertex of high valence cost its valence squared.
+    link = (v: number, w: number): void => {
+      const key = v < w ? `${v}:${w}` : `${w}:${v}`;
+      if (linked.has(key)) return;
+      linked.add(key);
+      (rings[v] ??= []).push(w);
+      (rings[w] ??= []).push(v);
+    },
     holes: FilledHole[] = [],
     diagnostics: string[] = [];
   for (const face of mesh.faces) {
@@ -402,8 +419,7 @@ export function fillMeshHoles(mesh: PolygonMesh, options: FillHolesOptions = {})
     face.vertices.forEach((v, i) => {
       const w = face.vertices[(i + 1) % face.vertices.length];
       normals.set(`${w}>${v}`, n);
-      if (!rings[v].includes(w)) rings[v].push(w);
-      if (!rings[w].includes(v)) rings[w].push(v);
+      link(v, w);
     });
   }
   for (const loop of meshBoundaryLoops(mesh)) {
@@ -444,10 +460,7 @@ export function fillMeshHoles(mesh: PolygonMesh, options: FillHolesOptions = {})
     for (const polygon of polygons)
       polygon.forEach((v, i) => {
         const w = polygon[(i + 1) % polygon.length];
-        rings[v] ??= [];
-        rings[w] ??= [];
-        if (!rings[v].includes(w)) rings[v].push(w);
-        if (!rings[w].includes(v)) rings[w].push(v);
+        link(v, w);
       });
     if (fair && added.length) fairVertices(added, rings, vertices);
     const before = sink.faces.length;

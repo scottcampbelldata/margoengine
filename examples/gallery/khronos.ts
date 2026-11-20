@@ -3,7 +3,7 @@
 // models named by the section buttons to gallery/models/ and nothing else, so the 250 MB set stays out of the site.
 import { engineRuntime } from '@margoengine/core/extension';
 import { createStage } from 'margoengine';
-import type { loadGLTF } from '@margoengine/gltf-pro';
+import type { loadGLTF } from '@margoengine/gltf/pbr';
 import { ColorBackground, Environment, EnvironmentLighting } from '@margoengine/environment';
 import { OrbitControls } from '@margoengine/controls';
 import type { Clustered } from '@margoengine/clustered';
@@ -13,7 +13,7 @@ import { mountGallery } from './gallery.js';
 
 const BASE = import.meta.env.DEV ? '../assets/khronos/' : './models/';
 
-/** The material extensions `@margoengine/gltf-pro/extended` adds. */
+/** The material extensions `@margoengine/gltf/extended-materials` adds. */
 const EXTENDED = new Set([
   'KHR_materials_iridescence',
   'KHR_materials_anisotropy',
@@ -47,7 +47,7 @@ interface ModelEntry {
 async function main() {
   // The loader comes with the first model, not before the first frame (the gallery check's 120,000 B budget): its
   // download starts here, beside the stage's, and show() waits for it (amd-gpu-hunt row 16).
-  const pro = import('@margoengine/gltf-pro');
+  const pro = import('@margoengine/gltf/pbr');
   pro.catch(() => {}); // a failed load is reported by show(), which awaits it
   const manifest: ModelEntry[] = (await (await fetch(new URL(`${BASE}manifest.json`, document.baseURI))).json()).models;
   const host = document.querySelector<HTMLElement>('#viewport')!,
@@ -93,7 +93,7 @@ async function main() {
     if (used.includes('KHR_meshopt_compression') || used.includes('EXT_meshopt_compression'))
       decoders.meshopt = (await import('@margoengine/decoders')).MeshoptDecoder;
     if (used.some((name) => EXTENDED.has(name)))
-      decoders.materials = (await import('@margoengine/gltf-pro/extended')).extendedMaterials;
+      decoders.materials = (await import('@margoengine/gltf/extended-materials')).extendedMaterials;
     const { applyGLTFLights, loadGLTF, viewGLTFCamera } = await pro;
     const next = await loadGLTF(engine, new URL(`${BASE}${id}/${entry.file}`, document.baseURI), {
       decoders,

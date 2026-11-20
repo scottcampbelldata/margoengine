@@ -145,6 +145,8 @@ test('scattered affine contours interpolate exactly with owned output', async ()
   assert.match(svg, /fill-rule="evenodd"/);
   assert.match(svg, /rotate\(/);
   assert.ok(!svg.includes('fill="" onload='));
+  // A title with a control character still writes a well-formed document (XML 1.0 forbids U+0007 even escaped).
+  assert.match(contourSVG(r, { title: 'bell\u0007' }), /<title>bell\ufffd<\/title>/);
 });
 
 test('argument validation, cancellation during work and snapshot semantics', async () => {

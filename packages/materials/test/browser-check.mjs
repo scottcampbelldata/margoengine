@@ -193,6 +193,7 @@ try {
     'litEffects',
     'parallax',
     'triplanar',
+    'triplanarDefaultWrap',
     'triplanarUp',
     'triplanarNormal',
     'subsurfaceThin',
@@ -331,7 +332,7 @@ try {
       const flat = await redShare();
       assert.ok(Math.abs(flat - 0.75) < 0.012, `parallaxScale 0, live: red share ${flat}`);
     }
-    if (name === 'triplanar') {
+    if (name === 'triplanar' || name === 'triplanarDefaultWrap') {
       const points = [-0.75, -0.25, 0.25, 0.75].map((x) => [x, 0.1]);
       const world = await atWorld(points);
       for (const [k, rgb] of [

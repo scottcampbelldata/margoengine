@@ -8,7 +8,7 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 from .animation import animated, export_animated
-from .bake import bake_material, principled
+from .bake import bake_material, principled, render_uv, second_uv
 from .curves import KINDS, GeometryData, read_object
 from .writer import png, write
 
@@ -300,7 +300,8 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
             return None
         if len(mesh.loop_triangles) > 1_000_000:
             raise ValueError(f"Object '{obj.name}': too many triangles")
-        uv_layer = mesh.uv_layers.active
+        # TEXCOORD_0 is the map Blender renders with (KB-P15a), which can differ from the one active for editing.
+        uv_layer = render_uv(mesh)
         if uv_layer:
             mesh.calc_tangents(uvmap=uv_layer.name)
         stride = 24 if not uv_layer and not mesh.color_attributes else 80
@@ -346,9 +347,10 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
                 values[:, 11] = signs
                 values[:, 12:14] = uv.reshape(-1, 2)
                 values[:, 13] = 1 - values[:, 13]
-            if len(mesh.uv_layers) > 1:
+            lightmap_uv = second_uv(mesh)
+            if lightmap_uv:
                 uv1 = np.empty(len(mesh.loops) * 2, dtype=np.float32)
-                mesh.uv_layers[1].data.foreach_get("uv", uv1)
+                lightmap_uv.data.foreach_get("uv", uv1)
                 values[:, 14:16] = uv1.reshape(-1, 2)
                 values[:, 15] = 1 - values[:, 15]
         if not np.isfinite(values).all():
@@ -370,7 +372,7 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
             pbr = materials[mid]["pbrMetallicRoughness"]
             if pbr.get("baseColorTexture") or pbr.get("metallicRoughnessTexture") or materials[mid].get("normalTexture") or materials[mid].get("emissiveTexture"):
                 if not uv_layer:
-                    raise ValueError(f"Object '{obj.name}': textured material requires an active UV map")
+                    raise ValueError(f"Object '{obj.name}': textured material requires a UV map")
             bounds = vertices[:, :3].min(axis=0).tolist() + vertices[:, :3].max(axis=0).tolist()
             primitives.append({"vertices": vertices.tobytes(), "indices": remap[inverse].tobytes(), "material": mid, "stride": stride, "bounds": bounds})
             if extra is not None:
@@ -495,11 +497,16 @@ def _export_scene(context, path, bake_size, lights_cameras, curves, object_anima
             # Power in W over the whole sphere; a spot's power is that of the point light it is cut from.
             result = {"margo:light": "point" if light.type == "POINT" else "spot", "margo:intensity": float(light.energy) * LUMENS_PER_WATT / (4 * math.pi)}
             if light.use_custom_distance:
+                # KHR_lights_punctual's range must be above 0; Blender allows a Custom Distance of 0 (KB-P15c).
+                if not light.cutoff_distance > 0:
+                    raise ValueError(f"Light '{obj.name}': a Custom Distance of 0 has no glTF range; raise it or turn Custom Distance off")
                 result["margo:range"] = float(light.cutoff_distance) * unit_scale
             if light.type == "SPOT":
                 outer = min(float(light.spot_size) / 2, math.pi / 2)
                 result["margo:outer_cone"] = outer
-                result["margo:inner_cone"] = outer * (1 - float(light.spot_blend))
+                # glTF needs inner < outer, so a hard edge (Spot Blend 0) keeps the narrowest glTF blend, 0.1% of the
+                # cone, as the FBX importer does (KB-P15b).
+                result["margo:inner_cone"] = min(outer * (1 - float(light.spot_blend)), outer * 0.999)
         result["margo:color"] = color
         return result
 

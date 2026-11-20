@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>timber valley still</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// One still of @margoengine/scenes/timber-valley. URL: view (an anchor name), w and h (pixels), frames (warm-up frames,
+// default 60), any setting (weather, fire, fireTime, hour, date, houses, quality, look, windFrom), and rock=<a .gltf URL> to draw
+// that model (such as /asset-library/big-burn-1910/rocks/rock_07/rock_07_2k.gltf) in place of the procedural one through the mesh registry,
+// and fir=<a .gltf URL prefix> to draw the textured levels <prefix>_near, _middle and _far.gltf (libraryParts) as every conifer (each rockies species key).
+import {Engine} from '/packages/core/dist/index.js';
+import {attach,info} from '/packages/scenes/dist/timber-valley.js';
+import {libraryMesh,libraryParts} from '/packages/scenes/dist/library.js';
+const q=new URLSearchParams(location.search),errors=[],canvas=document.querySelector('canvas');
+const w=Number(q.get('w')??960),h=Number(q.get('h')??540);
+canvas.width=w;canvas.height=h;canvas.style.width=w+'px';canvas.style.height=h+'px';
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,1000,0],target:[100,900,0],fov:50,near:0.5,far:30000}});
+engine.stop();
+engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const settings={};
+for(const [k,spec] of Object.entries(info.settings)){const v=q.get(k);if(v===null)continue;settings[k]=typeof spec.default==='number'?Number(v):v;}
+let rock=null;
+if(q.get('rock')){rock=await libraryMesh(q.get('rock'),{color:[0.3,0.29,0.27],kind:'stone',maxTriangles:60000});settings.meshes={'procedural:rock':[rock]};}
+let fir=null;
+if(q.get('fir')){const p=q.get('fir');fir=await libraryParts([p+'_near.gltf',p+'_middle.gltf',p+'_far.gltf']);settings.meshes={...settings.meshes,...Object.fromEntries(['western-white-pine','western-larch','western-red-cedar','douglas-fir','grand-fir'].map((k)=>['procedural:'+k+'/pole',fir]))};}
+const since=performance.now();
+const scene=await attach(engine,settings);
+const built=performance.now()-since;
+scene.view(q.get('view')??'aerial-west',Number(q.get('fov')??50));
+window.check={async run(){
+  const frames=Number(q.get('frames')??60);
+  for(let i=0;i<frames;i++){engine.render({delta:1/30});if(i%10===9){await engine.gpu.queue.onSubmittedWorkDone();await scene.settle();}}
+  await engine.gpu.queue.onSubmittedWorkDone();
+  const f=scene.parts.fireFront,parts=[...(engine.plugins?.values?.()??[])].map(p=>p.name);
+  return {errors,built,ground:scene.height(...scene.layout.rail[60]),lots:scene.layout.structures.length,
+    fire:f?{time:f.time,embers:f.embers,spots:f.spots}:null,rockTriangles:rock?rock.geometry.indices.length/3:0,firParts:fir?fir.map(p=>p.name+":"+p.kind):[],
+    post:scene.parts.preset.post.effects.map(e=>e.name),parts};
+}};
+window.ready=true;
+</script></body></html>

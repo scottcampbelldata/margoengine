@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Geometry } from '../../core/dist/index.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { MSFTMaterialLOD } from '../dist/msft.js';
 import { ClusterLOD } from '../dist/clusters.js';
 import { LODSystem } from '../dist/index.js';

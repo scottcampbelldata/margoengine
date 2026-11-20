@@ -17,7 +17,11 @@ export interface GCodeLayer {
     travel: Float32Array;
 }
 
-export function parseGCode(input: BinaryInput | string, options?: ParseLimits): GCode;
+export interface GCodeOptions extends ParseLimits {
+    arcP?: 'turns' | 'circles';
+}
+
+export function parseGCode(input: BinaryInput | string, options?: GCodeOptions): GCode;
 
 // Not exported from this entry, but used by the exports above:
 

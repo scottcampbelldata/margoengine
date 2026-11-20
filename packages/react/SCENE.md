@@ -11,16 +11,21 @@ Canvas on the server creates no GPU, physics world, pointer lock or XR session. 
 | `@margoengine/react` | `Canvas`, `Stage`, `Mesh`/`Group`, `BoxGeometry`, `PbrMaterial`, `GeometryResource`, `Sun`, `Center`, `Scene`, `RenderView`, `useFrame`, `useMargo`, `useEngine`, `useCamera`, `useLoader`, `useProgress` | nothing more (core, the stage, math, cache and selection come with it) |
 | `@margoengine/react/xr-pointer` | `XRPointerEvents`, `XRMeshPointerEvent` | `@margoengine/xr`, selection picker supplied by the caller |
 | `@margoengine/react/controls` | `OrbitControls`, `MapControls`, `CadControls`, `ArcballControls`, `PointerLock`, `TransformControls` | `@margoengine/controls` |
-| `@margoengine/react/gltf-pro` | `Gltf` (`Model`), `Gltf.preload` | `@margoengine/gltf-pro` |
-| `@margoengine/react/fbx` | `Fbx`, `Fbx.preload` | `@margoengine/fbx`, `@margoengine/gltf-pro` |
+| `@margoengine/react/gltf` | `Gltf` (`Model`), `Gltf.preload` | `@margoengine/gltf/pbr` |
+| `@margoengine/react/fbx` | `Fbx`, `Fbx.preload` | `@margoengine/fbx`, `@margoengine/gltf/pbr` |
 | `@margoengine/react/animation` | `Animation` | `@margoengine/animation`, `@margoengine/animator` |
 | `@margoengine/react/environment` | `Environment`, `Environment.preload`, `AmbientLight`, `HemisphereLight`, `Fog` | `@margoengine/environment` |
-| `@margoengine/react/shadows` | `Shadows` (turns the Canvas shadows on), `ContactShadows` | `@margoengine/shadows` |
+| `@margoengine/react/shadows` | `Shadows` (turns the Canvas shadows on), `SoftShadows` (drei's PCSS props), `ContactShadows`, `BakeShadows` | `@margoengine/shadows` |
 | `@margoengine/react/html` | `Html` | `@margoengine/html` |
 | `@margoengine/react/text` | `Text` | `@margoengine/text` |
 | `@margoengine/react/sky` | `Sky` | `@margoengine/sky` |
 | `@margoengine/react/geometry` | `Box`, `Sphere`, `Plane` | `@margoengine/geometry` |
-| `@margoengine/react/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `@margoengine/materials` (and `gltf-pro` for transmission) |
+| `@margoengine/react/marching-cubes` | `MarchingCubes`, `MarchingCube`, `MarchingPlane` | `@margoengine/procedural` |
+| `@margoengine/react/caustics` | `Caustics` | `@margoengine/studio` |
+| `@margoengine/react/accumulative-shadows` | `AccumulativeShadows`, `RandomizedLight` | `@margoengine/studio` |
+| `@margoengine/react/outlines` | `Outlines` | `@margoengine/toon` |
+| `@margoengine/react/sampler` | `Sampler`, `useSurfaceSampler` | `@margoengine/geometry` |
+| `@margoengine/react/materials` | `MeshTransmissionMaterial`, `BatchedMesh`, `BatchedItem` | `@margoengine/materials` (and `gltf/pbr` for transmission) |
 | `@margoengine/react/post` | `EffectComposer`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `DepthTexture`, `SceneTargets` | `@margoengine/post` |
 | `@margoengine/react/dof`, `/tonemap`, `/taa` | `DepthOfField`, `Tonemap`, `TAA` (inside an `EffectComposer`) | `@margoengine/dof`, `tonemap` or `taa`, and `@margoengine/post` |
 | `@margoengine/react/voxel` | `Voxels`, `useBlockTextures` | `@margoengine/voxel` |
@@ -105,7 +110,7 @@ parent mesh. `Html`, `Environment` and `OrbitControls` retain their existing
 import {Suspense} from 'react';
 import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
 import { Animation } from '@margoengine/react/animation';
-import { Gltf } from '@margoengine/react/gltf-pro';
+import { Gltf } from '@margoengine/react/gltf';
 import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 
 <Canvas backend="webgpu">
@@ -124,7 +129,7 @@ import { MeshTransmissionMaterial } from '@margoengine/react/materials';
 
 `MeshTransmissionMaterial` attaches to procedural Mesh geometry and calls the
 existing `@margoengine/materials` transmission/volume installation. Positive
-`factor` requires WebGPU and `@margoengine/gltf-pro`; it preserves the original
+`factor` requires WebGPU and `@margoengine/gltf/pbr`; it preserves the original
 Mesh's transform, ref and event ID. `factor={0}` is exactly `PbrMaterial` and
 does not load those peers. Native single-sample, screen-space transmission
 limits still apply. Transmitted surfaces follow the native blended shadow
@@ -142,7 +147,7 @@ More control, all optional:
 ```tsx
 import {useRef} from 'react';
 import { Animation, type AnimationHandle } from '@margoengine/react/animation';
-import { Gltf } from '@margoengine/react/gltf-pro';
+import { Gltf } from '@margoengine/react/gltf';
 
 function Character() {
   const handle = useRef<AnimationHandle>(null);
@@ -191,8 +196,11 @@ One effect attaches on its own. Two or more share one HDR scene capture through
 `@margoengine/post`'s `PostStack`, in stack order whatever the JSX order: HDR effects
 (`SSAO` or `GTAO`, `SSGI`, `SSR`, `MotionBlur`, `DepthOfField`, `Bloom`, `LensFlare`,
 `Afterimage`), then `Tonemap`, then `SMAA` or `FXAA` and `Glitch`. So Bloom, SSAO and
-DepthOfField combine, with or without Tonemap. Adding or removing an effect rebuilds
-the stack. `TAA` attaches beside it and reads its depth. SSAO, GTAO, SSR, SSGI and
+DepthOfField combine, with or without Tonemap. While two or more effects stay, adding
+or removing one changes the live stack through `addEffect` and `removeEffect`: only the
+added effect is built and compiles, and the others keep their pipelines, targets and
+history. Going from one effect to two, or back, rebuilds them, since a lone effect
+attaches on its own. `TAA` attaches beside it and reads its depth. SSAO, GTAO, SSR, SSGI and
 TAA register current and later loaded models. `MotionBlur` reads the motion
 vectors of a `<TAA>` in the same composer unless given `velocity`. The composer
 reports, before attaching anything: SMAA with FXAA, SSAO with GTAO, a duplicate

@@ -45,6 +45,14 @@
     "./export-cube": {
       "types": "./dist/export-cube.d.ts",
       "import": "./dist/export-cube.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    },
+    "./3dl": {
+      "types": "./dist/3dl.d.ts",
+      "import": "./dist/3dl.js"
     }
   },
   "files": [
@@ -74,8 +82,14 @@
     "test:gpu:custom": "cd ../.. && node packages/tonemap/tests/custom-browser.mjs",
     "test:gpu:metering": "cd ../.. && node packages/tonemap/tests/metering-browser.mjs",
     "test:gpu:local": "cd ../.. && node packages/tonemap/tests/local-browser.mjs",
+    "test:gpu:dither-vignette": "cd ../.. && node packages/tonemap/tests/dither-vignette-browser.mjs",
     "test:gpu:hue": "cd ../.. && node packages/tonemap/tests/hue-browser.mjs",
     "test:gpu:export-cube": "cd ../.. && node packages/tonemap/tests/export-cube-browser.mjs",
-    "test:gpu:finite": "cd ../.. && node packages/tonemap/tests/finite-browser.mjs"
+    "test:gpu:finite": "cd ../.. && node packages/tonemap/tests/finite-browser.mjs",
+    "test:gpu:contrast-zero": "cd ../.. && node packages/tonemap/tests/contrast-zero-browser.mjs",
+    "test:gpu:white-balance": "cd ../.. && node packages/tonemap/tests/white-balance-browser.mjs",
+    "test:gpu:seek": "cd ../.. && node packages/tonemap/tests/seek-browser.mjs",
+    "test:settings:browser": "cd ../.. && node packages/tonemap/tests/settings-browser.mjs && node packages/tonemap/tests/settings-browser.mjs --compat && node packages/tonemap/tests/shape-browser.mjs && node packages/tonemap/tests/shape-browser.mjs --compat",
+    "test:gpu:postfx": "cd ../.. && npm run modern:test:postfx:browser"
   }
 }

@@ -5,14 +5,14 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GLTFAsset, parseGLTFAsync } from '@margoengine/gltf-pro';
-import { loadBehaviorGraph } from '@margoengine/gltf-pro/interactivity';
+import { GLTFAsset, parseGLTFAsync } from '@margoengine/gltf/pbr';
+import { loadBehaviorGraph } from '@margoengine/gltf/interactivity';
 import { GLTFInteractivity, sampleChannel } from '../dist/interactivity.js';
 import { pointerWriter } from '../dist/pointer.js';
 import { glbChunks } from '../../shared/glb.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
-const fixtures = fileURLToPath(new URL('../../gltf-pro/tests/fixtures/interactivity/', import.meta.url));
+const fixtures = fileURLToPath(new URL('../../gltf/test/fixtures/interactivity/', import.meta.url));
 const samples = requireExternalAssets('interactivity/');
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 

@@ -1,5 +1,5 @@
 // Real-GPU check of lit particles in a real engine (run from the repository root after building packages, one GPU job
-// at a time): node scripts/gpu-lock.mjs run --owner=<id> -- node packages/vfx/test/lit-check.mjs
+// at a time): node scripts/run-with-timeout.mjs -- node packages/vfx/test/lit-check.mjs
 // A grey particle 2 units across, seen from z = 10, must show at its centre and at a quarter and a half of its radius:
 // - under ambient 1 alone, its own colour times its opacity;
 // - lit by a Clustered point light at (0, 0, 2), the clustered BRDF (GGX at roughness 1, no metal, Fresnel F0 0.04)

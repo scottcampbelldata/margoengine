@@ -3,8 +3,11 @@
 ## Portable state and provenance
 
 Choose the opt-in `/spec` Figure factory before plotting. `toJSON` is asynchronous,
-defaults to inline typed arrays and includes timeline frames. Versioned schema/hash
-validation precedes resource allocation. URL-backed arrays must be pinned and hash
+defaults to inline typed arrays and includes timeline frames: it shows each frame in turn,
+so a playing timeline is paused (its `play()` resolves as on `pause()`) and the frame shown
+before the save, if any, is shown again. Versioned schema/hash validation, of every timeline frame
+too, precedes resource allocation, and every malformed part is a coded error. `limits` holds
+4 numbers (2D) or 6 (3D), in the schema as in `validateFigureSpec`. URL-backed arrays must be pinned and hash
 checked; the document is data, never executable code. Restore custom resource kinds
 with application codecs and pipeline names with a trusted registry. Unknown custom
 kinds reject; absent pipeline registries preserve dormant descriptions. `/link`

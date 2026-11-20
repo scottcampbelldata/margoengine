@@ -3,7 +3,7 @@ import type { MaterialGraph, NormalMapNode, ValueNode } from '@margoengine/mater
 import { SRGBToLinear } from '@margoengine/math/color';
 import { LoaderError } from './types.js';
 import { throwIfAborted, toText, type BinaryInput } from './util.js';
-import { readXMLTree, type XMLElement } from './xml.js';
+import { readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 
 const F = 'MaterialX';
 const MAX_DEPTH = 256;
@@ -166,7 +166,8 @@ function scoped(element: XMLElement, scope: Scope): Scope {
   const { colorspace, fileprefix } = element.attributes;
   return {
     colorspace: colorspace ?? scope.colorspace,
-    fileprefix: fileprefix === undefined ? scope.fileprefix : (scope.fileprefix ?? '') + fileprefix,
+    // An inner fileprefix replaces the enclosing one (MaterialX Specification, File Prefixes).
+    fileprefix: fileprefix ?? scope.fileprefix,
   };
 }
 
@@ -641,8 +642,8 @@ async function convert(
  * @throws LoaderError code `header` when the root is not `<materialx>`, `syntax` for a bad value or a missing name,
  * `unsupported` for a document of 1.37 or before.
  */
-export function parseMaterialX(input: BinaryInput | string): MaterialXDocument {
-  const root = readXMLTree(toText(input, F), F).children[0];
+export function parseMaterialX(input: BinaryInput | string, options: XMLExternalOptions = {}): MaterialXDocument {
+  const root = readXMLTree(toText(input, F), F, { external: options.external }).children[0];
   if (root?.name !== 'materialx')
     throw new LoaderError(F, 'header', `root element is <${root?.name}>, not <materialx>`);
   const scope = scoped(root, {}),

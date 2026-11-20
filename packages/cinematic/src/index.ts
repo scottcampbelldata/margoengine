@@ -60,7 +60,7 @@ export class Cinematic implements EnginePlugin {
   private remaining = 0;
   private shakeDuration = 1;
   private frequency = 25;
-  private time = 0;
+  private elapsed = 0;
   private initialized = false;
   /**
    * @throws TypeError when `offset` is not 3 values or `collide` is not a function.
@@ -189,11 +189,11 @@ export class Cinematic implements EnginePlugin {
       }
     }
     this.initialized = true;
-    this.time += delta;
+    this.elapsed += delta;
     this.remaining = Math.max(0, this.remaining - delta);
     const shake = this.amplitude * (this.remaining / this.shakeDuration) ** 2;
     for (let i = 0; i < 3; i++) {
-      this.cameraPosition[i] = this.position[i] + Math.sin(this.time * this.frequency * (1 + i * 0.37) + i * 2) * shake;
+      this.cameraPosition[i] = this.position[i] + Math.sin(this.elapsed * this.frequency * (1 + i * 0.37) + i * 2) * shake;
       this.cameraTarget[i] = this.lookAt[i];
     }
     const dy = this.cameraPosition[1] - this.lookAt[1];
@@ -209,9 +209,13 @@ export class Cinematic implements EnginePlugin {
       this.position[1] += lift;
       this.velocity[1] = Math.max(0, this.velocity[1]);
     }
-    // Preserve upward look when terrain clearance lifts a requested below-target orbit.
+    // Preserve upward look when terrain clearance lifts a requested below-target orbit: raise the look by what the
+    // ground lifted (the arm goal and the camera), never by spring lag or shake.
     if (this.options.ground && this.offset[1] < 0)
-      this.cameraTarget[1] += Math.max(0, this.cameraPosition[1] - this.lookAt[1] - this.offset[1]);
+      this.cameraTarget[1] += Math.min(
+        Math.max(0, this.cameraPosition[1] - this.lookAt[1] - this.offset[1]),
+        offsetY - this.offset[1] + Math.max(0, lift),
+      );
     this.avoidWalls(followDecay);
     if (this.engine) {
       this.engine.camera.position = this.cameraPosition as unknown as Vec3;
@@ -281,9 +285,21 @@ export class Cinematic implements EnginePlugin {
       throw new TypeError('Target belongs to another engine; follow a mesh of the engine this rig is attached to');
     this.engine = engine;
   }
+  /** Seconds the rig has followed (its shake clock). */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * One frame of the rig with no draw: {@link Cinematic.update}, all CPU (springs, shake, ground and wall queries, the
+   * engine camera). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays the follow and the
+   * shake exactly while film code moves the target on the way.
+   */
+  advanceTime(delta: number): void {
+    this.update(delta);
+  }
   /** Plugin hook: runs {@link Cinematic.update} with the frame delta in seconds. */
   onPreUpdate(delta: number): void {
-    this.update(delta);
+    this.advanceTime(delta);
   }
   /** Detach from the engine (removing the plugin) and stop following; the rig can be attached again. */
   dispose(): void {

@@ -283,3 +283,49 @@ test('RiggedFigure.glb: on its real walking clip a hand reaches a point while th
     for (const foot of ['leg_joint_L_3', 'leg_joint_R_3']) near(f.world(foot), plain.world(foot), 2e-3, `${foot} frame ${frame}`);
   }
 });
+
+test('a rig without head or arms stands still away from the origin (the centre of mass is a weighted mean)', async (t) => {
+  // Winter's segment shares sum to 1 only for a full body; legs and trunk alone are 0.819 of it. Summed without
+  // dividing by that total, the centre of mass sat at 0.819 times its true place, so a body at x 4 read as off balance
+  // and the solve dragged the pelvis toward the origin with no target set.
+  const clips = { Stand: { duration: 1, tracks: { 'Hips.translation': () => [4, 1, 2] } } };
+  const f = await animatorRun(animatorDocument(BIPED, clips), { initial: 'stand', states: { stand: 'Stand' } });
+  t.after(() => f.release());
+  const i = (name) => f.index.get(name),
+    leg = (a, b, c) => ({ upper: i(a), lower: i(b), end: i(c) });
+  const ik = addFullBodyIK(f.animator, {
+    pelvis: i('Hips'),
+    spine: [i('Spine'), i('Chest')],
+    legs: [leg('LeftUpLeg', 'LeftLeg', 'LeftFoot'), leg('RightUpLeg', 'RightLeg', 'RightFoot')],
+  });
+  f.step();
+  assert.ok(ik.result.balanced, `off balance by ${ik.result.imbalance}`);
+  assert.equal(ik.result.iterations, 0);
+  near(f.world('Hips'), [4, 1, 2], 1e-6, 'hips');
+});
+
+test("a raised leg balances on Winter's segment centres (arm 0.530, leg 0.447 of the way from the root)", async (t) => {
+  // Winter's anthropometric table (after Dempster) puts the centre of mass of the whole arm 0.530 of the way from the
+  // shoulder to the wrist and of the whole leg 0.447 of the way from the hip to the ankle. Placed half way, a leg held
+  // out 0.6 m in front put the body's centre of mass too far forward; and a free arm was weighed at its animated place
+  // while the body under it moved over the support foot. Together the true centre of mass stood 13 mm off the foot.
+  const f = await rig({ supportRadius: 0 });
+  t.after(() => f.release());
+  f.rightLeg.pinned = false;
+  f.rightLeg.support = false;
+  f.rightLeg.target = [-0.1, 0.7, 0.6];
+  f.step();
+  near(f.world('RightFoot'), f.rightLeg.target, 1e-3, 'raised foot');
+  near(f.world('LeftFoot'), FEET[0], 2e-3, 'standing foot');
+  const centre = [0, 0, 0];
+  const mass = (share, point) => point.forEach((v, c) => (centre[c] += share * v));
+  const along = (a, b, s) => f.world(a).map((v, c) => v + (f.world(b)[c] - v) * s);
+  for (const name of ['Hips', 'Spine', 'Chest']) mass(0.497 / 3, f.world(name));
+  mass(0.081, f.world('Head'));
+  mass(0.05, along('LeftArm', 'LeftHand', 0.53));
+  mass(0.05, along('RightArm', 'RightHand', 0.53));
+  mass(0.161, along('LeftUpLeg', 'LeftFoot', 0.447));
+  mass(0.161, along('RightUpLeg', 'RightFoot', 0.447));
+  const off = Math.hypot(centre[0] - f.world('LeftFoot')[0], centre[2] - f.world('LeftFoot')[2]);
+  assert.ok(off <= 1.5e-3, `the centre of mass stands ${off} from the support foot`);
+});

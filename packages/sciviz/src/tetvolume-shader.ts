@@ -1,5 +1,22 @@
 // Clean-room barycentric half-space ray casting with opposite-face adjacency.
-export const tetrahedralShader = /* wgsl */ `
+import { colorLookupWGSL } from './color-lookup.js';
+
+const plainTransfer = /* wgsl */ `
+fn transferAt(value:f32,y:f32)->vec4f {
+ let n=vec2f(textureDimensions(transfer));let uv=select(vec2f(value,y),(vec2f(value,y)*(n-1.0)+0.5)/n,u.classification.x>0.5);
+ return textureSampleLevel(transfer,linearSampler,uv,0.0);
+}`;
+// A colour scale's float table (under, over, NaN colours, log or binned steps) is not filterable: read it with the
+// shared lookup, and a gradient or preintegrated table with explicit bilinear loads, as the regular volume does.
+const encodedTransfer = /* wgsl */ `${colorLookupWGSL}
+fn transferAt(value:f32,y:f32)->vec4f {
+ if(u.classification.x<0.5){return colourLookup(transfer,value);}
+ let n=vec2f(textureDimensions(transfer));let p=clamp(vec2f(value,y),vec2f(0.0),vec2f(1.0))*(n-1.0);
+ let i=vec2i(floor(p));let j=min(i+vec2i(1),vec2i(n)-vec2i(1));let f=fract(p);
+ return mix(mix(textureLoad(transfer,i,0),textureLoad(transfer,vec2i(j.x,i.y),0),f.x),mix(textureLoad(transfer,vec2i(i.x,j.y),0),textureLoad(transfer,j,0),f.x),f.y);
+}`;
+/** @internal The ray caster, specialised for a plain (filterable) or a colour-scale (float table) transfer texture. */
+export const tetrahedralShader = (encoded: boolean): string => /* wgsl */ `
 struct TetVolume { model:mat4x4f,inverse:mat4x4f,options:vec4f,classification:vec4f,low:vec4f,span:vec4f,size:vec4f,planes:array<vec4f,4> }
 @group(1) @binding(0) var<uniform> u:TetVolume;
 @group(1) @binding(1) var cells:texture_2d<f32>;
@@ -36,12 +53,12 @@ fn closest(origin:vec3f,d:vec3f,start:f32,limit:f32)->i32 {
  }return result;
 }
 fn scalar(cell:u32,p:vec3f)->f32 {var w=clamp(weights(cell,p),vec4f(0.0),vec4f(1.0));w/=dot(w,vec4f(1.0));return dot(w,load(cells,cell*6u+3u));}
+${encoded ? encodedTransfer : plainTransfer}
 fn classify(cell:u32,p:vec3f,next:vec3f)->vec4f {
  let value=scalar(cell,p);var y=0.5;
  if(u.classification.x==1.0){y=length(load(cells,cell*6u+5u).xyz)*u.classification.y;}
  if(u.classification.x==2.0){y=scalar(cell,next);}
- let n=vec2f(textureDimensions(transfer));let uv=select(vec2f(value,y),(vec2f(value,y)*(n-1.0)+0.5)/n,u.classification.x>0.5);
- return textureSampleLevel(transfer,linearSampler,uv,0.0);
+ return transferAt(value,y);
 }
 struct Out { @builtin(position) position:vec4f,@location(0) ndc:vec2f }
 @vertex fn vertex(@builtin(vertex_index) i:u32)->Out {let p=array<vec2f,3>(vec2f(-1.0,-1.0),vec2f(3.0,-1.0),vec2f(-1.0,3.0));var o:Out;o.position=vec4f(p[i],0.0,1.0);o.ndc=p[i];return o;}

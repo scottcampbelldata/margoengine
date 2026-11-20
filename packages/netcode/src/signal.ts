@@ -8,6 +8,16 @@ const encoder = new TextEncoder(),
   decoder = new TextDecoder('utf-8', { fatal: true });
 const send = (connection: Connection, message: unknown): void =>
   connection.send(encoder.encode(JSON.stringify(message)), 'reliable');
+/** A JSON object from the server, or undefined for bytes that are not UTF-8 JSON of an object. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const readSignal = (data: Uint8Array): Record<string, any> | undefined => {
+  try {
+    const message: unknown = JSON.parse(decoder.decode(data));
+    return message !== null && typeof message === 'object' ? (message as Record<string, unknown>) : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /** Options of {@link SignalServer}. */
 export interface SignalServerOptions {
@@ -131,7 +141,14 @@ export class SignalServer {
     const { kind, room, token } = message;
     if (kind !== 'join' || typeof room !== 'string' || !room || room.length > 128)
       return connection.close(CloseCode.protocol, 'join first, with a room name of 1 to 128 characters');
-    const allowed = (await this.options.authorize?.(room, token as string | undefined)) ?? true;
+    let allowed: boolean;
+    try {
+      allowed = (await this.options.authorize?.(room, token as string | undefined)) ?? true;
+    } catch {
+      // The join runs detached from the transport's callback: an authorize that throws or rejects refuses the peer
+      // here instead of becoming an unhandled rejection.
+      allowed = false;
+    }
     if (!connection.open || this.closed) return;
     if (!allowed) return this.refuse(connection, 'not allowed in this room');
     const peers = this.rooms.get(room);
@@ -245,18 +262,24 @@ export class SignalClient {
         reject(fault('failed', `Signal connection closed before joining (${code} ${reason}); check the server`));
       };
       connection.onmessage = (data) => {
-        const message = JSON.parse(decoder.decode(data));
         signal?.removeEventListener('abort', abort);
-        if (message.kind === 'joined') return resolve(new SignalClient(connection, message.id, message.peers));
+        const message = readSignal(data);
         connection.onclose = null;
-        reject(fault('failed', `Signal join refused: ${message.reason}; check the room name and token`));
+        if (message?.kind === 'joined' && Number.isInteger(message.id) && Array.isArray(message.peers))
+          return resolve(new SignalClient(connection, message.id as number, message.peers as number[]));
+        if (message?.kind === 'refused')
+          return reject(fault('failed', `Signal join refused: ${String(message.reason)}; check the room name and token`));
+        // Bytes that are not a signal reply close the link; the error must not escape into the transport.
+        connection.close(CloseCode.protocol, 'not a signal reply');
+        reject(fault('failed', 'Signal server sent something that is not a join reply; check the server version'));
       };
       send(connection, { kind: 'join', room, token });
     });
   }
 
   private receive(bytes: Uint8Array): void {
-    const message = JSON.parse(decoder.decode(bytes));
+    const message = readSignal(bytes);
+    if (!message) return this.connection.close(CloseCode.protocol, 'not a signal message');
     if (message.kind === 'peer') {
       this.peers.add(message.id);
       this.onpeer?.(message.id);

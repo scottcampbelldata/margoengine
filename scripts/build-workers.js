@@ -4,6 +4,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseSync } from 'rolldown/utils';
 import { build } from 'vite';
+import { STAGING_DIR, distDir } from './support/dist-dir.mjs';
 
 const decoderStub = fileURLToPath(new URL('./worker-decoder-stub.js', import.meta.url)),
   poolStub = fileURLToPath(new URL('./worker-pool-stub.js', import.meta.url)),
@@ -14,11 +15,11 @@ const decoderStub = fileURLToPath(new URL('./worker-decoder-stub.js', import.met
 
 const aliases = [
   { find: /^@margoengine\/decoders$/, replacement: decoderStub },
-  // Browser workers always have createImageBitmap; gltf-pro's Node image fallback would name the decoder package.
+  // Browser workers always have createImageBitmap; gltf/pbr's Node image fallback would name the decoder package.
   { find: /^\.\/node-image-decode\.js$/, replacement: nodeImageStub },
-  // Another package's parser worker (fbx) takes gltf-pro's prepare from the sources, so the stub above applies there
+  // Another package's parser worker (fbx) takes gltf/pbr's prepare from the sources, so the stub above applies there
   // too: the built entry has the Node fallback inlined in a shared chunk.
-  { find: /^@margoengine\/gltf-pro\/prepare$/, replacement: `${packagesDir}gltf-pro/src/prepare.ts` },
+  { find: /^@margoengine\/gltf\/prepare$/, replacement: `${packagesDir}gltf/src/prepare.ts` },
   // A biome world worker never starts workers itself (its world has workers: false).
   { find: /^@margoengine\/biomes\/workers$/, replacement: poolStub },
   // Nor does it get a GPU device (its options name none), so it never loads the GPU kernels.
@@ -28,7 +29,7 @@ const aliases = [
   // Its other entries come from the sources, as its relative imports do: one copy of each module in the file
   // (and one object per hook), where the built entries would add a second copy of the shared modules.
   { find: /^@margoengine\/biomes\/([a-z0-9-]+)$/, replacement: `${biomesSrc}$1.ts` },
-  // A file with Gaussian splats goes back to the page before anything reads them (gltf-pro's asyncCompression).
+  // A file with Gaussian splats goes back to the page before anything reads them (gltf/pbr's asyncCompression).
   { find: /^@margoengine\/splats(\/data)?$/, replacement: emptyStub },
 ];
 
@@ -45,7 +46,7 @@ const WORKER_PARTS = [
     worker: 'biomes.worker.ts',
     pkg: '@margoengine/biomes',
     global: 'MargoBiomes',
-    parts: ['splines', 'erosion', 'graph', 'zones', 'multinoise'],
+    parts: ['splines', 'erosion', 'valley', 'graph', 'zones', 'multinoise'],
   },
 ];
 
@@ -60,10 +61,13 @@ const config = (entry, outDir, fileName, name, plugins = [], write = true) => ({
   configFile: false,
   publicDir: false,
   logLevel: 'warn',
-  // Classic scripts have no module URL. Keep core's identity/version checks, naming the published worker instead.
+  // Classic scripts have no module URL. Keep core's identity/version checks, naming the published worker instead
+  // (in dist, where it is published, not dist-next, where build:packages writes it first).
   define: {
     'import.meta.url': JSON.stringify(
-      `@margoengine/${relative(packagesDir, resolve(outDir, fileName)).replaceAll('\\', '/')}`,
+      `@margoengine/${relative(packagesDir, resolve(outDir, fileName))
+        .replaceAll('\\', '/')
+        .replace(`/${STAGING_DIR}/`, '/dist/')}`,
     ),
   },
   plugins,
@@ -91,9 +95,8 @@ function moduleIds(result) {
 // starts it with new URL('./workers/<name>.js?no-inline', import.meta.url), which the app's bundler copies as an asset,
 // so the worker's code is never part of the app's own bundle. Draco and KTX2 are not part of that script: an IIFE has no
 // import.meta.url, and those codecs run on the thread that can see the decoder package's own assets.
-export async function buildWorkers(root) {
+export async function buildWorkers(root, dist = distDir(root)) {
   const src = resolve(root, 'src'),
-    dist = resolve(root, 'dist'),
     outDir = resolve(dist, 'workers');
   if (!existsSync(src)) return;
   for (const file of (await readdir(src)).filter((file) => file.endsWith('.worker.ts'))) {

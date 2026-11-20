@@ -1,19 +1,30 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { parseFontOutlines } from '../dist/extrude.js';
+import { parseFontOutlines as parseLean } from '../dist/extrude.js';
+import { openType } from '@margoengine/loaders/font-opentype';
 import { Text } from '../dist/index.js';
+import { GlyphFieldFont } from '../dist/outline.js';
 import {
   CUBIC_TOLERANCE,
   toQuadratics,
   vectorCoverage,
-  VectorFont,
+  VectorFont as VectorFontLean,
   VectorGlyphStore,
   VectorTextRenderer,
 } from '../dist/vector.js';
+// These tests read CFF and variable fonts, so they pass the OpenType readers; tests/opentype-optin.test.js covers the
+// lean TrueType path without them.
+const parseFontOutlines = (bytes, options = {}) => parseLean(bytes, { openType, ...options });
+class VectorFont extends VectorFontLean {
+  constructor(data, options = {}) {
+    super(data, { openType, ...options });
+  }
+}
 
 const fonts = new URL('./fixtures/fonts/', import.meta.url);
 const bytes = (name) => readFileSync(new URL(name, fonts));
+const kerningReference = JSON.parse(readFileSync(new URL('kerning-reference.json', fonts), 'utf8'));
 const ttf = parseFontOutlines(bytes('SourceSans3-Regular.ttf')),
   otf = parseFontOutlines(bytes('SourceSans3-Regular.otf')),
   cjk = parseFontOutlines(bytes('NotoSansSC-subset.ttf'));
@@ -289,11 +300,19 @@ test('VectorFont measures from the file and builds each glyph once', () => {
   assert.equal(font.loaded, true);
   assert.equal(font.advance('H'), ttf.glyphAdvance(ttf.glyphIndex('H')));
   assert.equal(font.advance('H‍️'), font.advance('H'), 'joiners and variation selectors draw and measure nothing');
-  assert.equal(font.kerning('A', 'V'), 0, 'no FontFace in Node: no kerning source');
+  // Kerning comes from the file's GPOS in Node too (it was 0 here before VectorFont became a GlyphFieldFont).
+  assert.ok(font instanceof GlyphFieldFont, 'a VectorFont is a GlyphFieldFont');
+  assert.equal(Math.round(font.kerning('A', 'V') * font.unitsPerEm), kerningReference.fonts['SourceSans3-Regular.ttf'].AV, 'A V kerns as Chromium measures it');
+  assert.ok(font.kerning('A', 'V') < 0);
+  assert.ok(font.advance('AV') < font.advance('A') + font.advance('V'), 'a run advance includes its kerning');
+  assert.equal(font.clusterGlyphs('AV')[1].x, font.advance('A') + font.kerning('A', 'V'), 'the vector path places a kerned run as shape() does');
+  assert.equal(new VectorFont(bytes('SourceSans3VF-Upright.ttf'), { variations: { wght: 900 } }).kerning('A', 'V'), 0, 'a varied instance has no kerning');
+  assert.ok(font.clusterGlyphs('office').length < 6, 'a shaped run (ligatures: true) draws the ffi ligature in the vector path too');
   assert.deepEqual(font.metrics(), { ascent: ttf.ascender / ttf.unitsPerEm, descent: -ttf.descender / ttf.unitsPerEm });
-  const first = font.clusterGlyphs('é');
+  assert.deepEqual(font.clusterGlyphs('é').map((g) => g.glyph.id), [ttf.glyphIndex('é')], 'a decomposed cluster draws the precomposed glyph the font has');
+  const first = font.clusterGlyphs('q́');
   assert.equal(first.length, 2);
-  assert.equal(first[1].x, ttf.glyphAdvance(ttf.glyphIndex('e')));
+  assert.equal(first[1].x, ttf.glyphAdvance(ttf.glyphIndex('q')));
   const revision = font.store.revision;
   assert.equal(font.vectorGlyph(first[0].glyph.id), first[0].glyph);
   assert.equal(font.store.revision, revision, 'a built glyph is not packed again');

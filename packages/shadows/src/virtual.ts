@@ -19,6 +19,7 @@ import { viewMatrix } from '../../shared/view.js';
 import { geometrySurface, meshTriangles } from '../../shared/mesh-source.js';
 import { sectionState, sectionShader } from '../../shared/section.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { CasterGroups, isCasterGroup } from '../../shared/shadow-group.js';
 import { invert } from '../../shared/math.js';
 import {
   casterPipeline,
@@ -45,8 +46,11 @@ import {
 import {
   shadowDepth,
   effectEntries,
+  effectsRevised,
+  rebindEffects,
   moveEffects,
   validEffects,
+  checkSoft,
   type ShadowEffect,
   type ShadowEffectFrame,
   type ShadowFilter,
@@ -96,6 +100,18 @@ export interface VirtualShadowOptions {
   budgetPages?: number;
   /** Light size for the `'soft'` filter's penumbra width, 0 or more. Default 0.02. */
   lightSize?: number;
+  /** The `'soft'` filter's comparison taps per lit pixel, a whole number from 1 to 128, as `Shadows`. Default 32. Live. */
+  samples?: number;
+  /**
+   * The `'soft'` filter's blocker-search reads per lit pixel, a whole number from 1 to 128, as `Shadows`. Default 16;
+   * fewer give noisier penumbrae. Live.
+   */
+  blockerSamples?: number;
+  /**
+   * The `'soft'` filter's focus, as `Shadows`: the blocker-to-receiver distance, world units, 0 or more, at which the
+   * penumbra is sharpest. Default 0: sharpest where a caster touches the receiver. Live.
+   */
+  focus?: number;
   /**
    * Extra constant depth bias along the light, world units, 0 or more. Default 0. Every receiver already compares 2^-20
    * of the depth range nearer the light, and the range follows the default reach, so any model scale works without it.
@@ -123,6 +139,10 @@ interface Source {
   receive: boolean;
   version: number;
   removeLighting?: () => void;
+  /** Taken out of `sources` (removed, or its mesh was disposed). */
+  gone?: boolean;
+  /** Registered by the walk below an added node, not added by hand. */
+  grouped?: boolean;
   meshPrimitive?: ShadowPrimitive[];
   primitiveBuffer?: ShadowPrimitive[];
 }
@@ -213,9 +233,19 @@ export class VirtualShadows implements EnginePlugin {
   private entries: GPUBindGroupEntry[] = [];
   private disposed = false;
   private sources: Source[] = [];
+  /** The casters below each added group, kept in step once a frame. */
+  private readonly groups = new CasterGroups<Source>();
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
   private readonly hooks = new Map<number, { declarations: string; direct(direct: string, normal?: string): string }>();
   private readonly shaders = new Map<number, Map<string, string>>();
+  // The effects' last `revision`s: a change composes every receiver's shader again (code an effect loads has arrived).
+  private readonly revisions: number[] = [];
+  private revise(): void {
+    if (effectsRevised(this.effects as readonly ShadowEffect[], this.revisions)) {
+      this.shaders.clear();
+      this.hooks.clear();
+    }
+  }
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly draws = new Map<Mesh, Map<object, Draw>>();
   private casters: Draw[] = [];
@@ -251,7 +281,7 @@ export class VirtualShadows implements EnginePlugin {
   private serial = 0;
   private table = new Uint32Array(0);
   private centers = new Int32Array(0);
-  private readonly values = new Float32Array(116);
+  private readonly values = new Float32Array(120);
   private readonly view = this.values.subarray(0, 16);
   private readonly right = this.values.subarray(16, 19);
   private readonly up = this.values.subarray(20, 23);
@@ -297,6 +327,8 @@ export class VirtualShadows implements EnginePlugin {
         throw new RangeError(
           'Invalid virtual shadow options: lightSize, bias, normalBias and casterMargin must be finite and 0 or more',
         );
+    // samples, blockerSamples and focus, checked as Shadows checks them (shader.ts).
+    checkSoft(o);
     const filter = o.filter ?? 'soft';
     if (filter !== 'soft' && filter !== 'pcf' && filter !== 'hard')
       throw new RangeError(`Invalid shadow filter '${String(filter)}': use 'soft', 'pcf' or 'hard'`);
@@ -312,8 +344,11 @@ export class VirtualShadows implements EnginePlugin {
     return this.engine;
   }
   /**
-   * Adds `source` (a core mesh, gltf-pro model, materials mesh, terrain, scatter, voxels or other source) as a caster and,
-   * for sources with their own lighting (`addLighting`), a receiver. `castShadow: false` keeps it out of the map;
+   * Adds `source` (a core mesh, gltf/pbr model, materials mesh, terrain, scatter, voxels or other source) as a caster and,
+   * for sources with their own lighting (`addLighting`), a receiver. A group (a mesh with no geometry of its own, such
+   * as a model's `root`) casts every mesh with geometry below it, each gltf/pbr model below it once, with the same
+   * options; meshes parented to it later cast from the next frame, and the remover takes every one of them out. A mesh
+   * with its own geometry casts itself and every mesh with geometry below it the same way; one you also add by hand is cast once. `castShadow: false` keeps it out of the map;
    * `receiveShadow: false` leaves its lighting unshadowed. `static` keeps its pages cached until it changes; a `drawShadow`
    * source without it redraws every resident page every frame. Returns the remover.
    */
@@ -350,8 +385,45 @@ export class VirtualShadows implements EnginePlugin {
         'attached',
         'Shadow source belongs to another engine; use objects created by the same engine',
       );
-    if (this.sources.some((r) => r.source === runtime))
+    if (isCasterGroup(runtime)) {
+      if (this.groups.has(runtime)) throw new MargoError('attached', 'Duplicate shadow source; add each source once');
+      return this.below(runtime, { static: cached, castShadow, receiveShadow });
+    }
+    const taken = this.sources.find((r) => r.source === runtime);
+    // A mesh the walk below another node already casts becomes this source; the walk skips it from the next frame.
+    if (taken && !taken.grouped)
       throw new MargoError('attached', 'Duplicate shadow source; add each source once');
+    if (taken) this.unregister(taken);
+    const r = this.register(runtime, { static: cached, castShadow, receiveShadow });
+    // A mesh with its own geometry casts itself and every mesh below it, those parented later too.
+    const unwatch = 'id' in runtime && (runtime as unknown as Mesh).geometry ? this.below(runtime as unknown as Mesh, { static: cached, castShadow, receiveShadow }) : undefined;
+    return () => {
+      unwatch?.();
+      this.unregister(r);
+    };
+  }
+  /** Casts every mesh with geometry below `node` with `options`, as they are parented and until the remover runs. */
+  private below(
+    node: Mesh,
+    options: { static: boolean; castShadow: boolean; receiveShadow: boolean },
+  ): () => void {
+    return this.groups.add(
+      node,
+      (mesh) => {
+        const r = this.register(mesh, options);
+        r.grouped = true;
+        return r;
+      },
+      (record) => this.unregister(record),
+      (record) => !!record.gone,
+      (mesh) => this.sources.some((r) => r.source === mesh),
+    );
+  }
+  /** Adds one caster that is no group (`runtime` is a live mesh of this engine, or a shadow source). */
+  private register(
+    runtime: ReturnType<typeof meshRuntime> | ShadowSource,
+    { static: cached, castShadow, receiveShadow }: { static: boolean; castShadow: boolean; receiveShadow: boolean },
+  ): Source {
     const triangles = 'id' in runtime ? meshTriangles(runtime) : undefined,
       lightingSource = triangles?.kind === 'pbr' ? (triangles.source.model as ShadowSource) : (runtime as ShadowSource);
     let removeLighting: (() => void) | undefined;
@@ -386,14 +458,16 @@ export class VirtualShadows implements EnginePlugin {
     };
     this.sources.push(r);
     this.invalidate();
-    return () => {
-      const index = this.sources.indexOf(r);
-      if (index >= 0) {
-        this.sources.splice(index, 1);
-        r.removeLighting?.();
-        this.invalidate();
-      }
-    };
+    return r;
+  }
+  private unregister(r: Source): void {
+    const index = this.sources.indexOf(r);
+    if (index >= 0) {
+      this.sources.splice(index, 1);
+      r.gone = true;
+      r.removeLighting?.();
+      this.invalidate();
+    }
   }
   /** Draws every resident page again next frame. */
   invalidate(): void {
@@ -407,6 +481,7 @@ export class VirtualShadows implements EnginePlugin {
   }
   /** Patches core's or a material's lighting shader `source` to receive, for bind group `group`. */
   shader(source: string, group = 0): string {
+    this.revise();
     const filter = this.options.filter ?? 'soft',
       receive = unshadowedCore(this.engine, source),
       key = shaderKey(filter, group) + (receive ? 1 : 0);
@@ -431,8 +506,9 @@ export class VirtualShadows implements EnginePlugin {
     cache.set(source, output);
     return output;
   }
-  /** gltf-pro lighting hooks for bind group `group`. */
+  /** gltf\/pbr lighting hooks for bind group `group`. */
   pbr(group: number): { declarations: string; direct(direct: string, normal?: string): string } {
+    this.revise();
     const filter = this.options.filter ?? 'soft',
       key = shaderKey(filter, group);
     let hooks = this.hooks.get(key);
@@ -450,6 +526,23 @@ export class VirtualShadows implements EnginePlugin {
         }),
       );
     return hooks;
+  }
+  private elapsed = 0;
+  /** Seconds of frame time the effects' own clocks have moved by (a `lightPattern`'s scroll). A fresh one reads 0. */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves the effects' own clocks by `delta` seconds: the CPU part of the frame update, which a seek from
+   * `@margoengine/cutscene/seek` replays.
+   */
+  advanceTime(delta: number): void {
+    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid shadow delta; pass finite seconds >= 0');
+    this.elapsed += delta;
+    for (const effect of this.effects) effect.advanceTime?.(delta);
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   /** Allocates the pools and the page table. Called by `engine.use`. */
   setup(engine: Engine): void {
@@ -495,7 +588,7 @@ export class VirtualShadows implements EnginePlugin {
       size: 64,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     });
-    this.uniform = device.createBuffer({ size: 528, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({ size: 544, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ compare: 'less-equal', magFilter: 'linear', minFilter: 'linear' });
     this.alphaSampler = device.createSampler();
     // One white texel stands in for the alpha map of casters without one.
@@ -510,7 +603,7 @@ export class VirtualShadows implements EnginePlugin {
       { binding: 3, resource: this.sampler },
       { binding: 31, resource: this.tableTexture.createView({ dimension: '2d-array' }) },
     ];
-    for (const effect of this.effects) effect.setup?.(device, { width: size, height: size, layers: 1 });
+    for (const effect of this.effects) effect.setup?.(device, { width: size, height: size, layers: 1, engine: this.engine });
     this.entries.push(...effectEntries(this.effects as readonly ShadowEffect[]));
     if ((o.filter ?? 'soft') === 'soft' && compatibilityLevel(device))
       this.entries.push({ binding: 30, resource: poolView });
@@ -638,6 +731,8 @@ export class VirtualShadows implements EnginePlugin {
     this.previous = this.casters;
     this.casters = before;
     before.length = 0;
+    // Meshes parented to an added group since the last frame join the casters, and meshes that left it drop out.
+    if (this.groups.size) this.groups.sync();
     for (let i = this.sources.length - 1; i >= 0; i--) {
       const r = this.sources[i];
       if (
@@ -645,6 +740,7 @@ export class VirtualShadows implements EnginePlugin {
         ('id' in r.source && this.engine!.meshes.get(r.source.id) !== r.source)
       ) {
         this.sources.splice(i, 1);
+        r.gone = true;
         r.removeLighting?.();
         this.dirty = true;
       }
@@ -781,9 +877,11 @@ export class VirtualShadows implements EnginePlugin {
     if (animation && p.stride !== 80) throw new RangeError('UV-animated shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
+      hashed = (p.cutoff ?? 0) > 0 ? p.hashed : undefined,
       key =
         (displacement?.key ?? '') +
         (p.stride +
+          (hashed ? 512 : 0) +
           (transform ? 1 : 0) +
           (inst ? 2 : 0) +
           (lines ? 4 : 0) +
@@ -800,6 +898,7 @@ export class VirtualShadows implements EnginePlugin {
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
       if (animation) code = animatedDepth(code, 0);
+      if (hashed) code = hashed(code);
       if (section) {
         code = code
           .replace('struct Out {', 'struct Out {@location(2) position:vec3f,')
@@ -1064,6 +1163,10 @@ export class VirtualShadows implements EnginePlugin {
     values[33] = PAGE_TEXELS / (o.poolSize ?? 4096);
     values[34] = levels;
     values[35] = distance;
+    // The 'soft' filter's taps, blocker reads and focus (shader.ts `pcss`), as Shadows writes them.
+    values[116] = o.samples ?? 32;
+    values[117] = o.blockerSamples ?? 16;
+    values[118] = o.focus ?? 0;
     c.device.queue.writeBuffer(this.uniform!, 0, values as Float32Array<ArrayBuffer>);
     const serial = ++this.serial,
       section = sectionState(c);
@@ -1111,6 +1214,7 @@ export class VirtualShadows implements EnginePlugin {
       frame.changed = true;
       for (let i = 0; i < this.effects.length; i++) this.effects[i].update?.(frame);
       frame.context = undefined!;
+      rebindEffects(this.entries, this.effects as readonly ShadowEffect[]);
     }
   }
   /** Reduces each level's mapped pages to the level's nearest depth for the PCSS search, when pages changed. */
@@ -1134,7 +1238,7 @@ export class VirtualShadows implements EnginePlugin {
     pass.setBindGroup(0, this.nearestGroup);
     pass.dispatchWorkgroups(PAGES_PER_SIDE, PAGES_PER_SIDE, this.pages!.levels);
     pass.end();
-    c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 464, 64);
+    c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 480, 64);
     this.nearestStale = false;
   }
   private pagePipelines(device: GPUDevice): void {
@@ -1376,6 +1480,7 @@ export class VirtualShadows implements EnginePlugin {
     if (this.disposed) return;
     this.disposed = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.groups.clear();
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
     this.casters.length = this.receivers.length = this.customReceivers.length = 0;

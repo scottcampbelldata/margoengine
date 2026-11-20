@@ -5,7 +5,7 @@
 ```ts
 import { Vec3 } from "@margoengine/core";
 import { MutableVec3 } from "@margoengine/math";
-import { Snapshot, SnapshotBuffer } from "@margoengine/net";
+import { Snapshot, SnapshotBuffer } from "@margoengine/netcode/interpolation";
 import { BlockTypes, PackedChunk, VoxelWorld } from "@margoengine/voxel";
 import { NoiseTerrainOptions } from "@margoengine/voxel/generate";
 import { VoxelCharacter, VoxelCharacterOptions } from "@margoengine/voxel/query";

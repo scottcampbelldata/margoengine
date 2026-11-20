@@ -1,15 +1,15 @@
 // Real-GPU check of physical materials on meshes built in code. Correctness only (no timing). After
-// npm run build:packages, on AC power, under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/physical-gpu.mjs [--only=side,brdf,refraction,lit]
-// 1. Side by side: a materials sphere and the equivalent glTF sphere (gltf-pro) for glass (refracting a checkerboard),
+// npm run build:packages, on AC power:
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/physical-gpu.mjs [--only=side,brdf,refraction,lit]
+// 1. Side by side: a materials sphere and the equivalent glTF sphere (gltf/pbr) for glass (refracting a checkerboard),
 //    clearcoat car paint and sheen fabric, MSAA 4x: linear HDR capture and the displayed 8-bit frame.
 // 2. BRDF terms: car paint and fabric under one directional light without ambient against the CPU reference
-//    (packages/materials/test/physical-reference.js, composed as gltf-pro's physical shader composes them), per pixel.
+//    (packages/materials/test/physical-reference.js, composed as gltf/pbr's physical shader composes them), per pixel.
 // 3. Refraction: the light the glass adds over a checkerboard (frame with checkerboard minus frame without) against the
 //    CPU model of the same terms (refracted exit point, scene mip chain, Beer-Lambert volume, 1 - Fresnel), 1x and 4x;
 //    the same pixels without refraction as a control.
 // 4. Lit: each preset, both kinds, refracting, with shadows, IBL, fog and clustered lights + LocalShadows: renders with 0
-//    validation errors or throws gltf-pro's named texture-limit error (a glTF physical material has 13 textures of its own).
+//    validation errors or throws gltf/pbr's named texture-limit error (a glTF physical material has 13 textures of its own).
 // Every frame is checked for 0 WebGPU validation errors. Writes results/physical-gpu.json and test-results/physical-*.png.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
@@ -141,7 +141,7 @@ const trilinear = (chain, u, v, lod) => {
   return a.map((x, k) => x * (1 - t) + b[k] * t);
 };
 
-// gltf-pro's physical fragment for one directional light and no ambient, from the reference terms.
+// gltf/pbr's physical fragment for one directional light and no ambient, from the reference terms.
 function physicalDirect(o, n, v) {
   const l = LIGHT.direction,
     light = LIGHT.intensity,

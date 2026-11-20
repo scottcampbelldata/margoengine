@@ -1,11 +1,17 @@
 // Spec-scoped comparison of hardware mip footprints (Scott's ruling of 2026-11-10; docs/known-bugs.md, "AMD D3D11
 // compressed mip blend"). WebGPU 7.1.1 leaves the precise filtering behavior implementation-dependent, and the AMD
 // D3D11 driver under ANGLE blends two mip levels with a compressed weight, clamp((frac - 0.1) / 0.8, 0, 1), where
-// native WebGPU (D3D12) on the same GPU uses frac. A raw WebGL2 probe classifies the backend:
+// native WebGPU (D3D12) on the same GPU uses frac. A raw WebGL2 probe, beside native's own, classifies the backend:
 // - linear blend: the layer must still equal native bit for bit (the callers keep their exact assertions);
-// - compressed blend: native and the layer must pick the same LOD (equal nearest-mip sweeps, compared exactly) and
-//   every blended texel must be exactly what each side's own sampler returns at one LOD of the 1/256 grid: native
-//   against native textureSampleLevel, the layer against raw WebGL2 textureLod at that same LOD.
+// - same as native: raw WebGL2 returns native's bits at every probed LOD (one sampler under both APIs, as Metal under
+//   Dawn and ANGLE on Apple silicon, whose explicit LOD is snapped to 1/64), so there is no driver difference to
+//   excuse and the layer must equal native bit for bit too;
+// - compressed blend (it differs from native): native and the layer must pick the same LOD (equal nearest-mip
+//   sweeps, compared exactly) and every blended texel must be exactly what each side's own sampler returns at one LOD
+//   of the 1/256 grid: native against native textureSampleLevel, the layer against raw WebGL2 textureLod at that LOD.
+//   That last step assumes a sampler's explicit LOD is as fine as its footprint LOD, which WebGPU does not promise;
+//   it held on the AMD D3D11 backend it was written for. Metal breaks it (explicit LOD 1/64, footprint LOD about
+//   1/256), which is why a backend equal to native never takes this path (docs/known-bugs.md, "Metal mip blend").
 // No tolerance is widened: every comparison here is of IEEE-754 bits.
 
 /** LODs k/256 for k = 0..1024, as the blend probe in features.html renders them. */
@@ -13,10 +19,12 @@ export const PROBE_LODS = 1025;
 
 /**
  * The backend's mip blend from a probe between a white level 0 and a black level 1 (the first 257 LODs of a
- * blendProbe([255, 0, 255, 0, 255]) result): 'linear' when every weight 1 - value is within 1/256 (one step of the
- * hardware's LOD fraction) of k/256, else 'compressed'. Also returns the worst weight seen.
+ * blendProbe([255, 0, 255, 0, 255]) result, raw WebGL2 and native WebGPU): 'linear' when every WebGL2 weight
+ * 1 - value is within 1/256 (one step of the hardware's LOD fraction) of k/256; else 'native' when the WebGL2 bits
+ * equal native's at every probed LOD (the same sampler under both APIs); else 'compressed'. Also returns the worst
+ * WebGL2 weight seen.
  */
-export function classifyBlend(whiteBlackBits) {
+export function classifyBlend(whiteBlackBits, nativeBits) {
   const values = new Float32Array(Uint32Array.from(whiteBlackBits).buffer);
   let worst = { k: 0, weight: 0, error: 0 };
   for (let k = 0; k <= 256; k++) {
@@ -24,7 +32,9 @@ export function classifyBlend(whiteBlackBits) {
     const error = Math.abs(weight - k / 256);
     if (error > worst.error) worst = { k, weight, error };
   }
-  return { blend: worst.error > 1 / 256 ? 'compressed' : 'linear', worst };
+  if (!nativeBits) throw new TypeError('classifyBlend needs native WebGPU probe bits beside the WebGL2 ones');
+  const blend = worst.error <= 1 / 256 ? 'linear' : same([...whiteBlackBits], [...nativeBits]) ? 'native' : 'compressed';
+  return { blend, worst };
 }
 
 const texel = (bits, i) => bits.slice(i * 4, i * 4 + 4);

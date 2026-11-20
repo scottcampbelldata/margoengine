@@ -1,0 +1,12 @@
+{
+ "proof": "gltf-pbr-lighting-hooks",
+ "ref": "8c71da0556",
+ "revision": "8c71da0556d86e43094bf3738f8651ad3775c90f",
+ "capturedAt": "b3c8204ded004c631b0bf8e3310b8ac886843431",
+ "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
+ "facts": {},
+ "outputs": {
+  "1x": "af22a643fb039a5051dd3efb996b6ab939bc12e2fa5b97530bc51f1838e9d2a4",
+  "4x": "5a2434f18c3cb8145462f9cf967608ccff085d98a38ad74b0f308ebdfb85f5f5"
+ }
+}

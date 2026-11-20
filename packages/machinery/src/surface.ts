@@ -5,6 +5,7 @@ import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Engine, EnginePlugin, Vec3 } from '@margoengine/core/extension';
 import { machineryMemory } from './runtime.js';
 import { checkCount, countLimit } from '../../shared/limits.js';
+import { captureScene } from '../../shared/scene-scope.js';
 /** A moving surface (a belt or roller): `velocity` in scene units per second, `angularVelocity` in radians per second about the node, and `contactOffset` from the node to the contact point. */
 export interface SurfaceCarrier {
   node: MeshHandle;
@@ -74,8 +75,10 @@ export class SurfacePhysics implements EnginePlugin {
     carriers: readonly SurfaceCarrier[],
     options?: SurfaceOptions,
   ): Promise<SurfacePhysics> {
-    const value = await SurfacePhysics.create(parts, carriers, options);
-    engine.use(value);
+    // The scene attach was called for, kept across the await.
+    const scope = captureScene(engine),
+      value = await SurfacePhysics.create(parts, carriers, options);
+    scope.run(() => engine.use(value));
     return value;
   }
   static async create(

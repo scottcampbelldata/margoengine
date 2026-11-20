@@ -135,7 +135,8 @@ test('selection bounds, output limits, missing signatures and malformed headers 
   await assert.rejects(openNetCDF(new Uint8Array(32)), /CDF-1 and CDF-2/);
   await assert.rejects(openNetCDF(cdf().subarray(0, 60)), /header ends early/);
   await assert.rejects(openNetCDF(cdf(), { maxBytes: 32 }), /header exceeds/);
-  const invalidText = cdf(); invalidText[invalidText.indexOf(Buffer.from('Temperature'))] = 255;
+  const invalidText = cdf();
+  invalidText[invalidText.indexOf(Buffer.from('Temperature'))] = 255;
   await assert.rejects(openNetCDF(invalidText), /UTF-8.*https:\/\/margoengine/);
 });
 
@@ -172,6 +173,83 @@ test('HTTP Range handles valid 206 and bounded 200 responses, refusing mismatche
   for (mode of ['offset', 'length']) await assert.rejects(openNetCDF('https://files.invalid/wind.nc'), /Content-Range/);
   mode = 'whole';
   await assert.rejects(openNetCDF('https://files.invalid/wind.nc', { maxBytes: 32 }), /bounded read/);
+});
+
+// One fixed-size variable `v` over dimension x; attrs are [name, type, values or text]; data are stored values.
+function cdfVar(type, attrs, data) {
+  const size = [0, 1, 1, 2, 4, 4, 8][type],
+    parts = [];
+  const u32 = (n) => {
+    const b = Buffer.alloc(4);
+    b.writeUInt32BE(n);
+    parts.push(b);
+  };
+  const pad = (b) => parts.push(b, Buffer.alloc((4 - (b.length % 4)) % 4));
+  const text = (s) => (u32(Buffer.byteLength(s)), pad(Buffer.from(s)));
+  const values = (t, list) => {
+    const n = [0, 1, 1, 2, 4, 4, 8][t],
+      b = Buffer.alloc(list.length * n);
+    list.forEach((x, i) =>
+      [
+        ,
+        () => b.writeInt8(x, i),
+        ,
+        () => b.writeInt16BE(x, i * 2),
+        () => b.writeInt32BE(x, i * 4),
+        () => b.writeFloatBE(x, i * 4),
+        () => b.writeDoubleBE(x, i * 8),
+      ][t](),
+    );
+    return b;
+  };
+  parts.push(Buffer.from([67, 68, 70, 1]));
+  u32(0);
+  u32(10), u32(1), text('x'), u32(data.length);
+  u32(0), u32(0);
+  u32(11), u32(1), text('v'), u32(1), u32(0);
+  u32(12), u32(attrs.length);
+  for (const [key, t, v] of attrs) {
+    text(key);
+    u32(t);
+    if (t === 2) text(v);
+    else u32(v.length), pad(values(t, v));
+  }
+  u32(type);
+  u32(Math.ceil((data.length * size) / 4) * 4);
+  const begin = Buffer.alloc(4);
+  parts.push(begin);
+  begin.writeUInt32BE(Buffer.concat(parts).length);
+  pad(values(type, data));
+  return Buffer.concat(parts);
+}
+const readVar = async (type, attrs, data, options) => {
+  using file = await openNetCDF(cdfVar(type, attrs, data));
+  return [...(await file.variables.v.read(options))];
+};
+
+test('a byte variable without _FillValue keeps -127; the default fill of other types bounds the valid range', async () => {
+  assert.deepEqual(await readVar(1, [], [-128, -127, 0, 127]), [-128, -127, 0, 127]);
+  assert.deepEqual(await readVar(1, [['_FillValue', 1, [-127]]], [-128, -127, 0]), [NaN, NaN, 0]);
+  assert.deepEqual(await readVar(3, [], [-32768, -32767, -32766, 7]), [NaN, NaN, -32766, 7]);
+  assert.deepEqual(await readVar(4, [['_FillValue', 4, [99]]], [98, 99, 100]), [98, NaN, NaN]);
+  assert.deepEqual(await readVar(5, [], [1.5, 9.969209968386869e36, 3e38]), [1.5, NaN, NaN]);
+  assert.deepEqual(await readVar(3, [['valid_min', 3, [-32768]]], [-32768, -32767]), [-32768, NaN]);
+});
+
+test('_Unsigned = "true" reads byte, short and int data and same-typed attributes as unsigned', async () => {
+  const u = ['_Unsigned', 2, 'true'];
+  assert.deepEqual(await readVar(1, [u], [-1, -128, 5]), [255, 128, 5]);
+  assert.deepEqual(await readVar(1, [u, ['_FillValue', 1, [-1]]], [-1, -2, 0]), [NaN, 254, 0]);
+  assert.deepEqual(await readVar(3, [u], [-1, -32767, 1]), [NaN, NaN, 1]);
+  assert.deepEqual(await readVar(3, [u, ['valid_max', 3, [-2]], ['missing_value', 3, [-3]]], [-1, -2, -3]), [
+    NaN,
+    65534,
+    NaN,
+  ]);
+  assert.deepEqual(await readVar(4, [u, ['valid_range', 6, [0, 4294967295]]], [-1, 2]), [4294967295, 2]);
+  assert.deepEqual(await readVar(4, [u], [-1, -2], { unpack: false }), [4294967295, 4294967294]);
+  assert.deepEqual(await readVar(1, [u, ['scale_factor', 5, [0.5]], ['_FillValue', 1, [0]]], [-2, 0]), [127, NaN]);
+  assert.deepEqual(await readVar(1, [['_Unsigned', 2, 'false']], [-1]), [-1]);
 });
 
 const xml = (type, attrs, piece, content) =>

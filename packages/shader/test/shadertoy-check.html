@@ -1,0 +1,296 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Shadertoy programs</title><style>body{margin:0}canvas{width:32px;height:32px;display:block}</style></head><body><canvas id="margo"></canvas>
+<script type="module">
+// Each source of test/shadertoy-fixtures.js through Shadertoy as a pass, as toy.texture shown by a pass, and as
+// toy.material() on a quad, against the same wrapped GLSL in the browser's own WebGL2 (the oracle) with the same
+// inputs, textures and GL matrices. All targets are 8-bit display colour, as the oracle's readback is.
+import {Engine} from '/packages/core/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {RawShaders} from '/packages/shader/dist/raw.js';
+import {shaderMesh} from '/packages/shader/dist/glsl-material.js';
+import {ShaderPass} from '/packages/shader/dist/glsl-pass.js';
+import {Shadertoy} from '/packages/shader/dist/shadertoy.js';
+import {toyFixtures,inputs,texels,multiFixtures,audio,keyEvents,keyRows,paint,cubeFixtures,vrFixture,soundFixtures} from '/packages/shader/test/shadertoy-fixtures.js';
+import {passGenerator} from '/packages/shader/test/glsl-pass-fixtures.js';
+const W=32,H=32,canvas=document.querySelector('#margo');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:[W,H]}),device=engine.gpu,errors=[];
+engine.scene.background='#30507a';
+Object.assign(engine.camera,{position:[0,0,2],target:[0,0,0],fov:60,near:0.1,far:10});
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.onError=e=>errors.push(e.message);
+const raw=RawShaders.attach(engine);
+// The quad of the mesh leg covers the canvas; a ShaderMaterial reads uv as given (v up, as GL's).
+const quad={positions:[-1.5,-1.5,0,1.5,-1.5,0,1.5,1.5,0,-1.5,1.5,0],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]},glUv=[0,0,1,0,1,1,0,1];
+const sizes={'2d':[8,8,1],cube:[4,4,6],'3d':[4,4,4]};
+function gpuTexture(kind){
+  const [w,h,d]=sizes[kind],texture=device.createTexture({size:[w,h,d],dimension:kind==='3d'?'3d':'2d',format:'rgba8unorm',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+  device.queue.writeTexture({texture},texels(kind),{bytesPerRow:w*4,rowsPerImage:h},[w,h,d]);
+  return texture;
+}
+const channelsOf=(f)=>Object.fromEntries(Object.entries(f.channels).map(([k,c])=>[k,c.kind==='input'?'input':{texture:gpuTexture(c.kind),type:c.kind,filter:c.filter,wrap:c.wrap}]));
+let toy,stack,mesh,extra=[];
+const clear=()=>{stack?.dispose();if(mesh)raw.remove(mesh);mesh=undefined;toy?.dispose();for(const e of extra.splice(0))e.dispose();toy=stack=undefined;};
+const apply=(which)=>{const v=inputs[which-1];toy.pause();Object.assign(toy,{time:v.time,frame:v.frame,timeDelta:v.timeDelta,frameRate:v.frameRate,mouse:[...v.mouse]});toy.date=v.date;};
+const settle=async()=>{await waitForPipelines(async()=>{engine.render();await device.queue.onSubmittedWorkDone();await toy?.ready();for(const e of extra)await e.ready?.();await raw.ready();});return errors.splice(0);};
+function oracle(f,mode,which,image){
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const gl=c.getContext('webgl2',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+  const program=mode==='generator'?{vertex:'attribute vec3 position;void main(){gl_Position=vec4(position.xy,0.0,1.0);}\n',fragment:passGenerator.fragment}
+    :mode==='mesh'?{vertex:toy.meshShaders.vertexShader.replace('#version 300 es\n','#version 300 es\nuniform mat4 projectionMatrix;uniform mat4 modelViewMatrix;\n'),fragment:toy.meshShaders.fragmentShader}
+    :{vertex:'#version 300 es\nin vec3 position;void main(){gl_Position=vec4(position.xy,0.0,1.0);}\n',fragment:toy.fragmentShader};
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+source);return s;};
+  const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,program.vertex));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,program.fragment));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+  const stream=(name,data,size)=>{const at=gl.getAttribLocation(p,name);if(at<0)return;const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,0,0);};
+  if(mode==='mesh'){stream('position',quad.positions,3);stream('uv',glUv,2);
+    const u=(n)=>gl.getUniformLocation(p,n),{view,projection}=glCamera(engine.camera);gl.uniformMatrix4fv(u('projectionMatrix'),false,projection);gl.uniformMatrix4fv(u('modelViewMatrix'),false,view);
+    const b=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(quad.indices),gl.STATIC_DRAW);}
+  else stream('position',[-1,-1,0,3,-1,0,-1,3,0],3);
+  if(mode!=='generator'){
+    const v=inputs[which-1],u=(n)=>gl.getUniformLocation(p,n),res=mode==='mesh'?toy.resolution:[W,H];
+    gl.uniform3f(u('iResolution'),res[0],res[1],1);gl.uniform1f(u('iTime'),v.time);gl.uniform1f(u('iTimeDelta'),v.timeDelta);gl.uniform1f(u('iFrameRate'),v.frameRate);
+    gl.uniform1i(u('iFrame'),v.frame);gl.uniform4fv(u('iMouse'),v.mouse);gl.uniform4fv(u('iDate'),v.date);gl.uniform1f(u('iSampleRate'),44100);gl.uniform1fv(u('iChannelTime'),[0,0,0,0]);
+    const cres=[0,0,0,0,0,0,0,0,0,0,0,0];
+    Object.entries(f.channels).forEach(([k,ch])=>{const i=+k.at(-1),unit=i;cres.splice(i*3,3,...(ch.kind==='input'?[W,H,1]:ch.kind==='3d'?sizes['3d']:[sizes[ch.kind][0],sizes[ch.kind][1],1]));
+      gl.uniform1i(u(k),unit);gl.activeTexture(gl.TEXTURE0+unit);const t=gl.createTexture(),filter=ch.filter==='nearest'?gl.NEAREST:gl.LINEAR,wrap=ch.wrap==='repeat'?gl.REPEAT:gl.CLAMP_TO_EDGE;
+      const target=ch.kind==='cube'?gl.TEXTURE_CUBE_MAP:ch.kind==='3d'?gl.TEXTURE_3D:gl.TEXTURE_2D;gl.bindTexture(target,t);
+      if(ch.kind==='input'||ch.kind==='2d'){
+        // Rows from the top, so GL's bottom-up rows take them in reverse (Margo's v flip at 2D lookups).
+        const [w,h]=ch.kind==='input'?[W,H]:[8,8],src=ch.kind==='input'?image:texels('2d'),rows=new Uint8Array(w*h*4);
+        for(let y=0;y<h;y++)for(let x=0;x<w;x++){const s=((h-1-y)*w+x)*(ch.kind==='input'?3:4),d=(y*w+x)*4;rows.set([src[s],src[s+1],src[s+2],ch.kind==='input'?255:src[s+3]],d);}
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,rows);}
+      else if(ch.kind==='cube'){const d=texels('cube');for(let face=0;face<6;face++)gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X+face,0,gl.RGBA,4,4,0,gl.RGBA,gl.UNSIGNED_BYTE,d.subarray(face*64,face*64+64));}
+      else gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA,4,4,4,0,gl.RGBA,gl.UNSIGNED_BYTE,texels('3d'));
+      for(const [k2,x] of [[gl.TEXTURE_MIN_FILTER,filter],[gl.TEXTURE_MAG_FILTER,filter],[gl.TEXTURE_WRAP_S,wrap],[gl.TEXTURE_WRAP_T,wrap],[gl.TEXTURE_WRAP_R,wrap]])gl.texParameteri(target,k2,x);});
+    gl.uniform3fv(u('iChannelResolution'),cres);
+    // Unbound channels read GL's unbound unit; each declared channel without a texture gets a unit of its own.
+    for(let i=0;i<4;i++)if(!f.channels['iChannel'+i]){gl.uniform1i(u('iChannel'+i),4+i);}
+  }
+  gl.viewport(0,0,W,H);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  if(mode==='mesh')gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);else gl.drawArrays(gl.TRIANGLES,0,3);
+  const out=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  const rgb=[];for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)rgb.push(...out.slice((y*W+x)*4,(y*W+x)*4+3));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return rgb;
+}
+// GL's matrices for a look-at camera and a perspective projection (OpenGL ES 3.0 section 2.13, clip z from -w to w).
+function glCamera(c){
+  let z=[0,1,2].map(i=>c.position[i]-c.target[i]);const zl=Math.hypot(...z);z=z.map(v=>v/zl);
+  const up=[0,1,0];let x=[up[1]*z[2]-up[2]*z[1],up[2]*z[0]-up[0]*z[2],up[0]*z[1]-up[1]*z[0]];const xl=Math.hypot(...x);x=x.map(v=>v/xl);
+  const y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]],p=c.position,dot=(a)=>a[0]*p[0]+a[1]*p[1]+a[2]*p[2];
+  const view=[x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x),-dot(y),-dot(z),1];
+  const f=1/Math.tan(c.fov*Math.PI/360),n=c.near,fa=c.far,projection=[f,0,0,0,0,f,0,0,0,0,(fa+n)/(n-fa),-1,0,0,2*fa*n/(n-fa),0];
+  return {view,projection};
+}
+const display='#version 300 es\nprecision highp float;uniform sampler2D toyTexture;out vec4 c;\nvoid main(){c=texelFetch(toyTexture,ivec2(gl_FragCoord.xy),0);}\n';
+window.check={
+  modes:(i)=>toyFixtures[i].pass?['pass']:['pass','texture','mesh'],
+  async draw(i,mode){
+    clear();
+    const f=toyFixtures[i];
+    toy=new Shadertoy({image:{source:f.source,...channelsOf(f)},resolution:[W,H]});
+    apply(1);
+    if(mode==='pass'){
+      const stages=[toy.pass()];
+      if(f.pass){const g=new ShaderPass({fragmentShader:passGenerator.fragment},{name:'generator'});extra.push(g);stages.unshift(g);}
+      stack=PostStack.attach(engine,stages);
+    }else if(mode==='texture'){
+      engine.use(toy);
+      const shown=new ShaderPass({fragmentShader:display,uniforms:{toyTexture:{value:toy.texture}}},{input:null,name:'shown'});extra.push(shown);
+      stack=PostStack.attach(engine,[shown]);
+    }else{
+      engine.use(toy);
+      mesh=raw.add(shaderMesh(quad,toy.material()));
+    }
+    return settle();
+  },
+  async change(){apply(2);return settle();},
+  oracle:(i,mode,which)=>oracle(toyFixtures[i],mode,which,toyFixtures[i].pass?oracle(null,'generator',1):undefined),
+  close(){clear();engine.dispose();return errors.splice(0);},
+};
+// Multipass: the toy as a pass, a texture and a mesh material, drawn frame by frame with the clock paused and the
+// frame set, against the same programs in WebGL2 with RGBA32F buffers (EXT_color_buffer_float, OES_texture_float_linear)
+// taking turns as Shadertoy's do, GL's own filtering and generateMipmap.
+const media=[];
+const feedOf=(c)=>c.kind==='keyboard'?'keyboard':c.kind==='audio'?audio:c.kind==='canvas'?(media.push(paint(document.createElement('canvas'))),media.at(-1)):c.kind;
+const lists={multi:multiFixtures,cube:cubeFixtures};
+const tabOf=(t)=>t&&{source:t.source,...Object.fromEntries(Object.entries(t.channels).map(([k,c])=>[k,{texture:feedOf(c),filter:c.filter,wrap:c.wrap}]))};
+function multiOracle(f,mode){
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const gl=c.getContext('webgl2',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+  if(!gl.getExtension('EXT_color_buffer_float')||!gl.getExtension('OES_texture_float_linear'))throw new Error('the oracle needs EXT_color_buffer_float and OES_texture_float_linear');
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+source);return s;};
+  const link=(v,fr)=>{const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,v));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,fr));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p;};
+  const screenV='#version 300 es\nin vec3 position;void main(){gl_Position=vec4(position.xy,0.0,1.0);}\n';
+  const letters=Object.keys(f.buffers??{});
+  const mips=(l)=>[...letters.map((k)=>f.buffers[k]),f.cubeA,f.image].some((t)=>t&&Object.values(t.channels).some((ch)=>ch.kind===l&&ch.filter==='mipmap'));
+  const levels=Math.floor(Math.log2(Math.max(W,H)))+1;
+  const held={};
+  for(const l of letters){const textures=[0,1].map(()=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texStorage2D(gl.TEXTURE_2D,mips(l)?levels:1,gl.RGBA32F,W,H);
+    const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);gl.clearBufferfv(gl.COLOR,0,[0,0,0,0]);return {t,fb};});
+    held[l]={textures,front:0};}
+  // Cube A: drawn into a 3 x 2 atlas of RGBA16F faces (+X -X +Y from row 0, then -Y +Z -Z), mip levels made by
+  // generateMipmap on the atlas, each level's faces blitted into the cube's faces through framebufferTexture2D.
+  const s=f.size,cubeLevels=f.cubeA?(mips('cubeA')?Math.log2(s)+1:1):0,cube={};
+  if(f.cubeA){
+    cube.atlas=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,cube.atlas);gl.texStorage2D(gl.TEXTURE_2D,cubeLevels,gl.RGBA16F,3*s,2*s);
+    cube.t=gl.createTexture();gl.bindTexture(gl.TEXTURE_CUBE_MAP,cube.t);gl.texStorage2D(gl.TEXTURE_CUBE_MAP,cubeLevels,gl.RGBA16F,s,s);
+    cube.read=[];cube.write=[];
+    for(let l=0;l<cubeLevels;l++){const r=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,r);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,cube.atlas,l);cube.read.push(r);
+      cube.write.push([0,1,2,3,4,5].map((face)=>{const w=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,w);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_CUBE_MAP_POSITIVE_X+face,cube.t,l);return w;}));}
+    cube.program=link(screenV,toy.cubeShader);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  // Keyboard, audio and canvas textures, rows from GL's lowest.
+  const r8=(w,h,rows)=>{const d=new Uint8Array(w*h*4);rows.forEach((row,y)=>row.forEach((v,x)=>d.set([v,0,0,255],(y*w+x)*4)));const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,d);return t;};
+  const fixed={};
+  const textureOf=(ch)=>{
+    if(held[ch.kind])return held[ch.kind].textures[held[ch.kind].front].t;
+    if(ch.kind==='cubeA')return cube.t;
+    if(fixed[ch.kind])return fixed[ch.kind];
+    if(ch.kind==='keyboard')return fixed.keyboard=r8(256,3,keyRows());
+    if(ch.kind==='audio'){const s=new Uint8Array(512),w=new Uint8Array(512);audio.getByteFrequencyData(s);audio.getByteTimeDomainData(w);return fixed.audio=r8(512,2,[s,w]);}
+    const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,paint(document.createElement('canvas')));gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.generateMipmap(gl.TEXTURE_2D);return fixed.canvas=t;};
+  const resOf=(ch)=>held[ch.kind]?[W,H,1]:ch.kind==='cubeA'?[s,s,1]:ch.kind==='keyboard'?[256,3,1]:ch.kind==='audio'?[512,2,1]:[16,16,1];
+  const timeOf=(ch)=>ch.kind==='audio'?2.5:ch.kind==='canvas'?1.5:0;
+  const samplers=new Map();
+  const samplerOf=(ch)=>{const key=ch.filter+(ch.wrap??'clamp');if(!samplers.has(key)){const s=gl.createSampler(),wrap=ch.wrap==='repeat'?gl.REPEAT:gl.CLAMP_TO_EDGE;
+    gl.samplerParameteri(s,gl.TEXTURE_MIN_FILTER,ch.filter==='nearest'?gl.NEAREST:ch.filter==='mipmap'?gl.LINEAR_MIPMAP_LINEAR:gl.LINEAR);gl.samplerParameteri(s,gl.TEXTURE_MAG_FILTER,ch.filter==='nearest'?gl.NEAREST:gl.LINEAR);
+    gl.samplerParameteri(s,gl.TEXTURE_WRAP_S,wrap);gl.samplerParameteri(s,gl.TEXTURE_WRAP_T,wrap);samplers.set(key,s);}return samplers.get(key);};
+  const quadUv=[0,0,1,0,1,1,0,1];
+  const draw=(p,tab,frame,res,mesh,port=[W,H])=>{
+    gl.useProgram(p);
+    const stream=(name,data,size)=>{const at=gl.getAttribLocation(p,name);if(at<0)return;const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,0,0);};
+    const u=(n)=>gl.getUniformLocation(p,n);
+    if(mesh){stream('position',quad.positions,3);stream('uv',quadUv,2);const {view,projection}=glCamera(engine.camera);gl.uniformMatrix4fv(u('projectionMatrix'),false,projection);gl.uniformMatrix4fv(u('modelViewMatrix'),false,view);
+      const b=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(quad.indices),gl.STATIC_DRAW);}
+    else stream('position',[-1,-1,0,3,-1,0,-1,3,0],3);
+    gl.uniform3f(u('iResolution'),res[0],res[1],1);gl.uniform1f(u('iTime'),frame/10);gl.uniform1f(u('iTimeDelta'),0.1);gl.uniform1f(u('iFrameRate'),10);gl.uniform1i(u('iFrame'),frame);
+    gl.uniform4fv(u('iMouse'),[0,0,0,0]);gl.uniform4fv(u('iDate'),[2026,10,15,100]);gl.uniform1f(u('iSampleRate'),44100);
+    const cres=new Array(12).fill(0),ctime=[0,0,0,0];
+    for(let i=0;i<4;i++){const ch=tab.channels['iChannel'+i];gl.uniform1i(u('iChannel'+i),i);gl.activeTexture(gl.TEXTURE0+i);
+      gl.bindTexture(gl.TEXTURE_CUBE_MAP,null);gl.bindTexture(gl.TEXTURE_2D,null);
+      if(!ch){gl.bindSampler(i,null);continue;}
+      gl.bindTexture(ch.kind==='cubeA'?gl.TEXTURE_CUBE_MAP:gl.TEXTURE_2D,textureOf(ch));gl.bindSampler(i,samplerOf(ch));cres.splice(i*3,3,...resOf(ch));ctime[i]=timeOf(ch);}
+    gl.uniform3fv(u('iChannelResolution'),cres);gl.uniform1fv(u('iChannelTime'),ctime);
+    gl.viewport(0,0,port[0],port[1]);
+    if(mesh)gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);else gl.drawArrays(gl.TRIANGLES,0,3);
+  };
+  const programs=Object.fromEntries(letters.map((l)=>[l,link(screenV,toy.buffers[l])]));
+  const image=mode==='mesh'?link(toy.meshShaders.vertexShader.replace('#version 300 es\n','#version 300 es\nuniform mat4 projectionMatrix;uniform mat4 modelViewMatrix;\n'),toy.meshShaders.fragmentShader):link(screenV,toy.fragmentShader);
+  const res=mode==='mesh'?toy.resolution:[W,H];
+  for(let k=0;k<f.frames;k++){
+    for(const l of letters){const h=held[l],back=h.textures[1-h.front];gl.bindFramebuffer(gl.FRAMEBUFFER,back.fb);draw(programs[l],f.buffers[l],k,[W,H],false);h.front=1-h.front;
+      if(mips(l)){gl.bindTexture(gl.TEXTURE_2D,h.textures[h.front].t);gl.generateMipmap(gl.TEXTURE_2D);}}
+    if(f.cubeA){
+      gl.bindFramebuffer(gl.FRAMEBUFFER,cube.read[0]);draw(cube.program,f.cubeA,k,[s,s],false,[3*s,2*s]);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+      if(cubeLevels>1){gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,cube.atlas);gl.generateMipmap(gl.TEXTURE_2D);}
+      for(let l=0;l<cubeLevels;l++){const e=s>>l;gl.bindFramebuffer(gl.READ_FRAMEBUFFER,cube.read[l]);
+        for(let face=0;face<6;face++){const x=(face%3)*e,y=Math.floor(face/3)*e;gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,cube.write[l][face]);gl.blitFramebuffer(x,y,x+e,y+e,0,0,e,e,gl.COLOR_BUFFER_BIT,gl.NEAREST);}}
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER,null);gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER,null);
+    }
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  draw(image,f.image,f.frames-1,res,mode==='mesh');
+  const out=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  const rgb=[];for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)rgb.push(...out.slice((y*W+x)*4,(y*W+x)*4+3));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return rgb;
+}
+window.check.multiModes=(i,list='multi')=>lists[list][i].buffers?['pass','texture','mesh']:['pass','mesh'];
+window.check.multi=async(i,mode,list='multi')=>{
+  clear();media.length=0;
+  const f=lists[list][i],keys=new EventTarget();
+  toy=new Shadertoy({common:f.common,image:tabOf(f.image),...Object.fromEntries(Object.entries(f.buffers??{}).map(([l,t])=>['buffer'+l,tabOf(t)])),...(f.cubeA&&{cubeA:{...tabOf(f.cubeA),size:f.size}}),resolution:[W,H],keyboard:keys});
+  for(const [type,keyCode] of keyEvents)keys.dispatchEvent(new KeyboardEvent(type,{keyCode}));
+  toy.pause();
+  if(mode==='pass')stack=PostStack.attach(engine,[toy.pass()]);
+  else if(mode==='texture'){engine.use(toy);const shown=new ShaderPass({fragmentShader:display,uniforms:{toyTexture:{value:toy.texture}}},{input:null,name:'shown'});extra.push(shown);stack=PostStack.attach(engine,[shown]);}
+  else{engine.use(toy);mesh=raw.add(shaderMesh(quad,toy.material()));}
+  for(let k=0;k<f.frames;k++){Object.assign(toy,{frame:k,time:k/10,timeDelta:0.1,frameRate:10,mouse:[0,0,0,0]});toy.date=[2026,10,15,100];
+    if(k===0){const e=await settle();if(e.length)return e;}else{engine.render();await device.queue.onSubmittedWorkDone();}}
+  return settle();
+};
+window.check.multiOracle=(i,mode,list='multi')=>multiOracle(lists[list][i],mode);
+// mainVR: the pass and the mesh material drawn from each of two fixed eyes, against the same programs in WebGL2 with
+// the eye's GL matrices; the pass's ray matrix there is inverse(projection x view) with GL's near plane at z -1.
+function inverse4(m){
+  const a=[0,1,2,3].map((r)=>[0,1,2,3,4,5,6,7].map((c)=>c<4?m[c*4+r]:+(c-4===r)));
+  for(let c=0;c<4;c++){let p=c;for(let r=c+1;r<4;r++)if(Math.abs(a[r][c])>Math.abs(a[p][c]))p=r;[a[c],a[p]]=[a[p],a[c]];const d=a[c][c];a[c]=a[c].map((v)=>v/d);
+    for(let r=0;r<4;r++)if(r!==c){const k=a[r][c];a[r]=a[r].map((v,j)=>v-k*a[c][j]);}}
+  const out=[];for(let c=0;c<4;c++)for(let r=0;r<4;r++)out.push(a[r][4+c]);return out;
+}
+const times=(x,y)=>{const o=[];for(let c=0;c<4;c++)for(let r=0;r<4;r++){let v=0;for(let k=0;k<4;k++)v+=x[k*4+r]*y[c*4+k];o.push(v);}return o;};
+const home={position:[...engine.camera.position],target:[...engine.camera.target]};
+window.check.vr=async(eye,mode)=>{
+  clear();
+  Object.assign(engine.camera,vrFixture.eyes[eye]);
+  toy=new Shadertoy({image:{source:vrFixture.source},vr:true,resolution:[W,H]});
+  apply(1);
+  if(mode==='pass')stack=PostStack.attach(engine,[toy.pass()]);
+  else{engine.use(toy);mesh=raw.add(shaderMesh(quad,toy.material()));}
+  return settle();
+};
+window.check.vrOracle=(eye,mode)=>{
+  const e=vrFixture.eyes[eye],c=document.createElement('canvas');c.width=W;c.height=H;
+  const gl=c.getContext('webgl2',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+source);return s;};
+  const vertex=mode==='mesh'?toy.meshShaders.vertexShader.replace('#version 300 es\n','#version 300 es\nuniform mat4 projectionMatrix;uniform mat4 modelViewMatrix;uniform mat4 modelMatrix;uniform vec3 cameraPosition;\n'):'#version 300 es\nin vec3 position;void main(){gl_Position=vec4(position.xy,0.0,1.0);}\n';
+  const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,mode==='mesh'?toy.meshShaders.fragmentShader:toy.vrShader));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+  const u=(n)=>gl.getUniformLocation(p,n),{view,projection}=glCamera(engine.camera);
+  const stream=(name,data,size)=>{const at=gl.getAttribLocation(p,name);if(at<0)return;const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,size,gl.FLOAT,false,0,0);};
+  gl.uniform3f(u('iResolution'),...(mode==='mesh'?toy.resolution:[W,H]),1);
+  if(mode==='mesh'){stream('position',quad.positions,3);stream('uv',glUv,2);gl.uniformMatrix4fv(u('projectionMatrix'),false,projection);gl.uniformMatrix4fv(u('modelViewMatrix'),false,view);
+    gl.uniformMatrix4fv(u('modelMatrix'),false,[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);gl.uniform3fv(u('cameraPosition'),e.position);
+    const b=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,b);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(quad.indices),gl.STATIC_DRAW);gl.drawElements(gl.TRIANGLES,6,gl.UNSIGNED_SHORT,0);}
+  else{stream('position',[-1,-1,0,3,-1,0,-1,3,0],3);gl.uniformMatrix4fv(u('shadertoyEye'),false,times(inverse4(times(projection,view)),[1,0,0,0,0,1,0,0,0,0,-1,0,0,0,0,1]));gl.uniform3fv(u('shadertoyEyePosition'),e.position);gl.drawArrays(gl.TRIANGLES,0,3);}
+  const out=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  const rgb=[];for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)rgb.push(...out.slice((y*W+x)*4,(y*W+x)*4+3));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  if(eye===vrFixture.eyes.length-1&&mode==='mesh')Object.assign(engine.camera,home);
+  return rgb;
+};
+// mainSound: toy.sound() run frame by frame, against the same program drawn block by block into a 512 x 512 RGBA32F
+// target in WebGL2 and read with readPixels; samples compared after 16-bit quantisation (a step of 1/32768).
+window.check.sound=async(i)=>{
+  clear();
+  const f=soundFixtures[i];
+  toy=new Shadertoy({image:{source:'void mainImage(out vec4 fragColor, in vec2 fragCoord) { fragColor = vec4(1.0); }'},sound:{source:f.source,...channelsOf(f)},sampleRate:f.sampleRate,resolution:[W,H]});
+  engine.use(toy);
+  let sound,failure;
+  toy.sound({seconds:f.seconds}).then((s)=>{sound=s;},(e)=>{failure=e;});
+  for(let k=0;k<64&&!sound&&!failure;k++){engine.render();await device.queue.onSubmittedWorkDone();}
+  if(failure)return {errors:[String(failure?.message??failure)]};
+  if(!sound)return {errors:['toy.sound() did not finish in 64 frames']};
+  const n=Math.ceil(f.seconds*f.sampleRate),c=document.createElement('canvas'),gl=c.getContext('webgl2');
+  if(!gl.getExtension('EXT_color_buffer_float'))throw new Error('the oracle needs EXT_color_buffer_float');
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+source);return s;};
+  const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,'#version 300 es\nin vec3 position;void main(){gl_Position=vec4(position.xy,0.0,1.0);}\n'));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,toy.soundShader));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));gl.useProgram(p);
+  const u=(name)=>gl.getUniformLocation(p,name),at=gl.getAttribLocation(p,'position'),b=gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,0,3,-1,0,-1,3,0]),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,3,gl.FLOAT,false,0,0);
+  gl.uniform1f(u('iSampleRate'),f.sampleRate);
+  if(f.channels.iChannel0){gl.uniform1i(u('iChannel0'),0);gl.activeTexture(gl.TEXTURE0);const t=gl.createTexture(),src=texels('2d'),rows=new Uint8Array(256);
+    for(let y=0;y<8;y++)rows.set(src.subarray((7-y)*32,(8-y)*32),y*32);
+    gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,8,8,0,gl.RGBA,gl.UNSIGNED_BYTE,rows);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);}
+  const target=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,target);gl.texStorage2D(gl.TEXTURE_2D,1,gl.RGBA32F,512,512);
+  const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,target,0);gl.viewport(0,0,512,512);
+  const block=new Float32Array(512*512*4),q=(v)=>Math.round(Math.max(-1,Math.min(1,v))*32767);
+  let max=0,where=-1,ends=0,checked=0;
+  for(let base=0;base<n;base+=512*512){
+    gl.uniform1i(u('shadertoySoundBase'),base);gl.drawArrays(gl.TRIANGLES,0,3);gl.readPixels(0,0,512,512,gl.RGBA,gl.FLOAT,block);
+    for(let k=0;k<512*512&&base+k<n;k++)for(const ch of [0,1]){const d=Math.abs(q(sound.channels[ch][base+k])-q(block[k*4+ch]));if(d>max){max=d;where=base+k;}if(Math.abs(sound.channels[ch][base+k])===1)ends++;checked++;}
+  }
+  if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  const offline=new OfflineAudioContext(2,n,f.sampleRate),buffer=sound.audioBuffer(offline);
+  const same=buffer.length===n&&buffer.numberOfChannels===2&&buffer.getChannelData(1).every((v,k)=>v===sound.channels[1][k]);
+  // An aborted render rejects with the signal's reason.
+  const abort=new AbortController(),again=toy.sound({seconds:f.seconds,signal:abort.signal});engine.render();abort.abort(new Error('stopped'));
+  const reason=await again.then(()=>'resolved',(e)=>e.message);
+  return {errors:errors.splice(0),length:[sound.channels[0].length,sound.channels[1].length,n],max,where,ends,checked,same,sampleRate:sound.sampleRate,reason};
+};
+window.ready=true;
+</script></body></html>

@@ -11,7 +11,7 @@ const harness = () => {
 };
 
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-// A gltf-pro shaped model: 20-float vertices, one triangle a primitive, GPU buffers as after setup.
+// A gltf/pbr shaped model: 20-float vertices, one triangle a primitive, GPU buffers as after setup.
 const fakeModel = (h, primitives) => ({
   name: 'model',
   setup() {},
@@ -211,4 +211,37 @@ test('per-material width and colour by name, a material without a line, and vert
   h.frame();
   assert.equal(passes.length, 1);
   outlines.dispose();
+});
+
+// Batch 132 audit: the draw rows went to offset 0 of one storage buffer for every view, and `queue.writeBuffer` runs
+// before the frame's commands, so with two views of one frame seeing different models (render layers) the first view's
+// hulls read the second view's rows: the wrong primitive's matrix, colour and width.
+test('each view of a frame keeps its own draw rows', () => {
+  const h = harness(),
+    key = Symbol.for('margoengine.layers'),
+    saved = globalThis[key];
+  // Node 1 is on layer 2 only, node 2 on layer 1.
+  globalThis[key] = { maskOf: (node) => (node.id === 1 ? 2 : 1), masks: new Map() };
+  try {
+    const moved = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 0, 0, 1];
+    const model = fakeModel(h, [{ id: 1, matrix: moved }, { id: 2 }]);
+    const outlines = new ModelOutlines({ models: [model], smooth: false });
+    h.engine.use(outlines);
+    const passes = recordPasses(h);
+    // Two views recorded in one task, as core records a frame: the first sees both nodes, the second only node 2.
+    h.context.view = { id: 1, index: 0, layers: 3 };
+    h.engine.frameGraph.execute(h.context);
+    h.context.view = { id: 2, index: 1, layers: 1 };
+    h.engine.frameGraph.execute(h.context);
+    assert.equal(passes.length, 2);
+    const first = passes[0].calls.filter((c) => c[0] === 'draw').map((d) => d[5]);
+    const storage = h.bufferWrites.at(-1).buffer;
+    // The first view's draw of node 1 reads its slot: x translation 5, not node 2's identity matrix.
+    assert.equal(new Float32Array(storage.data, first[0] * 80, 16)[12], 5);
+    assert.equal(new Float32Array(storage.data, first[1] * 80, 16)[12], 0);
+    outlines.dispose();
+  } finally {
+    if (saved === undefined) delete globalThis[key];
+    else globalThis[key] = saved;
+  }
 });

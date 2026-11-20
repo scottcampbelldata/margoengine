@@ -2,11 +2,15 @@ import { checkDitherRange } from '../../shared/screen-door.js';
 import { parseColor, type ColorInput } from './color.js';
 
 /**
- * Anything the plugin can sample: a GPUTexture you own (created on the engine's device), or an image source it
- * uploads itself with `copyExternalImageToTexture` (ImageBitmap, canvas, OffscreenCanvas, image, video, ImageData).
+ * Anything the plugin can sample: a GPUTexture you own (created on the engine's device), a function that makes one for
+ * a device (called once per device, so it comes back after a device restore), or an image source it uploads itself
+ * with `copyExternalImageToTexture` (ImageBitmap, canvas, OffscreenCanvas, image, video, ImageData). A plain GPUTexture
+ * held at a device restore is reported once through `engine.onError` and the material draws untextured until `map` is
+ * given a new one (docs/conventions.md, "Borrowed GPU objects").
  */
 export type PointsTextureSource =
   | GPUTexture
+  | ((device: GPUDevice) => GPUTexture)
   | ImageBitmap
   | HTMLCanvasElement
   | OffscreenCanvas
@@ -110,7 +114,8 @@ abstract class BaseMaterial {
     return this.source;
   }
   set map(value: PointsTextureSource | null) {
-    if (value !== null && typeof value !== 'object') throw new TypeError('map must be a texture source or null');
+    if (value !== null && typeof value !== 'object' && typeof value !== 'function')
+      throw new TypeError('map must be a texture source, a function of the device or null');
     if (value !== this.source) {
       this.source = value;
       this.mapVersion++;

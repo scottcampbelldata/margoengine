@@ -1,8 +1,10 @@
+// MARGO_COMPAT not applicable: the script runs its own WebGL2-layer leg (install({ force: true })) and the WebGL2 preview beside native WebGPU.
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { trackPipelines } from '../../../scripts/support/gpu-ready.js';
@@ -18,7 +20,7 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'empty-geometry-page',
       configureServer(s) {

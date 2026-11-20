@@ -1,6 +1,6 @@
 // Camera and punctual-light definitions from the loaded model's live public records or data-scene nodes. Keep
 // runtime node handles out of JSON, and snapshot nested values before the model writer awaits texture encoding.
-import type { GLTFCamera, GLTFLight, PBRModel } from '@margoengine/gltf-pro';
+import type { GLTFCamera, GLTFLight, PBRModel } from '@margoengine/gltf/pbr';
 import type { GLTFCameraDefinition, GLTFLightDefinition } from '../../shared/gltf.js';
 import type { Bin } from './container.js';
 import { copyExtras } from './extras.js';

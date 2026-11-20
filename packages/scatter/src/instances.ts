@@ -8,6 +8,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { windShader, validateWind, type ScatterWind } from './wind.js';
+import { translucencyShader } from './translucency.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
@@ -99,19 +100,13 @@ export const positiveColor = (code: string): string =>
 /** The first @location a struct does not use: patches that add varyings to a shared struct must not collide. */
 export const freeLocation = (struct: string): number =>
   Math.max(-1, ...[...struct.matchAll(/@location\((\d+)\)/g)].map((m) => Number(m[1]))) + 1;
-const translucencyShader = /* wgsl */ `
-fn foliageTranslucency(n:vec3f,v:vec3f,l:vec3f,occlusion:f32,strength:f32)->f32 {
- let back=pow(clamp(dot(v,-normalize(l+n*0.4)),0.0,1.0),4.0);let wrap=clamp((0.5-dot(n,l))/1.5,0.0,1.0);
- return strength*occlusion*(back+0.3*wrap)/3.14159265;
-}
-`;
 const shadowShader =
   windShader +
   `
 struct ShadowFrame {camera:mat4x4f,time:vec4f}
 @group(0) @binding(0) var<uniform> frame:ShadowFrame;
 struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(10) wind:vec4f}
-@vertex fn vertex(i:Input)->@builtin(position) vec4f {var p=mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);let bend=windDeformation(p.xyz,i.d.xyz,vec4f(i.wind.xyz,frame.time.x),i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);return frame.camera*p;}
+@vertex fn vertex(i:Input)->@builtin(position) @invariant vec4f {var p=mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);let bend=windDeformation(p.xyz,i.d.xyz,vec4f(i.wind.xyz,frame.time.x),i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);return frame.camera*p;}
 `;
 let serial = 0;
 
@@ -131,7 +126,7 @@ export class ScatterInstances implements EnginePlugin {
   private uniform?: GPUBuffer;
   private readonly values = new Float32Array(36);
   private readonly shadowValues = new Float32Array(20);
-  private time = 0;
+  private seconds = 0;
   private shadowPipeline?: GPURenderPipeline;
   private shadowUniforms: GPUBuffer[] = [];
   private shadowGroups: GPUBindGroup[] = [];
@@ -280,10 +275,21 @@ export class ScatterInstances implements EnginePlugin {
       },
     });
   }
-  onPreUpdate(delta: number): void {
+  /** Seconds on the wind clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the wind clock by `delta` seconds without drawing: all of a frame update. `seek` from
+   * `@margoengine/cutscene/seek` replays these steps, so every instance sways where a continuous run has it.
+   */
+  advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid scatter delta; pass a finite frame time of 0 or more.');
-    this.time = this.time + delta;
+    this.seconds = this.seconds + delta;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   private draw(c: ScatterPassContext): void {
     const intensity = typeof this.emissiveIntensity === 'function' ? this.emissiveIntensity() : this.emissiveIntensity;
@@ -359,7 +365,7 @@ export class ScatterInstances implements EnginePlugin {
     this.values.set(this.engine!.lighting.radiance, 24);
     this.values.fill(1, 28, 31);
     if (this.engine!.lighting.ambient) this.values.set(this.engine!.lighting.ambient, 28);
-    this.values[32] = this.time;
+    this.values[32] = this.seconds;
     this.values[33] = intensity;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.color.view = c.color;
@@ -382,7 +388,7 @@ export class ScatterInstances implements EnginePlugin {
     cascade: number;
   }): void {
     this.shadowValues.set(matrix);
-    this.shadowValues[16] = this.time;
+    this.shadowValues[16] = this.seconds;
     context.device.queue.writeBuffer(this.shadowUniforms[cascade], 0, this.shadowValues as Float32Array<ArrayBuffer>);
     pass.setPipeline(this.shadowPipeline!);
     pass.setBindGroup(0, this.shadowGroups[cascade]);

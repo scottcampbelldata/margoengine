@@ -8,6 +8,7 @@ const venv = venvDir(),
   result = ensureVenv({ venv });
 if (!result.ok) {
   console.error(`setup:python-test: ${result.reason}`);
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log(`setup:python-test: ${result.made ? 'made' : 'ready'}: ${venv} (jupyter ${result.tools.jupyter})`);
 }
-console.log(`setup:python-test: ${result.made ? 'made' : 'ready'}: ${venv} (jupyter ${result.tools.jupyter})`);

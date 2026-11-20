@@ -24,9 +24,9 @@ test('shared validation errors name their fix', async () => {
   await assert.rejects(readBytes(new Response(new Uint8Array(8)).body, { maxBytes: -1 }), fixed(RangeError));
 });
 
-test('gltf-pro throws coded MargoErrors, never a bare Error', () => {
+test('gltf/pbr throws coded MargoErrors, never a bare Error', () => {
   for (const file of ['asset', 'compression', 'index', 'side-shader', 'worker']) {
-    const source = readFileSync(new URL(`../packages/gltf-pro/src/${file}.ts`, import.meta.url), 'utf8');
+    const source = readFileSync(new URL(`../packages/gltf/src/${file}.ts`, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /throw new Error\(/, `${file}.ts throws a bare Error; use margoError(code, message)`);
   }
 });

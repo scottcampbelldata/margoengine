@@ -26,7 +26,7 @@
     "@margoengine/core": "^1.0.0",
     "@margoengine/inspector": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/environment": "^1.0.0"
   },
@@ -40,7 +40,7 @@
     "@margoengine/loaders": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/gltf": {
       "optional": true
     },
     "@margoengine/materials": {

@@ -67,6 +67,31 @@ for (const compat of [false, true]) {
         check(demo.windFigure.engine.stats.drawCalls === 1, 'one instanced draw per shape');
         shapes.push({ shape: typeof shape === 'string' ? shape : 'custom', ...image });
       }
+      const { Figure } = await import('/packages/sciviz/dist/spec.js'),
+        canvas = document.body.appendChild(
+          Object.assign(document.createElement('canvas'), { width: 160, height: 160 }),
+        ),
+        flatFigure = await Figure.create(canvas, { axes: false, controls: false }),
+        planar = await glyphLayer(
+          flatFigure,
+          { points: [0, 0, 0], pointArrays: { v: [1, 1, 0] } },
+          { shape: 'cube', vectors: 'v', scaleMode: 'components' },
+        ),
+        flat = [];
+      flatFigure.engine.stop();
+      for (const y of [3, -3]) {
+        flatFigure.engine.camera.position = [0, y, 0];
+        flatFigure.engine.camera.target = [0, 0, 0];
+        flatFigure.engine.camera.up = [0, 0, -1];
+        flat.push(await pixels(flatFigure));
+      }
+      check(
+        planar.instances.ids.length === 1 && flat.every((image) => image.lit > 500),
+        `planar components glyph draws flattened and lit from both sides ${JSON.stringify(flat)}`,
+      );
+      planar.dispose();
+      flatFigure.dispose();
+      canvas.remove();
       await demo.show('arrow', 20, 'scalar');
       const scalarImage = await pixels(demo.warpFigure);
       check(scalarImage.hash !== warp.hash, 'scalar and vector warp have different geometry');
@@ -95,6 +120,7 @@ for (const compat of [false, true]) {
         wind,
         warp,
         shapes,
+        flat,
         scalarImage,
         restored: after.hash === before.hash,
         vectorDelta: delta,

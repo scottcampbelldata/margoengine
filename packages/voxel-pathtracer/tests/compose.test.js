@@ -10,7 +10,7 @@ import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, simpleScene } from './support.js';
 
 const factories = [resampledEmitters, triangleMeshes, coloredMedia, causticGuiding, spectralTransport];
-const signatures = ['fn resampledEmitters', 'fn meshClosest', 'fn mediaIntegral', 'fn guidePdf', 'spectralLambda'];
+const signatures = ['fn directionalEmitter', 'fn meshClosest', 'fn mediaIntegral', 'fn guidePdf', 'spectralLambda'];
 
 test('feature factories reject malformed option containers before specialization', () => {
   for (const make of [resampledEmitters, causticGuiding, spectralTransport])

@@ -1,6 +1,6 @@
 // Vertex displacement along the normal (@margoengine/materials `displacementMap`): position + normal * (map.r * scale +
 // bias), in mesh space. One WGSL text for the material's beauty shader and for the depth passes that draw it as a
-// shadow caster (@margoengine/shadows, @margoengine/clustered, @margoengine/staging, @margoengine/selection), which bind the material's feature uniform and map.
+// shadow caster (@margoengine/shadows, @margoengine/clustered, @margoengine/studio, @margoengine/selection), which bind the material's feature uniform and map.
 /** The materials feature uniform: [bumpScale, displacementScale, displacementBias, lightMapIntensity], two UV rows per map. */
 export const featureStruct = 'struct MargoFeatures {values:vec4f,uvt:array<vec4f,8>}';
 /** Displacement of vertex UVs `uv` (UV0 xy, UV1 zw) through the displacement map's UV rows (4 and 5). */

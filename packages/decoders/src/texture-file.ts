@@ -131,6 +131,10 @@ export function uploadTexture(device: GPUDevice, file: TextureFile, options: Upl
     throw new RangeError(
       `Texture ${file.width}x${file.height} exceeds the device's maxTextureDimension2D; use a smaller file`,
     );
+  if (file.layers > device.limits.maxTextureArrayLayers)
+    throw new RangeError(
+      `Texture of ${file.layers} layers exceeds the device's maxTextureArrayLayers; request a higher limit or use fewer layers`,
+    );
   const texture = device.createTexture({
     label: options.label,
     size: [file.width, file.height, file.layers],

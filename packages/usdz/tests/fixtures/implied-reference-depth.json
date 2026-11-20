@@ -1,0 +1,56 @@
+{
+ "deeper": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    append inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n        prepend inherits = </C>\n    )\n    {\n        def \"a\" (\n            payload = @./l0.usda@</M>\n        )\n        {\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n",
+   "root.usda": "#usda 1.0\n(\n\n)\ndef \"P\" (\n    payload = @./l1.usda@</M/a> (offset = 3; scale = 2)\n)\n{\n}\n"
+  },
+  "prims": {
+   "/P": [
+    6,
+    4,
+    1
+   ],
+   "/P/a": [
+    5,
+    1,
+    2,
+    0
+   ],
+   "/P/a/a": [
+    2
+   ]
+  }
+ },
+ "authored": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    append inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        def \"c\" (\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"b\" (\n                        append inherits = </C/a>\n                        references = @./l0.usda@ (offset = 10)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\" (\n    variants = { string vs = \"y\" }\n)\n{\n}\ndef \"P\" (\n    payload = @./l1.usda@</M/a> (offset = 3; scale = 2)\n)\n{\n    over \"c\" (\n        prepend inherits = </C>\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    9,
+    4
+   ],
+   "/P/c": [
+    10,
+    8,
+    5,
+    6
+   ],
+   "/P/c/b": [
+    8,
+    7,
+    2,
+    1,
+    0
+   ],
+   "/P/c/b/a": [
+    2
+   ]
+  }
+ }
+}

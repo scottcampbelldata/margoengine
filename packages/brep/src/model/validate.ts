@@ -350,16 +350,17 @@ export function validateBody(body: Body): ValidityProblem[] {
         continue;
       if (gapBound(e.curve, def, ts[0], ts[4]) <= tolerance / 2) continue;
       const s = surfaceEvaluator(def);
-      let hint: [number, number] | undefined;
+      let hint: [number, number] | undefined,
+        worst = 0;
+      // The most the samples are off, not the first past the tolerance: an edge leaving the surface from its start is
+      // reported by its far end.
       for (const t of ts) {
         const p = c.at(t).slice(0, 3) as XYZ,
           [uv, gap] = foot(s, p, hint, tolerance);
         hint = uv;
-        if (gap > tolerance) {
-          report(e.name, `${gap.toExponential(2)} m off the surface of ${use.loop.face.name}`);
-          break;
-        }
+        worst = Math.max(worst, gap);
       }
+      if (worst > tolerance) report(e.name, `${worst.toExponential(2)} m off the surface of ${use.loop.face.name}`);
     }
   }
   return problems;

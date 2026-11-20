@@ -47,7 +47,7 @@ and `frame.eye`).
 
 ## The plugin
 
-`FloatingOrigin` keeps float64 world positions of root meshes (and gltf-pro `model.root`) on the CPU and writes them to
+`FloatingOrigin` keeps float64 world positions of root meshes (and gltf/pbr `model.root`) on the CPU and writes them to
 core relative to an origin near the camera. When the camera is farther from the origin than `ratio` × its distance to
 the target (default 1000, so 50 m at 50 mm zoom), the origin moves to the camera: camera, placed roots and any running
 `fitToBoundingBox` animation shift by the same float64 amount, so nothing moves on screen. API and usage:
@@ -70,11 +70,11 @@ The worst case does not depend on the distance from the world origin, only on `r
 ## Real GPU
 
 `node examples/package-benchmarks/large-coordinates-gpu.mjs` (Intel Xe2 / Arc 140V, Edge 155, 640×360, 4× MSAA; AC
-before and after, GPU lock held) renders the same 40-frame orbit + dolly for the flange as core meshes and as a gltf-pro
-model (gltf-pro PBR shading), at each distance, with and without the plugin. Every frame is compared with the same
+before and after) renders the same 40-frame orbit + dolly for the flange as core meshes and as a gltf/pbr
+model (gltf/pbr shading), at each distance, with and without the plugin. Every frame is compared with the same
 kind rendered by core near the origin: silhouette centroid offset (sub-pixel), pixels whose coverage differs (XOR of
 the masks) and mean colour difference (0-255). Jitter = largest frame-to-frame change of the centroid offset. The pick
-is `engine.pick` on a pixel inside the reference silhouette (core meshes: plain `engine.pick`; gltf-pro: selection's
+is `engine.pick` on a pixel inside the reference silhouette (core meshes: plain `engine.pick`; gltf/pbr: selection's
 `Picking` plugin). Results: `examples/package-benchmarks/results/large-coordinates-gpu.json`; frame 0 images in
 `test-results/large-coordinates-*.png`.
 
@@ -85,7 +85,7 @@ is `engine.pick` on a pixel inside the reference silhouette (core meshes: plain 
 | 100 km | 58 / 42 | 8,350 (smeared to 6,507 px) | 3.1 | flange | 0.009 / 0.019 | 1 | 0 | flange |
 | 6,000 km | flange gone (0 px drawn) | 3,941 | 1.4 | none | 0.009 / 0.019 | 1 | 0 | flange |
 
-The gltf-pro model gives the same numbers to within 0.02 px (1 km: 0.248 / 0.359; 100 km: 57.6 / 42.5; colour
+The gltf/pbr model gives the same numbers to within 0.02 px (1 km: 0.248 / 0.359; 100 km: 57.6 / 42.5; colour
 difference up to 4.3 at 100 km from its specular). With the plugin the residual is one pixel of edge coverage and
 0.02 px of centroid movement, the same at 1 km and 6,000 km, because after the first rebase the scene core sees is
 identical. The GPU agrees with the CPU emulation: ~0.4 px of jitter at 1 km (CPU: 0.7 px for the worst single vertex),
@@ -107,7 +107,7 @@ median of 15:
 | 50,000 | 1.62 ms | 4.26 ms | 7.13 ms | 336 kB | 11.1 ms |
 
 Real GPU (`large-coordinates-gpu.mjs --cost`, Arc 140V; wall time of `engine.render()` + `onSubmittedWorkDone`,
-browser timer ~0.1 ms). The quiet gate passed before the run waited for the GPU lock, so treat these as
+browser timer ~0.1 ms). The quiet gate passed before the run, so treat these as
 semi-diagnostic:
 
 | Placed roots | Static frame | `rebase()` call | Frame after the rebase |
@@ -123,7 +123,7 @@ target almost never rebase; zooming in on a spot far from the current origin tri
 
 Works (unit-tested in `packages/cameras/test/origin.test.js` on the real kernel, or on the GPU above):
 
-- Core meshes and their children; gltf-pro models (`origin.place(model.root, world)`), and so materials meshes and
+- Core meshes and their children; gltf/pbr models (`origin.place(model.root, world)`), and so materials meshes and
   anything else parented to a placed root.
 - `CADCameraControls`, `OrbitControls` (and every control that reads `camera.position`/`target` each update): rebases
   happen between frames and shift the camera, so orbit, pan and dolly continue without a jump.
@@ -137,7 +137,7 @@ Doesn't (or needs app code):
 
 - **Huge geometry or child offsets.** Vertex positions and child (node) translations that are themselves kilometres
   from their root are float32 in core when loaded; the plugin cannot recover precision lost at load. Re-centre the
-  asset (most IFC/glTF exporters have a local-origin or RTC option) or load far parts as separate roots. A gltf-pro or
+  asset (most IFC/glTF exporters have a local-origin or RTC option) or load far parts as separate roots. A gltf/pbr or
   loader option that subtracts an offset at parse time would fix it without core.
 - **State held in local coordinates by other code**: OrbitControls `saveState()`/`reset()`, an orthographic
   `CameraProjection.fit` animation in flight, your own saved views or section planes. Shift them in `onRebase` (or
@@ -162,6 +162,6 @@ view-projection and vertex world-position errors with no app code. But it cannot
 already float32 in `store.transforms` (0.5 m grid at 6,000 km; the 7 mm bolts still share one world position). It would also
 need float64 position columns in the Rust/Wasm kernel, which changes the memory layout and the `store.transforms`
 types. And `store.matrices` would become eye-relative, which breaks every package that reads world matrices from it
-(gltf-pro, bvh, selection, shadows, staging, taa and others). Byte cost was not measured on a scratch
+(gltf/pbr, bvh, selection, shadows, staging, taa and others). Byte cost was not measured on a scratch
 branch, because nothing remains that only core can fix. The one thing left (km-scale vertices or child translations
 inside a single asset) is not fixed by that core change either; a loader that re-centres at parse time fixes it.

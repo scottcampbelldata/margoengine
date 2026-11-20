@@ -16,6 +16,7 @@ export interface CloudShadowFrame {
 export interface VolumetricCloudShadow {
     readonly options: VolumetricCloudShadowOptions;
     readonly call: string;
+    readonly revision: number;
     wgsl(group: number, binding: number): string;
     resources(): readonly GPUBindingResource[];
     setup(device: GPUDevice): void;
@@ -31,11 +32,136 @@ export interface VolumetricCloudShadowOptions {
 export interface VolumetricCloudSource {
     readonly options: VolumetricCloudOptions;
     readonly drift: ArrayLike<number>;
+    readonly time?: number;
 }
 
 export function volumetricCloudShadows(clouds: VolumetricCloudSource, options?: VolumetricCloudShadowOptions): VolumetricCloudShadow;
 
 // Not exported from this entry, but used by the exports above:
+
+type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+
+interface CloudWeather {
+    readonly cloud: number;
+    readonly rain?: number;
+    readonly lightning?: number;
+}
+
+class Hurricane {
+    readonly options: HurricaneOptions;
+    constructor(options?: HurricaneOptions);
+    get resolved(): ResolvedHurricane;
+    centerAt(t?: number): [number, number];
+    windAt(x: number, z: number, t?: number): HurricaneWind;
+    rainAt(x: number, z: number, t?: number): number;
+    coverAt(x: number, z: number, height?: number, t?: number, depth?: number): HurricaneCover;
+    regionAt(x: number, z: number, t?: number): HurricaneRegion;
+    weatherAt(x: number, z: number, t?: number): HurricaneWeather;
+}
+
+interface HurricaneCover {
+    eye: number;
+    eyewall: number;
+    outerEyewall: number;
+    moat: number;
+    band: number;
+    shield: number;
+    canopy: number;
+    cover: number;
+}
+
+interface HurricaneOptions {
+    center?: readonly [number, number];
+    velocity?: readonly [number, number];
+    pressureDrop?: number;
+    maxWindRadius?: number;
+    holland?: number;
+    latitude?: number;
+    airDensity?: number;
+    surfaceFactor?: number;
+    inflow?: number;
+    gustFactor?: number;
+    eyeRadius?: number;
+    eyeSlope?: number;
+    eyewallWidth?: number;
+    eyeCloud?: number;
+    outerEyewall?: number;
+    outerEyewallStrength?: number;
+    moat?: number;
+    bands?: number;
+    bandPitch?: number;
+    bandWidth?: number;
+    bandStart?: number;
+    bandTop?: number;
+    bandRotation?: number;
+    bandDrift?: number;
+    principalBand?: number;
+    extent?: number;
+    shield?: number;
+    canopy?: number;
+    rainMax?: number;
+    rainExtent?: number;
+    flowPeriod?: number;
+    swirl?: number;
+}
+
+type HurricaneRegion = 'eye' | 'eyewall' | 'moat' | 'outerEyewall' | 'band' | 'shield' | 'outside';
+
+interface HurricaneWeather {
+    weight: number;
+    wind: number;
+    gust: number;
+    windDirection: number;
+    rain: number;
+    cloud: number;
+    lightning: number;
+    humidity: number;
+}
+
+interface HurricaneWind {
+    speed: number;
+    gust: number;
+    velocity: [number, number];
+    direction: number;
+}
+
+interface ResolvedHurricane {
+    cx: number;
+    cz: number;
+    vx: number;
+    vz: number;
+    dp: number;
+    rmax: number;
+    b: number;
+    rho: number;
+    f: number;
+    spin: number;
+    surface: number;
+    inflow: number;
+    gust: number;
+    eye: number;
+    slope: number;
+    wall: number;
+    eyeCloud: number;
+    outer: number;
+    outerStrength: number;
+    moat: number;
+    bands: number;
+    pitch: number;
+    bandWidth: number;
+    bandStart: number;
+    bandTop: number;
+    bandRotation: number;
+    bandDrift: number;
+    principal: number;
+    extent: number;
+    shield: number;
+    canopy: number;
+    rainMax: number;
+    rainExtent: number;
+    flowPeriod: number;
+    swirl: number;
+}
 
 interface VolumetricCloudFlash {
     position: Vec3;
@@ -47,6 +173,9 @@ interface VolumetricCloudFlash {
 interface VolumetricCloudOptions {
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
+    weather?: CloudWeather;
+    type?: CloudType;
+    hurricane?: HurricaneOptions | Hurricane;
     coverage?: number;
     bottom?: number;
     top?: number;
@@ -57,11 +186,15 @@ interface VolumetricCloudOptions {
     steps?: number;
     lightSteps?: number;
     maxDistance?: number;
+    stepCap?: number;
+    dimLight?: boolean;
+    erosion?: number;
     sunIntensity?: number;
     ambient?: readonly [Vec3, Vec3];
+    groundAlbedo?: number;
     depth?: () => GPUTexture | undefined;
     flash?: VolumetricCloudFlash;
-    temporal?: boolean;
+    temporal?: boolean | 'auto';
 }
 
 interface VolumetricCloudSky {
@@ -69,12 +202,18 @@ interface VolumetricCloudSky {
     readonly options: {
         readonly turbidity?: number;
         readonly exposure?: number;
+        readonly lighting?: {
+            readonly intensity?: number;
+        };
     };
     readonly reflectionTexture?: GPUTexture | undefined;
+    readonly lightScale?: number;
     readonly lights?: readonly {
         readonly direction: ArrayLike<number>;
         readonly radiance: ArrayLike<number>;
     }[];
     environmentLayer?: GPUTexture | undefined;
+    environmentLightLayer?: GPUTexture | undefined;
+    deck?: ((up: number) => number) | undefined;
 }
 ```

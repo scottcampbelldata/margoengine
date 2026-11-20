@@ -12,13 +12,11 @@
 // ./lod: a hierarchy of the real capture fully refined draws as the plain cloud; a 16.7 M-splat stand-in streams in a 2 M budget.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 import { encodeWebpLossless } from '../../src/webp.ts';
 import { checkStreamedSog } from './lod-sog-check.mjs';
 import { checkModifiers } from './modify-check.mjs';
 
-const release = await acquire({ owner: 'splats-gpu' });
 const context = await openBrowser({ startPath: '/packages/splats/test/gpu/splats.html', port: 'free' }),
   { page } = context;
 const report = {};
@@ -564,5 +562,4 @@ try {
   console.log('splats GPU check passed');
 } finally {
   await context.close();
-  release();
 }

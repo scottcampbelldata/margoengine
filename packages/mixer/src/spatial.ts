@@ -122,13 +122,40 @@ export class Emitter implements Disposable {
   }
 }
 
+/**
+ * The unit up at right angles to `forward`: `up` minus its part along forward (Gram-Schmidt), so Web Audio's
+ * right = forward x up is never zero. When `up` has no part across forward (looking straight down with up +Y), the
+ * up of a level view pitched by 90 degrees is used: [0, 0, -1] looking down, [0, 0, 1] looking up, otherwise +Y with
+ * its part along forward removed. The same rule as `@margoengine/audio`'s AudioListener.
+ */
+function independentUp(forward: Vec3, up: Vec3): Vec3 {
+  const length = Math.hypot(forward[0], forward[1], forward[2]),
+    fx = forward[0] / length,
+    fy = forward[1] / length,
+    fz = forward[2] / length;
+  let d = up[0] * fx + up[1] * fy + up[2] * fz,
+    x = up[0] - d * fx,
+    y = up[1] - d * fy,
+    z = up[2] - d * fz,
+    size = Math.hypot(x, y, z);
+  if (!(size > 1e-6 * Math.max(1, Math.hypot(up[0], up[1], up[2])))) {
+    d = fy;
+    x = -d * fx;
+    y = 1 - d * fy;
+    z = -d * fz;
+    size = Math.hypot(x, y, z);
+    if (!(size > 1e-6)) return [0, 0, fy > 0 ? 1 : -1];
+  }
+  return [x / size, y / size, z / size];
+}
+
 /** Where the listener stands and looks. */
 export interface ListenerPose {
   /** World position in metres. */
   position: Vec3;
   /** Direction the listener faces. */
   forward: Vec3;
-  /** Which way is up. Default `[0, 1, 0]`. */
+  /** Which way is up. Default `[0, 1, 0]`; only its part at right angles to `forward` is used. */
   up?: Vec3;
 }
 
@@ -140,8 +167,11 @@ export interface ListenerPose {
 export function setListenerPose(context: BaseAudioContext, pose: ListenerPose, at?: number): void {
   const [px, py, pz] = vec(pose.position, [0, 0, 0], 'position'),
     [fx, fy, fz] = vec(pose.forward, [0, 0, -1], 'forward'),
-    [ux, uy, uz] = vec(pose.up, [0, 1, 0], 'up');
+    up = vec(pose.up, [0, 1, 0], 'up');
   if (fx === 0 && fy === 0 && fz === 0) throw new RangeError('forward must not be the zero vector');
+  if (up[0] === 0 && up[1] === 0 && up[2] === 0) throw new RangeError('up must not be the zero vector');
+  // Web Audio's listener right axis is forward x up; an up along forward makes it zero and every source centred.
+  const [ux, uy, uz] = independentUp([fx, fy, fz], up);
   const l = context.listener;
   move(context, l.positionX, px, at);
   move(context, l.positionY, py, at);

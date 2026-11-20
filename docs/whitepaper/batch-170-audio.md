@@ -12,6 +12,12 @@ hoist or scheduling reorder from accidentally passing. The parent starts 154,500
 code starts zero. Both produce 931,662 recorded automation events with the same SHA-256 of event kinds, raw Float64
 arguments, observable parameter state and world vectors:
 `3468f19ee9de8dea6679e6814e1b6163b2fd3441c34607da58f59b183e95d836`.
+Since 2026-11-15 the replay draws its circle points from basic arithmetic (the rational parametrisation) instead of
+Math.cos and Math.sin, which are not correctly rounded: the x64 machine that recorded the hash above and an arm64 Mac
+disagreed in the last bit of some inputs, so the test failed on the Mac with the code unchanged. With those inputs the
+parent and the new code again record the same 931,662 events with one SHA-256,
+`16196051c30a9163715121ff66d1e81464af7f587e59d562fcfd314577a83202`, on an arm64 Mac (the parent with 154,500
+iterators, the new code with none).
 The work-count regression fails on the parent. This proves command/value identity for the replay, not PCM identity
 across audio devices or a win against another engine. Existing browser tests exercise real Web Audio rendering.
 

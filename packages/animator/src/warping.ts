@@ -89,7 +89,7 @@ export interface DistanceWarp {
 
 /** A distance warp handle. */
 export interface DistanceWarpHandle {
-  /** The clip's whole travel, units. */
+  /** The clip's whole travel along the ground, world units (through the joint's parent's current rotation and scale). */
   readonly length: number;
   /** Stops driving the state by distance. */
   dispose(): void;
@@ -103,6 +103,41 @@ const wrap = (angle: number) => angle - 2 * Math.PI * Math.round(angle / (2 * Ma
 type Clip = Animator['animation']['clips'][number];
 const trackOf = (clip: Clip, joint: number) =>
   clip.tracks.find((track) => track.node === joint && track.path === 'translation');
+/**
+ * The rotation and scale, as a column-major 3 x 3 into `out`, that carry a joint's clip translation to world axes: its
+ * ancestors' local rotations and scales from the transform store (current this frame, unlike the world matrices, which
+ * update after the pose). A rig exported in centimetres under a 0.01 scale, a Z-up rig under a turn, or a model the
+ * app scales all travel in the parent's units and axes, not the world's.
+ */
+function parentLinear(animator: Animator, joint: Mesh, out: Float64Array): Float64Array {
+  const store = animator.animation.model.root.engine.store,
+    t = store.transforms;
+  for (let c = 0; c < 3; c++) {
+    let x = c === 0 ? 1 : 0,
+      y = c === 1 ? 1 : 0,
+      z = c === 2 ? 1 : 0;
+    for (let n = store.parents[joint.id]; n !== -1; n = store.parents[n]) {
+      x *= t.sx[n];
+      y *= t.sy[n];
+      z *= t.sz[n];
+      const qx = t.qx[n],
+        qy = t.qy[n],
+        qz = t.qz[n],
+        qw = t.qw[n],
+        tx = 2 * (qy * z - qz * y),
+        ty = 2 * (qz * x - qx * z),
+        tz = 2 * (qx * y - qy * x);
+      [x, y, z] = [x + qw * tx + qy * tz - qz * ty, y + qw * ty + qz * tx - qx * tz, z + qw * tz + qx * ty - qy * tx];
+    }
+    out[3 * c] = x;
+    out[3 * c + 1] = y;
+    out[3 * c + 2] = z;
+  }
+  return out;
+}
+/** Length along the world ground (x, z) of the parent-space vector (x, y, z) carried by the 3 x 3 `m`. */
+const groundLength = (m: ArrayLike<number>, x: number, y: number, z: number): number =>
+  Math.hypot(m[0] * x + m[3] * y + m[6] * z, m[2] * x + m[5] * y + m[8] * z);
 
 /**
  * Adds orientation and stride warping to `animator`, solved every frame after the pose, layers, foot IK and the solvers
@@ -168,8 +203,10 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
     return { weight, maxTurn, turnTime, minStride, maxStride, maxDrop };
   };
   read();
-  // Travel speed of each clip, once.
-  const speeds = new Map<string, number>(),
+  // Travel of each clip a second in the speed joint's parent space, once; measured on the ground in world units per frame.
+  const speeds = new Map<string, readonly [number, number, number]>(),
+    speedNode = nodes[speedJoint],
+    speedAxes = new Float64Array(9),
     start = new Float32Array(3),
     end = new Float32Array(3);
   for (const clip of animator.animation.clips) {
@@ -179,16 +216,19 @@ export function addWarping(animator: Animator, warp: Warping): WarpingHandle {
       sampleTrackInto(track.times, track.values, track.width, time, track.interpolation, false, out);
     at(0, start);
     at(clip.duration, end);
-    speeds.set(clip.name, Math.hypot(end[0] - start[0], end[2] - start[2]) / clip.duration);
+    const d = clip.duration;
+    speeds.set(clip.name, [(end[0] - start[0]) / d, (end[1] - start[1]) / d, (end[2] - start[2]) / d]);
   }
   const measured = (): number => {
+    const m = parentLinear(animator, speedNode, speedAxes);
     const { clips, weights } = treeWeights(animator.options.states[animator.state], animator.parameters);
     let total = 0,
       sum = 0;
     for (let i = 0; i < clips.length; i++)
       if (weights[i] > 0) {
         total += weights[i];
-        sum += weights[i] * (speeds.get(clips[i]) ?? 0);
+        const v = speeds.get(clips[i]);
+        if (v) sum += weights[i] * groundLength(m, v[0], v[1], v[2]);
       }
     return total > 0 ? sum / total : 0;
   };
@@ -311,22 +351,41 @@ export function addDistanceWarp(animator: Animator, warp: DistanceWarp): Distanc
   if (warp.mode !== undefined && warp.mode !== 'stop' && warp.mode !== 'start')
     throw new RangeError("Distance warp mode must be 'stop' or 'start'");
   if (!track) throw new RangeError(`Distance warp clip "${name}" has no translation on joint ${warp.joint}; pass the bone that carries its travel`);
-  // Keyed travel along the ground, summed so it only ever grows.
+  // Keyed travel in the joint's parent space; along the world ground it is summed so it only ever grows, and summed
+  // again whenever the parent's rotation or scale changes.
   const times = Array.from(track.times),
+    steps = new Float64Array(3 * times.length),
     travelled = new Float64Array(times.length),
+    linear = new Float64Array(9).fill(Number.NaN),
+    axes = new Float64Array(9),
+    jointNode = animator.animation.model.nodes[warp.joint],
     a = new Float32Array(3),
     b = new Float32Array(3);
   sampleTrackInto(track.times, track.values, track.width, times[0], track.interpolation, false, a);
   for (let i = 1; i < times.length; i++) {
     sampleTrackInto(track.times, track.values, track.width, times[i], track.interpolation, false, b);
-    travelled[i] = travelled[i - 1] + Math.hypot(b[0] - a[0], b[2] - a[2]);
+    for (let c = 0; c < 3; c++) steps[3 * i + c] = b[c] - a[c];
     a.set(b);
   }
-  const length = travelled[times.length - 1];
-  if (!(length > 0)) throw new RangeError(`Distance warp clip "${name}" does not travel on joint ${warp.joint}; pass the bone that carries its travel`);
+  /** The clip's whole travel in world units now; refreshes `travelled` when the parent's rotation or scale moved. */
+  const measure = (): number => {
+    const m = parentLinear(animator, jointNode, axes);
+    let changed = false;
+    for (let k = 0; k < 9; k++)
+      if (linear[k] !== m[k]) {
+        linear[k] = m[k];
+        changed = true;
+      }
+    if (changed)
+      for (let i = 1; i < times.length; i++)
+        travelled[i] = travelled[i - 1] + groundLength(m, steps[3 * i], steps[3 * i + 1], steps[3 * i + 2]);
+    return travelled[times.length - 1];
+  };
+  if (!(measure() > 0)) throw new RangeError(`Distance warp clip "${name}" does not travel on joint ${warp.joint}; pass the bone that carries its travel`);
   /** Clip seconds at `covered` units of travel. */
   const timeAt = (covered: number): number => {
     if (covered <= 0) return times[0];
+    const length = travelled[times.length - 1];
     if (covered >= length) return times[times.length - 1];
     let low = 0,
       high = times.length - 1;
@@ -342,6 +401,7 @@ export function addDistanceWarp(animator: Animator, warp: DistanceWarp): Distanc
     advance(time) {
       const distance = warp.distance;
       if (!Number.isFinite(distance) || distance < 0) throw new RangeError('Distance warp distance must be 0 or more');
+      const length = measure();
       return Math.max(time, timeAt((warp.mode ?? 'stop') === 'stop' ? length - distance : distance));
     },
     clipTime: (_, time) => time,
@@ -352,5 +412,11 @@ export function addDistanceWarp(animator: Animator, warp: DistanceWarp): Distanc
     removed = true;
     animator.setStateClock(state, null);
   };
-  return { length, dispose, [Symbol.dispose]: dispose };
+  return {
+    get length() {
+      return measure();
+    },
+    dispose,
+    [Symbol.dispose]: dispose,
+  };
 }

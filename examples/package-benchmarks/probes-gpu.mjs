@@ -1,4 +1,4 @@
-// Real-GPU check of @margoengine/environment/probes (AC power, GPU lock, after npm run build:packages):
+// Real-GPU check of @margoengine/environment/probes (AC power, after npm run build:packages):
 //   node examples/package-benchmarks/probes-gpu.mjs            correctness (no quiet machine needed)
 //   node examples/package-benchmarks/probes-gpu.mjs --bench    plus bake time and per-frame cost (quiet-gate first; else diagnostic)
 // Room scene (probes.html?scene=room): six walls each radiating exactly its linear colour (ambient 1, sun off).
@@ -8,14 +8,14 @@
 //    analytic radiance at the level's roughness (the bake's n = v = r prefilter).
 // 3. Shading, from the read-back texels through a CPU mirror of the WGSL (trilinear SH, box projection, octahedral levels
 //    blended by GGX alpha, analytic split-sum) and each path's tone map: a white core sphere and a white materials
-//    sphere (gltf-pro hook), a mirror metal floor and a rough (0.5) metal floor, within 3/255 (mirror: 95th percentile;
+//    sphere (gltf/pbr hook), a mirror metal floor and a rough (0.5) metal floor, within 3/255 (mirror: 95th percentile;
 //    its sharp level 0 flips a texel at a wall-colour boundary for a sub-pixel shift between the CPU ray and the raster,
 //    so the maximum is only reported).
 // 4. Box projection is physical: on the mirror floor each pixel shows the wall its reflected ray hits (the probe box is the
 //    room, at bake-time wall radiance), 95th percentile within 3/255, for wall points 0.4 m or more from a wall edge. The
 //    truth is the room radiance seen from the floor point, GGX-prefiltered at the floor's real roughness (core's 0.045
 //    floor) times the split-sum weight (parts/probe-truth.mjs).
-// 5. Zero cost: an attached, unbaked LightProbes leaves core meshes bit-identical and gltf-pro within 1/255.
+// 5. Zero cost: an attached, unbaked LightProbes leaves core meshes bit-identical and gltf/pbr within 1/255.
 // 6. SSR (post/ssr) over the probes on the mirror floor, two views: where the mirrored wall is on screen the floor shows it as
 //    rendered now (the probe specular was replaced, not added: the probe holds the bake-time radiance, which differs);
 //    where it is off screen the floor keeps the probe reflection (equal to the frame without SSR).
@@ -486,7 +486,7 @@ const report = {
       );
       await shot('room-after-ssr', { floor: 'diffuse', ssr: false });
     }
-    // 5. Zero cost: unbaked probes leave core meshes bit-identical (fallback = core's own ambient); gltf-pro within 1/255.
+    // 5. Zero cost: unbaked probes leave core meshes bit-identical (fallback = core's own ambient); gltf/pbr within 1/255.
     let coreDiff = 0,
       modelDiff = 0;
     rays.forEach((d, i) => {
@@ -498,10 +498,10 @@ const report = {
       if (disc > 0) modelDiff = Math.max(modelDiff, diff);
       else coreDiff = Math.max(coreDiff, diff);
     });
-    report.unbaked = { coreMaxDiff: coreDiff, gltfProMaxDiff: modelDiff };
+    report.unbaked = { coreMaxDiff: coreDiff, gltfPbrMaxDiff: modelDiff };
     console.log(JSON.stringify(report.unbaked));
     expect(coreDiff === 0, `unbaked core diff ${coreDiff}`);
-    expect(modelDiff <= 1, `unbaked gltf-pro diff ${modelDiff}`);
+    expect(modelDiff <= 1, `unbaked gltf/pbr diff ${modelDiff}`);
     if (bench) {
       // Timings count only after the quiet gate (AC, CPU <= 20% for 20 s, waited up to 3 min); otherwise they are diagnostic.
       try {

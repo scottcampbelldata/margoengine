@@ -1,7 +1,8 @@
 import { importLimits } from './limits.js';
 import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro/model';
-import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf-pro/worker';
+import type { PBRModel } from '@margoengine/gltf/pbr-model';
+import { modelFromPrepared, type PreparedGLTF } from '@margoengine/gltf/worker';
+import { captureScene } from '../../shared/scene-scope.js';
 import { canUseWorker, movable, runWorker } from '../../shared/worker.js';
 import type { FBXOptions } from './index.js';
 // The main-thread fallback loads the converter lazily, so the worker entry stays small.
@@ -19,7 +20,12 @@ export async function parseFBXInWorker(
   input: ArrayBuffer | ArrayBufferView,
   options: FBXOptions = {},
 ): Promise<PBRModel> {
-  if (!canUseWorker() || options.fetch) return (await import('./index.js')).parseFBX(engine, input, options);
+  // The model is built after the awaits below: in the scene this call started in.
+  const scope = captureScene(engine);
+  if (!canUseWorker() || options.fetch) {
+    const { parseFBX } = await import('./index.js');
+    return scope.run(() => parseFBX(engine, input, options));
+  }
   const prepared = await runWorker<PreparedGLTF>(
     workerURL(),
     {
@@ -32,7 +38,7 @@ export async function parseFBXInWorker(
     },
     options.signal,
   );
-  return modelFromPrepared(engine, prepared, options.signal);
+  return scope.run(() => modelFromPrepared(engine, prepared, options.signal));
 }
 /** loadFBX with the download and all parsing in a worker; same model as loadFBX. Runs on this thread when `fetch` is passed. */
 export async function loadFBXInWorker(
@@ -40,7 +46,12 @@ export async function loadFBXInWorker(
   url: string | URL,
   options: FBXOptions = {},
 ): Promise<PBRModel> {
-  if (!canUseWorker() || options.fetch) return (await import('./index.js')).loadFBX(engine, url, options);
+  // The model is built after the awaits below: in the scene this call started in.
+  const scope = captureScene(engine);
+  if (!canUseWorker() || options.fetch) {
+    const { loadFBX } = await import('./index.js');
+    return scope.run(() => loadFBX(engine, url, options));
+  }
   const target = new URL(url, globalThis.location.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('FBX URL needs HTTP(S)');
   const prepared = await runWorker<PreparedGLTF>(
@@ -55,5 +66,5 @@ export async function loadFBXInWorker(
     },
     options.signal,
   );
-  return modelFromPrepared(engine, prepared, options.signal);
+  return scope.run(() => modelFromPrepared(engine, prepared, options.signal));
 }

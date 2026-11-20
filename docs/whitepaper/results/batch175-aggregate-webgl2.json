@@ -7,32 +7,32 @@
     {
       "glyph": "points",
       "gpuBufferPeak": 36288,
-      "logicalStagingBound": 54544
+      "logicalStagingBound": 54560
     },
     {
       "glyph": "lines",
       "gpuBufferPeak": 36288,
-      "logicalStagingBound": 54544
+      "logicalStagingBound": 54560
     },
     {
       "glyph": "areas",
       "gpuBufferPeak": 36288,
-      "logicalStagingBound": 54544
+      "logicalStagingBound": 54560
     },
     {
       "glyph": "triangles",
       "gpuBufferPeak": 36288,
-      "logicalStagingBound": 54544
+      "logicalStagingBound": 54560
     },
     {
       "glyph": "quads",
       "gpuBufferPeak": 36288,
-      "logicalStagingBound": 54544
+      "logicalStagingBound": 54560
     }
   ],
   "routes": {
     "fragment": 0,
-    "scatter": 15,
+    "scatter": 22,
     "cpu": 0
   }
 }

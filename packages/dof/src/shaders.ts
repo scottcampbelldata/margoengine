@@ -76,29 +76,92 @@ ${sampling}
   textureStore(coarse,id.xy,vec4f(farColor/farWeight,select(0.0,center.y,wide)));
 }`;
 
+// Near-field tap source: a mip chain at the gather's size of the near pixels premultiplied by 1 / radius^2 (their weight
+// in the gather): colour and weight (nearTaps), weighted radius and view depth (nearShapes), and the plain scene
+// (nearScene) for the background a near pixel sees past its own edge. Level 0 holds each pixel (nearShader), each level
+// above the 2x2 mean of the one below (nearDownShader), so level k averages 2^k-pixel blocks. The gather reads it
+// trilinearly at the level that matches its tap spacing, so a tap stands for its share of the disk, not for one pixel:
+// read pixel by pixel, a sharp edge on a wide near surface came out in steps from row to row (known-bugs, "DOF near
+// field: stepped blocks").
+export const NEAR_LEVELS = 4;
+export const nearShader = `${params}
+@group(0) @binding(1) var scene:texture_2d<f32>;
+@group(0) @binding(2) var coc:texture_2d<f32>;
+@group(0) @binding(3) var nearTaps:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(4) var nearShapes:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(5) var nearScene:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
+  if(any(id.xy>=textureDimensions(nearTaps))||p.frame.w==0.0){return;}
+  let at=vec2i(id.xy);let s=textureLoad(coc,at,0).xy;let color=textureLoad(scene,at,0).rgb;
+  let g=select(0.0,1.0/max(s.x*s.x,1.0),s.x< -0.5);
+  textureStore(nearTaps,at,vec4f(color*g,g));
+  textureStore(nearShapes,at,vec4f(-s.x*g,s.y*g,0,0));
+  textureStore(nearScene,at,vec4f(color,1));
+}`;
+export const nearDownShader = `@group(0) @binding(0) var tapsBelow:texture_2d<f32>;
+@group(0) @binding(1) var shapesBelow:texture_2d<f32>;
+@group(0) @binding(2) var sceneBelow:texture_2d<f32>;
+@group(0) @binding(3) var nearTaps:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(4) var nearShapes:texture_storage_2d<rgba16float,write>;
+@group(0) @binding(5) var nearScene:texture_storage_2d<rgba16float,write>;
+@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
+  if(any(id.xy>=textureDimensions(nearTaps))){return;}
+  let last=vec2i(textureDimensions(tapsBelow))-1;var taps=vec4f(0);var shapes=vec4f(0);var plain=vec4f(0);
+  for(var k=0;k<4;k++){
+    let at=min(vec2i(id.xy)*2+vec2i(k%2,k/2),last);
+    taps+=textureLoad(tapsBelow,at,0);shapes+=textureLoad(shapesBelow,at,0);plain+=textureLoad(sceneBelow,at,0);
+  }
+  textureStore(nearTaps,vec2i(id.xy),taps*0.25);
+  textureStore(nearShapes,vec2i(id.xy),shapes*0.25);
+  textureStore(nearScene,vec2i(id.xy),plain*0.25);
+}`;
+
 // Gather bokeh. Far field: about one spiral tap per pixel of the disk (16 taps to r 2.26, 32 to 3.19); wider disks
 // interpolate the 2x2 block gathers (a wide disk changes little over one pixel), or gather 64 taps themselves when
 // any interpolated block lies at another depth (silhouettes, where the gather changes fastest).
-// Near field: foreground pixels within maxRadius whose own disk reaches this pixel. Tap i lies sqrt((i+0.5)/64)*
-// maxRadius out and rounding moves it at most 0.71 px closer, so taps beyond the largest near radius of the
-// neighbouring tiles plus one pixel cannot pass the radius test and are skipped. The foreground center counts as one
-// tap's share of its own disk (64 taps cover the largest disk, so a disk under an eighth of it is covered by its own
+// Near field: foreground whose own disk reaches this pixel, read from the near mip chain (nearShader): at each tap the
+// premultiplied weight 1 / radius^2, colour, radius and depth of the near pixels around it. The 64 taps spread over the
+// largest near radius that can reach this 8x8 tile, plus one pixel (R, at most maxRadius; a neighbouring tile counts
+// where its own largest radius and the chain's footprint reach this one), so a small disk gets all 64 taps and keeps
+// its shape, where taps over the whole maxRadius disk left a few blurred spots. Each tap reads the chain at the level
+// whose footprint matches the taps' spacing, sqrt(area / 64) for the lens's tap area (tapArea, 1 for a round disk):
+// trilinear sampling at level L blurs like a box 2^L * sqrt(3) wide. A tap counts where that radius reaches it (over
+// one pixel, so a disk's outline moves smoothly as the radius changes) and that near field lies in front of this pixel.
+// The foreground center counts as one tap's share of its own disk (a disk under an eighth of R is covered by its own
 // pixel alone, smaller than the sampling lattice), not as full coverage: at a blurred near edge the taps from inside
 // cover about half the disk, and the background seen past the edge (partial occlusion, Kraus & Strengert 2007) is the
-// visible background within the center's own disk, gathered by the same taps.
+// visible background within the center's own disk, gathered by the same taps: each tap's chain scene less the near
+// field in front of this pixel there, by the share of the tap that field leaves open.
+// The two whole levels around that level are read and blended here, not by the sampler's trilinear filter: a sampler
+// blends two levels by the level's fraction at its own precision and in its own arithmetic, both left to the
+// implementation (Vulkan's mipmapPrecisionBits, at least 4 bits), while the WebGL2 layer blends two whole levels by the
+// full float fraction in the shader. Through the sampler the one-sample 'focus' case drew one 8-bit level apart on the
+// two: 7 pixels on the Radeon 680M, and on the RTX A6000 even with the level on the 1/256 grid (mean 0.00053). A whole
+// level is read alike by every sampler, so the near field draws the same on native WebGPU and on the layer.
+const nearRead = (name: string, texture: string) =>
+  `var ${name}=textureSampleLevel(${texture},filtered,at,low);if(blend>0.0){${name}=mix(${name},textureSampleLevel(${texture},filtered,at,low+1.0),blend);}`;
 export const bokehShader = `${params}
 ${sampling}
 @group(0) @binding(3) var result:texture_storage_2d<rgba16float,write>;
 @group(0) @binding(4) var tiles:texture_2d<f32>;
 @group(0) @binding(5) var coarse:texture_2d<f32>;
+@group(0) @binding(6) var filtered:sampler;
+@group(0) @binding(7) var nearTaps:texture_2d<f32>;
+@group(0) @binding(8) var nearShapes:texture_2d<f32>;
+@group(0) @binding(9) var nearScene:texture_2d<f32>;
 ${groupMax}
 fn disk(i:u32)->vec2f {return spiral(i,64.0);}
+const tapArea=1.0;
+fn nearLod(radius:f32)->f32 {return max(log2(radius*0.2215567*sqrt(tapArea)/1.7320508),0.0);}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u,@builtin(workgroup_id) tile:vec3u,@builtin(local_invocation_index) local:u32) {
-  let count=vec2i(textureDimensions(tiles));let reach=i32(ceil(ceil(p.lens.w)/8.0));let span=2*reach+1;
+  let count=vec2i(textureDimensions(tiles));let footprint=1.5*exp2(min(ceil(nearLod(p.lens.w)),${NEAR_LEVELS - 1}.0));let reach=i32(ceil((p.lens.w+1.0+footprint)/8.0));let span=2*reach+1;
   var mine=0.0;
   for(var t=i32(local);t<span*span;t+=64){
-    let at=vec2i(tile.xy)+vec2i(t%span,t/span)-reach;
-    if(all(at>=vec2i(0))&&all(at<count)){mine=max(mine,textureLoad(tiles,at,0).x);}
+    let o=vec2i(t%span,t/span)-reach;let at=vec2i(tile.xy)+o;
+    if(all(at>=vec2i(0))&&all(at<count)){
+      let m=textureLoad(tiles,at,0).x;let gap=vec2f(max(abs(o)*8-7,vec2i(0)));
+      if(length(gap)<=m+1.0+footprint){mine=max(mine,m);}
+    }
   }
   let nearMax=groupMax(mine,local);
   let size=textureDimensions(result);if(any(id.xy>=size)){return;}
@@ -117,20 +180,29 @@ fn disk(i:u32)->vec2f {return spiral(i,64.0);}
     }
     if(up.w>0.999){farColor=up.rgb;farWeight=up.w;}else{${far(64)}}
   }else if(center.x>2.26){${far(32)}}else if(center.x>0.5){${far(16)}}
-  let reachTaps=select(0u,u32(clamp(64.0*pow((nearMax+1.0)/p.lens.w,2.0)+0.5,0.0,64.0)),nearMax>0.5);
+  let reachTaps=select(0u,64u,nearMax>0.5);let R=min(p.lens.w,nearMax+1.0);let lod=min(nearLod(R),${NEAR_LEVELS - 1}.0);
+  let low=floor(lod);let blend=lod-low;
+  let nearSize=vec2f(textureDimensions(nearTaps));
   for(var i=0u;i<reachTaps;i++){
-    let nearOffset=vec2i(round(disk(i)*p.lens.w));let nearPixel=pixel+nearOffset;
+    let nearTap=disk(i)*R;let nearPixel=pixel+vec2i(round(nearTap));
     if(any(nearPixel<vec2i(0))||any(nearPixel>limit)){continue;}
-    let nearCoC=textureLoad(coc,nearPixel,0).xy;let radius=-nearCoC.x;
-    if(radius>0.5&&length(vec2f(nearOffset))<=radius&&nearCoC.y<=center.y+max(0.001,center.y*0.01)){
-      let weight=p.lens.w*p.lens.w/max(radius*radius,1.0);
-      nearColor+=textureLoad(scene,nearPixel,0).rgb*weight;nearWeight+=weight;
-    }else if(center.x< -0.5&&nearCoC.y>center.y+max(0.001,center.y*0.01)&&covers(vec2f(nearOffset),-center.x,pixel)>0.0){
-      backColor+=textureLoad(scene,nearPixel,0).rgb;backWeight+=1.0;
+    let at=(vec2f(pixel)+0.5+nearTap)/nearSize;${nearRead('source', 'nearTaps')}
+    var share=0.0;var tint=vec3f(0);
+    if(source.w>0.0){
+      ${nearRead('nearForm', 'nearShapes')}let form=nearForm.xy/source.w;let radius=form.x;tint=source.rgb/source.w;
+      if(form.y<=center.y+max(0.001,center.y*0.01)){
+        share=min(source.w*max(radius*radius,1.0),1.0);
+        let inside=clamp(radius-length(nearTap)+0.5,0.0,1.0);
+        let weight=R*R*source.w*inside;
+        nearColor+=tint*weight;nearWeight+=weight;
+      }
+    }
+    if(center.x< -0.5&&share<1.0&&covers(nearTap,-center.x,pixel)>0.0){
+      ${nearRead('behind', 'nearScene')}backColor+=max(behind.rgb-tint*share,vec3f(0));backWeight+=1.0-share;
     }
   }
   if(center.x< -0.5){
-    let weight=p.lens.w*p.lens.w/(center.x*center.x);nearColor+=sharp.rgb*weight;nearWeight+=weight;
+    let weight=R*R/(center.x*center.x);nearColor+=sharp.rgb*weight;nearWeight+=weight;
     if(backWeight>0.0){farColor=backColor;farWeight=backWeight;}
   }
   let coverage=clamp(nearWeight/64.0,0.0,1.0);

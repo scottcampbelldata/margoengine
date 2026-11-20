@@ -6,10 +6,8 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
-const release = await acquire({ owner: 'stage-viewer-gpu-check', max: 10 });
 const browser = await openBrowser({ startPath: '/tests/stage-viewer.html' });
 const { page } = browser;
 const shot = async (name) => {
@@ -153,5 +151,4 @@ try {
   );
 } finally {
   await browser.close();
-  release();
 }

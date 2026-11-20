@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCustomTransition } from '../dist/custom.js';
 import { Transitions } from '../dist/index.js';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 const wgsl =
   'fn transition(a:texture_2d<f32>,b:texture_2d<f32>,uv:vec2f,p:f32)->vec4f{return mix(sample(a,uv),sample(b,uv),p*p);}';
@@ -110,4 +111,52 @@ test('abort after attachment does not cancel shader execution or detach the effe
   assert.equal(effect.progress, 0.1);
   assert.equal(h.engine.plugins.get(effect.name), effect);
   effect.dispose();
+});
+
+// KB-OWN-ASYNC3: the effect was added after the shader validation, when the default scene is active again.
+async function realEngine(h) {
+  return new Engine(
+    { width: 16, height: 16 },
+    await TransformStore.create(4),
+    { backend: 'webgpu', gpu: h.engine.gpu, dispose() {} },
+    {},
+    null,
+  );
+}
+test('createCustomTransition started in a second scene joins that scene', async () => {
+  const h = harness(),
+    engine = await realEngine(h),
+    other = engine.createScene('other');
+  try {
+    let pending;
+    other.use({ name: 'probe', setup: () => (pending = createCustomTransition(engine, wgsl)) });
+    const effect = await pending;
+    assert.ok(engine.sceneOf(effect) === other, 'the effect is not in the second scene');
+    assert.deepEqual([...engine.scene.plugins.keys()], [], 'a plugin landed in the default scene');
+    effect.dispose();
+    assert.deepEqual([...other.plugins.keys()], ['probe']);
+  } finally {
+    engine.dispose();
+    h.cleanup();
+  }
+});
+test('an aborted createCustomTransition started in a second scene leaves nothing in either scene', async () => {
+  const h = harness(),
+    engine = await realEngine(h),
+    other = engine.createScene('other'),
+    controller = new AbortController();
+  try {
+    let pending;
+    other.use({
+      name: 'probe',
+      setup: () => (pending = createCustomTransition(engine, wgsl, { signal: controller.signal })),
+    });
+    controller.abort();
+    await assert.rejects(pending, { name: 'AbortError' });
+    assert.deepEqual([...engine.scene.plugins.keys()], []);
+    assert.deepEqual([...other.plugins.keys()], ['probe']);
+  } finally {
+    engine.dispose();
+    h.cleanup();
+  }
 });

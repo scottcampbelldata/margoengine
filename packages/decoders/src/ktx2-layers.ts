@@ -135,7 +135,13 @@ export async function parseKTX2(bytes: Uint8Array, options: { signal?: AbortSign
     target: 'ktx2',
     transcoded: 'native',
     srgb: format.endsWith('-srgb'),
-    hasAlpha: !rgb && /^(rgba|bgra|rgb10a2|bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format),
+    // VK_FORMAT_BC1_RGB_UNORM_BLOCK and _SRGB_BLOCK (131, 132) have no alpha: their three-colour blocks' black texel is
+    // opaque, where WebGPU's bc1-rgba formats sample it with alpha 0.
+    hasAlpha:
+      !rgb &&
+      vkFormat !== 131 &&
+      vkFormat !== 132 &&
+      /^(rgba|bgra|rgb10a2|bc[1237]|etc2-rgba|etc2-rgb8a1|astc)/.test(format),
   };
 }
 

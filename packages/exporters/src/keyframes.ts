@@ -191,7 +191,7 @@ export function animatePlacements(
       const m = Float64Array.from(vector(matrix, 16, `matrices[${i}]`));
       if (m[3] || m[7] || m[11] || m[15] !== 1) throw new RangeError(`matrices[${i}] must be affine`);
       const trs = decompose(m);
-      if (!trs) throw new RangeError(`matrices[${i}] has shear or zero scale; keep sheared parents as separate nodes`);
+      if (!trs) throw new RangeError(`matrices[${i}] has shear; keep sheared parents as separate nodes`);
       return trs;
     });
   let held = parts.find((part) => part !== null);

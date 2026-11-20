@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { exportGLB, exportOBJ, paletteTexture, splitGLB, joinGLB } from '../dist/index.js';
+import { exportGLB, exportOBJ, paletteTexture, splitGLB, joinGLB, readAccessor } from '../dist/index.js';
 import { createGodotImportBundle } from '../dist/godot.js';
 import { createGodotImportAddon } from '../dist/godot-addon.js';
 import { encodeZIP } from '../dist/capture.js';
@@ -426,6 +426,13 @@ test('the import add-on binds linear vertex colors and applies extras.loop', asy
   assert.match(extension, /func _import_post_parse\(state: GLTFState\) -> Error:/);
   assert.match(extension, /attributes\.has\("COLOR_0"\)/);
   assert.match(extension, /vertex_color_is_srgb = false/);
+  // A colored primitive with no material took the null path to ERR_UNAVAILABLE, failing the whole import; it now gets
+  // glTF's default material (3.9.6), which the binding loop then marks linear. A null override is left alone.
+  assert.match(
+    extension,
+    /if materials\[0\] == null and colored:\n\t+#[^\n]*\n\t+var fallback := StandardMaterial3D\.new\(\)\n\t+fallback\.metallic = 1\.0\n\t+fallback\.roughness = 1\.0\n\t+materials\[0\] = fallback\n/,
+  );
+  assert.match(extension, /for material in materials:\n\t+if material == null:\n\t+continue\n/);
   assert.match(extension, /extras\.get\("loop"\) is bool/);
   assert.match(extension, /animations\[i\]\.loop = extras\.loop/);
   assert.ok(
@@ -505,4 +512,39 @@ test('material pointer clips need no target node but keep the STEP grid', async 
   const bundle = await createGodotImportBundle(glb, options({ fps: 8 }));
   assert.equal(bundle.manifest.animationFPS, 8);
   await assert.rejects(createGodotImportBundle(glb, options({ fps: 5 })), /cannot represent a STEP key/);
+});
+
+test('Godot helper inventory counts every separator Godot reads before convcol: -, _ and $', async () => {
+  // Godot 4 reads each name suffix after a `-`, `_` or `$`, in any case, so a hidden `_convcol` node also gets a
+  // convex body and must be listed; a `-convcolonly` node loses its mesh and is never a helper.
+  for (const name of ['Physics Stone_convcol', 'Physics Stone$CONVCOL']) {
+    const source = scene();
+    source.nodes[1] = { ...source.nodes[1], name };
+    const glb = exportGLB(source);
+    assert.equal((await createGodotImportBundle(glb, options())).manifest.helpers.length, 1, name);
+    await assert.rejects(createGodotImportBundle(glb, options({ convexHelperIds: [] })), /every exported hidden/);
+  }
+  const only = scene();
+  only.nodes[1] = { ...only.nodes[1], name: 'Physics Stone-convcolonly' };
+  await assert.rejects(createGodotImportBundle(exportGLB(only), options()), /needs a hidden mesh node/);
+});
+
+test('Godot bundle takes a default exportGLB morph mesh (sparse accessors) and writes it dense with the same values', async () => {
+  const count = 64,
+    positions = new Float32Array(count * 3),
+    normals = new Float32Array(count * 3),
+    indices = new Uint32Array([0, 1, 2]),
+    delta = new Float32Array(count * 3);
+  for (let v = 0; v < count; v++) normals[v * 3 + 2] = 1;
+  delta.set([0.5, 0.25, -0.125], 7 * 3);
+  const glb = exportGLB({
+    nodes: [{ name: 'Face', geometry: { positions, normals, indices, morphs: [{ name: 'smile', positions: delta }] }, morphWeights: [0] }],
+  });
+  assert.ok(splitGLB(glb).json.accessors.some((accessor) => accessor.sparse), 'default export writes the morph sparse');
+  const bundle = await createGodotImportBundle(glb, options({ convexHelperIds: [] }));
+  const { json, bin } = splitGLB(bundle.entries[0].data);
+  assert.equal(json.accessors.some((accessor) => accessor.sparse), false);
+  const target = json.meshes[0].primitives[0].targets[0].POSITION;
+  assert.deepEqual(Array.from(readAccessor({ json, bin }, target).values), Array.from(delta));
+  assert.equal(bundle.manifest.glbSHA256, sha(bundle.entries[0].data));
 });

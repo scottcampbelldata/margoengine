@@ -110,3 +110,82 @@ test('invalid source graphs and states do not define partially usable block type
   objects.dispose();
   engine.dispose();
 });
+
+test('origin: objects 2^24 blocks out, under their origin, sit where the same objects near zero sit; a moved origin moves them', async () => {
+  const S = 2 ** 24,
+    { engine, world, objects } = await setup(),
+    far = VoxelObjects.attach(engine, world, { origin: { origin: [S, 2048, -S] } }),
+    source = engine
+      .createMesh()
+      .setGeometry(box(0.5, 0.5, 0.5))
+      .setMaterial(new PbrMaterial({ color: '#ff0000' })),
+    id = objects.define('item', source),
+    farId = far.define('far item', source);
+  world.setBlock(3, 1, 5, objectState(id, 1));
+  world.setBlock(S + 3, 2048 + 1, -S + 5, objectState(farId, 1));
+  objects.update();
+  far.update();
+  const xyz = (m) => [m.position.x, m.position.y, m.position.z],
+    near = objects.at(3, 1, 5)[0],
+    placed = far.at(S + 3, 2048 + 1, -S + 5)[0];
+  assert.deepEqual(xyz(near), [3.5, 1, 5.5]);
+  assert.deepEqual(xyz(placed), xyz(near));
+  assert.deepEqual([placed.rotation.x, placed.rotation.y], [near.rotation.x, near.rotation.y]);
+  // In place and live: every placement moves to its cell minus the new origin, in float64.
+  far.origin.origin[0] = S + 10.25;
+  far.update();
+  assert.deepEqual(xyz(placed), [3.5 - 10.25, 1, 5.5]);
+  far.origin = null;
+  far.update();
+  assert.deepEqual(xyz(placed), [Math.fround(S + 3.5), 2049, Math.fround(-S + 5.5)]);
+  assert.throws(() => VoxelObjects.attach(engine, world, { origin: [1, 2, 3] }), TypeError);
+  far.origin = { origin: [0, Number.NaN, 0] };
+  assert.throws(() => far.update(), RangeError);
+  far.dispose();
+  objects.dispose();
+  engine.dispose();
+});
+test('a placement that fails mid-chunk keeps the placements made before it owned, so dispose releases them', async () => {
+  const { engine, world, objects } = await setup(),
+    good = box(0.5, 0.5, 0.5),
+    bad = box(0.5, 0.5, 0.5),
+    material = new PbrMaterial({ color: '#ff0000' }),
+    make = (geometry) => engine.createMesh().setGeometry(geometry).setMaterial(material),
+    ok = objects.define('ok', make(good)),
+    // A chain one level deeper than a placement can hold is refused at define; one level shorter is placed.
+    chain = [make(bad)];
+  while (chain.length < 64) chain.push(make(bad).setParent(chain.at(-1)));
+  assert.throws(() => objects.define('too deep', { root: chain[0], meshes: chain }), RangeError);
+  const deepest = objects.define('deep', { root: chain[0], meshes: chain.slice(0, 63) });
+  world.setBlock(40, 0, 0, deepest);
+  objects.update();
+  assert.equal(objects.at(40, 0, 0).length, 64);
+  world.setBlock(40, 0, 0, 0);
+  objects.update();
+  // A placement that fails part way (here the engine refuses every mesh from the fifth on).
+  const broken = objects.define('broken', make(bad)),
+    before = engine.meshes.size,
+    createMesh = engine.createMesh;
+  let calls = 0;
+  engine.createMesh = function (...args) {
+    if (++calls >= 5) throw new RangeError('no mesh slot');
+    return createMesh.apply(this, args);
+  };
+  world.setBlocks([0, 0, 0, ok, 1, 0, 0, ok, 2, 0, 0, broken]);
+  assert.throws(() => objects.update());
+  assert.deepEqual(objects.stats, { chunks: 1, cells: 2, meshes: 4 });
+  assert.equal(objects.at(1, 0, 0).length, 2);
+  assert.equal(engine.meshes.size, before + 4);
+  // A second try does not place the first cells twice.
+  assert.throws(() => objects.update());
+  assert.equal(engine.meshes.size, before + 4);
+  engine.createMesh = createMesh;
+  objects.update(); // the retry finishes the chunk
+  assert.deepEqual(objects.stats, { chunks: 1, cells: 3, meshes: 6 });
+  world.setBlock(2, 0, 0, 0);
+  objects.update();
+  assert.deepEqual(objects.stats, { chunks: 1, cells: 2, meshes: 4 });
+  objects.dispose();
+  assert.equal(engine.meshes.size, before);
+  engine.dispose();
+});

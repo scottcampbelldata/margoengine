@@ -135,7 +135,7 @@ struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32, @location(
     if (head.w == 0.0 || clip.w <= 0.0) { return out; }
     let x = select(-1.0, 1.0, vertexIndex == 1u || vertexIndex == 2u || vertexIndex == 4u);
     let y = select(-1.0, 1.0, vertexIndex == 2u || vertexIndex == 4u || vertexIndex == 5u);
-    out.clip = vec4f(clip.xy + vec2f(x, y) * flow.life.y * clip.w / frame.viewport.xy, clip.zw);
+    out.clip = vec4f(clip.xy + vec2f(x, y) * flow.life.y * frame.origin.z * clip.w / frame.viewport.xy, clip.zw);
     out.alpha = flow.life.z;
     return out;
   }
@@ -148,7 +148,7 @@ struct Out { @builtin(position) clip: vec4f, @location(0) alpha: f32, @location(
   let positive = vertexIndex == 2u || vertexIndex == 4u || vertexIndex == 5u;
   let clip = select(clipA, clipB, atEnd);
   out.world = (flow.model * vec4f(flowProject(select(dataA, dataB, atEnd)), 1.0)).xyz;
-  let offset = side * select(-1.0, 1.0, positive) * flow.life.y / frame.viewport.xy;
+  let offset = side * select(-1.0, 1.0, positive) * flow.life.y * frame.origin.z / frame.viewport.xy;
   out.clip = vec4f(clip.xy + offset * clip.w, clip.zw);
   let age = f32(segment) + select(1.0, 0.0, atEnd);
   out.alpha = flow.life.z * pow(1.0 - age / f32(flow.info.y - 1u), 2.0);

@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky lightning link check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// Lightning that lights, with no wiring, on a real GPU (elements plan step 7), read back from Bloom's HDR scene capture:
+// a held flash over a night scene with a ground, a block, a cloud deck and a Clustered light list must light the ground
+// (through the weather's own light group), light the deck from inside, and cast the block's shadow; with `link: false`
+// and the whole-frame overlay off nothing changes. Driven by features-check.mjs (`lightning-link`), on WebGPU and under
+// MARGO_COMPAT=1 on the WebGL2 layer.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LightGroups} from '/packages/clustered/dist/groups.js';
+import {applySkySettings} from '/packages/sky/dist/settings.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {VolumetricClouds,Weather} from '/packages/sky/dist/compat-clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,3,12],target:[0,6,-40],near:0.5,far:20000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+const sky=new Sky({hours:23,timeScale:0});engine.use(sky);
+const lights=Clustered.attach(engine,{shadows:{resolution:512}});
+const groups=LightGroups.attach(engine,lights);
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,0]);
+engine.createMesh().setGeometry(box(6,6,6)).setMaterial(new PbrMaterial({color:'#b0b0b0',roughness:0.9})).setPosition([0,3,-30]);
+const clouds=new VolumetricClouds({sky,coverage:0.9,bottom:600,top:1400,density:0.05});engine.use(clouds);
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x>=s.x||id.y>=s.y){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {data,w:texture.width,h:texture.height};
+}
+const shot=async()=>{engine.render({delta:1/60});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+// Mean luminance of a band of rows (fractions of the frame height from the top) over the middle half of the width.
+const band=(img,top,bottom)=>{let s=0,n=0;for(let y=Math.floor(top*img.h);y<Math.floor(bottom*img.h);y++)for(let x=Math.floor(img.w/4);x<Math.floor(img.w*3/4);x++){const i=(y*img.w+x)*4;s+=0.2126*img.data[i]+0.7152*img.data[i+1]+0.0722*img.data[i+2];n++;}return s/n;};
+const regions=img=>({deck:band(img,0.05,0.3),ground:band(img,0.8,0.98)});
+window.check={samples:sceneSamples,
+ async run(){
+  const out={};device.pushErrorScope('validation');
+  const weather=new Weather({intensity:0,lightning:{strength:0,seed:3,cloud:{radius:400}}});engine.use(weather);
+  weather.strike({distance:300,azimuth:Math.PI,strength:1});
+  for(let i=0;i<4;i++)await shot();
+  weather.options.lightning.hold=0;await shot();
+  out.dark=regions(await shot());
+  weather.options.lightning.hold=1;await shot();
+  out.lit=regions(await shot());
+  out.light={intensity:weather.lightningLight.intensity,shadow:weather.lightningLight.shadow??null,group:groups.names};
+  out.deckFlash=clouds.options.flash===weather.cloudFlash;
+  // A flash lights the same frame with the light group off: only the deck changes.
+  weather.options.lightning.link={lights:false};await shot();await shot();
+  out.noLights=regions(await shot());
+  weather.options.lightning.link=false;await shot();await shot();
+  out.off=regions(await shot());
+  out.offFlash=clouds.options.flash===undefined;
+  weather.options.lightning.link=true;weather.options.lightning.hold=0;await shot();await shot();
+  out.back=regions(await shot());
+  // The settings rows (applySkySettings with the weather as its target), on the held flash.
+  const rows={},apply=async(v,hold=1)=>{applySkySettings({sky,weather},{hours:23,timeScale:0,...v,'lightning.hold':hold});await shot();await shot();return regions(await shot());};
+  rows.base=await apply({},0);
+  rows.full=await apply({});
+  rows.lightOff=await apply({'lightning.light.scale':0});
+  rows.cloudOff=await apply({'lightning.cloud.scale':0});
+  rows.noShadow=await apply({'lightning.light.shadow':'off'});rows.noShadowMap=weather.lightningLight.shadow??null;
+  rows.handedBack=await apply({});
+  out.rows=rows;
+  weather.dispose();
+  const error=await device.popErrorScope();
+  out.validation=error?.message??null;out.errors=errors.splice(0);
+  return out;
+ }};
+window.ready=true;
+</script></body></html>

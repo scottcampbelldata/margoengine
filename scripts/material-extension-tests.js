@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 import { clearcoatBrowserChecks } from './materials-clearcoat-tests.js';
 import { transmissionBrowserChecks } from './materials-transmission-tests.js';
 import { nodeBrowserChecks } from './materials-node-tests.js';
@@ -19,7 +19,7 @@ try {
   const checks = await browser.page.evaluate(
     async ({ doc, buffers }) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
-        { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+        { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
         { SSAO } = await import('/packages/post/dist/index.js');
       const canvas = document.createElement('canvas');
       canvas.style.cssText = 'width:128px;height:128px';

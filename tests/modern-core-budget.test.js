@@ -15,7 +15,7 @@ test('core + stage gate rejects the ceiling and any excess', async () => {
     modules.every((path) => !path.replaceAll('\\', '/').includes('/packages/kinematics-constraints/')),
     'Kinematics constraints entered core + stage',
   );
-  for (const name of ['decoders', 'gltf-pro'])
+  for (const name of ['decoders', 'gltf'])
     assert.ok(
       modules.every((path) => !path.replaceAll('\\', '/').includes(`/packages/${name}/`)),
       name + ' entered core + stage',

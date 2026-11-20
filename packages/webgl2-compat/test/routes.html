@@ -34,7 +34,7 @@ function boxes(engine, n = 9) {
 }
 // Expected compute dispatches of one frame once the route is taken (the layer's per-tier counters).
 const routes = {
-  dof: { fragment: 4, scatter: 0, cpu: 0 }, // CoC, tiles, 2x2 far gather, bokeh
+  dof: { fragment: 8, scatter: 0, cpu: 0 }, // CoC, tiles, near field, three near mip reductions, 2x2 far gather, bokeh
   splats: { fragment: 0, scatter: 1, cpu: 1 }, // projection on the GPU, the sort on the CPU
   instances: { fragment: 0, scatter: 0, cpu: 0 },
   meshes: { fragment: 0, scatter: 0, cpu: 0 },

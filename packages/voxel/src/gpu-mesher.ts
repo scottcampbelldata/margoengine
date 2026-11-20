@@ -7,6 +7,7 @@ import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
 import type { BlockType } from './blocks.js';
 import type { PackedChunk } from './chunk.js';
+import { meshBorder } from './border.js';
 import { type ChunkMesh, blockMaterials, meshChunk, meshInput, sortQuads } from './mesher.js';
 import type { VoxelWorld } from './world.js';
 
@@ -174,13 +175,15 @@ fn faces(@builtin(local_invocation_index) t: u32, @builtin(workgroup_id) w: vec3
     let o0 = (A >> 12u) & 3u; let o1 = (A >> 14u) & 3u; let o2 = (A >> 16u) & 3u; let o3 = (A >> 18u) & 3u;
     let l0 = B & 255u; let l1 = (B >> 8u) & 255u; let l2 = (B >> 16u) & 255u; let l3 = B >> 24u;
     var width = 1u; var height = 1u;
-    if (o0 == o1 && o3 == o2 && l0 == l1 && l3 == l2) {
+    // Translucent faces stay one per cell face, as in meshChunk, so sortQuads can order them exactly.
+    let single = ((A >> 24u) & 3u) == 2u;
+    if (!single && o0 == o1 && o3 == o2 && l0 == l1 && l3 == l2) {
       loop {
         if (u + width >= 32u || keys[m + width] != A || lights[m + width] != B) { break; }
         width++;
       }
     }
-    if (o0 == o3 && o1 == o2 && l0 == l3 && l1 == l2) {
+    if (!single && o0 == o3 && o1 == o2 && l0 == l3 && l1 == l2) {
       loop {
         if (v + height >= 32u) { break; }
         var same = true;
@@ -292,9 +295,12 @@ interface Job {
   priority: number;
   order: number;
   eye?: Vec3;
+  border: boolean;
   resolve(mesh: ChunkMesh | null): void;
   reject(error: unknown): void;
   cancelled: boolean;
+  // Taken off a lost or replaced device and queued again: the batch it was in settles nothing for it.
+  moved?: boolean;
 }
 
 interface Table {
@@ -307,6 +313,7 @@ interface Table {
 
 const keyPattern = /^(-?\d+),(-?\d+),(-?\d+)$/;
 const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
+const hasQuads = (mesh: ChunkMesh): boolean => !!(mesh.opaque.length || mesh.cutout.length || mesh.translucent.length);
 
 /**
  * Meshes chunks in WebGPU compute shaders: the same quads, in the same order, as {@link meshChunk} on the CPU (see
@@ -314,6 +321,10 @@ const isChunk = (c: number): boolean => (c << 5) >> 5 === c;
  * up to `batch` chunks per dispatch, nearest first, so a large edit remeshes in a few GPU passes instead of a worker
  * job per chunk. A chunk with a slab or stair within a cell of it is meshed by meshChunk on this thread. The page still
  * packs each chunk and its shell (as for the worker mesher) and finds which chunk faces see each other.
+ *
+ * The mesher holds GPU objects of the device it was made with. When that device is lost its jobs wait, and
+ * {@link GpuVoxelMesher.setDevice} moves it to the device the engine restored, where they run. A `VoxelRenderer` given
+ * the mesher does this from its own restore hook; a page using the mesher alone calls it after `engine.rebootDevice()`.
  *
  * ```ts
  * const mesher = new GpuVoxelMesher(engine.gpu!);
@@ -341,6 +352,7 @@ export class GpuVoxelMesher {
   #scheduled = false;
   #order = 0;
   #disposed = false;
+  #lost = false;
 
   /**
    * @param device The WebGPU device: `engine.gpu`.
@@ -348,18 +360,53 @@ export class GpuVoxelMesher {
    * @throws RangeError when `batch` is not a whole number from 1 to 32, or the device cannot bind its scratch.
    */
   constructor(device: GPUDevice, options: GpuVoxelMesherOptions = {}) {
-    if (typeof device?.createComputePipeline !== 'function')
-      throw new TypeError('GpuVoxelMesher expects a GPUDevice; pass engine.gpu of a WebGPU engine');
     const { batch = 8 } = options;
     if (!Number.isInteger(batch) || batch < 1 || batch > 32)
       throw new RangeError(`GpuVoxelMesher batch is ${batch}; pass a whole number from 1 to 32`);
-    const slotBytes = batch * SLOTS * 4096 * 4;
-    if (slotBytes > device.limits.maxStorageBufferBindingSize)
-      throw new RangeError(
-        `GpuVoxelMesher batch ${batch} needs ${slotBytes} bytes in one binding, over this device's limit; pass a smaller batch`,
-      );
+    fits(device, batch);
     this.#device = device;
     this.batch = batch;
+    this.#watch(device);
+  }
+
+  /**
+   * Moves the mesher to `device`, such as the one `engine.rebootDevice()` restored: its pipelines and scratch are made
+   * again there on the next batch, and the jobs that waited for it run. `VoxelRenderer` calls it for the mesher it was
+   * given. Calling it with the device in use does nothing.
+   * @throws TypeError when `device` is not a GPUDevice.
+   * @throws RangeError when `device` cannot bind this mesher's `batch` scratch.
+   * @throws MargoError `disposed` after {@link GpuVoxelMesher.dispose}.
+   */
+  setDevice(device: GPUDevice): void {
+    this.#check();
+    fits(device, this.batch);
+    if (device === this.#device && !this.#lost) return;
+    this.#requeue();
+    // The lost device's objects are dead already; a device still alive frees them once its submitted work ends.
+    for (const buffer of this.#buffers.splice(0)) buffer.destroy();
+    this.#pipelines = this.#src = this.#out = undefined;
+    if (this.#table) this.#table.buffer = undefined;
+    this.#device = device;
+    this.#lost = false;
+    this.#watch(device);
+    this.#schedule();
+  }
+
+  // When the device is lost, the jobs of the batch on it are queued again and wait for setDevice.
+  #watch(device: GPUDevice): void {
+    void device.lost?.then(() => {
+      if (this.#device !== device || this.#disposed) return;
+      this.#lost = true;
+      this.#requeue();
+    });
+  }
+
+  #requeue(): void {
+    for (const job of this.#running) {
+      if (job.cancelled || job.moved) continue;
+      job.moved = true;
+      if (!this.#queue.has(job.key)) this.#queue.set(job.key, { ...job, moved: false, order: this.#order++ });
+    }
   }
 
   // Pipelines and the fixed scratch, made on first use.
@@ -411,11 +458,12 @@ export class GpuVoxelMesher {
    * newer call for the key, and when the chunk is not loaded once its batch starts. Rejects when the GPU work fails.
    * @param priority Lower is meshed sooner, such as the chunk's distance to the camera. Default 0.
    * @param eye The camera's world position: the translucent quads come back sorted from it (`sortQuads`).
+   * @param border Also list the shell's cube faces in `ChunkMesh.border`, read on this thread. Default false.
    * @throws TypeError when `world` is not a VoxelWorld, `key` is not a string or `eye` is not three numbers.
    * @throws RangeError when `key` is not three chunk coordinates, or `priority` or `eye` is not finite.
    * @throws MargoError `disposed` after {@link GpuVoxelMesher.dispose}.
    */
-  mesh(world: VoxelWorld, key: string, priority = 0, eye?: Vec3): Promise<ChunkMesh | null> {
+  mesh(world: VoxelWorld, key: string, priority = 0, eye?: Vec3, border = false): Promise<ChunkMesh | null> {
     this.#check();
     if (typeof world?.getChunk !== 'function')
       throw new TypeError('GpuVoxelMesher.mesh expects a VoxelWorld and a key');
@@ -440,6 +488,7 @@ export class GpuVoxelMesher {
         priority,
         order: this.#order++,
         eye: local,
+        border: border === true,
         resolve,
         reject,
         cancelled: false,
@@ -463,65 +512,96 @@ export class GpuVoxelMesher {
   }
 
   #schedule(): void {
-    if (this.#busy || this.#scheduled || !this.#queue.size || this.#disposed) return;
+    if (this.#busy || this.#scheduled || !this.#queue.size || this.#disposed || this.#lost) return;
     this.#scheduled = true;
     queueMicrotask(() => {
       this.#scheduled = false;
-      if (!this.#busy && this.#queue.size && !this.#disposed) void this.#run();
+      if (!this.#busy && this.#queue.size && !this.#disposed && !this.#lost) void this.#run();
     });
   }
 
   // Takes the nearest jobs, answers the empty and part-block chunks here and meshes the rest in one GPU batch.
   async #run(): Promise<void> {
     this.#busy = true;
-    const gpu: { job: Job; chunk: PackedChunk; shell: Uint32Array; light: Uint8Array; visibility: number }[] = [];
+    const device = this.#device;
+    const gpu: {
+      job: Job;
+      chunk: PackedChunk;
+      shell: Uint32Array;
+      light: Uint8Array;
+      visibility: number;
+      border?: Uint32Array;
+    }[] = [];
     try {
       const picked = [...this.#queue.values()].sort((a, b) => a.priority - b.priority || a.order - b.order);
       for (const job of picked) {
         if (gpu.length === this.batch) break;
         this.#queue.delete(job.key);
-        const input = meshInput(job.world, job.key);
-        if (!input) {
-          job.resolve(null);
-          continue;
-        }
-        if (gpu.length && input.blocks !== this.#table?.blocks) {
-          // Another world's block table: its own batch.
-          this.#queue.set(job.key, job);
-          break;
-        }
-        const chunk = input.chunk as PackedChunk,
-          flags = this.#flags(input.blocks);
-        let seen = 0;
-        for (const s of chunk.palette) seen |= flags[s & 0xffff];
-        for (const s of input.shell) seen |= flags[s & 0xffff];
-        const first = flags[chunk.palette[0] & 0xffff];
-        if (!chunk.bits && (first & 3) === INVISIBLE) {
-          this.stats.empty++;
-          job.resolve({ ...EMPTY(), visibility: ALL });
-        } else if (seen & PART) {
-          this.stats.cpu++;
-          const mesh = meshChunk(input);
-          if (job.eye) sortQuads(mesh.translucent, job.eye);
-          job.resolve(mesh);
-        } else {
-          gpu.push({ job, chunk, shell: input.shell, light: input.light, visibility: visibility(chunk, flags) });
-          this.#running.add(job);
+        // The job left the queue: whatever this thread throws for it settles its promise, so no chunk waits forever.
+        try {
+          const input = meshInput(job.world, job.key);
+          if (!input) {
+            job.resolve(null);
+            continue;
+          }
+          if (gpu.length && input.blocks !== this.#table?.blocks) {
+            // Another world's block table: its own batch.
+            this.#queue.set(job.key, job);
+            break;
+          }
+          const chunk = input.chunk as PackedChunk,
+            flags = this.#flags(input.blocks);
+          let seen = 0;
+          for (const s of chunk.palette) seen |= flags[s & 0xffff];
+          for (const s of input.shell) seen |= flags[s & 0xffff];
+          const first = flags[chunk.palette[0] & 0xffff];
+          if (!chunk.bits && (first & 3) === INVISIBLE) {
+            this.stats.empty++;
+            job.resolve({ ...EMPTY(), visibility: ALL });
+          } else if (seen & PART) {
+            this.stats.cpu++;
+            const mesh = meshChunk(input);
+            if (job.eye) sortQuads(mesh.translucent, job.eye);
+            if (job.border && hasQuads(mesh)) mesh.border = meshBorder(input);
+            job.resolve(mesh);
+          } else {
+            gpu.push({
+              job,
+              chunk,
+              shell: input.shell,
+              light: input.light,
+              visibility: visibility(chunk, flags),
+              border: job.border ? meshBorder(input) : undefined,
+            });
+            this.#running.add(job);
+          }
+        } catch (error) {
+          job.reject(error);
         }
       }
       if (gpu.length) {
         const meshes = await this.#dispatch(gpu);
         this.stats.gpu += gpu.length;
         this.stats.batches++;
-        gpu.forEach(({ job }, i) => {
+        gpu.forEach(({ job, border }, i) => {
+          if (job.moved) return;
           if (job.cancelled || this.#disposed) return job.resolve(null);
           const mesh = meshes[i];
           if (job.eye) sortQuads(mesh.translucent, job.eye);
+          if (border && hasQuads(mesh)) mesh.border = border;
           job.resolve(mesh);
         });
       }
     } catch (error) {
-      for (const { job } of gpu) job.reject(error);
+      // A read back that a lost device aborted can settle before device.lost does: the jobs wait for setDevice too.
+      if (device === this.#device && !this.#lost && (error as { name?: unknown })?.name === 'AbortError') {
+        this.#lost = true;
+        this.#requeue();
+      }
+      for (const { job } of gpu)
+        if (job.moved) continue;
+        else if (job.cancelled || this.#disposed) job.resolve(null);
+        else job.reject(error);
     } finally {
       for (const { job } of gpu) this.#running.delete(job);
       this.#busy = false;
@@ -631,6 +711,7 @@ export class GpuVoxelMesher {
     let totals: Uint32Array;
     try {
       const [error] = await Promise.all([device.popErrorScope(), read.mapAsync(GPUMapMode.READ)]);
+      moved(device, this.#device);
       if (error)
         throw new MargoError(
           'failed',
@@ -665,6 +746,7 @@ export class GpuVoxelMesher {
     let all: Uint32Array;
     try {
       await back.mapAsync(GPUMapMode.READ);
+      moved(device, this.#device);
       all = new Uint32Array(back.getMappedRange().slice(0));
     } finally {
       back.destroy();
@@ -688,6 +770,23 @@ export class GpuVoxelMesher {
   [Symbol.dispose](): void {
     this.dispose();
   }
+}
+
+// Throws when `device` is not a GPUDevice or cannot bind the slot scratch of `batch` chunks in one binding.
+function fits(device: GPUDevice, batch: number): void {
+  if (typeof device?.createComputePipeline !== 'function')
+    throw new TypeError('GpuVoxelMesher expects a GPUDevice; pass engine.gpu of a WebGPU engine');
+  const slotBytes = batch * SLOTS * 4096 * 4;
+  if (slotBytes > device.limits.maxStorageBufferBindingSize)
+    throw new RangeError(
+      `GpuVoxelMesher batch ${batch} needs ${slotBytes} bytes in one binding, over this device's limit; pass a smaller batch`,
+    );
+}
+
+// A batch whose device was replaced while it waited stops: its jobs were queued again on the new device.
+function moved(device: GPUDevice, current: GPUDevice): void {
+  if (device !== current)
+    throw new MargoError('state', 'GpuVoxelMesher moved to another device during a batch; its jobs run again there');
 }
 
 const EMPTY = () => ({ opaque: new Uint32Array(0), cutout: new Uint32Array(0), translucent: new Uint32Array(0) });

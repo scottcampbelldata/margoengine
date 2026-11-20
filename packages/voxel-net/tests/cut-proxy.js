@@ -17,28 +17,29 @@ export async function until(what, check, ms = 20_000) {
 
 /** Proxies to `port` on loopback. Starts listening on any free port, given as `port`. */
 export async function cutProxy(port) {
-  const pairs = new Set(),
-    server = createServer((down) => {
-      const up = connect(port, '127.0.0.1'),
-        pair = { down, up, dropDown: false, frozen: false };
-      pairs.add(pair);
-      up.setNoDelay(true);
-      down.setNoDelay(true);
-      down.on('data', (data) => pair.frozen || up.write(data));
-      up.on('data', (data) => pair.frozen || pair.dropDown || down.write(data));
-      for (const [a, b] of [
-        [down, up],
-        [up, down],
-      ]) {
-        a.on('end', () => pair.frozen || b.end());
-        a.on('close', () => {
-          if (pair.frozen) return; // the other end stays open until close()
-          pairs.delete(pair);
-          b.destroy();
-        });
-        a.on('error', () => {});
-      }
-    });
+  const pairs = new Set();
+  let stalling = false;
+  const server = createServer((down) => {
+    const up = connect(port, '127.0.0.1'),
+      pair = { down, up, dropDown: false, frozen: false, held: stalling ? [] : undefined };
+    pairs.add(pair);
+    up.setNoDelay(true);
+    down.setNoDelay(true);
+    down.on('data', (data) => pair.frozen || (pair.held ? pair.held.push(data) : up.write(data)));
+    up.on('data', (data) => pair.frozen || pair.dropDown || down.write(data));
+    for (const [a, b] of [
+      [down, up],
+      [up, down],
+    ]) {
+      a.on('end', () => pair.frozen || b.end());
+      a.on('close', () => {
+        if (pair.frozen) return; // the other end stays open until close()
+        pairs.delete(pair);
+        b.destroy();
+      });
+      a.on('error', () => {});
+    }
+  });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
   return {
     port: server.address().port,
@@ -67,6 +68,22 @@ export async function cutProxy(port) {
         pair.frozen = false;
         pair.down.destroy();
         pair.up.destroy();
+      }
+    },
+    /** From now on, what a new connection's client sends is held back until release(): a slow handshake. */
+    stall() {
+      stalling = true;
+    },
+    /** How many connections are held back by stall(). */
+    get stalled() {
+      return [...pairs].filter((pair) => pair.held).length;
+    },
+    /** Sends what stall() held back, and forwards from then on. */
+    release() {
+      stalling = false;
+      for (const pair of pairs) {
+        for (const data of pair.held ?? []) pair.up.write(data);
+        pair.held = undefined;
       }
     },
     /** Lets go of everything. */

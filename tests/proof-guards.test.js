@@ -60,8 +60,45 @@ test('every guarded package runs its proofs in its own test script, and no other
 
 test('the reader finds the names written each way the proofs write them', () => {
   const found = named(
-    "versions('post', ref); entryAt('gltf-pro', 'src/index.ts'); both('labels', e); 'packages/bvh/src/math.ts' " +
+    "versions('post', ref); entryAt('gltf', 'src/pbr.ts'); both('labels', e); 'packages/bvh/src/math.ts' " +
       "['clustered', 'tonemap'].map((name) => entryAt(name)); packages/core/dist; packages/shared/x.js",
   );
-  assert.deepEqual([...found].sort(), ['bvh', 'clustered', 'gltf-pro', 'labels', 'post', 'tonemap']);
+  assert.deepEqual([...found].sort(), ['bvh', 'clustered', 'gltf', 'labels', 'post', 'tonemap']);
+});
+
+test('no proof binds a catch variable it never reads (biome noUnusedVariables in npm run lint)', () => {
+  const bad = [];
+  for (const file of readdirSync(proofs).filter((name) => /\.(?:js|mjs)$/.test(name))) {
+    const source = readFileSync(resolve(proofs, file), 'utf8');
+    for (const match of source.matchAll(/catch \((\w+)\) \{/g)) {
+      const start = match.index + match[0].length;
+      let depth = 1,
+        end = start;
+      while (depth > 0 && end < source.length) {
+        depth += source[end] === '{' ? 1 : source[end] === '}' ? -1 : 0;
+        end++;
+      }
+      if (!new RegExp(`\\b${match[1]}\\b`).test(source.slice(start, end))) bad.push(`${file}: catch (${match[1]})`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
+
+test('no proof reads the error of a bare catch (a catch without a binding that then uses e, err or error is a ReferenceError)', () => {
+  const bad = [];
+  for (const file of readdirSync(proofs).filter((name) => /\.(?:js|mjs)$/.test(name))) {
+    const source = readFileSync(resolve(proofs, file), 'utf8');
+    for (const match of source.matchAll(/catch \{/g)) {
+      const start = match.index + match[0].length;
+      let depth = 1,
+        end = start;
+      while (depth > 0 && end < source.length) {
+        depth += source[end] === '{' ? 1 : source[end] === '}' ? -1 : 0;
+        end++;
+      }
+      if (/(?<![\w.])(?:e|err|error|ex)\b(?!\s*[:=])/.test(source.slice(start, end)))
+        bad.push(`${file}: a bare catch reads its error`);
+    }
+  }
+  assert.deepEqual(bad, []);
 });

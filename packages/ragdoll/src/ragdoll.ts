@@ -6,6 +6,7 @@
 import type { Engine, EnginePlugin, Mesh } from '@margoengine/core/extension';
 import type { ColliderOptions, Physics, PhysicsBody, PhysicsJoint } from '@margoengine/physics';
 import { MargoError } from '@margoengine/math/errors';
+import { sceneScope } from '../../shared/scene-scope.js';
 import {
   conjugateQuaternion,
   normalizeQuaternion,
@@ -614,23 +615,28 @@ export class Ragdoll implements EnginePlugin {
     );
   }
 
-  /** Builds a ragdoll on `physics` and adds it to its bones' engine, after the plugins already there (the Animator). */
+  /** Builds a ragdoll on `physics` and adds it to its bones' engine, in the world's scene, after the plugins already there (the Animator). */
   static attach(physics: Physics, options: RagdollOptions): Ragdoll {
-    const ragdoll = new Ragdoll(physics, options);
-    if (ragdoll.engine.hasPlugin(ragdoll.name)) {
-      ragdoll.dispose();
-      throw new MargoError(
-        'attached',
-        'This skeleton already has an attached ragdoll; dispose it first, or use the one you have.',
-      );
-    }
-    try {
-      ragdoll.engine.use(ragdoll);
-    } catch (error) {
-      ragdoll.dispose();
-      throw error;
-    }
-    return ragdoll;
+    const ragdoll = new Ragdoll(physics, options),
+      engine = ragdoll.engine;
+    // In the physics world's scene, which is the active one only when the ragdoll is attached from there: hasPlugin
+    // and use both act on the active scene.
+    return sceneScope(engine, engine.sceneOf(physics)).run(() => {
+      if (engine.hasPlugin(ragdoll.name)) {
+        ragdoll.dispose();
+        throw new MargoError(
+          'attached',
+          'This skeleton already has an attached ragdoll; dispose it first, or use the one you have.',
+        );
+      }
+      try {
+        engine.use(ragdoll);
+      } catch (error) {
+        ragdoll.dispose();
+        throw error;
+      }
+      return ragdoll;
+    });
   }
 
   private collider(
@@ -1208,7 +1214,8 @@ export class Ragdoll implements EnginePlugin {
       }
     const engine = this.attached;
     this.attached = undefined;
-    if (engine?.plugins.get(this.name) === this) engine.removePlugin(this.name);
+    // The scene that holds this ragdoll, not the active one (removePlugin and plugins act on the active scene).
+    engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

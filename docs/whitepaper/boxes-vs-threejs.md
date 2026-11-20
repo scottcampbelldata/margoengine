@@ -6,13 +6,13 @@ load than frame rates, the variants alternated within every round and the order 
 ratios between variants of the same run are used. Do not quote these numbers as engine performance.
 
 Machine: Intel Core Ultra 7 258V, Intel Arc 140V (Xe2), driver 32.0.101.8860, Edge 155 headless, 1280x720, DPR 1,
-4x MSAA, AC power before and after every run, GPU lock held. Harness: `examples/package-benchmarks/vs-threejs`
+4x MSAA, AC power before and after every run. Harness: `examples/package-benchmarks/vs-threejs`
 (removed 2026-10-24 for the clean-room rule; its Margo side and in-page harness became `bench/scenes/`, see
 docs/benchmarking.md, and the commands below need a checkout from before that date).
 Raw JSON: `examples/package-benchmarks/results/vs-threejs-boxes-{diag1,diag2,proto,fps}.json` (per-run `resources`
 lists stripped). Reproduce: `node examples/package-benchmarks/vs-threejs/run.mjs --busy --rounds=3 --frames=120
 --only=boxes:1000,boxes:10000,boxes:50000,cad:50000 --variants=margo,margo+double,margo+cull,margo+plugin,margo+pass,three-webgpu-instanced,three-webgl-instanced`.
-No round overlapped another GPU run: every round held the GPU lock.
+No round overlapped another GPU job: every round ran with nothing else running on the GPU.
 
 ## Update 2026-10-15: fix B is in core; like-for-like pairs
 
@@ -51,7 +51,7 @@ GPU win of fix B (same run, `margo+nocull` -> `margo`): 1k 1.64 -> 0.46 ms (3.6x
 
 | Variant | 1k | 10k | 50k | 10k moving |
 | --- | --- | --- | --- | --- |
-| Margo `createInstancedMesh` (1 draw, gltf-pro shader) | 490 / 0.35 / 1.18 / 6.6 | 212 / 0.32 / n/a† / 10.3 | 94 / 0.29 / 10.2 / 15.9 | 135 / 6.0 / 4.53 / 16.4 |
+| Margo `createInstancedMesh` (1 draw, gltf/pbr shader) | 490 / 0.35 / 1.18 / 6.6 | 212 / 0.32 / n/a† / 10.3 | 94 / 0.29 / 10.2 / 15.9 | 135 / 6.0 / 4.53 / 16.4 |
 | Margo `CulledInstances` (16 indirect draws) | 389 / 0.31 / 1.00 / 6.5 | 270 / 0.26 / 2.36 / 7.7 | 163 / 0.21 / 5.52 / 11.7 | 5.2 / 187 / 4.14 / 286 |
 | three WebGL2 `InstancedMesh` | **891** / 0.15 / 0.73* / 4.8 | **645** / 0.13 / 1.40* / 5.8 | **220** / 0.19 / 5.29* / 12.9 | **256** / 3.3 / 3.15* / 10.0 |
 | three WebGPU `InstancedMesh` | 654 / 0.42 / 0.72 / 5.6 | 364 / 0.44 / 2.40 / 8.4 | 113 / 0.98 / 8.28 / 14.9 | 190 / 3.8 / 3.27 / 12.4 |
@@ -67,7 +67,7 @@ Reading (diagnostic only; the quiet-PC run decides any claim):
   off-screen boxes, Margo's kernel culls too but the 50k grid is mostly on screen; not diagnosed).
 - **Instanced <-> instanced: three ahead** on these static boxes except `CulledInstances` at 50k against three WebGPU
   (163 vs 113 FPS). Neither Margo instanced path gets core's culled pipeline: `createInstancedMesh` draws with
-  gltf-pro's heavier PBR shader (and ACES, so its frames are brighter: `vsMargoImage` 20/255), `CulledInstances` with
+  gltf/pbr's heavier PBR shader (and ACES, so its frames are brighter: `vsMargoImage` 20/255), `CulledInstances` with
   core's cull-none pipeline and the discard plus its compute passes. Core meshes, which do get it, beat three's
   WebGPU `InstancedMesh` on GPU (0.46 / 1.80 / 6.00 vs 0.72 / 2.40 / 8.28 ms) and take 0.6-1.3x the GPU time of its
   WebGL2 one, but pay 2-9 ms of CPU per frame for entities an `InstancedMesh` does not have.
@@ -80,7 +80,7 @@ Reading (diagnostic only; the quiet-PC run decides any claim):
   Instanced <-> instanced at 50k: `CulledInstances` 80 FPS / 0.26 ms CPU / 11.0 ms GPU, `createInstancedMesh` 55 /
   0.43 / 16.8, three WebGL2 `InstancedMesh` 92 / 0.21 / 10.9, three WebGPU 80 / 0.74 / 11.3; Margo core meshes 69 /
   12.9 / 12.0 (the mesh <-> mesh three `Mesh` variants were not run here).- Open follow-ups (packages, not core): give `CulledInstances` the same back-culled, discard-free pipeline for
-  single-sided unmirrored batches, and a bulk transform upload; check gltf-pro's single-sided GPU cost.
+  single-sided unmirrored batches, and a bulk transform upload; check gltf/pbr's single-sided GPU cost.
 
 ## Instanced: fixes and what is left (2026-10-25)
 
@@ -89,7 +89,7 @@ as measured. This section is a second machine, the cause of each gap, what was f
 quiet-machine run (HANDOFF item 36) decides any public claim.
 
 Machine: AMD Ryzen 9 9950X, NVIDIA RTX A6000 (driver 617.42), Windows 11, Edge 156 headless, 1280x720, DPR 1, 4x
-MSAA, GPU lock held, quiet gate skipped (other sessions were building). Scenes: the shared `boxes` scene of the bench
+MSAA, quiet gate skipped (other sessions were building). Scenes: the shared `boxes` scene of the bench
 tool (`bench/scenes/catalog.js`), Margo's `createInstancedMesh` (`mode=instanced`) and `CulledInstances`
 (`mode=culled`) against three.js r186 `InstancedMesh` on its WebGL2 and WebGPU renderers (written against three's
 public API in `engine-bench/margo-bench/`, outside this repository). Engines alternate within every repetition; 3 runs
@@ -113,11 +113,11 @@ page, `diag` scripts of this change's session):
    pipeline, whose `discard` costs early depth testing for every fragment. Fixed: single-sided batches without
    mirrored parts use core's back-culled variant (the same switch core and `@margoengine/scatter` use). Trade-off:
    one more pipeline per shader; a batch with a mirrored part keeps the old one.
-2. *createInstancedMesh was not missing the culled pipeline.* gltf-pro already culls back faces and compiles the
+2. *createInstancedMesh was not missing the culled pipeline.* gltf/pbr already culls back faces and compiles the
    discard out; the earlier "ACES" remark no longer applies (both use PBR Neutral). Its costs were elsewhere:
-   - a plain `Material` read ten textures per fragment (gltf-pro's white defaults times the materials package's).
+   - a plain `Material` read ten textures per fragment (gltf/pbr's white defaults times the materials package's).
      Fixed: a standard material with no maps reads none (same pixels). Gain at 50k: 0.669 -> 0.629 ms.
-   - the rest is vertex fetch. gltf-pro's vertex is 80 bytes (position, normal, tangent, UVs, colour) and the
+   - the rest is vertex fetch. gltf/pbr's vertex is 80 bytes (position, normal, tangent, UVs, colour) and the
      vertex stage reads all of it for a material that uses none of the extras: reading only position and normal
      takes 50k from 0.642 to 0.47 ms, level with three. Not fixed yet (known-bugs).
 3. *CulledInstances' compute culling pays for itself.* At 10k and 50k it is the fastest of the four on the GPU. At 1k
@@ -133,7 +133,7 @@ page, `diag` scripts of this change's session):
 
 **After** (`benchmarks/records/20261025-104804-26e20b90-dev.json`: the code of the commit before the one that added
 this section; `26e20b90` is its id before rebasing onto main; rerun:
-`npm run build:packages`, then, under the GPU lock, `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu
+`npm run build:packages`, then, `npm run bench -- instanced --engines=margo,three-webgl,three-webgpu
 --runs=3 --no-gate --no-compare --no-fail --label=dev`; on a quiet machine drop `--no-gate`):
 
 | Case | Margo `createInstancedMesh` | Margo `CulledInstances` | three WebGL2 | three WebGPU |
@@ -195,7 +195,7 @@ this is diagnostic. CPU ms / GPU ms per frame:
 Not an instanced path: 10,000 `UnlitMaterial` meshes from `@margoengine/materials` (speed-matrix scene `p-unlit`).
 **Before** (run `20261025-232359-1ff80aff-dev`, bench tool, 3 runs x 60 frames): Margo 166.2 ms CPU and 3.97 ms GPU per
 frame, three.js WebGL 6.3 ms CPU and 3.59 ms GPU. **Cause:** a render pass per mesh (620,124 `beginRenderPass`
-calls in 62 frames, each storing and reloading the multisampled targets). **Fix:** gltf-pro `PBRDrawRun`, one pass for
+calls in 62 frames, each storing and reloading the multisampled targets). **Fix:** gltf/pbr `PBRDrawRun`, one pass for
 all meshes. **After** (profile script, not the bench tool): about 91-97 ms CPU per frame; history in
 [perf-history.md](perf-history.md) entry 21. **Then** (entry 22: one uniform upload per frame, shared derivations and
 pipelines, one view block, instanced batches): 4.94 ms CPU against three.js WebGL's 6.52 ms (run

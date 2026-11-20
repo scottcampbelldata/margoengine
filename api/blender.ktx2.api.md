@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { GLTFDocument, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
+import { GLTFDocument, PBRModel, PreparedGeometry } from "@margoengine/gltf/pbr";
 
 export interface CompressMargoOptions {
     mode?: "etc1s" | "uastc";

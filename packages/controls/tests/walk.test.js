@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Geometry, box } from '@margoengine/core';
 import { Engine as Runtime, TransformStore } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { FloatingOrigin } from '../../cameras/dist/origin.js';
 import { WalkControls } from '../dist/walk.js';
@@ -405,7 +405,7 @@ test('dollhouse view: eases out to an orbit view and back to the exact walk pose
   near(engine.camera.position[1], EYE, 1e-6, 'a toggle cancelled half way returns to the walk pose');
 });
 
-test('collides with gltf-pro models (default colliders include attached models) and honours hidden meshes and explicit collider lists', async () => {
+test('collides with gltf/pbr models (default colliders include attached models) and honours hidden meshes and explicit collider lists', async () => {
   const data = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
     bytes = new Uint8Array(data.buffer.slice(0));
   const doc = {
@@ -594,4 +594,51 @@ test('bug 37: the eye step per frame scales with the frame time; a slow frame is
   engine.render({ delta: 1 / 60 });
   assert.ok(Math.abs(engine.camera.position[1] - y) < 0.41); // the controls do not hide it, the check must see it
   assert.ok(0.4 > eyeStepLimit(1 / 60, walk.stepHeight));
+});
+
+test('a jump rises to v0^2 / 2g at any frame rate (exact constant-acceleration step)', async () => {
+  // jumpSpeed g / 3 puts the apex at t = 1/3 s, a whole number of frames at both 30 and 144 updates per second.
+  const g = 9.81,
+    v0 = g / 3,
+    apex = [];
+  for (const fps of [30, 144]) {
+    const { engine } = await world();
+    block(engine, [-3, -0.2, -3], [3, 0, 3]);
+    const walk = new WalkControls(engine);
+    walk.jumpSpeed = v0;
+    run(engine, 10, 1 / fps);
+    walk.pressed.add('Space');
+    const heights = run(engine, fps, 1 / fps).map((p) => p[1]);
+    apex.push(Math.max(...heights) - EYE);
+    near(heights.at(-1), EYE, 1e-9, `${fps} updates/s: landed`);
+    assert.ok(walk.grounded);
+    walk.dispose();
+    engine.dispose();
+  }
+  near(apex[0], apex[1], 1e-6, 'same apex at 30 and 144 updates/s');
+  near(apex[0], (v0 * v0) / (2 * g), 1e-6, 'apex v0^2 / 2g');
+});
+
+test('keys held when the window loses focus are let go, as a keyup would; dispose removes the blur listener', async () => {
+  const finish = async (release) => {
+    const { engine, canvas } = await world(),
+      win = new FakeElement(),
+      doc = Object.assign(new FakeElement(), { defaultView: win });
+    canvas.ownerDocument = doc;
+    block(engine, [-20, -0.2, -20], [20, 0, 20]);
+    const walk = new WalkControls(engine);
+    doc.dispatch('keydown', { code: 'KeyW' });
+    run(engine, 30);
+    release(doc, win);
+    run(engine, 120);
+    const z = engine.camera.position[2];
+    walk.dispose();
+    assert.equal(win.listenerCount, 0, 'blur listener removed');
+    engine.dispose();
+    return z;
+  };
+  const keyup = await finish((doc) => doc.dispatch('keyup', { code: 'KeyW' })),
+    blur = await finish((doc, win) => win.dispatch('blur'));
+  assert.ok(keyup > 0.3, `walked: ${keyup}`);
+  near(blur, keyup, 1e-12, 'a blur stops the walk exactly as the keyup does');
 });

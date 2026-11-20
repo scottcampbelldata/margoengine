@@ -1,12 +1,10 @@
-// Run against an existing package build, using MARGO_GPU_LOCK for the shared physical adapter.
+// Run against an existing package build.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
 const beautyOnly = process.argv.includes('--beauty-only'),
-  release = await acquire({ owner: 'section-loaded-asset-tests' }),
   output = 'test-results/section-loaded-asset',
   report = { beautyOnly, hardware: null, checks: [], failures: [], samples: [] },
   // Hand-derived projection: screen x=192+64*worldX, y=128-64*worldY.
@@ -42,7 +40,7 @@ try {
         image = await decodePNG(await page.locator('canvas').screenshot({ path: `${output}/${samples}x-${name}.png` }));
       assert.equal(state.sampleCount, samples, 'Actual render sample count');
       assert.equal(state.primitives, 1, 'Real Box.glb primitive loaded');
-      assert.equal(state.coreGeometry, false, 'Loaded caster must use its glTF-pro draw path');
+      assert.equal(state.coreGeometry, false, 'Loaded caster must use its glTF PBR draw path');
       assert.ok(state.vertices >= 24 && state.indices >= 36, 'Real loaded triangle buffers');
       return {
         state,
@@ -114,5 +112,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.sectionLoadedAsset?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

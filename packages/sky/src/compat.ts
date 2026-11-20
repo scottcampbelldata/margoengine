@@ -2,11 +2,12 @@
 // The WebGPU projection onto nine spherical harmonics (lighting.ts `project`) reduces with workgroup memory, which put
 // it on the layer's CPU tier: a read-back of the light map every frame, and that read waits for the whole frame's GPU
 // work (57 ms of a 60 ms frame in the gameplay sandbox). Here one invocation per coefficient runs on the GPU as a point
-// draw and adds the same terms in the same order: 64 running sums over the texels, then the same halving tree.
+// draw and adds the same terms in the same order: 64 running sums over the texels, then the same halving tree, and the same
+// ground (`project`) from the same sum of the upper half.
 
 /** Nine invocations, each storing its coefficient at its own index. Dispatched as the WebGPU kernel is, one group. */
 export const projectRoute = `@group(0) @binding(0) var level:texture_2d<f32>;
-@group(0) @binding(1) var<storage,read_write> light:array<vec4f,10>;
+@group(0) @binding(1) var<storage,read_write> light:array<vec4f,11>;
 fn basis(i:u32,w:vec3f)->f32{
  switch i {
   case 0u {return 1.0;}
@@ -21,18 +22,21 @@ fn basis(i:u32,w:vec3f)->f32{
  }
 }
 @compute @workgroup_size(9) fn main(@builtin(global_invocation_id) id:vec3u){
- let i=id.x;var sums=array<vec3f,64>();
+ let i=id.x;var sums=array<vec3f,64>();var up=array<vec3f,64>();let ground=light[10].w>0.0;
  for(var t=0u;t<64u;t++){
-  var c=vec3f(0);
+  var c=vec3f(0);var e=vec3f(0);
   for(var k=t;k<512u;k+=64u){
    let x=k%32u;let y=k/32u;let phi=((f32(x)+0.5)/32.0-0.5)*6.2831853;let theta=(f32(y)+0.5)/16.0*3.14159265;
    let w=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));
-   let l=textureLoad(level,vec2i(i32(x),i32(y)),0).rgb*sin(theta)*0.0385531;
-   c+=l*basis(i,w);
+   let l=select(textureLoad(level,vec2i(i32(x),i32(y)),0).rgb*sin(theta)*0.0385531,vec3f(0),ground&&w.y<0.0);
+   c+=l*basis(i,w);e+=l*max(w.y,0.0);
   }
-  sums[t]=c;
+  sums[t]=c;up[t]=e;
  }
- for(var s=32u;s>0u;s=s>>1u){for(var t=0u;t<s;t++){sums[t]+=sums[t+s];}}
+ for(var s=32u;s>0u;s=s>>1u){for(var t=0u;t<s;t++){sums[t]+=sums[t+s];up[t]+=up[t+s];}}
  var scale=array<f32,9>(0.0795775,0.1591549,0.1591549,0.1591549,0.2984155,0.2984155,0.0248680,0.2984155,0.0746039);
- light[i]=vec4f(sums[0]*scale[i],0);
+ // The ground's light (project.ts): 2 pi on the first coefficient, -pi on the second.
+ let lg=select(vec3f(0),light[10].w*(up[0]/3.14159265+light[10].rgb),ground);
+ let add=select(select(vec3f(0),-lg*3.14159265,i==1u),lg*6.2831853,i==0u);
+ light[i]=vec4f((sums[0]+add)*scale[i],0);
 }`;

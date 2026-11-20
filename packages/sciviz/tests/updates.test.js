@@ -445,6 +445,16 @@ test('concurrent timeline seeks never overlap and disposal cannot publish a pend
   assert.deepEqual(events, [0]);
 });
 
+test('play with an aborted signal rejects with its reason instead of throwing', async () => {
+  const timeline = new Timeline(undefined, {}, [0, 1], () => {}, { controls: false }),
+    reason = new Error('stopped');
+  let played;
+  assert.doesNotThrow(() => (played = timeline.play({ signal: AbortSignal.abort(reason) })));
+  await assert.rejects(played, (error) => error === reason);
+  assert.equal(timeline.playing, false);
+  timeline.dispose();
+});
+
 test('replace validates ownership, preserves layer order, refits bounds and frees only the old layer', () => {
   const f = fixture();
   const engine = {
@@ -551,4 +561,17 @@ test('removing and disposing figure traces detaches their resources synchronousl
   make('line', 'disposed line');
   figure.dispose();
   assert.deepEqual(calls, ['removed cloud', 'removed line', 'disposed cloud', 'disposed line']);
+});
+
+test('a disposed surface refuses setHeights instead of writing its destroyed buffer', () => {
+  const f = fixture(),
+    writes = [];
+  f.renderer.device.queue.writeBuffer = (buffer) => writes.push(buffer);
+  const surface = new SurfaceLayer(f.renderer, new Float32Array(4)),
+    built = writes.length;
+  surface.setHeights([1, 2, 3, 4]);
+  assert.equal(writes.length, built + 1);
+  surface.dispose();
+  assert.throws(() => surface.setHeights([1, 2, 3, 4]), /disposed/);
+  assert.equal(writes.length, built + 1);
 });

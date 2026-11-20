@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/worker/tests/browser-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/worker/tests/browser-check.mjs
 // A real Worker runs core on a transferred canvas: it sizes to the page's canvas, draws pixels the page shows, picks in
 // CSS pixels, follows forwarded input through a control package, and neither thread stops the other.
 // Results: test-results/worker-browser.json.
@@ -149,12 +149,12 @@ try {
     `test-results/worker-browser${browserName === 'chromium' ? '' : '-' + browserName}.json`,
     JSON.stringify({ hardware, result }, null, 1),
   );
+  // The blocked-thread timings run only in the speed phase; say so rather than print "undefined page ticks".
   console.log(
     'ok worker:',
-    result.pageTicks,
-    'page ticks,',
-    result.workerFrames,
-    'worker frames while the other blocked',
+    result.pageTicks === undefined
+      ? 'blocked-thread timings deferred (speed phase)'
+      : `${result.pageTicks} page ticks, ${result.workerFrames} worker frames while the other blocked`,
   );
 } finally {
   await context.close();

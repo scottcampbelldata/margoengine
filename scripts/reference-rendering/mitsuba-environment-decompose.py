@@ -9,7 +9,7 @@ Each picture removes one difference between Margo's split-sum IBL and the frozen
                              and bias; Fdez-Aguera 2019), its directional albedo terms A and B integrated per pixel
                              by Monte Carlo instead of read from a table: what the model gives with exact integrals
 The unoccluded pictures are one-bounce estimates: radiance E times the BSDF-sampled weight f cos / pdf, with no
-shadow ray, so other geometry neither occludes nor reflects. Runs on the CUDA variant (GPU-locked by the caller).
+shadow ray, so other geometry neither occludes nor reflects. Runs on the CUDA variant .
 """
 import json
 from pathlib import Path

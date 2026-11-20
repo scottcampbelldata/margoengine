@@ -3,8 +3,7 @@
 //   npm run visual:update [-- --only=...] [--runs=3] [--no-build]             re-capture baselines and noise tolerances
 //   npm run visual:device-loss [-- --only=...] [--no-build]                     device loss in every site demo (5i.d)
 // Run `npm run build:packages` first; the script builds the site (scripts/build-site.js) and serves site/dist.
-// Refuses on battery, takes a shared slot of test-results/gpu.lock in the main checkout (scripts/gpu-lock.mjs: up to 3
-// correctness checks at once, waits behind a benchmark), and discards the run if AC power is lost.
+// Refuses on battery and discards the run if AC power is lost.
 // Report, actual and diff images: test-results/visual/index.html (with checks side by side, the last to finish writes it).
 // --device-loss (site demos only, one run): after the normal capture, every GPUDevice the page made is destroyed at the
 // start of its next render pass (mid-frame; a demo that renders no frame within 2 s is hit while idle). Core restores
@@ -21,12 +20,12 @@
 // `visual:update` captures each view
 // `runs` times in separate browser launches and stores the worst pairwise run-to-run noise and the tolerance derived from it.
 import { preview, createServer } from 'vite';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { mkdir, rm, readFile, writeFile, copyFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, copyFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { decodePNG } from '../tests/support/png.js';
 import { acPower } from '../examples/package-benchmarks/parts/power.mjs';
-import { acquire } from './gpu-lock.mjs';
 import { clearVisualOutput } from './support/visual-output.js';
 import { watchWgsl, wgslGuard } from './support/wgsl-guard.js';
 import { deviceLossGuard, watchDeviceLoss } from './support/device-loss.js';
@@ -44,10 +43,11 @@ import {
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { lastAdapterChoice } from './lib/gpu-adapter.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { exitOnHelp } from './support/help.mjs';
+import { showHelp } from './support/help.mjs';
 import { HOT, compare, downsample, encodePNG } from './support/visual-image.js';
 
-exitOnHelp(`usage: node scripts/visual-regression.js [options]
+if (
+  !showHelp(`usage: node scripts/visual-regression.js [options]
 
 Compares (or, with --update, re-captures) the visual baselines of the site demos on a real GPU.
 
@@ -61,434 +61,438 @@ Options:
   -h, --help                 print this help and exit
 
 Example:
-  node scripts/visual-regression.js --only=earth --no-build`);
+  node scripts/visual-regression.js --only=earth --no-build`)
+)
+  process.exitCode = await run();
 
-const root = resolve(import.meta.dirname, '..'),
-  baselineRoot = resolve(root, 'tests/visual'),
-  out = resolve(root, 'test-results/visual');
-function changedRenderedInputs() {
-  const paths = ['packages', 'examples', 'site'],
-    options = { cwd: root, encoding: 'utf8' };
-  return renderedInputChanges(
-    execFileSync('git', ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--', ...paths], options),
-    execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z', '--', ...paths], options),
-  );
-}
-const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
-const update = process.argv.includes('--update'),
-  loss = process.argv.includes('--device-loss') && !update,
-  only = (arg('only') ?? '').split(',').filter(Boolean);
-const runs = loss ? 1 : Number(arg('runs') ?? (update ? 4 : 1));
-// Tolerance = noise floor x MARGIN + a floor-independent allowance (so a bit-exact demo still tolerates a stray pixel).
-const MARGIN = 3,
-  ALLOWANCE = { changed: 0.0005, hot: 0.0002 },
-  GATED = Object.keys(ALLOWANCE);
+// Checks or captures every view; resolves to the exit code.
+async function run() {
+  const root = resolve(import.meta.dirname, '..'),
+    baselineRoot = resolve(root, 'tests/visual'),
+    out = resolve(root, 'test-results/visual');
+  function changedRenderedInputs() {
+    const paths = ['packages', 'examples', 'site'],
+      options = { cwd: root, encoding: 'utf8' };
+    return renderedInputChanges(
+      execFileSync('git', ['diff', '--name-only', '--no-renames', '-z', 'HEAD', '--', ...paths], options),
+      execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z', '--', ...paths], options),
+    );
+  }
+  const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+  const update = process.argv.includes('--update'),
+    loss = process.argv.includes('--device-loss') && !update,
+    only = (arg('only') ?? '').split(',').filter(Boolean);
+  const runs = loss ? 1 : Number(arg('runs') ?? (update ? 4 : 1));
+  // Tolerance = noise floor x MARGIN + a floor-independent allowance (so a bit-exact demo still tolerates a stray pixel).
+  const MARGIN = 3,
+    ALLOWANCE = { changed: 0.0005, hot: 0.0002 },
+    GATED = Object.keys(ALLOWANCE);
 
-const iphone =
-  'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
-const desktop = { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, factor: 2 };
-const views = {
-  high: { ...desktop, query: '?quality=high' },
-  light: { ...desktop, query: '?quality=low' },
-  phone: {
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 3,
-    isMobile: true,
-    hasTouch: true,
-    userAgent: iphone,
-    factor: 6,
-    query: '',
-  },
-  model: { viewport: { width: 640, height: 480 }, deviceScaleFactor: 1, factor: 2, query: '' },
-};
-// A view's query (`?quality=high`) appended to a demo path that may already have one (`voxel/?view=ground`).
-const withQuery = (path, query) => (query && path.includes('?') ? `${path}&${query.slice(1)}` : path + query);
-const allCases = demos
-    .filter((demo) => (loss ? !demo.dev : !demo.lossOnly))
-    .filter((demo) => !demo.pending || only.some((o) => demo.id.includes(o)))
-    .flatMap((demo) =>
-      (demo.views ?? ['high', 'light', 'phone']).map((view) => ({ id: `${demo.id}-${view}`, demo, view: views[view] })),
-    ),
-  cases = allCases.filter((c) => !only.length || only.some((o) => c.id.includes(o)));
-
-const round = (v) => Number(v.toPrecision(3));
-// --device-loss page hooks (init script): record every device, destroy them all at the first render pass after
-// `fire` is armed, and flag when a device made after the loss submits work.
-function lossHooks() {
-  const state = (window.margoDeviceLoss = {
-    devices: [],
-    lost: [],
-    armed: false,
-    fired: null,
-    dead: 0,
-    restored: false,
-  });
-  state.fire = (kind) => {
-    state.armed = false;
-    state.fired = kind;
-    state.dead = state.devices.length;
-    for (const device of state.devices) device.destroy();
+  const iphone =
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1';
+  const desktop = { viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1, factor: 2 };
+  const views = {
+    high: { ...desktop, query: '?quality=high' },
+    light: { ...desktop, query: '?quality=low' },
+    phone: {
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 3,
+      isMobile: true,
+      hasTouch: true,
+      userAgent: iphone,
+      factor: 6,
+      query: '',
+    },
+    model: { viewport: { width: 640, height: 480 }, deviceScaleFactor: 1, factor: 2, query: '' },
   };
-  const request = GPUAdapter.prototype.requestDevice,
-    begin = GPUCommandEncoder.prototype.beginRenderPass,
-    submit = GPUQueue.prototype.submit;
-  GPUAdapter.prototype.requestDevice = async function (...args) {
-    const device = await request.apply(this, args);
-    state.devices.push(device);
-    device.lost.then((info) => state.lost.push(info.reason));
-    return device;
-  };
-  GPUCommandEncoder.prototype.beginRenderPass = function (...args) {
-    if (state.armed) state.fire('mid-frame');
-    return begin.apply(this, args);
-  };
-  GPUQueue.prototype.submit = function (...args) {
-    if (state.fired && state.devices.findIndex((device) => device.queue === this) >= state.dead) state.restored = true;
-    return submit.apply(this, args);
-  };
-}
+  // A view's query (`?quality=high`) appended to a demo path that may already have one (`voxel/?view=ground`).
+  const withQuery = (path, query) => (query && path.includes('?') ? `${path}&${query.slice(1)}` : path + query);
+  const allCases = demos
+      .filter((demo) => (loss ? !demo.dev : !demo.lossOnly))
+      .filter((demo) => !demo.pending || only.some((o) => demo.id.includes(o)))
+      .flatMap((demo) =>
+        (demo.views ?? ['high', 'light', 'phone']).map((view) => ({
+          id: `${demo.id}-${view}`,
+          demo,
+          view: views[view],
+        })),
+      ),
+    cases = allCases.filter((c) => !only.length || only.some((o) => c.id.includes(o)));
 
-// Power and the GPU lock (shared with the other GPU scripts in the main checkout).
-if (acPower() === false) {
-  console.error('On battery: refusing to run (GPU and CPU are throttled). Plug in and retry.');
-  process.exit(1);
-}
-if (!process.argv.includes('--no-build') && cases.some((c) => !c.demo.dev)) {
-  const built = spawnSync(process.execPath, ['scripts/build-site.js'], { cwd: root, stdio: 'inherit' });
-  if (built.status !== 0) process.exit(built.status ?? 1);
-}
-// A correctness check: it shares the GPU (up to MARGO_GPU_SLOTS at once; scripts/gpu-lock.mjs).
-const releaseGpu = await acquire({ owner: 'visual-check', mode: 'shared' });
-process.on('SIGINT', () => {
-  releaseGpu();
-  process.exit(130);
-});
-
-const started = Date.now(),
-  results = new Map(
-    cases.map((c) => [
-      c.id,
-      { id: c.id, url: withQuery(c.demo.path, c.view.query), profiles: c.demo.profiles, captures: [], errors: [] },
-    ]),
-  );
-let server,
-  devServer,
-  environment = {},
-  exitCode = 0;
-try {
-  await clearVisualOutput(out, { mine: cases.map((c) => c.id), known: allCases.map((c) => c.id) });
-  const powerBefore = acPower(),
-    sourceChangesBefore = changedRenderedInputs();
-  if (cases.some((c) => !c.demo.dev))
-    server = await preview({
-      configFile: false,
-      root,
-      build: { outDir: 'site/dist' },
-      preview: { port: 0, strictPort: true },
-      logLevel: 'error',
+  const round = (v) => Number(v.toPrecision(3));
+  // --device-loss page hooks (init script): record every device, destroy them all at the first render pass after
+  // `fire` is armed, and flag when a device made after the loss submits work.
+  function lossHooks() {
+    const state = (window.margoDeviceLoss = {
+      devices: [],
+      lost: [],
+      armed: false,
+      fired: null,
+      dead: 0,
+      restored: false,
     });
-  const origin = server && new URL(server.resolvedUrls.local[0]).origin;
-  if (cases.some((c) => c.demo.dev))
-    devServer = await (
-      await createServer({
+    state.fire = (kind) => {
+      state.armed = false;
+      state.fired = kind;
+      state.dead = state.devices.length;
+      for (const device of state.devices) device.destroy();
+    };
+    const request = GPUAdapter.prototype.requestDevice,
+      begin = GPUCommandEncoder.prototype.beginRenderPass,
+      submit = GPUQueue.prototype.submit;
+    GPUAdapter.prototype.requestDevice = async function (...args) {
+      const device = await request.apply(this, args);
+      state.devices.push(device);
+      device.lost.then((info) => state.lost.push(info.reason));
+      return device;
+    };
+    GPUCommandEncoder.prototype.beginRenderPass = function (...args) {
+      if (state.armed) state.fire('mid-frame');
+      return begin.apply(this, args);
+    };
+    GPUQueue.prototype.submit = function (...args) {
+      if (state.fired && state.devices.findIndex((device) => device.queue === this) >= state.dead)
+        state.restored = true;
+      return submit.apply(this, args);
+    };
+  }
+
+  // Power.
+  if (acPower() === false) {
+    console.error('On battery: refusing to run (GPU and CPU are throttled). Plug in and retry.');
+    return 1;
+  }
+  if (!process.argv.includes('--no-build') && cases.some((c) => !c.demo.dev)) {
+    const built = spawnSync(process.execPath, ['scripts/build-site.js'], { cwd: root, stdio: 'inherit' });
+    if (built.status !== 0) return built.status ?? 1;
+  }
+
+  const started = Date.now(),
+    results = new Map(
+      cases.map((c) => [
+        c.id,
+        { id: c.id, url: withQuery(c.demo.path, c.view.query), profiles: c.demo.profiles, captures: [], errors: [] },
+      ]),
+    );
+  let server,
+    devServer,
+    environment = {},
+    exitCode = 0;
+  try {
+    await clearVisualOutput(out, { mine: cases.map((c) => c.id), known: allCases.map((c) => c.id) });
+    const powerBefore = acPower(),
+      sourceChangesBefore = changedRenderedInputs();
+    if (cases.some((c) => !c.demo.dev))
+      server = await preview({
         configFile: false,
         root,
+        build: { outDir: 'site/dist' },
+        preview: { port: 0, strictPort: true },
         logLevel: 'error',
-        optimizeDeps: { noDiscovery: true, include: [] },
-        // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
-        // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
-        server: { port: 0, hmr: false, watch: null },
-      })
-    ).listen();
-  const devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
-  const wgslModules = new Set();
-  for (let run = 0; run < runs; run++) {
-    const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
-    try {
-      const browserVersion = `${browserLabel()} ${browser.version()}`;
-      if (run === 0)
-        console.log(`visual check GPU request: ${lastAdapterChoice() ?? 'browser default'}; browser ${browserVersion}`);
-      for (const { id, demo, view } of cases) {
-        const { factor, query, ...options } = view,
-          result = results.get(id),
-          t = Date.now();
-        const context = await browser.newContext({ ...options, reducedMotion: 'reduce' }),
-          page = await context.newPage();
-        if (loss) await page.addInitScript(lossHooks);
-        // WGSL errors of any module the view creates fail it, drawn or not.
-        await page.addInitScript(wgslGuard);
-        const wgsl = watchWgsl(page);
-        // A GPU reset that takes the view's device fails it at once, saying so, instead of at the 120 s ready timeout.
-        await page.addInitScript(deviceLossGuard);
-        watchDeviceLoss(page);
-        const capture = async () => {
-          // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
-          await page.waitForTimeout(1000);
-          await page.evaluate(() =>
-            document.fonts.ready.then(
-              () =>
-                new Promise((r) => {
-                  let n = 4;
-                  const f = () => (--n ? requestAnimationFrame(f) : r());
-                  requestAnimationFrame(f);
-                }),
-            ),
-          );
-          const currentEnvironment = {
-            browser: browserVersion,
-            gpu: await page.evaluate(async () => {
-              const i = (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })).info;
-              return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');
-            }),
-          };
-          assertCaptureEnvironment(environment.gpu ? environment : currentEnvironment, currentEnvironment);
-          if (!environment.gpu) {
-            environment = currentEnvironment;
-            console.log(`visual check ran on GPU: ${environment.gpu}`);
-          }
-          // Under load a screenshot can catch the browser mid-raster (a band of CSS gradient or blur 1-4 levels off,
-          // gone half a second later; gate 9), so shoot until two in a row match, as Playwright's toHaveScreenshot does.
-          const shot = () =>
-            page.screenshot({ animations: 'disabled', mask: (demo.mask ?? []).map((s) => page.locator(s)) });
-          let last = Buffer.alloc(0),
-            next = await shot();
-          for (let i = 0; i < 6 && !next.equals(last); i++) {
-            await page.waitForTimeout(500);
-            [last, next] = [next, await shot()];
-          }
-          return downsample(await decodePNG(next), factor);
-        };
-        page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));
-        page.on('console', (m) => {
-          if (m.type() === 'error') result.errors.push(`console: ${m.text()}`);
-        });
-        try {
-          // 90 s: generous for a busy laptop (a 30-140 s first load was the dev server's file watcher, now off).
-          await page.goto((demo.dev ? devOrigin : origin) + '/' + withQuery(demo.path, query), { timeout: 90_000 });
-          await page.waitForFunction(demo.ready, null, { timeout: 120_000 });
-          if (loss) {
-            result.before = await capture();
-            result.loss = await page.evaluate(() => {
-              const s = window.margoDeviceLoss;
-              s.armed = true;
-              return new Promise((r) =>
-                setTimeout(() => {
-                  if (s.armed) s.fire('idle');
-                  r(s.fired);
-                }, 2000),
-              );
-            });
-            await page
-              .waitForFunction(() => window.margoDeviceLoss.restored, null, { timeout: 30_000 })
-              .catch(() => {
-                throw new Error(`no frame from a restored device within 30 s (lost: ${result.loss})`);
-              });
-          }
-          result.captures.push(await capture());
-          for (const e of wgsl.errors) result.errors.push(`wgsl: ${e}`);
-          for (const label of wgsl.unexpected) result.errors.push(`wgsl: ${label} was expected to fail and compiled`);
-          for (const k of wgsl.modules) wgslModules.add(k);
-        } catch (error) {
-          if (error.name === 'MargoError' && error.code === 'state') throw error;
-          result.errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
-          await page.screenshot({ path: resolve(out, `${id}.failed.png`) }).catch(() => {});
-        } finally {
-          await context.close();
-        }
-        console.log(
-          `run ${run + 1}/${runs} ${id} ${((Date.now() - t) / 1000).toFixed(1)} s${result.captures.length > run ? '' : ' FAILED'}`,
-        );
-      }
-      // Edge's shutdown can hang after a power change (seen 2026-10-14): closeAll gives up after its budget and says
-      // what was still open, instead of blocking the remaining runs.
-    } finally {
-      // The teardown budget ran out: say so and go on, the pictures are already taken.
-      await closeAll({ browser }).catch((error) => {
-        if (error.code !== 'SHUTDOWN_TIMEOUT') throw error;
-        console.warn(error.message);
       });
-    }
-  }
-  const powerAfter = acPower(),
-    sourceChanges = [...new Set([...sourceChangesBefore, ...changedRenderedInputs()])];
-  environment = {
-    ...environment,
-    acPowerBefore: powerBefore,
-    acPowerAfter: powerAfter,
-    date: new Date().toISOString(),
-    commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    packagesDirty: sourceChanges.some((path) => /^packages\//i.test(path)),
-    renderedInputsDirty: sourceChanges.length > 0,
-    renderedInputChanges: sourceChanges,
-  };
-  if (powerAfter === false) throw new Error('AC power was lost during the run: results discarded. Plug in and retry.');
-
-  const legacyManifest = JSON.parse(await readFile(resolve(baselineRoot, 'manifest.json'), 'utf8')),
-    profile = selectBaselineProfile(environment, legacyManifest.environment),
-    baselines = resolve(baselineRoot, profile.directory),
-    manifestPath = resolve(baselines, 'manifest.json');
-  let manifest =
-    profile.id === 'legacy'
-      ? legacyManifest
-      : await readFile(manifestPath, 'utf8')
-          .then((text) => JSON.parse(text))
-          .catch((error) => {
-            if (error.code === 'ENOENT') return undefined;
-            throw error;
+    const origin = server && new URL(server.resolvedUrls.local[0]).origin;
+    if (cases.some((c) => c.demo.dev))
+      devServer = await (
+        await createServer({
+          plugins: [noFileWatcher()],
+          configFile: false,
+          root,
+          logLevel: 'error',
+          optimizeDeps: { noDiscovery: true, include: [] },
+          // No file watcher: its first crawl of the repository (and every worktree under it) blocked this process for
+          // 30-140 s on a busy machine, so the first page load timed out ("Preparing the citadel...", gate 9).
+          server: { port: 0, hmr: false, watch: null },
+        })
+      ).listen();
+    const devOrigin = devServer && new URL(devServer.resolvedUrls.local[0]).origin;
+    const wgslModules = new Set();
+    for (let run = 0; run < runs; run++) {
+      const browser = await launchBrowser({ headless: true, args: ['--enable-unsafe-webgpu'] });
+      try {
+        const browserVersion = `${browserLabel()} ${browser.version()}`;
+        if (run === 0)
+          console.log(
+            `visual check GPU request: ${lastAdapterChoice() ?? 'browser default'}; browser ${browserVersion}`,
+          );
+        for (const { id, demo, view } of cases) {
+          const { factor, query, ...options } = view,
+            result = results.get(id),
+            t = Date.now();
+          const context = await browser.newContext({ ...options, reducedMotion: 'reduce' }),
+            page = await context.newPage();
+          if (loss) await page.addInitScript(lossHooks);
+          // WGSL errors of any module the view creates fail it, drawn or not.
+          await page.addInitScript(wgslGuard);
+          const wgsl = watchWgsl(page);
+          // A GPU reset that takes the view's device fails it at once, saying so, instead of at the 120 s ready timeout.
+          await page.addInitScript(deviceLossGuard);
+          watchDeviceLoss(page);
+          const capture = async () => {
+            // Let late UI text settle (sandbox clock label ticks every 500 ms) and a few frames present.
+            await page.waitForTimeout(1000);
+            await page.evaluate(() =>
+              document.fonts.ready.then(
+                () =>
+                  new Promise((r) => {
+                    let n = 4;
+                    const f = () => (--n ? requestAnimationFrame(f) : r());
+                    requestAnimationFrame(f);
+                  }),
+              ),
+            );
+            const currentEnvironment = {
+              browser: browserVersion,
+              gpu: await page.evaluate(async () => {
+                const i = (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })).info;
+                return [i.vendor, i.architecture, i.description].filter(Boolean).join(' ');
+              }),
+            };
+            assertCaptureEnvironment(environment.gpu ? environment : currentEnvironment, currentEnvironment);
+            if (!environment.gpu) {
+              environment = currentEnvironment;
+              console.log(`visual check ran on GPU: ${environment.gpu}`);
+            }
+            // Under load a screenshot can catch the browser mid-raster (a band of CSS gradient or blur 1-4 levels off,
+            // gone half a second later; gate 9), so shoot until two in a row match, as Playwright's toHaveScreenshot does.
+            const shot = () =>
+              page.screenshot({ animations: 'disabled', mask: (demo.mask ?? []).map((s) => page.locator(s)) });
+            let last = Buffer.alloc(0),
+              next = await shot();
+            for (let i = 0; i < 6 && !next.equals(last); i++) {
+              await page.waitForTimeout(500);
+              [last, next] = [next, await shot()];
+            }
+            return downsample(await decodePNG(next), factor);
+          };
+          page.on('pageerror', (e) => result.errors.push(`pageerror: ${e.message}`));
+          page.on('console', (m) => {
+            if (m.type() === 'error') result.errors.push(`console: ${m.text()}`);
           });
-  console.log(
-    `visual baseline profile ${profile.id}: ${baselines}; reference ${JSON.stringify(manifest?.environment ?? {})}`,
-  );
-  if (manifest) assertBaselineIdentity(manifest.environment, environment);
-  else if (!update && !loss) {
-    const committed = await readdir(resolve(baselineRoot, 'profiles')).catch(() => []);
-    throw margoError('state', missingBaselineMessage(profile.id, environment, committed));
-  }
+          try {
+            // 90 s: generous for a busy laptop (a 30-140 s first load was the dev server's file watcher, now off).
+            await page.goto((demo.dev ? devOrigin : origin) + '/' + withQuery(demo.path, query), { timeout: 90_000 });
+            await page.waitForFunction(demo.ready, null, { timeout: 120_000 });
+            if (loss) {
+              result.before = await capture();
+              result.loss = await page.evaluate(() => {
+                const s = window.margoDeviceLoss;
+                s.armed = true;
+                return new Promise((r) =>
+                  setTimeout(() => {
+                    if (s.armed) s.fire('idle');
+                    r(s.fired);
+                  }, 2000),
+                );
+              });
+              await page
+                .waitForFunction(() => window.margoDeviceLoss.restored, null, { timeout: 30_000 })
+                .catch(() => {
+                  throw new Error(`no frame from a restored device within 30 s (lost: ${result.loss})`);
+                });
+            }
+            result.captures.push(await capture());
+            for (const e of wgsl.errors) result.errors.push(`wgsl: ${e}`);
+            for (const label of wgsl.unexpected) result.errors.push(`wgsl: ${label} was expected to fail and compiled`);
+            for (const k of wgsl.modules) wgslModules.add(k);
+          } catch (error) {
+            if (error.name === 'MargoError' && error.code === 'state') throw error;
+            result.errors.push(`capture: ${String(error.message ?? error).split('\n')[0]}`);
+            await page.screenshot({ path: resolve(out, `${id}.failed.png`) }).catch(() => {});
+          } finally {
+            await context.close();
+          }
+          console.log(
+            `run ${run + 1}/${runs} ${id} ${((Date.now() - t) / 1000).toFixed(1)} s${result.captures.length > run ? '' : ' FAILED'}`,
+          );
+        }
+        // Edge's shutdown can hang after a power change (seen 2026-10-14): closeAll gives up after its budget and says
+        // what was still open, instead of blocking the remaining runs.
+      } finally {
+        // The teardown budget ran out: say so and go on, the pictures are already taken.
+        await closeAll({ browser }).catch((error) => {
+          if (error.code !== 'SHUTDOWN_TIMEOUT') throw error;
+          console.warn(error.message);
+        });
+      }
+    }
+    const powerAfter = acPower(),
+      sourceChanges = [...new Set([...sourceChangesBefore, ...changedRenderedInputs()])];
+    environment = {
+      ...environment,
+      acPowerBefore: powerBefore,
+      acPowerAfter: powerAfter,
+      date: new Date().toISOString(),
+      commit: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+      packagesDirty: sourceChanges.some((path) => /^packages\//i.test(path)),
+      renderedInputsDirty: sourceChanges.length > 0,
+      renderedInputChanges: sourceChanges,
+    };
+    if (powerAfter === false)
+      throw new Error('AC power was lost during the run: results discarded. Plug in and retry.');
 
-  if (update && !manifest) {
-    assertProfileCreationCoverage(
-      cases.map((c) => c.id),
-      allCases.map((c) => c.id),
-      environment.renderedInputsDirty,
+    const legacyManifest = JSON.parse(await readFile(resolve(baselineRoot, 'manifest.json'), 'utf8')),
+      profile = selectBaselineProfile(environment, legacyManifest.environment),
+      baselines = resolve(baselineRoot, profile.directory),
+      manifestPath = resolve(baselines, 'manifest.json');
+    let manifest =
+      profile.id === 'legacy'
+        ? legacyManifest
+        : await readFile(manifestPath, 'utf8')
+            .then((text) => JSON.parse(text))
+            .catch((error) => {
+              if (error.code === 'ENOENT') return undefined;
+              throw error;
+            });
+    console.log(
+      `visual baseline profile ${profile.id}: ${baselines}; reference ${JSON.stringify(manifest?.environment ?? {})}`,
     );
-    if (runs < 2) throw new RangeError('A new visual profile needs repeated captures; use --runs=4');
-    if (
-      [...results.values()].some(
-        (r) =>
-          r.captures.length < runs ||
-          r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture') || e.startsWith('wgsl')),
-      )
-    )
-      throw margoError(
-        'failed',
-        'Visual profile capture is incomplete; fix the failed captures and retry the full view set',
+    if (manifest) assertBaselineIdentity(manifest.environment, environment);
+    else if (!update && !loss) {
+      const committed = await readdir(resolve(baselineRoot, 'profiles')).catch(() => []);
+      throw margoError('state', missingBaselineMessage(profile.id, environment, committed));
+    }
+
+    if (update && !manifest) {
+      assertProfileCreationCoverage(
+        cases.map((c) => c.id),
+        allCases.map((c) => c.id),
+        environment.renderedInputsDirty,
       );
-  }
-  manifest ??= { views: {} };
-  if (update) for (const entry of Object.values(manifest.views)) entry.environment ??= manifest.environment;
-  const rows = [];
-  for (const r of results.values()) {
-    const failed =
-      r.captures.length < runs ||
-      r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture') || e.startsWith('wgsl'));
-    if (update) {
-      if (failed) {
-        exitCode = 1;
-        console.log(`FAIL ${r.id}: not updated (${r.errors[0] ?? 'missing capture'})`);
-        rows.push({ ...r, status: 'not updated' });
+      if (runs < 2) throw new RangeError('A new visual profile needs repeated captures; use --runs=4');
+      if (
+        [...results.values()].some(
+          (r) =>
+            r.captures.length < runs ||
+            r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture') || e.startsWith('wgsl')),
+        )
+      )
+        throw margoError(
+          'failed',
+          'Visual profile capture is incomplete; fix the failed captures and retry the full view set',
+        );
+    }
+    manifest ??= { views: {} };
+    if (update) for (const entry of Object.values(manifest.views)) entry.environment ??= manifest.environment;
+    const rows = [];
+    for (const r of results.values()) {
+      const failed =
+        r.captures.length < runs ||
+        r.errors.some((e) => e.startsWith('pageerror') || e.startsWith('capture') || e.startsWith('wgsl'));
+      if (update) {
+        if (failed) {
+          exitCode = 1;
+          console.log(`FAIL ${r.id}: not updated (${r.errors[0] ?? 'missing capture'})`);
+          rows.push({ ...r, status: 'not updated' });
+          continue;
+        }
+        const noise = r.captures.flatMap((a, i) => r.captures.slice(i + 1).map((b) => compare(a, b))),
+          floor = Object.fromEntries(
+            ['changed', 'hot', 'mean', 'max'].map((k) => [k, round(Math.max(0, ...noise.map((n) => n[k])))]),
+          );
+        const tolerance = recordedTolerance(
+          Object.fromEntries(GATED.map((k) => [k, round(floor[k] * MARGIN + ALLOWANCE[k])])),
+          floor,
+          manifest.views[r.id]?.tolerance,
+          { id: r.id, raise: process.argv.includes('--raise-tolerance') },
+        );
+        await mkdir(baselines, { recursive: true });
+        await writeFile(resolve(baselines, `${r.id}.png`), encodePNG(r.captures[0]));
+        manifest.views[r.id] = {
+          url: r.url,
+          size: `${r.captures[0].width}x${r.captures[0].height}`,
+          runs,
+          noise: floor,
+          tolerance,
+          environment: { ...environment },
+        };
+        console.log(`updated ${r.id}: noise ${JSON.stringify(floor)} -> tolerance ${JSON.stringify(tolerance)}`);
+        rows.push({
+          ...r,
+          status: 'updated',
+          noise: manifest.views[r.id].noise,
+          tolerance,
+          baselineEnvironment: manifest.views[r.id].environment,
+        });
         continue;
       }
-      const noise = r.captures.flatMap((a, i) => r.captures.slice(i + 1).map((b) => compare(a, b))),
-        floor = Object.fromEntries(
-          ['changed', 'hot', 'mean', 'max'].map((k) => [k, round(Math.max(0, ...noise.map((n) => n[k])))]),
-        );
-      const tolerance = recordedTolerance(
-        Object.fromEntries(GATED.map((k) => [k, round(floor[k] * MARGIN + ALLOWANCE[k])])),
-        floor,
-        manifest.views[r.id]?.tolerance,
-        { id: r.id, raise: process.argv.includes('--raise-tolerance') },
+      // Device loss: the capture before the loss is the baseline, with the view's tolerance (bit-exact allowance if none).
+      const entry = loss
+        ? { ...manifest.views[r.id], tolerance: manifest.views[r.id]?.tolerance ?? ALLOWANCE }
+        : manifest.views[r.id];
+      const baseline = loss
+        ? r.before
+        : entry &&
+          (await readFile(resolve(baselines, `${r.id}.png`))
+            .then((b) => decodePNG(new Uint8Array(b)))
+            .catch(() => undefined));
+      if (!baseline && !failed && r.profiles && !r.profiles.includes(profile.id)) {
+        const why = `not recorded on ${profile.id} yet (npm run visual:update -- --only=${r.id} --runs=4)`;
+        console.log(`SKIP ${r.id}: ${why}`);
+        rows.push({ ...r, status: 'skipped', why });
+        continue;
+      }
+      if (!baseline || failed) {
+        exitCode = 1;
+        const why = failed ? (r.errors[0] ?? 'missing capture') : 'no baseline (run visual:update)';
+        console.log(`FAIL ${r.id}: ${why}`);
+        rows.push({ ...r, status: 'FAIL', why });
+        continue;
+      }
+      // Worst of the runs against the baseline.
+      const score = (m) => Math.max(...GATED.map((k) => m[k] / entry.tolerance[k]));
+      const worst = r.captures
+          .map((c) => ({ ...compare(baseline, c), capture: c }))
+          .reduce((a, b) => (score(b) > score(a) ? b : a)),
+        pass = score(worst) <= 1;
+      if (!pass) exitCode = 1;
+      if (loss) await writeFile(resolve(out, `${r.id}.baseline.png`), encodePNG(baseline));
+      else await copyFile(resolve(baselines, `${r.id}.png`), resolve(out, `${r.id}.baseline.png`));
+      await writeFile(resolve(out, `${r.id}.actual.png`), encodePNG(worst.capture));
+      if (worst.image) await writeFile(resolve(out, `${r.id}.diff.png`), encodePNG(worst.image));
+      const metrics = { changed: round(worst.changed), hot: round(worst.hot), mean: round(worst.mean), max: worst.max };
+      console.log(
+        `${pass ? 'pass' : 'FAIL'} ${r.id}${loss ? ` (device lost ${r.loss}, restored)` : ''}: changed ${metrics.changed} (limit ${entry.tolerance.changed}), hot ${metrics.hot} (limit ${entry.tolerance.hot}), mean ${metrics.mean}, max ${metrics.max}`,
       );
-      await mkdir(baselines, { recursive: true });
-      await writeFile(resolve(baselines, `${r.id}.png`), encodePNG(r.captures[0]));
-      manifest.views[r.id] = {
-        url: r.url,
-        size: `${r.captures[0].width}x${r.captures[0].height}`,
-        runs,
-        noise: floor,
-        tolerance,
-        environment: { ...environment },
-      };
-      console.log(`updated ${r.id}: noise ${JSON.stringify(floor)} -> tolerance ${JSON.stringify(tolerance)}`);
       rows.push({
         ...r,
-        status: 'updated',
-        noise: manifest.views[r.id].noise,
-        tolerance,
-        baselineEnvironment: manifest.views[r.id].environment,
+        status: pass ? 'pass' : 'FAIL',
+        metrics,
+        noise: entry.noise,
+        tolerance: entry.tolerance,
+        baselineEnvironment: entry.environment ?? manifest.environment,
+        images: true,
       });
-      continue;
     }
-    // Device loss: the capture before the loss is the baseline, with the view's tolerance (bit-exact allowance if none).
-    const entry = loss
-      ? { ...manifest.views[r.id], tolerance: manifest.views[r.id]?.tolerance ?? ALLOWANCE }
-      : manifest.views[r.id];
-    const baseline = loss
-      ? r.before
-      : entry &&
-        (await readFile(resolve(baselines, `${r.id}.png`))
-          .then((b) => decodePNG(new Uint8Array(b)))
-          .catch(() => undefined));
-    if (!baseline && !failed && r.profiles && !r.profiles.includes(profile.id)) {
-      const why = `not recorded on ${profile.id} yet (npm run visual:update -- --only=${r.id} --runs=4)`;
-      console.log(`SKIP ${r.id}: ${why}`);
-      rows.push({ ...r, status: 'skipped', why });
-      continue;
-    }
-    if (!baseline || failed) {
-      exitCode = 1;
-      const why = failed ? (r.errors[0] ?? 'missing capture') : 'no baseline (run visual:update)';
-      console.log(`FAIL ${r.id}: ${why}`);
-      rows.push({ ...r, status: 'FAIL', why });
-      continue;
-    }
-    // Worst of the runs against the baseline.
-    const score = (m) => Math.max(...GATED.map((k) => m[k] / entry.tolerance[k]));
-    const worst = r.captures
-        .map((c) => ({ ...compare(baseline, c), capture: c }))
-        .reduce((a, b) => (score(b) > score(a) ? b : a)),
-      pass = score(worst) <= 1;
-    if (!pass) exitCode = 1;
-    if (loss) await writeFile(resolve(out, `${r.id}.baseline.png`), encodePNG(baseline));
-    else await copyFile(resolve(baselines, `${r.id}.png`), resolve(out, `${r.id}.baseline.png`));
-    await writeFile(resolve(out, `${r.id}.actual.png`), encodePNG(worst.capture));
-    if (worst.image) await writeFile(resolve(out, `${r.id}.diff.png`), encodePNG(worst.image));
-    const metrics = { changed: round(worst.changed), hot: round(worst.hot), mean: round(worst.mean), max: worst.max };
-    console.log(
-      `${pass ? 'pass' : 'FAIL'} ${r.id}${loss ? ` (device lost ${r.loss}, restored)` : ''}: changed ${metrics.changed} (limit ${entry.tolerance.changed}), hot ${metrics.hot} (limit ${entry.tolerance.hot}), mean ${metrics.mean}, max ${metrics.max}`,
-    );
-    rows.push({
-      ...r,
-      status: pass ? 'pass' : 'FAIL',
-      metrics,
-      noise: entry.noise,
-      tolerance: entry.tolerance,
-      baselineEnvironment: entry.environment ?? manifest.environment,
-      images: true,
-    });
-  }
-  if (update) {
-    manifest.profile = profile.id;
-    manifest.environment = environment;
-    manifest.method = { hot: HOT, margin: MARGIN, allowance: ALLOWANCE };
-    await writeFile(manifestPath, JSON.stringify(manifest, null, 1) + '\n');
-  } else if (
-    manifest.environment &&
-    (manifest.environment.gpu !== environment.gpu || manifest.environment.browser !== environment.browser)
-  )
-    console.log(
-      `warning: baselines are from ${manifest.environment.gpu} / ${manifest.environment.browser}; this run is ${environment.gpu} / ${environment.browser}`,
-    );
-  const seconds = ((Date.now() - started) / 1000).toFixed(0),
-    esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-  await writeFile(
-    resolve(out, 'index.html'),
-    `<!doctype html><meta charset="utf-8"><title>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}</title>
+    if (update) {
+      manifest.profile = profile.id;
+      manifest.environment = environment;
+      manifest.method = { hot: HOT, margin: MARGIN, allowance: ALLOWANCE };
+      await writeFile(manifestPath, JSON.stringify(manifest, null, 1) + '\n');
+    } else if (
+      manifest.environment &&
+      (manifest.environment.gpu !== environment.gpu || manifest.environment.browser !== environment.browser)
+    )
+      console.log(
+        `warning: baselines are from ${manifest.environment.gpu} / ${manifest.environment.browser}; this run is ${environment.gpu} / ${environment.browser}`,
+      );
+    const seconds = ((Date.now() - started) / 1000).toFixed(0),
+      esc = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+    await writeFile(
+      resolve(out, 'index.html'),
+      `<!doctype html><meta charset="utf-8"><title>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}</title>
 <style>body{font:14px system-ui;margin:16px;background:#111;color:#ddd}td{vertical-align:top;padding:6px;border-top:1px solid #333}img{max-width:420px;display:block}.FAIL{color:#f66}.pass{color:#6c6}pre{white-space:pre-wrap;max-width:420px;font-size:12px}</style>
 <h1>Visual ${update ? 'update' : loss ? 'device loss' : 'check'}: ${rows.filter((r) => ['pass', 'updated', 'skipped'].includes(r.status)).length}/${rows.length} ok</h1>
 <p>profile: ${esc(profile.id)} (${esc(baselines)})<br>${esc(JSON.stringify(environment))}<br>baselines: ${esc(JSON.stringify(manifest.environment ?? {}))}<br>${runs} run(s), ${seconds} s. d = max RGB difference per pixel; hot = share of pixels with d &gt; ${HOT}.</p>
 <table>${rows.map((r) => `<tr><td><b class="${r.status.split(' ')[0]}">${r.status}</b> ${esc(r.id)}<br><code>/${esc(r.url)}</code><pre>${esc(JSON.stringify({ loss: r.loss, metrics: r.metrics, noise: r.noise, tolerance: r.tolerance, baselineEnvironment: r.baselineEnvironment, why: r.why }, null, 1))}\n${esc(r.errors.slice(0, 8).join('\n'))}</pre></td>${r.images ? ['baseline', 'actual', 'diff'].map((k) => `<td>${k}<img src="${r.id}.${k}.png"></td>`).join('') : ''}</tr>`).join('\n')}</table>`,
-  );
-  console.log(
-    `${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s (${wgslModules.size} distinct WGSL modules compiled); report test-results/visual/index.html`,
-  );
-} catch (error) {
-  console.error(error);
-  exitCode = 1;
-} finally {
-  try {
-    await closeAll({ servers: [server, devServer] });
+    );
+    console.log(
+      `${update ? 'updated' : 'checked'} ${rows.length} views in ${seconds} s (${wgslModules.size} distinct WGSL modules compiled); report test-results/visual/index.html`,
+    );
+  } catch (error) {
+    console.error(error);
+    exitCode = 1;
   } finally {
-    releaseGpu();
+    await closeAll({ servers: [server, devServer] });
   }
+  return exitCode;
 }
-process.exit(exitCode);

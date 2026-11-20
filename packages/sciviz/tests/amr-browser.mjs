@@ -75,10 +75,17 @@ for (const compat of [false, true]) {
         },
       );
       result.encoded = await pixels(f);
+      result.listed = f.layers.includes(encoded) && f.layers.includes(encoded.source);
       encoded.dispose();
+      result.unlisted = !f.layers.includes(encoded) && !f.layers.includes(encoded.source);
+      // A volume left attached is freed with its figure, its source once.
+      const kept = amrVolume(f, demo.licensed);
       for (const figure of Object.values(demo.figures)) figure.dispose();
+      result.freed = f.layers.length === 0;
+      kept.dispose();
       return result;
     });
+    assert.ok(report.listed && report.unlisted && report.freed, 'the AMR volume is a figure layer');
     for (const key of ['volume', 'slice', 'contour', 'mip'])
       assert.ok(report[key].lit > 100, `${key} has real rendered pixels`);
     assert.notEqual(report.dense.hash, report.volume.hash);

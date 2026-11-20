@@ -94,6 +94,22 @@
     "./migrate": {
       "types": "./dist/migrate.d.ts",
       "import": "./dist/migrate.js"
+    },
+    "./interpolation": {
+      "types": "./dist/interpolation.d.ts",
+      "import": "./dist/interpolation.js"
+    },
+    "./interpolation-delay": {
+      "types": "./dist/interpolation-delay.d.ts",
+      "import": "./dist/interpolation-delay.js"
+    },
+    "./interpolation-fields": {
+      "types": "./dist/interpolation-fields.d.ts",
+      "import": "./dist/interpolation-fields.js"
+    },
+    "./interpolation-timeline": {
+      "types": "./dist/interpolation-timeline.d.ts",
+      "import": "./dist/interpolation-timeline.js"
     }
   },
   "files": [
@@ -105,8 +121,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0",
-    "@margoengine/net": "^1.0.0"
+    "@margoengine/math": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js netcode",

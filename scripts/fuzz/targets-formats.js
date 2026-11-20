@@ -1,5 +1,5 @@
 // Fuzz targets for launch gate 11a part 1: the glTF, texture and image parsers. @margoengine/gltf (light loader),
-// gltf-pro (main thread, the parse-worker job, KHR_texture_basisu KTX2 through the real Basis transcoder, the
+// gltf/pbr (main thread, the parse-worker job, KHR_texture_basisu KTX2 through the real Basis transcoder, the
 // progressive range-request stream), blender's .margo, decoders (meshopt, Draco and KTX2 through their real Wasm) and
 // environment (HDR, EXR, UltraHDR). Seeds are the repo's own files (helpers in formats.js); part 2's parsers are in
 // targets-assets.js. Besides the harness oracle, outputs are checked (finite, in range: `GARBAGE: ...`), meshopt
@@ -114,7 +114,7 @@ function ktx2Fields(bytes) {
 const ktx2Files = () => files('packages/decoders/tests/fixtures', /\.ktx2$/);
 const TRANSCODE = ['rgba8', 'bc7', 'astc-4x4', 'etc2'];
 
-// --- gltf-pro/progressive: a mock WebGPU engine and an HTTP server for one in-memory file ------------------------
+// --- gltf/progressive: a mock WebGPU engine and an HTTP server for one in-memory file ------------------------
 async function gpuEngine() {
   const [{ optionalGPU }, { Engine, TransformStore }] = await Promise.all([
     import(pathToFileURL(join(root, 'tests/support/optional-gpu.js')).href),
@@ -241,7 +241,7 @@ const sized = (image) => {
   return image;
 };
 
-const gltfPro = (name, description, extra) => ({
+const gltfPbr = (name, description, extra) => ({
   name,
   description,
   own,
@@ -285,15 +285,15 @@ export default [
       });
     },
   },
-  gltfPro(
-    'gltf-pro',
-    'gltf-pro parseGLTFAsync: accessors (sparse, normalized, strides), images, every KHR_/EXT_ extension',
+  gltfPbr(
+    'gltf/pbr',
+    'gltf/pbr parseGLTFAsync: accessors (sparse, normalized, strides), images, every KHR_/EXT_ extension',
     {
       async setup() {
         const [{ parseGLTFAsync }, { instancing }, { extendedMaterials }, { MeshoptDecoder }] = await Promise.all([
-          import(dist('gltf-pro/dist/index.js')),
-          import(dist('gltf-pro/dist/instancing.js')),
-          import(dist('gltf-pro/dist/extended.js')),
+          import(dist('gltf/dist/pbr.js')),
+          import(dist('gltf/dist/pbr-instancing.js')),
+          import(dist('gltf/dist/extended.js')),
           import(dist('decoders/dist/index.js')),
         ]);
         this.parse = parseGLTFAsync;
@@ -313,9 +313,9 @@ export default [
       },
     },
   ),
-  gltfPro('gltf-pro/metadata', 'gltf-pro readGLTFMetadata: KHR_xmp_json_ld packets, references, language alternatives', {
+  gltfPbr('gltf/metadata', 'gltf/pbr readGLTFMetadata: KHR_xmp_json_ld packets, references, language alternatives', {
     async setup() {
-      this.read = (await import(dist('gltf-pro/dist/metadata.js'))).readGLTFMetadata;
+      this.read = (await import(dist('gltf/dist/metadata.js'))).readGLTFMetadata;
     },
     seeds: async () => metadataSeeds(),
     generators: [
@@ -337,17 +337,17 @@ export default [
           throw new Error('GARBAGE: a metadata name is not text');
     },
   }),
-  gltfPro(
-    'gltf-pro/worker',
-    'gltf-pro parse-worker job: prepareGLTF, structured clone with transfers, modelFromPrepared',
+  gltfPbr(
+    'gltf/worker',
+    'gltf/pbr parse-worker job: prepareGLTF, structured clone with transfers, modelFromPrepared',
     {
       async setup() {
         const [{ prepareGLTF }, { modelFromPrepared }, { instancing }, { extendedMaterials }, { transferables }] =
           await Promise.all([
-            import(dist('gltf-pro/dist/prepare.js')),
-            import(dist('gltf-pro/dist/worker.js')),
-            import(dist('gltf-pro/dist/instancing.js')),
-            import(dist('gltf-pro/dist/extended.js')),
+            import(dist('gltf/dist/prepare.js')),
+            import(dist('gltf/dist/worker.js')),
+            import(dist('gltf/dist/pbr-instancing.js')),
+            import(dist('gltf/dist/extended.js')),
             import(dist('shared/worker.js')),
           ]);
         Object.assign(this, { prepareGLTF, modelFromPrepared, transferables, engine: await headless() });
@@ -369,12 +369,12 @@ export default [
       },
     },
   ),
-  gltfPro('gltf-pro/ktx2', 'gltf-pro KHR_texture_basisu: KTX2 header and budget checks, the real Basis transcoder', {
+  gltfPbr('gltf/ktx2', 'gltf/pbr KHR_texture_basisu: KTX2 header and budget checks, the real Basis transcoder', {
     timeMs: 8000,
     memory: 1100 * MiB,
     async setup() {
       const [{ parseGLTFAsync }, codec] = await Promise.all([
-        import(dist('gltf-pro/dist/index.js')),
+        import(dist('gltf/dist/pbr.js')),
         import(dist('decoders/dist/codec.js')),
       ]);
       this.parse = parseGLTFAsync;
@@ -420,13 +420,13 @@ export default [
       }
     },
   }),
-  gltfPro(
-    'gltf-pro/progressive',
-    'gltf-pro/progressive: GLB/JSON head and range requests against misbehaving servers',
+  gltfPbr(
+    'gltf/progressive',
+    'gltf/progressive: GLB/JSON head and range requests against misbehaving servers',
     {
       timeMs: 8000,
       async setup() {
-        this.load = (await import(dist('gltf-pro/dist/progressive.js'))).loadGLTFProgressive;
+        this.load = (await import(dist('gltf/dist/progressive.js'))).loadGLTFProgressive;
         this.engine = await gpuEngine();
       },
       seeds: async () => gltfSeeds(256 * 1024).map((s, i) => withParams([i % SERVER.length], s)),

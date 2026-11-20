@@ -14,6 +14,32 @@ test('locale, SI, engineering, percentages, fixed, dates and rounding carry are 
   assert.doesNotMatch(numberFormatter({ mode: 'engineering' })(Number.MIN_VALUE), /Infinity|NaN/);
   assert.throws(() => numberFormatter({ digits: 20 }));
 });
+test('SI and engineering keep the value at every magnitude; dates outside a Date print as numbers', () => {
+  const si = numberFormatter({ mode: 'si' }),
+    eng = numberFormatter({ mode: 'engineering' });
+  // The old code clamped the prefix to Y, then carried 1e6 Y to 1,000e27 and printed 1e-30 as 0y.
+  assert.equal(si(1e30), '1Q');
+  assert.equal(si(2.5e27), '2.5R');
+  assert.equal(si(1e-30), '1q');
+  assert.equal(si(1e33), '1e33');
+  assert.equal(si(-1.5e-33), '-1.5e-33');
+  assert.equal(si(999.9996e24), '1R');
+  assert.equal(si(1e-27), '1r');
+  assert.equal(si(0), '0');
+  assert.equal(eng(0), '0e0');
+  // Powers of ten whose Math.log10 rounds below the integer, and subnormals, keep their group and digits.
+  for (let p = -320; p <= 308; p++) {
+    const text = eng(Number(`1e${p}`)),
+      [mantissa, exponent] = text.split('e').map(Number);
+    assert.equal(Math.abs(exponent % 3), 0, text);
+    assert.equal(Number(`${mantissa}e${exponent}`), Number(`1e${p}`), text);
+  }
+  assert.equal(eng(1.23456e-320), '12.347e-321');
+  const date = numberFormatter({ mode: 'date' });
+  assert.equal(date(NaN), 'NaN');
+  assert.equal(date(Infinity), 'Infinity');
+  assert.equal(date(9e15), '9000000000000000');
+});
 test('piecewise scales preserve endpoints and retained distances, exposing inverse gaps', () => {
   const s = brokenScale({
     domain: [0, 100],

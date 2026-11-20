@@ -62,6 +62,7 @@ test('TMX: map attributes, embedded tileset, csv data and GID flip bits', async 
       margin: 0,
       columns: 4,
       tilecount: 12,
+      tileoffset: { x: 0, y: 0 },
       image: { path: 'tiles/atlas.png', width: 64, height: 48 },
       properties: Object.create(null),
     },
@@ -273,4 +274,12 @@ test('TMX: unsupported and malformed maps are rejected with clear errors', async
   const controller = new AbortController();
   controller.abort();
   await rejects(parseTMX(CSV, { signal: controller.signal }), 'aborted');
+});
+
+test('TMX Map Format <tileoffset>: the tileset offset (pixels, y down) moves its quads and is kept on the tileset', async () => {
+  const tmx = await parseTMX(CSV.replace('columns="4">', 'columns="4"><tileoffset x="16" y="-8"/>'));
+  assert.deepEqual(tmx.tilesets[0].tileoffset, { x: 16, y: -8 });
+  const quads = tmxLayerQuads(tmx, tmx.layers[0], { tileSize: 2 });
+  // Cell (1, 0) as in the quads test (x 3..5, z 0..2), moved one cell along +X and a quarter cell along -Z.
+  close(quads.positions.subarray(12, 24), [5, 0, -1, 5, 0, 1, 7, 0, 1, 7, 0, -1], 'offset positions');
 });

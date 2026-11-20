@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { harness, modules } from './support.js';
 import { DepthTexture } from '../dist/depth.js';
 
-/** A gltf-pro model stand-in: keeps the capture hook it is given and draws one triangle into the hook's pass. */
+/** A gltf/pbr model stand-in: keeps the capture hook it is given and draws one triangle into the hook's pass. */
 function model() {
   const m = {
     hooks: [],
@@ -347,12 +347,12 @@ test('DepthTexture errors name the fix', () => {
   assert.throws(() => new DepthTexture({ order: '1' }), TypeError);
   const depth = new DepthTexture();
   assert.throws(() => depth.setup({ gpu: undefined }), { code: 'unsupported', message: /needs WebGPU/ });
-  assert.throws(() => depth.add({}), { name: 'TypeError', message: /gltf-pro model or materials mesh/ });
+  assert.throws(() => depth.add({}), { name: 'TypeError', message: /gltf\/pbr model, materials mesh or Terrain/ });
   assert.throws(() => depth.add(null), TypeError);
   assert.throws(() => depth.onResize('later'), { name: 'TypeError', message: /needs a function/ });
   const m = model();
   depth.add(m);
-  assert.throws(() => m.hooks[0].declarations('fn other(){}'), { code: 'unsupported', message: /gltf-pro surfaces/ });
+  assert.throws(() => m.hooks[0].declarations('fn other(){}'), { code: 'unsupported', message: /gltf\/pbr surfaces/ });
   depth.dispose();
   assert.throws(() => depth.add(model()), { code: 'disposed', message: /create new/ });
   assert.throws(() => depth.setup(harness().engine), { code: 'disposed' });

@@ -52,7 +52,7 @@ tag for its component (see [Lowercase tags and extend](../packages/react/README.
 | --- | --- |
 | Core and the stage facade are frozen | No edits under `packages/core` or the `margoengine` stage package. `new Stage(engine)` stays where `MargoCanvas` already calls it. |
 | 20,000-byte gzip gate | `@margoengine/react` is a separate package. `npm run measure:size` must still report core plus stage under the gate. |
-| Optional and tree-shakable | `sideEffects` stays `false`. `gltf-pro`, `environment`, `controls`, and `shadows` stay optional peers. Shadows stay a dynamic `import()` inside the canvas, which is how it works now. |
+| Optional and tree-shakable | `sideEffects` stays `false`. `gltf/pbr`, `environment`, `controls`, and `shadows` stay optional peers. Shadows stay a dynamic `import()` inside the canvas, which is how it works now. |
 | One scene graph | The JSX components call `engine.createMesh()`, `setParent`, `setGeometry`, and `setMaterial`. Unmount returns the dispose function. There is no second graph. |
 
 A `react-reconciler`, the thing React Three Fiber uses, could also live only in `@margoengine/react` and still pass the size gate. It would be a second scene graph beside the one these hooks already dispose correctly under StrictMode. The package README already rules that out. The aliases give the public snippet the names without that second graph.

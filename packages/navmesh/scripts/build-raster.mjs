@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { rasterSourceHash, binaryHash } from './raster-source.mjs';
 import { resolve } from 'node:path';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 const root = resolve(import.meta.dirname, '..');
 execFileSync(
   'cargo',
@@ -17,11 +18,7 @@ execFileSync(
   {
     stdio: 'inherit',
     timeout: 180000,
-    env: {
-      ...process.env,
-      RUSTFLAGS: '-C target-feature=+simd128',
-      CARGO_TARGET_DIR: resolve(root, 'native/raster/target'),
-    },
+    env: blueprintRustEnv(resolve(root, 'native/raster'), '-C target-feature=+simd128'),
   },
 );
 copyFileSync(

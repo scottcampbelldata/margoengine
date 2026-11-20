@@ -5,6 +5,30 @@ import type { VFXFeatures } from './base.js';
 /** Bytes of the soft-particle uniform: inverse view-projection (64), view-axis plane (16), screen rectangle (16), softness (16). */
 const BYTES = 112;
 /**
+ * WGSL for depth-soft billboards, shared by the particle billboard and `@margoengine/vfx/clouds`: the uniform at
+ * `@group(0) @binding(11)` and the scene depth at binding 12 (multisampled when `samples` > 1), with
+ * `softGap(position, viewDepth)`, the gap from a fragment at `viewDepth` (its depth along the view axis,
+ * `dot(soft.plane.xyz, world) + soft.plane.w`) to the scene depth behind it, over the softness. Above 1 where the scene
+ * depth is empty. Clamp it to [0, 1] for a linear fade (Lorach 2007, "Soft Particles", NVIDIA).
+ */
+export function softDepthWgsl(samples: number): string {
+  const multisampled = samples > 1;
+  return /* wgsl */ `
+struct Soft {inverse:mat4x4f,plane:vec4f,screen:vec4f,softness:vec4f}
+@group(0) @binding(11) var<uniform> soft:Soft;
+@group(0) @binding(12) var sceneDepth:texture_depth${multisampled ? '_multisampled' : ''}_2d;
+// Reversed Z: 1 at the near plane, 0 where nothing was drawn. With several samples the nearest one counts.
+fn softGap(position:vec4f,viewDepth:f32)->f32 {
+  let at=vec2i(position.xy);var d=textureLoad(sceneDepth,at,0);
+  ${multisampled ? `for(var s=1;s<${samples};s++){d=max(d,textureLoad(sceneDepth,at,s));}` : ''}
+  if(d<=0.0){return 2.0;}
+  let ndc=vec2f((position.x-soft.screen.z)/soft.screen.x*2-1,1-(position.y-soft.screen.w)/soft.screen.y*2);
+  let w=soft.inverse*vec4f(ndc,d,1);
+  return (dot(soft.plane.xyz,w.xyz/w.w)+soft.plane.w-viewDepth)/soft.softness.x;
+}
+`;
+}
+/**
  * The `soft` feature: `softness` (world units) fades each particle out over that distance in front of whatever opaque
  * surface is behind it, so a particle meeting the floor or a wall no longer shows a hard line. Scene depth comes from the
  * `depth` option, a function returning a sampleable reversed-Z depth texture the size of the drawing buffer (for example
@@ -13,7 +37,6 @@ const BYTES = 112;
  */
 export const soft: NonNullable<VFXFeatures['soft']> = {
   patch(billboard, samples) {
-    const multisampled = samples > 1;
     const code = billboard
       .replace('@location(0) uv:vec2f,', '@location(0) uv:vec2f,@location(6) viewDepth:f32,')
       .replace(
@@ -26,20 +49,9 @@ export const soft: NonNullable<VFXFeatures['soft']> = {
       );
     return (
       code +
+      softDepthWgsl(samples) +
       /* wgsl */ `
-struct Soft {inverse:mat4x4f,plane:vec4f,screen:vec4f,softness:vec4f}
-@group(0) @binding(11) var<uniform> soft:Soft;
-@group(0) @binding(12) var sceneDepth:texture_depth${multisampled ? '_multisampled' : ''}_2d;
-// Reversed Z: 1 at the near plane, 0 where nothing was drawn. With several samples the nearest one counts.
-fn softened(i:Out,c:vec4f)->vec4f {
-  let at=vec2i(i.clip.xy);var d=textureLoad(sceneDepth,at,0);
-  ${multisampled ? `for(var s=1;s<${samples};s++){d=max(d,textureLoad(sceneDepth,at,s));}` : ''}
-  if(d<=0.0){return c;}
-  let ndc=vec2f((i.clip.x-soft.screen.z)/soft.screen.x*2-1,1-(i.clip.y-soft.screen.w)/soft.screen.y*2);
-  let w=soft.inverse*vec4f(ndc,d,1);
-  let gap=dot(soft.plane.xyz,w.xyz/w.w)+soft.plane.w-i.viewDepth;
-  return vec4f(c.rgb,c.a*clamp(gap/soft.softness.x,0.0,1.0));
-}
+fn softened(i:Out,c:vec4f)->vec4f {return vec4f(c.rgb,c.a*clamp(softGap(i.clip,i.viewDepth),0.0,1.0));}
 `
     );
   },

@@ -7,6 +7,7 @@ import { convexCellsExact } from './exact-kernel.js';
 import { assertPolygonMesh } from './polygon.js';
 import { faceIdFactory } from './result.js';
 import type { MeshEditOptions, PolygonMesh } from './types.js';
+import { greatestOf } from './least.js';
 
 /** Options for mesh convex hulls. All generated faces get planar UVs. */
 export interface MeshHullOptions extends MeshEditOptions {
@@ -59,7 +60,7 @@ function hullOf(points: readonly Vec3[], createId: () => string, signal?: AbortS
       u = b.map((x, k) => x - a[k]),
       v = c.map((x, k) => x - a[k]),
       n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]],
-      axis = n.map(Math.abs).indexOf(Math.max(...n.map(Math.abs))),
+      axis = n.map(Math.abs).indexOf(greatestOf(n.map(Math.abs))),
       axes = [0, 1, 2].filter((k) => k !== axis);
     mesh.faces.push({
       id: createId(),

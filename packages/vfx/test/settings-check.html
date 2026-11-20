@@ -1,0 +1,107 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX settings check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// The particle settings table on a real GPU: a smoke effect, then every live row written each frame for 60 frames (each
+// swept between two values away from its default) with no pipeline, buffer or texture made and no GPU error, and the
+// defaults written leaving the options as built. Driven by settings-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {VFX} from '/packages/vfx/dist/index.js';
+import {VFX_LIVE_SETTINGS,applyVfxSettings,vfxSettingValues,SAND_LIVE_SETTINGS,applySandSettings,sandSettingDefaults} from '/packages/vfx/dist/settings.js';
+import {BlownSand} from '/packages/vfx/dist/blown-sand.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,3,12],target:[0,3,0],near:0.1,far:200}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const smoke=VFX.attach(engine,{capacity:4096,rate:300,position:[0,0.5,0],velocity:[0,3,0],lifetime:[2,4],size:0.4,color:[0.5,0.5,0.5,0.6]});
+const made={pipelines:0,buffers:0,textures:0};
+for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){
+ const real=device[method];
+ if(real)device[method]=function(...a){made[key]++;return real.apply(this,a);};
+}
+async function frame(delta){engine.render({delta});if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();}
+const base=vfxSettingValues(smoke);
+// 30% to 100% of the way from the row's current value to a value a quarter of its range away.
+const sweep=(row,t)=>{
+ if(row.kind==='color')return base.color.map((x,i)=>x+([0.9,0.2,0.6][i]-x)*(0.3+0.7*t));
+ const from=base[row.name]??(row.name==='rate'?300:row.default),span=(row.max-row.min)/4,to=from+span<=row.max?from+span:from-span;
+ return from+(to-from)*(0.3+0.7*t);
+};
+const values=t=>{
+ const v={...base};
+ for(const row of VFX_LIVE_SETTINGS)v[row.name]=row.name==='wind.x'||row.name==='wind.z'?(row.name==='wind.x'?4+t:-2*t):sweep(row,t);
+ v['lifetime.min']=1+t;v['lifetime.max']=4+t;
+ return v;
+};
+// Frame exactness: an effect on a fresh engine, 40 frames at 1/60 s, the displayed 8-bit frame kept (read the way a
+// screenshot is). Written at their defaults the rows must draw the frame of an effect built without the options, and
+// written with values they must draw the frame of an effect built with those options.
+async function exactFrame(options,set){
+ const c=document.createElement('canvas');c.width=256;c.height=192;
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,3,12],target:[0,3,0],near:0.1,far:200}});
+ e.stop();
+ const fx=VFX.attach(e,{capacity:4096,position:[0,0.5,0],...options});
+ if(set)set(fx);
+ const shot=new OffscreenCanvas(256,192),g=shot.getContext('2d',{willReadFrequently:true});
+ let last;
+ for(let f=0;f<40;f++){
+  e.render({delta:1/60});
+  if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();
+  g.drawImage(c,0,0);last=g.getImageData(0,0,256,192).data;
+ }
+ e.dispose();
+ return last;
+}
+const differ=(a,b)=>{let n=0,max=0,lit=0;for(let p=0;p<a.length;p++){const d=Math.abs(a[p]-b[p]);if(d){n++;max=Math.max(max,d);}}for(let p=0;p<b.length;p+=4)if(b[p]+b[p+1]+b[p+2]>0)lit++;return {differing:n,max,lit};};
+const own={rate:300,velocity:[0,4,0],turbulence:2,size:0.3,lifetime:[1,2.5],color:[0.4,0.5,0.9,0.7],wind:[3,-1],gravity:[0,-2,0]};
+// Blown sand on its own engine: every live sand row written each frame for 60 frames makes no pipeline, buffer or texture,
+// and the defaults draw the frame of a layer built with the same wind and no options.
+async function sandScene(set,frames,count){
+ const c=document.createElement('canvas');c.width=256;c.height=192;
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[-3,0.6,-2],target:[2,0.15,6],fov:50,near:0.05,far:500}});
+ e.stop();
+ const errs=[];e.gpu.addEventListener('uncapturederror',x=>errs.push(x.error.message));
+ e.scene.background='#9fb8d8';
+ const sand=BlownSand.attach(e,{ground:()=>0,wind:{speed:12,direction:0,gust:0.3},seed:7});
+ sand.time=2;
+ const shot=new OffscreenCanvas(256,192),g=shot.getContext('2d',{willReadFrequently:true});
+ const render=async(d)=>{e.render({delta:d});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();g.drawImage(c,0,0);return g.getImageData(0,0,256,192).data;};
+ let last=await render(0);
+ const counts=count?{pipelines:0,buffers:0,textures:0}:null;
+ if(count)for(const [method,key] of [['createRenderPipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){const real=e.gpu[method];if(real)e.gpu[method]=function(...a){counts[key]++;return real.apply(this,a);};}
+ for(let f=0;f<frames;f++){set(sand,f/Math.max(1,frames-1));last=await render(0);}
+ e.dispose();
+ return {last,counts,errs,particles:sand.stats.particles};
+}
+window.sand=async()=>{
+ const live=SAND_LIVE_SETTINGS.filter(r=>r.kind==='number'&&!r.name.startsWith('wind.')||r.name==='wind.speed');
+ const run=await sandScene((sand,t)=>{
+  const v={...sandSettingDefaults(),'wind.speed':10+8*t,'wind.direction':90*t,'wind.gust':0.2+0.5*t};
+  for(const r of live)if(r.name!=='wind.speed'&&!(r.nullable&&r.default===null&&r.name!=='fog'&&r.name!=='threshold'&&r.name!=='gustiness'))v[r.name]=r.min+(r.max-r.min)*(0.2+0.5*t);
+  v.threshold=5+t;v.gustiness=0.3+0.4*t;v.fog=0.001*t;v.opacity=0.5+0.4*t;v.streak=0.6+t;v.height=0.3+0.3*t;v.color=[0.5+0.2*t,0.42,0.29];v.grainSize=0.00025+0.0001*t;v.windHeight=10+t;
+  applySandSettings(sand,v);
+ },60,true);
+ const defaults=await sandScene((sand)=>applySandSettings(sand,{'wind.speed':12,'wind.direction':0,'wind.gust':0.3,'wind.gustPeriod':8,seed:7}),3,false);
+ const plain=await sandScene(()=>{},3,false);
+ let n=0;for(let p=0;p<plain.last.length;p++)if(plain.last[p]!==defaults.last[p])n++;
+ return {counts:run.counts,errs:[...run.errs,...defaults.errs,...plain.errs],rows:SAND_LIVE_SETTINGS.length,differing:n,particles:plain.particles};
+};
+window.check={
+ async exact(){
+  const plain=await exactFrame({}),defaults=await exactFrame({},fx=>applyVfxSettings(fx,{})),
+   built=await exactFrame(own),written=await exactFrame({},fx=>applyVfxSettings(fx,{rate:300,'velocity.y':4,turbulence:2,size:0.3,'lifetime.min':1,'lifetime.max':2.5,color:[0.4,0.5,0.9],alpha:0.7,'wind.x':3,'wind.z':-1,'gravity.y':-2})),
+   again=await exactFrame(own);
+  return {defaults:differ(plain,defaults),written:differ(built,written),repeat:differ(built,again),apart:differ(plain,built)};
+ },
+ async run(){
+  device.pushErrorScope('validation');
+  for(const t of [0,1,0.5]){applyVfxSettings(smoke,values(t));await frame(1/60);await frame(1/60);}
+  const before={...made};
+  for(let f=0;f<60;f++){applyVfxSettings(smoke,values(f/59));await frame(1/60);}
+  const after={...made},wind=smoke.options.wind;
+  applyVfxSettings(smoke,base);
+  await frame(1/60);
+  const error=await device.popErrorScope();
+  return {before,after,errors:[...errors,...(error?[error.message]:[])],rows:VFX_LIVE_SETTINGS.length,wind,back:JSON.stringify(vfxSettingValues(smoke))===JSON.stringify(base)};
+ },
+};
+window.ready=true;
+</script></body></html>

@@ -296,6 +296,7 @@ export class ScatterRoute {
     v.set(matrix);
     v.set(h.values.subarray(16, 20), 16);
     v.set(h.values.subarray(68, 80), 20);
+    v[19] = h.values[80]; // eye.w: the camera's pixel footprint
     d.queue.writeBuffer(uniform, 0, v as Float32Array<ArrayBuffer>);
     pass.setPipeline(p);
     for (let ring = 0; ring < RINGS; ring++) {

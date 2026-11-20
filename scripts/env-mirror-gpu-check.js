@@ -1,17 +1,15 @@
 // Real-GPU check for Reflector, Refractor, CubeCamera (@margoengine/environment) and render layers
-// (@margoengine/cameras/layers). Run under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=env-mirror -- node scripts/env-mirror-gpu-check.js
+// (@margoengine/cameras/layers). Run:
+//   node scripts/run-with-timeout.mjs -- node scripts/env-mirror-gpu-check.js
 // Expectations are independent renders, not copies of the feature's shader: a perfect mirror in z = 0 must show the
 // scene reflected in z = 0 (geometry and light) drawn by core without any mirror; a clear glass must show the scene
 // drawn without the glass; cube faces must hold the ambient-only box colours in the standard WebGPU face layout.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { encodePNG } from '../packages/exporters/dist/capture.js';
 import { compareFlat } from './support/mirror-compare.mjs';
 
-const release = await acquire({ owner: 'env-mirror-gpu-check' });
 const W = 320,
   H = 240,
   out = 'test-results/env-mirror';
@@ -317,5 +315,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.mirrorFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

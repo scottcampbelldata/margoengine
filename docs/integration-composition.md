@@ -14,13 +14,12 @@ backend are common infrastructure, including when the post/FXAA adapter is absen
 
 Generated `.html` and `.ts` files live in `tests/composition/`. Regenerate with
 `node scripts/generate-composition.mjs`; the CPU test fails on stale output.
-`npm run test:composition:browser` holds one shared GPU slot and runs one native browser and one compatibility
+`npm run test:composition:browser` runs one native browser and one compatibility
 browser on the layer's default ANGLE backend (Direct3D 11 on Windows), with every row at 1x and 4x MSAA. Rows with
 voxel-pathtracer run there too: its staged WebGL2 route compiles on Direct3D 11 (packages/voxel-pathtracer README,
-`test:gpu:d3d11`), so the earlier routing of those rows to ANGLE Vulkan is gone. Each scene run has a 150 s limit, under the GPU lease's 3 minute
-idle window: a scene that does not return fails with `ERR_COMPOSITION_STALL`
+`test:gpu:d3d11`), so the earlier routing of those rows to ANGLE Vulkan is gone. Each scene run has a 150 s limit: a scene that does not return fails with `ERR_COMPOSITION_STALL`
 naming the row, backend, sample count and the page's pending pipelines, instead of
-holding the slot until the lease reclaims the whole run. Use `-- --packages=taa,dof` to select
+stalling the whole run. Use `-- --packages=taa,dof` to select
 rows containing those packages. `check:gpu-packages` registers it as a ROOT suite;
 affected-GPU footprints include every generated page and the packages it imports.
 
@@ -99,7 +98,7 @@ check also pass.
 The generator produces 34 rows covering all 276 positive pairs and
 adds numeric reversed-depth readback, target/MSAA/viewport/scissor restoration
 checks and simulated XR sessions drawing real GPU eye textures. Creative uses
-its particle pass and scenery its Moon pass, so the separate toon and sky
+its particle pass and sky/moon its Moon pass, so the separate toon and sky
 members exercise different renderers in the same graph. Water receives the
 supported explicit depth provider when another effect owns capture.
 
@@ -121,7 +120,7 @@ stage code is changed by this expansion.
 Reproduce from this checkout with `npm run build:packages`, then
 `node --test --test-timeout=120000 tests/composition-generator.test.js tests/check-merge-affected.test.js`,
 `node node_modules/typescript/bin/tsc -p tests/composition/tsconfig.json`, and
-`node scripts/gpu-lock.mjs run --owner=j2-reproduce --max=10 --wait-max=5 -- node scripts/composition-browser-tests.mjs`.
+`node scripts/run-with-timeout.mjs --max=10 -- node scripts/composition-browser-tests.mjs`.
 The GPU command runs 34 rows on each backend at both sample counts, 136 cases.
 Coverage describes these fixed settings and probes; it does not prove every
 option, every pixel, higher-order interactions, C1 or C3-C10. No speed claim.

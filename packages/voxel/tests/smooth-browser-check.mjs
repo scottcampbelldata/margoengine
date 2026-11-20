@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel/smooth (run from the repository root after building packages, one GPU job at a
-// time: node scripts/gpu-lock.mjs run --owner=voxel-smooth -- node packages/voxel/tests/smooth-browser-check.mjs): a
+// time: node scripts/run-with-timeout.mjs -- node packages/voxel/tests/smooth-browser-check.mjs): a
 // smooth terrain drawn by SmoothTerrainView as core meshes, green grass on top, beside a VoxelRenderer stone tower in
 // the same frame; carving a ball out of the hill re-meshes only the chunks it touches and changes the picture there;
 // no WebGPU validation errors.

@@ -3,7 +3,7 @@
 <script type="module">
 import {Engine,Geometry} from '@margoengine/core';
 import {webglRenderer,glRenderer} from '@margoengine/webgl2-compat/preview';
-import {GLTFAsset} from '@margoengine/gltf-pro/model';
+import {GLTFAsset} from '@margoengine/gltf/pbr-model';
 import {GLInspector} from '@margoengine/inspector/gl';
 window.setup=async()=>{
   const engine=window.engine=await Engine.create(document.querySelector('canvas'),{backend:'webgl2',fallback:webglRenderer,camera:{position:[3,2,5],target:[0,0,0]}});

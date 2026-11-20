@@ -173,3 +173,81 @@ test('GPU eigensystem construction releases every earlier allocation when a late
     );
   }
 });
+
+test('hyperstreamline rings keep their winding when the principal axis changes sign along a curved fiber', async () => {
+  // Principal axis tangent to circles about the grid centre: the decomposition's sign for it changes along the loop.
+  const n = 32,
+    tensors = new Float64Array(n * n * 6);
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      const a = Math.atan2(y + 0.5 - n / 2, x + 0.5 - n / 2),
+        axes = [
+          [-Math.sin(a), Math.cos(a), 0],
+          [Math.cos(a), Math.sin(a), 0],
+          [0, 0, 1],
+        ],
+        t = (r, c) => [3, 2, 1].reduce((s, l, k) => s + l * axes[k][r] * axes[k][c], 0);
+      tensors.set([t(0, 0), t(1, 1), t(2, 2), t(0, 1), t(0, 2), t(1, 2)], (y * n + x) * 6);
+    }
+  const sides = 8,
+    { triangles } = await hyperstreamlines(
+      { dims: [n, n, 1], bounds: [0, n, 0, n, 0, 1], tensors },
+      [n / 2 + 8, n / 2, 0.5],
+      { method: 'euler', stepSize: 0.1, minFA: 0, maxAngle: 90, sides },
+    );
+  const p = triangles.positions,
+    segments = p.length / 9 / (sides * 2),
+    // Quad k's first triangle is last[k], ring[k], ring[k + 1]; offset 0 reads the last ring, 3 the new one.
+    at = (s, k, o) => [0, 1, 2].map((a) => p[s * sides * 18 + k * 18 + o + a]),
+    winding = (s, o) => {
+      const [a, b, c] = [0, 2, 4].map((k) => at(s, k, o)),
+        u = b.map((v, i) => v - a[i]),
+        w = c.map((v, i) => v - a[i]);
+      return [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+    };
+  assert.ok(segments > 1000);
+  let mirrored = 0;
+  for (let s = 0; s < segments; s++) {
+    const a = winding(s, 0),
+      b = winding(s, 3);
+    if (a[0] * b[0] + a[1] * b[1] + a[2] * b[2] < 0) mirrored++;
+  }
+  assert.equal(mirrored, 0, 'no segment joins a ring to its mirror image');
+});
+test('hyperstreamline rings each carry their own FA, so the colour runs continuously along the tube', async () => {
+  const f = field();
+  // FA falls along x: lambda1 from 3 at x = 0 to 2.3 at x = 7.
+  for (let i = 0; i < 128; i++) f.tensors[i * 6] = 3 - (i % 8) * 0.1;
+  const { triangles } = await hyperstreamlines(f, [4, 2, 2], { method: 'fact', minFA: 0, radius: 0.5, sides: 6 });
+  const seen = new Map();
+  let shared = 0;
+  for (let i = 0; i < triangles.values.length; i++) {
+    const key = [0, 1, 2].map((a) => triangles.positions[i * 3 + a].toFixed(5)).join(),
+      value = triangles.values[i];
+    if (seen.has(key)) {
+      shared++;
+      assert.equal(seen.get(key), value, `the ring vertex at ${key} carries one FA`);
+    } else seen.set(key, value);
+  }
+  assert.ok(shared > 0);
+});
+test('a hyperstreamline follows its fiber past masked neighbours and stays finite where the tensor sum is 0', async () => {
+  const masked = field();
+  // Cells in the row y = 0 from x = 5 on are masked; the fiber runs in the row y = 1 from x = 0 to x = 8.
+  masked.mask = Uint8Array.from({ length: 128 }, (_, i) => (Math.floor(i / 8) % 4 === 0 && i % 8 >= 5 ? 0 : 1));
+  const tube = await hyperstreamlines(masked, [4, 1.2, 2], { method: 'fact', radius: 0.5, sides: 6 });
+  assert.equal(tube.fibers[0].positions.at(-3), 8);
+  close(tube.triangles.bounds[1], 8, 1e-6);
+  assert.equal(tube.triangles.cells.length, (tube.fibers[0].positions.length / 3 - 1) * 6 * 2);
+  // From x = 5 on every tensor is the negative of the one before it: the fiber stops at x = 5, where the interpolated
+  // tensor is 0 (largest eigenvalue 0).
+  const opposite = field();
+  for (let i = 0; i < 128; i++) if (i % 8 >= 5) opposite.tensors.set([-3, -2, -1, 0, 0, 0], i * 6);
+  const flat = await hyperstreamlines(opposite, [4, 1.5, 2.5], { method: 'fact', radius: 0.5, sides: 6 });
+  assert.equal(flat.fibers[0].positions.at(-3), 5);
+  assert.ok(flat.triangles.positions.every(Number.isFinite), 'every tube vertex is finite');
+  assert.ok(flat.triangles.normals.every(Number.isFinite), 'every tube normal is finite');
+});
+test('a tensor field refuses bounds whose span is past the largest double', () => {
+  assert.throws(() => sampleTensor({ ...field(), bounds: [-1e308, 1e308, 0, 4, 0, 4] }, [0, 1, 1]), /finite/);
+});

@@ -17,7 +17,7 @@ page.on('console', (message) => {
 try {
   const result = await page.evaluate(async () => {
     const { Engine, box } = await import('/packages/core/dist/index.js'),
-      { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+      { loadGLTF } = await import('/packages/gltf/dist/pbr.js'),
       { cloneModel } = await import('/packages/animation/dist/skeleton-utils.js'),
       { indexedDBStorage, loadGame, saveGame } = await import('/packages/save/dist/index.js'),
       { captureScene, restoreScene } = await import('/packages/save/dist/engine.js');
@@ -155,7 +155,7 @@ try {
       lit,
       message,
       moved,
-      plugins: [...target.scene.plugins.keys()].filter((name) => name.startsWith('gltf-pro')).length,
+      plugins: [...target.scene.plugins.keys()].filter((name) => /^gltf[/-]pbr/.test(name)).length,
     };
   });
   console.log(JSON.stringify(result));

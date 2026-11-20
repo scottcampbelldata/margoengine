@@ -1,5 +1,5 @@
 // Proof that x-ray outlines (hidden lines) leave selection unchanged while x-ray is off: every GPU call, descriptor and
-// buffer write of a 30-frame story (core meshes, a gltf-pro-shaped model and its nodes, width, color, both algorithms,
+// buffer write of a 30-frame story (core meshes, a gltf-pbr-shaped model and its nodes, width, color, both algorithms,
 // resize, hidden nodes, depth and color format changes, an empty selection, model rescans, device restore, dispose)
 // matches the package at `ref`, byte for byte, at 1x and 4x MSAA, with `xray` absent, false and deleted mid-story.
 // The same story with x-ray on must differ (so the comparison can see the feature).
@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { refs, versions, current, golden } from './compare.js';
 import { mockGPU, passes, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('46f9484', '80d4cfb', 'f3d25c892'),
+const { ref, pin } = refs('46f9484', '80d4cfb', '41050c560'),
   { baseline, candidate } = await versions('selection', ref, undefined, pin);
 
 function story(module, samples, xray) {

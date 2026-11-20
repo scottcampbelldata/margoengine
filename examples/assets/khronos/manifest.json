@@ -940,7 +940,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "With @margoengine/gltf-pro/extended: the glass globe shows thin-film purple and green fringes; the reference studio is darker, so our globe reads milkier and the metal base plainer. The shade lining is not visible from the gallery camera."
+    "notes": "With @margoengine/gltf/extended-materials: the glass globe shows thin-film purple and green fringes; the reference studio is darker, so our globe reads milkier and the metal base plainer. The shade lining is not visible from the gallery camera."
    }
   },
   {
@@ -980,7 +980,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "With @margoengine/gltf-pro/extended: brushed copper highlights stretch along the circular grooves (anisotropic GGX, bent-normal IBL); the bulb glass is clear."
+    "notes": "With @margoengine/gltf/extended-materials: brushed copper highlights stretch along the circular grooves (anisotropic GGX, bent-normal IBL); the bulb glass is clear."
    }
   },
   {
@@ -1018,7 +1018,7 @@
    },
    "render": {
     "verdict": "matches",
-    "notes": "With @margoengine/gltf-pro/extended: light from behind passes through the porcelain (diffuse BTDF), so the cup reads bright white as in the reference."
+    "notes": "With @margoengine/gltf/extended-materials: light from behind passes through the porcelain (diffuse BTDF), so the cup reads bright white as in the reference."
    }
   },
   {

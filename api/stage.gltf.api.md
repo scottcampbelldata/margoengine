@@ -6,7 +6,7 @@
 import { Animation } from "@margoengine/animation";
 import { EngineKernel, EnginePlugin, Geometry, Mesh, PbrMaterial, Scene, Vec3 } from "@margoengine/core";
 import { GeometryBuffers } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface AddGLTFOptions {
     signal?: AbortSignal;

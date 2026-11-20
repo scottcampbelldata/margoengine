@@ -473,6 +473,8 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
     this.#cache = new BrickCache(this.budget.capacity);
     this.#selected = false;
     this.#settled = false;
+    // The lost device's objects are released here, not left for the collector.
+    for (const o of [this.#atlas, this.#pages, this.#transfer, this.#uniform]) o?.destroy();
     this.#build();
   }
 
@@ -820,7 +822,10 @@ export class BrickedVolumeLayer extends EventTarget implements Drawable {
     v.set([sx * side, sy * side, sz * side, 0], 72);
     v.set([brickSize, border, side, 0], 76);
     const b = this.bounds;
-    v.set([0, 1, 2].map((a) => Math.abs(b[2 * a + 1] - b[2 * a]) / (this.dims[a] - 1)), 80);
+    v.set(
+      [0, 1, 2].map((a) => Math.abs(b[2 * a + 1] - b[2 * a]) / (this.dims[a] - 1)),
+      80,
+    );
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
   }
 
@@ -914,6 +919,7 @@ export class BrickedSliceLayer implements Drawable {
   /** @internal */
   restore(): void {
     const device = this.#renderer.device!;
+    this.#uniform?.destroy();
     this.#uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.#layout = device.createBindGroupLayout({
       entries: [
@@ -1004,6 +1010,13 @@ export function brickedVolume(
   options: BrickedVolumeOptions = {},
 ): BrickedVolumeLayer {
   const layer = new BrickedVolumeLayer(figure.renderer, source, options);
+  // The figure takes the layer before the renderer draws it: a refused layer (a 2D chart, a disposed figure) is freed.
+  try {
+    figure.addLayer(layer);
+  } catch (error) {
+    layer.dispose();
+    throw error;
+  }
   figure.renderer.add(layer);
-  return trackSpecLayer(figure, 'bricks', [source, options], figure.addLayer(layer));
+  return trackSpecLayer(figure, 'bricks', [source, options], layer);
 }

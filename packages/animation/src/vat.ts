@@ -4,6 +4,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Animation } from './index.js';
+import { vertexValues } from '../../shared/vertex-map.js';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { neutralShader } from '../../shared/display.js';
 import { lightPBR } from '../../shared/pbr-hooks.js';
@@ -75,20 +76,22 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
   const parts = model.primitives.map((p) => {
     const def = p.definition,
       s = doc.nodes![p.nodeIndex].skin === undefined ? null : doc.skins![doc.nodes![p.nodeIndex].skin!],
-      joints: number[] = s?.joints ?? [];
+      joints: number[] = s?.joints ?? [],
+      // A part of a split primitive reads the definition's per-vertex accessors through its vertexMap.
+      map = p.part?.vertexMap;
     return {
       p,
       count: p.vertices.length / 20,
       joints,
       deltas: (def.targets ?? []).map((t: Record<string, number>) =>
-        [t.POSITION, t.NORMAL].map((a) => (a === undefined ? null : asset.accessor(a, 'VEC3'))),
+        [t.POSITION, t.NORMAL].map((a) => (a === undefined ? null : vertexValues(asset.accessor(a, 'VEC3'), 3, map))),
       ),
       bind:
         s?.inverseBindMatrices === undefined
           ? new Float32Array(joints.length * 16).map((_, i) => +((i % 16) % 5 === 0))
           : asset.accessor(s.inverseBindMatrices, 'MAT4'),
-      ids: s ? asset.accessor(def.attributes!.JOINTS_0, 'VEC4') : null,
-      weights: s ? asset.accessor(def.attributes!.WEIGHTS_0, 'VEC4') : null,
+      ids: s ? vertexValues(asset.accessor(def.attributes!.JOINTS_0, 'VEC4'), 4, map) : null,
+      weights: s ? vertexValues(asset.accessor(def.attributes!.WEIGHTS_0, 'VEC4'), 4, map) : null,
       palette: new Float32Array(Math.max(1, joints.length) * 16),
     };
   });
@@ -168,7 +171,8 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
             const X = m[0] * px + m[3] * py + m[6] * pz + m[9],
               Y = m[1] * px + m[4] * py + m[7] * pz + m[10],
               Z = m[2] * px + m[5] * py + m[8] * pz + m[11];
-            // Cofactor matrix times the determinant's sign: correct normals under non-uniform and mirrored scale.
+            // Cofactor matrix times the determinant's sign: correct normals under non-uniform and mirrored scale. A zero
+            // scale counts as not mirrored, and a normal it maps to zero becomes +Y, as the GPU stages do.
             const ax = m[4] * m[8] - m[5] * m[7],
               ay = m[5] * m[6] - m[3] * m[8],
               az = m[3] * m[7] - m[4] * m[6],
@@ -178,7 +182,7 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
               cx = m[1] * m[5] - m[2] * m[4],
               cy = m[2] * m[3] - m[0] * m[5],
               cz = m[0] * m[4] - m[1] * m[3];
-            const sign = Math.sign(m[0] * ax + m[1] * ay + m[2] * az),
+            const sign = m[0] * ax + m[1] * ay + m[2] * az < 0 ? -1 : 1,
               Nx = (ax * nx + bx * ny + cx * nz) * sign,
               Ny = (ay * nx + by * ny + cy * nz) * sign,
               Nz = (az * nx + bz * ny + cz * nz) * sign,
@@ -187,9 +191,9 @@ export function bakeVAT(animation: Animation, { fps = 30, clips }: VATBakeOption
             texels[o + 1] = Y;
             texels[o + 2] = Z;
             texels[o + 3] = 1;
-            texels[o + 4] = Nx / l;
-            texels[o + 5] = Ny / l;
-            texels[o + 6] = Nz / l;
+            texels[o + 4] = l > 0 ? Nx / l : 0;
+            texels[o + 5] = l > 0 ? Ny / l : 1;
+            texels[o + 6] = l > 0 ? Nz / l : 0;
           }
         }
       }
@@ -268,7 +272,7 @@ export interface CrowdLayout {
   readonly attributes: readonly GPUVertexBufferLayout[];
 }
 
-/** gltf-pro's lighting hooks (its `PBRLighting`), declared here so the VAT entry does not import gltf-pro. */
+/** gltf/pbr's lighting hooks (its `PBRLighting`), declared here so the VAT entry does not import gltf/pbr. */
 export interface VATLightingHooks {
   readonly declarations: string;
   direct?(direct: string): string;
@@ -276,7 +280,7 @@ export interface VATLightingHooks {
   readonly ambient?: string;
   output?(color: string): string;
 }
-/** What `crowd.addLighting` takes: an effect with gltf-pro `pbr` hooks (Shadows, EnvironmentLighting, Fog), bound in group 1. */
+/** What `crowd.addLighting` takes: an effect with gltf/pbr `pbr` hooks (Shadows, EnvironmentLighting, Fog), bound in group 1. */
 export interface VATLighting {
   pbr?(group: number): VATLightingHooks | undefined;
   bindings(): GPUBindGroupEntry[];
@@ -292,22 +296,22 @@ struct Instance {m:mat4x4f,p:vec4f,uv:vec4f}
 @group(0) @binding(3) var vat:texture_2d<f32>;
 @group(0) @binding(4) var map:texture_2d<f32>;
 @group(0) @binding(5) var mapSampler:sampler;
-struct Out {@builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) uv:vec2f}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) uv:vec2f}
 fn texel(row:u32,v:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+v)*2u+k;let w=u32(f.vat.y);return textureLoad(vat,vec2u(i%w,i/w),0);}
 @vertex fn vertex(@location(0) uv:vec2f,@builtin(vertex_index) v:u32,@builtin(instance_index) id:u32)->Out {
  let s=instances[id];let c=clips[u32(s.p.x)];var t=(f.options.x*s.p.z+s.p.y)/max(c.z,0.000001);
  t=select(clamp(t,0.0,1.0),fract(t),c.w>0.5);let x=t*c.y;let a=min(floor(x),c.y-1.0);let w=x-a;let r=u32(c.x+a);
  let p=mix(texel(r,v,0u),texel(r+1u,v,0u),w).xyz;let n=mix(texel(r,v,1u),texel(r+1u,v,1u),w).xyz;
  let m=s.m;let c0=cross(m[1].xyz,m[2].xyz);let world=m*vec4f(p,1.0);
- var o:Out;o.clip=f.camera*world;o.position=world.xyz;o.normal=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*n*sign(dot(m[0].xyz,c0));o.uv=s.uv.xy+uv*s.uv.zw;return o;
+ var o:Out;o.clip=f.camera*world;o.position=world.xyz;let bent=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*n*select(-1.0,1.0,dot(m[0].xyz,c0)>=0.0);o.normal=select(vec3f(0,1,0),bent,dot(bent,bent)>0.0);o.uv=s.uv.xy+uv*s.uv.zw;return o;
 }
 `,
   srgbShader =
     'fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12.92,1.055*pow(x,vec3f(1.0/2.4))-0.055,x>=vec3f(0.0031308));}\n';
-// GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); hemisphere fill is Margo design (gltf-pro's).
+// GGX (Walter et al. 2007) + Schlick, F0 0.04 (glTF 2.0 App. B); hemisphere fill is Margo design (gltf/pbr's).
 const unlitShader = (
   vertex: string,
-) => `${neutralShader}${vertex}${srgbShader}// gltf-pro's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
+) => `${neutralShader}${vertex}${srgbShader}// gltf/pbr's lighting: GGX key light, hemisphere fill, PBR Neutral + sRGB unless the target is HDR.
 @fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let albedo=(f.base*textureSample(map,mapSampler,i.uv)).rgb;let rough=f.options.z;let metal=f.options.w;
  let nn=normalize(i.normal)*select(-1.0,1.0,front);let v=normalize(f.eye.xyz-i.position);let l=f.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
@@ -322,7 +326,7 @@ const unlitShader = (
 /** The WGSL source the crowd draws with: bindings, vertex-texture pose sampling and neutral shading. Exposed for tooling and tests; {@link VATCrowd} builds its pipeline from it. */
 export const vatShader = unlitShader(vatVertex);
 const lit = new Map<string, string>();
-// The same lighting with gltf-pro's Surface and hook points, so `lightPBR` composes effects into it. Built only once an
+// The same lighting with gltf/pbr's Surface and hook points, so `lightPBR` composes effects into it. Built only once an
 // effect is added; the HDR flag is then also written to the last Frame float, renamed `settings` where the fog hook reads `.w`.
 const buildLit = (vertex: string) =>
   `${neutralShader}${vertex.replace('vat:vec4f}', 'settings:vec4f}').replaceAll('f.vat.', 'f.settings.')}${srgbShader}
@@ -497,7 +501,12 @@ export class VATCrowd implements EnginePlugin {
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {
-    this.time += delta;
+    this.advanceTime(delta);
+  }
+  /** Moves `time` by `delta` seconds; the draw samples it per instance, so a seek replays it. */
+  advanceTime(delta: number): void {
+    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid VAT delta; pass finite seconds >= 0');
+    if (!this.disposed) this.time += delta;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -547,7 +556,7 @@ export class VATCrowd implements EnginePlugin {
       ),
     });
   }
-  /** Lights the crowd with an effect's gltf-pro `pbr` hooks; `shadows.add(crowd)` and `lighting.add(crowd)` call this. Returns a remover. */
+  /** Lights the crowd with an effect's gltf\/pbr `pbr` hooks; `shadows.add(crowd)` and `lighting.add(crowd)` call this. Returns a remover. */
   addLighting(effect: VATLighting): () => void {
     if (this.disposed || !effect || typeof effect.pbr !== 'function' || typeof effect.bindings !== 'function')
       throw new TypeError('VAT crowd lighting needs a live crowd and an effect with pbr() and bindings() functions');

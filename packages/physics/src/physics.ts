@@ -141,7 +141,7 @@ export interface PointProjection extends Hit {
   distance: number;
 }
 
-// gltf-pro models (shared/model.js): skinned and morphed primitives are read in their bind pose; an instanced
+// gltf/pbr models (shared/model.js): skinned and morphed primitives are read in their bind pose; an instanced
 // primitive gives one collider per drawn instance.
 export type { ModelLike, ModelPrimitiveLike };
 /** Options for `Physics.addModel`: body options plus how the model's triangles become colliders. */
@@ -722,7 +722,7 @@ export class Physics implements EnginePlugin, BodyOwner {
   }
 
   /**
-   * Colliders for a whole glTF model (gltf-pro `PBRModel`, or a @margoengine/materials mesh) in one call: one collider
+   * Colliders for a whole glTF model (gltf/pbr `PBRModel`, or a @margoengine/materials mesh) in one call: one collider
    * per primitive (per instance for instanced primitives), built from its triangles with every node, instance and scale
    * transform of the hierarchy applied. By default one body on `model.root` holds them all (a level, or a prop that
    * moves as one); `perNode: true` gives each node with primitives its own body instead (hits and events then report
@@ -737,7 +737,7 @@ export class Physics implements EnginePlugin, BodyOwner {
         `Model colliders must be 'trimesh', 'convexHull' or 'convexDecomposition', not ${String(shape)}; choose one of them.`,
       );
     if (!model?.root || !Array.isArray(model.primitives))
-      throw new TypeError('addModel needs a gltf-pro model (root and primitives)');
+      throw new TypeError('addModel needs a gltf/pbr model (root and primitives)');
     const groups = new Map<Mesh, ModelPrimitiveLike[]>();
     for (const primitive of model.primitives) {
       if (filter && !filter(primitive)) continue;
@@ -1215,11 +1215,13 @@ export class Physics implements EnginePlugin, BodyOwner {
   /** Frees every controller, joint, collider, body and the world. Detaches from the engine if attached. */
   dispose(): void {
     if (this.disposed) return;
-    const engine = this.engine;
-    if (engine && !engine.disposed && engine.hasPlugin(this.name)) {
+    const engine = this.engine,
+      // The scene this world is in, not the active one: a world in a second scene is disposed while another is active.
+      scene = engine && !engine.disposed ? engine.sceneOf(this) : undefined;
+    if (scene) {
       // removePlugin calls back into dispose() after unregistering.
       try {
-        engine.removePlugin(this.name);
+        scene.removePlugin(this.name);
         return;
       } catch {
         /* engine is tearing down; free below */

@@ -1,3 +1,4 @@
+// MARGO_COMPAT not applicable: the pages pass WebRTC data-channel messages and make no GPU calls.
 // Real signalling proof: three real Chromium pages find each other through a SignalServer on a real WebSocket, make a
 // full mesh of WebRTC data channels with PeerMesh, and pass reliable and unreliable messages. Then the server closes
 // and they go on talking, so nothing but the setup went through it. `npm run test:browser --workspace @margoengine/netcode`.
@@ -20,7 +21,7 @@ const PAGES = 3;
 const ARGS = ['--disable-features=WebRtcHideLocalIpsWithMdns'];
 const limit = setTimeout(() => {
   console.error('signal proof timed out');
-  process.exit(1);
+  process.exit(1); // process.exit: the hard limit; a page that never connects would hold the process for ever
 }, 60_000);
 
 const dist = join(dirname(fileURLToPath(import.meta.url)), '../../dist'),
@@ -125,7 +126,11 @@ try {
   const ids = results.map((r) => r.id);
   assert.equal(new Set(ids).size, PAGES);
   for (const { id, heard } of results)
-    assert.deepEqual(heard, ids.filter((other) => other !== id).sort(), 'each page heard every other, on both channels');
+    assert.deepEqual(
+      heard,
+      ids.filter((other) => other !== id).sort(),
+      'each page heard every other, on both channels',
+    );
   assert.equal(signals.peers('proof'), PAGES);
 
   signals.close();
@@ -150,4 +155,3 @@ try {
   await closeAll({ browser, servers: [web] });
   rmSync(folder, { recursive: true, force: true, maxRetries: 5 });
 }
-process.exit(0);

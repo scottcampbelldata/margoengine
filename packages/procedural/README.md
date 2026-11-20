@@ -37,6 +37,73 @@ for (const data of Object.values(cabin.parts)) {
 engine.dispose();
 ```
 
+`generateLogWall({ courses, diameter = 0.3, bottom = diameter / 2, openings = [], segments = 14, sill = true })` builds a log
+wall as one geometry: round logs along local X, stacked one diameter apart from `bottom` (the centre of the first
+course), Z the wall's thickness. `courses` lists each course's `[start, end]`, bottom first; an empty course (`[0, 0]`)
+ends a gable early. `openings` are `[x0, x1, y0, y1]` rectangles cut out exactly (a door's sill is `-Infinity`):
+a log wholly inside one is cut away, and a log the opening's top or bottom edge crosses keeps the part outside it,
+notched flat along the edge, so a door 2.15 m high in 0.3 m courses opens to 2.15 m, not to the 2.4 m top of the log
+it cuts into. Openings must not overlap. Chinking runs along every course line where both logs exist: a faceted log's flat sits
+`r (1 - cos(pi / segments))` inside its circle, so bare stacked logs leave a slit straight through the wall (0.75 cm
+for 0.3 m logs of 14 segments), which showed the sky as one-pixel lines. The chinking, the strip log builders pack
+between courses (B. D. Bomberger, "The Preservation and Repair of Historic Log Buildings", NPS Preservation Brief 26,
+1991), lies inside the logs' inscribed circles, so it fills the slit and is hidden everywhere else. Pieces shorter
+than a tenth of the diameter are dropped. A wall standing on the ground (its bottom course less than a diameter up) is
+closed down to y = 0 by default: notched corners set two of a cabin's four walls half a log higher, and builders
+start those walls on a sill log hewn flat underneath, the half-log starter course (B. A. Mackie, "Building with Logs",
+1971; sill logs on the foundation in Bomberger 1991), so `generateLogWall` puts one under the bottom course, cut at
+y = 0 and chinked to the course above, and chinks a bottom course that rests on y = 0 to the ground under its facets.
+Without it the room's light showed on the snow under Cabin Hearth's side walls. `sill: false` leaves the gap for a
+foundation built up to the bottom course (stone piers or a raised foundation); a wall a diameter or more up, such as a
+gable set on another wall, never gets a sill.
+
+```ts
+import { Engine, Geometry } from '@margoengine/core';
+import { generateLogWall } from '@margoengine/procedural';
+const engine = await Engine.create(document.querySelector('canvas')!);
+// A 6 m wall of nine 0.3 m courses with a window and a door, and a gable that shortens toward the ridge.
+const front = generateLogWall({
+  courses: Array.from({ length: 9 }, () => [-3.25, 3.25] as const),
+  openings: [
+    [0.6, 1.8, 0.95, 2.05],
+    [-2.1, -1.1, -Infinity, 2.15],
+  ],
+});
+const gable = generateLogWall({ courses: [[-2.75, 2.75], [-2.2, 2.2], [-1.6, 1.6], [0, 0]], bottom: 2.85 });
+// A side wall half a log up, notched over the front wall's corners: it stands on a sill log hewn flat at y = 0.
+const side = generateLogWall({ courses: Array.from({ length: 9 }, () => [-2.75, 2.75] as const), bottom: 0.3 });
+for (const data of [front, gable, side])
+  engine.createMesh().setGeometry(new Geometry(data.positions, data.normals, data.indices));
+engine.dispose();
+```
+
+`generateWindowPane({ width, height, thickness = 0.004, glazing = 'clear', frost = 1, lites = [1, 1], barWidth = 0.03, barDepth = 0.035 })`
+builds a window's glass and its glazing bars, centred on the origin with its outdoor face toward +Z: `clear` and
+`frosted` geometry, `bars` and `frostedShare`, the frosted share of the glass's area. `lites` divides the pane into
+`lites[0] x lites[1]` panes of glass with glazing bars (muntins), `barWidth` wide and `barDepth` deep, in the glass's
+plane: the glass stops at them, so from outside they read as dark bars against backlit frost, and from inside they
+shade the frost behind them. The bars are one mesh with no overlaps (the columns run the full height, the rows between
+them); give them the sash's wood. `glazing: 'frosted'` is a pane frosted over on its room side, as a winter window is.
+Frost forms where the glass is coldest, first at each lite's edges, where the frame and the bars carry heat out (the
+edge-of-glass zone that NFRC 100 rates apart from the centre of glass), so `frost` (0 to 1) is how far it has grown in:
+a border `frost x min(liteWidth, liteHeight) / 2` wide is frosted round a clear middle, and 1 frosts the whole lite.
+Frost is ice, which scatters light and absorbs almost none (Warren and Brandt, J. Geophys. Res. 113, D14220, 2008), so
+as a shadow caster the frosted part stops a lamp's beam, and its light leaves diffusely instead: `openingLight` and
+`glazingSurface` (`@margoengine/clustered/area`, "Frosted glazing") take the same `glazing`, `frost`, `lites`,
+`barWidth`, `barDepth` and `thickness` and give the window's light and the pane's two faces, brightest nearest the lamp.
+The frosted geometry has two groups: 0, its outdoor face, and 1, its room face and edges; its UVs are the pane's (u from
+the left edge, v down from the top), where `glazingSurface`'s `emissiveMap` lies.
+
+```ts
+import { generateWindowPane } from '@margoengine/procedural';
+const pane = generateWindowPane({ width: 1.2, height: 1.1, glazing: 'frosted' });
+console.log(pane.frostedShare, pane.frosted.groups?.length); // 1 2: frosted over
+const edges = generateWindowPane({ width: 1.2, height: 1.1, glazing: 'frosted', frost: 0.4 });
+console.log(edges.frostedShare.toFixed(2)); // 0.62: a frosted border, the middle still clear
+const cross = generateWindowPane({ width: 1.2, height: 1.1, glazing: 'frosted', lites: [2, 2], barWidth: 0.045, barDepth: 0.05 });
+console.log(cross.bars.indices.length / 36); // 3: a column and the two halves of the row, 12 triangles each
+```
+
 `createIslandHeight(seed = 731)` returns the coastal island preset's world-height
 sampler. `generateGrassMesh(blades = 3)` returns crossed, tapered grass ribbons;
 use 3/2/1 blades for scatter LODs with a double-sided material. Lower LODs remove
@@ -68,6 +135,18 @@ invalid level throws a `RangeError`.
 ```ts
 import {generateTreeMesh} from 'margoengine/procedural';
 const rings = ([2, 1, 0] as const).map((detail) => generateTreeMesh('broadleaf', {detail})); // near, middle, far
+```
+
+Beyond the last ring, `generateTreeStandIn(kind)` from `@margoengine/procedural/standin` gives a far tree of 14
+triangles (`'broadleaf'`, `'conifer'` or `'palm'`; another kind throws a `RangeError`): an open three-sided trunk prism
+and an eight-face crown with the height and canopy width of the full mesh, every triangle facing out, so a
+single-sided material shows it whole from any side. Draw it through `Scatter` where a tree is a few pixels.
+
+```ts
+import {Geometry} from '@margoengine/core';
+import {generateTreeStandIn} from '@margoengine/procedural/standin';
+const far = generateTreeStandIn('conifer');
+const geometry = new Geometry(far.positions, far.normals, far.indices); // 14 triangles
 ```
 
 For a cove scene there are two waterfront props, each one `GeometryData` mesh with UVs, tangents and unit normals,
@@ -102,7 +181,7 @@ const noise = new Noise(123);
 const geometry = marchingCubes((x,y,z) => x*x+y*y+z*z-0.5, {resolution: [32,32,32]});
 ```
 
-Surface extraction is the package's own marching tetrahedra (since 5l.v; it replaced the `isosurface` dependency): each grid cube is split into six tetrahedra around its main diagonal, so neighbouring cubes cut shared faces the same way and the indexed mesh is closed wherever the surface stays inside the grid. It makes more, smaller triangles than classic Marching Cubes and none of its ambiguous-case holes. Negative density is inside; gradient normals and triangle winding face outward. Empty surfaces return null. Resolution is 3..128 on each axis, with a bounded output geometry. Worley searches a sufficient five-cell neighborhood per axis for F1. Sampling/extraction are CPU work, not frame-time GPU voxel meshing.
+Surface extraction is the package's own Marching Cubes (Lorensen and Cline 1987; it replaced the `isosurface` dependency, and since 2026-11-16 the earlier marching tetrahedra): vertices lie on the grid's own axis edges, and each cube's polygons are traced on its faces, where a face whose corners alternate inside and outside is split by the asymptotic decider (Nielson and Hamann 1991), so both cubes on a face agree (the paper's own test: the corners below the level join when the saddle value lies below it, and a saddle value exactly at the level joins the upper pair) and the indexed mesh is closed wherever the surface stays inside the grid. With a density function each vertex is the function's own root on its edge (an Illinois regula falsi, Dowell and Jarratt 1971), so it lies on the exact surface to float32 precision; with a grid it is linear between the two samples. Tetrahedra put vertices on face and body diagonals too, up to 1.73 cells long, where linear interpolation of a curved field strays furthest: a 1 / d^2 metaball came out 1.229 times its radius at resolution 28, against 1.073 on cube edges and exact with the function. Negative density is inside; gradient normals and triangle winding face outward. A surface through a grid point (a sample at the level, or within float32 precision of it) gets one vertex on that point, shared by every edge from it, with no zero-area triangles (the corner snapping of Treece, Prager and Gee's regularised marching tetrahedra, 1998). Body ambiguities (Chernyaev 1995, Marching Cubes 33) are not resolved: a cube whose inside corners meet only through its interior gets the separated polygons. Empty surfaces return null. Resolution is 3..128 on each axis, with a bounded output geometry. Worley searches a sufficient five-cell neighborhood per axis for F1. Sampling/extraction are CPU work, not frame-time GPU voxel meshing.
 
 For a surface that changes every frame (metaballs, sculpting), pass the samples instead of a function: a grid of
 `resolution[0] * [1] * [2]` values, x fastest, then y, then z, sampled at the grid points of `bounds`. Writing each
@@ -115,6 +194,14 @@ for (let z = 0, i = 0; z < n; z++)
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++, i++) grid[i] = Math.hypot(x - 24, y - 24, z - 24) / 16 - 1; // a sphere
 const sphere = marchingCubes(grid, {resolution: [n, n, n]}); // normals from the grid's gradient
+```
+
+`marchingCubes` is also its own entry, `@margoengine/procedural/marching-cubes`, for code that only polygonizes (the
+cliffs and sea rocks of `@margoengine/terrain/rocks` use it): it loads none of the root's generators.
+
+```ts
+import {marchingCubes} from 'margoengine/procedural/marching-cubes';
+const ball = marchingCubes((x, y, z) => Math.hypot(x, y, z) - 0.8, {resolution: [24, 24, 24]});
 ```
 
 ```ts
@@ -130,10 +217,17 @@ engine.dispose();
 ```
 
 For a complete tree in one call, import the optional `/tree` entry. `createTree`
-creates a root plus both child meshes, with brown trunk and green canopy materials.
-Options: `position` defaults to [0,0,0], `detail` to 2; `trunkMaterial` and
-`canopyMaterial` optionally borrow your PbrMaterials. Move/rotate/scale `root` to
-transform both parts. Dispose the returned tree to remove all three nodes.
+creates a root plus both child meshes, with a brown trunk and a green canopy (a broadleaf) or the needles' measured
+colour, `CONIFER_NEEDLES` (a conifer). Options: `position` defaults to [0,0,0], `detail` to 2, `height` (metres, 0.1
+to 200) to the mesh's own, scaling the whole tree evenly; `branches` (conifer, default true here) builds each tier as
+a whorl of drooping branch sprays; `shootDistance` (conifer with branches, metres, default 30) is how near the camera a
+conifer must be for its sprays to show their shoots rather than the same shoots coarse, 0 always coarse and Infinity
+always the shoots (`shoots: true` or `'coarse'` forces either, `false` the plain solid sprays); `diameter` (metres,
+0.005 to 3) is the stem's diameter at breast height, default `spruceDiameter(height)` for a conifer and the mesh's
+trunk for a broadleaf; `flare` (1 to 2.5) is the trunk's diameter at the ground over its diameter at breast height,
+default `SPRUCE_FLARE` (1.3) for a conifer and the historical trunk for a broadleaf; `trunkMaterial` and `canopyMaterial`
+optionally borrow your PbrMaterials. Trees of one shape share their geometry, so core draws them as one batch.
+Move/rotate/scale `root` to transform both parts. Dispose the returned tree to remove all three nodes.
 
 ```ts
 import {Engine} from '@margoengine/core';
@@ -141,8 +235,83 @@ import {createTree} from '@margoengine/procedural/tree';
 const engine = await Engine.create(document.querySelector('canvas')!);
 using tree = createTree(engine, 'broadleaf', {position: [4, 0, 7]});
 tree.root.position.x = 8;
+const spruce = createTree(engine, 'conifer', {position: [-3, 0, 5], height: 11});
+// A far ridge of spruces that never needs the shoots, open-grown: a thicker stem on a heavier, older butt flare.
+const ridge = createTree(engine, 'conifer', {position: [60, 0, -80], height: 18, shootDistance: 0, diameter: 0.4, flare: 1.45});
+ridge.dispose();
+spruce.dispose();
 tree.dispose();
 engine.dispose();
+```
+
+A conifer seen up close (`branches: true` on `generateTreeMesh('conifer', ...)`, the default in `createTree`) has 7
+main branches a whorl and 5 shorter ones between whorls, each a lanceolate, cupped spray drooping toward its tip, with
+the sky between them, after the spruce habit in Weber and Penn 1995 ("Creation and rendering of realistic trees",
+SIGGRAPH) and Deussen and Lintermann 2005 (Digital Design of Nature, ch. 6). Its normals mix the spray's surface with
+the direction from the trunk and tilt each vertex by up to 0.3 rad, the spread of needle orientation in a shoot. The
+skirts (`branches` false, the `generateTreeMesh` default) close the crown and cost about a third of the triangles, for
+mid and far trees. `CONIFER_NEEDLES` is linear sRGB [0.0245, 0.051, 0.0215], albedo 0.044: needle reflectance and
+transmittance measured for Norway spruce and Scots pine (Lukes et al. 2013, Remote Sensing Letters 4(7)) less the light
+a shoot's needles recollide, recollision probability 0.47 (Smolander and Stenberg 2003, Remote Sensing of Environment 88).
+
+Seen from 1 to 30 m a spray needs its twigs, ragged needle edges and gaps, or it reads as a smooth dark blade. With
+`shoots: true` (the `createTree` default within `shootDistance`) each spray is built as the branch it stands for: a
+twig axis from the trunk to the tip, lateral shoots every 0.075 m alternating sides about 55 degrees forward (the
+spruce's flat two-ranked branch system; Weber and Penn 1995; Deussen and Lintermann 2005), each shoot a band of needles
+with a serrated edge of forward-swept tufts, about 30 mm a side (Norway spruce needles are 10 to 25 mm, Farjon 2010, A
+Handbook of the World's Conifers), and the sky between the shoots, all inside the plain spray's outline, so a switch
+does not move the silhouette. Seen from the side, 42 percent of the crown is sky: a measured young Norway spruce's needle
+area (Pokorný and Tomášková 2007, Journal of Forest Science 53(12): 1.1083 H^1.9771 or 12.79 dbh - 50.65 m2 of needles in
+a cone 6.5 m long and 2.5 m across) with its shoots' silhouette (STAR = (1 - 0.47) / 4, Smolander and Stenberg 2003)
+leaves 26 to 43 percent through the same crown by Poisson's law (Nilson 1971, Agricultural Meteorology 8), where the
+plain sprays leave 16 (test/conifer-lod.test.js). About 37,000 triangles a tree at detail 2 (9,600 at detail 1), so
+`createTree` shows them only within `shootDistance` (default 30 m, where an 8 cm shoot still spans 2 pixels in a
+1080-pixel, 60 degree view), picked at creation and before each frame with 10 percent hysteresis.
+
+Beyond it a tree shows the same branches coarse (`shoots: 'coarse'`, about 5,700 triangles at detail 2 and 3,300 at
+detail 1, against 3,500 and 700 for the plain sprays): the laterals 1.5 times as far apart and 1.55 times as wide at
+detail 2, the needle teeth folded into each band's mean width, so the projected area and the normals, and with them the
+colour and the snow, are the shoots'. A coarser level of aggregate detail keeps what the eye averages: the expected
+projected area and the distribution of normals (R. L. Cook, J. Halstead, M. Planck and D. Ryu 2007, "Stochastic
+simplification of aggregate detail", SIGGRAPH; D. Lacewell, B. Edwards, P. Shirley and W. B. Thompson 2006, "Stochastic
+billboard clouds for interactive foliage rendering", Journal of Graphics Tools 11(1); E. Bruneton and F. Neyret 2012,
+"Real-time realistic rendering and lighting of forests", Computer Graphics Forum 31(2); O. Deussen, C. Colditz,
+M. Stamminger and G. Drettakis 2002, "Interactive visualization of complex plant ecosystems", IEEE Visualization). Seen
+from four elevations and eight sides, the coarse level's coverage and lit, snow-covered luminance stay within the
+shoots' own change for a 45 degree turn of the tree (under 4 percent), where the plain sprays differ by 17 to 190
+percent; the plain sprays covered all of their outline against the shoots' 56 percent, so a tree changed species as it
+crossed 30 m (KB-CABIN-FGTREE3).
+The crown's top is built the same way, near and coarse alike: the youngest whorl, its reach closing the crown from the
+last tier's to the tip, and above it the leader, this year's 0.5 m terminal shoot with its needle tufts and no side shoots
+yet, as a spruce grows (a growth unit a year from the terminal bud, a whorl of lateral buds at each unit's top: Hallé,
+Oldeman and Tomlinson 1978, Tropical Trees and Forests: An Architectural Analysis; Fabrika et al. 2019, BioResources,
+young Norway spruce crown architecture). The leader's normals are the crown cone's at its apex, so it takes snow as the
+crown's outline does. Its gap fraction, snow and lit colour lie within the range the tiers' tenths span
+(test/conifer-leader.test.js); it was a solid, snowless cone that read as a black spike (KB-CABIN-LEADER1).
+Core materials take no textures, so the needle detail is geometry and vertex normals, not alpha-tested cards or a
+normal map; it needs no alpha test, so early depth rejection stays on.
+
+The trunk's butt flare follows measured spruce stems: the diameter at the stump is 1.25 d + 2 cm (d at breast height),
+1.30 to 1.45 times d for 40 to 10 cm stems, at a stump 1 percent of the height up in Finnish pine and spruce
+(Laasasenaho's 1982 approximation as Repola 2009 uses it, "Biomass equations for Scots pine and Norway spruce in
+Finland", Silva Fennica 43(4)), and 1.10 to 1.20 times inside the bark at a 1 ft stump in
+northeastern spruce and fir (Wharton 1984, "Predicting diameter at breast height from stump diameters for northeastern
+tree species", USDA Forest Service Research Note NE-322). `flare` sets the ratio at the ground against 1.3 m of the
+placed tree (`generateTreeMesh` takes it with `breastHeight` in mesh metres, default 1.3); the swell dies away over the
+lowest 0.25 m. Unset in `generateTreeMesh`, the trunk keeps its historical ring, about 2.1 times the breast-height
+diameter.
+
+A placed spruce's stem follows Näslund's height curve for Norway spruce, h = 1.3 + d^3 / (1.811 + 0.308 d)^3 (d in cm),
+the mean of 64 southern Finnish spruce stands (J. Siipilehto 2000, "A comparison of two parameter prediction methods for
+stand structure in Finland", Silva Fennica 34(4), Fig. 2): `spruceDiameter(height)` inverts it, 7.8 cm at breast height
+for the 7.6 m default tree and 12 cm at 12 m, where the mesh's own trunk was 0.55 m. Measured 7.0 m Czech spruces
+averaged 8.4 cm (Pokorný and Tomášková 2007); an open-grown tree is stouter, so pass `diameter`. `generateTreeMesh` takes
+it as `breastDiameter` in mesh metres and scales the trunk across, keeping its taper and flare.
+
+```ts
+import {spruceDiameter, SPRUCE_HEIGHT_CURVE} from '@margoengine/procedural/tree';
+const stem = spruceDiameter(12); // 0.124 m at 1.3 m on a 12 m spruce
+console.log(stem.toFixed(3), SPRUCE_HEIGHT_CURVE.a, SPRUCE_HEIGHT_CURVE.b);
 ```
 
 Trees return separate `trunk` and `canopy` GeometryData plus canopy `center` and
@@ -154,7 +323,10 @@ collective centroid. The clumps add 1,440 triangles to the 4,800 of the lobes
 and need no alpha test, so they keep early depth rejection on phone GPUs.
 Shrubs use three compact, asymmetric hemispherical lobes with smooth normals.
 All meshes have contiguous Float32 positions, normals, UVs and tangents, and
-Uint32 indices. Generation is deterministic, initialization-only CPU work, with
+Uint32 indices. Tangents are xyzw, with `cross(normal, tangent.xyz) * w` pointing toward increasing v; `meshTree`
+writes w = -1 on the base cap of each bark tube, whose UV disc is mirrored as seen from below. Trunks of the palm,
+birch, acacia and snag taper from a wide root to a narrow tip, and the cactus's ribs follow each column's own axis.
+Generation is deterministic, initialization-only CPU work, with
 no asset downloads. Pack them into your scene's 80-byte vertex stream, then
 upload and release CPU arrays. The gameplay sandbox
 uses these exports with `ScatterInstances` and `PlacementLayout` from scatter.
@@ -243,6 +415,49 @@ the bisectors of the Delaunay neighbours, each edge/face tagged with the site ac
 (triangulated with holes, so a torus fractures correctly). Chunk volumes add up to the mesh volume (1e-5 relative in the
 tests; 240 fractures of a box, icosphere, UV sphere and torus checked closed). Needs a closed mesh; chunks are non-indexed;
 caps get flat normals and no UVs; all CPU work, meant for load time or a loading step, not per frame.
+
+## Gears and gear trains (`@margoengine/procedural/gears`, 1.9 kB min+gzip)
+
+Spur wheels with true involute teeth, and the search for the gear train that turns an output at a wanted ratio:
+clocks, orreries, gearboxes and machines that must turn at the right rate. Pure maths, no GPU code.
+
+```ts
+import {createStage} from 'margoengine';
+import {Shape, Path, extrudeGeometry, toGeometry} from 'margoengine/geometry';
+import {involuteOutline, gearRadii, designCompoundTrain, compoundRatio, compoundWheelAngles} from 'margoengine/procedural/gears';
+const stage = await createStage('#app');
+// A 30-tooth wheel of module 2 mm, 6 mm thick, with a 5 mm bore.
+const wheel = new Shape(involuteOutline(30, 0.002));
+const bore = new Path(); bore.absarc(0, 0, 0.005, 0, Math.PI * 2, true);
+wheel.holes.push(bore);
+stage.mesh(toGeometry(extrudeGeometry(wheel, {depth: 0.006, bevelEnabled: false})));
+console.log(gearRadii(30, 0.002)); // {pitch: 0.03, tip: 0.032, root: 0.0275, base: 0.0282}
+// A minute-to-hour train (1 to 12) on three arbors 4 cm and 5 cm apart.
+const frame = {drive: [0.05, 0.04], stud: [0.05, 0], output: [0, 0]} as const;
+const train = designCompoundTrain(1 / 12, frame); // {a, b, c, d}
+console.log(compoundRatio(train), compoundWheelAngles(train, Math.PI / 2, frame).d);
+```
+
+| Export | Does |
+| --- | --- |
+| `involuteOutline(teeth, module, options?)` | counterclockwise `[x, y]` loop, tooth 0 on +x: involute flanks from the base circle (radial below it), tip lands, a three-point root; `flankPoints` (default 6) per flank |
+| `gearRadii(teeth, module, form?)` | `pitch` (m z / 2), `tip`, `root`, `base` |
+| `designCompoundTrain(ratio, frame, {tolerance})` | the two-stage train (a on the drive meshes b on the stud; c with b meshes d on the output) whose tooth counts come closest to `ratio`, every wheel fitting the frame; within `tolerance` (default 2e-6) the coarsest finer module wins |
+| `compoundTrainMisfit(train, frame)` | why a train does not fit (`'a has 11 teeth'`, `'c reaches the drive arbor'`, ...), or null |
+| `compoundModules(train, frame)`, `compoundRatio(train)` | the modules the centre distances give each mesh; output turns per drive turn |
+| `compoundWheelAngles(train, drive, frame)` | every wheel's angle for a drive angle, teeth interleaved at both meshes |
+| `meshAngle(driver, driverTeeth, drivenTeeth, toward)`, `toothPhase(angle, teeth, dir)` | the driven wheel's angle that puts a gap where the driver has a tooth; how far a wheel's tooth sits from a direction, in pitches |
+| `involute(a)` | tan a - a |
+
+Tooth form (`pressureAngle`, `addendum`, `dedendum`) defaults to the ISO 53 basic rack: 20 degrees, 1 and 1.25
+modules. The frame takes the three centres and, all defaulting to 0 or unbounded, the tooth range (default 15 to 140),
+module range, the radius of what turns on the output (`outputBundle`), the `arbor` radius, the running `clearance`, the
+room wheel d needs round the bundle (`outputHub`) and the metal each pinion needs over its arbor (`pinionHub`). The
+search tries every a, b and c in the tooth range with the two nearest d (about 4 million trains for 15 to 140), so
+it suits a build step, not a frame. Wheels with fewer than about 17 teeth at 20 degrees are
+undercut on a real cutter; the outline draws the full involute regardless. An invalid count, module or ratio throws a
+`RangeError` that names the fix; no fitting train throws a `MargoError` with code `failed`. The Orrery example
+(`examples/orrery`) turns eight planets with trains from this search.
 
 ## Voxel expressions (`@margoengine/procedural/expression`, 4.5 kB min+gzip)
 
@@ -420,7 +635,10 @@ console.log(roots.remainingAttractions);
 The attraction point count times maxNodes times maxIterations must not exceed 134,217,728. This bounds
 nearest-distance work; it is not a generation-time guarantee. A point influences its nearest node within
 influenceRadius, including the boundary. Points at or within killRadius are consumed. Direction sums with
-length at most 1e-12 do not grow a segment. Symmetrically balanced or unreachable clouds can stop without
+length at most 1e-12 do not grow a segment. A node never grows a second child at the position of one it already
+has: the published rule (Runions et al. 2007, eq. 2) would regrow it every round while the points that pulled it
+stay nearer the parent (each lies less than D/2 along the growth direction), so those points stop growth instead
+of filling the skeleton with stacked copies (the default crown of seed 1 had 315 of 682 nodes duplicated). Symmetrically balanced or unreachable clouds can stop without
 consuming all points. `stopped` is `complete`, `stalled`, `maxNodes` or `maxIterations`; `remainingAttractions`
 records unreached points. The generator also consumes reached points after its final growth round.
 
@@ -491,8 +709,12 @@ extent 0.0001..10000 per axis and coordinates within +/-10000. A nonpositive sam
 boundary value throws code `failed` and asks for larger bounds. An empty sampled
 field returns empty arrays. Features smaller than the grid, multiple crossings of
 one edge, tangent surfaces and disconnected components inside one cell may be lost
-or become nonmanifold. CSG may produce zero-area triangles where surfaces touch;
-there is no topology guarantee for arbitrary expressions. Normals are analytical
+or become nonmanifold. CSG may produce zero-area triangles where surfaces touch. A
+sample within 2^-40 of a step of zero counts as exactly on the surface (outside), so
+a surface through a grid point, such as a default-bounds sphere's poles at a
+resolution that is a multiple of 12, meshes without slivers.
+Each dual quad splits along the diagonal that keeps both triangles facing along its
+edge, so smooth surfaces and most seams do not fold; there is no topology guarantee for arbitrary expressions. Normals are analytical
 primitive gradients selected through CSG, with deterministic axis ties on box edges.
 Roots use 40 bisections; rank-deficient QEFs use the Hermite mass point with a 1e-10
 absolute eigenvalue cutoff on the unit-normal system and bounded face/edge/corner
@@ -597,6 +819,457 @@ GPU wait promises are observed before checking cancellation, and loss/cancellati
 is checked again after completion. An already lost factory and a cancelled queue
 cannot leave a later GPU rejection unhandled; the original abort reason still wins.
 
+## PBR material maps (`@margoengine/procedural/textures-pbr`)
+
+`createPBRTextureBaker(engine or device)` bakes four linear `rgba8unorm` maps on the GPU (albedo, normal, roughness,
+height) with full filtered mip chains, on WebGPU or the full WebGL2 compatibility layer. Patterns: `noise`, `bricks`,
+`tiles`, `wood`, `rust`, `marble`, `cloud`, `grass`, `fire`, `starfield`, `road`, `stone` and `soot`.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { createPBRTextureBaker } from '@margoengine/procedural/textures-pbr';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+using baker = await createPBRTextureBaker(engine);
+using stone = await baker.bake({ pattern: 'stone', repeat: [6, 6], chip: 0.4 });
+using bricks = await baker.bake({ pattern: 'bricks', tint: 0.2, chip: 0.5, width: 1024, height: 1024 });
+using soot = await baker.bake({ pattern: 'soot', width: 128, height: 256, mipmaps: false });
+console.log(stone.mipLevelCount, bricks.width, soot.heightPixels);
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| pattern | bricks | One of the thirteen above |
+| normalStrength | 1 | 0..8, tangent-space normal multiplier |
+| heightScale | 0.05 | 0..1, height amplitude per UV tile |
+| roughness | 0.7 | 0..1, base perceptual roughness |
+| roughnessVariation | 0.3 | 0..1, roughness that follows the height |
+| tint | 0.25 for stone, 0 otherwise | 0..1, per-cell colour of bricks, tiles and stone: each cell's colour times a seeded 1 +- tint; mortar untouched |
+| chip | 0 | 0..1, chipped edges of bricks, tiles and stone: a rounded bevel with a broken, noisy edge for close-ups |
+| time | 0 | 0..1e6 seconds; rebake to animate cloud, fire and starfield |
+| mipmaps | true | Complete chain to 1x1, area filtered, normals renormalized |
+
+The size, seed, repeat, detail, grout, stagger, colour and offset options are those of `/textures` above. With `tint`
+and `chip` at 0 the bricks and tiles maps are the same as before the options existed.
+
+`stone` is irregular cells with mortar (Worley 1996): each texel finds its nearest and second-nearest jittered cell
+point, (F2 - F1) / 2 is about the distance to the mortar line, and each stone gets its own height (0.8 to 1 of the
+range) and, through `tint`, its own colour. `grout` sets the mortar width; `repeat` the stones per tile (default
+[4, 8], so pass a square count for a square texture). It repeats like the other patterns.
+
+`soot` is a smoke mask, not a repeating pattern: a plume rises from the middle of the v = 0 edge, its half-width
+growing linearly with height and its density falling as (b0 / b)^(5/3), the shape of a buoyant plume (Morton, Taylor
+and Turner 1956); `detail` (default 0.2) adds vertical streaks. Use it with clamp addressing. Its default colours are
+white `secondary` and near-black `color`, so the albedo is a multiply atlas for `@margoengine/post/decals` (see
+`sootDecal` in `@margoengine/materials/soot`) and the height map is the darkness itself.
+
+Sources: Worley, "A Cellular Texture Basis Function", SIGGRAPH 1996, https://dl.acm.org/doi/10.1145/237170.237267;
+Morton, Taylor and Turner, "Turbulent gravitational convection from maintained and instantaneous sources", Proc. R.
+Soc. A 234, 1956, https://doi.org/10.1098/rspa.1956.0011; Lefebvre and Poulin, "Analysis and synthesis of structural
+textures", Graphics Interface 2000 (bricks and tiles).
+
+## Board sheds and a launch rail (`@margoengine/procedural/sheds`)
+
+`generatePlankShed(options?)` builds a board-built gabled shed: horizontal lapped boards (clapboard) or vertical
+boards on the walls, door and window openings that cut the boards they cross, door leaves (`closed`, `open` on a
+side hinge, or `awning`, hinged at the top and propped up 75 degrees), two board roof slopes with an overhang, fascia
+and a ridge board, and corner boards. It returns `{parts: {siding, roof, trim}, ridge}`, one `GeometryData` per
+material with UVs, tangents and unit normals; the origin is on the ground at the middle of the floor and the ridge
+runs along x. The default is the Wright brothers' 1903 hangar at Kill Devil Hills: 13.4 by 4.9 m (44 by 16 ft), low
+roof, a wide awning door on the front. `generateLaunchRail(options?)` lays a straight timber rail along +x, timbers on
+edge capped with a thin metal strip, following `ground(x)`: the default is their 60 ft rail of 2 by 4s in four
+lengths. Both are seeded (`seed`, `weathering` 0 to 1 for small tilts, uneven ends and gaps).
+
+```ts
+import {generateLaunchRail, generatePlankShed} from 'margoengine/procedural/sheds';
+const hangar = generatePlankShed(); // the 1903 hangar
+const shed = generatePlankShed({length: 7.6, pitch: 30, siding: 'vertical', openings: [
+  {wall: 'front', at: -1.6, width: 0.9, height: 1.95, leaf: 'closed'},
+  {wall: 'front', at: 1.5, width: 0.8, height: 0.7, bottom: 1}]});
+const rail = generateLaunchRail({ground: (x) => x * 0.02});
+console.log(hangar.ridge.toFixed(2), shed.parts.siding.indices.length > 0, rail.parts.metal !== undefined); // 3.20 true true
+```
+
+| Option | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `length`, `width` | 13.4, 4.9 | 1.5 to 40, 1.2 to 16 m | along the ridge (x) and across it (z) |
+| `eaves` | 2.4 | 1.5 to 8 m | wall height |
+| `pitch` | 18 | 5 to 60 degrees | roof slope |
+| `siding` | `'horizontal'` | `'horizontal'`, `'vertical'` | lapped boards or boards side by side |
+| `board` | 0.15 | 0.08 to 0.4 m | board face width (lap siding is about 6 inches) |
+| `overhang` | 0.2 | 0 to 1 m | roof past the walls |
+| `openings` | one awning door 3.6 by 2.1 m on the front | | `{wall, at, width, height, bottom, leaf}`; `wall` is `front` (+z), `back`, `left` (-x gable) or `right` |
+| `weathering` | 0.5 | 0 to 1 | small tilts, uneven ends and gaps |
+| `seed` | 1 | integer | the same seed gives the same boards |
+
+Rail options: `length` 1 to 60 m (18.3), `sections` 1 to 12 (4), `timber` width and height in metres ([0.038, 0.089],
+a dressed 2 by 4 on edge), `strip` (true), `ground(x)` (flat 0), `seed`. A wrong type throws a `TypeError`, a
+value out of range or an opening that does not fit its wall a `RangeError` naming what to pass.
+
+Sources: US Forest Products Laboratory 2010, *Wood Handbook: Wood as an Engineering Material*, FPL-GTR-190
+(https://www.fpl.fs.usda.gov/documnts/fplgtr/fpl_gtr190.pdf), lap siding widths and laps and dressed lumber sizes;
+Library of Congress Wright Brothers negatives LC-W86-15 and LC-W86-21 (public domain,
+https://www.loc.gov/pictures/collection/wri/), the 1903 camp buildings and the launching track; McFarland (ed.) 1953,
+*The Papers of Wilbur and Orville Wright* (McGraw-Hill), the hangar's size and the rail.
+
+## Building rules and period styles (`@margoengine/procedural/building-rules`)
+
+`generateBuilding(options?)` makes a whole building from rules: the footprint is split into storeys, each side into a
+whole number of bays, and each bay into wall, window or door, inside walls of real thickness, under a roof. Roofs are
+`hip`, `gable`, `hip-gable` (the Japanese irimoya), `shed` or `flat` (with a parapet); a `falseFront` stands over the
+front wall and always clears the roof behind it. Windows sit back by the `reveal` with jambs through the wall, frames
+(sliding, double-hung or strip), sills, casings or stone lintels; doors are panelled, glazed or roller doors; a front
+`porch` gets posts, a shed roof, railings and steps, a raised door without one gets a stoop and steps (a ramp for a
+vehicle door), and a `balcony` gets a 1.1 m railing and a full height sash onto it. Roofs carry courses of tile (with
+pan and roll at `near` detail), shingle or standing seam metal, ridge and hip caps, gutters and downspouts, knee
+braces and a chimney that clears the roof by the building code. `detail` (`far`, `mid`, `near`) sets how much small
+geometry there is, so a whole town can be `mid` and the hero house `near`.
+
+It returns `{parts, palette, options, floors, eaves, top, openings, footprint, roofHeight(x, z), chimney, steps,
+railings, rooms, furniture, doorways}`: one `GeometryData` per part (`walls`, `interior`, `furniture`, `trim`, `roof`, `glass`, `frames`, `doors`, `base`,
+`porch`, `awning`, `chimney`, `gutters`; a part with nothing in it is left out), all in world space with UVs in metres
+for tiling textures and tangents, plus a suggested material for each part. The origin is on the ground under the middle
+of the footprint, the front faces +z turned by `yaw`.
+
+Style sets (`style`), each a full set of defaults that any option overrides:
+
+| Style | What it is |
+| --- | --- |
+| `japan-2011-house` (default) | Two storey wooden house on the 910 mm module, 9.1 by 7.28 m, tiled hip roof at 4.5 sun, ceramic siding, aluminium sliding windows, a second floor veranda, gutters |
+| `japan-2011-concrete` | Four storey reinforced concrete public building, strip windows, slab edge bands, a flat roof with a 1.1 m parapet |
+| `japan-2011-warehouse` | Fish market shed or harbour warehouse: one 6.5 m storey, corrugated metal, low metal gable, two roller doors and ramps |
+| `western-1910-house` | Front-gabled frame house: clapboard, corner boards, casings, double-hung sash, full width porch, brick chimney, shingles at 10 in 12 |
+| `western-1910-false-front` | Two storey store on a 25 ft lot: square or stepped false front with a cornice, storefront and transoms, awning |
+| `western-1910-brick` | Three storey brick commercial block: storefronts, tall double-hung windows with stone lintels, belt courses, parapet and dentil cornice |
+| `western-1910-depot` | One storey rail depot: long hip roof with 1.8 m bracketed eaves, clapboard, two doors |
+
+`townBuildings(lots, {styles, margin, detail, seed, override})` turns the lots of a settlement layout (the `houses` of
+`layoutSettlements` from `@margoengine/biomes/settlements`, `pattern: 'grid'`) into one building's options each: a style
+drawn by weight, the lot less the margin, the front to its street, the floor on the pad, and seeded variety in storeys,
+roof shape, pitch and door bay.
+
+```ts
+import {generateBuilding, townBuildings} from 'margoengine/procedural/building-rules';
+const house = generateBuilding();
+const shop = generateBuilding({style: 'western-1910-false-front', origin: [20, 0, 0]});
+console.log(house.eaves.toFixed(2), house.top.toFixed(2), shop.openings.filter((o) => o.kind === 'shop').length); // 6.30 8.16 2
+const lots = [{centre: [0, 0], size: [14, 18], along: [1, 0], floor: 1.2, front: [0, 1]}] as const;
+const town = townBuildings(lots, {styles: {'japan-2011-house': 3, 'japan-2011-concrete': 1}}).map((o) => generateBuilding(o));
+console.log(town.length, Object.keys(town[0].parts).length > 5); // 1 true
+```
+
+| Option | Default (`japan-2011-house`) | Range | Meaning |
+| --- | --- | --- | --- |
+| `width`, `depth` | 9.1, 7.28 | 3 to 120 m | footprint along the front (x) and front to back (z) |
+| `storeys` | [2.9, 2.9] | 1 to 12 of 2.2 to 8 m | floor to floor height of each storey from the ground up |
+| `plinth` | 0.5 | 0 to 2 m | ground floor height over the ground |
+| `wall`, `reveal` | 0.15, 0.08 | 0.08 to 1, 0.02 to 0.5 m | wall thickness; how far glass and doors sit back (at most 0.9 of the wall) |
+| `roof` | `hip` | `flat`, `gable`, `hip`, `hip-gable`, `shed` | roof shape |
+| `pitch` | 24.2 | 2 to 60 degrees | roof slope |
+| `ridge` | `auto` | `auto`, `x`, `z` | ridge direction (a shed roof's high edge); hips always run along the longer side |
+| `gableInset` | 0.5 | 0.1 to 0.9 | hip-gable: where the small gable stands, as a share of half the depth |
+| `overhang` | 0.6 | 0 to 3 m | eaves and verges past the walls |
+| `roofing` | `tile` | `tile`, `shingle`, `metal`, `membrane` | covering, courses and caps |
+| `parapet` | 0 | 0 to 3 m | flat roofs: parapet height |
+| `falseFront`, `falseFrontShape` | 0, `square` | 0 to 8 m; `square`, `stepped` | false front over the eaves |
+| `cladding` | `siding` | `clapboard`, `siding`, `brick`, `concrete`, `plaster`, `metal` | lap courses at `near` for clapboard and siding, corrugation for metal, lintels for brick |
+| `bayWidth` | 2.73 | 1 to 12 m | target bay width |
+| `window`, `sill` | [1.69, 1.17], 0.9 | 0.3 to 6 m; 0 to 3 m | window size; sill over its floor |
+| `windowKind` | `sliding` | `sliding`, `double-hung`, `strip` | sash type |
+| `sideWindows` | true | | windows on the end sides |
+| `door`, `doors` | [0.9, 2.1], [-1] | 0.6 to 8 m; bay indices, -1 the middle | door size and which front ground floor bays hold one |
+| `storefront`, `awning` | false, false | | shop windows over a bulkhead with transoms; a canvas awning |
+| `porch`, `porchWidth` | 0, 1 | 0 to 5 m; 0.2 to 1 | front porch depth and width share |
+| `balcony`, `balconyFloor`, `balconyWidth` | 0.91, 1, 0.6 | 0 to 3 m; 1 to 11; 0.2 to 1 | front balcony |
+| `chimney`, `chimneyAt` | false, [0.4, 0] | -0.9 to 0.9 each | a chimney and its place as shares of the half width and depth |
+| `gutters`, `cornerBoards`, `casings`, `bands`, `cornice`, `brackets` | true, false, false, false, false, false | | trim |
+| `detail` | `mid` | `far`, `mid`, `near` | small geometry |
+| `origin`, `yaw`, `seed` | [0, 0, 0], 0, 1 | | placement and the seed of small differences |
+
+Measured sizes the tests hold (packages/procedural/test/building-rules.test.js): Japan's Building Standard Law
+Enforcement Order art. 21 (2.1 m ceilings), art. 22 (a wooden floor 45 cm over the ground) and art. 126 (a 1.1 m
+balcony railing); tile roofs at 4 sun or steeper (JIS A 5208 J-shape tiles, 265 by 235 mm a tile); the International
+Residential Code R311.7.5 (risers at most 7 3/4 in, treads at least 10 in) and R1003.9 (a chimney 3 ft over where it
+leaves the roof and 2 ft over any roof within 10 ft); 1910 ceilings of 8 1/2 to 9 ft, roofs of 6 to 12 in 12 and
+commercial ground floors of 12 to 15 ft. A wrong type throws a `TypeError`, a value out of range a `RangeError`.
+
+Sources: Wonka, Wimmer, Sillion and Ribarsky 2003, "Instant Architecture" (https://doi.org/10.1145/882262.882324);
+Mueller, Wonka, Haegler, Ulmer and Van Gool 2006, "Procedural Modeling of Buildings"
+(https://doi.org/10.1145/1141911.1141931); Aichholzer, Aurenhammer, Alberts and Gaertner 1995, "A Novel Type of
+Skeleton for Polygons" (https://doi.org/10.3217/jucs-001-12-0752); Kelly and Wonka 2011, "Interactive Architectural
+Modeling with Procedural Extrusions" (https://doi.org/10.1145/1944846.1944854); Parish and Mueller 2001, "Procedural
+Modeling of Cities" (https://doi.org/10.1145/383259.383292).
+
+Behind the windows, `interior` builds `rooms` (the default at `mid` and `near`): each storey is split into rooms two
+ken or 12 ft wide on the bay lines, with partition walls and doorways (fusuma openings of 0.86 by 1.8 m, or 32 by 80 in
+doors) and furnishing blocks of the period (chabudai, zabuton and tansu; table, chairs, sideboard, bed and wardrobe; a
+shop counter and shelves; office desks; stacked crates), each placed only where it blocks no window, doorway or door.
+`cells` (the default at `far`) builds one five-faced room cell behind each window instead, the cell that interior
+mapping traces (van Dongen 2008) made as geometry, ten triangles a window; `none` keeps the inner wall faces and
+floors only. The result lists `rooms` (floor rectangle, level, clear height, area), `furniture` (kind and box) and
+`doorways`, all in local metres.
+
+```ts
+import {generateBuilding} from 'margoengine/procedural/building-rules';
+const house = generateBuilding({style: 'western-1910-house'});
+console.log(house.rooms.length, house.furniture.some((f) => f.kind === 'bed')); // 8 true
+```
+
+## Joined plans, dormers and towers (`@margoengine/procedural/building-plans`)
+
+`generateBuildingPlan(options?)` builds a house or hall on an `L`, `T`, `U` or `cross` plan (or `rect`), from the
+building rules: the main block takes every `generateBuilding` option, each wing is a block of its own (`wingWidth`,
+`wingLength`, `wingSide`, or `wings` given by hand with `at` and `turn`), `dormers` stand on the main roof's long
+slopes (`gable`, `shed` or `hip`, each with a glazed window sized to the IRC escape opening and a sill over the 4 in
+step flashing), and a `tower` rises at a corner with a pyramid roof. The blocks are joined: every part of a block that
+lies inside another block (under its roof, or in its roof slab past the walls) is cut away, so roofs meet in valleys
+where their planes cross (45 degrees in plan between equal pitches), walls open into each other at the junction, the
+main roof is cut open behind each dormer, and nothing hidden is left to draw. A dormer is left out where a wing or the
+tower already covers that part of the slope, or where the roof is too low for one.
+
+It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, roofHeight(x, z),
+insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding`; `roofHeight` is the upper envelope of
+the blocks' roofs. `BUILDING_PLAN_SETTINGS` and `buildingPlanOptionsFromSettings` in
+`@margoengine/procedural/building-settings` are its slider rows.
+
+```ts
+import {generateBuildingPlan} from 'margoengine/procedural/building-plans';
+const farmhouse = generateBuildingPlan({style: 'western-1910-house', plan: 'L', wingSide: 'back', ridge: 'x', width: 11, depth: 8, dormers: 2});
+console.log(farmhouse.blocks.map((b) => b.kind).join(' ')); // main wing dormer dormer
+```
+
+## Period vehicles (`@margoengine/procedural/vehicles`)
+
+A 1910 steam locomotive and tender, 1910 freight cars, a 1910 touring car, a Japanese kei truck and a Japanese drink
+vending machine, built from published dimensions. Each returns `parts` (one geometry per material), a `palette` of
+material hints and its measured `size` [length, width, height]; +x forward, +y up, the rail top or ground at y = 0.
+
+- `generateLocomotive({arrangement, driver, stack, tender, fuel})`: Whyte `2-8-0` (default, a Consolidation with 52 in
+  drivers on a 15 ft driving wheelbase), `4-4-0`, `2-6-0` or `4-6-0` on standard gauge (1.435 m, wheel back-to-back
+  1.356 m, 1 in flanges), a diamond or straight stack about 15 ft above the rail, domes, bell, headlight, rods and
+  crossheads, air pump, cab and a tender of cordwood or coal on two arch bar trucks. Returns `wheels` (every wheel
+  set's x, diameter and kind), `drivingWheelbase`, `gauge`, `backToBack`, `coupler` (34 in) and `length` over the
+  couplers. Everything stays inside AAR Plate B (10 ft 8 in by 15 ft 6 in).
+- `generateWagon({kind, length, seed})`: `boxcar` (default, the 36 ft MCB box car), `flatcar`, `log-car` (logs chained
+  between stakes) or `gondola` (heaped coal), with truss rods, grab irons, a brake wheel and two arch bar trucks of
+  5 ft wheelbase on 33 in wheels.
+- `generateTouringCar({top})`: a five seat touring car in the manner of the 1910 Ford Model T: 100 in wheelbase, 56 in
+  track, 30 in artillery wheels, brass radiator and lamps, a folding top `up` or `down`.
+- `generateKeiTruck({gates, color})`: a cab-over kei truck at the Suzuki Carry DA63T's catalogue sizes (3,395 by 1,475
+  by 1,765 mm, inside the kei class's 3.40 by 1.48 by 2.00 m without the door mirrors), 145R12 tyres, a 1.94 by 1.41 m
+  bed at 0.65 m with 0.29 m drop sides `closed` or `open`, and a guard frame.
+- `generateVendingMachine({width, rows, seed})`: an outdoor drink machine 1.83 m high and 0.72 m deep, sample cans and
+  bottles in a lit window, a button under each, and the coin slot, bill slot and change return inside the ADA 2010
+  forward reach (0.381 to 1.219 m).
+- `VEHICLE_SETTINGS`, `vehicleSettingDefaults()` and `vehicleOptionsFromSettings(values)`: slider rows on the shared
+  shape (`locomotive.arrangement`, `wagon.kind`, `kei.gates` and the rest) and their mapping to each generator.
+
+```ts
+import {generateKeiTruck, generateLocomotive, generateWagon, vehicleBounds} from 'margoengine/procedural/vehicles';
+const engine = generateLocomotive();
+console.log(engine.arrangement, engine.wheels.length, engine.drivingWheelbase.toFixed(2)); // 2-8-0 9 4.56
+const truck = generateKeiTruck({gates: 'open'});
+const body = vehicleBounds(truck.parts, ['cab']);
+console.log((body.hi[1] - body.lo[1]).toFixed(2), Object.keys(truck.parts).length); // 1.34 10
+console.log(generateWagon({kind: 'log-car'}).wheels.length); // 4
+```
+
+Sources: Whyte's wheel notation (1900); Master Car Builders' Association standards (gauge, back-to-back, flange, coupler
+height, the 1910 box car) and AAR Plate B; Forney 1906, *Locomotive Dictionary*, and Baldwin Locomotive Works record
+cards 1905-1912; Ford Motor Company Model T specifications 1909-1910; Japan's Road Transport Vehicle Act kei class and
+the Suzuki Carry DA63T catalogue; ADA Standards 2010, 308.2.1.
+
+## Harbour pieces (`@margoengine/procedural/harbour`)
+
+Sea walls, tetrapods, quays, breakwaters, slipways, mooring posts and a coastal fishing boat. Walls, quays and
+breakwaters run along +x with the sea on +z; heights are metres above sea level (y = 0).
+
+- `generateTetrapod({mass, segments})`: four truncated cone legs on tetrahedral axes, one straight up; the size follows
+  the mass (2.3 t/m3) and the Shore Protection Manual's V = 0.28 H^3. Returns `{geometry, height, volume, mass, legs,
+  centre}`.
+- `placeTetrapods({mass, length, slope, crest, toe, crestWidth, z, layers, placement, seed})`: one or more layers of
+  tetrapods on a slope (cot) and crest, at n k_D (1 - P) / V^(2/3) units per m2 (k_D 1.04, P 50 %). With
+  `placement: 'settled'` (the default) each unit is lowered over its spot, from the toe up and layer by layer, in the
+  placing attitudes it tries (standing on three legs, or turned over with a leg down between the units under it) and
+  rests on the bed or the units under it, none overlapping; `settling` reports the least clearance, the units at rest,
+  and the layer thickness and porosity measured on the units (the default armour measures 3.73 m against the Shore
+  Protection Manual's 3.39 m, porosity 56 % against 50 %). `placement: 'pattern'` sets randomly turned units on the
+  layer lines instead (fast, for far views; units may cross). Returns instance `matrices` for one tetrapod mesh,
+  `count`, `area`, `density`, the layer `thickness` (n k_D V^(1/3)), `placement` and `settling`.
+- `generateSeaWall({length, crest, toe, land, crown, batter, landBatter, recurve, joints, stairs, toeTetrapods, detail})`:
+  a gravity concrete wall, default 6 m (the Sanriku coast walls stand 5 to 10 m), with a recurved wave return,
+  expansion joints, land side stairs with handrails and an optional row of toe tetrapods. Parts `concrete`, `trim`,
+  `stairs`, `rails`.
+- `generateQuay({length, width, crest, bottom, bollards, fenders, ladders, detail})`: a block quay with a kerb, bollards
+  every 15 m, rubber fenders and ladders. Parts `concrete`, `kerb`, `bollards`, `fenders`, `ladders`.
+- `generateBreakwater({length, crest, bottom, crestWidth, slope, harbourSlope, armour, crownWall, seed})`: a rubble
+  mound core, a crown wall and two layers of tetrapods on the seaward slope (`armour` instances).
+- `generateSlipway({width, top, foot, gradient, detail})`, `generateMooringPost({height, radius, segments})`.
+- `generateFishingBoat({length, beamRatio, draft, freeboard, bulwark, wheelhouse, mast, lamps, stations, seed})`: a
+  V-bottom FRP coastal boat, 14.5 m by default, length to beam about 4.1, with a flared raked bow, transom, bulwark,
+  wheelhouse with windows all round, mast and stay, rubbing strake and an optional row of fishing lamps. The hull below
+  the waterline is its own part (`bottom`, for antifouling); origin on the waterline at midships, bow toward +x.
+
+```ts
+import {generateFishingBoat, generateSeaWall, generateTetrapod, placeTetrapods} from 'margoengine/procedural/harbour';
+const wall = generateSeaWall({length: 200, crest: 6});
+const armour = placeTetrapods({mass: 20, length: 120});
+console.log(wall.crest, generateTetrapod({mass: 20}).height.toFixed(2), armour.count); // 6 3.14 420
+console.log(armour.placement, armour.settling!.minGap >= 0); // settled true
+const boat = generateFishingBoat();
+console.log((boat.length / boat.beam).toFixed(2), Object.keys(boat.parts).length); // 4.08 7
+```
+
+Sources: US Army Corps of Engineers 1984, *Shore Protection Manual*, vol. II ch. 7 (tetrapod volume, armour layer
+thickness, placing density and slopes); US Army Corps of Engineers 2002, *Coastal Engineering Manual* EM 1110-2-1100,
+part VI ch. 5 (rubble mound and seawall sections); CIRIA, CUR and CETMEF 2007, *The Rock Manual* C683, ch. 6 and 9
+(placing armour from the toe up); Visscher and Bolsterli 1972, "Random packing of equal and unequal spheres in two and
+three dimensions", Nature 239, 504-507 (https://doi.org/10.1038/239504a0); Jodrey and Tory 1985, "Computer simulation of
+close random packing of equal spheres", Phys. Rev. A 32, 2347 (https://doi.org/10.1103/PhysRevA.32.2347); Mirtich 1996,
+*Impulse-based Dynamic Simulation of Rigid Body Systems*, PhD thesis, UC Berkeley (conservative advancement); Danel 1953, "Tetrapods", Proc. 4th Coastal Engineering Conference
+(https://doi.org/10.9753/icce.v4.28); Gulbrandsen 2004, *Fishing Boat Designs: 2. V-bottom Boats*, FAO Fisheries
+Technical Paper 134 rev. 2; Fyson (ed.) 1985, *Design of Small Fishing Vessels* (FAO / Fishing News Books).
+
+## Building and harbour sliders (`@margoengine/procedural/building-settings`)
+
+`BUILDING_SETTINGS` and `HARBOUR_SETTINGS` are slider rows on the shared shape (name, group, kind, default, range,
+step, unit, about, live). None is live: each rebuilds geometry. `buildingOptionsFromSettings(values)` and
+`harbourOptionsFromSettings(values)` turn a panel's values into generator options, setting only the names given so the
+chosen style keeps its own defaults; `buildingSettingDefaults()` and `harbourSettingDefaults()` give a fresh panel.
+
+```ts
+import {buildingOptionsFromSettings} from 'margoengine/procedural/building-settings';
+import {generateBuilding} from 'margoengine/procedural/building-rules';
+const block = generateBuilding(buildingOptionsFromSettings({style: 'western-1910-brick', storeys: 2, cornice: 'on'}));
+console.log(block.floors.length); // 2
+```
+
+## Northern Rockies conifers (`@margoengine/procedural/conifers`)
+
+Western white pine, western larch, western red cedar, Douglas-fir and grand fir, the timber of the 1910 Big Burn country,
+at any age, live, as snags or fire-killed. Sizes are measured forestry, not guesses: height and diameter follow the
+Wykoff height-diameter equation, crown width Crookston's crown width equation (both with the Inland Empire coefficients
+of the Forest Vegetation Simulator), the live crown ratio falls with age and rises with shade tolerance (larch shortest,
+cedar longest), and the branches stand in annual whorls on the species' height growth curve, wide apart low on the stem
+and close at the top of an old tree (cedar spirals, its branches sweep down and up, its leader nods). Bark ridges are as
+deep as the species' bark (thick plated larch and furrowed Douglas-fir, thin white pine) and the butt flares (cedar's
+buttress most).
+
+- `coniferForm(species, {age, height, basalArea})` (also in `/conifer-species`, a small data entry): `{height, dbh,
+  crownRatio, crownLength, crownBase, crownWidth, whorlSpacing, barkThickness}` in metres. `age` is years or
+  `'sapling'` (15), `'pole'` (40), `'mature'` (100, the default) or `'old'` (250).
+- `generateConiferMesh(species, {age, height, basalArea, detail, condition, seed})`: `{trunk, canopy, form, whorls}`,
+  standing on y = 0. `detail` 2 (near: limbs, sprays and cross bands, at most about 12,000 triangles), 1 (middle, about
+  1,000) or 0 (crown tiers). `condition` `'live'`, `'snag'` (broken top, branch stubs, no needles) or `'burnt'`
+  (bare limbs, a fire scar at the butt).
+- `generateConiferImposter(mesh, {size, needles, bark, cards})`: three crossed cards and an RGBA image of the tree's
+  silhouette baked side on (needles and bark, darker deeper in the crown, alpha the coverage); the right half of the
+  image is the needle colour solid, for the nearer levels (`solidUv`).
+- `coniferLevels(species, options)`: the three scatter LOD rings, near, middle and imposter, with the canopy's
+  `textures` (draw the canopy white: its colour is in the image). Dead trees draw their stem at detail 0 far out.
+- `parseConiferKey(key)`: what a biome mesh key names. `@margoengine/biomes` draws `procedural:<species>`,
+  `procedural:<species>/<age>`, `procedural:<species>/snag`, `procedural:<species>/burnt`, `procedural:conifer-snag`
+  and `procedural:burnt-trunk` with these levels; the rockies presets use the `/pole` keys. Each part takes the wind and
+  the burnt and flooded plant states like any other.
+
+```ts
+import {coniferLevels, generateConiferMesh, parseConiferKey} from 'margoengine/procedural/conifers';
+const fir = generateConiferMesh('douglas-fir', {age: 'mature'});
+console.log(fir.form.height.toFixed(1), (fir.form.dbh * 100).toFixed(0), fir.form.crownWidth.toFixed(1)); // 28.6 55 6.9
+const larch = coniferLevels('western-larch', {age: 'pole'});
+console.log(larch.canopy.length, larch.textures?.baseColor.width); // 3 256
+console.log(parseConiferKey('procedural:western-red-cedar/old')?.age); // old
+```
+
+`CONIFER_SETTINGS` (`@margoengine/procedural/conifer-settings`) are the slider rows on the shared shape (species, age,
+basal area, condition, seed, imposter size; all rebuild); `coniferOptionsFromSettings(values)` gives the species and
+the options.
+
+```ts
+import {coniferOptionsFromSettings} from 'margoengine/procedural/conifer-settings';
+const {species, options} = coniferOptionsFromSettings({species: 'grand-fir', age: 250, condition: 'snag'});
+console.log(species, options.age, options.condition); // grand-fir 250 snag
+```
+
+Sources: Wykoff, Crookston and Stage 1982, *User's guide to the Stand Prognosis Model*, USDA Forest Service INT-GTR-133;
+Keyser (comp.), *Inland Empire (IE) Variant Overview, Forest Vegetation Simulator*, USDA Forest Service (Tables 4.1.1,
+4.1.2 and 4.4.1; Crookston 2003 crown width); Burns and Honkala (tech. coords.) 1990, *Silvics of North America, Vol. 1,
+Conifers*, Agriculture Handbook 654; Minore 1979, *Comparative autecological characteristics of northwestern tree
+species*, PNW-GTR-87; Kozak 1988, "A variable-exponent taper equation", Can. J. For. Res. 18(11); Richards 1959, "A
+flexible growth function for empirical use", J. Exp. Bot. 10(2); Hallé, Oldeman and Tomlinson 1978, *Tropical Trees and
+Forests*; Décoret, Durand, Sillion and Dorsey 2003, "Billboard clouds for extreme model simplification", ACM TOG 22(3).
+
+## The 1903 Wright Flyer and its four flights (`@margoengine/procedural/flyer`)
+
+`generateWrightFlyer(options?)` builds the 1903 Wright Flyer from its published dimensions: double-covered cambered
+wings (camber 1 in 20, peaking at 30 % of the chord) with the tips drooped 10 in, the struts between them, two skids
+running forward and up to the biplane elevator, twin rudders behind, a rib every foot over and under each wing, the
+crossed bracing wires in every bay, the engine right of centre (crankcase, four forward-pointing cylinders, flywheel,
+sprocket, the upright flat-tube radiator and the fuel tank) with its chains and chain tubes, the pilot's hip cradle
+left of centre and two pusher propellers 8 ft 6 in across. Each part is its own `GeometryData` so fabric, wood and
+metal get their own materials: `wings`, `frame`, `ribs`, `wires`, `engine`, `cradle`, and the
+moving parts `elevator`, `rudder` and `propellers` as `{geometry, pivot, axis}` (each propeller adds `spin` about +Z, -1 for
+the left and +1 for the right: they turn opposite ways, each with blades pitched to pull the Flyer forward when it turns
+its own way). The Flyer's own space is glTF's: +Z forward (the elevator end), +Y up and the skids' lowest point on
+y = 0, so the prone pilot's right is -X. The engine sits at -X, right of the pilot as in 1903; the cradle, `pilot`
+(where a prone pilot lies) and the left propeller (`propellers[0]`) are at +X.
+
+`wrightFlightPose(n, t, options?)` is the pose of flight `n` (1 to 4) at `t` seconds after release: the run of about
+40 ft on the 60 ft rail, uniformly accelerated to the flight's groundspeed; in the air a rise and fall with a pitching
+undulation of about 3 s (the "up and down" course of the diaries; damped on the long fourth flight), pitch as a 4
+degree angle of attack plus the climb angle through the air; then a short slide. It returns `{position, pitch, roll,
+elevator, propeller, phase, duration}`; `position` is `[0, height of the skids, distance from the rail's start]`.
+`WRIGHT_FLIGHTS_1903` holds the flights (120 ft in 12 s, 175 ft in 12 s, 200 ft in 15 s, 852 ft in 59 s) and
+`WRIGHT_RAIL` the rail.
+
+The film's other parts: `lever` is the elevator hand lever at the pilot's left hand (a moving part about +X through its
+foot; turn it with the elevator), and `restraint.tie` the point at the rear of the skids where the restraining wire was
+hooked. `restrainingWire(tie, stake, slack?, ground?, segments?)` draws that wire to a stake as steel segments: `slack`
+0 taut (held before release), 1 hanging an eighth of its length at the middle (let go), lying on `ground` where it would
+dip below it. `generateWrightFlyer({wrecked: true, seed?})` is the Flyer after the gust of 17 December: about a third
+of the right wings' ribs broken out, the right panels crushed down and swept back, outer uprights and the right
+propeller snapped, the engine tipped 14 degrees and slid back on its bed with its chain tubes; the same seed gives the
+same wreck. `wrightGustRoll(t, options?)` is that gust: the left wing lifts over `lift` seconds (1.2), then the Flyer
+turns over its right tip `turns` times (1) in `seconds` (4), its centre at half the span times |sin roll| above the
+sand, carried sideways and drifting back; it returns `{position, pitch, roll, yaw, phase, duration}` in the Flyer's
+own axes (`phase` standing, rolling or rest).
+
+```ts
+import {generateWrightFlyer, wrightFlightPose, wrightGustRoll, restrainingWire, WRIGHT_FLIGHTS_1903} from 'margoengine/procedural/flyer';
+const flyer = generateWrightFlyer();
+const pose = wrightFlightPose(1, 12);
+console.log(flyer.size[0].toFixed(2), flyer.propellers[0].spin, pose.phase, WRIGHT_FLIGHTS_1903.length); // 12.29 -1 air 4
+const wreck = generateWrightFlyer({wrecked: true});
+const wire = restrainingWire(flyer.restraint.tie, [0, 0.25, flyer.restraint.tie[2] - 3], 1, 0);
+console.log(wrightGustRoll(10).phase, wreck.ribs.indices.length < flyer.ribs.indices.length, wire.indices.length > 0); // rest true true
+```
+
+| Option | Default | Range | Meaning |
+| --- | --- | --- | --- |
+| `span` | 12.29 | 4 to 30 m | wingspan (40 ft 4 in) |
+| `chord`, `gap` | 1.98, 1.88 | 0.5 to 5 m | wing chord (6 ft 6 in) and the gap between the wings (6 ft 2 in) |
+| `camber` | 0.05 | 0 to 0.15 | camber as a share of the chord |
+| `droop` | 0.254 | 0 to 1 m | how far the tips sit below the centre |
+| `propeller` | 2.59 | 0.5 to 5 m | propeller diameter |
+| `segments` | 48 | 8 to 128 | spanwise segments of each wing |
+| `wrecked` | false | | the Flyer as the gust of 17 December left it |
+| `seed` | 1903 | | the wreck's broken ribs and crumpling |
+
+Flight options: `wind` (12.07 m/s, 27 mph), `railTop` (0.2 m, the skids' height on the rail), `rpm` (350), `warmup`
+(4 s of propeller turning before release). A value out of range or a flight that is not 1 to 4 throws a `RangeError`.
+Limits: chains are plain runs (no links), the engine has no valve gear or pipework, wing warping is not modelled,
+the wreck is a seeded deformation (normals are kept from the whole Flyer), the gust roll is a kinematic path, not a
+simulation, and the flight path is a smooth fit to the recorded distances and times, not a flight simulation.
+
+Sources: National Air and Space Museum, *1903 Wright Flyer*, object A19610048000
+(https://airandspace.si.edu/collection-objects/1903-wright-flyer/nasm_A19610048000), span, length, height, weight and
+the layout; National Park Service, *1903: The First Flight* (https://www.nps.gov/wrbr/learn/historyculture/thefirstflight.htm),
+the wind, the rail, the distances and times and the first flight's groundspeed and airspeed; Jakab, P. L. 1990,
+*Visions of a Flying Machine: The Wright Brothers and the Process of Invention* (Smithsonian Institution Press), chord,
+gap, camber, droop and the propellers; Hobbs, L. S. 1971, *The Wright Brothers' Engines and Their Design*
+(Smithsonian Annals of Flight 5), the engine's layout; McFarland, M. W. (ed.) 1953, *The Papers of Wilbur and Orville Wright*
+(McGraw-Hill), Orville's diary of 17 December 1903.
+
 ## Rectangular building shape grammar
 
 The optional `@margoengine/procedural/buildings` entry applies a restricted,
@@ -628,15 +1301,16 @@ bays pack floor,side,start,bottom,width,height,windowWidth,windowHeight. Facade
 sides run +X at -Z, +Z at +X, -X at +Z, -Z at -X. Roof ridge runs along local Z.
 Wall rings and flush panes partition the shell without overlapping faces. There
 are no interior slabs, doors, wall thickness, collision data, UVs, arbitrary
-footprints, recursive user productions or context/occlusion queries. Separate
-planar faces have separate vertices; boundary T junctions require welding and
-subdivision before use as a manifold solid in downstream tooling.
+footprints, recursive user productions or context/occlusion queries. Each planar
+face shares its vertices, and every face is cut at the same bay, window, floor and
+eave lines, so each edge meets exactly one opposite edge: no T junctions, and
+welding by position gives a closed 2-manifold solid.
 
 One lazy buildings.wasm; no import-time fetch. Independent of GPU resources and
 identical on WebGPU/WebGL2 before and after loss. Synchronous generation checks
 signal before work; use a worker for interruption. Dispose is idempotent and owned
 outputs survive disposal. Errors are coded with help links. JS 1502 B gzip;
-Wasm 31252 B raw / 12794 B gzip. Native and browser area/volume, partition,
+Wasm 38840 B raw / 15526 B gzip. Native and browser area/volume, partition,
 ownership and hostile-input tests; real Montreal CityJSON supplies measured
 envelope dimensions only. Generated facades and other controls remain stand-ins.
 Two shared sine/cosine evaluations equal the per-vertex transform oracle with
@@ -699,7 +1373,14 @@ with identical output; tiny grids select the direct stencil when cheaper. Counts
 include intermediate and centre reads, exclude initialization, copies, allocation
 and compilation. No elapsed-time, SIMD gain or rival-speed claim is made.
 
-Caves entry: 1433 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 24844 B gzip, strictly below 25000 B.
+Caves entry: 1433 B min+gzip (ceiling 1680 B); caves.wasm 27405 B raw / 11564 B gzip. Core plus stage 24797 B gzip, strictly below 25000 B.
+
+## Baked textures after a device restore
+
+A baked texture (`WebGPUBakedTexture.texture`, and the four maps of a `PBRTextureSet`) is made by the baker on the device the baker was created
+with, and you own it until you call `dispose()`. A baker ends when its device is lost: its next `bake` rejects with a `'failed'` error that says to
+create a baker on the replacement device. After `engine.rebootDevice()` create a new baker from `engine` and bake again; nothing of the lost
+device is carried over.
 
 ## Texture baker and WebGL2 tiers
 

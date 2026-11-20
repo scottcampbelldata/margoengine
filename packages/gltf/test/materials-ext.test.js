@@ -1,0 +1,785 @@
+// KHR_materials_iridescence, anisotropy, diffuse_transmission (extended materials), KHR_materials_variants
+// and transmission under ambient hooks. The BRDF terms are checked against tests/support/khr-brdf.js (written from the
+// specs) here on the CPU side and in WGSL on a real GPU by scripts/gltf-pbr-materials-gpu-check.js.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
+import { Engine, TransformStore } from '../../core/dist/extension.js';
+import { GLTFAsset, loadGLTF, parseGLTF } from '../dist/pbr.js';
+import { extendedMaterials } from '../dist/extended.js';
+import { Shadows } from '../../shadows/dist/index.js';
+import { Clustered } from '../../clustered/dist/index.js';
+import { LocalShadows } from '../../clustered/dist/shadows.js';
+import { EnvironmentLighting } from '../../environment/dist/index.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
+import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
+import {
+  anisotropicD,
+  anisotropicV,
+  isotropicD,
+  iridescentFresnel,
+  sensitivity,
+  correlatedV,
+  separableV,
+  vec,
+} from '../../../tests/support/khr-brdf.js';
+import {
+  extendedPlan,
+  extendedShader,
+  extendedTextureLimit,
+  factorPhysicalShader,
+  physicalShader,
+  sparsePhysicalShader,
+  transmissiveShader,
+  surfaceTintPBR,
+  viewShader,
+} from '../src/shader.ts';
+import { lightPBR } from '../../shared/pbr-hooks.js';
+
+const near = (a, b, tolerance, label) =>
+  [a]
+    .flat()
+    .forEach((v, i) => assert.ok(Math.abs(v - [b].flat()[i]) <= tolerance, `${label}[${i}]: ${v} vs ${[b].flat()[i]}`));
+const textures = (code) => code.match(/var\s*\w+\s*:\s*texture_(?!storage)/g)?.length ?? 0;
+const features = { iridescence: true, anisotropy: true, diffuseTransmission: true, bump: false, scatter: false };
+// A recorded writeBuffer's hex bytes as floats (copied: Buffer.from may hand out a slice of a shared pool).
+const floatsOf = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer);
+
+test('all physical map bindings survive base-layer packing and model cleanup', async () => {
+  const map = (index) => ({ index });
+  const { gpu, engine, model, view } = await scene(
+    [
+      {
+        pbrMetallicRoughness: { baseColorTexture: map(0), metallicRoughnessTexture: map(1) },
+        normalTexture: map(2),
+        occlusionTexture: map(3),
+        emissiveTexture: map(4),
+        extensions: {
+          KHR_materials_clearcoat: {
+            clearcoatFactor: 1,
+            clearcoatTexture: map(5),
+            clearcoatRoughnessTexture: map(6),
+            clearcoatNormalTexture: map(7),
+          },
+          KHR_materials_transmission: { transmissionFactor: 0.5, transmissionTexture: map(8) },
+          KHR_materials_sheen: { sheenColorTexture: map(9), sheenRoughnessTexture: map(10) },
+          KHR_materials_specular: { specularTexture: map(11), specularColorTexture: map(12) },
+        },
+      },
+    ],
+    {
+      doc: {
+        textures: Array.from({ length: 13 }, (_, source) => ({ source })),
+        images: Array.from({ length: 13 }, () => ({})),
+      },
+      images: Array.from({ length: 13 }, () => ({ width: 1, height: 1, close() {} })),
+    },
+  );
+  try {
+    const r = model['resources'][0];
+    assert.equal(r.packedBase.texture.format, 'rgba32float');
+    assert.equal(r.packedBase.texture.depthOrArrayLayers, 5);
+    assert.equal(r.packedBase.params.size, 160);
+    const log = gpu.record(() => {
+      view.begin(0);
+      model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+    });
+    const group = log.find((e) => e[0] === 'group' && e[2].entries.some((entry) => entry.binding === 25));
+    assert.deepEqual(
+      group[2].entries.map((e) => e.binding),
+      [0, 1, ...Array.from({ length: 16 }, (_, i) => i + 10)],
+    );
+    assert.equal(r.views.length, 13, 'original views remain available to shadow and custom-hook consumers');
+    let released = 0;
+    for (const resource of [r.packedBase.texture, r.packedBase.params]) {
+      const original = resource.destroy;
+      resource.destroy = () => {
+        released++;
+        original.call(resource);
+      };
+    }
+    model.dispose();
+    assert.equal(released, 2, 'cleanup retires the exact packed array and parameter buffer');
+  } finally {
+    model.dispose();
+    engine.dispose();
+  }
+});
+
+async function scene(materials, extra = {}) {
+  const gpu = mockGPU(),
+    store = await TransformStore.create(64),
+    renderer = { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {} };
+  const engine = new Engine(
+    { width: 128, height: 96, clientWidth: 128, clientHeight: 96 },
+    store,
+    renderer,
+    { position: [0, 0, 4], target: [0, 0, 0] },
+    null,
+  );
+  engine.camera.update(4 / 3, true);
+  extra.configureGPU?.(gpu);
+  const fixture = animatedTriangle(),
+    primitive = fixture.doc.meshes[0].primitives[0],
+    uv = new Float32Array([0, 0, 1, 0, 0.5, 1]);
+  fixture.buffers.push(uv);
+  fixture.doc.buffers.push({ byteLength: uv.byteLength });
+  fixture.doc.bufferViews.push({ buffer: fixture.buffers.length - 1, byteLength: uv.byteLength });
+  primitive.attributes.TEXCOORD_0 =
+    fixture.doc.accessors.push({
+      bufferView: fixture.doc.bufferViews.length - 1,
+      componentType: 5126,
+      count: 3,
+      type: 'VEC2',
+    }) - 1;
+  Object.assign(fixture.doc, {
+    materials,
+    meshes: materials.map((_, material) => ({
+      primitives: [{ ...primitive, material, ...extra.primitive?.(material) }],
+    })),
+    nodes: materials.map((_, mesh) => ({ mesh, translation: [0, 0, -mesh] })),
+    ...extra.doc,
+  });
+  delete fixture.doc.skins;
+  delete fixture.doc.animations;
+  const model = parseGLTF(
+    engine,
+    fixture.doc,
+    fixture.buffers,
+    extra.images ?? [],
+    extra.plain ? {} : { materials: extendedMaterials },
+  );
+  store.tick(false);
+  return { gpu, engine, model, view: context(gpu, { samples: 4, format: 'rgba16float', depthFormat: 'depth32float' }) };
+}
+
+test('non-mip glTF samplers preserve minification independently from magnification', async () => {
+  for (const minFilter of [9728, 9729]) {
+    const descriptors = [],
+      magFilter = minFilter === 9728 ? 9729 : 9728,
+      { engine, model } = await scene([{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }], {
+        doc: { textures: [{ source: 0, sampler: 0 }], images: [{}], samplers: [{ minFilter, magFilter }] },
+        images: [{ width: 4, height: 4, close() {} }],
+        configureGPU(gpu) {
+          const create = gpu.device.createSampler;
+          gpu.device.createSampler = (descriptor) => {
+            descriptors.push({ ...descriptor });
+            return create(descriptor);
+          };
+        },
+      });
+    try {
+      const sampler = descriptors.find((s) => s.lodMaxClamp !== undefined);
+      assert.equal(sampler.minFilter, minFilter === 9728 ? 'nearest' : 'linear');
+      assert.equal(sampler.magFilter, magFilter === 9728 ? 'nearest' : 'linear');
+      assert.equal(sampler.mipmapFilter, 'nearest', 'sample only level zero without forcing magnification');
+      assert.equal(sampler.lodMaxClamp, 0.25, 'a positive LOD keeps minification active, nearest mip stays zero');
+    } finally {
+      model.dispose();
+      engine.dispose();
+    }
+  }
+});
+
+for (const variant of ['physical', 'extended', 'factors']) {
+  test(`${variant} clearcoat without a normal map retains the geometric normal`, async () => {
+    for (const mapped of variant === 'factors' ? [false] : [false, true]) {
+      const extensions = {
+        KHR_materials_clearcoat: {
+          clearcoatFactor: 1,
+          ...(mapped ? { clearcoatNormalTexture: { index: 0, scale: 1.75 } } : {}),
+        },
+      };
+      if (variant === 'extended') extensions.KHR_materials_iridescence = { iridescenceFactor: 0.4 };
+      const { gpu, engine, model, view } = await scene(
+        [{ extensions }],
+        mapped
+          ? {
+              doc: { textures: [{ source: 0 }], images: [{}] },
+              images: [{ width: 1, height: 1, close() {} }],
+            }
+          : {},
+      );
+      try {
+        const material = model.primitives[0].material;
+        if (variant === 'factors') material.maps.length = 5;
+        view.begin(0);
+        const authoredScale = material.physical[2],
+          log = gpu.record(() => model.draw(view.c, 'beauty', view.c.color, view.c.depth)),
+          frame = model['resources'][0].uniform.contents;
+        assert.equal(frame[variant === 'extended' ? 274 : 210], mapped ? 1.75 : 0);
+        assert.equal(material.physical[2], authoredScale, 'Rendering must not mutate authored normal scale');
+      } finally {
+        engine.dispose();
+      }
+    }
+  });
+}
+
+test('factor-only clearcoat shader uses an exact neutral tangent-space normal', () => {
+  assert.match(factorPhysicalShader(), /let cm=vec4f\(0\.5,0\.5,1,1\)\.xyz\*2-1/);
+});
+
+test('CPU reference: anisotropic GGX reduces to isotropic GGX at strength 0 and stays normalized', () => {
+  const n = [0, 0, 1],
+    t = [1, 0, 0],
+    b = vec.cross(n, t);
+  for (const alpha of [0.1, 0.3, 0.7])
+    for (const theta of [0, 0.4, 1.1]) {
+      const h = [Math.sin(theta) * 0.6, Math.sin(theta) * 0.8, Math.cos(theta)];
+      near(
+        anisotropicD(h[2], vec.dot(t, h), vec.dot(b, h), alpha, alpha),
+        isotropicD(h[2], alpha),
+        1e-9 * isotropicD(h[2], alpha),
+        'D',
+      );
+    }
+  // Projected-area normalization of a microfacet distribution: integral of D(h) (n.h) over the hemisphere is 1.
+  for (const [at, ab] of [
+    [0.5, 0.2],
+    [0.9, 0.3],
+    [0.3, 0.3],
+  ]) {
+    let sum = 0;
+    const steps = 600;
+    for (let i = 0; i < steps; i++)
+      for (let j = 0; j < steps; j++) {
+        const cos = (i + 0.5) / steps,
+          phi = ((j + 0.5) / steps) * 2 * Math.PI,
+          sin = Math.sqrt(1 - cos * cos);
+        sum +=
+          anisotropicD(cos, sin * Math.cos(phi), sin * Math.sin(phi), at, ab) *
+          cos *
+          (1 / steps) *
+          ((2 * Math.PI) / steps);
+      }
+    near(sum, 1, 0.01, `integral ${at}/${ab}`);
+  }
+  // Height-correlated visibility at strength 0 is the isotropic height-correlated Smith term 0.5 / (NL sqrt(NV^2 (1 - a^2) + a^2)
+  // + NV sqrt(NL^2 (1 - a^2) + a^2)), the form gltf/pbr's isotropic path uses since 2026-11-11 (correlatedV).
+  const v = vec.normalize([0.3, 0.5, 0.4]),
+    l = vec.normalize([-0.2, 0.1, 0.7]),
+    nv = vec.dot(n, v),
+    nl = vec.dot(n, l);
+  for (const alpha of [0.05, 0.25, 0.8]) {
+    const a2 = alpha * alpha,
+      iso = 0.5 / (nl * Math.sqrt(nv * nv * (1 - a2) + a2) + nv * Math.sqrt(nl * nl * (1 - a2) + a2));
+    near(
+      anisotropicV(nl, nv, vec.dot(b, v), vec.dot(t, v), vec.dot(t, l), vec.dot(b, l), alpha, alpha),
+      Math.min(iso, 1),
+      1e-9,
+      `V ${alpha}`,
+    );
+    near(correlatedV(nl, nv, alpha), iso, 1e-12, `isotropic V ${alpha}`);
+    assert.ok(iso >= separableV(nl, nv, alpha), `height-correlated V is never below the separable one (${alpha})`);
+  }
+  near(correlatedV(1, 1, 0.3), 0.25, 1e-12, 'height-correlated V at normal incidence');
+  near(separableV(1, 1, 0.3), 0.25, 1e-12, 'separable V at normal incidence');
+});
+
+test('CPU reference: thin-film sensitivity and Fresnel limits from the iridescence spec', () => {
+  // The Gaussian fits are normalized so that Y integrates to 1 at zero path difference (CIE Y of equal-energy white).
+  const rgb = sensitivity(0, [0, 0, 0]),
+    Y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  near(Y, 1, 2e-3, 'Y');
+  // At normal incidence a film with the outside IOR has no first interface (R12 = 0): the result is the base's F0, up to
+  // the interference terms the spec's 1e-5 floor on R12 R23 leaves (amplitude sqrt(1e-5) x 2 x sensitivity).
+  for (const f0 of [0.02, 0.04, 0.5])
+    near(iridescentFresnel([f0, f0, f0], 1, 400, 1), [f0, f0, f0], 0.012, `no film, F0 ${f0}`);
+  // A real film colours the reflection: the channels differ, and they stay in [0, 1] for dielectric bases.
+  const F = iridescentFresnel([0.04, 0.04, 0.04], 0.9, 400, 1.3);
+  assert.ok(Math.max(...F) - Math.min(...F) > 0.01 && F.every((v) => v >= 0 && v <= 1), String(F));
+});
+
+test('binding plan: shared glTF textures bind once, at most 8 extension textures, unused maps fall back to defaults', () => {
+  const maps = Array.from({ length: 18 }, (_, k) => (k < 5 ? { index: k } : { index: 100 + (k % 4) }));
+  const plan = extendedPlan(maps, features);
+  assert.deepEqual(plan.slots, [-1, -1, -1, -1, -1, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, -1, -1, -1]);
+  const distinct = extendedPlan(
+    Array.from({ length: 18 }, (_, k) => ({ index: k })),
+    features,
+  );
+  assert.deepEqual(
+    distinct.slots.slice(5),
+    [0, 1, 2, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1, -1, -1, -1],
+    'extension slots beyond the limit use their defaults',
+  );
+  assert.equal(extendedTextureLimit, 8);
+  const code = extendedShader(distinct);
+  assert.equal(textures(code), 1 + 8);
+  assert.equal(distinct.packedBase, true);
+  for (let slot = 0; slot < 5; slot++) assert.match(code, new RegExp('margoBaseSample\\(' + slot + ','));
+  for (let binding = 0; binding < 8; binding++) assert.ok(code.includes('var margoMap' + binding + ':texture_2d<f32>'));
+  assert.match(
+    code,
+    /s\.ir=vec4f\(margoIridescence\([^;]*vec4f\(1\)\.g\),f\.iri\.y\),f\.iri\.x\*vec4f\(1\)\.r\)/,
+    'iridescence maps past the limit read the spec defaults',
+  );
+  assert.match(
+    code,
+    /margoAnisotropy\(s\.n,t,b,vec4f\(1,0\.5,1,1\)\.xyz\)/,
+    'anisotropy default texel (1, 0.5, 1): +X direction, full strength',
+  );
+  assert.equal(extendedShader(distinct), code, 'cached per plan');
+});
+
+test('extended shaders: hook points once, only used features compiled, worst case 12 sampled textures reserves units for compatibility storage and shadow aliases', async () => {
+  const points = [
+    'direct+ambient(s)',
+    'var color=',
+    'if(f.settings.w<0.5) {color=pbrNeutral(max(color,vec3f(0)));',
+    'return vec4f(color,',
+    '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',
+  ];
+  for (const iridescence of [false, true])
+    for (const anisotropy of [false, true])
+      for (const diffuseTransmission of [false, true]) {
+        const code = extendedShader(extendedPlan([], { iridescence, anisotropy, diffuseTransmission }));
+        for (const point of [
+          ...points,
+          'fn margoAmbientLayers(',
+          'fn margoAmbientTerm(i:Out,s:Surface,v:vec3f)->vec3f {return vec3f(0);}',
+        ])
+          assert.equal(code.split(point).length, 2, point);
+        assert.equal(code.includes('fn margoIridescence('), iridescence);
+        assert.equal(code.includes('fn margoAnisotropy('), anisotropy);
+        assert.equal(code.includes('var back=s;'), diffuseTransmission);
+        assert.equal(textures(code), 5);
+      }
+  // Every map of every extension, all distinct (18 textures), with shadows, environment IBL and clustered LocalShadows.
+  const gpu = mockGPU(),
+    store = await TransformStore.create(64),
+    renderer = { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {} };
+  const engine = new Engine(
+    { width: 64, height: 64, clientWidth: 64, clientHeight: 64 },
+    store,
+    renderer,
+    { position: [0, 0, 4], target: [0, 0, 0] },
+    null,
+  );
+  const shadows = new Shadows({ resolution: 64 }),
+    clustered = new Clustered({ grid: [4, 3, 2] });
+  clustered.shadow = new LocalShadows({ lights: clustered });
+  const ibl = new EnvironmentLighting({
+    device: gpu.device,
+    disposed: false,
+    version: 0,
+    specularView: {},
+    sampler: {},
+    brdfLut: {},
+    shBuffer: {},
+    paramsBuffer: {},
+    restore: () => Promise.resolve(),
+  });
+  const worst = extendedShader(
+    extendedPlan(
+      Array.from({ length: 18 }, (_, k) => ({ index: k })),
+      features,
+    ),
+  );
+  const lit = [shadows.pbr(2), clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, worst);
+  assert.equal(textures(lit), 12, 'worst case: 9 material + shadow cascades + IBL cube + local shadow atlas');
+  assert.equal(
+    textures([shadows.pbr(2), clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, physicalShader())),
+    16,
+    'the raw physical source contract retains its original separate bindings',
+  );
+  // Layered hooks: the ambient hook becomes margoAmbientTerm, local lights margoLocal0 on the transmitted-out surface.
+  assert.match(lit, /fn margoAmbientTerm\(i:Out,s:Surface,v:vec3f\)->vec3f \{return iblShade\(/);
+  assert.match(
+    lit,
+    /let margoAmbient=margoAmbientLayers\(i,s,v\);var color=margoLocal0\(i,margoFront\(s\),v\)\+direct\*margoDirectVisible\+ambient\(s\)\+s\.emissive\+margoAmbient;/,
+  );
+  assert.match(lit, /\nfn margoLocal0\(i:Out,s:Surface,v:vec3f\)->vec3f \{return clusterLighting\(/);
+  // The physical variant without transmission keeps the inline hooks (unchanged text, GPU-call proofs).
+  assert.match(
+    [clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, physicalShader()),
+    /let margoAmbient=iblShade\([^;]*;var color=clusterLighting\(/,
+  );
+  shadows.dispose();
+  clustered.dispose();
+  ibl.dispose();
+  engine.dispose();
+});
+
+test('extended material: uniform rows, 1232-byte buffer, only used textures bound (shared once), extended shader', async () => {
+  const { gpu, engine, model, view } = await scene(
+    [
+      {
+        normalTexture: { index: 0 },
+        extensions: {
+          KHR_materials_iridescence: {
+            iridescenceFactor: 0.8,
+            iridescenceIor: 1.8,
+            iridescenceThicknessMinimum: 120,
+            iridescenceThicknessMaximum: 450,
+            iridescenceThicknessTexture: { index: 1 },
+          },
+          KHR_materials_anisotropy: {
+            anisotropyStrength: 0.6,
+            anisotropyRotation: 0.5,
+            anisotropyTexture: { index: 1 },
+          },
+          KHR_materials_diffuse_transmission: {
+            diffuseTransmissionFactor: 0.4,
+            diffuseTransmissionColorFactor: [0.9, 0.8, 0.7],
+            diffuseTransmissionTexture: { index: 0 },
+          },
+        },
+      },
+    ],
+    {
+      doc: { textures: [{ source: 0 }, { source: 1 }], images: [{}, {}] },
+      images: [
+        { width: 1, height: 1, close() {} },
+        { width: 1, height: 1, close() {} },
+      ],
+    },
+  );
+  const m = model.primitives[0].material;
+  assert.deepEqual(m.extended, features);
+  assert.equal(m.maps.length, 21);
+  assert.equal(m.uvt.length, 168);
+  near(
+    m.physical.slice(12),
+    [0.8, 1.8, 120, 450, 0.6, Math.cos(0.5), Math.sin(0.5), 0, 0.4, 0.9, 0.8, 0.7, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    1e-7,
+    'iri, aniso, dtr, bump, scatter, extinction',
+  );
+  const log = gpu.record(() => {
+    view.begin(0);
+    model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+  });
+  const module = log.find((e) => e[0] === 'module')[2].code,
+    groups = log.filter((e) => e[0] === 'group');
+  assert.ok(module.includes('uvt:array<vec4f,42>') && module.includes('fn margoIridescence('));
+  // Material group: base maps 0-9 plus texture 1 (thickness + anisotropy) and texture 0 (diffuse transmission) once each.
+  assert.deepEqual(
+    groups[1][2].entries.map((e) => e.binding),
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+  );
+  const uniform = model['resources'][0].uniform,
+    floats = uniform.contents;
+  assert.equal(uniform.binding.size, 1232);
+  near(
+    Array.from(floats.slice(272 + 12, 300)),
+    m.physical.slice(12),
+    1e-6,
+    'extended rows after coat, specular, sheen',
+  );
+  near(Array.from(floats.slice(104 + 14 * 8, 104 + 14 * 8 + 4)), [1, 0, 0, 0], 1e-6, 'slot 14 (thickness) UV row');
+  model.dispose();
+  engine.dispose();
+});
+
+test('EXT_materials_bump: the height map takes slot 18, its factor and space the bump row, and only this shader tilts s.n', async () => {
+  const { gpu, engine, model, view } = await scene(
+    [{ extensions: { EXT_materials_bump: { bumpFactor: 0.25, heightSpace: 'object', bumpTexture: { index: 0 } } } }],
+    {
+      doc: { textures: [{ source: 0 }], images: [{}] },
+      images: [{ width: 1, height: 1, close() {} }],
+    },
+  );
+  const m = model.primitives[0].material;
+  assert.deepEqual(m.extended, {
+    iridescence: false,
+    anisotropy: false,
+    diffuseTransmission: false,
+    bump: true,
+    scatter: false,
+  });
+  assert.equal(m.maps[18].index, 0);
+  const log = gpu.record(() => {
+    view.begin(0);
+    model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+  });
+  const code = log.find((e) => e[0] === 'module')[2].code,
+    uniform = model['resources'][0].uniform;
+  assert.ok(code.includes('fn margoBumpGradient(') && code.includes('uvt:array<vec4f,42>'));
+  // Bump stands before the thin film and anisotropy, which read s.n.
+  assert.ok(code.indexOf('s.n=margoBumpGradient(') < code.indexOf('s.ir='));
+  assert.equal(uniform.binding.size, 1232);
+  near(Array.from(uniform.contents.slice(272 + 24, 300)), [0.25, 1, 0, 0], 1e-7, 'bump row');
+  near(Array.from(uniform.contents.slice(104 + 18 * 8, 104 + 18 * 8 + 4)), [1, 0, 0, 0], 1e-6, 'slot 18 UV row');
+  model.dispose();
+  engine.dispose();
+  assert.equal(extendedShader(extendedPlan([], { ...features, bump: false })).includes('margoBumpGradient'), false);
+  assert.notEqual(
+    extendedShader(extendedPlan([], { ...features, bump: true, scatter: false })),
+    extendedShader(extendedPlan([], features)),
+  );
+});
+
+test('EXT_materials_bump: no texture or a zero factor is no bump, a bad height space or factor is refused', () => {
+  const parse = (bump) => extendedMaterials.parse({ EXT_materials_bump: bump });
+  assert.equal(parse({ bumpFactor: 2 }), undefined, 'one height everywhere has no gradient');
+  assert.equal(parse({ bumpFactor: 0, bumpTexture: { index: 0 } }), undefined);
+  const defaults = parse({ bumpTexture: { index: 3 } });
+  assert.deepEqual(defaults.rows.slice(12, 16), [1, 0, 0, 0], 'bumpFactor 1, world space when heightSpace is absent');
+  assert.equal(defaults.maps[5].index, 3);
+  assert.deepEqual(parse({ heightSpace: 'world', bumpTexture: { index: 0 } }).rows.slice(12, 16), [1, 0, 0, 0]);
+  assert.throws(() => parse({ heightSpace: 'tangent', bumpTexture: { index: 0 } }), /bump height space/);
+  assert.throws(() => parse({ bumpFactor: 'high', bumpTexture: { index: 0 } }), /bump factor/);
+});
+
+test('EXT_materials_bump: a file that requires it needs the extended decoder', () => {
+  const { doc, buffers } = animatedTriangle();
+  doc.extensionsRequired = ['EXT_materials_bump'];
+  doc.extensionsUsed = ['EXT_materials_bump'];
+  assert.throws(() => new GLTFAsset(doc, buffers), /EXT_materials_bump \(pass a materials decoder\)/);
+  assert.doesNotThrow(() => new GLTFAsset(doc, buffers, undefined, { materials: extendedMaterials }));
+});
+
+test('materials without the new extensions keep their shaders and buffers; zero factors stay standard', async () => {
+  const { gpu, engine, model, view } = await scene([
+    {},
+    { extensions: { KHR_materials_clearcoat: { clearcoatFactor: 1 } } },
+    {
+      extensions: {
+        KHR_materials_iridescence: { iridescenceFactor: 0 },
+        KHR_materials_anisotropy: {},
+        KHR_materials_diffuse_transmission: {},
+      },
+    },
+  ]);
+  assert.deepEqual(
+    model.primitives.map((p) => [p.material.extended, p.material.maps.length]),
+    [
+      [undefined, 5],
+      [undefined, 13],
+      [undefined, 5],
+    ],
+    'extensions with zero factors change nothing: standard',
+  );
+  const log = gpu.record(() => {
+    view.begin(0);
+    model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+  });
+  assert.ok(log.filter((e) => e[0] === 'buffer' && e[2].usage === 72).every((e) => e[2].size === 880));
+  assert.ok(!log.some((e) => e[0] === 'module' && e[2].code.includes('margoAmbientLayers')));
+  model.dispose();
+  engine.dispose();
+});
+
+test('without @margoengine/gltf/extended-materials the three extensions are ignored, and rejected when required', async () => {
+  const film = {
+    extensions: {
+      KHR_materials_iridescence: { iridescenceFactor: 1 },
+      KHR_materials_anisotropy: { anisotropyStrength: 1 },
+    },
+  };
+  const { engine, model } = await scene([film], { plain: true });
+  assert.equal(model.primitives[0].material.extended, undefined);
+  assert.equal(model.primitives[0].material.maps.length, 5);
+  model.dispose();
+  await assert.rejects(
+    scene([film], {
+      plain: true,
+      doc: { extensionsRequired: ['KHR_materials_iridescence', 'KHR_materials_variants'] },
+    }),
+    {
+      code: 'unsupported',
+      message:
+        /^Required glTF extensions are unsupported: KHR_materials_iridescence \(pass a materials decoder\); pass the listed decoders/,
+    },
+  );
+  engine.dispose();
+});
+
+test('transmission: tint multiply then lit add (no blend constant); ambient hooks shade the untransmitted diffuse', async () => {
+  const { gpu, engine, model, view } = await scene([
+    {
+      pbrMetallicRoughness: { baseColorFactor: [0.5, 1, 0.25, 1] },
+      extensions: { KHR_materials_transmission: { transmissionFactor: 0.8 } },
+    },
+  ]);
+  const ibl = new EnvironmentLighting({
+    device: gpu.device,
+    disposed: false,
+    version: 0,
+    specularView: {},
+    sampler: {},
+    brdfLut: {},
+    shBuffer: {},
+    paramsBuffer: {},
+    restore: () => Promise.resolve(),
+  });
+  const draw = () =>
+    gpu.record(() => {
+      view.begin(0);
+      model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+    });
+  let log = draw();
+  const pipelines = log.filter((e) => e[0] === 'renderPipeline'),
+    passes = log.filter((e) => e[0].startsWith('pass.')).map((e) => (e[0] === 'pass.setPipeline' ? e[1] : e[0]));
+  assert.equal(
+    log.find((e) => e[0] === 'module')[2].code,
+    viewShader(surfaceTintPBR(transmissiveShader(sparsePhysicalShader(model.primitives[0].material.maps)))),
+  );
+  assert.deepEqual(
+    pipelines.map((e) => [e[2].fragment.entryPoint, e[2].fragment.targets[0].blend.color]),
+    [
+      ['fragment', { dstFactor: 'one', srcFactor: 'one' }],
+      ['margoTint', { dstFactor: 'src', srcFactor: 'zero' }],
+    ],
+  );
+  assert.ok(!passes.includes('pass.setBlendConstant'));
+  assert.deepEqual(passes.slice(0, 2), [pipelines[1][1], 'pass.setBindGroup'], 'the tint draw comes first');
+  assert.equal(passes.filter((e) => e === 'pass.drawIndexed').length, 2);
+  // The arena uploads the changed range of its chunk; the model's one uniform is the chunk's first slot.
+  const write = log.find((e) => e[0] === 'writeBuffer'),
+    values = new Float32Array(write[2] / 4 + floatsOf(write[3]).length);
+  values.set(floatsOf(write[3]), write[2] / 4);
+  near(
+    [values[98], values[99], values[102]],
+    [0, 0, 0],
+    1e-6,
+    'tint lanes: zero volume optical depth, the rest comes from the surface',
+  );
+  ibl.applyTo(model);
+  log = draw();
+  const code = log.find((e) => e[0] === 'module')[2].code;
+  assert.match(
+    code,
+    /fn margoAmbientLayers\(i:Out,s:Surface,v:vec3f\)->vec3f \{return margoAmbientTerm\(i,margoFront\(s\),v\);\}/,
+  );
+  assert.match(code, /fn margoAmbientTerm\(i:Out,s:Surface,v:vec3f\)->vec3f \{return iblShade\(/);
+  assert.match(code, /o\.base=vec4f\(s\.base\.rgb\*\(1-s\.tr\),s\.base\.a\)/);
+  ibl.dispose();
+  model.dispose();
+  engine.dispose();
+});
+
+test('KHR_materials_variants: names, switching rebinds the mapped material, undefined restores, unknown variants throw', async () => {
+  const red = { pbrMetallicRoughness: { baseColorFactor: [1, 0, 0, 1] } },
+    glass = { extensions: { KHR_materials_iridescence: { iridescenceFactor: 1 } } };
+  const { gpu, engine, model, view } = await scene([{}, red, glass], {
+    doc: { extensions: { KHR_materials_variants: { variants: [{ name: 'Red' }, { name: 'Film' }] } } },
+    primitive: (index) =>
+      index === 0
+        ? {
+            extensions: {
+              KHR_materials_variants: {
+                mappings: [
+                  { material: 1, variants: [0] },
+                  { material: 2, variants: [1] },
+                ],
+              },
+            },
+          }
+        : {},
+  });
+  const p = model.primitives[0],
+    own = p.material,
+    draw = () =>
+      gpu.record(() => {
+        view.begin(0);
+        model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+      });
+  assert.deepEqual(model.variants, ['Red', 'Film']);
+  draw();
+  assert.equal(model.selectedVariant, undefined);
+  model.selectVariant('Red');
+  assert.equal(model.selectedVariant, 0, 'the index, by name or by number');
+  assert.equal(p.material, model.primitives[1].material, 'the mapped material object');
+  await null; // next frame: within one frame a changed uniform goes to a frame-arena slice
+  draw();
+  const frame = model['resources'].find((r) => r.primitive === p).uniform.contents;
+  assert.deepEqual(Array.from(frame.slice(76, 80)), [1, 0, 0, 1], 'primitive 0 draws red');
+  model.selectVariant(1);
+  assert.deepEqual(p.material.extended, {
+    iridescence: true,
+    anisotropy: false,
+    diffuseTransmission: false,
+    bump: false,
+    scatter: false,
+  });
+  const log = draw();
+  assert.equal(
+    model['resources'].find((r) => r.primitive === p).uniform.binding.size,
+    1232,
+    'uniform buffer resized for the extended material',
+  );
+  assert.equal(
+    p.material,
+    model.primitives[2].material,
+    'the iridescent material (its pipeline is cached from the first draw)',
+  );
+  assert.equal(log.filter((e) => e[0] === 'pass.drawIndexed').length, 3);
+  model.selectVariant();
+  assert.equal(model.selectedVariant, undefined);
+  assert.ok(
+    [model.root, ...model.nodes].every((mesh) => model.ownedMeshes.includes(mesh)),
+    'ownedMeshes has what the model made',
+  );
+  assert.equal(p.material, own);
+  assert.equal(model.primitives[1].material, model.primitives[1].material, 'unmapped primitives keep theirs');
+  assert.throws(() => model.selectVariant('Blue'), {
+    name: 'RangeError',
+    message: 'selectVariant: the model has no material variant Blue; pass an index below the variant count',
+  });
+  assert.throws(() => model.selectVariant(2), RangeError);
+  assert.equal(model.selectedVariant, undefined, 'a refused choice changes nothing');
+  model.dispose();
+  engine.dispose();
+});
+
+const root = new URL('../../../examples/assets/khronos/', import.meta.url);
+const fetch = async (url) => new Response(await readFile(new URL(new URL(url).pathname.slice(1), root)));
+const load = async (engine, file) =>
+  loadGLTF(engine, `https://khronos.test/${file}`, { fetch, decoders: { materials: extendedMaterials } });
+
+test('Khronos samples: extended materials and variants parse as their files declare', () =>
+  headlessModels(async () => {
+    const lamp = await load(await headless(), 'IridescenceLamp/IridescenceLamp.glb');
+    const lampExtended = new Set(
+      lamp.primitives.map((p) => JSON.stringify([p.material.extended ?? null, !!p.material.tint])),
+    );
+    assert.deepEqual(
+      [...lampExtended].sort(),
+      [
+        JSON.stringify([null, false]),
+        JSON.stringify([
+          { iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false },
+          false,
+        ]),
+        JSON.stringify([
+          { iridescence: true, anisotropy: false, diffuseTransmission: false, bump: false, scatter: false },
+          true,
+        ]),
+      ],
+      'plain, iridescent, and iridescent transmissive glass',
+    );
+    const barn = await load(await headless(), 'AnisotropyBarnLamp/AnisotropyBarnLamp.glb'),
+      metal = barn.primitives.find((p) => p.material.name === 'Lamp Metal').material;
+    assert.deepEqual(metal.extended, {
+      iridescence: false,
+      anisotropy: true,
+      diffuseTransmission: false,
+      bump: false,
+      scatter: false,
+    });
+    assert.deepEqual(
+      extendedPlan(metal.maps, metal.extended).slots.slice(5),
+      [-1, -1, 0, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1],
+      'clearcoat normal and anisotropy textures only',
+    );
+    const cup = await load(await headless(), 'DiffuseTransmissionTeacup/DiffuseTransmissionTeacup.glb'),
+      saucer = cup.primitives.find((p) => p.material.name === 'tea_saucer').material;
+    near(saucer.physical.slice(20, 24), [1, 0.84, 0.8, 0.74], 1e-6, 'diffuse transmission factor and colour');
+    const shoe = await load(await headless(), 'MaterialsVariantsShoe/MaterialsVariantsShoe.glb');
+    assert.ok(shoe.variants.length >= 2, String(shoe.variants));
+    const before = shoe.primitives.map((p) => p.material);
+    for (const name of shoe.variants) {
+      shoe.selectVariant(name);
+      assert.ok(shoe.primitives.some((p, i) => p.material !== before[i]) || name === shoe.variants[0], name);
+    }
+    shoe.selectVariant();
+    assert.deepEqual(
+      shoe.primitives.map((p) => p.material),
+      before,
+    );
+    const chair = await load(await headless(), 'SheenChair/SheenChair.glb');
+    assert.ok(chair.variants.length >= 2, String(chair.variants));
+  }));

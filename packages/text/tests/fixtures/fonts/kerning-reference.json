@@ -1,0 +1,50 @@
+{
+  "method": "Chromium canvas measureText(pair) - measureText(first) - measureText(second) at 1000 px with fontKerning normal, from a FontFace of the file; in font units (unitsPerEm 1000)",
+  "browser": "Playwright Chromium",
+  "fonts": {
+    "SourceSans3-Regular.ttf": {
+      "AV": -14,
+      "VA": -14,
+      "AT": -55,
+      "To": -66,
+      "Ta": -73,
+      "Te": -66,
+      "Yo": -41,
+      "Wa": -16,
+      "LT": -120,
+      "LY": -76,
+      "P.": -112,
+      "F,": -72,
+      "r.": -57,
+      "y.": -35,
+      "Av": -7,
+      "ov": -4,
+      "AY": -14,
+      "Tr": -46,
+      "kn": 0,
+      "OO": 0
+    },
+    "SourceSans3-Regular.otf": {
+      "AV": -14,
+      "VA": -14,
+      "AT": -55,
+      "To": -66,
+      "Ta": -73,
+      "Te": -66,
+      "Yo": -41,
+      "Wa": -16,
+      "LT": -120,
+      "LY": -76,
+      "P.": -112,
+      "F,": -72,
+      "r.": -57,
+      "y.": -35,
+      "Av": -7,
+      "ov": -4,
+      "AY": -14,
+      "Tr": -46,
+      "kn": 0,
+      "OO": 0
+    }
+  }
+}

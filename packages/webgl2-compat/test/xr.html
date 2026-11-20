@@ -102,6 +102,17 @@ Object.defineProperty(navigator, 'xr', {
   },
 });
 /** Stands for the browser's layer; its framebuffer is the opaque one, here an ordinary one with the same rules. */
+/** Records the GL bindings the stand-in layer touches; the returned function puts them back. */
+function keepBindings(gl) {
+  const draw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING),
+    read = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING),
+    texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
+  return () => {
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, draw);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+  };
+}
 class FakeWebGLLayer {
   constructor(owner, gl, init) {
     // Chromium reports false here on a machine with no XR device, so what the layer asked for is what is checked.
@@ -110,14 +121,16 @@ class FakeWebGLLayer {
     this.init = init;
     this.width = SIZE * 2;
     this.height = SIZE + RAISE;
+    // A browser's XRWebGLLayer leaves the page's GL bindings as they were (WebXR Device API, "XRWebGLLayer"), and the
+    // compatibility layer caches them, so this stand-in puts back every binding it changes.
+    const kept = keepBindings(gl);
     this.texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, this.width, this.height);
-    gl.bindTexture(gl.TEXTURE_2D, null);
     this.framebuffer = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    kept();
     webglLayer = this;
   }
   getViewport(view) {
@@ -127,7 +140,7 @@ class FakeWebGLLayer {
   }
   /** Both eyes, top row first as a WebGPU texture is read. */
   read() {
-    const gl = this.gl, out = [];
+    const gl = this.gl, out = [], kept = keepBindings(gl);
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.framebuffer);
     for (const eye of EYES) {
       const v = this.getViewport({ eye }), rows = new Uint8Array(SIZE * SIZE * 4), flipped = new Uint8Array(rows.length);
@@ -135,7 +148,7 @@ class FakeWebGLLayer {
       for (let y = 0; y < SIZE; y++) flipped.set(rows.subarray(y * SIZE * 4, (y + 1) * SIZE * 4), (SIZE - 1 - y) * SIZE * 4);
       out.push(flipped);
     }
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    kept();
     return out;
   }
 }

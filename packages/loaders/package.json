@@ -66,6 +66,10 @@
       "types": "./dist/font.d.ts",
       "import": "./dist/font.js"
     },
+    "./font-opentype": {
+      "types": "./dist/font-opentype.d.ts",
+      "import": "./dist/font-opentype.js"
+    },
     "./svg": {
       "types": "./dist/svg.d.ts",
       "import": "./dist/svg.js"
@@ -190,14 +194,14 @@
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/materials": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/decoders": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
+    "@margoengine/gltf": {
       "optional": true
     },
     "@margoengine/materials": {

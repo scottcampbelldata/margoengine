@@ -11,308 +11,322 @@ import { decodePNG } from '../tests/support/png.js';
 const notBuilt = starterBuildMessage(missingStarterBuilds(resolve('.')));
 if (notBuilt) {
   console.error(`modern:test:browser: ${notBuilt}`);
-  process.exit(1);
-}
-const context = await openBrowser({ startPath: '/tests/modern.html' }),
-  { page, hardware } = context,
-  errors = [];
-page.on('pageerror', (error) => errors.push(error.message));
-page.on('console', (message) => {
-  if (message.type() === 'error') errors.push(`${message.text()} (${message.location().url})`);
-});
-const result = { hardware, checks: [] };
-let vite, next;
-try {
-  await page.waitForFunction(() => window.modern);
-  const pixels = [];
-  for (const backend of ['webgl2', 'webgpu']) {
-    const report = await page.evaluate((backend) => window.modern.core(backend), backend);
-    assert.equal(report.backend, backend);
-    assert.equal(report.stats.visible, 1);
-    assert.equal(report.stats.drawCalls, 1);
-    await page.evaluate(async () => {
-      window.modern.state.core.render();
-      await window.modern.state.core.gpu?.queue.onSubmittedWorkDone();
-    });
-    const png = await page.locator('[data-core]').screenshot({ path: `test-results/modern-${backend}.png` }),
-      image = await decodePNG(png),
-      offset = (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
-    const pixel = [...image.data.slice(offset, offset + 3)];
-    assert.ok(pixel[0] > pixel[1] + 15, `${backend} did not render red PBR geometry (${pixel})`);
-    pixels.push(pixel);
-    const uncull = await page.evaluate(() => {
-      const e = window.modern.state.core;
-      e.render({ culling: false });
-      return { ...e.stats };
-    });
-    assert.equal(uncull.visible, 2);
-    assert.equal(uncull.drawCalls, 1);
-    result.checks.push({ name: `${backend}: pixels, instancing and culling`, pixel });
-  }
-  assert.ok(
-    pixels[0].every((v, i) => Math.abs(v - pixels[1][i]) <= 3),
-    'Backend PBR pixels disagree',
-  );
-  const particles = await page.evaluate(async () => {
-    const e = window.modern.state.core,
-      p = await window.modern.particles(),
-      device = e.gpu;
-    const read = async () => {
-      const buffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
-        encoder = device.createCommandEncoder();
-      encoder.copyBufferToBuffer(p.gpuState.particles, 0, buffer, 0, 32);
-      device.queue.submit([encoder.finish()]);
-      await buffer.mapAsync(GPUMapMode.READ);
-      const values = [...new Float32Array(buffer.getMappedRange())];
-      buffer.unmap();
-      buffer.destroy();
-      return values;
-    };
-    const before = await read();
-    e.render({ delta: 0.1 });
-    await device.queue.onSubmittedWorkDone();
-    const after = await read();
-    e.removePlugin(p.name);
-    e.render();
-    await device.queue.onSubmittedWorkDone();
-    return { count: p.count, before, after };
+  process.exitCode = 1;
+} else {
+  const context = await openBrowser({ startPath: '/tests/modern.html' }),
+    { page, hardware } = context,
+    errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(`${message.text()} (${message.location().url})`);
   });
-  assert.equal(particles.count, 100_000);
-  assert.ok(particles.after[1] < particles.before[1]);
-  assert.ok(particles.after.every(Number.isFinite));
-  result.checks.push({ name: '100000 GPU particles update storage and retire passes', ...particles });
-  await page.evaluate(() => window.modern.mount());
-  await page.waitForFunction(
-    () => window.modern.state.react?.meshes.size === 2 && window.modern.state.parent && window.modern.state.child,
-  );
-  const initial = await page.evaluate(() => {
-    const s = window.modern.state;
-    return {
-      count: s.react.meshes.size,
-      parent: s.parent.id,
-      child: s.child.id,
-      link: s.react.store.parents[s.child.id],
-      x: s.child.matrix[12],
-      renders: s.renders,
-      frames: s.frames,
-    };
-  });
-  assert.equal(initial.link, initial.parent);
-  await page.waitForFunction(() => window.modern.state.frames >= 20);
-  assert.equal(
-    await page.evaluate(() => window.modern.state.renders),
-    initial.renders,
-    'Frame updates caused React renders',
-  );
-  assert.equal(await page.locator('mesh,boxgeometry,pbrmaterial').count(), 0, 'Custom tags leaked into DOM');
-  await page.evaluate(() => window.modern.mount({ position: 2 }));
-  await page.waitForFunction(() => window.modern.state.parent?.position.x === 2);
-  assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 2);
-  await page.evaluate(() => window.modern.mount({ show: false }));
-  await page.waitForFunction(() => window.modern.state.react.meshes.size === 0);
-  await page.evaluate(() => window.modern.mount({ suspend: true }));
-  await page.waitForTimeout(100);
-  assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0, 'Suspended render leaked entities');
-  await page.evaluate(() => window.modern.mount());
-  await page.waitForFunction(() => window.modern.state.react.meshes.size === 2 && window.modern.state.child);
-  await page.evaluate(() => window.modern.unmount());
-  assert.ok(await page.evaluate(() => window.modern.state.react.disposed));
-  assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0);
-  result.checks.push({ name: 'React StrictMode, nesting, live props, no frame re-renders, Suspense, teardown' });
-  assert.deepEqual(await page.evaluate(() => window.modern.state.errors), []);
-  assert.deepEqual(errors, []);
-  const fallback = await page.evaluate(async () => {
-    Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
-    try {
-      return await window.modern.core('auto');
-    } finally {
-      delete navigator.gpu;
+  const result = { hardware, checks: [] };
+  let vite, next;
+  try {
+    await page.waitForFunction(() => window.modern);
+    const pixels = [];
+    for (const backend of ['webgl2', 'webgpu']) {
+      const report = await page.evaluate((backend) => window.modern.core(backend), backend);
+      assert.equal(report.backend, backend);
+      assert.equal(report.stats.visible, 1);
+      assert.equal(report.stats.drawCalls, 1);
+      await page.evaluate(async () => {
+        window.modern.state.core.render();
+        await window.modern.state.core.gpu?.queue.onSubmittedWorkDone();
+      });
+      const png = await page.locator('[data-core]').screenshot({ path: `test-results/modern-${backend}.png` }),
+        image = await decodePNG(png),
+        offset = (Math.floor(image.height / 2) * image.width + Math.floor(image.width / 2)) * 4;
+      const pixel = [...image.data.slice(offset, offset + 3)];
+      assert.ok(pixel[0] > pixel[1] + 15, `${backend} did not render red PBR geometry (${pixel})`);
+      pixels.push(pixel);
+      const uncull = await page.evaluate(() => {
+        const e = window.modern.state.core;
+        e.render({ culling: false });
+        return { ...e.stats };
+      });
+      assert.equal(uncull.visible, 2);
+      assert.equal(uncull.drawCalls, 1);
+      result.checks.push({ name: `${backend}: pixels, instancing and culling`, pixel });
     }
-  });
-  assert.equal(fallback.backend, 'webgl2');
-  assert.match(fallback.fallbackReason, /unavailable/);
-  result.checks.push({ name: 'Automatic WebGL2 fallback without WebGPU' });
-  const manifest = JSON.parse(await readFile('examples/vite/dist/.vite/manifest.json', 'utf8')),
-    requests = new Set();
-  const chunks = {};
-  for (const name of ['gltf', 'creative', 'scenery']) {
-    const key = `../../packages/${name}/dist/index.js`;
-    assert.ok(manifest[key].isDynamicEntry);
-    assert.ok(!manifest['index.html'].imports?.includes(key));
-    chunks[name] = manifest[key].file;
-  }
-  vite = await listenWhenFree(
-    () =>
-      preview({
-        root: 'examples/vite',
-        configFile: false,
-        logLevel: 'error',
-        preview: { host: '127.0.0.1', port: 5194, strictPort: true },
-      }),
-    { port: 5194 },
-  );
-  page.on('request', (request) => requests.add(new URL(request.url()).pathname.slice(1)));
-  await page.goto('http://127.0.0.1:5194');
-  await page.getByText('Rust / Wasm + webgpu', { exact: true }).waitFor();
-  for (const file of Object.values(chunks)) assert.ok(!requests.has(file), 'Optional pack fetched during initial load');
-  const scenery = page.getByRole('button', { name: 'Toggle moonlit scenery' });
-  const moonPixels = (image) => {
-    let total = 0,
-      count = 0,
-      lit = 0;
-    for (let y = 0; y < image.height * 0.3; y++)
-      for (let x = Math.floor(image.width * 0.6); x < image.width; x++) {
-        const i = (y * image.width + x) * 4;
-        total += image.data[i] + image.data[i + 1] + image.data[i + 2];
-        count++;
-      }
-    const threshold = total / count + 60;
-    for (let y = 0; y < image.height * 0.3; y++)
-      for (let x = Math.floor(image.width * 0.6); x < image.width; x++) {
-        const i = (y * image.width + x) * 4;
-        if (
-          image.data[i] > 180 &&
-          image.data[i + 1] > 180 &&
-          image.data[i + 2] > 180 &&
-          image.data[i] + image.data[i + 1] + image.data[i + 2] > threshold
-        )
-          lit++;
-      }
-    return lit;
-  };
-  assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Scenery: moonlit sky' }).waitFor();
-  assert.equal(await scenery.getAttribute('aria-pressed'), 'true');
-  assert.ok(requests.has(chunks.scenery));
-  const moonImage = await decodePNG(
-      await page.locator('canvas').screenshot({ path: 'test-results/modern-vite-scenery.png' }),
-    ),
-    moon = moonPixels(moonImage);
-  assert.ok(moon > 100, `Moon not visible over the base engine: ${moon}`);
-  let mint = 0;
-  for (let i = 0; i < moonImage.data.length; i += 4)
-    if (moonImage.data[i + 1] > 80 && moonImage.data[i + 1] > moonImage.data[i] + 10) mint++;
-  assert.ok(mint > 500, 'Scenery hid the base geometry');
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
-  assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
-  assert.ok(moonPixels(await decodePNG(await page.locator('canvas').screenshot())) < 20, 'Moon remained after removal');
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Scenery: moonlit sky' }).waitFor();
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
-  result.checks.push({
-    name: 'Vite scenery: lazy load, visible moon over base geometry, pressed state, removal and repeated toggle',
-    moonPixels: moon,
-  });
-  await page.getByRole('button', { name: 'Load glTF module' }).click();
-  await page.getByRole('status').filter({ hasText: 'Static glTF loaded' }).waitFor();
-  assert.ok(requests.has(chunks.gltf));
-  await page.getByRole('button', { name: 'Load glTF module' }).click();
-  await page.getByRole('status').filter({ hasText: 'Static glTF loaded' }).waitFor();
-  await page.getByRole('button', { name: 'Toggle GPU leaves' }).click();
-  await page.getByRole('status').filter({ hasText: 'Creative: 5,000 GPU leaves' }).waitFor();
-  assert.ok(requests.has(chunks.creative));
-  await page.getByLabel('Metalness').fill('0.8');
-  assert.equal(await page.locator('output').innerText(), '0.80');
-  await page.locator('canvas').screenshot({ path: 'test-results/modern-vite.png' });
-  await page.getByRole('button', { name: 'Toggle GPU leaves' }).click();
-  await page.getByRole('status').filter({ hasText: 'Particles removed' }).waitFor();
-  await page.getByText('Domain tools', { exact: true }).click();
-  const fx = page.getByRole('button', { name: 'Toggle atmosphere and FX' });
-  await fx.click();
-  await page.getByRole('status').filter({ hasText: 'Bloom, atmosphere and FX' }).waitFor();
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Scenery: moonlit sky' }).waitFor();
-  assert.ok(
-    moonPixels(await decodePNG(await page.locator('canvas').screenshot())) > 100,
-    'Existing FX covered the moon',
-  );
-  await fx.click();
-  await page.getByRole('status').filter({ hasText: 'Effects removed' }).waitFor();
-  await fx.click();
-  await page.getByRole('status').filter({ hasText: 'Bloom, atmosphere and FX' }).waitFor();
-  assert.ok(moonPixels(await decodePNG(await page.locator('canvas').screenshot())) > 100, 'New FX covered the moon');
-  await page.getByRole('button', { name: 'Toggle toon shading' }).click();
-  await page.getByRole('status').filter({ hasText: 'Creative: toon shading' }).waitFor();
-  await page.getByRole('button', { name: 'Restore GPU device' }).click();
-  await page.getByRole('status').filter({ hasText: 'GPU restored; scene retained' }).waitFor();
-  assert.equal(await scenery.getAttribute('aria-pressed'), 'true');
-  assert.ok(
-    moonPixels(await decodePNG(await page.locator('canvas').screenshot())) > 100,
-    'Device restoration lost the moon',
-  );
-  await page.locator('canvas').screenshot({ path: 'test-results/modern-vite-domains.png' });
-  result.checks.push({
-    name: 'Vite domain controls: atmosphere/FX, toon, device restoration',
-  });
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
-  assert.ok(
-    moonPixels(await decodePNG(await page.locator('canvas').screenshot())) < 20,
-    'Removing scenery did not restore the FX atmosphere',
-  );
-  result.checks.push({
-    name: 'Vite scenery: FX enabled in either order, restored atmosphere on removal and GPU device restoration',
-  });
-  await page.setViewportSize({ width: 390, height: 844 });
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await page.screenshot({ path: 'test-results/modern-vite-mobile.png', fullPage: true });
-  result.checks.push({
-    name: 'Vite production: lazy packages, repeated import, GPU leaves, material control, mobile layout',
-    chunks,
-  });
-  await page.addInitScript(() => {
-    if (location.search === '?fallback=1')
+    assert.ok(
+      pixels[0].every((v, i) => Math.abs(v - pixels[1][i]) <= 3),
+      'Backend PBR pixels disagree',
+    );
+    const particles = await page.evaluate(async () => {
+      const e = window.modern.state.core,
+        p = await window.modern.particles(),
+        device = e.gpu;
+      const read = async () => {
+        const buffer = device.createBuffer({ size: 32, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+          encoder = device.createCommandEncoder();
+        encoder.copyBufferToBuffer(p.gpuState.particles, 0, buffer, 0, 32);
+        device.queue.submit([encoder.finish()]);
+        await buffer.mapAsync(GPUMapMode.READ);
+        const values = [...new Float32Array(buffer.getMappedRange())];
+        buffer.unmap();
+        buffer.destroy();
+        return values;
+      };
+      const before = await read();
+      e.render({ delta: 0.1 });
+      await device.queue.onSubmittedWorkDone();
+      const after = await read();
+      e.removePlugin(p.name);
+      e.render();
+      await device.queue.onSubmittedWorkDone();
+      return { count: p.count, before, after };
+    });
+    assert.equal(particles.count, 100_000);
+    assert.ok(particles.after[1] < particles.before[1]);
+    assert.ok(particles.after.every(Number.isFinite));
+    result.checks.push({ name: '100000 GPU particles update storage and retire passes', ...particles });
+    await page.evaluate(() => window.modern.mount());
+    await page.waitForFunction(
+      () => window.modern.state.react?.meshes.size === 2 && window.modern.state.parent && window.modern.state.child,
+    );
+    const initial = await page.evaluate(() => {
+      const s = window.modern.state;
+      return {
+        count: s.react.meshes.size,
+        parent: s.parent.id,
+        child: s.child.id,
+        link: s.react.store.parents[s.child.id],
+        x: s.child.matrix[12],
+        renders: s.renders,
+        frames: s.frames,
+      };
+    });
+    assert.equal(initial.link, initial.parent);
+    await page.waitForFunction(() => window.modern.state.frames >= 20);
+    assert.equal(
+      await page.evaluate(() => window.modern.state.renders),
+      initial.renders,
+      'Frame updates caused React renders',
+    );
+    assert.equal(await page.locator('mesh,boxgeometry,pbrmaterial').count(), 0, 'Custom tags leaked into DOM');
+    await page.evaluate(() => window.modern.mount({ position: 2 }));
+    await page.waitForFunction(() => window.modern.state.parent?.position.x === 2);
+    assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 2);
+    await page.evaluate(() => window.modern.mount({ show: false }));
+    await page.waitForFunction(() => window.modern.state.react.meshes.size === 0);
+    await page.evaluate(() => window.modern.mount({ suspend: true }));
+    await page.waitForTimeout(100);
+    assert.equal(
+      await page.evaluate(() => window.modern.state.react.meshes.size),
+      0,
+      'Suspended render leaked entities',
+    );
+    await page.evaluate(() => window.modern.mount());
+    await page.waitForFunction(() => window.modern.state.react.meshes.size === 2 && window.modern.state.child);
+    await page.evaluate(() => window.modern.unmount());
+    assert.ok(await page.evaluate(() => window.modern.state.react.disposed));
+    assert.equal(await page.evaluate(() => window.modern.state.react.meshes.size), 0);
+    result.checks.push({ name: 'React StrictMode, nesting, live props, no frame re-renders, Suspense, teardown' });
+    assert.deepEqual(await page.evaluate(() => window.modern.state.errors), []);
+    assert.deepEqual(errors, []);
+    const fallback = await page.evaluate(async () => {
       Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
-  });
-  requests.clear();
-  await page.goto('http://127.0.0.1:5194/?fallback=1');
-  await page.getByText('Rust / Wasm + webgl2', { exact: true }).waitFor();
-  await scenery.click();
-  await page.getByRole('status').filter({ hasText: 'Moonlit scenery needs WebGPU' }).waitFor();
-  assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
-  assert.ok(!requests.has(chunks.scenery), 'Unsupported backend fetched scenery');
-  result.checks.push({ name: 'Vite scenery: WebGL2 fallback reports WebGPU requirement before fetching the pack' });
-  // Port 0 and the URL Next prints: on a fixed port another worktree's Next answers too (serverUrl).
-  next = spawn(
-    process.execPath,
-    [resolve('node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '0'],
-    { cwd: resolve('examples/next'), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
-  );
-  const { url: nextUrl, output: nextLog } = await serverUrl(next, {
-    name: 'next start',
-    pattern: /- Local:\s+(http:\/\/\S+)[\s\S]*\bReady\b/,
-  });
-  const nextHome = await fetch(nextUrl);
-  assert.ok(nextHome.ok, `Next answered ${nextHome.status} at ${nextUrl}: ${nextLog()}`);
-  await page.setViewportSize({ width: 1100, height: 800 });
-  await page.goto(nextUrl);
-  await page.getByRole('heading', { name: 'Margo Engine / Next.js' }).waitFor();
-  await page.waitForFunction(() => document.querySelector('canvas')?.width > 1);
-  // The cube shows once the first frame's pipelines are compiled: 180-280 ms after the canvas is sized on the RTX A6000,
-  // later on an integrated GPU (an Intel Arc 140V missed the fixed 300 ms this used to wait). Wait for the geometry.
-  const mintPixels = async () => {
-    const image = await decodePNG(await page.locator('canvas').screenshot({ path: 'test-results/modern-next.png' }));
-    let lit = 0;
-    for (let i = 0; i < image.data.length; i += 4)
-      if (image.data[i + 1] > 80 && image.data[i + 1] > image.data[i] + 10) lit++;
-    return lit;
-  };
-  const shown = Date.now();
-  let lit = await mintPixels();
-  while (lit <= 500 && Date.now() - shown < 20_000) lit = await mintPixels();
-  assert.deepEqual(await page.locator('p[role="alert"]').allTextContents(), []);
-  assert.ok(lit > 500, `Next client failed to render mint geometry within 20 s (${lit} mint pixels)`);
-  result.checks.push({ name: 'Next first frame', mintPixels: lit, milliseconds: Date.now() - shown });
-  result.checks.push({ name: 'Next production: SSR, client hydration, rendered geometry' });
-  assert.deepEqual(errors, []);
-  await mkdir('test-results', { recursive: true });
-  await writeFile('test-results/modern-browser.json', JSON.stringify(result, null, 2));
-  console.log(JSON.stringify(result, null, 2));
-} finally {
-  // The browser goes first: it holds keep-alive connections to the servers, and closing a server before it never
-  // finishes (bug 30). `context.close()` also closes the dev server `openBrowser` started.
-  await closeAll({ context, servers: vite ? [vite] : [], children: next ? [next] : [] });
+      try {
+        return await window.modern.core('auto');
+      } finally {
+        delete navigator.gpu;
+      }
+    });
+    assert.equal(fallback.backend, 'webgl2');
+    assert.match(fallback.fallbackReason, /unavailable/);
+    result.checks.push({ name: 'Automatic WebGL2 fallback without WebGPU' });
+    const manifest = JSON.parse(await readFile('examples/vite/dist/.vite/manifest.json', 'utf8')),
+      requests = new Set();
+    const chunks = {};
+    // The Vite example loads SkyMoon from the sky's night-preset entry, the others from their package roots.
+    for (const [name, path] of [
+      ['gltf', 'gltf/dist/index.js'],
+      ['creative', 'creative/dist/index.js'],
+      ['scenery', 'sky/dist/night-preset.js'],
+    ]) {
+      const key = `../../packages/${path}`;
+      assert.ok(manifest[key].isDynamicEntry);
+      assert.ok(!manifest['index.html'].imports?.includes(key));
+      chunks[name] = manifest[key].file;
+    }
+    vite = await listenWhenFree(
+      () =>
+        preview({
+          root: 'examples/vite',
+          configFile: false,
+          logLevel: 'error',
+          preview: { host: '127.0.0.1', port: 5194, strictPort: true },
+        }),
+      { port: 5194 },
+    );
+    page.on('request', (request) => requests.add(new URL(request.url()).pathname.slice(1)));
+    await page.goto('http://127.0.0.1:5194');
+    await page.getByText('Rust / Wasm + webgpu', { exact: true }).waitFor();
+    for (const file of Object.values(chunks))
+      assert.ok(!requests.has(file), 'Optional pack fetched during initial load');
+    const scenery = page.getByRole('button', { name: 'Toggle moonlit scenery' });
+    const moonPixels = (image) => {
+      let total = 0,
+        count = 0,
+        lit = 0;
+      for (let y = 0; y < image.height * 0.3; y++)
+        for (let x = Math.floor(image.width * 0.6); x < image.width; x++) {
+          const i = (y * image.width + x) * 4;
+          total += image.data[i] + image.data[i + 1] + image.data[i + 2];
+          count++;
+        }
+      const threshold = total / count + 60;
+      for (let y = 0; y < image.height * 0.3; y++)
+        for (let x = Math.floor(image.width * 0.6); x < image.width; x++) {
+          const i = (y * image.width + x) * 4;
+          if (
+            image.data[i] > 180 &&
+            image.data[i + 1] > 180 &&
+            image.data[i + 2] > 180 &&
+            image.data[i] + image.data[i + 1] + image.data[i + 2] > threshold
+          )
+            lit++;
+        }
+      return lit;
+    };
+    assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Scenery: moonlit sky' }).waitFor();
+    assert.equal(await scenery.getAttribute('aria-pressed'), 'true');
+    assert.ok(requests.has(chunks.scenery));
+    const moonImage = await decodePNG(
+        await page.locator('canvas').screenshot({ path: 'test-results/modern-vite-scenery.png' }),
+      ),
+      moon = moonPixels(moonImage);
+    assert.ok(moon > 100, `Moon not visible over the base engine: ${moon}`);
+    let mint = 0;
+    for (let i = 0; i < moonImage.data.length; i += 4)
+      if (moonImage.data[i + 1] > 80 && moonImage.data[i + 1] > moonImage.data[i] + 10) mint++;
+    assert.ok(mint > 500, 'Scenery hid the base geometry');
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
+    assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
+    assert.ok(
+      moonPixels(await decodePNG(await page.locator('canvas').screenshot())) < 20,
+      'Moon remained after removal',
+    );
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Scenery: moonlit sky' }).waitFor();
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
+    result.checks.push({
+      name: 'Vite scenery: lazy load, visible moon over base geometry, pressed state, removal and repeated toggle',
+      moonPixels: moon,
+    });
+    await page.getByRole('button', { name: 'Load glTF module' }).click();
+    await page.getByRole('status').filter({ hasText: 'Static glTF loaded' }).waitFor();
+    assert.ok(requests.has(chunks.gltf));
+    await page.getByRole('button', { name: 'Load glTF module' }).click();
+    await page.getByRole('status').filter({ hasText: 'Static glTF loaded' }).waitFor();
+    await page.getByRole('button', { name: 'Toggle GPU leaves' }).click();
+    await page.getByRole('status').filter({ hasText: 'Creative: 5,000 GPU leaves' }).waitFor();
+    assert.ok(requests.has(chunks.creative));
+    await page.getByLabel('Metalness').fill('0.8');
+    assert.equal(await page.locator('output').innerText(), '0.80');
+    await page.locator('canvas').screenshot({ path: 'test-results/modern-vite.png' });
+    await page.getByRole('button', { name: 'Toggle GPU leaves' }).click();
+    await page.getByRole('status').filter({ hasText: 'Particles removed' }).waitFor();
+    await page.getByText('Domain tools', { exact: true }).click();
+    const fx = page.getByRole('button', { name: 'Toggle atmosphere and FX' });
+    await fx.click();
+    await page.getByRole('status').filter({ hasText: 'Bloom, atmosphere and FX' }).waitFor();
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Scenery: moonlit sky' }).waitFor();
+    assert.ok(
+      moonPixels(await decodePNG(await page.locator('canvas').screenshot())) > 100,
+      'Existing FX covered the moon',
+    );
+    await fx.click();
+    await page.getByRole('status').filter({ hasText: 'Effects removed' }).waitFor();
+    await fx.click();
+    await page.getByRole('status').filter({ hasText: 'Bloom, atmosphere and FX' }).waitFor();
+    assert.ok(moonPixels(await decodePNG(await page.locator('canvas').screenshot())) > 100, 'New FX covered the moon');
+    await page.getByRole('button', { name: 'Toggle toon shading' }).click();
+    await page.getByRole('status').filter({ hasText: 'Creative: toon shading' }).waitFor();
+    await page.getByRole('button', { name: 'Restore GPU device' }).click();
+    await page.getByRole('status').filter({ hasText: 'GPU restored; scene retained' }).waitFor();
+    assert.equal(await scenery.getAttribute('aria-pressed'), 'true');
+    assert.ok(
+      moonPixels(await decodePNG(await page.locator('canvas').screenshot())) > 100,
+      'Device restoration lost the moon',
+    );
+    await page.locator('canvas').screenshot({ path: 'test-results/modern-vite-domains.png' });
+    result.checks.push({
+      name: 'Vite domain controls: atmosphere/FX, toon, device restoration',
+    });
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Scenery removed' }).waitFor();
+    assert.ok(
+      moonPixels(await decodePNG(await page.locator('canvas').screenshot())) < 20,
+      'Removing scenery did not restore the FX atmosphere',
+    );
+    result.checks.push({
+      name: 'Vite scenery: FX enabled in either order, restored atmosphere on removal and GPU device restoration',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.screenshot({ path: 'test-results/modern-vite-mobile.png', fullPage: true });
+    result.checks.push({
+      name: 'Vite production: lazy packages, repeated import, GPU leaves, material control, mobile layout',
+      chunks,
+    });
+    await page.addInitScript(() => {
+      if (location.search === '?fallback=1')
+        Object.defineProperty(navigator, 'gpu', { value: undefined, configurable: true });
+    });
+    requests.clear();
+    await page.goto('http://127.0.0.1:5194/?fallback=1');
+    await page.getByText('Rust / Wasm + webgl2', { exact: true }).waitFor();
+    await scenery.click();
+    await page.getByRole('status').filter({ hasText: 'Moonlit scenery needs WebGPU' }).waitFor();
+    assert.equal(await scenery.getAttribute('aria-pressed'), 'false');
+    assert.ok(!requests.has(chunks.scenery), 'Unsupported backend fetched scenery');
+    result.checks.push({ name: 'Vite scenery: WebGL2 fallback reports WebGPU requirement before fetching the pack' });
+    // Port 0 and the URL Next prints: on a fixed port another worktree's Next answers too (serverUrl).
+    next = spawn(
+      process.execPath,
+      [resolve('node_modules/next/dist/bin/next'), 'start', '--hostname', '127.0.0.1', '--port', '0'],
+      { cwd: resolve('examples/next'), stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true },
+    );
+    const { url: nextUrl, output: nextLog } = await serverUrl(next, {
+      name: 'next start',
+      pattern: /- Local:\s+(http:\/\/\S+)[\s\S]*\bReady\b/,
+    });
+    const nextHome = await fetch(nextUrl);
+    assert.ok(nextHome.ok, `Next answered ${nextHome.status} at ${nextUrl}: ${nextLog()}`);
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.goto(nextUrl);
+    await page.getByRole('heading', { name: 'Margo Engine / Next.js' }).waitFor();
+    await page.waitForFunction(() => document.querySelector('canvas')?.width > 1);
+    // The cube shows once the first frame's pipelines are compiled: 180-280 ms after the canvas is sized on the RTX A6000,
+    // later on an integrated GPU (an Intel Arc 140V missed the fixed 300 ms this used to wait). Wait for the geometry.
+    const mintPixels = async () => {
+      const image = await decodePNG(await page.locator('canvas').screenshot({ path: 'test-results/modern-next.png' }));
+      let lit = 0;
+      for (let i = 0; i < image.data.length; i += 4)
+        if (image.data[i + 1] > 80 && image.data[i + 1] > image.data[i] + 10) lit++;
+      return lit;
+    };
+    const shown = Date.now();
+    let lit = await mintPixels();
+    while (lit <= 500 && Date.now() - shown < 20_000) lit = await mintPixels();
+    assert.deepEqual(await page.locator('p[role="alert"]').allTextContents(), []);
+    assert.ok(lit > 500, `Next client failed to render mint geometry within 20 s (${lit} mint pixels)`);
+    result.checks.push({ name: 'Next first frame', mintPixels: lit, milliseconds: Date.now() - shown });
+    result.checks.push({ name: 'Next production: SSR, client hydration, rendered geometry' });
+    assert.deepEqual(errors, []);
+    await mkdir('test-results', { recursive: true });
+    await writeFile('test-results/modern-browser.json', JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    // The browser goes first: it holds keep-alive connections to the servers, and closing a server before it never
+    // finishes (bug 30). `context.close()` also closes the dev server `openBrowser` started.
+    await closeAll({ context, servers: vite ? [vite] : [], children: next ? [next] : [] });
+  }
 }

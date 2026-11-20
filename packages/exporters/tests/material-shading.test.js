@@ -14,6 +14,9 @@ test('lambert and phong reach glTF as metalness 0 with roughness 1 or the shinin
   const phong = pbr({ shading: 'phong', shininess: 30 });
   assert.equal(phong.metallicFactor, 0);
   assert.equal(phong.roughnessFactor, 0.5, '(2 / 32)^(1/4)');
+  // A string shininess was coerced: '5' + 2 made '52', so roughness came out 0.443.
+  for (const shininess of ['5', true])
+    assert.throws(() => pbr({ shading: 'phong', shininess }), { name: 'RangeError', message: /shininess/ });
 });
 
 test('COLLADA writes the named effect: lambert, phong with its specular and shininess', () => {

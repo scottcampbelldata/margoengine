@@ -13,7 +13,7 @@
 // hand-set depthRange case; three can, at the paper's wrapping zone.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
-import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRTransparency } from '@margoengine/gltf/pbr';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire, writeUniform } from '../../shared/frame-resources.js';
 import { alphaBlend, groupCode, type SurfaceTransparency } from '../../shared/pass.js';
@@ -183,7 +183,7 @@ const compositeLinear = linearComposite(
 const formats: readonly GPUTextureFormat[] = ['rgba16float', 'rgba16float', 'rgba16float'];
 
 /**
- * Moment-based order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf-pro) or a
+ * Moment-based order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf/pbr) or a
  * transparent materials mesh twice, once to sum the moments of each pixel's layers and once to shade each layer by the
  * transmittance in front of it, so a near layer really does hide a far one. Closer to exact than `OIT` with several
  * layers, at about twice its geometry cost, and with fixed memory, unlike `ExactOIT`. Still an approximation. Models not
@@ -287,7 +287,7 @@ export class MomentOIT extends TransparentPass {
     const start = Math.max(least * 0.98, near);
     return [start, Math.max(most * 1.02, start * 1.01)];
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   declarations(group: number): string {
     return groupCode(this.code, group, (g) => this.surface(g) + pbrLayer);
   }
@@ -295,11 +295,11 @@ export class MomentOIT extends TransparentPass {
   surface(group: number): string {
     return groupCode(this.surfaceCode, group, sums);
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   bindings(): GPUBindGroupEntry[] {
     return [{ binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } }];
   }
-  /** @internal gltf-pro transparency hook: the moment pass, begun on the first transparent draw of the frame. */
+  /** @internal gltf\/pbr transparency hook: the moment pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
     return (this.pass ??= this.open(
       'oit:moments',

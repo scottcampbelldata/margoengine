@@ -2,7 +2,8 @@
  * WGSL that places one GPU scatter vertex. Instances store `position = (x, y, z, scale)` and
  * `rotation = (yaw, packed ground normal, LOD fade, fade mode)`; the ground normal's X and Z take 12 bits each in one
  * float (integers below 2^24 are exact). `ground.x` is the `alignToGround` amount; `blade` is
- * `(rootShade, widen / far, 1 / mesh top, 1 / far)`, all 0 without `blades`. Needs `windShader`.
+ * `(rootShade, widen / far, 1 / mesh top, 1 / far)`, all 0 without `blades`. `pixel` is the drawing camera's pixel
+ * footprint per metre of distance (`pixelFootprint`), which `GrassScatter` floors its blades' width at. Needs `windShader`.
  */
 export const poseShader = /* wgsl */ `
 fn scatterGround(packed:f32)->vec3f {
@@ -16,7 +17,7 @@ fn scatterTurn(v:vec3f,c:f32,s:f32,up:vec3f)->vec3f {
 }
 // ground.xyz is the terrain normal and ground.w how far the shading normal blends toward it; shade scales the albedo.
 struct ScatterPose {world:vec3f,normal:vec3f,ground:vec4f,shade:f32}
-fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:vec4f,eye:vec3f,wind:vec4f)->ScatterPose {
+fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:vec4f,eye:vec3f,wind:vec4f,pixel:f32)->ScatterPose {
  let c=cos(rotation.x);let s=sin(rotation.x);let g=scatterGround(rotation.y);let up=normalize(mix(vec3f(0,1,0),g,ground.x));
  // Blades: t is 0 at the root and 1 at the tip; distant blades widen so they do not thin below a pixel and alias.
  let d=distance(position.xyz,eye);let t=clamp(p.y*blade.z,0.0,1.0);let wide=1.0+d*blade.y;
@@ -37,3 +38,15 @@ fn lodVisible(pixel:vec2f,fade:vec2f)->bool {
  return select(fade.x>=threshold,fade.x<threshold,fade.y==1.0);
 }
 `;
+
+/**
+ * The world size of one pixel row per metre of distance from the eye, for a perspective view-projection `matrix`
+ * (column-major) drawn into a target `height` pixels tall: 2 |row 3| / (height |row 1|) over the matrix's xyz columns,
+ * which for core's perspective is 2 tan(fov / 2) / height. 0 when either is degenerate.
+ */
+export function pixelFootprint(matrix: ArrayLike<number>, height: number): number {
+  const up = Math.hypot(matrix[1], matrix[5], matrix[9]),
+    depth = Math.hypot(matrix[3], matrix[7], matrix[11]),
+    value = (2 * depth) / (height * up);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}

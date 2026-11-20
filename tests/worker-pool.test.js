@@ -183,3 +183,46 @@ test('dispose rejects queued and running jobs, terminates the workers and refuse
   await assert.rejects(jobs.run({}), isCode('disposed', /create a new pool/));
   assert.throws(() => new JobPool(() => new FakeWorker(), 0), RangeError);
 });
+
+// KB-VOX-SETTLE1 (2026-11-15, local CI): a voxel render test waited 20 s for meshes that normally arrive in 46 to 68 ms,
+// while worker_threads starts took 17 to 41 s under load (KB-WORKER-RPC1). The pool is not what loses time there: a worker
+// that answers late, however late, still settles its job, the jobs queued behind it keep waiting for their turn, and nothing
+// rejects, retires the worker or drops the reply while it is held. This pins that (no `timeout` is set by the voxel mesher).
+test('a held reply is waited for: the job and the jobs behind it stay pending, then settle in order, with no worker lost', async () => {
+  const jobs = pool(2);
+  const settled = [];
+  const run = (name) =>
+    jobs.run({ name }).then(
+      (value) => settled.push(value),
+      (error) => settled.push(`rejected:${error.message}`),
+    );
+  const all = ['a', 'b', 'c', 'd'].map(run);
+  const [first, second] = FakeWorker.created;
+  assert.equal(FakeWorker.created.length, 2, 'two workers, the pool size, however slow they are to answer');
+  // A long wait of event-loop turns and timers while both workers hold their replies: nothing settles, nothing is retired.
+  for (let turn = 0; turn < 50; turn++) await tick();
+  // fixed-wait: a time in which nothing may happen (a held reply must not settle or retire a worker); no condition ends it.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(settled, [], 'no job settles while its reply is held');
+  assert.equal(first.terminated || second.terminated, false, 'a slow worker is not retired without a timeout');
+  assert.deepEqual(
+    [first.received.length, second.received.length],
+    [1, 1],
+    'each worker holds exactly one job; the other two wait in the queue',
+  );
+  second.reply({ result: 'b' });
+  await tick();
+  assert.deepEqual(settled, ['b']);
+  assert.equal(second.received.length, 2, 'the queued job went to the worker that just answered');
+  first.reply({ result: 'a' });
+  second.reply({ result: 'c' });
+  first.reply({ result: 'd' });
+  await Promise.all(all);
+  assert.deepEqual(settled, ['b', 'a', 'c', 'd'], 'every reply settled its own job');
+  assert.deepEqual(
+    [first.terminated, second.terminated, FakeWorker.created.length],
+    [false, false, 2],
+    'no worker was retired or replaced',
+  );
+  jobs.dispose();
+});

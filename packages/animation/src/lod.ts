@@ -51,6 +51,8 @@ interface Member {
   phase: number;
   /** Seconds not yet applied to the pose. */
   owed: number;
+  /** Its turn came in the last `advanceTime`; the update that follows poses it. */
+  due: boolean;
   time: number;
   playing: boolean;
   tier: AnimationLODTier;
@@ -111,6 +113,11 @@ export class AnimationLOD implements EnginePlugin {
   private frame = 0;
   private next = 0;
   private disposed = false;
+  private elapsed = 0;
+  /** Seconds this LOD has advanced its copies by. A fresh LOD reads 0. */
+  get time(): number {
+    return this.elapsed;
+  }
 
   /** Same as `engine.use(new AnimationLOD(...))`; returns it. */
   static attach(engine: EngineKernel, options?: AnimationLODOptions): AnimationLOD {
@@ -150,6 +157,7 @@ export class AnimationLOD implements EnginePlugin {
       radius,
       phase: this.next++,
       owed: 0,
+      due: false,
       time: animation.time,
       playing: animation.playing,
       tier: this.tiers[0],
@@ -182,8 +190,23 @@ export class AnimationLOD implements EnginePlugin {
   }
   /** Advances every copy by `delta` seconds, posing those whose turn it is. */
   update(delta: number): void {
+    this.advanceTime(delta);
+    for (const member of this.members.values())
+      if (member.due) {
+        member.due = false;
+        this.pose(member, member.tier);
+      }
+  }
+  /**
+   * Advances every copy's clock by `delta` seconds and picks its tier and turn from the camera, posing nothing: the
+   * CPU part of `update`, which a seek from `@margoengine/cutscene/seek` replays (the same turns as a continuous run
+   * when the camera is where it was); the next update poses the copies whose turn came, at the time they reached.
+   */
+  advanceTime(delta: number): void {
+    if (this.disposed) return;
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid animation delta; pass a finite delta >= 0 seconds');
+    this.elapsed += delta;
     const camera = this.engine?.camera,
       stats = this.stats,
       frame = this.frame++;
@@ -220,7 +243,7 @@ export class AnimationLOD implements EnginePlugin {
       }
       member.time += member.owed * (animation.options.speed ?? 1);
       member.owed = 0;
-      this.pose(member, tier);
+      member.due = true;
       stats.updated++;
     }
   }

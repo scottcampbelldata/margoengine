@@ -139,17 +139,18 @@ fn record(r:Row)->Record {return Record(r.m,vec4f(b.base.rgb*bitcast<vec3f>(r.ti
 }
 `;
 // Depth-only caster drawing for @margoengine/shadows (its cascade passes: depth32float, less-equal, no face culling).
+// Position @invariant, as Shadows' own casters: the same light*model*p then writes the same depth as a core mesh's.
 const shadowShader = `
 @group(0) @binding(0) var<uniform> light:mat4x4f;
 struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f}
-@vertex fn vertex(i:Input)->@builtin(position) vec4f {return light*mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);}
+@vertex fn vertex(i:Input)->@builtin(position) @invariant vec4f {return light*mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);}
 `;
 // One id per instance (its index), drawn into a 1x1 r32uint target for `pick`. Ids are the row order of `world`.
 const pickShader = `
 @group(0) @binding(0) var<uniform> camera:mat4x4f;
 struct Input {@builtin(instance_index) n:u32,@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f}
 struct Output {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) id:u32}
-@vertex fn vertex(i:Input)->Output {var o:Output;o.clip=camera*mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);o.id=i.n;return o;}
+@vertex fn vertex(i:Input)->Output {var o:Output;o.clip=camera*mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);o.id=i.n+1u;return o;}
 @fragment fn fragment(i:Output)->@location(0) u32 {return i.id;}
 `;
 const instanceLayout: GPUVertexBufferLayout = {
@@ -514,6 +515,9 @@ export class DynamicInstances implements EnginePlugin {
     f[40] = c.width;
     f[41] = (Math.hypot(m[1], m[5], m[9]) * c.height) / 2;
     f[42] = this.minRadius * ratio;
+    // `filled` says whether `world` holds this cull's rows: the CPU route writes them, the GPU route leaves them to `fill`.
+    // Keyed to the route this cull took, not to `this.route`, which the lazy import can set after a GPU cull.
+    this.filled = !!this.route;
     if (this.route)
       this.route(
         d,
@@ -525,9 +529,8 @@ export class DynamicInstances implements EnginePlugin {
         floats,
         this.sphere,
         this.geometry.indices.length,
-        this.shape
-          ? (records, at, frame) => this.shape!.cpu(records, at, this.geometry.vertices, 6, 0, frame)
-          : undefined,
+        this.shape?.cpu,
+        this.geometry.vertices,
       );
     else {
       d.queue.writeBuffer(b.frame, 0, f as Float32Array<ArrayBuffer>);
@@ -538,7 +541,6 @@ export class DynamicInstances implements EnginePlugin {
       pass.setPipeline(p.cull);
       pass.dispatchWorkgroups(groups);
       pass.end();
-      this.filled = false;
     }
     // The batch core keeps for the own geometry: the same object while this plugin retains the geometry.
     let batch = this.batch;
@@ -643,10 +645,10 @@ export class DynamicInstances implements EnginePlugin {
     };
   }
 
-  /** Records `world` on `encoder`, once per cull. The compatibility route writes it on the CPU. */
+  /** Records `world` on `encoder`, once per cull; nothing after a cull of the compatibility route, which wrote it on the CPU. */
   private fill(encoder: GPUCommandEncoder): void {
     const p = this.pipelines;
-    if (this.filled || !p || this.route) return;
+    if (this.filled || !p) return;
     this.filled = true;
     const pass = encoder.beginComputePass();
     pass.setBindGroup(0, p.group);
@@ -749,8 +751,7 @@ export class DynamicInstances implements EnginePlugin {
         }),
         uniform = d.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
         ids = d.createTexture({ size: [1, 1], format: 'r32uint', usage: 16 | 1 }),
-        depth = d.createTexture({ size: [1, 1], format: 'depth32float', usage: 16 }),
-        none = 4294967295;
+        depth = d.createTexture({ size: [1, 1], format: 'depth32float', usage: 16 });
       return {
         pipeline,
         uniform,
@@ -763,7 +764,9 @@ export class DynamicInstances implements EnginePlugin {
         }),
         descriptor: {
           colorAttachments: [
-            { view: ids.createView(), clearValue: [none, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
+            // Ids are written one up over a clear of 0: Firefox 157 clears an r32uint target through float32, so a
+            // clear of 0xffffffff came back 0 and every empty pixel picked instance 0.
+            { view: ids.createView(), clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
           ],
           depthStencilAttachment: {
             view: depth.createView(),
@@ -803,9 +806,9 @@ export class DynamicInstances implements EnginePlugin {
       encoder.copyTextureToBuffer({ texture: t.ids }, { buffer: read }, [1, 1]);
       d.queue.submit([encoder.finish()]);
       await read.mapAsync(GPUMapMode.READ);
-      const id = new Uint32Array(read.getMappedRange().slice(0))[0];
+      const id = new Uint32Array(read.getMappedRange().slice(0))[0] - 1;
       read.unmap();
-      return id < this.high && this.states[id * 4 + 3] === 1 ? id : null;
+      return id >= 0 && id < this.high && this.states[id * 4 + 3] === 1 ? id : null;
     } finally {
       read.destroy();
     }

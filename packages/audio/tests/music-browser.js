@@ -5,10 +5,17 @@ import { AudioMusic } from '@margoengine/audio/music';
 
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 export async function runMusicTests() {
-  const reports = [];
+  const reports = [], notRun = [];
   for (const backend of ['webgpu', 'webgl2', 'webgl2-compat']) {
     const compat = backend === 'webgl2-compat' ? await import('@margoengine/webgl2-compat') : null;
-    if (compat) await compat.install({force:true});
+    if (compat)
+      try { await compat.install({force:true}); }
+      catch (error) {
+        // A context below the layer's full tier is refused with code 'unsupported'; the runner names it.
+        if (error?.code !== 'unsupported') throw error;
+        notRun.push(`runMusicTests on webgl2-compat: ${error.message}`);
+        continue;
+      }
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 64;
     document.body.append(canvas);
@@ -55,5 +62,5 @@ export async function runMusicTests() {
       reports.push({backend,beat,bar,maxError,gpuErrors});
     } finally { engine?.dispose(); canvas.remove(); compat?.uninstall(); }
   }
-  return {fixture:'Generated 600/900 Hz stems and game-state triggers, stand-ins',reports,loopGrid:await measureLoopGrid()};
+  return {fixture:'Generated 600/900 Hz stems and game-state triggers, stand-ins',reports,notRun,loopGrid:await measureLoopGrid()};
 }

@@ -446,7 +446,11 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64, fu
       if (type === 11 || type === 12) return token(payload);
       if (type === 8 || type === 9) return f.getFloat32(0);
       if (type === 7) return half(low & 65535);
-      if (type === 3) return low | 0;
+      // A 32-bit int, or a 64-bit one that fits in 32 bits, is held as its low 32 bits, signed or not by its type.
+      if (type === 3 || type === 5) return low | 0;
+      if (type === 4 || type === 6) return low;
+      // A half2 fits in 32 bits, so its two halves are held as they are; other vectors as one int8 per component.
+      if (type === 21) return [half(low & 65535), half(low >>> 16)];
       if (type >= 19 && type <= 30) return bytes.slice(0, SHAPES[type][0]);
       if (type >= 13 && type <= 15) {
         const n = type - 11,
@@ -469,7 +473,8 @@ export function parseCrate(data: Uint8Array, maxBytes: number, maxDepth = 64, fu
     if (type === 42 || type === 43 || type === 44) return u32();
     if (type === 10 || type === 11 || type === 12) {
       const count = array ? (minor < 7 ? u32() : u64()) : 1,
-        values = repeat(count, () => u32()).map((i) => (type === 10 ? string(i) : token(i)));
+        // Strings, and asset paths in an array, are indices into the string table; tokens index the token table.
+        values = repeat(count, () => u32()).map((i) => (type === 10 || (type === 12 && array) ? string(i) : token(i)));
       return array ? values : values[0];
     }
     const shape = SHAPES[type];

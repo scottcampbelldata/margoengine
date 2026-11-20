@@ -4,11 +4,15 @@
 // dist/error-codes.json (the entries of the error help page, from its one source scripts/errors/entries.js).
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { entries } from '../../../scripts/errors/entries.js';
 import { collectCorpus } from '../../../scripts/support/llms-corpus.mjs';
-import { portingGuidesFromCorpus } from '../dist/porting.js';
+import { distDir } from '../../../scripts/support/dist-dir.mjs';
 
-const dist = resolve(import.meta.dirname, '../dist');
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs); the porting reader comes from
+// the build just written there.
+const dist = distDir(resolve(import.meta.dirname, '..'));
+const { portingGuidesFromCorpus } = await import(pathToFileURL(resolve(dist, 'porting.js')).href);
 const corpus = collectCorpus();
 await mkdir(dist, { recursive: true });
 await writeFile(resolve(dist, 'corpus.json'), JSON.stringify(corpus));

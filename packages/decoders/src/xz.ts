@@ -11,7 +11,8 @@ export interface XzOptions {
   maxBytes?: number;
 }
 
-const corrupt = (why: string) => decodeFailed(`LZMA stream is corrupt: ${why}`);
+const corrupt = (why: string) =>
+  decodeFailed(`LZMA stream is corrupt: ${why}; pass the complete, unmodified compressed bytes`);
 
 const BITS_MODEL = 11;
 const TOP = 2 ** 24;
@@ -459,8 +460,9 @@ const MAGIC = [0xfd, 0x37, 0x7a, 0x58, 0x5a, 0];
 
 /**
  * Decodes an `.xz` stream, or several in a row with padding between, and checks all the file holds: the CRC32 of the
- * headers, and each block's own CRC32, CRC64 or SHA-256. Only the LZMA2 filter is read.
- * @throws MargoError `'failed'` for a corrupt or short stream or one past `maxBytes`, `'unsupported'` for another filter.
+ * headers, and each block's own CRC32, CRC64 or SHA-256. Reads LZMA2 blocks, with Delta filters before it.
+ * @throws MargoError `'failed'` for a corrupt or short stream or one past `maxBytes`, `'unsupported'` for another
+ * filter (the branch/call/jump filters for executables are not read).
  */
 export function decodeXz(input: Uint8Array, options: XzOptions = {}): Uint8Array {
   const out = new Output(Math.max(1024, input.length * 4), options.maxBytes ?? 2 ** 30);
@@ -482,7 +484,10 @@ export function decodeXz(input: Uint8Array, options: XzOptions = {}): Uint8Array
     if (input[at + 6] !== 0 || input[at + 7] > 15) throw corrupt('its stream flags are unknown');
     if (crc32(input.subarray(at + 6, at + 8)) !== u32(input, at + 8)) throw corrupt('its header fails its CRC');
     const check = input[at + 7],
-      size = CHECK_SIZES[check];
+      size = CHECK_SIZES[check],
+      streamFlags = at + 6,
+      // Unpadded and uncompressed size of each block, for the index (xz format 1.2.1, 4.3: it MUST match them).
+      blocks: number[] = [];
     at += 12;
     for (;;) {
       if (at >= input.length) throw corrupt('it ends early');
@@ -495,20 +500,36 @@ export function decodeXz(input: Uint8Array, options: XzOptions = {}): Uint8Array
       const flags = input[at++],
         filters = (flags & 3) + 1;
       if (flags & 0x3c) throw corrupt('a block header has unknown flags');
-      if (flags & 0x40) varint();
-      if (flags & 0x80) varint();
+      const packed = flags & 0x40 ? varint() : -1,
+        unpacked = flags & 0x80 ? varint() : -1;
+      // Filter chain in encoding order (xz format 1.2.1, 5.3): LZMA2 last, Delta (0x03) before it any number of times.
+      const deltas: number[] = [];
       for (let i = 0; i < filters; i++) {
         const id = varint(),
           bytes = varint();
-        if (id !== 0x21 || i !== filters - 1 || filters > 1)
-          throw deviceUnsupported(`xz filter 0x${id.toString(16)} is not read; only LZMA2 is`);
+        if (at + bytes > head + headerSize - 4) throw corrupt('a filter runs past its block header');
+        if (i === filters - 1 ? id !== 0x21 : id !== 0x03)
+          throw deviceUnsupported(`xz filter 0x${id.toString(16)} is not read; LZMA2 with Delta before it is`);
+        if (bytes !== 1) throw corrupt(`filter 0x${id.toString(16)} has ${bytes} property bytes, not 1`);
+        if (id === 0x21 && input[at] > 40) throw corrupt('an LZMA2 dictionary size is out of range');
+        if (id === 0x03) deltas.push(input[at] + 1);
         at += bytes;
       }
+      while (at < head + headerSize - 4) if (input[at++]) throw corrupt('block header padding is not zero');
       at = head + headerSize;
       const first = out.length,
         start = at;
       out.floor = out.length;
       at = readLzma2(input, at, input.length, out);
+      if ((packed >= 0 && at - start !== packed) || (unpacked >= 0 && out.length - first !== unpacked))
+        throw corrupt('a block differs from the sizes its header states');
+      // Delta decoding adds the byte `distance` back, inside this block only (5.3.2): the last listed filter first.
+      for (let k = deltas.length - 1; k >= 0; k--) {
+        const data = out.data,
+          distance = deltas[k];
+        for (let i = first + distance; i < out.length; i++) data[i] = (data[i] + data[i - distance]) & 0xff;
+      }
+      const unpadded = at - head + size;
       while ((at - start) % 4) if (input[at++]) throw corrupt('block padding is not zero');
       if (at + size > input.length) throw corrupt('it ends early');
       if (
@@ -518,17 +539,21 @@ export function decodeXz(input: Uint8Array, options: XzOptions = {}): Uint8Array
       )
         throw corrupt('a block fails its check');
       at += size;
+      blocks.push(unpadded, out.length - first);
     }
-    // The index repeats sizes already checked by decoding: its own CRC and the footer are what is read here.
     const index = at++,
       records = varint();
-    for (let i = 0; i < records * 2; i++) varint();
+    if (records !== blocks.length / 2) throw corrupt(`its index lists ${records} blocks, not ${blocks.length / 2}`);
+    for (const real of blocks) if (varint() !== real) throw corrupt('its index differs from its blocks');
     while ((at - index) % 4) if (input[at++]) throw corrupt('index padding is not zero');
     if (at + 4 + 12 > input.length) throw corrupt('it ends early');
     if (crc32(input.subarray(index, at)) !== u32(input, at)) throw corrupt('its index fails its CRC');
     at += 4;
     if (input[at + 10] !== 0x59 || input[at + 11] !== 0x5a) throw corrupt('it has no xz footer');
     if (crc32(input.subarray(at + 4, at + 10)) !== u32(input, at)) throw corrupt('its footer fails its CRC');
+    if ((u32(input, at + 4) + 1) * 4 !== at - index) throw corrupt('its footer gives another index size');
+    if (input[at + 8] !== input[streamFlags] || input[at + 9] !== input[streamFlags + 1])
+      throw corrupt('its footer flags differ from its header');
     at += 12;
     while (at + 4 <= input.length && !u32(input, at)) at += 4;
   } while (at < input.length);

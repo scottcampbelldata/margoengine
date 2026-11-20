@@ -342,7 +342,14 @@ function cellBounds(axisValues: Float64Array, bounds: Float64Array | undefined, 
     return Array.from(axisValues, (_, i) => {
       let a = bounds[i * 2],
         b = bounds[i * 2 + 1];
-      if (!latitude && Math.abs(b - a) < 360 - 1e-8) b = a + wrapLongitude(b - a);
+      // A longitude pair names an interval only modulo 360: of the two arcs from a, take the one that holds the
+      // cell's own centre (CF 7.1), so a cell wider than 180 degrees is not swapped for its complement.
+      if (!latitude && Number.isFinite(a) && Number.isFinite(b) && Math.abs(b - a) < 360 - 1e-8) {
+        const short = wrapLongitude(b - a),
+          long = short - Math.sign(short) * 360,
+          holds = (d: number) => (((axisValues[i] - Math.min(a, a + d)) % 360) + 360) % 360 <= Math.abs(d) + 1e-10;
+        b = a + (short !== 0 && !holds(short) && holds(long) ? long : short);
+      }
       if (!Number.isFinite(a) || !Number.isFinite(b) || a === b || (latitude && (Math.abs(a) > 90 || Math.abs(b) > 90)))
         throw bad('invalid cell bounds');
       return [Math.min(a, b), Math.max(a, b)];

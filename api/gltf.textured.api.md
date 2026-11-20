@@ -112,6 +112,7 @@ interface GLTFExtension {
     load?(file: GLTFFile, signal?: AbortSignal): Promise<void>;
     read?(file: GLTFFile): void;
     finish?(model: Model, file: GLTFFile, built: GLTFBuilt): void;
+    abandon?(file: GLTFFile): void;
 }
 
 interface GLTFExtensions {

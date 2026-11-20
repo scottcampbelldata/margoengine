@@ -194,7 +194,7 @@ function lines(result) {
       [
         'Gate',
         gate
-          ? `AC ${gate.ac ?? 'unknown'}; GPU lock ${gate.lock ? 'held' : 'not needed'}; CPU ${gate.quiet?.cpuLoadPercent ?? '?'}% after ${gate.quiet?.waitedSeconds ?? 0} s${gate.quiet?.skipped ? ' (gate skipped)' : ''}`
+          ? `AC ${gate.ac ?? 'unknown'}; CPU ${gate.quiet?.cpuLoadPercent ?? '?'}% after ${gate.quiet?.waitedSeconds ?? 0} s${gate.quiet?.skipped ? ' (gate skipped)' : ''}`
           : 'none',
       ],
       [

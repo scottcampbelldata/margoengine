@@ -9,8 +9,10 @@ import {
   GLSL_HELPERS,
   INVERSE_TRIG_IMPLAUSIBLE,
   INVERSE_TRIG_PROBE,
+  INVERSE_TRIG_SMOOTH,
   INVERSE_TRIG_TOLERANCE,
   inverseTrigError,
+  inverseTrigVerdict,
   translateWGSL,
 } from '../dist/glsl.js';
 
@@ -157,4 +159,23 @@ test('the probe flags the ANGLE Direct3D 11 results and passes accurate ones', (
   assert.ok(inverseTrigError(off) > INVERSE_TRIG_TOLERANCE);
   off[4] = NaN;
   assert.equal(inverseTrigError(off), Infinity);
+  assert.equal(inverseTrigVerdict(exact), false);
+  assert.equal(inverseTrigVerdict(d3d11), true);
+  assert.equal(inverseTrigVerdict(new Float32Array(INVERSE_TRIG_PROBE.length * 4)), false, 'a stand-in never changes the shaders');
+  assert.equal(inverseTrigVerdict(own), false);
+});
+
+// Apple M6, Chrome 156, raw WebGL2 (ANGLE Metal) and native WebGPU (Dawn Metal) alike (2026-11-15): exact on every
+// smooth input, but atan2(1, -0) = -pi / 2, atan2(-1, -0) = pi / 2 and atan2(-0, -1) = pi. The layer then shipped
+// those built-ins, and features-browser.mjs inverseTrig read atan2(-0, -1) 6.28 off.
+test('the probe flags a driver whose atan2 is a half turn off at x = -0 (Apple silicon Metal)', () => {
+  const metalAtan2 = (y, x) => (Object.is(x, -0) && y !== 0 ? -Math.atan2(y, 0) : Object.is(y, -0) && x < 0 ? Math.PI : Math.atan2(y, x));
+  const metal = new Float32Array(INVERSE_TRIG_PROBE.flatMap(([x, y, z]) => [Math.acos(x), Math.asin(x), metalAtan2(y, z), 0]));
+  assert.ok(INVERSE_TRIG_PROBE.slice(INVERSE_TRIG_SMOOTH).every(([, y, x]) => Object.is(x, -0) || Object.is(y, -0)), 'the edges hold signed zeros');
+  assert.ok(inverseTrigError(metal, INVERSE_TRIG_SMOOTH) < 1e-6, 'every smooth input is exact');
+  assert.ok(inverseTrigError(metal) > 1, 'an edge is a half turn off');
+  assert.equal(inverseTrigVerdict(metal), true);
+  // Its probe values as the layer's own helpers give them pass.
+  const own = new Float32Array(INVERSE_TRIG_PROBE.flatMap(([x, y, z]) => [acos(x), asin(x), atan2(y, z), 0]));
+  assert.ok(inverseTrigError(own) <= INVERSE_TRIG_TOLERANCE);
 });

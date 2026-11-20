@@ -12,7 +12,7 @@ test('sky test:gpu runs every feature check once, in named groups of at most thr
     ...[...source.matchAll(/^ {2}async '?([a-z-]+)'?\(page, samples\)/gm)].map((m) => m[1]),
     ...[...source.matchAll(/^checks\.([a-z]+) = async/gm)].map((m) => m[1]),
   ];
-  assert.equal(all.length, 11);
+  assert.equal(all.length, 20);
   const groups = [...script.matchAll(/features-check\.mjs((?: [a-z-]+)*)/g)].map((m) => m[1].trim().split(' '));
   assert.ok(groups.length >= 4, `groups ${JSON.stringify(groups)}`);
   for (const group of groups) assert.ok(group.length >= 1 && group[0] !== '' && group.length <= 3, `group ${group}`);

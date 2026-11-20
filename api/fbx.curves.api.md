@@ -12,6 +12,7 @@ export interface FBXCurveRecord {
     weights: number[];
     knots: number[];
     polyline: number[];
+    pieces?: number[];
 }
 
 export function fbxCurves(nodes: readonly {

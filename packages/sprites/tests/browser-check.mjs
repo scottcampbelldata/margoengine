@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/browser-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/browser-check.mjs
 // Under exactSize [64, 32] each frame reads back byte for byte against an image composed on the CPU: a 4 x 4 sprite at
 // (10, 7), flips, tint, alpha, y-sort and add order, snapping, a camera, half-pixel pivots, quarter turns, buffer growth,
 // layers, a caller target with its alpha, normals, views, and a device loss. Results: test-results/sprites-browser.json.
@@ -32,7 +32,18 @@ try {
   assert.equal(result.msaa.validation, null, 'MSAA engine: no validation error');
   assert.equal(result.msaa.normals, 'state', 'normals on an MSAA target name their fix');
   assert.ok(result.msaa.samples > 1, `the MSAA engine has ${result.msaa.samples} samples`);
-  assert.equal(result.lostPlainAtlas, 'state', 'a plain GPUTexture atlas names its fix after a device loss');
+  // KB-RESTORE-BORROWED1: no frame throws, one report, the function form is called once per device.
+  assert.deepEqual(result.lostPlainAtlas, {
+    thrown: null,
+    reports: [
+      [
+        'state',
+        'SpriteLayer atlas lost with the device; pass a function or call setAtlas; see https://margoengine.com/errors#borrowed-lost',
+      ],
+    ],
+    functionCalls: 2,
+    functionDevices: true,
+  });
   assert.deepEqual(pageErrors, []);
   console.log(
     'ok sprites:',

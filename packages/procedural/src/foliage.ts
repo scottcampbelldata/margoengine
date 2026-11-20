@@ -256,24 +256,393 @@ function leafClumps(x: number, y: number, z: number, size: number, phase: number
   return geometryData(positions, new Float32Array(positions.length), uvs, indices);
 }
 
+/** Options of {@link generateTreeMesh}: the detail level, and for a conifer whether its tiers are branch whorls. */
+export interface TreeMeshShapeOptions extends MeshDetailOptions {
+  /**
+   * Conifer only, detail 1 and 2: build each tier as a whorl of drooping branch sprays with gaps between them, as a
+   * spruce's branches grow (7 main branches a whorl and 5 shorter ones between whorls, each a cupped spray that droops
+   * toward its tip), instead of one jagged skirt. A tree seen up close, from below or against the sky then shows its
+   * branches, the sky between them and each spray's own shading, where a skirt reads as one flat dark shape. Its
+   * normals mix the spray's surface with the crown's radial direction and a per-vertex needle tilt. Default false: the
+   * skirts, about a third of the triangles, for mid and far trees. `createTree` turns it on.
+   */
+  branches?: boolean;
+  /**
+   * Conifer with `branches`, detail 1 and 2: build each spray as the branch it stands for, a twig axis with lateral
+   * shoots along it, alternating sides, each shoot and the axis edged with a serrated fringe of needle tufts, and the
+   * sky between the shoots, inside the plain spray's outline. Seen from 1 to 30 m a branch then shows its twigs, ragged
+   * needle edges and gaps, where the plain spray reads as one smooth tapered blade. About ten times the plain
+   * sprays' triangles, so `createTree` builds it only for trees near the camera (its `shootDistance`). `'coarse'` is
+   * the same branch for mid and far trees: at detail 2 the lateral shoots half as far apart again and 1.55 times as
+   * wide, at detail 1 the same laterals, the needle fringe's serration folded into the band's width, so it covers the same
+   * share of its outline as the shoots from every side, with the same normals and so the same colour and snow. This is
+   * the level of detail rule of aggregate geometry: a coarser level keeps the expected projected area and the
+   * distribution of normals of what it stands for (Cook, Halstead, Planck and Ryu 2007, Stochastic simplification of
+   * aggregate detail; Lacewell, Edwards, Shirley and Thompson 2006, Stochastic billboard clouds; Bruneton and Neyret
+   * 2012, Real-time realistic rendering and lighting of forests; Deussen, Colditz, Stamminger and Drettakis 2002,
+   * Interactive visualization of complex plant ecosystems). The plain sprays cover all of their outline where the
+   * shoots cover about 60 percent, so a tree switching between them changes its look. Default false: the plain sprays.
+   */
+  shoots?: boolean | 'coarse';
+  /**
+   * Butt flare: the trunk's diameter at the ground over its diameter at breast height (1.3 m of the unscaled mesh),
+   * 1 to 2.5. The swell dies away over about the lowest 0.25 m, as a stem's butt swell does below breast height.
+   * Unset: the historical trunk, one ring widened 1.8 times at the ground (about 2.1 times the breast-height
+   * diameter). `createTree` gives a conifer `SPRUCE_FLARE`, 1.3.
+   */
+  flare?: number;
+  /**
+   * With `flare`: the height in mesh metres where the breast-height diameter is taken, 0.3 to 6. Default 1.3.
+   * `createTree` sets 1.3 m of the placed tree (1.3 divided by its scale), so the flare holds at every height.
+   */
+  breastHeight?: number;
+  /**
+   * The trunk's diameter at `breastHeight` (1.3 m when unset) in mesh metres, 0.005 to 3: the whole trunk is scaled
+   * across (not up) to it, so its taper and flare keep their shape. Unset: the historical trunk, about 0.55 m at 1.3 m
+   * of the 7.6 m conifer. `createTree` gives a conifer the measured spruce stem for its height (`spruceDiameter`).
+   */
+  breastDiameter?: number;
+}
+
+/** Shoot layout of a near spray: metres along the axis per lateral shoot, and per needle tuft along a shoot. */
+interface ShootSpacing {
+  spacing: number;
+  tooth: number;
+  /**
+   * The coarse level: no serrated teeth, each band as wide as the toothed band's mean (its half width w plus half of
+   * the teeth's reach beyond it, the teeth being triangles), and the laterals widened by `widen`, the coarse spacing over
+   * the near one, so the projected area per metre of branch is the near level's.
+   */
+  coarse?: { widen: number; ratio: number };
+}
+
+// One spray built as the branch it stands for, inside the plain spray's outline (half width `halfWidth` times the same
+// profile, the same droop and cupping). A first-order axis runs from the trunk to the tip; lateral (second-order) shoots
+// leave it every `spacing` metres, alternating sides, about 55 degrees forward of the axis, and run out to the outline;
+// the spruce's flat, two-ranked branch system (Weber and Penn 1995, the child stems' down angle and rotation along their
+// parent; Deussen and Lintermann 2005, ch. 6). Every shoot is a narrow twig strip edged on both sides by a serrated
+// fringe, one forward-swept tooth per `tooth` metres: the needle tufts, about 30 mm a side for a Norway spruce shoot
+// with its needles (needles 10 to 25 mm, Farjon 2010, A Handbook of the World's Conifers) and the third-order twigs that
+// the fringe stands for. The sky shows between the shoots and between the teeth; a shoot's silhouette is the shoot's
+// projected area, not its needles' (Smolander and Stenberg 2003, shoot silhouette to total area). Triangles wind as the
+// plain spray's do, so their face normals point up.
+// Reach of a lateral shoot's needle tufts beyond its twig, metres.
+const NEEDLE_TUFT = 0.034;
+// The leader (KB-CABIN-LEADER1): the stem's terminal shoot, this year's growth unit standing on the youngest whorl,
+// 0.5 m to the crown's top (a young Norway spruce's annual height growth, 7 m in 20 years and quickening; Pokorný and
+// Tomášková 2007), with no side shoots yet, and its half width, the axis twig and its needle tufts. A spruce grows
+// rhythmically, a growth unit a year from the terminal bud, with a whorl of lateral buds at each unit's top (Hallé,
+// Oldeman and Tomlinson 1978, Tropical Trees and Forests: An Architectural Analysis; Fabrika et al. 2019, BioResources,
+// crown architecture of young Norway spruce).
+const LEADER = 0.5,
+  LEADER_HALF = 0.042,
+  // The crown cone's half angle: the lowest whorl's 2.1 m reach under the 5.6 m from its top to the crown's.
+  CROWN_HALF = Math.atan2(2.1, 5.6),
+  CROWN_COS = Math.cos(CROWN_HALF),
+  CROWN_SIN = Math.sin(CROWN_HALF);
+function branchShoots(
+  positions: number[],
+  uvs: number[],
+  indices: number[],
+  cx: number,
+  cy: number,
+  cz: number,
+  dx: number,
+  dz: number,
+  len: number,
+  halfWidth: number,
+  droop: number,
+  { spacing, tooth, coarse }: ShootSpacing,
+  hash: (n: number) => number,
+  upright = false,
+): void {
+  const planar: number[] = [],
+    halfAt = (t: number) =>
+      halfWidth * Math.sin(Math.PI * Math.min(1, t * 0.85 + 0.15)) ** 0.8 * Math.min(1, 0.25 + t * 1.9),
+    // The point s metres out along the axis and l metres to its side, drooped and cupped as the plain spray is; an
+    // upright shoot (the leader) runs straight up from (cx, cy, cz) with its side l across (dx, dz).
+    put = (s: number, l: number) => {
+      const t = Math.min(1, Math.max(0, s / len)),
+        r = 0.06 + s,
+        drop = droop * (0.35 * t + 0.65 * t * t),
+        cup = (0.28 * l * l) / Math.max(halfAt(t), halfWidth * 0.1);
+      if (upright) positions.push(cx - dz * l, cy + s, cz + dx * l);
+      else positions.push(cx + dx * r - dz * l, cy - drop - cup, cz + dz * r + dx * l);
+      uvs.push(t, 0.5 + l / (2 * halfWidth));
+      planar.push(s, l);
+      return positions.length / 3 - 1;
+    },
+    base = positions.length / 3,
+    tri = (a: number, b: number, c: number) => {
+      const pa = (a - base) * 2,
+        pb = (b - base) * 2,
+        pc = (c - base) * 2,
+        area =
+          (planar[pb] - planar[pa]) * (planar[pc + 1] - planar[pa + 1]) -
+          (planar[pb + 1] - planar[pa + 1]) * (planar[pc] - planar[pa]);
+      // The plain spray's first triangle has a negative area in (s, l): keep that winding.
+      if (area < 0) indices.push(a, b, c);
+      else indices.push(a, c, b);
+    },
+    // A shoot from (s0, l0) along unit (as, al) for `length` metres: twig half width `twig`, tufts `needle` long.
+    fringe = (
+      s0: number,
+      l0: number,
+      as: number,
+      al: number,
+      length: number,
+      twig: number,
+      needle: number,
+      widen = 1,
+    ) => {
+      const steps = Math.max(coarse ? 1 : 2, Math.ceil(length / tooth));
+      let left = -1,
+        right = -1;
+      for (let i = 0; i <= steps; i++) {
+        const f = i / steps,
+          // The band of needles along the twig, then the tufts' serrated tips beyond it. The coarse band is the toothed
+          // band's mean width: w, plus half of the teeth's mean reach (hash 0.5) beyond it.
+          band = (twig + 0.45 * needle) * (1 - 0.6 * f),
+          w = coarse ? widen * 0.5 * (band + (twig + needle * 1.025) * (1 - 0.55 * f)) : band,
+          s = s0 + as * length * f,
+          l = l0 + al * length * f,
+          nextLeft = put(s - al * w, l + as * w),
+          nextRight = put(s + al * w, l - as * w);
+        if (i > 0 && coarse) {
+          tri(left, right, nextLeft);
+          tri(nextLeft, right, nextRight);
+        } else if (i > 0) {
+          const m = (i - 0.5) / steps,
+            k = 1 - 0.55 * m,
+            reach = (twig + needle * (0.85 + 0.35 * hash(i * 7 + steps))) * k,
+            ms = s0 + as * length * m + as * needle * k * 0.6,
+            ml = l0 + al * length * m + al * needle * k * 0.6;
+          tri(left, right, nextLeft);
+          tri(nextLeft, right, nextRight);
+          tri(left, nextLeft, put(ms - al * reach, ml + as * reach));
+          tri(right, nextRight, put(ms + al * reach, ml - as * reach));
+        }
+        left = nextLeft;
+        right = nextRight;
+      }
+    };
+  fringe(0, 0, 1, 0, len, 0.012, 0.03);
+  // The leader is this year's terminal shoot: needles, no side shoots yet.
+  if (upright) return;
+  const laterals = Math.max(4, Math.round((len * 0.84) / spacing)),
+    // A short spray has at least 4 laterals at both levels. Where the near level's count is held up to that floor, the
+    // coarse widening (spacing ratio times the teeth's share) is scaled by the near count over the coarse count and
+    // over the spacing ratio, so a short spray (the crown top's) keeps its coverage too.
+    nearLaterals = coarse ? Math.round((len * 0.84 * coarse.ratio) / spacing) : 0,
+    widen = coarse && nearLaterals < 4 ? (coarse.widen * 4) / (laterals * coarse.ratio) : coarse?.widen;
+  for (let k = 0; k < laterals; k++) {
+    const s0 = len * (0.1 + (0.84 * (k + 0.5)) / laterals),
+      side = k % 2 ? 1 : -1,
+      angle = 0.96 + (hash(k + 3) - 0.5) * 0.2,
+      as = Math.cos(angle),
+      al = Math.sin(angle) * side;
+    // Out to the spray's outline: the longest run that stays inside it.
+    let length = 0;
+    while (length < len) {
+      const next = length + 0.01,
+        s = s0 + as * next;
+      if (s > len || Math.abs(al * next) > 0.97 * halfAt(s / len)) break;
+      length = next;
+    }
+    if (length >= 0.04) fringe(s0, 0, as, al, length, 0.006, NEEDLE_TUFT, widen);
+  }
+}
+
+// One whorl of branch sprays round the trunk at (cx, cy, cz). Each spray runs from the trunk out to `length` metres
+// (jittered 0 to 18 percent shorter), lanceolate (widest at 40 percent of its length, a point at its tip), cupped across
+// (its edges hang lower) and drooping along a parabola to `droop` metres at the tip: the spruce branch habit
+// (Weber and Penn 1995, conifer shape and branch curvature; Deussen and Lintermann 2005, ch. 6). Vertex normals are
+// the spray's own, half mixed with the direction from the trunk, a crown-volume normal, and tilted by up to 0.3 rad per
+// vertex by a hash, the spread of needle orientations within a shoot (Smolander and Stenberg 2003) at the vertex scale.
+// `upright`: `count` blades crossing on a vertical axis instead (the leader), each `across` metres a side at its widest,
+// their normals the crown cone's at its apex (half angle CROWN_HALF), tilted the same way.
+function sprayWhorl(
+  cx: number,
+  cy: number,
+  cz: number,
+  length: number,
+  count: number,
+  phase: number,
+  droop: number,
+  along: number,
+  across: number,
+  shoot?: ShootSpacing,
+  upright = false,
+): GeometryData {
+  const positions: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [],
+    hash = (n: number) => {
+      const v = Math.sin(n * 12.9898 + phase * 78.233) * 43758.5453;
+      return v - Math.floor(v);
+    };
+  for (let b = 0; b < count; b++) {
+    // Upright blades cross on the axis (count of them, a half turn apart over all), each its full length.
+    const yaw = phase + ((upright ? 1 : 2) * b * Math.PI) / count + (hash(b) - 0.5) * 0.35,
+      len = upright ? length : length * (0.82 + 0.18 * hash(b + 17)),
+      dx = Math.cos(yaw),
+      dz = Math.sin(yaw),
+      // Widest about 40 percent out, three quarters of the gap between neighbours there; an upright blade `across`
+      // metres a side.
+      halfWidth = upright ? across : len * Math.tan((Math.PI / count) * 0.75),
+      first = positions.length / 3;
+    if (shoot) {
+      branchShoots(positions, uvs, indices, cx, cy, cz, dx, dz, len, halfWidth, droop, shoot, (n) => hash(b * 131 + n), upright);
+      continue;
+    }
+    const columns = upright ? 2 : across;
+    for (let i = 0; i <= along; i++) {
+      const t = i / along,
+        r = 0.06 + len * t,
+        width = halfWidth * Math.sin(Math.PI * Math.min(1, t * 0.85 + 0.15)) ** 0.8 * Math.min(1, 0.25 + t * 1.9),
+        drop = droop * (0.35 * t + 0.65 * t * t);
+      for (let j = 0; j <= columns; j++) {
+        const u = (j / columns) * 2 - 1,
+          lateral = u * width;
+        if (upright) positions.push(cx - dz * lateral, cy + len * t, cz + dx * lateral);
+        else positions.push(cx + dx * r - dz * lateral, cy - drop - 0.28 * width * u * u, cz + dz * r + dx * lateral);
+        uvs.push(t, j / columns);
+      }
+    }
+    for (let i = 0; i < along; i++)
+      for (let j = 0; j < columns; j++) {
+        const a = first + i * (columns + 1) + j,
+          c = a + columns + 1;
+        // Wound so the face normals point up.
+        indices.push(a, a + 1, c, c, a + 1, c + 1);
+      }
+  }
+  const data = computeVertexNormals(
+    geometryData(positions, new Array<number>(positions.length).fill(0), uvs, indices),
+  );
+  const n = data.normals,
+    p = data.positions;
+  for (let i = 0; i < p.length; i += 3) {
+    let ox = p[i] - cx,
+      oy = p[i + 1] - (cy - length * 0.35),
+      oz = p[i + 2] - cz;
+    const ol = Math.hypot(ox, oy, oz) || 1,
+      tilt = (hash(i + 101) - 0.5) * 0.6,
+      turn = hash(i + 211) * Math.PI * 2;
+    if (upright) {
+      // The leader's needles spread round its axis: its normal is the crown cone's own at the apex, out from the axis
+      // (across the blade on the axis itself) and up by the crown's half angle, tilted as the sprays' normals are.
+      const side = Math.hypot(ox, oz),
+        hx = side > 1e-4 ? ox : n[i],
+        hz = side > 1e-4 ? oz : n[i + 2],
+        h = Math.hypot(hx, hz) || 1;
+      ox = (hx / h) * CROWN_COS + Math.cos(turn) * tilt;
+      oy = CROWN_SIN;
+      oz = (hz / h) * CROWN_COS + Math.sin(turn) * tilt;
+    } else {
+      ox = n[i] * 0.5 + (ox / ol) * 0.5 + Math.cos(turn) * tilt;
+      oy = n[i + 1] * 0.5 + (oy / ol) * 0.5;
+      oz = n[i + 2] * 0.5 + (oz / ol) * 0.5 + Math.sin(turn) * tilt;
+    }
+    const l = Math.hypot(ox, oy, oz);
+    n[i] = ox / l;
+    n[i + 1] = oy / l;
+    n[i + 2] = oz / l;
+  }
+  return data;
+}
+
+// A tapering trunk standing on y = 0, `radial` sides, radius 0.32 at the ground to 0.11 at the top as the cylinder, with
+// a butt swell: the radius times 1 + A e^(-y / 0.2), A set so the diameter at the ground is `flare` times the diameter at
+// `breast` (1.3 m, the breast height of forest mensuration, in the placed tree; Repola 2009 and Wharton 1984 for the
+// measured spruce ratios). Extra rings in the lowest 0.75 m draw the swell; the top is closed.
+function flaredTrunk(height: number, radial: number, segments: number, flare: number, breast: number): GeometryData {
+  const taper = (y: number) => 0.32 - (0.21 * y) / height,
+    fade = Math.exp(-breast / 0.2),
+    swell = (flare * taper(breast) - taper(0)) / (taper(0) - flare * taper(breast) * fade),
+    rings = [0, 0.06, 0.15, 0.3, 0.5, 0.75, breast];
+  for (let k = 1; k <= segments; k++) rings.push((k * height) / segments);
+  // A ring at breast height, so the mesh's diameter there is the flare's own; rings closer than 0.1 m above 0.75 m merge.
+  rings.sort((a, b) => a - b);
+  for (let i = rings.length - 1; i > 0; i--)
+    if (rings[i] - rings[i - 1] < (rings[i] > 0.8 ? 0.1 : 1e-6)) rings.splice(rings[i] === breast ? i - 1 : i, 1);
+  const positions: number[] = [],
+    uvs: number[] = [],
+    indices: number[] = [];
+  for (const y of rings) {
+    const r = taper(y) * (1 + swell * Math.exp(-y / 0.2));
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2;
+      positions.push(Math.sin(a) * r, y, Math.cos(a) * r);
+      uvs.push(j / radial, y / height);
+    }
+  }
+  for (let i = 0; i + 1 < rings.length; i++)
+    for (let j = 0; j < radial; j++) {
+      const a = i * (radial + 1) + j,
+        c = a + radial + 1;
+      // Wound so the faces point out of the trunk.
+      indices.push(a, a + 1, c, a + 1, c + 1, c);
+    }
+  const top = positions.length / 3,
+    ring = (rings.length - 1) * (radial + 1);
+  positions.push(0, height, 0);
+  uvs.push(0.5, 1);
+  for (let j = 0; j < radial; j++) indices.push(top, ring + j, ring + j + 1);
+  return geometryData(positions, new Array<number>(positions.length).fill(0), uvs, indices);
+}
+
 /**
  * Initialization-only tree geometry with smooth foliage and enclosed pine supports. Broadleaf canopies are fifteen
  * lumpy lobes plus 24 opaque leaf clumps per lobe that break the outline; every canopy vertex's normal radiates from
  * the canopy centre. `options.detail` (default 2, the mesh above) trades triangles for distance: level 1 uses coarser
  * lobes with 8 clumps each, level 0 five merged coarse lobes (broadleaf) or 6-sided tiers (conifer); at levels 0 and 1
  * each broadleaf lobe vertex's normal mixes 40 percent toward its own lobe centre so the canopy keeps a clustered look.
+ * A conifer's tiers are branch whorls with `options.branches` ({@link TreeMeshShapeOptions}).
  * @throws RangeError when `kind` is not a tree kind or `options.detail` is not 0, 1 or 2.
  */
-export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDetailOptions) {
+export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMeshShapeOptions) {
   if (kind !== 'conifer' && kind !== 'broadleaf')
     throw new RangeError("Invalid tree kind; pass 'conifer' or 'broadleaf'.");
+  const flare = options?.flare;
+  if (flare !== undefined && !(typeof flare === 'number' && flare >= 1 && flare <= 2.5))
+    throw new RangeError('Invalid trunk flare; pass a ratio from 1 to 2.5.');
+  const breast = options?.breastHeight;
+  if (breast !== undefined && !(typeof breast === 'number' && breast >= 0.3 && breast <= 6))
+    throw new RangeError('Invalid breast height; pass 0.3 to 6 mesh metres.');
+  const wanted = options?.breastDiameter;
+  if (wanted !== undefined && !(typeof wanted === 'number' && wanted >= 0.005 && wanted <= 3))
+    throw new RangeError('Invalid breast diameter; pass 0.005 to 3 mesh metres.');
+  const shoots = options?.shoots;
+  if (shoots !== undefined && shoots !== true && shoots !== false && shoots !== 'coarse')
+    throw new RangeError("Invalid shoots; pass true, false or 'coarse'.");
   const detail = resolveDetail(options),
     trunkHeight = kind === 'conifer' ? 6.2 : 5.3,
-    trunk = cylinderGeometry(0.11, 0.32, trunkHeight, [5, 6, 8][detail], [2, 4, 6][detail]);
+    flared = options?.flare,
+    trunk =
+      flared === undefined
+        ? cylinderGeometry(0.11, 0.32, trunkHeight, [5, 6, 8][detail], [2, 4, 6][detail])
+        : flaredTrunk(trunkHeight, [5, 6, 8][detail], [2, 4, 6][detail], flared, options?.breastHeight ?? 1.3),
+    // The flared trunk is built standing on the ground; the cylinder is centred on its middle.
+    lift = flared === undefined ? trunkHeight / 2 : 0;
+  // With `breastDiameter`, the trunk scaled across so its diameter at breast height is that: the profile's radius there
+  // is the ring's (flared trunk) or the cylinder's linear taper (0.32 at the ground to 0.11 at the top).
+  const breastAt = options?.breastHeight ?? 1.3,
+    profile =
+      flared === undefined
+        ? 0.32 - (0.21 * breastAt) / trunkHeight
+        : (() => {
+            let r = 0;
+            for (let i = 0; i < trunk.positions.length; i += 3)
+              if (Math.abs(trunk.positions[i + 1] - breastAt) < 1e-6)
+                r = Math.max(r, Math.hypot(trunk.positions[i], trunk.positions[i + 2]));
+            return r;
+          })(),
+    widthScale = wanted === undefined ? 1 : wanted / (2 * profile);
   for (let i = 0; i < trunk.positions.length; i += 3) {
-    const y = trunk.positions[i + 1] + trunkHeight / 2,
+    const y = trunk.positions[i + 1] + lift,
       angle = y * 0.055,
-      flare = y < 0.001 ? 1.8 : 1,
+      flare = (flared === undefined && y < 0.001 ? 1.8 : 1) * widthScale,
       x = trunk.positions[i] * flare,
       z = trunk.positions[i + 2] * flare;
     trunk.positions[i] = x * Math.cos(angle) + z * Math.sin(angle) + y * y * 0.008;
@@ -284,7 +653,44 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDe
     leaves: GeometryData[] = [],
     clumps: GeometryData[] = [],
     lobeCenters: number[][] = [];
-  if (kind === 'conifer') {
+  if (kind === 'conifer' && options?.branches === true && detail > 0) {
+    // Six whorls on the skirts' heights and reach, a shorter whorl between each two, and a leader at the top.
+    const along = detail === 2 ? 6 : 4,
+      across = detail === 2 ? 4 : 2,
+      near = detail === 2 ? { spacing: 0.075, tooth: 0.06 } : { spacing: 0.12, tooth: 0.1 },
+      // The coarse level (detail 2): laterals 1.5 times as far apart and 1.55 times as wide, a segment per 0.15 m;
+      // at detail 1 the near level's laterals, a segment per 0.15 m. Both widths keep the near level's coverage (see
+      // ShootSpacing.coarse).
+      coarseFactor = detail === 2 ? 1.5 : 1,
+      shoot: ShootSpacing | undefined =
+        options?.shoots === true
+          ? near
+          : options?.shoots === 'coarse'
+            ? { spacing: near.spacing * coarseFactor, tooth: 0.15, coarse: { widen: detail === 2 ? 1.55 : 1, ratio: coarseFactor } }
+            : undefined;
+    for (let tier = 0; tier < 6; tier++) {
+      const y = 1.8 + tier * 0.9,
+        reach = 2.1 * (1 - tier * 0.12),
+        top = y + 1.15 - tier * 0.05,
+        at = (h: number): [number, number, number] => [h * h * 0.008, h, Math.sin(h * 0.7) * 0.1];
+      leaves.push(sprayWhorl(...at(top), reach, 7, tier * 2.399963, reach * 0.62, along, across, shoot));
+      if (detail === 2)
+        leaves.push(sprayWhorl(...at(top - 0.45), reach * 0.82, 5, tier * 2.399963 + 0.45, reach * 0.55, along, across, shoot));
+    }
+    // The crown's top: the youngest whorl, where the next tier's would stand, the whorl between (detail 2), and the
+    // leader above them. Their reach closes the crown from the last tier's to the leader's tip.
+    const whorl = 1.8 + 6 * 0.9 + 1.15 - 6 * 0.05,
+      last = whorl - 0.85,
+      apex = whorl + LEADER,
+      reachAt = (h: number) => (2.1 * (1 - 5 * 0.12) * (apex - h)) / (apex - last),
+      at = (h: number): [number, number, number] => [h * h * 0.008, h, Math.sin(h * 0.7) * 0.1];
+    leaves.push(sprayWhorl(...at(whorl), reachAt(whorl), 5, 6 * 2.399963, reachAt(whorl) * 0.62, along, across, shoot));
+    if (detail === 2) {
+      const between = whorl - 0.45;
+      leaves.push(sprayWhorl(...at(between), reachAt(between), 5, 6 * 2.399963 + 0.45, reachAt(between) * 0.55, along, across, shoot));
+    }
+    leaves.push(sprayWhorl(...at(whorl), LEADER, 2, 0.3, 0, along, LEADER_HALF, shoot, true));
+  } else if (kind === 'conifer') {
     for (let tier = 0; tier < 6; tier++) {
       const r = 2.05 * (1 - tier * 0.115),
         skirt = coneGeometry(r, 2, [6, 8, 12][detail], 2);

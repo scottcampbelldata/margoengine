@@ -209,6 +209,7 @@ fn build(code: &[f64], n: usize, origin: P, step: P) -> Mesh {
         ]
     };
     let mut values = vec![0.0; size * size * size];
+    let tolerance = step[0].min(step[1]).min(step[2]) * (2.0f64).powi(-40);
     let mut mesh = Mesh {
         positions: vec![],
         indices: vec![],
@@ -220,7 +221,12 @@ fn build(code: &[f64], n: usize, origin: P, step: P) -> Mesh {
         for y in 0..size {
             for x in 0..size {
                 let d = field(code, at(x, y, z)).0;
-                values[index(x, y, z)] = d;
+                // A sample within the bisection's resolution (2^-40 of a step) of zero is on the surface: it takes
+                // zero, which counts as outside, so its rounding error cannot decide its side. A sphere whose pole
+                // sits on a grid point rounds to about -1e-16 there; counted inside, every edge from the pole crossed
+                // on it or (along the tangent) 1e-8 from it, and the cells around it put their vertices on top of
+                // each other: dual quads of zero area.
+                values[index(x, y, z)] = if d.abs() <= tolerance { 0.0 } else { d };
                 if (x == 0 || y == 0 || z == 0 || x == n || y == n || z == n) && d <= 0.0 {
                     mesh.boundary = true;
                 }
@@ -316,11 +322,28 @@ fn build(code: &[f64], n: usize, origin: P, step: P) -> Mesh {
                         c[v] -= 1 - b;
                         ids[i] = vertices[cell(c[0], c[1], c[2])];
                     }
-                    if values[index(x, y, z)] >= 0.0 {
+                    let inside = values[index(x, y, z)] < 0.0;
+                    if !inside {
                         ids.reverse();
                     }
-                    mesh.indices
-                        .extend([ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]]);
+                    // The four vertices circle the edge counter-clockwise about the outward axis, but a dual quad is
+                    // rarely planar or convex. Split along the diagonal whose two triangles both keep the most area
+                    // projected on that axis: a simple quad always has one inside diagonal, and the other one
+                    // folds a triangle over its neighbour (inward-facing, shaded dark or culled).
+                    let p = ids.map(|i| mesh.positions[i]);
+                    let sign = if inside { 1.0 } else { -1.0 };
+                    let projected = |a: usize, b: usize, c: usize| {
+                        let (i, j) = ((axis + 1) % 3, (axis + 2) % 3);
+                        sign * ((p[b][i] - p[a][i]) * (p[c][j] - p[a][j])
+                            - (p[b][j] - p[a][j]) * (p[c][i] - p[a][i]))
+                    };
+                    let first = projected(0, 1, 2).min(projected(0, 2, 3));
+                    let second = projected(0, 1, 3).min(projected(1, 2, 3));
+                    mesh.indices.extend(if second > first {
+                        [ids[0], ids[1], ids[3], ids[1], ids[2], ids[3]]
+                    } else {
+                        [ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]]
+                    });
                 }
             }
         }

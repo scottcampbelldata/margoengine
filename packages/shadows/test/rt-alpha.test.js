@@ -7,7 +7,7 @@ import { packRayTracedAlpha, createRayTracedAlpha, alphaRayTracedFilter } from '
 import { canTraceShadows } from '../dist/rt.js';
 import { EFFECT_BINDING, effectEntries, moveEffects, shadowSampling } from '../src/shader.ts';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { decodePNG } from '../../../tests/support/png.js';
 import { readFileSync } from 'node:fs';

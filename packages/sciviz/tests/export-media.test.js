@@ -59,7 +59,10 @@ function captureFixture(maxTextureDimension2D = 4) {
     createTexture: ({ size }) => (textures.push(size), own()),
     createBuffer: ({ size }) =>
       own({ mapAsync: async () => {}, getMappedRange: () => new ArrayBuffer(size), unmap() {} }),
-    createCommandEncoder: () => ({ copyTextureToBuffer: (...args) => copies.push(args[2]), finish() {} }),
+    createCommandEncoder: () => ({
+      copyTextureToBuffer: (source, _, size) => copies.push([...(source.origin ?? [0, 0]), ...size]),
+      finish() {},
+    }),
     queue: { submit() {} },
   };
   // As core: plugins join the active scene, removePlugin(name) acts on the active scene, sceneOf finds the owner.
@@ -92,14 +95,15 @@ function captureFixture(maxTextureDimension2D = 4) {
     removePlugin(name) {
       owner(active).removePlugin(name);
     },
-    render({ views }) {
-      views.push({ viewport: views[0].viewport, scissor: views[0].scissor });
-      views[0].camera.update(1, true);
-      projections.push(views[0].camera.matrix.slice());
+    render({ views: [view] }) {
+      views.push({ viewport: view.viewport, scissor: view.scissor, exportScale: figure.renderer.exportScale });
+      view.camera.update(1, true);
+      projections.push(view.camera.matrix.slice());
     },
   };
   const figure = {
     engine,
+    renderer: { exportScale: undefined },
     theme: { background: '#ffffff' },
     ready: async () => {},
     render() {},
@@ -110,42 +114,78 @@ function captureFixture(maxTextureDimension2D = 4) {
   return { figure, created, removed, projections, textures, views, copies };
 }
 
-// Lane N R6 row 18: the Radeon 680M drew 64 px tiles 1 apart from the whole image in 1,982 of 307,200 values, as it
-// draws lines differently into render targets of 128 px or less. Every tile target is now at least 256 px (within
-// the device limit), with the tile drawn into its top-left corner and only that corner read back.
-test('tile targets are at least 256 px, drawn and read back in their top-left corner', async () => {
-  const { figure, textures, views, copies } = captureFixture(8192);
-  const tiles = await Array.fromAsync(renderMediaTiles(figure, { overlays: false, tileSize: 4 }));
+// Every pixel is drawn in its 1024 px render block, with the block's viewport and projection, and a tile is the part
+// of that drawing its scissor keeps. Apple Metal coloured 164 of 307,200 values 1 apart between 64 px tiles and one
+// whole-image tile when each tile had a viewport and cropped projection of its own (the Radeon 680M 1,982, as it also
+// draws lines differently into targets of 128 px or less): the GPU placed and interpolated the same lines differently.
+test('tiles are scissored parts of one block drawing: same viewport, projection and target for every tile size', async () => {
+  const { figure, textures, views, copies, projections } = captureFixture(8192);
+  figure.engine.canvas.clientWidth = figure.engine.canvas.width = 320;
+  figure.engine.canvas.clientHeight = figure.engine.canvas.height = 240;
+  const tiles = await Array.fromAsync(renderMediaTiles(figure, { overlays: false, tileSize: 300 }));
   assert.deepEqual(
-    tiles.map((t) => [t.x, t.y, t.width, t.height, t.pixels.length]),
+    tiles.map((t) => [t.x, t.y, t.width, t.height]),
     [
-      [0, 0, 4, 4, 64],
-      [4, 0, 4, 4, 64],
+      [0, 0, 300, 240],
+      [300, 0, 20, 240],
     ],
   );
-  assert.deepEqual(textures, [
-    [256, 256],
-    [256, 256],
-  ]);
-  for (const view of views) {
-    assert.deepEqual(view.viewport, [0, 0, 4 / 256, 4 / 256]);
-    assert.deepEqual(view.scissor, [0, 0, 4 / 256, 4 / 256]);
-  }
+  assert.deepEqual(textures, [[1024, 1024]], 'one block target for the whole capture');
   assert.deepEqual(copies, [
-    [4, 4],
-    [4, 4],
+    [0, 0, 300, 240],
+    [300, 0, 20, 240],
   ]);
-  // A tile larger than the minimum keeps its own size, and a device limit below 256 caps the minimum.
-  const big = captureFixture(8192);
-  big.figure.engine.canvas.clientWidth = big.figure.engine.canvas.width = 300;
-  await Array.fromAsync(renderMediaTiles(big.figure, { overlays: false, tileSize: 300 }));
-  assert.deepEqual(big.textures, [[300, 256]]);
-  const small = captureFixture(4);
-  await Array.fromAsync(renderMediaTiles(small.figure, { overlays: false, tileSize: 4 }));
-  assert.deepEqual(small.textures, [
-    [4, 4],
-    [4, 4],
+  assert.deepEqual(views, [
+    { viewport: [0, 0, 1, 1], scissor: [0, 0, 300 / 1024, 240 / 1024], exportScale: 1 },
+    { viewport: [0, 0, 1, 1], scissor: [300 / 1024, 0, 20 / 1024, 240 / 1024], exportScale: 1 },
   ]);
+  assert.equal(figure.renderer.exportScale, undefined, 'the export scale ends with the capture');
+  // CSS pixel sizes (graph nodes) draw at the image's pixels per CSS pixel, not window.devicePixelRatio.
+  const double = captureFixture(8192);
+  double.figure.engine.canvas.clientWidth = double.figure.engine.canvas.width = 320;
+  double.figure.engine.canvas.clientHeight = double.figure.engine.canvas.height = 240;
+  await Array.fromAsync(renderMediaTiles(double.figure, { overlays: false, scale: 2, tileSize: 64 }));
+  assert.ok(double.views.length && double.views.every((v) => v.exportScale === 2));
+  assert.deepEqual(projections[1], projections[0], 'both tiles draw with the block projection');
+  // The block projection maps the 1024 px block, from the image's top-left pixel, onto clip space.
+  const whole = new Camera();
+  whole.update(320 / 240, true);
+  const m = whole.matrix,
+    close = (a, b) => assert.ok(Math.abs(a - b) < 1e-6 * Math.max(1, Math.abs(b)), `${a} vs ${b}`);
+  close(projections[0][0], (320 / 1024) * m[0] + ((320 - 1024) / 1024) * m[3]);
+  close(projections[0][5], (240 / 1024) * m[5] + ((1024 - 240) / 1024) * m[7]);
+  // A tile size that does not divide the block ends its last tile at the block edge; tiles never cross blocks.
+  const wide = captureFixture(8192);
+  wide.figure.engine.canvas.clientWidth = wide.figure.engine.canvas.width = 2100;
+  const spans = await Array.fromAsync(renderMediaTiles(wide.figure, { overlays: false, tileSize: 1000 }));
+  assert.deepEqual(
+    spans.map((t) => [t.x, t.width]),
+    [
+      [0, 1000],
+      [1000, 24],
+      [1024, 1000],
+      [2024, 24],
+      [2048, 52],
+    ],
+  );
+  assert.deepEqual(
+    wide.copies.map((c) => c[0]),
+    [0, 1000, 0, 1000, 0],
+  );
+  assert.deepEqual(wide.projections[1], wide.projections[0]);
+  assert.deepEqual(wide.projections[3], wide.projections[2]);
+  assert.notDeepEqual(wide.projections[2], wide.projections[0]);
+  assert.equal((await exportImage(wide.figure, { overlays: false, tileSize: 1000 })).type, 'image/png');
+  // The block is the largest power of two within a device limit below 1024, and caps the tile size.
+  const odd = captureFixture(300);
+  odd.figure.engine.canvas.clientWidth = odd.figure.engine.canvas.width = 320;
+  const edges = await Array.fromAsync(renderMediaTiles(odd.figure, { overlays: false }));
+  assert.deepEqual(
+    edges.map((t) => t.width),
+    [256, 64],
+  );
+  assert.deepEqual(odd.textures, [[256, 256]]);
+  assert.ok([wide, odd].every((f) => f.created.every((c) => c.destroyed)));
 });
 
 test('tile capture uses actual cropped perspective projection and releases each resource and pass', async () => {

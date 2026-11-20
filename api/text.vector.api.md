@@ -5,6 +5,7 @@
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
+import { FontVariationAxis, OpenTypeReaders } from "@margoengine/loaders/font";
 import { ColorInput, Mat4 } from "@margoengine/math";
 
 export const BAND_TARGET = 64;
@@ -35,22 +36,15 @@ export interface VectorCoverageOptions {
     };
 }
 
-export class VectorFont extends Font {
-    readonly outlines: FontOutlines;
+export class VectorFont extends GlyphFieldFont {
     readonly store: VectorGlyphStore;
+    static load(url: string | URL, options?: GlyphFieldFontLoadOptions): Promise<VectorFont>;
     constructor(data: ArrayBuffer | ArrayBufferView, options?: VectorFontOptions);
-    get unitsPerEm(): number;
     vectorGlyph(id: number): VectorGlyph;
     clusterGlyphs(cluster: string): readonly VectorClusterGlyph[];
-    advance(cluster: string): number;
-    kerning(left: string, right: string): number;
-    metrics(): {
-        ascent: number;
-        descent: number;
-    };
 }
 
-export interface VectorFontOptions extends FontVariationOptions {
+export interface VectorFontOptions extends GlyphFieldFontOptions {
     family?: string;
 }
 
@@ -124,10 +118,10 @@ class Font implements TextMeasurer {
     readonly weight: string;
     readonly style: string;
     readonly face?: FontFace;
-    readonly size: 48;
-    readonly buffer: 8;
-    readonly radius: 10;
-    readonly cutoff: 0.25;
+    readonly size: number;
+    readonly buffer: number;
+    readonly radius: number;
+    readonly cutoff: number;
     revision: number;
     constructor(options?: FontOptions);
     get css(): string;
@@ -155,6 +149,8 @@ class FontOutlines {
     readonly descender: number;
     constructor(buffer: ArrayBuffer | ArrayBufferView, options?: FontVariationOptions);
     get glyphCount(): number;
+    tableBytes(tag: string): Uint8Array | undefined;
+    get varied(): boolean;
     get variationAxes(): readonly FontVariationAxis[];
     withVariations(variations: Readonly<Record<string, number>>): FontOutlines;
     glyphIndex(charOrCode: string | number): number;
@@ -163,15 +159,9 @@ class FontOutlines {
     getGlyphSegments(glyphIndex: number): number[][][];
 }
 
-interface FontVariationAxis {
-    tag: string;
-    min: number;
-    default: number;
-    max: number;
-}
-
 interface FontVariationOptions {
     variations?: Readonly<Record<string, number>>;
+    openType?: OpenTypeReaders;
 }
 
 interface GlyphBitmap {
@@ -183,6 +173,49 @@ interface GlyphBitmap {
     readonly color: boolean;
     readonly data: Uint8Array;
     readonly msdf?: Uint8Array;
+}
+
+class GlyphFieldFont extends Font {
+    readonly outlines: FontOutlines;
+    readonly size: number;
+    readonly radius: number;
+    readonly cutoff: number;
+    readonly buffer: number;
+    readonly stats: GlyphFieldFontStats;
+    static load(url: string | URL, options?: GlyphFieldFontLoadOptions): Promise<GlyphFieldFont>;
+    constructor(data: ArrayBuffer | ArrayBufferView, options?: GlyphFieldFontOptions);
+    get unitsPerEm(): number;
+    get loaded(): boolean;
+    load(): Promise<void>;
+    shape(text: string): OutlineRun;
+    glyphKerning(left: number, right: number, script?: string): number;
+    advance(cluster: string): number;
+    kerning(left: string, right: string): number;
+    metrics(): {
+        ascent: number;
+        descent: number;
+    };
+    glyph(cluster: string): GlyphBitmap | null;
+    prepare(text: string, options?: LayoutOptions): number;
+    get key(): string;
+    exportGlyphs(): Uint8Array;
+    importGlyphs(bytes: Uint8Array): boolean;
+}
+
+interface GlyphFieldFontLoadOptions extends GlyphFieldFontOptions {
+    signal?: AbortSignal;
+}
+
+interface GlyphFieldFontOptions extends FontVariationOptions {
+    size?: number;
+    radius?: number;
+    family?: string;
+}
+
+interface GlyphFieldFontStats {
+    rasterized: number;
+    evaluations: number;
+    imported: number;
 }
 
 interface LayoutGlyph {
@@ -223,6 +256,12 @@ interface LayoutOptions {
     whiteSpace?: 'normal' | 'nowrap';
     overflowWrap?: 'normal' | 'break-word';
     ligatures?: boolean;
+}
+
+interface OutlineRun {
+    readonly glyphs: readonly number[];
+    readonly x: readonly number[];
+    readonly advance: number;
 }
 
 type Point2D = [number, number];

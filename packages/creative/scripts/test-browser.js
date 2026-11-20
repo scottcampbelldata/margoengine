@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser, resolveBrowser } from '../../../scripts/lib/browser.mjs';
 import { build, createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -16,6 +18,7 @@ await build({
   build: { write: false, target: 'es2022' },
 });
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },
@@ -26,6 +29,8 @@ try {
   const args = process.env.BROWSER_ARGS ? JSON.parse(process.env.BROWSER_ARGS) : [];
   browser = await launchBrowser({ headless: true, args });
   const page = await browser.newPage({ viewport: { width: 800, height: 600 }, deviceScaleFactor: 1 });
+  // A forced-compatibility run (MARGO_COMPAT=1) draws every page on the WebGL2 layer.
+  if (compatRun()) await page.addInitScript(compatShim, compatUrl());
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
@@ -38,40 +43,45 @@ try {
   const checks = await page.evaluate(() => window.runPlanetTests());
   const instrument = () => {
     window.earthAudit = { live: new Set(), samples: [], textures: [], boundSamples: new Set(), created: 0, frame: [] };
-    const pipelines = new WeakMap();
-    for (const name of ['createBuffer', 'createTexture', 'createRenderPipeline', 'createBindGroup']) {
-      const create = GPUDevice.prototype[name];
-      GPUDevice.prototype[name] = function (desc) {
-        const result = create.call(this, desc),
-          audit = window.earthAudit;
-        audit.created++;
-        if (name === 'createRenderPipeline') {
-          const samples = desc.multisample?.count ?? 1;
-          audit.samples.push(samples);
-          pipelines.set(result, samples);
-        }
-        if (name === 'createTexture') audit.textures.push(desc.sampleCount ?? 1);
-        if (name === 'createBuffer' || name === 'createTexture') {
-          audit.live.add(result);
-          const destroy = result.destroy.bind(result);
-          result.destroy = () => {
-            audit.live.delete(result);
-            destroy();
-          };
-        }
-        return result;
+    // On the WebGL2 layer the GPU classes are the layer's, installed on the first requestAdapter: patch them then.
+    const patch = () => {
+      const pipelines = new WeakMap();
+      for (const name of ['createBuffer', 'createTexture', 'createRenderPipeline', 'createBindGroup']) {
+        const create = GPUDevice.prototype[name];
+        GPUDevice.prototype[name] = function (desc) {
+          const result = create.call(this, desc),
+            audit = window.earthAudit;
+          audit.created++;
+          if (name === 'createRenderPipeline') {
+            const samples = desc.multisample?.count ?? 1;
+            audit.samples.push(samples);
+            pipelines.set(result, samples);
+          }
+          if (name === 'createTexture') audit.textures.push(desc.sampleCount ?? 1);
+          if (name === 'createBuffer' || name === 'createTexture') {
+            audit.live.add(result);
+            const destroy = result.destroy.bind(result);
+            result.destroy = () => {
+              audit.live.delete(result);
+              destroy();
+            };
+          }
+          return result;
+        };
+      }
+      const set = GPURenderPassEncoder.prototype.setPipeline;
+      GPURenderPassEncoder.prototype.setPipeline = function (pipeline) {
+        earthAudit.boundSamples.add(pipelines.get(pipeline));
+        return set.call(this, pipeline);
       };
-    }
-    const set = GPURenderPassEncoder.prototype.setPipeline;
-    GPURenderPassEncoder.prototype.setPipeline = function (pipeline) {
-      earthAudit.boundSamples.add(pipelines.get(pipeline));
-      return set.call(this, pipeline);
+      const write = GPUQueue.prototype.writeBuffer;
+      GPUQueue.prototype.writeBuffer = function (buffer, offset, data, ...rest) {
+        if (data instanceof Float32Array && data.length === 48) earthAudit.frame = Array.from(data);
+        return write.call(this, buffer, offset, data, ...rest);
+      };
     };
-    const write = GPUQueue.prototype.writeBuffer;
-    GPUQueue.prototype.writeBuffer = function (buffer, offset, data, ...rest) {
-      if (data instanceof Float32Array && data.length === 48) earthAudit.frame = Array.from(data);
-      return write.call(this, buffer, offset, data, ...rest);
-    };
+    if (globalThis.__margoCompat) (globalThis.__margoOnLayer ??= []).push(patch);
+    else patch();
   };
   await page.addInitScript(instrument);
   // Desktops start on the light tier (1× MSAA); `?quality=high` is the 4× tier.
@@ -85,6 +95,11 @@ try {
     );
   };
   await earth('');
+  // The audit counts real work on either backend: the light tier made textures and bound 1x pipelines.
+  assert(
+    await page.evaluate(() => earthAudit.textures.length > 0 && earthAudit.boundSamples.has(1)),
+    'The earth audit counted no textures or bound pipelines',
+  );
   assert(
     await page.evaluate(() => !earthAudit.textures.includes(4) && !earthAudit.boundSamples.has(4)),
     'Desktop light-tier globe rendered with 4× MSAA',
@@ -234,6 +249,7 @@ try {
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1',
   });
   try {
+    if (compatRun()) await mobileContext.addInitScript(compatShim, compatUrl());
     await mobileContext.addInitScript(instrument);
     const mobile = await mobileContext.newPage();
     mobile.on('pageerror', (e) => errors.push(e.message));
@@ -252,6 +268,10 @@ try {
         open: document.getElementById('settings').open,
       };
     });
+    assert(
+      quality.samples.length > 0 && quality.textures.length > 0,
+      'The mobile audit counted no pipelines or textures',
+    );
     assert(!quality.samples.includes(4) && !quality.textures.includes(4));
     assert.equal(quality.dpr, 1, 'Phones render at DPR 1 (@margoengine/quality phone tier)');
     assert(!quality.overflow && !quality.open);
@@ -281,9 +301,10 @@ try {
         ],
       });
       await pinch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    } else
-      // Only Chromium takes real multi-touch from a script; elsewhere the same two fingers go in as the pointer events
-      // a touch screen makes, which is what OrbitControls reads.
+    }
+    // Only Chromium takes real multi-touch from a script; elsewhere the same two fingers go in as the pointer events
+    // a touch screen makes, which is what OrbitControls reads.
+    else
       await mobile.evaluate(() => {
         const canvas = document.querySelector('canvas'),
           finger = (type, pointerId, clientX) =>

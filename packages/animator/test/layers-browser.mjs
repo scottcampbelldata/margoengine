@@ -6,7 +6,7 @@ const browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 
 try {
   const result = await browser.page.evaluate(async () => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js');
     const { Animation } = await import('/packages/animation/dist/index.js');
     const { Animator } = await import('/packages/animator/dist/index.js');
     const { createBoneMask, addWeightedLayer } = await import('/packages/animator/dist/masks.js');

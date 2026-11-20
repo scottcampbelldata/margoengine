@@ -165,3 +165,23 @@ test('ground transforms sample world height and preserve yaw, scale and footprin
   assert.throws(() => groundTransforms(placements, () => NaN), /finite/);
   assert.throws(() => instanceTransforms([[0, 0, 0, 0, 0]]), /placement/);
 });
+
+test('ground paths keep scaled footprints more than half their width from the centreline (GAP-FILM-LOOK)', () => {
+  const road = { points: [[-10, 0], [0, 0], [10, 10]], width: 4 },
+    candidates = [
+      [0, 0, 1, 0], // on the road
+      [-5, 2.9, 1, 1], // 2.9 from the centreline: inside 2 + 1
+      [-5, 3.1, 1, 2], // clear
+      [-5, 3.1, 2, 3], // a larger footprint touches it
+      [-11.5, 0, 1, 4], // past the end: 1.5 from the end point
+      [-13.5, 0, 1, 5], // clear past the end
+      [5, 0, 1, 6], // 5 / sqrt(2) = 3.54 from the bend's second leg
+    ],
+    before = structuredClone(road);
+  assert.deepEqual(clearPlacements(candidates, 1, [road]), [candidates[2], candidates[5], candidates[6]]);
+  assert.deepEqual(clearPlacements(candidates, 1, [road], 0.4).map((c) => c[3]), [5, 6], 'the gap widens the clearance');
+  assert.deepEqual(clearPlacements(candidates, 1, [road, [-6, 2, -4, 4]]).map((c) => c[3]), [5, 6], 'paths and rectangles combine');
+  assert.deepEqual(road, before);
+  for (const bad of [{ points: [[0, 0]], width: 1 }, { points: [[0, 0], [1, 1]], width: 0 }, { points: [[0, 0], [1, NaN]], width: 1 }, { points: 'road', width: 1 }])
+    assert.throws(() => clearPlacements([], 1, [bad]), /path/);
+});

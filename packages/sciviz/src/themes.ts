@@ -1,4 +1,3 @@
-import { hexColor } from '@margoengine/math/color';
 import type { Figure } from './figure.js';
 import { colormapNames } from './colormaps.js';
 import { THEMES, type Theme } from './axes.js';
@@ -30,9 +29,6 @@ export function createTheme(base: Theme | ThemeName = 'light', overrides: Partia
   if (!source || typeof source !== 'object')
     throw typeError('Choose a named theme or a complete Theme object', 'sciviz');
   const theme = { ...source, ...overrides };
-  for (const key of ['background', 'axis', 'grid', 'text'] as const)
-    if (typeof theme[key] !== 'string' || theme[key].length !== 7 || !hexColor(theme[key]))
-      throw typeError(`Theme ${key} needs #rrggbb; correct the colour`, 'sciviz');
   validateThemeStyle(theme);
   if (theme.scalarMap !== undefined && !colormapNames.includes(theme.scalarMap))
     throw typeError('Theme scalarMap needs a named colour map; choose colormapNames', 'sciviz');

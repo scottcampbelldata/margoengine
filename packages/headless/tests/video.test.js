@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { createHeadlessCanvas } from '../dist/index.js';
-import { encodeVideo, imageSequence, renderFrames } from '../dist/video.js';
+import { encodeVideo, imageSequence, renderFrames, streamVideo } from '../dist/video.js';
 import { encodeWithFFmpeg, ffmpegArguments } from '../dist/ffmpeg.js';
+import { spsWithRange } from '../src/avc-range.ts';
 
 /** Lets the event loop turn until `ready` holds. */
 const until = async (ready) => {
@@ -19,12 +20,12 @@ const frame = (width = 4, height = 2, value = 9) => ({
 });
 const frames = (count, width, height) => Array.from({ length: count }, (_, i) => frame(width, height, i));
 
-/** WebCodecs stand-in. Each encoded frame becomes a chunk holding its first byte. */
+/** WebCodecs stand-in. Each encoded frame becomes a chunk holding its place in encode order. */
 function fakeCodecs({ supported = () => true, description, colorSpace, reorder, failAt, holdOutput, queue = 0 } = {}) {
-  const log = { configs: [], encoded: [], closedFrames: 0, closed: false, asked: [], maxQueue: 0 };
+  const log = { configs: [], encoded: [], frames: [], closedFrames: 0, closed: false, asked: [], maxQueue: 0 };
   class VideoFrame {
     constructor(data, init) {
-      Object.assign(this, init, { first: data[0] });
+      Object.assign(this, init, { data: Uint8Array.from(data) });
     }
     close() {
       log.closedFrames++;
@@ -51,6 +52,8 @@ function fakeCodecs({ supported = () => true, description, colorSpace, reorder, 
       log.configs.push(config);
     }
     encode(picture, options) {
+      picture.first = log.encoded.length;
+      log.frames.push({ format: picture.format, colorSpace: picture.colorSpace, data: picture.data });
       log.encoded.push({ timestamp: picture.timestamp, duration: picture.duration, keyFrame: options.keyFrame });
       if (log.encoded.length - 1 === failAt) {
         queueMicrotask(() => this.error(new Error('encoder broke')));
@@ -323,6 +326,9 @@ test('encodeVideo writes a WebM a parser can walk: times, key frames, cues and s
   assert.equal(number(bytes, inside(bytes, videoBox, 0xb0)[0]), 4);
   assert.equal(number(bytes, inside(bytes, videoBox, 0xba)[0]), 2);
   assert.equal(number(bytes, inside(bytes, colour, 0x55b1)[0]), 1, 'BT.709 matrix');
+  // Matroska ChromaSitingHorz 1 (left collocated) and ChromaSitingVert 2 (half), as the planes are made.
+  assert.equal(number(bytes, inside(bytes, colour, 0x55b7)[0]), 1, 'chroma on the left column');
+  assert.equal(number(bytes, inside(bytes, colour, 0x55b8)[0]), 2, 'chroma between rows');
 
   // Three key frames, three clusters; blocks at the frame times, the key flag on the first of each.
   assert.equal(clusters.length, 3);
@@ -405,7 +411,7 @@ test('encodeVideo writes an MP4 with moov first, whose tables find every sample'
     ['avcC', 'colr'],
   );
   assert.deepEqual([...bytes.subarray(config[0].start, config[0].end)], [...description]);
-  assert.deepEqual([...bytes.subarray(config[1].start + 4, config[1].end)], [0, 1, 0, 2, 0, 1, 0x80]);
+  assert.deepEqual([...bytes.subarray(config[1].start + 4, config[1].end)], [0, 1, 0, 13, 0, 1, 0]);
 
   const stts = child(bytes, stbl, 'stts'),
     stss = child(bytes, stbl, 'stss'),
@@ -488,45 +494,133 @@ function muxedSps(bytes) {
   return out;
 }
 
-test('an H.264 MP4 states the range the encoder reported in its SPS, as its colr box does', async () => {
-  const source = readSps(Uint8Array.from(RADEON_AVCC.slice(8, 40)));
-  assert.equal(source.vui.signal.full, 0, 'the recorded SPS says limited');
-  for (const fullRange of [true, false]) {
-    const { webCodecs } = fakeCodecs({
-        description: Uint8Array.from(RADEON_AVCC),
-        colorSpace: { primaries: 'bt709', transfer: 'iec61966-2-1', matrix: 'bt709', fullRange },
-      }),
-      { bytes } = await encodeVideo(frames(3), { format: 'mp4', fps: 10, webCodecs }),
-      list = muxedSps(bytes),
-      read = readSps(list[0]);
-    assert.equal(list.length, 1);
-    assert.equal(read.vui.signal.full, fullRange ? 1 : 0, `fullRange ${fullRange}`);
-    // Every other field of the parameter set is unchanged, and it still ends in its stop bit.
-    assert.deepEqual({ ...read, vui: { ...read.vui, signal: { ...read.vui.signal, full: 0 } } }, source);
-    if (!fullRange) assert.deepEqual([...list[0]], RADEON_AVCC.slice(8, 40), 'already limited: the bytes as given');
-  }
+// WebKit 27.2 on macOS, given RGBA frames, wrote limited-range BT.709 samples (#336699 as Y 97, Cb 156, Cr 104) and
+// reported { fullRange: true, matrix: null }; Chromium for macOS reported full range too. The file then said full range
+// and players drew it contrast-reduced (docs/known-bugs.md, "WebKit headless MP4 drawn contrast-reduced").
+const WEBKIT_REPORT = { primaries: 'bt709', transfer: 'iec61966-2-1', matrix: null, fullRange: true };
+
+test('encodeVideo gives the encoder limited-range BT.709 I420 planes it converted itself', async () => {
+  const { webCodecs, log } = fakeCodecs({ description: Uint8Array.from(RADEON_AVCC), colorSpace: WEBKIT_REPORT }),
+    // 3 x 3 (odd: the last chroma column and row cover half blocks): #336699 except one white and one black pixel.
+    data = new Uint8Array(36);
+  for (let i = 0; i < 9; i++) data.set([51, 102, 153, 255], i * 4);
+  data.set([255, 255, 255, 255], 0);
+  data.set([0, 0, 0, 255], 8 * 4);
+  // WebM (VP9) keeps the odd size; H.264 and H.265 would pad it.
+  await encodeVideo([{ width: 3, height: 3, data }], { format: 'webm', fps: 10, webCodecs });
+  const [frame] = log.frames;
+  assert.equal(frame.format, 'I420');
+  assert.deepEqual(frame.colorSpace, { primaries: 'bt709', transfer: 'iec61966-2-1', matrix: 'bt709', fullRange: false });
+  // Y: 16 + 219 E'Y; white 235, black 16, #336699 97.45 (BT.709-6 items 3.2 to 3.5).
+  assert.deepEqual([...frame.data.subarray(0, 9)], [235, 97, 97, 97, 97, 97, 97, 97, 16]);
+  // Chroma sits where H.264 and H.265 place it when the stream does not say (H.273 chroma_sample_loc_type 0): on the
+  // even luma columns, between the two rows. Each sample weighs columns 2x - 1, 2x, 2x + 1 by 1, 2, 1 and rows 2y and
+  // 2y + 1 equally, edges repeated. Top left: white weighs 3 of 8, #336699 5: R'G'B' (127.5, 159.375, 191.25). Top
+  // right and bottom left: #336699 alone (Cb 155.5, Cr 103.5). Bottom right: #336699 1 of 4, black 3 of 4.
+  assert.deepEqual([...frame.data.subarray(9, 13)], [145, 156, 156, 135]);
+  assert.deepEqual([...frame.data.subarray(13, 17)], [113, 104, 104, 122]);
 });
 
-test('an SPS without VUI gains a video signal type only when the encoder reported full range', async () => {
+test('H.264 and H.265 take an odd size by repeating the last column and row; VP9 and AV1 keep it', async () => {
+  // H.264 and H.265 4:2:0 crop in units of two luma samples (H.264 7.4.2.1.1 CropUnitX and CropUnitY; H.265 7.4.3.2.1
+  // SubWidthC and SubHeightC), so an odd picture cannot be stated, and their encoders refuse one.
+  const data = new Uint8Array(3 * 3 * 4);
+  for (let i = 0; i < 9; i++) data.set([(i % 3) * 100, Math.floor(i / 3) * 100, 0, 255], i * 4);
+  for (const codec of ['avc1.42001f', 'hvc1.1.6.L93.B0']) {
+    const { webCodecs, log } = fakeCodecs({ description: Uint8Array.from(RADEON_AVCC) }),
+      video = await encodeVideo([{ width: 3, height: 3, data }, { width: 3, height: 3, data }], {
+        format: 'mp4',
+        fps: 10,
+        codec,
+        webCodecs,
+      });
+    assert.deepEqual([log.configs[0].width, log.configs[0].height], [4, 4], codec);
+    assert.deepEqual([video.width, video.height], [4, 4], `${codec}: the file states the size it holds`);
+    const y = [...log.frames[0].data.subarray(0, 16)],
+      luma = (r, g) => Math.round(16 + (219 / 255) * (0.2126 * r + 0.7152 * g));
+    assert.deepEqual(
+      y,
+      [0, 1, 2, 2].flatMap((row) => [0, 1, 2, 2].map((col) => luma(Math.min(col, 2) * 100, Math.min(row, 2) * 100))),
+      `${codec}: column 3 and row 3 repeat column 2 and row 2`,
+    );
+    assert.equal(log.frames[0].data.length, 16 + 2 * 4, `${codec}: 2 x 2 chroma`);
+  }
+  for (const [format, codec] of [
+    ['webm', 'vp09.00.10.08'],
+    ['mp4', 'av01.0.04M.08'],
+  ]) {
+    const { webCodecs, log } = fakeCodecs(),
+      video = await encodeVideo([{ width: 3, height: 3, data }], { format, fps: 10, codec, webCodecs });
+    assert.deepEqual([log.configs[0].width, log.configs[0].height, video.width, video.height], [3, 3, 3, 3], codec);
+  }
+  const { webCodecs } = fakeCodecs({ description: Uint8Array.from(RADEON_AVCC) });
+  await assert.rejects(
+    encodeVideo(
+      [
+        { width: 3, height: 3, data },
+        { width: 4, height: 4, data: new Uint8Array(64) },
+      ],
+      { format: 'mp4', codec: 'avc1.42001f', webCodecs },
+    ),
+    RangeError,
+    'a padded size is not a new frame size',
+  );
+});
+
+test('encodeVideo places chroma on the even luma columns, as H.264, H.265, VP9 and AV1 players assume', async () => {
+  const { webCodecs, log } = fakeCodecs({ description: Uint8Array.from(RADEON_AVCC) }),
+    // 4 x 2: red in columns 0 and 1, blue in 2 and 3. A centred 2 x 2 mean would give pure red then pure blue, which
+    // a player then draws half a pixel to the right of where it was rendered.
+    data = new Uint8Array(32);
+  for (let i = 0; i < 8; i++) data.set(i % 4 < 2 ? [255, 0, 0, 255] : [0, 0, 255, 255], i * 4);
+  await encodeVideo([{ width: 4, height: 2, data }], { format: 'mp4', fps: 10, webCodecs });
+  const chroma = [...log.frames[0].data.subarray(8)],
+    red = [Math.round(128 + (224 / 255) * ((0 - 54.213) / 1.8556)), Math.round(128 + (224 / 255) * ((255 - 54.213) / 1.5748))],
+    // Column 2 weighs red 1 of 4 and blue 3 of 4.
+    mix = [0.25 * 255, 0, 0.75 * 255],
+    e = 0.2126 * mix[0] + 0.0722 * mix[2];
+  assert.deepEqual(chroma, [
+    red[0],
+    Math.round(128 + (224 / 255) * ((mix[2] - e) / 1.8556)),
+    red[1],
+    Math.round(128 + (224 / 255) * ((mix[0] - e) / 1.5748)),
+  ]);
+});
+
+test('an H.264 MP4 states limited range in its SPS and colr box, whatever range the encoder reports', async () => {
+  const source = readSps(Uint8Array.from(RADEON_AVCC.slice(8, 40))),
+    // The recorded SPS with its video_full_range_flag set, as an encoder that reports full range may write it.
+    full = spsWithRange(Uint8Array.from(RADEON_AVCC.slice(8, 40)), true),
+    fullRecord = [...RADEON_AVCC.slice(0, 6), 0, full.length, ...full, ...RADEON_AVCC.slice(40)];
+  assert.equal(source.vui.signal.full, 0, 'the recorded SPS says limited');
+  assert.equal(readSps(full).vui.signal.full, 1);
+  for (const record of [RADEON_AVCC, fullRecord])
+    for (const colorSpace of [WEBKIT_REPORT, { ...WEBKIT_REPORT, matrix: 'bt709', fullRange: false }, undefined]) {
+      const { webCodecs } = fakeCodecs({ description: Uint8Array.from(record), colorSpace }),
+        { bytes } = await encodeVideo(frames(3), { format: 'mp4', fps: 10, webCodecs }),
+        list = muxedSps(bytes),
+        stsd = path(bytes, 'moov', 'trak', 'mdia', 'minf', 'stbl', 'stsd'),
+        entry = readBoxes(bytes, stsd.start + 8, stsd.end)[0],
+        colr = readBoxes(bytes, entry.start + 78, entry.end)[1];
+      assert.equal(list.length, 1);
+      assert.deepEqual([...list[0]], RADEON_AVCC.slice(8, 40), 'limited: the recorded bytes, every field the same');
+      assert.deepEqual([...bytes.subarray(colr.start + 4, colr.end)], [0, 1, 0, 13, 0, 1, 0], 'BT.709, sRGB, limited');
+    }
+});
+
+test('an SPS without VUI stays as given: limited is its default', async () => {
   // The recorded SPS cut at its vui_parameters_present_flag (bit 62 of the RBSP), which is then 0, and its stop bit.
   const rbsp = RADEON_AVCC.slice(9, 40),
     kept = Array.from({ length: 62 }, (_, i) => (rbsp[i >> 3] >> (7 - (i & 7))) & 1),
     all = [...kept, 0, 1, 0],
     plain = [103, ...Array.from({ length: all.length / 8 }, (_, i) => all.slice(i * 8, i * 8 + 8).reduce((v, b) => v * 2 + b, 0))],
-    record = [...RADEON_AVCC.slice(0, 6), 0, plain.length, ...plain, ...RADEON_AVCC.slice(40)],
-    before = readSps(Uint8Array.from(plain));
-  assert.equal(before.head.vui, 0);
+    record = [...RADEON_AVCC.slice(0, 6), 0, plain.length, ...plain, ...RADEON_AVCC.slice(40)];
+  assert.equal(readSps(Uint8Array.from(plain)).head.vui, 0);
   for (const fullRange of [true, false]) {
     const { webCodecs } = fakeCodecs({ description: Uint8Array.from(record), colorSpace: { fullRange } }),
       { bytes } = await encodeVideo(frames(2), { format: 'mp4', fps: 10, webCodecs }),
       [sps] = muxedSps(bytes);
-    if (fullRange) {
-      const read = readSps(sps);
-      assert.deepEqual(read.head, { ...before.head, vui: 1 });
-      assert.deepEqual(read.vui.signal, { format: 5, full: 1, colour: null });
-      assert.equal(read.stop, 1);
-      assert.ok(read.rest < 8, 'then only the alignment zeros');
-    } else assert.deepEqual([...sps], plain, 'limited is the default: the bytes as given');
+    assert.deepEqual([...sps], plain, `reported fullRange ${fullRange}: the bytes as given`);
   }
 });
 
@@ -554,7 +648,8 @@ test('VP9 and AV1 in MP4 carry their configuration records; AV1 in WebM its code
   assert.equal(entry.type, 'vp09');
   assert.equal(vpcC.type, 'vpcC');
   assert.equal(bytes[vpcC.start], 1, 'version 1');
-  assert.deepEqual([...bytes.subarray(vpcC.start + 4, vpcC.start + 7)], [2, 41, (10 << 4) | 3]);
+  // Chroma 0: 4:2:0 sited vertically between rows, on the left column, as the planes are made (VP codec ISOBMFF binding).
+  assert.deepEqual([...bytes.subarray(vpcC.start + 4, vpcC.start + 7)], [2, 41, 10 << 4]);
 
   const av1 = fakeCodecs(),
     mp4 = await encodeVideo(frames(2), { format: 'mp4', codec: 'av01.0.13H.10', webCodecs: av1.webCodecs }),
@@ -663,7 +758,23 @@ test('ffmpegArguments picks the codec from the file name, and tags BT.709', () =
   assert.ok(webm.includes('libvpx-vp9') && !webm.includes('libx264'));
   assert.ok(mp4.includes('libx264') && mp4.includes('+faststart'));
   assert.equal(mp4[10 - 2], '30');
-  assert.ok(mp4.includes('scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'));
+  // The frames carry all four BT.709 tags (setparams): ffmpeg 9 writes the frames' own primaries and transfer over the
+  // -color_primaries and -color_trc options, and the scaler alone leaves both unset (known-bugs, 2026-11-14).
+  // The transfer is sRGB (H.273 code 13), as encodeVideo states it: the frames are sRGB-encoded renders. Chroma is
+  // made and tagged on the left column between rows (H.273 chroma_sample_loc_type 0), as encodeVideo makes it.
+  const filter =
+    'scale=out_color_matrix=bt709:out_range=tv:out_chroma_loc=left,format=yuv420p,setparams=color_primaries=bt709:color_trc=iec61966-2-1:colorspace=bt709:range=tv:chroma_location=left';
+  for (const args of [mp4, webm]) {
+    assert.equal(args[args.indexOf('-vf') + 1], filter);
+    for (const [option, value] of [
+      ['-colorspace', 'bt709'],
+      ['-color_primaries', 'bt709'],
+      ['-color_trc', 'iec61966-2-1'],
+      ['-color_range', 'tv'],
+      ['-chroma_sample_location', 'left'],
+    ])
+      assert.equal(args[args.indexOf(option) + 1], value, option);
+  }
   assert.deepEqual(ffmpegArguments(2, 2, { output: 'x.mkv', args: ['-c:v', 'ffv1'] }).slice(-3), [
     '-c:v',
     'ffv1',
@@ -676,9 +787,11 @@ const STAND_IN = `
 import { createWriteStream, writeFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 writeFileSync(args.at(-1) + '.args', JSON.stringify(args));
-if (process.env.MARGO_STAND_IN === 'fail') { console.error('Unknown encoder'); process.exit(3); }
-if (process.env.MARGO_STAND_IN === 'hang') setInterval(() => {}, 1000);
-process.stdin.pipe(createWriteStream(args.at(-1)));
+if (process.env.MARGO_STAND_IN === 'fail') { console.error('Unknown encoder'); process.exitCode = 3; }
+else {
+  if (process.env.MARGO_STAND_IN === 'hang') setInterval(() => {}, 1000);
+  process.stdin.pipe(createWriteStream(args.at(-1)));
+}
 `;
 
 test('encodeWithFFmpeg pipes every frame, in order, to the program', async () => {
@@ -696,6 +809,40 @@ test('encodeWithFFmpeg pipes every frame, in order, to the program', async () =>
     assert.deepEqual([written[0], written[big], written[big * 2], written.at(-1)], [0, 1, 2, 2]);
     const args = JSON.parse(await readFile(output + '.args', 'utf8'));
     assert.deepEqual(args, ffmpegArguments(512, 512, { output, fps: 12 }));
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test('encodeWithFFmpeg gives H.264 an even size by repeating the last column and row; VP9 and custom args keep it', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'margo-ffmpeg-'));
+  try {
+    const script = join(folder, 'stand-in.mjs'),
+      data = Uint8Array.from({ length: 3 * 3 * 4 }, (_, i) => i);
+    await writeFile(script, STAND_IN);
+    const mp4 = join(folder, 'odd.mp4'),
+      result = await encodeWithFFmpeg([{ width: 3, height: 3, data }], { output: mp4, ffmpeg: [process.execPath, script] }),
+      written = await readFile(mp4),
+      args = JSON.parse(await readFile(mp4 + '.args', 'utf8'));
+    assert.deepEqual(result, { output: mp4, width: 4, height: 4, frames: 1 });
+    assert.equal(args[args.indexOf('-s') + 1], '4x4');
+    const pixel = (x, y) => [...data.subarray((y * 3 + x) * 4, (y * 3 + x) * 4 + 4)];
+    assert.deepEqual(
+      [...written],
+      [0, 1, 2, 2].flatMap((y) => [0, 1, 2, 2].flatMap((x) => pixel(Math.min(x, 2), Math.min(y, 2)))),
+    );
+    for (const [output, args] of [
+      [join(folder, 'odd.webm'), undefined],
+      [join(folder, 'odd.mkv'), ['-c:v', 'ffv1']],
+    ]) {
+      const kept = await encodeWithFFmpeg([{ width: 3, height: 3, data }], {
+        output,
+        args,
+        ffmpeg: [process.execPath, script],
+      });
+      assert.deepEqual([kept.width, kept.height], [3, 3], output);
+      assert.deepEqual([...(await readFile(output))], [...data], output);
+    }
   } finally {
     await rm(folder, { recursive: true, force: true });
   }
@@ -749,4 +896,154 @@ test('abort ends the ffmpeg process and rejects with the reason', async () => {
     delete process.env.MARGO_STAND_IN;
     await rm(folder, { recursive: true, force: true });
   }
+});
+
+// A stand-in that also copies the sound pipe (fd 3) to the output's `.sound` file.
+const SOUND_STAND_IN = `
+import { createReadStream, createWriteStream, writeFileSync } from 'node:fs';
+const args = process.argv.slice(2);
+writeFileSync(args.at(-1) + '.args', JSON.stringify(args));
+createReadStream(null, { fd: 3 }).pipe(createWriteStream(args.at(-1) + '.sound'));
+process.stdin.pipe(createWriteStream(args.at(-1)));
+`;
+
+test('encodeWithFFmpeg pipes sound as interleaved f32le on pipe 3 beside the frames, and maps it', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'margo-ffmpeg-'));
+  try {
+    const script = join(folder, 'stand-in.mjs'),
+      output = join(folder, 'out.mp4');
+    await writeFile(script, SOUND_STAND_IN);
+    // Longer than one write block and than a pipe's buffer, so the sound waits for room while frames are written.
+    const length = 100_000,
+      left = Float32Array.from({ length }, (_, i) => Math.sin(i / 7)),
+      right = Float32Array.from({ length }, (_, i) => -i / length),
+      audio = { channels: [left, right], sampleRate: 48_000, bitrate: 96_000 },
+      source = [0, 1].map((value) => ({ width: 512, height: 512, data: new Uint8Array(1 << 20).fill(value) })),
+      result = await encodeWithFFmpeg(source, { output, ffmpeg: [process.execPath, script], audio });
+    assert.deepEqual(result, { output, width: 512, height: 512, frames: 2, audioDuration: length / 48_000 });
+    const sound = await readFile(output + '.sound'),
+      samples = new Float32Array(sound.buffer, sound.byteOffset, sound.length / 4);
+    assert.equal(samples.length, length * 2);
+    for (const i of [0, 1, 16383, 16384, 99_999]) assert.deepEqual([samples[2 * i], samples[2 * i + 1]], [left[i], right[i]]);
+    const args = JSON.parse(await readFile(output + '.args', 'utf8'));
+    assert.deepEqual(args, ffmpegArguments(512, 512, { output, audio }));
+    const at = args.indexOf('pipe:3');
+    assert.deepEqual(args.slice(at - 7, at + 5), ['-f', 'f32le', '-ar', '48000', '-ac', '2', '-i', 'pipe:3', '-map', '0:v:0', '-map', '1:a:0']);
+    assert.ok(!args.includes('-an'));
+    assert.deepEqual(args.slice(-5, -1), ['-c:a', 'aac', '-b:a', '96000']);
+    assert.deepEqual(ffmpegArguments(2, 2, { output: 'a.webm', audio }).slice(-5, -1), ['-c:a', 'libopus', '-b:a', '96000']);
+    // Custom args: the sound is still input 1 and mapped; its codec is the caller's.
+    assert.deepEqual(ffmpegArguments(2, 2, { output: 'a.mkv', args: ['-c:v', 'ffv1'], audio }).slice(-3), ['-c:v', 'ffv1', 'a.mkv']);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
+test('encodeWithFFmpeg checks its sound before starting ffmpeg', async () => {
+  const frame = { width: 2, height: 2, data: new Uint8Array(16) },
+    bad = [
+      { channels: [], sampleRate: 48_000 },
+      { channels: [new Float32Array(4), new Float32Array(5)], sampleRate: 48_000 },
+      { channels: [new Float32Array(0)], sampleRate: 48_000 },
+      { channels: [[0, 1]], sampleRate: 48_000 },
+      { channels: [new Float32Array(4)], sampleRate: 0 },
+      { channels: [new Float32Array(4)], sampleRate: 44_100.5 },
+      { channels: [new Float32Array(4)], sampleRate: 48_000, bitrate: -1 },
+    ];
+  for (const audio of bad)
+    await assert.rejects(encodeWithFFmpeg([frame], { output: 'x.mp4', ffmpeg: 'margo-no-such-program', audio }), {
+      name: 'RangeError',
+    });
+});
+
+// Every piece of a stream, the frames pulled when each came out, and the iteration's return value.
+async function drain(stream, pulled) {
+  const pieces = [],
+    at = [];
+  let step;
+  while (!(step = await stream.next()).done) {
+    pieces.push(step.value);
+    at.push(pulled());
+  }
+  const bytes = new Uint8Array(pieces.reduce((sum, piece) => sum + piece.length, 0));
+  pieces.reduce((offset, piece) => (bytes.set(piece, offset), offset + piece.length), 0);
+  return { pieces, at, bytes, result: step.value };
+}
+
+test('streamVideo writes a fragmented MP4 piece by piece: header, a moof and mdat per key frame interval, then mfra', async () => {
+  const { webCodecs, log } = fakeCodecs({ description: Uint8Array.of(1, 0x64, 0, 0x33, 0xff, 0xe0, 0) });
+  let pulled = 0;
+  function* source() {
+    for (let i = 0; i < 7; i++) {
+      pulled++;
+      yield frame(4, 2, i);
+    }
+  }
+  const { pieces, at, bytes, result } = await drain(
+    streamVideo(source(), { fps: 2, keyFrameInterval: 1.5, codec: 'vp09.00.10.08', webCodecs }),
+    () => pulled,
+  );
+  // The header comes out after the first frame, and each fragment once the next key frame shows where it ends: frames
+  // are not all held until the end.
+  assert.equal(pieces.length, 5);
+  assert.deepEqual(at, [1, 4, 7, 7, 7]);
+  assert.deepEqual(result, { mimeType: 'video/mp4; codecs="vp09.00.10.08"', codec: 'vp09.00.10.08', width: 4, height: 2, frames: 7, duration: 3.5 });
+  assert.equal(log.closed, true);
+  const top = readBoxes(bytes);
+  assert.deepEqual(top.map((box) => box.type), ['ftyp', 'moov', 'moof', 'mdat', 'moof', 'mdat', 'moof', 'mdat', 'mfra']);
+  assert.equal(String.fromCharCode(...bytes.subarray(8, 12)), 'iso6');
+  const trex = path(bytes, 'moov', 'mvex', 'trex');
+  assert.deepEqual([u32At(bytes, trex.start + 4), u32At(bytes, trex.start + 8)], [1, 1]);
+  const stbl = path(bytes, 'moov', 'trak', 'mdia', 'minf', 'stbl');
+  assert.equal(u32At(bytes, child(bytes, stbl, 'stsz').start + 8), 0, 'no samples in the header tables');
+  assert.equal(u32At(bytes, path(bytes, 'moov', 'trak', 'mdia', 'mdhd').start + 12), 2000);
+  const moofs = top.filter((box) => box.type === 'moof');
+  moofs.forEach((moof, n) => {
+    const mfhd = child(bytes, moof, 'mfhd'),
+      traf = child(bytes, moof, 'traf'),
+      tfhd = child(bytes, traf, 'tfhd'),
+      tfdt = child(bytes, traf, 'tfdt'),
+      trun = child(bytes, traf, 'trun'),
+      view = new DataView(bytes.buffer, bytes.byteOffset);
+    assert.equal(u32At(bytes, mfhd.start + 4), n + 1, 'sequence numbers count from 1');
+    assert.equal(u32At(bytes, tfhd.start) & 0xffffff, 0x020000, 'default-base-is-moof');
+    assert.equal(Number(view.getBigUint64(tfdt.start + 4)), n * 3000, 'absolute decode time');
+    const count = u32At(bytes, trun.start + 4),
+      offset = u32At(bytes, trun.start + 8);
+    assert.equal(count, n < 2 ? 3 : 1);
+    for (let i = 0, data = moof.start - 8 + offset; i < count; i++) {
+      const row = trun.start + 12 + i * 12;
+      assert.deepEqual([u32At(bytes, row), u32At(bytes, row + 4)], [1000, 3], 'duration and size');
+      assert.equal(u32At(bytes, row + 8), i === 0 ? 0x02000000 : 0x01010000, 'sync flags');
+      assert.deepEqual([...bytes.subarray(data, data + 3)], [n * 3 + i, 0xaa, 0xbb], 'the data offset finds the sample');
+      data += 3;
+    }
+  });
+  // mfra: one entry per fragment, at its moof, and mfro gives the mfra size so a reader finds it from the end.
+  const mfra = top.at(-1),
+    tfra = child(bytes, mfra, 'tfra'),
+    view = new DataView(bytes.buffer, bytes.byteOffset);
+  assert.equal(u32At(bytes, tfra.start + 12), 3);
+  for (let n = 0; n < 3; n++) {
+    const row = tfra.start + 16 + n * 19;
+    assert.equal(Number(view.getBigUint64(row)), n * 3000);
+    assert.equal(Number(view.getBigUint64(row + 8)), moofs[n].start - 8);
+  }
+  assert.equal(u32At(bytes, bytes.length - 4), mfra.end - mfra.start + 8);
+});
+
+test('streamVideo: stopping early closes the encoder; an H.264 stream carries its avcC; bad options throw', async () => {
+  const { webCodecs, log } = fakeCodecs({ description: Uint8Array.of(1, 0x64, 0, 0x33, 0xff, 0xe0, 0) });
+  for await (const piece of streamVideo(frames(9), { webCodecs, codec: 'avc1.640033' })) {
+    assert.ok(path(piece, 'moov', 'trak', 'mdia', 'minf', 'stbl', 'stsd'));
+    break;
+  }
+  assert.equal(log.closed, true);
+  const stopped = new AbortController(),
+    { webCodecs: second, log: secondLog } = fakeCodecs();
+  stopped.abort(new Error('stop'));
+  await assert.rejects(streamVideo(frames(2), { webCodecs: second, signal: stopped.signal }).next(), /stop/);
+  assert.equal(secondLog.created, undefined);
+  await assert.rejects(streamVideo(frames(2), { webCodecs: second, fps: 0 }).next(), { name: 'RangeError' });
+  await assert.rejects(streamVideo([], { webCodecs: second }).next(), /No frames/);
 });

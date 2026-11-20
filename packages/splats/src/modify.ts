@@ -9,6 +9,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { captureScene } from '../../shared/scene-scope.js';
 import { validateSplats, type SplatData } from './data.js';
 import type { Splats } from './index.js';
 
@@ -154,10 +155,12 @@ export class SplatModifier implements EnginePlugin {
   }
   /** Creates the canonical snapshot, then attaches the modifier to engine. */
   static async attach(engine: EngineKernel, cloud: Splats, options: SplatModifierOptions = {}): Promise<SplatModifier> {
-    const modifier = await SplatModifier.create(cloud, options);
+    // The scene attach was called for, kept across the await.
+    const scope = captureScene(engine),
+      modifier = await SplatModifier.create(cloud, options);
     try {
       options.signal?.throwIfAborted();
-      engineRuntime(engine).use(modifier);
+      scope.run(() => engineRuntime(engine).use(modifier));
       return modifier;
     } catch (error) {
       modifier.dispose();
@@ -219,7 +222,6 @@ export class SplatModifier implements EnginePlugin {
   }
   private run(c: Context, stage: number): void {
     if (stage === 0) {
-      if (!c.view?.index && this.playing) this.time += c.delta * this.speed;
       if (
         !Number.isFinite(Math.fround(this.time)) ||
         !Number.isFinite(Math.fround(c.delta)) ||
@@ -262,6 +264,16 @@ export class SplatModifier implements EnginePlugin {
     this.uniform = this.rest = this.bound = this.evaluated = undefined;
     this.groups = [];
     this.pipelines = [];
+  }
+  /**
+   * Moves `time` by `delta` seconds times `speed` while `playing`, without drawing (a delta of 0 or less moves
+   * nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0 && this.playing) this.time += delta * this.speed;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   onDeviceRestored(engine: Engine): void {
     this.release();

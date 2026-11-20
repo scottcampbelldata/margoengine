@@ -83,12 +83,13 @@ const volume = await figure.volume(new Float32Array(27).fill(0.5), { dims: [3,3,
 ```
 
 `/cinematic` adds independent default-off lighting modes around a scalar volume.
-Options use Henyey-Greenstein scattering and scene-distance optical transport, not
+Options use the Henyey-Greenstein phase normalised over the sphere (an isotropic
+scatterer returns `light` / (4 pi) in both the single-scatter march and the path tracer) and scene-distance optical transport, not
 an arbitrary data-coordinate metric. Progressive accumulation defaults to 4096
 samples and seed 1; configure/reset and camera changes restart histories. HG anisotropy
 defaults to 0, bounces to 8 and albedo to 0.9. Enabled ambient occlusion defaults to
 radius 8 smallest scene voxels, 8 directions and 8 steps; shadows use 32 steps. Ambient
-radiance defaults to [0.3,0.3,0.3], light radiance [0.7,0.7,0.7], direction
+radiance defaults to [0.3,0.3,0.3], light irradiance [8.8,8.8,8.8], direction
 [0.4,0.6,1]. `cost()` reads exact last-pass scalar samples, shadow/ambient rays,
 collisions and dispatched pixels; it is a work count, not elapsed GPU timing.
 Saturated frames do no new transport work. Retained depth/count history costs 56
@@ -163,7 +164,9 @@ maxAngle 45 degrees, maxLength 1000 per direction, maxSteps 4096, bidirectional 
 and maxPoints one million. Hyperstreamlines default to radius half the smallest
 spacing, 12 sides and one million triangles. Glyphs default to superquadric,
 normalize true, size 0.4 smallest spacing (0.4 for scattered data), gamma 3,
-direction-fa colour, stride 1, resolution 16 and opacity 1.
+direction-fa colour, stride 1, resolution 16 and opacity 1. On a regular field `stride`
+steps every axis (stride 2 keeps every second i, j and k, as ParaView Extract Subset
+does); scattered samples keep every stride-th sample.
 Field coordinates and tensor bases must agree; no registration is guessed.
 `fitDiffusionTensor` is ordinary linear least squares on log signals, not weighted,
 constrained or nonlinear fitting. Default positive signal floor is 1 input unit;

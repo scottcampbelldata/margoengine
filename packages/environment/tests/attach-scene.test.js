@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Environment } from '../dist/index.js';
 import { EnvironmentBlend } from '../dist/blend.js';
+import { EnvironmentLighting } from '../dist/index.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
@@ -49,4 +50,27 @@ test('EnvironmentBlend.attach installs into the scene active at the call, and di
   assert.equal(other.plugins.has(blend.name), false);
   from.dispose();
   to.dispose();
+});
+
+test('EnvironmentLighting.load puts the environment and the lighting in the scene active at the call', async (t) => {
+  const engine = await setup(t), other = engine.createScene('other'), first = engine.scene;
+  let pending;
+  other.use({ name: 'probe', setup() { pending = EnvironmentLighting.load(engine, image(), { size: 16 }); } });
+  const lighting = await pending;
+  assert.equal(engine.sceneOf(lighting), other);
+  assert.equal(engine.sceneOf(lighting.environment), other);
+  assert.deepEqual([...first.plugins.keys()], [], 'a plugin landed in the default scene');
+  lighting.dispose();
+  assert.equal(other.plugins.has(lighting.environment.name), false, 'the environment stayed in its scene');
+  assert.deepEqual([...other.plugins.keys()], ['probe']);
+});
+
+test('an aborted EnvironmentLighting.load started in a second scene leaves nothing in either scene', async (t) => {
+  const engine = await setup(t), other = engine.createScene('other'), first = engine.scene, abort = new AbortController();
+  let pending;
+  other.use({ name: 'probe', setup() { pending = EnvironmentLighting.load(engine, image(), { size: 16, signal: abort.signal }); } });
+  abort.abort(new Error('stop'));
+  await assert.rejects(pending, /stop/);
+  assert.deepEqual([...first.plugins.keys()], []);
+  assert.deepEqual([...other.plugins.keys()], ['probe']);
 });

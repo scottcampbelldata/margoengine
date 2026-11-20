@@ -67,6 +67,12 @@ export const SRGBToLinear: (c: number) => number;
 
 export const SRGB_TO_P3: readonly number[];
 
+export function blackbodyChromaticity(kelvin: number): [number, number];
+
+export function blackbodyColor<T extends NumberArray = number[]>(kelvin: number, out?: T, offset?: number): T;
+
+export function chromaticityToLinearSRGB<T extends NumberArray = number[]>(x: number, y: number, out?: T, offset?: number): T;
+
 export function clipToSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, out?: T, offset?: number): T;
 
 export function gradeSRGB<T extends NumberArray = number[]>(rgb: ArrayLike<number>, grade: ColorGrade, out?: T, offset?: number): T;

@@ -27,6 +27,19 @@ test('GPU query validates every bound before touching GPU state', async () => {
     await assert.rejects(pick.pick(1, 2, options), /finite coordinates/);
   await assert.rejects(pick.pick(NaN, 2), /finite coordinates/);
 });
+test('a deadline above the largest host timer rejects as a coded range error instead of firing early or throwing', async () => {
+  using pick = new GpuPicking(fake(() => new Promise(() => {})));
+  for (const timeout of [2 ** 31, 2 ** 32, 2 ** 53, 1e300]) {
+    let result;
+    assert.doesNotThrow(() => (result = pick.pick(1, 2, { timeout })));
+    await assert.rejects(result, (error) => error instanceof RangeError && /timeout in \(0, 2147483647\]/.test(error.message));
+  }
+  // The largest accepted deadline is still pending (not fired early) when the picker is disposed.
+  const longest = pick.pick(1, 2, { timeout: 2 ** 31 - 1 });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  pick.dispose();
+  await assert.rejects(longest, /Create a new GpuPicking/);
+});
 test('cancellation, deadlines and disposal settle queued requests even while figure ready is unresolved', async () => {
   const pick = new GpuPicking(fake(() => new Promise(() => {})));
   const reason = new Error('cancelled request'),

@@ -127,6 +127,8 @@ export class RollbackRelay {
   }
 
   private greet(connection: Connection, data: Uint8Array): void {
+    // A connection accepted before close() whose hello comes after it would otherwise be seated in a closed relay.
+    if (this.closed) return this.refuse(connection, CloseCode.removed, 'relay closed');
     let player: number | undefined, token: string;
     try {
       const r = new Reader(data, 'Rollback relay hello', 'send what relayPeers or RollbackSpectator sends');
@@ -331,12 +333,20 @@ export function relayPeers(link: Connection, { players, local, token = '' }: Rel
     peers.set(player, connection);
   }
   link.onmessage = (data, channel) => {
-    const r = new Reader(data, 'Rollback relay message', 'update the client to the relay version'),
-      kind = r.u8(),
-      player = r.varint(),
-      peer = peers.get(player);
+    let kind: number, player: number, at: number;
+    try {
+      const r = new Reader(data, 'Rollback relay message', 'update the client to the relay version');
+      kind = r.u8();
+      player = r.varint();
+      at = r.at;
+    } catch (error) {
+      // Bytes that do not decode close the link; the error must not escape into the transport's callback.
+      if (!(error instanceof RangeError)) throw error;
+      return link.close(CloseCode.protocol, error.message);
+    }
+    const peer = peers.get(player);
     if (!peer) return;
-    if (kind === FROM) peer.onmessage?.(data.subarray(r.at), channel);
+    if (kind === FROM) peer.onmessage?.(data.subarray(at), channel);
     else if (kind === GONE) peer.close(CloseCode.normal, 'player left');
   };
   link.onclose = (code, reason) => {
@@ -409,6 +419,17 @@ export class RollbackSpectator<State, Input> {
   }
 
   private receive(data: Uint8Array): void {
+    try {
+      this.read(data);
+    } catch (error) {
+      // Bytes that do not decode, or a frame before the welcome, close the link instead of escaping into the transport.
+      if (!(error instanceof RangeError)) throw error;
+      this.closed = true;
+      this.connection.close(CloseCode.protocol, error.message);
+    }
+  }
+
+  private read(data: Uint8Array): void {
     const r = new Reader(data, 'Rollback spectator message', 'update the client to the relay version'),
       kind = r.u8();
     if (kind === WELCOME) {
@@ -422,13 +443,15 @@ export class RollbackSpectator<State, Input> {
       this.current = game.schema.decode(game.stateType, game.schema.encode(game.stateType, state)) as State;
       for (let frame = 1; frame <= this.delay; frame++) this.queue.push([]);
     } else if (kind === FRAME) {
+      if (!this.players) throw r.fail('is a frame before the welcome');
       r.varint();
       const list: Uint8Array[] = [];
-      for (let i = 0; i < (this.players as number[]).length; i++) {
+      for (let i = 0; i < this.players.length; i++) {
         const length = r.count(MAX_INPUT_BYTES);
         r.need(length);
         list.push(data.subarray(r.at, (r.at += length)));
       }
+      r.end();
       this.queue.push(list);
     }
   }

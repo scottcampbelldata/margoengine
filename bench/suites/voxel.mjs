@@ -182,7 +182,7 @@ export default {
           draws: { unit: '', exact: true },
         },
         async run() {
-          // The gate already ran and this process holds the GPU lock (MARGO_GPU_LOCK_NESTED lets the script in).
+          // The quiet gate already ran.
           execFileSync(
             process.execPath,
             ['examples/voxel-sandbox/bench.mjs', '--no-quiet', '--distances=8', '--loads=1'],

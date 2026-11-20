@@ -9,6 +9,7 @@ const scenes = [],
   skies = [],
   pointers = [],
   gizmos = [],
+  drags = [],
   renderers = [],
   texts = [];
 const identity = () => Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
@@ -68,19 +69,49 @@ class Node {
 }
 mock.module('@margoengine/core/extension', {
   namedExports: {
-    assertCore, coreRequirement, meshRuntime: mesh => mesh, Engine: {}, Mesh: Node, PbrMaterial: Material, box: () => ({}) },
+    assertCore,
+    coreRequirement,
+    meshRuntime: (mesh) => mesh,
+    Engine: {},
+    Mesh: Node,
+    PbrMaterial: Material,
+    box: () => ({}),
+  },
 });
 mock.module('@margoengine/geometry', {
   namedExports: {
     boxGeometry: (...args) => ({ kind: 'box', args }),
     sphereGeometry: (...args) => ({ kind: 'sphere', args }),
     planeGeometry: (...args) => ({ kind: 'plane', args }),
+    ...Object.fromEntries(
+      [
+        'cylinder',
+        'cone',
+        'capsule',
+        'circle',
+        'ring',
+        'torus',
+        'torusKnot',
+        'tetrahedron',
+        'octahedron',
+        'icosahedron',
+        'dodecahedron',
+        'polyhedron',
+        'lathe',
+        'tube',
+        'shape',
+        'extrude',
+      ].map((kind) => [`${kind}Geometry`, (...args) => ({ kind, args })]),
+    ),
     toGeometry(data) {
       const geometry = { ...data, vertices: Float32Array.from([-1, 0, -1, 0, 1, 0, 1, 0, 1, 0, 1, 0]) };
       geometries.push(geometry);
       return geometry;
     },
   },
+});
+mock.module('@margoengine/geometry/extras', {
+  namedExports: { roundedBoxGeometry: (...args) => ({ kind: 'roundedBox', args }) },
 });
 class Events {
   constructor() {
@@ -175,10 +206,24 @@ const controlsExports = {
     setScaleSnap(value) {
       this.scaleSnap = value;
     }
+    setPivot(value) {
+      this.pivot = value;
+    }
   },
 };
 mock.module('@margoengine/controls', { namedExports: controlsExports });
 mock.module('@margoengine/controls/transform', { namedExports: controlsExports });
+mock.module('@margoengine/controls/drag', {
+  namedExports: {
+    DragControls: class extends Events {
+      constructor(engine, objects, options) {
+        super();
+        Object.assign(this, { engine, objects, options, enabled: true });
+        drags.push(this);
+      }
+    },
+  },
+});
 mock.module('@margoengine/sky', {
   namedExports: {
     Sky: class {
@@ -274,6 +319,33 @@ mock.module('@margoengine/inspector', {
 mock.module('@margoengine/stats', {
   namedExports: { Stats: { attach: (_, options) => new Panel('stats', options) } },
 });
+const modelClones = [];
+mock.module('@margoengine/animation/skeleton-utils', {
+  namedExports: {
+    async cloneModel(model) {
+      const engine = model.root.engine,
+        root = new Node(engine),
+        clone = {
+          disposed: false,
+          root,
+          nodes: [],
+          bounds: model.bounds,
+          primitives: model.primitives.map(() => ({ material: { base: [], factors: [], emission: [], settings: [] } })),
+          lit: [],
+          addLighting(effect) {
+            clone.lit.push(effect);
+            return () => clone.lit.splice(clone.lit.indexOf(effect), 1);
+          },
+          dispose() {
+            clone.disposed = true;
+            root.dispose();
+          },
+        };
+      modelClones.push(clone);
+      return clone;
+    },
+  },
+});
 mock.module('@margoengine/lines', {
   namedExports: {
     GridHelper: class {
@@ -299,8 +371,23 @@ mock.module('@margoengine/lines', {
 });
 const { Context } = await import('../dist/internal.js');
 const { Mesh } = await (await import('./entries.js')).allEntries();
-const { Billboard, Bounds, DevTools, Float, Grid, useBounds } = await (await import('./entries.js')).allEntries();
-const { Box, Sphere, Plane, Sky, ContactShadows, Center, PointerLock, TransformControls, Text } = await (
+const {
+  Billboard,
+  Bounds,
+  CameraShake,
+  DevTools,
+  Float,
+  Stats,
+  Grid,
+  shakeNoise,
+  useAspect,
+  useBounds,
+  useCursor,
+  useIntersect,
+  useViewport,
+  Clone,
+} = await (await import('./entries.js')).allEntries();
+const { Box, Sphere, Plane, Sky, ContactShadows, Center, PointerLock, TransformControls, DragControls, Text } = await (
   await import('./entries.js')
 ).allEntries();
 const { sceneWorldBounds } = await import('../dist/center.js');
@@ -353,6 +440,7 @@ function makeScene() {
   engine.store = {
     parents: [],
     hidden: [],
+    visible: [],
     tick() {
       const done = new Set();
       function update(mesh) {
@@ -617,6 +705,56 @@ test('TransformControls wraps children as a group, changes modes, and supports p
   await frame(scene);
   assert.equal(ref2.current.object, parent.current);
   next.unmount();
+});
+
+test('DragControls drags its children as one group, locks an axis and holds the group within its limits', async () => {
+  const scene = makeScene(),
+    ref = createRef(),
+    seen = [];
+  const drag = (props) =>
+    tree(
+      scene,
+      React.createElement(
+        DragControls,
+        {
+          ref,
+          position: [1, 0, 0],
+          dragLimits: [[-2, 2], undefined, [0, 0]],
+          onDragStart: (origin) => seen.push(['start', origin]),
+          onDrag: (position) => seen.push(['drag', position]),
+          onDragEnd: () => seen.push(['end']),
+          onHover: (hovering) => seen.push(['hover', hovering]),
+          ...props,
+        },
+        React.createElement(Box),
+      ),
+    );
+  const view = render(drag({ axisLock: 'x' }));
+  await flush();
+  const controls = ref.current,
+    [group] = controls.objects;
+  assert.equal(controls, drags.at(-1));
+  assert.equal(controls.options.transformGroup, true, 'the whole group moves, whichever child is grabbed');
+  assert.equal(group.geometry, null);
+  const shape = [...scene.engine.meshes.values()].find((node) => node.geometry);
+  assert.equal(scene.engine.store.parents[shape.id], group.id, 'the children hang under the dragged group');
+  assert.deepEqual(controls.axis, [1, 0, 0]);
+  assert.equal(controls.mode, 'translate');
+  controls.emit('hoveron');
+  controls.emit('dragstart');
+  group.setPosition([5, 3, -1]);
+  controls.emit('drag');
+  controls.emit('dragend');
+  assert.deepEqual([group.position.x, group.position.y, group.position.z], [2, 3, 0], 'the limits hold the group');
+  assert.deepEqual(seen, [['hover', true], ['start', [1, 0, 0]], ['drag', [2, 3, 0]], ['end']]);
+  view.rerender(drag({ mode: 'rotate', enabled: false }));
+  await flush();
+  assert.equal(controls.axis, null);
+  assert.equal(controls.mode, 'rotate');
+  assert.equal(controls.enabled, false);
+  view.unmount();
+  assert.equal(controls.disposals, 1);
+  assert.equal(controls.events.size, 0);
 });
 
 test('Text shares an optional renderer, attaches to parent meshes and updates content/style/transform', async () => {
@@ -1116,4 +1254,474 @@ test('DevTools on a React without owner stacks opens its panels and leaves meshe
   } finally {
     if (capture) React.captureOwnerStack = capture;
   }
+});
+
+test('every geometry builder has a shape component and a geometry child; equal inline args keep the geometry, a replaced object argument rebuilds it', async () => {
+  const entries = await (await import('./entries.js')).allEntries();
+  const cases = {
+    Cylinder: ['cylinder', [0.5, 1, 2, 16]],
+    Cone: ['cone', [1, 2, 24]],
+    Capsule: ['capsule', [0.5, 1]],
+    Circle: ['circle', [1, 24]],
+    Ring: ['ring', [0.5, 1, 32]],
+    Torus: ['torus', [1, 0.3, 12, 48]],
+    TorusKnot: ['torusKnot', [1, 0.3, 64, 8, 2, 3]],
+    Tetrahedron: ['tetrahedron', [1]],
+    Octahedron: ['octahedron', [1, 1]],
+    Icosahedron: ['icosahedron', [1, 2, true]],
+    Dodecahedron: ['dodecahedron', [1]],
+    Polyhedron: ['polyhedron', [[1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1], [2, 1, 0, 0, 3, 2, 1, 3, 0, 2, 3, 1], 1]],
+    Lathe: [
+      'lathe',
+      [
+        [
+          [0, 0],
+          [1, 0.5],
+          [0, 1],
+        ],
+        12,
+      ],
+    ],
+    RoundedBox: ['roundedBox', [1, 2, 3, 4, 0.25]],
+  };
+  for (const [name, [kind, args]] of Object.entries(cases)) {
+    const scene = makeScene(),
+      shape = createRef(),
+      child = createRef(),
+      Child = entries[`${name}Geometry`];
+    assert.equal(typeof entries[name], 'object', `${name} is exported`);
+    assert.equal(typeof Child, 'function', `${name}Geometry is exported`);
+    // Fresh but equal array literals on every render, as JSX writes them.
+    const content = () => [
+      React.createElement(entries[name], { key: 'shape', ref: shape, args: structuredClone(args) }),
+      React.createElement(
+        Mesh,
+        { key: 'child', ref: child },
+        React.createElement(Child, { args: structuredClone(args) }),
+      ),
+    ];
+    const view = render(tree(scene, content()));
+    await flush();
+    assert.equal(shape.current.geometry.kind, kind, name);
+    assert.deepEqual(shape.current.geometry.args, args, name);
+    assert.equal(child.current.geometry.kind, kind, `${name}Geometry`);
+    assert.deepEqual(child.current.geometry.args, args, `${name}Geometry`);
+    const first = [shape.current.geometry, child.current.geometry];
+    view.rerender(tree(scene, content()));
+    await flush();
+    assert.equal(shape.current.geometry, first[0], `${name} keeps its geometry for equal args`);
+    assert.equal(child.current.geometry, first[1], `${name}Geometry keeps its geometry for equal args`);
+    view.unmount();
+  }
+  // A Curve or Shape instance counts by identity: the same object keeps the geometry, a new one rebuilds it.
+  class Path {
+    constructor(length) {
+      this.length = length;
+    }
+  }
+  const scene = makeScene(),
+    tube = createRef(),
+    path = new Path(2);
+  const content = (curve) => React.createElement(entries.Tube, { ref: tube, args: [curve, 32, 0.1] });
+  const view = render(tree(scene, content(path)));
+  await flush();
+  assert.equal(tube.current.geometry.kind, 'tube');
+  assert.equal(tube.current.geometry.args[0], path);
+  const first = tube.current.geometry;
+  view.rerender(tree(scene, content(path)));
+  await flush();
+  assert.equal(tube.current.geometry, first);
+  view.rerender(tree(scene, content(new Path(2))));
+  await flush();
+  assert.notEqual(tube.current.geometry, first);
+  view.unmount();
+});
+
+test('useCursor sets the canvas cursor while hovered and puts it back', async () => {
+  const scene = makeScene(),
+    Hover = ({ on }) => {
+      useCursor(on, 'grab');
+      return null;
+    };
+  const view = render(tree(scene, React.createElement(Hover, { on: false })));
+  await flush();
+  assert.equal(scene.engine.canvas.style.cursor, '');
+  view.rerender(tree(scene, React.createElement(Hover, { on: true })));
+  await flush();
+  assert.equal(scene.engine.canvas.style.cursor, 'grab');
+  view.rerender(tree(scene, React.createElement(Hover, { on: false })));
+  await flush();
+  assert.equal(scene.engine.canvas.style.cursor, 'auto');
+  view.rerender(tree(scene, React.createElement(Hover, { on: true })));
+  await flush();
+  view.unmount();
+  assert.equal(scene.engine.canvas.style.cursor, 'auto', 'unmounting while hovered restores it');
+});
+
+test('useViewport and useAspect measure the view at the camera target and cover it', async () => {
+  const scene = makeScene();
+  Object.assign(scene.engine.camera, { fov: 90, position: [0, 0, 2], target: [0, 0, 0] });
+  Object.defineProperty(scene.engine.canvas, 'clientWidth', { value: 200 });
+  Object.defineProperty(scene.engine.canvas, 'clientHeight', { value: 100 });
+  let viewport, wide, tall;
+  const Read = () => {
+    viewport = useViewport();
+    wide = useAspect(16, 9);
+    tall = useAspect(1, 2, 2);
+    return null;
+  };
+  render(tree(scene, React.createElement(Read)));
+  await flush();
+  // 2 * distance * tan(45 degrees) = 4 units high; the 2:1 canvas makes it 8 wide; 100 px over 4 units.
+  assert.ok(Math.abs(viewport.height - 4) < 1e-12 && Math.abs(viewport.width - 8) < 1e-12);
+  assert.equal(viewport.aspect, 2);
+  assert.ok(Math.abs(viewport.factor - 25) < 1e-12);
+  // 16:9 is narrower than 2:1, so it fills the width: 8 by 4.5.
+  assert.ok(Math.abs(wide[0] - 8) < 1e-12 && Math.abs(wide[1] - 4.5) < 1e-12 && wide[2] === 1);
+  // 1:2 fills the width too: 8 by 16, times factor 2.
+  assert.ok(Math.abs(tall[0] - 16) < 1e-12 && Math.abs(tall[1] - 32) < 1e-12);
+});
+
+test('shakeNoise is continuous, bounded and differs by seed', () => {
+  let previous = shakeNoise(0, 7),
+    largest = 0,
+    differs = false;
+  assert.equal(previous, 0, 'zero at every lattice point');
+  for (let x = 0.001; x < 50; x += 0.001) {
+    const value = shakeNoise(x, 7);
+    assert.ok(Math.abs(value - previous) < 0.02, `jump at ${x}`);
+    largest = Math.max(largest, Math.abs(value));
+    if (Math.abs(value - shakeNoise(x, 8)) > 0.1) differs = true;
+    previous = value;
+  }
+  assert.ok(largest <= 1 && largest > 0.3);
+  assert.ok(differs);
+});
+
+test('CameraShake turns the view within its limits, follows a moved camera, decays and restores on unmount', async () => {
+  const scene = makeScene(),
+    shake = createRef(),
+    camera = scene.engine.camera;
+  Object.assign(camera, { position: [0, 0, 5], target: [0, 0, 0], up: [0, 1, 0] });
+  const angle = (a, b) =>
+    Math.acos(Math.min(1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / Math.hypot(...a) / Math.hypot(...b)));
+  const view = render(
+    tree(
+      scene,
+      React.createElement(CameraShake, {
+        ref: shake,
+        maxYaw: 0.2,
+        maxPitch: 0.2,
+        maxRoll: 0.3,
+        yawFrequency: 3,
+        pitchFrequency: 3,
+        rollFrequency: 3,
+      }),
+    ),
+  );
+  await flush();
+  let moved = 0;
+  for (let i = 0; i < 60; i++) {
+    await frame(scene, 0.05);
+    const forward = camera.target.map((v, k) => v - camera.position[k]);
+    const off = angle(forward, [0, 0, -1]);
+    assert.ok(off <= Math.hypot(0.2, 0.2) + 1e-9, 'yaw and pitch stay inside their limits');
+    assert.ok(Math.abs(Math.hypot(...forward) - 5) < 1e-9, 'the target keeps its distance');
+    assert.ok(Math.abs(Math.hypot(...camera.up) - 1) < 1e-9);
+    moved = Math.max(moved, off);
+  }
+  assert.ok(moved > 0.01, 'it shakes');
+  // Something else moves the camera: the shake builds on the new place instead of pulling it back.
+  camera.target = [10, 0, 5];
+  await frame(scene, 0.05);
+  assert.ok(Math.hypot(camera.target[0] - 10, camera.target[1], camera.target[2] - 5) < 10 * 0.3);
+  shake.current.setIntensity(0);
+  await frame(scene, 0.05);
+  assert.deepEqual(camera.target, [10, 0, 5]);
+  assert.equal(shake.current.getIntensity(), 0);
+  view.rerender(
+    tree(scene, React.createElement(CameraShake, { ref: shake, decay: true, decayRate: 1, intensity: 0.75 })),
+  );
+  await flush();
+  assert.equal(shake.current.getIntensity(), 0.75, 'a new intensity prop applies');
+  for (let i = 0; i < 4; i++) await frame(scene, 0.25);
+  assert.equal(shake.current.getIntensity(), 0, '0.75 lasts 0.75 s at decayRate 1');
+  shake.current.setIntensity(1);
+  await frame(scene, 0.1);
+  view.unmount();
+  assert.deepEqual(camera.target, [10, 0, 5], 'unmount puts the camera back');
+  assert.deepEqual(camera.up, [0, 1, 0]);
+});
+
+test('Stats opens the readout alone with its options and closes it on unmount', async () => {
+  const scene = makeScene(),
+    parent = document.createElement('div');
+  panels.length = 0;
+  const view = render(tree(scene, React.createElement(Stats, { parent, samples: 60 })));
+  await flush();
+  const open = panels.filter((p) => !p.disposals);
+  assert.deepEqual(
+    open.map((p) => p.kind),
+    ['stats'],
+  );
+  assert.equal(open[0].options.parent, parent);
+  assert.equal(open[0].options.samples, 60);
+  view.unmount();
+  await flush();
+  assert.ok(panels.every((p) => p.disposals >= 1));
+  panels.length = 0;
+  render(tree(scene, React.createElement(Stats, { enabled: false })));
+  await flush();
+  assert.equal(panels.length, 0);
+});
+
+test("useIntersect reports entering and leaving the view by the last frame's culling, for meshes, groups and models", async () => {
+  const scene = makeScene(),
+    { engine } = scene,
+    calls = [],
+    group = createRef(),
+    child = createRef();
+  // Camera planes: only x >= 0 is in view (normal +x, distance 0); the other five pass everything.
+  engine.camera.planes = Float32Array.from([1, 0, 0, 0, ...Array.from({ length: 5 }, () => [0, 0, 0, 1]).flat()]);
+  let ref;
+  const Watch = () => {
+    ref = useIntersect((visible) => calls.push(visible));
+    return React.createElement(
+      Mesh,
+      { ref: (node) => ((ref.current = node), (group.current = node)) },
+      React.createElement(Mesh, { ref: child }),
+    );
+  };
+  const view = render(tree(scene, React.createElement(Watch)));
+  await flush();
+  await frame(scene);
+  assert.deepEqual(calls, [], 'a group with nothing drawn is not visible and reports nothing');
+  child.current.geometry = { indices: [0, 1, 2] };
+  engine.store.visible[child.current.id] = 1;
+  await frame(scene);
+  await frame(scene);
+  assert.deepEqual(calls, [true], 'a drawn child makes the group visible, reported once');
+  engine.store.hidden[group.current.id] = 1;
+  await frame(scene);
+  assert.deepEqual(calls, [true, false], 'a hidden group is not visible');
+  engine.store.hidden[group.current.id] = 0;
+  engine.store.visible[child.current.id] = 0;
+  await frame(scene);
+  assert.deepEqual(calls, [true, false], 'culled: still not visible');
+  const model = { disposed: false, root: child.current, bounds: [-3, -1, -1, -2, 1, 1] };
+  scene.resources.models.add(model);
+  await frame(scene);
+  assert.deepEqual(calls, [true, false], 'a model wholly on the culled side is not visible');
+  model.bounds = [-3, -1, -1, 0.5, 1, 1];
+  await frame(scene);
+  assert.deepEqual(calls, [true, false, true], 'a model whose bounds meet the view is visible');
+  scene.resources.models.delete(model);
+  view.unmount();
+  await frame(scene);
+  assert.deepEqual(calls, [true, false, true]);
+});
+
+test('Clone copies a mesh tree with shared geometry and material, copies models, places the copy and cleans up', async () => {
+  const scene = makeScene(),
+    { engine } = scene,
+    source = createRef(),
+    child = createRef(),
+    copyRef = createRef(),
+    geometry = { indices: [0, 1, 2] },
+    material = new Material({ color: 'red' });
+  // The store inputs Clone reads, from the mock's transforms.
+  const lane = (read) => new Proxy([], { get: (_, id) => read(engine.meshes.get(Number(id))) });
+  engine.store.transforms = {
+    x: lane((m) => m?.position.x),
+    y: lane((m) => m?.position.y),
+    z: lane((m) => m?.position.z),
+    qx: lane(() => 0),
+    qy: lane(() => 0),
+    qz: lane(() => 0),
+    qw: lane(() => 1),
+    sx: lane((m) => m?.scale.x),
+    sy: lane((m) => m?.scale.y),
+    sz: lane((m) => m?.scale.z),
+  };
+  const Source = () =>
+    React.createElement(
+      Mesh,
+      { ref: source, position: [1, 2, 3] },
+      React.createElement(Mesh, { ref: child, position: [0, 1, 0], scale: [2, 2, 2] }),
+    );
+  const view = render(tree(scene, React.createElement(Source)));
+  await flush();
+  child.current.setGeometry(geometry).setMaterial(material);
+  child.current.visible = false;
+  const material2 = { base: [1, 0, 0, 1], factors: [0.3, 0.7, 1, 1], emission: [0, 0, 0], settings: [0, 0.5, 0] };
+  const model = {
+    disposed: false,
+    root: new Node(engine),
+    nodes: [],
+    bounds: [0, 0, 0, 1, 1, 1],
+    primitives: [{ material: material2, node: null }],
+  };
+  model.root.setParent(child.current);
+  scene.resources.models.add(model);
+  const effect = {};
+  scene.resources.lighting.set(effect, new Map());
+  const before = new Set(engine.meshes.keys());
+  view.rerender(
+    tree(
+      scene,
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(Source),
+        React.createElement(Clone, { ref: copyRef, object: source, position: [10, 0, 0] }),
+      ),
+    ),
+  );
+  await flush();
+  await flush();
+  const added = [...engine.meshes.values()].filter((m) => !before.has(m.id));
+  const group = copyRef.current;
+  assert.deepEqual(group.position, { x: 10, y: 0, z: 0 });
+  const rootCopy = added.find((m) => engine.store.parents[m.id] === group.id && m !== group);
+  assert.deepEqual(rootCopy.position, { x: 1, y: 2, z: 3 }, 'the copied root keeps its local transform');
+  const childCopy = added.find((m) => engine.store.parents[m.id] === rootCopy.id && m.geometry);
+  assert.equal(childCopy.geometry, geometry, 'geometry is shared');
+  assert.equal(childCopy.material, material, 'material is shared');
+  assert.deepEqual(childCopy.scale, { x: 2, y: 2, z: 2 });
+  assert.equal(childCopy.visible, false);
+  assert.equal(modelClones.length, 1, 'the model is copied once, not as plain meshes');
+  const modelCopy = modelClones[0];
+  assert.equal(engine.store.parents[modelCopy.root.id], childCopy.id, 'the model copy hangs under the copied parent');
+  assert.deepEqual(
+    modelCopy.primitives[0].material.factors,
+    [0.3, 0.7, 1, 1],
+    'material values as the source shows them',
+  );
+  assert.notEqual(modelCopy.primitives[0].material.factors, material2.factors);
+  assert.ok(scene.resources.models.has(modelCopy));
+  assert.deepEqual(modelCopy.lit, [effect]);
+  assert.equal(
+    added.filter((m) => m.id !== modelCopy.root.id).length,
+    3,
+    'the group, the root copy and the child copy',
+  );
+  view.rerender(tree(scene, React.createElement(Source)));
+  await flush();
+  assert.ok(modelCopy.disposed);
+  assert.equal(scene.resources.models.has(modelCopy), false);
+  assert.deepEqual(modelCopy.lit, []);
+  assert.deepEqual(
+    [...engine.meshes.keys()].filter((id) => !before.has(id)),
+    [],
+    'every copy is disposed',
+  );
+  scene.resources.models.delete(model);
+  scene.resources.lighting.clear();
+  model.root.dispose();
+  view.unmount();
+});
+
+test('BakeShadows makes every caster static while mounted and dynamic again after', async () => {
+  const { BakeShadows } = await (await import('./entries.js')).allEntries();
+  const scene = makeScene(),
+    ref = createRef(),
+    casters = new Map();
+  scene.shadows = {
+    add(mesh, options) {
+      casters.set(mesh, options);
+      return () => casters.delete(mesh);
+    },
+  };
+  const content = (bake) =>
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement(Mesh, { ref, castShadow: true }),
+      bake && React.createElement(BakeShadows),
+    );
+  const view = render(tree(scene, content(false)));
+  await flush();
+  assert.equal(casters.get(ref.current).static, false);
+  view.rerender(tree(scene, content(true)));
+  await flush();
+  assert.equal(casters.size, 1);
+  assert.equal(casters.get(ref.current).static, true, 'baked: the caster is static');
+  view.rerender(tree(scene, content(false)));
+  await flush();
+  assert.equal(casters.get(ref.current).static, false, 'unbaked: dynamic again');
+  view.unmount();
+  assert.equal(casters.size, 0);
+});
+
+test('AdaptiveEvents pauses hover picking while performance has declined and resumes it', async () => {
+  const { AdaptiveEvents, PerformanceMonitor } = await (await import('./entries.js')).allEntries();
+  const { hoverPaused } = await import('../dist/events.js');
+  const scene = makeScene(),
+    content = (factor) => React.createElement(PerformanceMonitor, { factor }, React.createElement(AdaptiveEvents));
+  const view = render(tree(scene, content(0.5)));
+  await flush();
+  assert.equal(hoverPaused(scene.engine), true, 'declined: paused');
+  view.rerender(tree(scene, content(1)));
+  await flush();
+  assert.equal(hoverPaused(scene.engine), false, 'back at full quality: resumed');
+  view.rerender(tree(scene, content(0.5)));
+  await flush();
+  view.unmount();
+  await flush();
+  assert.equal(hoverPaused(scene.engine), false, 'unmounting resumes');
+});
+
+test('Preload draws everything once with culling off, hidden meshes too with all, and again when a model arrives', async () => {
+  const { Preload } = await (await import('./entries.js')).allEntries();
+  const scene = makeScene(),
+    hidden = createRef(),
+    draws = [];
+  scene.engine.render = (options) => draws.push({ ...options, hiddenShown: hidden.current?.visible });
+  scene.assetCache = { tracker: { state: { active: false } } };
+  const view = render(
+    tree(
+      scene,
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(Mesh, { ref: hidden }),
+        React.createElement(Preload, { all: true }),
+      ),
+    ),
+  );
+  await flush();
+  hidden.current.visible = false;
+  view.rerender(
+    tree(
+      scene,
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(Mesh, { ref: hidden }),
+        React.createElement(Preload, { all: true, key: 2 }),
+      ),
+    ),
+  );
+  await flush();
+  const last = draws.at(-1);
+  assert.deepEqual(
+    [last.culling, last.delta, last.hiddenShown],
+    [false, 0, true],
+    'culling off, the hidden mesh drawn',
+  );
+  assert.equal(hidden.current.visible, false, 'and hidden again after');
+  const count = draws.length;
+  await frame(scene);
+  assert.equal(draws.length, count, 'no draw without a new model');
+  scene.assetCache.tracker.state.active = true;
+  scene.resources.models.add({});
+  await frame(scene);
+  assert.equal(draws.length, count, 'not while files are still loading');
+  scene.assetCache.tracker.state.active = false;
+  await frame(scene);
+  assert.equal(draws.length, count + 1, 'once loading settles with a new model');
+  await frame(scene);
+  assert.equal(draws.length, count + 1);
+  scene.resources.models.clear();
+  view.unmount();
 });

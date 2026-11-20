@@ -292,3 +292,12 @@ test('a SPLINE whose knots or weights cannot make a curve stays its control poly
   body.push('0', 'ENDSEC', '0', 'EOF');
   assert.equal(parseDXF(new TextEncoder().encode(body.join('\n'))).lines.positions.length, 4 * 3);
 });
+
+test('$INSUNITS 21 to 24 are the US survey foot, inch, yard and mile', () => {
+  const unit = (code) =>
+    parseDXF(new TextEncoder().encode(dxf([...section('HEADER', [[9, '$INSUNITS'], [70, code]])]))).unit;
+  assert.equal(unit(21), 1200 / 3937);
+  assert.equal(unit(22), 100 / 3937);
+  assert.equal(unit(23), 3600 / 3937);
+  assert.equal(unit(24), 6336000 / 3937);
+});

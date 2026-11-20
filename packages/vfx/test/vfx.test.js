@@ -63,6 +63,15 @@ test('reset puts the clock, the seed and the waiting births back, and clears the
   h.cleanup();
 });
 
+test('burst after dispose throws the coded disposed error, as reset does', () => {
+  const effect = new VFX({ capacity: 32 });
+  effect.dispose();
+  assert.throws(
+    () => effect.burst(1),
+    (e) => e.name === 'MargoError' && e.code === 'disposed',
+  );
+});
+
 test('one current 64-byte particle buffer survives frames and is retired once on restoration/disposal', () => {
   const h = optionalGPU();
   h.engine.stats = { drawCalls: 0 };
@@ -175,6 +184,8 @@ test('a texture atlas draws one frame per particle, random at spawn or stepped o
     random = shader({ columns: 4, rows: 2, frames: 'random' }),
     lifetime = shader({ columns: 4, rows: 2, frames: 'lifetime' });
   assert.ok(plain.includes('textureSample(sprite,spriteSampler,i.uv*vec2f(0.5,-0.5)+0.5)') && !plain.includes('cell'));
+  // The disc's triangle cuts the sprite's top corners (its edges pass y = 0.27 at x = +-1): a sprite needs the square.
+  assert.ok(plain.includes('array<vec2f,3>(vec2f(-3,-1),vec2f(3,-1),vec2f(0,2))'), 'the triangle holds the whole sprite');
   for (const code of [random, lifetime]) {
     assert.ok(code.includes('@location(1) color:vec4f,@location(2) @interpolate(flat) cell:vec2f}'));
     assert.ok(code.includes('o.cell=vec2f(f32(atlasFrame%4u),f32(atlasFrame/4u));'), 'frames run left to right');
@@ -229,4 +240,12 @@ test('capacity reaches what the device holds: 2,097,152 slots on a default devic
     () => h.engine.use(new VFX({ capacity: 2_097_153 })),
     (e) => e instanceof RangeError && /capacity 2097153 exceeds the device limits .*at most 2097152 here/.test(e.message),
   );
+});
+
+// KB-FIRE-RECEIVER1 (Scott, 2026-11-16 03:39, "Yes to both"): a particle's intensity is limited by the HDR target it
+// draws into, a half float, not by 16. A fire whose flames are as bright as the light they give (about 59) threw.
+test('intensity accepts any finite value from 0 to the half-float maximum, and nothing outside it', () => {
+  for (const intensity of [0, 1, 16, 16.5, 58.52, 65_504]) assert.equal(new VFX({ capacity: 4, intensity }).options.intensity, intensity);
+  for (const intensity of [-1e-9, 65_504.001, Infinity, NaN])
+    assert.throws(() => new VFX({ capacity: 4, intensity }), (e) => e instanceof RangeError && /between 0 and 65,504/.test(e.message));
 });

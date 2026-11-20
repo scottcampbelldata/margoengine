@@ -329,12 +329,19 @@ window.runDecoderTests = async () => {
       statuses.push(response.status);
       return response;
     },
-    streamer = new KTX2Streamer({ device, fetch: streamFetch, headBytes: 4096 }),
+    // A level that fails to load fails the test with its error, instead of leaving toFull waiting for an update.
+    failures = Promise.withResolvers(),
+    streamer = new KTX2Streamer({ device, fetch: streamFetch, headBytes: 4096, onError: failures.reject }),
     toFull = async (stream) => {
       const changes = stream.updates();
       stream.want(1 << 20);
       streamer.update();
-      for await (const _texture of changes) if (stream.residentLevel === 0) break;
+      await Promise.race([
+        (async () => {
+          for await (const _texture of changes) if (stream.residentLevel === 0) break;
+        })(),
+        failures.promise,
+      ]);
     };
   device.pushErrorScope('validation');
   const streamCube = await streamer.open('/tests/fixtures/ktx2-layers/cube-uastc-zstd.ktx2'),

@@ -155,7 +155,11 @@ try {
       water.setWaveHeight(0);
       await advance(600);
       const drained = await capture(water);
+      // stillVolume is what the basin holds at the still level (0): the connected basin's first frame already holds the
+      // sea of the surf's 40 s spin-up (KB-WATER-SWASH1), so the channel's flooding and the sill's retention are measured
+      // from still water, as they were when the flow started at rest.
       let initialVolume = 0,
+        stillVolume = 0,
         floodedVolume = 0,
         retainedVolume = 0,
         maxDryDepth = 0,
@@ -166,6 +170,7 @@ try {
           minimumDepth = Math.min(minimumDepth, drained[i]);
           if (x >= 6 && x < 13 && y >= 12 && y < 20) {
             initialVolume += before[i];
+            stillVolume += Math.max(0, -ground[y * 32 + x]);
             floodedVolume += flooded[i];
             retainedVolume += drained[i];
           }
@@ -174,6 +179,7 @@ try {
       results.push({
         connected,
         initialVolume,
+        stillVolume,
         floodedVolume,
         retainedVolume,
         maxDryDepth,
@@ -202,8 +208,15 @@ try {
       ],
       peakDepths = [0, 0, 0, 0],
       lowDepths = [Infinity, Infinity, Infinity, Infinity];
-    for (const [x, z] of beaches)
-      if (initial[(z * 32 + x) * 4] !== 0) throw new Error('Shore regression must start dry');
+    // Each beach stands above the still level, so any water on it ran up. Since KB-WATER-SWASH1 the flow spins up over
+    // the surf's last 40 s before its first frame, so the first frame already holds the swash and counts as a sample.
+    for (let i = 0; i < beaches.length; i++) {
+      const [x, z] = beaches[i],
+        cell = (z * 32 + x) * 4;
+      if (!(initial[cell + 1] > 0)) throw new Error('Shore regression beach must stand above the still level');
+      peakDepths[i] = initial[cell];
+      lowDepths[i] = initial[cell];
+    }
     const maskRead = device.createBuffer({
         size: island.coastal.connected.size,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
@@ -301,14 +314,17 @@ try {
     return results;
   });
   const [isolated, connected] = basins;
+  // The surf's spin-up leaves an enclosed pond at the still level: its sea drive once pushed water up over the 2 m bank
+  // while the sea beside it stood at 0.74 m, 120 m^3 into this pond before the first frame (KB-WATER-SWASH1).
+  assert.ok(Math.abs(isolated.initialVolume - isolated.stillVolume) < 0.001, 'The spin-up flooded an enclosed basin');
   assert.ok(Math.abs(isolated.retainedVolume - isolated.initialVolume) < 0.001, 'Enclosed basin gained or lost water');
   assert.ok(
     Math.abs(isolated.floodedVolume - isolated.initialVolume) < 0.001,
     'Offshore waves independently animated an enclosed pond',
   );
-  assert.ok(connected.floodedVolume > connected.initialVolume + 0.1, 'Ocean did not flow through the channel');
+  assert.ok(connected.floodedVolume > connected.stillVolume + 0.1, 'Ocean did not flow through the channel');
   assert.ok(
-    connected.retainedVolume > connected.initialVolume + 0.1,
+    connected.retainedVolume > connected.stillVolume + 0.1,
     'Basin did not retain water behind its outlet sill',
   );
   assert.ok(connected.retainedVolume < connected.floodedVolume - 0.1, 'Basin did not drain back towards the sea');

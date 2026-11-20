@@ -90,6 +90,10 @@ function walks(body, counter) {
 }
 
 /** Follow lexically scoped local helpers, retaining the existing conservative textual wait detection. */
+/** The tokens after which a slash starts a regular expression literal. */
+const REGEX_BEFORE =
+  /^(?:(?![)\]}]|\+\+|--)[=([{,:;!?&|^~<>+\-*%]+|=>|\.\.\.|return|throw|case|yield|typeof|instanceof|in|of|new|delete|void|await|else|do)$/;
+
 function controls(source) {
   const scopes = [{ start: 0, end: source.length, parent: null }],
     stack = [scopes[0]],
@@ -111,8 +115,10 @@ function controls(source) {
     braces = 0;
   const templates = [];
   for (let kind = scanner.scan(); kind !== SyntaxKind.EndOfFile; kind = scanner.scan()) {
-    if (kind === SyntaxKind.SlashToken && (!previous || /^(?:[=([{,:;!?]|=>|return|throw|case|yield)$/.test(previous)))
-      kind = scanner.reScanSlashToken();
+    // A slash starts a regular expression after an operator or punctuator (not after `)`, `]`, `}` or `++`/`--`) and
+    // after a keyword that takes an expression; anywhere else it divides. `&&` and `||` once fell through to divide, and
+    // the scanner stopped inside `ok && /re/.test(x)` (packages/studio/test/accumulate.test.js).
+    if (kind === SyntaxKind.SlashToken && (!previous || REGEX_BEFORE.test(previous))) kind = scanner.reScanSlashToken();
     if (kind === SyntaxKind.CloseBraceToken && templates.at(-1) === braces) {
       kind = scanner.reScanTemplateToken(false);
       if (kind === SyntaxKind.TemplateTail) templates.pop();
@@ -131,16 +137,22 @@ function controls(source) {
   const scopeAt = (index) => scopes.findLast((s) => s.start <= index && index < s.end),
     helpers = [];
   const declarations =
-    /(?:\b(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>\s*|\b(?:async\s+)?function\s+(\w+)\s*\([^)]*\)\s*)/g;
+    /(?:\b(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?(?:\(([^)]*)\)|(\w+))\s*=>\s*|\b(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)\s*)/g;
   for (const m of source.matchAll(declarations))
-    helpers.push({ name: m[1] ?? m[2], scope: scopeAt(m.index), body: bodyAt(source, m.index + m[0].length) });
-  const bodyOf = (name, index) => {
+    helpers.push({
+      name: m[1] ?? m[4],
+      scope: scopeAt(m.index),
+      body: bodyAt(source, m.index + m[0].length),
+      params: (m[2] ?? m[3] ?? m[5] ?? '').split(',').map((p) => p.trim().replace(/\s*=[\s\S]*$/, '')),
+    });
+  const helperOf = (name, index) => {
     for (let scope = scopeAt(index); scope; scope = scope.parent) {
       const helper = helpers.find((h) => h.name === name && h.scope === scope);
-      if (helper) return helper.body;
+      if (helper) return helper;
     }
-    return '';
+    return undefined;
   };
+  const bodyOf = (name, index) => helperOf(name, index)?.body ?? '';
   const terminates = (body) => /\.kill\s*\(/.test(body) && !/\b(?:resolve|done)\s*\(/.test(body);
   return {
     timer(index) {
@@ -164,9 +176,21 @@ function controls(source) {
       return terminates(body.replace(/\b(\w+)\(\)/g, (call, name) => bodyOf(name, index) || call));
     },
     steps(body, index) {
-      return [...body.matchAll(/\b(\w+)\s*\(/g)].some((m) =>
-        /\brender\s*\([^)]*delta\s*:\s*(?!0\s*[,}])[^,}\s]/.test(bodyOf(m[1], index)),
-      );
+      return [...body.matchAll(/\b(\w+)\s*\(([^()]*)\)?/g)].some((m) => {
+        const helper = helperOf(m[1], index);
+        if (!helper) return false;
+        if (/\brender\s*\([^)]*delta\s*:\s*(?!0\s*[,}])[^,}\s]/.test(helper.body)) return true;
+        // A helper that renders with its own parameter as the delta (`render({ delta })`, `delta: step`) steps time when
+        // this call passes a number other than 0 there, `frame(1 / 60)`; `frame(0)` still waits (KB-GLTF-FIXEDWAIT1:
+        // the vfx and weather settings checks step 60 frames of 1/60 s).
+        const passed = /\brender\s*\(\s*\{[^}]*?\bdelta\s*(?::\s*(\w+))?\s*[,}]/.exec(helper.body);
+        if (!passed || m[2] === undefined) return false;
+        const at = helper.params.indexOf(passed[1] ?? 'delta'),
+          number = /^\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(\d+(?:\.\d+)?)\s*)?$/.exec(
+            at < 0 ? '' : (m[2].split(',')[at] ?? ''),
+          );
+        return Boolean(number) && Number(number[1]) / Number(number[2] ?? 1) > 0;
+      });
     },
   };
 }
@@ -257,8 +281,9 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/').replac
     console.error(
       `Fixed waits in checks. Wait for readiness instead (scripts/support/gpu-ready.js, or poll the condition in a unit test), or mark a wait that is really about time with // fixed-wait: <reason>.\n${problems.join('\n')}`,
     );
-    process.exit(1);
+    process.exitCode = 1;
+  } else {
+    const total = Object.values(baseline.files).reduce((s, n) => s + n, 0);
+    console.log(`fixed waits: none new (${total} known in ${Object.keys(baseline.files).length} files, being removed)`);
   }
-  const total = Object.values(baseline.files).reduce((s, n) => s + n, 0);
-  console.log(`fixed waits: none new (${total} known in ${Object.keys(baseline.files).length} files, being removed)`);
 }

@@ -1,5 +1,5 @@
 // Real-GPU checks of @margoengine/sciviz (one GPU job at a time; from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sciviz/tests/sciviz-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sciviz/tests/sciviz-browser.mjs
 // The page (sciviz-browser.js) draws each layer and reads the canvas back: surfaces coloured by height with contours
 // and NaN holes, volumes (composite, maximum intensity, clip planes), slices, GPU isosurfaces with exactly the CPU
 // table's triangles (from CPU data and from a GpuArray), a million-point scatter within its budget, and the axes,

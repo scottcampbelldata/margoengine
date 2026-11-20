@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: groups and model roots cast</title><style>body{margin:0;background:#000}canvas{width:640px;height:360px;display:block}</style></head><body><canvas width="640" height="360"></canvas>
+<script type="module">
+// Regression page for shadows.add(group): a geometry-free mesh (a group, a gltf/pbr model's root) casts every mesh below
+// it. Flat slabs hang 2 units above a floor, the light from the side, so the slab at world (-2, 2, z) shades the floor at
+// (0, 0, z). group-casters-browser.mjs reads those floor points. Known bug it guards (docs/known-bugs.md,
+// KB-SHADOW-GROUP1): add() accepted a group, as its error text promises, and drew nothing for it.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const camera={position:[0,10,5],target:[0,0,0],fov:60};
+const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.createMesh().setGeometry(box(14,0.1,14)).setPosition([0,-0.05,0]);
+engine.lighting.direction.set([-1,1,0].map(v=>v*Math.SQRT1_2));
+let shadows,removers=[],scene={},model;
+const render=async(n=3)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+const slab=(parent,x,y,z)=>engine.createMesh(parent).setGeometry(box(1.2,0.2,1.2)).setPosition([x,y,z]);
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],unit=v=>{const l=Math.hypot(...v);return v.map(x=>x/l);};
+const kinds={
+  directional:()=>Shadows.attach(engine,{resolution:1024,bounds:{min:[-7,-1,-7],max:[7,3,7]}}),
+  virtual:()=>VirtualShadows.attach(engine),
+};
+const clear=()=>{removers.forEach(r=>r());removers=[];shadows?.dispose();shadows=undefined;for(const m of Object.values(scene))m?.dispose?.();scene={};if(model)model.root.visible=false;};
+window.check={
+  // `cast` false builds the same scene and registers nothing: the open light each case is measured against.
+  // 'group': slab A under a group, slab B under a group inside it (shades (0,0,0) and (0,0,2)); 'single' adds the two
+  // slabs one by one; 'model' is a gltf/pbr Box at A; 'empty' a group with nothing below it.
+  async show(kind,scenario,cast=true){
+    clear();
+    shadows=kinds[kind]();
+    const outer=engine.createMesh().setPosition([-2,2,0]),inner=engine.createMesh(outer).setPosition([0,0,2]);
+    scene={outer,inner,a:slab(outer,0,0,0),b:slab(inner,0,0,0)};
+    if(scenario==='model'){
+      model??=await loadGLTF(engine,'/packages/exporters/tests/fixtures/Box.glb');
+      model.root.visible=true;model.root.setPosition([-2,2,0]);model.root.setScale([1.2,0.2,1.2]);
+    }
+    if(cast){
+      if(scenario==='group'||scenario==='late')removers.push(shadows.add(outer));
+      else if(scenario==='single')removers.push(shadows.add(scene.a),shadows.add(scene.b));
+      else if(scenario==='model')removers.push(shadows.add(model.root));
+      else if(scenario==='empty'){scene.group=engine.createMesh();removers.push(shadows.add(scene.group));}
+    }
+    await render();
+    return errors.splice(0);
+  },
+  // Steps on the 'late' scenario, each followed by renders. The group is `outer`; C shades (0,0,-2).
+  async step(name){
+    if(name==='attach')scene.c=slab(scene.outer,0,0,-2);          // parented after add()
+    if(name==='away')scene.c.setParent(null).setPosition([0,50,0]); // leaves the group
+    if(name==='remove')removers.splice(0).forEach(r=>r());
+    if(name==='dispose-group')scene.outer.dispose();
+    await render();
+    return errors.splice(0);
+  },
+  pixel(p){
+    const e=camera.position,d=unit([camera.target[0]-e[0],camera.target[1]-e[1],camera.target[2]-e[2]]),r=unit(cross(d,[0,1,0])),u=cross(r,d),v=[p[0]-e[0],p[1]-e[1],p[2]-e[2]];
+    const depth=v[0]*d[0]+v[1]*d[1]+v[2]*d[2],t=Math.tan(camera.fov*Math.PI/360)*depth,a=canvas.width/canvas.height;
+    const x=(v[0]*r[0]+v[1]*r[1]+v[2]*r[2])/(t*a),y=(v[0]*u[0]+v[1]*u[1]+v[2]*u[2])/t;
+    return [Math.round((x+1)/2*canvas.width),Math.round((1-y)/2*canvas.height)];
+  },
+};
+window.ready=true;
+</script></body></html>

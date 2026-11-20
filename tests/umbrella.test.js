@@ -96,16 +96,16 @@ test('margoengine/react puts no Wasm in a build, and a model page gets it from i
   };
   assert.deepEqual(await emitted("import { Canvas } from 'margoengine/react'; export { Canvas };"), []);
   assert.deepEqual(await emitted("export * from 'margoengine/react';"), []);
-  assert.notDeepEqual(await emitted("import { Model } from 'margoengine/react/gltf-pro'; export { Model };"), []);
-  // The kits, and the packages that only draw models: gltf-pro's root alone names the decoders.
+  assert.notDeepEqual(await emitted("import { Model } from 'margoengine/react/gltf'; export { Model };"), []);
+  // The kits, and the packages that only draw models: gltf/pbr's root alone names the decoders.
   for (const kit of ['game', 'web', 'viz'])
     assert.deepEqual(await emitted(`import { createStage } from 'margoengine/${kit}'; export { createStage };`), [], kit);
   assert.deepEqual(await emitted("import { createMesh } from 'margoengine/materials'; export { createMesh };"), []);
   assert.deepEqual(await emitted("import { Animation } from 'margoengine/animation'; export { Animation };"), []);
-  assert.deepEqual(await emitted("import { PBRModel } from 'margoengine/gltf-pro/model'; export { PBRModel };"), []);
+  assert.deepEqual(await emitted("import { PBRModel } from 'margoengine/gltf/pbr-model'; export { PBRModel };"), []);
   assert.deepEqual(await emitted("import { loadFBX } from 'margoengine/fbx'; export { loadFBX };"), []);
   assert.deepEqual(await emitted("import { exportGLB } from 'margoengine/exporters/gltf'; export { exportGLB };"), []);
-  assert.notDeepEqual(await emitted("import { loadGLTF } from 'margoengine/gltf-pro'; export { loadGLTF };"), []);
+  assert.notDeepEqual(await emitted("import { loadGLTF } from 'margoengine/gltf/pbr'; export { loadGLTF };"), []);
 });
 
 test('importing through margoengine bundles the same code as importing the package', async () => {

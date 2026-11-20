@@ -5,7 +5,7 @@ import { LightLayers } from '../dist/layers.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
-// A receiver that keeps the lighting it is given, as gltf-pro models do.
+// A receiver that keeps the lighting it is given, as gltf/pbr models do.
 const receiver = () => {
   const r = {
     effects: new Set(),

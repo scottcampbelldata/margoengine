@@ -137,7 +137,7 @@
       "name": "resume7-decoder-gpu.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--max=10",
@@ -297,7 +297,7 @@
       "name": "resume7-final-gpu-gates.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--exclusive",
@@ -427,7 +427,7 @@
       "name": "resume7-gltf-gpu.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--max=10",
@@ -449,7 +449,7 @@
       "name": "resume7-gltf-pro-gpu.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--max=10",
@@ -510,7 +510,7 @@
       "name": "resume7-pair-gates.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--exclusive",
@@ -556,7 +556,7 @@
       "name": "resume7-readme.json",
       "command": "node",
       "args": [
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-133",
         "--max=20",

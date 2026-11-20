@@ -8,7 +8,7 @@ import {
   type PropertyKeyframeTrack,
 } from '@margoengine/animation';
 import { sampleTrackInto } from '@margoengine/animation/sampling';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import type { EngineKernel } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
@@ -103,6 +103,9 @@ export class AnimationAction {
   private fade?: Envelope;
   private speed?: Envelope;
   private start?: number;
+  /** What the last clock step left for the blend: the clip time to sample and its weight (0: no contribution). */
+  private sampled = 0;
+  private contribution = 0;
   /** @internal Actions are cached by AnimationMixer.clipAction. */
   constructor(
     private readonly mixer: AnimationMixer,
@@ -272,8 +275,12 @@ export class AnimationAction {
     action.crossFadeTo(this, duration, warp);
     return this;
   }
-  /** @internal Advance once, then contribute channels to the mixer. */
-  advance(delta: number): void {
+  /**
+   * @internal One step of the action clock (start time, warp and fade ends, loops), keeping the clip time and weight
+   * it reaches for {@link contribute}. The mixer's `advanceTime` runs it for every action.
+   */
+  step(delta: number): void {
+    this.contribution = 0;
     if (!this.scheduled || !this.enabled) return;
     finite(this.time, 'action time');
     finite(this.timeScale, 'timeScale');
@@ -325,12 +332,17 @@ export class AnimationAction {
     }
     if (this.loop === LoopPingPong && this.loops % 2) sample = duration - sample;
     if (!this.enabled) weight = 0;
-    if (weight > 0)
-      for (const channel of this.channels)
-        this.mixer.accumulate(channel.binding, channel.sample(sample), weight, this.blendMode);
-    if (weight > 0)
-      for (const channel of this.discrete)
-        this.mixer.accumulateDiscrete(channel.binding, channel.sample(sample), weight);
+    this.sampled = sample;
+    this.contribution = weight;
+  }
+  /** @internal Adds the channels at the clip time of the last {@link step} to the mixer, at its weight. */
+  contribute(): void {
+    const sample = this.sampled,
+      weight = this.contribution;
+    if (!(weight > 0)) return;
+    for (const channel of this.channels)
+      this.mixer.accumulate(channel.binding, channel.sample(sample), weight, this.blendMode);
+    for (const channel of this.discrete) this.mixer.accumulateDiscrete(channel.binding, channel.sample(sample), weight);
   }
   /** @internal Binding ownership for cache eviction. */
   uses(binding: Binding): boolean {
@@ -521,6 +533,16 @@ export class AnimationMixer implements EnginePlugin {
   }
   /** Advance independent action clocks, then blend once per affected property. */
   update(delta: number): this {
+    this.advanceTime(delta);
+    this.blend();
+    return this;
+  }
+  /**
+   * Moves the mixer clock by `delta` seconds times `timeScale` and steps every action's clock (start times, fades,
+   * warps, loops), writing no property: the CPU part of `update`, which a seek from `@margoengine/cutscene/seek`
+   * replays. The next update blends and writes the properties at the times reached.
+   */
+  advanceTime(delta: number): void {
     this.assertLive();
     finite(delta, 'mixer delta');
     finite(this.timeScale, 'mixer timeScale');
@@ -537,12 +559,16 @@ export class AnimationMixer implements EnginePlugin {
         if (removed.some((a) => a.uses(b)) && !this.actions.some((a) => a.uses(b))) map.delete(key);
       if (!map.size) this.bindings.delete(target);
     }
-    this.additive.clear();
     for (const [target, map] of this.discreteBindings) {
       for (const [key, b] of map)
         if (removed.some((a) => a.usesDiscrete(b)) && !this.actions.some((a) => a.usesDiscrete(b))) map.delete(key);
       if (!map.size) this.discreteBindings.delete(target);
     }
+    for (const action of this.actions) action.step(step);
+  }
+  /** Blends every action's last step once per affected property and writes it. */
+  private blend(): void {
+    this.additive.clear();
     for (const map of this.discreteBindings.values())
       for (const b of map.values()) {
         b.total = 0;
@@ -554,7 +580,7 @@ export class AnimationMixer implements EnginePlugin {
         binding.total = 0;
         binding.value.fill(0);
       }
-    for (const action of this.actions) action.advance(step);
+    for (const action of this.actions) action.contribute();
     for (const map of this.bindings.values())
       for (const b of map.values()) {
         const active = b.total > 0 || this.additive.has(b);
@@ -593,7 +619,6 @@ export class AnimationMixer implements EnginePlugin {
         b.channel.write(!active || Math.max(0, 1 - b.total) > b.winner ? b.base : b.value);
         b.applied = active;
       }
-    return this;
   }
   /** Seek global playback from the beginning, scaling by timeScale. */
   setTime(time: number): this {

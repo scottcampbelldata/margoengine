@@ -1,6 +1,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import { meshRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
-import type { GLTFDocument, PBRModel, PBRPrimitive } from '@margoengine/gltf-pro';
+import type { GLTFDocument, PBRModel, PBRPrimitive } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { worldRadius } from '../../shared/sphere.js';
 

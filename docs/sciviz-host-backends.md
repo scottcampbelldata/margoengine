@@ -35,6 +35,6 @@ failures. backend-isolation.test.js additionally checks setup ordering, all
 three backend selections, omitted callbacks, thrown setup errors, cancellation
 during setup and pre-abort. Build Python's AFM with python/build-notebook.mjs,
 prepare python/tests/notebook-fixtures.py in the documented notebook environment,
-then run sciviz's share and notebook browser scripts under the GPU lock. They
+then run sciviz's share and notebook browser scripts. They
 exercise native and compatibility rendering, file/data documents and offline
 operation. This is not certification of every notebook host or physical GPU.

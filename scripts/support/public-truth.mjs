@@ -63,9 +63,32 @@ export function packageCountProblems(files, total) {
       for (const match of text.matchAll(phrase)) {
         const stated = Number(match[1].replaceAll(',', ''));
         if (stated !== total)
-          problems.push(`${path}: states ${stated} packages, the catalog has ${total} (${match[0].trim()})`);
+          problems.push(
+            `${path}: states ${stated} packages, the catalog has ${total} (${match[0].trim()}); npm run catalog:build restates it`,
+          );
       }
   return problems;
+}
+
+/**
+ * The text with every package-count statement (the phrases packageCountProblems reads) set to `total`. Run by
+ * scripts/build-catalog.js over packageCountFiles, so a new package restates every count and the check stays exact.
+ */
+export function restatePackageCount(text, total) {
+  let out = text;
+  for (const phrase of COUNT_PHRASES)
+    out = out.replace(phrase, (whole, stated) => whole.replace(stated, total.toLocaleString('en-US')));
+  return out;
+}
+
+/** The files packageCountProblems reads under `root`: COUNT_FILES and every HTML page under site/whitepaper. */
+export function packageCountFiles(root) {
+  const pages = existsSync(join(root, 'site/whitepaper'))
+    ? readdirSync(join(root, 'site/whitepaper'))
+        .filter((name) => name.endsWith('.html'))
+        .map((name) => `site/whitepaper/${name}`)
+    : [];
+  return [...new Set([...COUNT_FILES, ...pages])].filter((path) => existsSync(join(root, path)));
 }
 
 /** Files that state a package count in public (the HTML pages under site/whitepaper are added by name). */
@@ -248,7 +271,7 @@ export function publicTruthProblems(root = resolve(import.meta.dirname, '..', '.
     problems.push(...licenceProblems({ html, page, license: pkg.license, licenseText: read('LICENSE') }));
   }
   const files = {};
-  for (const path of [...COUNT_FILES, ...pages]) if (existsSync(join(root, path))) files[path] = read(path);
+  for (const path of packageCountFiles(root)) files[path] = read(path);
   problems.push(...packageCountProblems(files, catalog.length));
   const counted = {};
   for (const path of TEST_COUNT_FILES) if (existsSync(join(root, path))) counted[path] = read(path);
@@ -270,7 +293,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const problems = publicTruthProblems();
   if (problems.length) {
     console.error(`public-truth: ${problems.length} problem(s)\n  ${problems.join('\n  ')}`);
-    process.exit(1);
-  }
-  console.log("public-truth: licence, package counts, test count and the 'unsafe-eval' statement match");
+    // The exit code, then the event loop's end: process.exit can hold the exit for ever (KB-OWN-EXIT2).
+    process.exitCode = 1;
+  } else console.log("public-truth: licence, package counts, test count and the 'unsafe-eval' statement match");
 }

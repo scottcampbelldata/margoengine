@@ -36,7 +36,10 @@ interface ShadowEffect<Context = unknown> {
     readonly call?: string;
     readonly style?: string;
     resources?(): readonly GPUBindingResource[];
+    readonly revision?: number;
+    rebind?(): boolean;
     setup?(device: GPUDevice, map: ShadowEffectMap): void;
+    advanceTime?(delta: number): void;
     update?(frame: ShadowEffectFrame<Context>): void;
     dispose?(): void;
 }
@@ -52,5 +55,9 @@ interface ShadowEffectMap {
     width: number;
     height: number;
     layers: number;
+    engine?: {
+        readonly gpu: GPUDevice | null;
+        onError(error: unknown): void;
+    };
 }
 ```

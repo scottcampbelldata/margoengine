@@ -34,6 +34,7 @@ export interface LottieCanvas {
     bezierCurveTo(a: number, b: number, c: number, d: number, e: number, f: number): void;
     quadraticCurveTo(a: number, b: number, c: number, d: number): void;
     closePath(): void;
+    clip?(): void;
     fill(rule?: 'nonzero' | 'evenodd'): void;
     stroke(): void;
     transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
@@ -73,6 +74,7 @@ export interface LottieImage {
     opacity: number;
     width: number;
     height: number;
+    clip?: OutlineCommand[][];
 }
 
 export interface LottieImageAsset {
@@ -105,6 +107,7 @@ export interface LottiePath {
         pattern: number[];
         offset: number;
     } | null;
+    clip?: OutlineCommand[][];
     toShapes(options?: {
         flipY?: boolean;
     }): Shape[];

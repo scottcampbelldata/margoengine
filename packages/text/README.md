@@ -183,8 +183,9 @@ before its font loaded kept the fallback font's spacing, and styles set after co
 
 ## Extruded 3D text: `extrudeText`
 
-`@margoengine/text/extrude` parses OpenType font outlines (TrueType `glyf`/`loca` and PostScript `CFF ` tables) directly,
-triangulates the 2D glyph paths with hole bridging, and extrudes them into 3D solid geometry with front/back caps, side walls,
+`@margoengine/text/extrude` reads OpenType font outlines (TrueType `glyf`/`loca`, PostScript `CFF ` and `CFF2` tables, variable
+fonts) through `parseTTFSource` of `@margoengine/loaders/font`, Margo's one font parser (CFF, CFF2 and variable instances
+need its readers: pass `openType` from `@margoengine/loaders/font-opentype` in the options), triangulates the 2D glyph paths with hole bridging, and extrudes them into 3D solid geometry with front/back caps, side walls,
 and optional bevels. The resulting vertex attributes can be converted to a core `Geometry` and rendered on both WebGPU and WebGL2.
 
 ```ts
@@ -210,6 +211,18 @@ const geometry = extrudeText('A', {
 console.log(geometry.positions.length, geometry.indices.length);
 ```
 
+A CFF (`.otf`) file or a variable instance needs the OpenType readers of `@margoengine/loaders/font-opentype`; TrueType
+fonts extrude without them, so pages that ship only `.ttf` files never load the readers:
+
+```ts
+import {extrudeText} from 'margoengine/text/extrude';
+import {openType} from 'margoengine/loaders/font-opentype';
+
+const otf = await (await fetch('/fonts/SourceSans3-Regular.otf')).arrayBuffer();
+const title = extrudeText('Margo', {font: otf, openType, size: 1, depth: 0.2});
+console.log(title.positions.length > 0); // true
+```
+
 `FontLike` returns contours and advances in em coordinates, including for procedural fonts; `unitsPerEm` describes
 the source font and does not rescale those values. `size` defaults to 1. `depth` defaults to 0.2 world units.
 `curveSegments` is an integer in 1..256 (default 12); `steps` is an integer in 1..256 (default 1).
@@ -222,12 +235,13 @@ integer in 0..64 (default 3); 0 and 1 produce a flat chamfer. Collapsing or inte
 
 Contours use nonzero winding: overlapping and nested contours with the same winding stay filled. Zero-area paths
 are discarded without an absolute world-size cutoff. Fonts use Unicode cmap format 4 or 12, unhinted TrueType
-outlines or name-keyed CFF1 Type 2 outlines. CID-keyed CFF, CFF2, variations and shaping are outside this entry.
-TrueType composite depth is at most 32, with 4,096 components and 200,000 source points per glyph. Type 2 uses
-the specification's 48 operands, 96 stems and 10 nested subroutine calls, plus a 100,000-token execution budget.
-Outline decoding and contour filling accept at most 16,384 flattened vertices per glyph; mesh allocation has a
+outlines, name-keyed CFF Type 2 outlines or CFF2 outlines; CID-keyed CFF is not read. Shaping comes from `shapedRuns`.
+The parser's budgets apply (composites nest at most 16 levels with 4,096 components and 1,000,000 points per glyph;
+Type 2 uses the specification's 48 operands, 96 stems and 10 nested subroutine calls, plus a 100,000-operation
+execution budget). Contour filling accepts at most 16,384 flattened vertices per glyph; mesh allocation has a
 conservative 1,000,000-vertex budget per text block. Boundary vertices weld at 1e-12 of the glyph
-extent. Malformed font ranges and subdivision limits throw `MargoError` with `code: 'failed'` and a help link.
+extent. Malformed fonts throw the parser's `LoaderError` (`code` `'header'`, `'truncated'`, `'range'`, `'limit'` or
+`'unsupported'`); layout and subdivision limits throw `MargoError` with `code: 'failed'` and a help link.
 Depth 0 produces two planar caps; positive depth produces a solid. `toGeometry(Geometry)` takes the core constructor
 explicitly; with no constructor it returns the attribute data.
 
@@ -270,7 +284,7 @@ if (text instanceof VectorTextRenderer) console.log(text.stats);
 | `dilation` | `0` | Outline growth in screen pixels, 0 to 1, for darker small text. Layout is unchanged. |
 | `rays` | `'auto'` | Rays per axis per pixel: `1`, `3` or `5`. `'auto'` casts 5 under 7.5 px per em and 3 above. |
 
-`VectorFont(bytes, {family?, variations?})` measures advances from `hmtx` and ascent and descent from `hhea`. It also registers the bytes as a `FontFace`; once that face has loaded, kerning is measured through it (a variable instance gets none). `vectorGlyph(id)` and `store` expose the packed bands, and `vectorCoverage(store, glyph, x, y, pixelsPerEm)` is a CPU mirror of the shader for tests and hit maps.
+`VectorFont(bytes, {family?, variations?, size?, radius?})` is an `GlyphFieldFont` (see below): advances come from `hmtx`, ascent and descent from `hhea`, and pair kerning from the file's GPOS (or `kern` table) in a page and in Node alike; a variable instance gets none. No `FontFace` is registered. The same font also draws with the SDF `TextRenderer`, from fields built on the CPU from its outlines. `vectorGlyph(id)` and `store` expose the packed bands, and `vectorCoverage(store, glyph, x, y, pixelsPerEm)` is a CPU mirror of the shader for tests and hit maps.
 
 **How it works.**
 
@@ -287,7 +301,7 @@ if (text instanceof VectorTextRenderer) console.log(text.stats);
 | Source Sans 3 (Latin) | 0.0064 | 0.0060 | 0.0069 | 0.0051 | 0.0012 | 0.0003 |
 | Noto Sans SC (CJK) | 0.0100 | 0.0075 | 0.0111 | 0.0092 | 0.0020 | 0.0002 |
 
-Rotated 17 degrees: 0.0029. Zoomed 40 times: 0.0001. The largest single-pixel error in any case is 0.139. The bar is a mean under 1/64 and a maximum under 0.25 on both backends. Counting only pixels with ink the means are higher (CJK at 4 px 0.018, Latin at 8 px 0.0165). A 0.49 px stem at 6 px keeps 0.49 px of ink in every row, with a worst row error of 0.062 against the reference, where `TextRenderer`'s SDF gives the same rows a worst error of 0.341 (at 4 px: 0.060 against 0.557). SDF and MSDF text, which the other web text libraries use, share that loss: a field sampled at 48 px cannot hold features smaller than its texels. 100,000 glyphs draw in 100 calls; the first frame uploads 4.8 MB and later frames write 112 bytes.
+Rotated 17 degrees: 0.0029. Zoomed 40 times: 0.0001. The largest single-pixel error in any case is 0.139. The bar is a mean under 1/64 and a maximum under 0.25 on both backends. Counting only pixels with ink the means are higher (CJK at 4 px 0.018, Latin at 8 px 0.0165). A 0.49 px stem at 6 px keeps 0.49 px of ink in every row, with a worst row error of 0.062 against the reference, where `TextRenderer`'s SDF gives the same rows a worst error of 0.365 (at 4 px: 0.060 against 0.581; the SDF figures are the same `VectorFont`'s fields built from its outlines at 64 px since 2026-11-16, and were 0.341 and 0.557 with the browser's canvas fields). SDF and MSDF text, which the other web text libraries use, share that loss: a field sampled at 48 px cannot hold features smaller than its texels. 100,000 glyphs draw in 100 calls; the first frame uploads 4.8 MB and later frames write 112 bytes.
 
 **Clean-room record.** Built from these papers alone, without reading any implementation of them:
 
@@ -297,16 +311,100 @@ Rotated 17 degrees: 0.0029. Zoomed 40 times: 0.0001. The largest single-pixel er
 - Mark Kilgard and Jeff Bolz, "GPU-accelerated Path Rendering", SIGGRAPH Asia 2012, and Diego Nehab and Hugues Hoppe, "Random-access rendering of general vector graphics", SIGGRAPH Asia 2008: ruled out as heavier for text (stencil-and-cover passes, lattice clipping).
 - Patents, checked 2026-11-10. US 10,373,352 B1 (Lengyel, the root-counting method) was dedicated to the public domain effective 2026-03-17: https://terathon.com/blog/decade-slug.html and https://patents.google.com/patent/US10373352B1/en. US 7,564,459 B2 (Loop and Blinn) expired on 2026-03-25: https://patents.google.com/patent/US7564459B2/en. US 7,239,319 B2 (rendering outline fonts) lapsed in 2019: https://patents.google.com/patent/US7239319B2/en.
 
-**Limits.** No outlines yet: `outlineWidth` is ignored, with one warning. Shaping is per code point, so there are no ligatures or contextual forms and no `GSUB` or `GPOS` (a combining mark is drawn at its base's advance, so it lands over the base only when the font draws marks left of their zero-width origin); kerning comes only through the loaded `FontFace`. No colour fonts (COLR, emoji). WOFF and WOFF2 files must be unpacked to plain OpenType first, and bitmap-only fonts are not read. Curve points are 16-bit fractions of the glyph box and the shader works in 32-bit floats. Caps are listed in [docs/limits.md](../../docs/limits.md).
+**Limits.** No outlines yet: `outlineWidth` is ignored, with one warning. Shaping is `GlyphFieldFont`'s: GPOS pair kerning and, with `ligatures: true`, GSUB `liga` ligatures, but no contextual forms or mark attachment (a combining mark with no precomposed glyph is drawn at its base's advance, so it lands over the base only when the font draws marks left of their zero-width origin); a variable instance gets no kerning. No colour fonts (COLR, emoji). WOFF and WOFF2 files must be unpacked to plain OpenType first, and bitmap-only fonts are not read. Curve points are 16-bit fractions of the glyph box and the shader works in 32-bit floats. Caps are listed in [docs/limits.md](../../docs/limits.md).
+
+## Text from a font file, the same in a page and in Node: `GlyphFieldFont`
+
+`@margoengine/text/outline` builds every glyph's signed distance field on the CPU from the font file's own outlines, with no browser API on any path. (`GlyphFieldFont` was named `OutlineFont` before 2026-11-16; `OutlineFont` is now only the outline font of `@margoengine/loaders/font`, whose parser reads the file here too.) Titles, captions and lower thirds therefore render in a headless Node process (a film render, a thumbnail server) as they do in a page: the glyph fields are byte for byte the same, and the frames match within two levels. Draw it with the ordinary `TextRenderer`; outlines, shadows, `RichText`, `AnimatedText`, `fitText`, labels and `Ui({font})` work as with `Font`.
+
+```ts
+import { readFile, writeFile } from 'node:fs/promises';
+import { Camera, Engine } from '@margoengine/core';
+import { createHeadlessCanvas, installGPU, toPNG } from '@margoengine/headless';
+import { Text, TextRenderer } from '@margoengine/text';
+import { GlyphFieldFont } from '@margoengine/text/outline';
+import { create } from 'webgpu';
+
+// 64 px per em suits captions; use size 128 or 256 for large titles.
+const font = new GlyphFieldFont(await readFile('SourceSans3-Regular.ttf'), { size: 64 });
+using installed = installGPU({ gpu: create([]) });
+const engine = await Engine.create(createHeadlessCanvas({ width: 1280, height: 720 }), { backend: 'webgpu' });
+engine.scene.background = '#1d2733';
+const text = TextRenderer.attach(engine);
+text.add(new Text({
+  text: 'When It Forms', font, fontSize: 0.6, anchorX: 'center', anchorY: 'middle', color: '#ffd84a',
+  outlineWidth: 0.03, outlineColor: '#000000', shadowOpacity: 0.6, shadowBlur: 0.04, shadowOffset: [0.03, -0.03],
+}));
+text.add(new Text({ text: 'office: ligatures on', font, ligatures: true, fontSize: 0.15, anchorX: 'center', position: [0, -0.6, 0] }));
+engine.render({ camera: new Camera({ position: [0, 0, 3], target: [0, 0, 0] }) });
+await writeFile('title.png', await toPNG(engine));
+
+// The fields built here, for the next scene process: importGlyphs takes them only for the same file, size and radius.
+await writeFile('glyphs.bin', font.exportGlyphs());
+const next = new GlyphFieldFont(await readFile('SourceSans3-Regular.ttf'), { size: 64 });
+console.log(next.importGlyphs(await readFile('glyphs.bin')), next.prepare('When It Forms')); // true 0
+engine.dispose();
+```
+
+| Option | Default | Notes |
+| --- | --- | --- |
+| `size` | `64` | Pixels per em of the stored fields, an integer from 8 to 512. Captions and lower thirds at 58 to 80 px per em draw near 1:1 at 64; titles of 150 to 300 px want 128 or 256. A 256 px glyph fills about a ninth of a 1,024 px atlas page. |
+| `radius` | `size / 4` | Field range in pixels, above 0 and at most `size / 2`. The default leaves 0.17 em for outline plus shadow blur together; `size / 2` doubles that at half the edge precision. |
+| `variations` | `{}` | Axis values of a variable font, for example `{ wght: 650 }`. A varied instance gets no kerning. |
+| `family` | a unique name | A name for errors and logs; nothing is registered. |
+| `openType` | none | The CFF, CFF2 and variation readers, `openType` from `@margoengine/loaders/font-opentype`: needed for a `.otf` (CFF) file or a `variations` instance. `GlyphFieldFont.load` and `VectorFont.load` import them on their own when the file or options need them, so pages that use only TrueType fonts never load them. |
+
+`GlyphFieldFont.load(url, {signal, ...options})` downloads a file first. `shape(text)` returns the glyph ids, pen offsets and advance of a string; `prepare(text, layoutOptions)` builds the fields a text needs and returns how many it built; `stats` counts fields built (`rasterized`), distance evaluations and imported fields. `exportGlyphs()` and `importGlyphs(bytes)` carry built fields to a fresh process: the `key` hashes the font bytes, size, radius, cutoff, variations and the field builder's version, and a cache with another key is refused (`false`). The engine never touches the file system; the host stores the bytes. `new Font()` in Node still throws `unsupported`, and its message names `GlyphFieldFont`.
+
+**How it works.**
+
+- **Fields from outlines.** Each glyph's lines, quadratics and cubics are cut into straight pieces by the uniform second-difference bound, so no piece strays more than a quarter of a byte step (at most 1/64 px) from the curve. The sign of each texel is the nonzero winding number of the outline, counted by scanline crossings at texel centres; the magnitude is the exact distance from the texel centre to the nearest piece, worked out only inside each piece's box grown by the field's reach, so the cost follows the outline's length, not its area. Bytes use the same encoding as `Font` (`alphaToSdf`), so the shader, atlas and outline and shadow layers are unchanged. Every sampled texel is within one level of a brute-force reference with 4,096 points per curve, for TrueType, CFF, a variable instance and CJK at 32, 64 and 128 px (tests/outline.test.js).
+- **Overlapping contours.** Variable fonts and many CJK fonts draw a glyph from overlapping or touching parts. Edges with ink on both sides are left out of the distance: every piece is cut into quarter-pixel parts, and a part with ink a 1/32 px step to both sides of its middle is dropped, so the inside shows no seam. Two overlapping squares, or two that share an edge, give the field of their union within one level.
+- **The same bytes everywhere.** Only addition, subtraction, multiplication, division and square roots touch fractional values, and IEEE 754 rounds each of them the same way on every machine, so a page and Node build identical fields (the GPU test compares their SHA-256).
+- **Kerning and ligatures.** Pair kerning is read from GPOS (lookup type 2, formats 1 and 2, through extension lookups) for the `kern` feature of the character's script (Latin, Greek, Cyrillic, else the default script), or from the legacy `kern` table when GPOS has none; the value is the first glyph's XAdvance. It equals what Chromium's own shaper measures on the 20 test pairs of Source Sans 3 TTF and OTF. With `ligatures: true` on a `Text`, each Latin word is one shaped run: GSUB `liga` ligatures (lookup type 4) replace their components and the run's field is built as one bitmap (`office` draws the ffi ligature, as HarfBuzz shapes it).
+- **Speed.** Measured on the development PC in Node, one core: 88 Latin glyphs of Source Sans 3 at 64 px build in 22 to 33 ms (about 65,000 distance evaluations each), and 13 glyphs at 256 px in 38 ms. A film's glyph set costs well under a second once, and nothing in a fresh process that imports the cache.
+
+**Limits.** No Arabic or Indic shaping, mark attachment (GPOS type 4) or contextual substitutions; no colour fonts or emoji; WOFF and WOFF2 files must be unpacked first; no hinting; variable kerning deltas are not applied, so a varied instance has none. Very large titles keep rounded corners, as every single-channel field does: multi-channel fields are a later step. Caps are in [docs/limits.md](../../docs/limits.md).
+
+**Clean-room record.** Built from these sources, without reading any implementation (full record in docs/clean-room.md, "Text outline SDF"):
+
+- C. Green, "Improved Alpha-Tested Magnification for Vector Textures and Special Effects", SIGGRAPH 2007 Course 28 (Advanced Real-Time Rendering in 3D Graphics and Games), chapter 2, https://www.advances.realtimerendering.com/s2007/ : distance fields in one texture channel, with outlines and shadows from the same field.
+- K. Hormann and A. Agathos, "The point in polygon problem for arbitrary polygons", Computational Geometry 20(3), 2001, https://doi.org/10.1016/S0925-7721(01)00012-8 : the nonzero winding number by crossings.
+- J. Gravesen, "Adaptive subdivision and the length and energy of Bezier curves", Computational Geometry 8(1), 1997, https://doi.org/10.1016/0925-7721(95)00054-2 , and R. Goldman, "Pyramid Algorithms", Morgan Kaufmann, 2003: the chord bound of a uniformly split curve from its second differences.
+- C. Ericson, "Real-Time Collision Detection", Morgan Kaufmann, 2005, chapter 5: the closest point on a segment.
+- P. F. Felzenszwalb and D. P. Huttenlocher, "Distance Transforms of Sampled Functions", Theory of Computing 8(19), 2012, https://doi.org/10.4086/toc.2012.v008a019 , and S. F. Frisken, R. N. Perry, A. P. Rockwood and T. R. Jones, "Adaptively Sampled Distance Fields", SIGGRAPH 2000, https://doi.org/10.1145/344779.344899 : compared and not used here; sampled transforms lose the sub-texel edge position the outline gives exactly.
+- E. Lengyel, "GPU-Centered Font Rendering Directly from Glyph Outlines", JCGT 6(2), 2017, https://jcgt.org/published/0006/02/02/ ; J. Manson and S. Schaefer, "Analytic Rasterization of Curves with Polynomial Filters", Computer Graphics Forum 32(2), 2013, https://doi.org/10.1111/cgf.12070 ; E. Catmull, "A Hidden-Surface Algorithm with Anti-Aliasing", SIGGRAPH 1978, https://doi.org/10.1145/965139.807360 : exact coverage, the fallback the plan kept and did not need.
+- G. Rong and T.-S. Tan, "Jump Flooding in GPU with Applications to Voronoi Diagram and Distance Transform", I3D 2006, https://doi.org/10.1145/1111411.1111431 : ruled out, as GPU results differ per backend and need a readback for the cache.
+- V. Chlumsky, "Shape Decomposition for Multi-channel Distance Fields", master's thesis, Czech Technical University in Prague, 2015, and V. Chlumsky, J. Sloup and I. Simecek, "Improved Corners with Multi-Channel Signed Distance Fields", Computer Graphics Forum 37(1), 2018, https://doi.org/10.1111/cgf.13265 : the multi-channel follow-up.
+- Microsoft and Adobe, OpenType Specification 1.9.1 (2024), https://learn.microsoft.com/en-us/typography/opentype/spec/ (GPOS, GSUB, kern, hmtx, hhea, OpenType Layout common table formats); ISO/IEC 14496-22:2019 Open Font Format; Unicode UAX #15 Normalization Forms, revision 58, https://www.unicode.org/reports/tr15/ .
+
+## Caption files: `@margoengine/text/captions`
+
+`parseSrt` and `parseVtt` read SubRip (.srt) and WebVTT (.vtt) files into cues with times in seconds; `toSrt` and `toVtt` write them back, to the millisecond. Plain TypeScript with no DOM, so the same code runs in Node, a worker or a page. `cueText` turns a cue line into plain text: markup such as `<i>`, `<v Ann>` and `<00:01.500>` removed, `&amp;` and the other escapes decoded.
+
+```ts
+import {cueText, parseSrt, toVtt} from 'margoengine/text/captions';
+
+const {cues, problems} = parseSrt('1\n00:00:01,000 --> 00:00:02,500\n<i>Hello</i> there\n');
+console.log(cues[0].start, cues[0].end, cueText(cues[0].lines[0]), problems.length); // 1 2.5 Hello there 0
+console.log(toVtt(cues)); // WEBVTT, then 1, 00:00:01.000 --> 00:00:02.500, <i>Hello</i> there
+```
+
+- The readers never throw on a bad file. Each block they skip is listed in `problems` with its line number, and they keep going; a byte order mark and CRLF, CR or LF line ends are read.
+- WebVTT follows the W3C parser: the `WEBVTT` signature and header, cue identifiers, settings (`align:start line:0`, kept as written in `settings`), NOTE comments, STYLE and REGION blocks before the first cue (in `styles` and `regions`), and both timestamp forms (`01:02.000` and `01:02:03.000`). A block with a timing line is a cue even when its identifier starts with NOTE, as in the spec's parser. A payload line holding `-->` ends the cue and is reported.
+- SubRip has no formal standard, so the reader takes what files in the wild hold: the counter line is optional, a `.` before the milliseconds and trailing `X1:` position data are read, and times past 59 minutes or seconds are reported.
+- The writers throw a `RangeError` with a help link on a cue they cannot write so that it reads back the same: a negative or non-finite time, an end not after its start once rounded to the millisecond, no lines, or a blank line or `-->` in its text, id or settings. `toVtt` writes lines as given, so markup stays; escape a literal `&` or `<` as `&amp;` or `&lt;`.
+
+Sources: W3C, "WebVTT: The Web Video Text Tracks Format", Candidate Recommendation, 4 April 2019, https://www.w3.org/TR/webvtt1/ (sections 4.1, 4.2.2, 4.4, 4.5, 6.1 and 6.4); Library of Congress, "SubRip Subtitle (SRT)", https://www.loc.gov/preservation/digital/formats/fdd/fdd000569.shtml .
 
 ## Limits
 
 - Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
 - Shaping needs the browser's text stack: a worker without the font draws isolated fallback forms. Shaped runs size dynamically without clipping, and letter spacing applies between clusters within shaped runs.
-- Outlines plus shadow blur are limited by the field range to about 0.14 em together. SDF text under about 6 px loses thin strokes; `@margoengine/text/vector` keeps them (a 0.49 px stem at 6 px keeps 0.49 px of ink, worst row error 0.062 against 0.341 for SDF; see Vector text).
+- Outlines plus shadow blur are limited by the field range to about 0.14 em together. SDF text under about 6 px loses thin strokes; `@margoengine/text/vector` keeps them (a 0.49 px stem at 6 px keeps 0.49 px of ink, worst row error 0.062 against 0.365 for SDF; see Vector text).
 - Emoji are bitmaps scaled from 48 px, so they soften when magnified far beyond that.
 - Exact vector text from the font's curves is available via `@margoengine/text/vector` (its own limits are in Vector text above).
-- Extruded 3D glyph geometry is available via `@margoengine/text/extrude` (reads TrueType and PostScript OpenType font binaries directly).
+- Extruded 3D glyph geometry is available via `@margoengine/text/extrude` (reads TrueType and PostScript OpenType font binaries through `@margoengine/loaders/font`).
 - A FontFace that is still loading delays its text; text drawn with a CSS web font before it loads uses the fallback, so call `await font.load(sample)` first.
 - `fitText` and `FittedText` drop trailing white space before the ellipsis; `visibleEnd` is the end of the shown text, and the ellipsis glyph maps to it with length 0 (changed 2026-11-14: before, the dropped space counted as visible and the ellipsis owned it).
 - Atlas eviction: once `maxPages` is reached, pages no longer referenced by any active visible `Text` block are evicted and reused. If all pages contain active glyphs, `place` throws.
@@ -314,6 +412,8 @@ Rotated 17 degrees: 0.0029. Zoomed 40 times: 0.0001. The largest single-pixel er
 ## Tests
 
 `npm test` in `packages/text` runs Node checks with a deterministic mock measurer: grapheme clusters, advances, kerning, letter spacing, font size and line metrics, wrapping (spaces, hanging spaces, long words, ideographs, `nowrap`), paragraphs, all four alignments including justify, every anchor, right-to-left reordering with numbers, bracket pairs and mirroring, hit testing and carets, option validation, the distance transform and `alphaToSdf` against brute-force references on random binary, sampled and antialiased bitmaps, shelf packing without overlaps, and SSR-safe construction.
+
+`npm run test:gpu:outline` (a real-GPU script) draws a title with an outline and a soft shadow, a kerned caption and small text with `GlyphFieldFont` on a page canvas and in a Node process on the `webgpu` binding, and requires byte-identical glyph fields, every channel within 2 levels and at most 0.1 % of pixels off by more than 1 (measured on an RTX A6000: no pixel differs at all); it also checks the file's kerning against Chromium's shaper. `tests/outline.test.js` checks fields against a brute-force reference, winding, overlapping and abutting contours, kerning, ligatures and the glyph cache.
 
 `npm run test:browser` (a real-GPU script, not in CI) uses a real engine in Chromium (or Edge with `BROWSER_CHANNEL`): ink position and area within 2.5 px of the layout for all 12 anchor combinations, fill, outline and shadow colors, opacity, overlapping glyphs keeping their fills under outlines, depth against a mesh with `onTop`, billboards after orbiting, mesh attachment and visibility, buffer reuse on string updates with one draw call per block, emoji in color, atlas growth with 2,000 CJK glyphs (Latin, Greek and Cyrillic when no CJK font is installed) with earlier glyphs unchanged, device restore, disposal, the WebGL2 preview refusal, and zero validation errors. It saves `test-results/text-gallery.png`.
 

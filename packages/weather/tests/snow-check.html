@@ -1,8 +1,9 @@
-<!doctype html><html><head><meta charset="utf-8"/><title>Snow browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas>
+<!doctype html><html><head><meta charset="utf-8"/><title>Snow browser check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas><canvas id="c"></canvas>
 <script type="module">
 // Real-GPU proof for @margoengine/weather/snow: the WGSL against its JavaScript twin; on core meshes no cover changes
 // nothing, full cover whitens the ground and leaves a wall bare; the snow has depth (a plate's far edge rises on screen
-// by the projected thickness); and snow and puddles hook the same shader together.
+// by the projected thickness); a flat-shaded box keeps its sides joined to its lifted top; and snow and puddles hook
+// the same shader together.
 import {Engine,Geometry,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {sceneSamples} from '/packages/core/dist/quality.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
@@ -18,6 +19,9 @@ A.engine.createMesh().setGeometry(box(8,14,1)).setMaterial(new PbrMaterial({colo
 const B=await make(document.querySelector('#b'),{position:[0,2,6],target:[0,2,-10],near:0.1,far:400});
 const plate=new Geometry([-2,0,-2, 2,0,-2, 2,0,2, -2,0,2],[0,1,0, 0,1,0, 0,1,0, 0,1,0],[0,2,1, 0,3,2]);
 B.engine.createMesh().setGeometry(plate).setMaterial(new PbrMaterial({color:'#20a020',roughness:0.9}));
+// A flat-shaded box (core's box has its own vertices per face) seen side on from between its top and the snow's top.
+const C=await make(document.querySelector('#c'),{position:[0,1.17,5],target:[0,1.17,0],near:0.1,far:400});
+C.engine.createMesh().setGeometry(box(2,1,2)).setMaterial(new PbrMaterial({color:'#c02020',roughness:0.9})).setPosition([0,0.5,0]);
 const device=A.engine.gpu;
 const module=(d)=>d.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
 async function read(d,texture){
@@ -72,6 +76,15 @@ window.check={samples:sceneSamples,
   const project=(y)=>{const m=B.engine.camera.matrix,v=[0,y,-2,1],c=[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);return (1-c[1]/c[3])/2*BH;};
   out.edgeBare=edge(bare,BW,BH);out.edgeDeep=edge(deep,BW,BH);out.expectedBare=project(0);out.expectedDeep=project(0.5);
   lift.dispose();
+  // The seam: under 0.35 m of snow the box's sides rise with its top, so down the middle column no row from just under
+  // the lifted top to the lifted foot (with no shelter the whole box rises by the depth) shows the background, and the top
+  // edge sits where the lifted corner projects.
+  const capped=Snow.attach(C.engine,{cover:1,depth:0.35,variation:0}),side=await shot(C),CW=C.post.sceneTexture.width,CH=C.post.sceneTexture.height;
+  const rowAt=(y)=>{const m=C.engine.camera.matrix,v=[0,y,1,1],c=[0,1,2,3].map(r=>m[r]*v[0]+m[4+r]*v[1]+m[8+r]*v[2]+m[12+r]*v[3]);return (1-c[1]/c[3])/2*CH;};
+  out.seamGap=0;out.seamRows=0;const sx=CW>>1;
+  for(let y=Math.ceil(rowAt(1.3));y<=Math.floor(rowAt(0.4));y++){out.seamRows++;const p=(y*CW+sx)*4,b=sx*4;if(Math.abs(side[p]-side[b])+Math.abs(side[p+1]-side[b+1])+Math.abs(side[p+2]-side[b+2])<=0.01)out.seamGap++;}
+  out.seamTop=edge(side,CW,CH);out.expectedSeamTop=rowAt(1.35);
+  capped.dispose();
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);
   return out;

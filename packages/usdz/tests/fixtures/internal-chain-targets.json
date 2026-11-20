@@ -1,0 +1,160 @@
+{
+ "sublayered-chain": {
+  "files": {
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n    references = </Shared>\n)\n{\n}\nover \"Y\" (\n    references = </M>\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@]\n)\ndef \"Shared\"\n{\n    custom rel r = [</M/a>]\n}\n"
+  },
+  "want": {
+   "/M.r": [],
+   "/Y.r": [
+    "/M/a"
+   ],
+   "/Shared.r": [
+    "/M/a"
+   ]
+  }
+ },
+ "one-layer-chain": {
+  "files": {
+   "root.usda": "#usda 1.0\ndef \"Shared\"\n{\n    custom rel r = [</M/a>]\n}\ndef \"M\" (\n    references = </Shared>\n)\n{\n}\nover \"Y\" (\n    references = </M>\n)\n{\n}\n"
+  },
+  "want": {
+   "/Shared.r": [
+    "/M/a"
+   ],
+   "/M.r": [],
+   "/Y.r": [
+    "/M/a"
+   ]
+  }
+ },
+ "chain-every-kind": {
+  "files": {
+   "root.usda": "#usda 1.0\ndef \"Shared\"\n{\n    custom rel r = [</M/a>, </Shared/b>, </Y/c>, </Q>]\n}\ndef \"M\" (\n    references = </Shared>\n)\n{\n}\ndef \"Y\" (\n    references = </M>\n)\n{\n}\n"
+  },
+  "want": {
+   "/Shared.r": [
+    "/M/a",
+    "/Shared/b",
+    "/Y/c",
+    "/Q"
+   ],
+   "/M.r": [
+    "/M/b",
+    "/Y/c",
+    "/Q"
+   ],
+   "/Y.r": [
+    "/M/a",
+    "/Y/b",
+    "/Q"
+   ]
+  }
+ },
+ "class-then-reference": {
+  "files": {
+   "root.usda": "#usda 1.0\nclass \"C\"\n{\n    def \"a\"\n    {\n        custom rel r = [</M/a>, </M/b>, </C/x>, </Y/c/q>, </Y/q>, </Q>]\n    }\n}\ndef \"M\" (\n    inherits = </C>\n)\n{\n}\ndef \"Y\"\n{\n    def \"c\" (\n        references = </M>\n    )\n    {\n    }\n}\n"
+  },
+  "want": {
+   "/M/a.r": [
+    "/M/x",
+    "/Y/c/q",
+    "/Y/q",
+    "/Q"
+   ],
+   "/Y/c/a.r": [
+    "/M/a",
+    "/M/b",
+    "/Y/c/x",
+    "/Y/q",
+    "/Q"
+   ]
+  }
+ },
+ "seed1942-stage99": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    references = </Shared>\n)\n{\n}\nover \"Y\" (\n    references = </M>\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"Shared\"\n{\n    custom rel r = [</M/a>]\n}\n"
+  },
+  "want": {
+   "/M.r": [],
+   "/Y.r": [
+    "/M/a"
+   ],
+   "/Shared.r": [
+    "/M/a"
+   ]
+  }
+ },
+ "seed1942-stage15": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"Y\" (\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n        def \"c\"\n        {\n            add rel r = [</M/a>]\n        }\n    }\n}\ndef \"M\" (\n    append inherits = </C>\n)\n{\n}\nover \"Y\" (\n)\n{\n    over \"c\" (\n        references = </M>\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\n"
+  },
+  "want": {
+   "/Y/c/a/c.r": [
+    "/M/a"
+   ],
+   "/M/a/c.r": []
+  }
+ },
+ "seed7-stage36": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    def \"c\" (\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\"\n                {\n                    prepend rel r = [</M/a>]\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n}\ndef \"Y\" (\n    references = </M>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\" (\n)\n{\n    def \"c\" (\n        variantSets = \"vs\"\n    )\n    {\n    }\n}\nover \"Y\"\n{\n    over \"c\" (\n        specializes = </C>\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n    variants = { string vs = \"x\" }\n)\n{\n}\n"
+  },
+  "want": {
+   "/Y/c/a.r": [
+    "/M/a"
+   ]
+  }
+ },
+ "seed7-stage124": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    inherits = </C/a>\n)\n{\n}\nover \"Y\" (\n    references = </M>\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\nclass \"C\" (\n)\n{\n    def \"a\"\n    {\n        def \"c\"\n        {\n            custom rel r = [</M/a>]\n        }\n    }\n}\n"
+  },
+  "want": {
+   "/M/c.r": [],
+   "/Y/c.r": [
+    "/M/a"
+   ]
+  }
+ },
+ "seed7-stage128": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"Y\" (\n)\n{\n    def \"b\" (\n        references = </M>\n    )\n    {\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\" (\n)\n{\n    def \"b\" (\n    )\n    {\n        def \"b\"\n        {\n            custom rel r = [</M/a>]\n        }\n    }\n}\ndef \"M\" (\n    append inherits = </C>\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\n"
+  },
+  "want": {
+   "/Y/b/b/b.r": [
+    "/M/a"
+   ],
+   "/M/b/b.r": []
+  }
+ },
+ "seed7-stage135": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    def \"a\" (\n    )\n    {\n        def \"c\"\n        {\n            append rel r = [</M/a>]\n        }\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\nover \"Y\" (\n    references = </M>\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\n"
+  },
+  "want": {
+   "/M/a/c.r": [],
+   "/Y/a/c.r": [
+    "/M/a"
+   ]
+  }
+ }
+}

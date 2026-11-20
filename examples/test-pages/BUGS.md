@@ -30,7 +30,7 @@ Open bugs: none. Every entry was fixed, is intended and documented, or was a wro
 | 14 | voxel-edit | Fixed: `push`, `undo` and `redo` all return the grid (5f0d78af92) |
 | 15 | selection | Wrong report: the preview renderer refuses `Selection` at setup with code `unsupported`; the WebGL2 layer draws it |
 | 16 | animator | Fixed: foot IK accepts ancestor chains (9aa62906d6); a disconnected chain still rejects by design |
-| 17 | gltf-pro | Wrong report: the preview refuses `PBRModel` at setup; the WebGL2 layer draws it |
+| 17 | gltf/pbr | Wrong report: the preview refuses `PBRModel` at setup; the WebGL2 layer draws it |
 | 18 | animation | Fixed: `setMorph(name, weight)` and a morph error that lists the mesh nodes (845652f4f2) |
 | 19 | animation | Fixed: the unnamed clip name is documented (16a3a4fb2e) |
 | 20 | environment | Fixed: a disposed environment leaves its scene (920e758634, 0e2f1e61cb) |

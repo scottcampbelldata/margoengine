@@ -22,7 +22,7 @@ type TilesPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 export interface ScatterTilesOptions
   extends Omit<
     ScatterOptions,
-    'count' | 'area' | 'center' | 'density' | 'densityMap' | 'follow' | 'exclusions' | 'scale'
+    'count' | 'area' | 'center' | 'density' | 'densityMap' | 'follow' | 'exclusions' | 'paths' | 'scale'
   > {
   /** World rectangle `[minX, minZ, maxX, maxZ]` the heightmap covers (and the tiles lie in). */
   readonly bounds: readonly [number, number, number, number];
@@ -181,9 +181,19 @@ export class ScatterTiles extends Scatter {
     if (share) {
       this.#leader = share;
       share.#followers.push(this);
-      // The shared culling keeps whatever either mesh shows: the larger bounding radius.
-      share.values[35] = Math.max(share.values[35], this.values[35]);
+      // The shared culling keeps whatever either mesh shows: the larger bounding radius (applyReach takes it).
+      share.applyReach();
     }
+  }
+
+  /** The shared culling keeps what either mesh shows, so a wind on this mesh or on one that shares it doubles the reach. */
+  protected override applyReach(): void {
+    const reach = this.#followers.reduce((r, f) => Math.max(r, f.reach), this.reach);
+    this.values[35] = reach * (this.options.wind || this.#followers.some((f) => f.options.wind) ? 2 : 1);
+  }
+  protected override reachChanged(): void {
+    this.applyReach();
+    this.#leader?.applyReach();
   }
 
   static override attach(

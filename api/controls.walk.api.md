@@ -151,7 +151,7 @@ export class WalkControls extends Controls {
     readonly pressed: Set<string>;
     constructor(engine: EngineKernel, options?: WalkControlsOptions);
     protected get kind(): string;
-    protected bind(element: ControlElement): Array<[EventTargetLike, string, InputEventListener, AddEventListenerOptions?]>;
+    protected bind(element: ControlElement): [EventTargetLike, string, (event: Event) => void, (AddEventListenerOptions | undefined)?][];
     protected onDisconnect(): void;
     dispose(): void;
     get mode(): WalkMode;

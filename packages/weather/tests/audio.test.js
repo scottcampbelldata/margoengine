@@ -120,3 +120,62 @@ test('attach adds the sounds to an engine, whose frames update them', () => {
   near(sounds.rainSound.volume, weatherAudioMix(WEATHER_PRESETS.rain).rain);
   sounds.dispose();
 });
+
+// Seed 0 ran the generator from state 1, the state of seed 1, and the three sounds took the streams seed, seed + 1 and
+// seed + 2, so the rain of seed 2 was the white noise under the wind of seed 1. Each sound's stream is now a hash of
+// the seed and the sound.
+test('every seed gives its own noise: seed 0 is not seed 1, and no seed reuses a neighbour stream', () => {
+  assert.notDeepEqual(weatherNoise(8000, 0).rain, weatherNoise(8000, 1).rain);
+  const correlation = (x, y) => {
+    const n = Math.min(x.length, y.length),
+      mean = (v) => v.slice(0, n).reduce((s, a) => s + a, 0) / n,
+      mx = mean(x),
+      my = mean(y);
+    let xy = 0,
+      xx = 0,
+      yy = 0;
+    for (let i = 0; i < n; i++) {
+      xy += (x[i] - mx) * (y[i] - my);
+      xx += (x[i] - mx) ** 2;
+      yy += (y[i] - my) ** 2;
+    }
+    return xy / Math.sqrt(xx * yy);
+  };
+  for (const seed of [1, 2, 1000]) {
+    // The white noise under the wind, back out of its leaky integrator.
+    const { wind } = weatherNoise(8000, seed),
+      white = wind.slice(1).map((w, i) => w - 0.995 * wind[i]);
+    const next = weatherNoise(8000, seed + 1).rain.slice(1);
+    assert.ok(Math.abs(correlation(white, next)) < 0.05, `seed ${seed}: ${correlation(white, next)}`);
+    assert.ok(Math.abs(correlation(weatherNoise(8000, seed).rain, next)) < 0.05);
+  }
+});
+
+// dispose stopped the sounds but left them attached, so the engine's next frame called onPreUpdate and threw
+// 'disposed'. The sounds now leave the scene they joined, as the other weather plugins do.
+test('disposing attached sounds removes them from their scene', async () => {
+  const { Engine, TransformStore } = await import('../../core/dist/extension.js');
+  const { mockGPU } = await import('../../../examples/package-benchmarks/proofs/gpu-recorder.js');
+  const engine = new Engine(
+    { width: 64, height: 64, clientWidth: 64, clientHeight: 64 },
+    await TransformStore.create(8),
+    { backend: 'webgpu', gpu: mockGPU().device, add() {}, remove() {}, render() {}, dispose() {} },
+    { position: [0, 0, 4], target: [0, 0, 0] },
+    null,
+  );
+  try {
+    const scene = engine.createScene('weather'),
+      sounds = new WeatherAudio(new AudioListener({ context: new Context(), smoothing: 0 }), {
+        weather: { state: { ...WEATHER_PRESETS.rain } },
+      });
+    scene.use(sounds);
+    const decoy = { name: sounds.name, setup() {}, dispose() {} };
+    engine.use(decoy);
+    sounds.dispose();
+    assert.equal(scene.plugins.has(sounds.name), false);
+    assert.equal(engine.sceneOf(sounds), undefined);
+    assert.equal(engine.scene.plugins.get(decoy.name), decoy, 'the active scene keeps its own plugin');
+  } finally {
+    engine.dispose();
+  }
+});

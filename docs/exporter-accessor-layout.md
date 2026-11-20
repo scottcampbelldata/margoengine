@@ -29,7 +29,7 @@ no claim that every file becomes smaller. Sparse storage targets many-zero data,
 particularly morph deltas. The wrapper's maxBytes applies to final output;
 maxBinaryBytes retains the ordinary writer's dense-build allocation limit.
 AbortSignal is checked before writing and between accessors/streams. This is
-CPU work and never holds the GPU lock.
+CPU work and never uses the GPU.
 
 Research compared storage rules, sparse conversion behavior and memory-layout
 motivation. No rival source or paper companion implementation was read:

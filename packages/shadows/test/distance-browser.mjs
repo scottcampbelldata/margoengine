@@ -5,7 +5,6 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const linear = (v) => {
@@ -22,7 +21,6 @@ const light = (v) => {
 const wall = [];
 for (let row = 0; row < 65; row++) wall.push([40, row, 6]);
 const field = { columns: 65, rows: 65, size: [64, 64], origin: [-32, -32], walls: wall };
-const release = await acquire({ owner: 'shadows-distance' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/distance.html', port: 5277 }),
   { page } = context,
   pageErrors = [];
@@ -115,5 +113,4 @@ try {
   console.log('far shadows: ok');
 } finally {
   await context.close?.();
-  await release();
 }

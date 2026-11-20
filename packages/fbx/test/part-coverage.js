@@ -1,4 +1,4 @@
-// Proves gltf-pro's parts of the default-scale mesh (test/default-scale.js) cover it exactly: every source vertex is
+// Proves gltf/pbr's parts of the default-scale mesh (test/default-scale.js) cover it exactly: every source vertex is
 // in some part, and every source triangle is drawn by exactly one part, unchanged. Quad q of that mesh is corners
 // 4q..4q+3, triangulated as (4q, 4q+1, 4q+2) and (4q, 4q+2, 4q+3), in that winding. No imports, so the browser check loads it too.
 // `parts`: [{ indices: Uint32Array, vertexMap?: Uint32Array }] (no vertexMap: the part is the whole mesh).

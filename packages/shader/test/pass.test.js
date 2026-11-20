@@ -4,7 +4,7 @@ import { NodeMaterial, uv, vec3, vec4 } from '../dist/index.js';
 import { PassMaterial, ScenePass, sceneColor } from '../dist/pass.js';
 import { drawCapture, shareCapture } from '../../shared/capture.js';
 
-const { capturePBR, pbrShader } = await import('../../gltf-pro/src/shader.ts');
+const { capturePBR, pbrShader } = await import('../../gltf/src/shader.ts');
 
 const hook = (pass) => {
   let held;

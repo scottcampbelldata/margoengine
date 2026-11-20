@@ -2,21 +2,44 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'vite';
 
+// Builds one entry as a library and lists its chunks and module ids.
+async function bundle(entry, external = []) {
+  const result = await build({
+    configFile: false,
+    publicDir: false,
+    logLevel: 'silent',
+    build: { write: false, lib: { entry, formats: ['es'] }, rollupOptions: { external } },
+  });
+  const chunks = result[0].output.filter((c) => c.type === 'chunk');
+  return { chunks, modules: chunks.flatMap((c) => Object.keys(c.modules)) };
+}
+
+// The gltf package modules only gltf/pbr brings in: its graph minus the basic loader's (packages/gltf/dist/index.js),
+// which any package may import. A path test cannot tell them apart now that both live in packages/gltf.
+async function pbrOnlyModules(external = []) {
+  const basic = new Set((await bundle('packages/gltf/dist/index.js', external)).modules),
+    pbrOnly = (await bundle('packages/gltf/dist/pbr.js', external)).modules.filter(
+      (m) => m.includes('/packages/gltf/') && !basic.has(m),
+    );
+  assert.ok(pbrOnly.some((m) => m.endsWith('/packages/gltf/dist/pbr.js')), 'gltf/pbr graph found');
+  return pbrOnly;
+}
+
 test('optional packages stay isolated and an accessor-only import discards rendering', async () => {
   const external = [
     '@margoengine/core',
     '@margoengine/core/extension',
     '@margoengine/animation',
     '@margoengine/animation/sampling',
-    '@margoengine/gltf-pro',
-    '@margoengine/gltf-pro/model',
+    '@margoengine/gltf/pbr',
+    '@margoengine/gltf/pbr-model',
     '@margoengine/blender',
-    // gltf-pro loads these on demand: a dynamic import is the one link allowed, which the check below holds.
+    // gltf/pbr loads these on demand: a dynamic import is the one link allowed, which the check below holds.
     '@margoengine/splats',
     '@margoengine/splats/data',
   ];
   const optional = [
-    'gltf-pro',
+    'gltf/pbr',
     'blender',
     'animation',
     'post',
@@ -28,31 +51,24 @@ test('optional packages stay isolated and an accessor-only import discards rende
     'splats',
     'terrain',
   ];
+  // gltf/pbr is an entry of the gltf package (dist/pbr.js), not a package root; every other item is a package root.
+  const entryOf = (pack) => (pack === 'gltf/pbr' ? 'packages/gltf/dist/pbr.js' : 'packages/' + pack + '/dist/index.js');
+  const pbrOnly = await pbrOnlyModules(external);
+  const owns = (pack, m) => (pack === 'gltf/pbr' ? pbrOnly.includes(m) : m.includes('/packages/' + pack + '/'));
   for (const pack of optional) {
-    const result = await build({
-      configFile: false,
-      publicDir: false,
-      logLevel: 'silent',
-      build: {
-        write: false,
-        lib: { entry: 'packages/' + pack + '/dist/index.js', formats: ['es'] },
-        rollupOptions: { external },
-      },
-    });
-    const chunks = result[0].output.filter((c) => c.type === 'chunk'),
-      modules = chunks.flatMap((c) => Object.keys(c.modules));
+    const { chunks, modules } = await bundle(entryOf(pack), external);
     assert.ok(
       chunks.every((c) => !c.imports.some((id) => id.startsWith('@margoengine/splats'))),
       'splats is a static import of ' + pack,
     );
-    if (pack === 'gltf-pro')
+    if (pack === 'gltf/pbr')
       assert.ok(
         chunks.some((c) => c.dynamicImports.includes('@margoengine/splats')),
-        'gltf-pro loads splats on demand',
+        'gltf/pbr loads splats on demand',
       );
     for (const other of optional.filter((p) => p !== pack))
       assert.ok(
-        modules.every((m) => !m.includes('/packages/' + other + '/')),
+        modules.every((m) => !owns(other, m)),
         other + ' leaked into ' + pack,
       );
   }
@@ -77,6 +93,7 @@ test('optional packages stay isolated and an accessor-only import discards rende
 });
 
 test('Blender decoding discards PBR and never enters core + stage', async () => {
+  const pbrOnly = await pbrOnlyModules();
   const result = await build({
     configFile: false,
     publicDir: false,
@@ -97,13 +114,13 @@ test('Blender decoding discards PBR and never enters core + stage', async () => 
     .filter(([, module]) => module.renderedLength > 0)
     .map(([id]) => id);
   assert.ok(
-    decodeModules.every((id) => !/\/packages\/(gltf-pro|decoders)\//.test(id)),
+    decodeModules.every((id) => !pbrOnly.includes(id) && !id.includes('/packages/decoders/')),
     'Decode-only imports retained PBR or codec modules',
   );
   const { measureCoreStage } = await import('../scripts/measure-size.js');
   const { modules } = await measureCoreStage();
   assert.ok(
-    modules.every((m) => !m.includes('/packages/blender/') && !m.includes('/packages/gltf-pro/')),
+    modules.every((m) => !m.includes('/packages/blender/') && !m.includes('/packages/gltf/')),
     'Blender/PBR entered core + stage',
   );
   const core = await build({
@@ -114,7 +131,7 @@ test('Blender decoding discards PBR and never enters core + stage', async () => 
   });
   const coreModules = core[0].output.filter((c) => c.type === 'chunk').flatMap((c) => Object.keys(c.modules));
   assert.ok(
-    coreModules.every((m) => !m.includes('/packages/blender/') && !m.includes('/packages/gltf-pro/')),
+    coreModules.every((m) => !m.includes('/packages/blender/') && !m.includes('/packages/gltf/')),
     'Blender/PBR entered core-only application',
   );
 });

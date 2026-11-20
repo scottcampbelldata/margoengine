@@ -1,5 +1,5 @@
 // Real-GPU checks of @margoengine/ui (one GPU job at a time; from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/ui/tests/ui-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/ui/tests/ui-browser.mjs
 // The page (ui-browser.js) draws a card with a button, a health bar, labels and a clipped scrolling list through the
 // real UiRenderer, reads the canvas back, and checks colours, rounded corners, shadows, text, clipping, dialogs
 // dimming the screen, resolution scaling, themes, and that an unchanged frame uploads nothing. Results go to

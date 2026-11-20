@@ -216,6 +216,7 @@ export class PointsPlugin implements EnginePlugin {
         uploads: number;
         uploadBytes: number;
     };
+    pixelScale: ((context: GpuContext) => number) | undefined;
     static attach(engine: EngineKernel, options?: PointsPluginOptions): PointsPlugin;
     constructor(options?: PointsPluginOptions);
     get pointClouds(): ReadonlySet<PointCloud>;
@@ -246,7 +247,7 @@ export interface PointsPluginOptions {
     edlRadius?: number;
 }
 
-export type PointsTextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
+export type PointsTextureSource = GPUTexture | ((device: GPUDevice) => GPUTexture) | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
 
 export interface RampOptions {
     min?: number;
@@ -345,7 +346,7 @@ export function packColors(source: ArrayLike<number>, components: number, count:
 
 export { parseColor } from "@margoengine/math";
 
-export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number> | null, ranges: readonly PickRange[], mvp: ArrayLike<number>, width: number, height: number, x: number, y: number, radius: number): PointsPickHit | null;
+export function pickPoint(positions: ArrayLike<number>, order: ArrayLike<number> | null, ranges: readonly PickRange[], mvp: ArrayLike<number>, width: number, height: number, x: number, y: number, radius: number, hidden?: (index: number) => boolean): PointsPickHit | null;
 
 export function projectToPixels(mvp: ArrayLike<number>, x: number, y: number, z: number, width: number, height: number, out: Float64Array | number[]): boolean;
 
@@ -386,6 +387,10 @@ abstract class BaseMaterial {
     protected apply(options: BaseMaterialOptions): void;
     validate(): void;
 }
+
+type GpuContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 type P = ArrayLike<number>;
 

@@ -60,6 +60,132 @@ test('RPC progress is ordered, channel-isolated, transferable and stops after se
   assert.equal(await client.call('run', []), 42, 'observer failure remains local to its call');
 });
 
+// A transport the test drives by hand. Each direction is a FIFO, as on a real port, and a message waits there until the
+// schedule delivers it, so the two directions, a handler's progress and a caller's abort can meet in any order.
+const manual = () => {
+  const queues = { toServer: [], toClient: [] },
+    side = (queue) => {
+      const end = new EventTarget();
+      end.postMessage = (data, transfer = []) => queues[queue].push(structuredClone(data, { transfer }));
+      return end;
+    },
+    ends = { client: side('toServer'), server: side('toClient') };
+  const deliver = (queue) =>
+    ends[queue === 'toServer' ? 'server' : 'client'].dispatchEvent(
+      new MessageEvent('message', { data: queues[queue].shift() }),
+    );
+  return { ...ends, queues, deliver };
+};
+// Runs `scenario` once per schedule: choose(n) picks one of n actions, and every pick sequence is tried, depth first.
+const everySchedule = async (scenario) => {
+  const open = [[]];
+  let runs = 0;
+  while (open.length) {
+    const prefix = open.pop(),
+      taken = [];
+    await scenario((n) => {
+      const at = taken.length,
+        pick = at < prefix.length ? prefix[at] : 0;
+      if (at >= prefix.length) for (let other = 1; other < n; other++) open.push([...taken, other]);
+      taken.push(pick);
+      return pick;
+    });
+    runs++;
+  }
+  return runs;
+};
+const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+// KB-WORKER-RPC1: a local CI run under heavy machine load timed out the progress test above. Whatever the order in which
+// the call, its progress, a cancel, the result, the handler's finish and a caller abort or a throwing observer arrive,
+// the call settles once, releases its slot (`done`) and leaves no message behind: no reply is lost or waits forever.
+test('every delivery order of call, progress, cancel, result and abort settles once and releases the slot', {
+  timeout: 30000,
+}, async () => {
+  for (const mode of ['abort', 'observer']) {
+    const runs = await everySchedule(async (choose) => {
+      const wire = manual(),
+        gate = Promise.withResolvers(),
+        seen = [];
+      let entered = false,
+        opened = false,
+        aborted = false,
+        report;
+      const server = exposeRpc(
+        {
+          async run({ progress, signal }) {
+            entered = true;
+            report = progress;
+            progress(1);
+            await gate.promise;
+            progress(2);
+            return signal.aborted ? 'cancelled' : 42;
+          },
+        },
+        wire.server,
+      );
+      const client = new RpcClient(wire.client),
+        controller = new AbortController(),
+        call = client.dispatch('run', [], {
+          signal: controller.signal,
+          onProgress(value) {
+            seen.push(value);
+            if (mode === 'observer') throw new Error('observer failed');
+          },
+        });
+      let outcome,
+        settled = 0,
+        released = false;
+      call.result.then(
+        (value) => ((outcome = { value }), settled++),
+        (error) => ((outcome = { error }), settled++),
+      );
+      call.done.then(() => (released = true));
+      for (;;) {
+        const actions = [];
+        if (wire.queues.toServer.length) actions.push('toServer');
+        if (wire.queues.toClient.length) actions.push('toClient');
+        if (entered && !opened) actions.push('open');
+        if (mode === 'abort' && !aborted) actions.push('abort');
+        if (!actions.length) break;
+        const action = actions[choose(actions.length)];
+        if (action === 'open') {
+          opened = true;
+          gate.resolve();
+        } else if (action === 'abort') {
+          aborted = true;
+          controller.abort(new Error('stop'));
+        } else wire.deliver(action);
+        await turn();
+      }
+      assert.equal(settled, 1, 'the call settles exactly once');
+      assert.equal(released, true, 'the slot is released once the handler has finished');
+      if (mode === 'observer') {
+        assert.match(outcome.error.message, /observer failed/);
+        assert.deepEqual(seen, [1], 'no progress reaches an observer after it failed');
+      } else if (outcome.error) {
+        assert.match(outcome.error.message, /stop/);
+        assert.deepEqual(seen, [1, 2].slice(0, seen.length), 'progress stays in order');
+      } else {
+        assert.equal(outcome.value, 42, 'a result delivered before the abort wins');
+        assert.deepEqual(seen, [1, 2]);
+      }
+      report('late');
+      assert.deepEqual(wire.queues.toClient, [], 'progress after settlement sends nothing');
+      // The same client and server still answer, delivered in plain FIFO order (the gate stays open now).
+      const next = client.call('run', []);
+      while (wire.queues.toServer.length || wire.queues.toClient.length) {
+        wire.deliver(wire.queues.toServer.length ? 'toServer' : 'toClient');
+        await turn();
+      }
+      assert.equal(await next, 42);
+      client.dispose();
+      server.dispose();
+    });
+    assert.equal(runs, { abort: 40, observer: 7 }[mode], `${mode}: every schedule explored`);
+  }
+});
+
 test('RPC resolves typed-shape calls, preserves this, multiplexes clients and leaves unrelated traffic alone', {
   timeout: 3000,
 }, async (t) => {

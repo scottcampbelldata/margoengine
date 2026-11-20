@@ -44,7 +44,21 @@ export interface BloomOptions {
    * quarters in the widest, and 0.5 weighs every level equally (the chain as it is without a radius).
    */
   radius?: number;
+  /**
+   * How the glow treats a pixel far brighter than its neighbours (default `'temporal'`):
+   * - `'temporal'`: light that was there the frame before glows with all its energy; a spike that was not (a
+   *   firefly: a specular glint caught by one sample for one frame) is damped as `'karis'` damps it, for that frame.
+   *   A small steady emitter (a lamp flame 2 px wide) keeps its glow; the first frame, with no frame before it, counts
+   *   as steady.
+   * - `'karis'`: every bright spike is damped, steady or not (the box weighting of Karis 2014). A light a few pixels
+   *   wide loses a large share of its glow: a flame 2 x 3 px at 17,000 cd/m2 keeps 57% of it.
+   * - `'none'`: no damping; every pixel glows by its energy, fireflies included.
+   */
+  fireflies?: BloomFireflies;
 }
+/** {@link BloomOptions.fireflies} modes. */
+export type BloomFireflies = 'temporal' | 'karis' | 'none';
+const FIREFLIES: readonly string[] = ['temporal', 'karis', 'none'];
 /** 3x3 tent (1 2 1 by 1 2 1, over 16) of bilinear taps one texel of `t` apart: every upsample of the chain. */
 const tent = `
 fn tent(t:texture_2d<f32>,s:sampler,uv:vec2f)->vec3f{
@@ -56,9 +70,28 @@ fn tent(t:texture_2d<f32>,s:sampler,uv:vec2f)->vec3f{
  * The glow chain, after Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare" (SIGGRAPH 2014).
  * Going down, each level is half the size of the one above, filtered by 13 bilinear taps that form five overlapping
  * 2x2-texel boxes: the centre box weighs 0.5, the four corner boxes 0.125 each. The top level reads the full-resolution
- * scene, keeps only the light above the threshold in every tap and weights each box by 1/(1+luma) (Karis average), so
- * one very bright pixel (a water glint, an ember) cannot switch the glow on and off as it crosses pixels. Coming back
- * up, each level adds a tent upsample of the summed levels below it, kept within the half-float range.
+ * scene and keeps only the light above the threshold in every tap. Coming back up, each level adds a tent upsample of
+ * the summed levels below it, kept within the half-float range.
+ *
+ * Energy. Glare is a linear spread of each image point's light by a point spread function that integrates to the share
+ * of the light scattered (Spencer, Shirley, Zimmerman and Greenberg, "Physically-Based Glare Effects for Digital
+ * Images", SIGGRAPH 1995; the eye's veiling term of Vos, "Disability glare: a state of the art report", CIE Journal 3(2),
+ * 1984), so a source's glow carries `strength` times its light above the threshold whatever its size. The chain does:
+ * the 13 taps give every source texel a quarter of its light at each of the four phases of the 2x downsample, the tent
+ * and the bilinear upsample give each texel's light four times over at twice the size, and each level is weighted by
+ * `strength / levels` (`bloomWeights` keep the sum), so the glow of a texel of light E sums to `strength x E`.
+ *
+ * Fireflies. Weighting each top box by 1/(1+luma) (the Karis average: Karis, "High Quality Temporal Supersampling",
+ * SIGGRAPH 2014 Advances course; Jimenez, as above) keeps a one-sample glint from switching the glow on and off, but it
+ * damps every box brighter than its neighbours whether it flickers or not: a flame 2 x 3 px at 17,000 cd/m2 kept 57% of
+ * its glow, a lone texel 25%. A firefly is a temporal outlier, light a sample caught in one frame and not the next (the
+ * stability test of reverse reprojection caching: Nehab, Sander, Lawrence, Tatarchuk and Isidoro, "Accelerating
+ * Real-Time Shading with Reverse Reprojection Caching", Graphics Hardware 2007; the neighbourhood bounds of Salvi, "An Excursion in Temporal Supersampling", GDC
+ * 2016). So the top level keeps both the linear box filter and the Karis average, and gives back the light the Karis
+ * average took up to the light its neighbourhood held the frame before: the linear luma rides down the chain in alpha,
+ * the coarsest level keeps it to the next frame, and its 3 x 3 coarse texels, times the level-0 texels each covers,
+ * bound the light any one texel keeps. A steady source keeps its full energy and may move a coarse texel (64 px at six
+ * levels) a frame; a new spike keeps only the Karis share for its first frame.
  *
  * Non-finite input (an Inf from an overflowing emissive, a NaN from a shader) would spread through every tap that
  * touches it, then down and up the chain. `clean` maps NaN and -Inf to 0 and +Inf to 65504 (the largest binary16, IEEE
@@ -66,6 +99,11 @@ fn tent(t:texture_2d<f32>,s:sampler,uv:vec2f)->vec3f{
  * evaluation), so `x != x` may be folded away. A prefilter tap whose bilinear result is not finite is refetched as four
  * cleaned texels; finite taps keep the hardware filter, so a finite image filters exactly as before.
  */
+// In the chain: boxes() gives the five boxes of the 13 taps (s[3]+s[4]+s[8]+s[9] the centre), each the mean of its
+// four taps, at the top level only the light above the threshold with alpha 0; down() is linear (centre box 0.5, corner
+// boxes 0.125) and carries the linear luma down in alpha; budget() is the light one top texel may keep, what the 3 x 3
+// coarsest texels round it held the frame before (their alpha) times the top texels each covers, spikes.y a floor (no
+// limit on a first frame); prefilter() gives back the light the Karis average took up to that budget.
 const chain =
   tent +
   cleanShader +
@@ -75,6 +113,8 @@ const chain =
 @group(0) @binding(2) var output:texture_storage_2d<rgba16float,write>;
 @group(0) @binding(3) var detail:texture_2d<f32>;
 @group(0) @binding(4) var<uniform> settings:vec4f;
+@group(0) @binding(5) var<uniform> spikes:vec4f;
+fn luma(c:vec3f)->f32{return dot(c,vec3f(0.2126,0.7152,0.0722));}
 fn cleanTap(uv:vec2f)->vec3f{
  let size=vec2i(textureDimensions(source));let x=uv*vec2f(size)-0.5;let i=vec2i(floor(x));let f=x-floor(x);
  let a=clean(textureLoad(source,clamp(i,vec2i(0),size-1),0).rgb);
@@ -83,29 +123,45 @@ fn cleanTap(uv:vec2f)->vec3f{
  let d=clean(textureLoad(source,clamp(i+vec2i(1,1),vec2i(0),size-1),0).rgb);
  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
 }
-fn downsample(id:vec2u,top:bool){
- let size=textureDimensions(output);if(any(id>=size)){return;}
- let uv=(vec2f(id)+0.5)/vec2f(size);let t=1.0/vec2f(textureDimensions(source));
+fn boxes(id:vec2u,top:bool)->array<vec4f,5>{
+ let uv=(vec2f(id)+0.5)/vec2f(textureDimensions(output));let t=1.0/vec2f(textureDimensions(source));
  let o=array<vec2f,13>(vec2f(-2,-2),vec2f(0,-2),vec2f(2,-2),vec2f(-1,-1),vec2f(1,-1),vec2f(-2,0),vec2f(0,0),vec2f(2,0),vec2f(-1,1),vec2f(1,1),vec2f(-2,2),vec2f(0,2),vec2f(2,2));
- var s:array<vec3f,13>;
+ var s:array<vec4f,13>;
  for(var i=0;i<13;i++){
-  var c=textureSampleLevel(source,bilinear,uv+o[i]*t,0.0).rgb;
+  var c=textureSampleLevel(source,bilinear,uv+o[i]*t,0.0);
   if(top){
-   if(any(bad(c))){c=cleanTap(uv+o[i]*t);}
-   c=min(c,vec3f(65504.0));let m=max(c.r,max(c.g,c.b));c*=max(0.0,m-settings.w)/max(0.0001,m);
+   var r=c.rgb;if(any(bad(r))){r=cleanTap(uv+o[i]*t);}
+   r=min(r,vec3f(65504.0));let m=max(r.r,max(r.g,r.b));c=vec4f(r*(max(0.0,m-settings.w)/max(0.0001,m)),0);
   }
   s[i]=c;
  }
- let b=array<vec3f,5>(s[3]+s[4]+s[8]+s[9],s[0]+s[1]+s[5]+s[6],s[1]+s[2]+s[6]+s[7],s[5]+s[6]+s[10]+s[11],s[6]+s[7]+s[11]+s[12]);
- var color=vec3f(0);var total=0.0;
- for(var i=0;i<5;i++){
-  let box=b[i]*0.25;var w=select(0.125,0.5,i==0);
-  if(top){w/=1+dot(box,vec3f(0.2126,0.7152,0.0722));}color+=box*w;total+=w;
- }
- textureStore(output,vec2i(id),vec4f(color/total,1));
+ return array<vec4f,5>((s[3]+s[4]+s[8]+s[9])*0.25,(s[0]+s[1]+s[5]+s[6])*0.25,(s[1]+s[2]+s[6]+s[7])*0.25,(s[5]+s[6]+s[10]+s[11])*0.25,(s[6]+s[7]+s[11]+s[12])*0.25);
 }
-@compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u){downsample(id.xy,true);}
-@compute @workgroup_size(8,8) fn down(@builtin(global_invocation_id) id:vec3u){downsample(id.xy,false);}
+@compute @workgroup_size(8,8) fn down(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=textureDimensions(output))){return;}
+ let b=boxes(id.xy,false);
+ textureStore(output,vec2i(id.xy),b[0]*0.5+(b[1]+b[2]+b[3]+b[4])*0.125);
+}
+fn budget(id:vec2u)->f32{
+ let size=vec2f(textureDimensions(output));let n=vec2i(textureDimensions(detail));
+ let p=vec2i((vec2f(id)+0.5)/size*vec2f(n));var e=0.0;
+ for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+  let q=p+vec2i(x,y);if(all(q>=vec2i(0))&&all(q<n)){e+=textureLoad(detail,q,0).a;}
+ }}
+ return max(spikes.y,e*spikes.x*size.x*size.y/f32(n.x*n.y));
+}
+@compute @workgroup_size(8,8) fn prefilter(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=textureDimensions(output))){return;}
+ let b=boxes(id.xy,true);
+ var lin=vec3f(0);var rob=vec3f(0);var total=0.0;
+ for(var i=0;i<5;i++){
+  let w=select(0.125,0.5,i==0);lin+=b[i].rgb*w;let k=w/(1+luma(b[i].rgb));rob+=b[i].rgb*k;total+=k;
+ }
+ rob/=total;
+ let ll=luma(lin);let lr=luma(rob);
+ let keep=select(1.0,clamp((budget(id.xy)-lr)/(ll-lr),0.0,1.0),ll>lr);
+ textureStore(output,vec2i(id.xy),vec4f(mix(rob,lin,keep),ll));
+}
 @compute @workgroup_size(8,8) fn up(@builtin(global_invocation_id) id:vec3u){
  let size=textureDimensions(output);if(any(id.xy>=size)){return;}
  let uv=(vec2f(id.xy)+0.5)/vec2f(size);
@@ -212,7 +268,10 @@ export class Bloom implements EnginePlugin {
   private readonly scenePipelines = new Map<string, GPURenderPipeline>();
   private readonly sceneOptions: DrawOptions = {};
   private readonly drawScene = (options?: DrawOptions): void => this.originalDraw!(options ?? this.sceneOptions);
-  private readonly values = new Float32Array(4);
+  /** The composite's settings at byte 0, the prefilter's firefly settings (`spikes`) at byte 256. */
+  private readonly values = new Float32Array((slice + 16) / 4);
+  /** True until the first frame over new chain textures: that frame has no frame before it, so all its light is kept. */
+  private fresh = true;
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
   private disposed = false;
@@ -246,6 +305,8 @@ export class Bloom implements EnginePlugin {
       t = this.options.threshold ?? 1,
       e = this.options.exposure ?? 0,
       r = this.options.radius ?? 0.5;
+    if (!FIREFLIES.includes(this.options.fireflies ?? 'temporal'))
+      throw new RangeError("Invalid bloom fireflies; use 'temporal', 'karis' or 'none'.");
     if (
       !Number.isFinite(r) ||
       r < 0 ||
@@ -282,7 +343,7 @@ export class Bloom implements EnginePlugin {
   }
   private initialize(device: GPUDevice): void {
     requireCompatTier(device, 'Bloom HDR processing', 'half-float');
-    this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.uniform = device.createBuffer({ size: slice + 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
     const module = device.createShaderModule({ code: chain });
     this.passes = ['prefilter', 'down', 'up'].map((entryPoint) =>
@@ -430,6 +491,7 @@ export class Bloom implements EnginePlugin {
   private allocate(device: GPUDevice, width: number, height: number): void {
     // Six levels (1/2 to 1/64 of the viewport) where the viewport allows, none smaller than a pixel.
     this.levels = Math.min(6, 32 - Math.clz32(Math.min(width, height)));
+    this.fresh = true;
     const separate = compatibilityLevel(device);
     this.lists = [this.levels, Math.max(1, this.levels - 1)].map((levels) => {
       const list: GPUTexture[] = [];
@@ -486,13 +548,16 @@ export class Bloom implements EnginePlugin {
           Math.ceil(Math.max(1, down.width >> level) / 8),
           Math.ceil(Math.max(1, down.height >> level) / 8),
         ]);
+    // The prefilter reads the coarsest level as the frame before left it; a single level has none (see apply), so it
+    // reads an up texture there, unused.
     for (let i = 0; i < levels; i++)
       step(i ? reduce : prefilter, i, [
         i ? downs[i - 1] : source,
         this.sampler,
         downs[i],
-        undefined,
+        i ? undefined : levels > 1 ? downs[levels - 1] : mip(upList, 0),
         { buffer: this.uniform! },
+        i ? undefined : { buffer: this.uniform!, offset: slice, size: 16 },
       ]);
     // The smallest level stands for itself; each level above adds the tent of the sum below it.
     for (let i = levels - 2; i >= 0; i--)
@@ -541,6 +606,13 @@ export class Bloom implements EnginePlugin {
     this.values[1] = this.options.exposure ?? 0;
     this.values[2] = format.includes('8unorm') ? 1 / 255 : 0;
     this.values[3] = this.options.threshold ?? 1;
+    // spikes: x scales the coarse budget ('temporal' only); y is its floor, no limit for 'none', for the first frame
+    // over new textures, and for a single level, which has no coarser level to remember.
+    const mode = this.options.fireflies ?? 'temporal',
+      free = mode === 'none' || (mode === 'temporal' && (this.fresh || this.levels < 2));
+    this.values[slice / 4] = mode === 'temporal' ? 1 : 0;
+    this.values[slice / 4 + 1] = free ? 3e38 : 0;
+    this.fresh = false;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values);
     const radius = this.options.radius ?? 0.5;
     if ((radius !== 0.5) !== this.weighted) this.link(c.device, this.source!);

@@ -368,6 +368,7 @@ export function parseVTKLegacy(input: BinaryInput, options: VTKLegacyOptions = {
     vertices = uints(),
     vertexCells = uints(),
     lineCells = uints();
+  builder.coords = positions;
   offsets.push(0);
   for (let c = 0; c < cells.length; c++) {
     if (!(c % 1024)) throwIfAborted(options.signal, F);
@@ -447,7 +448,12 @@ export function parseVTKLegacy(input: BinaryInput, options: VTKLegacyOptions = {
     return out;
   };
   if (normalName) result.normals = vertexAttribute(normalName, 3);
-  if (uvName) result.uvs = vertexAttribute(uvName, 2);
+  if (uvName) {
+    // VTK puts t = 0 at the image's bottom (OpenGL's convention); Margo puts v = 0 at the top, as parseVTKXML does.
+    const uvs = vertexAttribute(uvName, 2);
+    for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i];
+    result.uvs = uvs;
+  }
   if (colorName) result.colors = vertexAttribute(colorName, 3);
   return result;
 }

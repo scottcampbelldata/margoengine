@@ -17,7 +17,7 @@ other engine code). No new runtime dependency. Margo names. Errors per docs/conv
   569-576, 597-608, 640-643). Shadows.add calls addLighting (shadows/src/index.ts:300-312, 363-373); clustered calls
   receiver.addLighting (clustered/src/index.ts:71-73, 251-266, 285); Fog via ShaderEffect.add -> addLighting with an
   `output` hook on binding 25 (environment/src/lighting.ts:28-38, 84-99, 398-400). The voxel fragment shader must
-  contain gltf-pro's hook points: `direct+ambient(s)`, `var color=...+s.emissive;`, `fn ambient(s:Surface)`, the
+  contain gltf/pbr's hook points: `direct+ambient(s)`, `var color=...+s.emissive;`, `fn ambient(s:Surface)`, the
   tone-map line keyed on `f.settings.w` (pbr-hooks.js:28-62).
 - Shadow casting: static `drawShadow` source drawn into the cached map, redrawn when `shadowVersion` changes
   (shadows/src/index.ts:80-86, 552-556, 786-797). Day/night: Sky writes the sun into engine.lighting every frame
@@ -32,7 +32,7 @@ other engine code). No new runtime dependency. Margo names. Errors per docs/conv
 - `@margoengine/physics`: the `voxels` shape with `setVoxel`, `combineVoxelStates`, `propagateVoxelChange` on
   `PhysicsCollider`; `physics.supportsShape('voxels')`.
 - Real-GPU tests: follow packages/sky/test/browser-check.mjs (openBrowser from scripts/browser.js) under
-  `node scripts/gpu-lock.mjs run --owner=...`. WGSL is only proven valid in the browser; WGSL changes also need
+  `node scripts/run-with-timeout.mjs`. WGSL is only proven valid in the browser; WGSL changes also need
   build:site + visual:check.
 
 ## Package layout (packages/voxel)
@@ -166,8 +166,9 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
   layers; liquid tops with `wave` move vertically by world x,z so neighbours stay seamless.
 - Shadows: `{static: true}`, shadowVersion bumps only when a changed chunk intersects the shadow bounds; per-cascade
   CPU cull from ShadowContext.matrix.
-- Translucency: sorted (chunks back to front; worker orders quads per chunk from the camera cell; re-sort near chunks
-  after the camera moves >= 4 blocks); water-water and glass-glass faces culled.
+- Translucency: sorted exactly (Scott, 2026-11-15): chunks by descending grid distance from the eye's chunk, quads
+  by descending grid distance of their cell from the eye's cell (Frieder, Gordon and Reynolds 1985), translucent faces
+  never merged; a chunk re-sorts when the eye's cell changes against it; water-water and glass-glass faces culled.
 - Device loss: onDeviceRestored remeshes everything.
 - Budget targets at render distance 16 on the Arc 140V (1080p, 4x MSAA, 2-cascade PCF to 96 m, fog, sky): ~2,100
   resident chunks, 500-700 meshed, ~2.5M quads ~30 MiB GPU, ~50 MiB CPU chunk data (memoryBudget default 128 MiB),
@@ -179,7 +180,15 @@ on vfx's texture option). Avoided taken names: `World`, `RayHit`, `WorkerPool`.
 1. Quads stay 12 bytes with baked per-vertex smooth light (best look now; a per-chunk 3D light texture is a later option).
 2. 256 texture layers in v1 (default limits; no core change).
 3. Translucency sorted in v1; no generic OIT source API.
-4. World size bounded by float32 (~100 km jitter); no floating origin in v1; document it in limits.md.
+4. Origin rebasing (Scott, 2026-11-15, replacing "no floating origin in v1"): every voxel renderer, smooth terrain
+   view, object, model and debris layer takes (and `/gi` and `/light-rgb` follow their renderer's)
+   `origin`, an object whose `origin` is the float64 world point at engine zero (a `FloatingOrigin` of
+   `@margoengine/cameras/origin`, or any `{origin}`), read every frame. The CPU keeps world cells in float64. The GPU
+   draws chunks in an integer frame, world minus a base snapped to 1,024 cells near the origin, so chunk origins
+   stay exact integers and seams stay closed; the fraction origin minus base is folded into the camera and shadow
+   matrices in float64, and pixel positions handed to lighting hooks are engine-local. Wave and wind phases add the
+   base's phase, taken modulo 2 pi in float64. Precision is then that of a world within about 1,500 blocks of zero,
+   wherever the camera is (Thorne 2005; Ohlarik 2008; Persson 2012).
 5. `engine.pick` does not see voxels; games pick with `raycastVoxels`.
 6. Light on the main thread with a per-frame budget, single-channel with one block-light tint colour in v1.
 7. No SharedArrayBuffer; mesh jobs copy ~50 KB.
@@ -258,7 +267,7 @@ Status: on main are phases 1 (storage), 2 (mesher), 3 (worker mesher), 4 (render
   Greedy and one-quad-per-face images differ only in edge samples (under 0.6% of drawn pixels, never a 2 x 2 block):
   bit-identical images are impossible because the two meshes put different vertices on the same edges. Render bundles
   kept (re-record 0.1-0.8 ms). GPU-verified on the Arc 140V and the RTX A6000 (tests/render-browser-check.mjs).
-- Renderer lighting (phase 5): `addLighting(effect)` takes a `VoxelRendererEffect` (glTF-pro hooks: `pbr(group)`,
+- Renderer lighting (phase 5): `addLighting(effect)` takes a `VoxelRendererEffect` (glTF PBR hooks: `pbr(group)`,
   `bindings()`), composes it with `lightPBR` into all three pipelines (group 1) and keeps the previous pipelines
   drawing while the new ones compile; `drawShadow(VoxelShadowContext)`, `shadowVersion`, live `blockLightColor`
   (default [1, 0.82, 0.6]). Shadow pass: opaque depth only, cutout alpha tested at level 0, translucent casts none,

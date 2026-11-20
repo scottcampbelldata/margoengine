@@ -459,7 +459,7 @@ function meshNodePolicy(
   let triangles = 0;
   for (const primitive of primitives) triangles += primitiveTriangles(primitive, skin, meshIndex, source);
   const chain = source.chains[nodeIndex],
-    suffix = /-((?:conv)?col(?:only)?)$/i.exec(name)?.[1].toLowerCase() ?? '',
+    suffix = /[-_$]((?:conv)?col(?:only)?)$/i.exec(name)?.[1].toLowerCase() ?? '',
     collider: UnityImportNode['collider'] = suffix.startsWith('conv') ? 'convex' : suffix ? 'concave' : 'none';
   if (colliders && collider !== 'none') {
     if (

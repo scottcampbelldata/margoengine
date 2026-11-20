@@ -722,3 +722,69 @@ test('Box.glb comes through with every triangle', async () => {
   assert.equal(stats.trianglesAfter, 12);
   await clean(glb);
 });
+
+test('weldVertices refuses an index outside the vertices instead of reading it as vertex 0', () => {
+  // glTF 2.0 3.7.2.1: every index names an existing vertex.
+  const arrays = [{ values: [0, 0, 0, 1, 0, 0, 0, 1, 0], width: 3 }];
+  assert.throws(() => weldVertices(arrays, [0, 1, 5], 3), RangeError);
+  assert.throws(() => weldVertices(arrays, [0, 1, -1], 3), RangeError);
+  assert.throws(() => weldVertices(arrays, [0, 1, 1.5], 3), RangeError);
+  assert.deepEqual(weldVertices(arrays, [0, 1, 2], 3).indices, new Uint32Array([0, 1, 2]));
+});
+
+test('an index past the vertices is refused with welding off too', async () => {
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+    parts = splitGLB(exportGLB({ nodes: [{ geometry: { positions, normals, indices: new Uint32Array([0, 1, 2]) } }] })),
+    accessor = parts.json.accessors[parts.json.meshes[0].primitives[0].indices],
+    view = parts.json.bufferViews[accessor.bufferView],
+    at = (view.byteOffset ?? 0) + (accessor.byteOffset ?? 0),
+    size = { 5121: 1, 5123: 2, 5125: 4 }[accessor.componentType],
+    data = new DataView(parts.bin.buffer, parts.bin.byteOffset);
+  if (size === 1) data.setUint8(at + 2, 9);
+  else if (size === 2) data.setUint16(at + 4, 9, true);
+  else data.setUint32(at + 8, 9, true);
+  accessor.max = [9];
+  await assert.rejects(optimizeGLB(joinGLB(parts), { weld: false }), RangeError);
+});
+
+test('a non-indexed primitive of two vertices keeps its accessors and gets no empty index accessor', async () => {
+  // glTF 2.0 5.1: accessor.count is at least 1, so no 0-count index accessor may be written.
+  const parts = splitGLB(exportGLB({ nodes: [{ geometry: grid(1) }] })),
+    primitive = parts.json.meshes[0].primitives[0],
+    position = parts.json.accessors[primitive.attributes.POSITION];
+  delete primitive.indices;
+  for (const name of Object.keys(primitive.attributes)) {
+    const accessor = parts.json.accessors[primitive.attributes[name]];
+    accessor.count = 2;
+    if (name === 'POSITION') [accessor.min, accessor.max] = [[0, 0, 0], [1, 0, 0]];
+  }
+  assert.ok(position);
+  const { glb } = await optimizeGLB(joinGLB(parts)),
+    { json } = splitGLB(glb);
+  assert.equal(json.meshes[0].primitives[0].indices, undefined);
+  assert.ok(json.accessors.every((accessor) => accessor.count >= 1));
+});
+
+test('merged textures are renumbered where a primitive extension names them', async () => {
+  const png = await encodePNG({ width: 2, height: 2, data: new Uint8Array(16).fill(90) }),
+    material = (color) => ({ color, baseColorTexture: { image: png, mimeType: 'image/png' } }),
+    parts = splitGLB(
+      exportGLB({
+        nodes: [
+          { geometry: grid(2), material: material([1, 1, 1, 1]) },
+          { translation: [3, 0, 0], geometry: grid(2), material: material([1, 0, 0, 1]) },
+        ],
+      }),
+    );
+  assert.equal(parts.json.textures.length, 2);
+  const last = parts.json.textures.length - 1;
+  parts.json.meshes[0].primitives[0].extensions = {
+    EXT_mesh_features: { featureIds: [{ featureCount: 1, texture: { index: last, channels: [0] } }] },
+  };
+  (parts.json.extensionsUsed ??= []).push('EXT_mesh_features');
+  const { json } = splitGLB((await optimizeGLB(joinGLB(parts))).glb),
+    named = json.meshes.flatMap((mesh) => mesh.primitives).find((p) => p.extensions?.EXT_mesh_features);
+  assert.equal(json.textures.length, 1);
+  assert.equal(named.extensions.EXT_mesh_features.featureIds[0].texture.index, 0);
+});

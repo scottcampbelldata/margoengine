@@ -10,6 +10,18 @@ import {SSAO} from '/packages/post/dist/index.js';
 import {Picking} from '/packages/selection/dist/index.js';
 import {ComputePass,storage,vec4} from '/packages/shader/dist/index.js';
 import {RawMesh,RawPicking,RawShaderMaterial,RawShaders} from '/packages/shader/dist/raw.js';
+import {ShaderMaterial,shaderMesh} from '/packages/shader/dist/glsl-material.js';
+import {TAA} from '/packages/taa/dist/index.js';
+// A GLSL program (ES 1.00, the modelViewMatrix names) that moves its quad by a world-space uniform, and may cut its middle.
+const glslVertex=`attribute vec3 position;
+uniform vec3 shift;
+varying vec3 vWorld;
+void main() { vec4 w = modelMatrix * vec4(position, 1.0) + vec4(shift, 0.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const glslFragment=(cut='')=>`precision highp float;
+varying vec3 vWorld;
+void main() { ${cut}gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }`;
+const glslQuad=(h)=>({positions:[-h,-h,0,h,-h,0,h,h,0,-h,h,0],indices:[0,1,2,0,2,3]});
+const glsl=(s,{shift=[0,0,0],cut,half=0.3,matrix,...options}={})=>s.raw.add(shaderMesh(glslQuad(half),new ShaderMaterial({vertexShader:glslVertex,fragmentShader:glslFragment(cut),uniforms:{shift:{value:shift}},...options}),{...(matrix?{matrix}:{})}));
 const vertex=`struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f,@location(1) normal:vec3f}
 @vertex fn vertex(a:Attributes)->Out {let w=mesh.world*vec4f(a.position,1);return Out(camera.viewProjection*w,w.xyz,mesh.normal*vec3f(0,0,1));}\n`;
 const fragment=body=>`@fragment fn fragment(i:Out)->@location(0) vec4f {${body}}\n`;
@@ -21,6 +33,11 @@ const uniformBlock=(device,values)=>{const buffer=device.createBuffer({size:16,u
 const read=async(device,buffer,size)=>{const out=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),e=device.createCommandEncoder();e.copyBufferToBuffer(buffer,0,out,0,size);device.queue.submit([e.finish()]);await out.mapAsync(GPUMapMode.READ);const v=Array.from(new Float32Array(out.getMappedRange().slice(0)));out.unmap();out.destroy();return v;};
 const solid=(s,options,mesh={})=>s.raw.add(new RawMesh({material:new RawShaderMaterial(options),attributes:quad(),index,...mesh}));
 const scenarios={
+  // A missing depth texture reads the far depth 1, so a less-equal comparison against 0.5 passes everywhere.
+  depthTexture:s=>solid(s,{vertexShader:vertex+fragment('let v=textureSampleCompare(shadow,shadowSampler,vec2f(0.5),0.5)*0.5;return margoEncode(vec4f(v,0,0,1));'),textures:{shadow:{texture:null,sampleType:'depth'}}}),
+  // A second quad at the same depth passes greater only when its depth bias moves it nearer.
+  depthEqual:s=>{solid(s,{vertexShader:paint('vec3f(1,0,0)')});solid(s,{vertexShader:paint('vec3f(0,1,0)'),depthCompare:'greater'},{renderOrder:1});},
+  depthBiased:s=>{solid(s,{vertexShader:paint('vec3f(1,0,0)')});solid(s,{vertexShader:paint('vec3f(0,1,0)'),depthCompare:'greater',depthBias:1000},{renderOrder:1});},
   uniformList:s=>solid(s,{vertexShader:paint('uniforms.colors[1].rgb'),uniforms:{colors:{type:'vec4f',count:3,value:[[1,0,0,1],[0,1,0,1],[0,0,1,1]]}}}),
   uniformFlat:s=>solid(s,{vertexShader:paint('uniforms.colors[1]+uniforms.tail'),uniforms:{colors:{type:'vec3f',count:2,value:[1,0,0,0,0.5,0]},tail:{value:[0,0,0.25]}}}),
   uniformColours:s=>solid(s,{vertexShader:paint('uniforms.colors[1]'),uniforms:{colors:{type:'vec3f',count:2,value:['#000000','#ff0000']}}}),
@@ -56,6 +73,15 @@ const scenarios={
   shadowStatic:s=>shadowScene(s,paint('vec3f(0)'),{},{},{static:true}),
   shadowTransparent:s=>shadowScene(s,paint('vec3f(0)'),{transparent:true}),
   shadowOut:s=>shadowScene(s,paint('vec3f(0)'),{},{visible:false}),
+  // The GLSL caster's points sit 5 to the right; its vertex stage moves it back over the wall's middle, in the shadow pass too.
+  glslShadow:s=>glslShadowScene(s,{shift:[-5,0,0],matrix:translate(5.5,0,0.5)}),
+  glslShadowCut:s=>glslShadowScene(s,{matrix:translate(0.5,0,0.5),cut:'if (abs(vWorld.x - 0.5) < 0.15) discard; '}),
+  // TAA jitters the projection a GLSL vertex stage reads and resolves it back to the shape's own colour.
+  // A quad turned 0.5 rad, so its edges cross pixels, drawn by a GLSL program (projectionMatrix * viewMatrix) or by WGSL
+  // (camera.viewProjection), with or without TAA: TAA's jitter has to reach both the same way.
+  glslTAA:s=>turned(s,'glsl',true),
+  wgslTAA:s=>turned(s,'wgsl',true),
+  glslNoTAA:s=>turned(s,'glsl',false),
   ssaoOwn:s=>room(s,true),
   ssaoDepth:s=>room(s,false),
   ssaoFlipped:s=>room(s,true,'-i.normal'),
@@ -67,6 +93,7 @@ const scenarios={
   pickMoved:async s=>{const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=solid(s,{vertexShader:`struct Out {@builtin(position) clip:vec4f}
 @vertex fn vertex(a:Attributes)->Out {return Out(camera.viewProjection*(mesh.world*vec4f(a.position,1)+vec4f(0.8,0,0,0)));}
 @fragment fn fragment()->@location(0) vec4f {return vec4f(1);}`},{attributes:quad(0.3),frustumCulled:false});await s.draw();return {shown:picking.rawOf(await s.engine.pick(...s.pixel([0.8,0,0])))===m,source:await s.engine.pick(...s.pixel([-0.6,0,0]))};},
+  glslPick:async s=>{const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),m=glsl(s,{shift:[0.8,0,0]});m.frustumCulled=false;await s.draw();return {shown:picking.rawOf(await s.engine.pick(...s.pixel([0.8,0,0])))===m,source:await s.engine.pick(...s.pixel([-0.6,0,0]))};},
   pickFollowed:async s=>{const picking=RawPicking.attach(Picking.attach(s.engine),s.raw),core=s.engine.createMesh(),m=solid(s,{vertexShader:paint('vec3f(1)')},{mesh:core});await s.draw();const hit=await s.engine.pick(...s.pixel([0,0,0]));return {core:hit===core,raw:picking.rawOf(hit)===m};},
   pickRemoved:async s=>{const {picking,left}=await pickScene(s);s.raw.remove(left);await s.draw();return {miss:await s.engine.pick(...s.pixel([-0.6,0,0])),gone:picking.rawOf(null)};},
 };
@@ -75,6 +102,18 @@ function shadowScene(s,code,options={},mesh={},add={}){
   const wall=createMesh(s.engine,planeGeometry(2,2),new Material({shading:'lambert',color:[0.75,0.75,0.75]})),shadows=Shadows.attach(s.engine,{resolution:1024,filter:'hard'});
   shadows.add(wall);
   shadows.add(s.raw.add(new RawMesh({material:new RawShaderMaterial({vertexShader:code,colorWrite:false,depthWrite:false,...options}),attributes:quad(0.3),index,matrix:translate(0.5,0,0.5),...mesh})),add);
+}
+async function turned(s,kind,taa){
+  if(taa)TAA.attach(s.engine).add(s.raw);
+  const matrix=[Math.cos(0.5),Math.sin(0.5),0,0,-Math.sin(0.5),Math.cos(0.5),0,0,0,0,1,0,0,0,0,1];
+  if(kind==='glsl')glsl(s,{half:1,matrix});else solid(s,{vertexShader:paint('vec3f(1,0,0)')},{attributes:quad(1),matrix});
+  for(let i=0;i<6;i++)await s.draw();
+}
+function glslShadowScene(s,options){
+  s.engine.lighting.radiance[3]=0;s.engine.lighting.direction.set([1,0,1,2]);
+  const wall=createMesh(s.engine,planeGeometry(2,2),new Material({shading:'lambert',color:[0.75,0.75,0.75]})),shadows=Shadows.attach(s.engine,{resolution:1024,filter:'hard'});
+  shadows.add(wall);
+  const mesh=glsl(s,{colorWrite:false,depthWrite:false,...options});mesh.frustumCulled=false;shadows.add(mesh);
 }
 // A wall at z = 0 and a floor at y = -1 running towards the camera, in white, with SSAO. `own` writes the G-buffer with the
 // shader's normals and full ambient light; without it the mesh only gives SSAO its depth.

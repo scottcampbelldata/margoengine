@@ -72,6 +72,10 @@
     "./clip": {
       "types": "./dist/clip.d.ts",
       "import": "./dist/clip.js"
+    },
+    "./style": {
+      "types": "./dist/style.d.ts",
+      "import": "./dist/style.js"
     }
   },
   "files": [

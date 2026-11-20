@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import { deferSpeed, speedEnabled } from '../../../scripts/support/speed-phase.mjs';
@@ -22,19 +22,47 @@ import { begin, canonicalNaN, fact, golden as storedGolden, readOnly, reading, t
 import { neutralNormalExpectations } from './normal-fallback.js';
 import { median as nearestMedian } from '../../../scripts/lib/percentile.mjs';
 export { canonicalNaN, fact, readOnly, tape };
-/** Historical exact expectations include the reviewed normal-fallback bug correction; candidate calls remain raw. */
+/** Historical exact expectations include the reviewed normal-fallback bug correction; candidate calls remain raw. A
+ * baseline from before a fold names its GPU objects after the old package (foldedLabels). */
 export async function golden(...args) {
-  const value = await storedGolden(...args);
+  const value = foldedLabels(await storedGolden(...args));
   return process.argv.includes('--current') ? neutralNormalExpectations(value) : value;
+}
+
+/** GPU object labels a folded package's refs wrote, to the label the same object carries since the fold. */
+const FOLDED_LABELS = new Map([['gltf-pro uniform arena', 'gltf/pbr uniform arena']]);
+/** `value` with every `label` string a pre-fold ref wrote renamed (FOLDED_LABELS); the GPU calls are otherwise as stored. */
+export function foldedLabels(value) {
+  if (Array.isArray(value)) return value.map(foldedLabels);
+  if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      key === 'label' && FOLDED_LABELS.has(item) ? FOLDED_LABELS.get(item) : foldedLabels(item),
+    ]),
+  );
 }
 
 const root = resolve(import.meta.dirname, '../../..'),
   slash = (value) => value.replaceAll('\\', '/');
 const bare = (id) => !id.startsWith('.') && !isAbsolute(id) && !/^[a-z]:[\\/]/i.test(id) && !id.startsWith('\0');
 
+/** Packages folded into another since a proof's refs. Proofs name today's folder and entry; a ref from before the fold
+ * holds them in the old folder (under the old entry name), which is where `git show` reads them. */
+const folded = { gltf: { before: 'gltf-pro', entries: { 'src/pbr.ts': 'src/index.ts', 'src/pbr-instancing.ts': 'src/instancing.ts' } } };
+/** Where package `name`'s `entry` lives at `ref`: unchanged, or its place before a fold when the ref predates it. */
+export function placeAt(name, entry, ref) {
+  const fold = folded[name],
+    path = (folder, file) => slash(relative(root, resolve(root, 'packages', folder, file)));
+  if (!ref || !fold || showAt(ref, path(name, entry)) !== undefined) return { name, entry };
+  const before = fold.entries[entry] ?? entry;
+  return showAt(ref, path(fold.before, before)) === undefined ? { name, entry } : { name: fold.before, entry: before };
+}
+
 /** One package entry bundled by Vite from `ref` (its src and packages/shared), or from the working tree without one; bare
  * imports stay external. Returns the output chunks. */
 export async function bundle(name, entry, ref, minify = false) {
+  ({ name, entry } = placeAt(name, entry, ref));
   const result = await build({
     root: resolve(root, 'packages', name),
     configFile: false,
@@ -46,7 +74,7 @@ export async function bundle(name, entry, ref, minify = false) {
       minify,
       target: 'es2022',
       lib: { entry: resolve(root, 'packages', name, entry), formats: ['es'] },
-      // A lazily imported module (gltf-pro imports its physical shader on first need) is inlined, so the entry still
+      // A lazily imported module (gltf/pbr imports its physical shader on first need) is inlined, so the entry still
       // builds to the one module the comparison loads; the code that runs is the same.
       // Rollup asks `external` before any plugin, so core's ids stay internal here for pinned-core to resolve.
       rollupOptions: {
@@ -68,7 +96,9 @@ function gitSource(name, ref) {
           name: 'git-source',
           enforce: 'pre',
           resolveId(id, importer) {
-            // A file deleted or renamed since the ref (e.g. shared/math.js, gltf-pro's instances.ts) is missing on disk; resolve it
+            // The entry of a folder folded away since the ref (placeAt) is not on disk: load() reads it from the ref.
+            if (!importer && sources.some((s) => slash(id).startsWith(s)) && !existsSync(id)) return slash(id);
+            // A file deleted or renamed since the ref (e.g. shared/math.js, gltf/pbr's instances.ts) is missing on disk; resolve it
             // to its path in the ref (.ts when the ref has one) so load() reads the ref.
             if (!importer || !id.startsWith('.')) return;
             const file = slash(resolve(dirname(importer.split('?')[0]), id)),

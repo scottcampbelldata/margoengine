@@ -77,7 +77,7 @@ const triangle = {
   uvs: [0, 0, 1, 0, 0, 1],
 };
 
-test('packGeometry writes the gltf-pro 80-byte vertex once per geometry object', () => {
+test('packGeometry writes the gltf/pbr 80-byte vertex once per geometry object', () => {
   const g = {
       ...triangle,
       tangents: [2, 0, 0, -0.5, 1, 0, 0, 1, 1, 0, 0, 0],
@@ -97,7 +97,7 @@ test('packGeometry writes the gltf-pro 80-byte vertex once per geometry object',
   assert.throws(() => packGeometry({ ...triangle, normals: [0, 0, 0, 0, 0, 1, 0, 0, 1] }), /non-zero/);
 });
 
-test('Material converts colors, validates options and keeps live gltf-pro arrays in sync', () => {
+test('Material converts colors, validates options and keeps live gltf/pbr arrays in sync', () => {
   const m = new Material({
     color: '#ff8000',
     opacity: 0.5,
@@ -147,7 +147,7 @@ test('Texture validates sources and options', () => {
 });
 
 test('a standard material without maps reads no texture: constant texels, no texture bindings', async () => {
-  // Regression: a plain Material drew with ten texture reads per fragment (gltf-pro's white defaults times this
+  // Regression: a plain Material drew with ten texture reads per fragment (gltf/pbr's white defaults times this
   // package's), the largest GPU cost of createInstancedMesh boxes against core's untextured shader.
   const s = await scene();
   try {
@@ -165,8 +165,8 @@ test('a standard material without maps reads no texture: constant texels, no tex
 
 test('a material without maps over the KHR physical shader reads no dropped texture', async () => {
   // Regression: bareShader dropped every group-1 declaration but replaced only the five core maps' reads, so over
-  // gltf-pro's physical variant it left reads of undeclared maps (`unresolved value 'specularColorMap'`).
-  const { pbrShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
+  // gltf/pbr's physical variant it left reads of undeclared maps (`unresolved value 'specularColorMap'`).
+  const { pbrShader, physicalShader } = await import('../../gltf/src/shader.ts');
   for (const source of [pbrShader, physicalShader()]) {
     const code = new Material({ color: [0.5, 0.25, 1] }).shader(source, 2);
     assert.ok(!code.includes('textureSample('), 'no texture read');
@@ -175,7 +175,7 @@ test('a material without maps over the KHR physical shader reads no dropped text
   assert.ok(new Material().shader(physicalShader(), 2).includes('let cm=vec4f(0.5,0.5,1,1).xyz'), 'flat coat normal');
 });
 
-test('createMesh draws through gltf-pro with patched shader and default bindings', async () => {
+test('createMesh draws through gltf/pbr with patched shader and default bindings', async () => {
   const s = await scene();
   try {
     const emissiveMap = new Texture({ data: new Uint8Array(16).fill(200), width: 2, height: 2 });
@@ -197,7 +197,7 @@ test('createMesh draws through gltf-pro with patched shader and default bindings
     );
     assert.equal(group.entries[0].resource, group.entries[2].resource, 'missing maps share the white default');
     assert.notEqual(group.entries[4].resource, group.entries[0].resource, 'normal slot uses the flat normal default');
-    const uniform = model['resources'][0].uniform; // gltf-pro's per-draw Frame uniform (a slot of its arena)
+    const uniform = model['resources'][0].uniform; // gltf/pbr's per-draw Frame uniform (a slot of its arena)
     assert.equal(uniform.binding.size, 880);
     assert.deepEqual([...uniform.contents.slice(76, 80)], [0.5, 0.25, 1, 1]);
   } finally {
@@ -258,7 +258,7 @@ test('shading modes add early returns and matcap binds its own slot', () => {
   assert.ok(
     materialShader(source, 2, 'standard').includes('+0*textureSample(normalMap,normalSampler,uv(i,f.coordsA.z)).xyz'),
   );
-  assert.throws(() => materialShader('fn other(){}', 2, 'standard'), /standard gltf-pro PBR shader/);
+  assert.throws(() => materialShader('fn other(){}', 2, 'standard'), /standard gltf\/pbr shader/);
 });
 
 test('textures upload once, are shared, honor color space and re-upload on update or new video frames', async () => {
@@ -367,9 +367,9 @@ test('materials draw opaque first, then transparent back to front, each by rende
     assert.deepEqual(
       add.primitives[0].material.renderState,
       { blend: additive[0].fragment.targets[0].blend, depthWrite: false, depthCompare: undefined },
-      'gltf-pro renderState hook',
+      'gltf/pbr renderState hook',
     );
-    assert.equal(near.primitives[0].material.renderState, undefined, 'default state leaves gltf-pro untouched');
+    assert.equal(near.primitives[0].material.renderState, undefined, 'default state leaves gltf/pbr untouched');
     const unsorted = createMesh(
       s.engine,
       planeGeometry(1, 1),
@@ -427,14 +427,14 @@ test('loadTexture fetches into an owned ImageBitmap and enforces protocol and si
   }
 });
 
-test('uvTransform follows KHR_texture_transform, defaults to gltf-pro identity rows bit for bit and stays live per slot', async () => {
-  const { textureTransform } = await import('../../gltf-pro/dist/index.js');
+test('uvTransform follows KHR_texture_transform, defaults to gltf/pbr identity rows bit for bit and stays live per slot', async () => {
+  const { textureTransform } = await import('../../gltf/dist/pbr.js');
   const plain = new Material(),
     t = { offset: [0.5, 0.25], rotation: Math.PI / 2, scale: [2, 3] };
   assert.deepStrictEqual(
     plain.uvt,
     Array(5).fill(textureTransform()).flat(),
-    'identity, including the -0 gltf-pro writes',
+    'identity, including the -0 gltf/pbr writes',
   );
   assert.deepStrictEqual(textureTransform(), [1, 0, 0, 0, -0, 1, 0, 0]);
   const m = new Material({ uvTransform: t });
@@ -444,7 +444,7 @@ test('uvTransform follows KHR_texture_transform, defaults to gltf-pro identity r
   assert.deepStrictEqual(m.uvt.slice(0, 8), textureTransform(t));
   assert.throws(() => m.setUVTransform(t, 'matcap'), TypeError);
   assert.throws(() => m.setUVTransform({ scale: [1] }), TypeError);
-  // transformUVs bakes the same mapping into geometry: (1,0)->(0.5,-1.75), (0,1)->(3.5,0.25) as in gltf-pro's own test.
+  // transformUVs bakes the same mapping into geometry: (1,0)->(0.5,-1.75), (0,1)->(3.5,0.25) as in gltf/pbr's own test.
   assert.deepEqual(
     [...transformUVs([1, 0, 0, 1], t)].map((v) => +v.toFixed(6)),
     [0.5, -1.75, 3.5, 0.25],

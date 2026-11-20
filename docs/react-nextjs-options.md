@@ -12,7 +12,7 @@ Sources: `packages/react/README.md`, `packages/react/SCENE.md`, `packages/react/
 `<Canvas>` creates one engine, and its children are ordinary React components that edit it through hooks and effects.
 
 - React 18 and 19.
-- Import from `margoengine/react` (one install; models from `margoengine/react/gltf-pro`), or install `@margoengine/react` alone plus the packages
+- Import from `margoengine/react` (one install; models from `margoengine/react/gltf`), or install `@margoengine/react` alone plus the packages
   its subpaths name.
 - `sideEffects: false`, ESM, full types, `react-server` export condition on every entry.
 
@@ -34,8 +34,8 @@ package, installed separately, and loaded when its component mounts.
 | --- | --- | --- |
 | `@margoengine/react` | `Canvas`, `Stage`, `Mesh`, `Group`, `BoxGeometry`, `PbrMaterial`, `Sun`, `Center`, `Scene`, `RenderView`, `useFrame`, `useMargo`, `useEngine`, `useCamera`, `useLoader`, `useProgress` | nothing more |
 | `/controls` | `OrbitControls`, `MapControls`, `CadControls`, `ArcballControls`, `PointerLock`, `TransformControls` | `@margoengine/controls` |
-| `/gltf-pro` | `Gltf` (`Model`), `Gltf.preload` | `@margoengine/gltf-pro` |
-| `/fbx` | `Fbx`, `Fbx.preload` | `fbx`, `gltf-pro` |
+| `/gltf/pbr` | `Gltf` (`Model`), `Gltf.preload` | `@margoengine/gltf/pbr` |
+| `/fbx` | `Fbx`, `Fbx.preload` | `fbx`, `gltf/pbr` |
 | `/animation` | `Animation` clip inside a `Model` | `animation`, `animator` |
 | `/environment` | `Environment`, `AmbientLight`, `HemisphereLight`, `Fog` | `environment` |
 | `/shadows` | `Shadows`, `ContactShadows` | `shadows` |
@@ -80,8 +80,8 @@ Suspense-aware, cached per Canvas, aborted when the last consumer unmounts, disp
 `@margoengine/cache`).
 
 **Lighting and environment:** `Sun`, `AmbientLight`, `HemisphereLight`, `Fog`, `Environment` (HDR/EXR IBL, `exposure`,
-`background`, `rotation`, `blur`), `Shadows` (resolution, distance, lambda, lightSize, bias, normalBias, casterMargin,
-filter, bounds/frustum), `ContactShadows`. IBL, PBR models and shadows need WebGPU.
+`background`, `rotation`, `blur`), `Shadows` (resolution, distance, lambda, lightSize, samples, blockerSamples, focus, bias, normalBias, casterMargin,
+filter, bounds/frustum), `SoftShadows` (drei size, samples, focus), `ContactShadows`. IBL, PBR models and shadows need WebGPU.
 
 **Hooks:** `useFrame((engine, delta) => ...)` (no React render), `useEngine`, `useCamera`, `useMargo`
 (`stage, ready, canvas, camera, size, gl, clock, invalidate`), `useMargoStage` (the portable `EngineKernel` for
@@ -111,7 +111,7 @@ Rapier. `XR`, `Controller`, `useXR`.
   (webpack and Turbopack), Rollup and esbuild, fails on any warning, and fails if the page requests Wasm or an
   optional package.
 - `examples/next` has `app/` (layout, page, scene) and `pages/pages-router.tsx`.
-- Size: a Next.js page is about 194 KB gzip of JavaScript. A page that imports `margoengine/react/gltf-pro`, `/fbx`,
+- Size: a Next.js page is about 194 KB gzip of JavaScript. A page that imports `margoengine/react/gltf`, `/fbx`,
   `/animation` or `/materials` also has the Basis (527,333 B) and Draco (192,420 B) decoders in its build output,
   requested only for a model that needs them. `margoengine/react` alone emits neither.
 
@@ -171,4 +171,4 @@ type-checked from packed tarballs), `modern:test:bundlers`. Guides: `docs/react-
 - WebGPU only for React click events, PBR, IBL, shadows, post; WebGL2 is a basic preview (`engine.pick` needs its `/pick` entry there).
 - `Box`, `Sphere`, `Plane` take a colour or one base colour `map` (PNG or JPEG, WebGPU only, needs `@margoengine/gltf`); other maps need a glTF `Model`.
 - Lowercase JSX tags and `extend()` need `jsxImportSource: '@margoengine/react'` (2026-11-07); `extend` takes React components, not engine classes. Events bubble from the hit mesh through its parents.
-- `Model`, `Fbx`, `Animation` and the `materials` components have their own entries (`margoengine/react/gltf-pro` and so on), so a page without them builds with no Basis or Draco `.wasm`.
+- `Model`, `Fbx`, `Animation` and the `materials` components have their own entries (`margoengine/react/gltf` and so on), so a page without them builds with no Basis or Draco `.wasm`.

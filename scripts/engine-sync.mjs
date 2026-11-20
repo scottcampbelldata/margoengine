@@ -27,9 +27,10 @@ const app = resolve(option('--app') ?? process.cwd());
 const checkOnly = args.includes('--check');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
+/** A refusal the script reports in one line and ends with exit code 1. */
+class SyncError extends Error {}
 function fail(message) {
-  console.error(`engine:sync: ${message}`);
-  process.exit(1);
+  throw new SyncError(message);
 }
 const git = (...parts) =>
   execFileSync('git', ['-C', engine, ...parts], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -102,81 +103,91 @@ export function checkApp(appRoot = app) {
   return problems;
 }
 
-if (checkOnly) {
-  const problems = checkApp();
-  if (problems.length) fail(`\n${problems.join('\n')}`);
-  console.log(
-    `engine:sync --check: ${relative(process.cwd(), app) || '.'} uses engine ${git('rev-parse', '--short', 'HEAD')} from ../margoengine`,
-  );
-  process.exit(0);
+function main() {
+  if (checkOnly) {
+    const problems = checkApp();
+    if (problems.length) fail(`\n${problems.join('\n')}`);
+    console.log(
+      `engine:sync --check: ${relative(process.cwd(), app) || '.'} uses engine ${git('rev-parse', '--short', 'HEAD')} from ../margoengine`,
+    );
+    return;
+  }
+
+  // One preparation at a time per engine checkout because several apps may run hooks together.
+  const lock = join(engine, 'node_modules', '.cache', 'engine-sync.lock');
+  mkdirSync(dirname(lock), { recursive: true });
+  const alive = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return error.code === 'EPERM';
+    }
+  };
+  const started = Date.now();
+  let told = false;
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      writeFileSync(join(lock, 'pid'), String(process.pid));
+      break;
+    } catch {
+      let holder = 0;
+      try {
+        holder = Number(readFileSync(join(lock, 'pid'), 'utf8'));
+      } catch {}
+      if (!holder || !alive(holder)) {
+        if (Date.now() - statSync(lock).mtimeMs > 5_000 || holder) rmSync(lock, { recursive: true, force: true });
+      } else if (Date.now() - started > 5 * 60_000)
+        fail(`another engine:sync (process ${holder}) has held ${lock} for over 5 minutes; wait for it or end it`);
+      else if (!told) {
+        told = true;
+        console.log(`engine:sync: waiting for another engine:sync (process ${holder}) to finish`);
+      }
+      spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},500)']);
+    }
+  }
+  process.on('exit', () => rmSync(lock, { recursive: true, force: true }));
+  try {
+    if (git('status', '--porcelain', '--untracked-files=no'))
+      fail(`${engine} has tracked changes; finish or discard them before preparing app dependencies`);
+    const head = git('rev-parse', 'HEAD');
+    if (!existsSync(join(engine, 'node_modules', 'typescript')))
+      fail(`engine dependencies are missing; run npm ci in ${engine}`);
+    const { all } = packagesOf(app);
+    const stale = all.filter((name) => builtAt(name) !== head);
+    if (stale.length) {
+      console.log(
+        `engine:sync: building engine packages at ${head.slice(0, 8)} (${stale.length} of ${all.length} out of date)`,
+      );
+      const build = spawnSync(npm, ['run', 'build:packages'], {
+        cwd: engine,
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      });
+      if (build.status !== 0) fail('npm run build:packages in the engine failed');
+      const changed = git('status', '--porcelain', '--untracked-files=no');
+      if (changed)
+        fail(
+          `building engine ${head.slice(0, 8)} changed tracked files:\n${changed}\ncommit the generated source changes before preparing the app again`,
+        );
+      for (const name of readdirSync(join(engine, 'packages')))
+        if (existsSync(join(engine, 'packages', name, 'dist'))) writeFileSync(stamp(name), `${head}\n`);
+    }
+    const out = join(app, '.engine');
+    mkdirSync(out, { recursive: true });
+    const record = { engine: 'margoengine', commit: head, packages: all };
+    writeFileSync(join(out, 'manifest.json'), `${JSON.stringify(record, null, 2)}\n`);
+    console.log(`engine:sync: ${relative(dirname(engine), app).split(sep).join('/')} on engine ${head.slice(0, 8)}`);
+  } finally {
+    rmSync(lock, { recursive: true, force: true });
+  }
 }
 
-// One preparation at a time per engine checkout because several apps may run hooks together.
-const lock = join(engine, 'node_modules', '.cache', 'engine-sync.lock');
-mkdirSync(dirname(lock), { recursive: true });
-const alive = (pid) => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === 'EPERM';
-  }
-};
-const started = Date.now();
-let told = false;
-for (;;) {
-  try {
-    mkdirSync(lock);
-    writeFileSync(join(lock, 'pid'), String(process.pid));
-    break;
-  } catch {
-    let holder = 0;
-    try {
-      holder = Number(readFileSync(join(lock, 'pid'), 'utf8'));
-    } catch {}
-    if (!holder || !alive(holder)) {
-      if (Date.now() - statSync(lock).mtimeMs > 5_000 || holder) rmSync(lock, { recursive: true, force: true });
-    } else if (Date.now() - started > 5 * 60_000)
-      fail(`another engine:sync (process ${holder}) has held ${lock} for over 5 minutes; wait for it or end it`);
-    else if (!told) {
-      told = true;
-      console.log(`engine:sync: waiting for another engine:sync (process ${holder}) to finish`);
-    }
-    spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},500)']);
-  }
-}
-process.on('exit', () => rmSync(lock, { recursive: true, force: true }));
 try {
-  if (git('status', '--porcelain', '--untracked-files=no'))
-    fail(`${engine} has tracked changes; finish or discard them before preparing app dependencies`);
-  const head = git('rev-parse', 'HEAD');
-  if (!existsSync(join(engine, 'node_modules', 'typescript')))
-    fail(`engine dependencies are missing; run npm ci in ${engine}`);
-  const { all } = packagesOf(app);
-  const stale = all.filter((name) => builtAt(name) !== head);
-  if (stale.length) {
-    console.log(
-      `engine:sync: building engine packages at ${head.slice(0, 8)} (${stale.length} of ${all.length} out of date)`,
-    );
-    const build = spawnSync(npm, ['run', 'build:packages'], {
-      cwd: engine,
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-    });
-    if (build.status !== 0) fail('npm run build:packages in the engine failed');
-    const changed = git('status', '--porcelain', '--untracked-files=no');
-    if (changed)
-      fail(
-        `building engine ${head.slice(0, 8)} changed tracked files:\n${changed}\ncommit the generated source changes before preparing the app again`,
-      );
-    for (const name of readdirSync(join(engine, 'packages')))
-      if (existsSync(join(engine, 'packages', name, 'dist'))) writeFileSync(stamp(name), `${head}\n`);
-  }
-  const out = join(app, '.engine');
-  mkdirSync(out, { recursive: true });
-  const record = { engine: 'margoengine', commit: head, packages: all };
-  writeFileSync(join(out, 'manifest.json'), `${JSON.stringify(record, null, 2)}\n`);
-  console.log(`engine:sync: ${relative(dirname(engine), app).split(sep).join('/')} on engine ${head.slice(0, 8)}`);
-} finally {
-  rmSync(lock, { recursive: true, force: true });
+  main();
+} catch (error) {
+  if (!(error instanceof SyncError)) throw error;
+  console.error(`engine:sync: ${error.message}`);
+  process.exitCode = 1;
 }

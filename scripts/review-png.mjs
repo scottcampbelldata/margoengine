@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
 import { deflateSync } from 'node:zlib';
 import { margoError } from '../packages/shared/errors.js';
 import { decodePNG } from '../tests/support/png.js';
-import { exitOnHelp } from './support/help.mjs';
+import { showHelp } from './support/help.mjs';
 
 /** The largest file an image-reading tool passes on unchanged: 5 MiB of base64 is 3,932,160 bytes. */
 export const REVIEW_LIMIT = 5 * 1024 * 1024 * 0.75;
@@ -101,8 +101,10 @@ export async function shrinkForReview(bytes, { limit = REVIEW_LIMIT } = {}) {
   return small;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  exitOnHelp('node scripts/review-png.mjs <in.png> [out.png] [--limit=bytes]');
+if (
+  import.meta.url === pathToFileURL(process.argv[1] ?? '').href &&
+  !showHelp('node scripts/review-png.mjs <in.png> [out.png] [--limit=bytes]')
+) {
   const args = process.argv.slice(2),
     limit = Number(args.find((a) => a.startsWith('--limit='))?.slice(8) ?? REVIEW_LIMIT),
     [input, output = `${input}.review.png`] = args.filter((a) => !a.startsWith('--'));

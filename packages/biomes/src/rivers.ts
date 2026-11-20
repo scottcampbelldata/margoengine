@@ -1,7 +1,8 @@
 // Still river and lake water for a BiomeView (entry `@margoengine/biomes/rivers`, loaded only for a view with
 // `water: { rivers }` or `water: { lakes }`): from river centre lines, lake levels and the world's heights, the water
-// surface and the coarse ground `@margoengine/water` stands it on. A river's surface runs a fixed depth above the bed along
-// each line, so it falls with the bed; a lake's is its fill level. The world's terrain hides the water wherever the real
+// surface and the coarse ground `@margoengine/water` stands it on. A river's surface runs along each line over its bed,
+// three quarters of a carved channel's depth (at most 1.5 m) so the banks stand over it, never rising downstream and
+// averaged along the line, so it falls with the bed as one smooth slope; a lake's is its fill level. The world's terrain hides the water wherever the real
 // ground is above it, so the banks draw the edge, not this grid. Our own layout.
 import { rangeError, typeError } from '../../shared/errors.js';
 import type { Hydrology, HydrologyWorld } from './hydrology.js';
@@ -14,6 +15,15 @@ export const RIVER_DEPTH = 1.5;
 const REACH = 48;
 // The most water cells a side: the most `Water` couples to.
 const MOST_CELLS = 512;
+// Half width across a line in which its bed is looked for, and how far each side its banks are, metres.
+const CHANNEL_HALF = 6;
+const BANK_REACH = 24;
+// Samples (half cells) each way the surface is averaged over along a line.
+const SMOOTH = 4;
+// How far each way along a line its course and its channel depth are averaged, metres.
+const SPAN = 32;
+// A channel shallower than this, metres, is open ground: the water stands RIVER_DEPTH over it.
+const MIN_CHANNEL = 0.5;
 
 /** What {@link riverWater} reads. Lengths in metres, except the river lines. */
 export interface RiverWaterSource {
@@ -182,9 +192,11 @@ export interface RiverWater {
 }
 
 /**
- * Builds still river water: a surface {@link RIVER_DEPTH} over the ground along each line, in a corridor around it, and
+ * Builds still river water: a surface over the bed along each line (three quarters of a carved channel's depth under its
+ * lower bank, at most {@link RIVER_DEPTH}; {@link RIVER_DEPTH} over open ground), never rising downstream and averaged
+ * over 9 half cells along the line, in a corridor around it, and
  * the coarse ground it stands on, and with `lakes` each lake cell at its level where that is higher. Cells are the world
- * over at most 512 a side: a 4 km world has 8 m cells, an 8 km world 16 m. Cost on the calling thread: one height per
+ * over at most 512 a side: a 4 km world has 8 m cells, an 8 km world 16 m. Cost on the calling thread: 49 heights per
  * half cell of line and one per cell near it, and with lakes one look-up per cell.
  * @throws TypeError when a line is not an Int32Array of at least two points; RangeError for a bad grid or `bounds`.
  * @example
@@ -230,40 +242,97 @@ export function riverWater(source: RiverWaterSource): RiverWater {
       ground[j * nx + i] = low;
     }
   }
-  const lowest = source.lakes ? ground.slice() : undefined;
-  // Each cell takes the surface of its nearest point along the lines.
+  const lowest = source.lakes ? ground.slice() : undefined,
+    beds = new Float32Array(nx * nz).fill(Number.NaN);
+  // Each line sampled every half cell: the bed (the lowest ground across the line within CHANNEL_HALF, so a line that
+  // cuts a bend's chord still finds the channel) and the lower of its two banks (the highest ground each side within
+  // BANK_REACH). A carved channel (deeper than MIN_CHANNEL) fills to three quarters of its depth, at most RIVER_DEPTH, so
+  // the banks stand over the water; open ground takes RIVER_DEPTH. Then the
+  // surface never rises downstream and is averaged over SMOOTH samples each way, so it is one smooth slope, not steps.
   const step = Math.min(cx, cz) / 2; // float division: half a cell
-  for (const line of lines)
+  for (const line of lines) {
+    const xs: number[] = [],
+      zs: number[] = [];
     for (let k = 0; k + 3 < line.length; k += 2) {
       const ax = line[k] / 1000, // float division: millimetres to metres
         az = line[k + 1] / 1000, // float division
         bx = line[k + 2] / 1000, // float division
         bz = line[k + 3] / 1000, // float division
         count = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / step)); // float division: sample count
-      for (let s = 0; s <= count; s++) {
-        const t = s / count, // float division: along the segment
-          x = ax + (bx - ax) * t,
-          z = az + (bz - az) * t;
-        if (x < x0 || z < z0 || x > x1 || z > z1) continue;
-        const level = heightAt(x, z) + RIVER_DEPTH;
-        if (level <= sea) continue;
-        const i0 = Math.max(0, Math.floor((x - outer - x0) / cx)), // float division: cell index
-          i1 = Math.min(nx - 1, Math.floor((x + outer - x0) / cx)), // float division: cell index
-          j0 = Math.max(0, Math.floor((z - outer - z0) / cz)), // float division: cell index
-          j1 = Math.min(nz - 1, Math.floor((z + outer - z0) / cz)); // float division: cell index
-        for (let j = j0; j <= j1; j++)
-          for (let i = i0; i <= i1; i++) {
-            const dx = x0 + (i + 0.5) * cx - x,
-              dz = z0 + (j + 0.5) * cz - z,
-              d = dx * dx + dz * dz,
-              c = j * nx + i;
-            if (d < nearest[c] && d <= outer * outer) {
-              nearest[c] = d;
-              levels[c] = level;
-            }
-          }
+      for (let s = k ? 1 : 0; s <= count; s++) {
+        const t = s / count; // float division: along the segment
+        xs.push(ax + (bx - ax) * t);
+        zs.push(az + (bz - az) * t);
       }
     }
+    const n = xs.length,
+      span = Math.max(1, Math.ceil(SPAN / step)), // float division: samples
+      bed = new Float64Array(n),
+      channel = new Float64Array(n + 1),
+      raw = new Float64Array(n);
+    // Across the line's course over SPAN each way, so a line of short wandering chords looks straight across its channel.
+    for (let s = 0; s < n; s++) {
+      const a = Math.max(0, s - span),
+        b = Math.min(n - 1, s + span),
+        length = Math.hypot(xs[b] - xs[a], zs[b] - zs[a]) || 1,
+        ux = -(zs[b] - zs[a]) / length, // float division: unit normal
+        uz = (xs[b] - xs[a]) / length; // float division: unit normal
+      let low = Infinity,
+        left = -Infinity,
+        right = -Infinity;
+      for (let o = -BANK_REACH; o <= BANK_REACH; o++) {
+        const h = heightAt(xs[s] + ux * o, zs[s] + uz * o);
+        if (Math.abs(o) <= CHANNEL_HALF && h < low) low = h;
+        if (o < 0 && h > left) left = h;
+        if (o > 0 && h > right) right = h;
+      }
+      bed[s] = low;
+      channel[s + 1] = channel[s] + Math.min(left, right) - low;
+    }
+    for (let s = 0; s < n; s++) {
+      // The channel's depth averaged over SPAN each way (a window even about the sample), so the banks' own bumps do not
+      // move the surface.
+      const half = Math.min(span, s, n - 1 - s),
+        deep = (channel[s + half + 1] - channel[s - half]) / (2 * half + 1); // float division: the running mean
+      raw[s] = bed[s] + (deep > MIN_CHANNEL ? Math.min(RIVER_DEPTH, 0.75 * deep) : RIVER_DEPTH);
+    }
+    // Downstream is the lower end; walk from the upper end and never let the surface climb.
+    const down = n > 1 && raw[n - 1] > raw[0] ? -1 : 1,
+      start = down > 0 ? 0 : n - 1;
+    for (let s = start + down, last = raw[start]; s >= 0 && s < n; s += down) {
+      if (raw[s] > last) raw[s] = last;
+      last = raw[s];
+    }
+    const sum = new Float64Array(n + 1);
+    for (let s = 0; s < n; s++) sum[s + 1] = sum[s] + raw[s];
+    for (let s = 0; s < n; s++) {
+      const x = xs[s],
+        z = zs[s];
+      if (x < x0 || z < z0 || x > x1 || z > z1) continue;
+      // A window even about the sample, narrowed toward the ends, so a steady fall stays exact there.
+      const half = Math.min(SMOOTH, s, n - 1 - s),
+        lo = s - half,
+        hi = s + half,
+        level = (sum[hi + 1] - sum[lo]) / (hi - lo + 1); // float division: the running mean
+      if (level <= sea) continue;
+      const i0 = Math.max(0, Math.floor((x - outer - x0) / cx)), // float division: cell index
+        i1 = Math.min(nx - 1, Math.floor((x + outer - x0) / cx)), // float division: cell index
+        j0 = Math.max(0, Math.floor((z - outer - z0) / cz)), // float division: cell index
+        j1 = Math.min(nz - 1, Math.floor((z + outer - z0) / cz)); // float division: cell index
+      for (let j = j0; j <= j1; j++)
+        for (let i = i0; i <= i1; i++) {
+          const dx = x0 + (i + 0.5) * cx - x,
+            dz = z0 + (j + 0.5) * cz - z,
+            d = dx * dx + dz * dz,
+            c = j * nx + i;
+          if (d < nearest[c] && d <= outer * outer) {
+            nearest[c] = d;
+            levels[c] = level;
+            beds[c] = Math.min(bed[s], level - 0.05);
+          }
+        }
+    }
+  }
   // Under the line the bed, always; out to REACH the ground decides, under a bank that climbs through the surface at REACH,
   // so the waterline is smooth between cells; past it the ring is dry and holds the level.
   for (let j = 0; j < nz; j++)
@@ -278,7 +347,7 @@ export function riverWater(source: RiverWaterSource): RiverWater {
         continue;
       }
       const h = heightAt(x0 + (i + 0.5) * cx, z0 + (j + 0.5) * cz);
-      ground[c] = Math.max(bank, d <= 1.5 * cell ? Math.min(h, level - RIVER_DEPTH) : h);
+      ground[c] = Math.max(bank, d <= 1.5 * cell ? Math.min(h, beds[c]) : h);
     }
   // A lake's surface wins where it is the higher one, over the lowest ground under the cell (no river bank in a lake).
   if (source.lakes && lowest) {
@@ -370,4 +439,59 @@ export function riverWaterOptions(
       made = undefined;
     },
   };
+}
+
+/** What {@link paintRiverbed} reads and writes: a texel rectangle of a view's ground. */
+export interface RiverbedPaint {
+  /** The water surface at world `(x, z)`, or undefined (`RiverWater.fill`). */
+  readonly fill: (x: number, z: number) => number | undefined;
+  /** World XZ of the rectangle's first texel. */
+  readonly origin: readonly [number, number];
+  /** Metres between texels. */
+  readonly texel: number;
+  readonly width: number;
+  readonly depth: number;
+  /**
+   * The world's own ground height at `(x, z)` (`BiomeWorld.heightAt`), read only where `fill` has water: a view's coarse
+   * far heights smooth a narrow channel away, so they cannot say where its water stands.
+   */
+  readonly heightAt: (x: number, z: number) => number;
+  /** Ground weights: 4 materials per texel in each array (material m in array m >> 2, byte m & 3), summing to 255. */
+  readonly weights: readonly Uint8Array[];
+  /** The riverbed material's index. */
+  readonly index: number;
+}
+
+/** How deep, metres, the ground lies under the water where the riverbed material is in full. */
+const WET_FULL = 0.3;
+
+/**
+ * Gives the ground under river and lake water the riverbed material: in full {@link WET_FULL} m under the surface,
+ * fading to none at the waterline, the other materials scaled down so each texel still sums to 255. A terrain's coarse
+ * rings point-sample its heights and cover a narrow channel's water far off; this paints the stream into the ground's
+ * own texels, sampled per pixel, so it stays one line as wide as its water at every distance. Cost: one `fill` per
+ * texel and one `heightAt` per texel under a river's corridor.
+ * @example
+ * paintRiverbed({ fill: river.fill, origin: [x0, z0], texel: 2, width, depth, heightAt: (x, z) => world.heightAt(x, z), weights, index });
+ */
+export function paintRiverbed(paint: RiverbedPaint): void {
+  const { fill, origin, texel, width, depth, heightAt, weights, index } = paint,
+    target = weights[index >> 2];
+  for (let j = 0; j < depth; j++)
+    for (let i = 0; i < width; i++) {
+      const x = origin[0] + i * texel,
+        z = origin[1] + j * texel,
+        level = fill(x, z),
+        under = level === undefined ? 0 : level - heightAt(x, z);
+      if (!(under > 0)) continue;
+      const share = Math.min(255, Math.round((under / WET_FULL) * 255)), // float division: the share of full
+        k = (j * width + i) * 4;
+      let sum = 0;
+      for (const out of weights)
+        for (let c = 0; c < 4; c++) {
+          out[k + c] = Math.floor((out[k + c] * (255 - share)) / 255); // float division: the rest scaled down
+          sum += out[k + c];
+        }
+      target[k + (index & 3)] += 255 - sum;
+    }
 }

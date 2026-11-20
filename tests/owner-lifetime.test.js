@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import { exerciseLifetime, leafEntries, lifecycleCases, LifetimeObserver, sameView, viewState } from './support/owner-lifetime.js';
-import { nodeLifetimeAdapter } from './support/owner-lifetime-node.js';
-import { OWNER_FIXTURES, ownerLeaves, pendingLine, selectOwnerPackages } from '../scripts/support/owner-lifetime-registry.mjs';
+import { nodeLifetimeAdapter, standardShader } from './support/owner-lifetime-node.js';
+import { CPU_LIMIT_MS, OWNER_EXCLUSIONS, OWNER_FIXTURES, cpuRuns, ownerLeaves, pendingLine, selectOwnerPackages } from '../scripts/support/owner-lifetime-registry.mjs';
 import { runOwners } from '../scripts/check-owner-lifetime.mjs';
 
 test('registered package fixtures share every lifetime transition', { timeout: 120000 }, async () => {
@@ -126,20 +127,91 @@ test('listener observation respects duplicate identity, capture, once and AbortS
   } finally { observer.close(); }
 });
 
+test('a second DOM implementation is watched too; detached nodes count only for a fixture that says so', async () => {
+  const { JSDOM } = await import('jsdom');
+  const { window } = new JSDOM('<body></body>'), owner = {}, callback = () => {};
+  const observer = new LifetimeObserver();
+  observer.watchEvents();
+  observer.watchEvents(window.EventTarget.prototype);
+  try {
+    const node = window.document.body.appendChild(window.document.createElement('div'));
+    observer.scope(owner, () => node.addEventListener('click', callback));
+    assert.throws(() => observer.assertReleased(owner), /1: click on HTMLDivElement/);
+    node.remove();
+    assert.throws(() => observer.assertReleased(owner), /leaked event listeners/, 'a removed node still counts by default');
+    observer.detachedNodes = true;
+    observer.assertReleased(owner);
+    window.document.body.append(node);
+    assert.throws(() => observer.assertReleased(owner), /leaked event listeners/, 'a node back in the page counts again');
+    node.removeEventListener('click', callback);
+    observer.assertReleased(owner);
+  } finally { observer.close(); window.close(); }
+});
+
+test("a fixture's app scope owns nothing: its listeners and GPU objects are the application's", { timeout: 10000 }, async () => {
+  const adapter = await nodeLifetimeAdapter(), page = new EventTarget(), callback = () => {};
+  const fixture = { name: 'app-scope', create({ engine, scene, app }) {
+    app(() => page.addEventListener('app', callback));
+    const plugin = { name: 'app-scope', setup() {}, dispose() {} };
+    return { plugin, dispose() { if (scene.plugins.get(plugin.name) === plugin) scene.removePlugin(plugin.name); } };
+  } };
+  const leak = { ...fixture, name: 'owned', create(args) {
+    page.addEventListener('owned', callback);
+    return fixture.create(args);
+  } };
+  try {
+    await exerciseLifetime(fixture, adapter);
+    await assert.rejects(exerciseLifetime(leak, adapter), /leaked event listeners/);
+  } finally { adapter.close(); }
+});
+
 test('packages with no fixture are pending, never passed; held packages are explicit; unknown names throw', () => {
-  assert.deepEqual(selectOwnerPackages(['math', 'cinematic']), { selected: ['cinematic'], pending: ['math'] });
+  // A package with no fixture and no exclusion is pending; the registry here is a stand-in so the test never depends
+  // on which real packages still lack a fixture.
+  assert.deepEqual(selectOwnerPackages(['later', 'cinematic'], { cinematic: 'fixture.js' }, () => true),
+    { selected: ['cinematic'], pending: ['later'] });
   assert.throws(() => selectOwnerPackages(['unknown']), /OWNER_UNKNOWN_PACKAGE: unknown/);
-  assert.deepEqual(selectOwnerPackages(['physics', 'physics2d', 'ragdoll', 'core', 'terrain', 'cinematic']),
-    { selected: ['cinematic'], pending: ['terrain'] });
+  assert.deepEqual(selectOwnerPackages(['physics', 'physics2d', 'ragdoll', 'core', 'math', 'splines', 'cinematic']),
+    { selected: ['cinematic'], pending: [] });
   assert.match(pendingLine(['audio', 'stage']), /pending, no fixture yet, NOT checked \(2\): audio, stage/);
   assert.equal(pendingLine([]), '');
+});
+
+// A full CPU check:owners ran every package in one process under one 120 s limit: the fixtures summed to about 160 s
+// (biomes alone about 90 s), so the run always timed out and read as a hang (2026-11-18). Each package now runs in its
+// own process under its own limit, and a timeout names the case that was running.
+test('check:owners runs the CPU model one package per run, each under its own limit', async () => {
+  const all = Object.keys(OWNER_FIXTURES);
+  const runs = cpuRuns(all);
+  assert.equal(runs.length, all.length);
+  assert.ok(runs.every((run) => run.length === 1));
+  assert.deepEqual(runs.flat(), all);
+  assert.ok(CPU_LIMIT_MS >= 90_000, 'the slowest package (biomes, about 90 s) fits one run');
+  const gate = readFileSync(new URL('../scripts/check-owner-lifetime-gate.mjs', import.meta.url), 'utf8');
+  assert.ok(gate.includes('for (const run of cpuRuns(selected))'), 'the gate runs one CPU process per cpuRuns entry');
+  assert.doesNotMatch(gate, /limitMs: 130000/);
+});
+
+test('check:owners names each case before it runs, so a timeout points at it', { timeout: 120000 }, async () => {
+  const adapter = await nodeLifetimeAdapter();
+  try {
+    const seen = [];
+    const result = await runOwners({ packages: ['cinematic'], adapter, report() {}, onCase: (label) => seen.push(label) });
+    assert.equal(seen.length, result.results.length + result.failures.length);
+    assert.ok(seen.every((label) => /^cinematic\/.+\/(default|secondary)\/[a-z-]+$/.test(label)), seen[0]);
+    const cli = readFileSync(new URL('../scripts/check-owner-lifetime.mjs', import.meta.url), 'utf8');
+    assert.ok(cli.includes('OWNER_LIFETIME_TIMEOUT: ${CPU_LIMIT_MS / 1000} seconds, still in ${running}'));
+  } finally { adapter.close(); }
 });
 
 test('check:owners prints the pending list and runs only registered fixtures', { timeout: 120000 }, async () => {
   const adapter = await nodeLifetimeAdapter();
   try {
-    const result = await runOwners({ packages: ['math', 'cinematic'], adapter, report() {} });
-    assert.deepEqual(result.pending, ['math']);
+    // One real package that still has no fixture and no exclusion, if any is left.
+    const waiting = readdirSync(new URL('../packages', import.meta.url)).sort()
+      .filter((name) => !OWNER_FIXTURES[name] && !OWNER_EXCLUSIONS[name]).slice(0, 1);
+    const result = await runOwners({ packages: [...waiting, 'cinematic'], adapter, report() {} });
+    assert.deepEqual(result.pending, waiting);
     assert.ok(result.results.length > 0 && result.results.every((r) => r.package === 'cinematic'));
   } finally { adapter.close(); }
 });
@@ -205,29 +277,53 @@ test('view state compares numbers by value and objects by identity, cycles inclu
 });
 
 // post's 31 entries took 208 s in one WebGL2 browser leaf on a Radeon 680M, past the leaf's 180 s limit: check:owners
-// now runs a leafPerEntry fixture one leaf per entry, and a leaf runs exactly the entry it names.
+// runs a leafPerEntry fixture one leaf per entry, and a leaf runs exactly the entries it names.
 test('a leafPerEntry fixture gives one leaf per entry; others one leaf for all', async () => {
   const fixtures = async () => [{ name: 'a' }, { name: 'b' }];
   assert.deepEqual(await ownerLeaves({ fixtures }), [undefined]);
-  assert.deepEqual(await ownerLeaves({ fixtures, leafPerEntry: true }), ['a', 'b']);
+  assert.deepEqual(await ownerLeaves({ fixtures, leafPerEntry: true }), [['a'], ['b']]);
   await assert.rejects(ownerLeaves({ leafPerEntry: true, fixtures: async () => [{ name: 'a' }, { name: 'a' }] }),
     /OWNER_ENTRY_TWICE: a/);
   await assert.rejects(ownerLeaves({ leafPerEntry: true, fixtures: async () => [] }), /OWNER_FIXTURE_EMPTY/);
-  const entries = [{ name: 'a' }, { name: 'b' }];
+  const entries = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
   assert.equal(leafEntries(entries), entries);
   assert.deepEqual(leafEntries(entries, 'b'), [entries[1]]);
-  assert.throws(() => leafEntries(entries, 'c'), /OWNER_ENTRY_UNKNOWN: c/);
+  assert.deepEqual(leafEntries(entries, ['c', 'a']), [entries[0], entries[2]]);
+  assert.throws(() => leafEntries(entries, 'd'), /OWNER_ENTRY_UNKNOWN: d/);
+  assert.throws(() => leafEntries(entries, ['a', 'a']), /OWNER_ENTRY_TWICE: a, a/);
+});
+
+// Water's 35 entries ran one leaf each, 70 leaves with the WebGL2 pass, and each leaf started its own dev server and
+// browser and compiled the shared shaders again: check:owners for water alone ran past its 10 minutes on 2026-11-18
+// with every case passing. leafCases packs entries in order into leaves of at most that many cases, every entry in
+// exactly one leaf, and never more than the 208 cases a leaf may hold.
+test('leafCases packs every entry, in order, into leaves of at most that many cases', async () => {
+  const fixtures = async () => ['a', 'b', 'c', 'd', 'e'].map((name) => ({ name }));
+  assert.deepEqual(await ownerLeaves({ fixtures, leafCases: 26 }), [['a', 'b'], ['c', 'd'], ['e']]);
+  assert.deepEqual(await ownerLeaves({ fixtures, leafCases: 13 }), [['a'], ['b'], ['c'], ['d'], ['e']]);
+  assert.deepEqual(await ownerLeaves({ fixtures, leafCases: 208 }), [['a', 'b', 'c', 'd', 'e']]);
+  for (const leafCases of [0, 12, 20, 221, 1.5])
+    await assert.rejects(ownerLeaves({ fixtures, leafCases }), /OWNER_LEAF_CASES/);
+});
+
+test('water runs check:owners in leaves of eight entries, not one leaf per entry', async () => {
+  const module = await import(new URL('../' + OWNER_FIXTURES.water, import.meta.url).href);
+  const names = (await module.fixtures()).map((fixture) => fixture.name), leaves = await ownerLeaves(module);
+  assert.deepEqual(leaves.flat(), names);
+  assert.equal(leaves.length, Math.ceil(names.length / 8));
 });
 
 // culling's 30 entries passed the same limit in one WebGL2 leaf on 2026-11-12; environment's 19 (247 cases) took 137 s
 // idle and passed it under load on 2026-11-13.
-for (const [name, count, sample] of [['post', 31, 'PostStack.attach'], ['culling', 30, 'WebGL2Culling.attach'],
+// post gained HeatHaze with KB-FLAME-HEATHAZE1 (32 entries).
+for (const [name, count, sample] of [['post', 32, 'PostStack.attach'], ['culling', 30, 'WebGL2Culling.attach'],
   ['environment', 19, 'LightProbes']])
   test(`${name} runs check:owners one leaf per entry, every entry named once`, async () => {
     const module = await import(new URL('../' + OWNER_FIXTURES[name], import.meta.url).href);
     const leaves = await ownerLeaves(module);
     assert.equal(leaves.length, count);
-    assert.ok(leaves.includes(sample));
+    assert.ok(leaves.every((leaf) => leaf.length === 1));
+    assert.ok(leaves.flat().includes(sample));
   });
 
 // A fixture that runs in one leaf runs all its cases inside the leaf's 180 s limit. The largest one-leaf fixtures today,
@@ -246,4 +342,24 @@ test('no fixture runs more than 208 owner cases in one browser leaf', async () =
     }
   }
   assert.deepEqual(over, []);
+});
+
+// Plugins (sky, environment, scatter, clustered, toon) anchor on core's `let linear=` line; a stand-in line that
+// differs made sky's PresetScene refuse the CPU model's shader. The CPU model must hand over core's own line.
+test("the CPU model's stand-in shader carries core's own let linear= line", () => {
+  const core = readFileSync(new URL('../packages/core/src/shaders.ts', import.meta.url), 'utf8');
+  const line = (text) => /let linear=[^;]+;/.exec(text)?.[0];
+  assert.ok(line(core), 'core has a let linear= line');
+  assert.equal(line(standardShader), line(core));
+});
+
+// Surface hooks (weather Puddles and Snow, its field's centroid position) anchor on core's fragment signature, its
+// Output struct, its model transform and its o.position line; a stand-in fragment of another shape made them refuse
+// the CPU model's shader as a replaced one.
+test("the CPU model's stand-in shader carries core's fragment signature, Output struct and position lines", () => {
+  const core = readFileSync(new URL('../packages/core/src/shaders.ts', import.meta.url), 'utf8');
+  for (const anchor of [/@fragment fn fragment\(i:Output,[^{]*\{/, /struct Output \{[^}]*\}/, /let p=model\*vec4f\(i\.position,1\);/, /o\.position=p\.xyz;/]) {
+    assert.ok(anchor.exec(core), `core has ${anchor}`);
+    assert.equal(anchor.exec(standardShader)?.[0], anchor.exec(core)[0], `the stand-in carries ${anchor}`);
+  }
 });

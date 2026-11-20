@@ -11,11 +11,14 @@ import { build } from 'vite';
 import { copyLegal } from './package-legal.js';
 import { declarePackageCore } from './core-requirements.mjs';
 import { stripPackageShaderComments } from './shader-comments.mjs';
+import { distDir, tsconfigFor } from './support/dist-dir.mjs';
 
 const name = process.argv[2];
 assert.ok(/^[a-z][a-z0-9-]*$/.test(name ?? ''), 'Expected an optional package name');
 const repository = fileURLToPath(new URL('..', import.meta.url)),
   root = resolve(repository, 'packages', name);
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
 const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'));
 assert.equal(manifest.name, `@margoengine/${name}`);
 // A package may generate sources its bundle embeds (sciviz: the versions of its dependencies) in scripts/prebuild.mjs.
@@ -48,7 +51,7 @@ await build({
   publicDir: false,
   logLevel: 'warn',
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: dist,
     emptyOutDir: true,
     target: 'es2022',
     lib: { entry: entries, formats: ['es'], fileName: (_format, name) => name + '.js' },
@@ -64,7 +67,7 @@ await build({
 await buildWorkers(root);
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 await packageDeclarations(root);

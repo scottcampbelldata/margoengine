@@ -636,11 +636,13 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
 
   dispose(): void {
     if (this.disposed) return;
-    const engine = this.engine;
-    if (engine && !engine.disposed && engine.hasPlugin(this.name)) {
+    const engine = this.engine,
+      // The scene this world is in, not the active one: a world in a second scene is disposed while another is active.
+      scene = engine && !engine.disposed ? engine.sceneOf(this) : undefined;
+    if (scene) {
       // removePlugin calls back into dispose() after unregistering.
       try {
-        engine.removePlugin(this.name);
+        scene.removePlugin(this.name);
         return;
       } catch {
         /* engine is tearing down; free below */

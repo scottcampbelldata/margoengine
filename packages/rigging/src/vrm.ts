@@ -18,6 +18,7 @@ import { GLB_BIN, GLB_JSON, GLB_MAGIC, glbChunks, isGLB } from '../../shared/glb
 import { parseJSON } from '../../shared/json.js';
 import type { HumanoidBone } from './retarget.js';
 import { SpringBones, springAccess, type SpringBonesOptions, type SpringChain } from './springs.js';
+import { PRESETS } from './vrm-presets.js';
 
 /** The expressions the specification names. */
 export type VRMPresetExpression =
@@ -129,7 +130,7 @@ export interface VRMAvatar {
     [field: string]: unknown;
   };
   lookAt?: VRMLookAtData;
-  firstPerson?: { meshAnnotations?: { node: number; type: string }[]; [field: string]: unknown };
+  firstPerson?: { meshAnnotations?: { node: number; type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly' }[]; [field: string]: unknown };
   /** `VRMC_springBone`. */
   springBone?: VRMSpringBoneData;
   [field: string]: unknown;
@@ -170,26 +171,6 @@ export const VRM_REQUIRED_BONES: readonly HumanoidBone[] = [
   'rightHand',
 ];
 
-const PRESETS = new Set<string>([
-  'happy',
-  'angry',
-  'sad',
-  'relaxed',
-  'surprised',
-  'aa',
-  'ih',
-  'ou',
-  'ee',
-  'oh',
-  'blink',
-  'blinkLeft',
-  'blinkRight',
-  'lookUp',
-  'lookDown',
-  'lookLeft',
-  'lookRight',
-  'neutral',
-]);
 const KINDS = {
   overrideMouth: ['aa', 'ih', 'ou', 'ee', 'oh'],
   overrideBlink: ['blink', 'blinkLeft', 'blinkRight'],
@@ -913,14 +894,29 @@ export function addVRM(animation: Animator['animation'], avatar: VRMAvatar, opti
   let remove: (() => void) | null;
   if (animator) remove = animator.addSolver(update);
   else {
-    const plugin: EnginePlugin = { name, setup() {}, onPreUpdate: update };
+    // Removed by its scene (removePlugin, scene or engine disposal), the binding ends with it; a later dispose()
+    // then leaves alone another plugin registered under the same name.
+    const plugin: EnginePlugin = {
+      name,
+      setup() {},
+      onPreUpdate: update,
+      dispose: () => {
+        if (!remove) return;
+        remove = () => {};
+        dispose();
+      },
+    };
     engine.use(plugin);
     // The scene it was attached to, not whichever scene is active when it stops.
-    remove = () => engine.sceneOf(plugin)?.removePlugin(name);
+    remove = () => {
+      const scene = engine.sceneOf(plugin);
+      if (scene?.plugins.get(name) === plugin) scene.removePlugin(name);
+    };
   }
   const stop = (): void => {
-    remove?.();
+    const detach = remove;
     remove = null;
+    detach?.();
     poseSources.clear();
     unsubscribe?.();
     unsubscribe = null;

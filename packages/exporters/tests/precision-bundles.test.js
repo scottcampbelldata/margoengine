@@ -14,8 +14,17 @@ import {
   robloxRuntimePreflight,
   verifyRobloxRuntimeBundle,
 } from '../dist/roblox-runtime.js';
-import { unityPrecisionPreflight, verifyUnityPrecisionBundle } from '../dist/unity-precision.js';
-import { unrealPrecisionPreflight } from '../dist/unreal-precision.js';
+import { joinGLB } from '../dist/glb.js';
+import {
+  createUnityPrecisionBundle,
+  unityPrecisionPreflight,
+  verifyUnityPrecisionBundle,
+} from '../dist/unity-precision.js';
+import {
+  createUnrealPrecisionBundle,
+  unrealPrecisionPreflight,
+  verifyUnrealPrecisionBundle,
+} from '../dist/unreal-precision.js';
 
 const options = { layout: 'objects', transformMode: 'bake', animation: 'static', skin: false, objectAnimation: false };
 const corners = [
@@ -299,5 +308,243 @@ test('a Roblox runtime bundle round-trips through its independent verifier and r
   await assert.rejects(
     verifyRobloxRuntimeBundle(scene, bundle, { ...expected, masterRoundTrips: () => false }),
     /parsed source project including workspace/,
+  );
+  // The verifier applies the writer's basename rules before anything else: a basename ending in a dot is refused.
+  const renamed = (to) => ({
+    ...bundle,
+    files: bundle.files.map((f) => (f.filename.startsWith('Quad-') ? { ...f, filename: to + f.filename.slice(4) } : f)),
+  });
+  await assert.rejects(verifyRobloxRuntimeBundle(scene, renamed('Quad.'), expected), /basename breaks the Roblox/);
+  await assert.rejects(verifyRobloxRuntimeBundle(scene, renamed('Q'.repeat(181)), expected), /basename breaks/);
+  // A lone surrogate has no UTF-8 form and no Luau escape, so the writer refuses it too.
+  await assert.rejects(
+    createRobloxRuntimeBundle({
+      appName: 'Acme',
+      basename: 'Quad\ud800',
+      options: runtimeOptions,
+      scene,
+      inputs: [surface(scene)],
+      images: async () => new Map(),
+      master: runtimeMaster,
+      snapshotSha256: snapshot.sha256,
+    }),
+    TypeError,
+  );
+});
+
+/**
+ * A strip of `n` triangle faces (not quads) over n + 2 shared vertices, all facing +z, and the exact static GLB a
+ * precision writer emits for it, its indices of glTF type `component`.
+ */
+async function stripBundleSource(n = 1, component = 5123, tweak = () => {}) {
+  const scene = quadScene(),
+    count = n + 2,
+    point = (k) => [k, k % 2, 0],
+    uv = (k) => [k / 131072, k % 2];
+  scene.faces = Array.from({ length: n }, (_, i) => {
+    const ids = i % 2 ? [i, i + 1, i + 2] : [i, i + 2, i + 1],
+      at = ids.map(point),
+      tri = [[0, 1, 2]];
+    return {
+      source: {
+        id: 'f' + i,
+        objectId: 'o',
+        materialId: 'm',
+        vertices: ids.map((k) => 'v' + k),
+        colors: [white, white, white],
+      },
+      effectiveUVs: ids.map(uv),
+      localCorners: at,
+      worldCorners: at,
+      outputWorldCorners: at,
+      localTriangles: tri,
+      worldBakedTriangles: tri,
+      localNormal: [0, 0, 1],
+      worldNormal: [0, 0, 1],
+    };
+  });
+  const Index = { 5121: Uint8Array, 5123: Uint16Array, 5125: Uint32Array }[component],
+    indices = Index.from(scene.faces.flatMap((f) => f.source.vertices.map((v) => Number(v.slice(1))))),
+    image = await png(scene.document.assets.img),
+    parts = [
+      new Float32Array(Array.from({ length: count }, (_, k) => point(k)).flat()),
+      new Float32Array(count * 3).map((_, i) => (i % 3 === 2 ? 1 : 0)),
+      new Float32Array(Array.from({ length: count }, (_, k) => uv(k)).flat()),
+      new Float32Array(count * 4).fill(1),
+      indices,
+      image,
+    ].map((p) => new Uint8Array(p.buffer, p.byteOffset, p.byteLength));
+  const views = [];
+  let length = 0;
+  for (const p of parts) {
+    views.push({ buffer: 0, byteOffset: length, byteLength: p.length });
+    length += Math.ceil(p.length / 4) * 4;
+  }
+  const bin = new Uint8Array(length);
+  parts.forEach((p, i) => bin.set(p, views[i].byteOffset));
+  const accessor = (bufferView, componentType, type, extra = {}) => ({
+    bufferView,
+    componentType,
+    count: bufferView === 4 ? indices.length : count,
+    type,
+    ...extra,
+  });
+  const json = {
+    asset: { version: '2.0' },
+    extensionsUsed: ['KHR_materials_unlit'],
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ name: 'Panel', mesh: 0 }],
+    meshes: [
+      {
+        name: 'Panel',
+        primitives: [
+          { attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2, COLOR_0: 3 }, indices: 4, mode: 4, material: 0 },
+        ],
+      },
+    ],
+    materials: [
+      {
+        name: 'Stone',
+        pbrMetallicRoughness: {
+          baseColorFactor: [1, 1, 1, 1],
+          metallicFactor: 0,
+          roughnessFactor: 1,
+          baseColorTexture: { index: 0 },
+        },
+        doubleSided: true,
+        extensions: { KHR_materials_unlit: {} },
+      },
+    ],
+    textures: [{ source: 0, sampler: 0 }],
+    images: [{ bufferView: 5, mimeType: 'image/png', name: 'atlas' }],
+    samplers: [{ magFilter: 9728, minFilter: 9728, wrapS: 33071, wrapT: 33071 }],
+    accessors: [
+      accessor(0, 5126, 'VEC3', { min: [0, 0, 0], max: [count - 1, 1, 0] }),
+      accessor(1, 5126, 'VEC3'),
+      accessor(2, 5126, 'VEC2'),
+      accessor(3, 5126, 'VEC4'),
+      accessor(4, component, 'SCALAR'),
+    ],
+    bufferViews: views,
+    buffers: [{ byteLength: length }],
+  };
+  tweak(json, scene);
+  return { scene, glb: joinGLB({ json, bin }) };
+}
+
+/** Creates and verifies the Unity and Unreal bundles of a strip; resolves with both verifications. */
+async function verifyStrip(n, component, tweak) {
+  const { scene, glb } = await stripBundleSource(n, component, tweak),
+    preserve = { ...options, transformMode: 'preserve' },
+    unity = { appName: 'Acme', extension: 'acmeunity', master, snapshot },
+    unityBundle = await createUnityPrecisionBundle({ ...unity, basename: 'Tri', options: preserve, scene, glb });
+  const helper = {
+      materialName: 'AcmeUnlit',
+      validateMaster: 'def validate_master(project, manifest):\n    return project\n',
+      atlasPayload: 'def atlas_payload(manifest, master, source_sha):\n    return source_sha\n',
+      checkMasterAtlas: '    pass\n',
+    },
+    unreal = {
+      appName: 'Acme',
+      extension: 'acmeunreal',
+      master: { ...master, role: 'original-full-source-project' },
+      snapshot,
+      helper,
+    },
+    unrealBundle = await createUnrealPrecisionBundle({
+      ...unreal,
+      basename: 'Tri',
+      options: preserve,
+      scene,
+      glb,
+      nodeIndices: () => [0],
+    });
+  return Promise.allSettled([
+    verifyUnityPrecisionBundle(scene, unityBundle, unity),
+    verifyUnrealPrecisionBundle(scene, unrealBundle, { ...unreal, checks, assertReproduces: () => {} }),
+  ]);
+}
+
+test('Unity and Unreal precision bundles verify a face that is one triangle, not two', async () => {
+  for (const result of await verifyStrip(1, 5123)) {
+    assert.equal(result.status, 'fulfilled', String(result.reason));
+    assert.deepEqual([result.value.triangles, result.value.meshes], [1, 1]);
+  }
+});
+
+test('Unity and Unreal precision verifiers refuse a restart index and take 65,536 vertices on 32-bit indices', async () => {
+  // glTF 2.0 3.7.2.1: an index may not be its type's maximum (255, 65535); a 32-bit list may address 65,536 vertices.
+  for (const [n, component] of [
+    [254, 5121],
+    [65534, 5123],
+  ])
+    for (const result of await verifyStrip(n, component)) {
+      assert.equal(result.status, 'rejected', `${n} triangles, type ${component}`);
+      assert.match(String(result.reason), /physical references\/wide indices/);
+    }
+  for (const result of await verifyStrip(65534, 5125)) {
+    assert.equal(result.status, 'fulfilled', String(result.reason));
+    assert.equal(result.value.triangles, 65534);
+  }
+});
+
+test('the emitted triangle normal check is relative to edge length and refuses only collinear corners', async () => {
+  const { emittedTriangleNormal } = await import('../dist/precision-shared.js');
+  // 1e-5 m edges: twice the area is 1e-10 m^2, which the old absolute bound (< 1e-10) refused.
+  const tiny = [
+    [0, 0, 0],
+    [1e-5, 0, 0],
+    [0, 1e-5, 0],
+  ];
+  assert.deepEqual(emittedTriangleNormal(tiny, 'tiny'), [0, 0, 1]);
+  assert.deepEqual(emittedTriangleNormal([tiny[0], tiny[2], tiny[1]], 'flipped'), [0, 0, -1]);
+  assert.throws(
+    () =>
+      emittedTriangleNormal(
+        [
+          [0, 0, 0],
+          [1, 1, 1],
+          [2, 2, 2],
+        ],
+        'line',
+      ),
+    /line has a degenerate triangle/,
+  );
+  assert.throws(() => emittedTriangleNormal([tiny[0], tiny[0], tiny[1]], 'repeat'), /degenerate/);
+  assert.throws(() => emittedTriangleNormal([tiny[0], tiny[1], [0, NaN, 0]], 'nan'), /nonfinite world corners/);
+});
+
+test('Unity and Unreal precision verifiers refuse a byteStride on an index view (glTF 2.0 3.6.1.1)', async () => {
+  const results = await verifyStrip(1, 5123, (json) => {
+    json.bufferViews[4].byteStride = 4;
+  });
+  for (const result of results) {
+    assert.equal(result.status, 'rejected');
+    assert.ok(result.reason instanceof RangeError, String(result.reason));
+    assert.match(String(result.reason), /accessor representation/);
+  }
+});
+
+test('the Unreal verifier refuses a GLB without samplers with its RangeError, not a TypeError', async () => {
+  const [, unreal] = await verifyStrip(1, 5123, (json) => {
+    delete json.samplers;
+    delete json.textures[0].sampler;
+  });
+  assert.equal(unreal.status, 'rejected');
+  assert.ok(unreal.reason instanceof RangeError, String(unreal.reason));
+});
+
+test('the Unreal preflight refuses a rotation off unit length, and a face naming a missing material', () => {
+  const preserve = { ...options, transformMode: 'preserve' },
+    turned = quadScene();
+  turned.objects[0].transform.rotation = [0, 0, 0, 1.5];
+  assert.ok(
+    unrealPrecisionPreflight(turned, preserve, checks).some((d) => d.code === 'UNREAL_PRECISION_TRANSFORM_PRECISION'),
+  );
+  const missing = quadScene();
+  missing.faces[0].source.materialId = 'gone';
+  assert.ok(
+    unrealPrecisionPreflight(missing, preserve, checks).some((d) => d.code === 'UNREAL_PRECISION_MATERIAL_MISSING'),
   );
 });

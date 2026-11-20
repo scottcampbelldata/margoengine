@@ -39,7 +39,7 @@ audio and navigation steps below go further than the demo does.
   them into your app, or work inside the repository's examples. Once published, a game like this one installs:
 
 ```sh
-npm install @margoengine/core @margoengine/gltf-pro @margoengine/animation @margoengine/animator \
+npm install @margoengine/core @margoengine/gltf/pbr @margoengine/animation @margoengine/animator \
   @margoengine/input @margoengine/physics @margoengine/bvh @margoengine/cinematic \
   @margoengine/audio @margoengine/sky @margoengine/water @margoengine/shadows @margoengine/post @margoengine/quality
 ```
@@ -58,8 +58,8 @@ Use **File > Export > glTF 2.0 (.glb/.gltf)** with these settings:
 | Include > Data > Custom Properties | On | Writes object custom properties to glTF `extras` (next section). Off by default. |
 | Include > Data > Punctual Lights | On if you place lamps | Point and spot lamps arrive as `model.lights`; `model.clusteredLights()` feeds `@margoengine/clustered`. |
 | Transform > +Y Up | On (the default) | Margo is Y-up, in meters. |
-| Data > Mesh > Apply Modifiers | On | gltf-pro reads triangles only; modifiers are not evaluated at runtime. |
-| Data > Mesh > UVs, Normals, Tangents | On | Materials may use two UV maps (gltf-pro rejects texture coordinate sets beyond the second). Without tangents gltf-pro derives a tangent frame. |
+| Data > Mesh > Apply Modifiers | On | gltf/pbr reads triangles only; modifiers are not evaluated at runtime. |
+| Data > Mesh > UVs, Normals, Tangents | On | Materials may use two UV maps (gltf/pbr rejects texture coordinate sets beyond the second). Without tangents gltf/pbr derives a tangent frame. |
 | Material > Materials | Export | Principled BSDF maps to glTF metallic-roughness. Procedural node textures do not export: bake them to images. |
 | Animation | On, mode Actions | Each Action becomes a clip, by name. Push or stash every Action on the armature so the exporter finds it. |
 | Animation > Shape Keys, Skinning | On | Morph targets and skins. Leave the skinning option **Include All Bone Influences** off: the animation package takes four influences per vertex and rejects more. |
@@ -71,7 +71,7 @@ Before exporting:
   transforms and the triangles you read back for colliders and navmeshes are already in world space. Apply the
   character's scale before skinning it.
 - Keep the character's origin at its feet and facing -Y in Blender (glTF +Z after export).
-- One file for the level, one per character. A level file must contain at least one mesh: gltf-pro rejects a file
+- One file for the level, one per character. A level file must contain at least one mesh: gltf/pbr rejects a file
   with only empties ("glTF contains no renderable meshes").
 
 `@margoengine/blender` is a different path: a Blender add-on that writes `.margo` files, which load without glTF
@@ -94,7 +94,7 @@ node order, with a copy of its world matrix:
 
 ```ts
 import {box, PbrMaterial} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 const level = await loadGLTF(engine, '/assets/level.glb');
 let playerStart: [number, number, number] = [0, 0, 0];
@@ -122,7 +122,7 @@ for (const {extras, matrix, node} of level.extras()) {
 - `.margo` files from `@margoengine/blender` go through the same method: their properties are under
   `extras.margo.properties`.
 
-The test `packages/gltf-pro/tests/extras.test.js` builds a GLB in this shape (an empty under a parent empty, a
+The test `packages/gltf/test/extras.test.js` builds a GLB in this shape (an empty under a parent empty, a
 non-object `extras`, mesh and material extras) and checks what `extras()` returns.
 
 ## Start the engine
@@ -153,8 +153,8 @@ maximum 100,000. `engine.dispose()` disposes every attached plugin and model.
 accessor decoding, vertex packing and image decoding to a worker and returns the same model:
 
 ```ts
-import {loadGLTF} from '@margoengine/gltf-pro';
-import {loadGLTFInWorker} from '@margoengine/gltf-pro/worker';
+import {loadGLTF} from '@margoengine/gltf/pbr';
+import {loadGLTFInWorker} from '@margoengine/gltf/worker';
 import {engineRuntime} from '@margoengine/core/extension';
 import {DracoDecoder, KTX2Decoder, MeshoptDecoder} from '@margoengine/decoders';
 
@@ -184,7 +184,7 @@ with no configuration. `Physics.load()` fetches and compiles it once:
 
 ```ts
 import {Physics} from '@margoengine/physics';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 await Physics.load();
 const physics = Physics.attach(engine); // fixed 1/60 s steps, meshes interpolated between them
@@ -233,7 +233,7 @@ physics.on('intersectionstart', ({meshA, meshB}) => {
 and two-bone foot IK on top of it. Clip names are your Blender Action names.
 
 ```ts
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {Animation} from '@margoengine/animation';
 import {Animator} from '@margoengine/animator';
 import {Physics} from '@margoengine/physics';
@@ -337,7 +337,7 @@ input.rumble(120, 0.5); // resolves false when the gamepad has no actuator
 
 ```ts
 import {Cinematic} from '@margoengine/cinematic';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {Raycaster} from '@margoengine/bvh';
 
 const level = await loadGLTF(engine, '/assets/level.glb');
@@ -372,7 +372,7 @@ per primitive. Combined with `extras()` it tells you which Blender object was cl
 
 ```ts
 import {Raycaster, computePrimitiveBVHAsync} from '@margoengine/bvh';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 const level = await loadGLTF(engine, '/assets/level.glb');
 // Build the BVHs in a worker after loading so the first click does not stall.
@@ -406,7 +406,7 @@ With physics attached, `physics.raycast` answers the same question from the coll
 ```ts
 import {Navigation} from '@margoengine/navmesh/build';
 import {worldTriangles} from '@margoengine/bvh';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 const level = await loadGLTF(engine, '/assets/level.glb');
 const {vertices, indices} = worldTriangles(engine, [level]); // every node transform applied, merged
@@ -460,7 +460,7 @@ a mesh:
 
 ```ts
 import {AudioListener, Audio, PositionalAudio} from '@margoengine/audio';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 
 const level = await loadGLTF(engine, '/assets/level.glb');
 const hero = await loadGLTF(engine, '/assets/hero.glb');
@@ -493,7 +493,7 @@ that also drives the sun light and ambient, distance fog, ocean water that refle
 cascaded soft shadows, and bloom.
 
 ```ts
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {Sky} from '@margoengine/sky/base';
 import {bruneton} from '@margoengine/sky/bruneton';
 import {clouds} from '@margoengine/sky/clouds';
@@ -560,7 +560,7 @@ void water;
 - **Volumetric fog and light shafts are coming**; they have not merged. Use sky's distance fog or environment's
   `Fog` (including height fog) today.
 - A glTF material with every lighting package attached (physical material + shadows + IBL + local shadows) uses all
-  16 texture slots WebGPU guarantees per shader stage; gltf-pro throws a `RangeError` naming the combination if a
+  16 texture slots WebGPU guarantees per shader stage; gltf/pbr throws a `RangeError` naming the combination if a
   further texture would exceed the device limit ([limits](../limits.md)).
 
 ## Quality tiers
@@ -603,7 +603,7 @@ Margo is a rendering engine plus optional building blocks, not a game engine wit
   doors, checkpoints and scripted events is yours. `@margoengine/fsm` (a small state machine) and
   `@margoengine/tween` help.
 - **Save state.** No save system: serialize your own game state (`localStorage`, IndexedDB or a server).
-- **Networking.** `@margoengine/net` interpolates received snapshots (position, rotation, velocity) with capped dead
+- **Networking.** `@margoengine/netcode/interpolation` interpolates received snapshots (position, rotation, velocity) with capped dead
   reckoning; the transport, authority, prediction, lobbies and servers are yours.
 - **No visual editor.** Blender plus code is the workflow: change the level in Blender, re-export, reload.
   `@margoengine/inspector` shows the entity hierarchy and edits transforms while the game runs, as a debugging aid;
@@ -626,7 +626,7 @@ laptop with an Intel Arc 140V integrated GPU, Edge 155, on AC power.
 | Island demo, full tier (4x MSAA) on the same laptop | 45-53 FPS (100k), 40-44 FPS (1M): below 60, which is why the light tier exists | same file |
 | Loading a generated 41 MB GLB (1.28M triangles) while rendering | longest main-thread task 222 ms with `loadGLTF`, 0 ms with `loadGLTFInWorker`; load time 0.60 s vs 0.68 s | [workers.json](../../examples/package-benchmarks/results/workers.json) (`examples/package-benchmarks/workers/run.mjs`) |
 | Screen-space reflections, worst case (glossy floor filling the view) | 2.3 ms GPU at 1280x720 4x MSAA, 5.8 ms at 1920x1080 4x | [ssr-gpu.json](../../examples/package-benchmarks/results/ssr-gpu.json) |
-| Package entries this game imports (min + gzip, each alone; Rapier not included) | gltf-pro 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
+| Package entries this game imports (min + gzip, each alone; Rapier not included) | gltf/pbr 16.9 kB, animation 5.0, animator 3.9, input 2.3, physics 8.2, bvh 13.6, cinematic 1.5, audio 6.3, sky base + bruneton + clouds + fog + reflection + lighting 11.7, water 13.9, shadows 6.4, Bloom 4.9, quality 1.3 | [entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json) (`examples/package-benchmarks/entry-sizes.mjs`) |
 
 | Rapier itself, as `@margoengine/physics` ships it (`@dimforge/rapier3d` 0.21.0) | `rapier3d.wasm` 1,176,707 bytes gzip (3,082,103 raw) plus the `rapier-solver` chunk 42,407 gzip (270,338 raw); until 2026-11-10 one `rapier3d-compat` module with the Wasm inlined, 1,645,573 gzip (4,340,292 raw) | the sizes page ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json), `lazyFiles` and `splits`); the old module in [walk-size.json](../../examples/package-benchmarks/results/walk-size.json) |
 

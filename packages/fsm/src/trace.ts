@@ -125,8 +125,9 @@ function check<C>(machine: StateMachine<C>, value: MachineSnapshot, where: strin
   for (const [index, at] of value.waits ?? [])
     if (machine.transitions[index]?.after === undefined || !time(at) || at > value.clock)
       fail(`bad wait for transition ${index}`);
+  // A name that is not a state is never on the path of a known child, so the path test refuses it too.
   for (const [name, child] of value.memory)
-    if (!known(machine, name) || !known(machine, child) || !pathOf(machine, child).includes(name) || name === child)
+    if (!known(machine, child) || !pathOf(machine, child).includes(name) || name === child)
       fail(`${name} cannot remember ${child}`);
   const holders = held(machine);
   if (holders.length !== value.regions.length) fail('it holds other regions than this machine');

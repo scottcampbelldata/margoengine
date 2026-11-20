@@ -55,7 +55,7 @@
       "elapsedSeconds": 10.46408200263977,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-134",
         "--",
@@ -68,7 +68,7 @@
       "elapsedSeconds": 3.944901943206787,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-134",
         "--",
@@ -81,7 +81,7 @@
       "elapsedSeconds": 2.2667510509490967,
       "command": [
         "node",
-        "scripts/gpu-lock.mjs",
+        "the command runner",
         "run",
         "--owner=codex-134",
         "--",

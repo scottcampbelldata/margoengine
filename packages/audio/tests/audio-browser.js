@@ -78,10 +78,10 @@ function rms(rendered) {
     return Math.sqrt(total / (data.length - start));
   });
 }
-async function renderPositional({ buffer, seconds = 0.25, position, direction, options }) {
+async function renderPositional({ buffer, seconds = 0.25, position, direction, options, forward = [0, 0, -1] }) {
   const context = new OfflineAudioContext(2, Math.round(seconds * rate), rate);
   const listener = new AudioListener({ context, autoResume: false });
-  listener.setPose([0, 0, 0], [0, 0, -1]);
+  listener.setPose([0, 0, 0], forward);
   const audio = new PositionalAudio(listener, options);
   if (direction) audio.setDirection(direction);
   audio.setPosition(...position);
@@ -111,8 +111,12 @@ function wav(samples, sampleRate) {
   return new Blob([bytes], { type: 'audio/wav' });
 }
 
+// Mid-render reads and changes need OfflineAudioContext.suspend(time), which Firefox 157 does not implement. Where it
+// is missing those checks are named in `notRun`; the runner fails if a browser that has it reports any.
+window.offlinePause = () => typeof OfflineAudioContext.prototype.suspend === 'function';
 window.runOfflineTests = async () => {
   const checks = [],
+    notRun = [],
     measurements = {};
   // Left/right: a source on the listener's right (+X when facing -Z) is louder in the right channel.
   for (const panningModel of ['HRTF', 'equalpower']) {
@@ -123,6 +127,19 @@ window.runOfflineTests = async () => {
     assert(left[0] > left[1] * 2, `${panningModel}: source on the left is not louder on the left ${left}`);
   }
   checks.push('HRTF and equal-power: a source on the right is louder in the right channel (and mirrored)');
+
+  // Looking straight down with the default up +Y (a top view, or a mesh followed along its up axis): the listener
+  // turns up to [0, 0, -1], so +X is still on the right. Before, it passed up = -forward and Web Audio had no right
+  // axis, so the source sat in the middle (equal channels).
+  {
+    const options = { panningModel: 'equalpower' },
+      forward = [0, -1, 0];
+    const right = await renderPositional({ buffer: noise, position: [3, -1, 0], options, forward });
+    const left = await renderPositional({ buffer: noise, position: [-3, -1, 0], options, forward });
+    measurements.topView = { right, left };
+    assert(right[1] > right[0] * 2 && left[0] > left[1] * 2, `Top view: left/right lost ${JSON.stringify(measurements.topView)}`);
+  }
+  checks.push('Looking straight down with up +Y keeps a right axis: +X stays on the right');
 
   // Distance attenuation per model, relative to the gain at refDistance.
   measurements.distance = {};
@@ -196,7 +213,8 @@ window.runOfflineTests = async () => {
   checks.push('The cone reduces gain behind the source to coneOuterGain and interpolates between the cones');
 
   // Analyser on a 1 kHz tone, read mid-render through OfflineAudioContext.suspend.
-  {
+  if (!window.offlinePause()) notRun.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
+  else {
     const context = new OfflineAudioContext(2, rate / 2, rate),
       listener = new AudioListener({ context, autoResume: false });
     const audio = new Audio(listener),
@@ -220,7 +238,7 @@ window.runOfflineTests = async () => {
       `Analyser data ${JSON.stringify(reading)}`,
     );
   }
-  checks.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
+  if (window.offlinePause()) checks.push('Analyser reports the dominant frequency, a nonzero average and the waveform peak');
 
   // Offset, duration and loop points render where expected (a ramp buffer encodes the read position).
   {
@@ -239,6 +257,17 @@ window.runOfflineTests = async () => {
       near(out[0], 0.55, 1e-3) && near(out[Math.round(0.07 * rate)], 0.52, 2e-3),
       `Loop points ${out[0]} ${out[Math.round(0.07 * rate)]}`,
     );
+    // loopEnd 0 means the buffer end even with a loopStart: a quarter-second ramp looping from 0.1 s reads 0.13 at
+    // 0.28 s (0.1 + 0.18 mod 0.15). A node handed loopEnd 0 loops the whole buffer and read 0.03 there.
+    const contextEnd = new OfflineAudioContext(1, seconds * rate, rate),
+      listenerEnd = new AudioListener({ context: contextEnd, autoResume: false }),
+      short = contextEnd.createBuffer(1, rate / 4, rate);
+    short.getChannelData(0).forEach((_, i, data) => {
+      data[i] = i / rate;
+    });
+    new Audio(listenerEnd, { loop: true, loopStart: 0.1 }).setBuffer(short).play();
+    const outEnd = (await contextEnd.startRendering()).getChannelData(0);
+    assert(near(outEnd[Math.round(0.28 * rate)], 0.13, 2e-3), `Loop start with loopEnd 0 ${outEnd[Math.round(0.28 * rate)]}`);
     const context2 = new OfflineAudioContext(1, seconds * rate, rate),
       listener2 = new AudioListener({ context: context2, autoResume: false });
     let ended = 0;
@@ -251,6 +280,7 @@ window.runOfflineTests = async () => {
     );
     // Seeking while playing: one source reads on from the new position (two would sum), and seeking past the end of
     // a non-looping buffer ends it. Suspend times sit on render-quantum boundaries.
+    if (window.offlinePause()) {
     const context3 = new OfflineAudioContext(1, seconds * rate, rate),
       listener3 = new AudioListener({ context: context3, autoResume: false }),
       first = (128 * 20) / rate,
@@ -272,9 +302,10 @@ window.runOfflineTests = async () => {
       near(at(0.03), 0.03, 1e-3) && near(at(0.1), 0.8 + 0.1 - first, 1e-3) && at(0.2) === 0 && ended3 === 1,
       `Seek ${at(0.03)} ${at(0.1)} ${at(0.2)} ended=${ended3}`,
     );
+    }
   }
-  checks.push('Offset, duration and loop points select the right samples; onEnded fires at the natural end');
-  checks.push('Seeking while playing reads on from the new position on one source; past the end it ends');
+  checks.push('Offset, duration and loop points select the right samples (loopEnd 0 keeps loopStart); onEnded fires at the natural end');
+  (window.offlinePause() ? checks : notRun).push('Seeking while playing reads on from the new position on one source; past the end it ends');
 
   // Fade-in ramp from silence.
   {
@@ -327,7 +358,7 @@ window.runOfflineTests = async () => {
   checks.push(
     'AudioVoicePool: overlapping plays sound on separate voices at their own positions and per-play volumes (samples within 0.002); a play past the voice count steals the oldest voice; playbackRate 2 halves the length',
   );
-  return { checks, measurements };
+  return { checks, notRun, measurements };
 };
 
 window.runEngineTests = async () => {
@@ -342,6 +373,23 @@ window.runEngineTests = async () => {
   const context = listener.context;
   if (context.state !== 'running') await listener.resume();
   assert(context.state === 'running', `Context state ${context.state}`);
+  // Firefox 157's AudioListener has no position, forward or up AudioParams, only setPosition and setOrientation, which
+  // the listener then calls; record what it passes there, as nothing reads those back.
+  const l = context.listener,
+    written = {};
+  if (!l.positionX) {
+    const setPosition = l.setPosition.bind(l),
+      setOrientation = l.setOrientation.bind(l);
+    l.setPosition = (...v) => {
+      written.position = v;
+      setPosition(...v);
+    };
+    l.setOrientation = (...v) => {
+      written.forward = v.slice(0, 3);
+      written.up = v.slice(3);
+      setOrientation(...v);
+    };
+  }
   const mesh = engine
     .createMesh()
     .setGeometry(box())
@@ -352,12 +400,11 @@ window.runEngineTests = async () => {
   audio.source.start();
   const analyser = new AudioAnalyser(audio, 256);
   engine.render();
-  const l = context.listener;
-  const read = () => ({
+  const read = () => l.positionX ? ({
     position: [l.positionX.value, l.positionY.value, l.positionZ.value],
     forward: [l.forwardX.value, l.forwardY.value, l.forwardZ.value],
     up: [l.upX.value, l.upY.value, l.upZ.value],
-  });
+  }) : { ...written };
   await sleep(60);
   let pose = read();
   assert(

@@ -49,7 +49,9 @@ class DataChannelConnection implements Connection {
         if (!(event.data instanceof ArrayBuffer)) return this.close(CloseCode.protocol, 'text message');
         this.onmessage?.(new Uint8Array(event.data), kind);
       });
-      channel.addEventListener('close', () => this.finish(CloseCode.normal, 'data channel closed'));
+      // Either channel closing ends the connection, and the other channel is closed with it, so neither end is left
+      // holding a half-open pair (a closed unreliable channel would otherwise leave the reliable one open).
+      channel.addEventListener('close', () => this.close(CloseCode.normal, 'data channel closed'));
     }
   }
   get open(): boolean {

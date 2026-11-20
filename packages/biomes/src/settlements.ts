@@ -11,11 +11,52 @@
 // Road Networks", Computer Graphics Forum (Pacific Graphics) 2011; A* search, Hart, Nilsson and Raphael, IEEE
 // Transactions on Systems Science and Cybernetics, 1968; Prim's spanning tree, Bell System Technical Journal, 1957;
 // line simplification, Douglas and Peucker, The Canadian Cartographer, 1973; houses facing a street in lots along it,
-// as in Parish and Muller, "Procedural Modeling of Cities", SIGGRAPH 2001. Our own layout from those descriptions.
+// as in Parish and Muller, "Procedural Modeling of Cities", SIGGRAPH 2001, which also gives the `'grid'` pattern: blocks
+// between straight streets cut into lots that face the street beside them. Our own layout from those descriptions.
 import { rangeError, typeError } from '../../shared/errors.js';
 import { hash2, hash3, sincos, TURN } from '@margoengine/biomes/toolkit';
 import { pathExclusions, type PathOptions } from '@margoengine/biomes/splines';
 import type { Exclusion } from './placement.js';
+import { imod } from './fixed.js';
+
+/** Whether (x, z) is inside an `avoid` shape: within half a line's width plus its verge, or inside a polygon or its verge. */
+function avoided(avoid: readonly Exclusion[], x: number, z: number): boolean {
+  for (const e of avoid) {
+    const pts = e.points,
+      reach = (e.kind === 'line' ? e.width / 2 : 0) + (e.verge ?? 0); // float division: half the width
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [ax, az] = pts[j],
+        [bx, bz] = pts[i];
+      if (e.kind === 'line' && i === 0) continue;
+      const dx = bx - ax,
+        dz = bz - az,
+        len = dx * dx + dz * dz,
+        t = len > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len)) : 0; // float division: projection
+      if ((x - ax - t * dx) ** 2 + (z - az - t * dz) ** 2 <= reach * reach) return true;
+      if (e.kind === 'polygon' && bz > z !== az > z && x < ax + ((z - az) * dx) / dz) inside = !inside; // float division: crossing
+    }
+    if (inside) return true;
+  }
+  return false;
+}
+
+/** The centre, corners and edge midpoints of a footprint from its corners. */
+function footprint(corners: readonly (readonly [number, number])[]): [number, number][] {
+  const out: [number, number][] = [],
+    n = corners.length;
+  let cx = 0,
+    cz = 0;
+  for (let i = 0; i < n; i++) {
+    const a = corners[i],
+      b = corners[imod(i + 1, n)];
+    out.push([a[0], a[1]], [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); // float division: midpoint
+    cx += a[0] / n; // float division: centre
+    cz += a[1] / n; // float division: centre
+  }
+  out.push([cx, cz]);
+  return out;
+}
 
 /** What {@link layoutSettlements} reads of a world. A `BiomeWorld` is one. */
 export interface SettlementWorld {
@@ -60,6 +101,44 @@ export interface SettlementOptions {
   readonly lane?: Omit<PathOptions, 'points'>;
   /** Yard kept clear around each house in metres, 0..100 (its exclusion verge). Default 4. */
   readonly yard?: number;
+  /**
+   * `'lanes'` runs a few lanes out of each village centre with houses on both sides; `'grid'` lays blocks of lots
+   * between straight streets, a main street running to the quay and cross streets along the shore. Default `'lanes'`.
+   */
+  readonly pattern?: 'lanes' | 'grid';
+  /** Settings of the `'grid'` pattern (ignored by `'lanes'`). */
+  readonly grid?: GridOptions;
+  /**
+   * Levels the ground under each house: one carve path a house (`Settlements.pads`, also in `paths`), and each house's
+   * `floor` becomes the level of its pad. Default true for the `'grid'` pattern, false for `'lanes'` (its bytes stay).
+   */
+  readonly pads?: boolean;
+  /** A driveway path a house, from its front to its street (`Settlements.drives`, also in `paths`). Default as `pads`. */
+  readonly drives?: boolean;
+  /** Path settings of the driveways (`points` aside). Default width 3, edge 1, polyline, mask `'roads'`. */
+  readonly drive?: Omit<PathOptions, 'points'>;
+  /**
+   * Shapes no house may touch (a rail line, a creek, a mine yard; `pathExclusions(paths)` gives them for paths): a house
+   * whose footprint (its centre, corners and edge midpoints) falls inside one, or within its width and verge of a line,
+   * is not built. Streets may cross them. Default none.
+   */
+  readonly avoid?: readonly Exclusion[];
+}
+
+/** Settings of the `'grid'` pattern of {@link layoutSettlements}. Every one has a default. */
+export interface GridOptions {
+  /** A block's size `[along the shore, toward the water]` in metres, each 8..400. Default `[56, 36]`. */
+  readonly block?: readonly [number, number];
+  /** Street width in metres between blocks, 2..40. Default 8. `lane.width` is the drawn width and defaults to it. */
+  readonly street?: number;
+  /** Lot frontage in metres, 8..60 (a block holds a whole number of lots, so lots come out near this). Default 14. */
+  readonly lot?: number;
+  /** Metres from a house front to its street edge, 0..30. Default 4. */
+  readonly setback?: number;
+  /** Direction `[x, z]` the main street runs (to the quay). Default toward the nearest sea, else the nearest river. */
+  readonly toward?: readonly [number, number];
+  /** Metres over sea level that lots and streets keep, 0..1,000. Default 0 (dry land). */
+  readonly above?: number;
 }
 
 /** A house: a rectangle facing its lane. */
@@ -74,6 +153,10 @@ export interface House {
   readonly floor: number;
   /** The four corners `[x, z]` in metres, counter-clockwise seen from above. */
   readonly corners: readonly (readonly [number, number])[];
+  /** Grid pattern only: unit direction `[x, z]` from the house to its street (its door side). */
+  readonly front?: readonly [number, number];
+  /** Grid pattern only: index in `Village.streets` of the street this house fronts. */
+  readonly street?: number;
 }
 
 /** A village: a site, its lanes and its houses. */
@@ -85,6 +168,11 @@ export interface Village {
   /** Radius its houses keep within, metres. */
   readonly radius: number;
   readonly houses: readonly House[];
+  /**
+   * Grid pattern only: its streets as paths (also in `Settlements.lanes`), the main street to the quay first. Every
+   * house fronts one, and every street joins the main street.
+   */
+  readonly streets?: readonly PathOptions[];
 }
 
 /** A settlement layout: plain data. */
@@ -94,9 +182,13 @@ export interface Settlements {
   readonly roads: readonly PathOptions[];
   /** Lanes from each village centre out along its houses. */
   readonly lanes: readonly PathOptions[];
-  /** Roads then lanes: for `carvePaths`, `paintPaths` and `pathEdits` (`@margoengine/biomes/splines`). */
+  /** Pads: one level-ground path under each house (only when `pads` is on). Carve only: no paint, no exclusion. */
+  readonly pads?: readonly PathOptions[];
+  /** Driveways from each house front to its street (only when `drives` is on). */
+  readonly drives?: readonly PathOptions[];
+  /** Roads, lanes, driveways then pads: for `carvePaths`, `paintPaths` and `pathEdits` (`@margoengine/biomes/splines`). */
   readonly paths: readonly PathOptions[];
-  /** Roads, lanes (their edges as verges) and houses (their yards as verges) for `BiomePlacement.attach`. */
+  /** Roads, lanes and driveways (their edges as verges) and houses (their yards as verges) for `BiomePlacement.attach`. */
   readonly exclusions: readonly Exclusion[];
 }
 
@@ -157,6 +249,24 @@ class Heap {
 }
 
 function check(world: SettlementWorld, o: SettlementOptions) {
+  if (
+    o.avoid !== undefined &&
+    (!Array.isArray(o.avoid) ||
+      !o.avoid.every(
+        (e) =>
+          e &&
+          (e.kind === 'line' || e.kind === 'polygon') &&
+          Array.isArray(e.points) &&
+          e.points.length >= (e.kind === 'line' ? 2 : 3) &&
+          e.points.every((p: readonly [number, number]) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) &&
+          (e.kind !== 'line' || (Number.isFinite(e.width) && e.width >= 0)) &&
+          (e.verge === undefined || (Number.isFinite(e.verge) && e.verge >= 0)),
+      ))
+  )
+    throw typeError(
+      'layoutSettlements avoid is an array of exclusions: lines of two or more [x, z] points with a width, or polygons of three or more',
+      'biomes',
+    );
   if (!world || typeof world.heightAt !== 'function' || !Array.isArray(world.bounds) || world.bounds.length !== 4)
     throw typeError(
       'layoutSettlements needs a world with bounds [x0, z0, x1, z1] and heightAt(x, z), such as a BiomeWorld',
@@ -185,7 +295,27 @@ function check(world: SettlementWorld, o: SettlementOptions) {
   if (o.bridge !== undefined && !inRange(o.bridge, 1, 1000)) throw bad('bridge cost', 'a multiple 1..1,000');
   if (o.detour !== undefined && !inRange(o.detour, 1, 100)) throw bad('detour', 'a ratio 1..100');
   if (o.yard !== undefined && !inRange(o.yard, 0, 100)) throw bad('yard', 'a number of metres, 0..100');
-  for (const k of ['road', 'lane'] as const)
+  if (o.pattern !== undefined && o.pattern !== 'lanes' && o.pattern !== 'grid') throw bad('pattern', "'lanes' or 'grid'");
+  if (o.pads !== undefined && typeof o.pads !== 'boolean') throw bad('pads setting', 'true or false');
+  if (o.drives !== undefined && typeof o.drives !== 'boolean') throw bad('drives setting', 'true or false');
+  if (o.grid !== undefined) {
+    const g = o.grid;
+    if (g === null || typeof g !== 'object')
+      throw typeError('A settlement grid is an object of block, street, lot, setback, toward and above', 'biomes');
+    const pair = (v: unknown, lo: number, hi: number) =>
+      Array.isArray(v) && v.length === 2 && inRange(v[0], lo, hi) && inRange(v[1], lo, hi);
+    if (g.block !== undefined && !pair(g.block, 8, 400)) throw bad('grid block', 'two sizes in metres, each 8..400');
+    if (g.street !== undefined && !inRange(g.street, 2, 40)) throw bad('grid street', 'a width in metres, 2..40');
+    if (g.lot !== undefined && !inRange(g.lot, 8, 60)) throw bad('grid lot', 'a frontage in metres, 8..60');
+    if (g.setback !== undefined && !inRange(g.setback, 0, 30)) throw bad('grid setback', 'a number of metres, 0..30');
+    if (g.above !== undefined && !inRange(g.above, 0, 1000)) throw bad('grid above', 'a number of metres, 0..1,000');
+    if (
+      g.toward !== undefined &&
+      !(Array.isArray(g.toward) && g.toward.length === 2 && g.toward.every(finite) && (g.toward[0] || g.toward[1]))
+    )
+      throw bad('grid toward', 'a direction [x, z] that is not zero');
+  }
+  for (const k of ['road', 'lane', 'drive'] as const)
     if (o[k] !== undefined && (o[k] === null || typeof o[k] !== 'object' || 'points' in o[k]!))
       throw typeError(`A settlement ${k} is path settings without points (the layout finds them)`, 'biomes');
 }
@@ -233,6 +363,335 @@ function segment2(x: number, z: number, ax: number, az: number, bx: number, bz: 
   return ex * ex + ez * ez;
 }
 
+/** What the pads and driveways of a house need. */
+interface Dwellings {
+  readonly heightAt: (x: number, z: number) => number;
+  readonly pads: boolean;
+  readonly drives: boolean;
+  readonly drive: Omit<PathOptions, 'points'>;
+}
+
+/**
+ * The pad and driveway of a house centred `(cx, cz)`, its width axis `(ax, az)`, `w` wide and `d` deep, with its door
+ * side `(fx, fz)` and `toStreet` metres from its front to the street edge. The pad is a carve path along the width
+ * axis, `d + 1` wide, whose bed is the mean of the ground at its two ends, so the whole footprint stands level at
+ * that height (`floor`); the driveway runs from the front to half a metre into the street.
+ */
+function dwelling(
+  o: Dwellings,
+  cx: number,
+  cz: number,
+  ax: number,
+  az: number,
+  w: number,
+  d: number,
+  fx: number,
+  fz: number,
+  toStreet: number,
+  floor: number,
+): { floor: number; pad?: PathOptions; drive?: PathOptions } {
+  const out: { floor: number; pad?: PathOptions; drive?: PathOptions } = { floor };
+  if (o.pads) {
+    const x0 = cx - (ax * w) / 2, // float division: half the width
+      z0 = cz - (az * w) / 2, // float division: half the width
+      x1 = cx + (ax * w) / 2, // float division: half the width
+      z1 = cz + (az * w) / 2; // float division: half the width
+    out.floor = (o.heightAt(x0, z0) + o.heightAt(x1, z1)) / 2; // float division: the mean of two heights
+    out.pad = {
+      points: [
+        [x0, z0],
+        [x1, z1],
+      ],
+      width: d + 1,
+      edge: 1.5,
+      carve: { mode: 'flatten', depth: 0, grade: 2 * w },
+    };
+  }
+  if (o.drives) {
+    const ex = cx + (fx * d) / 2, // float division: half the depth
+      ez = cz + (fz * d) / 2, // float division: half the depth
+      len = toStreet + 1;
+    out.drive = {
+      width: 3,
+      edge: 1,
+      mask: 'roads',
+      carve: { mode: 'flatten', depth: 0, grade: 2 * len },
+      ...o.drive,
+      points: [
+        [ex - fx * 0.5, ez - fz * 0.5],
+        [ex + fx * (toStreet + 0.5), ez + fz * (toStreet + 0.5)],
+      ],
+    };
+  }
+  return out;
+}
+
+/** What the grid pattern reads of the layout around it. */
+interface GridContext extends Dwellings {
+  readonly world: SettlementWorld;
+  readonly sea: number;
+  readonly seed: number;
+  readonly cell: number;
+  readonly block: readonly [number, number];
+  readonly street: number;
+  readonly lot: number;
+  readonly setback: number;
+  readonly above: number;
+  readonly toward: readonly [number, number] | undefined;
+  readonly siteGrade: number;
+  readonly maxGrade: number;
+  readonly lane: Omit<PathOptions, 'points'>;
+  /** Centre lines of the roads between villages and how far from them a house keeps. */
+  readonly roadLines: readonly (readonly (readonly [number, number])[])[];
+  readonly roadClear: number;
+  /** Houses of the villages laid out so far. */
+  readonly houses: readonly House[];
+  /** 0 dry, 1 sea, 2 river, -1 outside the site grid. */
+  readonly waterAt: (x: number, z: number) => number;
+  /** Shapes no house may touch (`SettlementOptions.avoid`). */
+  readonly avoid: readonly Exclusion[];
+  /** Direction and distance to the nearest sea (else river) within 1,200 m of a point. */
+  readonly nearest: (x: number, z: number) => readonly [number, number, number] | null;
+}
+
+/** A straight street stretch: axis 0 runs along the main direction `u`, axis 1 along `v`; `line` numbers the street. */
+interface Run {
+  readonly axis: 0 | 1;
+  readonly line: number;
+  readonly lo: number;
+  readonly hi: number;
+}
+
+/** One house of a grid village before the checks: block `k, j`, lot `m`, row 0 (low `u`) or 1, centre `(a, b)`. */
+interface Lot {
+  readonly key: number;
+  readonly a: number;
+  readonly b: number;
+  readonly w: number;
+  readonly d: number;
+  readonly row: 0 | 1;
+  readonly run: number;
+  readonly dist2: number;
+}
+
+const SAMPLE = 2; // metres between samples along a street
+const SHORTEST = 8; // shortest street stretch kept, metres
+
+/**
+ * The grid pattern of one village at `(cx, cz)`: a frame with `u` toward the water (the main street's way to the quay)
+ * and `v` along the shore; streets at every block pitch in both directions, cut into stretches wherever the ground is
+ * wet, below `above` or steeper than `maxGrade`; only the stretches that join the main street are kept, and lots in
+ * rows on both sides of each block face the stretch beside them. The closest `count` lots that pass the house checks
+ * get houses; only the streets those houses front (and the way to the main street) are returned.
+ */
+function gridVillage(
+  o: GridContext,
+  c: number,
+  cx: number,
+  cz: number,
+  count: number,
+): { houses: House[]; streets: PathOptions[]; pads: PathOptions[]; drives: PathOptions[]; radius: number } {
+  const none = { houses: [], streets: [], pads: [], drives: [], radius: 14 };
+  if (count === 0) return none;
+  const [bw, bd] = o.block,
+    sw = o.street,
+    pitchU = bd + sw,
+    pitchV = bw + sw,
+    M = Math.max(1, Math.round(bw / o.lot)), // float division: lots across a block
+    lw = bw / M, // float division: lot frontage
+    [x0, z0, x1, z1] = o.world.bounds;
+  // Direction u: toward the nearest water, as asked, or at a seeded angle on a land with none.
+  let ux: number, uz: number, reach = 600;
+  const near = o.toward ? null : o.nearest(cx, cz);
+  if (o.toward || near) {
+    const [dx, dz] = o.toward ?? near!,
+      l = Math.sqrt(dx * dx + dz * dz);
+    ux = dx / l; // float division: a unit direction
+    uz = dz / l; // float division: a unit direction
+    if (near) reach = near[2] + 4 * o.cell;
+  } else {
+    const sc = [0, 0];
+    sincos((hash2(o.seed, c) >>> 0) % TURN, sc);
+    const l = Math.sqrt(sc[0] * sc[0] + sc[1] * sc[1]);
+    ux = sc[0] / l; // float division: a unit direction
+    uz = sc[1] / l; // float division: a unit direction
+  }
+  const vx = -uz,
+    vz = ux;
+  // Blocks to each side: enough lots for twice the houses wanted.
+  const R = Math.min(14, Math.max(1, Math.ceil(Math.sqrt(Math.ceil((count * 2) / (2 * M))) / 2) + 1)); // float division: blocks to a half side
+  const sea = o.sea + o.above;
+  const px = (a: number, b: number) => cx + ux * a + vx * b,
+    pz = (a: number, b: number) => cz + uz * a + vz * b;
+  // Ground height at (a, b) when it is dry land at least `above` over the sea and inside the world, else NaN.
+  const sample = (a: number, b: number) => {
+    const x = px(a, b),
+      z = pz(a, b);
+    if (!(x >= x0 && x <= x1 && z >= z0 && z <= z1) || o.waterAt(x, z) !== 0) return NaN;
+    const h = o.world.heightAt(x, z);
+    return h >= sea ? h : NaN;
+  };
+  // Streets: stretches of each street line where every sample is good and no step is steeper than maxGrade.
+  const runs: Run[] = [];
+  const cut = (axis: 0 | 1, line: number, from: number, to: number) => {
+    const fixed = line * (axis === 0 ? pitchV : pitchU);
+    let start = NaN,
+      last = NaN,
+      prev = NaN;
+    const close = () => {
+      if (start === start && last - start >= SHORTEST) runs.push({ axis, line, lo: start, hi: last });
+      start = NaN;
+    };
+    for (let i = Math.ceil(from / SAMPLE); i <= Math.floor(to / SAMPLE); i++) {
+      const s = i * SAMPLE, // float division: none, a whole multiple
+        h = axis === 0 ? sample(s, fixed) : sample(fixed, s);
+      if (h !== h) {
+        close();
+        continue;
+      }
+      if (start === start && Math.abs(h - prev) / SAMPLE > o.maxGrade) close(); // float division: rise over run
+      if (start !== start) start = s;
+      last = s;
+      prev = h;
+    }
+    close();
+  };
+  for (let j = -R; j <= R; j++) cut(0, j, -R * pitchU, j === 0 ? Math.max(R * pitchU, reach) : R * pitchU);
+  for (let k = -R; k <= R; k++) cut(1, k, -R * pitchV, R * pitchV);
+  const main = runs.findIndex((r) => r.axis === 0 && r.line === 0 && r.lo - 1 <= 0 && r.hi + 1 >= 0);
+  if (main < 0) return none;
+  // Which stretches join the main street: breadth first over the crossings, parent kept to walk back.
+  const crosses = (p: Run, q: Run) => {
+    const u = p.axis === 0 ? p : q,
+      v = p.axis === 0 ? q : p;
+    return (
+      p.axis !== q.axis &&
+      v.line * pitchU >= u.lo - 1 &&
+      v.line * pitchU <= u.hi + 1 &&
+      u.line * pitchV >= v.lo - 1 &&
+      u.line * pitchV <= v.hi + 1
+    );
+  };
+  const parent = new Int32Array(runs.length).fill(-2);
+  parent[main] = -1;
+  for (let queue = [main], q = 0; q < queue.length; q++)
+    for (let i = 0; i < runs.length; i++)
+      if (parent[i] === -2 && crosses(runs[queue[q]], runs[i])) {
+        parent[i] = queue[q];
+        queue.push(i);
+      }
+  // Lots: two rows a block, each facing the street beside it.
+  const lots: Lot[] = [];
+  for (let k = -R; k < R; k++)
+    for (let j = -R; j < R; j++)
+      for (let m = 0; m < M; m++)
+        for (const row of [0, 1] as const) {
+          const key = (((k + R) * 32 + (j + R)) * 64 + m) * 2 + row,
+            r = hash3(o.seed, c, key),
+            w = Math.min(lw - 2, 7 + (r & 3)),
+            d = Math.min(6 + ((r >>> 2) & 3), bd / 2 - o.setback - 1), // float division: half a block
+            b = j * pitchV + sw / 2 + (m + 0.5) * lw, // float division: half a street, half a lot
+            a =
+              row === 0
+                ? k * pitchU + sw / 2 + o.setback + d / 2 // float division: half a street, half the depth
+                : (k + 1) * pitchU - sw / 2 - o.setback - d / 2, // float division: half a street, half the depth
+            fixed = (row === 0 ? k : k + 1) * pitchU;
+          if (d < 3) continue;
+          const run = runs.findIndex(
+            (s, i) =>
+              parent[i] !== -2 &&
+              s.axis === 1 &&
+              s.line * pitchU === fixed &&
+              s.lo - 1 <= b - w / 2 && // float division: half the width
+              s.hi + 1 >= b + w / 2, // float division: half the width
+          );
+          if (run >= 0) lots.push({ key, a, b, w, d, row, run, dist2: a * a + b * b });
+        }
+  lots.sort((p, q) => p.dist2 - q.dist2 || p.key - q.key);
+  // Houses: the closest lots whose house stands level on dry ground, off the roads and clear of every other house.
+  const houses: House[] = [],
+    pads: PathOptions[] = [],
+    drives: PathOptions[] = [],
+    used = new Set<number>(),
+    taken: House[] = [],
+    chosen: Lot[] = [];
+  const offRoads = (x: number, z: number) =>
+    o.roadLines.every((line) => {
+      for (let q = 0; q + 1 < line.length; q++)
+        if (segment2(x, z, line[q][0], line[q][1], line[q + 1][0], line[q + 1][1]) < o.roadClear * o.roadClear)
+          return false;
+      return true;
+    });
+  for (const lot of lots) {
+    if (houses.length >= count) break;
+    const hx = px(lot.a, lot.b),
+      hz = pz(lot.a, lot.b),
+      ax = vx * (lot.w / 2), // float division: half the width
+      az = vz * (lot.w / 2), // float division: half the width
+      bx = -vz * (lot.d / 2), // float division: half the depth
+      bz = vx * (lot.d / 2); // float division: half the depth
+    const corners: [number, number][] = [
+      [hx - ax - bx, hz - az - bz],
+      [hx + ax - bx, hz + az - bz],
+      [hx + ax + bx, hz + az + bz],
+      [hx - ax + bx, hz - az + bz],
+    ];
+    const spots = [[hx, hz] as [number, number], ...corners];
+    if (!spots.every(([x, z]) => x >= x0 && x <= x1 && z >= z0 && z <= z1 && o.waterAt(x, z) === 0)) continue;
+    const ys = spots.map(([x, z]) => o.world.heightAt(x, z));
+    if (Math.min(...ys) < sea || (Math.max(...ys) - Math.min(...ys)) / Math.max(lot.w, lot.d) > o.siteGrade) continue; // float division: grade over the lot
+    if (!spots.every(([x, z]) => offRoads(x, z))) continue;
+    if (o.avoid.length && footprint(corners).some(([x, z]) => avoided(o.avoid, x, z))) continue;
+    const reach = Math.sqrt(lot.w * lot.w + lot.d * lot.d) / 2 + 1; // float division: half the diagonal
+    const clash = (p: House) =>
+      (p.centre[0] - hx) ** 2 + (p.centre[1] - hz) ** 2 <
+      (reach + Math.sqrt(p.size[0] ** 2 + p.size[1] ** 2) / 2) ** 2; // float division: half the diagonal
+    if (o.houses.some(clash) || taken.some(clash)) continue;
+    const f: [number, number] = lot.row === 0 ? [-ux, -uz] : [ux, uz];
+    const dw = dwelling(o, hx, hz, vx, vz, lot.w, lot.d, f[0], f[1], o.setback, ys[0]);
+    const house: House = {
+      centre: [hx, hz],
+      size: [lot.w, lot.d],
+      along: [vx, vz],
+      floor: dw.floor,
+      corners,
+      front: f,
+      street: -1,
+    };
+    taken.push(house);
+    houses.push(house);
+    chosen.push(lot);
+    if (dw.pad) pads.push(dw.pad);
+    if (dw.drive) drives.push(dw.drive);
+    for (let i = lot.run; i >= 0; i = parent[i]) used.add(i);
+  }
+  used.add(main);
+  // Streets: the main one first, then by direction, line and place; houses learn the index of theirs.
+  const order = [...used].sort((p, q) => (p === main ? -1 : q === main ? 1 : 0) || runs[p].axis - runs[q].axis || runs[p].line - runs[q].line || runs[p].lo - runs[q].lo);
+  const streets = order.map((i): PathOptions => {
+    const s = runs[i],
+      fixed = s.line * (s.axis === 0 ? pitchV : pitchU);
+    return {
+      ...o.lane,
+      points:
+        s.axis === 0
+          ? [
+              [px(s.lo, fixed), pz(s.lo, fixed)],
+              [px(s.hi, fixed), pz(s.hi, fixed)],
+            ]
+          : [
+              [px(fixed, s.lo), pz(fixed, s.lo)],
+              [px(fixed, s.hi), pz(fixed, s.hi)],
+            ],
+    };
+  });
+  const final = houses.map((h, n) => ({ ...h, street: order.indexOf(chosen[n].run) }));
+  let radius = 14;
+  for (const h of final)
+    radius = Math.max(radius, Math.sqrt((h.centre[0] - cx) ** 2 + (h.centre[1] - cz) ** 2) + Math.sqrt(h.size[0] ** 2 + h.size[1] ** 2) / 2 + 4); // float division: half the diagonal
+  return { houses: final, streets, pads, drives, radius };
+}
+
 /**
  * Lays out villages, roads, lanes and houses on a world. Sites are grid points on dry land (above sea level, off the
  * rivers) whose ground and its eight neighbours stay under `siteGrade`, scored by flatness, nearness to water (best
@@ -252,7 +711,8 @@ function segment2(x: number, z: number, ax: number, az: number, bx: number, bz: 
  */
 export function layoutSettlements(world: SettlementWorld, options: SettlementOptions = {}): Settlements {
   check(world, options);
-  const seed = options.seed ?? 1,
+  const avoid = options.avoid ?? [],
+    seed = options.seed ?? 1,
     most = options.villages ?? 3,
     spacing = options.spacing ?? 800,
     perVillage = options.houses ?? 16,
@@ -262,8 +722,17 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
     bridge = options.bridge ?? 8,
     detour = options.detour ?? 1.6,
     yard = options.yard ?? 4;
+  const grid = options.pattern === 'grid',
+    gridBlock = options.grid?.block ?? [56, 36],
+    gridStreet = options.grid?.street ?? 8,
+    dwellings: Dwellings = {
+      heightAt: (x, z) => world.heightAt(x, z),
+      pads: options.pads ?? grid,
+      drives: options.drives ?? grid,
+      drive: { ...options.drive },
+    };
   const road: Omit<PathOptions, 'points'> = { width: 5, edge: 3, curve: 'catmull-rom', mask: 'roads', ...options.road };
-  const lane: Omit<PathOptions, 'points'> = { width: 3, edge: 1.5, mask: 'roads', ...options.lane };
+  const lane: Omit<PathOptions, 'points'> = { width: grid ? gridStreet : 3, edge: 1.5, mask: 'roads', ...options.lane };
   const [x0, z0, x1, z1] = world.bounds,
     sea = (world.climate?.sea ?? 0) / 1000; // float division: mm to metres
   const nx = Math.floor((x1 - x0) / cell) + 1, // float division: metres to cells
@@ -480,10 +949,80 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
     const i = at(x, z);
     return i >= 0 && water[i] === 0 && x >= x0 && x <= x1 && z >= z0 && z <= z1;
   };
+  const padList: PathOptions[] = [],
+    driveList: PathOptions[] = [];
+  // Nearest sea (else river) within 1,200 m of a point, rings of cells out from it: direction and distance.
+  const nearest = (px: number, pz: number): [number, number, number] | null => {
+    const ci = Math.round((px - x0) / cell), // float division: metres to cells
+      cj = Math.round((pz - z0) / cell), // float division: metres to cells
+      maxR = Math.ceil(1200 / cell), // float division: metres to cells
+      best = [Infinity, Infinity],
+      cellOf = [-1, -1];
+    for (let r = 1; r <= maxR; r++) {
+      for (let dz = -r; dz <= r; dz++)
+        for (let dx = -r; dx <= r; dx += Math.abs(dz) === r ? 1 : 2 * r) {
+          const ix = ci + dx,
+            iz = cj + dz;
+          if (ix < 0 || iz < 0 || ix >= nx || iz >= nz) continue;
+          const i = iz * nx + ix,
+            kind = water[i];
+          if (!kind) continue;
+          const d = (X(i) - px) ** 2 + (Z(i) - pz) ** 2;
+          if (d < best[kind - 1]) {
+            best[kind - 1] = d;
+            cellOf[kind - 1] = i;
+          }
+        }
+      if (best[0] <= (r * cell) ** 2) break; // nothing nearer in the rings beyond
+    }
+    const kind = cellOf[0] >= 0 ? 0 : cellOf[1] >= 0 ? 1 : -1;
+    if (kind < 0) return null;
+    return [X(cellOf[kind]) - px, Z(cellOf[kind]) - pz, Math.sqrt(best[kind])];
+  };
   chosen.forEach((c) => {
     const cx = X(c),
       cz = Z(c),
       dirs: [number, number][] = [];
+    if (grid) {
+      const g = options.grid ?? {};
+      const town = gridVillage(
+        {
+          ...dwellings,
+          world,
+          sea,
+          seed,
+          cell,
+          block: gridBlock,
+          street: gridStreet,
+          lot: g.lot ?? 14,
+          setback: g.setback ?? 4,
+          above: g.above ?? 0,
+          toward: g.toward,
+          siteGrade,
+          maxGrade,
+          lane,
+          roadLines,
+          roadClear: clear,
+          avoid,
+          houses,
+          waterAt: (x, z) => {
+            const i = at(x, z);
+            return i < 0 ? -1 : water[i];
+          },
+          nearest,
+        },
+        c,
+        cx,
+        cz,
+        perVillage,
+      );
+      houses.push(...town.houses);
+      lanes.push(...town.streets);
+      padList.push(...town.pads);
+      driveList.push(...town.drives);
+      villages.push({ centre: [cx, cz], height: h[c], radius: town.radius, houses: town.houses, streets: town.streets });
+      return;
+    }
     for (const line of roadLines) {
       const ends = [line[0], line[line.length - 1]];
       for (let e = 0; e < 2; e++)
@@ -543,6 +1082,7 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
           ];
           if (!dry(hx, hz) || !corners.every(([x, z]) => dry(x, z) && off(x, z, laneClear, j))) continue;
           if (!off(hx, hz, laneClear, j)) continue;
+          if (avoid.length && footprint(corners).some(([x, z]) => avoided(avoid, x, z))) continue;
           const ys = corners.map(([x, z]) => world.heightAt(x, z)),
             floor = world.heightAt(hx, hz);
           if ((Math.max(...ys, floor) - Math.min(...ys, floor)) / Math.max(w, depth) > siteGrade) continue; // float division: grade over the lot
@@ -555,7 +1095,27 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
             )
           )
             continue;
-          const house: House = { centre: [hx, hz], size: [w, depth], along: [ux, uz], floor, corners };
+          let level = floor;
+          if (dwellings.pads || dwellings.drives) {
+            // The door faces the lane: toward it from the house is -side times the lane's left (-uz, ux).
+            const dw = dwelling(
+              dwellings,
+              hx,
+              hz,
+              ux,
+              uz,
+              w,
+              depth,
+              uz * side,
+              -ux * side,
+              keep + 1 - (along ? (road.width ?? 5) : (lane.width ?? 3)) / 2, // float division: half a street
+              floor,
+            );
+            level = dw.floor;
+            if (dw.pad) padList.push(dw.pad);
+            if (dw.drive) driveList.push(dw.drive);
+          }
+          const house: House = { centre: [hx, hz], size: [w, depth], along: [ux, uz], floor: level, corners };
           mine.push(house);
           houses.push(house);
           end = t + w / 2;
@@ -572,12 +1132,20 @@ export function layoutSettlements(world: SettlementWorld, options: SettlementOpt
     });
     villages.push({ centre: [cx, cz], height: h[c], radius, houses: mine });
   });
-  const paths = [...roads, ...lanes];
+  const paths = [...roads, ...lanes, ...driveList, ...padList];
   const exclusions: Exclusion[] = [
-    ...pathExclusions(paths),
+    ...pathExclusions([...roads, ...lanes, ...driveList]),
     ...houses.map((o) => ({ kind: 'polygon' as const, points: o.corners, verge: yard })),
   ];
-  return { villages, roads, lanes, paths, exclusions };
+  return {
+    villages,
+    roads,
+    lanes,
+    paths,
+    exclusions,
+    ...(dwellings.pads ? { pads: padList } : {}),
+    ...(dwellings.drives ? { drives: driveList } : {}),
+  };
 }
 
 /** Whether a road line leaves the village `(cx, cz)` in the direction `(ux, uz)`. */

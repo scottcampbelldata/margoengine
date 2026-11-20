@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/edge.browser.mjs
 // The clipmap's outer rings reach past the heightmap. Main drew them there from the clamped edge texels: a flat shelf
 // of the edge height (with stretched walls where the edge is not flat) out to the outermost ring, about a kilometre

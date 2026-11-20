@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky overcast check</title><style>body{margin:0}canvas{display:block;width:160px;height:120px}</style></head><body><canvas width="160" height="120"></canvas>
+<script type="module">
+// The overcast deck (KB-SKY-OVERCAST1) on a real GPU: a Preetham sky with the cloud sheet at full cover, the sun 45
+// degrees up, drawn into a PostStack's HDR scene target (linear, before any tone map). Three views: up the sky away
+// from the sun, toward the sun, and along the horizon. Each pixel is compared with overcastDeck (the CPU twin) for its
+// ray, under the Preetham sky and the Bruneton sky (whose deck is in its own sun units). Driven by features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/base.js';
+import {preetham} from '/packages/sky/dist/preetham.js';
+import {bruneton} from '/packages/sky/dist/bruneton.js';
+import {clouds,overcastDeck,DECK_DEPTH} from '/packages/sky/dist/clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.6,0],target:[0,1.6,-1],fov:60,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function scene(){
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();return {w,h,v};
+}
+const lum=(c)=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+// The ray through pixel (x, y) of a camera at yaw (radians from -Z toward +X) and pitch, fov 60 degrees.
+const ray=(x,y,w,h,yaw,pitch)=>{const t=Math.tan(Math.PI/6),cx=(2*(x+0.5)/w-1)*t*w/h,cy=(1-2*(y+0.5)/h)*t;
+ const f=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)],r=[Math.cos(yaw),0,Math.sin(yaw)],u=[r[1]*f[2]-r[2]*f[1],r[2]*f[0]-r[0]*f[2],r[0]*f[1]-r[1]*f[0]];
+ const d=[0,1,2].map(k=>f[k]+r[k]*cx+u[k]*cy),l=Math.hypot(...d);return d.map(v=>v/l);};
+window.check={samples:sceneSamples,
+ async run({coverage=1,depth,model='preetham'}={}){
+  device.pushErrorScope('validation');
+  const sun=[Math.SQRT1_2*Math.sin(0.5),Math.SQRT1_2,-Math.SQRT1_2*Math.cos(0.5)];
+  const sky=Sky.attach(engine,{timeScale:0,sunDirection:sun,turbidity:6,model,clouds:{coverage,...(depth===undefined?{}:{depth})}},{preetham,bruneton,clouds}),out={views:{}};
+  for(const [name,yaw,pitch] of [['away',0.5+Math.PI,0.9],['sun',0.5,Math.PI/4],['horizon',0.5+Math.PI/2,0.35]]){
+   const f=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
+   engine.camera.target=[f[0],1.6+f[1],f[2]];
+   engine.render({delta:0});engine.render({delta:0});
+   out.units=sky.values[35]*(1+0.075*(depth??DECK_DEPTH));
+   const {w,h,v}=await scene(),sunlight=[...sky.values.subarray(60,63)],units=sky.values[35]*(1+0.075*(depth??DECK_DEPTH)),ratios=[];let worst=0,warm=0;
+   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const d=ray(x,y,w,h,yaw,pitch);if(d[1]<0.02)continue;
+    const i=(y*w+x)*4,c=[v[i],v[i+1],v[i+2]],want=overcastDeck(sunlight,sun[1],d[1],depth??DECK_DEPTH,units);
+    ratios.push(lum(c)/lum(want));
+    // Chroma against the deck's own: an orange glow toward the sun raises red over blue.
+    warm=Math.max(warm,(c[0]/c[2])/(want[0]/want[2]));
+   }
+   ratios.sort((a,b)=>a-b);
+   out.views[name]={pixels:ratios.length,min:ratios[0],max:ratios.at(-1),mean:ratios.reduce((a,b)=>a+b,0)/ratios.length,p01:ratios[Math.floor(ratios.length*0.01)],warm};
+  }
+  sky.dispose();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

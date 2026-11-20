@@ -5,8 +5,9 @@ import { encodeEXR, encodeJPEG, encodeWebP, readTexture } from '../src/formats.t
 import { parseEXR } from '../../environment/src/exr.ts';
 import { PostStack } from '../../post/src/stack.ts';
 import { Bloom } from '../../post/src/bloom.ts';
-import { encodeVideo, renderFrames } from '../src/video.ts';
+import { encodeVideo, renderFrames, streamVideo } from '../src/video.ts';
 import { createHeadlessStage } from '../src/stage.ts';
+import { ALPHA, alphaFile } from './alpha-frames.js';
 import { createStage } from '../../stage/src/index.ts';
 import { addSky } from '../../stage/src/sky.ts';
 
@@ -109,7 +110,22 @@ window.check.video = async (format) => {
       yield frame;
     }
   }
-  const encoded = await encodeVideo(keep(), { format, fps: FPS, keyFrameInterval: 0.5, bitrate: 4_000_000 });
+  let encoded, pieces;
+  if (format === 'fmp4' || format === 'webm-stream') {
+    // The stream, joined: what a file or socket written piece by piece holds.
+    const stream = streamVideo(keep(), {
+      format: format === 'fmp4' ? 'mp4' : 'webm',
+      fps: FPS,
+      keyFrameInterval: 0.5,
+      bitrate: 4_000_000,
+    });
+    pieces = [];
+    let step;
+    while (!(step = await stream.next()).done) pieces.push(step.value);
+    const bytes = new Uint8Array(pieces.reduce((sum, piece) => sum + piece.length, 0));
+    pieces.reduce((at, piece) => (bytes.set(piece, at), at + piece.length), 0);
+    encoded = { ...step.value, bytes };
+  } else encoded = await encodeVideo(keep(), { format, fps: FPS, keyFrameInterval: 0.5, bitrate: 4_000_000 });
   engine.dispose();
   installed.dispose();
   const video = document.createElement('video');
@@ -124,7 +140,36 @@ window.check.video = async (format) => {
     same = [];
   for (const index of [0, 7, 15, 31, 45, 59]) same.push(difference(await shown(video, at(index)), source[index]));
   const other = difference(await shown(video, at(31)), source[15]);
+  // Media Source Extensions take the pieces as they come: the header, then each fragment, appended one at a time.
+  let streamed;
+  if (pieces && globalThis.MediaSource?.isTypeSupported(encoded.mimeType)) {
+    const media = new MediaSource(),
+      player = document.createElement('video');
+    player.src = URL.createObjectURL(media);
+    await new Promise((done) => media.addEventListener('sourceopen', done, { once: true }));
+    const buffer = media.addSourceBuffer(encoded.mimeType);
+    // The index after the last fragment or cluster (mfra, Cues) is for files; a SourceBuffer takes the rest.
+    for (const piece of pieces.slice(0, -1)) {
+      const updated = new Promise((done, fail) => {
+        buffer.addEventListener('updateend', done, { once: true });
+        buffer.addEventListener('error', () => fail(new Error('SourceBuffer error')), { once: true });
+      });
+      buffer.appendBuffer(piece);
+      await updated;
+    }
+    streamed = { ranges: buffer.buffered.length, start: buffer.buffered.start(0), end: buffer.buffered.end(0) };
+    // The pieces play as they arrive, frame for frame, from the SourceBuffer.
+    media.endOfStream();
+    player.muted = true;
+    await new Promise((done) =>
+      player.readyState >= 2 ? done() : player.addEventListener('loadeddata', done, { once: true }),
+    );
+    streamed.same = [];
+    for (const index of [0, 15, 31, 59]) streamed.same.push(difference(await shown(player, at(index)), source[index]));
+  }
   return {
+    pieces: pieces?.length,
+    streamed,
     codec: encoded.codec,
     frames: encoded.frames,
     bytes: encoded.bytes.length,
@@ -138,6 +183,90 @@ window.check.video = async (format) => {
     errors,
   };
 };
+// Alpha video: frames with known alpha (alpha-frames.js), encoded with the browser's encoder (twice: colour and alpha),
+// muxed by Margo and played by a <video> element drawn over a coloured background.
+window.check.alphaVideo = async (codec, streamed) => {
+  const { width, height, fps } = ALPHA,
+    blue = [32, 64, 224],
+    options = { alpha: true, codec, fps, keyFrameInterval: 0.5, bitrate: 2_000_000 };
+  let encoded;
+  if (streamed) {
+    // streamVideo's WebM, joined, and its pieces given to Media Source Extensions as they come.
+    const stream = streamVideo(alphaFile(), { ...options, format: 'webm' }),
+      pieces = [];
+    let step;
+    while (!(step = await stream.next()).done) pieces.push(step.value);
+    const bytes = new Uint8Array(pieces.reduce((sum, piece) => sum + piece.length, 0));
+    pieces.reduce((at, piece) => (bytes.set(piece, at), at + piece.length), 0);
+    encoded = { ...step.value, bytes, pieces };
+  } else encoded = await encodeVideo(alphaFile(), options);
+  const video = document.createElement('video');
+  video.muted = true;
+  if (streamed === 'mse') {
+    const media = new MediaSource();
+    video.src = URL.createObjectURL(media);
+    await new Promise((done) => media.addEventListener('sourceopen', done, { once: true }));
+    const buffer = media.addSourceBuffer(encoded.mimeType);
+    for (const piece of encoded.pieces.slice(0, -1)) {
+      const updated = new Promise((done, fail) => {
+        buffer.addEventListener('updateend', done, { once: true });
+        buffer.addEventListener('error', () => fail(new Error('SourceBuffer error')), { once: true });
+      });
+      buffer.appendBuffer(piece);
+      await updated;
+    }
+    media.endOfStream();
+  } else video.src = URL.createObjectURL(new Blob([encoded.bytes], { type: encoded.mimeType }));
+  await new Promise((done, fail) => {
+    if (video.readyState >= 2) return done();
+    video.addEventListener('loadeddata', done, { once: true });
+    video.addEventListener('error', () => fail(new Error(video.error?.message ?? 'video error')), { once: true });
+  });
+  // What a page shows: the video drawn over a blue background, and over nothing (the alpha the element gives).
+  const picks = [];
+  for (const index of [0, 7, 15, 22, 29]) {
+    const seeked = new Promise((done) => video.addEventListener('seeked', done, { once: true }));
+    video.currentTime = (index + 0.5) / fps;
+    await seeked;
+    const over = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true }),
+      bare = new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true });
+    over.fillStyle = `rgb(${blue})`;
+    over.fillRect(0, 0, width, height);
+    over.drawImage(video, 0, 0);
+    bare.drawImage(video, 0, 0);
+    const shownOver = over.getImageData(0, 0, width, height).data,
+      shownBare = bare.getImageData(0, 0, width, height).data,
+      at = (x, y) => (y * width + x) * 4,
+      row = (index % 6) * 16,
+      // Centres of the plain regions away from the square, and the square's centre.
+      points = {
+        clear: [32, 48],
+        half: [64, 48],
+        solid: [108, 48],
+        square: [16, row + 8],
+      };
+    picks.push({
+      index,
+      ...Object.fromEntries(
+        Object.entries(points).map(([name, [x, y]]) => [
+          name,
+          { over: [...shownOver.subarray(at(x, y), at(x, y) + 3)], alpha: shownBare[at(x, y) + 3] },
+        ]),
+      ),
+    });
+  }
+  return {
+    codec: encoded.codec,
+    mimeType: encoded.mimeType,
+    alpha: encoded.alpha,
+    frames: encoded.frames,
+    bytes: encoded.bytes.length,
+    file: [...encoded.bytes],
+    width: video.videoWidth,
+    height: video.videoHeight,
+    picks,
+  };
+};
 /** The browser's own decode of a file, as straight RGBA with no colour management (WebCodecs). */
 async function decoded(bytes, type) {
   const decoder = new ImageDecoder({ data: bytes, type, colorSpaceConversion: 'none' }),
@@ -148,6 +277,37 @@ async function decoded(bytes, type) {
   image.close();
   decoder.close();
   return { size, data: out };
+}
+/** The browser's decode of an image with alpha, straight: an ImageBitmap with no premultiplication or colour conversion,
+ * copied to an rgba8unorm texture with premultipliedAlpha false and read back. The two decodes that would be simpler are
+ * wrong in WebKit 27.2 (docs/known-bugs.md, "WebKit drops or doubles the alpha of decoded images"): ImageDecoder returns
+ * alpha 255 for every pixel, and a 2D canvas draws a bitmap made with premultiplyAlpha 'none' as if premultiplied. */
+async function decodedWithAlpha(device, bytes, type) {
+  const bitmap = await createImageBitmap(new Blob([bytes], { type }), {
+      premultiplyAlpha: 'none',
+      colorSpaceConversion: 'none',
+    }),
+    { width, height } = bitmap,
+    row = Math.ceil((width * 4) / 256) * 256,
+    texture = device.createTexture({
+      size: [width, height],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT,
+    }),
+    buffer = device.createBuffer({ size: row * height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }),
+    encoder = device.createCommandEncoder();
+  device.queue.copyExternalImageToTexture({ source: bitmap }, { texture, premultipliedAlpha: false }, [width, height]);
+  encoder.copyTextureToBuffer({ texture }, { buffer, bytesPerRow: row }, [width, height]);
+  device.queue.submit([encoder.finish()]);
+  await buffer.mapAsync(GPUMapMode.READ);
+  const mapped = new Uint8Array(buffer.getMappedRange()),
+    data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y++) data.set(mapped.subarray(y * row, y * row + width * 4), y * width * 4);
+  buffer.unmap();
+  buffer.destroy();
+  texture.destroy();
+  bitmap.close();
+  return { size: [width, height], data };
 }
 /** The same pixels premultiplied: the browser's decoders keep colour premultiplied, so a straight pixel of low alpha
  * comes back rounded, and only its premultiplied value is a fact of the file. */
@@ -200,7 +360,7 @@ window.check.formats = async () => {
   out.lossless = [];
   for (const [w, h] of [[1, 1], [37, 21], [101, 3], [64, 64]]) {
     const source = paint(w, h),
-      seen = await decoded(await encodeWebP(source), 'image/webp');
+      seen = await decodedWithAlpha(engine.gpu, await encodeWebP(source), 'image/webp');
     out.lossless.push({ size: seen.size, want: [w, h], ...distance(premultiplied(seen.data), premultiplied(source.data)) });
   }
   const opaque = await decoded(await encodeWebP(pixels), 'image/webp');

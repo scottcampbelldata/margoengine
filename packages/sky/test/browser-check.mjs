@@ -58,6 +58,11 @@ try {
   assert.deepEqual(weather.errors, []);
   assert.ok(weather.rainChanged > 200, `rain changed ${weather.rainChanged} of ${weather.pixels} pixels`);
   assert.ok(weather.snowChanged > 200, `snow changed ${weather.snowChanged} of ${weather.pixels} pixels`);
+  // Snow exposure (lane SC5, Whiteout Pass): flakes in an 18 m/s wind summed over eight sub-frames showed as rows of
+  // dots; swept over the exposure they streak, spreading about the same light over more pixels.
+  assert.ok(weather.sweptPixels > 2 * weather.stillPixels, `swept flakes cover ${weather.sweptPixels} pixels, discs ${weather.stillPixels}`);
+  const light = weather.sweptLight / weather.stillLight;
+  assert.ok(light > 0.8 && light < 1.25, `swept flakes keep the discs' light: ${weather.sweptLight} against ${weather.stillLight}`);
   assert.equal(weather.afterNone, 0, 'precipitation none draws nothing');
   assert.equal(weather.dry, 0, 'intensity 0 draws nothing');
   assert.ok(weather.flashGain > 0, `the flash lit the frame: ${JSON.stringify(weather)}`);

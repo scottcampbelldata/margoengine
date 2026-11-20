@@ -39,6 +39,32 @@ Bloom reads non-finite HDR input as finite light: NaN and -Inf as 0, +Inf as 655
 bad texel from an overflowing emissive or a broken shader stays where it is instead of spreading through the glow
 chain; finite images filter exactly as before.
 
+### Bloom: energy and fireflies
+
+Bloom's glow of a light sums to `strength` times its light above `threshold`, whatever the light's size: glare is a
+linear spread by a point spread function that integrates to the share scattered (Spencer, Shirley, Zimmerman and
+Greenberg, "Physically-Based Glare Effects for Digital Images", SIGGRAPH 1995). `fireflies` (default `'temporal'`,
+read every frame) sets how a pixel far brighter than its neighbours is damped:
+
+| `fireflies` | What glows |
+| --- | --- |
+| `'temporal'` | Light that was there the frame before glows with all its energy (its 3 x 3 neighbourhood of the coarsest level, 64 px a texel at six levels, bounds what each pixel keeps, so a steady light may move that far a frame). A spike that was not there (a glint one sample caught for one frame) keeps only the Karis share for that frame. The first frame keeps everything. |
+| `'karis'` | Every top-level box is weighted by 1 / (1 + luma) (Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014; Jimenez, SIGGRAPH 2014), steady or not: a lamp flame 2 x 3 px at 17,000 cd/m2 keeps 57% of its glow, a lone texel 25%. Bloom did this on every frame before KB-CABIN-BLOOM1. |
+| `'none'` | Every pixel glows by its energy, one-frame spikes included. |
+
+`packages/post/test/bloom-energy-browser.mjs` measures it on a GPU: a 2 x 3 px flame at 17,000 cd/m2 keeps 99.3% of
+`strength` x its light with the Cabin Hearth kit's options and 99.7% with the defaults (binary16 rounding bounds the
+loss at 0.86%), also when it moves 40 px between frames; a new one-texel spike keeps the Karis share, 25%. The temporal
+mode adds nine texel reads per top-level texel and 256 B of uniform; the coarsest level it reads is the chain's own.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Bloom} from 'margoengine/post/bloom';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const bloom = Bloom.attach(engine, {strength: 0.12, threshold: 1.2, radius: 0.8});
+bloom.options.fireflies = 'karis'; // every bright spike damped, from the next frame
+```
+
 ## Combining effects: `PostStack`
 
 On the WebGL2 compatibility layer, a stack with HDR or display effects requires
@@ -135,7 +161,57 @@ stack.dispose(); // also disposes its effects
   Water draws into the capture before the stack's effects run. Real-GPU check:
   `packages/water/test/stack.browser.mjs` (refraction shows an underwater block, SSAO active in the same frame).
 - Intermediate targets are two `rgba16float` and up to two canvas-format textures, created on first
-  use and kept until resize or device restoration. Steady frames create no GPU objects.
+  use and kept until resize or device restoration; one that no effect wrote in a frame (after a remove or a move) is
+  freed at the end of that frame. Steady frames create no GPU objects.
+
+### Changing the stack after setup
+
+`addEffect`, `removeEffect` and `moveEffect` change a live stack between frames, and `PostStack.join` adds an
+effect to the scene's stack or makes one. The new effect draws from the next frame:
+
+```ts
+import {createStage} from 'margoengine';
+import {PostStack} from 'margoengine/post/stack';
+import {SSAO} from 'margoengine/post/ssao';
+import {Bloom} from 'margoengine/post/bloom';
+import {FXAA} from 'margoengine/post/fxaa';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const stack = PostStack.attach(stage.engine, [new SSAO(), new Tonemap(), new FXAA()]);
+const bloom = new Bloom({strength: 0.6});
+stack.addEffect(bloom);                 // after the last HDR effect: SSAO, Bloom, Tonemap, FXAA
+stack.moveEffect(bloom, 0);             // Bloom, SSAO, Tonemap, FXAA; nothing is disposed
+console.log(stack.effects.map((effect) => effect.name)); // ['bloom', 'ssao', 'tonemap', 'fxaa']
+stack.removeEffect(bloom);              // takes it out and disposes it, as scene.removePlugin does
+const own = PostStack.join(stage.engine, new Bloom()); // the scene already has a stack: the same one
+console.log(own === stack);             // true
+stack.dispose();
+```
+
+- `stack.addEffect(effect, index?)` returns the stack. With no index the effect goes after the last effect of its
+  kind (HDR, display, LDR), so a Bloom added to `[SSAO, Tonemap, FXAA]` lands before Tonemap. An index places it
+  there and must keep the order. A refused call changes nothing: `TypeError` for an effect that cannot join, a
+  repeated name or SMAA with FXAA; `RangeError` for an index out of range or out of order (a second display effect
+  too); `MargoError` `'attached'` for an effect that is already attached or in another stack, `'unsupported'` for an
+  HDR or display effect on the LDR tier, `'disposed'`, and `'state'` while a frame draws. An effect refused for its
+  place may be added to the same stack again.
+- `stack.removeEffect(effect)` returns true when the effect was in the stack. It disposes the effect, the same as
+  `scene.removePlugin(name)`; to switch an effect off and on without that, set its `enabled` option.
+- `stack.moveEffect(effect, index)` reorders without disposing; the order rule still holds.
+- `stack.effects` is a frozen copy of the list, replaced on every change. An empty stack (`new PostStack()`) passes
+  frames through untouched.
+- `PostStack.join(engine, effect, index?)` adds to the PostStack of the engine's scene, or attaches a new one holding
+  the effect; a stack that `join` made disposes itself when its last effect is removed. The one-effect factories
+  (`NodePass.attach`, `ShaderPass.attach`, water `Caustics`, `Underwater` and `ParticleLiquid`, creative `Painterly`
+  and `AnisotropicPainterly`, cameras `WideAngle` and `WideAngleCube`) use it, so they work on a scene that has a stack.
+- Nothing is rebuilt stack-wide. The added effect compiles its own pipelines on its first frame, the same work as at
+  construction; an existing effect compiles again only when its output changes (it becomes or stops being the last
+  effect, or the last HDR effect that tonemaps). `packages/post/test/stack-dynamic.test.js` counts it: adding Bloom
+  to `[SSAO, Tonemap, FXAA]` creates 4 pipelines and 3 textures, exactly the difference between constructing the two
+  lists; moving or removing it creates none; removing Tonemap after Bloom creates 1 pipeline (Bloom's tonemapping
+  output).
+- The names other composers use (`addPass`, `insertPass`, `removePass`, `passes`) are mapped in the
+  porting guide in `docs/`.
 
 When the stack landed (`5b1fe66`), every effect used alone made exactly the GPU calls it made before the stack existed:
 `examples/package-benchmarks/proofs/post-stack.proof.js` checks 12,378 recorded calls across 12 single-effect stories,
@@ -169,14 +245,14 @@ cameras, an eye inside the part and image-based light.
 
 ## Screen-space reflections: `SSR`
 
-`@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal) and in glTF-pro
+`@margoengine/post/ssr` reflects what is on screen in glossy core meshes (floors, polished CAD metal) and in glTF PBR
 models, `@margoengine/materials` meshes, `Terrain` (@margoengine/terrain) and `Water` (@margoengine/water) added with
 `ssr.add(model)`. It is an HDR `PostStack` effect;
 `SSR.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {EnvironmentLighting} from 'margoengine/environment';
 import {PostStack} from 'margoengine/post/stack';
 import {SSAO} from 'margoengine/post/ssao';
@@ -186,9 +262,9 @@ const stage = await createStage('#viewport', {backend: 'webgpu'});
 const ibl = await EnvironmentLighting.load(stage.engine, '/studio.hdr');
 const ssr = new SSR({maxRoughness: 0.6, thickness: 0.5, maxDistance: 100, steps: 64});
 const stack = PostStack.attach(stage.engine, [new SSAO(), ssr, new Bloom({strength: 0.6})]);
-const helmet = await loadGLTF(stage.engine, '/FlightHelmet.glb'); // from 'margoengine/gltf-pro'
+const helmet = await loadGLTF(stage.engine, '/FlightHelmet.glb'); // from 'margoengine/gltf/pbr'
 ibl.add(helmet);                     // EnvironmentLighting, so SSR replaces its specular (below)
-const stop = ssr.add(helmet);        // glTF-pro model or materials mesh: its own surfaces reflect; stop() undoes it
+const stop = ssr.add(helmet);        // glTF PBR model or materials mesh: its own surfaces reflect; stop() undoes it
 ssr.enabled = false; // pass-through, no recompiles
 ```
 
@@ -200,16 +276,16 @@ ssr.enabled = false; // pass-through, no recompiles
   materials and depth, so MSAA silhouettes never average two materials, and no multisampled targets). The Hi-Z is
   built from that depth. Memory: 16 B/pixel of targets (+4 B depth at 4x, or at 1x once models are added), a half-resolution `r32float` Hi-Z and a
   half-resolution `rgba16float` blur chain, about 45 MB at 1080p.
-- **Model capture.** Models added with `ssr.add(model)` (a gltf-pro `PBRModel` or a materials mesh; returns a remover,
+- **Model capture.** Models added with `ssr.add(model)` (a gltf/pbr `PBRModel` or a materials mesh; returns a remover,
   disposal of the model or of SSR detaches it) then draw into the same three targets in one more pass, through
-  gltf-pro's declared capture hook (gltf-pro README "Capture hook"; no text search of its shader): their own base
+  gltf/pbr's declared capture hook (gltf/pbr README "Capture hook"; no text search of its shader): their own base
   colour, metal/roughness, normal and occlusion maps, materials' maps, alpha mask, instances and skinned/morphed
   vertices, depth tested against and written into SSR's own 1x depth, which the Hi-Z is built from (with models added
   SSR keeps its own depth at 1x MSAA too, so a capture never writes the stack's depth, which water samples). BLEND, transmission and
   unlit primitives are skipped. Models not added are still reflected but do not reflect. With no model added SSR makes
   exactly the GPU calls it made before (`examples/package-benchmarks/proofs/post-ssr-models.proof.js`, against
   `3cf1453`). Models not added are missing from SSR's own depth, so rays pass through them. `Terrain` and `Water`
-  take the same hook: shaders without gltf-pro's PBR `Surface` get only `margoSSR` and the `MargoSSR` targets (the
+  take the same hook: shaders without gltf/pbr's PBR `Surface` get only `margoSSR` and the `MargoSSR` targets (the
   `SSRCapture` TSDoc), terrain calls `margoSSR` with its layer colour and roughness, water returns its own sky
   reflection as the specular to replace; their READMEs have the checks. One capture hook per model, shared with SSGI
   (`packages/post/src/capture.ts`). With models
@@ -263,7 +339,7 @@ ssr.options.stochastic = false;                                         // back 
   The model capture pass adds 0.19-0.21 ms at 1280x720 and 0.44-0.46 ms at 1920x1080 for a glTF floor filling most
   of the view, 0.05-0.07 ms for DamagedHelmet (4x and 1x; diagnostic timings on a busy machine); the reflective model
   pixels then trace like core ones. `examples/package-benchmarks/ssr-models-gpu.mjs` (results/ssr-models-gpu.json).
-- **Limits.** Core meshes and added models (gltf-pro, materials, terrain, water) show reflections; other custom shaders
+- **Limits.** Core meshes and added models (gltf/pbr, materials, terrain, water) show reflections; other custom shaders
   are reflected but do not reflect (each would need its own capture into SSR's targets). Only what is on screen is
   reflected; with reflection probes (`@margoengine/environment/probes`) SSR removes the probes' own specular
   where its ray hits and keeps the probe's reflection elsewhere, so off-screen reflections come from the probes
@@ -287,12 +363,12 @@ import {PostStack} from 'margoengine/post/stack';
 import {GTAO} from 'margoengine/post/gtao';
 import {SSR} from 'margoengine/post/ssr';
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/scene.glb');
 const gtao = new GTAO({radius: 0.5, slices: 2, steps: 6});
 PostStack.attach(stage.engine, [gtao, new SSR()]); // or GTAO.attach(stage.engine)
-gtao.add(model);                // gltf-pro model: its normal maps feed the horizon search, as with SSAO
+gtao.add(model);                // gltf/pbr model: its normal maps feed the horizon search, as with SSAO
 gtao.options.slices = 1;        // options and `enabled` are read every frame
 ```
 
@@ -302,6 +378,9 @@ gtao.options.slices = 1;        // options and `enabled` are read every frame
   cosine-weighted visibility of the open arc, weighted by the projected normal's length; the slices average to the
   visible share of the cosine-weighted hemisphere. Occluders fade out between 60% and 100% of `radius`. The 4x4 pixel
   tile rotates the slices and offsets the steps (both 4x4 Bayer orders), and SSAO's bilateral blur averages the tile.
+  A sample's pixel is the nearest one to its point on the slice's line, up to half a pixel off it; each sample is slid
+  back into the slice along the surface's tangent plane, keeping its height above that plane, so an open plane of any
+  tilt reads exactly 1 (before, an open floor seen 53 degrees off its normal read 0.980; KB-GTAO-OPENFLOOR1).
 - **Shared with SSAO.** The normal G-buffer (with `gtao.add(source)` material normals), the blur, the ambient replay and
   the composite are SSAO's, so GTAO darkens exactly the ambient and image-based light (`margoAmbient`), not direct light
   or emission, under perspective and orthographic cameras. GTAO is a subclass of `SSAO`; with no GTAO, SSAO makes the
@@ -309,11 +388,38 @@ gtao.options.slices = 1;        // options and `enabled` are read every frame
 - **Checked on a real GPU** against closed forms (NVIDIA RTX A6000, Edge 155; `examples/package-benchmarks/post-effects-gpu.mjs
   --only=gtao`, [gtao-gpu.json](../../examples/package-benchmarks/results/gtao-gpu.json)): ambient light only, the
   frame with GTAO over the frame with it disabled. A point on a floor where a plane through it closes the hemisphere to
-  a wedge of angle b keeps `(1 - cos b) / 2` of its ambient light. Next to the crease GTAO measures 0.525, 0.267 and
+  a wedge of angle b keeps `(1 - cos b) / 2` of its ambient light. Next to the crease GTAO measures 0.520, 0.268 and
   0.783 for 90, 60 and 120 degree wedges (closed form 0.5, 0.25, 0.75; the blur mixes in floor up to a few cm out),
-  rising to 0.85-0.96 at 0.64 m with `radius: 2`; the open floor measures 0.995-1.009. The same at 1x MSAA and with
-  an orthographic camera (0.533, 0.270, 0.779). Alone, the open floor is unchanged (0/255) and the crease darker; in
+  rising to 0.85-0.96 at 0.64 m with `radius: 2`; the open floor measures 0.996-1.009. The same at 1x MSAA and with
+  an orthographic camera (0.532, 0.264, 0.777; open floor 1.000). Alone, the open floor is unchanged (0/255) and the crease darker; in
   a stack with SSR and Bloom and under TAA, no errors and no NaN.
+- **Sky occlusion** (`skyRadius`, default 0: off). Above 0, the slices search their horizons a second time out to
+  `skyRadius` scene units (`skySteps` samples a side, default 16, spaced by the square of their index from 1 pixel
+  out, slid into the slice like the GTAO term's) and keep only the sky half of each slice, the directions above the world horizon. The visible share of that sky
+  arc, cosine weighted with the same closed form and divided by the open sky arc, multiplies the occlusion, so the sky
+  light darkens in streets, valleys, slots and under eaves at a larger scale than `radius`, while an open surface of
+  any tilt reads 1 (a wall does not count the ground below the horizon as cover). The `animatedFeature` look sets it to
+  8 m (`POST_LOOKS`, rows `gtao.skyRadius` and `gtao.skySteps`). With `skyRadius` 0 the occlusion is the plain GTAO's
+  bit for bit (the uniform's sky values are 0 and the sky term returns 1 before any work). Checked on a real GPU,
+  WebGPU and the WebGL2 layer, by `test/gtao-sky-browser.mjs` on an RTX A6000: an open floor seen 53 degrees off its
+  normal reads 1.0000 of the plain GTAO and a 30 degree slope 1.0000 (the plain GTAO itself 1.0000 on both, and about
+  0.5 in a 90 degree crease of floor and wall: 0.674 after the blur at its darkest pixel, WebGL2 layer 0.612); the middle of a slot 2 m wide and 2 m
+  deep, seen from above, reads 0.471 (WebGL2 layer 0.476) against its view factor to the opening, sin(atan(w / 2h)) =
+  0.447, high because the nearest sample past the rim lies about half a step beyond it; switching it off restores the
+  plain occlusion exactly, which also matched the build before this option value for value. Sources: Bavoil, Sainz and
+  Dimitrov 2008, "Image-Space Horizon-Based Ambient Occlusion" (SIGGRAPH talk); Jimenez, Wu, Pesce and Jarabo 2016;
+  Klehm, Ritschel, Eisemann and Seidel 2011, "Bent Normals and Cones in Screen-space", VMV
+  (https://doi.org/10.2312/PE/VMV/VMV11/177-182); Max 1988, "Horizon mapping: shadows for bump-mapped surfaces", The
+  Visual Computer 4(2); Timonen and Westerholm 2010, "Scalable Height Field Self-Shadowing", Computer Graphics Forum
+  29(2); Hottel and Sarofim 1967, "Radiative Transfer" (crossed strings, the slot's view factor).
+
+  ```ts
+  import {GTAO} from 'margoengine/post/gtao';
+  import {createStage} from 'margoengine';
+  const stage = await createStage('#viewport', {backend: 'webgpu'});
+  const gtao = GTAO.attach(stage.engine, {skyRadius: 8}); // sky light darkens within 8 m of cover
+  gtao.options.skyRadius = 0;                            // live: back to plain GTAO from the next frame
+  ```
 - **Limits.** Screen-space: occluders off screen or hidden behind nearer surfaces do not occlude, and thin objects
   occlude as if infinitely thick (no thickness heuristic). No multi-bounce colour approximation, no bent normals and no
   specular occlusion cone: the IBL specular is darkened by the same factor as the diffuse, as with SSAO. Up to 4 slices
@@ -331,20 +437,20 @@ import {PostStack} from 'margoengine/post/stack';
 import {SSGI} from 'margoengine/post/ssgi';
 import {SSR} from 'margoengine/post/ssr';
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/scene.glb');
 const ssgi = new SSGI({rays: 4, maxDistance: 10, thickness: 0.5, steps: 32, intensity: 1});
 const ssr = new SSR();
 PostStack.attach(stage.engine, [ssgi, ssr]);
-ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may capture it (one shared capture hook)
+ssgi.add(model); ssr.add(model);  // gltf/pbr model or materials mesh: both may capture it (one shared capture hook)
 ```
 
 - **Material replay.** At order 15 (after SSAO's and SSR's replays) core meshes are redrawn once at 1x with core's own
   shader into three targets: the ambient light the scene added at the pixel (`rgba16float`; SSAO's ambient replay:
   `margoAmbient` when a plugin such as `EnvironmentLighting` names it, else core's ambient term), the diffuse albedo
   `base·(1−metal)` (`rgba8unorm`) and the normal (`rgb10a2unorm`). At 4x MSAA the replay writes its own 1x depth, as
-  SSR's does. Models added with `ssgi.add(model)` draw into the same targets through gltf-pro's capture hook (their
+  SSR's does. Models added with `ssgi.add(model)` draw into the same targets through gltf/pbr's capture hook (their
   own `ambient(s)`, occlusion included, albedo and normal maps). A model takes one capture hook, so SSR and SSGI share
   one per model (`packages/post/src/capture.ts`); with only SSR, SSR's calls are what they were
   (`proofs/post-ssr-models.proof.js`).
@@ -363,8 +469,8 @@ ssgi.add(model); ssr.add(model);  // gltf-pro model or materials mesh: both may 
   the floor's green falls by the share of its cosine-weighted hemisphere the wall covers (the form factor from a
   floor point to the rectangle, integrated numerically) and its red stays. At 18 floor points 5 cm to 2 m from the
   wall the measured share is within 0.023 of it (0.471 against 0.486 at 5 cm, 0.234 against 0.249 at 1 m, 0.110
-  against 0.111 at 2 m) and red stays 1.000; the same at 1x MSAA, for a gltf-pro floor added to SSGI and SSR (red
-  0.990: gltf-pro's ambient also holds a specular term, removed and not re-added), and with an orthographic camera
+  against 0.111 at 2 m) and red stays 1.000; the same at 1x MSAA, for a gltf/pbr floor added to SSGI and SSR (red
+  0.990: gltf/pbr's ambient also holds a specular term, removed and not re-added), and with an orthographic camera
   (within 0.021). With GTAO, SSR and TAA in the same frame and alone: no errors, no NaN.
 - **More bounces (`multiBounce: true`).** Rays then read the light they hit from the previous frame's result,
   reprojected through the previous frame's camera, which already holds the bounces before it: each frame adds one
@@ -467,15 +573,18 @@ import {PostStack} from 'margoengine/post/stack';
 import {LensFlare} from 'margoengine/post/lens-flare';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
-const device = stage.engine.gpu!;
-// Any 2D texture of this device with a filterable format; here a small white disc fading to its edge.
-const glow = device.createTexture({size: [64, 64], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+// Any 2D texture of the engine's device with a filterable format; here a small white disc fading to its edge. As a
+// function it is made once per device, so the images are back by themselves after a device restore.
 const pixels = new Uint8Array(64 * 64 * 4);
 for (let i = 0; i < 64 * 64; i++) {
   const r = Math.hypot((i % 64) - 31.5, Math.floor(i / 64) - 31.5) / 32;
   pixels.set([255, 255, 255, Math.max(0, 1 - r) * 255], i * 4);
 }
-device.queue.writeTexture({texture: glow}, pixels, {bytesPerRow: 64 * 4}, [64, 64]);
+const glow = (device: GPUDevice) => {
+  const texture = device.createTexture({size: [64, 64], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+  device.queue.writeTexture({texture}, pixels, {bytesPerRow: 64 * 4}, [64, 64]);
+  return texture;
+};
 const lamp = [0, 6, 0];
 PostStack.attach(stage.engine, [
   new LensFlare({
@@ -497,6 +606,9 @@ PostStack.attach(stage.engine, [
   sun against the stack's depth (`host.depthTexture`): a sample sees the sun where nothing nearer than the sun's point
   is drawn. The flare is scaled by the share that does, so a sun behind geometry disappears, one at an edge dims, and
   one leaving the screen fades out. The share stays on the GPU (no readback).
+- **Device restore.** An element's `texture` is a `GPUTexture` or `(device) => GPUTexture`, made once per device. A plain
+  texture is lost with its device: that image draws nothing, `engine.onError` hears of it once (`'state'`,
+  [#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), and giving the element a new texture brings it back.
 - **Checked on a real GPU** (NVIDIA RTX A6000, Edge 155; `post-effects-gpu.mjs --only=flare`,
   [flare-gpu.json](../../examples/package-benchmarks/results/flare-gpu.json)), the frame with the flare minus without,
   linear: the brightest pixel is the sun's projected pixel (within one pixel); the flare is mirror-symmetric about the
@@ -717,7 +829,9 @@ in `render` to stay short. Release what you create in `dispose`.
 
 `@margoengine/post/contact-shadows` marches a short ray toward the light through the frame's depth, in a `PostStack`. It catches the
 small gaps where an object meets the ground. Options: `distance` (0.4), `thickness` (0.2), `strength` (0.7), `steps` (16), `enabled`
-(true). It sees only what is on screen, and it darkens ambient light too in the pixels it hits.
+(true). It sees only what is on screen, and it darkens ambient light too in the pixels it hits. A depth texel holds one depth
+for its whole pixel, so a hit needs the ray behind the depth by more than 1.5 pixels' worth of the surface's depth change;
+without that, lit slopes shadowed themselves in a dither pattern. Contacts thinner than that are not drawn.
 
 ```ts
 import {Engine} from 'margoengine/core';
@@ -725,6 +839,43 @@ import {ContactShadows} from 'margoengine/post/contact-shadows';
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas, {backend: 'webgpu'});
 ContactShadows.attach(engine, {distance: 0.3});
+```
+
+## Heat haze: `HeatHaze`
+
+`@margoengine/post/heat-haze` draws the shimmer of what lies behind the hot plume over a fire, in a `PostStack`. Each pixel's
+view ray is bent by the refraction of the hot air it crosses: the refractivity of air falls as 1 / T (Gladstone and Dale 1863,
+the ideal gas), the plume's temperature follows McCaffrey's measured flame and plume laws (about 850 K low in the flame, falling
+as z^(-5/3) above it) over Heskestad's Gaussian half-width, and its eddies (0.4 of the mean rise, George et al. 1977) rise with
+it at the flame's own speed. A bend at distance t shifts a background at tb by 1 - t / tb (background-oriented schlieren), so
+a wall just behind the fire barely moves, the far hills move most, and a surface in front of the plume never moves.
+
+Feed it plumes: a `Flame` of `@margoengine/vfx/flame` carries its own as `flame.plume` (its base, length, footprint, lean in
+the wind and clock, so a seeked flame shimmers as a played one), and a `FireFront`'s flames are `front.flameVolumes` and
+`front.buildingFlameVolumes`. A plain `{position, length, footprint?, yaw?, lean?, time?}` works too. Options: `sources`
+(a list or a function called every frame), `strength` (1, the physical bend; 0 to 100), `turbulence` (0.4), `ambient`
+(293.15 K), `steps` (24, the least march steps through a plume, more where it is narrow), `enabled` (true). Put it first among
+the HDR effects so the glow and focus see the bent scene.
+
+The physical bend is small: a 3 m flame turns light by about 1e-4 radian, a fraction of a pixel at a 60 degree field of view
+and a pixel or two through a telephoto, which is why real heat shimmer shows best on a long lens. Raise `strength` for a
+stylised look. `plumeBend` gives the bend of one ray on the CPU, `airRefractivity` and `plumeExcess` the physics.
+
+A plain plume without `time` rises on the effect's own clock, `haze.time`, the sum of its frame deltas. Its frame update
+moves it through `haze.advanceTime(delta)` (a draw never does), so `seek` of `@margoengine/cutscene/seek` replays it with
+the scene's other clocks and a film rendered scene by scene shows the same shimmer across a cut.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PostStack} from 'margoengine/post/stack';
+import {HeatHaze} from 'margoengine/post/heat-haze';
+import {Flame} from 'margoengine/vfx/flame';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: {position: [0, 3, 40], target: [0, 3, 0], fov: 15},
+});
+const flame = Flame.attach(engine, {position: [0, 0, 0], length: 4});
+PostStack.attach(engine, [new HeatHaze({sources: [flame]})]);
 ```
 
 ## Subsurface scattering: `SSS`
@@ -857,6 +1008,11 @@ const stage = await createStage('#viewport', {backend: 'webgpu'});
 const lens = new Lens({distortion: 0.15, dirtIntensity: 1.5});
 PostStack.attach(stage.engine, [lens, new Tonemap()]);
 lens.options.distortion = -0.1; // pincushion: options are read every frame
+lens.options.dirt = (device: GPUDevice) => {  // your own dirt image, made once per device
+  const image = device.createTexture({size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+  device.queue.writeTexture({texture: image}, new Uint8Array([255, 240, 220, 255]), {bytesPerRow: 4}, [1, 1]);
+  return image;
+};
 ```
 
 | Option | Default | Meaning |
@@ -864,7 +1020,7 @@ lens.options.distortion = -0.1; // pincushion: options are read every frame
 | `distortion` | `0` | Radial distortion k, -1 to 1: above 0 barrel (corners stay put), below 0 pincushion |
 | `dirtIntensity` | `1` | Strength of the lit dirt, 0 to 10; 0 skips the glow passes |
 | `threshold` | `1` | Linear brightness (largest channel) above which light lights the dirt |
-| `dirt` | built-in smudges | A `GPUTexture` of the engine's device, linear RGB, stretched over the view |
+| `dirt` | built-in smudges | A `GPUTexture` of the engine's device, linear RGB, stretched over the view, or `(device) => GPUTexture`, made once per device so it is back after a device restore. A plain texture is lost with its device: the built-in smudges draw, `engine.onError` hears of it once (`'state'`, [#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), and assigning `lens.options.dirt` a new texture brings it back |
 | `enabled` | `true` | False passes frames through |
 
 - **Method.** Each pixel reads the frame at c + (p - c) (1 + k r^2) s, with r measured in view heights from the
@@ -885,10 +1041,26 @@ lens.options.distortion = -0.1; // pincushion: options are read every frame
 value (`albedo`, `normal` (world), `position` (world), `distance` (from the camera), `emissive`, `material`
 (roughness, metalness, occlusion)) or your WGSL `vec4f` expression over `t: TargetSurface` (the same values, all world
 space), with its own float or normalised colour format. Core meshes always draw (a replay of core's shader with the
-lighting left out); add gltf-pro models and materials meshes with `targets.add(model)` so their own maps, skinning and
-instances write the outputs. The pass runs before the main pass by default (`order: -5`), so materials can read this
-frame's targets; a material that reads a target must not be added. Its own depth is `targets.depth`. Textures follow
-the drawing size and are replaced on resize (`onResize`). WebGPU only.
+lighting left out); add gltf/pbr models, materials meshes and a `Terrain` with `targets.add(model)` so their own maps,
+skinning and instances write the outputs. The pass runs after the passes at -5 that change core's shader and draw
+shadow maps (`Shadows`, sections), whatever order they were attached in, and before the main pass (`order: -4.5` by
+default), so materials can read this frame's targets; a material that reads a target must not be added. Its own depth
+is `targets.depth`. Textures follow the drawing size and are replaced on resize (`onResize`). WebGPU only (and the
+WebGL2 layer that runs it).
+
+Sun light and the look masks. `t.shadow` is the sun's visibility on the surface (1 lit, 0 hidden): the share of the sun
+a shadow plugin lets through (`@margoengine/shadows`, its light functions and coloured shadows counted by Rec. 709
+luminance), 1 with no shadow plugin; `t.light` is the unit direction toward the sun and `t.subject` is 1 on models
+added with `targets.add(model, {subject: true})`. Built-in values make the masks `@margoengine/headless/look`'s
+clean-frame checks read (`r8unorm`, 1 inside): `penumbra` (a surface facing the sun, cosine over 0.05, with
+visibility strictly between 0.02 and 0.98), `litGround` (ground, a normal within 45 degrees of up, facing the sun with
+a cosine of at least 0.2, visibility at least 0.98), `shadedGround` (the same ground with visibility at most 0.02) and
+`subject`; `shadow` itself is `rg16float`, the visibility and the cosine to the sun. The limits are exported as
+`TARGET_MASK_LIMITS`. Checked on a real GPU, WebGPU and the WebGL2 layer, by `test/scene-targets-shadow-browser.mjs`: a
+terrain and a core floor under a high sun each carry a box's soft shadow (about 350 shaded, 70 penumbra and 20,700 lit
+pixels at 320 x 240, visibility 0.0002 shaded and 0.99999 lit), the frame is darker inside the shaded mask, a gltf box
+fills the subject mask, and with the Shadows plugin removed every surface reads 1. Core meshes cannot be marked as the
+subject (core draws them in one pass); make the subject a gltf/pbr model or a materials mesh.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -905,13 +1077,34 @@ const targets = SceneTargets.attach(engine, {
 targets.onResize(() => console.log(targets.texture('normal')?.width));
 ```
 
+The look masks of a shot (`tools/shot`, docs/shots.md) from the sun's shadow and a subject model:
+
+```ts
+import { Engine, box } from 'margoengine/core';
+import { Shadows } from 'margoengine/shadows';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { SceneTargets } from 'margoengine/post/mrt';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const ground = engine.createMesh().setGeometry(box(20, 0.2, 20));
+const person = await loadGLTF(engine, '/models/person.glb');
+const shadows = Shadows.attach(engine);
+shadows.add(ground, { static: true });
+shadows.add(person);
+const looks = SceneTargets.attach(engine, {
+  outputs: { penumbra: 'penumbra', lit: 'litGround', shadow: 'shadedGround', subject: 'subject' },
+});
+looks.add(person, { subject: true });
+engine.start();
+```
+
 ## Depth texture: `DepthTexture`
 
 `@margoengine/post/depth` keeps the scene's depth in textures of its own, so any pass or material can sample it without
 borrowing one from an effect: `depth.texture` (depth32float, reversed Z, bind as `texture_depth_2d`) and
 `depth.distance` (r32float world distance from the camera, 0 where empty; read with `textureLoad`). It runs before the
 main pass, so a material reads this frame's depth: soft particles, shorelines, fog volumes. Core meshes always draw
-into it; add gltf-pro models and materials meshes with `depth.add(model)`, but not one whose material reads the depth.
+into it; add gltf/pbr models and materials meshes with `depth.add(model)`, but not one whose material reads the depth.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -965,6 +1158,11 @@ import {Decals} from 'margoengine/post/decals';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 Tonemap.attach(engine);                               // any post capture provides the scene depth
 const decals = Decals.attach(engine);                 // default white texel; pass {atlas} for a sampled 2D GPUTexture
+decals.setAtlas((device) => {                         // or (device) => GPUTexture, made once per device: back after a device restore
+  const atlas = device.createTexture({size: [1, 1], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+  device.queue.writeTexture({texture: atlas}, new Uint8Array([200, 60, 40, 255]), {bytesPerRow: 4}, [1, 1]);
+  return atlas;
+});
 decals.setDecals([
   {position: [0, 0, 1], direction: [0, -1, 0], width: 1, height: 0.5, rect: [0, 0, 0.5, 0.5]},        // grime, multiply
   {position: [2, 1, -1], direction: [0, 0, -1], width: 0.6, height: 0.3, mode: 'over', color: [4, 3, 2]}, // glowing sign
@@ -973,14 +1171,16 @@ decals.setDecals([
 
 - **Projection.** `direction` points into the surface; the footprint is `width` x `height` around `position` (right =
   direction x `up`), the box reaches `depth` (default the smaller side) along `direction`, and the last 10% at both ends
-  fades. `rect` is the atlas region (u0, v0, u1, v1; v down).
+  fades. `rect` is the atlas region (u0, v0, u1, v1; v down). The atlas is a texture or `(device) => texture` (made once per
+  device); a plain atlas lost at a device restore draws no decal, is reported once through `engine.onError`
+  (`'state'`, [#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), and `setAtlas` brings the decals back.
 - **Normal-angle fade.** The surface normal comes from the depth buffer (per axis, the neighbour on the same surface, so
   silhouettes do not smear); a surface turned more than `angle` (default 60 degrees) from facing the projector gets
   nothing, with a fade over the last third, so a decal on a box top does not stretch down its sides.
 - **Blending.** `'multiply'` (default) scales the lit pixel by `color x texel` mixed by alpha: lighting, shadows and
   reflections stay (grime, cracks, paint on a light surface); it cannot brighten. `'over'` blends `color x texel` as
   unlit radiance (signs, glows; `color` may exceed 1). Multiply decals draw first, then over decals, each in list order.
-- **Where it runs.** Order 1.9: after opaque core meshes (0), gltf-pro and materials models (1) and LOD (1.5); before the
+- **Where it runs.** Order 1.9: after opaque core meshes (0), gltf/pbr and materials models (1) and LOD (1.5); before the
   sky (2), water (4), volumetric fog (5) and particles, so everything that writes depth before it can carry decals and
   the effects after it draw over them. Back faces of the boxes only, no depth test: each covered pixel runs once, also
   with the camera inside a box. One render pass, one instanced draw per mode (36 vertices per decal), one storage buffer
@@ -1008,7 +1208,7 @@ console.log(`${decals.drawn} of ${decals.count} decals drawn`);
 
 - **Validation.** `setDecals` checks the whole list (no holes, every field valid, values finite as Float32) before
   replacing anything, so a bad list throws and leaves the current decals drawing. `setDecals([])` clears them.
-- **Checks** (Intel Arc 140V, Edge 155, AC, GPU lock; `node examples/package-benchmarks/decals-gpu.mjs`,
+- **Checks** (Intel Arc 140V, Edge 155, AC; `node examples/package-benchmarks/decals-gpu.mjs`,
   [decals-gpu.json](../../examples/package-benchmarks/results/decals-gpu.json)), each at 4x and 1x MSAA, every 8th
   pixel ray-cast on the CPU: outside every decal box (3 cm margin) the frame equals the decal-free frame exactly; a
   multiply decal scales the floor's radiance by its colour (channel ratios within 0.04, through the inverse of Tonemap
@@ -1027,7 +1227,7 @@ console.log(`${decals.drawn} of ${decals.count} decals drawn`);
 
 Limits: needs a post capture's scene depth (throws `Decals need scene depth: attach a post capture (Tonemap, Bloom,
 PostStack, SSAO, TAA) first`); at 4x MSAA it reads depth sample 0 and writes every covered sample, so decal edges along
-geometry silhouettes are per pixel, not per sample; gltf-pro BLEND primitives (drawn before it, without depth) get no
+geometry silhouettes are per pixel, not per sample; gltf/pbr BLEND primitives (drawn before it, without depth) get no
 decal of their own and are tinted with the decal of the surface behind them; it changes colour only (`MaterialDecals` below changes normal, roughness and metalness); `multiply` cannot lighten; up to 4,096 decals per `setDecals`; the cull costs one sphere test per decal per frame on the CPU and the size cull drops
 decals under `minPixels` across (default 1 px). WebGPU only.
 
@@ -1068,9 +1268,12 @@ decals.setDecals([
 - **Atlas.** `atlas` is a sampled 2D texture: RGB a tangent-space normal map (green up, as glTF and OpenGL), alpha the
   coverage, read at mip level 0. The map's x follows the decal's right axis (`up` x `direction`) and its y the decal's up
   axis, laid onto the surface. Default a flat normal with full coverage, so a decal without an atlas changes only
-  roughness, metalness and colour.
+  roughness, metalness and colour. Pass `atlas` as `(device) => GPUTexture` and it is made once per device, so it is back
+  after a device restore. A plain texture is lost with its device: no decal applies, `engine.onError` hears of it once
+  (`'state'`, [#borrowed-lost](https://margoengine.com/errors#borrowed-lost)), and assigning `decals.options.atlas` a new
+  texture brings the decals back.
 - **Light.** The relight uses core's lit model (Lambert plus GGX, the sun and the ambient of `engine.lighting`). Core
-  meshes match it; gltf-pro and materials models, which add image-based light and more lights, get the sun and ambient
+  meshes match it; gltf/pbr and materials models, which add image-based light and more lights, get the sun and ambient
   part of the change only.
 - **Checks** (Apple silicon Mac, Metal, Chromium; `node packages/post/test/material-decals-browser.mjs`): on a rough grey
   floor seen along the sun's mirror direction, a 1 m decal with a normal tilted 45 degrees toward the sun brightens
@@ -1105,7 +1308,7 @@ SSAO or Bloom. It blends the last visible base frame over upgraded effects using
 smooth 180 ms opacity uniform. Attach before rendering the base scene, call
 `capture()` immediately after that render, then `await warm()` before attaching
 the remaining effects. After their GPU work completes, call `start()`, await
-`finished`, and dispose the fade. Pass duration `0` for reduced motion. The
+`finished`, and dispose the fade. Pass duration `0` for reduced motion. The fade reads `performance.now` by default; `SceneFade.attach(engine, duration, clock)` takes a milliseconds clock so a film frame fades by simulation time, not by how fast the machine renders (KB-FILM-CLOCK1). The
 temporary texture and uniform are released on disposal or device restoration.
 
 `Bloom` is Margo's one bloom (creative `PostProcessing` has none; put Bloom before it in a `PostStack`).
@@ -1128,7 +1331,7 @@ descriptors are retained until resize or device restoration. The curve reference
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {SSAO} from 'margoengine/post/ssao';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const model = await loadGLTF(stage.engine, '/FlightHelmet.glb');
@@ -1143,11 +1346,11 @@ stage.dispose();
 
 Captures linear HDR color and reversed scene depth, reconstructs view-space normals and linear depth, and overlays material normal maps from registered sources. A deterministic 32-point hemisphere kernel and tiled 4×4 rotation texture feed SSAO. Two separable bilateral passes respect normal and depth discontinuities. Composition attenuates captured ambient lighting, preserving direct lighting and emission, then tone maps once.
 
-Sources implement `draw(context, 'gbuffer' | 'ambient', color, depth)`; this structural interface avoids a dependency on glTF Pro. Core materials work without source registration. Resize, removal and device restoration recreate/release owned textures and buffers.
+Sources implement `draw(context, 'gbuffer' | 'ambient', color, depth)`; this structural interface avoids a dependency on glTF PBR. Core materials work without source registration. Resize, removal and device restoration recreate/release owned textures and buffers.
 
 **Orthographic cameras** (`@margoengine/cameras` or any projection that writes `camera.matrix`): when clip w is constant, samples are projected with the camera's own orthographic terms (scale, off-centre offset, signed near/far, from `shared/projection.js`) instead of a projection rebuilt from `fov`; depth reconstruction already inverts the real matrix. The gbuffer stores the signed view depth, so surfaces behind an orthographic eye (a negative near plane, cameras' default) are occluded like any other; exactly 0 marks "no surface". Perspective output is unchanged.
 
-**Image-based lighting**: the light SSAO occludes is the ambient term it replays. By default that is core's constant `radiance[3]` (glTF-pro: its hemisphere `ambient()`). A plugin that replaces the ambient light names it in the mesh shader as `let margoAmbient=<light>;` and adds `margoAmbient` to the lit color; SSAO then replays the whole lit shader returning `margoAmbient` (`_=` keeps the remaining bindings in the auto layout, so every pass binding is passed), and glTF-pro's ambient replay does the same for its models. `@margoengine/environment`'s `EnvironmentLighting` follows this convention, so with both active SSAO darkens the IBL diffuse and specular; neither package imports the other, and each renders exactly as before without the other. Specular occlusion is approximated by the same AO factor as diffuse (no roughness- or view-dependent cone), which slightly over-darkens glossy reflections in creases. Other ambient light added on top (sky's ambient patch) is not occluded.
+**Image-based lighting**: the light SSAO occludes is the ambient term it replays. By default that is core's constant `radiance[3]` (glTF PBR: its hemisphere `ambient()`). A plugin that replaces the ambient light names it in the mesh shader as `let margoAmbient=<light>;` and adds `margoAmbient` to the lit color; SSAO then replays the whole lit shader returning `margoAmbient` (`_=` keeps the remaining bindings in the auto layout, so every pass binding is passed; without `margoAmbient` the lighting sits in a dead `if(false)` block, so a plugin binding read anywhere in the lit shader, such as TerrainColors' look uniform, is bound as well), and glTF PBR's ambient replay does the same for its models. `@margoengine/environment`'s `EnvironmentLighting` follows this convention, so with both active SSAO darkens the IBL diffuse and specular; neither package imports the other, and each renders exactly as before without the other. Specular occlusion is approximated by the same AO factor as diffuse (no roughness- or view-dependent cone), which slightly over-darkens glossy reflections in creases. Other ambient light added on top (sky's ambient patch) is not occluded.
 
 Alone, the effect owns the output target and cannot run alongside Creative PostProcessing or Bloom; use a `PostStack` to combine them. It requires the standard core lighting shader. Transparent surfaces do not write opaque depth; SSAO is based on the opaque scene. Sampling is bounded to 1-32 points; radius uses scene units.
 
@@ -1179,6 +1382,28 @@ and after the alpha changes (it writes frames only, no committed result yet).
 - **DOF** (`@margoengine/dof`) keeps the sharp alpha: out-of-focus silhouettes spill colour onto
   transparent pixels. **TAA** (`@margoengine/taa`) writes opaque alpha. **SceneFade** darkens empty
   pixels while it fades. Use these on opaque canvases.
+
+## Sliders for the lens and glow: `@margoengine/post/settings`
+
+Every effect here keeps its options object and reads it each frame into a uniform, so the look changes while the scene runs and nothing is rebuilt. `@margoengine/post/settings` lists those controls as a table for sliders and panels: `POST_SETTINGS` has 69 rows (`name`, `group`, `kind`, `default`, `min`, `max`, `step`, `unit`, `about` and `live`), grouped by effect: `bloom`, `lens` (distortion and dirt), `lensFlare`, `anamorphic`, `motionBlur` (the shutter as an angle in degrees, 180 the film standard), `dof` (focus distance, focal length or film gauge, f-number, bokeh radius), `gtao`, `ssao`, `ssgi`, `ssr`, `contactShadows`, `heatHaze` (the bend's strength, the eddies' turbulence, the air's temperature, the march steps) and `smaa`. `applyPostSettings({bloom, lens, dof, ...}, values)` writes a set of values onto the effects you give (a name left out takes its default, a row set to null removes its option so the effect uses its own), and `POST_LOOKS` names five looks made only of row values: `natural` (the defaults), `cinematic`, `dream`, `documentary` and `nightGlow`. An unknown name throws `TypeError`, a value outside its row's range `RangeError`, and a row moved off its default whose effect you did not pass `TypeError`. Exposure, white balance, the grade, vignette, grain, dither and chromatic aberration are options of `Tonemap`, so they are rows of `@margoengine/tonemap/settings`.
+
+64 rows are `live`: writing all of them every frame for 60 frames creates no pipeline, buffer or texture (`npm run test:settings:browser`, native WebGPU and the WebGL2 layer), and the defaults written draw exactly what each effect draws with no options. Five rows are `live: false` because they make GPU objects: `bloom.radius` (the first move off 0.5 compiles one compute program and makes one buffer, later moves make none), `motionBlur.maxBlur` (the tile size of the velocity search), `ssgi.multiBounce` and `ssr.stochastic` (a history), and `dof.temporal` (read when the DOF attaches).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Bloom} from 'margoengine/post/bloom';
+import {POST_LOOKS, applyPostSettings} from 'margoengine/post/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const bloom = Bloom.attach(engine);
+applyPostSettings({bloom}, {'bloom.strength': 0.5, 'bloom.threshold': 1.2});
+// Key a row over a shot: the glow swells over four seconds.
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  applyPostSettings({bloom}, {...POST_LOOKS.cinematic, 'bloom.strength': 0.5 + 0.25 * Math.min(time, 4)});
+});
+```
 
 ## Preview tier contract
 

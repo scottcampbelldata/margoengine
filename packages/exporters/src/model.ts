@@ -1,8 +1,8 @@
-// glTF 2.0 / GLB export of gltf-pro models (loaded glTF and @margoengine/materials meshes) for PBR
+// glTF 2.0 / GLB export of gltf/pbr models (loaded glTF and @margoengine/materials meshes) for PBR
 // content. Writes the live node transforms, visibility, materials and morph weights,
 // with skins, morph targets, animation clips, EXT_mesh_gpu_instancing, textures and the KHR material extensions
-// gltf-pro renders. Accessors are re-written from the decoded data gltf-pro uses, so a re-import reads the same values.
-import type { PBRModel, PBRMaterial, PBRPrimitive as ModelPrimitive } from '@margoengine/gltf-pro';
+// gltf/pbr renders. Accessors are re-written from the decoded data gltf/pbr uses, so a re-import reads the same values.
+import type { PBRModel, PBRMaterial, PBRPrimitive as ModelPrimitive } from '@margoengine/gltf/pbr';
 import type {
   GLTFMesh,
   GLTFSkin,
@@ -139,7 +139,7 @@ class Writer extends Bin {
     return i;
   }
 
-  /** A source accessor as gltf-pro decodes it: floats, JOINTS as unsigned ints, WEIGHTS normalized per vertex. */
+  /** A source accessor as gltf\/pbr decodes it: floats, JOINTS as unsigned ints, WEIGHTS normalized per vertex. */
   private data(model: PBRModel, id: number, name: string, back = false, vertexMap?: Uint32Array): number {
     const type = model.asset.doc.accessors![id].type,
       source = vertexMap ? this.gather(model, id, vertexMap) : model.asset.accessor(id),
@@ -151,7 +151,7 @@ class Writer extends Bin {
         return this.accessor(values, type, max < 256 ? 5121 : 5123, ARRAY_BUFFER);
       }
       if (name.startsWith('WEIGHTS_')) {
-        // gltf-pro divides by the sum when skinning; written normalized so validators accept unnormalized sources.
+        // gltf/pbr divides by the sum when skinning; written normalized so validators accept unnormalized sources.
         const w = new Float32Array(values.length);
         for (let i = 0; i < w.length; i += 4) {
           const s = values[i] + values[i + 1] + values[i + 2] + values[i + 3];
@@ -194,6 +194,9 @@ class Writer extends Bin {
       attributes: Record<string, number> = Object.create(null),
       out: Json = { attributes },
       count = p.vertices.length / 20,
+      // gltf/pbr decodes strips, loops and fans (modes 2, 3, 5, 6) to point, line or triangle lists (pack.ts listIndices):
+      // they are written as those lists, indexed, so an unindexed strip is not read back as a list of its vertices.
+      listed = !!def.attributes && [2, 3, 5, 6].includes(def.mode ?? 4),
       back = !p.topology && side(p.material) === 'back',
       column = (at: number, width: number) => {
         const o = new Float32Array(count * width);
@@ -241,14 +244,17 @@ class Writer extends Bin {
       out.indices = this.memo(indices, () =>
         this.accessor(indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
       );
-    } else if (def.indices !== undefined || !def.attributes || p.part)
-      out.indices = this.memo(def.attributes && !p.part ? model.asset.accessor(def.indices) : p.indices, () =>
-        this.accessor(p.indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
+    } else if (def.indices !== undefined || !def.attributes || p.part || listed)
+      out.indices = this.memo(
+        def.attributes && !p.part && !listed ? model.asset.accessor(def.indices) : p.indices,
+        () => this.accessor(p.indices, 'SCALAR', count <= 65535 ? 5123 : 5125, ELEMENT_ARRAY_BUFFER),
       );
+    // glTF mode (3.7.2.1): without it a point or line primitive would be read as triangles.
+    if (p.topology) out.mode = p.topology === 'point-list' ? 0 : 1;
     if (def.material !== undefined) out.material = this.material(model, p.material, def.material);
     if (def.targets?.length)
       out.targets = def.targets.map((t: Record<string, number>) =>
-        Object.fromEntries(Object.entries(t).map(([k, id]) => [k, this.data(model, id, k, back)])),
+        Object.fromEntries(Object.entries(t).map(([k, id]) => [k, this.data(model, id, k, back, p.part?.vertexMap)])),
       );
     return out;
   }
@@ -279,7 +285,7 @@ class Writer extends Bin {
     );
   }
 
-  /** Live values from gltf-pro's material record (shared with an @margoengine/materials Material). */
+  /** Live values from gltf\/pbr's material record (shared with an @margoengine/materials Material). */
   private material(model: PBRModel, m: PBRMaterial, index: number): number {
     return this.memo(m, () => {
       const owner = textureOwner(model, index),
@@ -294,7 +300,7 @@ class Writer extends Bin {
         [normalScale, occlusion] = m.factors.slice(2),
         [roughness, metallic] = exponent < 0 ? m.factors : [(2 / (exponent + 2)) ** 0.25, 0],
         mode = ['OPAQUE', 'MASK', 'BLEND'][m.settings[0]];
-      // gltf-pro holds emissiveFactor * strength; factors above 1 move into KHR_materials_emissive_strength. A materials
+      // gltf/pbr holds emissiveFactor * strength; factors above 1 move into KHR_materials_emissive_strength. A materials
       // Material's emissiveIntensity is that strength, its emissive the factor.
       const intensity = owner?.emissiveIntensity ?? 1,
         own = intensity !== 1 && intensity > 0,
@@ -403,7 +409,7 @@ class Writer extends Bin {
     });
   }
 
-  /** Texture info for map slot `i` (gltf-pro order), with its KHR_texture_transform taken back out of the material's UV rows. */
+  /** Texture info for map slot `i` (gltf\/pbr order), with its KHR_texture_transform taken back out of the material's UV rows. */
   private textureInfo(model: PBRModel, m: PBRMaterial, i: number, owner: TextureOwner | undefined): Json | undefined {
     const texture = owner?.[slots[i]],
       map = owner && slots[i] in owner ? undefined : m.maps[i];
@@ -557,11 +563,8 @@ class Writer extends Bin {
       d = inst.data;
     for (let i = 0; i < n; i++) {
       const m = Float64Array.from(d.subarray(i * 24, i * 24 + 16)),
-        parts =
-          decompose(m) ??
-          ([0, 4, 8].some((c) => !Math.hypot(m[c], m[c + 1], m[c + 2]))
-            ? { t: [m[12], m[13], m[14]], r: [0, 0, 0, 1], s: [0, 0, 0] }
-            : null);
+        // A zero column is a zero scale on that axis only (glTF 2.0 section 3.5.3).
+        parts = decompose(m);
       if (!parts) throw new RangeError('Instance matrices must not shear');
       t.set(parts.t, i * 3);
       r.set(parts.r, i * 4);
@@ -594,7 +597,7 @@ function trs(node: PBRModel['root']): Json {
 }
 
 /**
- * Exports gltf-pro models (from loadGLTF/parseGLTF, or @margoengine/materials `createMesh`) as glTF 2.0: the hierarchy
+ * Exports gltf/pbr models (from loadGLTF/parseGLTF, or @margoengine/materials `createMesh`) as glTF 2.0: the hierarchy
  * with live transforms, cameras, punctual lights, meshes, materials and textures, skins, morph targets and weights,
  * instancing, and `animations`.
  * `binary: true` resolves to GLB bytes, otherwise to the `.gltf` result. Async because textures without encoded bytes
@@ -634,7 +637,7 @@ export async function exportModel(
     throw new TypeError('Invalid export options; pass the documented option types');
   if (!(maxTextureSize >= 1)) throw new RangeError('maxTextureSize must be at least 1');
   if (!list.length || list.some((m) => !m?.asset?.doc || !Array.isArray(m.nodes) || m.disposed))
-    throw new TypeError('Expected live gltf-pro models');
+    throw new TypeError('Expected live gltf/pbr models');
   const w = new Writer(embedImages, maxTextureSize, pixelArtOf(options.pixelArt)),
     json = w.json,
     maps = new Map<PBRModel, Int32Array>(),
@@ -685,7 +688,15 @@ export async function exportModel(
     // Meshes, skins and instancing once every kept node has its index.
     for (let i = 0; i < defs.length; i++) {
       const def = defs[i],
-        primitives = model.primitives.filter((p) => p.nodeIndex === i),
+        triangles = model.primitives.filter((p) => p.nodeIndex === i),
+        lines = model.pointsAndLines.filter((p) => p.nodeIndex === i),
+        // Points and lines (`pointsAndLines`) go back into their mesh in source primitive order (glTF 2.0 3.7.2.1).
+        sourcePrimitives: readonly unknown[] = def.mesh === undefined ? [] : doc.meshes![def.mesh].primitives,
+        primitives = lines.length
+          ? [...triangles, ...lines].sort(
+              (a, b) => sourcePrimitives.indexOf(a.definition) - sourcePrimitives.indexOf(b.definition),
+            )
+          : triangles,
         inst = (primitives[0] as PBRPrimitive | undefined)?.instances,
         out = json.nodes?.[map[i]];
       if (map[i] < 0 || !primitives.length || (inst && !inst.count)) continue;

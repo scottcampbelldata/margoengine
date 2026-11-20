@@ -5,7 +5,7 @@
 import {Engine} from '/packages/core/dist/index.js';
 import {LODSystem} from '/packages/lod/dist/index.js';
 import {autoLOD} from '/packages/lod/dist/auto.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {Animation} from '/packages/animation/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,0,10],target:[0,0,0],fov:50}}),device=engine.gpu;

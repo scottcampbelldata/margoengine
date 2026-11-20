@@ -1,0 +1,81 @@
+{
+ "deeper-reference": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        def \"a\" (\n            inherits = </C/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"a\"\n    {\n        def \"c\" (\n        )\n        {\n        }\n    }\n}\ndef \"M\" (\n    references = @./l0.usda@ (offset = 3; scale = 2)\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"a\" (\n    )\n    {\n        over \"c\"\n        {\n        }\n    }\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n        prepend references = @./l0.usda@ (offset = 3; scale = 2)\n    )\n    {\n        def \"a\" (\n            prepend references = @./l1.usda@</M/a> (offset = 10)\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\ndef \"Q\" (\n    payload = @./l2.usda@</M/a> (offset = 3; scale = 2)\n)\n{\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    13,
+    11,
+    0
+   ],
+   "/Q/a": [
+    12,
+    1
+   ],
+   "/Q/a/a": [
+    8,
+    4,
+    2
+   ],
+   "/Q/a/a/c": [
+    9,
+    5
+   ]
+  }
+ },
+ "same-prim": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        def \"a\" (\n            inherits = </C/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"a\"\n    {\n        def \"c\" (\n        )\n        {\n        }\n    }\n}\ndef \"M\" (\n    references = @./l0.usda@ (offset = 3; scale = 2)\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"a\" (\n    )\n    {\n        over \"c\"\n        {\n        }\n    }\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        def \"a\" (\n            prepend references = [@./l1.usda@</M/a> (offset = 10), @./l0.usda@</M/a> (offset = 3; scale = 2)]\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\ndef \"Q\" (\n    payload = @./l2.usda@</M/a> (offset = 3; scale = 2)\n)\n{\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    13,
+    11
+   ],
+   "/Q/a": [
+    12,
+    1
+   ],
+   "/Q/a/a": [
+    8,
+    4,
+    2
+   ],
+   "/Q/a/a/c": [
+    9,
+    5
+   ]
+  }
+ },
+ "stage-root": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        def \"a\" (\n            inherits = </C/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"a\"\n    {\n        def \"c\" (\n        )\n        {\n        }\n    }\n}\ndef \"M\" (\n    references = @./l0.usda@ (offset = 3; scale = 2)\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\n(\n)\ndef \"Q\" (\n    prepend references = @./l0.usda@\n)\n{\n    def \"a\" (\n        prepend references = @./l1.usda@</M/a> (offset = 10)\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    7,
+    0
+   ],
+   "/Q/a": [
+    8,
+    1
+   ],
+   "/Q/a/a": [
+    4,
+    2
+   ],
+   "/Q/a/a/c": [
+    5
+   ]
+  }
+ }
+}

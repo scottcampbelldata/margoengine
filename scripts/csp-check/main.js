@@ -1,8 +1,8 @@
-// Every feature class with a CSP footprint in one page: the core Wasm kernel, gltf-pro worker parsing, the Draco and
+// Every feature class with a CSP footprint in one page: the core Wasm kernel, gltf/pbr worker parsing, the Draco and
 // KTX2 decoder workers (Emscripten + Wasm), the BVH module worker, the post stack, DOM overlays (stats, labels, view
 // cube, inspector). scripts/csp-check.mjs serves the build with _headers applied.
 import { Engine, PbrMaterial, box } from '@margoengine/core';
-import { loadGLTFInWorker } from '@margoengine/gltf-pro/worker';
+import { loadGLTFInWorker } from '@margoengine/gltf/worker';
 import { DracoDecoder, KTX2Decoder } from '@margoengine/decoders';
 import { buildAsync } from '@margoengine/bvh';
 import { PostStack } from '@margoengine/post/stack';
@@ -43,7 +43,7 @@ engine
   .position.set(-1.5, 0.5, 0);
 engine.start();
 
-await step('gltf-pro worker', async () => {
+await step('gltf/pbr worker', async () => {
   await loadGLTFInWorker(engine, helmetURL);
   return 'flight-helmet-mobile.glb';
 });

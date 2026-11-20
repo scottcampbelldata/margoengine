@@ -10,7 +10,11 @@ export interface SmoothOptions {
   method?: 'taubin' | 'laplacian';
   /** Passes, 1 to 10000. A Taubin pass is one shrink step and one grow step. Default 10. */
   iterations?: number;
-  /** How far a vertex moves toward its neighbors' average per step, above 0 and at most 1. Default 0.5. */
+  /**
+   * How far a vertex moves toward its neighbors' average per step, above 0 and at most 1. Default 0.5. Taubin
+   * smoothing also needs a stable filter, |(1 - 2 factor)(1 - 2 mu)| <= 1, which allows factor up to about 0.7 at
+   * the default pass band.
+   */
   factor?: number;
   /** Taubin pass band: frequencies under it survive, so a larger value keeps less detail. Above 0, under 1. Default 0.1. */
   passBand?: number;
@@ -73,8 +77,14 @@ export function smoothMesh(mesh: PolygonMesh, options: SmoothOptions = {}): Mesh
   const moving: number[] = [];
   for (let v = 0; v < free.length; v++) if (free[v] && rings[v].length && !(pinBoundary && boundary[v])) moving.push(v);
   // Taubin's two steps: lambda = factor, and mu from 1 / lambda + 1 / mu = passBand.
-  const steps = method === 'taubin' ? [factor, 1 / (passBand - 1 / factor)] : [factor],
-    points: MutableVec3[] = mesh.vertices.map((p) => [p[0], p[1], p[2]]),
+  const steps = method === 'taubin' ? [factor, 1 / (passBand - 1 / factor)] : [factor];
+  // Taubin's transfer function f(k) = (1 - lambda k)(1 - mu k) must keep |f| <= 1 at the umbrella operator's top
+  // frequency k = 2, or every pass amplifies the highest-frequency noise and the mesh blows up.
+  if (method === 'taubin' && Math.abs((1 - 2 * steps[0]) * (1 - 2 * steps[1])) > 1)
+    throw new RangeError(
+      'Smooth factor is too large for Taubin smoothing at this passBand and would amplify noise; use 0.7 or less.',
+    );
+  const points: MutableVec3[] = mesh.vertices.map((p) => [p[0], p[1], p[2]]),
     delta = new Float64Array(moving.length * 3);
   for (let pass = 0; pass < iterations; pass++) {
     signal?.throwIfAborted();

@@ -1,4 +1,4 @@
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import { normalizeQuaternion } from '@margoengine/math/quat';
 import { type ClipMarker, validateMarkers } from './sampling.js';
 import { finite, Skeleton } from './skin.js';
@@ -451,7 +451,7 @@ export function sampleKeyframes(
 }
 
 /**
- * What {@link applyKeyframeClip} drives on a glTF-pro model: an `Animation` (`Animation.attach(model)`) fits, so morph
+ * What {@link applyKeyframeClip} drives on a glTF PBR model: an `Animation` (`Animation.attach(model)`) fits, so morph
  * weights go through its `setMorph`.
  */
 export interface KeyframeModelTarget {
@@ -482,7 +482,7 @@ function boneBinding(clip: KeyframeClip, skeleton: Skeleton): Int32Array {
 }
 /**
  * Poses `target` at `time`. On a `Skeleton`, every translation, rotation or scale track whose target names one of its
- * bones sets that bone's property (weights tracks are skipped: bones have no morphs). On a glTF-pro model's
+ * bones sets that bone's property (weights tracks are skipped: bones have no morphs). On a glTF PBR model's
  * `Animation`, tracks name model nodes (the first node with that name): transform tracks set the node's local
  * transform and weights tracks set every morph weight through `setMorph`. Pause the Animation's own clip
  * (`animation.playing = false`) while a code clip drives the model, or the two overwrite each other. Every property

@@ -21,7 +21,8 @@ heightmap.dispose(); // Frees its texture and registration; product can register
 Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
-with recomputed slope normals. `origin` is the minimum world XZ corner; it defaults
+with recomputed slope normals; `heightfield(height, options)` gives the same grid as a core `Geometry`, ready for
+`mesh.setGeometry`. `origin` is the minimum world XZ corner; it defaults
 to a centered rectangle, and mesh resolution defaults to 192 segments.
 `TerrainHeightmap.attach(engine, height, {size, origin?, resolution?})` owns an
 `r32float` texture sampled at cell centers, exposed as `.texture` for scatter and
@@ -33,14 +34,95 @@ The module validates finite samples and device limits, regenerates the texture
 on device restoration, and destroys it on disposal. Sampling arrays are released
 after upload; there is no per-frame CPU sampling or allocation.
 
-`TerrainColors.attach(engine, mesh, options)` applies height/slope colors and wet
+`TerrainColors.attach(engine, mesh, options?)` applies height/slope colors and wet
 shoreline darkening to one ordinary terrain mesh using its mesh ID. It preserves
 the existing PBR/shadow shader and caches the patch. Options are captured at
-attachment: `sand`, two `meadow` colors, `stone`, height ranges `shore`,
-`meadowHeight`, `stoneHeight`, `wetHeight`, plus `stoneNormal` (normal Y in 0..1),
-`wetDarkening` (0..1), and optional `variation` (0..1, default 0) and `detail`
-(0..1, default 1). Ranges must be increasing; colors are linear RGB in 0..1.
-Other meshes keep their materials.
+attachment, and every one has a default, so `TerrainColors.attach(engine, mesh)` alone gives sand at sea level
+(world Y 0, as `@margoengine/water`), grass over the rest and rock on slopes past about 35 degrees:
+
+| Option | Default | Source |
+| --- | --- | --- |
+| `sand` | `[0.5, 0.42, 0.29]` | dry sand albedo 0.35 to 0.45 (Oke 1987, table 1.1) |
+| `meadow` | `[0.133, 0.263, 0.033]`, `[0.274, 0.342, 0.064]` | grass albedo 0.16 to 0.26 (Oke 1987); the biomes package's grass and meadow |
+| `stone` | `[0.253, 0.223, 0.187]` | the biomes package's rock |
+| `shore` | `[0.3, 1.5]` m | beaches up to 1.5 m above sea level |
+| `meadowHeight` | the mesh's lowest to highest point, under its position and Y scale | |
+| `stoneHeight` | above the mesh's highest point (only slopes are stone) | pass a range for rocky peaks |
+| `stoneNormal` | `[0.75, 0.85]` (normal Y: 32 to 41 degrees) | angle of repose of loose soil and scree, 30 to 40 degrees (Carrigy 1970) |
+| `wetHeight` | `[-0.1, 0.4]` m | just above sea level |
+| `wetDarkening` | `0.6` | wet ground at about 0.6 of its dry albedo (Lekner and Dorf 1988) |
+| `wetDryTime` | `900` s (1 to 604,800) | with `wetness`: sand the water has left dries to 1/e of its moisture (Namikas et al. 2010) |
+| `wetGlossTime` | `20` s (0.1 to 3,600) | with `wetness`: its glossy water film drains to 1/e (Horn 2006) |
+| `variation` | `0` (0..1) | |
+| `detail` | `1` (0..1) | |
+| `sandSurface` | `{wind: [1, 0], ripple: 0.1, ripples: 1, streaks: 1, sorting: 1, broad: 0}`; `false` removes it | wind-built sand, below |
+
+Ranges must be increasing; colors are linear RGB in 0..1. Other meshes keep their materials. Sources: T. R. Oke,
+"Boundary Layer Climates", 2nd ed., 1987; J. Lekner and M. Dorf, "Why some things are darker when wet", Applied Optics
+27(7), 1988, https://doi.org/10.1364/AO.27.001278 ; J. Carrigy, "Experiments on the angles of repose of granular
+materials", Sedimentology 14, 1970, https://doi.org/10.1111/j.1365-3091.1970.tb00184.x
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainColors, heightfield} from 'margoengine/terrain';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const ground = engine.createMesh();
+ground.setGeometry(heightfield((x, z) => 6 * Math.sin(x / 9) * Math.cos(z / 11) + 2, {size: [120, 120]}));
+TerrainColors.attach(engine, ground); // sand, grass and rock with no options
+engine.camera.position = [0, 40, 90];
+engine.camera.target = [0, 0, 0];
+```
+
+### Wind-built sand: `sandSurface`
+
+The sand band carries what the wind does to dry sand, on by default (with `detail` above 0): impact ripples across
+the wind, streaks along it, and sorting by slope, so a dune field reads as dunes in flat overcast light instead of one
+beige sheet. Pass the direction the wind blows toward; a scene with a north wind blows toward +z:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainColors, heightfield} from 'margoengine/terrain';
+import {duneField} from 'margoengine/terrain/dunes';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const heights = duneField({width: 129, depth: 129, cellSize: 1, origin: [-64, -64], height: 2, wind: 90, seed: 3});
+const ground = engine.createMesh().setGeometry(heightfield((x, z) => {
+  const i = Math.min(128, Math.max(0, Math.round(x + 64))), j = Math.min(128, Math.max(0, Math.round(z + 64)));
+  return heights[j * 129 + i];
+}, {size: [128, 128], resolution: 128}));
+TerrainColors.attach(engine, ground, {shore: [20, 30], sandSurface: {wind: [0, 1], ripple: 0.1}});
+engine.camera.position = [0, 1.7, -20];
+engine.camera.target = [0, 0, 0];
+```
+
+| `sandSurface` field | Default | Meaning |
+| --- | --- | --- |
+| `wind` | `[1, 0]` | direction the wind blows toward, world `[x, z]`, any length above 0 |
+| `ripple` | `0.1` m (0.02 to 1) | ripple spacing; impact ripples of fine to medium sand are 5 to 20 cm apart |
+| `ripples` | `1` (0 to 2) | relief: height 1/15 of the spacing, a 5.5 degree windward side and a 19 degree lee side |
+| `streaks` | `1` (0 to 1) | streaks along the wind, 1 to 2 m wide, albedo up to 8% either way |
+| `sorting` | `1` (0 to 1) | lee slip faces up to 10% paler and smooth, with grainflow strips; windward faces up to 7% darker |
+| `broad` | `0` (0 to 1) | broad scour bands along the wind, 8 to 15 m wide and about 80 m long, up to 15% albedo either way; they never fade with distance, so far dune faces keep the wind's marks |
+
+- Ripples: crests run across the wind and wander and break off at defects (a two-octave phase warp and an amplitude
+  noise), with coarse grains darkening the crests and lee sides. Their relief bends the shading normal as a surface
+  gradient. Before a pixel covers half a ripple they fade out in object space (the footprint is the distance over
+  1,000, stretched by the grazing angle), and the crest band has zero mean, so the far ground keeps its colour and
+  does not shimmer. They are left off avalanching slip faces.
+- Sorting: a face turned downwind past about 15 to 27 degrees is a slip face (paler, fresh avalanche sand in strips
+  about 1 m wide); a face turned upwind is windward (darker coarse lag). On sand only; meadow and stone are unchanged.
+- Measured (`npm run test:gpu` in this package runs `test/sand.browser.mjs`; RTX A6000, WebGPU and the WebGL2
+  layer): near ground luma spread 1.77 times that of `sandSurface: false`, slip face 1.047 and windward face 0.963
+  times in sRGB luma, far ground pixel-to-pixel change 1.08 times.
+- Sources: R. S. Anderson, "A theoretical model for aeolian impact ripples", Sedimentology 34, 1987; B. Andreotti,
+  P. Claudin and O. Pouliquen, "Aeolian sand ripples: experimental study of fully developed states", Physical Review
+  Letters 96, 2006; R. P. Sharp, "Wind ripples", Journal of Geology 71, 1963; R. A. Bagnold, "The Physics of Blown Sand
+  and Desert Dunes", 1941; B. T. Werner and G. Kocurek, "Bedform spacing from defect dynamics", Geology 27, 1999; R. E.
+  Hunter, "Basic types of stratification in small eolian dunes", Sedimentology 24, 1977; N. Lancaster, "Geomorphology
+  of Desert Dunes", 1995; R. Greeley and J. D. Iversen, "Wind as a Geological Process", 1985; M. Mikkelsen, "Surface
+  Gradient-Based Bump Mapping Framework", JCGT 9(3), 2020; A. Norton, A. Rockwood and P. Skolmoski, "Clamping: a method
+  of antialiasing textured surfaces by bandwidth limiting in object space", SIGGRAPH 1982.
 
 Colors are worked out per pixel from the interpolated world height and normal, so
 band borders follow the true height and slope instead of the mesh's triangles.
@@ -86,14 +168,58 @@ The module keeps a stable GPU snapshot so flow ping-pong does not rebuild scene
 or vegetation bindings each frame. A 256 × 256 `rgba32float` snapshot costs 1 MiB
 and one GPU copy per frame. Terrain owns that snapshot, not the provider texture.
 
+Sand the swash has left stays wet (KB-TERRAIN-WETSAND1). Terrain keeps a moisture
+record over the water's grid, one `rgba32float` texel per water texel, updated once
+a frame by a small compute pass from the depth snapshot: wherever water stands the
+moisture and the surface film are full, and once it has gone the moisture falls as
+`exp(-t / wetDryTime)` and the film as `exp(-t / wetGlossTime)`. The darkening share
+is `(1 - e^-3m) / (1 - e^-3)` of the moisture `m`, since reflectance falls fastest
+with the first moisture and levels off near saturation (Lobell and Asner 2002;
+Nolet et al. 2014), so drying sand holds its dark tone and pales late; the film
+sets the sheen. `wetSandAfter(seconds, dryTime, glossTime)` returns what the record
+holds that long after the water left. Both times are live (`setLook`, and the
+`wet.dryTime` and `wet.glossTime` rows). The record costs two more textures the size
+of the water grid (2 MiB for 256 × 256) and starts dry: a shot that needs the wet
+band in its first frame lets the water run before it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainColors, heightfield, wetSandAfter} from 'margoengine/terrain';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const depth = engine.gpu!.createTexture({
+  size: [64, 64],
+  format: 'r32float',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST,
+});
+const beach = engine.createMesh().setGeometry(heightfield((x) => x * 0.02, {size: [80, 80], origin: [-40, -40]}));
+const colors = TerrainColors.attach(engine, beach, {
+  wetness: {texture: () => depth, origin: [-40, -40], size: [80, 80]},
+  wetDryTime: 600, // sand behind the swash dries to 1/e in 10 minutes
+});
+colors.setLook({wetGlossTime: 10});
+console.log(wetSandAfter(60, 600, 10).darkening); // 0.98 of the full darkening a minute after the swash
+```
+
+Sources: D. P. Horn, "Beach groundwater dynamics", Geomorphology 48, 2002,
+https://doi.org/10.1016/S0169-555X(02)00178-2 ; D. P. Horn, "Measurements and modelling of beach groundwater flow in
+the swash-zone: a review", Continental Shelf Research 26(5), 2006, https://doi.org/10.1016/j.csr.2006.02.001 ; R. A.
+Namikas, B. L. Edwards, M. C. Bitton, J. L. Booth and Y. Zhu, "Temporal and spatial variabilities in the surface
+moisture content of a fine-grained beach", Geomorphology 114(3), 2010, https://doi.org/10.1016/j.geomorph.2009.07.011 ;
+D. B. Lobell and G. P. Asner, "Moisture effects on soil reflectance", Soil Sci. Soc. Am. J. 66, 2002,
+https://doi.org/10.2136/sssaj2002.7220 ; C. Nolet, A. Poortinga, P. Roosjen, H. Bartholomeus and G. Ruessink,
+"Measuring and modeling the effect of surface moisture on the spectral reflectance of coastal beach sand", PLoS ONE
+9(11), 2014, https://doi.org/10.1371/journal.pone.0112151 ; S. A. Twomey, C. F. Bohren and J. L. Mergenthaler,
+Applied Optics 25(3), 1986, https://doi.org/10.1364/AO.25.000431 . The 900 s and 20 s defaults are Margo's values
+inside those ranges (minutes of drainage behind the swash, hours of drying landward), not a groundwater model.
+
 Wetness samples world XZ per fragment and darkens only the sand albedo below
-`wetHeight[1]`; fully wet sand is also 40% smoother, so it catches a soft sheen
-toward the sun. Meadow/stone blends and geometry stay fixed to terrain height and
-slope. The mask follows current water depth; it does not simulate erosion or
-retain a drying history after recession. It uses a group 0 binding from 40 up and
-flat output location 6 in the standard PBR shader. No core changes are required.
-Physical WebGPU regression: `node packages/terrain/test/wetness.browser.mjs` from
-the repository root after building the packages.
+`wetHeight[1]`; fully wet sand is also 40% smoother while its film lasts, so it
+catches a sheen toward the sun. Meadow/stone blends and geometry stay fixed to
+terrain height and slope. It uses a group 0 binding from 40 up and flat output
+location 6 in the standard PBR shader. No core changes are required. Physical
+regression on WebGPU and the WebGL2 layer: `node packages/terrain/test/wetness.browser.mjs`
+from the repository root after building the packages (MARGO_COMPAT=1 for the layer).
 
 Optional geometry clipmaps with vertex texture height/normal sampling and 4 to 16 terrain layers. Fixed grids form a center and concentric rings. Uniform origins follow the camera, inner ring edges follow the finer grid, and outer-edge vertices collapse onto the next coarser lattice to close seams ([seams.browser.mjs](test/seams.browser.mjs): rough ground seen from above at 200 camera offsets that step through fractions of a cell draws 0 clear-colour pixels on WebGPU and the WebGL2 layer). Height sampling uses bilinear `textureLoad`, including non-filterable `r32float` maps. Cliff faces use triplanar splatting; normalized slope/height weights blend an sRGB texture array.
 Each ring's 176-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
@@ -171,6 +297,41 @@ Terrain.attach(engine, {
     return { ...make(device), tint };
   },
 });
+```
+
+## Sliders for the sand and ground look: `@margoengine/terrain/settings`
+
+`TerrainColors` keeps its look (the colours, the height and slope ranges, the wet darkening and the sand surface's wind,
+ripples, streaks, sorting and broad bands) in one small uniform, so any of it changes while the scene runs with
+`colors.setLook(values)`: nothing is rebuilt, the next frame writes 176 bytes. `@margoengine/terrain/settings` lists those
+controls as a table for sliders and panels: `TERRAIN_SETTINGS` has 24 rows (`name`, `group`, `kind`, `default`, `min`,
+`max`, `step`, `unit`, `about` and `live`, which is true for every row), `applyTerrainSettings(colors, values)` writes a
+set of values (a name left out takes its default) with one `setLook` call, and `TERRAIN_LOOKS` names four looks made only
+of row values: `paleDesert`, `redDesert`, `volcanicBeach` and `saltFlat`. An unknown name throws `TypeError`, a value
+outside its row's range `RangeError`, and `null` is accepted only on the rows that say `nullable`: the four height
+ranges (null is the mesh's own range) and `sand.windDirection` (null leaves the wind to the weather drive).
+`detail`, `variation`, `wetness` and whether `sandSurface` is on were compiled in at construction and are not rows; a
+sand row on a `TerrainColors` built with `sandSurface: false` throws `TypeError`. Writing every live row each frame for 60
+frames creates no pipeline, buffer or texture (`test/sand.browser.mjs`, native WebGPU and the WebGL2 layer), and the
+defaults written draw exactly what a plain `TerrainColors` draws.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {TerrainColors, heightfield} from 'margoengine/terrain';
+import {TERRAIN_LOOKS, applyTerrainSettings} from 'margoengine/terrain/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const ground = engine.createMesh().setGeometry(heightfield((x, z) => 0.3 * Math.sin(x * 0.2) * Math.cos(z * 0.2), {size: [128, 128], resolution: 128}));
+const colors = TerrainColors.attach(engine, ground, {shore: [20, 30]});
+applyTerrainSettings(colors, {...TERRAIN_LOOKS.paleDesert, 'sand.windDirection': 45});
+// Key a row over a shot: the sand drifts from fine ripples to long scour bands.
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  applyTerrainSettings(colors, {...TERRAIN_LOOKS.paleDesert, 'sand.windDirection': 45, 'sand.broad': Math.min(1, time / 10)});
+});
+engine.camera.position = [0, 1.7, -20];
+engine.camera.target = [0, 0, 0];
 ```
 
 ## Relief and far detail: `bump` and `macro`
@@ -710,6 +871,105 @@ texels finer than a pixel. Cost not timed.
 - Attach it after `TerrainMaterials`, before any effect that replaces the terrain's lit shader. `shadows` darkens the
   sun's light only, not ambient or image-based light.
 
+## Wind-built dunes: `@margoengine/terrain/dunes`
+
+`duneField(options)` returns the heights of a dune field (a `Float32Array`, `width` heights a row, `depth` rows, in
+metres) to feed a `Terrain` heightmap or a `BiomeWorld`'s `height.samples`. Each dune has a long gentle windward side
+whose steepest slope is `stoss` and a short slip face at the angle of repose `lee`, the profile measured on real
+dunes: a 5 m dune is about 37 m from its windward toe to the crest and 8 m from the crest to the foot of its face.
+`transverse` lays ridges across the wind every `spacing` metres, their crests wandering and varying in height
+(`irregularity`); a ridge too high for its spacing is lowered so it fits. `barchan` lays isolated crescents, about 11
+heights wide, with their horns trailing downwind and some cells left bare where sand is short. `base` builds the dunes on
+ground you already have (real heights, a beach), and `amount(x, z)` (0 to 1) keeps them off wet sand or a launch flat.
+
+```ts
+import {duneField, duneLengths, slopeAt} from 'margoengine/terrain/dunes';
+const heights = duneField({width: 256, depth: 256, cellSize: 1, type: 'transverse', height: 5, spacing: 70, wind: 90, seed: 2});
+console.log(heights.length, duneLengths(5).stoss.toFixed(1), slopeAt(heights, 256, 128, 128).toFixed(1)); // 65536 37.0 ...
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `width`, `depth` | required | heights along x and z (2 or more each, at most 67,108,864 in all) |
+| `cellSize` | 1 | metres between heights |
+| `origin` | [0, 0] | world x and z of the first height |
+| `wind` | 90 | degrees from +x toward +z that the wind blows toward; slip faces face downwind |
+| `type` | `'transverse'` | `'transverse'` ridges (plenty of sand) or `'barchan'` crescents (scarce sand), Werner 1995 |
+| `height` | 4 | crest height in metres |
+| `spacing` | 70 | crest-to-crest spacing (transverse) or the cell each barchan stands in, metres |
+| `stoss` | 12 | steepest windward slope, 3 to 20 degrees |
+| `lee` | 32 | slip face, the angle of repose of dry sand, 25 to 36 degrees |
+| `irregularity` | 0.35 | 0 to 1: crest wander, height variation, bare cells and low hummocks between dunes |
+| `seed` | 1 | the same seed gives the same heights on every machine |
+| `base` | flat 0 | heights to build on, the grid's layout (not changed) |
+| `amount` | 1 | `(x, z) => 0..1`, the share of dune height at each point |
+| `round` | 0 | metres over which each brink is rounded; 0 keeps a sharp brink |
+
+`duneHill(x, z, {crest, height, wind, halfWidth, stoss, lee, round})` is the height of one big isolated dune, such as
+a coastal hill built by one main wind: a long windward side at `stoss` (default 12 degrees), a crest rounded over
+`round` metres (default a third of the height), a lee face at `lee` (default 30 degrees, a settled face) and a crest
+that falls off as a raised cosine to `halfWidth` across the wind (default 5 heights). Add it to a field or to real
+heights:
+
+```ts
+import {duneHill} from 'margoengine/terrain/dunes';
+const hill = {crest: [0, 0] as [number, number], height: 30, wind: 90, stoss: 12, lee: 30};
+console.log(duneHill(0, 0, hill).toFixed(1), duneHill(0, -100, hill).toFixed(1), duneHill(0, 40, hill).toFixed(1)); // crest, windward, lee
+```
+
+`duneProfile(p, height, tanStoss, tanLee, toe, round)` is one dune's height `p` metres downwind of its windward toe, `duneLengths`
+its windward and lee lengths, `barchan(u, v, height, tanStoss, tanLee)` one crescent around its crest, and
+`slopeAt(heights, width, i, j, cellSize)` the steepest slope at a height in degrees. Aeolian ripples (5 to 20 cm,
+Anderson 1987) are far finer than a terrain cell and belong in the sand material's relief, not the height field. Plain
+JavaScript with no GPU and no dependency; the dunes do not move (no saltation or avalanche simulation in v1.0.0,
+docs/limits.md).
+
+Sources: Bagnold 1941, *The Physics of Blown Sand and Desert Dunes* (London, 1941), slip faces at the angle of repose;
+Sauermann, Kroy and Herrmann 2001, "Continuum saltation model for sand dunes", Phys. Rev. E 64, 031305
+(https://doi.org/10.1103/PhysRevE.64.031305), and Kroy, Sauermann and Herrmann 2002, "Minimal model for sand dunes", Phys.
+Rev. Lett. 88, 054301 (https://doi.org/10.1103/PhysRevLett.88.054301), the convex windward profile and the brink at the
+crest; Hersen, Douady and Andreotti 2002, "Relevant length scale of barchan dunes", Phys. Rev. Lett. 89, 264301
+(https://doi.org/10.1103/PhysRevLett.89.264301), barchan width in proportion to height; Andreotti, Claudin and Douady 2002,
+"Selection of dune shapes and velocities", Eur. Phys. J. B 28, 321 (https://doi.org/10.1140/epjb/e2002-00236-4), sinuous
+crests; Werner 1995, "Eolian dunes: computer simulations and attractor interpretation", Geology 23(12), 1107
+(https://doi.org/10.1130/0091-7613(1995)023<1107:EDCSAA>2.3.CO;2), ridges against crescents by sand supply; Anderson 1987,
+"A theoretical model for aeolian impact ripples", Sedimentology 34, 943 (https://doi.org/10.1111/j.1365-3091.1987.tb00814.x).
+
+## Stored height grids: `@margoengine/terrain/height-grid`
+
+`gridHeightField(options)` turns a height grid you already have (a USGS 3DEP or SRTM tile read from a GeoTIFF, a decoded
+heightmap, any row-major numbers) into the `(x, z) => height` function that `heightfield`, `heightfieldGeometry` and
+`TerrainHeightmap` take. It reads bilinearly between texels over the grid's real ground size, holds the edge heights
+outside the box, and fills missing samples (NaN, or the file's no-data value such as -32768 or -999999) before the first
+read. The function also carries `min`, `max`, `origin`, `size` and `filled` (how many samples were missing).
+
+```ts
+import {heightfield} from 'margoengine/terrain';
+import {gridHeightField} from 'margoengine/terrain/height-grid';
+const heights = new Float32Array([0, 1, 0, 1, 2, -999999, 0, 1, 0]); // 3 by 3, one missing sample
+const ground = gridHeightField({width: 3, height: 3, heights, size: [300, 300], noData: -999999, exaggeration: 1.5});
+console.log(ground(0, 0), ground.max, ground.filled); // 3 3 1
+const mesh = heightfield(ground, {size: [300, 300], resolution: 96});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `width`, `height` | required | texels across x and down z, integers 2 to 65,536 |
+| `heights` | required | `width * height` numbers, row-major; row 0 at the minimum z (the north edge of a north-up raster when north is -z), copied once |
+| `size` | required | real ground extent `[x, z]`, each above 0 to 100,000 |
+| `origin` | centred on 0 | world x and z of the minimum corner |
+| `exaggeration` | 1 | vertical scale applied to the samples |
+| `base` | 0 | added to every height after `exaggeration` |
+| `noData` | none | a sample value that means no data (compared as float32); NaN always does |
+| `fill` | `'nearest'` | what a missing sample becomes: a number (world height), `'nearest'` valid texel over the eight neighbours, `'min'` or `'mean'` of the valid heights; a grid with no valid sample needs a number |
+| `registration` | `'point'` | `'point'`: texel (0, 0) at the corner and the last at `origin + size`, as `Terrain` and `TerrainQuery` read heights; `'area'`: texels are cells centred half a cell in (GeoTIFF PixelIsArea) |
+| `flipRows` | false | row 0 at the maximum z (a south-up grid) |
+
+Sources: bilinear interpolation, W. Press and others, Numerical Recipes, 3rd ed., 2007, section 3.6; no-data values,
+the GDAL raster data model (https://gdal.org/user/raster_data_model.html); PixelIsArea and PixelIsPoint, OGC GeoTIFF
+standard 1.1 (OGC 19-008r4); the nearest-valid sweep, A. Rosenfeld and J. Pfaltz, "Sequential operations in digital
+picture processing", Journal of the ACM 13(4), 1966. Our own code from those descriptions.
+
 ## Footprints, tracks and trails: `@margoengine/terrain/deform`
 
 `TerrainDeformation.attach(engine, terrain, options)` presses footprints, tyre tracks and trails into snow, mud and sand.
@@ -766,6 +1026,234 @@ is 6.6 of 255 on average from the same prints built as real geometry (a terrain 
 read-back relief), the flat picture 33.3; a print fills back in by `depth / fade` a second of frame time (0.075, 0.050
 and 0 deep after 0.5, 1 and 2 s at 0.05 m a second); a 2 m move keeps it, a 12 m one clears it; a painted layer of
 softness 0 takes none. Cost not timed.
+
+## Ground that changes on screen: `@margoengine/terrain/ground-change`
+
+`GroundChange.attach(engine, mesh, options)` changes a heightfield mesh's ground over film time: gullies cut back from
+their mouths, river banks retreat, scour holes deepen, slopes fail and run out, a flood leaves mud that dries, ash falls
+from a vent, lava flows and cools, and fire leaves a burn scar that whitens. Each event is a closed form of film time,
+so the ground at a time is the same whether a film is rendered in order, seeked to that time or rendered again. Each
+frame whose time moved recomputes only the vertices the active events can touch, writes their heights and normals into
+the mesh's own vertex buffer (so shadows and every other pass see the new shape) and lays the covers over the mesh's
+colour (after `TerrainColors`, if attached), with lava's glow added to its light.
+
+```ts
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {heightfieldGeometry, TerrainColors} from 'margoengine/terrain';
+import {toGeometry} from 'margoengine/geometry/utils';
+import {GroundChange} from 'margoengine/terrain/ground-change';
+import {applyGroundChangeSettings} from 'margoengine/terrain/ground-change-settings';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const grid = {size: [400, 400] as [number, number], origin: [-200, -200] as [number, number], resolution: 512};
+const hills = (x: number, z: number) => 0.05 * z + 4 * Math.sin(x * 0.02) * Math.cos(z * 0.015);
+const ground = engine.createMesh()
+  .setGeometry(toGeometry(heightfieldGeometry(hills, grid)))
+  .setMaterial(new PbrMaterial({color: [0.3, 0.26, 0.2], roughness: 0.9}));
+TerrainColors.attach(engine, ground);
+const change = GroundChange.attach(engine, ground, {
+  grid,                                   // the grid the mesh was built on
+  events: [
+    {kind: 'gully', path: [[-80, -120], [-60, -40], [-70, 30]], width: 6, depth: 2.5, duration: 40},
+    {kind: 'bank', path: [[-200, 120], [200, 140]], river: 'left', retreat: 12, bed: 2, duration: 60},
+    {kind: 'scour', center: [60, -20], radius: 8, depth: 3, flow: [0, 1], start: 10},
+    {kind: 'slide', from: [120, 160], to: [140, 60], width: 30, depth: 4, start: 20},
+    {kind: 'mud', shore: [[-200, -180], [200, -180]], land: 'right', reach: 250, thickness: 0.3, duration: 90},
+    {kind: 'ash', vent: [150, -150], thickness: 0.08, half: 80, wind: [6, 2], start: 30, duration: 60},
+    {kind: 'lava', path: [[150, -150], [100, -60], [40, -40]], width: 14, thickness: 2, start: 30, duration: 120},
+    {kind: 'burn', ignition: [-120, 60], wind: [5, -1], rate: 0.6, start: 5, duration: 240},
+  ],
+});
+applyGroundChangeSettings(change, {'lava.glow': 16, 'wet.rain': null});   // null: wet with the weather's rain
+change.setTime(45);                                                    // or let frames advance it
+engine.start();
+const {height, lava, heat} = change.sample(100, -60);                  // stand a person or a prop on it
+console.log(height, lava, heat);
+```
+
+On a clipmap `Terrain`, attach it to the terrain instead: the grid is the heightmap's texels, the changed heights are
+written into the heightmap itself (so every ring, the terrain's shadows and its normals show them), and the covers lie
+over `terrainColor` as a terrain lighting effect (after the terrain's other effects that replace its shader). The
+heightmap must be `r32float` with `COPY_SRC | COPY_DST` usage; its base is read back once (`await change.ready`).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {GroundChange} from 'margoengine/terrain/ground-change';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const n = 513, heights = new Float32Array(n * n).map((_, k) => 0.02 * Math.floor(k / n));
+const terrain = Terrain.attach(engine, {
+  size: [512, 512], origin: [-256, -256], heightScale: 1,
+  layers: Array.from({length: 4}, () => ({height: [-1e4, 1e4] as [number, number], slope: [0, 1] as [number, number], scale: 0.1})),
+  textures: (device) => {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 15});   // COPY_SRC | COPY_DST | ...
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(128), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const change = GroundChange.attach(engine, terrain, {   // grid left out: the heightmap's texels
+  events: [{kind: 'lava', path: [[0, 0], [60, 120]], width: 20, thickness: 3, duration: 90}],
+});
+await change.ready;                                      // the base heights are read back
+engine.start();
+```
+
+
+  default 0.3) and `seed`:
+  - `gully` (`path` mouth first, `width` 4, `depth` 1.5, `shape` `'v'` or `'u'`, `deposit` 0.6 of the eroded volume
+    left as a fan of radius `fan` below the mouth): the headcut climbs the path at a steady rate and the channel behind
+    it deepens and widens toward its full section.
+  - `bank` (`path`, `river` side, `retreat` 6, `bed` world Y, `face` 60 degrees): the land side retreats at a steady
+    rate, cut down to the bed with its face at the angle.
+  - `scour` (`center`, `radius` 5, `depth` 2, `flow`, `deposit` 0.5): depth grows as 1 - exp(-t / T) to the full depth
+    at the end; with a `flow` the scoured sand forms a mound downstream.
+  - `slide` (`from` crown, `to` toe, `width` 20, `depth` 3, `length` 40% of the way, `bulking` 1.15): the scar fails in
+    the first third and the lobe runs out as a block under friction, holding the scar's volume times `bulking`.
+  - `mud` (`shore`, `land` side, `reach` 400, `thickness` 0.25, `decay` reach / 3, `drying` 1,800 s): the front slows
+    inland, the deposit thins by e every `decay` metres and dries by e every `drying` seconds after the water passes.
+  - `ash` (`vent`, `thickness` 0.1, `half` 400, `wind`, `elongation` 1 + 0.25 wind speed): thickness halves every
+    `half` metres of an isopach's crosswind half width, the isopachs stretched downwind; it falls at a steady rate.
+  - `lava` (`path` vent first, `width` 12, `thickness` 2, `levee` 0.35, `cooling` 1, `glowCrust` 0.03): the front
+    advances and slows, the sheet stands between levees, and its glow fades as the crust grows 0.0779 sqrt(hours) m
+    (`cooling` real seconds per film second). With `arrival` (film seconds the front reaches each path point), and
+    optionally `widths`, `thicknesses` and `glows` (one per point), the front follows those times instead and stops
+    where they stop: `LavaFlow.lavaEvent()` of `margoengine/weather/lava` gives all four for a flow that runs down the
+    slope. `pond` (`center`, `start`, `end`, `flux` m^3/s, `viscosity` Pa s, `density` 2,600) fills a pond where the
+    flow can run no further: it spreads as Huppert's (1982) R = 0.715 (g Q^3 / (3 nu))^(1/8) t^(1/2) while fed and
+    holds after `end`, its thickness H (1 - (r/R)^2)^(1/3) with H = Q t / (0.75 pi R^2), so it holds the volume fed
+    into it (to 1 percent on a 0.5 m lattice in the tests), and its surface glows by the time since its edge passed;
+    `lavaEvent()` gives it for a flow that ponds. `roofs` (film seconds, one per point, 1e9 for never) roofs the
+    channel from each point into a lava tube: from the front's arrival to then a crust grows in from the levees
+    (Peterson et al. 1994) until it closes level with their crests, and nothing under it glows; `lavaEvent()` gives
+    them for a flow on gentle ground. `skylights` (metres, default 200, 0 for none) is the mean spacing of skylights
+    in a closed roof (Kauahikaua et al. 1998): a hole 0.8 widths long and half a width across in three of four
+    stretches of that length, at a seeded place, showing the stream half a sheet down, fresh until `drains` (film
+    seconds per point, 1e9 for never) and crusting from then on.
+  - `burn` (`ignition`, `wind`, `rate` 0.3 m/s, `severity` 1, `ashing` 900 s, `consume` 0.03 m): a wind ellipse grows
+    with the head running `rate`, its length to breadth from the wind; char whitens to ash by e every `ashing` seconds.
+- Look (all live, `setLook` or the rows of `@margoengine/terrain/ground-change-settings`): `soil`, `mud`, `ash`,
+  `char`, `ashen` and `lava` colours, `glow` 12, `cracks` 0.7, `crackSize` 0.8 m, `wetDarkening` 0.55, `wetGloss` 0.5,
+  and `rain` (null: a `WeatherDrive` writes the weather's rain; a number holds it).
+- Time: frames add their delta, or `clock` returns a shot's time, or `setTime(t)`; `advanceTime(delta)` is the clock
+  step `seek` from `@margoengine/cutscene/seek` replays. Pass `shadows` so a cached still shadow map re-renders when the
+  ground moves.
+- CPU model alone: `new GroundChange({grid, base, events})`, then `setTime` and `update()`; `change`, `heights` and
+  `covers` hold the grid, `sample(x, z, t)` the exact value anywhere, `onChange` reports each changed rectangle.
+- Plants follow the ground: spread `change.scatterGround()` into a `Scatter` or `GrassScatter`
+  (`@margoengine/scatter`). Its `heightmap` holds base plus change in metres, so plants rise and sink with the ground;
+  its `densityMap` keeps them where the ground keeps its own cover and clears them under fresh soil, mud, ash, char and
+  lava (255 less the strongest cover byte), so a gully or slide scar is bare, mud, ash and lava bury them and a burn
+  scar is burned clear as its front passes; `bounds` is the rectangle both cover. On a terrain, `await change.ready`
+  before the first frame. Dispose the scatter before the change (the maps go with it). Plants left standing at the edge
+  of a cover take its char, ash and mud through `change.plantCovers()` (`{covers, bounds}`, rgba8 mud, ash, char and
+  wetness per grid vertex) as the `ground` source of a `PlantStates` map (`@margoengine/scatter/states`).
+
+  ```ts
+  import {Engine, box} from 'margoengine/core';
+  import {heightfieldGeometry} from 'margoengine/terrain';
+  import {toGeometry} from 'margoengine/geometry/utils';
+  import {GroundChange} from 'margoengine/terrain/ground-change';
+  import {Scatter} from 'margoengine/scatter';
+  const engine = await Engine.create(document.querySelector('canvas')!);
+  const grid = {size: [48, 48] as [number, number], resolution: 96};
+  const ground = engine.createMesh().setGeometry(toGeometry(heightfieldGeometry((x, z) => 0.05 * z, grid)));
+  const change = GroundChange.attach(engine, ground, {
+    grid,
+    events: [{kind: 'burn', ignition: [-12, 0], rate: 0.25, duration: 60}],
+  });
+  Scatter.attach(engine, box(0.2, 0.8, 0.2), {count: 60000, area: [48, 48], ...change.scatterGround()});
+  engine.start();
+  ```
+- A terrain's heightmap must be `r32float` with `COPY_SRC` and `COPY_DST` (the read back and the writes); the grid is
+  its texels over the terrain's `origin` and `size` (`resolution` may differ along X and Z). Each changed frame writes
+  the changed texels (base plus change over `heightScale`) and invalidates the terrain's cached shadows; `dispose()` or
+  `engine.removePlugin(change.name)` writes the read-back texels back exactly. Normals the terrain takes from a
+  `normalmap` are tilted by the change's slope in the fragment shader. The terrain's CPU copies (`TerrainQuery`,
+  `TerrainSculpt.heights`) keep the base: read heights from `change.sample`. Memory on the GPU: 12 bytes a texel.
+- The mesh must be a `heightfieldGeometry` on the same grid at the identity transform (any vertex order). The mesh's
+  culling sphere grows over any raise past it, so ground lifted at the edge of a small mesh is never culled early.
+  `dispose()` or `engine.removePlugin(change.name)` gives the mesh its base heights, normals and sphere back, on the GPU
+  and in the CPU copy. Memory: 8 bytes of cover textures and 25 bytes of CPU grids a
+  vertex (26 MiB at 1,024 cells a side).
+
+Checked by `test/ground-change.test.js` against each law (Sumer's scour curve to 1e-9, Pyle's halving, Hon's crust,
+Alexander's length to breadth to 3%, volumes kept to 2 to 5%, the same grid whatever order the times come in) and on a
+real GPU by `test/ground-change.browser.mjs` (in `test:gpu`, WebGPU and `MARGO_COMPAT=1`, 2026-11-17): a gully and a
+scour drawn through GroundChange are 0.05 of 255 on average from a mesh built from the same final heights, the uncut
+ground 1.29; fresh lava glows orange (235, 132, 63), cooled lava is dark (33, 28, 25), ash greys and char blackens the
+ground; time 40 reached directly or in 1,200 steps draws the same pixels; `dispose` and `engine.removePlugin` draw the
+uncut ground exactly; lava 3 m thick at the edge of a 4 m mesh grows its culling sphere from 2.83 to 4.65 m, every
+vertex inside, and dispose puts 2.83 back. On a clipmap terrain (`test/ground-change-terrain.browser.mjs`, 129 x 129 texels 0.5 m
+apart, rings of 16 cells, WebGPU and `MARGO_COMPAT=1`): the heightmap holds base plus change exactly; the cut draws
+0.016 of 255 on average from a terrain whose heightmap is the final heights (the uncut 1.0); lava glows (235, 131, 63)
+and cools to (33, 28, 25); with a normal map the tilted cut is 0.12 from a normal map of the cut ground (untilted
+1.15); `dispose` and `engine.removePlugin` give every texel and pixel back. With a `Scatter` (`test/ground-change-scatter.browser.mjs`, both
+backends): its heightmap equals the changed heights exactly and its density map the cleared covers exactly; the burn
+scar and the lava draw no plants, the ground beside them 98 to 100% green.
+The whole-scene test page `examples/test-pages/ground-change.html` runs all eight kinds on one hillside with a weather
+drive (`node scripts/test-pages-browser.mjs --page=ground-change`). A changed frame recomputes the box around every
+active event on the CPU: 31 ms for 148,225 vertices with all eight active, measured once on a loaded dev PC.
+Sources: Mei, Decaudin and Hu 2007 (Pacific Graphics); Galin et al. 2019 (Computer Graphics Forum 38(2)); Bennett et
+al. 2000 (Water Resources Research 36(7)); Ikeda, Parker and Sawai 1981 (J. Fluid Mech. 112); Sumer, Fredsoe and
+Christiansen 1992 (J. Waterway, Port, Coastal and Ocean Eng. 118(1)); Heim 1932; Scheidegger 1973 (Rock Mechanics 5);
+Goto et al. 2011 (Marine Geology 290); Abe, Goto and Sugawara 2012 (Sedimentary Geology 282); Pyle 1989 (Bulletin of
+Volcanology 51); Hulme 1974 (Geophys. J. R. Astr. Soc. 39); Hon et al. 1994 (GSA Bulletin 106); Anderson 1983 (USDA
+INT-305); Alexander 1985 (8th Conf. Fire and Forest Meteorology); Key and Benson 2006 (USDA RMRS-GTR-164-CD).
+
+## Wet ground where a flood has been: `@margoengine/terrain/wet-ground`
+
+`WetGround.attach(engine, terrain, {record, origin, size})` draws a clipmap `Terrain` darker and glossier wherever a
+wetting record says the water has been, and dries it back over time. The record is `Flood.wetTexture` of
+`margoengine/water/flood` (rgba32float, one texel a flood cell: green the seconds since the cell was last wet above
+1 cm, blue 1 once it has been wet), read every frame, so the wet ground follows each tick, seek and device restore of
+the flood. A cell's wetness is `exp(-seconds since wet / dryTime)`; fully wet ground has `darkening` of the dry albedo
+(Lekner and Dorf 1988, https://doi.org/10.1364/AO.27.001278) and `1 - gloss` of the roughness, so the sun's highlight
+sharpens. It is a terrain lighting effect, so it composes with `GroundChange`, shadows and lights.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {WetGround, applyWetGroundSettings} from 'margoengine/terrain/wet-ground';
+import {Water} from 'margoengine/water';
+import {Flood} from 'margoengine/water/flood';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu',
+  camera: {position: [0, 30, 40], target: [0, 0, 0], near: 0.5, far: 1000},
+});
+// A street 64 m square falling gently east, and 1 m of water held west of x = -20 m that breaks loose.
+const n = 129, heights = new Float32Array(n * n).map((_, k) => 1 - 0.01 * (k % n));
+const terrain = Terrain.attach(engine, {
+  size: [64, 64], origin: [-32, -32], heightScale: 1, cellSize: 0.5,
+  layers: Array.from({length: 4}, () => ({height: [-1e4, 1e4] as [number, number], slope: [0, 1] as [number, number], scale: 0.1})),
+  textures: (device) => {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 15});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(128), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const water = Water.attach(engine, {
+  height: -50,
+  terrain: {heightmap: () => terrain.heightmap, origin: [-32, -32], size: [64, 64]},
+  fill: (x) => (x < -20 ? 2 : undefined),
+});
+const flood = Flood.attach(engine, {surface: water, maxDepth: 2, maxSpeed: 6});
+const wet = WetGround.attach(engine, terrain, {record: () => flood.wetTexture, origin: [-32, -32], size: [64, 64]});
+applyWetGroundSettings(wet, {'wet.dryTime': 120});   // dries within minutes for this shot (live, keyable)
+engine.start();
+```
+
+- Look (all live, `setLook` or the rows of `WET_GROUND_SETTINGS`, the shared slider row shape): `darkening` 0.55,
+  `gloss` 0.5, `dryTime` 10,800 s (3 hours; a soil surface dries over hours to a day, Idso et al. 1974,
+  https://doi.org/10.2136/sssaj1974.03615995003800050037x). `wetGroundSettingDefaults()` gives a panel's state.
+- `binding` (default 116) moves its two lighting-group bindings if another effect uses them. `dispose()` gives the
+  terrain its shader back; the record stays the flood's.
+- Measured on WebGPU and the WebGL2 layer (`test/wet-ground.browser.mjs`): fully wet ground draws as the terrain whose
+  layer is 0.55 of the dry albedo and, under the sun's mirror direction, as the terrain at roughness 0.45 (its highlight
+  1.19 times the dry ground's); at `dryTime` it is the layer times 1 - 0.45 / e, and at 20 x `dryTime` the plain terrain.
+  Limits: one wetness a flood cell, the same darkening for every layer, no evaporation model (docs/limits.md).
 
 ## Mesh to terrain blending: `@margoengine/terrain/blend`
 
@@ -825,6 +1313,116 @@ without). Every pixel that changes lies on the box's foot (within the fade's rea
 same bytes. With noise 0 the fade's top is the same row across the face (spread 1), with noise 1 it wanders over 10
 rows. Cost not timed.
 
+## Cliffs, overhangs and sea rocks: `@margoengine/terrain/rocks`
+
+A heightfield holds one height per point, so it can draw neither an overhang nor a sea stack with a notch cut at its
+foot, and its steep slopes stretch into smooth ramps. `findRockSites(ground, options)` finds where rock belongs on a
+height grid (any grid: a `Terrain`'s heightmap texels, a `@margoengine/biomes` world's heights, a sculpted grid) from
+its relief and slope; `buildCliff`, `buildSeaRock` and `buildBoulder` build each piece as a closed mesh standing a little
+proud of the heightfield; `TerrainBlend` fades their feet into the ground and `RockSurface`
+(`@margoengine/terrain/rock-surface`) shades them as rock that holds up close.
+
+```ts
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {TerrainVirtualTexture} from 'margoengine/terrain/rvt';
+import {TerrainBlend} from 'margoengine/terrain/blend';
+import {findRockSites, buildRocks} from 'margoengine/terrain/rocks';
+import {RockSurface} from 'margoengine/terrain/rock-surface';
+// A 30 m cliffed headland falling to the sea (sea level 0), as heights on a 129 x 129 grid over 256 m.
+const n = 129, heights = new Float32Array(n * n);
+for (let j = 0; j < n; j++)
+  for (let i = 0; i < n; i++) heights[j * n + i] = 30 / (1 + Math.exp(-(j * 2 - 138) / 2.5)) - 8;
+const ground = {heights, resolution: [n, n] as [number, number], origin: [-128, -128] as [number, number], size: [256, 256] as [number, number]};
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 12, -40], target: [0, 8, 10]}});
+const terrain = Terrain.attach(engine, {
+  size: [256, 256], origin: [-128, -128], heightScale: 1,
+  layers: [0, 1, 2, 3].map(() => ({height: [-100, 100] as [number, number], slope: [0, 1] as [number, number], scale: 1})),
+  textures(device) {
+    const heightmap = device.createTexture({size: [n, n], format: 'r32float', usage: 6});
+    device.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: n * 4}, [n, n]);
+    const layers = device.createTexture({size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6});
+    device.queue.writeTexture({texture: layers}, new Uint8Array(16).fill(150), {bytesPerRow: 4, rowsPerImage: 1}, [1, 1, 4]);
+    return {heightmap, layers};
+  },
+});
+const sites = findRockSites(ground, {
+  seaLevel: 0,         // the water the sea rocks stand in
+  cliffSlope: 50,      // degrees of slope that can hold a cliff
+  cliffRelief: 8,      // metres of local relief a cliff needs, within reliefRadius (16 m)
+  seaRocks: 12,        // most stacks and skerries
+  boulders: 3,         // fallen blocks at each cliff piece's foot
+});
+const blend = TerrainBlend.attach(engine, terrain, TerrainVirtualTexture.attach(engine, terrain), {height: 1});
+const rock = RockSurface.attach(engine, {moss: 0.3, tideHeight: 1.5});
+for (const piece of buildRocks(sites, ground, {cliff: {overhang: 3, strata: 1.4}, seaRock: {notchDepth: 0.8}})) {
+  const mesh = engine.createMesh().setGeometry(piece.geometry).setPosition(piece.position)
+    .setMaterial(new PbrMaterial({color: '#888888', roughness: 0.9}));
+  blend.add(mesh);
+  rock.add(mesh, {type: 'sandstone', seaLevel: 0});
+}
+engine.start();
+```
+
+- Sites. Slope is Horn's 3 x 3 weighted difference (Horn 1981); local relief is the highest less the lowest ground in a
+  square of `reliefRadius` (van Herk 1992, Gil and Werman 1993: linear in the grid whatever the radius). A cliff piece
+  stands where ground at least `cliffSlope` steep (default 50 degrees) has `cliffRelief` of relief (default 8 m); its
+  foot and crest are found by walking down and up the slope until it eases to half the cliff slope, its `position` is
+  mid-face and `facing` points down the slope. Pieces are `cliffWidth` wide (24 m) and 0.75 of that apart at mid-face,
+  so they overlap; none is placed nearer the grid's edge than half a width. Sea rocks stand in water `seaRockDepth`
+  deep (1 to 15 m) within `shoreDistance` (80 m) of land (a two-pass chamfer distance, Borgefors 1986), most often about
+  half that reach out, at least `seaRockSpacing` (14 m) apart: stacks (0.35 to 0.85 of the nearby cliff's height) off
+  cliffed coast as its remnants, skerries (0.4 to 2.5 m above the sea) elsewhere (Sunamura 1992, Trenhaile 1987).
+  Boulders lie in front of each cliff's foot, bigger ones further out (fall sorting, Kirkby and Statham 1975). Sites
+  are a pure function of the ground and options (`seed` picks again); `slope` and `relief` come back as grids too.
+- Cliff pieces. The face is the ground's own crossing of each height along the facing, so the piece follows the real
+  relief, moved `proud` (0.6 m) out past its deepest crack, soft bed and bump so the smooth slope never shows. It leans
+  `overhang` (2.5 m) out over its top third (a true overhang once that beats the slope's lean back), steps in strata of
+  `strata` (1.4 m) beds whose hard ones stand up to `ledges` (0.5 m) out (tilted by `dip`), is cut by vertical joints
+  every `joints` (3 m), shifted bed by bed, `crackDepth` (0.35 m) deep (jointed blocks after Paris et al. 2020), carries
+  3D bumps of `roughness` (0.35 m), stops just under the crest and goes `embed` (1.5 m) into the ground at its foot; its
+  ends fold back into the hill. Rock volumes over a heightfield after Peytavie et al. 2009 (Arches), Paris et al. 2019
+  and Gamito and Musgrave 2001.
+- Sea rocks. A lumpy (`lobes` 0.22 of the radius), tapering (`taper` 0.25, a skerry 0.5) column with a wave-cut notch
+  `notchDepth` (0.6 m, at most 0.45 of the radius) deep in a band `notchHeight` (1.2 m) high, centred a tenth of it over
+  the still water, so the rock above overhangs it; strata ledges, `joints` (7) around it and a rounded top. Boulders are
+  the cell of `facets` (9) fracture planes inside a sphere, edges rounded by `rounding` (rock piles after Peytavie et al.
+  2009), `embed` (0.3) of the radius buried.
+- Meshes. Each piece is a signed distance field polygonized by Marching Cubes (Lorensen and Cline 1987, `marchingCubes`
+  of `@margoengine/procedural`) at `cell` spacing (cliffs 0.5 m, sea rocks radius / 12, boulders radius / 10) in blocks
+  of up to 127 cells whose shared vertices are welded and whose normals all come from the field's central differences,
+  so every mesh is closed and shows no seam between blocks. Geometry is about `position` (set the mesh there). A 24 m
+  wide, 30 m high cliff piece at 0.5 m is about 25,000 triangles and takes about a fifth of a second on one core; build
+  a long coast in a worker. `cliffField`, `seaRockField` and `boulderField` return the signed distance and its box, for
+  collision or your own polygonizer.
+- `RockSurface` replaces an added mesh's colour, roughness and metalness, per pixel from the world position (no UVs or
+  textures): six octaves of triplanar relief as a surface gradient on the normal (Mikkelsen 2020, Blinn 1978), each
+  octave fading as its wavelength nears the pixel's footprint so far rock does not shimmer (Norton et al. 1982); the
+  rock type's two bed tones banded by its `strata` with thin bedding lines; broad tone variation; broken joint cracks;
+  moss on faces that look up; a wet, algae-dark band up to `tideHeight` over the rock's `seaLevel`; and rain that
+  darkens and smooths it (Lekner and Dorf 1988, Jensen et al. 1999). Rock types: `sandstone` (default), `limestone`,
+  `chalk`, `granite`, `basalt`, `shale` (`ROCK_TYPES`; give `color`, `color2`, `strata` or `porosity` to override). The
+  look (`RockLook`, defaults in `ROCK_LOOK_DEFAULTS`) is live through `setLook`; `look.rain` null follows a
+  `WeatherDrive`, which finds the surface by its name. One group-0 binding (from 40, past any taken); an added mesh's
+  pixels cost about twenty value-noise reads, other meshes one storage read. WebGPU, and WebGPU on the WebGL2 layer.
+  Its patch runs after `TerrainBlend`'s, so the blend's fade into the ground is laid over the rock.
+- Sliders: `@margoengine/terrain/rock-settings` holds every control on the shared row shape: the live look rows
+  (`detail.*`, `moss.*`, `tide.*`, `wet.*`; `wet.rain` null follows the weather's `rainRate`) for
+  `applyRockSettings(surface, values)`, and the shape rows (`cliff.*`, `sea.*`, `live` false) that `rockShapeOf(values)`
+  turns into the builders' options.
+
+Checked by `test/rocks.test.js` (CPU): slope exact on a 45 degree plane, relief equal to a brute-force window; on a
+coast of a 30 m headland beside a beach, cliffs only on the steep high ground and facing down it, sea rocks in their
+depth band within reach of the shore and spaced, stacks off the cliffs, boulders in front of the feet; 98% of the
+ground's slope behind the face; an overhang of 4 m standing 3.4 m or more past the plain face at 85% of the height
+with the lower face unmoved, and a 12 m one past the face below it; a stack's notch cut 1.1 m or more at the sea
+surface and under 0.05 m 2.5 m away; meshes closed (every edge in two triangles) across polygonizer blocks, normals out
+of the rock, the same input giving the same bytes. On a real GPU by `test/rocks.browser.mjs` (in `test:gpu`, WebGPU and
+`MARGO_COMPAT=1`, RTX A6000, 2026-11-18): a cliff piece seen from 12 m has 3.0 times the plain mesh's mean absolute Laplacian of
+luminance; rain darkens it to 0.69 of its light, the tide band to 0.61 with the rock above unchanged; with
+`TerrainBlend` the changed foot pixels sit 40 of 255 from the bare ground against 96 without; 150 m off, a quarter-pixel
+camera move changes the picture by 0.17 against the plain mesh's 0.15. Both backends give the same figures.
+
 ## Planet terrain: `@margoengine/terrain/planet`
 
 `PlanetTerrain.attach(engine, options)` draws a whole planet that can be flown around from orbit down to a metre above
@@ -865,6 +1463,10 @@ console.log(planet.altitude(engine.camera.position)); // metres above the ground
   that must fit the device's `maxBufferSize`, 256 MiB by default, so 10,992 patches at resolution 32 and 2,992 at 64,
   and `attach` throws `RangeError` past it, batch 132b); `origin` a
   `FloatingOrigin` to follow. Invalid values throw `RangeError` or `TypeError`.
+- The same patches on every machine (KB-FILM-CLOCK1): the millisecond `budget` makes a slower machine build fewer patches
+  a frame, so a frame drawn mid-refinement differs. For a film pass `maxBuilds` (patches a frame, 1 or more, `Infinity`
+  until nothing more is wanted): it replaces `budget`, and the patches built and drawn are the same on every run. `clock`
+  (milliseconds, default `performance.now`) is the clock the `budget` reads, for a simulation clock in replay.
 - Your own ground: `height(x, y, z, detail)` gets a unit direction from the centre (float64) and returns metres above
   `radius`; `detail` is the spacing of the vertices being built there, so a procedural height can skip finer detail.
   `cubeSphere(face, s, t)` maps a cube face point to its direction.
@@ -958,6 +1560,13 @@ at 1e7 as at zero, and blend and stream stay within 1 of 255 after a rebase in p
 `planRings` and `planWindows` bit for bit at those offsets, the layer wrap and tone, a rebase rewriting the rules once
 and redrawing shadows once, and `TerrainQuery` at the offsets.
 
+## Textures after a device restore
+
+`textures` is a function `(device) => TerrainTextures`, never a plain set, so a device restore needs nothing from you. The terrain calls it once
+for each device (at attach and again after `engine.rebootDevice()` or core's own recovery), binds the textures it returns, and destroys the old
+set. Make the textures from data you keep (the heights, the layer colours, the painted weights, the holes mask), not from a texture you made
+earlier, and nothing is lost and nothing is reported.
+
 ## On the WebGL2 compatibility layer
 
 Where the browser has no WebGPU, install the layer (`margoengine/webgl2-compat`) before `Engine.create` and the
@@ -1013,7 +1622,7 @@ at 4x and 1x MSAA. A terrain is reflected only on screen and, being a dielectric
 
 ## Shadows
 
-`shadows.add(terrain, {static: true})` casts and receives, in `Shadows` and in `VirtualShadows` alike; give either a `distance` that reaches as far as the camera sees. Any lighting effect may bind what it declares in its WGSL: the lighting group's layout is read from there.
+`shadows.add(terrain, {static: true})` casts and receives, in `Shadows` and in `VirtualShadows` alike, through the vertex entry of its colour pass, its position `@invariant` (WGSL 12.10) as every Margo shadow caster's is, so another program drawing the same surface writes the same depth bit for bit; give either a `distance` that reaches as far as the camera sees. Any lighting effect may bind what it declares in its WGSL: the lighting group's layout is read from there.
 
 ## Terrain as an occluder
 

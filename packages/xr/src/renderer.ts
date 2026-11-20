@@ -3,6 +3,7 @@ import type { Engine, Geometry, PassContext } from '@margoengine/core/extension'
 import { MargoError } from '@margoengine/math/errors';
 import type { XRBinding, XRProjectionLayer, XRViewerPose } from './types.js';
 import { meshTriangles, type MeshSourceOwner } from '../../shared/mesh-source.js';
+import { meshLayers } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { nativeGlassMaterial } from '../../shared/pbr-transmission.js';
@@ -12,7 +13,7 @@ declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: num
 type Resource = { vertex: GPUBuffer; index: GPUBuffer; instance: GPUBuffer; data: Float32Array; count: number };
 type DeviceRenderer = {
   prepare(context: Pick<Extract<PassContext, { backend: 'webgpu' }>, 'backend' | 'device' | 'encoder'>): void;
-  /** Returns the pass open afterwards: `pass`, or the one `options.snapshot` reopened (gltf-pro KB2281). */
+  /** Returns the pass open afterwards: `pass`, or the one `options.snapshot` reopened (gltf\/pbr KB2281). */
   draw(
     context: Extract<PassContext, { backend: 'webgpu' }>,
     pass: GPURenderPassEncoder,
@@ -35,6 +36,8 @@ export class StereoRenderer {
     colorView?: GPUTextureView;
     depthView?: GPUTextureView;
     depthGroup?: GPUBindGroup;
+    /** The eye's view while `layers` filters: the PBR renderers test each node against its mask (shared/view-rect inView). */
+    view?: NonNullable<PassContext['view']>;
   }> = [];
   private readonly used = new Set<Geometry>();
   private readonly pbr = new Map<MeshSourceOwner, DeviceRenderer[]>();
@@ -70,6 +73,7 @@ export class StereoRenderer {
     viewer: XRViewerPose,
     transparent: boolean,
     onEye?: (target: XREyeTarget) => boolean | void,
+    layers?: number,
   ): void {
     const device = this.device,
       pipeline = this.pipeline!;
@@ -88,7 +92,7 @@ export class StereoRenderer {
     used.clear();
     for (const resource of this.resources.values()) resource.count = 0;
     for (const mesh of engine.meshes.values())
-      if (mesh.geometry && engine.store.visible[mesh.id]) {
+      if (mesh.geometry && engine.store.visible[mesh.id] && (layers === undefined || meshLayers(mesh) & layers)) {
         const geometry = mesh.geometry;
         used.add(geometry);
         let resource = this.resources.get(geometry);
@@ -230,8 +234,17 @@ export class StereoRenderer {
           throw error;
         }
       }
+      const camera = Object.assign(Object.create(engine.camera), {
+        matrix: data.subarray(0, 16),
+        position: [position.x, position.y, position.z],
+      });
+      if (layers !== undefined) {
+        const box = image.viewport;
+        frame.view = { id: `xr-${eye}`, camera, viewport: [box.x, box.y, box.width, box.height], index: eye, count: viewer.views.length, layers };
+      }
       const context = {
         ...this.context!,
+        ...(layers !== undefined ? { view: frame.view } : {}),
         backend: 'webgpu' as const,
         device,
         encoder,
@@ -240,10 +253,7 @@ export class StereoRenderer {
         format: image.colorTexture.format,
         color: frame.colorView!,
         depth: frame.depthView!,
-        camera: Object.assign(Object.create(engine.camera), {
-          matrix: data.subarray(0, 16),
-          position: [position.x, position.y, position.z],
-        }),
+        camera,
         descriptor: {
           ...this.context!.descriptor,
           multisample: { count: 4 },
@@ -345,7 +355,7 @@ export class StereoRenderer {
     device.queue.submit([encoder.finish()]);
     binding.present?.(layer);
   }
-  /** True when a drawn gltf-pro model has a material drawn as native glass. */
+  /** True when a drawn gltf\/pbr model has a material drawn as native glass. */
   private glass(): boolean {
     for (const model of this.pbr.keys())
       for (const primitive of model.primitives) if (nativeGlassMaterial(primitive.material)) return true;

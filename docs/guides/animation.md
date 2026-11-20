@@ -17,7 +17,7 @@ repository to `public/models/` in your quickstart project. This page replaces `m
 ```ts
 import { createStage } from 'margoengine';
 import { Animation } from 'margoengine/animation';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Shadows } from 'margoengine/shadows';
 
 const stage = await createStage('#scene', { camera: { position: [0, 2, 6], target: [0, 1.2, 0] } });
@@ -115,7 +115,7 @@ raw data" in the [animation README](../../packages/animation/README.md).
 - **`play` throws "Unknown animation clip".** Clip names are case-sensitive. Print `animation.clips` and copy the name.
 - **The animation freezes after you set `playing = false` and never resumes.** Set `playing = true`, or call `play`.
 - **Many characters are slow.** Each `Animation` runs its own compute pass. For crowds, see
-  [animator](../../packages/animator/README.md) and [instancing](../../packages/gltf-pro/README.md).
+  [animator](../../packages/animator/README.md) and [instancing](../../packages/gltf/README.md).
 - **Animation needs WebGPU.** Skinning runs in a compute shader.
 
 ## Next

@@ -35,4 +35,5 @@ setInterval(() => {
         `tick p95 ${times[Math.floor(times.length * 0.95)]?.toFixed(1)} ms`,
     );
 }, 10_000).unref();
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close().then(() => process.exit(0)));
+// Closing the server leaves nothing to run, so the process ends by its event loop.
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => server.close());

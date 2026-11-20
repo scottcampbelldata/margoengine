@@ -69,7 +69,7 @@ Subtracting from a vertex whose other bones hold nothing passes the weight to th
 
 ## Skin checks before export
 
-`checkSkin` reports what Unity, Unreal, Godot, Roblox and glTF validators reject or render wrongly: unweighted vertices, more than four influences, weights that don't sum to 1, negative or non-finite weights, joint indices outside the skin, and degenerate bones (a joint on its parent, or a non-invertible inverse bind matrix). `assertSkin` throws a `RangeError` naming each fault and its fix.
+`checkSkin` reports what Unity, Unreal, Godot, Roblox and glTF validators reject or render wrongly: unweighted vertices, more than four influences, weights that don't sum to 1, negative or non-finite weights, joint indices outside the skin (in any slot, weighted or not), one joint in two weighted slots of a vertex (`duplicate-joint`; glTF 2.0 3.7.3.3 forbids both), and degenerate bones (each counted once) (a joint on its parent, or a non-invertible inverse bind matrix). `assertSkin` throws a `RangeError` naming each fault and its fix.
 
 ```ts
 import { WeightMap, assertSkin, checkSkin } from 'margoengine/rigging';
@@ -95,7 +95,7 @@ FABRIK (A. Aristidou and J. Lasenby, 2011) chains of any length with a pole: the
 
 ```ts
 import { EngineKernel } from 'margoengine/core';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { Animator } from 'margoengine/animator';
 import { addIKChain, type AnimatorIKChain } from 'margoengine/rigging/ik';
@@ -214,7 +214,7 @@ On a character, joints and collider nodes are glTF node indices; find them by na
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import { detectSkeleton, humanoidBones } from 'margoengine/rigging/retarget';
@@ -275,7 +275,7 @@ A model scaled up swings the same, only larger: forces, `radius`, collider radii
 VRM 1.0 avatars from any tool that writes them. `readVRM` takes a `.vrm` file's bytes and gives the avatar's data; `addVRM` puts it to work on the model: the 18 preset expressions and any custom ones, the look-at, the spring bones and a mouth and blink channel for your own lip sync. `writeVRM` puts an avatar back into a `.vrm`, and `createVRM` makes one from any rigged glTF.
 
 ```ts
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { addVRM, readVRM } from 'margoengine/rigging/vrm';
 import {Engine} from 'margoengine/core';
@@ -337,6 +337,48 @@ console.log(readVRM(out).humanoid.humanBones.head?.node === names.indexOf('mixam
 | `mouth`, `blink`, `lookAt` | none | Custom expression names that an expression's `overrideMouth`, `overrideBlink` or `overrideLookAt` also holds back, beside the presets the specification names. |
 
 Expressions drive morph targets, `color` and `emissionColor` of materials, and texture moves. The other colour binds exist only in MToon and land in `unsupported`, because Margo draws MToon materials by their plain glTF fallback: no toon shading or outlines. `VRMC_node_constraint` data stays in the file through `writeVRM` and does not run.
+
+With `MToon` from `@margoengine/rigging/mtoon` attached, MToon UV animation is computed in float64 and sent as small phases, so a scrolling or turning texture keeps its 1/60 s steps after days of running; [details and limits](../../docs/rigging-mtoon.md).
+
+## VRM first person (`margoengine/rigging/vrm-first-person`)
+
+A VRM 1.0 file says which meshes the wearer sees through their own eyes (`firstPerson.meshAnnotations`): `thirdPersonOnly` meshes (the head, the hair) stay out of the first-person view, `firstPersonOnly` meshes appear only in it, `both` show everywhere, and `auto` (also a mesh with no annotation) means "cut the head off for me". `loadVRM` makes that cut before the model loads: each `auto` skinned mesh is split into the triangles weighted to the head bone or a bone below it, drawn in third person only, and the rest. `addVRMFirstPerson` then puts each mesh on a render layer and gives you the two view masks, so every camera, mirror, probe and XR eye filters the avatar the way the file asks.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Reflector } from 'margoengine/environment/reflector';
+import { addVRMFirstPerson, loadVRM } from 'margoengine/rigging/vrm-first-person';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const model = await loadVRM(engine, 'Seed-san.vrm'); // `auto` meshes come back split into head and body
+const fp = addVRMFirstPerson(model, { firstPersonCameras: [engine.camera] }); // this camera looks through the eyes
+engine.render({ delta: 0 }); // world matrices, so viewpoint() reads the posed head
+const eye = fp.viewpoint();
+engine.camera.position = eye;
+engine.camera.target = [eye[0], eye[1], eye[2] + 1]; // a VRM 1.0 avatar faces +Z
+const mirror = Reflector.attach(engine, { width: 2, height: 2, layers: fp.thirdPersonLayers }); // the mirror shows the head
+mirror.node.setPosition([0, eye[1], 1]).setRotation([0, Math.PI, 0]);
+engine.start();
+// In a headset: xr.layers = fp.firstPersonLayers (margoengine/xr) hides the head in both eyes.
+```
+
+| Name | Meaning |
+| --- | --- |
+| `loadVRM(engine, url or bytes, options)` | Fetches (at most `maxDownloadBytes`, 64 MiB by default), splits and loads a VRM 1.0 file as a gltf/pbr `PBRModel`. Takes gltf/pbr's load options, `threshold` and `signal`. For VRM 0.x, run `convertVRM0Bytes` from `margoengine/rigging/vrm0` first. |
+| `splitVRMFirstPerson(glb, options)` | The split alone, bytes in and bytes out: no `auto` left, every other byte of the file kept. A second split changes nothing. |
+| `addVRMFirstPerson(model, options)` | Applies the annotations through render layers and returns the handle below. Throws a coded `state` error when a mesh is still `auto` (load it with `loadVRM`). |
+| `fp.firstPersonLayers`, `fp.thirdPersonLayers` | View masks: every layer but the third-person one, and every layer but the first-person one. Give the second to any mirror, probe or outside camera. |
+| `fp.viewpoint(out?)` | World position of the eyes: `lookAt.offsetFromHeadBone` on the head bone. |
+| `fp.meshAnnotations` | Each mesh node and the type it resolved to. |
+| `fp.dispose()` | Puts every mask back as it was (also `using`). |
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `threshold` (`loadVRM`, `splitVRMFirstPerson`) | `0` | Skin weight a vertex must pass on the head to count as head. 0 is the specification's rule; raise it when a stray head weight pulls collar triangles out of first person. |
+| `firstPersonOnlyLayer`, `thirdPersonOnlyLayer` | `29`, `30` | The layers the two kinds of mesh go on (`FIRST_PERSON_ONLY_LAYER`, `THIRD_PERSON_ONLY_LAYER`). |
+| `firstPersonCameras` | none | Cameras that get `firstPersonLayers`. |
+| `thirdPersonCameras` | the engine camera | Cameras that get `thirdPersonLayers`, only when the file has a `firstPersonOnly` mesh. |
+
+A camera, mirror or probe with no mask draws every layer, so it shows `firstPersonOnly` meshes until you give it `fp.thirdPersonLayers`. Shadows are not filtered: the avatar casts its whole shadow, head included, in every view, which is what you want when you look down at your own shadow. Draco and meshopt compressed meshes are read through `margoengine/decoders`, loaded only for a file that needs them. Limits and the measured GPU checks: [VRM first person](../../docs/rigging-vrm-first-person.md).
 
 ## Voxel weights (`margoengine/rigging/voxel-weights`)
 
@@ -404,7 +446,7 @@ console.log(rig.weights?.toInfluences()); // JOINTS_0 and WEIGHTS_0
 | --- | --- | --- |
 | `resolution` | `128` | Voxels along the longest side, 32 to 384. Thin arms need more. |
 | `up` | `[0, 1, 0]` | The mesh's up direction. |
-| `forward` | read from the feet | The way the figure faces, which says which side is its left. |
+| `forward` | read from the feet | The way the figure faces, which says which side is its left. A forward along `up` is a `RangeError`. |
 | `closing` | `1` | Closes gaps up to this many voxels before filling, joining parts that nearly touch. |
 | `symmetric` | `true` | Evens left and right joints across the body's centre when they already nearly agree. |
 | `weights` | `'voxel'` | `'voxel'` weights with `voxelWeights`; with `'none'`, pass `joints` to `boneHeatWeights` or any other solver. |
@@ -419,7 +461,7 @@ Linear skinning collapses elbows, knees and shoulders. A corrective is a blend s
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Animation} from 'margoengine/animation';
 import {Animator} from 'margoengine/animator';
 import { addCorrectives } from 'margoengine/rigging/correctives';
@@ -500,7 +542,7 @@ console.log(weights.toInfluences(), matched, filled);
 | --- | --- | --- |
 | `maxDistance` | `0.05` | Farthest a match may be, as a fraction of the source's size. |
 | `maxAngle` | `60` | Largest angle between the two surfaces at a match, degrees. Either facing counts, because cloth is often one layer with its normals any way round. |
-| `iterations` | `1000` | Most sweeps of the fill; it stops sooner once weights settle. |
+| `iterations` | `1000` | Most conjugate-gradient steps of the fill per bone; it stops once the harmonic system's residual is 1e-10 of where it started. |
 | `threshold` | `1e-4` | Weights below this are dropped before renormalising. |
 | `boneCount` | the source's | Bones in the result, for influences that do not use the last ones. |
 | `weld` | `1e-6` | Welding tolerance of the target as a fraction of its size. |
@@ -513,7 +555,7 @@ console.log(weights.toInfluences(), matched, filled);
 Puts a tracked face on a character. Face trackers report the same 52 values from 0 to 1, one per facial movement: Apple's ARKit, Google's MediaPipe Face Landmarker and Live Link Face all do. `addFace` reads a frame in any of their shapes, smooths it and drives the model's morph targets, found by name, or a VRM avatar's expressions.
 
 ```ts
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Animation } from 'margoengine/animation';
 import { addFace } from 'margoengine/rigging/face';
 import {Engine} from 'margoengine/core';
@@ -534,7 +576,7 @@ A frame is a record of names to values, or a list of `{ categoryName, score }`, 
 import { addFace } from 'margoengine/rigging/face';
 import { addVRM, readVRM } from 'margoengine/rigging/vrm';
 import { Animation } from 'margoengine/animation';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { Engine } from 'margoengine/core';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const url = '/avatar.vrm';
@@ -560,13 +602,13 @@ ARKit is a trademark of Apple Inc. MediaPipe is a trademark of Google LLC. Live 
 
 ## Retarget presets (`margoengine/rigging/retarget`)
 
-Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:
+Clips made for one skeleton play on another: `prepareRetarget(source, target)` recognises each rig's naming (Mixamo with any `mixamorig` prefix, Godot's humanoid profile, Roblox R15, MPFB (MakeHuman's default rig), Character Creator's CC3+ skeleton (`CC_Base_Hip`, `CC_Base_L_Upperarm`, ...; its twist and share bones stay at rest and follow their limb through the skin), the joints of `@margoengine/exporters/skin`'s `humanoidJoints()`, or the 55 humanoid bone names themselves), maps every target bone to its source bone, and by default turns the target's reference pose so each bone points the way the source's does at rest (an A-pose character driven by T-pose clips). Pass the result to `@margoengine/animation`'s `Retarget`:
 
 ```ts
 import { Animation, applyKeyframeClip } from 'margoengine/animation';
 import { Retarget, retargetRig } from 'margoengine/animation/skeleton-utils';
 import { createStage } from 'margoengine';
-import { loadGLTF } from 'margoengine/gltf-pro';
+import { loadGLTF } from 'margoengine/gltf/pbr';
 import { detectSkeleton, prepareRetarget } from 'margoengine/rigging/retarget';
 const stage = await createStage('#viewport', { backend: 'webgpu' });
 const [mixamoModel, godotHero] = await Promise.all(
@@ -583,11 +625,61 @@ applyKeyframeClip(walk, Animation.attach(godotHero), 0.5);
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `from` | detected | The source's naming: `mixamo`, `godot`, `roblox`, `margo` or `humanoid`. |
+| `from` | detected | The source's naming: `mixamo`, `godot`, `roblox`, `margo`, `mpfb`, `characterCreator`, `cmu` (CMU motion capture, as `@margoengine/loaders/mocap` `parseASF` names its joints) or `humanoid`. |
 | `to` | detected | The target's naming. |
-| `alignRest` | `true` | Turn the target's reference pose to the source's, bone by bone. `false` keeps the target's own rest pose (both rigs already stand alike). |
+| `alignRest` | `true` | Turn the target's limbs (arms, hands, fingers, legs, feet) to point as the source's do at rest, so a T-pose source drives an A-pose target. The trunk, neck and collarbones keep the target's own rest: their directions are body layout, and aiming them along a motion-capture skeleton's would hunch and shrug the target. `false` keeps the target's whole rest pose (both rigs already stand alike). |
 
-Target bones with no source bone (a Godot `Root`, Roblox's `HumanoidRootPart`, fingers a source lacks) map to `''` and stay at rest; the humanoid bones among them are listed in `unmapped`. Roblox R15 has no neck, shoulders, toes or fingers, so clips from it leave those at rest. Both rigs' model spaces must face the same way (glTF: +z forward, the figure's left at +x). `humanoidBones(names, preset)` gives the humanoid bone -> index map for your own tools, and `HUMANOID_BONES` lists every humanoid bone, parents first. An unrecognised naming throws a `RangeError` that asks for `from` or `to`.
+Target bones with no source bone (a Godot `Root`, Roblox's `HumanoidRootPart`, fingers a source lacks) map to `''` and stay at rest; the humanoid bones among them are listed in `unmapped`. Roblox R15 has no neck, shoulders, toes or fingers, so clips from it leave those at rest; its `UpperTorso` maps to `spine`, which VRM 1.0 requires (chest is optional). Both rigs' model spaces must face the same way (glTF: +z forward, the figure's left at +x). `humanoidBones(names, preset)` gives the humanoid bone -> index map for your own tools, and `HUMANOID_BONES` lists every humanoid bone, parents first. An unrecognised naming throws a `RangeError` that asks for `from` or `to`.
+
+## Hands (`margoengine/rigging/hands`)
+
+Named hand poses and a per-hand layer on an `@margoengine/animator` Animator. Body clips often carry flat or no finger
+tracks, which read as dead hands; `addHands` blends a relaxed rest pose into every clip whose finger tracks stay under
+15 degrees on average, cross-faded with the Animator's own transitions, and leaves clips that key their fingers alone.
+Each hand also takes keyed poses over time: `relaxed()`, `fist()`, `flat()`, `point()`, `pinch()`, `grip(diameter)`
+(a power grip solved for a bar of that diameter in metres) or `handPose(table)` with your own joint angles. The
+fingers are found through the retarget presets: Mixamo, VRM, MPFB (MakeHuman), Godot and the humanoid names.
+
+```ts
+import { Animation } from 'margoengine/animation';
+import { Animator } from 'margoengine/animator';
+import { createStage } from 'margoengine';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { addHands, grip, relaxed } from 'margoengine/rigging/hands';
+const stage = await createStage('#viewport', { backend: 'webgpu' });
+const model = await loadGLTF(stage.engine, '/mixamo-walk.glb');
+const animator = Animator.attach(Animation.attach(model), { initial: 'walk', states: { walk: 'Walk' } });
+const hands = addHands(animator); // relaxed fingers on every clip with flat finger tracks
+console.log(hands.flat.left); // the clips whose flat fingers get the relaxed pose
+hands.right.set(grip(0.035), { blend: 0.3 }); // close the right hand on a 35 mm rail over 0.3 s
+hands.right.set(relaxed()); // and open it again later
+hands.dispose(); // the clips play as authored again
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `left`, `right` | null | A pose each hand takes from the start; null leaves the hand to the clip (and the relaxed default). |
+| `auto` | true | Blend `rest` into clips whose finger tracks stay under `threshold`. |
+| `threshold` | 15 | Mean finger turn from rest, degrees, under which a clip counts as having flat fingers. |
+| `rest` | `relaxed()` | The pose `auto` blends in. |
+| `preset`, `bones` | detected | The rig's naming, or your own humanoid bone map, when detection cannot tell. |
+
+`hands.left.keys` and `hands.right.keys` are plain `{time, pose, blend, weight}` lists, so a film can write them ahead
+of time; with `hands.time` set the hands are a pure function of time and a seek gives what playing gives. A key with
+`pose: null` hands the hand back to the clip over its blend. A digit a pose leaves out (the relaxed pose leaves out the
+thumb, which a bind pose splays away from the palm) keeps the clip's own rotation and fades back to it.
+
+The poses follow the grasp literature: fingers close joint by joint until they meet the bar, the tip joint at 2/3 of
+the middle one (Rijpkema and Girard 1991), flexion grows from the index to the little finger (Santello, Flanders and
+Soechting 1998), the grip and rest classes of Feix et al. 2016, and the rest posture's ranges after Wheatland et al.
+2015. Without the engine, `measureHands(rig)`, `poseTable(pose, hand)`, `handRotations(hand, table)` and
+`gripFinger(lengths, diameter)` give the same numbers as plain data:
+
+```ts
+import { gripFinger } from 'margoengine/rigging/hands';
+const index = gripFinger([0.045, 0.026, 0.019], 0.035); // phalanx lengths in metres, a 35 mm bar
+console.log(index.flex.map(Math.round), index.tipGap < 0.0005); // joint angles in degrees; the tip meets the bar
+```
 
 ## Test character
 
@@ -602,3 +694,7 @@ with them and uses only their published bone names.
 ## Sources
 
 Written clean room from the published papers listed in [docs/clean-room.md](../../docs/clean-room.md#rigging-margoenginerigging).
+
+## Film time
+
+`MToon.advanceTime(delta)` moves the UV scroll and rotation clock (`mtoon.time`); the frame update runs it, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the UV phase a continuous run shows.

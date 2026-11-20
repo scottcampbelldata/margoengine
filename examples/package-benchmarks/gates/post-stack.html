@@ -1,9 +1,9 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Post stack gate</title><style>body{margin:0;background:#000}canvas{width:1280px;height:720px;display:block}</style></head><body><canvas></canvas>
 <script type="module">
-// Real scene for the post-stack gate (post-stack.mjs): SciFiHelmet (gltf-pro) on a floor with near and far boxes, optional
+// Real scene for the post-stack gate (post-stack.mjs): SciFiHelmet (gltf/pbr) on a floor with near and far boxes, optional
 // environment IBL. window.bench.setup(config) builds a fresh engine; measure(frames) times every GPU pass of each frame.
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {PostStack} from '/packages/post/dist/stack.js';
 import {SSAO} from '/packages/post/dist/ssao.js';
 import {Bloom} from '/packages/post/dist/bloom.js';

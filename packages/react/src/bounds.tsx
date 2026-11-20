@@ -1,10 +1,10 @@
 import { createContext, forwardRef, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import type { FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { Mesh as EngineMesh, Vec3 } from '@margoengine/core/extension';
-import { MargoError } from '@margoengine/math/errors';
 import { sceneWorldBounds } from './center.js';
 import { Mesh, type MeshProps, type MeshRef } from './components.js';
 import { live, report, useMesh, useScene } from './internal.js';
+import { fault } from '../../shared/errors.js';
 
 /** Props of `<Bounds>`; every prop is optional. */
 export interface BoundsProps extends MeshProps {
@@ -26,11 +26,11 @@ export interface BoundsApi {
   /** Frames `mesh`, default the whole `<Bounds>`. Returns false when it has no geometry yet. */
   fit(mesh?: MeshHandle): boolean;
 }
-const BoundsContext = createContext<BoundsApi | null>(null);
+const BoundsContext = /* @__PURE__ */ createContext<BoundsApi | null>(null);
 /** The enclosing `<Bounds>`, to frame it or one of its meshes from an event handler. */
 export function useBounds(): BoundsApi {
   const api = useContext(BoundsContext);
-  if (!api) throw new MargoError('state', 'useBounds needs a <Bounds> above it; wrap the component in <Bounds>');
+  if (!api) throw fault('state', 'useBounds needs a <Bounds> above it; wrap the component in <Bounds>', 'react-usage');
   return api;
 }
 type Options = Pick<BoundsProps, 'fit' | 'clip' | 'observe' | 'margin' | 'duration' | 'onError'>;
@@ -94,7 +94,7 @@ function BoundsBinding({ children, ...options }: Options & { children?: ReactNod
   return <BoundsContext.Provider value={api}>{children}</BoundsContext.Provider>;
 }
 /** Frames its content in the camera: on mount with `fit`, or from `useBounds().fit()`. Keeps the viewing direction. */
-export const Bounds = forwardRef<MeshRef, BoundsProps>(function Bounds(
+export const Bounds = /* @__PURE__ */ forwardRef<MeshRef, BoundsProps>(function Bounds(
   { fit, clip, observe, margin, duration, onError, children, ...props },
   ref,
 ) {

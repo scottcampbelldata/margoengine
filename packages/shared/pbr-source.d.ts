@@ -7,6 +7,8 @@ export interface PBRSource {
   readonly root: Mesh;
   readonly nodes: readonly Mesh[];
   readonly primitives: readonly PBRSourcePrimitive[];
+  /** glTF POINTS and LINES primitives (strips and loops decoded to lists), `topology` set, kept out of `primitives`. */
+  readonly pointsAndLines?: readonly PBRSourcePrimitive[];
   readonly asset: {
     readonly doc: GLTFDocument;
     /** Where the file came from, so its relative image URIs can be fetched. */
@@ -22,6 +24,8 @@ export interface PBRSourcePrimitive {
   /** Bind-pose position4, normal4, tangent4, UV0/UV1, color4 (20 floats). */
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
+  /** Set on a point or line list; absent on triangles. */
+  readonly topology?: 'point-list' | 'line-list';
   readonly deformed?: GPUBuffer;
   readonly definition: GLTFPrimitive;
   readonly extension?: unknown;
@@ -37,4 +41,6 @@ export interface PBRSourcePrimitive {
   };
   readonly weights: Float32Array;
   readonly targetNames: readonly string[];
+  /** Set on a part of a primitive split into parts: `vertexMap` names the definition's vertex of each local vertex. */
+  readonly part?: { readonly index: number; readonly count: number; readonly vertexMap: Uint32Array };
 }

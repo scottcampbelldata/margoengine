@@ -1,5 +1,5 @@
 // The worker mesher: the built worker script (no eval, as the strict CSP in docs/deploying.md needs, following
-// tests/no-eval-workers.test.js), sortQuads against an independent centre-distance oracle, and VoxelMesher on real
+// tests/no-eval-workers.test.js), sortQuads against an independent ray oracle, and VoxelMesher on real
 // worker_threads (results, priority order, supersede, cancel, dispose).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,26 +31,6 @@ function glassWorld(seed) {
   }
   world.setBlocks(edits);
   return world;
-}
-// Each quad's centre from the decoded fields and the geometry in ChunkMesh's documentation.
-const AXES = [
-  [0, 2, 1],
-  [0, 2, 1],
-  [1, 0, 2],
-  [1, 0, 2],
-  [2, 0, 1],
-  [2, 0, 1],
-]; // normal, u and v axis per face
-function centre(words, i) {
-  const q = decodeQuad(words, i),
-    c = [q.x + 0.5, q.y + 0.5, q.z + 0.5];
-  if (q.face < 6) {
-    const [n, u, v] = AXES[q.face];
-    c[n] += q.face & 1 ? -0.5 : 0.5;
-    c[u] += (q.w - 1) / 2;
-    c[v] += (q.h - 1) / 2;
-  }
-  return c;
 }
 const quads = (words) =>
   Array.from({ length: words.length / QUAD_WORDS }, (_, i) => words.slice(i * 3, i * 3 + 3).join());
@@ -96,24 +76,78 @@ test('the built mesher worker is a classic script without eval and meshes exactl
   assert.equal(posted.at(-1).data.error.name, 'TypeError', 'a bad job gets an error reply');
 });
 
-test('sortQuads orders quads back to front by centre distance, stable, as a permutation', () => {
-  for (const seed of [1, 2, 3]) {
-    const mesh = meshChunk(meshInput(glassWorld(seed), '0,0,0')),
+// A wide pool of water with glass scattered over and in it: wide water tops beside small glass faces.
+function poolWorld(seed) {
+  const world = new VoxelWorld({ blocks }),
+    next = random(seed),
+    edits = [];
+  for (let x = 2; x < 30; x++) for (let z = 2; z < 30; z++) edits.push(x, 6, z, WATER);
+  for (let i = 0; i < 40; i++) edits.push((next() * 32) | 0, 7 + ((next() * 4) | 0), (next() * 32) | 0, GLASS);
+  edits.push(20, 7, 20, GLASS, 8, 7, 22, GLASS, 22, 9, 6, GLASS);
+  world.setBlocks(edits);
+  return world;
+}
+
+test('sortQuads draws every quad a ray from the eye meets after the ones behind it, as a permutation', () => {
+  // The independent oracle: rays from the eye through scattered glass and water; the quads each ray meets, nearest
+  // last, must come in that order in the sorted array. Centre distance fails this beside a large or tilted quad.
+  let merged = 0;
+  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    const mesh = meshChunk(meshInput(seed > 3 ? poolWorld(seed) : glassWorld(seed), '0,0,0')),
       next = random(seed + 10),
-      eye = [next() * 60 - 14, next() * 60 - 14, next() * 60 - 14],
+      pool = seed > 3,
+      // Over a pool, eyes above the water: a merged water top sorted by its centre drew over glass in front of it.
+      eye = pool ? [next() * 32, 7 + next() * 10, next() * 32] : [next() * 60 - 14, next() * 60 - 14, next() * 60 - 14],
       before = mesh.translucent.slice(),
-      sorted = sortQuads(mesh.translucent, eye);
+      sorted = sortQuads(mesh.translucent, eye),
+      n = sorted.length / QUAD_WORDS;
     assert.equal(sorted, mesh.translucent, 'in place');
     assert.deepEqual(quads(sorted).sort(), quads(before).sort(), 'same quads');
-    const distance = (words, i) => centre(words, i).reduce((sum, c, axis) => sum + (c - eye[axis]) ** 2, 0),
-      position = new Map(quads(before).map((q, i) => [q, i]));
-    for (let i = 1; i < sorted.length / 3; i++) {
-      const a = distance(sorted, i - 1),
-        b = distance(sorted, i);
-      assert.ok(a >= b, `seed ${seed}: quad ${i} is farther than quad ${i - 1}`);
-      if (a === b) assert.ok(position.get(quads(sorted)[i - 1]) < position.get(quads(sorted)[i]), 'ties keep order');
+    // Each quad as a rectangle: its plane along the face's axis, its span (w along u, h along v) on the other two.
+    const rects = [];
+    for (let i = 0; i < n; i++) {
+      const q = decodeQuad(sorted, i),
+        axis = q.face >> 1,
+        [u, v] = [
+          [2, 1],
+          [0, 2],
+          [0, 1],
+        ][axis],
+        cell = [q.x, q.y, q.z],
+        size = [1, 1, 1];
+      size[u] = q.w;
+      size[v] = q.h;
+      rects.push({ axis, plane: cell[axis] + (q.face & 1 ? 0 : 1), cell, size });
     }
+    let checked = 0;
+    for (let r = 0; r < 600; r++) {
+      const target = [next() * 32, pool ? 6 + next() * 4 : next() * 32, next() * 32],
+        dir = target.map((c, a) => c - eye[a]),
+        hits = [];
+      for (let i = 0; i < n; i++) {
+        const { axis, plane, cell, size } = rects[i];
+        if (dir[axis] === 0) continue;
+        const t = (plane - eye[axis]) / dir[axis];
+        if (t <= 0) continue;
+        let inside = true;
+        for (let a = 0; a < 3 && inside; a++) {
+          if (a === axis) continue;
+          const c = eye[a] + t * dir[a];
+          inside = c > cell[a] + 1e-9 && c < cell[a] + size[a] - 1e-9;
+        }
+        if (inside) hits.push([t, i]);
+      }
+      hits.sort((a, b) => a[0] - b[0]);
+      for (let h = 1; h < hits.length; h++) {
+        if (hits[h][0] - hits[h - 1][0] < 1e-9) continue; // through a shared edge: either order is right
+        assert.ok(hits[h - 1][1] > hits[h][1], `seed ${seed} ray ${r}: a nearer quad is drawn before a farther one`);
+        checked++;
+      }
+    }
+    assert.ok(checked > 100, `seed ${seed}: the rays met ${checked} quad pairs`);
+    merged += rects.filter((r) => r.size.some((c) => c > 1)).length;
   }
+  assert.equal(merged, 0, 'translucent quads are not merged: each has one cell to sort by');
   // A row of glass blocks along x seen from +x: the farthest block's faces come first.
   const row = new VoxelWorld({ blocks });
   for (let x = 0; x < 8; x += 2) row.setBlock(x, 0, 0, GLASS);

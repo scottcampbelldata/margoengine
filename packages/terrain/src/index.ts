@@ -26,8 +26,15 @@ import { applyView } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 export { clipmapGrid } from './grid.js';
-export { TerrainColors, type TerrainColorOptions } from './colors.js';
-export { heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
+export {
+  TerrainColors,
+  wetSandAfter,
+  type SandSurface,
+  type TerrainColorOptions,
+  type TerrainLook,
+  type TerrainLookUpdate,
+} from './colors.js';
+export { heightfield, heightfieldGeometry, TerrainHeightmap, type HeightField, type HeightfieldOptions } from './heightfield.js';
 declare const GPUBufferUsage: { UNIFORM: number; VERTEX: number; INDEX: number; STORAGE: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number };
 declare const GPUShaderStage: { VERTEX: number; FRAGMENT: number };

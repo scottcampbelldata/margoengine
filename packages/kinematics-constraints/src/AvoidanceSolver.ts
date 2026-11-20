@@ -815,6 +815,8 @@ export class AvoidanceSolver {
       }
       return result;
     } finally {
+      // acceptPose belongs to this solve: a later calculatePoleClearance must not apply it, nor this keep it alive.
+      this.poseFilter = undefined;
       this.busy = false;
     }
   }

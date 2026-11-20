@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { legDevice, legDevices } from '../../../scripts/support/compat-shim.js';
 const results = [];
 for (const compat of [false, true]) {
   const context = await openBrowser({
@@ -16,7 +17,7 @@ for (const compat of [false, true]) {
   try {
     await context.page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     const result = await context.page.evaluate((compat) => window.run(compat), compat);
-    console.log(JSON.stringify({ compat, hardware: context.hardware, result }));
+    console.log(JSON.stringify({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result }));
     assert.deepEqual(errors, []);
     assert.deepEqual(result.errors, []);
     assert.deepEqual(result.messages, []);
@@ -45,7 +46,7 @@ for (const compat of [false, true]) {
         for (const v of [...scene.reference, ...scene.actual])
           assert.ok(Math.abs(v - scene.expected) < 0.02, `${scene.name}: ${v} vs ${scene.expected}`);
     }
-    results.push({ compat, hardware: context.hardware, result });
+    results.push({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result });
   } finally {
     await context.close();
   }
@@ -71,4 +72,4 @@ try {
 }
 await mkdir('test-results', { recursive: true });
 await writeFile('test-results/voxel-pathtracer-guiding.json', JSON.stringify(results, null, 2));
-console.log('guiding: native, compatibility, values, device restoration and disposal passed');
+console.log(`guiding: ${legDevices(results)} legs, values, device restoration and disposal passed`);

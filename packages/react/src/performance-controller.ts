@@ -1,4 +1,4 @@
-import { MargoError } from '@margoengine/math/errors';
+import { fault, rangeError } from '../../shared/errors.js';
 
 /** A measured window, published once per averaging interval, with a quality factor in [0, 1]. */
 export interface PerformanceSnapshot {
@@ -55,7 +55,7 @@ export class PerformanceController {
       Number.isFinite(threshold) && threshold > 0 && threshold <= 1 && Number.isFinite(step) && step > 0 && step <= 1 &&
       Number.isFinite(factor) && factor >= 0 && factor <= 1 && Number.isFinite(fallbackFactor) && fallbackFactor >= 0 && fallbackFactor <= 1 &&
       (flipflops === Infinity || Number.isInteger(flipflops) && flipflops >= 0)))
-      throw new RangeError('Invalid performance options; use positive ms/iterations, factors in [0,1] and a nonnegative flipflops count.');
+      throw rangeError('Invalid performance options; use positive ms/iterations, factors in [0,1] and a nonnegative flipflops count', 'react-arguments');
     this.settings = { ms, iterations, threshold, factor, step, flipflops, fallbackFactor };
     this.current = Object.freeze({ fps: 0, refreshrate: 0, factor, frames: Object.freeze([]), averages: Object.freeze([]), flips: 0, fallback: false });
   }
@@ -84,7 +84,7 @@ export class PerformanceController {
     if (this.averages.length >= this.settings.iterations) {
       const [lower, upper] = (this.options.bounds ?? defaults)(refreshrate);
       if (![lower, upper].every(Number.isFinite) || lower <= 0 || upper <= lower)
-        throw new RangeError('Performance bounds must be finite positive FPS with lower < upper.');
+        throw rangeError('Performance bounds must be finite positive FPS with lower < upper', 'react-arguments');
       const above = this.averages.filter(value => value > upper).length / this.averages.length;
       const below = this.averages.filter(value => value < lower).length / this.averages.length;
       const direction = below >= this.settings.threshold ? -1 : above >= this.settings.threshold ? 1 : 0;
@@ -108,7 +108,7 @@ export class PerformanceController {
     }
   }
   private publish(): void { for (const listener of this.listeners) listener(); }
-  private live(): void { if (this.closed) throw new MargoError('disposed', 'PerformanceController is disposed; create a new controller. See https://margoengine.com/errors#disposed'); }
+  private live(): void { if (this.closed) throw fault('disposed', 'PerformanceController is disposed; create a new controller', 'react-usage'); }
   dispose(): void { if (this.closed) return; this.closed = true; this.clear(); this.listeners.clear(); this.callbacks.clear(); }
   [Symbol.dispose](): void { this.dispose(); }
 }

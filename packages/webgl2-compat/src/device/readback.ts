@@ -2,9 +2,10 @@
 // compute, downloads it (queue.submit and device.loadReadback load it first). The format conversions are the larger part
 // of it: every WebGPU layout a texture can be read in, from WebGL2's few readPixels formats.
 import { type FormatInfo, FORMATS, toHalf } from './formats.js';
+import { S } from './gl.js';
 import { fenceDone } from './tasks.js';
-import { origin, type Replayer, writeTexture } from './render.js';
-import type { CompatBuffer, CompatTexture, TextureStorage } from './resources.js';
+import { blocksOf, origin, type Replayer, writeTexture } from './render.js';
+import { type CompatBuffer, type CompatTexture, levelRange, type TextureStorage } from './resources.js';
 
 /** Where readPixels reads a copy from: the bound read framebuffer, in this format and type; free() deletes it. */
 interface ReadSource {
@@ -75,7 +76,7 @@ export function fetchInto(
   gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
   r.helperState(h_, w, h);
   state.unit(0, s.target, s.gl, r.device.loadSampler);
-  const all = `0:${s.texture.mipLevelCount - 1}`;
+  const all = levelRange(0, s.texture.mipLevelCount - 1);
   if (s.levels !== all) {
     state.activeUnit(0);
     gl.texParameteri(s.target, gl.TEXTURE_BASE_LEVEL, 0);
@@ -176,9 +177,15 @@ function stencilInto(r: Replayer, s: TextureStorage, level: number, layer: numbe
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
   // The stencil and blend state the pipelines cache was changed by hand: forget it.
-  for (const key of ['blend', 'stencilMask']) state.forget(key);
-  for (const face of [gl.FRONT, gl.BACK])
-    for (const k of ['stencilFunc', 'stencilOp', 'stencilMask']) state.forget(`${k}${face}`);
+  // Every blend slot: enable(BLEND) and blendFunc above set every draw buffer's (helperState forgot the draw
+  // buffers' slots already; the readback does not rely on it).
+  for (let i = -1; i < 8; i++) state.forgetBlend(i);
+  state.forget(S.stencilMask);
+  state.forget(S.stencilMaskFront, 2);
+  state.forget(S.stencilFuncFront, 3);
+  state.forget(S.stencilFuncBack, 3);
+  state.forget(S.stencilOpFront, 3);
+  state.forget(S.stencilOpBack, 3);
   state.enable(gl.STENCIL_TEST, false);
   state.bindDrawFramebuffer(null);
   state.bindReadFramebuffer(fbo);
@@ -205,8 +212,30 @@ export function copyTextureToBuffer(
     t = source.texture as CompatTexture,
     aspect = source.aspect ?? 'all';
   if (t.renderbuffer) throw r.device.unsupported('copying a multisampled texture');
-  if (t.info.block)
-    throw r.device.unsupported(`reading back a ${t.format} texture (WebGL2 cannot read compressed texels)`);
+  if (t.info.block) {
+    // WebGL2 cannot read compressed texels, so the blocks come from those the texture keeps (CompatTexture.blocks),
+    // written into the buffer row by row in order with the buffer's other writes (WebGPU "copyTextureToBuffer()").
+    const block = t.info.block,
+      [x, y, z] = origin(source.origin),
+      across = Math.ceil(w / block.w) * block.bytes,
+      down = Math.ceil(h / block.h),
+      tight = new Uint8Array(across * down * depth),
+      bytesPerRow = destination.bytesPerRow ?? across,
+      rowsPerImage = destination.rowsPerImage ?? down,
+      base = destination.offset ?? 0;
+    blocksOf(t, 'copyTextureToBuffer').blockRegion(source.mipLevel ?? 0, x, y, z, w, h, depth, tight, false);
+    if (bytesPerRow === across && rowsPerImage === down) destination.buffer.write(base, tight);
+    else
+      for (let layer = 0; layer < depth; layer++)
+        for (let row = 0; row < down; row++) {
+          const from = (layer * down + row) * across;
+          destination.buffer.write(
+            base + (layer * rowsPerImage + row) * bytesPerRow,
+            tight.subarray(from, from + across),
+          );
+        }
+    return;
+  }
   const plan = readPlan(t.info, aspect);
   if (!plan)
     throw r.device.unsupported(

@@ -1,6 +1,6 @@
 // What a GPU suite shares with other suites, read from the files it runs, so scripts/support/parallel-run.mjs never
-// runs two users of one thing at once: a fixed port (listenWhenFree would make the second wait, up to 20 min, holding a
-// GPU slot), an output path under test-results (two runs would overwrite each other's report or capture), or Vite's
+// runs two users of one thing at once: a fixed port (listenWhenFree would make the second wait, up to 20 min), an
+// output path under test-results (two runs would overwrite each other's report or capture), or Vite's
 // default dependency cache (a re-optimize answers the other server's page 504, bug 26). It over-counts on purpose: a
 // false conflict costs seconds, a missed one a wait or a wrong report.
 import { existsSync, readFileSync } from 'node:fs';
@@ -40,7 +40,7 @@ export function outputPaths(text) {
     found = new Set();
   for (const m of code.matchAll(/['"`]test-results\/([\w.-]+)/g)) found.add(m[1]);
   for (const m of code.matchAll(/['"`]test-results['"`]\s*,\s*['"`]([\w.-]+)/g)) found.add(m[1]);
-  for (const name of ['.venv-data', 'gpu-packages.json', 'gpu.lock']) found.delete(name);
+  for (const name of ['.venv-data', 'gpu-packages.json']) found.delete(name);
   return [...found].sort().map((name) => `test-results/${name}`);
 }
 

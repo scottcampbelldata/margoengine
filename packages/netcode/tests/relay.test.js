@@ -148,3 +148,34 @@ test('relay: authorize, maxSpectators and history refuse; junk closes the sender
   assert.throws(() => relayPeers(w.connect(), { players: [1], local: 2 }), TypeError);
   assert.throws(() => new RollbackSpectator(game, w.connect(), { maxFrames: 0 }), RangeError);
 });
+
+test('relay: junk or out-of-order bytes from the relay close the link instead of throwing into the transport', () => {
+  const network = new LoopbackNetwork({ latency: 1 });
+  const [near, far] = network.pair();
+  relayPeers(near, { players: [1, 2], local: 1 });
+  far.onmessage = () => {};
+  let code = 0;
+  far.onclose = (c) => (code = c);
+  far.send(new Uint8Array([3])); // FROM with no player id
+  assert.doesNotThrow(() => network.advance(10));
+  assert.equal(near.open, false);
+  assert.equal(code, CloseCode.protocol);
+
+  const [watch, relayEnd] = network.pair();
+  const watcher = new RollbackSpectator(game, watch);
+  relayEnd.onmessage = () => {};
+  relayEnd.send(new Uint8Array([6, 1, 0])); // FRAME before WELCOME
+  assert.doesNotThrow(() => network.advance(10));
+  assert.equal(watcher.open, false, 'the spectator closes on a frame it cannot place');
+});
+
+test('relay: a hello that arrives after close is refused', () => {
+  const network = new LoopbackNetwork({ latency: 1 }),
+    relay = new RollbackRelay({ players: [1, 2] });
+  const [near, far] = network.pair();
+  relay.accept(far);
+  relay.close();
+  relayPeers(near, { players: [1, 2], local: 1 });
+  network.advance(10);
+  assert.equal(far.open, false, 'the closed relay seats nobody');
+});

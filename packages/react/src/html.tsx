@@ -5,9 +5,9 @@ import { createPortal } from 'react-dom';
 import type { Engine, Mesh as EngineMesh, Vec3 } from '@margoengine/core/extension';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type * as HTMLModule from '@margoengine/html';
-import { MargoError } from '@margoengine/math/errors';
 import { useCommit, useScene, zero } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { fault } from '../../shared/errors.js';
 
 type HTMLOverlay = HTMLModule.HTML;
 interface OverlayEntry {
@@ -22,7 +22,7 @@ function acquireOverlay(engine: Engine): OverlayEntry {
       users: 0,
       promise: optionalPeer('@margoengine/html', () => import('@margoengine/html')).then(({ HTML }) => {
         if (engine.disposed)
-          throw new MargoError('disposed', 'Canvas is disposed; render the component inside a live <Canvas>.');
+          throw fault('disposed', 'Canvas is disposed; render the component inside a live <Canvas>', 'react-usage');
         return HTML.attach(engine as unknown as EngineKernel);
       }),
     };

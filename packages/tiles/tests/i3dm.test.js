@@ -67,7 +67,7 @@ test('i3dm maths: root x node x instance row equals translate(center) x instance
   }
 });
 
-/** A fake engine and gltf-pro-shaped model: one primitive on a node translated (1, 2, 3) inside the model. */
+/** A fake engine and gltf-pbr-shaped model: one primitive on a node translated (1, 2, 3) inside the model. */
 function fakeEngine() {
   const mesh = (matrix = Float32Array.from([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])) => {
     const m = { visible: true, matrix, position: null, quaternion: null, scale: null, disposed: false };
@@ -97,7 +97,7 @@ function fakeEngine() {
     removePlugin(name) {
       const p = this.plugins.get(name);
       this.plugins.delete(name);
-      p?.dispose();
+      p?.dispose?.();
     },
   };
   const loadModel = async (_engine, gltf) => {

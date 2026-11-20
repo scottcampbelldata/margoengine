@@ -112,6 +112,7 @@ type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
 interface Host {
     width: number;
     height: number;
+    time?: number;
     delta?: number;
     frames?: Readonly<Record<string, ArrayLike<number>>>;
     [key: string]: unknown;
@@ -242,7 +243,6 @@ class Program {
         buffer: GPUBuffer;
         view: DataView;
         bytes: Uint8Array;
-        last: number;
     }>;
     constructor(base?: number, compute?: boolean);
     stage(stage: ShaderStage, outputs: readonly Node[]): {

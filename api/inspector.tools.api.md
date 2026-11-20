@@ -5,7 +5,7 @@
 ```ts
 import { Camera, EngineKernel } from "@margoengine/core";
 import { EnginePlugin } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { CanvasRecording, CanvasRecordingOptions } from "@margoengine/video/record";
 
 export class CameraTools implements EnginePlugin {

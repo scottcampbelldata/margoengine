@@ -229,6 +229,8 @@ async function readChunk2(
       bytes = Number(view.getBigUint64(o + 14, true));
     setCount(node, view.getUint32(o + 2, true));
     if (type === 2) {
+      // A chunk starts with its own top node; a proxy there points at a page again, at worst this one, for ever.
+      if (!i) throw new RangeError('Potree hierarchy chunk starts with a proxy record; the file is corrupt');
       node.page = (pageSignal) => readChunk2(node, offset, bytes, read, pageSignal);
       continue;
     }

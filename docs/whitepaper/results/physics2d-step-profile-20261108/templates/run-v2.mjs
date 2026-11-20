@@ -4,7 +4,6 @@ import { createHash } from 'node:crypto';
 import { cpus, hostname } from 'node:os';
 import { resolve, join } from 'node:path';
 import { createServer } from 'vite';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { launchBrowser, resolveBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
@@ -18,7 +17,6 @@ const cpuBefore = cpuTimes();
 const report = { started: new Date().toISOString(), host: hostname(), cpu: cpus()[0].model, logicalCpus: cpus().length, node: process.version, busyDiagnostic: true, artifacts: artifacts.map(({ calibration, ...a }) => a), expectedHashes: manifest.expected, phases: manifest.phases, countNames: manifest.counts, publicCountNames: manifest.publicCounts, method: { rows: 100, settleSteps: 60, measuredSteps: 40, rounds: 8, alternatingOrder: true, fingerprintReadsOutsideTimer: true, emptyLoopObservedInWat: true, phaseExtremaAreNonAdditive: true }, nodePrecheck: [], browsers: [], failure: null };
 const save = () => writeFileSync(directory + '/results-v2.json', JSON.stringify(report, null, 2) + '\n');
 save();
-const release = await acquire({ owner: 'lane-P-current-complete-step-profile-v1', mode: 'exclusive', max: 15, waitMax: 0.1 });
 const server = await createServer({ configFile: false, root: process.cwd(), logLevel: 'error', optimizeDeps: { noDiscovery: true, include: [] }, server: { port: 0, hmr: false, watch: null, headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' } } });
 const reference = [];
 try {
@@ -150,5 +148,4 @@ try {
   report.aggregateCpuBusyPercent = 100 * (1 - (cpuAfter.idle - cpuBefore.idle) / (cpuAfter.total - cpuBefore.total));
   save();
   await closeAll({ servers: [server] });
-  await release();
 }

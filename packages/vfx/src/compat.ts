@@ -10,6 +10,10 @@
 // A GPU-written indirect draw would stall the main thread on a read-back of its arguments (WebGL2 has no indirect
 // draws), so the draw asks for every slot and its vertex shader drops those at or past the count in `visible`.
 // The `sort` feature keeps its own kernels: it works on `alive` and `visible` as on WebGPU.
+// The `events` feature lists its events in WebGPU's main kernel with a workgroup scan, which this route drops with
+// the rest of that kernel; here `update` stores each slot's event flag, a prefix count places it and a compaction
+// kernel writes the same list, in slot order, with its total in events[1] (events.ts has the layout). The event itself
+// is stored once `update` has returned, as in WebGPU's kernel, so `update` plans as a point draw (KB-VFX-EVENTS-CPU).
 import { MargoError } from '@margoengine/math/errors';
 import { PrefixCount } from '../../shared/prefix.js';
 import { frame } from './frame.js';
@@ -29,13 +33,17 @@ const entry = '@compute @workgroup_size(256) fn main(@builtin(global_invocation_
 const liveCount = 'atomicAdd(&indirect.instanceCount,1u);';
 const updateEnd = '  return 1u;\n}';
 const particlesRead = '@group(0) @binding(1) var<storage,read> particles:array<vec4f>;\n';
+/** The `events` feature's flag in `update`: set when the slot raised an event this frame. */
+const eventFlag = 'var<private> eventHere:u32;';
+/** Binding of the route's event flags in `update`; free in the simulation and in every feature's patch. */
+export const EVENT_FLAGS_BINDING = 28;
 
 /**
  * The kernels of a simulation text (`simulationShader` with its features' patches): `flags` flags the dying slots,
  * `update` runs each slot with its ticket, `marks` flags the live and the on-screen slots.
  * @throws MargoError `'unsupported'` when the text is not the one these edits were written for.
  */
-export function routeShaders(simulation: string): { flags: string; update: string; marks: string } {
+export function routeShaders(simulation: string): { flags: string; update: string; marks: string; events: boolean } {
   const dies = /fn dies\(i:u32\)->u32 \{[^\n]*\n/.exec(simulation)?.[0],
     wide = /var<workgroup> scratch[^\n]*\nfn prefix[^\n]*\n/.exec(simulation)?.[0],
     testStart = simulation.indexOf(liveCount),
@@ -56,10 +64,15 @@ export function routeShaders(simulation: string): { flags: string; update: strin
     ['@group(0) @binding(10) var<storage,read_write> total:array<u32,5>;\n', ''],
   ])
     update = once(update, from, to);
+  const events = update.includes(eventFlag);
   return {
+    events,
     flags: `${frame}${particlesRead}@group(0) @binding(2) var<storage,read_write> flags:array<u32>;
 ${dies}${entry}){if(id.x<f.control.x){flags[id.x]=dies(id.x);}}`,
-    update: `${update}${entry}){if(id.x<f.control.x){let drawn=update(id.x,tickets[id.x]);}}`,
+    update: events
+      ? `${update}@group(0) @binding(${EVENT_FLAGS_BINDING}) var<storage,read_write> eventFlags:array<u32>;
+${entry}){if(id.x<f.control.x){let drawn=update(id.x,tickets[id.x]);storeEvents(id.x);eventFlags[id.x]=eventHere;}}`
+      : `${update}${entry}){if(id.x<f.control.x){let drawn=update(id.x,tickets[id.x]);}}`,
     // Keep the patched simulation declarations with its cull expression: optional features can read their own
     // uniforms or helpers there. The entry only calls onScreen; update and its other helpers stay unreachable.
     marks: `${update}@group(0) @binding(2) var<storage,read_write> living:array<u32>;
@@ -80,6 +93,20 @@ export const compactShader = `@group(0) @binding(0) var<uniform> n:vec4u;
 @group(0) @binding(2) var<storage,read> places:array<u32>;
 @group(0) @binding(3) var<storage,read_write> alive:array<u32>;
 ${entry}){if(id.x<n.x&&shown[id.x]==1u){alive[places[id.x]]=id.x;}}`;
+/**
+ * Lists each slot that raised an event at its place in slot order, where events.ts reads the list:
+ * events[4 + groups x 257 + place]. `n` is (capacity, groups).
+ */
+export const eventCompactShader = `@group(0) @binding(0) var<uniform> n:vec4u;
+@group(0) @binding(1) var<storage,read> raised:array<u32>;
+@group(0) @binding(2) var<storage,read> places:array<u32>;
+@group(0) @binding(3) var<storage,read_write> events:array<u32>;
+${entry}){if(id.x<n.x&&raised[id.x]==1u){events[4u+n.y*257u+places[id.x]]=id.x;}}`;
+/** One invocation: the frame's event count into events[1], as WebGPU's event scan leaves it. */
+export const eventTotalShader = (word: number): string =>
+  `@group(0) @binding(0) var<storage,read> total:array<u32>;
+@group(0) @binding(1) var<storage,read_write> events:array<u32>;
+@compute @workgroup_size(1) fn main(){events[1]=total[${word}];}`;
 /** One invocation: the frame's totals, as the WebGPU route leaves them in the two argument buffers. */
 export const totalsShader = (living: number, shown: number): string =>
   `@group(0) @binding(0) var<storage,read> living:array<u32>;
@@ -101,6 +128,40 @@ ${billboardEntry}
   if(instance>=drawn[1]){var none:Out;none.clip=vec4f(2,2,2,1);return none;}`,
   );
 
+/**
+ * The `@group(0)` bindings the entry point `main` of `code` statically uses (WGSL 7.7: the variables named in `main`
+ * and in every function it calls, transitively). An auto layout holds only those, and WebGPU refuses a bind group
+ * entry its layout does not have, so each kernel binds exactly these.
+ */
+export function usedBindings(code: string): Set<number> {
+  const text = code.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, ''),
+    vars = new Map<string, number>(),
+    bodies = new Map<string, string>();
+  for (const m of text.matchAll(/@group\(0\)\s*@binding\((\d+)\)\s*var(?:<[^>]*>)?\s+(\w+)/g)) vars.set(m[2]!, +m[1]!);
+  for (const m of text.matchAll(/\bfn\s+(\w+)\s*\(/g)) {
+    let i = text.indexOf('{', m.index + m[0].length),
+      depth = 0;
+    const start = i;
+    for (; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}' && --depth === 0) break;
+    }
+    bodies.set(m[1]!, text.slice(start, i + 1));
+  }
+  const used = new Set<number>(),
+    seen = new Set<string>(['main']),
+    todo = [bodies.get('main') ?? ''];
+  while (todo.length)
+    for (const [name] of todo.pop()!.matchAll(/\b[A-Za-z_]\w*\b/g)) {
+      const binding = vars.get(name);
+      if (binding !== undefined) used.add(binding);
+      if (bodies.has(name) && !seen.has(name)) {
+        seen.add(name);
+        todo.push(bodies.get(name)!);
+      }
+    }
+  return used;
+}
 /** The route's GPU state for one effect: its kernels and prefix counts. Every buffer it makes goes to `owned`. */
 export class SimulationRoute {
   private readonly deaths: PrefixCount;
@@ -111,11 +172,20 @@ export class SimulationRoute {
   private readonly marking: Kernel;
   private readonly compacting: Kernel;
   private readonly totals: Kernel;
+  private readonly events?: { count: PrefixCount; compact: Kernel; total: Kernel };
   constructor(
     device: GPUDevice,
     simulation: string,
     capacity: number,
-    b: { uniform: GPUBuffer; particles: GPUBuffer; alive: GPUBuffer; indirect: GPUBuffer; visible: GPUBuffer },
+    b: {
+      uniform: GPUBuffer;
+      particles: GPUBuffer;
+      alive: GPUBuffer;
+      indirect: GPUBuffer;
+      visible: GPUBuffer;
+      /** The `events` feature's list (its runtime's `eventList`), when the simulation raises events. */
+      events?: GPUBuffer;
+    },
     more: GPUBindGroupEntry[],
     owned: { destroy(): void }[],
   ) {
@@ -126,16 +196,26 @@ export class SimulationRoute {
           layout: 'auto',
           compute: { module: device.createShaderModule({ code: text }), entryPoint: 'main' },
         });
-        return [pipeline, device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries }), count];
+        // Only the bindings the entry point uses: its auto layout holds no others (KB-VFX-COMPATBIND1).
+        const used = usedBindings(text);
+        return [pipeline, device.createBindGroup({ layout: pipeline.getBindGroupLayout(0), entries: entries.filter((e) => used.has(e.binding)) }), count];
       },
       bind = (binding: number, buffer: GPUBuffer): GPUBindGroupEntry => ({ binding, resource: { buffer } });
     this.deaths = new PrefixCount(device, capacity, owned);
     this.living = new PrefixCount(device, capacity, owned, { totalOnly: true });
     this.shown = new PrefixCount(device, capacity, owned);
+    if (code.events !== (b.events !== undefined)) throw stale();
+    const raised = b.events ? new PrefixCount(device, capacity, owned) : undefined;
     this.flagging = kernel(code.flags, [bind(0, b.uniform), bind(1, b.particles), bind(2, this.deaths.flags)], groups);
     this.updating = kernel(
       code.update,
-      [bind(0, b.uniform), bind(1, b.particles), bind(5, this.deaths.prefix), ...more],
+      [
+        bind(0, b.uniform),
+        bind(1, b.particles),
+        bind(5, this.deaths.prefix),
+        ...(raised ? [bind(EVENT_FLAGS_BINDING, raised.flags)] : []),
+        ...more,
+      ],
       groups,
     );
     this.marking = kernel(
@@ -152,7 +232,7 @@ export class SimulationRoute {
     );
     const size = device.createBuffer({ size: 16, usage: 0x48 }); // UNIFORM | COPY_DST
     owned.push(size);
-    device.queue.writeBuffer(size, 0, new Uint32Array([capacity, 0, 0, 0]));
+    device.queue.writeBuffer(size, 0, new Uint32Array([capacity, groups, 0, 0]));
     this.compacting = kernel(
       compactShader,
       [bind(0, size), bind(1, this.shown.flags), bind(2, this.shown.prefix), bind(3, b.alive)],
@@ -163,6 +243,16 @@ export class SimulationRoute {
       [bind(0, this.living.total), bind(1, this.shown.total), bind(2, b.indirect), bind(3, b.visible)],
       1,
     );
+    if (raised && b.events)
+      this.events = {
+        count: raised,
+        compact: kernel(
+          eventCompactShader,
+          [bind(0, size), bind(1, raised.flags), bind(2, raised.prefix), bind(3, b.events)],
+          groups,
+        ),
+        total: kernel(eventTotalShader(raised.totalWord), [bind(0, raised.total), bind(1, b.events)], 1),
+      };
   }
   /** Records one frame of the simulation; a frame without births needs no tickets, as on WebGPU. */
   encode(pass: GPUComputePassEncoder, births: boolean): void {
@@ -176,6 +266,11 @@ export class SimulationRoute {
       this.deaths.encode(pass);
     }
     step(this.updating);
+    if (this.events) {
+      this.events.count.encode(pass);
+      step(this.events.compact);
+      step(this.events.total);
+    }
     step(this.marking);
     this.living.encode(pass);
     this.shown.encode(pass);

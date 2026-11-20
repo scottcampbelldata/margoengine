@@ -18,10 +18,12 @@ const usage = `Usage: margo-convert-cad <input.step|.stp|.iges|.igs|.sat|.x_t|.x
 Output: binary glTF 2.0 in metres (each format converts from its own unit), axes unchanged as with loadCAD.
 .brep files (the native format of the earlier importer's kernel) are not read: export STEP from the CAD tool instead.`;
 
+/** A failure the command reports in one line, then ends with exit code 1. */
+class CliError extends Error {}
+
 /** @param {string} message @returns {never} */
 function fail(message) {
-  console.error(`margo-convert-cad: ${message}`);
-  process.exit(1);
+  throw new CliError(`margo-convert-cad: ${message}`);
 }
 
 const options = /** @type {const} */ ({
@@ -41,49 +43,56 @@ const args = () => {
     return fail(`${error instanceof Error ? error.message : error}\n\n${usage}`);
   }
 };
-const { values, positionals } = args();
-if (values.help) {
-  console.log(usage);
-  process.exit(0);
-}
-if (positionals.length < 1 || positionals.length > 2)
-  fail(`expected an input file and an optional output file\n\n${usage}`);
-
-/** @param {'linear-deflection'|'angular-deflection'|'edge-angle'} name @returns {number|undefined} */
-const number = (name) => {
-  const text = values[name];
-  if (text === undefined) return undefined;
-  const value = Number(text);
-  if (!text.trim() || !Number.isFinite(value)) fail(`--${name} needs a number, got ${text}`);
-  return value;
-};
-
-const [input, output = input.replace(/\.[^./\\]+$/, '') + '.glb'] = positionals;
-if (sameFile(input, output)) fail('output would overwrite the input; choose another output path');
-
-try {
-  const data = readFileSync(input),
-    started = performance.now();
-  const { glb, stats } = await convert(data, formatOf(input), {
-    linearDeflection: number('linear-deflection'),
-    angularDeflection: number('angular-deflection'),
-    merge: values.merge === true,
-    instancing: values.instancing !== false,
-    edges: values.edges ? (number('edge-angle') ?? 30) : undefined,
-  });
-  writeFileSync(output, glb);
-  if (!values.quiet) {
-    const kB = (/** @type {number} */ n) => `${(n / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} kB`,
-      ms = (/** @type {number} */ n) => `${Math.round(n).toLocaleString('en-US')} ms`;
-    console.log(`${input} (${kB(data.length)}) -> ${output} (${kB(glb.length)})`);
-    if (stats.failedFaces) console.log(`  ${stats.failedFaces} faces the kernel could not mesh were left out`);
-    console.log(
-      `  ${stats.parts} parts, ${stats.meshes} meshes (${stats.instanced} instanced), ${stats.triangles.toLocaleString('en-US')} triangles${values.edges ? `, ${stats.edges.toLocaleString('en-US')} edge segments` : ''}`,
-    );
-    console.log(
-      `  tessellation ${ms(stats.tessellateMs)}, write ${ms(stats.writeMs)}, total ${ms(performance.now() - started)}`,
-    );
+async function main() {
+  const { values, positionals } = args();
+  if (values.help) {
+    console.log(usage);
+    return;
   }
-} catch (error) {
-  fail(error instanceof Error ? error.message : String(error));
+  if (positionals.length < 1 || positionals.length > 2)
+    fail(`expected an input file and an optional output file\n\n${usage}`);
+
+  /** @param {'linear-deflection'|'angular-deflection'|'edge-angle'} name @returns {number|undefined} */
+  const number = (name) => {
+    const text = values[name];
+    if (text === undefined) return undefined;
+    const value = Number(text);
+    if (!text.trim() || !Number.isFinite(value)) fail(`--${name} needs a number, got ${text}`);
+    return value;
+  };
+
+  const [input, output = input.replace(/\.[^./\\]+$/, '') + '.glb'] = positionals;
+  if (sameFile(input, output)) fail('output would overwrite the input; choose another output path');
+
+  try {
+    const data = readFileSync(input),
+      started = performance.now();
+    const { glb, stats } = await convert(data, formatOf(input), {
+      linearDeflection: number('linear-deflection'),
+      angularDeflection: number('angular-deflection'),
+      merge: values.merge === true,
+      instancing: values.instancing !== false,
+      edges: values.edges ? (number('edge-angle') ?? 30) : undefined,
+    });
+    writeFileSync(output, glb);
+    if (!values.quiet) {
+      const kB = (/** @type {number} */ n) => `${(n / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} kB`,
+        ms = (/** @type {number} */ n) => `${Math.round(n).toLocaleString('en-US')} ms`;
+      console.log(`${input} (${kB(data.length)}) -> ${output} (${kB(glb.length)})`);
+      if (stats.failedFaces) console.log(`  ${stats.failedFaces} faces the kernel could not mesh were left out`);
+      console.log(
+        `  ${stats.parts} parts, ${stats.meshes} meshes (${stats.instanced} instanced), ${stats.triangles.toLocaleString('en-US')} triangles${values.edges ? `, ${stats.edges.toLocaleString('en-US')} edge segments` : ''}`,
+      );
+      console.log(
+        `  tessellation ${ms(stats.tessellateMs)}, write ${ms(stats.writeMs)}, total ${ms(performance.now() - started)}`,
+      );
+    }
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
 }
+
+main().catch((error) => {
+  console.error(error instanceof CliError ? error.message : error);
+  process.exitCode = 1;
+});

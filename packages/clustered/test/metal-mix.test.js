@@ -1,5 +1,5 @@
 // Regression (KB3240b, 2026-11-12): the clustered light loop weighted its Lambert lobe by 1 minus the Fresnel at the
-// metal-mixed F0, so every part-metal surface came out darker than glTF 2.0 Appendix B's metal/dielectric mix (gltf-pro's
+// metal-mixed F0, so every part-metal surface came out darker than glTF 2.0 Appendix B's metal/dielectric mix (gltf/pbr's
 // sun was fixed for this in KB3240). The loop's per-light BRDF (shared clusterBrdf, which materials, shader, rigging and
 // voxel also key on) now weights the diffuse by 1 minus the dielectric Fresnel.
 import test from 'node:test';
@@ -33,7 +33,7 @@ test('head on at metal 0.5 the clustered BRDF is ((1 - metal) 0.96 base + F0 / 4
   assert.ok(Math.abs(r - headOn.expected) < 1e-8 * headOn.expected, `${r} != ${headOn.expected} (old weight gives ${headOn.old})`);
 });
 
-test("KHR_materials_specular's coloured F0 weighs the diffuse by its largest channel, as gltf-pro's physical shader", () => {
+test("KHR_materials_specular's coloured F0 weighs the diffuse by its largest channel, as gltf/pbr's physical shader", () => {
   const n = normalize([0, 0, 1]),
     f0 = [0.02, 0.08, 0.05],
     [r, g, b] = site.call(n, n, n, [0.5, 0.5, 0.5], 1, 0, f0, 1);

@@ -7,6 +7,15 @@
 // route keeps and this one drops lies wholly outside the frustum, and the image is the same. Occlusion culling needs
 // the Hi-Z pyramid of this frame's depth on the CPU, a GPU readback per frame, so on this route 'occlusion' culls
 // against the frustum only: the same image with more parts drawn.
+// Every route runs once a frame, so none allocates: records are copied by a loop (a subarray is a view object per
+// row), lengths are Math.sqrt of the sum of squares (Math.hypot boxes its arguments into an array per call: 484 KB a
+// frame for the frame-alloc dynamic scene) and the shape test is passed with its vertices, not wrapped in a closure.
+import type { CullShape } from './shape.js';
+
+/** Copies the 24-float record at `from` of `source` to `to` of `target`, with no view object. */
+function copyRecord(source: Float32Array, from: number, target: Float32Array, to: number): void {
+  for (let k = 0; k < 24; k++) target[to + k] = source[from + k];
+}
 
 /** The six frustum planes (xyz normal, w distance; inside where dot(n, p) + w >= 0) as 24 floats. */
 type Planes = ArrayLike<number>;
@@ -62,9 +71,9 @@ export function cullParts(
         m[at + 8] ** 2 + m[at + 9] ** 2 + m[at + 10] ** 2,
       );
       const r = bounds[b * 4 + 3] * Math.sqrt(scale);
-      if (!inside(planes, cx, cy, cz, r + 1e-5 * (Math.hypot(cx, cy, cz) + r))) continue;
+      if (!inside(planes, cx, cy, cz, r + 1e-5 * (Math.sqrt(cx * cx + cy * cy + cz * cz) + r))) continue;
     }
-    drawn.set(records.subarray(at, at + 24), (starts[b] + kept[b]++) * 24);
+    copyRecord(records, at, drawn, (starts[b] + kept[b]++) * 24);
   }
   for (let b = 0; b < starts.length; b++) args[b * 5 + 1] = kept[b];
 }
@@ -72,7 +81,8 @@ export function cullParts(
 /**
  * `CulledMeshes`' kernel on the CPU for one core batch: its instance records (24 floats each) whose sphere `sphere`
  * (local centre and radius) passes the frustum and screen-size test of `frame` (camera, planes, then width, pixel
- * scale and minimum radius at 40 to 42), packed in order into `drawn`.
+ * scale and minimum radius at 40 to 42) and the shape test `test` over `vertices` when one is given, packed in order
+ * into `drawn`.
  * @returns How many were kept.
  */
 export function cullMeshes(
@@ -81,12 +91,13 @@ export function cullMeshes(
   sphere: ArrayLike<number>,
   frame: Float32Array,
   drawn: Float32Array,
-  test?: (records: Float32Array, at: number, frame: Float32Array) => boolean,
+  test?: CullShape['cpu'],
+  vertices?: Float32Array,
 ): number {
   let kept = 0;
   for (let i = 0; i < count; i++)
-    if (keeps(records, i * 24, sphere, frame) && (!test || test(records, i * 24, frame)))
-      drawn.set(records.subarray(i * 24, i * 24 + 24), kept++ * 24);
+    if (keeps(records, i * 24, sphere, frame) && (!test || test(records, i * 24, vertices!, 6, 0, frame)))
+      copyRecord(records, i * 24, drawn, kept++ * 24);
   return kept;
 }
 
@@ -110,7 +121,7 @@ function keeps(m: Float32Array, at: number, sphere: ArrayLike<number>, frame: Fl
       Math.abs(m[at + 2]) + Math.abs(m[at + 6]) + Math.abs(m[at + 10]),
     );
   let r = sphere[3] * Math.sqrt(cols * rows);
-  r += 1e-5 * (Math.hypot(cx, cy, cz) + r);
+  r += 1e-5 * (Math.sqrt(cx * cx + cy * cy + cz * cz) + r);
   for (let p = 16; p < 40; p += 4)
     if (frame[p] * cx + frame[p + 1] * cy + frame[p + 2] * cz + frame[p + 3] < -r) return false;
   const w = frame[3] * cx + frame[7] * cy + frame[11] * cz + frame[15],
@@ -124,16 +135,16 @@ export function instancesRoute(lists: PartLists, args: Uint32Array, batches: num
     kept = new Uint32Array(batches);
   return (device: GPUDevice, buffers: Record<string, GPUBuffer>, planes: Planes, cull: boolean): void => {
     cullParts(lists, planes, cull, drawn, args, kept);
-    lists.starts.forEach((start, i) => {
+    const starts = lists.starts;
+    for (let i = 0; i < starts.length; i++)
       if (kept[i])
         device.queue.writeBuffer(
           buffers.drawn,
-          start * 96,
+          starts[i] * 96,
           drawn as Float32Array<ArrayBuffer>,
-          start * 24,
+          starts[i] * 24,
           kept[i] * 24,
         );
-    });
     device.queue.writeBuffer(buffers.args, 0, args as Uint32Array<ArrayBuffer>);
   };
 }
@@ -152,7 +163,7 @@ export function meshesRoute() {
     drawn: GPUBuffer,
     argsBuffer: GPUBuffer,
     frame: Float32Array,
-    test?: import('./shape.js').CullShape['cpu'],
+    test?: CullShape['cpu'],
   ): void => {
     if (packed.length < batch.count * 24) packed = new Float32Array(batch.count * 48);
     const kept = cullMeshes(
@@ -161,7 +172,8 @@ export function meshesRoute() {
       batch.geometry.bounds,
       frame,
       packed,
-      test ? (records, at, frame) => test(records, at, batch.geometry.vertices, 6, 0, frame) : undefined,
+      test,
+      batch.geometry.vertices,
     );
     if (kept) device.queue.writeBuffer(drawn, 0, packed as Float32Array<ArrayBuffer>, 0, kept * 24);
     args[0] = batch.geometry.indices.length;
@@ -191,7 +203,8 @@ export function dynamicRoute(capacity: number) {
     part: Float32Array,
     sphere: Float32Array,
     indices: number,
-    test?: (records: Float32Array, at: number, frame: Float32Array) => boolean,
+    test?: CullShape['cpu'],
+    vertices?: Float32Array,
   ): void => {
     // The state word of each row shares the tints' buffer (Uint32 view, made once).
     if (states?.buffer !== tints.buffer) states = new Uint32Array(tints.buffer, tints.byteOffset, tints.length);
@@ -214,11 +227,8 @@ export function dynamicRoute(capacity: number) {
       for (let k = 0; k < 3; k++) world[out + 16 + k] = part[12 + k] * tints[i * 4 + k];
       world[out + 19] = 1;
       for (let k = 0; k < 4; k++) world[out + 20 + k] = part[8 + k];
-      if (keeps(world, out, sphere, frame) && (!test || test(world, out, frame))) {
-        // A loop, not set(subarray): a view per kept row would be garbage every frame.
-        for (let k = 0; k < 24; k++) drawn[kept * 24 + k] = world[out + k];
-        kept++;
-      }
+      if (keeps(world, out, sphere, frame) && (!test || test(world, out, vertices!, 6, 0, frame)))
+        copyRecord(world, out, drawn, kept++ * 24);
     }
     if (high) device.queue.writeBuffer(buffers.world, 0, world as Float32Array<ArrayBuffer>, 0, high * 24);
     if (kept) device.queue.writeBuffer(buffers.drawn, 0, drawn as Float32Array<ArrayBuffer>, 0, kept * 24);

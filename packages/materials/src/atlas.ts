@@ -1,4 +1,4 @@
-import type { TextureTransform } from '@margoengine/gltf-pro';
+import type { TextureTransform } from '@margoengine/gltf/pbr';
 type Pixels = { data: ArrayLike<number>; width: number; height: number };
 /** Options for `packAtlas`: edge padding (default 2) and the largest atlas edge (default 4096). */
 export interface AtlasOptions {
@@ -121,14 +121,27 @@ export interface TileGridOptions {
   margin?: number;
   /** Pixels between source tiles (Tiled's tileset spacing). Default 0. */
   spacing?: number;
+  /**
+   * Largest output width and height in pixels, an integer up to 4096 (as `packAtlas`). Default 4096. A grid whose
+   * padded layout is wider or taller is wrapped into more output rows or columns; the regions follow the tiles.
+   */
+  maxSize?: number;
 }
-/** {@link padTileGrid}'s result: the padded image, one region per tile (row-major, top row first) and the grid's size. */
+/**
+ * {@link padTileGrid}'s result: the padded image, one region per source tile (row-major, top row first) and the source
+ * grid's size. The output may lay the tiles out in a different number of columns than the source (see `maxSize`).
+ */
 export interface TileGridAtlas extends Atlas {
   columns: number;
   rows: number;
   tileWidth: number;
   tileHeight: number;
   padding: number;
+  /**
+   * True when the image was read through a 2D canvas (an image, bitmap or canvas): its rows are stored bottom first, as
+   * `Texture`'s flipY upload of the source puts its top row at v = 1. False for raw data and ImageData.
+   */
+  flipped: boolean;
 }
 /**
  * Re-lays an atlas that is already a grid of equal tiles (a tileset) with `padding` copies of each tile's own border
@@ -140,11 +153,20 @@ export interface TileGridAtlas extends Atlas {
  */
 export function padTileGrid(image: Pixels | CanvasImageSource, options: TileGridOptions): TileGridAtlas {
   const [s, flip] = pixels(image),
-    { tileWidth: tw, tileHeight: th, padding: p = 2, margin = 0, spacing = 0 } = options ?? ({} as TileGridOptions);
+    {
+      tileWidth: tw,
+      tileHeight: th,
+      padding: p = 2,
+      margin = 0,
+      spacing = 0,
+      maxSize = 4096,
+    } = options ?? ({} as TileGridOptions);
   if (![tw, th].every((v) => Number.isInteger(v) && v > 0))
     throw new RangeError('Tile grid tileWidth and tileHeight must be positive integers; pass the tile size in pixels');
   if (![p, margin, spacing].every((v) => Number.isInteger(v) && v >= 0))
     throw new RangeError('Tile grid padding, margin and spacing must be integers >= 0');
+  if (!Number.isInteger(maxSize) || maxSize < 1 || maxSize > 4096)
+    throw new RangeError('Tile grid maxSize must be an integer from 1 to 4096');
   if (!(Number.isInteger(s.width) && Number.isInteger(s.height) && s.data.length >= s.width * s.height * 4))
     throw new RangeError('Tile grid image needs width*height RGBA8 pixels');
   const columns = Math.floor((s.width - 2 * margin + spacing) / (tw + spacing)),
@@ -153,40 +175,65 @@ export function padTileGrid(image: Pixels | CanvasImageSource, options: TileGrid
     throw new RangeError('Tile grid tiles do not fit the image; check tileWidth, tileHeight, margin and spacing');
   const pw = tw + 2 * p,
     ph = th + 2 * p,
-    width = columns * pw,
-    height = rows * ph;
-  if (width * height > 16_777_216) throw new RangeError('Tile grid output exceeds 4096x4096 pixels; use less padding');
+    count = columns * rows;
+  // Output columns: the source's when its padded layout fits both edges, otherwise the most square layout that does
+  // (a long thin tileset, one row of hundreds of tiles, would pass an area check yet exceed the device's
+  // maxTextureDimension2D on one edge).
+  let across = columns;
+  if (columns * pw > maxSize || rows * ph > maxSize) {
+    across = 0;
+    for (let k = Math.min(count, Math.floor(maxSize / pw)); k >= 1; k--) {
+      const down = Math.ceil(count / k);
+      if (down * ph > maxSize) break;
+      if (!across || Math.max(k * pw, down * ph) <= Math.max(across * pw, Math.ceil(count / across) * ph)) across = k;
+    }
+    if (!across)
+      throw new RangeError(`Tile grid output exceeds ${maxSize}x${maxSize} pixels; use less padding or fewer tiles`);
+  }
+  const width = across * pw,
+    height = Math.ceil(count / across) * ph;
   // Source pixel (x, y), rows top first as decoded; drawable images are written bottom row first (see pixels()).
   const source = (x: number, y: number) => (y * s.width + x) * 4;
-  const data = new Uint8Array(width * height * 4);
+  const data = new Uint8Array(width * height * 4),
+    regions: TextureTransform[] = [];
   for (let row = 0; row < rows; row++)
     for (let column = 0; column < columns; column++) {
-      const sx = margin + column * (tw + spacing),
+      const tile = row * columns + column,
+        ox = (tile % across) * pw,
+        oy0 = Math.floor(tile / across) * ph,
+        sx = margin + column * (tw + spacing),
         sy = margin + row * (th + spacing);
       for (let y = -p; y < th + p; y++)
         for (let x = -p; x < tw + p; x++) {
           const from = source(sx + Math.min(tw - 1, Math.max(0, x)), sy + Math.min(th - 1, Math.max(0, y))),
-            oy = row * ph + p + y,
-            to = ((flip ? height - 1 - oy : oy) * width + column * pw + p + x) * 4;
+            oy = oy0 + p + y,
+            to = ((flip ? height - 1 - oy : oy) * width + ox + p + x) * 4;
           for (let c = 0; c < 4; c++) data[to + c] = s.data[from + c];
         }
-    }
-  const regions: TextureTransform[] = [];
-  for (let row = 0; row < rows; row++)
-    for (let column = 0; column < columns; column++) {
-      const top = row * ph + p;
+      const top = oy0 + p;
       regions.push({
-        offset: [(column * pw + p) / width, (flip ? height - top - th : top) / height],
+        offset: [(ox + p) / width, (flip ? height - top - th : top) / height],
         scale: [tw / width, th / height],
       });
     }
-  return { image: { data, width, height }, regions, columns, rows, tileWidth: tw, tileHeight: th, padding: p };
+  return {
+    image: { data, width, height },
+    regions,
+    columns,
+    rows,
+    tileWidth: tw,
+    tileHeight: th,
+    padding: p,
+    flipped: flip,
+  };
 }
 /**
  * Moves UV pairs written for the source grid onto `grid`'s padded atlas. `tiles` names each vertex's tile as an index
  * `row * columns + column` (UVs on a shared tile edge are ambiguous, so the caller says which tile a vertex belongs
- * to); a UV outside its tile is kept at the same offset from it. `sourceWidth`/`sourceHeight` and `margin`/`spacing`
- * describe the source image as passed to {@link padTileGrid}.
+ * to); a UV outside its tile is kept at the same offset from it. `source.width`/`source.height` and `margin`/`spacing`
+ * describe the source image as passed to {@link padTileGrid}. The UVs are the ones that sample the source as a
+ * `Texture` would: v counts data rows for raw data and, for a drawable image (`grid.flipped`, uploaded with flipY), up
+ * from the image's bottom row.
  */
 export function remapTileUVs(
   uvs: ArrayLike<number>,
@@ -204,9 +251,11 @@ export function remapTileUVs(
       throw new RangeError(`remapTileUVs tile ${tile} is not in the grid; use 0 to ${grid.regions.length - 1}`);
     const column = tile % grid.columns,
       row = Math.floor(tile / grid.columns),
-      // Position inside the tile, in tile units, from the source tile's own corner (v counted like the image rows).
+      top = margin + row * (grid.tileHeight + spacing),
+      // Position inside the tile, in tile units, from the tile's corner at its smallest v: its first data row, or for a
+      // flipped grid its bottom image row, which the region's offset names too.
       u = (uvs[i * 2] * width - (margin + column * (grid.tileWidth + spacing))) / grid.tileWidth,
-      v = (uvs[i * 2 + 1] * height - (margin + row * (grid.tileHeight + spacing))) / grid.tileHeight,
+      v = (uvs[i * 2 + 1] * height - (grid.flipped ? height - top - grid.tileHeight : top)) / grid.tileHeight,
       r = grid.regions[tile];
     out[i * 2] = r.offset![0] + u * r.scale![0];
     out[i * 2 + 1] = r.offset![1] + v * r.scale![1];

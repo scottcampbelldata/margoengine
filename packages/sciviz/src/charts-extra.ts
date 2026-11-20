@@ -1,6 +1,7 @@
 // Clean-room specialised vector charts. Sources and design choices: docs/clean-room.md, batch 177 job 3.
 import { rangeError } from '../../shared/errors.js';
 import { ticks } from './ticks.js';
+import { escapeXML as esc } from '../../shared/xml-escape.js';
 
 /** A point in the chart's 0..1000 by 0..600 layout coordinate system. */
 export type ChartPoint = readonly [number, number];
@@ -26,13 +27,28 @@ export interface ExtraLabel {
   readonly anchor?: 'start' | 'middle' | 'end';
 }
 const colors = ['#277da8', '#d47a46', '#60956a', '#9971a4', '#bd9a35', '#488e91', '#b85d79', '#697aab'];
-const esc = (s: string) =>
-  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);
 const fail = (s: string): never => {
   throw Object.assign(rangeError(s, 'sciviz'), { code: 'out-of-range' });
 };
-const finite = (...a: number[]) => {
-  if (!a.every(Number.isFinite)) fail('Chart values must be finite');
+// Loops, not spread arguments: spreading a large array overflows the call stack.
+const finiteAll = (a: ArrayLike<number>) => {
+  for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) fail('Chart values must be finite');
+};
+const finite = (...a: number[]) => finiteAll(a);
+const largest = (a: ArrayLike<number>, start: number) => {
+  let m = start;
+  for (let i = 0; i < a.length; i++) if (a[i] > m) m = a[i];
+  return m;
+};
+const smallest = (a: ArrayLike<number>, start: number) => {
+  let m = start;
+  for (let i = 0; i < a.length; i++) if (a[i] < m) m = a[i];
+  return m;
+};
+/** A scale label with the significant digits its step needs, in plain decimals (toPrecision gives 1.0e+3). */
+const scaleLabel = (v: number, step: number, digits: number) => {
+  const p = Math.floor(Math.log10(Math.abs(v) || Math.abs(step))) - Math.floor(Math.log10(Math.abs(step))) + 2;
+  return String(Number(v.toPrecision(Math.min(17, Math.max(digits, p)))));
 };
 const positive = (a: readonly number[]) => {
   if (!a.length || a.some((v) => !Number.isFinite(v) || v < 0) || !Number.isFinite(a.reduce((s, v) => s + v, 0)))
@@ -115,7 +131,8 @@ function polarScale(d: Drawing, domain: readonly [number, number], log = false):
   for (let i = 1; i <= 5; i++) {
     const r = (240 * i) / 5;
     d.path(sector(0, tau, r, r));
-    d.text(510, 310 - r, Number(log ? Math.exp(lo + (span * i) / 5) : lo + (span * i) / 5).toPrecision(3), 'start');
+    const v = log ? Math.exp(lo + (span * i) / 5) : lo + (span * i) / 5;
+    d.text(510, 310 - r, scaleLabel(v, log ? v - Math.exp(lo + (span * (i - 1)) / 5) : span / 5, 3), 'start');
   }
   for (let i = 0; i < 8; i++) {
     const a = (i * tau) / 8;
@@ -137,9 +154,9 @@ export function polarChart(
 ): ExtraChart {
   if (!theta.length || theta.length !== radius.length) fail('Polar arrays must be nonempty and aligned');
   const r = Array.from(radius);
-  finite(...r);
+  finiteAll(r);
   const d = new Drawing(),
-    scale = polarScale(d, options.radialDomain ?? [0, Math.max(1, ...r)], options.radialScale === 'log');
+    scale = polarScale(d, options.radialDomain ?? [0, largest(r, 1)], options.radialScale === 'log');
   const p = r.map((v, i) => {
     finite(theta[i]);
     return point(theta[i] * (options.radians ? 1 : Math.PI / 180), scale(v));
@@ -219,7 +236,7 @@ export function windRoseChart(
     d = new Drawing(),
     factor = options.percentage && bins.total ? 100 / bins.total : 1,
     totals = bins.counts.map((r) => r.reduce((s, v) => s + v, 0) * factor),
-    scale = polarScale(d, [0, Math.max(1, ...totals)]),
+    scale = polarScale(d, [0, largest(totals, 1)]),
     n = bins.counts.length;
   bins.counts.forEach((r, i) => {
     let s = 0;
@@ -310,10 +327,17 @@ function financial(rows: readonly OHLCRow[], ohlc: boolean, options: FinancialOp
     finite(r.x, r.open, r.high, r.low, r.close);
     if (r.low > Math.min(r.open, r.close) || r.high < Math.max(r.open, r.close) || (i && r.x <= rows[i - 1].x))
       fail('OHLC rows need ordered unique x and consistent price bounds');
+    if (options.dateAxis && Math.abs(r.x) > 8.64e15) fail('Date axis x must be Unix milliseconds within +/-8.64e15');
   });
   const d = new Drawing(),
-    min = Math.min(...rows.map((r) => r.low)),
-    max = Math.max(...rows.map((r) => r.high)),
+    min = smallest(
+      rows.map((r) => r.low),
+      Infinity,
+    ),
+    max = largest(
+      rows.map((r) => r.high),
+      -Infinity,
+    ),
     span = max - min || 1,
     x0 = rows[0].x,
     dx = rows.at(-1)!.x - x0 || 1;
@@ -634,7 +658,8 @@ export function sankeyLayout(
     indeg[b!]++;
     out[a!].push(i);
   });
-  finite(...input, ...output);
+  finiteAll(input);
+  finiteAll(output);
   const queue = indeg.map((n, i) => (n === 0 ? i : -1)).filter((i) => i >= 0);
   let visited = 0;
   while (visited < queue.length) {
@@ -849,7 +874,7 @@ export function radarChart(axes: readonly RadarAxis[], series: readonly RadarSer
   if (axes.length < 3 || !series.length) fail('Radar needs at least three axes and one series');
   series.forEach((s) => {
     if (s.values.length !== axes.length) fail('Radar values must match axes');
-    finite(...s.values);
+    finiteAll(s.values);
   });
   const d = new Drawing(),
     n = axes.length;
@@ -860,7 +885,17 @@ export function radarChart(axes: readonly RadarAxis[], series: readonly RadarSer
         true,
       ),
     );
-  const domains = axes.map((a, i) => a.domain ?? ([0, Math.max(1, ...series.map((s) => s.values[i]))] as const));
+  const domains = axes.map(
+    (a, i) =>
+      a.domain ??
+      ([
+        0,
+        largest(
+          series.map((s) => s.values[i]),
+          1,
+        ),
+      ] as const),
+  );
   domains.forEach((r) => {
     finite(...r);
     if (r[1] <= r[0]) fail('Radar domains must increase');
@@ -871,7 +906,8 @@ export function radarChart(axes: readonly RadarAxis[], series: readonly RadarSer
     d.text(p[0], p[1], a.label);
     for (let j = 1; j <= 5; j++) {
       const p = point((i * tau) / n, j * 48);
-      d.text(p[0] + 6, p[1] + 4, (domains[i][0] + ((domains[i][1] - domains[i][0]) * j) / 5).toPrecision(2), 'start');
+      const step = (domains[i][1] - domains[i][0]) / 5;
+      d.text(p[0] + 6, p[1] + 4, scaleLabel(domains[i][0] + step * j, step, 2), 'start');
     }
   });
   series.forEach((s, k) => {
@@ -916,7 +952,7 @@ export function calendarHeatmap(values: readonly CalendarValue[], options: Calen
     dates.set(v.date, v.value);
   });
   const a = values.filter((v) => Number(v.date.slice(0, 4)) === year).map((v) => v.value),
-    range = options.range ?? [Math.min(...a, 0), Math.max(...a, 1)];
+    range = options.range ?? [smallest(a, 0), largest(a, 1)];
   finite(...range);
   if (range[1] <= range[0]) fail('Calendar color range must increase');
   const d = new Drawing(),
@@ -949,7 +985,7 @@ export function calendarHeatmap(values: readonly CalendarValue[], options: Calen
       `rgb(${Math.round(235 - 200 * u)},${Math.round(245 - 120 * u)},${Math.round(250 - 80 * u)})`,
       'none',
     );
-    d.text(290 + i * 65, 410, (range[0] + u * (range[1] - range[0])).toPrecision(3), 'start');
+    d.text(290 + i * 65, 410, scaleLabel(range[0] + u * (range[1] - range[0]), (range[1] - range[0]) / 5, 3), 'start');
   }
   d.text(500, 460, String(year));
   return d.done('Calendar heatmap');

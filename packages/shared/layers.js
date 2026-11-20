@@ -37,3 +37,10 @@ export function setRenderLayers(mesh, mask) {
   // object in a tool or test) has no engine.
   if (mesh.engine) mesh.engine.collected = -1;
 }
+
+// Layers Margo's own packages use by default, named here so no two packages take the same bit. Layer 0 is every
+// mesh's default; user layers stay free below these. Each package lets its caller pick another layer.
+/** VRM first person (@margoengine/rigging/vrm-first-person): meshes only the first-person cameras draw. */
+export const FIRST_PERSON_ONLY_LAYER = 29;
+/** VRM first person: meshes every camera but the first-person ones draws (the head seen from inside). */
+export const THIRD_PERSON_ONLY_LAYER = 30;

@@ -1,0 +1,72 @@
+{
+  "name": "@margoengine/humans",
+  "version": "1.0.0",
+  "description": "People in one call: addPerson dresses a loaded character with skin, eyes and strand hair by material name, an Animator with clip cross-fades, dual quaternion skinning, shadows and natural hand poses; a period cast kit of measured bodies and code-built garments with measured cloth optics, fitted and skinned to any loaded rig in one call.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "humans",
+    "characters",
+    "people"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/humans"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js humans",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu": "cd ../.. && node packages/humans/test/person-still.mjs && node packages/humans/test/cast-still.mjs && node packages/humans/test/fit-still.mjs"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./crowd": {
+      "types": "./dist/crowd.d.ts",
+      "import": "./dist/crowd.js"
+    },
+    "./cast": {
+      "types": "./dist/cast.d.ts",
+      "import": "./dist/cast.js"
+    },
+    "./fit": {
+      "types": "./dist/fit.d.ts",
+      "import": "./dist/fit.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/animation": "^1.0.0",
+    "@margoengine/animator": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/rigging": "^1.0.0"
+  },
+  "devDependencies": {
+    "@margoengine/navmesh": "^1.0.0"
+  }
+}

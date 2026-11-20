@@ -98,7 +98,7 @@ test('a code-authored clip drives Skeletons and models through bindings made onc
   looping.add(c, -0.5);
   near(c.getPose(1).translation, expect(1.5).translation, 1e-12, 'wrapped behind');
 
-  // On a glTF-pro model: node transforms by name and morph weights through setMorph.
+  // On a glTF PBR model: node transforms by name and morph weights through setMorph.
   const face = {
       name: 'face',
       geometry: {

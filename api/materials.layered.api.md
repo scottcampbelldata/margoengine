@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine } from "@margoengine/core/extension";
-import { MaterialSide, TextureTransform } from "@margoengine/gltf-pro";
+import { MaterialSide, TextureTransform } from "@margoengine/gltf/pbr";
 import { ColorInput } from "@margoengine/math";
 
 export type LayerChannel = 'r' | 'g' | 'b' | 'a';
@@ -397,6 +397,7 @@ interface MaterialFeature {
     tangentFrame?: boolean;
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    castHashed?(code: string): string;
     attach?(material: Material): void;
     detach?(material: Material): void;
 }
@@ -567,7 +568,7 @@ class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
-    sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
+    sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }

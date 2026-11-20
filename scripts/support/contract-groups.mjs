@@ -13,13 +13,13 @@ export const CONTRACT_GROUPS = [
   // Clips, skeletons and timelines over the same meshes.
   { name: 'animation', packages: m(['animation', 'animator', 'mixer', 'tween', 'rigging', 'kinematics-constraints', 'cinematic', 'cutscene']) },
   // Loaders and exporters over the shared glTF scene and texture formats.
-  { name: 'assets', packages: m(['gltf', 'gltf-pro', 'loaders', 'exporters', 'decoders', 'usdz', 'fbx', 'blender', 'cache']) },
+  { name: 'assets', packages: m(['gltf', 'loaders', 'exporters', 'decoders', 'usdz', 'fbx', 'blender', 'cache']) },
   // Materials, shading and the environment they light against.
-  { name: 'materials and environment', packages: m(['materials', 'shader', 'sky', 'environment', 'water', 'weather', 'terrain', 'scenery']) },
+  { name: 'materials and environment', packages: m(['materials', 'shader', 'sky', 'environment', 'water', 'weather', 'terrain']) },
   // The stage facade and the packages that drive whole scenes.
-  { name: 'stage', packages: m(['stage', 'staging', 'scene', 'transitions', 'save']) },
+  { name: 'stage', packages: m(['stage', 'studio', 'scene', 'transitions', 'save']) },
   // Game logic over shared entities and messages.
-  { name: 'gameplay', packages: m(['ecs', 'behavior', 'fsm', 'net', 'netcode', 'navmesh', 'worker']) },
+  { name: 'gameplay', packages: m(['ecs', 'behavior', 'fsm', 'netcode', 'navmesh', 'worker']) },
   // Voxel worlds and the generators that fill them.
   { name: 'voxel', packages: m(['voxel', 'voxel-edit', 'voxel-net', 'voxel-pathtracer', 'wfc', 'procedural', 'biomes', 'road']) },
 ];

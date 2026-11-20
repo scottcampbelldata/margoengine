@@ -4,8 +4,8 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { GLTFDocument, GLTFLightReceiver, PBRModel, PreparedGeometry } from "@margoengine/gltf-pro";
-import { GLTFPhysics, GLTFPhysicsOptions } from "@margoengine/gltf-pro/physics";
+import { GLTFDocument, GLTFLightReceiver, PBRModel, PreparedGeometry } from "@margoengine/gltf/pbr";
+import { GLTFPhysics, GLTFPhysicsOptions } from "@margoengine/gltf/physics";
 
 export interface MargoComponentsDocument {
     readonly document: GLTFDocument;

@@ -104,8 +104,17 @@ test('regression: the glTF build says where point clouds go, and no longer calls
   );
 });
 
-test('DracoPointsDecoder is free to build and names what it needs where there are no workers', async () => {
+test('DracoPointsDecoder is free to build and names what it needs where there are no workers outside Node', async () => {
   const decoder = new DracoPointsDecoder({ workerLimit: 1 });
-  await assert.rejects(decoder.decode(fixture('survey.drc')), (error) => error.code === 'unsupported');
+  // Node decodes in this thread (tests/draco-node.test.js); an edge runtime without workers is refused by name.
+  const saved = Object.getOwnPropertyDescriptor(process.versions, 'node');
+  Object.defineProperty(process.versions, 'node', { value: undefined, configurable: true });
+  let pending;
+  try {
+    pending = decoder.decode(fixture('survey.drc'));
+  } finally {
+    Object.defineProperty(process.versions, 'node', saved);
+  }
+  await assert.rejects(pending, (error) => error.code === 'unsupported');
   decoder.dispose();
 });

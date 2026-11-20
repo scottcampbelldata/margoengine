@@ -305,10 +305,18 @@ export class Hail implements EnginePlugin {
 
   /** Advances time and the amount by `delta` seconds (the engine calls this each frame). */
   update(delta: number): void {
-    this.onPreUpdate(delta);
+    this.advanceTime(delta);
   }
 
   onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+
+  /**
+   * Moves the hail clock and the amount by `delta` seconds without drawing: all of a frame update. `seek` from
+   * `@margoengine/cutscene/seek` replays these steps, so every stone is where a continuous run has it.
+   */
+  advanceTime(delta: number): void {
     if (this.disposed) throw new MargoError('disposed', 'Hail is disposed; attach a new Hail');
     validateHail(this.options);
     if (typeof delta !== 'number' || !Number.isFinite(delta) || delta < 0)

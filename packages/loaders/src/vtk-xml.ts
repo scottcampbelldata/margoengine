@@ -2,7 +2,7 @@ import { Builder, gridCell } from './vtk-cells.js';
 // VTK XML files: PolyData (.vtp) and UnstructuredGrid (.vtu), with ascii, binary and appended arrays.
 import { LoaderError, type LoadedGeometry, type ParseLimits } from './types.js';
 import { checkCount, latin1, limits, throwIfAborted, toBytes, type BinaryInput } from './util.js';
-import { readXMLTree, type XMLElement } from './xml.js';
+import { readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 import { inflate } from './zip.js';
 
 const F = 'VTK XML';
@@ -23,7 +23,7 @@ const SIZES: Record<string, number> = Object.assign(Object.create(null), {
 type Numbers = ArrayLike<number>;
 
 /** Options of {@link parseVTKXML}. */
-export interface VTKXMLOptions extends ParseLimits {
+export interface VTKXMLOptions extends ParseLimits, XMLExternalOptions {
   /** Volume cells of a grid: `'outer'` (default) keeps faces only one cell owns; `'all'` keeps every face. */
   surface?: 'outer' | 'all';
   signal?: AbortSignal;
@@ -394,10 +394,15 @@ export interface VTKXMLDatasetOptions extends VTKXMLOptions {
   readAppended?: (offset: number, length: number, signal?: AbortSignal) => Promise<Uint8Array>;
 }
 
-function xmlContext(bytes: Uint8Array, maxBytes: number, signal?: AbortSignal): { file: XMLElement; context: Context } {
+function xmlContext(
+  bytes: Uint8Array,
+  maxBytes: number,
+  signal?: AbortSignal,
+  external?: XMLExternalOptions['external'],
+): { file: XMLElement; context: Context } {
   throwIfAborted(signal, F);
   const { xml, appended, appendedText } = splitAppended(bytes),
-    file = child(readXMLTree(xml, F), 'VTKFile');
+    file = child(readXMLTree(xml, F, { external }), 'VTKFile');
   if (!file) throw new LoaderError(F, 'header', 'no <VTKFile> element');
   const { byte_order: order, header_type: headerType, compressor: named } = file.attributes;
   if (order !== undefined && order !== 'LittleEndian' && order !== 'BigEndian')
@@ -432,7 +437,7 @@ export function openVTKXMLDataset(input: BinaryInput, options: VTKXMLDatasetOpti
   const maxBytes = options.maxBytes ?? 256 * 1024 * 1024;
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
     throw new LoaderError(F, 'limit', 'maxBytes must be a positive safe integer');
-  const { file, context } = xmlContext(toBytes(input, F), maxBytes, options.signal),
+  const { file, context } = xmlContext(toBytes(input, F), maxBytes, options.signal, options.external),
     type = file.attributes.type;
   if (!['PolyData', 'UnstructuredGrid', 'ImageData', 'StructuredGrid', 'RectilinearGrid'].includes(type))
     throw new LoaderError(F, 'unsupported', `dataset type "${String(type).slice(0, 32)}" is not read`);
@@ -514,7 +519,7 @@ export async function parseVTKXML(input: BinaryInput, options: VTKXMLOptions = {
     { signal, surface = 'outer' } = options;
   throwIfAborted(signal, F);
   if (surface !== 'outer' && surface !== 'all') throw new LoaderError(F, 'range', 'surface must be "outer" or "all"');
-  const { file, context } = xmlContext(bytes, maxVertices * 128 + maxTriangles * 128, signal);
+  const { file, context } = xmlContext(bytes, maxVertices * 128 + maxTriangles * 128, signal, options.external);
   const { type } = file.attributes;
   if (type !== 'PolyData' && type !== 'UnstructuredGrid')
     throw new LoaderError(F, 'unsupported', `dataset type "${String(type).slice(0, 32)}" is not read`);

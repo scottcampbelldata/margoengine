@@ -390,7 +390,7 @@ const physicalMaps = {
   async commonLive(mode: 'base' | 'assign' | 'remove' | 'reference') {
     if (mode === 'base' || mode === 'reference') {
       clear();
-      // No advanced scalar options: the initial draw uses gltf-pro's native group-1 layout.
+      // No advanced scalar options: the initial draw uses gltf/pbr's native group-1 layout.
       live = material({ ...common, clearcoat: mode === 'base' ? 1 : cases.clearcoatMap.b[0] / 255 });
       current = add(createMesh(engine, quad(), live));
     } else if (mode === 'assign') {

@@ -84,7 +84,7 @@ export const shadowShader = `struct Caster {m:mat4x4f,threshold:vec4f}
 @group(0) @binding(0) var<uniform> u:Caster;
 @group(0) @binding(1) var<storage,read> positions:array<vec4f>;
 @group(0) @binding(2) var<storage,read> covariances:array<vec4f>;
-struct Out {@builtin(position) clip:vec4f,@location(0) corner:vec2f,@location(1) @interpolate(flat) opacity:f32,@location(2) @interpolate(flat) index:u32}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(0) corner:vec2f,@location(1) @interpolate(flat) opacity:f32,@location(2) @interpolate(flat) index:u32}
 @vertex fn vertex(@builtin(vertex_index) vertex:u32,@builtin(instance_index) index:u32)->Out {
   let corners=array<vec2f,4>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(1,1));let world=positions[index];var o:Out;
   o.corner=corners[vertex];o.opacity=world.w;o.index=index;o.clip=vec4f(2,2,0,1);

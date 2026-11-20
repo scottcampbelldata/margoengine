@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanRoomGate, ENGINES } from '../scripts/quality/clean-room.js';
 import { FAMILIES, normalise, duplicatesGate } from '../scripts/quality/duplicates.js';
-import { BASELINES, compare, readBaseline, staleTotal, updateBaseline } from '../scripts/quality/ratchet.js';
+import { BASELINES, compare, frozenItems, readBaseline, staleTotal, updateBaseline } from '../scripts/quality/ratchet.js';
 import { headroom } from '../scripts/quality/sizes.js';
 
 test('compare fails on new and worse items and lists improvements', () => {
@@ -78,6 +78,13 @@ test('updateBaseline keeps the budgets of items measured from a stale build', ()
   }
 });
 
+test('--update of a gate with no owner map keeps no item frozen instead of crashing', () => {
+  const stale = new Set(['@margoengine/sky']);
+  assert.equal(frozenItems(undefined, stale)('environment | studio'), false);
+  const owner = (key) => key.split('/').slice(0, 2).join('/');
+  assert.equal(frozenItems(owner, stale)('@margoengine/sky/moon'), true);
+  assert.equal(frozenItems(owner, stale)('@margoengine/vfx/fire'), false);
+});
 test('the sizes gate names the package each item measures, so stale builds can be kept', async () => {
   const { sizesGate } = await import('../scripts/quality/sizes.js');
   const { packageList, repoFiles } = await import('../scripts/quality/packages.js');

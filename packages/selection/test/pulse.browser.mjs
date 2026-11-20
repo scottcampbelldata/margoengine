@@ -9,7 +9,7 @@ try{
  await page.waitForFunction(()=>window.modern);
  await page.evaluate(async()=>{
   const {Engine,box}=await import('/packages/core/dist/extension.js');
-  const {loadGLTF}=await import('/packages/gltf-pro/dist/index.js');
+  const {loadGLTF}=await import('/packages/gltf/dist/pbr.js');
   const {XRaySelection}=await import('/packages/selection/dist/xray.js');
   const {waitForPipelines}=await import('/scripts/support/gpu-ready.js');
   const canvas=document.createElement('canvas');canvas.style.cssText='width:240px;height:160px;display:block';document.body.prepend(canvas);

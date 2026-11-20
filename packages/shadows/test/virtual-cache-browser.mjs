@@ -10,14 +10,12 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const SETTLE = 6,
   // Largest channel difference and how many pixels may differ between the cached and the fresh frame.
   CHANNEL = 2,
   PIXELS = 0;
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-virtual-cache' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/virtual-cache.html', port: 5272 }),
   { page } = context,
   pageErrors = [];
@@ -95,5 +93,4 @@ try {
   console.log('shadows virtual cache: ok');
 } finally {
   await context.close?.();
-  await release?.();
 }

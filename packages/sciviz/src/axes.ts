@@ -51,6 +51,7 @@ export class Axes {
   readonly #drawn: Line[] = [];
   readonly #texts: Label[] = [];
   #loading: Promise<void> | undefined;
+  #Line: typeof import('@margoengine/lines').Line | undefined;
   /** @internal The tick values last drawn on x and y, for export. */
   drawnTicks: { x: readonly number[]; y: readonly number[] } = { x: [], y: [] };
   #disposed = false;
@@ -81,14 +82,20 @@ export class Axes {
     scales: readonly [Scale, Scale, Scale] = [axisScale(), axisScale(), axisScale()],
   ): Promise<void> {
     this.#loading ??= (async () => {
-      const [lines, { LabelRenderer }] = await Promise.all([this.lines(), import('@margoengine/labels')]);
+      const [lines, { LabelRenderer }, { Line }] = await Promise.all([
+        this.lines(),
+        import('@margoengine/labels'),
+        import('@margoengine/lines'),
+      ]);
       if (this.#disposed) return;
       this.#lines = lines;
+      this.#Line = Line;
       this.#labels = LabelRenderer.attach(this.engine);
     })();
     await this.#loading;
-    if (this.#disposed || !this.#lines || !this.#labels) return;
-    const { Line } = await import('@margoengine/lines');
+    // No await from here on: a dispose() can only land before this check, never between it and the drawing.
+    if (this.#disposed || !this.#lines || !this.#labels || !this.#Line) return;
+    const Line = this.#Line;
     this.#offTicks?.();
     this.#offTicks = undefined;
     this.#updateTicks = undefined;

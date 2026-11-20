@@ -48,6 +48,89 @@ const ARROW_SPOKES = 12;
  */
 const BASIS_SWITCH = 0.999;
 
+/**
+ * A grid's distance fade (GAP-FILM-GRIDFADE): full opacity within `near` world units of the grid's centre, falling to 0
+ * at `far` along smoothstep, 3t^2 - 2t^3 (the OpenGL Shading Language 4.60 specification, section 8.3), so a large
+ * grid melts into the horizon instead of ending in a hard straight edge.
+ */
+export interface GridFade {
+  /** Distance from the grid's centre where the fade starts, 0 or more. */
+  near: number;
+  /** Distance where the grid is gone, above `near`. */
+  far: number;
+}
+
+/**
+ * Segments `[ax, az, bx, bz]` in the XZ plane with one colour each, as points and RGBA colours faded by `fade`: each is
+ * cut where it crosses the near and far circles, the part beyond `far` is dropped, and the part between is split into
+ * pieces at most a sixteenth of the band long (64 at most), each end taking the fade's alpha, so the linear blend
+ * between ends follows the curve.
+ */
+function fadeSegments(
+  segments: readonly number[],
+  colours: readonly (readonly number[])[],
+  { near, far }: GridFade,
+): [Float32Array, Float32Array] {
+  const points: number[] = [],
+    rgba: number[] = [],
+    step = (far - near) / 16,
+    alpha = (x: number, z: number) => {
+      const t = Math.min(1, Math.max(0, (Math.hypot(x, z) - near) / (far - near)));
+      return 1 - t * t * (3 - 2 * t);
+    };
+  for (let s = 0; s < colours.length; s++) {
+    const [ax, az, bx, bz] = segments.slice(s * 4, s * 4 + 4),
+      dx = bx - ax,
+      dz = bz - az,
+      a = dx * dx + dz * dz,
+      b = 2 * (ax * dx + az * dz),
+      length = Math.sqrt(a),
+      cuts = [0, 1];
+    // Where |A + t (B - A)| = r, for the two circles.
+    for (const r of [near, far]) {
+      const disc = b * b - 4 * a * (ax * ax + az * az - r * r);
+      if (a > 0 && disc > 0)
+        for (const t of [(-b - Math.sqrt(disc)) / (2 * a), (-b + Math.sqrt(disc)) / (2 * a)])
+          if (t > 0 && t < 1) cuts.push(t);
+    }
+    cuts.sort((p, q) => p - q);
+    for (let k = 1; k < cuts.length; k++) {
+      const t0 = cuts[k - 1],
+        t1 = cuts[k],
+        middle = Math.hypot(ax + dx * (t0 + t1) * 0.5, az + dz * (t0 + t1) * 0.5);
+      if (t1 <= t0 || middle >= far) continue;
+      // Inside near only when both ends are too: a line touching the near circle has no cut there.
+      const inside =
+          Math.max(middle, Math.hypot(ax + dx * t0, az + dz * t0), Math.hypot(ax + dx * t1, az + dz * t1)) <= near,
+        pieces = inside ? 1 : Math.min(64, Math.max(1, Math.ceil((length * (t1 - t0)) / step)));
+      for (let j = 0; j < pieces; j++)
+        for (const t of [t0 + ((t1 - t0) * j) / pieces, t0 + ((t1 - t0) * (j + 1)) / pieces]) {
+          const x = ax + dx * t,
+            z = az + dz * t;
+          points.push(x, 0, z);
+          rgba.push(colours[s][0], colours[s][1], colours[s][2], alpha(x, z));
+        }
+    }
+  }
+  return [Float32Array.from(points), Float32Array.from(rgba)];
+}
+
+/** Checks a grid's `fade`: undefined, or finite `near` 0 or more below a finite `far`. */
+function checkFade(fade: GridFade | undefined): void {
+  if (
+    fade !== undefined &&
+    !(
+      typeof fade === 'object' &&
+      fade !== null &&
+      Number.isFinite(fade.near) &&
+      Number.isFinite(fade.far) &&
+      fade.near >= 0 &&
+      fade.far > fade.near
+    )
+  )
+    throw new RangeError('Invalid grid fade; pass { near, far } in world units with 0 <= near < far, both finite');
+}
+
 const styled = (options: HelperOptions) => ({ cap: 'butt' as const, join: 'miter' as const, ...options });
 const linear = (color: ColorInput): number[] => Array.from(parseColor(color) as ArrayLike<number>);
 
@@ -102,16 +185,24 @@ function writeBoxEdges(out: Float32Array, lo: ArrayLike<number>, hi: ArrayLike<n
  * Square grid in the XZ plane (y = 0), centred on the origin: `divisions + 1` lines along each axis, `size` across.
  * With even `divisions` the two lines through the origin use `color1`, every other line `color2`; with odd
  * `divisions` no line passes through the origin and all use `color2`.
- * Defaults: size 10, divisions 10, color1 '#8f8f8f', color2 '#5e5e5e'.
- * @throws RangeError when `size` is not positive or `divisions` is not an integer from 1 to 10000.
+ * Defaults: size 10, divisions 10, color1 '#8f8f8f', color2 '#5e5e5e', no fade. `fade: { near, far }` fades the
+ * lines out with distance from the centre (see {@link GridFade}).
+ * @throws RangeError when `size` is not positive, `divisions` is not an integer from 1 to 10000 or `fade` is invalid.
  */
 export class GridHelper extends Line {
   constructor(
-    options: { size?: number; divisions?: number; color1?: ColorInput; color2?: ColorInput } & HelperOptions = {},
+    options: {
+      size?: number;
+      divisions?: number;
+      color1?: ColorInput;
+      color2?: ColorInput;
+      fade?: GridFade;
+    } & HelperOptions = {},
   ) {
-    const { size = 10, divisions = 10, color1 = GRID_CENTRE, color2 = GRID_LINES, ...style } = options;
+    const { size = 10, divisions = 10, color1 = GRID_CENTRE, color2 = GRID_LINES, fade, ...style } = options;
     if (!(size > 0) || !Number.isFinite(size) || !Number.isInteger(divisions) || divisions < 1 || divisions > 10000)
       throw new RangeError('Invalid grid size or divisions; pass a positive size and an integer divisions 1..10000');
+    checkFade(fade);
     super({ ...styled(style), mode: 'segments' });
     const centre = linear(color1),
       rest = linear(color2),
@@ -129,7 +220,17 @@ export class GridHelper extends Line {
       p += 12;
       for (let k = 0; k < 4; k++, c += 3) colors.set(colour, c);
     }
-    this.setPositions(positions, colors);
+    if (!fade) {
+      this.setPositions(positions, colors);
+      return;
+    }
+    const segments: number[] = [],
+      colours: number[][] = [];
+    for (let i = 0; i < positions.length; i += 6) {
+      segments.push(positions[i], positions[i + 2], positions[i + 3], positions[i + 5]);
+      colours.push(Array.from(colors.subarray(i, i + 3)));
+    }
+    this.setPositions(...fadeSegments(segments, colours, fade));
   }
 }
 
@@ -138,9 +239,10 @@ export class GridHelper extends Line {
  * radius * (rings - 1) / rings, ... down to radius / rings), each drawn with `divisions` chords. Angles start on +Z and
  * turn toward +X (a point at angle a is (sin a, 0, cos a) * r). Sectors and rings alternate `color1` (even index,
  * the outermost ring first) and `color2`.
- * Defaults: radius 5, sectors 12, rings 5, divisions 72, color1 '#8f8f8f', color2 '#5e5e5e'.
+ * Defaults: radius 5, sectors 12, rings 5, divisions 72, color1 '#8f8f8f', color2 '#5e5e5e', no fade. `fade: { near,
+ * far }` fades the lines out with distance from the centre (see {@link GridFade}).
  * @throws RangeError when `radius` is not positive, `sectors`, `rings` or `divisions` is not an integer in 0..4096,
- * or `divisions` is below 3.
+ * `divisions` is below 3 or `fade` is invalid.
  */
 export class PolarGridHelper extends Line {
   constructor(
@@ -151,9 +253,11 @@ export class PolarGridHelper extends Line {
       divisions?: number;
       color1?: ColorInput;
       color2?: ColorInput;
+      fade?: GridFade;
     } & HelperOptions = {},
   ) {
     const {
+      fade,
       radius = 5,
       sectors = 12,
       rings = 5,
@@ -174,6 +278,7 @@ export class PolarGridHelper extends Line {
       throw new RangeError(
         'Invalid polar grid options; pass a positive radius, sectors and rings 0..4096 and divisions 3..4096',
       );
+    checkFade(fade);
     super({ ...styled(style), mode: 'segments' });
     const even = linear(color1),
       odd = linear(color2),
@@ -203,7 +308,17 @@ export class PolarGridHelper extends Line {
         put(Math.sin(a1) * r, Math.cos(a1) * r, colour);
       }
     }
-    this.setPositions(positions, colors);
+    if (!fade) {
+      this.setPositions(positions, colors);
+      return;
+    }
+    const segments: number[] = [],
+      colours: number[][] = [];
+    for (let i = 0; i < positions.length; i += 6) {
+      segments.push(positions[i], positions[i + 2], positions[i + 3], positions[i + 5]);
+      colours.push(Array.from(colors.subarray(i, i + 3)));
+    }
+    this.setPositions(...fadeSegments(segments, colours, fade));
   }
 }
 
@@ -284,7 +399,7 @@ export function geometryBounds(geometry: Geometry): Float32Array {
   return bounds;
 }
 
-/** Bind-pose bounds of a gltf-pro mesh source, cached per source (the bind pose does not change). */
+/** Bind-pose bounds of a gltf/pbr mesh source, cached per source (the bind pose does not change). */
 function sourceBounds(source: MeshSource): Float32Array {
   let bounds = boundsCache.get(source);
   if (!bounds) boundsCache.set(source, (bounds = Float32Array.from(source.bounds)));
@@ -297,7 +412,7 @@ const allFinite = (values: ArrayLike<number>): boolean => {
 };
 
 /**
- * World-space bounding box of a core mesh or a loaded gltf-pro (PBR) mesh: the axis-aligned box around the mesh's
+ * World-space bounding box of a core mesh or a loaded gltf/pbr (PBR) mesh: the axis-aligned box around the mesh's
  * local bounds transformed by its world matrix, refreshed each frame. PBR meshes use their bind-pose bounds (skinning
  * and morphing are not followed); nothing is read back from the GPU. Hidden while the mesh is removed or hidden.
  * Default colour '#f0931e'.
@@ -588,7 +703,13 @@ export class PlaneHelper extends Line {
   private readonly square: Float32Array | null;
   private readonly fillOpacity: number;
   constructor(
-    options: { normal?: Vec3; constant?: number; size?: number; color?: ColorInput; fillOpacity?: number } & HelperOptions = {},
+    options: {
+      normal?: Vec3;
+      constant?: number;
+      size?: number;
+      color?: ColorInput;
+      fillOpacity?: number;
+    } & HelperOptions = {},
   ) {
     const { normal = [0, 1, 0], constant = 0, size = 1, color = OUTLINE, fillOpacity = 0, ...style } = options;
     super({ ...styled(style), color, mode: 'segments' });
@@ -647,7 +768,7 @@ function vertexArrays(triangles: NonNullable<ReturnType<typeof meshTriangles>>):
 }
 
 /**
- * One world-space line per vertex of a core mesh or a loaded gltf-pro (PBR) mesh (bind pose), from the vertex along
+ * One world-space line per vertex of a core mesh or a loaded gltf/pbr (PBR) mesh (bind pose), from the vertex along
  * its normal, `size` long (default 1). Normals go through the inverse transpose of the world matrix, so non-uniform
  * scales and mirrors keep them perpendicular to the surface. Hidden while the mesh is removed or hidden or its world
  * matrix is singular. Default colour '#e8459a'.

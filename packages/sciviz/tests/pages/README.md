@@ -15,7 +15,7 @@ the single-slice DICOM coverage. The synthetic phantom starts with a cutaway so 
 After building packages, open these through `npm run dev:examples`, or run the bounded browser check from the root:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=sciviz-pages --max=12 --wait-max=5 -- node packages/sciviz/tests/demos-browser.mjs
+node scripts/run-with-timeout.mjs --max=12 -- node packages/sciviz/tests/demos-browser.mjs
 ```
 
 It checks the real demos and these pages at 1440 x 900 and 390 x 844, on native WebGPU and forced WebGL2,

@@ -1,11 +1,11 @@
 // Character playground test page: stress and edge-case testing for:
-// @margoengine/gltf, @margoengine/gltf-pro, @margoengine/animation, @margoengine/animator,
+// @margoengine/gltf, @margoengine/gltf/pbr, @margoengine/animation, @margoengine/animator,
 // @margoengine/mixer, @margoengine/rigging, @margoengine/kinematics-constraints,
 // @margoengine/controls, @margoengine/cameras,
 // using only documented public APIs.
 import { ready } from './page-harness';
 import { createStage, type Stage, Geometry, type Mesh } from '@margoengine/stage';
-import { loadGLTF as loadGLTFPro, type PBRModel } from '@margoengine/gltf-pro';
+import { loadGLTF as loadGLTFPbr, type PBRModel } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { Animator, type FootIK, type GroundHit } from '@margoengine/animator';
 import { OrbitControls } from '@margoengine/controls';
@@ -321,11 +321,11 @@ async function loadCharacterModel(config: ModelConfig) {
 
   const t0 = performance.now();
   try {
-    // Load model with @margoengine/gltf-pro
-    currentPbrModel = await loadGLTFPro(stage.engine, config.url);
+    // Load model with @margoengine/gltf/pbr
+    currentPbrModel = await loadGLTFPbr(stage.engine, config.url);
     const loadMs = performance.now() - t0;
     log(
-      `[GLTF-Pro] Loaded "${config.name}" in ${loadMs.toFixed(1)} ms. Primitives: ${currentPbrModel.primitives.length}, Nodes: ${currentPbrModel.nodes.length}`,
+      `[glTF PBR] Loaded "${config.name}" in ${loadMs.toFixed(1)} ms. Primitives: ${currentPbrModel.primitives.length}, Nodes: ${currentPbrModel.nodes.length}`,
       'info',
     );
 
@@ -402,7 +402,7 @@ async function loadCharacterModel(config: ModelConfig) {
     const b = currentPbrModel.bounds;
     stage.engine.camera.fitToBoundingBox([b[0], b[1], b[2]], [b[3], b[4], b[5]], { duration: 0 });
   } catch (err) {
-    log(`[GLTF-Pro][error] Failed to load "${config.name}": ${(err as Error).message}`, 'error');
+    log(`[glTF PBR][error] Failed to load "${config.name}": ${(err as Error).message}`, 'error');
   }
 }
 

@@ -51,6 +51,103 @@ test('animated surfaces cannot merge across cells and metadata survives worker c
   }
   assert.equal(tops, 12);
 });
+test('a large clock reaches the shader as float64-reduced phases, one per distinct speed', () => {
+  const blocks = new BlockTypes();
+  defineWindBlock(blocks, 'grass', { shape: 'cross' });
+  const renderer = {
+      world: { blocks },
+      addVertexMotion: () => () => {},
+      onDispose: () => () => {},
+    },
+    wind = new VoxelWind(renderer),
+    written = [],
+    device = {
+      createBuffer: ({ size }) => ({ size, destroy() {} }),
+      queue: { writeBuffer: (buffer, offset, data) => written.push(new Float32Array(data)) },
+    },
+    speed = blocks.table.find((t) => t.vertexMotion).vertexMotion.speed,
+    time = 1e6 + 0.3,
+    phase = time * speed;
+  wind.bindings(device, time);
+  // A float32 clock of 1e6 s steps by 0.0625 s, a sixth of a radian at speed 1.6; the phase is reduced first.
+  assert.equal(written.at(-1)[4], Math.fround(phase - Math.floor(phase / (2 * Math.PI)) * 2 * Math.PI));
+  assert.match(
+    wind.shader('fn voxelPlace(w0:u32,w1:u32,c:u32,t:vec4f)->vec3f {}'),
+    /windFrame\.phase\[slot>>2u\]\[slot&3u\]/,
+  );
+  wind.time = 5;
+  wind.bindings(device, time);
+  assert.equal(
+    written.at(-1)[4],
+    Math.fround(5 * speed - 2 * Math.PI),
+    'an explicit time wins over the renderer clock',
+  );
+  wind.dispose();
+});
+
+test('a rebased renderer: the wind phase adds the integer frame base, per speed and frequency, in float64', () => {
+  const blocks = new BlockTypes();
+  defineWindBlock(blocks, 'grass', { shape: 'cross' });
+  const grass = blocks.table.find((t) => t.vertexMotion).vertexMotion;
+  blocks.define('reed', { shape: 'cross', textures: 1, vertexMotion: { ...grass, frequency: grass.frequency * 2 } });
+  const renderer = {
+      world: { blocks },
+      addVertexMotion: () => () => {},
+      onDispose: () => () => {},
+    },
+    wind = new VoxelWind(renderer, { direction: [0.6, 0.8] }),
+    written = [],
+    device = {
+      createBuffer: ({ size }) => ({ size, destroy() {} }),
+      queue: { writeBuffer: (buffer, offset, data) => written.push(new Float32Array(data)) },
+    },
+    base = [2 ** 24, 1024, -(2 ** 24)],
+    time = 12.5,
+    tau = 2 * Math.PI,
+    reduce = (v) => Math.fround(v - Math.floor(v / tau) * tau);
+  wind.bindings(device, time, base);
+  // A shader position p is world cell p + base: dot(p + base, d) f + t s = dot(p, d) f + (dot(base, d) f + t s).
+  const shift = (base[0] * Math.fround(0.6) + base[2] * Math.fround(0.8)) * Math.fround(grass.frequency);
+  assert.equal(written.at(-1)[4], reduce(time * grass.speed + shift));
+  assert.equal(written.at(-1)[5], reduce(time * grass.speed + 2 * shift), 'one slot per (speed, frequency) pair');
+  assert.match(wind.shader('fn voxelPlace(w0:u32,w1:u32,c:u32,t:vec4f)->vec3f {}'), /vec4f\(1\.0,[^)]*,1\);\}/);
+  wind.bindings(device, time);
+  assert.equal(written.at(-1)[4], reduce(time * grass.speed + shift), 'the last base is kept');
+  wind.dispose();
+});
+
+test('a rebased renderer with a wind shorter or longer than 1: the base phase uses the unit direction, as the shader', () => {
+  // The shader adds dot(p.xz, direction / |direction|) * frequency, so the base's part must use the unit direction too:
+  // otherwise a weak wind (|direction| < 1 only scales the sway) shifts its phase whenever the base moves.
+  const blocks = new BlockTypes();
+  defineWindBlock(blocks, 'grass', { shape: 'cross' });
+  const grass = blocks.table.find((t) => t.vertexMotion).vertexMotion,
+    renderer = { world: { blocks }, addVertexMotion: () => () => {}, onDispose: () => () => {} },
+    written = [],
+    device = {
+      createBuffer: ({ size }) => ({ size, destroy() {} }),
+      queue: { writeBuffer: (buffer, offset, data) => written.push(new Float32Array(data)) },
+    },
+    tau = 2 * Math.PI,
+    reduce = (v) => Math.fround(v - Math.floor(v / tau) * tau),
+    time = 3.25;
+  for (const direction of [
+    [0.3, 0],
+    [0, -0.25],
+    [30, 40],
+  ]) {
+    const wind = new VoxelWind(renderer, { direction }),
+      length = Math.hypot(...direction),
+      base = [1024, 7, -2048];
+    wind.bindings(device, time, base);
+    const shift =
+      (base[0] * Math.fround(direction[0] / length) + base[2] * Math.fround(direction[1] / length)) *
+      Math.fround(grass.frequency);
+    assert.equal(written.at(-1)[4], reduce(time * grass.speed + shift), `direction ${direction}`);
+    wind.dispose();
+  }
+});
+
 test('live controls upload only changes, restore a device, and release after removing the adapter', () => {
   const blocks = new BlockTypes();
   defineWindBlock(blocks, 'grass', { shape: 'cross' });

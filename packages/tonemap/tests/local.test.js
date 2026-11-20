@@ -17,7 +17,7 @@ test('LocalExposure adds its stops after the exposure step and binds its base at
   assert.ok(code.includes('@group(0) @binding(16) var localBase:texture_2d<f32>;'));
   const entries = h.groups.at(-1).entries.map((e) => e.binding);
   assert.ok(entries.includes(5) && entries.includes(16), 'uniform and base bound');
-  assert.deepEqual([...local.values()], [0.5, 3, 0, 0], 'strength and maxStops defaults');
+  assert.deepEqual([...local.values()], [0.5, 3, 4, 0], 'strength and maxStops defaults, 4 by 4 blocks');
   // Three quarter-resolution passes a frame, no new GPU objects on a steady frame.
   const before = { ...h.counts };
   h.frame();
@@ -32,7 +32,49 @@ test('LocalExposure adds its stops after the exposure step and binds its base at
   assert.equal(h.counts.groups, before.groups);
   effect.dispose();
   local.dispose();
-  assert.ok(h.resources.every((r) => r.destroyed), 'every texture and buffer is freed');
+  assert.ok(
+    h.resources.every((r) => r.destroyed),
+    'every texture and buffer is freed',
+  );
+});
+
+test('LocalExposure blurs three sigma a side at any radius by building its base from larger blocks', () => {
+  // Before, the taps a side stopped at 32 quarter-resolution texels, so a sigma above 10.7 texels was cut short (radius
+  // 0.1 at 2160 rows: sigma 54 texels, cut at 0.59 sigma).
+  const h = gpuHarness(),
+    device = h.engine.gpu,
+    writes = [],
+    write = device.queue.writeBuffer;
+  device.queue.writeBuffer = (buffer, offset, values, start = 0, count) => {
+    if (buffer.size === 528) writes.push([offset, ...values.slice(start, start + (count ?? values.length))]);
+    return write(buffer, offset, values, start, count);
+  };
+  for (const [height, radius, block] of [
+    [240, 0.02, 4],
+    [2160, 0.02, 8],
+    [2160, 0.1, 32],
+    [8192, 0.1, 128],
+  ]) {
+    const local = new LocalExposure({ radius }),
+      textures = [];
+    const create = device.createTexture;
+    writes.length = 0;
+    const source = device.createTexture({ size: [16, 16], format: 'rgba16float', usage: 6 });
+    device.createTexture = (d) => (textures.push(d.size), create.call(device, d));
+    local.encode({ device, encoder: h.context.encoder, source, width: 3840, height });
+    device.createTexture = create;
+    const sigma = (radius * height) / block,
+      [h0, v0, d0] = [0, 256, 512].map((o) => writes.find((w) => w[0] === o));
+    assert.equal(d0[1], block, `${height} rows, radius ${radius}: ${block} by ${block} blocks`);
+    assert.deepEqual(textures.at(-1), [Math.ceil(3840 / block), Math.ceil(height / block)]);
+    for (const w of [h0, v0]) {
+      assert.equal(w[1], Math.fround(sigma));
+      assert.equal(w[2], Math.ceil(3 * sigma), 'three sigma a side');
+      assert.ok(w[2] <= 32);
+    }
+    assert.equal(local.values()[2], block, 'the base is sampled at the block size');
+    local.dispose();
+  }
 });
 
 test('LocalExposure follows the auto-exposure stops in the effects variant', () => {

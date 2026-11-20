@@ -85,18 +85,23 @@ export class GPUMemory {
   constructor(device: GPUDevice) {
     const createBuffer = device.createBuffer,
       createTexture = device.createTexture;
-    device.createBuffer = (descriptor) =>
-      this.count(createBuffer.call(device, descriptor), this.groups.buffers, descriptor.size, descriptor.label);
-    device.createTexture = (descriptor) =>
-      this.count(
-        createTexture.call(device, descriptor),
-        this.groups.textures,
-        textureBytes(descriptor),
-        descriptor.label,
-      );
+    let counting = true;
+    const buffer: GPUDevice['createBuffer'] = (descriptor) => {
+        const made = createBuffer.call(device, descriptor);
+        return counting ? this.count(made, this.groups.buffers, descriptor.size, descriptor.label) : made;
+      },
+      texture: GPUDevice['createTexture'] = (descriptor) => {
+        const made = createTexture.call(device, descriptor);
+        return counting ? this.count(made, this.groups.textures, textureBytes(descriptor), descriptor.label) : made;
+      };
+    device.createBuffer = buffer;
+    device.createTexture = texture;
     this.restore = () => {
-      device.createBuffer = createBuffer;
-      device.createTexture = createTexture;
+      counting = false;
+      // Something that wrapped these after us owns them now; writing the originals back would remove it, so our
+      // wrapper stays under it and only passes calls through.
+      if (device.createBuffer === buffer) device.createBuffer = createBuffer;
+      if (device.createTexture === texture) device.createTexture = createTexture;
     };
   }
   private count<T extends { destroy(): void }>(object: T, group: GPUMemoryGroup, bytes: number, label = ''): T {

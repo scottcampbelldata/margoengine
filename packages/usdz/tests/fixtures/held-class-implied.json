@@ -1,0 +1,64 @@
+{
+ "held": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\nclass \"C\"\n{\n    over \"a\"\n    {\n        custom double v = 1\n    }\n}\ndef \"M\" (\n    references = @./l0.usda@\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\ndef \"P\" (\n    references = @./l0.usda@\n)\n{\n    def \"a\" (\n        references = @./l1.usda@</M/a>\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    4,
+    0
+   ],
+   "/P/a": [
+    5
+   ]
+  }
+ },
+ "other-layer": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n}\n",
+   "l0b.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\nclass \"C\"\n{\n    over \"a\"\n    {\n        custom double v = 1\n    }\n}\ndef \"M\" (\n    references = @./l0b.usda@\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\ndef \"P\" (\n    references = @./l0.usda@\n)\n{\n    def \"a\" (\n        references = @./l1.usda@</M/a>\n    )\n    {\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    5,
+    0
+   ],
+   "/P/a": [
+    6,
+    3
+   ]
+  }
+ },
+ "r1942-21": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    prepend inherits = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    over \"a\"\n    {\n        def \"c\" (\n        )\n        {\n        }\n    }\n}\ndef \"M\" (\n    references = @./l0.usda@ (offset = 3; scale = 2)\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        prepend references = @./l0.usda@ (offset = 3; scale = 2)\n    )\n    {\n        def \"a\" (\n            prepend references = @./l1.usda@</M/a> (offset = 10)\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\ndef \"P\"\n{\n    def \"b\" (\n        variantSets = \"vs\"\n        variants = { string vs = \"x\" }\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"c\" (\n                    prepend references = @./l2.usda@ (offset = 3; scale = 2)\n                )\n                {\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    8
+   ],
+   "/P/b": [
+    9,
+    10
+   ],
+   "/P/b/c": [
+    11,
+    5
+   ],
+   "/P/b/c/a": [
+    6,
+    0
+   ],
+   "/P/b/c/a/a": [
+    7
+   ]
+  }
+ }
+}

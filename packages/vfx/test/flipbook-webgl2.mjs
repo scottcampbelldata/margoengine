@@ -1,7 +1,7 @@
 // Pixel comparison of flipbook on the WebGL2 compatibility layer (the features check's checkFlipbook, same page).
 // The layer is installed by scripts/browser.js when MARGO_COMPAT=1, before the page's first requestAdapter.
-// Run from the repository root, under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node packages/vfx/test/flipbook-webgl2.mjs
+// Run from the repository root:
+//   node scripts/run-with-timeout.mjs -- node packages/vfx/test/flipbook-webgl2.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 

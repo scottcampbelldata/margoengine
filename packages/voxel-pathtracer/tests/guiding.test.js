@@ -30,7 +30,10 @@ test('guiding is optional, zero is exact baseline, and all mixture PDFs share th
     assert.ok(tracers[2] instanceof GuidedVoxelPathTracer);
     assert.match(c.sources[0], /e.pdf=guidePdf\(o,n,wi\)/);
     assert.match(c.sources[0], /guidedSurface\(m,n,wo,etaI,p\+off,inAir\)/);
-    assert.match(c.sources[0], /s.pdf=guidePdf\(o,n,s.wi\)/);
+    // The bounce builds the guide boxes in its own loop (one guideBox copy) and weighs them as guidePdf does.
+    const mix = c.sources[0].match(/return ([\d.]+)\*base\+([\d.]+)\*pdf;/);
+    assert.ok(mix, 'guidePdf mixes the cosine and box PDFs');
+    assert.ok(c.sources[0].includes(`s.pdf=${mix[1]}*(max(dot(n,s.wi),0.0)*INV_PI)+${mix[2]}*pdf;`));
     assert.match(c.sources[0], /k<count;k\+\+/);
     assert.match(c.sources[0], /guidedRoulette\(&thr,bounces,guideRoulette\)/);
     assert.ok(c.sources[0].indexOf('fn guidePdf') < c.sources[0].indexOf('@compute @workgroup_size(8,8) fn trace'));

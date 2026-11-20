@@ -3,6 +3,8 @@ import { MargoError } from '@margoengine/math/errors';
 
 // Clean room from Woop/Benthin/Wald's ray-space shear (JCGT 2013),
 // binary BVH traversal and the existing Margo BSDF/volume integrator.
+// triangleShading is a triangle hit's shading normal (the PBR feature reads its normal map there). meshClosest has one
+// meshBlas call site: a lone mesh is one pass of its instance loop with the world ray (fxc copies every call site).
 const GEOMETRY = /* wgsl */ `
 const TRIANGLE=0xfffffffcu;
 var<private> meshGeometric:vec3f;
@@ -34,15 +36,14 @@ fn meshTexel(h:Hit)->vec4f {
  let c=unpack4x8unorm(scene[scene[t]+min(u32(uv.y*f32(ht)),ht-1u)*w+min(u32(uv.x*f32(w)),w-1u)]);
  return vec4f(select(c.rgb/12.92,pow((c.rgb+0.055)/1.055,vec3f(2.4)),c.rgb>vec3f(0.04045)),c.a);
 }
+fn triangleHitNormal(h:Hit)->vec3f {return h.sgn*triangleNormal(h);}
 fn hitNormal(h:Hit)->vec3f {
- if(h.inst==TRIANGLE){return h.sgn*triangleNormal(h);}
+ if(h.inst==TRIANGLE){return triangleHitNormal(h);}
  return h.sgn*normalize(rowOf(localX(h.inst),h.axis));
 }
-fn shadingNormal(h:Hit)->vec3f {
- if(h.inst==TRIANGLE){return triangleShadingNormal(h);}return hitNormal(h);
-}
+fn triangleShading(h:Hit)->vec3f {return triangleShadingNormal(h);}
 fn hitOffset(h:Hit,p:vec3f)->vec3f {
- if(h.inst==TRIANGLE){return hitNormal(h)*max(1e-5,max(max(abs(p.x),abs(p.y)),abs(p.z))*9.53674316e-7);}
+ if(h.inst==TRIANGLE){return triangleHitNormal(h)*max(1e-5,max(max(abs(p.x),abs(p.y)),abs(p.z))*9.53674316e-7);}
  return h.sgn*EPS*colOf(worldX(h.inst),h.axis);
 }
 // Exact zero directions stay parallel. Division also handles nonzero directions
@@ -132,17 +133,23 @@ fn meshBlas(head:u32,instance:u32,o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<fun
 }
 fn meshClosest(o:vec3f,d:vec3f,medium:u32,mInst:u32,h:ptr<function,Hit>){
  let head=scene[2];if(head==0u){return;}
- if(scene[head+1u]!=0u){meshBlas(head,0u,o,d,medium,mInst,h);return;}
- let count=scene[head];let records=head+scene[head+5u];var node=0u;
+ let lone=scene[head+1u]!=0u;
+ let count=select(scene[head],1u,lone);var node=0u;
  loop{
-  if(node>=count){break;}let b=head+16u+node*8u;
-  if(!meshBox(b,o,d,(*h).t)){node=scene[b+3u];continue;}
-  let leaf=scene[b+7u];node++;if(leaf==0u){continue;}
-  let instance=records+(leaf-1u)*32u;let lx=meshX(instance+12u);
-  let lo=vec3f(dot(lx.r0,vec4f(o,1.0)),dot(lx.r1,vec4f(o,1.0)),dot(lx.r2,vec4f(o,1.0)));
-  // Do not normalize: the transformed ray must retain the world-space t.
-  let ld=vec3f(dot(lx.r0.xyz,d),dot(lx.r1.xyz,d),dot(lx.r2.xyz,d));
-  meshBlas(head+scene[instance+24u],instance,lo,ld,medium,mInst,h);
+  if(node>=count){break;}
+  var blas=head;var instance=0u;var lo=o;var ld=d;
+  if(lone){node++;}
+  else{
+   let b=head+16u+node*8u;
+   if(!meshBox(b,o,d,(*h).t)){node=scene[b+3u];continue;}
+   let leaf=scene[b+7u];node++;if(leaf==0u){continue;}
+   instance=head+scene[head+5u]+(leaf-1u)*32u;let lx=meshX(instance+12u);
+   lo=vec3f(dot(lx.r0,vec4f(o,1.0)),dot(lx.r1,vec4f(o,1.0)),dot(lx.r2,vec4f(o,1.0)));
+   // Do not normalize: the transformed ray must retain the world-space t.
+   ld=vec3f(dot(lx.r0.xyz,d),dot(lx.r1.xyz,d),dot(lx.r2.xyz,d));
+   blas=head+scene[instance+24u];
+  }
+  meshBlas(blas,instance,lo,ld,medium,mInst,h);
  }
 }
 fn meshOccludes(o:vec3f,d:vec3f,tMax:f32)->bool {
@@ -166,12 +173,12 @@ export function meshSource(input: string): string {
     'fn shadow(o:vec3f,d:vec3f,tMax:f32)->f32 {\n if(meshOccludes(o,d,tMax)){return 0.0;}',
   );
   edit(
-    'fn edgeBand(h:Hit,p:vec3f)->bool {',
-    'fn edgeBand(h:Hit,p:vec3f)->bool {\n if(h.inst==TRIANGLE){return false;}',
+    'fn edgeBand(h:Hit,lp:vec3f)->bool {',
+    'fn edgeBand(h:Hit,lp:vec3f)->bool {\n if(h.inst==TRIANGLE){return false;}',
   );
   edit(
-    'fn faceTexel(h:Hit,p:vec3f)->vec4f {',
-    'fn faceTexel(h:Hit,p:vec3f)->vec4f {\n if(h.inst==TRIANGLE){return meshTexel(h);}',
+    'fn faceTexel(h:Hit,l:vec3f)->vec4f {',
+    'fn faceTexel(h:Hit,l:vec3f)->vec4f {\n if(h.inst==TRIANGLE){return meshTexel(h);}',
   );
   // Until triangle light sampling is installed, a directional RIS proposal must
   // leave triangle emission to path hits, without treating its marker as an instance.
@@ -199,26 +206,26 @@ export function meshSource(input: string): string {
   );
   edit(
     '  // Light sampled at a glossy metal',
-    '  meshGeometric=vec3f(0.0);if(!scatter&&h.inst==TRIANGLE){meshGeometric=hitNormal(h); }\n  // Light sampled at a glossy metal',
+    '  meshGeometric=vec3f(0.0);if(!scatter&&h.inst==TRIANGLE){meshGeometric=triangleHitNormal(h); }\n  // Light sampled at a glossy metal',
   );
   edit(
     'let s=dielectric(mm.alpha,n,-d,mm.ior,sm);\n     if(!s.ok){break;}',
-    'let s=dielectric(mm.alpha,n,-d,mm.ior,sm);\n     if(!s.ok){break;}\n     if(h.inst==TRIANGLE&&select(dot(hitNormal(h),s.wi)<=0.0,dot(hitNormal(h),s.wi)>=0.0,s.transmit)){break;}',
+    'let s=dielectric(mm.alpha,n,-d,mm.ior,sm);\n     if(!s.ok){break;}\n     if(h.inst==TRIANGLE&&select(dot(triangleHitNormal(h),s.wi)<=0.0,dot(triangleHitNormal(h),s.wi)>=0.0,s.transmit)){break;}',
   );
   edit(
     'if(!s.ok){done=true;continue;}',
-    'if(!s.ok){done=true;continue;}\n  if(h.inst==TRIANGLE&&select(dot(hitNormal(h),s.wi)<=0.0,dot(hitNormal(h),s.wi)>=0.0,s.transmit)){done=true;continue;}',
+    'if(!s.ok){done=true;continue;}\n  if(h.inst==TRIANGLE&&select(dot(triangleHitNormal(h),s.wi)<=0.0,dot(triangleHitNormal(h),s.wi)>=0.0,s.transmit)){done=true;continue;}',
   );
   edit('let wn=h.sgn*normalize(rowOf(localX(h.inst),h.axis));', 'let wn=hitNormal(h);');
   edit('let woff=h.sgn*EPS*colOf(worldX(h.inst),h.axis);', 'let woff=hitOffset(h,wp);');
   edit('if(h.inst!=GROUND){n=rowOf(localX(h.inst),h.axis);}', 'if(h.inst!=GROUND){n=hitNormal(h);}');
   edit(
-    'let lx=localX(h.inst);\n    n=h.sgn*normalize(rowOf(lx,h.axis));\n    off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);',
-    'n=shadingNormal(h);\n    off=hitOffset(h,p);',
+    'let lx=localX(h.inst);let lp=xpoint(lx,p);\n    n=h.sgn*normalize(rowOf(lx,h.axis));\n    off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);',
+    'var lp=p;\n    if(h.inst==TRIANGLE){n=triangleShading(h);}else{let lx=localX(h.inst);lp=xpoint(lx,p);n=h.sgn*normalize(rowOf(lx,h.axis));}\n    off=hitOffset(h,p);',
   );
   edit(
-    'n=normalize(h.sgn*rowOf(localX(h.inst),h.axis));m=material(h.value);',
-    'n=shadingNormal(h);m=material(h.value);',
+    'let lx=localX(h.inst);let lp=xpoint(lx,p);\n    n=normalize(h.sgn*rowOf(lx,h.axis));m=material(h.value);',
+    'var lp=p;\n    if(h.inst==TRIANGLE){n=triangleShading(h);}else{let lx=localX(h.inst);lp=xpoint(lx,p);n=normalize(h.sgn*rowOf(lx,h.axis));}m=material(h.value);',
   );
   edit(
     'else if(h.inst!=NONE){v=f32(h.inst+1u)*256.0+f32(h.value&255u);}',

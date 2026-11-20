@@ -1,5 +1,5 @@
 // Real-GPU check of @margoengine/geometry/gpu (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/geometry/tests/gpu-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/geometry/tests/gpu-check.mjs
 // Generated vertices are read back and compared with what the shaders promise: closed forms, control points, frames.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';

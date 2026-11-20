@@ -11,17 +11,18 @@ import {
   conjugateQuaternion,
 } from '@margoengine/math/quat';
 import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
-import { IDENTITY, invertAffine, transformPoint, quatFromMatrix, type Q4, type V3 } from './math.js';
+import { EPS, IDENTITY, invertAffine, transformPoint, quatFromMatrix, type Q4, type V3 } from './math.js';
 import { rollFrame, ray } from './view.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 
 const clamp = (v: number, min = 0, max = 1): number => Math.max(min, Math.min(max, v));
 const time = (delta: number): void => {
   if (!Number.isFinite(delta) || delta < 0)
-    throw new RangeError('Control delta must be finite and nonnegative; pass seconds');
+    throw rangeError('Control delta must be finite and nonnegative; pass seconds', 'controls-arguments');
 };
 const vector = (p: ArrayLike<number>): V3 => {
   if (p.length !== 3 || ![p[0], p[1], p[2]].every(Number.isFinite))
-    throw new RangeError('Path points must have three finite components; return [x,y,z]');
+    throw rangeError('Path points must have three finite components; return [x,y,z]', 'controls-arguments');
   return [p[0], p[1], p[2]];
 };
 const blend = (now: number, target: number, delta: number, damping: number, maxSpeed: number): number => {
@@ -89,8 +90,9 @@ export class PresentationControls extends Controls {
       !Number.isFinite(options.zoom ?? 1) ||
       (options.zoom ?? 1) <= 0
     )
-      throw new RangeError(
+      throw rangeError(
         'Presentation limits must contain zero and speed/zoom must be finite with speed >= 0 and zoom > 0; pass valid options',
+        'controls-arguments',
       );
     const settings =
       options.spring?.duration === undefined
@@ -99,7 +101,7 @@ export class PresentationControls extends Controls {
     const pitch = new Spring({ ...settings, value: 0, target: 0 }),
       yaw = new Spring({ ...settings, value: 0, target: 0 });
     if (engineRuntime(engine).meshes.get(meshRuntime(object).id) !== object)
-      throw new TypeError('Presentation needs a live product mesh from its engine; pass one');
+      throw typeError('Presentation needs a live product mesh from its engine; pass one', 'controls-arguments');
     super(engine, options.element);
     this.object = object;
     this.polar = [...polar];
@@ -260,9 +262,9 @@ export class ScrollArea {
     const pages = options.pages ?? 1,
       distance = options.distance ?? 1;
     if (!Number.isFinite(pages) || pages < 1 || !Number.isFinite(distance) || distance <= 0)
-      throw new RangeError('ScrollArea needs finite pages >= 1 and distance > 0; pass valid options');
+      throw rangeError('ScrollArea needs finite pages >= 1 and distance > 0; pass valid options', 'controls-arguments');
     const parent = canvas.parentElement;
-    if (!parent) throw new TypeError('ScrollArea needs a mounted canvas; append it to a parent first');
+    if (!parent) throw typeError('ScrollArea needs a mounted canvas; append it to a parent first', 'controls-arguments');
     this.parent = parent;
     this.previous = parent.style.position;
     this.positioned = (canvas.ownerDocument.defaultView?.getComputedStyle(parent).position || 'static') === 'static';
@@ -361,8 +363,9 @@ export class ScrollControls extends Controls {
       !Number.isFinite(eps) ||
       eps < 0
     )
-      throw new RangeError(
+      throw rangeError(
         'Scroll needs pages >= 1, positive distance/maxSpeed and nonnegative damping/eps; pass finite options except maxSpeed=Infinity',
+        'controls-arguments',
       );
     super(source, options.element);
     this.pages = pages;
@@ -374,11 +377,15 @@ export class ScrollControls extends Controls {
     this.infinite = options.infinite ?? false;
     this.init();
   }
-  /** Set normalized target progress; values outside [0,1] wrap only in infinite mode. */
+  /**
+   * Set normalized target progress. Outside infinite mode it is clamped to [0,1]. In infinite mode it names a place on
+   * the loop (any whole number of loops is the same place) and the offset travels the short way round to it, at most
+   * half a loop, through the seam when that is shorter.
+   */
   setProgress(progress: number, immediate = false): void {
     if (this.dead) throw new MargoError('disposed', 'Scroll controls are disposed; create new controls');
-    if (!Number.isFinite(progress)) throw new RangeError('Scroll progress must be finite; pass normalized progress');
-    this.goal = this.infinite ? progress : clamp(progress);
+    if (!Number.isFinite(progress)) throw rangeError('Scroll progress must be finite; pass normalized progress', 'controls-arguments');
+    this.goal = this.infinite ? this.current + ((((progress - this.offset + 0.5) % 1) + 1) % 1) - 0.5 : clamp(progress);
     if (immediate) {
       this.current = this.goal;
       this.delta = 0;
@@ -401,8 +408,9 @@ export class ScrollControls extends Controls {
   }
   private interval(from: number, length: number, margin: number): void {
     if (![from, length, margin].every(Number.isFinite) || length <= 0 || margin < 0)
-      throw new RangeError(
+      throw rangeError(
         'Scroll interval needs finite start, positive length and nonnegative margin; pass normalized units',
+        'controls-arguments',
       );
   }
   protected override bind(
@@ -448,12 +456,14 @@ export class ScrollControls extends Controls {
     if (extent > 0) return; // Native scrolling remains accessible to touch, keyboard and browser defaults.
     const pixels =
       (this.horizontal ? e.deltaX || e.deltaY : e.deltaY) *
-      (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.element.clientHeight : 1);
+      // A page (UI Events DOM_DELTA_PAGE) is the element's size along the scroll axis.
+      (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? (this.horizontal ? el.clientWidth : el.clientHeight) : 1);
     const goal =
       this.goal +
       pixels /
         (Math.max(1, this.pages - 1) * this.distance * Math.max(1, this.horizontal ? el.clientWidth : el.clientHeight));
-    this.setProgress(goal);
+    // Wheel travel adds up across loops, so it moves the goal directly rather than naming a place on the loop.
+    this.goal = this.infinite ? goal : clamp(goal);
     e.preventDefault();
   };
   override update(delta = 1 / 60): boolean {
@@ -466,8 +476,9 @@ export class ScrollControls extends Controls {
       !Number.isFinite(this.eps) ||
       this.eps < 0
     )
-      throw new RangeError(
+      throw rangeError(
         'Scroll damping/eps must be finite and nonnegative and maxSpeed positive; restore valid settings',
+        'controls-arguments',
       );
     const before = this.current;
     this.current = blend(before, this.goal, delta, this.damping, this.maxSpeed);
@@ -558,8 +569,9 @@ export class PathControls extends Controls {
       !Number.isFinite(focusDamping) ||
       focusDamping < 0
     )
-      throw new RangeError(
+      throw rangeError(
         'Path controls need a curve, finite offset, damping >= 0, maxSpeed > 0 and lookAhead in (0,1); pass valid options',
+        'controls-arguments',
       );
     super(source, null);
     this.path = path;
@@ -575,11 +587,11 @@ export class PathControls extends Controls {
     this.offset = this.normalize(offset);
     if (this.object && !this.engine) {
       this.dispose();
-      throw new TypeError('Mesh path controls need an engine; pass the owning engine');
+      throw typeError('Mesh path controls need an engine; pass the owning engine', 'controls-arguments');
     }
     if (this.object && engineRuntime(this.engine!).meshes.get(meshRuntime(this.object).id) !== this.object) {
       this.dispose();
-      throw new TypeError('Path mesh must belong to its engine; pass a live mesh from that engine');
+      throw typeError('Path mesh must belong to its engine; pass a live mesh from that engine', 'controls-arguments');
     }
   }
   private normalize(p: number): number {
@@ -609,8 +621,9 @@ export class PathControls extends Controls {
       !Number.isFinite(this.focusDamping) ||
       this.focusDamping < 0
     )
-      throw new RangeError(
+      throw rangeError(
         'Path progress must be finite, damping/focusDamping nonnegative and maxSpeed positive; restore valid settings',
+        'controls-arguments',
       );
     let desired = this.normalize(goal);
     if (this.loop) desired = this.progress + (((desired - this.normalize(this.progress) + 1.5) % 1) - 0.5);
@@ -635,6 +648,7 @@ export class PathControls extends Controls {
     this.lookTarget = [...target];
     let forward = sub(target, point);
     if (Math.hypot(...forward) < 1e-9) forward = [0, 0, -1];
+    let before: number[], after: () => number[];
     if (this.object) {
       const runtime = engineRuntime(this.engine!),
         id = meshRuntime(this.object).id;
@@ -642,6 +656,9 @@ export class PathControls extends Controls {
         this.dispose();
         return false;
       }
+      const t = runtime.store.transforms;
+      after = () => [t.x[id], t.y[id], t.z[id], t.qx[id], t.qy[id], t.qz[id], t.qw[id]];
+      before = after();
       const parent = runtime.store.parents[id],
         m = parent < 0 ? IDENTITY : runtime.store.matrices.subarray(parent * 16, parent * 16 + 16);
       this.object.setPosition(transformPoint(invertAffine(m), point));
@@ -656,11 +673,17 @@ export class PathControls extends Controls {
         ),
       );
     } else {
+      const c = this.camera;
+      after = () => [...c.position, ...c.target, ...c.up];
+      before = after();
       this.camera.position = point;
       this.camera.target = add(point, forward);
       if (Math.abs(normalize(forward)[1]) > 0.999) this.camera.up = [0, 0, 1];
       else this.camera.up = [0, 1, 0];
     }
+    // Like the other controls, report and dispatch only when the camera or mesh actually moved.
+    const now = after();
+    if (!now.some((v, i) => Math.abs(v - before[i]) > EPS)) return false;
     this.dispatchEvent({ type: 'change', offset: this.offset });
     return true;
   }

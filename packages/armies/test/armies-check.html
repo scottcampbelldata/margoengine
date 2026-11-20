@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>armies check</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// GPU check page of @margoengine/armies, on the code-built test body of test/soldier.js. window.check.army(): 300 foot
+// soldiers in line and skirmish order and 40 riders charging on horses, drawn by addArmy under a key light; returns the
+// frame, the level counts and the frame after a seek to the same film time. window.check.handover(): the same men all
+// skinned near, then all far, from one camera, then all far a quarter cycle off the near pose: the three frames.
+import {Engine} from '/packages/core/dist/index.js';
+import {parseGLTFAsync} from '/packages/gltf/dist/pbr.js';
+import {Animation} from '/packages/animation/dist/index.js';
+import {Army} from '/packages/navmesh/dist/formations.js';
+import {addArmy, bakePerson} from '/packages/armies/dist/index.js';
+import {soldierGLB} from '/packages/armies/test/soldier.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const canvas=document.querySelector('canvas');canvas.width=480;canvas.height=360;canvas.style.width='480px';canvas.style.height='360px';
+const make=async(camera)=>{
+  const engine=await Engine.create(canvas,{camera:{fov:35,near:0.1,far:800,...camera}});
+  engine.stop();
+  const errors=[];engine.gpu?.addEventListener?.('uncapturederror',e=>errors.push(e.error.message));
+  engine.scene.background='#30333a';
+  engine.lighting.direction.set([0.5,0.6,0.62,3]);engine.lighting.radiance.set([1,0.95,0.88,0.45]);
+  return {engine,errors};
+};
+const png=async()=>[...new Uint8Array(await (await new Promise(r=>canvas.toBlob(r,'image/png'))).arrayBuffer())];
+// Renders until no pipeline is compiling (scripts/support/gpu-ready.js): a slow driver gets the frames it needs.
+const settle=(engine)=>waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu?.queue?.onSubmittedWorkDone?.();});
+const person=async(engine)=>{const model=await parseGLTFAsync(engine,soldierGLB({rings:8,sides:16}).buffer);const bake=await bakePerson(new Animation(model),{farTriangles:500});model.dispose?.();return bake;};
+const build=()=>{
+  const army=new Army();
+  army.add({count:200,shape:'line',ranks:2,position:[0,0]}).march();
+  const sk=army.add({count:100,shape:'line',ranks:1,position:[0,14]});sk.form('skirmish');sk.march();
+  army.add({count:40,kind:'cavalry',shape:'line',ranks:2,position:[-30,-30]}).charge({goal:[-30,200]});
+  return army;
+};
+window.check={
+  async army(){
+    const {engine,errors}=await make({position:[-14,6,-26],target:[-10,1,14]});
+    const bake=await person(engine);
+    const army=build();
+    const drawn=await addArmy(engine,army,{person:bake,seed:5,near:64});
+    army.advanceTime(8);drawn.update(engine.camera);
+    await settle(engine);
+    const bytes=await png(),counts={...drawn.people.counts},posed=drawn.people.posed,horses=drawn.horses.count;
+    const played=JSON.stringify([drawn.persons.map(p=>[...p.matrix,p.clip,p.offset,p.blendClip,p.blendOffset,p.blend,p.uvTransform]),[...drawn.people.levels]]);
+    army.seek(3);army.seek(8);drawn.update(engine.camera);
+    const sought=JSON.stringify([drawn.persons.map(p=>[...p.matrix,p.clip,p.offset,p.blendClip,p.blendOffset,p.blend,p.uvTransform]),[...drawn.people.levels]]);
+    await settle(engine);
+    const again=await png();
+    const clips=drawn.persons.map(p=>p.clip);
+    drawn.dispose();engine.dispose();
+    return {bytes,again,errors,counts,posed,horses,same:played===sought,played,sought,clips,near:bake.near.vertexCount,far:bake.far.vertexCount};
+  },
+  async handover(){
+    const {engine,errors}=await make({position:[0,3,-14],target:[0,1,6]});
+    const bake=await person(engine);
+    const army=new Army();army.add({count:24,shape:'line',ranks:2}).march();
+    army.advanceTime(1.3);
+    const near=await addArmy(engine,army,{person:bake,nearScreen:0.001,cullScreen:0});
+    near.update(engine.camera);await settle(engine);
+    const a=await png(),na={...near.people.counts};near.dispose();
+    const far=await addArmy(engine,army,{person:bake,near:0,cullScreen:0});
+    far.update(engine.camera);await settle(engine);
+    const b=await png(),nb={...far.people.counts};
+    // The control: the far men a quarter of a walk cycle off the near men's pose, in the same places, as a far level
+    // posed from its own clock instead of the near bone rows would stand.
+    const d=bake.clips[1].duration,off=far.persons.map(p=>({...p,offset:(p.offset+d/4)%d,blendOffset:(p.offset+d/4)%d,blend:0}));
+    far.people.update(off,engine.camera);await settle(engine);
+    const c=await png();far.dispose();
+    engine.dispose();
+    return {a,b,c,na,nb,errors};
+  },
+};
+window.ready=true;
+</script></body></html>

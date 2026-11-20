@@ -32,7 +32,7 @@ same view. It uses core's `camera.project` and `camera.up` hooks.
 ```ts
 import {Engine} from 'margoengine/core';
 import {CameraProjection} from 'margoengine/cameras';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const canvas = document.querySelector('canvas')!;
 
 const engine = await Engine.create(canvas, {camera: {position: [0, 40, 0], target: [0, 0, 0]}}); // straight down
@@ -44,6 +44,8 @@ projection.mode = 'orthographic';
 projection.height = 12;                      // or fix the visible world height (resize widens with the aspect)
 projection.zoom = 2;
 projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, maxX, maxY, maxZ], animated
+projection.mode = 'perspective';
+projection.fit(model.bounds, {framing: 'box'}); // move in until the box's corners fill the frame
 ```
 
 - **Fitting**: `fit(bounds, {aspect, duration, padding})` takes the flat bounds array models carry (no slicing into
@@ -52,6 +54,20 @@ projection.fit(model.bounds);                // frame a box: [minX, minY, minZ, 
   `height` or `left`/`right`/`top`/`bottom`. Perspective: core's `fitToBoundingBox`. `aspect` defaults to the engine
   canvas, `duration` to 0.3 s; the engine advances the animation (after `attach(camera)` call `onPreUpdate(delta)`
   yourself). Throws `Bounds exceed far` when the box does not fit the default depth range (`camera.far` deep).
+  `framing: 'box'` (perspective) keeps the view direction and field of view and moves the eye to the closest point from
+  which all eight corners sit in the padded frame, so a car side-on fills 48 % of a 16:9 frame where the bounding
+  sphere gave 13 %. The box is centred on screen on both axes: the tighter one touches the padded frame on both
+  sides, the looser one has equal margins in pixels even when the box's near and far corners sit at different depths
+  (a plate seen from above). The default, `'sphere'`, stays core's framing.
+- **`fitBox(view, bounds, {aspect, padding})`** is that framing as a pure function: it returns `{position, target,
+  distance, nearest}` for a `{position, target, fov, up?}` view, to set on any camera or to plan a shot without one:
+
+```ts
+import {fitBox} from 'margoengine/cameras';
+
+const fit = fitBox({position: [0, 1, 10], target: [0, 0.7, 0], fov: 40}, [-2.3, 0, -1, 2.3, 1.5, 1], {aspect: 16 / 9});
+console.log(fit.position, fit.target, fit.nearest); // nearest: the closest corner's depth, to check against camera.near
+```
 
 - **Parameters**: `left`, `right`, `top`, `bottom` (all four replace `height` and
   the canvas aspect, so update them on resize), `zoom` (divides the frustum about its centre), `near`, `far` (eye-space, may be negative).
@@ -118,7 +134,7 @@ origin.onRebase(() => { material.clippingPlanes = [origin.toLocalPlane(worldPlan
 ```
 
 - **Local coordinates.** While attached, the camera, controls (`OrbitControls`, `CADCameraControls`, any that read
-  `camera.position`/`target`), `engine.pick`, bvh hits, `mesh.matrix`, gltf-pro node matrices, section planes and
+  `camera.position`/`target`), `engine.pick`, bvh hits, `mesh.matrix`, gltf/pbr node matrices, section planes and
   measurements all work in local coordinates (world − `origin`). Convert at the boundary with `toWorld`, `toLocal` and
   `toLocalPlane`; `cameraPosition`/`cameraTarget` read the camera in world coordinates. Distances and angles between
   local points need no conversion.
@@ -147,7 +163,7 @@ mask shares a bit with its own. Core does the filtering while it collects instan
 ```ts
 import {ALL_LAYERS, layerMask, setCameraLayers, setRenderLayers, withLayers} from 'margoengine/cameras/layers';
 import {Reflector} from 'margoengine/environment/reflector';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Camera, Engine} from 'margoengine/core';
 const top = new Camera({position: [0, 20, 0], target: [0, 0, 0]});
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -334,7 +350,7 @@ const engine = await Engine.create(canvas);
 engine.camera.fov = 100;                                   // the rectilinear picture the stage resamples
 const wide = new WideAngle({mode: 'panini', distance: 1}); // 'panini' | 'equidistant' | 'equisolid' | 'stereographic' | 'orthographic'
 PostStack.attach(engine, [wide]);                          // after the display effect: [new Tonemap(), wide]
-// or alone: const wide = await WideAngle.attach(engine, {mode: 'panini'}); (needs @margoengine/post)
+// or: const wide = await WideAngle.attach(engine, {mode: 'panini'}); joins the scene's stack, or makes one (needs @margoengine/post)
 wide.options.distance = 0.6;                               // read every frame, like mode and crop
 wide.enabled = false;                                      // the plain picture
 
@@ -385,6 +401,7 @@ wide.dispose();                                            // the effect, its st
 - **Circle**: `circle` (default true) leaves black past half of `fov`; false fills the corners as far as the law reaches.
 - **Light**: the cube holds linear light and this is an HDR stage, so tone mapping comes after it, and a display effect
   goes after it in your own stack: `const cube = CubeCamera.attach(engine, {size: 512}); PostStack.attach(engine, [new WideAngleCube({cube}), new Tonemap()]);`
+  `WideAngleCube.attach(engine, options)` on a scene that already has a PostStack adds the stage after its last HDR effect.
   Faces run the scene passes only, so HDR effects ahead of this stage do not reach the picture. The camera's `fov` is not used.
 - **Errors**: `Invalid wide angle fov ...` and the `WideAngle` errors; MargoError `state` outside a PostStack, with no cube,
   or for `capture()` before attaching; `unsupported` on WebGL2, `attached` and `disposed`.

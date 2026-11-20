@@ -2,9 +2,9 @@
 // Light probes baked from the scene on the GPU: an irradiance volume (a grid of L1 or L2 spherical-harmonic probes,
 // trilinear between probes) and local reflection probes (box-projected, prefiltered octahedral radiance, blended by their
 // influence boxes). Both replace the ambient term (`margoAmbient`, like EnvironmentLighting, so SSAO occludes them) on core
-// meshes (`engine.use`) and on every `add(model)` receiver (gltf-pro and materials models, terrain). Everything lives in one
+// meshes (`engine.use`) and on every `add(model)` receiver (gltf/pbr and materials models, terrain). Everything lives in one
 // storage buffer, so the probes add no sampled texture: with an Environment fallback the binding count matches
-// EnvironmentLighting's (gltf-pro's physical material with every light still fits WebGPU's 16).
+// EnvironmentLighting's (gltf/pbr's physical material with every light still fits WebGPU's 16).
 import type { EngineKernel } from '@margoengine/core';
 import {
   Camera,
@@ -15,6 +15,7 @@ import {
   type Vec3,
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
+import { frameCapture } from '../../shared/frame-capture.js';
 import type { Environment } from './environment.js';
 import { reportRestore } from './restore-report.js';
 import { IBL_WGSL, iblBindGroupEntries } from './ibl.js';
@@ -160,10 +161,27 @@ export interface LiveVolumeOptions {
   /** Volume probes captured per frame (1-4,096, default 4). */
   probesPerFrame?: number;
 }
+/**
+ * A sky whose own light is the fallback outside the probes ({@link LightProbeOptions.sky}): `Sky` from
+ * `@margoengine/sky` with `lighting.ambient`. Its `pbr(group)` declarations define `skyIrradiance(n)` (diffuse
+ * irradiance over pi) and `skyRadiance(r, rough)` (prefiltered sky radiance), both in the engine light's units, and
+ * `bindings()` holds their resources (empty until the sky's light is ready).
+ */
+export interface ProbeSkyLight extends ProbeCapturePlugin {
+  pbr(group: number): { readonly declarations: string } | undefined;
+  bindings(): GPUBindGroupEntry[];
+}
 /** Options of {@link LightProbes}. */
 export interface LightProbeOptions {
   /** Ambient light outside the probes (and the sky the captures see). Without it, receivers keep their own ambient there. */
   environment?: Environment;
+  /**
+   * A sky with `lighting.ambient` (`Sky` of `@margoengine/sky`): the light outside the probes is the sky's own diffuse
+   * and specular light, exactly as without probes, and every capture sees the sky (`addCapture(sky)` is done for you).
+   * Inside the volume the sky light comes only through what the probes see of it (doors, windows), so rooms and sheds
+   * are not lit as the open ground. Not with `environment`. Default none.
+   */
+  sky?: ProbeSkyLight;
   volume?: IrradianceVolume;
   /** At most {@link MAX_REFLECTION_PROBES}; earlier probes win where boxes overlap (list nested boxes first), unless `reflectionBlend` is 'weighted'. */
   reflections?: readonly ReflectionProbe[];
@@ -216,7 +234,7 @@ const CAPTURE_ORDER = -0.5;
 
 /** Reflection probes per LightProbes. */
 export const MAX_REFLECTION_PROBES = 16;
-/** Binding of the probe storage buffer, in core's group 0 and gltf-pro's group 2 (the IBL fallback keeps 20-24). */
+/** Binding of the probe storage buffer, in core's group 0 and gltf/pbr's group 2 (the IBL fallback keeps 20-24). */
 export const PROBE_BINDING = 26;
 const CAPTURE_BINDING = 27,
   HEADER_BYTES = 64 + MAX_REFLECTION_PROBES * 64,
@@ -344,7 +362,19 @@ ${project}    sum+=w*probeRadiance(b,select(r,d,dot(d,d)>1e-12),rough);${weighte
 // weighted by GGX alpha (roughness^2, the lobe width) so the blend's width matches the lobe's: in level units x, weight
 // (x^2 - k^2) / (2k + 1). Weighting by roughness itself gave 0.045 (alpha 0.002) 22.5% of the 0.2 level (alpha 0.04),
 // 20 times too wide (KB-A3c).
-const shadingWgsl = (group: number, environment: boolean, visibility: boolean, sphere = false, weighted = false) =>
+// probeShade is the receiver's ambient term with the probes: diffuse from the volume, specular from the reflection
+// probes, the rest from the environment, else the sky (`sky`: its own skyIrradiance and skyRadiance, so outside the
+// probes the sum is the sky's skyLighting), else `ambient`, the receiver's own ambient. Split-sum weights as
+// EnvironmentLighting.
+const shadingWgsl = (
+  group: number,
+  environment: boolean,
+  visibility: boolean,
+  sphere = false,
+  weighted = false,
+  sky?: string,
+) =>
+  (sky ?? '') +
   dataWgsl('read', group, PROBE_BINDING) +
   (visibility ? binWgsl : '') +
   /* wgsl */ `
@@ -413,7 +443,7 @@ ${IBL_WGSL}`
 // prefiltered sky (or nothing). Post's SSR calls it to remove exactly the light its reflections replace.
 fn probeSpecular(p:vec3f,n:vec3f,v:vec3f,rough:f32)->vec3f {
   let r=reflect(-v,n);let s=probeReflection(p,r,rough);
-  return s.rgb+(1.0-s.a)*${environment ? 'iblPrefiltered(iblSpecular,iblSampler,iblParams,r,rough)*iblParams.w' : 'vec3f(0)'};
+  return s.rgb+(1.0-s.a)*${environment ? 'iblPrefiltered(iblSpecular,iblSampler,iblParams,r,rough)*iblParams.w' : sky ? 'skyRadiance(r,rough)' : 'vec3f(0)'};
 }
 // The receiver's ambient term with the probes: diffuse from the volume, specular from the reflection probes, the rest from
 // the environment (or \`ambient\`, the receiver's own ambient, without one). Split-sum weights as EnvironmentLighting.
@@ -425,7 +455,7 @@ fn probeShade(p:vec3f,n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32,ambient:vec
       : 'let c=rough*vec4f(-1,-0.0275,-0.572,0.022)+vec4f(1,0.0425,1.04,-0.04);let a=min(c.x*c.x,exp2(-9.28*nv))*c.x+c.y;let sw=f0*(c.z-1.04*a)+f90*(c.w+1.04*a);'
   }
   let diffuse=(1.0-sw)*(1.0-metal)*base;let e=probeIrradiance(p,n);
-  ${environment ? 'let fallback=diffuse*iblIrradiance(iblSh,iblRotate(n,iblParams))*iblParams.w;' : 'let fallback=ambient;'}
+  ${environment ? 'let fallback=diffuse*iblIrradiance(iblSh,iblRotate(n,iblParams))*iblParams.w;' : sky ? 'let fallback=diffuse*skyIrradiance(n);_=ambient;' : 'let fallback=ambient;'}
   return mix(fallback,diffuse*e.rgb,e.a)+probeSpecular(p,n,v,rough)*sw;
 }
 `;
@@ -526,27 +556,11 @@ var<workgroup> texelSum:array<vec4f,64>;
 }`;
 
 // The capture shader: core's lit shader with every patch, drawn from the probe camera (its own Frame at CAPTURE_BINDING;
-// core's binding 0 kept statically used), output as linear radiance, without fog (receivers fog themselves) and with
-// clustered lights looped in full (the light lists are culled for the main camera).
-const captureCore = (shader: string): string => {
-  const code = shader
-    .replace(
-      '@group(0) @binding(0) var<uniform> frame:Frame;',
-      `@group(0) @binding(0) var<uniform> margoMainFrame:Frame;\n@group(0) @binding(${CAPTURE_BINDING}) var<uniform> frame:Frame;`,
-    )
-    .replace('@vertex fn vertex(i:Input)->Output {', '@vertex fn vertex(i:Input)->Output {_=margoMainFrame.eye;')
-    .replace(/let mapped=[\s\S]*?return vec4f\([^\n]+\);/, 'if(false){$&}return vec4f(linear,1);');
-  if (
-    !code.includes('margoMainFrame:Frame') ||
-    !code.includes('_=margoMainFrame') ||
-    !code.includes('return vec4f(linear,1);')
-  )
-    throw new MargoError(
-      'unsupported',
-      "Light probe capture requires the standard core lighting shader; remove the plugin that replaced core's shader",
-    );
-  return captureLights(code);
-};
+// core's binding 0 kept statically used; TAA's jittered clip transform gives way to the probe camera, KB-PROBES-TAA1),
+// output as linear radiance, without fog (receivers fog themselves) and with clustered lights looped in full (the light
+// lists are culled for the main camera). The rebind is shared with LightBounce (packages/shared/frame-capture.js).
+const captureCore = (shader: string): string =>
+  captureLights(frameCapture(shader, CAPTURE_BINDING, 'return vec4f(linear,1);', 'Light probe capture'));
 const captureLights = (code: string): string => {
   let out = code.replace(/(?<!fn )fogAmount\(/g, '0.0*fogAmount(');
   if (out.includes('fn clusterLighting(')) {
@@ -596,13 +610,16 @@ const levelTexels = (size: number) => {
 
 /**
  * Light probes baked from the scene on the GPU: an irradiance volume (L1/L2 SH probes on a grid, trilinear between them)
- * and up to 16 box-projected reflection probes. `engine.use(probes)` lights core meshes, `probes.add(model)` gltf-pro and
+ * and up to 16 box-projected reflection probes. `engine.use(probes)` lights core meshes, `probes.add(model)` gltf/pbr and
  * materials models and terrain; added models are also captured. They replace the ambient term (and EnvironmentLighting:
  * pass the environment as the fallback instead of attaching both). `await probes.bake()` captures at load or on demand;
  * {@link setLive} keeps reflection probes current while the scene changes, and {@link refresh} re-captures one from code.
  */
 export class LightProbes extends ShaderEffect {
   readonly environment?: Environment;
+  /** The sky lighting what the probes do not ({@link LightProbeOptions.sky}). */
+  readonly sky?: ProbeSkyLight;
+  private skyEntries?: { sky: GPUBindGroupEntry[]; own: GPUBindGroupEntry[]; length: number; entries: GPUBindGroupEntry[] };
   readonly volume?: Readonly<IrradianceVolume>;
   readonly reflections: readonly Readonly<ReflectionProbe & { min: Vec3; max: Vec3; blend: number }>[];
   /** How overlapping reflection probes combine ({@link LightProbeOptions.reflectionBlend}). */
@@ -670,10 +687,21 @@ export class LightProbes extends ShaderEffect {
   }
   constructor(options: LightProbeOptions) {
     super(options?.name ?? 'light-probes');
-    const { volume, reflections = [], environment }: LightProbeOptions = options ?? {};
+    const { volume, reflections = [], environment, sky }: LightProbeOptions = options ?? {};
     if (!volume && !reflections.length) throw new TypeError('LightProbes needs a volume or reflection probes');
     if (environment !== undefined && (typeof environment !== 'object' || !('specularView' in environment)))
       throw new TypeError('LightProbes environment must be an Environment');
+    if (
+      sky !== undefined &&
+      (typeof sky !== 'object' ||
+        sky === null ||
+        typeof sky.pbr !== 'function' ||
+        typeof sky.bindings !== 'function' ||
+        typeof sky.registerPasses !== 'function')
+    )
+      throw new TypeError('LightProbes sky must be a Sky from @margoengine/sky (with lighting.ambient)');
+    if (sky && environment)
+      throw new TypeError('LightProbes takes environment or sky as the light outside the probes, not both; pass one');
     this.near = options.near ?? 0.05;
     this.far = options.far ?? 1000;
     if (!finite(this.near) || !finite(this.far) || this.near <= 0 || this.far <= this.near)
@@ -789,6 +817,10 @@ export class LightProbes extends ShaderEffect {
       texels += v.counts[0] * v.counts[1] * v.counts[2] * VISIBILITY_BINS;
     }
     this.environment = environment;
+    if (sky) {
+      this.sky = sky;
+      this.addCapture(sky);
+    }
     this.texelCount = texels;
     this.roundDone = new Uint8Array(this.reflections.length);
     this.active = new Uint8Array(this.reflections.length);
@@ -923,9 +955,19 @@ export class LightProbes extends ShaderEffect {
   }
   protected get device(): GPUDevice | null | undefined {
     if (!this.gpu || this.disposed) return null;
+    // A sky whose light is not ready (no lighting.ambient, or before its first frame) lights the scene by itself.
+    if (this.sky && !this.sky.bindings().length) return null;
     return this.environment && (this.environment.disposed || this.environment.device !== this.gpu) ? null : this.gpu;
   }
   protected entries(): GPUBindGroupEntry[] {
+    if (this.sky) {
+      const sky = this.sky.bindings();
+      const own = this.entry;
+      let held = this.skyEntries;
+      if (!held || held.sky !== sky || held.own !== own || held.length !== sky.length + own.length)
+        this.skyEntries = held = { sky, own, length: sky.length + own.length, entries: [...sky, ...own] };
+      return held.entries;
+    }
     if (!this.environment) return this.entry;
     if (!this.cached || this.version !== this.environment.version) {
       this.cached = [...iblBindGroupEntries(this.environment, IBL_BINDING), ...this.entry];
@@ -940,7 +982,7 @@ export class LightProbes extends ShaderEffect {
         `${this.name} replaces EnvironmentLighting: pass {environment} to LightProbes instead of attaching both`,
       );
     const base = source.includes('let base=terrainColor') ? 'base' : 'i.color',
-      env = !!this.environment,
+      env = !!this.environment || !!this.sky,
       color = source.includes('frame.ambient.rgb') ? '*frame.ambient.rgb' : '';
     // A HemisphereLight patched first: without an environment its light is the fallback outside the probes; with one it adds.
     const code = source.replace(/let linear=([^;]+);/, (_, terms: string) => {
@@ -952,12 +994,20 @@ export class LightProbes extends ShaderEffect {
     });
     return code === source
       ? source
-      : shadingWgsl(group, env, this.visibilityOffset > 0, this.spheres, this.reflectionBlend === 'weighted') + code;
+      : shadingWgsl(
+          group,
+          !!this.environment,
+          this.visibilityOffset > 0,
+          this.spheres,
+          this.reflectionBlend === 'weighted',
+          this.skyDeclarations(group),
+        ) + code;
   }
   protected hooks(group: number): PBRHooks {
-    // Without an environment the fallback is gltf-pro's own hemisphere ambient (its `ambient(s)`, which the hook replaces).
+    // Without an environment the fallback is gltf/pbr's own hemisphere ambient (its `ambient(s)`, which the hook replaces).
     // Ground (0.35, 0.3, 0.25) and the 0.5 specular weight are Margo design choices.
-    const ambient = this.environment
+    const ambient =
+      this.environment || this.sky
       ? 'vec3f(0)'
       : '(s.base.rgb*(1.0-s.metal)+mix(s.f0,s.base.rgb,s.metal)*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1),clamp(s.n.y*0.5+0.5,0.0,1.0))*f.radiance.w';
     return {
@@ -967,11 +1017,23 @@ export class LightProbes extends ShaderEffect {
         this.visibilityOffset > 0,
         this.spheres,
         this.reflectionBlend === 'weighted',
+        this.skyDeclarations(group),
       ),
       ambient: `probeShade(i.position,s.n,v,s.base.rgb,s.metal,s.roughness,${ambient},s.f0,s.sw)*s.occlusion`,
     };
   }
-  /** Adds the probe lighting to a model (gltf-pro, materials, terrain); models with a `draw` method are also captured by `bake`. */
+  // The sky's WGSL for bind group `group` (its skyIrradiance and skyRadiance), or undefined without a sky.
+  private skyDeclarations(group: number): string | undefined {
+    if (!this.sky) return undefined;
+    const declarations = this.sky.pbr(group)?.declarations;
+    if (!declarations?.includes('fn skyIrradiance(') || !declarations.includes('fn skyRadiance('))
+      throw new MargoError(
+        'unsupported',
+        `${this.name} sky must define skyIrradiance and skyRadiance (Sky from @margoengine/sky with lighting.ambient)`,
+      );
+    return declarations;
+  }
+  /** Adds the probe lighting to a model (gltf\/pbr, materials, terrain); models with a `draw` method are also captured by `bake`. */
   override add(model: LightingTarget): () => void {
     const release = super.add(model),
       drawable = model as unknown as Partial<CaptureModel>;
@@ -1939,7 +2001,7 @@ export class LightProbes extends ShaderEffect {
   }
 }
 
-/** What `bake` captures besides core meshes: anything drawn like a gltf-pro `PBRModel` (materials meshes too). */
+/** What `bake` captures besides core meshes: anything drawn like a gltf/pbr `PBRModel` (materials meshes too). */
 interface CaptureModel {
   draw(context: Context, mode: 'beauty', color: GPUTextureView, depth: GPUTextureView): void;
 }

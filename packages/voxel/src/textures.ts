@@ -33,6 +33,8 @@ interface State {
   dirty: Set<number>;
   disposed: boolean;
   gpu?: { device: GPUDevice; texture: GPUTexture; view: GPUTextureView; layers: number };
+  // Renderers drawing with the GPU texture: the last to let go destroys it (the pixels stay for the next one).
+  users: Set<object>;
 }
 const states = new WeakMap<BlockTextures, State>(),
   MAX_LAYERS = 2048,
@@ -189,7 +191,7 @@ export class BlockTextures {
     if (images.length > MAX_LAYERS)
       throw new RangeError(`BlockTextures got ${images.length} images; a texture array holds at most 2048 layers`);
     this.size = checkSize(options.size ?? (images.length ? dimensions(images[0])[0] : 16));
-    states.set(this, { levels: [], dirty: new Set(), disposed: false });
+    states.set(this, { levels: [], dirty: new Set(), disposed: false, users: new Set() });
     for (let i = 0; i < images.length; i++) this.#put(i, images[i]);
   }
 
@@ -205,7 +207,8 @@ export class BlockTextures {
   ): Promise<BlockTextures> {
     if (!Array.isArray(urls) || !urls.length || urls.length > MAX_LAYERS)
       throw new TypeError('BlockTextures.load expects an array of 1 to 2048 image URLs');
-    const images = await Promise.all(
+    // Every load settles first, so a failure closes the images the other URLs already made.
+    const settled = await Promise.allSettled(
       urls.map(async (url) => {
         const response = await get(url);
         if (!response.ok)
@@ -213,7 +216,10 @@ export class BlockTextures {
         return createImageBitmap(await response.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
       }),
     );
+    const images = settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
     try {
+      const failure = settled.find((result) => result.status === 'rejected');
+      if (failure) throw failure.reason;
       return new BlockTextures({ ...options, images });
     } finally {
       for (const image of images) image.close();
@@ -238,7 +244,7 @@ export class BlockTextures {
       rows = Math.floor(height / size);
     if (!columns || !rows || columns * rows > MAX_LAYERS)
       throw new RangeError(
-        `Atlas of ${width} x ${height} holds ${columns * rows} tiles of ${size} texels; it needs 1 to 256 tiles`,
+        `Atlas of ${width} x ${height} holds ${columns * rows} tiles of ${size} texels; it needs 1 to 2,048 tiles`,
       );
     const textures = new BlockTextures({ size });
     for (let r = 0; r < rows; r++)
@@ -261,7 +267,10 @@ export class BlockTextures {
     this.#put(checkLayer(layer), image);
   }
 
-  /** Destroys the GPU texture. Renderers still using these textures throw on their next frame. */
+  /**
+   * Destroys the GPU texture. Renderers still using these textures throw on their next frame. The texture is also
+   * destroyed when the last renderer drawing with it is disposed or removed, and made again when one draws.
+   */
   dispose(): void {
     const state = this.#state(false);
     state.disposed = true;
@@ -300,7 +309,7 @@ export class BlockTextures {
  * layers) and uploads the layers changed since the last call. Not part of the public API.
  * @throws MargoError `disposed` after `textures.dispose()`.
  */
-export function blockTextureView(textures: BlockTextures, device: GPUDevice): GPUTextureView {
+export function blockTextureView(textures: BlockTextures, device: GPUDevice, user: object): GPUTextureView {
   const state = states.get(textures) as State;
   if (state.disposed)
     throw new MargoError('disposed', 'VoxelRenderer textures are disposed; pass live BlockTextures to the renderer');
@@ -335,5 +344,17 @@ export function blockTextureView(textures: BlockTextures, device: GPUDevice): GP
       );
   }
   state.dirty.clear();
+  state.users.add(user);
   return gpu.view;
+}
+
+/**
+ * `user` no longer draws with `textures`: the last user destroys the GPU texture, which the next
+ * {@link blockTextureView} makes again from the kept pixels. Not part of the public API.
+ */
+export function releaseBlockTextureView(textures: BlockTextures, user: object): void {
+  const state = states.get(textures) as State;
+  if (!state.users.delete(user) || state.users.size || !state.gpu) return;
+  state.gpu.texture.destroy();
+  state.gpu = undefined;
 }

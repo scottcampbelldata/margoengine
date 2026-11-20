@@ -73,6 +73,12 @@ export class CopcSource implements OctreeSource {
     this.origin = info.center;
   }
   /**
+   * Whether the file's colours are 16-bit (the specification) or 8-bit values stored as they are, decided once from the
+   * first node loaded with colour, the root when `OctreeCloud` draws it: deciding per node would brighten a dark node of
+   * a 16-bit file 256 times.
+   */
+  private wideColors?: boolean;
+  /**
    * Reads the header, the records and every hierarchy page.
    * @throws MargoError `'failed'` when the server answers an error; TypeError when the file is not COPC; RangeError for
    * a hierarchy that is corrupt; the `signal`'s reason when it aborts.
@@ -109,7 +115,9 @@ export class CopcSource implements OctreeSource {
         };
         nodes.set(`${d}-${x}-${y}-${z}`, node);
       };
-    const pages = [[info.rootHierarchyOffset, info.rootHierarchySize]];
+    const pages = [[info.rootHierarchyOffset, info.rootHierarchySize]],
+      // A page listed twice (a page that links to itself or to one before it) would be read for ever.
+      seen = new Set<number>([info.rootHierarchyOffset]);
     while (pages.length) {
       const batch = pages.splice(0);
       const read = await Promise.all(batch.map(([at, bytes]) => get(at, bytes)));
@@ -128,7 +136,12 @@ export class CopcSource implements OctreeSource {
             span = 2 ** d;
           if (!(d >= 0 && d < 32) || !(x >= 0 && x < span && y >= 0 && y < span && z >= 0 && z < span))
             throw new RangeError(`COPC hierarchy voxel ${d}-${x}-${y}-${z} lies outside the cube; the file is corrupt`);
-          if (count === -1) pages.push([offset, bytes]);
+          if (count === -1) {
+            if (seen.has(offset))
+              throw new RangeError(`COPC hierarchy page at ${offset} is listed twice; the file is corrupt`);
+            seen.add(offset);
+            pages.push([offset, bytes]);
+          }
           else if (count < 0) throw new RangeError('COPC hierarchy holds a negative point count; the file is corrupt');
           else made(d, x, y, z, count, offset, bytes);
         }
@@ -185,8 +198,12 @@ export class CopcSource implements OctreeSource {
     if (!rgb) return { positions: points.positions, attributes };
     const colors = new Uint8Array(rgb.length);
     // The specification asks for 16-bit colour; files with 8-bit values stored as they are stay visible.
-    let wide = false;
-    for (let i = 0; i < rgb.length && !wide; i++) wide = rgb[i] > 255;
+    let wide = this.wideColors;
+    if (wide === undefined && rgb.length) {
+      wide = false;
+      for (let i = 0; i < rgb.length && !wide; i++) wide = rgb[i] > 255;
+      this.wideColors = wide;
+    }
     for (let i = 0; i < rgb.length; i++) colors[i] = wide ? rgb[i] >> 8 : rgb[i];
     return { positions: points.positions, colors, colorComponents: 3, attributes };
   }

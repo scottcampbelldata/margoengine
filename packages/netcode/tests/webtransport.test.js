@@ -246,3 +246,48 @@ test('webtransport: the older writable property works, and a whole game runs ove
   client.close();
   server.close();
 });
+
+test('webtransport: a session that cannot become a connection is closed, on either end', async () => {
+  // W3C WebTransport: a session holds an HTTP/3 stream and server state until close(); a rejected open must not leak it.
+  const { client, server } = pair();
+  const noWriter = { ...client, datagrams: { readable: pipe().readable } },
+    Class = function () {
+      return noWriter;
+    };
+  noWriter.close = (info = {}) => (noWriter.closeInfo = info);
+  await assert.rejects(openWebTransport('https://x.test/', { WebTransport: Class }), { code: 'failed' });
+  assert.ok(noWriter.closeInfo, 'the client session is closed');
+  const serverNoWriter = { ...server, datagrams: { readable: pipe().readable } };
+  serverNoWriter.close = (info = {}) => (serverNoWriter.closeInfo = info);
+  serverNoWriter.incomingBidirectionalStreams = new ReadableStream({
+    start: (c) => c.enqueue({ readable: pipe().readable, writable: pipe().writable }),
+  });
+  await assert.rejects(acceptWebTransport(serverNoWriter), TypeError);
+  assert.ok(serverNoWriter.closeInfo, 'the server session is closed');
+});
+
+test('webtransport: the reliable stream ending closes the connection', async () => {
+  const up = pipe(),
+    session = pair().client,
+    connection = webTransportConnection(session, { readable: up.readable, writable: pipe().writable }),
+    closes = [];
+  connection.onclose = (code) => closes.push(code);
+  await up.writable.getWriter().close();
+  await settle();
+  assert.equal(connection.open, false, 'no reliable path is left, so the connection is not open');
+  assert.deepEqual(closes, [CloseCode.protocol]);
+  assert.equal(session.closeInfo?.closeCode, CloseCode.protocol, 'the session is closed with the same code');
+});
+
+test('webtransport: a session closed by the peer reports its code even when the stream ends first', async () => {
+  const up = pipe(),
+    session = pair().client,
+    connection = webTransportConnection(session, { readable: up.readable, writable: pipe().writable }),
+    closes = [];
+  connection.onclose = (code, reason) => closes.push([code, reason]);
+  // W3C cleanup: the streams are errored, then `closed` resolves, in one task.
+  await up.writable.abort(new Error('session gone'));
+  session.end({ closeCode: CloseCode.removed, reason: 'kicked' });
+  await settle();
+  assert.deepEqual(closes, [[CloseCode.removed, 'kicked']]);
+});

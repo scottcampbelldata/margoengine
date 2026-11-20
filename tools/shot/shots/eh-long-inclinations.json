@@ -1,0 +1,134 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 100,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            0,
+            0.12,
+            12.499
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38
+        },
+        {
+          "time": 20,
+          "position": [
+            3.165,
+            2.599,
+            11.81
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 45,
+          "position": [
+            5.873,
+            7.17,
+            8.388
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 70,
+          "position": [
+            4.807,
+            11.037,
+            3.366
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 90,
+          "position": [
+            2.04,
+            12.31,
+            0.742
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 100,
+          "position": [
+            1.287,
+            12.432,
+            0.227
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "eh-long-inclinations",
+    "kind": "long",
+    "seed": 71,
+    "seconds": 100,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1.5,
+    "subframes": 4,
+    "shutter": 180,
+    "warmup": 30,
+    "probes": {
+      "open": 0,
+      "third": 33.333,
+      "two-thirds": 66.667,
+      "end": 99.9
+    },
+    "page": {
+      "path": "examples/event-horizon/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#panel,#status,#error,#telemetry{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "eventHorizon.engine",
+      "apply": "eventHorizon.apply",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

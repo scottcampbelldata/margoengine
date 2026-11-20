@@ -26,6 +26,20 @@ test('descriptions retain missing/count/extremes and a numerically stable trend'
   assert.equal(d.trend, 'rising');
   assert.ok(Math.abs(d.slope - 3) < 0.0001);
   assert.equal(describeSeries({ ...series, datum: () => ({ value: NaN }) }).trend, 'unavailable');
+  // Values near the largest double: the mean, slope and trend stay finite instead of overflowing to NaN.
+  const big = [-1.5e308, 1e308, 1.7e308],
+    wide = describeSeries({ name: 'Wide', kind: 'series', count: 3, datum: (i) => ({ x: i * 5e307, value: big[i] }) });
+  assert.ok(Math.abs(wide.mean - 4e307) < 1e293, `mean ${wide.mean}`);
+  assert.equal(wide.trend, 'rising');
+  assert.ok(Math.abs(wide.slope - 3.2) < 1e-12, `slope ${wide.slope}`);
+  const tiny = describeSeries({
+    name: 'Tiny',
+    kind: 'series',
+    count: 2,
+    datum: (i) => ({ value: [5e-324, 1e-323][i] }),
+  });
+  assert.ok(tiny.mean >= 5e-324 && tiny.mean <= 1e-323, `mean ${tiny.mean}`);
+  assert.equal(tiny.trend, 'rising');
 });
 
 test('pitch plans preserve every sample, missing silence, monotonic pitch, data times and exact abort reasons', () => {
@@ -35,6 +49,10 @@ test('pitch plans preserve every sample, missing silence, monotonic pitch, data 
   assert.deepEqual([...plan.frequencies], [220, 220, 440, 880]);
   assert.deepEqual([...sonificationPlan([1, 2, 3], { times: [10, 11, 20], duration: 3 }).times], [0, 0.2, 2]);
   assert.deepEqual([...sonificationPlan([2, 2]).frequencies], [440, 440]);
+  // A data span or time span past the largest double still maps every sample to a pitch and a time.
+  const wide = sonificationPlan([-1.7e308, 0, 1.7e308], { times: [-1e308, 0, 1e308], duration: 3 });
+  assert.deepEqual([...wide.frequencies], [220, 440, 880]);
+  assert.deepEqual([...wide.times], [0, 1, 2]);
   for (const options of [{ duration: 0 }, { pitch: [20, 20] }, { times: [0, 0] }, { maxPoints: 1 }])
     assert.throws(() => sonificationPlan([1, 2], options));
   assert.throws(() => sonificationPlan([NaN]));
@@ -97,7 +115,7 @@ test('Web Audio owns and releases nodes, retains borrowed contexts and cancels a
   await assert.rejects(pending, (e) => e === reason);
 });
 
-function domFixture() {
+function domFixture(renderer = { ready: async () => {}, dispose() {} }) {
   const dom = new JSDOM('<div><canvas aria-label="Observed data"></canvas></div>'),
     saved = {};
   for (const key of ['document', 'getComputedStyle']) {
@@ -115,8 +133,7 @@ function domFixture() {
       stop() {
         this.stopped = true;
       },
-    },
-    renderer = { ready: async () => {}, dispose() {} };
+    };
   const fig = new Figure(engine, { axes: false }, renderer);
   return {
     dom,
@@ -145,7 +162,9 @@ test('disposing accessibility restores the original theme and frame pacing', asy
     assert.deepEqual(f.fig.theme, theme);
     assert.equal(f.engine.pace, pace);
     assert.notEqual(f.engine.stopped, true);
-  } finally { f.restore(); }
+  } finally {
+    f.restore();
+  }
 });
 
 test('OS preferences restore theme and motion without restarting a stopped engine', async (t) => {
@@ -168,22 +187,32 @@ test('OS preferences restore theme and motion without restarting a stopped engin
     const theme = { ...f.fig.theme };
     const a = attachAccessibility(f.fig);
     await a.ready;
-    for (const q of queries) { q.matches = true; q.dispatchEvent(new Event('change')); }
+    for (const q of queries) {
+      q.matches = true;
+      q.dispatchEvent(new Event('change'));
+    }
     await f.fig.ready();
     assert.deepEqual(f.fig.theme, HIGH_CONTRAST_THEME);
-    for (const q of queries) { q.matches = false; q.dispatchEvent(new Event('change')); }
+    for (const q of queries) {
+      q.matches = false;
+      q.dispatchEvent(new Event('change'));
+    }
     await f.fig.ready();
     assert.deepEqual(f.fig.theme, theme);
     assert.equal(f.engine.pace, undefined);
     assert.equal(f.engine.stopped, true);
     a.dispose();
-  } finally { f.restore(); }
+  } finally {
+    f.restore();
+  }
 });
 
 test('reduced motion suspends timeline frames while preserving playback and cancellation', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const savedReport = globalThis.reportError;
-  globalThis.reportError = (e) => { throw e; };
+  globalThis.reportError = (e) => {
+    throw e;
+  };
   t.after(() => {
     if (savedReport === undefined) delete globalThis.reportError;
     else globalThis.reportError = savedReport;
@@ -191,7 +220,13 @@ test('reduced motion suspends timeline frames while preserving playback and canc
   const f = domFixture();
   try {
     let frames = 0;
-    const timeline = f.fig.timeline([0, 1, 2], () => { frames++; }, { controls: false });
+    const timeline = f.fig.timeline(
+      [0, 1, 2],
+      () => {
+        frames++;
+      },
+      { controls: false },
+    );
     await timeline.seek(0);
     const before = frames;
     const abort = new AbortController();
@@ -209,7 +244,9 @@ test('reduced motion suspends timeline frames while preserving playback and canc
     const reason = new Error('stop restored playback');
     abort.abort(reason);
     await assert.rejects(playback, (e) => e === reason);
-  } finally { f.restore(); }
+  } finally {
+    f.restore();
+  }
 });
 test('keyboard movement, full table paging, live descriptions, weak discovery and figure-owned cleanup', async () => {
   const f = domFixture();
@@ -347,6 +384,72 @@ test('an external cancellation retains its exact reason while removing owned con
     c.abort(reason);
     await assert.rejects(a.ready, (e) => e === reason);
     assert.equal(a.element.isConnected, false);
+  } finally {
+    f.restore();
+  }
+});
+
+test('a refused attach keeps the current view, and a 2D record outside the window shows no marker', async () => {
+  const f = domFixture();
+  try {
+    const a = attachAccessibility(f.fig, { reducedMotion: true, series: [] });
+    await a.refresh();
+    assert.throws(() => attachAccessibility(f.fig, { pageSize: 0 }), RangeError);
+    assert.equal(a.element.isConnected, true, 'an invalid pageSize disposed the working view');
+    a.dispose();
+  } finally {
+    f.restore();
+  }
+  const g = domFixture();
+  try {
+    g.fig.dispose();
+    const fig = new Figure(
+      g.engine,
+      { mode: '2d', axes: false, limits: [0, 1, 0, 1] },
+      {
+        ready: async () => {},
+        dispose() {},
+      },
+    );
+    for (const [k, v] of [
+      ['clientWidth', 400],
+      ['clientHeight', 300],
+    ])
+      Object.defineProperty(g.canvas, k, { value: v, configurable: true });
+    // The engine updates its camera each frame; this one draws no frames.
+    g.engine.camera.update(400 / 300, true);
+    const a = attachAccessibility(fig, {
+      reducedMotion: true,
+      series: [{ name: 'trace', kind: 'series', count: 2, datum: (i) => ({ x: [0.5, 1.05][i], y: 0.5, value: i }) }],
+    });
+    await a.refresh();
+    const marker = [...g.canvas.parentElement.children].find((e) => e.tagName === 'SPAN' && e.style.borderRadius);
+    a.focus(0, 0);
+    assert.equal(marker.hidden, false, 'a record inside the window is marked');
+    // x 1.05 lands in the right margin (inside the canvas, outside the plot area), where nothing is drawn.
+    a.focus(0, 1);
+    assert.equal(marker.hidden, true);
+    a.dispose();
+    fig.dispose();
+  } finally {
+    g.restore();
+  }
+});
+
+test('toSVG waits for the renderer like toPNG and rejects with its failure before drawing a frame', async () => {
+  let fail;
+  const failure = new Error('pipeline failed'),
+    renderer = { ready: () => new Promise((_, reject) => (fail = reject)), dispose() {} },
+    f = domFixture(renderer);
+  try {
+    let frames = 0;
+    f.engine.render = () => frames++;
+    const svg = f.fig.toSVG({ vector: false });
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+    assert.equal(frames, 0);
+    fail(failure);
+    await assert.rejects(svg, (e) => e === failure);
+    assert.equal(frames, 0);
   } finally {
     f.restore();
   }

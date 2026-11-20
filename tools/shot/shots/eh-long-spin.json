@@ -1,0 +1,106 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 60,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -0.55,
+            0.95,
+            11.8
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 38
+        },
+        {
+          "time": 60,
+          "position": [
+            -0.35,
+            0.9,
+            11.2
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "id": "spin",
+      "target": "hole",
+      "property": "spin",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0
+        },
+        {
+          "time": 6,
+          "value": 0
+        },
+        {
+          "time": 28,
+          "value": 0.998
+        },
+        {
+          "time": 38,
+          "value": 0.998
+        },
+        {
+          "time": 56,
+          "value": 0.5
+        },
+        {
+          "time": 60,
+          "value": 0.5
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "eh-long-spin",
+    "kind": "long",
+    "seed": 72,
+    "seconds": 60,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1.5,
+    "subframes": 4,
+    "shutter": 180,
+    "warmup": 30,
+    "probes": {
+      "open": 0,
+      "third": 20,
+      "two-thirds": 40,
+      "end": 59.9
+    },
+    "page": {
+      "path": "examples/event-horizon/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#panel,#status,#error,#telemetry{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "eventHorizon.engine",
+      "apply": "eventHorizon.apply",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

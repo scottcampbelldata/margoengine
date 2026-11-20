@@ -1,5 +1,7 @@
 // Clean room from Hernell et al. (2010), Schott et al. (2009), Kroes et al. (2012).
 // Integrate extinction in scene units; the data texture stays in unit-box coordinates.
+// phase() is Henyey-Greenstein normalised over the sphere (PBRT 4th ed., sec. 11.3); march() scatters the
+// distant light with its isotropic case 1/(4 pi) = 0.0795775, so `light` is irradiance on both paths.
 export const cinematicShader = /* wgsl */ `
 struct Lighting {
   inverse: mat4x4f, toBox: mat4x4f, model: mat4x4f,
@@ -88,7 +90,7 @@ fn shadow(p: vec3f) -> f32 {
 }
 fn phase(cosine: f32) -> f32 {
   let g=u.transport.y;
-  return (1.0-g*g)/pow(max(1.0+g*g-2.0*g*cosine,1e-6),1.5);
+  return (1.0-g*g)*0.0795775/pow(max(1.0+g*g-2.0*g*cosine,1e-6),1.5);
 }
 fn scatter(direction: vec3f) -> vec3f {
   let g=u.transport.y; let x=random(); var z=2.0*x-1.0;
@@ -107,7 +109,7 @@ fn march(origin: vec3f, direction: vec3f) -> vec4f {
   for (var k=0u;k<n;k++) {
     let p=origin+d*(hit.x+(f32(k)+0.5)*ds); let c=classify(p);
     let a=1.0-exp(-extinction(c)*ds);
-    let lighting=u.ambient.rgb*ambientVisibility(p)+u.direct.rgb*shadow(p);
+    let lighting=u.ambient.rgb*ambientVisibility(p)+u.direct.rgb*shadow(p)*0.0795775;
     out+=vec4f(c.rgb*lighting*a,a)*(1.0-out.a);
     if (out.a>0.9999) { break; }
   }

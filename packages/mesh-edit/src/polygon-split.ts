@@ -3,7 +3,7 @@ import { polygonAreaVector, polygonGeometryError } from './polygon.js';
 import type { PolygonFace } from './types.js';
 
 /** Largest polygon loop the splitter accepts (ear clipping is quadratic in the corner count). */
-const MAX_LOOP_CORNERS = 4096;
+export const MAX_LOOP_CORNERS = 4096;
 
 /** A plane basis (u, v) from the loop's Newell area vector, or null when the loop has no area. */
 function loopBasis(points: readonly Vec3[]): { u: number[]; v: number[]; area: number } | null {

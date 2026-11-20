@@ -1,5 +1,5 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Animation } from '@margoengine/animation';
 import type { GeometryBuffers } from '@margoengine/core/extension';
 import { loadedModel as placedModel } from '../../shared/stage-model.js';

@@ -1,8 +1,8 @@
-// cloneModel: an independent copy of a skinned glTF-pro model that animates apart from its source.
+// cloneModel: an independent copy of a skinned glTF PBR model that animates apart from its source.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { exportGLB } from '../../exporters/dist/index.js';
 import { Animation } from '../dist/index.js';
 import { cloneModel } from '../dist/skeleton-utils.js';
@@ -190,4 +190,31 @@ test('cloneModel of a registered model runs no engine tick, skinned or static, a
   const bounds = copies[0].bounds;
   assert.equal(copies[0].nodes[1].matrix[12], 3, 'model.bounds ticks first');
   assert.equal(bounds[3], 4);
+});
+
+// KB-OWN-ASYNC3: a clone of a model in a second scene was made in the scene active when cloneModel ran, so it landed in
+// the wrong scene and was not registered beside its source.
+test('cloneModel of a model in a second scene builds and registers the clone in that scene', async () => {
+  const e = await engine(),
+    other = e.createScene('other'),
+    setup = PBRModel.prototype.setup;
+  // This engine has no device: the model's own setup is a no-op, as in the other headless tests.
+  PBRModel.prototype.setup = () => {};
+  try {
+    let source;
+    other.use({ name: 'probe', setup: () => (source = model(e, skinnedStrip())) });
+    other.use(source);
+    assert.ok(source.root.scene === other);
+    const clone = await cloneModel(source);
+    assert.ok(clone.root.scene === other, 'the clone root is not in the second scene');
+    for (const node of clone.nodes) assert.ok(node.scene === other, 'a clone node is not in the second scene');
+    assert.ok(e.sceneOf(clone) === other, 'the clone is not registered in the second scene');
+    assert.equal(e.scene.meshes.size, 0, 'meshes landed in the default scene');
+    assert.deepEqual([...e.scene.plugins.keys()], [], 'a plugin landed in the default scene');
+    clone.dispose();
+    source.dispose();
+    assert.equal(other.meshes.size, 0);
+  } finally {
+    PBRModel.prototype.setup = setup;
+  }
 });

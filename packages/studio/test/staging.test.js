@@ -1,0 +1,458 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { ContactShadows } from '../dist/index.js';
+import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { loadedPBRFixtures, serveLoadedPBRFixtures } from '../../../tests/support/loaded-pbr-fixtures.js';
+
+const identity = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+function scene() {
+  const h = optionalGPU(),
+    engine = h.engine,
+    passes = [],
+    render = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    passes.push(descriptor.depthStencilAttachment ? 'plane' : descriptor.colorAttachments[0].view);
+    return render(descriptor);
+  };
+  const vertex = engine.gpu.createBuffer({ size: 240, usage: GPUBufferUsage.VERTEX }),
+    index = engine.gpu.createBuffer({ size: 12, usage: GPUBufferUsage.INDEX });
+  const node = { id: 0, engine, matrix: identity(), check() {} },
+    model = { shadowPrimitives: [{ node, vertex, index, count: 3, stride: 80 }] };
+  const frame = () => {
+    passes.length = 0;
+    engine.frameGraph.execute(h.context);
+    return passes.map((p) => (p === 'plane' ? p : 'texture'));
+  };
+  return { h, engine, node, model, vertex, index, passes, frame };
+}
+const apply = (m, p) => [0, 1, 2, 3].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]);
+
+test('maps the plane footprint to the texture and the height range to depth 0..1, then blurs and draws the plane', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { position: [1, 2, 3], size: [4, 2], height: 0.5, resolution: 64 });
+  s.h.context.camera.position = [0, 5, 4];
+  try {
+    contact.add(s.model);
+    assert.deepEqual(
+      s.frame(),
+      ['texture', 'texture', 'texture', 'plane'],
+      'occluders, horizontal and vertical blur, plane',
+    );
+    const uniform = s.h.resources.find((r) => r.size === 144 && r.data),
+      m = new Float32Array(uniform.data, 0, 16);
+    assert.deepEqual(
+      apply(m, [-1, 2, 2]).map((v) => +v.toFixed(6)),
+      [-1, -1, 0, 1],
+      'min x, min z at the ground',
+    );
+    assert.deepEqual(
+      apply(m, [3, 2.5, 4]).map((v) => +v.toFixed(6)),
+      [1, 1, 1, 1],
+      'max x, max z at the top',
+    );
+    const occluder = s.h.pipelines.find((p) => p.fragment?.targets[0].format === 'r16float' && p.vertex.buffers),
+      plane = s.h.pipelines.find((p) => p.depthStencil);
+    assert.equal(
+      occluder.fragment.targets[0].blend.color.operation,
+      'max',
+      'the lowest surface wins without a depth buffer',
+    );
+    assert.equal(occluder.vertex.buffers[0].arrayStride, 80);
+    assert.deepEqual(
+      [
+        plane.depthStencil.depthWriteEnabled,
+        plane.depthStencil.depthCompare,
+        plane.multisample.count,
+        plane.fragment.targets[0].format,
+      ],
+      [false, 'greater-equal', 4, 'bgra8unorm'],
+    );
+    // Plane uniform: colour + opacity, then the corner lifted a hair above the ground.
+    const p = new Float32Array(s.h.resources.find((r) => r.size === 160).data);
+    assert.ok(p[21] > 2 && p[21] < 2.001);
+    assert.deepEqual(
+      [...p.subarray(16, 20)].map((v) => +v.toFixed(4)),
+      [0, 0, 0, 0.6],
+    );
+    s.h.context.camera.position = [0, 1.5, 4];
+    assert.deepEqual(s.frame(), ['texture', 'texture', 'texture'], 'no plane seen from below the ground');
+  } finally {
+    contact.dispose();
+  }
+  assert.ok(
+    s.h.resources.filter((r) => r !== s.vertex && r !== s.index).every((r) => r.destroyed),
+    'dispose releases every buffer and texture',
+  );
+});
+
+test('instanced shadow primitives (gltf/pbrInstances) draw every instance in one occluder draw', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { resolution: 32 }),
+    buffer = s.engine.gpu.createBuffer({ size: 96 * 5, usage: GPUBufferUsage.VERTEX }),
+    slots = [],
+    draws = [],
+    render = s.h.context.encoder.beginRenderPass;
+  s.h.context.encoder.beginRenderPass = (d) => {
+    const p = render(d);
+    return { ...p, setVertexBuffer: (slot, b) => slots.push([slot, b]), drawIndexed: (...a) => draws.push(a) };
+  };
+  try {
+    s.model.shadowPrimitives[0].instances = { count: 5, upload: () => buffer };
+    contact.add(s.model);
+    s.frame();
+    assert.deepEqual(draws, [[3, 5]]);
+    assert.ok(slots.some(([slot, b]) => slot === 1 && b === buffer));
+    const occluder = s.h.pipelines.find((p) => p.fragment?.targets[0].format === 'r16float' && p.vertex.buffers);
+    assert.equal(occluder.vertex.buffers[1].stepMode, 'instance');
+    assert.equal(occluder.vertex.buffers[1].arrayStride, 96);
+    s.model.shadowPrimitives[0].instances.count = 0;
+    draws.length = 0;
+    s.frame();
+    assert.deepEqual(draws, [], 'no instances, no draw');
+  } finally {
+    contact.dispose();
+  }
+});
+test('a cut-out caster draws with its UV transform, opacity map and vertex alpha setting', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    modules = [],
+    create = s.engine.gpu.createShaderModule.bind(s.engine.gpu);
+  s.engine.gpu.createShaderModule = (descriptor) => {
+    modules.push(descriptor.code);
+    return create(descriptor);
+  };
+  try {
+    contact.add(s.model);
+    primitive.alphaTransform = new Float32Array([1, 0, 0.5, 0, 0, 1, 0, 0]);
+    primitive.opacity = { buffer: s.vertex, view: {}, sampler: {} };
+    primitive.vertexAlpha = false;
+    s.frame();
+    const code = modules.find((c) => c.includes('margoOpacityAt'));
+    assert.match(code, /alphaUV0:vec4f,alphaUV1:vec4f/);
+    assert.match(code, /o\.alpha=1\.0-\(1\.0\);/);
+    assert.match(code, /\.a\*margoOpacityAt\(i\.margoUV\)\*f\.alpha\.x/);
+    primitive.alphaTransform = new Float32Array(4);
+    assert.throws(() => s.frame(), /alpha transform/);
+  } finally {
+    contact.dispose();
+  }
+});
+test('static redraws an opacity-mapped caster, whose UV rows change on the GPU alone, and follows a changed cut-out', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    full = 4;
+  try {
+    contact.add(s.model);
+    primitive.alphaTransform = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]);
+    assert.equal(s.frame().length, full);
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.alphaTransform[2] = 0.5;
+    assert.equal(s.frame().length, full, 'moved UV rows');
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.vertexAlpha = false;
+    assert.equal(s.frame().length, full, 'vertex alpha off');
+    primitive.opacity = { buffer: s.vertex, view: {}, sampler: {} };
+    assert.equal(s.frame().length, full);
+    assert.equal(s.frame().length, full, 'every frame while it has an opacity map');
+    delete primitive.opacity;
+    s.frame();
+    assert.deepEqual(s.frame(), ['plane']);
+  } finally {
+    contact.dispose();
+  }
+});
+test('a cut-out whose UVs move (MToon UV animation) cuts at the animated UV and redraws every static frame', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    modules = [],
+    entries = [],
+    create = s.engine.gpu.createShaderModule.bind(s.engine.gpu),
+    group = s.engine.gpu.createBindGroup.bind(s.engine.gpu),
+    full = 4;
+  s.engine.gpu.createShaderModule = (descriptor) => {
+    modules.push(descriptor.code);
+    return create(descriptor);
+  };
+  s.engine.gpu.createBindGroup = (descriptor) => {
+    entries.push(descriptor.entries.map((e) => e.binding));
+    return group(descriptor);
+  };
+  try {
+    contact.add(s.model);
+    assert.equal(s.frame().length, full);
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.animation = { buffer: s.vertex, view: {}, sampler: {} };
+    assert.equal(s.frame().length, full);
+    assert.equal(s.frame().length, full, 'every frame while its cut-out moves (time changes on the GPU alone)');
+    const code = modules.find((c) => c.includes('margoAnimatedUV'));
+    assert.match(code, /textureSample(?:Level)?\(\w+,\w+,margoAnimatedUV\(i\.margoRaw\)/);
+    assert.ok(entries.some((list) => [7, 8, 9].every((b) => list.includes(b))), 'bindings 7 to 9');
+    delete primitive.animation;
+    s.frame();
+    assert.deepEqual(s.frame(), ['plane']);
+  } finally {
+    contact.dispose();
+  }
+});
+test('static re-renders only on transform, source, visibility or option changes', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    full = 4;
+  try {
+    const remove = contact.add(s.model);
+    assert.equal(s.frame().length, full);
+    assert.deepEqual(s.frame(), ['plane']);
+    assert.deepEqual(contact.stats, { updates: 1, cacheHits: 1 });
+    s.node.matrix[13] = 0.2;
+    assert.equal(s.frame().length, full, 'moved');
+    assert.deepEqual(s.frame(), ['plane']);
+    s.engine.store.hidden[0] = 1;
+    assert.equal(s.frame().length, full, 'hidden');
+    s.engine.store.hidden[0] = 0;
+    assert.equal(s.frame().length, full, 'shown');
+    contact.options.blur = 0.3;
+    assert.equal(s.frame().length, full, 'option');
+    contact.invalidate();
+    assert.equal(s.frame().length, full, 'invalidate');
+    remove();
+    assert.equal(s.frame().length, full, 'removed');
+    assert.deepEqual(s.frame(), ['plane']);
+    contact.options.static = false;
+    assert.equal(s.frame().length, full);
+    assert.equal(s.frame().length, full, 'dynamic: every frame');
+    contact.options.resolution = 128;
+    s.frame();
+    assert.ok(
+      s.h.resources.some((r) => r.width === 128) &&
+        s.h.resources.filter((r) => r.width === 32).every((r) => r.destroyed),
+      'resolution change replaces the targets',
+    );
+    contact.onDeviceRestored(s.engine);
+    assert.equal(s.frame().length, full);
+  } finally {
+    contact.dispose();
+  }
+});
+
+test('wireframe contact casters invalidate static maps on topology changes and reuse pipelines', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    draws = [],
+    begin = s.h.context.encoder.beginRenderPass;
+  primitive.topology = 'line-list';
+  primitive.index = s.engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX });
+  primitive.count = 6;
+  s.h.context.encoder.beginRenderPass = (descriptor) => {
+    const pass = begin(descriptor);
+    let pipeline, index;
+    return {
+      ...pass,
+      setPipeline(value) {
+        pipeline = value;
+      },
+      setIndexBuffer(value) {
+        index = value;
+      },
+      drawIndexed(...args) {
+        draws.push({ pipeline, index, args });
+      },
+    };
+  };
+  const frame = () => {
+    draws.length = 0;
+    s.frame();
+  };
+  try {
+    contact.add(s.model);
+    frame();
+    const lines = draws[0].pipeline;
+    assert.equal(lines.primitive?.topology, 'line-list');
+    assert.equal(draws[0].index, primitive.index);
+    assert.deepEqual(draws[0].args, [6]);
+    frame();
+    assert.equal(draws.length, 0);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws.length, 1, 'topology alone invalidates the static contact texture');
+    const triangles = draws[0].pipeline;
+    assert.equal(Object.hasOwn(triangles, 'primitive'), false);
+    primitive.topology = 'line-list';
+    frame();
+    assert.equal(draws[0].pipeline, lines);
+    delete primitive.topology;
+    frame();
+    assert.equal(draws[0].pipeline, triangles);
+    primitive.topology = 'line-list';
+    primitive.instances = { count: 2, upload: () => primitive.vertex };
+    frame();
+    assert.deepEqual(draws[0].args, [6, 2]);
+    assert.equal(draws[0].pipeline.primitive.topology, 'line-list');
+    assert.equal(draws[0].pipeline.vertex.buffers[1].stepMode, 'instance');
+  } finally {
+    contact.dispose();
+    s.h.cleanup();
+  }
+});
+
+test('static contact maps refresh when returning to a cached index buffer or changing its count', () => {
+  const s = scene(),
+    contact = ContactShadows.attach(s.engine, { static: true, resolution: 32 }),
+    primitive = s.model.shadowPrimitives[0],
+    original = primitive.index,
+    replacement = s.engine.gpu.createBuffer({ size: 24, usage: GPUBufferUsage.INDEX });
+  try {
+    contact.add(s.model);
+    assert.equal(s.frame().length, 4);
+    primitive.index = replacement;
+    assert.equal(s.frame().length, 4);
+    assert.deepEqual(s.frame(), ['plane']);
+    primitive.index = original;
+    assert.equal(s.frame().length, 4, 'the currently cached texture came from the other index buffer');
+    primitive.count = 0;
+    assert.equal(s.frame().length, 4, 'count-only changes refresh the cached texture');
+    assert.deepEqual(s.frame(), ['plane']);
+  } finally {
+    contact.dispose();
+    s.h.cleanup();
+  }
+});
+
+test('core meshes use the engine geometry buffers; disposed or foreign sources are rejected or dropped', () => {
+  const s = scene(),
+    contact = new ContactShadows(),
+    geometry = { indices: new Uint32Array(36) };
+  const mesh = { id: 1, engine: s.engine, matrix: identity(), geometry, check() {} };
+  s.engine.meshes.set(1, mesh);
+  s.engine.geometryBuffers = (g) => (g === geometry ? { vertex: s.vertex, index: s.index } : null);
+  s.engine.use(contact);
+  try {
+    const counts = [];
+    const begin = s.h.context.encoder.beginRenderPass;
+    s.h.context.encoder.beginRenderPass = (d) => {
+      const pass = begin(d);
+      return {
+        ...pass,
+        drawIndexed(n) {
+          counts.push(n);
+        },
+      };
+    };
+    contact.add(mesh);
+    s.frame();
+    assert.deepEqual(counts, [36]);
+    assert.equal(
+      s.h.pipelines.find((p) => p.vertex.buffers?.[0]?.arrayStride === 24).vertex.buffers[0].attributes[0].format,
+      'float32x3',
+    );
+    assert.throws(() => contact.add(mesh), /Duplicate/);
+    assert.throws(() => contact.add({ disposed: true, shadowPrimitives: [] }), /disposed/);
+    assert.throws(() => contact.add({}), /Invalid/);
+    assert.throws(() => contact.add({ ...mesh, id: 2, engine: {} }), /another engine/);
+    s.engine.meshes.delete(1);
+    counts.length = 0;
+    s.frame();
+    assert.deepEqual(counts, [], 'removed meshes drop out');
+  } finally {
+    contact.dispose();
+  }
+});
+
+test('loaded gltf/pbr and FBX mesh handles cast contact shadows from their current PBR buffers', async (t) => {
+  const assets = await serveLoadedPBRFixtures();
+  t.after(() => assets.close());
+  for (const fixture of loadedPBRFixtures)
+    await t.test(fixture.producer, async () => {
+      const loaded = await assets.load(fixture),
+        { engine, model, mesh, primitive } = loaded,
+        contact = ContactShadows.attach(engine, { static: true, resolution: 32 }),
+        draws = [];
+      let execute;
+      contact.registerPasses({
+        add(pass) {
+          execute = pass.execute;
+        },
+      });
+      const context = {
+        backend: 'webgpu',
+        device: engine.gpu,
+        camera: { matrix: identity(), position: [0, 2, 4] },
+        format: 'bgra8unorm',
+        descriptor: { multisample: { count: 4 }, depthStencil: { format: 'depth32float' } },
+        encoder: {
+          beginRenderPass() {
+            let vertex, pipeline;
+            return {
+              setPipeline(value) {
+                pipeline = value;
+              },
+              setBindGroup() {},
+              setVertexBuffer(_slot, value) {
+                vertex = value;
+              },
+              setIndexBuffer() {},
+              drawIndexed(count) {
+                draws.push({ vertex, count, stride: pipeline.vertex.buffers[0].arrayStride });
+              },
+              draw() {},
+              end() {},
+            };
+          },
+        },
+      };
+      const frame = () => {
+        draws.length = 0;
+        execute(context);
+        return draws;
+      };
+      try {
+        assert.equal(mesh.geometry, null);
+        contact.add(mesh);
+        const current = model.shadowPrimitives[0];
+        assert.deepEqual(frame(), [{ vertex: current.vertex, count: primitive.indices.length, stride: 80 }]);
+        assert.deepEqual(frame(), [], 'an unchanged static source reuses the contact texture');
+        const deformed = engine.gpu.createBuffer({ size: primitive.vertices.byteLength, usage: GPUBufferUsage.VERTEX });
+        primitive.deformed = deformed;
+        try {
+          assert.deepEqual(
+            frame(),
+            [{ vertex: deformed, count: primitive.indices.length, stride: 80 }],
+            'a changed draw buffer invalidates the cached contact texture',
+          );
+          model.root.visible = false;
+          assert.deepEqual(frame(), [], 'a hidden ancestor suppresses PBR contact draws');
+          model.root.visible = true;
+          assert.deepEqual(frame(), [{ vertex: deformed, count: primitive.indices.length, stride: 80 }]);
+        } finally {
+          primitive.deformed = undefined;
+          deformed.destroy();
+        }
+        model.dispose();
+        assert.deepEqual(frame(), [], 'disposed loader meshes no longer cast contact shadows');
+      } finally {
+        loaded.dispose();
+      }
+    });
+});
+
+test('fit centres the plane under model.bounds; options are validated', () => {
+  const contact = new ContactShadows().fit([-1, 0.5, -3, 3, 2.5, 1]);
+  assert.deepEqual(contact.options, { position: [1, 0.5, -1], size: 8, height: 2 });
+  for (const options of [
+    { size: 0 },
+    { size: [1] },
+    { height: -1 },
+    { opacity: 2 },
+    { resolution: 10 },
+    { blur: -1 },
+    { position: [0, 0] },
+    { static: 1 },
+  ])
+    assert.throws(() => new ContactShadows(options), /Invalid contact shadow options/, JSON.stringify(options));
+  assert.throws(() => contact.fit([0, 0, 0, 1, 1]), /bounds/);
+  assert.throws(() => contact.fit([0, 0, 0, 1, 1, 1], 0.5), /bounds/);
+});

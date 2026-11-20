@@ -172,7 +172,7 @@ speed result is claimed at this checkpoint.
   supplies context, not evidence of the current hang's internal locking cause.
 
 Observed comparison on the same RTX A6000/D3D11 host, correctness diagnostics
-only, each actual GPU command holding one shared slot:
+only:
 
 | Input representation | Observed boundary |
 | --- | --- |
@@ -228,11 +228,11 @@ zero-initialized reservoir is insufficient compile evidence for all transport.
 The next decomposition should isolate the final reservoir/BSDF evaluation as
 well as shadow/candidate work, preserving all operations and their order.
 Command: `node test-results/testpage-45-split-light-supervisor.mjs light --carried`.
-All own GPU commands have ended and released their shared slot.
+All own GPU commands have ended.
 
 ### Bug 45 hunt (2026-11-09): where the compile time goes
 
-Method, CPU only after one GPU-locked capture: Chromium with
+Method, CPU only after one GPU capture: Chromium with
 `--use-angle=d3d11 --enable-privileged-webgl-extensions` returns ANGLE's
 translated HLSL through `WEBGL_debug_shaders.getTranslatedShaderSource` after
 `compileShader`, with no link. Filling the three link-time `@@` placeholders

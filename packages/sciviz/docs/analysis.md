@@ -48,6 +48,9 @@ Composite boundaries are not welded; only common compatible arrays survive flatt
 and block/source-cell IDs retain provenance. Higher-order elements use deterministic
 parametric subdivision (default 2, maximum 64), not exact curved-cell integration.
 Polyhedron faces use the global-ID outward face stream `nfaces,npoints,ids,...`.
+A polyvertex, polyline or triangle strip may repeat a point: a closed polyline repeats its
+first point, a zero-length polyline step and a strip triangle with a repeated point (its
+turn-around) are skipped, and a cell left with nothing to draw is rejected.
 `openDataSet` reads supported VTK dataset families; `parsePLOT3D` reads the documented
 structured PLOT3D forms. File and expansion budgets reject oversized data before
 publishing a partial dataset; increasing subdivisions increases both cells and memory.
@@ -133,12 +136,15 @@ const largest = await connectivityGrid(pieces, { extract: 'largest' });
 console.log(Array.from(regions.regionCells), Array.from(largest.sourceCells!)); // [3, 2, 1] [3, 4, 5]
 ```
 
-`/probe` owns locator snapshots; rebuild after input edits. Barycentric simplex and
-pulling-linear mixed cells differ deliberately from true trilinear hex interpolation.
+`/probe` owns locator snapshots; rebuild after input edits. Quads interpolate bilinearly
+and hexes trilinearly, as regular images do, so an image and its curvilinear twin sample
+alike; wedges and pyramids use the pulling-linear simplex split, which differs
+deliberately from their own shape functions.
 Outside points return null, shared boundaries choose lowest current cell ID. Profiles
 default to 101 equal arc-length samples with masks/NaNs outside; `resampleDataset` and
 `resampleToImage` retain masks and separate sampled cell arrays. Integrals separate
-length, area and volume; nonfolded trilinear hexes use 3x3x3 Gaussian quadrature.
+length, area and volume; unfolded bilinear quads and trilinear hexes use 3-point
+Gaussian quadrature per axis.
 Ill-conditioned/folded geometry is outside the model; reference-coordinate epsilon
 envelopes are arithmetic allowances, not extrapolation distances. `linkProbePlot`
 owns chart/path/marker layers and supports `moveTo(index)`; it borrows two figures
@@ -162,7 +168,12 @@ function, forward-error bound and conditioning limit with the NASA calculator de
 Defaults: arrow, point association, no orientation/scalar array, scaleMode 'none',
 scaleFactor 1, stride 1, cyan roughness 0.65. Six sources are arrow, cone, sphere,
 cube, line and borrowed custom Geometry. Built-ins orient +X along vectors; zero
-vectors keep +X, zero scale omits samples, signed scales reflect. `glyphLayer` owns
+vectors keep +X, signed scales reflect. A zero scale component (scaleMode
+'components' on a planar field) flattens the glyph along that axis: each triangle is
+projected and takes the plane normal signed by its projected winding, the limit of
+the inverse-transpose rule, so the flat glyph is lit from both sides with no NaN; two
+zero components leave a segment with nothing to draw, and only an all-zero scale
+omits the sample. `glyphLayer` owns
 its meshes and built-in geometry, never a caller custom geometry or Figure.
 `warpByVector` adds scaleFactor times xyz; `warpByScalar` uses supplied normals,
 surface normals or direction [0,0,1], without normalization. Warped topology/attributes
@@ -188,7 +199,8 @@ as a Cartesian volume without checking physical axes.
 | `/ometiff` | Series/ZCT and multifile plane selection | Explicit resources and supported compression/sample types; no invented missing planes |
 
 FITS/MRC/OME-TIFF grid bounds follow storage order, including descending axes.
-Rotation, shear, permutation and nonuniform grids reject in Cartesian helpers;
+Rotation, shear, permutation and nonuniform grids reject in Cartesian helpers, as does
+an axis of several samples with zero physical extent (a FITS CDELT of 0);
 resample physically before drawing. `world()` remains available independently.
 See [physical-grid and packed-row corrections](../../../docs/sciviz-review-fixes.md)
 and the engineering/astronomy demos and their asset manifests for supported concrete

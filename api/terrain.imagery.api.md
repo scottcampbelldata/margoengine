@@ -123,6 +123,7 @@ class PlanetTerrain implements EnginePlugin, Disposable {
     readonly relief: number;
     screenError: number;
     budget: number;
+    maxBuilds: number | undefined;
     readonly stats: PlanetStats;
     get owner(): Engine | undefined;
     get localCenter(): [number, number, number];
@@ -153,6 +154,8 @@ interface PlanetTerrainOptions {
     maxLevel?: number;
     screenError?: number;
     budget?: number;
+    maxBuilds?: number;
+    clock?: () => number;
     maxPatches?: number;
     origin?: PlanetOrigin;
 }

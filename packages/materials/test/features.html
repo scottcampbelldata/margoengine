@@ -4,7 +4,9 @@
 // small scene and returns numbers, read back from a copy of the frame.
 import {Engine} from '/packages/core/dist/index.js';
 import {KTX2LayerDecoder,parseKTX2} from '/packages/decoders/dist/ktx2-layers.js';
-import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,loadKTX2Texture} from '/packages/materials/dist/index.js';
+import {CubeTexture,NormalMaterial,PbrMaterial,UnlitMaterial,Texture,WgslMaterial,createMesh,createInstancedMesh,install,loadKTX2Texture} from '/packages/materials/dist/index.js';
+import {parseGLTF} from '/packages/gltf/dist/pbr.js';
+import {Animation} from '/packages/animation/dist/index.js';
 import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {DirectionalLights} from '/packages/clustered/dist/directional.js';
@@ -17,7 +19,7 @@ import {objectNormal} from '/packages/materials/dist/object-normal.js';
 import {stochasticTiling} from '/packages/materials/dist/stochastic.js';
 import {hair} from '/packages/materials/dist/hair.js';
 import {eye} from '/packages/materials/dist/eye.js';
-import {skin,skinTable} from '/packages/materials/dist/skin.js';
+import {skin,skinTable,skinProfileOf} from '/packages/materials/dist/skin.js';
 import {sphereGeometry} from '/packages/geometry/dist/index.js';
 import {TAA} from '/packages/taa/dist/index.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
@@ -90,10 +92,13 @@ const specularRed=async(device,env,level,face=4)=>{
   const float=h=>{const e=(h>>10)&31,m=h&1023;return e?(1+m/1024)*2**(e-15):m/1024*2**-14;};
   return float(half[(edge/2)*row/2+(edge/2)*4]);
 };
-// The surfaces of the lobes checks: black under the lobe, so what shows is the lobe.
+// The surfaces of the lobes checks: black under the lobe, so what shows is the lobe. The sheen's base has no specular
+// either (KHR_materials_specular 0): under a 0.04 one the sheen lobe and what the albedo scaling takes off the highlight
+// cancel to within one 8-bit step here. sheenOver keeps that specular, for the scaling itself.
 const lobeSurfaces={
   coat:{color:[0,0,0,1],clearcoat:1,clearcoatRoughness:0.3},
-  sheen:{color:[0,0,0,1],sheenColor:[1,1,1],sheenRoughness:0.5},
+  sheen:{color:[0,0,0,1],specularIntensity:0,sheenColor:[1,1,1],sheenRoughness:0.5},
+  sheenOver:{color:[0,0,0,1],sheenColor:[1,1,1],sheenRoughness:0.5},
   film:{color:[0.2,0.2,0.2,1],metalness:1,roughness:0.3,iridescence:1,iridescenceThicknessRange:[400,400]},
   plainFilm:{color:[0.2,0.2,0.2,1],metalness:1,roughness:0.3},
   grain:{color:[0.8,0.8,0.8,1],metalness:1,roughness:0.4,anisotropy:0.9},
@@ -101,7 +106,7 @@ const lobeSurfaces={
 };
 // Light from straight ahead, tilted a little, with no ambient: the sun, or a clustered light of the same illuminance at the
 // quad's middle. Each surface gets enough of it to stay above the tone curve's dark end.
-const toward=[0.3,0.2,1],lobePower={coat:16,sheen:64,film:2,grain:1};
+const toward=[0.3,0.2,1],lobePower={coat:16,sheen:512,sheenOver:64,film:2,grain:1};
 // An engine with or without the clip-distances feature that keeps every shader it compiles.
 const clipScene=async(hardware,camera=front)=>{
   const made=await scene(camera,hardware?{features:['clip-distances']}:{}),codes=[],make=made.engine.gpu.createShaderModule.bind(made.engine.gpu);
@@ -178,9 +183,10 @@ window.check={
       m.instances.setMatrices(0,new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]));wall(engine);await render();
       const data=await pixels(made),path=made.path();engine.dispose();return {...path,errors,wrong:wrongPixels(data,keep)};
     };
+    // A bare eyeball (no lid shading its top), so the probe above the plane reads the clipping alone.
     const eyed=async()=>{
       const made=await clipScene(true),{engine,errors,render}=made;
-      createMesh(engine,sphereGeometry(1,32,24),new PbrMaterial({clippingPlanes:[[0,1,0,0]],features:[eye()]}));await render();
+      createMesh(engine,sphereGeometry(1,32,24),new PbrMaterial({clippingPlanes:[[0,1,0,0]],features:[eye({lid:false})]}));await render();
       const data=await pixels(made),path=made.path();engine.dispose();
       return {...path,errors,above:at(data,128,100),below:at(data,128,156)};
     };
@@ -206,12 +212,60 @@ window.check={
     return {columns:Array.from(columns),low,high,moved,errors};
   },
   // Strand highlights on a flat quad (a stand-in), its strands up the V axis, seen from `height` units away.
-  async hair({shift,width}){
+  async hair({shift,width,specular=3,behind=false}){
     const d=3,made=await scene({position:[0,0,d],target:[0,0,0],fov:60}),{engine,errors,render}=made;
-    engine.lighting.direction.set([0,0,1,Math.PI]);engine.lighting.radiance.set([1,1,1,0]);
-    createMesh(engine,quad(),new PbrMaterial({color:[0.4,0,0,1],toneMapped:false,features:[hair({shift,width,specular:3,jitter:0})]}));await render();
+    engine.lighting.direction.set([0,0,behind?-1:1,Math.PI]);engine.lighting.radiance.set([1,1,1,0]);
+    createMesh(engine,quad(),new PbrMaterial({color:[0.4,0,0,1],toneMapped:false,side:'double',features:[hair({shift,width,specular,jitter:0})]}));await render();
     const data=await pixels(made),rows=[];for(let y=0;y<size;y++)rows.push(at(data,size/2,y));engine.dispose();
     return {rows,errors};
+  },
+  // skin(), hair() and eye() on a loaded glTF through install(model, {features}): a sphere skinned to one joint, with a
+  // morph target, deformed by Animation (`shift` moves the joint, and the mesh with it), against the same sphere and material values as a createMesh PbrMaterial with
+  // the feature in Material.features. The two must draw the same picture; without features, and after dispose(), the
+  // loaded sphere draws as plain glTF.
+  async modelFeatures({feature,shift=0,turn=0,follow=true}){
+    // On the loaded model the eye and a mesh-axis hair direction follow the joint's skin matrix: the mesh node's inverse
+    // world matrix times the joint's world matrix (the inverse bind matrix is the identity), as the skinning moves the
+    // vertices. `turn` turns the joint (and the stand-in mesh) that many radians about z; `follow` false leaves it out.
+    const skinOf=model=>()=>{const m=model.primitives[0].node.matrix,j=model.nodes[1].matrix,out=new Float64Array(16);
+      for(let c=0;c<4;c++)for(let r=0;r<4;r++)out[c*4+r]=j[c*4+r]-(r===3?0:m[12+r])*(c===3?1:0);return out;};
+    const make={skin:()=>skin(),hair:(model)=>hair({direction:[0,-1,0],jitter:0,follow:model&&follow?skinOf(model):undefined}),eye:(model)=>eye({irisColor:[0.1,0.3,0.6],follow:model&&follow?skinOf(model):undefined})}[feature];
+    const quaternion=[0,0,Math.sin(turn/2),Math.cos(turn/2)];
+    const g=sphereGeometry(1.5,64,48),color=[0.8,0.6,0.5,1],roughness=0.5,view={position:[0,0,5],target:[0,0,0],fov:45};
+    const lit=engine=>{engine.lighting.direction.set([0.8,0.3,0.6,3]);engine.lighting.radiance.set([1,1,1,0]);};
+    const glb=()=>{
+      const count=g.positions.length/3,buffers=[],bufferViews=[],accessors=[];
+      const add=(data,type,componentType=5126,extra={})=>{buffers.push(data);bufferViews.push({buffer:buffers.length-1,byteLength:data.byteLength});accessors.push({bufferView:buffers.length-1,componentType,count:data.length/{SCALAR:1,VEC2:2,VEC3:3,VEC4:4,MAT4:16}[type],type,...extra});return accessors.length-1;};
+      const position=add(new Float32Array(g.positions),'VEC3',5126,{min:[-1.5,-1.5,-1.5],max:[1.5,1.5,1.5]});
+      const attributes={POSITION:position,NORMAL:add(new Float32Array(g.normals),'VEC3'),TEXCOORD_0:add(new Float32Array(g.uvs),'VEC2'),
+        JOINTS_0:add(new Uint16Array(count*4),'VEC4',5123),WEIGHTS_0:add(new Float32Array(count*4).map((_,k)=>k%4?0:1),'VEC4')};
+      const target=add(new Float32Array(count*3),'VEC3',5126,{min:[0,0,0],max:[0,0,0]}),indices=add(new Uint32Array(g.indices),'SCALAR',5125);
+      const ibm=add(new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]),'MAT4');
+      const doc={asset:{version:'2.0'},scene:0,scenes:[{nodes:[0,1]}],nodes:[{mesh:0,skin:0},{name:'joint',translation:[shift,0,0],rotation:quaternion}],skins:[{joints:[1],inverseBindMatrices:ibm}],
+        meshes:[{primitives:[{attributes,indices,material:0,targets:[{POSITION:target}]}],weights:[0]}],
+        materials:[{name:'Ball',pbrMetallicRoughness:{baseColorFactor:color,metallicFactor:0,roughnessFactor:roughness}}],
+        buffers:buffers.map(b=>({byteLength:b.byteLength})),bufferViews,accessors};
+      return {doc,buffers};
+    };
+    const loaded=async(withFeatures,thenDispose)=>{
+      const made=await scene(view),{engine,errors,render}=made;lit(engine);
+      const {doc,buffers}=glb(),model=parseGLTF(engine,doc,buffers,[]),animation=Animation.attach(model);
+      const installation=withFeatures?install(model,{features:{Ball:[make(model)]}}):undefined;
+      await render();
+      if(thenDispose){installation.dispose();await render();}
+      const deformed=!!model.primitives[0].deformed,data=await pixels(made);animation.dispose();engine.dispose();
+      return {data,errors,deformed};
+    };
+    const made=await scene(view),{engine,errors,render}=made;lit(engine);
+    createMesh(engine,g,new PbrMaterial({color,roughness,metalness:0,features:[make()]})).root.setPosition([shift,0,0]).setQuaternion(quaternion);await render();
+    const mesh=await pixels(made);engine.dispose();
+    const shaded=await loaded(true,false),plain=await loaded(false,false),restored=await loaded(true,true);
+    let same=0,changed=0,back=0,drawn=0;
+    for(let k=0;k<size*size;k++){
+      let d=0,c=0,r=0;for(let i=0;i<3;i++){d=Math.max(d,Math.abs(mesh[k*4+i]-shaded.data[k*4+i]));c=Math.max(c,Math.abs(shaded.data[k*4+i]-plain.data[k*4+i]));r=Math.max(r,Math.abs(restored.data[k*4+i]-plain.data[k*4+i]));}
+      same=Math.max(same,d);back=Math.max(back,r);if(c>2)changed++;if(plain.data[k*4]+plain.data[k*4+1]+plain.data[k*4+2]>0)drawn++;
+    }
+    return {same,changed,back,drawn,deformed:[shaded.deformed,plain.deformed,restored.deformed],errors:[...errors,...shaded.errors,...plain.errors,...restored.errors]};
   },
   // The same light as the sun and as clustered lights, on one model.
   async character({model,light}){
@@ -243,10 +297,10 @@ window.check={
   },
   // A sphere of radius 2 scene units lit from the side by a strong sun, along the middle row: its colour there, n.l, and the
   // x of the ray, which fixes the half vector.
-  async skinSphere({unitsPerMeter,power}){
+  async skinSphere({unitsPerMeter,power,physiology}){
     const camera=8,made=await scene({position:[0,0,camera],target:[0,0,0],fov:30}),{engine,errors,render}=made;
     engine.lighting.direction.set([1,0,0,power]);engine.lighting.radiance.set([1,1,1,0]);
-    createMesh(engine,sphereGeometry(2,256,128),new PbrMaterial({color:[1,1,1,1],roughness:1,toneMapped:false,features:[skin({unitsPerMeter})]}));await render();
+    createMesh(engine,sphereGeometry(2,256,128),new PbrMaterial({color:[1,1,1,1],roughness:1,toneMapped:false,features:[skin({unitsPerMeter,...physiology})]}));await render();
     const data=await pixels(made);engine.dispose();
     const samples=[],t=Math.tan(Math.PI/12);
     for(let x=size/2-64;x<size/2;x+=2){
@@ -254,7 +308,15 @@ window.check={
       const u=((x+0.5)/size*2-1)*t,w=[u,((size/2+0.5)/size*2-1)*-t,-1],l=Math.hypot(...w),r=w.map(v=>v/l),b=camera*r[2],c=camera*camera-4,hit=-b-Math.sqrt(b*b-c);
       samples.push({nl:(r[0]*hit)/2,ray:r[0],color:at(data,x,size/2)});
     }
-    return {samples,errors,table:Array.from(skinTable())};
+    return {samples,errors,table:Array.from(skinTable(64,physiology?skinProfileOf(physiology):undefined))};
+  },
+  // A square facing the camera, the sun straight behind it, skin with subsurface against the same skin without: the
+  // middle pixel of each.
+  async skinThrough({thickness,subsurfaceThickness,power}){
+    const square={positions:[-2,-2,0,2,-2,0,2,2,0,-2,2,0],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]};
+    const draw=async(subsurface)=>{const made=await scene({position:[0,0,8],target:[0,0,0],fov:30}),{engine,errors,render}=made;engine.lighting.direction.set([0,0,-1,power]);engine.lighting.radiance.set([1,1,1,0]);createMesh(engine,square,new PbrMaterial({color:[1,1,1,1],roughness:1,toneMapped:false,subsurface,subsurfaceThickness,features:[skin({thickness})]}));await render();const data=await pixels(made);engine.dispose();return {color:at(data,size/2,size/2),errors};};
+    const lit=await draw(0.8),plain=await draw(0);
+    return {lit:lit.color,plain:plain.color,errors:[...lit.errors,...plain.errors]};
   },
   // Skin on the real avatar's head, lit from the side, against the plain material, with each pixel's n.l from a normal pass.
   async skinAvatar({power}){
@@ -271,10 +333,34 @@ window.check={
     return {band,black,soft:sum.map(v=>v/black),errors:[...normals.errors,...plain.errors,...soft.errors]};
   },
   // A sphere as an eye (a stand-in for a real eyeball), its colour alone: the dark run along the middle row is the pupil.
-  async eyeRun({angle,ior,pupil,depth=0.25}){
+  // A sphere as an eye lit from the side, the sun at a right angle to the view: the brightest pixel of the white (green,
+  // linear), where it is and how many pixels are above half of it.
+  async eyeShine({wetness,power,probe=[0,0]}){
+    const made=await scene({position:[0,0,5],target:[0,0,0],fov:30}),{engine,errors,render}=made;
+    engine.lighting.direction.set([1,0,0,power]);engine.lighting.radiance.set([1,1,1,0]);
+    createMesh(engine,sphereGeometry(1,256,128),new PbrMaterial({color:[0.8,0.8,0.8,1],roughness:0.5,toneMapped:false,features:[eye({wetness})]}));await render();
+    const data=await pixels(made);engine.dispose();
+    let peak=0,at=[0,0],area=0;
+    for(let y=0;y<size;y++)for(let x=size/2;x<size;x++){const v=light(data[(y*size+x)*4+1]);if(v>peak){peak=v;at=[x,y];}}
+    for(let y=0;y<size;y++)for(let x=size/2;x<size;x++)if(light(data[(y*size+x)*4+1])>peak/2)area++;
+    return {peak,at,area,there:light(data[(probe[1]*size+probe[0])*4+1]),errors};
+  },
+  // A sphere as an eye with a tiny iris, seen head on: linear green at points `heights` (in radii) up its middle column,
+  // lit by the ambient alone or by a sun from above the view, with the default upper lid or none.
+  async eyeLid({lid,lowerLid,ambient,sun,heights}){
+    const made=await scene({position:[0,0,5],target:[0,0,0],fov:30}),{engine,errors,render}=made;
+    engine.lighting.direction.set([...sun,ambient?0:1]);engine.lighting.radiance.set([1,1,1,ambient?1:0]);
+    createMesh(engine,sphereGeometry(1,256,128),new PbrMaterial({color:[0.8,0.8,0.8,1],roughness:1,toneMapped:false,features:[eye({irisRadius:0.05,wetness:0,lid,lowerLid})]}));await render();
+    const data=await pixels(made);engine.dispose();
+    // The row nearest each height, and the height its pixel's centre really sees: the view ray met with the sphere.
+    const t=Math.tan(Math.PI/12),rows=heights.map(h=>Math.round(size/2-h/(5-Math.sqrt(1-h*h))/t*size/2-0.5));
+    const seen=rows.map(r=>{const y=(size/2-r-0.5)/(size/2)*t,k=1+y*y,b=-5,c=24,s=(-b-Math.sqrt(b*b-k*c))/k;return s*y;});
+    return {values:rows.map(r=>light(data[(r*size+size/2)*4+1])),seen,errors};
+  },
+  async eyeRun({angle,ior,pupil,depth=0.25,corneaRadius=1}){
     const camera=[5*Math.sin(angle),0,5*Math.cos(angle)],made=await scene({position:camera,target:[0,0,0],fov:30}),{engine,errors,render}=made;
     engine.lighting.direction.set([0,0,1,0]);engine.lighting.radiance.set([1,1,1,0]);
-    const seeBase={name:'peek',shader:code=>code.replace('  return s;\n}','  s.emissive=s.base.rgb;\n  return s;\n}')},feature=eye({ior,pupil:0.3,depth,irisColor:[1,1,1]});
+    const seeBase={name:'peek',shader:code=>code.replace('  return s;\n}','  s.emissive=s.base.rgb;\n  return s;\n}')},feature=eye({chamberIor:ior,pupil:0.3,depth,corneaRadius,irisColor:[1,1,1]});
     createMesh(engine,sphereGeometry(1,256,128),new PbrMaterial({color:[1,1,1,1],toneMapped:false,features:[feature,seeBase]}));await render();
     feature.pupil=pupil;await render();
     const data=await pixels(made);engine.dispose();

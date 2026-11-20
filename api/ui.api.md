@@ -719,6 +719,8 @@ export class UiRenderer implements EnginePlugin {
     constructor(ui: Ui, options?: UiRendererOptions);
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

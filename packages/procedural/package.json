@@ -50,6 +50,14 @@
       "types": "./dist/voronoi.d.ts",
       "import": "./dist/voronoi.js"
     },
+    "./gears": {
+      "types": "./dist/gears.d.ts",
+      "import": "./dist/gears.js"
+    },
+    "./flyer": {
+      "types": "./dist/flyer.d.ts",
+      "import": "./dist/flyer.js"
+    },
     "./expression": {
       "types": "./dist/expression.d.ts",
       "import": "./dist/expression.js"
@@ -74,6 +82,30 @@
       "types": "./dist/buildings.d.ts",
       "import": "./dist/buildings.js"
     },
+    "./sheds": {
+      "types": "./dist/sheds.d.ts",
+      "import": "./dist/sheds.js"
+    },
+    "./building-rules": {
+      "types": "./dist/building-rules.d.ts",
+      "import": "./dist/building-rules.js"
+    },
+    "./building-plans": {
+      "types": "./dist/building-plans.d.ts",
+      "import": "./dist/building-plans.js"
+    },
+    "./harbour": {
+      "types": "./dist/harbour.d.ts",
+      "import": "./dist/harbour.js"
+    },
+    "./vehicles": {
+      "types": "./dist/vehicles.d.ts",
+      "import": "./dist/vehicles.js"
+    },
+    "./building-settings": {
+      "types": "./dist/building-settings.d.ts",
+      "import": "./dist/building-settings.js"
+    },
     "./caves": {
       "types": "./dist/caves.d.ts",
       "import": "./dist/caves.js"
@@ -85,6 +117,22 @@
     "./textures-pbr": {
       "types": "./dist/textures-pbr.d.ts",
       "import": "./dist/textures-pbr.js"
+    },
+    "./marching-cubes": {
+      "types": "./dist/marching-cubes.d.ts",
+      "import": "./dist/marching-cubes.js"
+    },
+    "./conifer-species": {
+      "types": "./dist/conifer-species.d.ts",
+      "import": "./dist/conifer-species.js"
+    },
+    "./conifers": {
+      "types": "./dist/conifers.d.ts",
+      "import": "./dist/conifers.js"
+    },
+    "./conifer-settings": {
+      "types": "./dist/conifer-settings.d.ts",
+      "import": "./dist/conifer-settings.js"
     }
   },
   "files": [
@@ -107,7 +155,7 @@
     "test": "npm run build && node --test test/*.test.js",
     "build:poisson": "node scripts/build-poisson.mjs",
     "test:poisson-kernel": "node scripts/build-poisson.mjs --test",
-    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs && node test/tree-mesh-browser.mjs && node test/textures-pbr-browser.mjs",
+    "test:gpu": "node test/poisson-browser.mjs && node test/textures-browser.mjs && node test/caves-browser.mjs && node test/tree-mesh-browser.mjs && node test/textures-pbr-browser.mjs && node test/buildings-browser.mjs && node test/building-plans-browser.mjs && node test/vehicles-browser.mjs",
     "prepack": "npm run build",
     "build:dungeon": "node scripts/build-dungeon.mjs",
     "test:dungeon-kernel": "node scripts/build-dungeon.mjs --test",

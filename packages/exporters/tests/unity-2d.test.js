@@ -227,3 +227,48 @@ test('what cannot be built is refused with the fix named', () => {
     /under 1 ms/,
   );
 });
+
+test('a name that would leave the bundle or clash with another file is refused, never renamed', () => {
+  const { manifest } = atlasBundle(),
+    ground = { ground: png(1) };
+  assert.throws(
+    () =>
+      createUnity2DBundle({
+        map: map({ image: { source: '../art/ground.png', width: 36, height: 36 } }),
+        tilesetImages: ground,
+      }),
+    /tileset image "\.\.\/art\/ground\.png" is not a plain file name/,
+  );
+  assert.throws(
+    () => createUnity2DBundle({ map: map({ name: 'a/b' }), tilesetImages: { 'ground.png': png(1) } }),
+    /tileset name "a\/b"/,
+  );
+  assert.throws(
+    () => createUnity2DBundle({ manifest, pages: [png(1)], clips: { 'walk/left': { frames: ['plain'] } } }),
+    /clip name "walk\/left"/,
+  );
+  assert.throws(
+    () =>
+      createUnity2DBundle({
+        manifest: atlasManifest(packAtlasFrames([{ ...opaque(4, 4), name: 'a' }]), { image: 'con.png' }),
+        pages: [png(1)],
+      }),
+    /page image "con\.png"/,
+  );
+  const two = map();
+  two.tilesets.push({ ...two.tilesets[0], name: 'walls', firstGid: 5 });
+  assert.throws(
+    () => createUnity2DBundle({ map: two, tilesetImages: { 'ground.png': png(1) } }),
+    /writes ground\.png twice/,
+  );
+  assert.throws(
+    () =>
+      createUnity2DBundle({
+        manifest: atlasManifest(packAtlasFrames([{ ...opaque(4, 4), name: 'a' }]), { image: 'ground.png' }),
+        pages: [png(1)],
+        map: map(),
+        tilesetImages: ground,
+      }),
+    /writes ground\.png twice/,
+  );
+});

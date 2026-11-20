@@ -18,7 +18,7 @@ import {
   UnlitMaterial,
   createMesh,
 } from '../dist/index.js';
-import { extendedShader, pbrShader } from '../../gltf-pro/src/shader.ts';
+import { extendedShader, pbrShader } from '../../gltf/src/shader.ts';
 
 async function scene() {
   const gpu = mockGPU(),

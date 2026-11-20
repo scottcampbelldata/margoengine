@@ -1,7 +1,7 @@
 // The schema-first binary codec: one schema definition gives full encoding, delta encoding against a baseline,
 // canonical equality and interpolation for every named struct. The wire format is written out in README.md ("Wire
 // format") so another language (a Rust server) can generate the same encoders from the same normalized JSON.
-import { blendAngle } from '@margoengine/net/timeline';
+import { blendAngle } from './interpolation-timeline.js';
 import { ByteReader, ByteWriter, unzigzag, zigzag } from '../../shared/bytes.js';
 
 /** Number kinds: fixed-width integers, 32-bit LEB128 varints (`uint`, zigzag `int`) and little-endian floats. */

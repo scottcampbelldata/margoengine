@@ -188,7 +188,7 @@ test('USDC: hostile path jump tables, deep paths and non-UTF-8 USDA are USD erro
   assert.throws(() => parseUSDC(writeCrate(specs)), /USD: hierarchy exceeds depth limit/);
   assert.throws(
     () => usdzUSDA(new Uint8Array([0x23, 0x75, 0xff, 0xfe])),
-    /^LoaderError: USD: USDA layer is not UTF-8 text$/,
+    /^LoaderError: USD: USDA layer is not UTF-8 text; see https:\/\/margoengine\.com\/errors#loader-syntax$/,
   );
   // Found (fuzzer, iteration 1316 of seed 1): "n is not iterable" for an xformOpOrder stored as a Crate int; a
   // connection stored as an int array reached String.prototype.split.
@@ -196,7 +196,7 @@ test('USDC: hostile path jump tables, deep paths and non-UTF-8 USDA are USD erro
     { path: '/', type: 7, fields: {} },
     { path: '/M', type: 6, fields: { typeName: V.token('Mesh'), xformOpOrder: V.specifier(5) } },
   ];
-  assert.throws(() => parseUSDC(writeCrate(mesh)), /^LoaderError: USD: invalid xformOpOrder$/);
+  assert.throws(() => parseUSDC(writeCrate(mesh)), /^LoaderError: USD: invalid xformOpOrder; see https:\/\/margoengine\.com\/errors#loader-syntax$/);
   const shader = [
     { path: '/', type: 7, fields: {} },
     { path: '/M', type: 6, fields: { typeName: V.token('Material') } },
@@ -208,7 +208,7 @@ test('USDC: hostile path jump tables, deep paths and non-UTF-8 USDA are USD erro
     { path: '/P.faceVertexIndices', type: 1, fields: { default: V.intArray([0, 1, 2]) } },
     { path: '/P.subdivisionScheme', type: 1, fields: { default: V.token('none') } },
   ];
-  assert.throws(() => parseUSDC(writeCrate(shader)), /^LoaderError: USD: invalid relationship target$/);
+  assert.throws(() => parseUSDC(writeCrate(shader)), /^LoaderError: USD: invalid relationship target; see https:\/\/margoengine\.com\/errors#loader-syntax$/);
 });
 
 test('USDC: counts read from the file are never preallocated (fuzzer reproducers, 1,706 B each)', async () => {

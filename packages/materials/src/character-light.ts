@@ -8,7 +8,7 @@ const direct = /fn direct_light\(s:Surface,v:vec3f,l:vec3f\)->vec3f \{[^}]*\}/,
   surfaceEnd = /if\((?:margoFaceTest&&)?!facing&&f\.settings\.z<0\.5\)\{discard;\}/g,
   vertex = /let p=f\.model\*vec4f\([^;]*,1\);/;
 const missing = (label: string) =>
-  new TypeError(`${label} needs a PbrMaterial without anisotropy or a thin film, and matching gltf-pro and materials versions`);
+  new TypeError(`${label} needs a PbrMaterial without anisotropy or a thin film, and matching gltf/pbr and materials versions`);
 /** `code` whose sun goes through WGSL function `light`, and `statements` run at the end of the surface. */
 export function shaded(code: string, light: string, statements: string, label: string): string {
   if (code.includes('fn margoDirect(') || !direct.test(code)) throw missing(label);
@@ -22,7 +22,7 @@ export function shaded(code: string, light: string, statements: string, label: s
 export const localShaded = (code: string, light: string): string => code.split(localTerm).join(`result+=${light}(n,v,l,base)*`);
 /**
  * `code` handing the fragment `fields` (`@location` declarations) that `statements` set in the vertex stage, where
- * `margoObjectModel` is the mesh's or the instance's matrix (gltf-pro's instanced vertex stage turns it into the instance's).
+ * `margoObjectModel` is the mesh's or the instance's matrix (gltf/pbr's instanced vertex stage turns it into the instance's).
  */
 export function vertexFields(code: string, fields: string, statements: string, label: string): string {
   const model = code.includes('let margoObjectModel=') ? '' : 'let margoObjectModel=f.model;',

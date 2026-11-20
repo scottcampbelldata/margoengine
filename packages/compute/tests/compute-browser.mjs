@@ -1,6 +1,6 @@
 import { reportSpeedPhase, speedPhase } from '../../../scripts/support/speed-phase.mjs';
 // Real-GPU checks of @margoengine/compute (one GPU job at a time; from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/compute-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/compute/tests/compute-browser.mjs
 // The page (compute-browser.js) checks map, reduce, scan, sort, argsort, sortByKey and histogram against CPU references
 // at sizes around every block boundary, kernels bound by name, coded GPU errors, AbortSignal, disposal, the 2D grid
 // past 65,535 workgroups and device sharing with an engine; compute-extras-browser.js checks linalg, fft, signal,

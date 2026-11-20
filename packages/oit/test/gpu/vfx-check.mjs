@@ -1,5 +1,5 @@
 // Real-GPU check for addEffect: particles, splats, points and sprites blend with glass in true depth order, whichever of
-// them draws first. Takes a GPU slot itself. From the repository root, after building packages:
+// them draws first. From the repository root, after building packages:
 // node packages/oit/test/gpu/vfx-check.mjs
 // Under MARGO_COMPAT=1 ExactOIT refuses by design (README "Exact (ExactOIT)": storage buffers in fragment shaders,
 // `setup` throws 'unsupported'; use OIT). Every 'exact' build then asserts that coded refusal instead of drawing, the
@@ -7,12 +7,10 @@
 // are skipped, with a printed note. Every other mode runs and is asserted as on WebGPU.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { compatRun } from '../../../../scripts/support/compat-shim.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const compat = compatRun(),
-  release = await acquire({ owner: 'oit-vfx' });
+const compat = compatRun();
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/vfx.html', port: 5289 }),
   { page } = context;
 const biggest = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
@@ -175,5 +173,4 @@ try {
   console.log('oit vfx GPU check passed');
 } finally {
   await context.close();
-  release();
 }

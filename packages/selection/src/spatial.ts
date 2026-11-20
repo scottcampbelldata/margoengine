@@ -73,7 +73,8 @@ export class SpatialPicking {
     const owner = runtime.sceneOf(this.picking);
     if (owner && owner !== (this.options.scene ?? runtime.scene))
       throw fault('attached', 'Spatial ray picker belongs to another scene; attach Picking to the selected scene', 'arguments');
-    const view: RenderView = { camera, viewport: [0, 0, 1, 1], scene: this.options.scene as RuntimeScene | undefined, layers: this.options.layers };
+    // A world ray answers only on its own pixel: the mouse pick's neighbour fallback would land up to one pixel off the ray.
+    const view = { camera, viewport: [0, 0, 1, 1], scene: this.options.scene as RuntimeScene | undefined, layers: this.options.layers, [Symbol.for('margoengine.selection.exactPick')]: true } as RenderView;
     const hit = await abortable(this.picking.pick((canvas.clientWidth || canvas.width) / 2, (canvas.clientHeight || canvas.height) / 2, view), signal);
     return this.disposed || runtime.disposed ? null : hit;
   }

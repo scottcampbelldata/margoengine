@@ -1,4 +1,4 @@
-// Morph-weight tracks in code-authored clips: sampling, glTF baking, and playback on Skeletons and glTF-pro models.
+// Morph-weight tracks in code-authored clips: sampling, glTF baking, and playback on Skeletons and glTF PBR models.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exportGLB } from '../../exporters/dist/index.js';
@@ -108,7 +108,7 @@ test('a Skeleton skips weights tracks; other targets must be a Skeleton or an An
   assert.throws(() => applyKeyframeClip(smile, {}, 0), /needs a Skeleton or an Animation/);
 });
 
-test('code-authored weights drive a glTF-pro model through setMorph, and bake to glTF weights channels', async () => {
+test('code-authored weights drive a glTF PBR model through setMorph, and bake to glTF weights channels', async () => {
   const { glb } = faceScene(),
     model = fromGLB(
       await engine(),
@@ -128,7 +128,7 @@ test('code-authored weights drive a glTF-pro model through setMorph, and bake to
   });
   assert.throws(() => applyKeyframeClip(wide, animation, 0), /has 3 values but the node has 2 morph targets/);
 
-  // Baked: one LINEAR or STEP 'weights' channel, two values per key, read back by gltf-pro and played by Animation.
+  // Baked: one LINEAR or STEP 'weights' channel, two values per key, read back by gltf/pbr and played by Animation.
   const baked = bakeKeyframeClip(smile, 30, (target) => (target === 'face' ? 'face' : undefined)),
     channel = baked.channels.find((c) => c.path === 'weights');
   assert.equal(channel.interpolation, 'LINEAR');

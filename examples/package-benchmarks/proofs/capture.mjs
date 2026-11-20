@@ -4,6 +4,7 @@
 // docs/whitepaper/claims.md:
 //   node examples/package-benchmarks/proofs/capture.mjs [--only=post-ssr,splats]
 // It then runs the same proofs as `npm run proofs -- --current` does (from baselines/ alone) to show they pass there.
+// It only ever runs --current (call-trace and output comparison; no proof times anything without --time).
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
@@ -22,11 +23,10 @@ if (captured.status !== 0) {
   console.error(
     'capture: a proof failed against its reference commit; nothing was stored for it. Fix it, then capture again.',
   );
-  process.exit(1);
-}
-const replayed = run({});
-if (replayed.status !== 0) {
+  process.exitCode = 1;
+} else if (run({}).status !== 0) {
   console.error('capture: the stored golden outputs do not reproduce the run; see above.');
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log('capture: golden outputs stored in examples/package-benchmarks/proofs/baselines and replayed.');
 }
-console.log('capture: golden outputs stored in examples/package-benchmarks/proofs/baselines and replayed.');

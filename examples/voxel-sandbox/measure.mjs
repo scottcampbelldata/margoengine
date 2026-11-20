@@ -29,9 +29,11 @@ const option = (name, fallback) => {
   lag = Number(option('lag', 0)),
   serverOption = option('server');
 let base = option('url') || (option('live') ? LIVE : undefined);
-if (!base && !local) {
+// Without a build to measure the run says so and ends with code 2 (by its event loop, KB-OWN-EXIT2).
+const named = Boolean(base || local);
+if (!named) {
   console.error('Say which build: --live, --local or --url=https://host/plaza/');
-  process.exit(2);
+  process.exitCode = 2;
 }
 const size = option('size', local ? '1920x1080' : undefined)
   ?.split('x')
@@ -480,185 +482,189 @@ async function delayPipe(target, ms) {
   return { url: `ws://127.0.0.1:${server.address().port}`, close: () => server.close() };
 }
 
-// A hard limit on the whole run: a browser that stops answering must not hold the GPU or the terminal.
-setTimeout(() => {
-  console.error(`measure: stopped after ${LIMIT_MINUTES} minutes`);
-  process.exit(124);
-}, LIMIT_MINUTES * 60_000).unref();
-const report = {
-  host: hostname(),
-  date: new Date().toISOString(),
-  argv: process.argv.slice(2),
-  base: undefined,
-  runs: [],
-  walks: [],
-};
-let stopServer = () => {};
-if (local) {
-  process.chdir(resolve(import.meta.dirname, '../..'));
-  const { startDevServer } = await import(pathToFileURL(resolve('scripts/browser.js')).href),
-    port = 5261,
-    { close } = await startDevServer({ startPath: '/examples/voxel-sandbox/index.html', port });
-  stopServer = close;
-  base = `http://127.0.0.1:${port}/examples/voxel-sandbox/index.html`;
-}
-report.base = base;
-const args = ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'];
-try {
-  const { gpuAdapterArg } = await import(pathToFileURL(resolve('scripts/lib/gpu-adapter.mjs')).href);
-  const arg = await gpuAdapterArg?.();
-  if (typeof arg === 'string') args.push(arg);
-} catch {
-  // No adapter helper in this checkout: Edge picks the adapter.
-}
-if (!headless) args.push('--start-maximized');
-const browser = await chromium.launch({ channel: 'msedge', headless, args });
-const context = await browser.newContext(
-  size?.every((v) => v > 0) ? { viewport: { width: size[0], height: size[1] } } : { viewport: null },
-);
-const page = await context.newPage();
-await page.addInitScript(instrument);
-// The control: how fast this browser runs an empty page. A headless Edge on Windows gave 32 Hz here, so an FPS number means
-// nothing above this cadence; the GPU columns do not depend on it.
-await page.goto('about:blank');
-report.emptyPage = await page.evaluate(
-  () =>
-    new Promise((done) => {
-      const gaps = [];
-      let last = 0;
-      const tick = (t) => {
-        if (last) gaps.push(t - last);
-        last = t;
-        if (gaps.length < 120) requestAnimationFrame(tick);
-        else {
-          gaps.sort((a, b) => a - b);
-          Promise.resolve(navigator.getBattery?.())
-            .then((b) => (b ? { charging: b.charging, level: b.level } : null))
-            .catch(() => null)
-            .then((battery) =>
-              done({
-                fps: +(1000 / gaps[60]).toFixed(1),
-                screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
-                battery: battery ?? null,
-              }),
-            );
-        }
-      };
-      requestAnimationFrame(tick);
-    }),
-);
-console.log('empty page', report.emptyPage);
-const errors = [];
-page.on('pageerror', (e) => errors.push(e.message));
-const url = (query) => `${base}${base.includes('?') ? '&' : '?'}${query}`;
-const SPAWN = { timeout: 180_000, polling: 200 };
-const keep = ({ result, adapter, timestamps }) => {
-  report.adapter ??= adapter;
-  report.timestamps ??= timestamps;
-  report.runs.push(result);
-};
-try {
-  if (only.includes('poses'))
-    for (const [name, pose] of Object.entries(POSES)) {
-      await page.goto(url(`view=ground&pose=${pose}&rd=8&quality=low&seed=1`));
-      await page.waitForFunction(() => window.voxelSandbox?.ready, null, SPAWN);
-      keep(await sample(page, `pose ${name} (no network, sun still)`));
-    }
-  const play = async (label, query, poseAt) => {
-    await page.goto(url(query));
-    await page.waitForFunction(() => window.voxelSandbox?.spawned, null, SPAWN);
-    await page.waitForFunction(() => window.voxelSandbox?.ready, null, SPAWN);
-    if (poseAt)
-      await page.evaluate((p) => {
-        window.voxelSandbox.player.position = p;
-      }, poseAt);
-    keep(await sample(page, `${label}, overlay up`));
-    await lock(page);
-    keep(await sample(page, `${label}, overlay gone`));
-    for (const [name, yaw, pitch] of [
-      ['up', 3.14, 1.0],
-      ['horizon', -1.1, 0.02],
-      ['down', 3.14, -1.4],
-    ]) {
-      await lookAt(page, yaw, pitch);
-      keep(await sample(page, `${label}, looking ${name}`));
-    }
-    return true;
+if (named) await measure();
+
+async function measure() {
+  // A hard limit on the whole run: a browser that stops answering must not hold the GPU or the terminal.
+  setTimeout(() => {
+    console.error(`measure: stopped after ${LIMIT_MINUTES} minutes`);
+    process.exit(124); // process.exit: the hard run limit ends the run whatever still holds it (browser, dev server)
+  }, LIMIT_MINUTES * 60_000).unref();
+  const report = {
+    host: hostname(),
+    date: new Date().toISOString(),
+    argv: process.argv.slice(2),
+    base: undefined,
+    runs: [],
+    walks: [],
   };
-  if (only.includes('solo'))
-    await play('solo', 'plaza=&rd=8&seed=1&reset', [-41.3, 16, 18.3]).catch((error) => {
-      report.soloError = String(error);
-      console.error(error);
-    });
-  let shard = serverOption,
-    pipe;
-  if (shard && lag) {
-    pipe = await delayPipe(shard, lag);
-    shard = pipe.url;
+  let stopServer = () => {};
+  if (local) {
+    process.chdir(resolve(import.meta.dirname, '../..'));
+    const { startDevServer } = await import(pathToFileURL(resolve('scripts/browser.js')).href),
+      port = 5261,
+      { close } = await startDevServer({ startPath: '/examples/voxel-sandbox/index.html', port });
+    stopServer = close;
+    base = `http://127.0.0.1:${port}/examples/voxel-sandbox/index.html`;
   }
-  if (only.includes('online') && (shard || !local))
-    await play('online', shard ? `server=${encodeURIComponent(shard)}&rd=8` : '').catch((error) => {
-      report.onlineError = String(error);
-      console.error(error);
-    });
-  if (only.includes('speed')) {
-    const speed = async (label, query, burns) => {
+  report.base = base;
+  const args = ['--enable-unsafe-webgpu', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'];
+  try {
+    const { gpuAdapterArg } = await import(pathToFileURL(resolve('scripts/lib/gpu-adapter.mjs')).href);
+    const arg = await gpuAdapterArg?.();
+    if (typeof arg === 'string') args.push(arg);
+  } catch {
+    // No adapter helper in this checkout: Edge picks the adapter.
+  }
+  if (!headless) args.push('--start-maximized');
+  const browser = await chromium.launch({ channel: 'msedge', headless, args });
+  const context = await browser.newContext(
+    size?.every((v) => v > 0) ? { viewport: { width: size[0], height: size[1] } } : { viewport: null },
+  );
+  const page = await context.newPage();
+  await page.addInitScript(instrument);
+  // The control: how fast this browser runs an empty page. A headless Edge on Windows gave 32 Hz here, so an FPS number means
+  // nothing above this cadence; the GPU columns do not depend on it.
+  await page.goto('about:blank');
+  report.emptyPage = await page.evaluate(
+    () =>
+      new Promise((done) => {
+        const gaps = [];
+        let last = 0;
+        const tick = (t) => {
+          if (last) gaps.push(t - last);
+          last = t;
+          if (gaps.length < 120) requestAnimationFrame(tick);
+          else {
+            gaps.sort((a, b) => a - b);
+            Promise.resolve(navigator.getBattery?.())
+              .then((b) => (b ? { charging: b.charging, level: b.level } : null))
+              .catch(() => null)
+              .then((battery) =>
+                done({
+                  fps: +(1000 / gaps[60]).toFixed(1),
+                  screen: `${screen.width}x${screen.height}@${devicePixelRatio}`,
+                  battery: battery ?? null,
+                }),
+              );
+          }
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  console.log('empty page', report.emptyPage);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const url = (query) => `${base}${base.includes('?') ? '&' : '?'}${query}`;
+  const SPAWN = { timeout: 180_000, polling: 200 };
+  const keep = ({ result, adapter, timestamps }) => {
+    report.adapter ??= adapter;
+    report.timestamps ??= timestamps;
+    report.runs.push(result);
+  };
+  try {
+    if (only.includes('poses'))
+      for (const [name, pose] of Object.entries(POSES)) {
+        await page.goto(url(`view=ground&pose=${pose}&rd=8&quality=low&seed=1`));
+        await page.waitForFunction(() => window.voxelSandbox?.ready, null, SPAWN);
+        keep(await sample(page, `pose ${name} (no network, sun still)`));
+      }
+    const play = async (label, query, poseAt) => {
       await page.goto(url(query));
       await page.waitForFunction(() => window.voxelSandbox?.spawned, null, SPAWN);
+      await page.waitForFunction(() => window.voxelSandbox?.ready, null, SPAWN);
+      if (poseAt)
+        await page.evaluate((p) => {
+          window.voxelSandbox.player.position = p;
+        }, poseAt);
+      keep(await sample(page, `${label}, overlay up`));
       await lock(page);
-      for (const burn of burns) {
-        await page.evaluate((ms) => {
-          window.__m.burn = ms;
-        }, burn);
-        report.walks.push(await measureWalk(page, `${label}, main thread burning ${burn} ms a frame`));
+      keep(await sample(page, `${label}, overlay gone`));
+      for (const [name, yaw, pitch] of [
+        ['up', 3.14, 1.0],
+        ['horizon', -1.1, 0.02],
+        ['down', 3.14, -1.4],
+      ]) {
+        await lookAt(page, yaw, pitch);
+        keep(await sample(page, `${label}, looking ${name}`));
       }
-      await page.evaluate(() => {
-        window.__m.burn = 0;
-      });
+      return true;
     };
-    if (!lag) await speed('solo', 'plaza=&rd=4&seed=1', [0, 40, 120]);
-    if (shard || !local)
-      await speed(
-        `online${lag ? ` +${lag} ms each way` : ''}`,
-        shard ? `server=${encodeURIComponent(shard)}&rd=4` : '',
-        [0, 40, 120],
+    if (only.includes('solo'))
+      await play('solo', 'plaza=&rd=8&seed=1&reset', [-41.3, 16, 18.3]).catch((error) => {
+        report.soloError = String(error);
+        console.error(error);
+      });
+    let shard = serverOption,
+      pipe;
+    if (shard && lag) {
+      pipe = await delayPipe(shard, lag);
+      shard = pipe.url;
+    }
+    if (only.includes('online') && (shard || !local))
+      await play('online', shard ? `server=${encodeURIComponent(shard)}&rd=8` : '').catch((error) => {
+        report.onlineError = String(error);
+        console.error(error);
+      });
+    if (only.includes('speed')) {
+      const speed = async (label, query, burns) => {
+        await page.goto(url(query));
+        await page.waitForFunction(() => window.voxelSandbox?.spawned, null, SPAWN);
+        await lock(page);
+        for (const burn of burns) {
+          await page.evaluate((ms) => {
+            window.__m.burn = ms;
+          }, burn);
+          report.walks.push(await measureWalk(page, `${label}, main thread burning ${burn} ms a frame`));
+        }
+        await page.evaluate(() => {
+          window.__m.burn = 0;
+        });
+      };
+      if (!lag) await speed('solo', 'plaza=&rd=4&seed=1', [0, 40, 120]);
+      if (shard || !local)
+        await speed(
+          `online${lag ? ` +${lag} ms each way` : ''}`,
+          shard ? `server=${encodeURIComponent(shard)}&rd=4` : '',
+          [0, 40, 120],
+        );
+    }
+    pipe?.close();
+  } finally {
+    report.errors = errors;
+    const out =
+      option('out') ||
+      join('test-results', `plaza-measure-${hostname()}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, JSON.stringify(report, null, 1));
+    const lines = [
+      `# Plaza measure, ${report.host}, ${report.date}`,
+      `Build ${report.base}`,
+      `GPU ${JSON.stringify(report.adapter)}, timestamps ${report.timestamps}`,
+      `Empty page ${JSON.stringify(report.emptyPage)}`,
+      '',
+    ];
+    for (const r of report.runs) {
+      lines.push(
+        `## ${r.label}`,
+        `${r.fps} FPS (interval ${r.frameIntervalMs.median} ms, p95 ${r.frameIntervalMs.p95}); frame CPU ${r.frameCpuMs.median} ms; GPU passes sum ${r.gpuSumMs} ms, first to last ${r.gpuSpanMs} ms; submit to done ${r.submitToDoneMs.median} ms; long tasks ${r.longTaskMs} ms; shadow cache hits ${r.shadowCacheHits} of ${r.framesTimed} timed frames; canvas ${r.stats.canvas}; tier ${r.stats.tier}; visible ${r.stats.visible} of ${r.stats.chunks}; draws ${r.stats.draws}; quads ${r.stats.quads}`,
+        '',
+        '| pass | ms median | p95 | frames | draws | indirect | indices |',
+        '| --- | --- | --- | --- | --- | --- | --- |',
+        ...r.passes.map(
+          (p) =>
+            `| ${p.pass} [${p.key}] | ${p.medianMs} | ${p.p95Ms} | ${p.framesWithIt} | ${p.draws} | ${p.indirect} | ${p.indices} |`,
+        ),
+        '',
       );
+    }
+    for (const w of report.walks)
+      lines.push(
+        `${w.label}: walk ${w.best} blocks/s best heading, fly ${w.fly} blocks/s${w.touching?.length ? ` (touching ${w.touching})` : ''}, ${w.fps} FPS, corrections ${w.corrections}`,
+      );
+    writeFileSync(out.replace(/\.json$/, '.md'), `${lines.join('\n')}\n`);
+    console.log(`Wrote ${out} and its .md`);
+    await closeAll({ browser });
+    await stopServer();
   }
-  pipe?.close();
-} finally {
-  report.errors = errors;
-  const out =
-    option('out') ||
-    join('test-results', `plaza-measure-${hostname()}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-  mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, JSON.stringify(report, null, 1));
-  const lines = [
-    `# Plaza measure, ${report.host}, ${report.date}`,
-    `Build ${report.base}`,
-    `GPU ${JSON.stringify(report.adapter)}, timestamps ${report.timestamps}`,
-    `Empty page ${JSON.stringify(report.emptyPage)}`,
-    '',
-  ];
-  for (const r of report.runs) {
-    lines.push(
-      `## ${r.label}`,
-      `${r.fps} FPS (interval ${r.frameIntervalMs.median} ms, p95 ${r.frameIntervalMs.p95}); frame CPU ${r.frameCpuMs.median} ms; GPU passes sum ${r.gpuSumMs} ms, first to last ${r.gpuSpanMs} ms; submit to done ${r.submitToDoneMs.median} ms; long tasks ${r.longTaskMs} ms; shadow cache hits ${r.shadowCacheHits} of ${r.framesTimed} timed frames; canvas ${r.stats.canvas}; tier ${r.stats.tier}; visible ${r.stats.visible} of ${r.stats.chunks}; draws ${r.stats.draws}; quads ${r.stats.quads}`,
-      '',
-      '| pass | ms median | p95 | frames | draws | indirect | indices |',
-      '| --- | --- | --- | --- | --- | --- | --- |',
-      ...r.passes.map(
-        (p) =>
-          `| ${p.pass} [${p.key}] | ${p.medianMs} | ${p.p95Ms} | ${p.framesWithIt} | ${p.draws} | ${p.indirect} | ${p.indices} |`,
-      ),
-      '',
-    );
-  }
-  for (const w of report.walks)
-    lines.push(
-      `${w.label}: walk ${w.best} blocks/s best heading, fly ${w.fly} blocks/s${w.touching?.length ? ` (touching ${w.touching})` : ''}, ${w.fps} FPS, corrections ${w.corrections}`,
-    );
-  writeFileSync(out.replace(/\.json$/, '.md'), `${lines.join('\n')}\n`);
-  console.log(`Wrote ${out} and its .md`);
-  await closeAll({ browser });
-  await stopServer();
 }

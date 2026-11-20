@@ -45,4 +45,4 @@ and bit-identical output for 17- and 128-frame blocks. The metering implementati
 checked against independent direct convolution with the published numeric table, including
 zero-padded ends. `browser.js` renders real AudioWorklets beside both rendering backends.
 All signals are generated stand-ins. Other browsers and converters, listening quality and
-performance are unmeasured. Use the GPU-lock command documented in the mixer README.
+performance are unmeasured. Use the GPU command documented in the mixer README.

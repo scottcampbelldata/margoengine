@@ -15,13 +15,19 @@ import {
 
 const root = resolve(import.meta.dirname, '..');
 test('api:update enrolls new packages without moving locked packages or mutating the existing lock', () => {
-  const original = { locked: ['@margoengine/core'], watch: ['@margoengine/web'], internal: ['packages/shared'], ticked: {} };
-  const next = enrollWatch(original, ['@margoengine/game', '@margoengine/core', '@margoengine/web']);
-  assert.deepEqual(next.watch, ['@margoengine/game', '@margoengine/web']);
-  assert.deepEqual(original.watch, ['@margoengine/web']);
+  const original = { locked: ['@margoengine/core'], watch: ['@margoengine/kit-web'], internal: ['packages/shared'], ticked: {} };
+  const next = enrollWatch(original, ['@margoengine/game', '@margoengine/core', '@margoengine/kit-web']);
+  assert.deepEqual(next.watch, ['@margoengine/game', '@margoengine/kit-web']);
+  assert.deepEqual(original.watch, ['@margoengine/kit-web']);
   assert.deepEqual(next.locked, original.locked);
   assert.deepEqual(next.internal, original.internal);
   assert.deepEqual(enrollWatch(next, ['@margoengine/game']), next);
+});
+test('api:update drops a watched name that is no longer a package (a rename leaves no stale entry)', () => {
+  const original = { locked: ['@margoengine/core'], watch: ['@margoengine/old', '@margoengine/game'], internal: [], ticked: {} };
+  const next = enrollWatch(original, ['@margoengine/new'], ['@margoengine/core', '@margoengine/game', '@margoengine/new']);
+  assert.deepEqual(next.watch, ['@margoengine/game', '@margoengine/new']);
+  assert.deepEqual(original.watch, ['@margoengine/old', '@margoengine/game']);
 });
 const report = (body) => `## API Report File for "@margoengine/example"\n\n\`\`\`ts\n${body}\n\`\`\`\n`;
 const compare = (a, b) => classify(report(a), report(b));

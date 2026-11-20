@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/planet.browser.mjs
 // Planet terrain (`@margoengine/terrain/planet`) at the Earth's size, 320 x 240 exact pixels, magenta sky:
 // 1. from orbit (3 radii from the centre) the planet is a disc of the projected size: asin(1/3) seen through a 60 degree

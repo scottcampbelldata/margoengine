@@ -1,4 +1,4 @@
-// Real-GPU check of TAA's velocity for shapes a shader moves (built packages; takes the GPU lock itself). A plane 40
+// Real-GPU check of TAA's velocity for shapes a shader moves (built packages). A plane 40
 // units wide, bright 1 px dots 4 px apart on dark with a white bar one unit wide, all fixed to the plane, slides 6 px a
 // frame to the right by its vertex shader alone: the mesh's matrix never changes, so only the graph's or the shader's
 // own motion can tell TAA where each pixel was. Without it every pixel reads its own history: the bar's white stays in
@@ -8,20 +8,24 @@
 //   raw: RawShaderMaterial moving its vertices by `uniforms.shift`, with `velocityEntry` (last frame's shift beside it);
 //   rawPlain: the same raw shader without `velocityEntry`, today's raw behaviour: depth and camera motion only.
 // Trail: the mean red of a band 40 px wide behind the bar's left edge, minus the reference's, in sRGB levels.
+// The raw engines compile pipelines asynchronously, here held back 1.5 s each as on a loaded machine: a mesh draws
+// (colour or velocity) only once its pipeline is done, so the rigs render and wait on `raw.ready()` until every
+// pipeline the frames ask for is built, before the slide is measured.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
+import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
-const release = await acquire({ owner: 'taa-deform' });
 const timer = setTimeout(() => {
   console.error('deform-browser: timed out after 180 s');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 180_000);
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/taa-deform/vite-cache',
   optimizeDeps: { noDiscovery: true },
@@ -40,6 +44,8 @@ const WIDTH = 320,
 try {
   const page = await browser.newPage({ viewport: { width: 1000, height: 600 }, deviceScaleFactor: 1 }),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim);
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text());
@@ -104,7 +110,11 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
 }`;
       const rawRig = async (id, opted) => {
         const r = await engineOn(id),
-          raw = RawShaders.attach(r.engine),
+          compile = r.engine.gpu.createRenderPipelineAsync.bind(r.engine.gpu);
+        r.engine.gpu.createRenderPipelineAsync = (descriptor) =>
+          // fixed-wait: an injected 1.5 s pipeline compile, the latency this check proves the raw pipelines wait out
+          new Promise((done) => setTimeout(done, 1500)).then(() => compile(descriptor));
+        const raw = RawShaders.attach(r.engine),
           material = new RawShaderMaterial({
             vertexShader: opted ? vertexShader : vertexShader.replace(/@vertex fn velocity[^}]*\}\n/, ''),
             uniforms: { shift: { value: 0 }, shiftBefore: { value: 0 } },
@@ -119,9 +129,10 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
           }),
         );
         r.taa.add(raw);
-        await raw.ready();
         return {
           ...r,
+          ready: () => raw.ready(),
+          compiled: () => material.compiled,
           move(u) {
             material.uniforms.shiftBefore.value = material.uniforms.shift.value;
             material.uniforms.shift.value = u;
@@ -136,6 +147,17 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
       };
       window.t = {
         gpuErrors: () => Object.values(rigs).flatMap((r) => r.gpuErrors),
+        // A pipeline starts compiling when a frame first asks for it (the velocity one in TAA's pass, some only once
+        // there is history): render still frames and wait for every pipeline compiling, until a round compiles none.
+        async settle() {
+          const raws = Object.values(rigs).filter((r) => r.ready);
+          for (;;) {
+            const before = raws.map((r) => r.compiled());
+            await this.frames(30, 0, 0);
+            await Promise.all(raws.map((r) => r.ready()));
+            if (raws.every((r, i) => r.compiled() === before[i])) return;
+          }
+        },
         async frames(n, from, step) {
           for (const r of Object.values(rigs))
             for (let i = 0; i < n; i++) {
@@ -149,7 +171,7 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
     { WIDTH, HEIGHT, PIXELS, START },
   );
   // Settle still (pipelines compile, history fills), then slide.
-  await page.evaluate(() => window.t.frames(30, 0, 0));
+  await page.evaluate(() => window.t.settle());
   await page.evaluate(() => window.t.frames(30, 0, 0));
   await page.evaluate(({ STEP, FRAMES }) => window.t.frames(FRAMES, STEP, STEP), { STEP, FRAMES });
   const band = (image, from, to) => {
@@ -185,7 +207,7 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
     };
   }
   console.log('against the matrix-moved plane, in sRGB levels', result);
-  // Apple silicon Mac, Metal: the raw shape without its own motion trails 24.7 levels; with it, and the graph, the frames
+  // Apple silicon Mac, Metal: the raw shape without its own motion trails about 21 levels; with it, and the graph, the frames
   // match the reference but for rounding (a level at most).
   assert.ok(result.rawPlain.trail > 15, `a raw shape without its own motion trails (${result.rawPlain.trail.toFixed(1)})`);
   for (const id of ['graph', 'raw']) {
@@ -198,5 +220,4 @@ struct Out { @builtin(position) clip:vec4f, @location(0) local:vec2f }
 } finally {
   clearTimeout(timer);
   await closeAll({ browser, servers: [server] });
-  await release();
 }

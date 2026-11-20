@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { parseGLTF } from '@margoengine/gltf';
 import { MeshBVH, Raycaster } from '@margoengine/bvh';
 import { Picking, Selection } from '@margoengine/selection';
-import { parseGLTF as parsePBR } from '@margoengine/gltf-pro';
+import { parseGLTF as parsePBR } from '@margoengine/gltf/pbr';
 import { meshTriangles } from '../packages/shared/mesh-source.js';
 import { loadedPBRFixtures, serveLoadedPBRFixtures, primitivePositions } from './support/loaded-pbr-fixtures.js';
 

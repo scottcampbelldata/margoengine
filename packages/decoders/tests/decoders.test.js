@@ -40,13 +40,15 @@ test('decoder asset server returns 404 for missing assets and remains usable', a
   assert.ok((await present.arrayBuffer()).byteLength > 0);
 });
 
-test('module evaluation and construction are SSR-safe; decoding rejects clearly without workers', async () => {
+test('module evaluation and construction are SSR-safe; KTX2 rejects clearly without workers, Draco decodes in Node', async () => {
   assert.equal(typeof globalThis.window, 'undefined');
   const draco = new decoders.DracoDecoder(),
     ktx2 = new decoders.KTX2Decoder();
   assert.ok(draco.workerLimit >= 1 && draco.workerLimit <= 4);
   assert.equal(ktx2.target, 'rgba8');
-  await assert.rejects(draco.decode(new Uint8Array(4)), /SSR/);
+  // Node has no Web Worker: Draco decodes in this thread (tests/draco-node.test.js), so four stray bytes are refused by
+  // the decoder itself, not by the worker check.
+  await assert.rejects(draco.decode(new Uint8Array(4)), (error) => !/SSR/.test(error.message));
   await assert.rejects(ktx2.transcode(new Uint8Array(4)), /SSR/);
   assert.throws(() => new decoders.DracoDecoder({ workerLimit: 0 }), RangeError);
   draco.dispose();
@@ -132,6 +134,7 @@ test('createKTX2Texture allocates the compressed format and writes each mip at i
   const writes = [],
     created = [];
   const device = {
+    limits: { maxTextureDimension2D: 8192 },
     createTexture: (descriptor) => {
       const texture = {
         descriptor,
@@ -204,6 +207,17 @@ test('createKTX2Texture allocates the compressed format and writes each mip at i
     /lost/,
   );
   assert.equal(created.at(-1).destroyed, true, 'a failed upload releases its texture');
+  // A texture wider than the device allows is refused before any texture is made, not left invalid.
+  const count = created.length;
+  assert.throws(
+    () =>
+      decoders.createKTX2Texture(
+        { ...device, limits: { maxTextureDimension2D: 4 } },
+        { width: 8, height: 8, mipmaps, format: 'bc7-rgba-unorm', target: 'bc7' },
+      ),
+    (error) => error instanceof RangeError && /8x8 exceeds the device's maxTextureDimension2D/.test(error.message),
+  );
+  assert.equal(created.length, count, 'no texture is made for a refused size');
 });
 
 class FakeWorker {
@@ -1054,5 +1068,30 @@ test('meshopt decoding is bit-exact with the meshoptimizer reference decoder', a
   assert.throws(
     () => decoders.decodeMeshoptBuffer(encoded, attributes.count, attributes.stride, 'ATTRIBUTES', 'BOGUS'),
     /unknown filter/,
+  );
+});
+
+test('KTX2 level count is bounded by the largest of width, height and depth', async () => {
+  const { readKTX2Index } = await import('../dist/ktx2-file.js');
+  // A 4 x 4 x 16 volume holds 5 levels (KTX 2.0 levelCount); it was refused because depth was left out of the bound.
+  const volume = ktx2Header(4, 4, 5);
+  new DataView(volume.buffer).setUint32(28, 16, true);
+  assert.equal(readKTX2Index(volume).levels.length, 5);
+  new DataView(volume.buffer).setUint32(40, 6, true);
+  assert.throws(() => readKTX2Index(volume), /level count/);
+});
+
+test('a Zstandard KTX2 level shorter than its declared uncompressed length fails as damaged', async () => {
+  const { levelData } = await import('../dist/ktx2-file.js');
+  // One single-segment frame holding a 4-byte raw block (RFC 8878 3.1.1).
+  const frame = Uint8Array.of(0x28, 0xb5, 0x2f, 0xfd, 0x20, 0x04, 0x21, 0x00, 0x00, 1, 2, 3, 4),
+    index = (uncompressedLength) => ({
+      supercompression: 2,
+      levels: [{ offset: 0, length: frame.length, uncompressedLength }],
+    });
+  assert.deepEqual([...(await levelData(frame, index(4), 0))], [1, 2, 3, 4]);
+  await assert.rejects(
+    levelData(frame, index(14), 0),
+    (error) => error.code === 'failed' && /decompresses to 4 bytes, not the 14 it declares/.test(error.message),
   );
 });

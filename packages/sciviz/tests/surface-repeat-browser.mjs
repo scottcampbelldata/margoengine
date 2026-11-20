@@ -3,8 +3,8 @@
 // must repeat exactly on WebGPU and on the WebGL2 compatibility layer. A translucent surface that folds over itself in
 // its one draw is not bit-stable on NVIDIA (RTX A6000, D3D12 and ANGLE D3D11) and is stable on Apple M6 (Metal), with a
 // raw-API page alone (scripts/reference-rendering/fold-blend-repeat.html; docs/limits.md, docs/upstream-reports/KB5700f):
-// that case is reported, not asserted. From the repository root, with the GPU lock held:
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sciviz/tests/surface-repeat-browser.mjs
+// that case is reported, not asserted. From the repository root:
+//   node scripts/run-with-timeout.mjs -- node packages/sciviz/tests/surface-repeat-browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -30,6 +30,10 @@ for (const compat of [false, true]) {
       assert.equal(r.differing, 0, `${r.shape} at opacity ${r.opacity} repeats exactly: ${JSON.stringify(r)}`);
     }
     assert.ok(folded.drawn > 20000, 'the folded translucent surface draws');
+    // Infinite heights are gaps like NaN (vectorGeometry and the colour range skip them too), not spikes to infinity.
+    const nan = await browser.page.evaluate(() => window.gap(NaN));
+    for (const hole of ['Infinity', '-Infinity'])
+      assert.deepEqual(await browser.page.evaluate((h) => window.gap(Number(h)), hole), nan, `${hole} heights draw the same gap as NaN`);
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

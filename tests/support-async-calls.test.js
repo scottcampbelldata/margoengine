@@ -76,13 +76,17 @@ function inComment(source, at) {
 }
 
 /**
- * Whether the call at `at` assigns its promise to a variable that is awaited after the call, inside the innermost
- * enclosing block that declares that variable (its function, for a `let` at the top of the function).
+ * Whether the call at `at` assigns its promise to a variable that is awaited or returned after the call (plainly, or
+ * with a `.then`, `.catch` or `.finally` chained on it), inside the innermost enclosing block that declares that
+ * variable (its function, for a `let` at the top of the function). A returned promise is the caller's to settle, as
+ * scripts/lib/browser.mjs's close returns `closing` or `closing.catch(...)`.
  */
 function awaitedLater(source, at, before) {
   const name = ASSIGNED.exec(before)?.[1];
   if (!name) return false;
-  const AWAITED = new RegExp(`\\bawait\\s+${name.replace(/\$/g, '\\$')}(?![\\w$.(\\[])`);
+  const AWAITED = new RegExp(
+    `\\b(?:await|return)\\s+${name.replace(/\$/g, '\\$')}(?:(?![\\w$.(\\[])|\\s*\\.(?:then|catch|finally)\\()`,
+  );
   for (const [open, close] of enclosingBlocks(source, at))
     if (declares(ownText(source.slice(open + 1, close)), name)) return AWAITED.test(source.slice(at, close));
   return false;
@@ -242,13 +246,24 @@ test('the checker accepts a promise kept in a variable and awaited later in its 
     '  const later = endTree(pid);',
     '  await later;',
     '}',
+    'function handed(pid, host) {',
+    '  const closing = endTree(pid);',
+    '  if (!host) return closing;',
+    '  return closing.catch(() => {});',
+    '}',
+    'function chained(pid) {',
+    '  const quiet = endTree(pid);',
+    '  quiet.catch(() => {});',
+    '}',
   ].join('\n');
   const file = 'scripts/x.mjs';
   // Line 8 is accepted (declared on line 5, awaited on line 12 in the same function); 19 is never awaited, 24 is
-  // awaited only in another function, 31 only has a property of it awaited.
+  // awaited only in another function, 31 only has a property of it awaited. Line 37 is returned (plainly and with a
+  // catch chained), so its caller settles it; 42 has a catch chained but is neither awaited nor returned.
   assert.deepEqual(unawaitedCalls(file, source, ['endTree']), [
     `${file}:19 endTree`,
     `${file}:24 endTree`,
     `${file}:31 endTree`,
+    `${file}:42 endTree`,
   ]);
 });

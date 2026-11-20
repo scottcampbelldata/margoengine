@@ -85,3 +85,44 @@ test('total one clusters read as weights, and an additive vertex keeps its unwei
   const moved = posed(glb, 0);
   assert.ok(moved.every((p) => p.every(Number.isFinite)));
 });
+
+test('two additive skins on one skeleton both keep their joint that stays in the scene (stand-in)', async () => {
+  const array = (name, values) => `${name}: *${values.length} {\n a: ${values.join(',')}\n}`,
+    move = (x) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1],
+    cluster = (n, name, transform, link) =>
+      `Deformer: ${n}, "SubDeformer::${name}", "Cluster" {\n  Mode: "Additive"\n  ${array('Indexes', [0, 1, 2])}\n  ${array('Weights', [0.25, 0.25, 0.25])}\n  ${array('Transform', transform)}\n  ${array('TransformLink', link)}\n }`;
+  // A second triangle bound to the same Root and Tip joints, with additive clusters of its own.
+  const extraModel = `Geometry: 101, "Geometry::Second", "Mesh" {
+  ${array('Vertices', [0, 0, 0, 1, 0, 0, 0, 1, 0])}
+  ${array('PolygonVertexIndex', [0, 1, -3])}
+ }
+ Model: 102, "Model::Second", "Mesh" {
+  Properties70: {
+   P: "Lcl Translation", "Vector3D", "Vector", "A", 2,0,0
+  }
+ }
+ Deformer: 110, "Deformer::SecondSkin", "Skin" {
+ }
+ ${cluster(111, 'SecondRoot', move(2), move(0))}
+ ${cluster(112, 'SecondTip', move(1), move(1))}`;
+  const extraConnections =
+    'C: "OO",101,102\n C: "OO",102,0\n C: "OO",110,101\n C: "OO",111,110\n C: "OO",112,110\n C: "OO",3,111\n C: "OO",4,112';
+  const text = rigFixture({ mode: 'Additive', morph: false, animation: false, extraModel, extraConnections }).replaceAll(
+      'a: 0.5,0.5,0.5',
+      'a: 0.25,0.25,0.25',
+    ),
+    { doc } = readGLB(await convertFBX(new TextEncoder().encode(text), { extensions }));
+  assert.equal(doc.skins.length, 2);
+  const reached = new Set(),
+    walk = (n) => {
+      reached.add(n);
+      for (const c of doc.nodes[n].children ?? []) walk(c);
+    };
+  for (const n of doc.scenes[doc.scene ?? 0].nodes) walk(n);
+  for (const skin of doc.skins) {
+    assert.equal(skin.joints.length, 3);
+    // glTF 2.0 3.7.3: every joint is a node of the scene, so the joint that stays must be reachable from a root.
+    for (const joint of skin.joints) assert.ok(reached.has(joint), `joint ${doc.nodes[joint].name} is not in the scene`);
+  }
+  assert.notEqual(doc.skins[0].joints[2], doc.skins[1].joints[2]);
+});

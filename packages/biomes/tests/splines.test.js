@@ -256,6 +256,47 @@ test('carving: no paths changes nothing; flatten levels the ground across a path
   }
 });
 
+test('level: a path levels the ground to its top, raising or lowering it, and sides slope across its edge (a sea wall)', async () => {
+  const plain = await BiomeWorld.create(base),
+    straight = { points: [[-250, 10], [250, 10]], width: 8, edge: 6 },
+    wall = await BiomeWorld.create({ ...base, height: carvePaths([{ ...straight, carve: { mode: 'level', top: 40 } }]) }),
+    pit = await BiomeWorld.create({ ...base, height: carvePaths([{ ...straight, carve: { mode: 'level', top: -5 } }]) });
+  const h = async (w, x, z) =>
+    (await w.tile(x >= 256 ? 1 : 0, z >= 256 ? 1 : 0)).layer('height').data[(z & 255) * 256 + (x & 255)];
+  for (const i of [20, 200, 300, 480]) {
+    for (let j = 262; j <= 270; j++) {
+      assert.equal(await h(wall, i, j), 40000, `crest at x cell ${i}, z cell ${j}`);
+      assert.equal(await h(pit, i, j), -5000, `floor at x cell ${i}, z cell ${j}`);
+    }
+    assert.equal(await h(wall, i, 100), await h(plain, i, 100), 'far from the wall the ground is the plain ground');
+    // The side blends from the crest to the ground across the edge, never past either.
+    for (const j of [271, 272, 273, 274, 275, 276]) {
+      const v = await h(wall, i, j),
+        g = await h(plain, i, j);
+      assert.ok(v >= Math.min(g, 40000) && v <= Math.max(g, 40000), `${i},${j}: ${v} between ${g} and the crest`);
+    }
+  }
+  assert.equal(wall.heightAt(1, 10), 40, 'heightAt stands on the crest');
+  // A top is for level paths only, and in range.
+  assert.throws(() => definePath({ ...straight, carve: { mode: 'flatten', top: 3 } }), RangeError);
+  assert.throws(() => definePath({ ...straight, carve: { mode: 'level', top: 1e5 } }), RangeError);
+  assert.equal(definePath({ ...straight, carve: { mode: 'level' } }).options.carve.top, 0, 'top defaults to sea level');
+  assert.equal('top' in definePath(straight).options.carve, false, 'a flatten path keeps its old settings bytes');
+});
+
+test('nested carves: a carve over a carved relief loads the relief entry by itself (a fresh worker builds it)', () => {
+  // A fresh process, as a worker replica is: nothing has loaded the relief entry before the world is made.
+  const script = `
+    import { BiomeWorld } from './dist/index.js';
+    import { carvePaths } from './dist/splines.js';
+    const lane = { points: [[-100, 0], [100, 0]], width: 6 };
+    const wall = { points: [[-100, 30], [100, 30]], width: 4, carve: { mode: 'level', top: 50 } };
+    const w = await BiomeWorld.create({ size: [512, 512], workers: false, height: carvePaths([wall], carvePaths([lane], { relief: { relief: 80 } })) });
+    console.log(w.heightAt(0, 30));`;
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
+  assert.equal(Number(out.trim()), 50);
+});
+
 test('seams: a carved height is a function of position, so tiles and any grid of it agree', async () => {
   const paths = [road, track],
     heights = heightsOf(carvePaths(paths), [-256000, -256000], [512000, 512000], 9, createRelief),

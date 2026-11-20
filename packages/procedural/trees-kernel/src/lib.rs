@@ -129,6 +129,7 @@ fn run(points: Vec<Point>, s: Settings, exhaustive: bool) -> Vec<f64> {
     }
     let mut nodes = vec![s.root];
     let mut parents = vec![-1];
+    let mut children: Vec<Vec<usize>> = vec![Vec::new()];
     let mut grid = BTreeMap::<Cell, Vec<usize>>::new();
     grid.entry(cell(s.root, s.influence)).or_default().push(0);
     let mut active = vec![true; points.len()];
@@ -170,10 +171,17 @@ fn run(points: Vec<Point>, s: Settings, exhaustive: bool) -> Vec<f64> {
             if length <= 1e-12 {
                 continue;
             }
-            let p = std::array::from_fn(|k| nodes[j][k] + s.segment * direction[k] / length);
+            let p: Point = std::array::from_fn(|k| nodes[j][k] + s.segment * direction[k] / length);
+            // The published rule regrows the same child while the points that pulled it stay nearer the parent
+            // (each lies less than D/2 along the growth direction); that child exists, so the node does not grow.
+            if children[j].iter().any(|&c| nodes[c] == p) {
+                continue;
+            }
             let index = nodes.len();
             nodes.push(p);
             parents.push(j as i32);
+            children[j].push(index);
+            children.push(Vec::new());
             grid.entry(cell(p, s.influence)).or_default().push(index);
             if nodes.len() == s.max_nodes {
                 break;
@@ -310,6 +318,12 @@ mod tests {
             a[4] = b[4];
             assert_eq!(a, b);
         }
+    }
+    #[test]
+    fn a_node_does_not_regrow_an_existing_child() {
+        let out = run(vec![[1.0, 0.05, 0.0], [-1.0, 0.05, 0.0]], settings(), false);
+        assert_eq!(out[1], 2.0);
+        assert_eq!(out[5], 2.0);
     }
     #[test]
     fn invalid_limits_and_nonfinite_values() {

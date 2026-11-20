@@ -48,6 +48,7 @@ interface BiomeDefinition {
     readonly priority?: number;
     readonly weight?: number;
     readonly zones?: readonly string[];
+    readonly openFuel?: string;
 }
 
 interface ClimateEnvelope {
@@ -131,6 +132,7 @@ interface SpeciesRule {
     readonly lod?: readonly [near: number, mid: number, far: number];
     readonly color?: ColorVariation;
     readonly tags?: readonly string[];
+    readonly fuel?: string;
 }
 
 interface StandRule {

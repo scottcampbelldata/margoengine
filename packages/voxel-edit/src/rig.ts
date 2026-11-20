@@ -235,7 +235,8 @@ export class VoxelRig {
     root.set(move, 12);
     for (const bone of this.bones) {
       const parent = bone.parent === undefined ? root : bones[this.#index.get(bone.parent) as number],
-        q = rotations[bone.name];
+        // Own keys only: a bone named 'constructor' or 'toString' is not turned by Object.prototype.
+        q = Object.hasOwn(rotations, bone.name) ? rotations[bone.name] : undefined;
       bones.push(
         q === undefined ? parent : multiply(parent, turnAbout(checkQuat(q, `VoxelRig pose ${bone.name}`), bone.joint)),
       );

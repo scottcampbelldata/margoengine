@@ -341,7 +341,11 @@ async function normalize(
         for (const tri of facets) emit([apex, ...tri], 10, c);
       }
     } else {
-      validateIds(cell.ids, points.length / 3);
+      // A polyvertex, polyline or strip may repeat a point (a closed loop, a strip's turn-around); only what each
+      // emits must be a proper cell, and at least one must remain.
+      const chain = cell.type === 2 || cell.type === 4 || cell.type === 6;
+      validateIds(chain ? [...new Set(cell.ids)] : cell.ids, points.length / 3);
+      const before = types.length;
       if (cell.type === 'lagrange' || cell.type === 'quadratic') {
         tessellateCell(
           cell,
@@ -354,17 +358,17 @@ async function normalize(
         for (const id of cell.ids) emit([id], 1, c);
       } else if (cell.type === 4) {
         if (cell.ids.length < 2) bad('polyline needs two vertices');
-        for (let i = 1; i < cell.ids.length; i++) emit([cell.ids[i - 1], cell.ids[i]], 3, c);
+        for (let i = 1; i < cell.ids.length; i++)
+          if (cell.ids[i - 1] !== cell.ids[i]) emit([cell.ids[i - 1], cell.ids[i]], 3, c);
       } else if (cell.type === 6) {
         if (cell.ids.length < 3) bad('strip needs three vertices');
-        for (let i = 2; i < cell.ids.length; i++)
-          emit(
-            i % 2 ? [cell.ids[i - 1], cell.ids[i - 2], cell.ids[i]] : [cell.ids[i - 2], cell.ids[i - 1], cell.ids[i]],
-            5,
-            c,
-          );
+        for (let i = 2; i < cell.ids.length; i++) {
+          const [a, b, d] = cell.ids.slice(i - 2, i + 1);
+          if (a !== b && b !== d && a !== d) emit(i % 2 ? [b, a, d] : [a, b, d], 5, c);
+        }
       } else if (cell.type === 7) for (const tri of triangles(cell.ids, points)) emit(tri, 5, c);
       else emit(cell.ids, cell.type, c);
+      if (chain && types.length === before) bad('polyline or strip needs two distinct points per segment or three per triangle');
     }
   }
   const pointData = pa[''] && Float64Array.from(pa['']),

@@ -15,6 +15,22 @@ export type DecodedTIFF = {
     data: Float32Array;
 };
 
+export interface TIFFCodecs {
+    lzma?: (bytes: Uint8Array, options: {
+        maxBytes: number;
+    }) => Uint8Array;
+    zstd?: (bytes: Uint8Array, options: {
+        maxOutputSize: number;
+    }) => Uint8Array;
+    webp?: (bytes: Uint8Array, options: {
+        maxPixels: number;
+    }) => {
+        width: number;
+        height: number;
+        data: Uint8Array;
+    };
+}
+
 export interface TIFFFile {
     readonly bigTIFF: boolean;
     readonly length: number;
@@ -24,6 +40,7 @@ export interface TIFFFile {
 
 export interface TIFFOptions {
     maxPixels?: number;
+    codecs?: TIFFCodecs;
 }
 
 export interface TIFFPage {
@@ -35,6 +52,7 @@ export interface TIFFPage {
     readonly samples: TIFFSamples;
     readonly description: string;
     readonly tags: ReadonlyMap<number, readonly number[]>;
+    readonly ascii: ReadonlyMap<number, string>;
 }
 
 export type TIFFSamples = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;

@@ -4,10 +4,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
+import { extendedMaterials } from '../../gltf/dist/extended.js';
 import {
   ColorBackground,
   ImageBackground,
@@ -25,7 +25,7 @@ import {
 
 const source = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').split('`')[1];
 const coreShader = source('../../core/src/shaders.ts'),
-  gltfShader = source('../../gltf-pro/src/shader.ts');
+  gltfShader = source('../../gltf/src/shader.ts');
 // Core shader as other packages leave it before order -1 (shadows -5, sky -6, clustered -3, tonemap/ssao/dof/post capture).
 const variants = {
   core: coreShader,
@@ -290,7 +290,7 @@ async function model(materials) {
   return { engine, model: loaded, harness, context: { ...harness.context, camera: engine.camera } };
 }
 
-test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in the real PBR shader, and removal restores it', async () => {
+test('glTF PBR models: applyTo lights and fogs opaque and blended primitives in the real PBR shader, and removal restores it', async () => {
   const {
     engine,
     model: loaded,
@@ -359,7 +359,7 @@ test('glTF-pro models: applyTo lights and fogs opaque and blended primitives in 
   }
 });
 
-test('glTF-pro models: the SSAO ambient replay returns the IBL term (margoAmbient) only while environment lighting is applied', async () => {
+test('glTF PBR models: the SSAO ambient replay returns the IBL term (margoAmbient) only while environment lighting is applied', async () => {
   const {
     engine,
     model: loaded,

@@ -72,5 +72,6 @@ for (const [version, { path, v8 }] of [...nodes].sort()) {
 if (!nodes.size) throw new Error('No Node executable found; set MARGO_NODES to the Node executables to test.');
 if (failed.length) {
   console.error(`Frame allocation over its limit on ${failed.join(', ')}.`);
-  process.exit(1);
+  // The exit code, then the event loop's end: process.exit can hold the exit for ever (KB-OWN-EXIT2).
+  process.exitCode = 1;
 }

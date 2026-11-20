@@ -263,10 +263,48 @@ test('many short steps inside one update all arrive: no elapsed time is dropped'
   assert.deepEqual(machine.state, { ...WEATHER_PRESETS.snow });
 });
 
-test('a listener cannot change the weather it is called from', () => {
+// The refused call used to replace the running transition before it threw: the weather then went to the listener's
+// rain, not the caller's snow. A listener's transitionTo, schedule, randomWalk and update now throw before any change.
+test('a listener cannot change the weather it is called from, and its refused call changes nothing', () => {
   const machine = new WeatherMachine('clear');
-  machine.on(() => machine.transitionTo('rain'));
-  assert.throws(() => machine.transitionTo('snow'), { name: 'MargoError', code: 'state' });
+  for (const call of [
+    () => machine.transitionTo('rain'),
+    () => machine.schedule([{ to: 'rain' }]),
+    () => machine.randomWalk('rain'),
+    () => machine.update(1),
+  ]) {
+    const off = machine.on(call),
+      before = machine.time;
+    assert.throws(() => machine.transitionTo('snow', { seconds: 10 }), { name: 'MargoError', code: 'state' });
+    off();
+    assert.equal(machine.time, before, 'the listener did not step the weather');
+    machine.update(10);
+    assert.deepEqual(machine.state, { ...WEATHER_PRESETS.snow });
+    machine.set('clear');
+  }
+});
+
+// A step's ease was checked only when the schedule reached it, so a bad ease in a later step threw from update and a
+// bad first ease left the machine holding a schedule with no transition. Every step's ease is now checked up front.
+test("schedule checks every step's ease before it starts", () => {
+  const machine = new WeatherMachine('clear');
+  machine.transitionTo('fog', { seconds: 10 });
+  assert.throws(() => machine.schedule([{ to: 'rain' }, { to: 'snow', ease: 'cubic' }]), TypeError);
+  assert.throws(() => machine.schedule([{ to: 'rain', ease: 'cubic' }]), TypeError);
+  machine.update(10);
+  assert.deepEqual(machine.state, { ...WEATHER_PRESETS.fog }, 'the running transition went on');
+});
+
+// randomWalk checked its seed after stopping the running schedule, so a refused walk left the schedule stopped.
+test('a randomWalk refused for its seed leaves a running schedule going', () => {
+  const machine = new WeatherMachine('clear');
+  machine.schedule([
+    { to: 'rain', seconds: 1, hold: 1 },
+    { to: 'snow', seconds: 1, hold: 1 },
+  ]);
+  assert.throws(() => machine.randomWalk('clear', { seed: Number.NaN }), RangeError);
+  machine.update(10);
+  assert.deepEqual(machine.state, { ...WEATHER_PRESETS.snow });
 });
 
 test('random walk follows the chain, is deterministic for a seed, and different for another', () => {
@@ -288,6 +326,22 @@ test('random walk follows the chain, is deterministic for a seed, and different 
   for (let i = 1; i < a.length; i++)
     assert.ok(a[i] in TEMPERATE[a[i - 1]], `${a[i - 1]} -> ${a[i]} is not in the chain`);
   assert.ok(new Set(a).size >= 6, 'it visits a variety of weather');
+});
+
+// The walk took `seed | 0`, so the seeds -1 and 4294967295 (both in its range) walked the same weather, and 1.5 walked
+// as 1. The walk's state is now a hash of the seed's whole value.
+test('random walk seeds that differ walk differently: -1 is not 4294967295, 1.5 is not 1', () => {
+  const run = (seed) => {
+    const machine = new WeatherMachine('clear'),
+      path = [];
+    machine.on((e) => e.type === 'arrive' && path.push(e.preset));
+    machine.randomWalk('clear', { seed, hold: [10, 30], blend: [5, 10] });
+    machine.update(20000);
+    return path;
+  };
+  assert.notDeepEqual(run(-1), run(4294967295));
+  assert.notDeepEqual(run(1.5), run(1));
+  assert.deepEqual(run(-0), run(0), 'zero is one seed');
 });
 
 test('a walk that reaches a preset with no way out stops there', () => {
@@ -526,6 +580,8 @@ test('skyWeather maps a state to the sky Weather settings', () => {
   assert.equal(rain.precipitation, 'rain');
   assert.equal(rain.intensity, WEATHER_PRESETS.rain.rain);
   assert.equal(rain.fadeSeconds, 0);
+  near(rain.rainRate, 80 * WEATHER_PRESETS.rain.rain ** 3);
+  assert.equal(skyWeather(WEATHER_PRESETS.clear).rainRate, 0);
   assert.equal(rain.lightning, undefined);
   near(Math.hypot(...rain.wind), WEATHER_PRESETS.rain.wind);
   const storm = skyWeather(WEATHER_PRESETS.thunderstorm);

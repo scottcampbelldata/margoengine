@@ -127,6 +127,31 @@ export const BUNDLED = [
     notices: ['NOTICE.md'],
   },
   {
+    package: '@margoengine/sky',
+    component:
+      "Mars magnitude correction tables (Mallama 2007, Icarus 192; Mallama and Hilton 2018, Eq. 6), recovered from JPL Horizons' Mars magnitudes",
+    licence:
+      'public-domain facts: JPL Horizons output is United States government work, and the tables were fitted by least squares from 18,786 Horizons magnitudes, not copied; no notice is required',
+    files: 'dist/astro.js (src/astro.ts: 72 numbers, thousandths of a magnitude)',
+    source:
+      'https://ssd.jpl.nasa.gov/api/horizons.api observer tables for Mars (COMMAND 499, CENTER 500@399, QUANTITIES 9,14,15,19,20,24,44), 1985 to 2045; derivation and residuals in docs/limits.md',
+    modified:
+      'derived: least-squares fit, every entry within 0.00004 of a thousandth; checked against the eight values Mallama 2017 (arXiv:1609.05048) prints; origin stated in src/astro.ts',
+    notices: [],
+  },
+  {
+    package: '@margoengine/ifc',
+    component:
+      'IFC class inheritance (entity names and their SUBTYPE OF parents under IfcObjectDefinition) and the enumeration types of the predefined property sets\' attributes, of IFC4 ADD2 TC1 and IFC4X3 ADD2, from the buildingSMART International EXPRESS schemas',
+    licence:
+      'buildingSMART technical documentation terms (the IFC4 and IFC4X3 files may be used in software development or translated into another computer language with full attribution); nothing is derived from the IFC2X3 TC1 file, which reserves all rights',
+    files: 'dist/query.js (src/schema-tree.ts: class names and parents only) and the readIFCData chunk (src/predefined-enums.ts: attribute and enumeration names only); no definitions, rules or text',
+    source:
+      'https://github.com/buildingSMART/Standards-builds IFC/RELEASE/IFC4/ADD2_TC1/EXPRESS/IFC4.exp, IFC/RELEASE/IFC4_3/HTML/IFC4X3_ADD2.exp',
+    modified: 'derived: packages/ifc/scripts/schema-tree.mjs extracts each SUBTYPE OF link and each enumerated attribute of an IfcPreDefinedPropertySet subtype; the EXPRESS files are not shipped',
+    notices: ['NOTICE.md'],
+  },
+  {
     package: '@margoengine/physics',
     component: 'Rapier 3D rigid-body solver (Dimforge)',
     licence: 'Apache-2.0',
@@ -150,6 +175,14 @@ export const BUNDLED = [
 
 /** Credits for the assets the site, demos and examples use. None of these files is in an npm tarball. */
 const ASSETS = [
+  [
+    'packages/ifc/tests/fixtures/bcf/NOTICE.md',
+    'buildingSMART BCF-XML test cases for the ifc /bcf tests: ten .bcf archives (BCF 3.0 and 2.1 visualization and markup cases) and the Architectural.ifc they were made on, from https://github.com/buildingSMART/BCF-XML (release_3_0, Test Cases), (c) buildingSMART International Ltd., CC BY-ND 4.0, redistributed verbatim (renamed only) with the SHA-256 of each file in NOTICE.md, checked by packages/ifc/tests/fixtures-verbatim.test.js. Standard test data only, no BCF source code read or copied; never shipped.',
+  ],
+  [
+    'packages/ifc/tests/fixtures/ids/NOTICE.md',
+    'buildingSMART IDS 1.0 test cases for the ifc /ids tests: the 334 .ids and .ifc pairs (attribute, classification, entity, ids, material, partOf, property, restriction and tolerance) from https://github.com/buildingSMART/IDS (development, Documentation/ImplementersDocumentation/TestCases), (c) buildingSMART International Ltd., CC BY-ND 4.0, redistributed verbatim (same names and folders) with the SHA-256 of each file in NOTICE.md, checked by packages/ifc/tests/fixtures-verbatim.test.js. Standard test data only, no IDS checker source code read or copied; never shipped.',
+  ],
   [
     'packages/loaders/tests/fixtures/materialx-examples/NOTICE.md',
     'MaterialX example materials for the loaders toGraph test (KB3108): the 26 .mtlx files of resources/Materials/Examples of the MaterialX project at tag v1.39.5 (Academy Software Foundation, Copyright Contributors to the MaterialX Project), https://github.com/AcademySoftwareFoundation/MaterialX/tree/v1.39.5/resources/Materials/Examples, unmodified; Apache-2.0, licence text beside them in LICENSE.txt; Git blob and SHA-256 of each file in NOTICE.md. Standard sample data only, no MaterialX source read or copied; never shipped.',
@@ -191,8 +224,8 @@ const ASSETS = [
     'Batch 267 redistributes a 3.9 MB subset of standard CC0 asset-proof data only in packages/mcp/tests/fixtures; test data is excluded by the package files whitelist. packages/mcp/tests/assets-prepare.mjs obtains standard glTF Sample Assets metadata, Triangle.gltf/Triangle.bin (Marco Hutter, 2017, CC0-1.0), Poly Haven WoodenTable_02, venice_sunset, aerial_rocks_04 (CC0-1.0, https://polyhaven.com/license), and an ambientCG bricks material (CC0-1.0, https://docs.ambientcg.com/license/). Original URLs, authors, licence URLs and original download inventories are recorded in packages/mcp/tests/fixtures/index.json; each distributed file has its byte count and SHA-256. Optional network refresh records the complete downloads under ignored test-results/mcp-assets-proof. No external implementation code is included. ## NASA TMR flat-plate solution data (batch 172 pipeline demo)',
   ],
   [
-    'examples/orrery/reference/horizons.json',
-    'Orrery accuracy reference: JPL Horizons state vectors (ephemeris DE441) of the eight planets (heliocentric) and the Moon (geocentric) in the ecliptic and equinox of J2000 at 51 dates from 1800 to 2050, retrieved 2026-11-13 from the Horizons API (https://ssd.jpl.nasa.gov/horizons/) by examples/orrery/reference/fetch-horizons.mjs, which records the query. US Federal Government public-domain data, numbers only, unmodified; used by tests/orrery-ephemeris.test.js to measure the demo, no endorsement. No implementation copied.',
+    'packages/sky/test/fixtures/horizons/horizons.json',
+    'Orrery accuracy reference: JPL Horizons state vectors (ephemeris DE441) of the eight planets (heliocentric) and the Moon (geocentric) in the ecliptic and equinox of J2000 at 51 dates from 1800 to 2050, retrieved 2026-11-13 from the Horizons API (https://ssd.jpl.nasa.gov/horizons/) by packages/sky/test/fixtures/horizons/fetch-horizons.mjs, which records the query. US Federal Government public-domain data, numbers only, unmodified; used by packages/sky/test/ephemeris.test.js to measure @margoengine/sky/ephemeris, no endorsement. No implementation copied.',
   ],
   [
     'examples/assets/sciviz/tmr-tet.json',
@@ -209,6 +242,10 @@ const ASSETS = [
   [
     'examples/assets/sciviz/pipeline/source.json',
     'File: examples/assets/sciviz/pipeline/cf-plate.dat. NASA Turbulence Modeling Resource, SA flat plate, CFL3D and FUN3D surface skin-friction solutions. Source: https://tmbwg.github.io/turbmodels/FlatPlate/SA/cf_plate.dat ; description https://tmbwg.github.io/turbmodels/flatplate_sa.html . US government public-domain data under NASA media usage guidance, https://www.nasa.gov/nasa-brand-center/images-and-media/ . Original bytes retained; source.json records SHA-256 and zone counts. Demo selects the 447 FUN3D samples. No NASA endorsement is implied.',
+  ],
+  [
+    'packages/sprites/tests/fixtures/dragonbones/SOURCE.txt',
+    'DragonBones sample exports (Dragon, mecha_1406, mecha_1502b, you_xin body, bounding_box_tester `_ske.json` and `_tex.json`) from the DragonBonesJS demo resources, commit 64b6c69ae35777c2404be68c9192e2c56906079e, https://github.com/DragonBones/DragonBonesJS/tree/64b6c69ae35777c2404be68c9192e2c56906079e/Egret/Demos/resource , downloaded unchanged 2026-11-15. MIT, Copyright (c) 2012-2025 The DragonBones team and other contributors; full text in LICENSE beside the fixtures, SHA-256 of each file in SOURCE.txt. JSON test data only under the AGENTS.md standard-file exception: no texture images, runtime or editor code are included or were read. DragonBones is a project of the DragonBones team; no affiliation or endorsement.',
   ],
   [
     'packages/sprites/tests/fixtures/trees/SOURCE.txt',
@@ -397,7 +434,7 @@ const ASSETS = [
     'test fixtures: WebP files from two CC0 images on Wikimedia Commons, made with libwebp 1.4.0 tools, and 50 BC blocks from the DDS test images of Pillow (HPND)',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/bump/NOTICE.md',
+    'packages/gltf/test/fixtures/bump/NOTICE.md',
     'test fixture: BumpMaterial.gltf, the EXT_materials_bump interoperability file from luma.gl (CC0-1.0, vis.gl contributors)',
   ],
   [
@@ -405,19 +442,19 @@ const ASSETS = [
     'test fixtures: Franka Emika Panda description from Gepetto example-robot-data, commit 6249cab1 (Apache-2.0)',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/uv/NOTICE.md',
+    'packages/gltf/test/fixtures/uv/NOTICE.md',
     'test fixture: FourUV.glb, exported for this project by Blender 5.3 from fixtures/uv/four-uv.blender.py (Apache-2.0, as this repository)',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/metadata/NOTICE.md',
+    'packages/gltf/test/fixtures/metadata/NOTICE.md',
     'test fixtures: XmpMetadataRoundedCube.glb of Khronos glTF-Sample-Assets, commit 8f492390 (CC-BY-4.0, Adam Morris); Box.gltf, Box0.bin and the language edge cases of https://github.com/KhronosGroup/glTF-Metadata-CLI, commit e35dbb00 (CC-BY-4.0, The Khronos Group); boom_box.gltf (CC0-1.0, The Khronos Group) and rocket_ship.gltf (CC-BY-3.0, Poly by Google and aaronfranke) of https://github.com/omigroup/gltf-extensions, commit 4f1fe73b, exported by the Godot Engine',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/scatter/NOTICE.md',
+    'packages/gltf/test/fixtures/scatter/NOTICE.md',
     'test fixture: ScatteringSkull.gltf and its external geometry and thickness map, Khronos glTF-Sample-Assets commit 8f492390 (CC0-1.0, Vladimir Petkovic and Adobe Inc.); required hashes in scripts/support/external-test-assets.json',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/streaming/NOTICE.md',
+    'packages/gltf/test/fixtures/streaming/NOTICE.md',
     'test fixture: the FlightHelmet glTF-KTX-BasisU texture and all 17 external model inputs, Khronos glTF-Sample-Assets commit 8f492390 (CC0-1.0, Gary Hsu and Microsoft); required hashes in scripts/support/external-test-assets.json',
   ],
   [
@@ -429,7 +466,7 @@ const ASSETS = [
     'test fixture: TypeB-AsymmetricNarrow.ies, a GE Lighting Solutions Evolve LED Flood report, as Type B - 03.ies of https://github.com/lfaynshteyn/ies_rescale, commit bf2e6a6a (MIT, Lev Faynshteyn)',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/interactivity/NOTICE.md',
+    'packages/gltf/test/fixtures/interactivity/NOTICE.md',
     'test fixtures: conformance files of https://github.com/KhronosGroup/glTF-Test-Assets-Interactivity, commit f99d9b6 (CC-BY-4.0, The Khronos Group)',
   ],
   [
@@ -437,15 +474,15 @@ const ASSETS = [
     'test fixture: one PNG of https://github.com/googlefonts/noto-emoji, commit 99701e0 (Apache-2.0, Google)',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/physics/NOTICE.md',
+    'packages/gltf/test/fixtures/physics/NOTICE.md',
     'test fixtures: the KHR_physics_rigid_bodies sample files of https://github.com/visgl/luma.gl/tree/master/examples/gltf/physics/assets (MIT, vis.gl contributors); seven more samples of https://github.com/eoineoineoin/glTF_Physics state no licence, so they are named there and never stored here',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/lights/NOTICE.md',
+    'packages/gltf/test/fixtures/lights/NOTICE.md',
     'test fixtures: the EXT_lights_ies Example files and LightProfile.ies from https://github.com/BabylonJS/Assets/tree/master/meshes/EXT_lights_ies (CC-BY-4.0, The Babylon.js contributors); external EnvironmentTest glTF-IBL and its three companions, Khronos glTF-Sample-Assets commit 8f492390 (Adobe Stock License, Adobe Dimension sample; external test only), required hashes in scripts/support/external-test-assets.json',
   ],
   [
-    'packages/gltf-pro/tests/fixtures/splats/NOTICE.md',
+    'packages/gltf/test/fixtures/splats/NOTICE.md',
     'test fixtures: CesiumJS sh_unit_cube.glb (Apache-2.0, Cesium GS, Inc.) and the godot-gsplat minimal_point sample from luma.gl (MIT, KOGA Mitsuhiro)',
   ],
   [
@@ -454,7 +491,7 @@ const ASSETS = [
   ],
   [
     'packages/loaders/tests/fixtures/SOURCES.txt',
-    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl at 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d; Stanford bunny scan); PyVista data fran_cut.vtk and polyEx.vtk (Apache-2.0, at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3); fetch-fixtures.js pins source hashes. OFF parser comparisons: John Burkardt Geomview box.off and MC-authored mctri.off, GNU LGPL (off.html explicitly covers data; upstream version unspecified), hashes pinned by fetch-fixtures.js; licence texts in fixtures/OFF-LGPL-3.0.txt and OFF-GPL-3.0.txt. Legacy decimated-knight.off remains only for held physics and the existing workload, libigl/Cosmic Blobs attribution but no verified licence, not re-fetched. OpenVDB website sphere.vdb at 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0 (repository LICENSE.txt), source and pinned digest in SOURCES.txt',
+    'test fixtures: Point Cloud Library test/bunny.pcd (BSD-3-Clause, github.com/PointCloudLibrary/pcl at 3aac7b68cc8f26428ba9c9192d990c0c21cc5a7d; Stanford bunny scan); PyVista data fran_cut.vtk and polyEx.vtk (Apache-2.0, at 5a3de12d34c24aa5dd5e5db1cbc2defebc0d4da3); fetch-fixtures.js pins source hashes. OFF parser comparisons: John Burkardt Geomview box.off and MC-authored mctri.off, GNU LGPL (off.html explicitly covers data; upstream version unspecified), hashes pinned by fetch-fixtures.js; licence texts in fixtures/OFF-LGPL-3.0.txt and OFF-GPL-3.0.txt. Legacy decimated-knight.off remains only for held physics and the existing workload, libigl/Cosmic Blobs attribution but no verified licence, not re-fetched. OpenVDB website sphere.vdb at 3d8fd4d3f2d670464f4390e2775cfc87274233dc, CC-BY-4.0 (repository LICENSE.txt), source and pinned digest in SOURCES.txt. CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu, free for all uses, redistribution allowed, funded by NSF EIA-0196217): subject 35 skeleton and walk 35_01 trimmed to a few KB in cmu/, source hashes in SOURCES.txt',
   ],
   [
     'packages/points/tests/fixtures/NOTICE.md',
@@ -473,7 +510,7 @@ const ASSETS = [
     'test fixtures: Khronos CarConcept textures Dot_C.ktx2 and Rib_N.ktx2 (CC BY 4.0, Darmstadt Graphics Group, Eric Chadwick)',
   ],
   [
-    'packages/staging/test/fixtures/NOTICE.md',
+    'packages/studio/test/fixtures/NOTICE.md',
     'Small Empty Room 1 photographic HDR by Sergej Majboroda, Poly Haven, CC0-1.0; unmodified 1K Radiance test image, source and SHA-256 in the notice',
   ],
   [
@@ -505,8 +542,16 @@ const ASSETS = [
     'test fixtures: 798 METAR and SPECI reports of 50 aerodromes, the 12 hours before 2026-11-07 17:15 UTC, byte for byte from the NOAA Aviation Weather Center data service https://aviationweather.gov/api/data/metar (metar.txt 30,720 bytes, SHA-256 2ab25e4c497e3dec530ab26135ca3fe762ce0b0dae7f36f5db0bc69a5a6fdf79; metar2.txt 30,134 bytes, SHA-256 177e105cf7947f97ea84d344700b1956211f5683aee8da5a66c186b99e59c43d; downloaded 2026-11-07); a United States Government work, public domain in the United States; the observations of the issuing national weather services, exchanged under WMO Resolution 40',
   ],
   [
+    'examples/assets/blender-library/kitty-hawk/flyer-1903/LABEL.md',
+    'Kitty Hawk film, 1903 Wright Flyer: build_flyer.py reads CC0 4K texture sets that are never committed and live only in the asset library beside the checkout, with the built model: Poly Haven White Maple Veneer (https://polyhaven.com/a/white_maple_veneer), Ash Veneer (https://polyhaven.com/a/ash_veneer) and Terlenka (https://polyhaven.com/a/terlenka), CC0 1.0 (https://polyhaven.com/license); ambientCG Metal050C, Metal052C and Metal038 (https://ambientcg.com/a/Metal050C and the same path for the others), CC0 1.0 (https://docs.ambientcg.com/license/). The label names the maps each became. The model is Margo-made in Blender by script, from Smithsonian, Library of Congress and National Park Service descriptions and photographs cited in the label',
+  ],
+  [
+    'examples/assets/blender-library/kitty-hawk/camp/LABEL.md',
+    'Kitty Hawk film, the Wright camp (1903 hangar, 1901 shed, launching rail, props): build_camp.py reads CC0 4K texture sets that are never committed and live only in the asset library beside the checkout, with the built models: Poly Haven Hinoki Planks (https://polyhaven.com/a/hinoki_planks), Wood Planks Grey (https://polyhaven.com/a/wood_planks_grey) and Bitumen (https://polyhaven.com/a/bitumen), CC0 1.0 (https://polyhaven.com/license). The models are Margo-made in Blender by script, from National Park Service, Library of Congress and published diary descriptions and photographs cited in the label',
+  ],
+  [
     'scripts/reference-rendering/NOTICE.md',
-    'batch 160 outside reference data, never shipped: Khronos MetalRoughSpheresNoTextures (CC0-1.0, Krill Gavrilov, 2019) and the IORTestGrid determinism fixture (CC0-1.0, Eric Chadwick, 2023), pinned source/scene/picture hashes and hosted Sample Viewer PNG provenance; original assets, legal notices and pictures stay in engine-bench/batch-160. Also records outside standard assets for the existing gltf-pro GPU checks',
+    'batch 160 outside reference data, never shipped: Khronos MetalRoughSpheresNoTextures (CC0-1.0, Krill Gavrilov, 2019) and the IORTestGrid determinism fixture (CC0-1.0, Eric Chadwick, 2023), pinned source/scene/picture hashes and hosted Sample Viewer PNG provenance; original assets, legal notices and pictures stay in engine-bench/batch-160. Also records outside standard assets for the existing gltf/pbr GPU checks',
   ],
 ];
 
@@ -771,10 +816,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (process.argv.includes('--check')) {
     if (current !== text) record.problems.push(`${OUTPUT} is stale: run node scripts/supply-chain.mjs`);
     for (const p of record.problems) console.error(`supply-chain: ${p}`);
-    process.exit(record.problems.length ? 1 : 0);
+  } else {
+    writeFileSync(join(root, OUTPUT), text);
+    for (const p of record.problems) console.error(`supply-chain: ${p}`);
+    console.log(`${OUTPUT}: ${record.rows.length} packages, ${record.deps.length} runtime npm dependencies`);
   }
-  writeFileSync(join(root, OUTPUT), text);
-  for (const p of record.problems) console.error(`supply-chain: ${p}`);
-  console.log(`${OUTPUT}: ${record.rows.length} packages, ${record.deps.length} runtime npm dependencies`);
-  process.exit(record.problems.length ? 1 : 0);
+  process.exitCode = record.problems.length ? 1 : 0;
 }

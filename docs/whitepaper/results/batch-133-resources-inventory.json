@@ -188204,7 +188204,7 @@
         "name": "resource-browser",
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Actual rendering, uploads and texture readback",
@@ -188226,7 +188226,7 @@
         "name": "resource-node-gltf",
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Actual rendering, uploads and texture readback",
@@ -188248,7 +188248,7 @@
         "name": "resource-gltf-browser",
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Actual rendering, uploads and texture readback",
@@ -188270,7 +188270,7 @@
         "name": "resource-gltf-pro-gpu",
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Actual rendering, uploads and texture readback",
@@ -188292,7 +188292,7 @@
         "name": "resource-readmes",
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Actual rendering, uploads and texture readback",
@@ -188315,7 +188315,7 @@
         "name": "resource-readmes-after-build",
         "command": "node",
         "args": [
-          "scripts/gpu-lock.mjs",
+          "the command runner",
           "run",
           "--owner=codex-133",
           "--gpu=Actual rendering, uploads and texture readback",

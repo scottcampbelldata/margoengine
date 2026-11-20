@@ -3,7 +3,7 @@
 // with `animatorGLB`.
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../packages/gltf/dist/pbr.js';
 import { Animation } from '../../packages/animation/dist/index.js';
 import { Animator } from '../../packages/animator/dist/index.js';
 

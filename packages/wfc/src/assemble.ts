@@ -2,7 +2,7 @@ import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type Mesh } from '@margoengine/core/extension';
 import { Quaternion } from '@margoengine/math';
 
-/** A loaded glTF model, structurally compatible with gltf and gltf-pro models. Resources stay caller-owned. */
+/** A loaded glTF model, structurally compatible with gltf and gltf/pbr models. Resources stay caller-owned. */
 export interface TileModel {
   root: MeshHandle;
   meshes: readonly MeshHandle[];
@@ -139,7 +139,10 @@ export function assembleWFC(
         clones.set(node, copy);
         copy.name = node.name;
         copy.setPosition([node.position.x, node.position.y, node.position.z]);
-        copy.setRotation([node.rotation.x, node.rotation.y, node.rotation.z]);
+        // The stored quaternion, not the Float32 Euler lanes: those round-trip near pitch 90 degrees with error. Read
+        // the store each time: creating meshes may grow it.
+        const q = engine.store.transforms;
+        copy.setQuaternion([q.qx[node.id], q.qy[node.id], q.qz[node.id], q.qw[node.id]]);
         copy.setScale([node.scale.x, node.scale.y, node.scale.z]);
         copy.setGeometry(node.geometry).setMaterial(node.material);
         copy.visible = node.visible;

@@ -210,6 +210,8 @@ export async function render({ model, el, signal, load, prepareBackend }: Notebo
   signal?.addEventListener('abort', dispose, { once: true });
   try {
     await update();
+    // An abort during the first load disposed the view; the caller sees the abort, as for any cancelled load.
+    signal?.throwIfAborted();
     return dispose;
   } catch (error) {
     dispose();

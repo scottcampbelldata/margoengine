@@ -32,12 +32,25 @@ export interface RiverWaterSource {
     readonly lakes?: LakeLevels;
 }
 
+export interface RiverbedPaint {
+    readonly fill: (x: number, z: number) => number | undefined;
+    readonly origin: readonly [number, number];
+    readonly texel: number;
+    readonly width: number;
+    readonly depth: number;
+    readonly heightAt: (x: number, z: number) => number;
+    readonly weights: readonly Uint8Array[];
+    readonly index: number;
+}
+
 export interface ViewWaterChoice {
     readonly rivers?: 'auto' | 'hydrology' | readonly Int32Array[];
     readonly lakes?: 'auto' | false;
 }
 
 export function lakeLevels(h: LakeHydrology): LakeLevels;
+
+export function paintRiverbed(paint: RiverbedPaint): void;
 
 export function riverSources(lines: readonly Int32Array[], heightAt: (x: number, z: number) => number, discharge: number, radius: number): {
     position: [number, number];

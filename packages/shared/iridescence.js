@@ -3,7 +3,7 @@
 // at most 0.9999, keeps a white metal finite). Airy sum: constant term plus Fourier orders 1 and 2, each weighted by
 // margoFilmSpectrum, the closed-form Fourier transform of the spec's Gaussian CIE fits (amplitudes a sqrt(2 pi var) /
 // 1.0685e-7 precomputed) in linear Rec. 709. Total internal reflection in the film reflects everything.
-/** WGSL module-scope text declaring gltf-pro's thin-film Fresnel for extended materials. */
+/** WGSL module-scope text declaring gltf/pbr's thin-film Fresnel for extended materials. */
 export const iridescenceWgsl = /* wgsl */ `fn margoFilmSpectrum(opd:f32,shift:vec3f)->vec3f {
   let k=6.28318531e-9*opd;
   var xyz=vec3f(0.84659,1.0002219,1.0011225)*cos(vec3f(1.6810e6,1.7953e6,2.2084e6)*k+shift)*exp(-k*k*vec3f(4.3278e9,9.3046e9,6.6121e9));

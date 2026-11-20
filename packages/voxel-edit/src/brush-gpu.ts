@@ -3,7 +3,7 @@
 // a grid held in GPU buffers that brushes run on pass after pass. Used by ./shaders and ./gpu.
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from '@margoengine/math';
-import type { VoxelGrid } from './grid.js';
+import { checkCell, checkGrid, type VoxelGrid } from './grid.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -57,7 +57,10 @@ fn face_offset(d: i32) -> vec3<i32> {
     default: { return vec3<i32>(0, 0, 1); }
   }
 }
-fn param(i: u32) -> f32 { return info.params[min(i, 15u) >> 2u][i & 3u]; }
+fn param(i: u32) -> f32 {
+  let j = min(i, 15u);
+  return info.params[j >> 2u][j & 3u];
+}
 fn pass_number() -> u32 { return info.pass_index; }
 fn hash_u32(x: u32) -> u32 {
   var h = x * 747796405u + 2891336453u;
@@ -172,6 +175,53 @@ export interface PassInputs {
   toolOffset: Vec3;
   /** 256 entries or null. */
   table: ArrayLike<number> | null;
+}
+
+/** What a brush run may pass besides the grid, before {@link brushInputs} checks it. */
+export interface BrushRunInputs {
+  selection?: ArrayLike<number>;
+  passes?: number;
+  params?: readonly number[];
+  seed?: number;
+  tool?: VoxelGrid;
+  toolOffset?: Vec3;
+  table?: ArrayLike<number>;
+}
+
+/**
+ * Checks a brush run's options for a grid of `count` cells (`toolLimit` cells at most in the tool) and packs them.
+ * ShaderBrush.run and GpuGrid.brush share it, so both refuse the same inputs.
+ */
+export function brushInputs(options: BrushRunInputs, count: number, toolLimit: number, subject: string): PassInputs {
+  const { selection, passes = 1, params = [], seed = 0, tool, toolOffset = [0, 0, 0], table } = options;
+  if (!Number.isInteger(passes) || passes < 1 || passes > 1024)
+    throw new RangeError(`${subject} passes is ${passes}; pass a whole number from 1 to 1024`);
+  if (!Array.isArray(params) || params.length > 16 || !params.every((v) => typeof v === 'number' && Number.isFinite(v)))
+    throw new TypeError(`${subject} params must be up to 16 finite numbers; pass an array such as [0.1, 0.5, 3]`);
+  if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
+    throw new RangeError(`${subject} seed is ${seed}; pass a whole number from 0 to 4294967295`);
+  if (tool !== undefined) checkGrid(tool, toolLimit, `${subject} tool`);
+  checkCell(toolOffset, `${subject} toolOffset`);
+  if (table !== undefined) {
+    if (typeof table?.length !== 'number' || table.length !== 256)
+      throw new TypeError(`${subject} table must hold 256 numbers; pass a Uint8Array(256)`);
+    for (let i = 0; i < 256; i++)
+      if (!Number.isInteger(table[i]) || table[i] < 0 || table[i] > 255)
+        throw new RangeError(`${subject} table[${i}] is ${table[i]}; pass whole numbers 0 to 255`);
+  }
+  let mask: Uint8Array | null = null;
+  if (selection !== undefined) {
+    if (typeof selection?.length !== 'number')
+      throw new TypeError(`${subject} selection must be cell indexes; pass a Float64Array`);
+    mask = new Uint8Array(Math.ceil(count / 4) * 4);
+    for (let i = 0; i < selection.length; i++) {
+      const c = selection[i];
+      if (!Number.isInteger(c) || c < 0 || c >= count)
+        throw new RangeError(`${subject} selection holds ${c}, not a cell index of this grid; pass 0 to ${count - 1}`);
+      mask[c] = 1;
+    }
+  }
+  return { passes, params, seed, mask, tool: tool ?? null, toolOffset, table: table ?? null };
 }
 
 /** Bytes a grid of `count` cells takes on the GPU, refused past the device's binding limit. */

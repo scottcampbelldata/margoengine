@@ -2,6 +2,12 @@
 // Screen-space contact shadows, an HDR PostStack stage: a short ray march on scene depth from each pixel toward the
 // light, in the manner of screen-space ray tracing (McGuire & Mara 2014). Catches the small contact gaps a shadow map's
 // texels miss. Start offset from interleaved gradient noise (Jimenez 2014).
+// A depth texel holds one depth for a whole pixel (the nearest of its MSAA samples on WebGPU, a single sample on the
+// WebGL2 layer), so a lit slope's own depth texels sit up to about a pixel's depth change in front of the ray that
+// starts on it. A hit therefore needs the ray behind the depth by more than one and a half pixel spans of depth, read
+// from the start pixel's flatter neighbour on each axis: the slope-scaled bias of shadow mapping (Williams 1978; Dou
+// et al. 2014, "Adaptive Depth Bias for Shadow Maps") applied to the screen-space depth. Without it every lit slope
+// showed dithered acne, and different acne on each backend.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
@@ -37,6 +43,9 @@ struct U {view:mat4x4f,inverse:mat4x4f,light:vec4f,march:vec4f}
  let p=vec2i(at.xy);let size=vec2f(textureDimensions(depth));let now=textureLoad(scene,p,0);
  let d=textureLoad(depth,p,0);var lit=1.0;
  if(d>0&&u.march.z>0){
+  let last=vec2i(size)-1;
+  let span=min(abs(d-textureLoad(depth,max(p-vec2i(1,0),vec2i(0)),0)),abs(textureLoad(depth,min(p+vec2i(1,0),last),0)-d))
+   +min(abs(d-textureLoad(depth,max(p-vec2i(0,1),vec2i(0)),0)),abs(textureLoad(depth,min(p+vec2i(0,1),last),0)-d));
   let start=u.inverse*vec4f(at.xy/size*vec2f(2,-2)+vec2f(-1,1),d,1);let world=start.xyz/start.w;
   let step=u.light.xyz*u.march.x/u.march.w;
   let shift=fract(52.9829189*fract(dot(at.xy,vec2f(0.06711056,0.00583715))));
@@ -47,7 +56,7 @@ struct U {view:mat4x4f,inverse:mat4x4f,light:vec4f,march:vec4f}
    let ndc=clip.xyz/clip.w;let uv=ndc.xy*vec2f(0.5,-0.5)+0.5;
    if(any(uv<vec2f(0))||any(uv>=vec2f(1))){break;}
    let found=textureLoad(depth,vec2i(uv*size),0);
-   if(found>ndc.z){
+   if(found-ndc.z>1.5*span){
     let back=u.inverse*vec4f(ndc.xy,found,1);
     if(distance(back.xyz/back.w,q)<u.light.w){lit=1-u.march.z;break;}
    }

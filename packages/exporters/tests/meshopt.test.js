@@ -465,6 +465,31 @@ test('options and inputs it cannot take are refused, and a signal stops it', asy
   await assert.rejects(compressMeshopt(source, { signal: stop.signal }), /stopped/);
 });
 
+test('triangle streams carry header 0xe1, the only one the meshopt specifications allow, and round trip', () => {
+  // EXT_meshopt_compression and KHR_meshopt_compression, Appendix A: the triangle header must equal 0xe1, where codes
+  // 0xXd and 0xXe mean last - 1 and last + 1 and only FIFO entries 1 to 12 are read. A 0xe0 stream read FIFO 13 and 14.
+  const side = 8,
+    tris = [];
+  for (let y = 0; y < side; y++)
+    for (let x = 0; x < side; x++) {
+      const v = y * (side + 1) + x;
+      tris.push([v, v + 1, v + side + 1], [v + 1, v + side + 2, v + side + 1]);
+    }
+  let seed = 1;
+  for (let i = tris.length - 1; i > 0; i--) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    const j = seed % (i + 1);
+    [tris[i], tris[j]] = [tris[j], tris[i]];
+  }
+  const flat = tris.flat(),
+    { bytes, indices } = encodeTriangles(flat, (side + 1) * (side + 1));
+  assert.equal(bytes[0], 0xe1);
+  const decoded = new Uint32Array(meshoptDecodeGltfBuffer(bytes, flat.length, 4, 'TRIANGLES', 'NONE').buffer);
+  assert.deepEqual([...decoded], [...indices]);
+  const codes = bytes.subarray(1, 1 + tris.length);
+  assert.ok(codes.some((code) => code >> 4 < 15 && ((code & 15) === 13 || (code & 15) === 14)));
+});
+
 test('the streams decode with encodeVertexBuffer and encodeTriangles used on their own', () => {
   const data = Uint8Array.from({ length: 64 }, (_, i) => i * 3),
     stream = encodeVertexBuffer(data, 16, 4);

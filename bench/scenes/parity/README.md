@@ -27,6 +27,6 @@ node bench/cli.mjs parity --cases=p-unlit,p-lambert --engines=margo,three-webgpu
 node bench/parity-report.mjs --print
 ```
 
-The first command takes the GPU lock itself. The second prints the verdict, the medians, the image match (SSIM and
+The first command runs the cases. The second prints the verdict, the medians, the image match (SSIM and
 mean delta E between the Margo and three.js screenshots) and task outputs for the newest run. Screenshots are in
 `benchmarks/runs/<run id>/parity-<case>.png`.

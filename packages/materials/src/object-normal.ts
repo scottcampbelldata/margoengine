@@ -27,7 +27,7 @@ function mapped(source: string, up: 'y' | 'z'): string {
     .replace(
       place,
       (head) =>
-        // gltf-pro's instanced vertex stage turns this matrix into the instance's own.
+        // gltf/pbr's instanced vertex stage turns this matrix into the instance's own.
         `${head}let margoObjectModel=f.model; let margoObjectSign=select(-1.0,1.0,dot(margoObjectModel[0].xyz,cross(margoObjectModel[1].xyz,margoObjectModel[2].xyz))>0);
   o.margoObjectX=cross(margoObjectModel[1].xyz,margoObjectModel[2].xyz)*margoObjectSign; o.margoObjectY=cross(margoObjectModel[2].xyz,margoObjectModel[0].xyz)*margoObjectSign; o.margoObjectZ=cross(margoObjectModel[0].xyz,margoObjectModel[1].xyz)*margoObjectSign;`,
     )
@@ -37,7 +37,7 @@ function mapped(source: string, up: 'y' | 'z'): string {
     );
   if (!out.includes('o.margoObjectX=') || !out.includes('i.margoObjectX,'))
     throw new TypeError(
-      'objectNormal needs the standard gltf-pro PBR shader; use matching gltf-pro and materials versions',
+      'objectNormal needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions',
     );
   if (cached.size >= 64) cached.clear();
   cached.set(id, out);

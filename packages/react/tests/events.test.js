@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
 const { window } = new JSDOM('<canvas></canvas>');
-const { attachPointerEvents, liveHandlers, hasPointerHandlers } = await import('../dist/events.js');
+const { attachPointerEvents, liveHandlers, hasPointerHandlers, pauseHover } = await import('../dist/events.js');
 
 /** A stand-in engine: meshes with a parent table, and a pick that answers `under(x)` after a microtask. */
 function scene() {
@@ -228,5 +228,31 @@ test('a bordered canvas picks and reports x/y from the padding box, as engine.pi
   await s.settle();
   assert.deepEqual(picked, [[13, 7]]);
   assert.deepEqual(seen, [[13, 7]]);
+  s.detach();
+});
+
+test('paused hover picks nothing on move but presses and clicks still pick, and it resumes', async () => {
+  const s = scene(),
+    a = s.mesh(),
+    log = [];
+  let picks = 0;
+  s.setUnder(() => (picks++, a));
+  s.on(a, { onPointerOver: () => log.push('over'), onPointerMove: () => log.push('move'), onClick: () => log.push('click') });
+  const resume = pauseHover(s.engine);
+  s.send('pointermove', 10);
+  await s.settle();
+  assert.deepEqual(log, []);
+  assert.equal(picks, 0, 'no hover pick while paused');
+  s.send('pointerdown', 10);
+  s.send('pointerup', 10);
+  s.send('click', 10);
+  await s.settle();
+  assert.deepEqual(log, ['click']);
+  resume();
+  resume();
+  log.length = 0;
+  s.send('pointermove', 12);
+  await s.settle();
+  assert.deepEqual(log, ['over', 'move'], 'resumed, and a second resume call does nothing');
   s.detach();
 });

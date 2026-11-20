@@ -205,7 +205,7 @@
     "coreStageLimit": 25000
   },
   "notes": [
-    "No benchmark, timing-only assertion or exclusive GPU lease ran.",
+    "No benchmark, timing-only assertion or the GPU run ran.",
     "Each real GPU command used one shared lane slot and wait-max 60.",
     "The compute-owner loop annotation preserves its original four-step work and every exact assertion.",
     "The initial raw build omitted the separate Wasm-copy step; restored package assets closed the affected CPU/GPU failures.",

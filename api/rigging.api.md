@@ -59,7 +59,7 @@ export interface SkinIssue {
     readonly message: string;
 }
 
-export type SkinIssueCode = 'unweighted' | 'too-many-influences' | 'not-normalized' | 'negative-weight' | 'non-finite' | 'invalid-joint' | 'degenerate-bone';
+export type SkinIssueCode = 'unweighted' | 'too-many-influences' | 'not-normalized' | 'negative-weight' | 'non-finite' | 'invalid-joint' | 'duplicate-joint' | 'degenerate-bone';
 
 export interface SkinReport {
     readonly ok: boolean;

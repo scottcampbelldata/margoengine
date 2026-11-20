@@ -19,14 +19,14 @@ export interface TransmissionSource extends ShadowSource {
   readonly effect: ShadowEffect<{ device: GPUDevice }>;
 }
 /**
- * `source` with what lets light through (`ShadowPrimitive.transmits`: a gltf-pro material with
+ * `source` with what lets light through (`ShadowPrimitive.transmits`: a gltf/pbr material with
  * KHR_materials_diffuse_transmission) tinting the light behind it instead of blocking it, so the ground under leaves is lit
  * by what the leaves pass on. Give the `Shadows` `colored: true` and `effects: [leaves.effect]`, then `shadows.add(leaves)`.
  * Every other primitive casts as before. Throws TypeError on adding it to shadows that have no `colored`.
  */
 export function transmission(source: ShadowSource, options: TransmissionOptions = {}): TransmissionSource {
   if (!source || !('shadowPrimitives' in source))
-    throw new TypeError('transmission needs a source with shadowPrimitives; pass a gltf-pro model');
+    throw new TypeError('transmission needs a source with shadowPrimitives; pass a gltf/pbr model');
   const through = (p: ShadowPrimitive) => !!p.transmits;
   const values = new Float32Array(4);
   let at = 0,

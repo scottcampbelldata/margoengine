@@ -231,8 +231,8 @@ fn spiral(i:u32,n:f32)->vec2f {`,
     // transmission over the disk keeps a fully covered pixel's near weight at 64 taps' worth, as for the round disk.
     bokehShader: editAll(
       far(out.bokehShader, [64, 32, 16]),
-      'let weight=p.lens.w*p.lens.w/max(radius*radius,1.0);',
-      `let weight=p.lens.w*p.lens.w/max(radius*radius,1.0)*aperture(-vec2f(nearOffset)/radius)/${mean.toFixed(6)};`,
+      'let weight=R*R*source.w*inside;',
+      `let weight=R*R*source.w*inside*aperture(-nearTap/radius)/${mean.toFixed(6)};`,
       1,
     ),
   };
@@ -294,14 +294,12 @@ fn spiral(i:u32,n:f32)->vec2f {`,
     1,
   );
   // A polygon's boundary is looked up at the angle of the offset unsqueezed.
-  bokeh = bokeh
-    .split('radius*shape(f32(i)*2.39996323)')
-    .join(`radius*shape(atan2(f32(nearOffset.y),f32(nearOffset.x)*${a}))`);
-  bokeh = editAll(bokeh, 'length(vec2f(nearOffset))<=radius', `length(vec2f(nearOffset)*vec2f(${a},1.0))<=radius`, 1);
+  bokeh = bokeh.split('radius*shape(f32(i)*2.39996323)').join(`radius*shape(atan2(nearTap.y,nearTap.x*${a}))`);
+  bokeh = editAll(bokeh, '-length(nearTap)+0.5', `-length(nearTap*vec2f(${a},1.0))+0.5`, 1);
   bokeh = editAll(
     bokeh,
-    'let weight=p.lens.w*p.lens.w/max(radius*radius,1.0);',
-    `let weight=p.lens.w*p.lens.w/max(radius*radius,1.0)*${a}*eye(-vec2f(nearOffset)/radius,pixel)/lensArea(pixel);`,
+    'let weight=R*R*source.w*inside;',
+    `let weight=R*R*source.w*inside*${a}*eye(-nearTap/radius,pixel)/lensArea(pixel);`,
     1,
   );
   return { ...out, coarseShader: far(out.coarseShader, [64]), bokehShader: bokeh };
@@ -383,12 +381,15 @@ fn spiral(i:u32,n:f32)->vec2f {`,
     out.coarseShader = edit(source.coarseShader, taps);
     out.bokehShader = edit(source.bokehShader, [
       ...taps,
-      // The near gather's reach and its reach test follow the polygon: its taps lie closer, down to the inner circle.
-      ['pow((nearMax+1.0)/p.lens.w,2.0)', `pow((nearMax+1.0)/(p.lens.w*${inner}),2.0)`],
-      ['length(vec2f(nearOffset))<=radius', 'length(vec2f(nearOffset))<=radius*shape(f32(i)*2.39996323)'],
+      // The near taps fill the polygon, a share of the disk's area, so they lie closer and read a finer level.
+      ['const tapArea=1.0;', `const tapArea=${((n / 2) * Math.sin(sector)) / Math.PI};`],
+      // The near gather's reach test follows the polygon.
+      ['clamp(radius-length(nearTap)+0.5', 'clamp(radius*shape(f32(i)*2.39996323)-length(nearTap)+0.5'],
       [REACH, REACH.replace('length(o)<=radius', 'length(o)<=radius*shape(atan2(o.y,o.x))')],
     ]);
-    out.coarseShader = edit(out.coarseShader, [[REACH, REACH.replace('length(o)<=radius', 'length(o)<=radius*shape(atan2(o.y,o.x))')]]);
+    out.coarseShader = edit(out.coarseShader, [
+      [REACH, REACH.replace('length(o)<=radius', 'length(o)<=radius*shape(atan2(o.y,o.x))')],
+    ]);
     return opticsShaders(out, this.catEye, this.anamorphic);
   }
   /** Writes the tilt per clip unit into the free uniform slots 9 and 10. Called by `DOF` every frame. */

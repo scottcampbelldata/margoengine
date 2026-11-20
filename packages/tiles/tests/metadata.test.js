@@ -209,6 +209,7 @@ test('draco pnts: without the dracoPoints option the renderer fails the tile wit
       },
       hasPlugin: () => false,
       sceneOf: () => undefined,
+      removePlugin() {},
     };
   const renderer = await TilesRenderer.load(engine, memory.url, { fetch: memory.fetch, frame: 'local' }),
     errors = [];

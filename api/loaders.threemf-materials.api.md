@@ -48,6 +48,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -114,7 +115,7 @@ interface ThreeMFExtension {
 
 type ThreeMFModel = Model;
 
-interface ThreeMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
+interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
     units?: 'meters' | 'file';
     maxDepth?: number;
     signal?: AbortSignal;
@@ -129,6 +130,12 @@ interface ThreeMFResult extends LoadedGeometry {
     kind: 'mesh';
     unit: string;
     metadata: Record<string, string>;
+}
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
 }
 
 interface ZipOptions {

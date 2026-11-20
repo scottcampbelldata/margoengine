@@ -3,7 +3,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {DenoiseML} from '/packages/voxel-pathtracer/dist/denoise-ml.js';
 import {MeshPathTracer} from '/packages/voxel-pathtracer/dist/mesh.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 window.run=async(compat=false,fixture)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
  const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[1.8,1.4,2.5],target:[0,0,0]}});
@@ -19,7 +19,7 @@ window.run=async(compat=false,fixture)=>{
   const synthetic=make(16,16);let state=243099;const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/2**32;};for(let i=0;i<synthetic.color.length;i++)synthetic.color[i]=.5+random();
   const syntheticResult=await d.denoise(synthetic,{signal:AbortSignal.timeout(120000)}),syntheticMSE={raw:mse(synthetic.color,new Float32Array(synthetic.color.length).fill(1)),network:mse(syntheticResult.color,new Float32Array(synthetic.color.length).fill(1))};
   if(!fixture){
-   const model=await loadGLTF(engine,'/packages/gltf-pro/tests/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});engine.render();const parts=await model.readPickingGeometry();model.dispose();
+   const model=await loadGLTF(engine,'/packages/gltf/test/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});engine.render();const parts=await model.readPickingGeometry();model.dispose();
    const meshes=parts.map((part,index)=>{const positions=new Float32Array(part.vertices.length/20*3),m=part.matrix;for(let i=0;i<part.vertices.length/20;i++){const at=i*20,x=part.vertices[at],y=part.vertices[at+1],z=part.vertices[at+2];for(let a=0;a<3;a++)positions[i*3+a]=m[a]*x+m[4+a]*y+m[8+a]*z+m[12+a];}return {id:'box'+index,material:1,positions,indices:part.indices};});
    meshes.push({id:'floor',material:2,positions:new Float32Array([-3,-.51,-3,3,-.51,-3,3,-.51,3,-3,-.51,3]),indices:new Uint32Array([0,2,1,0,3,2])});
    const scene={revision:1,models:[],instances:[],materials:[{id:1,type:'diffuse',color:[.65,.3,.12]},{id:2,type:'diffuse',color:[.65,.65,.65]}],meshes,environment:{ground:false,sunIntensity:0,skyIntensity:.02},lights:[{position:[0,2,1],direction:[0,-1,0],width:1,height:1,intensity:8,opaque:false}]};

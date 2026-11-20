@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { packedTolerance } from './support/raster-snap.mjs';
 
-// In parallel worktrees, set MARGO_GPU_LOCK to the shared adapter lock before running.
 // Browser/channel/adapter choices are supplied through scripts/browser.js environment options.
-const release = await acquire({ owner: 'material-depth-distance-gpu-check' }),
-  report = { checks: [], failures: [], captures: [] },
+const report = { checks: [], failures: [], captures: [] },
   points = [
     [80, 80],
     [160, 120],
@@ -366,5 +363,4 @@ try {
   );
   await browser?.page.evaluate(() => window.depthDistanceFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

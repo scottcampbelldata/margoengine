@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { pbrShader } from '../../gltf-pro/src/shader.ts';
+import { pbrShader } from '../../gltf/src/shader.ts';
 import { shadowDepth } from '../../shadows/src/shader.ts';
 import { Fur, FurMaterial, createFur } from '../dist/fur.js';
 

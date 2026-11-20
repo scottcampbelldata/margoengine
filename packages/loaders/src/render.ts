@@ -1,12 +1,12 @@
 import type { EngineKernel, Mesh } from '@margoengine/core';
-import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf-pro/model';
+import { parsePreparedPBR, type GLTFDocument, type PBRModel, type PreparedGeometry } from '@margoengine/gltf/pbr-model';
 import { SRGBToLinear } from '@margoengine/math/color';
 import type { CreateMeshesOptions } from './engine.js';
 import { splitTriangles, toGeometries } from './geometry.js';
 
 /**
- * Vertices of one part: gltf-pro's default `maxPartVertices` (20 MiB of 80-byte vertices, inside every storage binding,
- * the WebGL2 layer's included), so gltf-pro draws each part as made here instead of splitting it again.
+ * Vertices of one part: gltf/pbr's default `maxPartVertices` (20 MiB of 80-byte vertices, inside every storage binding,
+ * the WebGL2 layer's included), so gltf/pbr draws each part as made here instead of splitting it again.
  */
 const PRIMITIVE_MAX_VERTICES = 262_144;
 import { LoaderError, type LoadedGeometry, type LoadedGroup } from './types.js';
@@ -42,11 +42,11 @@ function attribute(value: Float32Array | undefined, length: number, name: string
 }
 
 /**
- * Renders triangle loader output with exact per-vertex RGB and opacity through optional `gltf-pro`.
+ * Renders triangle loader output with exact per-vertex RGB and opacity through optional `gltf/pbr`.
  * Source RGB is sRGB; opacity is linear. Group RGBA supplies only missing vertex channels, independently.
  * Uncovered index ranges render with white/opaque fallback. The explicit material factor multiplies RGBA.
  * Returns the renderer's owned model: dispose it once finished; its existing lifecycle restores GPU resources.
- * The input is never modified. A part past gltf-pro's limit of 1,000,000 vertices a primitive becomes several primitives of one
+ * The input is never modified. A part past 262,144 vertices (gltf/pbr's default `maxPartVertices`) becomes several primitives of one
  * glTF mesh, split as toGeometries splits (normals seam-free). Point clouds, overlapping groups, more than 4096
  * parts, or an exceeded packed-data budget are refused before any GPU allocation.
  */

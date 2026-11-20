@@ -36,13 +36,18 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { parseSync } from 'rolldown/utils';
 import { assertLlmsCurrent } from './build-llms.mjs';
 import { assertErrorPageCurrent } from './errors/check.mjs';
+import { assertSiteLinksLive } from './check-site-links.mjs';
 import { entries as errorHelp } from './errors/entries.js';
 import { plan as gpuPlan } from './gpu-package-tests.mjs';
 import { assertCitedResultsTracked } from './support/cited-results.mjs';
 import { assertNoConflictMarkers } from './support/conflict-markers.mjs';
+import { assertPackageRecordsCurrent } from './support/package-records.mjs';
+import { assertDocumentReadersPass } from './support/unit-readers.mjs';
 import { changedDeclarations, declarationStamps, missingDeclaration } from './support/declaration-snapshot.mjs';
+import { assertFixCommitsHaveRegression } from './support/fix-regression.mjs';
 import { assertLockInSync } from './support/lock-sync.mjs';
 import { assertPluginsLeaveOwnScene } from './support/plugin-scene-owner.mjs';
+import { assertNoProcessExit } from './support/process-exit.mjs';
 import { assertValidTrackedManifests } from './support/manifest-json.mjs';
 import { countMissingHelp, countNoFix } from './support/throw-messages.js';
 import { assertWgslReturns } from './support/wgsl-returns.mjs';
@@ -62,15 +67,30 @@ assertWasmBlueprintsCurrent(root);
 // because the fast gate runs hygiene on every push while a lane runs only its own package tests; an unlisted sciviz
 // message once reached main that way (KB-ERR1).
 assertErrorPageCurrent(root);
+// Every margoengine.com link in the sources names a page and anchor the site build produces (scripts/check-site-links.mjs).
+assertSiteLinksLive(root);
 // site/llms.txt and site/llms-full.txt are generated from READMEs, api/ and docs/: a change to those must regenerate them.
 assertLlmsCurrent(root);
 // Every shipped value-returning WGSL function ends in a return on every path, as Firefox requires (KB-FF1b).
 assertWgslReturns(root);
+// No script ends through process.exit, which can hold the exit for ever, unless the line says why it must (KB-OWN-EXIT2):
+// the files still owed are listed, exactly, in scripts/support/exit-owed.json (scripts/support/process-exit.mjs).
+assertNoProcessExit(root);
 // Every browser test file must have a script check:gpu-packages runs; its plan throws otherwise. Checked here because
 // the fast gate runs hygiene on every push and the plan would only fail later, in local CI's full check.
 gpuPlan();
 // A plugin leaves the scene it was attached to, never the active one (the whole class, docs/integration-fixtures.md).
 assertPluginsLeaveOwnScene(root);
+// A new package brings its records: the stated package counts, its entry sizes (sizes.html), THIRD-PARTY-NOTICES.md and
+// its example's type-check project (scripts/support/package-records.mjs). Checked here because only the full root
+// tests in local CI saw them, after the push.
+assertPackageRecordsCurrent(root);
+// A changed document (docs/limits.md, docs/whitepaper/claims.md, any .md) belongs to no package, so no package test runs for
+// it: every root test that names it in code runs here (scripts/support/unit-readers.mjs, KB-GATE-DOCREADERS1).
+assertDocumentReadersPass(root);
+// A fix commit changes a test file or names an existing one in a Regression: line (AGENTS.md "Bugs"), over origin/main..HEAD
+// (HYGIENE_COMMIT_RANGE overrides the range; an empty range is skipped).
+assertFixCommitsHaveRegression(root);
 const quick = process.argv.includes('--verify');
 const strict = process.argv.includes('--strict');
 const slash = (p) => p.replaceAll('\\', '/');

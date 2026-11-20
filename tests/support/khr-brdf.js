@@ -1,7 +1,7 @@
-// CPU reference for the BRDF terms gltf-pro shades extended materials with, written from the Khronos extension
+// CPU reference for the BRDF terms gltf/pbr shades extended materials with, written from the Khronos extension
 // specifications (KHR_materials_iridescence "Iridescence Fresnel", KHR_materials_anisotropy "Implementation",
-// KHR_materials_diffuse_transmission "Material Structure Updates") in double precision. packages/gltf-pro/tests and
-// scripts/gltf-pro-materials-gpu-check.js compare the WGSL against it.
+// KHR_materials_diffuse_transmission "Material Structure Updates") in double precision. packages/gltf/test and
+// scripts/gltf-pbr-materials-gpu-check.js compare the WGSL against it.
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const scale = (a, k) => a.map((v) => v * k);
@@ -51,7 +51,7 @@ export function iridescentFresnel(baseF0, cosTheta1, thickness, iridescenceIor, 
     T121 = 1 - R12;
   const phi12 = iridescenceIor < outsideIor ? Math.PI : 0,
     phi21 = Math.PI - phi12;
-  // gltf-pro clamps F0 + 0.0001 to 0.9999 so a white metal stays finite (the spec only adds 0.0001).
+  // gltf/pbr clamps F0 + 0.0001 to 0.9999 so a white metal stays finite (the spec only adds 0.0001).
   const baseIor = baseF0.map((f) => {
     const s = Math.sqrt(Math.min(f + 0.0001, 0.9999));
     return (1 + s) / (1 - s);
@@ -98,7 +98,7 @@ export const separableV = (NdotL, NdotV, alpha) => {
 };
 /**
  * Height-correlated Smith visibility G2 / (4 NdotL NdotV) = 0.5 / (NdotL sqrt(a2 + (1 - a2) NdotV^2) + NdotV sqrt(a2 +
- * (1 - a2) NdotL^2)), as gltf-pro's isotropic direct light evaluates it: Heitz 2014, JCGT 3(2), eq. 99; glTF 2.0
+ * (1 - a2) NdotL^2)), as gltf/pbr's isotropic direct light evaluates it: Heitz 2014, JCGT 3(2), eq. 99; glTF 2.0
  * Appendix B.3.2 (current revision).
  */
 export const correlatedV = (NdotL, NdotV, alpha) => {

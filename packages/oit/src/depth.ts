@@ -10,7 +10,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import type { PBRModel, PBRTransparency } from '@margoengine/gltf-pro';
+import type { PBRModel, PBRTransparency } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
@@ -85,7 +85,7 @@ export class TransparentDepth implements EnginePlugin, PBRTransparency {
     this.order = order;
     this.threshold = threshold;
   }
-  /** Writes a gltf-pro model's transparent surfaces (or a transparent materials mesh) into the depth. Returns a remover. */
+  /** Writes a gltf\/pbr model's transparent surfaces (or a transparent materials mesh) into the depth. Returns a remover. */
   add(model: PBRModel): () => void {
     if (this.disposed || !this.engine)
       throw new MargoError(
@@ -133,15 +133,15 @@ export class TransparentDepth implements EnginePlugin, PBRTransparency {
       },
     });
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   declarations(group: number): string {
     return groupCode(this.code, group, declarations);
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   bindings(): GPUBindGroupEntry[] {
     return [{ binding: BINDING, resource: { buffer: this.uniform! } }];
   }
-  /** @internal gltf-pro transparency hook: the depth pass, begun on the first transparent draw of the frame. */
+  /** @internal gltf\/pbr transparency hook: the depth pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
     const c = this.context!;

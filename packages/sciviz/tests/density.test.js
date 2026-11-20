@@ -31,7 +31,8 @@ const fake = () => {
       },
     },
   };
-  const renderer = { device, add() {}, remove() {} };
+  // Two target pixels per CSS pixel, so the bandwidth (CSS pixels) reaches the kernel in target pixels.
+  const renderer = { device, add() {}, remove() {}, cssScale: () => 2 };
   return { figure: { renderer, layers: [], addLayer: (x) => x }, destroyed, uploads, allocations };
 };
 test('density options reject malformed data before allocating, and aborted construction has no side effects', () => {
@@ -86,6 +87,8 @@ test('density uploads every point in bounded chunks and caches unchanged views',
     uploads.filter((a) => a[2].length !== 32).reduce((n, a) => n + a[2].length, 0),
     data.length,
   );
+  // The default 4 CSS pixel bandwidth reaches the blur as 8 target pixels.
+  assert.equal(uploads.filter((a) => a[2].length === 32).at(-1)[2][30], 8);
   assert.equal(dispatches, 3);
   assert.equal(clears, 1);
   layer.prepare(context);
@@ -118,6 +121,17 @@ test('source ownership is exclusive and restored when publication fails', () => 
   assert.equal(cloud.visible, true);
 });
 
+test('readCounts rejects a deadline above the largest host timer before any GPU work', async () => {
+  const { figure, allocations } = fake(),
+    cloud = { positions: new Float32Array(3), visible: true },
+    source = { cloud, bounds: [0, 1, 0, 1, 0, 0] };
+  figure.layers.push(source);
+  using layer = new DensityLayer(figure, source);
+  const before = allocations.length;
+  for (const timeout of [2 ** 31, 2 ** 32, 2 ** 53, 1e300, 0, NaN])
+    await assert.rejects(layer.readCounts({ timeout }), (error) => error instanceof RangeError && /timeout in \(0, 2147483647\]/.test(error.message));
+  assert.equal(allocations.length, before);
+});
 test('a replaced native cloud transfers draw suppression and retains current source bounds', () => {
   const { figure } = fake(),
     original = { positions: new Float32Array(3), visible: true },

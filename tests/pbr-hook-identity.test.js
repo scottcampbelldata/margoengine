@@ -9,7 +9,7 @@ import {
   physicalShader,
   factorPhysicalShader,
   transmissiveShader,
-} from '../packages/gltf-pro/src/shader.ts';
+} from '../packages/gltf/src/shader.ts';
 const variants = [
   ['compact', pbrShader],
   ['extended', extendedPBRShader],
@@ -61,7 +61,7 @@ const unsupported = (anchor) => ({
   name: 'MargoError',
   code: 'unsupported',
   message:
-    'PBR lighting hook point missing: ' + anchor + '; use matching @margoengine/gltf-pro and effect package versions',
+    'PBR lighting hook point missing: ' + anchor + '; use matching @margoengine/gltf/pbr and effect package versions',
 });
 const bad = [
   ['direct', 'let untouched=1;', { direct: (v) => v }, 'direct+ambient(s)'],

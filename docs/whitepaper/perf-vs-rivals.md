@@ -31,7 +31,7 @@ time is the fastest round. These numbers were taken on a busy machine and are di
 | `@margoengine/oit` | same picture against exact ray-composited reference | MAE 1.567519, PSNR 35.388 dB | Babylon MAE 0.048151, PSNR 61.305 dB | loss, accepted difference (weighted default) |
 | `@margoengine/oit/peel` (`PeelOIT`, like for like with depth peeling) | same picture, same reference | MAE 0.048151, PSNR 61.305 dB, max 1 (`ExactOIT` and the core per-mesh sort the same) | Babylon MAE 0.048151, PSNR 61.305 dB, max 1 | match |
 | `@margoengine/sky` | default Preetham angular radiance, 297 samples, zenith-Y normalized | MAE 1.439228, max 70.681783 | Mitsuba 3.9.1 sunsky (Hosek-Wilkie), scalar_rgb | accepted difference (different model; Margo tuning share MAE 0.012108) |
-| `@margoengine/staging` | default ContactShadows, sphere on ground, ray-traced hemispherical occlusion | MAE 0.048174, RMSE 0.074416 | 4096 cosine rays/pixel; projected-solid-angle oracle | loss |
+| `@margoengine/studio` | default ContactShadows, sphere on ground, ray-traced hemispherical occlusion | MAE 0.048174, RMSE 0.074416 | 4096 cosine rays/pixel; projected-solid-angle oracle | loss |
 
 The flock checksums after that step were 31517.19 (Margo) and 31516.70 (Yuka). Both moved from the same grid. They are
 not bit-equal: Yuka keeps a neighbourhood per vehicle and Margo uses one uniform grid. The behaviours are the ones in
@@ -80,7 +80,7 @@ run met the same 0.01 window. TensorFlow.js keeps the same transform: DC bin exa
 by 16.7 and 153 (magnitude 0.06% low). The FFT rounds do not overlap (Margo 2.4 to 7.0 ms, TensorFlow.js 22.7 to
 27.1). On matmul and the sum, one slow Margo round sits inside the TensorFlow.js spread; the minima still favour
 Margo. Busy machine, diagnostic. Rerun:
-`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs -- node packages/compute/scripts/rival-bench.mjs`.
 The oracle is `packages/compute/tests/numpy-oracle.test.js`.
 
 The sciviz row is volume-64, a radial sphere whose samples sum to 32731.121874443877
@@ -91,7 +91,7 @@ fastest round. One headless page on an RTX A6000. The last pair differs by 1.801
 7.48% of pixels differ by more than 8. VTK.js reports bounds half a spacing outside the point box. The rounds overlap
 (Margo 1.5 to 2.0 ms, VTK.js 1.3 to 2.2). The minimum still favours VTK.js, so the row is a loss. Busy machine,
 diagnostic. Rerun:
-`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs -- node packages/sciviz/scripts/rival-bench.mjs`.
 
 The splat rows are the published truck at iteration 7,000 (1,692,538 degree-3 splats) cut to the first 699,050,
 the most whose SH buffer fits the WebGPU minimum storage binding of 134,217,728 bytes. The full cloud is refused
@@ -107,7 +107,7 @@ per-round minimum. The rounds do not overlap (Margo 10.765 to 14.535 ms, Gaussia
 rival's shared-memory GPU sort produced no draw calls, so the timed path is its CPU sort (`gpuAcceleratedSort`
 false, `sharedMemoryForWorkers` false, `integerBasedSort` false), antialiasing off, SH degree 3, black background.
 RTX A6000, busy machine, diagnostic. The loss and the picture error stay open. Rerun:
-`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
 The fit count is `packages/splats/test/storage-fit.test.js`. The pose maths are `packages/splats/test/paper-camera.test.js`.
 
 The tiles rows are one explicit REPLACE quadtree, 7 levels, 5,461 tiles, 256 m on a side, y-up, no geodetic
@@ -120,7 +120,7 @@ select the same 1,120 tiles: 992 at level 5 and 128 at level 6, checksum 1215863
 `update`, not the load. Two warmups, then 7 paired rounds, per-round minimum. The rounds do not overlap (Margo
 0.300 to 0.900 ms, 3DTilesRendererJS 2.300 to 3.100). Busy machine, diagnostic. The selected set is locked by
 `packages/tiles/tests/sse-scene.test.js`. Rerun:
-`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs -- node packages/tiles/scripts/rival-bench.mjs`.
 
 The points row is one Potree 2.0 folder, a single leaf of 10,000,000 points on a 200 x 200 x 250 grid in a 100 m
 cube centred on the origin. Both budgets are 10,000,000, so a settled frame draws every point. Point size is 4
@@ -131,7 +131,7 @@ completion: `onSubmittedWorkDone` on Margo, and a one-pixel `readPixels` on the 
 (Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600). The rival submitted 7 draws of 10,000,000 points. Busy
 machine, diagnostic. The loss stays open. The grid and the file layout round-trip in
 `packages/points/tests/points-10m.test.js`. Rerun:
-`node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
 
 The lightmap row is the published Cornell box, scaled by 0.01, with every face snapped to a parallelogram
 (`p2 = p1 + p3 - p0`). The short block top moves from (240, 165, 272) to (242, 165, 274). The floor, the back wall,
@@ -163,7 +163,7 @@ Completion is queue.onSubmittedWorkDone on Margo, one-pixel readPixels on Babylo
 Busy machine, diagnostic, not isolated GPU pass costs. Weighted OIT approximates depth-ordered transport,
 while depth peeling resolves these five layers. Like for like (2026-11-11, KB3148a): Margo's own depth peeling, `PeelOIT`, draws the same picture as Babylon's, MAE 0.048151, PSNR 61.305 dB, max 1, and so do `ExactOIT` and the core's per-mesh sort (RTX A6000, `packages/oit/test/gpu/reference-check.mjs`, no rival code). The weighted default's loss is the accepted difference of the method it is (one pass, no layer limit, order-free for interpenetrating parts), recorded in docs/limits.md. Nonbinary colours introduce an
 additional display-domain blending limitation, which this binary-palette algorithm comparison does not cover.
-Rerun: `node scripts/gpu-lock.mjs run --exclusive --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`.
+Rerun: `node scripts/run-with-timeout.mjs -- node packages/oit/scripts/rival-bench.mjs`.
 
 
 The sky comparison evaluates the shipped Preetham WGSL directly on the GPU, before display mapping.
@@ -178,7 +178,7 @@ ranges from 0.199319 to 0.765628 by case. Largest channel error 70.681783 (sun 1
 Preetham and Hosek-Wilkie are different models. The paper Preetham model without Margo's tuning measures MAE
 1.436382 on the same grid; Margo's daylight-locus floor moves it by MAE 0.012108 and its clamps do not act here, so
 the difference is the model (accepted difference KB3148c, docs/limits.md). No coefficients were copied or invented.
-[Per-case values](results/batch-168-sky.json). Rerun under the shared GPU lock:
+[Per-case values](results/batch-168-sky.json). Re:
 `node packages/sky/scripts/rival-bench.mjs`. No speed comparison is claimed.
 
 
@@ -192,9 +192,9 @@ MAE 0.048174, RMSE 0.074416, max 0.288788. Mean darkness is 0.000177 (contact) v
 The nearness map's fixed blur and height falloff produce a local contact cue rather than broad hemispherical
 occlusion. Accepted difference (KB3193, 2026-11-11): the default is a footprint cue by design (one pass,
 cacheable), and a sphere's footprint lies under the sphere. AmbientShadows with `ambient: 1` (all-sky visibility, 1024 cosine directions, opacity 1) on the same scene, pixels and reference measures MAE 0.001561, RMSE 0.001948, max 0.007994, mean darkness 0.048200 against 0.048351, on WebGPU and the WebGL2 compatibility layer
-(`packages/staging/test/sky-occlusion-browser.mjs`). No directional area-light or speed equivalence is claimed.
-[Raw result](results/batch-168-staging.json). Rerun under the shared GPU lock:
-`node packages/staging/scripts/rival-bench.mjs`, and `--ambient` for AmbientShadows.
+(`packages/studio/test/sky-occlusion-browser.mjs`). No directional area-light or speed equivalence is claimed.
+[Raw result](results/batch-168-staging.json). Re:
+`node packages/studio/scripts/rival-bench.mjs`, and `--ambient` for AmbientShadows.
 
 
 The closing batch 168 check also path-traces the OIT panes independently in Cycles (Blender 5.3.0 Beta,
@@ -205,7 +205,7 @@ has MAE 0.094812; their centre RGB is identical (198,163,103). Residual path noi
 differences give max 125 on all three comparisons, so the full-frame PSNR includes reference noise and
 edge differences. The independent trace confirms the weighted image loss, not an accuracy-parity claim.
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
-Reproduce: `node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`.
+Reproduce: `node scripts/run-with-timeout.mjs --max=6 -- node scripts/rival-oit-cycles.mjs`.
 
 ## Batch 169 procedural: work counts, 2026-11-10
 

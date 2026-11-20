@@ -10,7 +10,7 @@ const flags = [
   '--disable-renderer-backgrounding',
 ];
 const main = await readFile('examples/package-benchmarks/main.js', 'utf8'),
-  gltf = await readFile('packages/gltf-pro/dist/index.js', 'utf8'),
+  gltf = await readFile('packages/gltf/dist/pbr.js', 'utf8'),
   usage = 'GPUBufferUsage.VERTEX|GPUBufferUsage.STORAGE';
 assert.equal(gltf.split(usage).length, 2, 'Expected exactly one central PBR vertex allocation');
 assert.equal(main.split('readiness.workloadConstructed = performance.now();').length, 2);
@@ -93,7 +93,7 @@ async function scene(profile, name, { oldUsage = false, attach = false, restore 
     route.fulfill({ contentType: 'text/javascript', body: exposed }),
   );
   if (oldUsage)
-    await page.route('**/packages/gltf-pro/dist/index.js', async (route) => {
+    await page.route('**/packages/gltf/dist/pbr.js', async (route) => {
       const response = await route.fetch(),
         body = await response.text();
       assert.equal(body.split(usage).length, 2);

@@ -142,8 +142,16 @@ export class PlazaShard {
     return join(this.#o.dataDir, 'final');
   }
 
-  /** Loads or makes the world and starts serving. Resolves false when the world was already over: it ended instead. */
-  async start() {
+  /**
+   * Loads or makes the world and starts serving. Resolves false when the world was already over (it ended instead) or
+   * the shard was shut down first. A shutdown or an end asked for meanwhile waits until it has started.
+   */
+  start() {
+    return this.#serial(() => this.#start());
+  }
+
+  async #start() {
+    if (this.#closed) return false;
     await mkdir(this.#dir, { recursive: true });
     this.world = await this.#loadWorld();
     if (!this.world) await this.#newWorld();
@@ -608,25 +616,26 @@ export class PlazaShard {
 
 // Forked by the router: options in argv as JSON, messages over IPC. Exit code 0 means the router asked, or the world
 // ended and it said so first; anything else is a crash, and the router restarts this shard into the same world.
+// A clean stop ends by the event loop: shutdown and the world's end close the listener, every socket and every timer,
+// and the IPC channel goes last. A crash leaves a broken world serving, so it ends at once.
 async function main() {
   const shard = new PlazaShard(JSON.parse(process.argv[2])),
-    leave = (code) => {
+    leave = () => {
       if (process.connected) process.disconnect();
-      process.exit(code);
     },
     send = (message, then = () => {}) => (process.connected ? process.send(message, then) : then()),
     crash = (error) => {
       console.error(error);
-      leave(1);
+      process.exit(1); // process.exit: a crashed shard still holds its listener and timers; the router restarts it
     };
   let stopping = false;
   const stop = () => {
     if (stopping) return;
     stopping = true;
-    shard.shutdown().then(() => leave(0), crash);
+    shard.shutdown().then(leave, crash);
   };
   shard.onBeat = (beat) => send({ type: 'beat', beat });
-  shard.onEnded = (ended) => send({ type: 'ended', ...ended }, () => leave(0));
+  shard.onEnded = (ended) => send({ type: 'ended', ...ended }, leave);
   shard.onFailed = crash;
   process.on('SIGTERM', stop);
   process.on('SIGINT', stop);
@@ -660,5 +669,5 @@ async function main() {
 if (process.argv[1] === fileURLToPath(import.meta.url))
   main().catch((error) => {
     console.error(error);
-    process.exit(1);
+    process.exit(1); // process.exit: a start that failed part way may hold a listener or timers; the router restarts it
   });

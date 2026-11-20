@@ -18,7 +18,14 @@ export type {
   GLSLVarying,
 } from './glsl/emit.js';
 export { encodeName as glslName, floatLiteral as glslFloat } from './glsl/emit.js';
-export { INVERSE_TRIG_IMPLAUSIBLE, INVERSE_TRIG_PROBE, INVERSE_TRIG_TOLERANCE, inverseTrigError } from './device/inverse-trig.js';
+export {
+  INVERSE_TRIG_IMPLAUSIBLE,
+  INVERSE_TRIG_PROBE,
+  INVERSE_TRIG_SMOOTH,
+  INVERSE_TRIG_TOLERANCE,
+  inverseTrigError,
+  inverseTrigVerdict,
+} from './device/inverse-trig.js';
 export { ATAN_UNIT, HELPERS as GLSL_HELPERS } from './glsl/helpers.js';
 
 /** One stage of a pipeline to translate: a module (source or checked IR) and its entry point. */
@@ -59,7 +66,7 @@ export interface TranslateOptions {
   /**
    * acos, asin and atan2 call the layer's own float32 versions (error under 1e-6) instead of GLSL's built-ins. The
    * device sets it where a startup probe finds the driver's built-ins more than 1e-5 off (ANGLE Direct3D 11: acos(0)
-   * is 1.5707288). Default false.
+   * is 1.5707288; Apple silicon Metal: atan2(1, -0) is -pi / 2). Default false.
    */
   readonly accurateInverseTrig?: boolean;
 }

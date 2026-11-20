@@ -8,6 +8,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize, resolve } from 'node:path';
 import test from 'node:test';
 import { plan } from '../scripts/gpu-package-tests.mjs';
+import { nodeFiles } from './support/gpu-script-files.js';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -21,18 +22,7 @@ export function literalStartPaths(text) {
   return paths;
 }
 
-/** [file run, folder it runs in] for each `node <file>` part of a script, following its `cd` parts. */
-export function nodeFiles(command, cwd) {
-  const out = [];
-  let dir = cwd;
-  for (const part of command.split(/\s*&&\s*/)) {
-    const cd = /^cd\s+(\S+)$/.exec(part);
-    if (cd) dir = normalize(join(dir, cd[1]));
-    const node = /^node\s+(?:--\S+\s+)*([^\s-]\S*\.(?:mjs|js|cjs))\b/.exec(part);
-    if (node) out.push([normalize(join(dir, node[1])), dir]);
-  }
-  return out;
-}
+export { nodeFiles };
 
 /** The folder a script serves: where it runs, or what its `process.chdir(... new URL(rel, import.meta.url))` names. */
 export function servedFolder(text, file, dir) {

@@ -1,5 +1,5 @@
 // @margoengine/webgl2-compat/compute: compute shaders on WebGL2 (roadmap milestone M5). The device loads this entry
-// by itself the first time a page creates a compute pipeline, so a render-only page never downloads it; import it
+// by itself when `requestDevice` answers, so a scene's first compute submit runs in its own task; import it
 // directly only to plan or run compute shaders outside a device (tools, tests). Written clean room from the W3C WGSL
 // and WebGPU specifications. Nothing runs at import time.
 import { checkWGSL } from './wgsl.js';

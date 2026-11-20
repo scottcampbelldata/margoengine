@@ -53,7 +53,7 @@ const flag = (log) =>
     .filter((e) => e[0] === 'writeBuffer' && (e[2] === 284 || (e[2] === 0 && e[3].length >= 576)))
     .map((e) => Buffer.from(e[2] === 284 ? e[3].slice(0, 8) : e[3].slice(568, 576), 'hex').readFloatLE(0));
 
-// A gltf-pro model's side of the hook: it hands its BLEND draw to the hook and draws into the hook's pass.
+// A gltf/pbr model's side of the hook: it hands its BLEND draw to the hook and draws into the hook's pass.
 function model() {
   const m = {
     hook: undefined,
@@ -103,10 +103,11 @@ function effect() {
 test('without add: every shader and the uniform are what they were before the option', () => {
   const { record, frame } = rig({ temporal: 0 });
   const log = record(() => frame(0));
-  // SHA-256 of the froxel and composite shaders at 2d4f794f1 (before fogged transparents).
+  // SHA-256 of the froxel shader at 2d4f794f1 (before fogged transparents) and of the far-air composite
+  // (Scott 2026-11-16, re-pin equally strict; was c725bd91... before the analytic tail).
   assert.deepEqual(modules(log).map(sha), [
     'b68de0e316cec876773e0cf7d44c18f2b05cd57d478dfb0c2144a9d4dded074e',
-    'c725bd91a27d3c0e22235fd9587c3f0055c9ba8c27f8e53f9c819d1bdfd3734e',
+    '6e45b7b3154a0090393007e4be6a1449af7e98559a5ac607932a0c78ad6f5dcb',
   ]);
   assert.deepEqual(flag(log), [0], 'jitter.w stays 0');
   assert.equal(log.filter((e) => e[0] === 'beginRenderPass').length, 1, 'only the composite pass');
@@ -134,7 +135,8 @@ test('add(model): drawn after the composite, over the frame with depth read only
   assert.deepEqual(flag(log), [1], 'jitter.w 1: the fog applies');
   assert.deepEqual(
     fog.bindings().map((e) => e.binding),
-    [120, 121, 122],
+    [120, 121, 122, 123, 124],
+    'the uniform, the volume, its sampler, and the sky map and its sampler for the far air (KB-FOG-FAR-TRANSPARENT)',
   );
   assert.equal(fog.bindings(), fog.bindings(), 'entries kept until the volume changes');
   assert.deepEqual(fog.targets, [{ format: 'rgba16float', blend: fog.targets[0].blend }]);
@@ -172,7 +174,7 @@ test('effects, validation and dispose', () => {
   fog.add(e);
   fog.add(m);
   for (const bad of [null, {}, { setTransparency() {} }]) assert.throws(() => fog.add(bad), TypeError);
-  assert.equal(fog.layout.length, 3);
+  assert.equal(fog.layout.length, 5);
   fog.dispose();
   assert.equal(e.hook, undefined);
   assert.equal(m.hook, undefined);

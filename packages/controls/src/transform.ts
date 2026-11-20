@@ -6,14 +6,17 @@ import { EventDispatcher, type ControlElement } from './controls.js';
 import {
   buildDelta,
   buildGizmo,
+  handleAction,
   pickHandle,
   type GizmoDelta,
   type GizmoFrame,
   type Handle,
   type HandleName,
   type Prim,
+  type RGBA,
   type TransformMode,
 } from './gizmo.js';
+import { hexColor } from '@margoengine/math/color';
 import { IDENTITY, invertAffine, madd, quatFromMatrix, transformPoint, type Q4, type V3 } from './math.js';
 import { add, cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
 import { OverlayRenderer, tessellate } from './overlay.js';
@@ -24,8 +27,9 @@ import {
   normalizeQuaternion,
   rotateByQuaternion,
 } from '@margoengine/math/quat';
-import { basis, intersectPlane, project, ray, type Basis } from './view.js';
+import { rollFrame, intersectPlane, project, ray, type Basis } from './view.js';
 import { viewSize } from '../../shared/view-rect.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 
 /** Distance along a ray from `origin` in unit `direction` to the nearest scene surface, null for none. */
 export type GizmoOccluder = (origin: readonly number[], direction: readonly number[]) => number | null;
@@ -67,6 +71,8 @@ export interface TransformControlsOptions {
   showDelta?: boolean;
   /** Hide the parts of the gizmo behind scene geometry instead of drawing on top. Default false. */
   occlude?: boolean;
+  /** Handles to leave out, neither drawn nor picked, such as `['RX', 'RY', 'RZ']` for the `all` mode without rings. Default none. */
+  hide?: readonly HandleName[];
   /**
    * With `occlude`, the distance along a ray to the nearest scene surface, null for none, so a handle behind it cannot be
    * grabbed or hovered. Picking is on the CPU and has no scene depth: pass a ray cast of your own, such as `@margoengine/bvh`.
@@ -82,7 +88,32 @@ export interface TransformControlsOptions {
   view?: RenderView;
   /** Frame graph order of the overlay pass. Default 1000, after the scene and most effects. */
   order?: number;
+  /**
+   * Where the gizmo sits in the attached object's own space, with one object attached: moves, turns and scales then go
+   * about that point (the object's origin orbits it). Default [0, 0, 0], the object's origin.
+   */
+  offset?: readonly [number, number, number];
+  /** Keep a constant size on screen (`size` is a multiplier). With false, `size` is the gizmo's length in world units. Default true. */
+  fixed?: boolean;
+  /** Colours of the X, Y and Z handles, each `'#rgb'`, `'#rrggbb'`, `'#rrggbbaa'` or `[r, g, b]` / `[r, g, b, a]` in 0..1. Default red, green, blue. */
+  axisColors?: readonly [GizmoColor, GizmoColor, GizmoColor] | null;
+  /** Colour of the hovered or dragged handle, as `axisColors`. Default yellow. */
+  hoveredColor?: GizmoColor | null;
+  /** Width in CSS pixels of the arrow shafts, scale lines and rings. Default 2.5. */
+  lineWidth?: number;
 }
+// Argument errors name their fix and link to their entry on the error help page (docs/conventions.md).
+/** A gizmo colour: `'#rgb'`, `'#rrggbb'`, `'#rrggbbaa'`, or `[r, g, b]` or `[r, g, b, a]` in 0..1, written to the overlay as given. */
+export type GizmoColor = string | readonly number[];
+const rgba = (color: GizmoColor, name: string): RGBA => {
+  let out: number[] | null = null;
+  if (typeof color === 'string') out = hexColor(color) ?? null;
+  else if ((color?.length === 3 || color?.length === 4) && color.every((v) => Number.isFinite(v) && v >= 0 && v <= 1))
+    out = [color[0], color[1], color[2], color[3] ?? 1];
+  if (!out)
+    throw typeError(`TransformControls ${name} must be '#rgb', '#rrggbb', '#rrggbbaa' or [r, g, b(, a)] in 0..1; pass a colour like that`, 'controls-transform');
+  return out as unknown as RGBA;
+};
 
 /** One object of a multi-object drag, as it was when the drag began. */
 interface Member {
@@ -97,6 +128,9 @@ interface Member {
 }
 
 interface DragStart {
+  /** What the grabbed handle does (its mode, or its part of the `all` mode). */
+  op: Exclude<TransformMode, 'all'>;
+  /** The axis letters it acts on: the handle name without the `all` mode's `R` or `S` prefix. */
   axis: HandleName;
   origin: V3;
   axes: [V3, V3, V3];
@@ -170,6 +204,8 @@ export class TransformControls extends EventDispatcher {
   flipAxes: boolean;
   /** Draw a line or swept arc from where a drag began to where it is now. Default true. */
   showDelta: boolean;
+  /** Handles left out, neither drawn nor picked. Default none. */
+  hide: readonly HandleName[];
   /**
    * Hide the parts of the gizmo behind scene geometry instead of drawing on top. Default false. Only the drawing
    * changes unless `occluder` is set: picking is on the CPU and has no scene depth, so a hidden handle can still be grabbed.
@@ -182,6 +218,12 @@ export class TransformControls extends EventDispatcher {
   /** Hovered or dragged handle. */
   axis: HandleName | null = null;
   dragging = false;
+  /** Keep a constant size on screen (`size` a multiplier); false makes `size` world units. Default true. */
+  fixed: boolean;
+  private offsetValue: V3 = [0, 0, 0];
+  private colorsValue: [RGBA, RGBA, RGBA] | null = null;
+  private hoverValue: RGBA | null = null;
+  private widthValue = 2.5;
   readonly overlay = new OverlayRenderer();
   private drag: DragStart | null = null;
   private pointerId: number | null = null;
@@ -214,9 +256,15 @@ export class TransformControls extends EventDispatcher {
     this.showZ = options.showZ ?? true;
     this.flipAxes = options.flipAxes ?? false;
     this.showDelta = options.showDelta ?? true;
+    this.hide = options.hide ?? [];
     this.occlude = options.occlude ?? false;
     this.occluder = options.occluder;
     this.view = options.view ?? null;
+    this.fixed = options.fixed ?? true;
+    if (options.offset) this.offset = options.offset;
+    if (options.axisColors) this.axisColors = options.axisColors;
+    if (options.hoveredColor) this.hoveredColor = options.hoveredColor;
+    if (options.lineWidth !== undefined) this.lineWidth = options.lineWidth;
     this.pluginName = `margoengine-controls:transform:${++counter}`;
     const order = options.order ?? 1000;
     const plugin = {
@@ -268,7 +316,7 @@ export class TransformControls extends EventDispatcher {
   private owned(object: Mesh): void {
     meshRuntime(object).check();
     if ((meshRuntime(object) as unknown as { engine: unknown }).engine !== engineRuntime(this.engine))
-      throw new TypeError('Mesh belongs to another engine; attach a mesh created by this engine');
+      throw typeError('TransformControls: the mesh belongs to another engine; attach a mesh created by this engine', 'controls-transform');
   }
   attach(object: Mesh): this {
     this.owned(object);
@@ -289,7 +337,7 @@ export class TransformControls extends EventDispatcher {
     for (const object of list) this.owned(object);
     const chosen = active ?? list[list.length - 1];
     if (!chosen) return this.detach();
-    if (!list.includes(chosen)) throw new TypeError('The active mesh is not one of the attached meshes');
+    if (!list.includes(chosen)) throw typeError('TransformControls: the active mesh is not one of the attached meshes; pass one of them or none', 'controls-transform');
     if (list.length === 1) return this.attach(chosen);
     if (this.dragging) this.endDrag();
     this.object = chosen;
@@ -338,7 +386,8 @@ export class TransformControls extends EventDispatcher {
     }
   }
   setSize(size: number): void {
-    if (!(size > 0)) throw new RangeError('Gizmo size must be positive');
+    if (!(Number.isFinite(size) && size > 0))
+      throw rangeError('TransformControls size must be a finite number above 0; pass a positive size', 'controls-transform');
     this.size = size;
     this.dispatchEvent({ type: 'change' });
   }
@@ -455,6 +504,45 @@ export class TransformControls extends EventDispatcher {
       if (this.live(m.mesh)) m.mesh.setPosition(m.position).setQuaternion(m.quaternion).setScale(m.scale);
   }
 
+  /** Where the gizmo sits in the attached object's own space (one object attached). Default [0, 0, 0]. */
+  get offset(): readonly [number, number, number] {
+    return this.offsetValue;
+  }
+  set offset(value: readonly [number, number, number]) {
+    if (value?.length !== 3 || !value.every(Number.isFinite))
+      throw typeError('TransformControls offset must be three finite numbers; pass [x, y, z]', 'controls-transform');
+    this.offsetValue = [value[0], value[1], value[2]];
+  }
+  /** Colours of the X, Y and Z handles, or null for red, green and blue. */
+  get axisColors(): readonly [RGBA, RGBA, RGBA] | null {
+    return this.colorsValue;
+  }
+  set axisColors(value: readonly [GizmoColor, GizmoColor, GizmoColor] | null) {
+    if (value !== null && value?.length !== 3)
+      throw typeError('TransformControls axisColors must be three colours or null; pass [x, y, z] colours', 'controls-transform');
+    this.colorsValue = value && [rgba(value[0], 'axisColors'), rgba(value[1], 'axisColors'), rgba(value[2], 'axisColors')];
+  }
+  /** Colour of the hovered or dragged handle, or null for yellow. */
+  get hoveredColor(): RGBA | null {
+    return this.hoverValue;
+  }
+  set hoveredColor(value: GizmoColor | null) {
+    this.hoverValue = value === null ? null : rgba(value, 'hoveredColor');
+  }
+  /** Width in CSS pixels of the arrow shafts, scale lines and rings. Default 2.5. */
+  get lineWidth(): number {
+    return this.widthValue;
+  }
+  set lineWidth(value: number) {
+    if (!(Number.isFinite(value) && value > 0))
+      throw rangeError('TransformControls lineWidth must be a finite number above 0; pass a width in CSS pixels', 'controls-transform');
+    this.widthValue = value;
+  }
+  /** True when one object is attached with a non-zero `offset`: drags then go about the offset point. */
+  private offsetPivot(): boolean {
+    return !this.selection.length && this.offsetValue.some((v) => v !== 0);
+  }
+
   /** The gizmo frame for a viewport size in CSS pixels, or null when nothing is attached. */
   frame(): GizmoFrame | null {
     const object = this.attached();
@@ -462,26 +550,32 @@ export class TransformControls extends EventDispatcher {
     const store = engineRuntime(this.engine).store,
       id = meshRuntime(object).id,
       m = store.matrices.subarray(id * 16, id * 16 + 16);
-    const origin: V3 = this.pivotPoint() ?? [m[12], m[13], m[14]],
+    const origin: V3 =
+        this.pivotPoint() ?? (this.offsetPivot() ? transformPoint(m, this.offsetValue) : [m[12], m[13], m[14]]),
       camera = this.view?.camera ?? this.engine.camera,
-      b = basis(camera);
+      b = rollFrame(camera);
     // One object scales along its own axes, the only ones it has; a group can also spread along the world's.
     const space = this.mode === 'scale' && !this.selection.length ? 'local' : this.space,
       q = this.worldQuaternion(object);
-    const axes: [V3, V3, V3] =
-      space === 'local'
-        ? [rotateByQuaternion([1, 0, 0], q), rotateByQuaternion([0, 1, 0], q), rotateByQuaternion([0, 0, 1], q)]
-        : [
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1],
-          ];
+    const own: [V3, V3, V3] = [
+        rotateByQuaternion([1, 0, 0], q),
+        rotateByQuaternion([0, 1, 0], q),
+        rotateByQuaternion([0, 0, 1], q),
+      ],
+      axes: [V3, V3, V3] =
+        space === 'local'
+          ? own
+          : [
+              [1, 0, 0],
+              [0, 1, 0],
+              [0, 0, 1],
+            ];
     const toCamera = sub(camera.position, origin),
       distance = Math.hypot(...toCamera) || 1;
     // One gizmo unit spans GIZMO_SCREEN_FRACTION of the viewport height. The visible half height at the gizmo is
     // distance * tan(fov / 2) in perspective (tan capped so very wide lenses stay bounded) or the orthographic half height.
     const halfHeight = b.ortho ?? distance * Math.min(b.tanHalf, GIZMO_TAN_CAP),
-      size = 2 * GIZMO_SCREEN_FRACTION * halfHeight * this.size,
+      size = this.fixed ? 2 * GIZMO_SCREEN_FRACTION * halfHeight * this.size : this.size,
       eye = b.ortho !== undefined ? scale(b.forward, -1) : scale(toCamera, 1 / distance);
     if (!this.dragging)
       for (let i = 0; i < 3; i++) {
@@ -492,22 +586,28 @@ export class TransformControls extends EventDispatcher {
       mode: this.mode,
       origin,
       axes,
+      // The combined mode's scale handles follow one object's own axes, like the scale mode.
+      scaleAxes: this.mode === 'all' && !this.selection.length ? own : undefined,
       size,
       eye,
       up: b.up,
       show: { X: this.showX, Y: this.showY, Z: this.showZ },
+      hide: this.hide,
       axis: this.axis,
       dragging: this.dragging,
       flip: this.flipAxes ? [...this.flip] : undefined,
       delta: this.showDelta ? this.progress(origin) : null,
+      colors: this.colorsValue ?? undefined,
+      hover: this.hoverValue ?? undefined,
+      lineWidth: this.widthValue,
     };
   }
   /** The active drag's progress for the overlay; `origin` is where the object is now. */
   private progress(origin: V3): GizmoDelta | null {
     const d = this.drag;
     if (!d) return null;
-    if (this.mode === 'translate') return { kind: 'line', from: d.origin, to: origin };
-    if (this.mode === 'scale')
+    if (d.op === 'translate') return { kind: 'line', from: d.origin, to: origin };
+    if (d.op === 'scale')
       return d.pointStart && d.pointNow
         ? { kind: 'line', from: add(d.origin, d.pointStart) as V3, to: add(d.origin, d.pointNow) as V3 }
         : null;
@@ -548,13 +648,13 @@ export class TransformControls extends EventDispatcher {
     const w = Math.max(1, e.clientWidth),
       h = Math.max(1, e.clientHeight),
       v = this.view;
-    if (!v) return { b: basis(this.engine.camera), x: 0, y: 0, width: w, height: h };
+    if (!v) return { b: rollFrame(this.engine.camera), x: 0, y: 0, width: w, height: h };
     const canvas = this.engine.canvas,
       sx = v.pixels ? w / canvas.width : w,
       sy = v.pixels ? h / canvas.height : h,
       [x, y, width, height] = v.viewport;
     return {
-      b: basis(v.camera),
+      b: rollFrame(v.camera),
       x: x * sx,
       y: y * sy,
       width: Math.max(1, width * sx),
@@ -656,7 +756,8 @@ export class TransformControls extends EventDispatcher {
     const { b, width, height } = s;
     x -= s.x;
     y -= s.y;
-    const axis = this.axis,
+    const { op, axis } = handleAction(this.axis, this.mode),
+      axes = op === 'scale' && f.scaleAxes ? f.scaleAxes : f.axes,
       local = this.local(),
       parent = this.parentMatrix(object),
       parentQuaternion = quatFromMatrix(parent);
@@ -664,11 +765,12 @@ export class TransformControls extends EventDispatcher {
       center = project(b, o, width, height);
     const pixelsPerUnit = (height / (2 * (b.ortho ?? Math.max(1e-9, center.depth) * b.tanHalf))) * f.size;
     const drag: DragStart = {
+      op,
       axis,
       origin: o,
-      axes: f.axes,
+      axes,
       eye: f.eye,
-      normal: this.planeNormal(axis, f),
+      normal: this.planeNormal(axis, axes, f.eye),
       pointStart: null,
       screenStart: { x, y },
       screenLast: { x, y },
@@ -688,9 +790,14 @@ export class TransformControls extends EventDispatcher {
       tangent: { x: 0, y: 0 },
       spoke: null,
       pointNow: null,
-      members: this.selection.length ? this.movers().map((mesh) => this.member(mesh)) : null,
+      // With an offset, one object is a member like several: it moves, turns and scales about the gizmo, not its origin.
+      members: this.selection.length
+        ? this.movers().map((mesh) => this.member(mesh))
+        : this.offsetPivot()
+          ? [this.member(object)]
+          : null,
     };
-    if (this.mode === 'rotate' && 'XYZ'.includes(axis) && axis.length === 1) {
+    if (op === 'rotate' && 'XYZ'.includes(axis) && axis.length === 1) {
       const a = f.axes['XYZ'.indexOf(axis)],
         hit = intersectPlane(ray(b, x, y, width, height), o, a);
       drag.exact = !!hit && Math.abs(dot(a, f.eye)) > 0.15;
@@ -707,11 +814,11 @@ export class TransformControls extends EventDispatcher {
         const l = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
         drag.tangent = { x: (p1.x - p0.x) / l, y: (p1.y - p0.y) / l };
       }
-    } else if (this.mode === 'rotate' && axis === 'E') {
+    } else if (op === 'rotate' && axis === 'E') {
       // From the centre to the grab point on screen, laid in the plane of the ring.
       const across = madd(scale(b.right, x - center.x), b.up, center.y - y);
       drag.spoke = normalize(madd(across, f.eye, -dot(across, f.eye))) as V3;
-    } else if (this.mode === 'translate' || (this.mode === 'scale' && axis !== 'XYZ')) {
+    } else if (op === 'translate' || (op === 'scale' && axis !== 'XYZ')) {
       const hit = intersectPlane(ray(b, x, y, width, height), o, drag.normal);
       drag.pointStart = hit ? sub(hit, o) : null;
       if (!drag.pointStart) return;
@@ -734,8 +841,8 @@ export class TransformControls extends EventDispatcher {
     const { b, width, height } = s;
     x -= s.x;
     y -= s.y;
-    if (this.mode === 'translate') this.translate(d, object, b, x, y, width, height);
-    else if (this.mode === 'rotate') this.rotate(d, object, b, x, y, width, height);
+    if (d.op === 'translate') this.translate(d, object, b, x, y, width, height);
+    else if (d.op === 'rotate') this.rotate(d, object, b, x, y, width, height);
     else this.scale(d, object, b, x, y, width, height);
     d.screenLast = { x, y };
     this.dispatchEvent({ type: 'objectChange' });
@@ -894,7 +1001,7 @@ export class TransformControls extends EventDispatcher {
   /** Each object turns by the world rotation R, about the pivot or in place; on its own axes, the same turn in its frame. */
   private turnMembers(d: DragStart, rotation: Q4): void {
     const own = this.ownAxes(d),
-      inPlace = this.pivot === 'individual',
+      inPlace = this.pivot === 'individual' && this.selection.length > 0,
       inFrame = multiplyQuaternions(
         multiplyQuaternions(conjugateQuaternion(d.worldQuaternion), rotation),
         d.worldQuaternion,
@@ -922,7 +1029,7 @@ export class TransformControls extends EventDispatcher {
    */
   private scaleMembers(d: DragStart, factors: V3): void {
     const own = this.ownAxes(d),
-      inPlace = this.pivot === 'individual';
+      inPlace = this.pivot === 'individual' && this.selection.length > 0;
     for (const m of d.members!) {
       if (!this.live(m.mesh)) continue;
       if (!inPlace) {
@@ -986,11 +1093,11 @@ export class TransformControls extends EventDispatcher {
   }
 
   // ---- helpers ----
-  private planeNormal(axis: HandleName, f: GizmoFrame): V3 {
-    if (axis === 'XYZ' || axis === 'E' || axis === 'XYZE') return f.eye;
-    if (axis.length === 2) return f.axes['XYZ'.indexOf('XYZ'.split('').find((c) => !axis.includes(c))!)];
-    const a = f.axes['XYZ'.indexOf(axis)],
-      n = sub(f.eye, scale(a, dot(f.eye, a)));
+  private planeNormal(axis: HandleName, axes: [V3, V3, V3], eye: V3): V3 {
+    if (axis === 'XYZ' || axis === 'E' || axis === 'XYZE') return eye;
+    if (axis.length === 2) return axes['XYZ'.indexOf('XYZ'.split('').find((c) => !axis.includes(c))!)];
+    const a = axes['XYZ'.indexOf(axis)],
+      n = sub(eye, scale(a, dot(eye, a)));
     if (Math.hypot(...n) > 1e-6) return normalize(n);
     return normalize(Math.abs(a[1]) < 0.9 ? cross(a, [0, 1, 0]) : cross(a, [1, 0, 0]));
   }
@@ -1033,8 +1140,18 @@ export class TransformControls extends EventDispatcher {
       this.object = left[left.length - 1] ?? null;
       this.savedSelection = this.savedSelection.filter((m) => this.live(m.mesh));
       this.resetState = this.savedSelection.find((m) => m.mesh === this.object) ?? null;
-      this.dragging = false;
-      this.drag = null;
+      // End a drag like a release, so mouseUp and dragging-changed fire and the pointer capture is let go.
+      if (this.dragging) {
+        const pointerId = this.pointerId;
+        if (pointerId !== null) {
+          try {
+            if (this.element?.hasPointerCapture?.(pointerId) ?? true) this.element?.releasePointerCapture?.(pointerId);
+          } catch {
+            /* ignore */
+          }
+        }
+        this.endDrag();
+      }
       return this.object;
     }
     return object;

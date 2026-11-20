@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { GCProfiler, setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Animator, CCDSolver, addCCDChain } from '../packages/animator/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 const random = (seed) => () => {
   seed = (seed + 0x6d2b79f5) | 0;

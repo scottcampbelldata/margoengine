@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
-import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
+import { PBRInstances } from '../../gltf/dist/pbr-instancing.js';
 import { BatchTable, FeatureTable } from '../dist/index.js';
 import { TileFeatures, textureFeatureId, metadataTexel } from '../dist/features.js';
 import { validatePreparedGeometry } from '../../shared/prepared-geometry.js';
@@ -380,8 +380,8 @@ test('feature texture transforms and UINT32 shader factors remain exact and budg
   assert.equal(destroyed, 1);
   features.dispose();
 });
-test('feature ID texture transforms pick and highlight the texel gltf-pro draws (review 5)', async () => {
-  const { textureCoordinates } = await import('../../gltf-pro/dist/index.js');
+test('feature ID texture transforms pick and highlight the texel gltf/pbr draws (review 5)', async () => {
+  const { textureCoordinates } = await import('../../gltf/dist/pbr.js');
   const transform = { offset: [0.25, 0.5], rotation: Math.PI / 2, scale: [2, 1] };
   const f = fixture((doc) => {
     const p = doc.meshes[0].primitives[0];
@@ -475,7 +475,7 @@ test('percent-encoded binary data: URI feature images decode to their exact byte
   assert.equal(features.images.get(model).get(0).data[0], 7);
 });
 
-// A primitive over gltf-pro's maxPartVertices loads as parts whose local vertices name their source vertex through
+// A primitive over gltf/pbr's maxPartVertices loads as parts whose local vertices name their source vertex through
 // part.vertexMap; feature IDs are per source vertex, so a hit on a part resolves the same feature as on the whole.
 test('a split primitive: every face of every part resolves the feature of the same face unsplit', async () => {
   const whole = fixture(),

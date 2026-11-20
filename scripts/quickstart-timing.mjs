@@ -6,7 +6,7 @@ import { speedBudget } from './speed/budgets.mjs';
 // route 2 line by line (route 1 with --route=1): clone, `npm ci`, `npm run pack:packages`, a new project,
 // `npm install <tarballs> vite`, then writes index.html and main.ts EXACTLY as the README prints them (extracted from
 // the clone's README by scripts/support/doc-snippets.mjs, never retyped), starts `npx vite` and opens the page in a
-// real WebGPU browser (the Edge/Chromium the GPU checks use, under a shared GPU lock slot for the browser part only).
+// real WebGPU browser (the Edge/Chromium the GPU checks use).
 // The browser asserts, from pixels and handlers, never by eye:
 //   * a lit, TEXTURED scene: the first frame has content, the floor shows the checker's sharp edges and the same
 //     scene with the texture removed does not;
@@ -42,7 +42,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { browserLabel, launchBrowser } from './lib/browser.mjs';
 import sharp from 'sharp';
-import { acquire, killTree, windowsCommandLine } from './gpu-lock.mjs';
+import { killTree, windowsCommandLine } from './run-with-timeout.mjs';
 import { quickstartFiles } from './support/doc-snippets.mjs';
 import { describeHardware, hardwareLine, settleOneAtATime, waitForPicture } from './support/scene-ready.mjs';
 import { closeAll } from './support/shutdown.mjs';
@@ -185,10 +185,7 @@ export async function main() {
     timeline = [],
     sizes = {},
     notes = [];
-  // Time spent queueing for the GPU behind other jobs is not the quickstart's time: it is taken off every timestamp and
-  // off the hard limit, and reported as gpuLockWaitSeconds.
-  let waited = 0;
-  const active = () => Date.now() - started - waited;
+  const active = () => Date.now() - started;
   const mark = (step) => {
     const seconds = Number((active() / 1000).toFixed(1));
     timeline.push({ step, seconds });
@@ -211,7 +208,7 @@ export async function main() {
         console.error(`quickstart-timing: hard limit of ${limit} s reached; ending every process it started`);
         cleanup();
         writeResults(false, `hard limit of ${limit} s reached`);
-        process.exit(2);
+        process.exit(2); // process.exit: the hard-limit watchdog ends a hung run whose children may hold the loop
       },
       Math.max(1, limit * 1000 - active()),
     );
@@ -252,7 +249,7 @@ export async function main() {
     return total;
   };
 
-  let dev, browser, release;
+  let dev, browser;
   try {
     mark('start (first command)');
     // 1. Obtain: the README's "GIT_LFS_SKIP_SMUDGE=1 git clone" from the local checkout (--lfs fetches the test assets too).
@@ -392,14 +389,7 @@ export async function main() {
         ? `${origin}/${name === 'readme' ? '' : `${name}.html`}`
         : `${origin}/${name === 'readme' ? 'readme-index.html' : `readme-${name}.html`}`;
 
-    // 5. The browser, under one shared GPU slot.
-    clearTimeout(hardStop);
-    const queued = Date.now();
-    release = await acquire({ owner: 'quickstart-timing', mode: 'shared', max: 15 });
-    waited += Date.now() - queued;
-    sizes.gpuLockWaitSeconds = Number((waited / 1000).toFixed(1));
-    arm();
-    mark(`GPU lock held (waited ${sizes.gpuLockWaitSeconds} s behind other jobs; not counted)`);
+    // 5. The browser.
     browser = await launchBrowser({ headless: true });
     notes.push(`browser ${browserLabel()} ${browser.version()} headless`);
     const open = async (url, { noGpu = false, noAdapter = false, noWebGL2 = false } = {}) => {
@@ -695,7 +685,6 @@ export async function main() {
   } finally {
     clearTimeout(hardStop);
     await closeAll({ browser }).catch((error) => console.error(error.message));
-    release?.();
     cleanup();
     if (!flag('keep') && !reuse)
       // Deleting node_modules can take minutes on Windows; do it detached so the check ends now.

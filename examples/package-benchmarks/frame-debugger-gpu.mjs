@@ -1,5 +1,5 @@
-// Real-GPU check of the frame debugger (run on AC power under the GPU lock, after npm run build:packages):
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/frame-debugger-gpu.mjs
+// Real-GPU check of the frame debugger (run on AC power, after npm run build:packages):
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/frame-debugger-gpu.mjs
 // Captures one frame of SciFiHelmet + shadows + GPU-culled indirect boxes + PostStack(SSAO, Bloom, FXAA) with
 // timestamp queries, checks the report, and writes test-results/frame-debugger-report.json and
 // test-results/frame-debugger-panel.png (the DOM panel over the scene).
@@ -55,7 +55,7 @@ try {
   );
   assert.deepEqual([...errors, ...pageErrors], []);
   assert.equal(report.timing, 'gpu', report.note);
-  for (const owner of ['core', 'shadows', 'gltf-pro:', 'culling:', 'post:stack'])
+  for (const owner of ['core', 'shadows', 'gltf/pbr:', 'culling:', 'post:stack'])
     assert.ok(
       owners.some((name) => name.startsWith(owner)),
       `a pass owned by ${owner}: ${owners}`,

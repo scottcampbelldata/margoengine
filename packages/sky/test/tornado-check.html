@@ -1,0 +1,92 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky tornado check</title><style>body{margin:0}canvas{display:block;width:240px;height:180px}</style></head><body><canvas></canvas>
+<script type="module">
+// A tornado on a real GPU (TornadoCloud), read back from Bloom's HDR scene capture over a black background. Each
+// pixel's ray is followed through the tornado's CPU field (funnelRadius, the same table the shader reads): a ray
+// that passes deep inside the funnel must show lit cloud, a ray that never comes near the funnel, the debris, the wall
+// cloud or the base must stay black. Then: nothing draws before the shader has loaded; a wedge's funnel is wider than a
+// rope's in the ratio of their CPU radii; the funnel moves along the path with the clock; and a funnel that does not
+// reach the ground leaves the ground clear under it. Driven by features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Tornado,TornadoCloud,funnelRadius,funnelBottom,funnelProfile,debrisRadius,tornadoShaderLoaded} from '/packages/sky/dist/tornado.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,300,3000],target:[0,300,0],fov:60,near:1,far:50000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return {w:texture.width,h:texture.height,v:data};
+}
+const lum=(v,i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2];
+// The ray through pixel (x, y) of the camera at `eye` looking along -Z, fov 60 degrees.
+const ray=(x,y,w,h)=>{const t=Math.tan(Math.PI/6),d=[(2*(x+0.5)/w-1)*t*w/h,(1-2*(y+0.5)/h)*t,-1],l=Math.hypot(...d);return d.map(v=>v/l);};
+const EYE=[0,300,3000];
+const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+// The view's light less the same view with no storm (the engine's clear colour), per pixel.
+let background;
+const render=async()=>{const img=await frame();if(background)for(let i=0;i<img.v.length;i++)img.v[i]-=background.v[i];return img;};
+// Along a ray, every 2 m out to 6 km: the deepest it goes into the funnel (1 - r / Rf, the largest), and whether it
+// comes near anything the storm draws (within 1.5 funnel radii, the debris cloud's reach, or the wall cloud's or the
+// base's cylinders at their heights).
+function field(t,cloud){const s=t.resolved,k=t.strengthAt(cloud.time);return {s,k,c:t.centerAt(cloud.time),rd:debrisRadius(s,k)*1.6,hd:s.debrisHeight*k,bottom:funnelBottom(s,k),prof:funnelProfile(s,k)};}
+// The funnel's radius at height y from the same 32-height table the shader reads, linear between.
+const tableAt=(f,y)=>{const x=Math.min(Math.max(y/f.s.wallBase,0),1)*31,i=Math.floor(x),j=Math.min(i+1,31);return f.prof[i]+(f.prof[j]-f.prof[i])*(x-i);};
+function along(d,f){
+ const s=f.s,c=f.c;let deep=-1,near=false;
+ for(let u=0;u<6000;u+=2){const y=EYE[1]+d[1]*u;if(y<0||y>s.cloudBase+300)continue;const r=Math.hypot(EYE[0]+d[0]*u-c[0],EYE[2]+d[2]*u-c[1]);
+  const rf=tableAt(f,y);if(rf>0&&y>=f.bottom){deep=Math.max(deep,1-r/rf);if(r<1.5*rf+20)near=true;}
+  if(y<f.hd+20&&r<f.rd)near=true;if(y>s.wallBase-200&&r<1.4*s.wallRadius)near=true;if(y>s.cloudBase-200&&r<1.2*s.mesoRadius)near=true;}
+ return {deep,near};
+}
+function score(img,t,cloud){const clear=[],solid=[],f=field(t,cloud);
+ for(let y=0;y<img.h;y+=2)for(let x=0;x<img.w;x+=2){const a=along(ray(x,y,img.w,img.h),f),l=lum(img.v,(y*img.w+x)*4);if(!a.near)clear.push(l);else if(a.deep>0.5)solid.push(l);}
+ const sorted=a=>[...a].sort((p,q)=>p-q);
+ return {clear:clear.length,solid:solid.length,clearMax:clear.length?sorted(clear).at(-1):0,solidP10:solid.length?sorted(solid)[Math.floor(solid.length*0.1)]:0};}
+// The funnel's width in pixels along the row through height y (pixels whose light is over a fifth of the row's peak,
+// counted near the centre column), and its centre column.
+function row(img,height){const t=Math.tan(Math.PI/6),y=Math.round((0.5-0.5*(height-EYE[1])/(EYE[2]*t))*img.h-0.5);let peak=0;
+ for(let x=0;x<img.w;x++)peak=Math.max(peak,lum(img.v,(y*img.w+x)*4));let n=0,sx=0;
+ for(let x=0;x<img.w;x++)if(lum(img.v,(y*img.w+x)*4)>0.2*peak){n++;sx+=x;}return {width:n,centre:n?sx/n:-1,peak};}
+const metresPerPixel=(img)=>2*EYE[2]*Math.tan(Math.PI/6)/img.h;
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const out={};
+  const base={cloudBase:1000,wallCloudDrop:400,wallCloudRadius:1200,mesocycloneRadius:2000,turbulence:0,debrisDensity:0};
+  const strong=new Tornado({...base,pressureDrop:90,coreRadius:120});
+  await waitForPipelines(frame);background=await frame();
+  const cloud=TornadoCloud.attach(engine,{tornado:strong,steps:256});
+  // Before the shader has loaded the storm draws nothing (black), with no error.
+  out.loadedBefore=tornadoShaderLoaded();
+  const first=await render();let lit=0;for(let i=0;i<first.v.length;i+=4)lit=Math.max(lit,lum(first.v,i));out.beforeReady=lit;
+  await cloud.ready;await waitForPipelines(render);
+  const img=await render();out.strong=score(img,strong,cloud);
+  // Rope against wedge: the funnel's width 150 m up, in pixels, against the CPU's radius there.
+  const mpp=metresPerPixel(img);out.strongRow=row(img,150);out.strongCpu=2*funnelRadius(150,strong.resolved)/mpp;
+  cloud.tornado.options.coreRadius=40;cloud.tornado.options.pressureDrop=85;
+  const rope=await render();out.ropeRow=row(rope,150);out.ropeCpu=2*funnelRadius(150,cloud.tornado.resolved)/mpp;
+  cloud.tornado.options.coreRadius=350;cloud.tornado.options.pressureDrop=110;
+  const wedge=await render();out.wedgeRow=row(wedge,150);out.wedgeCpu=2*funnelRadius(150,cloud.tornado.resolved)/mpp;
+  out.wedge=score(wedge,cloud.tornado,cloud);
+  // A path: 400 m toward +X over 40 s, the funnel's centre column follows it.
+  Object.assign(cloud.tornado.options,{coreRadius:120,pressureDrop:90,path:[[0,0,0],[40,400,0]]});
+  cloud.setTime(0);const at0=row(await render(),150);cloud.setTime(40);const at40=row(await render(),150);
+  out.moved=(at40.centre-at0.centre)*mpp;
+  // A weak vortex: a funnel aloft, the ground under it clear (black below the funnel's bottom).
+  Object.assign(cloud.tornado.options,{pressureDrop:45,path:undefined});cloud.setTime(0);
+  const weak=await render();out.weakBottom=funnelBottom(cloud.tornado.resolved);out.weak=score(weak,cloud.tornado,cloud);
+  out.weakGround=row(weak,Math.max(5,out.weakBottom-120)).peak;out.weakAloft=row(weak,Math.min(560,out.weakBottom+150)).peak;
+  cloud.dispose();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

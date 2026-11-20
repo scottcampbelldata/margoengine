@@ -294,7 +294,7 @@ export class WFC {
     }
     throw new MargoError(
       'failed',
-      'WFC constraints contradicted within the retry budget; raise the retry budget, relax the pins or try another seed. Help: https://margoengine.com/docs/wfc',
+      'WFC constraints contradicted within the retry budget; raise the retry budget, relax the pins or try another seed. Help: https://margoengine.com/llms/packages/wfc.md',
     );
   }
 }

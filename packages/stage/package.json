@@ -29,8 +29,8 @@
     "test:gpu": "cd ../.. && node scripts/stage-viewer-gpu-check.js && node packages/stage/test/gpu/scene-check.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:features": "cd ../.. && node scripts/stage-features-gpu-check.js",
-    "test:gpu:gltf": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-gltf --wait-max=60 --max=5 --gpu=stage-gltf-shadow-pixel-comparison -- node packages/stage/test/gpu/gltf-check.mjs",
-    "test:gpu:lights": "cd ../.. && node scripts/gpu-lock.mjs run --owner=stage-lights --wait-max=60 --max=4 --gpu=stage-lights-pixel-comparison -- node packages/stage/test/gpu/lights-check.mjs",
+    "test:gpu:gltf": "cd ../.. && node scripts/run-with-timeout.mjs --max=5 -- node packages/stage/test/gpu/gltf-check.mjs",
+    "test:gpu:lights": "cd ../.. && node scripts/run-with-timeout.mjs --max=4 -- node packages/stage/test/gpu/lights-check.mjs",
     "test:gpu:viewer-extras": "cd ../.. && node packages/stage/test/gpu/viewer-extras-check.mjs"
   },
   "sideEffects": false,
@@ -98,12 +98,11 @@
   "peerDependencies": {
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/creative": "^1.0.0",
-    "@margoengine/scenery": "^1.0.0",
+    "@margoengine/sky": "^1.0.0",
     "@margoengine/environment": "^1.0.0",
     "@margoengine/shadows": "^1.0.0",
     "@margoengine/xr": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
-    "@margoengine/staging": "^1.0.0",
+    "@margoengine/studio": "^1.0.0",
     "@margoengine/tonemap": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
     "@margoengine/save": "^1.0.0",
@@ -125,7 +124,7 @@
     "@margoengine/creative": {
       "optional": true
     },
-    "@margoengine/scenery": {
+    "@margoengine/sky": {
       "optional": true
     },
     "@margoengine/environment": {
@@ -137,10 +136,7 @@
     "@margoengine/xr": {
       "optional": true
     },
-    "@margoengine/gltf-pro": {
-      "optional": true
-    },
-    "@margoengine/staging": {
+    "@margoengine/studio": {
       "optional": true
     },
     "@margoengine/tonemap": {

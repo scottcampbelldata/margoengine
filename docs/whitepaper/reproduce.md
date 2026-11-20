@@ -18,7 +18,7 @@
 
 - Batch 170 React: after building, `node --experimental-test-module-mocks --test --test-timeout=120000
   --test-name-pattern=10000 packages/react/test/declarative.test.js` checks the props enumerations and transform
-  bytes. The R3F smoke is `node scripts/gpu-lock.mjs run --owner=react-smoke --max=20 -- node
+  bytes. The R3F smoke is `node scripts/run-with-timeout.mjs run --max=20 -- node
   scripts/parity-smoke-browser.mjs --runs=1 --standard=react --engines=margo,r3f`. [Setup](batch-170-react.md).
 
 - Batch 170 audio: after building, `node --test --test-timeout=120000 packages/audio/tests/workcount.test.js` checks
@@ -30,19 +30,19 @@
 
 - Batch 165 job 1: build packages, then run `node --test --test-timeout=120000 packages/tonemap/tests/cube-workcount.test.js packages/tonemap/tests/cube-sizes.test.js packages/webgl2-compat/test/wgsl-minus.test.js` for deterministic operation counts, pre-change byte hashes, malformed inputs and context-aware WGSL minus parsing. Run `npm run check:readme-run -- --packages=tonemap,webgl2-compat` for runnable examples. [Complete method and quiet-run separation](batch-165-workcounts.md).
 
-- Batch 179 provenance: after building packages, run node --test packages/sciviz/tests/provenance.test.js. Browser correctness: node scripts/gpu-lock.mjs run --owner=provenance-review --wait-max=60 --max=8 -- node packages/sciviz/tests/provenance-browser.mjs, with a hard outer process-tree timeout. Default covers all 24 demos on both backends. PROVENANCE_BACKENDS=webgpu or webgl2 and PROVENANCE_DEMOS=head,points select affected cases; PROVENANCE_ARTIFACTS=1 writes MRI PNG/SVG/PDF and the executed ESM trace under test-results/sciviz-provenance. Reports include record data hash counts, package/device identity and exported byte counts, which are file sizes rather than speed measurements. All real inputs retain their existing demo source/licence attribution.
+- Batch 179 provenance: after building packages, run node --test packages/sciviz/tests/provenance.test.js. Browser correctness: node scripts/run-with-timeout.mjs run --max=8 -- node packages/sciviz/tests/provenance-browser.mjs, with a hard outer process-tree timeout. Default covers all 24 demos on both backends. PROVENANCE_BACKENDS=webgpu or webgl2 and PROVENANCE_DEMOS=head,points select affected cases; PROVENANCE_ARTIFACTS=1 writes MRI PNG/SVG/PDF and the executed ESM trace under test-results/sciviz-provenance. Reports include record data hash counts, package/device identity and exported byte counts, which are file sizes rather than speed measurements. All real inputs retain their existing demo source/licence attribution.
 
 
 
 ### Batch 163 job 1: points upload work count
 
-Build with `npm run build:packages`, then run `node --test --test-timeout=120000 packages/points/tests/frame-work.test.js`. Run the GPU-locked points browser commands in [bp-163-workcounts.md](bp-163-workcounts.md) for native and compatibility pixel checks. No benchmark is run in this phase; historical timing rows remain unchanged.
+Build with `npm run build:packages`, then run `node --test --test-timeout=120000 packages/points/tests/frame-work.test.js`. Run the points browser commands in [bp-163-workcounts.md](bp-163-workcounts.md) for native and compatibility pixel checks. No benchmark is run in this phase; historical timing rows remain unchanged.
 
 ## Batch 187: global lightmap opaque visibility
 
 Build packages; run node --test --test-timeout=120000 packages/lightmap/tests/global-path.test.js
 packages/lightmap/tests/global.test.js (one command, paths separated by spaces). For pixels use
-node scripts/gpu-lock.mjs run --owner=codex-batch187 --max=3 --wait-max=60 -- node packages/lightmap/tests/global-browser.mjs;
+node scripts/run-with-timeout.mjs run --max=3 -- node packages/lightmap/tests/global-browser.mjs;
 repeat with --compat on the browser script. The unblocked receiver must be lit; every blocked centre RGB channel is
 zero, with no GPU validation errors and all meshes released. These are correctness runs, not speed measurements.
 The existing Batch 168 Cornell reference remains unchanged outside the repository. Decode its cycles.json using the
@@ -53,11 +53,11 @@ maximum 0.3539794757772641. Do not run rival-bench.mjs during the deferred speed
 required or claimed; cached reference correctness comparison only, no timings or speed assertions.
 
 
-Batch 175 job 1: after build:packages, run `node --test --test-timeout=30000 packages/sciviz/tests/omezarr.test.js`; run `node scripts/gpu-lock.mjs run --owner=codex-batch175 --max=5 --wait-max=60 -- node packages/sciviz/tests/omezarr-browser.mjs` for both native and full WebGL2 in one leaf. The leaf draws all three recorded scientific regions and checks source replacement, lit pixels and errors, writing test-results/sciviz-omezarr-gpu.json. The example is examples/sciviz-cloud.html. Each fixture manifest retains original store URL, resolution/ROI, Range requests, hashes and licence. `node scripts/prepare-sciviz-cloud.mjs` refreshes only small public compressed regions, never entire volumes. For an independent numeric comparison, install binary Python numcodecs, numpy, lz4, xxhash and Pillow in an environment (the scripts also look in test-results/batch175-tools), then run `py -3.13 scripts/prepare-sciviz-cloud-codecs.py` and `py -3.13 scripts/audit-sciviz-cloud.py`. No implementation source is read by either generator. The audit retains exact lossless equality and records the existing one-value JPEG IDCT difference separately. Speed is deferred; counts and memory bytes are the evidence.
+Batch 175 job 1: after build:packages, run `node --test --test-timeout=30000 packages/sciviz/tests/omezarr.test.js`; run `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/omezarr-browser.mjs` for both native and full WebGL2 in one leaf. The leaf draws all three recorded scientific regions and checks source replacement, lit pixels and errors, writing test-results/sciviz-omezarr-gpu.json. The example is examples/sciviz-cloud.html. Each fixture manifest retains original store URL, resolution/ROI, Range requests, hashes and licence. `node scripts/prepare-sciviz-cloud.mjs` refreshes only small public compressed regions, never entire volumes. For an independent numeric comparison, install binary Python numcodecs, numpy, lz4, xxhash and Pillow in an environment (the scripts also look in test-results/batch175-tools), then run `py -3.13 scripts/prepare-sciviz-cloud-codecs.py` and `py -3.13 scripts/audit-sciviz-cloud.py`. No implementation source is read by either generator. The audit retains exact lossless equality and records the existing one-value JPEG IDCT difference separately. Speed is deferred; counts and memory bytes are the evidence.
 
-Batch 190 job 2: build packages, run `node --test --test-timeout=120000 packages/oit/test/*.test.js`, then `node scripts/gpu-lock.mjs run --owner=codex-batch190 --max=3 --wait-max=60 --gpu=float32-accumulation-pixel-correctness -- node packages/oit/test/gpu/precise-check.mjs` and append `--compat` for WebGL2. Eight emissive layers deliberately overflow the old weighted half-float sums, with numeric readback before display mapping; the expected result is emitted radiance times `1 - 0.5^8`. The harness compares both implementations on ordinary radiance and full images with sloped MSAA edges, checks opaque depth, reordered input and the existing CC0 Khronos GlassVaseFlowers PBR model. CPU recording checks all four R32F channels, no implicit hardware resolve, both sample counts, device restoration, disposal and capability refusal before allocation. No timing assertion.
+Batch 190 job 2: build packages, run `node --test --test-timeout=120000 packages/oit/test/*.test.js`, then `node scripts/run-with-timeout.mjs run --max=3 -- node packages/oit/test/gpu/precise-check.mjs` and append `--compat` for WebGL2. Eight emissive layers deliberately overflow the old weighted half-float sums, with numeric readback before display mapping; the expected result is emitted radiance times `1 - 0.5^8`. The harness compares both implementations on ordinary radiance and full images with sloped MSAA edges, checks opaque depth, reordered input and the existing CC0 Khronos GlassVaseFlowers PBR model. CPU recording checks all four R32F channels, no implicit hardware resolve, both sample counts, device restoration, disposal and capability refusal before allocation. No timing assertion.
 
-Batch 190 job 1: after building packages, run `node --test --test-timeout=120000 packages/oit/test/*.test.js` and `node scripts/gpu-lock.mjs run --owner=codex-batch190 --max=3 --wait-max=60 --gpu=depth-peeling-pixel-correctness -- node packages/oit/test/gpu/peel-check.mjs`, then the same GPU command with `--compat` appended. The GPU checks compare against analytic alpha transport at 1x/4x scene MSAA, reorder meshes, cross sheets, limit layers, insert opaque occluders and check post/canvas alpha. They also load the existing CC0 Khronos GlassVaseFlowers sample with environment lighting and post processing. CPU recording covers private writable depth, immutable scene depth, resize between views, restoration, disposal and rejection of unsupported effect attachment. No benchmark or timing assertion is used.
+Batch 190 job 1: after building packages, run `node --test --test-timeout=120000 packages/oit/test/*.test.js` and `node scripts/run-with-timeout.mjs run --max=3 -- node packages/oit/test/gpu/peel-check.mjs`, then the same GPU command with `--compat` appended. The GPU checks compare against analytic alpha transport at 1x/4x scene MSAA, reorder meshes, cross sheets, limit layers, insert opaque occluders and check post/canvas alpha. They also load the existing CC0 Khronos GlassVaseFlowers sample with environment lighting and post processing. CPU recording covers private writable depth, immutable scene depth, resize between views, restoration, disposal and rejection of unsupported effect attachment. No benchmark or timing assertion is used.
 
 Batch 256 job 4: build packages and run
 `node --test --test-timeout=30000 packages/netcode/tests/migrate.test.js`.
@@ -84,7 +84,7 @@ protocol. No new GPU rendering path, benchmark or downloaded demo asset.
 
 Batch 273 failure 18: build packages, then run
 `node --test packages/webgl2-compat/test/compute-limits.test.js`.
-Run `node packages/shader/test/readback-check.mjs` in a shared GPU slot, first
+Run `node packages/shader/test/readback-check.mjs`, first
 with `MARGO_COMPAT` unset, then with `MARGO_COMPAT=1`. Keep all original
 assertions, the full 4,194,304-element workload and every lifecycle case.
 Compatibility validation must return `failed`, then recover with `[5,6,7,8]`,
@@ -99,24 +99,15 @@ names/bytes. Other platforms retain the stat counts. Additional fixtures cover
 metadata equality, shared changes, timestamp ties/backwards changes, per-write
 capacity decisions, disappearing entries and native helper errors.
 
-For the Bug 45 GPU idle-lease correction, run
-`node --test --test-timeout=60000 tests/gpu-idle-window.test.js tests/gpu-activity.test.js tests/gpu-monitor-edges.test.js tests/gpu-lock.test.js`.
-These CPU fixtures simulate the exact idle intervals and inspect real fake-lock
-entries; no GPU work or timing benchmark is involved. For an actual instrumented
-parity run, set `MARGO_GPU_IDLE_MIN=4` in that command's environment and retain
-`--max=8 --wait-max=60`, one shared slot and the existing eight-minute leaf limit.
-The idle window is 240 seconds, covering the measured 194.050-second reclamation
-interval plus 45.950 seconds of margin. Test and wrapper deadlines remain intact.
-
 ## Batch 258 input entry
 
 After `npm run build:packages`, run the deterministic state and draw-list
 checks with `node --test --test-timeout=120000 packages/ui/tests/text-input.test.js`.
-Run each browser command sequentially (one slot for this lane):
+Run each browser command in turn:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=codex-batch258 --max=3 --wait-max=60 -- node packages/ui/tests/text-input-browser.mjs
-node scripts/gpu-lock.mjs run --owner=codex-batch258 --max=3 --wait-max=60 -- node packages/ui/tests/text-input-browser.mjs --compat
+node scripts/run-with-timeout.mjs run --max=3 -- node packages/ui/tests/text-input-browser.mjs
+node scripts/run-with-timeout.mjs run --max=3 -- node packages/ui/tests/text-input-browser.mjs --compat
 ```
 
 Reports and captures are test-results/ui-text-input-{native,compat}.{json,png}.
@@ -130,7 +121,7 @@ integration example; run it through check:readme-run -- --packages=ui.
 
 After `npm run build:packages`, run
 `node --test --test-timeout=120000 packages/rigging/tests/vrm0.test.js`.
-Then run `node scripts/gpu-lock.mjs run --owner=vrm0-review --max=3 --wait-max=60 -- node packages/rigging/tests/rigging-browser.mjs`
+Then run `node scripts/run-with-timeout.mjs run --max=3 -- node packages/rigging/tests/rigging-browser.mjs`
 and repeat with `--compat` on the browser command. The harness checks the real
 0.51 model's turned-original picture against the converted picture, expression
 changes, neutral restoration, and the existing weight/IK/1.0 checks. Receipts:
@@ -172,8 +163,8 @@ Wasm as the scalar ruling. The author-retained measure folder holds
 controller2400s), `report23-hostile.mjs` (240s), `report23-memory.mjs`
 (173 fresh old/new process pairs, each180s, controller2400s), and
 `report23-uploads.mjs` (real GPU copies/readback, max1minute). Only the last
-runs through gpu-lock with owner codex-134, shared mode, wait-max60 and an
-explicit compressed-texture upload/readback reason. CPU scripts never hold it.
+runs on the GPU, for an explicit compressed-texture upload/readback
+reason. CPU scripts never use the GPU.
 Source pins, frozen control hashes and all image identities are retained.
 The upload harness uses the existing installGPU lifetime owner. ETC2/EAC
 absence on RTX A6000 WebGPU remains missing hardware evidence. No timing A/B.
@@ -184,11 +175,10 @@ acceptance: the runtime still receives the original source containers.
 
 One npm run verify (hard 40-minute process-tree limit): 14012 tests, 14010 passed,
 two metadata failures subsequently corrected; all seven affected checks pass. Do not rerun the full suite.
-Run the six sciviz *-browser.mjs leaves through scripts/gpu-lock.mjs in shared mode, one at a time,
---wait-max=60, with command limits from their measured duration plus margin. Do not hold a slot for
-package builds, units, lint, hygiene or verify. check:readme-run -- --packages=sciviz runs 25 examples.
+Run the six sciviz *-browser.mjs leaves one at a time, with command limits from their measured
+duration plus margin. Package builds, units, lint, hygiene and verify need no GPU. check:readme-run -- --packages=sciviz runs 25 examples.
 The [receipt](results/batch-171-tubes-validation.json) records exact counts, backend/restore evidence
-and the coherent c333a7390 measurement pair. No benchmark, exclusive GPU run or time-only assertion.
+and the coherent c333a7390 measurement pair. No benchmark, time-only assertion or run that needs the GPU to itself.
 
 
 ## Batch 171 critical-point regression and LIC attribution
@@ -200,7 +190,7 @@ all 96 unmodified NOAA day/seed combinations, including both mesh builders. The 
 unit glob runs the same file. Canonical entry method: scripts/measure-size.js, bundleBytes, bare imports
 external, compactOutput, default gzip. The isolated attribution uses the current src/lic.ts twice, with only
 src/colormaps.ts and src/tables.ts loaded from f33472ed6^ for the historical variant, through Vite's load
-hook. No source checkout, timing run or GPU lease is needed. The durable JSON retains exact settings,
+hook. No source checkout, timing run or GPU is needed. The durable JSON retains exact settings,
 module inventory and byte counts; both variants return exactly the historical/current recorded LIC sizes.
 
 
@@ -225,7 +215,7 @@ compares exact scalar numerator SSE, new <= old with zero tolerance; and
 publishes original-source conventional and mapped numbers, including losses.
 The [published evidence](results/batch-134-scalar-payload-bar.json) pins this
 combined Wasm and its sources. EAC denominator is 2047 squared, not a rounded
-byte decode. No GPU lock or timing A/B is involved in these commands.
+byte decode. No GPU or timing A/B is involved in these commands.
 
 Batch 171 job 3 CPU checkpoint: build the geometry and sciviz packages, then run
 node --test --test-timeout=120000 packages/sciviz/tests/tubes.test.js packages/sciviz/tests/mesh-ownership.test.js.
@@ -254,15 +244,13 @@ Batch 171 LIC checkpoint (analytical and demo GPU checks pass; full gates pendin
 Batch 171 LIC (analytical, demo and package GPU checks pass; full verify's four affected failures corrected):
 `npm run build --workspace @margoengine/sciviz`, then
 `node --test --test-timeout=120000 packages/sciviz/tests/lic.test.js`. Analytical convolution, masks, slices,
-animation and restored/backend pixels: `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60
---max=2 -- node packages/sciviz/tests/entries-browser.mjs --only=lic`. Use `--only=lic-curvature` for exact
-circular-arc and phase-reversal checks. Run `packages/sciviz/tests/demos-browser.mjs --only=lic` under a
-separate shared lease (max 3 minutes) for both layouts/backends and the NOAA controls. Full package GPU gates and README runs
-use separate shared leases, one at a time per lane; CPU builds/lint/hygiene/verify do not hold a lease.
+animation and restored/backend pixels: `node scripts/run-with-timeout.mjs run --max=2 -- node packages/sciviz/tests/entries-browser.mjs --only=lic`. Use `--only=lic-curvature` for exact
+circular-arc and phase-reversal checks. Run `packages/sciviz/tests/demos-browser.mjs --only=lic` (max 3 minutes) for both layouts/backends and the NOAA controls. Full package GPU gates and README runs
+run one at a time per lane; CPU builds/lint/hygiene/verify do not use the GPU.
 `examples/sciviz-lic.html` reuses hash-pinned `examples/assets/sciviz/wind.bin`; phase is a direction cue,
 not atmospheric elapsed time. No new timing claim.
 After the full package build, regenerate `node examples/package-benchmarks/entry-sizes.mjs` and
-`node scripts/basic-scene-network.mjs` from the same clean package source; the latter self-locks only its GPU
+`node scripts/basic-scene-network.mjs` from the same clean package source; the latter uses the GPU only in its GPU
 step. Run `npm run api:update`, the size quality gate and paired-record tests for the refreshed artifacts.
 
 The [rational scalar experiment](results/batch-134-scalar-rational.json) is an
@@ -319,19 +307,19 @@ Do not treat this prototype as package integration or remove the prebuilt.
 
 CPU pathline foundation (batch 171 job 1): run `npm run build:flow --workspace @margoengine/sciviz`,
 `npm run test:flow-kernel --workspace @margoengine/sciviz`, build the package, then
-`node --test --test-timeout=120000 packages/sciviz/tests/flow.test.js`. No device or GPU lock is requested.
+`node --test --test-timeout=120000 packages/sciviz/tests/flow.test.js`. No device is requested.
 The NOAA daily-mean asset is the existing hash-pinned `examples/assets/sciviz/wind.bin`; tests convert its
 velocity components to projected km/s and trace two days in seconds. Analytic tests are the accuracy references;
 halving the NOAA time step is a convergence check only.
-After building packages, run `node scripts/gpu-lock.mjs run --owner=flow-reference-proof --wait-max=60 --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-pathline` for real-browser Wasm loading,
+After building packages, run `node scripts/run-with-timeout.mjs run --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-pathline` for real-browser Wasm loading,
 analytic samples, existing-line pixels and device replacement on WebGPU and WebGL2 compatibility.
 
 Moving-flow continuation: include `packages/sciviz/tests/flow-seeds.test.js` in the CPU command above.
-After building sciviz, run `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-motion` for GPU particle arithmetic,
+After building sciviz, run `node scripts/run-with-timeout.mjs run --max=1 -- node packages/sciviz/tests/entries-browser.mjs --only=flow-motion` for GPU particle arithmetic,
 CPU reference comparison, deterministic seeds, respawn/NaNs/abort, all-pixel parity and actual device replay.
-Then run `node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=2 -- node packages/sciviz/tests/demos-browser.mjs --only=moving-flow` for all four mobile/desktop/backend demo groups.
+Then run `node scripts/run-with-timeout.mjs run --max=2 -- node packages/sciviz/tests/demos-browser.mjs --only=moving-flow` for all four mobile/desktop/backend demo groups.
 The latter writes screenshots under `test-results/sciviz-fixes/`. The real asset and its provenance are
-unchanged `examples/assets/sciviz/wind.bin` and `wind.json`. No speed suite or exclusive hold is required.
+unchanged `examples/assets/sciviz/wind.bin` and `wind.json`. No speed suite or run with the GPU to itself is required.
 
 CPU isosurface extraction (batch 181 job 1 foundation): run
 `npm run build:fallback --workspace @margoengine/sciviz`,
@@ -341,7 +329,7 @@ CPU isosurface extraction (batch 181 job 1 foundation): run
 `examples/assets/sciviz/head.nrrd` at intensity 300 to check 216,150 triangles and the pinned vertex hash in claims.md.
 The Wasm is a lazy asset outside the root entry; no WebGPU device or browser is needed. These checks establish
 extraction only. For WebGL2 drawing (the native driver was retired, KB1405), build sciviz and webgl2-compat, then run
-`node scripts/gpu-lock.mjs run --owner=sciviz-fallback-proof --wait-max=60 --max=1 -- node packages/sciviz/tests/fallback-browser.mjs`,
+`node scripts/run-with-timeout.mjs run --max=1 -- node packages/sciviz/tests/fallback-browser.mjs`,
 natively and with `MARGO_COMPAT=1`. It compares surface, slice, volume, CPU isosurface, bars, heatmap, axes, scatter, line
 and label volumes on native WebGPU, the complete layer and the layer's half-float and LDR tiers, with restoration and
 cancellation, and prints each case's mean and share.
@@ -350,7 +338,7 @@ Owned Chromium shutdown ordering: run `node --test --test-timeout=120000
 tests/browser-teardown.test.js tests/browser-selection.test.js
 tests/shutdown.test.js`. The asynchronous-session regression must fail before
 the repair and pass afterward. Revalidate rendering with the voxel package's
-`test:gpu` and README gates in shared GPU slots. The existing five known voxel
+`test:gpu` and README gates. The existing five known voxel
 README failures remain recorded by that gate; 18 of 23 examples succeed.
 
 The [active licensed corpus](results/batch-134-active-corpus.json)
@@ -399,7 +387,7 @@ Pull Git LFS assets and build packages, then run the sciviz unit and browser tes
 git lfs pull
 npm run build:packages
 npm test --workspace @margoengine/sciviz
-node scripts/gpu-lock.mjs run --owner=sciviz-real-data --max=12 --wait-max=5 -- node packages/sciviz/tests/demos-browser.mjs
+node scripts/run-with-timeout.mjs run --max=12 -- node packages/sciviz/tests/demos-browser.mjs
 ```
 
 The runner checks all three real-data demos and four retained synthetic test pages on WebGPU and forced WebGL2,
@@ -410,7 +398,7 @@ counts, and observes live frames during trace updates. Results and screenshots a
 ### Biome prefetch shared-generation proof (2026-11-09)
 
 After building packages, run
-`node scripts/gpu-lock.mjs run --exclusive --owner=codex-missing -- node packages/biomes/scripts/prefetch-proof.mjs`.
+`node scripts/run-with-timeout.mjs run -- node packages/biomes/scripts/prefetch-proof.mjs`.
 The five-minute child supervisor compares isolated Margo parent fc1ed452f sources with the
 current build using the same dependencies, full default 4 km world, three workers and original
 144-tile rectangle. It checks every result field and typed-array SHA-256 for 292 unique keys,
@@ -433,30 +421,25 @@ The record is `test-results/biomes-io-proof/result.json`; the retained evidence 
 `node --test --test-timeout=120000 packages/biomes/tests/io.test.js packages/biomes/tests/gpu-field-integration.test.js`
 checks exact worker/serial output, cropped edits, bounded outstanding jobs, one classification
 per tile, failure cleanup and exact height-only cell requests. Run all biome package tests too.
-The runtime gate is `node scripts/gpu-lock.mjs run --owner=codex-missing -- npm run check:readme-run -- --packages=biomes,loaders`.
-Both loaders GPU suites and biome `test:gpu` remain required under the same GPU lock.
+The runtime gate is `node scripts/run-with-timeout.mjs run -- npm run check:readme-run -- --packages=biomes,loaders`.
+Both loaders GPU suites and biome `test:gpu` remain required.
 
-`node --test --test-timeout=120000 tests/gpu-lock-mutex.test.js tests/gpu-lock.test.js tests/gpu-lock-compat.test.js tests/gpu-lock-limits.test.js tests/run-readme-examples.test.js`
-checks locking and complete-page scheduling. On Windows the native regression uses the OS's
-PowerShell and a clean-room Win32 fixture to hold a directory delete-pending: the old name
-fails with EPERM, while a retired name leaves the reusable mutex available. No fixture or
-platform is silently skipped; the portable retirement/permission models run everywhere.
-API basis: [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle)
-and [directory deletion lifetime](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-removedirectoryw).
+`node --test --test-timeout=120000 tests/run-readme-examples.test.js`
+checks complete-page scheduling.
 
 ## Five executable README repairs (2026-11-09)
 
 After `npm run build:packages`, run
-`node scripts/gpu-lock.mjs run --owner=codex-readme5 --max=15 -- npm run check:readme-run -- --packages=react,stage,text,worker`.
+`node scripts/run-with-timeout.mjs run --max=15 -- npm run check:readme-run -- --packages=react,stage,text,worker`.
 The scoped result is 40/40, zero failures. React's standalone picking test receives the same selected browser/GPU
 launch environment as the page harness. It serves its own scene on a free port, waits for frames, clicks the box
 and waits for the React state update. A driver that cannot finish fails at its deadline.
 
 Regenerate the atlas with
-`node scripts/gpu-lock.mjs run --owner=codex-readme5 --max=3 -- node packages/text/scripts/make-readme-atlas.mjs`.
+`node scripts/run-with-timeout.mjs run --max=3 -- node packages/text/scripts/make-readme-atlas.mjs`.
 This uses the pinned Source Sans 3 TTF and Margo's SDF code, not an outside atlas generator. The generated
 JSON and PNG live together under packages/text/tests/fixtures/fonts/readme. Run `npm test --workspace @margoengine/text`
-for all ASCII glyphs and `npm run test:browser --workspace @margoengine/text` under the GPU lock for JSON/PNG fetch
+for all ASCII glyphs and `npm run test:browser --workspace @margoengine/text` for JSON/PNG fetch
 and actual Hello rendering. The fixture notice records the source and OFL; no font implementation is copied.
 
 ## Poisson placement work count (batch 68, job 1)
@@ -465,12 +448,19 @@ Run `npm test --workspace @margoengine/procedural` for the seeded 3,000-candidat
 3,329 hash distance tests versus 3,445,553 all-pairs tests, exactly the same accepted coordinates. This is a work
 count, not a wall-clock speed claim. `npm run test:poisson-kernel --workspace @margoengine/procedural` runs the
 native Rust tests; `npm run build:poisson --workspace @margoengine/procedural` rebuilds the committed Wasm.
-Run `node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
+Run `node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/procedural`
 for real production-browser WebGPU/WebGL2 value, lazy-asset, non-root-base and device/context-loss checks.
 Only synthetic geometric inputs are proven; authored mesh placement and spectral/speed quality are unmeasured.
 
 Every public number should come from one of the commands below. Run them from the repository root on the commit you
 want to check. Status of each claim and which command backs it: [claims.md](claims.md).
+
+## WebGL2 layer waits (2026-11-18)
+
+`node scripts/run-with-timeout.mjs --max=10 -- npm run check:owners -- --packages=water` prints each entry's seconds on
+native WebGPU and then on the WebGL2 layer (`MARGO_COMPAT=1`); sum the two halves for the case-time ratio. The work
+counts are `node --test packages/webgl2-compat/test/task-polling.test.js packages/webgl2-compat/test/device.test.js`.
+Do not time the page under a CPU profiler: on Windows it raises the timer resolution and hides the timer tick.
 
 ## Engine size comparison
 
@@ -498,7 +488,7 @@ npm run build:packages     # every package, size gates, catalog (no Rust toolcha
 
 ```sh
 npm run bench                  # every suite: size, startup, render, objects, scaling, math, glTF, loaders, assemblies,
-                               # voxel, physics, memory, React (quiet-machine gate, GPU lock, 5 runs per case)
+                               # voxel, physics, memory, React (quiet-machine gate, 5 runs per case)
 npm run bench -- features      # also every per-feature real-GPU script below (about an hour)
 npm run bench -- --list        # the suites and cases
 npm run proofs -- --current    # the recorded-GPU-call proofs
@@ -544,7 +534,7 @@ node scripts/quickstart-timing.mjs --route=1 --keep --dir=<folder>   # route 1 (
 It clones this checkout (uncommitted work laid over it) into a temp folder with a cold npm cache, then does what the
 README says line by line: `npm ci`, `npm run pack:packages`, a new project, `npm install <tarballs> vite`,
 `index.html` and `main.ts` extracted from the README text itself (never retyped), `npx vite`, and the page in headless
-Edge under one shared GPU slot. The browser asserts, from pixels and handlers:
+Edge. The browser asserts, from pixels and handlers:
 
 - a first frame with content, and sharp checker edges on the floor (none in the same scene without the texture);
 - a shadow beside the ball, darker than the same scene without `shadows.add`, also on the shipped page;
@@ -570,8 +560,7 @@ route is a clone because 1.0.0 is not on npm yet.
 
 - AC power before and after (`(Get-CimInstance -Namespace root/wmi -ClassName BatteryStatus | Select-Object -First 1).PowerOnline`
   on Windows). The scripts check it and refuse or flag battery runs; on battery Windows throttles CPU and GPU.
-- One GPU job at a time: the scripts take `test-results/gpu.lock` in the main checkout (they wait while another run
-  holds it). Close other GPU apps; on an integrated GPU even a browser tab changes the result.
+- One GPU job at a time. Close other GPU apps; on an integrated GPU even a browser tab changes the result.
 - Headless Edge/Chrome with `--disable-gpu-vsync --disable-frame-rate-limit`, so FPS is throughput, not the display.
 - Medians of alternating rounds; compare A/B only within one run (clocks drift between runs).
 - Record the GPU clock and power state with each side of a comparison (the `nvidia-smi` query in docs/benchmarking.md,
@@ -594,16 +583,16 @@ route is a clone because 1.0.0 is not on npm yet.
 | 10,000 tweens against tween.js (perf history entry 97) | `node packages/tween/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/tween` | no | console | tween.js 25.0.0 is installed outside the repository under engine-bench `batch-167`. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The linear halfway rule is `node --test packages/tween/test/linear-oracle.test.js`. |
 | Rollback resimulation (perf history entry 98) | `node packages/netcode/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/netcode` | no | console | No JavaScript rival (GGPO is C++, Colyseus is not rollback). Paired turns, per-round minimum of 180 frames. Busy-machine numbers are diagnostic. |
 | Save migration fuzz (perf history entry 99) | `node packages/save/scripts/fuzz-roundtrip.mjs` after `npm run build --workspace @margoengine/save` | no | console | No rival package. Seed 167, 200 documents. The regression test is `node --test packages/save/tests/migration-fuzz.test.js`. Busy-machine numbers are diagnostic. |
-| matmul-256, fft-65536 and a sum of 1,048,576 against TensorFlow.js (perf history entry 100) | `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/compute/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/compute` | yes | console | TensorFlow.js 4.22.0 and tfjs-backend-webgpu 4.22.0 are installed outside the repository under engine-bench `batch-167`. Node 26.12 has no WebGPU, so both run in one headless page, taking turns. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The NumPy oracle is `node --test packages/compute/tests/numpy-oracle.test.js`. |
-| volume-64 against VTK.js (perf history entry 102) | `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/sciviz/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/sciviz` | yes | console | VTK.js 38.0.5 is installed outside the repository under engine-bench `batch-167`. One headless page, taking turns. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The field is `node --test packages/sciviz/tests/volume-field.test.js`. |
-| Truck 7k against the published photograph (perf history entry 115) | `node scripts/gpu-lock.mjs run --owner=<you> --gpu=splats-truck-photo -- node packages/splats/scripts/truck-photo.mjs` (`--ply=truck-7k-fit.ply` for the prefix, `--save=<folder>` for the renders) after `npm run build --workspace @margoengine/splats` | yes | console | Correctness only, no clock; same engine-bench `batch-168` data as the row below. Camera-to-world PSNR 20.882 dB on the full cloud. |
-| Truck 7k prefix against GaussianSplats3D (perf history entry 103) | `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/splats/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/splats` | yes | console | GaussianSplats3D 0.4.7 and three 0.170.0 are installed outside the repository under engine-bench `batch-168`. The truck ply, the `000001` JPEG and `cameras.json` stay in that folder's `data` (not in this repo). The bench writes `truck-7k-fit.ply` there, the first 699,050 vertices. One headless page, taking turns. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The fit count is `node --test packages/splats/test/storage-fit.test.js` and the pose maths are `node --test packages/splats/test/paper-camera.test.js`. |
-| Quadtree screen-space error against 3DTilesRendererJS (perf history entry 104) | `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/tiles/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/tiles` | yes | console | 3DTilesRendererJS 0.4.21 and three 0.170.0 are installed outside the repository under engine-bench `batch-168`. The quadtree is built in the process (5,461 tiles, one shared GLB). One headless page. The rival's `errorTarget` is set to 16. Paired turns, per-round minimum, after loads settle. Busy-machine numbers are diagnostic. The Margo set is `node --test packages/tiles/tests/sse-scene.test.js`. |
-| 10 million points against potree-core (perf history entry 105) | `node scripts/gpu-lock.mjs run --exclusive --owner=<you> -- node packages/points/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/points` | yes | console | potree-core 2.0.17 and three 0.170.0 are installed outside the repository under engine-bench `batch-168`. The bench writes `data/points-10m` there (metadata.json, hierarchy.bin, octree.bin, 200,000,000 bytes of points) and does not commit it. One headless page. Both budgets are 10,000,000. Paired turns, per-round minimum, after the leaf has loaded. Busy-machine numbers are diagnostic. The grid is `node --test packages/points/tests/points-10m.test.js`. |
+| matmul-256, fft-65536 and a sum of 1,048,576 against TensorFlow.js (perf history entry 100) | `node scripts/run-with-timeout.mjs run -- node packages/compute/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/compute` | yes | console | TensorFlow.js 4.22.0 and tfjs-backend-webgpu 4.22.0 are installed outside the repository under engine-bench `batch-167`. Node 26.12 has no WebGPU, so both run in one headless page, taking turns. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The NumPy oracle is `node --test packages/compute/tests/numpy-oracle.test.js`. |
+| volume-64 against VTK.js (perf history entry 102) | `node scripts/run-with-timeout.mjs run -- node packages/sciviz/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/sciviz` | yes | console | VTK.js 38.0.5 is installed outside the repository under engine-bench `batch-167`. One headless page, taking turns. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The field is `node --test packages/sciviz/tests/volume-field.test.js`. |
+| Truck 7k against the published photograph (perf history entry 115) | `node scripts/run-with-timeout.mjs run -- node packages/splats/scripts/truck-photo.mjs` (`--ply=truck-7k-fit.ply` for the prefix, `--save=<folder>` for the renders) after `npm run build --workspace @margoengine/splats` | yes | console | Correctness only, no clock; same engine-bench `batch-168` data as the row below. Camera-to-world PSNR 20.882 dB on the full cloud. |
+| Truck 7k prefix against GaussianSplats3D (perf history entry 103) | `node scripts/run-with-timeout.mjs run -- node packages/splats/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/splats` | yes | console | GaussianSplats3D 0.4.7 and three 0.170.0 are installed outside the repository under engine-bench `batch-168`. The truck ply, the `000001` JPEG and `cameras.json` stay in that folder's `data` (not in this repo). The bench writes `truck-7k-fit.ply` there, the first 699,050 vertices. One headless page, taking turns. Paired turns, per-round minimum. Busy-machine numbers are diagnostic. The fit count is `node --test packages/splats/test/storage-fit.test.js` and the pose maths are `node --test packages/splats/test/paper-camera.test.js`. |
+| Quadtree screen-space error against 3DTilesRendererJS (perf history entry 104) | `node scripts/run-with-timeout.mjs run -- node packages/tiles/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/tiles` | yes | console | 3DTilesRendererJS 0.4.21 and three 0.170.0 are installed outside the repository under engine-bench `batch-168`. The quadtree is built in the process (5,461 tiles, one shared GLB). One headless page. The rival's `errorTarget` is set to 16. Paired turns, per-round minimum, after loads settle. Busy-machine numbers are diagnostic. The Margo set is `node --test packages/tiles/tests/sse-scene.test.js`. |
+| 10 million points against potree-core (perf history entry 105) | `node scripts/run-with-timeout.mjs run -- node packages/points/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/points` | yes | console | potree-core 2.0.17 and three 0.170.0 are installed outside the repository under engine-bench `batch-168`. The bench writes `data/points-10m` there (metadata.json, hierarchy.bin, octree.bin, 200,000,000 bytes of points) and does not commit it. One headless page. Both budgets are 10,000,000. Paired turns, per-round minimum, after the leaf has loaded. Busy-machine numbers are diagnostic. The grid is `node --test packages/points/tests/points-10m.test.js`. |
 | Cornell box irradiance against Cycles (perf history entry 108) | `node packages/lightmap/scripts/rival-bench.mjs` after `npm run build --workspace @margoengine/lightmap` | no | console | Blender 5.3.0 Beta is `C:\blender\blender.exe` (`MARGO_BLENDER` overrides it). Cycles bakes on the CPU. The bench writes `data/cornell` under engine-bench `batch-168` (`MARGO_ENGINE_BENCH` overrides the folder) and does not commit it. 128 samples, `diffuse_bounces` 1 (Margo's `bounces`; the bench refuses a reference with another count). The snaps and the direct integral are `node --test packages/lightmap/tests/cornell-box.test.js`. |
 | Own physics GJK and expanding polytope against brute force (LIM-372) | `npm run test:physics-kernel` | no | no | under a minute |
 | Own physics replay, Node, native, Chromium and Firefox (LIM-366) | `npm run test:physics-kernel`, `npm test --workspace @margoengine/physics` and `npm run test:replay --workspace @margoengine/physics` | no | `packages/physics/test-results/replay-browsers.json` | Install Firefox once with `node node_modules/@playwright/test/cli.js install firefox`. `REPLAY_FIREFOX` names a `firefox.exe` where Playwright's own will not start. |
-| Own 2D physics in Wasm: the pinned bits on WebGPU and WebGL2 pages, and the 100-row pyramid against Rapier 2D's Wasm and Box2D v3's Wasm (perf history entries 88 and 89) | `npm run check:rust-kernels -- --packages=physics2d` (Node), then `node scripts/physics2d-kernel-browsers.mjs` (`npm run test:physics2d-kernel-browsers` is its check:merge form: the default browser, bits only; `REPLAY_FIREFOX` names a Firefox copy on a PC that will not start Playwright's from the home folder). Box2D v3 joins when `BOX2D_WASM` names its build, made outside the repository as a black box: clone the official emsdk (`git clone https://github.com/emscripten-core/emsdk`, then `python emsdk.py install latest` and `python emsdk.py activate latest`; Emscripten 7.0.0 here), configure Box2D v3.2.0's own CMake project under `emcmake` with `-DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=OFF -DBOX2D_UNIT_TESTS=OFF -DBOX2D_BENCHMARKS=OFF -DBOX2D_VALIDATE=OFF` (its Emscripten defaults add `-pthread -msimd128 -msse2 -ffp-contract=off`), build it, and link a harness on its public API that exports `bench_pyramid(rows)`, `bench_step()` and `bench_top_y()` with `emcc -O3 -pthread -msimd128 -msse2 -sMODULARIZE -sEXPORT_ES6 -sINITIAL_MEMORY=268435456` (physics-refs `wasm/box2d3/build.sh` and `pyramid.c`) | yes (WebGPU pages, takes the GPU lock) | `test-results/physics2d-kernel-browsers.json` | about a minute; timings are paired in one page, busy-machine numbers are diagnostic |
+| Own 2D physics in Wasm: the pinned bits on WebGPU and WebGL2 pages, and the 100-row pyramid against Rapier 2D's Wasm and Box2D v3's Wasm (perf history entries 88 and 89) | `npm run check:rust-kernels -- --packages=physics2d` (Node), then `node scripts/physics2d-kernel-browsers.mjs` (`npm run test:physics2d-kernel-browsers` is its check:merge form: the default browser, bits only; `REPLAY_FIREFOX` names a Firefox copy on a PC that will not start Playwright's from the home folder). Box2D v3 joins when `BOX2D_WASM` names its build, made outside the repository as a black box: clone the official emsdk (`git clone https://github.com/emscripten-core/emsdk`, then `python emsdk.py install latest` and `python emsdk.py activate latest`; Emscripten 7.0.0 here), configure Box2D v3.2.0's own CMake project under `emcmake` with `-DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=OFF -DBOX2D_UNIT_TESTS=OFF -DBOX2D_BENCHMARKS=OFF -DBOX2D_VALIDATE=OFF` (its Emscripten defaults add `-pthread -msimd128 -msse2 -ffp-contract=off`), build it, and link a harness on its public API that exports `bench_pyramid(rows)`, `bench_step()` and `bench_top_y()` with `emcc -O3 -pthread -msimd128 -msse2 -sMODULARIZE -sEXPORT_ES6 -sINITIAL_MEMORY=268435456` (physics-refs `wasm/box2d3/build.sh` and `pyramid.c`) | yes (WebGPU pages) | `test-results/physics2d-kernel-browsers.json` | about a minute; timings are paired in one page, busy-machine numbers are diagnostic |
 | Own 2D physics against Box2D v3 natively, eight lanes and four (perf history entry 91) | Margo: `cargo test --release --manifest-path packages/physics2d/kernel/Cargo.toml --test bits -- --ignored --nocapture step_time` (the four-lane solve, SSE2). Box2D v3.2.0, built outside the repository as a black box: physics-refs `native/box2d3/profile.cpp` (its own per-phase profile through the public API) built by `native/scripts/native-build.bat` (Box2D's defaults: its contact file at `/arch:AVX2`, eight lanes on an AVX2 CPU) and by `native/scripts/native-build-sse2.bat` (`-DREFS_BOX2D_SSE2=ON` into `native/build-sse2`: the harness file `box2d3/no_avx2.c` answers 4 to Box2D's SIMD width query and false to `b2IsAVX2Available`, so the four-lane SSE2 solve runs, and says so on stderr); run the builds in turns | no | printed | under a minute; busy-machine numbers are diagnostic |
 | Own physics contact ids and warm start (LIM-376) | `npm run test:physics-kernel` | no | no | under a minute |
 | Own physics manifold reduction and persistence (LIM-380) | `npm run test:physics-kernel` | no | no | under a minute |
@@ -632,10 +621,10 @@ route is a clone because 1.0.0 is not on npm yet.
 | Post stack per effect, SSAO + IBL | `node examples/package-benchmarks/gates/post-stack.mjs` | yes | `results/gates-post-stack.json` | |
 | DOF before/after | `node examples/package-benchmarks/gates/dof.mjs --baseline=5b9dbbd` | yes | `results/gates-dof.json` | Builds the baseline. |
 | Loaders + memory cycles | `node examples/package-benchmarks/gates/memory.mjs` | yes | `results/gates-memory.json` | |
-| Native glass tint draw cost | `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/tint-pass-gpu.mjs` | yes | `results/tint-pass-gpu.json` | Patches the served gltf-pro build for its comparison arms; fails if an arm leaves the frame unchanged. About 10 minutes. |
-| Precise maths against the WGSL builtins | `node scripts/gpu-lock.mjs run --exclusive --owner=<id> -- node examples/package-benchmarks/precise-math-gpu.mjs` | yes | `results/precise-math-gpu.json` | Compute functions and path tracer lenses. |
+| Native glass tint draw cost | `node scripts/run-with-timeout.mjs run -- node examples/package-benchmarks/tint-pass-gpu.mjs` | yes | `results/tint-pass-gpu.json` | Patches the served gltf/pbr build for its comparison arms; fails if an arm leaves the frame unchanged. About 10 minutes. |
+| Precise maths against the WGSL builtins | `node scripts/run-with-timeout.mjs run -- node examples/package-benchmarks/precise-math-gpu.mjs` | yes | `results/precise-math-gpu.json` | Compute functions and path tracer lenses. |
 | Growable ECS worlds against fixed ones | `node examples/package-benchmarks/ecs-growable.mjs` | no | console | |
-| Workgroup sizes of the compute package's own kernels | `node scripts/gpu-lock.mjs run --owner=<id> -- node packages/compute/tests/compute-browser.mjs`, line `tuneCompute, 16M elements` | no | console | perf-history entry 77 |
+| Workgroup sizes of the compute package's own kernels | `node scripts/run-with-timeout.mjs run -- node packages/compute/tests/compute-browser.mjs`, line `tuneCompute, 16M elements` | no | console | perf-history entry 77 |
 | Subgroup kernels against the default compute kernels | `node examples/package-benchmarks/compute-subgroups.mjs` | yes | `examples/package-benchmarks/results/compute-subgroups.json` | |
 | Shadow shimmer | `node examples/package-benchmarks/shadow-shimmer.mjs` | yes | `results/shadow-shimmer.json` | |
 | Textured instancing on GPU | `node examples/package-benchmarks/textured-instancing-gpu.mjs` | yes | `results/textured-instancing-gpu.json` | |
@@ -673,13 +662,13 @@ route is a clone because 1.0.0 is not on npm yet.
 | GLB optimize on real models against outside tools | `optimizeGLB` a GLB with its defaults and with `{ simplify: 0.5, lods: [0.5, 0.25] }`, run the Khronos validator on input and output, then `gltfpack -i out.glb -o back.glb -noq` and `gltf-transform inspect out.glb`; compare the triangles of each node, corner by corner, and each level's vertices with the source's | no | console | By hand; no script in the repository. |
 | USDZ real size on real models (LIM-265) | `exportAnimatedUSDZ` each clip and read `size` and `bounds`; compare `bounds` with glTF maths at every frame, node transforms and skinning applied, weights normalized. On a Mac, load the file with RealityKit's `Entity(contentsOf:)` and read `visualBounds(relativeTo: nil)`, and render with `usdrecord --sessionLayer cam.usda --camera Cam -f <frame>` through one fixed camera to compare a file before and after a change. On an iPhone, open the file in AR Quick Look, place it on a floor and check it stands in view at about 2 m and moves with a drag | no | console | By hand; no script in the repository. RealityKit's bounds do not run the skeleton, so they read the rest points. Only the phone shows placement, clipping and moving. |
 | USDZ animation on real models against Apple's tools | `exportAnimatedUSDZ` each clip of a rigged GLB, then on a Mac `usdchecker --arkit out.usdz` and `usdcat --flatten out.usdz -o flat.usda`; evaluate the flattened skeleton and Xforms by UsdSkel's rules at a few frames and compare the world bounds with glTF's skinning maths; load it in ModelIO, SceneKit and RealityKit | no | console | By hand; no script in the repository. |
-| USD composition against OpenUSD (LIM-303) | Run `packages/usdz/tests/oracle/truth.py` inside Blender's Python on a list of files, for example `blender --background --factory-startup --python packages/usdz/tests/oracle/truth.py -- list.txt truth.json`, then open each file with `composition()` and compare meshes, world bounds, triangle counts and bound materials. `tests/oracle/generate-stages.py out 150 <seed>` writes stress stages; `truth.py` also runs under plain Python with `pip install usd-core` (OpenUSD 26.11 was used for seeds 1942 and 7, mode `prims`), and the property comparison is the `differences` function of `packages/usdz/tests/compose.test.js`. |
+| USD composition against OpenUSD (LIM-303) | Run `packages/usdz/tests/oracle/truth.py` inside Blender's Python on a list of files, for example `blender --background --factory-startup --python packages/usdz/tests/oracle/truth.py -- list.txt truth.json`, then open each file with `composition()` and compare meshes, world bounds, triangle counts and bound materials. `tests/oracle/generate-stages.py out 150 <seed>` writes stress stages; `truth.py` also runs under plain Python with `pip install usd-core` (OpenUSD 26.11 was used for seeds 1942 and 7, mode `prims`), and the property comparison is the `differences` function of `packages/usdz/tests/openusd-differences.js`. `node packages/usdz/tests/oracle/stress-fixture.mjs truth.json openusd-<seed>.json.gz` turns such a reading into the fixture `packages/usdz/tests/stress-stages.test.js` checks every stress stage against. |
 | UsdSkel against OpenUSD (LIM-310) | `packages/usdz/tests/oracle/skel-truth.py` inside Blender's Python on a list of files gives each mesh's points at five times through `UsdSkel.Cache`, `SkinningQuery` and `BlendShapeQuery`. Parse the same file with `skeletons()`, pose it by plain glTF rules (`packages/usdz/tests/pose.js`) and compare point by point. Apple's and Pixar's samples are read from a local download. | yes |
 | Time samples against OpenUSD (LIM-315) | `packages/usdz/tests/oracle/anim-truth.py` inside Blender's Python on a list of files gives each moving prim's world matrix and visibility at several times through `UsdGeom.XformCache` and `ComputeVisibility`. Parse the same file with `animation()`, pose it by plain glTF rules (`packages/usdz/tests/pose.js`) and compare matrix by matrix. The usd-wg files are at commit 091bb5c6; Pixar's are read from a local download. | yes |
 | Subdivision against Blender (LIM-319) | `packages/usdz/tests/oracle/subdiv-truth.py` (points) and `subdiv-uv-truth.py` (face-varying values, in the mode each mesh authors) run inside Blender 5.3 on a list of files and give refined points and corners through its Subdivision Surface modifier, with `use_limit_surface` off. `subdiv-faces.py` writes the stand-in stage and its truth in all six modes. Parse the same files with `subdivision({level:2})` and pair corners by nearest point, not by a rounded key. Real meshes of the Kitchen Set, OpenChessSet, usd-wg assets and HumanFemale are read locally; two usd-wg files are committed. |
 | Lights and cameras against OpenUSD (LIM-320) | `packages/usdz/tests/oracle/lux-truth.py` inside Blender's Python gives each light's and camera's world matrix through `UsdGeom.XformCache`, each camera's frustum through `Gf.Camera`, and `UsdLux.BlackbodyTemperatureAsRgb`. Parse the same stages with `lights()` and compare node world matrices under the root node. The 55 real stages are the files of the usd-wg assets that hold lights or cameras, read locally. |
 | Reset transform stacks against OpenUSD (LIM-324) | `packages/usdz/tests/oracle/reset-truth.py` inside Blender's Python writes the stand-in stage and what OpenUSD computes for it into `tests/fixtures/xform/`; `node --test packages/usdz/tests/reset.test.js` compares. |
-| MaterialX graphs against MaterialX's baker (LIM-205, KB3108) | `pip install MaterialX==1.39.5` in a virtual environment, then `python -I packages/loaders/tests/oracle/materialx-bake.py packages/loaders/tests/fixtures/materialx-reference` rewrites the eight documents and their GLSL bakes byte for byte (OpenGL needed); `node --test packages/loaders/tests/materialx-reference.test.js` compares on the CPU and `node scripts/gpu-lock.mjs run --owner=<you> -- node packages/loaders/tests/materialx-reference-check.mjs` (and with `MARGO_COMPAT=1`) on the GPU. |
+| MaterialX graphs against MaterialX's baker (LIM-205, KB3108) | `pip install MaterialX==1.39.5` in a virtual environment, then `python -I packages/loaders/tests/oracle/materialx-bake.py packages/loaders/tests/fixtures/materialx-reference` rewrites the eight documents and their GLSL bakes byte for byte (OpenGL needed); `node --test packages/loaders/tests/materialx-reference.test.js` compares on the CPU and `node scripts/run-with-timeout.mjs run -- node packages/loaders/tests/materialx-reference-check.mjs` (and with `MARGO_COMPAT=1`) on the GPU. |
 | MaterialX in USD against OpenUSD (LIM-331) | `packages/usdz/tests/oracle/materialx-truth.py` inside Blender's Python writes what `UsdShade` reads from each material, with the shader registry's defaults, to `tests/fixtures/materialx/openusd.json`; `node --test packages/usdz/tests/materialx.test.js` compares. 53 of the 58 materials are in stored files; the two large stages, `StandardShaderBall/layers/shaderball.usda` and `MaterialXTest/basicTextured_flatten.usda` of the usd-wg assets, are read when copied beside them. `npm run modern:test:usdz:browser` compiles the networks on the GPU. |
 | 3MF on real models against a slicer and Windows | `export3MF` a GLB, then `prusa-slicer-console --info out.3mf` and `prusa-slicer-console --support-material --export-gcode --merge --scale-to-fit 150,150,150 --center 100,100 --output out.gcode out.3mf` (without `--support-material` for the 22 of 26); for a print-ready model, read https://github.com/CreativeTools/3DBenchy `Single-part/3DBenchy.stl` with `parseSTL`, `export3MF` it with `upAxis: 'z'`, and slice both with `--export-gcode --center 100,100`, comparing layers and filament; load it with `Windows.Graphics.Printing3D.Printing3D3MFPackage` and compare unit, triangles, items and colours with the file written | no | console | By hand; no script in the repository. |
 | FBX cameras and lights from Blender | `blender --background --factory-startup --python packages/fbx/test/fixtures/blender-shot.py -- <folder>` writes the two FBX files and Blender's own numbers as JSON; `node --test packages/fbx/test/scene-extras.test.js` compares them after `npm run build --workspace @margoengine/fbx` | no | console | Blender is run by hand; the fixtures and its numbers are checked in. |
@@ -720,8 +709,8 @@ Instantiate both in one Node process, require every `check(i)` to return zero, t
 Lane P's local driver is `.lane/p/ab-wasm.mjs old.wasm new.wasm 24`. The committed
 [record](results/physics2d-four-pairs-20261108.json) contains every round and the separate phase-probe rows.
 
-For the browser comparison set `BOX2D_WASM` to the existing external `box2d3-pyramid.mjs` black box,
-`REPLAY_FIREFOX` if needed, and `MARGO_GPU_EXCLUSIVE=1`; run
+For the browser comparison set `BOX2D_WASM` to the existing external `box2d3-pyramid.mjs` black box
+and `REPLAY_FIREFOX` if needed, with nothing else running on the GPU; run
 `node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12` before and after, preserving
 the JSON report from each run. Edge WebGPU/WebGL2 and Firefox WebGL2 passed the pinned bits here; Firefox WebGPU
 has no adapter and remains unrun. All timings are diagnostic on the loaded SCOTT-DEV machine; a quiet rerun is
@@ -756,7 +745,7 @@ For browsers set `BOX2D_WASM` to the existing external black box and `REPLAY_FIR
 node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12
 ~~~
 
-Set `MARGO_GPU_EXCLUSIVE=1` for that timing run. Preserve `test-results/physics2d-kernel-browsers.json` before and
+Give that timing run the GPU to itself. Preserve `test-results/physics2d-kernel-browsers.json` before and
 after. Firefox WebGPU without an adapter remains unrun. All raw rounds and acceptance outcomes are in
 [the record](results/physics2d-certified-faces-20261108.json); failed solver sources remain isolated in Lane P,
 with paths and formulas in the [study](../architecture/physics2d-solver-study.md). They are not production options.
@@ -914,8 +903,8 @@ sampling and an analytic chord-error bound. No speed comparison is claimed.
 For both WebGPU and the native WebGL2 mesh output assertion:
 
 ~~~sh
-node scripts/gpu-lock.mjs run --owner=codex-extrude --max=10 --wait-max=5 -- node packages/text/scripts/test-browser.js
-node scripts/gpu-lock.mjs run --owner=codex-extrude --max=10 --wait-max=5 -- npm run check:readme-run -- --packages=text
+node scripts/run-with-timeout.mjs run --max=10 -- node packages/text/scripts/test-browser.js
+node scripts/run-with-timeout.mjs run --max=10 -- npm run check:readme-run -- --packages=text
 ~~~
 
 The browser report includes orange pixel count and hidden orange pixel count for WebGL2; calling render alone is
@@ -962,7 +951,7 @@ and spread. The exact local driver and immutable modules are under `.lane/p/spee
 Do not overwrite the original evidence when reproducing it.
 
 Use `BOX2D_WASM` with the existing external black-box build and `REPLAY_FIREFOX` as documented above, then run
-`node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12` under the exclusive GPU lease
+`node scripts/physics2d-kernel-browsers.mjs --browsers=default,firefox --rounds=12`
 and a hard 600-second process-tree limit. Preserve original scene and engine order. The before/after browser
 sessions have different load and do not establish a controlled speed gain. Firefox WebGPU without an adapter
 is unrun; owned-2D CCD remains separate T-11 / 127.y. Quiet release reruns are still required.
@@ -1013,7 +1002,7 @@ remain necessary, while current work continues without waiting for a quiet machi
 
 ### Batch 168 OIT (perf history 109)
 
-`node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=2 --owner=codex-168 -- node packages/oit/scripts/rival-bench.mjs`
+`node scripts/run-with-timeout.mjs run --max=6 -- node packages/oit/scripts/rival-bench.mjs`
 after building packages. External `engine-bench/batch-168/node_modules/@babylonjs/core` is version 8.33.0.
 If absent, install with `npm install --prefix ../engine-bench/batch-168 @babylonjs/core@8.33.0`.
 `MARGO_ENGINE_BENCH` overrides the engine-bench parent. The rival stays external. Oracle:
@@ -1027,7 +1016,7 @@ Create an external Python 3.12 venv:
 `py -3.12 -m venv ../engine-bench/batch-168/mitsuba-venv`, then
 `../engine-bench/batch-168/mitsuba-venv/Scripts/python.exe -m pip install mitsuba==3.9.1`.
 After building packages run
-`node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/sky/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs run --max=3 -- node packages/sky/scripts/rival-bench.mjs`.
 `MARGO_ENGINE_BENCH` overrides engine-bench; `MARGO_MITSUBA_PYTHON` overrides the interpreter.
 Inputs and outputs stay in external batch-168/data/sunsky. scalar_rgb needs no LLVM vectorization;
 this install reports an LLVM initialization warning but evaluates the scalar model successfully.
@@ -1037,16 +1026,16 @@ No timing is measured. [Per-case result](results/batch-168-sky.json).
 ### Batch 168 staging (perf history 111)
 
 After building packages run
-`node scripts/gpu-lock.mjs run --max=3 --wait-max=1 --owner=codex-168 -- node packages/staging/scripts/rival-bench.mjs`.
+`node scripts/run-with-timeout.mjs run --max=3 -- node packages/studio/scripts/rival-bench.mjs`.
 No external renderer installation is needed: a clean-room cosine ray tracer has an independent analytic
-projected-solid-angle oracle (`node --test packages/staging/test/contact-reference.test.js`).
+projected-solid-angle oracle (`node --test packages/studio/test/contact-reference.test.js`).
 The actual canvas goes to ignored `test-results/staging-ray-reference.png`; all defaults are retained.
 15,472 exposed-ground pixels, 4096 rays per pixel; no timing comparison. [Result](results/batch-168-staging.json).
 
 
 ### Batch 168 independent OIT path tracer
 
-`node scripts/gpu-lock.mjs run --exclusive --max=6 --wait-max=1 --owner=codex-168 -- node scripts/rival-oit-cycles.mjs`
+`node scripts/run-with-timeout.mjs run --max=6 -- node scripts/rival-oit-cycles.mjs`
 uses Blender 5.3.0 Beta at `C:\blender\blender.exe` (`MARGO_BLENDER` overrides), CPU, four threads,
 1024 samples and seed 168. External Babylon setup is the same as entry 109. Inputs/EXR/float RGB and
 both engine images stay under external engine-bench/batch-168/data/oit-cycles; `MARGO_ENGINE_BENCH`
@@ -1082,7 +1071,7 @@ into a sum of marginal minima; 99.29%-busy absolute profile times do not replace
 For performance use the entry-106 unchanged-scene protocol: one process, 24 alternating rounds, explicit
 three-pin arrays, 60 settling steps and minima of 40 steps, checking 5,050 awake after every visit. The
 frozen driver/modules are .lane/p/frame-preparation-v2-ab-v1; use a new output path when reproducing.
-Browser/rival rows use the original scene and black-box engines under an exclusive lease, 12 rounds,
+Browser/rival rows use the original scene and black-box engines, 12 rounds,
 hard 600-second process-tree deadline, with current full hash and awake assertions outside each timer.
 The copied harness/provenance is .lane/p/frame-preparation-v2-browser-v1. Separate browser sessions
 have changing load; the paired advantage belongs to the combination. Quiet release reruns remain
@@ -1092,7 +1081,7 @@ required. Box2D parity is open and owned-2D CCD stays T-11 / 127.y.
 
 Retained native/compatibility hardware and readback evidence: [pixel-review102.json](results/pixel-review102.json).
 
-After `npm run build:packages`, run `npm test --workspace @margoengine/pixel` for pipeline identity, scene/resource ownership, scissor intersections, huge cycle shifts, overflow errors and the architecture evidence check. Run `node scripts/gpu-lock.mjs run --owner=codex-pixel --max=12 --wait-max=2 -- npm run test:gpu --workspace @margoengine/pixel` for all five pixel GPU harnesses, including shared format/disposal/scissor regressions and the 154-size exact CRT/nearest sweep. Repeat with environment `MARGO_COMPAT=1` for the WebGL2 layer. Each CRT all-off sample is checked byte for byte against rational nearest and PixelScale, including exact boundaries; no sample is skipped. GPU result files are `test-results/pixel-browser.json`, `palette-browser.json`, `render3d-browser.json`, `pixel-scale-browser.json` and `pixel-crt-browser.json`; native and compatibility runs overwrite those local files, so retain copies between runs. No speed measurement is claimed.
+After `npm run build:packages`, run `npm test --workspace @margoengine/pixel` for pipeline identity, scene/resource ownership, scissor intersections, huge cycle shifts, overflow errors and the architecture evidence check. Run `node scripts/run-with-timeout.mjs run --max=12 -- npm run test:gpu --workspace @margoengine/pixel` for all five pixel GPU harnesses, including shared format/disposal/scissor regressions and the 154-size exact CRT/nearest sweep. Repeat with environment `MARGO_COMPAT=1` for the WebGL2 layer. Each CRT all-off sample is checked byte for byte against rational nearest and PixelScale, including exact boundaries; no sample is skipped. GPU result files are `test-results/pixel-browser.json`, `palette-browser.json`, `render3d-browser.json`, `pixel-scale-browser.json` and `pixel-crt-browser.json`; native and compatibility runs overwrite those local files, so retain copies between runs. No speed measurement is claimed.
 
 
 ## Batch 160 metallic-roughness
@@ -1102,9 +1091,9 @@ Build packages first. Set MARGO_ENGINE_BENCH to the outside engine-bench folder 
 
 ~~~sh
 node scripts/reference-rendering/fetch-assets.mjs
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 --wait-max=5 -- node scripts/reference-rendering/run.mjs --capture-reference
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 --wait-max=5 -- node scripts/reference-rendering/run.mjs
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=5 --wait-max=5 -- node scripts/reference-rendering/run.mjs --compat
+node scripts/run-with-timeout.mjs run --max=5 -- node scripts/reference-rendering/run.mjs --capture-reference
+node scripts/run-with-timeout.mjs run --max=5 -- node scripts/reference-rendering/run.mjs
+node scripts/run-with-timeout.mjs run --max=5 -- node scripts/reference-rendering/run.mjs --compat
 node --test --test-timeout=30000 tests/reference-rendering.test.js
 ~~~
 
@@ -1138,6 +1127,26 @@ The recorded outside legal README credits Ed Mackey / Analytical Graphics, Inc. 
 `--measure` now refuses an established result file, preventing accidental budget replacement.
 See [the skip audit](batch-160-skips.md) for all 14 former missing-data skips and setup.
 
+### Batch 160 like for like (accepted differences)
+
+`--like-for-like` reruns a case with the Sample Viewer's measured display: pow(x, 1/2.2) in place of the exact sRGB
+encode (only that final expression of Margo's WGSL is rewritten, scripts/reference-rendering/viewer-transfer.mjs, and
+the run fails if no shader carried it) and one sample per pixel (`exactSize`, no MSAA). Native WebGPU only; it never
+captures a reference. It is gated by the case's `likeForLike` row:
+
+~~~sh
+node scripts/run-with-timeout.mjs run -- node scripts/reference-rendering/run.mjs --case=clearcoat --like-for-like
+node scripts/run-with-timeout.mjs run -- node scripts/reference-rendering/run.mjs --case=metallic-roughness --like-for-like
+~~~
+
+RTX A6000, Edge 157: clearcoat MAE 0.05530420939127604 (absolute 43,493), metallic-roughness MAE
+0.009241739908854166 (absolute 7,268), against 1.6820462544759114 and 0.6997248331705729 at Margo's own display;
+anisotropy 0.20022964477539062 (157,467) and iridescence 0.34775416056315106 (273,485), against 1.0324020385742188 and
+0.7803204854329427; sheen (`--case=sheen`, row added 2026-11-15, re-pinned after KB3297d) 0.27827199300130206 (218,842), against
+1.3442039489746094.
+`--measure --like-for-like` writes a first row only where the case has none. Why: docs/limits.md, "Sample Viewer like
+for like".
+
 ### Batch 160 sheen
 
 Use the metallic-roughness commands with `--case=sheen`, including fetch, capture and both
@@ -1146,12 +1155,17 @@ plan's shorthand SheenTest), pinned at 8f492390ddc7a2ae221a1369ef560589cf8c70fb.
 The legal README credits Eric Chadwick, 2023, CC0-1.0. Every source primitive and material
 is preserved. Camera [-0.18, 0, 1.8] targets [-0.18, 0, 0], 35 degrees, near .01, far 100,
 scale 1; the same sun as job 1. Frozen reference PNG SHA-256: 240715ff0a53416190448056a5aa7eeb767a0d7b2f52aa0a0a77e4ca17dc529a.
-The default gltf-pro physical path is measured; shared/sheen.js is also used by materials.
+The default gltf/pbr physical path is measured; shared/sheen.js is also used by materials.
 No standalone material or IBL equivalence follows from this direct-light picture.
+
+The sheen albedo table (KB3297c) is rebuilt and measured by `node scripts/sheen-albedo-fit.mjs --compare` (about 25 s
+on 32 threads; it prints the table for packages/shared/sheen.js and the validation errors and WGSL bytes of each
+representation compared in docs/clean-room.md), and checked on a GPU by
+`node scripts/run-with-timeout.mjs run -- npm run test:gpu:sheen-albedo -w @margoengine/materials`.
 
 ## Batch 99 emissive resampling accuracy
 
-After `npm run build:packages`, run `node scripts/gpu-lock.mjs run --owner=resampled-proof --max=10 --wait-max=10 -- npm run test:gpu:resampled --workspace packages/voxel-pathtracer`.
+After `npm run build:packages`, run `node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu:resampled --workspace packages/voxel-pathtracer`.
 The generated scene contains 1,024 contiguous emissive ceiling voxels, a white floor and a fixed orthographic camera.
 The unchanged 16 x 16 image, seed 17, 32 samples and 8 candidates must have less than half the original tracer's
 squared RGB error against its 8,192-sample seed-987 reference. The score sums all 768 channel errors; it is not MSE.
@@ -1163,7 +1177,7 @@ The accuracy result is from generated geometry on one RTX A6000 and Edge 157. No
 ### Batch 77 painterly pixels
 
 Build packages, then run `npm test --workspace @margoengine/creative` and
-`node scripts/gpu-lock.mjs run --owner=codex-77 -- npm run test:gpu:paint --workspace @margoengine/creative`.
+`node scripts/run-with-timeout.mjs run -- npm run test:gpu:paint --workspace @margoengine/creative`.
 The GPU script reads every tested pixel against the independent CPU reference (double-precision squared
 deviations), asserts exact alpha/bypass and one-code RGB error, tests BGRA/MSAA, separate views, real device
 replacement and real Engine/PostStack integration. Generated stand-ins only; no timing or aesthetic judgement.
@@ -1171,20 +1185,20 @@ replacement and real Engine/PostStack integration. Generated stand-ins only; no 
 ### Consolidated WebGL2 entries
 
 After `npm run build:packages`, run
-`node scripts/gpu-lock.mjs run --owner=webgl-merge --max=20 --wait-max=20 -- node packages/webgl2-compat/test/preview-browser-check.mjs`.
+`node scripts/run-with-timeout.mjs run --max=20 -- node packages/webgl2-compat/test/preview-browser-check.mjs`.
 The result is `test-results/webgl2-preview-browser.json`: picks, context recovery,
 native WebGPU isolation and preview-to-full-device escalation.
 ### Browser shutdown control-flow regressions
 
-Run `node --experimental-test-module-mocks --test --test-timeout=120000 tests/browser-teardown.test.js tests/browser-selection.test.js tests/gltf-pro-materials-lifecycle.test.js tests/shutdown.test.js`. The Windows ownership fixtures are injected on every platform; a separate control retains the POSIX driver route. `node --test --test-timeout=180000 tests/catalog.test.js` checks the actual catalog lifecycle after the package build. Material GPU validation uses the usual GPU lock and `node scripts/gltf-pro-materials-gpu-check.js`. Production shutdown stays at 30,000 ms; the larger command limits cover the complete tests, not a longer teardown.
+Run `node --experimental-test-module-mocks --test --test-timeout=120000 tests/browser-teardown.test.js tests/browser-selection.test.js tests/gltf-pbr-materials-lifecycle.test.js tests/shutdown.test.js`. The Windows ownership fixtures are injected on every platform; a separate control retains the POSIX driver route. `node --test --test-timeout=180000 tests/catalog.test.js` checks the actual catalog lifecycle after the package build. Material GPU validation uses `node scripts/gltf-pbr-materials-gpu-check.js`. Production shutdown stays at 30,000 ms; the larger command limits cover the complete tests, not a longer teardown.
 
 ### Audio review regressions (2026-11-09)
 
-Run npm test --workspace @margoengine/audio for suspended/resumed live-context stand-ins, quantized audio clocks with monotonic frame time, source-kind detachment, pooled/event authored pitch, disposed occlusion, missing engines and evidence wording. Run node scripts/gpu-lock.mjs run --owner=audio-review --max=12 --wait-max=2 -- npm run test:browser --workspace @margoengine/audio for native WebGPU and both WebGL2 routes. The browser harness also uses a real AudioContext with controlled 60 Hz frame and 10.667 ms audio clocks, and OfflineAudioContext fractional-loop markers at 130 bpm: one hour at 8 kHz, 300 s each at 44.1/48 kHz. Every loop is checked against its original fractional-sample grid; the allowed crossing interpolation error is 1.5 frames, not a per-loop allowance. Result: results/audio-review-20261109.json. No speed measurement or device-output proof.
+Run npm test --workspace @margoengine/audio for suspended/resumed live-context stand-ins, quantized audio clocks with monotonic frame time, source-kind detachment, pooled/event authored pitch, disposed occlusion, missing engines and evidence wording. Run node scripts/run-with-timeout.mjs run --max=12 -- npm run test:browser --workspace @margoengine/audio for native WebGPU and both WebGL2 routes. The browser harness also uses a real AudioContext with controlled 60 Hz frame and 10.667 ms audio clocks, and OfflineAudioContext fractional-loop markers at 130 bpm: one hour at 8 kHz, 300 s each at 44.1/48 kHz. Every loop is checked against its original fractional-sample grid; the allowed crossing interpolation error is 1.5 frames, not a per-loop allowance. Result: results/audio-review-20261109.json. No speed measurement or device-output proof.
 
 ## Batch 99 caustic guiding accuracy
 
-After `npm run build:packages`, run `node scripts/gpu-lock.mjs run --owner=guiding-proof --max=10 --wait-max=10 -- npm run test:gpu:guiding --workspace packages/voxel-pathtracer`.
+After `npm run build:packages`, run `node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu:guiding --workspace packages/voxel-pathtracer`.
 The fixed generated scene has a one-voxel smooth glass block above a white ground plane and a one-voxel emissive lamp
 above the glass. The orthographic camera is below the block. At 16 x 16, seed 17 and 64 samples, the default guide
 must have less than half the original tracer's squared RGB error against its 16,384-sample seed-987 guided reference.
@@ -1201,7 +1215,7 @@ survival heuristic removes that cause without changing the scene, sample count o
 ## Scatter tile capacity boundaries (batch 77 review)
 
 After `npm run build:packages`, run `node --test --test-timeout=60000 packages/scatter/test/tiles-budget.test.js`
-and `node scripts/gpu-lock.mjs run --owner=codex-77fix --max=5 -- node packages/scatter/test/grass-tiles.browser.mjs`.
+and `node scripts/run-with-timeout.mjs run --max=5 -- node packages/scatter/test/grass-tiles.browser.mjs`.
 The latter already runs in check:merge through scatter's `test:browser:grass-tiles` script. Each boundary fixture
 starts with fresh one-instance rings and 64 generated packed records; compare counts and capacities with
 [the recorded before/after result](results/scatter-tile-budget-20261109.json). The parent loses records in all five
@@ -1214,11 +1228,11 @@ Run npm test --workspace @margoengine/wfc for exhaustive local relations, linear
 
 ### Batch 69 WFC worker solving
 
-Build packages, then npm test --workspace @margoengine/wfc. Actual shipped classic scripts run on worker threads for TS/SIMD parity, pins, weighted/wide fallback and solver errors, beside transport lifecycle tests. Run node scripts/gpu-lock.mjs run --owner=codex-69 --max=8 -- node packages/wfc/test/browser-check.mjs --record for the device record. It solves 512x512 with both implementations beside real WebGPU and WebGL2 render loops, requires positive in-flight work plus rendered frames, compares synchronous seeded output and aborts a second active solve. npm run check:readme-run -- --packages=wfc executes the browser example. Generated rules are stand-ins; frame counts demonstrate scheduling, not a speed or frame-time claim.
+Build packages, then npm test --workspace @margoengine/wfc. Actual shipped classic scripts run on worker threads for TS/SIMD parity, pins, weighted/wide fallback and solver errors, beside transport lifecycle tests. Run node scripts/run-with-timeout.mjs run --max=8 -- node packages/wfc/test/browser-check.mjs --record for the device record. It solves 512x512 with both implementations beside real WebGPU and WebGL2 render loops, requires positive in-flight work plus rendered frames, compares synchronous seeded output and aborts a second active solve. npm run check:readme-run -- --packages=wfc executes the browser example. Generated rules are stand-ins; frame counts demonstrate scheduling, not a speed or frame-time claim.
 
 ### Batch 76 custom transitions
 
-Build packages, run npm test --workspace @margoengine/transitions, then node scripts/gpu-lock.mjs run --owner=codex-76 --max=10 --wait-max=30 -- npm run test:gpu --workspace @margoengine/transitions. The browser harness uses generated solid-color stand-ins and reads every tested output pixel. Expected values come from exact endpoints and the supplied p*p weight, within one UNORM code. Both 1x and 4x captures include resize and replacement-device redraw; actual WebGL2 must give coded linked unsupported. Invalid WGSL is deliberately labelled for the compile guard; incompatible bindings reject before attachment. npm run check:readme-run -- --packages=transitions runs both examples. No timing comparison was made.
+Build packages, run npm test --workspace @margoengine/transitions, then node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/transitions. The browser harness uses generated solid-color stand-ins and reads every tested output pixel. Expected values come from exact endpoints and the supplied p*p weight, within one UNORM code. Both 1x and 4x captures include resize and replacement-device redraw; actual WebGL2 must give coded linked unsupported. Invalid WGSL is deliberately labelled for the compile guard; incompatible bindings reject before attachment. npm run check:readme-run -- --packages=transitions runs both examples. No timing comparison was made.
 
 ## Missing format proofs
 
@@ -1242,7 +1256,7 @@ publisher archive SHA-256 db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d
 
 ## Batch 99 multiple-scattering tracer sky
 
-Build packages, then run `node scripts/gpu-lock.mjs run --owner=codex-99 -- node packages/voxel-pathtracer/tests/sky-browser.mjs`
+Build packages, then run `node scripts/run-with-timeout.mjs run -- node packages/voxel-pathtracer/tests/sky-browser.mjs`
 with a 10-minute hard limit. It runs native WebGPU and WebGL2 compatibility and writes
 `test-results/voxel-pathtracer-sky.json`; the committed record is `results/batch-99-sky-20261109.json`.
 Generated 32x16 maps compare higher orders on/off, Earth/no ozone, low sun and vacuum with Lambert ground;
@@ -1258,22 +1272,20 @@ and cancellation while each waits. No wall-time performance result or outside-re
 Run npm test --workspace @margoengine/wfc after building. The overlapping extraction subprocess has a 128 MiB heap,
 a 30-second hard timeout and a finite 512x512 sample; it must throw RangeError instead of exhausting the process.
 inputs.test.js, loading.test.js, sockets.test.js and worker.test.js exercise the other review findings and their
-related input/error classes. All run in verify/check:merge. Run node scripts/gpu-lock.mjs run --owner=codex-69fix
---max=8 --wait-max=8 -- npm run test:gpu --workspace @margoengine/wfc for both real browser backends, and the same
-lock wrapper around npm run check:readme-run -- --packages=wfc. No measured-speed rerun is needed: output algorithms,
+related input/error classes. All run in verify/check:merge. Run node scripts/run-with-timeout.mjs run --max=8 -- npm run test:gpu --workspace @margoengine/wfc for both real browser backends, and the same wrapper around
+npm run check:readme-run -- --packages=wfc. No measured-speed rerun is needed: output algorithms,
 work counts, benchmark scenes and the Rust artifact are unchanged.
 
 ### Scatter LOD representation cross-check
 
 Run npm test --workspace @margoengine/scatter; tiles-budget.test.js covers float64-to-f32 collapse and the existing
 inclusive capacity fixtures. After the package build, run the scatter browser scripts through
-node scripts/gpu-lock.mjs run --owner=codex-69fix --max=15 --wait-max=8 --
-node scripts/gpu-package-tests.mjs --no-build --only=scatter --serial.
+node scripts/run-with-timeout.mjs run --max=15 -- node scripts/gpu-package-tests.mjs --no-build --only=scatter --serial.
 The ordered compaction, per-ring caps and conservative tile-distance arithmetic are unchanged.
 
 ### Batch 76 mask wipes
 
-Run the same transitions unit, GPU-lock and README commands as job 1. The GPU suite also creates a 2x2 four-grey ImageData and ImageBitmap, checks 1344 pixels across hard/soft thresholds at 1x/4x, resizes through odd 5x7 and 7x3 captures and replaces a real device. A double-precision threshold oracle is independent of the integer WGSL addressing. Endpoints are byte-exact; blended channels allow one UNORM code. The fixtures are stand-ins. Native WebGL2 must refuse with linked unsupported. No performance comparison was made.
+Run the same transitions unit, GPU and README commands as job 1. The GPU suite also creates a 2x2 four-grey ImageData and ImageBitmap, checks 1344 pixels across hard/soft thresholds at 1x/4x, resizes through odd 5x7 and 7x3 captures and replaces a real device. A double-precision threshold oracle is independent of the integer WGSL addressing. Endpoints are byte-exact; blended channels allow one UNORM code. The fixtures are stand-ins. Native WebGL2 must refuse with linked unsupported. No performance comparison was made.
 
 ### BSP dungeon layouts (batch 68 job 3)
 
@@ -1283,7 +1295,7 @@ then `npm test --workspace @margoengine/procedural`. The dungeon tests independe
 grids, verify rooms and tree links, cover 256 seeded thin/small layouts plus the maximum grid, and compare
 direct raster writes against a full-grid membership oracle with exactly matching cells. The emitted
 `dungeonWork` counts are diagnostic work counts, not wall-time speed results.
-Run `node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
+Run `node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/procedural`
 for a production consumer under /sampling/: both independent lazy Wasm assets, no asset fetch on import,
 native WebGPU and WebGL2 values, real loss events and disposal. Generated maps only (STAND-IN, LIM-628).
 
@@ -1298,7 +1310,7 @@ shared README cache. The recorded result is 45/47, two retained other-cause fail
 ### Batch 56 job 1: projected HDR floor and contact composition
 
 After building packages, run
-`node scripts/gpu-lock.mjs run --owner=codex-56 --max=5 --wait-max=4 -- node packages/staging/test/ground-browser.mjs`
+`node scripts/run-with-timeout.mjs run --max=5 -- node packages/studio/test/ground-browser.mjs`
 and the same command with `--compat` appended. Both read the existing licensed BrightRings EXR,
 compare shadow-on/off pixels, assert unchanged product/outside pixels, destroy and replace an actual
 device, remove the caster and dispose the scene. The product geometry is a stand-in. The README's
@@ -1307,14 +1319,13 @@ No new projection or shadow algorithm, physical HDR-shadow claim or timing measu
 
 ### Batch 76 two live scenes
 
-Run transitions unit tests and the package GPU suite through gpu-lock as for jobs 1 and 2. live-browser.js uses two real Engine scenes, whose update plugins change generated backgrounds. It changes both colors at fixed progress and reads every output pixel, 374 total across 1x/4x, with exact endpoints and at most one UNORM code for blends. It resizes 8x4 to 7x3 and 5x7, destroys a real device, awaits engine recovery and proves progress continues. It also renders to canvas, disposes twice and renders a borrowed scene afterward. Native WebGL2 must give linked unsupported. Results are in results/batch-76-live.json, stand-in correctness, not performance.
+Run transitions unit tests and the package GPU suite as for jobs 1 and 2. live-browser.js uses two real Engine scenes, whose update plugins change generated backgrounds. It changes both colors at fixed progress and reads every output pixel, 374 total across 1x/4x, with exact endpoints and at most one UNORM code for blends. It resizes 8x4 to 7x3 and 5x7, destroys a real device, awaits engine recovery and proves progress continues. It also renders to canvas, disposes twice and renders a borrowed scene afterward. Native WebGL2 must give linked unsupported. Results are in results/batch-76-live.json, stand-in correctness, not performance.
 
 ### Real AVC B-frame edited timestamps
 
 Run node scripts/reference-rendering/fetch-skip-assets.mjs, build the packages, then run
 npm test --workspace @margoengine/video for the complete independent packet/timestamp
-oracle and rounding regressions. Run node scripts/gpu-lock.mjs run --owner=codex-missing
---max=10 -- npm run test:gpu --workspace @margoengine/video for all five browser checks,
+oracle and rounding regressions. Run node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/video for all five browser checks,
 including every real frame. The CC0 MDN flower clip stays in the shared outside cache.
 Its URL/SHA-256/size are in scripts/support/external-test-assets.json. The committed
 packages/video/test/flower-ffprobe.json comes only from FFprobe 8.1.2 JSON output:
@@ -1330,7 +1341,7 @@ Run fetch-assets.mjs and the existing viewer capture/run commands with --case=an
 
 ## Batch 99 heterogeneous RGB media
 
-Build packages, then run `node scripts/gpu-lock.mjs run --owner=media-proof -- node packages/voxel-pathtracer/tests/media-browser.mjs`.
+Build packages, then run `node scripts/run-with-timeout.mjs run -- node packages/voxel-pathtracer/tests/media-browser.mjs`.
 Run `node --test --test-timeout=180000 packages/voxel-pathtracer/tests/media.test.js` for hostile coefficients,
 atomic replacement, input ownership, optionality and fake-device restoration. The browser driver first
 checks root physical path length, then RGB absorption/emission/shadows, clear and extreme channels and
@@ -1340,11 +1351,11 @@ are stand-ins for analytic optical media, not outside production assets or rival
 
 ### Batch 160 environment IBL, job 7
 
-Fetch the pinned job 1 asset with node scripts/reference-rendering/fetch-assets.mjs. References and binaries stay under engine-bench. In an outside Python venv install mitsuba==3.9.1 and numpy==2.5.4; set MARGO_MITSUBA_PYTHON to its python executable (default is engine-bench/batch-168/mitsuba-venv/Scripts/python.exe). Run node scripts/gpu-lock.mjs run --owner=codex-160 --max=25 -- node scripts/reference-rendering/environment.mjs --capture-reference, then the same harness without --capture-reference and with --compat. The public Python adapter renders fixed-seed scalar_rgb direct/full images into a candidate directory; both raw and display hashes must match before any frozen artifact changes. Unchanged copies are retained outside, never committed. --measure refuses any existing budget. Root tests: node --test --test-timeout=120000 tests/reference-environment.test.js. All pixels, no crop, denoise, fitted exposure or new tone curve. Constant furnace only; use the existing batch 168 harness for sky/OIT/staging/lightmap evidence. KB3563 decomposition: add --decompose (and --compat) to compare the same Margo picture with the four CUDA references of mitsuba-environment-decompose.py (principled direct 1024 spp, principled and glTF without visibility, the split-sum model with exact albedo integrals) against batch-160-environment-decomposition.json; --capture-decomposition regenerates them under the GPU lock and refuses changed hashes, --measure-decomposition records once.
+Fetch the pinned job 1 asset with node scripts/reference-rendering/fetch-assets.mjs. References and binaries stay under engine-bench. In an outside Python venv install mitsuba==3.9.1 and numpy==2.5.4; set MARGO_MITSUBA_PYTHON to its python executable (default is engine-bench/batch-168/mitsuba-venv/Scripts/python.exe). Run node scripts/run-with-timeout.mjs run --max=25 -- node scripts/reference-rendering/environment.mjs --capture-reference, then the same harness without --capture-reference and with --compat. The public Python adapter renders fixed-seed scalar_rgb direct/full images into a candidate directory; both raw and display hashes must match before any frozen artifact changes. Unchanged copies are retained outside, never committed. --measure refuses any existing budget. Root tests: node --test --test-timeout=120000 tests/reference-environment.test.js. All pixels, no crop, denoise, fitted exposure or new tone curve. Constant furnace only; use the existing batch 168 harness for sky/OIT/staging/lightmap evidence. KB3563 decomposition: add --decompose (and --compat) to compare the same Margo picture with the four CUDA references of mitsuba-environment-decompose.py (principled direct 1024 spp, principled and glTF without visibility, the split-sum model with exact albedo integrals) against batch-160-environment-decomposition.json; --capture-decomposition regenerates them and refuses changed hashes, --measure-decomposition records once.
 
 ### Batch 160 Cornell lights, job 8
 
-Use the outside Mitsuba venv documented for job 7. Run node scripts/gpu-lock.mjs run --owner=codex-160 --max=25 -- node scripts/reference-rendering/cornell.mjs --capture-reference and add --point for the independent point-light scene. Then run both cases without --capture-reference, each with and without --compat. Native WebGL2 is explicitly refused before the measured compatibility path. Raw RGB/EXR/PNG artifacts remain in engine-bench/batch-160/clustered and clustered-point; raw/display hashes protect recapture. --measure cannot replace any established budget. Tests: node --test --test-timeout=120000 tests/reference-cornell.test.js. cornell-scene.mjs reuses packages/lightmap/scripts/cornell-box.mjs directly; all 15 quads, reflectance, winding and Float32 snap match batch 168. Only direct-light pictures are new; the existing lightmap-bake result is reused. Both unshadowed controls and default LocalShadows are compared with the same hard-visibility reference, with no fitted exposure or crop. Point finite-range attenuation is an explicit model difference, not fitted into the reference. Add --decompose to also render the KB3573 diagnostic variants (range window removed, LocalShadows resolution 1024 to 4096) against their frozen budgets in batch-160-clustered-decomposition.json and batch-160-clustered-point-decomposition.json; --measure-decomposition records them once and cannot replace them.
+Use the outside Mitsuba venv documented for job 7. Run node scripts/run-with-timeout.mjs run --max=25 -- node scripts/reference-rendering/cornell.mjs --capture-reference and add --point for the independent point-light scene. Then run both cases without --capture-reference, each with and without --compat. Native WebGL2 is explicitly refused before the measured compatibility path. Raw RGB/EXR/PNG artifacts remain in engine-bench/batch-160/clustered and clustered-point; raw/display hashes protect recapture. --measure cannot replace any established budget. Tests: node --test --test-timeout=120000 tests/reference-cornell.test.js. cornell-scene.mjs reuses packages/lightmap/scripts/cornell-box.mjs directly; all 15 quads, reflectance, winding and Float32 snap match batch 168. Only direct-light pictures are new; the existing lightmap-bake result is reused. Both unshadowed controls and default LocalShadows are compared with the same hard-visibility reference, with no fitted exposure or crop. Point finite-range attenuation is an explicit model difference, not fitted into the reference. Add --decompose to also render the KB3573 diagnostic variants (range window removed, LocalShadows resolution 1024 to 4096) against their frozen budgets in batch-160-clustered-decomposition.json and batch-160-clustered-point-decomposition.json; --measure-decomposition records them once and cannot replace them.
 
 ### Space colonisation trees (batch 68 job 4)
 
@@ -1353,7 +1364,7 @@ Run `npm run test:trees-kernel --workspace @margoengine/procedural`,
 `npm test --workspace @margoengine/procedural`. The trees tests check generated and custom clouds,
 graph and length invariants, extreme bounds, owned output, abort/dispose and an exhaustive assignment
 oracle. Work counts compare distance tests, not elapsed time or language speed. Run
-`node scripts/gpu-lock.mjs run --owner=codex-68 --max=10 --wait-max=10 -- npm run test:gpu --workspace @margoengine/procedural`
+`node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/procedural`
 for the production consumer under /sampling/, independent lazy assets, exact backend values and real
 device/context loss. All inputs are generated stand-ins (LIM-631).
 
@@ -1363,8 +1374,8 @@ caller cancellation reasons. Four cases fail without the owning loader correctio
 
 ### Batch 56 job 2: accumulated shadows
 
-Build packages, then run `node --test --test-timeout=240000 packages/staging/test/*.test.js`.
-Run `node scripts/gpu-lock.mjs run --owner=codex-56 --max=10 --wait-max=40 -- node packages/staging/test/accumulate-browser.mjs`
+Build packages, then run `node --test --test-timeout=240000 packages/studio/test/*.test.js`.
+Run `node scripts/run-with-timeout.mjs run --max=10 -- node packages/studio/test/accumulate-browser.mjs`
 and append `--compat` for the WebGL2 compatibility layer. Both runs compare all texels against an
 independent ray-plane rectangle oracle on the Direct3D raster grid, test sharp contact and increasing
 penumbrae, exact maximum integer sums, stable completed history, empty scenes, resize/removal,
@@ -1378,10 +1389,9 @@ No benchmark or physical-lighting comparison was performed.
 
 ### Batch 56 job 3: studio rig reuse
 
-Build packages. Run `node --test --test-timeout=120000 packages/environment/tests/studio.test.js`.
-Under the GPU lock with owner codex-56, max 20 minutes and wait-max 40 minutes, run
-`node packages/environment/scripts/test-browser.js --page=studio` and again with `--compat`.
-Run `node packages/staging/test/ground-browser.mjs --studio` on both paths too. The studio value
+Build packages. Run `node --test --test-timeout=120000 packages/environment/tests/studio.test.js`. Then run
+`node scripts/run-with-timeout.mjs run --max=20 -- node packages/environment/scripts/test-browser.js --page=studio` and again with `--compat`.
+Run `node packages/studio/test/ground-browser.mjs --studio` on both paths too. The studio value
 oracle checks all four softboxes' source directions, SH and irradiance ordering; staging checks off/on
 contact pixels, unchanged product/outside pixels, removal, disposal and real replacement-device
 recovery. [Frozen evidence](results/batch-56-rigs.json). No external assets or speed comparison.
@@ -1404,7 +1414,7 @@ there is no elapsed-time or SIMD speed claim (LIM-632).
 After `git lfs pull` and `npm run build:packages`, run:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=mips-proof -- node packages/materials/test/features-browser.mjs mips
+node scripts/run-with-timeout.mjs run -- node packages/materials/test/features-browser.mjs mips
 ```
 
 The required unmodified KTX-Software-CTS file fails on missing/LFS/changed bytes. Its
@@ -1417,7 +1427,7 @@ claim. Durable record: `results/mips-real-tool-20261109.json`.
 
 ### Batch 76 independent review corrections
 
-Run npm test --workspace @margoengine/transitions, then node scripts/gpu-lock.mjs run --owner=codex-76fix --max=8 --wait-max=10 -- node packages/transitions/scripts/test-gpu.mjs. The runner includes viewport-browser.js: compare patterned 8x4 captures with a no-transition baseline inside the right-half viewport and throughout a stacked inset/scissor target, for four built-in kinds/custom/mask at idle/0/0.5/1, 1x/4x. Original code fails at wipe idle 1x pixel 4,0 red (0 versus 127). The live integer-format regression fails against the original code because rgba8uint does not throw. Live real-device tests check integer/depth/non-resolvable float refusal with unchanged source updates/progress and accept baseline float/normalized formats. Additional resource-interface probes compile only; the costly-loop shader is never dispatched. Run node --test --test-timeout=60000 packages/scatter/test/*.test.js for the ring/f32/capacity audit's existing regression suite. Evidence is correctness on generated inputs, not throughput or hostile-shader execution safety.
+Run npm test --workspace @margoengine/transitions, then node scripts/run-with-timeout.mjs run --max=8 -- node packages/transitions/scripts/test-gpu.mjs. The runner includes viewport-browser.js: compare patterned 8x4 captures with a no-transition baseline inside the right-half viewport and throughout a stacked inset/scissor target, for four built-in kinds/custom/mask at idle/0/0.5/1, 1x/4x. Original code fails at wipe idle 1x pixel 4,0 red (0 versus 127). The live integer-format regression fails against the original code because rgba8uint does not throw. Live real-device tests check integer/depth/non-resolvable float refusal with unchanged source updates/progress and accept baseline float/normalized formats. Additional resource-interface probes compile only; the costly-loop shader is never dispatched. Run node --test --test-timeout=60000 packages/scatter/test/*.test.js for the ring/f32/capacity audit's existing regression suite. Evidence is correctness on generated inputs, not throughput or hostile-shader execution safety.
 
 ### Static USDZ README input
 
@@ -1446,15 +1456,13 @@ its 268,320 bytes and SHA-256 are in the fixture notice. This is not an outside
 
 ### Batch 56 viewer numeric safety
 
-Build packages, run the stage package tests, then run scripts/stage-viewer-gpu-check.js through
-the GPU lock (owner codex-56). Append --compat for the compatibility path. Extreme periods are
+Build packages, run the stage package tests, then run scripts/stage-viewer-gpu-check.js. Append --compat for the compatibility path. Extreme periods are
 Number.MIN_VALUE, -1e-309 and Number.MAX_VALUE, with a visible real helmet and no GPU errors.
 The CPU test includes both signs and huge finite deltas; old code produces nonfinite coordinates.
 
 ### Batch 56 audit: physical sampler pressure
 
-After building packages, run the gltf-pro tests and scripts/stage-viewer-gpu-check.js through the
-GPU lock, on native WebGPU and with --compat. The same real FlightHelmet file, including its
+After building packages, run the gltf/pbr tests and scripts/stage-viewer-gpu-check.js, on native WebGPU and with --compat. The same real FlightHelmet file, including its
 transmission-factor lens, uses IBL plus a floor shadow. Before the repair ANGLE reported fragment
 texture image units exceeding MAX_TEXTURE_IMAGE_UNITS(16), the frame loop stopped and the
 turntable assertion failed. The same unchanged assertions pass after unused physical maps are
@@ -1462,17 +1470,16 @@ replaced by exact fallback constants and omitted from the bind group.
 
 ### Batch 56 audit: mandatory direct glTF GPU inputs
 
-Run node scripts/support/external-test-assets.mjs, then run the gltf-pro test:extensions:browser
-script through the GPU lock. No environment override is required for the normal shared cache.
+Run node scripts/support/external-test-assets.mjs, then run the gltf/pbr test:extensions:browser
+script. No environment override is required for the normal shared cache.
 For a missing or changed input, use the named fetch-skip-assets recovery command. The four cases
 now actually consume their validated files. Run tests/external-test-assets.test.js for the cache
 failure regressions and the direct-harness contract checked by verify/check:merge.
 
 ### Batch 56 job 4: existing product viewer
 
-Build packages; run npm test --workspace @margoengine/stage and the staging package tests. Through
-the GPU lock with owner codex-56, run scripts/stage-viewer-gpu-check.js and append --compat for
-the compatibility layer, or run gltf-pro's test:gpu:viewer script for both. The licensed real
+Build packages; run npm test --workspace @margoengine/stage and the staging package tests. Run scripts/stage-viewer-gpu-check.js and append --compat for
+the compatibility layer, or run gltf/pbr's test:gpu:viewer script for both. The licensed real
 FlightHelmet is the existing mobile GLB fixture. The tests assert product coverage, ground pixels,
 orbit radius/height/target, rollback, extreme finite periods, disposal and actual device replacement
 restoring the whole frame exactly. Raw reports are test-results/stage-viewer.json and
@@ -1480,7 +1487,7 @@ stage-viewer-compat.json; the committed batch-56-frame.json preserves both devic
 
 ### Batch 99 mixed triangle geometry
 
-Build with npm run build:mesh --workspace @margoengine/voxel-pathtracer, then npm run build:packages. Run npm run test:mesh-kernel --workspace @margoengine/voxel-pathtracer and the voxel-pathtracer package tests. Run node scripts/gpu-lock.mjs run --owner=codex-99 --max=10 --wait-max=5 -- npm run test:gpu:mesh --workspace @margoengine/voxel-pathtracer for native and compatibility analytic paths, predicate arithmetic, device replacement and raster restoration. The generated-scene record is results/batch-99-mesh-20261109.json. No downloaded reference asset is involved.
+Build with npm run build:mesh --workspace @margoengine/voxel-pathtracer, then npm run build:packages. Run npm run test:mesh-kernel --workspace @margoengine/voxel-pathtracer and the voxel-pathtracer package tests. Run node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu:mesh --workspace @margoengine/voxel-pathtracer for native and compatibility analytic paths, predicate arithmetic, device replacement and raster restoration. The generated-scene record is results/batch-99-mesh-20261109.json. No downloaded reference asset is involved.
 
 node packages/voxel-pathtracer/tests/mesh-build-ab.mjs runs the CPU-only scalar/Rust paired diagnostic and writes test-results/voxel-pathtracer-mesh-build-ab.json. Both builders emit the same 524,284 words for 16,384 triangles; every timed output is compared byte for byte. Alternating rounds use per-round minima. This is a loaded-machine implementation diagnostic, not a quiet release or rival benchmark.
 
@@ -1504,13 +1511,13 @@ quality. Other controls remain generated stand-ins (LIM-639). No speed measured.
 
 ### Batch 160: independent raw blend repeat regression
 
-From this checkout, after npm ci, run through the shared GPU lock:
+From this checkout, after npm ci, run:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat.mjs --api=webgpu
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat.mjs --api=webgl2
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat-node.mjs --backend=d3d12
-node scripts/gpu-lock.mjs run --owner=codex-160 --max=8 --wait-max=8 -- node scripts/reference-rendering/blend-repeat-node.mjs --backend=d3d11
+node scripts/run-with-timeout.mjs run --max=8 -- node scripts/reference-rendering/blend-repeat.mjs --api=webgpu
+node scripts/run-with-timeout.mjs run --max=8 -- node scripts/reference-rendering/blend-repeat.mjs --api=webgl2
+node scripts/run-with-timeout.mjs run --max=8 -- node scripts/reference-rendering/blend-repeat-node.mjs --backend=d3d12
+node scripts/run-with-timeout.mjs run --max=8 -- node scripts/reference-rendering/blend-repeat-node.mjs --backend=d3d11
 ```
 
 The browser commands render 200 frames per process, in two fresh processes. Each
@@ -1540,10 +1547,9 @@ since been deleted; jobs 4 and 5 now reproduce from main (see "Batch 160 job 5" 
 
 Use the job 1 commands with `--case=specular` and `--case=ior` (Khronos SpecularTest and
 IORTestGrid, pinned at 8f492390ddc7a2ae221a1369ef560589cf8c70fb; NOTICE in
-scripts/reference-rendering). After `npm run build:packages`, each capture runs through the
-GPU lock, for example
-`node scripts/gpu-lock.mjs run --owner=<lane> --max=10 --gpu="reference capture" -- node scripts/reference-rendering/run.mjs --case=ior`
-and the same with `--compat`. Repeat proofs, under the same lock:
+scripts/reference-rendering). After `npm run build:packages`, each capture runs, for example
+`node scripts/run-with-timeout.mjs run --max=10 -- node scripts/reference-rendering/run.mjs --case=ior`
+and the same with `--compat`. Repeat proofs:
 `MARGO_GPU=nvidia node scripts/reference-rendering/proof.mjs --case=ior`, or with
 `MARGO_GPU=amd GPU_POWER=low-power` for the Radeon adapter, each with and without `--compat`.
 Every proof is three fresh browser processes, four devices and six frames, all 72 decoded
@@ -1561,7 +1567,7 @@ Generated stand-in geometry and networks; no external asset is needed. In a buil
 ```sh
 npm run build:packages
 node --test --test-timeout=180000 packages/road/test/*.test.js
-node scripts/gpu-lock.mjs run --owner=road-proof --max=8 --wait-max=10 -- npm run test:gpu --workspace @margoengine/road
+node scripts/run-with-timeout.mjs run --max=8 -- npm run test:gpu --workspace @margoengine/road
 npm run check:readme-run -- --packages=road
 npm run measure:size
 ```
@@ -1570,19 +1576,19 @@ The browser proof uses native WebGPU and forced real WebGL2 compatibility. It ch
 
 ### Batch 99 spectral and lens effects
 
-After npm run build:packages, run the voxel-pathtracer package tests. Through scripts/gpu-lock.mjs
-with owner codex-99 and a ten-minute limit, run npm run test:gpu:spectral --workspace
+After npm run build:packages, run the voxel-pathtracer package tests. Run
+node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu:spectral --workspace
 @margoengine/voxel-pathtracer. This runs native WebGPU and WebGL2 compatibility analytic values:
 equal-energy colour, one glass interface, a closed slab, glass and lens furnaces, finite-slab disk
 coverage at three wavelengths, and extreme finite lens settings. All scenes are generated stand-ins.
 Run node packages/voxel-pathtracer/tests/browser-check.mjs --spectral --report=spectral-snell dispersion
-viewport through the same GPU lock for the unchanged analytic Snell and actual device-replacement
+viewport for the unchanged analytic Snell and actual device-replacement
 and raster-restoration assertions. No external spectral asset, reference renderer or speed claim.
 The committed reports are results/batch-99-spectral-20261109.json and the matching Snell/lifecycle record.
 
 ### Batch 68 job 7: building shape grammar
 
-Run procedural test, test:buildings-kernel and GPU-locked test:gpu. The JS test
+Run procedural test, test:buildings-kernel and test:gpu. The JS test
 compares floor/bay coverage, material areas, normals and shell volume with analytic
 oracles; a per-vertex sine/cosine transform is coordinate-identical to the shared
 scope while doing2 trig calls per vertex instead of2 per model. This is a work count,
@@ -1613,8 +1619,8 @@ Build packages, then run node scripts/reference-rendering/fetch-skip-assets.mjs.
 The existing required manifest includes the complete CC0 FlightHelmet Basis model
 under helmet/ in the external cache. Run node --test tests/readme-assets.test.js
 tests/run-readme-examples.test.js packages/decoders/tests/readme-node.test.js.
-Through node scripts/gpu-lock.mjs run --owner=codex-missing --max=5 --, run
-node packages/decoders/scripts/test-node-gltf.mjs. It executes the README's original
+Run
+node scripts/run-with-timeout.mjs run --max=5 -- node packages/decoders/scripts/test-node-gltf.mjs. It executes the README's original
 Node setup/load, checks texture/mip/geometry totals and GPU validation, then reads
 the rendered model. Raw result: packages/decoders/test-results/node-gltf/result.json.
 Run npm run check:readme-run -- --packages=decoders to execute all 17 examples.
@@ -1628,12 +1634,12 @@ Build packages; fetch with node scripts/reference-rendering/fetch-skip-assets.mj
 
 The independent oracle uses Python 3.13, python-plyfile 1.1.3 and NumPy 2.3.4 installed in an outside environment. Run python packages/loaders/scripts/ply-reference.py <external-cache>/ply-horse/horse.ply <output.json>, then compare it with packages/loaders/tests/fixtures/horse-oracle.json. It reads the original file without re-encoding it and records every position/color/index hash. Python is needed to regenerate that oracle, not to run the required Node regression.
 
-For the existing outside-file harness, select REAL_FILES_ONLY=ply-big-endian-vtk and set REAL_FILES_DIR to an outside directory before node packages/loaders/scripts/test-real-files.mjs. REAL_FILES_RENDER=1 adds the real-GPU blank-frame check; run it through the shared GPU lock. The horse contains white RGB and confidence, with no authored normals/UVs. No visual-quality or speed comparison is implied.
+For the existing outside-file harness, select REAL_FILES_ONLY=ply-big-endian-vtk and set REAL_FILES_DIR to an outside directory before node packages/loaders/scripts/test-real-files.mjs. REAL_FILES_RENDER=1 adds the real-GPU blank-frame check; run it. The horse contains white RGB and confidence, with no authored normals/UVs. No visual-quality or speed comparison is implied.
 
 ### Batch 56 job 5: idle triangle product still
 
-Build packages, then run staging's package tests. Under the codex-56 GPU lock run
-node packages/staging/test/pathtrace-browser.mjs. It runs native and compatibility (ANGLE Vulkan
+Build packages, then run staging's package tests. Run
+node packages/studio/test/pathtrace-browser.mjs. It runs native and compatibility (ANGLE Vulkan
 on Windows), the existing licensed examples/assets/flight-helmet-mobile.glb, 20,734 triangles.
 Palette material intentionally replaces the authored material. It measures 8/64-sample image error
 against a 512-sample reference and asserts each emission hit against [2,1,0.5], plus camera/idle
@@ -1647,7 +1653,7 @@ From a built checkout, run:
 
 ```sh
 npm test --workspace @margoengine/sciviz
-node scripts/gpu-lock.mjs run --owner=sciviz-updates --max=15 --wait-max=10 -- npm run test:browser --workspace @margoengine/sciviz
+node scripts/run-with-timeout.mjs run --max=15 -- npm run test:browser --workspace @margoengine/sciviz
 npm run check:readme-run -- --packages=sciviz
 npm run measure:size
 ```
@@ -1660,7 +1666,7 @@ WebGPU and forced WebGL2. Results are written to `test-results/sciviz-browser.js
 
 ## Batch 56 job 6: oriented staging receivers
 
-After build:packages, run node scripts/gpu-lock.mjs run --owner=codex-56 -- node packages/staging/test/orientation-browser.mjs, then the same command with --compat. --record writes the two committed evidence records under examples/package-benchmarks/results. npm test --workspace @margoengine/staging runs the independent CPU projection/fit/extreme-direction regressions. The real-product case loads the already licensed examples/assets/flight-helmet-mobile.glb; no generated model substitutes for it. Screenshots are compositor screenshots. Native preview refusal is also asserted on a real WebGL2 context.
+After build:packages, run node scripts/run-with-timeout.mjs run -- node packages/studio/test/orientation-browser.mjs, then the same command with --compat. --record writes the two committed evidence records under examples/package-benchmarks/results. npm test --workspace @margoengine/studio runs the independent CPU projection/fit/extreme-direction regressions. The real-product case loads the already licensed examples/assets/flight-helmet-mobile.glb; no generated model substitutes for it. Screenshots are compositor screenshots. Native preview refusal is also asserted on a real WebGL2 context.
 
 ### Batch 65 review corrections
 
@@ -1669,9 +1675,9 @@ After a package build, run the exact four review inputs and shared periodic cons
 ```sh
 npm run check:road-invariants
 node --test --test-timeout=120000 packages/road/test/*.test.js packages/splines/test/*.test.js packages/geometry/tests/*.test.js
-node scripts/gpu-lock.mjs run --owner=codex-65fix --max=10 --wait-max=5 -- npm run test:gpu --workspace @margoengine/road
-node scripts/gpu-lock.mjs run --owner=codex-65fix --max=10 --wait-max=5 -- npm run test:gpu --workspace @margoengine/geometry
-node scripts/gpu-lock.mjs run --owner=codex-65fix --max=10 --wait-max=5 -- npm run check:readme-run -- --packages=road,splines,geometry
+node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/road
+node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu --workspace @margoengine/geometry
+node scripts/run-with-timeout.mjs run --max=10 -- npm run check:readme-run -- --packages=road,splines,geometry
 npm run lint
 npm run hygiene
 npm run verify
@@ -1683,8 +1689,8 @@ The review and corrective logs are local worktree evidence under test-results/re
 
 Build: npm run build:caves --workspace @margoengine/procedural (Rust wasm32 target).
 Run npm run test:caves-kernel --workspace @margoengine/procedural, then npm test
---workspace @margoengine/procedural. GPU values/loss: use the required GPU lock
-around npm run test:gpu --workspace @margoengine/procedural. The caves browser
+--workspace @margoengine/procedural. GPU values/loss: run
+npm run test:gpu --workspace @margoengine/procedural. The caves browser
 test checks a seeded 2D cave, a seeded 3D island volume and real Natural Earth
 Madagascar land. reference.json pins the source URL, public-domain terms, original
 length/hash, extent and cell-centre resolution. caves-reference.js independently
@@ -1696,12 +1702,12 @@ runtime/speed threshold, connectivity or real 3D geology is claimed.
 
 ## Batch 56 reflective-floor audit regressions
 
-Run npm test --workspace @margoengine/environment, then under the GPU lock run node packages/staging/test/floor-browser.mjs and the same command with --compat. --record writes batch-56-floor.json and batch-56-floor-compat.json in examples/package-benchmarks/results. The licensed FlightHelmet mobile GLB is an existing required fixture. The test verifies every component of all eight power-of-two mips against independent 2x2 means, exact half-rounding probes, displayed reflected pixels, actual replacement-device frame equality, resize and a uniform cleared product capture. Existing scripts/env-mirror-gpu-check.js exercises independent mirror, glass and cube-camera references.
+Run npm test --workspace @margoengine/environment, then run node packages/studio/test/floor-browser.mjs and the same command with --compat. --record writes batch-56-floor.json and batch-56-floor-compat.json in examples/package-benchmarks/results. The licensed FlightHelmet mobile GLB is an existing required fixture. The test verifies every component of all eight power-of-two mips against independent 2x2 means, exact half-rounding probes, displayed reflected pixels, actual replacement-device frame equality, resize and a uniform cleared product capture. Existing scripts/env-mirror-gpu-check.js exercises independent mirror, glass and cube-camera references.
 
 ## Batch 99 parity gamma regression (2026-11-09)
 
 Run `npm run build:packages`, then
-`node scripts/gpu-lock.mjs run --owner=parity-gamma --max=6 -- node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs`.
+`node scripts/run-with-timeout.mjs run --max=6 -- node packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs`.
 The test requires exact reference bytes on native WebGPU and WebGL2 compatibility and writes
 `test-results/voxel-pathtracer-magicavoxel-gamma.json`.
 
@@ -1722,7 +1728,7 @@ The independent full zero-error parity corpus remains unfinished.
 Build with `npm run build:packages`, then run `npm run check:testpage-contracts`
 and `npm run check:road-invariants`. Run native SDF tests with
 `npm run test:sdf-kernel --workspace=@margoengine/procedural`.
-GPU proof: `node scripts/gpu-lock.mjs run --owner=codex-testpage --max=10 --wait-max=10 -- node packages/procedural/test/textures-browser.mjs`.
+GPU proof: `node scripts/run-with-timeout.mjs run --max=10 -- node packages/procedural/test/textures-browser.mjs`.
 The shader oracle, both native backends, repeat seams, GL state restoration,
 context/device loss, cancellation and disposal use the same tolerances.
 Actual character-asset contracts: `node --test --test-timeout=120000 packages/animation/tests/testpage.test.js`.
@@ -1747,7 +1753,7 @@ Test-page 36: after `npm run build:packages`, run
 and `npm run measure:size`. The parent fails replacement rejection; the repaired
 build preserves mutation and inspector restoration. Package GPU and README checks
 use `npm run test:gpu --workspace=@margoengine/core` and
-`npm run check:readme-run -- --packages=core` under the shared GPU lock.
+`npm run check:readme-run -- --packages=core`.
 
 For test-page 44, build packages then run
 `node --test --test-timeout=120000 packages/mesh-edit/tests/testpage-bevel.test.js`.
@@ -1757,7 +1763,7 @@ closed winding, provenance and subsequent edits. The package browser script and
 
 
 Batch 160 isolated mip correction: build packages, then run node --test
-packages/webgl2-compat/test/*.test.js. Under the shared GPU lock run both
+packages/webgl2-compat/test/*.test.js. Run both
 webgl2-compat/test:browser and webgl2-compat/test:gpu through
 scripts/gpu-package-tests.mjs --no-build --select=webgl2-compat/test:browser,webgl2-compat/test:gpu.
 features-browser.mjs compares all original cases plus unfiltered native mip
@@ -1775,9 +1781,8 @@ Use fetch-assets.mjs and cycles-gltf.py for public licensed data and black-box
 Blender Cycles; never inspect reference-renderer source. The full/direct controls
 retain all authored primitives, pixels, samples and budgets.
 
-Build packages, set MARGO_GPU=amd and GPU_POWER=low-power, then run each command
-in its own shared GPU slot with owner codex-160, wait-max at least 60 and max
-at measured runtime plus a small margin:
+Build packages, set MARGO_GPU=amd and GPU_POWER=low-power, then run each command with a time limit of the
+measured runtime plus a small margin:
 
 ~~~powershell
 node scripts/reference-rendering/proof.mjs --case=transmission
@@ -1789,7 +1794,7 @@ node scripts/reference-rendering/proof.mjs --case=volume --compat
 Each command preserves 72 PNGs and proof.json in a unique external directory,
 validates every original budget, actual AMD adapter and identical decoded RGBA
 bytes. The full volume ceiling is 13,794,699 on NVIDIA since 2026-11-11 (was 13,792,000). Native WebGL2 refusal is
-covered by run.mjs. Run gltf-pro's native-volume GPU test for twenty exact slab
+covered by run.mjs. Run gltf/pbr's native-volume GPU test for twenty exact slab
 readbacks on each backend, and its unit tests for transformed/instanced shader
 math and exact absent normal-map fallbacks. No benchmark is part of this proof.
 
@@ -1800,8 +1805,7 @@ packages/voxel-pathtracer/tests/media-readme.test.js. With the original media
 example, the controlled unresolved-trace promise fails the initialization assertion.
 The replacement also checks the real renderImage API with its original dimensions,
 sample count and cancellation signal, capture error propagation and disposal.
-Run check:readme-run with --packages=voxel-pathtracer --only=heterogeneous in one
-shared GPU slot (wait-max at least 60, max measured duration plus a small margin).
+Run check:readme-run with --packages=voxel-pathtracer --only=heterogeneous (time limit: the measured duration plus a small margin).
 The 20-second module deadline is unchanged. Click Render 32 x 32 image to request
 the awaited float capture; leaving the page disposes both owners. Forced WebGL2
 uses the existing compatibility shim. Proof:
@@ -1810,7 +1814,7 @@ results/batch-99-media-readme-startup-20261109.json.
 ### Batch 99 viewport history mask
 
 Build packages, then run
-`node scripts/gpu-lock.mjs run --owner=codex-99 --wait-max=60 --max=0.75 -- node packages/voxel-pathtracer/tests/history-taps-browser.mjs`.
+`node scripts/run-with-timeout.mjs run --max=0.75 -- node packages/voxel-pathtracer/tests/history-taps-browser.mjs`.
 The suite captures the DENOISE shader from the built root entry, dispatches its
 combine kernel on controlled finite-ray inputs, and checks all 16 masks, live
 and exhausted/zero history, HDR 32768, native WebGPU and WebGL2 compatibility,
@@ -1822,31 +1826,30 @@ reproduces 112 failures among 448 cases; the full repair evidence is in
 case remains an additional camera-motion quality check, without a noise-free
 claim. No baseline test or tolerance was weakened.
 
-Batch 99 history/artifact landing: build the current workspace, run voxel-pathtracer package tests and test:gpu:history-taps, then check:readme-run -- --packages=voxel-pathtracer. GPU commands use one shared slot per lane, wait-max at least 60 and measured holds plus a small margin. Preserve successful equivalent-source checks and rerun failed steps only, as the coordinator directs. Commit package inputs, regenerate examples/package-benchmarks/entry-sizes.mjs and scripts/basic-scene-network.mjs from that same clean revision, api:update after entries, api:check, and scripts/build-llms.mjs after final docs. Do not edit provenance metadata. Current scoped receipts and retained historical verify evidence are in results/batch-99-history-landing-20261109.json.
+Batch 99 history/artifact landing: build the current workspace, run voxel-pathtracer package tests and test:gpu:history-taps, then check:readme-run -- --packages=voxel-pathtracer. GPU commands run one at a time per lane, each with a time limit of the measured duration plus a small margin. Preserve successful equivalent-source checks and rerun failed steps only, as the coordinator directs. Commit package inputs, regenerate examples/package-benchmarks/entry-sizes.mjs and scripts/basic-scene-network.mjs from that same clean revision, api:update after entries, api:check, and scripts/build-llms.mjs after final docs. Do not edit provenance metadata. Current scoped receipts and retained historical verify evidence are in results/batch-99-history-landing-20261109.json.
 
 ### Preview attachment contract
 
 For the compatibility continuation, build packages and run
 `node --test --test-timeout=120000 packages/webgl2-compat/test/private-inference.test.js packages/webgl2-compat/test/device.test.js packages/dof/tests/temporal-compat.test.js`.
-Under one shared GPU slot run `node scripts/light-render-gpu-check.js`,
+Run `node scripts/light-render-gpu-check.js`,
 `node packages/culling/test/gpu/dynamic-check.mjs`, and both
 `node packages/dof/tests/gpu/lens-check.mjs` and
 `node packages/dof/tests/gpu/compat-check.mjs`. Repeat the applicable native and
 `MARGO_COMPAT=1` checks; the comparison fixture controls its two tiers itself.
 Keep the original exact pixel and lens bounds. No timing suite is authorized.
 
-After `npm run build:packages`, run `npm run check:preview-contract` and `node --test --test-timeout=120000 tests/preview-contract.test.js tests/preview-refusal.test.js packages/lod/test/preview.test.js`. Run browser evidence under `node scripts/gpu-lock.mjs run --owner=preview-contract --max=15 -- node packages/webgl2-compat/test/package-tiers-browser.mjs`; add `--compat` to exercise the first scene on the full layer too. Results: `test-results/preview-package-tiers.json`. The fixture is a clean-room triangle embedded in an HTTP glTF, with selected magenta edges. No external asset or rival source is needed.
+After `npm run build:packages`, run `npm run check:preview-contract` and `node --test --test-timeout=120000 tests/preview-contract.test.js tests/preview-refusal.test.js packages/lod/test/preview.test.js`. Run browser evidence under `node scripts/run-with-timeout.mjs run --max=15 -- node packages/webgl2-compat/test/package-tiers-browser.mjs`; add `--compat` to exercise the first scene on the full layer too. Results: `test-results/preview-package-tiers.json`. The fixture is a clean-room triangle embedded in an HTTP glTF, with selected magenta edges. No external asset or rival source is needed.
 
 The package-tier browser gate also covers Gemini entries 21, 22, 26, 29, 30, 31, 33 and the missing-fallback diagnostic (28). Run webgl2-compat/test/device.test.js after the package build for the native-retained install warning (27). The procedural preview route must finish without loading the compatibility layer.
 
-Research basis and source comparison: [preview contract review](preview-contract-research.md). Under the 2026-11-10 restart use the shared GPU phase only; the three cutout-caster timing scripts are deferred in the speed-phase record.
+Research basis and source comparison: [preview contract review](preview-contract-research.md). Under the 2026-11-10 restart use the GPU phase only; the three cutout-caster timing scripts are deferred in the speed-phase record.
 
-Recording example activation: run `node --test --test-timeout=30000 packages/video/test/readme-record.test.js` and `npm run check:readme-run -- --packages=video` under the shared GPU lock. Click the README example's Record button to capture its generated picture and tone. [Research and the regression's scope](recording-example-research.md).
+Recording example activation: run `node --test --test-timeout=30000 packages/video/test/readme-record.test.js` and `npm run check:readme-run -- --packages=video`. Click the README example's Record button to capture its generated picture and tone. [Research and the regression's scope](recording-example-research.md).
 
 Batched picking work counts: after building packages, run
 `node --test --test-timeout=120000 packages/selection/test/picking.test.js`.
-GPU equivalence and command counts: `node scripts/gpu-lock.mjs run
---owner=codex-skipgaps -- node packages/selection/test/pick-many.browser.mjs`.
+GPU equivalence and command counts: `node scripts/run-with-timeout.mjs run -- node packages/selection/test/pick-many.browser.mjs`.
 This retains the same points, IDs, clipping and neighbor priority. For elapsed
 time, only after Scott ends the build phase, rerun the parity command in
 perf-history entry 60 under the speed-phase policy.
@@ -1950,13 +1953,13 @@ or GPU work are run. Source manifest: packages/biomes/tests/fixtures/erosion-dem
 
 For the production browser proof, first run the package CPU bundle regression:
 `node --test --test-timeout=120000 packages/biomes/tests/erosion-bundle.test.js`.
-Then run `node packages/biomes/tests/erosion-browser.mjs` in one shared GPU slot
-with wait-max 60 and a one-minute hold. It validates separate emission, lazy
+Then run `node scripts/run-with-timeout.mjs run --max=1 -- node packages/biomes/tests/erosion-browser.mjs`.
+It validates separate emission, lazy
 fetch, exact served Wasm and all real-crop fields on WebGPU/WebGL2 pages.
 ### Review 99 deferred spectral regression
 
-Run `node scripts/gpu-lock.mjs run --owner=review-99 --wait-max=60 --max=7 -- node
-packages/voxel-pathtracer/tests/spectral-browser.mjs` with `MARGO_GPU_SLOTS=1` after building packages.
+Run `node scripts/run-with-timeout.mjs run --max=7 -- node
+packages/voxel-pathtracer/tests/spectral-browser.mjs` after building packages.
 The native and real WebGL2 compatibility reports require exactly zero white-scene RGB spread at
 1 and 64 spp, and exact root equality for achromatic/inactive lens paths. Analytic interface/slab,
 dispersive furnace, finite-slab lens disk-edge, alpha and restoration checks retain their bounds.
@@ -1976,10 +1979,9 @@ with AlphaRaycaster, counting rays through clear nearest candidates even when
 a farther opaque surface is present. The CPU oracle caches decoded masks by
 identity; it does not decode the same million pixels again for each ray. Mock
 GPU resources prove ownership/restore/fallback/cleanup without acquiring a GPU.
-Then run these registered real-GPU steps, each in its own shared slot with
-`--owner=codex-skipgaps --wait-max=60 --max=1`:
-`node packages/shadows/test/rt-alpha-browser.mjs` and
-`node packages/shadows/test/rt-alpha-attach-browser.mjs`.
+Then run these registered real-GPU steps, each as
+`node scripts/run-with-timeout.mjs run --max=1 -- node packages/shadows/test/rt-alpha-browser.mjs` and
+`node scripts/run-with-timeout.mjs run --max=1 -- node packages/shadows/test/rt-alpha-attach-browser.mjs`.
 The first checks actual standard-model closest/any/fragment coverage and repeated
 setup. The second renders public Shadows.attach with the complete model and
 opaque/alpha/restored/fallback controls. Its RT far=7.1 ends before the opaque
@@ -1989,14 +1991,12 @@ JSON and PNG evidence is in test-results/shadows-rt-alpha*. No timing gate runs.
 
 For the independent texture-rotation reference, prepare the pinned assets on CPU
 with scripts/support/gltf-production-assets.js cachedProductionAssets(), then run
-`node scripts/gltf-production-assets-tests.js` in one shared slot. This generic
-filename needs an explicit `--gpu=Renders production models and texture pixels`
-classification when invoking gpu-lock directly. No companion implementation is used.
+`node scripts/gltf-production-assets-tests.js`. No companion implementation is used.
 
 ### Batch 273 tier device checkpoint
 
 For the full-tier materials vertex-input fixture regression, build packages and run
-`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=2 -- node packages/materials/test/vertex-inputs-browser.mjs`.
+`node scripts/run-with-timeout.mjs run --max=2 -- node packages/materials/test/vertex-inputs-browser.mjs`.
 The leaf explicitly selects native then compatibility even when MARGO_COMPAT is
 set. It requires 2/3/5 fetched inputs, five when trimming is disabled, more than
 5,000 lit pixels and exact RGBA equality. Before repair, forced compatibility
@@ -2006,7 +2006,7 @@ batch-273-vertex-inputs-after.log. No timing assertion or benchmark was run.
 
 The inherited compute scheduling repair is reproduced by
 `node --test tests/modern-extension-suite.test.js tests/check-fixed-waits.test.js`
-and the GPU-locked `node packages/compute/tests/scene-owner-browser.mjs` leaf.
+and the `node packages/compute/tests/scene-owner-browser.mjs` leaf.
 The manifest previously omitted this browser file, making plan() throw; the
 fixed-work scanner also required the exact four-dispatch oracle to state its
 reason. All 133 tests in the nine originally failing planner/scanner files
@@ -2017,11 +2017,10 @@ batch-273-compute-scene-owner.log. This does not relabel the failed full verify.
 
 Build with npm run build --workspace @margoengine/webgl2-compat. Run the CPU tests
 with npm test --workspace @margoengine/webgl2-compat (hard limit 5 minutes). Run
-node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=3 -- node
+node scripts/run-with-timeout.mjs run --max=3 -- node
 packages/webgl2-compat/test/tiers-browser.mjs for all three extension-masked tiers.
-For the retained native comparison, run the same shared lock command with --max=5
-and packages/webgl2-compat/test/compat-browser-check.mjs. Each command renders
-under one shared slot and releases on completion. The tier test compares exact
+For the retained native comparison, run the same command with --max=5
+and packages/webgl2-compat/test/compat-browser-check.mjs. Each command renders and releases on completion. The tier test compares exact
 logical copy bytes and uses an independently compiled raw-GL physical-format
 oracle for blending. No timings are asserted or published. The complete package
 GPU/browser suites and full lower-tier package refusal/image matrix remain required
@@ -2039,7 +2038,7 @@ The canonical corpus continues to exclude the 20 independently owned tracer
 pipelines exactly as before; this batch does not claim their check. Receipts:
 test-results/batch-273-remaining-gpu.json and its per-step logs.
 
-For the ten scoped tier package scenes, use the same shared lock with --max=2
+For the ten scoped tier package scenes, use the same command with --max=2
 and packages/webgl2-compat/test/tier-packages-browser.mjs. Failed-only selections
 use --only=<URI-encoded scene name>, comma separated. The three original LDR
 misses are retained in results/batch-273-tier-packages*-initial.json; repaired
@@ -2053,7 +2052,7 @@ Landing scope (coordinator direction): ship the device entry and these ten scene
 T273-COVERAGE in the package README and limits tracks the remaining package work.
 On current-main integration, all three device tiers and all 20 scoped package rows
 pass again, as does the upstream preview/auto package browser proof. All eleven
-post GPU commands also pass with MARGO_COMPAT=1 in a single shared slot. CPU
+post GPU commands also pass with MARGO_COMPAT=1. CPU
 validation passes 283/284 initially; the only failure was the explicit isolation
 alias list missing the now-tracked tiers umbrella file. Adding that registered
 alias passes all six isolation checks, including exact generated alias contents.
@@ -2075,11 +2074,11 @@ From this checkout after `npm run build:packages`, run the package unit suites
 (environment, staging and TAA), then these bounded real-GPU cases:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/staging/test/pathtrace-browser.mjs
-node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/environment/tests/review56-browser.mjs
-node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/environment/tests/review56-browser.mjs --compat
-node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/staging/test/hdr-shadow-browser.mjs
-node scripts/gpu-lock.mjs run --owner=codex-56fix --max=10 -- node packages/staging/test/hdr-shadow-browser.mjs --compat
+node scripts/run-with-timeout.mjs run --max=10 -- node packages/studio/test/pathtrace-browser.mjs
+node scripts/run-with-timeout.mjs run --max=10 -- node packages/environment/tests/review56-browser.mjs
+node scripts/run-with-timeout.mjs run --max=10 -- node packages/environment/tests/review56-browser.mjs --compat
+node scripts/run-with-timeout.mjs run --max=10 -- node packages/studio/test/hdr-shadow-browser.mjs
+node scripts/run-with-timeout.mjs run --max=10 -- node packages/studio/test/hdr-shadow-browser.mjs --compat
 ```
 
 Pathtrace includes both backends and sixteen stationary TAA frames for each
@@ -2095,7 +2094,7 @@ remain required, along with lint, hygiene, verify and the unchanged size ceiling
 ### Batch 56 PostStack ownership audit (CPU)
 
 After `npm run build:packages`, run these inert-GPU regressions; they create real
-engine registries without requesting a physical adapter or GPU lock:
+engine registries without requesting a physical adapter:
 
 ```sh
 node --test --test-timeout=120000 packages/post/test/scene-owner.test.js packages/post/test/effect-owners.test.js packages/dof/tests/scene-owner.test.js packages/tonemap/tests/scene-owner.test.js packages/creative/tests/post-owner.test.js packages/cameras/test/scene-owner.test.js packages/shader/test/post-owner.test.js tests/post-stack-owner-contract.test.js
@@ -2127,9 +2126,9 @@ Run `node examples/package-benchmarks/proofs/terrain-ssr.proof.js --current`
 only after the build finishes; its 6,458-call proof is deterministic and does
 not run timings. The first attempted proof overlapped the core rebuild and
 failed module resolution; the ordered run passes without a source change.
-Then run each of terrain's 15 package GPU commands in one shared slot per
-command, with `--owner=codex-56fix --wait-max=60 --max=1.5`, followed by
-`node scripts/run-readme-examples.mjs --packages=terrain` with `--max=2`.
+Then run each of terrain's 15 package GPU commands
+with a 1.5 minute limit, followed by
+`node scripts/run-readme-examples.mjs --packages=terrain` with a 2 minute limit.
 The inherited sequence's original successful commands and reset-interrupted
 README are retained under test-results/56fix/owed-terrain-*.
 
@@ -2156,10 +2155,9 @@ or a universal source-error lower bound. Both current bars stay unchanged.
 
 Build voxel-pathtracer and the generated umbrella entries, then run
 `node --test packages/voxel-pathtracer/tests/compose.test.js`.
-Real-GPU command: `node scripts/gpu-lock.mjs run --owner=review-99-compose
---wait-max=60 --max=12 -- node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native`
+Real-GPU command: `node scripts/run-with-timeout.mjs run --max=12 -- node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native`
 (join the command onto one line), then the same command with --backend=compat.
-Each backend runs under its own bounded lease, one at a time. Reports are
+Each backend runs one at a time. Reports are
 test-results/voxel-pathtracer-compose-{native,compat}-all.json. The --phase=ids
 option reruns only the AOV checks after a fixture correction, preserving transport evidence.
 The page checks all 32 subsets against analytic Beer attenuation, triangle ids,
@@ -2170,7 +2168,7 @@ No timings or speed experiments run.
 ## Batch 234 FFT ocean reproduction
 
 Follow [water-fft.md](../water-fft.md) for the research equations, real NOAA
-wind fixture, oracle tolerances and separate shared-lock WebGPU/compat commands.
+wind fixture, oracle tolerances and separate WebGPU/compat commands.
 Package unit tests: `npm test --workspace @margoengine/water`. Results are
 correctness-only; no speed experiment is part of this claim.
 
@@ -2194,20 +2192,18 @@ culling, KTX2 image reproducibility, sampler pressure and LOD remain open.
 Build @margoengine/stats, then run node --test --test-timeout=120000
 packages/stats/test/*.test.js tests/stats-owner-contract.test.js with a five-minute
 process-tree limit. The focused scene-owner test has four direct failures on the
-parent with four passing owner-removal controls. Run scripts/test-stats-browser.mjs
-in one shared GPU slot, --owner=codex-56fix --wait-max=60 --max=1.5, then
-scripts/run-readme-examples.mjs --packages=stats with --max=1.5. Both commands
-render on a real GPU; never hold a slot for the CPU suite or closing checks.
+parent with four passing owner-removal controls. Run scripts/test-stats-browser.mjs with a 1.5 minute limit, then
+scripts/run-readme-examples.mjs --packages=stats with a 1.5 minute limit. Both commands
+render on a real GPU; the CPU suite and closing checks need no GPU.
 The browser adds eight scene-owner cases to all existing profiling checks.
 
 ### ComputeFrame owner package command
 
 Build packages first, then run the compute package's test:browser:scene-owner
-script under gpu-lock run --owner=codex-56fix --wait-max=60 --max=1.5. It changes
+script with a 1.5 minute limit. It changes
 to the repository root itself and checks both backends. Run the complete compute
-browser driver and --packages=compute runtime README command in separate shared
-slots. The CPU regression tests/compute-owner-gate.test.js asserts the real
-planner command and shared mode; it fails before the missing script is added.
+browser driver and --packages=compute runtime README command. The CPU regression tests/compute-owner-gate.test.js asserts the real
+planner command; it fails before the missing script is added.
 Collected results: test-results/56fix/owed-results-compute-owner-gate-gate-repair-rooted.json.
 
 ### Recorded colour-map decimal fidelity
@@ -2220,10 +2216,10 @@ original data container hashes: [size restoration](../size-restore.md), finding 
 No timing or new display perceptual claim is made.
 
 Batch 273 failure 9: after building packages, run the complete native and compat
-grids in separate shared holds:
-`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=1.5 -- node scripts/material-dispersion-gpu-check.js --backend=native`
+grids:
+`node scripts/run-with-timeout.mjs run --max=1.5 -- node scripts/material-dispersion-gpu-check.js --backend=native`
 and
-`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=3 -- node scripts/material-dispersion-gpu-check.js --backend=compat`.
+`node scripts/run-with-timeout.mjs run --max=3 -- node scripts/material-dispersion-gpu-check.js --backend=compat`.
 Omitting --backend runs both; --focus=caller isolates the original circular
 resource regression. The default canonical leaf retains both complete grids.
 The native full grid passes; full compatibility reaches 278 checks/254 captures
@@ -2238,7 +2234,7 @@ Job 2's exact acquisition checklist and local browser receipts are in
 ../the batch 273 browser matrix checklist. No speed run or Bug 45 work was done.
 
 Batch 273 failure 6: after building packages, run
-`node scripts/gpu-lock.mjs run --owner=codex-batch273 --wait-max=60 --max=2 -- node packages/materials/test/features-browser.mjs`.
+`node scripts/run-with-timeout.mjs run --max=2 -- node packages/materials/test/features-browser.mjs`.
 The canonical leaf explicitly opens native then full compatibility, even under
 MARGO_COMPAT=1. Every one of the 15 groups runs on both devices. Add `clip` to
 isolate the plane/depth/shadow/instancing/live-switch regression. Original
@@ -2267,8 +2263,7 @@ No whole-verify pass is claimed for the original failed invocation.
 Run `npm run test --workspace @margoengine/save` for all 112 units, including
 `tests/scene-owner.test.js`. Its 16 cases fail 13 times against parent
 0ba1d4f94; the original nine-case fixture fails six times. Run the package's
-`test:gpu` under one shared GPU lock (owner set, wait-max 60, bounded per-command
-max), then `npm run check:readme-run -- --packages=save`. The engine browser gate
+`test:gpu` (each command has a time limit), then `npm run check:readme-run -- --packages=save`. The engine browser gate
 renders the secondary factory mesh and verifies target-only pass execution and
 failure cleanup alongside the existing real-model exact frame comparison.
 
@@ -2276,7 +2271,7 @@ failure cleanup alongside the existing real-model exact frame comparison.
 
 Follow [water-query.md](../water-query.md). Run water unit tests and
 `node packages/water/test/query.browser.mjs` on native WebGPU and with
-`--compat`, using separate shared GPU leases, `--wait-max=60 --max=3`.
+`--compat`, each with a 3 minute limit.
 The retained NOAA wind observation drives the FFT cases. Actual GPU raster
 positions/normals, finite-difference displacement velocity, an independent
 coastal face-flux oracle and lifecycle/edit invalidation are correctness
@@ -2288,11 +2283,10 @@ checks. The detailed results are `batch234-water-query-*.json` in `results/`.
 Run the complete Quality package units and tests/speed-phase.test.js with a
 120-second per-test limit. Its ten scene-owner cases fail on the pre-fix parent.
 After building packages, run each of the five leaves in the package test:gpu
-script separately through scripts/gpu-lock.mjs run --owner=codex-56fix, shared,
---wait-max=60 and measured duration plus margin. scene-owner-browser.mjs proves
+script separately, each with a time limit of the measured duration plus margin. scene-owner-browser.mjs proves
 two real redraws and red canvas pixels for default/secondary scenes, cancellation
 before and between frames, detachment and same-name isolation. Run
-npm run check:readme-run -- --packages=quality through a shared slot. The
+npm run check:readme-run -- --packages=quality. The
 acceptance receipt records results and limits. The inherited single full verify
 is retained; this continuation reruns affected gates only.
 
@@ -2307,9 +2301,9 @@ Timestamp validity, tier storage/next-load and wrapper cleanup stay live.
 Build Cinematic, then run packages/cinematic/test/*.test.js and
 tests/cinematic-owner-contract.test.js with a 120-second per-test limit. Four of
 sixteen scene-owner cases fail on parent a1831da68. Run the complete package
-browser leaf through one shared GPU slot with wait-max60 and measured hold plus
+browser leaf with a time limit of the measured duration plus
 margin; it now includes eight actual owner/pixel cases. Run the runtime README
-examples separately through that same slot. Builds stay outside the GPU lock.
+examples separately. Builds need no GPU.
 All 108 units, the class guard, complete browser and ten runtime examples pass.
 The eight GPU owner cases each draw 484 red pixels. The [receipt](results/batch-56-cinematic-owner-20261109.json)
 records affected gates. No second full verify or speed suite was run.
@@ -2324,8 +2318,8 @@ The original 12-case probe independently has three failures and nine controls.
 
 The accepted GPU proof extends the complete package browser leaf with twelve
 real-GPU owner cases and rendered pixels. Run that and the walk browser leaf
-separately, using the shared GPU lock, wait-max60 and measured time plus margin.
-Builds stay outside the GPU lock. All fourteen Controls runtime README examples
+separately, each with a time limit of the measured time plus margin.
+Builds need no GPU. All fourteen Controls runtime README examples
 pass, as do seventeen browser checks and three walk checks. Two additional CAD
 replacement controls bring the fixed owner suite to 83 and package/guard total
 to 304. No second full verify was run.
@@ -2337,9 +2331,9 @@ packages/animator/test/*.test.js tests/modern-animator*.test.js
 tests/modern-game.test.js tests/animator-owner-contract.test.js. The owner file
 has fourteen cases; the full command has 198 passing checks. The unchanged parent
 fails five owner cases. Run packages/animator/test/scene-owner-browser.mjs and
-scripts/run-readme-examples.mjs --packages=animator in separate shared GPU lock
-commands with --wait-max=60, one lane slot, and a measured hold plus margin.
-Builds, units and other CPU checks stay outside the lock.
+scripts/run-readme-examples.mjs --packages=animator
+commands, one at a time, each with a time limit of the measured duration plus margin.
+Builds, units and other CPU checks need no GPU.
 
 Animator final acceptance: the same unit command now includes the fifteen
 readme-assets.test.js contracts and passes 213 checks. The owner browser passes
@@ -2355,19 +2349,17 @@ stall, old README failures and the subsequently corrected sync-marker table.
 
 Build webgl2-compat, then run node --test packages/webgl2-compat/test/device.test.js.
 Run node scripts/material-render-state-gpu-check.js once natively and once with
-MARGO_COMPAT=1, each under one shared scripts/gpu-lock.mjs run slot with
---owner=codex-batch273 --wait-max=60 --max=2. Full assertions remain unchanged;
+MARGO_COMPAT=1, each with a 2 minute time limit. Full assertions remain unchanged;
 negative native-bias clamp cases extend the grid. The clamp checkpoint retains
 the two independently known stencil failures and does not count that suite closed.
 Never invoke the canonical compatibility GPU chain containing tracer compilation.
 
 ### Video overlay owner/view continuation
 
-Build Video outside the GPU lock, then run node --test --test-timeout=120000
+Build Video, then run node --test --test-timeout=120000
 packages/video/test/*.test.js tests/video-owner-contract.test.js
-tests/environment-staging-view-state.test.js. Run each of the six package GPU
-leaves and scripts/run-readme-examples.mjs --packages=video in separate shared
-GPU lock commands, one lane slot and --wait-max=60, with a measured hold plus
+tests/environment-studio-view-state.test.js. Run each of the six package GPU
+leaves and scripts/run-readme-examples.mjs --packages=video commands, one at a time, with a time limit of the measured duration plus
 margin. The new scene-owner-browser.mjs tests default/secondary direct/owner
 removal, actual VideoFrame pixels, scissor exact-zero preservation, replacement,
 source ownership and redraw after removal.
@@ -2445,8 +2437,7 @@ wasm32-unknown-unknown target required for source builds). Run
 bridge's frozen point records, normalized accessor, subset/output budget and
 corrupt-input recovery checks. The regular decoder browser gate now also covers
 its dedicated worker, concurrent jobs, transfer, abort, disposal and production
-Vite-emitted worker/Wasm assets. Run it through the shared GPU lock with owner
-codex-133. Neither default entry nor either prebuilt is replaced.
+Vite-emitted worker/Wasm assets. Neither default entry nor either prebuilt is replaced.
 
 Batch 133 E21: build packages, then run node --test --test-timeout=60000
 packages/decoders/tests/draco-native-entry.test.js. The metadata-strings fixture
@@ -2456,14 +2447,14 @@ hashes and complete22 failed streams. No timing or GPU is involved.
 
 ### Batch 273 stencil reference repair
 
-Build outside the GPU lock with npm run build:packages. Run node --test
+Build with npm run build:packages. Run node --test
 packages/webgl2-compat/test/*.test.js and packages/materials/test/*.test.js in
 separate bounded commands. The new device.test.js regression fails before the
 one-line effective-reference mask and passes after it. Run the full canonical
-node scripts/material-render-state-gpu-check.js through node scripts/gpu-lock.mjs
-run --owner=codex-batch273 --wait-max=60 --max=3 --, once normally and once with
-MARGO_COMPAT=1. One shared slot per lane; outer bound 64 minutes includes queue.
-The prior measured leaf cost is 84 seconds including queue; no build runs during
+node scripts/material-render-state-gpu-check.js through
+node scripts/run-with-timeout.mjs run --max=3 --, once normally and once with
+MARGO_COMPAT=1. One run per lane at a time.
+The prior measured leaf cost is 84 seconds; no build runs during
 GPU reads. Retain both reports because the canonical output path is reused.
 The expanded grid retains every existing case and adds unsigned bit-31/MAX
 comparison, replacement and change/reset at both sample counts. Research and
@@ -2501,12 +2492,12 @@ report25-hostile.mjs for bounded actual-Wasm random-block/range/video probes.
 Pin both the adapter and Wasm before any seed. These campaigns remain bounded,
 with final missing-target/public-API fuzz acceptance still owed.
 For ETC2/EAC, prepare normative samples with report25-prepare-etc-uploads.mjs
-outside the GPU lock; report25-etc-webgl-uploads.mjs takes the real hardware
+on the CPU; report25-etc-webgl-uploads.mjs takes the real hardware
 compressed-upload/render/integer-readback path only when the ETC extension is
 exposed. Software is refused. A6000 D3D11 has no extension, so its exact red
 render control is useful hardware-selection evidence and is not ETC proof.
-The GPU leaf uses one shared slot, --wait-max=60, a bounded command maximum;
-never wrap preparation, build, CPU tests or waits in that lock.
+The GPU leaf runs with a bounded command time limit;
+preparation, build and CPU tests run without the GPU.
 Timing, cold/warm/startup and paired A/B debt stay in the deferred speed phase.
 
 Batch133 non-timed resources: freeze packages/decoders/dist/draco-native.wasm
@@ -2557,8 +2548,8 @@ adapter-browser.mjs, compat-browser-check.mjs, features-browser.mjs,
 compute-browser.mjs, routes-browser.mjs and xr-browser.mjs under
 packages/webgl2-compat/test/. Run npm run test:gpu --workspace
 @margoengine/terrain once with MARGO_COMPAT=1 and once without it. Every GPU
-leaf takes one shared lock with --wait-max=60 and a bounded --max; no CPU
-preparation holds the GPU. The native feature-level fixture is deliberately
+leaf runs with a bounded --max; no CPU
+preparation uses the GPU. The native feature-level fixture is deliberately
 not the WebGL2 layer. No test assertion or image bound changes.
 Do not invoke the unrelated tracer compilation or teardown investigations.
 [Receipt](results/batch-273-native-baselines.json).
@@ -2566,8 +2557,7 @@ Do not invoke the unrelated tracer compilation or teardown investigations.
 ## Batch 265 native React binding proof
 
 After building packages, run node --experimental-test-module-mocks --test packages/react/tests/package-bindings.test.js
-and npm run modern:test:react. For actual rendering, run node scripts/gpu-lock.mjs run --owner=codex-batch265 --max=4
---wait-max=60 -- node packages/react/scripts/test-bindings-browser.mjs, then the same command with --compat appended.
+and npm run modern:test:react. For actual rendering, run node scripts/run-with-timeout.mjs run --max=4 -- node packages/react/scripts/test-bindings-browser.mjs, then the same command with --compat appended.
 Reports and paired PNGs are written to test-results/react-bindings*.json and test-results/react-binding-*.png.
 The source page is packages/react/tests/bindings-browser.html. Real-capture licence/source is in
 packages/splats/test/fixtures/NOTICE.md. Run npm run check:readme-run -- --packages=react for all copy-paste examples.
@@ -2575,8 +2565,7 @@ packages/splats/test/fixtures/NOTICE.md. Run npm run check:readme-run -- --packa
 ### Batch 268 XR pointer checks
 
 Build with npm run build:packages. Run the XR, selection and React package tests.
-Run node scripts/gpu-lock.mjs run --owner=codex-batch268 --wait-max=60 --max=3 --
-node packages/xr/tests/pointer.browser.mjs, then the same command with --compat
+Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/xr/tests/pointer.browser.mjs, then the same command with --compat
 at the end. Each run emits test-results/batch268-pointer-<mode>.json. The browser
 fixture loads Cesium's Khronos Box (CC BY 4.0) from the already-noticed exporter
 fixture folder. It tests the real selection readback, not a simulated picker.
@@ -2600,16 +2589,15 @@ refusal and recovery. api:update records the constructor's optional descriptor.
 Under MARGO_COMPAT=1 run the complete voxel test:gpu, test:gpu:slow-compile
 and test:gpu:slow-mesh scripts, preserving both sample counts. Run the bevel
 leaf natively too, plus the optional layer's render/pick/restore, feature,
-compute, package-route and XR comparison leaves. GPU leaves use shared locks,
-one per lane, --wait-max=60 and command-specific hard bounds. The whole voxel
+compute, package-route and XR comparison leaves. GPU leaves run
+one per lane with command-specific hard bounds. The whole voxel
 suite includes GI and debris; no test is removed. The separate native-only
 delay injection gap is not treated as compatibility slow-compiler evidence.
 [Receipt](results/batch-273-array-layer-limits.json).
 
 ## Batch 265 job 2: Instances
 
-Build packages, then run npm test --workspace=@margoengine/react. For real rendering run node scripts/gpu-lock.mjs run
---owner=codex-batch265 --wait-max=60 --max=2 -- node packages/react/scripts/test-instances-browser.mjs,
+Build packages, then run npm test --workspace=@margoengine/react. For real rendering run node scripts/run-with-timeout.mjs run --max=2 -- node packages/react/scripts/test-instances-browser.mjs,
 then append --compat for the WebGL2 compatibility device. Each leaf has a three-minute outer process-tree deadline.
 Reports: test-results/react-instances.json and react-instances-compat.json. The page uses the unmodified Cesium
 Box.glb standard fixture and its linked licence notice. README: npm run check:readme-run -- --packages=react,margoengine.
@@ -2618,7 +2606,7 @@ Box.glb standard fixture and its linked licence notice. README: npm run check:re
 
 Run `npm test --workspace packages/controls` for transition maths/lifecycle and
 existing controls. Then run
-`node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=3 --wait-max=60 -- npm run test:browser --workspace packages/controls`.
+`node scripts/run-with-timeout.mjs run --max=3 -- npm run test:browser --workspace packages/controls`.
 The controls-browser.json report contains eight transition rows: four controls
 times WebGPU/WebGL2, fitted foreground pixels, completion and wheel cancellation,
 and no GPU errors. These are generated correctness fixtures, not asset demos.
@@ -2628,25 +2616,25 @@ The build phase adds no benchmark or timing assertion.
 ### Batch 197 globe controls
 
 Build controls, run `node --test --test-timeout=30000 packages/controls/tests/globe.test.js`,
-then `node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js globe`.
+then `node scripts/run-with-timeout.mjs run --max=2 -- node packages/controls/scripts/test-optional-browser.js globe`.
 The browser script checks both real backends and writes
 `packages/controls/test-results/globe-browser.json`. Run the controls README
 examples through `npm run check:readme-run -- --packages=controls`. No speed
-measurement, benchmark or exclusive GPU lease is required.
+measurement, benchmark or run with the GPU to itself is required.
 
 FSM payload proof: build fsm, then node --test --test-timeout=120000 packages/fsm/test/events.test.js. No GPU or timing measurement is involved.
 
 FSM final/always proof: node --test --test-timeout=120000 packages/fsm/test/final.test.js after building packages. Includes delay split equivalence and cycle rejection without wall-clock assertions.
 ### Batch 239 job 1: tile property styling
 
-Build packages, then run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tiles-style --wait-max=60 --max=5 -- node packages/tiles/tests/tiles-browser.mjs`, then the same command with `--compat` on the browser script. The style case colours the first two features red and hides the other two based on the sample's structural metadata values. Input provenance is in examples/assets/3d-tiles/NOTICE.md. No benchmark or timing assertion is required.
+Build packages, then run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run `node scripts/run-with-timeout.mjs run --max=5 -- node packages/tiles/tests/tiles-browser.mjs`, then the same command with `--compat` on the browser script. The style case colours the first two features red and hides the other two based on the sample's structural metadata values. Input provenance is in examples/assets/3d-tiles/NOTICE.md. No benchmark or timing assertion is required.
 
 FSM invocation proof: node --test --test-timeout=120000 packages/fsm/test/invoke.test.js after building packages. All races use explicitly resolved promises, with no time-based assertions.
 
 ### Batch 273 XR canvas regression
 
 After build:packages, run node --test
-packages/webgl2-compat/test/canvas-present.test.js. Under a shared GPU lock run
+packages/webgl2-compat/test/canvas-present.test.js. Run
 node scripts/modern-xr-tests.js, then the same command with --compat, and
 node packages/webgl2-compat/test/xr-browser.mjs. Keep every stereo, package pass,
 depth, AR alpha, controller and lifecycle assertion unchanged.
@@ -2663,21 +2651,21 @@ After building loaders and sciviz, run `node --test --test-timeout=120000 packag
 packages/loaders/tests/vtk-xml-dataset.test.js` (one shell line). Real-file hashes and all 200 measured values
 are checked against the same NOAA input converted by public netCDF4 and VTK writer APIs. Recreate with
 `python scripts/prepare-sciviz-formats.py`, after prepare-sciviz-data.py populates this worktree's cache.
-`node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=3 -- node packages/sciviz/tests/formats-browser.mjs`
+`node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/formats-browser.mjs`
 checks six format variants on WebGPU and the WebGL2 compatibility backend. Its JSON stays in
 `test-results/sciviz-fixes/formats-gpu.json`. No benchmark or timing-only assertion is run during the build phase.
 Batch 251 inspector: after building behavior, run
 `node --test --test-timeout=120000 packages/behavior/tests/inspect.test.js`.
 The CPU DOM fixtures verify hierarchy, live updates and scheduling cleanup.
-FSM view proof: build packages, run node --test --test-timeout=120000 packages/fsm/test/inspect.test.js, then node scripts/gpu-lock.mjs run --owner=fsm-inspect --max=2 --wait-max=60 -- node packages/fsm/test/inspect-browser.mjs; repeat the browser command with --compat. Screenshots go to test-results/batch250. The overlay itself uses DOM rendering and has no GPU math or backend-specific shaders.
+FSM view proof: build packages, run node --test --test-timeout=120000 packages/fsm/test/inspect.test.js, then node scripts/run-with-timeout.mjs run --max=2 -- node packages/fsm/test/inspect-browser.mjs; repeat the browser command with --compat. Screenshots go to test-results/batch250. The overlay itself uses DOM rendering and has no GPU math or backend-specific shaders.
 
 
 ### Save OPFS (batch 255 job 3)
 
-After building packages, run node --test --test-timeout=120000 packages/save/tests/opfs.test.js. The existing save test:gpu command includes safe-check.mjs, which checks real OPFS close/abort and persistence across a page reload; run once normally and once with MARGO_COMPAT=1 using a shared GPU lock. The fixture consists of generated binary test values, not a public asset demo. No timing suite is needed for this storage feature.
+After building packages, run node --test --test-timeout=120000 packages/save/tests/opfs.test.js. The existing save test:gpu command includes safe-check.mjs, which checks real OPFS close/abort and persistence across a page reload; run once normally and once with MARGO_COMPAT=1. The fixture consists of generated binary test values, not a public asset demo. No timing suite is needed for this storage feature.
 ### Batch 197 orbit collision
 
-After build:packages, run node --test --test-timeout=30000 packages/controls/tests/collide.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js collide. The browser report is packages/controls/test-results/collide-browser.json and covers both backends. No timing benchmark.
+After build:packages, run node --test --test-timeout=30000 packages/controls/tests/collide.test.js, then node scripts/run-with-timeout.mjs run --max=2 -- node packages/controls/scripts/test-optional-browser.js collide. The browser report is packages/controls/test-results/collide-browser.json and covers both backends. No timing benchmark.
 
 
 Batch 252 job 2: after building, run `node --test --test-timeout=120000 packages/navmesh/test/partial.test.js`. All fixtures are analytic CPU tests; Crowd walks through partial arrival and a subsequent surface revision.
@@ -2688,10 +2676,9 @@ Batch 252 job 2: after building, run `node --test --test-timeout=120000 packages
 Build sciviz; run node --test packages/sciviz/tests/derive.test.js. Its synthetic integer Jacobian
 fixture was generated locally with NumPy default_rng(171), integers(-8,9,(3,3)) and eigvalsh(sym(J^2)),
 24 matrices; no foreign source or data copied. CPU test stencils also have direct analytic oracles.
-For actual GPU dispatch/readback and volume/isosurface integration on BOTH backends, run through one
-shared slot: node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=3 -- node
+For actual GPU dispatch/readback and volume/isosurface integration on BOTH backends, run: node scripts/run-with-timeout.mjs run --max=3 -- node
 packages/sciviz/tests/derive-browser.mjs. Results: test-results/sciviz-fixes/derive-gpu.json.
-Run demos-browser.mjs --only=derive through the same shared lock for both NOAA layouts/backends,
+Run demos-browser.mjs --only=derive for both NOAA layouts/backends,
 all diagnostic/day controls and PNG export. Original wind.json pins source URLs/hashes/licence;
 wind.bin hash is e6ab31d5a3816b68f1c22e9c3563230bcb7e574aaaa90bb6513e34280ee93edd.
 CPU/GPU bounds are absolute, scale-aware envelopes on a rounded input, not truncation-error estimates.
@@ -2700,7 +2687,7 @@ No benchmarks or timing-only assertions; build phase remains in effect.
 Batch 171 derived-field source evidence: results/batch-171-derive-entries.json and results/batch-171-derive-network.json preserve the complete original 461e82a93 pair (both dirty=false), together with the retained source audit branch. Shared current benchmark records retain the other lanes' updates. This is historical byte/network evidence, not a new speed run.
 ### Sprite slices (batch 245 job 1)
 After build:packages, run node --test --test-timeout=120000 packages/sprites/tests/slice.test.js.
-Pixel proof: node scripts/gpu-lock.mjs run --owner=slice-proof --gpu="Slice pixel readback" --max=3 --wait-max=60 -- node packages/sprites/tests/slice-check.mjs.
+Pixel proof: node scripts/run-with-timeout.mjs run --max=3 -- node packages/sprites/tests/slice-check.mjs.
 Repeat that command with --compat appended to the leaf for WebGL2 compatibility.
 Fixtures are generated RGBA gradients; nearest pixels are compared to independent
 source-cell indices for fixed corners, repeat edges, flips and scrolled fills.
@@ -2708,16 +2695,16 @@ source-cell indices for fixed corners, repeat edges, flips and scrolled fills.
 
 ### Authenticated saves (batch 255 job 4)
 
-Build packages, then run node --test --test-timeout=120000 packages/save/tests/signed.test.js. The save package test:gpu command also exercises signedStorage with native WebCrypto and IndexedDB across page reload in safe-check.mjs. Run that changed-package suite normally and with MARGO_COMPAT=1, each through the shared GPU lock. Its generated binary fixtures and deterministic test keys are tests, not production secrets or a public asset demo. No speed or timing-only assertion is used.
+Build packages, then run node --test --test-timeout=120000 packages/save/tests/signed.test.js. The save package test:gpu command also exercises signedStorage with native WebCrypto and IndexedDB across page reload in safe-check.mjs. Run that changed-package suite normally and with MARGO_COMPAT=1, each. Its generated binary fixtures and deterministic test keys are tests, not production secrets or a public asset demo. No speed or timing-only assertion is used.
 ### Batch 197 BoxGizmo
 
-After build:packages, run node --test --test-timeout=30000 packages/controls/tests/box-gizmo.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js box-gizmo. Read packages/controls/test-results/box-gizmo-browser.json for both backend pixel and transform checks.
+After build:packages, run node --test --test-timeout=30000 packages/controls/tests/box-gizmo.test.js, then node scripts/run-with-timeout.mjs run --max=2 -- node packages/controls/scripts/test-optional-browser.js box-gizmo. Read packages/controls/test-results/box-gizmo-browser.json for both backend pixel and transform checks.
 
 Batch 252 job 3: build, then `node --test --test-timeout=120000 packages/navmesh/test/sampling.test.js`. The fixed seeded samples test analytic surface areas, triangle centroids and E[r^2]=R^2/2 for a uniform disk. The tiled test uses exact segment and corner distances before and after a rebuild. No GPU or downloaded model is needed.
 Batch 251 fuzzy decisions: build behavior, then run
 `node --test --test-timeout=120000 packages/behavior/tests/fuzzy.test.js`.
 Fixtures use analytical membership values and output moments, not timing budgets.
-SCXML proof: build packages, then node --test --test-timeout=120000 packages/fsm/test/scxml.test.js. packages/fsm/test/inspect-browser.mjs additionally round-trips a delayed machine with the browser native DOMParser, in normal and --compat runs under the shared GPU lock. No timed assertions or performance measurements.
+SCXML proof: build packages, then node --test --test-timeout=120000 packages/fsm/test/scxml.test.js. packages/fsm/test/inspect-browser.mjs additionally round-trips a delayed machine with the browser native DOMParser, in normal and --compat runs. No timed assertions or performance measurements.
 
 Batch 251 text trees: build behavior, then run
 `node --test --test-timeout=120000 packages/behavior/tests/text.test.js`.
@@ -2725,7 +2712,7 @@ The generated round trips compare exact JSON fields and canonical printed text.
 
 ### 2D rigging (batch 245 job 2)
 CPU proof: node --test --test-timeout=120000 packages/sprites/tests/rigging.test.js.
-Rendered proof: node scripts/gpu-lock.mjs run --owner=rigging-proof --gpu="Skeletal attachment and IK pixel readback" --max=3 --wait-max=60 -- node packages/sprites/tests/rigging-check.mjs (append --compat for WebGL2).
+Rendered proof: node scripts/run-with-timeout.mjs run --max=3 -- node packages/sprites/tests/rigging-check.mjs (append --compat for WebGL2).
 No speed measurement is asserted. Rigging fixtures are synthetic overlapping atlas
 regions and bone chains with known targets, not externally sourced demo data.
 
@@ -2733,7 +2720,7 @@ regions and bone chains with known targets, not externally sourced demo data.
 Batch 252 job 4: build with npm run build:packages, then run node --test --test-timeout=120000 packages/navmesh/test/wasm.test.js and cargo test --locked --manifest-path packages/navmesh/native/raster/Cargo.toml. Rebuild the kernel with node packages/navmesh/scripts/build-raster.mjs; its source/binary hashes must match before distribution. The work-count test bundles only Margo's own reference pipeline, compares its counters to the real worker, and compares checked encoded polygons byte for byte. No rival source or external model is used.
 ### Batch 197 presentation controls
 
-After build:packages, run node --test --test-timeout=30000 packages/controls/tests/presentation.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js presentation. The report packages/controls/test-results/presentation-browser.json checks real WebGPU and WebGL2 product/scroll/path behavior. No wall-clock speed assertions.
+After build:packages, run node --test --test-timeout=30000 packages/controls/tests/presentation.test.js and node scripts/run-with-timeout.mjs run --max=2 -- node packages/controls/scripts/test-optional-browser.js presentation. The report packages/controls/test-results/presentation-browser.json checks real WebGPU and WebGL2 product/scroll/path behavior. No wall-clock speed assertions.
 Batch 251 trigger regions: build behavior, then run
 `node --test --test-timeout=120000 packages/behavior/tests/triggers.test.js`.
 The namespace collision regression was run red before tuple encoding and green
@@ -2756,7 +2743,7 @@ Build packages, then node --test --test-timeout=120000 packages/tween/test/contr
 
 ### Pin and snap fixture (batch 215 job 5)
 
-Build packages; run node --test --test-timeout=120000 packages/tween/test/scroll-pin.test.js. Browser: node scripts/gpu-lock.mjs run --owner=codex-batch215 --max=4 --wait-max=60 -- node packages/tween/test/scroll-pin-browser.mjs, then add --compat for the second backend. The assertions check scroll/layout results, not a speed budget.
+Build packages; run node --test --test-timeout=120000 packages/tween/test/scroll-pin.test.js. Browser: node scripts/run-with-timeout.mjs run --max=4 -- node packages/tween/test/scroll-pin-browser.mjs, then add --compat for the second backend. The assertions check scroll/layout results, not a speed budget.
 
 ### Inertia correctness samples (batch 215 job 6)
 
@@ -2766,7 +2753,7 @@ Batch 253 vector input correctness: build packages/input, then node --test --tes
 ## Batch 262 tweak panel
 
 Run npm run test --workspace @margoengine/inspector, then after build:packages run
-node scripts/gpu-lock.mjs run --owner=inspector-parity --max=3 --wait-max=60 -- node
+node scripts/run-with-timeout.mjs run --max=3 -- node
 packages/inspector/test/parity-browser.mjs (one command line). It drives native
 controls and undo over real WebGPU and WebGL2 preview draws; repeat that command
 with --compat appended for the WebGL2 compatibility layer. README coverage is tracked in the README-owed list. Entry bytes use bundleBytes
@@ -2779,69 +2766,68 @@ Batch 253 XR binding correctness: build packages/input then node --test --test-t
 
 ## Batch 262 viewport gizmo
 
-Run npm run test --workspace @margoengine/inspector. After building, run node
-scripts/gpu-lock.mjs run --owner=inspector-gizmo --max=2 --wait-max=60 -- node
+Run npm run test --workspace @margoengine/inspector. After building, run node scripts/run-with-timeout.mjs run --max=2 -- node
 packages/inspector/test/gizmo-browser.mjs as one command; repeat with --compat
 appended. All three modes use real pointer drags, rendered colour checks and
 exact local pose comparisons after undo/redo. Package test:browser:gizmo and
 test:browser:gizmo:compat expose both routes to check:gpu-packages.
 
-Batch 254 pan: build packages, run node --test --test-timeout=60000 packages/audio/tests/pan.test.js, then node scripts/gpu-lock.mjs run --owner=audio-pan --max=4 --wait-max=60 -- node packages/audio/scripts/test-browser.js. pan-browser.js compares PCM to W3C mono/stereo equations; test-results/audio-browser.json stores the browser report.
+Batch 254 pan: build packages, run node --test --test-timeout=60000 packages/audio/tests/pan.test.js, then node scripts/run-with-timeout.mjs run --max=4 -- node packages/audio/scripts/test-browser.js. pan-browser.js compares PCM to W3C mono/stereo equations; test-results/audio-browser.json stores the browser report.
 
 ### Batch 197 device orientation
 
-After build:packages, run node --test --test-timeout=30000 packages/controls/tests/device-orientation.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch197 --max=2 --wait-max=60 -- node packages/controls/scripts/test-optional-browser.js device-orientation. Read packages/controls/test-results/device-orientation-browser.json for both backends' replay pixel and cleanup checks. Permission abort/timeout tests cover clock correctness, not a speed assertion.
+After build:packages, run node --test --test-timeout=30000 packages/controls/tests/device-orientation.test.js and node scripts/run-with-timeout.mjs run --max=2 -- node packages/controls/scripts/test-optional-browser.js device-orientation. Read packages/controls/test-results/device-orientation-browser.json for both backends' replay pixel and cleanup checks. Permission abort/timeout tests cover clock correctness, not a speed assertion.
 
 
 
 ### Batch 171 job 6: geographic atmosphere
 
-Build sky and sciviz, then run node --test --test-timeout=120000 packages/sciviz/tests/atmosphere.test.js packages/sky/test/planet.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch171 --wait-max=60 --max=4 -- node packages/sciviz/tests/atmosphere-browser.mjs for both GPU backends. It uses the official sciviz-atmosphere NOAA demo and writes test-results/sciviz-atmosphere/gpu.json. Existing sciviz GPU suites check unchanged flat/Cartesian paths. No speed suite, full verify or README example command is part of the lane gate.
+Build sky and sciviz, then run node --test --test-timeout=120000 packages/sciviz/tests/atmosphere.test.js packages/sky/test/planet.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/atmosphere-browser.mjs for both GPU backends. It uses the official sciviz-atmosphere NOAA demo and writes test-results/sciviz-atmosphere/gpu.json. Existing sciviz GPU suites check unchanged flat/Cartesian paths. No speed suite, full verify or README example command is part of the lane gate.
 
 
 ### Batch 258 image correctness
-After build:packages, run node --test --test-timeout=120000 packages/ui/tests/image.test.js. Under one shared GPU slot run node packages/ui/tests/image-browser.mjs, then the same command with --compat. Each mode also runs the preview GL page. The tracked Poly Haven JPG and its CC0 provenance are in examples/assets/source/skinning_ik/textures/polyhaven and examples/assets/skinning-ik-LICENSE.md. The tests assert actual nine-slice/cell/fit pixels, photograph decoding, tint and unchanged uploads. No timing comparison is performed.
+After build:packages, run node --test --test-timeout=120000 packages/ui/tests/image.test.js. Run node packages/ui/tests/image-browser.mjs, then the same command with --compat. Each mode also runs the preview GL page. The tracked Poly Haven JPG and its CC0 provenance are in examples/assets/source/skinning_ik/textures/polyhaven and examples/assets/skinning-ik-LICENSE.md. The tests assert actual nine-slice/cell/fit pixels, photograph decoding, tint and unchanged uploads. No timing comparison is performed.
 
 
 Batch 252 job 6: after building, run node --test --test-timeout=120000 packages/navmesh/test/border.test.js packages/navmesh/test/wasm.test.js. A 32x32-cell floor with borderSize=3 must allocate 38x38 columns with empty outer padding, retain byte-identical walkable polygons and match the Rust worker. Tile tests inspect bounds and all interior cell centers, not timings.
-Batch 253 pointer lock: build packages, run node --test --test-timeout=30000 packages/input/test/lock.test.js. Under a shared GPU lock, run node packages/input/test/input-browser.mjs and the same command with --compat. The browser fixture uses a click to acquire native lock, feeds vector/locked counts into a mesh transform and compares red-pixel centroids before movement, after movement and after release. It uses generated primitive geometry as a test fixture, no public demo asset.
-Batch 255 scene-state: build packages, then run node --test packages/animator/test/playback-state.test.js packages/save/tests/scene-state.test.js. Run the save engine browser check through the shared GPU lock on native WebGPU and MARGO_COMPAT=1. Use the existing Knight.glb fixture (source/licence already in THIRD-PARTY-NOTICES.md). No benchmarks.
+Batch 253 pointer lock: build packages, run node --test --test-timeout=30000 packages/input/test/lock.test.js. Run node packages/input/test/input-browser.mjs and the same command with --compat. The browser fixture uses a click to acquire native lock, feeds vector/locked counts into a mesh transform and compares red-pixel centroids before movement, after movement and after release. It uses generated primitive geometry as a test fixture, no public demo asset.
+Batch 255 scene-state: build packages, then run node --test packages/animator/test/playback-state.test.js packages/save/tests/scene-state.test.js. Run the save engine browser check on native WebGPU and MARGO_COMPAT=1. Use the existing Knight.glb fixture (source/licence already in THIRD-PARTY-NOTICES.md). No benchmarks.
 
 
 ## Batch 262 scene editing
 
 Run npm run test --workspace @margoengine/inspector. After build:packages, run
-node scripts/gpu-lock.mjs run --owner=codex-batch262 --wait-max=60 --max=4 -- node
+node scripts/run-with-timeout.mjs run --max=4 -- node
 packages/inspector/test/edit-browser.mjs, then the same command with --compat appended.
 The browser tests use real HTML tree dragging and form input, plus rendered native
 point/spot/directional lights and preview ambient. All assertions are correctness
 checks, never time budgets. README coverage is tracked in the README-owed list.
 
-Batch 254 binaural: after build:packages, node --test --test-timeout=60000 packages/audio/tests/binaural.test.js proves modal reconstruction and lifecycle. Shared-lock node packages/audio/scripts/test-browser.js runs binaural-browser.js, comparing 32 native HRTFs driven by the gain graph against independent polynomial speaker PCM. Test-results report records max error/energy, channels and rotation; tolerance 1e-6 is for float32 summation, not listening quality.
-Batch 257 job 1: after npm run build:packages, run node --test --test-timeout=20000 packages/worker/tests/rpc.test.js; node node_modules/typescript/bin/tsc --noEmit --strict --skipLibCheck --target esnext --module nodenext packages/worker/tests/rpc-types.ts; and node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-check.mjs. The browser check covers WebGPU and WebGL2 worker canvases and the browser RPC pool. Build phase defers only the existing timing budgets; correctness assertions remain enabled.
+Batch 254 binaural: after build:packages, node --test --test-timeout=60000 packages/audio/tests/binaural.test.js proves modal reconstruction and lifecycle. Node packages/audio/scripts/test-browser.js runs binaural-browser.js, comparing 32 native HRTFs driven by the gain graph against independent polynomial speaker PCM. Test-results report records max error/energy, channels and rotation; tolerance 1e-6 is for float32 summation, not listening quality.
+Batch 257 job 1: after npm run build:packages, run node --test --test-timeout=20000 packages/worker/tests/rpc.test.js; node node_modules/typescript/bin/tsc --noEmit --strict --skipLibCheck --target esnext --module nodenext packages/worker/tests/rpc-types.ts; and node scripts/run-with-timeout.mjs run --max=4 -- node packages/worker/tests/browser-check.mjs. The browser check covers WebGPU and WebGL2 worker canvases and the browser RPC pool. Build phase defers only the existing timing budgets; correctness assertions remain enabled.
 ### Batch 239 job 3: terrain and imagery protocols
 
-Build packages and run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run packages/tiles/tests/tiles-browser.mjs under the shared GPU lock on WebGPU and with --compat. The imagery case checks ordered WMS/WMTS alpha composition and a Mercator terrain draw using the Apache-2.0 sample in examples/assets/terrain/NOTICE.md. The CPU tests append an extension-4 availability control to the real tile and prove unavailable children are never emitted/requested. No speed-phase benchmark is needed.
+Build packages and run `node --test --test-timeout=120000 packages/tiles/tests/*.test.js`. Run packages/tiles/tests/tiles-browser.mjs on WebGPU and with --compat. The imagery case checks ordered WMS/WMTS alpha composition and a Mercator terrain draw using the Apache-2.0 sample in examples/assets/terrain/NOTICE.md. The CPU tests append an extension-4 availability control to the real tile and prove unavailable children are never emitted/requested. No speed-phase benchmark is needed.
 
-Batch 253 keyboard labels: build packages/input, then node --test --test-timeout=30000 packages/input/test/layout.test.js. For native browser integration, run the package input-browser.mjs GPU fixture and --compat variant under a shared lock; the prompt matches the native Keyboard Map when exposed/allowed and the standard code label otherwise. Layout mocks assert AZERTY and QWERTZ independently of the development machine's layout.
-Batch 255 materials: after build:packages, run node --test packages/save/tests/materials.test.js packages/materials/test/serialization.test.js packages/shader/test/serialization.test.js. Through the shared GPU lock run node packages/save/tests/browser/materials-check.mjs, then the same with MARGO_COMPAT=1. Browser material fixtures are deterministic own texels/shader expressions; the separate scene-state proof uses the existing licensed Khronos Fox.glb. No timing suite.
+Batch 253 keyboard labels: build packages/input, then node --test --test-timeout=30000 packages/input/test/layout.test.js. For native browser integration, run the package input-browser.mjs GPU fixture and --compat variant; the prompt matches the native Keyboard Map when exposed/allowed and the standard code label otherwise. Layout mocks assert AZERTY and QWERTZ independently of the development machine's layout.
+Batch 255 materials: after build:packages, run node --test packages/save/tests/materials.test.js packages/materials/test/serialization.test.js packages/shader/test/serialization.test.js. Run node packages/save/tests/browser/materials-check.mjs, then the same with MARGO_COMPAT=1. Browser material fixtures are deterministic own texels/shader expressions; the separate scene-state proof uses the existing licensed Khronos Fox.glb. No timing suite.
 ### Batch 260 HTML preview texture
-Build packages, then run `node scripts/gpu-lock.mjs run --owner=html-check --max=5 --wait-max=60 -- node packages/html/scripts/test-browser.js`, followed by the same command with `--compat` after test-browser.js. Reports: packages/html/test-results/html-browser.json and html-browser-compat.json. CPU: `node --test --test-timeout=120000 packages/html/test/*.test.js`. No benchmark or timing-only assertion.
+Build packages, then run `node scripts/run-with-timeout.mjs run --max=5 -- node packages/html/scripts/test-browser.js`, followed by the same command with `--compat` after test-browser.js. Reports: packages/html/test-results/html-browser.json and html-browser-compat.json. CPU: `node --test --test-timeout=120000 packages/html/test/*.test.js`. No benchmark or timing-only assertion.
 
 ### XR smooth movement and comfort
 
-Build packages, run `node --test packages/xr/tests/locomotion.test.js packages/xr/tests/xr.test.js`, then run `node scripts/gpu-lock.mjs run --owner=lane-P-xr --wait-max=60 --max=3 -- node packages/xr/tests/locomotion.browser.mjs`. The stereo check uses the existing licensed Khronos/Cesium Box fixture and writes test-results/xr-locomotion-browser.json. It covers native/compat, engine/separate routes and both eye textures. Quest/Android evidence is still required separately.
+Build packages, run `node --test packages/xr/tests/locomotion.test.js packages/xr/tests/xr.test.js`, then run `node scripts/run-with-timeout.mjs run --max=3 -- node packages/xr/tests/locomotion.browser.mjs`. The stereo check uses the existing licensed Khronos/Cesium Box fixture and writes test-results/xr-locomotion-browser.json. It covers native/compat, engine/separate routes and both eye textures. Quest/Android evidence is still required separately.
 
-Batch 267 job 1: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/live.test.js; GPU proof: node scripts/gpu-lock.mjs run --owner=live-proof --max=4 --wait-max=60 -- node packages/mcp/tests/live-browser.mjs. Both backends list the scene, hide its mesh through inspector setters, assert the PNG changes, read a diagnostic and receive native MCP image content.
+Batch 267 job 1: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/live.test.js; GPU proof: node scripts/run-with-timeout.mjs run --max=4 -- node packages/mcp/tests/live-browser.mjs. Both backends list the scene, hide its mesh through inspector setters, assert the PNG changes, read a diagnostic and receive native MCP image content.
 
-Batch 257 job 2: build packages, then node --test --test-timeout=20000 packages/worker/tests/auto.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-check.mjs. The browser test renders the same scene URL through worker, page and a capability-denied fallback for each backend; it checks transfer ownership, original canvas identity, pixels and disposal.
+Batch 257 job 2: build packages, then node --test --test-timeout=20000 packages/worker/tests/auto.test.js and node scripts/run-with-timeout.mjs run --max=4 -- node packages/worker/tests/browser-check.mjs. The browser test renders the same scene URL through worker, page and a capability-denied fallback for each backend; it checks transfer ownership, original canvas identity, pixels and disposal.
 
 
-Batch 254 voices: after build:packages run node --test --test-timeout=60000 packages/audio/tests/voice-manager.test.js. Shared-lock node packages/audio/scripts/test-browser.js runs voice-manager-browser.js and records cap=1, handoff times, virtual detune and PCM error in the voices report. The reference schedules native source segments without using manager code; the stimulus is the existing CC BY 4.0 rain fixture.
+Batch 254 voices: after build:packages run node --test --test-timeout=60000 packages/audio/tests/voice-manager.test.js. Node packages/audio/scripts/test-browser.js runs voice-manager-browser.js and records cap=1, handoff times, virtual detune and PCM error in the voices report. The reference schedules native source segments without using manager code; the stimulus is the existing CC BY 4.0 rain fixture.
 
 ### Sprite hit testing (batch 245 job 3)
 CPU: node --test --test-timeout=120000 packages/sprites/tests/pick.test.js.
-GPU: node scripts/gpu-lock.mjs run --owner=pick-proof --max=3 --wait-max=60 -- node packages/sprites/tests/pick-check.mjs (append --compat for WebGL2).
+GPU: node scripts/run-with-timeout.mjs run --max=3 -- node packages/sprites/tests/pick-check.mjs (append --compat for WebGL2).
 The generated white atlas has asymmetric transparent texels so independent
 texture flips affect the proof. Three overlapping tinted sprites use rotated
 and reflected transforms, nonzero camera and zoom; every picked identity is
@@ -2857,8 +2843,7 @@ The existing HTML browser commands above also run blendScenario on WebGPU and na
 
 Run the inspector unit suite and build:packages. README work is tracked in
 the README-owed list.
-Run node scripts/gpu-lock.mjs run --owner=codex-batch262 --wait-max=60 --max=4 --
-node packages/inspector/test/textures-browser.mjs; repeat with --compat appended.
+Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/inspector/test/textures-browser.mjs; repeat with --compat appended.
 The source textures precede panel attachment and exact byte assertions check mip,
 channel, aspect, integer range, array/depth slices, 1D, sRGB and MSAA. The CC0 real
 image is the existing terrain fixture, not a downloaded engine implementation.
@@ -2866,23 +2851,23 @@ GPU format support follows requested device features; no timing assertion is use
 
 The backend aspect regression runs with node --test --test-timeout=120000
 packages/webgl2-compat/test/device.test.js. Run the owning backend features-browser.mjs
-and compat-browser-check.mjs under the shared GPU lock for sampling and renderer
+and compat-browser-check.mjs for sampling and renderer
 coverage. No timing assertions or benchmark measurements are involved.
 
-- Stats geometry: build packages, then `node --test packages/stats/test/geometry.test.js`. Hardware correctness on both backends: `node scripts/gpu-lock.mjs run --owner=stats-parity --wait-max=60 --max=3 --gpu=stats-native-render-counters -- node scripts/test-stats-parity.mjs`. The script renders two repository-owned boxes, checks submitted totals and frame reset, and releases the shared lock on exit. No timing benchmark.
+- Stats geometry: build packages, then `node --test packages/stats/test/geometry.test.js`. Hardware correctness on both backends: `node scripts/run-with-timeout.mjs run --max=3 -- node scripts/test-stats-parity.mjs`. The script renders two repository-owned boxes, checks submitted totals and frame reset. No timing benchmark.
 Batch 253 trigger rumble: build packages/input, then node --test --test-timeout=30000 packages/input/test/haptics.test.js. Injected actuator fixtures assert exact native effect type/parameters/results, capability absence and denial, preemption, parameter checks, bounded abort/timeout, zero-stop fallback, overlapping-call ownership and reset failure. On a physical supported controller, check supportsTriggerRumble(nativeGamepad), then verify independent trigger and handle channels; hardware acceptance remains owed. Run the input package GPU fixture on WebGPU and --compat as its renderer integration check; it does not claim tactile proof.
 ### XR skinned hands
 
-After build:packages run `node --test packages/xr/tests/hands.test.js` and the registered xr test:gpu:hands leaf through the shared GPU lock. The standard left/right GLBs and licence are in packages/xr/tests/fixtures/hands. The browser records pose-driven skin-buffer changes and stereo pixel changes for both XR routes and backends. Real Quest/Android runs remain required separately.
+After build:packages run `node --test packages/xr/tests/hands.test.js` and the registered xr test:gpu:hands leaf. The standard left/right GLBs and licence are in packages/xr/tests/fixtures/hands. The browser records pose-driven skin-buffer changes and stereo pixel changes for both XR routes and backends. Real Quest/Android runs remain required separately.
 
-Batch 254 sprites: after build:packages run node --test --test-timeout=60000 packages/audio/tests/sprites.test.js. Shared-lock node packages/audio/scripts/test-browser.js runs sprites-browser.js, using native canPlayType and a controlled 503 response followed by tests/fixtures/rain-foa.wav (CC BY 4.0, existing NOTICE). The report records exact candidate order, PCM error and energy for one-shot and loop bounds.
-Batch 257 job 3: build packages, run node --test --test-timeout=10000 packages/worker/tests/pointer-lock.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-check.mjs. The GPU check must observe both native page lock and worker controls lock state, a changed camera target after mouse movement, and a worker-requested native unlock.
+Batch 254 sprites: after build:packages run node --test --test-timeout=60000 packages/audio/tests/sprites.test.js. Node packages/audio/scripts/test-browser.js runs sprites-browser.js, using native canPlayType and a controlled 503 response followed by tests/fixtures/rain-foa.wav (CC BY 4.0, existing NOTICE). The report records exact candidate order, PCM error and energy for one-shot and loop bounds.
+Batch 257 job 3: build packages, run node --test --test-timeout=10000 packages/worker/tests/pointer-lock.test.js, then node scripts/run-with-timeout.mjs run --max=4 -- node packages/worker/tests/browser-check.mjs. The GPU check must observe both native page lock and worker controls lock state, a changed camera target after mouse movement, and a worker-requested native unlock.
 Batch 249 job 1: build packages then node --test --test-timeout=120000 packages/ecs/test/objects.test.js. Synthetic identity/lifecycle fixtures, no asset downloads required.
 
-- Stats WebGL2: `node --test packages/stats/test/gl.test.js`; then the shared-lock scripts/test-stats-parity.mjs command in the geometry proof above. The hardware proof requires EXT_disjoint_timer_query_webgl2, polls across requestAnimationFrame tasks, checks completed named intervals and frame accounting, and uses no timing threshold. Existing native Stats pass and browser suites remain applicable to the package.
+- Stats WebGL2: `node --test packages/stats/test/gl.test.js`; then the scripts/test-stats-parity.mjs command in the geometry proof above. The hardware proof requires EXT_disjoint_timer_query_webgl2, polls across requestAnimationFrame tasks, checks completed named intervals and frame accounting, and uses no timing threshold. Existing native Stats pass and browser suites remain applicable to the package.
 ### XR AR extras
 
-After build:packages run `node --test packages/xr/tests/ar-extra.test.js`, then the registered xr test:gpu:ar-extra through the shared GPU lock. It injects native module stand-ins into Margo's stereo fixture, displays a detected mesh derived from the licensed Khronos/Cesium Box, verifies DOM selection suppression, image scores/observations and anchor save/restore/delete, and writes test-results/xr-ar-extra-browser.json. Native device tracking and storage proof remain job 1's hardware gap.
+After build:packages run `node --test packages/xr/tests/ar-extra.test.js`, then the registered xr test:gpu:ar-extra. It injects native module stand-ins into Margo's stereo fixture, displays a detected mesh derived from the licensed Khronos/Cesium Box, verifies DOM selection suppression, image scores/observations and anchor save/restore/delete, and writes test-results/xr-ar-extra-browser.json. Native device tracking and storage proof remain job 1's hardware gap.
 
 
 
@@ -2893,27 +2878,27 @@ Batch 225 job 1: npm run build --workspace @margoengine/splines, then node --tes
 ### Batch 273 scatter shadow-culling observation
 
 After build:packages, run node --test packages/scatter/test/shadow-cull-fixture.test.js.
-Under a shared GPU lock run node packages/scatter/test/shadow-cull.browser.mjs,
+Run node packages/scatter/test/shadow-cull.browser.mjs,
 then the same driver with MARGO_COMPAT=1. Do not forward a Firefox executable
 override into these Chromium runs. All original assertions and scene work stay.
 ### Batch 260 foreignObject resources
 The HTML browser commands above now also start a local CORS-only resource fixture server, serve the existing Noto Emoji donut and Source Sans 3 font with their recorded licences, and exercise an imported stylesheet. Inspect measurements.resources: matchedImagePixels = 1893, fontWidth = referenceWidth = 92. Both native and --compat invocations run it. CPU coverage is inline.test.js; the texture hook accepts prepare: resourceInliner() from @margoengine/html/inline. No README example or benchmark runs in this build-phase change.
 ## Batch 237 assembly
-Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch237 --max=5 --wait-max=60 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
+Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/run-with-timeout.mjs run --max=5 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
 ### XR performance controls
 
-Build packages, run packages/xr/tests/performance.test.js and packages/webgl2-compat/test/xr.test.js with node --test, then run the registered xr test:gpu:performance and the existing compatibility test/xr-browser.mjs through the shared GPU lock. The performance leaf uses the existing stereo fixture and licensed Khronos/Cesium Box, writes test-results/xr-performance-browser.json, checks scale forwarding and foveation restoration, and reads known pixels from a browser-owned stand-in camera texture on the actual compatibility context. Real camera/headset proof remains separate.
+Build packages, run packages/xr/tests/performance.test.js and packages/webgl2-compat/test/xr.test.js with node --test, then run the registered xr test:gpu:performance and the existing compatibility test/xr-browser.mjs. The performance leaf uses the existing stereo fixture and licensed Khronos/Cesium Box, writes test-results/xr-performance-browser.json, checks scale forwarding and foveation restoration, and reads known pixels from a browser-owned stand-in camera texture on the actual compatibility context. Real camera/headset proof remains separate.
 
 Core version guard: build packages, then run `node --test --test-timeout=120000 packages/core/tests/version-guard.test.js tests/core-requirements.test.js`.
 The packed test extracts the same npm tarball to two real installation paths and also supplies a
 stale build requirement; it needs npm and tar, uses no network, and cleans its own worktree scratch.
 Run `npm run measure:size` for the unchanged 25000 B core/stage limit.
 
-- Stats panels: build packages; run `node --test packages/stats/test/panels.test.js packages/stats/test/panel-gpu.test.js packages/stats/test/scene-owner.test.js`. Run the shared-lock Stats parity script above on the native GPU. It requests timestamp-query, renders 48 frames per backend, checks four histories and named compute/post pass samples, and saves test-results/stats-panels-hardware.png for visual inspection. Durations are observations only; there are no speed thresholds.
+- Stats panels: build packages; run `node --test packages/stats/test/panels.test.js packages/stats/test/panel-gpu.test.js packages/stats/test/scene-owner.test.js`. Run the Stats parity script above on the native GPU. It requests timestamp-query, renders 48 frames per backend, checks four histories and named compute/post pass samples, and saves test-results/stats-panels-hardware.png for visual inspection. Durations are observations only; there are no speed thresholds.
 
 
 ## Batch 237 assembly
-Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch237 --max=5 --wait-max=60 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
+Build packages, then run node --test --test-timeout=60000 packages/wfc/test/assemble.test.js. GPU: node scripts/run-with-timeout.mjs run --max=5 -- node packages/wfc/test/assemble-browser.mjs. Run the existing wfc test:gpu suite as well. Both commands use authored test fixtures. No benchmarks in the build phase.
 
 
 
@@ -2926,8 +2911,7 @@ Batch 249 job 2: node --test --test-timeout=120000 packages/ecs/test/relation-qu
 ## Batch 234 caustics acceptance
 
 Build water, then run `packages/water/test/caustics.browser.mjs` and
-`packages/water/test/caustics-energy.browser.mjs` using Node through the shared
-GPU lock, with and without `--compat`. Details: [record](../water-caustics.md).
+`packages/water/test/caustics-energy.browser.mjs` using Node, with and without `--compat`. Details: [record](../water-caustics.md).
 
 Also run `packages/water/test/caustics-project.browser.mjs` on each backend for
 the independent receiver planes. `caustics-preview.browser.mjs` retains NOAA
@@ -2940,15 +2924,15 @@ flow gate now completes on both backends at its unchanged bound. Run the fast
 gate and affected tests; full verify belongs to local CI and README work waits.
 See results/batch234-caustics-landing.json for all outcomes and runner corrections.
 
-Batch 257 job 4 branch-only reproduction: install browsers with node node_modules/playwright/cli.js install firefox webkit (optionally set PLAYWRIGHT_BROWSERS_PATH to a folder inside this worktree). Run node scripts/gpu-lock.mjs run --owner=codex-batch257 --max=4 --wait-max=60 -- node packages/worker/tests/browser-matrix.mjs --browser=firefox, then the same with --browser=webkit. Run the original strict suite with browser-check.mjs --browser=<name> to expose missing WebGPU/worker capabilities without weakening assertions. Windows WebKit receipts are supplementary; a native Safari run on Apple hardware remains owed.
-- Batch 263 animation: build packages, run `node --test --test-timeout=30000 packages/inspector/test/animation.test.js`, then run `node packages/inspector/test/animation-browser.mjs` and the same command with `--compat` under a shared GPU lock. The real CC0 Fox test checks clip changes, weighted transforms, a populated skeleton path and disposed-model cleanup.
+Batch 257 job 4 branch-only reproduction: install browsers with node node_modules/playwright/cli.js install firefox webkit (optionally set PLAYWRIGHT_BROWSERS_PATH to a folder inside this worktree). Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/worker/tests/browser-matrix.mjs --browser=firefox, then the same with --browser=webkit. Run the original strict suite with browser-check.mjs --browser=<name> to expose missing WebGPU/worker capabilities without weakening assertions. Windows WebKit receipts are supplementary; a native Safari run on Apple hardware remains owed.
+- Batch 263 animation: build packages, run `node --test --test-timeout=30000 packages/inspector/test/animation.test.js`, then run `node packages/inspector/test/animation-browser.mjs` and the same command with `--compat`. The real CC0 Fox test checks clip changes, weighted transforms, a populated skeleton path and disposed-model cleanup.
 
 ## Batch 237 tilesets
-Run node --test --test-timeout=60000 packages/wfc/test/tileset.test.js after building packages. The wfc test:gpu script runs the existing solver browser suite and assemble-browser.mjs, which also parses XML, expands F symmetry and solves on both native WebGPU and WebGL2 compatibility routes. Use the shared GPU lock as for batch 237 assembly.
+Run node --test --test-timeout=60000 packages/wfc/test/tileset.test.js after building packages. The wfc test:gpu script runs the existing solver browser suite and assemble-browser.mjs, which also parses XML, expands F symmetry and solves on both native WebGPU and WebGL2 compatibility routes.
 
-Batch 245 blending: after build:packages, run node --test packages/sprites/tests/blend.test.js. Under the shared GPU lock, run node packages/sprites/tests/blend-check.mjs, then the same command with --compat. The browser returns cases=146, maximumError<=1, validation=null and empty error arrays. Synthetic atlas texels are regression fixtures, not downloaded art or a demo.
+Batch 245 blending: after build:packages, run node --test packages/sprites/tests/blend.test.js. Run node packages/sprites/tests/blend-check.mjs, then the same command with --compat. The browser returns cases=146, maximumError<=1, validation=null and empty error arrays. Synthetic atlas texels are regression fixtures, not downloaded art or a demo.
 
-SNORM storage repair: build packages, then run node packages/webgl2-compat/test/snorm-storage-browser.mjs and node packages/webgl2-compat/test/compute-browser.mjs in an owned GPU slot. The latter compares native WebGPU with compatibility under normal and strict CSP. Reproduce the original dependent failure with MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs. All numeric assertions and tolerances remain unchanged.
+SNORM storage repair: build packages, then run node packages/webgl2-compat/test/snorm-storage-browser.mjs and node packages/webgl2-compat/test/compute-browser.mjs. The latter compares native WebGPU with compatibility under normal and strict CSP. Reproduce the original dependent failure with MARGO_COMPAT=1 node packages/shader/test/compute-texture-check.mjs. All numeric assertions and tolerances remain unchanged.
 
 Size reproduction: on 2873b6acb and the repair, build packages and evaluate bundleSplit from scripts/measure-size.js on packages/webgl2-compat/dist/index.js with /^(runtime|readback)-/, then gzipSync its lazy and base byte arrays. The recorded parent-source substitution uses the same current package dependency graph for both emissions; no timing comparison is involved. See results/snorm-storage-sizes.json.
 
@@ -2957,14 +2941,14 @@ Batch 225 job 2: npm run build --workspace @margoengine/splines, then node --tes
 Batch 249 job 3: build then node --test --test-timeout=120000 packages/ecs/test/reactive.test.js. Work counts assert no rescan with no timing assertion or GPU requirement.
 
 ### Batch 273 Firefox
-After build:packages, supply the shipped Firefox executable through BROWSER_EXECUTABLE in the process environment; never commit the value. Run node packages/webgl2-compat/test/firefox-matrix.mjs for the eleven-driver sweep, which preserves failures and returns nonzero if any remain. Under a shared correctness GPU lock run node packages/webgl2-compat/test/firefox-compat-cases.mjs for the46 cross-browser cases. To isolate a changed cell, use --fixtures=compute.html?strict and retain the selected receipt alongside the original. Run firefox-matrix.mjs --leaf=corpus-draw-browser.mjs under a shared lock for all recorded corpus work. The corpus separately checks the intended over-limit negative pipeline; all legal pipelines must dispatch. Run node --test packages/webgl2-compat/test/firefox-bidi.test.js packages/webgl2-compat/test/corpus-validation.test.js tests/integration-json.test.js. Forced tiers never replace physical lower-tier evidence.
+After build:packages, supply the shipped Firefox executable through BROWSER_EXECUTABLE in the process environment; never commit the value. Run node packages/webgl2-compat/test/firefox-matrix.mjs for the eleven-driver sweep, which preserves failures and returns nonzero if any remain. Run node packages/webgl2-compat/test/firefox-compat-cases.mjs for the46 cross-browser cases. To isolate a changed cell, use --fixtures=compute.html?strict and retain the selected receipt alongside the original. Run firefox-matrix.mjs --leaf=corpus-draw-browser.mjs for all recorded corpus work. The corpus separately checks the intended over-limit negative pipeline; all legal pipelines must dispatch. Run node --test packages/webgl2-compat/test/firefox-bidi.test.js packages/webgl2-compat/test/corpus-validation.test.js tests/integration-json.test.js. Forced tiers never replace physical lower-tier evidence.
 ## Batch 237 3D overlapping
-Build packages, then node --test --test-timeout=60000 packages/wfc/test/overlapping3d.test.js. Run the changed wfc package test:gpu through the shared GPU lock; assemble-browser.mjs checks all 64 pinned checkerboard values on native WebGPU and WebGL2 compatibility. Tests use authored numerical volumes and independent window extraction, not third-party implementations.
+Build packages, then node --test --test-timeout=60000 packages/wfc/test/overlapping3d.test.js. Run the changed wfc package test:gpu; assemble-browser.mjs checks all 64 pinned checkerboard values on native WebGPU and WebGL2 compatibility. Tests use authored numerical volumes and independent window extraction, not third-party implementations.
 
 
 ### Batch 258 forms correctness
-After build:packages, run node --test --test-timeout=120000 packages/ui/tests/forms.test.js packages/ui/tests/mirror.test.js. Under a shared GPU slot run node packages/ui/tests/forms-browser.mjs, then the same command with --compat. The driver uses actual canvas pointer and keyboard actions, shared gamepad commands, native hex input and exact ARIA state checks after mirror reconciliation. No timing assertion or benchmark is included.
-- Batch 263 WebGL2 inspector: build packages, run `node --test --test-timeout=30000 packages/inspector/test/gl.test.js`; under the shared GPU lock run `node packages/inspector/test/gl-browser.mjs` and the same command with `--compat`. The fixture uses CC0 BoxVertexColors geometry and checks all overlays, returned draw/shader state, pass costs and pixel restoration.
+After build:packages, run node --test --test-timeout=120000 packages/ui/tests/forms.test.js packages/ui/tests/mirror.test.js. Run node packages/ui/tests/forms-browser.mjs, then the same command with --compat. The driver uses actual canvas pointer and keyboard actions, shared gamepad commands, native hex input and exact ARIA state checks after mirror reconciliation. No timing assertion or benchmark is included.
+- Batch 263 WebGL2 inspector: build packages, run `node --test --test-timeout=30000 packages/inspector/test/gl.test.js`; run `node packages/inspector/test/gl-browser.mjs` and the same command with `--compat`. The fixture uses CC0 BoxVertexColors geometry and checks all overlays, returned draw/shader state, pass costs and pixel restoration.
 
 Batch 220 job 1: build packages, then node --test --test-timeout=120000 packages/math/test/*.test.js. methods.test.js imports math/compat and checks analytic independent results; math.test.js retains unchanged small-import assertions. CPU-only mathematics; this package defines no GPU test. Sources and API contract comparison are in docs/clean-room.md.
 # Batch 204 exporter optimization
@@ -2982,36 +2966,36 @@ Material extension evidence: after building, run
 `node --test --test-timeout=90000 packages/exporters/tests/materials-entry.test.js`.
 It reads the existing Khronos BoxTextured fixture and validates the written GLBs.
 
-After building packages, run `node --test --test-timeout=90000 packages/exporters/tests/optimize-extra.test.js` for deterministic key, resource and instance counts, geometry from the existing Khronos Box fixture, and Khronos validator checks. The exporters browser suite runs through the shared GPU lock; `MARGO_COMPAT=1` selects its WebGL2 compatibility path. `packages/exporters/tests/capture-browser.mjs` accepts the same compatibility flag. No wall-clock benchmark is part of this evidence.
+After building packages, run `node --test --test-timeout=90000 packages/exporters/tests/optimize-extra.test.js` for deterministic key, resource and instance counts, geometry from the existing Khronos Box fixture, and Khronos validator checks. The exporters browser suite runs; `MARGO_COMPAT=1` selects its WebGL2 compatibility path. `packages/exporters/tests/capture-browser.mjs` accepts the same compatibility flag. No wall-clock benchmark is part of this evidence.
 
-Batch 267 job 2: run node --test --test-timeout=90000 packages/mcp/tests/assets.test.js. Run node packages/mcp/tests/assets-prepare.mjs outside any GPU lock (downloads real CC0 metadata and data, stores licence manifests). Then node scripts/gpu-lock.mjs run --owner=assets-proof --max=5 --wait-max=60 -- node packages/mcp/tests/assets-browser.mjs. Fixtures cover Khronos Triangle, Poly Haven WoodenTable_02, venice_sunset HDRI and aerial_rocks_04 texture, plus the current ambientCG bricks result/zip. The saved fixtures.json records exact selected ids/variants and hashes; files are served locally for GPU checks.
+Batch 267 job 2: run node --test --test-timeout=90000 packages/mcp/tests/assets.test.js. Run node packages/mcp/tests/assets-prepare.mjs without the GPU (downloads real CC0 metadata and data, stores licence manifests). Then node scripts/run-with-timeout.mjs run --max=5 -- node packages/mcp/tests/assets-browser.mjs. Fixtures cover Khronos Triangle, Poly Haven WoodenTable_02, venice_sunset HDRI and aerial_rocks_04 texture, plus the current ambientCG bricks result/zip. The saved fixtures.json records exact selected ids/variants and hashes; files are served locally for GPU checks.
 
 ## Batch 237 hex layouts
-After building, run node --test --test-timeout=60000 packages/wfc/test/hex.test.js. Run wfc test:gpu through the shared lock for native WebGPU and WebGL2 compatibility evidence: assemble-browser.mjs solves a 6x6x2 periodic odd-r prism and checks each edge while retaining the assembly draw-count assertion. No benchmark required or run.
+After building, run node --test --test-timeout=60000 packages/wfc/test/hex.test.js. Run wfc test:gpu for native WebGPU and WebGL2 compatibility evidence: assemble-browser.mjs solves a 6x6x2 periodic odd-r prism and checks each edge while retaining the assembly draw-count assertion. No benchmark required or run.
 
 ### Batch273 scenery capture
-Run node --test packages/scenery/test/presented-frame.test.js and npm test --workspace @margoengine/scenery after build:packages. Under a shared correctness lock run node packages/scenery/test/scenery-check.mjs, then the same complete driver with MARGO_COMPAT=1. The scenes selector isolates displayed capture after changing its scheduling; keep all other existing assertions and both sample counts.
+Run node --test packages/sky/test/presented-frame.test.js and npm test --workspace @margoengine/sky after build:packages. Run node packages/sky/test/night-check.mjs, then the same complete driver with MARGO_COMPAT=1. The scenes selector isolates displayed capture after changing its scheduling; keep all other existing assertions and both sample counts.
 
 ### Batch 239 job 5: property reads
-After npm run build:packages, run node --test --test-timeout=120000 packages/tiles/tests/properties.test.js. The licensed CC0 samples and SHA-256 values are in examples/assets/3d-tiles/NOTICE.md. For rendered evidence run node scripts/gpu-lock.mjs run --owner=properties-proof --wait-max=60 --max=5 -- node packages/tiles/tests/tiles-browser.mjs, then the same command with --compat appended. The properties result contains point count/classification, green pixels, and exact texture rows: (13,9,40/255) and (20,13,50/255). These are correctness checks, not timing budgets.
+After npm run build:packages, run node --test --test-timeout=120000 packages/tiles/tests/properties.test.js. The licensed CC0 samples and SHA-256 values are in examples/assets/3d-tiles/NOTICE.md. For rendered evidence run node scripts/run-with-timeout.mjs run --max=5 -- node packages/tiles/tests/tiles-browser.mjs, then the same command with --compat appended. The properties result contains point count/classification, green pixels, and exact texture rows: (13,9,40/255) and (20,13,50/255). These are correctness checks, not timing budgets.
 
 Batch 225 job 3: npm run build --workspace @margoengine/splines, then node --test --test-timeout=120000 packages/splines/test/offset.test.js. Every approximation piece includes a source t range; tests compare dense points in that range to the exact offset evaluator, including points between fitter samples. Work counts are deterministic interval nodes, not timing assertions.
 
 ### Batch 221 BVH parallel and existing indirect behavior
 
-After npm run build:packages, run node --test --test-timeout=120000 packages/bvh/tests/parallel.test.js packages/bvh/tests/index-order.test.js. The test adapter uses real Node worker threads, including a coordinator and nested leaf workers; it also disables SharedArrayBuffer inside workers to exercise cloning. For production browser assets and both graphics backends run node scripts/gpu-lock.mjs run --owner=bvh-parallel-repro --wait-max=60 --max=5 -- node packages/bvh/scripts/test-browser.js. The production consumer builds one mesh with three workers and compares all packed buffers to serial construction; the existing suite exercises WebGPU and WebGL2. No timing threshold or benchmark is required in the build phase. Reproduce initial entry/worker sizes with bundleBytes from scripts/measure-size.js and gzipSync from node:zlib for packages/bvh/dist/parallel.js, parallel.worker.js and parallel-leaf.worker.js. npm run measure:size measures the unchanged core plus stage budget.
+After npm run build:packages, run node --test --test-timeout=120000 packages/bvh/tests/parallel.test.js packages/bvh/tests/index-order.test.js. The test adapter uses real Node worker threads, including a coordinator and nested leaf workers; it also disables SharedArrayBuffer inside workers to exercise cloning. For production browser assets and both graphics backends run node scripts/run-with-timeout.mjs run --max=5 -- node packages/bvh/scripts/test-browser.js. The production consumer builds one mesh with three workers and compares all packed buffers to serial construction; the existing suite exercises WebGPU and WebGL2. No timing threshold or benchmark is required in the build phase. Reproduce initial entry/worker sizes with bundleBytes from scripts/measure-size.js and gzipSync from node:zlib for packages/bvh/dist/parallel.js, parallel.worker.js and parallel-leaf.worker.js. npm run measure:size measures the unchanged core plus stage budget.
 
 Batch 249 job 4: build packages and run node --test --test-timeout=120000 packages/ecs/test/serialize.test.js. Synthetic identity, lifecycle, corruption and deterministic byte-count fixtures. Requires native CompressionStream/DecompressionStream, Uint8Array base64 and Web Crypto; no GPU or assets.
 
-Batch 267 job 3: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/http*.test.js. The suites start OS-assigned loopback listeners and drives real HTTP requests with the same docs tools/resources/prompts, and image content. All network waits are bounded; idle expiry uses a controlled clock. This transport-only test needs no GPU slot.
+Batch 267 job 3: after build:packages, run node --test --test-timeout=90000 packages/mcp/tests/http*.test.js. The suites start OS-assigned loopback listeners and drives real HTTP requests with the same docs tools/resources/prompts, and image content. All network waits are bounded; idle expiry uses a controlled clock. This transport-only test needs no GPU.
 
-Final batch 267 CI wiring: test:browser:live, test:browser:live:compat and test:browser:assets are discoverable package GPU leaves. assets-browser uses committed CC0 fixtures with exact hash tests, so it performs no downloads while holding a GPU slot. assets-prepare.mjs remains the separate CPU/network reproduction of full catalogue downloads.
-Batch 208 job 1: build cache with npm run build --workspace=@margoengine/cache, run node --test --test-timeout=120000 packages/cache/test/stream.test.js, then node packages/cache/scripts/test-browser.js under a 300 s process-tree limit. Browser checks use real IndexedDB and the attributed SheenChair GLB; packages/cache/test-results/cache-browser.json records browser version, hashes and the prefix received before EOF. Cache checks do not render or compute on a GPU and do not occupy a GPU slot.
+Final batch 267 CI wiring: test:browser:live, test:browser:live:compat and test:browser:assets are discoverable package GPU leaves. assets-browser uses committed CC0 fixtures with exact hash tests, so it performs no downloads while using the GPU. assets-prepare.mjs remains the separate CPU/network reproduction of full catalogue downloads.
+Batch 208 job 1: build cache with npm run build --workspace=@margoengine/cache, run node --test --test-timeout=120000 packages/cache/test/stream.test.js, then node packages/cache/scripts/test-browser.js under a 300 s process-tree limit. Browser checks use real IndexedDB and the attributed SheenChair GLB; packages/cache/test-results/cache-browser.json records browser version, hashes and the prefix received before EOF. Cache checks do not render or compute on a GPU .
 ## Batch 172 job 1
 
-Build packages, then run node --test --test-timeout=120000 packages/sciviz/tests/pipeline.test.js. Run node scripts/gpu-lock.mjs run --owner=sciviz-pipeline --wait-max=60 --max=3 -- node packages/sciviz/tests/pipeline-browser.mjs for the real NASA solution on both backends. Serve examples/sciviz-pipeline.html to change the cutoff and save the graph JSON. No benchmarks or README checks are required.
+Build packages, then run node --test --test-timeout=120000 packages/sciviz/tests/pipeline.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/pipeline-browser.mjs for the real NASA solution on both backends. Serve examples/sciviz-pipeline.html to change the cutoff and save the graph JSON. No benchmarks or README checks are required.
 
-- Batch 263 tools: build packages; run `node --test --test-timeout=30000 packages/inspector/test/tools.test.js`. Under the shared GPU lock run `node packages/inspector/test/tools-browser.mjs` and the same command with `--compat`. Tests use the existing CC0 BoxVertexColors geometry, check camera state, real downloads, encoded image signatures, glTF scene contents and decoded video dimensions.
+- Batch 263 tools: build packages; run `node --test --test-timeout=30000 packages/inspector/test/tools.test.js`. Run `node packages/inspector/test/tools-browser.mjs` and the same command with `--compat`. Tests use the existing CC0 BoxVertexColors geometry, check camera state, real downloads, encoded image signatures, glTF scene contents and decoded video dimensions.
 ### Animation scene registration and terminal disposal
 
 After `npm run build:packages`, run
@@ -3024,59 +3008,59 @@ The dependent React browser working-directory regression runs without a GPU:
 
 Batch 220 job 2: build packages and run node --test --test-timeout=120000 packages/math/test/*.test.js. curve.test.js imports the public optional entry, compares independent polynomial/table values and boundary derivatives, and checks editing, ownership, output reuse, channel sampling and invalid inputs. This is CPU mathematics and has no GPU test. Research and public-contract comparison are in docs/clean-room.md.
 
-Batch 220 inspector repair: build inspector, run node --test --test-timeout=120000 packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js; run packages/inspector/test/gl-browser.mjs with and without --compat under a shared GPU lock. No isolation assertion is weakened.
-Batch 230 tree meshing: build packages, then `node --test packages/procedural/test/tree-mesh.test.js`; render with `node scripts/gpu-lock.mjs run --owner=tree-mesh-proof --max=3 --wait-max=60 -- node packages/procedural/test/tree-mesh-browser.mjs`. Synthetic analytical and seeded fixtures, no timing assertions, no external model needed. Package GPU gate additionally retains all previous procedural backend checks.
+Batch 220 inspector repair: build inspector, run node --test --test-timeout=120000 packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js; run packages/inspector/test/gl-browser.mjs with and without --compat. No isolation assertion is weakened.
+Batch 230 tree meshing: build packages, then `node --test packages/procedural/test/tree-mesh.test.js`; render with `node scripts/run-with-timeout.mjs run --max=3 -- node packages/procedural/test/tree-mesh-browser.mjs`. Synthetic analytical and seeded fixtures, no timing assertions, no external model needed. Package GPU gate additionally retains all previous procedural backend checks.
 
 
 
 ### Batch 258 preview GL world panels
-After build:packages run node --test --test-timeout=120000 packages/ui/tests/world-gl.test.js. Under a shared GPU slot run node packages/ui/tests/world-gl-browser.mjs, then the same command with --compat. Each invocation runs preview GL and the native WebGPU API path; the preview adds the foreign-state probe. The driver also sends real canvas clicks through the camera ray. Existing world tests stay unchanged. No benchmark is involved.
+After build:packages run node --test --test-timeout=120000 packages/ui/tests/world-gl.test.js. Run node packages/ui/tests/world-gl-browser.mjs, then the same command with --compat. Each invocation runs preview GL and the native WebGPU API path; the preview adds the foreign-state probe. The driver also sends real canvas clicks through the camera ray. Existing world tests stay unchanged. No benchmark is involved.
 ### Batch 226 graph
-Build packages, then run node --test --test-timeout=120000 packages/scene/tests/graph.test.js. Rendering: node scripts/gpu-lock.mjs run --owner=scene-graph --max=4 --wait-max=60 -- node packages/scene/tests/graph-browser.mjs; repeat with --compat appended. Results go to test-results/batch226/graph-*.json. No benchmark or README execution.
-Batch 208 job 2: npm run build:packages, node --test --test-timeout=120000 packages/cache/test/decoded.test.js and node packages/cache/scripts/test-browser.js under a 300 s process-tree deadline. test-results/cache-browser.json under the package records real source hashes, per-array digests, 24 Draco vertices, six KTX2 mip levels and two persistent hits across reload. The decoders transcode on CPU workers with an explicit rgba8 target, without GPU rendering or a GPU slot.
+Build packages, then run node --test --test-timeout=120000 packages/scene/tests/graph.test.js. Rendering: node scripts/run-with-timeout.mjs run --max=4 -- node packages/scene/tests/graph-browser.mjs; repeat with --compat appended. Results go to test-results/batch226/graph-*.json. No benchmark or README execution.
+Batch 208 job 2: npm run build:packages, node --test --test-timeout=120000 packages/cache/test/decoded.test.js and node packages/cache/scripts/test-browser.js under a 300 s process-tree deadline. test-results/cache-browser.json under the package records real source hashes, per-array digests, 24 Draco vertices, six KTX2 mip levels and two persistent hits across reload. The decoders transcode on CPU workers with an explicit rgba8 target, without GPU rendering.
 
 ### Mesh-edit plane sections
-Build with npm run build:packages, then run node --test --test-timeout=120000 packages/mesh-edit/tests/section.test.js. For GPU presentation use node scripts/gpu-lock.mjs run --owner=codex-batch224 --max=3 --wait-max=60 -- node packages/mesh-edit/scripts/test-browser.js; repeat with --compat on the browser script for the WebGL2 layer. The section fixtures are analytic synthetic solids, not imported demonstration assets. Assertions include cap closure and signed volume, annular section area 0.75, two disconnected regions, and rendered capped output. No benchmark is run.
+Build with npm run build:packages, then run node --test --test-timeout=120000 packages/mesh-edit/tests/section.test.js. For GPU presentation use node scripts/run-with-timeout.mjs run --max=3 -- node packages/mesh-edit/scripts/test-browser.js; repeat with --compat on the browser script for the WebGL2 layer. The section fixtures are analytic synthetic solids, not imported demonstration assets. Assertions include cap closure and signed volume, annular section area 0.75, two disconnected regions, and rendered capped output. No benchmark is run.
 ### Batch 226 clone
-After building packages: node --test --test-timeout=120000 packages/scene/tests/clone.test.js. Run node scripts/gpu-lock.mjs run --owner=scene-clone --max=4 --wait-max=60 -- node packages/scene/tests/graph-browser.mjs --clone, then the same command with --compat appended. Results: test-results/batch226/clone-*.json. No benchmark or README execution.
+After building packages: node --test --test-timeout=120000 packages/scene/tests/clone.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/scene/tests/graph-browser.mjs --clone, then the same command with --compat appended. Results: test-results/batch226/clone-*.json. No benchmark or README execution.
 
-Batch 239 job 2: after build:packages, run node --test --test-timeout=120000 packages/tiles/tests/*.test.js packages/gltf-pro/tests/interpolated-directions.test.js, then run packages/tiles/tests/tiles-browser.mjs under the shared GPU lock, once normally and once with --compat. The feature case uses the pinned real CC0 metadata sample, checks restored pixels, smooth white highlight and exact transformed UINT32 shader IDs.
-Batch 230 PBR: after build, `node --test packages/procedural/test/textures-pbr.test.js`; render/read back with `node scripts/gpu-lock.mjs run --owner=pbr-textures-proof --max=5 --wait-max=60 -- node packages/procedural/test/textures-pbr-browser.mjs`. This checks native WebGPU and a createCompatGPU WebGL2 device in the same run, 11 seeded motifs, every mip including NPOT edge footprints, explicit time and resource lifecycle. Inputs are synthetic mathematical controls, not real material scans; no timing budget is run.
+Batch 239 job 2: after build:packages, run node --test --test-timeout=120000 packages/tiles/tests/*.test.js packages/gltf/test/interpolated-directions.test.js, then run packages/tiles/tests/tiles-browser.mjs, once normally and once with --compat. The feature case uses the pinned real CC0 metadata sample, checks restored pixels, smooth white highlight and exact transformed UINT32 shader IDs.
+Batch 230 PBR: after build, `node --test packages/procedural/test/textures-pbr.test.js`; render/read back with `node scripts/run-with-timeout.mjs run --max=5 -- node packages/procedural/test/textures-pbr-browser.mjs`. This checks native WebGPU and a createCompatGPU WebGL2 device in the same run, 11 seeded motifs, every mip including NPOT edge footprints, explicit time and resource lifecycle. Inputs are synthetic mathematical controls, not real material scans; no timing budget is run.
 
 ### Batch273 bitmap orientation
-After build:packages, run node --test packages/webgl2-compat/test/external-image.test.js packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js. Under a shared GPU lock run node scripts/normal-map-orientation-gpu-check.js, then repeat with MARGO_COMPAT=1, retaining the complete canonical case list. Counterfactual swaps only the owning upload source to the parent, builds them, runs the regressions, and restores/builds the repair in finally. It changes no baseline, numeric assertion or runtime setting. Existing tests/umbrella.test.js checks the regenerated alias.
+After build:packages, run node --test packages/webgl2-compat/test/external-image.test.js packages/inspector/test/gl.test.js packages/webgl2-compat/test/isolation.test.js. Run node scripts/normal-map-orientation-gpu-check.js, then repeat with MARGO_COMPAT=1, retaining the complete canonical case list. Counterfactual swaps only the owning upload source to the parent, builds them, runs the regressions, and restores/builds the repair in finally. It changes no baseline, numeric assertion or runtime setting. Existing tests/umbrella.test.js checks the regenerated alias.
 
-Batch 249 job 5: build packages, then node --test --test-timeout=150000 packages/ecs/test/parallel.test.js packages/ecs/test/parallel-browser.test.js. Fixtures use original numeric worlds, no external assets. Node verifies real worker overlap without a timing assertion; the isolated browser runs the shipped worker with GPU disabled. No GPU lock is acquired for CPU work.
+Batch 249 job 5: build packages, then node --test --test-timeout=150000 packages/ecs/test/parallel.test.js packages/ecs/test/parallel-browser.test.js. Fixtures use original numeric worlds, no external assets. Node verifies real worker overlap without a timing assertion; the isolated browser runs the shipped worker with GPU disabled. No GPU is used for CPU work.
 Final batch 249 size check: npm run measure:size reports current rebased main core plus stage at 24209 B; source in those packages is unchanged by this batch.
 ### Batch 199 hit details
-After `npm run build:packages`, run `node scripts/gpu-lock.mjs run --owner=selection-details --wait-max=60 --max=4 -- node packages/selection/test/hit-details.browser.mjs`, then the same leaf with `--compat`. It loads the existing attributed Khronos Box fixture, tests raster depth against known planes, interpolated UV0, normal length/direction, world distance, mirrors/nonuniform scale and orthographic projection. The package browser script includes this leaf; CPU checks use `node --test --test-timeout=120000 packages/selection/test/*.test.js`.
-Batch 208 job 3: npm run test:browser --workspace=@margoengine/cache under a 300 s process-tree deadline (build cache first when calling node packages/cache/scripts/test-browser.js directly). The proof report is packages/cache/test-results/cache-browser.json. Inspect prefetchWindow, throttleWindow, prefetchWorker, throttleWorker and serviceWorker for queue outcomes, hashes, timer debt and exact offline range results. The worker uses respondWith plus waitUntil(flush), then is unregistered and replaced for persistent-cache proof. No GPU work is submitted and no GPU slot is taken.
+After `npm run build:packages`, run `node scripts/run-with-timeout.mjs run --max=4 -- node packages/selection/test/hit-details.browser.mjs`, then the same leaf with `--compat`. It loads the existing attributed Khronos Box fixture, tests raster depth against known planes, interpolated UV0, normal length/direction, world distance, mirrors/nonuniform scale and orthographic projection. The package browser script includes this leaf; CPU checks use `node --test --test-timeout=120000 packages/selection/test/*.test.js`.
+Batch 208 job 3: npm run test:browser --workspace=@margoengine/cache under a 300 s process-tree deadline (build cache first when calling node packages/cache/scripts/test-browser.js directly). The proof report is packages/cache/test-results/cache-browser.json. Inspect prefetchWindow, throttleWindow, prefetchWorker, throttleWorker and serviceWorker for queue outcomes, hashes, timer debt and exact offline range results. The worker uses respondWith plus waitUntil(flush), then is unregistered and replaced for persistent-cache proof. No GPU work is submitted.
 ### UI curved panels (batch 259)
-After `npm run build:packages`, run `node --test --test-timeout=60000 packages/ui/tests/curved.test.js packages/ui/tests/world.test.js` and `node scripts/gpu-lock.mjs run --owner=ui-curved --max=4 --wait-max=60 -- node packages/ui/tests/world-gl-browser.mjs`. The latter exercises flat, cylinder and sphere UI pixels and real pointer clicks on native WebGPU and preview WebGL2, including scene depth and sidedness. Data: public-domain NASA planetary names, https://nssdc.gsfc.nasa.gov/planetary/factsheet/ .
+After `npm run build:packages`, run `node --test --test-timeout=60000 packages/ui/tests/curved.test.js packages/ui/tests/world.test.js` and `node scripts/run-with-timeout.mjs run --max=4 -- node packages/ui/tests/world-gl-browser.mjs`. The latter exercises flat, cylinder and sphere UI pixels and real pointer clicks on native WebGPU and preview WebGL2, including scene depth and sidedness. Data: public-domain NASA planetary names, https://nssdc.gsfc.nasa.gov/planetary/factsheet/ .
 
 ## Batch 210 job 1: action mixer
-Build packages; run node --test --test-timeout=30000 packages/animation/tests/mixer.test.js tests/animation-owner-contract.test.js. Under the shared GPU lock run node packages/animation/tests/mixer-browser.mjs, then the same command with --compat. The driver checks every strip vertex against independent trigonometry at five times, and two live Fox actions; Fox is the existing licensed Khronos asset. No benchmark, timing assertion or README execution is involved.
+Build packages; run node --test --test-timeout=30000 packages/animation/tests/mixer.test.js tests/animation-owner-contract.test.js. Run node packages/animation/tests/mixer-browser.mjs, then the same command with --compat. The driver checks every strip vertex against independent trigonometry at five times, and two live Fox actions; Fox is the existing licensed Khronos asset. No benchmark, timing assertion or README execution is involved.
 
 ### Batch 224 batch booleans
 After npm run build:packages, run node --test --test-timeout=120000 packages/mesh-edit/tests/boolean-batch.test.js packages/mesh-edit/tests/boolean-exact.test.js. The 200-solid fixture checks space/materialization/tree-build counts, closure, provenance and analytic volume; no benchmark or timing assertion runs. The existing mesh-edit browser command (and --compat variant) additionally draws the final batch output. No downloaded demo is introduced.
 ### Batch 226 tags and lifecycle
-Build packages, then node --test --test-timeout=120000 packages/scene/tests/tags.test.js. Run node scripts/gpu-lock.mjs run --owner=scene-tags --max=4 --wait-max=60 -- node packages/scene/tests/graph-browser.mjs --tags, then append --compat for real WebGL2 compatibility. Outputs: test-results/batch226/tags-*.json. Default and --clone variants retain earlier graph/clone rendering regressions. No benchmark or README execution.
+Build packages, then node --test --test-timeout=120000 packages/scene/tests/tags.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/scene/tests/graph-browser.mjs --tags, then append --compat for real WebGL2 compatibility. Outputs: test-results/batch226/tags-*.json. Default and --clone variants retain earlier graph/clone rendering regressions. No benchmark or README execution.
 ### Batch 202 face metadata
-Build loaders, then run `node --test --test-timeout=60000 packages/loaders/tests/face-properties.test.js`. The existing loader browser and render browser scripts run under the shared GPU lock in native and `--compat` modes. The face-group browser case passes PLY/OFF face colors to `createMeshes`; the existing 3MF color classification and render analytic reference cover rendering. No speed run is needed in the build phase.
+Build loaders, then run `node --test --test-timeout=60000 packages/loaders/tests/face-properties.test.js`. The existing loader browser and render browser scripts run in native and `--compat` modes. The face-group browser case passes PLY/OFF face colors to `createMeshes`; the existing 3MF color classification and render analytic reference cover rendering. No speed run is needed in the build phase.
 
-- Batch 245 skeletal JSON: after npm run build:packages, run node --test --test-timeout=120000 packages/sprites/tests/spine.test.js, then node scripts/gpu-lock.mjs run --owner=skeletal-json --gpu=skeletal-json-pixel-readbacks -- node packages/sprites/tests/spine-check.mjs and repeat with --compat after the .mjs path. Fixtures/provenance: packages/sprites/tests/fixtures/trees and THIRD-PARTY-NOTICES.md. These are correctness checks, not timing measurements.
+- Batch 245 skeletal JSON: after npm run build:packages, run node --test --test-timeout=120000 packages/sprites/tests/spine.test.js, then node scripts/run-with-timeout.mjs run -- node packages/sprites/tests/spine-check.mjs and repeat with --compat after the .mjs path. Fixtures/provenance: packages/sprites/tests/fixtures/trees and THIRD-PARTY-NOTICES.md. These are correctness checks, not timing measurements.
 
 ### Batch 199 pulse outlines
-After a package build, run `node scripts/gpu-lock.mjs run --owner=selection-pulse --wait-max=60 --max=2 -- node packages/selection/test/pulse.browser.mjs`, then the same leaf with `--compat`. The test loads the existing attributed Khronos Box, compares peak/trough magenta energy, and requires hidden edges to add actual pixels over visible-only outlines, in JFA and morphological modes. CPU time/validation proof: packages/selection/test/pulse.test.js.
+After a package build, run `node scripts/run-with-timeout.mjs run --max=2 -- node packages/selection/test/pulse.browser.mjs`, then the same leaf with `--compat`. The test loads the existing attributed Khronos Box, compares peak/trough magenta energy, and requires hidden edges to add actual pixels over visible-only outlines, in JFA and morphological modes. CPU time/validation proof: packages/selection/test/pulse.test.js.
 
 
 ### Batch 265 frame priorities
 
-After building packages, run `node --test --test-timeout=120000 packages/react/tests/frame-priority.test.js packages/xr/tests/xr.test.js`. Run `node scripts/gpu-lock.mjs run --owner=react-priority --wait-max=60 --max=4 -- node packages/react/scripts/test-priority-browser.mjs` and the same command with `--compat` appended. The fixture checks actual render-pass counts and exact manual/automatic output from the real Cesium Box. No timing assertion or benchmark is used.
+After building packages, run `node --test --test-timeout=120000 packages/react/tests/frame-priority.test.js packages/xr/tests/xr.test.js`. Run `node scripts/run-with-timeout.mjs run --max=4 -- node packages/react/scripts/test-priority-browser.mjs` and the same command with `--compat` appended. The fixture checks actual render-pass counts and exact manual/automatic output from the real Cesium Box. No timing assertion or benchmark is used.
 ### Batch 204 job 2: texture processing
-Build packages, then run node --test --test-timeout=60000 packages/exporters/tests/textures.test.js. Under a shared GPU lock run node packages/exporters/scripts/test-browser.js, then repeat with --compat. textures-browser.js checks actual native WebP, decoded dimensions, PNG fallbacks, required-extension metadata, DOM toBlob and AVIF capability/error reporting. AVIF success-path extension wiring also has an explicitly labelled platform double in the CPU suite. Existing package PNG/capture checks remain in the package GPU gate. Results are in packages/exporters/test-results/exporters-browser.json. No timing or README execution. See docs/exporter-textures.md for sources and format/runtime limits.
+Build packages, then run node --test --test-timeout=60000 packages/exporters/tests/textures.test.js. Run node packages/exporters/scripts/test-browser.js, then repeat with --compat. textures-browser.js checks actual native WebP, decoded dimensions, PNG fallbacks, required-extension metadata, DOM toBlob and AVIF capability/error reporting. AVIF success-path extension wiring also has an explicitly labelled platform double in the CPU suite. Existing package PNG/capture checks remain in the package GPU gate. Results are in packages/exporters/test-results/exporters-browser.json. No timing or README execution. See docs/exporter-textures.md for sources and format/runtime limits.
 ### UI virtual keyboard (batch 259)
-After building packages, run `node --test --test-timeout=60000 packages/ui/tests/keyboard.test.js` and `node scripts/gpu-lock.mjs run --owner=ui-keyboard --max=3 --wait-max=60 -- node packages/ui/tests/keyboard-browser.mjs`; repeat the latter with `--compat`. The browser edits the public-domain NASA planet name Mars (https://nssdc.gsfc.nasa.gov/planetary/factsheet/) with real pointer clicks and gamepad commands.
+After building packages, run `node --test --test-timeout=60000 packages/ui/tests/keyboard.test.js` and `node scripts/run-with-timeout.mjs run --max=3 -- node packages/ui/tests/keyboard-browser.mjs`; repeat the latter with `--compat`. The browser edits the public-domain NASA planet name Mars (https://nssdc.gsfc.nasa.gov/planetary/factsheet/) with real pointer clicks and gamepad commands.
 
 
 
@@ -3089,13 +3073,13 @@ From the repository root, run node packages/voxel-pathtracer/scripts/build-mesh.
 @margoengine/voxel-pathtracer. Every command needs an outer hard tree limit
 (5 minutes for Rust, 4 for the package). The independent exact-classification
 case is in tests/mesh-build-regression.test.js. Run the registered mesh browser
-suite under gpu-lock with --owner=review-99-mesh-build --wait-max=60 --max=6;
+suite with a 6 minute limit;
 it retains all previous assertions and adds skipped-count/original-ID checks
 on native and WebGL2/Vulkan. No benchmark or timing assertion is needed.
 
 The review-99 checkpoint mesh suite and exact README example now pass on the
 rebased checkpoint build. The additional composed native run uses --max=12 and
---backend=native; it fails at subset 31 readiness. Preserve that lease, all 32
+--backend=native; it fails at subset 31 readiness. Preserve that command, all 32
 subsets and the reflected/update cases when investigating. Per-pipeline markers
 are already flushed by compose.html. The failed command has not been retried.
 
@@ -3104,7 +3088,7 @@ are already flushed by compose.html. The failed command has not been retried.
 Build the mesh Wasm and package, then run mesh-attributes.test.js with an outer
 hard limit. The registered test:gpu:mesh-attributes runs both backends with
 independent per-pixel barycentric-normal and UV sun/texture oracles, standalone
-and composed, under one shared slot (--wait-max=60 --max=4). It never polls for
+and composed (4 minute limit). It never polls for
 a visual match, changes a bound, or uses a timing assertion. The full existing
 mesh suite must also run after these shader changes. Full composed native
 validation remains blocked by the separate recorded timeout; it was not retried.
@@ -3113,9 +3097,8 @@ validation remains blocked by the separate recorded timeout; it was not retried.
 
 Run `node --test packages/voxel-pathtracer/tests/compose-diagnostic.test.js` under
 a one-minute process-tree deadline. Its clock is simulated; it tests timeouts,
-not execution speed, and needs no GPU lock. The full browser command remains
-`node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native`
-under one shared slot with `--wait-max=60 --max=12`; compatibility uses
+not execution speed, and needs no GPU. The full browser command remains
+`node scripts/run-with-timeout.mjs run --max=12 -- node packages/voxel-pathtracer/tests/compose-browser.mjs --backend=native`; compatibility uses
 `--backend=compat`. It executes all 32 subsets and the reflected/update checks.
 The host records `test-results/voxel-pathtracer-compose-native-all-diagnostic.json`
 (or compat), and emits `compose-diagnostic` before terminating a stuck child tree.
@@ -3128,8 +3111,8 @@ is in results/review-99-compose-timeout-20261109.json. Neither timeout is waived
 
 Build packages, then run the voxel-pathtracer package units and
 `npm run test:mesh-kernel --workspace=@margoengine/voxel-pathtracer`.
-With MARGO_GPU_SLOTS=1, run
-`node scripts/gpu-lock.mjs run --owner=review-99-instances --wait-max=60 --max=7 -- node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs`.
+Run
+`node scripts/run-with-timeout.mjs run --max=7 -- node packages/voxel-pathtracer/tests/mesh-instances-browser.mjs`.
 The generated scene compares explicit instances against independently baked
 geometry on native WebGPU and WebGL2/Vulkan with the original 1e-5 color/depth
 bounds, exact ids and atomic-failure checks. The CPU test mutates every SIMD
@@ -3137,13 +3120,13 @@ comparison lane and scalar tail. Also retain the existing mesh, mesh-attributes
 and composed compatibility GPU suites. Do not rerun the known native full-
 composition failure or full-package README deadline to green; lane-U owns both.
 No timing/benchmark command is needed for these correctness proofs.
-Batch 172 contours: build packages, run node --test packages/sciviz/tests/contour.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=6 --wait-max=60 -- node packages/sciviz/tests/contour-browser.mjs. Serve examples/sciviz-contour.html to switch CPU/GPU intersections and level multiplier on the original NASA quad slice. The browser report includes maximum coordinate difference, the computed bound, primitive counts and visible pixel counts for each backend. No timing benchmark is involved.
+Batch 172 contours: build packages, run node --test packages/sciviz/tests/contour.test.js; run node scripts/run-with-timeout.mjs run --max=6 -- node packages/sciviz/tests/contour-browser.mjs. Serve examples/sciviz-contour.html to switch CPU/GPU intersections and level multiplier on the original NASA quad slice. The browser report includes maximum coordinate difference, the computed bound, primitive counts and visible pixel counts for each backend. No timing benchmark is involved.
 
 
 ### Batch 265 adaptive performance
 
-After build:packages, run node --test --test-timeout=120000 packages/react/tests/performance.test.js packages/react/tests/performance-react.test.js. Run node scripts/gpu-lock.mjs run --owner=react-performance --wait-max=60 --max=4 -- node packages/react/scripts/test-performance-browser.mjs, then the same command with --compat appended. The fixture injects fixed measured durations into the production controller to prove reduction and restoration independent of machine load. It does not benchmark elapsed execution. The default controller's monotonic clock and explicit sample input share the same arithmetic.
-Batch 219 job 1: after building packages, run `node --test --test-timeout=120000 packages/geometry/tests/nurbs-edit.test.js`. Run geometry/tests/gpu-check.mjs through the shared GPU lock, once normally and once with --compat. The trimmed panel must render red with background visible at its central UV hole; existing geometry GPU readbacks remain in the same suite. No benchmark is needed for these correctness claims.
+After build:packages, run node --test --test-timeout=120000 packages/react/tests/performance.test.js packages/react/tests/performance-react.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/react/scripts/test-performance-browser.mjs, then the same command with --compat appended. The fixture injects fixed measured durations into the production controller to prove reduction and restoration independent of machine load. It does not benchmark elapsed execution. The default controller's monotonic clock and explicit sample input share the same arithmetic.
+Batch 219 job 1: after building packages, run `node --test --test-timeout=120000 packages/geometry/tests/nurbs-edit.test.js`. Run geometry/tests/gpu-check.mjs, once normally and once with --compat. The trimmed panel must render red with background visible at its central UV hole; existing geometry GPU readbacks remain in the same suite. No benchmark is needed for these correctness claims.
 
 
 ### Batch 224 mesh repair
@@ -3151,30 +3134,30 @@ Run npm run build:packages, then node --test --test-timeout=120000 packages/mesh
 ### Batch 202 legacy VTK
 Run the built loaders' `vtk-legacy.test.js`, existing `vtk-xml*.test.js` and loader suite with Node's test timeout. `test-browser.js` also verifies mixed legacy cells and their cell data before rendering the extracted surface with createMeshes, on WebGPU and `--compat`. No external rival implementation is imported.
 ### Batch 199 exact area selection
-Build packages, then run `node scripts/gpu-lock.mjs run --owner=selection-area --wait-max=60 --max=2 -- node packages/selection/test/area.browser.mjs` and repeat with `--compat`. It requires two actually visible mesh IDs, one lasso ID, no fully occluded mesh, zero hits in an adjacent one-pixel marquee and one submission/map for the whole canvas. The real glTF is the existing attributed Khronos Box. CPU validation is packages/selection/test/area.test.js; package point/model GPU suites also run after changing the region rendering hook.
+Build packages, then run `node scripts/run-with-timeout.mjs run --max=2 -- node packages/selection/test/area.browser.mjs` and repeat with `--compat`. It requires two actually visible mesh IDs, one lasso ID, no fully occluded mesh, zero hits in an adjacent one-pixel marquee and one submission/map for the whole canvas. The real glTF is the existing attributed Khronos Box. CPU validation is packages/selection/test/area.test.js; package point/model GPU suites also run after changing the region rendering hook.
 ## Batch 210 job 2: playback
-Build packages, then run node --test --test-timeout=30000 packages/animation/tests/playback.test.js. Under the shared GPU lock run node packages/animation/tests/playback-browser.mjs, then repeat with --compat. The authored strip visits 0, 0.5, 1, 0.5, 0 and checks every deformed position component; the credited Fox is driven to exact forward and reverse endpoints. No timing assertions or README execution.
+Build packages, then run node --test --test-timeout=30000 packages/animation/tests/playback.test.js. Run node packages/animation/tests/playback-browser.mjs, then repeat with --compat. The authored strip visits 0, 0.5, 1, 0.5, 0 and checks every deformed position component; the credited Fox is driven to exact forward and reverse endpoints. No timing assertions or README execution.
 
 
 
 ## Batch 207 job 1
-Build packages, then node --test --test-timeout=120000 packages/blender/tests/objects.test.js. Regenerate the CC0 Blender oracle with C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_objects.py -- test-results/blender-objects. Run node scripts/gpu-lock.mjs run --owner=objects --max=2 --wait-max=60 -- node packages/blender/tests/objects-browser.mjs, then the same command with --compat on the browser script. Each browser run renders and compares actual Animation.seek/model node matrices, checks validation and disposal. No timing measurement.
+Build packages, then node --test --test-timeout=120000 packages/blender/tests/objects.test.js. Regenerate the CC0 Blender oracle with C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_objects.py -- test-results/blender-objects. Run node scripts/run-with-timeout.mjs run --max=2 -- node packages/blender/tests/objects-browser.mjs, then the same command with --compat on the browser script. Each browser run renders and compares actual Animation.seek/model node matrices, checks validation and disposal. No timing measurement.
 
 
 ### Batch 209 tiled still correctness
-After build:packages, run node --test --test-timeout=120000 packages/headless/tests/tiles.test.js. Run node scripts/gpu-lock.mjs run --owner=tiles-proof --gpu=tiles-render-and-readback --wait-max=1200 --max=240 -- node packages/headless/tests/tiles-gpu.mjs for exact single/tiled comparison, four samples and streamed output past the real texture limit. No benchmark or README runner is involved.
+After build:packages, run node --test --test-timeout=120000 packages/headless/tests/tiles.test.js. Run node scripts/run-with-timeout.mjs run --max=240 -- node packages/headless/tests/tiles-gpu.mjs for exact single/tiled comparison, four samples and streamed output past the real texture limit. No benchmark or README runner is involved.
 ### UI localization (batch 259)
-After building, run `node --test --test-timeout=60000 packages/ui/tests/i18n.test.js`; run `node scripts/gpu-lock.mjs run --owner=ui-i18n --max=3 --wait-max=60 -- node packages/ui/tests/i18n-browser.mjs` natively and with --compat. Data: Wikidata Q111 labels (CC0), https://www.wikidata.org/wiki/Q111 . Tests verify fallback, plural selection, parameter refresh, direction metadata, automatic relayout and aborted bindings.
+After building, run `node --test --test-timeout=60000 packages/ui/tests/i18n.test.js`; run `node scripts/run-with-timeout.mjs run --max=3 -- node packages/ui/tests/i18n-browser.mjs` natively and with --compat. Data: Wikidata Q111 labels (CC0), https://www.wikidata.org/wiki/Q111 . Tests verify fallback, plural selection, parameter refresh, direction metadata, automatic relayout and aborted bindings.
 
 
 
 ### Batch 243 mesh PBR channels
-Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtracer/tests/mesh-pbr.test.js. GPU correctness uses node scripts/gpu-lock.mjs run --owner=codex-batch243 --wait-max=60 --max=5 -- node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs. The latter tests native and WebGL2/Vulkan, compares maps with independent equivalent scalar/vertex scenes and snapshots the existing licensed Khronos Box before disposing its loaded model. Results: test-results/voxel-pathtracer-mesh-pbr.json. README work remains deferred in the README-owed list.
+Build packages, then run node --test --test-timeout=120000 packages/voxel-pathtracer/tests/mesh-pbr.test.js. GPU correctness uses node scripts/run-with-timeout.mjs run --max=5 -- node packages/voxel-pathtracer/tests/mesh-pbr-browser.mjs. The latter tests native and WebGL2/Vulkan, compares maps with independent equivalent scalar/vertex scenes and snapshots the existing licensed Khronos Box before disposing its loaded model. Results: test-results/voxel-pathtracer-mesh-pbr.json. README work remains deferred in the README-owed list.
 ### Batch 233 job 1: road intersections
-After building packages: node --test --test-timeout=120000 packages/road/test/intersections.test.js. Rendering: node scripts/gpu-lock.mjs run --owner=codex-batch233 --max=8 --wait-max=60 -- node packages/road/test/browser-check.mjs. Both backends check separate layer pixels, restoration and disposal. Analytic fixtures use independent equations, no timing assertions. See [road-design.md](../road-design.md).
-Batch 219 job 2: after building packages run `node --test --test-timeout=120000 packages/geometry/tests/parity-extras.test.js`; geometry/tests/gpu-check.mjs through the shared GPU lock normally and with --compat covers all five uploads and a Goldberg picture. No timed performance comparison is claimed.
+After building packages: node --test --test-timeout=120000 packages/road/test/intersections.test.js. Rendering: node scripts/run-with-timeout.mjs run --max=8 -- node packages/road/test/browser-check.mjs. Both backends check separate layer pixels, restoration and disposal. Analytic fixtures use independent equations, no timing assertions. See [road-design.md](../road-design.md).
+Batch 219 job 2: after building packages run `node --test --test-timeout=120000 packages/geometry/tests/parity-extras.test.js`; geometry/tests/gpu-check.mjs normally and with --compat covers all five uploads and a Goldberg picture. No timed performance comparison is claimed.
 
-Batch 223 software occlusion: build packages, then hold a shared GPU slot for
+Batch 223 software occlusion: build packages, then run
 `node packages/culling/test/gpu/webgl2-check.mjs`, and again with `--compat`.
 The six fixed edits compare both canvases byte for byte and assert hidden-row
 reduction, immediate reveal after moving a wall and disabling culling. Data is
@@ -3192,70 +3175,70 @@ Each bridge test independently decodes the produced GLB's PNG and compares every
 
 ### Batch 243 learned denoising
 With Python and NumPy 2.5.4, run python packages/voxel-pathtracer/scripts/train-denoise.py --output=test-results/denoise-ml-training. The authored seeds, 800 steps, generated weights and validation metrics are recorded; no network access or foreign weights are used. Limit BLAS threads for a busy machine. Compare generated Float32 weights against tests/fixtures/denoise-ml-training.json's SHA-256. Build the package and run node --test packages/voxel-pathtracer/tests/denoise-ml.test.js.
-Under a named shared GPU lease, run node packages/voxel-pathtracer/tests/denoise-ml-browser.mjs. Native rendering produces the independent 4-spp Box raw image and 512-spp reference; both native and WebGL2/Vulkan denoising use those same raw guide arrays. The fixture's licence/source is already recorded under gltf-pro/tests/fixtures/metadata. The script also compares actual GPU output to the same WGSL CPU evaluation, preserves HDR constants/coverage, and replaces the actual device. It writes test-results/voxel-pathtracer-denoise-ml.json and raw diagnostic inputs before assertions. No timing budget or assertion is relaxed.
+Run node packages/voxel-pathtracer/tests/denoise-ml-browser.mjs. Native rendering produces the independent 4-spp Box raw image and 512-spp reference; both native and WebGL2/Vulkan denoising use those same raw guide arrays. The fixture's licence/source is already recorded under gltf/test/fixtures/metadata. The script also compares actual GPU output to the same WGSL CPU evaluation, preserves HDR constants/coverage, and replaces the actual device. It writes test-results/voxel-pathtracer-denoise-ml.json and raw diagnostic inputs before assertions. No timing budget or assertion is relaxed.
 
 
 ### Batch 209 null stage correctness
-After build:packages run node --test --test-timeout=120000 packages/headless/tests/null.test.js. No GPU slot is needed: the proof forbids GPU access and uses the real CPU transform kernel and animation samplers.
-Batch 172 clipping: after build:packages, run node --test packages/sciviz/tests/clip.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=4 --wait-max=60 -- node packages/sciviz/tests/clip-browser.mjs. Serve examples/sciviz-clip.html and change the calibrated CT lower threshold. Asset source.json pins the CT-ORG mirror revision, original downloaded gzip hash, NIfTI calibration, stride sampling, dimensions and derived sample hash. The NASA slice is shared with the contour demo. Deterministic tetra volume fractions and complementary cuts are CPU correctness checks; no timing is asserted.
-Batch 206 PointInstancer: build packages, run node --test --test-timeout=120000 packages/usdz/tests/*.test.js. Regenerate oracle with OpenUSD 26.11 installed: python packages/usdz/tests/oracle/instancer-truth.py packages/usdz/tests/fixtures/instancer.usda packages/usdz/tests/fixtures/instancer-openusd.json. Run scripts/modern-usdz-tests.js through the shared GPU lock once normally and once with --compat; the CPU suite prepares usdz-textured.usdz first.
+After build:packages run node --test --test-timeout=120000 packages/headless/tests/null.test.js. No GPU is needed: the proof forbids GPU access and uses the real CPU transform kernel and animation samplers.
+Batch 172 clipping: after build:packages, run node --test packages/sciviz/tests/clip.test.js; run node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/clip-browser.mjs. Serve examples/sciviz-clip.html and change the calibrated CT lower threshold. Asset source.json pins the CT-ORG mirror revision, original downloaded gzip hash, NIfTI calibration, stride sampling, dimensions and derived sample hash. The NASA slice is shared with the contour demo. Deterministic tetra volume fractions and complementary cuts are CPU correctness checks; no timing is asserted.
+Batch 206 PointInstancer: build packages, run node --test --test-timeout=120000 packages/usdz/tests/*.test.js. Regenerate oracle with OpenUSD 26.11 installed: python packages/usdz/tests/oracle/instancer-truth.py packages/usdz/tests/fixtures/instancer.usda packages/usdz/tests/fixtures/instancer-openusd.json. Run scripts/modern-usdz-tests.js once normally and once with --compat; the CPU suite prepares usdz-textured.usdz first.
 
 ### Batch 199 glow and fill
-After building packages, run `node scripts/gpu-lock.mjs run --owner=selection-highlight --wait-max=60 --max=2 -- node packages/selection/test/highlight.browser.mjs`, then repeat with `--compat`. The existing attributed Khronos Box provides the selected mesh. Checks require a magenta interior fill, unchanged centre for outer-only glow, no outside contribution for inner-only glow, exact finite radius support and byte-identical beauty output when fully occluded. Run highlight.test.js for no JFA dispatch, default-algorithm mask-only support, bind/view reuse, style failures and restore/disposal. The ordinary picking/model/xray package suite also runs after the Selection mask hook change.
+After building packages, run `node scripts/run-with-timeout.mjs run --max=2 -- node packages/selection/test/highlight.browser.mjs`, then repeat with `--compat`. The existing attributed Khronos Box provides the selected mesh. Checks require a magenta interior fill, unchanged centre for outer-only glow, no outside contribution for inner-only glow, exact finite radius support and byte-identical beauty output when fully occluded. Run highlight.test.js for no JFA dispatch, default-algorithm mask-only support, bind/view reuse, style failures and restore/disposal. The ordinary picking/model/xray package suite also runs after the Selection mask hook change.
 
 ### Batch 202 geospatial vectors
-Build loaders and run `node --test --test-timeout=120000 packages/loaders/tests/geo.test.js`. Natural Earth is the already-noticed public-domain fixture; spec-derived binary writers independently construct Shapefile, dBASE and MVT records. Shared-lock loader browser tests run native and --compat, including a polygon with a hole and its feature group. Source-double comparisons use result.positions; result.mesh is the existing float32 render contract.
+Build loaders and run `node --test --test-timeout=120000 packages/loaders/tests/geo.test.js`. Natural Earth is the already-noticed public-domain fixture; spec-derived binary writers independently construct Shapefile, dBASE and MVT records. Loader browser tests run native and --compat, including a polygon with a hole and its feature group. Source-double comparisons use result.positions; result.mesh is the existing float32 render contract.
 ### Batch 233 job 2: lane paint
-After package build run node --test --test-timeout=120000 packages/road/test/lanes.test.js; rendering uses the shared-lock road browser command above. The lanes fixture checks curved paint pixels and exact reboot/disposal on both backends. No benchmark or timing assertion.
+After package build run node --test --test-timeout=120000 packages/road/test/lanes.test.js; rendering uses the road browser command above. The lanes fixture checks curved paint pixels and exact reboot/disposal on both backends. No benchmark or timing assertion.
 ### UI layout editor (batch 259)
-Build packages and serve the repository through its Vite dev server; open `/examples/ui-editor/`. Run `node --test --test-timeout=60000 packages/ui/tests/editor.test.js` and `node scripts/gpu-lock.mjs run --owner=ui-editor --max=3 --wait-max=60 -- node packages/ui/tests/editor-browser.mjs`, repeated with --compat. The browser edits text/styles, rejects a broken draft, downloads JSON through the browser, opens it through the file input and checks responsive geometry. Demo facts: Wikidata Q111, CC0, https://www.wikidata.org/wiki/Q111 .
+Build packages and serve the repository through its Vite dev server; open `/examples/ui-editor/`. Run `node --test --test-timeout=60000 packages/ui/tests/editor.test.js` and `node scripts/run-with-timeout.mjs run --max=3 -- node packages/ui/tests/editor-browser.mjs`, repeated with --compat. The browser edits text/styles, rejects a broken draft, downloads JSON through the browser, opens it through the file input and checks responsive geometry. Demo facts: Wikidata Q111, CC0, https://www.wikidata.org/wiki/Q111 .
 
 ## Batch 210 job 3: categorical tracks
-Build packages, then node --test --test-timeout=30000 packages/animation/tests/discrete.test.js packages/animation/tests/mixer.test.js packages/animation/tests/playback.test.js. Under a shared GPU lock run node packages/animation/tests/discrete-browser.mjs, then with --compat; also run mixer-browser.mjs on each backend because the mixer scheduler changed. The discrete driver uses the existing credited Khronos Fox, samples 0/0.49/0.5/0.99/1, checks real drawn/background pixels plus DOM text, and restores originals. Read discrete unit/lifetime before logs for regression failures. No benchmark or README execution.
-Batch 239 job 4: build:packages, then node --test --test-timeout=120000 packages/tiles/tests/*.test.js packages/points/tests/*.test.js packages/splats/test/*.test.js. Run packages/tiles/tests/tiles-browser.mjs under a shared GPU lock, normally and with --compat; its fade case checks real-model replacement pixels, outgoing retention/eviction, exact half/zero point coverage, the real Gaussian cube and original-ID synthetic sorted masks. Owners also run packages/points/scripts/test-browser.js and packages/splats/test/gpu/check.mjs on both backends. No speed measurement is run during the build phase.
+Build packages, then node --test --test-timeout=30000 packages/animation/tests/discrete.test.js packages/animation/tests/mixer.test.js packages/animation/tests/playback.test.js. Run node packages/animation/tests/discrete-browser.mjs, then with --compat; also run mixer-browser.mjs on each backend because the mixer scheduler changed. The discrete driver uses the existing credited Khronos Fox, samples 0/0.49/0.5/0.99/1, checks real drawn/background pixels plus DOM text, and restores originals. Read discrete unit/lifetime before logs for regression failures. No benchmark or README execution.
+Batch 239 job 4: build:packages, then node --test --test-timeout=120000 packages/tiles/tests/*.test.js packages/points/tests/*.test.js packages/splats/test/*.test.js. Run packages/tiles/tests/tiles-browser.mjs, normally and with --compat; its fade case checks real-model replacement pixels, outgoing retention/eviction, exact half/zero point coverage, the real Gaussian cube and original-ID synthetic sorted masks. Owners also run packages/points/scripts/test-browser.js and packages/splats/test/gpu/check.mjs on both backends. No speed measurement is run during the build phase.
 
 
 
 
 
 ### Batch 243 mesh light sampling
-Build the package with npm run build --workspace=@margoengine/voxel-pathtracer, then run node --test packages/voxel-pathtracer/tests/mesh-lights.test.js. The browser fixture is node packages/voxel-pathtracer/tests/mesh-lights-browser.mjs under the named shared GPU lock with a six-minute lease; it renders WebGPU and WebGL2/Vulkan, retaining errors, finite output and unchanged analytic bounds in test-results/voxel-pathtracer-mesh-lights.json. The area reference integrates the square using independent 160x160 midpoint quadrature; the emitter has zero reflecting albedo so the reference includes exactly its emitted direct transport. Spot and IES references use Lambert cosine, inverse square, cone and finite-range terms. Both package and dependent CPU tests remain required.
+Build the package with npm run build --workspace=@margoengine/voxel-pathtracer, then run node --test packages/voxel-pathtracer/tests/mesh-lights.test.js. The browser fixture is node packages/voxel-pathtracer/tests/mesh-lights-browser.mjs with a six-minute time limit; it renders WebGPU and WebGL2/Vulkan, retaining errors, finite output and unchanged analytic bounds in test-results/voxel-pathtracer-mesh-lights.json. The area reference integrates the square using independent 160x160 midpoint quadrature; the emitter has zero reflecting albedo so the reference includes exactly its emitted direct transport. Spot and IES references use Lambert cosine, inverse square, cone and finite-range terms. Both package and dependent CPU tests remain required.
 
 Batch 243 continuation: mesh-lights-browser.mjs now prints numbered create, ready-wait, image, complete and dispose phases while retaining all original assertions, samples and deadlines. The canonical two-backend receipt is batch243-mesh-lights-20261109.json. Historical timeout attribution remains open; a passing continuation is not proof of a specific repair.
 
 ## Batch 207 job 2
-Build packages; run node --test --test-timeout=120000 packages/blender/tests/lightmap.test.js packages/lightmap/tests/imported.test.js. Regenerate fixtures in a separate factory-startup Blender process: C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_lightmap.py -- test-results/blender-lightmap. GPU: node scripts/gpu-lock.mjs run --owner=lightmap --max=2 --wait-max=60 -- node packages/blender/tests/lightmap-browser.mjs; repeat with --compat on the browser script. The imported irradiance, default display and no-double-lighting checks are deterministic, with no timing assertions.
-Batch 219 job 3: build packages and run `node --test --test-timeout=120000 packages/geometry/tests/teapot.test.js`. Run geometry/tests/gpu-check.mjs through the shared GPU lock normally and with --compat; the teapot case expects 9120 triangles at 12 segments, outward analytic normals and visible red pixels. The unchanged model fixture and its SHA-256/source/terms are recorded in THIRD-PARTY-NOTICES.md. No benchmark is used.
+Build packages; run node --test --test-timeout=120000 packages/blender/tests/lightmap.test.js packages/lightmap/tests/imported.test.js. Regenerate fixtures in a separate factory-startup Blender process: C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_lightmap.py -- test-results/blender-lightmap. GPU: node scripts/run-with-timeout.mjs run --max=2 -- node packages/blender/tests/lightmap-browser.mjs; repeat with --compat on the browser script. The imported irradiance, default display and no-double-lighting checks are deterministic, with no timing assertions.
+Batch 219 job 3: build packages and run `node --test --test-timeout=120000 packages/geometry/tests/teapot.test.js`. Run geometry/tests/gpu-check.mjs normally and with --compat; the teapot case expects 9120 triangles at 12 segments, outward analytic normals and visible red pixels. The unchanged model fixture and its SHA-256/source/terms are recorded in THIRD-PARTY-NOTICES.md. No benchmark is used.
 
 
 
 ### Batch 246 job 1
-After build:packages, run `node --test --test-timeout=60000 packages/tilemap/test/objects.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tilemap-proof --gpu=ordered-map-pixel-readback --max=4 --wait-max=60 -- node packages/tilemap/test/objects-check.mjs`, then append `--compat` for WebGL2. Readback artifacts: test-results/tilemap-objects.json and tilemap-objects-compat.json. Diagnostic texels are generated by the tests.
+After build:packages, run `node --test --test-timeout=60000 packages/tilemap/test/objects.test.js`. Run `node scripts/run-with-timeout.mjs run --max=4 -- node packages/tilemap/test/objects-check.mjs`, then append `--compat` for WebGL2. Readback artifacts: test-results/tilemap-objects.json and tilemap-objects-compat.json. Diagnostic texels are generated by the tests.
 
 
 ### Batch 209 GIF correctness
-After build:packages, run node --test --test-timeout=120000 packages/headless/tests/gif.test.js packages/exporters/tests/palette.test.js packages/exporters/tests/capture.test.js. Render/decode proof on both GPU paths: node scripts/gpu-lock.mjs run --owner=gif-proof --gpu=rendered-gif-native-and-full-compat --wait-max=1200 --max=180 -- node packages/headless/tests/gif-gpu.mjs. The exporter capture-browser.mjs gate also passes natively and with --compat. It includes image transparency and the existing capture/codec checks. No README runner or benchmark used.
+After build:packages, run node --test --test-timeout=120000 packages/headless/tests/gif.test.js packages/exporters/tests/palette.test.js packages/exporters/tests/capture.test.js. Render/decode proof on both GPU paths: node scripts/run-with-timeout.mjs run --max=180 -- node packages/headless/tests/gif-gpu.mjs. The exporter capture-browser.mjs gate also passes natively and with --compat. It includes image transparency and the existing capture/codec checks. No README runner or benchmark used.
 
 ### Batch 224 mesh hull/Minkowski
-After npm run build:packages run node --test --test-timeout=120000 packages/geometry/tests/hull-indices.test.js packages/geometry/tests/convex.test.js packages/mesh-edit/tests/hull.test.js. Analytic volumes (27,16,26,32.256 and disconnected volume16), large-offset source precision, cavity retention, zero plane triples for convex inputs, budget failure and cancellation are asserted independently. For rendering run the mesh-edit browser script natively and with --compat, plus packages/geometry/tests/gpu-check.mjs on each backend, under the shared GPU lock. Fixtures are synthetic correctness solids, not external demonstrations or measured speed scenes.
+After npm run build:packages run node --test --test-timeout=120000 packages/geometry/tests/hull-indices.test.js packages/geometry/tests/convex.test.js packages/mesh-edit/tests/hull.test.js. Analytic volumes (27,16,26,32.256 and disconnected volume16), large-offset source precision, cavity retention, zero plane triples for convex inputs, budget failure and cancellation are asserted independently. For rendering run the mesh-edit browser script natively and with --compat, plus packages/geometry/tests/gpu-check.mjs on each backend. Fixtures are synthetic correctness solids, not external demonstrations or measured speed scenes.
 
 
 ### Batch 265 texture hooks
 
-Build packages, then run `node --experimental-test-module-mocks --test --test-timeout=120000 packages/react/tests/textures.test.js packages/materials/tests/shared-pass.test.js`. For pixel comparisons run `node scripts/gpu-lock.mjs run --owner=react-textures --wait-max=60 --max=6 -- node packages/react/scripts/test-textures-browser.mjs`, then the same command with `--compat` appended. The test compares unmodified native and React material output for each supported native shading class and named/default Scenes, plus image, KTX2 and video fixtures, with exact pixels.
-Batch 206 shapes: node --test --test-timeout=120000 packages/usdz/tests/shapes.test.js after building. Regenerate: python packages/usdz/tests/oracle/shapes-truth.py packages/usdz/tests/fixtures/shapes.usda packages/usdz/tests/fixtures/shapes-openusd.json with OpenUSD 26.11. The USD browser suite renders all five types normally and with --compat through the shared GPU lock.
+Build packages, then run `node --experimental-test-module-mocks --test --test-timeout=120000 packages/react/tests/textures.test.js packages/materials/tests/shared-pass.test.js`. For pixel comparisons run `node scripts/run-with-timeout.mjs run --max=6 -- node packages/react/scripts/test-textures-browser.mjs`, then the same command with `--compat` appended. The test compares unmodified native and React material output for each supported native shading class and named/default Scenes, plus image, KTX2 and video fixtures, with exact pixels.
+Batch 206 shapes: node --test --test-timeout=120000 packages/usdz/tests/shapes.test.js after building. Regenerate: python packages/usdz/tests/oracle/shapes-truth.py packages/usdz/tests/fixtures/shapes.usda packages/usdz/tests/fixtures/shapes-openusd.json with OpenUSD 26.11. The USD browser suite renders all five types normally and with --compat.
 ### Large FBX correctness (batch 205)
 
 After building, run `node --test --test-timeout=240000 packages/fbx/test/large.test.js`.
 The test generates its own independent standard-layout input. For GPU/worker proof run the
-package test:gpu command, then with `--compat`, through the shared GPU lock. No speed suite runs.
+package test:gpu command, then with `--compat`. No speed suite runs.
 
 ### Batch 233 job 3: road import
-After build: node --test --test-timeout=120000 packages/road/test/geojson.test.js, then the shared-lock road browser gate above. Real data source/license is packages/road/test/fixtures/osm-source.json. Both backends render a source road in local WGS84 metres, restore identical pixels and dispose it. No timing assertion.
+After build: node --test --test-timeout=120000 packages/road/test/geojson.test.js, then the road browser gate above. Real data source/license is packages/road/test/fixtures/osm-source.json. Both backends render a source road in local WGS84 metres, restore identical pixels and dispose it. No timing assertion.
 
-Batch 172 probes: build packages, run node --test packages/sciviz/tests/probe.test.js; run node scripts/gpu-lock.mjs run --owner=codex-batch172 --max=5 --wait-max=60 -- node packages/sciviz/tests/probe-browser.mjs. Serve examples/sciviz-probe.html; hover either chart. The test reports four data-view pixel counts, 32768 MRI target points, 101 valid NASA profile samples and zero difference between profile and dataset resampling. CPU oracles include the warped trilinear cell with volume 1.25 and field integral 1/6, rather than a triangulation-derived expectation. No timing run.
+Batch 172 probes: build packages, run node --test packages/sciviz/tests/probe.test.js; run node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/probe-browser.mjs. Serve examples/sciviz-probe.html; hover either chart. The test reports four data-view pixel counts, 32768 MRI target points, 101 valid NASA profile samples and zero difference between profile and dataset resampling. CPU oracles include the warped trilinear cell with volume 1.25 and field integral 1/6, rather than a triangulation-derived expectation. No timing run.
 
-Batch 223 box bounds: after building packages, hold a shared GPU slot for
+Batch 223 box bounds: after building packages, run
 `node packages/culling/test/gpu/bounds-extended-check.mjs` and repeat with
 `--compat`. Each of the three routes compares all pixels across camera and wall
 edits; native mesh/model Hi-Z also asserts reduction behind the wall. CPU layout
@@ -3265,126 +3248,126 @@ shared with job 1. No timing test or benchmark is needed for these claims.
 
 
 ## Batch 207 job 3
-After build: node --test --test-timeout=120000 packages/blender/tests/meshopt.test.js. GPU: node scripts/gpu-lock.mjs run --owner=meshopt --max=3 --wait-max=60 -- node packages/blender/tests/meshopt-browser.mjs, then the same script with --compat. It compresses the own fixtures at runtime and compares every decoded RGBA pixel with the original static/animated load. The CPU suite compares every original binary section and manifest, validates unchanged triangle order and checks decoder corruption/size/abort rejection. No wall-clock assertions.
+After build: node --test --test-timeout=120000 packages/blender/tests/meshopt.test.js. GPU: node scripts/run-with-timeout.mjs run --max=3 -- node packages/blender/tests/meshopt-browser.mjs, then the same script with --compat. It compresses the own fixtures at runtime and compares every decoded RGBA pixel with the original static/animated load. The CPU suite compares every original binary section and manifest, validates unchanged triangle order and checks decoder corruption/size/abort rejection. No wall-clock assertions.
 
 ### Batch 246 job 2
 After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/tiled*.test.js packages/tilemap/test/autotile.test.js`. The job 1 objects-check.mjs command on both backends now also reads imported XML template and image-layer pixels. Documents and texels are deterministic in-test fixtures.
 ### Batch 211 job 1
 
-Build packages; run node --test packages/animator/test/layers.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch211 --wait-max=60 --max=4 -- npm.cmd run test:gpu --workspace @margoengine/animator; repeat with MARGO_COMPAT=1. Layers use the existing Khronos Fox CC0 file, and synthetic CPU poses supply exact independent numerical oracles.
+Build packages; run node --test packages/animator/test/layers.test.js. GPU: node scripts/run-with-timeout.mjs run --max=4 -- npm.cmd run test:gpu --workspace @margoengine/animator; repeat with MARGO_COMPAT=1. Layers use the existing Khronos Fox CC0 file, and synthetic CPU poses supply exact independent numerical oracles.
 ### Batch 233 job 4: road structures
-After build: node --test --test-timeout=120000 packages/road/test/structures.test.js; run the changed-package shared-lock road browser command above. Oblique fixtures check bridge decks/green piers and tunnel shell/green portal pixels on native WebGPU and WebGL2 compatibility, then exact reboot/disposal. CPU volume and clearance equations are independent oracles; no benchmark or timing assertion.
+After build: node --test --test-timeout=120000 packages/road/test/structures.test.js; run the changed-package road browser command above. Oblique fixtures check bridge decks/green piers and tunnel shell/green portal pixels on native WebGPU and WebGL2 compatibility, then exact reboot/disposal. CPU volume and clearance equations are independent oracles; no benchmark or timing assertion.
 
 ### Batch 261 GPU label layer
-Build packages, then run node --test --test-timeout=120000 packages/labels/tests/*.test.js. Run node scripts/gpu-lock.mjs run --owner=labels-gpu --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js. The labels-browser.json report contains three rendering paths, near/far pixel extents, 100,000 glyphs/one draw and coincident grid work counts. No timing assertions or benchmarks.
+Build packages, then run node --test --test-timeout=120000 packages/labels/tests/*.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/labels/scripts/test-browser.js. The labels-browser.json report contains three rendering paths, near/far pixel extents, 100,000 glyphs/one draw and coincident grid work counts. No timing assertions or benchmarks.
 
 API-index aggregate regression (batch 206): node --test --test-timeout=60000 tests/api-report-scope.test.js checks that all table rows, including margoengine, agree with the committed package/entry/export totals. npm run api:check validates the full compiled declarations and every row. A summary merge omitting the umbrella reports 97 packages and fails the regression; canonical generation reports 98 for this tree. This is a records-consistency check, not a compatibility certification.
 
 
 
 Scenery moon: build packages, then run
-`node --test --test-timeout=120000 packages/scenery/test/moon.test.js` and
-`node scripts/gpu-lock.mjs run --owner=moon-proof --max=4 --wait-max=60 -- node packages/scenery/test/moon-gpu.mjs`.
+`node --test --test-timeout=120000 packages/sky/test/moon.test.js` and
+`node scripts/run-with-timeout.mjs run --max=4 -- node packages/sky/test/moon-gpu.mjs`.
 Repeat the GPU command with `--compat` after `moon-gpu.mjs` for full WebGL2.
 The fixture checks 1x/4x MSAA, real map variation, synthetic north/east landmarks,
 full/quarter/new phases, earthshine, deterministic frames and mesh occlusion.
 
 ### Batch 202 native 3MF
-Build loaders and run the threemf-lattice and threemf-materials Node tests with --test-timeout=120000, followed by the affected package/dependent suite. `threemf-native-fixture.js` defines original XML data; the test verifies the committed lattice-slices.3mf browser ZIP against writeZip(nativeFixtureXML()). Shared-lock loader browser checks exercise the new entry, native resources and existing createMeshes fallback on native WebGPU and --compat. Material expectations use explicit standard color-transfer equations and unchanged tolerances. No speed measurement is claimed.
+Build loaders and run the threemf-lattice and threemf-materials Node tests with --test-timeout=120000, followed by the affected package/dependent suite. `threemf-native-fixture.js` defines original XML data; the test verifies the committed lattice-slices.3mf browser ZIP against writeZip(nativeFixtureXML()). Loader browser checks exercise the new entry, native resources and existing createMeshes fallback on native WebGPU and --compat. Material expectations use explicit standard color-transfer equations and unchanged tolerances. No speed measurement is claimed.
 
 ## Batch 213 job 2 MToon
-Build packages, then run the rigging and gltf-pro CPU tests and their dependents. The new `packages/rigging/tests/mtoon-browser.mjs` runs each independent scene with its own 120-second hard limit and process-tree termination. Run it through the shared GPU lock, with and without `--compat`, alongside the existing rigging and gltf-pro GPU commands. It writes test-results/mtoon/oracle-*.json and avatar PNGs. Public reference observations use the exact CDN URL and controlled input values in results/batch213-mtoon-provenance.json; execute that reference only in external engine-bench and inspect documented material properties, never source. [Sources, assertions and limits](../rigging-mtoon.md). README work is deferred and local CI alone runs full verify.
+Build packages, then run the rigging and gltf/pbr CPU tests and their dependents. `npm run test:mtoon:browser -w @margoengine/rigging` runs each independent scene as its own step (the earlier `mtoon-browser.mjs` runner, which missed the uv-shadow scene, was removed on 2026-11-16). Run it, with and without `--compat`, alongside the existing rigging and gltf/pbr GPU commands. It writes test-results/mtoon/oracle-*.json and avatar PNGs. Public reference observations use the exact CDN URL and controlled input values in results/batch213-mtoon-provenance.json; execute that reference only in external engine-bench and inspect documented material properties, never source. [Sources, assertions and limits](../rigging-mtoon.md). README work is deferred and local CI alone runs full verify.
 
-Batch 213 existing extension driver compatibility command: set MARGO_COMPAT=1 in the command environment, then run node packages/gltf-pro/scripts/test-extensions-browser.js with no positional filter. Passing --compat as argv[2] selects zero names in that existing driver. The separate physical-material worst-case compatibility failure and unchanged parent shader inputs are recorded in results/batch213-physical-compat-existing-failure.json; it is not a MToon feature refusal or a speed result.
+Batch 213 existing extension driver compatibility command: set MARGO_COMPAT=1 in the command environment, then run node packages/gltf/scripts/test-extensions-browser.js with no positional filter. Passing --compat as argv[2] selects zero names in that existing driver. The separate physical-material worst-case compatibility failure and unchanged parent shader inputs are recorded in results/batch213-physical-compat-existing-failure.json; it is not a MToon feature refusal or a speed result.
 
 ### Batch 211 job 2
 
-After build: node --test packages/animator/test/blend-trees.test.js. Run the animator package GPU command through the shared lock on WebGPU and again with MARGO_COMPAT=1 for WebGL2 compatibility. Fox remains the existing Khronos CC0 model. Exact synthetic weight and pose oracles are CPU conformance tests, not demo content.
+After build: node --test packages/animator/test/blend-trees.test.js. Run the animator package GPU command on WebGPU and again with MARGO_COMPAT=1 for WebGL2 compatibility. Fox remains the existing Khronos CC0 model. Exact synthetic weight and pose oracles are CPU conformance tests, not demo content.
 
 
 ### Batch 246 job 3
-After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/plane.test.js`. Run `node scripts/gpu-lock.mjs run --owner=tilemap-plane-proof --gpu=perspective-depth-pixel-readback --max=1 --wait-max=60 -- node packages/tilemap/test/plane-check.mjs`, then append `--compat`. Artifacts: test-results/tilemap-plane.json and tilemap-plane-compat.json. All 4096 pixels per scene are compared exactly; source transforms keep projected boundaries off sample centres so the independent oracle does not depend on rasterizer edge tie-breaking.
+After build:packages run `node --test --test-timeout=60000 packages/tilemap/test/plane.test.js`. Run `node scripts/run-with-timeout.mjs run --max=1 -- node packages/tilemap/test/plane-check.mjs`, then append `--compat`. Artifacts: test-results/tilemap-plane.json and tilemap-plane-compat.json. All 4096 pixels per scene are compared exactly; source transforms keep projected boundaries off sample centres so the independent oracle does not depend on rasterizer edge tie-breaking.
 
 ### Batch 261 distance labels
-After build: node --test --test-timeout=120000 packages/labels/tests/*.test.js. The changed DOM-layout path is rendered by node scripts/gpu-lock.mjs run --owner=labels-distance --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only. The optional GPU label shader is unchanged; job 1 retains its separate full GPU test page.
+After build: node --test --test-timeout=120000 packages/labels/tests/*.test.js. The changed DOM-layout path is rendered by node scripts/run-with-timeout.mjs run --max=3 -- node packages/labels/scripts/test-browser.js --dom-only. The optional GPU label shader is unchanged; job 1 retains its separate full GPU test page.
 
 ### Batch 238 progressive splats
-After build:packages, run node --test --test-timeout=60000 packages/splats/test/progressive.test.js. Run packages/splats/test/gpu/check.mjs through gpu-lock with owner codex-batch238, --gpu=splats-render-readback, --max=8 and --wait-max=60, once normally and once with --compat. The GPU check loads the existing MIT raccoon splat fixture in two delayed pieces, draws while the source is suspended, and checks all 8,385 records are visible at completion. No benchmark required.
+After build:packages, run node --test --test-timeout=60000 packages/splats/test/progressive.test.js. Run packages/splats/test/gpu/check.mjs with an 8 minute time limit, once normally and once with --compat. The GPU check loads the existing MIT raccoon splat fixture in two delayed pieces, draws while the source is suspended, and checks all 8,385 records are visible at completion. No benchmark required.
 
 Compatibility upload regression: node --test --test-timeout=120000 packages/webgl2-compat/test/bitmap-straight.test.js packages/webgl2-compat/test/external-image.test.js, plus the unchanged exact WebP channel assertions in the two splats GPU runs above. No timing bar.
-Batch 172 calculator correctness: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/calc.test.js. With a shared GPU lock run node packages/sciviz/tests/calc-browser.mjs (native and compatibility in one command). Demo: /examples/sciviz-calc.html. All expression groups, transfers, centres, connectivity, elevation, quality and least-squares gradients use analytic cases and original NASA FUN3D data. No benchmark or timing assertion.
+Batch 172 calculator correctness: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/calc.test.js. Run node packages/sciviz/tests/calc-browser.mjs (native and compatibility in one command). Demo: /examples/sciviz-calc.html. All expression groups, transfers, centres, connectivity, elevation, quality and least-squares gradients use analytic cases and original NASA FUN3D data. No benchmark or timing assertion.
 
 
-Batch 223 sorting: build packages, then hold a shared GPU slot for
+Batch 223 sorting: build packages, then run
 `node packages/culling/test/gpu/sort-check.mjs` and again with `--compat`.
 Direct readbacks verify all record fields, stable order, source ranges and
 argument words; every route also compares sorted and original canvas pixels.
 CPU contracts run in `packages/culling/test/sort.test.js`. No wall-clock A/B,
 benchmark or timing-only assertion runs during the build phase.
 ### Batch 266 input helpers
-After build:packages, run node --test --test-timeout=60000 packages/react/tests/controls-extra.test.js. For actual pixels run node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-controls-extra-browser.mjs, then the same command with --compat appended to the inner script. The existing CC-BY-4.0 Cesium Box fixture exercises keyboard, native scroll, product drag, spring snap-back and unmount disposal.
-Batch 205 job 3: build packages, then run `node --test --test-timeout=120000 packages/fbx/test/legacy.test.js`. Render with shared GPU admission: `node scripts/gpu-lock.mjs run --owner=fbx-legacy-proof --max=3 --wait-max=60 -- node packages/fbx/test/legacy-browser.mjs`, then the same with `--compat`. `npm run measure:size` reports the base/core+stage gzip; do not use build summary's particlesOnly field for that number. Standard data hashes/licences are in the real-fixture NOTICE.
+After build:packages, run node --test --test-timeout=60000 packages/react/tests/controls-extra.test.js. For actual pixels run node scripts/run-with-timeout.mjs run --max=3 -- node packages/react/scripts/test-controls-extra-browser.mjs, then the same command with --compat appended to the inner script. The existing CC-BY-4.0 Cesium Box fixture exercises keyboard, native scroll, product drag, spring snap-back and unmount disposal.
+Batch 205 job 3: build packages, then run `node --test --test-timeout=120000 packages/fbx/test/legacy.test.js`. Render with `node scripts/run-with-timeout.mjs run --max=3 -- node packages/fbx/test/legacy-browser.mjs`, then the same with `--compat`. `npm run measure:size` reports the base/core+stage gzip; do not use build summary's particlesOnly field for that number. Standard data hashes/licences are in the real-fixture NOTICE.
 ### Batch 231 textured scatter
 
-Build packages, then run node --test --test-timeout=120000 packages/scatter/test/textured.test.js. In a shared GPU slot run node packages/scatter/test/textured.browser.mjs, then the same command with --compat. The fixture uses the checked-in licensed Khronos DiffuseTransmissionPlant and compares the whole scene against separately loaded plant copies at 1x and 4x MSAA, plus normal, mask, shadow and reboot controls. GPU lock owner codex-batch231, no exclusive hold. No benchmark or timing assertion.
+Build packages, then run node --test --test-timeout=120000 packages/scatter/test/textured.test.js. Run node packages/scatter/test/textured.browser.mjs, then the same command with --compat. The fixture uses the checked-in licensed Khronos DiffuseTransmissionPlant and compares the whole scene against separately loaded plant copies at 1x and 4x MSAA, plus normal, mask, shadow and reboot controls. No benchmark or timing assertion.
 
 ### Lines stroke correctness (batch 227 job 1)
-Build packages, then run node --test --test-timeout=120000 packages/lines/tests/stroke.test.js. Under the shared GPU lock run node packages/lines/scripts/test-browser.js, then the same command with --compat. The stroke check verifies taper pixels, a cutoff inside an unequal-length path, zero/full visibility, visible/hidden picks, dashes with depth writing and restoration. Existing package checks still run in full. No external asset is required for these synthetic correctness fixtures.
+Build packages, then run node --test --test-timeout=120000 packages/lines/tests/stroke.test.js. Run node packages/lines/scripts/test-browser.js, then the same command with --compat. The stroke check verifies taper pixels, a cutoff inside an unequal-length path, zero/full visibility, visible/hidden picks, dashes with depth writing and restoration. Existing package checks still run in full. No external asset is required for these synthetic correctness fixtures.
 
 
 ### Batch 229 imagery
-Build with npm run build:packages. Run node --test --test-timeout=120000 packages/terrain/test/imagery.test.js. Render with node scripts/gpu-lock.mjs run --owner=imagery-repro --wait-max=60 --max=4 -- node packages/terrain/test/imagery.browser.mjs; repeat with --compat appended to the browser command. The existing terrain GPU script covers the whole changed package. Reports are written to test-results/terrain-imagery.json. No full verify or README checks are lane gates.
+Build with npm run build:packages. Run node --test --test-timeout=120000 packages/terrain/test/imagery.test.js. Render with node scripts/run-with-timeout.mjs run --max=4 -- node packages/terrain/test/imagery.browser.mjs; repeat with --compat appended to the browser command. The existing terrain GPU script covers the whole changed package. Reports are written to test-results/terrain-imagery.json. No full verify or README checks are lane gates.
 ### Batch 211 job 3
 
-Build packages, then node --test packages/animator/test/transitions.test.js tests/modern-animator-graph.test.js. The animator GPU package suite runs through the shared GPU lock; run again with MARGO_COMPAT=1. The real Fox graph transitions to Run at normalized offset 0.25.
+Build packages, then node --test packages/animator/test/transitions.test.js tests/modern-animator-graph.test.js. The animator GPU package suite runs; run again with MARGO_COMPAT=1. The real Fox graph transitions to Run at normalized offset 0.25.
 
 ### Batch 261 label clustering
-Build packages, then node --test --test-timeout=120000 packages/labels/tests/cluster.test.js. The normal labels CPU suite covers composition. Render node scripts/gpu-lock.mjs run --owner=labels-cluster --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for real centroid/count/zoom checks. Generated numeric clouds are correctness controls; no geographic demo is introduced.
+Build packages, then node --test --test-timeout=120000 packages/labels/tests/cluster.test.js. The normal labels CPU suite covers composition. Render node scripts/run-with-timeout.mjs run --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for real centroid/count/zoom checks. Generated numeric clouds are correctness controls; no geographic demo is introduced.
 
 ### Batch 266 scene portals
-Build packages, then node --test --test-timeout=60000 packages/react/tests/portals.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-portals-browser.mjs ; repeat with --compat appended. Texture, isolated overlay and stacked overlays must match direct native rendering pixel for pixel, with no errors and complete disposal.
+Build packages, then node --test --test-timeout=60000 packages/react/tests/portals.test.js. GPU: node scripts/run-with-timeout.mjs run --max=3 -- node packages/react/scripts/test-portals-browser.mjs ; repeat with --compat appended. Texture, isolated overlay and stacked overlays must match direct native rendering pixel for pixel, with no errors and complete disposal.
 
 ### Repeated line textures (batch 227 job 2)
-After build: node --test --test-timeout=120000 packages/lines/tests/texture.test.js. Under the shared GPU lock run node packages/lines/scripts/test-browser.js and repeat with --compat. Build before starting the browser so served dist changes cannot trigger a reload. The textured check exercises unequal segment lengths, image transparency and picks, UV edits, progress, mip/device restoration, and promise image decoding. Authored red/transparent pixels and a generated 1x1 image are synthetic correctness fixtures, not third-party demo assets.
+After build: node --test --test-timeout=120000 packages/lines/tests/texture.test.js. Run node packages/lines/scripts/test-browser.js and repeat with --compat. Build before starting the browser so served dist changes cannot trigger a reload. The textured check exercises unequal segment lengths, image transparency and picks, UV edits, progress, mip/device restoration, and promise image decoding. Authored red/transparent pixels and a generated 1x1 image are synthetic correctness fixtures, not third-party demo assets.
 ### Batch 231 surface placements
 
-After building packages, run node --test --test-timeout=120000 packages/scatter/test/surface.test.js. In a shared GPU slot run node packages/scatter/test/surface.browser.mjs and repeat with --compat. The real-data fixture samples the checked-in standard Teapot and places the licensed Khronos plant through TexturedScatter, comparing it to independently decomposed root transforms. Test PNGs are saved under test-results/batch231-surface-*.png. No wall-clock assertion or benchmark.
-Batch 172 glyph/warp correctness: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/glyph.test.js packages/sciviz/tests/glyph-data.test.js. With a shared GPU lock run node packages/sciviz/tests/glyph-browser.mjs for native and compatibility. Interactive demo /examples/sciviz-glyph.html uses the original SEACAS displacement file, source/hash/licence in examples/assets/sciviz/glyph/source.json, and the existing NOAA wind.bin provenance. One draw per glyph source is a deterministic work count, not a speed measurement.
+After building packages, run node --test --test-timeout=120000 packages/scatter/test/surface.test.js. Run node packages/scatter/test/surface.browser.mjs and repeat with --compat. The real-data fixture samples the checked-in standard Teapot and places the licensed Khronos plant through TexturedScatter, comparing it to independently decomposed root transforms. Test PNGs are saved under test-results/batch231-surface-*.png. No wall-clock assertion or benchmark.
+Batch 172 glyph/warp correctness: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/glyph.test.js packages/sciviz/tests/glyph-data.test.js. Run node packages/sciviz/tests/glyph-browser.mjs for native and compatibility. Interactive demo /examples/sciviz-glyph.html uses the original SEACAS displacement file, source/hash/licence in examples/assets/sciviz/glyph/source.json, and the existing NOAA wind.bin provenance. One draw per glyph source is a deterministic work count, not a speed measurement.
 
-Batch 205 job 4: after build:packages run `node --test --test-timeout=90000 packages/fbx/test/surfaces.test.js`. Render the real Maya plane with `node scripts/gpu-lock.mjs run --owner=fbx-surfaces-proof --max=3 --wait-max=60 -- node packages/fbx/test/surfaces-browser.mjs`, then the same with `--compat`. Both page and parser-worker paths must show lit pixels without GPU validation errors. Standard model hashes and licences are in the real-fixture NOTICE. `npm run measure:size` after build:packages reports core+stage.
+Batch 205 job 4: after build:packages run `node --test --test-timeout=90000 packages/fbx/test/surfaces.test.js`. Render the real Maya plane with `node scripts/run-with-timeout.mjs run --max=3 -- node packages/fbx/test/surfaces-browser.mjs`, then the same with `--compat`. Both page and parser-worker paths must show lit pixels without GPU validation errors. Standard model hashes and licences are in the real-fixture NOTICE. `npm run measure:size` after build:packages reports core+stage.
 ### Batch 206 curves
-Build packages, then `node --test packages/usdz/tests/curves.test.js`. GPU: `node scripts/gpu-lock.mjs run --owner=batch206 --wait-max=60 --max=3 -- node scripts/modern-usdz-tests.js`, repeat with `--compat`. Lines own GPU checks: `node packages/lines/scripts/test-browser.js`, likewise with `--compat`, under the same shared lock. Inputs are original analytical fixtures; no licensed external demo asset was needed.
+Build packages, then `node --test packages/usdz/tests/curves.test.js`. GPU: `node scripts/run-with-timeout.mjs run --max=3 -- node scripts/modern-usdz-tests.js`, repeat with `--compat`. Lines own GPU checks: `node packages/lines/scripts/test-browser.js`, likewise with `--compat`. Inputs are original analytical fixtures; no licensed external demo asset was needed.
 ### Batch 211 job 4
 
-Build packages, then node --test packages/animator/test/masks.test.js. Run the animator GPU suite through the shared GPU lock on WebGPU and with MARGO_COMPAT=1. The Fox fixture combines the completed layer graph, nested tree, transition offset and fractional mask. Synthetic CPU tracks are exact mathematical conformance inputs, not demo replacements.
+Build packages, then node --test packages/animator/test/masks.test.js. Run the animator GPU suite on WebGPU and with MARGO_COMPAT=1. The Fox fixture combines the completed layer graph, nested tree, transition offset and fractional mask. Synthetic CPU tracks are exact mathematical conformance inputs, not demo replacements.
 ### Batch 247 job 1
-After build:packages, run node --test --test-timeout=90000 packages/lighting2d/tests/*.test.js. For actual GPU work use node scripts/gpu-lock.mjs run --owner=lighting2d-sdf --wait-max=60 --max=3 -- node packages/lighting2d/tests/browser-check.mjs, then the same command with --compat after the browser driver. The SDF checks are named SDF in test-results/lighting2d-browser.json. Generated tiny RGBA fixtures have independent distance and analytic opaque-rectangle oracles; no downloads or external art are required. Size measurement uses bundleBytes in scripts/measure-size.js with bare imports external; no benchmark runs during build phase.
+After build:packages, run node --test --test-timeout=90000 packages/lighting2d/tests/*.test.js. For actual GPU work use node scripts/run-with-timeout.mjs run --max=3 -- node packages/lighting2d/tests/browser-check.mjs, then the same command with --compat after the browser driver. The SDF checks are named SDF in test-results/lighting2d-browser.json. Generated tiny RGBA fixtures have independent distance and analytic opaque-rectangle oracles; no downloads or external art are required. Size measurement uses bundleBytes in scripts/measure-size.js with bare imports external; no benchmark runs during build phase.
 
 
 ### Batch 218 job 1
 
-Build packages, then run `node --test --test-timeout=60000 packages/transitions/test/*.test.js`. Run `node scripts/gpu-lock.mjs run --owner=codex-batch218 --max=5 --wait-max=60 -- node packages/transitions/scripts/test-gpu.mjs`, then the same command with `--compat` after the test script. The full-live fixture checks eight modes over two sample counts with independently computed pixel expectations.
-Batch 213 job 3: build packages, run packages/rigging/tests/vrm-constraints.test.js and packages/gltf-pro/tests/vrm-constraints-data.test.js with node --test --test-timeout=60000, then run packages/rigging/tests/vrm-constraints.browser.mjs under the shared GPU lock, once native and once with --compat. Both real avatars run each time. Numeric public-runtime inputs and outputs are in results/batch213-constraint-public-values.json; the independent reference ran only in external engine-bench. Research and API details are in ../rigging-vrm-constraints.md.
+Build packages, then run `node --test --test-timeout=60000 packages/transitions/test/*.test.js`. Run `node scripts/run-with-timeout.mjs run --max=5 -- node packages/transitions/scripts/test-gpu.mjs`, then the same command with `--compat` after the test script. The full-live fixture checks eight modes over two sample counts with independently computed pixel expectations.
+Batch 213 job 3: build packages, run packages/rigging/tests/vrm-constraints.test.js and packages/gltf/test/vrm-constraints-data.test.js with node --test --test-timeout=60000, then run packages/rigging/tests/vrm-constraints.browser.mjs, once native and once with --compat. Both real avatars run each time. Numeric public-runtime inputs and outputs are in results/batch213-constraint-public-values.json; the independent reference ran only in external engine-bench. Research and API details are in ../rigging-vrm-constraints.md.
 ### Cluster LOD and imposter readback (batch 222)
-After building packages, run `node --test --test-timeout=120000 packages/lod/test/clusters.test.js packages/mesh-edit/tests/simplify.test.js packages/webgl2-compat/test/task-polling.test.js`. Run `node packages/lod/test/clusters-check.mjs` and the same command with `--compat`, under the shared GPU lock. FlightHelmet source/licence: examples/assets/ATTRIBUTION.md. Run the unchanged full picking grid and atlas sweeps using `node packages/lod/test/imposter-check.mjs batch222 --compat`; its existing pixel assertions remain intact. These are correctness checks, with no speed assertion or wall-clock A/B.
+After building packages, run `node --test --test-timeout=120000 packages/lod/test/clusters.test.js packages/mesh-edit/tests/simplify.test.js packages/webgl2-compat/test/task-polling.test.js`. Run `node packages/lod/test/clusters-check.mjs` and the same command with `--compat`. FlightHelmet source/licence: examples/assets/ATTRIBUTION.md. Run the unchanged full picking grid and atlas sweeps using `node packages/lod/test/imposter-check.mjs batch222 --compat`; its existing pixel assertions remain intact. These are correctness checks, with no speed assertion or wall-clock A/B.
 
 
 
-Batch 216 physical lens: after build:packages, run node --test packages/cinematic/test/physical-lens.test.js; run node packages/cinematic/test/physical-lens-browser.mjs and the same with --compat under the shared GPU lock. It checks numerical FOV and rendered f/1 versus f/16 blur; the fixture disposes its engine. No external asset or benchmark required.
+Batch 216 physical lens: after build:packages, run node --test packages/cinematic/test/physical-lens.test.js; run node packages/cinematic/test/physical-lens-browser.mjs and the same with --compat. It checks numerical FOV and rendered f/1 versus f/16 blur; the fixture disposes its engine. No external asset or benchmark required.
 
 
 
 ## Batch 207 job 4
-Build packages, then node --test --test-timeout=120000 packages/blender/tests/nodes.test.js. Regenerate the own CC0 fixture/oracle: C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_nodes.py -- packages/blender/tests/fixtures. The script exports with live_nodes=True and bake_size at its default (asserting no images created), bakes a separate Cycles emission oracle and rejects an unsupported reachable node by name. Run node scripts/gpu-lock.mjs run --owner=codex-batch207 --max=2 --wait-max=60 -- node packages/blender/tests/nodes-browser.mjs and repeat with --compat. No timing assertion or exclusive GPU hold.
+Build packages, then node --test --test-timeout=120000 packages/blender/tests/nodes.test.js. Regenerate the own CC0 fixture/oracle: C:/blender/blender.exe --background --factory-startup --python-exit-code 1 --python tools/blender-addon/tests/blender_nodes.py -- packages/blender/tests/fixtures. The script exports with live_nodes=True and bake_size at its default (asserting no images created), bakes a separate Cycles emission oracle and rejects an unsupported reachable node by name. Run node scripts/run-with-timeout.mjs run --max=2 -- node packages/blender/tests/nodes-browser.mjs and repeat with --compat. No timing assertion or run with the GPU to itself.
 
 ### Batch 261 elbow routing
-After build, run node --test --test-timeout=120000 packages/labels/tests/callouts-route.test.js for pure planar matching, independent exact reference predicates, box placement, removal and unchanged-frame caching. Run node scripts/gpu-lock.mjs run --owner=labels-routes --wait-max=60 --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for actual SVG endpoint-to-label checks within 1 px on native WebGPU/WebGL2. Synthetic numeric fixtures are correctness controls, not an asset-backed demo.
+After build, run node --test --test-timeout=120000 packages/labels/tests/callouts-route.test.js for pure planar matching, independent exact reference predicates, box placement, removal and unchanged-frame caching. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/labels/scripts/test-browser.js --dom-only for actual SVG endpoint-to-label checks within 1 px on native WebGPU/WebGL2. Synthetic numeric fixtures are correctness controls, not an asset-backed demo.
 
 ### Immediate debug and arc correctness (batch 227 job 3)
-After building, run node --test --test-timeout=120000 packages/lines/tests/debug.test.js. Under a shared GPU lock run node packages/lines/scripts/test-browser.js and then the same command with --compat. The debug check verifies one-frame pixels, zero-delta clearing, depthTest behavior, pick-safe queues, immediate/persistent arc apex pixels, persistent picking, multi-view retention and restoration. CPU checks include buffer reuse, style draw counts, queue overflow, tilted/vertical planar arcs, spherical radii, coincident directions and exact/near antipodes. Fixtures are authored synthetic correctness data, with no downloaded demo assets.
+After building, run node --test --test-timeout=120000 packages/lines/tests/debug.test.js. Run node packages/lines/scripts/test-browser.js and then the same command with --compat. The debug check verifies one-frame pixels, zero-delta clearing, depthTest behavior, pick-safe queues, immediate/persistent arc apex pixels, persistent picking, multi-view retention and restoration. CPU checks include buffer reuse, style draw counts, queue overflow, tilted/vertical planar arcs, spherical radii, coincident directions and exact/near antipodes. Fixtures are authored synthetic correctness data, with no downloaded demo assets.
 
 ### Batch 238 formats
-Build packages, then node --test --test-timeout=120000 packages/splats/test/formats.test.js. The KSplat fixture source and exact regeneration arguments are in packages/splats/test/fixtures/NOTICE.md; rivals run in their external benchmark folder only. GPU: use gpu-lock run --owner=codex-batch238 --gpu=splats-format-render --max=2 --wait-max=60 -- node packages/splats/test/gpu/formats-check.mjs, normally and with --compat. All four render inputs derive from the existing MIT raccoon capture. No timed suite.
+Build packages, then node --test --test-timeout=120000 packages/splats/test/formats.test.js. The KSplat fixture source and exact regeneration arguments are in packages/splats/test/fixtures/NOTICE.md; rivals run in their external benchmark folder only. GPU: use node scripts/run-with-timeout.mjs run --max=2 -- node packages/splats/test/gpu/formats-check.mjs, normally and with --compat. All four render inputs derive from the existing MIT raccoon capture. No timed suite.
 
 
 ### Batch 218 job 2
@@ -3392,154 +3375,154 @@ Build packages, then node --test --test-timeout=120000 packages/splats/test/form
 The transitions package GPU command documented for job 1 now also runs presets-browser.js: 27,648 gradient pixel comparisons cover eight treatments, four directions, three progress values and both sample counts per backend. CPU: node --test --test-timeout=60000 packages/transitions/test/*.test.js. No benchmarks or timing assertions are part of this evidence.
 
 ### Batch 229 vector overlays
-Build with npm run build:packages. Run node --test --test-timeout=300000 packages/terrain/test/overlays.test.js and the terrain package CPU suite. Render with node scripts/gpu-lock.mjs run --owner=overlays-repro --wait-max=60 --max=4 -- node packages/terrain/test/overlays.browser.mjs; append --compat to repeat on the compatibility layer. test-results/terrain-overlays.json contains coverage probes, exact baseline/restored values, display references and bake work counts. The package test:gpu script includes both imagery and overlay regressions; run it separately on each backend in a shared slot. No wall-clock benchmark, full verify or README gate is used.
+Build with npm run build:packages. Run node --test --test-timeout=300000 packages/terrain/test/overlays.test.js and the terrain package CPU suite. Render with node scripts/run-with-timeout.mjs run --max=4 -- node packages/terrain/test/overlays.browser.mjs; append --compat to repeat on the compatibility layer. test-results/terrain-overlays.json contains coverage probes, exact baseline/restored values, display references and bake work counts. The package test:gpu script includes both imagery and overlay regressions; run it separately on each backend. No wall-clock benchmark, full verify or README gate is used.
 ### Batch 247 job 2
-Use the lighting2d CPU and shared-lock native/--compat browser commands listed for job 1. GI history checks appear as GI temporal, GI resetHistory, GI painted diffuse order and invalidation checks in test-results/lighting2d-browser.json. The test wraps only its own GPU allocations with COPY_SRC to observe cached intervals, then forces fresh computation for comparison. Painted-reflection oracles are independent analytic boundary segments of a generated seven-pixel U-shaped enclosure, not rival source or imported assets. Existing opaque-energy, wall and finite-order fixtures retain their bounds. No speed suite is run during the build phase.
+Use the lighting2d CPU and native/--compat browser commands listed for job 1. GI history checks appear as GI temporal, GI resetHistory, GI painted diffuse order and invalidation checks in test-results/lighting2d-browser.json. The test wraps only its own GPU allocations with COPY_SRC to observe cached intervals, then forces fresh computation for comparison. Painted-reflection oracles are independent analytic boundary segments of a generated seven-pixel U-shaped enclosure, not rival source or imported assets. Existing opaque-energy, wall and finite-order fixtures retain their bounds. No speed suite is run during the build phase.
 
-Batch 216 orthographic: after build:packages, run node --test packages/cinematic/test/ortho.test.js; run node packages/cinematic/test/ortho-browser.mjs under the shared GPU lock, then with --compat. The diagnostic checks the subject at quarter-width/three-quarter-height before and after a depth move, interpolated world height 15 between 10 and 20, and a two-sphere group at height 5.625. No external data or timing run.
+Batch 216 orthographic: after build:packages, run node --test packages/cinematic/test/ortho.test.js; run node packages/cinematic/test/ortho-browser.mjs, then with --compat. The diagnostic checks the subject at quarter-width/three-quarter-height before and after a depth move, interpolated world height 15 between 10 and 20, and a two-sphere group at height 5.625. No external data or timing run.
 ### Batch 266 effect helpers
-After build:packages, run node --experimental-test-module-mocks --test --test-timeout=60000 packages/react/tests/effects-extra.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch266 --wait-max=60 --max=3 -- node packages/react/scripts/test-effects-extra-browser.mjs, then repeat with --compat appended. All five native pixel oracles must be exact.
+After build:packages, run node --experimental-test-module-mocks --test --test-timeout=60000 packages/react/tests/effects-extra.test.js. GPU: node scripts/run-with-timeout.mjs run --max=3 -- node packages/react/scripts/test-effects-extra-browser.mjs, then repeat with --compat appended. All five native pixel oracles must be exact.
 
 ## Batch 212 job 1: stereo controls
-Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch212 --wait-max=60 --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
+Build mixer, then node --test --test-timeout=120000 packages/mixer/tests/stereo.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/mixer/scripts/test-browser.js. The report lists stereo checks for both backends.
 
 
 
 ### Batch 217 job 1: graph authoring
 
-Build packages, then run node --test --test-timeout=120000 packages/cutscene/tests/curve-editor.test.js. For actual mouse/keyboard interactions run node scripts/gpu-lock.mjs run --owner=cutscene-curve --wait-max=60 --max=2 -- node packages/cutscene/tests/curve-browser.mjs. The cutscene package test:gpu also runs this suite; MARGO_COMPAT=1 selects the compatibility backend for rendering suites. No timing assertion or benchmark is used.
+Build packages, then run node --test --test-timeout=120000 packages/cutscene/tests/curve-editor.test.js. For actual mouse/keyboard interactions run node scripts/run-with-timeout.mjs run --max=2 -- node packages/cutscene/tests/curve-browser.mjs. The cutscene package test:gpu also runs this suite; MARGO_COMPAT=1 selects the compatibility backend for rendering suites. No timing assertion or benchmark is used.
 
 ### Batch 200 light glTF scenes
-After npm run build:packages, run npm test --workspace @margoengine/gltf. The two meshless tests in packages/gltf/test/scene-data.test.js fail with the old no-renderable guard and pass with sceneExtras opting into allowEmptyScene. They create JSON and a JSON-only GLB locally and verify every loader and rollback with a headless engine. For the existing texture path run node scripts/gpu-lock.mjs run --owner=codex-batch200 --max=4 --wait-max=60 -- node scripts/test-gltf-browser.mjs, then the same command with --compat. Both exercise actual GPU rendering. Size reproduction: import bundleBytes from scripts/measure-size.js, gzipSync each packages/gltf/dist/{index,scene-data,textured}.js bundle; npm run measure:size checks the combined core/stage limit. These are correctness and byte-count checks, not speed benchmarks.
-Batch 248 job 1: build packages, then `node --test --test-timeout=240000 packages/text/tests/fit.test.js`; run `node scripts/gpu-lock.mjs run --owner=codex-batch248 --max=8 --wait-max=60 -- node packages/text/scripts/test-browser.js`, then the same with `--compat` after test-browser.js. Existing Source Sans 3 font data is SIL OFL 1.1 (packages/text/tests/fixtures/fonts/NOTICE.md). No benchmark or timing assertion.
+After npm run build:packages, run npm test --workspace @margoengine/gltf. The two meshless tests in packages/gltf/test/scene-data.test.js fail with the old no-renderable guard and pass with sceneExtras opting into allowEmptyScene. They create JSON and a JSON-only GLB locally and verify every loader and rollback with a headless engine. For the existing texture path run node scripts/run-with-timeout.mjs run --max=4 -- node scripts/test-gltf-browser.mjs, then the same command with --compat. Both exercise actual GPU rendering. Size reproduction: import bundleBytes from scripts/measure-size.js, gzipSync each packages/gltf/dist/{index,scene-data,textured}.js bundle; npm run measure:size checks the combined core/stage limit. These are correctness and byte-count checks, not speed benchmarks.
+Batch 248 job 1: build packages, then `node --test --test-timeout=240000 packages/text/tests/fit.test.js`; run `node scripts/run-with-timeout.mjs run --max=8 -- node packages/text/scripts/test-browser.js`, then the same with `--compat` after test-browser.js. Existing Source Sans 3 font data is SIL OFL 1.1 (packages/text/tests/fixtures/fonts/NOTICE.md). No benchmark or timing assertion.
 ### Batch 231 scatter Hi-Z
-After build:packages, run `node packages/scatter/test/occlusion.browser.mjs` and the same with `--compat`, each in a shared GPU slot. It renders the licensed Utah Teapot geometry behind building/terrain occluders, compares exact pixels against disabled culling, reads colour/shadow indirect counts and exercises camera/projection changes, near-plane, odd sizes, restore and multiple views. CPU: `node --test packages/culling/test/depth.test.js packages/scatter/test/occlusion.test.js`. No timing assertion or benchmark.
+After build:packages, run `node packages/scatter/test/occlusion.browser.mjs` and the same with `--compat`, each. It renders the licensed Utah Teapot geometry behind building/terrain occluders, compares exact pixels against disabled culling, reads colour/shadow indirect counts and exercises camera/projection changes, near-plane, odd sizes, restore and multiple views. CPU: `node --test packages/culling/test/depth.test.js packages/scatter/test/occlusion.test.js`. No timing assertion or benchmark.
 
-Batch 244 camera rig: build packages, run `node --test --test-timeout=60000 packages/pixel/tests/follow.test.js`, then `node scripts/gpu-lock.mjs run --owner=pixel-follow --max=2 --wait-max=60 -- node packages/pixel/tests/follow-check.mjs` and the same command with `--compat` after the script path. Original analytic fixtures need no downloaded data.
+Batch 244 camera rig: build packages, run `node --test --test-timeout=60000 packages/pixel/tests/follow.test.js`, then `node scripts/run-with-timeout.mjs run --max=2 -- node packages/pixel/tests/follow-check.mjs` and the same command with `--compat` after the script path. Original analytic fixtures need no downloaded data.
 
 ## Imported weather (batch 236 job 1)
-After build: `node --test --test-timeout=60000 packages/weather/tests/gltf.test.js`. GPU: `node scripts/gpu-lock.mjs run --owner=weather-proof --wait-max=60 --max=2 -- node packages/weather/tests/parity-browser.mjs gltf`, then the same with `--compat`. Fixture is original procedural test geometry, not an imported third-party demo. The gate requires wetness, puddles, animated rings and snow to change pixels; zero weather and disposal must match the baseline exactly.
+After build: `node --test --test-timeout=60000 packages/weather/tests/gltf.test.js`. GPU: `node scripts/run-with-timeout.mjs run --max=2 -- node packages/weather/tests/parity-browser.mjs gltf`, then the same with `--compat`. Fixture is original procedural test geometry, not an imported third-party demo. The gate requires wetness, puddles, animated rings and snow to change pixels. Zero weather (wetness and snow cover 0) is proved inside the weather program: coverage, rain, puddle size and start, ripple size and strength, ring time, snow depth, variation, drift, colour, roughness and grain each move in turn, and every picture must equal the first zero-weather one bit for bit with no new shader module or pipeline. The plain gltf/pbr picture against the zero-weather one crosses two programs, which WGSL lets round f32 differently (15.7.5; only an `@invariant` position matches across programs, 12.10), so it is printed as `crossProgram` and not compared. Disposal returns to the plain program and must match the baseline bit for bit.
 ## Batch 212 job 2: live meters
-Build packages, run node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js. Run the existing shared GPU-locked mixer/scripts/test-browser.js on both backends; its live-analysis check includes FFT, waveform, audio-clock reports and exact output samples.
+Build packages, run node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js. Run the existing mixer/scripts/test-browser.js on both backends; its live-analysis check includes FFT, waveform, audio-clock reports and exact output samples.
 ### Batch 274 job 1 shape correctness
-After npm run build:packages, run node --test --test-timeout=40000 packages/compute/tests/shape.test.js. Run node scripts/gpu-lock.mjs run --owner=shape-repro --wait-max=60 --max=3 -- node packages/compute/tests/shape-browser.mjs for the same 30 exact cases on native WebGPU and WebGL2 compatibility. Fixtures are explicit standard examples and independent logical-index references. No benchmark or timing-only assertions.
+After npm run build:packages, run node --test --test-timeout=40000 packages/compute/tests/shape.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/compute/tests/shape-browser.mjs for the same 30 exact cases on native WebGPU and WebGL2 compatibility. Fixtures are explicit standard examples and independent logical-index references. No benchmark or timing-only assertions.
 
 Compute landing-gate regressions: node --test --test-timeout=120000 tests/gpu-browser-registration.test.js tests/parallel-check.test.js packages/compute/tests/maths.test.js ; the full compute browser runner also runs with --compat and retains all precise-error, invalid-shader and supported workgroup-size assertions. Unsupported workgroup sizes must reject against the real device limit. Build output must remain stable for a browser run because optional CPU chunks load lazily.
 
 ### Batch 228 job 1
-Build packages, then `node --test packages/points/tests/clip.test.js`. The existing Stanford scan fixture and independent scalar predicates prove profile/box membership. Run `node packages/points/scripts/test-browser.js` and the same command with `--compat`, through the shared GPU lock, for retained/excluded pixel and budget checks. No timing result is claimed.
+Build packages, then `node --test packages/points/tests/clip.test.js`. The existing Stanford scan fixture and independent scalar predicates prove profile/box membership. Run `node packages/points/scripts/test-browser.js` and the same command with `--compat`, for retained/excluded pixel and budget checks. No timing result is claimed.
 
 
 
 ### Batch 217 job 2: viewport keying
 
-After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/viewport.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-viewport --wait-max=60 --max=2 -- node packages/cutscene/tests/viewport-browser.mjs. Repeat with MARGO_COMPAT=1 for the WebGL2 compatibility layer. This proof picks a real mesh, drags all three gizmo modes, verifies authored transform keys, replaces at one time and disposes the tool.
+After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/viewport.test.js. Run node scripts/run-with-timeout.mjs run --max=2 -- node packages/cutscene/tests/viewport-browser.mjs. Repeat with MARGO_COMPAT=1 for the WebGL2 compatibility layer. This proof picks a real mesh, drags all three gizmo modes, verifies authored transform keys, replaces at one time and disposes the tool.
 ### MSFT material LOD (batch 222 job 2)
-After build:packages, run `node --test --test-timeout=120000 packages/lod/test/msft.test.js`. Under the shared GPU lock run `node packages/lod/test/msft-check.mjs`, then with `--compat`. FlightHelmet must switch six primitives from level 0 to 2, change red to blue, retain vertex buffers, prepare lower-level UV2 and restore material objects. Source/licence: examples/assets/ATTRIBUTION.md.
-- Batch 213 VRMA: build packages, then `node --test --test-timeout=60000 packages/rigging/tests/vrma.test.js`. Under one shared GPU slot run `node packages/rigging/tests/vrma.browser.mjs`, then the same command with `--compat`. Outputs are in `test-results/vrma/`; both real avatars must change and restore exactly. No timing assertions.
+After build:packages, run `node --test --test-timeout=120000 packages/lod/test/msft.test.js`. Run `node packages/lod/test/msft-check.mjs`, then with `--compat`. FlightHelmet must switch six primitives from level 0 to 2, change red to blue, retain vertex buffers, prepare lower-level UV2 and restore material objects. Source/licence: examples/assets/ATTRIBUTION.md.
+- Batch 213 VRMA: build packages, then `node --test --test-timeout=60000 packages/rigging/tests/vrma.test.js`. Run `node packages/rigging/tests/vrma.browser.mjs`, then the same command with `--compat`. Outputs are in `test-results/vrma/`; both real avatars must change and restore exactly. No timing assertions.
 Batch 248 job 2: `node --test --test-timeout=240000 packages/text/tests/selection.test.js`; existing text browser commands in job 1 cover real-font measurements on native and full compatibility backends. No timing proof required.
 
-Batch 244 xBR-style modes: after building packages, run `node --test --test-timeout=60000 packages/pixel/tests/xbr.test.js`, then `node scripts/gpu-lock.mjs run --owner=pixel-scale --max=2 --wait-max=60 -- node packages/pixel/tests/scale-check.mjs` and repeat with `--compat`. The original diagonal, colored-block and half-alpha fixture is reused, with integer 3x/4x, noninteger, stretch and below-room cases. All output pixels are checked; smoothing may differ from other xBR variants.
+Batch 244 xBR-style modes: after building packages, run `node --test --test-timeout=60000 packages/pixel/tests/xbr.test.js`, then `node scripts/run-with-timeout.mjs run --max=2 -- node packages/pixel/tests/scale-check.mjs` and repeat with `--compat`. The original diagonal, colored-block and half-alpha fixture is reused, with integer 3x/4x, noninteger, stretch and below-room cases. All output pixels are checked; smoothing may differ from other xBR variants.
 
 ### Batch 196 panorama
 
-Build packages, run node --test packages/cameras/test/*.test.js, then under the shared GPU lock run node packages/cameras/test/panorama-browser.mjs and the same command with --compat. The analytic primary-colour scene verifies full-sphere orientation, unaligned output rows, PNG dimensions, exact HDR/sRGB, abort and camera/canvas preservation. Existing cameras/test/browser-check.mjs also runs on both backends. No benchmark is required during build phase.
+Build packages, run node --test packages/cameras/test/*.test.js, then run node packages/cameras/test/panorama-browser.mjs and the same command with --compat. The analytic primary-colour scene verifies full-sphere orientation, unaligned output rows, PNG dimensions, exact HDR/sRGB, abort and camera/canvas preservation. Existing cameras/test/browser-check.mjs also runs on both backends. No benchmark is required during build phase.
 
 ### Batch 231 instance attributes
-After build:packages run `node --test packages/scatter/test/attributes.test.js`, then in separate shared GPU runs `node packages/scatter/test/attributes.browser.mjs` and the same with `--compat`. The GPU matrix covers default colour, custom tint/translation, live edits, device restoration, multiple batches and 1x/4x MSAA against independent instances. Existing edges.browser.mjs covers the default fixed-instance renderer. No wall-clock assertion is used.
+After build:packages run `node --test packages/scatter/test/attributes.test.js`, then in separate runs `node packages/scatter/test/attributes.browser.mjs` and the same with `--compat`. The GPU matrix covers default colour, custom tint/translation, live edits, device restoration, multiple batches and 1x/4x MSAA against independent instances. Existing edges.browser.mjs covers the default fixed-instance renderer. No wall-clock assertion is used.
 ### Batch 206 PreviewSurface
-Build packages, then node --test packages/usdz/tests/preview-surface.test.js packages/gltf-pro/tests/upload-image.test.js. Run scripts/modern-usdz-tests.js under the shared GPU lock, then --compat. The original generated PNG/USDZ fixture in packages/usdz/tests/preview-fixture.js checks 128/255 channel opacity, independent UV1, numeric storage interpolation, identical direct/worker renders and lifetime. gltf-pro texture checks run via scripts/gltf-texture-tests.js on both backends. No external demo asset.
+Build packages, then node --test packages/usdz/tests/preview-surface.test.js packages/gltf/test/upload-image.test.js. Run scripts/modern-usdz-tests.js, then --compat. The original generated PNG/USDZ fixture in packages/usdz/tests/preview-fixture.js checks 128/255 channel opacity, independent UV1, numeric storage interpolation, identical direct/worker renders and lifetime. gltf/pbr texture checks run via scripts/gltf-texture-tests.js on both backends. No external demo asset.
 
 Job 0 conflict-marker reproduction: `node --test --test-timeout=120000 tests/hygiene-conflict-markers.test.js`, then `npm run hygiene`. The regression builds a worktree-local Git fixture containing tracked markers, safe near-matches, binary and LFS content; removing the scanner or hygiene invocation makes it fail. No GPU is used.
-Batch 248 job 3: `node --test --test-timeout=120000 packages/text/tests/msdf.test.js`; run the existing text browser suite under the shared GPU lock, once natively and once with --compat. The center of the RGB interpolation diagnostic must be white, while both exterior probes stay dark. No performance benchmark.
+Batch 248 job 3: `node --test --test-timeout=120000 packages/text/tests/msdf.test.js`; run the existing text browser suite, once natively and once with --compat. The center of the RGB interpolation diagnostic must be white, while both exterior probes stay dark. No performance benchmark.
 ## Batch 212 job 3: modulation and colour
-Build packages; node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js tests/umbrella.test.js. Run the shared GPU-locked mixer/scripts/test-browser.js as in job 1. Its JSON-effects check renders every algorithm and all native oversampling choices on both backends.
+Build packages; node --test --test-timeout=120000 packages/mixer/tests/*.test.js packages/audio/tests/*.test.js tests/umbrella.test.js. Run the mixer/scripts/test-browser.js as in job 1. Its JSON-effects check renders every algorithm and all native oversampling choices on both backends.
 
 
 ### Batch 218 job 3
 
-Use the transitions CPU and locked GPU commands recorded above. glsl-browser.js runs 23 original fixtures over three progress values on 16 by 16 gradients: 17664 pixel comparisons per backend against a separate native GLSL compiler. The same fixtures also compile and render via both frozen and live factory APIs. No downloaded shader library is part of this test or package.
+Use the transitions CPU and GPU commands recorded above. glsl-browser.js runs 23 original fixtures over three progress values on 16 by 16 gradients: 17664 pixel comparisons per backend against a separate native GLSL compiler. The same fixtures also compile and render via both frozen and live factory APIs. No downloaded shader library is part of this test or package.
 
-Batch 244 composite look: build packages and run `node --test --test-timeout=60000 packages/pixel/tests/crt.test.js`; then `node scripts/gpu-lock.mjs run --owner=pixel-crt --max=2 --wait-max=60 -- node packages/pixel/tests/crt-check.mjs` and the same with `--compat`. All 23 cases compare readback to the float64 tube oracle plus an independently inverted SMPTE matrix and normalized chroma kernels in crt-signal-reference.js. The original 7x5 colored diagnostic includes a half-alpha sample; default/all-off exact-boundary sweeps remain enabled.
+Batch 244 composite look: build packages and run `node --test --test-timeout=60000 packages/pixel/tests/crt.test.js`; then `node scripts/run-with-timeout.mjs run --max=2 -- node packages/pixel/tests/crt-check.mjs` and the same with `--compat`. All 23 cases compare readback to the float64 tube oracle plus an independently inverted SMPTE matrix and normalized chroma kernels in crt-signal-reference.js. The original 7x5 colored diagnostic includes a half-alpha sample; default/all-off exact-boundary sweeps remain enabled.
 
 
 
 ### Batch 238 streamed SOG
-Build packages; node --test --test-timeout=120000 packages/splats/test/lod-sog.test.js. Fixtures derive from existing MIT raccoon.sog and Margo's own WebP encoder. GPU under shared lock: node scripts/gpu-lock.mjs run --owner=codex-batch238 --gpu=splats-lod-sog --max=3 --wait-max=60 -- node packages/splats/test/gpu/lod-sog-check.mjs, then with --compat. Full changed-package suite: packages/splats/test/gpu/check.mjs on both backends. No benchmarks.
+Build packages; node --test --test-timeout=120000 packages/splats/test/lod-sog.test.js. Fixtures derive from existing MIT raccoon.sog and Margo's own WebP encoder. GPU: node scripts/run-with-timeout.mjs run --max=3 -- node packages/splats/test/gpu/lod-sog-check.mjs, then with --compat. Full changed-package suite: packages/splats/test/gpu/check.mjs on both backends. No benchmarks.
 
 ### Batch 196 stereo
 
-Build packages, run node --test packages/cameras/test/*.test.js, then under a shared GPU lock run node packages/cameras/test/stereo-browser.mjs and the same command with --compat. stereo-check.html is the analytic fixture. It checks all four layouts against separately rendered eye images at constant-colour interior pixels, including a CPU Dubois reference, both swaps, row/column phase, one plugin update, resize and device restoration.
+Build packages, run node --test packages/cameras/test/*.test.js, then run node packages/cameras/test/stereo-browser.mjs and the same command with --compat. stereo-check.html is the analytic fixture. It checks all four layouts against separately rendered eye images at constant-colour interior pixels, including a CPU Dubois reference, both swaps, row/column phase, one plugin update, resize and device restoration.
 
-Batch 248 job 4: `node --test --test-timeout=120000 packages/text/tests/curve.test.js`; run the text browser suite under the shared GPU lock on native and --compat. It compares flat and cylindrical pixel fields and checks a sinusoidal baseline with analytic tangent/normal frames. No elapsed-time assertion.
+Batch 248 job 4: `node --test --test-timeout=120000 packages/text/tests/curve.test.js`; run the text browser suite on native and --compat. It compares flat and cylindrical pixel fields and checks a sinusoidal baseline with analytic tangent/normal frames. No elapsed-time assertion.
 ## Batch 212 job 4: extended dynamics
-Build packages, run node --test --test-timeout=120000 packages/mixer/tests/dynamics.test.js; the normal changed-package/dependent CPU test scope also runs it. Use the existing shared GPU-locked mixer browser runner for both backends; its extended-dynamics check renders all three factories.
+Build packages, run node --test --test-timeout=120000 packages/mixer/tests/dynamics.test.js; the normal changed-package/dependent CPU test scope also runs it. Use the existing mixer browser runner for both backends; its extended-dynamics check renders all three factories.
 ## Batch 173 transfer classification
-After building packages: `node --test --test-timeout=120000 packages/sciviz/tests/transfer.test.js`. Render correctness: `node scripts/gpu-lock.mjs run --owner=transfer-review --wait-max=60 --max=7 -- node packages/sciviz/tests/transfer-browser.mjs`. It runs both GPU backends and writes test-results/batch173-transfer.json. Open examples/sciviz-transfer.html with dev:examples to inspect the 1D pre-integrated view and live value/gradient histogram/editor. The source record is examples/assets/sciviz/clip/source.json; all original attribution and hashes are reused. No speed benchmark is required or claimed.
+After building packages: `node --test --test-timeout=120000 packages/sciviz/tests/transfer.test.js`. Render correctness: `node scripts/run-with-timeout.mjs run --max=7 -- node packages/sciviz/tests/transfer-browser.mjs`. It runs both GPU backends and writes test-results/batch173-transfer.json. Open examples/sciviz-transfer.html with dev:examples to inspect the 1D pre-integrated view and live value/gradient histogram/editor. The source record is examples/assets/sciviz/clip/source.json; all original attribution and hashes are reused. No speed benchmark is required or claimed.
 
 
 
 ### Batch 243 traced extension lobes
-Build voxel-pathtracer and gltf-pro, run node --test packages/voxel-pathtracer/tests/mesh-pbr-lobes.test.js and npm test --workspace=@margoengine/gltf-pro. Under a named shared GPU lease, run node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs for both backend variants. It compares independently decoded extension factors, coat emission attenuation and a real Box glTF snapshot, writing test-results/voxel-pathtracer-mesh-pbr-lobes.json. Console create/ready/image phase records localize any readiness or render deadline failure. The thin-film random reference comparison remains packages/gltf-pro/tests/thin-film.test.js; its shader text is shared unchanged.
+Build voxel-pathtracer and gltf/pbr, run node --test packages/voxel-pathtracer/tests/mesh-pbr-lobes.test.js and npm test --workspace=@margoengine/gltf. Run node packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs for both backend variants. It compares independently decoded extension factors, coat emission attenuation and a real Box glTF snapshot, writing test-results/voxel-pathtracer-mesh-pbr-lobes.json. Console create/ready/image phase records localize any readiness or render deadline failure. The thin-film random reference comparison remains packages/gltf/test/thin-film.test.js; its shader text is shared unchanged.
 
-Batch 243 final regression: run cargo test --manifest-path packages/voxel-pathtracer/mesh-kernel/Cargo.toml, npm run build:mesh --workspace=@margoengine/voxel-pathtracer, then build:packages. CPU: mesh-pbr-lobes.test.js, mesh-lights.test.js and materials/tests/thin-film.test.js, plus changed/dependent package CPU suites. The final native/compatibility GPU leaves are mesh-browser.mjs, mesh-instances-browser.mjs, mesh-attributes-browser.mjs, mesh-pbr-browser.mjs, mesh-pbr-lobes-browser.mjs and mesh-lights-browser.mjs, each in packages/voxel-pathtracer/tests and admitted under a named shared GPU lease. No dependent GPU suite gates this push. To reproduce the unresolved extra cold-cache diagnostic, add --disable-gpu-shader-disk-cache to the compatibility Chromium launch arguments and retain the original image signal; do not alter canonical defaults or bounds. The receipt distinguishes canonical success from this defect.
+Batch 243 final regression: run cargo test --manifest-path packages/voxel-pathtracer/mesh-kernel/Cargo.toml, npm run build:mesh --workspace=@margoengine/voxel-pathtracer, then build:packages. CPU: mesh-pbr-lobes.test.js, mesh-lights.test.js and materials/tests/thin-film.test.js, plus changed/dependent package CPU suites. The final native/compatibility GPU leaves are mesh-browser.mjs, mesh-instances-browser.mjs, mesh-attributes-browser.mjs, mesh-pbr-browser.mjs, mesh-pbr-lobes-browser.mjs and mesh-lights-browser.mjs, each in packages/voxel-pathtracer/tests and admitted. No dependent GPU suite gates this push. To reproduce the unresolved extra cold-cache diagnostic, add --disable-gpu-shader-disk-cache to the compatibility Chromium launch arguments and retain the original image signal; do not alter canonical defaults or bounds. The receipt distinguishes canonical success from this defect.
 
 
 ## Lens drops (batch 236 job 3)
-Build packages. CPU: node --test --test-timeout=60000 packages/weather/tests/lens.test.js. GPU: node scripts/gpu-lock.mjs run --owner=weather-lens-proof --wait-max=60 --max=2 -- node packages/weather/tests/parity-browser.mjs lens, then the same command with --compat. The original checkerboard scene is captured by PostStack; a probe reads the HDR result after LensDrops. Both the procedural field and image behavior are checked. No third-party fixture or benchmark is needed.
+Build packages. CPU: node --test --test-timeout=60000 packages/weather/tests/lens.test.js. GPU: node scripts/run-with-timeout.mjs run --max=2 -- node packages/weather/tests/parity-browser.mjs lens, then the same command with --compat. The original checkerboard scene is captured by PostStack; a probe reads the HDR result after LensDrops. Both the procedural field and image behavior are checked. No third-party fixture or benchmark is needed.
 ## Batch 212 job 5: time-domain pitch shift
-Build packages, run node --test --test-timeout=120000 packages/mixer/tests/pitch.test.js; changed-package/dependent CPU scope includes all mixer/audio tests and umbrella tests. Run the existing shared GPU-locked mixer/scripts/test-browser.js. Its final check measures pitch ratio and constant duration, exact unison samples, linked stereo and changes at audio time 0.5 s on both backends.
+Build packages, run node --test --test-timeout=120000 packages/mixer/tests/pitch.test.js; changed-package/dependent CPU scope includes all mixer/audio tests and umbrella tests. Run the existing mixer/scripts/test-browser.js. Its final check measures pitch ratio and constant duration, exact unison samples, linked stereo and changes at audio time 0.5 s on both backends.
 
 
 ### Voxel generation (batch 241 job 1)
-After building packages, run `node --test --test-timeout=120000 packages/voxel-edit/tests/generate.test.js`; native font proof: `node packages/voxel-edit/tests/generate-browser-check.mjs`. Package GPU correctness uses `node scripts/gpu-lock.mjs run --owner=codex-batch241 --wait-max=60 --max=5 -- npm run test:gpu --workspace=@margoengine/voxel-edit`, then the same command with MARGO_COMPAT=1. No benchmark is required. No external fixture download.
+After building packages, run `node --test --test-timeout=120000 packages/voxel-edit/tests/generate.test.js`; native font proof: `node packages/voxel-edit/tests/generate-browser-check.mjs`. Package GPU correctness uses `node scripts/run-with-timeout.mjs run --max=5 -- npm run test:gpu --workspace=@margoengine/voxel-edit`, then the same command with MARGO_COMPAT=1. No benchmark is required. No external fixture download.
 
 
 ### Batch 266 job 3: React component and offscreen proof
 
-After build:packages, run node --test --test-timeout=30000 packages/react/tests/test-renderer.test.js packages/react/tests/offscreen.test.js. For rendering, run node scripts/gpu-lock.mjs run --owner=react-test-offscreen --wait-max=60 --max=3 -- node packages/react/scripts/test-test-offscreen-browser.mjs, and again with --compat on the browser script. The generated cube is a mathematical control; no imported demo asset. Both paths use margoLow=1, 128 by 128 backing pixels and the same camera/material. The fixture asserts exact pixels, scene/frame/click counts, all thread selection paths, React page state and cleanup, with bounded waits and no timing or speed assertion.
+After build:packages, run node --test --test-timeout=30000 packages/react/tests/test-renderer.test.js packages/react/tests/offscreen.test.js. For rendering, run node scripts/run-with-timeout.mjs run --max=3 -- node packages/react/scripts/test-test-offscreen-browser.mjs, and again with --compat on the browser script. The generated cube is a mathematical control; no imported demo asset. Both paths use margoLow=1, 128 by 128 backing pixels and the same camera/material. The fixture asserts exact pixels, scene/frame/click counts, all thread selection paths, React page state and cleanup, with bounded waits and no timing or speed assertion.
 
 ### Batch 214 chain correctness
-After build:packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/chain.test.js tests/modern-animator-fbik.test.js. Both CCD and FABRIK must find clear length-preserving N-link poses; independent per-link volume readings verify acceptance. The full-body tests place an obstacle at a solved elbow, solve again and check both links, then reject a late limb and compare all joints with the original frame. Existing GPU scripts for the changed animator and kinematics-constraints packages run under the shared GPU lock.
+After build:packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/chain.test.js tests/modern-animator-fbik.test.js. Both CCD and FABRIK must find clear length-preserving N-link poses; independent per-link volume readings verify acceptance. The full-body tests place an obstacle at a solved elbow, solve again and check both links, then reject a late limb and compare all joints with the original frame. Existing GPU scripts for the changed animator and kinematics-constraints packages run.
 
 ### Batch 238 modifiers
-Build packages, then node --test --test-timeout=120000 packages/splats/test/modify.test.js. Shared GPU gate: node scripts/gpu-lock.mjs run --owner=codex-batch238 --gpu=splats --max=2 --wait-max=60 -- node packages/splats/test/gpu/check.mjs, normally and with --compat. The full suite includes modify-check.mjs and the earlier streamed-SOG checks. A focused diagnostic can run modify-check.mjs with the same shared lock. CPU tests for dependents run only after api:update, which can rebuild dependent dist trees; overlapping them produces transient missing chunks rather than a source defect. No benchmarks or paired timings.
+Build packages, then node --test --test-timeout=120000 packages/splats/test/modify.test.js. GPU gate: node scripts/run-with-timeout.mjs run --max=2 -- node packages/splats/test/gpu/check.mjs, normally and with --compat. The full suite includes modify-check.mjs and the earlier streamed-SOG checks. A focused diagnostic can run modify-check.mjs. CPU tests for dependents run only after api:update, which can rebuild dependent dist trees; overlapping them produces transient missing chunks rather than a source defect. No benchmarks or paired timings.
 
 
 ### Batch 217 job 4: nested authoring
 
-After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/nested-editor.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-nested --wait-max=60 --max=2 -- node packages/cutscene/tests/nested-browser.mjs, and repeat with MARGO_COMPAT=1 for compatibility browser behavior. The package test:gpu includes this proof and existing render/editor suites. No benchmark, timing assertion, README check or example execution is required during build phase.
+After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/nested-editor.test.js. Run node scripts/run-with-timeout.mjs run --max=2 -- node packages/cutscene/tests/nested-browser.mjs, and repeat with MARGO_COMPAT=1 for compatibility browser behavior. The package test:gpu includes this proof and existing render/editor suites. No benchmark, timing assertion, README check or example execution is required during build phase.
 
 ### Screen-space voxel selections (batch 241 job 2)
-Build packages, then `node --test --test-timeout=120000 packages/voxel-edit/tests/select.test.js`. These independent grid/camera oracles are deterministic and need no external assets or GPU. Changed-package GPU suites run under the shared lock with MARGO_COMPAT=0 and 1; no dependent GPU suite or timing benchmark is part of this job.
+Build packages, then `node --test --test-timeout=120000 packages/voxel-edit/tests/select.test.js`. These independent grid/camera oracles are deterministic and need no external assets or GPU. Changed-package GPU suites run with MARGO_COMPAT=0 and 1; no dependent GPU suite or timing benchmark is part of this job.
 
-Batch 248 job 5: run `node --test --test-timeout=240000 packages/text/tests/extrude*.test.js` after the package build. The committed oracle JSON is generated by `generate-variable-reference.py` and `generate-shaping-reference.py` in packages/text/tests using FontTools 4.68 and uharfbuzz installed outside the shipped package. No oracle dependency is needed to run the frozen tests. Font hashes, source URLs and OFL licences live beside the fixtures. The existing shared-lock text browser commands cover shaped CFF2 rendering on native and --compat. No speed suite or timing assertion.
+Batch 248 job 5: run `node --test --test-timeout=240000 packages/text/tests/extrude*.test.js` after the package build. The committed oracle JSON is generated by `generate-variable-reference.py` and `generate-shaping-reference.py` in packages/text/tests using FontTools 4.68 and uharfbuzz installed outside the shipped package. No oracle dependency is needed to run the frozen tests. Font hashes, source URLs and OFL licences live beside the fixtures. The existing text browser commands cover shaped CFF2 rendering on native and --compat. No speed suite or timing assertion.
 ### Batch 240 job 1
 
-After npm run build:packages, run node --test --test-timeout=120000 packages/voxel/tests/models.test.js. For rendered proof, run node scripts/gpu-lock.mjs run --owner=codex-batch240 --max=3 --wait-max=60 -- node packages/voxel/tests/models-browser-check.mjs, then the same command with --compat after the script path. The original test geometry is a unit panel: compare red coverage before/after rotation, exact restoration after reload, zero coverage after removal/disposal, and empty GPU/page error arrays. Tests use mathematical fixtures and contain no third-party art or code.
-- Batch 213 pose tracking: build packages, run `node --test --test-timeout=60000 packages/rigging/tests/pose-tracking.test.js`; under one shared GPU slot run `node packages/rigging/tests/pose-tracking.browser.mjs`, then with `--compat`. Both standard licensed VRM files must have 50 solved outputs, nonzero changed pixels, zero neutral/restoration difference and no GPU validation errors. Public comparison uses opaque Kalidokit 1.1.5 UMD at https://unpkg.com/kalidokit@1.1.5/dist/kalidokit.umd.js in external engine-bench; analytic inputs are `bodyPoints` and `handPoints`, curl offsets 0, 0.025 and 0.05. No speed tests.
+After npm run build:packages, run node --test --test-timeout=120000 packages/voxel/tests/models.test.js. For rendered proof, run node scripts/run-with-timeout.mjs run --max=3 -- node packages/voxel/tests/models-browser-check.mjs, then the same command with --compat after the script path. The original test geometry is a unit panel: compare red coverage before/after rotation, exact restoration after reload, zero coverage after removal/disposal, and empty GPU/page error arrays. Tests use mathematical fixtures and contain no third-party art or code.
+- Batch 213 pose tracking: build packages, run `node --test --test-timeout=60000 packages/rigging/tests/pose-tracking.test.js`; run `node packages/rigging/tests/pose-tracking.browser.mjs`, then with `--compat`. Both standard licensed VRM files must have 50 solved outputs, nonzero changed pixels, zero neutral/restoration difference and no GPU validation errors. Public comparison uses opaque Kalidokit 1.1.5 UMD at https://unpkg.com/kalidokit@1.1.5/dist/kalidokit.umd.js in external engine-bench; analytic inputs are `bodyPoints` and `handPoints`, curl offsets 0, 0.025 and 0.05. No speed tests.
 ### Batch 235 job 1: ripple correctness
 
-Build packages, then run node --test --test-timeout=60000 packages/water/test/ripples.test.js. Run node scripts/gpu-lock.mjs run --owner=water-ripples --wait-max=60 --max=4 -- node packages/water/test/ripples.browser.mjs and repeat with --compat after the script path. Independent stencil and impulse errors must be below 1e-6; scroll overlap must be exact. Reports: test-results/water-ripples-webgpu.json and water-ripples-compat.json. NOAA source/licence: packages/water/test/data/README.md.
+Build packages, then run node --test --test-timeout=60000 packages/water/test/ripples.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/water/test/ripples.browser.mjs and repeat with --compat after the script path. Independent stencil and impulse errors must be below 1e-6; scroll overlap must be exact. Reports: test-results/water-ripples-webgpu.json and water-ripples-compat.json. NOAA source/licence: packages/water/test/data/README.md.
 ### Batch 222 job 3: imposter dissolve
-After build:packages, run node --test packages/lod/test/imposter-fade.test.js and run node packages/lod/test/imposter-fade-check.mjs with the shared GPU lock, then the same command with --compat. The package test:gpu registers it. The pinned CC0 FlightHelmet geometry supplies the mesh and baked atlas. Both backends produced 2140 initial red pixels, quarter/late mesh-to-imposter counts 1613/537 red and 420/1272 green, and 1696 final green pixels. Reverse animation-to-mesh restores 2140 red pixels; null finishes at zero. Shared-image 2/7 fps playback produced 1801 green left pixels and 2002 blue right pixels, with no opposite color or validation error. These are image counts, not performance results. Existing LOD suites retain their own assertions and deadlines.
+After build:packages, run node --test packages/lod/test/imposter-fade.test.js and run node packages/lod/test/imposter-fade-check.mjs, then the same command with --compat. The package test:gpu registers it. The pinned CC0 FlightHelmet geometry supplies the mesh and baked atlas. Both backends produced 2140 initial red pixels, quarter/late mesh-to-imposter counts 1613/537 red and 420/1272 green, and 1696 final green pixels. Reverse animation-to-mesh restores 2140 red pixels; null finishes at zero. Shared-image 2/7 fps playback produced 1801 green left pixels and 2002 blue right pixels, with no opposite color or validation error. These are image counts, not performance results. Existing LOD suites retain their own assertions and deadlines.
 
 
 ## Batch 198 job 1: configurable view cube
-Build packages, then run node --test packages/viewcube/test/*.test.js. Run packages/viewcube/test/browser-check.mjs through scripts/gpu-lock.mjs with owner codex-batch198, shared mode, --max=3 and --wait-max=60; repeat with --compat for WebGL2. The browser verifies existing cube controls plus Z-up face/edge hit testing and a rendered exact pole. Measure entry gzip using bundleBytes from scripts/measure-size.js with bare peer imports external; core-stage uses npm run measure:size. No timing benchmark.
+Build packages, then run node --test packages/viewcube/test/*.test.js. Run packages/viewcube/test/browser-check.mjs with a 3 minute time limit; repeat with --compat for WebGL2. The browser verifies existing cube controls plus Z-up face/edge hit testing and a rendered exact pole. Measure entry gzip using bundleBytes from scripts/measure-size.js with bare peer imports external; core-stage uses npm run measure:size. No timing benchmark.
 
-Batch 201 spec/gloss: after build:packages, run `node --test --test-timeout=120000 packages/gltf-pro/tests/spec-gloss.test.js`. Render with `node scripts/gpu-lock.mjs run --owner=spec-gloss --wait-max=60 --max=5 -- node packages/gltf-pro/scripts/test-spec-gloss-browser.mjs`, then the same command with `--compat` after the script. The fixture compares independently authored metal/rough endpoints and draws examples/assets/khronos-samples/SpecGlossVsMetalRough.glb. Reports: test-results/batch201-spec-gloss.json and batch201-spec-gloss-compat.json. The exact data source, hash and licensing are in THIRD-PARTY-NOTICES.md. `npm run measure:size` verifies the unchanged core/stage gate. No timed speed experiment is required.
+Batch 201 spec/gloss: after build:packages, run `node --test --test-timeout=120000 packages/gltf/test/spec-gloss.test.js`. Render with `node scripts/run-with-timeout.mjs run --max=5 -- node packages/gltf/scripts/test-spec-gloss-browser.mjs`, then the same command with `--compat` after the script. The fixture compares independently authored metal/rough endpoints and draws examples/assets/khronos-samples/SpecGlossVsMetalRough.glb. Reports: test-results/batch201-spec-gloss.json and batch201-spec-gloss-compat.json. The exact data source, hash and licensing are in THIRD-PARTY-NOTICES.md. `npm run measure:size` verifies the unchanged core/stage gate. No timed speed experiment is required.
 
 
 - Batch 242 rooms: build packages, then node --test --test-timeout=30000 packages/voxel-net/tests/rooms.test.js. Uses real loopback WebSockets and authored flat-world fixtures; no GPU or downloaded demo asset.
 
 ### Batch 214 joint-limit correctness
-After build:packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/limits.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch214 --max=3 --wait-max=60 -- node packages/kinematics-constraints/tests/limits-browser.mjs for rendered native/compat checks. Test quaternions are independently composed from axis rotations; box acceptance covers 300 deterministic poses and exact singular branches. No speed measurement.
+After build:packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/limits.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/kinematics-constraints/tests/limits-browser.mjs for rendered native/compat checks. Test quaternions are independently composed from axis rotations; box acceptance covers 300 deterministic poses and exact singular branches. No speed measurement.
 ### Batch 269 dome correctness
-After build:packages, run `node --test --test-timeout=60000 packages/video/test/dome.test.js`. Render with `node scripts/gpu-lock.mjs run --owner=video-dome --gpu=dome-render-pixels --max=3 --wait-max=60 -- node packages/video/test/dome-check.mjs`, then the same command with `--compat` after the test filename. The independent colour-sector oracle checks 12 combinations, six view directions, stereo separation and black rear. The usual video package GPU suite includes this check. Texture-existing proof: `node --test --test-timeout=60000 packages/materials/test/materials.test.js packages/materials/test/material-usage.test.js`. No benchmark or external download is needed for these analytic tests.
+After build:packages, run `node --test --test-timeout=60000 packages/video/test/dome.test.js`. Render with `node scripts/run-with-timeout.mjs run --max=3 -- node packages/video/test/dome-check.mjs`, then the same command with `--compat` after the test filename. The independent colour-sector oracle checks 12 combinations, six view directions, stereo separation and black rear. The usual video package GPU suite includes this check. Texture-existing proof: `node --test --test-timeout=60000 packages/materials/test/materials.test.js packages/materials/test/material-usage.test.js`. No benchmark or external download is needed for these analytic tests.
 
 ## Batch 173 label and multi-component fusion
-After `npm run build:packages`, run `node --test --test-timeout=120000 packages/sciviz/tests/labels.test.js`. For rendered references run `node scripts/gpu-lock.mjs run --owner=labels-repro --wait-max=60 --max=5 -- node packages/sciviz/tests/labels-browser.mjs`. The one shared slot is released after the command; it exercises native WebGPU and WebGL2 compatibility sequentially. Report: test-results/batch173-labels.json. Screenshots: batch173-labels-native.png and batch173-labels-compat.png. The constant reference has seven voxel intervals, two alpha=0.06 components, opacity 1-(1-0.06)^14 and equal red/blue optical weights. The rotated ramp uses a 90-degree unit-box affine and is compared pixelwise against the equivalent aligned y ramp. No wall-clock benchmark runs.
+After `npm run build:packages`, run `node --test --test-timeout=120000 packages/sciviz/tests/labels.test.js`. For rendered references run `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/labels-browser.mjs`. It exercises native WebGPU and WebGL2 compatibility sequentially. Report: test-results/batch173-labels.json. Screenshots: batch173-labels-native.png and batch173-labels-compat.png. The constant reference has seven voxel intervals, two alpha=0.06 components, opacity 1-(1-0.06)^14 and equal red/blue optical weights. The rotated ramp uses a 90-degree unit-box affine and is compared pixelwise against the equivalent aligned y ramp. No wall-clock benchmark runs.
 View examples/sciviz-labels.html through the example server. The MSD archive source, original hashes and reduction are in examples/assets/sciviz/msd-brain.json. To reproduce the bytes, supply the original BRATS_457.nii.gz, label-BRATS_457.nii.gz and Task01 dataset.json to `node scripts/prepare-sciviz-labels.mjs <directory>`; it validates pinned original hashes, uses Margo's NIfTI reader and retains original samples at strides 4,4,4. Dataset category IDs and intensity values are unchanged. OpenNeuro uses the existing head.nrrd/head.json, CC0. No foreign implementation files or engines are needed.
 
 
@@ -3547,39 +3530,39 @@ View examples/sciviz-labels.html through the example server. The MSD archive sou
 
 After npm run build:packages, run node --test --test-timeout=120000 packages/decoders/tests/jpeg.test.js packages/decoders/tests/image.test.js packages/exporters/tests/jpeg-read.test.js. Fixtures and their independent reference PNGs are already in exporters/tests/fixtures/jpeg; source is recorded in its parent NOTICE.md. No benchmark or README execution is involved.
 
-The additional worker/GPU round trip runs with node scripts/gpu-lock.mjs run --owner=codex-batch203 --wait-max=60 --max=2 -- node packages/decoders/tests/jpeg-browser.mjs. It checks the same 15,688 stored RGBA8 channels exactly on both WebGPU and WebGL2 compatibility.
+The additional worker/GPU round trip runs with node scripts/run-with-timeout.mjs run --max=2 -- node packages/decoders/tests/jpeg-browser.mjs. It checks the same 15,688 stored RGBA8 channels exactly on both WebGPU and WebGL2 compatibility.
 
 ### Batch 240 job 2
 
-Build packages, then node --test --test-timeout=120000 packages/voxel/tests/objects.test.js. Run node scripts/gpu-lock.mjs run --owner=codex-batch240 --max=3 --wait-max=60 -- node packages/voxel/tests/objects-browser-check.mjs, and again with --compat after the script. Two visible red placements share one core draw; a third loaded object at x=10000 is culled. Edits lower coverage, unload removes it, reload restores it bit for bit and disposal leaves zero coverage.
+Build packages, then node --test --test-timeout=120000 packages/voxel/tests/objects.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/voxel/tests/objects-browser-check.mjs, and again with --compat after the script. Two visible red placements share one core draw; a third loaded object at x=10000 is culled. Edits lower coverage, unload removes it, reload restores it bit for bit and disposal leaves zero coverage.
 
 - Batch 242 replay: build packages then node --test --test-timeout=30000 packages/voxel-net/tests/replay.test.js. Real loopback server, authored flat-world fixture, temporary recording file and exact reconstructed chunk snapshots. No GPU or external demo asset.
 ### Batch 206 value clips
-After building packages, node --test packages/usdz/tests/clips.test.js runs the 78 scalar plus 4 topology OpenUSD oracles and ownership/discovery checks. Regenerate with Python 3.12 + usd-core 26.11: python packages/usdz/tests/oracle/clips-truth.py packages/usdz/tests/fixtures/clips. All authored layers are original analytical data. Run node scripts/modern-usdz-tests.js and then --compat under the shared GPU lock for direct/worker sampling and managed topology-changing cache playback.
-Batch 270 job 1: build packages, run node --test --test-timeout=120000 packages/vfx/test/space.test.js, then under shared scripts/gpu-lock.mjs run packages/vfx/test/parity.mjs and the same with --compat (GPU classification reason: VFX particle simulation and readback). These compare buffer coordinates/velocities with analytic values. Existing VFX GPU suite also remains required.
+After building packages, node --test packages/usdz/tests/clips.test.js runs the 78 scalar plus 4 topology OpenUSD oracles and ownership/discovery checks. Regenerate with Python 3.12 + usd-core 26.11: python packages/usdz/tests/oracle/clips-truth.py packages/usdz/tests/fixtures/clips. All authored layers are original analytical data. Run node scripts/modern-usdz-tests.js and then --compat for direct/worker sampling and managed topology-changing cache playback.
+Batch 270 job 1: build packages, run node --test --test-timeout=120000 packages/vfx/test/space.test.js, then run packages/vfx/test/parity.mjs and the same with --compat. These compare buffer coordinates/velocities with analytic values. Existing VFX GPU suite also remains required.
 ### Batch 235 job 2: flow maps
 
-After building packages, run node --test --test-timeout=60000 packages/water/test/flow-map.test.js. Run node scripts/gpu-lock.mjs run --owner=water-flow --wait-max=60 --max=4 -- node packages/water/test/flow-map.browser.mjs, then repeat with --compat after the script path. Vector/slope error must be below 2e-6; fixed-time screenshots must match and advancing time must change the image. Reports and PNGs: test-results/water-flow-webgpu and water-flow-compat. The real NOAA observation and licence are attributed in packages/water/test/data/README.md.
+After building packages, run node --test --test-timeout=60000 packages/water/test/flow-map.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/water/test/flow-map.browser.mjs, then repeat with --compat after the script path. Vector/slope error must be below 2e-6; fixed-time screenshots must match and advancing time must change the image. Reports and PNGs: test-results/water-flow-webgpu and water-flow-compat. The real NOAA observation and licence are attributed in packages/water/test/data/README.md.
 
 
 
 ### Batch 194 job 2
-See [toon parity](../toon-parity.md) for the CPU and shared-lock GPU commands, repeat GPU with MARGO_COMPAT=1. The screen-outline browser checks measure physical-pixel silhouette bands at two distances for perspective/orthographic core and materials meshes and draw the real animated Fox. Existing model and hatch suites remain in test:gpu.
+See [toon parity](../toon-parity.md) for the CPU and GPU commands, repeat GPU with MARGO_COMPAT=1. The screen-outline browser checks measure physical-pixel silhouette bands at two distances for perspective/orthographic core and materials meshes and draw the real animated Fox. Existing model and hatch suites remain in test:gpu.
 
 # Batch 185 volume storage
 
-After build:packages, run `node --test packages/shader/test/compute-volume.test.js`. Under a shared GPU lock, run `node packages/shader/test/compute-volume-check.mjs`, then the same command with `--compat`. Both compare all voxels for 16 storage formats in 3D and arrays, feedback steps and volume sampling; no benchmark or timing assertion runs. Job 1's pre-existing GLSL backend proof is `node packages/shader/test/browser-check.mjs --compat` under the same shared lock.
+After build:packages, run `node --test packages/shader/test/compute-volume.test.js`. Run `node packages/shader/test/compute-volume-check.mjs`, then the same command with `--compat`. Both compare all voxels for 16 storage formats in 3D and arrays, feedback steps and volume sampling; no benchmark or timing assertion runs. Job 1's pre-existing GLSL backend proof is `node packages/shader/test/browser-check.mjs --compat`.
 
 
-- Batch 242 WebRTC: after building, node --test --test-timeout=30000 packages/voxel-net/tests/webrtc.test.js and node packages/voxel-net/tests/webrtc-browser.mjs. The latter uses two real peers in a GPU-disabled browser, a 60-second suite limit and the existing bounded shutdown helper. No GPU lock or external asset.
+- Batch 242 WebRTC: after building, node --test --test-timeout=30000 packages/voxel-net/tests/webrtc.test.js and node packages/voxel-net/tests/webrtc-browser.mjs. The latter uses two real peers in a GPU-disabled browser, a 60-second suite limit and the existing bounded shutdown helper. No GPU or external asset.
 
-Batch 270 job 2: build packages, node --test --test-timeout=120000 packages/vfx/test/over-life.test.js; under the shared GPU lock run node packages/vfx/test/parity.mjs --over-life and add --compat for WebGL2. The runner compares every sampled step with analytic speed, size and angle, including reset replay and local-frame rotation.
+Batch 270 job 2: build packages, node --test --test-timeout=120000 packages/vfx/test/over-life.test.js; run node packages/vfx/test/parity.mjs --over-life and add --compat for WebGL2. The runner compares every sampled step with analytic speed, size and angle, including reset replay and local-frame rotation.
 
-- Batch 193 hue: build packages, then node --test --test-timeout=120000 packages/tonemap/tests/hue.test.js; node scripts/gpu-lock.mjs run --owner=codex-batch193 --max=3 --wait-max=60 -- node packages/tonemap/tests/hue-browser.mjs. Both native WebGPU and forced full WebGL2 compatibility run in the browser suite.
+- Batch 193 hue: build packages, then node --test --test-timeout=120000 packages/tonemap/tests/hue.test.js; node scripts/run-with-timeout.mjs run --max=3 -- node packages/tonemap/tests/hue-browser.mjs. Both native WebGPU and forced full WebGL2 compatibility run in the browser suite.
 
-Batch 271 job 2: build packages, then `node --test --test-timeout=30000 packages/creative/tests/planet-atmosphere.test.js`. Under a shared GPU lock run `node packages/creative/scripts/test-orbit-atmosphere.js` and the same command with `--compat` (3-minute hold limit, 60-minute queue limit). The original analytic fixtures need no third-party dataset. No benchmark, timing assertion or dependent GPU suite.
+Batch 271 job 2: build packages, then `node --test --test-timeout=30000 packages/creative/tests/planet-atmosphere.test.js`. Run `node packages/creative/scripts/test-orbit-atmosphere.js` and the same command with `--compat` (3-minute limit). The original analytic fixtures need no third-party dataset. No benchmark, timing assertion or dependent GPU suite.
 ### Batch 269 demux correctness
-Fetch required CC0 flower MP4 and WebM with `node scripts/reference-rendering/fetch-skip-assets.mjs`. `node --test --test-timeout=60000 packages/video/test/demux*.test.js` covers structural fixtures and every real packet. Regenerate the WebM oracle with `node packages/video/scripts/webm-reference.mjs <FFprobe-8.1.2-path>`. The original AVC oracle remains flower-ffprobe.json. Run `node scripts/gpu-lock.mjs run --owner=video-demux --gpu=demux-decoder-frame-proof --max=4 --wait-max=60 -- node packages/video/test/demux-check.mjs`, then add `--compat` after the test filename. The browser repacks original AVC packets into two ISO fragments, decodes each reference directly from FFprobe offsets, compares selected frame bytes and timestamps, and checks generated VP9/AV1 colours. No benchmark, fixed timing assertion, third-party code or new demo.
+Fetch required CC0 flower MP4 and WebM with `node scripts/reference-rendering/fetch-skip-assets.mjs`. `node --test --test-timeout=60000 packages/video/test/demux*.test.js` covers structural fixtures and every real packet. Regenerate the WebM oracle with `node packages/video/scripts/webm-reference.mjs <FFprobe-8.1.2-path>`. The original AVC oracle remains flower-ffprobe.json. Run `node scripts/run-with-timeout.mjs run --max=4 -- node packages/video/test/demux-check.mjs`, then add `--compat` after the test filename. The browser repacks original AVC packets into two ISO fragments, decodes each reference directly from FFprobe offsets, compares selected frame bytes and timestamps, and checks generated VP9/AV1 colours. No benchmark, fixed timing assertion, third-party code or new demo.
 
 
 
@@ -3587,22 +3570,22 @@ Fetch required CC0 flower MP4 and WebM with `node scripts/reference-rendering/fe
 After npm run build:packages run node --test --test-timeout=120000 packages/decoders/tests/streams.test.js packages/decoders/tests/zstd-destination.test.js. The checked-in LZ4 manifest and NOTICE record the native producer and CC0 source; tests reconstruct expected data from Avocado.bin. No native codec is needed to run them. Zstandard references use Node zlib. Existing decoder GPU tests continue to cover decoded texture upload on both backends.
 
 ## Batch 198 job 2: bounds fitting
-After building packages, run node --test packages/viewcube/test/*.test.js. fit.test.js independently projects AABB corners through Camera.matrix throughout transitions. Run packages/viewcube/test/browser-check.mjs and the same with --compat, each under the shared GPU lock with owner codex-batch198, --max=3 and --wait-max=60. The added fixture switches to a FitViewCube, clicks an edge, toggles projection and clicks Top; both resulting rendered camera matrices must contain all bounds corners. No external data or benchmark.
-Batch 270 job 3: build packages, run node --test --test-timeout=120000 packages/vfx/test/shapes.test.js, then under the shared GPU lock run node packages/vfx/test/parity.mjs --shapes, with --compat for WebGL2. Expected radial volume moments are 1/2 (shell 1), hemisphere mean normalized height 1/2, cylinder mean y squared over height squared 1/12, torus-shell mean cos(beta) tube/(2*radius), rectangle side shares proportional to length and all 24 test grid cells occupied near equally.
+After building packages, run node --test packages/viewcube/test/*.test.js. fit.test.js independently projects AABB corners through Camera.matrix throughout transitions. Run packages/viewcube/test/browser-check.mjs and the same with --compat, each with a 3 minute time limit. The added fixture switches to a FitViewCube, clicks an edge, toggles projection and clicks Top; both resulting rendered camera matrices must contain all bounds corners. No external data or benchmark.
+Batch 270 job 3: build packages, run node --test --test-timeout=120000 packages/vfx/test/shapes.test.js, then run node packages/vfx/test/parity.mjs --shapes, with --compat for WebGL2. Expected radial volume moments are 1/2 (shell 1), hemisphere mean normalized height 1/2, cylinder mean y squared over height squared 1/12, torus-shell mean cos(beta) tube/(2*radius), rectangle side shares proportional to length and all 24 test grid cells occupied near equally.
 
 ## Batch 185 pass authoring
-After build:packages run node --test packages/shader/test/editor-pass.test.js. Under the shared GPU lock run node packages/shader/test/editor-pass-check.mjs, then the same command with --compat. Expected post centre pixels: [128,94,69], [255,188,137], [64,47,34], then restored full colour. Compute output is [i*scale,2*scale,4*scale,0.5] for i 0..23 and scales 0.5 and 0.25. Existing editor-check.mjs covers the shared canvas's gesture/keyboard path; run on both backends for presentation changes.
-Batch 191 job 1: build packages, then node --test --test-timeout=120000 packages/post/test/selective-bloom.test.js. GPU: node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/selective-bloom-browser.mjs (repeat with --compat). Original analytic fixtures need no external data.
+After build:packages run node --test packages/shader/test/editor-pass.test.js. Run node packages/shader/test/editor-pass-check.mjs, then the same command with --compat. Expected post centre pixels: [128,94,69], [255,188,137], [64,47,34], then restored full colour. Compute output is [i*scale,2*scale,4*scale,0.5] for i 0..23 and scales 0.5 and 0.25. Existing editor-check.mjs covers the shared canvas's gesture/keyboard path; run on both backends for presentation changes.
+Batch 191 job 1: build packages, then node --test --test-timeout=120000 packages/post/test/selective-bloom.test.js. GPU: node scripts/run-with-timeout.mjs run --max=3 -- node packages/post/test/selective-bloom-browser.mjs (repeat with --compat). Original analytic fixtures need no external data.
 
 
-- Batch 193 grade export: build packages; node --test --test-timeout=120000 packages/tonemap/tests/export-cube.test.js; node scripts/gpu-lock.mjs run --owner=codex-batch193 --max=2 --wait-max=60 -- node packages/tonemap/tests/export-cube-browser.mjs. Tests compare parsed exports with live Grade/HueGrade WGSL float targets on both backends; no screenshot quantization or timing assertion.
+- Batch 193 grade export: build packages; node --test --test-timeout=120000 packages/tonemap/tests/export-cube.test.js; node scripts/run-with-timeout.mjs run --max=2 -- node packages/tonemap/tests/export-cube-browser.mjs. Tests compare parsed exports with live Grade/HueGrade WGSL float targets on both backends; no screenshot quantization or timing assertion.
 
 ### Batch 194 job 3
-Run node --test --test-timeout=60000 packages/toon/test/*.test.js packages/gltf-pro/tests/material-draw-run.test.js after build:packages. Run toon test:gpu through gpu-lock in shared mode, repeat with MARGO_COMPAT=1, as described in toon-parity.md. hatch-models.browser.mjs checks independent stripe/dot interior positions and restored real-avatar pixels. The owner-package fix also runs gltf-pro shader, extension, materials, viewer, volume and spec/gloss GPU suites on both backends; dependents receive CPU tests only. No speed-phase commands.
+Run node --test --test-timeout=60000 packages/toon/test/*.test.js packages/gltf/test/material-draw-run.test.js after build:packages. Run toon test:gpu, repeat with MARGO_COMPAT=1, as described in toon-parity.md. hatch-models.browser.mjs checks independent stripe/dot interior positions and restored real-avatar pixels. The owner-package fix also runs gltf/pbr shader, extension, materials, viewer, volume and spec/gloss GPU suites on both backends; dependents receive CPU tests only. No speed-phase commands.
 
 
 ### Batch 173 cinematic volume lighting
-Build packages, then run `node --test --test-timeout=120000 packages/sciviz/tests/cinematic.test.js` and `node scripts/gpu-lock.mjs run --owner=cinematic-proof --wait-max=60 --max=6 -- node packages/sciviz/tests/cinematic-browser.mjs`. The browser check runs native WebGPU and WebGL2 compatibility, emits test-results/batch173-cinematic.json and screenshots, and records exact work counts rather than timings. In the constant field sigma=-7*log(1-20/255), A=1-exp(-sigma), RGB=128/255. Plain radiance is RGB*A; the coaxial light's single-scattering radiance is RGB*(1-exp(-2*sigma))/2. Convert unpremultiplied radiance to sRGB then blend over black with A. The conservative white environment has expected intensity 255*A. The stochastic image checks a central 12x12 patch with a fixed seed and the same explicit classifier; RMSE must fall from 16 to 256 samples. Positive HG g reduces backscattering. Cost() reads counters for actual shader execution. No speed suite or README example runner is invoked.
+Build packages, then run `node --test --test-timeout=120000 packages/sciviz/tests/cinematic.test.js` and `node scripts/run-with-timeout.mjs run --max=6 -- node packages/sciviz/tests/cinematic-browser.mjs`. The browser check runs native WebGPU and WebGL2 compatibility, emits test-results/batch173-cinematic.json and screenshots, and records exact work counts rather than timings. In the constant field sigma=-7*log(1-20/255), A=1-exp(-sigma), RGB=128/255. Plain radiance is RGB*A; the coaxial light's single-scattering radiance is RGB*(1-exp(-2*sigma))/2. Convert unpremultiplied radiance to sRGB then blend over black with A. The conservative white environment has expected intensity 255*A. The stochastic image checks a central 12x12 patch with a fixed seed and the same explicit classifier; RMSE must fall from 16 to 256 samples. Positive HG g reduces backscattering. Cost() reads counters for actual shader execution. No speed suite or README example runner is invoked.
 To reproduce demo assets, download the EMD-8117 original from its source JSON, then `node scripts/prepare-sciviz-emdb.mjs <original.map.gz>`; the original hash is checked before extracting stride-3 mode-2 density samples. CT assets and provenance are reused without republishing the original dataset archive. Open examples/sciviz-cinematic.html for separate local-occlusion, shadow, plain and progressive modes.
 
 The cinematic AO reference integrates sigma*exp(-sigma*t) times the six-direction average exp(-sigma*min(radius,boxExitDistance)), using exact homogeneous ray transmittance and 4096 axial quadrature points. Engine reboot is separately checked from lighting-only restore.
@@ -3610,106 +3593,106 @@ The cinematic AO reference integrates sigma*exp(-sigma*t) times the six-directio
 - Batch 242 runtimes: build packages, install Bun and Deno outside the repository or set MARGO_BUN_BIN and MARGO_DENO_BIN to their executables, then npm run test:runtimes --workspace @margoengine/voxel-net. One shared Node assertion body launches native fixtures with per-child 40-second hard limits. Deno uses run --allow-all --node-modules-dir=manual for the local workspace. Node-only unsupported-runtime behavior is server-runtimes.test.js. The native contract fails on Deno worker stderr before the worker close-capability adapter.
 
 
-Batch 271 job 3: build packages, run `node --test --test-timeout=30000 packages/creative/tests/grass-terrain.test.js`; under the shared GPU lock run `node packages/creative/scripts/test-grass-terrain.js` and again with `--compat` (3-minute hold, 60-minute queue). Fixtures are original analytic maps, not a demo dataset. No dependent GPU run or timing suite.
+Batch 271 job 3: build packages, run `node --test --test-timeout=30000 packages/creative/tests/grass-terrain.test.js`; run `node packages/creative/scripts/test-grass-terrain.js` and again with `--compat` (3-minute limit). Fixtures are original analytic maps, not a demo dataset. No dependent GPU run or timing suite.
 ### Batch 269 playback correctness
-`node --test --test-timeout=60000 packages/video/test/playback.test.js` runs deterministic lifecycle tests (mock clock for ready timeout). With the required CC0 WebM asset fetched, run `node scripts/gpu-lock.mjs run --owner=video-playback --gpu=playback-video-render-and-policy --max=3 --wait-max=60 -- node packages/video/test/playback-check.mjs`, and repeat with `--compat` after the filename. A real video starts muted, reaches frame readiness and feeds base/emissive textures with repeat/mips, compared with a frozen VideoFrame through the same material. A second audible video is refused by the browser's native policy, exposes the owned button, and starts on a trusted Playwright click. This is browser-policy and rendering correctness, not a timing or universal autoplay claim.
+`node --test --test-timeout=60000 packages/video/test/playback.test.js` runs deterministic lifecycle tests (mock clock for ready timeout). With the required CC0 WebM asset fetched, run `node scripts/run-with-timeout.mjs run --max=3 -- node packages/video/test/playback-check.mjs`, and repeat with `--compat` after the filename. A real video starts muted, reaches frame readiness and feeds base/emissive textures with repeat/mips, compared with a frozen VideoFrame through the same material. A second audible video is refused by the browser's native policy, exposes the owned button, and starts on a trusted Playwright click. This is browser-policy and rendering correctness, not a timing or universal autoplay claim.
 
 
 ## Batch 198 job 3: compass/menu reproduction
-Build packages and run node --test packages/viewcube/test/*.test.js. The compass tests exercise actual delegated DOM input and lifecycle in JSDOM. Under the shared GPU lock, owner codex-batch198, --max=3 --wait-max=60, run packages/viewcube/test/browser-check.mjs then repeat with --compat. The new section clicks East/South, saves/returns Home through the context menu, toggles projection, clamps an edge menu and drags a cardinal with pointer capture. It writes one screenshot per backend for layout review. No new asset download or speed benchmark.
+Build packages and run node --test packages/viewcube/test/*.test.js. The compass tests exercise actual delegated DOM input and lifecycle in JSDOM. Run packages/viewcube/test/browser-check.mjs with a 3 minute time limit, then repeat with --compat. The new section clicks East/South, saves/returns Home through the context menu, toggles projection, clamps an edge menu and drags a cardinal with pointer capture. It writes one screenshot per backend for layout review. No new asset download or speed benchmark.
 ### Batch 235 job 3: planar reflection input
 
-Build packages. CPU: node --test --test-timeout=120000 packages/water/test/reflector.test.js packages/environment/tests/mirror.test.js. GPU: node scripts/gpu-lock.mjs run --owner=water-reflector --wait-max=60 --max=4 -- node packages/water/test/reflector.browser.mjs, then repeat with --compat after the script path. The main-camera marker centre must be offscreen, its independently mirrored image gains red, unready capture pixels equal baseline and GPU validation stays clean. Reports/PNGs: test-results/water-reflector-webgpu and water-reflector-compat. The observational bearing is NOAA public-domain data attributed in water/test/data.
-Batch 270 job 4: build packages, node --test --test-timeout=120000 packages/vfx/test/schedule.test.js, then under the shared GPU lock run node packages/vfx/test/parity.mjs --schedule, and add --compat for WebGL2. A 0.5-second warmup at 0.125-second steps plus a visible step must match five ordinary steps, including seeded bursts and the full particle buffer.
+Build packages. CPU: node --test --test-timeout=120000 packages/water/test/reflector.test.js packages/environment/tests/mirror.test.js. GPU: node scripts/run-with-timeout.mjs run --max=4 -- node packages/water/test/reflector.browser.mjs, then repeat with --compat after the script path. The main-camera marker centre must be offscreen, its independently mirrored image gains red, unready capture pixels equal baseline and GPU validation stays clean. Reports/PNGs: test-results/water-reflector-webgpu and water-reflector-compat. The observational bearing is NOAA public-domain data attributed in water/test/data.
+Batch 270 job 4: build packages, node --test --test-timeout=120000 packages/vfx/test/schedule.test.js, then run node packages/vfx/test/parity.mjs --schedule, and add --compat for WebGL2. A 0.5-second warmup at 0.125-second steps plus a visible step must match five ordinary steps, including seeded bursts and the full particle buffer.
 
-Batch 241 job 3: after npm run build:packages, run node --test packages/decoders/tests/lzfse.test.js packages/voxel-edit/tests/formats-extra.test.js. Committed codec fixtures were compressed through the prebuilt lzfse 0.4.2.post1 public API; original byte expectations and the entropy fixture SHA-256 are asserted without an oracle dependency. v1 and reused-table fixtures derive from the same original fse payload and were separately decoded through that black box. Format fixtures combine original asymmetric probes, standard Python plistlib/zipfile encodings and the CC0 DeathByDenim Arm (source in THIRD-PARTY-NOTICES.md). CUB oracle: vengi-voxconvert.exe --input <original 2x3x4 probe.cub> --output <probe.qef> --force, external tool directory, 30-second process-tree hard limit. Reference QEF sizes and colour positions are pinned in formats-extra.test.js. GPU correctness: only decoders and voxel-edit own browser/GPU scripts, separately on native WebGPU and MARGO_COMPAT=1 under the shared GPU lock. No speed suite is part of this build-phase proof.
+Batch 241 job 3: after npm run build:packages, run node --test packages/decoders/tests/lzfse.test.js packages/voxel-edit/tests/formats-extra.test.js. Committed codec fixtures were compressed through the prebuilt lzfse 0.4.2.post1 public API; original byte expectations and the entropy fixture SHA-256 are asserted without an oracle dependency. v1 and reused-table fixtures derive from the same original fse payload and were separately decoded through that black box. Format fixtures combine original asymmetric probes, standard Python plistlib/zipfile encodings and the CC0 DeathByDenim Arm (source in THIRD-PARTY-NOTICES.md). CUB oracle: vengi-voxconvert.exe --input <original 2x3x4 probe.cub> --output <probe.qef> --force, external tool directory, 30-second process-tree hard limit. Reference QEF sizes and colour positions are pinned in formats-extra.test.js. GPU correctness: only decoders and voxel-edit own browser/GPU scripts, separately on native WebGPU and MARGO_COMPAT=1. No speed suite is part of this build-phase proof.
 
 ## Batch 185 array texture sampling
-After build:packages run node --test packages/shader/test/texture-array.test.js. Under a shared GPU lock run node packages/shader/test/texture-array-check.mjs, then the same command with --compat. The fixture has 32 distinct RGBA8 layers; each material pixel matches its encoded source, all computed RGBA values exactly equal sampling an independent 32x1 2D sRGB texture, and -1/4294967295u select the first/last layer. Post samples and the missing-source white array are checked too. No benchmark runs.
-Batch 191 job 2: node --test --test-timeout=120000 packages/post/test/mask.test.js after build. Pixel check: node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/mask-browser.mjs, then repeat with --compat. Original analytic two-tone scene and binary mask need no downloaded assets.
+After build:packages run node --test packages/shader/test/texture-array.test.js. Run node packages/shader/test/texture-array-check.mjs, then the same command with --compat. The fixture has 32 distinct RGBA8 layers; each material pixel matches its encoded source, all computed RGBA values exactly equal sampling an independent 32x1 2D sRGB texture, and -1/4294967295u select the first/last layer. Post samples and the missing-source white array are checked too. No benchmark runs.
+Batch 191 job 2: node --test --test-timeout=120000 packages/post/test/mask.test.js after build. Pixel check: node scripts/run-with-timeout.mjs run --max=3 -- node packages/post/test/mask-browser.mjs, then repeat with --compat. Original analytic two-tone scene and binary mask need no downloaded assets.
 ### Batch 184 transmission backgrounds
-After npm run build:packages, run node --test --test-timeout=60000 packages/materials/tests/transmission-background.test.js, then node scripts/gpu-lock.mjs run --owner=batch184-proof --max=6 --wait-max=60 -- node packages/materials/test/transmission-background-browser.mjs. The GPU script runs all eight native/compat, sorted/weighted, 1x/4x grids and writes captures and numeric comparisons under test-results/batch184. All checks are correctness checks; no timing suite is run.
+After npm run build:packages, run node --test --test-timeout=60000 packages/materials/tests/transmission-background.test.js, then node scripts/run-with-timeout.mjs run --max=6 -- node packages/materials/test/transmission-background-browser.mjs. The GPU script runs all eight native/compat, sorted/weighted, 1x/4x grids and writes captures and numeric comparisons under test-results/batch184. All checks are correctness checks; no timing suite is run.
 
-For the compressed-upload regression, run node --test --test-timeout=60000 packages/materials/test/texture-formats.test.js and the shared-lock scripts/mat-more-gpu-check.js --compat command. The repaired complete compatibility run passes all 50 checks, including the real Dot_C.ktx2 asset already pinned and licensed in the decoder fixtures. The full dispersion leaf passes both 278-check backend grids in this continuation; unchanged historical wireframe compatibility failures remain documented.
+For the compressed-upload regression, run node --test --test-timeout=60000 packages/materials/test/texture-formats.test.js and the scripts/mat-more-gpu-check.js --compat command. The repaired complete compatibility run passes all 50 checks, including the real Dot_C.ktx2 asset already pinned and licensed in the decoder fixtures. The full dispersion leaf passes both 278-check backend grids in this continuation; unchanged historical wireframe compatibility failures remain documented.
 
 ## Batch 214 job 3: multi-goal and closed-chain IK
-After building packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/multi-goal.test.js. All fixtures are original analytic mechanisms, including independent trigonometric five-bar endpoint checks and a weighted compromise with known minimizer. Under the shared GPU lock run node packages/kinematics-constraints/tests/multi-goal-browser.mjs; it renders a solved mixed-joint loop on both WebGPU and WebGL2 compatibility. The normal package browser and limits-browser suites remain required. No benchmark or external asset is used.
+After building packages, run node --test --test-timeout=120000 packages/kinematics-constraints/tests/multi-goal.test.js. All fixtures are original analytic mechanisms, including independent trigonometric five-bar endpoint checks and a weighted compromise with known minimizer. Run node packages/kinematics-constraints/tests/multi-goal-browser.mjs; it renders a solved mixed-joint loop on both WebGPU and WebGL2 compatibility. The normal package browser and limits-browser suites remain required. No benchmark or external asset is used.
 
-Batch 271 job 4: build packages, then `node --test --test-timeout=30000 packages/creative/tests/paint-aniso.test.js`; under a shared GPU lock run `node packages/creative/scripts/test-paint-aniso.js` and again with `--compat`, with a 3-minute hold and 60-minute queue limit. The independent scalar reference is packages/creative/tests/paint-aniso-reference.js. The circular fixture fails the original hard-support implementation without changing the one-code comparison bar. No dependent GPU suite or timing run.
+Batch 271 job 4: build packages, then `node --test --test-timeout=30000 packages/creative/tests/paint-aniso.test.js`; run `node packages/creative/scripts/test-paint-aniso.js` and again with `--compat`, with a 3-minute limit. The independent scalar reference is packages/creative/tests/paint-aniso-reference.js. The circular fixture fails the original hard-support implementation without changing the one-code comparison bar. No dependent GPU suite or timing run.
 
 ### Batch 240 job 3
 
-Build packages; run node --test --test-timeout=120000 packages/voxel/tests/wind.test.js packages/voxel/tests/mesher.test.js packages/voxel/tests/render.test.js. Render with node scripts/gpu-lock.mjs run --owner=codex-batch240 --max=5 --wait-max=60 -- node packages/voxel/tests/wind-browser-check.mjs, then add --compat after the script. Both plain and chamfer scenes must change at time 1, reproduce time 0 exactly, remain unchanged between times 0 and 2 at zero wind, and remove the adapter without a GPU error. The chamfer scene also selects GpuVoxelMesher and checks the detailed-shape path, with custom-model/object types in the same registry.
+Build packages; run node --test --test-timeout=120000 packages/voxel/tests/wind.test.js packages/voxel/tests/mesher.test.js packages/voxel/tests/render.test.js. Render with node scripts/run-with-timeout.mjs run --max=5 -- node packages/voxel/tests/wind-browser-check.mjs, then add --compat after the script. Both plain and chamfer scenes must change at time 1, reproduce time 0 exactly, remain unchanged between times 0 and 2 at zero wind, and remove the adapter without a GPU error. The chamfer scene also selects GpuVoxelMesher and checks the detailed-shape path, with custom-model/object types in the same registry.
 ### Batch 192: velocity upscaling
-After npm run build:packages, run npm run test --workspace @margoengine/taa. GPU: node scripts/gpu-lock.mjs run --owner=taa-upscale-velocity --max=4 --wait-max=60 -- node packages/taa/test/upscale-velocity-browser.mjs, then the same command with --compat after the script. The original analytic fixture covers 200x160 output, scale 0.5, 4x MSAA, stereo target isolation, shared offset viewports, translating thin geometry and stopped-surface jitter. Expected: zero byte differences versus each isolated eye/viewport, nonzero parallax/coverage and object motion, stationary error below 2e-5 UV, no GPU errors. No downloaded model, rival source, benchmark or exclusive GPU hold is required.
+After npm run build:packages, run npm run test --workspace @margoengine/taa. GPU: node scripts/run-with-timeout.mjs run --max=4 -- node packages/taa/test/upscale-velocity-browser.mjs, then the same command with --compat after the script. The original analytic fixture covers 200x160 output, scale 0.5, 4x MSAA, stereo target isolation, shared offset viewports, translating thin geometry and stopped-surface jitter. Expected: zero byte differences versus each isolated eye/viewport, nonzero parallax/coverage and object motion, stationary error below 2e-5 UV, no GPU errors. No downloaded model, rival source, benchmark or run with the GPU to itself is required.
 
-Batch 191 job 3: build packages, node --test --test-timeout=120000 packages/post/test/pixelate.test.js; node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/pixelate-browser.mjs, repeated with --compat. Original analytic cube fixture; no external assets.
-Batch 270 job 5: build packages, node --test --test-timeout=120000 packages/vfx/test/json.test.js, then under the shared GPU lock run node packages/vfx/test/parity.mjs --json and add --compat. The fixture combines the four preceding optional features, typed texture and fog, then requires exact saved/reloaded state and nonempty rendered images with identical pixels.
+Batch 191 job 3: build packages, node --test --test-timeout=120000 packages/post/test/pixelate.test.js; node scripts/run-with-timeout.mjs run --max=3 -- node packages/post/test/pixelate-browser.mjs, repeated with --compat. Original analytic cube fixture; no external assets.
+Batch 270 job 5: build packages, node --test --test-timeout=120000 packages/vfx/test/json.test.js, then run node packages/vfx/test/parity.mjs --json and add --compat. The fixture combines the four preceding optional features, typed texture and fog, then requires exact saved/reloaded state and nonempty rendered images with identical pixels.
 
 ## Batch 272 job 1, textured stills
-After build:packages, run node --test --test-timeout=120000 packages/staging/test/*.test.js, then node scripts/gpu-lock.mjs run --owner=staging-materials --max=5 --wait-max=60 -- node packages/staging/test/pathtrace-materials-browser.mjs. It runs WebGPU and compatibility and writes test-results/staging-pathtrace-materials.json. FlightHelmet is the existing openly licensed fixture; no network dependency. Checks include independently decoded factor/channel/normal/cutout images, idle convergence, real mapped product conversion after source disposal, cancellation, PNG capture and actual device replacement. No benchmark.
+After build:packages, run node --test --test-timeout=120000 packages/studio/test/*.test.js, then node scripts/run-with-timeout.mjs run --max=5 -- node packages/studio/test/pathtrace-materials-browser.mjs. It runs WebGPU and compatibility and writes test-results/staging-pathtrace-materials.json. FlightHelmet is the existing openly licensed fixture; no network dependency. Checks include independently decoded factor/channel/normal/cutout images, idle convergence, real mapped product conversion after source disposal, cancellation, PNG capture and actual device replacement. No benchmark.
 
 
 ## Batch 189: clouds and weather through WebGL2 compatibility
-After npm run build:packages, run node --test --test-timeout=60000 packages/sky/test/compat-clouds.test.js. Run node scripts/gpu-lock.mjs run --owner=batch189 --gpu=sky-pixel-correctness --max=4 --wait-max=60 -- node packages/sky/test/features-check.mjs volumetric weather weather-fx sleet for native WebGPU. Set MARGO_COMPAT=1 and repeat for full WebGL2 compatibility. The browser log records the adapter, both 1x/4x sample counts, validation errors, changed pixels, weather depth/cover results and lightning reset. The full sky GPU gate additionally runs browser-check.mjs, dither-check.mjs and all features-check.mjs cases on each backend. These are correctness checks; frame times printed by old pages are diagnostics, not benchmarks. No external demo data is required.
-Batch 274 decomposition: node packages/compute/scripts/build-decomp.mjs reproduces the checked-in optional Wasm asset (Rust wasm32-unknown-unknown, simd128). cargo test --locked --manifest-path packages/compute/decomp-kernel/Cargo.toml checks scalar native algorithms. After npm run build:packages, node --test --test-timeout=60000 packages/compute/tests/decomp.test.js runs CPU references, failures and SIMD conformance. node scripts/gpu-lock.mjs run --owner=codex-batch274 --wait-max=60 --max=3 -- node packages/compute/tests/decomp-browser.mjs runs the same cases on native WebGPU and WebGL2 compatibility. Tests use analytic synthetic matrices with no external data or licence requirement.
-Batch 270 recurring suite: under the shared GPU lock run npm run test:gpu --workspace @margoengine/vfx. The command includes native and WebGL2 parity.mjs --all. The CPU registration regression is node --test --test-timeout=120000 packages/vfx/test/gpu-registration.test.js.
+After npm run build:packages, run node --test --test-timeout=60000 packages/sky/test/compat-clouds.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/sky/test/features-check.mjs volumetric weather weather-fx sleet for native WebGPU. Set MARGO_COMPAT=1 and repeat for full WebGL2 compatibility. The browser log records the adapter, both 1x/4x sample counts, validation errors, changed pixels, weather depth/cover results and lightning reset. The full sky GPU gate additionally runs browser-check.mjs, dither-check.mjs and all features-check.mjs cases on each backend. These are correctness checks; frame times printed by old pages are diagnostics, not benchmarks. No external demo data is required.
+Batch 274 decomposition: node packages/compute/scripts/build-decomp.mjs reproduces the checked-in optional Wasm asset (Rust wasm32-unknown-unknown, simd128). cargo test --locked --manifest-path packages/compute/decomp-kernel/Cargo.toml checks scalar native algorithms. After npm run build:packages, node --test --test-timeout=60000 packages/compute/tests/decomp.test.js runs CPU references, failures and SIMD conformance. node scripts/run-with-timeout.mjs run --max=3 -- node packages/compute/tests/decomp-browser.mjs runs the same cases on native WebGPU and WebGL2 compatibility. Tests use analytic synthetic matrices with no external data or licence requirement.
+Batch 270 recurring suite: run npm run test:gpu --workspace @margoengine/vfx. The command includes native and WebGL2 parity.mjs --all. The CPU registration regression is node --test --test-timeout=120000 packages/vfx/test/gpu-registration.test.js.
 
 
 
-Batch 188 baked IBL: build packages, then node --test --test-timeout=120000 packages/environment/tests/prefiltered.test.js. GPU under a shared lock: node scripts/gpu-lock.mjs run --owner=codex-batch188 --max=4 --wait-max=60 -- node packages/environment/scripts/test-browser.js --page=prefiltered ; repeat with --compat. The CC0 real panorama provenance is packages/environment/tests/fixtures/NOTICE.md. CPU tests cover exact encode/decode, every truncated prefix, corrupt dimensions and overlapping levels, cancellation, upload-only creation, disposal and restoration. GPU tests compare all source/specular mips, SH and LUT values and identical saved bytes after device replacement.
+Batch 188 baked IBL: build packages, then node --test --test-timeout=120000 packages/environment/tests/prefiltered.test.js. GPU: node scripts/run-with-timeout.mjs run --max=4 -- node packages/environment/scripts/test-browser.js --page=prefiltered ; repeat with --compat. The CC0 real panorama provenance is packages/environment/tests/fixtures/NOTICE.md. CPU tests cover exact encode/decode, every truncated prefix, corrupt dimensions and overlapping levels, cancellation, upload-only creation, disposal and restoration. GPU tests compare all source/specular mips, SH and LUT values and identical saved bytes after device replacement.
 ### Batch 184 fur
-After npm run build:packages, run node --test --test-timeout=60000 packages/materials/tests/fur.test.js. Under the shared GPU lock run node packages/materials/test/fur-browser.mjs with a three-minute hold limit and a 60-minute queue limit. It renders all native/compat 1x/4x grids and stores captures and quantitative control differences at test-results/batch184/fur/gpu.json. The CC0 Wood Table Worn image is already in examples/assets/source/skinning_ik/textures/polyhaven/wood_table_worn. No network fetch or timing assertion is part of the gate.
-Batch 191 job 4: node --test --test-timeout=120000 packages/post/test/halftone.test.js after build; node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/halftone-browser.mjs, repeated with --compat. Uses an original constant-colour scene, with no external assets.
+After npm run build:packages, run node --test --test-timeout=60000 packages/materials/tests/fur.test.js. Run node packages/materials/test/fur-browser.mjs with a three-minute limit. It renders all native/compat 1x/4x grids and stores captures and quantitative control differences at test-results/batch184/fur/gpu.json. The CC0 Wood Table Worn image is already in examples/assets/source/skinning_ik/textures/polyhaven/wood_table_worn. No network fetch or timing assertion is part of the gate.
+Batch 191 job 4: node --test --test-timeout=120000 packages/post/test/halftone.test.js after build; node scripts/run-with-timeout.mjs run --max=3 -- node packages/post/test/halftone-browser.mjs, repeated with --compat. Uses an original constant-colour scene, with no external assets.
 
 ## Batch 272 job 2: sky and multiple lights
-After build:packages run node --test --test-timeout=120000 packages/staging/test/*.test.js and node scripts/gpu-lock.mjs run --owner=staging-ambient --max=4 --wait-max=60 -- node packages/staging/test/accumulate-ambient-browser.mjs. The latter runs both backends and writes test-results/staging-accumulate-ambient.json. Its original contact-reference sphere fixture has a closed-form cosine visibility integral. No external data or timing assertion.
+After build:packages run node --test --test-timeout=120000 packages/studio/test/*.test.js and node scripts/run-with-timeout.mjs run --max=4 -- node packages/studio/test/accumulate-ambient-browser.mjs. The latter runs both backends and writes test-results/staging-accumulate-ambient.json. Its original contact-reference sphere fixture has a closed-form cosine visibility integral. No external data or timing assertion.
 
 
 ### Batch 173 volume quality and opaque termination
-Build packages, run `node --test --test-timeout=120000 packages/sciviz/tests/volume-quality.test.js`, then run volume-depth-browser.mjs and volume-quality-browser.mjs under `node scripts/gpu-lock.mjs run --owner=volume-quality-proof --wait-max=60 --max=5 -- node packages/sciviz/tests/<script>`. Each browser script covers native WebGPU and WebGL2 compatibility. Reports: test-results/batch173-volume-depth.json and batch173-volume-quality.json; screenshots: batch173-volume-quality-native.png / compat.png.
+Build packages, run `node --test --test-timeout=120000 packages/sciviz/tests/volume-quality.test.js`, then run volume-depth-browser.mjs and volume-quality-browser.mjs under `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/<script>`. Each browser script covers native WebGPU and WebGL2 compatibility. Reports: test-results/batch173-volume-depth.json and batch173-volume-quality.json; screenshots: batch173-volume-quality-native.png / compat.png.
 For the half-volume fixture, a=20/255 and a green opaque slice halves the path. Ordinary extinction spans four voxels, so A=1-(1-a)^4; cinematic/fusion span 3.5 centre-to-centre voxel intervals, so A=1-(1-a)^3.5. Blend red with the measured green slice using A. For constant quality integration, a=5/255 over 32 intervals gives round(255*(1-(1-a)^32))=120. The affine ramp has 33 samples exactly representable in binary16, y=i/32; threshold 0.37 is bracketed against independently placed opaque planes, including a two-millionth interval after 24 explicit-interpolation bisections. No tolerance was relaxed when hardware texture-filter fraction quantization was found; refined samples now interpolate corner loads in float32.
 The static 32x32 rank tile is generated clean room by `python scripts/prepare-sciviz-blue-noise.py` (NumPy 2.5.4, PCG64 seed 17304, Gaussian sigma 1.5, 75 relaxation swaps). CPU checks require ranks 0..1023 exactly once and mean low-frequency power below a tenth of the high-frequency comparison modes. The source scan and its CC0 provenance are unchanged; open examples/sciviz-volume-quality.html and select iso/composite/MIP. Timing suites remain deferred.
 
 ### Batch 195 job 1
-Build packages; run node --test --test-timeout=120000 packages/quality/test/demand.test.js and node scripts/gpu-lock.mjs run --owner=codex-batch195 --max=3 --wait-max=60 -- node packages/quality/test/demand-browser.mjs. The browser fixture compares draw counters across idle frames, damped control activity and load completion on both backends. Fixtures are original analytic geometry, no external data.
-Batch 270 recurring suite: under the shared GPU lock run npm run test:gpu --workspace @margoengine/vfx, then npm run test:gpu:parity --workspace @margoengine/vfx. The dedicated command includes native and WebGL2 parity.mjs --all. The CPU registration regression is node --test --test-timeout=120000 packages/vfx/test/gpu-registration.test.js.
+Build packages; run node --test --test-timeout=120000 packages/quality/test/demand.test.js and node scripts/run-with-timeout.mjs run --max=3 -- node packages/quality/test/demand-browser.mjs. The browser fixture compares draw counters across idle frames, damped control activity and load completion on both backends. Fixtures are original analytic geometry, no external data.
+Batch 270 recurring suite: run npm run test:gpu --workspace @margoengine/vfx, then npm run test:gpu:parity --workspace @margoengine/vfx. The dedicated command includes native and WebGL2 parity.mjs --all. The CPU registration regression is node --test --test-timeout=120000 packages/vfx/test/gpu-registration.test.js.
 ### Batch 186 job 1: disk and sphere shadows
 
-Build packages, run the clustered CPU tests, then run `node scripts/gpu-lock.mjs run --owner=codex-batch186 --max=4 --wait-max=60 -- node scripts/clustered-area-shapes-gpu.mjs` and the same command with `--compat` after the script. The procedural scene has an emitter at y=3, a block from y=1 to 1.5, and floor probes at x=0 and x=3. Blocked visibility must be below 0.05, clear visibility within 0.02 of 1, and core/probe shaders must compile without errors or warnings. No benchmarks are run in the build phase.
-Batch 191 job 5: node --test --test-timeout=120000 packages/post/test/stylize.test.js after build; node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/stylize-browser.mjs, repeated with --compat. All visual fixtures are original analytic bars.
+Build packages, run the clustered CPU tests, then run `node scripts/run-with-timeout.mjs run --max=4 -- node scripts/clustered-area-shapes-gpu.mjs` and the same command with `--compat` after the script. The procedural scene has an emitter at y=3, a block from y=1 to 1.5, and floor probes at x=0 and x=3. Blocked visibility must be below 0.05, clear visibility within 0.02 of 1, and core/probe shaders must compile without errors or warnings. No benchmarks are run in the build phase.
+Batch 191 job 5: node --test --test-timeout=120000 packages/post/test/stylize.test.js after build; node scripts/run-with-timeout.mjs run --max=3 -- node packages/post/test/stylize-browser.mjs, repeated with --compat. All visual fixtures are original analytic bars.
 
 
 ### Batch 195 job 3
-Build packages, run node --test --test-timeout=120000 packages/quality/test/events.test.js, then node scripts/gpu-lock.mjs run --owner=codex-batch195 --max=3 --wait-max=60 -- node packages/quality/test/events-browser.mjs. The fixture uses original box geometry, a control-like change event and real engine.pick on native WebGPU then full WebGL2 compatibility. The 200-to-1 assertion counts work and has no timing budget.
+Build packages, run node --test --test-timeout=120000 packages/quality/test/events.test.js, then node scripts/run-with-timeout.mjs run --max=3 -- node packages/quality/test/events-browser.mjs. The fixture uses original box geometry, a control-like change event and real engine.pick on native WebGPU then full WebGL2 compatibility. The 200-to-1 assertion counts work and has no timing budget.
 
 ### Batch 201 job 2
-After build:packages, run `node --test --test-timeout=120000 packages/gltf-pro/tests/dds.test.js packages/decoders/tests/bc-float.test.js`. Under the shared GPU lock run `node packages/gltf-pro/scripts/test-dds-browser.mjs`, then the same script with `--compat`. The fixture compares native and forced software BC paths and records maximum channel error in test-results/batch201-dds[-compat].json; it also asserts a visible red mip-chain material and no GPU validation errors.
+After build:packages, run `node --test --test-timeout=120000 packages/gltf/test/dds.test.js packages/decoders/tests/bc-float.test.js`. Run `node packages/gltf/scripts/test-dds-browser.mjs`, then the same script with `--compat`. The fixture compares native and forced software BC paths and records maximum channel error in test-results/batch201-dds[-compat].json; it also asserts a visible red mip-chain material and no GPU validation errors.
 
 ### Assigned batch-273 sampler overflow
-Build packages, then run gltf-pro CPU tests. Under the shared GPU lock run `node scripts/gltf-pro-materials-gpu-check.js` and again with `--compat`; all composed and transmissive permutations must still report null pipeline errors. Run `node packages/gltf-pro/scripts/test-base-textures-browser.mjs` and again with `--compat` for 360 continuous-filter reference cases per backend; test-results/batch201-base-textures[-compat].json records analytic and native filtering errors separately. No original pipeline assertion is relaxed.
+Build packages, then run gltf/pbr CPU tests. Run `node scripts/gltf-pbr-materials-gpu-check.js` and again with `--compat`; all composed and transmissive permutations must still report null pipeline errors. Run `node packages/gltf/scripts/test-base-textures-browser.mjs` and again with `--compat` for 360 continuous-filter reference cases per backend; test-results/batch201-base-textures[-compat].json records analytic and native filtering errors separately. No original pipeline assertion is relaxed.
 
 ### Batch 203 HDR6
 
-Build packages, then run node --test packages/decoders/tests/ktx2-hdr6.test.js and cargo test --offline --locked --manifest-path packages/decoders/native/hdr6/Cargo.toml, with a hard process-tree timeout. Golden records and fixture attribution are in packages/decoders/tests/fixtures/ktx2-hdr6. The clean-room crate has no dependencies. Run node scripts/gpu-lock.mjs run --owner=hdr6-correctness --wait-max=60 --max=3 -- node packages/decoders/tests/hdr6-browser.mjs for both backends. Production asset emission is covered by packages/decoders/scripts/test-browser.js. No README run or full verify is a lane gate.
+Build packages, then run node --test packages/decoders/tests/ktx2-hdr6.test.js and cargo test --offline --locked --manifest-path packages/decoders/native/hdr6/Cargo.toml, with a hard process-tree timeout. Golden records and fixture attribution are in packages/decoders/tests/fixtures/ktx2-hdr6. The clean-room crate has no dependencies. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/decoders/tests/hdr6-browser.mjs for both backends. Production asset emission is covered by packages/decoders/scripts/test-browser.js. No README run or full verify is a lane gate.
 
 ## Batch 177 job 1
 
-Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/contour2d.test.js`. Render with `node scripts/gpu-lock.mjs run --owner=codex-batch177 --wait-max=60 --max=3 -- node packages/sciviz/tests/contour2d-browser.mjs`. Open `/examples/sciviz-contour2d.html` using the examples server and switch both fields/modes; the download stays SVG paths/text with polygon holes. Frozen data hashes and reductions are in `examples/assets/sciviz/contour2d/source.json`. Regenerate with `packages/sciviz/scripts/prepare-contour2d.py` using the dependencies listed in its header. No rival source, benchmarks or timing-only tests are needed.
+Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/contour2d.test.js`. Render with `node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/contour2d-browser.mjs`. Open `/examples/sciviz-contour2d.html` using the examples server and switch both fields/modes; the download stays SVG paths/text with polygon holes. Frozen data hashes and reductions are in `examples/assets/sciviz/contour2d/source.json`. Regenerate with `packages/sciviz/scripts/prepare-contour2d.py` using the dependencies listed in its header. No rival source, benchmarks or timing-only tests are needed.
 
 
-Batch 188 Fresnel floor: build packages, node --test --test-timeout=120000 packages/environment/tests/reflector-pbr.test.js packages/vfx/test/manifest.test.js. Native GPU: node scripts/gpu-lock.mjs run --owner=codex-batch188 --max=4 --wait-max=60 -- node packages/environment/scripts/test-browser.js --page=reflector-pbr ; repeat with --compat. Tests check independent Schlick HDR values over view angles, real oblique capture depth at contact and distance, no shader compilation for live uniform changes, exact pixels after device replacement, and the CC0 panorama already attributed in environment fixtures/NOTICE.md. No speed measurement.
+Batch 188 Fresnel floor: build packages, node --test --test-timeout=120000 packages/environment/tests/reflector-pbr.test.js packages/vfx/test/manifest.test.js. Native GPU: node scripts/run-with-timeout.mjs run --max=4 -- node packages/environment/scripts/test-browser.js --page=reflector-pbr ; repeat with --compat. Tests check independent Schlick HDR values over view angles, real oblique capture depth at contact and distance, no shader compilation for live uniform changes, exact pixels after device replacement, and the CC0 panorama already attributed in environment fixtures/NOTICE.md. No speed measurement.
 
 ## Precipitation cover (batch 236 job 2)
-Build packages. CPU: node --test --test-timeout=60000 packages/weather/tests/cover.test.js. GPU: node scripts/gpu-lock.mjs run --owner=weather-cover-proof --wait-max=60 --max=8 -- node packages/weather/tests/parity-browser.mjs cover, then the same command with --compat (or npm run test:browser:parity --workspace=@margoengine/weather for gltf, cover and lens on both backends). Original procedural fixture: imported floor and wall, core strip, capture-only roof with 0.5 m eaves and a small canopy probe. No third-party fixture or benchmark.
+Build packages. CPU: node --test --test-timeout=60000 packages/weather/tests/cover.test.js. GPU: node scripts/run-with-timeout.mjs run --max=8 -- node packages/weather/tests/parity-browser.mjs cover, then the same command with --compat (or npm run test:browser:parity --workspace=@margoengine/weather for gltf, cover and lens on both backends). Original procedural fixture: imported floor and wall, core strip, capture-only roof with 0.5 m eaves and a small canopy probe. No third-party fixture or benchmark.
 
 ## Batch 272 job 3: product caustics
-After build:packages run node --test --test-timeout=120000 packages/staging/test/*.test.js and node scripts/gpu-lock.mjs run --owner=staging-caustics --max=4 --wait-max=60 -- node packages/staging/test/caustics-browser.mjs. Both backends use original plane, slab and sphere oracles; report: test-results/staging-caustics.json. Compare water against 1-((ior-1)/(ior+1)) squared and the slab against two such Fresnel transmission factors. Require focused irradiance above one, integrated flux below one, nonblack floor pixels, exact retained/restored maps and rejection followed by successful replacement. No network assets or timing assertions.
+After build:packages run node --test --test-timeout=120000 packages/studio/test/*.test.js and node scripts/run-with-timeout.mjs run --max=4 -- node packages/studio/test/caustics-browser.mjs. Both backends use original plane, slab and sphere oracles; report: test-results/staging-caustics.json. Compare water against 1-((ior-1)/(ior+1)) squared and the slab against two such Fresnel transmission factors. Require focused irradiance above one, integrated flux below one, nonblack floor pixels, exact retained/restored maps and rejection followed by successful replacement. No network assets or timing assertions.
 ### Batch 174 job 1: shared selections
-Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/link.test.js. Under a shared GPU lock run node packages/sciviz/tests/link-browser.mjs (the script covers native WebGPU and WebGL2 compatibility). The public-domain 2MASS asset's hashes and query are pinned in examples/assets/sciviz/stars.json. The real-data predicate selects J-Ks strictly between 0.8 and 1.1: 242,931 of the sample's million sources. Both backends must change all three linked view images, preserve exact histogram counts, undo all memberships, upload one mask for two million plotted marks, and return exactly 485,862 selected entries on GPU readback. Two copies of the observed rows supply the stress layer. No timings are asserted.
+Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/link.test.js. Run node packages/sciviz/tests/link-browser.mjs (the script covers native WebGPU and WebGL2 compatibility). The public-domain 2MASS asset's hashes and query are pinned in examples/assets/sciviz/stars.json. The real-data predicate selects J-Ks strictly between 0.8 and 1.1: 242,931 of the sample's million sources. Both backends must change all three linked view images, preserve exact histogram counts, undo all memberships, upload one mask for two million plotted marks, and return exactly 485,862 selected entries on GPU readback. Two copies of the observed rows supply the stress layer. No timings are asserted.
 
 ### Batch 186 job 2: shared shadow atlas
-After build:packages, run clustered CPU tests. Run node scripts/gpu-lock.mjs run --owner=codex-batch186 --max=4 --wait-max=60 -- node scripts/clustered-shadow-atlas-gpu.mjs, and append --compat for the full WebGL2 check. Point/spot blocked visibility must be below 0.05; clear visibility must stay within 0.02 of 1; combined rectangle/sphere probes must remain blocked below 0.05 of clear. No shader warnings or errors. CPU shadow-atlas.test.js independently pins face count, disjoint tiles, allocation and rasterized-texel counts. Benchmarks remain deferred.
+After build:packages, run clustered CPU tests. Run node scripts/run-with-timeout.mjs run --max=4 -- node scripts/clustered-shadow-atlas-gpu.mjs, and append --compat for the full WebGL2 check. Point/spot blocked visibility must be below 0.05; clear visibility must stay within 0.02 of 1; combined rectangle/sphere probes must remain blocked below 0.05 of clear. No shader warnings or errors. CPU shadow-atlas.test.js independently pins face count, disjoint tiles, allocation and rasterized-texel counts. Benchmarks remain deferred.
 
 
 
@@ -3717,69 +3700,68 @@ After build:packages, run clustered CPU tests. Run node scripts/gpu-lock.mjs run
 
 Rebuild the single optional SIMD artifact with node packages/exporters/scripts/build-draco.mjs, then npm run build:packages. CPU correctness: cargo test --locked --manifest-path packages/exporters/draco-kernel/Cargo.toml and node --test --test-timeout=120000 packages/exporters/tests/draco.test.js packages/exporters/tests/draco-native.test.js. The normal test records opaque Draco 1.5.7 maximum errors for an original xorshift-seeded 3,000-direction input and compares six bit depths; no encoder oracle dependency ships in that test. The boundary-call test counts actual exported Wasm calls through a forwarding object at two output sizes. The output is decoded independently, so reducing the count cannot omit geometry.
 
-Own-package browser correctness: node packages/exporters/scripts/test-browser.js, tests/png-browser.mjs and tests/capture-browser.mjs, with and without --compat, each under node scripts/gpu-lock.mjs run --owner=codex-batch136 --max=1 --wait-max=60 -- . Use the complete repository-relative paths for the two tests. These are shared correctness slots. Never run a timing benchmark during the deferred build phase. Entry bytes use scripts/measure-size.js bundleBytes followed by gzipSync; raw/gzip Wasm bytes use the committed artifact. The pre-change entry was measured from origin-main source against the same supporting modules before implementation changes. The complete external-corpus ratio/settings harness is the following proof job; no universal ratio or speed guarantee is asserted here.
-Batch 191 job 6: node --test --test-timeout=120000 packages/post/test/curvature.test.js after build; node scripts/gpu-lock.mjs run --owner=codex-batch191 --max=3 --wait-max=60 -- node packages/post/test/curvature-browser.mjs, repeated with --compat. Original signed half-float normal fields and a flat/cube scene require no external assets.
+Own-package browser correctness: node packages/exporters/scripts/test-browser.js, tests/png-browser.mjs and tests/capture-browser.mjs, with and without --compat, each under node scripts/run-with-timeout.mjs run --max=1 -- . Use the complete repository-relative paths for the two tests. Never run a timing benchmark during the deferred build phase. Entry bytes use scripts/measure-size.js bundleBytes followed by gzipSync; raw/gzip Wasm bytes use the committed artifact. The pre-change entry was measured from origin-main source against the same supporting modules before implementation changes. The complete external-corpus ratio/settings harness is the following proof job; no universal ratio or speed guarantee is asserted here.
+Batch 191 job 6: node --test --test-timeout=120000 packages/post/test/curvature.test.js after build; node scripts/run-with-timeout.mjs run --max=3 -- node packages/post/test/curvature-browser.mjs, repeated with --compat. Original signed half-float normal fields and a flat/cube scene require no external assets.
 
 
 
 ## Batch 178 vector publication
-After build:packages, run node --test --test-timeout=90000 packages/sciviz/tests/export-vector.test.js, then node scripts/gpu-lock.mjs run --owner=vector-publication --wait-max=60 --max=5 -- node packages/sciviz/tests/export-vector-browser.mjs. The latter runs native WebGPU and WebGL2 compatibility and records test-results/sciviz-export-vector.json. Open examples/sciviz-export-vector.html to inspect/download paths for the OpenNeuro threshold surface and the full NASA TMR scalar surface; source/licence/hashes remain in the existing asset JSON records. No timing measurement is part of these checks.
+After build:packages, run node --test --test-timeout=90000 packages/sciviz/tests/export-vector.test.js, then node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/export-vector-browser.mjs. The latter runs native WebGPU and WebGL2 compatibility and records test-results/sciviz-export-vector.json. Open examples/sciviz-export-vector.html to inspect/download paths for the OpenNeuro threshold surface and the full NASA TMR scalar surface; source/licence/hashes remain in the existing asset JSON records. No timing measurement is part of these checks.
 
 ## Batch 272 job 4: backdrop and preset studio lighting
-After build:packages run node --test --test-timeout=120000 packages/staging/test/*.test.js and node scripts/gpu-lock.mjs run --owner=staging-backdrop --max=4 --wait-max=60 -- node packages/staging/test/backdrop-browser.mjs. Both backends reuse FlightHelmet mobile from the existing licensed fixtures. Compare four named rig pictures, require >1000 changed backdrop pixel components after removal, exact restored output and detached owned mesh/environment. Report: test-results/staging-backdrop.json. No timing assertions or new data download.
+After build:packages run node --test --test-timeout=120000 packages/studio/test/*.test.js and node scripts/run-with-timeout.mjs run --max=4 -- node packages/studio/test/backdrop-browser.mjs. Both backends reuse FlightHelmet mobile from the existing licensed fixtures. Compare four named rig pictures, require >1000 changed backdrop pixel components after removal, exact restored output and detached owned mesh/environment. Report: test-results/staging-backdrop.json. No timing assertions or new data download.
 ## Batch 176 job 1: datasets
-After npm run build:packages, run node --test packages/sciviz/tests/datasets.test.js packages/sciviz/tests/datasets-elements.test.js packages/loaders/tests/vtk-datasets.test.js. Run node scripts/gpu-lock.mjs run --owner=dataset-repro --max=4 --wait-max=60 -- node packages/sciviz/tests/datasets-browser.mjs for both GPU backends. The page is examples/sciviz-datasets.html. Original NASA grids and SHA-256 values are in examples/assets/sciviz/datasets/source.json. To regenerate the independent writer outputs and interpolation oracle, install the external VTK 9.7.2 and NumPy tools outside package runtime dependencies, then run python packages/sciviz/scripts/datasets-fixtures.py from the repository root. It invokes public runtime APIs only. No benchmark or speed assertion is part of this proof; all timing work remains deferred by the build phase.
+After npm run build:packages, run node --test packages/sciviz/tests/datasets.test.js packages/sciviz/tests/datasets-elements.test.js packages/loaders/tests/vtk-datasets.test.js. Run node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/datasets-browser.mjs for both GPU backends. The page is examples/sciviz-datasets.html. Original NASA grids and SHA-256 values are in examples/assets/sciviz/datasets/source.json. To regenerate the independent writer outputs and interpolation oracle, install the external VTK 9.7.2 and NumPy tools outside package runtime dependencies, then run python packages/sciviz/scripts/datasets-fixtures.py from the repository root. It invokes public runtime APIs only. No benchmark or speed assertion is part of this proof; all timing work remains deferred by the build phase.
 ### Batch 217 job 3: scroll and ranges
 
-After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/scroll.test.js. Run node scripts/gpu-lock.mjs run --owner=cutscene-scroll --wait-max=60 --max=2 -- node packages/cutscene/tests/scroll-browser.mjs for browser interactions. The package test:gpu includes all cutscene proofs; repeat with MARGO_COMPAT=1 for compatibility rendering. Scroll/range logic is DOM/CPU only and identical on both backends. All comparisons are correctness assertions; no benchmark or timing budget runs.
+After build:packages, run node --test --test-timeout=120000 packages/cutscene/tests/scroll.test.js. Run node scripts/run-with-timeout.mjs run --max=2 -- node packages/cutscene/tests/scroll-browser.mjs for browser interactions. The package test:gpu includes all cutscene proofs; repeat with MARGO_COMPAT=1 for compatibility rendering. Scroll/range logic is DOM/CPU only and identical on both backends. All comparisons are correctness assertions; no benchmark or timing budget runs.
 
 ## Batch 177 job 2
 
-Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/stats.test.js`. Browser proof: `node scripts/gpu-lock.mjs run --owner=codex-batch177 --wait-max=60 --max=3 -- node packages/sciviz/tests/stats-browser.mjs`. Open `/examples/sciviz-stats.html` for thirteen vector charts and SVG downloads; the page shows units, data dates and missing-error policy. `node packages/sciviz/scripts/prepare-stats.mjs` reproduces the frozen reductions from NOAA GHCN and a commit-pinned public NASA-table mirror. No rival source is used. Timing benchmarks are deferred during the build phase.
+Build packages, then `node --test --test-timeout=30000 packages/sciviz/tests/stats.test.js`. Browser proof: `node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/stats-browser.mjs`. Open `/examples/sciviz-stats.html` for thirteen vector charts and SVG downloads; the page shows units, data dates and missing-error policy. `node packages/sciviz/scripts/prepare-stats.mjs` reproduces the frozen reductions from NOAA GHCN and a commit-pinned public NASA-table mirror. No rival source is used. Timing benchmarks are deferred during the build phase.
 
 ### Batch 274 job 3: CPU SIMD correctness
 
-Build with node packages/compute/scripts/build-cpu.mjs, then npm run build:packages. Run node --test --test-timeout=120000 packages/compute/tests/cpu.test.js packages/compute/tests/cpu-wasm.test.js. Run cargo test --locked --manifest-path packages/compute/cpu-kernel/Cargo.toml with a 120 s process-tree limit. GPU correctness: node scripts/gpu-lock.mjs run --owner=cpu-wasm-proof --wait-max=60 --max=3 -- node packages/compute/tests/cpu-wasm-browser.mjs. This driver compares the new CPU factory with WebGPU and then WebGL2, with 59 checks each. It makes no elapsed-time assertion. The SIMD counter comes from actual Rust loop execution; the odd-sized exact A/B test also covers the scalar tail.
+Build with node packages/compute/scripts/build-cpu.mjs, then npm run build:packages. Run node --test --test-timeout=120000 packages/compute/tests/cpu.test.js packages/compute/tests/cpu-wasm.test.js. Run cargo test --locked --manifest-path packages/compute/cpu-kernel/Cargo.toml with a 120 s process-tree limit. GPU correctness: node scripts/run-with-timeout.mjs run --max=3 -- node packages/compute/tests/cpu-wasm-browser.mjs. This driver compares the new CPU factory with WebGPU and then WebGL2, with 59 checks each. It makes no elapsed-time assertion. The SIMD counter comes from actual Rust loop execution; the odd-sized exact A/B test also covers the scalar tail.
 
 ### Batch 195 job 2
-Build packages, then run `node --test --test-timeout=60000 packages/quality/test/knobs.test.js`. Run `node scripts/gpu-lock.mjs run --owner=quality-knobs --max=4 --wait-max=60 -- node packages/quality/test/knobs-browser.mjs` for both native and compatibility backends. The fixture uses original analytic stripes/clear colour and fixed particle deltas; no external downloads or timing assertion. Observe 4/4/1 pipeline samples across selection and engine re-create, actual reduced dimensions, restored source pixels and birth counts 10/15/15/25.
+Build packages, then run `node --test --test-timeout=60000 packages/quality/test/knobs.test.js`. Run `node scripts/run-with-timeout.mjs run --max=4 -- node packages/quality/test/knobs-browser.mjs` for both native and compatibility backends. The fixture uses original analytic stripes/clear colour and fixed particle deltas; no external downloads or timing assertion. Observe 4/4/1 pipeline samples across selection and engine re-create, actual reduced dimensions, restored source pixels and birth counts 10/15/15/25.
 
-Batch 188 EXR codecs: build packages, then node --test --test-timeout=120000 packages/environment/tests/exr-codecs.test.js. GPU-locked node packages/environment/scripts/test-browser.js --page=exr-codecs, and node packages/environment/tests/exr-codecs-bundled-browser.mjs; run each with --compat too. The lock owner is codex-batch188, shared, max 4 and wait-max 60 minutes. The native oracle records are packages/environment/tests/fixtures/codecs/reference.json; run source.mjs there from the repo root after building, then generate.py with native OpenEXR 3.5.3 and NumPy installed (the script also accepts test-results/exr-oracledeps). The source.mjs step writes the intermediate photographic crop into this worktree's ignored test-results. Expected .f32 bytes are native decoder output, never Margo's. Native SDK and prebuilt Wasm versions are intentionally independent.
+Batch 188 EXR codecs: build packages, then node --test --test-timeout=120000 packages/environment/tests/exr-codecs.test.js. Run node packages/environment/scripts/test-browser.js --page=exr-codecs, and node packages/environment/tests/exr-codecs-bundled-browser.mjs; run each with --compat too, with a 4 minute time limit. The native oracle records are packages/environment/tests/fixtures/codecs/reference.json; run source.mjs there from the repo root after building, then generate.py with native OpenEXR 3.5.3 and NumPy installed (the script also accepts test-results/exr-oracledeps). The source.mjs step writes the intermediate photographic crop into this worktree's ignored test-results. Expected .f32 bytes are native decoder output, never Margo's. Native SDK and prebuilt Wasm versions are intentionally independent.
 
 ### Batch 201 job 3
-After build:packages run `node --test --test-timeout=120000 packages/gltf-pro/tests/audio.test.js`. Under the shared GPU lock run `node packages/gltf-pro/scripts/test-audio-browser.mjs`, then repeat with `--compat`. A generated 48-kHz mono PCM tone is decoded by real Web Audio and rendered into 4,800 stereo frames. Both dialects follow the model node from +X to -X, retain their opposite forward axes, and produce the expected right-channel equal-power output at +X. Receipts: test-results/batch201-audio[-compat].json. No external model/audio asset or timing benchmark is needed.
+After build:packages run `node --test --test-timeout=120000 packages/gltf/test/audio.test.js`. Run `node packages/gltf/scripts/test-audio-browser.mjs`, then repeat with `--compat`. A generated 48-kHz mono PCM tone is decoded by real Web Audio and rendered into 4,800 stereo frames. Both dialects follow the model node from +X to -X, retain their opposite forward axes, and produce the expected right-channel equal-power output at +X. Receipts: test-results/batch201-audio[-compat].json. No external model/audio asset or timing benchmark is needed.
 
 
 
-Batch 136 ratio/error proof: after building packages, run node packages/exporters/tests/draco-parity.mjs --oracle=<outside-folder> --matrix packages/exporters/tests/fixtures/Box.glb examples/assets/khronos/Fox/Fox.glb examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb examples/assets/khronos/Lantern/Lantern.glb examples/assets/khronos/RiggedFigure/RiggedFigure.glb under a hard process-tree timeout. The outside folder contains opaque draco_encoder_wrapper.cjs, draco_encoder.wasm, draco_decoder.cjs and draco_decoder.wasm; the harness rejects a folder inside the repository. Existing asset notices supply source/licence. Output is test-results/batch-136/draco-parity.json. The committed results/batch-136-draco-parity.json captures all 76 rows and exact hashes. No GPU lock or timing benchmark is involved. Permanent regressions run with cargo test for exporters/draco-kernel and node --test packages/exporters/tests/draco-native.test.js.
+Batch 136 ratio/error proof: after building packages, run node packages/exporters/tests/draco-parity.mjs --oracle=<outside-folder> --matrix packages/exporters/tests/fixtures/Box.glb examples/assets/khronos/Fox/Fox.glb examples/assets/khronos/MetalRoughSpheres/MetalRoughSpheres.glb examples/assets/khronos/CommercialRefrigerator/CommercialRefrigerator.glb examples/assets/khronos/Lantern/Lantern.glb examples/assets/khronos/RiggedFigure/RiggedFigure.glb under a hard process-tree timeout. The outside folder contains opaque draco_encoder_wrapper.cjs, draco_encoder.wasm, draco_decoder.cjs and draco_decoder.wasm; the harness rejects a folder inside the repository. Existing asset notices supply source/licence. Output is test-results/batch-136/draco-parity.json. The committed results/batch-136-draco-parity.json captures all 76 rows and exact hashes. No GPU or timing benchmark is involved. Permanent regressions run with cargo test for exporters/draco-kernel and node --test packages/exporters/tests/draco-native.test.js.
 ### Batch 173 job 5 mapped volumes
-Run node --test --test-timeout=60000 packages/sciviz/tests/curvilinear.test.js after building packages. Run node scripts/gpu-lock.mjs run --owner=mapped-repro --max=9 --wait-max=60 -- node packages/sciviz/tests/curvilinear-browser.mjs for both backends; report test-results/batch173-curvilinear.json and mapped-demo PNGs. Cube analytical opacity: 1-(1-13/255)^4. Hollow spherical-shell ray length is twice (1-.5), reference distance .1, giving 1-(1-13/255)^10. Camera/physical ray offset changes this by less than one display byte. Rebuild public-domain NOAA subsets with python scripts/prepare-sciviz-mapped.py, bounded network requests, output hashes in examples/assets/sciviz/*curvilinear.json and woa23-shell.json. Open examples/sciviz-curvilinear.html to switch ray march, coordinate slices and boundary grid.
+Run node --test --test-timeout=60000 packages/sciviz/tests/curvilinear.test.js after building packages. Run node scripts/run-with-timeout.mjs run --max=9 -- node packages/sciviz/tests/curvilinear-browser.mjs for both backends; report test-results/batch173-curvilinear.json and mapped-demo PNGs. Cube analytical opacity: 1-(1-13/255)^4. Hollow spherical-shell ray length is twice (1-.5), reference distance .1, giving 1-(1-13/255)^10. Camera/physical ray offset changes this by less than one display byte. Rebuild public-domain NOAA subsets with python scripts/prepare-sciviz-mapped.py, bounded network requests, output hashes in examples/assets/sciviz/*curvilinear.json and woa23-shell.json. Open examples/sciviz-curvilinear.html to switch ray march, coordinate slices and boundary grid.
 ### Batch 186 job 3: cube-cookie projection
-After build:packages, run clustered CPU tests. Run node scripts/gpu-lock.mjs run --owner=codex-batch186 --max=4 --wait-max=60 -- node scripts/clustered-cube-projector-gpu.mjs, then the same command with --compat. The script compares production clusterLighting output to the same untextured lights: six axis colours, a one-third three-face corner, a half-red/half-green edge, continuity across that edge, quaternion rotation, an oriented 2x2 pattern, sRGB grey times alpha and independent mixed spot/cube cookies. Tolerance is 0.0002 on normalized radiance; no shader warnings/errors. Diagnostic images are generated locally from the constants in the script.
+After build:packages, run clustered CPU tests. Run node scripts/run-with-timeout.mjs run --max=4 -- node scripts/clustered-cube-projector-gpu.mjs, then the same command with --compat. The script compares production clusterLighting output to the same untextured lights: six axis colours, a one-third three-face corner, a half-red/half-green edge, continuity across that edge, quaternion rotation, an oriented 2x2 pattern, sRGB grey times alpha and independent mixed spot/cube cookies. Tolerance is 0.0002 on normalized radiance; no shader warnings/errors. Diagnostic images are generated locally from the constants in the script.
 
 
 
 
-Batch 180 job 1: build packages, then node --test packages/sciviz/tests/geo-lod.test.js; for rendering use node scripts/gpu-lock.mjs run --owner=geo-lod-repro --wait-max=60 --max=4 -- node packages/sciviz/tests/geo-lod-browser.mjs. The browser suite tests both WebGPU and webgl2-compat and writes test-results/sciviz-geo-lod.json. Demo: examples/sciviz-geo-lod.html, pinned levels 0..2 by default; optional live AWS detailed tiles. No benchmark or exclusive lock.
+Batch 180 job 1: build packages, then node --test packages/sciviz/tests/geo-lod.test.js; for rendering use node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/geo-lod-browser.mjs. The browser suite tests both WebGPU and webgl2-compat and writes test-results/sciviz-geo-lod.json. Demo: examples/sciviz-geo-lod.html, pinned levels 0..2 by default; optional live AWS detailed tiles. No benchmark or run with the GPU to itself.
 Batch 181 job 1: build packages, then run node --test --test-timeout=120000
-packages/sciviz/tests/*.test.js. Run node scripts/gpu-lock.mjs run
---owner=codex-batch181 --max=6 --wait-max=60 -- node packages/sciviz/tests/fallback-browser.mjs
+packages/sciviz/tests/*.test.js. Run node scripts/run-with-timeout.mjs run --max=6 -- node packages/sciviz/tests/fallback-browser.mjs
 for native/shared-WebGL2 pixels, CPU extraction, replacement, cancellation and all three
 real-data demos. Result: test-results/sciviz-fallback.json. Open examples/sciviz-head.html,
 sciviz-stars.html and sciviz-wind.html with ?backend=webgl2 to force the complete route.
 Data sources and licences remain in examples/assets/sciviz/README.md; no new dataset or
 performance measurement is introduced. The scripts test correctness under a hard outer
-process-tree deadline and shared GPU admission, with no exclusive speed reservation.
+process-tree deadline, with no GPU reserved for speed.
 
-Batch 136 removal: build packages, then run exporters/draco-native.test.js and tests/supply-chain.test.js with a hard timeout. They require the owned Wasm, no old encoder vendor/dist directories, successful default compression, current generated notices, retained asset addenda and valid package file lists. scripts/lazy-files.js lists only the owned Draco encoder asset. Run the exporter browser script for native and --compat under separate shared GPU slots. The external-oracle parity command above remains available without bundling its opaque modules.
-Batch 177 job 3: build packages, run node --test --test-timeout=60000 packages/sciviz/tests/charts-extra.test.js, then node scripts/gpu-lock.mjs run --owner=sciviz-charts-extra --wait-max=60 --max=3 -- node packages/sciviz/tests/charts-extra-browser.mjs. Open examples/sciviz-charts-extra.html for the 13 charts and downloads. Data provenance is examples/assets/sciviz/charts-extra/source.json; prepare.py re-downloads government data with bounded network waits. EIA revisions can change source hashes, so committed JSON is the proof fixture.
+Batch 136 removal: build packages, then run exporters/draco-native.test.js and tests/supply-chain.test.js with a hard timeout. They require the owned Wasm, no old encoder vendor/dist directories, successful default compression, current generated notices, retained asset addenda and valid package file lists. scripts/lazy-files.js lists only the owned Draco encoder asset. Run the exporter browser script for native and --compat. The external-oracle parity command above remains available without bundling its opaque modules.
+Batch 177 job 3: build packages, run node --test --test-timeout=60000 packages/sciviz/tests/charts-extra.test.js, then node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/charts-extra-browser.mjs. Open examples/sciviz-charts-extra.html for the 13 charts and downloads. Data provenance is examples/assets/sciviz/charts-extra/source.json; prepare.py re-downloads government data with bounded network waits. EIA revisions can change source hashes, so committed JSON is the proof fixture.
 
 ### Batch 274 job 4: NN-extra reproduction
 
-After npm run build:packages, run node --test --test-timeout=120000 packages/compute/tests/nn.test.js packages/compute/tests/nn-extra.test.js. This covers JavaScript and Rust SIMD CPU contexts, independent finite differences and allocation accounting. Run node scripts/gpu-lock.mjs run --owner=nn-extra-proof --wait-max=60 --max=3 -- node packages/compute/tests/nn-extra-browser.mjs for 38 cases each on WebGPU and compatibility. The transpose oracle scatters input taps, independently of the implementation's output gather. All tests are correctness-only.
+After npm run build:packages, run node --test --test-timeout=120000 packages/compute/tests/nn.test.js packages/compute/tests/nn-extra.test.js. This covers JavaScript and Rust SIMD CPU contexts, independent finite differences and allocation accounting. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/compute/tests/nn-extra-browser.mjs for 38 cases each on WebGPU and compatibility. The transpose oracle scatters input taps, independently of the implementation's output gather. All tests are correctness-only.
 
 The NN-extra landing detector regression runs with node --test --test-timeout=120000 tests/quality-gate.test.js; retain both positive GGX and negative convolution-geometry cases.
-Batch 271 job 1: build packages, then `node --test --test-timeout=30000 packages/creative/tests/targets-depth.test.js`; under a shared GPU lock run `node packages/creative/scripts/test-targets-depth.js` and again with `--compat` (164 surfaces each). The layer regression is `node packages/webgl2-compat/test/features-browser.mjs` (case volumeSliceDepth; it reads red on the layer without the stand-in). No timing run.
+Batch 271 job 1: build packages, then `node --test --test-timeout=30000 packages/creative/tests/targets-depth.test.js`; run `node packages/creative/scripts/test-targets-depth.js` and again with `--compat` (164 surfaces each). The layer regression is `node packages/webgl2-compat/test/features-browser.mjs` (case volumeSliceDepth; it reads red on the layer without the stand-in). No timing run.
 ### Batch 1 job 2: umbrella test discovery
 
 Run node --test --test-timeout=90000 tests/package-test-scripts.test.js and npm test --workspace packages/margoengine -- --test-timeout=90000. Removing scripts.test from packages/margoengine/package.json reproduces the missing tests/export-order.test.js report. No GPU or timing test is required for this manifest-only change.
@@ -3789,14 +3771,14 @@ Run node --test --test-timeout=90000 tests/package-test-scripts.test.js and npm 
 
 ## Batch 174 job 2: tables
 
-After building packages, run `node --test --test-timeout=120000 packages/sciviz/tests/table.test.js packages/decoders/tests/snappy.test.js`. Then run `node scripts/gpu-lock.mjs run --owner=table-proof --max=10 --wait-max=60 -- node packages/sciviz/tests/table-browser.mjs` shared. It tests both backends and prints counts, work and all sums; it has no timing threshold. Open `/examples/sciviz-tlc.html` through the normal Vite server to inspect distance-filtered charts. Standard fixtures regenerate with PyArrow 26.0.1 via `python packages/sciviz/scripts/generate-table-fixtures.py`; the downloaded original stays in this lane's ignored test-results/batch174 folder. No foreign implementation is copied.
+After building packages, run `node --test --test-timeout=120000 packages/sciviz/tests/table.test.js packages/decoders/tests/snappy.test.js`. Then run `node scripts/run-with-timeout.mjs run --max=10 -- node packages/sciviz/tests/table-browser.mjs`. It tests both backends and prints counts, work and all sums; it has no timing threshold. Open `/examples/sciviz-tlc.html` through the normal Vite server to inspect distance-filtered charts. Standard fixtures regenerate with PyArrow 26.0.1 via `python packages/sciviz/scripts/generate-table-fixtures.py`; the downloaded original stays in this lane's ignored test-results/batch174 folder. No foreign implementation is copied.
 ## Batch 178 PDF and math
-Run node --test --test-timeout=120000 packages/sciviz/tests/math.test.js packages/sciviz/tests/pdf.test.js after building packages. Run node scripts/gpu-lock.mjs run --owner=publication --wait-max=60 --max=6 -- node packages/sciviz/tests/pdf-browser.mjs for native WebGPU and WebGL2; artifacts are test-results/sciviz-publication/. Open examples/sciviz-publication.html for all 3441 LIGO samples and PDF/SVG downloads. For independent decoding, PyMuPDF opens each generated PDF; assert one page, is_repaired false, zero images/12 paths for LIGO and the mixed fixture pixel expectations recorded in ../sciviz-publication.md. No timing assertions.
+Run node --test --test-timeout=120000 packages/sciviz/tests/math.test.js packages/sciviz/tests/pdf.test.js after building packages. Run node scripts/run-with-timeout.mjs run --max=6 -- node packages/sciviz/tests/pdf-browser.mjs for native WebGPU and WebGL2; artifacts are test-results/sciviz-publication/. Open examples/sciviz-publication.html for all 3441 LIGO samples and PDF/SVG downloads. For independent decoding, PyMuPDF opens each generated PDF; assert one page, is_repaired false, zero images/12 paths for LIGO and the mixed fixture pixel expectations recorded in ../sciviz-publication.md. No timing assertions.
 
 ## Batch 176 job 2 engineering formats
-After building packages and fetching Git LFS data, run node --test --test-timeout=60000 packages/sciviz/tests/hdf5.test.js packages/sciviz/tests/engineering.test.js packages/sciviz/tests/engineering-selections.test.js. Run node scripts/gpu-lock.mjs run --owner=engineering-reproduce --max=3 --wait-max=60 -- node packages/sciviz/tests/engineering-browser.mjs for both rendering routes. The demo is examples/sciviz-engineering.html. Native fixture writer scripts are under packages/sciviz/scripts/*fixtures.py and use public APIs of externally installed tools only; test execution itself needs no native format library. Fixture provenance records the exact writer versions and transformations. Correctness tests contain no timing budgets or performance claims.
-Batch 183 job 1: after build:packages, run the stage CPU suite and `node scripts/gpu-lock.mjs run --owner=codex-batch183 --wait-max=60 --max=5 --gpu=stage-gltf-pixel-comparison -- node packages/stage/test/gpu/gltf-check.mjs`. Both backends load BoxTextured, RiggedFigure and MorphStressTest side by side through the facade and direct PBR + Animation. Every RGBA byte must match and more than 100 pixels must contain visible model geometry; no driver or page errors are accepted. Existing fixture licence records are cited in docs/clean-room.md.
-Review 4: after build:packages, run packages/clustered/test/stochastic.test.js and ltc-edge.test.js with node --test; run scripts/clustered-cube-projector-gpu.mjs and scripts/shape-lights-gpu-check.js under the repository GPU lock, both normally and with --compat. The latter retains the 54 float64 mirror cases and their original limits.
+After building packages and fetching Git LFS data, run node --test --test-timeout=60000 packages/sciviz/tests/hdf5.test.js packages/sciviz/tests/engineering.test.js packages/sciviz/tests/engineering-selections.test.js. Run node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/engineering-browser.mjs for both rendering routes. The demo is examples/sciviz-engineering.html. Native fixture writer scripts are under packages/sciviz/scripts/*fixtures.py and use public APIs of externally installed tools only; test execution itself needs no native format library. Fixture provenance records the exact writer versions and transformations. Correctness tests contain no timing budgets or performance claims.
+Batch 183 job 1: after build:packages, run the stage CPU suite and `node scripts/run-with-timeout.mjs run --max=5 -- node packages/stage/test/gpu/gltf-check.mjs`. Both backends load BoxTextured, RiggedFigure and MorphStressTest side by side through the facade and direct PBR + Animation. Every RGBA byte must match and more than 100 pixels must contain visible model geometry; no driver or page errors are accepted. Existing fixture licence records are cited in docs/clean-room.md.
+Review 4: after build:packages, run packages/clustered/test/stochastic.test.js and ltc-edge.test.js with node --test; run scripts/clustered-cube-projector-gpu.mjs and scripts/shape-lights-gpu-check.js, both normally and with --compat. The latter retains the 54 float64 mirror cases and their original limits.
 
 
 Review 2 VTK wedge orientation: after building packages, run node --test --test-timeout=120000 packages/loaders/tests/vtk-wedge.test.js packages/loaders/tests/vtk-legacy.test.js packages/loaders/tests/vtk-xml.test.js. The unit prism must have signed volume +0.5, the positive affine transform +12, with every triangle facing away from the interior in both parsers and surface policies.
@@ -3806,10 +3788,10 @@ Review 2 canvas ray coordinates: after build:packages, run node --test --test-ti
 Review 2 off-scene animation dependencies: after building packages, run `node --test --test-timeout=120000 packages/exporters/tests/optimize-extra.test.js`. The pruning regression covers a directly animated skinned mesh and an animation target below a skinned ancestor outside scene roots. It validates both GLBs and the retained transform/joint references.
 
 
-Batch 175 job 2: build packages; run `node --experimental-test-module-mocks --test --test-timeout=30000 packages/sciviz/tests/pointcloud.test.js packages/sciviz/tests/pointcloud-data.test.js packages/sciviz/tests/link.test.js packages/points/tests/octree-attributes.test.js packages/points/tests/copc.test.js`. Run `node scripts/gpu-lock.mjs run --owner=pointcloud --wait-max=60 --max=3 -- node packages/sciviz/tests/pointcloud-browser.mjs` for native and compatibility pixels and work counts. Open examples/sciviz-pointcloud.html for original archived USGS EPT tiles. Their manifest pins compressed and decoded hashes; the independent oracle was laspy 2.7.0 with lazrs 0.8.2, comparing SHA-256 of complete little-endian point records, including extras. No download is required by tests.
-Batch 177 job 4: node --test --test-timeout=60000 packages/sciviz/tests/chart-polish.test.js; node scripts/gpu-lock.mjs run --owner=chart-polish --wait-max=60 --max=3 -- node packages/sciviz/tests/chart-polish-browser.mjs. Open examples/sciviz-chart-polish.html. It reuses the frozen public-domain GHCN Central Park table and attribution in examples/assets/sciviz/stats/source.json. Browser reports/snapshots live under ignored test-results/chart-polish. Existing line/scatter, rectangle and native WebGL2 drawing suites also exercise the Figure integration.
+Batch 175 job 2: build packages; run `node --experimental-test-module-mocks --test --test-timeout=30000 packages/sciviz/tests/pointcloud.test.js packages/sciviz/tests/pointcloud-data.test.js packages/sciviz/tests/link.test.js packages/points/tests/octree-attributes.test.js packages/points/tests/copc.test.js`. Run `node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/pointcloud-browser.mjs` for native and compatibility pixels and work counts. Open examples/sciviz-pointcloud.html for original archived USGS EPT tiles. Their manifest pins compressed and decoded hashes; the independent oracle was laspy 2.7.0 with lazrs 0.8.2, comparing SHA-256 of complete little-endian point records, including extras. No download is required by tests.
+Batch 177 job 4: node --test --test-timeout=60000 packages/sciviz/tests/chart-polish.test.js; node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/chart-polish-browser.mjs. Open examples/sciviz-chart-polish.html. It reuses the frozen public-domain GHCN Central Park table and attribution in examples/assets/sciviz/stats/source.json. Browser reports/snapshots live under ignored test-results/chart-polish. Existing line/scatter, rectangle and native WebGL2 drawing suites also exercise the Figure integration.
 ### Batch 173 job 6 tetrahedral volumes
-Build packages, then run node --test --test-timeout=60000 packages/sciviz/tests/tetvolume.test.js. Run node scripts/gpu-lock.mjs run --owner=tet-repro --max=9 --wait-max=60 -- node packages/sciviz/tests/tetvolume-browser.mjs. The script tests both backends and writes test-results/batch173-tetvolume.json plus demo PNGs. Cube reference: alpha=13/255 per physical distance 0.25 through length 1, so displayed red is round(255*(1-(1-alpha)^4))=48. A half-length disconnected domain gives 25. Normalize the regular-image alpha to its physical voxel spacing before comparing it with the direct mesh; otherwise the two integrators have different optical depth. For a density d, voxel distance h and reference distance r, a_h=1-(1-min(alpha*d,1))^(h/r), with regular-source density a_h/alpha. This conversion is tested at densities 1 and 4.
+Build packages, then run node --test --test-timeout=60000 packages/sciviz/tests/tetvolume.test.js. Run node scripts/run-with-timeout.mjs run --max=9 -- node packages/sciviz/tests/tetvolume-browser.mjs. The script tests both backends and writes test-results/batch173-tetvolume.json plus demo PNGs. Cube reference: alpha=13/255 per physical distance 0.25 through length 1, so displayed red is round(255*(1-(1-alpha)^4))=48. A half-length disconnected domain gives 25. Normalize the regular-image alpha to its physical voxel spacing before comparing it with the direct mesh; otherwise the two integrators have different optical depth. For a density d, voxel distance h and reference distance r, a_h=1-(1-min(alpha*d,1))^(h/r), with regular-source density a_h/alpha. This conversion is tested at densities 1 and 4.
 Run python scripts/prepare-sciviz-tetvolume.py to rebuild the attributed NASA subset; the original zip stays under ignored test-results/batch173/job6, every network request has a 60-second limit. Open examples/sciviz-tetvolume.html for identical fixed views of direct cells and their CellLocator resampling. Source samples are a two-dimensional CFL3D SA field, extended unchanged along display span; geometry transformations are declared in the UI and metadata.
 
 
@@ -3817,115 +3799,114 @@ Run python scripts/prepare-sciviz-tetvolume.py to rebuild the attributed NASA su
 
 ## Batch 174 job 3: multivariate plots
 
-After building packages, run node --test --test-timeout=60000 packages/sciviz/tests/parcoords.test.js. Run the shared GPU proof with node scripts/gpu-lock.mjs run --owner=parcoords-proof --max=3 --wait-max=60 -- node packages/sciviz/tests/parcoords-browser.mjs. It tests native and compatibility devices, counts actual submitted line instances, compares every density pixel against the repeated-observation reference, checks linked selection/undo, reorder/flip writes and resource restoration. Open /examples/sciviz-parcoords.html through the normal Vite server for the real-observation demo. Snapshot source, query reduction, licence and hashes remain in examples/assets/sciviz/stats/source.json. No timing-only check runs.
+After building packages, run node --test --test-timeout=60000 packages/sciviz/tests/parcoords.test.js. Run the GPU proof with node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/parcoords-browser.mjs. It tests native and compatibility devices, counts actual submitted line instances, compares every density pixel against the repeated-observation reference, checks linked selection/undo, reorder/flip writes and resource restoration. Open /examples/sciviz-parcoords.html through the normal Vite server for the real-observation demo. Snapshot source, query reduction, licence and hashes remain in examples/assets/sciviz/stats/source.json. No timing-only check runs.
 
 ## Batch 181 job 2: allocation reporting
 
 Build packages, then run packages/sciviz/tests/monitor.test.js with Node's test runner
-and --test-timeout=120000. Under the shared GPU lock, run monitor-browser.mjs, then
+and --test-timeout=120000. Run monitor-browser.mjs, then
 packages/sciviz/tests/limits-browser.mjs once normally and once with --backend=webgl2 and a
-separate --output path. Each render command has a three-minute active hard limit and
---wait-max=60; an outer process-tree limit covers teardown. The suite JSON is documented
+separate --output path. Each render command has a three-minute active hard limit;
+an outer process-tree limit covers teardown. The suite JSON is documented
 in ../sciviz-monitor.md. It includes source commit and source digest, raw per-layer counts
 and bytes, browser, GPU and CPU utilization. Original asset hashes/provenance stay beside
 the assets; NYC TLC source.json includes its exact query and terms. Default scene ceilings
 are censored correctness observations. Timed mode is refused until speed-phase.json ends
 deferral; the exact outstanding scale and format matrix is in the speed-phase inventory.
-Batch 180 job 2 vector geography: build packages, then node --test --test-timeout=120000 packages/sciviz/tests/geo-vector.test.js. Render correctness: node scripts/gpu-lock.mjs run --owner=<lane> --wait-max=60 --max=1 -- node packages/sciviz/scripts/browser-root.mjs tests/geo-vector-browser.mjs. Both backends write test-results/sciviz-geo-vector.json and use examples/sciviz-geo-vector.html. Asset reconstruction commands, original/derived hashes and fields are in examples/assets/sciviz/geo-vector/source.json and prepare.mjs. No benchmark or timing claim.
-Batch 183 job 2: after build:packages run the stage and clustered CPU suites, then `node scripts/gpu-lock.mjs run --owner=codex-batch183 --wait-max=60 --max=4 --gpu=stage-lights-pixel-comparison -- node packages/stage/test/gpu/lights-check.mjs`. Each backend renders point, spot, rectangular area, extra directional and all four together. The facade must equal direct setup byte for byte, visibly change at least 100 pixels from the unlit-by-those-lights baseline and report no page/device error. The BoxTextured source/licence record is cited in docs/clean-room.md.
+Batch 180 job 2 vector geography: build packages, then node --test --test-timeout=120000 packages/sciviz/tests/geo-vector.test.js. Render correctness: node scripts/run-with-timeout.mjs run --max=1 -- node packages/sciviz/scripts/browser-root.mjs tests/geo-vector-browser.mjs. Both backends write test-results/sciviz-geo-vector.json and use examples/sciviz-geo-vector.html. Asset reconstruction commands, original/derived hashes and fields are in examples/assets/sciviz/geo-vector/source.json and prepare.mjs. No benchmark or timing claim.
+Batch 183 job 2: after build:packages run the stage and clustered CPU suites, then `node scripts/run-with-timeout.mjs run --max=4 -- node packages/stage/test/gpu/lights-check.mjs`. Each backend renders point, spot, rectangular area, extra directional and all four together. The facade must equal direct setup byte for byte, visibly change at least 100 pixels from the unlit-by-those-lights baseline and report no page/device error. The BoxTextured source/licence record is cited in docs/clean-room.md.
 
 ### Batch 179 scientific figure state
-Build with `npm run build:packages`. CPU: `node --test --test-timeout=120000 packages/sciviz/tests/spec.test.js`. GPU: `node scripts/gpu-lock.mjs run --owner=spec-proof --max=8 --wait-max=60 -- node packages/sciviz/tests/spec-demos-browser.mjs` and the same command with `spec-browser.mjs` and `--max=6`. The tests run WebGPU and WebGL2 compatibility, retain all numerical data and exact equality assertions, and report compared canvas lengths and resource kinds. The demo suite uses EngineOptions.exactSize for deterministic byte capture; real data and existing analytic fixtures keep their original licences and values. No timing assertion or benchmark is run.
+Build with `npm run build:packages`. CPU: `node --test --test-timeout=120000 packages/sciviz/tests/spec.test.js`. GPU: `node scripts/run-with-timeout.mjs run --max=8 -- node packages/sciviz/tests/spec-demos-browser.mjs` and the same command with `spec-browser.mjs` and `--max=6`. The tests run WebGPU and WebGL2 compatibility, retain all numerical data and exact equality assertions, and report compared canvas lengths and resource kinds. The demo suite uses EngineOptions.exactSize for deterministic byte capture; real data and existing analytic fixtures keep their original licences and values. No timing assertion or benchmark is run.
 
 Batch 179 GPU state mutation regression: after GpuArray.write followed by isosurface.update, saving waits for the mutation and snapshots the consumed field again. Both native WebGPU and compatibility exact captures reproduce the updated field with zero differing bytes. Async mutations are included in the figure's pending state set.
 ## Batch 178 job 3: media
-After build:packages, run the shared-slot command in [sciviz-media.md](../sciviz-media.md#evidence-and-reproduction). The NOAA wind page exercises image/video/ZIP controls. The test writes test-results/sciviz-media/report.json, checks bit-exact tiled/full wind pixels on both backends, streams beyond the texture limit, and uses browser video playback/seek as an independent container oracle. CPU tests cover PNG chunks, ZIP loading, lifetime, timeline restoration and metadata; no benchmark or speed assertion is run.
+After build:packages, run the command in [sciviz-media.md](../sciviz-media.md#evidence-and-reproduction). The NOAA wind page exercises image/video/ZIP controls. The test writes test-results/sciviz-media/report.json, checks bit-exact tiled/full wind pixels on both backends, streams beyond the texture limit, and uses browser video playback/seek as an independent container oracle. CPU tests cover PNG chunks, ZIP loading, lifetime, timeline restoration and metadata; no benchmark or speed assertion is run.
 
 
 Review 2 Blender Ping-Pong: run Blender --background --factory-startup --python packages/blender/tests/pingpong-reference.py to reproduce the public-API oracle. Run the blender/test:browser:nodes GPU package leaf on native WebGPU and MARGO_COMPAT=1. packages/blender/tests/nodes-browser.mjs retains the same one-byte tolerance for every frozen value and also checks all previous graph variants.
-Batch 183 job 3: build packages; run the stage CPU suite (including tests/viewer-extras.test.js) and its cutscene/headless/react/margoengine CPU dependents. Render correctness: node scripts/gpu-lock.mjs run --owner=codex-batch183 --wait-max=60 --max=5 --gpu=stage-viewer-extras-render-and-pick-on-both-backends -- node packages/stage/test/gpu/viewer-extras-check.mjs . It loads the existing four licensed models, compares against direct setup, checks all named variants, real picks, projected/node anchors, poster and declarative lifecycle, with no page/device errors. Existing stage viewer/scene/features GPU regressions also pass. Physical AR needs a compatible device and HTTPS; the desktop proof checks the disabled immersive-ar button and reason. No benchmark or timing assertion is run.
-Batch 177 job 5: node --test --test-timeout=60000 packages/sciviz/tests/stream.test.js; node scripts/gpu-lock.mjs run --owner=sciviz-stream --wait-max=60 --max=3 -- node packages/sciviz/tests/stream-browser.mjs. Open examples/sciviz-stream.html for replay and live USGS polling. Its committed GeoJSON is unmodified; source.json pins its hash and prepare.mjs can record a fresh official response. Replay supports deterministic direct advance calls; tests do not depend on external feed availability or timing budgets. chart-polish-browser.mjs also checks existing controller lifecycle/inset behavior after the shared optional mapping handshake.
+Batch 183 job 3: build packages; run the stage CPU suite (including tests/viewer-extras.test.js) and its cutscene/headless/react/margoengine CPU dependents. Render correctness: node scripts/run-with-timeout.mjs run --max=5 -- node packages/stage/test/gpu/viewer-extras-check.mjs . It loads the existing four licensed models, compares against direct setup, checks all named variants, real picks, projected/node anchors, poster and declarative lifecycle, with no page/device errors. Existing stage viewer/scene/features GPU regressions also pass. Physical AR needs a compatible device and HTTPS; the desktop proof checks the disabled immersive-ar button and reason. No benchmark or timing assertion is run.
+Batch 177 job 5: node --test --test-timeout=60000 packages/sciviz/tests/stream.test.js; node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/stream-browser.mjs. Open examples/sciviz-stream.html for replay and live USGS polling. Its committed GeoJSON is unmodified; source.json pins its hash and prepare.mjs can record a fresh official response. Replay supports deterministic direct advance calls; tests do not depend on external feed availability or timing budgets. chart-polish-browser.mjs also checks existing controller lifecycle/inset behavior after the shared optional mapping handshake.
 
 ### Batch 107 job 2
-Build packages, run `node --test packages/inspector/test/shaders.test.js`, then under the shared GPU lock `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:shaders` (native WebGPU only).
+Build packages, run `node --test packages/inspector/test/shaders.test.js`, then run `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:shaders` (native WebGPU only).
 
 ### List 3 batch 66 job 5: underwater view
 
 Build packages. CPU: node --test packages/water/test/underwater.test.js. GPU: node packages/water/test/underwater.browser.mjs, then again with --compat after the script path; results land in test-results/water-underwater-<mode>.json.
 
-Batch 234.3: after build:packages, run water's test:gpu leaves through node scripts/gpu-lock.mjs run --owner=codex-batch234 --wait-max=60 --max=3 -- node packages/water/test/underwater.browser.mjs, again with --single, and node packages/water/test/underwater-optics.browser.mjs. Repeat each with --compat after the script path. Both renderer modes record local water-underwater[-optics]-<mode>[-single].json evidence. The optics test builds synthetic sloped depth planes, independently intersects 1,026 rays in world space and compares exact hit availability, distance and texel colour. The scene test records HDR around the production stage and independently computes dielectric reflection/transmission for every fully covered flat and FFT surface pixel; the existing absorption/waterline/shaft checks remain unchanged. Run underwater-preview.browser.mjs with the same shared lock on each backend for NOAA wind-driven below/split/animated screenshots under test-results/batch234. Real wind data source and licence are in packages/water/test/data/README.md. No timing step or exclusive lock.
+Batch 234.3: after build:packages, run water's test:gpu leaves through node scripts/run-with-timeout.mjs run --max=3 -- node packages/water/test/underwater.browser.mjs, again with --single, and node packages/water/test/underwater-optics.browser.mjs. Repeat each with --compat after the script path. Both renderer modes record local water-underwater[-optics]-<mode>[-single].json evidence. The optics test builds synthetic sloped depth planes, independently intersects 1,026 rays in world space and compares exact hit availability, distance and texel colour. The scene test records HDR around the production stage and independently computes dielectric reflection/transmission for every fully covered flat and FFT surface pixel; the existing absorption/waterline/shaft checks remain unchanged. Run underwater-preview.browser.mjs on each backend for NOAA wind-driven below/split/animated screenshots under test-results/batch234. Real wind data source and licence are in packages/water/test/data/README.md. No timing step or run with the GPU to itself.
 ### Batch 107 job 3
-Build packages, run `node --test packages/inspector/test/remote.test.js` (starts the relay on 127.0.0.1 and talks to it with Node fetch), then under the shared GPU lock `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:remote`.
+Build packages, run `node --test packages/inspector/test/remote.test.js` (starts the relay on 127.0.0.1 and talks to it with Node fetch), then run `node scripts/gpu-package-tests.mjs --no-build --select=inspector/test:browser:remote`.
 
 ### List 3 batch 66 job 8: steep-bed rivers
 
 Build packages. CPU: node --test packages/water/test/rivers.test.js. GPU: node packages/water/test/rivers.browser.mjs, then again with --compat after the script path; results land in test-results/water-rivers-<mode>.json (summary with GPU against model error, chute depth and the 256 x 256 cost).
 
 ## Batch 176 job 3 astronomy and microscopy
-After npm run build:packages, run node --test --test-timeout=90000 packages/sciviz/tests/astronomy.test.js packages/decoders/tests/tiff.test.js packages/decoders/tests/tiff-scientific.test.js. Run the actual rendering check shared: node scripts/gpu-lock.mjs run --owner=astronomy-proof --max=4 --wait-max=60 -- node packages/sciviz/tests/astronomy-browser.mjs. Open examples/sciviz-astronomy.html for the original SDSS frame, full EMDB map and IDR crop. The browser check covers both backends; native/compatibility image heatmaps agree exactly, volume compositing uses backend-specific raster floating point.
+After npm run build:packages, run node --test --test-timeout=90000 packages/sciviz/tests/astronomy.test.js packages/decoders/tests/tiff.test.js packages/decoders/tests/tiff-scientific.test.js. Run the actual rendering check: node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/astronomy-browser.mjs. Open examples/sciviz-astronomy.html for the original SDSS frame, full EMDB map and IDR crop. The browser check covers both backends; native/compatibility image heatmaps agree exactly, volume compositing uses backend-specific raster floating point.
 Regenerate owner outputs with packages/sciviz/scripts/write-astronomy-fixtures.py in an environment containing the versions pinned in expected.json. Original SDSS/EMDB compressed downloads go under ignored test-results/batch176/astronomy; the writer retains their exact bytes and independently computes expectations. packages/sciviz/scripts/fetch-idr-crop.py requests only original header and intersecting native tile byte ranges, decodes with installed tifffile/imagecodecs and writes the lossless crop plus original-range provenance; wrap it in a 180-second process-tree limit. Crop origin is (row 4958, column 5311), 256x256 RGB, source 146114920 bytes. File hashes/licences and independent decoder versions are pinned in tests/fixtures/astronomy/source.json and expected.json. No external implementation is shipped or read.
 
-- Batch 174 job 4: build packages, then run node --test packages/sciviz/tests/query.test.js and node scripts/gpu-lock.mjs run --owner=query-proof --max=5 --wait-max=60 -- node packages/sciviz/tests/query-browser.mjs. The browser suite runs native WebGPU and WebGL2, checks 20 selected GHCN days, real NASA TMR selection, sorted physical keys, undo, typed extraction, time-plot PNG changes, and a 100k x 80 virtual spreadsheet. Open examples/sciviz-query.html for both public datasets; provenance is in stats/source.json and tmr-tet.json. No benchmarks or speed assertions.
-Batch 178 job 4: build packages, then run the sciviz CPU suite with --experimental-test-module-mocks and node scripts/gpu-lock.mjs run --owner=colors --wait-max=60 --max=5 -- node packages/sciviz/tests/colors-browser.mjs. The public-data demo is examples/sciviz-colors.html. Captures in test-results/sciviz-colors include OISST/2MASS PNG/SVG and binned PDF on both devices. Primary definitions, fixed comparison bounds and broader renderer suite are in ../sciviz-colors.md; compact evidence in results/batch178-colors.json. No timing gate.
+- Batch 174 job 4: build packages, then run node --test packages/sciviz/tests/query.test.js and node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/query-browser.mjs. The browser suite runs native WebGPU and WebGL2, checks 20 selected GHCN days, real NASA TMR selection, sorted physical keys, undo, typed extraction, time-plot PNG changes, and a 100k x 80 virtual spreadsheet. Open examples/sciviz-query.html for both public datasets; provenance is in stats/source.json and tmr-tet.json. No benchmarks or speed assertions.
+Batch 178 job 4: build packages, then run the sciviz CPU suite with --experimental-test-module-mocks and node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/colors-browser.mjs. The public-data demo is examples/sciviz-colors.html. Captures in test-results/sciviz-colors include OISST/2MASS PNG/SVG and binned PDF on both devices. Primary definitions, fixed comparison bounds and broader renderer suite are in ../sciviz-colors.md; compact evidence in results/batch178-colors.json. No timing gate.
 
-Review 2 caustics and ripples: build packages, then run packages/water/test/caustics.browser.mjs through the shared GPU slot, once native and once with MARGO_COMPAT=1. The existing caustics checks now also attach Ripples before construction, remove it, and reattach with a 0.4 m impulse; all maps must remain finite, flux must change, and validation must be empty. Existing numerical bars remain unchanged.
+Review 2 caustics and ripples: build packages, then run packages/water/test/caustics.browser.mjs, once native and once with MARGO_COMPAT=1. The existing caustics checks now also attach Ripples before construction, remove it, and reattach with a 0.4 m impulse; all maps must remain finite, flux must change, and validation must be empty. Existing numerical bars remain unchanged.
 
 ### Batch 203 job 4 AVIF
 
-Run cargo test --offline --locked --manifest-path packages/decoders/native/avif/Cargo.toml; node packages/decoders/native/avif/tests/pixels.mjs; node packages/decoders/native/avif/tests/wasm-pixels.mjs; node packages/decoders/native/avif/tests/wasm-transform.mjs. The frozen pixel references require no installed external codec. After the package build, node --test packages/decoders/tests/avif.test.js checks workers and container RGB references. Every command needs the lane's hard timeout wrapper. Run packages/decoders/tests/avif-browser.mjs through the shared GPU lock; it checks both backends. Package test:browser checks the production consumer emits and loads the AVIF worker/Wasm assets separately. No README check or full verify is a lane gate.
+Run cargo test --offline --locked --manifest-path packages/decoders/native/avif/Cargo.toml; node packages/decoders/native/avif/tests/pixels.mjs; node packages/decoders/native/avif/tests/wasm-pixels.mjs; node packages/decoders/native/avif/tests/wasm-transform.mjs. The frozen pixel references require no installed external codec. After the package build, node --test packages/decoders/tests/avif.test.js checks workers and container RGB references. Every command needs the lane's hard timeout wrapper. Run packages/decoders/tests/avif-browser.mjs; it checks both backends. Package test:browser checks the production consumer emits and loads the AVIF worker/Wasm assets separately. No README check or full verify is a lane gate.
 
 Independent reference capture used Chromium 157.0.4341.42 software VideoDecoder/ImageDecoder and FFmpeg/libdav1d through PyAV 19.0.2. The browser cannot expose raw 12-bit monochrome; its BGRX was rejected, and libdav1d supplies that full-precision reference instead. Container references pin Pillow 13.0.0/libavif 1.4.2, with explicit crop/orientation; kimono uses full-precision centered BT.2020 swscale instead of the approximating fast RGB path. Source revisions, input/output hashes, tool coverage and licenses are committed alongside the fixtures. Software reference tooling is development-only and not a runtime dependency.
 
 
 ### Batch 181 GPU picking
 
-Build packages. CPU: node --test --test-timeout=120000 packages/sciviz/tests/pick-gpu*.test.js. GPU, one shared slot: node scripts/gpu-lock.mjs run --owner=codex-batch181 --max=4 --wait-max=60 -- node packages/sciviz/scripts/browser-root.mjs tests/pick-gpu-browser.mjs. This opens both backends, compares against CPU points/cells and an independent binary16/trilinear CT ray, tests IDs above 24 bits, async hover and restore, then opens examples/sciviz-pick-gpu.html and its backend=webgl2 variant. Source/licence records are examples/assets/sciviz/stars.json and clip/source.json. Results: test-results/batch181-j3-picking.json and batch181-j3-demo-*.png. No benchmark or timing-only assertion runs.
-Batch 180 job 3: build packages, then node --test --test-timeout=120000 packages/sciviz/tests/geo-sgp4.test.js packages/sciviz/tests/geo-time.test.js. The reference fixture packages/sciviz/tests/fixtures/sgp4-vallado.json contains only Appendix D/E test data from Vallado et al. (2006). For GPU evidence run node scripts/gpu-lock.mjs run --owner=geo-time-review --wait-max=60 --max=5 -- node packages/sciviz/tests/geo-time-browser.mjs. Open examples/sciviz-geo-time.html for pinned NOAA AIS, CelesTrak ISS and NASA MODIS day selection. AIS curation: node examples/assets/sciviz/geo-time/prepare.mjs; verify its full compressed-source SHA-256 against source.json. No benchmark or README execution is required.
-Batch 174 job 5: build packages, run `node --test --test-timeout=120000 packages/sciviz/tests/annotate.test.js`, then `node scripts/gpu-lock.mjs run --owner=sciviz-annotate --max=5 --wait-max=60 -- node packages/sciviz/tests/annotate-browser.mjs`. It exercises both renderer backends and the existing licensed CT-ORG/OpenNeuro assets. The browser proof checks physical descending-source fitting, one-pixel camera-plane movement, escaped SVG and no exported handles, changed PNG bytes, native spec restoration and lifecycle. Existing spec-browser.mjs verifies all ordinary figure and T1 roundtrips. Open examples/sciviz-annotate.html for editable measurements, voxel labels and publication/state downloads. Timings are not measured.
+Build packages. CPU: node --test --test-timeout=120000 packages/sciviz/tests/pick-gpu*.test.js. GPU: node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/scripts/browser-root.mjs tests/pick-gpu-browser.mjs. This opens both backends, compares against CPU points/cells and an independent binary16/trilinear CT ray, tests IDs above 24 bits, async hover and restore, then opens examples/sciviz-pick-gpu.html and its backend=webgl2 variant. Source/licence records are examples/assets/sciviz/stars.json and clip/source.json. Results: test-results/batch181-j3-picking.json and batch181-j3-demo-*.png. No benchmark or timing-only assertion runs.
+Batch 180 job 3: build packages, then node --test --test-timeout=120000 packages/sciviz/tests/geo-sgp4.test.js packages/sciviz/tests/geo-time.test.js. The reference fixture packages/sciviz/tests/fixtures/sgp4-vallado.json contains only Appendix D/E test data from Vallado et al. (2006). For GPU evidence run node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/geo-time-browser.mjs. Open examples/sciviz-geo-time.html for pinned NOAA AIS, CelesTrak ISS and NASA MODIS day selection. AIS curation: node examples/assets/sciviz/geo-time/prepare.mjs; verify its full compressed-source SHA-256 against source.json. No benchmark or README execution is required.
+Batch 174 job 5: build packages, run `node --test --test-timeout=120000 packages/sciviz/tests/annotate.test.js`, then `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/annotate-browser.mjs`. It exercises both renderer backends and the existing licensed CT-ORG/OpenNeuro assets. The browser proof checks physical descending-source fitting, one-pixel camera-plane movement, escaped SVG and no exported handles, changed PNG bytes, native spec restoration and lifecycle. Existing spec-browser.mjs verifies all ordinary figure and T1 roundtrips. Open examples/sciviz-annotate.html for editable measurements, voxel labels and publication/state downloads. Timings are not measured.
 
 
 
 
 ## Batch 120: packed install profiles
 
-Build with npm run build:packages, run node scripts/kit-install-check.mjs (CPU only), then node scripts/gpu-lock.mjs run --owner=kit-check --wait-max=60 --max=4 --gpu=packed-kit-first-frames -- node scripts/kit-browser-check.mjs. The CPU run writes fresh folders, packed tarballs and report.json under test-results/kit-installs; the GPU run writes frames.json and PNGs there. No public package registry receives writes, and every engine package resolves from the verified private checkout. Snapshot file-byte counts in docs/guides/kit-install-sizes.json exclude tooling and include explicit React peers only for react-kit. No wall-clock result is a gate or public claim.
+Build with npm run build:packages, run node scripts/kit-install-check.mjs (CPU only), then node scripts/run-with-timeout.mjs run --max=4 -- node scripts/kit-browser-check.mjs. The CPU run writes fresh folders, packed tarballs and report.json under test-results/kit-installs; the GPU run writes frames.json and PNGs there. No public package registry receives writes, and every engine package resolves from the verified private checkout. Snapshot file-byte counts in docs/guides/kit-install-sizes.json exclude tooling and include explicit React peers only for react-kit. No wall-clock result is a gate or public claim.
 ### Batch 176 AMR
-After npm run build:packages, run node --test --test-timeout=120000 packages/sciviz/tests/amr.test.js. The tests use committed hash-pinned fixtures and the independent yt/HDF5 expected record. The original licensed sample is https://doi.org/10.5281/zenodo.20091893 (Mahesh Natarajan, 2026, CC BY 4.0); packages/sciviz/scripts/fetch-amr-sample.py uses bounded ZIP ranges and yt's public reader, then pack-amr-sample.py losslessly concatenates adjacent equal-level blocks. amr-fixtures.py writes the small Enzo/FLASH HDF5 inputs and regenerates Nyx expected samples with h5py and yt. Install those Python libraries into the scripts' documented ignored test-results paths; no runtime Python dependency. Render evidence: node scripts/gpu-lock.mjs run --owner=amr-reproduce --max=7 --wait-max=60 -- node packages/sciviz/tests/amr-browser.mjs. Open examples/sciviz-amr.html to inspect the real-data volume, slice, contours and level outlines.
+After npm run build:packages, run node --test --test-timeout=120000 packages/sciviz/tests/amr.test.js. The tests use committed hash-pinned fixtures and the independent yt/HDF5 expected record. The original licensed sample is https://doi.org/10.5281/zenodo.20091893 (Mahesh Natarajan, 2026, CC BY 4.0); packages/sciviz/scripts/fetch-amr-sample.py uses bounded ZIP ranges and yt's public reader, then pack-amr-sample.py losslessly concatenates adjacent equal-level blocks. amr-fixtures.py writes the small Enzo/FLASH HDF5 inputs and regenerates Nyx expected samples with h5py and yt. Install those Python libraries into the scripts' documented ignored test-results paths; no runtime Python dependency. Render evidence: node scripts/run-with-timeout.mjs run --max=7 -- node packages/sciviz/tests/amr-browser.mjs. Open examples/sciviz-amr.html to inspect the real-data volume, slice, contours and level outlines.
 
 
 ## Batch 175 job 3: exact raster aggregation
-Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/aggregate.test.js, then node scripts/gpu-lock.mjs run --owner=aggregate-reproduce --wait-max=60 --max=3 -- node packages/sciviz/tests/aggregate-browser.mjs. Both backends and the separate WebGPU 100M physical-row case run. The script writes test-results/batch175-aggregate-{webgpu,webgl2}.json. Original source queries/hashes/licences: packages/sciviz/tests/fixtures/aggregate/manifest.json. Demo: examples/sciviz-aggregate.html. Counts and bytes are correctness/work evidence; do not time this during the build phase.
-Batch 174 job 6: build packages, then `node --test --test-timeout=120000 packages/sciviz/tests/views.test.js` and `node scripts/gpu-lock.mjs run --owner=sciviz-views --max=5 --wait-max=60 -- node packages/sciviz/tests/views-browser.mjs`. The browser suite runs both backends, drags a NOAA cell to check shared ranges, compares per-cell time/parameter graph outputs, checks original T1 voxel provenance and physical crosshair fractions, verifies isotropic projection including resize, transfers actual 3D camera state and disposes queued work. Open examples/sciviz-views.html for the T1 quad and January 1/8 NOAA comparisons. Existing head.json and wind.json record source URLs, hashes, sample spacing and licences. No speed suite or timing-only assertion is run.
+Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/aggregate.test.js, then node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/aggregate-browser.mjs. Both backends and the separate WebGPU 100M physical-row case run. The script writes test-results/batch175-aggregate-{webgpu,webgl2}.json. Original source queries/hashes/licences: packages/sciviz/tests/fixtures/aggregate/manifest.json. Demo: examples/sciviz-aggregate.html. Counts and bytes are correctness/work evidence; do not time this during the build phase.
+Batch 174 job 6: build packages, then `node --test --test-timeout=120000 packages/sciviz/tests/views.test.js` and `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/views-browser.mjs`. The browser suite runs both backends, drags a NOAA cell to check shared ranges, compares per-cell time/parameter graph outputs, checks original T1 voxel provenance and physical crosshair fractions, verifies isotropic projection including resize, transfers actual 3D camera state and disposes queued work. Open examples/sciviz-views.html for the T1 quad and January 1/8 NOAA comparisons. Existing head.json and wind.json record source URLs, hashes, sample spacing and licences. No speed suite or timing-only assertion is run.
 
 
 ## Batch 120: template install-to-frame route
 
-After building the packages, run node scripts/template-install-check.mjs. This packs the actual create-margo binary and private engine packages, invokes npm create with each template against a read-only loopback registry, installs with an isolated cache, checks every engine resolution/version, and runs the generated build script (Next included). Then run node scripts/gpu-lock.mjs run --owner=template-check --wait-max=60 --max=2 --gpu=packed-template-first-frames -- node scripts/template-browser-check.mjs. Build logs, paths, engine counts, five PNGs and frames.json are under test-results/template-installs. Read docs/guides/kit-migration.md for the documented three.js path comparison and known setup differences. Elapsed-time proof is retained in speed-phase.md and not run during the build phase.
-- Batch 179 share/embed: build packages, then run `node --test packages/sciviz/tests/share.test.js`. For GPU correctness run `node scripts/gpu-lock.mjs run --owner=share-review --wait-max=60 --max=3 -- node packages/sciviz/tests/share-browser.mjs` under a hard process-tree timeout. It creates `test-results/batch179-mri-standalone-{webgpu,webgl2}.html`, raw pinned MRI data, camera/time deep-link text and screenshots. Serve the repository for the deep link while opening the standalone directly from disk requires no network. Input is the existing CC0 OpenNeuro MRI asset; source/licence remain in examples/assets/sciviz. Bundle only: `node packages/sciviz/scripts/bundle-share.mjs test-results/share-runtime.js`.
+After building the packages, run node scripts/template-install-check.mjs. This packs the actual create-margo binary and private engine packages, invokes npm create with each template against a read-only loopback registry, installs with an isolated cache, checks every engine resolution/version, and runs the generated build script (Next included). Then run node scripts/run-with-timeout.mjs run --max=2 -- node scripts/template-browser-check.mjs. Build logs, paths, engine counts, five PNGs and frames.json are under test-results/template-installs. Read docs/guides/kit-migration.md for the documented three.js path comparison and known setup differences. Elapsed-time proof is retained in speed-phase.md and not run during the build phase.
+- Batch 179 share/embed: build packages, then run `node --test packages/sciviz/tests/share.test.js`. For GPU correctness run `node scripts/run-with-timeout.mjs run --max=3 -- node packages/sciviz/tests/share-browser.mjs` under a hard process-tree timeout. It creates `test-results/batch179-mri-standalone-{webgpu,webgl2}.html`, raw pinned MRI data, camera/time deep-link text and screenshots. Serve the repository for the deep link while opening the standalone directly from disk requires no network. Input is the existing CC0 OpenNeuro MRI asset; source/licence remain in examples/assets/sciviz. Bundle only: `node packages/sciviz/scripts/bundle-share.mjs test-results/share-runtime.js`.
 ### Batch 178 job 5
-Run sciviz a11y.test.js after build; run tests/a11y-browser.mjs and chart-polish-browser.mjs through the shared GPU lock on both backends. For the pinned Lighthouse 13.6.0 snapshot runner, isolated installation, browser executable, complete readiness rule, viewport and machine-local output, follow docs/sciviz-a11y.md. No audits are disabled; all sciviz-*.html pages are selected by default. No speed claims or timing assertions.
+Run sciviz a11y.test.js after build; run tests/a11y-browser.mjs and chart-polish-browser.mjs on both backends. For the pinned Lighthouse 13.6.0 snapshot runner, isolated installation, browser executable, complete readiness rule, viewport and machine-local output, follow docs/sciviz-a11y.md. No audits are disabled; all sciviz-*.html pages are selected by default. No speed claims or timing assertions.
 
 
 
 ## Batch 181 job 5 progressive rendering
 
-After build:packages, run `node --experimental-test-module-mocks --test --test-timeout=60000 packages/sciviz/tests/progressive.test.js`. GPU correctness: `node scripts/gpu-lock.mjs run --owner=progressive-review --max=6 --wait-max=60 -- node packages/sciviz/tests/progressive-browser.mjs`. The suite covers both backends and writes test-results/batch181-j5-progressive.json. Serve examples/sciviz-progressive.html for the bricked EMDB/cinematic EMDB/TCIA demo; append ?backend=webgl2 for compatibility. Existing layer restoration suites remain part of the sciviz package GPU gate. No benchmark or timing-only assertion is run.
+After build:packages, run `node --experimental-test-module-mocks --test --test-timeout=60000 packages/sciviz/tests/progressive.test.js`. GPU correctness: `node scripts/run-with-timeout.mjs run --max=6 -- node packages/sciviz/tests/progressive-browser.mjs`. The suite covers both backends and writes test-results/batch181-j5-progressive.json. Serve examples/sciviz-progressive.html for the bricked EMDB/cinematic EMDB/TCIA demo; append ?backend=webgl2 for compatibility. Existing layer restoration suites remain part of the sciviz package GPU gate. No benchmark or timing-only assertion is run.
 
 
-Batch 180 job 5: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/temporal.test.js. For real rendering use node scripts/gpu-lock.mjs run --owner=temporal-review --wait-max=60 --max=1 -- node packages/sciviz/tests/temporal-browser.mjs. Open examples/sciviz-temporal.html, select NOAA or ERA5, choose any reduction, drag time or change probe longitude/latitude. Native and ?backend=webgl2 use identical data. The test writes test-results/sciviz-temporal.json. Recreate the unchanged NOAA daily JSON files with node scripts/prepare-sciviz-temporal.mjs; the separately curated era5.nc is pinned by SHA-256 in source.json. No benchmark, full verify or README execution is required.
+Batch 180 job 5: build packages, then node --test --test-timeout=60000 packages/sciviz/tests/temporal.test.js. For real rendering use node scripts/run-with-timeout.mjs run --max=1 -- node packages/sciviz/tests/temporal-browser.mjs. Open examples/sciviz-temporal.html, select NOAA or ERA5, choose any reduction, drag time or change probe longitude/latitude. Native and ?backend=webgl2 use identical data. The test writes test-results/sciviz-temporal.json. Recreate the unchanged NOAA daily JSON files with node scripts/prepare-sciviz-temporal.mjs; the separately curated era5.nc is pinned by SHA-256 in source.json. No benchmark, full verify or README execution is required.
 
-Batch 181 density: after build:packages, run `node --test packages/sciviz/tests/density.test.js`, then `node scripts/gpu-lock.mjs run --owner=density-check --max=5 --wait-max=60 -- node packages/sciviz/tests/density-browser.mjs` and the same command with `density-scale-browser.mjs` and --max=6. Both browser suites run native and WebGL2 compatibility and write test-results/batch181-j4-density.json and batch181-j4-scale.json. Scale data is the retained SoA gzip 2MASS stars.bin (RA, Dec, J-Ks, Ks) tiled 20 times, and the retained quoted NYC TLC CSV tiled to exactly 10M rows, with its incomplete final tile retained. No timing assertions or benchmark is part of these commands. Demo: examples/sciviz-density.html, also ?backend=webgl2. The 20M/10M timed rival comparison stays in the speed-phase inventory until Scott ends the build phase.
+Batch 181 density: after build:packages, run `node --test packages/sciviz/tests/density.test.js`, then `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/density-browser.mjs` and the same command with `density-scale-browser.mjs` and --max=6. Both browser suites run native and WebGL2 compatibility and write test-results/batch181-j4-density.json and batch181-j4-scale.json. Scale data is the retained SoA gzip 2MASS stars.bin (RA, Dec, J-Ks, Ks) tiled 20 times, and the retained quoted NYC TLC CSV tiled to exactly 10M rows, with its incomplete final tile retained. No timing assertions or benchmark is part of these commands. Demo: examples/sciviz-density.html, also ?backend=webgl2. The 20M/10M timed rival comparison stays in the speed-phase inventory until Scott ends the build phase.
 
-Density pixel-only rival reproduction: install regl-scatterplot@1.16.0, @deck.gl/core@9.4.1 and @deck.gl/layers@9.4.1 outside the repository under ../engine-bench/batch-181-density (MARGO_DENSITY_RIVALS overrides it). Run `node scripts/sciviz-density-pixels.mjs --prepare` on the CPU to bundle their published APIs into that external folder, then `node scripts/gpu-lock.mjs run --owner=density-pixels --max=3 --wait-max=60 --gpu="Render external density pixels" -- node scripts/sciviz-density-pixels.mjs --prepared`. The script captures Margo through Figure.toPNG, compares actual pixel bytes and separately checks analytical opacity, and writes test-results/batch181-j4-rival-pixels.json/.png. It measures no time. Exact source coordinates, draw policies, versions and hardware are in results/batch181-density.json. Packages are executed as black boxes; source implementations are never consulted by the agent or copied into Margo.
+Density pixel-only rival reproduction: install regl-scatterplot@1.16.0, @deck.gl/core@9.4.1 and @deck.gl/layers@9.4.1 outside the repository under ../engine-bench/batch-181-density (MARGO_DENSITY_RIVALS overrides it). Run `node scripts/sciviz-density-pixels.mjs --prepare` on the CPU to bundle their published APIs into that external folder, then `node scripts/run-with-timeout.mjs run --max=3 -- node scripts/sciviz-density-pixels.mjs --prepared`. The script captures Margo through Figure.toPNG, compares actual pixel bytes and separately checks analytical opacity, and writes test-results/batch181-j4-rival-pixels.json/.png. It measures no time. Exact source coordinates, draw policies, versions and hardware are in results/batch181-density.json. Packages are executed as black boxes; source implementations are never consulted by the agent or copied into Margo.
 
-Batch 274 job 5 ONNX: after build:packages, run node --test --test-timeout=120000 packages/compute/tests/onnx*.test.js and node packages/compute/tests/onnx-browser.mjs. Native kernel: cargo test --locked --manifest-path packages/compute/onnx-kernel/Cargo.toml. Browser ONNX is CPU Wasm and takes no GPU slot. The pinned references require no external runtime to reproduce; clean-room.md records the optional external reference regeneration, provenance and versions.
-Batch 179 notebook: follow docs/guides/sciviz-notebooks.md. Build sciviz and run node python/build-notebook.mjs; prepare the existing Python test venv with anywidget and pyarrow; execute python/tests/notebook-fixtures.py. Run notebook*.test.js with experimental module mocks and python/tests/test_notebook.py. Run packages/sciviz/tests/notebook-browser.mjs and python/tests/sciviz-jupyter-browser.mjs under the shared GPU lock with hard hold limits. Local artifacts are test-results/sciviz-notebook/{webgpu,webgl2}.json, the offline pages/screenshots and test-results/sciviz-jupyter/jupyterlab.png. No benchmark is run.
+Batch 274 job 5 ONNX: after build:packages, run node --test --test-timeout=120000 packages/compute/tests/onnx*.test.js and node packages/compute/tests/onnx-browser.mjs. Native kernel: cargo test --locked --manifest-path packages/compute/onnx-kernel/Cargo.toml. Browser ONNX is CPU Wasm and takes no GPU. The pinned references require no external runtime to reproduce; clean-room.md records the optional external reference regeneration, provenance and versions.
+Batch 179 notebook: follow docs/guides/sciviz-notebooks.md. Build sciviz and run node python/build-notebook.mjs; prepare the existing Python test venv with anywidget and pyarrow; execute python/tests/notebook-fixtures.py. Run notebook*.test.js with experimental module mocks and python/tests/test_notebook.py. Run packages/sciviz/tests/notebook-browser.mjs and python/tests/sciviz-jupyter-browser.mjs with hard time limits. Local artifacts are test-results/sciviz-notebook/{webgpu,webgl2}.json, the offline pages/screenshots and test-results/sciviz-jupyter/jupyterlab.png. No benchmark is run.
 
 ## Batch 274 job 6: quantized contractions
 
 Build with npm run build:packages. CPU: node --test --test-timeout=120000
-packages/compute/tests/quant.test.js. GPU: node scripts/gpu-lock.mjs run
---owner=quant-reproduce --max=4 --wait-max=60 -- node
+packages/compute/tests/quant.test.js. GPU: node scripts/run-with-timeout.mjs run --max=4 -- node
 packages/compute/tests/quant-browser.mjs. The browser script checks native WebGPU
 and forced WebGL2 sequentially, using 1,574 shared float-reference checks each and
 a WGSL compilation guard. The analytical sine-valued fixtures are original test
@@ -3935,8 +3916,8 @@ docs/compute-quant.md; no timing benchmark is part of this check.
 
 ## Batch 175 job 5: GPU graph layout
 
-Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/graph-gpu.test.js. Then run node scripts/gpu-lock.mjs run --owner=graph-gpu-proof --wait-max=60 --max=8 -- node packages/sciviz/tests/graph-gpu-browser.mjs. The browser suite covers native WebGPU and WebGL2 compatibility, exact CPU oracles and tree error, OpenAlex drawing, labels, cancellation and bundling. Native WebGPU also lays out and draws a million physical nodes in each force model, using repeated copies of the pinned original citation topology. Results are test-results/batch175-graph-gpu-{webgpu,webgl2}.json. --small omits only the standalone scale proof while retaining correctness cases on both backends. No benchmark or timing assertion runs. Open examples/sciviz-graph-gpu.html through the repository development server for the CC0 citation demo.
-Batch 180 job 4: after build:packages, run node --test --test-timeout=60000 packages/sciviz/tests/cf.test.js packages/sciviz/tests/projections.test.js. The committed climate-projection-reference.json is numerical black-box output with per-case projection definitions, version and parameters. GPU: node scripts/gpu-lock.mjs run --owner=climate-review --wait-max=60 --max=4 -- node packages/sciviz/scripts/browser-root.mjs tests/cf-browser.mjs. Open examples/sciviz-climate.html for real ERA5/CMIP6 fields, steps, five projections and land/ocean selection. Source hashes and transformations: examples/assets/sciviz/climate/source.json. No speed run or README execution.
+Build packages; run node --test --test-timeout=120000 packages/sciviz/tests/graph-gpu.test.js. Then run node scripts/run-with-timeout.mjs run --max=8 -- node packages/sciviz/tests/graph-gpu-browser.mjs. The browser suite covers native WebGPU and WebGL2 compatibility, exact CPU oracles and tree error, OpenAlex drawing, labels, cancellation and bundling. Native WebGPU also lays out and draws a million physical nodes in each force model, using repeated copies of the pinned original citation topology. Results are test-results/batch175-graph-gpu-{webgpu,webgl2}.json. --small omits only the standalone scale proof while retaining correctness cases on both backends. No benchmark or timing assertion runs. Open examples/sciviz-graph-gpu.html through the repository development server for the CC0 citation demo.
+Batch 180 job 4: after build:packages, run node --test --test-timeout=60000 packages/sciviz/tests/cf.test.js packages/sciviz/tests/projections.test.js. The committed climate-projection-reference.json is numerical black-box output with per-case projection definitions, version and parameters. GPU: node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/scripts/browser-root.mjs tests/cf-browser.mjs. Open examples/sciviz-climate.html for real ERA5/CMIP6 fields, steps, five projections and land/ocean selection. Source hashes and transformations: examples/assets/sciviz/climate/source.json. No speed run or README execution.
 Batch 180 job 4 integration note: the default ANGLE D3D11 atmosphere spec capture reproduced the known driver nondeterminism (50 same-source bytes). The unchanged remaining four compatibility spec cases passed with BROWSER_ARGS set to ["--use-angle=vulkan"], SPEC_BACKENDS=webgl2 and SPEC_DEMOS=atmosphere,surface,volume,points. Native WebGPU and all prior compatibility spec cases passed on the default backend. Keep the D3D11 failure in docs/known-bugs.md; do not widen exact assertions.
 
 
@@ -3944,17 +3925,17 @@ Batch 180 job 4 integration note: the default ANGLE D3D11 atmosphere spec captur
 Batch 274 ONNX trees/SVM: the existing ONNX Node and Chromium commands also run onnx-ml.test.js and the 52 shared analytic cases. Regenerate references with packages/compute/scripts/onnx-oracle-cases.mjs, execute onnx-oracle.py through the external environment recorded in clean-room.md, then onnx-oracle-record.mjs. The recorder fails on unexpected provider errors; deprecated legacy ML5 refusals retain analytic coverage. Normative-output metadata retains the original provider bytes and names the measured contract difference. Fixed comparison tolerances are unchanged.
 
 ## Batch 175 job 4: time series
-Build packages, then run `node --test --test-timeout=120000 packages/sciviz/tests/series.test.js` and `node scripts/gpu-lock.mjs run --owner=series-reproduce --wait-max=60 --max=5 -- node packages/sciviz/tests/series-browser.mjs`. The latter checks both backends, exact original selection after Figure zoom/box selection, format-native progressive records, PSD of a 1e-21 tone, STFT and rendered pixels/cancellation/resize. It writes test-results/series/{webgpu,webgl2}.{json,png}. Demo: examples/sciviz-series.html. Pinned source licence, SHA-256 and standard writer settings: packages/sciviz/tests/fixtures/series/source.json. No speed run is needed during the build phase.
+Build packages, then run `node --test --test-timeout=120000 packages/sciviz/tests/series.test.js` and `node scripts/run-with-timeout.mjs run --max=5 -- node packages/sciviz/tests/series-browser.mjs`. The latter checks both backends, exact original selection after Figure zoom/box selection, format-native progressive records, PSD of a 1e-21 tone, STFT and rendered pixels/cancellation/resize. It writes test-results/series/{webgpu,webgl2}.{json,png}. Demo: examples/sciviz-series.html. Pinned source licence, SHA-256 and standard writer settings: packages/sciviz/tests/fixtures/series/source.json. No speed run is needed during the build phase.
 ### Batch 178 job 6
-After build, run sciviz themes.test.js and themes-browser.mjs. The latter uses the shared GPU lock and covers both backends, GHCN/LIGO print demos, exact physical PNG/PDF dimensions, 3 px ticks after camera/resize, scalar-map defaults, explicit overrides and portable restore. Existing pages accept ?theme=print and ?theme=print-mono. See docs/sciviz-themes.md for limits and source basis.
+After build, run sciviz themes.test.js and themes-browser.mjs. The latter covers both backends, GHCN/LIGO print demos, exact physical PNG/PDF dimensions, 3 px ticks after camera/resize, scalar-map defaults, explicit overrides and portable restore. Existing pages accept ?theme=print and ?theme=print-mono. See docs/sciviz-themes.md for limits and source basis.
 # Batch 175 job 6: scientific reader workers
 
-After build:packages, run `node --test --test-timeout=60000 packages/sciviz/tests/workers.test.js packages/worker/tests/rpc.test.js`. Render the seven real-data choices and cancellation proof using `node scripts/gpu-lock.mjs run --owner=reader-workers --max=4 --wait-max=60 -- node packages/sciviz/tests/workers-browser.mjs`. It runs WebGPU and WebGL2 and writes test-results/batch175-job6-browser.json. The demo is examples/sciviz-workers.html. Dataset origins, licence records, transfer-copy accounting and progress semantics are in docs/sciviz-workers.md. Speed-phase load-time and inflater comparisons are explicitly deferred, with no timing assertions in these checks.
+After build:packages, run `node --test --test-timeout=60000 packages/sciviz/tests/workers.test.js packages/worker/tests/rpc.test.js`. Render the seven real-data choices and cancellation proof using `node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/workers-browser.mjs`. It runs WebGPU and WebGL2 and writes test-results/batch175-job6-browser.json. The demo is examples/sciviz-workers.html. Dataset origins, licence records, transfer-copy accounting and progress semantics are in docs/sciviz-workers.md. Speed-phase load-time and inflater comparisons are explicitly deferred, with no timing assertions in these checks.
 ### Batch 176 tensor fields
-After npm run build:packages, run node --test --test-timeout=120000 packages/sciviz/tests/tensor.test.js packages/sciviz/tests/tensor-real.test.js. The real-data test verifies source hashes and compares the full 32x32x8, 65-volume DWI crop with NumPy lstsq/eigh outputs. packages/sciviz/scripts/tensor-fixtures.py regenerates through public nibabel/NumPy APIs from ds000030/sub-10159/dwi under https://s3.amazonaws.com/openneuro.org/ (CC0); expected library versions and original/crop affines are in fixtures/tensor/source.json. The original files and test Python dependencies live in this worktree's ignored test-results/batch176/tensor/source and tensor/python folders. Render: node scripts/gpu-lock.mjs run --owner=tensor-reproduce --max=4 --wait-max=60 -- node packages/sciviz/tests/tensor-browser.mjs. Open examples/sciviz-tensor.html to inspect both glyph families, Euler/FACT fibres and hyperstreamlines.
+After npm run build:packages, run node --test --test-timeout=120000 packages/sciviz/tests/tensor.test.js packages/sciviz/tests/tensor-real.test.js. The real-data test verifies source hashes and compares the full 32x32x8, 65-volume DWI crop with NumPy lstsq/eigh outputs. packages/sciviz/scripts/tensor-fixtures.py regenerates through public nibabel/NumPy APIs from ds000030/sub-10159/dwi under https://s3.amazonaws.com/openneuro.org/ (CC0); expected library versions and original/crop affines are in fixtures/tensor/source.json. The original files and test Python dependencies live in this worktree's ignored test-results/batch176/tensor/source and tensor/python folders. Render: node scripts/run-with-timeout.mjs run --max=4 -- node packages/sciviz/tests/tensor-browser.mjs. Open examples/sciviz-tensor.html to inspect both glyph families, Euler/FACT fibres and hyperstreamlines.
 
 ### Batch 176 molecules
-Run `node --test --test-timeout=120000 packages/loaders/tests/mmcif.test.js packages/sciviz/tests/molecule.test.js` after build:packages. Run `node scripts/gpu-lock.mjs run --owner=molecule-reproduction --max=7 --wait-max=60 -- node packages/sciviz/tests/molecule-browser.mjs` for the native and compatibility GPU cases. Open examples/sciviz-molecule.html for the three real-data views and click a surface to identify its residue. The byte-preserved RCSB downloads and exact SHA-256 values are in packages/sciviz/tests/fixtures/molecule/source.json. The PDB reader remains @margoengine/loaders/pdb; mmCIF enters through @margoengine/loaders/mmcif. Do not infer timings from these correctness checks.
+Run `node --test --test-timeout=120000 packages/loaders/tests/mmcif.test.js packages/sciviz/tests/molecule.test.js` after build:packages. Run `node scripts/run-with-timeout.mjs run --max=7 -- node packages/sciviz/tests/molecule-browser.mjs` for the native and compatibility GPU cases. Open examples/sciviz-molecule.html for the three real-data views and click a surface to identify its residue. The byte-preserved RCSB downloads and exact SHA-256 values are in packages/sciviz/tests/fixtures/molecule/source.json. The PDB reader remains @margoengine/loaders/pdb; mmCIF enters through @margoengine/loaders/mmcif. Do not infer timings from these correctness checks.
 
 ## Batch 137 quality and interoperability
 
@@ -3967,9 +3948,11 @@ without Huffman coding; native Zstandard and Margo must recover every byte acros
 Run packages/exporters/scripts/basis-quality.mjs with the outside oracle path prefix followed by
 encoder/basis_encoder.cjs, encoder/basis_encoder.wasm,
 oracle-built/basis_transcoder.js and oracle-built/basis_transcoder.wasm, followed
-by an output JSON path. For the pinned lane artifacts the prefix is
-../margoengine-lane-M-basis134- (suffixes encoder and
-oracle-built name sibling folders). These pinned prebuilt modules run only as opaque black boxes
+by an output JSON path. For the pinned artifacts the prefix is
+../../Tools/margo-oracles/basis134- from the checkout (suffixes encoder and
+oracle-built name sibling folders in the workstation's tools folder; the recorded
+results/batch-137-quality-r10.json names their earlier place, ../margoengine-lane-M-basis134-, with the same
+hashes). These pinned prebuilt modules run only as opaque black boxes
 outside this repository. The script uses the full CC0 terrain Aerial Rocks 02
 fixtures, all eleven mips, equal RGB PSNR and Wang et al. 2004 valid 11x11 Gaussian
 SSIM (sigma 1.5, K1 .01, K2 .03), at the recorded matched-rate settings. The native
@@ -3980,7 +3963,7 @@ Final evidence: results/batch-137-quality-r10.json. Round 8 ETC1S fits and round
 color/normal UASTC fits are retained with exact unchanged-path provenance; all
 UASTC Zstandard packing reran, and lossless raw equality binds the retained metrics.
 The final data output is measured directly through the independent transcoder.
-GPU: node scripts/gpu-package-tests.mjs --no-build --only=exporters, shared lock,
+GPU: node scripts/gpu-package-tests.mjs --no-build --only=exporters,
 both backends. No verify, README gate or throughput benchmark is needed here.
 
 
@@ -3990,8 +3973,8 @@ From the repository root, build with `npm run build:packages`. Run
 `node --test --test-timeout=120000 tests/composition-generator.test.js tests/composition-run.test.js tests/check-merge-affected.test.js`
 (63 tests), then
 `node node_modules/typescript/bin/tsc -p tests/composition/tsconfig.json`.
-Run the browser suite under its bounded shared GPU lease:
-`node scripts/gpu-lock.mjs run --owner=j2-reproduce --max=10 --wait-max=5 -- node scripts/composition-browser-tests.mjs`.
+Run the browser suite with its time limit:
+`node scripts/run-with-timeout.mjs run --max=10 -- node scripts/composition-browser-tests.mjs`.
 It draws all 34 rows on both backends at 1x/4x, writes every probe into
 `test-results/composition.json` and reports 276/276 pairs only after all 136 cases
 pass. Compare with [the recorded results](results/integration-j2-composition.json).
@@ -4007,11 +3990,11 @@ Run npm run build:packages, npm run test:integration:browser -- --scene=product 
 
 ### Review 5 biased sampling
 
-Build packages, run the webgl2-compat CPU suite, then run its registered test:gpu:bias under the shared GPU lock with a five-minute hard limit. Exact commands, native-browser separation and research: [bias sampling](../review5-compat-bias.md). The test writes all hardware details and compared bits to test-results/review5-bias-bits.json.
+Build packages, run the webgl2-compat CPU suite, then run its registered test:gpu:bias with a five-minute hard limit. Exact commands, native-browser separation and research: [bias sampling](../review5-compat-bias.md). The test writes all hardware details and compared bits to test-results/review5-bias-bits.json.
 
 ### webgl2-compat explicit-gradient sampling
 
-After `npm run build:packages`, run `node --test packages/webgl2-compat/test/glsl.test.js`, then under the GPU lock with a hard limit `node scripts/gpu-lock.mjs run --owner=<you> --max=15 -- node packages/webgl2-compat/test/features-browser.mjs` and `node scripts/gpu-lock.mjs run --owner=<you> --max=10 -- node packages/materials/test/features-browser.mjs stochastic`. Before the fix the six explicit-gradient GLSL cases, the `implicitFootprint` gradient rows and the materials compat stochastic mips check (4253) fail.
+After `npm run build:packages`, run `node --test packages/webgl2-compat/test/glsl.test.js`, then with a hard limit `node scripts/run-with-timeout.mjs run --max=15 -- node packages/webgl2-compat/test/features-browser.mjs` and `node scripts/run-with-timeout.mjs run --max=10 -- node packages/materials/test/features-browser.mjs stochastic`. Before the fix the six explicit-gradient GLSL cases, the `implicitFootprint` gradient rows and the materials compat stochastic mips check (4253) fail.
 
 ### Review 5 live volume materials
 
@@ -4019,7 +4002,7 @@ After npm run build:packages, run the four CPU files and the two GPU commands li
 
 ### Review 5 refused HDR restoration
 
-Build packages and run the DOF/post CPU suites, then the registered DOF test:gpu:restore-tier under the shared GPU lock. [Exact commands, ten cases and limitations](../review5-effect-restoration.md). Existing package GPU suites still run on native WebGPU and WebGL2.
+Build packages and run the DOF/post CPU suites, then the registered DOF test:gpu:restore-tier. [Exact commands, ten cases and limitations](../review5-effect-restoration.md). Existing package GPU suites still run on native WebGPU and WebGL2.
 
 ### Batch 159 matrix preflight
 
@@ -4085,7 +4068,7 @@ and, with Blender installed outside the repository,
 ### Batch 169 text measurement work count
 
 [Text commands and sources](batch-169.md#job-2-reproduction-and-research) include the
-35-case byte/count regression and the shared-lock Canvas/Troika oracle. Rival code
+35-case byte/count regression and the Canvas/Troika oracle. Rival code
 is installed and run outside this repository. Timing pending the quiet rerun.
 
 ### Batch 169 UI layout work count
@@ -4104,7 +4087,7 @@ node scripts/gpu-package-tests.mjs --no-build --select=post/test:gpu:ssao-resolv
 ```
 
 Run the second command again with `MARGO_COMPAT=1` in the environment for the
-WebGL2 compatibility backend. The test uses the GPU lock. Six CPU cases compare
+WebGL2 compatibility backend. Six CPU cases compare
 the actual encoder calls with the previous resolve path. Twelve image pairs per
 backend compare every canvas byte, with zero tolerance: standalone/stacked SSAO
 and stacked GTAO, 1x/4x MSAA, initial and resized frames. The old path is injected
@@ -4158,7 +4141,7 @@ failures](parity-diagnoses.md). The historical speed ledger is unchanged.
 
 ## Batch 182 volume comparison
 
-Follow [the complete external-install and three-scene commands](../sciviz-rivals.md). --runs=1 records no elapsed times. Quiet runs require the active speed phase and exclusive GPU access; retain images and every sample. The allocation/byte oracle is packages/sciviz/tests/volume-workcount.test.js.
+Follow [the complete external-install and three-scene commands](../sciviz-rivals.md). --runs=1 records no elapsed times. Quiet runs require the active speed phase and the GPU to themselves; retain images and every sample. The allocation/byte oracle is packages/sciviz/tests/volume-workcount.test.js.
 
 
 ## Batch 182 sciviz comparison
@@ -4171,25 +4154,85 @@ Batch 164 screen effects: [descriptor work count and preserved passes](batch-164
 Batch 164 Tonemap and velocity: [capture resolve work count and the velocity-only row](batch-164-workcounts.md#rows-97-and-1315-tonemap-capture-resolve).
 ### Materials compatibility index replacement
 
-After building packages, run scripts/material-wireframe-gpu-check.js with and without --compat under the shared GPU lock. Both cover 1x and 4x, repeated transparent/mirrored replacements and exact hashes. The raw /tests/material-index-rebind-raw.html dev-server page exposes indexRebindRaw(false) and indexRebindRaw(true), returning all eight draws and exact uploaded-byte comparisons. The original may be correct on unaffected drivers; the detached path must remain exact. The capture SHA-256, observed failing indices and source comparison are in materials-compat-hunt.md.
+After building packages, run scripts/material-wireframe-gpu-check.js with and without --compat. Both cover 1x and 4x, repeated transparent/mirrored replacements and exact hashes. The raw /tests/material-index-rebind-raw.html dev-server page exposes indexRebindRaw(false) and indexRebindRaw(true), returning all eight draws and exact uploaded-byte comparisons. The original may be correct on unaffected drivers; the detached path must remain exact. The capture SHA-256, observed failing indices and source comparison are in materials-compat-hunt.md.
 ### Batch 163 line work counts
 
 See [the batch record](bp-163-workcounts.md#job-3-line-and-skeleton-draw-work) for the build, deterministic work-count test, native/compat GPU commands and original-work controls. No benchmark runs are required.
 
 ## Weather lens
 
-Build packages, then `node scripts/gpu-lock.mjs run --owner=weather-lens -- node packages/weather/tests/parity-browser.mjs lens` and the same with `--compat`. Both print the ordinary and long-time worst errors; each must stay at or below 0.0001.
+Build packages, then `node scripts/run-with-timeout.mjs run -- node packages/weather/tests/parity-browser.mjs lens` and the same with `--compat`. Both print the ordinary and long-time worst errors; each must stay at or below 0.0001.
 
 ## Stage viewer readiness
 
-`node --test --test-timeout=30000 tests/viewer-fixture-ready.test.js`, then under the GPU lock `node scripts/stage-viewer-gpu-check.js` native and with `MARGO_COMPAT=1`.
+`node --test --test-timeout=30000 tests/viewer-fixture-ready.test.js`, then run `node scripts/stage-viewer-gpu-check.js` native and with `MARGO_COMPAT=1`.
 
 Compute distance fields: `npm run build:packages`, then `node --test packages/compute/tests/distance.test.js` (CPU) and
-`node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/distance-browser.mjs` (WebGPU, then the WebGL2
+`node scripts/run-with-timeout.mjs run -- node packages/compute/tests/distance-browser.mjs` (WebGPU, then the WebGL2
 layer); the second prints the error-rate table quoted in docs/limits.md.
 
 Audio spectrograms: `npm run build:packages`, then `node --test packages/audio/tests/spectrogram.test.js` (CPU, includes the
-Griffin-Lim run, which prints the two SNR figures) and `node scripts/gpu-lock.mjs run --owner=<you> -- node
+Griffin-Lim run, which prints the two SNR figures) and `node scripts/run-with-timeout.mjs run -- node
 packages/audio/tests/spectrogram-browser.mjs` (the GPU path on WebGPU, then the WebGL2 layer).
 
-Sciviz rival accuracy (KB2594a): with the batch 182 rivals installed in engine-bench, run `node scripts/sciviz-compare.mjs --accuracy`. It is CPU only (no GPU slot), runs the isosurface, streamline and isoline closed-form references through VTK.js public filters as a black box and writes `accuracy.json` under test-results/bp-182/compare; docs/whitepaper/sciviz-vs-rivals.md holds the table. `node --test tests/sciviz-compare.test.js` checks the measures.
+Sciviz rival accuracy (KB2594a): with the batch 182 rivals installed in engine-bench, run `node scripts/sciviz-compare.mjs --accuracy`. It is CPU only (no GPU), runs the isosurface, streamline and isoline closed-form references through VTK.js public filters as a black box and writes `accuracy.json` under test-results/bp-182/compare; docs/whitepaper/sciviz-vs-rivals.md holds the table. `node --test tests/sciviz-compare.test.js` checks the measures.
+
+Look checks (headless/look, shorts P4): `npm run build:packages`, then `node --test packages/headless/tests/look.test.js`
+(CPU only, no GPU). Each check is run on a synthetic frame with its defect (a gradient with 16 levels, a doubled
+moon, NaN and half-float NaN pixels, a brightness jump on a still camera, froxel-pitch blocks, a hard horizon and water
+line, thresholded foam, crushed blacks, clipped sky, hot pixels, noise) and on a clean one. On a shot rendered by
+`node tools/shot/cli.mjs <shot.json>`, `checkShot` over its `manifest.json` gives the table and contact sheet; the
+README example under "Look checks for rendered shots" runs as written.
+
+### Batch 228 job 2
+Build packages, then `node --test packages/points/tests/style.test.js packages/tiles/tests/style.test.js`. Run `node packages/points/scripts/test-browser.js` and the same command with `--compat`, for the styleFilters pixel and budget checks. No timing result is claimed.
+
+### VRM first person (LIM-659)
+Build packages, then `node --test --test-timeout=120000 packages/rigging/tests/vrm-first-person.test.js`. Run `node packages/rigging/tests/vrm-first-person.browser.mjs`, then the same with `MARGO_COMPAT=1`; every "Vs" count that must be 0 is 0 and the rest are nonzero ([table](../rigging-vrm-first-person.md#evidence)). Then `node packages/xr/tests/view-layers.browser.mjs`, which runs both XR routes on both backends: `maskedVsHidden` is 0 for every eye. No timing assertions.
+
+## Job 185.1 GLSL functions in node graphs
+
+After `npm run build:packages`, run `node --test packages/shader/test/glsl.test.js`. Run `node packages/shader/test/glsl-check.mjs`, then the same command with `--compat`. Each prints one line per fixture and parameter value with the maximum and mean difference in levels against the browser's WebGL2 compiler, then the NodeMaterial comparisons; it fails above 1 level, on any GPU error, when a toGLSL program fails to link, or (natively) when `strict: true` does not make WebGPU refuse the implicit lookup in a branch.
+
+## Job 185.1 GLSL programs as materials
+
+After `npm run build:packages`, run `node --test packages/shader/test/glsl-material.test.js`. Run `node packages/shader/test/glsl-material-check.mjs`, then the same command with `--compat`. Each prints one line per program with the maximum and mean difference in levels against the browser's WebGL compiler (WebGL 1 for GLSL ES 1.00, WebGL 2 for 3.00), first with the program's first uniform values and defines and again after changing them, with the number of translations the change made; it fails above 1 level, on any GPU or material error, when a uniform change translates again or when a defines change does not translate exactly once.
+
+## Job 185.1 GLSL programs as materials, push 2
+
+After `npm run build:packages`, run `node --test packages/shader/test/glsl-material-builtins.test.js packages/shader/test/raw.test.js`. Run `node packages/shader/test/glsl-material-check.mjs` and `node packages/shader/test/raw-check.mjs`, then both with `--compat`. The material check prints one line per program (the push 1 programs and the six of `test/glsl-material-builtins-fixtures.js`) with the maximum and mean difference in levels against the browser's WebGL compiler fed the same engine values, first and after a live change, then the centre pixel of the two depth-order draws; it fails above 1 level or when a GLSL quad does not sort with the core box. The raw check fails when a depth compare, equal depth test or biased draw gives the wrong colour.
+
+## Job 185.1 GLSL post passes (ShaderPass)
+
+After `npm run build:packages`, run `node --test packages/shader/test/glsl-pass.test.js`. Run `node packages/shader/test/glsl-pass-check.mjs` and the same with `--compat` (or `npm run test:gpu:glsl-pass --workspace @margoengine/shader`). The check prints a line per program with the maximum and mean difference in levels against the browser's WebGL compiler, first and after a live uniform change, and fails above 1 level.
+
+## Job 185.1 GLSL programs as materials, push 3
+
+After `npm run build:packages`, run `node --test packages/shader/test/glsl-material-data.test.js packages/shader/test/glsl-material.test.js`. Run `node packages/shader/test/glsl-material-check.mjs`, the same with `--compat`, `node packages/shader/test/raw-check.mjs` and `npm run check:owners -- --packages=shader`. The material check prints a line per program with the maximum and mean difference in levels against the browser's WebGL compiler, first and after a live uniform change, and fails above 1 level; the raw check fails when a GLSL caster does not shadow the wall or its discard does not cut it, when a moved GLSL quad does not pick where it shows, or when its edge row under TAA differs from the WGSL quad's by more than 2 levels.
+
+## Job 185.1 GLSL lights, fog and motion vectors
+
+After `npm run build:packages`, run `node --test packages/shader/test/glsl-material-scene.test.js packages/shader/test/glsl-scene-split.test.js`. Run `node packages/shader/test/glsl-material-check.mjs` and `node packages/shader/test/glsl-velocity-check.mjs`, then both with `--compat`. The material check's `lights: true and fog: true` rows draw two programs (GLSL ES 3.00 and 1.00) with a sun, ambient light, point and spot lists and fog, then a changed scene, against the browser's WebGL drawing them with the values worked out in the page: 0 levels on both legs (2026-11-15, RTX A6000, Chrome, ANGLE Direct3D 11). The velocity check draws a square moved by its GLSL vertex stage under TAA and compares the velocity and previous depth with a hand-written WGSL `velocityEntry`: worst 1.00 half-float step and 4.28e-8 in depth over 4096 texels, and the square's own motion shows on 343 texels against the same GLSL without `velocity`.
+
+## Job 185.1 Shadertoy Cube A, mainVR and mainSound
+
+After `npm run build:packages`, run `node --test packages/shader/test/shadertoy.test.js`. Run `node packages/shader/test/shadertoy-check.mjs` and the same with `--compat`. After the multipass rows it prints the Cube A programs (as pass, texture and mesh, with the face check against the browser's cube lookups), mainVR from each of two fixed eyes as pass and mesh, and the two sound programs with their sample counts and largest difference in steps of 1/32767 (2026-11-15, RTX A6000, Chrome, ANGLE Direct3D 11: images at most 1 level, VR 0 levels, sound at most 1 step natively and 0 on the layer).
+
+## Job 185.1 Shadertoy multipass
+
+After `npm run build:packages`, run `node --test packages/shader/test/shadertoy.test.js packages/shader/test/glsl-material.test.js`. Run `node packages/shader/test/shadertoy-check.mjs` and the same with `--compat`. Its last rows are the multipass programs: the 8-frame feedback program over Buffers A to D as pass, texture and mesh, and the keyboard, audio and canvas-as-video program, each with its maximum and mean difference in levels against the browser's WebGL2 with RGBA32F buffers (EXT_color_buffer_float and OES_texture_float_linear are required there).
+
+## Job 185.1 Shadertoy single pass
+
+After `npm run build:packages`, run `node --test packages/shader/test/shadertoy.test.js`. Run `node packages/shader/test/shadertoy-check.mjs` and the same with `--compat` (or `npm run test:gpu:shadertoy --workspace @margoengine/shader`). The check prints a line per source, target and input set with the maximum and mean difference in levels against the browser's WebGL2 compiler.
+
+## Film time seek (GAP-FILM-TIME)
+
+After `npm run build:packages`: `node --test packages/cutscene/tests/seek.test.js packages/cutscene/tests/render.test.js`,
+then the `seek.test.js` of sky, weather, scatter, water, vfx, taa, tonemap, animation, shader and each swept package, and
+`node scripts/check-film-time.mjs` (0 unreviewed) with `node --test tests/film-time.test.js`.
+Run natively and with `MARGO_COMPAT=1`: `node packages/sky/test/seek-check.mjs`, `node packages/weather/tests/seek-check.mjs`,
+`node packages/scatter/test/seek-check.mjs`, `node packages/water/test/seek-check.browser.mjs`,
+`node packages/vfx/test/seek-check.mjs`, `node packages/taa/test/seek-check.mjs`,
+`node packages/tonemap/tests/seek-browser.mjs` and `node scripts/env-mirror-gpu-check.js` (zero-delta capture updates:
+"TAA mirror after a move under history equals a fresh history" reads p99 0).

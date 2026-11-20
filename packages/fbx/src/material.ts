@@ -30,7 +30,9 @@ export async function attachMaterials(
       }
     }
   };
-  const hook = ctx.extensions.find((extension) => extension.material),
+  // Every entry that finishes materials runs, in the order of `extensions`: pbrMaterials, then one that knows the file's
+  // own tool (Character Creator's material json).
+  const finishers = ctx.extensions.filter((extension) => extension.material),
     converters = ctx.extensions.filter((extension) => extension.image),
     /** What each texture could not find, for the material's record. */
     lost = new Map<FBXNode, string>();
@@ -50,9 +52,23 @@ export async function attachMaterials(
       );
       if (!raw) throw new TypeError('Missing FBX texture image; re-export the file, it looks damaged');
       // A full path names a folder on the PC that wrote the file; the image travels beside it, as tools look for it.
+      // So does a relative path that climbs above the server's root, which only that PC's folders can be: Character
+      // Creator writes `../../../../../../Users/artist/AppData/Local/Temp/.../Std_Tearline_R_Opacity.jpg`. One that
+      // stays on the server is still refused below unless the app allows it.
       const given = raw.replace(/\\/g, '/'),
-        path = /^([a-z]:\/|\/)/i.test(given) ? given.slice(given.lastIndexOf('/') + 1) : given,
-        base = resourcePath || globalThis.location?.href;
+        base = resourcePath || globalThis.location?.href,
+        name = given.slice(given.lastIndexOf('/') + 1);
+      let path = /^([a-z]:\/|\/)/i.test(given) ? name : given;
+      if (path !== name && base && URL.canParse(base)) {
+        let depth = new URL('.', base).pathname.split('/').filter(Boolean).length;
+        for (const part of path.split('/')) {
+          depth += part === '..' ? -1 : part === '.' || !part ? 0 : 1;
+          if (depth < 0) {
+            path = name;
+            break;
+          }
+        }
+      }
       let target: URL;
       try {
         target = new URL(path, base);
@@ -120,11 +136,18 @@ export async function attachMaterials(
         throw new RangeError(`Invalid FBX material ${name}; re-export the file, it looks damaged`);
       return value as number[];
     };
-    const shininess = Number(property(source, 'Shininess', 0));
+    // FbxSurfacePhong names the exponent ShininessExponent (FBX SDK 2017); Max writes only that, and 6.1 files and some
+    // tools write Shininess.
+    const shininess = Number(property(source, 'ShininessExponent', property(source, 'Shininess', 0)));
     if (!Number.isFinite(shininess) || shininess < 0)
       throw new RangeError('Invalid FBX shininess; re-export the file, it looks damaged');
+    // FbxSurfaceLambert's transparency is TransparentColor times TransparencyFactor, as the diffuse is DiffuseColor times
+    // DiffuseFactor; the colour is black by default (the class's property template, as Maya writes it in Definitions).
     const explicitOpacity = property(source, 'Opacity', undefined),
-      alpha = explicitOpacity === undefined ? 1 - scalar('TransparencyFactor', 0) : scalar('Opacity', 1),
+      transparent = color('TransparentColor', [0, 0, 0]),
+      transparency =
+        (scalar('TransparencyFactor', 0) * (transparent[0] + transparent[1] + transparent[2])) / 3,
+      alpha = explicitOpacity === undefined ? 1 - transparency : scalar('Opacity', 1),
       factor = scalar('DiffuseFactor', 1),
       diffuse = color('DiffuseColor', property(source, 'Diffuse', [1, 1, 1])),
       // Emission has no top: Max writes pi times its emission colour here.
@@ -164,7 +187,7 @@ export async function attachMaterials(
       links.push({ property: c.property ?? '', node: t });
       if (!['DiffuseColor', 'NormalMap'].includes(c.property ?? '')) continue;
       if (t.name !== 'Texture') {
-        if (hook) continue;
+        if (finishers.length) continue;
         throw new TypeError('FBX layered texture; pass pbrMaterials from @margoengine/fbx/pbr, or bake it in your 3D tool');
       }
       handled.add(c.property!);
@@ -182,7 +205,7 @@ export async function attachMaterials(
       texture: load,
       children: (node) => children(ctx, id(node.properties[0])),
     };
-    await hook?.material?.(read);
+    for (const finisher of finishers) await finisher.material!(read);
     if (names.size) out.extras = { ...out.extras, fbxMissingTextures: [...names] };
     return out;
   };

@@ -1,5 +1,5 @@
 // margo-convert-cad (tools/margo-convert-cad): converts STEP and IGES files through Margo's own B-rep kernel,
-// validates every GLB with the Khronos glTF-Validator (a root dev dependency: npm ci), loads it with gltf-pro and the
+// validates every GLB with the Khronos glTF-Validator (a root dev dependency: npm ci), loads it with gltf/pbr and the
 // light glTF loader, and checks triangles and part names against loadCAD of the same file (the same kernel and
 // default tessellation, run in Node through a stand-in Worker that executes the built CAD worker in-process) and
 // bounds against the shapes' closed forms.
@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Geometry } from '@margoengine/core';
-import { parseGLTFAsync } from '@margoengine/gltf-pro';
+import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { parseGLTF } from '@margoengine/gltf';
 import { loadCAD } from '@margoengine/cad';
 import { model as brep } from '@margoengine/brep';
@@ -95,8 +95,8 @@ async function viaLoadCAD(bytes, file) {
   }
 }
 
-/** gltf-pro: triangles, world bounds and the names of the nodes that draw. */
-async function viaGLTFPro(glb) {
+/** gltf/pbr: triangles, world bounds and the names of the nodes that draw. */
+async function viaGLTFPbr(glb) {
   const model = await headlessModels(async () => parseGLTFAsync(await headless(), glb.slice()));
   return {
     triangles: model.primitives.reduce((n, p) => n + p.indices.length / 3, 0),
@@ -122,7 +122,7 @@ for (const [name, bytes, file, bounds] of [
       { glb, stats, warnings } = await convert(data, formatOf(file));
     assert.equal(stats.failedFaces, 0, warnings.join('; '));
     const issues = await validate(glb),
-      pro = await viaGLTFPro(glb),
+      pro = await viaGLTFPbr(glb),
       cad = await viaLoadCAD(data, file);
     assert.equal(stats.triangles, cad.triangles);
     assert.equal(pro.triangles, cad.triangles);
@@ -160,13 +160,13 @@ test('margo-convert-cad shares one mesh between the placements of a body and kee
   near(material.pbrMetallicRoughness.baseColorFactor, [linear(0.8), linear(0.2), linear(0.1), 1], 'colour');
   const flat = await convert(read('assembly'), 'step', { instancing: false });
   assert.equal(readGLB(flat.glb).json.meshes.length, 2);
-  near((await viaGLTFPro(flat.glb)).bounds, (await viaGLTFPro(glb)).bounds, 'instanced vs flat bounds');
+  near((await viaGLTFPbr(flat.glb)).bounds, (await viaGLTFPbr(glb)).bounds, 'instanced vs flat bounds');
 });
 
 test('margo-convert-cad --merge writes one world-space node per material', async () => {
   const merged = await convert(read('assembly'), 'step', { merge: true }),
     { json } = readGLB(merged.glb),
-    pro = await viaGLTFPro(merged.glb);
+    pro = await viaGLTFPbr(merged.glb);
   await validate(merged.glb);
   assert.equal(json.nodes.length, json.materials.length);
   assert.equal(pro.triangles, 2);
@@ -190,7 +190,7 @@ test("margo-convert-cad --edges bakes FeatureEdges' edges into mesh extras", asy
   }
   assert.equal(stats.edges, segments);
   assert.equal(segments, 12, 'a box has 12 edges');
-  await viaGLTFPro(glb);
+  await viaGLTFPbr(glb);
   parseGLTF(await headless(), glb); // loaders ignore the extras
 });
 
@@ -200,7 +200,7 @@ test('margo-convert-cad tessellation options; .brep files and the units option a
   assert.ok(fine.stats.triangles > 2 * coarse.stats.triangles, `${fine.stats.triangles} vs ${coarse.stats.triangles}`);
   await validate(fine.glb);
   // Radius 5 mm, height 8 mm, axis z from the origin: every rim sample lies on the circle, so no bound passes it.
-  const bounds = (await viaGLTFPro(fine.glb)).bounds;
+  const bounds = (await viaGLTFPbr(fine.glb)).bounds;
   assert.ok(bounds.slice(0, 2).every((v) => v >= -0.005 - 1e-7) && bounds.slice(3, 5).every((v) => v <= 0.005 + 1e-7));
   near([bounds[2], bounds[5]], [0, 0.008], 'cylinder height', 1e-7);
   await assert.rejects(convert(boxStep(), 'step', { linearDeflection: -1 }), /linearDeflection/);

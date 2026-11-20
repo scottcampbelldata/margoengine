@@ -66,7 +66,7 @@ test("water draws its sky reflection, weight and normal into SSR's capture hook"
   assert.match(code, /@fragment fn fragment\(i:Output\)->MargoSSR\{/);
   assert.match(
     code,
-    /let keep=reflection\*\(1\.0-0\.95\*foam\);_=body;_=glint\*shade;return MargoSSR\(vec4f\(skyColor\(reflect\(-v,n\),rough\)\*keep,rough\),vec4f\(vec3f\(keep\),1\),vec4f\(n\*0\.5\+0\.5,1\)\);/,
+    /let keep=reflection\*\(1\.0-0\.95\*shown\);_=body;_=glint\*shade;return MargoSSR\(vec4f\(skyColor\(reflect\(-v,n\),rough\)\*keep,rough\),vec4f\(vec3f\(keep\),1\),vec4f\(n\*0\.5\+0\.5,1\)\);/,
     'the sky reflection it added, times Fresnel and the foam share, as the specular SSR replaces',
   );
   assert.doesNotMatch(code, /return Result\(/);

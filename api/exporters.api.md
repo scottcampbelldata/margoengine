@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Geometry, Mesh, PbrMaterial } from "@margoengine/core";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { Vec2 } from "@margoengine/math";
 
 export interface AccessorValues {
@@ -101,6 +101,7 @@ export interface ExportPrimitive {
     geometry: Geometry | GeometryData;
     material?: PbrMaterial | MaterialData;
     indices?: ArrayLike<number>;
+    mode?: PrimitiveMode;
     extras?: Extras;
 }
 
@@ -133,6 +134,13 @@ export interface ExportTrack {
     times: ArrayLike<number>;
     values: ArrayLike<number>;
     interpolation?: 'STEP' | 'LINEAR' | 'CUBICSPLINE';
+}
+
+export interface ExportWarning {
+    code: 'unsupported';
+    message: string;
+    node: Mesh | ExportNode | null;
+    item?: object;
 }
 
 export type Extras = {
@@ -182,11 +190,12 @@ export interface GLTFJsonResult {
 export interface GLTFOptions extends SceneOptions {
     flatten?: boolean;
     generator?: string;
+    sparseMorphs?: boolean;
 }
 
 export interface GeometryData {
     positions: ArrayLike<number>;
-    normals: ArrayLike<number>;
+    normals?: ArrayLike<number>;
     uvs?: ArrayLike<number>;
     uvs1?: ArrayLike<number>;
     uvs2?: ArrayLike<number>;
@@ -246,21 +255,21 @@ export interface MaterialData {
     alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
     alphaCutoff?: number;
     baseColorTexture?: TextureData;
-    baseColorTextureTransform?: {
-        offset: Vec2;
-        scale: Vec2;
-        rotation?: number;
-    };
+    baseColorTextureTransform?: TextureTransform;
     metallicRoughnessTexture?: TextureData;
+    metallicRoughnessTextureTransform?: TextureTransform;
     normalTexture?: TextureData;
+    normalTextureTransform?: TextureTransform;
     unlit?: boolean;
     shading?: 'standard' | 'lambert' | 'phong';
     specular?: readonly number[];
     shininess?: number;
     normalScale?: number;
     occlusionTexture?: TextureData;
+    occlusionTextureTransform?: TextureTransform;
     occlusionStrength?: number;
     emissiveTexture?: TextureData;
+    emissiveTextureTransform?: TextureTransform;
     emissiveStrength?: number;
     transmission?: number;
     ior?: number;
@@ -339,6 +348,7 @@ export interface SceneOptions {
     geometryData?: Lookup<Geometry, GeometryData>;
     materialData?: Lookup<PbrMaterial, MaterialData>;
     pixelArt?: boolean | PixelArtSampling;
+    onWarning?: (warning: ExportWarning) => void;
 }
 
 export interface SkinData {
@@ -365,6 +375,12 @@ export interface TextureData {
     wrapT?: 'repeat' | 'clamp' | 'mirror';
     texCoord?: 0 | 1 | 2 | 3;
     extras?: Extras;
+}
+
+export interface TextureTransform {
+    offset: Vec2;
+    scale: Vec2;
+    rotation?: number;
 }
 
 export function animateCels(cels: readonly ExportNode[], clip: FrameClip, shown: ArrayLike<number>): AnimationChannelData[];
@@ -444,4 +460,6 @@ interface Lookup<K, V> {
 }
 
 type Path = 'translation' | 'rotation' | 'scale';
+
+type PrimitiveMode = 'POINTS' | 'LINES' | 'LINE_LOOP' | 'LINE_STRIP' | 'TRIANGLES' | 'TRIANGLE_STRIP' | 'TRIANGLE_FAN' | 0 | 1 | 2 | 3 | 4 | 5 | 6;
 ```

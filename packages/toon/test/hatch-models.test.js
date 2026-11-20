@@ -5,10 +5,10 @@ import { runInNewContext } from 'node:vm';
 import { setImmediate } from 'node:timers/promises';
 import { ModelHatching } from '../dist/hatch-models.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
 import { boxGeometry } from '../../geometry/dist/index.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 async function fixture(materials = false) {

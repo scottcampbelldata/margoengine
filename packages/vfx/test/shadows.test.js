@@ -127,9 +127,7 @@ const deferMaps = (engine) => {
       if (!settle) return;
       const reject = settle.reject;
       settle = null;
-      reject(
-        Object.assign(new Error('Buffer was destroyed before mapping was resolved'), { name: 'AbortError' }),
-      );
+      reject(Object.assign(new Error('Buffer was destroyed before mapping was resolved'), { name: 'AbortError' }));
     };
     return buffer;
   };
@@ -185,17 +183,23 @@ const effect = new VFX({ capacity: 1, shadows: { into: { setLights() {} } } });
 h.engine.use(effect);
 h.frame();
 const staging = h.resources.find((resource) => resource.usage === 9);
-if (!staging) { console.error('no readback buffer'); process.exit(2); }
-staging.mapAsync = () => Promise.reject(new TypeError('readback failed'));
-h.frame();
-setImmediate(() => {
-  effect.dispose();
+// It ends by its event loop with the code it sets (KB-OWN-EXIT2): 2 without a readback buffer, 1 when the rejection
+// was not seen exactly once.
+if (!staging) {
+  console.error('no readback buffer');
+  process.exitCode = 2;
+} else {
+  staging.mapAsync = () => Promise.reject(new TypeError('readback failed'));
+  h.frame();
   setImmediate(() => {
-    if (seen.length === 1 && seen[0].includes('readback failed')) process.exit(0);
-    console.error(JSON.stringify(seen));
-    process.exit(1);
+    effect.dispose();
+    setImmediate(() => {
+      if (seen.length === 1 && seen[0].includes('readback failed')) return;
+      console.error(JSON.stringify(seen));
+      process.exitCode = 1;
+    });
   });
-});
+}
 `,
   );
   try {
@@ -261,7 +265,16 @@ test('disposing a vfx removes the point lights it published', async () => {
   assert.equal(seen.at(-1).length, 0);
 
   const calls = [];
-  const quiet = attach({ capacity: 1, shadows: { into: { setLights(lights) { calls.push(lights); } } } });
+  const quiet = attach({
+    capacity: 1,
+    shadows: {
+      into: {
+        setLights(lights) {
+          calls.push(lights);
+        },
+      },
+    },
+  });
   quiet.effect.dispose();
   assert.equal(calls.length, 0);
 
@@ -304,11 +317,14 @@ test('shadows rejects a range or intensity that overflows f32', () => {
     () => new VFX({ shadows: { intensity: 1e40 } }),
     (error) => error instanceof RangeError && link.test(error.message) && /intensity/.test(error.message),
   );
-  assert.throws(() => new VFX({ shadows: { range: 0 } }), (error) => {
-    assert.equal(error instanceof RangeError, true);
-    assert.equal(link.test(error.message), false);
-    return true;
-  });
+  assert.throws(
+    () => new VFX({ shadows: { range: 0 } }),
+    (error) => {
+      assert.equal(error instanceof RangeError, true);
+      assert.equal(link.test(error.message), false);
+      return true;
+    },
+  );
   assert.throws(
     () => new VFX({ shadows: { intensity: -0.1 } }),
     (error) => error instanceof RangeError && !link.test(error.message),
@@ -316,7 +332,10 @@ test('shadows rejects a range or intensity that overflows f32', () => {
   const { h, effect } = attach({ capacity: 1, shadows: { range: 4, intensity: 1 } });
   h.frame();
   effect.options.shadows.range = 1e40;
-  assert.throws(() => h.frame(), (error) => error instanceof RangeError && link.test(error.message));
+  assert.throws(
+    () => h.frame(),
+    (error) => error instanceof RangeError && link.test(error.message),
+  );
   effect.options.shadows.range = 4;
   effect.options.shadows.intensity = 1e40;
   assert.throws(

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
-import { gaussianSplats, readGaussianSplats } from '../../gltf-pro/dist/splats.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
+import { gaussianSplats, readGaussianSplats } from '../../gltf/dist/splats.js';
 import { transformSplats } from '../../splats/dist/index.js';
 import { glbChunks } from '../../shared/glb.js';
 import { TilesRenderer, holdsSplats, multiply, transformPoint } from '../dist/index.js';
@@ -12,7 +12,7 @@ import { boxGLB, memoryFetch, settle } from './generator.js';
 const folder = new URL('../../../examples/assets/3d-tiles/GaussianSplats/sh_unit_cube/', import.meta.url),
   sampleGlb = () => new Uint8Array(readFileSync(new URL('0/0.glb', folder)));
 
-/** The real sample's one primitive, read by gltf-pro as the drawer reads it. */
+/** The real sample's one primitive, read by gltf/pbr as the drawer reads it. */
 async function sampleSplats() {
   const [json, binary] = glbChunks(sampleGlb()),
     doc = JSON.parse(new TextDecoder().decode(json.data)),
@@ -105,7 +105,7 @@ test('splat tiles: holdsSplats tells a KHR_gaussian_splatting glTF from a plain 
 });
 
 test('splat tiles: without the splats option a splat tile fails with a coded error naming the entry, not misplaced', async () => {
-  // Before the fix the renderer handed the glTF to loadModel, and gltf-pro attached its splats at the model's own
+  // Before the fix the renderer handed the glTF to loadModel, and gltf/pbr attached its splats at the model's own
   // origin, outside the tile transform and the frame, and never hid them with the tile.
   const { renderer, models, errors } = await cube();
   assert.equal(models.length, 0, 'loadModel is not given a splat tile');

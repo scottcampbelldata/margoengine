@@ -1,13 +1,26 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { checkCamera, checkNumber } from './validation.js';
+import { BindGroups, TextureOption, viewOf } from './resources.js';
 
 type TextureSource = GPUTexture | (() => GPUTexture);
+/** What reports a lost texture and gives the device a new one belongs to: the engine of the pass that encodes. */
+interface SDFOwner {
+  readonly gpu?: GPUDevice | null;
+  onError(error: unknown): void;
+}
 /** Painted world-space geometry consumed by GILighting2D. Textures contain straight, linear RGBA. */
 export interface SDFScene2DOptions {
-  /** Alpha defines opaque cells; RGB defines diffuse albedo. A pixel layer's target getter is accepted. */
+  /**
+   * Alpha defines opaque cells; RGB defines diffuse albedo. A function is read each frame (a pixel layer's target
+   * getter). A plain texture lost at a device restore leaves the painted scene out of the light, reported once,
+   * until a new one is assigned to {@link SDFScene2D.source}.
+   */
   readonly source: TextureSource;
-  /** Emission image, same dimensions as source. Default source (black pixels do not emit). */
+  /**
+   * Emission image, same dimensions as source; a function is read each frame. Default source (black pixels do not emit).
+   * A plain texture lost at a device restore uses the default, reported once, until a new one is assigned.
+   */
   readonly emission?: TextureSource;
   /** Top-left world origin and pixels per world unit. Default {x:0,y:0,zoom:1}. Read each frame. */
   readonly camera?: { x: number; y: number; zoom: number };
@@ -82,10 +95,6 @@ const INF:f32=1e20;
 
 /** Exact pixel-centre signed distance transform, rebuilt on the GPU before every GI frame. */
 export class SDFScene2D implements Disposable {
-  /** Borrowed alpha/albedo texture or getter. Never destroyed by this object. */
-  source: TextureSource;
-  /** Borrowed emission texture or getter; undefined uses source. */
-  emission?: TextureSource;
   /** Top-left world origin and pixel scale, read on every encode. */
   camera: { x: number; y: number; zoom: number };
   /** Opaque alpha cutoff, default .5. */
@@ -102,11 +111,17 @@ export class SDFScene2D implements Disposable {
   #disposed = false;
   #historyKey?: string;
   #lastEncoder?: GPUCommandEncoder;
+  #owner?: SDFOwner;
+  readonly #sourceOption: TextureOption;
+  readonly #emissionOption: TextureOption;
+  readonly #groups = new BindGroups();
+  readonly #changed = new Uint32Array(1);
+  readonly #settings = new Float32Array(8);
 
   constructor(options: SDFScene2DOptions) {
     if (!options?.source) throw typeError('SDFScene2D source is required', 'pixel-lighting');
-    this.source = options.source;
-    this.emission = options.emission;
+    this.#sourceOption = new TextureOption(options.source, 'SDFScene2D source', 'assign a new source');
+    this.#emissionOption = new TextureOption(options.emission, 'SDFScene2D emission', 'assign a new emission');
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.alphaThreshold = options.alphaThreshold ?? .5;
     this.emissionIntensity = options.emissionIntensity ?? 1;
@@ -118,18 +133,41 @@ export class SDFScene2D implements Disposable {
     if (this.alphaThreshold > 1) throw rangeError('alphaThreshold must be in [0,1]', 'pixel-lighting');
     checkNumber(this.emissionIntensity, 'emissionIntensity', 0);
   }
+  /** Borrowed alpha/albedo texture or getter, read on every encode. Never destroyed by this object. */
+  get source(): TextureSource {
+    return this.#sourceOption.value!;
+  }
+  set source(value: TextureSource) {
+    if (!value) throw typeError('SDFScene2D source is required', 'pixel-lighting');
+    this.#sourceOption.set(value, this.#owner?.gpu);
+  }
+  /** Borrowed emission texture or getter; undefined uses source. Never destroyed by this object. */
+  get emission(): TextureSource | undefined {
+    return this.#emissionOption.value;
+  }
+  set emission(value: TextureSource | undefined) {
+    this.#emissionOption.set(value, this.#owner?.gpu);
+  }
   /** Current rgba32float field: R signed distance in source pixels, G occupancy. Replaced on resize/restore. */
   get distanceTexture(): GPUTexture | undefined { return this.#field; }
   /** GPU flag for exact source/emission/configuration changes in the current encoded snapshot. */
   get changeBuffer(): GPUBuffer | undefined { return this.#buffers[5]; }
 
-  /** Encode the three exact transform passes into the caller's frame. GILighting2D calls this automatically. */
-  encode(device: GPUDevice, encoder: GPUCommandEncoder): void {
+  /**
+   * Encode the three exact transform passes into the caller's frame; GILighting2D calls this automatically and passes
+   * its engine as `owner`, which reports a lost texture once. Returns false, encoding nothing, while a plain source is
+   * lost with its device.
+   */
+  encode(device: GPUDevice, encoder: GPUCommandEncoder, owner?: SDFOwner): boolean {
     if (this.#disposed) throw fault('disposed', 'SDFScene2D disposed; create a new one', 'pixel-lighting');
     this.#validate();
-    if (this.#lastEncoder === encoder && this.#device === device) return;
-    const pick = (source: TextureSource) => typeof source === 'function' ? source() : source;
-    const source = pick(this.source), emission = pick(this.emission ?? this.source);
+    if (owner) this.#owner = owner;
+    if (this.#lastEncoder === encoder && this.#device === device) return true;
+    if (this.#device !== device) { this.#release(); this.#device = device; }
+    const source = this.#sourceOption.get(device, this.#owner);
+    if (!source) return false;
+    // No emission image, or a plain one lost with its device: the source, as when emission is left out.
+    const emission = this.#emissionOption.get(device, this.#owner) ?? source;
     for (const image of [source, emission]) {
       if (image.dimension !== '2d' || image.depthOrArrayLayers !== 1 || image.sampleCount !== 1 ||
           !(image.usage & 4) || !/^(rgba8unorm(-srgb)?|bgra8unorm(-srgb)?|rgba16float|rgba32float)$/.test(image.format))
@@ -143,7 +181,6 @@ export class SDFScene2D implements Disposable {
     if (Math.ceil(Math.max(source.width * 2, source.height) / 64) > device.limits.maxComputeWorkgroupsPerDimension ||
         Math.ceil(Math.max(source.width, source.height) / 8) > device.limits.maxComputeWorkgroupsPerDimension)
       throw rangeError('SDF dispatch exceeds device limit', 'pixel-lighting');
-    if (this.#device !== device) { this.#release(); this.#device = device; }
     if (!this.#layout) {
       const visibility = 4;
       this.#layout = device.createBindGroupLayout({ entries: [
@@ -172,18 +209,18 @@ export class SDFScene2D implements Disposable {
     }
     this.#source = source; this.#emission = emission;
     const key = JSON.stringify([this.camera, this.alphaThreshold, this.emissionIntensity]);
-    device.queue.writeBuffer(this.#buffers[5], 0, new Uint32Array([this.#historyKey === key ? 0 : 1]));
-    device.queue.writeBuffer(this.#buffers[0], 0, new Float32Array([
-      this.camera.x, this.camera.y, this.camera.zoom, 0, this.alphaThreshold, this.emissionIntensity, 0, 0,
-    ]));
-    const group = device.createBindGroup({ layout: this.#layout, entries: [
-      { binding: 0, resource: { buffer: this.#buffers[0] } }, { binding: 1, resource: source.createView() },
-      ...this.#buffers.slice(1, 4).map((buffer, i) => ({ binding: i + 2, resource: { buffer } })),
-      { binding: 5, resource: this.#field.createView() },
-      { binding: 6, resource: emission.createView() },
-      { binding: 7, resource: { buffer: this.#buffers[4] } },
-      { binding: 8, resource: { buffer: this.#buffers[5] } },
-    ] });
+    this.#changed[0] = this.#historyKey === key ? 0 : 1;
+    device.queue.writeBuffer(this.#buffers[5], 0, this.#changed);
+    this.#settings.set([this.camera.x, this.camera.y, this.camera.zoom, 0, this.alphaThreshold, this.emissionIntensity]);
+    device.queue.writeBuffer(this.#buffers[0], 0, this.#settings);
+    // Kept while the images, the field and the scratch are the same objects: a steady frame makes none.
+    const b = this.#buffers, group = this.#groups.get(device, 'encode', this.#layout, [
+      { binding: 0, resource: { buffer: b[0] } }, { binding: 1, resource: viewOf(source) },
+      { binding: 2, resource: { buffer: b[1] } }, { binding: 3, resource: { buffer: b[2] } },
+      { binding: 4, resource: { buffer: b[3] } }, { binding: 5, resource: viewOf(this.#field) },
+      { binding: 6, resource: viewOf(emission) }, { binding: 7, resource: { buffer: b[4] } },
+      { binding: 8, resource: { buffer: b[5] } },
+    ]);
     this.#pipelines.forEach((pipeline, i) => {
       const pass = encoder.beginComputePass(); pass.setPipeline(pipeline); pass.setBindGroup(0, group);
       if (i === 2) pass.dispatchWorkgroups(Math.ceil(source.width / 8), Math.ceil(source.height / 8));
@@ -191,16 +228,17 @@ export class SDFScene2D implements Disposable {
       pass.end();
     });
     this.#historyKey = key; this.#lastEncoder = encoder;
+    return true;
   }
-  /** Bind the encoded field, source and emission for an owning lighting pass. */
+  /** Bind the encoded field, source and emission for an owning lighting pass; the same group while nothing changed. */
   bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup {
     if (device !== this.#device || !this.#field) throw fault('state', 'Encode the SDF scene before binding it', 'pixel-lighting');
-    return device.createBindGroup({ layout, entries: [
+    return this.#groups.get(device, 'bind', layout, [
       { binding: 0, resource: { buffer: this.#buffers[0] } },
-      { binding: 1, resource: this.#source!.createView() }, { binding: 2, resource: this.#emission!.createView() },
-      { binding: 3, resource: this.#field.createView() },
+      { binding: 1, resource: viewOf(this.#source!) }, { binding: 2, resource: viewOf(this.#emission!) },
+      { binding: 3, resource: viewOf(this.#field) },
       { binding: 4, resource: { buffer: this.#buffers[5] } },
-    ] });
+    ]);
   }
   #release(): void {
     this.#field?.destroy(); this.#field = undefined;
@@ -208,6 +246,7 @@ export class SDFScene2D implements Disposable {
     this.#buffers = []; this.#pipelines = []; this.#layout = undefined; this.#device = undefined;
     this.#source = this.#emission = undefined;
     this.#historyKey = undefined; this.#lastEncoder = undefined;
+    this.#groups.clear();
   }
   /** Release owned scratch and field textures; source textures remain borrowed. */
   dispose(): void { if (!this.#disposed) { this.#disposed = true; this.#release(); } }

@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><title>Material LOD: FlightHelmet</title><canvas width="256" height="256" style="width:256px;height:256px"></canvas><script type="module">
 // FlightHelmet mobile geometry/textures: Gary Hsu / Microsoft, CC0; examples/assets/ATTRIBUTION.md.
 import {Engine} from '/packages/core/dist/index.js';
-import {parseGLTFAsync} from '/packages/gltf-pro/dist/index.js';
+import {parseGLTFAsync} from '/packages/gltf/dist/pbr.js';
 import {glbChunks,GLB_JSON,GLB_BIN} from '/packages/shared/glb.js';
 import {MSFTMaterialLOD} from '/packages/lod/dist/msft.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0.25,1.2],target:[0,0.25,0]}});engine.stop();

@@ -39,12 +39,16 @@ export function checkRig(joints: readonly RigJoint[]): number[] {
   if (!Array.isArray(joints) || !joints.length || joints.length > MAX_JOINTS)
     throw new RangeError(`A rig needs 1 to ${MAX_JOINTS} joints; pass an array of {name, parent, position}`);
   const names = new Set<string>(),
-    n = joints.length,
-    children: number[][] = joints.map(() => []);
+    n = joints.length;
   for (let i = 0; i < n; i++) {
     const joint = joints[i];
-    if (!joint || typeof joint.name !== 'string' || !joint.name || names.has(joint.name))
+    if (!joint || typeof joint.name !== 'string' || !joint.name)
       throw new TypeError(`Rig joint ${i} needs a unique, nonempty name; rename it`);
+    // glTF 2.0 (3.4) does not require unique node names, but joints are found by name here (docs/limits.md).
+    if (names.has(joint.name))
+      throw new TypeError(
+        `Rig joint ${i} repeats the name ${joint.name}; glTF allows that, but rig joints are found by name, so rename one`,
+      );
     names.add(joint.name);
     const parent = joint.parent;
     if (!Number.isInteger(parent) || parent < -1 || parent >= n || parent === i)
@@ -52,16 +56,69 @@ export function checkRig(joints: readonly RigJoint[]): number[] {
     const p = joint.position;
     if (!p || p.length !== 3 || !Number.isFinite(p[0]) || !Number.isFinite(p[1]) || !Number.isFinite(p[2]))
       throw new RangeError(`Rig joint ${joint.name} position must be three finite numbers`);
-    if (parent >= 0) children[parent].push(i);
   }
+  return parentOrder(
+    joints.map((joint) => joint.parent),
+    'Rig',
+  );
+}
+
+/**
+ * The parent-before-child order of a bone hierarchy (each parent -1 or another bone's index, checked by the caller).
+ * @throws RangeError when the parents form a cycle, so no bone on it reaches a root.
+ */
+export function parentOrder(parents: readonly number[], label: string): number[] {
+  const n = parents.length,
+    children: number[][] = parents.map(() => []);
+  for (let i = 0; i < n; i++) if (parents[i] >= 0) children[parents[i]].push(i);
   const order: number[] = [];
-  for (const stack = joints.flatMap((joint, i) => (joint.parent < 0 ? [i] : [])); stack.length; ) {
-    const joint = stack.pop()!;
-    order.push(joint);
-    for (const child of children[joint]) stack.push(child);
+  for (const stack = parents.flatMap((parent, i) => (parent < 0 ? [i] : [])); stack.length; ) {
+    const bone = stack.pop()!;
+    order.push(bone);
+    for (const child of children[bone]) stack.push(child);
   }
-  if (order.length !== n) throw new RangeError('Rig parents form a cycle; every joint must reach a root (parent -1)');
+  if (order.length !== n) throw new RangeError(`${label} parents form a cycle; every joint must reach a root (parent -1)`);
   return order;
+}
+
+/**
+ * World frames of a bone hierarchy from local transforms (10 numbers per bone: translation, rotation xyzw, scale), in
+ * `order` (parents first). Positions compose full matrices as glTF 2.0 (3.5.3) does, M = M_parent * T * R * S, so a
+ * parent's uneven scale stretches a turned child's offset along the parent's axes; `linear` is each bone's 3x3 part
+ * (column-major) and `rotation` the product of the local rotations.
+ */
+export function worldFrames(
+  parents: readonly number[],
+  local: ArrayLike<number>,
+  order: readonly number[],
+): { position: Float64Array; rotation: Float64Array; linear: Float64Array } {
+  const n = parents.length,
+    position = new Float64Array(n * 3),
+    rotation = new Float64Array(n * 4),
+    linear = new Float64Array(n * 9);
+  for (const b of order) {
+    const p = parents[b],
+      l = b * 10,
+      q: [number, number, number, number] = [local[l + 3], local[l + 4], local[l + 5], local[l + 6]],
+      t = [local[l], local[l + 1], local[l + 2]];
+    // The local rotation-and-scale columns R * S.
+    const columns = [0, 1, 2].map((a) => rotateByQuaternion([a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0], q).map((v) => v * local[l + 7 + a]));
+    if (p < 0) {
+      position.set(t, b * 3);
+      rotation.set(q, b * 4);
+      for (let a = 0; a < 3; a++) linear.set(columns[a], b * 9 + a * 3);
+      continue;
+    }
+    const m = linear.subarray(p * 9, p * 9 + 9),
+      apply = (v: readonly number[], out: Float64Array, at: number) => {
+        for (let c = 0; c < 3; c++) out[at + c] = m[c] * v[0] + m[3 + c] * v[1] + m[6 + c] * v[2];
+      };
+    apply(t, position, b * 3);
+    for (let c = 0; c < 3; c++) position[b * 3 + c] += position[p * 3 + c];
+    rotation.set(multiplyQuaternions(rotation.subarray(p * 4, p * 4 + 4), q), b * 4);
+    for (let a = 0; a < 3; a++) apply(columns[a], linear, b * 9 + a * 3);
+  }
+  return { position, rotation, linear };
 }
 
 /** Index of each named joint, or -1. */
@@ -87,7 +144,8 @@ export function resolveJoints(
 
 /**
  * World rest positions of a {@link RigPose} (glTF nodes, a `Skeleton` or `retargetRig` output) as {@link RigJoint}s.
- * Unnamed bones are named `bone<index>`.
+ * Unnamed bones are named `bone<index>`. Names must be unique (rig joints are found by name, though glTF allows
+ * repeats): rename repeated ones first.
  */
 export function rigJoints(rig: RigPose): RigJoint[] {
   const { names, parents, rest } = rig ?? ({} as RigPose),
@@ -95,31 +153,13 @@ export function rigJoints(rig: RigPose): RigJoint[] {
   if (!Array.isArray(names) || !Array.isArray(parents) || parents.length !== n || rest?.length !== n * 10)
     throw new TypeError('rigJoints needs {names, parents, rest} with 10 rest numbers per bone (see retargetRig)');
   const order = checkRig(
-      names.map((name, i) => ({ name: name || `bone${i}`, parent: parents[i], position: [0, 0, 0] as Vec3 })),
-    ),
-    rotation = new Float64Array(n * 4),
-    position = new Float64Array(n * 3),
-    scale = new Float64Array(n * 3);
-  for (const b of order) {
-    const p = parents[b],
-      l = b * 10;
+    names.map((name, i) => ({ name: name || `bone${i}`, parent: parents[i], position: [0, 0, 0] as Vec3 })),
+  );
+  for (let b = 0; b < n; b++)
     for (let c = 0; c < 10; c++)
-      if (!Number.isFinite(rest[l + c]))
+      if (!Number.isFinite(rest[b * 10 + c]))
         throw new RangeError(`rigJoints bone ${b} rest pose is not finite; make all 10 rest numbers finite`);
-    if (p < 0) {
-      for (let c = 0; c < 3; c++) (position[b * 3 + c] = rest[l + c]), (scale[b * 3 + c] = rest[l + 7 + c]);
-      for (let c = 0; c < 4; c++) rotation[b * 4 + c] = rest[l + 3 + c];
-      continue;
-    }
-    const parent = rotation.subarray(p * 4, p * 4 + 4),
-      offset = rotateByQuaternion(
-        [scale[p * 3] * rest[l], scale[p * 3 + 1] * rest[l + 1], scale[p * 3 + 2] * rest[l + 2]],
-        parent,
-      );
-    for (let c = 0; c < 3; c++) position[b * 3 + c] = position[p * 3 + c] + offset[c];
-    rotation.set(multiplyQuaternions(parent, [rest[l + 3], rest[l + 4], rest[l + 5], rest[l + 6]]), b * 4);
-    for (let c = 0; c < 3; c++) scale[b * 3 + c] = scale[p * 3 + c] * rest[l + 7 + c];
-  }
+  const { position } = worldFrames(parents, rest, order);
   return names.map((name, i) => ({
     name: name || `bone${i}`,
     parent: parents[i],

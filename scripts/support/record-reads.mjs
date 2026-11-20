@@ -34,7 +34,7 @@ export const RECORDER_ENV = new Set([
  */
 export const CLOCK_INFRASTRUCTURE = [
   '/browser.js',
-  '/gpu-lock.mjs',
+  '/run-with-timeout.mjs',
   '/lib/browser.mjs',
   '/support/run-limited.mjs',
   '/support/record-reads.mjs',

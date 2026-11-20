@@ -1,5 +1,5 @@
 // Draw buffers that follow a sculpted surface. One draw vertex for each distinct UV a vertex has, in the 20-float layout
-// gltf-pro's prepared geometry uses, so a dab rewrites the few floats it changed instead of the whole mesh.
+// gltf/pbr's prepared geometry uses, so a dab rewrites the few floats it changed instead of the whole mesh.
 import type { SculptIndex } from './sculpt-index.js';
 import { triNormal, type SurfaceTri, type TriSurface } from './tri-surface.js';
 

@@ -12,6 +12,9 @@ export class Autofocus implements EnginePlugin {
     readonly name = "dof-autofocus";
     static attach(engine: EngineKernel, dof: DOF, options?: AutofocusOptions): Autofocus;
     constructor(dof: DOF, options?: AutofocusOptions);
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

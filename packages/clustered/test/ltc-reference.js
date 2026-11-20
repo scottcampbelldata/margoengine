@@ -4,7 +4,9 @@
 // - ltc(): a float64 mirror of the WGSL clusterAreaLighting (frame, LUT lookup, horizon clipping, edge sum).
 // - bruteForce(): independent midpoint quadrature over the rectangle of the BRDF the LTC table approximates (GGX D,
 //   height-correlated Smith G2, Schlick Fresnel) plus Lambert diffuse, with no LTC or polygon integration at all.
-// Lights are AreaLights' packed 16-float records: centre xyz + twoSided, right half-extent, up half-extent, radiance.
+// Lights are AreaLights' packed 16-float records: centre xyz + twoSided, right half-extent + recess, up half-extent +
+// sill, radiance. ltc() clips a recessed light as the shader does; bruteForce() instead traces each sample's segment
+// against the wall round the opening and the sill as boxes.
 import { ltcSize, ltcTable } from '../src/ltc.ts';
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
@@ -82,13 +84,15 @@ const light = (l) => ({
   center: l.slice(0, 3),
   twoSided: l[3] > 0.5,
   right: l.slice(4, 7),
+  recess: l[7],
   up: l.slice(8, 11),
+  sill: l[11],
   color: l.slice(12, 15),
 });
 
 /** The shader's result for one packed light at point p, unit normal n and unit view v: {diffuse, specular, total}. */
 export function ltc(l, p, n, v, base, roughness, metal) {
-  const { center, twoSided, right, up, color } = light(l),
+  const { center, twoSided, right, up, color, recess, sill } = light(l),
     nv = Math.min(Math.max(dot(n, v), 0.0001), 1),
     st = [Math.min(Math.max(roughness, 0.045), 1) * (ltcSize - 1), Math.sqrt(1 - nv) * (ltcSize - 1)],
     [m0, m1] = lookup(st, 0),
@@ -110,7 +114,26 @@ export function ltc(l, p, n, v, base, roughness, metal) {
     if (!twoSided) return zero;
     side = -1;
   }
-  const corners = [sub(sub(c, right), up), add(sub(c, right), up), add(add(c, right), up), sub(add(c, right), up)],
+  // The shader's opening clip (APERTURE_WGSL of src/area.ts), line for line.
+  let lo = [-1, -1],
+    hi = [1, 1];
+  if (recess > 0 || sill > 0) {
+    const q = [-dot(c, right) / dot(right, right), -dot(c, up) / dot(up, up)],
+      f = cross(right, up),
+      z = -dot(c, scale(f, 1 / Math.hypot(...f)));
+    if (z > recess) {
+      const k = z / Math.max(z - recess, 1e-6);
+      lo = lo.map((b, i) => Math.max(b, q[i] - (1 + q[i]) * k));
+      hi = hi.map((b, i) => Math.min(b, q[i] + (1 - q[i]) * k));
+    } else if (Math.abs(q[0]) > 1.001 || Math.abs(q[1]) > 1.001) return zero;
+    if (sill > 0) {
+      if (z > recess + sill) lo[1] = Math.max(lo[1], q[1] - ((1 + q[1]) * z) / Math.max(z - recess - sill, 1e-6));
+      else if (z > recess && q[1] < -1) return zero;
+    }
+    if (lo[0] >= hi[0] || lo[1] >= hi[1]) return zero;
+  }
+  const at = (x, y) => add(add(c, scale(right, x)), scale(up, y)),
+    corners = [at(lo[0], lo[1]), at(lo[0], hi[1]), at(hi[0], hi[1]), at(hi[0], lo[1])],
     spec = Math.max(side * integral(lobe, corners), 0),
     diff = Math.max(side * integral(local, corners), 0);
   const diffuse = color.map((k, i) => k * diff * (1 - metal) * base[i]),
@@ -128,7 +151,7 @@ export function ltc(l, p, n, v, base, roughness, metal) {
  * Lambda(l)), Schlick F with f0 = mix(0.04, base, metal). Returns {diffuse, specular, total}.
  */
 export function bruteForce(l, p, n, v, base, roughness, metal, k = 256) {
-  const { center, twoSided, right, up, color } = light(l),
+  const { center, twoSided, right, up, color, recess = 0, sill = 0 } = light(l),
     normal = cross(right, up),
     area = 4 * Math.hypot(...normal),
     facing = scale(normal, 1 / Math.hypot(...normal)),
@@ -148,6 +171,7 @@ export function bruteForce(l, p, n, v, base, roughness, metal, k = 256) {
         dir = scale(w, 1 / r),
         nl = dot(n, dir);
       if (!(nl > 0)) continue;
+      if ((recess > 0 || sill > 0) && blocked(q, p, { center, right, up, recess, sill })) continue;
       const solid = (Math.abs(dot(facing, dir)) * area) / (k * k) / r2;
       let h = add(v, dir);
       h = scale(h, 1 / Math.hypot(...h));
@@ -165,4 +189,48 @@ export function bruteForce(l, p, n, v, base, roughness, metal, k = 256) {
       }
     }
   return { diffuse, specular, total: diffuse.map((d, i) => d + specular[i]) };
+}
+
+/**
+ * Whether the segment from `q` (on a recessed light) to `p` meets the wall round the light's opening or its sill, both
+ * as boxes in the light's frame (across and up in half extents, out in world units): the wall `recess` thick, solid
+ * beyond the opening's outline (four boxes, 1,000 half extents wide), and the sill under the opening from `recess` to
+ * `recess + sill`, as wide. Slab test per box (Kay and Kajiya, SIGGRAPH 1986, doi:10.1145/15886.15916).
+ */
+export function blocked(q, p, { center, right, up, recess, sill }) {
+  const f = cross(right, up),
+    normal = scale(f, 1 / Math.hypot(...f)),
+    local = (x) => {
+      const w = sub(x, center);
+      return [dot(w, right) / dot(right, right), dot(w, up) / dot(up, up), dot(w, normal)];
+    },
+    a = local(q),
+    b = local(p),
+    big = 1000,
+    boxes = [];
+  if (recess > 0)
+    boxes.push(
+      [[-big, -big, 0], [-1, big, recess]],
+      [[1, -big, 0], [big, big, recess]],
+      [[-1, 1, 0], [1, big, recess]],
+      [[-1, -big, 0], [1, -1, recess]],
+    );
+  if (sill > 0) boxes.push([[-big, -big, recess], [big, -1, recess + sill]]);
+  return boxes.some(([lo, hi]) => {
+    let t0 = 1e-9,
+      t1 = 1 - 1e-9;
+    for (let k = 0; k < 3; k++) {
+      const d = b[k] - a[k];
+      if (Math.abs(d) < 1e-15) {
+        if (a[k] <= lo[k] || a[k] >= hi[k]) return false;
+        continue;
+      }
+      let s0 = (lo[k] - a[k]) / d,
+        s1 = (hi[k] - a[k]) / d;
+      if (s0 > s1) [s0, s1] = [s1, s0];
+      t0 = Math.max(t0, s0);
+      t1 = Math.min(t1, s1);
+    }
+    return t0 < t1;
+  });
 }

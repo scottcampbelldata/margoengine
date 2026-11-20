@@ -138,6 +138,33 @@ for (const compat of [false, true]) {
           bufferInventory.push({ glyph, gpuBufferPeak: peak, logicalStagingBound: actual.work.peakStagingBytes });
           dispatches += actual.work.dispatches;
         }
+        // Edges between points on a 0.2 pixel lattice pass through many pixel centres, where one ULP from a
+        // hardware divide, a fused multiply-add or a flushed subnormal flips coverage; a few coordinates also take
+        // random binary32 exponents. GPU coverage must still match the binary32 CPU reference exactly. The 32768 rows
+        // fill one default chunk of an 8 x 8 raster: tested by one invocation per bin, Chrome on ANGLE Metal dropped
+        // the WebGL2 layer's draw and every count read back 0.
+        let seed = 7;
+        const next = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0),
+          bits = new Uint32Array(1),
+          wide = new Float32Array(bits.buffer),
+          tieRows = 32768,
+          tieColumns = {};
+        for (const name of ['x', 'y', 'x1', 'y1', 'x2', 'y2', 'x3', 'y3']) {
+          const column = new Float64Array(tieRows);
+          for (let i = 0; i < tieRows; i++) {
+            bits[0] = (next() & 0x807fffff) | ((next() % 254) << 23);
+            column[i] = next() % 16 ? (next() % 41) / 10 : wide[0];
+          }
+          tieColumns[name] = column;
+        }
+        const ties = new ColumnarTable({ ...tieColumns, value: Float64Array.from({ length: tieRows }, (_, i) => i) }),
+          tieOptions = { columns: options.columns, width: 8, height: 8, bounds: [0, 4, 0, 4], value: 'value' };
+        for (const glyph of ['lines', 'triangles', 'quads']) {
+          const cpu = await aggregateRaster(ties, { ...tieOptions, glyph }),
+            actual = await aggregateRaster(ties, { ...tieOptions, glyph, gpu });
+          check(equal(cpu, actual), `GPU ${glyph}: coverage at pixel-centre ties matches the binary32 CPU reference`);
+          check(actual.work.dispatches === 2, `GPU ${glyph}: one chunk runs as row slices and one merge`);
+        }
         const routes = startRoutes
           ? Object.fromEntries(
               Object.entries(gpu.device.dispatches).map(([key, value]) => [key, value - startRoutes[key]]),

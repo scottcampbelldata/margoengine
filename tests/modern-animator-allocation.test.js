@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { GCProfiler, setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Animator, addLookAt } from '../packages/animator/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 test('blending avoids redundant pose copies and keeps transition snapshots intact', async () => {
   const store = await TransformStore.create(32),
@@ -51,9 +51,11 @@ test('blending avoids redundant pose copies and keeps transition snapshots intac
     assert.equal(model.nodes[1].position.x, Math.fround(0.1));
     assert.equal(model.nodes[0].position.x, 0);
     animator.transition('idle', 1);
-    for (const expected of [0.075, 0.05, 0.025, 0]) {
+    // The state left plays on through the fade: Move (x = 0.4 t, looping) at 0.75, 1, 1.25 and 1.5 s, at half
+    // weight in its blend, faded out by a quarter a step.
+    for (const expected of [0.75 * 0.5 * 0.3, 0.5 * 0.5 * 0, 0.25 * 0.5 * 0.1, 0]) {
       animator.onPreUpdate(0.25);
-      assert.ok(Math.abs(model.nodes[1].position.x - expected) < 1e-7);
+      assert.ok(Math.abs(model.nodes[1].position.x - expected) < 1e-7, `${model.nodes[1].position.x} for ${expected}`);
     }
     animator.transition('moving', 0);
     animator.onPreUpdate(0.5);
@@ -62,7 +64,8 @@ test('blending avoids redundant pose copies and keeps transition snapshots intac
     animator.onPreUpdate(0.25);
     animator.transition('moving', 1);
     animator.onPreUpdate(0.25);
-    assert.ok(Math.abs(model.nodes[1].position.x - 0.06875) < 1e-7);
+    // The interruption holds the blended 0.75 * 0.5 * 0.3 it cut in on; moving restarts at 0.25 s (0.5 * 0.1).
+    assert.ok(Math.abs(model.nodes[1].position.x - (0.75 * 0.1125 + 0.25 * 0.05)) < 1e-7);
   } finally {
     animator.dispose();
     model.dispose();

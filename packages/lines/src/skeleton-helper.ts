@@ -18,14 +18,14 @@ export interface SkeletonShape {
   /** Bumped on every pose change; when present, a frame with the same revision skips reading the matrices. */
   readonly revision?: number;
 }
-/** Bones as joint meshes that their world matrices pose, such as a glTF skin's joints among a gltf-pro model's `nodes`. */
+/** Bones as joint meshes that their world matrices pose, such as a glTF skin's joints among a gltf/pbr model's `nodes`. */
 export interface JointsShape {
   /** One core mesh per bone; each frame the helper reads their world matrices. */
   readonly joints: readonly Mesh[];
   /** Parent bone index per bone (an index into `joints`), -1 where the parent is not a joint. */
   readonly parents: readonly number[];
 }
-/** What `SkeletonHelper.fromGLTF` reads from a gltf-pro `PBRModel`: its glTF document and its node meshes. */
+/** What `SkeletonHelper.fromGLTF` reads from a gltf/pbr `PBRModel`: its glTF document and its node meshes. */
 export interface GLTFSkinSource {
   readonly asset: {
     readonly doc: {
@@ -57,7 +57,7 @@ const label = 'SkeletonHelper';
 /**
  * A skeleton as lines from each parent joint to its child joint, coloured from
  * `parentColor` at the parent end to `color` at the child end. Pass `@margoengine/animation`'s `Skeleton` (with
- * `mesh`, the skinned mesh that places it) or joint meshes (`fromGLTF` builds them from a gltf-pro model's skin); it
+ * `mesh`, the skinned mesh that places it) or joint meshes (`fromGLTF` builds them from a gltf/pbr model's skin); it
  * follows the current pose every frame. Add it to a `Lines` plugin; `dispose()` removes it and frees its GPU buffers.
  * @throws TypeError from the constructor for a skeleton without parents, joints that are not meshes, or a malformed
  * colour; RangeError for a parent index that is not another bone's, and each frame for too few skeleton matrices.
@@ -109,13 +109,13 @@ export class SkeletonHelper extends Line {
     this.setPositions(this.out);
     this.setColors(color, parentColor);
   }
-  /** A helper for skin `skin` (default 0) of a gltf-pro model: its joint nodes, each joined to its parent node when that is a joint too. */
+  /** A helper for skin `skin` (default 0) of a gltf\/pbr model: its joint nodes, each joined to its parent node when that is a joint too. */
   static fromGLTF(model: GLTFSkinSource, skin = 0, options?: SkeletonHelperOptions): SkeletonHelper {
     const doc = model?.asset?.doc,
       joints = doc?.skins?.[skin]?.joints;
     if (!Array.isArray(joints) || !Array.isArray(model.nodes))
       throw new TypeError(
-        `${label}.fromGLTF: the model has no skin ${skin}; pass a gltf-pro model and one of its skins`,
+        `${label}.fromGLTF: the model has no skin ${skin}; pass a gltf/pbr model and one of its skins`,
       );
     const parentOf = new Map<number, number>();
     (doc.nodes ?? []).forEach((node, index) => node?.children?.forEach((child) => parentOf.set(child, index)));

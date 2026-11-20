@@ -22,7 +22,7 @@ const featureMarkers = {
   environment: 'environment:lighting',
 };
 const cases = [
-  // Wrappers load the one implementation they wrap: creative particles over vfx, scenery's SkyMoon over sky.
+  // Wrappers load the one implementation they wrap: creative particles over vfx, the moonlit SkyMoon over the sky base.
   {
     key: 'particles',
     pack: 'creative',
@@ -43,14 +43,13 @@ const cases = [
   { key: 'post', pack: 'creative', entry: 'post', exports: ['PostProcessing'], allowed: ['post', 'targets'] },
   { key: 'grass', pack: 'creative', entry: 'grass', exports: ['GrassField'], allowed: ['grass'] },
   { key: 'planet', pack: 'creative', entry: 'planet', exports: ['Planet'], allowed: ['planet'] },
-  { key: 'sky', pack: 'scenery', entry: 'sky', exports: ['SkyMoon'], allowed: ['sky'], packs: ['sky'] },
+  { key: 'sky', pack: 'sky', entry: 'night-preset', exports: ['SkyMoon'], allowed: ['sky'] },
 ];
 const optionalPacks = [
   'creative',
-  'scenery',
   'sky',
   'gltf',
-  'gltf-pro',
+  'gltf/pbr',
   'blender',
   'animation',
   'environment',
@@ -168,12 +167,12 @@ test('initial core + stage consumer keeps every optional pack behind a lazy boun
     '@margoengine/gltf',
     '@margoengine/creative/particles',
     '@margoengine/creative/post',
-    '@margoengine/scenery/sky',
+    '@margoengine/sky/night-preset',
     '@margoengine/shadows',
     '@margoengine/environment',
     '@margoengine/xr',
-    '@margoengine/gltf-pro',
-    '@margoengine/staging',
+    '@margoengine/gltf/pbr',
+    '@margoengine/studio',
     '@margoengine/tonemap',
     '@margoengine/physics',
     '@margoengine/save',
@@ -250,16 +249,17 @@ test('eager facade and lazy features retain one canonical core module graph', as
 });
 
 test('actual root/subpath imports share identities and facade helpers preserve returned features', async () => {
-  const [facade, core, creative, scenery, gltf] = await Promise.all([
+  const [facade, core, creative, moonlit, gltf] = await Promise.all([
     import('margoengine'),
     import('@margoengine/core'),
     import('@margoengine/creative'),
-    import('@margoengine/scenery'),
+    import('@margoengine/sky/night-preset'),
     import('@margoengine/gltf'),
   ]);
   assert.equal(facade.Geometry, core.Geometry, 'Facade has a different Geometry constructor');
   assert.equal(facade.Engine, core.Engine, 'Facade has a different Engine factory');
-  const roots = { creative, scenery };
+  // SkyMoon's home is the sky's night-preset entry (the sky root does not re-export it), as the old scenery root held it.
+  const roots = { creative, sky: moonlit };
   for (const feature of cases) {
     const narrow = await import('@margoengine/' + feature.pack + '/' + feature.entry);
     assert.deepEqual(
@@ -307,7 +307,7 @@ test('actual root/subpath imports share identities and facade helpers preserve r
   const sky = await addSky(receiver, skyOptions);
   assert.ok(particle instanceof creative.GPUParticles);
   assert.ok(post instanceof creative.PostProcessing);
-  assert.ok(sky instanceof scenery.SkyMoon);
+  assert.ok(sky instanceof moonlit.SkyMoon);
   assert.deepEqual([particle.count, particle.options.size], [16, 0.08]);
   assert.equal(post.options, postOptions);
   assert.equal(sky.config, skyOptions);

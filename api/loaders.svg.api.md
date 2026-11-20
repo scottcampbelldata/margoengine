@@ -43,9 +43,15 @@ export interface SVGStrokeOptions extends SVGShapeOptions {
     divisions?: number;
 }
 
-export function parseSVG(input: string | BinaryInput): LoadedSVG;
+export function parseSVG(input: string | BinaryInput, options?: XMLExternalOptions): LoadedSVG;
 
 // Not exported from this entry, but used by the exports above:
 
 type BinaryInput = ArrayBuffer | ArrayBufferView;
+
+type XMLExternal = ReadonlyMap<string, string>;
+
+interface XMLExternalOptions {
+    external?: XMLExternal;
+}
 ```

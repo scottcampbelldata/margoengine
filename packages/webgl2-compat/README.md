@@ -7,7 +7,7 @@ show each one.
 
 Import `margoengine/webgl2-compat` from the `margoengine` package, or `@margoengine/webgl2-compat` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 27 site demos, 20 draw the same pixels as native WebGPU and 7 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). Path-tracer route limits are documented in its package README; XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
+**Status: milestones M0 to M8 of the [roadmap](../../docs/webgl2-compat-roadmap.md) done.** This layer is the site's fallback: every live demo on margoengine.com loads it when the browser has no WebGPU. Of the 31 site demos, 23 draw the same pixels as native WebGPU and 8 run with one accepted difference (WebGL2 cannot read one sample of a multisampled texture, so the layer's resolved depth is sample 0 where native keeps the nearest of the 4; the Orrery, 3.54% of pixels with d > 2, is the widest, and measured 0.00% with native resolving sample 0 as well and DOF's layer widening off); all 32 Khronos gallery models draw the same pixels ([webgl2-compat-demos.md](../../docs/webgl2-compat-demos.md) lists each one). Path-tracer route limits are documented in its package README; XR runs on it through the [`/xr` entry](#xr-margoenginewebgl2-compatxr). Not done: the frame-budget run on an integrated GPU is not recorded yet, and a transform-feedback tier for own-index compute stores is parked (speed only, those stores already run on the scatter tier with the same pixels). The small preview is now the optional `/preview` entry of this package. This package
 is the WebGL2 compatibility layer for browsers without WebGPU: a WebGPU-shaped device built on WebGL2 that translates
 every WGSL shader to GLSL ES 3.00, so core and the packages run their usual WebGPU code unchanged. Today core renders
 on it (meshes, instancing, 4x MSAA and exact-pixel mode, several views, picking and device loss) with the same pixels
@@ -148,11 +148,14 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   `isCompatDevice(device)` tells a package it runs on WebGL2. Each device owns one WebGL2 context made with
   `antialias: false`, so exact-pixel rendering stays exact; it multisamples itself when a pipeline asks for 4
   samples. Buffers, textures (2D, 2D array, 3D, cube, 4x multisampled, depth and stencil formats), samplers, bind
-  groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`), render passes with clears,
+  groups, render pipelines (async creation waits for `KHR_parallel_shader_compile`, and on ANGLE Direct3D 11 for one
+  draw with rasterizer discard into a pipeline's own colour targets when it has more than one: that back end compiles
+  the pixel shader again for them at the first draw, so a first frame would otherwise wait for it), render passes with clears,
   resolves and discards, indirect draws, copies, `writeBuffer`, `writeTexture`, `copyExternalImageToTexture`,
   `mapAsync` with fenced readbacks, `onSubmittedWorkDone` (a fence that signals on the next poll, also when no frame
-  is shown), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or
-  renderbuffer the driver cannot allocate (WebGL2's `GL_OUT_OF_MEMORY`, read once after each allocation) is reported as
+  is shown; each poll yields a port task and a 1 ms timer, about 2 ms in Chrome), error scopes, `uncapturederror` and `device.lost`. A buffer, texture or
+  renderbuffer the driver cannot allocate (WebGL2's `GL_OUT_OF_MEMORY`; one `getError` checks every allocation since the
+  last check, in the next task or when an `out-of-memory` or `internal` scope opens or closes) is reported as
   an `out-of-memory` error, a `GPUOutOfMemoryError` (`CompatOutOfMemoryError`), to its error scope or else as
   `uncapturederror`, as WebGPU reports a failed allocation; any other GL error the layer leaves is an `internal` one.
   Work that uses a destroyed buffer, texture or query set is a validation error and makes no GL call (a failed submit
@@ -184,9 +187,11 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
   per group on them. `textureGather` and `textureGatherCompare`, which GLSL ES 3.00 lacks, fetch
   the four texels by hand with the sampler's address modes (2D and 2D-array textures; a cube gather is refused).
 - **Compute** (`margoengine/webgl2-compat/compute`, milestone M5): compute pipelines and passes, with
-  `dispatchWorkgroups` and `dispatchWorkgroupsIndirect`. The device loads this entry by itself the first time a page
-  creates a compute pipeline, so a render-only page never downloads it; command buffers with compute passes wait in
-  the queue until it has loaded (later writes wait behind them, in order). Each entry point runs on the fastest of
+  `dispatchWorkgroups` and `dispatchWorkgroupsIndirect`. `requestDevice` loads this entry before it answers, so
+  the first compute submit of a scene runs in the task that makes it and a page canvas read in the task of the first
+  render shows that frame (KB-COMPAT-FIRSTTASK1: loaded on first use, the first submit waited in the queue and that
+  task's canvas stayed blank). A render-only page downloads the entry too; a command buffer with compute passes still
+  waits in the queue if it is submitted before the load finishes (a device made without `requestDevice`). Each entry point runs on the fastest of
   three tiers its shader allows:
   - **fragment**: every texel store writes the invocation's own texel (the global invocation id as coordinates) and
     no buffer is written: one full-target draw per written texture and z slice.
@@ -233,7 +238,9 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
 - **WGSL front end** (`margoengine/webgl2-compat/wgsl`, milestone M1): `checkWGSL(source)` and `parseWGSL(source)`.
 - `webgl2Capabilities(gl)` and `probeWebGL2()`: what a browser's WebGL2 offers and the tier it reaches. The layer
   renders only on the `full` tier: renderable float colour targets (`EXT_color_buffer_float`) and `highp` in fragment
-  shaders.
+  shaders. GLSL ES 3.00 makes `highp` ints 32-bit two's complement; where a browser reports less through
+  `getShaderPrecisionFormat` (Firefox on macOS answers 24, 24), the probe draws one pixel of wrapping 32-bit integer
+  arithmetic and accepts the context only when it reads back exact, leaving the context's bindings as it found them.
 - In the repository, not in the package: the WGSL corpus, every shader module the packages create in their real-GPU
   checks (`npm run record:wgsl-corpus`), which the translator is tested against.
   Additive recordings of an identical source retain all creating packages, labels,
@@ -303,10 +310,10 @@ only 4x route, so on LDR they refuse with PostStack's coded `unsupported`; at ha
 
 Tracked follow-up **T273-COVERAGE**: remaining post effects and standalone Tonemap,
 DOF, transitions, animation, BVH, cameras, clustered, compute, creative,
-environment, geometry, glTF/glTF-pro, headless, HTML, inspector, lighting2d,
+environment, geometry, glTF/glTF PBR, headless, HTML, inspector, lighting2d,
 lines, points, text, pixel, procedural, quality, React, scatter, sciviz,
-selection, shader, sky, splats, sprites, staging, stats, terrain, tilemap, toon,
-VFX, video, voxel, voxel-pathtracer, water, weather, XR, UI, biomes, scenery,
+selection, shader, sky, splats, sprites, studio, stats, terrain, tilemap, toon,
+VFX, video, voxel, voxel-pathtracer, water, weather, XR, UI, biomes,
 stage, controls, LOD and OIT still need feature-by-feature half-float/LDR images and measured
 attach-time refusals. Other optional rendering entries are uncovered until added
 to that matrix, as are untested features of core, shadows, materials and culling.
@@ -450,7 +457,9 @@ the same bits as `textureSample(t, s, uv)`, as it does on native WebGPU. Such re
 driver's blend between the two levels: the AMD driver under ANGLE D3D11 compresses it (weight
 clamp((frac - 0.1) / 0.8, 0, 1) on a Radeon 680M, where native WebGPU uses frac), so there the layer picks native's
 LOD but blends as WebGL2 does (WebGPU leaves precise filtering implementation-dependent; see docs/known-bugs.md, "AMD
-D3D11 compressed mip blend"). The translated texture's optional `mipFilter`
+D3D11 compressed mip blend"). On Apple silicon, ANGLE Metal and native WebGPU share one sampler (an explicit LOD
+snapped to 1/64, a footprint LOD to about 1/256), so there the layer returns native's bits exactly (docs/known-bugs.md,
+"Metal mip blend"). The translated texture's optional `mipFilter`
 uniform is a `vec3` containing the enable flag and the sampler's minimum/maximum
 LOD; the compatibility device supplies it automatically, along with `levels` and
 `size`. No additional texture unit is used.
@@ -577,10 +586,38 @@ browsers' own WebGPU compilers, where it was recorded.
   indirect dispatch, overrides, cube sampling on the CPU across seams and corners, queue order around the lazy load,
   and resources destroyed right after the submit
   that uses them while it waits for that load).
-- The corpus (`npm run test:browser`): all 1,049 vertex and fragment entry points compile, all 459 distinct stage pairs
-  of the recorded render pipelines link, all 624 recorded render pipelines draw once through the device, and 397
-  recorded compute pipelines are translated for their tier and dispatched once, none refused (the voxel path tracer's 20 are only planned here,
-  because its compile times on ANGLE's Direct3D backend do not fit this check; its own check runs them on Vulkan).
+- The corpus (`npm run test:browser`, `test:browser:compute` and `test:browser:compute-robot-planning-1` to `-3`): all 1,380
+  vertex and fragment entry points compile, all 629 distinct stage pairs of the recorded render pipelines link, all
+  830 recorded render pipelines draw once through the device, and 517 recorded compute pipelines are translated for
+  their tier and dispatched once, none refused (one more, an intentionally invalid pipeline, is checked for its
+  validation error; the voxel path tracer's 20 are only planned here, because its compile times on ANGLE's Direct3D
+  backend do not fit this check; its own check runs them on Vulkan). The draw runs in five parts, one package script
+  each (`test/corpus-draw-parts.mjs`): the render pipelines, the compute pipelines, and each of robot-planning's three
+  clearance kernels alone, as ANGLE's Direct3D compiler takes 90 to 200 s on each. Each part runs every one
+  of its pipelines under the 10 minute GPU step limit, and `test/corpus-draw-parts.test.js` checks that the parts
+  together are the whole corpus, each pipeline in one part. `node packages/webgl2-compat/test/corpus-draw-browser.mjs`
+  with no `--part` runs them all.
+- The browser matrix (`scripts/browser-matrix.mjs`, not a gate): the compatibility check, the adapter and feature
+  pages, and the materials, gltf/pbr, post and voxel path tracer checks, each run natively and through the layer in
+  one browser. Each row is a pass, a refusal with its code, or a difference with its numbers; a crash, a wrong value
+  or a refusal without a code is a bug and the script exits 1. A row the browser itself cannot measure is
+  `unmeasured` with the reason: a native row where the browser has no WebGPU adapter (the layer's feature probes then
+  run alone, against their own bars), or a picture row where the browser's screenshot shows no WebGL2 canvas at all
+  (checked first with a plain canvas cleared to red). Safari is driven by `safaridriver` (plain W3C WebDriver, no
+  extra dependency), Android Chrome by Playwright over adb (on a user build, which ignores Playwright's command line,
+  through Chrome's own DevTools socket), any other browser by the repository's harness. The measured results are in [docs/limits.md](../../docs/limits.md#browser-matrix-batch-273-2026-11-15).
+  From the repository root, after `npm run build:packages`:
+
+  ```sh
+  node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/scripts/browser-matrix.mjs --browser=firefox
+  ```
+
+  `--browser=safari` (macOS, with Allow Remote Automation on in Safari's Develop settings), `--browser=ios-simulator`
+  (Safari in the iOS Simulator; `MARGO_IOS_UDID` picks the device) and `--browser=android-chrome` (the first device
+  `adb devices` lists, with USB debugging on; `ADB` names adb; on a non-debuggable image finish Chrome's first run on
+  the device once, because Chrome there ignores the flag that skips it) pick the other drivers. The screen must stay unlocked: a browser
+  that fires no animation frames is refused at the start; `--cases=post,materials` runs some cases only. The
+  report is written to `test-results/browser-matrix/<browser>-<os>.json`.
 
 Nothing runs at import time. The package depends on `@margoengine/math` and has `@margoengine/core` as a peer;
 install matching local tarballs for all three. Core, the stage and the other packages never load the compatibility
@@ -742,7 +779,7 @@ Mesh/geometry LOD keeps its CPU route; imposter levels refuse when added. Screen
 statistics and picking with /pick retain their real preview routes. ColorOutput retains its documented
 sRGB/SDR preview behavior and registers no GPU passes there.
 
-Selection outlines and gltf-pro already refused on main before this change; the reported silent blank
+Selection outlines and gltf/pbr already refused on main before this change; the reported silent blank
 for those two could not be reproduced with a real preview engine. Their regression uses an HTTP glTF
 fixture, verifies both refusals, proves loadCompat runs once and setup runs on both tiers, and checks
 red model pixels and magenta selection pixels on native and compatibility devices.
@@ -753,7 +790,7 @@ error during setup triggers escalation, and setup builds the scene again on a fr
 attached later report the same refusal to the caller. Low-tier WebGL2 devices which cannot install
 the full layer still reject clearly.
 
-Evidence: test/package-tiers-browser.mjs (GPU lock, test:gpu:preview-contract),
+Evidence: test/package-tiers-browser.mjs (test:gpu:preview-contract),
 tests/preview-refusal.test.js, packages/lod/test/preview.test.js and
 npm run check:preview-contract. The source gate is in verify, therefore in check:merge.
 It parses package pass owners and requires an attach-time unsupported refusal or a reviewed,
@@ -763,6 +800,6 @@ tested preview route; it includes guarded work reached through class methods and
 
 The full layer is still a WebGPU-shaped device: after `await install({ force: true })`, use `Engine.create(canvas)` or `backend: 'webgpu'`. Setting `backend: 'webgl2'` selects the small preview, so it requires `fallback: webglRenderer` from `/preview`; without that renderer core already throws linked `unsupported`. Installing the full layer does not change that meaning. `autoEngine` imports the preview itself and escalates only for a coded setup refusal.
 
-The reported preview refusals for PostStack (21), Shadows (22), Video (26), VFX (29), Splats (30), Lighting2D/LayerCompositor (31) and CulledInstances (33) are covered by the package-tier browser test: direct preview refusal and one `loadCompat` escalation per attachment. Their full-layer rendering is covered by their package GPU suites. The current Gemini product, transition, particle and world pages force-install the full layer and leave the main engine on its default backend; their query-string badge does not identify the engine tier. The world's separate worker explicitly selects the small preview. The earlier report's actual no-device errors identify preview, not the full device. No silent blank was reproduced for Selection or gltf-pro.
+The reported preview refusals for PostStack (21), Shadows (22), Video (26), VFX (29), Splats (30), Lighting2D/LayerCompositor (31) and CulledInstances (33) are covered by the package-tier browser test: direct preview refusal and one `loadCompat` escalation per attachment. Their full-layer rendering is covered by their package GPU suites. The current Gemini product, transition, particle and world pages force-install the full layer and leave the main engine on its default backend; their query-string badge does not identify the engine tier. The world's separate worker explicitly selects the small preview. The earlier report's actual no-device errors identify preview, not the full device. No silent blank was reproduced for Selection or gltf/pbr.
 
 Entry 21's reported PostStack input is an effects object; the public API takes an array, for example `[new Bloom({ strength: 0.5 })]`. The tier regression uses that valid input. Its constructor rejects an effects object before any backend choice, so that argument error is separate from the preview refusal.

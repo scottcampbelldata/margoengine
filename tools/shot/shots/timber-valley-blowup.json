@@ -1,0 +1,108 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 12,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -1237.5449859106498,
+            882.7194601690721,
+            29.863760229734936
+          ],
+          "target": [
+            -1732,
+            1099.173672,
+            177.692
+          ],
+          "fov": 45
+        },
+        {
+          "time": 12,
+          "position": [
+            -1317.5449859106498,
+            881.7604601690722,
+            49.863760229734936
+          ],
+          "target": [
+            -1732,
+            1123.789,
+            127.69200000000001
+          ],
+          "fov": 45,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "timber-valley-blowup",
+    "kind": "long",
+    "seconds": 12,
+    "scene": "timber-valley",
+    "settings": {
+      "weather": {
+        "wind": {
+          "keys": [
+            {
+              "time": 0,
+              "value": 16
+            },
+            {
+              "time": 12,
+              "value": 24,
+              "ease": "in"
+            }
+          ]
+        }
+      }
+    },
+    "page": {
+      "path": "packages/scenes/test/timber-valley-shot.html",
+      "css": "#viewport{position:fixed;inset:0;width:100%!important;height:100%!important}",
+      "engine": "timberShot.engine",
+      "canvas": "#viewport",
+      "aovs": "timberShot.aovs",
+      "apply": "timberShot.apply",
+      "settings": "timberShot.settings",
+      "ready": "#viewport[data-ready=\"true\"]"
+    },
+    "seed": 1910,
+    "size": [
+      1920,
+      1080
+    ],
+    "fps": 30,
+    "supersample": 2,
+    "subframes": 8,
+    "shutter": 180,
+    "warmup": 60,
+    "probes": {
+      "early": 0.3,
+      "mid": 1
+    },
+    "lookFamily": "animatedFeature",
+    "moving": {
+      "depthScale": 2000
+    },
+    "aovs": [
+      "geometry",
+      "depth",
+      "penumbra",
+      "subject",
+      "lit",
+      "shadow",
+      "sky"
+    ],
+    "horizon": {
+      "y": -500
+    }
+  }
+}

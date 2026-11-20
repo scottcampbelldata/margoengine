@@ -1,6 +1,6 @@
 // Real-GPU check that incremental frames (unchanged entities skipped by the kernel, reused instances, patched matrices,
 // partial instance uploads) produce exactly the pixels of a from-scratch render of the same scene, over static parts mixed
-// with moving parts and edits. Run from the repository root after building packages, holding test-results/gpu.lock:
+// with moving parts and edits. Run from the repository root after building packages:
 //   node examples/package-benchmarks/parts/pixels-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';

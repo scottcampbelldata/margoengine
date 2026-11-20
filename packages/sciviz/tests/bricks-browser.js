@@ -6,7 +6,7 @@ import { arraySource, brickedVolume } from '@margoengine/sciviz/bricks';
 
 const errors = [];
 
-async function figureOn(width, height, camera, filterMode = 0) {
+async function figureOn(width, height, camera, filterMode = 0, filterSeed = 0) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -15,15 +15,17 @@ async function figureOn(width, height, camera, filterMode = 0) {
   const figure = await Figure.create(canvas, { controls: false, axes: false });
   figure.engine.stop?.();
   figure.renderer.device.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
-  if (filterMode) setFilterMode(figure.renderer.device, filterMode);
+  if (filterMode) setFilterMode(figure.renderer.device, filterMode, filterSeed);
   place(figure, camera);
   return figure;
 }
 
 // The volume marches' test-only filter mode (filterModeWGSL in src/volume.ts): every pipeline this device builds from a
-// module that declares it takes `filterMode` as a pipeline constant. 1 exact float trilinear, 2 and 3 exact with the
-// weights rounded to nearest or down to an 8-bit grid. The figure's own renderer keeps these pipelines.
-function setFilterMode(device, filterMode) {
+// module that declares it takes `filterMode` and `filterSeed` as pipeline constants. 1 exact float trilinear, 2 exact
+// with every axis weight one full 8-bit step off, the sign pattern picked by the seed. The figure's own renderer keeps
+// these pipelines. The source of every such module is kept in `filterSources`.
+const filterSources = new Set();
+function setFilterMode(device, filterMode, filterSeed) {
   const codes = new WeakMap(),
     module = device.createShaderModule.bind(device),
     pipeline = device.createRenderPipeline.bind(device);
@@ -33,10 +35,68 @@ function setFilterMode(device, filterMode) {
     return made;
   };
   device.createRenderPipeline = (descriptor) => {
-    const fragment = descriptor.fragment;
-    if (!codes.get(fragment?.module)?.includes('override filterMode')) return pipeline(descriptor);
-    return pipeline({ ...descriptor, fragment: { ...fragment, constants: { ...fragment.constants, filterMode } } });
+    const fragment = descriptor.fragment,
+      code = codes.get(fragment?.module);
+    if (!code?.includes('override filterMode')) return pipeline(descriptor);
+    filterSources.add(code);
+    const constants = { ...fragment.constants, filterMode, filterSeed };
+    return pipeline({ ...descriptor, fragment: { ...fragment, constants } });
   };
+}
+
+// The weight model's sign, as filterSign in src/volume.ts specifies it: the position floored to the 1/256 sub-texel
+// grid, hashed with pcg3d (Jarzynski and Olano 2020) in wrapping u32 arithmetic, +1 where the top bit is set.
+function modelSign(key, seed) {
+  const mix = Math.imul(seed, 0x9e3779b9);
+  let [x, y, z] = key.map((k) => (Math.imul(k ^ mix, 1664525) + 1013904223) | 0);
+  x = (x + Math.imul(y, z)) | 0;
+  y = (y + Math.imul(z, x)) | 0;
+  z = (z + Math.imul(x, y)) | 0;
+  (x ^= x >>> 16), (y ^= y >>> 16), (z ^= z >>> 16);
+  x = (x + Math.imul(y, z)) | 0;
+  y = (y + Math.imul(z, x)) | 0;
+  z = (z + Math.imul(x, y)) | 0;
+  return [x, y, z].map((v) => (v >>> 31 ? 1 : -1));
+}
+
+// The 512 x 512 probe keys: each pixel's 1/256 sub-texel cell, up to 64 texels along each axis.
+const probeKey = (i, j) => [i * 32 + (j & 31), j * 32 + (i & 31), Math.imul(j * 512 + i, 0x9e3779b1) >>> 18];
+
+// Draws the model's sign at every probe key with the march's own filterSign source on `device`, as 0 or 255 per axis.
+async function drawSigns(device, source, seed) {
+  const code = /* wgsl */ `${source}
+@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  return vec4f(vec2f(f32((i << 1u) & 2u), f32(i & 2u)) * 2.0 - 1.0, 0.0, 1.0);
+}
+@fragment fn fs(@builtin(position) q: vec4f) -> @location(0) vec4f {
+  let c = vec2u(q.xy);
+  let n = vec3u(c.x * 32u + (c.y & 31u), c.y * 32u + (c.x & 31u), ((c.y * 512u + c.x) * 0x9e3779b1u) >> 18u);
+  return vec4f(filterSign((vec3f(n) + 0.5) * 0.00390625) * 0.5 + 0.5, 1.0);
+}`;
+  const module = device.createShaderModule({ code }),
+    target = device.createTexture({ size: [512, 512], format: 'rgba8unorm', usage: 0x10 | 0x01 }),
+    buffer = device.createBuffer({ size: 512 * 512 * 4, usage: 0x08 | 0x01 }),
+    pipeline = device.createRenderPipeline({
+      layout: 'auto',
+      vertex: { module, entryPoint: 'vs' },
+      fragment: { module, entryPoint: 'fs', targets: [{ format: 'rgba8unorm' }], constants: { filterSeed: seed } },
+      primitive: { topology: 'triangle-list' },
+    }),
+    encoder = device.createCommandEncoder(),
+    pass = encoder.beginRenderPass({
+      colorAttachments: [{ view: target.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }],
+    });
+  pass.setPipeline(pipeline);
+  pass.draw(3);
+  pass.end();
+  encoder.copyTextureToBuffer({ texture: target }, { buffer, bytesPerRow: 2048 }, [512, 512]);
+  device.queue.submit([encoder.finish()]);
+  await buffer.mapAsync(1);
+  const pixels = new Uint8Array(buffer.getMappedRange().slice(0));
+  buffer.unmap();
+  buffer.destroy();
+  target.destroy();
+  return pixels;
 }
 
 function place(figure, camera = [1.9, 1.3, 2.1]) {
@@ -127,12 +187,13 @@ function field(nx, ny, nz, shift = 0) {
 
 const LOOK = { colormap: 'ember', range: [0, 1], opacity: (t) => t * t * 0.9 };
 const DIMS = [96, 80, 64];
+const MODEL_PATTERNS = 16;
 const WIDTH = 480;
 const HEIGHT = 360;
 
 // One whole and one bricked draw of the same data under `options`.
-async function whole(data, options = {}, dims = DIMS, filterMode = 0) {
-  const figure = await figureOn(WIDTH, HEIGHT, undefined, filterMode);
+async function whole(data, options = {}, dims = DIMS, filterMode = 0, filterSeed = 0) {
+  const figure = await figureOn(WIDTH, HEIGHT, undefined, filterMode, filterSeed);
   const layer = figure.volume(data, { dims, ...LOOK, ...options });
   const image = await capture(figure);
   layer.dispose();
@@ -140,8 +201,8 @@ async function whole(data, options = {}, dims = DIMS, filterMode = 0) {
   return image;
 }
 
-async function bricked(data, options = {}, dims = DIMS, filterMode = 0) {
-  const figure = await figureOn(WIDTH, HEIGHT, undefined, filterMode);
+async function bricked(data, options = {}, dims = DIMS, filterMode = 0, filterSeed = 0) {
+  const figure = await figureOn(WIDTH, HEIGHT, undefined, filterMode, filterSeed);
   const layer = brickedVolume(figure, arraySource(data, dims), { brickSize: 16, detail: 0, ...LOOK, ...options });
   await pump(figure, layer.ready());
   const image = await capture(figure),
@@ -219,9 +280,9 @@ window.runBrickTests = async () => {
   const dims = [40, 40, 40],
     small = field(...dims),
     look = { shading: true },
-    shot = async (filterMode) => ({
-      whole: await whole(small, look, dims, filterMode),
-      bricked: (await bricked(small, { ...look, brickSize: 64 }, dims, filterMode)).image,
+    shot = async (filterMode, filterSeed = 0) => ({
+      whole: await whole(small, look, dims, filterMode, filterSeed),
+      bricked: (await bricked(small, { ...look, brickSize: 64 }, dims, filterMode, filterSeed)).image,
     }),
     hardware = await shot(0),
     exact = await shot(1);
@@ -238,15 +299,46 @@ window.runBrickTests = async () => {
   // be off by up to one step, 1/256, and a fetch by up to 3/256 of its largest neighbour difference. The lit march
   // turns those value errors into normal errors through a normalised central difference, which has no finite closed
   // form bound where the gradient is small, so the bound is measured on the same picture from that error model:
-  // filter mode 2 puts every axis weight of every fetch one full step off, sign from a hash. Each hardware march must
-  // stay within the model's worst difference from exact filtering. Measured (A6000, native and the WebGL2 layer): the
-  // model 8 on the whole march and 3 on the bricked one, hardware 6 on both (docs/limits.md, volume filtering).
+  // filter mode 2 puts every axis weight of every fetch one full step off, the sign pattern an exact integer hash picked
+  // by a seed. One pattern's largest difference is not the model's worst (3 to 8 over 16 patterns on this picture), so
+  // the bound is the worst over MODEL_PATTERNS patterns, and each hardware march must stay within it. Measured (Apple
+  // M6, native and the WebGL2 layer alike): bound 8, hardware 4 on both marches; formerly one sin-hash pattern, 8 and 3
+  // on the A6000 with hardware 6 (docs/limits.md, "Sciviz volume filtering precision").
+  // The weight model must be the same model on every GPU: its sign pattern is integer arithmetic that WGSL and GLSL ES
+  // specify exactly, so the march's own filterSign source must draw the CPU's pattern at every probe position.
+  await check('the weight model draws the same sign pattern as the CPU on this GPU', async () => {
+    const sources = [...filterSources].map((code) => code.match(/override filterSeed: u32 = 0u;\nfn filterSign[\s\S]*?\n}\n/)?.[0]);
+    assert(sources.length >= 2 && sources.every(Boolean), `filterSign found in ${sources.filter(Boolean).length} of ${sources.length} march sources`);
+    assert(new Set(sources).size === 1, 'the marches share one filterSign');
+    const figure = await figureOn(16, 16),
+      device = figure.renderer.device,
+      wrong = {};
+    for (const seed of [0, 1, 5]) {
+      const pixels = await drawSigns(device, sources[0], seed);
+      let n = 0;
+      for (let j = 0; j < 512; j++)
+        for (let i = 0; i < 512; i++) {
+          const want = modelSign(probeKey(i, j), seed),
+            at = (j * 512 + i) * 4;
+          for (let k = 0; k < 3; k++) if ((pixels[at + k] > 127 ? 1 : -1) !== want[k]) n++;
+        }
+      wrong[seed] = n;
+    }
+    gone(figure);
+    numbers.weightModelSigns = wrong;
+    assert(Object.values(wrong).every((n) => n === 0), `signs differing from the CPU of 786,432 per seed: ${JSON.stringify(wrong)}`);
+  });
+
   await check('each hardware-filtered march stays within the 8-bit weight model of exact filtering', async () => {
-    const model = await shot(2),
-      bound = Math.max(compare(model.whole, exact.whole).max, compare(model.bricked, exact.bricked).max),
+    const patterns = [];
+    for (let seed = 0; seed < MODEL_PATTERNS; seed++) {
+      const model = await shot(2, seed);
+      patterns.push([compare(model.whole, exact.whole).max, compare(model.bricked, exact.bricked).max]);
+    }
+    const bound = Math.max(...patterns.flat()),
       whole = compare(hardware.whole, exact.whole),
       brickedResult = compare(hardware.bricked, exact.bricked);
-    numbers.weightModel = { bound, whole, bricked: brickedResult };
+    numbers.weightModel = { bound, patterns, whole, bricked: brickedResult };
     // The model must move the picture at all, or the bound proves nothing.
     assert(bound >= 1, JSON.stringify(numbers.weightModel));
     assert(whole.max <= bound, `whole: ${JSON.stringify(numbers.weightModel)}`);

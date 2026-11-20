@@ -7,7 +7,7 @@ import { findPython } from "./support/find-python.mjs";
 import { openBrowser } from "./browser.js";
 import { decodePNG } from "../tests/support/png.js";
 import { decodeMargo } from "../packages/blender/dist/index.js";
-import { GLTFAsset } from "../packages/gltf-pro/dist/index.js";
+import { GLTFAsset } from "../packages/gltf/dist/pbr.js";
 
 await mkdir("test-results/blender", { recursive: true });
 const fixtures = [
@@ -254,6 +254,49 @@ if (process.env.MARGO_BLENDER) {
     JSON.parse(await readFile("packages/blender/tests/fixtures/elastic-probe.json", "utf8")),
     "fresh Elastic probes differ from packages/blender/tests/fixtures/elastic-probe.json",
   );
+  // Render UV map, hard-edged spots and a zero Custom Distance (KB-P15a to KB-P15c); the script asserts in Blender.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    ["--background", "--factory-startup", "--python-exit-code", "1", "--python", "tools/blender-addon/tests/blender_uv_lights.py", "--", "test-results/blender/uv-lights"],
+    { stdio: "inherit" },
+  );
+  // Noise-modified socket curves (KB5339d): the script fails unless the exported keys give Blender's samples back, and the
+  // committed export and truth must still be what Blender writes and evaluates.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    ["--background", "--factory-startup", "--python-exit-code", "1", "--python", "tools/blender-addon/tests/blender_node_noise.py", "--", "test-results/blender/node-noise"],
+    { stdio: "inherit" },
+  );
+  {
+    const fresh = JSON.parse(await readFile("test-results/blender/node-noise/node-noise.json", "utf8"));
+    const kept = JSON.parse(await readFile("packages/blender/tests/fixtures/node-noise.json", "utf8"));
+    const close = (a, b, path) => {
+      if (typeof a === "number") assert.ok(Math.abs(a - b) < 1e-6, `fresh node noise differs at ${path}: ${a} against ${b}`);
+      else if (a && typeof a === "object") for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) close(a[key], b[key], `${path}.${key}`);
+      else assert.equal(a, b, `fresh node noise differs at ${path}`);
+    };
+    close(fresh.truth, kept.truth, "truth");
+    close(fresh.between, kept.between, "between");
+    close(fresh.graph.parameters, kept.graph.parameters, "parameters");
+  }
+  // Colour to float conversion and LINEAR extrapolation from each end-key kind (KB-P3d): the committed probes must still
+  // be what Blender bakes, exports and evaluates.
+  execFileSync(
+    process.env.MARGO_BLENDER,
+    ["--background", "--factory-startup", "--python-exit-code", "1", "--python", "tools/blender-addon/tests/blender_node_probes.py", "--", "test-results/blender/node-probes"],
+    { stdio: "inherit" },
+  );
+  {
+    const fresh = JSON.parse(await readFile("test-results/blender/node-probes/node-probes.json", "utf8"));
+    const kept = JSON.parse(await readFile("packages/blender/tests/fixtures/node-probes.json", "utf8"));
+    const close = (a, b, path) => {
+      if (typeof a === "number") assert.ok(Math.abs(a - b) < 1e-6, `fresh node probes differ at ${path}: ${a} against ${b}`);
+      else if (a && typeof a === "object") for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) close(a[key], b[key], `${path}.${key}`);
+      else assert.equal(a, b, `fresh node probes differ at ${path}`);
+    };
+    for (const part of ["truth", "cycles", "geometry"]) close(fresh[part], kept[part], part);
+    close(fresh.graph.parameters, kept.graph.parameters, "parameters");
+  }
   const { margoComponents } =
     await import("../packages/blender/dist/components.js");
   assert.deepEqual(
@@ -578,7 +621,7 @@ try {
     );
     return results;
   }, fixtures.length);
-  // Animated .margo (real Blender 5.2.3 export): glTF Pro draws it and Animation's GPU skinning and morphs reach
+  // Animated .margo (real Blender 5.2.3 export): glTF PBR draws it and Animation's GPU skinning and morphs reach
   // Blender's own deformed vertices.
   const animTruth = JSON.parse(
     await readFile("packages/blender/tests/fixtures/anim-truth.json", "utf8"),

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';
 import { addVRM, readVRM } from '../dist/vrm.js';
@@ -256,4 +256,24 @@ test("dispose removes the face plugin from its own scene, not the active scene's
   assert.equal(engine.plugins.get(name), kept, 'the active scene lost its own same-name plugin');
   assert.equal(kept.disposed, 0);
   assert.equal(other.plugins.has(name), false, 'the disposed face stayed in its scene');
+});
+
+// KB-OWN-RIG2: a face whose plugin its scene removed (removePlugin, scene or engine disposal) stayed live: the model
+// stayed marked, so a second addFace threw, and the model disposal listener was kept until dispose().
+test('a face whose scene removed its plugin ends, and its dispose leaves a same-name plugin alone', async (t) => {
+  const f = foxWithNames(['ARKit_jawOpen']),
+    { engine, model, animation } = await host(t, f.doc, f.buffers),
+    listeners = model.cleanupCallbacks.size,
+    face = addFace(animation, { smoothing: 0 }),
+    name = [...engine.plugins.keys()].find((key) => key.startsWith('face:'));
+  assert.equal(model.cleanupCallbacks.size, listeners + 1);
+  engine.removePlugin(name);
+  assert.equal(model.cleanupCallbacks.size, listeners, 'the model disposal listener is gone');
+  const second = addFace(animation, { smoothing: 0 });
+  assert.equal(engine.plugins.has(name), true);
+  face.dispose();
+  assert.equal(engine.plugins.has(name), true, "the first face's dispose removed the second face's plugin");
+  second.dispose();
+  assert.equal(engine.plugins.has(name), false);
+  assert.equal(model.cleanupCallbacks.size, listeners);
 });

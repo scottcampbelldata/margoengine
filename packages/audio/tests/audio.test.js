@@ -307,6 +307,20 @@ test('loop points wrap the resume position and are forwarded to the source node'
   assert.equal(audio.source.loop, false);
 });
 
+test('loopEnd 0 reaches the source node as the buffer end, so loopStart still holds', () => {
+  // AudioBufferSourceNode loops its whole buffer whenever loopEnd is 0, ignoring loopStart; passed through as 0, an
+  // intro-then-loop sound (loopStart 2) looped from 0 while currentTime and seek counted from 2.
+  const context = new FakeAudioContext(),
+    listener = new AudioListener({ context });
+  const audio = new Audio(listener, { loop: true, loopStart: 2 });
+  audio.setBuffer(buffer(10)).play();
+  assert.deepEqual([audio.source.loopStart, audio.source.loopEnd], [2, 10]);
+  audio.loopEnd = 6;
+  assert.equal(audio.source.loopEnd, 6);
+  audio.loopEnd = 0;
+  assert.equal(audio.source.loopEnd, 10);
+});
+
 test('changing playback rate mid-play keeps the playhead consistent and is smoothed', () => {
   const context = new FakeAudioContext({ state: 'running' }),
     listener = new AudioListener({ context, smoothing: 0.01 });
@@ -429,6 +443,54 @@ test('the listener can follow a mesh (world position, local forward axis, local 
   assert.deepEqual([...listener.position], [0, 0, 5]);
   assert.throws(() => listener.follow(hero, [0, 0, 0]), /nonzero/);
   assert.throws(() => listener.follow({}), /follows a core Mesh/);
+  listener.dispose();
+});
+
+test('the listener hands Web Audio an up at right angles to forward, also looking along up (a right axis always exists)', () => {
+  const engine = fakeEngine(),
+    context = new FakeAudioContext({ state: 'running' });
+  const listener = new AudioListener({ context, smoothing: 0 });
+  listener.setup(engine);
+  listener.registerPasses(engine.graph);
+  const l = context.listener;
+  const written = () => ({
+    forward: [l.forwardX.value, l.forwardY.value, l.forwardZ.value],
+    up: [l.upX.value, l.upY.value, l.upZ.value],
+  });
+  const right = ({ forward: f, up: u }) =>
+    Math.hypot(f[1] * u[2] - f[2] * u[1], f[2] * u[0] - f[0] * u[2], f[0] * u[1] - f[1] * u[0]);
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-12);
+  // The camera straight above the target with the default up +Y: before, up stayed [0, 1, 0] = -forward.
+  engine.camera.position = [0, 10, 0];
+  engine.camera.target = [0, 0, 0];
+  engine.camera.up = [0, 1, 0];
+  listener.addSource({ update() {}, dispose() {} });
+  engine.frame();
+  assert.deepEqual(written().forward, [0, -1, 0]);
+  assert.ok(near(written().up, [0, 0, -1]), JSON.stringify(written()));
+  assert.equal(right(written()), 1);
+  // Looking straight up: the level view pitched up has +Z as its up.
+  engine.camera.position = [0, -10, 0];
+  engine.frame();
+  assert.ok(near(written().up, [0, 0, 1]), JSON.stringify(written()));
+  // An up that leans toward forward keeps only its part across forward.
+  listener.follow(null).setPose([0, 0, 0], [0, 0, -1], [0, 1, -1]);
+  assert.ok(near([...listener.up], [0, 1, 0]) && near(written().up, [0, 1, 0]), JSON.stringify(written()));
+  // An up along an arbitrary forward falls back to +Y with its part along forward removed.
+  listener.setPose([0, 0, 0], [1, 0, 0], [-2, 0, 0]);
+  assert.ok(near(written().up, [0, 1, 0]), JSON.stringify(written()));
+  // A mesh followed along its own +Y: up becomes its local +Z, or the local up passed to follow().
+  const rocket = engine.createMesh();
+  engine.store.matrices.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], rocket.id * 16);
+  listener.follow(rocket, [0, 1, 0]);
+  engine.frame();
+  assert.deepEqual(written().forward, [0, 1, 0]);
+  assert.ok(near(written().up, [0, 0, 1]), JSON.stringify(written()));
+  assert.equal(right(written()), 1);
+  listener.follow(rocket, [0, 1, 0], [1, 0, 0]);
+  engine.frame();
+  assert.ok(near(written().up, [1, 0, 0]), JSON.stringify(written()));
+  assert.throws(() => listener.follow(rocket, [0, 1, 0], [0, 0, 0]), /up axis must be nonzero/);
   listener.dispose();
 });
 

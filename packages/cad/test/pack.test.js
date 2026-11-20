@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installWebGPU } from '../../../tests/support/gpu-recorder.js';
-import { Engine, PbrMaterial } from '@margoengine/core/extension';
-import { parseCAD, PartInstancer } from '../dist/index.js';
+import { Engine, Geometry, PbrMaterial, engineRuntime } from '@margoengine/core/extension';
+import { loadCAD, parseCAD, parseCADAsync, PartInstancer } from '../dist/index.js';
 
 globalThis.GPUBufferUsage = {
   COPY_DST: 8,
@@ -85,22 +85,28 @@ export function assemblyOBJ() {
 async function scene() {
   const calls = [],
     writes = [],
+    rects = [],
     pass = {
       setPipeline() {},
       setBindGroup() {},
       setIndexBuffer() {},
-      setViewport() {},
-      setScissorRect() {},
+      setViewport: (...rect) => rects.push(['viewport', ...rect]),
+      setScissorRect: (...rect) => rects.push(['scissor', ...rect]),
       end() {},
       setVertexBuffer() {},
-      drawIndexed: (count, instances, first, base, firstInstance) =>
-        calls.push(['draw', count, instances, first, firstInstance]),
+      draw() {},
+      drawIndexed: (count, instances, first, base, firstInstance) => {
+        rects.push(['draws']);
+        calls.push(['draw', count, instances, first, firstInstance]);
+      },
       drawIndexedIndirect: () => calls.push(['indirect']),
     },
     device = {
       createShaderModule: () => ({}),
       createRenderPipeline: () => ({ getBindGroupLayout: () => ({}) }),
       createBindGroup: () => ({}),
+      createBindGroupLayout: () => ({}),
+      createPipelineLayout: () => ({}),
       createTexture: () => ({ createView: () => ({}), destroy() {} }),
       createBuffer: (d) => ({ ...d, destroy() {} }),
       lost: new Promise(() => {}),
@@ -108,7 +114,7 @@ async function scene() {
       destroy() {},
       limits: { maxBufferSize: 1 << 30 },
       queue: { writeBuffer: (buffer, offset, data) => writes.push([buffer, offset, data]), submit() {} },
-      createCommandEncoder: () => ({ finish: () => ({}), beginRenderPass: () => pass }),
+      createCommandEncoder: () => ({ finish: () => ({}), beginRenderPass: () => (rects.push(['begin']), pass) }),
     },
     host = installWebGPU({ device }),
     engine = await Engine.create(host.canvas, {
@@ -122,7 +128,7 @@ async function scene() {
     engine.render({ culling: false });
     return calls.length;
   };
-  return { engine, model, calls, writes, frame };
+  return { engine, model, calls, writes, rects, frame };
 }
 
 test('1,000 distinct small static parts from a loaded OBJ encode one pack draw; big and open parts keep their own', async () => {
@@ -250,4 +256,95 @@ test('turning the pack off restores one draw per part', async () => {
 test('PartInstancer refuses the WebGL2 preview in setup', () => {
   const instancer = new PartInstancer();
   assert.throws(() => instancer.setup({ backend: 'webgl2', gpu: null, meshes: new Map() }), /PartInstancer needs WebGPU/);
+});
+
+test('disposing a PartInstancer takes it out of its scene, and its parts go back to their own draws', async () => {
+  const { engine, frame } = await scene();
+  try {
+    const instancer = PartInstancer.attach(engine);
+    frame();
+    assert.equal(frame(), 3, 'packed');
+    instancer.dispose();
+    assert.equal(engineRuntime(engine).hasPlugin('part-instancer'), false, 'the plugin left its scene');
+    assert.equal(frame(), 1002, 'one draw per part again');
+    instancer.dispose();
+    assert.equal(instancer.disposed, true, 'a second dispose is harmless');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('loadCAD builds its model in the scene it was called for, not the one active when the download ends', async () => {
+  const { engine, model } = await scene();
+  try {
+    model.dispose();
+    const runtime = engineRuntime(engine),
+      second = runtime.createScene('cad-room'),
+      text = assemblyOBJ();
+    let pending;
+    second.use({ name: 'probe', setup: () => (pending = loadCAD(engine, 'https://assets.example/a.obj', {
+      fetch: async () => new Response(text),
+    })) });
+    second.removePlugin('probe');
+    const loaded = await pending;
+    assert.ok([loaded.root, ...loaded.meshes].every((m) => m.scene === second), 'every part is in the calling scene');
+    assert.equal(runtime.scene.meshes.size, 0, 'the active scene gains nothing');
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('parseCADAsync builds the parts its worker sends in the scene it was called for', async () => {
+  const { engine, model } = await scene();
+  const saved = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
+  try {
+    model.dispose();
+    const g = new Geometry([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]);
+    // The worker's replies come in later tasks, while the default scene is active.
+    globalThis.Worker = class {
+      postMessage() {
+        setTimeout(() => {
+          this.onmessage({ data: { part: { name: 'p', vertices: g.vertices, indices: g.indices, bounds: g.bounds } } });
+          this.onmessage({ data: { done: true } });
+        }, 0);
+      }
+      terminate() {}
+    };
+    const runtime = engineRuntime(engine),
+      second = runtime.createScene('cad-room');
+    let pending;
+    second.use({ name: 'probe', setup: () => (pending = parseCADAsync(engine, new ArrayBuffer(8), 'obj')) });
+    second.removePlugin('probe');
+    const loaded = await pending;
+    assert.equal(loaded.meshes.length, 1);
+    assert.ok([loaded.root, ...loaded.meshes].every((m) => m.scene === second), 'root and part are in the calling scene');
+    assert.equal(runtime.scene.meshes.size, 0, 'the active scene gains nothing');
+  } finally {
+    if (saved) Object.defineProperty(globalThis, 'Worker', saved);
+    else delete globalThis.Worker;
+    engine.dispose();
+  }
+});
+
+test('the pack draw keeps to the view it is drawn in: its viewport and scissor are the view rectangles', async () => {
+  const { engine, calls, rects } = await scene();
+  try {
+    PartInstancer.attach(engine);
+    const { width: w, height: h } = engine.canvas,
+      half = Math.floor(w / 2),
+      view = { camera: engine.camera, viewport: [half, 0, w - half, h], scissor: [half + 2, 0, 4, h], pixels: true };
+    engine.render({ culling: false, views: [view] });
+    rects.length = calls.length = 0;
+    engine.render({ culling: false, views: [view] });
+    assert.ok(calls.some((c) => c[0] === 'draw' && c[1] === 36_000), 'the pack drew');
+    // Every pass of the frame, the pack's own included, is held to the view: each sets the view scissor.
+    const passes = rects.map((r) => r[0]).join(' ').split('begin').slice(1).filter((p) => p.includes('draws'));
+    assert.ok(passes.length >= 1, 'the pack draw pass');
+    assert.ok(passes.every((p) => p.includes('scissor') && p.includes('viewport')), `every pass sets both: ${passes.join('|')}`);
+    const scissors = rects.filter((r) => r[0] === 'scissor');
+    assert.ok(scissors.every((r) => r[1] === half + 2 && r[3] === 4), `every scissor is the view scissor: ${JSON.stringify(scissors)}`);
+    assert.equal(rects.filter((r) => r[0] === 'viewport').length, scissors.length, 'a viewport with every scissor');
+  } finally {
+    engine.dispose();
+  }
 });

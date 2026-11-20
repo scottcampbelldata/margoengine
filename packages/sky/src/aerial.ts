@@ -19,6 +19,7 @@ import {
   atmosphereCommon,
   atmosphereLookups,
   atmosphereParameters,
+  eyeRadius,
   type AtmosphereParameters,
 } from './atmosphere-luts.js';
 import { depthWGSL, sceneDepth } from './depth.js';
@@ -229,10 +230,8 @@ export class AerialPerspective implements EnginePlugin {
     v.set(c.camera.position, 40);
     v[43] = perUnit / 1000;
     v[44] = (o.maxDistance ?? 64000) / 1000;
-    // The planet's centre lies under the camera: radius = ground + height (km), at least a metre up.
-    v[45] =
-      a.bottomRadius +
-      Math.max(0.001, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
+    // The planet's centre lies under the camera: radius = ground + height (km), kept above the ground in Float32.
+    v[45] = eyeRadius(a.bottomRadius, (c.camera.position[1] * perUnit + (o.altitude ?? o.sky?.options.altitude ?? 0)) / 1000);
     v[46] = +!linearHdr(c.format);
   }
   private draw(c: Context): void {

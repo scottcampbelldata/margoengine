@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import * as materials from '../dist/index.js';
 import { materialQuad } from '../../../tests/support/materials-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
@@ -209,7 +209,7 @@ test('unextended models retain the baseline shader and allocation path after ins
     assert.deepEqual([...s.draws[0].groups.keys()], [0, 1]);
     assert.equal(
       digest(s.draws[0].pipeline.vertex.module.code),
-      '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23',
+      'e910ac332ad107235b3ffade40139f9fac9ed8d30e480082de2f8da0befa977a',
     );
     assert.equal(s.counts.textures, before.textures);
     assert.equal(s.counts.buffers, before.buffers);

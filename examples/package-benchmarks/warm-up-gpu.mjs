@@ -1,12 +1,13 @@
 // First-use hitch per feature with and without warmUp (@margoengine/quality/warm), real GPU.
-// After npm run build:packages, on AC power, holding the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/warm-up-gpu.mjs [--runs=3] [--only=ssao,dof] [--no-quiet]
+// After npm run build:packages, on AC power:
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/warm-up-gpu.mjs [--runs=3] [--only=ssao,dof] [--no-quiet]
 // Every sample launches a fresh browser (fresh profile: cold shader caches, as on a first visit). Runs the quiet gate
 // first unless --no-quiet (then, or if it times out, the numbers are diagnostic). The final frame of each warm sample is compared with the
 // cold sample of the same feature (delta 0 everywhere, so the images should match): `image` = max RGB difference and
 // share of differing pixels. Writes examples/package-benchmarks/results/warm-up-gpu.json.
 import { browserLabel, launchBrowser } from '../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../scripts/support/no-file-watcher.js';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -22,13 +23,14 @@ const runs = Number(arg('runs') ?? 3),
 const features = ['ssao', 'bloom', 'dof', 'tonemap', 'shadows', 'sky', 'grass'].filter(
   (f) => !only.length || only.includes(f),
 );
-// The quiet gate waits at most 5 minutes (this runs holding the GPU lock); a machine that never got quiet is recorded and
+// The quiet gate waits at most 5 minutes (this runs); a machine that never got quiet is recorded and
 // the numbers are labelled diagnostic.
 if (!onAC()) throw new Error('On battery: plug in before timing runs');
 const quiet = process.argv.includes('--no-quiet')
   ? null
   : await waitForQuiet({ timeout: 300 }).catch((error) => ({ failed: String(error.message ?? error) }));
 const server = await createServer({
+  plugins: [noFileWatcher()],
   root,
   configFile: false,
   logLevel: 'error',

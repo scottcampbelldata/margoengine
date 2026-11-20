@@ -1,11 +1,11 @@
-import { Engine, PbrMaterial, box } from '@margoengine/web/core';
-import { cylinderGeometry, sphereGeometry, torusKnotGeometry } from '@margoengine/web/geometry/primitives';
-import { toGeometry } from '@margoengine/web/geometry/utils';
-import { Environment, EnvironmentBackground, EnvironmentLighting } from '@margoengine/web/environment';
-import { OrbitControls } from '@margoengine/web/controls/orbit';
-import { Shadows } from '@margoengine/web/shadows';
-import { Stats } from '@margoengine/web/stats';
-import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/web/quality';
+import { Engine, PbrMaterial, box } from '@margoengine/kit-web/core';
+import { cylinderGeometry, sphereGeometry, torusKnotGeometry } from '@margoengine/kit-web/geometry/primitives';
+import { toGeometry } from '@margoengine/kit-web/geometry/utils';
+import { Environment, EnvironmentBackground, EnvironmentLighting } from '@margoengine/kit-web/environment';
+import { OrbitControls } from '@margoengine/kit-web/controls/orbit';
+import { Shadows } from '@margoengine/kit-web/shadows';
+import { Stats } from '@margoengine/kit-web/stats';
+import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/kit-web/quality';
 
 // A small procedural studio (sky gradient, dark floor, two soft boxes) used for image-based lighting.
 // For a real HDR: Environment.attach(engine, await loadEnvironmentImage('/studio.hdr')).

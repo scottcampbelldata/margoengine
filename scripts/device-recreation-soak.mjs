@@ -3,7 +3,7 @@
 // hundredth, the live GPU buffers and textures on the current device (created less destroyed, counted by wrapping the
 // device the engine asks for) must be the same, and so must the picture, pixel for pixel. A plugin that re-creates
 // resources on every restore without freeing the old ones, or that loses state a restore should rebuild, fails here.
-//   node scripts/device-recreation-soak.mjs [--cycles=100]   (in a shared GPU slot; MARGO_COMPAT=1 for the WebGL2 layer)
+//   node scripts/device-recreation-soak.mjs [--cycles=100]   (MARGO_COMPAT=1 for the WebGL2 layer)
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

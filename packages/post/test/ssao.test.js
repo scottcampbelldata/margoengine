@@ -114,16 +114,16 @@ test('SSAO occludes the ambient light a plugin names margoAmbient (environment I
     s.ssao.dispose();
     return { code: modules.find((code) => code.includes('struct Input')), draws };
   };
-  // Without the marker: the constant ambient term, TAA's camera binding only (unchanged).
+  // Without the marker: the constant ambient term; the lighting stays in a dead block, so the replay statically uses
+  // every binding the scene's shader does and binds them all.
   const plain = replay(wgsl, [taa, ibl, fog]);
   assert.match(
     plain.code,
-    /return vec4f\(i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\*frame\.ambient\.rgb,1\);\s*\}$/,
+    /if\(false\)\{let direct=[\s\S]*_=vec4f\([^\n]+\);\}return vec4f\(i\.color\*\(1\.0-i\.material\.y\)\*frame\.radiance\.w\*frame\.ambient\.rgb,1\);\s*\}$/,
   );
-  assert.doesNotMatch(plain.code, /let direct=/);
   assert.deepEqual(
     plain.draws.map((d) => d.bindings.map((e) => e.binding)),
-    [[18]],
+    [[18, 20, 25]],
   );
   // With it: the lit shader is kept whole (statically using every binding) and returns margoAmbient.
   const marked = wgsl.replace(/let linear=([^;]+);/, 'let margoAmbient=vec3f(0.5);let linear=$1+margoAmbient;'),
@@ -137,6 +137,33 @@ test('SSAO occludes the ambient light a plugin names margoAmbient (environment I
     lit.draws.map((d) => d.bindings.map((e) => e.binding)),
     [[18, 20, 25]],
   );
+});
+
+// KB-POST-GTAO-TERRAINLOOK1: TerrainColors reads its look uniform (binding 41) where the material colour is made, above
+// `let direct=`. The replay kept that code, so its auto layout held binding 41, but bound only 18, 8 and 144: an
+// invalid bind group every frame. The replay binds every pass binding, and its shader still reads each one.
+test('SSAO binds a plugin binding read above let direct= (the material colour) to its ambient replay', () => {
+  const look = { binding: 41, resource: { buffer: {} } },
+    shadow = { binding: 30, resource: {} };
+  const shader = wgsl
+    .replace('@group(0) @binding(0) var<uniform> frame:Frame;', (line) => `${line}\n@group(0) @binding(41) var<uniform> look:vec4f;\n@group(0) @binding(30) var shadowMap:texture_depth_2d;`)
+    .replace('let direct=', 'if(look.a<0.0){discard;}let direct=')
+    .replace('let linear=direct*', 'let linear=f32(textureDimensions(shadowMap).x)*direct*');
+  const s = recorded(shader),
+    draws = [],
+    log = s.frame(0, undefined, [look, shadow], draws),
+    code = log
+      .filter((e) => e[0] === 'module')
+      .map((e) => e[2].code)
+      .find((c) => c.includes('struct Input'));
+  s.ssao.dispose();
+  assert.deepEqual(
+    draws.map((d) => d.bindings.map((e) => e.binding)),
+    [[41, 30]],
+  );
+  const fragment = code.slice(code.indexOf('@fragment'));
+  assert.match(fragment, /look\.a/, 'the replay still reads the look uniform');
+  assert.match(fragment, /textureDimensions\(shadowMap\)/, 'and the shadow map below let direct= (in the dead block)');
 });
 
 test('SSAO retains frame upload arrays, updates radius and restores owned resources', async () => {

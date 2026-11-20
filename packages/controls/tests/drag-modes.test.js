@@ -147,11 +147,32 @@ test('groups: every member moves by the same world step under its own parent, an
   engine.dispose();
 });
 
+test('rotate about a screen-right axis: a drag down moves the near face down, either axis sign', async () => {
+  for (const axis of [
+    [1, 0, 0],
+    [-1, 0, 0],
+  ]) {
+    const { engine, canvas } = await world(),
+      mesh = add(engine),
+      drag = new DragControls(engine, [mesh], { mode: 'rotate', axis, rotateSpeed: 0.01 });
+    engine.render();
+    swipe(canvas, pixel(engine.camera, [0, 0, 0.5]), 0, 30);
+    closeVec(spin(mesh, [0, 0, 0.5]), [0, -0.5 * Math.sin(0.3), 0.5 * Math.cos(0.3)], 1e-5, `axis ${axis}`);
+    drag.dispose();
+    engine.dispose();
+  }
+});
+
 test('groups: rotate swings members about the grabbed origin; a member disposed mid-drag is left behind', async () => {
   const { engine, canvas } = await world(),
     a = add(engine, [0, 0, 0]),
     b = add(engine, [3, 0, 0]),
-    drag = new DragControls(engine, [a, b], { mode: 'rotate', group: [a, b], axis: [0, 0, 1], rotateSpeed: Math.PI / 200 });
+    drag = new DragControls(engine, [a, b], {
+      mode: 'rotate',
+      group: [a, b],
+      axis: [0, 0, 1],
+      rotateSpeed: Math.PI / 200,
+    });
   engine.render();
   const from = pixel(engine.camera, [0, 0, 0.5]);
   pointer(canvas, 'pointerdown', ...from);

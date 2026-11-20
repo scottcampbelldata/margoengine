@@ -45,5 +45,5 @@
     },
     "historicalFailure": "Initial interrupted attempt failed quality; API comments and generated llms were repaired before the resumed complete passing verify."
   },
-  "notes": "No benchmark, timing assertion, exclusive GPU lease, core/stage change or rival source adoption. One interrupted browser run overlapped the clean package rebuild; the post-build run passed. This receipt covers the requested four operations, not unrelated rival APIs."
+  "notes": "No benchmark, timing assertion, the GPU run, core/stage change or rival source adoption. One interrupted browser run overlapped the clean package rebuild; the post-build run passed. This receipt covers the requested four operations, not unrelated rival APIs."
 }

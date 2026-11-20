@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface MorphWeightMember {
     offset?: number;
@@ -29,13 +29,14 @@ export class MorphWeightPlayer implements EnginePlugin {
     remove(animation: Animation): boolean;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
-export const morphWeightShader = "\nstruct Track {times:u32,keys:u32,values:u32,width:u32,mode:u32,pad0:u32,pad1:u32,pad2:u32}\nstruct Item {weight:u32,track:u32,component:u32,member:u32}\nstruct Params {time:f32,duration:f32,loops:u32,pad:u32}\n@group(0) @binding(0) var<uniform> p:Params;\n@group(0) @binding(1) var<storage,read> tracks:array<Track>;\n@group(0) @binding(2) var<storage,read> times:array<f32>;\n@group(0) @binding(3) var<storage,read> values:array<f32>;\n@group(0) @binding(4) var<storage,read> items:array<Item>;\n@group(0) @binding(5) var<storage,read> members:array<vec2f>;\n@group(0) @binding(6) var<storage,read_write> weights:array<f32>;\n@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u,@builtin(num_workgroups) groups:vec3u) {\n  let i=id.y*groups.x*64u+id.x;\n  if(i>=arrayLength(&items)){return;}\n  let item=items[i];let member=members[item.member];let track=tracks[item.track];\n  var at=p.time*member.y+member.x;\n  if(p.loops>0u&&p.duration>0.0) {\n    // f32 division may round across a whole lap: pull the result back into [0,duration), as time % duration lands.\n    at=at-floor(at/p.duration)*p.duration;\n    if(at<0.0){at+=p.duration;}\n    if(at>=p.duration){at-=p.duration;}\n  } else {at=clamp(at,0.0,p.duration);}\n  var lo=0u;var hi=track.keys-1u;\n  while(lo<hi) {\n    let mid=(lo+hi+1u)/2u;\n    if(times[track.times+mid]<=at){lo=mid;}else{hi=mid-1u;}\n  }\n  let a=lo;let b=min(a+1u,track.keys-1u);\n  let span=times[track.times+b]-times[track.times+a];\n  var t=0.0;\n  if(span>0.0){t=clamp((at-times[track.times+a])/span,0.0,1.0);}\n  let w=track.width;let c=item.component;let cubic=track.mode==2u;\n  let ai=track.values+(a*select(1u,3u,cubic)+select(0u,1u,cubic))*w+c;\n  let bi=track.values+(b*select(1u,3u,cubic)+select(0u,1u,cubic))*w+c;\n  var out=values[ai];\n  if(track.mode!=0u&&a!=b) {\n    if(cubic) {\n      let t2=t*t;let t3=t2*t;\n      out=(2.0*t3-3.0*t2+1.0)*values[ai]+(t3-2.0*t2+t)*span*values[track.values+(a*3u+2u)*w+c]\n        +(-2.0*t3+3.0*t2)*values[bi]+(t3-t2)*span*values[track.values+b*3u*w+c];\n    } else {out=values[ai]*(1.0-t)+values[bi]*t;}\n  }\n  weights[item.weight]=out;\n}\n";
+export const morphWeightShader = "\nstruct Track {times:u32,keys:u32,values:u32,width:u32,mode:u32,pad0:u32,pad1:u32,pad2:u32}\nstruct Item {weight:u32,track:u32,component:u32,member:u32}\nstruct Params {time:f32,duration:f32,loops:u32,pad:u32}\n@group(0) @binding(0) var<uniform> p:Params;\n@group(0) @binding(1) var<storage,read> tracks:array<Track>;\n@group(0) @binding(2) var<storage,read> times:array<f32>;\n@group(0) @binding(3) var<storage,read> values:array<f32>;\n@group(0) @binding(4) var<storage,read> items:array<Item>;\n@group(0) @binding(5) var<storage,read> members:array<vec2f>;\n@group(0) @binding(6) var<storage,read_write> weights:array<f32>;\n@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id:vec3u,@builtin(num_workgroups) groups:vec3u) {\n  let i=id.y*groups.x*64u+id.x;\n  if(i>=arrayLength(&items)){return;}\n  let item=items[i];let member=members[item.member];let track=tracks[item.track];\n  var at=p.time*member.y+member.x;\n  if(p.loops>0u&&p.duration>0.0) {\n\n    at=at-floor(at/p.duration)*p.duration;\n    if(at<0.0){at+=p.duration;}\n    if(at>=p.duration){at-=p.duration;}\n  } else {at=clamp(at,0.0,p.duration);}\n  var lo=0u;var hi=track.keys-1u;\n  while(lo<hi) {\n    let mid=(lo+hi+1u)/2u;\n    if(times[track.times+mid]<=at){lo=mid;}else{hi=mid-1u;}\n  }\n  let a=lo;let b=min(a+1u,track.keys-1u);\n  let span=times[track.times+b]-times[track.times+a];\n  var t=0.0;\n  if(span>0.0){t=clamp((at-times[track.times+a])/span,0.0,1.0);}\n  let w=track.width;let c=item.component;let cubic=track.mode==2u;\n  let ai=track.values+(a*select(1u,3u,cubic)+select(0u,1u,cubic))*w+c;\n  let bi=track.values+(b*select(1u,3u,cubic)+select(0u,1u,cubic))*w+c;\n  var out=values[ai];\n  if(track.mode!=0u&&a!=b) {\n    if(cubic) {\n      let t2=t*t;let t3=t2*t;\n      out=(2.0*t3-3.0*t2+1.0)*values[ai]+(t3-2.0*t2+t)*span*values[track.values+(a*3u+2u)*w+c]\n        +(-2.0*t3+3.0*t2)*values[bi]+(t3-t2)*span*values[track.values+b*3u*w+c];\n    } else {out=values[ai]*(1.0-t)+values[bi]*t;}\n  }\n  weights[item.weight]=out;\n}\n";
 
 // Not exported from this entry, but used by the exports above:
 
@@ -58,6 +59,7 @@ class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

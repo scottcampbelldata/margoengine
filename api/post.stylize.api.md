@@ -22,6 +22,8 @@ export class Stylize extends ScreenEffect {
     protected readonly kind = "ldr";
     constructor(options?: StylizeOptions);
     static attach(engine: EngineKernel, options?: StylizeOptions): Stylize;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     explode(time?: number): void;
     protected check(): void;
@@ -49,12 +51,16 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 class PostStack implements EnginePlugin {
-    readonly effects: readonly EnginePlugin[];
     readonly name = "post:stack";
-    constructor(effects: readonly EnginePlugin[]);
-    static attach(engine: EngineKernel, effects: readonly EnginePlugin[]): PostStack;
+    constructor(effects?: readonly EnginePlugin[]);
+    static attach(engine: EngineKernel, effects?: readonly EnginePlugin[]): PostStack;
+    static join(engine: EngineKernel, effect: EnginePlugin, index?: number): PostStack;
+    get effects(): readonly EnginePlugin[];
     get depthTexture(): GPUTexture | undefined;
     get sceneTexture(): GPUTexture | undefined;
+    addEffect(effect: EnginePlugin, index?: number): this;
+    removeEffect(effect: EnginePlugin): boolean;
+    moveEffect(effect: EnginePlugin, index: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;

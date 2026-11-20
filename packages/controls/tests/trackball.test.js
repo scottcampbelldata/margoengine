@@ -239,7 +239,7 @@ test('trackball: zoom by wheel, middle drag, held keys and touch pinch; distance
   close(cam.position[2], out, T, 'damped total equals the static zoom');
   control.dispose();
 
-  // Held KeyS makes the left button zoom, KeyD pan; any keyup clears it.
+  // Held KeyS makes the left button zoom, KeyD pan; releasing that key clears it.
   const held = ball({ staticMoving: true }),
     k = held.keys;
   ({ el, cam, control } = held);
@@ -352,4 +352,142 @@ test('trackball: no* flags, disabling mid-drag, contextmenu, saveState and reset
   ]);
   assert.ok([...cam.position, ...cam.target].every(Number.isFinite));
   control.dispose();
+});
+
+// Audit 2026-11-15: a drag that only passes near a pole is not stopped there. The control with enableRoll (same frame
+// with up = +Y and no twist for a drag starting at the centre) is the unclamped oracle: when its great-circle arc keeps
+// more than POLE from both poles the clamped control must land on the same point, and only when the arc truly comes
+// within POLE does it stop exactly POLE from the pole.
+const unit = (v) => v.map((x) => x / len(v));
+const gapOf = (v) => Math.atan2(Math.hypot(v[0], v[2]), Math.abs(v[1]));
+const turn = (a, b) =>
+  Math.atan2(
+    len([a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]),
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  );
+function arcGap(s, e) {
+  const u = unit(s),
+    w = unit(e),
+    n = unit([u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]),
+    total = turn(u, w);
+  let gap = Math.min(gapOf(u), gapOf(w));
+  for (const sign of [1, -1]) {
+    const p = unit([-n[0] * n[1] * sign, sign - n[1] * n[1] * sign, -n[2] * n[1] * sign]);
+    if (Math.abs(turn(u, p) + turn(p, w) - total) < 1e-9) gap = Math.min(gap, gapOf(p));
+  }
+  return gap;
+}
+test('trackball: a drag that passes near a pole without reaching it is not stopped', () => {
+  let passed = 0,
+    stopped = 0;
+  for (const px of [12, 16, 19])
+    for (let a = 0; a < 360; a += 3) {
+      const ends = [false, true].map((enableRoll) => {
+        const { el, cam, control } = ball({ staticMoving: true, enableRoll });
+        cam.position = [0, 10 * Math.cos(0.04), 10 * Math.sin(0.04)];
+        pointer(el, 'pointerdown', 400, 300);
+        pointer(el, 'pointermove', 400 + px * Math.cos((a * Math.PI) / 180), 300 + px * Math.sin((a * Math.PI) / 180));
+        control.update(1 / 60);
+        control.dispose();
+        return [...cam.position];
+      });
+      const [clamped, free] = ends,
+        gap = arcGap([0, Math.cos(0.04), Math.sin(0.04)], free);
+      close(len(clamped), 10, T, 'distance kept');
+      if (gap > POLE + 1e-6) {
+        closeVec(clamped, free, 1e-9, `${px} px at ${a} deg keeps ${gap} rad from the pole`);
+        passed++;
+      } else if (gap < POLE - 1e-6) {
+        close(gapOf(clamped), POLE, 1e-12, `${px} px at ${a} deg stops at the limit`);
+        stopped++;
+      }
+    }
+  assert.ok(passed > 300 && stopped > 0, `both cases seen: ${passed} passed, ${stopped} stopped`);
+  // The auditor's case: 19 px at 60 degrees from polar 0.04 ends near polar 0.024, not at the limit.
+  const { el, cam, control } = ball({ staticMoving: true });
+  cam.position = [0, 10 * Math.cos(0.04), 10 * Math.sin(0.04)];
+  pointer(el, 'pointerdown', 400, 300);
+  pointer(el, 'pointermove', 400 + 19 * Math.cos(Math.PI / 3), 300 + 19 * Math.sin(Math.PI / 3));
+  control.update(1 / 60);
+  assert.ok(gapOf(cam.position) > 0.02, `polar ${gapOf(cam.position)}`);
+  control.dispose();
+});
+
+test('trackball: two fingers down then up is one start and one end', () => {
+  const { el, control, events } = ball({ staticMoving: true });
+  const touch = (type, id, x) => pointer(el, type, x, 300, { pointerId: id, pointerType: 'touch' });
+  touch('pointerdown', 1, 300);
+  touch('pointerdown', 2, 500);
+  touch('pointerup', 2, 500);
+  touch('pointerup', 1, 300);
+  assert.deepEqual(events, ['start', 'end']);
+  touch('pointerdown', 1, 300);
+  touch('pointerdown', 2, 500);
+  touch('pointerup', 1, 300);
+  touch('pointerup', 2, 500);
+  assert.deepEqual(events, ['start', 'end', 'start', 'end']);
+  control.dispose();
+});
+
+test('trackball: a held, still button does not coast; a release right after a fling does, holding still lets it die', () => {
+  const press = () => {
+    const b = ball();
+    pointer(b.el, 'pointerdown', 380, 300);
+    pointer(b.el, 'pointermove', 420, 300);
+    b.control.update(1 / 60);
+    return b;
+  };
+  let { el, cam, control } = press();
+  const held = [...cam.position];
+  for (let i = 0; i < 30; i++) assert.equal(control.update(1 / 60), false, `held still, update ${i}`);
+  closeVec(cam.position, held, 0, 'held still');
+  control.dispose();
+
+  ({ el, cam, control } = press());
+  control.update(1 / 60);
+  pointer(el, 'pointerup', 420, 300);
+  assert.equal(control.update(1 / 60), true, 'released right after the fling: coasts');
+  control.dispose();
+
+  ({ el, cam, control } = press());
+  run(control, 10);
+  pointer(el, 'pointerup', 420, 300);
+  const still = [...cam.position];
+  assert.equal(control.update(1 / 60), false, 'held still for 10 s: the coast has died out');
+  closeVec(cam.position, still, 0);
+  control.dispose();
+});
+
+test('trackball: releasing another key keeps the held key mode', () => {
+  const { el, keys, control } = ball({ staticMoving: true });
+  key(keys, 'keydown', 'KeyS');
+  key(keys, 'keydown', 'ShiftLeft');
+  key(keys, 'keyup', 'ShiftLeft');
+  pointer(el, 'pointerdown', 400, 300);
+  assert.equal(control.state, 'zoom', 'S still held');
+  pointer(el, 'pointerup', 400, 300);
+  key(keys, 'keyup', 'KeyS');
+  pointer(el, 'pointerdown', 400, 300);
+  assert.equal(control.state, 'rotate', 'S released');
+  pointer(el, 'pointerup', 400, 300);
+  control.dispose();
+});
+
+test('trackball: a key mode held when the window loses focus ends on blur; dispose removes the blur listener', () => {
+  const win = new FakeTarget(),
+    keys = Object.assign(new FakeTarget(), { defaultView: win }),
+    el = new FakeElement(),
+    cam = camera(),
+    control = new TrackballControls(cam, el, { keyTarget: keys });
+  control.staticMoving = true;
+  key(keys, 'keydown', 'KeyS');
+  win.dispatch('blur');
+  gesture(el, control, [
+    [400, 300],
+    [440, 300],
+  ]);
+  close(len(eye(cam)), 10, T, 'after blur the left button rotates, it does not zoom');
+  assert.ok(Math.abs(cam.position[0]) > 0.1, 'it rotated');
+  control.dispose();
+  assert.equal(win.listenerCount, 0);
 });

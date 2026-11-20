@@ -6,11 +6,7 @@
 // the entry chunk and its static imports, the @margoengine/gltf chunk and the model: no Wasm, no worker, no other pack.
 // Records every request and the bytes transferred to examples/package-benchmarks/results/basic-scene-network.json,
 // which margoengine.com/sizes.html lists (`npm run build:site` runs this). Needs WebGPU, so after build:packages.
-// The GPU lock (test-results/gpu.lock) is taken here, around the preview server's start and the browser only (a few
-// seconds). The Vite build before it and the hashing after it run without it, so callers do not wrap this script in the
-// lock. The lock comes before the port, as in every GPU suite: a server that held its port while queuing for the GPU
-// (behind an exclusive benchmark) once kept a GPU suite that holds a slot waiting 20 minutes for that port. The port is
-// this script's alone (tests/basic-scene-network-lock.test.js).
+// The port is this script's alone (tests/basic-scene-network-lock.test.js).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -19,7 +15,6 @@ import { join, resolve } from 'node:path';
 import { brotliCompressSync, gzipSync } from 'node:zlib';
 import { build, preview } from 'vite';
 import { listenWhenFree } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { launchBrowser, browserLabel } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
 import { checkBuilt, checkFetched, sceneGraph } from './support/basic-scene-graph.mjs';
@@ -113,7 +108,7 @@ await build({
 await writeFile(join(out, 'model.glb'), cubeGLB());
 
 // Expected: the HTML, the entry chunk and its static imports, the routed basic @margoengine/gltf chunk (and its static
-// imports), the model. Never @margoengine/gltf-pro or @margoengine/animation: the cube needs neither.
+// imports), the model. Never @margoengine/gltf/pbr or @margoengine/animation: the cube needs neither.
 const manifest = JSON.parse(readFileSync(join(out, '.vite/manifest.json'), 'utf8'));
 const graph = sceneGraph(manifest);
 const [entry, ...entryImports] = graph.entry,
@@ -142,29 +137,17 @@ assert.deepEqual(
   "the build emits no unrelated optional pack or worker/Wasm outside the glTF loaders' asset graphs",
 );
 
-const release = await acquire({ owner: 'basic-scene-network', max: 1, waitMax: 60, poll: 2000 });
-let held = true;
-const releaseGpu = () => {
-  if (held) release();
-  held = false;
-};
-let server;
-try {
-  server = await listenWhenFree(
-    () =>
-      preview({
-        configFile: false,
-        root: fixture,
-        logLevel: 'warn',
-        build: { outDir: out },
-        preview: { host: '127.0.0.1', port, strictPort: true },
-      }),
-    { port },
-  );
-} catch (error) {
-  releaseGpu();
-  throw error;
-}
+const server = await listenWhenFree(
+  () =>
+    preview({
+      configFile: false,
+      root: fixture,
+      logLevel: 'warn',
+      build: { outDir: out },
+      preview: { host: '127.0.0.1', port, strictPort: true },
+    }),
+  { port },
+);
 let browser;
 try {
   browser = await launchBrowser({ headless: true });
@@ -204,7 +187,7 @@ try {
   const browserVersion = browser.version();
   await browser.close();
   browser = undefined;
-  releaseGpu(); // nothing below touches the GPU
+  // nothing below touches the GPU
 
   const path = (url) => {
     const { pathname } = new URL(url);
@@ -271,9 +254,5 @@ try {
     `basic scene: ${files.length} requests, ${result.total.transferred} B transferred; ${result.notFetched.length} built files not fetched`,
   );
 } finally {
-  try {
-    await closeAll({ browser, servers: [server] });
-  } finally {
-    releaseGpu();
-  }
+  await closeAll({ browser, servers: [server] });
 }

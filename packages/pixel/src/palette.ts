@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { TextureOption } from '../../shared/texture-option.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -409,8 +410,8 @@ export class PaletteQuantize implements EnginePlugin {
   dither: PaletteDither;
   /** How far the pattern moves a colour, read each frame. */
   spread: number;
-  readonly #source: GPUTexture | (() => GPUTexture);
-  readonly #target: GPUTexture | (() => GPUTexture);
+  readonly #source: TextureOption;
+  readonly #target: TextureOption;
   readonly #order: number;
   readonly #distance: PaletteDistance;
   readonly #straight: boolean;
@@ -436,8 +437,8 @@ export class PaletteQuantize implements EnginePlugin {
       throw typeError('PaletteQuantize needs a palette, a source and a target', 'pixel-palette');
     const order = options.order ?? 20;
     if (!Number.isFinite(order)) throw rangeError('Invalid palette order: must be finite', 'pixel-palette');
-    this.#source = options.source;
-    this.#target = options.target;
+    this.#source = new TextureOption(options.source, 'PaletteQuantize source', 'setSource');
+    this.#target = new TextureOption(options.target, 'PaletteQuantize target', 'setTarget');
     this.#order = order;
     this.#distance = options.distance ?? 'oklab';
     if (this.#distance !== 'oklab' && this.#distance !== 'srgb')
@@ -482,10 +483,25 @@ export class PaletteQuantize implements EnginePlugin {
       ]);
     }
   }
+  /**
+   * Replaces the source from the next frame. A plain texture belongs to the engine's device as it is now, so call this from
+   * `onDeviceRestored` to bring a lost one back; a function is read every frame and needs nothing.
+   */
+  setSource(source: GPUTexture | (() => GPUTexture)): void {
+    if (!source) throw typeError('PaletteQuantize needs a source texture', 'pixel-palette');
+    this.#source.set(source, this.#engine?.gpu);
+  }
+  /** Replaces the target from the next frame, by the same rule as `setSource`. */
+  setTarget(target: GPUTexture | (() => GPUTexture)): void {
+    if (!target) throw typeError('PaletteQuantize needs a target texture', 'pixel-palette');
+    this.#target.set(target, this.#engine?.gpu);
+  }
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'PaletteQuantize disposed; create a new one');
     if (engine.backend !== 'webgpu') throw fault('unsupported', 'PaletteQuantize needs WebGPU', 'webgpu');
     this.#engine = engine;
+    this.#source.fix(engine.gpu);
+    this.#target.fix(engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.#order,
@@ -575,9 +591,10 @@ export class PaletteQuantize implements EnginePlugin {
     if (!Number.isFinite(this.spread) || this.spread < 0)
       throw rangeError('Invalid spread: must be finite and non-negative', 'pixel-palette');
     this.#prepare(device);
-    const pick = (texture: GPUTexture | (() => GPUTexture)) => (typeof texture === 'function' ? texture() : texture),
-      source = pick(this.#source),
-      target = pick(this.#target);
+    // A source or a target lost with the device is reported once and the pass draws nothing until a new one is set.
+    const source = this.#source.get(device, this.#engine),
+      target = this.#target.get(device, this.#engine);
+    if (!source || !target) return;
     if (source === target) throw fault('state', 'Palette source and target must differ', 'pixel-palette');
     const pattern = this.#pattern(device, mode);
     if (target.format !== this.#format) {

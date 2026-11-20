@@ -28,7 +28,8 @@ export function numberFormatter(options: NumberFormatOptions = {}): (value: numb
       day: 'numeric',
       ...options.date,
     });
-    return (v) => fmt.format(v);
+    // A Date holds at most 8.64e15 ms either side of the epoch (ECMA-262 21.4.1); other values print as numbers do.
+    return (v) => (Number.isFinite(v) && Math.abs(v) <= 8.64e15 ? fmt.format(v) : String(v));
   }
   if (!['number', 'si', 'engineering', 'percent', 'fixed'].includes(mode))
     throw rangeError('Choose a supported number format mode', 'sciviz');
@@ -37,21 +38,26 @@ export function numberFormatter(options: NumberFormatOptions = {}): (value: numb
       minimumFractionDigits: mode === 'fixed' ? digits : 0,
       style: mode === 'percent' ? 'percent' : 'decimal',
     }),
-    si = ['y', 'z', 'a', 'f', 'p', 'n', 'µ', 'm', '', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
+    round = new Intl.NumberFormat('en-US', { useGrouping: false, maximumFractionDigits: digits }),
+    // SI prefixes 10^-30 to 10^30, quecto to quetta (BIPM, SI Brochure 9th edition 2019, prefixes R, Q, r and q added
+    // by the 27th CGPM, 2022). Outside them, and in engineering mode, the power of 1000 is written as e<power>.
+    si = ['q', 'r', 'y', 'z', 'a', 'f', 'p', 'n', 'µ', 'm', '', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q'];
   return (value) => {
     if (!Number.isFinite(value)) return String(value);
     if (mode !== 'si' && mode !== 'engineering') return fmt.format(Object.is(value, -0) ? 0 : value);
-    let e = value === 0 ? 0 : 3 * Math.floor(Math.log10(Math.abs(value)) / 3);
-    if (mode === 'si') e = Math.max(-24, Math.min(24, e));
-    let v = e < -306 ? (value / 10 ** (e + 3)) * 1000 : value / 10 ** e;
-    const rounded = Number(
-      new Intl.NumberFormat('en-US', { useGrouping: false, maximumFractionDigits: digits }).format(v),
-    );
-    if (Math.abs(rounded) >= 1000) {
+    if (value === 0) return fmt.format(0) + (mode === 'si' ? '' : 'e0');
+    // The decimal exponent and digits come from the shortest decimal text of the value, so a power of ten never
+    // lands one group low (Math.log10 rounding) and a subnormal keeps its digits (10 ** -321 is itself inexact).
+    const [digitsText, exponentText] = Math.abs(value).toExponential().split('e'),
+      exponent = Number(exponentText),
+      shifted = (e: number) => Math.sign(value) * Number(`${digitsText}e${exponent - e}`);
+    let e = 3 * Math.floor(exponent / 3),
+      v = shifted(e);
+    if (Math.abs(Number(round.format(v))) >= 1000) {
       e += 3;
-      v = value / 10 ** e;
+      v = shifted(e);
     }
-    return fmt.format(v) + (mode === 'si' && e >= -24 && e <= 24 ? si[e / 3 + 8] : `e${e}`);
+    return fmt.format(v) + (mode === 'si' && e >= -30 && e <= 30 ? si[e / 3 + 10] : `e${e}`);
   };
 }
 /** A finite increasing domain and optional removed intervals. Gap is a fraction of the complete axis, default .035 per break. */
@@ -247,12 +253,12 @@ export class ChartPolish extends EventTarget {
       if (labels && (!labels.length || new Set(labels).size !== labels.length))
         throw rangeError('Use nonempty unique categorical axis labels', 'sciviz');
     this.x = brokenScale({
-      domain: options.x?.domain ?? (options.categories?.x ? [0, options.categories.x.length] : domain(0)),
       ...options.x,
+      domain: options.x?.domain ?? (options.categories?.x ? [0, options.categories.x.length] : domain(0)),
     });
     this.y = brokenScale({
-      domain: options.y?.domain ?? (options.categories?.y ? [0, options.categories.y.length] : domain(1)),
       ...options.y,
+      domain: options.y?.domain ?? (options.categories?.y ? [0, options.categories.y.length] : domain(1)),
     });
     this.secondaryY = options.secondaryY ? brokenScale(options.secondaryY) : undefined;
     const canvas = this.canvas,
@@ -619,18 +625,30 @@ export class ChartPolish extends EventTarget {
     axis(this.y, true);
     if (this.secondaryY) axis(this.secondaryY, true, true);
     path(`M${p.x},${p.y}h${p.width}v${p.height}h${-p.width}Z`);
-    const gap = (mapping: BrokenScale, vertical: boolean) => {
+    // A break masks its band of the plot and marks the axis at each visible end. The band is clipped to the visible
+    // bounds (a zoom can put it partly or wholly outside the plot). A secondary-y break removes values of the right
+    // axis only, so it masks that axis line, not the primary data in the band.
+    const gap = (mapping: BrokenScale, vertical: boolean, secondary = false) => {
+      const lo = vertical ? b[2] : b[0],
+        hi = vertical ? b[3] : b[1];
       for (const [a, z] of mapping.gaps) {
-        const pa = this.#pixel(a, a),
-          pz = this.#pixel(z, z);
+        const ca = Math.max(a, lo),
+          cz = Math.min(z, hi);
+        if (!(cz > ca)) continue;
+        const pa = this.#pixel(ca, ca),
+          pz = this.#pixel(cz, cz);
         if (vertical) {
           const y = pz[1],
-            h = pa[1] - y;
+            h = pa[1] - y,
+            x = secondary ? p.x + p.width : p.x;
           out.push({
             tag: 'rect',
-            attributes: { x: p.x - 2, y, width: p.width + 4, height: h, fill: theme.background },
+            attributes: secondary
+              ? { x: x - 2, y, width: 4, height: h, fill: theme.background }
+              : { x: p.x - 2, y, width: p.width + 4, height: h, fill: theme.background },
           });
-          path(`M${p.x - 4},${y + 2}l8,-4M${p.x - 4},${y + h + 2}l8,-4`);
+          const marks = (z <= hi ? `M${x - 4},${y + 2}l8,-4` : '') + (a >= lo ? `M${x - 4},${y + h + 2}l8,-4` : '');
+          if (marks) path(marks);
         } else {
           const x = pa[0],
             w = pz[0] - x;
@@ -638,12 +656,16 @@ export class ChartPolish extends EventTarget {
             tag: 'rect',
             attributes: { x, y: p.y - 2, width: w, height: p.height + 4, fill: theme.background },
           });
-          path(`M${x - 2},${p.y + p.height + 4}l4,-8M${x + w - 2},${p.y + p.height + 4}l4,-8`);
+          const marks =
+            (a >= lo ? `M${x - 2},${p.y + p.height + 4}l4,-8` : '') +
+            (z <= hi ? `M${x + w - 2},${p.y + p.height + 4}l4,-8` : '');
+          if (marks) path(marks);
         }
       }
     };
     gap(this.x, false);
     gap(this.y, true);
+    if (this.secondaryY) gap(this.secondaryY, true, true);
     text(p.x + p.width / 2, this.canvas.clientHeight - 6, this.#options.xLabel ?? 'x');
     text(Math.max(8, p.x - 48), p.y - 5, this.#options.yLabel ?? 'y', 'start');
     if (this.secondaryY) text(p.x + p.width + 8, p.y - 5, this.#options.secondaryY?.label ?? 'y2', 'start');

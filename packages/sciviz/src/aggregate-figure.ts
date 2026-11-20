@@ -52,9 +52,9 @@ export async function bindRasterAggregate(
     document.body.append(tooltip);
   }
   let current: AbortController | undefined;
-  function draw(): void {
+  function draw(shading = shades): void {
     if (!result || disposed) return;
-    const pixels = shadeAggregate(result, shades),
+    const pixels = shadeAggregate(result, shading),
       rects: number[] = [],
       values: number[] = [],
       colours: number[] = [],
@@ -167,8 +167,9 @@ export async function bindRasterAggregate(
     refresh,
     shade(next) {
       if (disposed) throw fault('disposed', 'Raster binding is disposed', 'sciviz');
+      // Shaded first: options it refuses must not become the shading every later refresh fails on.
+      draw(next);
       shades = next;
-      draw();
     },
     at(x, y) {
       return result?.at(x, y);

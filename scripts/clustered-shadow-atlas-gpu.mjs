@@ -17,8 +17,13 @@ try {
     assert.ok(Math.abs(on[1][0]/off[1][0]-1)<0.02,kind+' clear');
     results.push({kind,visibility:on.map((p,i)=>p[0]/off[i][0])});
   }
+  // The blue spot aims at the probe point with a narrow cone: its 32 texels then put the block's own shadow (from 23 to
+  // 39 degrees under this light, the point at 45) about 3.7 texels off the point, past the 3x3 filter's reach. Aimed
+  // straight down with a 1.2 rad cone, a texel was 0.08 rad there and the block's shadow edge 1.4 texels away, so a
+  // correct filter shades the point to 0.91 (plain LocalShadows the same as the atlas); it read clear only while the
+  // old 1.5-texel normal offset (1.2 m at this texel size) moved the lookup off it (KB-LOCALSHADOW-OFFSET1).
   const spots=[{position:[0,3,0],color:[1,0,0],range:10,intensity:10,direction:[0,-1,0],outerAngle:1.2,shadow:{resolution:64}},
-    {position:[3,3,0],color:[0,0,1],range:10,intensity:10,direction:[0,-1,0],outerAngle:1.2,shadow:{resolution:32}}];
+    {position:[3,3,0],color:[0,0,1],range:10,intensity:10,direction:[-Math.SQRT1_2,-Math.SQRT1_2,0],outerAngle:0.4,shadow:{resolution:32}}];
   await call('scene',{meshes:['floor','block'],atlas:true,points:spots.map(({shadow:_shadow,...p})=>p)});await call('render',2);
   const separateOff=await call('probe',points);
   await call('scene',{meshes:['floor','block'],atlas:true,points:spots.map(p=>({...p,castShadow:true}))});await call('render',2);

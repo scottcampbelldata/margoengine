@@ -80,3 +80,32 @@ test('maxBytes stops a stream that expands past it', () => {
   );
   assert.equal(decodeBrotli(packed, { maxBytes: 1 << 22 }).length, 1 << 22);
 });
+
+test('fill bits after the last meta-block must be zero (RFC 7932 sections 9.2 and 9.3)', () => {
+  // An empty stream with WBITS 16: bits 0 (window), 1 (ISLAST), 1 (ISLASTEMPTY), then five fill bits.
+  assert.equal(decodeBrotli(Uint8Array.of(0x06)).length, 0);
+  for (const bad of [0x86, 0x46, 0x0e])
+    assert.throws(
+      () => decodeBrotli(Uint8Array.of(bad)),
+      (e) => e.code === 'failed' && /fill bits/.test(e.message),
+      bad.toString(16),
+    );
+  // Every bit of a real stream's last byte either changes what decodes or makes the stream fail: none is ignored.
+  for (const data of [english, Buffer.from('a'), ints(3000)])
+    for (let quality = 0; quality <= 11; quality++) {
+      const packed = pack(data, quality),
+        want = createHash('sha1').update(data).digest('hex');
+      for (let bit = 0; bit < 8; bit++) {
+        const bad = Uint8Array.from(packed);
+        bad[bad.length - 1] ^= 1 << bit;
+        let got;
+        try {
+          got = createHash('sha1').update(decodeBrotli(bad)).digest('hex');
+        } catch (e) {
+          assert.equal(e.code, 'failed');
+          continue;
+        }
+        assert.notEqual(got, want, `quality ${quality}, last byte bit ${bit}`);
+      }
+    }
+});

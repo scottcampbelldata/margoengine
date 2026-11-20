@@ -1,7 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime, type Engine, type PassContext } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro/model';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr-model';
 import { neutralShader } from '../../shared/display.js';
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
@@ -17,7 +17,7 @@ declare const GPUTextureUsage: {
 };
 declare const GPUMapMode: { READ: number };
 /**
- * A core Geometry (with `material`), a core Mesh, or a gltf-pro model (loaded glTF or `@margoengine/materials` mesh), baked in its
+ * A core Geometry (with `material`), a core Mesh, or a gltf/pbr model (loaded glTF or `@margoengine/materials` mesh), baked in its
  * root's local space. A Mesh with child meshes bakes its whole visible subtree as it is at bake time (a CAD subassembly), each
  * part with its own material.
  */
@@ -31,7 +31,7 @@ export interface ImposterOptions {
   material?: PbrMaterial;
   /** Also bakes the source's emissive colour, in an atlas of its own (RGBA8, so it stops at 1). Default false. */
   emissive?: boolean;
-  /** Sets the source's pose just before each bake, the first and any after a device restore: a gltf-pro model only. */
+  /** Sets the source's pose just before each bake, the first and any after a device restore: a gltf\/pbr model only. */
   pose?: () => void;
   /** Multiplies the bounding sphere, for a pose reaching past the bind-pose bounds a skinned model reports. Default 1. */
   margin?: number;
@@ -112,7 +112,7 @@ export function frameMatrix(d: Vec3, c: Vec3, r: number, out = new Float32Array(
   out[15] = 1;
   return out;
 }
-/** Early return added to gltf-pro's beauty fragment: albedo (mode 0), octahedral normal, depth and roughness*32+metalness in 31 steps each (mode 1, exact in float16), or emissive (mode 2). */
+/** Early return added to gltf/pbr's beauty fragment: albedo (mode 0), octahedral normal, depth and roughness*32+metalness in 31 steps each (mode 1, exact in float16), or emissive (mode 2). */
 export function bakeShader(code: string, group: number): string {
   let found = false;
   const out = code.replace(/@fragment fn fragment\([\s\S]*?let s=surface\(i,front\);/, (head) => {
@@ -122,7 +122,7 @@ export function bakeShader(code: string, group: number): string {
   if (!found)
     throw new MargoError(
       'unsupported',
-      'Imposter baking requires the gltf-pro PBR shader; pass the shader of a gltf-pro PBRModel',
+      'Imposter baking requires the gltf/pbr shader; pass the shader of a gltf/pbrModel',
     );
   return (
     `@group(${group}) @binding(96) var<uniform> lod_bake:vec4f;\n${octWGSL}\nfn lod_bake_out(s:Surface,z:f32)->vec4f {if(lod_bake.x<0.5){return vec4f(s.base.rgb,1.0);}if(lod_bake.x>1.5){return vec4f(s.emissive,1.0);}return vec4f(lod_encode(normalize(s.n)),z*2.0-1.0,round(s.roughness*31.0)*32.0+round(s.metal*31.0));}\n` +
@@ -170,7 +170,7 @@ interface Part {
   material: PbrMaterial;
   matrix?: Float32Array;
 }
-/** A static gltf-pro copy of core parts (80-byte vertices, one primitive per part, transforms applied), set up without registering a draw pass. */
+/** A static gltf/pbr copy of core parts (80-byte vertices, one primitive per part, transforms applied), set up without registering a draw pass. */
 function coreModel(engine: Engine, parts: readonly Part[]): PBRModel {
   const prepared = parts.map(({ geometry: g, matrix: m = identity }) => {
     // Normals transform by the cofactor matrix; a mirroring transform also flips the winding so front faces stay front.
@@ -746,7 +746,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  if(alpha<=0.000001||coverage<=select(fract(52.9829189*fract(dot(i.clip.xy,vec2f(0.06711056,0.00583715)))),0.0,frame.options.y>0.5)){discard;}
  let instance=instances[i.id];let m=instance.m;let world=(m*vec4f(i.eye+ray*(along/max(alpha,0.000001)),1.0)).xyz;let clip=frame.camera*vec4f(world,1.0);
  let albedo=acc.rgb/max(alpha,0.0001)*instance.color.rgb;let glow=emit/max(alpha,0.0001)+instance.emissive.rgb;let rm=surface/max(alpha,0.000001)/31.0;let rough=clamp(rm.x,0.045,1.0);let metal=clamp(rm.y,0.0,1.0);
- let nn=normalize(mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))));
+ let bent=mat3x3f(cross(m[1].xyz,m[2].xyz),cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*normalize(normal)*select(-1.0,1.0,dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))>=0.0);let nn=normalize(select(vec3f(0,1,0),bent,dot(bent,bent)>0.0));
  let v=normalize(frame.eye.xyz-world);let l=frame.light.xyz;let h=(v+l)/max(length(v+l),0.0001);
  let nl=clamp(dot(nn,l),0.0,1.0);let nv=clamp(dot(nn,v),0.0001,1.0);let nh=clamp(dot(nn,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
  let a=rough*rough;let a2=a*a;let d=${/* @__PURE__ */ ggxDOf('nn', 'h')};let g=${smithGCorrelatedFloat};
@@ -754,7 +754,7 @@ fn srgb(c:vec3f)->vec3f {let x=clamp(c,vec3f(0.0),vec3f(1.0));return select(x*12
  var direct=((1.0-(0.04+0.96*pow(1.0-vh,5.0)))*(1.0-metal)*albedo/3.14159265+d*g*fresnel/max(4.0*nl*nv,0.0001))*nl*frame.radiance.rgb*frame.light.w;
  /*lod:direct*/
  var color:vec3f;
- // Match the source's renderer: gltf-pro (hemisphere fill) or core (flat ambient), both Khronos PBR Neutral.
+ // Match the source's renderer: gltf/pbr (hemisphere fill) or core (flat ambient), both Khronos PBR Neutral.
  if(atlas.grid.z>0.5){color=glow+direct+(albedo*(1.0-metal)+f0*0.5)*mix(vec3f(0.35,0.3,0.25),vec3f(1.0),clamp(nn.y*0.5+0.5,0.0,1.0))*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
  else{color=glow+direct+albedo*(1.0-metal)*frame.radiance.w;if(frame.options.x<0.5){color=srgb(pbrNeutral(max(color,vec3f(0.0))));}}
  return Pixel(vec4f(color,coverage),clamp(clip.z/clip.w,0.0,1.0));
@@ -775,7 +775,7 @@ struct Instance {m:mat4x4f,color:vec4f,emissive:vec4f}
 @group(0) @binding(3) var normalMap:texture_2d<f32>;
 @group(0) @binding(4) var colorSampler:sampler;
 @group(0) @binding(5) var<uniform> atlas:Atlas;
-struct Out {@builtin(position) clip:vec4f,@location(0) p:vec3f,@location(1) @interpolate(flat) tile:vec2f,@location(2) @interpolate(flat) ray:vec3f,@location(3) @interpolate(flat) id:u32}
+struct Out {@builtin(position) @invariant clip:vec4f,@location(0) p:vec3f,@location(1) @interpolate(flat) tile:vec2f,@location(2) @interpolate(flat) ray:vec3f,@location(3) @interpolate(flat) id:u32}
 struct Pixel {@builtin(frag_depth) depth:f32}
 fn lod_cell(p:vec3f,c:vec3f,r:f32,b:mat3x3f)->vec2f {let l=(p-c)/r;return vec2f(dot(l,b[0]),-dot(l,b[1]))*0.5+0.5;}
 @vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) id:u32)->Out {

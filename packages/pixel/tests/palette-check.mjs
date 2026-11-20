@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/pixel/tests/palette-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/pixel/tests/palette-check.mjs
 // A 16 x 4 gradient quantized to a 4-colour palette matches the CPU matcher byte for byte for each dither mode and both
 // distances; palette swap, a swap set live with no new texture, alpha, a device loss. Results: test-results/palette-browser.json.
 import assert from 'node:assert/strict';

@@ -79,6 +79,11 @@ test('camera tags it cannot read fail by object name', () => {
   rejects({ 'margo:camera': 'perspective', 'margo:active': 'yes' }, 'true or false');
   rejects({ 'margo:camra': 'perspective' }, "did you mean 'margo:camera'");
   rejects({ 'margo:camera': 'perspective', 'margo:light': 'point' }, 'without margo:light');
+  rejects({ 'margo:camera': 'perspective', 'margo:znear': 0 }, 'at least 5e-324');
+  // glTF 2.0 section 5.13: an orthographic znear may be 0 (KB-P3b).
+  const ortho = margoComponents(tagged({ 'margo:camera': 'orthographic', 'margo:znear': 0, 'margo:zfar': 10 })).document;
+  assert.deepEqual(ortho.cameras[ortho.nodes.find((n) => n.name === 'View').camera].orthographic, { xmag: 1, ymag: 1, znear: 0, zfar: 10 });
+  rejects({ 'margo:camera': 'orthographic', 'margo:znear': -1, 'margo:zfar': 10 }, "'margo:znear' must be a number of at least 0");
 });
 
 test('a scene without cameras names none', () => {

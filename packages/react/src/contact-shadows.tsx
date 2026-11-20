@@ -33,7 +33,7 @@ function ContactBinding({ onError, ...options }: ContactGroundOptions & ErrorPro
   return null;
 }
 /** A transparent ground that draws only the existing shadow map's occlusion. */
-export const ContactShadows = forwardRef<MeshRef, ContactShadowsProps>(function ContactShadows(
+export const ContactShadows = /* @__PURE__ */ forwardRef<MeshRef, ContactShadowsProps>(function ContactShadows(
   { width = 10, height = 10, opacity = 0.5, color = [0, 0, 0], onError, children, ...props },
   ref,
 ) {

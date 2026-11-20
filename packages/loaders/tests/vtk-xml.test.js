@@ -247,9 +247,45 @@ test('a polyhedron reads its faces array, across a second cell', async () => {
 });
 
 test('an unknown cell type warns and the rest still reads', async () => {
-  const model = await parseVTKXML(grid(QUAD, [0, 1, 2, 0, 1, 2, 3], [3, 7], [5, 77]));
+  // 99 is no VTK cell type (77, used here before, is the Bezier quadrilateral, which now draws).
+  const model = await parseVTKXML(grid(QUAD, [0, 1, 2, 0, 1, 2, 3], [3, 7], [5, 99]));
   assert.equal(model.indices.length, 3);
-  assert.deepEqual(model.warnings, ['cell type 77 is not drawn']);
+  assert.deepEqual(model.warnings, ['cell type 99 is not drawn']);
+});
+
+// VTK File Formats (Kitware, VTK 9 documentation, https://docs.vtk.org/en/latest/design_documents/VTKFileFormats.html):
+// higher-order cells list their corner points first, then edge, face and body points.
+test('higher-order cells 26 to 37 and the Lagrange and Bezier cells draw from their corners', async () => {
+  const cube = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1];
+  const points = [...cube, ...Array.from({ length: 30 * 3 }, (_, i) => 0.5 + (i % 3) * 0.01)];
+  const pad = (corners, n) => [...corners, ...Array.from({ length: n - corners.length }, (_, i) => 8 + i)];
+  const cells = [
+    [26, pad([0, 1, 3, 4, 5, 7], 15)],
+    [27, pad([0, 1, 2, 3, 4], 13)],
+    [28, pad([0, 1, 2, 3], 9)],
+    [29, pad([0, 1, 2, 3, 4, 5, 6, 7], 27)],
+    [30, pad([0, 1, 2, 3], 6)],
+    [34, pad([0, 1, 2], 7)],
+    [35, pad([0, 1], 4)],
+    [36, [0, 1, 2, 8, 9, 10]],
+    [37, pad([0, 1, 2, 3, 4], 19)],
+    [68, pad([0, 1], 3)],
+    [70, pad([0, 1, 2, 3], 9)],
+    [72, pad([0, 1, 2, 3, 4, 5, 6, 7], 27)],
+    [77, pad([0, 1, 2, 3], 9)],
+  ];
+  const connectivity = cells.flatMap(([, c]) => c),
+    offsets = [];
+  let end = 0;
+  for (const [, c] of cells) offsets.push((end += c.length));
+  const model = await parseVTKXML(grid(points, connectivity, offsets, cells.map(([t]) => t)), { surface: 'all' });
+  const counts = new Map();
+  for (const cell of model.triangleCells) counts.set(cell, (counts.get(cell) ?? 0) + 1);
+  // Triangles per cell: wedge 8, pyramid 6, quads 2, hexahedra 12, triangles 1; the two curves give line segments.
+  assert.deepEqual([...counts], [[0, 8], [1, 6], [2, 2], [3, 12], [4, 2], [5, 1], [7, 1], [8, 6], [10, 2], [11, 12], [12, 2]]);
+  assert.deepEqual([...model.lines], [0, 1, 0, 1]);
+  assert.ok(Array.from(model.indices).every((i) => i < 8), 'only corner points are drawn');
+  assert.deepEqual(model.warnings, ['second-order cells are drawn from their corner points']);
 });
 
 test('point data fills normals, uvs, colours and attributes; cell data stays by cell', async () => {

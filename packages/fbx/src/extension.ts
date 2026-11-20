@@ -53,7 +53,7 @@ export interface ExtensionHooks extends FBXExtension {
   inbetweens?(channel: FBXNode, sources: readonly FBXNode[]): { shape: FBXNode; percent: number }[];
   /** The weight of the shape at `percent` when a channel with these stops stands at `value`. */
   inbetweenWeight?(stops: readonly number[], percent: number, value: number): number;
-  /** Finishes a material after the base reader. */
+  /** Finishes a material after the base reader; every entry's hook runs, in the order of `extensions`. */
   material?(read: MaterialRead): Promise<void>;
   /** Makes PNG bytes of an image in another format; nothing when it cannot. */
   image?(bytes: Uint8Array): Promise<Uint8Array | undefined>;

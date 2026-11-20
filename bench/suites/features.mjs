@@ -1,5 +1,5 @@
 // The per-feature measurement scripts in examples/package-benchmarks (what `bench:all --gpu` used to run), each once
-// under this run's gate and GPU lock. Not part of the default run (about an hour): `npm run bench -- features`.
+// under this run's gate. Not part of the default run (about an hour): `npm run bench -- features`.
 // A script that exits non-zero fails its case. Every file a script writes under examples/package-benchmarks is copied
 // to benchmarks/runs/<id>/features/ and the committed version restored, so a run never edits committed results.
 import { execFileSync, spawnSync } from 'node:child_process';

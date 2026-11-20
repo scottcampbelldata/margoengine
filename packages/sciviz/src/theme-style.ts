@@ -9,6 +9,11 @@ export function themeFont(theme: Theme, title = false): string {
 }
 /** @internal Validate optional style tokens before any owned state changes. */
 export function validateThemeStyle(theme: Theme): void {
+  // Exactly #rrggbb: the chrome appends alpha digits for its panels (legend, tooltip, timeline), which a #rgb or
+  // #rrggbbaa colour turns into an invalid CSS colour, and the engine's clear colour takes no alpha.
+  for (const key of ['background', 'axis', 'grid', 'text'] as const)
+    if (typeof theme[key] !== 'string' || theme[key].length !== 7 || !hexColor(theme[key]))
+      throw typeError(`Theme ${key} needs #rrggbb; correct the colour`, 'sciviz');
   if (
     theme.fontFamily !== undefined &&
     (typeof theme.fontFamily !== 'string' || !theme.fontFamily.trim() || /[;{}<>\r\n]/.test(theme.fontFamily))

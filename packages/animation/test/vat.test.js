@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 const parseGLTF = (engine, doc, buffers = []) => new PBRModel(engine, new GLTFAsset(doc, buffers));
 import { Animation } from '../dist/index.js';
 import { bakeVAT, vatTexel, VATCrowd, VAT_STRIDE, VAT_WIDTH, vatShader } from '../dist/vat.js';

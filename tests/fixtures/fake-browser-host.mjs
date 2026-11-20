@@ -30,5 +30,5 @@ const launchServer = async (options) => {
   }
   return { process: () => child, wsEndpoint: () => 'ws://127.0.0.1:1/fake', kill: async () => {} };
 };
+// The host releases its input once asked to end, so it ends by its event loop like the real one.
 process.exitCode = await hostBrowser({ settings, launchServer, reapMs: settings.reapMs, logFile: settings.logFile });
-process.exit(process.exitCode);

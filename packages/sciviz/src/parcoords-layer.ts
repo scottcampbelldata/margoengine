@@ -29,7 +29,7 @@ if(p.info.z==0u){
  else{let row=instance/(dims*dims);let cell=instance%(dims*dims);let cx=cell%dims;let cy=cell/dims;let a=value(cx,row);let b=value(cy,row);point=vec2f(f32(cx)+a,f32(dims-1u-cy)+b);out.weight=mask[row];out.uv=uv;out.mode=1u;if(cx==cy||!(a>=0.0&&a<=1.0&&b>=0.0&&b<=1.0)){out.mode=3u;}}
 }
 out.clip=frame.clip*p.model*vec4f(point,0.0,1.0);
-if(out.mode==1u){out.clip=vec4f(out.clip.xy+out.uv*p.style.x/frame.viewport.xy*out.clip.w,out.clip.zw);}
+if(out.mode==1u){out.clip=vec4f(out.clip.xy+out.uv*p.style.x*frame.origin.z/frame.viewport.xy*out.clip.w,out.clip.zw);}
 return out;}
 @fragment fn fragment(in:Out)->@location(0) vec4f{
 if(in.mode==3u||(in.mode==1u&&dot(in.uv,in.uv)>1.0)){discard;}

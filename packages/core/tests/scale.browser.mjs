@@ -1,6 +1,6 @@
 // Real-GPU checks that core reaches the device's own limits for large scenes. Native WebGPU by default; MARGO_COMPAT=1
 // (or --compat) runs the same page on the WebGL2 compatibility layer. Run from the repository root after building:
-//   node scripts/gpu-lock.mjs run --owner=<you> --gpu=core-scale -- node packages/core/tests/scale.browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/core/tests/scale.browser.mjs
 // - limits: the device core makes has its adapter's maxBufferSize and maxStorageBufferBindingSize, not WebGPU's
 //   256 MiB / 128 MiB defaults (before 2026-11-10 core asked only for maxTextureArrayLayers).
 // - vertices: a 1,212,201-vertex plane (over the old 1,000,000 cap) that fills the view covers every pixel.
@@ -15,6 +15,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
@@ -33,7 +34,7 @@ const server = await createServer({
   logLevel: 'error',
   optimizeDeps: { entries: [], noDiscovery: true },
   server: { host: '127.0.0.1', port: 0, watch: null, hmr: false },
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'core-scale-page',
       configureServer(s) {

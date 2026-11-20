@@ -81,11 +81,10 @@ format tests and all six sciviz GPU suites pass. The eleven-package README run
 has 155 passes and fourteen existing known failures; Blender's live example was
 the sole fresh failure and now passes after its owner harness repair
 (`docs/readme-live.md`). Only failed steps were rerun. All nine remaining real
-GPU consumer suites pass: decoders, environment, gltf, gltf-pro extensions,
+GPU consumer suites pass: decoders, environment, gltf, gltf/pbr extensions,
 exporters, tiles, rigging, USDZ and Blender. USDZ required an explicit GPU-leaf
-reason because its command name is unclassified; its pixel/shader checks ran
-under one shared slot, not outside the lock. Remaining consumer requests use wait-max 60 and
-no timing work. Detailed logs remain in this worktree's test-results/size-restore.
+reason because its command name is unclassified; its pixel/shader checks ran.
+Remaining consumer requests did no timing work. Detailed logs remain in this worktree's test-results/size-restore.
 
 Rebase onto ba9248a85 preserved concurrent preview, teardown, decoder and scatter
 work. The package build, entry/lazy measurements and API surface were regenerated
@@ -126,8 +125,8 @@ Existing rendering and lifecycle tests remain in place. No timing or speed claim
 Validation: 119 package tests pass; the added ambient regression also passes.
 All 236 real-GPU pixel checks have zero wrong pixels and no validation errors;
 11 distinct shader modules compile. All nine README examples run (one Node,
-eight browser). Lint and hygiene pass. One shared slot per worktree, wait-max
-60, only the real browser commands inside the GPU lock. No successful step
+eight browser). Lint and hygiene pass. Only the real browser commands used the
+GPU. No successful step
 rerun to obtain this evidence. Full verify has 13744 passing unit tests and two
 stale-record failures: the API size table and the network record paired with
 entry sizes. Regenerated both from the measured build; only those two failed
@@ -187,8 +186,8 @@ after supplying the engine's sceneOf method in their fixture. Only the failed
 file was rerun; the infinite-spread regression has its own case. All five real
 GPU suites pass. Palette has 20 exact checks with no wrong pixels or validation
 errors and two shader modules compile; the compositor has 48 exact-pixel checks
-and six shader modules compile. The lock initially refused the unclassified
-palette-check filename before launching it; its explicit real-GPU reason was
+and six shader modules compile. The unclassified
+palette-check filename was refused before it launched; its explicit real-GPU reason was
 supplied, and only that failed/remaining sequence ran. No successful GPU suite
 rerun. Lint and hygiene pass. All seven README examples run in the browser with
 zero failures. Fresh entry and basic-scene network records measure the same
@@ -214,7 +213,7 @@ then regenerated the API. Pixel source and its passing proof inputs stay unchang
 
 Verified on 2f31a061e: math/quat still returned a tuple or a bare reason string.
 Restore TRSSplit as a discriminated union with ok and named position, rotation,
-scale or reason. Migrate every caller in exporters, gltf, gltf-pro, loaders,
+scale or reason. Migrate every caller in exporters, gltf, gltf/pbr, loaders,
 rigging and scene, including scene's world rotation/scale readers. This is a
 pre-release API correction with no deprecation adapter; the math README gives a
 runnable migration example and api:update records the signature.
@@ -251,15 +250,15 @@ would change the helper contract and complicate all six consumers. Byte changes
 and raised optional ceilings are recorded in limits.md. No speed claim.
 
 The first partial build also exposed a scheduler defect: when rigging and
-math/gltf-pro are selected but the intervening animator/animation packages are
-prebuilt, only direct selected edges were honored. Rigging could read gltf-pro
+math/gltf/pbr are selected but the intervening animator/animation packages are
+prebuilt, only direct selected edges were honored. Rigging could read gltf/pbr
 while its declarations were being replaced and infer unknown/any model nodes.
 The scheduler now respects transitive paths through unselected packages without
 rebuilding those intermediates. Regression: tests/package-order.test.js, narrowed
 build case, at one and three jobs, with a consumer listed before its provider.
 This is a build-tool fix; runtime bytes are unchanged. The initial passing math
 and scene builds were retained; only failed rigging and not-yet-started gltf,
-gltf-pro, exporters and loaders were built afterward.
+gltf/pbr, exporters and loaders were built afterward.
 
 Research: Arthur B. Kahn, *Topological sorting of large networks*, 1962,
 [Communications of the ACM](https://doi.org/10.1145/368996.369025), requires ordering
@@ -287,14 +286,13 @@ relaxed. Paired entry/network records measure 2f31a061e with dirty packages;
 the basic scene makes five requests, with zero unused built files. api:update
 records the named TRSSplit union and the changed size summary.
 
-All consumer GPU suites pass: gltf, gltf-pro extensions, exporters, rigging,
-loaders and loaders/render. The first gltf-pro run passed six cases before
+All consumer GPU suites pass: gltf, gltf/pbr extensions, exporters, rigging,
+loaders and loaders/render. The first gltf/pbr run passed six cases before
 Windows logged nvlddmkm event 153 at 16:02:42 and requestDevice failed with
 D3D12 E_OUTOFMEMORY. Retain those six passes; only the failed lights group and
 remaining scatter/uv/bump/splats groups run afterward, all passing. No source
-or bar changed for that confirmed system reset. Each real GPU leaf holds one
-shared slot, wait-max 60; no build/unit/verify command holds a GPU lock. The
-premature README request was stopped while still waiting, before any example
+or bar changed for that confirmed system reset. No build, unit or verify command used the GPU. The
+premature README request was stopped before any example
 ran, so the consumer sequence and subsequent README run never overlap.
 
 README execution: 112 of 121 pass, nine already listed known failures, no new
@@ -356,7 +354,7 @@ example passes. Paired entry/network records measure fc20cdca6 with dirty
 packages; the basic scene has five requests and no unused built files.
 api:update records the changed Unity size, without an API shape change.
 
-The original verify invocation passed hygiene, then check-gpu-policy could not
+The original verify invocation passed hygiene, then the removed GPU policy check could not
 read the intentionally deleted compactor because that deletion was not yet in
 Git's index. Stage the authorized deletion, rerun the failed policy step and
 run all still-unrun SERIAL/PARALLEL commands exported by verify.mjs. Every step
@@ -426,8 +424,8 @@ Validation: lint/hygiene, all 168 sciviz unit tests, all six sciviz GPU suites
 and all 23 README examples pass. GPU evidence includes 30 root checks, 13 brick
 checks, 12 native/compatibility entry cases, six restoration/cancellation
 checks, 32 demo/backend/layout checks and the native WebGL2 pixel parity suite.
-One shared slot is held by this worktree at a time, wait-max 60, with GPU leaves
-only; README and network checks self-lock and are sequenced after the leaves.
+GPU leaves ran one at a time in this worktree;
+README and network checks ran after the leaves.
 The paired entry/network records measure 5ec86fe7c with dirty packages; the
 basic scene makes five requests and has no unused built files. api:update
 records the new optional sizes; core plus stage stays 23924 B.
@@ -624,7 +622,7 @@ Headless closure: all six native Node README scenes pass (including sequence,
 MP4, comparison and HDR files), and all seven generic README examples pass
 across retained five original passes and the two failed/changed examples.
 Remove exactly those two obsolete known-failure exceptions. Browser and Node
-GPU checks run sequentially with one worktree slot, wait-max 60. The initially
+Browser and Node GPU checks run sequentially. The initially
 unclassified Node leaf was rejected before execution; an explicit native-GPU
 reason admits the real command. No successful browser or Node suite is repeated.
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 setTimeout(() => {
   console.error('adaptive events GPU hard timeout');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120000).unref();
 const context = await openBrowser({ startPath: '/packages/quality/test/ssaa-browser.html', port: 5228 });
 try {

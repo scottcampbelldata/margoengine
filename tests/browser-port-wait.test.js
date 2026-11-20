@@ -1,11 +1,11 @@
-// GPU suites share the GPU (scripts/gpu-lock.mjs), so two of them can want the same fixed port at once: the second
-// one's server waits for the port (listenWhenFree in scripts/browser.js) instead of failing with "Port N is already in
-// use", which the first real two-suite run under shared slots hit (sky and shader both on 5211).
-import './support/gpu-lock-env.js';
+// GPU suites run side by side, so two of them can want the same fixed port at once: the second one's server waits for
+// the port (listenWhenFree in scripts/browser.js) instead of failing with "Port N is already in use", which the first
+// real two-suite run side by side hit (sky and shader both on 5211).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer as createNetServer } from 'node:net';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../scripts/support/no-file-watcher.js';
 import { readFileSync } from 'node:fs';
 import { freePort, listenWhenFree, startDevServer } from '../scripts/browser.js';
 
@@ -20,6 +20,7 @@ test('a Vite server on a port another suite holds starts once that suite lets th
   const blocker = await occupy(),
     { port } = blocker.address();
   const server = await createServer({
+    plugins: [noFileWatcher()],
     configFile: false,
     logLevel: 'silent',
     optimizeDeps: { noDiscovery: true },

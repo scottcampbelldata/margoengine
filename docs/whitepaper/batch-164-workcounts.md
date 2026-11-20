@@ -15,7 +15,7 @@ Reproduce after `npm run build:packages`:
 
 ```sh
 node --test --test-timeout=120000 packages/environment/tests/volumetric-workcount.test.js
-node scripts/gpu-lock.mjs run --owner=bp164-fog --max=10 -- node packages/environment/scripts/test-browser.js --page=volumetric-transparent
+node scripts/run-with-timeout.mjs --max=10 -- node packages/environment/scripts/test-browser.js --page=volumetric-transparent
 npm run check:readme-run -- --packages=environment
 ```
 

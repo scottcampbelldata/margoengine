@@ -35,6 +35,39 @@ const gestures = ['pointerdown', 'mousedown', 'keydown', 'touchend'] as const;
 const defaultForward: Vec3 = [0, 0, -1],
   defaultUp: Vec3 = [0, 1, 0],
   meshForward: Vec3 = [0, 0, 1];
+/**
+ * Writes into `out` the unit up vector at right angles to the unit `forward`: `up` minus its part along forward
+ * (Gram-Schmidt), so Web Audio's right = forward x up is never zero. When `up` has no part across forward (a camera
+ * looking straight down with up +Y, or a followed mesh whose forward axis is its own up axis), the up a level view
+ * gets when pitched by 90 degrees about its right axis is used: [0, 0, -1] looking down, [0, 0, 1] looking up, and
+ * otherwise +Y with its part along forward removed.
+ */
+function independentUp(forward: ArrayLike<number>, up: ArrayLike<number>, out: Float64Array | number[]): void {
+  const fx = forward[0],
+    fy = forward[1],
+    fz = forward[2];
+  let d = up[0] * fx + up[1] * fy + up[2] * fz,
+    x = up[0] - d * fx,
+    y = up[1] - d * fy,
+    z = up[2] - d * fz,
+    length = Math.hypot(x, y, z);
+  if (!(length > 1e-6)) {
+    d = fy;
+    x = -d * fx;
+    y = 1 - d * fy;
+    z = -d * fz;
+    length = Math.hypot(x, y, z);
+    if (!(length > 1e-6)) {
+      x = 0;
+      y = 0;
+      z = fy > 0 ? 1 : -1;
+      length = 1;
+    }
+  }
+  out[0] = x / length;
+  out[1] = y / length;
+  out[2] = z / length;
+}
 const audioContextClass = (): (new () => AudioContext) => {
   const constructor = (globalThis as { AudioContext?: new () => AudioContext }).AudioContext;
   if (!constructor)
@@ -72,6 +105,7 @@ export class AudioListener implements EnginePlugin {
   private readonly meshUp: [number, number, number] = [0, 1, 0];
   private readonly meshPosition: [number, number, number] = [0, 0, 0];
   private readonly localForward = new Float64Array([0, 0, 1]);
+  private readonly localUp = new Float64Array([0, 1, 0]);
   private target: 'camera' | Mesh | null = 'camera';
   private readonly forwardScratch = new Float64Array(3);
   private readonly upScratch = new Float64Array(3);
@@ -197,17 +231,22 @@ export class AudioListener implements EnginePlugin {
     return this.target;
   }
   /**
-   * Puts the ears on something other than the camera: a mesh (its world position, its local `forward` axis and local
-   * +Y as up, for example a third-person character with `[0, 0, 1]`), `'camera'` (the default), or null to keep the
-   * last pose and place the listener only with `setPose`. A disposed mesh keeps its last pose.
+   * Puts the ears on something other than the camera: a mesh (its world position, its local `forward` axis and its
+   * local `up` axis, by default `[0, 0, 1]` and +Y, for example a third-person character), `'camera'` (the default),
+   * or null to keep the last pose and place the listener only with `setPose`. A disposed mesh keeps its last pose.
+   * `up` is made independent of `forward` as {@link AudioListener.setPose} does, so `follow(mesh, [0, 1, 0])` (a
+   * mesh that faces along its own +Y) hears with local +Z as up.
    */
-  follow(target: 'camera' | Mesh | null, forward: Vec3 = meshForward): this {
+  follow(target: 'camera' | Mesh | null, forward: Vec3 = meshForward, up: Vec3 = defaultUp): this {
     if (target !== 'camera' && target !== null && !Number.isInteger(meshRuntime(target)?.id))
       throw new TypeError("The listener follows a core Mesh, 'camera' or null; pass one of those to follow()");
-    const f = this.forwardScratch;
+    const f = this.forwardScratch,
+      u = this.upScratch;
     if (!normalize(forward[0], forward[1], forward[2], f, meshForward))
       throw new RangeError('Listener forward axis must be nonzero');
+    if (!normalize(up[0], up[1], up[2], u, defaultUp)) throw new RangeError('Listener up axis must be nonzero');
     this.localForward.set(f);
+    independentUp(f, u, this.localUp);
     this.target = target;
     return this;
   }
@@ -228,14 +267,18 @@ export class AudioListener implements EnginePlugin {
       fx = l[0],
       fy = l[1],
       fz = l[2],
+      k = this.localUp,
+      ux = k[0],
+      uy = k[1],
+      uz = k[2],
       forward = this.cameraForward,
       up = this.meshUp;
     forward[0] = m[o] * fx + m[o + 4] * fy + m[o + 8] * fz;
     forward[1] = m[o + 1] * fx + m[o + 5] * fy + m[o + 9] * fz;
     forward[2] = m[o + 2] * fx + m[o + 6] * fy + m[o + 10] * fz;
-    up[0] = m[o + 4];
-    up[1] = m[o + 5];
-    up[2] = m[o + 6];
+    up[0] = m[o] * ux + m[o + 4] * uy + m[o + 8] * uz;
+    up[1] = m[o + 1] * ux + m[o + 5] * uy + m[o + 9] * uz;
+    up[2] = m[o + 2] * ux + m[o + 6] * uy + m[o + 10] * uz;
     const position = this.meshPosition;
     position[0] = m[o + 12];
     position[1] = m[o + 13];
@@ -254,12 +297,18 @@ export class AudioListener implements EnginePlugin {
     this.setPose(p, forward, camera.up);
   }
 
-  /** Sets the listener pose directly (world position, forward direction, up direction). */
+  /**
+   * Sets the listener pose directly (world position, forward direction, up direction). The listener keeps `forward`
+   * and stores the part of `up` at right angles to it, so the pose it hands Web Audio always has a right axis; an up
+   * along forward (looking straight down with up +Y) becomes the up of that view pitched from level: [0, 0, -1]
+   * looking down, [0, 0, 1] looking up.
+   */
   setPose(position: Vec3, forward: Vec3, up: Vec3 = defaultUp): this {
     const f = this.forwardScratch,
       u = this.upScratch;
     normalize(forward[0], forward[1], forward[2], f, defaultForward);
     normalize(up[0], up[1], up[2], u, defaultUp);
+    independentUp(f, u, u);
     if (!Number.isFinite(position[0]) || !Number.isFinite(position[1]) || !Number.isFinite(position[2]))
       throw new RangeError('Listener pose must be finite');
     let changed = !this.written;

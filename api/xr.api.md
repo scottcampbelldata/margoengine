@@ -44,14 +44,12 @@ export class XR implements EnginePlugin {
     readonly name = "xr";
     session: XRNativeSession | null;
     readonly route: 'engine' | 'separate';
+    get layers(): number | undefined;
+    set layers(mask: number | undefined);
     readonly controllers: XRController[];
     static isSupported(mode?: XRMode): Promise<boolean>;
-    static attach(engine: EngineKernel, options?: {
-        signal?: AbortSignal;
-    }): Promise<XR>;
-    static create(engine: EngineKernel, { signal }?: {
-        signal?: AbortSignal;
-    }): Promise<XR>;
+    static attach(engine: EngineKernel, options?: XRCreateOptions): Promise<XR>;
+    static create(engine: EngineKernel, options?: XRCreateOptions): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
     onFrame(callback: (state: XRFrameState) => void): () => void;
@@ -106,6 +104,11 @@ export class XRController {
     update(frame: XRNativeFrame, space: XRSpace): void;
 }
 
+export interface XRCreateOptions {
+    signal?: AbortSignal;
+    layers?: number;
+}
+
 export interface XREyeTarget {
     readonly index: number;
     readonly device: GPUDevice;
@@ -154,14 +157,12 @@ class XR implements EnginePlugin {
     readonly name = "xr";
     session: XRNativeSession | null;
     readonly route: 'engine' | 'separate';
+    get layers(): number | undefined;
+    set layers(mask: number | undefined);
     readonly controllers: XRController[];
     static isSupported(mode?: XRMode): Promise<boolean>;
-    static attach(engine: EngineKernel, options?: {
-        signal?: AbortSignal;
-    }): Promise<XR>;
-    static create(engine: EngineKernel, { signal }?: {
-        signal?: AbortSignal;
-    }): Promise<XR>;
+    static attach(engine: EngineKernel, options?: XRCreateOptions): Promise<XR>;
+    static create(engine: EngineKernel, options?: XRCreateOptions): Promise<XR>;
     private constructor();
     setup(engine: Engine): void;
     onFrame(callback: (state: XRFrameState) => void): () => void;

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Kill Devil Hills on 17 December 1903: the sand flat, the camp, the launch rail and the big dune under a grey winter sky, from one call to @margoengine/scenes. Rendered live in WebGPU with Margo Engine.">
+  <title>Dune Coast · Margo Engine</title>
+  <!-- Margo engine made for Margie -->
+  <style>
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#c9c6bd;color:#1d1c19;font:16px/1.4 Georgia,'Times New Roman',serif;overflow:hidden}
+    #viewport{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+    h1{position:fixed;top:20px;left:24px;margin:0;font-size:16px;font-weight:400}
+    #status{position:fixed;top:44%;left:0;right:0;margin:0;padding:0 24px;text-align:center}#error{position:fixed;top:72px;left:24px;right:24px;margin:0;color:#7a1d00}#error:empty{display:none}
+  </style>
+</head>
+<body>
+  <main id="viewport" aria-label="Kill Devil Hills, 17 December 1903: a sand flat with a launch rail, two board sheds and a big dune"></main>
+  <h1>Dune Coast, <a href="../../">Margo Engine</a></h1>
+  <p id="status" role="status" data-webgpu-status>Laying out the sand. The first load can take up to half a minute.</p>
+  <p id="error" role="alert"></p>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

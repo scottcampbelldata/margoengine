@@ -5,6 +5,8 @@
 ```ts
 import { EngineKernel, Mesh, PbrMaterial } from "@margoengine/core";
 
+export const CONIFER_NEEDLES: readonly [number, number, number];
+
 export interface PlacedTree {
     readonly root: Mesh;
     readonly trunk: Mesh;
@@ -13,13 +15,25 @@ export interface PlacedTree {
     [Symbol.dispose](): void;
 }
 
-export interface TreeOptions extends MeshDetailOptions {
+export const SPRUCE_FLARE = 1.3;
+
+export const SPRUCE_HEIGHT_CURVE: {
+    readonly a: number;
+    readonly b: number;
+};
+
+export interface TreeOptions extends TreeMeshShapeOptions {
     position?: readonly [number, number, number];
+    height?: number;
+    shootDistance?: number;
+    diameter?: number;
     trunkMaterial?: PbrMaterial;
     canopyMaterial?: PbrMaterial;
 }
 
 export function createTree(engine: EngineKernel, kind: 'conifer' | 'broadleaf', options?: TreeOptions): PlacedTree;
+
+export function spruceDiameter(height: number): number;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -27,5 +41,13 @@ type MeshDetail = 0 | 1 | 2;
 
 interface MeshDetailOptions {
     detail?: MeshDetail;
+}
+
+interface TreeMeshShapeOptions extends MeshDetailOptions {
+    branches?: boolean;
+    shoots?: boolean | 'coarse';
+    flare?: number;
+    breastHeight?: number;
+    breastDiameter?: number;
 }
 ```

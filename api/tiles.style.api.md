@@ -4,8 +4,8 @@
 
 ```ts
 import { Mesh } from "@margoengine/core";
-import { PBRModel, PBRPrimitive } from "@margoengine/gltf-pro";
-import { PBRInstances } from "@margoengine/gltf-pro/instancing";
+import { PBRModel, PBRPrimitive } from "@margoengine/gltf/pbr";
+import { PBRInstances } from "@margoengine/gltf/pbr-instancing";
 import { PointCloud } from "@margoengine/points";
 
 export interface FeatureStyle {

@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Margo Engine whitepaper</title>
-  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,844 bytes gzip; 107 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta name="description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,797 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
   <link rel="canonical" href="https://margoengine.com/whitepaper/engine">
   <meta name="theme-color" content="#0b1020">
   <meta property="og:type" content="article">
   <meta property="og:title" content="Margo Engine whitepaper">
-  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,844 bytes gzip; 107 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
+  <meta property="og:description" content="Margo Engine: a WebGPU engine for the web. Core plus stage is 24,797 bytes gzip; 108 packages (none published to npm yet) behind one install; a named source for every number. Coming soon.">
   <meta property="og:url" content="https://margoengine.com/whitepaper/engine">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="../favicon.ico" sizes="32x32">
@@ -30,13 +30,13 @@
 <header class="masthead">
   <p class="eyebrow">Whitepaper · October 2026 · coming soon</p>
   <h1>Margo Engine</h1>
-  <p class="deck">A WebGPU engine for the web. Core plus stage is 24,844 bytes gzipped. The catalog lists 107 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
+  <p class="deck">A WebGPU engine for the web. Core plus stage is 24,797 bytes gzipped. The catalog lists 108 packages (none published to npm yet), with one install that holds them all. Every number we publish names its source.</p>
   <div class="byline"><span>Scott Campbell · Margo Interactive</span><span>Sizes at commit 51d8786a; tests at 01836c27; other figures name their own commit or date</span><span><a href="./engine.pdf">PDF</a></span></div>
 </header>
 
 <div class="ledger" role="list">
-  <div role="listitem"><b>24,844 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; the build fails a change at 25,000</span><i>entry-sizes.json · 0e71a9024</i></div>
-  <div role="listitem"><b>107</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
+  <div role="listitem"><b>24,797 B</b><span>core + stage, min + gzip, Wasm kernel and WebGPU backend included; the build fails a change at 25,000</span><i>entry-sizes.json · 0e71a9024</i></div>
+  <div role="listitem"><b>108</b><span>packages in the catalog, all reachable from <code>npm i margoengine</code> (none published to npm yet)</span><i>docs/catalog.json</i></div>
   <div role="listitem"><b>6,498</b><span>Node tests in every <code>npm run verify</code>: 6,496 pass, 2 skipped, 0 fail</span><i>results/test-count.json · 01836c27</i></div>
   <div role="listitem"><b>153 of 161</b><span>feature rows with an equivalent Margo package; 4 partial, 4 missing</span><i>docs/three-parity-matrix.md · bec8b597</i></div>
 </div>
@@ -72,7 +72,7 @@
 </nav>
 
 <h2 id="abstract"><span class="n">0</span>Abstract</h2>
-<p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 61,347 bytes minified and 24,844 bytes gzipped. The build fails at 25,000.</p>
+<p>Margo Engine is a 3D engine for web applications, written in TypeScript. It has a Rust kernel compiled to WebAssembly and a WebGPU renderer. Core plus the high-level stage (<code>createStage</code>) measures 60,984 bytes minified and 24,797 bytes gzipped. The build fails at 25,000.</p>
 <p>Everything else lives in optional, side-effect-free packages: glTF PBR, shadows, post-processing, physics, voxel worlds with multiplayer, a path tracer, exporters and React. A bundle contains only the packages it imports, and large runtimes load only when a file needs them.</p>
 <p>This paper covers the design, what we have measured, how the engine was built, and the limits we know about. Each figure names the file it came from. Where we have no committed measurement, we say so. A companion paper covers <a href="./voxel.html">Margo Voxel</a>.</p>
 
@@ -193,8 +193,8 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <div class="table"><table>
 <thead><tr><th>Entry</th><th class="num">Raw</th><th class="num">Gzip</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td><code>@margoengine/core</code></td><td class="num">53,484</td><td class="num">22,225</td><td>Wasm kernel, WebGPU renderer, views and scenes</td></tr>
-<tr><td>core + stage</td><td class="num">61,347</td><td class="num">24,844</td><td>the build-gated figure</td></tr>
+<tr><td><code>@margoengine/core</code></td><td class="num">53,196</td><td class="num">22,226</td><td>Wasm kernel, WebGPU renderer, views and scenes</td></tr>
+<tr><td>core + stage</td><td class="num">60,984</td><td class="num">24,797</td><td>the build-gated figure</td></tr>
 </tbody></table></div>
 <span class="src">examples/package-benchmarks/results/entry-sizes.json · record 0e71a9024 · dirty: false · <code>npm run measure:size</code> on main at 38ce7fbaa, 2026-11-12</span>
 <p>Every other entry and worker, and every lazily loaded file, is in the same record and on <a href="../sizes.html">margoengine.com/sizes</a>. A release test builds a page that calls <code>createStage</code> and loads a small glTF, records every request in headless Edge, and fails if the page fetches anything beyond the HTML, its chunks and the model (<code>examples/package-benchmarks/results/basic-scene-network.json</code>).</p>
@@ -216,7 +216,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <span class="src">docs/three-parity-matrix.md · bec8b597</span>
 
 <h2 id="perf"><span class="n">7</span>Internal measurements</h2>
-<p>These are measurements of Margo against earlier Margo, on named hardware. They are not comparisons with other engines. The method: headless Edge with vsync and the frame cap off, WebGPU timestamp queries on every pass, a GPU lock so only one GPU job runs at a time, and a quiet-machine gate. Our benchmark tool, <code>npm run bench</code>, now runs every such measurement this way.</p>
+<p>These are measurements of Margo against earlier Margo, on named hardware. They are not comparisons with other engines. The method: headless Edge with vsync and the frame cap off, WebGPU timestamp queries on every pass, no other GPU job running at the same time, and a quiet-machine gate. Our benchmark tool, <code>npm run bench</code>, now runs every such measurement this way.</p>
 <h3>Large scenes</h3>
 <p><code>FloatingOrigin</code> keeps a 10 mm part at 0.019 px of jitter up to 6,000 km from the origin, where float32 alone stops drawing it (<code>results/large-coordinates-gpu.json</code>).</p>
 
@@ -226,7 +226,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
   <li><strong>One external controller.</strong> Factory owns every workflow and Git mutation. The engine repository contains code, documentation and non-committing quality tools, not a second queue, integrator, scheduler or stop-order system.</li>
   <li><strong>Parallel work, isolated.</strong> Factory gives each coding task an isolated checkout and serializes integration to <code>main</code>. The repository does not create worktrees or branches in response to an ordinary edit.</li>
   <li><strong>Proportionate checks.</strong> A build runs the affected package checks and relevant dependents. <code>npm run check:merge:full</code>, pinned proofs, stress tests and benchmarks remain explicit release or owner-requested work rather than automatic repetition after every small change.</li>
-  <li><strong>Bounded hardware use.</strong> GPU correctness tests use a generic shared lock with hard time limits; measurements run exclusively. Factory chooses a capable machine and records deferred coverage instead of treating an unavailable runtime as a code defect.</li>
+  <li><strong>Bounded hardware use.</strong> GPU correctness tests run directly with hard time limits; measurements run with nothing else on the GPU. Factory chooses a capable machine and records deferred coverage instead of treating an unavailable runtime as a code defect.</li>
   <li><strong>A regression test for every bug.</strong> A fix lands with a test that fails without it. When a whole class of bug slips through, a check for the class is added, for example the gate on fixed waits in GPU checks and the reassociating-compiler stand-in in section 10.</li>
   <li><strong>Independent full validation.</strong> Factory can schedule <code>check:merge:full</code> and pinned proofs on the combined tree for release evidence without embedding a fleet scheduler or publisher in Margo.</li>
   <li><strong>One rerun, only after a logged GPU driver reset.</strong> A step that fails while the Windows event log shows a GPU driver reset runs once more. The reset and the rerun are printed and kept as a receipt in the check's result file, and a second failure fails the check. A failure without a logged reset is never retried.</li>
@@ -265,7 +265,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 <h3>A proof failed on two machines, and the engine was fine</h3>
 <p>The <code>math-consolidation</code> proof passed on Node 26 and failed on two machines with Node 22: 21 of 24 digests differed. ECMAScript leaves the rounding of <code>**</code> and the approximated <code>Math</code> functions to the engine; V8 in Node 26 uses the C library's <code>pow</code> and V8 in Node 22 its own, so <code>10 ** -5</code> differs. The proof now builds inputs from exact operations and fails if a taped call uses an approximated function (<code>ab27353f</code>, guard <code>tests/proofs-golden.test.js</code>, run in CI on Node 22.12 and 26).</p>
 <h3>Flaky tests had one shared cause</h3>
-<p>Four tests passed alone and failed under load, each because its timing depended on how busy the machine was: a heap probe that measured the shared test runner's heap (5.9 MB once; in its own process the same loop grows by at most 30 KB), a catalog test that read the system clipboard every process shares (both <code>6d08b0af</code>), a 300 ms server timeout whose clock started before the child process ran (<code>3a59aa55</code>), and a walk check that bounded the eye's movement per frame while the engine clamps a slow frame at 0.1 s (<code>7714e84e</code>; the guard <code>109ec352</code> walks at 1/60, 25, 40 and 100 ms frames and still fails a 0.4 m jump). The same class gave two more: browser suites sharing one Vite cache (<code>7ab8cd13</code>) and a suite waiting silently for a fixed port (<code>6ddd733b</code>). What we got wrong: we first blamed time spent queueing for the GPU lock; measurement ruled that out.</p>
+<p>Four tests passed alone and failed under load, each because its timing depended on how busy the machine was: a heap probe that measured the shared test runner's heap (5.9 MB once; in its own process the same loop grows by at most 30 KB), a catalog test that read the system clipboard every process shares (both <code>6d08b0af</code>), a 300 ms server timeout whose clock started before the child process ran (<code>3a59aa55</code>), and a walk check that bounded the eye's movement per frame while the engine clamps a slow frame at 0.1 s (<code>7714e84e</code>; the guard <code>109ec352</code> walks at 1/60, 25, 40 and 100 ms frames and still fails a 0.4 m jump). The same class gave two more: browser suites sharing one Vite cache (<code>7ab8cd13</code>) and a suite waiting silently for a fixed port (<code>6ddd733b</code>). What we got wrong: we first blamed time spent waiting for other GPU jobs; measurement ruled that out.</p>
 <h3>Headless Edge picked the wrong GPU</h3>
 <p>After a reboot, headless Edge on the main PC used the integrated AMD GPU instead of the RTX A6000 whenever the Remote Desktop session was disconnected, and every visual check failed for lack of references for that GPU. Chromium uses DXGI adapter 0, and Windows lists first the adapter that carries the session's display. Power-preference flags and the Windows per-app setting had no measured effect. The launcher now looks up the hardware adapter with the most video memory at launch and passes its LUID (<code>85c96a55</code>, <code>scripts/lib/gpu-adapter.mjs</code>, guard <code>tests/gpu-adapter.test.js</code>). Still unexplained: before that reboot, checks got the A6000 with the session disconnected.</p>
 <h3>NVIDIA driver resets: cause not found</h3>
@@ -305,7 +305,7 @@ window.addEventListener('pagehide', () =&gt; app.dispose(), {once: true});</code
 </ul>
 
 <h2 id="repro"><span class="n">13</span>Reproduce</h2>
-<p>From a checkout (Node 24.18 or newer for the repository; the published packages run on Node 22.12 or newer). Each command writes or prints the figure it backs; GPU commands take the shared GPU lock.</p>
+<p>From a checkout (Node 24.18 or newer for the repository; the published packages run on Node 22.12 or newer). Each command writes or prints the figure it backs; GPU commands run at once with a hard timeout.</p>
 <pre><code>npm ci
 npm run build:packages
 npm run measure:size          # core + stage gzip, fails at 25,000

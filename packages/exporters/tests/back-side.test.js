@@ -2,8 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Material, createMesh, createInstancedMesh } from '@margoengine/materials';
-import { parseGLTF } from '@margoengine/gltf-pro';
-import { instancing } from '@margoengine/gltf-pro/instancing';
+import { parseGLTF } from '@margoengine/gltf/pbr';
+import { instancing } from '@margoengine/gltf/pbr-instancing';
 import { exportModel } from '../dist/model.js';
 import { exportGLTF } from '../dist/index.js';
 import { headlessModels } from '../../../tests/support/pbr-snapshot.js';
@@ -183,6 +183,8 @@ test('exportModel ignores back-side geometry baking for synthetic point and line
       assert.deepEqual([...accessor(result.json, result.bin, out.indices)], indices);
       assert.deepEqual(values(result, out, 'NORMAL'), quad.normals);
       assert.deepEqual(values(result, out, 'TANGENT'), quad.tangents);
+      // glTF 3.7.2.1: points are mode 0 and lines mode 1; the default 4 would draw them as triangles.
+      assert.equal(out.mode, topology === 'point-list' ? 0 : 1, topology);
     }
   }));
 

@@ -1,4 +1,4 @@
-// Real-adapter check (from the repository root after building packages; hold the GPU lock): node packages/lod/test/imposter-check.mjs [label]
+// Real-adapter check (from the repository root after building packages): node packages/lod/test/imposter-check.mjs [label]
 // 1. Imposter picking: GPU Picking and the bvh Raycaster hit imposter-level objects through their bounding sphere.
 // 2. Atlas seams: rotate around an imposter in 0.5 degree steps and compare per-step change with a full-detail reference.
 import assert from 'node:assert/strict';

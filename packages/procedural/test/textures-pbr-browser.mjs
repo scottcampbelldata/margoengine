@@ -1,3 +1,4 @@
+// MARGO_COMPAT not applicable: the page bakes on native WebGPU and on its own layer device (createCompatGPU) in one run.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -68,6 +69,8 @@ try {
         'fire',
         'starfield',
         'road',
+        'stone',
+        'soot',
       ]) {
         console.log(route + ' ' + pattern);
         const output = await baker.bake({
@@ -81,6 +84,7 @@ try {
             normalStrength: 0.1,
             roughness: 0.5,
             roughnessVariation: 0.5,
+            tint: 0,
           }),
           maps = {};
         for (const name of ['albedo', 'normal', 'roughness', 'height']) {
@@ -104,6 +108,7 @@ try {
           normalStrength: 0.1,
           roughness: 0.5,
           roughnessVariation: 0.5,
+          tint: 0,
           offset: [1, -1],
           mipmaps: false,
         });
@@ -136,6 +141,28 @@ try {
       const a = await read(animatedA.albedo, 32, 32),
         b = await read(animatedB.albedo, 32, 32);
       if (a.every((x, i) => x === b[i])) throw new Error('Time has no effect');
+      // Close-up controls: tint changes colour only, per cell; chip changes the bricks' edges; soot is a plume.
+      const look = async (o) => {
+        const s = await baker.bake({
+            width: 64,
+            height: 64,
+            mipmaps: false,
+            heightScale: 1,
+            color: [1, 1, 1],
+            secondary: [0, 0, 0],
+            ...o,
+          }),
+          out = { albedo: await read(s.albedo, 64, 64), height: await read(s.height, 64, 64) };
+        s.dispose();
+        return out;
+      };
+      const stone0 = await look({ pattern: 'stone', tint: 0, color: [0.5, 0.5, 0.5] }),
+        stoneTinted = await look({ pattern: 'stone', color: [0.5, 0.5, 0.5] }),
+        bricks = await look({ pattern: 'bricks', color: [0.5, 0.5, 0.5] }),
+        bricksTinted = await look({ pattern: 'bricks', tint: 0.5, color: [0.5, 0.5, 0.5] }),
+        bricksChipped = await look({ pattern: 'bricks', chip: 0.8 }),
+        soot = await look({ pattern: 'soot', detail: 0 });
+      (window.closeUp ??= []).push({ route, stone0, stoneTinted, bricks, bricksTinted, bricksChipped, soot });
       baker.dispose();
       await device.queue.onSubmittedWorkDone();
       const error = await device.popErrorScope();
@@ -144,6 +171,26 @@ try {
     }
     return cases;
   });
+  for (const closeUp of await page.evaluate(() => window.closeUp)) {
+    const ratios = (c) => {
+      const set = new Set();
+      for (let i = 0; i < c.albedo.length; i += 4)
+        if (c.height[i] > 200) set.add(Math.round((c.albedo[i] / c.height[i]) * 20));
+      return set.size;
+    };
+    assert.deepEqual(closeUp.stone0.height, closeUp.stoneTinted.height, 'tint leaves the stone heights alone');
+    assert.notDeepEqual(closeUp.stone0.albedo, closeUp.stoneTinted.albedo, 'stone is tinted per cell by default');
+    assert.equal(ratios(closeUp.stone0), 1, 'untinted stone colour follows its height');
+    assert.ok(ratios(closeUp.stoneTinted) >= 3, 'tinted stones take several colours: ' + ratios(closeUp.stoneTinted));
+    assert.ok(ratios(closeUp.bricksTinted) >= 3, 'tinted bricks take several colours');
+    assert.equal(ratios(closeUp.bricks), 1);
+    const mortar = (c) => c.height.filter((x, i) => i % 4 === 0 && x === 0).length;
+    assert.ok(mortar(closeUp.bricksChipped) > mortar(closeUp.bricks) * 1.2, 'chipped edges eat into the bricks');
+    const sootAt = (x, y) => closeUp.soot.height[(y * 64 + x) * 4];
+    assert.ok(sootAt(32, 1) > 200, 'soot is densest just above the fire: ' + sootAt(32, 1));
+    assert.ok(sootAt(32, 1) > sootAt(32, 62) && sootAt(32, 62) > sootAt(2, 62), 'soot thins upward and sideways');
+    assert.ok(sootAt(1, 1) < 20, 'soot leaves the bottom corners clean: ' + sootAt(1, 1));
+  }
   let mipChecks = 0,
     maxBackendError = 0;
   for (const c of result) {
@@ -201,11 +248,11 @@ try {
       }
     }
   }
-  for (let i = 0; i < 11; i++)
+  for (let i = 0; i < 13; i++)
     for (const name of ['albedo', 'normal', 'roughness', 'height'])
       for (let level = 0; level < 6; level++) {
         const a = result[i].maps[name][level].pixels,
-          b = result[i + 11].maps[name][level].pixels;
+          b = result[i + 13].maps[name][level].pixels;
         for (let k = 0; k < a.length; k++) {
           const error = Math.abs(a[k] - b[k]);
           maxBackendError = Math.max(maxBackendError, error);
@@ -214,7 +261,7 @@ try {
       }
   assert.deepEqual(errors, []);
   console.log(
-    JSON.stringify({ patterns: 11, routes: ['webgpu', 'webgl2-compat'], mipChecks, maxBackendError, errors }),
+    JSON.stringify({ patterns: 13, routes: ['webgpu', 'webgl2-compat'], mipChecks, maxBackendError, errors }),
   );
 } finally {
   await closeAll({ browser, servers: [server] });

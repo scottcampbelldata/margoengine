@@ -1,16 +1,38 @@
-/** Horizontal direction (x,z) and maximum bend strength, in [0,1]. */
-export type ScatterWind = readonly [number, number, number];
+/**
+ * Horizontal direction (x,z), maximum bend strength in [0,1] and, optionally, the mean wind speed in m/s at 10 m (0 to
+ * 100), which sets how fast the plants thrash (`windClockRate`).
+ */
+export type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];
+const BAD_WIND =
+  'Invalid scatter wind; pass [x, z, strength] or [x, z, strength, speed] as finite numbers, a non-zero direction, strength from 0 to 1 and speed from 0 to 100 m/s.';
 export function validateWind(wind: ScatterWind): number {
-  if (wind.length !== 3 || wind[2] < 0 || wind[2] > 1 || !Math.hypot(Math.fround(wind[0]), Math.fround(wind[1])))
-    throw new RangeError(
-      'Invalid scatter wind; pass [x, z, strength] as finite numbers, a non-zero direction and strength from 0 to 1.',
-    );
-  for (let i = 0; i < 3; i++)
-    if (!Number.isFinite(Math.fround(wind[i])))
-      throw new RangeError(
-        'Invalid scatter wind; pass [x, z, strength] as finite numbers, a non-zero direction and strength from 0 to 1.',
-      );
+  if (
+    (wind.length !== 3 && wind.length !== 4) ||
+    wind[2] < 0 ||
+    wind[2] > 1 ||
+    !Math.hypot(Math.fround(wind[0]), Math.fround(wind[1])) ||
+    (wind.length === 4 && !(wind[3]! >= 0 && wind[3]! <= 100))
+  )
+    throw new RangeError(BAD_WIND);
+  for (let i = 0; i < wind.length; i++) if (!Number.isFinite(Math.fround(wind[i]!))) throw new RangeError(BAD_WIND);
   return Math.hypot(wind[0], wind[1]);
+}
+
+/**
+ * The wind speed in m/s (10 m) up to which the plants keep their own sway: 5.4, the top of Beaufort force 3 (gentle
+ * breeze) in the WMO table. Below it a plant sways near its natural frequency, whatever the wind (de Langre 2008).
+ */
+export const WIND_THRASH_FROM = 5.4;
+/**
+ * How many seconds of wind motion pass per second at a mean wind of `speed` m/s: 1 up to {@link WIND_THRASH_FROM},
+ * then speed / 5.4, so the gusts and the leaf flutter come faster as the wind rises through the Beaufort forces (2 at
+ * a force 6 strong breeze, 3.2 at a force 8 gale, 6.1 at hurricane force). The frequency of the gusts a canopy feels
+ * grows in proportion to the mean speed (the canopy mixing layer's frequency U / h, Raupach, Finnigan and Brunet 1996;
+ * the waving crop of Py, de Langre and Moulia 2006), and so does a leaf's flutter (vortex shedding, f = St U / d).
+ */
+export function windClockRate(speed: number): number {
+  if (!(speed >= 0 && speed <= 100)) throw new RangeError('windClockRate needs a wind speed from 0 to 100 m/s');
+  return Math.max(1, speed / WIND_THRASH_FROM);
 }
 export const windShader = /* wgsl */ `
 fn windBend(height:f32,root:vec2f,wind:vec4f)->vec3f {

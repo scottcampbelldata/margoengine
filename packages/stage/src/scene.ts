@@ -2,7 +2,7 @@
 import type { Clustered, PointLight, SpotLight } from '@margoengine/clustered';
 import type { CameraOptions, Mesh } from '@margoengine/core';
 import type { Engine as RuntimeEngine, Mesh as RuntimeMesh } from '@margoengine/core/extension';
-import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf-pro';
+import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf/pbr';
 import type { Json, Migrations, ResolvedEntity, SaveDocument, ValidateOptions } from '@margoengine/save';
 import type { MeshOptions, Stage } from './index.js';
 import { optionalPackage, stageSignal } from './feature.js';
@@ -56,7 +56,7 @@ export interface SceneLight {
   color?: [number, number, number];
   /** Default 1. */
   intensity?: number;
-  /** Point and spot. Default where inverse-square light falls under 1/256, as gltf-pro gives a light with none. */
+  /** Point and spot. Default where inverse-square light falls under 1/256, as gltf/pbr gives a light with none. */
   range?: number;
   /** Spot, radians. Default 0. */
   innerConeAngle?: number;
@@ -157,7 +157,7 @@ function build(stage: Stage, entity: ResolvedEntity): Mesh {
 /**
  * Loads a `@margoengine/save` document into the stage: one mesh per entity with its transform and parent, prefabs
  * expanded, migrations run, all or nothing. `source` is a URL, a document, its JSON text or its bytes (gzip or not). A
- * string starting with `{` is JSON text. Built-in components: `mesh` (a glTF URL, loaded with `@margoengine/gltf-pro`,
+ * string starting with `{` is JSON text. Built-in components: `mesh` (a glTF URL, loaded with `@margoengine/gltf/pbr`,
  * once per URL, or `{shape: 'box', size}` or `{shape: 'sphere', radius, segments}`), `material`
  * (`{color, roughness, metalness}`), `light` (`{type, color, intensity, range, innerConeAngle, outerConeAngle, ambient}`)
  * and `camera` (`{fov, near, far, target, active}`);
@@ -225,7 +225,7 @@ export async function addScene(
       const url = new URL(entity.components.mesh as string, root).href;
       byURL.set(url, [...(byURL.get(url) ?? []), entity]);
     }
-    const { loadGLTF } = await optionalPackage('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'), abort),
+    const { loadGLTF } = await optionalPackage('@margoengine/gltf', () => import('@margoengine/gltf/pbr'), abort),
       groups = [...byURL.values()],
       loads = await Promise.allSettled(
         [...byURL.keys()].map((url) => loadGLTF(stage.engine, new URL(url), { ...gltf, signal: abort })),
@@ -338,7 +338,7 @@ export async function addScene(
           local.map((entity) => {
             const { type, color = [1, 1, 1], intensity = 1, range, innerConeAngle = 0, outerConeAngle = Math.PI / 4 } = lightOf(entity),
               { position, forward } = pose(meshes.get(entity.id)!),
-              // The range gltf-pro gives a light with none: where inverse-square light falls under 1/256.
+              // The range gltf/pbr gives a light with none: where inverse-square light falls under 1/256.
               place = { position, color, intensity, range: range ?? (Math.sqrt(intensity * 256) || 1) };
             return type === 'spot'
               ? { ...place, direction: forward, innerAngle: innerConeAngle, outerAngle: outerConeAngle }

@@ -23,12 +23,9 @@ const old = await require(outside + 'encoder/basis_encoder.cjs')({
   printErr() {},
 });
 old.initializeBasis();
-const bytes = readFileSync(
-  new URL(
-    '../../../packages/exporters/native/basis/target/wasm32-unknown-unknown/release/margoengine_basis_encoder.wasm',
-    import.meta.url,
-  ),
-);
+// The shipped blueprint, which encodeKTX2 runs too, so the recorded encoderSHA256 names the bytes that were scored
+// (the cargo output under target/ may be older or missing).
+const bytes = readFileSync(new URL('../native/basis/margo_basis_encoder.wasm', import.meta.url));
 const {
   instance: { exports: api },
 } = await WebAssembly.instantiate(bytes, {});
@@ -133,8 +130,9 @@ const corpus = [
   records = [];
 for (const mode of ['etc1s', 'uastc'].filter((m) => !process.argv[4] || m === process.argv[4]))
   for (const [role, name, srgb, normalMap] of corpus.filter((r) => !process.argv[5] || r[0] === process.argv[5])) {
+    // Recorded as a repository path, read relative to this script so the current folder does not matter.
     const path = 'packages/terrain/test/fixtures/aerial-rocks-02/' + name,
-      source = readFileSync(path),
+      source = readFileSync(new URL('../../../' + path, import.meta.url)),
       image = decodeJPEG(source),
       options = { srgb, normalMap, mipmaps: true },
       reference = mipImages(image, srgb, normalMap),

@@ -498,6 +498,8 @@ export interface RectAreaLight {
     twoSided?: boolean;
     castShadow?: boolean;
     shadow?: AreaLightShadow;
+    recess?: number;
+    sill?: number;
 }
 
 export class SH3 {

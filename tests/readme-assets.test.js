@@ -202,7 +202,7 @@ test('the USDZ composition and voxel-file READMEs resolve real files of their ow
 });
 
 test('the IES README resolves the complete published photometric profile and its candela values', () => {
-  assert.equal(README_FILES['/downlight.ies'], 'packages/gltf-pro/tests/fixtures/lights/LightProfile.ies');
+  assert.equal(README_FILES['/downlight.ies'], 'packages/gltf/test/fixtures/lights/LightProfile.ies');
   const fixture = readmeFixture('/downlight.ies');
   const text = readFileSync(fixture.path, 'utf8');
   assert.match(text, /^IES:LM-63-2019/);

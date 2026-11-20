@@ -50,8 +50,9 @@ At full refinement the existing renderer's output is used unchanged. Do not use 
 Both native WebGPU and the full WebGL2 compatibility path are supported. A core WebGL2 preview engine, which does not
 provide the device/pass API, rejects with the existing `unsupported` code before attachment; use `createFallbackFigure`. Reduced targets use the
 device's ordinary texture limits and roughly width * height * (colour bytes + 4 depth bytes) per retained view.
-Each view retains at most one reduced target. Replacement, full refinement and disposal release it. Applications
-changing their view-ID set should recreate the controller to release removed views' state.
+Each view retains at most one reduced target. Replacement, full refinement and disposal release it, and a view the
+previous frame did not draw (removed, or its id no longer used) releases its target and refinement state at the next
+frame, like the other per-view effect state in the engine; a view that returns starts refining again.
 
 Engine device restoration releases all controller-owned textures/pipelines and invalidates pending timing results.
 The figure recreates scientific layers from their retained host data, including volume slices,
@@ -89,4 +90,4 @@ Research compared before implementation, without reading companion code or rival
 
 Entry size: 4746 B min+gzip, new ceiling 5002 B; core plus stage stays 24209 B. No existing entry ceiling is raised.
 
-The generated `margoengine/sciviz/progressive` and `@margoengine/viz/sciviz/progressive` aliases expose the same optional controller.
+The generated `margoengine/sciviz/progressive` and `@margoengine/kit-viz/sciviz/progressive` aliases expose the same optional controller.

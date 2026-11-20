@@ -146,3 +146,59 @@ test('Unreal texture policy uses only properties UE 5.8 has, and the used-textur
     /need\(used in \(\[\], \[texture\]\), "Actual native graph must bind only the exact owned atlas"\)/,
   );
 });
+
+test('the Unreal helper compiles with a checkMasterAtlas hook that has no final newline', async () => {
+  const text = createUnrealPrecisionImporter({
+    ...hooks,
+    appName: 'Acme',
+    masterFile: 'source.acme',
+    checkMasterAtlas: '    need(True, "atlas")',
+  });
+  assert.match(text, /\n {4}need\(True, "atlas"\)\n {4}need\(re\.fullmatch/);
+  const python = findPython();
+  if (!python) return; // no Python on this machine; the text assertion above still holds
+  const { spawnSync } = await import('node:child_process');
+  const run = spawnSync(python, ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: text, encoding: 'utf8' });
+  assert.ifError(run.error);
+  assert.equal(run.status, 0, run.stderr);
+});
+
+test('the Unreal helper refuses a restart index and a byteStride glTF does not allow', async () => {
+  const text = unrealText();
+  const python = findPython();
+  if (!python) return;
+  const { spawnSync } = await import('node:child_process');
+  const script = `
+import math, struct
+def need(ok, message):
+    if not ok: raise ValueError(message)
+${pythonBlock(text, 'array_item')}
+
+${pythonBlock(text, 'original_accessor')}
+
+${pythonBlock(text, 'original_indices')}
+
+def run(indices, component, view_extra={}, accessor_type="SCALAR"):
+    fmt = {5121: "B", 5123: "H", 5125: "I"}[component]
+    binary = struct.pack("<" + fmt * len(indices), *indices)
+    binary += bytes(-len(binary) % 4)
+    view = {"buffer": 0, "byteOffset": 0, "byteLength": len(binary), **view_extra}
+    g = {"accessors": [{"bufferView": 0, "componentType": component, "count": len(indices), "type": accessor_type}],
+         "bufferViews": [view]}
+    try:
+        original_indices(g, binary, 0, 300)
+        return "ok"
+    except ValueError as error:
+        return str(error)
+print(run([0, 1, 2], 5121))
+print(run([0, 1, 255], 5121))
+print(run([0, 1, 2], 5123, {"byteStride": 2}))
+`;
+  const run = spawnSync(python, ['-c', script], { encoding: 'utf8' });
+  assert.ifError(run.error);
+  assert.equal(run.status, 0, run.stderr);
+  const [plain, restart, stride] = run.stdout.trim().split(/\r?\n/);
+  assert.equal(plain, 'ok');
+  assert.match(restart, /restart value/);
+  assert.match(stride, /stride outside glTF rules/);
+});

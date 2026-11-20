@@ -37,8 +37,12 @@ export class VFX implements EnginePlugin {
     setFog(fog: FogLike | null): this;
     burst(count: number): this;
     reset(): this;
+    setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
     drawTransparent(c: Context, hook: SurfaceTransparency): void;
     get gpuState(): {
@@ -188,6 +192,12 @@ export interface VFXLit {
     shadows?: VFXLightSource;
     wrap?: number;
     ambient?: readonly [number, number, number];
+    glow?: {
+        position: readonly [number, number, number];
+        power: number;
+        radius?: number;
+        color?: readonly [number, number, number];
+    };
 }
 
 export interface VFXMeshParticles {
@@ -244,6 +254,7 @@ export interface VFXOptions {
     bounce?: number;
     turbulence?: number;
     frequency?: number;
+    wind?: VFXWind;
     angularVelocity?: number;
     emissionExtent?: Vec3;
     intensity?: number;
@@ -293,6 +304,7 @@ export interface VFXRuntime {
     render?: GPUBindGroupEntry[];
     write?(c: Context): void;
     run?(pass: GPUComputePassEncoder): void;
+    eventList?: GPUBuffer;
     draw?(c: Context): void;
     hides?(): boolean;
     births?: boolean;
@@ -348,6 +360,10 @@ export interface VFXState {
         drawCalls: number;
     };
     engine: Engine;
+    spin?: {
+        code: string;
+        entry: GPUBindGroupEntry;
+    };
 }
 
 export interface VFXStretch {
@@ -368,6 +384,10 @@ export interface VFXVectorField {
     halfSize: Vec3;
     strength?: number;
 }
+
+export type VFXWind = readonly [number, number] | {
+    sample(x: number, y: number, z: number, t: number): readonly number[];
+};
 
 // Not exported from this entry, but used by the exports above:
 

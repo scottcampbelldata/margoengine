@@ -2,8 +2,8 @@
 
 ## Textured stills
 
-`@margoengine/staging/pathtrace-materials` exports `TexturedStill` and
-`texturedSceneFromGLTF`. Convert a loaded gltf-pro model to an owned
+`@margoengine/studio/pathtrace-materials` exports `TexturedStill` and
+`texturedSceneFromGLTF`. Convert a loaded gltf/pbr model to an owned
 `PBRMeshTraceScene`, then pass it as `scene` to `TexturedStill.attach`.
 The model can be disposed after conversion. The adapter preserves current
 geometry, interpolated normals, UV sets, tangents, vertex colours, transforms,
@@ -42,7 +42,7 @@ Entry measurements for job 1: ordinary pathtrace 1398 B gzip (previous budget 14
 
 ## Multiple lights and ambient visibility
 
-`@margoengine/staging/accumulate-ambient` exports `AmbientShadows`. It has the
+`@margoengine/studio/accumulate-ambient` exports `AmbientShadows`. It has the
 ordinary accumulator's receiver, frames, invalidation, fit, disposal and
 compatibility APIs. `lights` is a copied array of up to 64 disks with required
 world `position`, `radius` (default 2) and relative `intensity` (default 1).
@@ -79,7 +79,7 @@ Job 2 contact-reference result: both GPU backends give analytic exposed-ground M
 
 ## Glass and water caustics
 
-`@margoengine/staging/caustics` exports `ProductCaustics`. Attach asynchronously
+`@margoengine/studio/caustics` exports `ProductCaustics`. Attach asynchronously
 with `geometry` containing world-space indexed positions and optional vertex
 normals. This is an owned snapshot independent of the camera and raster model.
 An arbitrary nonconvex boundary can be traced; there is no convex-volume or
@@ -133,7 +133,7 @@ Job 3 measured evidence: caustics 5447 B gzip, new ceiling 5703 B; core plus sta
 
 ## Curved backdrop and named photographic rigs
 
-`@margoengine/staging/backdrop` exports `Backdrop`, `backdropGeometry`,
+`@margoengine/studio/backdrop` exports `Backdrop`, `backdropGeometry`,
 `stagingLights` and `stagingLighting`. The backdrop is a real core PBR mesh:
 a straight floor, a quarter-circle bend and a vertical wall with analytic
 smooth normals. Default width 8, depth 5, height 4, radius 1 and 32 bend
@@ -156,7 +156,7 @@ stagingLighting lazily builds the existing procedural studio HDR and calls
 EnvironmentLighting.load. Image width defaults to 256; the remaining settings
 and AbortSignal are forwarded to the existing environment API. The returned
 lighting owns both lighting and environment; dispose it to replace a preset.
-Call lighting.add(model) for gltf-pro shading. Other preset descriptors can be
+Call lighting.add(model) for gltf/pbr shading. Other preset descriptors can be
 edited before passing them to studio for custom rigs. No new lighting shader,
 core option, camera fitting or auto-centering policy is introduced.
 

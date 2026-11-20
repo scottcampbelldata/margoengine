@@ -62,7 +62,7 @@ export function sampleAlpha(mask: AlphaMask, u: number, v: number): number {
   return ((upper * (1 - ty) + lower * ty) / 255) * factor;
 }
 
-/** What {@link modelAlphaMasks} reads of a model: `PBRModel` from `@margoengine/gltf-pro` is one. */
+/** What {@link modelAlphaMasks} reads of a model: `PBRModel` from `@margoengine/gltf/pbr` is one. */
 export interface AlphaMaskedModel {
   readonly primitives: readonly { readonly material: AlphaMaskedMaterial }[];
   readonly asset: {
@@ -114,7 +114,7 @@ export interface ModelAlphaMaskSource extends AlphaMaskSource {
 const MASK = 1,
   /** glTF's sampler wrap numbers. */
   WRAPS: Readonly<Record<number, AlphaWrap>> = { 33071: 'clamp', 33648: 'mirror', 10497: 'repeat' },
-  /** The sources gltf-pro decodes in place of `source`, in its order. */
+  /** The sources gltf\/pbr decodes in place of `source`, in its order. */
   SOURCES = ['KHR_texture_basisu', 'EXT_texture_webp', 'EXT_texture_avif'];
 
 function canvasPixels(image: unknown): AlphaPixels {

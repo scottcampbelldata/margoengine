@@ -4,7 +4,7 @@
 // reads each frame and divides it by the frame with no shadows, which is the same quantity reference.py takes from Cycles.
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {lightPattern} from '/packages/shadows/dist/light-function.js';

@@ -71,7 +71,7 @@ test('physical map scalar controls remain live and validate their ranges', () =>
     anisotropyRotation: Infinity,
     iridescence: -1,
     iridescenceIOR: 0.5,
-    iridescenceThicknessRange: [400, 100],
+    iridescenceThicknessRange: [400, -1],
   })) {
     assert.throws(() => new Material({ [key]: value }), RangeError, key);
   }

@@ -3,6 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import { render, compute, group as bind } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
+import { type BorrowSlot, type Borrowable, borrow, lend } from '../../shared/borrowed.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
 import { PostStack } from './stack.js';
@@ -15,8 +16,11 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** One image of a {@link LensFlare} drawn on the line from the light through the screen centre. */
 export interface LensFlareElement {
   /** The image (linear RGB; its alpha weights it, so a black or a transparent surround adds nothing), a 2D `GPUTexture`
-   * of this engine's device with a filterable format such as `rgba8unorm`. Default none: a soft round glow. */
-  texture?: GPUTexture;
+   * of this engine's device with a filterable format such as `rgba8unorm`, or `(device) => texture`, made once per
+   * device so it is back after a device restore. Default none: a soft round glow. A plain texture is lost with its
+   * device: that image draws nothing, `engine.onError` hears of it once (`'state'`, #borrowed-lost), and giving the
+   * element a new texture brings it back. */
+  texture?: Borrowable<GPUTexture>;
   /** Width and height in pixels of the drawing buffer, greater than 0 and at most 8192. */
   size: number;
   /** Place on the line: 0 at the light, 0.5 at the screen centre, 1 at the light's mirror image through the centre. Any
@@ -154,6 +158,8 @@ export class LensFlare implements EnginePlugin {
   private elementBuffer?: GPUBuffer;
   private sampler?: GPUSampler;
   private images: GPUTexture[] = [];
+  // One slot per texture or texture function given, so elements rebuilt each frame keep the device a texture belongs to.
+  private slots = new WeakMap<object, BorrowSlot<GPUTexture>>();
   private readonly values = new Float32Array(36);
   private readonly elementValues = new Float32Array(128);
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
@@ -202,11 +208,11 @@ export class LensFlare implements EnginePlugin {
               !((e?.size ?? 0) > 0 && e.size <= 8192) ||
               !Number.isFinite(e.distance ?? 0) ||
               !rgb(e.color) ||
-              (e.texture !== undefined && typeof e.texture?.createView !== 'function'),
+              (e.texture !== undefined && typeof e.texture !== 'function' && typeof e.texture?.createView !== 'function'),
           )))
     )
       throw new RangeError(
-        'Invalid LensFlare options; sun or position (not both) must be a function, color three finite values >= 0, intensity 0-10, occlusionRadius 1-64, elements at most 16 (at most 15 with a texture) with size in (0, 8192], a finite distance and a GPUTexture texture.',
+        'Invalid LensFlare options; sun or position (not both) must be a function, color three finite values >= 0, intensity 0-10, occlusionRadius 1-64, elements at most 16 (at most 15 with a texture) with size in (0, 8192], a finite distance and a GPUTexture or (device) => GPUTexture texture.',
       );
   }
   setup(engine: Engine): void {
@@ -254,6 +260,7 @@ export class LensFlare implements EnginePlugin {
     v[31] = point ? 1 : 0;
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     let layout = '';
+    const images: GPUTexture[] = [];
     if (elements?.length) {
       // Two vec4 per element: distance and size, then the tint; written only while elements are set.
       const e = this.elementValues.fill(0);
@@ -261,7 +268,25 @@ export class LensFlare implements EnginePlugin {
         e[8 * i] = element.distance ?? 0;
         e[8 * i + 1] = element.size;
         e.set(element.color ?? WHITE, 8 * i + 4);
-        layout += element.texture ? 't' : '-';
+        const texture = element.texture;
+        if (!texture) layout += '-';
+        else {
+          let slot = this.slots.get(texture);
+          if (!slot)
+            this.slots.set(
+              texture,
+              (slot = borrow<GPUTexture>(texture, 'LensFlare element texture', 'set the element texture', c.device)),
+            );
+          const image = lend(slot, c.device, this.engine);
+          if (image) {
+            layout += 't';
+            images.push(image);
+          } else {
+            // Lost with its device: a glow with no light adds nothing.
+            layout += '-';
+            e.fill(0, 8 * i + 4, 8 * i + 7);
+          }
+        }
       });
       this.elementBuffer ??= c.device.createBuffer({
         size: 512,
@@ -293,7 +318,6 @@ export class LensFlare implements EnginePlugin {
       });
       this.input = undefined;
     }
-    const images = elements?.flatMap((element) => (element.texture ? [element.texture] : [])) ?? [];
     if (this.input !== input || images.some((image, i) => image !== this.images[i])) {
       this.input = input;
       this.images = images;

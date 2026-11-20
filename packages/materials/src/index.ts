@@ -7,7 +7,7 @@ import {
   type MaterialExtensionTexture,
   type PBRMaterial,
   type PBRModel,
-} from '@margoengine/gltf-pro/model';
+} from '@margoengine/gltf/pbr-model';
 import { coordinateSlot } from './coordinates.js';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import { Cleanup } from '../../shared/cleanup.js';
@@ -16,6 +16,18 @@ import { MaterialTextures, validateTextureInfo, type TextureInfo } from './textu
 import { createTransmission, validateTransmission, type TransmissionOptions } from './transmission.js';
 import { acquireOpaqueColor } from './opaque-color.js';
 export { acquireOpaqueColor };
+import { applyModelFeatures, restoreModelFeatures, type FeaturePlan, type ModelFeatures } from './model-features.js';
+export type { ModelFeatures, ModelFeatureMaterial } from './model-features.js';
+
+/** Options of `install(model, options)`. */
+export interface InstallOptions {
+  /**
+   * Optional material features for the model's materials, by glTF material name: `{ Skin: [skin()], Hair: [hair()] }`.
+   * Each runs over the material as on a `PbrMaterial`'s `features`, keeping its maps, factors, alpha mode and the
+   * primitives' skinning, morphs and instancing. A name the model lacks throws and lists the names it has. Default none.
+   */
+  features?: ModelFeatures;
+}
 import { materialLobes, validateLobes, lobeMaps, type MaterialLobeOptions } from './lobes.js';
 export { materialLobes, sheen, specular, anisotropy, iridescence } from './lobes.js';
 export type {
@@ -153,8 +165,8 @@ function definition(value: unknown, label: string): MaterialDefinition | undefin
 
 /** Owns textures installed from glTF metadata. The model retains its image blueprints. */
 export class MaterialInstallation implements EnginePlugin {
-  static attach(model: PBRModel): MaterialInstallation {
-    return install(model);
+  static attach(model: PBRModel, options?: InstallOptions): MaterialInstallation {
+    return install(model, options);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
@@ -166,10 +178,17 @@ export class MaterialInstallation implements EnginePlugin {
   private textures?: MaterialTextures;
   private unsubscribe?: () => void;
   private capture?: ReturnType<typeof acquireOpaqueColor>;
-  constructor(readonly model: PBRModel) {
+  private features: FeaturePlan[] = [];
+  constructor(
+    readonly model: PBRModel,
+    options: InstallOptions = {},
+  ) {
     this.name = 'materials:' + model.name;
     if (model.disposed)
       throw margoError('disposed', 'Cannot install materials on a disposed model; install them on a live model.');
+    if (!options || typeof options !== 'object' || Array.isArray(options))
+      throw new TypeError('Invalid install options; pass an object such as { features: { Skin: [skin()] } } or omit it.');
+    const features = options.features;
     for (const material of new Set(model.primitives.map((p) => p.material))) {
       const normalized = material.clearcoat !== undefined,
         def = definition(
@@ -315,6 +334,9 @@ export class MaterialInstallation implements EnginePlugin {
         }
       this.plans.push(plan);
     }
+    // Last, once every glTF extension above has validated: a throw here leaves the records as they were.
+    this.features = applyModelFeatures(model, features);
+    if (this.features.length) this.unsubscribe ??= model.onDispose(() => this.destroy());
   }
   setup(engine: Engine): void {
     if (this.disposed || this.model.disposed || engine !== this.model.root.engine)
@@ -418,6 +440,9 @@ export class MaterialInstallation implements EnginePlugin {
       if (plan.extension && plan.material.extension === plan.extension) {
         plan.material.extension = plan.previous;
       }
+    const features = this.features;
+    this.features = [];
+    cleanup.run(() => restoreModelFeatures(features));
     cleanup.run(() => this.textures?.dispose()).run(() => this.capture?.release());
     this.textures = undefined;
     this.capture = undefined;
@@ -428,9 +453,12 @@ export class MaterialInstallation implements EnginePlugin {
   }
 }
 
-/** Explicit opt-in after loadGLTF/parseGLTF; absent material metadata allocates nothing. */
-export function install(model: PBRModel): MaterialInstallation {
-  const installation = new MaterialInstallation(model);
+/**
+ * Explicit opt-in after loadGLTF/parseGLTF: the model's glTF material extensions, and with `options.features` optional
+ * material features by material name. Absent material metadata and no features allocate nothing.
+ */
+export function install(model: PBRModel, options?: InstallOptions): MaterialInstallation {
+  const installation = new MaterialInstallation(model, options);
   const engine = model.root.engine;
   engine.use(installation, engine.sceneOf(model));
   return installation;

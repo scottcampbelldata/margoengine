@@ -201,11 +201,24 @@ export class Trail extends Line {
     return true;
   }
 
+  /** Seconds on the trail's fade clock. */
+  get time(): number {
+    return this.clock;
+  }
+  /**
+   * Advances the fade clock by `delta` seconds without reading the target or rebuilding (a delta of 0 or less moves
+   * nothing). The `Lines` frame update runs it for every visible trail, so `seek` from `@margoengine/cutscene/seek`
+   * replays the clock; the samples are the target's history, which a scene's warm-up of `lifetime` seconds refills.
+   */
+  advanceTime(delta: number): void {
+    if (!(delta > 0)) return;
+    this.clock += delta;
+    if (this.used) this.stale = true;
+  }
   /** Advances the clock by `delta` seconds, reads the target and rebuilds the points when anything changed. */
   override update(engine: EngineKernel, delta = 0): void {
-    this.clock += delta;
+    this.advanceTime(delta);
     if (this.follow(engine)) this.moveTo(this.at[0], this.at[1], this.at[2]);
-    if (delta > 0 && this.used) this.stale = true;
     if (this.stale) this.rebuild();
   }
 

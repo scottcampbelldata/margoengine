@@ -1,14 +1,16 @@
 // Margo-authored BMFont SDF atlas from the repository's licensed Source Sans 3 test font.
-// From the repository root: node scripts/gpu-lock.mjs run --owner=codex-readme5 --max=3 -- node packages/text/scripts/make-readme-atlas.mjs
+// From the repository root: node scripts/run-with-timeout.mjs --max=3 -- node packages/text/scripts/make-readme-atlas.mjs
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 const out = resolve(root, 'packages/text/tests/fixtures/fonts/readme');
 const server = await createServer({
+  plugins: [noFileWatcher()],
   root,
   configFile: false,
   logLevel: 'error',

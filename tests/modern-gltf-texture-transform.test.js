@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseGLTF, textureCoordinates } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF, textureCoordinates } from '../packages/gltf/dist/pbr.js';
 import { materialQuad } from './support/materials-fixture.js';
 import { textureQuad } from './support/texture-fixture.js';
 import { optionalGPU } from './support/optional-gpu.js';
@@ -11,7 +11,8 @@ const digest = (value) => createHash('sha256').update(value).digest('hex');
 // GPU-verified derivative frame correction changes shader text while retaining the frame and group ABI.
 // 2026-11-11: the base shader's Smith term is the height-correlated G2 (KB5875a); was 20ea22e3...ca4297.
 // 2026-11-12: the direct diffuse keeps the dielectric Fresnel weight (KB3240); was bdf7de1e...834390.
-const baselineShader = '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23';
+// 2026-11-15: the colour vertex's clip position is @invariant (KB-INV-GLTF); was 9429f501...4e9c23.
+const baselineShader = 'e910ac332ad107235b3ffade40139f9fac9ed8d30e480082de2f8da0befa977a';
 async function scene(fixture = materialQuad(), image = true) {
   const harness = optionalGPU(),
     store = await TransformStore.create(16),

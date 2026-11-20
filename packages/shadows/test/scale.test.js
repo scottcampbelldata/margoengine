@@ -75,7 +75,7 @@ async function rig(scale) {
   return { gpu, engine, buffers, frame };
 }
 
-// A gltf-pro style model (what loadGLTF and materials' createMesh make): a source with shadowPrimitives whose node has
+// A gltf/pbr style model (what loadGLTF and materials' createMesh make): a source with shadowPrimitives whose node has
 // no core geometry and a mesh-source record with a local box. `reads` counts how often that box is computed.
 function model(engine, buffers, size) {
   const node = engine.createMesh(),

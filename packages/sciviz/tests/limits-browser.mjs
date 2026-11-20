@@ -1,4 +1,4 @@
-// Run under gpu-lock. Allocation mode is the build-phase default. JSON schema is consumed by batch 182.
+// Allocation mode is the build-phase default. JSON schema is consumed by batch 182.
 import { cpus, hostname } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

@@ -206,3 +206,29 @@ test('options are checked, and dispose ends everything', async () => {
   assert.equal(calls[0].signal.aborted, true);
   engine.dispose();
 });
+
+// KB-OWN-ASYNC1: a fetch starts from a frame callback, when the default scene is active, whichever scene the stream is in.
+test('a level fetched by a stream in a second scene is made in that scene', async () => {
+  const engine = await headless(),
+    other = engine.createScene('other'),
+    stream = new LevelStream(),
+    system = new LODSystem();
+  try {
+    engine.use(system, other);
+    engine.use(stream, other);
+    const anchor = other.createMesh(),
+      coarse = other.createMesh(),
+      fine = stream.level(async () => engine.createMesh(), { bytes: 10 }),
+      lod = system.add(anchor, [{ object: fine }, { object: coarse, distance: 10 }], { radius: 1 });
+    engine.camera.position = [0, 0, 1];
+    const before = engine.scene.meshes.size;
+    frame(stream, system);
+    await tick();
+    assert.equal(fine.state, 'ready');
+    assert.ok(fine.object.scene === other, `the level is in scene ${fine.object.scene.name}`);
+    assert.equal(engine.scene.meshes.size, before, 'the level landed in the default scene');
+    assert.ok(lod);
+  } finally {
+    engine.dispose();
+  }
+});

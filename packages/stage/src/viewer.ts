@@ -6,9 +6,9 @@ import type {
   EnvironmentLoadOptions,
   EnvironmentSource,
 } from '@margoengine/environment';
-import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf-pro';
+import type { GLTFLoadOptions, PBRModel } from '@margoengine/gltf/pbr';
 import type { Shadows, ShadowOptions } from '@margoengine/shadows';
-import type { ContactShadowOptions, ContactShadows } from '@margoengine/staging';
+import type { ContactShadowOptions, ContactShadows } from '@margoengine/studio';
 import type { Tonemap, TonemapOptions } from '@margoengine/tonemap';
 import type { Stage } from './index.js';
 import { optionalPackage, stageSignal } from './feature.js';
@@ -109,8 +109,8 @@ function orbit(stage: Stage, angle: number): void {
 }
 
 /**
- * Loads a model into a product viewer: `@margoengine/gltf-pro` for the model, image-based light and a plain backdrop
- * from `@margoengine/environment`, a soft ground shadow from `@margoengine/staging` or a cast one from
+ * Loads a model into a product viewer: `@margoengine/gltf/pbr` for the model, image-based light and a plain backdrop
+ * from `@margoengine/environment`, a soft ground shadow from `@margoengine/studio` or a cast one from
  * `@margoengine/shadows`, grading from `@margoengine/tonemap`, a framed camera and a turntable, sized to the model.
  * Each package is imported on the first call and only when its part is on. Rejects with `Install <package>` when one
  * is missing, and with AbortError when `signal` aborts or the stage is disposed first. A failure leaves the stage as it
@@ -163,7 +163,7 @@ export async function addViewer(
       if (errors.length) throw errors[0];
     };
   const loading = await Promise.allSettled([
-    optionalPackage('@margoengine/gltf-pro', () => import('@margoengine/gltf-pro'), abort).then(({ loadGLTF }) =>
+    optionalPackage('@margoengine/gltf', () => import('@margoengine/gltf/pbr'), abort).then(({ loadGLTF }) =>
       loadGLTF(engine, url, { ...gltf, signal: abort }),
     ),
     environment === false
@@ -177,7 +177,7 @@ export async function addViewer(
     background === false
       ? null
       : optionalPackage('@margoengine/environment', () => import('@margoengine/environment'), abort),
-    shadows === 'contact' ? optionalPackage('@margoengine/staging', () => import('@margoengine/staging'), abort) : null,
+    shadows === 'contact' ? optionalPackage('@margoengine/studio', () => import('@margoengine/studio'), abort) : null,
     shadows === 'cascaded' ? optionalPackage('@margoengine/shadows', () => import('@margoengine/shadows'), abort) : null,
     tonemap ? optionalPackage('@margoengine/tonemap', () => import('@margoengine/tonemap'), abort) : null,
   ]);

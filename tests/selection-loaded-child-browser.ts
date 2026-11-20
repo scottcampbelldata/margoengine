@@ -1,6 +1,6 @@
 // Consume built public packages and the checked-in Khronos asset without constructing geometry.
 import { Engine } from '../packages/core/dist/extension.js';
-import { loadGLTF } from '../packages/gltf-pro/dist/index.js';
+import { loadGLTF } from '../packages/gltf/dist/pbr.js';
 import type { Picking, Selection } from '../packages/selection/dist/index.js';
 import { selectModel } from '../test-results/selection-loaded-child/readme-example.ts';
 

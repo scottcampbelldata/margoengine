@@ -1,5 +1,5 @@
 // Real-adapter check for x-ray outlines (run from the repository root after building packages): node packages/selection/test/xray.browser.mjs
-// A core box and a @margoengine/materials (gltf-pro) plane, each half hidden behind an occluder box, selected in magenta.
+// A core box and a @margoengine/materials (gltf/pbr) plane, each half hidden behind an occluder box, selected in magenta.
 // Inside each occluder (inset past the visible outline): no magenta with x-ray off, dashed magenta with it on, one solid
 // run with `dash: 0`; perspective and orthographic (@margoengine/cameras).
 import assert from 'node:assert/strict';

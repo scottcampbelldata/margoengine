@@ -88,10 +88,11 @@ export const demos = [
     views: ['high'],
     lossOnly: true,
   },
-  // Orrery: checked for device loss only until its baselines are recorded on a baseline profile.
+  // Orrery: checked for device loss only until its baselines are recorded on a baseline profile. It opens on today's
+  // date unless ?date= names one, and its planets turn with the date, so every capture pins the same day.
   {
     id: 'orrery',
-    path: 'demos/orrery/',
+    path: 'demos/orrery/?date=2026-01-01',
     ready: "document.querySelector('#viewport')?.dataset.ready==='true'",
     mask: ['#readout'],
     views: ['high', 'phone'],

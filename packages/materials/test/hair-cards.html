@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><title>hair cards</title></head><body style="margin:0;background:#000">
+<canvas width="64" height="64" style="width:64px;height:64px"></canvas>
+<script type="module">
+// A dark BLEND card of alpha 0.2 at the origin, its normal turned from the view by an angle with cosine `cos`, over a
+// white clear colour, with no light (the card's own colour is black). The centre pixel is the clear colour times
+// 1 - alpha: 0.8 without hairCards at any angle, 1 - 0.8^(1/cos) with it (at most 1/grazing). Read by hair-cards-browser.mjs.
+import {Engine} from '/packages/core/dist/extension.js';
+import {createMesh, PbrMaterial} from '/packages/materials/dist/index.js';
+import {hairCards} from '/packages/materials/dist/hair.js';
+const engine = await Engine.create(document.querySelector('canvas'), {camera: {position: [0, 0, 3], target: [0, 0, 0], fov: 40}});
+engine.stop();
+engine.scene.background = '#ffffff';
+engine.lighting.radiance.set([0, 0, 0, 0]);
+const errors = [];
+engine.onError = (e) => errors.push(String(e));
+let mesh;
+window.cards = {
+  errors,
+  async draw(cos, cards, mode = 'blend') {
+    mesh?.dispose();
+    mesh = undefined;
+    if (cos > 0) {
+      const sin = Math.sqrt(1 - cos * cos), t = [cos, 0, -sin], n = [sin, 0, cos], h = 1.5;
+      const positions = [], corner = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+      for (const [a, b] of corner) positions.push(t[0] * a * h, b * h, t[2] * a * h);
+      mesh = createMesh(engine, {positions, normals: [...n, ...n, ...n, ...n], uvs: [0, 0, 1, 0, 1, 1, 0, 1], indices: [0, 1, 2, 0, 2, 3]},
+        new PbrMaterial({color: [0, 0, 0], opacity: mode === 'opaque' ? 1 : 0.2, transparent: mode === 'blend', roughness: 1, metalness: 1, side: 'double', features: cards ? [hairCards()] : []}));
+    }
+    engine.render({delta: 0});
+    await engine.gpu?.queue.onSubmittedWorkDone();
+    return errors.length;
+  },
+};
+window.ready = true;
+</script></body></html>

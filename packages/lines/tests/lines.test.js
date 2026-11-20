@@ -15,6 +15,7 @@ import {
   parseColor,
   geometryBounds,
   VERTICES_PER_SEGMENT,
+  distinctNeighbours,
 } from '../dist/index.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { mockGPU, passes } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
@@ -376,4 +377,52 @@ test('WebGL2 preview refuses every Lines attachment with linked unsupported', ()
       () => lines.setup(engine),
       (error) => error.code === 'unsupported' && /https:\/\/margoengine.com\/errors#webgpu/.test(error.message),
     );
+});
+
+// Point-in-triangle test over an expandLine result, for corners a join must cover.
+const covered = (tris, x, y) => {
+  for (let t = 0; t + 8 < tris.length; t += 9) {
+    const [ax, ay, bx, by, cx, cy] = [tris[t], tris[t + 1], tris[t + 3], tris[t + 4], tris[t + 6], tris[t + 7]];
+    const d1 = (x - bx) * (ay - by) - (ax - bx) * (y - by),
+      d2 = (x - cx) * (by - cy) - (bx - cx) * (y - cy),
+      d3 = (x - ax) * (cy - ay) - (cx - ax) * (y - ay);
+    if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return true;
+  }
+  return false;
+};
+
+test('a repeated point in a strip joins across it instead of drawing two caps', () => {
+  const plain = [0, 0, 0, 100, -100, 100],
+    repeated = [0, 0, 0, 100, 0, 100, -100, 100];
+  for (const join of ['miter', 'bevel', 'round']) {
+    for (const cap of ['butt', 'round']) {
+      const options = { join, cap, width: 10, antialias: false };
+      const a = expandLine(plain, options),
+        b = expandLine(repeated, options);
+      close(triangleArea(b), triangleArea(a), 1e-3, `${join} ${cap} area`);
+      assert.equal(b.length, a.length, `${join} ${cap} draws the same triangles`);
+    }
+  }
+  const miter = expandLine(repeated, { join: 'miter', cap: 'butt', width: 10, antialias: false });
+  assert.ok(covered(miter, 3, 103), 'the miter corner is covered');
+  assert.ok(covered(miter, 1.5, 101.5), 'the bevel point is covered');
+  // A loop closed by repeating its first point joins there like a loop without the repeat.
+  const square = [0, 0, 50, 0, 50, 50, 0, 50],
+    loopOptions = { mode: 'loop', join: 'miter', cap: 'round', width: 8, antialias: false };
+  close(
+    triangleArea(expandLine([...square, 0, 0], loopOptions)),
+    triangleArea(expandLine(square, loopOptions)),
+    1e-3,
+    'closed loop',
+  );
+  // A line that is all one point still draws its round dot.
+  close(triangleArea(expandLine([5, 5, 5, 5], { cap: 'round', width: 10, antialias: false })), fanArea(5, Math.PI) * 2, 1e-3);
+});
+
+test('distinctNeighbours skips repeats and wraps loops', () => {
+  const p = [0, 0, 1, 1, 1, 1, 2, 2];
+  assert.deepEqual([...distinctNeighbours(p, 4, 'strip', undefined, 2, 2)], [-1, 1, 0, 3, 0, 3, 2, -1]);
+  assert.deepEqual([...distinctNeighbours(p, 4, 'loop', undefined, 2, 2)], [3, 1, 0, 3, 0, 3, 2, 0]);
+  assert.deepEqual([...distinctNeighbours([3, 3, 3, 3, 3, 3], 3, 'loop', undefined, 2, 2)], [-1, -1, -1, -1, -1, -1]);
+  assert.deepEqual([...distinctNeighbours(p, 4, 'segments', undefined, 2, 2)], new Array(8).fill(-1));
 });

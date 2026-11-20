@@ -316,8 +316,16 @@ async function execute(
       columns.set(name, { values: Float32Array.from(data), width: w, offset });
       offset += w;
     };
-    for (const [name, data] of Object.entries(association === 'point' ? (g.pointArrays ?? {}) : (g.cellArrays ?? {})))
-      add(name, data, count ? data.length / count : 1);
+    // Elevation reads only coordinates. An expression's named arrays must not share a built-in variable's name,
+    // which would otherwise replace the array without a word.
+    if (op.kind === 'expression')
+      for (const [name, data] of Object.entries(
+        association === 'point' ? (g.pointArrays ?? {}) : (g.cellArrays ?? {}),
+      )) {
+        if (['value', 'coords', 'x', 'y', 'z'].includes(name))
+          bad(`array '${name}' has the name of a built-in variable (value, coords, x, y, z); rename the array`);
+        add(name, data, count ? data.length / count : 1);
+      }
     const defaults = source(g, association);
     if (defaults) add('value', defaults, 1);
     const coords = association === 'point' ? g.points : centers();
@@ -349,13 +357,23 @@ async function execute(
     const cols = new Map<string, Column>(),
       packed: number[][] = Array.from({ length: 9 }, () => []),
       owners: number[] = [];
-    for (let c = 0; c < nc; c++)
+    for (let c = 0; c < nc; c++) {
+      // Verdict (Stimpson et al. 2007, eqs. 7, 11 to 13): a quad's corner area is signed by its centre normal
+      // n_c = X1 x X2, so a concave or folded corner is negative; X1 x X2 = 0 sets every corner area to 0.
+      let centre: number[] | undefined;
+      if (g.types[c] === 9) {
+        const [p0, p1, p2, p3] = ids[c].map((k) => point(g, k)),
+          n = cross3(sub3(sub3(p1, p0), sub3(p3, p2)), sub3(sub3(p2, p1), sub3(p0, p3))),
+          length = Math.hypot(...n);
+        centre = length ? n.map((v) => v / length) : [0, 0, 0];
+      }
       for (const corner of corners[g.types[c]]) {
         const p = point(g, ids[c][corner[0]]),
           edges = corner.slice(1).map((k) => sub3(point(g, ids[c][k]), p));
         const dimension = edges.length;
         if (edges.length === 1) edges.push([...edges[0]]);
-        if (edges.length === 2) {
+        if (centre) edges.push(centre);
+        else if (edges.length === 2) {
           const n = cross3(edges[0], edges[1]),
             length = Math.hypot(...n);
           edges.push(length ? n.map((v) => v / length) : [0, 0, 0]);
@@ -365,6 +383,7 @@ async function execute(
           owners.push(c);
         }
       }
+    }
     for (let k = 0; k < 3; k++)
       cols.set(['a', 'b', 'c'][k], {
         values: Float32Array.from(

@@ -1,5 +1,5 @@
 // Real-GPU checks of @margoengine/voxel-pathtracer (run from the repository root after building packages, one GPU job
-// at a time: node scripts/gpu-lock.mjs run --owner=voxel-pathtracer -- node packages/voxel-pathtracer/tests/browser-check.mjs).
+// at a time: node scripts/run-with-timeout.mjs -- node packages/voxel-pathtracer/tests/browser-check.mjs).
 // - compile: the trace, denoise and display WGSL compile with no diagnostics and no WebGPU validation errors;
 // - traversal: per-pixel first hits on the GPU (instance, palette index, distance) equal VoxelPathTracer.raycast on
 //   the CPU for rotated, scaled, sheared and mirrored instances, perspective and orthographic;
@@ -18,6 +18,8 @@
 //   per-pixel first hits of each agree with raycast along rays computed in the page;
 // - mediaboundary: voxel emission and an area light seen through an absorbing slab the path does not scatter in,
 //   against independent quadrature (emitter MIS over the full vertex-to-light distance, KB0986d).
+// - bouncelimit: a floor lit only off the ceiling (two scattering events) is black at maxBounces 1 and lit at 2: a
+//   surface vertex past the limit samples no light (KB-L5a-1).
 // - arealight: a panel's shadow area under a point sun, its front, back and see-through back radiance, and a dark
 //   panel occluding a lit ceiling against view factors;
 // - dispersion: a line's shift through a tilted slab per wavelength against Snell with Cauchy's index; colour order over
@@ -47,9 +49,10 @@
 // Results go to test-results/voxel-pathtracer-browser-check.json (or -<name>.json, see `--report`); `pictures` writes PNGs to test-results/voxel-pathtracer.
 // `denoise` runs its four scenes as four cases; `denoise-diffuse`, `denoise-opaque`, `denoise-materials` and
 // `denoise-caustics` name one each. With no case named every case but `pictures` and `timing` runs; the package's
-// check runs them as five scripts (test:gpu, test:gpu:denoise, test:gpu:denoise-materials, test:gpu:denoise-caustics,
-// test:gpu:viewport), each within its time limit on an Intel Arc 140V (tests/voxel-pathtracer-gpu-split.test.js
-// checks they name every case once). `--report=<name>` writes the results to
+// check runs them as seven scripts (test:gpu, test:gpu:light-transport, test:gpu:convergence, test:gpu:denoise,
+// test:gpu:denoise-materials, test:gpu:denoise-caustics, test:gpu:viewport), each within its time limit on an Intel Arc
+// 140V and on the WebGL2 layer over ANGLE Direct3D 11 (tests/voxel-pathtracer-gpu-split.test.js checks they name every
+// case once and fit the cold Direct3D 11 times in tests/compat-d3d11-case-seconds.json). `--report=<name>` writes the results to
 // test-results/voxel-pathtracer-browser-check-<name>.json. An unknown case name fails the run.
 // A case in which no GPU work finishes for MARGO_GPU_STALL_S (120 s) fails at once, naming the case, its last progress
 // step and its render (tests/progress.mjs); each case's time and longest wait for the GPU are printed and kept in the
@@ -371,6 +374,15 @@ try {
       assert.equal(r[name].finite, true, `${name} through a medium boundary is finite`);
       near(r[name].mean, r.expected, 0.02, `${name} MIS over the full vertex-to-light distance`);
     }
+  }
+  if (wanted('bouncelimit')) {
+    const r = await run('bouncelimit');
+    console.log(
+      `  floor lit off the ceiling only: maxBounces 1 max ${r[1].max} (0), maxBounces 2 mean ${r[2].mean.toFixed(4)}`,
+    );
+    assert.equal(r[1].finite, true);
+    assert.equal(r[1].max, 0, 'one scattering event: light that needs two adds nothing');
+    assert.ok(r[2].finite && r[2].mean > 0.01, 'two scattering events reach the panel off the ceiling');
   }
   if (wanted('arealight')) {
     const r = await run('arealight');
@@ -694,8 +706,16 @@ try {
     assert.ok(r.traced.differing > 1000, 'enabled: the traced image replaces it');
     assert.ok(r.newDevice);
     // Both images converged, so the comparison is of the restore and not of how far each accumulation got.
-    assert.equal(r.statsBefore.converged, true, `the image before the restore converged (${r.statsBefore.samples} samples)`);
-    assert.equal(r.statsAfter.converged, true, `the image after the restore converged (${r.statsAfter.samples} samples)`);
+    assert.equal(
+      r.statsBefore.converged,
+      true,
+      `the image before the restore converged (${r.statsBefore.samples} samples)`,
+    );
+    assert.equal(
+      r.statsAfter.converged,
+      true,
+      `the image after the restore converged (${r.statsAfter.samples} samples)`,
+    );
     assert.equal(r.statsBefore.samples, r.statsAfter.samples, 'the same sample count before and after the restore');
     assert.equal(r.restored.differing, 0, 'device restore: the same converged image');
     assert.equal(r.afterDispose.differing, 0, 'disposed: the raster frame again');
@@ -772,13 +792,34 @@ try {
       restore();
       return { count, max };
     });
-    console.log(`  trace dispatches: ${dispatches.count}, the largest ${dispatches.max} pixels`);
-    assert.ok(dispatches.count > 40, 'the 4K frames were traced');
-    assert.ok(dispatches.max <= 1 << 20, `a trace dispatch of ${dispatches.max} pixels (budget 2^20)`);
+    if (hardware.webgpu?.vendor === 'margo-webgl2') {
+      // The layer refuses timestamp query sets with a coded error (no GPU times), and traces through its route's
+      // parts of at most 2^17 paths (PART_PATHS, src/compat.ts) instead of compute dispatches.
+      console.log(`  layer: timestamp query set refused (${r.refusal?.code}: ${r.refusal?.message})`);
+      assert.equal(r.timed, false, 'the layer offers no timestamp-query feature');
+      assert.equal(r.refusal?.name, 'MargoError', 'createQuerySet on the layer throws a MargoError');
+      assert.equal(r.refusal.code, 'unsupported');
+      assert.match(r.refusal.message, /timestamp query sets/);
+      // Any trace or preview kernel the layer still dispatches keeps the same budget.
+      console.log(`  trace and preview dispatches: ${dispatches.count}, the largest ${dispatches.max} pixels`);
+      assert.ok(dispatches.max <= 1 << 20, `a dispatch of ${dispatches.max} pixels (budget 2^20)`);
+      for (const [name, p] of Object.entries(r.parts)) {
+        console.log(`  ${name}: ${p.count} route parts, the largest ${p.max} paths`);
+        assert.ok(p.count > 0, `${name}: the 4K frames were traced`);
+        assert.ok(p.max <= 1 << 17, `${name}: a route part of ${p.max} paths (budget 2^17)`);
+      }
+    } else {
+      console.log(`  trace dispatches: ${dispatches.count}, the largest ${dispatches.max} pixels`);
+      assert.equal(r.timed, true);
+      assert.equal(r.refusal, null);
+      assert.ok(dispatches.count > 40, 'the 4K frames were traced');
+      assert.ok(dispatches.max <= 1 << 20, `a trace dispatch of ${dispatches.max} pixels (budget 2^20)`);
+    }
     for (const [name, v] of Object.entries(r.results))
       console.log(
-        `  ${name} 3840x2160: traced ${v.traced.join('x')} (requested ${v.requested.join('x')}${v.limitedBy ? `, limited by ${v.limitedBy}` : ''}), GPU ${v.gpuMs.toFixed(2)} ms/frame, ${(v.gpuBytes / 2 ** 20).toFixed(1)} MiB; binding limit ${v.limits.binding}, texture ${v.limits.texture}`,
+        `  ${name} 3840x2160: traced ${v.traced.join('x')} (requested ${v.requested.join('x')}${v.limitedBy ? `, limited by ${v.limitedBy}` : ''}), ${v.gpuMs === null ? 'no GPU time on the layer' : `GPU ${v.gpuMs.toFixed(2)} ms/frame`}, ${(v.gpuBytes / 2 ** 20).toFixed(1)} MiB; binding limit ${v.limits.binding}, texture ${v.limits.texture}`,
       );
+    assert.deepEqual(Object.keys(r.results), ['raw', 'denoised']);
     for (const [name, v] of Object.entries(r.results)) {
       assert.deepEqual(v.canvas, [3840, 2160], `${name}: the canvas is 4K`);
       assert.deepEqual(v.traced, [3840, 2160], `${name}: traced at the native size`);

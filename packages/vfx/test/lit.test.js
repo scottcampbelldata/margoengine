@@ -25,7 +25,7 @@ const attach = (options, features) => {
   h.engine.use(effect);
   return { h, effect, bound };
 };
-const uniform = (h) => h.resources.find((r) => r.size === 64 && !r.destroyed && new Float32Array(r.data)[7] > 0);
+const uniform = (h) => h.resources.find((r) => r.size === 96 && !r.destroyed && new Float32Array(r.data)[7] > 0);
 const billboards = (h) => h.pipelines.filter((p) => p.fragment).map((p) => p.vertex.module.code);
 // A light source of the test's own, with the shape of Clustered and Shadows: WGSL for a group, and its entries.
 const source = (name, fn) => {
@@ -42,14 +42,23 @@ test('lit writes the sun, its colour, the ambient, the wrap and the eye each fra
   h.frame();
   const values = () => [...new Float32Array(uniform(h).data)].map((v) => +v.toFixed(5));
   // Sun towards [0, 0.6, 0.8] at intensity 2 times radiance; ambient = radiance.w x ambient; eye = the camera.
-  assert.deepEqual(values(), [0, 0.6, 0.8, 0, 2, 1, 0.5, 0.5, 0.2, 0.4, 0.6, 0, 0, 1, 4, 0]);
+  assert.deepEqual(values(), [0, 0.6, 0.8, 0, 2, 1, 0.5, 0.5, 0.2, 0.4, 0.6, 0, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   effect.options.lit.wrap = 1;
   effect.options.lit.ambient = [0.1, 0, 0];
   h.engine.lighting.direction.set([1, 0, 0, 0]);
   h.frame();
-  assert.deepEqual(values(), [0, 0, 0, 0, 0, 0, 0, 1, 0.1, 0, 0, 0, 0, 1, 4, 0], 'no sun at intensity 0');
+  assert.deepEqual(values(), [0, 0, 0, 0, 0, 0, 0, 1, 0.1, 0, 0, 0, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], 'no sun at intensity 0');
+  // A fire's glow (KB-VFX-SMOKEROPE1): position and radius, then colour and radiant power, read every frame.
+  effect.options.lit.glow = { position: [1, 2, 3], power: 5e6, radius: 4 };
+  h.frame();
+  assert.deepEqual(values().slice(16), [1, 2, 3, 4, 1, 0.42, 0.12, 5e6]);
+  effect.options.lit.glow = { position: [1, 2, 3], power: -1 };
+  assert.throws(() => h.frame(), /lit glow/);
+  delete effect.options.lit.glow;
+  h.frame();
+  assert.deepEqual(values().slice(16), [0, 0, 0, 0, 0, 0, 0, 0], 'no glow, nothing added');
   const code = billboards(h)[0];
-  assert.ok(code.includes('fn lit(i:Out,c:vec4f)') && code.includes('@binding(21) var<uniform> litFrame'));
+  assert.ok(code.includes('fn lit(i:Out,c:vec4f)') && code.includes('@binding(21) var<uniform> litFrame') && code.includes('litFrame.glowColor.w'));
   assert.ok(!code.includes('clusterLighting') && !code.includes('shadowLit'), 'no sources: the sun and ambient only');
   effect.options.lit = {};
   assert.throws(() => h.frame(), /fixed at attach/);

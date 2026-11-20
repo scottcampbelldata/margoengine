@@ -2,10 +2,18 @@
 struct Draw { vertices: u32, instances: atomic<u32>, firstVertex: u32, firstInstance: u32 }
 @group(0) @binding(3) var<storage, read_write> draws: array<Draw, 2>;
 
+// The kept fraction `density`: a blade stays when its hash is under it, so lowering it only thins the field.
+fn bladeHash(seed: u32) -> f32 {
+  var n = seed * 747796405u + 2891336453u;
+  n = ((n >> ((n >> 28u) + 4u)) ^ n) * 277803737u;
+  return f32((n >> 22u) ^ n) / 4294967296.0;
+}
+
 @compute @workgroup_size(64)
 fn cull(@builtin(global_invocation_id) id: vec3u) {
   let count = u32(frame.settings.y);
   if (id.x >= count) { return; }
+  if (frame.settings.w < 1.0 && bladeHash(id.x) >= frame.settings.w) { return; }
   let b = blades[id.x];
   let height = frame.field.z * b.scale;
   let root = vec3f(b.posX, b.posY, b.posZ);

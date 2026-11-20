@@ -903,7 +903,8 @@ function checkVTK(result) {
   assert.deepEqual([...result.indices.subarray(9)], [0, 1, 3, 3, 1, 2]);
   assert.deepEqual([...result.normals], Array.from({ length: 6 }, () => [0, 0, 1]).flat());
   closeArray(result.colors, [1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1], 1e-7, 'vtk colors');
-  closeArray(result.uvs, [0, 0, 1, 0, 1, 1, 0, 1, 0.5, 0.5, 0.25, 0.75], 1e-7, 'vtk uvs');
+  // VTK puts t = 0 at the image's bottom; Margo's v = 1 - t puts 0 at the top, as parseVTKXML does.
+  closeArray(result.uvs, [0, 1, 1, 1, 1, 0, 0, 0, 0.5, 0.5, 0.25, 0.25], 1e-7, 'vtk uvs');
   assert.deepEqual([...result.attributes.temperature], [10, 11, 12, 13, 14, 15]);
 }
 
@@ -1767,4 +1768,15 @@ test('security: file-supplied names never resolve or swap prototypes (gate 11b)'
   // detectFormat: a file name ending in `.constructor` is not a format.
   assert.equal(detectFormat(new Uint8Array(16), 'model.constructor'), null);
   assert.equal({}.polluted, undefined);
+});
+
+test('3MF Core 1.4 section 4.1: metadata inside a metadatagroup does not overwrite the model metadata', async () => {
+  const extra =
+    '<object id="5" type="model"><metadatagroup><metadata name="Title">part title</metadata></metadatagroup><mesh>' +
+    tetra +
+    '<triangles><triangle v1="0" v2="2" v3="1"/></triangles></mesh></object>';
+  const items = '<item objectid="5"><metadatagroup><metadata name="Designer">item</metadata></metadatagroup></item>';
+  const result = await parse3MF(package3MF(modelXML({ items, extra })));
+  assert.equal(result.metadata.Title, 'Test & model');
+  assert.equal(result.metadata.Designer, undefined);
 });

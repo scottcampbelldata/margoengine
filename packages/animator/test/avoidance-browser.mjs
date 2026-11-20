@@ -12,7 +12,7 @@ try {
         const installed=await install({force:true});
         if(!installed.installed) throw new Error(installed.reason);
       }
-      const {loadGLTF}=await import('/packages/gltf-pro/dist/index.js');
+      const {loadGLTF}=await import('/packages/gltf/dist/pbr.js');
       const {Animation}=await import('/packages/animation/dist/index.js');
       const {Animator}=await import('/packages/animator/dist/index.js');
       const {addFullBodyIK}=await import('/packages/animator/dist/fbik.js');

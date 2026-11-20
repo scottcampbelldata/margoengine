@@ -353,3 +353,17 @@ test('QB: the README sample (built from the format description) reads as two mat
   assert.deepEqual(colorAt(file, 1, 0, 1, 2), [80, 220, 255, 255]);
   assert.equal(file.models[0].grid.voxels[cellIndex([4, 5, 3], 1, 0, 0)], 0, 'a gap between the legs');
 });
+
+test('KVX: a column offset outside the voxel data is damage, not a silently empty column (KB-P9e)', () => {
+  const whole = kvx([1, 1, 4], [[0, 0, 0, [5]]]),
+    dv = (bytes) => new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  assert.equal(parseKVX(whole).models[0].grid.voxels.filter(Boolean).length, 1);
+  // xoffset[0] (byte 28) pointing back into the header.
+  const back = whole.slice();
+  dv(back).setInt32(28, -100, true);
+  assert.throws(() => parseKVX(back), /damaged/);
+  // xyoffset[0][0] (byte 36) after the column's end: the slab would be skipped unread.
+  const after = whole.slice();
+  dv(after).setUint16(36, 6, true);
+  assert.throws(() => parseKVX(after), /damaged/);
+});

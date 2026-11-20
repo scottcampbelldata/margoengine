@@ -118,7 +118,9 @@ export function packKTX2(
 ): Uint8Array {
   const dfd = descriptor(mode, alpha, srgb),
     dfdAt = 80 + levels.length * 24,
-    globalAt = (dfdAt + dfd.length + 7) & ~7;
+    // KTX 2.0 section 2 (file structure) and 3.12.1: sgdPadding aligns to 8 only when sgdByteLength > 0, and a
+    // supercompressed file's mip levels need no alignment (3.9.7), so a file without global data has no padding.
+    globalAt = global.length ? (dfdAt + dfd.length + 7) & ~7 : dfdAt + dfd.length;
   let length = globalAt + global.length;
   const positions: number[] = [];
   for (let i = levels.length - 1; i >= 0; i--) {
@@ -186,6 +188,10 @@ function encodeBasisLZOrder(
     for (let at = 0; at < data.length; at += 8) {
       const e = view.getUint32(at, true),
         s = view.getUint32(at + 4, true);
+      // ETC1S endpoints are 5-bit colours and a 3-bit intensity table (KTX 2.0, D.2.2 "Endpoints"): a wider value would
+      // be masked by the delta coder into a different colour.
+      if ((e & 0xf8e0e0e0) !== 0)
+        throw new RangeError('BasisLZ endpoint must hold three 5-bit colours and a 3-bit intensity table');
       if (!em.has(e)) {
         em.set(e, endpoints.length);
         endpoints.push(e);

@@ -1,4 +1,4 @@
-// Real-GPU proof of B6 (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof of B6 (run from the repository root after building packages):
 //   node packages/biomes/tests/objects-check.mjs
 // The zero-configuration biome world draws trees, shrubs, rocks and grass over its terrain, lit and varied.
 import assert from 'node:assert/strict';

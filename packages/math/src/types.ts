@@ -126,4 +126,18 @@ export interface RectAreaLight {
   castShadow?: boolean;
   /** Shadow map settings of a castShadow light. */
   shadow?: AreaLightShadow;
+  /**
+   * How far the rectangle sits back in a wall, world units, 0 or more (default 0): the wall's opening, the light's own
+   * size, reaches `recess` in front of it, so its reveal (the opening's sides) shades what the light lights. A point
+   * sees only the part of the rectangle that the opening's outer edge lets through, as the opening's outline projected
+   * from the point onto the light; a point beside the opening and behind the wall's face sees none. One-sided lights
+   * only. `@margoengine/clustered/area` clips each light to it exactly; `@margoengine/voxel-pathtracer` traces its
+   * scene instead and ignores it.
+   */
+  recess?: number;
+  /**
+   * How far a sill under the opening (along -`up`, level with the rectangle's lower edge) stands proud of the wall's
+   * face, world units, 0 or more (default 0): it shades the light from what lies below it. Read with `recess`, as it.
+   */
+  sill?: number;
 }

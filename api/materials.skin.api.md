@@ -4,20 +4,46 @@
 
 ```ts
 import { Engine } from "@margoengine/core/extension";
-import { MaterialSide, TextureTransform } from "@margoengine/gltf-pro";
+import { MaterialSide, TextureTransform } from "@margoengine/gltf/pbr";
 import { ColorInput } from "@margoengine/math";
 
-export interface SkinOptions {
+export type SkinGaussians = readonly (readonly [number, number, number, number])[];
+
+export interface SkinOptions extends SkinPhysiology {
     unitsPerMeter?: number;
+    thickness?: number;
 }
+
+export interface SkinPhysiology {
+    melanin?: number;
+    melaninBlend?: number;
+    hemoglobin?: number;
+    oxygenation?: number;
+}
+
+export function diffusionReflectance(scatter: number, absorb: number, ior?: number): number;
 
 export function skin(options?: SkinOptions): MaterialFeature;
 
+export function skinColor(physiology?: SkinPhysiology): [number, number, number];
+
 export const skinCurvature: (y: number) => number;
 
-export function skinProfile(distance: number): [number, number, number];
+export function skinFrequency(physiology: SkinPhysiology | undefined, k: number): [number, number, number];
 
-export function skinTable(size?: number): Float32Array;
+export function skinProfile(distance: number, profile?: SkinGaussians): [number, number, number];
+
+export function skinProfileOf(physiology?: SkinPhysiology): [number, number, number, number][];
+
+export const skinPublishedProfile: SkinGaussians;
+
+export function skinReflectance(physiology?: SkinPhysiology): Float64Array;
+
+export function skinTable(size?: number, profile?: SkinGaussians): Float32Array;
+
+export function skinTransmittance(depth: number, profile?: SkinGaussians): [number, number, number];
+
+export const skinWavelengths: readonly number[];
 
 // Not exported from this entry, but used by the exports above:
 
@@ -363,6 +389,7 @@ interface MaterialFeature {
     tangentFrame?: boolean;
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    castHashed?(code: string): string;
     attach?(material: Material): void;
     detach?(material: Material): void;
 }
@@ -533,7 +560,7 @@ class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
-    sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
+    sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }

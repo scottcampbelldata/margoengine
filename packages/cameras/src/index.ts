@@ -1,7 +1,10 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import type { Camera, Engine, EnginePlugin, Vec3 } from '@margoengine/core/extension';
-import { margoError } from '../../shared/errors.js';
+import { margoError, rangeError } from '../../shared/errors.js';
+import { fitBox } from './fit-box.js';
+
+export { fitBox, type BoxFit, type BoxFitOptions, type BoxFitView } from './fit-box.js';
 
 /** Options of `CameraProjection`: orthographic or perspective framing, frustum bounds, zoom and clip range. */
 export interface ProjectionOptions {
@@ -129,6 +132,12 @@ export interface FitOptions {
   duration?: number;
   /** At least 1. Default 1.1. */
   padding?: number;
+  /**
+   * Perspective only: 'sphere' (default) frames the box's bounding sphere, as core's `fitToBoundingBox`; 'box' moves
+   * the camera, along its own view, to the closest point from which all eight corners sit in the padded frame (see
+   * {@link fitBox}), so a wide, flat or tall model fills the frame. Orthographic fits always use the box's outline.
+   */
+  framing?: 'sphere' | 'box';
 }
 
 /** Vertical when the horizontal part of the view direction is at most this fraction of the distance. */
@@ -197,6 +206,7 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       aspect = this.canvas ? this.canvas.width / this.canvas.height : 1,
       duration = 0.3,
       padding = 1.1,
+      framing = 'sphere',
     }: FitOptions = {},
   ): void {
     const camera = this.camera;
@@ -215,8 +225,30 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
       padding < 1
     )
       throw new RangeError('Invalid fit; pass min <= max, aspect > 0, duration >= 0 and padding >= 1, all finite');
+    if (framing !== 'sphere' && framing !== 'box')
+      throw rangeError("Invalid fit framing; use 'sphere' or 'box'", 'camera');
     this.animation = undefined;
     this.applyLens(aspect);
+    if (this.mode === 'perspective' && framing === 'box') {
+      camera.cancelFit();
+      const fit = fitBox(
+        { position: camera.position, target: camera.target, fov: this.vfov(camera, aspect), up: this.screenUp(camera) },
+        b,
+        { aspect, padding },
+      );
+      this.animation = {
+        from: camera.position,
+        to: fit.position,
+        fromTarget: camera.target,
+        toTarget: fit.target,
+        fromZoom: this.zoom,
+        toZoom: this.zoom,
+        elapsed: 0,
+        duration,
+      };
+      this.onPreUpdate(0);
+      return;
+    }
     if (this.mode === 'perspective') {
       camera.fitToBoundingBox(min, max, { aspect, duration, padding });
       return;
@@ -335,7 +367,12 @@ export class CameraProjection implements EnginePlugin, ProjectionOptions {
     if (camera) {
       this.camera = undefined;
       this.animation = undefined;
-      Object.defineProperty(camera, 'up', { configurable: true, enumerable: true, writable: true, value: this.worldUp });
+      Object.defineProperty(camera, 'up', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: this.worldUp,
+      });
       delete (camera as { fixedOrthographic?: boolean }).fixedOrthographic;
       camera.project = undefined;
     }

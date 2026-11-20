@@ -90,9 +90,22 @@ export class Stylize extends ScreenEffect {
     e.stack = PostStack.attach(engine, [e]);
     return e;
   }
+  /** Seconds on the effect's own clock (the sum of its frame deltas, at most 10,000,000), used without `time`. */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves the effect's clock by `delta` seconds, the CPU part of its frame update, so `seek` from
+   * `@margoengine/cutscene/seek` replays it and a film rendered scene by scene keeps the wave and scroll across a cut
+   * (GAP-FILM-TIME). A draw moves no clock; a delta of 0 or less and a disposed effect move nothing.
+   */
+  advanceTime(delta: number): void {
+    if (this.ended || !(delta > 0)) return;
+    this.elapsed = Math.min(1e7, this.elapsed + delta);
+  }
   /** Advance once per engine update, independently of the number of views drawn. */
   onPreUpdate(delta: number): void {
-    this.elapsed = Math.min(1e7, this.elapsed + delta);
+    this.advanceTime(delta);
   }
   /** Emit or restart a wave at the current or explicit clock, for replay and seeking. */
   explode(time = this.options.time ?? this.elapsed): void {

@@ -4,7 +4,7 @@ export const leafPerEntry = true;
 const entries = {
   afterimage: ['Afterimage'], anamorphic: ['Anamorphic'], bloom: ['Bloom'], blur: ['Blur'],
   'contact-shadows': ['ContactShadows'], curvature: ['Curvature'], decals: ['Decals'], depth: ['DepthTexture'],
-  fxaa: ['FXAA'], glitch: ['Glitch'], gtao: ['GTAO'], halftone: ['Halftone', 'DotScreen'], image: ['ImagePost'],
+  fxaa: ['FXAA'], glitch: ['Glitch'], gtao: ['GTAO'], 'heat-haze': ['HeatHaze'], halftone: ['Halftone', 'DotScreen'], image: ['ImagePost'],
   'lens-flare': ['LensFlare'], lens: ['Lens'], 'material-decals': ['MaterialDecals'], outline: ['Outline'],
   pixelate: ['Pixelate'], smaa: ['SMAA'], ssao: ['SSAO'], ssgi: ['SSGI'], ssr: ['SSR'],
   sss: ['SSS'], stylize: ['Stylize'],

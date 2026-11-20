@@ -1,5 +1,5 @@
 // Real-GPU checks of @margoengine/ui/world (one GPU job at a time; from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/ui/tests/world-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/ui/tests/world-browser.mjs
 // The page (world-browser.js) draws a UI on a panel in a 3D scene and reads the canvas back; this driver then clicks the
 // panel's button with the real mouse. Results go to test-results/ui-world-browser.json.
 import assert from 'node:assert/strict';

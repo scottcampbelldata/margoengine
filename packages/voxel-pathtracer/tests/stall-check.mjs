@@ -7,7 +7,7 @@
 // own 3-minute limit. Without tests/progress.mjs the same run waits on the page's 15-minute evaluate timeout instead.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { killTree } from '../../../scripts/gpu-lock.mjs';
+import { killTree } from '../../../scripts/run-with-timeout.mjs';
 
 const LIMIT_MS = 180_000;
 const t0 = performance.now();

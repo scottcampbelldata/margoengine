@@ -68,11 +68,13 @@ export class Frustum {
   /** Conservative: may report true for boxes just outside a frustum corner. */
   intersectsBox(box: BoxLike): boolean {
     for (const { normal: n, constant } of this.planes) {
-      // Test the box corner furthest along the plane normal.
-      const x = n.x > 0 ? box.max.x : box.min.x,
-        y = n.y > 0 ? box.max.y : box.min.y,
-        z = n.z > 0 ? box.max.z : box.min.z;
-      if (n.x * x + n.y * y + n.z * z + constant < 0) return false;
+      // Test the box corner furthest along the plane normal. A zero component adds nothing along its axis, so a
+      // bound at infinity (an unbounded box) cannot turn the sum into NaN, which would keep a box that is outside.
+      let d = constant;
+      if (n.x !== 0) d += n.x * (n.x > 0 ? box.max.x : box.min.x);
+      if (n.y !== 0) d += n.y * (n.y > 0 ? box.max.y : box.min.y);
+      if (n.z !== 0) d += n.z * (n.z > 0 ? box.max.z : box.min.z);
+      if (d < 0) return false;
     }
     return true;
   }

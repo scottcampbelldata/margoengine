@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { FrameGraph, Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
-import { PBRInstances } from '../../gltf-pro/dist/instancing.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
+import { extendedMaterials } from '../../gltf/dist/extended.js';
+import { PBRInstances } from '../../gltf/dist/pbr-instancing.js';
 import { Material, Texture, createMesh } from '../../materials/dist/index.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 import { wgsl } from '../../core/dist/shaders.js';
 import { Bloom, PostStack, SSR, SSAO } from '../dist/index.js';
 
@@ -248,7 +248,7 @@ test('stochastic rough reflections: a GGX-sampled trace and a reprojected resolv
   assert.deepEqual(h.live(), []);
 });
 
-// gltf-pro models (opaque, MASK, BLEND, unlit, physical clearcoat) and an instanced materials mesh on a real core Engine;
+// gltf/pbr models (opaque, MASK, BLEND, unlit, physical clearcoat) and an instanced materials mesh on a real core Engine;
 // SSR's frame graph drives their capture with the same pass context. The IBL effect is a stand-in with environment's names.
 async function models(gpu) {
   const store = await TransformStore.create(32),
@@ -313,7 +313,7 @@ test('ssr.add(mesh) captures a textured materials mesh through its maps', async 
   );
 });
 for (const samples of [4, 1])
-  test(`ssr.add(model) draws gltf-pro and materials into the replay targets with their own materials (${samples}x)`, async () => {
+  test(`ssr.add(model) draws gltf/pbr and materials into the replay targets with their own materials (${samples}x)`, async () => {
     const h = harness(samples),
       ssr = new SSR();
     h.engine.use(new PostStack([ssr]));
@@ -434,7 +434,7 @@ for (const samples of [4, 1])
     engine.dispose();
   });
 
-test("SSR's capture declarations: margoCapture for gltf-pro's PBR Surface, margoSSR alone for terrain and water code", () => {
+test("SSR's capture declarations: margoCapture for gltf/pbr's PBR Surface, margoSSR alone for terrain and water code", () => {
   const h = harness(),
     ssr = new SSR(),
     seen = [];

@@ -76,7 +76,7 @@ export interface LocalLightShadow {
   radius?: number;
 }
 /**
- * A caster primitive of a `LocalShadowSource` (gltf-pro and materials `shadowPrimitives`): vertex and index buffers of
+ * A caster primitive of a `LocalShadowSource` (gltf/pbr and materials `shadowPrimitives`): vertex and index buffers of
  * a mesh node, with an optional alpha mask, instances and displacement.
  */
 export interface LocalShadowPrimitive {
@@ -117,9 +117,15 @@ export interface LocalShadowPrimitive {
   animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
+  /**
+   * Cuts against hashed noise instead of `cutoff` while `cutoff` is above 0: the caster shader edit of materials
+   * `alphaHash()` (its record's `castHashed`, shared/alpha-hash.js `hashedDepth`), so only an app that imports
+   * `alphaHash` carries the hash WGSL. Default none.
+   */
+  hashed?: (code: string) => string;
 }
 /**
- * A caster `Clustered.addShadowCaster` takes besides a core mesh: an object with `shadowPrimitives` (gltf-pro models,
+ * A caster `Clustered.addShadowCaster` takes besides a core mesh: an object with `shadowPrimitives` (gltf/pbr models,
  * materials meshes). A source with only a custom `drawShadow` is rejected with TypeError.
  */
 export interface LocalShadowSource {
@@ -584,9 +590,11 @@ export class LocalShadowMaps {
       );
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
+      hashed = (p.cutoff ?? 0) > 0 ? p.hashed : undefined,
       key =
         (displacement?.key ?? '') +
         (p.stride +
+        (hashed ? 256 : 0) +
         (transform ? 1 : 0) +
         (inst ? 2 : 0) +
         (lines ? 4 : 0) +
@@ -606,7 +614,8 @@ export class LocalShadowMaps {
           : code,
         cut = solid ? solidVertexDepth(placed) : placed,
         lit = opacity ? opacityDepth(cut, 0) : cut,
-        module = this.device!.createShaderModule({ code: animation ? animatedDepth(lit, 0) : lit });
+        moved = animation ? animatedDepth(lit, 0) : lit,
+        module = this.device!.createShaderModule({ code: hashed ? hashed(moved) : moved });
       pipeline = casterPipeline(this.device!, module, p.stride, !!displacement, !!inst, lines);
       this.pipelines.set(key, pipeline);
     }
@@ -730,7 +739,7 @@ struct LocalDepthFrame {camera:mat4x4f,model:mat4x4f,alpha:vec4f${transformed ? 
 @group(0) @binding(1) var localAlphaMap:texture_2d<f32>;
 @group(0) @binding(2) var localAlphaSampler:sampler;
 struct LocalDepthIn {@location(0) position:${pbr ? 'vec4f' : 'vec3f'},${pbr ? '@location(3) uv:vec4f,@location(4) color:vec4f' : ''}}
-struct LocalDepthOut {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+struct LocalDepthOut {@builtin(position) @invariant clip:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
 @vertex fn vertex(i:LocalDepthIn)->LocalDepthOut {var o:LocalDepthOut;o.clip=localDepth.camera*localDepth.model*vec4f(i.position.xyz,1);${pbr ? 'o.uv=select(i.uv.xy,i.uv.zw,localDepth.alpha.z>0.5);o.alpha=i.color.a;' : 'o.uv=vec2f(0);o.alpha=1;'}${transformed ? 'let sourceUV=o.uv;o.uv=vec2f(dot(localDepth.alphaUV0.xy,sourceUV)+localDepth.alphaUV0.z,dot(localDepth.alphaUV1.xy,sourceUV)+localDepth.alphaUV1.z);' : ''}return o;}
 @fragment fn fragment(i:LocalDepthOut){if(textureSampleLevel(localAlphaMap,localAlphaSampler,i.uv,0).a*localDepth.alpha.x*i.alpha<localDepth.alpha.y){discard;}}
 `;

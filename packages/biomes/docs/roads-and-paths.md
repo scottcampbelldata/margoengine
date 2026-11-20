@@ -66,7 +66,9 @@ const placement = BiomePlacement.attach(world, { exclusions: pathExclusions(path
   Under the width the ground goes to the bed, and across the edge it blends back with the path's `falloff`. Mode
   `'flatten'` sets the bed to the ground along the path averaged over `grade` metres of the line, then `depth` lower,
   so a road crosses a slope level and climbs a hill at an even grade; mode `'cut'` lowers the ground by `depth` (a
-  sunken lane, a ditch). Where paths overlap, the strongest weight wins and then the lowest bed. `BiomeWorld.create`
+  sunken lane, a ditch); mode `'level'` sets the bed to the world height `top` (metres, default 0), raising or lowering
+  the ground, so a sea wall, a breakwater mound running out into the sea, a quay apron or a levee is a path whose
+  sides slope across its edge (`top` is refused on the other modes, and their settings keep their old bytes). Where paths overlap, the strongest weight wins and then the lowest bed. `BiomeWorld.create`
   loads this entry for a carved height; `heightAt`, the region fields, hydrology and the worker replicas all read the
   carved ground, and `saveWorld` writes the paths into the saved heights (still format version 1; a saved world without
   paths loads as before).
@@ -106,6 +108,12 @@ console.log(town.villages.length, town.roads.length, town.villages[0]?.houses.le
 | `road`, `lane` | width 5, edge 3, Catmull-Rom; width 3, edge 1.5, polyline | path settings (`biome`, `mask`, `carve` and the rest), mask `'roads'` |
 | `yard` | 4 | metres kept clear around each house |
 | `seed` | 1 | the jitter of the site scores and the house sizes |
+| `pattern` | `'lanes'` | `'grid'` lays blocks of lots between straight streets with a main street to the quay |
+| `grid` | see below | block, street, lot, setback, toward and above of the grid pattern |
+| `pads` | true for `'grid'`, else false | one level-ground carve path under each house; its `floor` is the pad level |
+| `drives` | as `pads` | one driveway path a house, from its front to its street |
+| `drive` | width 3, edge 1, polyline, mask `'roads'` | path settings of the driveways |
+| `avoid` | none | exclusions no house may touch (a rail line, a creek, a yard; `pathExclusions(paths)`): a house whose centre, corners or edge midpoints fall inside one, or within a line's half width and verge, is not built; streets may cross them |
 
 - **Sites.** Grid points on dry land, above sea level and off the rivers, whose ground and eight neighbours stay under
   `siteGrade`. They score by flatness, by nearness to water (best 30 to 400 m from a river or the coast; closer floods)
@@ -126,8 +134,57 @@ console.log(town.villages.length, town.roads.length, town.villages[0]?.houses.le
 - **Cost.** About 1.4 s on the busy AMD mini PC for the default 4 km world at the 16 m cell (66,049 height reads, three
   villages; diagnostic, not a timed result). The work grows with the cells and with the links: each link is one search.
 
+### Grid towns
+
+`pattern: 'grid'` lays a town the way a harbour town is planned: a frame with one axis toward the water (the main street's
+way to the quay) and one along the shore, a street every block, and lots in two rows on both sides of each block, each
+facing the street beside it. `pads` and `drives` are on by default for it.
+
+```ts
+import { layoutSettlements } from '@margoengine/biomes/settlements';
+
+// Flat ground that falls to the sea on the east; any BiomeWorld works the same way.
+const world = {
+  bounds: [-1000, -1000, 1000, 1000] as [number, number, number, number],
+  heightAt: (x: number, z: number) => Math.max(-6, (300 - x) * 0.02 + 0.3 * Math.sin(z / 40)),
+  climate: { sea: 0 },
+};
+const town = layoutSettlements(world, { villages: 1, houses: 60, pattern: 'grid', sites: [[-100, 0]] });
+const village = town.villages[0];
+const house = village.houses[0];
+console.log(village.streets?.length, house.front, house.street, town.pads?.length, town.drives?.length);
+// Hand `town.paths` to carvePaths: roads, streets, driveways and pads are all in it.
+```
+
+| `grid` setting | Default | What it does |
+| --- | --- | --- |
+| `block` | `[56, 36]` | a block's size in metres, along the shore and toward the water, each 8 to 400 |
+| `street` | 8 | street width in metres, 2 to 40; `lane.width` is the drawn width and follows it |
+| `lot` | 14 | lot frontage in metres, 8 to 60; a block holds a whole number of lots, so lots come out near it |
+| `setback` | 4 | metres from a house front to the street edge, 0 to 30 |
+| `toward` | nearest sea | direction `[x, z]` of the main street; else the nearest sea within 1,200 m, else the nearest river, else a seeded angle |
+| `above` | 0 | metres over sea level that lots and streets keep, 0 to 1,000 (the sea wall's flood height, for a tsunami town) |
+
+- **Streets.** Every street runs straight, one every block in both directions, with the village centre at a crossing.
+  Each street is cut into stretches wherever the ground is wet, lower than `above`, or steeper than `maxGrade` over two
+  metres; a stretch under 8 m is dropped. The main street is the stretch through the centre toward the water and stops at
+  the last dry sample: its end is the quay. Only stretches that join the main street through crossings are kept, and
+  only those that front a house or lead to one are returned (`Village.streets`, main first; also in `lanes` and `paths`).
+- **Lots.** The closest lots to the centre get houses first: a house is 7 to 10 m wide (seeded) and 6 to 9 m deep, set
+  back `setback` from its street, with `front` (unit vector toward the street) and `street` (an index into
+  `Village.streets`). A lot is kept when its house and corners stand on dry land at least `above`, level within
+  `siteGrade`, clear of the roads between villages and of every other house, and its frontage lies on a stretch joined to
+  the main street, so every house reaches the main street by streets.
+- **Pads and drives.** A pad is a carve path along the house's width axis, `depth + 1` m wide with a 1.5 m edge, whose bed
+  is the mean of the ground at its two ends, so the house stands level at `House.floor`. A drive runs from half a metre
+  inside the front to half a metre into the street edge, flattened over twice its length, mask `'roads'`. Both also work
+  with the `'lanes'` pattern (`pads: true`); the defaults keep that pattern's bytes. `paths` is roads, lanes, drives, then
+  pads; the exclusions cover roads, lanes, drives and house yards (a pad's house polygon already clears it).
+- **Sources.** Block and lot subdivision with lots facing the street, after Parish and Muller, "Procedural Modeling of
+  Cities", SIGGRAPH 2001; the street cut and the connectivity are our own, from that description. No code read.
+
 `tests/settlements.test.js` checks the site choice, the pass, the bridge, the sea, the network, the lots, the placement
-exclusions on a real world and the same bytes.
+exclusions on a real world, the grid streets, lots, pads and drives, and the same bytes.
 
 ## Same bytes everywhere
 

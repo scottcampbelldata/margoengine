@@ -1,10 +1,11 @@
 import type { EngineKernel } from '@margoengine/core';
-import type { PBRModel } from '@margoengine/gltf-pro/model';
+import type { PBRModel } from '@margoengine/gltf/pbr-model';
 import { meshoptDecodeVertexBuffer } from '@margoengine/decoders/meshopt';
 import { readContainer, maxBytes, meshoptFlag, type MargoSection } from './container.js';
 import { writeMargo } from './write-container.js';
 import { decodeMargo, parseMargo, type MargoAsset, type MargoOptions } from './index.js';
 import { readResponse } from '../../shared/loading.js';
+import { captureScene } from '../../shared/scene-scope.js';
 
 function source(input: ArrayBuffer | ArrayBufferView) {
   const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : ArrayBuffer.isView(input) ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength) : undefined;
@@ -93,8 +94,9 @@ export async function parseMargoMeshopt(engine: EngineKernel, input: ArrayBuffer
 /** Fetch a compressed .margo with AbortSignal and the existing 256 MiB bound. */
 export async function loadMargoMeshopt(engine: EngineKernel, url: string | URL, options: MargoMeshoptOptions = {}): Promise<PBRModel> {
   options.signal?.throwIfAborted();
-  const target = new URL(url, globalThis.location?.href);
+  const scope = captureScene(engine), target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('Meshopt URL must use HTTP(S); read local bytes and call parseMargoMeshopt');
   const bytes = await readResponse(await (options.fetch ?? globalThis.fetch)(target, { signal: options.signal }), { maxBytes, signal: options.signal });
-  return parseMargoMeshopt(engine, bytes, options);
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(() => parseMargoMeshopt(engine, bytes, options));
 }

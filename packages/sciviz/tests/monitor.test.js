@@ -209,3 +209,30 @@ test('typed table adapters count int64 backing stores, shared columns and null b
   stop();
   assert.equal(stats.snapshot().layers.length, 0);
 });
+
+test('a sweep deadline above the host timer limit rejects instead of firing after 1 ms', async () => {
+  let prepared = 0;
+  const prepare = async () => {
+    prepared++;
+    return { frame: async () => {}, stats: empty, dispose() {} };
+  };
+  for (const timeoutMs of [2 ** 31, 3e9, Number.MAX_SAFE_INTEGER])
+    await assert.rejects(sweepLimits({ kind: 'load', sizes: [1], metadata, timeoutMs, prepare }), /timeout/);
+  assert.equal(prepared, 0);
+  const report = await sweepLimits({ kind: 'load', sizes: [1], metadata, timeoutMs: 2 ** 31 - 1, prepare });
+  assert.equal(report.rows[0].status, 'passed');
+});
+
+test('a disposed figure monitor is replaced on the next install; null-prototype keys get a name', () => {
+  const fig = { layers: [] };
+  const first = installFigureStats(fig).stats;
+  first.dispose();
+  const second = installFigureStats(fig).stats;
+  assert.notEqual(second, first);
+  assert.equal(fig.stats, second);
+  assert.deepEqual(second.snapshot().layers, []);
+  assert.equal(installFigureStats(fig).stats, second);
+  const key = Object.create(null);
+  second.track(key, { resources: () => ({ cpu: [], gpu: [] }) });
+  assert.equal(second.snapshot().layers[0].name, 'object');
+});

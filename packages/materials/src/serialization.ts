@@ -160,6 +160,16 @@ const image = (v: object) =>
     const Class = Reflect.get(globalThis, key);
     return typeof Class === 'function' && v instanceof Class;
   });
+/** A copy of captured pixels with their rows in reverse order. */
+function flipRows(source: unknown): TextureSource {
+  const { width, height, data } = (source ?? {}) as { width: number; height: number; data: Uint8ClampedArray };
+  if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || !(data instanceof Uint8ClampedArray))
+    return fail('Invalid captured texture pixels');
+  const row = width * 4,
+    out = new Uint8ClampedArray(data.length);
+  for (let y = 0; y < height; y++) out.set(data.subarray(y * row, (y + 1) * row), (height - 1 - y) * row);
+  return { width, height, data: out };
+}
 /** Capture every named material, shared texture and shader parameter without changing the originals. */
 export async function captureMaterialLibrary(
   materials: Readonly<Record<string, object>>,
@@ -195,10 +205,14 @@ export async function captureMaterialLibrary(
     if (value instanceof Texture) {
       const url = options.textureURL?.(value);
       slot.type = 'texture';
+      // A drawable source is stored as decoded rows, top row first, which a Texture keeps at v = 0; one uploaded with
+      // flipY had its top row at v = 1, so its restored rows are reversed.
+      const flipRows = url === undefined && image(value.source as object) && !('data' in value.source) && value.flipY;
       payload = {
         cube: value instanceof CubeTexture,
         options: value.options,
         source: url === undefined ? value.source : { url },
+        ...(flipRows ? { flipRows } : {}),
       };
     } else if (ArrayBuffer.isView(value)) {
       slot.type = 'typed';
@@ -221,10 +235,13 @@ export async function captureMaterialLibrary(
         videoHeight?: number;
         displayWidth?: number;
         displayHeight?: number;
+        naturalWidth?: number;
+        naturalHeight?: number;
       };
       let pixels = src.data;
-      const width = src.videoWidth ?? src.displayWidth ?? src.width,
-        height = src.videoHeight ?? src.displayHeight ?? src.height;
+      // An image element's width and height are its layout size; its pixels are naturalWidth by naturalHeight.
+      const width = src.videoWidth ?? src.displayWidth ?? src.naturalWidth ?? src.width,
+        height = src.videoHeight ?? src.displayHeight ?? src.naturalHeight ?? src.height;
       if (!pixels) {
         const canvas = new OffscreenCanvas(width, height),
           context = canvas.getContext('2d')!;
@@ -368,7 +385,11 @@ export async function restoreMaterialLibrary(
             ...(data.options as object),
             ...(cube.size === undefined ? {} : { size: cube.size }),
           });
-        } else result = new Texture(data.source as TextureSource, data.options as never);
+        } else
+          result = new Texture(
+            data.flipRows === true ? flipRows(data.source) : (data.source as TextureSource),
+            data.options as never,
+          );
         owned.push(result);
       } else {
         let codec = codecs.find((c) => c.type === row.type);

@@ -122,7 +122,8 @@ impl Kernel {
     fn matrix(&self, id: usize) -> Option<[f32; 16]> {
         let n = self.capacity;
         let value = |field| self.float(field * n + id) as f64;
-        if (X..PARENTS).any(|field| !value(field).is_finite()) || (SX..PARENTS).any(|field| value(field) == 0.0) { return None; }
+        // A zero scale is valid glTF 2.0 (section 3.5.3): the matrix gets a zero column and the sphere's radius follows it.
+        if (X..PARENTS).any(|field| !value(field).is_finite()) { return None; }
         let length = sqrt((QX..SX).map(|field| { let v=value(field); v*v }).sum::<f64>());
         if length == 0.0 { return None; }
         let (x, y, z, w) = (value(QX) / length, value(QY) / length, value(QZ) / length, value(QW) / length);
@@ -427,6 +428,22 @@ mod tests {
         assert_eq!(direct.data[QX],saved);
     }
     #[test]
+    fn zero_scale_flattens_the_matrix_and_keeps_a_finite_sphere() {
+        // KB-GLTFA B1: before 2026-11-19 a zero scale failed the whole tick as an invalid transform.
+        let n=1;let mut k=Kernel::new(n);k.flags[ACTIVE]=1;
+        for field in QW..PARENTS { k.data[field]=1.0; }
+        k.data[LOCAL_SPHERE+3]=2.0;
+        for scale in [[1.0,0.0,1.0],[0.0,0.0,0.0],[-1.0,0.0,0.0]] {
+            k.data[SX..PARENTS].copy_from_slice(&scale);
+            assert_eq!(k.tick(false),0);
+            let m=&k.data[WORLD_MATRIX..WORLD_MATRIX+16];
+            assert!(m.iter().all(|v| v.is_finite()));
+            for c in 0..3 { assert_eq!(m[c*4+c],scale[c] as f32); }
+            let r=k.data[WORLD_SPHERE+3];let largest=scale.iter().fold(0.0f32,|a,v| a.max(v.abs()));
+            assert!(r.is_finite() && r>=2.0*largest && r<=2.0*largest+1e-6,"radius {r} for scale {scale:?}");
+        }
+    }
+    #[test]
     fn layout_edges_preserve_validation_and_bitwise_change_tracking() {
         for n in [1,257] {
             let id=n-1;let mut k=Kernel::new(n);k.flags[ACTIVE*n+id]=1;
@@ -434,7 +451,7 @@ mod tests {
             k.data[LOCAL_SPHERE*n+id*4+3]=1.0;
             assert_eq!(k.tick(false),0);
             let output=k.data[WORLD_MATRIX*n..LOCAL_SPHERE*n].to_vec();
-            for (at,bad) in [(SX*n+id,0.0),(QW*n+id,0.0),(LOCAL_SPHERE*n+id*4+3,-1.0),(X*n+id,f32::from_bits(0x7fc00123))] {
+            for (at,bad) in [(QW*n+id,0.0),(LOCAL_SPHERE*n+id*4+3,-1.0),(X*n+id,f32::from_bits(0x7fc00123))] {
                 let saved=k.data[at];k.data[at]=bad;
                 assert_eq!(k.tick(false),id+1);assert_eq!(&k.data[WORLD_MATRIX*n..LOCAL_SPHERE*n],output.as_slice());
                 k.data[at]=saved;assert_eq!(k.tick(false),0);

@@ -21,6 +21,8 @@ export const ERROR_SOURCES = [
   'packages/mcp/src',
   'packages/biomes/src',
   'packages/cache/src',
+  'packages/react/src',
+  'packages/controls/src',
 ];
 
 // fault('code', message[, 'anchor']), typeError(message, 'anchor'), rangeError(message, 'anchor').
@@ -42,7 +44,7 @@ export function errorPageFindings(root, { entries = allEntries, page = errorsPag
   let calls = 0;
   for (const dir of ERROR_SOURCES) {
     if (!existsSync(join(root, dir))) continue;
-    for (const name of readdirSync(join(root, dir)).filter((f) => f.endsWith('.ts'))) {
+    for (const name of readdirSync(join(root, dir)).filter((f) => /\.tsx?$/.test(f))) {
       const file = `${dir}/${name}`,
         text = readFileSync(join(root, file), 'utf8');
       for (const m of text.matchAll(CALL)) {

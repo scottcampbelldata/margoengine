@@ -1,7 +1,7 @@
 // Additive Manufacturing Format .amf files, plain or zipped: objects, volumes, materials and constellations.
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { floats, limits, throwIfAborted, toBytes, uints, type BinaryInput } from './util.js';
-import { decodeXML, readXMLTree, type XMLElement } from './xml.js';
+import { decodeXML, readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 import { readZipDirectory, readZipEntry, type ZipOptions } from './zip.js';
 
 const F = 'AMF';
@@ -17,7 +17,10 @@ const MAX_INSTANCES = 100_000;
 const MAX_DEPTH = 32;
 
 /** Options of {@link parseAMF}: size limits, zip limits, units and an AbortSignal. */
-export interface AMFOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
+export interface AMFOptions
+  extends ParseLimits,
+    XMLExternalOptions,
+    Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
   /** `'meters'` (default) scales by the file's unit; `'file'` keeps its own units. */
   units?: 'meters' | 'file';
   signal?: AbortSignal;
@@ -138,7 +141,7 @@ export async function parseAMF(input: BinaryInput, options: AMFOptions = {}): Pr
     if (!entry) throw new LoaderError(F, 'zip', 'the archive is empty');
     bytes = await readZipEntry(source, entry, options);
   }
-  const root = kid(readXMLTree(decodeXML(bytes), F), 'amf');
+  const root = kid(readXMLTree(decodeXML(bytes), F, { external: options.external }), 'amf');
   if (!root) throw new LoaderError(F, 'header', 'no <amf> element');
   const unit = root.attributes.unit ?? 'millimeter';
   if (!(unit in UNITS)) throw new LoaderError(F, 'unsupported', `unknown unit "${unit.slice(0, 32)}"`);
@@ -161,7 +164,9 @@ export async function parseAMF(input: BinaryInput, options: AMFOptions = {}): Pr
     colors = floats(),
     indices = uints(),
     groups: LoadedGroup[] = [],
-    placing = new Set<string>();
+    placing = new Set<string>(),
+    // Vertices with a colour of their own (a vertex or triangle colour), which no lower level overrides.
+    owned: boolean[] = [];
   let vertexColors = false,
     instances = 0;
 
@@ -190,10 +195,14 @@ export async function parseAMF(input: BinaryInput, options: AMFOptions = {}): Pr
       if (color) vertexColors = true;
       const [r, g, b] = color ?? [1, 1, 1];
       colors.push3(r, g, b);
+      owned.push(!!color);
     }
     const objectColor = readColor(kid(object, 'color'), warn);
     for (const volume of kids(mesh, 'volume')) {
-      const start = indices.length;
+      const start = indices.length,
+        // Colour precedence (ISO/ASTM 52915): triangle, then vertex, then volume, then object, then material.
+        color =
+          readColor(kid(volume, 'color'), warn) ?? objectColor ?? materials.get(volume.attributes.materialid ?? '');
       for (const triangle of kids(volume, 'triangle')) {
         if (indices.length / 3 >= maxTriangles)
           throw new LoaderError(F, 'limit', `triangle count exceeds the limit of ${maxTriangles}`);
@@ -203,13 +212,32 @@ export async function parseAMF(input: BinaryInput, options: AMFOptions = {}): Pr
             throw new LoaderError(F, 'range', `${name} ${value} is outside 0..${list.length - 1}`);
           return base + value;
         };
-        indices.push3(corner('v1'), corner('v2'), corner('v3'));
+        const corners = [corner('v1'), corner('v2'), corner('v3')],
+          own = readColor(kid(triangle, 'color'), warn);
+        if (own) {
+          // A triangle colour outranks its vertices' colours: the triangle gets three corners of its own.
+          if (positions.length / 3 + 3 > maxVertices)
+            throw new LoaderError(F, 'limit', `vertex count exceeds the limit of ${maxVertices}`);
+          vertexColors = true;
+          for (let k = 0; k < 3; k++) {
+            const p = corners[k] * 3;
+            corners[k] = positions.length / 3;
+            positions.push3(positions.array[p], positions.array[p + 1], positions.array[p + 2]);
+            colors.push3(own[0], own[1], own[2]);
+            owned.push(true);
+          }
+        } else if (color)
+          // A vertex without a colour of its own shows the first volume colour that reaches it.
+          for (const v of corners)
+            if (!owned[v]) {
+              colors.array.set(color.slice(0, 3), v * 3);
+              owned[v] = true;
+            }
+        indices.push3(corners[0], corners[1], corners[2]);
       }
       if (indices.length === start) continue;
       const group: LoadedGroup = { start, count: indices.length - start, objectId: object.attributes.id },
-        name = kids(object, 'metadata').find((entry) => entry.attributes.type === 'name')?.text.trim(),
-        color =
-          readColor(kid(volume, 'color'), warn) ?? materials.get(volume.attributes.materialid ?? '') ?? objectColor;
+        name = kids(object, 'metadata').find((entry) => entry.attributes.type === 'name')?.text.trim();
       if (name) group.name = name;
       if (color) group.color = [...color];
       groups.push(group);

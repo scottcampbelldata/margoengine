@@ -2,7 +2,7 @@
 // containers are in video-mux.ts. No node: imports: Node has no WebCodecs, so @margoengine/headless/ffmpeg covers it.
 import type { Camera, Engine } from '@margoengine/core';
 import { encodePNG, readPixels, type HeadlessPixels } from './index.js';
-import { muxMP4, muxWebM, type SoundTrack, type VideoSample } from './video-mux.js';
+import { FragmentedMP4, StreamedWebM, muxMP4, muxWebM, type SoundTrack, type VideoSample } from './video-mux.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** Where a frame sits in a sequence. */
@@ -32,6 +32,83 @@ export interface RenderFramesOptions {
   update?: (frame: FrameTiming) => unknown;
   /** Stops the sequence; the iterator rejects with the signal's reason. Default none. */
   signal?: AbortSignal;
+}
+
+// The samples every encoder is given: Margo converts each RGBA frame itself and hands over 4:2:0 planes labelled with
+// this colour space, so the file states what its samples are. Encoders that convert RGBA themselves do not report what
+// they wrote: WebKit 27.2 on macOS writes limited-range BT.709 and reports full range with no matrix, so a player drew
+// the file contrast-reduced (docs/known-bugs.md, "WebKit headless MP4 drawn contrast-reduced"). Limited-range BT.709 with
+// the sRGB transfer of the rendered pixels (ITU-R BT.709-6 item 3.2 to 3.5; ITU-T H.273 code points 1, 13, 1).
+const SAMPLE_SPACE: VideoColorSpaceInit = {
+  primaries: 'bt709',
+  transfer: 'iec61966-2-1',
+  matrix: 'bt709',
+  fullRange: false,
+};
+
+/**
+ * Limited-range BT.709 I420 planes of 8-bit RGBA pixels (alpha ignored): Y per pixel, Cb and Cr per 2 x 2 block.
+ * Y = 16 + 219 E'Y, Cb = 128 + 224 (E'B - E'Y) / 1.8556, Cr = 128 + 224 (E'R - E'Y) / 1.5748, with
+ * E'Y = 0.2126 E'R + 0.7152 E'G + 0.0722 E'B (BT.709-6 items 3.2 to 3.5).
+ *
+ * Chroma is made where players put it when the stream does not say: ITU-T H.273 chroma_sample_loc_type 0, the default
+ * of H.264 and H.265 (Annex E) and what the files state (VP9 `vpcC` chroma 0, Matroska ChromaSiting left and half).
+ * A sample sits on luma column 2x, between rows 2y and 2y + 1, so it weighs columns 2x - 1, 2x, 2x + 1 by 1/4, 1/2,
+ * 1/4 (the triangle prefilter of that position) and the two rows equally, with edge pixels repeated. A centred 2 x 2
+ * mean, labelled this way, is drawn half a pixel to the right.
+ */
+function rgbaToI420(
+  data: Uint8Array | Uint8ClampedArray,
+  width: number,
+  height: number,
+  codedWidth = width,
+  codedHeight = height,
+): Uint8Array {
+  // A coded size past the frame (an odd frame padded for H.264 or H.265) repeats the last column and row.
+  const cw = (codedWidth + 1) >> 1,
+    ch = (codedHeight + 1) >> 1,
+    size = codedWidth * codedHeight,
+    out = new Uint8Array(size + 2 * cw * ch),
+    luma = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  for (let y = 0, i = 0; y < codedHeight; y++)
+    for (let x = 0; x < codedWidth; x++, i++) {
+      const p = (Math.min(y, height - 1) * width + Math.min(x, width - 1)) * 4;
+      out[i] = Math.round(16 + (219 / 255) * luma(data[p], data[p + 1], data[p + 2]));
+    }
+  for (let y = 0; y < ch; y++)
+    for (let x = 0; x < cw; x++) {
+      let r = 0,
+        g = 0,
+        b = 0;
+      for (let dy = 0; dy < 2; dy++) {
+        const row = Math.min(height - 1, 2 * y + dy) * width;
+        for (let dx = -1; dx <= 1; dx++) {
+          const p = (row + Math.min(width - 1, Math.max(0, 2 * x + dx))) * 4,
+            weight = dx ? 1 : 2;
+          r += weight * data[p];
+          g += weight * data[p + 1];
+          b += weight * data[p + 2];
+        }
+      }
+      // The weights sum to 8.
+      const e = luma(r, g, b),
+        at = size + y * cw + x;
+      out[at] = Math.round(128 + (224 / 255) * ((b - e) / 8 / 1.8556));
+      out[at + cw * ch] = Math.round(128 + (224 / 255) * ((r - e) / 8 / 1.5748));
+    }
+  return out;
+}
+
+/**
+ * The alpha of 8-bit RGBA pixels as an I420 picture for a second encoder: the alpha values as luma, as they are, and
+ * flat chroma. WebM carries that picture's frames beside the colour (Matroska codec mappings V_VP8 and V_VP9, "a
+ * single-channel encoding of an alpha channel"); players take its luma plane as the alpha.
+ */
+function alphaToI420(data: Uint8Array | Uint8ClampedArray, width: number, height: number): Uint8Array {
+  const size = width * height,
+    out = new Uint8Array(size + 2 * ((width + 1) >> 1) * ((height + 1) >> 1)).fill(128, size);
+  for (let i = 0; i < size; i++) out[i] = data[i * 4 + 3];
+  return out;
 }
 
 const checkFps = (fps: number): void => {
@@ -118,6 +195,18 @@ export interface VideoAudio {
   bitrate?: number;
 }
 
+/**
+ * A frame for {@link encodeVideo}: RGBA pixels, and optionally when it is shown. Give `timestamp` on every frame or on
+ * none: without it frame n shows at n / fps.
+ */
+export interface VideoInputFrame extends HeadlessPixels {
+  /** Seconds, counted from the first frame's `timestamp`; each frame's later than the one before. Default none. */
+  timestamp?: number;
+  /** Seconds the last timed frame is shown. Default the gap before it, or 1 / fps for a single frame. Other frames last
+   * until the next one. */
+  duration?: number;
+}
+
 /** Options of {@link encodeVideo}. */
 export interface EncodeVideoOptions {
   /** JSON provenance embedded in WebM tags or an MP4 user-data box. Default none. */
@@ -128,7 +217,8 @@ export interface EncodeVideoOptions {
   format?: 'webm' | 'mp4';
   /** Frames per second. Default 30. */
   fps?: number;
-  /** WebCodecs codec string. WebM takes `vp8`, `vp09.*` and `av01.*`; MP4 takes `avc1.*`, `vp09.*` and `av01.*`.
+  /** WebCodecs codec string. WebM takes `vp8`, `vp09.*` and `av01.*`; MP4 takes `avc1.*`, `hvc1.*`, `hev1.*`,
+   * `vp09.*` and `av01.*`.
    * Default the first the runtime supports: VP9, VP8, AV1 for WebM; H.264, VP9, AV1 for MP4. */
   codec?: string;
   /** Bits per second. Default `width * height * fps / 10`, about 6 Mbit/s at 1920 x 1080 and 30 fps. */
@@ -137,6 +227,9 @@ export interface EncodeVideoOptions {
   keyFrameInterval?: number;
   /** Sound for the file: Opus in WebM, and AAC or else Opus in MP4. Default none. */
   audio?: VideoAudio;
+  /** Keep the frames' alpha: a second encoder codes it, and WebM carries it beside each frame (VP9, else VP8; WebM
+   * only, as MP4 has no binding for it). Pixels are straight alpha, as `readPixels` gives them. Default false. */
+  alpha?: boolean;
   /** Where `VideoEncoder` and `VideoFrame` come from. Default `globalThis`. */
   webCodecs?: WebCodecsBinding;
   /** Stops encoding; the promise rejects with the signal's reason. Default none. */
@@ -158,13 +251,16 @@ export interface EncodedVideo {
   duration: number;
   /** The sound codec used, when the file has sound. */
   audioCodec?: 'opus' | 'aac';
+  /** True when the file carries alpha. */
+  alpha?: boolean;
 }
 
 const CODECS = {
     webm: ['vp09.00.51.08', 'vp8', 'av01.0.13M.08'],
     mp4: ['avc1.640033', 'avc1.4d0033', 'avc1.420033', 'vp09.00.51.08', 'av01.0.13M.08'],
   },
-  ALLOWED = { webm: ['vp8', 'vp09', 'av01'], mp4: ['avc1', 'vp09', 'av01'] },
+  ALLOWED = { webm: ['vp8', 'vp09', 'av01'], mp4: ['avc1', 'hvc1', 'hev1', 'vp09', 'av01'] },
+  ALPHA = /^(vp8|vp09\.)/, // The codecs whose Matroska mappings carry alpha.
   QUEUE = 4, // Frames waiting in the encoder before the source is asked for more.
   BITS_PER_PIXEL = 0.1;
 
@@ -172,15 +268,22 @@ async function supportedConfig(
   Encoder: typeof VideoEncoder,
   format: 'webm' | 'mp4',
   codec: string | undefined,
+  alpha: boolean,
   base: Omit<VideoEncoderConfig, 'codec'>,
 ): Promise<VideoEncoderConfig> {
-  for (const candidate of codec === undefined ? CODECS[format] : [codec]) {
+  for (const candidate of codec === undefined ? CODECS[format].filter((name) => !alpha || ALPHA.test(name)) : [codec]) {
     if (!ALLOWED[format].includes(candidate.split('.')[0]))
       throw rangeError('This codec does not fit this container', 'headless');
+    // H.264 and H.265 4:2:0 state a picture size in steps of two (H.264 7.4.2.1.1 CropUnitX and CropUnitY; H.265
+    // 7.4.3.2.1 SubWidthC and SubHeightC), so an odd frame gains a repeated last column or row there.
+    const even = /^(avc1|hvc1|hev1)\./.test(candidate);
     const config: VideoEncoderConfig = {
       ...base,
+      ...(even ? { width: base.width + (base.width & 1), height: base.height + (base.height & 1) } : {}),
       codec: candidate,
       ...(candidate.startsWith('avc1') ? { avc: { format: 'avc' } } : {}),
+      // Length-prefixed units with the parameter sets in `description` (WebCodecs HEVC registration, HevcEncoderConfig).
+      ...(/^(hvc1|hev1)\./.test(candidate) ? { hevc: { format: 'hevc' } } : {}),
     };
     if ((await Encoder.isConfigSupported(config)).supported) return config;
   }
@@ -419,49 +522,79 @@ async function encodeSound(
   return { codec, sampleRate, channels: channels.length, description, samples, ...(leadIn ? { leadIn } : {}) };
 }
 
-/**
- * Encodes frames to a WebM or MP4 file in memory with WebCodecs. Frames are all one size, and alpha is dropped. Frames
- * are asked for only as the encoder keeps up, so {@link renderFrames} can feed it directly. `audio` adds a sound track.
- */
-export async function encodeVideo(
-  frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>,
-  {
-    format = 'webm',
-    fps = 30,
-    codec,
-    bitrate,
-    keyFrameInterval = 2,
-    audio,
-    provenance,
-    maxBytes = 512 * 1024 * 1024,
-    webCodecs = globalThis as unknown as WebCodecsBinding,
-    signal,
-  }: EncodeVideoOptions = {},
-): Promise<EncodedVideo> {
-  if (format !== 'webm' && format !== 'mp4') throw typeError('Video format: webm or mp4', 'headless');
+/** What the encoder has given so far, and the stream's settings once known. */
+interface EncodedBatch {
+  samples: VideoSample[];
+  config: VideoEncoderConfig;
+  description?: Uint8Array;
+  /** The frames have their own times. */
+  timed: boolean;
+}
+
+/** How a run of {@link encodeSamples} ended. */
+interface EncodedRun {
+  config: VideoEncoderConfig;
+  description?: Uint8Array;
+  /** Seconds: where the last frame ends. */
+  end: number;
+  timed: boolean;
+}
+
+type SampleOptions = Required<
+  Pick<EncodeVideoOptions, 'format' | 'fps' | 'keyFrameInterval' | 'maxBytes' | 'webCodecs' | 'alpha'>
+> &
+  Pick<EncodeVideoOptions, 'codec' | 'bitrate' | 'signal'>;
+
+function checkOptions({ format, fps, maxBytes, keyFrameInterval, bitrate, webCodecs, alpha, codec }: SampleOptions): void {
   checkFps(fps);
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1)
+  if (alpha && (format !== 'webm' || (codec !== undefined && !ALPHA.test(codec))))
+    throw fault('unsupported', 'Alpha video needs WebM with VP9 or VP8', 'headless');
+  if (maxBytes !== Number.POSITIVE_INFINITY && (!Number.isSafeInteger(maxBytes) || maxBytes < 1))
     throw rangeError('maxBytes must be a positive safe integer', 'headless');
   if (!(keyFrameInterval > 0) || !Number.isFinite(keyFrameInterval))
     throw rangeError('Invalid keyFrameInterval', 'headless');
   if (bitrate !== undefined && (!(bitrate > 0) || !Number.isFinite(bitrate)))
     throw rangeError('Invalid bitrate', 'headless');
-  const { VideoEncoder: Encoder, VideoFrame: Frame } = webCodecs;
-  if (!Encoder || !Frame) throw fault('unsupported', 'encodeVideo needs WebCodecs', 'headless');
-  signal?.throwIfAborted();
+  if (!webCodecs?.VideoEncoder || !webCodecs.VideoFrame)
+    throw fault('unsupported', 'Encoding video needs WebCodecs', 'headless');
+}
 
+/**
+ * Feeds frames to a WebCodecs encoder and yields its samples, in decode order, as they come out: after each frame and
+ * after the final flush. Frames are asked for only as the encoder keeps up. Stopping the iteration closes the encoder.
+ */
+async function* encodeSamples(
+  frames: AsyncIterable<VideoInputFrame> | Iterable<VideoInputFrame>,
+  { format, fps, codec, bitrate, keyFrameInterval, maxBytes, webCodecs, alpha, signal }: SampleOptions,
+): AsyncGenerator<EncodedBatch, EncodedRun, void> {
+  const { VideoEncoder: Encoder, VideoFrame: Frame } = webCodecs;
+  signal?.throwIfAborted();
   const samples: VideoSample[] = [],
     keyEvery = Math.max(1, Math.round(keyFrameInterval * fps)),
     stamp = (index: number) => Math.round((index * 1e6) / fps);
+  // With alpha, a second encoder codes the alpha planes; its frames wait here to be paired with the colour by time.
+  const colours: VideoSample[] = [],
+    alphas: VideoSample[] = [];
   let encoder: VideoEncoder | undefined,
+    alphaEncoder: VideoEncoder | undefined,
     config: VideoEncoderConfig | undefined,
+    frameWidth = 0,
+    frameHeight = 0,
     description: Uint8Array | undefined,
-    colorSpace: VideoColorSpaceInit | undefined,
     failure: unknown,
     failed = false,
     wake = () => {},
     count = 0,
-    encodedBytes = 0;
+    encodedBytes = 0,
+    // Frames with their own times: none known yet (undefined), timed or not. A timed frame waits for the next one,
+    // which gives its duration.
+    timed: boolean | undefined,
+    origin = 0,
+    lastTime = 0,
+    gap = 0,
+    lastKey = Number.NEGATIVE_INFINITY,
+    held: { planes: Uint8Array; alpha?: Uint8Array; time: number; duration?: number } | undefined,
+    end = 0;
   const live = () => {
       signal?.throwIfAborted();
       if (failed) throw failure;
@@ -469,14 +602,71 @@ export async function encodeVideo(
     nudge = () => wake(),
     aborted = new Promise<never>((_, reject) => {
       signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
-    });
+    }),
+    batch = (): EncodedBatch => ({ samples: samples.splice(0), config: config!, description, timed: !!timed });
   aborted.catch(() => {}); // Read through the race below; an abort may come when nothing is racing it.
   signal?.addEventListener('abort', nudge, { once: true });
   try {
-    for await (const { width, height, data } of frames) {
+    // One frame to the encoder, and its alpha to the alpha encoder, `time` and `duration` in seconds from the first frame.
+    const submit = async (
+      planes: Uint8Array,
+      alphaPlanes: Uint8Array | undefined,
+      time: number,
+      duration: number,
+      key: boolean,
+    ) => {
+      while (encoder!.encodeQueueSize >= QUEUE || (alphaEncoder?.encodeQueueSize ?? 0) >= QUEUE) {
+        await new Promise<void>((resolve) => (wake = resolve));
+        live();
+      }
+      const timestamp = Math.round(time * 1e6);
+      for (const [into, data] of [
+        [encoder!, planes],
+        [alphaEncoder, alphaPlanes],
+      ] as const) {
+        if (!into || !data) continue;
+        const picture = new Frame(data, {
+          format: 'I420',
+          codedWidth: config!.width,
+          codedHeight: config!.height,
+          colorSpace: SAMPLE_SPACE,
+          timestamp,
+          duration: Math.round((time + duration) * 1e6) - timestamp,
+        });
+        try {
+          into.encode(picture, { keyFrame: key });
+        } finally {
+          picture.close();
+        }
+      }
+      end = time + duration;
+    };
+    // A held timed frame, now that its duration is known; key frames come keyFrameInterval seconds apart.
+    const release = async (duration: number) => {
+      const { planes, alpha: alphaPlanes, time } = held!,
+        key = time - lastKey >= keyFrameInterval - 1e-9;
+      if (key) lastKey = time;
+      held = undefined;
+      await submit(planes, alphaPlanes, time, duration, key);
+    };
+    for await (const input of frames) {
+      const { width, height, data } = input,
+        stamped = input.timestamp !== undefined;
       live();
+      timed ??= stamped;
+      if (stamped !== timed) throw rangeError('Give every video frame a timestamp, or none of them', 'headless');
+      if (timed) {
+        const { timestamp, duration } = input;
+        if (typeof timestamp !== 'number' || !Number.isFinite(timestamp))
+          throw rangeError('A video frame timestamp is a finite number of seconds', 'headless');
+        if (duration !== undefined && !(typeof duration === 'number' && duration > 0 && Number.isFinite(duration)))
+          throw rangeError('A video frame duration is a positive number of seconds', 'headless');
+        if (count === 0) origin = timestamp;
+        else if (!(timestamp - origin > lastTime)) throw rangeError('Video frame timestamps must increase', 'headless');
+      }
       if (!encoder) {
-        config = await supportedConfig(Encoder, format, codec, {
+        [frameWidth, frameHeight] = [width, height];
+        config = await supportedConfig(Encoder, format, codec, alpha, {
           width,
           height,
           framerate: fps,
@@ -484,79 +674,242 @@ export async function encodeVideo(
           latencyMode: 'quality',
         });
         live();
-        encoder = new Encoder({
-          output(chunk, metadata) {
-            encodedBytes += chunk.byteLength;
-            if (encodedBytes > maxBytes) {
-              failure = rangeError('Encoded video exceeds maxBytes', 'headless');
-              failed = true;
-              wake();
-              return;
-            }
-            const bytes = new Uint8Array(chunk.byteLength);
-            chunk.copyTo(bytes);
-            samples.push({
-              data: bytes,
-              timestamp: chunk.timestamp,
-              duration: chunk.duration ?? 0,
-              key: chunk.type === 'key',
-            });
-            const decoder = metadata?.decoderConfig;
-            if (decoder?.description) description = copyBytes(decoder.description);
-            if (decoder?.colorSpace) colorSpace = decoder.colorSpace;
-            wake();
-          },
-          error(error) {
+        const error = (error: unknown) => {
             failure = error;
             failed = true;
             wake();
           },
-        });
+          // Output into `into`; frames go out once each has its alpha, which the two encoders give in the same order.
+          output = (into: VideoSample[]) => (chunk: EncodedVideoChunk, metadata?: EncodedVideoChunkMetadata) => {
+            encodedBytes += chunk.byteLength;
+            if (encodedBytes > maxBytes) return error(rangeError('Encoded video exceeds maxBytes', 'headless'));
+            const bytes = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(bytes);
+            into.push({ data: bytes, timestamp: chunk.timestamp, duration: chunk.duration ?? 0, key: chunk.type === 'key' });
+            const decoder = metadata?.decoderConfig;
+            if (into === colours && decoder?.description) description = copyBytes(decoder.description);
+            for (; colours.length && (!alpha || alphas.length); ) {
+              const sample = colours.shift()!,
+                mask = alphas.shift();
+              if (mask && mask.timestamp !== sample.timestamp)
+                return error(fault('failed', 'The alpha encoder gave a frame the colour encoder did not', 'headless'));
+              // A seek lands on a key frame, so it is one only when both its colour and its alpha start afresh.
+              samples.push(mask ? { ...sample, key: sample.key && mask.key, alpha: mask.data } : sample);
+            }
+            wake();
+          };
+        encoder = new Encoder({ output: output(colours), error });
         encoder.addEventListener('dequeue', nudge);
         encoder.configure(config);
-      } else if (width !== config!.width || height !== config!.height)
+        if (alpha) {
+          alphaEncoder = new Encoder({ output: output(alphas), error });
+          alphaEncoder.addEventListener('dequeue', nudge);
+          alphaEncoder.configure(config);
+        }
+      } else if (width !== frameWidth || height !== frameHeight)
         throw rangeError('Video frames must all be one size', 'headless');
       if (data.length !== width * height * 4) throw rangeError('Frame data does not match its size', 'headless');
-      while (encoder.encodeQueueSize >= QUEUE) {
-        await new Promise<void>((resolve) => (wake = resolve));
-        live();
-      }
-      const picture = new Frame(data, {
-        format: 'RGBA',
-        codedWidth: width,
-        codedHeight: height,
-        timestamp: stamp(count),
-        duration: stamp(count + 1) - stamp(count),
-      });
-      try {
-        encoder.encode(picture, { keyFrame: count % keyEvery === 0 });
-      } finally {
-        picture.close();
-      }
+      const planes = rgbaToI420(data, width, height, config!.width, config!.height),
+        alphaPlanes = alpha ? alphaToI420(data, width, height) : undefined;
+      if (timed) {
+        const time = input.timestamp! - origin;
+        if (held) {
+          gap = time - held.time;
+          await release(gap);
+        }
+        held = { planes, alpha: alphaPlanes, time, duration: input.duration };
+        lastTime = time;
+      } else
+        await submit(
+          planes,
+          alphaPlanes,
+          stamp(count) / 1e6,
+          (stamp(count + 1) - stamp(count)) / 1e6,
+          count % keyEvery === 0,
+        );
       count++;
+      if (samples.length) yield batch();
     }
     if (!encoder) throw fault('state', 'No frames to encode', 'headless');
-    await Promise.race([encoder.flush(), aborted]);
+    if (held) await release(held.duration ?? (count > 1 ? gap : 1 / fps));
+    await Promise.race([Promise.all([encoder.flush(), alphaEncoder?.flush()]), aborted]);
     live();
+    if (colours.length || alphas.length)
+      throw fault('failed', 'The alpha encoder gave a different number of frames than the colour encoder', 'headless');
+    if (samples.length) yield batch();
   } finally {
     signal?.removeEventListener('abort', nudge);
-    if (encoder && encoder.state !== 'closed') encoder.close();
+    for (const one of [encoder, alphaEncoder]) if (one && one.state !== 'closed') one.close();
   }
-  const { codec: used, width, height } = config!;
-  if (used.startsWith('avc1') && !description)
-    throw fault('failed', 'The encoder gave no H.264 description', 'headless');
-  const track = { codec: used, width, height, fps, description, colorSpace, provenance },
+  const used = config!.codec;
+  if (used.startsWith('avc1') && !description) throw fault('failed', 'The encoder gave no H.264 description', 'headless');
+  if ((used.startsWith('hvc1') || used.startsWith('hev1')) && !description)
+    throw fault('failed', 'The encoder gave no H.265 description', 'headless');
+  return { config: config!, description, end, timed: !!timed };
+}
+
+/** RFC 6381: the codecs parameter names every stream in the file, the sound's too. */
+const mimeOf = (format: 'webm' | 'mp4', codec: string, sound: SoundTrack | undefined) =>
+  `video/${format}; codecs="${codec}${sound ? (sound.codec === 'aac' ? ',mp4a.40.2' : ',opus') : ''}"`;
+
+/**
+ * Encodes frames to a WebM or MP4 file in memory with WebCodecs. Frames are all one size; alpha is dropped unless
+ * `alpha` keeps it (WebM, VP9 or VP8). Frames are asked for only as the encoder keeps up, so {@link renderFrames} can
+ * feed it directly. `audio` adds a sound track.
+ */
+export async function encodeVideo(
+  frames: AsyncIterable<VideoInputFrame> | Iterable<VideoInputFrame>,
+  {
+    format = 'webm',
+    fps = 30,
+    codec,
+    bitrate,
+    keyFrameInterval = 2,
+    audio,
+    alpha = false,
+    provenance,
+    maxBytes = 512 * 1024 * 1024,
+    webCodecs = globalThis as unknown as WebCodecsBinding,
+    signal,
+  }: EncodeVideoOptions = {},
+): Promise<EncodedVideo> {
+  if (format !== 'webm' && format !== 'mp4') throw typeError('Video format: webm or mp4', 'headless');
+  const options = { format, fps, codec, bitrate, keyFrameInterval, maxBytes, webCodecs, alpha, signal };
+  checkOptions(options);
+  const run = encodeSamples(frames, options),
+    samples: VideoSample[] = [];
+  let step: IteratorResult<EncodedBatch, EncodedRun>;
+  while (!(step = await run.next()).done) for (const sample of step.value.samples) samples.push(sample);
+  const {
+      config: { codec: used, width, height },
+      description,
+      end,
+      timed,
+    } = step.value,
+    track = {
+      codec: used,
+      width,
+      height,
+      fps,
+      description,
+      colorSpace: SAMPLE_SPACE,
+      provenance,
+      ...(timed ? { variable: true } : {}),
+      ...(alpha ? { alpha } : {}),
+    },
     sound = audio ? await encodeSound(audio, format, webCodecs, signal) : undefined;
   return {
     bytes: (format === 'webm'
       ? muxWebM(track, samples, sound)
       : muxMP4(track, samples, sound)) as Uint8Array<ArrayBuffer>,
-    mimeType: `video/${format}; codecs="${used}"`,
+    mimeType: mimeOf(format, used, sound),
     codec: used,
     width,
     height,
     frames: samples.length,
-    duration: stamp(count) / 1e6,
+    duration: Math.round(end * 1e6) / 1e6,
     ...(sound ? { audioCodec: sound.codec } : {}),
+    ...(alpha ? { alpha } : {}),
+  };
+}
+
+/** Options of {@link streamVideo}: those of {@link encodeVideo} less `maxBytes`, as only one key frame interval is held. */
+export interface StreamVideoOptions extends Omit<EncodeVideoOptions, 'format' | 'maxBytes'> {
+  /** Container: fragmented MP4, or WebM written as a live stream. Default `'mp4'`. */
+  format?: 'mp4' | 'webm';
+}
+
+/** What {@link streamVideo} returns when its iteration ends: {@link EncodedVideo} without the bytes, already given. */
+export type StreamedVideo = Omit<EncodedVideo, 'bytes'>;
+
+/**
+ * Encodes frames to a video file and yields it in pieces as it is made, so only one key frame interval of encoded video
+ * is held at a time and a long render needs no `maxBytes`. Write each piece as it comes, to a file, a socket or a
+ * `WritableStream` (`ReadableStream.from(streamVideo(...))`). The pieces joined are a whole file, and all but the last
+ * are what Media Source Extensions take.
+ *
+ * - `'mp4'` (the default): a fragmented MP4 (ISO/IEC 14496-12 8.8): the header (`ftyp` and `moov`) once the encoder has
+ *   given its configuration, one `moof` and `mdat` per key frame interval, then an `mfra` index for seeking.
+ * - `'webm'`: a WebM written as a live stream (RFC 9559 6.2): the header, whose Segment has an unknown size and which so
+ *   states no duration, one Cluster per key frame interval, then the Cues. `alpha` keeps the frames' alpha (VP9 or VP8),
+ *   as {@link encodeVideo} does.
+ *
+ * The iteration's return value describes the file. Stopping the iteration (`break`, or `signal`) closes the encoder.
+ */
+export async function* streamVideo(
+  frames: AsyncIterable<VideoInputFrame> | Iterable<VideoInputFrame>,
+  given: StreamVideoOptions = {},
+): AsyncGenerator<Uint8Array<ArrayBuffer>, StreamedVideo, void> {
+  const {
+    format = 'mp4',
+    fps = 30,
+    codec,
+    bitrate,
+    keyFrameInterval = 2,
+    audio,
+    alpha = false,
+    provenance,
+    webCodecs = globalThis as unknown as WebCodecsBinding,
+    signal,
+  } = given;
+  if (format !== 'webm' && format !== 'mp4') throw typeError('Video format: webm or mp4', 'headless');
+  const options = {
+    format,
+    fps,
+    codec,
+    bitrate,
+    keyFrameInterval,
+    maxBytes: Number.POSITIVE_INFINITY,
+    webCodecs,
+    alpha,
+    signal,
+  };
+  checkOptions(options);
+  // The sound is given whole, so it is encoded first and each fragment carries the stretch of it beside its frames.
+  const sound = audio ? await encodeSound(audio, format, webCodecs, signal) : undefined,
+    run = encodeSamples(frames, options);
+  let writer: FragmentedMP4 | StreamedWebM | undefined,
+    count = 0,
+    step: IteratorResult<EncodedBatch, EncodedRun>;
+  // Stopping this iteration early stops the encoder's too, which closes the encoder.
+  try {
+    while (!(step = await run.next()).done) {
+      const { samples, config, description, timed } = step.value;
+      for (const sample of samples) {
+        writer ??= new (format === 'webm' ? StreamedWebM : FragmentedMP4)(
+          {
+            codec: config.codec,
+            width: config.width,
+            height: config.height,
+            fps,
+            description,
+            colorSpace: SAMPLE_SPACE,
+            provenance,
+            ...(timed ? { variable: true } : {}),
+            ...(alpha ? { alpha } : {}),
+          },
+          sound,
+        );
+        count++;
+        for (const piece of writer.add(sample)) yield piece as Uint8Array<ArrayBuffer>;
+      }
+    }
+  } finally {
+    await run.return(undefined as never);
+  }
+  const {
+    config: { codec: used, width, height },
+    end,
+  } = step.value;
+  for (const piece of writer!.finish()) yield piece as Uint8Array<ArrayBuffer>;
+  return {
+    mimeType: mimeOf(format, used, sound),
+    codec: used,
+    width,
+    height,
+    frames: count,
+    duration: Math.round(end * 1e6) / 1e6,
+    ...(sound ? { audioCodec: sound.codec } : {}),
+    ...(alpha ? { alpha } : {}),
   };
 }

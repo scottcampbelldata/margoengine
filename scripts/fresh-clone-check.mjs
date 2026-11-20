@@ -1,7 +1,7 @@
 // What a fresh clone runs, run in one (`npm run check:fresh-clone`, part of check:merge and the nightly job): the
 // working tree (tracked and untracked, not ignored) is committed as a parentless snapshot, fetched with --depth 1 into a
 // temporary folder, so the clone holds that one commit and no history at all, given this checkout's third-party
-// node_modules offline (junctions; @margoengine/* point at the clone's own packages); then `npm run verify` and the
+// node_modules offline (hard links; @margoengine/* are junctions to the clone's own packages); then `npm run verify` and the
 // proof runner run in it.
 // It fails when verify fails, and on any --current proof that fails, is HISTORICAL or prints a message about a
 // missing commit, object or baseline (they read golden outputs from baselines/ only). A fresh clone of main once failed
@@ -14,6 +14,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
@@ -99,17 +100,58 @@ export function snapshot(scratch) {
   }).trim();
 }
 
-/** node_modules for the clone: third-party entries are junctions to this checkout's, @margoengine/* to the clone's. */
-function linkModules(clone) {
-  const source = join(root, 'node_modules'),
-    target = join(clone, 'node_modules');
+/**
+ * The folder the clone goes in: under the temporary folder by its real (long) path. On Windows os.tmpdir() can be a
+ * short 8.3 path (a home folder named like ABCDEF~1), and Vite compares its allow list, built from the folder it starts in as given,
+ * with each file's real path, so every dev server in a clone under the short path answered 403 (check:dev-servers in
+ * the 2026-11-15 nightly). A developer's clone sits under its real path; so does this one.
+ */
+export function scratchFolder(tmp = tmpdir()) {
+  return mkdtempSync(join(realpathSync.native(tmp), 'margo-fresh-clone-'));
+}
+
+/**
+ * Gives `target` the tree at `source` as hard links (copies across volumes), keeping the directory links in it as
+ * junctions to where they point. A junction to this checkout's package would put the package's real path outside the
+ * clone, and a bundler that keeps to the project root (Next.js's Turbopack) then cannot read it: `next dev` and
+ * `next build` in the clone failed with "Could not find the Next.js package" and, with next itself in the clone, with
+ * "Can't resolve '@swc/helpers/...'". A hard link is the same file under a second name: nothing is copied, and
+ * removing the clone removes only its names.
+ */
+export function linkTree(source, target) {
+  mkdirSync(target, { recursive: true });
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const from = join(source, entry.name),
+      to = join(target, entry.name);
+    if (entry.isSymbolicLink()) {
+      const real = realpathSync(from);
+      if (lstatSync(real).isDirectory()) symlinkSync(real, to, 'junction');
+      else copyFileSync(real, to);
+    } else if (entry.isDirectory()) linkTree(from, to);
+    else hardLink(from, to);
+  }
+}
+
+/** `linkSync`, or a copy where the two folders are on different volumes (EXDEV: a hard link cannot cross one). */
+function hardLink(from, to) {
+  try {
+    linkSync(from, to);
+  } catch (error) {
+    if (error.code !== 'EXDEV') throw error;
+    copyFileSync(from, to);
+  }
+}
+
+/** node_modules for the clone: third-party entries are hard-linked from this checkout's (linkTree), @margoengine/*
+ * are junctions to the clone's own packages. */
+export function linkModules(clone, source = join(root, 'node_modules')) {
+  const target = join(clone, 'node_modules');
   if (!existsSync(source)) throw new Error('fresh-clone: run npm ci in this checkout first');
   mkdirSync(join(target, '@margoengine'), { recursive: true });
   for (const name of readdirSync(source))
-    if (name !== '@margoengine' && name !== 'margoengine' && name !== '.bin' && !name.startsWith('.'))
-      symlinkSync(realpathSync(join(source, name)), join(target, name), 'junction');
-  if (existsSync(join(source, '.bin')))
-    symlinkSync(realpathSync(join(source, '.bin')), join(target, '.bin'), 'junction');
+    if (name !== '@margoengine' && name !== 'margoengine' && !name.startsWith('.'))
+      linkTree(realpathSync(join(source, name)), join(target, name));
+  if (existsSync(join(source, '.bin'))) linkTree(realpathSync(join(source, '.bin')), join(target, '.bin'));
   for (const dir of readdirSync(join(clone, 'packages'))) {
     const manifest = join(clone, 'packages', dir, 'package.json');
     if (!existsSync(manifest)) continue;
@@ -144,7 +186,7 @@ async function main() {
   const pinned = process.argv.includes('--pinned'),
     keep = process.argv.includes('--keep'),
     started = Date.now();
-  const folder = mkdtempSync(join(tmpdir(), 'margo-fresh-clone-')),
+  const folder = scratchFolder(),
     clone = join(folder, 'clone');
   try {
     // A side-by-side check:merge snapshots right after verify, as the serial order does, before any step beside this

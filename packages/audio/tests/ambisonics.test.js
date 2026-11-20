@@ -44,7 +44,7 @@ test('unsupported formats/channels and invalid settings fail before allocating a
  assert.equal(s.nodes.length,0);
  s.listener.dispose();
 });
-test('exact camera poles and roll follow camera up; degenerate manual poses retain a finite decoder',()=>{
+test('exact camera poles and roll follow camera up; a manual pose looking along up decodes as the top view',()=>{
  const s=setup(),engine=fakeEngine();s.listener.setup(engine);
  const bed=new AmbisonicAudio(s.listener,s.buffer);let after=0;
  s.listener.addSource({update(){after++;},dispose(){}});
@@ -56,11 +56,14 @@ test('exact camera poles and roll follow camera up; degenerate manual poses reta
  }
  engine.camera.position=[0,0,10];engine.camera.up=[1,0,0];s.listener.update();
  near(coefficients(s),[.5,0,.25,Math.sqrt(3)/4,.5,0,-.25,Math.sqrt(3)/4]);
- const before=coefficients(s);s.listener.follow(null).setPose([0,0,0],[0,-1,0]);
- assert.doesNotThrow(()=>s.listener.update());near(coefficients(s),before);assert.equal(after,4);
+ // A manual pose looking straight down with the default up +Y: the listener makes up [0,0,-1], the top view's.
+ s.listener.follow(null).setPose([0,0,0],[0,-1,0]);
+ assert.doesNotThrow(()=>s.listener.update());near([...s.listener.up],[0,0,-1]);
+ const top=[.5,.25,-Math.sqrt(3)/4,0,.5,-.25,-Math.sqrt(3)/4,0];
+ near(coefficients(s),top);assert.equal(after,4);
  bed.dispose();const fresh=new AmbisonicAudio(s.listener,s.buffer);
  const initial=[...[...s.nodes[2].outputs]].map(n=>n.gain.value);
- near(initial,[.5,.25,0,Math.sqrt(3)/4,.5,-.25,0,Math.sqrt(3)/4]);fresh.dispose();s.listener.dispose();
+ near(initial,top);fresh.dispose();s.listener.dispose();
 });
 test('licensed external rain stimulus excerpt stays pinned with four discrete 24-bit channels',()=>{
  const base=new URL('./fixtures/',import.meta.url),record=JSON.parse(readFileSync(new URL('rain-foa.json',base)));

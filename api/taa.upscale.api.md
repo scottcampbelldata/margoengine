@@ -18,6 +18,9 @@ export class TAAUpscale implements EnginePlugin {
     constructor(options?: TAAUpscaleOptions);
     static attach(engine: EngineKernel, options?: TAAUpscaleOptions): TAAUpscale;
     reset(): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     protected capture(c: Context): void;
@@ -36,6 +39,7 @@ export interface TAAUpscaleOptions {
     depthThreshold?: number;
     clampGamma?: number;
     sharpen?: number;
+    settle?: boolean;
 }
 
 // Not exported from this entry, but used by the exports above:

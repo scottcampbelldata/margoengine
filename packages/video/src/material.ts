@@ -47,7 +47,7 @@ export function videoMaterial(
       if (cached !== undefined) return cached;
       const head = 'fn surface(i:Out,front:bool)->Surface {';
       if (!code.includes(head))
-        throw fault('unsupported', 'Video material surface missing; use matching materials and gltf-pro versions');
+        throw fault('unsupported', 'Video material surface missing; use matching materials and gltf/pbr versions');
       const start = code.indexOf(head),
         tail = code.slice(start),
         base = /s\.base=[^;]+;/;

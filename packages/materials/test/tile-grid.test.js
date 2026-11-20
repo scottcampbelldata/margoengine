@@ -139,3 +139,115 @@ test('padTileGrid rejects grids that do not fit and bad options with the fix in 
     { name: 'RangeError', message: /less padding/ },
   );
 });
+
+// A UV at a source texel's centre, written the way it samples the source Texture, lands on that texel in the padded
+// atlas. A drawable tileset is uploaded with flipY (top row at v = 1); remapTileUVs measured its v from the image's top
+// row, so every flipped tile but a middle one went to the wrong rows.
+test('remapTileUVs keeps each texel for raw and drawable (flipped) tilesets', () => {
+  const source = tileset(3, 3, 4, 2, 1, 2);
+  for (const flipped of [false, true]) {
+    if (flipped)
+      globalThis.OffscreenCanvas = class {
+        getContext() {
+          return { drawImage() {}, getImageData: () => source };
+        }
+      };
+    try {
+      const grid = padTileGrid(flipped ? { width: source.width, height: source.height } : source, {
+          tileWidth: 4,
+          tileHeight: 2,
+          padding: 1,
+          margin: 1,
+          spacing: 2,
+        }),
+        uvs = [],
+        tiles = [],
+        want = [];
+      assert.equal(grid.flipped, flipped);
+      for (let row = 0; row < 3; row++)
+        for (let column = 0; column < 3; column++)
+          for (let y = 0; y < 2; y++)
+            for (let x = 0; x < 4; x++) {
+              const sx = 1 + column * 6 + x,
+                sy = 1 + row * 4 + y;
+              uvs.push(
+                (sx + 0.5) / source.width,
+                flipped ? 1 - (sy + 0.5) / source.height : (sy + 0.5) / source.height,
+              );
+              tiles.push(row * 3 + column);
+              want.push([column, row, x, y]);
+            }
+      const out = remapTileUVs(uvs, tiles, grid, { width: source.width, height: source.height, margin: 1, spacing: 2 });
+      want.forEach((texel, i) =>
+        assert.deepEqual(
+          pixel(grid.image, Math.floor(out[i * 2] * grid.image.width), Math.floor(out[i * 2 + 1] * grid.image.height)),
+          texel,
+          `${flipped ? 'flipped' : 'raw'} texel ${texel}`,
+        ),
+      );
+    } finally {
+      delete globalThis.OffscreenCanvas;
+    }
+  }
+});
+
+// A long thin tileset (one row of 420 tiles of 16 x 8, padding 2) kept its source layout: an output 8,400 x 12 pixels,
+// under the area cap but wider than WebGPU's default maxTextureDimension2D (8,192), so creating its texture failed.
+// The tiles now wrap into more output rows within maxSize on both edges, and regions and remapTileUVs follow them.
+test('padTileGrid wraps a long thin grid so each output edge fits maxSize', () => {
+  const count = 420,
+    tw = 16,
+    th = 8,
+    width = count * tw,
+    data = new Uint8Array(width * th * 4);
+  for (let t = 0; t < count; t++)
+    for (let y = 0; y < th; y++)
+      for (let x = 0; x < tw; x++) data.set([t & 255, t >> 8, x, y], (y * width + t * tw + x) * 4);
+  const source = { width, height: th, data };
+  for (const flipped of [false, true]) {
+    if (flipped)
+      globalThis.OffscreenCanvas = class {
+        getContext() {
+          return { drawImage() {}, getImageData: () => source };
+        }
+      };
+    try {
+      const grid = padTileGrid(flipped ? { width, height: th } : source, { tileWidth: tw, tileHeight: th });
+      assert.equal(grid.flipped, flipped);
+      assert.deepEqual([grid.columns, grid.rows, grid.regions.length], [count, 1, count]);
+      assert.ok(grid.image.width <= 4096 && grid.image.height <= 4096, `${grid.image.width} x ${grid.image.height}`);
+      const uvs = [],
+        tiles = [],
+        want = [];
+      for (let t = 0; t < count; t++)
+        for (const [x, y] of [
+          [0, 0],
+          [tw - 1, th - 1],
+          [5, 3],
+        ]) {
+          const v = (y + 0.5) / th;
+          uvs.push((t * tw + x + 0.5) / width, flipped ? 1 - v : v);
+          tiles.push(t);
+          want.push([t & 255, t >> 8, x, y]);
+        }
+      const out = remapTileUVs(uvs, tiles, grid, { width, height: th });
+      want.forEach((texel, i) =>
+        assert.deepEqual(
+          pixel(grid.image, Math.floor(out[i * 2] * grid.image.width), Math.floor(out[i * 2 + 1] * grid.image.height)),
+          texel,
+          `${flipped ? 'flipped' : 'raw'} texel ${texel}`,
+        ),
+      );
+      // The border copies stay inside each tile's padded cell: the texel left of a tile's first column is its own.
+      const r = grid.regions[300],
+        x0 = Math.round(r.offset[0] * grid.image.width) - 1,
+        y0 = Math.round(r.offset[1] * grid.image.height);
+      assert.deepEqual(pixel(grid.image, x0, y0).slice(0, 2), [300 & 255, 300 >> 8]);
+    } finally {
+      delete globalThis.OffscreenCanvas;
+    }
+  }
+  assert.throws(() => padTileGrid(source, { tileWidth: tw, tileHeight: th, maxSize: 4097 }), RangeError);
+  const small = padTileGrid(source, { tileWidth: tw, tileHeight: th, maxSize: 1024 });
+  assert.ok(small.image.width <= 1024 && small.image.height <= 1024);
+});

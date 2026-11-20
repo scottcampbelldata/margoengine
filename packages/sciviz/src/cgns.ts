@@ -67,14 +67,26 @@ export async function readCGNS(input: FileInput, options: CGNSOptions = {}): Pro
       const arrays: Record<string, Float64Array> = Object.create(null);
       for (const n of await children(coords.path))
         if ((await label(n)) === 'DataArray_t') arrays[n.path.split('/').at(-1)!] = await data(n.path);
-      const x = arrays.CoordinateX ?? arrays.CoordinateR,
-        y = arrays.CoordinateY ?? arrays.CoordinateTheta,
+      // SIDS 7.1: one coordinate system per GridCoordinates, Cartesian (X, Y, Z) or cylindrical (R, Theta, Z).
+      const cylindrical = !!arrays.CoordinateR,
+        named = Object.keys(arrays).filter((k) => k.startsWith('Coordinate')),
+        allowed = cylindrical
+          ? ['CoordinateR', 'CoordinateTheta', 'CoordinateZ']
+          : ['CoordinateX', 'CoordinateY', 'CoordinateZ'],
+        x = cylindrical ? arrays.CoordinateR : arrays.CoordinateX,
+        y = cylindrical ? arrays.CoordinateTheta : arrays.CoordinateY,
         z = arrays.CoordinateZ;
-      if (!x) bad('CGNS coordinates need Cartesian X/Y/Z or cylindrical R/Theta/Z');
+      if (
+        !x ||
+        (cylindrical && !y) ||
+        named.some((k) => !allowed.includes(k)) ||
+        [y, z].some((a) => a && a.length !== x.length)
+      )
+        bad('CGNS coordinates need one Cartesian X/Y/Z or cylindrical R/Theta/Z set of equal lengths');
       const points = new Float64Array(x.length * 3);
       for (let i = 0; i < x.length; i++) {
-        points[i * 3] = arrays.CoordinateR ? x[i] * Math.cos(y[i]) : x[i];
-        points[i * 3 + 1] = arrays.CoordinateR ? x[i] * Math.sin(y[i]) : (y?.[i] ?? 0);
+        points[i * 3] = cylindrical ? x[i] * Math.cos(y![i]) : x[i];
+        points[i * 3 + 1] = cylindrical ? x[i] * Math.sin(y![i]) : (y?.[i] ?? 0);
         points[i * 3 + 2] = z?.[i] ?? 0;
       }
       const zoneType = (await ofLabel('ZoneType_t'))[0],

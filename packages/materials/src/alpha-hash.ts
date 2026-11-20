@@ -4,30 +4,20 @@
 // grids are blended so the pattern does not pop as the distance changes, and the blend's sum is remapped back to a
 // uniform distribution (the paper's CDF correction). The cell hash is pcg3d (Jarzynski and Olano 2020).
 import type { Material, MaterialFeature } from './built-material.js';
+import { alphaHashCode as code, hashedDepth } from '../../shared/alpha-hash.js';
 
 /** Options of `alphaHash()`. */
 export interface AlphaHashOptions {
   /** Noise cells per pixel: above 1 a finer grain, below 1 coarser. Default 1. */
   scale?: number;
   /**
-   * The alpha cutoff of the passes that do not run the colour shader (shadow maps, picking, contact shadows, TAA
-   * velocity), used while the material's own `alphaTest` is 0. Above 0, at most 1. Default 0.5.
+   * The alpha cutoff of picking and TAA velocity, which do not run the colour shader, used while the material's own
+   * `alphaTest` is 0. Shadow maps (`@margoengine/shadows`, `@margoengine/clustered`) and staging's contact shadows cut
+   * by the same hash as the colour pass instead, one noise cell per shadow-map texel, so a shadow fades with its
+   * object. Above 0, at most 1. Default 0.5.
    */
   cutoff?: number;
 }
-const code = (scale: string) => `fn margoHashCell(cell:vec3f)->f32 {
-  var v=bitcast<vec3u>(vec3i(floor(cell)))*1664525u+1013904223u;
-  v.x+=v.y*v.z; v.y+=v.z*v.x; v.z+=v.x*v.y; v^=v>>vec3u(16u); v.x+=v.y*v.z; v.y+=v.z*v.x; v.z+=v.x*v.y;
-  return f32(v.x>>8u)/16777216.0;
-}
-fn margoAlphaHash(p:vec3f)->f32 {
-  let footprint=max(length(dpdx(p)),length(dpdy(p))); let level=log2(${scale}/max(footprint,1e-20)); let low=floor(level);
-  let t=level-low; let x=mix(margoHashCell(p*exp2(low)),margoHashCell(p*exp2(low+1.0)),t); let a=max(min(t,1.0-t),1e-6);
-  let middle=(x-0.5*a)/(1.0-a); let spread=2.0*a*(1.0-a);
-  let edge=select(1.0-(1.0-x)*(1.0-x)/spread,x*x/spread,x<a);
-  return clamp(select(edge,middle,x>=a&&x<1.0-a),1e-6,1.0);
-}
-`;
 const cached = new Map<string, string>(),
   test = /if\(((?:margoAlphaTest&&)?f\.settings\.x>0\.5&&f\.settings\.x<1\.5&&s\.base\.a<)f\.settings\.y\)/g,
   place = /let p=f\.model\*vec4f\(([^;]*),1\);/;
@@ -42,7 +32,7 @@ function hashed(source: string, scale: string): string {
     .replace(test, (_, head: string) => `let margoCut=margoAlphaHash(i.margoObject);\n  if(${head}margoCut)`);
   if (!out.includes('o.margoObject=') || !out.includes('margoCut)'))
     throw new TypeError(
-      'alphaHash needs the standard gltf-pro PBR shader; use matching gltf-pro and materials versions',
+      'alphaHash needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions',
     );
   out = code(scale) + out;
   if (cached.size >= 64) cached.clear();
@@ -75,6 +65,8 @@ export function alphaHash(options: AlphaHashOptions = {}): MaterialFeature {
       else raised.delete(material);
     },
     shader: (source) => hashed(source, text),
+    // Shadow casters cut by the same hash, one cell per shadow-map texel (the record's castHashed).
+    castHashed: hashedDepth,
     attach(material) {
       if (material.alphaTest === 0) {
         material.alphaTest = cutoff;

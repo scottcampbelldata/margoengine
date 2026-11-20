@@ -2,7 +2,7 @@
 // through an id map the user fills after upload. Colliders are parts made invisible with CanCollide on. Runs anywhere.
 import type { Pixels } from './capture.js';
 import type { ExportScene, MaterialData } from './scene.js';
-import { collisionNodes, uvClips } from './uv-clips.js';
+import { collisionNodes, uniqueNamer, uvClips } from './uv-clips.js';
 
 /** Inputs of {@link createRobloxUVSwap}. */
 export interface RobloxUVOptions {
@@ -11,7 +11,6 @@ export interface RobloxUVOptions {
 }
 
 const lua = (text: string): string => JSON.stringify(text);
-const safe = (text: string): string => text.replace(/[^\w.-]+/g, '_');
 
 /**
  * UV animation for Roblox: one PNG per cel, cut from the material's texture at each key's offset and scale; `UVIds.luau`,
@@ -42,7 +41,9 @@ export async function createRobloxUVSwap(
 ): Promise<{ name: string; data: Uint8Array | string }[]> {
   const files: { name: string; data: Uint8Array | string }[] = [],
     ids: string[] = [],
-    tracks: string[] = [];
+    tracks: string[] = [],
+    // Each cel is a file and a UVIds key, so two cels whose names clean up alike must not share one.
+    celName = uniqueNamer();
   const { png } = await import('./png.js');
   for (const { clip, material, materialName, paths, keys } of uvClips(scene)) {
     const { data, width, height } = texture(material);
@@ -64,7 +65,7 @@ export async function createRobloxUVSwap(
       const cel = new Uint8Array(w * h * 4);
       for (let row = 0; row < h; row++)
         cel.set(data.subarray(((y + row) * width + x) * 4, ((y + row) * width + x + w) * 4), row * w * 4);
-      const name = safe(`${clip}_${materialName}_${k}`);
+      const name = celName(`${clip}_${materialName}_${k}`);
       files.push({ name: `cels/${name}.png`, data: await png({ data: cel, width: w, height: h }, Infinity, false) });
       ids.push(`	[${lua(name)}] = "",`);
       steps.push(`{ time = ${time}, cel = ${lua(name)} }`);

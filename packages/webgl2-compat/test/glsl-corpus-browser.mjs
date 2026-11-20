@@ -1,3 +1,4 @@
+// MARGO_COMPAT not applicable: the page compiles the layer's GLSL in WebGL2 directly and makes no WebGPU calls.
 // The GLSL back end against the whole WGSL corpus in a real WebGL2 compiler (run by `npm run test:browser`, part of
 // check:merge). Every recorded render pipeline is translated (storage buffers read through data textures, milestone
 // M4) and its two shaders compiled and linked together; every vertex and fragment entry point of the corpus is

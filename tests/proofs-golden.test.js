@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
+import { endRecorder } from './support/end-recorder.js';
 import {
   canonicalNaN,
   commitsOf,
@@ -164,14 +165,16 @@ revision('0000000000000000000000000000000000000001');`,
   }
 });
 
-/** Stored baselines in `store` naming a commit that Git at `cwd` cannot resolve, as "<proof>: <commit>" (golden.js
- * commitsOf: the reference and the commits the facts name, which capturing again asks Git for). */
-function unresolved(store, cwd) {
+/** Stored baselines in `store` naming a commit that is not in the history of HEAD at `cwd`, as "<proof>: <commit>"
+ * (golden.js commitsOf: the reference and the commits the facts name, which capturing again asks Git for). Resolving is
+ * not enough: a commit that was amended or rebased away still resolves in the checkout that made it, so the check there
+ * passed and every other clone failed (lines-perspective named b6e6955f50, the Mac's pre-rebase id of a63f7433a1). */
+function unreachable(store, cwd) {
   const missing = [];
   for (const file of readdirSync(store).filter((name) => name.endsWith('.json'))) {
     const entry = JSON.parse(readFileSync(join(store, file), 'utf8'));
     for (const commit of commitsOf(entry)) {
-      const found = spawnSync('git', ['rev-parse', '--verify', '--quiet', '--end-of-options', `${commit}^{commit}`], {
+      const found = spawnSync('git', ['merge-base', '--is-ancestor', '--end-of-options', commit, 'HEAD'], {
         cwd,
         stdio: 'ignore',
       });
@@ -181,7 +184,7 @@ function unresolved(store, cwd) {
   return missing;
 }
 
-test('every commit a stored baseline names resolves, so capturing it again never needs history the clone lacks', () => {
+test('every commit a stored baseline names is in the history of HEAD, so capturing it again never needs history the clone lacks', () => {
   // A DOF fix was stranded (lane BB3, 2026-11-14): color-output and post-stack named eaddd64, 5b1fe66^ and 3319317,
   // commits only one checkout's pre-rewrite history held, so no clone could capture them again at the fix.
   assert.deepEqual(
@@ -208,12 +211,21 @@ test('every commit a stored baseline names resolves, so capturing it again never
     git('add', 'a.txt');
     git('commit', '-q', '-m', 'one');
     const head = git('rev-parse', '--short=9', 'HEAD');
+    // A commit that was amended away: it still resolves here, but HEAD's history no longer holds it.
+    writeFileSync(join(dir, 'a.txt'), 'b');
+    git('commit', '-q', '-a', '-m', 'two');
+    const amended = git('rev-parse', '--short=10', 'HEAD');
+    git('reset', '-q', '--hard', head);
+    git('commit', '-q', '--allow-empty', '-m', 'two, amended');
+    const kept = git('rev-parse', '--short=9', 'HEAD');
     mkdirSync(store);
-    const meta = (proof, facts) =>
-      writeFileSync(join(store, `${proof}.json`), JSON.stringify({ proof, ref: head, facts }));
-    meta('kept', { [`${head} descends from ${head}`]: true });
+    const meta = (proof, facts, ref = head) =>
+      writeFileSync(join(store, `${proof}.json`), JSON.stringify({ proof, ref, facts }));
+    meta('kept', { [`${kept} descends from ${head}`]: true });
     meta('stranded', { [`${head} descends from eaddd64`]: false });
-    assert.deepEqual(unresolved(store, dir), ['stranded: eaddd64']);
+    meta('rebased', {}, amended);
+    assert.equal(spawnSync('git', ['rev-parse', '--verify', '--quiet', `${amended}^{commit}`], { cwd: dir }).status, 0);
+    assert.deepEqual(unreachable(store, dir).sort(), [`rebased: ${amended}`, 'stranded: eaddd64']);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -224,7 +236,7 @@ test('every commit a stored baseline names resolves, so capturing it again never
     count = execFileSync('git', ['rev-list', '--count', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
   if (shallow === 'true' || count === '1') return;
   assert.deepEqual(
-    unresolved(join(proofs, 'baselines'), repo),
+    unreachable(join(proofs, 'baselines'), repo),
     [],
     'move each named commit to one on main and capture again',
   );
@@ -272,6 +284,42 @@ test('a pinned run whose commit this clone lacks is HISTORICAL with the commit n
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// KB-OWN-EXIT2: historical() once ended the proof with process.exit(0), which can hold a Node process for ever
+// (KB-OWN-EXIT1). It now unwinds with a Historical signal and the proof ends by its event loop with code 0, from an
+// awaited build as from a plain call, through a proof's own catch that passes the signal on (size.js), and an unrelated
+// error after it still fails the run.
+test('a HISTORICAL proof ends by its event loop with code 0, and a later error still fails it', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'margo-golden-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const { env, lines } = endRecorder(dir);
+  const missing = '0000000000000000000000000000000000000001';
+  const imports = `import { isHistorical, revision } from ${JSON.stringify(url('history.js'))};`;
+  const cases = [
+    ['plain', [`revision('${missing}');`, "throw new Error('not reached');"], 0],
+    [
+      'awaited',
+      [
+        'const build = async () => {',
+        '  await null;',
+        `  try { return revision('${missing}'); } catch (error) { if (isHistorical(error)) throw error; return 0; }`,
+        '};',
+        'await build();',
+        "throw new Error('not reached');",
+      ],
+      0,
+    ],
+    ['later error', ["setTimeout(() => { throw new Error('a later failure'); }, 10);", `revision('${missing}');`], 1],
+  ];
+  for (const [name, body, code] of cases) {
+    const ran = proof(dir, [imports, ...body].join('\n'), env);
+    assert.equal(ran.status, code, `${name}: ${ran.out}`);
+    assert.match(ran.out, /^HISTORICAL: tiny is pinned to 0{39}1/m, name);
+    assert.doesNotMatch(ran.out, /not reached/, name);
+    if (code) assert.match(ran.out, /a later failure/);
+  }
+  assert.deepEqual(lines(), ['undefined loop 0', 'undefined loop 0', 'undefined loop 1']);
 });
 
 // A proof that exits 0 as HISTORICAL passes, so only Git's own "no" may lead there. Any other failure of `git` once meant

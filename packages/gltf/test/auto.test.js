@@ -2,21 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerHooks } from 'node:module';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import { loadAuto } from '../dist/auto.js';
 import { sceneData } from '../dist/scene-data.js';
 import { encodeAttributes } from '../../decoders/tests/support/meshopt-encode.js';
 import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.js';
 
-// Stands in for gltf-pro, which needs a GPU; the real one runs in scripts/test-gltf-browser.mjs. Node keeps a resolved
-// module but not a failed resolve, so the test with no gltf-pro has to come first.
-let installed = false;
+// Stands in for gltf/pbr, which needs a GPU; the real one runs in scripts/test-gltf-browser.mjs.
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === '@margoengine/gltf-pro/instancing')
+    if (specifier === '@margoengine/gltf/pbr-instancing')
       return { url: 'data:text/javascript,export const instancing = { read() {} };', shortCircuit: true };
-    if (specifier !== '@margoengine/gltf-pro') return next(specifier, context);
-    if (!installed)
-      throw Object.assign(new Error(`Cannot find package '${specifier}'`), { code: 'ERR_MODULE_NOT_FOUND' });
+    if (specifier !== '@margoengine/gltf/pbr') return next(specifier, context);
     return {
       url: 'data:text/javascript,export const loadGLTF = (...args) => globalThis.loadPro(...args);',
       shortCircuit: true,
@@ -63,23 +61,8 @@ const animated = () => plain({ animations: [{ channels: [], samplers: [] }] });
 const fileOf = (input) => ({ '/m.glb': glb(input) });
 const url = 'https://example.test/m.glb';
 
-test('a file that needs gltf-pro says to install it when it is missing', async () => {
-  const { engine } = await headlessEngine();
-  try {
-    await assert.rejects(loadAuto(engine, url, server(fileOf(animated()))), (error) => {
-      assert.equal(error.code, 'failed');
-      assert.match(error.message, /install @margoengine\/gltf-pro/);
-      return true;
-    });
-    assert.equal(engine.meshes.size, 0);
-  } finally {
-    engine.dispose();
-  }
-  installed = true;
-});
-
-test('a plain file stays on the light loader, downloaded once, and never imports gltf-pro', async (t) => {
-  globalThis.loadPro = () => assert.fail('gltf-pro was called');
+test('a plain file stays on the light loader, downloaded once, and never imports gltf/pbr', async (t) => {
+  globalThis.loadPro = () => assert.fail('gltf/pbr was called');
   t.after(() => delete globalThis.loadPro);
   const { engine } = await headlessEngine();
   try {
@@ -188,7 +171,7 @@ test('a camera and a light stay light too, and read back with sceneData', async 
   }
 });
 
-test('an unsupported file moves to gltf-pro from the bytes already downloaded', async (t) => {
+test('an unsupported file moves to gltf/pbr from the bytes already downloaded', async (t) => {
   const model = { dispose() {} },
     calls = [];
   globalThis.loadPro = async (engine, target, options) => {
@@ -202,7 +185,7 @@ test('an unsupported file moves to gltf-pro from the bytes already downloaded', 
     const { fetch, asked } = server(fileOf(animated())),
       allowedURLs = ['https://cdn.example.test/'],
       result = await loadAuto(engine, url, { fetch, maxNodes: 7, allowedURLs });
-    assert.equal(result.loader, 'gltf-pro');
+    assert.equal(result.loader, 'gltf/pbr');
     assert.equal(result.model, model);
     assert.match(result.reason, /skins and animations/);
     assert.deepEqual(asked, ['/m.glb']);
@@ -229,7 +212,7 @@ const moved = async (t, input, options) => {
   try {
     const { fetch, asked } = server(fileOf(input)),
       result = await loadAuto(engine, url, { fetch, ...options });
-    assert.equal(result.loader, 'gltf-pro');
+    assert.equal(result.loader, 'gltf/pbr');
     assert.equal(result.model, model);
     assert.deepEqual(asked, ['/m.glb']);
     assert.equal(engine.meshes.size, 0);
@@ -239,7 +222,7 @@ const moved = async (t, input, options) => {
   }
 };
 
-test('a file over a light limit gltf-pro does not share moves on: total vertices', async (t) => {
+test('a file over a light limit gltf/pbr does not share moves on: total vertices', async (t) => {
   const count = 600_000,
     file = documentOf([new Float32Array(count * 3), new Float32Array(count * 3).fill(1)], {
       accessors: accessors.map((a) => ({ ...a, count })),
@@ -250,7 +233,7 @@ test('a file over a light limit gltf-pro does not share moves on: total vertices
   assert.match(result.reason, /one million vertices/);
 });
 
-test('a file over a light limit gltf-pro does not share moves on: one accessor', async (t) => {
+test('a file over a light limit gltf/pbr does not share moves on: one accessor', async (t) => {
   const count = 1_000_001,
     file = documentOf([new Float32Array(count * 3), new Float32Array(count * 3).fill(1)], {
       accessors: accessors.map((a) => ({ ...a, count })),
@@ -269,28 +252,33 @@ const forest = (rest) =>
     ...rest,
   });
 
-test('instances past maxNodes move on, and gltf-pro gets the reader that keeps them', async (t) => {
-  const { result, options } = await moved(t, forest({ extensionsRequired: ['EXT_mesh_gpu_instancing'] }), { maxNodes: 2 });
+test('instances past maxNodes move on, and gltf/pbr gets the reader that keeps them', async (t) => {
+  const { result, options } = await moved(t, forest({ extensionsRequired: ['EXT_mesh_gpu_instancing'] }), {
+    maxNodes: 2,
+  });
   assert.match(result.reason, /maxNodes/);
   assert.equal(options.maxNodes, 2);
   assert.equal(typeof options.decoders.instancing.read, 'function');
 });
 
-test('an instanced file refused for another reason keeps its instances on gltf-pro', async (t) => {
-  const { options } = await moved(t, forest({
-    extensionsUsed: ['EXT_mesh_gpu_instancing'],
-    animations: [{ channels: [], samplers: [] }],
-  }));
+test('an instanced file refused for another reason keeps its instances on gltf/pbr', async (t) => {
+  const { options } = await moved(
+    t,
+    forest({
+      extensionsUsed: ['EXT_mesh_gpu_instancing'],
+      animations: [{ channels: [], samplers: [] }],
+    }),
+  );
   assert.equal(typeof options.decoders.instancing.read, 'function');
 });
 
-test('a file with no instances passes gltf-pro no decoders', async (t) => {
+test('a file with no instances passes gltf/pbr no decoders', async (t) => {
   const { options } = await moved(t, animated());
   assert.equal(options.decoders, undefined);
 });
 
-test('a limit both loaders share is the error, with no trip to gltf-pro', async (t) => {
-  globalThis.loadPro = () => assert.fail('gltf-pro must not run');
+test('a limit both loaders share is the error, with no trip to gltf/pbr', async (t) => {
+  globalThis.loadPro = () => assert.fail('gltf/pbr must not run');
   t.after(() => delete globalThis.loadPro);
   const { engine } = await headlessEngine();
   try {
@@ -312,8 +300,11 @@ test('a material the light entries refuse moves on; a texture on WebGL does too'
   withBitmaps(t);
   const { engine } = await headlessEngine();
   try {
-    const blended = plain({ materials: [{ alphaMode: 'BLEND' }], meshes: [{ primitives: [{ ...primitive, material: 0 }] }] });
-    assert.equal((await loadAuto(engine, url, server(fileOf(blended)))).loader, 'gltf-pro');
+    const blended = plain({
+      materials: [{ alphaMode: 'BLEND' }],
+      meshes: [{ primitives: [{ ...primitive, material: 0 }] }],
+    });
+    assert.equal((await loadAuto(engine, url, server(fileOf(blended)))).loader, 'gltf/pbr');
     const png = new Uint8Array([137, 80, 78, 71]),
       mapped = documentOf([positions, normals, new Float32Array(6), png], {
         accessors: [...accessors, { bufferView: 2, componentType: 5126, count: 3, type: 'VEC2' }],
@@ -324,7 +315,7 @@ test('a material the light entries refuse moves on; a texture on WebGL does too'
         nodes: [{ mesh: 0 }],
       });
     const result = await loadAuto(engine, url, server(fileOf(mapped)));
-    assert.equal(result.loader, 'gltf-pro');
+    assert.equal(result.loader, 'gltf/pbr');
     assert.match(result.reason, /WebGPU/);
     assert.equal(calls, 2);
     assert.equal(engine.meshes.size, 0);
@@ -333,15 +324,18 @@ test('a material the light entries refuse moves on; a texture on WebGL does too'
   }
 });
 
-test('a malformed file is an error, never a trip to gltf-pro', async (t) => {
-  globalThis.loadPro = () => assert.fail('gltf-pro was called');
+test('a malformed file is an error, never a trip to gltf/pbr', async (t) => {
+  globalThis.loadPro = () => assert.fail('gltf/pbr was called');
   t.after(() => delete globalThis.loadPro);
   const { engine } = await headlessEngine();
   try {
     const at = (body) => loadAuto(engine, 'https://example.test/m.gltf', server({ '/m.gltf': body }));
     await assert.rejects(at('{ nope'), /Invalid glTF JSON/);
     await assert.rejects(at('null'), /Expected glTF 2.0/);
-    await assert.rejects(at('{"asset":{"version":"2.0"},"meshes":3,"extensionsUsed":4}'), /glTF meshes must be an array/);
+    await assert.rejects(
+      at('{"asset":{"version":"2.0"},"meshes":3,"extensionsUsed":4}'),
+      /glTF meshes must be an array/,
+    );
     await assert.rejects(loadAuto(engine, url, server({})), /HTTP 404/);
     const broken = plain();
     broken.doc.accessors[0].count = 300;
@@ -365,11 +359,152 @@ test('an aborted load and a URL that is not HTTP stop before any download', asyn
   }
 });
 
-test('gltf-pro and the other entries stay out of what the entry imports at load', async () => {
+test('gltf/pbr and the other entries stay out of what the entry imports at load', async () => {
   const code = await readFile(new URL('../dist/auto.js', import.meta.url), 'utf8');
-  assert.match(code, /import\(["`]@margoengine\/gltf-pro["`]\)/);
-  assert.doesNotMatch(code, /from\s*["`]@margoengine\/gltf-pro/);
-  assert.match(code, /import\(["`]@margoengine\/gltf-pro\/instancing["`]\)/, 'the reader is gltf-pro\'s own, not a copy');
+  assert.match(code, /import\(["`]@margoengine\/gltf\/pbr["`]\)/);
+  assert.doesNotMatch(code, /from\s*["`]@margoengine\/gltf\/pbr/);
+  assert.match(
+    code,
+    /import\(["`]@margoengine\/gltf\/pbr-instancing["`]\)/,
+    "the reader is gltf/pbr's own, not a copy",
+  );
   for (const name of ['meshopt', 'quantized', 'textured', 'instancing', 'scene-data'])
     assert.doesNotMatch(code, new RegExp(`from\\s*["\`]\\./${name}`));
+});
+
+// KB-OWN-GLTF1: loadAuto finishes after its downloads, when the default scene is active again.
+// An earlier test edits the shared accessors above, so these tests read counts of their own.
+const fresh = () => plain({ accessors: accessors.map((a) => ({ ...a, count: 3 })) });
+const inScene = (engine, start) => {
+  const scene = engine.createScene('b');
+  let started;
+  scene.use({ name: 'loader', setup: () => (started = start()) });
+  return { scene, started };
+};
+
+test('loadAuto started in a second scene builds the light model there', async () => {
+  const { engine } = await headlessEngine();
+  try {
+    const { scene, started } = inScene(engine, () => loadAuto(engine, url, server(fileOf(fresh())))),
+      { loader, model } = await started;
+    assert.equal(loader, 'gltf');
+    assert.ok(model.meshes[0].scene === scene, 'the mesh is not in the second scene');
+    assert.equal(engine.scene.meshes.size, 0);
+    assert.equal(scene.meshes.size, 3);
+    model.dispose();
+    assert.equal(scene.meshes.size, 0);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('loadAuto hands gltf/pbr the second scene it started in', async (t) => {
+  const { engine } = await headlessEngine();
+  globalThis.loadPro = (target) => ({ mesh: target.createMesh() });
+  t.after(() => delete globalThis.loadPro);
+  try {
+    const { scene, started } = inScene(engine, () => loadAuto(engine, url, server(fileOf(animated())))),
+      { loader, model } = await started;
+    assert.equal(loader, 'gltf/pbr');
+    assert.ok(model.mesh.scene === scene, 'the gltf/pbr call ran outside the second scene');
+    assert.equal(engine.scene.meshes.size, 0);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('an abort during loadAuto leaves nothing in either scene', async () => {
+  const { engine } = await headlessEngine();
+  try {
+    const controller = new AbortController(),
+      files = server(fileOf(fresh())),
+      fetch = async (...args) => {
+        const response = await files.fetch(...args);
+        controller.abort();
+        return response;
+      },
+      { scene, started } = inScene(engine, () => loadAuto(engine, url, { fetch, signal: controller.signal }));
+    await assert.rejects(started, { name: 'AbortError' });
+    assert.equal(engine.scene.meshes.size + scene.meshes.size, 0);
+  } finally {
+    engine.dispose();
+  }
+});
+
+// Bytes held in ArrayBuffers after a full collection: a count of what is still reachable, not a timing.
+setFlagsFromString('--expose-gc');
+const collect = runInNewContext('gc');
+const heldBytes = () => {
+  collect();
+  collect();
+  return process.memoryUsage().arrayBuffers;
+};
+const MiB = 1024 * 1024;
+// A 100 MB stand-in, streamed in fresh 1 MiB chunks so the server holds none of it.
+const streamed = (chunks) =>
+  new ReadableStream({
+    pull(controller) {
+      if (chunks-- > 0) controller.enqueue(new Uint8Array(MiB));
+      else controller.close();
+    },
+  });
+
+test('a file over the light loader 64 MiB goes to gltf/pbr, downloaded once and held once (KB-GLTFA B5, B14)', async (t) => {
+  const model = { dispose() {} },
+    calls = [];
+  let read = 0,
+    held = 0;
+  const base = heldBytes();
+  globalThis.loadPro = async (_engine, target, options) => {
+    calls.push(String(target));
+    read = (await (await options.fetch(target, { signal: options.signal })).arrayBuffer()).byteLength;
+    // gltf/pbr has its bytes: nothing else may still hold a copy of them.
+    held = heldBytes() - base;
+    return model;
+  };
+  t.after(() => delete globalThis.loadPro);
+  const { engine } = await headlessEngine();
+  try {
+    let requests = 0;
+    const fetch = async () => {
+        requests++;
+        return new Response(streamed(100));
+      },
+      result = await loadAuto(engine, url, { fetch });
+    assert.equal(result.loader, 'gltf/pbr');
+    assert.equal(result.model, model);
+    assert.match(result.reason, /64 MiB/);
+    assert.deepEqual(calls, [url]);
+    assert.equal(requests, 1);
+    assert.equal(read, 100 * MiB);
+    assert.ok(held < 110 * MiB, `${held} bytes held while gltf/pbr loads 100 MiB`);
+  } finally {
+    engine.dispose();
+  }
+});
+
+test('a declared length over the light loader 64 MiB moves on before any byte is read (KB-GLTFA B5)', async (t) => {
+  let read = -1,
+    where = '';
+  globalThis.loadPro = async (_engine, target, options) => {
+    const response = await options.fetch(target, { signal: options.signal });
+    where = response.url;
+    read = (await response.arrayBuffer()).byteLength;
+    return { dispose() {} };
+  };
+  t.after(() => delete globalThis.loadPro);
+  const { engine } = await headlessEngine();
+  try {
+    const fetch = async () => {
+        const response = new Response(new Uint8Array(8), { headers: { 'content-length': String(65 * MiB) } });
+        // Where a redirect ended: the loaders take their base from it and check it against allowedURLs.
+        return Object.defineProperty(response, 'url', { value: `${url}?moved` });
+      },
+      result = await loadAuto(engine, url, { fetch });
+    assert.equal(result.loader, 'gltf/pbr');
+    assert.equal(read, 8);
+    assert.equal(where, `${url}?moved`);
+  } finally {
+    engine.dispose();
+  }
 });

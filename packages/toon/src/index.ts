@@ -92,7 +92,7 @@ export class Toon implements EnginePlugin {
           const code = this.outlineShader(
             meshVertex.replace(
               'let p=model*vec4f(i.position,1);',
-              'let normal=normalize(mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xyz,i.m1.xyz))*i.normal*sign(dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))));let p=model*vec4f(i.position,1)+vec4f(normal*outline.w,0);',
+              'let bent=mat3x3f(cross(i.m1.xyz,i.m2.xyz),cross(i.m2.xyz,i.m0.xyz),cross(i.m0.xyz,i.m1.xyz))*i.normal*select(-1.0,1.0,dot(i.m0.xyz,cross(i.m1.xyz,i.m2.xyz))>=0.0);let normal=normalize(select(vec3f(0,1,0),bent,dot(bent,bent)>0.0));let p=model*vec4f(i.position,1)+vec4f(normal*outline.w,0);',
             ) +
               '@group(0) @binding(1) var<uniform> outline:vec4f; @fragment fn fragment(i:Output)->@location(0) vec4f{return vec4f(outline.rgb,1);}',
           );

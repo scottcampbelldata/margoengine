@@ -9,7 +9,7 @@ D3D11). Control GPUs: AMD Radeon iGPU (RDNA 2) on the same PC and browser, and A
 ## Steps
 Open `scripts/reference-rendering/fold-blend-repeat.html` (raw WebGPU and raw WebGL2, no engine, nothing loaded) and call
 `await repeatFold({api: 'webgpu', frames: 24})`, then the same with `api: 'webgl2'`. From a Margo checkout:
-`node scripts/gpu-lock.mjs run --owner=<you> -- node scripts/reference-rendering/fold-blend-repeat.mjs`.
+`node scripts/run-with-timeout.mjs -- node scripts/reference-rendering/fold-blend-repeat.mjs`.
 
 Each frame clears a 512 x 512 4x multisampled rgba8unorm target, draws one 128 x 128 height-field grid (32,768
 triangles, cull mode none) seen from a low camera so its slopes cover many pixels two or three times in that one draw,

@@ -31,7 +31,7 @@ export interface GPUDynamicBVHOptions {
 
 /**
  * What {@link GPUDynamicBVH.fromPrimitive} reads of a primitive: an entry of `model.primitives` from
- * `@margoengine/gltf-pro`, once a deformer such as `Animation` from `@margoengine/animation` is attached.
+ * `@margoengine/gltf/pbr`, once a deformer such as `Animation` from `@margoengine/animation` is attached.
  */
 export interface DeformedPrimitive {
   /** The buffer the deformer writes, set when it attaches. */
@@ -51,7 +51,7 @@ export interface GPUDeformedBVHOptions {
   bvh?: MeshBVH;
 }
 
-/** Floats per vertex in gltf-pro's deformed output. */
+/** Floats per vertex in gltf/pbr's deformed output. */
 const PRIMITIVE_STRIDE = 20;
 const GROUP = 64;
 /** The tree's depth bound: 30 Morton bits, then at most 32 more from the index tie-break. */

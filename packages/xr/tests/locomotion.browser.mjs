@@ -17,7 +17,7 @@ function documentFor(active){
  html=inject(html,'({ views: EYES.map(eyeView) })',`({ views:EYES.map(eyeView),transform:eyeView('none').transform })`);
  html=inject(html,'const xr = await XR.create(engine);',`
  const {SmoothLocomotion}=await import('/packages/xr/dist/locomotion.js');
- const {loadGLTF}=await import('/packages/gltf-pro/dist/index.js');
+ const {loadGLTF}=await import('/packages/gltf/dist/pbr.js');
  // Khronos/Cesium Box, CC BY 4.0: existing fixture notice records source and licence.
  const licensed=await loadGLTF(engine,'/packages/exporters/tests/fixtures/Box.glb');
  licensed.root.setPosition([0,1,0]);

@@ -47,7 +47,7 @@ owns.
    (`npm view <name> time.modified repository.url`) and record anything worrying in the release notes.
 6. `npm run check:merge` passes, then `npm run publish:dry-run` and read the file lists.
 7. `npm run publish:rehearsal` (part of `publish:dry-run` and of the workflow) proves the release without making it. It
-   packs all 107 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
+   packs all 108 packages and the two npm tools and audits each tarball: every file the manifest names is shipped, LICENSE, NOTICE and README
    are present, no test or private file, install script or local dependency spec, no maintainer path or email, every
    import declared. It then serves them from a stand-in registry on 127.0.0.1 that refuses every write, and in a clean
    temp project with an empty cache runs `npm install margoengine`, imports every entry in Node, type-checks every entry
@@ -59,7 +59,7 @@ Run the `Publish` workflow from `main` with the version and `dry_run` checked; r
 unchecked. Order inside the workflow:
 
 1. Leaf workspace packages under `packages/`, in dependency order, including core and stage.
-2. `@margoengine/game`, `@margoengine/web`, `@margoengine/viz` and `@margoengine/react-kit`, after their members.
+2. `@margoengine/game`, `@margoengine/kit-web`, `@margoengine/kit-viz` and `@margoengine/kit-react`, after their members.
 3. `margoengine`, the install-everything option. scripts/publish-order.mjs derives this order from the workspace dependency graph; the workflow publishes one tarball at a time in that order. The four profiles are included automatically;
    do not expose create-margo until all names at the shared version are available. The registry may be temporarily
    incomplete during publication, so the release announcement follows the last successful publish.
@@ -67,7 +67,7 @@ unchecked. Order inside the workflow:
 5. `create-margo` last: its templates install the profiles, so they must exist first.
 
 Run `node scripts/kit-install-check.mjs` before a release to prove the domain dependency closures from packed
-tarballs, and its separate `scripts/kit-browser-check.mjs` under a shared GPU lock for native and compatibility
+tarballs, and its separate `scripts/kit-browser-check.mjs` for native and compatibility
 first frames. See [kits](guides/kits.md) for names, contents and install measurements. No registry publication is
 part of these checks. README authoring remains in the owed list until the README phase.
 

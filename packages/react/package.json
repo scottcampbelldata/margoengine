@@ -39,7 +39,11 @@
     "test:browser:controls-extra": "node scripts/test-controls-extra-browser.mjs",
     "test:browser:portals": "node scripts/test-portals-browser.mjs",
     "test:browser:effects-extra": "node scripts/test-effects-extra-browser.mjs",
-    "test:browser:test-offscreen": "node scripts/test-test-offscreen-browser.mjs"
+    "test:browser:shapes": "node scripts/test-shapes-browser.mjs",
+    "test:browser:test-offscreen": "node scripts/test-test-offscreen-browser.mjs",
+    "test:browser:fbo": "node scripts/test-fbo-browser.mjs",
+    "test:browser:stage-parts": "node scripts/test-stage-parts-browser.mjs",
+    "test:browser:reflections": "node scripts/test-reflections-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -53,10 +57,10 @@
       "react-server": "./dist/rsc/controls.js",
       "import": "./dist/controls.js"
     },
-    "./gltf-pro": {
-      "types": "./dist/gltf-pro.d.ts",
-      "react-server": "./dist/rsc/gltf-pro.js",
-      "import": "./dist/gltf-pro.js"
+    "./gltf": {
+      "types": "./dist/gltf.d.ts",
+      "react-server": "./dist/rsc/gltf.js",
+      "import": "./dist/gltf.js"
     },
     "./fbx": {
       "types": "./dist/fbx.d.ts",
@@ -242,6 +246,36 @@
       "types": "./dist/offscreen.d.ts",
       "react-server": "./dist/rsc/offscreen.js",
       "import": "./dist/offscreen.js"
+    },
+    "./marching-cubes": {
+      "types": "./dist/marching-cubes.d.ts",
+      "react-server": "./dist/rsc/marching-cubes.js",
+      "import": "./dist/marching-cubes.js"
+    },
+    "./caustics": {
+      "types": "./dist/caustics.d.ts",
+      "react-server": "./dist/rsc/caustics.js",
+      "import": "./dist/caustics.js"
+    },
+    "./accumulative-shadows": {
+      "types": "./dist/accumulative-shadows.d.ts",
+      "react-server": "./dist/rsc/accumulative-shadows.js",
+      "import": "./dist/accumulative-shadows.js"
+    },
+    "./sampler": {
+      "types": "./dist/sampler.d.ts",
+      "react-server": "./dist/rsc/sampler.js",
+      "import": "./dist/sampler.js"
+    },
+    "./outlines": {
+      "types": "./dist/outlines.d.ts",
+      "react-server": "./dist/rsc/outlines.js",
+      "import": "./dist/outlines.js"
+    },
+    "./clouds": {
+      "types": "./dist/clouds.d.ts",
+      "react-server": "./dist/rsc/clouds.js",
+      "import": "./dist/clouds.js"
     }
   },
   "files": [
@@ -255,7 +289,6 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
     "@margoengine/animator": "^1.0.0",
@@ -265,6 +298,10 @@
     "@margoengine/html": "^1.0.0",
     "@margoengine/fbx": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
+    "@margoengine/loaders": "^1.0.0",
+    "@margoengine/studio": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0",
+    "@margoengine/shader": "^1.0.0",
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/sky": "^1.0.0",
     "@margoengine/text": "^1.0.0",
@@ -292,7 +329,9 @@
     "@margoengine/viewcube": "^1.0.0",
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
-    "@margoengine/worker": "^1.0.0"
+    "@margoengine/worker": "^1.0.0",
+    "@margoengine/toon": "^1.0.0",
+    "@margoengine/vfx": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -305,9 +344,6 @@
       "optional": true
     },
     "@margoengine/animator": {
-      "optional": true
-    },
-    "@margoengine/gltf-pro": {
       "optional": true
     },
     "@margoengine/environment": {
@@ -326,6 +362,18 @@
       "optional": true
     },
     "@margoengine/geometry": {
+      "optional": true
+    },
+    "@margoengine/loaders": {
+      "optional": true
+    },
+    "@margoengine/studio": {
+      "optional": true
+    },
+    "@margoengine/procedural": {
+      "optional": true
+    },
+    "@margoengine/shader": {
       "optional": true
     },
     "@margoengine/sky": {
@@ -404,6 +452,12 @@
       "optional": true
     },
     "@margoengine/worker": {
+      "optional": true
+    },
+    "@margoengine/toon": {
+      "optional": true
+    },
+    "@margoengine/vfx": {
       "optional": true
     }
   }

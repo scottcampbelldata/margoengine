@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { legDevice, legDevices } from '../../../scripts/support/compat-shim.js';
 const results = [];
 const boundary = await openBrowser({ startPath: '/packages/voxel-pathtracer/tests/media-boundary.html', port: 'free' });
 try {
@@ -28,7 +29,7 @@ for (const compat of [false, true]) {
   try {
     await context.page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     const result = await context.page.evaluate((compat) => window.run(compat), compat);
-    console.log(JSON.stringify({ compat, hardware: context.hardware, result }));
+    console.log(JSON.stringify({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result }));
     assert.deepEqual(errors, []);
     assert.deepEqual(result.errors, []);
     assert.deepEqual(result.messages, []);
@@ -48,7 +49,7 @@ for (const compat of [false, true]) {
           `${row.name} channel ${c}: ${row.actual[c]} vs ${row.expected[c]}`,
         );
     }
-    results.push({ compat, hardware: context.hardware, result });
+    results.push({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result });
   } finally {
     await context.close();
   }
@@ -74,4 +75,4 @@ try {
 }
 await mkdir('test-results', { recursive: true });
 await writeFile('test-results/voxel-pathtracer-media.json', JSON.stringify(results, null, 2));
-console.log('media: native, compatibility, absorption, scattering, emission and shadows passed');
+console.log(`media: ${legDevices(results)} legs, absorption, scattering, emission and shadows passed`);

@@ -4,7 +4,7 @@
 
 ```ts
 import { Mesh, Vec3 } from "@margoengine/core";
-import { ReactNode } from "react";
+import { ReactNode, RefObject } from "react";
 
 export const Billboard: import("react").ForwardRefExoticComponent<BillboardProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
 
@@ -29,6 +29,33 @@ export interface BoundsProps extends MeshProps {
     onError?: (error: unknown) => void;
 }
 
+export const CameraShake: import("react").ForwardRefExoticComponent<CameraShakeProps & import("react").RefAttributes<CameraShakeRef>>;
+
+export interface CameraShakeProps {
+    maxYaw?: number;
+    maxPitch?: number;
+    maxRoll?: number;
+    yawFrequency?: number;
+    pitchFrequency?: number;
+    rollFrequency?: number;
+    intensity?: number;
+    decay?: boolean;
+    decayRate?: number;
+    onError?: (error: unknown) => void;
+}
+
+export interface CameraShakeRef {
+    getIntensity(): number;
+    setIntensity(value: number): void;
+}
+
+export const Clone: import("react").ForwardRefExoticComponent<CloneProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
+
+export interface CloneProps extends MeshProps {
+    object: MeshRef | RefObject<MeshRef | null> | null;
+    onError?: (error: unknown) => void;
+}
+
 export const Float: import("react").ForwardRefExoticComponent<FloatProps & import("react").RefAttributes<import("@margoengine/core").Mesh>>;
 
 export interface FloatProps extends MeshProps {
@@ -39,7 +66,45 @@ export interface FloatProps extends MeshProps {
     seed?: number;
 }
 
+export function Preload({ all, onError }: PreloadProps): null;
+
+export interface PreloadProps {
+    all?: boolean;
+    onError?: (error: unknown) => void;
+}
+
+export interface Viewport {
+    width: number;
+    height: number;
+    aspect: number;
+    distance: number;
+    factor: number;
+    size: {
+        width: number;
+        height: number;
+    };
+}
+
+export function shakeNoise(x: number, seed: number): number;
+
+export function useAspect(width: number, height: number, factor?: number): [number, number, number];
+
 export function useBounds(): BoundsApi;
+
+export function useCursor(hovered: boolean, over?: string, out?: string): void;
+
+export function useIntersect<T extends MeshRef = MeshHandle>(onChange: (visible: boolean) => void): RefObject<T | null>;
+
+export function useViewport(): Viewport;
+
+export function viewportAt(camera: {
+    fov: number;
+    position: readonly number[];
+    target: readonly number[];
+}, size: {
+    width: number;
+    height: number;
+}, distance?: number): Viewport;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -72,6 +137,8 @@ interface MeshProps extends PointerHandlers {
     layers?: number;
     children?: ReactNode;
 }
+
+type MeshRef = MeshHandle;
 
 interface PointerHandlers {
     onClick?: (event: MargoPointerEvent<MouseEvent>) => void;

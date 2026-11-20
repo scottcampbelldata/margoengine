@@ -1,5 +1,5 @@
 // Real-GPU checks of @margoengine/rigging (from the repository root after building packages, one GPU job at a time):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/rigging/tests/rigging-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/rigging/tests/rigging-browser.mjs
 // rigging-browser.ts weights, poses and checks meshes with this package; @margoengine/animation skins them on the GPU
 // and the engine draws them; this script checks the drawn pixels against the CPU pose. Every case has a time limit.
 // Results go to test-results/rigging-browser.json.
@@ -7,12 +7,10 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 // The dev server serves the repository root, whichever folder `npm run test:browser` starts in.
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const CASE_TIMEOUT = 120_000;
-const release = await acquire({ owner: 'rigging-browser' });
 const context = await openBrowser({ startPath: '/packages/rigging/tests/rigging.html', port: 5247 });
 const { page, hardware } = context,
   pageErrors = [],
@@ -85,5 +83,4 @@ try {
   );
 } finally {
   await context.close();
-  release();
 }

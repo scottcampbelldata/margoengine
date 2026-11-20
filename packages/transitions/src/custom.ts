@@ -1,5 +1,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
+import { captureScene } from '../../shared/scene-scope.js';
 import { customCode } from './custom-code.js';
 import { Transitions } from './index.js';
 
@@ -32,8 +33,10 @@ export async function createCustomTransition(
   options: CustomTransitionOptions = {},
 ): Promise<Transitions> {
   const runtime = engineRuntime(engine);
+  // The scene the call was made for, kept across the shader validation.
+  const scope = captureScene(engine);
   const code = await customCode(engine, wgsl, options.signal);
   const effect = new CustomTransition(code);
-  runtime.use(effect);
+  scope.run(() => runtime.use(effect));
   return effect;
 }

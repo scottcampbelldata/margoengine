@@ -63,7 +63,7 @@ export class PhongMaterial extends Material {
  * Toon shading (`shading: 'toon'`): Lambert's diffuse light read through a ramp, the
  * `gradientMap` texture (its RGB at u = n.l * 0.5 + 0.5) or `steps` flat bands (default 3), both live. The sun,
  * clustered point, spot and directional lights and shadows go through the ramp; the hemisphere, scene IBL and light maps
- * light it as Lambert. No highlight and no environment map. For a loaded glTF-pro model, use `toonModel`.
+ * light it as Lambert. No highlight and no environment map. For a loaded glTF PBR model, use `toonModel`.
  */
 export class ToonMaterial extends Material {
   constructor(

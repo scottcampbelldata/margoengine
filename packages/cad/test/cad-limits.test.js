@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { parseCAD, parseCADAsync } from '../dist/index.js';
 
-const glb = 'export it as GLB and load it with @margoengine/gltf-pro';
+const glb = 'export it as GLB and load it with @margoengine/gltf/pbr';
 
 async function headless() {
   return new Engine(
@@ -54,7 +54,7 @@ test('a STEP over 64 MiB names the size cap and the offline way past it; an empt
       name: 'RangeError',
       message:
         'CAD exceeds 64 MiB (67108865 > 67108864 bytes); tessellate it offline with @margoengine/brep, export it as GLB ' +
-        'with @margoengine/exporters and load it with @margoengine/gltf-pro',
+        'with @margoengine/exporters and load it with @margoengine/gltf/pbr',
     });
     assert.throws(() => parseCADAsync(engine, new ArrayBuffer(0), 'step'), {
       name: 'TypeError',

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { openBrowser } from './browser.js';
-import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 import { textureQuad } from '../tests/support/texture-fixture.js';
 
 const serialize = (fixture) => ({
@@ -95,7 +95,7 @@ export async function deformedPickingBrowserChecks(page) {
   return page.evaluate(async (payload) => {
     const { EngineKernel } = await import('/packages/core/dist/index.js'),
       { engineRuntime, box, PbrMaterial } = await import('/packages/core/dist/extension.js');
-    const { parseGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+    const { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
       { Animation } = await import('/packages/animation/dist/index.js');
     const { Picking, Selection } = await import('/packages/selection/dist/index.js'),
       { Raycaster } = await import('/packages/bvh/dist/index.js');

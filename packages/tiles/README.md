@@ -2,7 +2,7 @@
 
 Import `margoengine/tiles` from the `margoengine` package, or `@margoengine/tiles` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Streaming [OGC 3D Tiles 1.1](https://docs.ogc.org/cs/22-025r4/22-025r4.html) for engineering, GIS and digital-twin scenes: city models, photogrammetry, BIM and scanned sites far bigger than memory. Tiles load by screen-space error as the camera moves, coarse first, from a priority queue with a concurrency limit, and are evicted least recently used past a memory budget. glTF and b3dm tiles are drawn by [`@margoengine/gltf-pro`](../gltf-pro/README.md), pnts tiles by [`@margoengine/points`](../points/README.md); both are optional peers loaded with `import()` on the first tile that needs them. Core is not changed, and an app that does not import this package ships none of it.
+Streaming [OGC 3D Tiles 1.1](https://docs.ogc.org/cs/22-025r4/22-025r4.html) for engineering, GIS and digital-twin scenes: city models, photogrammetry, BIM and scanned sites far bigger than memory. Tiles load by screen-space error as the camera moves, coarse first, from a priority queue with a concurrency limit, and are evicted least recently used past a memory budget. glTF and b3dm tiles are drawn by [`@margoengine/gltf/pbr`](../gltf/README.md), pnts tiles by [`@margoengine/points`](../points/README.md); both are optional peers loaded with `import()` on the first tile that needs them. Core is not changed, and an app that does not import this package ships none of it.
 
 ## Quick start
 
@@ -61,7 +61,7 @@ Each update measures every visible tile's screen-space error, `geometricError x 
 | `signal` | none | `AbortSignal` for the load and every later request. |
 | `frame` (renderer) | `'enu'` | `'enu'`, `'local'` or a 4x4 matrix; see below. |
 | `origin` (renderer) | none | A floating origin (`FloatingOrigin` from `margoengine/cameras/origin`). |
-| `loadModel` (renderer) | gltf-pro's `parseGLTFAsync` | Your own glTF loader. |
+| `loadModel` (renderer) | gltf/pbr's `parseGLTFAsync` | Your own glTF loader. |
 | `budget` (renderer) | `'gpu'` | What `memoryBudget` counts: `'gpu'` the GPU memory each tile's model takes (vertex, index and uv buffers, textures with their mip chains or KTX2 levels, i3dm instance rows, point and splat buffers), so the cache limit matches what the device holds; `'content'` the bytes of each tile's file, as `Tileset` alone counts. |
 | `pointBudget` (renderer) | 2,000,000 | Budget of the points plugin made for pnts tiles. |
 | `i3dm` (renderer) | none | The i3dm drawer from `margoengine/tiles/i3dm`; without it an i3dm tile fails with code `unsupported`. |
@@ -89,7 +89,7 @@ origin.lookAt(tiles.cartographicToWorld(-75.613, 40.038, 300), tiles.cartographi
 
 ## Instanced content (i3dm)
 
-Trees, poles and street furniture often come as i3dm: one glTF and a transform per instance. Pass the drawer from `margoengine/tiles/i3dm` and each glTF primitive draws every instance of its tile in one instanced draw (gltf-pro's `PBRInstances`). Tilesets without i3dm never load this module.
+Trees, poles and street furniture often come as i3dm: one glTF and a transform per instance. Pass the drawer from `margoengine/tiles/i3dm` and each glTF primitive draws every instance of its tile in one instanced draw (gltf/pbr's `PBRInstances`). Tilesets without i3dm never load this module.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -133,7 +133,7 @@ console.log(metadata.propertyTables[0].get(1, 'example_variable_length_ARRAY_STR
 
 ## Gaussian splat tiles
 
-Photoreal captures are now published as 3D Tiles whose glTF content holds Gaussian splats (`KHR_gaussian_splatting`, often with the SPZ payload of the draft `KHR_gaussian_splatting_compression_spz_2`, declared through `3DTILES_content_gltf`). Pass the drawer from `margoengine/tiles/splats`: gltf-pro reads each tile's splats and meshes, and [`@margoengine/splats`](../splats/README.md) draws them. Tilesets without splats never load this module.
+Photoreal captures are now published as 3D Tiles whose glTF content holds Gaussian splats (`KHR_gaussian_splatting`, often with the SPZ payload of the draft `KHR_gaussian_splatting_compression_spz_2`, declared through `3DTILES_content_gltf`). Pass the drawer from `margoengine/tiles/splats`: gltf/pbr reads each tile's splats and meshes, and [`@margoengine/splats`](../splats/README.md) draws them. Tilesets without splats never load this module.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -269,8 +269,12 @@ The content parsers (`parseB3dm`, `parsePnts`, `parseI3dm`, `parseCmpt`, `parseC
 - Terrain: only `EPSG:4326` `tms` layers; tile availability from `layer.json` `available` (a layer without it, such as one using `metadataAvailability`, is assumed whole up to `maxzoom`, and a missing tile fails while its parent stays); one imagery tile per terrain tile, so near the poles and for very coarse terrain the imagery is a level coarser than it could be; every region spans -500 to 9,000 m, so selection boxes are taller than the ground; water mask and metadata are read but not drawn.
 - Splat tiles: the visible cloud is rebuilt on the CPU and uploaded again when the visible tiles change, which costs time in proportion to the visible splats (not measured); splats do not write depth or receive lighting (see `@margoengine/splats`); the renderer's `loadModel` is not used for splat tiles; a glTF tile with external buffers is not read.
 - Metadata: feature ID textures are named, not read (sample the texture yourself); property textures, property attributes and a `schemaUri` schema in glTF are not read; 64-bit integers become doubles (exact to 2^53); feature IDs of a Draco-compressed glTF primitive are not read; picking a vertex is yours (a raycast hit), the tables then give its feature.
-- Draco pnts decode in Web Workers (`@margoengine/decoders/draco-points`), so not in Node without a decoder of your own.
+- Draco pnts decode with `@margoengine/decoders/draco-points`: in Web Workers in a browser, in the calling thread in Node.
 - A tile whose glTF requires KHR_techniques_webgl (archived GLSL shaders, such as the billboard level of Cesium's TilesetWithTreeBillboards) fails with code `unsupported`, as glTF says a loader must; the rest of the tileset draws.
-- `budget: 'gpu'` counts gltf-pro models exactly from their arrays and images (Khronos BoomBox: within 0.1% of what the device allocated); points, i3dm rows and splats by their buffer layouts; a custom `loadModel` whose models have no `primitives` is counted by file size. Uniform buffers, pipelines and the engine's own targets are not tile memory and are not counted.
+- `budget: 'gpu'` counts gltf/pbr models exactly from their arrays and images (Khronos BoomBox: within 0.1% of what the device allocated); points, i3dm rows and splats by their buffer layouts; a custom `loadModel` whose models have no `primitives` is counted by file size. Uniform buffers, pipelines and the engine's own targets are not tile memory and are not counted.
 - Hosted tilesets: an ion token is asked for again only after a 401, once per expiry; requests to other hosts (a tile URL on another server) go unsigned; the credits are counted from glTF `asset.copyright` only (b3dm, i3dm and glTF content), so pnts tiles and imagery name none; nothing here draws a logo.
 - Orthographic cameras are told apart by the clip w row of `camera.matrix`: a projection that mixes the two (clip w that varies only a little with depth) is read as perspective, and before the first frame the renderer selects as perspective.
+
+### Scenes
+
+`TilesRenderer.load` remembers the scene that is active when you call it, before its first await, and attaches the renderer there. The tile models, point anchors and instances it makes later (after fetches and imports) belong to the renderer's own scene, not to the default scene that is active again by then.

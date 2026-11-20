@@ -91,18 +91,18 @@ Native WGSL compilation records 5 modules and no errors. Retained JSON results:
 [WebGPU](whitepaper/results/batch234-water-fft-webgpu.json),
 [compatibility](whitepaper/results/batch234-water-fft-compat.json).
 
-Run after package builds (one shared slot per command):
+Run after package builds:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=codex-batch234 --wait-max=60 --max=3 -- node packages/water/test/fft.browser.mjs
-node scripts/gpu-lock.mjs run --owner=codex-batch234 --wait-max=60 --max=3 -- node packages/water/test/fft.browser.mjs --compat
+node scripts/run-with-timeout.mjs --max=3 -- node packages/water/test/fft.browser.mjs
+node scripts/run-with-timeout.mjs --max=3 -- node packages/water/test/fft.browser.mjs --compat
 ```
 
-The 3 minute run limit excludes the queue wait. JSON and PNG results go to the
+Each run has a 3 minute limit. JSON and PNG results go to the
 lane's `test-results/water-fft-*`. Test/demo wind comes from NOAA NDBC buoy
 46042, 2023-01-01 00:00 UTC, 17.2 m/s from 314 degrees; the retained record and
 public-domain attribution accompany the test. Fetch is authored, not measured.
-No benchmark, speed-only assertion or exclusive GPU reservation is used.
+No benchmark or speed-only assertion is used.
 
 ## Sizes and limits
 

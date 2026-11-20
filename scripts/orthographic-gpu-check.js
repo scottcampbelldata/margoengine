@@ -1,5 +1,5 @@
 // Real-adapter check of clustered lighting and Gaussian splats under an orthographic camera (@margoengine/cameras).
-// Run from the repository root after building packages, with the GPU lock held: node scripts/orthographic-gpu-check.js
+// Run from the repository root after building packages: node scripts/orthographic-gpu-check.js
 // (points has its own orthographic section in `npm run test:browser --workspace packages/points`).
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';

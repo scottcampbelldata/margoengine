@@ -222,9 +222,9 @@ export class WideAngleCube implements EnginePlugin {
     this.map(1);
   }
   /**
-   * Runs a new WideAngleCube alone in its own PostStack with its own cube, all disposed with it (needs
-   * `@margoengine/post` and `@margoengine/environment`). To combine it with other effects, attach a `CubeCamera`, pass it
-   * as `cube` and put the effect in your own `PostStack`, ahead of the display effect.
+   * Adds a new WideAngleCube, with its own cube unless `cube` is given, to the scene's PostStack after its last HDR
+   * effect, or to a new PostStack when the scene has none (needs `@margoengine/post` and `@margoengine/environment`).
+   * Disposing it takes it out with the cube it made, and a stack made for it goes with it.
    */
   static async attach(engine: EngineKernel, options: WideAngleCubeOptions = {}): Promise<WideAngleCube> {
     const [{ PostStack }, { CubeCamera }] = await Promise.all([
@@ -243,7 +243,7 @@ export class WideAngleCube implements EnginePlugin {
       effect.ownsCube = true;
     }
     try {
-      effect.stack = PostStack.attach(engine, [effect]);
+      effect.stack = PostStack.join(engine, effect);
     } catch (error) {
       effect.dispose();
       throw error;
@@ -320,7 +320,7 @@ export class WideAngleCube implements EnginePlugin {
     this.engine = undefined;
     engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
-    this.stack?.dispose();
+    this.stack?.removeEffect(this);
     this.stack = undefined;
     if (this.ownsCube) this.cube?.dispose();
     this.cube = undefined;

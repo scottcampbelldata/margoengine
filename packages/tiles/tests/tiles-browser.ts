@@ -1,11 +1,11 @@
 // Real-GPU fixture for @margoengine/tiles: a generated city-scale tileset (6-level quadtree over 8 km, 1365 b3dm
-// tiles, anchored in ECEF at 40 N 75.6 W) streamed by TilesRenderer through gltf-pro and drawn by the engine.
+// tiles, anchored in ECEF at 40 N 75.6 W) streamed by TilesRenderer through gltf/pbr and drawn by the engine.
 // tests/tiles-browser.mjs drives it and checks the numbers. Built imports, so it uses the published package boundary.
 import { Engine } from '../../core/dist/extension.js';
 import { TilesFade, ditherRank } from '../dist/fade.js';
 import { TileFeatures } from '../dist/features.js';
-import { parseGLTFAsync, GLTFAsset } from '../../gltf-pro/dist/index.js';
-import { gaussianSplats, readGaussianSplats } from '../../gltf-pro/dist/splats.js';
+import { parseGLTFAsync, GLTFAsset } from '../../gltf/dist/pbr.js';
+import { gaussianSplats, readGaussianSplats } from '../../gltf/dist/splats.js';
 import { glbChunks } from '../../shared/glb.js';
 import { i3dm } from '../dist/i3dm.js';
 import { splats, tileSplats } from '../dist/splats.js';
@@ -539,7 +539,7 @@ async function run(name: string): Promise<unknown> {
     return { samples, pointSamples, greenPixels, errors: errors.slice(start) };
   }
   if (name === 'grove') {
-    // 25 box trees from one i3dm tile (EAST_NORTH_UP, RTC_CENTER, ECEF), drawn as instances through gltf-pro.
+    // 25 box trees from one i3dm tile (EAST_NORTH_UP, RTC_CENTER, ECEF), drawn as instances through gltf/pbr.
     const grove = groveTileset({ n: 5, spacing: 40, height: 12 }),
       files = memoryFetch(grove.files);
     engine.camera.position = [0, 90, 230];
@@ -574,7 +574,7 @@ async function run(name: string): Promise<unknown> {
     // The real TilesetWithTreeBillboards sample (Cesium 3d-tiles-samples, CC0): 25 trees in each of two i3dm tiles,
     // fetched from the repository by a relative URL, as a page would. Close enough (under 146 m) that the root's
     // geometric error of 10 m refines to the full trees; the root's billboards need KHR_techniques_webgl (GLSL
-    // shaders), which gltf-pro refuses with a coded error, as glTF says a loader must for a required extension.
+    // shaders), which gltf/pbr refuses with a coded error, as glTF says a loader must for a required extension.
     engine.camera.position = [0, 70, 110];
     engine.camera.target = [0, 0, 0];
     tiles = await TilesRenderer.load(

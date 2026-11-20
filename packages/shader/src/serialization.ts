@@ -10,6 +10,7 @@ import { StorageBuffer } from './compute.js';
 import { NodeMaterial } from './material.js';
 import { LightingMaterial } from './lighting.js';
 import { RawShaderMaterial, type RawShaderMaterialOptions } from './raw.js';
+import type { ShaderMaterial as ShaderMaterialClass, ShaderMaterialOptions } from './glsl-material.js';
 
 const nodeFields = [
   'fragmentCode',
@@ -145,11 +146,66 @@ export const shaderMaterialCodecs: readonly MaterialValueCodec[] = [
         'blending',
         'depthTest',
         'depthWrite',
+        'depthCompare',
+        'depthBias',
+        'depthBiasSlopeScale',
+        'alphaToCoverage',
         'cull',
         'colorWrite',
+        'wireframe',
         'onError',
       ]),
     }),
     restore: (data: RawShaderMaterialOptions) => new RawShaderMaterial(data),
   },
 ];
+
+/**
+ * The codec of a GLSL `ShaderMaterial` (`@margoengine/shader/glsl-material`): it keeps the GLSL, the options, the live
+ * uniform values and the render state, and restoring translates the GLSL again. It takes the class, so this entry
+ * stays free of the GLSL front end: `codecs: [...shaderMaterialCodecs, glslMaterialCodec(ShaderMaterial)]`. Without
+ * it a ShaderMaterial has no codec, and capturing one throws rather than saving it as plain WGSL.
+ */
+export function glslMaterialCodec(ShaderMaterial: typeof ShaderMaterialClass): MaterialValueCodec {
+  if (typeof ShaderMaterial !== 'function' || !(ShaderMaterial.prototype instanceof RawShaderMaterial))
+    throw new TypeError('glslMaterialCodec got no ShaderMaterial class; pass ShaderMaterial from @margoengine/shader/glsl-material');
+  return {
+    type: 'shader-glsl-material',
+    test: (v) => v instanceof ShaderMaterial,
+    capture: (value: RawShaderMaterial & Record<string, unknown>) => {
+      const { uniformNames: _, ...source } = value['source'] as Record<string, unknown>,
+        uniforms = value.uniforms as Record<string, { value: unknown }>;
+      return {
+        source,
+        uniforms: Object.fromEntries(Object.keys(uniforms).map((name) => [name, { value: uniforms[name]!.value }])),
+        state: fields(value, [
+          'name',
+          'transparent',
+          'blending',
+          'depthTest',
+          'depthWrite',
+          'depthCompare',
+          'polygonOffset',
+          'polygonOffsetFactor',
+          'polygonOffsetUnits',
+          'depthBias',
+          'depthBiasSlopeScale',
+          'alphaToCoverage',
+          'cull',
+          'colorWrite',
+          'wireframe',
+          'onError',
+        ]),
+      };
+    },
+    restore: (data: { source: Record<string, unknown>; uniforms: Record<string, { value: unknown }>; state: Record<string, unknown> }) => {
+      const { name, ...state } = data.state,
+        material = new ShaderMaterial({ ...(data.source as object), uniforms: data.uniforms, ...(name !== undefined ? { name: name as string } : {}) } as ShaderMaterialOptions);
+      // Polygon offset first: its setters write depthBias, which a saved bias of its own then replaces.
+      const order = ['polygonOffset', 'polygonOffsetFactor', 'polygonOffsetUnits'];
+      for (const key of [...order, ...Object.keys(state).filter((k) => !order.includes(k))])
+        if (state[key] !== undefined) Reflect.set(material, key, state[key]);
+      return material;
+    },
+  };
+}

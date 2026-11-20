@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { wmsURL, wmtsURL, terrainRectangle, terrainImagery } from '../dist/imagery.js';
 import { parseQuantizedMesh } from '../dist/terrain.js';
 import { parseB3dm, ecefToCartographic } from '../dist/index.js';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
 import { glbChunks } from '../../shared/glb.js';
 const tile = new Uint8Array(
   readFileSync(

@@ -6,7 +6,7 @@ WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl2-compat/p
 
 Desktop scenes use 4× MSAA with a canvas DPR cap of 1; phones use single-sample rendering with a DPR cap of 2. For slower desktop GPUs, set `globalThis.margoLow` to a pixel ratio (for example `1` or `1.5`) before creating the engine: scenes then render single-sampled with the DPR capped at that value, which on an Intel Arc 140V laptop cut the island demo's GPU frame from about 20 to 10 ms (particles off) compared with 4× MSAA. The site demos choose this light tier by measuring the GPU rather than guessing from the device. Color and depth targets follow canvas resize. Optional scene captures retain that sampling policy and expose single-sample resolved textures. CSS layout and HTML text retain native density.
 
-`engine.pick(x, y)` updates scene state without forcing a color frame. One readback runs at a time and overlapping calls wait their turn, so a loop of picks costs one readback a point; `pickMany` of `@margoengine/selection` answers many points from one. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`. On a canvas without client size (an `OffscreenCanvas` in a worker) pick coordinates are canvas pixels.
+`engine.pick(x, y)` updates scene state without forcing a color frame. One readback runs at a time and overlapping calls wait their turn, so a loop of picks costs one readback a point. A pick asked for during a frame starts after it, and one asked for inside a pick (a plugin's `onPreUpdate` picking for a hover) waits behind it instead of nesting. Meshes created or removed elsewhere during a readback leave its answer standing; only a mesh created after the pick started (one that took the hit slot) is answered as null; `pickMany` of `@margoengine/selection` answers many points from one. For cached forward-pass IDs, instance culling in a 3×3 micro frustum and neighbor resolution, attach the optional `Picking` plugin from `@margoengine/selection`. On a canvas without client size (an `OffscreenCanvas` in a worker) pick coordinates are canvas pixels.
 
 Static scenes cost little per frame: the kernel recomputes only entities whose position, rotation, scale, parent, bounds or visibility changed (and their descendants); the engine reuses last frame's instance list unless the mesh set, a geometry or material assignment, a material's values or the layers changed; a mesh that culling or `visible` shows or hides moves one row of its batch (shown: the batch's next row; hidden: the batch's last row takes its place), a moved mesh rewrites its own row, and the WebGPU renderer uploads only the changed rows, one `writeBuffer` for each run of neighbouring rows. On an Intel Arc 140V laptop the kernel part made the kernel 2.6-4x cheaper and let 50,000 CAD parts orbit at 92 FPS instead of 49 (CAD measurements, before the row change). An orbiting camera no longer re-collects every frame: with 50,000 boxes and 500 culling flips a frame, the frame does 50,000 byte compares, 1,000 map lookups, 12,000 float copies and uploads 48 KB in at most 500 writes, where it did 100,000 lookups, 1.2 million float copies and a 4.8 MB upload (counted in `tests/core-instance-cache.test.js`; not timed yet). Several cameras on one scene flip most rows, and then cost what a full collection costs. Draw order among the instances of one geometry follows these row moves, so it changes after a flip; opaque pixels are the same except for two core meshes at exactly the same depth. Contract for `@margoengine/core/extension` users: the per-geometry instance buffers (`engine.geometryBuffers(geometry).instance`) belong to core and are read-only for packages (bind them, never write them, except a package that claims a batch and uploads its changed rows with `uploadRows`, see "Bulk poses and instance rows"; use your own buffer, as `@margoengine/selection`'s micro pick pass does), and `store.matrices` is kernel output (change transforms through the mesh, never by writing world matrices). GPU culling of core meshes (`@margoengine/culling`'s `CulledMeshes`) uses one hook: passes see the frame's batches as `context.batches`, and a package may set `batch.redirect = {instances, args}` for the frame; every core draw of that batch (main pass and replays) then reads the package's compacted instance records and `drawIndexedIndirect` arguments instead of core's buffer and count. Core still uploads into its own instance buffer, which stays the read-only source the package culls from. `engine.start({culling: false})` skips core's CPU frustum test in the built-in loop (as `render({culling: false})` does for one frame) when a package culls on the GPU.
 
@@ -95,6 +95,8 @@ old one. WebGPU reports a real out-of-memory later, as a device error on the nex
 
 A `rebootDevice()` that fails leaves the engine and the canvas on the device they had, so on a healthy device the page
 keeps drawing and you can try again. The canvas moves to the new device only once every geometry is rebuilt on it.
+`engine.dispose()` ends a restore in flight at its next startup step: `rebootDevice()` rejects with `MargoError` code
+`disposed`, the device it asked for is destroyed, and an automatic restore stops without a report.
 
 Core restores a lost device by itself at most 3 times in a row. A fourth loss before 120 frames have drawn since the
 last one reports `MargoError` code `failed` (`GPU lost 4 times; reload the page`) through `engine.onError` once, and
@@ -169,6 +171,10 @@ const hit = await engine.pick(canvas.clientWidth / 2, canvas.clientHeight / 2); 
 console.log(hit === crate, engine.camera instanceof Camera);
 engine.dispose();
 ```
+
+A scale of 0 on an axis is valid (glTF 2.0 section 3.5.3): `mesh.setScale([1, 0, 1])` flattens the mesh onto a plane
+that is lit like its surviving normal axis, and `setScale([0, 0, 0])` draws nothing, for example to hide a node or to
+start a pop-in animation. Normals stay finite; a value that is not finite as float32 still throws `RangeError`.
 
 ## Bulk poses and instance rows (extension)
 
@@ -313,7 +319,7 @@ const engine = await Engine.create(canvas, { powerPreference: 'low-power' });
 
 `engine.renderTarget` names what a render pipeline must match to draw in the canvas pass: the colour format, the depth
 format and the sample count. An optional package reads it to compile its pipelines before the first frame, as
-`PBRModel.compile()` in `@margoengine/gltf-pro` does. It is `null` off WebGPU, and it follows a restored device.
+`PBRModel.compile()` in `@margoengine/gltf/pbr` does. It is `null` off WebGPU, and it follows a restored device.
 
 ```ts
 import { Engine } from '@margoengine/core';
@@ -338,9 +344,9 @@ lighting.radiance[3] = 0.2; // existing ambient intensity
 lighting.ambient.set([0.4, 0.6, 1]); // linear RGB multiplier; white by default
 ```
 
-The three components must be finite and nonnegative; values above one are allowed. Core meshes and packages drawing core's shader use this color. Independent material shaders, including glTF-pro's hemisphere model, retain their existing lighting APIs. Environment IBL replaces core ambient; Sky's explicit ambient color supplies its own absolute floor. This is a flat RGB hook, not a HemisphereLight.
+The three components must be finite and nonnegative; values above one are allowed. Core meshes and packages drawing core's shader use this color. Independent material shaders, including glTF PBR's hemisphere model, retain their existing lighting APIs. Environment IBL replaces core ambient; Sky's explicit ambient color supplies its own absolute floor. This is a flat RGB hook, not a HemisphereLight.
 
-Core's display curve is Khronos PBR Neutral, then the exact sRGB encoding: base colours under neutral light come out as authored, and highlights roll off to white. glTF-pro, terrain, sky, water, scatter, foliage and the post effects end with the same curve, so one colour looks the same whichever package draws it; `@margoengine/tonemap` defaults to it and adds AgX, ACES and LUT grading.
+Core's display curve is Khronos PBR Neutral, then the exact sRGB encoding: base colours under neutral light come out as authored, and highlights roll off to white. glTF PBR, terrain, sky, water, scatter, foliage and the post effects end with the same curve, so one colour looks the same whichever package draws it; `@margoengine/tonemap` defaults to it and adds AgX, ACES and LUT grading.
 
 For packages supplying `Lighting` directly to a renderer, omitted `ambient` means white. The canonical WGSL `Frame` is now 128 bytes: its original 112-byte prefix is unchanged and an `ambient:vec4f` follows it (RGB at floats 28-30). Packages allocating that uniform must supply the full layout; append their own fields after it.
 
@@ -398,7 +404,7 @@ Call `engine.dispose()` when the canvas is removed, or let `using engine = await
 
 Errors are a `MargoError` with a `code` (or a `TypeError` / `RangeError`) whose short message links to its entry on [margoengine.com/errors](https://margoengine.com/errors).
 
-Core geometry holds positions and normals only. For a second UV set (lightmaps, ambient occlusion), vertex colours or tangents on CPU geometry, use `createMesh(engine, {positions, normals, uvs, uvs1, ...}, material)` from `@margoengine/materials`; glTF files keep `TEXCOORD_1` through `@margoengine/gltf-pro`. For points (point clouds and sprites), use `PointCloud` and `PointsPlugin` from `@margoengine/points`.
+Core geometry holds positions and normals only. For a second UV set (lightmaps, ambient occlusion), vertex colours or tangents on CPU geometry, use `createMesh(engine, {positions, normals, uvs, uvs1, ...}, material)` from `@margoengine/materials`; glTF files keep `TEXCOORD_1` through `@margoengine/gltf/pbr`. For points (point clouds and sprites), use `PointCloud` and `PointsPlugin` from `@margoengine/points`.
 
 Wasm is embedded; no Rust toolchain or Wasm bundler plugin is required. The public API is exported from `@margoengine/core`; raw GPU/Wasm access uses the explicit `@margoengine/core/extension` entry. Both entries include TypeScript declarations.
 

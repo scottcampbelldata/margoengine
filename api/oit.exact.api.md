@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { PBRModel, PBRTransparency } from "@margoengine/gltf-pro";
+import { PBRModel, PBRTransparency } from "@margoengine/gltf/pbr";
 
 export class ExactOIT extends TransparentPass {
     readonly targets: readonly GPUColorTargetState[];

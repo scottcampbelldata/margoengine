@@ -1,5 +1,5 @@
 // Real-GPU proof of SpriteLayer masks in @margoengine/sprites (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/masks-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/masks-check.mjs
 // Under exactSize [64, 32]: a rect mask through a zoomed camera and a circle mask outside, moved, flipped and removed
 // frame by frame, a camera move and a shaded layer, each matching the image the mask rules give, pixel for pixel.
 // Results: test-results/sprites-masks-browser.json.

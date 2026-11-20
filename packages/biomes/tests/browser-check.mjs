@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/biomes/tests/browser-check.mjs
 // A biome world draws as terrain with its ground layer (temperate grass), painting the desert biome turns the painted
 // ground to the desert's sand, clearing the paint brings the grass back, a disposed view leaves no terrain, and with all
@@ -62,10 +62,19 @@ await runSuite(
     assert.ok(alpine.rockSd < 2.5 * 0.0415, `rock light and dark under 2.5x BASE's 0.0415: ${alpine.rockSd}`);
     // Plan 3 guessed 1.3x; measured here at the plan's rock values 1.20x (0.0455 over 0.0378), and any values under the
     // grain ceiling stay under 1.3x (0.0477 at 0.113): a 32 px block spans about 115 m, wider than the macro's 96 m.
+    // The world's own rock pixels only (KB-BIOMES-WORLDEDGE1 put far horizon ground in this frame; with horizon off the
+    // world measured 1.19x, 0.0461 over 0.0388).
     assert.ok(
       alpine.rockForm >= 1.15 * alpine.plainForm,
       `rock form ${alpine.rockForm} at least 1.15x plain rock's ${alpine.plainForm}`,
     );
+    // The horizon's rock reads as rock form too, held to the same bound: its material texture repeats once per ring
+    // texel, so the macro tone spans hundreds of metres at its distance (at the world's 4 m repeat it mipped flat:
+    // 0.0017 against plain 0.0059, 0.29x).
+    const far = alpine.horizonRock;
+    console.log('horizon rock', JSON.stringify(far));
+    assert.ok(far.pixels > 1000, `horizon rock in the frame: ${far.pixels} pixels`);
+    assert.ok(far.form >= 1.15 * far.plain, `horizon rock form ${far.form} at least 1.15x plain rock's ${far.plain}`);
     assert.ok(alpine.snow > 0.01, `snow outweighs rock on over 1 percent of the frame: ${alpine.snow}`);
     assert.ok(
       alpine.snowLuma > 0.82 * alpine.snowWhite,

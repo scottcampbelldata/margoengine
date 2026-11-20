@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel } from '@margoengine/gltf-pro';
+import { GLTFAsset, PBRModel } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { addSyncGroup } from '../dist/sync.js';
 import { Animator } from '../dist/index.js';

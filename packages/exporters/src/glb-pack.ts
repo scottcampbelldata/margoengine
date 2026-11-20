@@ -92,6 +92,17 @@ export function packGLB(parts: GLBParts, views: NewViews = new Map()): GLBParts 
   });
   if (kept.length) json.bufferViews = kept;
   else delete json.bufferViews;
-  if (json.buffers?.[0]) json.buffers[0].byteLength = length;
+  if (json.buffers?.[0] && length) json.buffers[0].byteLength = length;
+  else if (json.buffers?.[0]) {
+    // glTF 2.0 5.10 gives buffer.byteLength a minimum of 1, so a BIN buffer nothing reads any more goes, and every
+    // buffer reference after it moves down one. No view still reads buffer 0: each one put bytes in the new chunk.
+    json.buffers.splice(0, 1);
+    for (const view of kept) {
+      view.buffer -= 1;
+      for (const name of ['EXT_meshopt_compression', 'KHR_meshopt_compression'])
+        if (view.extensions?.[name]?.buffer !== undefined) view.extensions[name].buffer -= 1;
+    }
+    if (!json.buffers.length) delete json.buffers;
+  }
   return { json, bin: length ? bin : null, chunks: parts.chunks };
 }

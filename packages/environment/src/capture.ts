@@ -87,6 +87,16 @@ export class CaptureTarget {
   }
 }
 
+/**
+ * A background a capture draws in place of the scene's own: anything that records into the pass context's colour where
+ * depth still holds the clear value, as `EnvironmentBackground`, `ImageBackground` and `ColorBackground` do through
+ * `record(context)`.
+ */
+export interface CaptureBackground {
+  record(context: CapturePassContext): void;
+}
+const BACKGROUND_PASS = Symbol.for('margoengine.background-pass');
+
 /** @internal One capture: what to draw, through which camera, into which target. */
 export interface CaptureJob {
   readonly camera: Camera;
@@ -96,6 +106,8 @@ export interface CaptureJob {
   readonly layers: number;
   readonly exclude?: Iterable<Mesh>;
   readonly filter: CapturePassFilter;
+  /** Drawn in place of the scene's background passes (those of EnvironmentBackground, ImageBackground, ColorBackground). */
+  readonly background?: CaptureBackground | null;
   /** The capturing object; its own surface pass skips itself while `activeCapture()` returns it. */
   readonly owner: object;
   /** Runs inside the capture's frame graph after the scene is drawn and resolved (face copies, mips). */
@@ -173,6 +185,14 @@ const END: FramePass = {
   },
 };
 
+const BACKGROUND: FramePass = {
+  name: 'capture:background',
+  order: 0.5,
+  execute: (c) => {
+    if (c.backend === 'webgpu') active?.background?.record(c);
+  },
+};
+
 // Core's FrameGraph keeps its passes in one private array (the one holding the built-in 'main' pass); its field name
 // is not public (and is shortened in the published build), so it is found by shape and only read.
 function passArray(graph: FrameGraph): readonly FramePass[] | undefined {
@@ -186,7 +206,7 @@ function passArray(graph: FrameGraph): readonly FramePass[] | undefined {
 }
 const graphs = new WeakMap<
   FrameGraph,
-  { passes: readonly FramePass[]; revision: number; filter: CapturePassFilter; graph: FrameGraph }
+  { passes: readonly FramePass[]; revision: number; filter: CapturePassFilter; swap: boolean; graph: FrameGraph }
 >();
 
 /**
@@ -208,14 +228,27 @@ export function captureScene(engine: EngineKernel, job: CaptureJob): boolean {
   if (active)
     throw new MargoError('state', 'Scene capture already rendering; call update() outside captures and frame passes');
   let cached = graphs.get(frameGraph);
-  if (!cached || cached.passes !== passes || cached.revision !== frameGraph.revision || cached.filter !== job.filter) {
+  const swap = !!job.background;
+  if (
+    !cached ||
+    cached.passes !== passes ||
+    cached.revision !== frameGraph.revision ||
+    cached.filter !== job.filter ||
+    cached.swap !== swap
+  ) {
     const graph = new FrameGraph();
     graph.add(BEGIN);
+    // A capture background takes the place of the first scene background pass (order 0.5, ColorBackground's
+    // default, when the scene has none): before the transparent passes, which must blend over it.
+    let order = Infinity;
     for (const pass of passes)
-      if (pass.name !== 'main' && job.filter({ name: pass.name, order: pass.order }))
-        graph.add({ name: pass.name, order: pass.order, execute: pass.execute });
+      if (pass.name !== 'main' && job.filter({ name: pass.name, order: pass.order })) {
+        if (swap && (pass as { [BACKGROUND_PASS]?: boolean })[BACKGROUND_PASS]) order = Math.min(order, pass.order);
+        else graph.add({ name: pass.name, order: pass.order, execute: pass.execute });
+      }
+    if (swap) graph.add({ ...BACKGROUND, order: order === Infinity ? 0.5 : order });
     graph.add(END);
-    cached = { passes, revision: frameGraph.revision, filter: job.filter, graph };
+    cached = { passes, revision: frameGraph.revision, filter: job.filter, swap, graph };
     graphs.set(frameGraph, cached);
   }
   const host = scene as unknown as { frameGraph: FrameGraph };

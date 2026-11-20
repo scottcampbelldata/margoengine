@@ -1,0 +1,85 @@
+{
+  "name": "@margoengine/scenes",
+  "version": "1.0.0",
+  "description": "Ready places built from the engine's packages in one call: a catalogue of scenes, each with documented settings, presets, anchors and camera views.",
+  "keywords": [
+    "margoengine",
+    "webgpu",
+    "3d",
+    "scenes",
+    "environment",
+    "landscape"
+  ],
+  "homepage": "https://margoengine.com",
+  "bugs": {
+    "url": "https://github.com/scottcampbelldata/margoengine/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scottcampbelldata/margoengine.git",
+    "directory": "packages/scenes"
+  },
+  "license": "Apache-2.0",
+  "author": "Scott Campbell",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-optional.js scenes",
+    "test": "npm run build && node --test test/*.test.js",
+    "prepack": "npm --prefix ../.. run build:packages",
+    "test:gpu": "cd ../.. && node packages/scenes/test/dune-coast-still.mjs && node packages/scenes/test/timber-valley-still.mjs && node scripts/run-with-timeout.mjs 600 -- node packages/scenes/test/look-family-gpu.mjs"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./look-family": {
+      "types": "./dist/look-family.d.ts",
+      "import": "./dist/look-family.js"
+    },
+    "./dune-coast": {
+      "types": "./dist/dune-coast.d.ts",
+      "import": "./dist/dune-coast.js"
+    },
+    "./timber-valley": {
+      "types": "./dist/timber-valley.d.ts",
+      "import": "./dist/timber-valley.js"
+    },
+    "./library": {
+      "types": "./dist/library.d.ts",
+      "import": "./dist/library.js"
+    },
+    "./shot-settings": {
+      "types": "./dist/shot-settings.d.ts",
+      "import": "./dist/shot-settings.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "peerDependencies": {
+    "@margoengine/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@margoengine/biomes": "^1.0.0",
+    "@margoengine/environment": "^1.0.0",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/materials": "^1.0.0",
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0",
+    "@margoengine/scatter": "^1.0.0",
+    "@margoengine/shadows": "^1.0.0",
+    "@margoengine/sky": "^1.0.0",
+    "@margoengine/terrain": "^1.0.0",
+    "@margoengine/tonemap": "^1.0.0",
+    "@margoengine/vfx": "^1.0.0",
+    "@margoengine/water": "^1.0.0",
+    "@margoengine/weather": "^1.0.0"
+  }
+}

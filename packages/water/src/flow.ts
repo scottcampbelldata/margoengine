@@ -110,8 +110,19 @@ export class WaterFlow implements EnginePlugin {
     this.elapsed = scalar(seconds, 0, 1e9, 'time');
     return this;
   }
-  onPreUpdate(delta: number): void {
+  /** Seconds of flow animation time (`setTime` sets it). */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves the flow clock by `delta` seconds without drawing (a delta of 0 or less moves nothing); each frame update runs
+   * it, so `seek` from `@margoengine/cutscene/seek` replays the flow exactly.
+   */
+  advanceTime(delta: number): void {
     if (delta > 0) this.elapsed += delta;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   setup(engine: Engine): void {
     this.live();

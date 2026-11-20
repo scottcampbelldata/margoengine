@@ -30,6 +30,11 @@ rig.shake(0.2, 0.4);
 
 follow accepts a live mesh from the attached engine or a world-position tuple. Mesh targets use world transforms. Shake amplitude is in world units and duration is seconds; it does not alter the settled spring position. The frame plugin owns camera position/target while attached, so disable competing camera controls. dispose detaches it.
 
+Film time: `rig.advanceTime(delta)` is one frame of the rig with no draw (springs, shake, `rig.time`), so `seek` from
+`@margoengine/cutscene/seek` starts a film scene where a continuous run's follow and shake are. A `CameraNoise` stage
+moves its clock with `noise.advanceTime(delta)`; pass it to `seek` as an `extra` clock when no attached `CameraBrain`
+runs it as a stage (the brain's own clock steps its stages).
+
 Scope the rig with `using` (it calls `dispose()` and returns the camera to your controls):
 
 ```ts
@@ -51,8 +56,9 @@ Errors name their fix: a bad argument throws `RangeError` or `TypeError` (for ex
 Set `ground: (x,z) => height` to keep the camera arm above a CPU heightfield.
 `clearance` defaults to 0.65 world units. The rig checks both its desired arm and
 the resulting damped/shaken camera, without changing your requested `offset`.
-For a below-target orbit, it raises the rendered aim point with the camera so
-terrain clearance preserves upward look instead of forcing the view back down.
+For a below-target orbit, it raises the rendered aim point by as much as the ground
+lifted the camera, so terrain clearance preserves upward look instead of forcing the
+view back down; shake and spring lag never move the aim point.
 Six samples along each arm suit broad terrain; narrow ridges and buildings need
 collision geometry. Heights must be finite. Ground handling is disabled by default.
 
@@ -110,6 +116,16 @@ const rig = new Cinematic({offset: [0, 3, 6]});
 rig.follow([0, 1, 0]);
 brain.add({name: 'follow', stages: [rigStage(rig)]});
 console.log(brain.update(1 / 60).position);
+```
+
+Film time: `brain.advanceTime(delta)` is one update with no listener call (the cameras and their stages, the blend, `brain.stages` and the camera write), so `seek` from `@margoengine/cutscene/seek` starts a film scene where a continuous run's blend, camera moves and focus pulls are. A live `update` sends its `change` and `blended` events after its step, so a listener reads that frame's pose; the steps a seek replays send none.
+
+```ts
+import {CameraBrain} from 'margoengine/cinematic/brain';
+const brain = new CameraBrain({camera: {position: [0, 0, 0], target: [0, 0, 0], up: [0, 1, 0], fov: 60}});
+brain.add({name: 'wide', position: [0, 4, 12]});
+for (let step = 0; step < 600; step++) brain.advanceTime(1 / 60);
+console.log(brain.live?.name, brain.pose.position);
 ```
 
 Cutscenes have their own timed cameras in `@margoengine/cutscene/shots`; the brain is for play, where what happens decides the shot.

@@ -1,7 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
-import { atlasTexture } from '../../shared/atlas-texture.js';
+import { borrowedAtlas } from '../../shared/atlas-texture.js';
+import { type BorrowSlot, borrow, fix, lend } from '../../shared/borrowed.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
 import {
@@ -31,10 +32,14 @@ export interface TilePixels {
 /**
  * Where a tileset's texels come from. Pixels and `ImageBitmap`s are uploaded to an `rgba8unorm` texture the map owns and
  * uploads again after a device loss. A function is called with the device, also after a device loss. A plain
- * `GPUTexture` stays the caller's and needs {@link TileMap.setAtlas} after a device loss.
+ * `GPUTexture` stays the caller's: held at a device restore it is reported once through `engine.onError` and its tiles
+ * are skipped until {@link TileMap.setAtlas} gives a new one (docs/conventions.md, "Borrowed GPU objects").
  */
 export type TileAtlas = TilePixels | ImageBitmap | GPUTexture | ((device: GPUDevice) => GPUTexture);
-/** A render target, or a function read each frame for one that changes. A pixel layer's `target` fits. */
+/**
+ * A render target, or a function read each frame for one that changes. A pixel layer's `target` fits. A plain texture
+ * held at a device restore is reported once through `engine.onError` and the map draws nothing until `setTarget`.
+ */
 export type TileTarget = GPUTexture | (() => GPUTexture);
 /** Map pixels to target pixels: the map point at the top left and target pixels per map pixel. A pixel layer's `camera` fits. */
 export interface TileCamera {
@@ -177,7 +182,9 @@ let mapCount = 0;
  * WebGPU only.
  * @throws TypeError / RangeError on invalid options or, in a frame, a tileset with no atlas or larger than its atlas.
  * @throws MargoError `'unsupported'` on a WebGL engine or for a drawn image-collection tileset, `'disposed'` after
- * `dispose()`, `'state'` for a plain `GPUTexture` atlas after a device loss.
+ * `dispose()`. A plain `GPUTexture` atlas or target held at a device restore is reported once through `engine.onError`
+ * (`'state'`, help `borrowed-lost`) and the frame goes on without it until {@link TileMap.setAtlas} or
+ * {@link TileMap.setTarget} gives a new one.
  */
 export class TileMap implements EnginePlugin {
   readonly name: string;
@@ -195,17 +202,18 @@ export class TileMap implements EnginePlugin {
   readonly stats: TileMapStats = { draws: 0, uploadedBytes: 0 };
   private readonly order: number;
   private readonly layerMask: number;
-  private readonly target?: TileTarget;
+  private target?: TileTarget;
+  private targetSlot!: BorrowSlot<GPUTexture, GPUTexture>;
   private readonly clear?: readonly [number, number, number, number] | false;
   private readonly names?: readonly string[];
   private atlases: { [tileset: string]: TileAtlas };
+  private readonly slots = new Map<string, BorrowSlot<GPUTexture, TileAtlas>>();
   private data!: TileMapData;
   private sets: SetRun[] = [];
   private runs: LayerRun[] = [];
   private reach!: TileReach;
   private engine?: Engine;
   private device?: GPUDevice;
-  private stale = new Set<string>();
   private module?: GPUShaderModule;
   private layerLayout?: GPUBindGroupLayout;
   private cellsLayout?: GPUBindGroupLayout;
@@ -242,7 +250,7 @@ export class TileMap implements EnginePlugin {
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.snap = options.snap ?? true;
     this.parallax = options.parallax ?? true;
-    this.target = options.target;
+    this.setTarget(options.target);
     this.clear = options.clear;
     this.order = order;
     this.layerMask = checkLayers(options.layers ?? 1, 'TileMap layers');
@@ -301,11 +309,24 @@ export class TileMap implements EnginePlugin {
       });
     this.animatedAt = NaN;
   }
+  /**
+   * Replaces the map's own target: a texture, a function read each frame, or undefined for the frame's colour target.
+   * After a device restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: TileTarget | undefined): void {
+    this.target = target;
+    this.targetSlot = borrow(
+      typeof target === 'function' ? undefined : target,
+      'TileMap target',
+      'setTarget',
+      this.engine?.gpu,
+    );
+  }
   /** Replaces a tileset's atlas from the next frame. */
   setAtlas(tileset: string, atlas: TileAtlas): void {
     if (!atlas) throw typeError('TileMap needs atlases', 'tilemap-options');
     this.atlases[tileset] = atlas;
-    this.stale.delete(tileset);
+    this.slots.set(tileset, borrow(atlas, 'TileMap atlas', 'setAtlas', this.engine?.gpu));
     for (const run of this.sets)
       if (run.set.name === tileset) {
         if (run.atlas?.owned) run.atlas.texture.destroy();
@@ -337,6 +358,8 @@ export class TileMap implements EnginePlugin {
         this.disposed ? 'disposed' : 'webgpu',
       );
     this.engine = engine;
+    fix(this.targetSlot, engine.gpu);
+    for (const slot of this.slots.values()) fix(slot, engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
@@ -345,17 +368,20 @@ export class TileMap implements EnginePlugin {
       },
     });
   }
+  /**
+   * Moves the tile animation clock (`time`, in milliseconds) by `delta` seconds without drawing (a delta of 0 or less
+   * moves nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.time += delta * 1000;
+  }
   onPreUpdate(delta: number): void {
-    if (delta > 0) {
-      this.states.prune();
-      this.time += delta * 1000;
-    }
+    if (delta > 0) this.states.prune();
+    this.advanceTime(delta);
     this.stats.draws = this.stats.uploadedBytes = 0;
   }
   onDeviceRestored(): void {
-    for (const run of this.sets)
-      if (run.atlas && !run.atlas.owned && typeof this.atlases[run.set.name] !== 'function')
-        this.stale.add(run.set.name);
+    // A caller's plain GPUTexture is reported once at its next use (shared/borrowed.js); the rest comes back by itself.
     this.releaseDevice();
   }
   dispose(): void {
@@ -488,18 +514,31 @@ export class TileMap implements EnginePlugin {
       run.dirty.clear();
     }
   }
-  /** The bind group of a tileset some cell uses; made on first use, so an unused tileset needs no atlas. */
-  private setGroup(device: GPUDevice, run: SetRun): GPUBindGroup {
+  /** The atlas slot of a tileset, made on first use from the atlas given for it. */
+  private slot(name: string): BorrowSlot<GPUTexture, TileAtlas> {
+    let slot = this.slots.get(name);
+    if (!slot) {
+      slot = borrow(this.atlases[name], 'TileMap atlas', 'setAtlas', this.engine?.gpu);
+      this.slots.set(name, slot);
+    }
+    return slot;
+  }
+  /**
+   * The bind group of a tileset some cell uses; made on first use, so an unused tileset needs no atlas. Undefined while
+   * a caller's atlas is lost with the device: its tiles are skipped.
+   */
+  private setGroup(device: GPUDevice, run: SetRun): GPUBindGroup | undefined {
     if (run.group) return run.group;
     const { set } = run,
       spacing = set.spacing ?? 0,
       margin = set.margin ?? 0;
     if (!set.columns) throw fault('unsupported', 'Image collection tilesets are not drawn', 'tilemap-state');
-    if (this.stale.has(set.name))
-      throw fault('state', 'Tile atlas lost with the device; call setAtlas', 'tilemap-state');
     const source = this.atlases[set.name];
     if (!source) throw typeError('Tileset has no atlas', 'tilemap-options');
-    run.atlas ??= atlasTexture(device, source, () => rangeError('Invalid tile atlas pixels', 'tilemap-options'));
+    run.atlas ??= borrowedAtlas(this.slot(set.name), device, this.engine, () =>
+      rangeError('Invalid tile atlas pixels', 'tilemap-options'),
+    );
+    if (!run.atlas) return undefined;
     const texture = run.atlas.texture,
       rows = Math.ceil(set.tileCount / set.columns);
     if (
@@ -570,7 +609,9 @@ export class TileMap implements EnginePlugin {
     if (!this.visible) return;
     const view = c.view;
     if (view?.layers !== undefined && !(view.layers & this.layerMask)) return;
-    const own = this.target && (typeof this.target === 'function' ? this.target() : this.target);
+    const target = this.target,
+      own = typeof target === 'function' ? target() : target && lend(this.targetSlot, c.device, this.engine);
+    if (target && typeof target !== 'function' && !own) return;
     // A map with its own target draws once a frame, however many views the frame has.
     if (own && view?.index) return;
     const device = c.device,
@@ -671,8 +712,9 @@ export class TileMap implements EnginePlugin {
       pass.setBindGroup(0, state.group!, this.offsets);
       pass.setBindGroup(1, run.group!);
       for (let s = 0; s < sets.length; s++) {
-        if (!run.used[s]) continue;
-        pass.setBindGroup(2, sets[s].group!);
+        const group = sets[s].group;
+        if (!run.used[s] || !group) continue;
+        pass.setBindGroup(2, group);
         for (let y = range.firstY; y <= range.lastY; y++)
           for (let x = range.firstX; x <= range.lastX; x++) {
             const chunk = y * chunksWide + x;

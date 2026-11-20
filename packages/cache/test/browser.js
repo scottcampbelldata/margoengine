@@ -50,7 +50,7 @@ const decodedDigest = async (value) => {
   return value;
 };
 
-/** gltf-pro's progressive streaming code (the half that runs in its worker) with the global fetch answered by `ranges`. */
+/** gltf/pbr's progressive streaming code (the half that runs in its worker) with the global fetch answered by `ranges`. */
 async function stream(ranges, url) {
   const { GLTFStream } = await import(query.get('stream'));
   const saved = globalThis.fetch;

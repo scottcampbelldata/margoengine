@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // The far forest (biome look plan 3, B3): beyond the stored objects' radius a tree is a few pixels, so one
-// camera-following Scatter per tree kind draws a 12-triangle stand-in over the world's canopy cover. Stand-ins are hashed,
+// camera-following Scatter per tree kind draws a 14-triangle stand-in over the world's canopy cover. Stand-ins are hashed,
 // not placed, and hand over to the stored trees in a band of one tile, where a tree is about 5 pixels. Loaded only
 // when `far` is on. They cast no shadow: shadow maps do not reach them.
 import type { EngineKernel } from '@margoengine/core';
@@ -10,6 +10,7 @@ import type { Scatter } from '@margoengine/scatter';
 import { rangeError } from '../../shared/errors.js';
 import { CANOPY_KINDS, type CanopyCover, canopyCover, COVER_STEP } from './cover.js';
 import type { BiomeWorld } from './world.js';
+import { captureScene } from '../../shared/scene-scope.js';
 
 /** Default stand-ins a far forest draws: `BiomeObjects` `far.count`. */
 export const FAR_COUNT = 300000;
@@ -32,7 +33,7 @@ export function farStep(world: BiomeWorld): number {
   return step;
 }
 
-type Far = { scatter: Scatter; texture: GPUTexture; kind: number };
+type Far = { scatter?: Scatter; texture?: GPUTexture; device?: GPUDevice; kind: number };
 type Modules = { readonly scatter: typeof ScatterModule; readonly core: typeof CoreModule };
 
 /** The stand-ins of one view: one `Scatter` per tree kind the world has. */
@@ -41,6 +42,8 @@ export class FarForest implements Disposable {
   readonly #world: BiomeWorld;
   readonly #off: () => void;
   readonly #parts: Far[] = [];
+  // The newest cover raster: a restored device's textures are made from it.
+  #latest?: CanopyCover;
   #stale = false;
   #running = false;
   #disposed = false;
@@ -77,11 +80,13 @@ export class FarForest implements Disposable {
       throw rangeError("BiomeObjects far radius must reach past the stored objects' radius", 'biomes');
     if (!(count >= 1 && count <= 1000000))
       throw rangeError('BiomeObjects far count must be from 1 to 1,000,000', 'biomes');
+    // The scene attached from: the stand-ins register there, whichever scene is active once the cover is made.
+    const held = captureScene(engine);
     const standin = await import('@margoengine/procedural/standin'),
       far = new FarForest(engine, world),
-      cover = await far.#cover(),
-      device = (engine as unknown as { gpu: GPUDevice }).gpu;
+      cover = await far.#cover();
     if (far.#disposed) return far;
+    far.#latest = cover;
     // Instances are shared out by how much of the world each kind holds; each kind's map is scaled to its own fullest.
     let all = 0;
     const totals = cover.kinds.map((map) => {
@@ -90,12 +95,12 @@ export class FarForest implements Disposable {
       all += sum;
       return sum;
     });
-    cover.kinds.forEach((_, kind) => {
+    held.run(() =>
+      cover.kinds.forEach((_, kind) => {
       if (!totals[kind]) return;
       const shape = standin.generateTreeStandIn(CANOPY_KINDS[kind]),
-        texture = device.createTexture({ size: [cover.width, cover.depth], format: 'r8unorm', usage: 4 | 2 }); // TEXTURE_BINDING | COPY_DST
-      far.#upload(texture, cover, kind);
-      const scatter = modules.scatter.Scatter.attach(
+        part: Far = { kind };
+      part.scatter = modules.scatter.Scatter.attach(
         engine,
         new modules.core.Geometry(shape.positions, shape.normals, shape.indices),
         {
@@ -104,7 +109,7 @@ export class FarForest implements Disposable {
           follow: true,
           bounds,
           heightmap,
-          densityMap: () => texture,
+          densityMap: () => far.#texture(part),
           lod: [radius * 0.5, radius * 0.75, radius],
           lodFade: 0,
           edgeShrink: radius * 0.1,
@@ -116,8 +121,9 @@ export class FarForest implements Disposable {
           variation: { hue: 0.06, value: 0.15 },
         },
       );
-      far.#parts.push({ scatter, texture, kind });
-    });
+      far.#parts.push(part);
+      }),
+    );
     return far;
   }
 
@@ -128,9 +134,27 @@ export class FarForest implements Disposable {
     return workers ? workers.run<CanopyCover>({ op: 'cover', step }) : canopyCover(this.#world, step);
   }
 
-  #upload(texture: GPUTexture, cover: CanopyCover, kind: number): void {
-    const device = (this.#engine as unknown as { gpu: GPUDevice }).gpu;
-    device.queue.writeTexture({ texture }, cover.kinds[kind] as Uint8Array<ArrayBuffer>, { bytesPerRow: cover.width }, [
+  /**
+   * A kind's cover texture on the device drawing now, made from the newest raster on first use and again on a restored
+   * device: WebGPU objects are valid only with the device that made them, and a lost device's are unusable (W3C WebGPU,
+   * sections 3.2.1 and 3.5.2), so the scatter must never bind the old one (KB-OWN-BIOMES3).
+   */
+  #texture(part: Far): GPUTexture | undefined {
+    const device = (this.#engine as unknown as { gpu?: GPUDevice }).gpu,
+      cover = this.#latest;
+    if (!device || !cover) return undefined;
+    if (part.texture && part.device === device) return part.texture;
+    part.texture?.destroy();
+    part.texture = device.createTexture({ size: [cover.width, cover.depth], format: 'r8unorm', usage: 4 | 2 }); // TEXTURE_BINDING | COPY_DST
+    part.device = device;
+    this.#upload(part, cover);
+    return part.texture;
+  }
+
+  #upload(part: Far, cover: CanopyCover): void {
+    const { texture, device } = part;
+    if (!texture || !device) return;
+    device.queue.writeTexture({ texture }, cover.kinds[part.kind] as Uint8Array<ArrayBuffer>, { bytesPerRow: cover.width }, [
       cover.width,
       cover.depth,
     ]);
@@ -142,14 +166,18 @@ export class FarForest implements Disposable {
     while (this.#stale && !this.#disposed) {
       this.#stale = false;
       const cover = await this.#cover();
-      if (!this.#disposed) for (const p of this.#parts) this.#upload(p.texture, cover, p.kind);
+      if (this.#disposed) break;
+      this.#latest = cover;
+      // A texture of a device no longer drawing is made again from this raster when next read.
+      const device = (this.#engine as unknown as { gpu?: GPUDevice }).gpu;
+      for (const p of this.#parts) if (p.device === device) this.#upload(p, cover);
     }
     this.#running = false;
   }
 
   /** Stand-ins drawn at most (the sum of the kinds' counts). */
   get count(): number {
-    return this.#parts.reduce((n, p) => n + p.scatter.count, 0);
+    return this.#parts.reduce((n, p) => n + p.scatter!.count, 0);
   }
 
   /** Frees every scatter and texture. */
@@ -158,8 +186,8 @@ export class FarForest implements Disposable {
     this.#disposed = true;
     this.#off();
     for (const p of this.#parts) {
-      p.scatter.dispose();
-      p.texture.destroy();
+      p.scatter?.dispose();
+      p.texture?.destroy();
     }
   }
 

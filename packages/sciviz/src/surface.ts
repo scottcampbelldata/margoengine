@@ -1,4 +1,4 @@
-import { colorLookupWGSL } from './color-lookup.js';
+import { colorLookupWGSL, rangeUniform } from './color-lookup.js';
 // Surface plots: a height field z[j][i] over a regular x-y grid, drawn from a storage buffer (a GpuArray is read in
 // place, so a surface computed on the GPU never comes back to the CPU). The vertex shader builds the grid from the
 // vertex index and takes normals from central differences; the fragment shader colours by height through a colour
@@ -49,10 +49,11 @@ export interface SurfaceLayerOptions {
 /** WGSL of the surface pipeline. */
 const surfaceShader = /* Shader notes kept outside the uploaded source:
  * Central differences in data units (one-sided at the edges through the clamped reads).
+ * missing() is true for NaN and both infinities: a non-finite height is a gap, as in vectorGeometry and the colour range.
  * Contours: darken within about one pixel of each level.
  */ /* wgsl */ `${frameWGSL}
 ${colorLookupWGSL}
-struct Surface { model: mat4x4f, normalModel: mat4x4f, grid: vec4f, size: vec4u, style: vec4f }
+struct Surface { model: mat4x4f, normalModel: mat4x4f, grid: vec4f, size: vec4u, style: vec4f, range: vec4f }
 @group(1) @binding(0) var<uniform> surface: Surface;
 @group(1) @binding(1) var<storage, read> heights: array<f32>;
 @group(1) @binding(2) var colours: texture_2d<f32>;
@@ -63,9 +64,9 @@ fn height(i: i32, j: i32) -> f32 {
   let ny = i32(surface.size.y);
   return heights[u32(clamp(j, 0, ny - 1) * nx + clamp(i, 0, nx - 1))];
 }
-fn isNan(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) > 0x7f800000u; }
+fn missing(v: f32) -> bool { return (bitcast<u32>(v) & 0x7fffffffu) >= 0x7f800000u; }
 fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
-  let x = isNan(a); let y = isNan(b);
+  let x = missing(a); let y = missing(b);
   return (select(b, h, y) - select(a, h, x)) / max(span - f32(u32(x) + u32(y)), 1.0);
 }
 @vertex fn vertex(@builtin(vertex_index) index: u32) -> Out {
@@ -90,17 +91,17 @@ fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
   out.normal = normalize((surface.normalModel * vec4f(-gradient, 1.0, 0.0)).xyz);
   out.value = h;
   out.cell = vec2f(p);
-  if (isNan(height(x, y)) || isNan(height(x + 1, y + 1)) ||
-      isNan(height(x + select(0, 1, corner < 3u), y + select(1, 0, corner < 3u)))) {
+  if (missing(height(x, y)) || missing(height(x + 1, y + 1)) ||
+      missing(height(x + select(0, 1, corner < 3u), y + select(1, 0, corner < 3u)))) {
     out.clip = vec4f(0.0, 0.0, 2.0, 1.0);
   }
   return out;
 }
 @fragment fn fragment(in: Out) -> @location(0) vec4f {
-  let t = (in.value - surface.style.x) / max(surface.style.y - surface.style.x, 1e-30);
+  let t = colourFraction(in.value, surface.range);
   var albedo = colourLookup(colours, t).rgb;
-  if (surface.style.z > 0.0) {
-    let level = t * surface.style.z;
+  if (surface.style.x > 0.0) {
+    let level = t * surface.style.x;
     let width = fwidth(level);
     let line = 1.0 - smoothstep(0.0, 1.5 * width, abs(fract(level + 0.5) - 0.5));
     albedo = mix(albedo, albedo * 0.35, line * 0.8);
@@ -112,7 +113,7 @@ fn difference(a: f32, b: f32, h: f32, span: f32) -> f32 {
     albedo = mix(albedo, vec3f(0.92), line * 0.5);
   }
   let colour = shade(albedo, normalize(in.normal), normalize(frame.eye.xyz - in.world));
-  return vec4f(toOutput(colour), surface.style.w);
+  return vec4f(toOutput(colour), surface.style.y);
 }`;
 
 /** A surface plot layer. Create it with `figure.surface(z, options)`. */
@@ -163,7 +164,7 @@ export class SurfaceLayer implements Drawable {
   #uniform: GPUBuffer | undefined;
   #group: GPUBindGroup | undefined;
   #layout: GPUBindGroupLayout | undefined;
-  readonly #values = new Float32Array(48);
+  readonly #values = new Float32Array(52);
   #model: Float32Array = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   #dirty = true;
   #disposed = false;
@@ -313,6 +314,7 @@ export class SurfaceLayer implements Drawable {
 
   /** Writes new heights (same grid size) from the CPU. A GpuArray source updates in place; call `invalidate()` instead. */
   setHeights(values: ArrayLike<number>): void {
+    if (this.#disposed) throw fault('disposed', 'Surface disposed; create a new surface to draw new heights', 'sciviz');
     if (values.length !== this.nx * this.ny)
       throw rangeError(`setHeights needs ${this.nx * this.ny} values, got ${values.length}`, 'sciviz');
     if (!this.#heights?.owned)
@@ -355,12 +357,19 @@ export class SurfaceLayer implements Drawable {
     const v = this.#values,
       m = this.#model;
     v.set(m, 0);
-    // Normals: inverse transpose of the model's linear part (a scale and an axis swap: the inverse scale).
-    const inv = (s: number) => (s ? 1 / s : 0);
-    v.set([inv(m[0]), 0, 0, 0, 0, 0, inv(m[6]), 0, 0, inv(m[9]), 0, 0, 0, 0, 0, 1], 16);
+    // Normals: the cofactor matrix of the model's linear part (a scale and an axis swap), which is the inverse
+    // transpose times its positive determinant, scaled so its largest entry is 1. Unlike the inverse it stays right
+    // when an axis scale is 0 (a z range past the double limit flattens the heights): the normal then points along
+    // that axis instead of becoming 0 and shading NaN.
+    const a = Math.abs(m[0]),
+      b = Math.abs(m[6]),
+      c = Math.abs(m[9]),
+      top = Math.max(b * c, a * c, a * b) || 1,
+      side = (s: number, k: number) => ((s < 0 ? -1 : 1) * k) / top;
+    v.set([side(m[0], b * c), 0, 0, 0, 0, 0, side(m[6], a * c), 0, 0, side(m[9], a * b), 0, 0, 0, 0, 0, 1], 16);
     v.set([this.x[0], (this.x[1] - this.x[0]) / (this.nx - 1), this.y[0], (this.y[1] - this.y[0]) / (this.ny - 1)], 32);
     new Uint32Array(v.buffer, 36 * 4, 4).set([this.nx, this.ny, this.#grid, 0]);
-    v.set([this.#range[0], this.#range[1], this.#contours, this.#opacity], 40);
+    v.set([this.#contours, this.#opacity, 0, 0, ...rangeUniform(this.#range), 0], 40);
     this.#renderer.device!.queue.writeBuffer(this.#uniform!, 0, v);
     this.#dirty = false;
   }

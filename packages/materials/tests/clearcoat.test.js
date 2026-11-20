@@ -4,14 +4,14 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { clearcoat, install } from '../dist/index.js';
 import { materialQuad } from '../../../tests/support/materials-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
-// gltf-pro's base shader since KB3240 (direct diffuse keeps the dielectric Fresnel weight); was bdf7de1e...834390 (KB6016c).
-const baselineShader = '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23';
+// gltf/pbr's base shader since KB-INV-GLTF (its clip position is @invariant); was 9429f501...4e9c23 (KB3240), bdf7de1e...834390 (KB6016c).
+const baselineShader = 'e910ac332ad107235b3ffade40139f9fac9ed8d30e480082de2f8da0befa977a';
 
 test('clearcoat maps upload retained Node pixels and generate their sampler mip chain', async () => {
   const image = { width: 2, height: 2, data: new Uint8Array(16).fill(127) };
@@ -534,9 +534,9 @@ test('materials remains optional, tree shakable and absent from frozen and glTF 
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(manifest.name, '@margoengine/materials');
   assert.equal(manifest.sideEffects, false);
-  assert.ok(manifest.dependencies?.['@margoengine/gltf-pro'] || manifest.peerDependencies?.['@margoengine/gltf-pro']);
-  for (const name of ['core', 'margoengine', 'gltf-pro']) {
-    const source = readFileSync(new URL(`../../${name}/dist/index.js`, import.meta.url), 'utf8');
+  assert.ok(manifest.dependencies?.['@margoengine/gltf'] || manifest.peerDependencies?.['@margoengine/gltf']);
+  for (const file of ['core/dist/index.js', 'margoengine/dist/index.js', 'gltf/dist/pbr.js']) {
+    const source = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /(?:from\s*|import\s*\()["']@margoengine\/materials/);
   }
 });

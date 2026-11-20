@@ -83,11 +83,12 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js usdz",
     "test": "npm run build && node --test tests/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:gpu:usdz": "cd ../.. && npm run modern:test:usdz && npm run modern:test:usdz:browser"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/lines": "^1.0.0",
     "@margoengine/points": "^1.0.0"
   },

@@ -205,6 +205,9 @@ class Lines implements EnginePlugin {
     add<T extends Line>(line: T): T;
     remove(line: Line): void;
     clear(): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

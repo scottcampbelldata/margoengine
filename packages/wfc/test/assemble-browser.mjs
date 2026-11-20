@@ -1,12 +1,14 @@
+// MARGO_COMPAT not applicable: the script runs its own WebGL2-layer leg (install({ force: true })) beside native WebGPU.
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 const server = await createServer({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
   configFile: false,
-  plugins: [
+  plugins: [noFileWatcher(),
     {
       name: 'wfc-assembly-page',
       configureServer(s) {

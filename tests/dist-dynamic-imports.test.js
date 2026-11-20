@@ -1,7 +1,7 @@
 // No package ships an ineffective dynamic import: a dist module that one file loads with import() while another file
 // of the same package imports it statically. The static import already pulls it into the importer's chunk, so the
 // import() splits nothing, and Vite prints "dynamic import will not move module into another chunk" for every app that
-// links the package from a folder (gltf-pro's Draco module did, 2026-10-26). A module made only of re-exports
+// links the package from a folder (gltf/pbr's Draco module did, 2026-10-26). A module made only of re-exports
 // (`export ... from`) is not such an importer: a bundler resolves a name through it and does not take in what the app
 // leaves unnamed, so @margoengine/environment's index.js re-exports dist/loaders.js while main.js imports it on demand
 // (packages/environment/tests/lazy-loaders.test.js bundles that split). Run after `npm run build:packages`.
@@ -36,10 +36,12 @@ export function relativeImports(filename, code) {
       if (key !== 'comments' && child && typeof child === 'object') walk(child);
   };
   walk(parsed.program);
-  // Only re-exports: every top-level statement re-exports from another module.
+  // Only re-exports: every top-level statement re-exports from another module. A directive prologue ('use client' on
+  // the generated react-server entries) is not code and does not make the module an importer.
+  const statements = parsed.program.body.filter((node) => !(node.type === 'ExpressionStatement' && node.directive));
   found.reexportsOnly =
-    parsed.program.body.length > 0 &&
-    parsed.program.body.every(
+    statements.length > 0 &&
+    statements.every(
       (node) => (node.type === 'ExportNamedDeclaration' || node.type === 'ExportAllDeclaration') && node.source,
     );
   return found;
@@ -82,6 +84,8 @@ test('the check finds a module that is both dynamically and statically imported'
   assert.deepEqual([...found.dynamic], ['./c.js']);
   assert.equal(found.reexportsOnly, false);
   assert.equal(relativeImports('index.js', "export*from'./main.js';export{a}from'./b.js';").reexportsOnly, true);
+  assert.equal(relativeImports('rsc/html.js', "'use client';export{Html}from'../html.js';").reexportsOnly, true);
+  assert.equal(relativeImports('only.js', "'use client';").reexportsOnly, false);
   // A re-export beside code is still a static import of what it names.
   assert.equal(relativeImports('index.js', "export*from'./b.js';export const c=1;").reexportsOnly, false);
 });

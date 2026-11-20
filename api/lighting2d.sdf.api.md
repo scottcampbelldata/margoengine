@@ -4,8 +4,6 @@
 
 ```ts
 export class SDFScene2D implements Disposable {
-    source: TextureSource;
-    emission?: TextureSource;
     camera: {
         x: number;
         y: number;
@@ -14,9 +12,13 @@ export class SDFScene2D implements Disposable {
     alphaThreshold: number;
     emissionIntensity: number;
     constructor(options: SDFScene2DOptions);
+    get source(): TextureSource;
+    set source(value: TextureSource);
+    get emission(): TextureSource | undefined;
+    set emission(value: TextureSource | undefined);
     get distanceTexture(): GPUTexture | undefined;
     get changeBuffer(): GPUBuffer | undefined;
-    encode(device: GPUDevice, encoder: GPUCommandEncoder): void;
+    encode(device: GPUDevice, encoder: GPUCommandEncoder, owner?: SDFOwner): boolean;
     bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup;
     dispose(): void;
     [Symbol.dispose](): void;
@@ -35,6 +37,11 @@ export interface SDFScene2DOptions {
 }
 
 // Not exported from this entry, but used by the exports above:
+
+interface SDFOwner {
+    readonly gpu?: GPUDevice | null;
+    onError(error: unknown): void;
+}
 
 type TextureSource = GPUTexture | (() => GPUTexture);
 ```

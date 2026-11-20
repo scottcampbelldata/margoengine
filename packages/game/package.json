@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/game",
   "version": "1.0.0",
-  "description": "Games: models, animation, light and shadow, sky, physics, audio, input, effects",
+  "description": "Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Scott Campbell",
@@ -191,6 +191,22 @@
       "types": "./dist/audio/spectrogram.d.ts",
       "import": "./dist/audio/spectrogram.js"
     },
+    "./audio/wav": {
+      "types": "./dist/audio/wav.d.ts",
+      "import": "./dist/audio/wav.js"
+    },
+    "./audio/scan": {
+      "types": "./dist/audio/scan.d.ts",
+      "import": "./dist/audio/scan.js"
+    },
+    "./audio/resample": {
+      "types": "./dist/audio/resample.d.ts",
+      "import": "./dist/audio/resample.js"
+    },
+    "./audio/stretch": {
+      "types": "./dist/audio/stretch.d.ts",
+      "import": "./dist/audio/stretch.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"
@@ -279,6 +295,14 @@
       "types": "./dist/biomes/erosion.d.ts",
       "import": "./dist/biomes/erosion.js"
     },
+    "./biomes/valley": {
+      "types": "./dist/biomes/valley.d.ts",
+      "import": "./dist/biomes/valley.js"
+    },
+    "./biomes/settings": {
+      "types": "./dist/biomes/settings.d.ts",
+      "import": "./dist/biomes/settings.js"
+    },
     "./biomes/relief": {
       "types": "./dist/biomes/relief.d.ts",
       "import": "./dist/biomes/relief.js"
@@ -350,6 +374,10 @@
     "./biomes/settlements": {
       "types": "./dist/biomes/settlements.d.ts",
       "import": "./dist/biomes/settlements.js"
+    },
+    "./biomes/fuel": {
+      "types": "./dist/biomes/fuel.d.ts",
+      "import": "./dist/biomes/fuel.js"
     },
     "./biomes/graph": {
       "types": "./dist/biomes/graph.d.ts",
@@ -603,6 +631,18 @@
       "types": "./dist/clustered/contact.d.ts",
       "import": "./dist/clustered/contact.js"
     },
+    "./clustered/line": {
+      "types": "./dist/clustered/line.d.ts",
+      "import": "./dist/clustered/line.js"
+    },
+    "./clustered/bounce": {
+      "types": "./dist/clustered/bounce.d.ts",
+      "import": "./dist/clustered/bounce.js"
+    },
+    "./clustered/groups": {
+      "types": "./dist/clustered/groups.d.ts",
+      "import": "./dist/clustered/groups.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"
@@ -703,6 +743,10 @@
       "types": "./dist/controls/trackball.d.ts",
       "import": "./dist/controls/trackball.js"
     },
+    "./controls/first-person": {
+      "types": "./dist/controls/first-person.d.ts",
+      "import": "./dist/controls/first-person.js"
+    },
     "./controls/arcball": {
       "types": "./dist/controls/arcball.d.ts",
       "import": "./dist/controls/arcball.js"
@@ -782,6 +826,10 @@
     "./creative/grass": {
       "types": "./dist/creative/grass.d.ts",
       "import": "./dist/creative/grass.js"
+    },
+    "./creative/grass-settings": {
+      "types": "./dist/creative/grass-settings.d.ts",
+      "import": "./dist/creative/grass-settings.js"
     },
     "./creative/planet": {
       "types": "./dist/creative/planet.d.ts",
@@ -895,6 +943,10 @@
       "types": "./dist/cutscene/scroll.d.ts",
       "import": "./dist/cutscene/scroll.js"
     },
+    "./cutscene/seek": {
+      "types": "./dist/cutscene/seek.d.ts",
+      "import": "./dist/cutscene/seek.js"
+    },
     "./decoders/ktx2-hdr6": {
       "types": "./dist/decoders/ktx2-hdr6.d.ts",
       "import": "./dist/decoders/ktx2-hdr6.js"
@@ -974,6 +1026,14 @@
     "./decoders/tiff": {
       "types": "./dist/decoders/tiff.d.ts",
       "import": "./dist/decoders/tiff.js"
+    },
+    "./decoders/tiff-codecs": {
+      "types": "./dist/decoders/tiff-codecs.d.ts",
+      "import": "./dist/decoders/tiff-codecs.js"
+    },
+    "./decoders/geotiff": {
+      "types": "./dist/decoders/geotiff.d.ts",
+      "import": "./dist/decoders/geotiff.js"
     },
     "./decoders/ktx2-layers": {
       "types": "./dist/decoders/ktx2-layers.d.ts",
@@ -1127,6 +1187,10 @@
       "types": "./dist/environment/fog-volumes.d.ts",
       "import": "./dist/environment/fog-volumes.js"
     },
+    "./environment/settings": {
+      "types": "./dist/environment/settings.d.ts",
+      "import": "./dist/environment/settings.js"
+    },
     "./environment/studio": {
       "types": "./dist/environment/studio.d.ts",
       "import": "./dist/environment/studio.js"
@@ -1138,6 +1202,10 @@
     "./environment/reflector-pbr": {
       "types": "./dist/environment/reflector-pbr.d.ts",
       "import": "./dist/environment/reflector-pbr.js"
+    },
+    "./environment/lightformer": {
+      "types": "./dist/environment/lightformer.d.ts",
+      "import": "./dist/environment/lightformer.js"
     },
     "./environment/exr-codecs": {
       "types": "./dist/environment/exr-codecs.d.ts",
@@ -1283,81 +1351,85 @@
       "types": "./dist/gltf/textured.d.ts",
       "import": "./dist/gltf/textured.js"
     },
-    "./gltf-pro": {
-      "types": "./dist/gltf-pro.d.ts",
-      "import": "./dist/gltf-pro.js"
+    "./gltf/pbr": {
+      "types": "./dist/gltf/pbr.d.ts",
+      "import": "./dist/gltf/pbr.js"
     },
-    "./gltf-pro/model": {
-      "types": "./dist/gltf-pro/model.d.ts",
-      "import": "./dist/gltf-pro/model.js"
+    "./gltf/pbr-model": {
+      "types": "./dist/gltf/pbr-model.d.ts",
+      "import": "./dist/gltf/pbr-model.js"
     },
-    "./gltf-pro/asset": {
-      "types": "./dist/gltf-pro/asset.d.ts",
-      "import": "./dist/gltf-pro/asset.js"
+    "./gltf/asset": {
+      "types": "./dist/gltf/asset.d.ts",
+      "import": "./dist/gltf/asset.js"
     },
-    "./gltf-pro/scene": {
-      "types": "./dist/gltf-pro/scene.d.ts",
-      "import": "./dist/gltf-pro/scene.js"
+    "./gltf/scene": {
+      "types": "./dist/gltf/scene.d.ts",
+      "import": "./dist/gltf/scene.js"
     },
-    "./gltf-pro/extended": {
-      "types": "./dist/gltf-pro/extended.d.ts",
-      "import": "./dist/gltf-pro/extended.js"
+    "./gltf/extended-materials": {
+      "types": "./dist/gltf/extended-materials.d.ts",
+      "import": "./dist/gltf/extended-materials.js"
     },
-    "./gltf-pro/instancing": {
-      "types": "./dist/gltf-pro/instancing.d.ts",
-      "import": "./dist/gltf-pro/instancing.js"
+    "./gltf/pbr-instancing": {
+      "types": "./dist/gltf/pbr-instancing.d.ts",
+      "import": "./dist/gltf/pbr-instancing.js"
     },
-    "./gltf-pro/prepare": {
-      "types": "./dist/gltf-pro/prepare.d.ts",
-      "import": "./dist/gltf-pro/prepare.js"
+    "./gltf/prepare": {
+      "types": "./dist/gltf/prepare.d.ts",
+      "import": "./dist/gltf/prepare.js"
     },
-    "./gltf-pro/progressive": {
-      "types": "./dist/gltf-pro/progressive.d.ts",
-      "import": "./dist/gltf-pro/progressive.js"
+    "./gltf/progressive": {
+      "types": "./dist/gltf/progressive.d.ts",
+      "import": "./dist/gltf/progressive.js"
     },
-    "./gltf-pro/splats": {
-      "types": "./dist/gltf-pro/splats.d.ts",
-      "import": "./dist/gltf-pro/splats.js"
+    "./gltf/splats": {
+      "types": "./dist/gltf/splats.d.ts",
+      "import": "./dist/gltf/splats.js"
     },
-    "./gltf-pro/lights": {
-      "types": "./dist/gltf-pro/lights.d.ts",
-      "import": "./dist/gltf-pro/lights.js"
+    "./gltf/lights": {
+      "types": "./dist/gltf/lights.d.ts",
+      "import": "./dist/gltf/lights.js"
     },
-    "./gltf-pro/physics": {
-      "types": "./dist/gltf-pro/physics.d.ts",
-      "import": "./dist/gltf-pro/physics.js"
+    "./gltf/physics": {
+      "types": "./dist/gltf/physics.d.ts",
+      "import": "./dist/gltf/physics.js"
     },
-    "./gltf-pro/interactivity": {
-      "types": "./dist/gltf-pro/interactivity.d.ts",
-      "import": "./dist/gltf-pro/interactivity.js"
+    "./gltf/interactivity": {
+      "types": "./dist/gltf/interactivity.d.ts",
+      "import": "./dist/gltf/interactivity.js"
     },
-    "./gltf-pro/metadata": {
-      "types": "./dist/gltf-pro/metadata.d.ts",
-      "import": "./dist/gltf-pro/metadata.js"
+    "./gltf/report": {
+      "types": "./dist/gltf/report.d.ts",
+      "import": "./dist/gltf/report.js"
     },
-    "./gltf-pro/coordinates": {
-      "types": "./dist/gltf-pro/coordinates.d.ts",
-      "import": "./dist/gltf-pro/coordinates.js"
+    "./gltf/metadata": {
+      "types": "./dist/gltf/metadata.d.ts",
+      "import": "./dist/gltf/metadata.js"
     },
-    "./gltf-pro/worker": {
-      "types": "./dist/gltf-pro/worker.d.ts",
-      "import": "./dist/gltf-pro/worker.js"
+    "./gltf/texture-coordinates": {
+      "types": "./dist/gltf/texture-coordinates.d.ts",
+      "import": "./dist/gltf/texture-coordinates.js"
     },
-    "./gltf-pro/material-draw": {
-      "types": "./dist/gltf-pro/material-draw.d.ts",
-      "import": "./dist/gltf-pro/material-draw.js"
+    "./gltf/worker": {
+      "types": "./dist/gltf/worker.d.ts",
+      "import": "./dist/gltf/worker.js"
     },
-    "./gltf-pro/spec-gloss": {
-      "types": "./dist/gltf-pro/spec-gloss.d.ts",
-      "import": "./dist/gltf-pro/spec-gloss.js"
+    "./gltf/material-draw": {
+      "types": "./dist/gltf/material-draw.d.ts",
+      "import": "./dist/gltf/material-draw.js"
     },
-    "./gltf-pro/dds": {
-      "types": "./dist/gltf-pro/dds.d.ts",
-      "import": "./dist/gltf-pro/dds.js"
+    "./gltf/spec-gloss": {
+      "types": "./dist/gltf/spec-gloss.d.ts",
+      "import": "./dist/gltf/spec-gloss.js"
     },
-    "./gltf-pro/audio": {
-      "types": "./dist/gltf-pro/audio.d.ts",
-      "import": "./dist/gltf-pro/audio.js"
+    "./gltf/dds": {
+      "types": "./dist/gltf/dds.d.ts",
+      "import": "./dist/gltf/dds.js"
+    },
+    "./gltf/audio": {
+      "types": "./dist/gltf/audio.d.ts",
+      "import": "./dist/gltf/audio.js"
     },
     "./input": {
       "types": "./dist/input.d.ts",
@@ -1498,6 +1570,10 @@
     "./loaders/font": {
       "types": "./dist/loaders/font.d.ts",
       "import": "./dist/loaders/font.js"
+    },
+    "./loaders/font-opentype": {
+      "types": "./dist/loaders/font-opentype.d.ts",
+      "import": "./dist/loaders/font-opentype.js"
     },
     "./loaders/svg": {
       "types": "./dist/loaders/svg.d.ts",
@@ -1703,6 +1779,18 @@
       "types": "./dist/materials/fur.d.ts",
       "import": "./dist/materials/fur.js"
     },
+    "./materials/soot": {
+      "types": "./dist/materials/soot.d.ts",
+      "import": "./dist/materials/soot.js"
+    },
+    "./materials/presets": {
+      "types": "./dist/materials/presets.d.ts",
+      "import": "./dist/materials/presets.js"
+    },
+    "./materials/settings": {
+      "types": "./dist/materials/settings.d.ts",
+      "import": "./dist/materials/settings.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"
@@ -1799,21 +1887,13 @@
       "types": "./dist/navmesh/obstacles.d.ts",
       "import": "./dist/navmesh/obstacles.js"
     },
-    "./net": {
-      "types": "./dist/net.d.ts",
-      "import": "./dist/net.js"
+    "./navmesh/formations": {
+      "types": "./dist/navmesh/formations.d.ts",
+      "import": "./dist/navmesh/formations.js"
     },
-    "./net/delay": {
-      "types": "./dist/net/delay.d.ts",
-      "import": "./dist/net/delay.js"
-    },
-    "./net/fields": {
-      "types": "./dist/net/fields.d.ts",
-      "import": "./dist/net/fields.js"
-    },
-    "./net/timeline": {
-      "types": "./dist/net/timeline.d.ts",
-      "import": "./dist/net/timeline.js"
+    "./navmesh/formation-settings": {
+      "types": "./dist/navmesh/formation-settings.d.ts",
+      "import": "./dist/navmesh/formation-settings.js"
     },
     "./netcode": {
       "types": "./dist/netcode.d.ts",
@@ -1886,6 +1966,22 @@
     "./netcode/migrate": {
       "types": "./dist/netcode/migrate.d.ts",
       "import": "./dist/netcode/migrate.js"
+    },
+    "./netcode/interpolation": {
+      "types": "./dist/netcode/interpolation.d.ts",
+      "import": "./dist/netcode/interpolation.js"
+    },
+    "./netcode/interpolation-delay": {
+      "types": "./dist/netcode/interpolation-delay.d.ts",
+      "import": "./dist/netcode/interpolation-delay.js"
+    },
+    "./netcode/interpolation-fields": {
+      "types": "./dist/netcode/interpolation-fields.d.ts",
+      "import": "./dist/netcode/interpolation-fields.js"
+    },
+    "./netcode/interpolation-timeline": {
+      "types": "./dist/netcode/interpolation-timeline.d.ts",
+      "import": "./dist/netcode/interpolation-timeline.js"
     },
     "./oit": {
       "types": "./dist/oit.d.ts",
@@ -2035,6 +2131,10 @@
       "types": "./dist/post/contact-shadows.d.ts",
       "import": "./dist/post/contact-shadows.js"
     },
+    "./post/heat-haze": {
+      "types": "./dist/post/heat-haze.d.ts",
+      "import": "./dist/post/heat-haze.js"
+    },
     "./post/sss": {
       "types": "./dist/post/sss.d.ts",
       "import": "./dist/post/sss.js"
@@ -2079,6 +2179,10 @@
       "types": "./dist/post/curvature.d.ts",
       "import": "./dist/post/curvature.js"
     },
+    "./post/settings": {
+      "types": "./dist/post/settings.d.ts",
+      "import": "./dist/post/settings.js"
+    },
     "./procedural": {
       "types": "./dist/procedural.d.ts",
       "import": "./dist/procedural.js"
@@ -2107,6 +2211,14 @@
       "types": "./dist/procedural/voronoi.d.ts",
       "import": "./dist/procedural/voronoi.js"
     },
+    "./procedural/gears": {
+      "types": "./dist/procedural/gears.d.ts",
+      "import": "./dist/procedural/gears.js"
+    },
+    "./procedural/flyer": {
+      "types": "./dist/procedural/flyer.d.ts",
+      "import": "./dist/procedural/flyer.js"
+    },
     "./procedural/expression": {
       "types": "./dist/procedural/expression.d.ts",
       "import": "./dist/procedural/expression.js"
@@ -2131,6 +2243,30 @@
       "types": "./dist/procedural/buildings.d.ts",
       "import": "./dist/procedural/buildings.js"
     },
+    "./procedural/sheds": {
+      "types": "./dist/procedural/sheds.d.ts",
+      "import": "./dist/procedural/sheds.js"
+    },
+    "./procedural/building-rules": {
+      "types": "./dist/procedural/building-rules.d.ts",
+      "import": "./dist/procedural/building-rules.js"
+    },
+    "./procedural/building-plans": {
+      "types": "./dist/procedural/building-plans.d.ts",
+      "import": "./dist/procedural/building-plans.js"
+    },
+    "./procedural/harbour": {
+      "types": "./dist/procedural/harbour.d.ts",
+      "import": "./dist/procedural/harbour.js"
+    },
+    "./procedural/vehicles": {
+      "types": "./dist/procedural/vehicles.d.ts",
+      "import": "./dist/procedural/vehicles.js"
+    },
+    "./procedural/building-settings": {
+      "types": "./dist/procedural/building-settings.d.ts",
+      "import": "./dist/procedural/building-settings.js"
+    },
     "./procedural/caves": {
       "types": "./dist/procedural/caves.d.ts",
       "import": "./dist/procedural/caves.js"
@@ -2142,6 +2278,22 @@
     "./procedural/textures-pbr": {
       "types": "./dist/procedural/textures-pbr.d.ts",
       "import": "./dist/procedural/textures-pbr.js"
+    },
+    "./procedural/marching-cubes": {
+      "types": "./dist/procedural/marching-cubes.d.ts",
+      "import": "./dist/procedural/marching-cubes.js"
+    },
+    "./procedural/conifer-species": {
+      "types": "./dist/procedural/conifer-species.d.ts",
+      "import": "./dist/procedural/conifer-species.js"
+    },
+    "./procedural/conifers": {
+      "types": "./dist/procedural/conifers.d.ts",
+      "import": "./dist/procedural/conifers.js"
+    },
+    "./procedural/conifer-settings": {
+      "types": "./dist/procedural/conifer-settings.d.ts",
+      "import": "./dist/procedural/conifer-settings.js"
     },
     "./quality": {
       "types": "./dist/quality.d.ts",
@@ -2259,9 +2411,17 @@
       "types": "./dist/rigging/vrma.d.ts",
       "import": "./dist/rigging/vrma.js"
     },
+    "./rigging/vrm-first-person": {
+      "types": "./dist/rigging/vrm-first-person.d.ts",
+      "import": "./dist/rigging/vrm-first-person.js"
+    },
     "./rigging/pose-tracking": {
       "types": "./dist/rigging/pose-tracking.d.ts",
       "import": "./dist/rigging/pose-tracking.js"
+    },
+    "./rigging/hands": {
+      "types": "./dist/rigging/hands.d.ts",
+      "import": "./dist/rigging/hands.js"
     },
     "./road": {
       "types": "./dist/road.d.ts",
@@ -2371,34 +2531,6 @@
       "types": "./dist/scene/tags.d.ts",
       "import": "./dist/scene/tags.js"
     },
-    "./scenery": {
-      "types": "./dist/scenery.d.ts",
-      "import": "./dist/scenery.js"
-    },
-    "./scenery/sky": {
-      "types": "./dist/scenery/sky.d.ts",
-      "import": "./dist/scenery/sky.js"
-    },
-    "./scenery/presets": {
-      "types": "./dist/scenery/presets.d.ts",
-      "import": "./dist/scenery/presets.js"
-    },
-    "./scenery/scenes": {
-      "types": "./dist/scenery/scenes.d.ts",
-      "import": "./dist/scenery/scenes.js"
-    },
-    "./scenery/stars": {
-      "types": "./dist/scenery/stars.d.ts",
-      "import": "./dist/scenery/stars.js"
-    },
-    "./scenery/aurora": {
-      "types": "./dist/scenery/aurora.d.ts",
-      "import": "./dist/scenery/aurora.js"
-    },
-    "./scenery/moon": {
-      "types": "./dist/scenery/moon.d.ts",
-      "import": "./dist/scenery/moon.js"
-    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"
@@ -2442,6 +2574,10 @@
     "./shader/raw": {
       "types": "./dist/shader/raw.d.ts",
       "import": "./dist/shader/raw.js"
+    },
+    "./shader/black-hole": {
+      "types": "./dist/shader/black-hole.d.ts",
+      "import": "./dist/shader/black-hole.js"
     },
     "./shader/effects": {
       "types": "./dist/shader/effects.d.ts",
@@ -2490,6 +2626,22 @@
     "./shader/texture-array": {
       "types": "./dist/shader/texture-array.d.ts",
       "import": "./dist/shader/texture-array.js"
+    },
+    "./shader/glsl": {
+      "types": "./dist/shader/glsl.d.ts",
+      "import": "./dist/shader/glsl.js"
+    },
+    "./shader/glsl-material": {
+      "types": "./dist/shader/glsl-material.d.ts",
+      "import": "./dist/shader/glsl-material.js"
+    },
+    "./shader/glsl-pass": {
+      "types": "./dist/shader/glsl-pass.d.ts",
+      "import": "./dist/shader/glsl-pass.js"
+    },
+    "./shader/shadertoy": {
+      "types": "./dist/shader/shadertoy.d.ts",
+      "import": "./dist/shader/shadertoy.js"
     },
     "./shadows": {
       "types": "./dist/shadows.d.ts",
@@ -2571,6 +2723,10 @@
       "types": "./dist/sky/sun.d.ts",
       "import": "./dist/sky/sun.js"
     },
+    "./sky/moonlight": {
+      "types": "./dist/sky/moonlight.d.ts",
+      "import": "./dist/sky/moonlight.js"
+    },
     "./sky/volumetric-clouds": {
       "types": "./dist/sky/volumetric-clouds.d.ts",
       "import": "./dist/sky/volumetric-clouds.js"
@@ -2595,6 +2751,14 @@
       "types": "./dist/sky/astro.d.ts",
       "import": "./dist/sky/astro.js"
     },
+    "./sky/ephemeris": {
+      "types": "./dist/sky/ephemeris.d.ts",
+      "import": "./dist/sky/ephemeris.js"
+    },
+    "./sky/lightning-bolt": {
+      "types": "./dist/sky/lightning-bolt.d.ts",
+      "import": "./dist/sky/lightning-bolt.js"
+    },
     "./sky/weather-fx": {
       "types": "./dist/sky/weather-fx.d.ts",
       "import": "./dist/sky/weather-fx.js"
@@ -2610,6 +2774,50 @@
     "./sky/compat-clouds": {
       "types": "./dist/sky/compat-clouds.d.ts",
       "import": "./dist/sky/compat-clouds.js"
+    },
+    "./sky/night-preset": {
+      "types": "./dist/sky/night-preset.d.ts",
+      "import": "./dist/sky/night-preset.js"
+    },
+    "./sky/day-presets": {
+      "types": "./dist/sky/day-presets.d.ts",
+      "import": "./dist/sky/day-presets.js"
+    },
+    "./sky/scenes": {
+      "types": "./dist/sky/scenes.d.ts",
+      "import": "./dist/sky/scenes.js"
+    },
+    "./sky/scene-kits": {
+      "types": "./dist/sky/scene-kits.d.ts",
+      "import": "./dist/sky/scene-kits.js"
+    },
+    "./sky/milky-way": {
+      "types": "./dist/sky/milky-way.d.ts",
+      "import": "./dist/sky/milky-way.js"
+    },
+    "./sky/aurora": {
+      "types": "./dist/sky/aurora.d.ts",
+      "import": "./dist/sky/aurora.js"
+    },
+    "./sky/moon": {
+      "types": "./dist/sky/moon.d.ts",
+      "import": "./dist/sky/moon.js"
+    },
+    "./sky/look": {
+      "types": "./dist/sky/look.d.ts",
+      "import": "./dist/sky/look.js"
+    },
+    "./sky/settings": {
+      "types": "./dist/sky/settings.d.ts",
+      "import": "./dist/sky/settings.js"
+    },
+    "./sky/hurricane": {
+      "types": "./dist/sky/hurricane.d.ts",
+      "import": "./dist/sky/hurricane.js"
+    },
+    "./sky/tornado": {
+      "types": "./dist/sky/tornado.d.ts",
+      "import": "./dist/sky/tornado.js"
     },
     "./splines": {
       "types": "./dist/splines.d.ts",
@@ -2691,6 +2899,10 @@
       "types": "./dist/sprites/spine.d.ts",
       "import": "./dist/sprites/spine.js"
     },
+    "./sprites/dragonbones": {
+      "types": "./dist/sprites/dragonbones.d.ts",
+      "import": "./dist/sprites/dragonbones.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"
@@ -2739,38 +2951,6 @@
       "types": "./dist/stage/viewer-extras.d.ts",
       "import": "./dist/stage/viewer-extras.js"
     },
-    "./staging": {
-      "types": "./dist/staging.d.ts",
-      "import": "./dist/staging.js"
-    },
-    "./staging/accumulate": {
-      "types": "./dist/staging/accumulate.d.ts",
-      "import": "./dist/staging/accumulate.js"
-    },
-    "./staging/pathtrace": {
-      "types": "./dist/staging/pathtrace.d.ts",
-      "import": "./dist/staging/pathtrace.js"
-    },
-    "./staging/ground": {
-      "types": "./dist/staging/ground.d.ts",
-      "import": "./dist/staging/ground.js"
-    },
-    "./staging/pathtrace-materials": {
-      "types": "./dist/staging/pathtrace-materials.d.ts",
-      "import": "./dist/staging/pathtrace-materials.js"
-    },
-    "./staging/accumulate-ambient": {
-      "types": "./dist/staging/accumulate-ambient.d.ts",
-      "import": "./dist/staging/accumulate-ambient.js"
-    },
-    "./staging/caustics": {
-      "types": "./dist/staging/caustics.d.ts",
-      "import": "./dist/staging/caustics.js"
-    },
-    "./staging/backdrop": {
-      "types": "./dist/staging/backdrop.d.ts",
-      "import": "./dist/staging/backdrop.js"
-    },
     "./stats": {
       "types": "./dist/stats.d.ts",
       "import": "./dist/stats.js"
@@ -2806,6 +2986,38 @@
     "./stats/panels": {
       "types": "./dist/stats/panels.d.ts",
       "import": "./dist/stats/panels.js"
+    },
+    "./studio": {
+      "types": "./dist/studio.d.ts",
+      "import": "./dist/studio.js"
+    },
+    "./studio/accumulate": {
+      "types": "./dist/studio/accumulate.d.ts",
+      "import": "./dist/studio/accumulate.js"
+    },
+    "./studio/pathtrace": {
+      "types": "./dist/studio/pathtrace.d.ts",
+      "import": "./dist/studio/pathtrace.js"
+    },
+    "./studio/ground": {
+      "types": "./dist/studio/ground.d.ts",
+      "import": "./dist/studio/ground.js"
+    },
+    "./studio/pathtrace-materials": {
+      "types": "./dist/studio/pathtrace-materials.d.ts",
+      "import": "./dist/studio/pathtrace-materials.js"
+    },
+    "./studio/accumulate-ambient": {
+      "types": "./dist/studio/accumulate-ambient.d.ts",
+      "import": "./dist/studio/accumulate-ambient.js"
+    },
+    "./studio/caustics": {
+      "types": "./dist/studio/caustics.d.ts",
+      "import": "./dist/studio/caustics.js"
+    },
+    "./studio/backdrop": {
+      "types": "./dist/studio/backdrop.d.ts",
+      "import": "./dist/studio/backdrop.js"
     },
     "./terrain": {
       "types": "./dist/terrain.d.ts",
@@ -2843,9 +3055,21 @@
       "types": "./dist/terrain/deform.d.ts",
       "import": "./dist/terrain/deform.js"
     },
+    "./terrain/settings": {
+      "types": "./dist/terrain/settings.d.ts",
+      "import": "./dist/terrain/settings.js"
+    },
+    "./terrain/dunes": {
+      "types": "./dist/terrain/dunes.d.ts",
+      "import": "./dist/terrain/dunes.js"
+    },
     "./terrain/blend": {
       "types": "./dist/terrain/blend.d.ts",
       "import": "./dist/terrain/blend.js"
+    },
+    "./terrain/height-grid": {
+      "types": "./dist/terrain/height-grid.d.ts",
+      "import": "./dist/terrain/height-grid.js"
     },
     "./terrain/planet-recipes": {
       "types": "./dist/terrain/planet-recipes.d.ts",
@@ -2862,6 +3086,30 @@
     "./terrain/overlays": {
       "types": "./dist/terrain/overlays.d.ts",
       "import": "./dist/terrain/overlays.js"
+    },
+    "./terrain/ground-change": {
+      "types": "./dist/terrain/ground-change.d.ts",
+      "import": "./dist/terrain/ground-change.js"
+    },
+    "./terrain/ground-change-settings": {
+      "types": "./dist/terrain/ground-change-settings.d.ts",
+      "import": "./dist/terrain/ground-change-settings.js"
+    },
+    "./terrain/wet-ground": {
+      "types": "./dist/terrain/wet-ground.d.ts",
+      "import": "./dist/terrain/wet-ground.js"
+    },
+    "./terrain/rocks": {
+      "types": "./dist/terrain/rocks.d.ts",
+      "import": "./dist/terrain/rocks.js"
+    },
+    "./terrain/rock-surface": {
+      "types": "./dist/terrain/rock-surface.d.ts",
+      "import": "./dist/terrain/rock-surface.js"
+    },
+    "./terrain/rock-settings": {
+      "types": "./dist/terrain/rock-settings.d.ts",
+      "import": "./dist/terrain/rock-settings.js"
     },
     "./text": {
       "types": "./dist/text.d.ts",
@@ -2898,6 +3146,14 @@
     "./text/vector": {
       "types": "./dist/text/vector.d.ts",
       "import": "./dist/text/vector.js"
+    },
+    "./text/outline": {
+      "types": "./dist/text/outline.d.ts",
+      "import": "./dist/text/outline.js"
+    },
+    "./text/captions": {
+      "types": "./dist/text/captions.d.ts",
+      "import": "./dist/text/captions.js"
     },
     "./tilemap": {
       "types": "./dist/tilemap.d.ts",
@@ -2963,6 +3219,14 @@
       "types": "./dist/tonemap/export-cube.d.ts",
       "import": "./dist/tonemap/export-cube.js"
     },
+    "./tonemap/settings": {
+      "types": "./dist/tonemap/settings.d.ts",
+      "import": "./dist/tonemap/settings.js"
+    },
+    "./tonemap/3dl": {
+      "types": "./dist/tonemap/3dl.d.ts",
+      "import": "./dist/tonemap/3dl.js"
+    },
     "./toon": {
       "types": "./dist/toon.d.ts",
       "import": "./dist/toon.js"
@@ -2982,6 +3246,10 @@
     "./toon/hatch": {
       "types": "./dist/toon/hatch.d.ts",
       "import": "./dist/toon/hatch.js"
+    },
+    "./toon/outline": {
+      "types": "./dist/toon/outline.d.ts",
+      "import": "./dist/toon/outline.js"
     },
     "./transitions/mask": {
       "types": "./dist/transitions/mask.d.ts",
@@ -3199,6 +3467,38 @@
       "types": "./dist/vfx/json.d.ts",
       "import": "./dist/vfx/json.js"
     },
+    "./vfx/fire": {
+      "types": "./dist/vfx/fire.d.ts",
+      "import": "./dist/vfx/fire.js"
+    },
+    "./vfx/settings": {
+      "types": "./dist/vfx/settings.d.ts",
+      "import": "./dist/vfx/settings.js"
+    },
+    "./vfx/clouds": {
+      "types": "./dist/vfx/clouds.d.ts",
+      "import": "./dist/vfx/clouds.js"
+    },
+    "./vfx/blown-sand": {
+      "types": "./dist/vfx/blown-sand.d.ts",
+      "import": "./dist/vfx/blown-sand.js"
+    },
+    "./vfx/flame": {
+      "types": "./dist/vfx/flame.d.ts",
+      "import": "./dist/vfx/flame.js"
+    },
+    "./vfx/smoke": {
+      "types": "./dist/vfx/smoke.d.ts",
+      "import": "./dist/vfx/smoke.js"
+    },
+    "./vfx/fire-front": {
+      "types": "./dist/vfx/fire-front.d.ts",
+      "import": "./dist/vfx/fire-front.js"
+    },
+    "./vfx/gunfire": {
+      "types": "./dist/vfx/gunfire.d.ts",
+      "import": "./dist/vfx/gunfire.js"
+    },
     "./water": {
       "types": "./dist/water.d.ts",
       "import": "./dist/water.js"
@@ -3247,9 +3547,33 @@
       "types": "./dist/water/rivers.d.ts",
       "import": "./dist/water/rivers.js"
     },
+    "./water/flood": {
+      "types": "./dist/water/flood.d.ts",
+      "import": "./dist/water/flood.js"
+    },
+    "./water/sea-state": {
+      "types": "./dist/water/sea-state.d.ts",
+      "import": "./dist/water/sea-state.js"
+    },
+    "./water/settings": {
+      "types": "./dist/water/settings.d.ts",
+      "import": "./dist/water/settings.js"
+    },
     "./water/liquid": {
       "types": "./dist/water/liquid.d.ts",
       "import": "./dist/water/liquid.js"
+    },
+    "./water/ships": {
+      "types": "./dist/water/ships.d.ts",
+      "import": "./dist/water/ships.js"
+    },
+    "./water/ice": {
+      "types": "./dist/water/ice.d.ts",
+      "import": "./dist/water/ice.js"
+    },
+    "./water/splash": {
+      "types": "./dist/water/splash.d.ts",
+      "import": "./dist/water/splash.js"
     },
     "./weather": {
       "types": "./dist/weather.d.ts",
@@ -3266,6 +3590,26 @@
     "./weather/snow": {
       "types": "./dist/weather/snow.d.ts",
       "import": "./dist/weather/snow.js"
+    },
+    "./weather/snow-drift": {
+      "types": "./dist/weather/snow-drift.d.ts",
+      "import": "./dist/weather/snow-drift.js"
+    },
+    "./weather/avalanche": {
+      "types": "./dist/weather/avalanche.d.ts",
+      "import": "./dist/weather/avalanche.js"
+    },
+    "./weather/eruption": {
+      "types": "./dist/weather/eruption.d.ts",
+      "import": "./dist/weather/eruption.js"
+    },
+    "./weather/lava": {
+      "types": "./dist/weather/lava.d.ts",
+      "import": "./dist/weather/lava.js"
+    },
+    "./weather/lava-settings": {
+      "types": "./dist/weather/lava-settings.d.ts",
+      "import": "./dist/weather/lava-settings.js"
     },
     "./weather/regions": {
       "types": "./dist/weather/regions.d.ts",
@@ -3294,6 +3638,10 @@
     "./weather/cover": {
       "types": "./dist/weather/cover.d.ts",
       "import": "./dist/weather/cover.js"
+    },
+    "./weather/settings": {
+      "types": "./dist/weather/settings.d.ts",
+      "import": "./dist/weather/settings.js"
     },
     "./wfc": {
       "types": "./dist/wfc.d.ts",
@@ -3379,7 +3727,6 @@
     "@margoengine/fsm": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/gltf": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
     "@margoengine/input": "^1.0.0",
     "@margoengine/lighting2d": "^1.0.0",
     "@margoengine/lightmap": "^1.0.0",
@@ -3388,7 +3735,6 @@
     "@margoengine/materials": "^1.0.0",
     "@margoengine/mixer": "^1.0.0",
     "@margoengine/navmesh": "^1.0.0",
-    "@margoengine/net": "^1.0.0",
     "@margoengine/netcode": "^1.0.0",
     "@margoengine/oit": "^1.0.0",
     "@margoengine/physics": "^1.0.0",
@@ -3401,7 +3747,6 @@
     "@margoengine/road": "^1.0.0",
     "@margoengine/save": "^1.0.0",
     "@margoengine/scene": "^1.0.0",
-    "@margoengine/scenery": "^1.0.0",
     "@margoengine/selection": "^1.0.0",
     "@margoengine/shader": "^1.0.0",
     "@margoengine/shadows": "^1.0.0",
@@ -3409,8 +3754,8 @@
     "@margoengine/splines": "^1.0.0",
     "@margoengine/sprites": "^1.0.0",
     "@margoengine/stage": "^1.0.0",
-    "@margoengine/staging": "^1.0.0",
     "@margoengine/stats": "^1.0.0",
+    "@margoengine/studio": "^1.0.0",
     "@margoengine/terrain": "^1.0.0",
     "@margoengine/text": "^1.0.0",
     "@margoengine/tilemap": "^1.0.0",

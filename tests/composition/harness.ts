@@ -32,7 +32,7 @@ type Constructors = {
   oit?: { OIT: typeof import('@margoengine/oit').OIT; addMesh: typeof import('@margoengine/oit/meshes').addMesh };
   pixel?: typeof import('@margoengine/pixel').LayerCompositor;
   creative?: typeof import('@margoengine/creative/particles').GPUParticles;
-  scenery?: typeof import('@margoengine/scenery/moon').Moon;
+  moon?: typeof import('@margoengine/sky/moon').Moon;
   'voxel-pathtracer'?: typeof import('@margoengine/voxel-pathtracer').VoxelPathTracer;
   water?: typeof import('@margoengine/water').Water;
   sky?: typeof import('@margoengine/sky').Sky;
@@ -105,6 +105,8 @@ export function expose(scene: Scene, constructors: Constructors) {
       const transition = constructors.transitions ? new constructors.transitions() : undefined;
       if (transition) engine.use(transition);
       const checks: (() => void)[] = [];
+      // Members whose work lands after a frame's GPU work (the voxel tracer's WebGL2 route), awaited with the pipelines.
+      const landed: (() => boolean)[] = [];
       type GPUContext = Extract<PassContext, { backend: 'webgpu' }>;
       let initial: { color: GPUTextureView; depth: GPUTextureView; format: string; samples: number; rect: string };
       const rect = (c: GPUContext) => JSON.stringify([c.width, c.height, c.view?.viewport, c.view?.scissor]);
@@ -241,9 +243,9 @@ export function expose(scene: Scene, constructors: Constructors) {
             },
           }),
         );
-      if (constructors.scenery)
+      if (constructors.moon)
         engine.use(
-          new constructors.scenery({
+          new constructors.moon({
             albedo: { width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255]) },
             angularRadius: 1,
             sunDirection: [0, 0, 1],
@@ -308,6 +310,9 @@ export function expose(scene: Scene, constructors: Constructors) {
           toneMapping: 'linear',
         });
         await tracer.ready;
+        // On the WebGL2 route a trace runs in windows across tasks and its samples count once it lands, a few frames
+        // after the frame that started it.
+        landed.push(() => tracer.stats.samples > 0);
         checks.push(() => requireValue(tracer.stats.samples === 1, `trace samples ${tracer.stats.samples}`));
       }
       await waitForPipelines(
@@ -315,7 +320,11 @@ export function expose(scene: Scene, constructors: Constructors) {
           frame();
           await device.queue.onSubmittedWorkDone();
         },
-        { timeoutMs: 60_000 },
+        {
+          ready: () => landed.every((done) => done()),
+          timeoutMs: 60_000,
+          describe: () => `trace samples landed ${landed.map((done) => done())}`,
+        },
       );
       if (transition) {
         transition.start('wipe', 1);
@@ -366,7 +375,13 @@ export function expose(scene: Scene, constructors: Constructors) {
             xrProbe.session.step();
             await device.queue.onSubmittedWorkDone();
           },
-          { timeoutMs: 60_000 },
+          // Each eye is a view with its own tracer image (KB-VPT-XR-VIEWS): on the WebGL2 route an eye's first samples
+          // land a few frames after the frame that started them, the second eye's after the first's.
+          {
+            ready: () => landed.every((done) => done()),
+            timeoutMs: 60_000,
+            describe: () => `XR trace samples landed ${landed.map((done) => done())}`,
+          },
         );
         for (const layer of [0, 1]) {
           const eye = await readTexture(device, xrProbe.color, layer);

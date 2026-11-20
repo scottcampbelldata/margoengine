@@ -41,7 +41,9 @@ export function makeGrid(welded: Welded, joints: readonly RigJoint[], resolution
     ny: n[1],
     nz: n[2],
     cell,
-    origin: [min[0] - cell * 1.5, min[1] - cell * 1.5, min[2] - cell * 1.5],
+    // Centred on the bounds, so the spare part of the last cell splits evenly on both sides and a mirror-symmetric
+    // mesh voxelizes mirror-symmetrically (at least 1.5 cells of margin on each side).
+    origin: [0, 1, 2].map((c) => (min[c] + max[c]) / 2 - (n[c] * cell) / 2) as [number, number, number],
     state: new Uint8Array(n[0] * n[1] * n[2]),
   };
 }

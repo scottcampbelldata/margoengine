@@ -138,6 +138,43 @@ test('step runs engine.onFrame callbacks, so a package that drives itself from t
   assert.equal(frames.length, 1);
 });
 
+test('step refuses a delta core would refuse, and a step from inside a step, before any callback runs', async (t) => {
+  const seen = {};
+  stubEngine(t, seen);
+  using stage = await createHeadlessStage({ gpu, width: 1, height: 1 });
+  const ticks = [],
+    frames = [];
+  stage.onTick((delta) => ticks.push(delta));
+  stage.engine.onFrame((_engine, delta) => frames.push(delta));
+  for (const delta of [-0.5, NaN, Infinity, 1.5, '0.1'])
+    assert.throws(() => stage.step(delta), RangeError);
+  assert.deepEqual([ticks, frames, seen.engine.log], [[], [], []], 'a refused delta reaches no callback and draws nothing');
+  const off = stage.onTick(() => assert.throws(() => stage.step(0), { code: 'state' }));
+  stage.step(0.5);
+  off();
+  stage.step(0);
+  assert.deepEqual(ticks, [0.5, 0]);
+  assert.deepEqual(seen.engine.log, [
+    ['render', 0.5],
+    ['render', 0],
+  ]);
+});
+
+test('resize refuses a size the stand-in canvas would refuse at creation', async (t) => {
+  stubEngine(t);
+  using stage = await createHeadlessStage({ gpu, width: 4, height: 2 });
+  for (const [w, h] of [
+    [0, 2],
+    [4, -1],
+    [1.5, 2],
+    [4, NaN],
+  ])
+    assert.throws(() => stage.resize(w, h), RangeError);
+  assert.deepEqual([stage.canvas.width, stage.canvas.height], [4, 2], 'a refused size changes nothing');
+  stage.resize(8, 3);
+  assert.deepEqual([stage.canvas.width, stage.canvas.height], [8, 3]);
+});
+
 test('fit sees the image size as the CSS size, and the canvas keeps none after', async (t) => {
   // A stand-in canvas has clientWidth 0, so Stage.fit alone would fit every image as if it were square. The browser
   // check runs the real fit against a page.

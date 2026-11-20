@@ -68,7 +68,7 @@ window.check={
   clear(){window.current?.destroy();window.current=null;engine.render();},
   // Every shader variant, with every hook point composed, must compile.
   async variants(){
-    const {pbrShader,extendedPBRShader,physicalShader}=await import('/packages/gltf-pro/src/shader.ts');
+    const {pbrShader,extendedPBRShader,physicalShader}=await import('/packages/gltf/src/shader.ts');
     const m=new LightingMaterial({lightModel:({color})=>color.mul(uv().x),lightingNode:litColor.add(environment(sunDirection)).add(localLight).add(ambientLight)});
     const hooks={declarations:'fn margoShadow()->f32 {return 0.5;}\nfn margoLocal(s:Surface)->vec3f {return s.base.rgb;}\n',direct:d=>`${d}*margoShadow()`,light:'margoLocal(s)',ambient:'s.base.rgb*0.1*s.occlusion'};
     const out=[];

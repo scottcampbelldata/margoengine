@@ -54,8 +54,9 @@ export function readKTX2Index(bytes: Uint8Array, fileLength = bytes.length): KTX
     // 64-bit offsets and lengths: a high word means past 4 GiB, outside any file this can be given.
     u64 = (at: number) => (u32(at + 4) ? Number.POSITIVE_INFINITY : u32(at)),
     inside = (offset: number, length: number) => offset + length <= fileLength;
+  // KTX 2.0 Section 3.1: levelCount is at most log2 of the largest of width, height and depth, plus one.
   const count = Math.max(1, u32(40)),
-    size = Math.max(u32(20), u32(24), 1);
+    size = Math.max(u32(20), u32(24), u32(28), 1);
   if (count > 1 + Math.floor(Math.log2(size))) fail('level count');
   if (80 + count * 24 > bytes.length) fail('truncated level index');
   const levels: KTX2Level[] = [];
@@ -107,7 +108,11 @@ export async function levelData(bytes: Uint8Array, index: KTX2Index, level: numb
   }
   if (index.supercompression === 2) {
     const { decompressZstd } = await import('../../shared/zstd.js');
-    return decompressZstd(stored, { signal, maxOutputSize: uncompressedLength });
+    // Held to the declared size like the zlib path: a short level reached the transcoder short.
+    const data = await decompressZstd(stored, { signal, maxOutputSize: uncompressedLength });
+    if (data.length !== uncompressedLength)
+      throw decodeFailed(`KTX2: level ${level} decompresses to ${data.length} bytes, not the ${uncompressedLength} it declares`);
+    return data;
   }
   throw decodeFailed(`KTX2: supercompression scheme ${index.supercompression} on a vkFormat file; re-encode the file`);
 }

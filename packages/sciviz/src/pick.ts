@@ -35,7 +35,8 @@ export function inRegion(x: number, y: number, region: SelectRegion): boolean {
 
 /**
  * The point (xyz per point in `positions`, data units) nearest the screen position (sx, sy) within `radius` CSS
- * pixels, under `matrix` (camera clip times data-to-scene). Ties within half a pixel go to the point nearest the eye.
+ * pixels, under `matrix` (camera clip times data-to-scene). Of the points within half a pixel of the closest one, the
+ * point nearest the eye wins.
  * Points behind the eye are skipped. Returns the index and its screen distance, or null.
  */
 export function nearestPoint(
@@ -47,16 +48,26 @@ export function nearestPoint(
   sy: number,
   radius: number,
 ): { index: number; distance: number } | null {
+  const p = { x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false },
+    n = positions.length / 3;
+  // Pass 1: the closest screen distance. Pass 2: of the points within half a pixel of it, the one nearest the eye.
+  // Comparing each point with the current best in one pass let ties chain, each a little farther than the last.
+  let closest = Infinity;
+  for (let i = 0; i < n; i++) {
+    projectPoint(matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], width, height, 'webgpu', p);
+    if (p.inFront) closest = Math.min(closest, Math.hypot(p.x - sx, p.y - sy));
+  }
+  if (!(closest <= radius)) return null;
+  const limit = Math.min(radius, closest + 0.5);
   let best = -1,
-    bestDistance = radius,
+    bestDistance = Infinity,
     bestDepth = Infinity;
-  const p = { x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false };
-  for (let i = 0, n = positions.length / 3; i < n; i++) {
+  for (let i = 0; i < n; i++) {
     projectPoint(matrix, positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], width, height, 'webgpu', p);
     if (!p.inFront) continue;
     const d = Math.hypot(p.x - sx, p.y - sy);
     // projectPoint normalizes both backends to near=0, far=1.
-    if (d < bestDistance - 0.5 || (d <= bestDistance + 0.5 && d <= radius && p.depth < bestDepth)) {
+    if (d <= limit && (p.depth < bestDepth || (p.depth === bestDepth && d < bestDistance))) {
       best = i;
       bestDistance = d;
       bestDepth = p.depth;

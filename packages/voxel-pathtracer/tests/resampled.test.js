@@ -29,13 +29,13 @@ test('optional RIS kernel and exact one-candidate baseline preserve tracer ident
     assert.ok(c instanceof VoxelPathTracer);
     assert.equal(original.sources[0], one.sources[0]);
     assert.ok(!original.sources[0].includes('resampledEmitter'));
-    assert.match(many.sources[0], /candidate<8u/);
-    assert.match(many.sources[0], /L\+=resampledEmitters\(kind,m,n,wo,o,mask\)/);
-    assert.match(many.sources[0], /4.0\*light.pdfA\*d2\/cosine\+4.0\*bp/);
+    assert.match(many.sources[0], /const KIND_REPEAT=vec2u\(1u,8u\);/);
+    assert.match(many.sources[0], /L\+=risKept\*\(risScale\*risSum\)/);
+    assert.match(many.sources[0], /lp=4.0\*ls.pdfA\*d2\/cl\+4.0\*bp/);
     // The WebGL2 route's staged programs (src/compat-staged.ts) keep the text before the `trace` entry as the prefix
     // every program shares, so a helper the variant adds must be declared there to reach the `sample` stage.
     const fragmentBoundary = many.sources[0].indexOf('@compute @workgroup_size(8,8) fn trace');
-    for (const helper of ['fn directionalEmitter', 'fn resampledEmitters']) {
+    for (const helper of ['fn directionalEmitter', 'const KIND_REPEAT']) {
       const declaration = many.sources[0].indexOf(helper);
       assert.ok(declaration >= 0 && declaration < fragmentBoundary, `${helper} must be in the staged programs' shared prefix`);
     }
@@ -65,12 +65,12 @@ test('candidate limit is encoded per instance and restored after device replacem
   const tracer = ResampledVoxelPathTracer.attach(h.engine, { scene: simpleScene(), candidates: 64 });
   try {
     await tracer.ready;
-    assert.match(h.sources[0], /candidate<64u/);
+    assert.match(h.sources[0], /const KIND_REPEAT=vec2u\(1u,64u\);/);
     const replacement = harness();
     h.engine.gpu = replacement.device;
     h.frame();
     await tracer.ready;
-    assert.match(replacement.sources[0], /candidate<64u/);
+    assert.match(replacement.sources[0], /const KIND_REPEAT=vec2u\(1u,64u\);/);
   } finally {
     tracer.dispose();
   }

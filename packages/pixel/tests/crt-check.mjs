@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/pixel/tests/crt-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/pixel/tests/crt-check.mjs
 // A 7 x 5 picture drawn by CRT with the default, flat, strongest and all-off looks into textures and onto the canvas,
 // each read back against the CRT maths worked out on the CPU within one step of 255; looks changed live, errors, a
 // device loss.

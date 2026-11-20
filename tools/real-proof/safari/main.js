@@ -1,6 +1,6 @@
 // Real browser check: the same page runs in Safari on the Mac and in Edge on the PC, and posts what it sees.
 import { createStage } from '@margoengine/stage';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { JXLDecoder } from '@margoengine/decoders/jxl';
 import { recordCanvas } from '@margoengine/video/record';
 const report = { ua: navigator.userAgent, gpu: !!navigator.gpu, models: {}, jxl: {}, errors: [] };

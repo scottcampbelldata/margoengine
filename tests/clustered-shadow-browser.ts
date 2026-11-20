@@ -1,6 +1,6 @@
 // Real-GPU fixture for clustered directional and area-light shadows (scripts/clustered-shadow-gpu-check.js).
 // Built imports exercise the published package boundary. `probe` evaluates the production clusterLighting WGSL (the
-// declarations a gltf-pro receiver gets) at chosen world points in a compute pass, against the shadow maps the frame
+// declarations a gltf/pbr receiver gets) at chosen world points in a compute pass, against the shadow maps the frame
 // graph rendered, so shadow factors can be compared with analytic expectations.
 import { Engine, PbrMaterial, box } from '../packages/core/dist/extension.js';
 import { Clustered } from '../packages/clustered/dist/index.js';
@@ -12,6 +12,7 @@ import { ShadowAtlas } from '../packages/clustered/dist/shadow-atlas.js';
 import { CubeProjectorLights } from '../packages/clustered/dist/cube-projector.js';
 import { StochasticLights } from '../packages/clustered/dist/stochastic.js';
 import { ContactLights } from '../packages/clustered/dist/contact.js';
+import { LightBounce } from '../packages/clustered/dist/bounce.js';
 import { Terrain } from '../packages/terrain/dist/index.js';
 
 declare const GPUBufferUsage: {
@@ -27,7 +28,7 @@ declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
 type Light = Record<string, unknown>;
 type Config = {
-  local?: { resolution?: number; bias?: number; normalBias?: number } | false;
+  local?: { resolution?: number; bias?: number; normalBias?: number; receiverPlane?: boolean; slopeBias?: number } | false;
   points?: Light[];
   suns?: Light[];
   areas?: Light[];
@@ -44,6 +45,8 @@ type Config = {
   /** ClusteredOptions.maxLights and AreaLightOptions.maxLights. */
   maxLights?: number;
   areaMaxLights?: number;
+  /** LightBounce options (besides `lights`): one bounce of the point and spot lights (scripts/clustered-bounce-gpu-check.js). */
+  bounce?: Record<string, unknown>;
 };
 const canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, {
@@ -72,6 +75,13 @@ mesh('bar', [1, 0.05, 6], [0, 1.5, 0]); // a long bar, x -0.5 to 0.5, centred at
 mesh('ceiling', [8, 0.1, 8], [0, 6.05, 0]); // bottom at y = 6
 mesh('topBar', [1, 0.05, 6], [0, 4.5, 0]);
 mesh('pebble', [0.4, 0.1, 0.4], [0, 0.05, 0]); // lying on the floor: x and z -0.2 to 0.2, y 0 to 0.1
+// LightBounce: a 2 x 2 m patch (x -1 to 1, z 0 to 2, top at y 0) and the wall along its z = 0 edge, facing it.
+mesh('patch', [2, 0.1, 2], [0, -0.05, 1]);
+mesh('patchWall', [6, 3, 0.1], [0, 1.5, -0.05]);
+// Two rooms side by side, x 0 to 4 and 4.3 to 8.3, z 0 to 4, 2.5 high, a 0.3 m wall between them.
+mesh('roomsFloor', [8.3, 0.1, 4], [4.15, -0.05, 2]);
+mesh('roomsCeiling', [8.3, 0.1, 4], [4.15, 2.55, 2]);
+mesh('roomsWall', [0.3, 2.5, 4], [4.15, 1.25, 2]);
 let lights: Clustered | undefined, local: LocalShadows | undefined, suns: DirectionalLights | undefined;
 let areas: AreaLights | undefined,
   terrain: Terrain | undefined,
@@ -80,6 +90,7 @@ let areas: AreaLights | undefined,
 let shapes: AreaShapes | undefined;
 let cookies: CubeProjectorLights | undefined;
 let stochastic: StochasticLights | undefined;
+let bounce: LightBounce | undefined;
 const ridge = new Float32Array(64 * 64).map((_, i) => (Math.abs(((i % 64) + 0.5) / 8 - 4) < 0.5 ? 2 : 0));
 function terrainTextures(gpu: GPUDevice) {
   const heightmap = gpu.createTexture({
@@ -109,6 +120,8 @@ engine.frameGraph.add({
   },
 });
 function scene(config: Config) {
+  bounce?.dispose();
+  bounce = undefined;
   for (const plugin of [contact, stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
   contact = undefined;
   stochastic = undefined;
@@ -147,6 +160,7 @@ function scene(config: Config) {
   }
   if (config.stochastic) stochastic = StochasticLights.attach(engine, { lights, quad: false, temporal: false });
   if (config.contact) contact = ContactLights.attach(engine, { lights, ...config.contact });
+  if (config.bounce) bounce = LightBounce.attach(engine, { lights, ...config.bounce });
 }
 async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
   device.pushErrorScope('validation');
@@ -163,20 +177,25 @@ async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
 }
 const kinds: Record<number, GPUBindGroupLayoutEntry> = {};
 for (const binding of [4, 14, 151, 155]) kinds[binding] = { binding, visibility: 0, buffer: { type: 'uniform' } };
-for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 145, 150, 152])
+for (const binding of [5, 6, 7, 17, 28, 141, 142, 143, 145, 150, 152, 164])
   kinds[binding] = { binding, visibility: 0, buffer: { type: 'read-only-storage' } };
 for (const binding of [15, 29])
   kinds[binding] = { binding, visibility: 0, texture: { sampleType: 'depth', viewDimension: '2d-array' } };
 for (const binding of [16, 30]) kinds[binding] = { binding, visibility: 0, sampler: { type: 'comparison' } };
+// Each point is shaded at the screen pixel it projects to (the perspective camera), so clusterLighting reads the
+// cluster that holds it and the shadow noise of that pixel; a fixed pixel picked one corner's cells for every point.
 const probeCode = /* wgsl */ `
 struct ProbePoint {position:vec4f,normal:vec4f}
 @group(1) @binding(0) var<storage,read> probePoints:array<ProbePoint>;
 @group(1) @binding(1) var<storage,read_write> probeOut:array<vec4f>;
-@group(1) @binding(2) var<uniform> probeEye:vec4f;
+struct ProbeSurface {eye:vec4f,base:vec4f,f0:vec4f}
+@group(1) @binding(2) var<uniform> probeEye:ProbeSurface;
 @compute @workgroup_size(64) fn probeMain(@builtin(global_invocation_id) id:vec3u){
   if(id.x>=arrayLength(&probePoints)){return;}
-  let p=probePoints[id.x];
-  probeOut[id.x]=vec4f(clusterLighting(vec2f(0.5),p.position.xyz,normalize(p.normal.xyz),probeEye.xyz,vec3f(1),1.0,0.0,vec3f(0.04),1.0),1);
+  let p=probePoints[id.x];let eye=clusterFrame.view*vec4f(p.position.xyz,1);
+  let ndc=eye.xy/max(-eye.z,0.000001)/(clusterFrame.screen.z*vec2f(clusterFrame.screen.w,1.0));
+  let pixel=(vec2f(ndc.x,-ndc.y)*0.5+0.5+clusterFrame.depth.zw)*clusterFrame.screen.xy;
+  probeOut[id.x]=vec4f(clusterLighting(pixel,p.position.xyz,normalize(p.normal.xyz),probeEye.eye.xyz,probeEye.base.rgb,probeEye.base.w,probeEye.eye.w,probeEye.f0.xyz,probeEye.f0.w),1);
 }`;
 async function messages(code: string): Promise<string[]> {
   const info = await device.createShaderModule({ code }).getCompilationInfo();
@@ -194,6 +213,23 @@ async function messages(code: string): Promise<string[]> {
       return { stats: local ? { ...local.stats } : undefined, shader };
     });
   },
+  /**
+   * Renders until LightBounce has read back its captures and packed its virtual point lights (at most `frames` frames,
+   * each waiting for the GPU); returns its stats and its packed lit-shader data, for the JS twin.
+   */
+  async settle(frames = 30) {
+    for (let i = 0; i < frames; i++) {
+      await scoped(() => engine.render());
+      await new Promise((done) => setTimeout(done, 0));
+      if (i > 2 && bounce!.stats.vpls > 0) break;
+    }
+    await scoped(() => engine.render());
+    return { stats: bounce!.stats, data: [...(bounce as unknown as { data: Float32Array }).data] };
+  },
+  /** Replaces the point and spot lights of the current scene. */
+  lights(points: Light[]) {
+    lights!.setLights(points as never);
+  },
   /** ContactLights.setStrengths of the current scene. */
   contactStrengths(values: (number | null)[]) {
     contact!.setStrengths(values);
@@ -210,8 +246,15 @@ async function messages(code: string): Promise<string[]> {
       probe: await messages(lights!.pbr(0).declarations + probeCode),
     };
   },
-  /** clusterLighting at each [x, y, z, nx, ny, nz] point (white Lambert-like base, roughness 1), RGB per point. */
-  async probe(points: number[][]) {
+  /**
+   * clusterLighting at each [x, y, z, nx, ny, nz] point, RGB per point: a white dielectric of roughness 1 seen from the
+   * camera unless `surface` gives the base colour, roughness, metalness or eye. `specular: false` sets the dielectric
+   * F0 and F90 to 0, so a dielectric returns its Lambert diffuse alone (base / pi times the irradiance).
+   */
+  async probe(
+    points: number[][],
+    surface: { base?: number[]; roughness?: number; metal?: number; eye?: number[]; specular?: boolean } = {},
+  ) {
     return scoped(async () => {
       const declarations = lights!.pbr(0).declarations,
         entries = lights!.bindings(),
@@ -240,14 +283,24 @@ async function messages(code: string): Promise<string[]> {
           size: points.length * 16,
           usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
         }),
-        eye = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        eye = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
         read = device.createBuffer({
           size: points.length * 16,
           usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
         });
       try {
         device.queue.writeBuffer(input, 0, data);
-        device.queue.writeBuffer(eye, 0, new Float32Array([...engine.camera.position, 1]));
+        device.queue.writeBuffer(
+          eye,
+          0,
+          new Float32Array([
+            ...(surface.eye ?? engine.camera.position),
+            surface.metal ?? 0,
+            ...(surface.base ?? [1, 1, 1]),
+            surface.roughness ?? 1,
+            ...(surface.specular === false ? [0, 0, 0, 0] : [0.04, 0.04, 0.04, 1]),
+          ]),
+        );
         const encoder = device.createCommandEncoder(),
           pass = encoder.beginComputePass();
         pass.setPipeline(pipeline);
@@ -280,6 +333,7 @@ async function messages(code: string): Promise<string[]> {
     cookies!.setCubes(entries as never);
   },
   dispose() {
+    bounce?.dispose();
     for (const plugin of [contact, stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
     engine.dispose();
   },

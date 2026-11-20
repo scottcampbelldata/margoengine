@@ -183,7 +183,7 @@ function native(module: NativeExports, bytes: Uint8Array, request: DracoRequest,
     if (code === 5) throw deviceUnsupported('Draco: unsupported bitstream path; use the default prebuilt decoder');
     if (code)
       throw decodeFailed(
-        `Draco: damaged bitstream (${code}); re-export the file. See https://margoengine.com/errors/failed`,
+        `Draco: damaged bitstream (${code}); re-export the file. See https://margoengine.com/errors#failed`,
       );
     return unpack(new Uint8Array(module.memory.buffer, output, length));
   } finally {

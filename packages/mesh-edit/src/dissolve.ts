@@ -1,7 +1,8 @@
 import { MargoError, type MutableVec2 } from '@margoengine/math';
 import { assertOptions, remappedEdgeResult } from './edit-support.js';
 import { assertPolygonMesh, collectPolygonEdges, edgeId, faceGeometryError, polygonAreaVector } from './polygon.js';
-import { loopFaces } from './polygon-split.js';
+import { leastOf } from './least.js';
+import { loopFaces, MAX_LOOP_CORNERS } from './polygon-split.js';
 import { compactVertices, createMeshEditResult, faceIdFactory } from './result.js';
 import type { ComponentEditResult, MeshEditOptions, PolygonFace, PolygonMesh } from './types.js';
 
@@ -24,7 +25,8 @@ export type DissolveSelection =
  * into the fewest convex pieces the greedy merge finds (extra pieces get new IDs). Vertices left unused are removed
  * and the rest renumbered. Dissolving across a UV seam is allowed and noted in `diagnostics`.
  * @throws TypeError for unknown IDs, boundary or nonmanifold edges, or a vertex on an open boundary with more than
- * two edges; MargoError `unsupported` when a region would enclose a hole or touch itself at a vertex; MargoError
+ * two edges; MargoError `unsupported` when a region would enclose a hole, touch itself at a vertex or have a border of
+ * over 4096 corners; MargoError
  * `failed` when a merged polygon folds over itself.
  */
 export function dissolveMeshComponents(
@@ -166,7 +168,7 @@ export function dissolveMeshComponents(
         'unsupported',
         'Dissolve region covers a whole closed surface; leave at least one face out of the region.',
       );
-    const start = Math.min(...outgoing.keys()),
+    const start = leastOf(outgoing.keys()),
       vertices: number[] = [],
       uv: MutableVec2[] = [];
     let at = start;
@@ -257,6 +259,11 @@ export function dissolveMeshComponents(
     let out: PolygonFace[];
     if (!loop.dirty) out = [{ id: loop.id, vertices: loop.vertices, uv: loop.uv }];
     else {
+      if (loop.vertices.length > MAX_LOOP_CORNERS)
+        throw new MargoError(
+          'unsupported',
+          `Dissolve region border has ${loop.vertices.length} corners, over the ${MAX_LOOP_CORNERS} a merged polygon can be split into; dissolve a smaller region.`,
+        );
       const pieces =
         loop.vertices.length <= 64 && !faceGeometryError(mesh.vertices, loop.vertices)
           ? [{ id: loop.id, vertices: loop.vertices, uv: loop.uv }]

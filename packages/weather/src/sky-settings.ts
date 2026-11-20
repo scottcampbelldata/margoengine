@@ -1,6 +1,7 @@
 // Turning a weather state into the settings of the pieces that draw and sound it: `@margoengine/sky`'s Weather (rain,
 // snow, lightning), this package's Hail, and a fog density. Plain functions over plain objects, so they work with any
 // engine and are easy to test.
+import { ashExtinction, dustExtinction, rainRate, smokeExtinction, sprayExtinction } from './air.js';
 import type { WeatherState } from './state.js';
 import type { WindField } from './wind.js';
 
@@ -16,6 +17,8 @@ export interface SkyWeatherSettings {
   fadeSeconds: number;
   /** Horizontal wind `[x, z]` in metres per second. */
   wind: [number, number];
+  /** Rain rate in mm/h (`rainRate` of the state): the sky Weather sizes the drops and sets their fall speed from it. */
+  rainRate: number;
   /** Lightning settings, or `undefined` when the state has no lightning (assign it to remove storms). */
   lightning: { rate: number; threshold: number } | undefined;
 }
@@ -40,6 +43,7 @@ export function skyWeather(state: WeatherState, wind?: readonly [number, number]
     snowShare: total > 0 ? state.snow / total : 0,
     fadeSeconds: 0,
     wind: w,
+    rainRate: rainRate(state),
     // The storm threshold is set to 0 so any intensity can produce lightning; the state's activity sets the rate.
     lightning: state.lightning > 0.001 && state.rain > 0.05 ? { rate: 12 * state.lightning, threshold: 0 } : undefined,
   };
@@ -61,11 +65,12 @@ export function hailSettings(state: WeatherState, wind?: readonly [number, numbe
 /**
  * Fog density (per metre) for a state, for `@margoengine/sky`'s fog or any exponential fog: from 0.0002 (clear, visible to
  * about 10 km) at fog 0 to 0.02 (visible to about 150 m) at fog 1, interpolated in log space so each step of `fog` feels
- * like the same change. Rain and snow thicken it a little.
+ * like the same change. Rain and snow thicken it a little. Dust, smoke, ash and sea spray add their own extinction
+ * (`dustExtinction`, `smokeExtinction`, `ashExtinction`, `sprayExtinction`), none at 0.
  */
 export function fogDensity(state: WeatherState): number {
   const thickness = Math.min(1, state.fog + 0.15 * Math.max(state.rain, state.snow, state.hail));
-  return 0.0002 * (0.02 / 0.0002) ** thickness;
+  return 0.0002 * (0.02 / 0.0002) ** thickness + dustExtinction(state.dust) + smokeExtinction(state.smoke) + ashExtinction(state.ash) + sprayExtinction(state.spray);
 }
 
 /** Horizontal wind `[x, z]` at world position `(x, z)` and time `t` from a field, for {@link skyWeather}. */

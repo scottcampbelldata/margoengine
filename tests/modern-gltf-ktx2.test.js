@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { loadGLTF, parseGLTF, parseGLTFAsync } from '../packages/gltf-pro/dist/index.js';
+import { loadGLTF, parseGLTF, parseGLTFAsync } from '../packages/gltf/dist/pbr.js';
 import { KTX2Decoder } from '../packages/decoders/dist/index.js';
 import { initBasis, transcodeKTX2 } from '../packages/decoders/dist/codec.js';
 import { optionalGPU } from './support/optional-gpu.js';

@@ -24,7 +24,7 @@ async function nativeClosure(specifier) {
 }
 
 test('native asset and splat data entries require no GPU renderer or shaders', async () => {
-  for (const specifier of ['@margoengine/gltf-pro/asset', '@margoengine/splats/data']) {
+  for (const specifier of ['@margoengine/gltf/asset', '@margoengine/splats/data']) {
     const code = await nativeClosure(specifier);
     for (const marker of ['@fragment', '@compute', 'createBuffer', 'createRenderPipeline', 'PBRModel', 'project-sort'])
       assert.ok(!code.includes(marker), marker + ' entered ' + specifier);
@@ -33,8 +33,8 @@ test('native asset and splat data entries require no GPU renderer or shaders', a
 
 test('data entries preserve public root identities without exposing parser internals', async () => {
   const [pbr, asset, splats, data] = await Promise.all([
-    import('@margoengine/gltf-pro'),
-    import('@margoengine/gltf-pro/asset'),
+    import('@margoengine/gltf/pbr'),
+    import('@margoengine/gltf/asset'),
     import('@margoengine/splats'),
     import('@margoengine/splats/data'),
   ]);

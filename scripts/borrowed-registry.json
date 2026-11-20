@@ -1,0 +1,1217 @@
+{
+  "$comment": "Members of api/*.api.md that can hold a caller GPU object; docs/conventions.md, \"Borrowed GPU objects\". ruled: its source imports packages/shared/borrowed.js. exempt: not a borrowed input, with the reason. pending: open, KB-RESTORE-BORROWED1 in docs/known-bugs.md. tests/borrowed-gpu.test.js checks it; node scripts/borrowed-sites.mjs lists what is missing.",
+  "sites": {
+    "biomes:BiomeSky.reflectionTexture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:DeformedPrimitive.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "bvh:GPUDynamicBVHOptions.vertices": {
+      "status": "exempt",
+      "reason": "a per-call argument: GPUDynamicBVH.create(target, options) takes the device with the buffer and builds once (rule 6)"
+    },
+    "bvh:GPUFollowedVertices.vertices": {
+      "status": "exempt",
+      "reason": "a per-call argument: GPUMeshBVH.follow(target, followed) takes the device with the buffer (rule 6)"
+    },
+    "bvh:GPUMeshBVH.faces": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUMeshBVH.index": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUMeshBVH.nodes": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUMeshBVH.params": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUMeshBVH.positions": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:ModelPrimitiveLike.buffers": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "bvh:ModelPrimitiveLike.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "cad:PackShadowPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "cad:PackShadowPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "cameras:PanoramaCube.view": {
+      "status": "exempt",
+      "reason": "a per-call argument of the one-shot panorama capture, which updates all six faces first and fails with a state error otherwise (rule 6)"
+    },
+    "cameras:WideCubeSource.view": {
+      "status": "exempt",
+      "reason": "a live cube object read each frame (a CubeCamera that rebuilds its own view after a restore), the same as a per-frame getter (rule 6)"
+    },
+    "clustered:ContactLightOptions.depth": {
+      "status": "pending",
+      "reason": "plan site"
+    },
+    "clustered:LocalShadowPrimitive.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "clustered:LocalShadowPrimitive.alphaTexture": {
+      "status": "exempt",
+      "reason": "a caster record one package hands another each frame (rule 6)"
+    },
+    "clustered:LocalShadowPrimitive.animation": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "clustered:LocalShadowPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "clustered:LocalShadowPrimitive.opacity": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "clustered:LocalShadowPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "compute:Pass.indirect": {
+      "status": "exempt",
+      "reason": "a per-call argument of one dispatch (kernel.run({ indirect })), made on the context device (rule 6)"
+    },
+    "compute:Pass.resources": {
+      "status": "exempt",
+      "reason": "a per-call argument: an internal dispatch record Context.encode and submit take with the device that runs it (rule 6)"
+    },
+    "compute:RunOptions.indirect": {
+      "status": "exempt",
+      "reason": "a per-call argument (rule 6)"
+    },
+    "compute:Storage.buffer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "core:Batch.redirect": {
+      "status": "exempt",
+      "reason": "a per-call argument or core-owned record (rule 6)"
+    },
+    "core:GeometryBuffers.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "core:GeometryBuffers.instance": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "core:GeometryBuffers.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "core:RenderView.target": {
+      "status": "exempt",
+      "reason": "a per-call argument or core-owned record (rule 6)"
+    },
+    "core:ViewDraw.target": {
+      "status": "exempt",
+      "reason": "a per-call argument or core-owned record (rule 6)"
+    },
+    "creative:HDRRenderTarget.color": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "creative:HDRRenderTarget.depth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "creative:HDRRenderTarget.scene": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "culling:Buffers.args": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:Buffers.drawn": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:Buffers.frame": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:Buffers.matrices": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:Buffers.part": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:Buffers.rows": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:Buffers.world": {
+      "status": "exempt",
+      "reason": "an internal resource: the culling plugin makes these buffers on its own device in create() and makes them again after a device restore; a caller never passes one"
+    },
+    "culling:CullablePrimitive.culled": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "culling:CullablePrimitive.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "culling:CullablePrimitive.redirect": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "culling:OccluderPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "culling:OccluderPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "culling:Pyramid.buffer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "culling:SortRange.args": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "culling:SortRange.instances": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "decoders:StreamedKTX2.texture": {
+      "status": "exempt",
+      "reason": "an output: the streamer makes, replaces and copies the texture on the device it was given and hands it over through onChange; after a loss the caller opens the file on a streamer for the new device (pinned by packages/decoders/tests/ktx2-stream.test.js)"
+    },
+    "environment:CaptureTarget.color": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:CaptureTarget.depth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:CubeTextureSource.texture": {
+      "status": "pending",
+      "reason": "found by the class check; rule it or exempt it with a reason"
+    },
+    "environment:PlanarOptions.normalMap": {
+      "status": "ruled",
+      "source": "packages/environment/src/planar.ts"
+    },
+    "environment:Resources.brdf": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.cube": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.cubeView": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.equirect": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.equirectView": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.params": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.sampler": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.sh": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.specular": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:Resources.specularView": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:SceneTarget.color": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:SceneTarget.depth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:SceneTarget.depthSource": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:SceneTarget.resolvedColor": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:SceneTarget.resolvedDepth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:SharedLut.buffer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "environment:VolumetricFogOptions.sky": {
+      "status": "exempt",
+      "reason": "read again every frame from the sky object (the scene's sky plugin or the given one): its reflectionTexture is the sky's own output, taken fresh after a device restore and bound through a group rebuilt whenever it changes (rule 6)"
+    },
+    "gltf:BaseTextureSource.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:BatchInstances.buffer": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:BatchRows.buffer": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:Chunk.buffer": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawFrame.section": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.copies": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.samplers": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.sectionBuffer": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.uvs": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.views": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.volume": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.volumeWritten": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:DrawResource.wireframe": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:MaterialExtensionResource.uniform": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:MaterialExtensionTexture.sampler": {
+      "status": "ruled",
+      "source": "packages/gltf/src/material-extension.ts"
+    },
+    "gltf:MaterialExtensionTexture.view": {
+      "status": "ruled",
+      "source": "packages/gltf/src/material-extension.ts"
+    },
+    "gltf:PBRMaterial.castAnimation": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:PBRMaterial.castMask": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:PBRPrimitive.buffers": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PBRPrimitive.culled": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PBRPrimitive.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PBRPrimitive.redirect": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PBRSceneBuffers.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PBRSceneBuffers.alphaTexture": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PackedBaseTextures.params": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:PackedBaseTextures.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:PackedBaseTextures.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "gltf:PassBindings.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PassBindings.instances": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PassBindings.uvs": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:PassBindings.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:QuickRun.section": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:ShadowCasterRecord.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:ShadowCasterRecord.alphaTexture": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:ShadowCasterRecord.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "gltf:ShadowCasterRecord.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "html:HTMLSurface.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "html:HTMLSurface.uniform": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lighting2d:EmissiveLighting2D.bloomTexture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lighting2d:EmissiveLighting2D.emissiveTexture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lighting2d:EmissiveLighting2DOptions.target": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lighting2d:GILighting2DOptions.target": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lighting2d:HeightLighting2DOptions.target": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lighting2d:Lighting2DOptions.normals": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lighting2d:Lighting2DOptions.target": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lighting2d:SDFScene2DOptions.emission": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lighting2d:SDFScene2DOptions.source": {
+      "status": "ruled",
+      "source": "packages/lighting2d/src/resources.ts"
+    },
+    "lightmap:GPULightmapBaker.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lightmap:LiveLightmap.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lines:LinePickContext.color": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "lines:LinePickContext.depth": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "loaders:MaterialXTexture.sampler": {
+      "status": "exempt",
+      "reason": "what the caller's `texture` hook returns for one request: the converter hands the same object to the node material graph and keeps nothing, so `@margoengine/materials` holds it by its own rule (pinned by packages/loaders/tests/materialx.test.js)"
+    },
+    "loaders:MaterialXTexture.view": {
+      "status": "exempt",
+      "reason": "what the caller's `texture` hook returns for one request: the converter hands the same object to the node material graph and keeps nothing, so `@margoengine/materials` holds it by its own rule (pinned by packages/loaders/tests/materialx.test.js)"
+    },
+    "lod:Imposter.color": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lod:Imposter.glow": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lod:Imposter.normal": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "lod:Imposter.uniform": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "materials:CubeTarget.texture": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:CubeTarget.view": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:EnvironmentMap.sampler": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:EnvironmentMap.specularView": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:MaterialOptions.envMap": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:NodeMaterialOptions.opaqueColor": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:Texture.source": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "materials:TransmissionOptions.opaqueColor": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "physics:ModelPrimitiveLike.buffers": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "physics:ModelPrimitiveLike.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "pixel:PaletteQuantizeOptions.source": {
+      "status": "ruled",
+      "source": "packages/pixel/src/palette.ts"
+    },
+    "pixel:PaletteQuantizeOptions.target": {
+      "status": "ruled",
+      "source": "packages/pixel/src/palette.ts"
+    },
+    "pixel:Render3DOptions.target": {
+      "status": "ruled",
+      "source": "packages/pixel/src/render3d.ts"
+    },
+    "pixel:ScreenPassOptions.source": {
+      "status": "ruled",
+      "source": "packages/pixel/src/blit.ts"
+    },
+    "pixel:ScreenPassOptions.target": {
+      "status": "ruled",
+      "source": "packages/pixel/src/blit.ts"
+    },
+    "pixel:SpriteFrames.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (the result of renderSpriteFrames), never a caller input"
+    },
+    "points:BaseMaterialOptions.map": {
+      "status": "ruled",
+      "source": "packages/points/src/plugin.ts"
+    },
+    "points:PointPickContext.color": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "points:PointPickContext.depth": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "post:DecalOptions.atlas": {
+      "status": "ruled",
+      "source": "packages/post/src/decals.ts"
+    },
+    "post:LensFlareElement.texture": {
+      "status": "ruled",
+      "source": "packages/post/src/lens-flare.ts"
+    },
+    "post:LensOptions.dirt": {
+      "status": "ruled",
+      "source": "packages/post/src/lens.ts"
+    },
+    "post:MaterialDecalTargets.albedo": {
+      "status": "exempt",
+      "reason": "returned each frame by the targets getter (rule 6)"
+    },
+    "post:MaterialDecalTargets.material": {
+      "status": "exempt",
+      "reason": "returned each frame by the targets getter (rule 6)"
+    },
+    "post:MaterialDecalTargets.normal": {
+      "status": "exempt",
+      "reason": "returned each frame by the targets getter (rule 6)"
+    },
+    "post:MaterialDecalsOptions.atlas": {
+      "status": "ruled",
+      "source": "packages/post/src/material-decals.ts"
+    },
+    "post:MotionVectors.resolved": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:MotionVectors.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:SceneTarget.color": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:SceneTarget.depth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:SceneTarget.depthSource": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:SceneTarget.resolvedColor": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:SceneTarget.resolvedDepth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:StackHost.depthTexture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "post:StageOutput.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "procedural:PBRTextureSet.albedo": {
+      "status": "exempt",
+      "reason": "an output: the baker makes the texture on the device it was created with and hands it out; the baker ends when that device is lost and a baker for the replacement device makes new ones, a caller never passes one in (pinned by packages/procedural/test/borrowed-restore.test.js)"
+    },
+    "procedural:PBRTextureSet.height": {
+      "status": "exempt",
+      "reason": "an output: the baker makes the texture on the device it was created with and hands it out; the baker ends when that device is lost and a baker for the replacement device makes new ones, a caller never passes one in (pinned by packages/procedural/test/borrowed-restore.test.js)"
+    },
+    "procedural:PBRTextureSet.normal": {
+      "status": "exempt",
+      "reason": "an output: the baker makes the texture on the device it was created with and hands it out; the baker ends when that device is lost and a baker for the replacement device makes new ones, a caller never passes one in (pinned by packages/procedural/test/borrowed-restore.test.js)"
+    },
+    "procedural:PBRTextureSet.roughness": {
+      "status": "exempt",
+      "reason": "an output: the baker makes the texture on the device it was created with and hands it out; the baker ends when that device is lost and a baker for the replacement device makes new ones, a caller never passes one in (pinned by packages/procedural/test/borrowed-restore.test.js)"
+    },
+    "procedural:WebGPUBakedTexture.texture": {
+      "status": "exempt",
+      "reason": "an output: the baker makes the texture on the device it was created with and hands it out; the baker ends when that device is lost and a baker for the replacement device makes new ones, a caller never passes one in (pinned by packages/procedural/test/borrowed-restore.test.js)"
+    },
+    "quality:TextureKnob.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (the knob current texture), never a caller input"
+    },
+    "quality:TextureKnobOptions.texture": {
+      "status": "exempt",
+      "reason": "taken with its own device (TextureKnobOptions.device) and never drawn by the knob; the knob is rebuilt after a restore, as its docs say"
+    },
+    "react:FBO.target": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (useFBO creates its color and depth textures and remakes them on the engine device), never a caller input"
+    },
+    "react:MeshReflectorMaterialProps.distortionMap": {
+      "status": "ruled",
+      "source": "packages/react/src/materials.tsx"
+    },
+    "react:RenderTextureHandle.target": {
+      "status": "exempt",
+      "reason": "an output: RenderTexture makes the target on the engine's device and makes it again in onDeviceRestored, so the handle carries the replacement (pinned by packages/react/tests/portals.test.js)"
+    },
+    "scatter:FireLike.texture": {
+      "status": "exempt",
+      "reason": "read through a function each frame from the package that owns it (a FireFront's burn texture, a Flood's records), never held: the source re-reads it after that package rebuilds it (rule 6)"
+    },
+    "scatter:FloodLike.velocityTexture": {
+      "status": "exempt",
+      "reason": "read through a function each frame from the package that owns it (a FireFront's burn texture, a Flood's records), never held: the source re-reads it after that package rebuilds it (rule 6)"
+    },
+    "scatter:FloodLike.wetTexture": {
+      "status": "exempt",
+      "reason": "read through a function each frame from the package that owns it (a FireFront's burn texture, a Flood's records), never held: the source re-reads it after that package rebuilds it (rule 6)"
+    },
+    "scatter:OrderedCull.candidates": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "scatter:OrderedCull.flags": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sciviz:CurvilinearSection.buffer": {
+      "status": "exempt",
+      "reason": "an @internal buffer the section makes on the renderer's device and makes again in restore() (rule 6; pinned by the pixel-equal reboot checks in packages/sciviz/tests/curvilinear-browser.mjs)"
+    },
+    "sciviz:LayerResources.gpu": {
+      "status": "exempt",
+      "reason": "a report of the buffers and textures a layer holds, read by the memory monitor, never an input (rule 6; packages/sciviz/tests/monitor.test.js)"
+    },
+    "sciviz:SciRenderer.depthView": {
+      "status": "exempt",
+      "reason": "an @internal per-frame record: the opaque-depth snapshot view the renderer makes each frame and clears at a restore (rule 6; pinned by the reboot check in packages/sciviz/tests/volume-depth-browser.mjs)"
+    },
+    "selection:ModelPrimitiveLike.buffers": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:ModelPrimitiveLike.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:PickSurface.views": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "selection:PickingOverlayContext.color": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "selection:PickingOverlayContext.depth": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "selection:PickingPrimitive.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:PickingPrimitive.alphaTexture": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:PickingPrimitive.animation": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:PickingPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:PickingPrimitive.opacity": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "selection:PickingPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shader:BoundBuffers.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shader:BoundBuffers.slots": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shader:HeldBuffer.buffer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:Image.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:Image.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:MaterialGpu.buffer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:MeshGpu.groups": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:MeshGpu.object": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:Program.buffers": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shader:RawPickContext.color": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "shader:RawPickContext.depth": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "shader:RawShaderMaterialOptions.textures": {
+      "status": "ruled",
+      "source": "packages/shader/src/raw.ts"
+    },
+    "shader:RawStorage.buffer": {
+      "status": "ruled",
+      "source": "packages/shader/src/raw.ts"
+    },
+    "shader:RawTexture.texture": {
+      "status": "ruled",
+      "source": "packages/shader/src/raw.ts"
+    },
+    "shader:ShaderUniform.value": {
+      "status": "ruled",
+      "source": "packages/shader/src/raw.ts"
+    },
+    "shader:ShadertoyChannel.texture": {
+      "status": "ruled",
+      "source": "packages/shader/src/shadertoy.ts"
+    },
+    "shader:ShadertoyPassSource.iChannel0": {
+      "status": "ruled",
+      "source": "packages/shader/src/shadertoy.ts"
+    },
+    "shader:ShadertoyPassSource.iChannel1": {
+      "status": "ruled",
+      "source": "packages/shader/src/shadertoy.ts"
+    },
+    "shader:ShadertoyPassSource.iChannel2": {
+      "status": "ruled",
+      "source": "packages/shader/src/shadertoy.ts"
+    },
+    "shader:ShadertoyPassSource.iChannel3": {
+      "status": "ruled",
+      "source": "packages/shader/src/shadertoy.ts"
+    },
+    "shader:StageOutput.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "shadows:LightPatternOptions.texture": {
+      "status": "ruled",
+      "source": "packages/shadows/src/light-function.ts"
+    },
+    "shadows:ShadowEffectFrame.map": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6): the shadow depth map Shadows gives its effects"
+    },
+    "shadows:ShadowPrimitive.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shadows:ShadowPrimitive.alphaTexture": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shadows:ShadowPrimitive.animation": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shadows:ShadowPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shadows:ShadowPrimitive.opacity": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "shadows:ShadowPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "sky:CloudVolumes.erosion": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:CloudVolumes.sampler": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:CloudVolumes.shape": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:OccluderPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "sky:OccluderPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "sky:Sky.environmentLayer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:Sky.environmentLightLayer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:SkyTables.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:VolumetricCloudSky.environmentLayer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:VolumetricCloudSky.environmentLightLayer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:VolumetricCloudSky.reflectionTexture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "sky:WeatherOcclusion.buffer": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (WeatherFX sets weather.occlusion to its own buffer and view, rebuilt on restore)"
+    },
+    "sky:WeatherOcclusion.view": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (WeatherFX sets weather.occlusion to its own buffer and view, rebuilt on restore)"
+    },
+    "splats:SplatPickContext.color": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "splats:SplatPickContext.depth": {
+      "status": "exempt",
+      "reason": "a per-frame context handed to a callback (rule 6)"
+    },
+    "sprites:BillboardLayerOptions.atlas": {
+      "status": "ruled",
+      "source": "packages/sprites/src/billboard.ts"
+    },
+    "sprites:SkeletalLayerOptions.atlas": {
+      "status": "ruled",
+      "source": "packages/sprites/src/skeletal.ts"
+    },
+    "sprites:SpriteLayerOptions.atlas": {
+      "status": "ruled",
+      "source": "packages/sprites/src/index.ts"
+    },
+    "sprites:SpriteLayerOptions.target": {
+      "status": "ruled",
+      "source": "packages/sprites/src/index.ts"
+    },
+    "sprites:SpriteNormals.atlas": {
+      "status": "ruled",
+      "source": "packages/sprites/src/index.ts"
+    },
+    "sprites:SpriteNormals.target": {
+      "status": "ruled",
+      "source": "packages/sprites/src/index.ts"
+    },
+    "studio:CasterCutout.animation": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "studio:CasterCutout.displacement": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "studio:CasterCutout.opacity": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "studio:ContactPrimitive.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "studio:ContactPrimitive.alphaTexture": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "studio:ContactPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "studio:ContactPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:CasterCutout.animation": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:CasterCutout.displacement": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:CasterCutout.opacity": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:TAAVelocity.expectedDepth": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "taa:TAAVelocity.resolved": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "taa:TAAVelocity.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "taa:VelocityPrimitive.alphaSampler": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:VelocityPrimitive.alphaTexture": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:VelocityPrimitive.index": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "taa:VelocityPrimitive.vertex": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "terrain:TerrainHeightSource.heightmap": {
+      "status": "exempt",
+      "reason": "a per-frame getter of the terrain plugin own heightmap, read at each query (rule 6)"
+    },
+    "terrain:TerrainHeightmap.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (the heightmap plugin own texture, rebuilt in its onDeviceRestored)"
+    },
+    "terrain:TerrainMaterialTextures.normals": {
+      "status": "exempt",
+      "reason": "the result of the function form TerrainMaterialOptions.textures(device), called once per device (rule 2)"
+    },
+    "terrain:TerrainMaterialTextures.surface": {
+      "status": "exempt",
+      "reason": "the result of the function form TerrainMaterialOptions.textures(device), called once per device (rule 2)"
+    },
+    "terrain:TerrainTextures.heightmap": {
+      "status": "exempt",
+      "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
+    },
+    "terrain:TerrainTextures.holes": {
+      "status": "exempt",
+      "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
+    },
+    "terrain:TerrainTextures.layers": {
+      "status": "exempt",
+      "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
+    },
+    "terrain:TerrainTextures.normalmap": {
+      "status": "exempt",
+      "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
+    },
+    "terrain:TerrainTextures.tint": {
+      "status": "exempt",
+      "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
+    },
+    "terrain:TerrainTextures.weights": {
+      "status": "exempt",
+      "reason": "never a plain option: Terrain takes the set only from `TerrainOptions.textures(device)`, the function form of rule 2, called once per device and again at each restore, and frees the old set (pinned by packages/terrain/test/borrowed-restore.test.js)"
+    },
+    "tilemap:GridTileMapOptions.atlases": {
+      "status": "ruled",
+      "source": "packages/tilemap/src/iso.ts"
+    },
+    "tilemap:GridTileMapOptions.target": {
+      "status": "ruled",
+      "source": "packages/tilemap/src/iso.ts"
+    },
+    "tilemap:ObjectTileMapOptions.images": {
+      "status": "ruled",
+      "source": "packages/tilemap/src/objects.ts"
+    },
+    "tilemap:TileMapOptions.atlases": {
+      "status": "ruled",
+      "source": "packages/tilemap/src/renderer.ts"
+    },
+    "tilemap:TileMapOptions.target": {
+      "status": "ruled",
+      "source": "packages/tilemap/src/renderer.ts"
+    },
+    "tonemap:AutoExposure.mask": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "tonemap:TonemapPassContext.source": {
+      "status": "pending",
+      "reason": "Mac lane"
+    },
+    "toon:ModelPrimitiveLike.buffers": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "toon:ModelPrimitiveLike.deformed": {
+      "status": "exempt",
+      "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
+    },
+    "transitions:LiveTransitionFrame.target": {
+      "status": "exempt",
+      "reason": "a per-call frame target (rule 6)"
+    },
+    "vfx:FireFront.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "vfx:VFXRuntime.eventList": {
+      "status": "exempt",
+      "reason": "an internal resource: the events feature makes the list on the simulation's own device in create(), owns and destroys it, and VFX makes it again after a device restore; a caller never passes one"
+    },
+    "vfx:VFXShadows.buffer": {
+      "status": "exempt",
+      "reason": "an output: the light list the shadows feature makes and sets at attach, made again on the new device after a restore (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "vfx:VFXSkinnedPrimitive.deformed": {
+      "status": "exempt",
+      "reason": "a draw record one package hands another each frame: the deformer (animation, gltf) writes it and clears it at a device restore, and the skinned emitter reads it every frame (rule 6) (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "vfx:VFXState.alive": {
+      "status": "exempt",
+      "reason": "an internal resource the effect makes on each device (VFXState is not exported), never a caller input (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "vfx:VFXState.indirect": {
+      "status": "exempt",
+      "reason": "an internal resource the effect makes on each device (VFXState is not exported), never a caller input (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "vfx:VFXState.particles": {
+      "status": "exempt",
+      "reason": "an internal resource the effect makes on each device (VFXState is not exported), never a caller input (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "vfx:VFXState.uniform": {
+      "status": "exempt",
+      "reason": "an internal resource the effect makes on each device (VFXState is not exported), never a caller input (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "vfx:VFXState.visible": {
+      "status": "exempt",
+      "reason": "an internal resource the effect makes on each device (VFXState is not exported), never a caller input (pinned by packages/vfx/test/restore.test.js)"
+    },
+    "voxel:VoxelLightmap.texture": {
+      "status": "ruled",
+      "source": "packages/voxel/src/render.ts"
+    },
+    "voxel:VoxelLightmapOptions.texture": {
+      "status": "ruled",
+      "source": "packages/voxel/src/render.ts"
+    },
+    "water:ParticleSource.positions": {
+      "status": "ruled",
+      "source": "packages/water/src/liquid.ts"
+    },
+    "water:ParticleSource.velocities": {
+      "status": "ruled",
+      "source": "packages/water/src/liquid.ts"
+    },
+    "water:WaterPlanarCapture.texture": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "weather:PrecipitationCapture.coverTexture": {
+      "status": "exempt",
+      "reason": "an output of the capture (sky WeatherFX), made again on the new device at a restore; the cover reads it live and binds only the capture's current one (pinned by packages/weather/tests/cover.test.js)"
+    },
+    "weather:PrecipitationMap.buffer": {
+      "status": "exempt",
+      "reason": "an output of the capture (sky WeatherFX), made again on the new device at a restore; the cover reads it live and binds only the capture's current one (pinned by packages/weather/tests/cover.test.js)"
+    },
+    "weather:PrecipitationMap.view": {
+      "status": "exempt",
+      "reason": "an output of the capture (sky WeatherFX), made again on the new device at a restore; the cover reads it live and binds only the capture's current one (pinned by packages/weather/tests/cover.test.js)"
+    },
+    "xr:LayerTarget.texture": {
+      "status": "exempt",
+      "reason": "a per-frame WebXR layer target the session hands out (rule 6)"
+    },
+    "xr:LayerTarget.view": {
+      "status": "exempt",
+      "reason": "a per-frame WebXR layer target the session hands out (rule 6)"
+    },
+    "xr:XRSubImage.colorTexture": {
+      "status": "exempt",
+      "reason": "a per-frame WebXR layer target the session hands out (rule 6)"
+    },
+    "xr:XRSubImage.depthStencilTexture": {
+      "status": "exempt",
+      "reason": "a per-frame WebXR layer target the session hands out (rule 6)"
+    }
+  }
+}

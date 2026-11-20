@@ -22,7 +22,10 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    "./msft": { "types": "./dist/msft.d.ts", "import": "./dist/msft.js" },
+    "./msft": {
+      "types": "./dist/msft.d.ts",
+      "import": "./dist/msft.js"
+    },
     "./clusters": {
       "types": "./dist/clusters.d.ts",
       "import": "./dist/clusters.js"
@@ -55,7 +58,7 @@
   "peerDependencies": {
     "@margoengine/animation": "^1.0.0",
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/materials": "^1.0.0",
     "@margoengine/mesh-edit": "^1.0.0"
   },

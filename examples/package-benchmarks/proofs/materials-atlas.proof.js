@@ -120,6 +120,6 @@ const report = {
   image: '32x32 RGBA each, atlas 1024x512 with 2-texel padding',
   results,
   notes:
-    'Counts are one steady frame on the recording mock GPU. gltf-pro draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only).',
+    'Counts are one steady frame on the recording mock GPU. gltf/pbr draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only).',
 };
 if (measure) await save('materials-atlas', report);

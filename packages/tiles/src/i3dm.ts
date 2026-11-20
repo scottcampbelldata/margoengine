@@ -11,7 +11,7 @@ import type { TileRenderable, TilesetTile } from './tileset.js';
 /** An engine mesh with its world matrix (the engine's Mesh class has it; the Mesh interface leaves it out). */
 type Node = Mesh & { readonly matrix: Float32Array };
 
-/** The part of a gltf-pro model (`PBRModel`) the i3dm drawer needs: its primitives and their nodes. */
+/** The part of a gltf/pbr model (`PBRModel`) the i3dm drawer needs: its primitives and their nodes. */
 interface InstancedModel extends TilesModel {
   readonly root: Node;
   readonly primitives: readonly { node: Node; instances?: unknown }[];
@@ -59,7 +59,7 @@ export function instanceCenter(matrices: ArrayLike<number>): [number, number, nu
 
 /**
  * Draws i3dm content: pass it as `TilesRenderer.load(engine, url, { i3dm })`. Each primitive of the instanced glTF
- * draws all `INSTANCES_LENGTH` instances in one instanced draw (gltf-pro's `PBRInstances`). An external glTF
+ * draws all `INSTANCES_LENGTH` instances in one instanced draw (gltf/pbr's `PBRInstances`). An external glTF
  * (`gltfFormat` 0) is fetched with the tileset's own fetch, relative to the tile's content URL.
  */
 export const i3dm: TilesInstancesDrawer = async (
@@ -80,7 +80,7 @@ export const i3dm: TilesInstancesDrawer = async (
   const gltf =
     content.gltf ?? (await host.fetch(new URL(content.gltfUri!, tile.contentUrls[0] ?? host.url).href, signal));
   const [{ PBRInstances }, model] = await Promise.all([
-    import('@margoengine/gltf-pro/instancing'),
+    import('@margoengine/gltf/pbr-instancing'),
     host.loadModel(gltf, signal) as Promise<InstancedModel>,
   ]);
   let nodes = 0,
@@ -91,7 +91,7 @@ export const i3dm: TilesInstancesDrawer = async (
     if (!Array.isArray(model.primitives))
       throw new MargoError(
         'unsupported',
-        'i3dm needs a model with primitives (gltf-pro); a custom loadModel must return a gltf-pro PBRModel',
+        'i3dm needs a model with primitives (gltf/pbr); a custom loadModel must return a gltf/pbrModel',
       );
     const center = instanceCenter(content.matrices),
       root = model.root,

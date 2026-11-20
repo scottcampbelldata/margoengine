@@ -72,7 +72,7 @@ function scene(module, samples, meshCount, pbrCount) {
       primitive.node.matrix[14] = Math.cos(index * 0.07 + primitive.node.id);
     try {
       run(view.c);
-    } catch (error) {
+    } catch {
       gpu.note('throw');
     }
     view.end();

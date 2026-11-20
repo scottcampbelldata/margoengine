@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Animation } from '../dist/index.js';
 import { pointerChannels } from '../dist/pointer.js';
-import { parseGLTFAsync } from '@margoengine/gltf-pro';
+import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
 const near = (actual, expected, epsilon = 1e-5) => {

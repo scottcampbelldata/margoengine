@@ -1,7 +1,7 @@
 // Real-GPU check of shadows for deformed casters and lighting for VAT crowds. Run from the repository root
-// after `npm run build:packages`, with the GPU lock held:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/deformed-shadows/check.mjs [--timing]
-//  - skinned: RobotExpressive walking (gltf-pro + GPU skinning) as the only caster; the shadow map's silhouette at two clip
+// after `npm run build:packages`:
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/deformed-shadows/check.mjs [--timing]
+//  - skinned: RobotExpressive walking (gltf/pbr + GPU skinning) as the only caster; the shadow map's silhouette at two clip
 //    times must differ, repeat exactly at the same time, and differ from the bind pose (Shadows reads the deformed buffer).
 //  - crowd: 25 VAT robots under a floating slab. Without `shadows.add(crowd)` (B), without the crowd (C, which gives the
 //    crowd's pixels), with it (A: the crowd casts onto the floor and is shadowed), then with EnvironmentLighting IBL (D).

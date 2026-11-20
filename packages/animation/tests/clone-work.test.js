@@ -1,11 +1,11 @@
 // Batch 161 job 4: the CPU work of one cloneModel copy of RobotExpressive (p-skeleton-clone's task, 50 copies a call),
-// counted. The copy writes node transforms with no arrays per node, and gltf-pro groups the primitives by node in one
+// counted. The copy writes node transforms with no arrays per node, and gltf/pbr groups the primitives by node in one
 // pass instead of one filter of every primitive per primitive node; the copies come out the same.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloneModel } from '../dist/skeleton-utils.js';
 import { engine, model } from './support/models.js';
-import { PBRModel } from '../../gltf-pro/dist/index.js';
+import { PBRModel } from '../../gltf/dist/pbr.js';
 import { animatorGLB } from '../../../tests/support/animator-rig.js';
 
 const robot = new URL('../../../examples/assets/robot-expressive.glb', import.meta.url),
@@ -81,7 +81,11 @@ test('a RobotExpressive copy writes its nodes with no arrays per node and groups
   // The same scene structure: each copied node hangs under the copy of its source parent.
   const index = (m, id) => (id === m.root.id ? -1 : id === -1 ? -2 : m.nodes.findIndex((n) => n.id === id));
   source.nodes.forEach((node, i) =>
-    assert.equal(index(clone, e.store.parents[clone.nodes[i].id]), index(source, e.store.parents[node.id]), `parent ${i}`),
+    assert.equal(
+      index(clone, e.store.parents[clone.nodes[i].id]),
+      index(source, e.store.parents[node.id]),
+      `parent ${i}`,
+    ),
   );
   assert.equal(e.store.parents[clone.root.id], -1, 'clone root unparented');
   clone.primitives.forEach((p, i) => {
@@ -103,20 +107,14 @@ test('a RobotExpressive copy writes its nodes with no arrays per node and groups
   e.dispose();
 });
 
-test('a copy of a node whose store scale is zero still throws core setScale error', async () => {
+test('KB-GLTFA B1: a copy of a node whose store scale is zero keeps the zero scale', async () => {
   const e = await engine(1024),
     source = model(e, animatorGLB(robot));
   e.store.transforms.sx[source.nodes[2].id] = 0;
-  let expected;
-  try {
-    source.nodes[2].setScale([0, 1, 1]);
-  } catch (error) {
-    expected = error;
-  }
-  await assert.rejects(
-    cloneModel(source),
-    (error) => error.constructor === expected.constructor && error.message === expected.message,
-  );
+  const copy = await cloneModel(source);
+  assert.equal(e.store.transforms.sx[copy.nodes[2].id], 0);
+  assert.equal(e.store.transforms.sy[copy.nodes[2].id], e.store.transforms.sy[source.nodes[2].id]);
+  copy.dispose();
   source.dispose();
   e.dispose();
 });

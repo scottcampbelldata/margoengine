@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseGLTF, textureCoordinates } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF, textureCoordinates } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { optionalGPU } from './support/optional-gpu.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 import { materialQuad } from './support/materials-fixture.js';
 
 async function scene(fixture = materialQuad(), { pending = false } = {}) {

@@ -175,3 +175,10 @@ test('malformed data rejects rather than returning nonfinite or silently unconst
     {loops:[{a:frame(0),b:frame(-1),orientation:'yes'}]}]) assert.throws(()=>solver.solve(request));
   assert.throws(()=>solver.evaluate([NaN]));
 });
+test('an option passed as undefined takes its documented default',()=>{
+  const joints=[{type:'revolute',axis:[0,0,1]},{type:'fixed',parent:0,position:[1,0,0]}];
+  const solver=new MultiGoalIKSolver(joints,{iterations:undefined,candidates:undefined,positionTolerance:undefined,
+    orientationTolerance:undefined,damping:undefined,maxStep:undefined});
+  const r=solver.solve({goals:[{frame:{joint:1},position:[0,1,0]}]});
+  assert.equal(r.resolved,true);
+});

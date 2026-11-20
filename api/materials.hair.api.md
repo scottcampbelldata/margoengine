@@ -4,19 +4,34 @@
 
 ```ts
 import { Engine } from "@margoengine/core/extension";
-import { MaterialSide, TextureTransform } from "@margoengine/gltf-pro";
+import { MaterialSide, TextureTransform } from "@margoengine/gltf/pbr";
 import { ColorInput } from "@margoengine/math";
+
+export interface HairCardOptions {
+    grazing?: number;
+}
 
 export interface HairOptions {
     direction?: 'u' | 'v' | readonly [number, number, number];
     shift?: number;
     width?: number;
+    roughness?: number;
+    absorption?: readonly [number, number, number];
     specular?: number;
     strands?: number;
     jitter?: number;
+    follow?: () => ArrayLike<number>;
 }
 
+export function colorAbsorption(color: readonly number[], roughness?: number): [number, number, number];
+
 export function hair(options?: HairOptions): MaterialFeature;
+
+export function hairCards(options?: HairCardOptions): MaterialFeature;
+
+export function hairScattering(l: readonly number[], v: readonly number[], tangent: readonly number[], color: readonly number[], options?: Pick<HairOptions, 'shift' | 'width' | 'roughness' | 'absorption'>): [number, number, number];
+
+export function melaninAbsorption(eumelanin: number, pheomelanin?: number): [number, number, number];
 
 // Not exported from this entry, but used by the exports above:
 
@@ -362,6 +377,7 @@ interface MaterialFeature {
     tangentFrame?: boolean;
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    castHashed?(code: string): string;
     attach?(material: Material): void;
     detach?(material: Material): void;
 }
@@ -532,7 +548,7 @@ class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
-    sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
+    sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }

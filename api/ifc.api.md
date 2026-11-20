@@ -6,10 +6,27 @@
 import { LoadedGeometry, ParseLimits } from "@margoengine/loaders";
 import { IfcAPI, LoaderSettings } from "web-ifc";
 
-export interface IFCOptions extends ParseLimits {
+export interface IFCGeometryOptions extends ParseLimits {
+    signal?: AbortSignal;
+    origin?: 'auto' | readonly [number, number, number];
+}
+
+export interface IFCModel {
+    readonly api: IfcAPI;
+    readonly id: number;
+    readonly schema: string;
+    readonly closed: boolean;
+    close(): void;
+    [Symbol.dispose](): void;
+}
+
+export interface IFCOpenOptions {
     maxBytes?: number;
     signal?: AbortSignal;
     settings?: LoaderSettings;
+}
+
+export interface IFCOptions extends IFCOpenOptions, IFCGeometryOptions {
 }
 
 export interface IFCProduct {
@@ -23,7 +40,21 @@ export interface IFCResult extends LoadedGeometry {
     kind: 'mesh';
     schema: string;
     products: IFCProduct[];
+    origin: [number, number, number];
 }
 
+export function checkColor({ x, y, z, w }: {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+}): [number, number, number, number];
+
+export function checkPlacement(m: ArrayLike<number>): number;
+
+export function openIFC(api: IfcAPI, data: Uint8Array, options?: IFCOpenOptions): IFCModel;
+
 export function parseIFC(api: IfcAPI, data: Uint8Array, options?: IFCOptions): IFCResult;
+
+export function readIFCGeometry(model: IFCModel, options?: IFCGeometryOptions): IFCResult;
 ```

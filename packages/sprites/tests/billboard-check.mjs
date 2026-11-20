@@ -1,8 +1,8 @@
 // Real-GPU proof of @margoengine/sprites/billboard (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/billboard-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/billboard-check.mjs
 // A 64 x 64 exactSize frame with a 90 degree camera, read back and measured: billboards face the camera from three
 // sides, world sizes halve at twice the distance, pixel sizes do not, pivot and turn, cut-out depth writes and alpha
-// test, back-to-front blending, lockY, and the depth test against a core mesh. Results: test-results/billboards-browser.json.
+// test, back-to-front blending, lockY, the depth test against a core mesh, and a device loss. Results: test-results/billboards-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -51,6 +51,27 @@ try {
   }
   assert.equal(r.validation, null, 'no validation errors');
   assert.equal(r.msaa.validation, null, 'MSAA engine: no validation error');
+  // KB-RESTORE-BORROWED1: no frame throws, the plain-texture layer draws nothing until setAtlas, one report, and the
+  // function form is called once per device. Red from pixels sits left, green (plain) in the middle, blue right.
+  const [left, middle, right] = r.loss.before,
+    none = [64, 64, -64, -64];
+  assert.deepEqual(middle, [26, 26, 12, 12], 'the plain-texture layer draws before the loss');
+  assert.ok(left[0] < 20 && right[0] > 44 && left[2] > 10 && right[2] > 10, 'the other two draw either side of it');
+  assert.equal(r.loss.thrown, undefined, 'no frame throws after the restore');
+  assert.deepEqual(
+    r.loss.frames,
+    [0, 1, 2].map(() => [left, none, right]),
+    'three frames without the lost layer',
+  );
+  assert.deepEqual(r.loss.reports, [
+    [
+      'state',
+      'BillboardLayer atlas lost with the device; pass a function or call setAtlas; see https://margoengine.com/errors#borrowed-lost',
+    ],
+  ]);
+  assert.equal(r.loss.functionCalls, 2, 'the function form is called once per device');
+  assert.equal(r.loss.functionDevices, true);
+  assert.deepEqual(r.loss.after, [left, middle, right], 'setAtlas brings the layer back');
   assert.deepEqual(r.errors, []);
   assert.deepEqual(pageErrors, []);
   console.log(

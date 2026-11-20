@@ -50,11 +50,11 @@ engine.dispose();
 
 `agx` is the AgX Base display transform computed in the shader: Rec.2020 inset, log2 encoding over 16.5 stops around 18% grey, the parametric AgX sigmoid, hue restoration, then the outset back to Rec.709. 18% grey stays 18% grey. `acescg` selects an ACES fitted RRT/ODT display transform, with AP1 color handling; it is not the full ACES reference pipeline. ACEScg itself is a working color space. Core's default input is `linear-srgb`; use `inputColorSpace:'acescg'` only with an external AP1/D60 HDR `source`. `neutral`, the default, implements Khronos PBR Neutral: Margo's display curve, the one core and every package end with, so attaching Tonemap with no options changes nothing until you grade. See [references](NOTICE.md).
 
-## Auto-exposure, white balance, vignette, grain, chromatic aberration
+## Auto-exposure, white balance, vignette, grain, dithering, chromatic aberration
 
 ```ts
 import {createStage} from 'margoengine';
-import {Tonemap, whiteBalanceGain} from 'margoengine/tonemap';
+import {Tonemap, whiteBalanceMatrix} from 'margoengine/tonemap';
 const stage = await createStage('#viewport', {backend:'webgpu'});
 const tonemap = Tonemap.attach(stage.engine, {
   curve: 'agx',
@@ -63,11 +63,11 @@ const tonemap = Tonemap.attach(stage.engine, {
   vignette: 0.35, grain: 0.1, chromaticAberration: 0.2,
 });
 tonemap.options.vignette = 0; // every option can change per frame
-const gain = whiteBalanceGain(4500, 0.1); // the RGB gain, if you need it elsewhere
+const balance = whiteBalanceMatrix(4500, 0.1); // the 3x3 matrix (column-major), if you need it elsewhere
 stage.dispose();
 ```
 
-All are off by default and compiled in only when asked for: without them the shaders, bindings and GPU calls are exactly what they were. Order: input conversion, white balance gain, exposure plus the auto-exposure stops, curve, contrast, LUT, vignette, grain, sRGB. Chromatic aberration shifts the red and blue samples radially (1 = 2% of the view at its edge) before everything else.
+All are off by default and compiled in only when asked for: without them the shaders, bindings and GPU calls are exactly what they were. Order: input conversion, white balance, exposure plus the auto-exposure stops, curve, contrast, LUT, vignette, grain, sRGB, dither. Chromatic aberration shifts the red and blue samples radially (1 = 2% of the view at its edge) before everything else.
 
 - `autoExposure` meters the log-average luminance of the HDR source over the view with one 256-thread compute pass (4,096 samples) and moves the stored exposure toward 18% grey by `1 - exp(-speed * dt)` per frame (`min`, `max` in stops, `speed` in 1/s, `compensation` in stops; defaults -4, 4, 1.5, 0). The first frame snaps to the metered value. It adds one compute dispatch and an 8-byte storage buffer.
 - **Metering modes.** `metering` picks where the meter looks: `'average'` (default, the whole view evenly),
@@ -88,11 +88,35 @@ const tonemap = Tonemap.attach(stage.engine, {autoExposure: {method: 'histogram'
 tonemap.options.autoExposure = {metering: 'spot', spot: {x: 0.5, y: 0.4, radius: 0.08}}; // meter the face
 stage.dispose();
 ```
-- `temperature` is the colour temperature of the scene's light (1667-25000 K, default 6500 = no change): 3200 cools tungsten light to neutral. `tint` runs from -1 (green) to 1 (magenta). The gain keeps luminance.
+- `temperature` is the colour temperature of the scene's light (1667-25000 K, default 6500 = no change): 3200 cools tungsten light to neutral. `tint` runs from -1 (green) to 1 (magenta). It is a chromatic adaptation, as photo editors and cameras do it: a von Kries scaling in the Bradford cone space from the Planckian white of `temperature` to the 6500 K one, applied as one 3x3 matrix in the shader, so it holds over the whole range (a grey card lit by an 1800 K candle comes out neutral). The card keeps its luminance; colours the correction pushes outside Rec.709 clip at 0 before the curve. `whiteBalanceMatrix(temperature, tint)` returns the matrix.
 - `vignette` 0-1 with `vignetteRadius` and `vignetteSoftness` (fractions of the distance to the corner; defaults 0.5). Per view when the engine draws several.
+- `vignetteColor` (linear Rec.709 0-1, default `[0, 0, 0]`), `vignetteCenter` (fractions of the view, x from the left
+  and y from the top, default `[0.5, 0.5]`), `vignetteRoundness` (0 stretches it with the view into an ellipse through
+  the corners, the default; 1 makes it a circle; the corner distance stays 1 either way) and `vignetteBlend`
+  (`'multiply'`, the default, multiplies the picture by the colour as the vignette comes in, so black darkens and a tint
+  tints; `'opaque'` blends toward the colour itself, like a painted matte).
 - `grain` 0-1 is film grain that changes every frame, strongest in the mid-tones.
+- `dither` (`true`, or 0-1 to scale it; default off) removes banding from smooth gradients such as skies and fog:
+  triangular (TPDF) noise of up to one code value of the target either way, added to the sRGB-encoded colour as the very
+  last step before the target quantises it, changing every frame. Triangular noise keeps the mean and the noise level
+  independent of the signal, unlike uniform noise; it is narrowed near 0 and 1 so pure black and white stay exact. One
+  code value is 1/255 on an 8-bit canvas and 1/1023 on `rgb10a2unorm`; float targets do not band, so there it adds
+  nothing. Checked on a real GPU: a gradient two codes wide bands into flat columns 0.25 code off on average without it
+  and lands within 0.03 code with it (`packages/tonemap/tests/dither-vignette-browser.mjs`).
 
-Order: input color conversion → exposure in stops (−16 to 16) → selected curve → contrast around linear 18% gray (0 to 4) → optional LUT → clamp and exact sRGB transfer. The LUT operates on display-linear RGB after the curve; provide a LUT authored for that domain. It is not an automatic OCIO transform or a log/sRGB-encoded LUT decoder.
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const tonemap = Tonemap.attach(stage.engine, {
+  dither: true, // no banding in the sky
+  vignette: 0.6, vignetteColor: [0.1, 0.02, 0.15], vignetteCenter: [0.5, 0.45], vignetteRoundness: 1,
+});
+tonemap.options.vignetteBlend = 'opaque'; // a painted, coloured matte instead of a darkening
+stage.dispose();
+```
+
+Order: input color conversion → exposure in stops (−16 to 16) → selected curve → contrast about 18% gray (0 to 4; display-linear `0.18 (x / 0.18)^contrast`, a slope in log exposure that never clips the shadows to black; contrast 0 is flat 18% gray, black included) → optional LUT → clamp and exact sRGB transfer. The LUT operates on display-linear RGB after the curve; provide a LUT authored for that domain. It is not an automatic OCIO transform or a log/sRGB-encoded LUT decoder.
 
 For CPU-only parsing, supply the complete text. The result can later be passed to `tonemap.setLUT`:
 
@@ -119,6 +143,31 @@ Manually supplied LUT objects receive full validation when passed to `setLUT`.
 wrong counts, non-finite values and invalid domains reject. Input text is capped at 32 × 1024² JavaScript characters.
 The result contains explicit `size`, Float32Array RGBA data and Float32Array domains. Manually constructed legacy
 objects that omit `size` still mean 33³; other sizes require it.
+
+### .3dl LUTs (Flame, Smoke, Lustre, Nuke)
+
+`@margoengine/tonemap/3dl` reads and writes the integer `.3dl` format next to `.cube`. `parse3dl(text, options)`
+returns the same `CubeLUT` object that `setLUT` takes. It reads the Flame and Smoke layout (a first line of the grid's
+input code values, `0 64 128 ... 1023` for 17 samples at 10 bits, then N³ rows of integer R G B with blue varying
+fastest) and the Lustre layout (`3DMESH` and `Mesh <input bits> <output bits>` first, with or without the input line),
+from 2 to 65 samples per axis, with `#` comments. The output depth comes from the Lustre header, or `outputBits`, or
+else it is the smallest of 8, 10, 12, 14 and 16 bits that holds both the largest value and the largest input code (so
+a 12-bit LUT whose values all stay below 1024 needs `outputBits: 12`). The input line must be a uniform grid from 0 (a
+non-uniform one is a shaper; resample the LUT); its vertices are read as evenly spaced over 0..1.
+`export3dl(source, options)` writes a `Grade` or `HueGrade` snapshot (as `exportCube` bakes it; `size` default 33) or a
+0..1-domain `CubeLUT` in the Flame layout, `inputBits` default 10 and `outputBits` default 12, values clamped to 0..1.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {Grade} from 'margoengine/tonemap/grade';
+import {parse3dl, export3dl} from 'margoengine/tonemap/3dl';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const look = export3dl(new Grade({shadows: [0.02, 0, -0.02]}), {size: 33}); // save as look.3dl
+const tonemap = Tonemap.attach(stage.engine);
+tonemap.setLUT(parse3dl(look)); // or the text of a .3dl file from Flame, Lustre or Nuke
+stage.dispose();
+```
 
 `setLUT` accepts that object, raw `.cube` text or `null` and snapshots the size, samples and domains for restoration.
 Replacement checks the device's 3D texture limit; failed validation or upload preserves the previous LUT. A
@@ -157,9 +206,10 @@ use the workspace or packed local archives until the package is published.
 
 ## Live grading: `Grade`
 
-`@margoengine/tonemap/grade` (1,552 B min+gzip, its own entry) grades the picture live, without a LUT: shadows,
-midtones and highlights wheels, tone curves, and saturation against hue. Give it to Tonemap's `extensions`; its
-options are read every frame, so sliders can drive them.
+`@margoengine/tonemap/grade` (1,877 B min+gzip, its own entry) grades the picture live, without a LUT: shadows,
+midtones and highlights wheels, lift, gamma and gain, saturation, tone curves, and saturation against hue. Give it to
+Tonemap's `extensions`; its options are read every frame, so sliders can drive them. White balance (`temperature`,
+`tint`), `contrast`, `exposure` and a LUT (`setLUT`) are Tonemap's own options.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -170,6 +220,9 @@ const grade = new Grade({shadows: [0, 0.01, 0.04], highlights: [0.04, 0.02, 0]})
 Tonemap.attach(stage.engine, {curve: 'agx', extensions: [grade]});
 grade.options.curves = {master: [[0, 0.02], [0.25, 0.2], [0.75, 0.82], [1, 1]]}; // a gentle S curve
 grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter greens
+grade.options.lift = [0, 0, 0.03]; // blue in the blacks
+grade.options.gain = [1.05, 1, 0.95]; // warm whites
+grade.options.saturation = 1.2;
 ```
 
 | Option | Default | Meaning |
@@ -179,8 +232,17 @@ grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter gr
 | `highlights` | `[0, 0, 0]` | RGB offset for the bright tones, each -1 to 1 |
 | `curves` | straight | `{master, red, green, blue}`, each two or more `[x, y]` points in 0..1 with x increasing |
 | `hueSaturation` | `[1, 1, 1, 1, 1, 1]` | Saturation multipliers, 0 to 4, at red, yellow, green, cyan, blue, magenta |
+| `lift` | `[0, 0, 0]` | Per channel, -1 to 1: raises or lowers the blacks, leaves white |
+| `gamma` | `[1, 1, 1]` | Per channel, 0.1 to 10: above 1 brightens the midtones; black and white stay |
+| `gain` | `[1, 1, 1]` | Per channel, 0 to 4: scales the whites, leaves black |
+| `saturation` | `1` | Saturation about Rec. 709 luma, 0 (grey) to 4 |
 
-- **Method.** On display-linear colour after the curve and contrast, before a LUT. The wheels add their offsets
+- **Method.** On display-linear colour after the curve and contrast, before a LUT. Lift, gamma and gain run first,
+  `(gain (x + lift (1 - x)))^(1 / gamma)` per channel (the slope, offset and power of the ASC Color Decision List v1.2,
+  2009, written so lift holds white and gain holds black), then saturation about Rec. 709 luma (ITU-R BT.709-6). They
+  are compiled only while one is away from its default, so a `Grade` without them sends the GPU the same program and
+  data as before they existed (`tests/grade.test.js` checks the SHA-256 of both); setting or clearing them rebuilds
+  the pipeline once. The wheels add their offsets
   weighted by luminance masks that sum to 1: shadows 1 - smoothstep(0, 0.5, l), highlights smoothstep(0.5, 1, l),
   midtones the rest. Curves are monotone cubics through the points (no overshoot), sampled 33 times a frame and read
   with linear interpolation; the master curve runs first, then each channel's. Hue against saturation interpolates the
@@ -188,9 +250,13 @@ grade.options.hueSaturation = [1.2, 1, 0.8, 1, 1, 1]; // richer reds, quieter gr
 - **Checked on a real GPU** (`packages/tonemap/tests/grade-browser.mjs`, Apple silicon Mac, Metal, Chromium): default
   options change no pixel; a blue shadows offset lifts the blue of the dark pixels by 59 levels and leaves the bright
   ones; a red highlights cut lands within half a level of a CPU oracle of the wheel math; saturation 0 turns every
-  pixel grey and a flat curve at 0.5 gives sRGB 188 everywhere.
+  pixel grey and a flat curve at 0.5 gives sRGB 188 everywhere. On this PC's RTX A6000 (Chromium, D3D12) lift 0.2
+  raises the dark pixels 105 levels and the bright ones 10, gain 0.5 lowers the bright ones 56 and the dark ones 9,
+  gamma 2 lifts the red box's green 52 levels, saturation 0 greys every pixel and 2 widens the red box's red-blue gap
+  from 165 to 222 levels, and back at the defaults no pixel differs from the default `Grade`.
 - **Limits.** Display-referred grading in 0..1 (what lies above white under an HDR `ColorOutput` passes ungraded); 33
-  curve samples; one Grade per Tonemap.
+  curve samples. Several `Grade` and `HueGrade` (`@margoengine/tonemap/hue`) extensions may share one list, for a base
+  grade and a shot grade: each declares its own WGSL and they apply in the order given.
 
 `extensions` takes any `TonemapExtension` (`key`, `patch(shader, binding, extra)` returning the WGSL with its code in,
 an optional `values()` for one uniform buffer at that binding); changing the list rebuilds the pipeline once.
@@ -239,7 +305,9 @@ const soft = new CustomCurve({curve: (x) => 1 - Math.exp(-x)});
 
 `@margoengine/tonemap/local` keeps detail in bright windows and dark interiors in one frame: dark regions come up and
 bright ones come down toward middle grey, while the detail inside each region keeps its contrast. Give it to Tonemap's
-`extensions`; its options are read every frame.
+`extensions`; its options are read every frame. Its textures go when the Tonemap is disposed or removed with its scene,
+and after a device restore; it makes them again on its next frame. An extension of your own with GPU objects frees them
+in an optional `dispose()`, which Tonemap calls at the same times.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -259,22 +327,89 @@ local.options.strength = 0.7; // a flatter, more "HDR photo" look
 | `edges` | `1.3` | Edge stop of the bilateral blur in stops of luminance, 0.1 to 8: lower keeps edges sharper |
 
 - **Method.** The base and detail split of Durand and Dorsey (2002): log2 luminance is averaged over 4 by 4 blocks, then
-  blurred by a bilateral filter run as two separable passes (horizontal, vertical; an approximation of the 2D filter),
+  blurred by a bilateral filter that reaches three sigma on each side. When that would take more than 32 taps a side
+  (a sigma above 10.7 blocks, e.g. the default radius on a 2160-row view) the blocks double until it fits (8 by 8, 16
+  by 16, ...), the downsampled bilateral of the same paper; the blur runs as two separable passes (horizontal, vertical; an approximation of the 2D filter),
   all in `r32float`. Each pixel's exposure then moves by `-strength * (base + exposure - log2(0.18))` stops, clamped to
   `maxStops`, with the base read bilinearly; only the smooth base is compressed. It follows `exposure` and
   `autoExposure`, and runs before the curve, so every curve, `Grade` and a LUT apply after it.
-- **Cost.** Three render passes at quarter resolution before the presentation pass and three `r32float` textures (a
-  1920 by 1080 view: 480 by 270, about 1.5 MB). Dispose it (or `using`) to free them. GPU time not measured.
+- **Cost.** Three render passes at block resolution before the presentation pass and three `r32float` textures (a
+  1920 by 1080 view at the default radius: 480 by 270, about 1.5 MB; larger radii use larger blocks and less). Dispose it (or `using`) to free them. GPU time not measured.
 - **Checked on a real GPU** (`packages/tonemap/tests/local-browser.mjs`, Apple silicon Mac, Metal, Chromium): on a synthetic
   source with a bright window and a dark interior, both with a checker of detail, every pixel lands within one 8-bit
   level of a CPU oracle of the whole chain; strength 0 changes no pixel; the interior comes up 3 stops (the clamp), the
-  window goes down 0.75, and neighbouring checker cells differ in local stops by under 0.02.
+  window goes down 0.75, and neighbouring checker cells differ in local stops by under 0.02. The same holds at radius 0.1
+  on a 320 by 1400 view (16 by 16 blocks, 27 taps a side), on WebGPU and the WebGL2 compatibility layer.
 - **Limits.** The separable bilateral blur is an approximation: a thin bright line across a dark region can leave a
   faint halo along it; one view rect at a time (the whole source is filtered); 4 by 4 blocks set the finest region.
 
 `extensions` takes any `TonemapExtension`: `patch(shader, binding, extra)`, an optional `values()` for one uniform at
 `binding`, `resources()` for up to four more resources at `extra` on, and `encode(context)` for passes of its own before
-the presentation pass.
+the presentation pass. The pipeline layout is automatic, so the fragment shader must use every binding the extension
+gives, even one a setting leaves unread (`_ = myUniform;` keeps it, as `CustomCurve` does for a curve that ignores
+`curveParams`).
+
+## Film time: seeking the grain to a cut
+
+The grain and dither pattern changes every frame. `Tonemap` has `advanceTime(delta)`, the CPU part of its frame
+update, and a `time` getter; its `onPreUpdate` runs the same `advanceTime`, so every view of one frame shows the same
+grain and `seek` from `@margoengine/cutscene/seek` lands a fresh scene on the grain a continuous run shows there
+(`tests/seek.test.js` to 54,000 steps). A Tonemap that no frame update reaches (one stacked in a `PostStack`) moves its
+grain at each draw instead. An update with a delta of 0 (a mirror or cube capture inside the frame) moves no grain; a
+frame drawn after updates of 0 only moves it once. Auto exposure is view history: a cut snaps it to the metered scene on its first frame, then
+it adapts as a continuous run does, so after a warm-up of P seconds it keeps e^(-speed P) of the gap the cut left
+(speed 1.5, 2 s: 5 %; `tests/seek-browser.mjs` on WebGPU and the WebGL2 compatibility layer).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+import {seek} from 'margoengine/cutscene/seek';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const tonemap = Tonemap.attach(engine, {grain: 0.2, autoExposure: true});
+// The scene starts 95 s into the film and draws 2 s of warm-up frames first: seek to 93 s.
+await seek(engine, 93, {fps: 30});
+for (let frame = 0; frame < 60; frame++) engine.render({delta: 1 / 30});
+console.log(tonemap.time);
+```
+
+## Sliders for the display: `@margoengine/tonemap/settings`
+
+`Tonemap`, `Grade`, `HueGrade` and `LocalExposure` keep their options object and read it each frame, so the look changes while the scene runs. `@margoengine/tonemap/settings` lists those controls as a table for sliders and panels: `TONEMAP_SETTINGS` has 49 rows (`name`, `group`, `kind`, `default`, `min`, `max`, `step`, `unit`, `about` and `live`) in six groups: `tonemap` (curve, exposure, contrast, white point, toe, shoulder, temperature, tint, grain, dither, chromatic aberration), `vignette` (amount, radius, softness, colour, centre, roundness, blend), `autoExposure` (min, max, speed, compensation, method, percentiles, metering, spot), `grade` (shadows, midtones and highlights wheels, six hue saturations, lift, gamma, gain, saturation), `hue` (the hue shift) and `local` (strength, stops, radius, edges). `applyTonemapSettings({tonemap, grade, hueGrade, local}, values)` writes a set of values onto the objects you give (a name left out takes its default; `autoExposure.enabled` off removes the option, on writes the object), and `TONEMAP_LOOKS` names three looks made only of row values: `filmic`, `bleach` and `ember` (`natural` is the defaults). An unknown name throws `TypeError`, a value outside its row `RangeError`, and a row moved off its default whose object you did not pass `TypeError`.
+
+33 rows are `live`: writing all of them every frame for 60 frames creates no pipeline, buffer or texture (`npm run test:settings:browser`, native WebGPU and the WebGL2 layer), and the defaults written draw exactly what the effects draw with no options. The rows that change which program runs are `live: false`, and each is shown to make GPU objects: the white balance, tint, grain, dither and chromatic aberration and the vignette amount (each turns the effects program on at its first move off zero), `tonemap.whitePoint`, `toe` and `shoulder`, `autoExposure.enabled`, a classic curve (`reinhard`, `cineon`, `linear`; going among `neutral`, `agx` and `acescg` is free), the lift, gamma, gain and saturation of the grade (one program), and `local.radius` where it crosses a block size (about 43 px of blur, 0.04 of a 1080 px frame). Key those away from their defaults once before a shot, then move the live rows freely. The tone curves of `Grade`, the hue curve of `HueGrade`, the metering mask and the LUT are point lists or textures and stay on their option objects. The white point, toe and shoulder are `live: false` for the same reason: the first move of any of them off its default turns one more program on (moving them between other values is free; see "White point, toe and shoulder" below).
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap} from 'margoengine/tonemap';
+import {Grade} from 'margoengine/tonemap/grade';
+import {TONEMAP_LOOKS, applyTonemapSettings} from 'margoengine/tonemap/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const grade = new Grade();
+const tonemap = Tonemap.attach(engine, {extensions: [grade]});
+// The look first (it turns the vignette and grade programs on), then key live rows over the shot.
+applyTonemapSettings({tonemap, grade}, TONEMAP_LOOKS.bleach);
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  applyTonemapSettings({tonemap, grade}, {...TONEMAP_LOOKS.bleach, 'tonemap.exposure': -0.5 * Math.min(time / 4, 1)});
+});
+```
+
+## White point, toe and shoulder
+
+`Tonemap` options `whitePoint`, `toe` and `shoulder` shape the display curve (rows `tonemap.whitePoint`, `tonemap.toe`, `tonemap.shoulder`). After the curve and before contrast, `whitePoint` (0 to 64, default 0 = off) divides the curve output by the curve's own value at that scene-linear level (after exposure), so a pixel of that value lands on exactly 1 and brighter ones clip (the `reinhard` curve instead takes the paper's own white point, L (1 + L / W^2) / (1 + L), which also lands W on 1); then `toe` and `shoulder` (each 0 to 3, default 1) set the slope of the display curve at black and at white through the cubic Hermite spline of `shapeCurve(x, toe, shoulder)`, which is monotone over that range and the identity at 1 and 1. A toe below 1 eases into the shadows, a shoulder below 1 rolls the highlights off before white and 0 reaches white flat. With all three at their defaults the shaders, the program and the uniform bytes are exactly what they were (pinned by hash in `tests/shape.test.js`); the first move of any of them off its default compiles one more program, and a `CustomCurve` replaces the curve and this shaping together. Under `ColorOutput` (HDR or P3 canvas) the shaping applies to the picture up to SDR white and the highlight excess is not drawn while a control is on. Values of `whitePoint` from 0 to 0.01 act as 0.01. Sources: J. Hable, "Filmic Tonemapping Operators" (filmicworlds.com, 2010) and "Uncharted 2: HDR Lighting" (GDC 2010) for the toe, shoulder and white point of a filmic curve and the curve divided by its value at the white point; E. Reinhard, M. Stark, P. Shirley, J. Ferwerda, "Photographic Tone Reproduction for Digital Images" (SIGGRAPH 2002, https://doi.org/10.1145/566570.566575) for the white point of a global operator; F. N. Fritsch and R. E. Carlson, "Monotone Piecewise Cubic Interpolation" (SIAM J. Numer. Anal. 17(2), 1980, https://doi.org/10.1137/0717021) for the slope range 0 to 3 that keeps the cubic monotone. Read on 2026-11-17: the Reinhard paper (Eq. 4 is the `reinhard` white point) and the Hable page (the curve scaled by 1 / curve(W)); the toe and shoulder slope controls are Margo's own. The Fritsch and Carlson paper could not be obtained, so its square 0 to 3 is taken from secondary descriptions and checked by the derivative of the cubic over the whole square in `tests/shape.test.js`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Tonemap, shapeCurve} from 'margoengine/tonemap';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+// Scene-linear 6 lands on white, a soft toe, and highlights roll off before white.
+const tonemap = Tonemap.attach(engine, {whitePoint: 6, toe: 0.7, shoulder: 0.5});
+// The spline the shader uses, for a curve plot: 0.25 of the way from black to white.
+console.log(shapeCurve(0.25, tonemap.options.toe, tonemap.options.shoulder));
+```
 
 ## Preview tier contract
 

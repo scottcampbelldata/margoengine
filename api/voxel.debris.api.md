@@ -25,6 +25,7 @@ export class VoxelDebris {
     readonly maxPieces: number;
     readonly lifetime: number;
     readonly floor: number;
+    origin: VoxelOrigin | null;
     constructor(world: VoxelWorld, options?: VoxelDebrisOptions);
     get pieces(): readonly DebrisPiece[];
     get pending(): number;
@@ -46,6 +47,7 @@ export interface VoxelDebrisOptions {
     density?: number;
     friction?: number;
     material?: (type: BlockType) => PbrMaterial;
+    origin?: VoxelOrigin | null;
 }
 
 export function mergeBoxes(cells: ArrayLike<number>): Int32Array;
@@ -160,6 +162,10 @@ class VoxelChunk {
     get byteLength(): number;
     pack(): PackedChunk;
     static unpack(packed: PackedChunk): VoxelChunk;
+}
+
+interface VoxelOrigin {
+    readonly origin: ArrayLike<number>;
 }
 
 class VoxelWorld {

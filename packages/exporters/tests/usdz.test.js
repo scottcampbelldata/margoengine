@@ -6,7 +6,7 @@ import { exportUSDZ, measureUSDZ } from '../dist/usdz.js';
 import { exportGLB } from '../dist/index.js';
 import { parseUSDZ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { parseUSDZ as readUSD } from '@margoengine/usdz';
-import { textureTransform } from '@margoengine/gltf-pro';
+import { textureTransform } from '@margoengine/gltf/pbr';
 import { headlessEngine } from './helpers.js';
 
 // A unit quad in the XY plane with glTF uvs (v down).
@@ -342,8 +342,8 @@ test('USDZ samples texCoord 1 from primvars:st1 and textures engine meshes throu
   engine.dispose();
 });
 
-// KHR_texture_transform rotation (radians) into UsdTransform2d. gltf-pro's rows are the reference: through the V flip
-// (st = (u, 1 - v)) the USD transform must sample the texel gltf-pro samples at every uv. UsdTransform2d per the
+// KHR_texture_transform rotation (radians) into UsdTransform2d. gltf/pbr's rows are the reference: through the V flip
+// (st = (u, 1 - v)) the USD transform must sample the texel gltf/pbr samples at every uv. UsdTransform2d per the
 // UsdPreviewSurface spec: scale, then a counter-clockwise rotation in degrees (t up), then translation.
 const transformInputs = (source) => {
   const text = shader(source, 'BaseColorTransform'),
@@ -373,7 +373,7 @@ const usdST = ({ rotation, scale, translation }, s, t) => {
     b = scale[1] * t;
   return [Math.cos(r) * a - Math.sin(r) * b + translation[0], Math.sin(r) * a + Math.cos(r) * b + translation[1]];
 };
-/** gltf-pro's KHR_texture_transform rows (what its shader reads) applied to a uv. */
+/** gltf/pbr's KHR_texture_transform rows (what its shader reads) applied to a uv. */
 const gltfUV = (rows, u, v) => [rows[0] * u + rows[1] * v + rows[2], rows[4] * u + rows[5] * v + rows[6]];
 const inverse2 = ([a, b, c, d]) => {
   const det = a * d - b * c;
@@ -384,7 +384,7 @@ const glbJSON = (glb) =>
     new TextDecoder().decode(glb.subarray(20, 20 + new DataView(glb.buffer, glb.byteOffset).getUint32(12, true))),
   );
 
-test('USDZ writes texture rotation that samples the texels gltf-pro samples (0, +-30, 90, 180 degrees)', async () => {
+test('USDZ writes texture rotation that samples the texels gltf/pbr samples (0, +-30, 90, 180 degrees)', async () => {
   const offset = [0.25, -0.4],
     scale = [2, 3];
   for (const degrees of [0, 30, -30, 90, 180]) {
@@ -424,7 +424,7 @@ test('USDZ writes texture rotation that samples the texels gltf-pro samples (0, 
   }
 });
 
-test('USDZ rotation with offset, scale and mirror wrap samples the same texels of an F as gltf-pro', async () => {
+test('USDZ rotation with offset, scale and mirror wrap samples the same texels of an F as gltf/pbr', async () => {
   // An 8 x 8 "F" (row 0 at the top, glTF v down): no symmetry, so any turn or flip changes what is sampled.
   const F = ['........', '.#####..', '.#......', '.####...', '.#......', '.#......', '.#......', '........'];
   const repeat = (a) => a - Math.floor(a),
@@ -454,7 +454,7 @@ test('USDZ rotation with offset, scale and mirror wrap samples the same texels o
   assert.ok(compared > 4000, `${compared} samples compared`);
 });
 
-test("USDZ rotation reproduces KHR_texture_transform's own example without gltf-pro: lower-left quarter, turned clockwise", async () => {
+test("USDZ rotation reproduces KHR_texture_transform's own example without gltf/pbr: lower-left quarter, turned clockwise", async () => {
   // The extension's example: offset (0, 1), rotation pi/2, scale 0.5 "utilizes only the lower left quadrant of the
   // source image, rotated clockwise 90 degrees". Image points below are (x right, y down) fractions of the image.
   const usd = transformInputs(

@@ -6,10 +6,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'materials-cutout-passes' });
 const context = await openBrowser({ startPath: '/packages/materials/test/cutout-passes.html', port: 5269 }),
   { page } = context,
   pageErrors = [],
@@ -86,5 +84,4 @@ try {
   console.log('cut-outs hold in picking, contact shadows and TAA velocity');
 } finally {
   await context.close?.();
-  await release();
 }

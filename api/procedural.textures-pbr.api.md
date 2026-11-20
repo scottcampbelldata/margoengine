@@ -19,9 +19,11 @@ export interface PBRTextureOptions extends Omit<TextureBakeOptions, 'pattern'> {
     roughnessVariation?: number;
     time?: number;
     mipmaps?: boolean;
+    tint?: number;
+    chip?: number;
 }
 
-export type PBRTexturePattern = 'noise' | 'bricks' | 'tiles' | 'wood' | 'rust' | 'marble' | 'cloud' | 'grass' | 'fire' | 'starfield' | 'road';
+export type PBRTexturePattern = 'noise' | 'bricks' | 'tiles' | 'wood' | 'rust' | 'marble' | 'cloud' | 'grass' | 'fire' | 'starfield' | 'road' | 'stone' | 'soot';
 
 export interface PBRTextureSet {
     readonly albedo: GPUTexture;

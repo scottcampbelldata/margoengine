@@ -41,7 +41,7 @@ function fakeRenderer() {
         ...d,
         destroy() {},
         async mapAsync() {},
-        getMappedRange: () => new Uint32Array([7]).buffer,
+        getMappedRange: () => new Uint32Array([8]).buffer, // ids are written one up: mesh 7
         unmap() {},
       }),
       lost: new Promise(() => {}),

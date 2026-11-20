@@ -46,11 +46,13 @@ export interface Usable {
 /** What a command buffer uses: resources, and the lists its bind groups and render bundles share (one push each). */
 export type Uses = (Usable | readonly Usable[])[];
 /** The first destroyed resource in `uses`, else null. */
-export function destroyedUse(uses: Uses): Usable | null {
-  for (const u of uses)
+export function destroyedUse(uses: Uses, length = uses.length): Usable | null {
+  for (let i = 0; i < length; i++) {
+    const u = uses[i];
     if (Array.isArray(u)) {
-      for (const v of u as readonly Usable[]) if (v.released) return v;
+      for (let k = 0; k < u.length; k++) if ((u as readonly Usable[])[k].released) return (u as readonly Usable[])[k];
     } else if ((u as Usable).released) return u as Usable;
+  }
   return null;
 }
 
@@ -71,6 +73,9 @@ type Readback = {
    */
   discard?(): void;
 };
+
+/** The largest ArrayBuffer a buffer keeps its last write window of (the staging arrays of a frame loop are far smaller). */
+const MAX_KEPT_WINDOW = 8 << 20;
 
 /** A GPUBuffer on WebGL2. */
 export class CompatBuffer {
@@ -190,22 +195,57 @@ export class CompatBuffer {
 
   /** Writes bytes at `offset` into every copy (after the writes still waiting for the GPU, in order). */
   write(offset: number, bytes: Uint8Array): void {
+    this.writeRange(offset, bytes, 0, bytes.byteLength);
+  }
+
+  /**
+   * write() of `length` bytes of `source` from byte `from`: queue.writeBuffer passes a view of the caller's whole
+   * ArrayBuffer and a range, so a steady write makes no view of its own (bufferSubData takes the range).
+   */
+  writeRange(offset: number, source: Uint8Array, from: number, length: number): void {
     if (this.readbacks.length && !this.settle()) {
-      const copy = bytes.slice();
-      this.readbacks.push({ ready: () => true, forcible: true, apply: () => this.land(offset, copy) });
+      this.writeLater(offset, source.slice(from, from + length));
       return;
     }
     const gl = this.device.gl;
     this.version++;
-    if (this.gl) {
+    // A length of 0 would mean "to the end of source" to bufferSubData: an empty write writes nothing.
+    if (this.gl && length) {
       gl.bindBuffer(gl.COPY_WRITE_BUFFER, this.gl);
-      gl.bufferSubData(gl.COPY_WRITE_BUFFER, offset, bytes);
+      gl.bufferSubData(gl.COPY_WRITE_BUFFER, offset, source, from, length);
     }
-    if (this.element) writeElements(this.device, this.element, offset, bytes);
-    if (this.shadow && (this.shadowValid || (offset === 0 && bytes.byteLength === this.size))) {
-      this.shadow.set(bytes, offset);
-      if (offset === 0 && bytes.byteLength === this.size) this.shadowValid = true;
+    const whole = offset === 0 && length === this.size,
+      shadow = this.shadow;
+    if (this.element) writeElements(this.device, this.element, offset, this.window(source, from, length));
+    if (shadow && (this.shadowValid || whole)) {
+      // A small write is copied byte by byte, so it makes no view; a large one through a view (set is faster).
+      if (length > 256) shadow.set(this.window(source, from, length), offset);
+      else for (let i = 0; i < length; i++) shadow[offset + i] = source[from + i];
+      if (whole) this.shadowValid = true;
     }
+  }
+
+  /** The last view window() made, when its array is small enough to keep (see MAX_KEPT_WINDOW). */
+  private lastWindow: Uint8Array | null = null;
+
+  /**
+   * `source` from byte `from` for `length` bytes as a view. A scene writes the same range of the same staging array
+   * every frame, so the view made for the last write is returned again (a typed array is an object and a call).
+   */
+  private window(source: Uint8Array, from: number, length: number): Uint8Array {
+    const start = source.byteOffset + from,
+      last = this.lastWindow;
+    if (last && last.buffer === source.buffer && last.byteOffset === start && last.byteLength === length) return last;
+    const view = source.subarray(from, from + length);
+    // A weak reference would do without keeping the array, but its deref() adds the target to V8's kept-alive list, an
+    // allocation a call (60 B a frame, measured); a large array is not kept, so a one-off upload is not held.
+    this.lastWindow = source.buffer.byteLength <= MAX_KEPT_WINDOW ? view : null;
+    return view;
+  }
+
+  /** A write that waits behind readbacks still landing (a method: its closure would cost writeRange a context a call). */
+  private writeLater(offset: number, copy: Uint8Array): void {
+    this.readbacks.push({ ready: () => true, forcible: true, apply: () => this.land(offset, copy) });
   }
 
   /**
@@ -443,6 +483,7 @@ export class CompatBuffer {
     this.released = true;
     if (this.destroyed || this.device.queue.afterWaiting(() => this.destroy())) return;
     this.destroyed = true;
+    this.lastWindow = null;
     const gl = this.device.gl;
     this.packPending = false;
     for (const r of this.readbacks.splice(0)) r.discard?.();
@@ -474,11 +515,16 @@ export interface TextureStorage {
   /** The first texture layer it holds and how many (all of them, except for 2D and cube copies). */
   readonly layer: number;
   readonly layers: number;
+  /** 0, or 1 and up for a further copy of the same kind (see {@link CompatTexture.sampled}). */
+  readonly alias: number;
   /** The data version it holds per subresource (level * layers of the texture + layer); null until copies exist. */
   have: Uint32Array | null;
-  /** Base and max level last set on the GL texture. */
-  levels: string;
+  /** Base and max level last set on the GL texture, as levelRange(base, max); -1 before the first. */
+  levels: number;
 }
+
+/** A storage's base and max level as one number (TextureStorage.levels), so the replay compares them without a string. */
+export const levelRange = (base: number, max: number): number => base * 1024 + max;
 
 /**
  * log2 of the width of a data texture holding `rows` 16-byte rows: 2,048 texels, narrower for fewer rows, and wider
@@ -600,21 +646,20 @@ function storageLayout(
  * The runs `copyTexels` copies `n` texels in, from texel `s` of a texture `ws` wide to texel `d` of one `wd` wide:
  * whole rows at once where both line up, else one run per stretch that stays inside a row of both.
  */
-function texelRuns(ws: number, s: number, wd: number, d: number, n: number, copy?: (r: number[]) => void): number {
+function texelRuns(ws: number, s: number, wd: number, d: number, n: number, gl?: WebGL2RenderingContext): number {
   let runs = 0;
   while (n > 0) {
     const sx = s % ws,
       dx = d % wd;
-    let k: number, run: number[];
+    let k: number;
     if (sx === 0 && dx === 0 && ws === wd && n >= ws) {
       const rows = Math.floor(n / ws);
       k = rows * ws;
-      run = [0, d / wd, 0, s / ws, ws, rows];
+      gl?.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, d / wd, 0, s / ws, ws, rows);
     } else {
       k = Math.min(n, ws - sx, wd - dx);
-      run = [dx, Math.floor(d / wd), sx, Math.floor(s / ws), k, 1];
+      gl?.copyTexSubImage2D(gl.TEXTURE_2D, 0, dx, Math.floor(d / wd), sx, Math.floor(s / ws), k, 1);
     }
-    copy?.(run);
     runs++;
     s += k;
     d += k;
@@ -623,9 +668,9 @@ function texelRuns(ws: number, s: number, wd: number, d: number, n: number, copy
   return runs;
 }
 
-/** Copies texels from the read framebuffer's texture into the TEXTURE_2D bound on the active unit (see texelRuns). */
+/** Copies `n` texels from a source `ws` wide, starting at texel `s`, to a destination `wd` wide, starting at `d`. */
 function copyTexels(gl: WebGL2RenderingContext, ws: number, s: number, wd: number, d: number, n: number): void {
-  texelRuns(ws, s, wd, d, n, ([dx, dy, sx, sy, w, h]) => gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, dx, dy, sx, sy, w, h));
+  texelRuns(ws, s, wd, d, n, gl);
 }
 
 /** One writeTexture into a block-compressed texture: whole blocks of a region of one level (tight rows). */
@@ -647,6 +692,8 @@ const WORDS = FORMATS.get('rgba32uint') as FormatInfo;
 export class CompatTexture {
   readonly id = id();
   label: string;
+  /** The range every view made without one reads, made with the first such view (see {@link ViewRange}). */
+  defaultRange: ViewRange | null = null;
   readonly width: number;
   readonly height: number;
   readonly depthOrArrayLayers: number;
@@ -684,7 +731,11 @@ export class CompatTexture {
   /** Layers as subresources count them (a 3D texture is one layer per level). */
   readonly layers: number;
   /** Copies for views GL cannot make, by format, target and first layer; null while there are none. */
-  private copies: Map<string, TextureStorage> | null = null;
+  /**
+   * The copies made so far, found by format, target, first layer and alias (a few at most, so a scan: a key string
+   * built per lookup was garbage on every sampled view of every frame, KB-COMPAT-FRAMEALLOC1).
+   */
+  private copies: TextureStorage[] | null = null;
   /** Current data version per subresource and the storage holding it; null while the primary is the only storage. */
   private ver: Uint32Array | null = null;
   /** 2D stand-ins for slices of a 3D storage drawn beside depth or stencil, by storage id (Replayer.standIn). */
@@ -698,6 +749,14 @@ export class CompatTexture {
    */
   blockWrites: BlockWrite[] | null = null;
   blockTwin: TextureStorage | null = null;
+  /**
+   * The blocks of each level of a block-compressed texture made with COPY_SRC (every layer, tight block rows), zero
+   * until written. WebGPU copies compressed texels between textures and into buffers block for block (WebGPU
+   * "copyTextureToTexture()" and "copyTextureToBuffer()", from a source with COPY_SRC usage), but WebGL2 can neither
+   * read compressed texels back nor copy them between texture objects (it has no glCopyImageSubData), so every block
+   * write lands here too and both copies read it.
+   */
+  blocks: Uint8Array[] | null = null;
 
   constructor(
     readonly device: CompatDevice,
@@ -779,6 +838,39 @@ export class CompatTexture {
     this.primary = this.storageOf(target, this.format, info, 0, this.layers);
     this.texture = this.primary.gl;
     if (info.block && descriptor.viewFormats?.some((f) => f !== this.format)) this.blockWrites = [];
+    if (info.block && descriptor.usage & TextureUsage.COPY_SRC)
+      this.blocks = Array.from({ length: this.mipLevelCount }, (_, level) => {
+        const [pitch, image] = this.blockPitch(level);
+        return new Uint8Array(pitch * image * this.layers);
+      });
+  }
+
+  /** Bytes per block row of a level of a block-compressed texture, and block rows per layer. */
+  private blockPitch(level: number): [number, number] {
+    const block = this.info.block as NonNullable<FormatInfo['block']>,
+      [w, h] = this.levelSize(level);
+    return [Math.ceil(w / block.w) * block.bytes, Math.ceil(h / block.h)];
+  }
+
+  /**
+   * Copies whole blocks between `blocks` and `tight` (tight block rows, layer after layer): the region at texel `x`, `y`
+   * (whole blocks) of layers `z` to `z + depth` of `level`, `w` by `h` texels (rounded up to whole blocks). `keep` writes
+   * the region from `tight`; otherwise it is read into `tight`.
+   */
+  blockRegion(level: number, x: number, y: number, z: number, w: number, h: number, depth: number, tight: Uint8Array, keep: boolean): void {
+    const block = this.info.block as NonNullable<FormatInfo['block']>,
+      mirror = (this.blocks as Uint8Array[])[level],
+      [pitch, image] = this.blockPitch(level),
+      across = Math.ceil(w / block.w) * block.bytes,
+      down = Math.ceil(h / block.h),
+      start = (y / block.h) * pitch + (x / block.w) * block.bytes;
+    for (let layer = 0; layer < depth; layer++)
+      for (let row = 0; row < down; row++) {
+        const at = (z + layer) * image * pitch + start + row * pitch,
+          from = (layer * down + row) * across;
+        if (keep) mirror.set(tight.subarray(from, from + across), at);
+        else tight.set(mirror.subarray(at, at + across), from);
+      }
   }
 
   private allocate(target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): WebGLTexture {
@@ -799,6 +891,7 @@ export class CompatTexture {
     info: FormatInfo,
     layer: number,
     layers: number,
+    alias = 0,
   ): TextureStorage {
     const gl = this.device.gl;
     const depth = target === gl.TEXTURE_3D ? this.depthOrArrayLayers : target === gl.TEXTURE_2D_ARRAY ? layers : 1;
@@ -811,8 +904,9 @@ export class CompatTexture {
       info,
       layer,
       layers,
+      alias,
       have: null,
-      levels: '',
+      levels: -1,
     };
   }
 
@@ -846,6 +940,18 @@ export class CompatTexture {
     return v.format === this.format ? p : this.copy(v.format, p.target, 0, this.layers);
   }
 
+  /**
+   * The storage holding this block-compressed texture's blocks as `format` reads them: the primary, or the storage of
+   * its sRGB twin (see blockTwin). A decoded copy of a view in `format` is drawn from it.
+   */
+  blocksIn(format: GPUTextureFormat): TextureStorage {
+    const p = this.primary as TextureStorage;
+    if (format === this.format) return p;
+    if (!this.blockTwin && !this.blockWrites)
+      throw this.device.unsupported(`a ${format} view of a ${this.format} texture whose viewFormats do not name it`);
+    return this.copy(format, p.target, 0, this.layers);
+  }
+
   private copy(format: GPUTextureFormat, target: number, layer: number, layers: number, alias = 0): TextureStorage {
     const p = this.primary as TextureStorage;
     if (!alias && format === this.format && target === p.target) return p;
@@ -857,26 +963,47 @@ export class CompatTexture {
       }
       return this.blockTwin;
     }
-    const key = `${format}:${target}:${layer}:${alias}`;
-    let s = this.copies?.get(key);
-    if (s) return s;
-    const logical = FORMATS.get(format) as FormatInfo;
-    const info = this.device.adapter.tierFormats?.target(logical, this.usage) ?? logical;
-    if (!info.renderable || !this.info.renderable || this.info.kind === 'stencil')
-      throw this.device.unsupported(
-        `a ${format} ${target === p.target ? '' : 'layer or cube '}view of a ${this.format} texture, which WebGL2 would copy (${this.format} is not renderable there)`,
-      );
-    s = this.storageOf(target, format, info, layer, layers);
+    const copies = this.copies;
+    if (copies)
+      for (let i = 0; i < copies.length; i++) {
+        const c = copies[i];
+        if (c.format === format && c.target === target && c.layer === layer && c.alias === alias) return c;
+      }
+    let info: FormatInfo;
+    if (this.info.block) {
+      // WebGPU gives a 2D texture views of every dimension its layers allow (WebGPU "createView()" and "GPUTextureView
+      // creation": a '2d-array' view of any 2D texture, a 'cube' view of 6 square layers, a '2d' view of one layer),
+      // compressed formats included. GL fixes a texture object's target, cannot copy blocks between texture objects,
+      // and cannot render into a compressed format, so such a view reads a copy of the decoded texels: drawn from the
+      // blocks by the GPU's own decoder (Replayer.decodeBlocks) into a float format that holds them exactly
+      // (rgba32float, where it can be filtered; rgba16float otherwise). Compressed textures are only ever sampled, so
+      // the copy is never written through, and it follows every later block write as any copy does.
+      const exact = this.device.ext.colorBufferFloat && this.device.ext.floatLinear;
+      const decoded = FORMATS.get(exact ? 'rgba32float' : 'rgba16float') as FormatInfo;
+      info = this.device.adapter.tierFormats?.target(decoded, this.usage) ?? decoded;
+      if (!this.device.replayer.attachable(info))
+        throw this.device.unsupported(
+          `a ${format} ${target === p.target ? '' : 'layer or cube '}view of a ${this.format} texture, which WebGL2 would decode into a copy (this WebGL2 renders no float formats)`,
+        );
+    } else {
+      const logical = FORMATS.get(format) as FormatInfo;
+      info = this.device.adapter.tierFormats?.target(logical, this.usage) ?? logical;
+      if (!info.renderable || !this.info.renderable || this.info.kind === 'stencil')
+        throw this.device.unsupported(
+          `a ${format} ${target === p.target ? '' : 'layer or cube '}view of a ${this.format} texture, which WebGL2 would copy (${this.format} is not renderable there)`,
+        );
+    }
+    const s = this.storageOf(target, format, info, layer, layers, alias);
     if (!this.copies) {
       // Tracking starts with the first copy: every subresource is current in the primary.
       const n = this.mipLevelCount * this.layers;
-      this.copies = new Map();
+      this.copies = [];
       this.ver = new Uint32Array(n).fill(1);
       this.owner = new Array<TextureStorage>(n).fill(p);
       p.have = new Uint32Array(n).fill(1);
     }
     s.have = new Uint32Array(this.mipLevelCount * this.layers);
-    this.copies.set(key, s);
+    this.copies.push(s);
     return s;
   }
 
@@ -935,13 +1062,26 @@ export class CompatTexture {
     return (this.stencilCopy ??= this.allocate(this.device.gl.TEXTURE_2D, this.storageInfo, 1, this.width, this.height, 1));
   }
 
+  /** Width of a mip level. */
+  levelWidth(level: number): number {
+    return Math.max(1, this.width >> level);
+  }
+  /** Height of a mip level. */
+  levelHeight(level: number): number {
+    return Math.max(1, this.height >> level);
+  }
+  /** Depth of a mip level of a 3D texture (the layer count of any other). */
+  levelDepth(level: number): number {
+    return this.dimension === '3d' ? Math.max(1, this.depthOrArrayLayers >> level) : this.depthOrArrayLayers;
+  }
+
   /** Size of a mip level. */
   levelSize(level: number): [number, number, number] {
     const d = this.dimension === '3d' ? Math.max(1, this.depthOrArrayLayers >> level) : this.depthOrArrayLayers;
     return [Math.max(1, this.width >> level), Math.max(1, this.height >> level), d];
   }
 
-  createView(descriptor: GPUTextureViewDescriptor = {}): CompatTextureView {
+  createView(descriptor?: GPUTextureViewDescriptor): CompatTextureView {
     return new CompatTextureView(this, descriptor);
   }
 
@@ -967,7 +1107,7 @@ export class CompatTexture {
       this.resolved,
       this.stencilCopy,
       this.blockTwin?.gl,
-      ...[...(this.copies?.values() ?? [])].map((c) => c.gl),
+      ...(this.copies ?? []).map((c) => c.gl),
       ...(this.standIns?.values() ?? []),
     ])
       if (t) {
@@ -978,14 +1118,23 @@ export class CompatTexture {
   }
 }
 
-/** True when `b` is the sRGB twin of `a` (or `a` of `b`): the one format reinterpretation WebGPU views allow. */
-const twins = (a: FormatInfo, b: FormatInfo | undefined): boolean =>
+/**
+ * True when `b` is the sRGB twin of `a` (or `a` of `b`): the one format reinterpretation WebGPU views allow, and the
+ * formats a texture copies between besides its own (WebGPU "copy-compatible").
+ */
+export const twins = (a: FormatInfo, b: FormatInfo | undefined): boolean =>
   !!b && a.name !== b.name && a.name.replace('-srgb', '') === b.name.replace('-srgb', '');
 
-/** A GPUTextureView: a format, a mip range, a layer range and a dimension of one texture. */
-export class CompatTextureView {
-  readonly id = id();
-  label: string;
+/** A view made without a descriptor (a default `{}` would be a new object each call). */
+const NO_VIEW_DESCRIPTOR: GPUTextureViewDescriptor = Object.freeze({});
+
+/**
+ * What a view reads of its texture (format, dimension, mip and layer range, aspect), resolved from its descriptor. Every
+ * view a texture makes with no range given shares one (CompatTexture.defaultRange), so such a view, which a renderer
+ * makes of its canvas texture every frame, is one field (KB-COMPAT-FRAMEALLOC1: 80 B a view before, against a
+ * browser's 16 B GPUTextureView).
+ */
+export class ViewRange {
   readonly format: GPUTextureFormat;
   readonly dimension: GPUTextureViewDimension;
   readonly baseMipLevel: number;
@@ -998,7 +1147,6 @@ export class CompatTextureView {
     readonly texture: CompatTexture,
     d: GPUTextureViewDescriptor,
   ) {
-    this.label = d.label ?? '';
     this.format = d.format ?? texture.format;
     if (this.format !== texture.format && !twins(texture.info, FORMATS.get(this.format)))
       throw new TypeError(`A '${texture.format}' texture has no '${this.format}' view; WebGPU allows its sRGB twin`);
@@ -1035,6 +1183,59 @@ export class CompatTextureView {
       );
   }
 }
+
+/** A GPUTextureView: a format, a mip range, a layer range and a dimension of one texture. */
+export class CompatTextureView {
+  /** The texture and the range this view reads: the texture's shared default range for a view made without one. */
+  private readonly range: ViewRange;
+  /** The label: '' (the prototype's) unless the descriptor gives one. */
+  declare label: string;
+  /** The view's number, given when first asked for (a field set each view would be 4 bytes of every frame's view). */
+  declare private serial: number | undefined;
+
+  constructor(texture: CompatTexture, d: GPUTextureViewDescriptor = NO_VIEW_DESCRIPTOR) {
+    this.range =
+      d.format === undefined &&
+      d.dimension === undefined &&
+      d.baseMipLevel === undefined &&
+      d.mipLevelCount === undefined &&
+      d.baseArrayLayer === undefined &&
+      d.arrayLayerCount === undefined &&
+      d.aspect === undefined
+        ? (texture.defaultRange ??= new ViewRange(texture, NO_VIEW_DESCRIPTOR))
+        : new ViewRange(texture, d);
+    if (d.label) this.label = d.label;
+  }
+  /** A number unique to this view among the device's objects. */
+  get id(): number {
+    return (this.serial ??= id());
+  }
+  get texture(): CompatTexture {
+    return this.range.texture;
+  }
+  get format(): GPUTextureFormat {
+    return this.range.format;
+  }
+  get dimension(): GPUTextureViewDimension {
+    return this.range.dimension;
+  }
+  get baseMipLevel(): number {
+    return this.range.baseMipLevel;
+  }
+  get mipLevelCount(): number {
+    return this.range.mipLevelCount;
+  }
+  get baseArrayLayer(): number {
+    return this.range.baseArrayLayer;
+  }
+  get arrayLayerCount(): number {
+    return this.range.arrayLayerCount;
+  }
+  get aspect(): GPUTextureAspect {
+    return this.range.aspect;
+  }
+}
+CompatTextureView.prototype.label = '';
 
 /** WebGPU compare functions in the order {@link CompatSampler.modes} numbers them (from 1). */
 const COMPARE_FUNCTIONS: readonly GPUCompareFunction[] = [
@@ -1255,6 +1456,9 @@ export class CompatBindGroup {
     shift: number;
     rows: Map<number, number>;
     versions: Map<number, number>;
+    /** The bindings of `rows` and their rows, in order (read each frame without an iterator). */
+    bindings: number[];
+    rowOf: number[];
   } | null = null;
 
   constructor(
@@ -1263,8 +1467,11 @@ export class CompatBindGroup {
   ) {
     this.label = descriptor.label ?? '';
     this.layout = descriptor.layout as unknown as CompatBindGroupLayout;
+    const external = new Set<number>();
+    let repeated: number | null = null;
     for (const e of descriptor.entries) {
       const r = e.resource as unknown;
+      if (repeated === null && this.entries.has(e.binding)) repeated = e.binding;
       if (r instanceof CompatSampler) this.entries.set(e.binding, { kind: 'sampler', sampler: r });
       else if (r instanceof CompatTextureView) this.entries.set(e.binding, { kind: 'view', view: r });
       else if (r instanceof CompatTexture) this.entries.set(e.binding, { kind: 'view', view: r.createView() });
@@ -1287,10 +1494,13 @@ export class CompatBindGroup {
       const bound = this.entries.get(e.binding) as Bound;
       if (bound.kind === 'buffer') this.uses.push(bound.buffer);
       else if (bound.kind === 'view' && !(r instanceof CompatExternalTexture)) this.uses.push(bound.view.texture);
+      if (r instanceof CompatExternalTexture) external.add(e.binding);
     }
+    this.invalid = this.layoutMismatch([...descriptor.entries].length, repeated, external);
     // WebGPU's createBindGroup rules for buffers: the range lies inside the buffer and covers the layout's minimum
     // binding size. Without them a too-small buffer reached the CPU tier, which read past its end (a RangeError).
-    for (const l of this.layout.entries) {
+    if (!this.invalid)
+      for (const l of this.layout.entries) {
       const bound = this.entries.get(l.binding);
       if (!l.buffer || bound?.kind !== 'buffer') continue;
       const where = `createBindGroup${this.label ? ` '${this.label}'` : ''} @binding(${l.binding})`;
@@ -1321,6 +1531,30 @@ export class CompatBindGroup {
         this.invalid = `createBindGroup${this.label ? ` '${this.label}'` : ''}: its storage bindings total ${rows * 16} bytes, over the ${most * 16} bytes one WebGL2 data texture holds on this context; split them across bind groups`;
     }
     if (this.invalid) device.validationError(this.invalid);
+  }
+
+  /**
+   * WebGPU's createBindGroup rules for the entries against the layout (W3C WebGPU, "createBindGroup(descriptor)"
+   * validation): as many entries as the layout has, each binding given once and present in the layout, and each resource
+   * of the kind its layout entry declares (a buffer binding, a sampler, a texture view, or an external texture or view).
+   * Without them a group with an entry the layout lacks bound on the layer and failed on a device (KB-COMPAT-PHONY1).
+   */
+  private layoutMismatch(given: number, repeated: number | null, external: ReadonlySet<number>): string | null {
+    const where = `createBindGroup${this.label ? ` '${this.label}'` : ''}`,
+      declared = this.layout.entries;
+    if (repeated !== null) return `${where}: binding ${repeated} is given more than once; give each binding one entry`;
+    for (const binding of this.entries.keys())
+      if (!declared.some((l) => l.binding === binding))
+        return `${where}: binding index ${binding} not present in the bind group layout; remove the entry or declare it`;
+    if (given !== declared.length)
+      return `${where}: number of entries (${given}) did not match the number of entries (${declared.length}) specified in the bind group layout`;
+    for (const l of declared) {
+      const bound = this.entries.get(l.binding) as Bound,
+        want = l.buffer ? 'buffer' : l.sampler ? 'sampler' : 'view';
+      if (bound.kind !== want || (external.has(l.binding) && !l.externalTexture))
+        return `${where}: binding ${l.binding} needs ${want === 'buffer' ? 'a buffer binding' : want === 'sampler' ? 'a sampler' : l.externalTexture ? 'an external texture or texture view' : 'a texture view'}, as its layout entry declares`;
+    }
+    return null;
   }
 
   /**
@@ -1356,12 +1590,14 @@ export class CompatBindGroup {
       gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32UI, 1 << shift, Math.ceil(total / (1 << shift)));
       this.device.allocated(`the storage texture of bind group '${this.label}'`);
       this.device.replayer.zero(texture, gl.TEXTURE_2D, WORDS, 1, 1 << shift, Math.ceil(total / (1 << shift)), 1);
-      this.shared = { texture, shift, rows, versions: new Map() };
+      this.shared = { texture, shift, rows, versions: new Map(), bindings: [...rows.keys()], rowOf: [...rows.values()] };
     }
     const d = this.shared;
     let read = false;
-    for (const [binding, row] of d.rows) {
-      const bound = this.entries.get(binding) as Extract<Bound, { kind: 'buffer' }>,
+    for (let k = 0; k < d.bindings.length; k++) {
+      const binding = d.bindings[k],
+        row = d.rowOf[k],
+        bound = this.entries.get(binding) as Extract<Bound, { kind: 'buffer' }>,
         buffer = bound.buffer;
       if (buffer.destroyed || !buffer.raw) continue;
       // Writes still waiting change the version when they land: apply them before comparing.

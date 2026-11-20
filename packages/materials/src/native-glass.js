@@ -1,4 +1,4 @@
-// Internal gltf-pro adapter. Capture a display scene so each native glass surface can read the light behind it.
+// Internal gltf/pbr adapter. Capture a display scene so each native glass surface can read the light behind it.
 import { sceneTarget } from '../../shared/msaa.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';
 import { applyView } from '../../shared/view-rect.js';
@@ -24,7 +24,12 @@ class NativeGlass {
     this.device = engine.gpu;
   }
   registerPasses(graph) {
-    graph.add({ name: this.name + ':begin', order: -64, execute: (c) => this.begin(c) });
+    // Captures nest: the one that begins first ends last. HDR captures (PostStack -65, SSAO and bloom -60, DOF -55,
+    // tone mapping -50) begin before this and end from 30, so a glass under any of them sees their linear target and
+    // stays on the linear blend; at -64 it began outside SSAO, bloom, DOF and Tonemap, presented its own colour at 29
+    // before they wrote this frame into it, and every frame showed the one before (GAP-FILM-LATE). Below -25, so
+    // environment probes (scenePasses) skip it as they skip the other captures.
+    graph.add({ name: this.name + ':begin', order: -40, execute: (c) => this.begin(c) });
     graph.add({ name: this.name + ':present', order: 29, execute: (c) => this.present(c) });
   }
   begin(c) {
@@ -84,7 +89,7 @@ class NativeGlass {
       }
     }
     frames.set(c, this);
-    // A scene capture that began earlier (TAA's, at order -70) already owns the live color, and its later passes
+    // A scene capture that began earlier (TAA's at -70, FXAA's or SMAA's at -80) already owns the live color, and its later passes
     // check that they still do. copy() reads that capture's resolved color, so leave the target alone.
     this.redirected = !sceneTarget(c);
     if (!this.redirected) return;
@@ -166,7 +171,7 @@ export function nativeGlass(c) {
   return frames.get(c);
 }
 
-// A caller-owned, already-open render pass (gltf-pro `PBRDeviceRenderer.draw`) cannot be ended and reopened by the
+// A caller-owned, already-open render pass (gltf/pbr `PBRDeviceRenderer.draw`) cannot be ended and reopened by the
 // package, so the caller lends a snapshot hook: before each native glass surface the hook ends its pass, writes the
 // colour drawn so far into `target` and returns the reopened pass. Without one the external draw keeps the native
 // tint/add blend, which is exact only on a linear target.
@@ -207,7 +212,7 @@ class ExternalGlass {
     this.snapshot = this.entries = this.key = undefined;
   }
 }
-/** A display-target snapshot source for one caller-owned device renderer (gltf-pro `createRenderer`). */
+/** A display-target snapshot source for one caller-owned device renderer (gltf/pbr `createRenderer`). */
 export function externalNativeGlass(device) {
   return new ExternalGlass(device);
 }

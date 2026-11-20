@@ -99,7 +99,7 @@ function App() {
       } else {
         setSceneryLoading(true);
         setStatus('Loading scenery…');
-        const { SkyMoon } = await import('@margoengine/scenery');
+        const { SkyMoon } = await import('@margoengine/sky/night-preset');
         if (engine.current !== e || e.disposed) return;
         SkyMoon.attach(e, { moonDirection: [0.45, 0, -1] });
         setScenery(true);

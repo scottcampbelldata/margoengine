@@ -3,6 +3,7 @@ import { copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const cargo =
   process.env.CARGO ?? join(homedir(), '.cargo', 'bin', process.platform === 'win32' ? 'cargo.exe' : 'cargo');
@@ -20,7 +21,7 @@ execFileSync(
   {
     stdio: 'inherit',
     timeout: 120000,
-    env: { ...process.env, RUSTFLAGS: '-C target-feature=+simd128 -C link-arg=--max-memory=536870912' },
+    env: blueprintRustEnv(root + 'cpu-kernel', '-C target-feature=+simd128 -C link-arg=--max-memory=536870912'),
   },
 );
 copyFileSync(

@@ -33,7 +33,7 @@ Does not reproduce the multi-second case on an otherwise quiet machine; the late
 | 4 | 12 | 104 ms | 124 ms | 0 | 0 |
 | 12 | 36 | 253 ms | 470 ms | 0 | 0 |
 
-The slow cases need the machine state of the workstation under full load (many CPU lanes plus GPU slots), which this script does not recreate on its own.
+The slow cases need the machine state of the workstation under full load (many CPU lanes plus GPU jobs), which this script does not recreate on its own.
 A report to Microsoft would carry this script plus an ETW trace (Microsoft-Windows-Kernel-Process, GPU video memory manager) from a run that does take over 10 s; that trace has not been recorded.
 Margo's workaround (a separate host process that owns the browser and waits on the kernel; `scripts/support/browser-host.mjs`) is in place, so the suite no longer waits on it.
 

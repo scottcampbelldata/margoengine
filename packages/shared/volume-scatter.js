@@ -15,7 +15,7 @@ export function scatterShares(extinction, color, anisotropy, depth) {
     scattered = Math.max(Math.min((extinction - absorbed) * (1 - anisotropy), extinction), 0);
   return [1 - Math.exp(-scattered * depth), Math.exp(-(absorbed + scattered) * depth)];
 }
-/** `margoScatterShares(extinction, colour, anisotropy, depth)`: column 0 the share scattered, column 1 the share that crosses. One WGSL text for gltf-pro and `@margoengine/materials`. */
+/** `margoScatterShares(extinction, colour, anisotropy, depth)`: column 0 the share scattered, column 1 the share that crosses. One WGSL text for gltf/pbr and `@margoengine/materials`. */
 export const volumeScatterWgsl = `fn margoScatterShares(extinction:vec3f,color:vec3f,anisotropy:f32,depth:f32)->mat2x3f {
   let m=clamp(color,vec3f(0),vec3f(1)); let d=4.09712+4.20863*m-sqrt(9.59217+41.6808*m+17.7126*m*m);
   let absorbed=extinction*d*d; let scattered=max(min((extinction-absorbed)*(1-anisotropy),extinction),vec3f(0));

@@ -9,10 +9,10 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { exitOnHelp } from './support/help.mjs';
+import { showHelp } from './support/help.mjs';
 import { margoError } from '../packages/shared/errors.js';
 import { PROJECTS } from './support/example-projects.mjs';
-import { killTree } from './gpu-lock.mjs';
+import { killTree } from './run-with-timeout.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -38,10 +38,7 @@ export async function checkExampleTypes({
   const picked = ids.length ? projects.filter((p) => ids.includes(p.id)) : projects;
   const compiler = resolve(cwd, 'node_modules/typescript/bin/tsc');
   if (!existsSync(compiler))
-    throw margoError(
-      'EXAMPLE_TYPES_NO_COMPILER',
-      `${compiler} is missing; run npm ci in this checkout`,
-    );
+    throw margoError('EXAMPLE_TYPES_NO_COMPILER', `${compiler} is missing; run npm ci in this checkout`);
   if (!existsSync(resolve(cwd, 'packages/core/dist/index.d.ts')))
     throw margoError('EXAMPLE_TYPES_NOT_BUILT', 'packages/core/dist is missing; run npm run build:packages first');
   return Promise.all(picked.map(({ id, config }) => runProject({ id, config, cwd, compiler, limitMs })));
@@ -102,7 +99,6 @@ async function main() {
   process.exitCode = failed.length ? 1 : 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  exitOnHelp(USAGE);
+if (import.meta.url === pathToFileURL(process.argv[1]).href && !showHelp(USAGE)) {
   await main();
 }

@@ -412,7 +412,11 @@ async function encode(jobs: DracoJob[], options: CompressDracoOptions): Promise<
     const wasmURL = new URL('./draco-native-encoder.wasm', import.meta.url).href;
     if (typeof Worker === 'undefined') {
       const { loadNativeEncoder, encodeNativeMesh } = await import('./draco-native-encode.js');
-      native ??= loadNativeEncoder(wasmURL);
+      // A failed load is not kept: the next call loads again instead of rejecting with the old error.
+      native ??= loadNativeEncoder(wasmURL).catch((error: unknown) => {
+        native = undefined;
+        throw error;
+      });
       const module = await native;
       return inProcess(jobs, (job) => encodeNativeMesh(module, job), options.signal);
     }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { headless, headlessModels } from '../../../tests/support/pbr-snapshot.js';
 import { runParseWorker } from '../../../tests/support/parse-worker.js';
-import { modelFromPrepared } from '../../gltf-pro/dist/worker.js';
+import { modelFromPrepared } from '../../gltf/dist/worker.js';
 import { convertFBX, parseFBX } from '../dist/index.js';
 import { largeFBX } from '../dist/large.js';
 import { rigFixture, readGLB } from './native-scene-helper.js';
@@ -12,6 +12,9 @@ test('large import defaults are explicit, immutable, independent and validated',
   const ext = largeFBX();
   assert.equal(ext.limits.inputBytes, 512 * 1024 * 1024);
   assert.equal(ext.limits.vertices, 8_000_000);
+  // A Character Creator man decodes about 61 million texture pixels: the large caps hold sixteen 4096 x 4096 maps.
+  assert.equal(ext.limits.texturePixels, 268_435_456);
+  assert.equal(ext.limits.textureBytes, 512 * 1024 * 1024);
   assert.ok(Object.isFrozen(ext) && Object.isFrozen(ext.limits));
   for (const value of [0, -1, NaN, Infinity, 1.5, Number.MAX_SAFE_INTEGER + 1])
     assert.throws(() => largeFBX({ vertices: value }), /positive safe integer/);
@@ -153,15 +156,15 @@ test('the default limits hold 996,004 vertices: every corner its own vertex, wit
   assert.deepEqual([...indices.subarray(0, 6)], [0, 1, 2, 0, 2, 3]);
   assert.ok(doc.accessors[primitive.attributes.TANGENT].count === corners);
 });
-test('gltf-pro draws the 996,004-vertex FBX mesh as default-size parts that cover it exactly', {
+test('gltf/pbr draws the 996,004-vertex FBX mesh as default-size parts that cover it exactly', {
   timeout: 120000,
 }, async () => {
-  // The converted file holds one primitive; gltf-pro packs it in parts of at most 262,144 vertices (its documented
+  // The converted file holds one primitive; gltf/pbr packs it in parts of at most 262,144 vertices (its documented
   // default maxPartVertices). The GPU check (test/default-scale-browser.mjs) asserted one primitive and went red when
   // parts landed; this proves the 1,000,000-vertex promise on the parts: every vertex and every triangle, once.
   const { defaultScaleMesh } = await import('./default-scale.js');
   const { partCoverage } = await import('./part-coverage.js');
-  const { prepareGLTF } = await import('../../gltf-pro/dist/prepare.js');
+  const { prepareGLTF } = await import('../../gltf/dist/prepare.js');
   const { corners } = defaultScaleMesh();
   const prepared = await prepareGLTF(undefined, await convertFBX(defaultScaleMesh().bytes));
   const parts = prepared.geometry.flat().flatMap((g) => (Array.isArray(g) ? g : [g]));

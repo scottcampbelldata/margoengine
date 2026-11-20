@@ -1,5 +1,5 @@
-// gltf-pro PBRInstances vertex data, one 96-byte row per instance: model matrix columns (node space), RGBA tint and
-// UV scale (xy) + offset (zw). Depth-only passes (shadows, staging) read it with the same locations as gltf-pro's shader.
+// gltf/pbrInstances vertex data, one 96-byte row per instance: model matrix columns (node space), RGBA tint and
+// UV scale (xy) + offset (zw). Depth-only passes (shadows, staging) read it with the same locations as gltf/pbr's shader.
 export const instanceLayout = {
   arrayStride: 96,
   stepMode: 'instance',

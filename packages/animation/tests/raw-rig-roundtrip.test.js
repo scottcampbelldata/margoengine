@@ -1,10 +1,10 @@
-// A rig and clip authored from raw arrays, written by @margoengine/exporters and read back by gltf-pro + Animation
+// A rig and clip authored from raw arrays, written by @margoengine/exporters and read back by gltf/pbr + Animation
 // (a PBRModel without engine.use, since parseGLTF's setup needs WebGPU):
 // the posed vertices of the reimported glTF match this package's CPU skinning at fixed times.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { exportGLB } from '../../exporters/dist/index.js';
 import { invertMatrix, multiplyMatrices } from '../../math/dist/mat4.js';
 import { Animation, Skeleton, Skin, applyKeyframeClip, bakeKeyframeClip, createKeyframeClip } from '../dist/index.js';

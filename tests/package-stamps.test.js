@@ -129,17 +129,22 @@ test('a package with no stamp, or a cleared one, is stale', (t) => {
 
 test('the build writes a stamp after each package and clears it before', () => {
   const build = readFileSync(new URL('../scripts/build-modern.js', import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+  // Since KB-BUILD-ATOMIC1 (627259b1da) a package builds into its dist-next and is swapped into dist: the stamp is cleared
+  // before anything of the build is written and written only once the new dist is in place.
   assert.match(
     build,
-    /clearStamp\(process\.cwd\(\), name\);\n\s*await buildPackage\(name\);[\s\S]*?writeStamp\(process\.cwd\(\), name, stamps\.get\(name\)\);/,
+    /async \(\) => \{\n\s*clearStamp\(process\.cwd\(\), name\);\n[\s\S]*?await buildPackage\(name, output\);[\s\S]*?await swapDist\(root\);\n\s*writeStamp\(process\.cwd\(\), name, stamps\.get\(name\)\);\n\s*\}/,
   );
   const report = readFileSync(new URL('../scripts/api-report.js', import.meta.url), 'utf8');
-  assert.match(report, /const stale = stalePackages\(root\);/, 'the API report checks the stamps before it reads dist');
+  assert.match(report, /rebuildStalePackages\(root, /, 'the API report rebuilds stale packages before it reads dist');
+  const fresh = readFileSync(new URL('../scripts/support/fresh-dist.mjs', import.meta.url), 'utf8');
+  assert.match(fresh, /names = stale\(root\)/, 'and that step finds them by their stamps (KB-API-SURFACE-CHURN1)');
+  assert.match(fresh, /stale = stalePackages/, 'the default finder is stalePackages');
 });
 
 // Regression (KB-RM4, 2026-11-11): lightmap's Cycles test imports scripts/cornell-cycles.py, and Python wrote
 // scripts/__pycache__/cornell-cycles.cpython-311.pyc. The stamp hashed it, so mid-run lightmap and the five packages
-// built after it looked stale, two API reports rebuilt them at once and packages/web/dist was left deleted.
+// built after it looked stale, two API reports rebuilt them at once and packages/kit-web/dist was left deleted.
 test('Python bytecode written beside a package script leaves the stamp alone', (t) => {
   const { root, write, built, cleanup } = fixture();
   t.after(cleanup);

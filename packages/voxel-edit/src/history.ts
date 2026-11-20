@@ -9,8 +9,10 @@ export interface HistoryOptions {
   /** Most cells of each pushed grid, 1 to 67,108,864. Not a cumulative budget. Default 16,777,216. */
   maxCells?: number;
   /**
-   * Bytes of voxel buffers this history may retain at once. Default no extra limit (only `maxDepth` applies).
-   * This counts the history's own copies, not the rest of an editor document.
+   * Bytes of voxel buffers this history may retain at once. A push past it drops the oldest steps until the new one
+   * fits, as editors' undo memory limits do; a single step larger than the whole budget is kept as the only step.
+   * Default no extra limit (only `maxDepth` applies). This counts the history's own copies, not the rest of an editor
+   * document.
    */
   maxBytes?: number;
 }
@@ -25,7 +27,9 @@ export interface HistoryEntry {
 
 /**
  * An undo/redo stack of copied grids. Mutating a grid you passed in, or a grid this class returned, does not change
- * the stored steps. `maxCells` checks one grid. `maxBytes`, when set, is the sum of the stored copies only.
+ * the stored steps. `maxCells` checks one grid. `maxBytes`, when set, is the sum of the stored copies only: like
+ * GIMP's "Maximum undo memory" (GIMP 3.2 User Manual, "Undoing"), going past it drops the oldest steps, and the newest
+ * step always stays, so `bytes` exceeds `maxBytes` only while one step alone is larger than it.
  */
 export class VoxelHistory {
   #entries: { grid: VoxelGrid; label?: string }[] = [];
@@ -78,9 +82,9 @@ export class VoxelHistory {
   }
 
   /**
-   * Record a copy of `grid`. Discards any redo branch. Returns an owned grid copy, like undo/redo/go/current.
-   * @throws RangeError when the grid fails the cell budget or the retained copies would pass `maxBytes`; nothing is
-   * recorded then.
+   * Record a copy of `grid`. Discards any redo branch, then drops the oldest steps while the stored copies pass
+   * `maxDepth` or `maxBytes` (never the new step). Returns an owned grid copy, like undo/redo/go/current.
+   * @throws RangeError when the grid fails the cell budget; nothing is recorded then.
    */
   push(grid: VoxelGrid, label?: string): VoxelGrid {
     checkGrid(grid, this.#maxCells, 'History grid');
@@ -89,11 +93,9 @@ export class VoxelHistory {
     let bytes = this.#bytes + stored.voxels.byteLength;
     for (let i = next.length; i < this.#entries.length; i++) bytes -= this.#entries[i].grid.voxels.byteLength;
     next.push({ grid: stored, label });
-    while (next.length > this.#maxDepth) bytes -= next.shift()!.grid.voxels.byteLength;
-    if (bytes > this.#maxBytes)
-      throw new RangeError(
-        `History would retain ${bytes} bytes, over maxBytes ${this.#maxBytes}; push a smaller grid or raise maxBytes`,
-      );
+    // Scott's ruling (2026-11-15): past maxBytes drop the oldest step, never the one just pushed.
+    while (next.length > this.#maxDepth || (next.length > 1 && bytes > this.#maxBytes))
+      bytes -= next.shift()!.grid.voxels.byteLength;
     this.#entries = next;
     this.#index = next.length - 1;
     this.#bytes = bytes;

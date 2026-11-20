@@ -13,6 +13,7 @@ import { COMPRESSION_EXTENSIONS } from './formats.js';
 import { clearsLost } from './fresh-clears.js';
 import { inverseTrigInaccurate } from './inverse-trig.js';
 import { CompatComputePipeline, type ComputeRuntime } from './compute.js';
+import { type Tape, TapePool } from './tape.js';
 import {
   CompatBindGroup,
   CompatBindGroupLayout,
@@ -32,6 +33,7 @@ import {
   CompatRenderBundleEncoder,
   CompatRenderPipeline,
   IDLE_PROGRAMS,
+  NO_DESCRIPTOR,
   type LinkedProgram,
   Replayer,
   writeTexture,
@@ -40,6 +42,18 @@ import {
 
 /** The vendor string compatibility adapters report, so apps and stats can show "compatibility mode". */
 export const COMPAT_VENDOR = 'margo-webgl2';
+
+/** The command buffers of one submit. */
+type SubmitList = {
+  ops: Tape;
+  used?: boolean;
+  compute?: boolean;
+  readback?: boolean;
+  label?: string;
+  uses?: Uses;
+  usesLength?: number;
+  release?(): void;
+}[];
 
 /** Options for {@link CompatGPU}. */
 export interface CompatGPUOptions {
@@ -263,6 +277,10 @@ export class CompatAdapter {
     // Lower tiers cannot blit sample-only float textures. View synchronization can need the readback helper in
     // an ordinary render command, so make it available before exposing a device with these copy semantics.
     if (this.tierFormats) await device.loadReadback();
+    // The compute part loads here, before the first frame can exist: a scene's first compute submit used to wait for it
+    // in the queue, so that task's frames and their canvas present ran in a later task and a page canvas read in the
+    // task of the first render showed nothing (KB-COMPAT-FIRSTTASK1).
+    await device.loadCompute();
     return device;
   }
 }
@@ -308,6 +326,17 @@ export class CompatUncapturedErrorEvent extends Event {
   }
 }
 
+/**
+ * @internal A cached framebuffer (CompatDevice.framebuffer): how to attach it again, the frame it was last attached in,
+ * and whether it was deleted with one of its textures (the replay's own lookups then make it again).
+ */
+export interface FramebufferRecord {
+  readonly fbo: WebGLFramebuffer;
+  readonly build: (fbo: WebGLFramebuffer, made: boolean) => void;
+  frame: number;
+  dead: boolean;
+}
+
 /** A GPUDevice on WebGL2. */
 export class CompatDevice extends EventTarget {
   label = '';
@@ -340,23 +369,26 @@ export class CompatDevice extends EventTarget {
   onuncapturederror: ((event: Event) => void) | null = null;
   /** The sampler that loads and size queries use (no filtering, every level). */
   readonly loadSampler: WebGLSampler;
+  /** Removes the canvas's context-loss listener; called once, when the device is lost or destroyed. */
+  private readonly unlisten: () => void;
   private resolveLost!: (info: { reason: 'destroyed' | 'unknown'; message: string }) => void;
   private readonly scopes: { filter: ErrorFilter; error: CompatError | null }[] = [];
   /** Cached framebuffers by attachment key, with how to attach them again and the frame they were last attached in. */
-  private readonly framebuffers = new Map<
-    string,
-    { fbo: WebGLFramebuffer; build: (fbo: WebGLFramebuffer, made: boolean) => void; frame: number }
-  >();
+  private readonly framebuffers = new Map<string, FramebufferRecord>();
   /**
    * @internal Frames this device's canvases have shown (CompatCanvasContext.present). A cached framebuffer is attached
    * again on its first use in each new frame: see {@link framebuffer}.
    */
   frame = 0;
   /** Canvas contexts with a frame waiting to be shown. */
-  readonly presents = new Set<{ present(): void }>();
+  readonly presents: { present(): void }[] = [];
+  /** How many of `presents` are waiting (the array keeps its length between frames). */
+  presentCount = 0;
   /** Canvas contexts showing an image of this device's WebGL2 context. */
   readonly shown = new Set<{ keepFrame(): void }>();
   readonly replayer: Replayer;
+  /** The tapes of finished command buffers, waiting for the next encoder (see tape.ts). */
+  readonly tapes = new TapePool(this);
   /** The texture each external source copies into, reused while its size stays. */
   // The storage behind imported external textures belongs to the layer, as a browser's does on native WebGPU: made
   // directly, not through createTexture, and expired with the import (see externals.ts).
@@ -402,11 +434,15 @@ export class CompatDevice extends EventTarget {
     this.ext = extensions(gl);
     this.state = new GLState(gl);
     this.lost = new Promise((resolve) => (this.resolveLost = resolve));
-    const canvas = gl.canvas as EventTarget;
-    canvas.addEventListener?.('webglcontextlost', (event) => {
-      event.preventDefault();
-      this.lose('unknown', 'The WebGL2 context was lost');
-    });
+    const canvas = gl.canvas as EventTarget,
+      contextLost = (event: Event) => {
+        event.preventDefault();
+        this.lose('unknown', 'The WebGL2 context was lost');
+      };
+    canvas.addEventListener?.('webglcontextlost', contextLost);
+    // A lost or destroyed device takes it off again: the canvas may outlive the device (an app's own canvas), and the
+    // loss destroy() asks for must not be claimed for a restore no device will make.
+    this.unlisten = () => canvas.removeEventListener?.('webglcontextlost', contextLost);
     // WebGPU's conventions: clip z in [0, w], the first vertex provokes flat values, tight pixel rows.
     this.ext.clipControl?.clipControlEXT(this.ext.clipControl.LOWER_LEFT_EXT, this.ext.clipControl.ZERO_TO_ONE_EXT);
     this.ext.provoking?.provokingVertexWEBGL(this.ext.provoking.FIRST_VERTEX_CONVENTION_WEBGL);
@@ -423,31 +459,39 @@ export class CompatDevice extends EventTarget {
     this.replayer = new Replayer(this);
   }
 
+  /** Enums looked up so far, by name (the replay asks for the same few every frame). */
+  private readonly enums = new Map<string, number>();
+  /** GL comparison functions by WebGPU name, made once. */
+  private compares: Readonly<Record<string, number>> | null = null;
+
   /** The value of a WebGL2 enum by name. */
   enum(name: string): number {
+    const known = this.enums.get(name);
+    if (known !== undefined) return known;
     let v: unknown = (this.gl as unknown as Record<string, unknown>)[name];
     // Compressed formats' enums are on their extension objects, not on the context.
     for (const e of this.ext.compressed) v ??= e[name];
     if (typeof v !== 'number')
       throw fault('failed', `WebGL2 has no enum ${name} (a bug: report it)`, 'compatibility-layer');
+    this.enums.set(name, v);
     return v;
   }
 
   /** GL comparison function of a WebGPU compare function. */
   compare(f: GPUCompareFunction): number {
     const gl = this.gl;
-    return (
-      {
-        never: gl.NEVER,
-        less: gl.LESS,
-        equal: gl.EQUAL,
-        'less-equal': gl.LEQUAL,
-        greater: gl.GREATER,
-        'not-equal': gl.NOTEQUAL,
-        'greater-equal': gl.GEQUAL,
-        always: gl.ALWAYS,
-      }[f] ?? gl.ALWAYS
-    );
+    // The table is made once: a literal per call was garbage at every pipeline change.
+    this.compares ??= {
+      never: gl.NEVER,
+      less: gl.LESS,
+      equal: gl.EQUAL,
+      'less-equal': gl.LEQUAL,
+      greater: gl.GREATER,
+      'not-equal': gl.NOTEQUAL,
+      'greater-equal': gl.GEQUAL,
+      always: gl.ALWAYS,
+    };
+    return this.compares[f] ?? gl.ALWAYS;
   }
 
   /** A coded refusal for something the layer cannot do (yet). */
@@ -458,9 +502,14 @@ export class CompatDevice extends EventTarget {
   // ---------------------------------------------------------------- errors
 
   pushErrorScope(filter: ErrorFilter): void {
+    // Allocations made before an out-of-memory or internal scope opens report outside it.
+    if (filter !== 'validation') this.checkAllocations(false);
     this.scopes.push({ filter, error: null });
   }
   popErrorScope(): Promise<CompatError | null> {
+    const top = this.scopes.at(-1);
+    // Allocations made inside an out-of-memory or internal scope report to it.
+    if (top && top.filter !== 'validation') this.checkAllocations(false);
     const scope = this.scopes.pop();
     if (!scope) return Promise.reject(new DOMException('No error scope to pop', 'OperationError'));
     return Promise.resolve(scope.error);
@@ -477,17 +526,44 @@ export class CompatDevice extends EventTarget {
    * After an allocation (bufferData, texStorage, renderbufferStorage): WebGL2 reports a store the driver could not make
    * only as GL_OUT_OF_MEMORY from getError, and the object then draws as if empty. That becomes an `out-of-memory` error
    * (to its scope, else `uncapturederror`), as WebGPU reports a failed allocation; any other GL error left by the layer
-   * becomes an `internal` one. One getError per allocation, never per draw or submit.
+   * becomes an `internal` one. getError waits for the GPU process (about 0.3 to 1 ms in Chrome), so one getError checks
+   * every allocation since the last check: in a task of its own after the first, or before an out-of-memory or internal
+   * scope opens or closes, or before any other error is reported, whichever comes first. The scopes open at each
+   * allocation are the ones open at the check, so every error still goes to the scope it was raised in, and reaches
+   * listeners before the errors of later calls (KB-COMPAT-GETERROR1). Never per draw or submit.
    */
   allocated(what: string): void {
+    this.unchecked.push(what);
+    if (!this.allocationTimer) this.allocationTimer = setTimeout(this.checkAllocationsLater, 0);
+  }
+  /** Allocations not yet checked with getError (see {@link allocated}). */
+  private readonly unchecked: string[] = [];
+  private allocationTimer: ReturnType<typeof setTimeout> | 0 = 0;
+  private readonly checkAllocationsLater = (): void => {
+    this.allocationTimer = 0;
+    this.checkAllocations(true);
+  };
+  /**
+   * One getError for every unchecked allocation. `ownTask`: the check runs in a task of its own, so an uncaptured error
+   * is dispatched at once; inside another call it is dispatched in a later task, as {@link report} does.
+   */
+  private checkAllocations(ownTask: boolean): void {
+    const pending = this.unchecked;
+    if (!pending.length) return;
+    const what = pending.length === 1 ? pending[0] : `one of ${pending.length} allocations (${pending.join(', ')})`;
+    pending.length = 0;
+    if (this.destroyed) return;
     for (let i = 0, e = this.gl.getError(); e !== 0 && i < 8; i++, e = this.gl.getError()) {
-      if (e === 0x0505) this.report('out-of-memory', new CompatOutOfMemoryError(`WebGL2 is out of memory for ${what}`));
+      if (e === 0x0505)
+        this.report('out-of-memory', new CompatOutOfMemoryError(`WebGL2 is out of memory for ${what}`), ownTask);
       else if (typeof e === 'number' && !this.gl.isContextLost())
-        this.report('internal', new CompatInternalError(`WebGL2 error 0x${e.toString(16)} at ${what}`));
+        this.report('internal', new CompatInternalError(`WebGL2 error 0x${e.toString(16)} at ${what}`), ownTask);
       else return;
     }
   }
-  private report(filter: ErrorFilter, error: CompatError): void {
+  private report(filter: ErrorFilter, error: CompatError, now = false): void {
+    // An allocation made before the call that raised this error reports first.
+    this.checkAllocations(false);
     for (let i = this.scopes.length - 1; i >= 0; i--)
       if (this.scopes[i].filter === filter) {
         this.scopes[i].error ??= error;
@@ -495,14 +571,16 @@ export class CompatDevice extends EventTarget {
       }
     // As WebGPU does, in a task of its own, never inside the call that failed, and not once the device is gone: so a
     // failed allocation's error, raised first, reaches listeners before the errors of later calls that used the object.
-    setTimeout(() => {
+    const dispatch = () => {
       if (this.destroyed) return;
       const event = new CompatUncapturedErrorEvent('uncapturederror', { cancelable: true, error });
       this.dispatchEvent(event);
       this.onuncapturederror?.(event);
       // As browsers do: an uncaptured error nobody prevented shows in the console, so dropped work is never silent.
       if (!event.defaultPrevented) console.warn(`WebGL2 compatibility: uncaptured ${error.name}: ${error.message}`);
-    }, 0);
+    };
+    if (now) dispatch();
+    else setTimeout(dispatch, 0);
   }
 
   // ---------------------------------------------------------------- lifetime
@@ -510,6 +588,7 @@ export class CompatDevice extends EventTarget {
   lose(reason: 'destroyed' | 'unknown', message: string): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    this.unlisten();
     this.resolveLost({ reason, message });
   }
 
@@ -596,7 +675,8 @@ export class CompatDevice extends EventTarget {
 
   /** Marks a canvas whose texture a replayed pass drew into; the submit shows it when it ends. */
   queuePresent(context: { present(): void }): void {
-    this.presents.add(context);
+    for (let i = 0; i < this.presentCount; i++) if (this.presents[i] === context) return;
+    this.presents[this.presentCount++] = context;
   }
 
   /**
@@ -605,8 +685,11 @@ export class CompatDevice extends EventTarget {
    */
   flushPresents(): void {
     if (this.destroyed) return;
-    for (const c of [...this.presents]) c.present();
-    this.presents.clear();
+    // Those waiting when it starts show; whatever showing queues is dropped, as clearing a copied set dropped it.
+    const n = this.presentCount;
+    for (let i = 0; i < n; i++) this.presents[i].present();
+    for (let i = 0; i < this.presentCount; i++) this.presents[i] = undefined as never;
+    this.presentCount = 0;
   }
 
   // ---------------------------------------------------------------- framebuffers
@@ -627,26 +710,36 @@ export class CompatDevice extends EventTarget {
     key: string,
     textures: readonly CompatTexture[],
     build: (fbo: WebGLFramebuffer, made: boolean) => void,
-  ): WebGLFramebuffer {
+  ): FramebufferRecord {
     const cached = this.framebuffers.get(key);
     if (cached) {
-      if (cached.frame !== this.frame) {
-        cached.frame = this.frame;
-        cached.build(cached.fbo, false);
-      }
-      return cached.fbo;
+      this.framebufferAgain(cached);
+      return cached;
     }
-    const fbo = this.gl.createFramebuffer() as WebGLFramebuffer;
-    this.framebuffers.set(key, { fbo, build, frame: this.frame });
+    const fbo = this.gl.createFramebuffer() as WebGLFramebuffer,
+      record = { fbo, build, frame: this.frame, dead: false };
+    this.framebuffers.set(key, record);
     for (const t of textures) t.framebuffers.add(key);
     build(fbo, true);
-    return fbo;
+    return record;
+  }
+
+  /** @internal A cached framebuffer, attached again on its first use in a new frame (see {@link framebuffer}). */
+  framebufferAgain(record: FramebufferRecord): WebGLFramebuffer {
+    if (record.frame !== this.frame) {
+      record.frame = this.frame;
+      record.build(record.fbo, false);
+    }
+    return record.fbo;
   }
 
   dropFramebuffers(texture: CompatTexture): void {
     for (const key of texture.framebuffers) {
       const cached = this.framebuffers.get(key);
-      if (cached) this.gl.deleteFramebuffer(cached.fbo);
+      if (cached) {
+        cached.dead = true;
+        this.gl.deleteFramebuffer(cached.fbo);
+      }
       this.framebuffers.delete(key);
     }
     texture.framebuffers.clear();
@@ -753,7 +846,7 @@ export class CompatDevice extends EventTarget {
       return pipeline;
     });
   }
-  createCommandEncoder(descriptor: GPUCommandEncoderDescriptor = {}): CompatCommandEncoder {
+  createCommandEncoder(descriptor: GPUCommandEncoderDescriptor = NO_DESCRIPTOR): CompatCommandEncoder {
     return new CompatCommandEncoder(this, descriptor.label ?? '');
   }
   createRenderBundleEncoder(descriptor: GPURenderBundleEncoderDescriptor): CompatRenderBundleEncoder {
@@ -835,60 +928,104 @@ export class CompatQueue {
    * work without running any of it, and the WebGL2 calls it would make on the deleted objects would leave GL errors that
    * the next allocation's check reads as its own.
    */
-  private usable(what: string, uses: Uses): boolean {
-    const gone = destroyedUse(uses);
-    if (gone) this.device.validationError(`${what} uses '${gone.label}', which is destroyed`);
-    return !gone;
-  }
   private live(what: string, resource: Usable): boolean {
-    return this.usable(what, [resource]);
+    if (!resource.released) return true;
+    this.device.validationError(`${what} uses '${resource.label}', which is destroyed`);
+    return false;
   }
+  /** writeBuffer while waiting for a lazy chunk (a method: its closure would cost every write a context). */
+  private writeAfter(buffer: CompatBuffer, offset: number, copy: Uint8Array): void {
+    this.inOrder(() => buffer.write(offset, copy));
+  }
+  /** A byte view of all of `data`, made once per ArrayBuffer (writeBuffer passes its range to bufferSubData). */
+  private bytesOf(data: ArrayBufferLike): Uint8Array {
+    let bytes = this.byteViews.get(data);
+    if (!bytes) this.byteViews.set(data, (bytes = new Uint8Array(data)));
+    return bytes;
+  }
+  private readonly byteViews = new WeakMap<ArrayBufferLike, Uint8Array>();
+  /** The command buffers of the submit being checked and replayed (reused; emptied after). */
+  private readonly submitting: SubmitList = [];
 
   submit(
     buffers: Iterable<{
-      ops: readonly ((r: Replayer) => void)[];
+      ops: Tape;
       used?: boolean;
       compute?: boolean;
       readback?: boolean;
       label?: string;
       uses?: Uses;
+      usesLength?: number;
+      release?(): void;
     }>,
   ): void {
     const d = this.device;
     if (d.destroyed) return;
-    const list: {
-      ops: readonly ((r: Replayer) => void)[];
-      compute?: boolean;
-      readback?: boolean;
-      label?: string;
-      uses?: Uses;
-    }[] = [];
-    for (const cb of buffers) {
-      if (cb.used) {
-        d.validationError('A command buffer can be submitted once');
-        continue;
-      }
-      cb.used = true;
-      list.push(cb);
-    }
+    const list = this.submitting;
+    let count = 0;
+    // An array (what a caller passes) is read by index: the iterator of a for-of is an object a submit.
+    if (Array.isArray(buffers)) {
+      for (let i = 0; i < buffers.length; i++) count = this.accept(list, count, buffers[i]);
+    } else for (const cb of buffers) count = this.accept(list, count, cb);
     // A command buffer that uses a destroyed resource fails the whole submit (WebGPU: every command buffer is spent).
-    if (!list.every((cb) => !cb.uses || this.usable(`submit: command buffer '${cb.label ?? ''}'`, cb.uses))) return;
-    // What the commands need loads first; everything the queue gets meanwhile runs after, in order.
-    if (!d.computeRuntime && list.some((cb) => cb.compute)) this.hold(d.loadCompute());
-    if (!d.readback && list.some((cb) => cb.readback)) this.hold(d.loadReadback());
-    this.inOrder(() => {
-      d.objects.replaying++;
-      try {
-        for (const cb of list) if (!d.destroyed) d.replayer.run(cb.ops);
-      } finally {
-        d.objects.replaying--;
+    let compute = false,
+      readback = false;
+    for (let i = 0; i < count; i++) {
+      const cb = list[i],
+        gone = cb.uses ? destroyedUse(cb.uses, cb.usesLength) : null;
+      if (gone) {
+        this.forget(list, count);
+        d.validationError(`submit: command buffer '${cb.label ?? ''}' uses '${gone.label}', which is destroyed`);
+        return;
       }
-      d.collect();
-      d.flushPresents();
-      // WebGPU's submit hands the commands to the GPU; WebGL2 may hold them back until a later flush, so a query or
-      // copy submitted ahead of more work would only become available once that work finished too.
-      if (!d.destroyed) d.gl.flush();
-    });
+      compute ||= !!cb.compute;
+      readback ||= !!cb.readback;
+    }
+    // What the commands need loads first; everything the queue gets meanwhile runs after, in order.
+    if (!d.computeRuntime && compute) this.hold(d.loadCompute());
+    if (!d.readback && readback) this.hold(d.loadReadback());
+    if (this.backlog) this.replayLater(list.slice(0, count));
+    else this.replay(list, count);
+    this.forget(list, count);
+  }
+
+  /** Adds `cb` to the submit's list unless it was submitted before (then a validation error); returns the new count. */
+  private accept(list: SubmitList, count: number, cb: SubmitList[number]): number {
+    if (cb.used) {
+      this.device.validationError('A command buffer can be submitted once');
+      return count;
+    }
+    cb.used = true;
+    list[count] = cb;
+    return count + 1;
+  }
+
+  /** Empties the submit's list (its length stays, so the next submit writes into the same array). */
+  private forget(list: SubmitList, count: number): void {
+    for (let i = 0; i < count; i++) list[i] = undefined as never;
+  }
+
+  /** submit() while waiting for a lazy chunk (a method: its closure would cost every submit a context). */
+  private replayLater(list: SubmitList): void {
+    this.backlog?.push(() => this.replay(list, list.length));
+  }
+
+  /** Replays the first `count` submitted command buffers in order, then shows the canvases they drew and flushes. */
+  private replay(list: SubmitList, count: number): void {
+    const d = this.device;
+    d.objects.replaying++;
+    try {
+      for (let i = 0; i < count; i++) if (!d.destroyed) d.replayer.run(list[i].ops);
+    } finally {
+      // A command buffer replays once: its tape goes to the next encoder.
+      for (let i = 0; i < count; i++) list[i].release?.();
+      d.objects.replaying--;
+    }
+    d.collect();
+    d.flushPresents();
+    // WebGPU's submit hands the commands to the GPU; WebGL2 may hold them back until a later flush, so a query or
+    // copy submitted ahead of more work would only become available once that work finished too.
+    if (!d.destroyed) d.gl.flush();
   }
 
   writeBuffer(
@@ -912,11 +1049,9 @@ export class CompatQueue {
       );
       return;
     }
-    const bytes = new Uint8Array(view ? view.buffer : (data as ArrayBuffer), base + start, length);
-    if (this.backlog) {
-      const copy = bytes.slice();
-      this.inOrder(() => buffer.write(offset, copy));
-    } else buffer.write(offset, bytes);
+    const bytes = this.bytesOf(view ? view.buffer : (data as ArrayBuffer));
+    if (this.backlog) this.writeAfter(buffer, offset, bytes.slice(base + start, base + start + length));
+    else buffer.writeRange(offset, bytes, base + start, length);
   }
 
   writeTexture(

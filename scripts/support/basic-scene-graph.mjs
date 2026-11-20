@@ -49,12 +49,13 @@ function emittedFiles(manifest, roots) {
 
 export function sceneGraph(manifest) {
   // margoengine/stage/gltf routes by asset features (8f4f4db72): an asset with no extension, skin or animation (the
-  // basic scene's cube) loads @margoengine/gltf, the chunk the page fetches. @margoengine/gltf-pro and
+  // basic scene's cube) loads @margoengine/gltf, the chunk the page fetches. @margoengine/gltf/pbr and
   // @margoengine/animation stay dynamic imports: the build emits them and their codec assets, the page never fetches them.
-  const chunk = (pkg) => Object.keys(manifest).find((key) => key.endsWith(`packages/${pkg}/dist/index.js`));
+  const chunk = (pkg, file = 'index.js') =>
+    Object.keys(manifest).find((key) => key.endsWith(`packages/${pkg}/dist/${file}`));
   const loader = chunk('gltf');
   assert.ok(loader, 'the build has the routed basic @margoengine/gltf chunk');
-  const deferred = [chunk('gltf-pro'), chunk('animation')].filter(Boolean),
+  const deferred = [chunk('gltf', 'pbr.js'), chunk('animation')].filter(Boolean),
     entry = staticFiles(manifest, 'index.html'),
     gltf = staticFiles(manifest, loader),
     deferredChunks = new Set(deferred.map((key) => manifest[key].file));
@@ -84,13 +85,13 @@ export function checkBuilt(built, expected, graph) {
 
 /**
  * The network check: the page's requests (`paths`, outDir paths in request order) must be exactly `expected`, each once.
- * A deferred loader chunk (gltf-pro, animation) fetched by the basic scene is named first.
+ * A deferred loader chunk (gltf/pbr, animation) fetched by the basic scene is named first.
  */
 export function checkFetched(paths, expected, graph) {
   assert.deepEqual(
     paths.filter((path) => graph.deferredChunks.has(path)),
     [],
-    'the basic scene fetched a deferred glTF feature loader (gltf-pro or animation)',
+    'the basic scene fetched a deferred glTF feature loader (gltf/pbr or animation)',
   );
   assert.deepEqual([...new Set(paths)].sort(), [...expected].sort(), 'exactly the HTML, entry chunk, glTF chunk and model');
   assert.equal(paths.length, expected.size, 'each file once');

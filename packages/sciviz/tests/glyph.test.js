@@ -90,6 +90,44 @@ test('stride/mask retain source IDs and vector scaling omits zero size', async (
   );
   close(components.scales, [-2, 3, 4]);
 });
+test('components scaling on a planar field draws the flattened glyph with the flat shape normal', async () => {
+  const planar = {
+    points: [0, 0, 0, 1, 0, 0, 2, 0, 0, 3, 0, 0],
+    pointArrays: { v: [2, 3, 0, 4, 0, 0, 0, 0, 0, 1, 1, 1] },
+  };
+  const r = await prepareGlyphs(planar, { vectors: 'v', scaleMode: 'components' });
+  assert.deepEqual([...r.ids], [0, 1, 3]);
+  close(r.scales, [2, 3, 0, 4, 0, 0, 1, 1, 1]);
+  for (const shape of ['arrow', 'cone', 'sphere', 'cube', 'line']) {
+    const f = fixture(),
+      layer = await glyphLayer(f, planar, { vectors: 'v', scaleMode: 'components', shape });
+    assert.equal(layer.meshes.length, 3);
+    const [flat, segment, solid] = layer.meshes;
+    assert.equal(solid.geometry, layer.geometry);
+    for (const m of layer.meshes)
+      assert(
+        m.scale.every((x) => Number.isFinite(x) && x !== 0),
+        `${shape} ${m.scale}`,
+      );
+    const v = flat.geometry.vertices;
+    assert(v.length > 0, `${shape} flattened glyph has triangles`);
+    let up = 0,
+      down = 0;
+    for (let i = 0; i < v.length; i += 6) {
+      assert.equal(v[i + 2], 0);
+      assert.deepEqual([v[i + 3], v[i + 4]], [0, 0]);
+      assert.equal(Math.abs(v[i + 5]), 1);
+      v[i + 5] > 0 ? up++ : down++;
+    }
+    assert(up > 0 && down > 0, `${shape} both faces of the flattened glyph`);
+    assert.equal(segment.geometry.vertices.length, 0);
+    assert(layer.bounds.every(Number.isFinite));
+    layer.dispose();
+  }
+  const zero = await prepareGlyphs(planar, { vectors: 'v', scaleMode: 'components' });
+  zero.scales.fill(0, 0, 3);
+  assert.throws(() => new GlyphLayer(fixture(), zero), RangeError);
+});
 test('orientation maps +X onto axes, antipodes and nearly opposite vectors without singularities', async () => {
   for (const vector of [
     [1, 0, 0],

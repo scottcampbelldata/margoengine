@@ -1,10 +1,9 @@
 // The affected-GPU logic behind `npm run check:merge` (scripts/support/affected-gpu.mjs, scripts/check-merge.mjs):
 // dependents, the triggers that fall back to the full run, unknown files, and that a documents-only change skips every
 // GPU step of the real step list.
-import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import {
   GPU_STEPS,
@@ -25,11 +24,14 @@ import {
   commandEntries,
   demoSources,
   dependents,
+  MAX_AFFECTED,
   scan,
   stepClosure,
   visualIds,
   wgslPackages,
 } from '../scripts/support/affected-gpu.mjs';
+import { testPackages } from '../scripts/test-changed.mjs';
+import { docReaderPackages } from '../scripts/support/file-classes.mjs';
 import { umbrellaChangeIsReexportOnly } from '../scripts/support/umbrella-change.mjs';
 import { demos } from '../scripts/support/visual-demos.js';
 
@@ -419,7 +421,11 @@ test('every check:merge step is either narrowed GPU work or plain; a new step ha
 });
 
 test('a documents-only change skips every GPU step, the example types and the bundler matrix, and keeps the others', () => {
-  const { decision, planned } = planFor(['docs/known-bugs.md', 'docs/clean-room.md', 'packages/dof/README.md']);
+  const { decision, planned } = planFor([
+    'docs/guides/walkthrough.md',
+    'docs/guides/kits.md',
+    'packages/dof/README.md',
+  ]);
   assert.equal(decision.mode, 'affected');
   for (const { command, skip } of planned) {
     const name = stepName(command);
@@ -441,7 +447,11 @@ test('owner/lifetime runs affected packages and their dependents, and whole when
   // ./react entry declares @margoengine/react, became its 13th dependent.
   assert.match(ownerStep(['packages/viewcube/src/index.ts']).command, /--packages=.*\bviewcube\b/);
   assert.match(ownerStep(['packages/viewcube/src/index.ts']).command, /--packages=.*\bmachinery\b/);
-  assert.equal(planFor(['packages/animation/src/index.ts']).decision.mode, 'full', 'existing dependent threshold applies');
+  assert.equal(
+    planFor(['packages/animation/src/index.ts']).decision.mode,
+    'full',
+    'existing dependent threshold applies',
+  );
   assert.deepEqual(ownerStep(['packages/animation/src/index.ts']), { command: 'npm run check:owners' });
   assert.equal(ownerStep(['docs/known-bugs.md']).skip, 'no affected package uses it');
   assert.deepEqual(ownerStep(['tests/support/owner-lifetime.js']), { command: 'npm run check:owners' });
@@ -546,13 +556,7 @@ test('check:readme-run: every example in the full run, narrowed only on an affec
   assert.ok(![...SERIAL, ...PARALLEL.flat()].some((command) => command.includes('readme-run')), 'not in verify');
 });
 
-test('check:readme-run holds a GPU slot with a hard limit in its own script, so no runner can leave it unlimited', () => {
-  const text = readFileSync(resolve(root, 'scripts/run-readme-examples.mjs'), 'utf8');
-  assert.match(text, /acquire\(\{ owner: 'check-readme-run', max: LIMIT_MINUTES \}\)/);
-  assert.equal(Number(/LIMIT_MINUTES = (\d+)/.exec(text)[1]), 60);
-});
-
-test('the bundler matrix does not take the GPU lock, and a render in a browser is the only reason it would', () => {
+test('the bundler matrix does not use the GPU: it renders nothing in a browser', () => {
   assert.equal(manifest.scripts['modern:test:bundlers'], 'node scripts/bundler-matrix.mjs');
   assert.doesNotMatch(
     readFileSync(resolve(root, 'scripts/bundler-matrix.mjs'), 'utf8'),
@@ -565,7 +569,7 @@ test('verify keeps its checks and adds the preview contract after hygiene, asset
   assert.deepEqual(SERIAL, [
     'node scripts/support/external-test-assets.mjs',
     'node scripts/hygiene.js --verify',
-    'node scripts/check-gpu-policy.mjs',
+    'npm run check:wasm-repro',
     'npm run build:packages',
   ]);
   assert.deepEqual(
@@ -584,7 +588,6 @@ test('verify keeps its checks and adds the preview contract after hygiene, asset
       'npm run test --workspace examples/voxel-sandbox',
       `node --experimental-test-module-mocks --test --test-concurrency=${TEST_CONCURRENCY} --test-timeout=${TEST_TIMEOUT_MS} --test-reporter=spec --test-reporter-destination=stdout --test-reporter=./scripts/support/test-watch.mjs --test-reporter-destination=stderr tests/*.test.js packages/*/tests/*.test.js packages/*/test/*.test.js`,
       'npm run docs:links',
-      'npm run check:readmes',
       'npm run measure:size',
       'npm run proofs -- --current',
     ].sort(),
@@ -633,7 +636,7 @@ test('a one-package change narrows the visual demos, the GPU tests and the WGSL 
 test('a change to a package the extension suite draws, or to one of its suites, runs modern:test:extensions', () => {
   for (const file of [
     'packages/materials/src/lobes.ts',
-    'packages/gltf-pro/src/material-extension.ts',
+    'packages/gltf/src/material-extension.ts',
     'packages/shadows/src/index.ts',
     'scripts/pbr-box-tests.js',
     'scripts/materials-lobe-tests.js',
@@ -641,7 +644,7 @@ test('a change to a package the extension suite draws, or to one of its suites, 
   ]) {
     const { decision, planned } = planFor([file]),
       gpu = planned.find((p) => stepName(p.command) === 'check:gpu-packages');
-    // gltf-pro has more dependents than MAX_AFFECTED: the full run holds this suite too.
+    // gltf/pbr has more dependents than MAX_AFFECTED: the full run holds this suite too.
     if (decision.mode !== 'full') assert.match(gpu.command, /--select=.*root\/modern:test:extensions/, file);
   }
 });
@@ -714,7 +717,7 @@ test('stepClosure places check files in the steps that run them, and standalone 
   assert.deepEqual(stepsOf.placed('scripts/quiet-gate.mjs').filter(isGpuId), []);
   for (const file of ['scripts/benchmark-bvh.js', 'scripts/fuzz/run.js'])
     assert.deepEqual(stepsOf.placed(file).filter(isGpuId), [], file);
-  assert.ok(stepsOf.placed('scripts/gpu-lock.mjs').includes('check:gpu-packages'));
+  assert.ok(stepsOf.placed('scripts/run-with-timeout.mjs').includes('check:gpu-packages'));
   assert.ok(stepsOf.placed('scripts/check-wgsl.mjs').includes('check:wgsl'));
   assert.ok(stepsOf.placed('scripts/modern-package-tests.js').includes('modern:test:packages'));
   assert.ok(stepsOf.placed('scripts/bundler-matrix.mjs').includes('modern:test:bundlers'));
@@ -724,9 +727,9 @@ test('stepClosure places check files in the steps that run them, and standalone 
     assert.ok(real[id].files.has('scripts/visual-regression.js'), id);
     assert.ok(real[id].files.has('scripts/build-site.js'), id);
   }
-  // Every GPU test holds the runner's own files other than RUNNER (the lock it takes, for one).
+  // Every GPU test holds the runner's own files other than RUNNER (the time limit it reads, for one).
   for (const id of Object.keys(real).filter((k) => k.startsWith('gpu/')))
-    assert.ok(real[id].files.has('scripts/gpu-lock.mjs'), id);
+    assert.ok(real[id].files.has('scripts/run-with-timeout.mjs'), id);
   assert.deepEqual(commandEntries({ a: 'node x.mjs && npm run b', b: 'node y.js --z' }, 'npm run a'), [
     'x.mjs',
     'y.js',
@@ -752,12 +755,8 @@ test('RUNNER_SMOKE holds one real test of each kind the runner treats differentl
       return byId.get(id);
     });
   assert.ok(
-    smoke.some((t) => !t.name && !t.exclusive),
-    'a shared package test',
-  );
-  assert.ok(
-    smoke.some((t) => t.exclusive),
-    'an exclusive timing test',
+    smoke.some((t) => !t.name),
+    'a package test',
   );
   assert.ok(
     smoke.some((t) => splitSteps(t).length > 1),
@@ -853,12 +852,13 @@ test('case 5: runner files run the smoke list plus the tests of the packages tha
   for (const t of tests.filter((x) => x.dir === 'wfc')) assert.ok(ids.includes(testId(t)), testId(t));
   for (const id of ['water/test:gpu', 'materials/test:gpu', 'root/test:catalog:browser'])
     assert.ok(!ids.includes(id), id);
-  // gpu-lock's detached queue now uses run-limited. Both drivers reach that limiter through gpu-lock,
-  // so changing it must select them as well as the pinned smoke cases.
-  for (const step of ['check:views', 'check:depth']) {
-    assert.ok(stepsOf[step].files.has('scripts/support/run-limited.mjs'), `${step} reaches the queue limiter`);
-    assert.ok(runs(planned, step), `${step} runs when its limiter changes`);
-  }
+  // Steps other than the GPU runner reach run-limited too; changing it must select each of them as well as the pinned
+  // smoke cases.
+  const limited = stepsOf
+    .placed('scripts/support/run-limited.mjs')
+    .filter((id) => !id.startsWith('gpu/') && !id.startsWith('visual/'));
+  assert.ok(limited.length > 1, limited.join());
+  for (const step of limited) assert.ok(runs(planned, step), `${step} runs when its limiter changes`);
 });
 
 test('an optional staging integrator peer retains its downstream coverage after the closure exceeds the full-run threshold', () => {
@@ -866,7 +866,7 @@ test('an optional staging integrator peer retains its downstream coverage after 
   assert.equal(decision.mode, 'full');
   assert.match(decision.reason, /packages affected, more than 12/);
   const downstream = dependents(workspaces, new Set(['@margoengine/voxel-pathtracer']));
-  for (const name of ['@margoengine/voxel-pathtracer', '@margoengine/staging', '@margoengine/stage'])
+  for (const name of ['@margoengine/voxel-pathtracer', '@margoengine/studio', '@margoengine/stage'])
     assert.ok(downstream.has(name), name);
   assert.deepEqual(
     planned,
@@ -926,12 +926,24 @@ test('a path named in a comment is not a dependency, a path in code or a string 
     return scan(dir, [file], ws).packages;
   };
   // The comment that broke the matrix closure: ca8bbf1026 named packages/dof/src/compat.ts in taa's upscale.ts.
-  assert.ok(!scanSource('// Same fallback as packages/dof/src/compat.ts.\nexport const a = 1;\n').has('@margoengine/dof'));
-  assert.ok(!scanSource('/* see @margoengine/dof\n and packages/dof */\nexport const a = 1;\n').has('@margoengine/dof'));
+  assert.ok(
+    !scanSource('// Same fallback as packages/dof/src/compat.ts.\nexport const a = 1;\n').has('@margoengine/dof'),
+  );
+  assert.ok(
+    !scanSource('/* see @margoengine/dof\n and packages/dof */\nexport const a = 1;\n').has('@margoengine/dof'),
+  );
   assert.ok(scanSource("import '@margoengine/dof'; // x\n").has('@margoengine/dof'));
-  assert.ok(scanSource("export const url = 'https://x.test/a'; const p = 'packages/dof/src';\n").has('@margoengine/dof'));
+  assert.ok(
+    scanSource("export const url = 'https://x.test/a'; const p = 'packages/dof/src';\n").has('@margoengine/dof'),
+  );
   const bs = String.fromCharCode(92);
-  const quoteRegex = ['const re = /["' + String.fromCharCode(39) + ']', bs, '/', bs, '//; const p = "packages/dof/x";'].join('');
+  const quoteRegex = [
+    'const re = /["' + String.fromCharCode(39) + ']',
+    bs,
+    '/',
+    bs,
+    '//; const p = "packages/dof/x";',
+  ].join('');
   assert.ok(scanSource(quoteRegex).has('@margoengine/dof'));
   // The tokenizer keeps strings, templates and regexes whole and blanks only comments, newlines kept.
   const tick = String.fromCharCode(96);
@@ -948,4 +960,74 @@ test('a path named in a comment is not a dependency, a path in code or a string 
   assert.equal(out.split('\n').length, src.split('\n').length);
   assert.ok(out.includes('"// no"') && out.includes(`} // no${tick}`) && !out.includes('yes') && !out.includes(' c\n'));
   assert.ok(out.includes(regex));
+});
+
+test('a document a package reads selects that package CPU tests and no GPU step; an unread document selects nothing', () => {
+  const parity = planFor(['docs/threejs-parity.md']);
+  assert.deepEqual(parity.scope.unitTests.dirs, ['mcp']);
+  assert.equal(parity.decision.mode, 'affected');
+  assert.deepEqual(parity.decision.hits, [], 'no GPU step');
+  assert.deepEqual(parity.decision.affected, [], 'no dependents');
+  for (const { command, skip } of parity.planned)
+    if (GPU_STEPS.includes(stepName(command))) assert.ok(skip, `${command} should be skipped`);
+  assert.deepEqual(planFor(['docs/from-threejs.md']).scope.unitTests.dirs, ['mcp']);
+  assert.deepEqual(planFor(['docs/limits.md']).scope.unitTests.dirs.includes('mcp'), true);
+  assert.deepEqual(planFor(['docs/guides/walkthrough.md']).scope.unitTests.dirs, []);
+  assert.deepEqual(planFor(['docs/guides/kits.md', 'site/index.html']).scope.unitTests.dirs, []);
+  assert.deepEqual(planFor(['packages/dof/README.md']).scope.unitTests.dirs, []);
+  assert.deepEqual(planFor(['docs/whitepaper/claims.md']).scope.unitTests.dirs, ['audio', 'mixer', 'vfx']);
+});
+
+test('every document a package test reads from docs/ is declared in DOC_READERS', () => {
+  const reads = [
+    // new URL('../../../docs/x.md', import.meta.url)  (and a package's own ../docs/x.md)
+    {
+      re: /new URL\('(?:\.\.\/)+docs\/([\w./-]+\.(?:md|json))'/g,
+      path: (m, dir) => (m[0].includes('../../../docs') ? `docs/${m[1]}` : `packages/${dir}/docs/${m[1]}`),
+    },
+    // readFileSync(join(root, 'docs/x.md')), readFileSync(`${repository}/docs/x.md`), readFile(...)
+    { re: /readFile(?:Sync)?\([^)\n]*?(?<!\.\.\/)docs\/([\w./-]+\.(?:md|json))/g, path: (m) => `docs/${m[1]}` },
+    // readFileSync(join(root, 'docs', 'x.md'))
+    { re: /readFile(?:Sync)?\(\s*join\(\w+, 'docs', '([\w./-]+\.(?:md|json))'/g, path: (m) => `docs/${m[1]}` },
+  ];
+  let seen = 0;
+  for (const dir of readdirSync(join(root, 'packages'))) {
+    for (const sub of ['tests', 'test']) {
+      const folder = join(root, 'packages', dir, sub);
+      if (!existsSync(folder)) continue;
+      for (const name of readdirSync(folder).filter((n) => /\.test\.[cm]?js$/.test(n))) {
+        const text = readFileSync(join(folder, name), 'utf8');
+        for (const { re, path } of reads)
+          for (const m of text.matchAll(re)) {
+            seen++;
+            const file = path(m, dir);
+            assert.ok(
+              docReaderPackages([file]).includes(dir),
+              `${dir}/${sub}/${name} reads ${file}: declare it in DOC_READERS`,
+            );
+          }
+      }
+    }
+  }
+  assert.ok(seen >= 10, 'the scan finds the known reads');
+});
+
+test('test:changed picks the changed packages, their dependents and the document readers from the check:merge decision', () => {
+  const pick = (files) => testPackages(ctx, files, {}, root);
+  assert.deepEqual(pick(['docs/threejs-parity.md']).dirs, ['packages/mcp']);
+  assert.deepEqual(pick(['docs/guides/kits.md']).dirs, []);
+  const dof = pick(['packages/dof/src/index.ts']).dirs;
+  assert.ok(dof.includes('packages/dof') && dof.includes('packages/react'), dof.join());
+  assert.ok(pick(['packages/core/src/engine.ts']).dirs.length > 50, 'a core change runs every package');
+  assert.ok(!pick(['packages/dof/README.md']).dirs.includes('packages/mcp'));
+  // More than MAX_AFFECTED affected packages: still only those packages, never every package (108 ran for one
+  // voxel-pathtracer change and passed the gate's 20 min cap).
+  const vpt = pick(['packages/voxel-pathtracer/src/index.ts']),
+    names = dependents(ctx.workspaces, new Set(['@margoengine/voxel-pathtracer'])),
+    tested = ctx.workspaces.filter((w) => names.has(w.name) && vpt.dirs.includes(w.dir));
+  assert.ok(names.size > MAX_AFFECTED, `${names.size} affected`);
+  assert.equal(vpt.dirs.length, tested.length, vpt.dirs.join());
+  assert.ok(vpt.dirs.includes('packages/voxel-pathtracer') && !vpt.dirs.includes('packages/water'), vpt.dirs.join());
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  assert.equal(manifest.scripts['test:changed'], 'node scripts/test-changed.mjs');
 });

@@ -8,7 +8,7 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 const imports = [];
 registerHooks({
   resolve(specifier, context, next) {
-    if (['@margoengine/gltf-pro', '@margoengine/animation'].includes(specifier)) {
+    if (['@margoengine/gltf/pbr', '@margoengine/animation'].includes(specifier)) {
       imports.push(specifier);
       throw Object.assign(new Error(`Cannot find package '${specifier}'`), { code: 'ERR_MODULE_NOT_FOUND' });
     }
@@ -80,7 +80,7 @@ test('a missing advanced loader names the material feature and its package with 
   try {
     await assert.rejects(
       addGLTF({ engine: {}, signal: new AbortController().signal }, 'https://test.invalid/map.gltf'),
-      { name: 'MargoError', code: 'state', message: /textures.*@margoengine\/gltf-pro/ },
+      { name: 'MargoError', code: 'state', message: /textures requires @margoengine\/gltf;/ },
     );
   } finally {
     globalThis.fetch = previous;
@@ -107,9 +107,9 @@ test('a glTF URL that returns a Git LFS pointer throws a coded error naming git 
   }
 });
 
-// The route read at most 64 MiB, so a file only gltf-pro can load (its budget is 512 MiB) failed as a download error
+// The route read at most 64 MiB, so a file only gltf/pbr can load (its budget is 512 MiB) failed as a download error
 // before any loader was chosen; a plain one over 64 MiB went to the light loader, which reads at most 64 MiB.
-test('a GLB over 64 MiB is read whole and routed to gltf-pro, naming its size when gltf-pro is missing', async () => {
+test('a GLB over 64 MiB is read whole and routed to gltf/pbr, naming its size when gltf/pbr is missing', async () => {
   const json = new TextEncoder().encode(JSON.stringify({ ...triangle(), buffers: [{ byteLength: 36 }] }).padEnd(1000)),
     bin = 65 * 1024 * 1024,
     glb = new Uint8Array(28 + json.length + bin),
@@ -127,7 +127,7 @@ test('a GLB over 64 MiB is read whole and routed to gltf-pro, naming its size wh
   try {
     await assert.rejects(
       addGLTF({ engine: {}, signal: new AbortController().signal }, 'https://test.invalid/scan.glb'),
-      { name: 'MargoError', code: 'state', message: /files over 64 MiB.*@margoengine\/gltf-pro/ },
+      { name: 'MargoError', code: 'state', message: /files over 64 MiB requires @margoengine\/gltf;/ },
     );
   } finally {
     globalThis.fetch = previous;

@@ -6,9 +6,10 @@
 // TAA, AgX tone mapping and bloom. One Storm slider drives wind, rain, swell, cloud, fog and lightning together.
 import { createStage } from 'margoengine';
 import { engineRuntime } from '@margoengine/core/extension';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { OrbitControls } from '@margoengine/controls';
 import { PostStack } from '@margoengine/post/stack';
+import { SceneTargets } from '@margoengine/post/mrt';
 import { Bloom } from '@margoengine/post/bloom';
 import { Tonemap } from '@margoengine/tonemap';
 import { TAA } from '@margoengine/taa';
@@ -18,11 +19,13 @@ import { night } from '@margoengine/sky/night';
 import { reflection } from '@margoengine/sky/reflection';
 import { lighting } from '@margoengine/sky/lighting';
 import { Weather } from '@margoengine/sky/weather';
+import { LightningBolt } from '@margoengine/sky/lightning-bolt';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
 import { Shadows } from '@margoengine/shadows';
 import { Clustered, type PointLight, type SpotLight } from '@margoengine/clustered';
 type ClusteredLight = PointLight | SpotLight;
 import { LocalShadows } from '@margoengine/clustered/shadows';
+import { LightGroups } from '@margoengine/clustered/groups';
 import { VolumetricFog } from '@margoengine/environment/volumetric';
 import { FogVolumes } from '@margoengine/environment/fog-volumes';
 import { Water } from '@margoengine/water';
@@ -105,7 +108,9 @@ const sky = Sky.attach(
     },
     lighting: {
       intensity: 3,
-      moon: { intensity: 0.22, color: [0.55, 0.68, 1] },
+      // This scene's own moon, brighter than the real one so the storm reads; the cloud deck dims it (cloudCover, set
+      // with the storm below) in the sky package.
+      moon: { intensity: 1.2, color: [0.55, 0.68, 1] },
       ambient: { day: [0.03, 0.035, 0.045], night: nightAmbient },
     },
   },
@@ -140,6 +145,8 @@ const shadows = Shadows.attach(engine, {
   casterMargin: 60,
 });
 const lights = Clustered.attach(engine);
+// The scene's lights are one group beside the weather's own lightning group (`lightning.link` adds that one).
+const groups = LightGroups.attach(engine, lights);
 const localShadows = LocalShadows.attach(engine, { lights, resolution: 1024, maxLights: 2 });
 
 const [land, boat] = await Promise.all([
@@ -202,10 +209,6 @@ water = Water.attach(engine, {
   ],
 });
 
-// Far out, past the volumetric fog's range, the sea fades into the rain haze; it stays darker than the sky above it.
-const haze = { color: [0.012, 0.016, 0.026] as Vec3, near: 220, far: 2600 };
-water.setFog(haze);
-
 // Thicker storm air round the headland: rain haze and spray the beam lights up close, a soft-edged sphere of fog on the
 // tower that thins out to the open sea (where the thin sea fog keeps the horizon).
 const stormAir = new FogVolumes([
@@ -231,6 +234,9 @@ const fog = VolumetricFog.attach(engine, {
   depth: () => water?.depthTexture ?? stack.depthTexture,
 });
 
+// ?flash=<0..1> holds the lightning flash at one brightness for stills (the weather's `lightning.hold`).
+const held = new URLSearchParams(location.search).get('flash');
+const heldFlash = held !== null && Number(held) >= 0 && Number(held) <= 1 ? Number(held) : undefined;
 const weather = Weather.attach(engine, {
   precipitation: 'rain',
   intensity: 0.6,
@@ -240,10 +246,22 @@ const weather = Weather.attach(engine, {
   height: 24,
   brightness: 0.3,
   opacity: 0.18,
-  lightning: { rate: 6, threshold: 0.55, minDistance: 900, maxDistance: 7000, strength: 0.35, seed: 7 },
+  lightning: {
+    rate: 6,
+    threshold: 0.55,
+    minDistance: 900,
+    maxDistance: 7000,
+    strength: 0.35,
+    seed: 7,
+    hold: heldFlash,
+  },
   reactive: true,
 });
 rain.weather = weather;
+// `lightning.link` lights the cloud deck from inside, the storm air under it (the fog) and the scene (a light group of the
+// stroke's light) by plugin name. LightningBolt draws the branching channel and gives the light its shape: lights along
+// the channel in place of one point light 700 m up.
+LightningBolt.attach(engine, { weather });
 WaterRain.attach(engine, {
   surface: water,
   weather: {
@@ -307,19 +325,10 @@ const skyFill: ClusteredLight = {
   color: [0.5, 0.6, 0.85],
   intensity: 90000,
 };
-// Lightning: the bolt's light from behind the headland while a flash lasts (setLights), and the opening strike: the
+// Lightning: the weather's lightning light while a flash lasts (setLights), and the opening strike: the
 // first seconds of every visit (not under reduced motion) flash once, at the same time and place, so stills and the
 // tour show the deck lit from inside. ?flash=<0..1> holds that flash at one brightness for stills.
-const held = new URLSearchParams(location.search).get('flash');
-const heldFlash = held !== null && Number(held) >= 0 && Number(held) <= 1 ? Number(held) : undefined;
 const opening = { distance: 1800, azimuth: -2.2, strength: 1, seconds: 1.6 };
-const strikeAt = (distance: number, azimuth: number): Vec3 => [
-  hero.position[0] + Math.sin(azimuth) * distance,
-  0,
-  hero.position[2] + Math.cos(azimuth) * distance,
-];
-let strikePosition = strikeAt(opening.distance, opening.azimuth);
-const bolt: ClusteredLight = { position: [0, 0, 0], range: 5000, color: [0.75, 0.82, 1], intensity: 0, decay: 2 };
 const mastLocal = scene.boat.mastLight as Vec3;
 // ?beam=<radians> holds the beams at one bearing (for stills and tests); otherwise they turn once every twelve seconds.
 const heldBeam = new URLSearchParams(location.search).get('beam');
@@ -340,7 +349,7 @@ function setLights() {
       shadow: { near: 2.4, far: 600 },
     };
   });
-  lights.setLights([
+  groups.group('scene').setLights([
     ...beams,
     { position: [lamp[0], lamp[1] + 0.2, lamp[2]], range: 16, color: beamColor, intensity: 260 },
     ...windows,
@@ -349,7 +358,6 @@ function setLights() {
     cabin,
     fill,
     skyFill,
-    bolt,
   ]);
 }
 
@@ -428,28 +436,30 @@ struct Out { @builtin(position) clip:vec4f, @location(0) uv:vec2f, @location(1) 
 raw.add(new RawMesh({ material: streak, vertexCount: 6 }));
 
 // The boat rides the swell: the water is captured on the GPU, sampled under its hull, and the hull eases toward
-// that pose like a heavy wooden boat would.
+// that pose like a heavy wooden boat would. Each capture is the frame on screen; the next starts once it is read.
 const boatHome: Vec3 = [16, 0, 46];
 const pose = { y: 0, pitch: 0, roll: 0, vy: 0, vp: 0, vr: 0 };
 let surface: WaveQuery | undefined,
   capturing = false,
-  since = 0;
+  updates = 0;
 function sampleSea(x: number, z: number) {
-  const s = surface?.sample(x, z);
-  return s ? s.height + s.velocity[1] * since : undefined;
+  return surface?.sample(x, z)?.height;
 }
 function moveBoat(delta: number, time: number) {
-  if (!capturing && water) {
+  // The first frame updates before the sea's first draw, when a capture has nothing on screen to read.
+  if (updates++ > 0 && !capturing && water) {
     capturing = true;
     WaveQuery.capture(water)
       .then((frame) => {
         surface = frame;
-        since = 0;
       })
-      .catch(() => {})
+      .catch((reason: unknown) => {
+        // The hull holds its last pose rather than follow a stale sea, and the reason is shown.
+        surface = undefined;
+        error.textContent = String(reason);
+      })
       .finally(() => (capturing = false));
   }
-  since += delta;
   const heading = 2.5 + 0.12 * Math.sin(time * 0.11),
     fx = Math.sin(heading),
     fz = Math.cos(heading),
@@ -512,19 +522,18 @@ const ramp = (a: number, b: number, x: number) => {
 };
 const NAMES = ['Calm', 'Breeze', 'Fresh', 'Squall', 'Gale', 'Storm'];
 let storm = Number(slider.value),
-  windSpeed = 0,
-  moonLight = 1.2;
+  windSpeed = 0;
 function setStorm(value: number) {
   storm = value;
   force.value = NAMES[Math.min(NAMES.length - 1, Math.floor(value * NAMES.length))];
   windSpeed = 3 + 24 * value;
   const wind: [number, number] = [-0.8 * windSpeed * 0.7, -0.6 * windSpeed * 0.7];
   sky.options.hours = 20.1 + 2.4 * ramp(0, 1, value);
-  haze.far = 4200 - 2600 * ramp(0.2, 1, value);
-  moonLight = 1.2 * (1 - 0.5 * ramp(0.3, 1, value));
   // Broken enough that the deck shows its masses and the dark rifts between them, the moon glowing through the thin
   // places; a flash lights them from inside.
   deck.options.coverage = 0.55 + 0.2 * ramp(0, 0.9, value);
+  // The deck dims the moonlight under it by its cover (the sky's cloudTransmittance, Kasten and Czeplak 1980).
+  sky.options.lighting!.moon!.cloudCover = deck.options.coverage;
   deck.options.density = 0.012 + 0.016 * value;
   deck.options.wind = [wind[0] * 1.5, wind[1] * 1.5];
   weather.options.intensity = ramp(0.18, 0.9, value);
@@ -601,10 +610,9 @@ stage.canvas.addEventListener('pointerup', (event) => {
     across = (event.clientX / innerWidth - 0.5) * 0.9;
   weather.strike({ distance: 1200 + Math.random() * 1500, azimuth: Math.atan2(dx, dz) + across, strength: 1 });
 });
-// Each strike moves the flash's light over it.
+// The last strike, for tests (the weather moves its lights over each strike itself).
 let lastStrike: { azimuth: number; time: number } | undefined, openingStrike: typeof lastStrike;
 weather.onLightning((strike) => {
-  strikePosition = [strike.position[0], 0, strike.position[2]];
   lastStrike = strike;
 });
 
@@ -622,18 +630,11 @@ stage.use({
     moveBoat(delta, time);
     if (!still && heldFlash === undefined && time - delta < opening.seconds && time >= opening.seconds)
       openingStrike = weather.strike(opening);
-    // A lightning flash lights the cloud deck from inside (a light in the deck above the strike), and through the deck
-    // the scene's sky light and the sea's reflection; the bolt's light from behind the headland lights the cliffs and
-    // the sea, and the moon's light flares with it.
-    const flash = heldFlash ?? weather.flash;
-    bolt.position = [strikePosition[0], 420, strikePosition[2]];
-    bolt.intensity = flash * 4e6;
-    deck.options.flash = { position: [strikePosition[0], 950, strikePosition[2]], intensity: flash * 1.6e6 };
+    // A held flash lights the opening strike's place from the first frame.
+    if (heldFlash !== undefined && !openingStrike) openingStrike = weather.strike(opening);
     setLights();
-    sky.options.lighting!.moon!.intensity = moonLight + flash * 3;
     glow.uniforms.beam.value = beamAngle;
     streak.uniforms.time.value = time;
-    fog.options.ambient = [0.004 + flash * 0.06, 0.005 + flash * 0.066, 0.008 + flash * 0.084];
     if (status.isConnected && ++frames > 30) {
       status.remove();
       document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
@@ -642,6 +643,20 @@ stage.use({
   dispose: () => controls.dispose(),
 });
 setLights();
+// The shot tool's masks (tools/shot, docs/shots.md) with `?aovs=1`: `geometry`, 1 on the headland, lighthouse and
+// boat above the sea (rock under the sea counts as water), and `depth`, their nearness exp(-distance / 200); the tool
+// works out `sky` and `water` from them with the sea level as its horizon.
+const masks =
+  params.get('aovs') === '1'
+    ? SceneTargets.attach(engine, {
+        outputs: {
+          geometry: { wgsl: 'vec4f(select(0.0, 1.0, t.position.y >= 0.0), 0, 0, 1)', format: 'r8unorm' },
+          depth: { wgsl: 'vec4f(exp(-distance(t.eye, t.position) / 200.0), 0, 0, 1)', format: 'r8unorm' },
+        },
+      })
+    : undefined;
+masks?.add(land);
+masks?.add(boat);
 // For tests and the console.
 (window as unknown as Record<string, unknown>).stormLight = {
   engine,
@@ -654,6 +669,7 @@ setLights();
   beam: () => beamAngle,
   strike: () => lastStrike,
   opening: () => openingStrike,
+  aovs: masks && (() => ({ device, textures: { geometry: masks.texture('geometry'), depth: masks.texture('depth') } })),
 };
 engine.start();
 window.addEventListener('pagehide', () => stage.dispose(), { once: true });

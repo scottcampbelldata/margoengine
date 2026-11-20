@@ -1,6 +1,6 @@
 // Unreal collision names and UV flipbook materials from a scene, from Unreal's public documentation on FBX static mesh
 // collision naming and its Python API. Strings only; the script runs in the Unreal editor.
-import { collisionNodes, uvClips } from './uv-clips.js';
+import { collisionNodes, uniqueNamer, uvClips } from './uv-clips.js';
 import type { ExportScene } from './scene.js';
 
 /** The primitive a convex collision node should import as. Default `'convex'`. */
@@ -19,6 +19,8 @@ export interface UnrealCollisionEntry {
 export interface UnrealFlipbook {
   clip: string;
   material: string;
+  /** The Material asset's name, `M_<clip>_<material>` made safe for Unreal and distinct from every other flipbook's. */
+  asset: string;
   /** Frames per second. */
   fps: number;
   frames: number;
@@ -77,6 +79,7 @@ export function unrealCollisionNames(
  * sizes or off a regular grid, naming the fix.
  */
 export function unrealFlipbooks(scene: ExportScene): UnrealFlipbook[] {
+  const asset = uniqueNamer();
   return uvClips(scene).map(({ clip, materialName, keys }) => {
     const refuse = (why: string): never => {
       throw new RangeError(`UV clip ${clip} on ${materialName} ${why}; lay the cels out as a regular grid at one rate`);
@@ -103,6 +106,7 @@ export function unrealFlipbooks(scene: ExportScene): UnrealFlipbook[] {
     return {
       clip,
       material: materialName,
+      asset: asset(`M_${clip}_${materialName}`),
       fps: +(1 / interval).toFixed(6),
       frames: keys.length,
       columns,
@@ -116,7 +120,7 @@ export function unrealFlipbooks(scene: ExportScene): UnrealFlipbook[] {
 /**
  * Python for the Unreal editor, run after importing the file: it sets complex-as-simple collision on every `-col` mesh and
  * builds one Material per UV clip, a Time, Fmod and Floor graph that steps a cel grid on the base color (no Flipbook
- * function asset needed). Assign each `M_<clip>_<material>` to its mesh; set `BaseTexture` on the Material.
+ * function asset needed). Assign each flipbook's `asset` (`M_<clip>_<material>`, made safe and distinct) to its mesh; set `BaseTexture` on the Material.
  * @example
  * ```ts
  * import {createUnrealImportScript} from 'margoengine/exporters/unreal-import';
@@ -156,7 +160,7 @@ def set_complex_collision(name):
 def build_flipbook(book):
     lib = unreal.MaterialEditingLibrary
     tools = unreal.AssetToolsHelpers.get_asset_tools()
-    name = "M_" + book["clip"] + "_" + book["material"]
+    name = book["asset"]
     material = tools.create_asset(name, CONTENT, unreal.Material, unreal.MaterialFactoryNew())
 
     def node(kind):

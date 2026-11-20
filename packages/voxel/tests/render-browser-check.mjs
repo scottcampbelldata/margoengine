@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel/render (run from the repository root after building packages, one GPU job at a
-// time: node scripts/gpu-lock.mjs run --owner=voxel-render -- node packages/voxel/tests/render-browser-check.mjs):
+// time: node scripts/run-with-timeout.mjs -- node packages/voxel/tests/render-browser-check.mjs):
 // - T-junction cracks: a closed slab of two block types that never merge, every face the same colour, from grazing
 //   views: no background pixel inside the surface in the greedy image (nor in the naive one), at 4x and 1x MSAA;
 // - (tolerance: views that blend a translucent layer at 4x MSAA may differ by 1 ulp, nowhere else: blend-tolerance.js,
@@ -12,6 +12,7 @@
 //   position order, so equal-depth samples where chunks overlap never follow the workers' timing);
 // - a cutout square and translucent glass composite to their exact linear numbers;
 // - distant leaves stay dense over what is behind them, and fog takes water with nothing under it;
+// - two views side by side through one camera draw the same pixels in each half;
 // - a block edit is drawn within two 60 Hz frames (best of five); engine.rebootDevice() draws the same image again;
 // - the worst case, 196,608 quads in one chunk layer (cutout and translucent), draws;
 // - no WebGPU validation errors; sane stats.
@@ -145,6 +146,13 @@ try {
     assert.deepEqual(wf.errors, []);
     near(wf.water, [1, 0, 1], `${samples}x water with nothing under it takes the fog`, 0.02);
     console.log(`ok ${samples}x fog over water with nothing under it: ${wf.water.map((v) => v.toFixed(3))}`);
+    const sb = await page.evaluate(() => window.check.sideBySide());
+    report.results[`${samples}x side by side`] = sb;
+    assert.deepEqual(sb.errors, []);
+    assert.ok(sb.even, 'the canvas splits into two equal halves');
+    assert.ok(sb.result.lit > 1000, `side-by-side views drew too little: ${JSON.stringify(sb.result)}`);
+    assert.equal(sb.result.differing, 0, `${samples}x two views of one camera differ: ${JSON.stringify(sb.result)}`);
+    console.log(`ok ${samples}x two views side by side through one camera draw the same pixels`);
     const e = await page.evaluate(() => window.check.edit());
     report.results[`${samples}x edit`] = e;
     assert.deepEqual(e.errors, []);

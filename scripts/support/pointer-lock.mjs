@@ -1,3 +1,4 @@
+// MARGO_COMPAT not applicable: the probe page holds one button for pointer lock and makes no GPU calls.
 // Native pointer lock in the harness-launched browser, and what a check does when the operating system refuses it.
 //
 // Chromium grants `requestPointerLock` only to a page whose view has OS keyboard focus; otherwise the request rejects

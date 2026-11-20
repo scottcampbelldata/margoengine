@@ -474,3 +474,64 @@ test('Shapefile multipoints and PointM retain explicit points and measures', () 
   const measured = parseShapefile(shp(21, [pointRecord(21, 1, 2, 0, 3)]));
   assert.deepEqual(measured.features[0].geometry.coordinates, [1, 2, 0, 3]);
 });
+
+// ESRI Shapefile Technical Description (ESRI, July 1998), MultiPatch: walls stand vertical, and a ring sequence
+// (Outer Ring then its Inner Rings, First Ring then its Rings) is one polygon.
+test('Shapefile MultiPatch walls triangulate in their own plane and keep their holes', () => {
+  const wall = [
+    [0, 0, 0],
+    [4, 0, 0],
+    [4, 0, 4],
+    [0, 0, 4],
+    [0, 0, 0],
+  ];
+  const window = [
+    [1, 0, 1],
+    [1, 0, 3],
+    [3, 0, 3],
+    [3, 0, 1],
+    [1, 0, 1],
+  ];
+  const strip = [
+    [0, 5, 0],
+    [0, 5, 2],
+    [0, 7, 0],
+    [0, 7, 2],
+  ];
+  for (const [outer, inner] of [
+    [2, 3],
+    [4, 5],
+  ]) {
+    const result = parseShapefile(shp(31, [partsRecord(31, [wall, window, strip], [outer, inner, 0])]));
+    assert.equal(result.polygons.length, 3, 'one wall polygon with its hole, two strip triangles');
+    assert.equal(result.polygons[0].rings.length, 2);
+    // The x/z wall area 16 minus the window 4, plus the y/z strip 4, all with zero x/y area.
+    let wallArea = 0;
+    const p = result.positions,
+      ix = result.mesh.indices;
+    for (let t = 0; t < ix.length; t += 3) {
+      const [a, b, c] = [ix[t] * 3, ix[t + 1] * 3, ix[t + 2] * 3];
+      const u = [p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]],
+        v = [p[c] - p[a], p[c + 1] - p[a + 1], p[c + 2] - p[a + 2]];
+      wallArea += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
+    }
+    assert.ok(Math.abs(wallArea - 16) < 1e-9, `wall area ${wallArea}`);
+  }
+  // Two lone Rings are two polygons, not a ring and its hole.
+  const lone = parseShapefile(shp(31, [partsRecord(31, [wall, window], [5, 5])]));
+  assert.equal(lone.polygons.length, 2);
+  // Map polygons with lon/lat in degrees and heights in metres stay in x/y.
+  const roof = parseGeoJSON({
+    type: 'Polygon',
+    coordinates: [
+      [
+        [0, 0, 0],
+        [0.0001, 0, 10],
+        [0.0001, 0.0001, 10],
+        [0, 0.0001, 0],
+        [0, 0, 0],
+      ],
+    ],
+  });
+  assert.equal(roof.mesh.indices.length, 6);
+});

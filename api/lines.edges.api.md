@@ -31,6 +31,8 @@ export function featureEdges({ vertices, indices }: EdgeSource, { angle, stride,
 
 export function gradientColors(positions: ArrayLike<number>, colors: readonly ColorInput[], { mode, stops }?: GradientOptions): Float32Array;
 
+export function wireframeEdges({ vertices, indices }: EdgeSource, { stride, tolerance }?: Pick<FeatureEdgeOptions, 'stride' | 'tolerance'>): Float32Array;
+
 // Not exported from this entry, but used by the exports above:
 
 class Line extends SelectionMasked {

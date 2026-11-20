@@ -4,13 +4,14 @@ import { splitTRS } from '@margoengine/math/quat';
 import { sampleTrack, type Interpolation } from '@margoengine/animation/sampling';
 import type { RetargetRig } from '@margoengine/animation/skeleton-utils';
 import type { Animation } from '@margoengine/animation';
-import type { GLTFDocument } from '@margoengine/gltf-pro/asset';
+import type { GLTFDocument } from '@margoengine/gltf/asset';
 import { glbChunks, isGLB, GLB_JSON, GLB_BIN } from '../../shared/glb.js';
 import { parseJSON } from '../../shared/json.js';
 import { readResponse } from '../../shared/loading.js';
 import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { HUMANOID_BONES, type HumanoidBone } from './retarget.js';
 import type { VRMAvatar, VRMHandle, VRMGaze } from './vrm.js';
+import { PRESETS } from './vrm-presets.js';
 
 /** VRMC_vrm_animation metadata, retained with extension fields and licensing extras. */
 export interface VRMAExtension {
@@ -150,6 +151,9 @@ export async function readVRMA(source: Uint8Array | GLTFDocument, options: VRMAL
         ['lookUp', 'lookDown', 'lookLeft', 'lookRight'].includes(name)
       )
         fail(`expression ${name}`);
+      // VRMC_vrm_animation 1.0: "Custom expressions cannot have the same name as the preset expressions."
+      if (group === extension.expressions?.custom && PRESETS.has(name))
+        fail(`custom expression ${name} has a preset expression's name`);
       roles.set(ref.node, `expression:${name}`);
     }
   }
@@ -158,7 +162,7 @@ export async function readVRMA(source: Uint8Array | GLTFDocument, options: VRMAL
     if (!validNode(look, rig.names.length) || roles.has(look)) fail('lookAt node');
     roles.set(look, 'lookAt');
   }
-  const { GLTFAsset } = await import('@margoengine/gltf-pro/asset');
+  const { GLTFAsset } = await import('@margoengine/gltf/asset');
   options.signal?.throwIfAborted();
   // This entry implements VRMA, so only its required-extension marker is consumed here.
   const asset = new GLTFAsset(
@@ -200,13 +204,23 @@ export async function readVRMA(source: Uint8Array | GLTFDocument, options: VRMAL
         !values.every(Number.isFinite)
       )
         fail('animation times or values');
-      if (doc.accessors![sampler.input].componentType !== 5126 || doc.accessors![sampler.output].componentType !== 5126)
-        fail('animation accessors must be FLOAT');
+      // glTF 2.0 3.11 (VRMA uses core animation): inputs and translation outputs are float; rotation outputs may also
+      // be normalized signed or unsigned bytes or shorts, unit "within the margin of" their precision.
+      const output = doc.accessors![sampler.output],
+        steps = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 } as Record<number, number>,
+        quantized = width === 4 && output.normalized === true ? steps[output.componentType] : undefined;
+      if (doc.accessors![sampler.input].componentType !== 5126 || (output.componentType !== 5126 && !quantized))
+        fail('animation accessors must be FLOAT, or normalized bytes or shorts for rotations');
       if (width === 4) {
         const stride = interpolation === 'CUBICSPLINE' ? 12 : 4,
-          start = interpolation === 'CUBICSPLINE' ? 4 : 0;
-        for (let k = start; k < values.length; k += stride)
-          if (Math.abs(Math.hypot(...values.subarray(k, k + 4)) - 1) > 1e-5) fail('rotation keys must be normalized');
+          start = interpolation === 'CUBICSPLINE' ? 4 : 0,
+          // Rounding each of four components by half a step moves the length by at most one step.
+          margin = quantized ? 1 / quantized : 1e-5;
+        for (let k = start; k < values.length; k += stride) {
+          const length = Math.hypot(...values.subarray(k, k + 4));
+          if (Math.abs(length - 1) > margin) fail('rotation keys must be normalized');
+          if (quantized) for (let c = 0; c < 4; c++) values[k + c] /= length;
+        }
       }
       sampleTrack(times, values, width, 0, interpolation as Interpolation, width === 4);
       tracks.push({
@@ -401,8 +415,21 @@ export async function playVRMA(
   if (options.autoUpdate !== false) {
     if (options.vrm) detach = options.vrm.addPoseSource(update);
     else {
-      owner.use({ name, setup() {}, onPreUpdate: update });
-      detach = () => owner.removePlugin(name);
+      // Removed by its scene (removePlugin, scene or engine disposal), the binding ends with it; a later dispose()
+      // then leaves alone another plugin registered under the same name.
+      const plugin = {
+        name,
+        setup() {},
+        onPreUpdate: update,
+        dispose: () => {
+          detach = undefined;
+          dispose();
+        },
+      };
+      owner.use(plugin);
+      detach = () => {
+        if (owner.plugins.get(name) === plugin) owner.removePlugin(name);
+      };
     }
   }
   unsubscribe = model.onDispose(() => {

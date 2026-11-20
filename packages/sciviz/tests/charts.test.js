@@ -45,3 +45,19 @@ test('heatmapRects puts cell centres on the x and y ranges; NaN cells are empty;
   assert.deepEqual([...coloredMissing.slice(12, 16)], [0.5, 0.5, 1.5, 1.5]);
   assert.equal(rectAt(coloredMissing, 1, 1), 3, 'An explicit missing-data colour retains the cell');
 });
+
+test('histogram: a value on an edge counts in the bin the edge opens; huge constant values and spans count', () => {
+  for (const bins of [9, 11, 12, 17]) {
+    const { edges } = histogram([0, 1], { bins });
+    for (let k = 1; k < bins; k++)
+      assert.equal(histogram([edges[k]], { bins, range: [0, 1] }).counts[k], 1, `edge ${k} of ${bins} (${edges[k]})`);
+  }
+  // Half a unit does not move 1e20: the bins had zero width and lost both values.
+  const constant = histogram([1e20, 1e20]);
+  assert.equal(constant.counts.reduce((a, b) => a + b, 0), 2);
+  assert.ok(constant.edges[0] < 1e20 && constant.edges.at(-1) > 1e20);
+  // A span past the largest double: finite edges, each value in its own half.
+  const wide = histogram([-1e308, 1e308], { bins: 2 });
+  assert.deepEqual([...wide.edges], [-1e308, 0, 1e308]);
+  assert.deepEqual([...wide.counts], [1, 1]);
+});

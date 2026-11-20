@@ -35,6 +35,19 @@ test('a counted loop through a frame helper that steps time is not a wait; the s
   assert.ok(!fixedWaits(page).some((w) => /i<90/.test(w.text)), 'biomes water-check 90-frame flow step read as a wait');
 });
 
+// Regression (KB-GLTF-FIXEDWAIT1): packages/vfx/test/settings-check.html and packages/weather/tests/settings-check.html
+// step 60 frames through `frame(delta){engine.render({delta});}` with `frame(1/60)`; the delta is the helper's parameter.
+test('a helper that renders with its parameter as the delta steps time when called with a number above 0', () => {
+  const shorthand = 'async function frame(delta){engine.render({delta});await done();}\n';
+  assert.deepEqual(kinds(shorthand + 'for(let f=0;f<60;f++){apply(f/59);await frame(1/60);}'), []);
+  assert.deepEqual(kinds(shorthand + 'for(let f=0;f<60;f++){apply(f/59);await frame(0);}'), ['2:frames']);
+  assert.deepEqual(kinds(shorthand + 'for(let f=0;f<60;f++){apply(f/59);await frame(x);}'), ['2:frames']);
+  for (const file of ['packages/vfx/test/settings-check.html', 'packages/weather/tests/settings-check.html']) {
+    const page = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+    assert.ok(!fixedWaits(page).some((w) => /frame\(1\/60\)/.test(w.text)), `${file}: a 1/60 s step read as a wait`);
+  }
+});
+
 // Regression (2026-11-07): tests/modern-xr-passes.ts drew one reference render per eye in `for (let i = 0; i < 2; i++)
 // { const view = eyes()[i]; engine.render(...) }`, and the check read that walk over two eyes as a two-frame wait.
 test('a counted loop that reads a list item by its counter walks the list; recording each frame does not', () => {
@@ -150,13 +163,23 @@ test('HTML markup and strings with braces do not become helper scopes or stall s
   assert.deepEqual(kinds('const text = `value ${"{"}`; const kill=()=>child.kill(); setTimeout(kill,100);'), []);
 });
 
+// A regular expression after `&&` or `||` once read as a division: the scanner lost its place in the template and
+// stopped (packages/studio/test/accumulate.test.js, `error.code === 'x' && /https:\/\/a#/.test(error.message)`).
+test('a regular expression after && or || is read as one', () => {
+  const source =
+    "assert.throws(() => f(), (e) => e.code === 'x' && /https:\\/\\/a#/.test(e.message));\n" +
+    "const g = (e) => e || /}`{/.test(e);\nconst t = `${1}`;\n" +
+    'for (let i = 0; i < 20; i++) { engine.render({ delta: 0 }); await done(); }\n';
+  assert.deepEqual(kinds(source), ['4:frames']);
+});
+
 test('the check reads test folders, unit tests too, and the browser drivers in scripts/, not benchmarks or builds', () => {
   assert.ok(isCheckFile('packages/voxel/tests/bevel-browser-check.html'));
   assert.ok(isCheckFile('packages/sky/test/browser-check.html'));
   assert.ok(isCheckFile('scripts/modern-browser-tests.js'));
   assert.ok(!isCheckFile('packages/voxel/src/render.ts'));
   assert.ok(isCheckFile('packages/voxel/tests/mesher.test.js'));
-  assert.ok(isCheckFile('tests/gpu-lock-limits.test.js'));
+  assert.ok(isCheckFile('tests/parallel-check.test.js'));
   assert.ok(!isCheckFile('bench/cli.mjs'));
   assert.ok(!isCheckFile('scripts/benchmark-vfx-island.js'));
   assert.ok(!isCheckFile('packages/voxel/dist/tests/x.js'));

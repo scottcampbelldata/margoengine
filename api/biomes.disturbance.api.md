@@ -29,6 +29,18 @@ export interface Disturbance extends HeightGrid {
     readonly stage: Uint8Array;
 }
 
+export interface DisturbanceMarkTarget {
+    markEach(at: (x: number, z: number) => DisturbanceMarks | undefined): unknown;
+}
+
+export interface DisturbanceMarks {
+    readonly scorch?: number;
+    readonly char?: number;
+    readonly intensity?: number;
+    readonly ash?: number;
+    readonly water?: number;
+}
+
 export interface DisturbanceOptions {
     readonly seed?: number;
     readonly years?: number;
@@ -40,6 +52,16 @@ export interface DisturbanceOptions {
     readonly succession?: {
         readonly stages?: readonly number[];
     };
+}
+
+export interface DisturbanceStatesOptions {
+    readonly intensity?: number | ((x: number, z: number) => number);
+    readonly ambient?: number;
+    readonly wind?: number;
+    readonly burnYears?: number;
+    readonly charYears?: number;
+    readonly floodPeriod?: number;
+    readonly floodMark?: number;
 }
 
 export interface DisturbanceWorld {
@@ -71,6 +93,8 @@ export function decodeDisturbance(bytes: Uint8Array): Disturbance;
 export function disturbance(grid: HeightGrid, hydrology: Hydrology | undefined, options?: DisturbanceOptions): Disturbance;
 
 export function disturbanceOf(world: DisturbanceWorld, h: Hydrology | undefined, options?: DisturbanceOptions): Disturbance;
+
+export function disturbanceStates(world: DisturbanceWorld, d: Disturbance, states: DisturbanceMarkTarget, options?: DisturbanceStatesOptions): void;
 
 export function disturbanceTile(world: DisturbanceWorld, d: Disturbance, x: number, z: number): RasterLayer[];
 

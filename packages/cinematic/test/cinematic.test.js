@@ -125,3 +125,20 @@ test('camera springs reuse each decay across all three axes and resample mutable
     Math.exp = exp;
   }
 });
+test('a below-target orbit with ground out of reach keeps its look-at point through a shake', () => {
+  // The look is raised only by what the ground lifted the camera, never by shake or spring lag.
+  const engine = { camera: {}, removePlugin() {} },
+    rig = new Cinematic({ offset: [0, -1, 4], ground: () => -100 });
+  rig.setup(engine);
+  rig.follow([0, 0, 0]);
+  rig.update(0);
+  rig.shake(1, 1, 25);
+  for (let i = 0; i < 30; i++) {
+    rig.update(1 / 60);
+    assert.ok(Math.abs(engine.camera.target[1] - rig.lookAt[1]) < 1e-6, `frame ${i}: ${engine.camera.target[1]}`);
+  }
+  // Following a target that falls leaves the camera above its arm: still no lift, so the look stays on the target.
+  rig.follow([0, -5, 0]);
+  rig.update(1 / 60);
+  assert.ok(Math.abs(engine.camera.target[1] - rig.lookAt[1]) < 1e-6);
+});

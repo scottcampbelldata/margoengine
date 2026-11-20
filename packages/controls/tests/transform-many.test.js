@@ -243,4 +243,32 @@ test('disposal: a member disposed mid-drag drops out; losing the active object e
   assert.ok(gizmo.frame(), 'still attached');
   gizmo.dispose();
   engine.dispose();
+
+  // A pointer drag whose mesh is disposed ends like a release: mouseUp and dragging-changed false fire (so an orbit
+  // turned off with `enabled = !event.value` comes back) and the pointer capture is let go.
+  const second = await rig(),
+    events = [],
+    orbit = { enabled: true };
+  second.gizmo.addEventListener('dragging-changed', (e) => {
+    events.push(`dragging-changed:${e.value}`);
+    orbit.enabled = !e.value;
+  });
+  second.gizmo.addEventListener('mouseUp', () => events.push('mouseUp'));
+  second.gizmo.attach(second.a);
+  const f = second.gizmo.frame(),
+    [x, y] = pixel(second.engine.camera, [f.origin[0] + 0.8 * f.size, f.origin[1], f.origin[2]]);
+  second.canvas.dispatch('pointerdown', { clientX: x, clientY: y, pointerId: 7, button: 0, pointerType: 'mouse' });
+  assert.equal(second.gizmo.dragging, true, 'the X handle was grabbed');
+  assert.ok(second.canvas.captured.has(7));
+  second.a.dispose();
+  assert.deepEqual([...second.gizmo.objects], []);
+  assert.equal(second.gizmo.dragging, false);
+  assert.deepEqual(events, ['dragging-changed:true', 'mouseUp', 'dragging-changed:false']);
+  assert.equal(orbit.enabled, true, 'orbit enabled again');
+  assert.equal(second.canvas.captured.size, 0, 'capture released');
+  // The stale pointer no longer drives anything: its release is ignored and a new drag on another mesh works.
+  second.canvas.dispatch('pointerup', { clientX: x, clientY: y, pointerId: 7, button: 0, pointerType: 'mouse' });
+  assert.equal(events.length, 3);
+  second.gizmo.dispose();
+  second.engine.dispose();
 });

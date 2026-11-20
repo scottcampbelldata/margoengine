@@ -1,9 +1,20 @@
-import { CloudVolumes, cloudField, writeLayer, type VolumetricCloudOptions } from './volumetric-clouds.js';
+import {
+  CLOUD_FLOATS,
+  CloudVolumes,
+  cloudField,
+  stormFieldFor,
+  wantsStorm,
+  withStorm,
+  writeLayer,
+  type VolumetricCloudOptions,
+} from './volumetric-clouds.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 /** The clouds a {@link volumetricCloudShadows} matches: `VolumetricClouds` from `@margoengine/sky/volumetric-clouds`. */
 export interface VolumetricCloudSource {
   readonly options: VolumetricCloudOptions;
   readonly drift: ArrayLike<number>;
+  /** Seconds on the layer's clock (`VolumetricClouds.time`): where a storm it draws has moved. Default 0. */
+  readonly time?: number;
 }
 /** {@link volumetricCloudShadows} settings, read every frame from the effect's `options`. */
 export interface VolumetricCloudShadowOptions {
@@ -25,6 +36,8 @@ export interface VolumetricCloudShadow {
   readonly options: VolumetricCloudShadowOptions;
   /** WGSL multiplying the light: the transmittance of the clouds between a receiver and the light. */
   readonly call: string;
+  /** 1 once a storm's code the clouds draw has loaded, else 0: the shadows compose their receivers again when it moves. */
+  readonly revision: number;
   wgsl(group: number, binding: number): string;
   resources(): readonly GPUBindingResource[];
   setup(device: GPUDevice): void;
@@ -44,20 +57,29 @@ export function volumetricCloudShadows(
 ): VolumetricCloudShadow {
   if (!clouds || typeof clouds.options !== 'object' || !(clouds.drift?.length >= 3))
     throw new TypeError('volumetricCloudShadows needs VolumetricClouds; pass the clouds whose shadows these are');
-  const values = new Float32Array(64);
+  const values = new Float32Array(CLOUD_FLOATS);
   let uniform: GPUBuffer | undefined,
     volumes: CloudVolumes | undefined,
     owner: GPUDevice | undefined,
-    binding = 0;
+    binding = 0,
+    built = false; // whether the compiled field holds the storm
   return {
     options,
     get call() {
       return `vec3f(shadowFxVolume${binding}(position))`;
     },
+    // A storm's code loads on first use (reading this starts it): until then the shadows cast nothing, and once it has
+    // arrived this moves, so the shadows compose their receivers again with the storm in.
+    get revision() {
+      return wantsStorm(clouds.options) && stormFieldFor(clouds.options) ? 1 : 0;
+    },
     wgsl(group, at) {
       binding = at;
-      const field = cloudField
-        .replace(/\bcloud(Remap|Altitude|DensityAt|LightDepth)\b/g, `shadowFxCloud$1${at}`)
+      // The storm's code is read here, when the shadows compose a receiver; without it yet, they cast nothing (update).
+      const storm = stormFieldFor(clouds.options);
+      built = !!storm;
+      const field = withStorm(cloudField, storm)
+        .replace(/\bcloud(Remap|Altitude|DensityAt|LightDepth|Base|Storm[A-Za-z]*)\b/g, `shadowFxCloud$1${at}`)
         .replace(/\bClouds\b/g, `ShadowFxClouds${at}`);
       // Distance from p to the shell at height h along the unit direction s, for p inside it: the positive root of
       // |o + t s| = R + h, written without cancellation (as the clouds' own shell roots).
@@ -106,10 +128,11 @@ fn shadowFxVolume${at}(position:vec3f)->f32 {
       if (!Number.isInteger(samples) || samples < 2 || samples > 64)
         throw new RangeError('Invalid cloud shadow samples; use an integer from 2 to 64');
       volumes!.fill(device, encoder);
-      writeLayer(values, clouds.options, clouds.drift);
+      writeLayer(values, clouds.options, clouds.drift, clouds.time ?? 0);
       for (let i = 0; i < 3; i++) values[20 + i] = frame.light[i];
       values[35] = samples;
-      values[41] = strength;
+      // Compiled without the storm the clouds now draw (its code is still loading): no shadow until it is in.
+      values[41] = wantsStorm(clouds.options) && !built ? 0 : strength;
       device.queue.writeBuffer(uniform!, 0, values as Float32Array<ArrayBuffer>);
     },
     dispose() {

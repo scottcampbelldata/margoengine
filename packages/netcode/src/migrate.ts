@@ -323,7 +323,9 @@ export class HostMigration<State> {
   private receive(from: number, packet: Packet): void {
     if (this.closed || !this.links.get(from)?.connection.open) return;
     this.validate(packet);
-    if (packet.kind === STATUS && packet.epoch === this.epochNumber + 1 && this.hostId !== undefined) {
+    // A later epoch, not only the next: a host whose handoff target left has spent one epoch on the handoff and one on
+    // the recovery, while a follower that dropped the TRANSFER (its roster had already lost the target) is two behind.
+    if (packet.kind === STATUS && packet.epoch > this.epochNumber && this.hostId !== undefined) {
       this.future.set(from, packet);
       if (from === this.hostId) this.beginRecovery(packet.epoch);
       return;

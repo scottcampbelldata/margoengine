@@ -1,0 +1,1 @@
+{"character": {"Version": "1.10", "Object": {"character": {"Generation": "RL_CC3_Plus", "Meshes": {"CC_Base_Body": {"Materials": {"Std_Skin_Head": {"Two Side": true, "Textures": {"Base Color": {"Texture Path": "Std_Skin_Head_Diffuse.jpg", "Strength": 100}}, "Custom Shader": {"Shader Name": "RLHead", "Variable": {}}}}}}}}}}

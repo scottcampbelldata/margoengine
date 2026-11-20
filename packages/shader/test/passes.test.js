@@ -24,7 +24,7 @@ import { displacedDepth } from '../../shared/displacement.js';
 import { instancedDepth } from '../../shared/instances.js';
 import { displacementGroup } from '../../shared/caster.js';
 
-const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
+const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf/src/shader.ts');
 const { shadowDepth } = await import('../../shadows/src/shader.ts');
 const { objectVelocity } = await import('../../taa/src/shader.ts');
 const device = { fake: true };

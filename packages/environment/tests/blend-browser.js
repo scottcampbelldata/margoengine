@@ -5,6 +5,7 @@ import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Environment } from '../dist/index.js';
 import { EnvironmentBlend, rotateSH } from '../dist/blend.js';
+import { loadPrefilteredEnvironment, savePrefilteredEnvironment } from '../dist/prefiltered.js';
 import {
   assert,
   cubeTexel,
@@ -71,6 +72,19 @@ window.runTests = async () => {
         assert(Math.abs(gpu[k * 4 + c] - out.sh.irradiance[k * 3 + c]) < 1e-6, 'GPU irradiance SH');
         assert(Math.abs(gpu[64 + k * 4 + c] - out.sh.radiance[k * 3 + c]) < 1e-6, 'GPU radiance SH');
       }
+    // Regression (KB-A3d): a save spans several readbacks; a reblend during it used to put t 0.25's header and SH
+    // over t 0.6's later mips and resolve. The file now holds the lighting as it was when the save was called.
+    const saving = savePrefilteredEnvironment(out);
+    blend.t = 0.6;
+    const saved = await loadPrefilteredEnvironment(device, await saving);
+    assert(saved.radianceScale === 1, `saved radiance scale ${saved.radianceScale}`);
+    await compareMix(device, { environment: saved }, a, b, 0.75, 0.25, 'saved during a reblend');
+    for (const key of ['irradiance', 'radiance'])
+      for (let k = 0; k < 27; k++) {
+        const want = 0.75 * a.sh[key][k] + 0.25 * b.sh[key][k];
+        assert(Math.abs(saved.sh[key][k] - want) <= 1e-5 * Math.max(1, Math.abs(want)), `saved SH ${key} ${k}`);
+      }
+    saved.dispose();
     blend.t = 0;
     await compareMix(device, blend, a, b, 1, 0, 't 0');
     blend.t = 1;
@@ -86,6 +100,7 @@ window.runTests = async () => {
     blend.dispose();
     assert(out.disposed && !a.disposed && !b.disposed, 'dispose frees the blend output only');
     report.checks.push('t 0, 0.25, 1: cube and specular mips and SH equal the weighted sources within rgba16float rounding');
+    report.checks.push('a save during a reblend holds the lighting as it was when the save was called');
   }
 
   // 2. Rotation and intensity: at t 1 a source turned a quarter turn with intensity 2 lands texel for texel in the

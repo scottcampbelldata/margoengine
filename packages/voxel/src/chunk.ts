@@ -297,7 +297,12 @@ export class VoxelChunk {
     this.palette = palette;
     this.counts = counts;
     this.bits = bits;
-    if (cap > 16) this.lookup ??= new Map(Array.from(palette.subarray(0, this.size), (s, slot) => [s, slot]));
+    // Live slots only: a free slot keeps its old state, and mapping that state to it would let `set` reuse a slot
+    // that `add` later hands to another state.
+    if (cap > 16 && !this.lookup) {
+      this.lookup = new Map();
+      for (let s = 0; s < this.size; s++) if (counts[s]) this.lookup.set(palette[s], s);
+    }
   }
   private add(state: number): number {
     if (!this.free.length && this.size === this.palette.length) this.grow(this.size + 1);

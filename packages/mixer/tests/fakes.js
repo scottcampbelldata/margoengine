@@ -37,7 +37,8 @@ export class FakeNode {
   }
   disconnect(node) {
     if (node === undefined) this.outputs.clear();
-    else this.outputs.delete(node);
+    // Web Audio 1.5: disconnect(destinationNode) without a connection to it throws InvalidAccessError.
+    else if (!this.outputs.delete(node)) throw new DOMException('Not connected to that node', 'InvalidAccessError');
   }
 }
 

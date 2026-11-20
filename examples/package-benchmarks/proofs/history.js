@@ -1,6 +1,6 @@
 // The Git history a proof builds its baseline from. Pinned runs (the commit where a claim was made) rebuild packages at
 // commits that exist only in the pre-rewrite history of one checkout; a clone without them (a fresh clone, CI, a
-// contributor) cannot rerun those claims, so such a proof prints `HISTORICAL: <commit and reason>` and exits 0, as the
+// contributor) cannot rerun those claims, so such a proof prints `HISTORICAL: <commit and reason>` and ends with code 0, as the
 // runner documents. Ongoing guarantees (`--current`) never come here for their baseline: they read the golden outputs
 // in baselines/ (golden.js), which every clone has. A golden-mode proof that still asks Git for a missing revision is a
 // bug in the proof and fails instead.
@@ -52,7 +52,29 @@ export function historical(ref) {
   console.log(
     `HISTORICAL: ${proof()} is pinned to ${message}; its recorded result is ${existsSync(result) ? `results/${proof()}.json` : 'in docs/whitepaper/claims.md'}. Its ongoing guarantee, if it has one, runs with --current.`,
   );
-  process.exit(0);
+  // KB-OWN-EXIT2: the proof stops by unwinding, not process.exit, and ends by its event loop with code 0. The signal is
+  // uncaught on purpose (a proof's own catch passes it on, isHistorical); only the first one ends the run as HISTORICAL.
+  if (!process.listeners('uncaughtException').includes(endHistorical)) process.on('uncaughtException', endHistorical);
+  throw new Historical(message);
+}
+
+/** The signal historical() throws to stop a pinned proof this clone cannot run. */
+export class Historical extends Error {
+  name = 'Historical';
+}
+
+/** True for historical()'s signal: a proof that catches errors around a pinned build rethrows it. */
+export const isHistorical = (error) => error instanceof Historical;
+
+/** Ends the run as HISTORICAL (exit code 0, already announced) on the signal; any other uncaught error still fails it,
+ * reported as Node reports one. */
+function endHistorical(error) {
+  if (isHistorical(error)) {
+    process.exitCode ??= 0;
+    return;
+  }
+  console.error(error);
+  process.exitCode = 1;
 }
 
 /** Whether this clone holds commit `ref`. Throws when Git gives no answer. */

@@ -1,7 +1,7 @@
 // Water refraction at a grazing view follows the bent ray (Snell), so ground far along the unbent eye ray does not show
 // through: its light could only leave the water outside Snell's window. Regression for the blue speckles on the Storm
 // Light moon path: the in-air highlights of submerged rock tens of metres off came through the sea tinted blue.
-// Real WebGPU; run under the GPU lock: node scripts/gpu-lock.mjs run --owner=<id> -- node packages/water/test/refraction-window.browser.mjs
+// Real WebGPU; run: node scripts/run-with-timeout.mjs -- node packages/water/test/refraction-window.browser.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

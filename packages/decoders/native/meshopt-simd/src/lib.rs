@@ -207,10 +207,8 @@ pub unsafe extern "C" fn decode_attributes(source: *const u8, length: usize, tar
             }
         }
         if v1 && !checked_modes {
-            for c in 0..channels {
-                if src[modes_at + c] & 3 == 3 {
-                    return 1;
-                }
+            if !modes_valid(&src[modes_at..]) {
+                return 1;
             }
             checked_modes = true;
         }
@@ -218,7 +216,7 @@ pub unsafe extern "C" fn decode_attributes(source: *const u8, length: usize, tar
             let base = c * 4;
             let mode = if v1 { src[modes_at + c] } else { 0 };
             let out = unsafe { target.add(start * size + base) };
-            match mode & 3 {
+            match mode & 15 {
                 0 => unsafe { bytes_channel(rows, &mut prev, base, n, size, out) },
                 1 => unsafe { words_channel(rows, &mut prev, base, n, size, out) },
                 _ => unsafe { xor_channel(rows, &mut prev, base, n, size, out, mode >> 4) },
@@ -226,7 +224,14 @@ pub unsafe extern "C" fn decode_attributes(source: *const u8, length: usize, tar
         }
         start += n;
     }
-    (length - pos != tail_size) as i32
+    // An empty stream runs no block, and its modes must still be valid.
+    (length - pos != tail_size || (v1 && !checked_modes && !modes_valid(&src[modes_at..]))) as i32
+}
+
+/// KHR_meshopt_compression, version 1 channel modes: the low nibble is 0, 1 or 2, and only mode 2 may set the high
+/// nibble (its rotation).
+fn modes_valid(modes: &[u8]) -> bool {
+    modes.iter().all(|&m| m & 15 <= 2 && (m & 15 == 2 || m >> 4 == 0))
 }
 
 unsafe fn bytes_channel(rows: *const u8, prev: &mut [u8; 256], base: usize, n: usize, size: usize, out: *mut u8) {
@@ -294,7 +299,7 @@ struct Reader<'a> {
 }
 
 impl Reader<'_> {
-    /// None past the end of the stream: such a stream ends in an error whatever follows.
+    /// None past the end of the stream, or when a fifth byte still has its high bit set (at most 5 bytes).
     #[inline(always)]
     fn varint(&mut self) -> Option<u32> {
         let (mut value, mut shift) = (0u32, 0u32);
@@ -304,10 +309,10 @@ impl Reader<'_> {
             value |= ((byte & 127) as u32) << shift;
             shift += 7;
             if byte < 128 {
-                break;
+                return Some(value);
             }
         }
-        Some(value)
+        None
     }
 }
 
@@ -339,10 +344,18 @@ pub unsafe extern "C" fn decode_triangles(source: *const u8, length: usize, targ
     }
     let fifo_limit = if src[0] & 15 == 1 { 13 } else { 15 };
     let tail = length - 16;
-    let mut edge_a = [u32::MAX; 16];
-    let mut edge_b = [u32::MAX; 16];
-    let mut verts = [u32::MAX; 16];
+    // The codeaux table: its last two bytes are 0 and no nibble of it is 0xf.
+    for (i, &aux) in src[tail..].iter().enumerate() {
+        if if i >= 14 { aux != 0 } else { aux & 15 == 15 || aux >> 4 == 15 } {
+            return 1;
+        }
+    }
+    // FIFO contents start undefined: reading a slot before it was written makes the stream invalid.
+    let mut edge_a = [0u32; 16];
+    let mut edge_b = [0u32; 16];
+    let mut verts = [0u32; 16];
     let (mut edge_head, mut vert_head) = (0usize, 0usize);
+    let (mut edges, mut vertices) = (0usize, 0usize);
     let (mut next, mut last) = (0u32, 0u32);
     let mut data = Reader { src, pos: 1 + triangles };
     let wide = wide != 0;
@@ -352,18 +365,24 @@ pub unsafe extern "C" fn decode_triangles(source: *const u8, length: usize, targ
             edge_a[edge_head] = $a;
             edge_b[edge_head] = $b;
             edge_head = (edge_head + 1) & 15;
+            edges = (edges + 1).min(16);
         };
     }
     macro_rules! push_vertex {
         ($v:expr) => {
             verts[vert_head] = $v;
             vert_head = (vert_head + 1) & 15;
+            vertices = (vertices + 1).min(16);
         };
     }
     macro_rules! vertex {
-        ($i:expr) => {
-            verts[vert_head.wrapping_sub(1).wrapping_sub($i as usize) & 15]
-        };
+        ($i:expr) => {{
+            let i = $i as usize;
+            if i >= vertices {
+                return 1;
+            }
+            verts[vert_head.wrapping_sub(1).wrapping_sub(i) & 15]
+        }};
     }
     macro_rules! explicit {
         () => {{
@@ -388,6 +407,9 @@ pub unsafe extern "C" fn decode_triangles(source: *const u8, length: usize, targ
         let (hi, lo) = ((code >> 4) as usize, code & 15);
         let (a, b, c);
         if hi < 15 {
+            if hi >= edges {
+                return 1;
+            }
             let e = edge_head.wrapping_sub(1).wrapping_sub(hi) & 15;
             a = edge_a[e];
             b = edge_b[e];

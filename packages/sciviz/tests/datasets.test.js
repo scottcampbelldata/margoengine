@@ -105,6 +105,24 @@ test('polydata vertices, polylines, concave polygons and strips preserve source 
   assert.deepEqual([...(await contourGrid(vertex, [2])).points.positions], [0, 0, 0]);
   assert.equal((await clipGrid(vertex, { kind: 'plane', normal: [1, 0, 0], offset: 0 })).types[0], 1);
 });
+test('a closed polyline repeats its first point and a strip may repeat a point for its degenerate triangles', async () => {
+  const points = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0];
+  const loop = await createDataSet({ kind: 'polydata', points, lines: [[0, 1, 2, 3, 0]] });
+  assert.deepEqual([...loop.types], [3, 3, 3, 3]);
+  assert.deepEqual([...loop.connectivity], [0, 1, 1, 2, 2, 3, 3, 0]);
+  // A zero-length step draws nothing; the other segments keep their source cell.
+  const stutter = await createDataSet({ kind: 'polydata', points, lines: [[0, 1, 1, 2]], cellData: [7] });
+  assert.deepEqual([...stutter.connectivity], [0, 1, 1, 2]);
+  assert.deepEqual([...stutter.cellData], [7, 7]);
+  // Triangles that repeat a point are the strip's turn-around and are skipped, keeping every real triangle's winding.
+  const strip = await createDataSet({ kind: 'polydata', points, strips: [[0, 1, 3, 3, 2]] });
+  assert.deepEqual([...strip.types], [5]);
+  assert.deepEqual([...strip.connectivity], [0, 1, 3]);
+  const twice = await createDataSet({ kind: 'polydata', points, vertices: [[2, 2]] });
+  assert.deepEqual([...twice.connectivity], [2, 2]);
+  for (const bad of [{ lines: [[1, 1]] }, { strips: [[0, 0, 1]] }, { lines: [[0, 4]] }])
+    await assert.rejects(createDataSet({ kind: 'polydata', points, ...bad }), /DataSet:/);
+});
 test('composites preserve sparse hierarchy, repeated boundaries, source IDs and owned inputs', async () => {
   const leaf = await createDataSet(rect),
     result = await createDataSet({
@@ -284,4 +302,61 @@ test('PLOT3D binary endianness, real widths, record markers, blanking and invali
     { kind: 'unstructured', points: [0, 0, 0], cells: [{ type: 1, ids: [-1] }] },
   ])
     await assert.rejects(createDataSet(input));
+});
+
+// VTK 9.1 release notes (Data): the Lagrange hexahedron took the quadratic hexahedron's numbering, swapping the nodes
+// of edges 10 and 11; readers convert XML files older than version 2.2. Edge 10 runs 2-6 and edge 11 runs 3-7 now.
+const hexOrder2 = [
+  [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1],
+  [0.5, 0, 0], [1, 0.5, 0], [0.5, 1, 0], [0, 0.5, 0], [0.5, 0, 1], [1, 0.5, 1], [0.5, 1, 1], [0, 0.5, 1],
+  [0, 0, 0.5], [1, 0, 0.5], [1, 1, 0.5], [0, 1, 0.5],
+  [0, 0.5, 0.5], [1, 0.5, 0.5], [0.5, 0, 0.5], [0.5, 1, 0.5], [0.5, 0.5, 0], [0.5, 0.5, 1], [0.5, 0.5, 0.5],
+];
+const swapHexEdges = (nodes, order) => {
+  const n = order - 1,
+    ten = 8 + 10 * n,
+    eleven = 8 + 11 * n;
+  return [...nodes.slice(0, ten), ...nodes.slice(eleven, eleven + n), ...nodes.slice(ten, eleven), ...nodes.slice(eleven + n)];
+};
+const lagrangeHexFile = (version, nodes, values) => {
+  const tag = version === undefined ? '' : ` version="${version}"`,
+    list = (a) => a.flat().join(' ');
+  return new TextEncoder().encode(
+    `<VTKFile type="UnstructuredGrid"${tag}><UnstructuredGrid><Piece NumberOfPoints="${nodes.length}" NumberOfCells="1">` +
+      `<PointData><DataArray type="Float64" Name="f">${list(values)}</DataArray></PointData>` +
+      `<Points><DataArray type="Float64" NumberOfComponents="3">${list(nodes)}</DataArray></Points>` +
+      `<Cells><DataArray type="Int64" Name="connectivity">${nodes.map((_, i) => i).join(' ')}</DataArray>` +
+      `<DataArray type="Int64" Name="offsets">${nodes.length}</DataArray>` +
+      `<DataArray type="UInt8" Name="types">72</DataArray></Cells></Piece></UnstructuredGrid></VTKFile>`,
+  );
+};
+test('a Lagrange hexahedron reads edges 10 and 11 in the order of its VTK XML file version', async () => {
+  const f = ([x, y, z]) => x * y + z * z - 2 * x * z;
+  const check = async (version, nodes) => {
+    const grid = await openDataSet(lagrangeHexFile(version, nodes, nodes.map(f)), { subdivisions: 3 });
+    assert.ok(grid.points.length > 27 * 3);
+    for (let i = 0; i < grid.points.length / 3; i++)
+      near(grid.pointData[i], f([grid.points[3 * i], grid.points[3 * i + 1], grid.points[3 * i + 2]]), 1e-9);
+  };
+  await check('2.2', hexOrder2);
+  await check('2.10', hexOrder2);
+  await check('3.0', hexOrder2);
+  const old = swapHexEdges(hexOrder2, 2);
+  assert.deepEqual(old[18], [0, 1, 0.5]);
+  await check('2.1', old);
+  await check('1.0', old);
+  await check('0.1', old);
+  await check(undefined, old);
+  await assert.rejects(openDataSet(lagrangeHexFile('two', hexOrder2, hexOrder2.map(f))), /version must be major\.minor/);
+  // Order 3: two nodes per edge; a 2.1 file holding the 2.2 file's edge 10 and 11 blocks swapped reads the same cell.
+  const nodes3 = Array.from({ length: 64 }, (_, i) => [Math.sin(i * 1.3), Math.cos(i * 0.7), (i % 7) / 7]),
+    values3 = nodes3.map((_, i) => i);
+  const a = await openDataSet(lagrangeHexFile('2.2', nodes3, values3)),
+    b = await openDataSet(lagrangeHexFile('2.1', swapHexEdges(nodes3, 3), swapHexEdges(values3.map((v) => [v]), 3).flat()));
+  // The file's own points keep file order, so compare each output point with its value as a sorted set.
+  const tuples = (g) =>
+    Array.from({ length: g.points.length / 3 }, (_, i) => [...g.points.slice(3 * i, 3 * i + 3), g.pointData[i]].join())
+      .sort();
+  assert.deepEqual(tuples(b), tuples(a));
+  assert.deepEqual(Array.from(b.types), Array.from(a.types));
 });

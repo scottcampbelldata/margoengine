@@ -302,10 +302,15 @@ export function exportRobloxGLB(source: ExportSource, options: RobloxGLBOptions 
     }
     node.children.forEach(visit);
   };
-  const { onlyVisible, root, geometryData, materialData, generator } = options;
+  const { onlyVisible, root, geometryData, materialData, generator, onWarning } = options;
   return {
-    glb: writeGLB(source, { onlyVisible, root, geometryData, materialData, generator }, (roots) =>
-      roots.forEach(visit),
+    // Roblox meshes are triangles (Creator Hub mesh specifications), so points and lines warn and stay out.
+    glb: writeGLB(
+      source,
+      { onlyVisible, root, geometryData, materialData, generator, onWarning },
+      (roots) => roots.forEach(visit),
+      undefined,
+      [],
     ),
     mapping: {
       parts,

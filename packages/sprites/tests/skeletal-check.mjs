@@ -1,7 +1,7 @@
 // Real-GPU proof of @margoengine/sprites/skeletal (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/skeletal-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/skeletal-check.mjs
 // Under exactSize [64, 32]: a skinned strip in its bind pose and turned a quarter about its root matches the CPU image
-// byte for byte; bent at its tip, the top half stays, the bottom half swings out; tint and alpha blend.
+// byte for byte; bent at its tip, the top half stays, the bottom half swings out; tint and alpha blend; a device loss.
 // Results: test-results/sprites-skeletal-browser.json.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -30,6 +30,21 @@ try {
   const expected = [r.texel0[0] * 0.5 + r.background[0] * 0.5, r.background[1] * 0.5, r.background[2] * 0.5];
   r.tinted.forEach((v, c) => assert.ok(Math.abs(v - expected[c]) <= 1, `tinted ${r.tinted} vs ${expected}`));
   assert.equal(r.validation, null, 'no validation errors');
+  // KB-RESTORE-BORROWED1: no frame throws, the plain-texture layer draws nothing until setAtlas, one report, and the
+  // function form is called once per device; every frame is compared byte for byte.
+  assert.deepEqual(r.loss.before, { count: 0, first: null }, 'three strips before the loss');
+  assert.equal(r.loss.thrown, undefined, 'no frame throws after the restore');
+  assert.deepEqual(r.loss.frames, [0, 0, 0], 'three frames without the lost layer');
+  assert.deepEqual(r.loss.reports, [
+    [
+      'state',
+      'SkeletalLayer atlas lost with the device; pass a function or call setAtlas; see https://margoengine.com/errors#borrowed-lost',
+    ],
+  ]);
+  assert.equal(r.loss.functionCalls, 2, 'the function form is called once per device');
+  assert.equal(r.loss.functionDevices, true);
+  assert.equal(r.loss.after, 0, 'setAtlas brings the layer back');
+  assert.equal(r.loss.disposed, 0, 'nothing draws after dispose');
   assert.deepEqual(r.errors, []);
   assert.deepEqual(pageErrors, []);
   console.log('ok skeletal sprites: bind pose and quarter turn exact, bend, tint; 0 validation errors');

@@ -24,6 +24,8 @@ for (const compat of [false, true]) {
         const { GPUGraphLayout, GraphLayoutReference, gpuGraphLayer, bundleGraphEdges, bundleGraphEdgesReference } =
           await import('/packages/sciviz/dist/graph-gpu.js');
         const { ForceLayout } = await import('/packages/sciviz/dist/graph.js');
+        const { Figure } = await import('/packages/sciviz/dist/spec.js'),
+          { createCompute } = await import('/packages/compute/dist/index.js');
         demo.figure.engine.stop();
         const check = (ok, why) => {
           if (!ok) throw new Error(why);
@@ -222,7 +224,112 @@ for (const compat of [false, true]) {
         });
         check((await pixelHash()) !== thin, 'widths colours and arrows affect pixels');
         styleLayer.dispose();
+        const pixels = async (figure, keep = () => true) => {
+          const bitmap = await createImageBitmap(await figure.toPNG({ overlays: false })),
+            canvas = new OffscreenCanvas(bitmap.width, bitmap.height),
+            ctx = canvas.getContext('2d');
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          let count = 0;
+          for (let i = 0; i < d.length; i += 4) if (keep(d[i], d[i + 1], d[i + 2])) count++;
+          return count;
+        };
+        styleLayer = gpuGraphLayer(demo.figure, styled, {
+          bounds: [-1, 11, -2, 3, -1, 1],
+          nodeSize: 24,
+          nodeColor: '#0000ff',
+          edgeWidth: 0,
+          edgeColor: '#ff0000',
+          edgeOpacity: 1,
+          arrowSize: 12,
+        });
+        const arrowPixels = await pixels(demo.figure, (r, g, b) => r > 150 && g < 100 && b < 100);
+        check(arrowPixels > 40, `arrowheads end at the target node border, not hidden under it (${arrowPixels})`);
+        styleLayer.dispose();
         styled.dispose();
+        {
+          const canvas = document.body.appendChild(
+              Object.assign(document.createElement('canvas'), { width: 200, height: 200 }),
+            ),
+            figure = await Figure.create(canvas, { axes: false, controls: false }),
+            gpu3 = await createCompute({ engine: figure.engine }),
+            line = new GPUGraphLayout(
+              gpu3,
+              { nodes: 2, edges: [0, 1] },
+              { dimensions: 3, positions: Float32Array.of(-1, 0.4, 0, 1, 0.4, 0) },
+            ),
+            near = gpuGraphLayer(figure, line, {
+              bounds: [-1, 1, -1, 1, -1, 1],
+              nodeSize: 0,
+              edgeWidth: 8,
+              edgeOpacity: 1,
+              edgeColor: '#ff0000',
+              arrowSize: 0,
+            });
+          figure.engine.stop();
+          const m = figure.model,
+            scene = (x, y, z) => [0, 1, 2].map((r) => m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r]);
+          figure.engine.camera.position = scene(0, 0, 0);
+          figure.engine.camera.target = scene(1, 0, 0);
+          figure.engine.camera.up = [0, 1, 0];
+          await figure.ready();
+          const crossing = await pixels(figure, (r, g, b) => r > 150 && g < 100 && b < 100);
+          check(crossing > 200, `an edge crossing the near plane draws its visible part (${crossing})`);
+          near.dispose();
+          line.dispose();
+          gpu3.dispose();
+          figure.dispose();
+          canvas.remove();
+        }
+        {
+          const ratio = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+          Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+          try {
+            const labelled = new GPUGraphLayout(demo.gpu, g, { positions: bp, gravity: 0, gridSide: 4 }),
+              labelLayer = gpuGraphLayer(demo.figure, labelled, {
+                bounds: [-1, 11, -2, 3, -1, 1],
+                labels: [{ node: 0, text: 'sharp' }],
+              });
+            await labelLayer.refreshLabels();
+            const overlay = [...document.querySelectorAll('canvas')].find(
+                (c) => c.style.position === 'absolute' && c.getAttribute('aria-label') === 'sharp',
+              ),
+              host = demo.figure.engine.canvas;
+            check(
+              overlay &&
+                overlay.width === Math.round(2 * host.clientWidth) &&
+                overlay.style.width === `${host.clientWidth}px`,
+              `labels paint at device resolution (${overlay?.width} for ${host.clientWidth} CSS px)`,
+            );
+            labelLayer.dispose();
+            // Labels clear the node's drawn border (half its nodeSize), whatever the node size.
+            const big = gpuGraphLayer(demo.figure, labelled, {
+              bounds: [-1, 11, -2, 3, -1, 1],
+              nodeSize: 40,
+              labels: [{ node: 0, text: 'big' }],
+            });
+            await big.refreshLabels();
+            const host2 = demo.figure.engine.canvas,
+              w = host2.clientWidth,
+              h = host2.clientHeight,
+              cm = demo.figure.engine.camera.matrix,
+              fm = demo.figure.model,
+              world = [0, 1, 2, 3].map((r) => fm[12 + r]),
+              q = [0, 1, 2, 3].map((r) => [0, 1, 2, 3].reduce((sum, k) => sum + cm[k * 4 + r] * world[k], 0)),
+              ax = ((q[0] / q[3] + 1) * w) / 2,
+              ay = ((1 - q[1] / q[3]) * h) / 2,
+              b = big.labelBoxes[0];
+            check(b, 'the big-node label is placed');
+            const clear = Math.hypot(Math.max(b.x - ax, 0, ax - b.x - b.width), Math.max(b.y - ay, 0, ay - b.y - b.height));
+            check(clear >= 20 - 0.01, `a label clears a 40 px node's border (${clear} px from its centre)`);
+            big.dispose();
+            labelled.dispose();
+          } finally {
+            if (ratio) Object.defineProperty(window, 'devicePixelRatio', ratio);
+            else delete window.devicePixelRatio;
+          }
+        }
         const routes = startRoutes
           ? Object.fromEntries(Object.entries(demo.gpu.device.dispatches).map(([k, v]) => [k, v - startRoutes[k]]))
           : undefined;

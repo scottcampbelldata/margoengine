@@ -1,0 +1,56 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 31,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "tour",
+      "path": "linear",
+      "keys": [
+        { "time": 0, "position": [62, 7, 80], "target": [-4, 19, 2], "fov": 46 },
+        { "time": 7, "position": [38, 3.5, 58], "target": [2, 26, 0], "fov": 46, "ease": "smoothstep" },
+        { "time": 15, "position": [10, 34, 26], "target": [-6, 30, -4], "fov": 46, "ease": "smoothstep" },
+        { "time": 23, "position": [-44, 22, 54], "target": [-4, 22, 4], "fov": 46, "ease": "smoothstep" },
+        { "time": 31, "position": [62, 7, 80], "target": [-4, 19, 2], "fov": 46, "ease": "smoothstep" }
+      ]
+    }
+  ],
+  "markers": [{ "time": 1.6, "name": "opening-strike" }],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "storm-light-tour",
+    "seed": 7,
+    "size": [1080, 1920],
+    "fps": 60,
+    "seconds": 31,
+    "tier": "high",
+    "kit": null,
+    "subframes": 1,
+    "shutter": 0,
+    "grade": null,
+    "endCard": null,
+    "warmup": 60,
+    "probes": { "open": 0, "strike": 1.65, "climb": 7, "gallery": 15, "west": 23 },
+    "lookBounds": {},
+    "probeLookBounds": {
+      "open": { "lights": [0, 0] },
+      "strike": { "lights": [0, 0] },
+      "climb": { "lights": [2, 4] },
+      "gallery": { "lights": [1, 4] },
+      "west": { "lights": [2, 4] }
+    },
+    "probeLookBoundsReason": "Measured lit discs per probe (rulings 2026-11-16 00:13, 01:01 and 03:15): climb and west face the real lit windows, lamps and lantern, 2 to 4 discs; gallery sees one real lantern through a lattice, which counted as 2 parts before the far air and as 1 with it, so 1 to 4; open and strike face away and measure 0.",
+    "aovs": ["geometry", "depth", "sky", "water"],
+    "horizon": { "y": 0 },
+    "page": {
+      "path": "examples/storm-light/index.html",
+      "query": { "tour": 0, "storm": 0.78, "aovs": 1 },
+      "css": "h1,#hint,form,#status,#error{display:none!important}",
+      "engine": "stormLight.engine",
+      "aovs": "stormLight.aovs",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

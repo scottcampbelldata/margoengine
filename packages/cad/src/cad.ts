@@ -11,6 +11,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import { readResponse } from '../../shared/loading.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { meshTriangles, mergePrimitives } from '../../shared/mesh-source.js';
 import type { PBRSourcePrimitive } from '../../shared/pbr-source.js';
@@ -132,7 +133,7 @@ export function deduplicateParts(meshes: Iterable<MeshHandle>): { parts: number;
 }
 
 /**
- * Points every static triangle primitive at the GPU buffer pair of the first primitive of the same glTF-pro model with
+ * Points every static triangle primitive at the GPU buffer pair of the first primitive of the same glTF PBR model with
  * equal vertices and indices (the model's `shareBuffers`). Skinned and morphed primitives keep their own pair.
  */
 function shareBuffers(
@@ -241,6 +242,8 @@ export async function loadCAD(
   const target = new URL(url, globalThis.location?.href);
   if (!['http:', 'https:'].includes(target.protocol)) throw new TypeError('CAD URL must use HTTP(S)');
   signal?.throwIfAborted();
+  // The model is built after the download, with any scene active: it belongs to the scene this call was made in.
+  const scope = captureScene(engineRuntime(engine));
   const data = await readResponse(await get(target, { signal }), { maxBytes, signal, label: 'CAD download' }),
     kind = cadFormatOf(target.pathname, format);
   if (!kind)
@@ -255,13 +258,13 @@ export async function loadCAD(
         'unsupported',
         'B-rep import (STEP, IGES, SAT, XT, JT) requires Web Workers; pass an importer option to read them without one.',
       );
-    return parseCAD(engine, data, kind, options);
+    return scope.run(() => parseCAD(engine, data, kind, options));
   }
   const buffer =
     data.byteOffset === 0 && data.byteLength === data.buffer.byteLength
       ? data.buffer
       : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-  return parseCADAsync(engine, buffer as ArrayBuffer, kind, { signal, ...options });
+  return scope.run(() => parseCADAsync(engine, buffer as ArrayBuffer, kind, { signal, ...options }));
 }
 /** Options for {@link PartInstancer}. */
 export interface PartInstancerOptions {
@@ -294,6 +297,7 @@ export class PartInstancer implements EnginePlugin {
   pack: boolean;
   private readonly packs: PartPacks;
   private removed = false;
+  private engine?: Engine;
   constructor(options: PartInstancerOptions = {}) {
     const partVertices = options.partVertices ?? 4096,
       packVertices = options.packVertices ?? Math.max(262_144, partVertices);
@@ -315,6 +319,7 @@ export class PartInstancer implements EnginePlugin {
     return this.removed;
   }
   setup(engine: Engine): void {
+    this.engine = engine;
     // The packs draw through WebGPU indirect batches only: refuse the WebGL2 preview instead of drawing nothing.
     requireWebGPU(engine, 'PartInstancer');
     Object.assign(this.stats, deduplicateParts(engine.meshes.values()));
@@ -344,9 +349,12 @@ export class PartInstancer implements EnginePlugin {
   onDeviceRestored(): void {
     this.packs.onDeviceRestored();
   }
+  /** Hands every part back to its own draw, frees the pack buffers and leaves the plugin's scene. Safe to call twice. */
   dispose(): void {
+    if (this.removed) return;
     this.removed = true;
     this.packs.dispose();
+    this.engine?.sceneOf(this)?.removePlugin(this.name);
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

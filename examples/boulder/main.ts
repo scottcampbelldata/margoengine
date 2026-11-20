@@ -4,7 +4,7 @@ import { engineRuntime } from '@margoengine/core/extension';
 import { OrbitControls } from '@margoengine/controls/orbit';
 import { HemisphereLight, ColorBackground } from '@margoengine/environment';
 import { LightProbes } from '@margoengine/environment/probes';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { PostStack } from '@margoengine/post/stack';
 import { Bloom } from '@margoengine/post/bloom';
 import { SSAO } from '@margoengine/post/ssao';

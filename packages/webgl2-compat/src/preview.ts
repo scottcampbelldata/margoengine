@@ -19,7 +19,7 @@ import { ggxDFloat, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 const defaultDraw: DrawOptions = {};
 
 const glVertex = `#version 300 es
-precision highp float;layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec4 m0;layout(location=3) in vec4 m1;layout(location=4) in vec4 m2;layout(location=5) in vec4 m3;layout(location=6) in vec4 color;layout(location=7) in vec4 factors;uniform mat4 camera;out vec3 w;out vec3 wn;out vec3 b;out vec4 m;void main(){mat4 M=mat4(m0,m1,m2,m3);vec4 q=M*vec4(p,1);vec3 a=m0.xyz,y=m1.xyz,c=m2.xyz;wn=mat3(cross(y,c),cross(c,a),cross(a,y))*n*sign(dot(a,cross(y,c)));w=q.xyz;b=color.rgb;m=vec4(factors.xyz,sign(dot(a,cross(y,c))));gl_Position=camera*q;}`;
+precision highp float;layout(location=0) in vec3 p;layout(location=1) in vec3 n;layout(location=2) in vec4 m0;layout(location=3) in vec4 m1;layout(location=4) in vec4 m2;layout(location=5) in vec4 m3;layout(location=6) in vec4 color;layout(location=7) in vec4 factors;uniform mat4 camera;out vec3 w;out vec3 wn;out vec3 b;out vec4 m;void main(){mat4 M=mat4(m0,m1,m2,m3);vec4 q=M*vec4(p,1);vec3 a=m0.xyz,y=m1.xyz,c=m2.xyz;float s=dot(a,cross(y,c))<0.?-1.:1.;vec3 k=mat3(cross(y,c),cross(c,a),cross(a,y))*n*s;wn=dot(k,k)>0.?k:vec3(0,1,0);w=q.xyz;b=color.rgb;m=vec4(factors.xyz,s);gl_Position=camera*q;}`;
 // Core's lighting in GLSL: glTF 2.0 Appendix B BRDF (GGX D: Walter et al. 2007, eq. 33; Smith G: eq. 34; Schlick 1994
 // Fresnel, F0 0.04), Khronos PBR Neutral, then the sRGB encoding (IEC 61966-2-1).
 const glFragment = `#version 300 es
@@ -216,7 +216,10 @@ export class GLRenderer implements Renderer {
     const gl = this.gl;
     if (gl.isContextLost()) {
       if (this.recovering) return;
-      throw new MargoError('failed', 'WebGL context lost; create a new engine, or add webglRestore from the /restore entry');
+      throw new MargoError(
+        'failed',
+        'WebGL context lost; create a new engine, or add webglRestore from the /restore entry',
+      );
     }
     if (view?.target)
       throw new MargoError(

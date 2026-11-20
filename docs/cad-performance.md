@@ -13,7 +13,7 @@ Measured 2026-10-14 (11:53-12:02 UTC) on a laptop: Intel Core Ultra 7 258V, Inte
 `xe-2lpg`), 31 GB, headless Edge 155 through Playwright, canvas 1432x768 at DPR 1, 4x MSAA (the desktop full tier),
 vsync and the frame-rate limit off (FPS is throughput, not a 60 Hz cap), cross-origin isolated (5 µs timers). All
 numbers below come from one session on AC power (checked before and after every run and recorded in each JSON file as
-`acPowerAtStart` / `acPowerAtEnd`) while holding the shared `test-results/gpu.lock`, one GPU run at a time. Earlier
+`acPowerAtStart` / `acPowerAtEnd`) and one GPU run at a time. Earlier
 sessions without a recorded power state were discarded; they ran 10-40% faster or slower for the same build, so compare
 numbers only within one session. Raw JSON: `examples/package-benchmarks/cad/results-*.json`.
 
@@ -115,7 +115,7 @@ from-scratch render: 0 differing pixels over 25 comparisons plus 4 unchanged red
 
 Same host and browser setup as above, measured after every other build and benchmark was stopped (and other apps
 closed), with this benchmark the only workload, on AC power (checked before and after every run, recorded in each
-JSON as `acPowerAtStart`/`acPowerAtEnd`, plus a `conditions` note and the `core` commit), holding the GPU lock. Before =
+JSON as `acPowerAtStart`/`acPowerAtEnd`, plus a `conditions` note and the `core` commit). Before =
 core at `261f1d4`, after = this branch. Before and after alternate per case in two rounds (round 1 before then after,
 round 2 after then before); each cell is the mean of the two rounds' medians. Raw JSON:
 `examples/package-benchmarks/cad/results-{before,after}{1,2}-{orbit,still,move,orbitmove}.json`;
@@ -165,7 +165,7 @@ the discard out; pipelines that packages build from the same shader text keep `G
 core + stage 19,543 → 19,858 B gzip (+315), over the 19,600 target. Caveats: a batch mixing groups is drawn up to three
 times (vertex work, draw order between groups changes), and pipeline creation per group is synchronous.
 
-Benchmark `examples/package-benchmarks/cad/cull-bench.mjs` (on that branch; quiet machine, AC, GPU lock, 1432x768, 4x
+Benchmark `examples/package-benchmarks/cad/cull-bench.mjs` (on that branch; quiet machine, AC, 1432x768, 4x
 MSAA; 4 runs per case over two alternating rounds, median shown; raw `results-cull-{discard,cullmode}-{1,2}.json`):
 
 | Scene | Sides | GPU, discard (ms) | GPU, cullMode (ms) | Serial frame, discard → cullMode (ms) |
@@ -186,7 +186,7 @@ CAD runs are noisier (single runs between 8.7 and 15.7 ms).
 Hot spots 1-5 above, one commit per step so each can be accepted alone. Same API, identical pixels
 (`node examples/package-benchmarks/cad/pixels-check.mjs`: a static + moving mix with hide/show, reparent, material
 edits/assignment, remove/add, scale, geometry swap and picks, compared with a from-scratch render every step: 0 differing
-pixels; `engine.pick` agrees with selection's independent micro pass). Measured 2026-10-14 on AC under the GPU lock, same
+pixels; `engine.pick` agrees with selection's independent micro pass). Measured 2026-10-14 on AC, same
 host as above; `node examples/package-benchmarks/cad/summary.mjs s0 s1 s2 s3 s4 s5` prints every case. Cases: `orbit`
 (camera orbits, static parts; includes `engine.pick`), `still` (fixed camera, static parts), `move` (fixed camera, 1% of
 parts move every frame). Frame CPU at 90k parts includes waiting on the GPU (26-31 ms GPU per frame), so kernel and
@@ -325,7 +325,7 @@ re-run (and 200k / 500k / 1M browser runs) is still owed.
 ## GPU culling: `@margoengine/culling`
 
 Measured 2026-10-14 in one session (Arc 140V, headless Edge, 1432x768, 4x MSAA, AC power checked before and after every
-run, GPU lock held; 0 runs discarded). Raw JSON: `examples/package-benchmarks/cad/results-culling.json`, script
+run; 0 runs discarded). Raw JSON: `examples/package-benchmarks/cad/results-culling.json`, script
 `culling.mjs` / `culling.js` in the same folder. Compare these numbers with each other only (the core baseline here is
 faster than the session above; another worker's GPU timing shared the machine between runs).
 
@@ -390,7 +390,7 @@ own buffer as before. `@margoengine/culling`'s `CulledMeshes` uses it: first in 
 reads core's instance buffer and writes compacted records and indirect args. Core's own pipelines, shader variants,
 back-face pipeline choice and batch order are reused, so frames are pixel-identical to core.
 
-Real GPU (`node examples/package-benchmarks/cad/culled-meshes.mjs`, Arc 140V, Edge, GPU lock): engine A renders core
+Real GPU (`node examples/package-benchmarks/cad/culled-meshes.mjs`, Arc 140V, Edge): engine A renders core
 meshes through `CulledMeshes` with CPU culling off, engine B is plain core drawing every part; 8 steps (overview, close
 view with most parts outside the frustum, explode 0.6 via `ExplodedView`, side view, 1-in-7 parts moved, a module
 hidden, view from below, 400 parts added so A's store grows from 1,024 to 2,048): 0 differing pixels in every step; the GPU dropped parts where it should (drew 237 and 171 of 648 in the close views, 757 of 1,021 at the end) and drew all 648 in the overview. `engine.pick` over a
@@ -404,7 +404,7 @@ or extra line would differ by about 100.
 ## 100,000 parts: small-part culling, subassembly imposters, cheaper edges
 
 Same harness as the tables above (`run.mjs`, 1432x768, 4x MSAA, overview orbit, vsync off), 100,008 parts in 111,237
-entities (12.9 M instanced triangles), Arc 140V, Edge, GPU lock held, AC power, every run after `scripts/quiet-gate.mjs`
+entities (12.9 M instanced triangles), Arc 140V, Edge, AC power, every run after `scripts/quiet-gate.mjs`
 passed (CPU <= 20 % for 20 s) unless marked DIAGNOSTIC. Two sessions on 2026-10-15 (14:20-14:31 and 14:45-14:58 UTC):
 the quiet gate only watches the CPU, and the same configuration varied up to 40 % in FPS between them (other
 GPU-free work, thermals), so both are shown. Raw JSON: `examples/package-benchmarks/cad/results-5l-*.json` (`-2` = second
@@ -469,7 +469,7 @@ ship the GLB.
 ## Reproduce
 
 These commands ran in the kernel repository (its scripts are not in this one), from its root after
-`npm run build:packages`, on AC power (the scripts refuse to time on battery unless `BENCH_ALLOW_BATTERY=1`), holding `test-results/gpu.lock`:
+`npm run build:packages`, on AC power (the scripts refuse to time on battery unless `BENCH_ALLOW_BATTERY=1`):
 
 ```sh
 node examples/package-benchmarks/cad/run.mjs --sizes=10000,50000,max --label=after

@@ -2,6 +2,7 @@
 // graph can add its own effect on top and shadows follow. Linear blend skinning and morph targets as glTF 2.0 defines them.
 import { MargoError } from '@margoengine/math/errors';
 import { storage, type StorageBuffer } from './compute.js';
+import { vertexValues } from '../../shared/vertex-map.js';
 import {
   cast,
   loop,
@@ -15,7 +16,7 @@ import {
   type NodeInput,
 } from './node.js';
 
-/** What {@link skinningFromModel} reads of a loaded model: `PBRModel` from `@margoengine/gltf-pro` is one. */
+/** What {@link skinningFromModel} reads of a loaded model: `PBRModel` from `@margoengine/gltf/pbr` is one. */
 export interface SkinnedModel {
   readonly nodes: readonly { readonly matrix: ArrayLike<number> }[];
   readonly asset: {
@@ -29,10 +30,12 @@ export interface SkinnedModel {
 /** What {@link skinningFromModel} reads of a primitive: an entry of `model.primitives`. */
 export interface SkinnedPrimitive {
   readonly nodeIndex: number;
-  /** Twenty floats a vertex, position first, then at 4 the normal and at 12 UV0, as gltf-pro packs them. */
+  /** Twenty floats a vertex, position first, then at 4 the normal and at 12 UV0, as gltf\/pbr packs them. */
   readonly vertices: Float32Array;
   readonly indices: Uint32Array;
   readonly definition: { readonly attributes?: Readonly<Record<string, number>> };
+  /** Set on a part of a primitive gltf\/pbr split into parts: the definition's vertex of each local vertex. */
+  readonly part?: { readonly vertexMap: Uint32Array };
 }
 /** A skin read from a loaded model, for `positionNode` and `normalNode` of a NodeMaterial. */
 export interface ModelSkinning extends Skinning {
@@ -98,8 +101,10 @@ export function skinningFromModel(model: SkinnedModel, primitive: SkinnedPrimiti
     inverseBind = inverseBindMatrices === undefined ? undefined : model.asset.accessor(inverseBindMatrices, 'MAT4'),
     palette = new Float32Array(nodes.length * 16),
     bones = storage(palette, 'vec4f'),
-    joints = storage(Uint32Array.from(model.asset.accessor(attributes.JOINTS_0, 'VEC4')), 'vec4u'),
-    weights = storage(Float32Array.from(model.asset.accessor(attributes.WEIGHTS_0, 'VEC4')), 'vec4f');
+    // A part of a split primitive reads the definition's JOINTS_0 and WEIGHTS_0 through its vertexMap.
+    map = primitive.part?.vertexMap,
+    joints = storage(Uint32Array.from(vertexValues(model.asset.accessor(attributes.JOINTS_0, 'VEC4'), 4, map)), 'vec4u'),
+    weights = storage(Float32Array.from(vertexValues(model.asset.accessor(attributes.WEIGHTS_0, 'VEC4'), 4, map)), 'vec4f');
   const update = () => {
     nodes.forEach((node, bone) => {
       const a = model.nodes[node].matrix,

@@ -24,7 +24,7 @@ const chunks = bundled.output.filter((output) => output.type === 'chunk'),
   entry = chunks.find((chunk) => chunk.isEntry);
 // The stage root holds no import() of an optional package (its methods moved to feature entries, 2026-10-27), so the
 // quickstart pays for none of them, in its startup or in a lazy chunk.
-for (const name of ['gltf', 'gltf-pro', 'creative', 'scenery'])
+for (const name of ['gltf', 'creative', 'sky'])
   assert.ok(
     !chunks.some((chunk) => Object.keys(chunk.modules).some((id) => id.includes(`/packages/${name}/`))),
     `${name} is in the quickstart bundle`,

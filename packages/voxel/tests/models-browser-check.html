@@ -22,6 +22,16 @@ window.check={async run(){
  world.removeChunk(0,0,0);const removed=red(await draw());
  world.setBlock(0,0,0,id);world.getChunk(0,0,0).fillLight(240);const reloaded=red(await draw());
  renderer.dispose();await engine.gpu.queue.onSubmittedWorkDone();engine.render({delta:0});const disposed=red(image());
- engine.dispose();return {before,rotated,removed,reloaded,disposed,errors};
+ // Origin: the same panel 2^24 blocks out, under its origin, draws the same pixels; moving the origin by +1 block in x
+ // draws what the panel one block to the -x side draws near zero.
+ const S=2**24,same=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
+ const nearImage=async(x)=>{const w=new VoxelWorld({blocks});w.setBlock(x,0,0,id);w.getChunk(x>>5,0,0).fillLight(240);const r=await VoxelModelRenderer.create(engine,w);r.update();await waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});engine.render({delta:0});const out=image();r.dispose();return out;};
+ const at0=await nearImage(0),atLeft=await nearImage(-1);
+ const far=new VoxelWorld({blocks});far.setBlock(S,2048,-S,id);far.getChunk(S/32,64,-S/32).fillLight(240);
+ const origin={origin:[S,2048,-S]},farRenderer=await VoxelModelRenderer.create(engine,far,{origin});
+ farRenderer.update();await waitForPipelines(async()=>{engine.render({delta:0});await engine.gpu.queue.onSubmittedWorkDone();});engine.render({delta:0});const farImage=image();
+ origin.origin[0]=S+1;farRenderer.update();engine.render({delta:0});const movedImage=image();farRenderer.dispose();
+ const far0=red(farImage),farSame=same(farImage,at0),movedSame=same(movedImage,atLeft),moved=red(movedImage),left=red(atLeft);
+ engine.dispose();return {before,rotated,removed,reloaded,disposed,far0,farSame,moved,left,movedSame,errors};
 }};window.ready=true;
 </script>

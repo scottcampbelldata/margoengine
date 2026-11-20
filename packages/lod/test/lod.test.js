@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Engine, TransformStore, box, PbrMaterial } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import {
   LODSystem,
   Imposter,
@@ -327,16 +327,16 @@ test('the allocation probe fails when selection allocates', () => {
   assert.ok(Math.min(...growth) >= 64 * 1024, `probe saw only ${growth} bytes from a deliberately allocating loop`);
 });
 
-test('bakeShader adds an early return to the gltf-pro beauty fragment only', () => {
+test('bakeShader adds an early return to the gltf/pbr beauty fragment only', () => {
   const code =
     '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {\n  let s=surface(i,front); return x;}\n@fragment fn gbuffer(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {\n  let s=surface(i,front);}';
   const out = bakeShader(code, 2);
   assert.match(out, /@group\(2\) @binding\(96\) var<uniform> lod_bake/);
   assert.equal(out.match(/return lod_bake_out/g).length, 1);
-  assert.throws(() => bakeShader('fn x(){}', 2), /gltf-pro PBR shader/);
+  assert.throws(() => bakeShader('fn x(){}', 2), /gltf\/pbr shader/);
 });
 
-test('mock GPU: bake renders every view through gltf-pro, restores the source, draws imposters in one instanced call per atlas', async () => {
+test('mock GPU: bake renders every view through gltf/pbr, restores the source, draws imposters in one instanced call per atlas', async () => {
   const s = await gpu(),
     { engine, device, counts } = s;
   try {
@@ -362,7 +362,7 @@ test('mock GPU: bake renders every view through gltf-pro, restores the source, d
     assert.equal(imposter.color.mipLevelCount, 3);
     assert.equal(imposter.normal.format, 'rgba16float');
 
-    // A gltf-pro source is baked in its root's space and left exactly as it was.
+    // A gltf/pbr source is baked in its root's space and left exactly as it was.
     const doc = {
       asset: { version: '2.0' },
       nodes: [{ mesh: 0, translation: [1, 0, 0] }],

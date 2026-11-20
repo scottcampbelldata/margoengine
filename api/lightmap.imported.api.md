@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine, EnginePlugin } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { Texture } from "@margoengine/materials";
 
 export interface ImportedLightmap {

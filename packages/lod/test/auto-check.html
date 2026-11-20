@@ -5,7 +5,7 @@ import {Engine,Geometry,box} from '/packages/core/dist/index.js';
 import {LODSystem} from '/packages/lod/dist/index.js';
 import {hierarchicalLOD,autoLOD} from '/packages/lod/dist/auto.js';
 import {createMesh,PbrMaterial,Texture} from '/packages/materials/dist/index.js';
-import {loadGLTF,GLTFAsset,PBRModel} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF,GLTFAsset,PBRModel} from '/packages/gltf/dist/pbr.js';
 const sphere=(n)=>{const p=[],i=[];for(let y=0;y<=n;y++)for(let x=0;x<=n;x++){const a=x/n*Math.PI*2,b=y/n*Math.PI;p.push(Math.cos(a)*Math.sin(b),Math.cos(b),Math.sin(a)*Math.sin(b));}for(let y=0;y<n;y++)for(let x=0;x<n;x++){const c=y*(n+1)+x,d=c+n+1;i.push(c,d,c+1,c+1,d,d+1);}return new Geometry(p,p,i);};
 const canvas=document.querySelector('canvas'),camera={position:[0,20,20],target:[0,0,0],fov:60},errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu',camera}),device=engine.gpu;

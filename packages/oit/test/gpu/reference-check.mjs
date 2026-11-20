@@ -6,7 +6,7 @@
 // order, like the depth peeling it was compared with: they are the like-for-like rows and must match the reference within the 8-bit
 // rounding of the readback. The core's per-mesh sort is exact for these separate panes too.
 // From the repository root, after building packages:
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/oit/test/gpu/reference-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/oit/test/gpu/reference-check.mjs
 // With MARGO_COMPAT=1 it runs on the WebGL2 compatibility layer, where ExactOIT refuses by design (no fragment storage).
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
@@ -44,6 +44,6 @@ try {
   assert.deepEqual(errors, []);
   console.log('oit reference check passed');
 } finally {
-  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hold the GPU slot past 15 s
+  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hang past 15 s
   await Promise.race([browser.close(), new Promise((resolve) => setTimeout(resolve, 15000).unref())]);
 }

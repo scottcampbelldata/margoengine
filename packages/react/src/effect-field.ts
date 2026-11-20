@@ -1,5 +1,6 @@
 import { Color, parseColor, type ColorInput } from '@margoengine/math/color';
 import { createRandom } from '@margoengine/math/mathutils';
+import { rangeError } from '../../shared/errors.js';
 
 /** Inputs shared by the two native point-field bindings. */
 export interface FieldOptions {
@@ -29,15 +30,15 @@ function scalar(value: number | Float32Array | undefined, index: number, fallbac
 /** Seeded native-point data; absolute-time updates preserve repeatable component tests. */
 export function createField(options: FieldOptions): FieldData {
   const { count, kind } = options;
-  if (!Number.isSafeInteger(count) || count < 0 || count > 1_000_000) throw new RangeError('Effect count must be 0..1000000; reduce count or pass an integer.');
+  if (!Number.isSafeInteger(count) || count < 0 || count > 1_000_000) throw rangeError('Effect count must be 0..1000000; reduce count or pass an integer', 'react-arguments');
   const scale = triple(options.scale), noise = options.noise instanceof Float32Array ? options.noise : triple(options.noise), radius = options.radius ?? 100, depth = options.depth ?? 50, saturation = options.saturation ?? 0;
-  if (scale.length !== 3 || (noise.length !== 3 && noise.length !== count * 3) || ![...scale, ...noise, radius, depth, saturation].every(v => Number.isFinite(Math.fround(v))) || scale.some(v => v < 0) || noise.some(v => v < 0) || radius < 0 || depth < 0 || saturation < 0 || saturation > 1) throw new RangeError('Effect bounds/noise must be finite and nonnegative, saturation 0..1; pass valid options.');
+  if (scale.length !== 3 || (noise.length !== 3 && noise.length !== count * 3) || ![...scale, ...noise, radius, depth, saturation].every(v => Number.isFinite(Math.fround(v))) || scale.some(v => v < 0) || noise.some(v => v < 0) || radius < 0 || depth < 0 || saturation < 0 || saturation > 1) throw rangeError('Effect bounds/noise must be finite and nonnegative, saturation 0..1; pass valid options', 'react-arguments');
   for (const value of [options.size, options.speed, options.opacity]) {
-    if (value instanceof Float32Array && value.length !== count) throw new RangeError('Per-point effect arrays need count entries; resize the array.');
-    if (value !== undefined && !(typeof value === 'number' ? Number.isFinite(value) && value >= 0 : value.every(v => Number.isFinite(v) && v >= 0))) throw new RangeError('Effect size, speed and opacity must be finite and nonnegative; pass valid values.');
+    if (value instanceof Float32Array && value.length !== count) throw rangeError('Per-point effect arrays need count entries; resize the array', 'react-arguments');
+    if (value !== undefined && !(typeof value === 'number' ? Number.isFinite(value) && value >= 0 : value.every(v => Number.isFinite(v) && v >= 0))) throw rangeError('Effect size, speed and opacity must be finite and nonnegative; pass valid values', 'react-arguments');
   }
-  if (options.color instanceof Float32Array && options.color.length !== count * 3) throw new RangeError('Effect colors need count*3 RGB values; resize the array.');
-  if (options.color instanceof Float32Array && !options.color.every(Number.isFinite)) throw new RangeError('Effect RGB values must be finite; replace invalid colors.');
+  if (options.color instanceof Float32Array && options.color.length !== count * 3) throw rangeError('Effect colors need count*3 RGB values; resize the array', 'react-arguments');
+  if (options.color instanceof Float32Array && !options.color.every(Number.isFinite)) throw rangeError('Effect RGB values must be finite; replace invalid colors', 'react-arguments');
   const random = createRandom(options.seed ?? 1), positions = new Float32Array(count * 3), home = new Float32Array(count * 3), colors = new Float32Array(count * 4), sizes = new Float32Array(count), phase = new Float32Array(count), base = new Float32Array(count * 3), tint = new Color();
   const uniform = options.color instanceof Float32Array ? null : parseColor(options.color ?? '#ffffff');
   for (let i = 0; i < count; i++) {
@@ -52,7 +53,7 @@ export function createField(options: FieldOptions): FieldData {
     sizes[i] = scalar(options.size, i, kind === 'stars' ? 4 : 6) * (kind === 'stars' ? 0.5 + random() : 1);
   }
   const result: FieldData = { positions, colors, sizes, step(time) {
-    if (!Number.isFinite(time) || time < 0) throw new RangeError('Effect time must be finite and nonnegative; pass elapsed seconds.');
+    if (!Number.isFinite(time) || time < 0) throw rangeError('Effect time must be finite and nonnegative; pass elapsed seconds', 'react-arguments');
     for (let i = 0; i < count; i++) {
       const t = time * scalar(options.speed, i, 1), pulse = 0.5 + 0.5 * Math.sin(t + phase[i]);
       for (let axis = 0; axis < 3; axis++) {

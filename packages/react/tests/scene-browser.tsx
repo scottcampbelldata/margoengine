@@ -19,7 +19,7 @@ import { TransformControls, PointerLock } from '@margoengine/react/controls';
 import { Environment } from '@margoengine/react/environment';
 import { Fbx } from '@margoengine/react/fbx';
 import { Box, Sphere, Plane } from '@margoengine/react/geometry';
-import { Gltf } from '@margoengine/react/gltf-pro';
+import { Gltf } from '@margoengine/react/gltf';
 import { Html } from '@margoengine/react/html';
 import { ContactShadows } from '@margoengine/react/shadows';
 import { Sky } from '@margoengine/react/sky';
@@ -47,6 +47,8 @@ const box = createRef<MeshRef>(),
   gizmo = createRef<ComponentRef<typeof TransformControls>>(),
   pointer = createRef<ComponentRef<typeof PointerLock>>();
 let root: Root | undefined,
+  // Adds a Bloom to the DOF and Tonemap stack of the 'dof' mode, or takes it out (GAP-POST-ADD1-REACT).
+  setPostExtra: ((on: boolean) => void) | undefined,
   current: Engine | undefined,
   context: MargoContextValue | undefined,
   mode: Mode = 'kit',
@@ -177,6 +179,8 @@ function Kit() {
   );
 }
 function Post({ kind }: { kind: Mode }) {
+  const [extra, setExtra] = React.useState(false);
+  setPostExtra = setExtra;
   return (
     <>
       <Box ref={box} position={[-0.65, 0.6, 0]}>
@@ -204,6 +208,7 @@ function Post({ kind }: { kind: Mode }) {
         ) : (
           <>
             <DepthOfField focalDistance={8} maxRadius={4} onReady={() => postReady++} />
+            {extra ? <Bloom strength={0.8} threshold={0.6} /> : null}
             <Tonemap curve="agx" onReady={() => postReady++} />
             <TAA onReady={() => postReady++} />
           </>
@@ -631,6 +636,23 @@ async function verifyPhysics() {
     await draw();
   },
   physics: verifyPhysics,
+  // Bloom joins or leaves the live PostStack of the 'dof' mode; the stack and the effects it keeps stay the same objects.
+  async restack(on: boolean) {
+    type Stack = { effects: readonly { name: string }[] };
+    const before = current!.plugins.get('post:stack') as unknown as Stack | undefined,
+      held = [...(before?.effects ?? [])];
+    setPostExtra!(on);
+    await until(() => current!.hasPlugin('bloom') === on, on ? 'Bloom joins the stack' : 'Bloom leaves the stack');
+    await draw(3);
+    const after = current!.plugins.get('post:stack') as unknown as Stack | undefined;
+    return {
+      same: !!before && before === after,
+      before: held.map((effect) => effect.name),
+      after: (after?.effects ?? []).map((effect) => effect.name),
+      kept: held.filter((effect) => after?.effects.includes(effect)).map((effect) => effect.name),
+      ...snapshot(),
+    };
+  },
   preview,
   previewClicks: () => previewClicks,
   get errors() {

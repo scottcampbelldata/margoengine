@@ -1,6 +1,7 @@
 import { triangulate } from '@margoengine/geometry/triangulate';
 import { LoaderError, type LoadedGeometry, type ParseLimits } from './types.js';
 import { limits, throwIfAborted } from './util.js';
+import type { XMLExternalOptions } from './xml.js';
 
 /** A source coordinate; z is optional and extra ordinates remain in source geometry. */
 export type GeoPosition = number[];
@@ -23,7 +24,7 @@ export interface GeoFeature {
   extent?: number;
 }
 /** Parse and tessellation bounds for vector data. */
-export interface GeoOptions extends ParseLimits {
+export interface GeoOptions extends ParseLimits, XMLExternalOptions {
   /** Maximum source features. Default 100,000. */
   maxFeatures?: number;
   /** Maximum input bytes. Default 256 MiB. */
@@ -89,6 +90,30 @@ export function inside(p: GeoPosition, ring: GeoPosition[]): boolean {
     if (a[1] > p[1] !== b[1] > p[1] && p[0] < ((b[0] - a[0]) * (p[1] - a[1])) / (b[1] - a[1]) + a[0]) result = !result;
   }
   return result;
+}
+/**
+ * The two ordinates a ring is triangulated in: x and y, the plane of every map polygon, unless the ring stands
+ * vertical (a MultiPatch wall), where its x/y outline has no area; then the plane its Newell normal faces.
+ */
+export function planeAxes(ring: GeoPosition[]): [number, number] {
+  let nx = 0,
+    ny = 0,
+    nz = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[j],
+      b = ring[i],
+      az = a[2] ?? 0,
+      bz = b[2] ?? 0;
+    nx += (a[1] - b[1]) * (az + bz);
+    ny += (az - bz) * (a[0] + b[0]);
+    nz += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  const x = Math.abs(nx),
+    y = Math.abs(ny),
+    z = Math.abs(nz);
+  // Kept in x/y unless that projection is degenerate, so lon/lat polygons with metre heights never change plane.
+  if (z > Math.hypot(x, y, z) * 1e-9 || (x === 0 && y === 0)) return [0, 1];
+  return x >= y ? [1, 2] : [2, 0];
 }
 /** Internal containment grouping, independent of source ring winding or part ordering. */
 export function ringPolygons(rings: GeoPosition[][]): GeoPosition[][][] {
@@ -196,6 +221,7 @@ export function buildGeo(features: GeoFeature[], options: GeoOptions = {}, crs =
         if (!Array.isArray(g.coordinates)) throw new LoaderError(GEO, 'syntax', 'Polygon needs coordinate rings');
         if (!g.coordinates.length) break;
         const rings = g.coordinates.map((r) => path(r, feature, true)),
+          [u, w] = planeAxes(g.coordinates[0]),
           flat: number[] = [],
           mapping: number[] = [],
           holes: number[] = [];
@@ -203,7 +229,7 @@ export function buildGeo(features: GeoFeature[], options: GeoOptions = {}, crs =
           if (r) holes.push(mapping.length);
           for (const v of rings[r]) {
             mapping.push(v);
-            flat.push(positions[v * 3], positions[v * 3 + 1]);
+            flat.push(positions[v * 3 + u], positions[v * 3 + w]);
           }
         }
         const triangles = triangulate(flat, holes, 2);

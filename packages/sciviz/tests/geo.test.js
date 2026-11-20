@@ -77,4 +77,73 @@ test('slippy-map tiles: the whole world at zoom 0, each tile edge where the next
   );
   assert.deepEqual(tilesIn([-180, -80, 180, 80], 0), [[0, 0, 0]]);
   assert.deepEqual(tilesIn([10, -5, -10, 5], 0), [[0, 0, 0]]);
+  // A zoom or tile index that names no slippy-map tile throws instead of returning half tiles or edges past the map.
+  for (const zoom of [-1, 2.5, 31, NaN]) {
+    assert.throws(() => tileAt(0, 0, zoom), RangeError, `tileAt zoom ${zoom}`);
+    assert.throws(() => tileBounds(zoom, 0, 0), RangeError, `tileBounds zoom ${zoom}`);
+  }
+  for (const [x, y] of [
+    [2, 0],
+    [0, -1],
+    [0.5, 0],
+    [0, NaN],
+  ])
+    assert.throws(() => tileBounds(1, x, y), RangeError, `tileBounds 1 ${x} ${y}`);
+});
+
+test('tilesIn covers a box 360 degrees wide and counts before it lists', () => {
+  // Wrapping both ends made [0, 360] a single column at zoom 2.
+  assert.equal(tilesIn([0, -80, 360, 80], 2).length, 16);
+  assert.equal(tilesIn([-180, -10, 540, 10], 1).length, 4);
+  // An antimeridian box whose two parts meet lists each tile once.
+  assert.equal(tilesIn([-10, -10, -20, 10], 1).length, 4);
+  assert.throws(() => tilesIn([0, 0, 1, 1], 1.5), RangeError);
+  assert.throws(() => tilesIn([0, 0, NaN, 1], 1), RangeError);
+});
+
+test('a tile layer refuses an area over maxTiles before listing it', async () => {
+  // load() listed every tile first: the whole world at zoom 24 is 2^48 tiles, so it never reached the maxTiles check.
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const script = `import { TileLayer } from '@margoengine/sciviz/geo';
+    Object.assign(globalThis, { GPUShaderStage: { VERTEX: 1, FRAGMENT: 2 }, GPUBufferUsage: { UNIFORM: 64, COPY_DST: 8 } });
+    const device = { createBindGroupLayout: () => ({}), createSampler: () => ({}), createBuffer: () => ({ destroy() {} }), queue: { writeBuffer() {} } };
+    const layer = new TileLayer({ device, pipeline: () => ({}), remove() {} }, { tiles: async () => undefined, zoom: 24 });
+    layer.load({ tiles: async () => undefined }).then(() => console.log('loaded'), (e) => console.log(e.message));`;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  assert.equal(run.status, 0, `load did not finish in 10 s: ${run.signal ?? run.stderr}`);
+  assert.match(run.stdout, /^281474976710656 tiles at zoom 24 is over maxTiles 256/);
+});
+
+test('a tile layer a figure refuses is freed and never drawn', async () => {
+  const { tileLayer } = await import('@margoengine/sciviz/geo');
+  const saved = { GPUShaderStage: globalThis.GPUShaderStage, GPUBufferUsage: globalThis.GPUBufferUsage };
+  Object.assign(globalThis, {
+    GPUShaderStage: { VERTEX: 1, FRAGMENT: 2 },
+    GPUBufferUsage: { UNIFORM: 64, COPY_DST: 8 },
+  });
+  try {
+    const drawn = new Set(),
+      device = { createBindGroupLayout: () => ({}), createSampler: () => ({}) },
+      renderer = { device, engine: {}, add: (l) => drawn.add(l), remove: (l) => drawn.delete(l) };
+    let refused;
+    // A 2D chart (or a disposed figure) refuses the layer in addLayer.
+    const figure = {
+      renderer,
+      addLayer(layer) {
+        refused = layer;
+        throw new Error('This layer needs a 3D figure');
+      },
+    };
+    await assert.rejects(tileLayer(figure, { tiles: async () => undefined, zoom: 0 }), /3D figure/);
+    assert.equal(drawn.size, 0, 'the refused layer is not in the renderer');
+    assert.ok(refused);
+    assert.equal(drawn.has(refused), false);
+  } finally {
+    Object.assign(globalThis, saved);
+  }
 });

@@ -42,7 +42,7 @@ function FloatBinding(motion: Motion) {
   return null;
 }
 /** A group that bobs and sways gently, on top of its own position and rotation. Needs a running frame loop. */
-export const Float = forwardRef<MeshRef, FloatProps>(function Float(
+export const Float = /* @__PURE__ */ forwardRef<MeshRef, FloatProps>(function Float(
   { speed = 1, rotationIntensity = 1, floatIntensity = 1, floatingRange = [-0.1, 0.1], seed = 0, children, ...props },
   ref,
 ) {

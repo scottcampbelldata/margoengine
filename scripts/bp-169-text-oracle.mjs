@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { createServer } from 'vite';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { launchBrowser } from './lib/browser.mjs';
 import { closeAll } from './support/shutdown.mjs';
-import { acquire } from './gpu-lock.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const supplied = process.argv.find((a) => a.startsWith('--rival='))?.slice(8);
@@ -16,14 +16,13 @@ const pkg = JSON.parse(readFileSync(resolve(external, 'node_modules/troika-three
 assert.equal(pkg.name, 'troika-three-text');
 assert.equal(pkg.version, '0.52.4');
 const url = (p) => '/@fs/' + resolve(p).replaceAll('\\', '/');
-const lock = await acquire({ owner: 'bp-169-text-oracle', mode: 'shared', max: 5, waitMax: 60 });
 let browser, server;
 try {
   server = await createServer({
     configFile: false,
     root: external,
     cacheDir: resolve(root, 'test-results/bp-169-vite'),
-    plugins: [
+    plugins: [noFileWatcher(),
       {
         name: 'bp169-oracle-page',
         configureServer(srv) {
@@ -105,9 +104,5 @@ try {
     ),
   );
 } finally {
-  try {
-    await closeAll({ browser, servers: server ? [server] : [] });
-  } finally {
-    await lock();
-  }
+  await closeAll({ browser, servers: server ? [server] : [] });
 }

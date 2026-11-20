@@ -6,6 +6,12 @@
 import { LoadedGeometry, ParseLimits } from "@margoengine/loaders";
 import { LoaderSettings } from "web-ifc";
 
+export interface IFCStreamWorkerOptions extends IFCStreamOptions, IFCOpenOptions {
+    webIfc: string | URL;
+    wasmPath?: string;
+    timeoutMs?: number;
+}
+
 export interface IFCWorkerOptions extends IFCOptions {
     webIfc: string | URL;
     wasmPath?: string;
@@ -14,12 +20,55 @@ export interface IFCWorkerOptions extends IFCOptions {
 
 export function parseIFCInWorker(data: Uint8Array | ArrayBuffer, { webIfc, wasmPath, timeoutMs, signal, ...options }: IFCWorkerOptions): Promise<IFCResult>;
 
+export function streamIFCInWorker(data: Uint8Array | ArrayBuffer, { webIfc, wasmPath, timeoutMs, signal, ...options }: IFCStreamWorkerOptions): AsyncGenerator<IFCMeshChunk, void, undefined>;
+
 // Not exported from this entry, but used by the exports above:
 
-interface IFCOptions extends ParseLimits {
+interface IFCGeometryOptions extends ParseLimits {
+    signal?: AbortSignal;
+    origin?: 'auto' | readonly [number, number, number];
+}
+
+interface IFCMeshChunk extends IFCMeshes {
+    loaded: number;
+    total: number;
+}
+
+interface IFCMeshGeometry {
+    positions: Float32Array;
+    normals: Float32Array;
+    indices: Uint32Array;
+}
+
+interface IFCMeshOptions {
+    signal?: AbortSignal;
+    origin?: 'auto' | readonly [number, number, number];
+    elements?: Iterable<number>;
+    spaces?: boolean;
+    order?: 'envelope' | 'file';
+}
+
+interface IFCMeshes {
+    schema: string;
+    origin: [number, number, number];
+    geometries: Map<number, IFCMeshGeometry>;
+    placements: IFCPlacement[];
+}
+
+interface IFCOpenOptions {
     maxBytes?: number;
     signal?: AbortSignal;
     settings?: LoaderSettings;
+}
+
+interface IFCOptions extends IFCOpenOptions, IFCGeometryOptions {
+}
+
+interface IFCPlacement {
+    element: number;
+    geometry: number;
+    matrix: Float64Array;
+    color: [number, number, number, number];
 }
 
 interface IFCProduct {
@@ -33,5 +82,10 @@ interface IFCResult extends LoadedGeometry {
     kind: 'mesh';
     schema: string;
     products: IFCProduct[];
+    origin: [number, number, number];
+}
+
+interface IFCStreamOptions extends IFCMeshOptions {
+    chunk?: number;
 }
 ```

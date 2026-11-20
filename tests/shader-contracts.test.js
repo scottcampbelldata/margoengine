@@ -1,13 +1,13 @@
 // Cross-package WGSL contracts (docs/shader-contracts.md). Core's mesh shader is frozen for 1.0, so packages
 // that extend it still patch its text (PassContext.shader). Every anchor they rely on is listed here: the test fails, naming
 // the package, when an anchor leaves the shader it targets or when the package stops using the listed anchor (update both).
-// gltf-pro's own lighting hooks are checked in packages/gltf-pro/tests; terrain mirrors core's lighting lines on purpose.
+// gltf/pbr's own lighting hooks are checked in packages/gltf/test; terrain mirrors core's lighting lines on purpose.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { wgsl as core } from '../packages/core/src/shaders.ts';
 import { meshVertex } from '../packages/shared/gpu.js';
-import { pbrShader, extendedPBRShader } from '../packages/gltf-pro/src/shader.ts';
+import { pbrShader, extendedPBRShader } from '../packages/gltf/src/shader.ts';
 import { terrainFragment } from '../packages/terrain/src/shader.ts';
 
 const hdr = core.replace(/let mapped=pbrNeutral\([\s\S]*?return vec4f\([^\n]+\);/, 'return vec4f(linear,1);');
@@ -37,7 +37,6 @@ const contracts = [
   // post (stack, bloom, ssao), creative post, DOF, tonemap and environment captures: shared/display.js linearShader.
   ['shared/display.js', 'core', linearBlock],
   ['post/src/ssao.ts', 'core', /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/],
-  ['post/src/ssao.ts', 'core', /let direct=[\s\S]*return vec4f\([^\n]+\);/],
   ['post/src/ssao.ts', 'core', 'i.color*(1.0-i.material.y)*frame.radiance.w'],
   ['post/src/ssr.ts', 'hdr', /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/],
   ['post/src/ssr.ts', 'hdr', /(@fragment[^{]*)->@location\(0\) vec4f/],
@@ -69,7 +68,7 @@ const contracts = [
   ['terrain/src/mesh-patch.ts', 'core', 'o.color=i.color.rgb;'],
   ['terrain/src/mesh-patch.ts', 'core', /struct Output \{[^}]+\}/],
   ['terrain/src/mesh-patch.ts', 'core', 'let n=normalize(i.normal)*select(-1.0,1.0,facing);'],
-  // Text patches of gltf-pro's shader that stay (they rewrite sampling and the vertex stage, not lighting).
+  // Text patches of gltf/pbr's shader that stay (they rewrite sampling and the vertex stage, not lighting).
   [
     'materials/src/built-material.ts',
     'gltfExtended',
@@ -140,7 +139,7 @@ test('the lod selection mask check reads the call however biome wraps it, and on
   assert.doesNotMatch(`otherShader.replace('${anchor}', 'x')`, maskCall(anchor));
 });
 
-test('lod fade guards all three surface entries of the gltf-pro shader', () => {
+test('lod fade guards all three surface entries of the gltf/pbr shader', () => {
   const anchor = 'let s=surface(i,front);';
   assert.equal(count(pbrShader, anchor), 3);
   assert.ok(source('lod/src/fade.ts').includes(`'${anchor}'`));
@@ -177,4 +176,30 @@ test("SSR replays the IBL specular with environment's own split-sum helpers", ()
     "includes('fn iblBrdfTerms(')",
   ])
     assert.ok(ssr.includes(call), `post ssr.ts no longer calls ${call}`);
+});
+
+// A pass that draws the scene's lit shader again (a replay: SSAO and GTAO, SSGI, SSR, SceneTargets) keeps the shader's
+// code and so every binding it reads, and binds every pass binding (`c.bindings`). A hand-picked subset of them misses
+// the binding of any plugin it was not written for: SSAO kept bindings 18, 8 and 144 while TerrainColors' look uniform
+// (41), read above `let direct=`, stayed in its layout, an invalid bind group every frame (KB-POST-GTAO-TERRAINLOOK1).
+// The check catches the class: no package narrows a pass context's bindings by filtering them.
+test('no pass narrows the pass bindings it replays the lit shader with', () => {
+  const root = new URL('../packages/', import.meta.url),
+    narrowed = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== 'dist') walk(new URL(`${entry.name}/`, dir));
+      } else if (/\.(ts|js|mjs)$/.test(entry.name) && !entry.name.endsWith('.d.ts')) {
+        const text = readFileSync(new URL(entry.name, dir), 'utf8');
+        if (/\b(?:c|ctx|context|pass|frame)\.bindings\s*\.\s*filter\(/.test(text))
+          narrowed.push(new URL(entry.name, dir).pathname.split('/packages/')[1]);
+      }
+    }
+  };
+  for (const pkg of readdirSync(root, { withFileTypes: true })) {
+    const dir = new URL(`${pkg.name}/src/`, root);
+    if (pkg.isDirectory() && existsSync(dir)) walk(dir);
+  }
+  assert.deepEqual(narrowed, [], 'bind c.bindings whole and keep the lit code (in a dead block if unused) instead');
 });

@@ -132,7 +132,14 @@ export interface LoadedOBJ extends LoadedGeometry {
   materials: MTLMaterial[];
   /** Texture paths `materials` use, relative to the OBJ folder and without duplicates: give each to the resolver. */
   images: string[];
-  /** Statements this reader does not interpret (`l`, `p`, `vp`, curves, ...), in order. */
+  /**
+   * `p` point elements: one vertex index each, in file order, into `positions` (with faces, the corner welded from
+   * that `v`; without faces, the `v` itself).
+   */
+  pointIndices: Uint32Array;
+  /** `l` line elements as segments, two vertex indices each, a polyline of n vertices giving n - 1 segments. */
+  lineIndices: Uint32Array;
+  /** Statements this reader does not interpret (`vp`, curves, surfaces, ...), in order. */
   extras: OBJStatement[];
   /** Problems that did not stop the import, such as an MTL file the resolver could not read. */
   warnings: string[];
@@ -326,7 +333,10 @@ function readOBJ(text: string, limit: Limits): LoadedOBJ {
     cornerT = uints(),
     cornerN = uints(),
     faceSizes = uints(),
-    smoothing = uints();
+    smoothing = uints(),
+    pointV = uints(),
+    lineV = uints(),
+    lineT = uints();
   const groups: OBJGroup[] = [],
     extras: OBJStatement[] = [],
     libraries: string[] = [];
@@ -406,6 +416,41 @@ function readOBJ(text: string, limit: Limits): LoadedOBJ {
         triangles += t.length - 2;
         break;
       }
+      case 'p':
+      case 'l': {
+        // Wavefront OBJ: `p v1 v2 ...` (vertex references) and `l v1/vt1 v2/vt2 ...` (a polyline of two or more).
+        const t = words(rest);
+        if (keyword === 'l' ? t.length < 2 : !t.length)
+          throw new LoaderError(
+            F,
+            'syntax',
+            `${keyword} on line ${line} has ${t.length} vertices; ${keyword === 'l' ? 'a line needs at least 2' : 'a point needs 1'}`,
+          );
+        const refs = t.map((corner) => {
+          const parts = corner.split('/');
+          if (!parts[0] || parts.length > (keyword === 'l' ? 2 : 1))
+            throw new LoaderError(
+              F,
+              'syntax',
+              `${keyword} vertex "${corner.slice(0, 32)}" on line ${line} is not ${keyword === 'l' ? 'v or v/vt' : 'v'}`,
+            );
+          return [
+            cornerIndex(parts[0], positions.length / 3, 'v', line),
+            parts[1] ? cornerIndex(parts[1], uvs.length / 2, 'vt', line) : NONE,
+          ];
+        });
+        if (pointV.length + lineV.length + refs.length * 2 > limit.maxVertices)
+          throw new LoaderError(F, 'limit', `point and line vertices exceed the limit of ${limit.maxVertices}`);
+        if (keyword === 'p') for (const [v] of refs) pointV.push(v);
+        else
+          for (let k = 1; k < refs.length; k++) {
+            lineV.push(refs[k - 1][0]);
+            lineT.push(refs[k - 1][1]);
+            lineV.push(refs[k][0]);
+            lineT.push(refs[k][1]);
+          }
+        break;
+      }
       case 'o':
         object = rest || undefined;
         break;
@@ -449,11 +494,14 @@ function readOBJ(text: string, limit: Limits): LoadedOBJ {
     warnings: [],
   };
   if (!triangles)
+    // Every `v` is kept, so `p` and `l` index them directly (a line's vt needs corners, which only faces make).
     return {
       ...result,
       kind: 'points',
       positions: positions.result(),
       positionIndices: Uint32Array.from({ length: positions.length / 3 }, (_, i) => i),
+      pointIndices: pointV.result(),
+      lineIndices: lineV.result(),
       ...(anyColor ? { colors: colors.result() } : {}),
     };
   const welder = new CornerWelder(positions.length / 3),
@@ -467,6 +515,14 @@ function readOBJ(text: string, limit: Limits): LoadedOBJ {
     if (t !== NONE) hasUV = true;
     if (n !== NONE) hasNormal = true;
     vertexOf[i] = welder.weld(cornerV.array[i], t, n, NONE);
+  }
+  // Point and line vertices weld like face corners, without a normal.
+  const pointOut = new Uint32Array(pointV.length),
+    lineOut = new Uint32Array(lineV.length);
+  for (let i = 0; i < pointOut.length; i++) pointOut[i] = welder.weld(pointV.array[i], NONE, NONE, NONE);
+  for (let i = 0; i < lineOut.length; i++) {
+    if (lineT.array[i] !== NONE) hasUV = true;
+    lineOut[i] = welder.weld(lineV.array[i], lineT.array[i], NONE, NONE);
   }
   const count = welder.count;
   if (count > limit.maxVertices)
@@ -502,7 +558,15 @@ function readOBJ(text: string, limit: Limits): LoadedOBJ {
     }
   for (let g = 0; g < groups.length; g++)
     groups[g].count = (g + 1 < groups.length ? groups[g + 1].start : indices.length) - groups[g].start;
-  const loaded: LoadedOBJ = { ...result, kind: 'mesh', positions: outPositions, indices, positionIndices };
+  const loaded: LoadedOBJ = {
+    ...result,
+    kind: 'mesh',
+    positions: outPositions,
+    indices,
+    positionIndices,
+    pointIndices: pointOut,
+    lineIndices: lineOut,
+  };
   if (outNormals) loaded.normals = outNormals;
   if (outColors) loaded.colors = outColors;
   if (outUVs) loaded.uvs = outUVs;
@@ -573,7 +637,8 @@ async function readMaterials(loaded: LoadedOBJ, resolve: AssetResolver, options:
 
 /**
  * Parses a Wavefront OBJ: `v` (with optional `w`, or `r g b` vertex colors after xyz), `vt`, `vn`, faces of any size
- * with `v`, `v/vt`, `v//vn`, `v/vt/vn` and negative (relative) indices, `o`, `g`, `s`, `usemtl` and `mtllib`, with
+ * with `v`, `v/vt`, `v//vn`, `v/vt/vn` and negative (relative) indices, `p` points and `l` polylines (into `pointIndices`
+ * and `lineIndices`), `o`, `g`, `s`, `usemtl` and `mtllib`, with
  * `\` line continuations, comments and CRLF. With `resolve` it also reads every MTL library (within
  * `maxMaterialLibraries` and `maxMaterialBytes`) and colors each group with its material's `Kd`. Malformed input
  * throws a `LoaderError` naming the line. A file without faces is a

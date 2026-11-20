@@ -18,6 +18,8 @@ import { barRects, heatmapRects, histogram, type BinOptions } from './charts.js'
 import { arrowSegments, streamline, type StreamlineOptions, type VectorGrid } from './fields.js';
 import { ColorBar, type ColorBarOptions } from './colorbar.js';
 import { colormapNames, type Colormap } from './colormaps.js';
+import { mapColours } from './color-lookup.js';
+import { srgbHex } from '../../shared/srgb-hex.js';
 import { Interaction, type DragMode } from './interact.js';
 import { IsosurfaceLayer, levelColour, type IsosurfaceLayerOptions } from './isosurface.js';
 import { dataToClip, nearestPoint, screenRay, selectPoints, type SelectRegion } from './pick.js';
@@ -38,6 +40,7 @@ import {
 import { projectPoint } from '@margoengine/math/mat4';
 import {
   dataToScene,
+  dataToSceneExact,
   extent,
   isGpuArray,
   rangeOption,
@@ -46,6 +49,8 @@ import {
   type ColormapSource,
   type DataSource,
 } from './layer.js';
+import { panWindow, zoomWindow } from './plot-window.js';
+import { positionBounds } from './extent.js';
 import { SciRenderer, requireGPU } from './render.js';
 import { SurfaceLayer, type SurfaceLayerOptions } from './surface.js';
 import { VolumeLayer, type VolumeLayerOptions } from './volume.js';
@@ -285,8 +290,11 @@ export interface CustomLayer {
   readonly dimensions?: '2d' | '3d';
   /** Data bounds of the layer. */
   readonly bounds: Bounds;
-  /** The figure's data-to-scene transform. */
-  setModel(model: Float32Array): void;
+  /**
+   * The figure's data-to-scene transform, and the same transform in double precision for a layer whose geometry lies
+   * far from the data origin at a scale float32 cannot place (it subtracts its own origin on the CPU first).
+   */
+  setModel(model: Float32Array, exact?: Float64Array): void;
   /** Frees the layer. */
   dispose(): void;
 }
@@ -313,15 +321,7 @@ const layerVisible = (layer: Layer): boolean => {
 const read = async (data: DataSource | undefined): Promise<ArrayLike<number> | undefined> =>
   data === undefined ? undefined : isGpuArray(data) ? await data.read() : data;
 
-const toHex = (rgb: readonly number[]): string =>
-  `#${rgb
-    .slice(0, 3)
-    .map((v) =>
-      Math.round(v * 255)
-        .toString(16)
-        .padStart(2, '0'),
-    )
-    .join('')}`;
+const hexOf = (rgb: readonly number[]): string => srgbHex(rgb[0], rgb[1], rgb[2]);
 
 const MARGIN = { top: 16, right: 24, bottom: 48, left: 64 } as const;
 
@@ -330,43 +330,11 @@ const MARGIN = { top: 16, right: 24, bottom: 48, left: 64 } as const;
 const PALETTE = ['#56b4e9', '#e69f00', '#009e73', '#f0e442', '#0072b2', '#d55e00', '#cc79a7'];
 const DAY = 86_400_000;
 
-// Extents of each coordinate of interleaved xyz positions, skipping NaN.
-const positionBounds = (p: Float32Array): Bounds => {
-  const b: Bounds = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
-  for (let i = 0; i < p.length; i += 3)
-    for (let k = 0; k < 3; k++) {
-      const v = p[i + k];
-      if (v < b[k * 2]) b[k * 2] = v;
-      if (v > b[k * 2 + 1]) b[k * 2 + 1] = v;
-    }
-  for (let k = 0; k < 3; k++) if (!(b[k * 2] <= b[k * 2 + 1])) [b[k * 2], b[k * 2 + 1]] = [0, 1];
-  return b;
-};
-
 const hexRGB = (hex: string, what: string): [number, number, number] => {
   const rgba = hexColor(hex);
   if (!rgba) throw typeError(`${what} ${hex} is not #rrggbb`, 'sciviz');
   return [rgba[0], rgba[1], rgba[2]];
 };
-
-// sRGB colours (0..1, three per value) from values through a colour map.
-function mapColours(values: ArrayLike<number>, map: Colormap, range: readonly [number, number]): Float32Array {
-  const out = new Float32Array(values.length * 3),
-    table = map.table(256),
-    scale = 255 / (range[1] - range[0] || 1);
-  for (let i = 0; i < values.length; i++) {
-    if (map.encoding) {
-      out.set(map.sample((values[i] - range[0]) / (range[1] - range[0] || 1)), i * 3);
-      continue;
-    }
-    const v = values[i],
-      k = v === v ? Math.min(255, Math.max(0, Math.round((v - range[0]) * scale))) * 4 : 0;
-    out[i * 3] = table[k];
-    out[i * 3 + 1] = table[k + 1];
-    out[i * 3 + 2] = table[k + 2];
-  }
-  return out;
-}
 
 /**
  * A 3D figure in an engine: scatter, line, surface, volume and isosurface layers sharing one data frame, with axes,
@@ -462,7 +430,14 @@ export class Figure extends EventTarget {
       engine.dispose();
       throw options.signal.reason;
     }
-    const figure = new Figure(engine, options);
+    // The engine is ours until the figure owns it: invalid options must not leave a configured canvas and device.
+    let figure: Figure;
+    try {
+      figure = new Figure(engine, options);
+    } catch (error) {
+      engine.dispose();
+      throw error;
+    }
     figure.#ownsEngine = true;
     engine.scene.background = figure.theme.background;
     if (!figure.#flat) {
@@ -493,7 +468,6 @@ export class Figure extends EventTarget {
     for (const key of ['background', 'axis', 'grid', 'text'] as const) {
       if (typeof colors[key] !== 'string')
         throw typeError(`Theme ${key} needs a colour string; supply #rrggbb`, 'sciviz');
-      hexRGB(colors[key], `Theme ${key}`);
     }
     const aspect = options.aspect ?? [1, 1, 0.75];
     if (aspect.length !== 3 || !aspect.every((a) => a > 0 && Number.isFinite(a)))
@@ -577,7 +551,6 @@ export class Figure extends EventTarget {
     for (const key of ['background', 'axis', 'grid', 'text'] as const) {
       if (typeof theme[key] !== 'string')
         throw typeError(`Theme ${key} needs a colour string; supply #rrggbb`, 'sciviz');
-      hexRGB(theme[key], `Theme ${key}`);
     }
     validateThemeStyle(theme);
     if (theme.scalarMap !== undefined && !colormapNames.includes(theme.scalarMap))
@@ -726,7 +699,7 @@ export class Figure extends EventTarget {
       m = this.#margin;
     const sx = (x1 - x0) / Math.max(1, width - m.left - m.right),
       sy = (y1 - y0) / Math.max(1, height - m.top - m.bottom);
-    this.#window = [x0 - dx * sx, x1 - dx * sx, y0 + dy * sy, y1 + dy * sy, -1, 1];
+    this.#window = [...panWindow(x0, x1, -dx * sx), ...panWindow(y0, y1, dy * sy), -1, 1];
     this.#refit();
   }
 
@@ -737,16 +710,7 @@ export class Figure extends EventTarget {
       m = this.#margin;
     const u = Math.min(1, Math.max(0, (x - m.left) / Math.max(1, width - m.left - m.right))),
       v = Math.min(1, Math.max(0, (y - m.top) / Math.max(1, height - m.top - m.bottom)));
-    const cx = x0 + u * (x1 - x0),
-      cy = y1 - v * (y1 - y0);
-    this.#window = [
-      cx - (cx - x0) * factor,
-      cx + (x1 - cx) * factor,
-      cy - (cy - y0) * factor,
-      cy + (y1 - cy) * factor,
-      -1,
-      1,
-    ];
+    this.#window = [...zoomWindow(x0, x1, factor, u), ...zoomWindow(y0, y1, factor, 1 - v), -1, 1];
     this.#refit();
   }
 
@@ -1037,11 +1001,12 @@ export class Figure extends EventTarget {
       b[5] = 1;
     }
     this.#bounds = b;
-    this.#model = dataToScene(this.#bounds, this.#flat ? [1, 1, 1] : (this.#options.aspect ?? [1, 1, 0.75]));
+    const exact = dataToSceneExact(this.#bounds, this.#flat ? [1, 1, 1] : (this.#options.aspect ?? [1, 1, 0.75]));
+    this.#model = new Float32Array(exact);
     for (const layer of this.#layers) {
       if ('kind' in layer && layer.kind === 'scatter') layer.cloud.matrix.set(this.#model);
       else if ('kind' in layer && layer.kind === 'line') layer.line.setMatrix(this.#model);
-      else layer.setModel(this.#model);
+      else layer.setModel(this.#model, exact);
     }
     // One queued axes update at a time: it draws whatever the bounds are when it runs.
     if (this.#axes && !this.#axesQueued) {
@@ -1101,7 +1066,7 @@ export class Figure extends EventTarget {
       if (!name) continue;
       if (layer instanceof RectsLayer) entries.push({ name, color: layer.swatch, shape: 'square' });
       else if (layer instanceof SurfaceLayer)
-        entries.push({ name, color: toHex(layer.colormap.sample(0.6)), shape: 'square' });
+        entries.push({ name, color: hexOf(layer.colormap.sample(0.6)), shape: 'square' });
       else if ('kind' in layer && (layer.kind === 'scatter' || layer.kind === 'line'))
         entries.push({
           name,
@@ -1189,9 +1154,12 @@ export class Figure extends EventTarget {
       : colourData || options.colormap
         ? map.sample(0.6)
         : this.#nextColour();
-    const plugin = await (this.#points ??= import('@margoengine/points').then(({ PointsPlugin }) =>
-      PointsPlugin.attach(this.engine, { pointBudget: this.#options.pointBudget ?? 2_000_000 }),
-    ));
+    const plugin = await (this.#points ??= import('@margoengine/points').then(({ PointsPlugin }) => {
+      const points = PointsPlugin.attach(this.engine, { pointBudget: this.#options.pointBudget ?? 2_000_000 });
+      // Scatter sizes are CSS pixels, on screen and in export alike (SciRenderer.cssScale).
+      points.pixelScale = (context) => this.renderer.cssScale(context.width);
+      return points;
+    }));
     const { PointCloud } = await import('@margoengine/points');
     this.#check();
     const cloud = plugin.add(
@@ -1207,7 +1175,7 @@ export class Figure extends EventTarget {
         },
       }),
     );
-    const style = { color: toHex(uniform), colors: colours, width: options.size ?? (count > 200_000 ? 2 : 3) };
+    const style = { color: hexOf(uniform), colors: colours, width: options.size ?? (count > 200_000 ? 2 : 3) };
     const layer = this.#style(style, {
       kind: 'scatter',
       cloud,
@@ -1247,7 +1215,7 @@ export class Figure extends EventTarget {
     const lines = await this.#linesPlugin();
     const { Line } = await import('@margoengine/lines');
     this.#check();
-    const colour = options.color ?? toHex(c || options.colormap ? map.sample(0.6) : this.#nextColour());
+    const colour = options.color ?? hexOf(c || options.colormap ? map.sample(0.6) : this.#nextColour());
     const line = lines.add(
       new Line({
         positions,
@@ -1339,7 +1307,7 @@ export class Figure extends EventTarget {
     const lines = await this.#linesPlugin();
     const { Line } = await import('@margoengine/lines');
     this.#check();
-    const colour = options.color ?? toHex(map.sample(0.6)),
+    const colour = options.color ?? hexOf(map.sample(0.6)),
       width = options.width ?? this.theme.lineWidth ?? 1.5;
     const line = lines.add(
       new Line({ mode: 'segments', positions, colors: colours, color: colours ? '#ffffff' : colour, width }),
@@ -1527,7 +1495,7 @@ export class Figure extends EventTarget {
     if (values) {
       const rgb = mapColours(values, map, rangeOption(options.range, `${what} range`) ?? extent(values));
       for (let i = 0; i < count; i++) colours[i] = packColour(rgb[i * 3], rgb[i * 3 + 1], rgb[i * 3 + 2]);
-      return { colours, swatch: toHex(map.sample(0.6)) };
+      return { colours, swatch: hexOf(map.sample(0.6)) };
     }
     const one = options.color
       ? hexRGB(options.color, `${what} color`)
@@ -1535,7 +1503,7 @@ export class Figure extends EventTarget {
         ? map.sample(0.6)
         : this.#nextColour();
     colours.fill(packColour(one[0], one[1], one[2]));
-    return { colours, swatch: toHex(one) };
+    return { colours, swatch: hexOf(one) };
   }
 
   /**
@@ -1557,6 +1525,9 @@ export class Figure extends EventTarget {
     const fx = this.#forward(0, x),
       fy = this.#forward(1, y),
       base = fy(options.base ?? (this.#scales[1].type === 'log' ? 1 : 0));
+    // A base of 0 on a log axis (or an infinite one) maps to no plot position, and every bar would be NaN.
+    if (!Number.isFinite(base))
+      throw rangeError(`bar base must be finite, and above 0 on a log axis, got ${options.base}`, 'sciviz');
     const rects = barRects(Float64Array.from(x, fx), Float64Array.from(y, fy), { width: options.width, base }),
       { colours, swatch } = this.#colours(x.length, c, options, 'bar');
     return this.#rects('bar', rects, Float32Array.from(y), colours, options.name, swatch);
@@ -1567,6 +1538,7 @@ export class Figure extends EventTarget {
     this.#check();
     this.#need2d('A histogram');
     const v = await read(values);
+    if (!v) throw typeError('histogram needs values; pass an array of numbers, a TypedArray or a GpuArray', 'sciviz');
     this.#check();
     // Bins are equal in plot coordinates: on a log x axis, equal ratios.
     const fx = this.#forward(0, v),
@@ -1594,7 +1566,9 @@ export class Figure extends EventTarget {
     this.#check();
     this.#need2d('A heatmap');
     const shape = isGpuArray(values) ? values.shape : undefined,
-      v = (await read(values))!;
+      v = await read(values);
+    if (!v)
+      throw typeError('heatmap needs values; pass nx * ny numbers as an array, a TypedArray or a GpuArray', 'sciviz');
     this.#check();
     const nx = options.nx ?? (shape?.length === 2 ? shape[1] : Math.round(Math.sqrt(v.length)));
     const ny = options.ny ?? Math.round(v.length / nx);
@@ -1657,31 +1631,35 @@ export class Figure extends EventTarget {
    */
   async toPNG(options: PNGOptions = {}): Promise<Blob> {
     // Export code loads on first use.
-    const { paintOverlays, swatches, textRuns, captureGPU } = await import('./export-load.js');
+    const { paintOverlays, placedBars, swatches, textRuns, captureGPU } = await import('./export-load.js');
     await this.ready();
     this.#check();
-    const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
+    const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas,
+      overlays = options.overlays ?? true;
     if (this.#flat) this.#fitView();
+    // The overlay boxes are read in the task that draws the frame (placedBars): the GPU copy is read back tasks later,
+    // and a page change by then (a containing block or an inserted element) would move the labels off the frame.
+    let origin = canvas.getBoundingClientRect(),
+      runs: ReturnType<typeof textRuns> = [],
+      boxes: ReturnType<typeof swatches> = [],
+      bars: ReturnType<typeof placedBars> = [];
+    const frame = () => {
+      this.render();
+      origin = canvas.getBoundingClientRect();
+      if (!overlays) return;
+      const roots = this.#overlayRoots();
+      runs = textRuns(roots, origin);
+      boxes = swatches(roots, origin);
+      bars = placedBars([...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap })));
+    };
     const bitmap = this.engine.gpu
-        ? await captureGPU(this.engine, canvas, () => this.render())
-        : (this.render(), await createImageBitmap(canvas)),
+        ? await captureGPU(this.engine, canvas, frame)
+        : (frame(), await createImageBitmap(canvas)),
       out = new OffscreenCanvas(bitmap.width, bitmap.height),
       g = out.getContext('2d')!;
     g.drawImage(bitmap, 0, 0);
-    if (options.overlays ?? true) {
-      const origin = canvas.getBoundingClientRect(),
-        bars = [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap }));
-      paintOverlays(
-        g,
-        textRuns(this.#overlayRoots(), origin),
-        bars,
-        origin,
-        bitmap.width / (origin.width || bitmap.width),
-        swatches(this.#overlayRoots(), origin),
-      );
-    }
-    if (options.overlays ?? true)
-      for (const overlay of publicationOverlays(this)) overlay.paint(g, bitmap.width, bitmap.height);
+    if (overlays) paintOverlays(g, runs, bars, origin, bitmap.width / (origin.width || bitmap.width), boxes);
+    if (overlays) for (const overlay of publicationOverlays(this)) overlay.paint(g, bitmap.width, bitmap.height);
     bitmap.close();
     return out.convertToBlob({ type: 'image/png' });
   }
@@ -1689,15 +1667,16 @@ export class Figure extends EventTarget {
   /**
    * The figure as SVG in CSS pixels: tick labels, titles and colour bars as text and shapes. A 2D chart whose layers
    * are bars, histograms, heatmaps, lines and scatters of up to 50,000 points is drawn with vector shapes throughout;
-   * anything else is a fresh frame embedded as a PNG under the vector text (`vector: false` forces that).
+   * anything else is a fresh frame embedded as a PNG under the vector text (`vector: false` forces that). Waits for
+   * `ready()`, as toPNG does.
    */
   async toSVG(options: SVGOptions = {}): Promise<string> {
     const ex = await import('./export-load.js'),
       { base64, svgBars, svgSwatches, svgText, swatches, textRuns } = ex;
-    await this.#pending;
+    // The same readiness as toPNG: axis updates and the renderer's pipelines, so the raster frame has every layer.
+    await this.ready();
     this.#check();
     const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas,
-      origin = canvas.getBoundingClientRect(),
       { width, height } = this.#canvasSize();
     const vector =
       (options.vector ?? true) &&
@@ -1707,8 +1686,16 @@ export class Figure extends EventTarget {
           l instanceof RectsLayer ||
           ('kind' in l && (l.kind === 'line' || (l.kind === 'scatter' && l.count <= 50_000))),
       );
-    // A frame places the HTML labels as well as drawing the layers.
+    // A frame places the HTML labels as well as drawing the layers. Their boxes are read in the same task, before the
+    // raster path awaits its image, so a page change meanwhile cannot move them off the frame (toPNG).
     this.render();
+    const origin = canvas.getBoundingClientRect(),
+      bars = svgBars(
+        [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap })),
+        origin,
+      ),
+      text = svgText(textRuns(this.#overlayRoots(), origin)),
+      boxes = svgSwatches(swatches(this.#overlayRoots(), origin));
     let body: string;
     if (vector) body = this.#vectorSVG(width, height, ex);
     else {
@@ -1719,12 +1706,6 @@ export class Figure extends EventTarget {
       const bytes = new Uint8Array(await (await out.convertToBlob({ type: 'image/png' })).arrayBuffer());
       body = `<image x="0" y="0" width="${width}" height="${height}" href="data:image/png;base64,${base64(bytes)}"/>`;
     }
-    const bars = svgBars(
-        [...this.#bars].map((b) => ({ bar: b.bar, map: b.colormap })),
-        origin,
-      ),
-      text = svgText(textRuns(this.#overlayRoots(), origin)),
-      boxes = svgSwatches(swatches(this.#overlayRoots(), origin));
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">\n${body}\n${bars}\n${boxes}\n${text}\n${publicationOverlays(
       this,
     )
@@ -1734,7 +1715,7 @@ export class Figure extends EventTarget {
 
   // A 2D chart as SVG shapes: background, grid and frame, then rectangles, points and lines in drawing order, clipped
   // to the plot area.
-  #vectorSVG(width: number, height: number, { hex, escapeXML }: typeof import('./export-load.js')): string {
+  #vectorSVG(width: number, height: number, { hex, escapeXML, svgId }: typeof import('./export-load.js')): string {
     const m = this.#margin,
       { matrix } = this.#view(),
       p = { x: 0, y: 0, depth: 0, w: 0, inFront: false, inFrustum: false },
@@ -1745,9 +1726,11 @@ export class Figure extends EventTarget {
     const [x0, x1, y0, y1] = this.#bounds,
       pw = width - m.left - m.right,
       ph = height - m.top - m.bottom,
+      plot = `<rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}"/>`,
+      clip = svgId('sciviz-plot', plot),
       out: string[] = [
         `<rect width="${width}" height="${height}" fill="${this.theme.background}"/>`,
-        `<clipPath id="sciviz-plot"><rect x="${m.left}" y="${m.top}" width="${pw}" height="${ph}"/></clipPath>`,
+        `<clipPath id="${clip}">${plot}</clipPath>`,
       ];
     if ((this.#options.grid ?? true) && this.#axes && this.theme.gridStyle !== 'none') {
       const grid: string[] = [];
@@ -1763,7 +1746,7 @@ export class Figure extends EventTarget {
         `<path d="${grid.join('')}" stroke="${this.theme.grid}" stroke-width="${this.theme.gridWidth ?? 1}" fill="none"/>`,
       );
     }
-    out.push('<g clip-path="url(#sciviz-plot)">');
+    out.push(`<g clip-path="url(#${clip})">`);
     const layers = [...this.#layers].filter(layerVisible),
       rgb = (c: number) => hex((c & 255) / 255, ((c >>> 8) & 255) / 255, ((c >>> 16) & 255) / 255);
     for (const layer of layers.filter((l): l is RectsLayer => l instanceof RectsLayer)) {
@@ -1909,9 +1892,15 @@ export class Figure extends EventTarget {
     const canvas = (this.engine as unknown as { canvas: HTMLCanvasElement }).canvas;
     const bar = new ColorBar(canvas, resolveColormap(colormap), range, this.theme, options);
     this.#bars.add(bar);
-    // Make room for the bar beside a 2D chart unless the margin was chosen.
-    if (this.#flat && this.#options.margin?.right === undefined && this.#margin.right < 96)
-      this.#margin = { ...this.#margin, right: 96 };
+    // Make room for the bar beside a 2D chart unless the margin was chosen; the last bar's dispose gives it back.
+    const room = this.#flat && this.#options.margin?.right === undefined;
+    if (room && this.#margin.right < 96) this.#margin = { ...this.#margin, right: 96 };
+    bar.onDispose = () => {
+      this.#bars.delete(bar);
+      if (this.#disposed) return;
+      if (room && !this.#bars.size) this.#margin = { ...this.#margin, right: MARGIN.right };
+      this.#updateLegend();
+    };
     this.#updateLegend();
     return bar;
   }
@@ -1953,8 +1942,10 @@ export class Figure extends EventTarget {
     disposePublicationLabels(this);
     if (this.#disposed) return;
     this.#disposed = true;
-    for (const layer of [...this.#layers]) this.#free(layer);
+    // Cleared first, so a layer that removes the layers it owns while it is freed finds them already gone.
+    const layers = [...this.#layers];
     this.#layers.clear();
+    for (const layer of layers) this.#free(layer);
     for (const bar of this.#bars) bar.dispose();
     this.#axes?.dispose();
     this.#legend?.dispose();

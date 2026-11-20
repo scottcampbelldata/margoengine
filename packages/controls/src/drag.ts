@@ -12,8 +12,9 @@ import {
   normalizeQuaternion,
 } from '@margoengine/math/quat';
 import { basis, intersectPlane } from './view.js';
+import { rangeError } from '../../shared/errors.js';
 
-/** A core mesh, or a gltf-pro `PBRModel` (also @margoengine/materials meshes), which moves by its `root`. */
+/** A core mesh, or a gltf/pbr `PBRModel` (also @margoengine/materials meshes), which moves by its `root`. */
 export type DragObject = Mesh | ModelLike;
 /** What a drag does: move the object (`translate`, the default) or turn it (`rotate`). */
 export type DragMode = 'translate' | 'rotate';
@@ -61,7 +62,7 @@ interface Drag {
 }
 
 /**
- * Drags core meshes and gltf-pro models with the pointer, mouse or touch. Objects are grabbed with
+ * Drags core meshes and gltf/pbr models with the pointer, mouse or touch. Objects are grabbed with
  * the bvh Raycaster, so orthographic cameras from @margoengine/cameras work, and moved on a plane or along an axis in
  * world space, or turned about their origin (`mode: 'rotate'`; about `axis` when set, else with the screen as a
  * trackball). `group` carries a set of objects together, turning about the grabbed one. `recursive` grabs children of
@@ -225,7 +226,7 @@ export class DragControls extends EventDispatcher {
           ? normalize(n)
           : normalize(cross(axis, Math.abs(axis[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
     }
-    if (!Math.hypot(...normal)) throw new RangeError('Drag plane normal must be nonzero');
+    if (!Math.hypot(...normal)) throw rangeError('Drag plane normal must be nonzero', 'controls-arguments');
     const carried = this.carry(object);
     this.drag = {
       object,
@@ -283,9 +284,10 @@ export class DragControls extends EventDispatcher {
       speed = this.rotateSpeed;
     let axis: V3, angle: number;
     if (d.axis) {
-      // The near side of the object follows the pointer: right or down turns it the same way seen along the axis.
+      // The near side of the object follows the pointer: a turn about up moves it right, one about right moves it
+      // down (an axis along the view keeps the old sense there: a drag up turns it anticlockwise on screen).
       axis = d.axis;
-      angle = (dot(d.axis, b.up) >= 0 ? dx : -dx) * speed + (dot(d.axis, b.right) >= 0 ? -dy : dy) * speed;
+      angle = (dot(d.axis, b.up) >= 0 ? dx : -dx) * speed + (dot(d.axis, b.right) > 0 ? dy : -dy) * speed;
     } else {
       axis = normalize(add(scale(b.up, dx), scale(b.right, dy))) as V3;
       angle = length * speed;

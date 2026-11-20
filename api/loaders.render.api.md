@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh } from "@margoengine/core";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface CreatePBRMeshesOptions extends Pick<CreateMeshesOptions, 'parent' | 'normals' | 'roughness' | 'metalness' | 'doubleSided'> {
     baseColorFactor?: readonly [number, number, number, number];
@@ -33,6 +33,7 @@ interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }

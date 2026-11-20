@@ -1,15 +1,17 @@
 // Real-GPU check for @margoengine/culling's DynamicInstances: engine A draws boxes through it, engine B draws the same
 // boxes as plain core meshes (each instance's matrix is read from B's mesh, so both draw the same floats). Every step's
-// frames must be identical (moves, hides, deletes, adds, camera moves; then all again with shadows cast and received),
+// frames must be identical (moves, hides, deletes, adds, camera moves; then all again with shadows cast and received,
+// the two shadow maps equal texel for texel, shadow-maps.mjs),
 // compared sample by sample before the 4x resolve (msaa.mjs), the GPU must drop boxes in a partial view, and the
 // instance pick must name the box engine.pick names. A box dropped from A alone must show as differing samples. A bulk
 // list of 200,000 rows must compact the same rows in order with the look-back scan and with its fallback alone.
-// Run from the repository root after building packages, holding a GPU slot:
+// Run from the repository root after building packages:
 //   node packages/culling/test/gpu/dynamic-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 import { frameDiff } from './msaa.mjs';
+import { assertShadowMaps } from './shadow-maps.mjs';
 
 for (const shadows of [false, true]) {
   const context = await openBrowser({ startPath: '/packages/culling/test/gpu/index.html', port: 5281 }),
@@ -38,6 +40,7 @@ for (const shadows of [false, true]) {
         `step ${i}: ${r.label}: ${differing} of ${pixels} pixels differ (${mode}), ${lit} lit; GPU drew ${r.drawn} of ${r.alive}`,
       );
       assert.equal(differing, 0, `${r.label}: instance frame differs from core meshes`);
+      if (shadows) await assertShadowMaps(page, `step ${i}: ${r.label}`);
       assert.ok(lit > 1500, `${r.label}: scene not visible`);
       assert.ok(r.drawn <= r.alive, `${r.label}: drawn count out of range`);
       if (r.drawn < r.alive * 0.5) partial++;
@@ -71,7 +74,7 @@ for (const shadows of [false, true]) {
     assert.deepEqual(await page.evaluate(() => window.check.errors), []);
     assert.deepEqual(pageErrors, []);
   } finally {
-    // fixed-wait: a bounded close, so a browser that hangs while closing cannot hold the GPU slot past 15 s
+    // fixed-wait: a bounded close, so a browser that hangs while closing cannot hang past 15 s
     await Promise.race([context.close(), new Promise((resolve) => setTimeout(resolve, 15000).unref())]);
   }
 }

@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { BLUEPRINTS, writeRecord } from './wasm-blueprints.mjs';
+import { blueprintRustEnv } from './rust-wasm-env.mjs';
 
 const repository = resolve(import.meta.dirname, '..');
 const wasmPath = resolve(repository, 'packages/kernel/target/wasm32-unknown-unknown/release/margoengine_kernel.wasm'),
@@ -24,11 +25,7 @@ export function buildCoreKernel() {
     {
       cwd: repository,
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        CARGO_TARGET_DIR: resolve(repository, 'packages/kernel/target'),
-        RUSTFLAGS: '-C target-feature=+simd128',
-      },
+      env: blueprintRustEnv(resolve(repository, 'packages/kernel'), '-C target-feature=+simd128'),
     },
   );
   // -ocimfs 300: keep the kernel's recompute path out of line so the per-entity unchanged path stays small (parts assembly, 100k entities: 3.5 vs 4.8 ms per tick).

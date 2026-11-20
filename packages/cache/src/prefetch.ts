@@ -74,6 +74,7 @@ export class Prefetcher {
   private paused = false;
   private scheduled = false;
   private disposed = false;
+  private release?: () => void;
   private counts = { done: 0, failed: 0, cancelled: 0, bytes: 0 };
 
   constructor({ fetch, concurrency = 2, idle = true, idleTimeout = 2000, signal }: PrefetcherOptions = {}) {
@@ -86,7 +87,12 @@ export class Prefetcher {
     this.idle = idle;
     this.idleTimeout = idleTimeout;
     if (signal?.aborted) this.dispose();
-    else signal?.addEventListener('abort', () => this.dispose(), { once: true });
+    else if (signal) {
+      const stop = () => this.dispose();
+      signal.addEventListener('abort', stop, { once: true });
+      // The app's signal can outlive this prefetcher: its listener must not keep the prefetcher reachable.
+      this.release = () => signal.removeEventListener('abort', stop);
+    }
   }
 
   /** Counts so far. */
@@ -239,6 +245,8 @@ export class Prefetcher {
   dispose(): void {
     this.cancel();
     this.disposed = true;
+    this.release?.();
+    this.release = undefined;
     for (const resolve of this.settled.splice(0)) resolve();
   }
   declare [Symbol.dispose]: () => void;

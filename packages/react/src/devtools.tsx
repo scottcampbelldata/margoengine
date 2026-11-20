@@ -87,3 +87,17 @@ export function DevTools({
   }, [scene, showInspector, showStats]);
   return null;
 }
+/** Props of `<Stats>`: the readout's options, every one optional. */
+export interface StatsProps extends StatsOptions {
+  /** Show it. Default true, in production builds too (unlike `<DevTools>`). */
+  enabled?: boolean;
+  /** Called when `@margoengine/stats` fails to load. The Canvas's onError hears it too. */
+  onError?: (error: unknown) => void;
+}
+/**
+ * The frame-time and draw-call readout alone (`@margoengine/stats`, loaded when it first shows), on in every build
+ * because you placed it. `<DevTools>` adds the scene inspector and stays closed in production.
+ */
+export function Stats({ enabled = true, onError, ...options }: StatsProps) {
+  return <DevTools enabled={enabled} inspector={false} stats={options} onError={onError} />;
+}

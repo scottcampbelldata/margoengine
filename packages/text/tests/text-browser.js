@@ -4,6 +4,7 @@ import { SceneTarget } from '../../shared/msaa.js';
 import { TextRenderer, Text, Font } from '@margoengine/text';
 import { AnimatedText } from '@margoengine/text/animate';
 import { parseFontOutlines, extrudeText } from '@margoengine/text/extrude';
+import { openType } from '@margoengine/loaders/font-opentype';
 import { webglRenderer } from '@margoengine/webgl2-compat/preview';
 import { buildColorFont, COLOR_FONT_FAMILY } from './color-font.js';
 
@@ -476,7 +477,7 @@ window.runTextTests = async () => {
   label.visible = false;
   const shapedFixture = (await (await fetch('/tests/fixtures/fonts/shaping-reference.json')).json()).cases[0];
   const variableBytes = await (await fetch('/tests/fixtures/fonts/SourceSans3VF-Upright.otf')).arrayBuffer();
-  const shapedGeometry = extrudeText(shapedFixture.text, { font: variableBytes, variations: shapedFixture.variations,
+  const shapedGeometry = extrudeText(shapedFixture.text, { font: variableBytes, openType, variations: shapedFixture.variations,
     shapedRuns: shapedFixture.shapedRuns, size: 1.6, depth: 0.25 });
   const shapedMesh = engine.createMesh().setGeometry(new Geometry(shapedGeometry.positions, shapedGeometry.normals, shapedGeometry.indices))
     .setMaterial(new PbrMaterial({color:'#ff8800',roughness:0.4}));

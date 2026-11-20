@@ -263,3 +263,14 @@ test('the camera from the Margo Voxel report picks the exposed top of a curtain 
     assert.equal(faceCells(grid, hit.cell, hit.normal).length, 8);
   }
 });
+
+test('raycastGrid enters the grid from far away instead of missing on rounding', () => {
+  // About 3.7e9 cells out the entry point rounded just outside the box and the ray reported a miss.
+  const grid = { size: [8, 8, 8], voxels: new Uint8Array(512).fill(1) },
+    hit = raycastGrid(grid, {
+      origin: [839335879.2160283, 1035520397.717236, 64382601.86735724],
+      direction: [-0.22439891193062067, -0.2768494177144021, -0.017212876584380865],
+    });
+  assert.ok(hit, 'the ray crosses 11 cells of a full grid');
+  assert.ok(hit.cell.every((v) => v >= 0 && v < 8));
+});

@@ -111,7 +111,7 @@ export class Ray {
     return this.distanceToPlane(plane) !== null;
   }
 
-  /** Slab test. Returns the entry point, or the origin when it starts inside the box. */
+  /** Slab test. Returns the entry point, or the origin when it starts inside. An empty box (max below min) misses. */
   intersectBox<T extends Vec3Like>(box: BoxLike, out: T): T | null {
     const t = this.distanceToBox(box);
     return t === null ? null : this.at(t, out);
@@ -126,6 +126,7 @@ export class Ray {
    * entry, so ordinary hits keep their values.
    */
   private distanceToBox(box: BoxLike): number | null {
+    if (box.max.x < box.min.x || box.max.y < box.min.y || box.max.z < box.min.z) return null;
     const o = this.origin,
       d = this.direction,
       reach = Math.hypot(
@@ -133,7 +134,7 @@ export class Ray {
         Math.max(Math.abs(box.min.y - o.y), Math.abs(box.max.y - o.y)),
         Math.max(Math.abs(box.min.z - o.z), Math.abs(box.max.z - o.z)),
       ),
-      // An empty or unbounded box (infinite corners) keeps the plain test.
+      // An unbounded box (infinite corners) keeps the plain test.
       pad = reach < Infinity ? 8 * Number.EPSILON * reach : 0;
     let near = -Infinity,
       far = Infinity,

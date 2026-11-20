@@ -1,4 +1,4 @@
-// WGSL compile gate (`npm run check:wgsl`, part of check:merge; real GPU, takes the GPU lock): compiles, on the
+// WGSL compile gate (`npm run check:wgsl`, part of check:merge; real GPU): compiles, on the
 // browser's WebGPU, every WGSL source the packages hold, including the ones no view or test draws. Each package source
 // file (packages/*/src, packages/shared) is parsed; its top-level constants whose text has an entry point (@vertex,
 // @fragment, @compute) and its top-level functions whose body does are exposed to the page by a dev-server transform.
@@ -11,14 +11,13 @@
 // its body), is a fragment meant to be joined to others (counted, not failed); any other error (syntax, types, a parse
 // error inside the text) fails the gate with the file, the export and the source line. Its modules are labelled
 // `check-wgsl:` so the page's own guard (scripts/support/wgsl-guard.js) leaves the fragments to this classification.
-//   node scripts/gpu-lock.mjs run --owner=<you> -- npm run check:wgsl
+//   node scripts/run-with-timeout.mjs -- npm run check:wgsl
 // --packages=dof,post limits it to those package directories (check:merge passes the affected ones; shared WGSL is
 // compiled only by the full run).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { parseAst } from 'rolldown/parseAst';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { wgslReturnGaps } from './support/wgsl-guard.js';
 
 const root = resolve(import.meta.dirname, '..'),
@@ -103,101 +102,110 @@ const only = process.argv
     },
   };
 
-if (only && !files.length) {
-  console.log(`check:wgsl: no WGSL entry points in ${only.join(', ')}; nothing to compile`);
-  process.exit(0);
-}
-const release = await acquire({ owner: 'check-wgsl' }),
-  started = performance.now();
-let browser;
-try {
-  browser = await openBrowser({ startPath: '/tests/wgsl-check.html', port: 5317, plugins: [plugin] });
-  const paths = files.map((f) => `/${relative(root, f).replaceAll('\\', '/')}`),
-    report = await browser.page.evaluate(async (list) => {
-      if (!navigator.gpu)
-        throw new Error(
-          'navigator.gpu is missing in this browser; try MARGO_BROWSER=chrome, or MARGO_SOFTWARE_GPU=1 on a machine without a GPU',
-        );
-      const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
-        device = await adapter.requestDevice({ requiredFeatures: [...adapter.features] }),
-        seen = new Map(),
-        out = { files: list.length, constants: 0, variants: 0, skipped: [], threw: [], fragments: 0, errors: [], sources: [] },
-        UNRESOLVED = /unresolved (value|type|call target|function|identifier|attribute)|undeclared/i;
-      const compile = async (code, where) => {
-        if (typeof code !== 'string' || !/@(vertex|fragment|compute)\b/.test(code)) return;
-        if (seen.has(code)) return;
-        seen.set(code, where);
-        out.sources.push([where, code]);
-        const info = await device.createShaderModule({ code, label: `check-wgsl:${where}` }).getCompilationInfo(),
-          errors = info.messages.filter((m) => m.type === 'error'),
-          end = code.trimEnd().length;
-        if (!errors.length) return;
-        if (errors.every((m) => UNRESOLVED.test(m.message) || m.offset >= end)) {
-          out.fragments++;
-          return;
-        }
-        const lines = code.split('\n');
-        for (const m of errors)
-          out.errors.push(
-            `${where} ${m.lineNum}:${m.linePos} ${m.message} | ${(lines[m.lineNum - 1] ?? '').trim().slice(0, 160)}`,
+// Nothing to compile ends by the event loop, as every run does: process.exit can hold the exit for ever (KB-OWN-EXIT2).
+if (only && !files.length) console.log(`check:wgsl: no WGSL entry points in ${only.join(', ')}; nothing to compile`);
+else await compileAll();
+
+async function compileAll() {
+  const started = performance.now();
+  let browser;
+  try {
+    browser = await openBrowser({ startPath: '/tests/wgsl-check.html', port: 5317, plugins: [plugin] });
+    const paths = files.map((f) => `/${relative(root, f).replaceAll('\\', '/')}`),
+      report = await browser.page.evaluate(async (list) => {
+        if (!navigator.gpu)
+          throw new Error(
+            'navigator.gpu is missing in this browser; try MARGO_BROWSER=chrome, or MARGO_SOFTWARE_GPU=1 on a machine without a GPU',
           );
-      };
-      for (const path of list) {
-        let module;
-        try {
-          module = await import(path);
-        } catch (error) {
-          out.errors.push(`${path}: import failed: ${String(error.message ?? error).split('\n')[0]}`);
-          continue;
-        }
-        for (const [name, get, sets] of module.__margoWgslProbe ?? []) {
-          const where = `${path} ${name}`;
-          if (!get) {
-            out.skipped.push(where);
+        const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
+          device = await adapter.requestDevice({ requiredFeatures: [...adapter.features] }),
+          seen = new Map(),
+          out = {
+            files: list.length,
+            constants: 0,
+            variants: 0,
+            skipped: [],
+            threw: [],
+            fragments: 0,
+            errors: [],
+            sources: [],
+          },
+          UNRESOLVED = /unresolved (value|type|call target|function|identifier|attribute)|undeclared/i;
+        const compile = async (code, where) => {
+          if (typeof code !== 'string' || !/@(vertex|fragment|compute)\b/.test(code)) return;
+          if (seen.has(code)) return;
+          seen.set(code, where);
+          out.sources.push([where, code]);
+          const info = await device.createShaderModule({ code, label: `check-wgsl:${where}` }).getCompilationInfo(),
+            errors = info.messages.filter((m) => m.type === 'error'),
+            end = code.trimEnd().length;
+          if (!errors.length) return;
+          if (errors.every((m) => UNRESOLVED.test(m.message) || m.offset >= end)) {
+            out.fragments++;
+            return;
+          }
+          const lines = code.split('\n');
+          for (const m of errors)
+            out.errors.push(
+              `${where} ${m.lineNum}:${m.linePos} ${m.message} | ${(lines[m.lineNum - 1] ?? '').trim().slice(0, 160)}`,
+            );
+        };
+        for (const path of list) {
+          let module;
+          try {
+            module = await import(path);
+          } catch (error) {
+            out.errors.push(`${path}: import failed: ${String(error.message ?? error).split('\n')[0]}`);
             continue;
           }
-          if (!sets) {
-            out.constants++;
-            await compile(get(), where);
-            continue;
-          }
-          for (const args of sets) {
-            let code;
-            try {
-              code = get(...args.map((a) => (a === null ? undefined : a)));
-            } catch (error) {
-              out.threw.push(`${where}(${args.join(', ')}): ${String(error.message ?? error).split('\n')[0]}`);
+          for (const [name, get, sets] of module.__margoWgslProbe ?? []) {
+            const where = `${path} ${name}`;
+            if (!get) {
+              out.skipped.push(where);
               continue;
             }
-            out.variants++;
-            await compile(code, `${where}(${args.join(', ')})`);
+            if (!sets) {
+              out.constants++;
+              await compile(get(), where);
+              continue;
+            }
+            for (const args of sets) {
+              let code;
+              try {
+                code = get(...args.map((a) => (a === null ? undefined : a)));
+              } catch (error) {
+                out.threw.push(`${where}(${args.join(', ')}): ${String(error.message ?? error).split('\n')[0]}`);
+                continue;
+              }
+              out.variants++;
+              await compile(code, `${where}(${args.join(', ')})`);
+            }
           }
         }
-      }
-      out.modules = seen.size;
-      device.destroy();
-      return out;
-    }, paths);
-  // Every source a builder returned, fragments included, must end each value-returning function in a return on every
-  // path: Firefox rejects the rest although this browser compiles them (KB-FF1b, scripts/support/wgsl-returns.mjs).
-  for (const [where, code] of report.sources) {
-    const lines = code.split('\n');
-    for (const gap of wgslReturnGaps(code))
-      report.errors.push(
-        `${where} ${gap.line}:1 function '${gap.name}' returns a value but does not end in a return on every path (Firefox rejects it) | ${(lines[gap.line - 1] ?? '').trim().slice(0, 160)}`,
-      );
+        out.modules = seen.size;
+        device.destroy();
+        return out;
+      }, paths);
+    // Every source a builder returned, fragments included, must end each value-returning function in a return on every
+    // path: Firefox rejects the rest although this browser compiles them (KB-FF1b, scripts/support/wgsl-returns.mjs).
+    for (const [where, code] of report.sources) {
+      const lines = code.split('\n');
+      for (const gap of wgslReturnGaps(code))
+        report.errors.push(
+          `${where} ${gap.line}:1 function '${gap.name}' returns a value but does not end in a return on every path (Firefox rejects it) | ${(lines[gap.line - 1] ?? '').trim().slice(0, 160)}`,
+        );
+    }
+    const seconds = ((performance.now() - started) / 1000).toFixed(1);
+    console.log(
+      `check:wgsl: ${report.files} files, ${report.constants} constants and ${report.variants} builder variants: ${report.modules} distinct sources compiled (${report.fragments} fragments joined elsewhere), ${report.skipped.length} builders skipped (arguments not flags), ${report.threw.length} calls threw, in ${seconds} s`,
+    );
+    for (const t of report.threw) console.log(`  threw: ${t}`);
+    if (process.argv.includes('--verbose')) for (const s of report.skipped) console.log(`  skipped: ${s}`);
+    if (report.errors.length) {
+      for (const e of report.errors) console.error(`  WGSL error: ${e}`);
+      throw new Error(`check:wgsl: ${report.errors.length} WGSL errors`);
+    }
+  } finally {
+    await browser?.close();
   }
-  const seconds = ((performance.now() - started) / 1000).toFixed(1);
-  console.log(
-    `check:wgsl: ${report.files} files, ${report.constants} constants and ${report.variants} builder variants: ${report.modules} distinct sources compiled (${report.fragments} fragments joined elsewhere), ${report.skipped.length} builders skipped (arguments not flags), ${report.threw.length} calls threw, in ${seconds} s`,
-  );
-  for (const t of report.threw) console.log(`  threw: ${t}`);
-  if (process.argv.includes('--verbose')) for (const s of report.skipped) console.log(`  skipped: ${s}`);
-  if (report.errors.length) {
-    for (const e of report.errors) console.error(`  WGSL error: ${e}`);
-    throw new Error(`check:wgsl: ${report.errors.length} WGSL errors`);
-  }
-} finally {
-  await browser?.close();
-  release();
 }

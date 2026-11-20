@@ -10,11 +10,9 @@ const scripts = pathToFileURL(resolve(repository, 'packages/react/scripts') + se
 for (const name of readdirSync(scripts).filter((name) => /^test-.*-browser\.(mjs|js)$/.test(name))) {
   test(`${name} serves the repository when npm invokes it from the package`, () => {
     const browser = pathToFileURL(resolve(repository, 'scripts/browser.js')).href;
-    const lock = pathToFileURL(resolve(repository, 'scripts/gpu-lock.mjs')).href;
     const script = new URL(name, scripts).href;
     const probe = `
       import { mock } from 'node:test';
-      mock.module(${JSON.stringify(lock)}, { namedExports: { acquire: async () => () => {} } });
       mock.module(${JSON.stringify(browser)}, { namedExports: { openBrowser: async () => {
         console.log(JSON.stringify({ cwd: process.cwd() }));
         throw new Error('working-directory-probe');

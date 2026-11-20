@@ -4,8 +4,9 @@ import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 
-const server = await createServer({ configFile: false, logLevel: 'error', server: { port: 0 } });
+const server = await createServer({ plugins: [noFileWatcher()], configFile: false, logLevel: 'error', server: { port: 0 } });
 await server.listen();
 let browser;
 try {

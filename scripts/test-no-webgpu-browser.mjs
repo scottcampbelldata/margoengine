@@ -6,14 +6,14 @@
 //   2. with WebGPU, no page downloads any of the layer (a browser with WebGPU gets zero bytes of it);
 //   3. the @margoengine/webgl2-compat/preview preview draws a basic scene (two coloured boxes, one light): pixels are read back.
 // How each demo looks on the layer against native WebGPU is scripts/visual-compat.mjs's job.
-// Part of `npm run check:merge`, after `npm run build:site`. Takes the GPU lock itself:
+// Part of `npm run check:merge`, after `npm run build:site`.:
 //   npm run check:no-webgpu
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { launchBrowser, resolveBrowser } from './lib/browser.mjs';
 import { createServer, preview } from 'vite';
-import { acquire } from './gpu-lock.mjs';
+import { noFileWatcher } from './support/no-file-watcher.js';
 import { message } from '../examples/needs-webgpu.js';
 import { keptOffLayer } from './support/kept-off-layer.js';
 import { closeAll } from './support/shutdown.mjs';
@@ -77,7 +77,6 @@ function launch() {
   return launchBrowser({ headless: true, needs: 'none' });
 }
 
-const release = await acquire({ owner: 'no-webgpu-browser' });
 let browser, site, dev;
 try {
   const demos = await pages();
@@ -188,6 +187,7 @@ try {
   // The WebGL2 preview in a real browser: sources served by Vite (the packages' dist builds).
   dev = await (
     await createServer({
+      plugins: [noFileWatcher()],
       configFile: false,
       root,
       logLevel: 'error',
@@ -255,5 +255,4 @@ try {
   );
 } finally {
   await closeAll({ browser, servers: [site, dev] });
-  release();
 }

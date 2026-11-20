@@ -364,8 +364,9 @@ class Network {
         if (Array.isArray(a) && Array.isArray(b))
           return zip(a, b, kind === 'multiply' ? (x, y) => x * y : kind === 'add' ? (x, y) => x + y : (x, y) => x - y);
         if (kind !== 'multiply') {
-          const [image, other] = sampled(a) ? [a, b] : [b as Sampled, a];
-          return Array.isArray(other) && other.every((v) => v === 0) ? image : refuse();
+          // Adding 0 on either side, or taking 0 from the image, leaves the image; 0 minus an image is its negative.
+          const [image, other] = sampled(a) ? [a, b] : kind === 'add' ? [b as Sampled, a] : [undefined, a];
+          return image && Array.isArray(other) && other.every((v) => v === 0) ? image : refuse();
         }
         const [image, other] = sampled(a) ? [a, b] : [b as Sampled, a];
         return Array.isArray(other) ? { ...image, factor: zip(image.factor, other, (x, y) => x * y) } : refuse();

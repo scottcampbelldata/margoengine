@@ -1,5 +1,5 @@
 // Real-GPU proof of several atlases in one SpriteLayer (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/pages-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/pages-check.mjs
 // Three same-size atlases, one of them a caller's GPUTexture, in one layer: each sprite draws its page's texels byte for
 // byte, setAtlas reorders them, and filter 'linear', a shader and a one-atlas list work the same way; a page past the
 // list and atlases of different sizes throw RangeError. Results: test-results/sprites-pages-browser.json.

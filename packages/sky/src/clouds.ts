@@ -23,6 +23,57 @@ fn cloudOctaves(p:vec2f,footprint:f32,first:u32,last:u32)->f32 {
  return sum/max(total,0.000001);
 }
 `;
+// The overcast deck (KB-SKY-OVERCAST1, 2026-11-17). A sky all under cloud is one stratus deck seen from below: no sun
+// disc, no holes, a soft grey whose brightness falls toward the horizon. Its light is the two-stream diffuse light a
+// slab of optical depth tau passes, T = 1 / (1 + tau (1 - g) / 2), g 0.85 (Meador and Weaver 1980, "Two-stream
+// approximations to radiative transfer in planetary atmospheres", J. Atmos. Sci. 37; Bohren 1987, Am. J. Phys. 55;
+// cloudTransmission in cloud-types.ts), of the light falling on its top: the sun on a level surface, E / pi = 2.2 a unit
+// of the clouds' sun at the zenith (4 pi x 0.55, the Preetham sky's calibration in base.ts), with the clear sky's share
+// added (0.165 of the total at noon, D. G. Erbs, S. A. Klein and J. A. Duffie, "Estimation of the diffuse radiation
+// fraction for hourly, daily and monthly-average global radiation", Solar Energy 28(4), 1982). Under the deck that light
+// is spread as the CIE standard overcast sky, L(h) = Lz (1 + 2 sin h) / 3 (P. Moon and D. E. Spencer, "Illumination
+// from a non-uniform sky", Illuminating Engineering 37, 1942; CIE S 011/E:2003 sky type 1), whose zenith Lz is 9 / 7 of
+// E / pi (the gradation integrates to 7 pi / 9 over the hemisphere), so the level ground under it gets exactly T of the
+// light above. Gentle variation: the sheet's shape octaves shade it within +-DECK_VARIATION, fading into the haze with
+// distance, as the base of a real stratus deck shows soft, low-contrast undulations (WMO International Cloud Atlas,
+// stratus opacus). The moon and the sheet's sky floor light it at night, both through T.
+/** Light falling on the deck's top over pi, per unit of the clouds' sun at the zenith: the sun with the clear sky's share. */
+export const DECK_ABOVE = 2.2 / (1 - 0.165);
+/** How far the deck's shading strays from the CIE overcast gradation, a share of it: the gentle variation. */
+export const DECK_VARIATION = 0.12;
+/** Optical depth of the overcast deck when the `clouds` option gives no `depth`: a stratus deck (cloud-types.ts). */
+export const DECK_DEPTH = 20;
+/**
+ * The radiance of the overcast deck (`clouds.coverage` 1) seen along a view ray of sine of elevation `up`, for the
+ * clouds' sun `sunlight` (linear RGB) at sine of elevation `sunUp`, a deck of optical depth `depth` and shade 0 (its
+ * mean): the CIE overcast gradation of the two-stream light under it, before the sky's exposure. The sky draws this.
+ * `units` is the sky model's zenith sun on the ground over the Preetham sky's (4 pi x 0.55 sky units): 1 for Preetham,
+ * 20 x the zenith transmittance over 4 pi x 0.55 for Bruneton (about 2.6), so the deck is in the units of the sky it
+ * closes over.
+ * @example overcastDeck([1, 1, 1], Math.SQRT1_2, 1, 20); // the zenith of a deck under a sun 45 degrees up
+ */
+export function overcastDeck(
+  sunlight: readonly number[],
+  sunUp: number,
+  up: number,
+  depth = DECK_DEPTH,
+  units = 1,
+): [number, number, number] {
+  const T = units / (1 + depth * 0.075),
+    k = DECK_ABOVE * Math.max(sunUp, 0) * T * (9 / 7) * ((1 + 2 * Math.max(up, 0)) / 3);
+  return [sunlight[0] * k, sunlight[1] * k, sunlight[2] * k];
+}
+const deckWgsl = /* wgsl */ `// The overcast deck along ray at its hit p (km): the CIE overcast gradation of the two-stream light under the deck.
+// moonColor.w is the deck's two-stream transmission in the sky model's units: Sky sets units / (1 + 0.075 depth).
+fn cloudDeck(ray:vec3f,p:vec2f,footprint:f32,haze:f32)->vec3f {
+ let T=max(frame.moonColor.w,0.0);
+ let zenith=frame.sunlight.rgb*(${DECK_ABOVE.toFixed(6)}*max(frame.sun.y,0.0)*T*${(9 / 7).toFixed(6)});
+ let grade=(1.0+2.0*max(ray.y,0.0))/3.0;
+ let shade=1.0+${DECK_VARIATION.toFixed(3)}*(2.0*cloudOctaves(p,footprint,0u,4u)-1.0)*haze;
+ let moon=frame.moonColor.rgb*frame.moon.w*0.15*T;
+ return (zenith*shade+moon)*grade+vec3f(0.006,0.01,0.02)*T;
+}
+`;
 /** Procedural cloud layer on a curved shell, lit by the sun through the atmosphere (`clouds` option). */
 export const clouds: NonNullable<SkyFeatures['clouds']> = {
   field,
@@ -39,11 +90,18 @@ fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {
  if(frame.clouds.x<=0.0||r>=shell||(mu<0.0&&r*r*(mu*mu-1.0)+R*R>=0.0)){return color;}
  let t=-r*mu+sqrt(r*r*(mu*mu-1.0)+shell*shell);
  // Aerial fade by distance: far clouds thin into the haze (half at 28 km, about 3 degrees up from a 1.5 km base).
- let haze=exp(-t/40.0);if(haze<0.01){return color;}
+ let haze=exp(-t/40.0);
  // Cosine between the ray and the shell's normal at the hit: grazing rays see longer, more opaque paths.
  let slant=max((r*mu+t)/shell,0.03);
  let p=frame.eye.xz*0.001+ray.xz*t+normalize(vec2f(1,0.35))*frame.clouds.y*0.001;
  let footprint=angularFootprint*t/slant;
+ var sheet=color;if(haze>=0.01){sheet=cloudSheet(color,backdrop,ray,p,footprint,slant,haze);}
+ // Past 80 percent cover the sheet closes into the overcast deck (cloudDeck), all of it at full cover.
+ let deck=smoothstep(0.8,1.0,frame.clouds.x);if(deck<=0.0){return sheet;}
+ return mix(sheet,cloudDeck(ray,p,footprint,haze),deck);
+}
+// The sheet's broken cloud at the hit p (km) of the ray on the shell.
+fn cloudSheet(color:vec3f,backdrop:vec3f,ray:vec3f,p:vec2f,footprint:f32,slant:f32,haze:f32)->vec3f {
  let cover=cloudCover(cloudOctaves(p,footprint,0u,2u));if(cover<=0.0){return color;}
  // The two fine octaves erode the edges into wisps (Schneider 2015).
  let erode=cloudOctaves(p,footprint,2u,4u)*0.35;let density=clamp((cover-erode)/(1.0-erode),0.0,1.0);
@@ -62,7 +120,7 @@ fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {
  let moon=frame.moonColor.rgb*frame.moon.w*0.15*cloudPhase(dot(ray,frame.moon.xyz));
  return mix(color,lit+moon+backdrop*(1.0-0.4*density)+vec3f(0.006,0.01,0.02),opacity);
 }
-`,
+${deckWgsl}`,
   validate(c) {
     if (
       typeof c !== 'object' ||
@@ -74,10 +132,13 @@ fn cloudSky(color:vec3f,backdrop:vec3f,ray:vec3f,angularFootprint:f32)->vec3f {
       Math.abs(c.speed ?? 8) > 100 ||
       !Number.isFinite(c.height ?? 1500) ||
       (c.height ?? 1500) < 100 ||
-      (c.height ?? 1500) > 10000
+      (c.height ?? 1500) > 10000 ||
+      !Number.isFinite(c.depth ?? DECK_DEPTH) ||
+      (c.depth ?? DECK_DEPTH) < 1 ||
+      (c.depth ?? DECK_DEPTH) > 200
     )
       throw new RangeError(
-        'Invalid sky clouds; keep coverage from 0 to 1, speed within ±100 and height from 100 to 10000.',
+        'Invalid sky clouds; keep coverage from 0 to 1, speed within ±100, height from 100 to 10000 and depth from 1 to 200.',
       );
   },
 };

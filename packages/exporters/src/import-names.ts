@@ -6,7 +6,8 @@
 export type CollisionTag = 'col' | 'convcol' | 'colonly' | 'convcolonly';
 
 const TAGS: readonly CollisionTag[] = ['col', 'convcol', 'colonly', 'convcolonly'];
-const SUFFIX = /-(convcolonly|convcol|colonly|col)$/i;
+// Godot reads each suffix after a `-`, `_` or `$`, in any case (Godot 4 manual, node type customization).
+const SUFFIX = /[-_$](convcolonly|convcol|colonly|col)$/i;
 const LOOP_HEAD = /^(?:loop|cycle)(?:[-_$\s]+|$)/i;
 const LOOP_TAIL = /(?:[-_$\s]+|^)(?:loop|cycle)$/i;
 
@@ -15,12 +16,12 @@ const text = (value: unknown, label: string): string => {
   return value;
 };
 
-/** The collision suffix at the end of a node name, case-insensitive, or null when it has none. */
+/** The collision suffix at the end of a node name (after `-`, `_` or `$`, any case), or null when it has none. */
 export function collisionTag(name: string): CollisionTag | null {
   return (SUFFIX.exec(text(name, 'Node name'))?.[1].toLowerCase() as CollisionTag | undefined) ?? null;
 }
 
-/** `name` without any collision suffixes (repeated ones included). */
+/** `name` without any collision suffixes (repeated ones and every separator included). */
 export function collisionBase(name: string): string {
   let base = text(name, 'Node name');
   while (SUFFIX.test(base)) base = base.replace(SUFFIX, '');

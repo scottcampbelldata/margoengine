@@ -3,6 +3,8 @@ from contextlib import contextmanager
 import bpy
 import numpy as np
 
+from .bake import second_uv
+
 
 @contextmanager
 def lightmaps(context, size):
@@ -27,18 +29,20 @@ def lightmaps(context, size):
                 other.select_set(False)
             obj.select_set(True)
             context.view_layer.objects.active = obj
-            # UV0 remains the artist's material unwrap; a separate non-overlapping chart map carries illumination.
+            # The render UV map remains the artist's material unwrap (TEXCOORD_0); the first other map, a separate
+            # non-overlapping chart map, carries illumination (TEXCOORD_1, the exporter's second_uv).
             if not mesh.uv_layers:
                 mesh.uv_layers.new(name="UVMap")
             if len(mesh.uv_layers) < 2:
+                editing = mesh.uv_layers.active_index
                 mesh.uv_layers.new(name="MargoLightmap")
-                mesh.uv_layers.active_index = 1
+                mesh.uv_layers.active_index = len(mesh.uv_layers) - 1
                 bpy.ops.object.mode_set(mode="EDIT")
                 bpy.ops.mesh.select_all(action="SELECT")
                 bpy.ops.uv.smart_project(island_margin=4 / size)
                 bpy.ops.object.mode_set(mode="OBJECT")
-            mesh.uv_layers.active_index = 0
-            # UV0 remains active for shading; bake's explicit uv_layer selects UV1 only for rasterisation.
+                mesh.uv_layers.active_index = editing
+            # Shading reads the render map; bake's explicit uv_layer selects the lightmap map only for rasterisation.
             image = bpy.data.images.new("MargoLightmap", size, size, alpha=True, float_buffer=True)
             image.colorspace_settings.name = "Non-Color"
             targets.append(image)
@@ -56,7 +60,7 @@ def lightmaps(context, size):
                     temporary.append((tree, node, previous))
                 if not temporary:
                     raise ValueError(f"Object '{obj.name}': lightmap baking needs a material")
-                bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT"}, uv_layer=mesh.uv_layers[1].name, margin=4, use_clear=True)
+                bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT"}, uv_layer=second_uv(mesh).name, margin=4, use_clear=True)
                 pixels = np.empty(size * size * 4, dtype=np.float32)
                 image.pixels.foreach_get(pixels)
                 pixels = pixels.reshape(size, size, 4)

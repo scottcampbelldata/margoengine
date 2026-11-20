@@ -5,6 +5,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import { hexColor } from '@margoengine/math';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { BindGroups, TextureOption, viewOf } from './resources.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number; VERTEX: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
@@ -295,9 +296,16 @@ const FLOATS = STRIDE / 4;
 
 /** Settings of {@link Lighting2D}. */
 export interface Lighting2DOptions {
-  /** Where the light goes, such as a pixel layer's `target` with `blend: 'multiply'`. Texture or function. Required. */
+  /**
+   * Where the light goes, such as a pixel layer's `target` with `blend: 'multiply'`. Required. A function is read each
+   * frame (pass a layer's `() => layer.target`); a plain texture lost at a device restore skips the pass, reported once,
+   * until {@link Lighting2D.setTarget} gives a new one.
+   */
   target: GPUTexture | (() => GPUTexture);
-  /** Surface directions, the size of the target, such as a sprite layer's `normals.target`. Default flat. */
+  /**
+   * Surface directions, the size of the target, such as a sprite layer's `normals.target`; a function is read each frame.
+   * Default flat. A plain texture lost at a device restore draws flat, reported once, until {@link Lighting2D.setNormals}.
+   */
   normals?: GPUTexture | (() => GPUTexture);
   /** World units to pixels, read each frame, such as a pixel layer's `camera`. Default `{x: 0, y: 0, zoom: 1}`. */
   camera?: { readonly x: number; readonly y: number; readonly zoom: number };
@@ -333,8 +341,9 @@ export class Lighting2D implements EnginePlugin {
   declare layer: number;
   /** The lights, in the order added. Use {@link addLight} and {@link removeLight} to change the list. */
   readonly lights: Light2D[] = [];
-  readonly #target: GPUTexture | (() => GPUTexture);
-  readonly #normals?: GPUTexture | (() => GPUTexture);
+  readonly #target: TextureOption;
+  readonly #normals: TextureOption;
+  readonly #groups = new BindGroups();
   readonly #order: number;
   #edges: Float32Array = new Float32Array();
   #edgesWritten = false;
@@ -365,8 +374,8 @@ export class Lighting2D implements EnginePlugin {
     if (!options?.target) throw typeError('Lighting2D needs a target', 'pixel-lighting');
     const order = options.order ?? 20;
     checkNumber(order, 'order');
-    this.#target = options.target;
-    this.#normals = options.normals;
+    this.#target = new TextureOption(options.target, 'Lighting2D target', 'setTarget');
+    this.#normals = new TextureOption(options.normals, 'Lighting2D normals', 'setNormals');
     this.#order = order;
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.ambient = options.ambient ?? '#000000';
@@ -396,10 +405,24 @@ export class Lighting2D implements EnginePlugin {
     this.#edges = occluderEdges(occluders);
     this.#edgesWritten = false;
   }
+  /**
+   * Replaces where the light goes, from the next frame: a texture, or a function read each frame. After a device
+   * restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: GPUTexture | (() => GPUTexture)): void {
+    if (!target) throw typeError('Lighting2D needs a target', 'pixel-lighting');
+    this.#target.set(target, this.#engine?.gpu);
+  }
+  /** Replaces the surface directions, from the next frame; undefined draws flat. After a device restore, hand in new ones here. */
+  setNormals(normals: GPUTexture | (() => GPUTexture) | undefined): void {
+    this.#normals.set(normals, this.#engine?.gpu);
+  }
   setup(engine: Engine): void {
     if (this.#disposed) throw fault('disposed', 'Lighting2D disposed; create a new one');
     if (engine.backend !== 'webgpu') throw fault('unsupported', 'Lighting2D needs WebGPU', 'webgpu');
     this.#engine = engine;
+    this.#target.fix(engine.gpu);
+    this.#normals.fix(engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.#order,
@@ -435,6 +458,7 @@ export class Lighting2D implements EnginePlugin {
     this.#show = this.#showGroup = this.#sum = this.#sumView = undefined;
     this.#sumLayers = [];
     this.#group = this.#device = undefined;
+    this.#groups.clear();
     this.#edgesWritten = false;
   }
   #prepare(device: GPUDevice, target: GPUTextureFormat): void {
@@ -522,9 +546,10 @@ export class Lighting2D implements EnginePlugin {
   }
   #run(c: Extract<PassContext, { backend: 'webgpu' }>): void {
     const device = c.device,
-      pick = (texture: GPUTexture | (() => GPUTexture)) => (typeof texture === 'function' ? texture() : texture),
-      target = pick(this.#target),
-      bump = this.#normals && pick(this.#normals),
+      target = this.#target.get(device, this.#engine);
+    // A plain target lost with its device: nothing to light into until setTarget (reported once).
+    if (!target) return;
+    const bump = this.#normals.get(device, this.#engine),
       camera = this.camera,
       ambient = hexColor(this.ambient),
       lights = this.lights;
@@ -547,15 +572,12 @@ export class Lighting2D implements EnginePlugin {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
     }
-    const shown = bump ?? this.#flat!;
-    this.#group = device.createBindGroup({
-      layout: this.#layout!,
-      entries: [
-        { binding: 0, resource: { buffer: this.#uniform, size: 112 } },
-        { binding: 1, resource: shown.createView() },
-        { binding: 3, resource: { buffer: this.#masks.buffer! } },
-      ],
-    });
+    // Made again only when the uniform, the normals or the mask list is a new object: a steady frame makes none.
+    this.#group = this.#groups.get(device, 'light', this.#layout!, [
+      { binding: 0, resource: { buffer: this.#uniform, size: 112 } },
+      { binding: 1, resource: viewOf(bump ?? this.#flat!) },
+      { binding: 3, resource: { buffer: this.#masks.buffer! } },
+    ]);
     if (!this.#stencil || this.#stencil.width !== target.width || this.#stencil.height !== target.height) {
       this.#stencil?.destroy();
       this.#sum?.destroy();
@@ -667,7 +689,7 @@ export class Lighting2D implements EnginePlugin {
       pass.end();
     });
     const show = c.encoder.beginRenderPass({
-      colorAttachments: [{ view: target.createView(), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
+      colorAttachments: [{ view: viewOf(target), loadOp: 'clear', clearValue: [0, 0, 0, 1], storeOp: 'store' }],
     });
     show.setPipeline(this.#show!);
     show.setBindGroup(0, this.#showGroup);

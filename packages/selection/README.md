@@ -6,7 +6,7 @@ Import `margoengine/selection` from the `margoengine` package, or `@margoengine/
 
 Objects shown as an imposter of `@margoengine/lod` outline too: an engine plugin with `drawSelectionMask` (`SelectionMaskSource`) marks what it draws in the same mask, and a `LODSystem` does so for any object whose anchor or level is selected.
 
-Visible core and PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation. `Selection.set` discovers glTF Pro/FBX buffers from their loader-owned mesh nodes; no separate outline registration is required.
+Visible core and PBR selection outlines using Jump Flood Algorithm distance fields or circular morphological dilation. `Selection.set` discovers glTF PBR/FBX buffers from their loader-owned mesh nodes; no separate outline registration is required.
 
 ```ts
 import {Selection} from 'margoengine/selection';
@@ -116,7 +116,7 @@ Removing an explicit registration does not disable discovery of a loaded model. 
 ```ts
 import {Picking, Selection} from 'margoengine/selection';
 import type {EngineKernel} from 'margoengine/core';
-import type {PBRModel} from 'margoengine/gltf-pro';
+import type {PBRModel} from 'margoengine/gltf/pbr';
 
 function selectModel(engine:EngineKernel, model:PBRModel) {
   const picking=Picking.attach(engine,{capture:false});
@@ -380,7 +380,7 @@ that exact licensed fixture at the same URL.
 
 ```ts
 import { Engine } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Picking } from '@margoengine/selection';
 import { SpatialPicking } from '@margoengine/selection/spatial';
 
@@ -405,6 +405,8 @@ sphere contacts test geometric surfaces on both sides, without texture alpha.
 A sphere wholly inside a closed mesh does not touch its surface. Contacts retain
 mesh, model, primitive, instance, world position, distance and face identity;
 ray hits retain the existing `PickHit` fields and do not invent a world position.
+A ray answers only from the pixel it passes through: the one pixel tolerance of
+a mouse pick does not apply, so a hit is never off the ray.
 Proximity constructs world-space BVHs per query for current geometry; large
 continuous proximity workloads should budget that work explicitly.
 The helper owns no meshes or GPU picker; disposal terminates only the helper.
@@ -427,3 +429,7 @@ selection with loaders, usdz, fbx, mesh-edit, cameras and ViewCube. The
 [product viewer](../../docs/integration-product.md) combines loaded-model
 selection with lighting, post effects and React; each guide lists its runnable
 page, test command and measured integration boundaries.
+
+## Film time
+
+`XRaySelection` moves its pulse clock in the frame update with `advanceTime(delta)` (manual `time` holds), so `seek` from `@margoengine/cutscene/seek` starts a film scene on the pulse a continuous run shows.

@@ -41,13 +41,18 @@ const billboard = (code: string, lit: VFXLit): string => {
   return (
     out +
     /* wgsl */ `
-struct LitFrame {sun:vec4f,sunColor:vec4f,ambient:vec4f,eye:vec4f}
+struct LitFrame {sun:vec4f,sunColor:vec4f,ambient:vec4f,eye:vec4f,glow:vec4f,glowColor:vec4f}
 @group(0) @binding(${BINDING}) var<uniform> litFrame:LitFrame;
 fn lit(i:Out,c:vec4f)->vec4f {
   let toward=cross(f.right.xyz,f.up.xyz);let z=sqrt(max(0.0,1.0-dot(i.uv,i.uv)));
   let n=normalize(i.litSide.xyz+toward*z);let p=i.litWorld+toward*(z*i.litSide.w);let base=c.rgb;let wrap=litFrame.sunColor.w;
   var light=base*litFrame.ambient.rgb+${lit.shadows ? `shadowLit(${sun},p,n)` : sun};
   ${lit.lights ? 'light+=clusterLighting(i.clip.xy,p,n,litFrame.eye.xyz,base,1.0,0.0,vec3f(0.04),1.0);' : ''}
+  // A fire's glow: a point source of radiant power P (W) at glow.xyz, softened over glow.w metres; its irradiance
+  // P / (4 pi (d^2 + r^2)) lights the ball as a sun of 1,000 W/m^2 (intensity pi) would, with the same wrap.
+  let toGlow=litFrame.glow.xyz-p;let d2=dot(toGlow,toGlow);
+  let e=litFrame.glowColor.w/(12566.37*(d2+litFrame.glow.w*litFrame.glow.w));
+  light+=base*litFrame.glowColor.rgb*(e*max(0.0,dot(n,toGlow*inverseSqrt(max(d2,1e-6)))+wrap)/(1.0+wrap));
   return vec4f(light,c.a);
 }
 `
@@ -67,6 +72,25 @@ function source(value: unknown, name: string): void {
 }
 
 let revision = 0;
+
+/** A flame's colour as light, linear RGB (a 1,300 K blackbody's hue, as the flame ramp's edge). */
+export const GLOW_COLOR: readonly [number, number, number] = [1, 0.42, 0.12];
+
+function checkGlow(g: VFXLit['glow']): void {
+  if (g === undefined) return;
+  const ok = (v: unknown, lo: number, hi: number) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+  if (
+    !g ||
+    typeof g !== 'object' ||
+    !Array.isArray(g.position) ||
+    g.position.length !== 3 ||
+    !g.position.every((v) => ok(v, -1e7, 1e7)) ||
+    !ok(g.power, 0, 1e13) ||
+    (g.radius !== undefined && !ok(g.radius, 0.01, 1e5)) ||
+    (g.color !== undefined && (!Array.isArray(g.color) || g.color.length !== 3 || !g.color.every((v) => ok(v, 0, 16))))
+  )
+    throw new RangeError('VFX lit glow needs {position: [x, y, z], power: watts 0 to 1e13, radius?: 0.01 to 1e5 m, color?: linear [r, g, b] 0 to 16}');
+}
 
 /**
  * The `lit` feature: billboards lit by the engine's sun (with wrap lighting), its ambient light, `Clustered` point and
@@ -89,13 +113,14 @@ export const lit: VFXExtension<VFXLit> = {
       (!Array.isArray(a) || a.length !== 3 || !a.every((v) => typeof v === 'number' && v >= 0 && v <= 16))
     )
       throw new RangeError('VFX lit ambient must be linear [r, g, b], each 0 to 16');
+    checkGlow(l.glow);
   },
   billboard: (code, value) => billboard(code, value),
   create(state: VFXState, value, owned) {
     const { device, options } = state,
-      buffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      buffer = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     owned.push(buffer);
-    const values = new Float32Array(16),
+    const values = new Float32Array(24),
       sources = !!(value.lights || value.shadows),
       // The sources' declarations for each group, and a key that changes when they do.
       declared = new Map<number, { lights: string; shadows: string; key: string }>(),
@@ -126,6 +151,19 @@ export const lit: VFXExtension<VFXLit> = {
           values[12 + i] = c.camera.position[i];
         }
         values[7] = value.wrap ?? 0.5;
+        // The glow is read every frame; none (or no power) adds nothing.
+        const g = value.glow;
+        checkGlow(g);
+        values.fill(0, 16, 24);
+        if (g && g.power > 0) {
+          const color = g.color ?? GLOW_COLOR;
+          for (let i = 0; i < 3; i++) {
+            values[16 + i] = g.position[i]!;
+            values[20 + i] = color[i]!;
+          }
+          values[19] = g.radius ?? 1;
+          values[23] = g.power;
+        }
         c.device.queue.writeBuffer(buffer, 0, values as Float32Array<ArrayBuffer>);
       },
       ...(sources

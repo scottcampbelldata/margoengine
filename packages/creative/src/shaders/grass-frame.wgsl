@@ -9,6 +9,10 @@ struct Frame {
   settings: vec4f,
   right: vec4f,
   up: vec4f,
+  root: vec4f,
+  tip: vec4f,
+  tipVariant: vec4f,
+  translucency: vec4f,
 }
 struct Blade {
   posX: f32, posY: f32, posZ: f32,

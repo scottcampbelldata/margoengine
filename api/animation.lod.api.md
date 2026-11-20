@@ -5,11 +5,12 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export class AnimationLOD implements EnginePlugin {
     readonly name: string;
     readonly stats: AnimationLODStats;
+    get time(): number;
     static attach(engine: EngineKernel, options?: AnimationLODOptions): AnimationLOD;
     constructor({ tiers, hidden }?: AnimationLODOptions);
     get count(): number;
@@ -19,6 +20,7 @@ export class AnimationLOD implements EnginePlugin {
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
     update(delta: number): void;
+    advanceTime(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
@@ -67,6 +69,7 @@ class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

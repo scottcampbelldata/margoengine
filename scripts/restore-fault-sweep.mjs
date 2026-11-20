@@ -10,7 +10,7 @@
 // or loses state a restore should rebuild fails here, named by the call that broke it. Each failure must also be
 // reported exactly once, no frame may throw, and the frame after it must draw the scene (KB6434: an allocation
 // failure used to stop the engine until the next restore).
-//   node scripts/restore-fault-sweep.mjs [--only=shadows:createTexture:2]   (in a shared GPU slot; MARGO_COMPAT=1 for the WebGL2 layer)
+//   node scripts/restore-fault-sweep.mjs [--only=shadows:createTexture:2]   (MARGO_COMPAT=1 for the WebGL2 layer)
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

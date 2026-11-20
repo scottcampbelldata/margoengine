@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><title>FlightHelmet imposter dissolve</title><canvas width="256" height="256" style="width:256px;height:256px"></canvas><script type="module">
 // Real FlightHelmet geometry: Gary Hsu / Microsoft, CC0; examples/assets/ATTRIBUTION.md.
 import {Engine,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {LODSystem,Imposter,ImposterFrames} from '/packages/lod/dist/index.js';
 import {LODFade} from '/packages/lod/dist/fade.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,2],target:[0,0,0]}});engine.stop();

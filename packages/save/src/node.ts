@@ -166,10 +166,20 @@ export function fileStorage(directory: string, options: FileStorageOptions = {})
         if (isMissing(error)) return [];
         throw error;
       }
-      return names
-        .filter((name) => name.endsWith(SUFFIX))
-        .map((name) => decodeURIComponent(name.slice(0, -SUFFIX.length)))
-        .sort();
+      // Only names this storage writes: one that does not decode, or decodes to a key filed under another name, is
+      // some other program's file, and listing it would give a key that read() cannot find.
+      const out: string[] = [];
+      for (const name of names) {
+        if (!name.endsWith(SUFFIX)) continue;
+        let key: string;
+        try {
+          key = decodeURIComponent(name.slice(0, -SUFFIX.length));
+        } catch {
+          continue;
+        }
+        if (key && fileName(key) === name) out.push(key);
+      }
+      return out.sort();
     },
   };
 }

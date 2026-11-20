@@ -1,0 +1,8 @@
+{
+  "about": "KB-OWN-EXIT2: files that still end a run through process.exit, each to set process.exitCode and let the event loop end, then come off this list (scripts/support/process-exit.mjs). It shrinks to empty; nothing is added. Paths are grouped under their top folder, so the list names no script by its repository path: it is data the check compares against, and a script it names is not run by the step that reads it (scripts/support/affected-gpu.mjs follows named paths).",
+  "files": {
+    "scripts": [
+      "test-boulder-browser.mjs"
+    ]
+  }
+}

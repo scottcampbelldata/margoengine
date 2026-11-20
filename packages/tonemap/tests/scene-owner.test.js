@@ -26,3 +26,22 @@ for (const remove of [false, true])
     replacement.dispose();
     assert.equal(owner.plugins.size, 0);
   });
+
+// KB-OWN-TONE1: a Tonemap removed by its scene, disposed or restored after a device loss kept its extensions' own GPU
+// objects (LocalExposure's three r32float textures and its uniform buffer) alive, with nothing left to draw them.
+for (const how of ['dispose', 'removal', 'scene', 'restore'])
+  test(`Tonemap ${how} releases what its extensions made on the device`, async (t) => {
+    const e = await engine(t),
+      owner = e.createScene('tonemap-owner'),
+      calls = [],
+      extension = { key: 'spy', patch: (shader) => shader, dispose: () => calls.push('dispose') },
+      plain = { key: 'plain', patch: (shader) => shader },
+      effect = new Tonemap({ extensions: [plain, extension] });
+    owner.use(effect);
+    if (how === 'dispose') effect.dispose();
+    else if (how === 'removal') owner.removePlugin(effect.name);
+    else if (how === 'scene') owner.dispose();
+    else effect.onDeviceRestored(e);
+    assert.deepEqual(calls, ['dispose']);
+    if (how === 'restore') effect.dispose();
+  });

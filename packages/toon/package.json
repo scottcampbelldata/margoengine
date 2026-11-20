@@ -41,6 +41,10 @@
     "./hatch": {
       "types": "./dist/hatch.d.ts",
       "import": "./dist/hatch.js"
+    },
+    "./outline": {
+      "types": "./dist/outline.d.ts",
+      "import": "./dist/outline.js"
     }
   },
   "files": [
@@ -57,15 +61,17 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf": "^1.0.0"
   },
   "peerDependenciesMeta": {
-    "@margoengine/gltf-pro": { "optional": true }
+    "@margoengine/gltf": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js toon",
     "test": "npm run build && node --test test/*.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/toon/test/models-check.mjs && node packages/toon/test/hatch-check.mjs && node packages/toon/test/screen-outline.browser.mjs && node packages/toon/test/hatch-models.browser.mjs"
+    "test:gpu": "cd ../.. && node packages/toon/test/models-check.mjs && node packages/toon/test/hatch-check.mjs && node packages/toon/test/screen-outline.browser.mjs && node packages/toon/test/hatch-models.browser.mjs && node packages/toon/test/outline.browser.mjs"
   }
 }

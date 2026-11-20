@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { splitTRS, normalizeQuaternion } from '../dist/quat.js';
+import { splitNodeMatrix, splitTRS, normalizeQuaternion } from '../dist/quat.js';
 import { composeMatrix } from '../dist/mat4.js';
 
 const matrix = (scale = [1, 1, 1]) => composeMatrix([4, -2, 7], [0, 0, 0, 1], scale, new Float64Array(16));
 
 test('splitTRS exposes named success parts and round-trips rotations and reflections', () => {
-  for (const scale of [[2, 3, 4], [-2, 3, 4], [2, -3, 4], [-2, -3, 4]]) {
+  for (const scale of [
+    [2, 3, 4],
+    [-2, 3, 4],
+    [2, -3, 4],
+    [-2, -3, 4],
+  ]) {
     const original = composeMatrix([4, -2, 7], normalizeQuaternion([0.2, -0.4, 0.1, 0.8]), scale, new Float64Array(16));
     const before = original.slice();
     const result = splitTRS(original);
@@ -46,4 +51,37 @@ test('splitTRS rejects non-finite column lengths and determinants instead of suc
     assert.deepEqual(splitTRS(invalid), { ok: false, reason: 'singular' }, String(value));
     assert.deepEqual(splitTRS(invalid, Infinity), { ok: false, reason: 'singular' });
   }
+});
+
+test('splitNodeMatrix reads a zero column as a zero scale on that axis and keeps the rest of the split', () => {
+  const flat = composeMatrix([1, 2, 3], normalizeQuaternion([0.2, -0.4, 0.1, 0.8]), [2, 0, 4], new Float64Array(16));
+  assert.deepEqual(splitTRS(flat), { ok: false, reason: 'singular' });
+  const parts = splitNodeMatrix(flat);
+  assert.equal(parts.ok, true);
+  assert.deepEqual(parts.position, [1, 2, 3]);
+  assert.deepEqual(
+    parts.scale.map((v) => Math.round(v * 1e9) / 1e9),
+    [2, 0, 4],
+  );
+  const rebuilt = composeMatrix(parts.position, parts.rotation, parts.scale, new Float64Array(16));
+  for (let i = 0; i < 16; i++) assert.ok(Math.abs(rebuilt[i] - flat[i]) < 1e-12, `component ${i}`);
+  for (const scale of [
+    [0, 3, 0],
+    [0, 0, 0],
+  ]) {
+    const one = splitNodeMatrix(composeMatrix([0, 0, 0], [0, 0, 0, 1], scale, new Float64Array(16)));
+    assert.equal(one.ok, true);
+    assert.deepEqual(one.scale, scale);
+  }
+  // A column of float32 zeros counts only when asked: glTF numbers are float32.
+  const tiny = matrix([1e-50, 1, 1]);
+  assert.equal(splitNodeMatrix(tiny).scale[0], 1e-50, 'an exact read keeps a tiny scale');
+  assert.deepEqual(splitNodeMatrix(tiny, { float32: true }).scale, [0, 1, 1]);
+  const dependent = matrix([0, 1, 1]);
+  dependent.set(dependent.subarray(4, 8), 8);
+  assert.deepEqual(splitNodeMatrix(dependent), { ok: false, reason: 'singular' });
+  const sheared = matrix([0, 1, 1]);
+  sheared[8] = 0.5;
+  sheared[4] = 0.5;
+  assert.deepEqual(splitNodeMatrix(sheared), { ok: false, reason: 'shear' });
 });

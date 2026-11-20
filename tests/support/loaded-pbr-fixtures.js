@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { Engine, TransformStore } from '@margoengine/core/extension';
-import { loadGLTF, PBRModel } from '@margoengine/gltf-pro';
+import { loadGLTF, PBRModel } from '@margoengine/gltf/pbr';
 import { loadFBX } from '@margoengine/fbx';
 import { optionalGPU } from './optional-gpu.js';
 
 export const loadedPBRFixtures = [
-  { producer: 'gltf-pro', asset: 'Box.glb', file: '../../packages/exporters/tests/fixtures/Box.glb', load: loadGLTF },
+  { producer: 'gltf/pbr', asset: 'Box.glb', file: '../../packages/exporters/tests/fixtures/Box.glb', load: loadGLTF },
   {
     producer: 'fbx',
     asset: 'blender-rig.fbx',

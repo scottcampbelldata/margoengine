@@ -434,7 +434,16 @@ export class Audio implements ListenerSource {
   }
   set loopEnd(value: number) {
     this.loopEndValue = checkFinite(value, 'loopEnd', 0);
-    if (this.kind === 'buffer' && this.source) (this.source as AudioBufferSourceNode).loopEnd = value;
+    if (this.kind === 'buffer' && this.source) (this.source as AudioBufferSourceNode).loopEnd = this.nodeLoopEnd;
+  }
+  /**
+   * The loopEnd a buffer node gets. AudioBufferSourceNode loops the whole buffer whenever its loopEnd is 0, whatever
+   * loopStart says (Web Audio API, "Playback of AudioBuffer Contents"), so loopEnd 0, which here means the end of the
+   * buffer, is passed as the buffer's duration: loopStart 2 with loopEnd 0 loops from 2 s to the end, as the playhead
+   * counts it.
+   */
+  private get nodeLoopEnd(): number {
+    return this.loopEndValue > 0 ? this.loopEndValue : (this.buffer?.duration ?? 0);
   }
   get playbackRate(): number {
     return this.rateValue;
@@ -601,7 +610,7 @@ export class Audio implements ListenerSource {
     node.buffer = buffer;
     node.loop = this.loopValue;
     node.loopStart = this.loopStartValue;
-    node.loopEnd = this.loopEndValue;
+    node.loopEnd = this.nodeLoopEnd;
     smoothParam(node.playbackRate, this.rateValue, context, 0, true);
     smoothParam(node.detune, this.detuneValue, context, 0, true);
     if (limit === undefined) node.start(when, position);

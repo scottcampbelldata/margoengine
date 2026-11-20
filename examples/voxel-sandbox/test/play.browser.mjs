@@ -5,7 +5,7 @@ import { speedBudget } from '../../../scripts/speed/budgets.mjs';
 // placed block again after a reload (IndexedDB save). Then Plaza: a second client's figure and name tag on a local shard,
 // the banner and solo world on every failure (server killed, no welcome, router full or down, a world's end), the room
 // retry, a report, and a phone run on real touch events. Run from the repository root after `npm run build:packages`,
-// holding the GPU lock: node scripts/gpu-lock.mjs run --owner=you -- node examples/voxel-sandbox/test/play.browser.mjs
+//: node scripts/run-with-timeout.mjs -- node examples/voxel-sandbox/test/play.browser.mjs
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -44,134 +44,127 @@ const sandbox = (f, arg) => page.evaluate(f, arg),
   position = () => sandbox(() => [...window.voxelSandbox.player.position]);
 try {
   await page.setViewportSize({ width: 960, height: 540 });
-  // PLAY_ONLY=edits runs only the Plaza edit test below (a quick loop while working on it).
-  if (process.env.PLAY_ONLY === 'edits') {
-    await plazaEdits();
-    console.log('voxel sandbox Plaza edit test passed');
-    process.exit(await closeAll());
-  }
-  // PLAY_ONLY=load runs only the load order test.
-  if (process.env.PLAY_ONLY === 'load') {
-    await loadOrder();
-    console.log('voxel sandbox load order test passed');
-    process.exit(await closeAll());
-  }
-  // PLAY_ONLY=rejoin runs only the test of a dropped connection.
-  if (process.env.PLAY_ONLY === 'rejoin') {
-    await rejoin();
-    console.log('voxel sandbox rejoin test passed');
-    process.exit(await closeAll());
-  }
-  // PLAY_ONLY=phone runs only the phone test.
-  if (process.env.PLAY_ONLY === 'phone') {
-    await phone();
-    console.log('voxel sandbox phone test passed');
-    process.exit(await closeAll());
-  }
-  await page.goto(`http://127.0.0.1:${port}${path}`);
-  await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
-  const spawn = await position(),
-    ground = await sandbox(
-      ([x, y, z]) =>
-        window.voxelSandbox.world.blocks.get(window.voxelSandbox.world.getBlock(Math.floor(x), y - 1, Math.floor(z)))
-          .name,
-      spawn,
+  // PLAY_ONLY runs one test alone (a quick loop while working on it): edits (the Plaza edit test), load (the load order
+  // test), rejoin (a dropped connection) or phone. The run ends by its event loop after closeAll (KB-OWN-EXIT2).
+  const alone = {
+    edits: [plazaEdits, 'Plaza edit'],
+    load: [loadOrder, 'load order'],
+    rejoin: [rejoin, 'rejoin'],
+    phone: [phone, 'phone'],
+  }[process.env.PLAY_ONLY];
+  if (alone) {
+    await alone[0]();
+    console.log(`voxel sandbox ${alone[1]} test passed`);
+  } else {
+    await page.goto(`http://127.0.0.1:${port}${path}`);
+    await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
+    const spawn = await position(),
+      ground = await sandbox(
+        ([x, y, z]) =>
+          window.voxelSandbox.world.blocks.get(window.voxelSandbox.world.getBlock(Math.floor(x), y - 1, Math.floor(z)))
+            .name,
+        spawn,
+      );
+    assert.ok(['grass', 'sand'].includes(ground), `spawned on ${ground} at ${spawn}`);
+    console.log(`ok spawned at ${spawn.map((v) => v.toFixed(1))} on ${ground}`);
+    assert.deepEqual(
+      await sandbox(() => ['fps', 'help'].map((id) => getComputedStyle(document.getElementById(id)).display)),
+      ['none', 'none'],
+      'a desktop page has no frame rate or help button',
     );
-  assert.ok(['grass', 'sand'].includes(ground), `spawned on ${ground} at ${spawn}`);
-  console.log(`ok spawned at ${spawn.map((v) => v.toFixed(1))} on ${ground}`);
-  assert.deepEqual(
-    await sandbox(() => ['fps', 'help'].map((id) => getComputedStyle(document.getElementById(id)).display)),
-    ['none', 'none'],
-    'a desktop page has no frame rate or help button',
-  );
 
-  await page.mouse.click(480, 270);
-  await page.waitForFunction(() => document.pointerLockElement?.id === 'scene', null, { timeout: 5000 });
-  console.log('ok pointer lock');
+    await page.mouse.click(480, 270);
+    await page.waitForFunction(() => document.pointerLockElement?.id === 'scene', null, { timeout: 5000 });
+    console.log('ok pointer lock');
 
-  // Fly: F, rise with Space, forward with W.
-  await page.keyboard.press('KeyF');
-  assert.equal(await sandbox(() => window.voxelSandbox.player.flying), true);
-  const before = await position();
-  await hold('Space', 600);
-  await hold('KeyW', 800);
-  const after = await position(),
-    rose = after[1] - before[1],
-    moved = Math.hypot(after[0] - before[0], after[2] - before[2]);
-  assert.ok(rose > 3, `rose ${rose} blocks`);
-  assert.ok(moved > 4, `flew ${moved} blocks`);
-  console.log(`ok flew: up ${rose.toFixed(1)}, forward ${moved.toFixed(1)} blocks`);
+    // Fly: F, rise with Space, forward with W.
+    await page.keyboard.press('KeyF');
+    assert.equal(await sandbox(() => window.voxelSandbox.player.flying), true);
+    const before = await position();
+    await hold('Space', 600);
+    await hold('KeyW', 800);
+    const after = await position(),
+      rose = after[1] - before[1],
+      moved = Math.hypot(after[0] - before[0], after[2] - before[2]);
+    assert.ok(rose > 3, `rose ${rose} blocks`);
+    assert.ok(moved > 4, `flew ${moved} blocks`);
+    console.log(`ok flew: up ${rose.toFixed(1)}, forward ${moved.toFixed(1)} blocks`);
 
-  // Land: fly off, fall to the ground.
-  await page.keyboard.press('KeyF');
-  await page.waitForFunction(() => window.voxelSandbox.player.onGround, null, { timeout: 10_000 });
-  console.log('ok landed');
+    // Land: fly off, fall to the ground.
+    await page.keyboard.press('KeyF');
+    await page.waitForFunction(() => window.voxelSandbox.player.onGround, null, { timeout: 10_000 });
+    console.log('ok landed');
 
-  // Look down at the ground and break the block under the crosshair.
-  await page.mouse.move(480, 270);
-  for (let i = 0; i < 10; i++) await page.mouse.move(480, 270 + 40 * (i + 1));
-  await wait(200);
-  const target = await sandbox(() => window.voxelSandbox.target && [...window.voxelSandbox.target.cell]);
-  assert.ok(target, 'a block under the crosshair');
-  await page.mouse.down({ button: 'left' });
-  await page.mouse.up({ button: 'left' });
-  await wait(100);
-  assert.equal(await sandbox((c) => window.voxelSandbox.world.getBlock(...c), target), 0, `broke ${target}`);
-  console.log(`ok broke ${target}`);
+    // Look down at the ground and break the block under the crosshair.
+    await page.mouse.move(480, 270);
+    for (let i = 0; i < 10; i++) await page.mouse.move(480, 270 + 40 * (i + 1));
+    await wait(200);
+    const target = await sandbox(() => window.voxelSandbox.target && [...window.voxelSandbox.target.cell]);
+    assert.ok(target, 'a block under the crosshair');
+    await page.mouse.down({ button: 'left' });
+    await page.mouse.up({ button: 'left' });
+    await wait(100);
+    assert.equal(await sandbox((c) => window.voxelSandbox.world.getBlock(...c), target), 0, `broke ${target}`);
+    console.log(`ok broke ${target}`);
 
-  // Place stone (slot 1) against the face under the crosshair.
-  await page.keyboard.press('Digit1');
-  await wait(100);
-  const hit = await sandbox(() => {
-    const t = window.voxelSandbox.target;
-    return t && { cell: [...t.cell], adjacent: [...t.adjacent] };
-  });
-  assert.ok(hit, 'a face to place against');
-  await page.mouse.down({ button: 'right' });
-  await page.mouse.up({ button: 'right' });
-  await wait(100);
-  const placed = await sandbox((c) => window.voxelSandbox.world.getBlock(...c), hit.adjacent),
-    stone = await sandbox(() => window.voxelSandbox.world.blocks.id('stone'));
-  assert.equal(placed, stone, `placed stone at ${hit.adjacent}`);
-  console.log(`ok placed stone at ${hit.adjacent}`);
+    // Place stone (slot 1) against the face under the crosshair.
+    await page.keyboard.press('Digit1');
+    await wait(100);
+    const hit = await sandbox(() => {
+      const t = window.voxelSandbox.target;
+      return t && { cell: [...t.cell], adjacent: [...t.adjacent] };
+    });
+    assert.ok(hit, 'a face to place against');
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.up({ button: 'right' });
+    await wait(100);
+    const placed = await sandbox((c) => window.voxelSandbox.world.getBlock(...c), hit.adjacent),
+      stone = await sandbox(() => window.voxelSandbox.world.blocks.id('stone'));
+    assert.equal(placed, stone, `placed stone at ${hit.adjacent}`);
+    console.log(`ok placed stone at ${hit.adjacent}`);
 
-  // Render distance: V steps 4 -> 8.
-  await page.keyboard.press('KeyV');
-  assert.equal(await sandbox(() => window.voxelSandbox.streamer.distance), 8);
-  console.log('ok render distance 8');
+    // Render distance: V steps 4 -> 8.
+    await page.keyboard.press('KeyV');
+    assert.equal(await sandbox(() => window.voxelSandbox.streamer.distance), 8);
+    console.log('ok render distance 8');
 
-  // Swim: teleport into the lake west of spawn.
-  await sandbox(() => {
-    window.voxelSandbox.player.position = [-40.5, 0.2, -20.5];
-  });
-  await page.waitForFunction(() => window.voxelSandbox.player.inLiquid, null, { timeout: 10_000 });
-  console.log('ok swimming');
+    // Swim: teleport into the lake west of spawn.
+    await sandbox(() => {
+      window.voxelSandbox.player.position = [-40.5, 0.2, -20.5];
+    });
+    await page.waitForFunction(() => window.voxelSandbox.player.inLiquid, null, { timeout: 10_000 });
+    console.log('ok swimming');
 
-  // Save (leaving pointer lock saves; headless Escape does not unlock, so unlock directly) and reload.
-  await sandbox(() => document.exitPointerLock());
-  await page.waitForFunction(() => !document.pointerLockElement);
-  await sandbox(() => window.voxelSandbox.streamer.save());
-  await page.reload();
-  await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
-  await page.waitForFunction((c) => window.voxelSandbox.world.getChunk(c[0] >> 5, c[1] >> 5, c[2] >> 5), hit.adjacent, {
-    timeout: 30_000,
-  });
-  assert.equal(await sandbox((c) => window.voxelSandbox.world.getBlock(...c), hit.adjacent), stone);
-  if (String(target) !== String(hit.adjacent))
-    // the stone may have refilled the hole
-    assert.equal(await sandbox((c) => window.voxelSandbox.world.getBlock(...c), target), 0);
-  console.log('ok the edits survive a reload');
-  assert.deepEqual(errors, []);
+    // Save (leaving pointer lock saves; headless Escape does not unlock, so unlock directly) and reload.
+    await sandbox(() => document.exitPointerLock());
+    await page.waitForFunction(() => !document.pointerLockElement);
+    await sandbox(() => window.voxelSandbox.streamer.save());
+    await page.reload();
+    await page.waitForFunction(() => window.voxelSandbox?.spawned, null, { timeout: 120_000 });
+    await page.waitForFunction(
+      (c) => window.voxelSandbox.world.getChunk(c[0] >> 5, c[1] >> 5, c[2] >> 5),
+      hit.adjacent,
+      {
+        timeout: 30_000,
+      },
+    );
+    assert.equal(await sandbox((c) => window.voxelSandbox.world.getBlock(...c), hit.adjacent), stone);
+    if (String(target) !== String(hit.adjacent))
+      // the stone may have refilled the hole
+      assert.equal(await sandbox((c) => window.voxelSandbox.world.getBlock(...c), target), 0);
+    console.log('ok the edits survive a reload');
+    assert.deepEqual(errors, []);
 
-  await loadOrder();
-  await plaza();
-  await rejoin();
-  await plazaEdits();
-  assert.deepEqual(
-    errors.filter((e) => !NETWORK_ERROR.test(e)),
-    [],
-  );
-  console.log('voxel sandbox play test passed');
+    await loadOrder();
+    await plaza();
+    await rejoin();
+    await plazaEdits();
+    assert.deepEqual(
+      errors.filter((e) => !NETWORK_ERROR.test(e)),
+      [],
+    );
+    console.log('voxel sandbox play test passed');
+  }
 } finally {
   await closeAll();
   watchExit();

@@ -6,6 +6,7 @@
 export interface AssetFile {
     variant: string;
     url: string;
+    name?: string;
     size?: number;
     md5?: string;
     include?: Record<string, {
@@ -15,11 +16,13 @@ export interface AssetFile {
     }>;
 }
 
-export type AssetKind = 'model' | 'hdri' | 'texture';
+export type AssetKind = 'model' | 'hdri' | 'texture' | 'image';
 
 export class AssetLibrary {
     constructor(options: AssetLibraryOptions);
+    get providers(): string[];
     search(options: AssetSearchOptions): Promise<CatalogAsset[]>;
+    lookup(reference: string, signal?: AbortSignal): Promise<CatalogAsset>;
     files(reference: string, signal?: AbortSignal): Promise<AssetFile[]>;
     download(reference: string, variant: string, signal?: AbortSignal): Promise<DownloadedAsset>;
     wire(directory: string, options?: {
@@ -33,11 +36,14 @@ export interface AssetLibraryOptions {
     publicUrl?: string;
     live?: LiveConnection;
     fetch?: typeof fetch;
+    userAgent?: string;
+    licenses?: readonly string[];
+    sources?: readonly AssetSource[];
     maxBytes?: number;
     timeoutMs?: number;
 }
 
-export type AssetProvider = 'polyhaven' | 'ambientcg' | 'khronos';
+export type AssetProvider = 'polyhaven' | 'ambientcg' | 'khronos' | 'smithsonian' | (string & {});
 
 export interface AssetSearchOptions {
     query: string;
@@ -48,19 +54,41 @@ export interface AssetSearchOptions {
     signal?: AbortSignal;
 }
 
+export interface AssetSource {
+    name: string;
+    hosts: readonly string[];
+    kinds: readonly AssetKind[];
+    headers?: Readonly<Record<string, string>>;
+    search(options: {
+        query: string;
+        kind?: AssetKind;
+        limit: number;
+        offset: number;
+    }, context: AssetSourceContext): Promise<CatalogAsset[]>;
+    lookup(id: string, context: AssetSourceContext): Promise<CatalogAsset | undefined>;
+    files(asset: CatalogAsset, context: AssetSourceContext): Promise<AssetFile[]>;
+}
+
+export interface AssetSourceContext {
+    json(url: string): Promise<unknown>;
+    signal: AbortSignal;
+    licenses: ReadonlySet<string>;
+}
+
 export interface CatalogAsset {
     id: string;
     provider: AssetProvider;
     kind: AssetKind;
     title: string;
     source: string;
-    license: 'CC0-1.0';
+    license: string;
     licenseUrl: string;
     credit: string;
 }
 
 export interface DownloadedAsset {
     asset: CatalogAsset;
+    variant: string;
     directory: string;
     entry: string;
     files: {
@@ -69,9 +97,18 @@ export interface DownloadedAsset {
         bytes: number;
     }[];
     manifest: string;
+    reused: boolean;
+}
+
+export interface SmithsonianSourceOptions {
+    apiKey: string;
 }
 
 export function createAssetTools(library: AssetLibrary): ToolDefinition[];
+
+export function licenseUrl(spdx: string): string;
+
+export function smithsonianSource({ apiKey }: SmithsonianSourceOptions): AssetSource;
 
 // Not exported from this entry, but used by the exports above:
 

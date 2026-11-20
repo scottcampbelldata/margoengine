@@ -10,8 +10,23 @@ export const viewState = (view) => view && Object.entries(view).map(([key, value
 export const sameView = (a, b) => a === b || (!!a && !!b && a.length === b.length && a.every(([key, value], i) =>
   key === b[i][0] && (Array.isArray(value) ? same(value, b[i][1]) : Object.is(value, b[i][1]))));
 
+// A dispose may release late: it returns a promise, or the handle has only `Symbol.asyncDispose` (ecs
+// ParallelSchedule.stop() removes its worker listeners after a microtask; a LoadingManager request lets go of its abort
+// listener when it settles). The harness awaits every such promise, a handle's own and a plugin's, with this hard limit
+// before it asserts anything released; one that never settles fails the entry.
+export const DISPOSE_LIMIT_MS = 5000;
+const disposer = (handle) => handle && (typeof handle.dispose === 'function' ? handle.dispose
+  : typeof handle[Symbol.asyncDispose] === 'function' ? handle[Symbol.asyncDispose] : undefined);
+
+// A DOM node taken out of its document: nothing reaches it, and it goes with every listener on it.
+const detached = (target) => typeof target?.isConnected === 'boolean' && typeof target.nodeType === 'number' &&
+  !target.isConnected;
 export class LifetimeObserver {
   owner = null;
+  // Set from a fixture's `detachedNodes` (its reason): listeners left on nodes it removed from the page are not leaks.
+  detachedNodes = false;
+  // Promises returned by disposals not yet awaited: `settle` awaits them all.
+  settling = new Set();
   context = null;
   resources = new Set();
   // Every live buffer, texture and query set per device, owned or not: an unowned cache growing per attach shows here.
@@ -54,15 +69,20 @@ export class LifetimeObserver {
       else delete object[name];
     });
   }
+  // Native add/remove per watched prototype: a DOM implementation such as jsdom brings its own EventTarget, and a
+  // signal's abort listener goes through the native methods of the signal's own prototype.
+  natives = [];
   watchEvents(prototype = EventTarget.prototype) {
     const observer = this;
     const nativeAdd = prototype.addEventListener, nativeRemove = prototype.removeEventListener;
+    this.natives.push({ prototype, add: nativeAdd, remove: nativeRemove });
+    const native = (target) => observer.natives.find((n) => n.prototype.isPrototypeOf(target)) ?? observer.natives[0];
     const capture = (options) => typeof options === 'boolean' ? options : !!options?.capture;
     const find = (target, type, listener, options) => [...observer.listeners].find((r) =>
       r.target === target && r.type === type && r.listener === listener && r.capture === capture(options));
     const forget = (record) => {
       observer.listeners.delete(record);
-      if (record.signal) nativeRemove.call(record.signal, 'abort', record.abort);
+      if (record.signal) native(record.signal).remove.call(record.signal, 'abort', record.abort);
     };
     this.patch(prototype, 'addEventListener', () => function (type, listener, options) {
       if (!listener || options?.signal?.aborted) return nativeAdd.call(this, type, listener, options);
@@ -79,7 +99,7 @@ export class LifetimeObserver {
       record.abort = () => forget(record);
       nativeAdd.call(this, type, record.wrapped, options);
       observer.listeners.add(record);
-      if (record.signal) nativeAdd.call(record.signal, 'abort', record.abort, { once: true });
+      if (record.signal) native(record.signal).add.call(record.signal, 'abort', record.abort, { once: true });
     });
     this.patch(prototype, 'removeEventListener', () => function (type, listener, options) {
       const record = find(this, type, listener, options);
@@ -89,6 +109,7 @@ export class LifetimeObserver {
     // Failure cleanup is after the leak assertion, never a way to make it pass.
     this.undo.push(() => {
       for (const record of [...observer.listeners]) {
+        if (!prototype.isPrototypeOf(record.target)) continue;
         nativeRemove.call(record.target, record.type, record.wrapped, record.capture);
         forget(record);
       }
@@ -177,7 +198,8 @@ export class LifetimeObserver {
       this.patch(plugin, method, (original) => function (...args) {
         observer.hooks.add(method);
         if (method === 'onDeviceRestored') observer.watchDevice(args[0]?.gpu);
-        return observer.scope(owner, () => original.apply(this, args));
+        const result = observer.scope(owner, () => original.apply(this, args));
+        return method === 'dispose' ? observer.track(result) : result;
       });
     }
   }
@@ -199,6 +221,29 @@ export class LifetimeObserver {
       } });
     });
   }
+  track(result) {
+    if (!result || typeof result.then !== 'function') return result;
+    // Handled here so one dropped by a failing case's cleanup cannot end the process; `settle` still sees a rejection.
+    result.then(undefined, () => {});
+    this.settling.add(result);
+    return result;
+  }
+  async settle(what, limit = DISPOSE_LIMIT_MS) {
+    while (this.settling.size) {
+      const pending = [...this.settling];
+      this.settling.clear();
+      let timer;
+      const late = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(
+          `OWNER_LIFETIME: ${what} dispose did not settle within ${limit} ms; a disposal must finish, not hang`)), limit);
+      });
+      try {
+        await Promise.race([Promise.all(pending), late]);
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+  }
   lost(device) {
     for (const record of this.resources) if (record.device === device) this.resources.delete(record);
     this.alive.delete(device);
@@ -207,7 +252,9 @@ export class LifetimeObserver {
     return this.alive.get(device)?.size ?? 0;
   }
   assertReleased(owner) {
-    invariant(![...this.listeners].some((r) => r.owner === owner), 'no leaked event listeners');
+    const listeners = [...this.listeners].filter((r) => r.owner === owner && !(this.detachedNodes && detached(r.target)));
+    invariant(!listeners.length, `no leaked event listeners (${listeners.length}: ${listeners.slice(0, 6).map((r) =>
+      `${r.type} on ${r.target?.constructor?.name ?? typeof r.target}`).join(', ')})`);
     invariant(![...this.resources].some((r) => r.owner === owner), 'no leaked GPU buffers, textures or query sets');
     invariant(![...this.frames].some((r) => r.owner === owner), 'no leaked onFrame callbacks');
   }
@@ -222,10 +269,23 @@ export class LifetimeObserver {
 // 'cycles' attaches and disposes three more times on one device: GPU objects left alive, owned or not, must not grow
 // from the second disposal to the third.
 export const lifecycleCases = ['direct', 'detach', 'scene', 'engine', 'loss-attached', 'loss-detached', 'cycles'];
-export async function exerciseLifetime(fixture, adapter, { target = 'secondary', mode = 'direct' } = {}) {
+export async function exerciseLifetime(fixture, adapter, { target = 'secondary', mode = 'direct',
+  disposeLimit = DISPOSE_LIMIT_MS } = {}) {
   const observer = new LifetimeObserver(), token = {}, peerToken = {}, dependencyToken = {}, warmToken = {}, hosts = [];
   let handle, peer;
+  // Every disposal the harness makes, and every plugin disposal the engine makes, is awaited before an assertion.
+  const settled = () => observer.settle(fixture.name, disposeLimit);
+  const dispose = async (made) => {
+    observer.track(disposer(made).call(made));
+    await settled();
+  };
   observer.watchEvents();
+  // A fixture whose objects listen on another DOM implementation's targets (jsdom on the CPU) names its prototypes.
+  for (const prototype of fixture.eventTargets?.() ?? []) observer.watchEvents(prototype);
+  observer.detachedNodes = !!fixture.detachedNodes;
+  // What the host application owns, made outside any owner, such as a UI framework's root and the listeners it puts on
+  // its container for good: never a package's object. Synchronous only; anything the call starts later is owned again.
+  const app = (fn) => observer.scope(null, fn);
   try {
     for (let i = 0; i < 2; i++) hosts.push(await adapter.create());
     const [host, foreign] = hosts, { engine } = host;
@@ -244,7 +304,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
       const e = h.engine, warm = e.createScene('owner-lifetime:warm-up');
       let pending;
       const scope = { name: 'owner-lifetime:warm-up', setup() {
-        pending = fixture.create({ engine: e, scene: warm, host: h, dependency: (fn) => fn() });
+        pending = fixture.create({ engine: e, scene: warm, host: h, dependency: (fn) => fn(), app });
       } };
       warm.use(scope);
       warm.removePlugin(scope.name);
@@ -252,7 +312,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
       if (made.plugin && !e.sceneOf(made.plugin)) warm.use(made.plugin);
       const view = { id: 'owner-lifetime:warm-up', scene: warm, camera: e.camera, viewport: [0, 0, 64, 32], pixels: true };
       await h.render([view]);
-      made.dispose();
+      await dispose(made);
       await made.cleanup?.();
       warm.dispose();
     });
@@ -260,14 +320,14 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     let pendingPeer;
     const peerScope = { name: 'owner-lifetime:peer', setup() {
       pendingPeer = observer.scope(peerToken, () => fixture.create({ engine: foreign.engine,
-        scene: foreign.engine.scene, host: foreign, dependency }));
+        scene: foreign.engine.scene, host: foreign, dependency, app }));
     } };
     peer = await observer.hold(peerToken, () => {
       foreign.engine.use(peerScope);
       foreign.engine.removePlugin(peerScope.name);
       return pendingPeer;
     });
-    invariant(peer && typeof peer.dispose === 'function', `${fixture.name} provides peer disposal`);
+    invariant(disposer(peer), `${fixture.name} provides peer disposal`);
     if (peer.plugin && !foreign.engine.sceneOf(peer.plugin)) foreign.engine.use(peer.plugin);
     const peerInstalled = [...foreign.engine.plugins.values()].filter((p) => !peer.dependencies?.includes(p));
     invariant(peerInstalled.length > 0, 'second engine exercises a real instance');
@@ -282,14 +342,14 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     const attach = async () => {
       let pending;
       const scope = { name: 'owner-lifetime:create', setup() {
-        pending = observer.scope(token, () => fixture.create({ engine, scene, host, dependency }));
+        pending = observer.scope(token, () => fixture.create({ engine, scene, host, dependency, app }));
       } };
       const made = await observer.hold(token, () => {
         scene.use(scope);
         scene.removePlugin(scope.name);
         return pending;
       });
-      invariant(made && typeof made.dispose === 'function', `${fixture.name} provides dispose`);
+      invariant(disposer(made), `${fixture.name} provides dispose`);
       if (made.plugin && !engine.sceneOf(made.plugin)) scene.use(made.plugin);
       if (made.plugin) invariant(engine.sceneOf(made.plugin) === scene, 'async factory retains its originating scene');
       return made;
@@ -341,7 +401,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     if (mode === 'cycles') {
       const alive = [];
       for (let cycle = 2; cycle <= 4; cycle++) {
-        handle.dispose();
+        await dispose(handle);
         for (const plugin of installed) invariant(!engine.sceneOf(plugin), `${fixture.name} releases its registration`);
         await handle.cleanup?.();
         observer.assertReleased(token);
@@ -364,7 +424,8 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     if (mode === 'detach') for (const plugin of installed) scene.removePlugin(plugin.name);
     else if (mode === 'scene') scene.dispose();
     else if (mode === 'engine') engine.dispose();
-    else handle.dispose();
+    else await dispose(handle);
+    await settled();
     for (const plugin of installed) invariant(!engine.sceneOf(plugin), `${fixture.name} releases its registration`);
     if (mode !== 'engine') releasedViews();
     // A dependency may own lazily allocated shared pages. Its caller lifetime ends at cleanup, below.
@@ -376,7 +437,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     if (!['scene', 'engine'].includes(mode)) {
       const replacements = installed.map((p) => ({ name: p.name, setup() {} }));
       for (const replacement of replacements) scene.use(replacement);
-      handle.dispose();
+      await dispose(handle);
       if (mode === 'loss-detached') {
         await host.lose(observer);
         await warmUp(host);
@@ -398,7 +459,7 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
     await handle.check?.({ phase: 'disposed', host, views });
     for (const plugin of peerInstalled)
       invariant(foreign.engine.sceneOf(plugin) === foreign.engine.scene, 'peer instance survives owner disposal');
-    peer.dispose();
+    await dispose(peer);
     for (const plugin of peerInstalled) invariant(!foreign.engine.sceneOf(plugin), 'peer releases registration');
     await peer.cleanup?.();
     await handle.cleanup?.();
@@ -419,12 +480,17 @@ export async function exerciseLifetime(fixture, adapter, { target = 'secondary',
 }
 
 /**
- * The fixture entries one browser leaf runs: all of them, or with `name` only the entry of that name. A fixture that
- * exports `leafPerEntry` is run one leaf per entry by check:owners, so each leaf fits the leaf's own time limit.
+ * The fixture entries one browser leaf runs: all of them, or with `names` (one name or a list) only the entries of those
+ * names, in fixture order. check:owners runs a fixture that exports `leafCases` or `leafPerEntry` as several leaves
+ * (scripts/support/owner-lifetime-registry.mjs ownerLeaves), so each leaf fits the leaf's own time limit.
  */
-export function leafEntries(entries, name) {
-  if (name === undefined) return entries;
-  const found = entries.filter((fixture) => fixture.name === name);
-  if (found.length !== 1) throw new Error(`OWNER_ENTRY_UNKNOWN: ${name} (${found.length} entries of that name)`);
-  return found;
+export function leafEntries(entries, names) {
+  if (names === undefined) return entries;
+  const wanted = typeof names === 'string' ? [names] : names;
+  for (const name of wanted) {
+    const count = entries.filter((fixture) => fixture.name === name).length;
+    if (count !== 1) throw new Error(`OWNER_ENTRY_UNKNOWN: ${name} (${count} entries of that name)`);
+  }
+  if (new Set(wanted).size !== wanted.length) throw new Error(`OWNER_ENTRY_TWICE: ${wanted.join(', ')}`);
+  return entries.filter((fixture) => wanted.includes(fixture.name));
 }

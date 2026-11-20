@@ -166,22 +166,25 @@ const FRAGMENT_CHARACTERS = 49_152;
 const STUDS_PER_METER = 25 / 7;
 
 /**
- * Checks a Roblox output basename: a legal single file name without extension or path, at most 180 characters.
+ * Checks a Roblox output basename: a legal single file name without extension or path, at most 180 characters, with
+ * no lone UTF-16 surrogate (the README writes it into a Luau string literal, and a lone surrogate has no UTF-8 form;
+ * Luau syntax, "String literals", https://luau.org/syntax).
  * @throws TypeError otherwise.
  */
 export function assertRobloxBasename(value: string): void {
-  if (
-    typeof value !== 'string' ||
-    !value.length ||
-    value.length > 180 ||
-    value !== value.trim() ||
-    /[<>:"/\\|?*\u0000-\u001f]/.test(value) ||
-    /[. ]$/.test(value) ||
-    /^\.{1,2}$/.test(value) ||
-    /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(value)
-  )
+  if (!robloxBasenameOk(value))
     throw new TypeError('Roblox basename must be a legal single filename without an extension or path.');
 }
+const robloxBasenameOk = (value: string): boolean =>
+  typeof value === 'string' &&
+  value.length > 0 &&
+  value.length <= 180 &&
+  value === value.trim() &&
+  !/[<>:"/\\|?*\u0000-\u001f]/.test(value) &&
+  !/[. ]$/.test(value) &&
+  !/\p{Cs}/u.test(value) &&
+  !/^\.{1,2}$/.test(value) &&
+  !/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(value);
 
 const rgbaBytes = (image: PrecisionImage): boolean => {
   if (
@@ -310,7 +313,7 @@ export function robloxRuntimeSourceDiagnostics<S extends PrecisionScene>(
       result.push({
         code: 'ROBLOX_RUNTIME_HIERARCHY_DEPTH',
         objectId: object.id,
-        message: `Object ${object.id} needs runtime hierarchy depth ${emittedDepth}; the limit is 64 including the runtime root, MeshPart and appearance. Shorten the authored ancestry before exporting.`,
+        message: `Object ${object.id} needs runtime hierarchy depth ${emittedDepth}; Margo's cap is 64 including the runtime root, MeshPart and appearance. Shorten the authored ancestry before exporting.`,
       });
   }
 
@@ -1078,7 +1081,7 @@ export async function verifyRobloxRuntimeBundle<S extends PrecisionScene>(
   if (xmlFiles.length !== 1) fail('source model file inventory');
   const sourceFile = xmlFiles[0]!,
     basename = sourceFile.filename.slice(0, -'-roblox-source.rbxmx'.length);
-  if (!basename) fail('missing source basename');
+  if (!robloxBasenameOk(basename)) fail('source basename breaks the Roblox basename rules');
   const sourceRoot = envelope(xml(sourceFile.bytes)),
     source = folder(sourceRoot),
     placeFile = files.get(`${basename}-roblox-source.rbxlx`);

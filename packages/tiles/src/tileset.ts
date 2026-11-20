@@ -2,7 +2,7 @@
 // Streaming OGC 3D Tiles 1.1: tileset JSON (explicit and implicit tiling, external tilesets), screen-space-error
 // selection with ADD and REPLACE refinement, optional level skipping, a priority fetch queue, a memory budget with
 // least-recently-used eviction, metadata and progress events. Engine-free: content is handed to a `ContentFactory`
-// (the engine renderer in renderer.ts makes gltf-pro models). Written from the OGC 3D Tiles 1.1 specification.
+// (the engine renderer in renderer.ts makes gltf/pbr models). Written from the OGC 3D Tiles 1.1 specification.
 import { MargoError } from '@margoengine/math/errors';
 import { type BoundingVolumeExtension, type BoundingVolumeJSON, type TileBounds, createBounds } from './bounds.js';
 import { type TileContent, contentMagic, parseContent } from './formats.js';

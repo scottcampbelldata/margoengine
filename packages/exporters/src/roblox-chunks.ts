@@ -2,7 +2,13 @@
 // whose every object/material surface is written as chunks of at most 20,000 triangles with a node mapping.
 import { decodePNG } from '@margoengine/decoders/png';
 import { type AccessorValues, type GLBParts, readAccessor, splitGLB } from './glb.js';
-import type { PrecisionMaterial, PrecisionObject, PrecisionScene } from './precision-shared.js';
+import {
+  byteStrideAllowed,
+  emittedTriangleNormal,
+  type PrecisionMaterial,
+  type PrecisionObject,
+  type PrecisionScene,
+} from './precision-shared.js';
 import type { RobloxChunk, RobloxTriangleIdentity } from './roblox.js';
 
 export type { PrecisionImage, PrecisionMaterial, PrecisionObject, PrecisionScene } from './precision-shared.js';
@@ -127,7 +133,8 @@ export function robloxUsesTransformFrame(object: PrecisionObject): boolean {
 
 /**
  * `ROBLOX_HIERARCHY_DEPTH` for every object whose emitted depth (roots at zero, counting an export origin, raw
- * transform frames and its chunk children) passes Roblox's 64.
+ * transform frames and its chunk children) passes 64. The 64 is Margo's own cap, which keeps the verifier's recursive
+ * walk bounded; the Roblox Creator documentation states no instance hierarchy depth limit.
  */
 export function robloxHierarchyDiagnostics(
   scene: PrecisionScene,
@@ -161,7 +168,7 @@ export function robloxHierarchyDiagnostics(
       result.push({
         code: 'ROBLOX_HIERARCHY_DEPTH',
         objectId: object.id,
-        message: `Object ${object.id} emits Roblox native depth ${emittedDepth}; the limit is 64 including chunk children, raw transform frames and any export origin. Shorten the object ancestry before exporting.`,
+        message: `Object ${object.id} emits Roblox native depth ${emittedDepth}; Margo's cap is 64 including chunk children, raw transform frames and any export origin. Shorten the object ancestry before exporting.`,
       });
   }
   return result;
@@ -518,33 +525,6 @@ function transformed(p: readonly number[], node: Node, vector = false): number[]
     z + q[3]! * tz + q[0]! * ty - q[1]! * tx,
   ].map((n, i) => n + (vector ? 0 : t[i]!));
 }
-/** The face's geometric normal from both triangles of an emitted quad, with the checks editing applies. */
-function quadNormal(points: readonly (readonly number[])[], label: string): number[] {
-  if (!points.every((p) => p.every(Number.isFinite)))
-    throw new RangeError(`${label} has nonfinite world corners; use finite transforms and positions before exporting.`);
-  const sub = (a: readonly number[], b: readonly number[]) => [a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!];
-  const dot = (a: readonly number[], b: readonly number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
-  const normals = [
-    [0, 1, 2],
-    [0, 1, 2],
-  ].map(([a, b, c]) => cross(sub(points[b!]!, points[a!]!), sub(points[c!]!, points[a!]!)));
-  if (normals.some((n) => !n.every(Number.isFinite) || Math.hypot(...n) < 1e-10))
-    throw new RangeError(`${label} has a degenerate triangle; move distinct corners before exporting.`);
-  if (normals.some((n) => !Number.isFinite(Math.hypot(...n))))
-    throw new RangeError(
-      `${label} has a nonfinite world normal magnitude; reduce coordinate or transform magnitude before exporting.`,
-    );
-  if (dot(normals[0]!, normals[1]!) <= 0)
-    throw new RangeError(`${label} has folded or inconsistent triangles; adjust corners or diagonal before exporting.`);
-  const length = Math.hypot(...normals[0]!);
-  const result = normals[0]!.map((n) => n / length);
-  if (!result.every(Number.isFinite) || Math.hypot(...result) === 0)
-    throw new RangeError(
-      `${label} has a zero or nonfinite world normal; reduce coordinate or transform magnitude before exporting.`,
-    );
-  return result;
-}
-
 /** Bounded scalar accessor reader over splitGLB and readAccessor: flat values, no nested arrays. */
 function decode(bytes: Uint8Array) {
   if (!(bytes instanceof Uint8Array)) fail('invalid GLB container');
@@ -632,6 +612,7 @@ function decode(bytes: Uint8Array) {
       !integer(offset) ||
       offset % size ||
       !integer(stride) ||
+      !byteStrideAllowed(v.byteStride, indices) ||
       stride < width * size ||
       stride % size ||
       (a!.count && offset + (a!.count - 1) * stride + width * size > v.byteLength)
@@ -643,6 +624,9 @@ function decode(bytes: Uint8Array) {
     } catch {
       return fail('nonfinite accessor value');
     }
+    // glTF 2.0 3.7.2.1: no index may be its type's primitive restart value, the type's maximum.
+    const restart = a!.componentType === 5121 ? 255 : a!.componentType === 5123 ? 65535 : 4294967295;
+    if (indices && values.includes(restart)) fail('primitive restart index');
     return {
       count: a!.count,
       read(row: number, column = 0): number {
@@ -1029,7 +1013,7 @@ export async function verifyRobloxChunkGLB<S extends PrecisionScene>(
       const corrected = face!.worldBakedTriangles[ordinal]!.map(
         (corner) => emittedWorldPoints[chosen.indexOf(corner)]!,
       );
-      const geometric = quadNormal(corrected, `Face ${faceId} on object ${objectId} after emitted precision`);
+      const geometric = emittedTriangleNormal(corrected, `Face ${faceId} on object ${objectId} after emitted precision`);
       for (const emittedNormal of emittedWorldNormals)
         if (emittedNormal.reduce((dot, n, axis) => dot + n * geometric[axis]!, 0) <= 0)
           fail(`Face ${faceId} changed normal front orientation after emitted precision`);

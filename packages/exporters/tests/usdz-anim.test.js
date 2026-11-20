@@ -167,6 +167,21 @@ test('a clip that ends off the grid keeps its last pose on the last frame', asyn
   assert.equal(frames.at(-1)[0], 1);
 });
 
+test('a channel with no key times, or times out of order, is refused rather than written with a NaN end', async () => {
+  // glTF 2.0 3.11: animation input times are strictly increasing.
+  for (const [times, values] of [
+    [[], []],
+    [[0.5, 0.25], [0, 0, 0, 1, 0, 0]],
+    [[0, NaN], [0, 0, 0, 1, 0, 0]],
+  ]) {
+    const node = { name: 'box', geometry: quad };
+    await assert.rejects(
+      exportAnimatedUSDZ({ nodes: [node], animations: [{ channels: [{ node, path: 'translation', times, values }] }] }),
+      { name: 'RangeError', message: /strictly increasing key times/ },
+    );
+  }
+});
+
 test('a child rides its moving parent through the hierarchy', async () => {
   const child = { name: 'child', translation: [0, 2, 0], geometry: quad },
     parent = { name: 'parent', children: [child] },
@@ -748,8 +763,13 @@ test('a GLB primitive with no normals gets them from its faces, and one with no 
   assert.match(text, /normal3f\[\] normals = \[\(0, 0, 1\), \(0, 0, 1\), \(0, 0, 1\)\]/);
 });
 
-test('a GLB primitive that is not triangles is named and left out', async () => {
-  await assert.rejects(exportAnimatedUSDZ(slidingGLB({ mode: 1 })), /at least one mesh/);
+test('a GLB primitive with an unknown mode is named and left out; points are written as UsdGeomPoints', async () => {
+  await assert.rejects(exportAnimatedUSDZ(slidingGLB({ mode: 9 })), /at least one mesh/);
+  const text = await usda(await exportAnimatedUSDZ(slidingGLB({ mode: 0 })));
+  assert.match(text, /def Points "Points_0"/);
+  assert.doesNotMatch(text, /def Mesh/);
+  // Three indices are no whole number of segments (glTF 2.0 section 3.7.2.1), so LINES refuses rather than drops one.
+  await assert.rejects(exportAnimatedUSDZ(slidingGLB({ mode: 1 })), /complete segments/);
 });
 
 test('a channel with no node, as KHR_animation_pointer writes it, is named', async () => {
@@ -802,4 +822,16 @@ test('a texture prefix that leaves the archive is refused here too', async () =>
       animations: [{ channels: [{ node, path: 'translation', times: [0, 1], values: [0, 0, 0, 1, 0, 0] }] }],
     };
   await assert.rejects(exportAnimatedUSDZ(source, { texturePrefix: '../up/' }), /leaves the archive/);
+});
+
+test('a skin that lists one joint twice is refused, as glTF requires distinct joints', async () => {
+  const { lower, upper, mesh, inverses } = arm();
+  mesh.skin = { joints: [lower, lower], inverseBindMatrices: [...inverses.slice(0, 16), ...inverses.slice(0, 16)] };
+  await assert.rejects(
+    exportAnimatedUSDZ({
+      nodes: [upper, mesh],
+      animations: [{ channels: [{ node: lower, path: 'rotation', times: [0, 1], values: [...turn(0), ...turn(1)] }] }],
+    }),
+    /Skin joints must be distinct/,
+  );
 });

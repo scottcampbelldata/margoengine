@@ -15,7 +15,7 @@ test('baselineSource serves every src module of the package from the commit, wit
   const windowsId = ['C:', 'repo', 'packages', 'road', 'src', 'frame.ts'].join(String.fromCharCode(92));
   assert.equal(plugin.load(windowsId), show(`${head}:packages/road/src/frame.ts`));
   assert.equal(plugin.load('/repo/packages/road/src/index.ts?x'), 'export {};');
-  assert.equal(plugin.load('/repo/packages/net/src/index.ts'), undefined);
+  assert.equal(plugin.load('/repo/packages/netcode/src/interpolation.ts'), undefined);
   assert.equal(plugin.load('/repo/packages/road/dist/index.js'), undefined);
 });
 

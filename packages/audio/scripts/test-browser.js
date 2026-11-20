@@ -1,15 +1,18 @@
+// MARGO_COMPAT not applicable: the pages run their own WebGL2-layer leg (webgl2-compat install) beside native WebGPU for every backend loop.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },
@@ -65,15 +68,24 @@ try {
   report.checks.push(...report.offline.checks);
   report.engine = await call('runEngineTests', () => window.runEngineTests());
   report.checks.push(...report.engine.checks);
+  report.notRun = [...report.offline.notRun];
+  // These suites change the scene between render quanta of one OfflineAudioContext, through suspend(time).
+  const pause = await call('offlinePause', () => window.offlinePause());
+  const paused = async (key, name, run) => {
+    if (pause) report[key] = await call(name, run);
+    else report.notRun.push(`${name}: needs OfflineAudioContext.suspend(time)`);
+  };
   report.occlusion = await call('runOcclusionTests', () => window.runOcclusionTests());
-  report.doppler = await call('runDopplerTests', () => window.runDopplerTests());
-  report.events = await call('runEventTests', () => window.runEventTests());
+  report.notRun.push(...report.occlusion.notRun);
+  await paused('doppler', 'runDopplerTests', () => window.runDopplerTests());
+  await paused('events', 'runEventTests', () => window.runEventTests());
   report.music = await call('runMusicTests', () => window.runMusicTests());
-  report.zones = await call('runZoneTests', () => window.runZoneTests());
-  report.ambisonics = await call('runAmbisonicTests', () => window.runAmbisonicTests());
+  report.notRun.push(...report.music.notRun);
+  await paused('zones', 'runZoneTests', () => window.runZoneTests());
+  await paused('ambisonics', 'runAmbisonicTests', () => window.runAmbisonicTests());
   report.pan = await call('runPanTests', () => window.runPanTests());
   report.binaural = await call('runBinauralTests', () => window.runBinauralTests());
-  report.voices = await call('runVoiceManagerTests', () => window.runVoiceManagerTests());
+  await paused('voices', 'runVoiceManagerTests', () => window.runVoiceManagerTests());
   report.sprites = await call('runSpriteTests', () => window.runSpriteTests());
   assert.equal(await call('prepareGesture', () => window.prepareGesture()), 'suspended');
   await page.mouse.click(20, 20);
@@ -81,6 +93,9 @@ try {
   report.checks.push('A suspended context resumes on the first real pointer gesture');
   report.browser = browser.version();
   assert.deepEqual(errors, []);
+  // A browser with suspend(time) runs every check; one without it (Firefox 157) names each check it could not run.
+  if (pause) assert.deepEqual(report.notRun, []);
+  else for (const name of report.notRun) console.log(`audio test:browser: not run in ${report.browser}: ${name}`);
   await writeFile(resolve(results, 'audio-browser.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 } finally {

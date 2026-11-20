@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Camera, EngineKernel, EnginePlugin } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
+import { typeError } from '../../shared/errors.js';
 
 /** Native handlers may specialize the event type, as in the DOM listener overloads. */
 export type InputEventListener = { handleEvent(event: Event): void }['handleEvent'];
@@ -111,7 +112,7 @@ export abstract class Controls extends EventDispatcher {
       element = element === undefined ? (source.canvas as unknown as ControlElement) : element;
     } else {
       if (!source || typeof source !== 'object' || !('position' in source) || !('target' in source))
-        throw new TypeError('Expected an Engine or a Camera');
+        throw typeError('Expected an Engine or a Camera', 'controls-arguments');
       this.engine = null;
       this.camera = source;
     }
@@ -215,3 +216,14 @@ export abstract class Controls extends EventDispatcher {
 
 /** Default key target: the element's document when there is one (key events do not reach an unfocused canvas), else the element. */
 export const documentOf = (element: ControlElement): EventTargetLike => element.ownerDocument ?? element;
+type Viewed = { defaultView?: EventTargetLike | null; ownerDocument?: Viewed | null; document?: unknown };
+/**
+ * The window whose `blur` ends held keys (no keyup arrives once the page loses focus): the key target itself when it
+ * is a window, else the window of its document or of the element's document. Null without one (tests, workers).
+ */
+export const windowOf = (keys: EventTargetLike, element: ControlElement): EventTargetLike | null => {
+  const target = keys as Viewed,
+    owner = element as Viewed;
+  if (target.document && !target.ownerDocument) return keys;
+  return target.defaultView ?? target.ownerDocument?.defaultView ?? owner.ownerDocument?.defaultView ?? null;
+};

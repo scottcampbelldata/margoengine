@@ -13,8 +13,8 @@ import { Mesh, type MeshProps } from './components.js';
 import { splitPointerHandlers } from './events.js';
 import { useScene, useResourceEffect } from './internal.js';
 import { setWorldPose } from './scene-transform.js';
-import { MargoError } from '@margoengine/math/errors';
 import { advanceFrames, frameTakeover, xrFrameScope } from './frame-priority.js';
+import { fault } from '../../shared/errors.js';
 
 /** The xrcontext value component. */
 export interface XRContextValue {
@@ -28,7 +28,7 @@ export interface XRContextValue {
 interface XRState extends XRContextValue {
   frames: Set<(state: XRFrameState) => void>;
 }
-const Context = createContext<XRState | null>(null);
+const Context = /* @__PURE__ */ createContext<XRState | null>(null);
 /** Props of the XR component; every prop is optional unless noted. */
 export interface XRProps {
   children?: ReactNode;
@@ -98,7 +98,7 @@ export function XR({ children, ...props }: XRProps) {
       enter(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession> {
         const instance = current.current;
         if (!instance)
-          return Promise.reject(new Error('XR is not ready; wait for useXR().ready before requesting a session'));
+          return Promise.reject(fault('state', 'XR is not ready; wait for useXR().ready before requesting a session', 'react-usage'));
         const requested = { ...latest.current.options, ...options },
           onFrame = requested.onFrame,
           sessionMode = mode ?? latest.current.mode ?? 'immersive-vr';
@@ -165,7 +165,7 @@ export function XR({ children, ...props }: XRProps) {
 /** Returns the XR session controls of the nearest XR component; throws a MargoError (`state`) outside one. */
 export function useXR(): XRContextValue {
   const value = useContext(Context);
-  if (!value) throw new MargoError('state', 'useXR requires <XR>; call it inside one.');
+  if (!value) throw fault('state', 'useXR requires <XR>; call it inside one', 'react-usage');
   return value;
 }
 /** The controller event component. */
@@ -206,7 +206,7 @@ export function Controller({
 }
 function ControllerBinding(props: Omit<ControllerProps, keyof MeshProps>) {
   const context = useContext(Context);
-  if (!context) throw new MargoError('state', 'Controller requires <XR>; render it inside one.');
+  if (!context) throw fault('state', 'Controller requires <XR>; render it inside one', 'react-usage');
   const { engine, registry } = useScene(),
     latest = useRef(props);
   latest.current = props;

@@ -4,6 +4,7 @@
 import { multiplyMatrices, invertMatrixStable } from '@margoengine/math/mat4';
 import type { EngineKernel } from '@margoengine/core';
 import type { Animation } from './index.js';
+import { vertexValues } from '../../shared/vertex-map.js';
 import {
   VAT_WIDTH,
   VATCrowd,
@@ -76,8 +77,10 @@ export function bakeBones(animation: Animation, { fps = 30, clips }: VATBakeOpti
       skinId = doc.nodes![p.nodeIndex].skin,
       skin = skinId === undefined ? undefined : doc.skins![skinId],
       v = p.vertices,
+      // A part of a split primitive reads the definition's per-vertex accessors through its vertexMap.
+      map = p.part?.vertexMap,
       deltas = (def.targets ?? []).map((t: Record<string, number>) =>
-        [t.POSITION, t.NORMAL].map((a) => (a === undefined ? null : asset.accessor(a, 'VEC3'))),
+        [t.POSITION, t.NORMAL].map((a) => (a === undefined ? null : vertexValues(asset.accessor(a, 'VEC3'), 3, map))),
       );
     let first = skinId === undefined ? undefined : skinBase.get(skinId);
     if (first === undefined) {
@@ -95,7 +98,10 @@ export function bakeBones(animation: Animation, { fps = 30, clips }: VATBakeOpti
           [def.attributes!.JOINTS_1, def.attributes!.WEIGHTS_1],
         ]
           .filter(([j, w]) => j !== undefined && w !== undefined)
-          .map(([j, w]) => [asset.accessor(j, 'VEC4'), asset.accessor(w, 'VEC4')])
+          .map(([j, w]) => [
+            vertexValues(asset.accessor(j, 'VEC4'), 4, map),
+            vertexValues(asset.accessor(w, 'VEC4'), 4, map),
+          ])
       : [];
     for (let i = 0; i < count; i++) {
       const at = base + i;
@@ -240,12 +246,13 @@ fn skinned(s:Instance,position:vec3f,normal:vec3f,j0:vec4u,j1:vec4u,w0:vec4f,w1:
   }
  }
  let p=vec4f(position,1.0);let c0=cross(r1.xyz,r2.xyz);
- return SkinnedVertex(vec3f(dot(r0,p),dot(r1,p),dot(r2,p)),vec3f(dot(c0,normal),dot(cross(r2.xyz,r0.xyz),normal),dot(cross(r0.xyz,r1.xyz),normal))*sign(dot(r0.xyz,c0)));
+ let n=vec3f(dot(c0,normal),dot(cross(r2.xyz,r0.xyz),normal),dot(cross(r0.xyz,r1.xyz),normal))*select(-1.0,1.0,dot(r0.xyz,c0)>=0.0);
+ return SkinnedVertex(vec3f(dot(r0,p),dot(r1,p),dot(r2,p)),select(vec3f(0,1,0),n,dot(n,n)>0.0));
 }
 @vertex fn vertex(@location(0) uv:vec2f,@location(1) position:vec3f,@location(2) normal:vec3f,@location(3) j0:vec4u,@location(4) j1:vec4u,@location(5) w0:vec4f,@location(6) w1:vec4f,@builtin(instance_index) id:u32)->Out {
  let s=instances[id];let k=skinned(s,position,normal,j0,j1,w0,w1);
  let m=s.m;let c0=cross(m[1].xyz,m[2].xyz);let world=m*vec4f(k.position,1.0);
- var o:Out;o.clip=f.camera*world;o.position=world.xyz;o.normal=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*k.normal*sign(dot(m[0].xyz,c0));o.uv=s.uv.xy+uv*s.uv.zw;return o;
+ var o:Out;o.clip=f.camera*world;o.position=world.xyz;let n=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*k.normal*select(-1.0,1.0,dot(m[0].xyz,c0)>=0.0);o.normal=select(vec3f(0,1,0),n,dot(n,n)>0.0);o.uv=s.uv.xy+uv*s.uv.zw;return o;
 }
 `;
 
@@ -319,7 +326,8 @@ export class SkinnedCrowd extends VATCrowd {
   override set(index: number, instance: SkinnedCrowdInstance): this {
     const { blendClip, blendOffset, blendSpeed, blend } = instance;
     if (
-      (blendClip !== undefined && !(Number.isInteger(blendClip) && blendClip >= 0 && blendClip < this.bake.clips.length)) ||
+      (blendClip !== undefined &&
+        !(Number.isInteger(blendClip) && blendClip >= 0 && blendClip < this.bake.clips.length)) ||
       (blendOffset !== undefined && !Number.isFinite(blendOffset)) ||
       (blendSpeed !== undefined && !Number.isFinite(blendSpeed)) ||
       (blend !== undefined && !(blend >= 0 && blend <= 1))
@@ -345,6 +353,43 @@ function phase(clip: VATClip, time: number): [number, number] {
   const x = t * clip.frames,
     a = Math.min(Math.floor(x), clip.frames - 1);
   return [clip.start + a, x - a];
+}
+
+/**
+ * One bone of a member at `time` (the crowd's clock): its skinning matrix in the model root's space, before the
+ * member's own matrix, as the 12 numbers of its 3x4 rows (a bind-pose point `p` goes to `row . [p, 1]`), both clips and
+ * the blend applied as the shader applies them. The CPU twin of the shader for one bone: what a rider rides, a rifle in
+ * a hand, a flag on a pole follow, at the cost of 24 texel reads.
+ * @example
+ * const m = poseBone(bake, {clip: 1, offset: 0.4}, handBone, crowd.time);
+ * const grip = [m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7], m[8] * x + m[9] * y + m[10] * z + m[11]];
+ * @throws RangeError for a clip not in `bake.clips` or a bone not in the bake.
+ */
+export function poseBone(
+  bake: BoneBake,
+  { clip = 0, offset = 0, speed = 1, blendClip = 0, blendOffset = 0, blendSpeed = 1, blend = 0 }: SkinnedCrowdInstance,
+  bone: number,
+  time: number,
+  out = new Float32Array(12),
+): Float32Array {
+  if (
+    !bake.clips[clip] ||
+    !bake.clips[blendClip] ||
+    !(Number.isInteger(bone) && bone >= 0 && bone < bake.bones) ||
+    out.length < 12
+  )
+    throw new RangeError(
+      'Invalid bone pose; use clips from bake.clips, a bone below bake.bones and an output of 12 floats',
+    );
+  const a = phase(bake.clips[clip], time * speed + offset),
+    b = phase(bake.clips[blendClip], time * blendSpeed + blendOffset),
+    read = (row: number, k: number, e: number) => {
+      const [x, y] = boneTexel(row, bone, k, bake.bones, bake.width);
+      return bake.texels[(y * bake.width + x) * 4 + e];
+    },
+    at = (p: [number, number], k: number, e: number) => mix(read(p[0], k, e), read(p[0] + 1, k, e), p[1]);
+  for (let k = 0; k < 3; k++) for (let e = 0; e < 4; e++) out[k * 4 + e] = mix(at(a, k, e), at(b, k, e), blend);
+  return out;
 }
 
 /**

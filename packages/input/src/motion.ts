@@ -70,6 +70,7 @@ export class Gyro {
   private lastEvent: number | undefined;
   private lastUpdate: number;
   private disposed = false;
+  private stopCalibration: (() => void) | undefined;
   /** @throws RangeError for a `maxRate` or `maxTilt` not above 0, or a `deadzone` below 0. */
   constructor({
     target = window,
@@ -154,10 +155,20 @@ export class Gyro {
       const sum = (this.calibration = { alpha: 0, beta: 0, gamma: 0, count: 0 });
       const abort = () => {
         clearTimeout(timer);
+        this.stopCalibration = undefined;
         if (this.calibration === sum) this.calibration = undefined;
         reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
       };
+      // Disposal ends the wait at once: the timer is cleared, the abort listener removed, and nothing is measured.
+      this.stopCalibration = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+        this.stopCalibration = undefined;
+        if (this.calibration === sum) this.calibration = undefined;
+        resolve(false);
+      };
       const timer = setTimeout(() => {
+        this.stopCalibration = undefined;
         signal?.removeEventListener('abort', abort);
         if (this.calibration !== sum) return resolve(false);
         this.calibration = undefined;
@@ -174,6 +185,7 @@ export class Gyro {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.stopCalibration?.();
     this.target.removeEventListener('devicemotion', this.onMotion);
     this.target.removeEventListener('deviceorientation', this.onOrientation);
     for (const input of [...this.hosts.keys()]) this.detach(input);

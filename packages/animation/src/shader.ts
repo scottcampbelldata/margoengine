@@ -21,8 +21,8 @@ struct Influence {joints:vec4u,weights:vec4f}
     let skin=boneMatrices[inf.joints.x]*inf.weights.x+boneMatrices[inf.joints.y]*inf.weights.y+boneMatrices[inf.joints.z]*inf.weights.z+boneMatrices[inf.joints.w]*inf.weights.w;
     v.position=skin*vec4f(v.position.xyz,1);
     let normalMatrix=mat3x3f(cross(skin[1].xyz,skin[2].xyz),cross(skin[2].xyz,skin[0].xyz),cross(skin[0].xyz,skin[1].xyz));
-    let handedness=sign(dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz)));
-    v.normal=vec4f(normalMatrix*v.normal.xyz*handedness,0);
+    let handedness=select(-1.0,1.0,dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz))>=0.0);let bent=normalMatrix*v.normal.xyz*handedness;
+    v.normal=vec4f(select(vec3f(0,1,0),bent,dot(bent,bent)>0.0),0);
     v.tangent=vec4f((skin*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);
   }
   v.normal=vec4f(normalize(v.normal.xyz),0);output[id.x]=v;
@@ -77,15 +77,17 @@ export interface SkinningShader {
   blend: string;
 }
 
-const blendTerms = (extra: boolean) => /* wgsl */ `let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
+const blendTerms = (
+  extra: boolean,
+) => /* wgsl */ `let skin=boneMatrices[s.bones+joints.x]*jointWeights.x+boneMatrices[s.bones+joints.y]*jointWeights.y+boneMatrices[s.bones+joints.z]*jointWeights.z+boneMatrices[s.bones+joints.w]*jointWeights.w${
   extra
     ? '+boneMatrices[s.bones+jointsExtra.x]*weightsExtra.x+boneMatrices[s.bones+jointsExtra.y]*weightsExtra.y+boneMatrices[s.bones+jointsExtra.z]*weightsExtra.z+boneMatrices[s.bones+jointsExtra.w]*weightsExtra.w'
     : ''
 };
     v.position=skin*vec4f(v.position.xyz,1);
     let normalMatrix=mat3x3f(cross(skin[1].xyz,skin[2].xyz),cross(skin[2].xyz,skin[0].xyz),cross(skin[0].xyz,skin[1].xyz));
-    let handedness=sign(dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz)));
-    v.normal=vec4f(normalMatrix*v.normal.xyz*handedness,0);
+    let handedness=select(-1.0,1.0,dot(skin[0].xyz,cross(skin[1].xyz,skin[2].xyz))>=0.0);let bent=normalMatrix*v.normal.xyz*handedness;
+    v.normal=vec4f(select(vec3f(0,1,0),bent,dot(bent,bent)>0.0),0);
     v.tangent=vec4f((skin*vec4f(v.tangent.xyz,0)).xyz,v.tangent.w*handedness);`;
 
 /** Linear blending; eight influences fall back to the four-influence text where the extra weights are zero. */

@@ -10,6 +10,7 @@ import {
 import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
 import { madd, quatFromMatrix, type Q4 } from './math.js';
 import { rollFrame } from './view.js';
+import { rangeError } from '../../shared/errors.js';
 
 /** Browser capabilities used by device orientation; injectable for replay and tests. */
 export interface OrientationSource extends EventTargetLike {
@@ -37,7 +38,7 @@ const RAD = Math.PI / 180;
 /** Convert W3C intrinsic Z-X-Y sensor angles and screen angle (degrees) into a Y-up camera quaternion. */
 export function deviceOrientationQuaternion(alpha: number, beta: number, gamma: number, screenAngle = 0): Q4 {
   if (![alpha, beta, gamma, screenAngle].every(Number.isFinite))
-    throw new RangeError('Orientation angles must be finite; pass degrees');
+    throw rangeError('Orientation angles must be finite; pass degrees', 'controls-arguments');
   let q = multiply(axis([1, 0, 0], -Math.PI / 2), axis([0, 0, 1], alpha * RAD));
   q = multiply(q, axis([1, 0, 0], beta * RAD));
   q = multiply(q, axis([0, 1, 0], gamma * RAD));
@@ -69,7 +70,7 @@ export class DeviceOrientationControls extends Controls {
       (options.smoothTime ?? 0.1) < 0 ||
       !Number.isFinite(options.alphaOffset ?? 0)
     )
-      throw new RangeError('Device look needs finite smoothTime >= 0 and alphaOffset; pass valid values');
+      throw rangeError('Device look needs finite smoothTime >= 0 and alphaOffset; pass valid values', 'controls-arguments');
     super(source, options.element);
     this.source =
       options.source === undefined
@@ -100,7 +101,7 @@ export class DeviceOrientationControls extends Controls {
   } = {}): Promise<boolean> {
     if (this.dead) throw new MargoError('disposed', 'Device controls are disposed; create new controls');
     if (!Number.isFinite(timeout) || timeout <= 0)
-      throw new RangeError('Permission timeout must be positive and finite; pass milliseconds');
+      throw rangeError('Permission timeout must be positive and finite; pass milliseconds', 'controls-arguments');
     signal?.throwIfAborted();
     if (this.permissionState === 'unsupported') return false;
     const request = this.source?.DeviceOrientationEvent?.requestPermission;
@@ -168,8 +169,9 @@ export class DeviceOrientationControls extends Controls {
       this.smoothTime < 0 ||
       !Number.isFinite(this.alphaOffset)
     )
-      throw new RangeError(
+      throw rangeError(
         'Device look needs finite delta and smoothTime >= 0 and finite alphaOffset; pass valid values',
+        'controls-arguments',
       );
     const angle = this.source?.screen?.orientation?.angle ?? this.source?.orientation ?? 0;
     const raw = deviceOrientationQuaternion(...this.sample, angle),

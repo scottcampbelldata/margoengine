@@ -95,7 +95,7 @@ test('all arrays, null-prototype names, FIELD values and source double precision
   assert.deepEqual([...result.pointData.constructor.values], [3, 4, 5]);
   assert.deepEqual([...result.pointData.t.values], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.deepEqual([...result.normals], [0, 0, 1]);
-  assert.deepEqual([...result.uvs], [0.25, 0.75]);
+  assert.deepEqual([...result.uvs], [0.25, 0.25], 'v = 1 - t: VTK t = 0 is the image bottom');
 });
 test('binary mixed data are big endian, sliced inputs preserve double and cell ordering', () => {
   const bytes = [

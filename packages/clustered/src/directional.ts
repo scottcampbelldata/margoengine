@@ -70,7 +70,7 @@ struct ClusterDirectionalData {count:vec4u,lights:array<ClusterDirectionalLight,
 /**
  * Directional lights for clustered lighting, beyond core's one sun: GGX specular and
  * Lambert diffuse with the point lights' BRDF, so materials' Lambert and Phong shade them as they shade point lights and
- * a shadow catcher counts them. Core meshes and every receiver of the `lights` (gltf-pro models, materials meshes,
+ * a shadow catcher counts them. Core meshes and every receiver of the `lights` (gltf/pbr models, materials meshes,
  * terrain) are lit; `Clustered.intensityScale` scales them too. Every fragment evaluates every light (no culling: the
  * lights reach everywhere). Lights with `castShadow` are shadowed by `LocalShadows` (orthographic maps fitted to a
  * `bounds` box or to the camera's view, 3x3 PCF). Without lights it adds nothing to the shaders or the GPU work.

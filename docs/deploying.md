@@ -60,7 +60,7 @@ Workers are separate files next to your bundle, created with the bundler-friendl
 | --- | --- | --- |
 | `bvh.worker-*.js` | `@margoengine/bvh` (`buildAsync`) | module |
 | `decoder.worker-*.js` | `@margoengine/decoders` (Draco, KTX2) | classic, `importScripts` for the Draco and Basis wrappers |
-| `gltf-*.js` | `@margoengine/gltf-pro/worker` (`loadGLTFInWorker`, `parseGLTFInWorker`) | classic |
+| `gltf-*.js` | `@margoengine/gltf/worker` (`loadGLTFInWorker`, `parseGLTFInWorker`) | classic |
 | `fbx-*.js`, `usdz-*.js`, `usd-*.js` | `@margoengine/fbx`, `usdz`, `loaders` worker parsers | classic |
 | `biomes-*.js` | `@margoengine/biomes` (a `BiomeWorld` with `workers`) | classic, `importScripts` for its optional parts (`biomes-splines-*.js` and the like, same origin) |
 

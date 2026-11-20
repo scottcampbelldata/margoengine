@@ -4,7 +4,7 @@
 // with a margin for a machine several times slower, (b) runs only check files that end through `runSuite` (a failed
 // check exits at once, teardown bounded) and `watchExit` (a finished suite that does not end in 30 s exits 1 naming the
 // open handle), and (c) chains at most two check files, so one stuck page cannot hold a long chain. Measured times
-// (RTX A6000, one run in a shared slot, 2026-10-30): the whole chain was 431.5 s, of it view 2.8 s, objects 14.9 s,
+// (RTX A6000, one run beside other suites, 2026-10-30): the whole chain was 431.5 s, of it view 2.8 s, objects 14.9 s,
 // flythrough 413.7 s. A new step or a longer check must add its own measured row here.
 import test from 'node:test';
 import assert from 'node:assert/strict';

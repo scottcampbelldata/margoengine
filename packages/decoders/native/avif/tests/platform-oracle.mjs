@@ -1,4 +1,4 @@
-// AV1 standard data into Chromium as a black box. Software decoding only; no GPU slot is used.
+// AV1 standard data into Chromium as a black box. Software decoding only.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';

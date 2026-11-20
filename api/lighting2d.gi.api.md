@@ -38,6 +38,7 @@ export class GILighting2D implements EnginePlugin, Disposable {
     constructor(options: GILighting2DOptions);
     static attach(instance: EngineKernel, options: GILighting2DOptions): GILighting2D;
     setup(engine: Engine): void;
+    setTarget(target: GPUTexture | (() => GPUTexture)): void;
     resetHistory(): void;
     onDeviceRestored(): void;
     dispose(): void;
@@ -182,9 +183,12 @@ type Point2D = readonly [number, number];
 
 type RGB = [number, number, number];
 
+interface SDFOwner {
+    readonly gpu?: GPUDevice | null;
+    onError(error: unknown): void;
+}
+
 class SDFScene2D implements Disposable {
-    source: TextureSource;
-    emission?: TextureSource;
     camera: {
         x: number;
         y: number;
@@ -193,9 +197,13 @@ class SDFScene2D implements Disposable {
     alphaThreshold: number;
     emissionIntensity: number;
     constructor(options: SDFScene2DOptions);
+    get source(): TextureSource;
+    set source(value: TextureSource);
+    get emission(): TextureSource | undefined;
+    set emission(value: TextureSource | undefined);
     get distanceTexture(): GPUTexture | undefined;
     get changeBuffer(): GPUBuffer | undefined;
-    encode(device: GPUDevice, encoder: GPUCommandEncoder): void;
+    encode(device: GPUDevice, encoder: GPUCommandEncoder, owner?: SDFOwner): boolean;
     bindGroup(device: GPUDevice, layout: GPUBindGroupLayout): GPUBindGroup;
     dispose(): void;
     [Symbol.dispose](): void;

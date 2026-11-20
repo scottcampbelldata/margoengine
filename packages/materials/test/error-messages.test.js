@@ -8,7 +8,7 @@ test('shader patching failures are coded MargoErrors that name the fix', () => {
   assert.throws(() => materialShader('fn other(){}', 2, 'standard'), {
     name: 'MargoError',
     code: 'state',
-    message: /standard gltf-pro PBR shader; update @margoengine\/gltf-pro/,
+    message: /standard gltf\/pbr shader; update @margoengine\/gltf\/pbr/,
   });
 });
 

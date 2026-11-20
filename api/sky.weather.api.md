@@ -6,6 +6,46 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export const LIGHTNING_CLOUD_BASE = 1500;
+
+export const LIGHTNING_COLOR: Vec3;
+
+export const LIGHTNING_LIGHT_HEIGHT = 700;
+
+export const LIGHTNING_PEAK_CANDELA: number;
+
+export interface LightningBoltOptions {
+    scale?: number;
+    width?: number;
+    glow?: number;
+    branching?: number;
+    spread?: number;
+    detail?: number;
+    fade?: number;
+    top?: number;
+}
+
+export interface LightningChannelSource {
+    lights(strike: LightningStrike, count: number, decay: number): readonly {
+        position: Vec3;
+        weight: number;
+        radius: number;
+    }[];
+}
+
+export interface LightningLight {
+    position: [number, number, number];
+    color: [number, number, number];
+    intensity: number;
+    range: number;
+    decay: number;
+    shadow?: {
+        near: number;
+        far: number;
+    };
+    radius?: number;
+}
+
 export interface LightningStrike {
     id: number;
     time: number;
@@ -19,6 +59,21 @@ export interface LightningStrike {
     loudness: number;
 }
 
+export interface LiveStrike {
+    readonly strike: LightningStrike;
+    readonly age: number;
+    readonly offsets: readonly number[];
+    readonly amplitudes: readonly number[];
+}
+
+export const RAIN_FALL_DEFAULT = 9;
+
+export const SNOWFLAKE_FALL_COEFFICIENT = 0.8;
+
+export const SNOWFLAKE_FALL_EXPONENT = 0.16;
+
+export const SNOWFLAKE_MASS_COEFFICIENT = 0.073;
+
 export interface StrikeOptions {
     distance?: number;
     azimuth?: number;
@@ -29,25 +84,71 @@ export class Weather implements EnginePlugin {
     readonly options: WeatherOptions;
     readonly name: string;
     readonly listener: Float32Array<ArrayBuffer>;
+    channelSource?: LightningChannelSource;
     occlusion?: WeatherOcclusion;
     constructor(options?: WeatherOptions);
     static attach(engine: EngineKernel, options?: WeatherOptions): Weather;
     get reactiveMask(): GPUTexture | undefined;
     get amount(): number;
     get flash(): number;
+    get liveStrikes(): readonly LiveStrike[];
+    get lastStrike(): LightningStrike | undefined;
+    readonly lightningLight: LightningLight;
+    readonly cloudFlash: {
+        position: [number, number, number];
+        intensity: number;
+        color: [number, number, number];
+        radius: number;
+    };
     get wetness(): number;
     get snowCover(): number;
     get rainShare(): number;
     get elapsed(): number;
+    get time(): number;
     onLightning(listener: (strike: LightningStrike) => void): () => void;
     onThunder(listener: (strike: LightningStrike) => void): () => void;
     strike(options?: StrikeOptions): LightningStrike;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface WeatherLensOptions {
+    focalDistance?: number;
+    aperture?: number;
+    filmGauge?: number;
+}
+
+export interface WeatherLightningCloudOptions {
+    base?: number;
+    peak?: number;
+    radius?: number;
+    scale?: number;
+}
+
+export interface WeatherLightningLightOptions {
+    peak?: number;
+    height?: number;
+    color?: Vec3;
+    scale?: number;
+    range?: number;
+    shadow?: boolean | {
+        near?: number;
+        far?: number;
+    };
+    line?: boolean;
+    segments?: number;
+}
+
+export interface WeatherLightningLinkOptions {
+    clouds?: boolean;
+    fog?: boolean;
+    lights?: boolean;
+    group?: string;
 }
 
 export interface WeatherLightningOptions {
@@ -58,6 +159,11 @@ export interface WeatherLightningOptions {
     strength?: number;
     color?: Vec3;
     seed?: number;
+    hold?: number;
+    light?: WeatherLightningLightOptions;
+    cloud?: WeatherLightningCloudOptions;
+    link?: boolean | WeatherLightningLinkOptions;
+    bolt?: LightningBoltOptions;
 }
 
 export interface WeatherOcclusion {
@@ -70,21 +176,67 @@ export interface WeatherOptions {
     precipitation?: 'rain' | 'snow' | 'sleet' | 'none';
     snowShare?: number;
     intensity?: number;
+    rainRate?: number;
     fadeSeconds?: number;
     wind?: readonly [number, number];
     radius?: number;
     height?: number;
     particles?: number;
+    snowfallRate?: number;
+    flakeSizes?: readonly [number, number];
     color?: Vec3;
     brightness?: number;
     opacity?: number;
     reactive?: boolean;
+    exposure?: number;
+    lens?: WeatherLensOptions | false;
+    nearFade?: readonly [number, number];
     lightning?: WeatherLightningOptions;
 }
 
+export function lightningCloudShare(base: number): number;
+
 export function lightningFlash(seconds: number, offsets: readonly number[], amplitudes: readonly number[]): number;
+
+export function rainDropCount(rainRate: number): number;
+
+export function rainDropDiameter(rainRate: number): number;
+
+export function rainFall(rainRate?: number): number;
+
+export function rainFallSpeed(diameter: number): number;
+
+export function rainIntensity(rainRate: number): number;
+
+export function rainSlant(wind: readonly [number, number], fall: number): number;
+
+export function snowflakeBokeh(pixels: number, depth: number, lens: {
+    scale: number;
+    focus: number;
+    focalLength: number;
+}): {
+    radius: number;
+    alpha: number;
+};
+
+export function snowflakeDiameter(u: number, rate?: number, sizes?: readonly [number, number]): number;
+
+export function snowflakeFallSpeed(diameter: number): number;
+
+export function snowflakeSizeLaw(rate?: number, sizes?: readonly [number, number]): {
+    lambda: number;
+    low: number;
+    high: number;
+    span: number;
+};
 
 export const speedOfSound = 343;
 
 export function thunderDelay(distance: number, speed?: number): number;
+
+export function weatherLens(lens: WeatherLensOptions | false | undefined, width: number, height: number, fov: number): {
+    scale: number;
+    focus: number;
+    focalLength: number;
+};
 ```

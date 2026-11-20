@@ -1,11 +1,16 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 // Optional declarative styling. The interpreter is independent of rendering and never executes supplied JavaScript.
-import type { PBRModel, PBRPrimitive } from '@margoengine/gltf-pro';
-import type { PBRInstances } from '@margoengine/gltf-pro/instancing';
+import type { PBRModel, PBRPrimitive } from '@margoengine/gltf/pbr';
+import type { PBRInstances } from '@margoengine/gltf/pbr-instancing';
 import type { PointCloud } from '@margoengine/points';
 import { SRGBToLinear } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
-import { expression, type Expression, type Read } from './style-expression.js';
+import {
+  expression,
+  styleProperty,
+  type StyleEvaluator as Expression,
+  type StyleRead as Read,
+} from '../../shared/style-expression.js';
 import { readStructuralMetadata } from './metadata.js';
 import type { TilesDecorationContext, TilesContentDecoration } from './renderer.js';
 
@@ -38,21 +43,7 @@ export interface TileStyleBinding extends Disposable {
 }
 /** Feature properties as an object or a property lookup (for example a BatchTable row). */
 export type StyleProperties = Readonly<Record<string, unknown>> | ((name: string) => unknown);
-function compile(value: StyleExpression | undefined, fallback: unknown): Expression {
-  if (value === undefined) return () => fallback;
-  if (typeof value === 'string') return expression(value);
-  if (typeof value !== 'object' || value === null) return () => value;
-  const pairs = value.conditions.map(([condition, result]) => [expression(condition), compile(result, undefined)]);
-  return (read) => {
-    for (const [test, result] of pairs) {
-      const hit = test(read);
-      if (typeof hit !== 'boolean')
-        throw new MargoError('state', 'Style condition must return a boolean; compare the property explicitly');
-      if (hit) return result(read);
-    }
-    return undefined;
-  };
-}
+const compile = styleProperty;
 /**
  * The point cloud semantics of the Styling specification's "Point Cloud" section, for point `i`, or undefined for a
  * batch property: POSITION before RTC_CENTER (after QUANTIZED_VOLUME_SCALE, before QUANTIZED_VOLUME_OFFSET),
@@ -177,7 +168,7 @@ export class TilesStyle {
       if (!model.asset || !Array.isArray(model.primitives))
         throw new MargoError(
           'unsupported',
-          'Tile styling needs PBRModel primitives and asset; return a gltf-pro model from loadModel',
+          'Tile styling needs PBRModel primitives and asset; return a gltf/pbr model from loadModel',
         );
       const metadata = readStructuralMetadata(context.content.gltf, { buffer: (index) => model.asset.buffers[index] });
       const lookups = new Map<PBRPrimitive, (vertex: number) => StyleProperties>();

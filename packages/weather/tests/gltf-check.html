@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><title>Imported weather correctness</title></head><body><canvas style="width:256px;height:192px"></canvas>
 <script type="module">
 import {Engine} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/model-entry.js';
+import {parseGLTF} from '/packages/gltf/dist/model-entry.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {GLTFWeather} from '/packages/weather/dist/gltf.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,6,8],target:[0,0,0]}});
@@ -15,11 +15,41 @@ const buffer=new Uint8Array(pos.byteLength+normals.byteLength+ix.byteLength);buf
 const doc={asset:{version:'2.0'},buffers:[{byteLength:buffer.length}],bufferViews:[{buffer:0,byteOffset:0,byteLength:pos.byteLength},{buffer:0,byteOffset:pos.byteLength,byteLength:normals.byteLength},{buffer:0,byteOffset:pos.byteLength+normals.byteLength,byteLength:ix.byteLength}],accessors:[{bufferView:0,componentType:5126,count:8,type:'VEC3',min:[-6,0,-6],max:[6,5,6]},{bufferView:1,componentType:5126,count:8,type:'VEC3'},{bufferView:2,componentType:5123,count:6,type:'SCALAR'},{bufferView:2,byteOffset:12,componentType:5123,count:6,type:'SCALAR'}],materials:[{pbrMetallicRoughness:{baseColorFactor:[0.05,0.6,0.05,1],metallicFactor:0,roughnessFactor:0.9}},{pbrMetallicRoughness:{baseColorFactor:[0.6,0.05,0.05,1],metallicFactor:0,roughnessFactor:0.9}}],meshes:[{primitives:[{attributes:{POSITION:0,NORMAL:1},indices:2,material:0},{attributes:{POSITION:0,NORMAL:1},indices:3,material:1}]}],nodes:[{mesh:0}],scenes:[{nodes:[0]}],scene:0};
 const model=parseGLTF(engine,doc,[buffer]);
 const d=engine.gpu;
-async function shot(){engine.render({delta:0});await d.queue.onSubmittedWorkDone();const texture=post.sceneTexture;
+// The read-back program is made once, before the counters below start, so they see only what the engine makes.
 const code='@group(0) @binding(0) var t:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> o:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) i:vec3u){let s=textureDimensions(t);if(any(i.xy>=s)){return;}o[i.y*s.x+i.x]=textureLoad(t,vec2i(i.xy),0);}';
-const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code}),entryPoint:'main'}}),size=texture.width*texture.height*16;
+const p=d.createComputePipeline({layout:'auto',compute:{module:d.createShaderModule({code}),entryPoint:'main'}});
+// Every shader module and pipeline the engine makes from here on is counted.
+const made={modules:0,pipelines:0};
+for(const [name,kind] of [['createShaderModule','modules'],['createRenderPipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipeline','pipelines'],['createComputePipelineAsync','pipelines']]){const own=d[name];d[name]=function(...a){made[kind]++;return own.apply(this,a);};}
+async function shot(){engine.render({delta:0});await d.queue.onSubmittedWorkDone();const texture=post.sceneTexture,size=texture.width*texture.height*16;
 const out=d.createBuffer({size,usage:128|4}),st=d.createBuffer({size,usage:8|1});const e=d.createCommandEncoder(),pass=e.beginComputePass();pass.setPipeline(p);pass.setBindGroup(0,d.createBindGroup({layout:p.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:out}}]}));pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();e.copyBufferToBuffer(out,0,st,0,size);d.queue.submit([e.finish()]);await st.mapAsync(1);const a=new Float32Array(st.getMappedRange()).slice();st.unmap();out.destroy();st.destroy();return a;}
 const difference=(a,b)=>{let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>1e-4)n++;return n;};
-window.run=async()=>{d.pushErrorScope('validation');const dry=await shot();const effect=GLTFWeather.attach(engine,{puddles:{wetness:0,coverage:0},snow:{cover:0,depth:0}});effect.add(model);const unchanged=difference(dry,await shot());effect.options.puddles.wetness=1;const wet=await shot();effect.options.puddles.coverage=0.7;const puddles=await shot();effect.options.puddles.rain=1;engine.render({delta:0.3});const rings=await shot();effect.options.snow.cover=1;const snow=await shot();effect.dispose();const restored=difference(dry,await shot());const validation=(await d.popErrorScope())?.message??null;return {unchanged,wet:difference(dry,wet),puddles:difference(wet,puddles),rings:difference(puddles,rings),snow:difference(rings,snow),restored,validation,errors};};
+// Zero weather is proved inside the weather program. WGSL lets an implementation fuse or reassociate f32 operations
+// (15.7.5) and only an @invariant position matches across programs (12.10), so the plain gltf/pbr program and the
+// weather-edited one may round a pixel differently with no weather in it. With wetness and snow cover at zero, every
+// other weather input moves; any of them reaching the picture would change it, so each picture must equal the first
+// zero-weather one bit for bit, made by the same compiled program (no new shader module or pipeline).
+const zeroMoves=[
+  ['coverage',o=>{o.puddles.coverage=0.7;}],['rain',o=>{o.puddles.rain=1;}],['size',o=>{o.puddles.size=0.5;}],
+  ['start',o=>{o.puddles.start=0;}],['rippleSize',o=>{o.puddles.rippleSize=0.1;}],['rippleStrength',o=>{o.puddles.rippleStrength=1;}],
+  ['ripples',()=>{engine.render({delta:0.3});}],['depth',o=>{o.snow.depth=1;}],['variation',o=>{o.snow.variation=1;}],
+  ['drift',o=>{o.snow.drift=0.5;}],['color',o=>{o.snow.color=[0.1,0.3,0.9];}],['roughness',o=>{o.snow.roughness=0.05;}],
+  ['grain',o=>{o.snow.grain=1;}],
+];
+const bits=(a,b)=>{let n=0;for(let i=0;i<a.length;i++)if(!Object.is(a[i],b[i]))n++;return n;};
+window.run=async()=>{d.pushErrorScope('validation');const dry=await shot();const plain={...made};
+const effect=GLTFWeather.attach(engine,{puddles:{wetness:0,coverage:0},snow:{cover:0,depth:0}});effect.add(model);
+const zero=await shot();const first={...made};const zeroWeather={};
+const puddles0={...effect.options.puddles},snow0={...effect.options.snow};
+for(const [name,move] of zeroMoves){move(effect.options);zeroWeather[name]=bits(zero,await shot());}
+const recompiled={modules:made.modules-first.modules,pipelines:made.pipelines-first.pipelines};
+// Back to the first settings, so each amount below is measured from the dry look alone.
+for(const key of Object.keys(effect.options.puddles))if(!(key in puddles0))delete effect.options.puddles[key];
+for(const key of Object.keys(effect.options.snow))if(!(key in snow0))delete effect.options.snow[key];
+Object.assign(effect.options.puddles,puddles0);Object.assign(effect.options.snow,snow0);
+effect.options.puddles.wetness=1;const wet=await shot();effect.options.puddles.coverage=0.7;const puddles=await shot();effect.options.puddles.rain=1;engine.render({delta:0.3});const rings=await shot();effect.options.snow.cover=1;const snow=await shot();
+// Disposal returns to the plain program, so the restored picture is compared with the dry one exactly.
+effect.dispose();const restored=bits(dry,await shot());const validation=(await d.popErrorScope())?.message??null;
+return {weatherProgram:{modules:first.modules-plain.modules,pipelines:first.pipelines-plain.pipelines},crossProgram:difference(dry,zero),zeroWeather,recompiled,wet:difference(dry,wet),puddles:difference(wet,puddles),rings:difference(puddles,rings),snow:difference(rings,snow),restored,validation,errors};};
 window.ready=true;
 </script></body></html>

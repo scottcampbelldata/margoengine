@@ -156,3 +156,22 @@ test('an over-limit export throws before any buffer near its size is allocated',
   assert.match(String(json.error), /JSON chunk/);
   assert.ok(json.largest < budget, `largest allocation ${json.largest}`);
 });
+
+test('the early size plan counts uvs2, uvs3 and colors1', () => {
+  const scene = {
+      nodes: [
+        {
+          geometry: {
+            ...quad(),
+            uvs2: [0, 0, 1, 0, 1, 1],
+            uvs3: [0, 0, 1, 0, 1, 1],
+            colors1: [1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1],
+          },
+        },
+      ],
+    },
+    { bin } = sizes(exportGLB(scene));
+  assert.equal(bin, 36 + 36 + 24 + 24 + 24 + 48 + 8);
+  // Refused before anything is copied, with the whole planned size, not part way through writing.
+  assert.throws(() => exportGLB(scene, { maxBinaryBytes: bin - 1 }), new RegExp(`needs at least ${bin} bytes`));
+});

@@ -5,9 +5,10 @@
 // rewrote a module the page had loaded, Vite sent the page a full reload, and the page's next evaluate failed.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { openBrowser, startDevServer } from '../scripts/browser.js';
+import { createServer } from 'vite';
+import { noFileWatcher, openBrowser, startDevServer } from '../scripts/browser.js';
 
 test('a suite dev server watches no files, whatever the root Vite config says', async () => {
   const dev = await startDevServer({ startPath: '/LICENSE', port: 0 });
@@ -56,4 +57,54 @@ test('a suite dev server scans only its start page for dependencies', async () =
   } finally {
     await dev.close();
   }
+});
+
+// The text package's browser suites build their own server from packages/text/vite.config.js. Under MARGO_COMPAT=1 the
+// text suite failed once with "Execution context was destroyed" while packages/loaders was rebuilt in the same
+// checkout: the server watched the loaders dist the page had imported and reloaded the page mid-evaluate.
+test('noFileWatcher turns the watcher off for a server built from a package Vite config', async () => {
+  const server = await createServer({
+    configFile: 'packages/text/vite.config.js',
+    logLevel: 'error',
+    server: { port: 0 },
+    plugins: [noFileWatcher()],
+  });
+  try {
+    assert.equal(server.config.server.watch, null);
+    assert.notEqual(server.watcher.constructor.name, 'FSWatcher', 'no chokidar watcher is started');
+  } finally {
+    await server.close();
+  }
+});
+
+// KB-DEVWATCH-ALL1: the same watcher was in every suite and harness that called Vite's createServer itself.
+test('every Vite createServer call in the repository passes noFileWatcher()', () => {
+  const roots = ['scripts', 'tests', 'examples', ...readdirSync('packages').flatMap((p) => ['scripts', 'tests', 'test'].map((d) => join('packages', p, d)))],
+    files = [],
+    walk = (dir) => {
+      if (!existsSync(dir)) return;
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== 'node_modules' && entry.name !== 'dist' && entry.name !== 'test-results') walk(path);
+        } else if (/\.(m?js|m?ts)$/.test(entry.name)) files.push(path);
+      }
+    };
+  roots.forEach(walk);
+  const missing = [];
+  let calls = 0;
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8'),
+      imported = /import\s*\{([^}]*)\}\s*from\s*['"]vite['"]/.exec(source);
+    const name = imported && /\bcreateServer(?:\s+as\s+(\w+))?\b/.exec(imported[1]);
+    if (!name) continue;
+    const call = new RegExp(`\\b${name[1] ?? 'createServer'}\\(\\s*\\{`, 'g');
+    for (const match of source.matchAll(call)) {
+      calls++;
+      const options = source.slice(match.index, source.indexOf('});', match.index));
+      if (!options.includes('noFileWatcher()')) missing.push(`${file}:${source.slice(0, match.index).split('\n').length}`);
+    }
+  }
+  assert.ok(calls > 40, `found ${calls} createServer calls; the scan lost its files`);
+  assert.deepEqual(missing, [], 'createServer calls that keep a file watcher');
 });

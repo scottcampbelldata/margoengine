@@ -4,6 +4,8 @@
 // (doi:10.1029/TR032i002p00231), frequency factor; Nobre 2011 (doi:10.1016/j.jhydrol.2011.03.051),
 // drainage-relative heights, not fixed flood classes. Connell and Slatyer 1977 (doi:10.1086/283241)
 // motivates sequences after disturbance, not our chosen ages. Verification and limits are in README, Disturbance.
+// Plant marks (disturbanceStates): Van Wagner 1973 scorch height (doi:10.1139/x73-055), Byram 1959 flame length, Van Wagner
+// 1977 crown initiation (doi:10.1139/x77-004), as @margoengine/scatter/states.
 // Assumptions: full fuel R0 = 1000 mm/min, slope K = 5, wind C = 0.1 and B = 1.5;
 // cosine wind replaces an elliptical law. Flood depth = 10 mm * area(m2)^0.4 * (1 + K_T).
 import { rangeError, typeError } from '../../shared/errors.js';
@@ -568,6 +570,105 @@ export function disturbanceTile(world: DisturbanceWorld, d: Disturbance, x: numb
     data,
   });
   return [layer('age', age), layer('flood', flood), layer('stage', stage)];
+}
+
+/** What {@link disturbanceStates} writes to: a `PlantStates` map of `@margoengine/scatter/states` (its `markEach`). */
+export interface DisturbanceMarkTarget {
+  markEach(at: (x: number, z: number) => DisturbanceMarks | undefined): unknown;
+}
+/** One cell's marks, as `PlantMarks` of `@margoengine/scatter/states`. */
+export interface DisturbanceMarks {
+  readonly scorch?: number;
+  readonly char?: number;
+  readonly intensity?: number;
+  readonly ash?: number;
+  readonly water?: number;
+}
+/** Settings of {@link disturbanceStates}; every one has a default. */
+export interface DisturbanceStatesOptions {
+  /**
+   * Fireline intensity in kW/m of the burns, 1 to 100,000, or a function of world (x, z) giving it (from a fuel map and
+   * `fireBehaviour` of `@margoengine/vfx/fire-front`, say). Default 2,000, a high-intensity shrub or forest fire.
+   */
+  readonly intensity?: number | ((x: number, z: number) => number);
+  /** Air temperature at the fires, deg C, -60 to 59 (Van Wagner's scorch height). Default 25. */
+  readonly ambient?: number;
+  /** Midflame wind at the fires, m/s, 0 to 40. Default 2. */
+  readonly wind?: number;
+  /**
+   * Whole years after a burn that its scorched foliage, stripped crowns and ash stay, 1 to 10,000: a cell with `age`
+   * below it shows the fresh burn. Default 1 (burnt in the history's last year).
+   */
+  readonly burnYears?: number;
+  /** Whole years that charred bark stays on the stems after a burn, from `burnYears` to 10,000. Default 30. */
+  readonly charYears?: number;
+  /** Return period in years, 2 to 65,535, of the flood whose line shows: cells it reaches (`flood` 2 up to it) are marked. Default 10. */
+  readonly floodPeriod?: number;
+  /** High-water mark in m that flood leaves on the plants, 0 to 100. Default 0.5. */
+  readonly floodMark?: number;
+}
+
+/**
+ * Marks a plant state map (`PlantStates` of `@margoengine/scatter/states`) with what a disturbance history left: every
+ * map cell takes the disturbance of its nearest region corner. A cell burnt less than `burnYears` ago shows the fresh
+ * burn: scorched foliage up to Van Wagner's 1973 scorch height, bark charred up to Byram's 1959 flame length, ash, and
+ * crowns stripped where the intensity passes a plant's crown initiation (Van Wagner 1977); one burnt less than
+ * `charYears` ago keeps only the charred bark. A cell reached by the `floodPeriod` flood (not open water) carries the
+ * flood's mud line at `floodMark`. `BiomeView` does this itself from its `disturbance` option.
+ * @throws RangeError for a setting out of range or a history that is not of this world's region.
+ * @example
+ * const d = disturbanceOf(world, hydrologyOf(world), { seed: 7 });
+ * disturbanceStates(world, d, PlantStates.attach(engine, { bounds: world.bounds }), { intensity: 4000 });
+ */
+export function disturbanceStates(
+  world: DisturbanceWorld,
+  d: Disturbance,
+  states: DisturbanceMarkTarget,
+  options: DisturbanceStatesOptions = {},
+): void {
+  object(world, 'world');
+  object(options, 'states options');
+  resultCheck(d);
+  if (d.nx !== world.region.nx || d.nz !== world.region.nz || d.step !== world.region.step)
+    throw rangeError('disturbanceStates needs disturbanceOf this world region', 'biomes');
+  if (!states || typeof states.markEach !== 'function')
+    throw typeError('disturbanceStates needs a PlantStates map (@margoengine/scatter/states)', 'biomes');
+  const real = (v: number | undefined, fallback: number, lo: number, hi: number, name: string) => {
+    const x = v ?? fallback;
+    if (typeof x !== 'number' || !Number.isFinite(x) || x < lo || x > hi)
+      throw rangeError(`disturbanceStates ${name} must be a number from ${lo} to ${hi}`, 'biomes');
+    return x;
+  };
+  const ambient = real(options.ambient, 25, -60, 59, 'ambient'),
+    wind = real(options.wind, 2, 0, 40, 'wind'),
+    burnYears = integer(options.burnYears ?? 1, 1, 10000, 'burnYears'),
+    charYears = integer(options.charYears ?? 30, burnYears, 10000, 'charYears'),
+    period = integer(options.floodPeriod ?? 10, 2, 65535, 'floodPeriod'),
+    mark = real(options.floodMark, 0.5, 0, 100, 'floodMark'),
+    given = options.intensity;
+  if (given !== undefined && typeof given !== 'function') real(given, 2000, 1, 100000, 'intensity');
+  const intensityAt = (x: number, z: number): number =>
+    typeof given === 'function' ? real(given(x, z), 2000, 1, 100000, 'intensity') : (given ?? 2000);
+  const [x0, z0] = world.bounds,
+    metres = d.step / 1000; // float division: millimetres to metres
+  states.markEach((x, z) => {
+    const i = Math.min(d.nx - 1, Math.max(0, Math.round((x - x0) / metres))), // float division: nearest corner
+      j = Math.min(d.nz - 1, Math.max(0, Math.round((z - z0) / metres))), // float division: nearest corner
+      c = j * d.nx + i,
+      age = d.age[c],
+      flood = d.flood[c];
+    let out: { scorch?: number; char?: number; intensity?: number; ash?: number; water?: number } | undefined;
+    if (age < charYears) {
+      const kw = intensityAt(x, z),
+        char = 0.0775 * kw ** 0.46;
+      out =
+        age < burnYears
+          ? { scorch: Math.min(100, (4.665 * kw ** (7 / 6)) / ((60 - ambient) * Math.sqrt(kw + 38.7 * wind ** 3))), char: Math.min(100, char), intensity: kw / 1000, ash: 1 } // float division: kW to MW
+          : { char: Math.min(100, char) };
+    }
+    if (flood >= 2 && flood <= period) out = { ...out, water: mark };
+    return out;
+  });
 }
 
 const HEADER = 28,

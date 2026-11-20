@@ -330,8 +330,8 @@ export const builders = {
         drawCalls: engine.stats.drawCalls,
         triangles,
         note: dense
-          ? 'procedural marchingCubes (marching tetrahedra, more triangles) of a field function on the CPU each frame, every ball summed at every grid point (the original workload; three writes each ball only near it); new core Geometry each frame'
-          : 'procedural marchingCubes (marching tetrahedra, more triangles) of a sampled grid on the CPU each frame, balls written only within reach as three does; new core Geometry each frame',
+          ? 'procedural marchingCubes of a field function on the CPU each frame, every ball summed at every grid point (the original workload; three writes each ball only near it); new core Geometry each frame'
+          : 'procedural marchingCubes of a sampled grid on the CPU each frame, balls written only within reach as three does; new core Geometry each frame',
       }),
     };
   },

@@ -84,5 +84,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(JSON.stringify(countParity(text)));
   const errors = checkParity(text);
   for (const error of errors) console.error(error);
-  process.exit(errors.length ? 1 : 0);
+  process.exitCode = errors.length ? 1 : 0;
 }

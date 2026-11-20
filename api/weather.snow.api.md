@@ -8,15 +8,30 @@ import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
 export const SNOW_BINDING = 161;
 
+export const SNOW_FIELD_BINDINGS: readonly [164, 165];
+
 export class Snow extends SurfaceHook {
     readonly options: SnowOptions;
     readonly name: string;
     constructor(options?: SnowOptions);
     static attach(engine: EngineKernel, options?: SnowOptions): Snow;
     get cover(): number;
+    protected variant(): string;
+    protected shaderDeclarations(): string;
+    protected extraBindings(device: GPUDevice): GPUBindGroupEntry[];
+    protected releaseExtra(): void;
     patch(source: string): string;
     protected validate(): void;
     protected write(): void;
+}
+
+export interface SnowFieldSource {
+    readonly width: number;
+    readonly depth: number;
+    readonly cellSize: number;
+    readonly origin: readonly [number, number];
+    readonly version: number;
+    fieldData(): Float32Array;
 }
 
 export interface SnowOptions {
@@ -28,6 +43,8 @@ export interface SnowOptions {
     grain?: number;
     color?: readonly [number, number, number];
     roughness?: number;
+    field?: SnowFieldSource;
+    band?: number;
 }
 
 export interface SnowSource {
@@ -37,6 +54,14 @@ export interface SnowSource {
 export function snowAt(x: number, z: number, normalY: number, cover: number): number;
 
 export function snowDepthAt(x: number, z: number, normalY: number, cover: number, o?: SnowOptions): number;
+
+export function snowFieldAt(field: SnowFieldSource, x: number, z: number, slack?: number): [ground: number, depth: number] | undefined;
+
+export function snowFieldCover(field: SnowFieldSource, x: number, y: number, z: number, cover: number, band?: number, slack?: readonly [number, number, number]): number;
+
+export function snowFieldDepth(field: SnowFieldSource, x: number, y: number, z: number, cover: number, o?: SnowOptions): number;
+
+export const snowFieldWGSL: string;
 
 export const snowWGSL: string;
 
@@ -53,6 +78,9 @@ abstract class SurfaceHook implements EnginePlugin {
     protected abstract write(): void;
     abstract patch(source: string): string;
     protected variant(): string;
+    protected shaderDeclarations(): string;
+    protected extraBindings(_device: GPUDevice): GPUBindGroupEntry[];
+    protected releaseExtra(): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

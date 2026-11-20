@@ -609,3 +609,20 @@ test('a test stops its shard before removing its folder, so the shard writes its
   // In the other order the shard's last save makes the removed folder again.
   assert.equal(existsSync(dir), false);
 });
+
+// Regression (2026-11-19, KB-OWN-EXIT2): a shutdown that came while start() was still loading the world closed nothing
+// (no server yet, or one not yet listening), and start() then opened its listener and timers anyway: the stopped shard
+// process lingered until its router killed it 15 s later.
+test('a shutdown during start waits for it, then leaves no listener and no timer', async (t) => {
+  const listeners = () => process.getActiveResourcesInfo().filter((name) => name === 'TCPServerWrap').length,
+    timers = () => process.getActiveResourcesInfo().filter((name) => name === 'Timeout').length,
+    before = { listeners: listeners(), timers: timers() },
+    shard = new PlazaShard({ index: 0, dataDir: dataDir(t), origins: '*', quiet: true }),
+    started = shard.start();
+  await shard.shutdown();
+  assert.equal(await started, true, 'start finished first');
+  // A closed handle leaves the list one turn of the loop after its close callback.
+  await new Promise((done) => setTimeout(done, 0));
+  assert.equal(listeners(), before.listeners, 'no listener is left');
+  assert.equal(timers(), before.timers, 'no timer is left');
+});

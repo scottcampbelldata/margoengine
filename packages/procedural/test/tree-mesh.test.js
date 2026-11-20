@@ -136,3 +136,43 @@ test('reject malformed skeleton, settings, budgets and cancellation', () => {
   );
   assert.throws(() => meshTreeLODs(straight, {}, [{ distance: 1 }]));
 });
+
+// Every triangle's UV-derived bitangent agrees with the stored frame: sign(dot(cross(n, t), dP/dv)) equals w.
+function handedness(g) {
+  const v = (i) => [g.positions[i * 3], g.positions[i * 3 + 1], g.positions[i * 3 + 2]];
+  let wrong = 0,
+    checked = 0;
+  for (let t = 0; t < g.indices.length; t += 3) {
+    const [a, b, c] = [g.indices[t], g.indices[t + 1], g.indices[t + 2]],
+      e1 = v(b).map((x, k) => x - v(a)[k]),
+      e2 = v(c).map((x, k) => x - v(a)[k]),
+      du1 = g.uvs[b * 2] - g.uvs[a * 2],
+      dv1 = g.uvs[b * 2 + 1] - g.uvs[a * 2 + 1],
+      du2 = g.uvs[c * 2] - g.uvs[a * 2],
+      dv2 = g.uvs[c * 2 + 1] - g.uvs[a * 2 + 1],
+      det = du1 * dv2 - du2 * dv1;
+    if (Math.abs(det) < 1e-9) continue;
+    const bitangent = e1.map((x, k) => (du1 * e2[k] - du2 * x) / det);
+    for (const i of [a, b, c]) {
+      const n = g.normals.slice(i * 3, i * 3 + 3),
+        tg = g.tangents.slice(i * 4, i * 4 + 3),
+        cr = [n[1] * tg[2] - n[2] * tg[1], n[2] * tg[0] - n[0] * tg[2], n[0] * tg[1] - n[1] * tg[0]],
+        d = cr[0] * bitangent[0] + cr[1] * bitangent[1] + cr[2] * bitangent[2];
+      checked++;
+      if (Math.sign(d) !== g.tangents[i * 4 + 3]) wrong++;
+    }
+  }
+  return { wrong, checked };
+}
+
+test('bark caps, rings and leaf cards store the tangent sign their UVs need (base cap is mirrored)', () => {
+  const skeleton = { positions: new Float64Array([0, 0, 0, 0, 1, 0, 0.3, 2, 0]), parents: new Int32Array([-1, 0, 1]) };
+  for (const flatShading of [false, true]) {
+    const mesh = meshTree(skeleton, { bark: { flatShading } });
+    const bark = handedness(mesh.bark),
+      leaves = handedness(mesh.leaves);
+    assert.ok(bark.checked > 100 && leaves.checked > 100);
+    // Before the fix every base-cap vertex stored w = +1.
+    assert.deepEqual([bark.wrong, leaves.wrong], [0, 0], `flatShading ${flatShading}`);
+  }
+});

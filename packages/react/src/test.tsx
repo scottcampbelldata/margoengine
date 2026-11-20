@@ -56,7 +56,7 @@ export class TestRenderer {
   get scene(): EngineKernel['scene'] { return this.stage.engine.scene; }
   get disposed(): boolean { return this.closed; }
   private check(): void {
-    if (this.closed) throw fault('disposed', 'Test renderer disposed; create another mount', 'disposed');
+    if (this.closed) throw fault('disposed', 'Test renderer disposed; create another mount', 'react-usage');
   }
   /** All live meshes across default and named scenes, filtered in insertion order. */
   findAll(predicate: (mesh: Mesh) => boolean = () => true): Mesh[] {
@@ -80,7 +80,7 @@ export class TestRenderer {
   async advanceFrames(count = 1, delta = 1 / 60): Promise<void> {
     this.check();
     if (!Number.isSafeInteger(count) || count < 0 || !Number.isFinite(delta) || delta < 0 || delta > 1)
-      throw rangeError('Test frames need a nonnegative integer count and delta in 0..1', 'arguments');
+      throw rangeError('Test frames need a nonnegative integer count and delta in 0..1', 'react-arguments');
     await act(async () => {
       for (let i = 0; i < count; i++) {
         advanceFrames(this.context.frames, this.context.engine, delta, true);
@@ -92,7 +92,7 @@ export class TestRenderer {
   async fireEvent(target: Mesh | null, type: string, init: PointerEventInit & WheelEventInit = {}): Promise<void> {
     this.check();
     if (target && !this.findAll(mesh => mesh === target).length)
-      throw fault('state', 'Event target must be a live mesh in this test renderer', 'state');
+      throw fault('state', 'Event target must be a live mesh in this test renderer', 'react-usage');
     this.hit = target;
     const view = this.canvas.ownerDocument.defaultView!;
     const EventType = type === 'wheel' ? view.WheelEvent : (view.PointerEvent ?? view.MouseEvent);
@@ -100,7 +100,7 @@ export class TestRenderer {
     if (!('pointerId' in event)) Object.defineProperty(event, 'pointerId', { value: init.pointerId ?? 1 });
     await act(async () => { this.canvas.dispatchEvent(event); });
     if (type === 'pointerup' || type === 'pointercancel') this.canvas.releasePointerCapture(init.pointerId ?? 1);
-    if (this.eventErrors.length) throw Object.assign(fault('failed', 'Test pointer handler failed; inspect cause and repair the handler', 'failed'), { cause: this.eventErrors.splice(0) });
+    if (this.eventErrors.length) throw Object.assign(fault('failed', 'Test pointer handler failed; inspect cause and repair the handler', 'react-usage'), { cause: this.eventErrors.splice(0) });
   }
   /** Unmount effects, release caches and the owned stage. A borrowed stage stays alive. Idempotent. */
   async unmount(): Promise<void> {
@@ -120,7 +120,7 @@ export class TestRenderer {
 export async function createTestRenderer(children: ReactNode, options: TestRendererOptions = {}): Promise<TestRenderer> {
   const { container: supplied, stage: borrowed, ...settings } = options;
   const doc = supplied?.ownerDocument ?? globalThis.document;
-  if (!doc?.body) throw fault('unsupported', 'Component tests need a browser DOM or jsdom installed by the caller', 'unsupported');
+  if (!doc?.body) throw fault('unsupported', 'Component tests need a browser DOM or jsdom installed by the caller', 'react-usage');
   settings.signal?.throwIfAborted();
   const stage = borrowed ?? await (await optionalPeer('@margoengine/headless/null', () => import('@margoengine/headless/null'))).createNullStage(settings);
   const container = supplied ?? doc.body.appendChild(doc.createElement('div'));
@@ -137,7 +137,7 @@ export async function createTestRenderer(children: ReactNode, options: TestRende
   activateAssetCache(assetCache);
   const context: Scene = {
     engine, registry: null, resources: { models: new Set(), lighting: new Map() }, shadows: null,
-    requestShadows: () => { throw fault('unsupported', 'GPU shadows require a rendering Canvas', 'unsupported'); },
+    requestShadows: () => { throw fault('unsupported', 'GPU shadows require a rendering Canvas', 'react-usage'); },
     cameraOverrides: new Set(), pointerHandlers: new Map(),
     frames: { elapsed: 0, last: null, mode: 'demand', callbacks: new FrameCallbacks() },
     assetCache, world: null, views: createViews(engine),

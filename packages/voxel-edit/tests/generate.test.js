@@ -64,3 +64,57 @@ test('many image colours use the same deterministic palette reduction as file im
   assert.equal(a.colorsReduced, true);
   assert.deepEqual(a, heightmapToVoxels({ width: 300, height: 1, data }, { height: 1, channel: 'blue' }));
 });
+
+test('a grey heightmap ignores alphaThreshold, which applies to RGBA samples only', () => {
+  const image = { width: 2, height: 1, data: Uint8Array.from([255, 128]) };
+  // Grey samples read as alpha 255, so the top threshold (255) once turned every grey column into air.
+  assert.equal(heightmapToVoxels(image, { height: 2, alphaThreshold: 255 }).grid.voxels.filter(Boolean).length, 3);
+});
+
+// A stand-in 2D context: each glyph's ink is a box 3 px right of the pen (a side bearing) and 2 px below the baseline
+// (a descender only), 4 px wide and 3 px tall.
+function inkContext() {
+  const ink = [];
+  let width = 1,
+    height = 1;
+  const canvas = {
+    get width() {
+      return width;
+    },
+    set width(v) {
+      width = v;
+      ink.length = 0;
+    },
+    get height() {
+      return height;
+    },
+    set height(v) {
+      height = v;
+      ink.length = 0;
+    },
+  };
+  return {
+    canvas,
+    font: '',
+    measureText: (text) =>
+      text
+        ? { actualBoundingBoxLeft: -3, actualBoundingBoxRight: 7, actualBoundingBoxAscent: -2, actualBoundingBoxDescent: 5 }
+        : { actualBoundingBoxLeft: 0, actualBoundingBoxRight: 0, actualBoundingBoxAscent: 0, actualBoundingBoxDescent: 0 },
+    fillText: (text, x, y) => text && ink.push([x + 3, y + 2]),
+    getImageData: (x0, y0, w, h) => {
+      const data = new Uint8ClampedArray(w * h * 4);
+      for (const [x, y] of ink)
+        for (let row = y; row < y + 3; row++)
+          for (let col = x; col < x + 4; col++) if (col < w && row < h) data[(row * w + col) * 4 + 3] = 255;
+      return { data };
+    },
+  };
+}
+
+test('textToVoxels crops to the ink: no empty columns for a side bearing or rows above ink below the baseline', () => {
+  const { grid } = textToVoxels('x', { font: '10px test', context: inkContext() });
+  assert.deepEqual(grid.size, [4, 3, 1]);
+  assert.equal(grid.voxels.filter(Boolean).length, 12);
+  // Blank text is still one empty cell.
+  assert.deepEqual(textToVoxels('', { font: '10px test', context: inkContext() }).grid.size, [1, 1, 1]);
+});

@@ -1,6 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { Animation as BaseAnimation, type AnimationOptions } from '@margoengine/animation';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import { rangeError } from '../../shared/errors.js';
 import { LoopOnce, LoopRepeat, LoopPingPong, type ActionLoop } from './mixer.js';
 export { LoopOnce, LoopRepeat, LoopPingPong } from './mixer.js';
@@ -182,7 +182,32 @@ export class PlaybackAnimation extends BaseAnimation {
     } finally {
       this.playing = playing;
     }
-    if (!playing || this.terminal) return;
+    const step = this.stepClock(delta),
+      owed = this.owed;
+    if (owed) {
+      this.owed = undefined;
+      this.pose(owed[0], owed[1], owed[2]);
+    }
+    if (!step) return;
+    const [crossed, direction, finished] = step;
+    if (finished) this.events.dispatchEvent(finished);
+    else if (crossed) this.events.dispatchEvent(new PlaybackEvent('loop', this, crossed * direction, direction));
+  }
+  /**
+   * Moves the playback cursor by `delta` seconds times `speed` and `timeScale`, counting loops and the end of the run:
+   * the CPU part of the frame update, which a seek from `@margoengine/cutscene/seek` replays. It poses nothing and
+   * sends no `loop` or `finished` event (a replayed end still settles `finished`); the next update poses the place
+   * reached.
+   */
+  override advanceTime(delta: number): void {
+    this.validatePlayback();
+    this.stepClock(delta);
+  }
+  /** The pose a step owes the next update: cursor, direction, at an endpoint. */
+  private owed?: [number, 1 | -1, boolean];
+  /** One step of the cursor: loops crossed, direction and, at the end of the run, its `finished` event. */
+  private stepClock(delta: number): [number, 1 | -1, PlaybackEvent | undefined] | undefined {
+    if (!this.playing || this.terminal || this['disposed']) return;
     number(delta, 'delta');
     if (delta < 0) throw invalid('Playback delta must be nonnegative; reverse with timeScale');
     const step = number(delta * (this.options.speed ?? 1) * this.timeScale, 'advance');
@@ -219,15 +244,14 @@ export class PlaybackAnimation extends BaseAnimation {
     this.started = true;
     this.cursor = next;
     this.completed += crossed;
-    this.pose(next, direction, done);
-    if (done) {
-      this.terminal = true;
-      this.playing = false;
-      this.settled = true;
-      const event = new PlaybackEvent('finished', this, 0, direction);
-      this.resolve(event);
-      this.events.dispatchEvent(event);
-    } else if (crossed) this.events.dispatchEvent(new PlaybackEvent('loop', this, crossed * direction, direction));
+    this.owed = [next, direction, done];
+    if (!done) return [crossed, direction, undefined];
+    this.terminal = true;
+    this.playing = false;
+    this.settled = true;
+    const event = new PlaybackEvent('finished', this, 0, direction);
+    this.resolve(event);
+    return [crossed, direction, event];
   }
   /** Subscribe with optional AbortSignal; returns an unsubscribe function. */
   on<K extends keyof PlaybackEventMap>(

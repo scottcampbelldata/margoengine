@@ -4,6 +4,7 @@ import {
   encodeReader,
   decodeReader,
   readerBuffers,
+  nested,
   type ReaderProtocol,
   type ReaderCallbacks,
   type RemoteFunction,
@@ -120,11 +121,10 @@ export async function readInWorker<K extends keyof WorkerReaders>(
     callbacks.clear();
     endpoint.terminate();
   };
-  const collectSignals = (value: unknown, current: AbortSignal[] = []): AbortSignal[] => {
+  const collectSignals = (value: unknown, current: AbortSignal[] = [], path = new Set<object>()): AbortSignal[] => {
     if (value instanceof AbortSignal) current.push(value);
-    else if (Array.isArray(value)) value.forEach((v) => collectSignals(v, current));
     else if (value && typeof value === 'object' && !ArrayBuffer.isView(value) && !(value instanceof ArrayBuffer))
-      Object.values(value).forEach((v) => collectSignals(v, current));
+      nested(value, path, () => Object.values(value).forEach((v) => collectSignals(v, current, path)));
     return current;
   };
   const call = async (

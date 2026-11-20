@@ -1,0 +1,112 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 14,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "linear",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            2.6,
+            1.6,
+            9.5
+          ],
+          "target": [
+            1.2,
+            1.5,
+            2.5
+          ],
+          "fov": 40
+        },
+        {
+          "time": 8,
+          "position": [
+            1.5,
+            1.3,
+            3.4
+          ],
+          "target": [
+            1.48,
+            1.2,
+            0
+          ],
+          "fov": 40,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 11,
+          "position": [
+            1.47,
+            1.22,
+            1.9
+          ],
+          "target": [
+            1.05,
+            1,
+            -1.6
+          ],
+          "fov": 48,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 14,
+          "position": [
+            1.35,
+            1.25,
+            0.4
+          ],
+          "target": [
+            0.95,
+            0.65,
+            -2.05
+          ],
+          "fov": 55,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "cabin-long-through",
+    "kind": "long",
+    "seed": 31,
+    "seconds": 14,
+    "tier": "high",
+    "kit": "snowNight",
+    "msaa": 1,
+    "supersample": 1.5,
+    "warmup": 90,
+    "probes": {
+      "open": 0,
+      "mid": 7,
+      "end": 13.9
+    },
+    "lookBounds": {
+      "skyClip": 0.5,
+      "speckle": 400,
+      "banding": 1,
+      "flat": 20,
+      "crush": 3,
+      "lights": [
+        0,
+        3
+      ]
+    },
+    "page": {
+      "path": "examples/cabin-hearth/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#hint,nav,#status,#error{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "cabinHearth.engine",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

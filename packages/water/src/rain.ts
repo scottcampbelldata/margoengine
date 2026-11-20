@@ -130,11 +130,21 @@ export class WaterRain implements EnginePlugin {
     this.elapsed = scalar(seconds, 0, 1e9, 'time');
     return this;
   }
+  /** Seconds of ring time (`setTime` sets it). */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves the ring clock by `delta` seconds without drawing (a delta of 0 or less moves nothing), so `seek` from
+   * `@margoengine/cutscene/seek` replays the rings exactly. Splashes into `Ripples` are history on the GPU: a seek
+   * owes none, and the scene's warm-up frames bring them back.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.elapsed += delta;
+  }
   onPreUpdate(delta: number): void {
-    if (delta > 0) {
-      this.elapsed += delta;
-      this.pendingTime += delta;
-    }
+    this.advanceTime(delta);
+    if (delta > 0) this.pendingTime += delta;
   }
   setup(engine: Engine): void {
     this.live();

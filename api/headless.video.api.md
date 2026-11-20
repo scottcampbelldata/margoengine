@@ -14,6 +14,7 @@ export interface EncodeVideoOptions {
     bitrate?: number;
     keyFrameInterval?: number;
     audio?: VideoAudio;
+    alpha?: boolean;
     webCodecs?: WebCodecsBinding;
     signal?: AbortSignal;
 }
@@ -27,6 +28,7 @@ export interface EncodedVideo {
     frames: number;
     duration: number;
     audioCodec?: 'opus' | 'aac';
+    alpha?: boolean;
 }
 
 export interface FrameTiming {
@@ -58,10 +60,21 @@ export interface SequenceFile {
     bytes: Uint8Array<ArrayBuffer>;
 }
 
+export interface StreamVideoOptions extends Omit<EncodeVideoOptions, 'format' | 'maxBytes'> {
+    format?: 'mp4' | 'webm';
+}
+
+export type StreamedVideo = Omit<EncodedVideo, 'bytes'>;
+
 export interface VideoAudio {
     channels: readonly Float32Array[];
     sampleRate: number;
     bitrate?: number;
+}
+
+export interface VideoInputFrame extends HeadlessPixels {
+    timestamp?: number;
+    duration?: number;
 }
 
 export interface WebCodecsBinding {
@@ -72,11 +85,13 @@ export interface WebCodecsBinding {
     AudioDecoder?: typeof AudioDecoder;
 }
 
-export function encodeVideo(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { format, fps, codec, bitrate, keyFrameInterval, audio, provenance, maxBytes, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;
+export function encodeVideo(frames: AsyncIterable<VideoInputFrame> | Iterable<VideoInputFrame>, { format, fps, codec, bitrate, keyFrameInterval, audio, alpha, provenance, maxBytes, webCodecs, signal }?: EncodeVideoOptions): Promise<EncodedVideo>;
 
 export function imageSequence(frames: AsyncIterable<HeadlessPixels> | Iterable<HeadlessPixels>, { prefix, digits }?: ImageSequenceOptions): AsyncGenerator<SequenceFile, void, void>;
 
 export function renderFrames(engine: Engine, { frames, fps, camera, update, signal }: RenderFramesOptions): AsyncGenerator<RenderedFrame, void, void>;
+
+export function streamVideo(frames: AsyncIterable<VideoInputFrame> | Iterable<VideoInputFrame>, given?: StreamVideoOptions): AsyncGenerator<Uint8Array<ArrayBuffer>, StreamedVideo, void>;
 
 // Not exported from this entry, but used by the exports above:
 

@@ -30,8 +30,8 @@ import {
 import { Texture } from '../../materials/dist/index.js';
 import { displacedDepth } from '../../shared/displacement.js';
 
-const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf-pro/src/shader.ts');
-const { instancedShader, rowsShader } = await import('../../gltf-pro/src/instanced-shader.ts');
+const { pbrShader, extendedPBRShader, physicalShader } = await import('../../gltf/src/shader.ts');
+const { instancedShader, rowsShader } = await import('../../gltf/src/instanced-shader.ts');
 const { shadowDepth } = await import('../../shadows/src/shader.ts');
 
 test('view-space, tangent and depth inputs compile in both stages', () => {

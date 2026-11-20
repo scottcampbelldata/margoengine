@@ -10,7 +10,7 @@ import { speedEnabled } from '../../../scripts/support/speed-phase.mjs';
 
 setTimeout(() => {
   console.error('quality browser check: stopped at its time limit');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000).unref();
 const PATH = '/packages/quality/test/browser-check.html',
   context = await openBrowser({ startPath: PATH, port: 5211 }),

@@ -14,6 +14,11 @@ export interface FetchOptions {
     maxBytes?: number;
     fetch?: typeof fetch;
     init?: RequestInit;
+    protocols?: readonly string[];
+    publicOnly?: boolean;
+    allowHost?: (hostname: string, url: URL) => boolean;
+    maxRedirects?: number;
+    accept?: readonly string[];
 }
 
 export interface LoadedGeometry {
@@ -23,6 +28,7 @@ export interface LoadedGeometry {
     colors?: Float32Array;
     uvs?: Float32Array;
     indices?: Uint32Array;
+    lineIndices?: Uint32Array;
     groups?: LoadedGroup[];
     attributes?: Record<string, Float32Array>;
 }
@@ -39,7 +45,13 @@ export interface LoadedGroup {
 export class LoaderError extends Error {
     readonly format: string;
     readonly code: LoaderErrorCode;
-    constructor(format: string, code: LoaderErrorCode, message: string);
+    readonly status?: number;
+    readonly retryAfter?: number;
+    constructor(format: string, code: LoaderErrorCode, message: string, options?: {
+        cause?: unknown;
+        status?: number;
+        retryAfter?: number;
+    });
 }
 
 export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch' | 'url';

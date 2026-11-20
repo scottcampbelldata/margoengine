@@ -153,8 +153,10 @@ async function suite() {
     assert.equal(link.first, true, 'without KHR_parallel_shader_compile an async pipeline reads the link status at once');
     lines.push('no KHR_parallel_shader_compile here: an async compute pipeline reads the link status at once');
   }
-  assert.deepEqual(await page.evaluate(() => window.check.readbackOrder()), { lazy: true, value: 1 });
-  lines.push('the first read-back loads its chunk and keeps the queue in order');
+  // Since KB-COMPAT-FIRSTTASK1 requestDevice loads the compute part and with it the read-back chunk, so a device has it
+  // before its first copy; the queue still keeps a write after the copy behind it.
+  assert.deepEqual(await page.evaluate(() => window.check.readbackOrder()), { lazy: false, value: 1 });
+  lines.push('the read-back chunk is loaded with the device and the queue keeps its order');
   // KB2604d: a writable storage binding past one 128 MiB word texture keeps every store (160 MiB, two word textures).
   const large = await page.evaluate(() => window.check.largeWords());
   assert.deepEqual(

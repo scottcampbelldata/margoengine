@@ -139,7 +139,13 @@ test('parts that overlap are one object on one build item, so a slicer cannot pu
   // PrusaSlicer 2.9.7 read each build item, and each component too, as an object of its own: overlapping ones crashed it
   // (0xC0000005 after "gcode path conflicts") and --scale-to-fit sized each on its own.
   const file = await export3MF(
-      { nodes: [{ geometry: box }, { translation: [1, 0, 0], geometry: box }, { translation: [2, 0, 0], geometry: box }] },
+      {
+        nodes: [
+          { geometry: box },
+          { translation: [1, 0, 0], geometry: box },
+          { translation: [2, 0, 0], geometry: box },
+        ],
+      },
       { title: 'Stack' },
     ),
     text = await model(file);
@@ -156,13 +162,15 @@ test('parts that overlap are one object on one build item, so a slicer cannot pu
 });
 
 test('parts that touch stay separate shells: a shared corner would leave edges of four triangles', async () => {
-  const text = await model(
-    await export3MF({ nodes: [{ geometry: box }, { translation: [2, 0, 0], geometry: box }] }),
-  );
+  const text = await model(await export3MF({ nodes: [{ geometry: box }, { translation: [2, 0, 0], geometry: box }] }));
   assert.equal(count(text, /<vertex /g), 16);
   const uses = new Map();
   for (const [, a, b, c] of text.matchAll(/<triangle v1="(\d+)" v2="(\d+)" v3="(\d+)"/g))
-    for (const [u, v] of [[a, b], [b, c], [c, a]]) {
+    for (const [u, v] of [
+      [a, b],
+      [b, c],
+      [c, a],
+    ]) {
       const edge = [+u, +v].sort((x, y) => x - y).join();
       uses.set(edge, (uses.get(edge) ?? 0) + 1);
     }
@@ -170,7 +178,9 @@ test('parts that touch stay separate shells: a shared corner would leave edges o
 });
 
 test('a mirrored part of an assembly stays outward, and the file holds no reflection', async () => {
-  const file = await export3MF({ nodes: [{ geometry: box }, { translation: [5, 0, 0], scale: [-1, 1, 1], geometry: box }] }),
+  const file = await export3MF({
+      nodes: [{ geometry: box }, { translation: [5, 0, 0], scale: [-1, 1, 1], geometry: box }],
+    }),
     text = await model(file);
   assert.ok(!text.includes('transform='));
   assert.match(text, /x="3000" y="-4000"/, 'the reflection runs back from X = 5 m to 3 m');
@@ -195,7 +205,7 @@ test('parts of an assembly keep their colours triangle by triangle', async () =>
       }),
     );
   assert.match(text, /<object id="\d+" type="model" pid="1" pindex="0"/);
-  assert.equal(count(text, /pid="1" p1="1"\/>/g), 12, 'the second part names its colour, the first takes the object\'s');
+  assert.equal(count(text, /pid="1" p1="1"\/>/g), 12, "the second part names its colour, the first takes the object's");
   assert.match(text, /<triangle v1="16" v2="17" v3="18" pid="\d+" p1="0" p2="1" p3="2"\/>/);
 });
 
@@ -258,10 +268,7 @@ test('GLB bytes go in as they are, with their colours', async () => {
 });
 
 test('what it cannot write is refused', async () => {
-  await assert.rejects(
-    export3MF({ nodes: [{ scale: [1e-120, 1e-120, 1e-120], geometry: box }] }),
-    /non-zero determinant/,
-  );
+  await assert.rejects(export3MF({ nodes: [{ scale: [1e-120, 1e-120, 1e-120], geometry: box }] }), /has no volume/);
   await assert.rejects(export3MF({ nodes: [{ name: 'empty' }] }), RangeError);
   await assert.rejects(export3MF({ nodes: [{ geometry: box }] }, { unit: 'parsec' }), RangeError);
   await assert.rejects(export3MF({ nodes: [{ geometry: box }] }, { unit: 'toString' }), /3MF unit must be one of/);

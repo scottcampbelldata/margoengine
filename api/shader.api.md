@@ -100,6 +100,7 @@ export function Fn<P extends Type[], R extends Type>(body: (...args: {
 export interface Host {
     width: number;
     height: number;
+    time?: number;
     delta?: number;
     frames?: Readonly<Record<string, ArrayLike<number>>>;
     [key: string]: unknown;
@@ -227,7 +228,7 @@ export class NodePass implements EnginePlugin {
     readonly name: string;
     readonly kind: 'hdr' | 'ldr';
     readonly program: Program;
-    static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassOptions): NodePass;
+    static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassAttachOptions): Promise<NodePass>;
     constructor(node: Node<'vec3f' | 'vec4f'>, { kind, name }?: NodePassOptions);
     code(encode?: boolean): string;
     setup(engine: Engine): void;
@@ -235,6 +236,10 @@ export class NodePass implements EnginePlugin {
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+export interface NodePassAttachOptions extends NodePassOptions {
+    signal?: AbortSignal;
 }
 
 export interface NodePassOptions {
@@ -268,7 +273,6 @@ export class Program {
         buffer: GPUBuffer;
         view: DataView;
         bytes: Uint8Array;
-        last: number;
     }>;
     constructor(base?: number, compute?: boolean);
     stage(stage: ShaderStage, outputs: readonly Node[]): {
@@ -302,6 +306,21 @@ export const STMT = 4;
 export type Scalar = 'f32' | 'f16' | 'i32' | 'u32' | 'bool';
 
 export type ScalarOf<T extends Type> = T extends 'f32' | `vec${N}f` | Matrix ? 'f32' : T extends 'f16' | `vec${N}h` ? 'f16' : T extends 'i32' | `vec${N}i` ? 'i32' : T extends 'u32' | `vec${N}u` ? 'u32' : 'bool';
+
+export class ShaderClock implements EnginePlugin {
+    readonly name = "shader:clock";
+    static attach(engine: EngineKernel): ShaderClock;
+    static hold(engine: Kernel, host: object): ShaderClock;
+    static release(engine: Kernel | undefined, host: object): void;
+    static find(engine: Kernel | undefined): ShaderClock | undefined;
+    get time(): number;
+    get delta(): number;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
+    setup(engine: Engine): void;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
 
 export interface ShaderStage {
     readonly kind: 'vertex' | 'fragment' | 'post' | 'compute';
@@ -749,6 +768,8 @@ type Count<S extends string, A extends 0[] = []> = S extends `${infer _}${infer 
 type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
 
 type Index = NodeInput<'u32' | 'i32'>;
+
+type Kernel = EngineKernel | Engine;
 
 type N = 2 | 3 | 4;
 

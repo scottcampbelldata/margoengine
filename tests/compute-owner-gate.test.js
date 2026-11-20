@@ -7,5 +7,4 @@ test('ComputeFrame owner regression is planned as package GPU correctness work',
   assert.ok(owner, 'the real package GPU plan must execute the owner regression');
   assert.equal(owner.script, 'test:gpu:owners');
   assert.equal(owner.command, 'cd ../.. && node packages/compute/tests/scene-owner-browser.mjs');
-  assert.ok(!owner.exclusive, 'owner correctness uses a shared slot');
 });

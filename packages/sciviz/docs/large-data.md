@@ -137,7 +137,9 @@ demo and clean-room record document supported codecs, formulas and domains.
 
 `/graph-gpu` separates GPUGraphLayout from GraphLayoutReference and draws layout
 positions directly on the shared device with gpuGraphLayer. Widths, colours and arrows
-are explicit attributes. FDEB bundling has its own disposable resources; candidate
+are explicit attributes. An arrow's tip ends at its target node's border, so its full
+arrowSize stays visible; in 3D an edge crossing the camera's near plane is trimmed to
+it and its visible part still draws; node labels paint at the display's pixel ratio. FDEB bundling has its own disposable resources; candidate
 labels require refresh after layout/view changes. Cancel pending steps and release
 owners on device loss rather than reusing stale buffers. The OpenAlex demonstration
 retains source attribution and layout settings; it is not a claim that a particular

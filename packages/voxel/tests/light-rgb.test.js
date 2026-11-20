@@ -84,4 +84,100 @@ test('options are checked', () => {
   const rgb = VoxelColorLight.attach(engine, { world });
   assert.throws(() => rgb.setColor('nope', [1, 1, 1]), RangeError);
   rgb.dispose();
+  // strength scales the light in the shader: a value that is not a finite number >= 0 would colour every lit pixel NaN.
+  for (const strength of [NaN, -1, Infinity, '2'])
+    assert.throws(() => VoxelColorLight.attach(engine, { world, strength }), RangeError, `strength ${strength}`);
+  const live = VoxelColorLight.attach(engine, { world, strength: 0 });
+  live.strength = NaN;
+  assert.throws(() => live.update(), RangeError);
+  live.strength = 2;
+  live.update();
+  live.dispose();
+});
+
+// A recording device: the window uniform's bytes and every texture write.
+Object.assign(globalThis, {
+  GPUTextureUsage: { TEXTURE_BINDING: 4, COPY_DST: 2 },
+  GPUBufferUsage: { UNIFORM: 64, COPY_DST: 8 },
+});
+function gpuEngine(position) {
+  const device = {
+    buffers: [],
+    writes: [],
+    createBuffer({ size }) {
+      const b = { size, data: new ArrayBuffer(size), destroy() {} };
+      device.buffers.push(b);
+      return b;
+    },
+    createTexture: (d) => ({ ...d, createView: () => ({}), destroy() {} }),
+    createSampler: (d) => ({ ...d }),
+    queue: {
+      writeBuffer: (b, offset, data) =>
+        new Uint8Array(b.data, offset, data.byteLength).set(
+          new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
+        ),
+      writeTexture: ({ origin }, data) => device.writes.push({ origin: [...origin], data: data.slice() }),
+    },
+  };
+  return { device, engine: { gpu: device, camera: { position } } };
+}
+// A stone room with a red torch, in the 4 x 2 x 4 chunks from chunk (cx, cy, cz).
+function room(cx, cy, cz) {
+  const blocks = new BlockTypes();
+  blocks.define('stone');
+  blocks.define('torch', { shape: 'cross', layer: 'cutout', solid: false, light: 14 });
+  const world = new VoxelWorld({ blocks }),
+    edits = [];
+  for (let z = 0; z < 4; z++)
+    for (let y = 0; y < 2; y++) for (let x = 0; x < 4; x++) world.addChunk(cx + x, cy + y, cz + z);
+  const [x0, y0, z0] = [cx * 32, cy * 32, cz * 32];
+  for (let z = 0; z < 128; z++) for (let x = 0; x < 128; x++) edits.push(x0 + x, y0 + 1, z0 + z, 1);
+  edits.push(x0 + 40, y0 + 2, z0 + 50, 2);
+  world.setBlocks(edits);
+  return world;
+}
+const lit = (world, eye, origin) => {
+  const { device, engine } = gpuEngine(eye),
+    rgb = VoxelColorLight.attach(engine, { world, colors: { torch: [1, 0.25, 0] } });
+  rgb.add({ origin, addLighting: () => () => {} });
+  while (rgb.update() > 0);
+  const window = new Float32Array(device.buffers[0].data),
+    // Each write as its texel origin, lit texel count and an FNV-1a hash of its bytes.
+    writes = device.writes
+      .map((w) => {
+        let h = 2166136261,
+          n = 0;
+        for (const b of w.data) (h = Math.imul(h ^ b, 16777619) >>> 0), (n += +(b !== 0));
+        return `${w.origin}:${n}:${h}`;
+      })
+      .sort();
+  rgb.dispose();
+  return { window, writes };
+};
+
+test('origin: a world 2^24 blocks out, under its renderer origin, uploads the same volume and window as near zero', () => {
+  const S = 2 ** 24,
+    near = lit(room(0, 0, 0), [60, 10, 64], null),
+    far = lit(room(S / 32, 64, -S / 32), [60, 10, 64], { origin: [S, 2048, -S] });
+  assert.ok(
+    near.writes.some((w) => w.split(':')[1] !== '0'),
+    'the torch lights the volume',
+  );
+  assert.deepEqual(far.writes, near.writes);
+  assert.deepEqual([...far.window], [...near.window]);
+  assert.deepEqual([...near.window], [-32, -32, 0, 1, 0, 0, 0, 0]);
+});
+
+test('origin: a fractional origin far out writes the corner in engine cells and the origin mod the volume size', () => {
+  const S = 2 ** 24,
+    origin = [S + 70.5, 2048 + 3.25, -S - 9.75],
+    eye = [-10, 7, 64],
+    { window } = lit(room(S / 32, 64, -S / 32), eye, { origin });
+  [128, 64, 128].forEach((size, a) => {
+    const corner = (Math.floor((eye[a] + origin[a]) / 32) - (size >> 6)) * 32;
+    assert.equal(window[a], Math.fround(corner - origin[a]));
+    assert.ok(Math.abs(window[a]) < size);
+    assert.equal(window[4 + a], Math.fround(((origin[a] % size) + size) % size));
+  });
+  assert.throws(() => lit(room(0, 0, 0), eye, { origin: [0, Number.POSITIVE_INFINITY, 0] }), RangeError);
 });

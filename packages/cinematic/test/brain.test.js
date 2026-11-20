@@ -386,3 +386,22 @@ test('errors say what to pass', () => {
   b.priority = Infinity;
   assert.throws(() => brain.update(0), fixes(/priority/));
 });
+
+test('a disabled camera shown by two layers of one blend steps once per update', () => {
+  // a to b to a to b leaves a twice in the stack; disabling a must not run its stages twice a frame.
+  const brain = new CameraBrain({ blend: { duration: 10 } }),
+    steps = [],
+    a = brain.add({ name: 'a', priority: 1, stages: [(pose, delta) => steps.push(delta)] }),
+    b = brain.add({ name: 'b', priority: 0 });
+  brain.update(0.1);
+  b.priority = 2;
+  brain.update(0.1);
+  a.priority = 3;
+  brain.update(0.1);
+  b.priority = 4;
+  brain.update(0.1);
+  a.enabled = false;
+  steps.length = 0;
+  brain.update(0.1);
+  assert.deepEqual(steps, [0.1]);
+});

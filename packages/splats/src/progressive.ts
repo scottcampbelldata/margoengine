@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { Splats } from './index.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { parseSplat, type SplatData } from './data.js';
 import { parsePly } from './ply.js';
 import { decodeSpzBody } from './spz.js';
@@ -388,6 +389,8 @@ export async function loadProgressiveSplats(
   options: ProgressiveSplatOptions,
 ): Promise<Splats> {
   let cloud: Splats | undefined;
+  // The scene the load was called for; the first packet arrives after an await.
+  const scope = captureScene(engine);
   try {
     for await (const packet of readSplatsProgressive(source, options)) {
       if (!cloud) {
@@ -395,7 +398,8 @@ export async function loadProgressiveSplats(
           packet.total,
           packet.data.sphericalHarmonics ? packet.data.sphericalHarmonics.length / packet.data.positions.length : 0,
         );
-        engine.use(cloud);
+        const reserved = cloud;
+        scope.run(() => engine.use(reserved));
       }
       cloud.write(packet.first, packet.data);
     }

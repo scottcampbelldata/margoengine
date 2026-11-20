@@ -133,7 +133,7 @@ try {
   assert.deepEqual(
     await page.evaluate(() => window.check.variants()),
     [[], []],
-    'standard and physical gltf-pro variants compile with nodes',
+    'standard and physical gltf/pbr variants compile with nodes',
   );
   console.log('ok variants');
   assert.deepEqual(pageErrors, []);

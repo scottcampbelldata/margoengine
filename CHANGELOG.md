@@ -18,7 +18,7 @@
 - `@margoengine/save/remote`: `remoteStorage` keeps saves on any HTTP server with ETags, with a conflict policy of `error`, `local`, `remote` or your own merge, and `remoteHandler` is a server for it over any storage. `fileStorage` keeps keys that differ only by case apart.
 - `@margoengine/save/safe`: `safeStorage` keeps two checked copies of each save, so a failed or torn write never loses the last good one. `fileStorage` no longer fails a save on Windows while the same save is being read, and fsyncs the folder after a rename; `indexedDBStorage` writes with strict durability.
 - `@margoengine/save/slots`: `SaveSlots` gives named slots with a record for the load screen, thumbnails, an autosave ring and a timer, over any storage; `captureThumbnail` takes a small picture of a canvas.
-- `@margoengine/save/engine`: `captureScene` and `restoreScene` save and restore a running scene, its meshes, glTF models, camera, lighting and plugin state, with no mapping to write. `@margoengine/gltf-pro`: `PBRModel.selectedVariant` and `ownedMeshes`.
+- `@margoengine/save/engine`: `captureScene` and `restoreScene` save and restore a running scene, its meshes, glTF models, camera, lighting and plugin state, with no mapping to write. `@margoengine/gltf/pbr`: `PBRModel.selectedVariant` and `ownedMeshes`.
 - `@margoengine/netcode/relay`: `RollbackRelay`, `relayPeers` and `RollbackSpectator` take rollback sessions past a full mesh, proved with 16 peers and a spectator whose checksums match theirs.
 - `RollbackSession` no longer stalls for good after an outage longer than `redundancy`: every 8th message goes back to the oldest input not acknowledged.
 - `@margoengine/netcode/extrapolate`: `Extrapolator` keeps entities moving when the next snapshot is late, for up to `maxTicks`, and blends to the truth when it comes. `GameClient` gains `previousSnapshot`.
@@ -28,10 +28,10 @@
 - `@margoengine/netcode/smoothing`: `CorrectionSmoother` blends prediction errors away over a few frames instead of snapping, while the simulation stays exact. `GameClient` gains `oncorrection(before, after)`.
 - `@margoengine/netcode/interest`: `InterestManager` sends each client only the entities near it, by accumulated priority, within a byte budget per snapshot. The `view` of `GameServer` now also gets the state the client confirmed.
 - `GameClient.join` no longer waits for ever when its first ping is lost.
-- `@margoengine/net/timeline`: one home for time-ordered snapshots. `SnapshotBuffer`, and `GameClient`, `LagCompensation` and angle fields in `@margoengine/netcode`, all sit on it. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`. `@margoengine/net` no longer asks for core as a peer.
+- `@margoengine/netcode/interpolation-timeline`: one home for time-ordered snapshots. `SnapshotBuffer`, and `GameClient`, `LagCompensation` and angle fields in `@margoengine/netcode`, all sit on it. `GameClient` takes an `AdaptiveDelay` as `interpolationDelay`. `@margoengine/netcode/interpolation` no longer asks for core as a peer.
 - `LagCompensation.at` at a recorded tick no longer holds a shape that only the next tick has, so a shot cannot hit something that did not exist yet.
-- `@margoengine/net/fields`: `FieldBuffer` interpolates scale, colour in linear light, looping animation time and any other named field alongside the pose.
-- `@margoengine/net/delay`: `AdaptiveDelay` picks the render delay from measured jitter and loss, follows delay spikes, and runs the view's clock so it never jumps back.
+- `@margoengine/netcode/interpolation-fields`: `FieldBuffer` interpolates scale, colour in linear light, looping animation time and any other named field alongside the pose.
+- `@margoengine/netcode/interpolation-delay`: `AdaptiveDelay` picks the render delay from measured jitter and loss, follows delay spikes, and runs the view's clock so it never jumps back.
 
 ### Physics
 
@@ -73,14 +73,14 @@
 
 ### Packaging
 
-- A page that imports `margoengine/react` no longer gets the Draco and Basis Wasm in its build. Moved out of that entry: `Model` and `Gltf` (now `margoengine/react/gltf-pro`), `Fbx` (`/fbx`), `Animation` (`/animation`) and `BatchedMesh`, `BatchedItem`, `MeshTransmissionMaterial` (`/materials`).
+- A page that imports `margoengine/react` no longer gets the Draco and Basis Wasm in its build. Moved out of that entry: `Model` and `Gltf` (now `margoengine/react/gltf`), `Fbx` (`/fbx`), `Animation` (`/animation`) and `BatchedMesh`, `BatchedItem`, `MeshTransmissionMaterial` (`/materials`).
 - `npm run publish:rehearsal` proves a release without making one: it audits all 102 tarballs, then runs `npm install margoengine` and `npm create margo` in clean projects against a stand-in registry on 127.0.0.1 that refuses every write. `npm run publish:dry-run` and the publish workflow run it.
 - `FloatingOrigin`, `OctreeCloud` and `TilesRenderer` now implement the `EnginePlugin` their `setup` takes, so their published types compile in an app with `skipLibCheck` off.
 - The `create-margo` description no longer lists a `cad` template that does not exist.
 
 ### Apple GPUs
 
-- glTF PBR materials without textures or effects draw in WebKit: it gives an invalid layout for an empty group past the last one a shader uses, so `@margoengine/gltf-pro` now binds one explicit empty group there.
+- glTF PBR materials without textures or effects draw in WebKit: it gives an invalid layout for an empty group past the last one a shader uses, so `@margoengine/gltf/pbr` now binds one explicit empty group there.
 - Reflection probes no longer lose texels: `LightProbes` wrote two neighbouring texels into one `vec4u` from different workgroups, and an Apple GPU kept only one of them, so about half the texel pairs of the rough levels held a black texel.
 - The south pole of a `GeometryGenerator.sphere` is no longer a ring turned inside out: an accurate `sin` of f32 pi is a tiny negative.
 
@@ -298,9 +298,9 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
   USDZ remains an ancillary format outside the six core launch packages; no new
   package was introduced.
 
-### Compressed glTF in glTF Pro
+### Compressed glTF in glTF PBR
 
-- `@margoengine/gltf-pro` uses its `@margoengine/decoders` dependency to load
+- `@margoengine/gltf/pbr` uses its `@margoengine/decoders` dependency to load
   `KHR_draco_mesh_compression` primitives and `EXT_meshopt_compression` buffer
   views from glTF and GLB. Unknown required extensions still reject.
 - `parseGLTF(engine, input, buffers, images)` keeps its synchronous return value
@@ -316,7 +316,7 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
   Decoded counts, attribute widths, index ranges and output-byte budgets are
   checked before GPU construction; output preflight does not cap Draco's
   internal Wasm geometry allocations.
-- The basic `@margoengine/gltf` subset is unchanged. `gltf-pro` also loads
+- The basic `@margoengine/gltf` subset is unchanged. `gltf/pbr` also loads
   `KHR_texture_basisu` textures lazily, uploads complete GPU-ready mip chains,
   and releases loader-owned transcoder workers.
 
@@ -403,7 +403,7 @@ Message text changed: branch on `error.code` or the class, not the text. Changed
 
 ### Optional mixed scene helpers
 
-- `@margoengine/gltf-pro/scene` exposes `getSceneBounds`, `fitScene`, and
+- `@margoengine/gltf/scene` exposes `getSceneBounds`, `fitScene`, and
   `gatherSceneBuffers` for selected core/PBR mesh roots and their descendants.
   Mixed bounds use actual CPU vertices under current world transforms; camera
   fitting includes offscreen geometry and filters hidden ancestors by default.
@@ -473,5 +473,5 @@ Repeat the checks from a built checkout with `npm run typecheck`,
 `npm run measure:size`.
 `npm run test:all` rebuilds the workspace and runs the full suite; use Node 24
 to match CI. See the [USDZ](packages/usdz/README.md),
-[glTF Pro](packages/gltf-pro/README.md) and [decoder](packages/decoders/README.md)
+[glTF PBR](packages/gltf/README.md) and [decoder](packages/decoders/README.md)
 guides for API details and supported subsets.

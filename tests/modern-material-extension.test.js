@@ -3,15 +3,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 import { optionalGPU, uniformBytes } from './support/optional-gpu.js';
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 // Degenerate tangent frames use a finite orthogonal basis; ordinary UV paths retain this shared shader.
 // 2026-11-11: the base shader's Smith term is the height-correlated G2 (KB5875a); was 20ea22e3...ca4297.
 // 2026-11-12: the direct diffuse keeps the dielectric Fresnel weight (KB3240); was bdf7de1e...834390.
-const baselineShader = '9429f501af6518e12880c9582bce3b7446ade4ab9ba1eacc64af50f63f4e9c23';
+// 2026-11-15: the colour vertex's clip position is @invariant (KB-INV-GLTF); was 9429f501...4e9c23.
+const baselineShader = 'e910ac332ad107235b3ffade40139f9fac9ed8d30e480082de2f8da0befa977a';
 // The missing normal-map factor is zero; Camera.up-aware view math also preserves its signed-zero lanes.
 const baselineFrame = '611297c77674bf4a5642e187218a161e688e4b0cca3155598ff5768c34ecdba4';
 
@@ -101,7 +102,7 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
   try {
     assert.deepEqual(
       s.resources.filter((resource) => resource.data).map((buffer) => buffer.size),
-      [240, 12, 65536], // the third is gltf-pro's uniform arena, its first chunk (64 KiB)
+      [240, 12, 65536], // the third is gltf/pbr's uniform arena, its first chunk (64 KiB)
     );
     assert.equal(s.counts.textures, 5);
     for (const mode of ['beauty', 'gbuffer', 'ambient']) {
@@ -139,7 +140,7 @@ test('unextended PBR retains the exact baseline shader, frame bytes, pipeline an
       assert.deepEqual(pipeline.vertex.buffers, [
         {
           arrayStride: 80,
-          // Position and normal are read only as xyz, so every draw fetches them as three floats (gltf-pro vertexLayout).
+          // Position and normal are read only as xyz, so every draw fetches them as three floats (gltf/pbr vertexLayout).
           attributes: Array.from({ length: 5 }, (_, i) => ({
             shaderLocation: i,
             offset: i * 16,

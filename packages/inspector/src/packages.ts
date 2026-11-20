@@ -196,7 +196,7 @@ function materialObject(id: string, m: GLTFMaterialShape): PackageObject {
   return {
     id,
     group: 'material',
-    label: `Material ${m.name || id.slice(9)} (gltf-pro)`,
+    label: `Material ${m.name || id.slice(9)} (gltf/pbr)`,
     target: m,
     properties: [
       slot(base, 0, 'baseColor', 'color', unit),

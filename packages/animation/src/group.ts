@@ -1,12 +1,12 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { sampleKeyframes, type KeyframeClip } from './keyframes.js';
 import { Skeleton, type BonePose } from './skin.js';
 
 /**
- * A glTF-pro model's player that an {@link AnimationGroup} drives: an `Animation` from this package fits. Its own
+ * A glTF PBR model's player that an {@link AnimationGroup} drives: an `Animation` from this package fits. Its own
  * playback is paused while it is a member; the group seeks it instead.
  */
 export interface AnimationGroupPlayer {
@@ -49,7 +49,7 @@ let serial = 0;
 
 /**
  * One clip and one clock driving many models, for crowds of clones. Members are
- * glTF-pro models' `Animation`s playing a clip they all have (by name or index), or, for a code-authored
+ * glTF PBR models' `Animation`s playing a clip they all have (by name or index), or, for a code-authored
  * `KeyframeClip`, `Skeleton`s and `Animation`s whose bones or nodes the tracks name. Each member may run `offset`
  * seconds ahead (negative: behind) of the group. A glTF clip plays through each member's own sampling path
  * (`animation.seek`), and a code clip through bindings resolved once in `add`, so a frame allocates nothing in the group
@@ -152,10 +152,17 @@ export class AnimationGroup implements EnginePlugin {
   }
   /** Advances the group by `delta` seconds times `speed` (when playing) and poses every member. */
   update(delta: number): this {
-    if (finiteNumber(delta, 'delta') < 0) throw new RangeError(`AnimationGroup delta ${delta} is invalid; pass >= 0`);
-    if (this.playing) this.time += delta * (this.options.speed ?? 1);
+    this.advanceTime(delta);
     this.poseAll();
     return this;
+  }
+  /**
+   * Moves the group clock by `delta` seconds times `speed` when playing, posing nothing: the CPU part of `update`,
+   * which a seek from `@margoengine/cutscene/seek` replays; the next update poses every member at the time reached.
+   */
+  advanceTime(delta: number): void {
+    if (finiteNumber(delta, 'delta') < 0) throw new RangeError(`AnimationGroup delta ${delta} is invalid; pass >= 0`);
+    if (this.playing && !this.disposed) this.time += delta * (this.options.speed ?? 1);
   }
   /** Engine plugin hook; the group needs no GPU resources. */
   setup(engine: Engine): void {

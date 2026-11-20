@@ -1,6 +1,6 @@
 // Water refraction inside a PostStack with SSAO: Water samples the stack's shared HDR capture
-// (`stack.sceneTexture`) instead of a standalone Bloom's. Real WebGPU; run under the GPU lock:
-// node scripts/gpu-lock.mjs run --owner=<id> -- node packages/water/test/stack.browser.mjs
+// (`stack.sceneTexture`) instead of a standalone Bloom's. Real WebGPU; run:
+// node scripts/run-with-timeout.mjs -- node packages/water/test/stack.browser.mjs
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

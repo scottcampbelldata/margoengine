@@ -11,7 +11,7 @@ export const meshVertex = `
 struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 struct Input {@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) m0:vec4f,@location(3) m1:vec4f,@location(4) m2:vec4f,@location(5) m3:vec4f,@location(6) color:vec4f,@location(7) factors:vec4f}
-struct Output {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) id:u32}
+struct Output {@builtin(position) @invariant clip:vec4f,@location(0) @interpolate(flat) id:u32}
 @vertex fn vertex(i:Input)->Output {let model=mat4x4f(i.m0,i.m1,i.m2,i.m3);let p=model*vec4f(i.position,1);return Output(frame.camera*p,u32(i.factors.w));}
 `;
 export function group(device, pipeline, resources) {

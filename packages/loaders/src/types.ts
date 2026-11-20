@@ -28,6 +28,11 @@ export interface LoadedGeometry {
   uvs?: Float32Array;
   /** Triangle list, three per triangle. Absent for point clouds. */
   indices?: Uint32Array;
+  /**
+   * Line segments, two vertex indices each, when the file holds lines beside or instead of faces (PLY `edge`, OBJ `l`,
+   * COLLADA `<lines>` and `<linestrips>`). A file of lines and no faces has `kind` `'points'`.
+   */
+  lineIndices?: Uint32Array;
   /** Per-object or per-color index ranges, in order and non-overlapping. */
   groups?: LoadedGroup[];
   /** Extra per-vertex scalars such as PCD `intensity`, VTK point SCALARS or USD `opacity` (0 to 1). */
@@ -63,14 +68,52 @@ export type LoaderErrorCode =
   | 'fetch'
   | 'url';
 
-/** Thrown for every malformed, truncated, oversized or unsupported input. */
+/**
+ * Thrown for every malformed, truncated, oversized or unsupported input. The message reads `<format>: <message>` and
+ * ends with `; see https://margoengine.com/errors#loader-<code>`, the help entry for the code.
+ */
 export class LoaderError extends Error {
   readonly format: string;
   readonly code: LoaderErrorCode;
-  constructor(format: string, code: LoaderErrorCode, message: string) {
-    super(`${format}: ${message}`);
+  /**
+   * The HTTP status of a refused request (`403`, `404`, `429`, `503`...) when the server answered one, so a caller
+   * tells a refusal from a network failure without reading the message; undefined for every other error.
+   */
+  readonly status?: number;
+  /**
+   * Seconds the server asked the client to wait before trying again: its `Retry-After` header (RFC 9110 10.2.3), given
+   * as seconds or as a date, counted from when the answer came. Undefined when the answer had none or it was unreadable.
+   */
+  readonly retryAfter?: number;
+  /**
+   * `options.cause`: the error behind this one, such as what a custom `fetch` threw. `options.status` and
+   * `options.retryAfter` fill the fields of the same names.
+   */
+  constructor(
+    format: string,
+    code: LoaderErrorCode,
+    message: string,
+    options?: { cause?: unknown; status?: number; retryAfter?: number },
+  ) {
+    super(`${format}: ${message}; see https://margoengine.com/errors#loader-${code}`, options);
     this.name = 'LoaderError';
     this.format = format;
     this.code = code;
+    if (options?.status !== undefined) this.status = options.status;
+    if (options?.retryAfter !== undefined) this.retryAfter = options.retryAfter;
   }
+}
+
+/**
+ * The status and the `Retry-After` delay of an HTTP answer, for a {@link LoaderError}. Retry-After is delay-seconds
+ * (digits) or an HTTP-date (RFC 9110 10.2.3 and 5.6.7); a date gives the whole seconds from `now` to it, 0 when past.
+ */
+export function httpRefusal(response: Response, now = Date.now()): { status: number; retryAfter?: number } {
+  const value = response.headers.get('retry-after')?.trim();
+  if (!value) return { status: response.status };
+  if (/^\d+$/.test(value)) return { status: response.status, retryAfter: Math.min(Number(value), Number.MAX_SAFE_INTEGER) };
+  const at = Date.parse(value);
+  return Number.isNaN(at)
+    ? { status: response.status }
+    : { status: response.status, retryAfter: Math.max(0, Math.ceil((at - now) / 1000)) };
 }

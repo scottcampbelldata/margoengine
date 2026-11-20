@@ -51,20 +51,13 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
       }
       if (char === '"') {
         cursor++;
-        let value = '',
-          start = cursor;
-        while (cursor < text.length) {
-          const next = text[cursor++];
-          if (next === '"') {
-            value += text.slice(start, cursor - 1);
-            return { kind: 'string', value };
-          }
-          if (next === '\\' && (text[cursor] === '"' || text[cursor] === '\\')) {
-            value += text.slice(start, cursor - 1) + text[cursor++];
-            start = cursor;
-          }
-        }
-        invalid('unterminated string');
+        // FBX has no backslash escape: Autodesk's own files write Windows paths with raw backslashes. The FBX SDK writes a
+        // quote inside a string as &quot;, so the next quote ends the string.
+        const start = cursor,
+          end = text.indexOf('"', start);
+        if (end < 0) invalid('unterminated string');
+        cursor = end + 1;
+        return { kind: 'string', value: text.slice(start, end).replace(/&quot;/g, '"') };
       }
       const start = cursor;
       while (cursor < text.length && !/[\s:,{}*;"\ufeff]/.test(text[cursor])) cursor++;
@@ -82,8 +75,11 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
     lookahead = undefined;
     return value;
   }
-  function expect(value: string): void {
-    if (take().value !== value) invalid(`expected ${value}`);
+  /** Punctuation is a token of its own kind: a quoted "," or "}" is a string. */
+  const is = (token: Token, value: string): boolean => token.kind === 'punctuation' && token.value === value;
+  function expect(value: string, kind: Token['kind'] = 'punctuation'): void {
+    const token = take();
+    if (token.kind !== kind || token.value !== value) invalid(`expected ${value}`);
   }
   function lines(): void {
     while (peek().kind === 'newline') take();
@@ -120,18 +116,18 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
     lines();
     expect('{');
     lines();
-    expect('a');
+    expect('a', 'word');
     expect(':');
     let index = 0,
       comma = false;
     while (true) {
       lines();
       const token = peek();
-      if (token.value === '}') {
+      if (is(token, '}')) {
         take();
         break;
       }
-      if (token.value === ',') {
+      if (is(token, ',')) {
         if (!comma) invalid('unexpected array comma');
         take();
         comma = false;
@@ -173,18 +169,18 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
         // the following line. Other newlines terminate this node's values.
         if (
           (properties.length && !comma) ||
-          peek().value === '{' ||
-          peek().value === ',' ||
-          (!properties.length && (peek().kind === 'string' || numeric.test(peek().value)))
+          is(peek(), '{') ||
+          is(peek(), ',') ||
+          (!properties.length && (peek().kind === 'string' || (peek().kind === 'word' && numeric.test(peek().value))))
         )
           continue;
         break;
       }
-      if (token.kind === 'end' || token.value === '}') break;
-      if (token.value === '{') {
+      if (token.kind === 'end' || is(token, '}')) break;
+      if (is(token, '{')) {
         take();
         lines();
-        while (peek().value !== '}') {
+        while (!is(peek(), '}')) {
           if (peek().kind === 'end') invalid('unterminated node');
           children.push(node(depth + 1));
           lines();
@@ -192,7 +188,7 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
         take();
         return { name: name.value, properties, children };
       }
-      if (token.value === ',') {
+      if (is(token, ',')) {
         if (!comma) invalid('unexpected property comma');
         take();
         comma = false;
@@ -200,7 +196,7 @@ export function parseASCII(bytes: Uint8Array, budget: ParseBudget): { roots: FBX
       }
       if (comma) invalid('missing property comma');
       budget.property();
-      properties.push(token.value === '*' ? readArray(name.value) : scalar(take()));
+      properties.push(is(token, '*') ? readArray(name.value) : scalar(take()));
       comma = true;
     }
     if (!comma && properties.length) invalid('missing property after comma');

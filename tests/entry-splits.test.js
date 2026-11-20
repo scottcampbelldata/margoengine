@@ -9,7 +9,7 @@ import { parseSync } from 'rolldown/utils';
 const root = join(import.meta.dirname, '..');
 const splits = [
   ['@margoengine/decoders/texture', '@margoengine/decoders'],
-  ['@margoengine/gltf-pro/coordinates', '@margoengine/gltf-pro'],
+  ['@margoengine/gltf/texture-coordinates', '@margoengine/gltf/pbr'],
   ['@margoengine/materials/atlas', '@margoengine/materials'],
   // ClipMarkers and clip compression live in the sampling entry only, so the root does not pay for them.
   [
@@ -79,14 +79,14 @@ test('the orbit and transform entries load no fly, first-person, trackball or dr
 
 test('consumers load the split entries instead of the heavy roots', () => {
   for (const [file, heavy] of [
-    [dist('gltf-pro', 'index'), '@margoengine/decoders'],
-    [dist('materials', 'transmission'), '@margoengine/gltf-pro'],
+    [dist('gltf', 'pbr'), '@margoengine/decoders'],
+    [dist('materials', 'transmission'), '@margoengine/gltf/pbr'],
     [dist('lightmap', 'index'), '@margoengine/materials'],
     [dist('animator', 'index'), '@margoengine/animation'],
     [dist('usdz', 'index'), '@margoengine/loaders'],
     [dist('usdz', 'worker'), '@margoengine/loaders'],
-    [dist('usdz', 'worker'), '@margoengine/gltf-pro'],
-    [dist('fbx', 'worker'), '@margoengine/gltf-pro'],
+    [dist('usdz', 'worker'), '@margoengine/gltf/pbr'],
+    [dist('fbx', 'worker'), '@margoengine/gltf/pbr'],
     [dist('fbx', 'worker'), '@margoengine/exporters'],
     [dist('ifc', 'index'), '@margoengine/loaders'],
     [dist('loaders', 'font'), '@margoengine/geometry'],
@@ -101,7 +101,7 @@ test('the split entries work on their own', async () => {
   const { getBytesPerRow, getSupportedTranscodeFormat } = await import('@margoengine/decoders/texture');
   assert.equal(getBytesPerRow('bc7-rgba-unorm', 10), 48);
   assert.equal(getSupportedTranscodeFormat({ features: new Set(['texture-compression-astc']) }), 'astc-4x4');
-  const { textureCoordinates } = await import('@margoengine/gltf-pro/coordinates');
+  const { textureCoordinates } = await import('@margoengine/gltf/texture-coordinates');
   assert.deepEqual(textureCoordinates({ texCoord: 1 }), { texCoord: 1 });
   const { packAtlas } = await import('@margoengine/materials/atlas');
   assert.equal(packAtlas([{ data: new Uint8Array(64), width: 4, height: 4 }]).regions.length, 1);

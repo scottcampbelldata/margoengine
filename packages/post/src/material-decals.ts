@@ -11,6 +11,7 @@ import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, PassContext, Vec3 } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
+import { type BorrowSlot, type Borrowable, borrow, fix, lend, relend } from '../../shared/borrowed.js';
 import { finiteVector } from '@margoengine/math/validate';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayShader } from '../../shared/display.js';
@@ -69,9 +70,12 @@ export interface MaterialDecalsOptions {
   targets?: () => MaterialDecalTargets | undefined;
   /**
    * Tangent-space normal atlas the `rect`s address: RGB a normal map (OpenGL convention, green up), alpha the decal's
-   * coverage. Sampled 2D GPUTexture, read at mip level 0. Default a flat normal of full coverage.
+   * coverage. Sampled 2D GPUTexture, read at mip level 0, or `(device) => texture`, made once per device so it is back
+   * after a device restore. Default a flat normal of full coverage. A plain texture is lost with its device: no decal
+   * applies, `engine.onError` hears of it once (`'state'`, #borrowed-lost), and assigning `options.atlas` a new texture
+   * brings the decals back.
    */
-  atlas?: GPUTexture;
+  atlas?: Borrowable<GPUTexture>;
   /** False passes frames through. Default true. */
   enabled?: boolean;
 }
@@ -161,6 +165,7 @@ export class MaterialDecals implements EnginePlugin {
   private disposed = false;
   private uniform?: GPUBuffer;
   private flat?: GPUTexture;
+  private readonly slot: BorrowSlot<GPUTexture>;
   private sampler?: GPUSampler;
   private binding?: GPUBindGroup;
   private bound: readonly unknown[] = [];
@@ -171,6 +176,8 @@ export class MaterialDecals implements EnginePlugin {
 
   constructor(readonly options: MaterialDecalsOptions = {}) {
     this.validate();
+    this.slot = borrow<GPUTexture>(options.atlas, 'MaterialDecals atlas', 'set options.atlas');
+    this.slot = borrow<GPUTexture>(options.atlas, 'MaterialDecals atlas', 'set options.atlas');
   }
 
   /** Attaches new MaterialDecals to `engine` alone in its own PostStack. */
@@ -187,13 +194,8 @@ export class MaterialDecals implements EnginePlugin {
         'MaterialDecals targets must be a function returning {albedo, normal, material} or undefined',
       );
     const atlas = o.atlas;
-    if (
-      atlas !== undefined &&
-      (typeof atlas?.createView !== 'function' ||
-        atlas.dimension !== '2d' ||
-        !(atlas.usage & GPUTextureUsage.TEXTURE_BINDING))
-    )
-      throw new TypeError('MaterialDecals atlas must be a sampled 2D GPUTexture');
+    if (atlas !== undefined && typeof atlas !== 'function' && !sampled2D(atlas))
+      throw new TypeError('MaterialDecals atlas must be a sampled 2D GPUTexture or (device) => GPUTexture');
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw new TypeError('MaterialDecals enabled must be a boolean; pass true or false');
   }
@@ -305,6 +307,7 @@ export class MaterialDecals implements EnginePlugin {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
     device.queue.writeTexture({ texture: this.flat }, new Uint8Array([128, 128, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
+    fix(this.slot, device);
   }
 
   onDeviceRestored(engine: Engine): void {
@@ -333,9 +336,13 @@ export class MaterialDecals implements EnginePlugin {
   private draw(c: Context, input: GPUTextureView, output: StageOutput): GPUTextureView | void {
     this.validate();
     const o = this.options,
-      surface = (o.enabled ?? true) && this.count ? o.targets?.() : undefined;
+      device = c.device;
+    // Assigning options.atlas gives a new atlas that belongs to the device in use now.
+    if (this.slot.value !== o.atlas) relend(this.slot, o.atlas, device);
+    const atlas = o.atlas === undefined ? this.flat : lend(this.slot, device, this.engine),
+      surface = atlas && (o.enabled ?? true) && this.count ? o.targets?.() : undefined;
     if (!surface && output.hdr) return input;
-    const device = c.device,
+    const
       depth = this.host!.depthTexture!,
       v = this.values,
       { direction, radiance, ambient } = this.engine!.lighting;
@@ -356,7 +363,7 @@ export class MaterialDecals implements EnginePlugin {
     }
     // Without a surface the stage only encodes the frame for display (count 0), so any bound texture will do.
     const albedo = surface?.albedo ?? this.flat!,
-      parts = [pipeline, input, depth, albedo, surface?.normal, surface?.material, o.atlas];
+      parts = [pipeline, input, depth, albedo, surface?.normal, surface?.material, atlas];
     if (parts.some((part, i) => part !== this.bound[i])) {
       this.bound = parts;
       this.binding = group(device, pipeline, [
@@ -366,7 +373,7 @@ export class MaterialDecals implements EnginePlugin {
         albedo.createView(),
         (surface?.normal ?? this.flat!).createView(),
         (surface?.material ?? this.flat!).createView(),
-        (o.atlas ?? this.flat!).createView(),
+        (atlas ?? this.flat!).createView(),
         this.sampler!,
       ]);
     }
@@ -388,3 +395,6 @@ export class MaterialDecals implements EnginePlugin {
     this.pipelines.clear();
   }
 }
+
+const sampled2D = (t: GPUTexture): boolean =>
+  typeof t?.createView === 'function' && t.dimension === '2d' && !!(t.usage & GPUTextureUsage.TEXTURE_BINDING);

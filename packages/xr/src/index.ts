@@ -9,6 +9,8 @@ import {
 import { Engine as PublicEngine, type EngineKernel, type EngineOptions } from '@margoengine/core';
 import { MargoError } from '@margoengine/math/errors';
 import { COMPAT_VENDOR } from '../../shared/compat.js';
+import { checkLayers } from '../../shared/view-rect.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { StereoRenderer } from './renderer.js';
 import { EyeViews } from './eyes.js';
 import type { XREyeTarget } from './eye-target.js';
@@ -49,6 +51,13 @@ export type {
   XRTransientInputHitTestResult,
   XRTransientInputHitTestSource,
 } from './types.js';
+/** Options for {@link XR.create} and {@link XR.attach}. */
+export interface XRCreateOptions {
+  /** Abandons the wait for the device and releases it. */
+  signal?: AbortSignal;
+  /** Render layer mask both eyes draw; default every layer. See {@link XR.layers}. */
+  layers?: number;
+}
 /** Options for {@link XR.requestSession}. */
 export interface XRSessionOptions {
   /** Space of frame poses. Default 'local' (immersive) or 'viewer' (inline). */
@@ -141,6 +150,18 @@ export class XR implements EnginePlugin {
    * core meshes and loader PBR models only.
    */
   readonly route: 'engine' | 'separate';
+  private mask?: number;
+  /**
+   * Render layer mask both eyes draw (@margoengine/cameras/layers), on either route; undefined (default) draws every
+   * layer. A first-person avatar sets the mask of its head-free view here: `xr.layers = firstPerson.firstPersonLayers`.
+   * @throws RangeError for a mask that is not an integer from 0 to 0xffffffff.
+   */
+  get layers(): number | undefined {
+    return this.mask;
+  }
+  set layers(mask: number | undefined) {
+    this.mask = mask === undefined ? undefined : checkLayers(mask, 'XR layers');
+  }
   private engine!: Engine;
   private readonly renderer?: StereoRenderer;
   private eyes?: EyeViews;
@@ -171,12 +192,14 @@ export class XR implements EnginePlugin {
     return system()!.isSessionSupported(mode);
   }
   /** Prepare before the click handler so requestSession preserves the browser's user activation. */
-  static attach(engine: EngineKernel, options: { signal?: AbortSignal } = {}): Promise<XR> {
+  static attach(engine: EngineKernel, options: XRCreateOptions = {}): Promise<XR> {
     return XR.create(engine, options);
   }
   /** Creates the XR-compatible GPU device and adds the plugin to `engine`. `signal` abandons the wait and releases the device. */
-  static async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<XR> {
+  static async create(engine: EngineKernel, options: XRCreateOptions = {}): Promise<XR> {
+    const { signal } = options;
     signal?.throwIfAborted();
+    if (options.layers !== undefined) checkLayers(options.layers, 'XR layers');
     const runtime = engineRuntime(engine);
     if (runtime.backend !== 'webgpu')
       throw new MargoError(
@@ -192,9 +215,12 @@ export class XR implements EnginePlugin {
       throw new MargoError('unsupported', 'WebXR is unavailable; use a WebXR browser over HTTPS or localhost.');
     if (runtime.gpu && xrDevices.has(runtime.gpu)) {
       const xr = new XR(runtime.gpu, true);
+      xr.layers = options.layers;
       runtime.use(xr);
       return xr;
     }
+    // The scene create was called for, kept across the adapter and device requests.
+    const scope = captureScene(runtime);
     const adapter = await navigator.gpu.requestAdapter({
       xrCompatible: !!platform().XRGPUBinding,
     } as GPURequestAdapterOptions);
@@ -215,9 +241,10 @@ export class XR implements EnginePlugin {
       : [];
     const device = await adapter.requestDevice({ requiredFeatures }),
       xr = new XR(device);
+    xr.layers = options.layers;
     try {
       signal?.throwIfAborted();
-      runtime.use(xr);
+      scope.run(() => runtime.use(xr));
       return xr;
     } catch (error) {
       xr.dispose();
@@ -464,11 +491,11 @@ export class XR implements EnginePlugin {
       throw new MargoError('state', 'renderFrame requires an active XR frame; call it inside the session onFrame callback.');
     const { viewer, delta } = this.state;
     if (this.mode !== 'inline' && this.eyes) {
-      if (viewer) this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye);
+      if (viewer) this.eyes.render(this.binding!, this.layer!, viewer, delta, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye, this.mask);
     } else if (this.mode !== 'inline') {
       this.renderOptions.delta = delta;
       this.engine.render(this.renderOptions);
-      if (viewer) this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye);
+      if (viewer) this.renderer!.render(this.engine, this.binding!, this.layer!, viewer, this.mode === 'immersive-ar' || this.seeThrough, this.drawEye, this.mask);
     }
   }
   private readonly sourcesChanged = (): void => {

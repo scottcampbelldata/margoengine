@@ -15,6 +15,7 @@ export class FFTOcean implements EnginePlugin {
     static attach(engine: EngineKernel, options?: FFTOceanOptions): FFTOcean;
     get time(): number;
     setTime(seconds: number): this;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;

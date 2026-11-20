@@ -1,5 +1,5 @@
 import { Geometry } from '../../core/dist/index.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 
 const geometry = () => new Geometry([0, 0, 0, 1, 0, 0, 0, 1, 0], [0, 0, 1, 0, 0, 1, 0, 0, 1], [0, 1, 2]);
 const msftModel = (engine) => new PBRModel(engine, new GLTFAsset({

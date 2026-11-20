@@ -33,9 +33,9 @@ export interface GeoVectorOptions extends GeoVectorPrepareOptions {
   readonly fill?: boolean;
   /** Default [0.12,0.16,0.2]. */
   readonly lineColor?: RGB;
-  /** Line width in drawing-buffer pixels, default 1.5; zero hides lines. */
+  /** Line width in CSS pixels, default 1.5; zero hides lines. */
   readonly width?: number;
-  /** Point radius in drawing-buffer pixels, default 4. */
+  /** Point radius in CSS pixels, default 4. */
   readonly radius?: number;
   /** Default 1. */
   readonly opacity?: number;
@@ -62,10 +62,10 @@ struct Out { @builtin(position) clip: vec4f, @location(0) colour: vec3f,
   if (kind == 1.0) {
     let d = (cb.xy / max(cb.w, 0.000001) - ca.xy / max(ca.w, 0.000001)) * frame.viewport.xy;
     let n = vec2f(-d.y, d.x) / max(length(d), 0.000001);
-    c = vec4f(c.xy + n * corner.y * style.params.z / frame.viewport.xy * c.w, c.zw);
+    c = vec4f(c.xy + n * corner.y * style.params.z * frame.origin.z / frame.viewport.xy * c.w, c.zw);
     if (ca.w <= 0.0 || cb.w <= 0.0) { c = vec4f(0.0, 0.0, 2.0, 1.0); }
   }
-  if (kind == 2.0) { c = vec4f(c.xy + corner * 2.0 * style.params.z / frame.viewport.xy * c.w, c.zw); }
+  if (kind == 2.0) { c = vec4f(c.xy + corner * 2.0 * style.params.z * frame.origin.z / frame.viewport.xy * c.w, c.zw); }
   out.clip = c; out.colour = colour; out.data = data; out.normal = normal; out.corner = corner;
   return out;
 }

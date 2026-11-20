@@ -106,9 +106,16 @@ async function alpine(){
  }
  // Form: the spread of 32 x 32 pixel block means on rock, which grain cannot raise (a block averages it away).
  const form=(px)=>{let c=0,m=0,q=0;for(let by=0;by+32<=H;by+=32)for(let bx=0;bx+32<=W;bx+=32){let k=0,v=0;for(let y=by;y<by+32;y++)for(let x=bx;x<bx+32;x++){const i=y*W+x;if(rock[i]){k++;v+=Math.log(luma(px,i*4)/Math.max(1,mask[i*4])*255);}}if(k>=256){v/=k;c++;m+=v;q+=v*v;}}m/=Math.max(1,c);return Math.sqrt(Math.max(0,q/Math.max(1,c)-m*m));};
- const mean=sum/Math.max(1,n),errors=s.errs.splice(0),rockForm=form(look),plainForm=form(plainRock);
+ // The world's own rock and the horizon's (BiomeView horizon, far ground past the world's edge) apart: a pixel whose mask
+ // colour changes with the horizon off is horizon ground. Each is held to its own bound, so far haze between the two
+ // (the same in every look) does not stand in for form.
+ const maskWorld=await s.pixels(world,{horizon:false,materials:{rock:flat([0.35,0,0]),snow:flat([0,0,0.35]),scree:flat([0.35,0.35,0]),meadow:flat([0,0.35,0])}});
+ const far=i=>{const k=i*4;return Math.abs(mask[k]-maskWorld[k])+Math.abs(mask[k+1]-maskWorld[k+1])+Math.abs(mask[k+2]-maskWorld[k+2])>6;};
+ const part=sel=>{const all=rock.slice();let c=0;for(let i=0;i<W*H;i++){if(rock[i]&&!sel(i))rock[i]=0;c+=rock[i];}const r={form:form(look),plain:form(plainRock),pixels:c};rock.set(all);return r;};
+ const worldRock=part(i=>!far(i)),horizonRock=part(far);
+ const mean=sum/Math.max(1,n),errors=s.errs.splice(0),rockForm=worldRock.form,plainForm=worldRock.plain;
  s.dispose();world.dispose();
- return {rockForm,plainForm,rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),snowWhite:sw/Math.max(1,sn),errors};
+ return {rockForm,plainForm,horizonRock,rock:n/(W*H),rockSd:Math.sqrt(Math.max(0,sq/Math.max(1,n)-mean*mean)),saturated:mask.filter((v,k)=>k%4===0&&v===255).length,snow:sn/(W*H),snowLuma:ss/Math.max(1,sn),snowWhite:sw/Math.max(1,sn),errors};
 }
 // Shot 08: the temperate world with desert painted (constant, radius 260 m at [0, -300]) from 110 m over [0, 500]. On the
 // screen row through the circle's centre, the largest change between neighbouring pixels (the sum of the absolute R, G

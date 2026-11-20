@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { PBRDrawRun, PBRModel, parseGLTF } from '../../gltf-pro/dist/index.js';
+import { PBRDrawRun, PBRModel, parseGLTF } from '../../gltf/dist/pbr.js';
 import { Material, createMesh, install } from '../dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { materialQuad } from '../../../tests/support/materials-fixture.js';

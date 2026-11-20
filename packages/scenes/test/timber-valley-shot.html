@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>Timber valley shot</title>
+<style>html,body{height:100%;margin:0;background:#000}#viewport{display:block;width:640px;height:360px}</style></head><body>
+<canvas id="viewport" aria-label="The timber-valley scene, for the shot tool"></canvas>
+<script type="module">
+// @margoengine/scenes/timber-valley as a shot page for tools/shot (shot files from shotFilesFromScene with this page).
+// URL: any catalogue setting but quality (look, weather, fire, fireTime, hour, date, houses, windFrom, seed). The page
+// gives the shot tool `timberShot.engine`, `timberShot.aovs` (geometry, depth as nearness exp(-distance / 2000 m), and
+// SceneTargets' look masks penumbra, subject, lit and shadow with the terrain added), `timberShot.apply` (the scene's
+// own time follows the shot clock: fire, sky and weather) and `timberShot.settings` (per-shot rows through each
+// package's own apply function). The scene has no subject yet (the town draws no buildings and no people are ready), so
+// the subject mask stays empty. WebGPU only (SceneTargets and the terrain).
+import {Engine} from '/packages/core/dist/index.js';
+import {attach,info} from '/packages/scenes/dist/timber-valley.js';
+import {SceneTargets} from '/packages/post/dist/mrt.js';
+const q=new URLSearchParams(location.search),canvas=document.querySelector('#viewport');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,1000,0],target:[100,900,0],fov:45,near:0.5,far:30000}});
+const settings={};
+// `quality` in the URL is the shot tool's tier (@margoengine/quality: high, low), not the scene's film or preview: the
+// scene keeps its own default, film.
+for(const [k,spec] of Object.entries(info.settings)){const v=q.get(k);if(v===null||k==='quality')continue;settings[k]=typeof spec.default==='number'?Number(v):v;}
+const scene=await attach(engine,settings);
+scene.view(scene.views[0],45);
+const targets=SceneTargets.attach(engine,{outputs:{
+  geometry:{wgsl:'vec4f(1, 0, 0, 1)',format:'r8unorm'},
+  depth:{wgsl:'vec4f(exp(-distance(t.eye, t.position) / 2000.0), 0, 0, 1)',format:'r8unorm'},
+  penumbra:'penumbra',subject:'subject',lit:'litGround',shadow:'shadedGround'}});
+targets.add(scene.parts.view.terrain);
+
+let last=null;
+globalThis.timberShot={
+  engine,scene,
+  aovs:()=>({device:engine.gpu,textures:Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow'].map(n=>[n,targets.texture(n)]))}),
+  async apply(state,{time}){if(last!==null&&time>last)scene.advanceTime(time-last);last=time;},
+  settings(values){scene.applySettings(values);},
+};
+engine.start();
+canvas.dataset.ready='true';
+</script></body></html>

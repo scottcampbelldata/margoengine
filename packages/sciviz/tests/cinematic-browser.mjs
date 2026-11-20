@@ -78,7 +78,9 @@ for (const compat of [false, true]) {
       c.configure({ ambientOcclusion: { directions: 6, radius: 1, steps: 4 }, ambient: [1, 1, 1], light: [0, 0, 0] });
       const ao = centre(await pixels()),
         aoCost = await c.cost();
-      c.configure({ shadows: { steps: 32 }, lightDirection: [0, 0, 1], ambient: [0, 0, 0], light: [1, 1, 1] });
+      // light is irradiance; an isotropic scatterer returns light / (4 pi), so 4 pi gives the unit-phase reference.
+      const E = 4 * Math.PI;
+      c.configure({ shadows: { steps: 32 }, lightDirection: [0, 0, 1], ambient: [0, 0, 0], light: [E, E, E] });
       const shadow = centre(await pixels()),
         shadowCost = await c.cost();
       let aoIntegral = 0;
@@ -104,7 +106,7 @@ for (const compat of [false, true]) {
         pathTracing: { bounces: 1, anisotropy: 0, albedo: 1, samples: 256 },
         lightDirection: [0, 0, 1],
         ambient: [0, 0, 0],
-        light: [1, 1, 1],
+        light: [E, E, E],
       };
       c.configure(pathOptions);
       await accumulate(16);
@@ -129,6 +131,12 @@ for (const compat of [false, true]) {
       c.configure({ ...pathOptions, pathTracing: { ...pathOptions.pathTracing, anisotropy: 0.6 } });
       await accumulate(256);
       const forward = centre(await pixels());
+      // Henyey-Greenstein normalised over the sphere, g = 0.6, light behind the camera: scattering cosine -1.
+      const backPixels = await pixels(),
+        backRatio = (1 - 0.6 ** 2) / (1 + 0.6) ** 3,
+        expectedBack = srgb(((128 / 255) * shadowEnergy * backRatio) / alpha) * alpha * 255;
+      let backMean = 0;
+      for (let y = 26; y < 38; y++) for (let x = 26; x < 38; x++) backMean += backPixels[(y * 64 + x) * 4] / 144;
       volume.setClassification({
         kind: 'gradient',
         gradientMax: 1,
@@ -198,6 +206,8 @@ for (const compat of [false, true]) {
         pathCost,
         samples,
         forward,
+        backMean,
+        expectedBack,
         cameraReset,
         restoreError,
         rebootError,
@@ -226,6 +236,7 @@ for (const compat of [false, true]) {
     assert.ok(
       report.forward < report.pathMean * 0.5 && report.pathCost.collisions > 0 && report.shadowCost.shadowRays > 0,
     );
+    assert.ok(Math.abs(report.backMean - report.expectedBack) <= 3, JSON.stringify(report));
     assert.equal(report.samples, 256);
     assert.equal(report.cameraReset, 1);
     assert.equal(report.restoreError, 0);

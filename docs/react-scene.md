@@ -12,7 +12,7 @@ with every bundler; the full list is in [packages/react/SCENE.md](../packages/re
 | Subpath | What an R3F app gets from Fiber or Drei | What it binds |
 | --- | --- | --- |
 | `@margoengine/react` | `<Canvas>`, `<Mesh>`, `useFrame`, events, Suspense | The stage the canvas already creates |
-| `@margoengine/react/gltf-pro`, `/fbx`, `/environment`, `/html`, `/text`, `/controls`, `/sky`, `/shadows`, `/geometry` | Loaders, lights, `<Html>`, `<Text>`, gizmos, environment, sky, shapes (once the kit) | the package each is named after |
+| `@margoengine/react/gltf`, `/fbx`, `/environment`, `/html`, `/text`, `/controls`, `/sky`, `/shadows`, `/geometry` | Loaders, lights, `<Html>`, `<Text>`, gizmos, environment, sky, shapes (once the kit) | the package each is named after |
 | `@margoengine/react/post`, `/dof`, `/tonemap`, `/taa` | Effect composer passes | `post`, `dof`, `tonemap`, `taa` |
 | `@margoengine/react/physics` | Rigid bodies | `physics` |
 | `@margoengine/react/xr` | Immersive session | `xr` |

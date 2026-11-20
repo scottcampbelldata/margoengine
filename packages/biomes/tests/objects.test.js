@@ -217,3 +217,208 @@ test('seasons tint the foliage of seasonal species only, follow seasons.set, and
   assert.ok(near(color(tc), colder), 'a disposed BiomeObjects no longer follows the seasons');
   plain.dispose();
 });
+
+// KB-OWN-BIOMES3: a device restore gives the engine a new GPUDevice, and WebGPU objects are valid only with the device
+// that made them (W3C WebGPU, section 3.2.1). The detail and far-forest density maps were made once and kept, so after
+// a restore scatter bound the lost device's texture at binding 7 of its cull pass. Each fake object names its device.
+const fakeDevice = () => {
+  const device = {
+    limits: { maxTextureDimension2D: 8192 },
+    createTexture: (d) => ({ device, format: d.format, usage: d.usage, destroyed: false, destroy() {
+      this.destroyed = true;
+    } }),
+    queue: { writes: 0, writeTexture() {
+      this.writes++;
+    } },
+  };
+  return device;
+};
+
+test('detail and far-forest density maps are made on the device drawing them, also after a device restore', async () => {
+  const { BiomeWorld } = await import('../dist/index.js');
+  const first = fakeDevice(),
+    second = fakeDevice(),
+    attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (plugin) => attached.push(plugin), gpu: first },
+    world = await BiomeWorld.create({ size: [512, 512], workers: 0 }),
+    placement = {
+      tile() {},
+      species: [],
+      details: [{ id: 'grass', mesh: 'procedural:grass', density: 40 }],
+      tileSize: 256,
+    },
+    objects = await BiomeObjects.attach(engine, placement, {
+      heightmap: () => undefined,
+      bounds: world.bounds,
+      far: { radius: 2500, world },
+    }),
+    maps = attached.filter((p) => p.options?.densityMap).map((p) => p.options.densityMap);
+  assert.ok(maps.length >= 2, `a detail map and at least one far-forest kind: ${maps.length}`);
+  const before = maps.map((read) => read());
+  for (const t of before) assert.equal(t.device, first);
+  assert.deepEqual(
+    maps.map((read) => read()),
+    before,
+    'the same texture while the device stays',
+  );
+  // The restore: the engine draws with a new device.
+  engine.gpu = second;
+  const after = maps.map((read) => read());
+  for (const t of after) assert.equal(t.device, second, 'made again on the restored device');
+  for (const t of before) assert.ok(t.destroyed, "the lost device's copy is destroyed");
+  assert.ok(second.queue.writes >= after.length, 'each new copy is filled from the CPU data');
+  objects.dispose();
+  for (const t of after) assert.ok(t.destroyed);
+  world.dispose();
+});
+
+// The mesh registry (M8 seam, scenes plan push 13): a key in `meshes` draws its own parts in place of the procedural
+// mesh of that key, so a library model (a scanned rock, a fir made by an artist) drops in by name. Before it every key
+// drew a procedural mesh and an unknown key drew a shrub, so a library plant could not be drawn by a biome at all.
+test('meshes draws a registry mesh by key in place of the procedural one, snags included', async () => {
+  const quad = (y) => ({
+      positions: [0, 0, 0, 1, 0, 0, 0, y, 0, 1, y, 0],
+      normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+      indices: [0, 1, 2, 2, 1, 3],
+    }),
+    attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (effect) => attached.push(effect) },
+    species = [
+      { key: 'fir', mesh: 'library:fir', layer: 1 },
+      { key: 'rock', mesh: 'procedural:rock', layer: 0 },
+    ],
+    placement = { tile() {}, species, details: [{ id: 'grass', mesh: 'library:grass', density: 10 }], tileSize: 256 },
+    meshes = {
+      'library:fir': [
+        { geometry: [quad(3), quad(2), quad(1)], color: [0.2, 0.15, 0.1], kind: 'bark' },
+        { geometry: quad(4), color: [0.05, 0.12, 0.05], kind: 'foliage' },
+      ],
+      'procedural:rock': [{ geometry: quad(0.5), color: [0.3, 0.3, 0.3], kind: 'stone' }],
+      'procedural:snag': [{ geometry: quad(6), color: [0.25, 0.2, 0.18], kind: 'bark' }],
+      'library:grass': [{ geometry: quad(0.3), color: [0.3, 0.3, 0.1], kind: 'foliage' }],
+    },
+    objects = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 512, 512], meshes }),
+    tops = (scatter) => scatter.geometries.map((g) => +(g.bounds[1] * 2).toFixed(3));
+  // fir bark (three rings), fir foliage, rock and snag (the grass detail is not a caster).
+  assert.equal(objects.casters.length, 4);
+  const [bark, foliage, rock, snag] = objects.casters;
+  assert.deepEqual(tops(bark), [3, 2, 1], 'the fir bark draws its three rings, finest first');
+  assert.deepEqual(tops(foliage), [4, 4, 4], 'one mesh serves every ring');
+  assert.deepEqual(tops(rock), [0.5, 0.5, 0.5], 'procedural:rock is replaced by the library rock');
+  assert.deepEqual(tops(snag), [6, 6, 6], 'the snag is replaced too');
+  assert.deepEqual(Array.from(bark.options.material.data.slice(0, 3), (v) => +v.toFixed(3)), [0.2, 0.15, 0.1], 'the part colour');
+  assert.equal(foliage.options.clusters, 0.6, 'foliage takes the foliage look');
+  assert.equal(rock.options.wind, undefined, 'stone does not sway');
+  objects.dispose();
+});
+
+test('meshes is checked before anything is built', async () => {
+  const engine = { camera: { position: [0, 0, 0] }, use() {} },
+    placement = { tile() {}, species: [], details: [], tileSize: 256 },
+    at = (meshes) => BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 1, 1], meshes }),
+    tri = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], normals: [0, 1, 0, 0, 1, 0, 0, 1, 0], indices: [0, 1, 2] };
+  await assert.rejects(at([]), TypeError);
+  await assert.rejects(at({ a: [] }), TypeError);
+  await assert.rejects(at({ a: [{ geometry: tri, color: [0, 0, 0], kind: 'leaf' }] }), TypeError);
+  await assert.rejects(at({ a: [{ geometry: tri, color: [0, 2, 0], kind: 'stone' }] }), RangeError);
+  await assert.rejects(at({ a: [{ geometry: [tri, tri], color: [0, 0, 0], kind: 'stone' }] }), TypeError);
+  await assert.rejects(at({ a: [{ geometry: { ...tri, indices: [0, 1, 3] }, color: [0, 0, 0], kind: 'stone' }] }), RangeError);
+  await assert.rejects(at({ a: [{ geometry: { ...tri, normals: [0, 1, 0] }, color: [0, 0, 0], kind: 'stone' }] }), RangeError);
+});
+
+// KB-SCATTER-TEX1: a registry part with texture maps (a scanned fir's needle cards) draws them: its uvs and maps reach
+// the part's ScatterTiles, and a malformed one is refused. Before, a part was one flat colour and its maps were dropped.
+test('meshes parts carry their texture maps to the scatter', async () => {
+  const quad = { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0], normals: [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1], indices: [0, 1, 2, 2, 1, 3] },
+    attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (effect) => attached.push(effect) },
+    placement = { tile() {}, species: [{ key: 'fir', mesh: 'library:fir', layer: 1 }], details: [], tileSize: 256 },
+    baseColor = { width: 1, height: 1, data: new Uint8Array([40, 90, 40, 255]) },
+    textures = { uvs: [0, 1, 1, 1, 0, 0, 1, 0], baseColor, alphaCutoff: 0.4 },
+    meshes = { 'library:fir': [{ geometry: quad, color: [1, 1, 1], kind: 'foliage', textures }] },
+    objects = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 512, 512], meshes });
+  const [needles] = objects.casters;
+  assert.equal(needles.options.textures, textures, 'the maps reach the scatter');
+  objects.dispose();
+  const at = (t) =>
+    BiomeObjects.attach(engine, placement, {
+      heightmap: () => undefined,
+      bounds: [0, 0, 512, 512],
+      meshes: { 'library:fir': [{ geometry: quad, color: [1, 1, 1], kind: 'foliage', textures: t }] },
+    });
+  await assert.rejects(at('needles.png'), TypeError);
+  await assert.rejects(at({ uvs: [0, 1], baseColor }), RangeError);
+});
+
+// Burnt and flooded plants: `states` gives each part its plant state response by key and kind, details included.
+test('states hands each part its plant state response, by mesh key and kind, and is checked', async () => {
+  const { PlantStates } = await import('@margoengine/scatter/states'),
+    attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (effect) => attached.push(effect) },
+    map = PlantStates.create({}, { bounds: [0, 0, 512, 512], resolution: 8 }),
+    trunks = map.plant({ crownBase: 100, trunkRadius: 1000 }),
+    crowns = map.plant({ crownBase: 4 }),
+    grass = map.plant({ stiffness: 0.02 }),
+    asked = [],
+    species = [
+      { key: 'conifer', mesh: 'procedural:conifer', layer: 1 },
+      { key: 'rock', mesh: 'procedural:rock', layer: 0 },
+    ],
+    placement = { tile() {}, species, details: [{ id: 'grass', mesh: 'procedural:grass', density: 10 }], tileSize: 256 },
+    objects = await BiomeObjects.attach(engine, placement, {
+      heightmap: () => undefined,
+      bounds: [0, 0, 512, 512],
+      states: (key, kind) => {
+        asked.push(`${key}:${kind}`);
+        return key === 'procedural:grass' ? grass : kind === 'stone' ? undefined : kind === 'bark' ? trunks : crowns;
+      },
+    });
+  const [bark, foliage, rock] = objects.casters;
+  assert.equal(bark.options.states, trunks, 'the conifer trunk takes the bark response');
+  assert.equal(foliage.options.states, crowns, 'its canopy the foliage response');
+  assert.equal(rock.options.states, undefined, 'stone is left as it is');
+  assert.ok(attached.some((e) => e.options?.states === grass), 'the grass detail takes its own');
+  assert.ok(asked.includes('procedural:conifer:bark') && asked.includes('procedural:rock:stone'), asked.join());
+  objects.dispose();
+  await assert.rejects(
+    BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 1, 1], states: {} }),
+    TypeError,
+  );
+  map.dispose();
+});
+
+// Scenes plan M8: the northern Rockies conifer keys draw their species meshes (@margoengine/procedural/conifers): the
+// near and middle meshes and, for a live tree, the imposter cards in the far ring with the baked cut-out image; dead
+// trees draw a bare stem. Before, every rockies tree was the one generic procedural:conifer.
+test('conifer species keys draw their species meshes, imposters in the far ring, swaying and with their bark', async () => {
+  const conifers = await import('@margoengine/procedural/conifers'),
+    attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (effect) => attached.push(effect) },
+    species = [
+      { key: 'fir', mesh: 'procedural:douglas-fir/pole', layer: 1 },
+      { key: 'larch', mesh: 'procedural:western-larch', layer: 1 },
+      { key: 'dead', mesh: 'procedural:grand-fir/burnt', layer: 1 },
+    ],
+    placement = { tile() {}, species, details: [], tileSize: 256 },
+    objects = await BiomeObjects.attach(engine, placement, { heightmap: () => undefined, bounds: [0, 0, 512, 512] }),
+    tris = (s) => s.geometries.map((g) => g.indices.length / 3),
+    [firBark, firNeedles, larchBark, larchNeedles, deadBark, snag] = objects.casters;
+  assert.equal(objects.casters.length, 6, 'two parts per live tree, one for the burnt tree, then the snags');
+  const fir = conifers.coniferLevels('douglas-fir', { age: 'pole' });
+  assert.deepEqual(tris(firNeedles), fir.canopy.map((g) => g.indices.length / 3), 'near, middle and imposter cards');
+  assert.deepEqual(tris(firBark).slice(0, 2), fir.trunk.slice(0, 2).map((g) => g.indices.length / 3));
+  assert.equal(tris(firBark)[2], 1, 'the far stem is in the imposter');
+  assert.equal(firNeedles.options.textures.baseColor.width, 256, 'the needles draw the baked image');
+  assert.equal(firNeedles.options.textures.uvs.length, 3);
+  assert.deepEqual(Array.from(firNeedles.options.material.data.slice(0, 3)), [1, 1, 1], 'needle colour comes from the image');
+  assert.deepEqual(
+    Array.from(firBark.options.material.data.slice(0, 3), (v) => +v.toFixed(3)),
+    conifers.CONIFER_SPECIES['douglas-fir'].bark.map((v) => +v.toFixed(3)),
+  );
+  assert.ok(firNeedles.options.wind && firBark.options.wind, 'needles and stems take the wind');
+  assert.ok(larchNeedles.options.textures && larchBark.options.wind);
+  assert.equal(deadBark.options.textures, undefined, 'a burnt tree is a bare stem');
+  assert.ok(Array.from(deadBark.options.material.data.slice(0, 3)).every((v) => v < 0.05), 'charred bark');
+  assert.ok(snag);
+  objects.dispose();
+});

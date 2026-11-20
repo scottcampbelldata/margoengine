@@ -3,9 +3,9 @@
 // Loads one model over the throttled server (run.mjs) with loadGLTF, loadGLTFInWorker or loadGLTFProgressive while the
 // engine renders every animation frame and the camera orbits the model, as a user would. Times are from the call.
 import {Engine} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
-import {loadGLTFInWorker} from '/packages/gltf-pro/dist/worker.js';
-import {loadGLTFProgressive} from '/packages/gltf-pro/dist/progressive.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
+import {loadGLTFInWorker} from '/packages/gltf/dist/worker.js';
+import {loadGLTFProgressive} from '/packages/gltf/dist/progressive.js';
 
 const canvas=document.querySelector('canvas'),errors=[];
 const engine=await Engine.create(canvas,{backend:'webgpu',capacity:8192,camera:{position:[0,3,8],target:[0,0,0],near:0.05,far:5000}});

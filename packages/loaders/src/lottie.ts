@@ -48,6 +48,11 @@ export interface LottiePath {
   miterLimit: number;
   /** Dash pattern and offset in composition units, or null. */
   dash: { pattern: number[]; offset: number } | null;
+  /**
+   * Clip outlines in composition units, one per precomposition above the item: its `w` by `h` rectangle, every
+   * transform applied. The item shows only inside all of them. Absent when nothing clips it.
+   */
+  clip?: OutlineCommand[][];
   /** The filled outline as shapes, with holes decided by the fill rule. `flipY` negates y for a y-up world. */
   toShapes(options?: { flipY?: boolean }): Shape[];
 }
@@ -62,6 +67,11 @@ export interface LottieImage {
   opacity: number;
   width: number;
   height: number;
+  /**
+   * Clip outlines in composition units, one per precomposition above the item: its `w` by `h` rectangle, every
+   * transform applied. The item shows only inside all of them. Absent when nothing clips it.
+   */
+  clip?: OutlineCommand[][];
 }
 
 /** What {@link LottieAnimation.frame} returns: everything drawn at a frame, back to front. */
@@ -87,6 +97,8 @@ export interface LottieCanvas {
   bezierCurveTo(a: number, b: number, c: number, d: number, e: number, f: number): void;
   quadraticCurveTo(a: number, b: number, c: number, d: number): void;
   closePath(): void;
+  /** Needed for files whose precompositions clip their layers; `draw` throws `unsupported` without it. */
+  clip?(): void;
   fill(rule?: 'nonzero' | 'evenodd'): void;
   stroke(): void;
   transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
@@ -1055,9 +1067,18 @@ function collect(
           height: asset.height,
         });
     } else if (layer.precomp) {
-      const { remap, layers: inner } = layer.precomp,
-        time = remap ? remap.number(frame) * rate : (frame - layer.startTime) / layer.stretch;
+      const { remap, layers: inner, width, height } = layer.precomp,
+        time = remap ? remap.number(frame) * rate : (frame - layer.startTime) / layer.stretch,
+        first = out.length;
       collect(inner, time, rate, sizes, here, alpha, out);
+      // Lottie specification, precomposition layer: `w` and `h` are the width and height of its clipping rect.
+      if (width > 0 && height > 0 && out.length > first) {
+        const rect = commandsOf([runsOf(rectangle(width / 2, height / 2, width, height, 0))], here);
+        for (let k = first; k < out.length; k++) {
+          const item = out[k]!;
+          item.clip = item.clip ? [rect, ...item.clip] : [rect];
+        }
+      }
     }
   }
 }
@@ -1206,17 +1227,25 @@ export function parseLottie(input: BinaryInput | string, options: LottieOptions 
     frame,
     draw(context, at, drawOptions = {}) {
       for (const item of frame(at)) {
-        if (item.kind === 'path') {
-          paintPath(context, item);
-          continue;
-        }
-        const image = drawOptions.images?.[item.asset];
+        const image = item.kind === 'image' ? drawOptions.images?.[item.asset] : null;
         if (image === undefined) continue;
-        context.save();
-        context.globalAlpha = item.opacity;
-        context.transform(...item.matrix);
-        context.drawImage(image as never, 0, 0, item.width, item.height);
-        context.restore();
+        if (item.clip) {
+          if (!context.clip) throw new LoaderError(F, 'unsupported', 'the canvas has no clip(); precompositions clip');
+          context.save();
+          for (const outline of item.clip) {
+            trace(context, outline);
+            context.clip();
+          }
+        }
+        if (item.kind === 'path') paintPath(context, item);
+        else {
+          context.save();
+          context.globalAlpha = item.opacity;
+          context.transform(...item.matrix);
+          context.drawImage(image as never, 0, 0, item.width, item.height);
+          context.restore();
+        }
+        if (item.clip) context.restore();
       }
     },
   };

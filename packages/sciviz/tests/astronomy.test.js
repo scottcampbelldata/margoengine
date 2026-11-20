@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { parseFITS, readFITS, fitsWCS, fitsGrid } from '../dist/fits.js';
 import { parseMRC, readMRC, mrcGrid } from '../dist/mrc.js';
 import { readOMETIFF, omeTIFFGrid } from '../dist/ometiff.js';
@@ -133,6 +134,21 @@ test('FITS truncated, oversized, malformed and cancelled reads reject explicitly
   bad.fill(32, 0, 80);
   assert.throws(() => parseFITS(bad), /SIMPLE/);
 });
+test('corrupt or truncated gzip FITS and MRC input rejects with the coded gzip error', { timeout: 2000 }, async () => {
+  const fits = gzipSync(read('owner.fits')),
+    mrc = read('emd_1003.map.gz'),
+    damaged = Uint8Array.from(fits);
+  for (let i = 20; i < 60; i++) damaged[i] ^= 0xa5;
+  const gzipError = (error) =>
+    error instanceof TypeError &&
+    /^Scientific image gzip data is corrupt or truncated; supply the complete file/.test(error.message) &&
+    error.cause !== undefined;
+  for (const input of [fits.subarray(0, fits.length >> 1), damaged, new Uint8Array([31, 139, 0, 0])])
+    await assert.rejects(readFITS(input), gzipError);
+  for (const input of [mrc.subarray(0, mrc.length >> 1), new Uint8Array([31, 139, 0, 0])])
+    await assert.rejects(readMRC(input), gzipError);
+  assert.equal((await readFITS(fits)).hdus[0].data.length, 60);
+});
 test('mrcfile owner output: integer and float modes, starts, origin, reordered axes and triclinic cell', {
   timeout: 1000,
 }, async () => {
@@ -142,9 +158,10 @@ test('mrcfile owner output: integer and float modes, starts, origin, reordered a
     assert.deepEqual(map.axisOrder, [2, 1, 3]);
     assert.deepEqual(map.origin, [10, 20, 30]);
     for (let i = 0; i < 60; i++) assert.equal(map.data[i], dtype === 'uint16' ? i + 50000 : i - 25);
-    const zero = map.world([-2, 1, -3]);
+    // ORIGIN places the first sample; START (2, -1, 3) describes the same place and is not added again.
+    const zero = map.world([0, 0, 0]);
     for (let i = 0; i < 3; i++) near(zero[i], map.origin[i]);
-    const p = map.world([-1, 1, -3]);
+    const p = map.world([1, 0, 0]);
     near(p[0], 10 + 2.5 * Math.cos((70 * Math.PI) / 180), 1e-6);
     near(p[1], 20 + 2.5 * Math.sin((70 * Math.PI) / 180), 1e-6);
     assert.throws(
@@ -152,6 +169,37 @@ test('mrcfile owner output: integer and float modes, starts, origin, reordered a
       (e) => e.code === 'unsupported',
     );
   }
+});
+test('MRC first sample: ORIGIN or START, never both; IMOD origin sign and unsigned bytes', { timeout: 1000 }, () => {
+  const source = read('owner-int8.mrc'),
+    make = (edit) => {
+      const bytes = Uint8Array.from(source),
+        v = new DataView(bytes.buffer);
+      edit(v);
+      return parseMRC(bytes);
+    },
+    stamp = (flags) => (v) => {
+      v.setInt32(152, 1146047817, true);
+      v.setInt32(156, flags, true);
+    };
+  // With ORIGIN zero the crystallographic START places the first sample.
+  const crystal = make((v) => [196, 200, 204].forEach((o) => v.setFloat32(o, 0, true)));
+  const fromStarts = crystal.world([-2, 1, -3]);
+  for (let j = 0; j < 3; j++) near(fromStarts[j], 0, 1e-9);
+  // IMOD before 4.11 stores the origin negated (flag 4 clear); 4.11 and later set flag 4.
+  assert.deepEqual(make(stamp(1)).world([0, 0, 0]).map(Math.round), [-10, -20, -30]);
+  assert.deepEqual(make(stamp(5)).world([0, 0, 0]).map(Math.round), [10, 20, 30]);
+  // Mode 0 is signed (MRC2014) unless an IMOD stamp leaves flag 1 clear (IMOD before 4.9 wrote unsigned bytes).
+  assert.equal(make(() => {}).data[0], -25);
+  assert.equal(make(stamp(5)).data[0], -25);
+  assert.equal(make(stamp(4)).data[0], 231);
+  // Complex modes keep ORIGIN as a phase origin in pixels, not a position.
+  const complex = new Uint8Array(1024 + 60 * 8);
+  complex.set(read('owner-float32.mrc').subarray(0, 1024));
+  new DataView(complex.buffer).setInt32(12, 4, true);
+  const fourier = parseMRC(complex);
+  assert.deepEqual(fourier.origin, [10, 20, 30]);
+  for (let j = 0; j < 3; j++) near(fourier.world([-2, 1, -3])[j], 0, 1e-9);
 });
 test('real EMDB CC0 map matches independent mrcfile dimensions and decoded densities', { timeout: 10000 }, async () => {
   const map = await readMRC(read('emd_1003.map.gz')),
@@ -229,11 +277,11 @@ test('MRC mode 101 skips odd-width row padding and requires every padded byte', 
     assert.throws(() => parseMRC(bytes.subarray(0, bytes.length - 1)), /truncated/);
   }
 });
-test('OME BigTIFF and classic TIFF, tiles and strips, LZW and deflate retain uint16 Z/C/T stacks', {
+test('OME BigTIFF and classic TIFF, tiles and strips, LZW, deflate and Zstandard retain uint16 Z/C/T stacks', {
   timeout: 10000,
 }, async () => {
   for (const big of [false, true])
-    for (const codec of ['lzw', 'deflate']) {
+    for (const codec of ['lzw', 'deflate', 'zstd']) {
       const stack = await readOMETIFF(read(`owner-${big ? 'True' : 'False'}-${codec}.ome.tiff`));
       assert.deepEqual(stack.size, { X: 21, Y: 19, Z: 2, C: 3, T: 2 });
       assert.deepEqual(stack.spacing, [0.25, 0.5, 2]);
@@ -269,6 +317,92 @@ test('OME explicit TiffData reverse order and multi-file UUID resolution', { tim
   assert.equal((await stack.plane(1))[0], 222);
   assert.equal((await stack.plane(1))[0], 222);
   assert.deepEqual(resolved, ['part.ome.tiff']);
+});
+/** Minimal little-endian classic TIFF: uncompressed 8-bit pages, one strip each, OME-XML on the first page. */
+const ometiff = (xml, pages) => {
+  const text = new TextEncoder().encode(xml + '\0'),
+    out = [],
+    u16 = (v) => [v & 255, v >> 8],
+    u32 = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, v >>> 24];
+  let size = 8 + text.length;
+  const layout = pages.map((p, i) => {
+    const data = size,
+      bits = (size += p.data.length),
+      tags = 11 + (i === 0 ? 1 : 0),
+      ifd = (size += p.spp > 2 ? p.spp * 2 : 0);
+    size += 2 + tags * 12 + 4;
+    return { data, bits, ifd, tags };
+  });
+  out.push(0x49, 0x49, 42, 0, ...u32(layout[0].ifd), ...text);
+  pages.forEach((p, i) => {
+    const { data, bits, ifd, tags } = layout[i];
+    out.push(...p.data);
+    if (p.spp > 2) for (let s = 0; s < p.spp; s++) out.push(...u16(8));
+    const entries = [
+      [256, 3, 1, p.w],
+      [257, 3, 1, p.h],
+      [258, 3, p.spp, p.spp > 2 ? bits : 8],
+      [259, 3, 1, 1],
+      [262, 3, 1, p.spp === 3 ? 2 : 1],
+      ...(i === 0 ? [[270, 2, text.length, 8]] : []),
+      [273, 4, 1, data],
+      [277, 3, 1, p.spp],
+      [278, 3, 1, p.h],
+      [279, 4, 1, p.data.length],
+      [284, 3, 1, 1],
+      [339, 3, 1, 1],
+    ];
+    assert.equal(entries.length, tags);
+    out.push(...u16(tags));
+    for (const [tag, type, count, value] of entries)
+      out.push(...u16(tag), ...u16(type), ...u32(count), ...(type === 3 && count === 1 ? [...u16(value), 0, 0] : u32(value)));
+    out.push(...u32(i + 1 < pages.length ? layout[i + 1].ifd : 0));
+    assert.equal(out.length, ifd + 2 + tags * 12 + 4);
+  });
+  return new Uint8Array(out);
+};
+const ome = (pixels, inner) =>
+  `<?xml version="1.0" encoding="UTF-8"?><OME xmlns="http://www.openmicroscopy.org/Schemas/OME/2016-06" UUID="urn:uuid:main"><Image ID="Image:0"><Pixels ID="Pixels:0" Type="uint8" ${pixels}>${inner}</Pixels></Image></OME>`;
+test('OME Plane positions index channels, not samples, and convert to the physical size unit', { timeout: 10000 }, async () => {
+  const rgb = await readOMETIFF(
+    ometiff(
+      ome(
+        'DimensionOrder="XYCZT" SizeX="2" SizeY="1" SizeZ="1" SizeC="3" SizeT="1" PhysicalSizeX="0.5" PhysicalSizeZ="2" PhysicalSizeZUnit="nm"',
+        '<Channel ID="Channel:0:0" SamplesPerPixel="3"/><TiffData/><Plane TheZ="0" TheC="0" TheT="0" PositionX="1" PositionXUnit="mm" PositionY="20" PositionZ="3" PositionZUnit="Å"/>',
+      ),
+      [{ w: 2, h: 1, spp: 3, data: [1, 2, 3, 4, 5, 6] }],
+    ),
+  );
+  assert.deepEqual([...(await rgb.plane(0, 2))], [3, 6]);
+  // Every sample of the RGB channel shares the channel's Plane: 1 mm is 1000 µm, 3 Å is 0.3 nm.
+  for (const c of [0, 1, 2]) {
+    const world = (await rgb.image(c)).world([2, 0, 1]);
+    assert.ok(Math.abs(world[0] - 1001) < 1e-9 && world[1] === 20 && Math.abs(world[2] - 2.3) < 1e-12, `${c}: ${world}`);
+  }
+});
+test('OME TiffData with neither IFD nor PlaneCount covers every IFD of the file it names', { timeout: 10000 }, async () => {
+  const resolved = [],
+    part = ometiff(ome('DimensionOrder="XYZCT" SizeX="1" SizeY="1" SizeZ="3" SizeC="1" SizeT="1"', ''), [
+      { w: 1, h: 1, spp: 1, data: [20] },
+      { w: 1, h: 1, spp: 1, data: [30] },
+    ]),
+    stack = await readOMETIFF(
+      ometiff(
+        ome(
+          'DimensionOrder="XYZCT" SizeX="1" SizeY="1" SizeZ="3" SizeC="1" SizeT="1"',
+          '<TiffData PlaneCount="1"><UUID>urn:uuid:main</UUID></TiffData><TiffData FirstZ="1"><UUID FileName="part.ome.tif">urn:uuid:part</UUID></TiffData>',
+        ),
+        [{ w: 1, h: 1, spp: 1, data: [10] }],
+      ),
+      {
+        resolve: async (name) => {
+          resolved.push(name);
+          return part;
+        },
+      },
+    );
+  assert.deepEqual([(await stack.plane(0))[0], (await stack.plane(1))[0], (await stack.plane(2))[0]], [10, 20, 30]);
+  assert.deepEqual(resolved, ['part.ome.tif']);
 });
 test('IDR CC BY 4.0 native pixel crop keeps each interleaved RGB sample without display scaling', {
   timeout: 10000,

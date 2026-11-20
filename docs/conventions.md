@@ -83,12 +83,76 @@ does `npm run hygiene`, so the fast gate of any lane fails on an unlisted messag
 package tests (an unlisted sciviz message once reached `main` that way). The quality gate counts a linked message as naming its
 fix, and a link to a missing entry as naming none.
 
+Fix commits: `npm run hygiene` also checks every commit in `origin/main..HEAD` (override with
+`HYGIENE_COMMIT_RANGE`; an empty range is skipped). A commit typed `fix` or `fix(scope)` must change a test file (under
+a `tests/` or `test/` folder, or `*.test.*`) or carry a body line `Regression: <repo path>` naming a test file that
+exists in that commit; otherwise hygiene fails naming the commit (`scripts/support/fix-regression.mjs`,
+`tests/hygiene-fix-regression.test.js`). Commits already on `main` are never rewritten.
+
 Optional packages use the same helpers and help page entries (add them to
 `scripts/errors/entries.js`, one entry per message family), but the message itself
 names the failing field, allowed range and fix. A help link supplements that
 guidance; it does not replace it. Raise an optional entry's recorded ceiling with
 before/after measurements rather than shorten diagnostics to fit. Core and the
 stage root retain their size-limited message convention.
+
+Every `margoengine.com` link in code, READMEs and docs names a page the site build produces and, after a `#`, an
+anchor that page has; `npm run hygiene` fails on one that does not (`scripts/check-site-links.mjs`). Error help is at
+`/errors#<id>`; package help is the package README at `/llms/packages/<package>.md` and a document of `docs/` is at
+`/llms/docs/<path>.md`. There is no `/docs/<name>` page. A new demo page goes into `scripts/support/site-routes.mjs`,
+which `scripts/build-site.js` builds from.
+
+## Borrowed GPU objects
+
+A `GPUTexture`, `GPUTextureView`, `GPUSampler` or `GPUBuffer` that the caller made and passed in is borrowed. It
+belongs to the device that made it: WebGPU makes an object valid to use only with its own device, and a lost device
+takes all its objects with it and raises no errors of its own (W3C WebGPU, sections 3.2.1 and 3.5.2). Nothing can
+ask an object for its device, and a lost object cannot be revived. So after a device restore (`engine.rebootDevice()`,
+or core's own recovery) the package still holds an object the new device rejects. One rule covers every option that
+takes one:
+
+1. Margo never destroys a borrowed object and never carries it to another device.
+2. Every such option also takes `(device: GPUDevice) => T`, called once per device: at first use and again after
+   each restore. READMEs show this form first. With it nothing is lost and nothing is reported.
+3. A plain object held at a restore is dropped and the frame keeps drawing. A part that draws only through the object
+   is skipped (a sprite or tile layer, decals, a flare image, terrain; a light pattern becomes no pattern). A map that
+   only modulates falls back to what its slot uses when the option is left out (white, a flat normal, black, no dirt).
+4. The owner reports once per lost object through `engine.onError`, never by throwing from a frame:
+   a `MargoError` with code `'state'`, `'<Owner> <option> lost with the device; pass a function or call <setter>'`,
+   linking to [margoengine.com/errors#borrowed-lost](https://margoengine.com/errors#borrowed-lost).
+5. A new object goes in through the option's setter at any time, usually from the caller's own plugin
+   `onDeviceRestored(engine)`. The setter records `engine.gpu` at that moment, so the order of the caller's hook and
+   the owner's hook does not matter.
+6. Not covered: per-frame getters `() => GPUTexture | undefined` (read live every frame), per-call arguments (core
+   `RenderView.target`, a transition's frame target) and the caster, pick and draw records one package hands another
+   each frame. A lost object handed in after the restore is the caller's error and takes core's validation path.
+
+A caller's object that holds a device of its own, rather than one GPU object (a `GpuVoxelMesher` given to
+`VoxelRenderer`), has a `setDevice(device)` method, and the owner it was given to calls it from its restore hook with
+`engine.gpu`; the owner keeps the object and never disposes or remakes it. Used on its own, the caller calls it after
+`engine.rebootDevice()`; until then its work waits and none goes to the lost device.
+
+Owners build this from `packages/shared/borrowed.js`: `borrow(value, name, setter, device?)` makes a slot,
+`lend(slot, device, engine)` returns what to bind (the function's result for this device, the plain object while its
+device is in use, or `undefined` after the one report), `relend(slot, value, device)` is what a setter calls, and
+`fix(slot, engine.gpu)` in `setup` ties an object given before attach to the device it was set up on.
+
+An option that takes either a GPU object or an options object (`{ texture, sampler }`) tells them apart with
+`isOptionObject(value)` from the same module: an options object is a plain object, and every GPU object, on either
+backend, and every materials Texture is a class instance. Never by field names: the WebGL2 layer's texture keeps its GL
+texture as `texture` and its views keep their texture there, so a `'texture' in value` test once bound the GL object
+and threw on every frame (KB-COMPAT-RAWFIRST1).
+`tests/borrowed-gpu.test.js` reads every `api/*.api.md`, finds each member that can hold one of the four GPU types, and
+fails unless `scripts/borrowed-registry.json` lists it as `ruled` (its source imports `shared/borrowed.js`), `exempt`
+with a reason, or `pending`; pending rows are open work tracked in docs/known-bugs.md (KB-RESTORE-BORROWED1).
+The scan (`scripts/borrowed-sites.mjs`) throws, naming the report and line, on any head or statement it cannot read,
+instead of skipping what follows: a type parameter default in a head, a comment line, a template literal over several
+lines and an enum once hid 17 members without a word.
+
+Rivals, from their public docs: Babylon.js rebuilds its own resources after a context loss and leaves the
+application's buffers to `onContextRestoredObservable`; PlayCanvas fires `devicerestored` and resumes rendering while
+the application regenerates GPU-made content; three.js offers `onDeviceLost` and an `onError` so errors do not
+escalate. None of them stops drawing.
 
 ## Core freeze
 
@@ -164,7 +228,7 @@ A name declared and exported by two packages must mean the same thing, or be ren
 | `smoothstep` (tween) | math, shader | Tween's easing renamed `easeSmoothstep`. |
 | `ExpandOptions` | lines, procedural | lines' renamed `ExpandLineOptions` (its function is `expandLine`). |
 | `Vector3` (navmesh/build) | math | `Navigation` takes math's `Vec3Like`; math's `Vector3` is the class. |
-| `loadGLTF`, `parseGLTF` | gltf, gltf-pro | Open, group B. |
+| `loadGLTF`, `parseGLTF` | gltf, gltf/pbr | Open, group B. |
 | `texture` (vfx) | shader | vfx's `@margoengine/vfx/texture` feature object renamed `textureFeature` (pass `{texture: textureFeature}`); shader's `texture()` node keeps the name. |
 | `Environment`, `Sky`, `Bloom`, `SSAO`, `GTAO`, `SSR`, `SSGI`, `MotionBlur`, `LensFlare`, `SMAA`, `FXAA`, `Glitch`, `Afterimage`, `TAA`, `Tonemap`, `Shadows`, `AmbientLight`, `HemisphereLight`, `Fog`, `Scene`, `RenderView`, `BatchedMesh`, `DepthTexture`, `SceneTargets`, `OrbitControls`, `MapControls`, `ArcballControls` | environment, sky, post, taa, tonemap, shadows, core, materials, controls; react | Kept: the plugin or pass class and react's JSX component that adds it with the same options (React names components after what they render). Allowlisted. |
 | `Vec3` (lod), `Color` (sky, terrain), `HeightField` (terrain) | math | Math's: lod uses `MutableVec3` / `Vec3`, sky and terrain colours are `Vec3`, terrain re-exports math's `HeightField`. |
@@ -174,7 +238,11 @@ A name declared and exported by two packages must mean the same thing, or be ren
 
 `npm run quality` (`scripts/quality-gate.mjs`, part of `npm run verify` and CI, about 25 s after a build) runs six
 ratchets over `packages/`. Each has a baseline of today's known violations in `scripts/quality/baselines/<gate>.json`:
-a gate passes on what its baseline records and fails on anything new or worse, naming the fix.
+a gate passes on what its baseline records and fails on anything new or worse, naming the fix. One strict step,
+`readme-types`, has no baseline: every example of every package README and guide must type-check against the built
+packages (`npm run check:readmes` prints the same list; its known list only shrinks). It runs here, in every fast gate,
+because a change to one package can break another package's example while a lane runs only its own package tests; on
+2026-11-18 ten such errors were on main, seen only by the full verify after the push.
 
 | Gate | Items | Fails when |
 | --- | --- | --- |
@@ -232,6 +300,15 @@ non-alias entry needs a TypeScript report with no unresolved exports. Missing ma
 explicit directory in `lock.json`'s `internal` list. TSDoc stays in hygiene and quality's zero-tsdoc API baseline.
 Current internal directories are shared TypeScript, the Rust-only kernel crate and the retired webgl directory
 containing licence/notice files. The latter two are explicit inventory exceptions, not user-facing JS packages.
+
+The report reads cross-package declarations through `node_modules/@margoengine/*`, so those links must point at
+this checkout's `packages/`. A worktree that junctions the main checkout's whole `node_modules` folder reads the
+main checkout's packages instead, and every cross-package re-export came out as `from "undefined"` (15 reports
+"changed" on a main that matched, KB-API-FOREIGN1). `api-report.js` now stops with the list of foreign links
+before it reads anything (`foreignWorkspaceLinks` in `scripts/api-report-scope.mjs`,
+`tests/api-report-foreign-links.test.js`). Give a worktree its own `node_modules` folder whose third-party entries
+are junctions to the main checkout's and whose `@margoengine/*` entries are junctions to its own `packages/`, as
+`linkModules` in `scripts/fresh-clone-check.mjs` does.
 
 Day 0 locks every existing and future entry of core and stage. Every other reported package is in `watch`,
 the conservative fallback to the private tracker. Watch diffs print `would fail:` and pass compatibility,
@@ -291,8 +368,8 @@ fails for any script that starts a browser and an HTTP server of its own without
 Engine-bound factories are additive convenience APIs. Construction that already registers or installs a
 wrapper is called once; plugin factories register through the owning engine and dispose a newly created
 resource if registration fails. GPULabelLayer and LivePageBridge detach their registrations on disposal.
-LensDrops.attach lazily loads the optional post/stack peer and owns its one-effect PostStack; disposing
-the returned lens removes both registrations. It accepts an optional AbortSignal before and after the load.
+LensDrops.attach lazily loads the optional post/stack peer and joins the scene's PostStack (or makes one, which
+goes with its last effect); disposing the returned lens takes it out of the stack and removes its registration. It accepts an optional AbortSignal before and after the load.
 ImportedLightmapInstallation.attach takes the model, bake and optional node indices, matching applyLightmap.
 StereoOutput, Fur, AssetInstaller, SceneEvents, ValueClipPlayer and VoxelObjects factories retain their
 constructor defaults and ownership. AnimationMixer.attach takes the engine and mixer root.

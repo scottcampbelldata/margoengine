@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
 import { Shadows } from '../packages/shadows/dist/index.js';
 import { optionalGPU } from './support/optional-gpu.js';
 import { materialQuad } from './support/materials-fixture.js';
@@ -59,12 +59,14 @@ test('untransformed shadow casters retain the recorded shader and 144-byte unifo
     const pipelines = shadowPipelines(s);
     assert.equal(pipelines.length, 1);
     // The quad has no COLOR_0, so it casts on the exact vertex alpha path (shared/caster.js solidVertexDepth): the
-    // recorded shader with only that path's two edits.
+    // recorded shader with only that path's two edits. Its clip position is declared @invariant (WGSL 12.10), so every
+    // caster program writes the same shadow depth for the same position; that attribute is the only change from the
+    // previous digest.
     const code = pipelines[0].vertex.module.code;
     assert.match(code, /o\.alpha=1\.0-\(1\.0\);/);
     assert.equal(
       digest(code.replace('o.alpha=1.0-(1.0);', 'o.alpha=i.color.a;').replace('(1.0-i.alpha)', 'i.alpha')),
-      'f8d50d66edc6126585b54be2138ec93f0f98cf6dc7da45405c7953fdfc3cf47f',
+      '022eac2b4e8f15722104e192edd23eed778cf6ca1041cbe8b2cc3948e527e555',
     );
     assert.equal(s.resources.filter((r) => r.size === 144 && !r.destroyed).length, 4);
     assert.equal(s.resources.filter((r) => r.size === 176).length, 0);

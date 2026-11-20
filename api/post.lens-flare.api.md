@@ -20,7 +20,7 @@ export class LensFlare implements EnginePlugin {
 }
 
 export interface LensFlareElement {
-    texture?: GPUTexture;
+    texture?: Borrowable<GPUTexture>;
     size: number;
     distance?: number;
     color?: readonly [number, number, number];
@@ -35,4 +35,8 @@ export interface LensFlareOptions {
     occlusionRadius?: number;
     enabled?: boolean;
 }
+
+// Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 ```

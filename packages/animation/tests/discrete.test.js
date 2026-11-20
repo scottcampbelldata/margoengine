@@ -9,7 +9,7 @@ import {
 } from '../dist/discrete-tracks.js';
 import { AnimationMixer, LoopOnce, AdditiveAnimationBlendMode } from '../dist/mixer.js';
 import { ownerEngine } from './owner-lifetime.fixture.js';
-import { PBRModel, GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { PBRModel, GLTFAsset } from '../../gltf/dist/pbr.js';
 import { skinnedStrip } from '../test/fixture.js';
 
 test('step sampling agrees with an independent scan at keys, between keys and outside', () => {

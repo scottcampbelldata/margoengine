@@ -1,7 +1,7 @@
 // Serves built apps with the headers from their own _headers file (Cloudflare Pages / Netlify syntax) and loads each
 // page in a real browser, failing on any CSP violation, page error or failed feature. Checks docs/deploying.md.
-// After `npm run build:packages` and `npm run build:site`, on AC power, under the GPU lock:
-//   node scripts/gpu-lock.mjs run --owner=<id> -- node scripts/csp-check.mjs     harness, create-margo app, site/dist
+// After `npm run build:packages` and `npm run build:site`, on AC power:
+//   node scripts/run-with-timeout.mjs -- node scripts/csp-check.mjs     harness, create-margo app, site/dist
 //   node scripts/csp-check.mjs harness    any subset of: harness app site
 // CSP_OVERRIDE='<policy>' replaces the CSP on every response (to show what a missing directive breaks); with `harness`
 // alone the run is recorded in examples/package-benchmarks/results/csp-check-negative.json.

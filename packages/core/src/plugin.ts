@@ -162,7 +162,14 @@ export class FrameGraph {
       this.passes.some((p) => p.name === pass.name)
     )
       throw typeError('Invalid pass', 'arguments');
-    const record = { ...pass, owner: this.owner };
+    // The graph's own record calls the caller's pass: a class instance keeps its prototype methods and `this` is the
+    // caller's object, so state the pass keeps on itself reaches its owner.
+    const record = {
+      ...pass,
+      owner: this.owner,
+      execute: (context: PassContext) => pass.execute(context),
+      prepare: (context: PassContext) => pass.prepare?.(context),
+    };
     this.passes.push(record);
     this.passes.sort((a, b) => a.order - b.order);
     this.revision++;

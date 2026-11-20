@@ -1,12 +1,12 @@
 // @margoengine/blender/components: the tags of a real Blender 5.2.3 export (tests/fixtures/components.margo, made by
-// tools/blender-addon/tests/blender_components.py) as glTF extensions, then simulated by glTF Pro's physics reader with
+// tools/blender-addon/tests/blender_components.py) as glTF extensions, then simulated by glTF PBR's physics reader with
 // the real solver: the crate and the ball come to rest on the floor where the mechanics put them.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Physics } from '../../physics/dist/index.js';
-import { GLTFAsset } from '../../gltf-pro/dist/index.js';
-import { applyGLTFPhysics } from '../../gltf-pro/dist/physics.js';
+import { GLTFAsset } from '../../gltf/dist/pbr.js';
+import { applyGLTFPhysics } from '../../gltf/dist/physics.js';
 import { decodeMargo } from '../dist/index.js';
 import { margoComponents, parseMargoComponents } from '../dist/components.js';
 

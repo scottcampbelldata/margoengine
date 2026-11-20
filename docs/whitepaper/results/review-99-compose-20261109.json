@@ -2,7 +2,7 @@
   "scope": "Review 99 P2 composition only; full-scene mesh and remaining P3 findings stay open",
   "notes": [
     "Native transport capture is retained from the first run. Its original AOV oracle incorrectly expected a triangle id through a medium. The suite reports the first boundary. The corrected AOV checks ran separately, without changing numeric bounds or repeating the transport comparisons.",
-    "Each backend uses a separate bounded shared GPU lease. CPU checks and builds take no GPU lease. No timing or speed experiments ran.",
+    "Each backend uses a separate bounded the GPU run. CPU checks and builds. No timing or speed experiments ran.",
     "Standalone shader strings match the parent 8ca1632cb exactly for default, disabled and extreme feature settings. The new composed RIS triangle-marker branch does not alter standalone mesh shaders."
   ],
   "nativeTransport": {

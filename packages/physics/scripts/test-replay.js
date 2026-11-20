@@ -9,8 +9,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
@@ -18,7 +20,7 @@ const golden = JSON.parse(await readFile(resolve(root, 'tests/fixtures/replay-ha
 const chosen = process.argv.find((arg) => arg.startsWith('--browsers='))?.slice('--browsers='.length);
 const browsers = (chosen ?? process.env.REPLAY_BROWSERS ?? 'chromium,firefox').split(',');
 await mkdir(results, { recursive: true });
-const server = await createServer({ configFile: resolve(root, 'vite.config.js'), logLevel: 'error', server: { port: 0 } });
+const server = await createServer({ plugins: [noFileWatcher()], configFile: resolve(root, 'vite.config.js'), logLevel: 'error', server: { port: 0 } });
 await server.listen();
 const report = [];
 try {
@@ -33,6 +35,8 @@ try {
     try {
       const page = await browser.newPage(),
         errors = [];
+      // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+      if (compatRun()) await page.addInitScript(compatShim, compatUrl());
       page.on('pageerror', (error) => errors.push(error.message));
       await page.goto(`${server.resolvedUrls.local[0]}tests/replay.html`);
       await page.waitForFunction(() => typeof window.runReplay === 'function', null, { timeout: 60_000 });

@@ -1,6 +1,6 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/terrain/test/planet-recipes.browser.mjs
-//   MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --owner=<you> -- node packages/terrain/test/planet-recipes.browser.mjs
+// Real-GPU check (run from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/terrain/test/planet-recipes.browser.mjs
+//   MARGO_COMPAT=1 node scripts/run-with-timeout.mjs -- node packages/terrain/test/planet-recipes.browser.mjs
 // `PlanetTerrain` draws every `planetPreset` (moon, mars, asteroid, ice) from orbit and from 3 km up (5% of the radius on the asteroid), 320 x 240 exact
 // pixels: ground fills the view, the surface is lit with real relief (a deviation over 2 in the luminance), no validation
 // error, and a second engine draws the same bytes (the picture is deterministic).

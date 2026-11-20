@@ -1,7 +1,7 @@
 // Animation.attach puts the animation in its model's scene, wherever it is called from (docs/integration-fixtures.md).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../dist/index.js';
 import { skinnedStrip } from '../test/fixture.js';
 import { ownerEngine } from './owner-lifetime.fixture.js';

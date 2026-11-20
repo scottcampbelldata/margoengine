@@ -1,15 +1,24 @@
-import { clusterBrdf, clusterCell, decayTerms, ggxD, legacyTerms, smithGCorrelated } from '../../shared/light-terms.js';
-const declarations = (group: number) => /* wgsl */ `
+import {
+  clusterBrdf,
+  clusterCell,
+  decayTerms,
+  ggxD,
+  ggxDOf,
+  legacyTerms,
+  smithGCorrelated,
+} from '../../shared/light-terms.js';
+// While some light has a `radius` (sized), each light record carries one more vec4f, `size` (x: the radius).
+const declarations = (group: number, sized = false) => /* wgsl */ `
 struct ClusterFrame {view:mat4x4f,grid:vec4u,screen:vec4f,depth:vec4f,intensity:vec4f}
-struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f}
+struct ClusterLight {positionRange:vec4f,colorIntensity:vec4f,directionOuter:vec4f,params:vec4f${sized ? ',size:vec4f' : ''}}
 @group(${group}) @binding(4) var<uniform> clusterFrame:ClusterFrame;
 @group(${group}) @binding(5) var<storage,read> clusterLights:array<ClusterLight>;
 `;
 // Clustered shading (Olsson, Billeter & Assarsson 2012): exponential depth slices, sphere-AABB and cone-sphere culling.
 // The 1024 indices per cell is Margo's cap; culling stops at it, so a cell reached by more lights (maxLights above 1,024)
 // never writes into the next cell's list.
-export const cullingShader =
-  declarations(0) +
+const culling = (sized: boolean) =>
+  declarations(0, sized) +
   /* wgsl */ `
 @group(0) @binding(6) var<storage,read_write> clusterCounts:array<u32>;
 @group(0) @binding(7) var<storage,read_write> clusterIndices:array<u32>;
@@ -41,6 +50,63 @@ export const cullingShader =
   }
   clusterCounts[id]=count;
 }`;
+export const cullingShader = culling(false);
+/** {@link cullingShader} over light records with their `size` (some light has a radius). */
+export const sizedCullingShader = culling(true);
+// Sphere lights (Karis 2013, "Real Shading in Unreal Engine 4", SIGGRAPH course notes, section "Sphere Lights",
+// equations 10, 11 and 14): the specular takes its light direction from the representative point, the point of the
+// sphere nearest the reflection ray (centerToRay = (L . r) r - L, closestPoint = L + centerToRay saturate(radius /
+// |centerToRay|)), and GGX D at that direction is scaled by (alpha / alpha')^2 with alpha' = saturate(alpha + radius /
+// (2 distance)), the energy of the lobe widened by the sphere's angle. Two additions of Margo's: (1) alpha' is kept at
+// least radius / (2 distance), the same value from half the radius outward, so inside the source the scale keeps the
+// bound below too; (2) the widening is anisotropic, as Karis's tube light: across the plane of incidence the sphere's
+// angle maps to half of it in half-vector space, along it to half of it over v.h (the half-vector Jacobian, dl = 4 (v.h)
+// dh: Walter, Marschner, Li and Torrance 2007, eq. 14), so the normalisation is alpha^2 / (alpha_x alpha_y) (anisotropic
+// GGX's 1 / (pi alpha_x alpha_y)) with alpha_x from radius / (2 distance) and alpha_y from radius / (2 distance v.h). At
+// normal incidence (v.h = 1) that is Karis's (alpha / alpha')^2; at grazing views it stops the 1 / (n.v) of the BRDF
+// from lifting a highlight past the sphere's own radiance, which an isotropic alpha' allows (4x on the Cabin Hearth
+// kettle spout). So where h = n (v.h = n.v) the specular of a light of intensity I and radius r is
+// G F I / (4 pi alpha_x alpha_y (n.v) d^2) <= F I / (pi r^2), the sphere's radiance times F, at every distance and
+// angle; at normal incidence F0 I / (4 pi alpha'^2 d^2). The loop's names d, g and fresnel hold
+// the representative point's terms.
+// Diffuse (KB-FIRE-WALLHOT1): the irradiance of the sphere, not of its centre. A sphere of radiance L = I / (pi r^2)
+// seen under the angular radius sigma (sin sigma = r / d) lights a plane with L times the cosine-weighted solid angle of
+// its cap (Snyder 1996, "Area Light Sources for Real-Time Graphics", MSR-TR-96-11, the subhemispherical source;
+// Lagarde and de Rousiers 2014, "Moving Frostbite to Physically Based Rendering 3.0", section 4.7 (area lights); Howell's
+// configuration factor B-43, a tilted differential element to a sphere): fully above the horizon pi sin^2 sigma
+// cos theta, which is I cos theta / d^2, the point light's own term (Karis 2013 lights diffuse from the centre for that
+// reason); crossing it (cos^2 theta < sin^2 sigma) (cos theta acos(y) - x sin theta sqrt(1 - y^2)) sin^2 sigma +
+// atan(sin theta sqrt(1 - y^2), x), x = cot sigma, y = -x cot theta. Inside the sphere (d < r) the cap is the
+// hemisphere it is at the surface (sin sigma = 1), so the irradiance is continuous at d = r and never above pi L = I / r^2,
+// where the point light's I / d^2 grows without limit (the Cabin Hearth firebox back, 0.09 m from flame spheres of
+// 0.634 m, was lit 50 times past it). The loop writes it as an effective cosine: `nl` is the cap's form factor over
+// pi sin^2 sigma (0 to 1; exactly the clamped centre cosine above the horizon outside the sphere), times d^2 / r^2 inside
+// it, so nl times the falloff's 1 / d^2 is the sphere's irradiance per unit intensity. Every BRDF that multiplies the
+// loop's nl (this one, materials' Lambert and Phong) gets it; the specular's nl / (4 nl nv) still cancels, and its
+// Smith G takes the representative point's cosine. A light of radius 0 takes the centre's terms exactly (select), so a
+// radius-0 light in such a shader shades as before.
+const sphereTerms = (head: string) =>
+  head
+    .replace(
+      'let nl=clamp(dot(n,l),0.0,1.0);',
+      'let rs=light.size.x;let sfc=clamp(dot(n,l),-1.0,1.0);let sfs=min(rs*rs/max(distance*distance,0.000001),1.0);var sfg=max(sfc,0.0);\n    ' +
+        'if(sfc*sfc<sfs){let sft=sqrt(max(1.0-sfc*sfc,0.0));let sfx=sqrt(max(1.0/sfs-1.0,0.0));let sfy=clamp(-sfx*sfc/max(sft,0.000001),-1.0,1.0);' +
+        'let sfq=sft*sqrt(1.0-sfy*sfy);sfg=clamp(((sfc*acos(sfy)-sfx*sfq)*sfs+atan2(sfq,sfx))/(3.14159265*sfs),0.0,1.0);}\n    ' +
+        'let nl=select(clamp(dot(n,l),0.0,1.0),sfg*select(1.0,max(distance*distance,0.000244140625)/(rs*rs),distance<rs),rs>0.0);',
+    )
+    .replace(
+      'let d=',
+      'let rr=reflect(-v,n);let ray=dot(delta,rr)*rr-delta;let sp=delta+ray*clamp(rs/max(length(ray),0.000001),0.0,1.0);' +
+        'let sl=select(l,sp/max(length(sp),0.0001),rs>0.0);let sh=select(h,(v+sl)/max(length(v+sl),0.0001),rs>0.0);' +
+        'let snl=clamp(dot(n,sl),0.0,1.0);let snh=clamp(dot(n,sh),0.0,1.0);let svh=clamp(dot(v,sh),0.0,1.0);' +
+        'let spread=rs/(2.0*max(distance,0.0001));let along=spread/max(svh,0.0001);let ax=max(min(a+spread,1.0),spread);' +
+        'let ay=max(min(a+along,1.0),along);let norm=select(1.0,(a/ax)*(a/ay),rs>0.0);\n    let d=',
+    )
+    .replace(`let d=${ggxD};`, `let d=${ggxDOf('n', 'sh').replace(/\bnh\b/g, 'snh')}*norm;`)
+    // The search key is concatenated, not a template: tests/smith-shaders.test.js counts every g template in this file
+    // as a declaration of the light loop, and a search key is none.
+    .replace('let g=' + smithGCorrelated + ';', `let g=${smithGCorrelated.replace(/\bnl\b/g, 'snl')};`)
+    .replace('pow(1-vh,5.0);', 'pow(1-svh,5.0);');
 // Extra directional lights (Clustered.directional): the point loop's BRDF text, so materials' Lambert and Phong (litShader)
 // and the shadow catcher (catcherLit) rewrite and measure them too. `toLight` is the unit vector toward the light.
 // `shadow` (LocalShadows' clusterDirectionalShadow factor) darkens each light; empty, the text is the original.
@@ -77,6 +143,13 @@ export interface ClusteredSamplingHooks {
    * shadows are, on a core mesh with `receiveShadow` false.
    */
   contact?: { declarations(group: number): string; readonly term: string };
+  /**
+   * Some light has a `radius` (`PointLight.radius`): the light records carry their `size`, and the specular is a sphere
+   * light's (Karis 2013 representative point and energy normalisation). Omitted, the text is the point lights' one.
+   */
+  sized?: boolean;
+  /** `LightBounce` (`@margoengine/clustered/bounce`): WGSL defining `clusterBounceLighting`, added to the result. */
+  bounce?: { declarations(group: number): string };
 }
 // BRDF: GGX D (Walter et al. 2007 eq. 33) and height-correlated Smith-GGX G2 (Heitz 2014, JCGT 3(2), eq. 99; KB6016), Schlick 1994 Fresnel, F0 0.04 and Lambert / pi
 // (glTF 2.0 Appendix B). Roughness floor 0.045: the minimum perceptual roughness of the Filament design document, a
@@ -101,7 +174,7 @@ export function clusteredSampling(
   integratedShadows = false,
   decay = false,
   receive = false,
-  { directional, terms = [], shapes, stochastic, contact }: ClusteredSamplingHooks = {},
+  { directional, terms = [], shapes, stochastic, contact, sized = false, bounce }: ClusteredSamplingHooks = {},
 ): string {
   const shadows = shadow === true || integratedShadows,
     hook = typeof shadow === 'object' ? shadow : undefined,
@@ -113,18 +186,19 @@ export function clusteredSampling(
     visibility =
       (hook ? term('clusterShadow(light,position,n)') : '') +
       (shadows ? term('clusterShadowVisibility(light,position,n)') : ''),
-    head = `${terms.length || sampled || contact ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
+    point = `${terms.length || sampled || contact ? 'let index=clusterIndices[cell*1024u+j];let light=clusterLights[index];' : 'let light=clusterLights[clusterIndices[cell*1024u+j]];'}let delta=light.positionRange.xyz-position;let distance=length(delta);
     if(distance>=light.positionRange.w){continue;}let l=delta/max(distance,0.0001);let h=(v+l)/max(length(v+l),0.0001);
     let nl=clamp(dot(n,l),0.0,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);
     let d=${ggxD};
     let g=${smithGCorrelated};
     let f0=mix(dielectricF0,base,metal);let fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-vh,5.0);
     ${decay ? decayTerms : legacyTerms}`,
+    head = sized ? sphereTerms(point) : point,
     start =
       '\n  let v=normalize(eye-position);let nv=clamp(dot(n,v),0.0001,1.0);let a=max(roughness,0.045)*max(roughness,0.045);let a2=a*a;',
     radiance = `${clusterBrdf}*nl*light.colorIntensity.rgb*light.colorIntensity.w*falloff*cone${terms.map((t) => '*' + t.term).join('')}${contact ? term(contact.term) : ''}`;
   const code =
-    declarations(group) +
+    declarations(group, sized) +
     (hook ? hook.declarations(group) : '') +
     (area ? (areaShadow ? area.declarations(group, term(areaShadow)) : area.declarations(group)) : '') +
     (directional ? directional.declarations(group) : '') +
@@ -132,6 +206,7 @@ export function clusteredSampling(
     (shapes ? shapes.declarations(group, hook?.shapeShadow ? term(hook.shapeShadow) : undefined) : '') +
     (sampled ? sampled.declarations(group) : '') +
     (contact ? contact.declarations(group) : '') +
+    (bounce ? bounce.declarations(group) : '') +
     /* wgsl */ `
 @group(${group}) @binding(6) var<storage,read> clusterCounts:array<u32>;
 @group(${group}) @binding(7) var<storage,read> clusterIndices:array<u32>;${receive ? '\nvar<private> clusterReceive=true;' : ''}
@@ -151,7 +226,7 @@ ${
     result+=${radiance}${visibility};
   }`
 }${directional ? directionalLoop(directionalShadow ? term(directionalShadow) : '') : ''}
-  return ${area || shapes ? `(result${area ? '+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${shapes ? '+clusterShapeLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''})` : 'result'}*clusterFrame.intensity.x;
+  return ${area || shapes || bounce ? `(result${area ? '+clusterAreaLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${shapes ? '+clusterShapeLighting(position,n,v,nv,base,roughness,metal,dielectricF0,dielectricF90)' : ''}${bounce ? '+clusterBounceLighting(position,n,base,metal)' : ''})` : 'result'}*clusterFrame.intensity.x;
 }`;
   return shadows ? localShadowSampling(group) + code : code;
 }

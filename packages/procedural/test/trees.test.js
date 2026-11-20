@@ -67,7 +67,10 @@ function reference(points, options = {}) {
       const s = sums[j],
         length = Math.sqrt(s[0] ** 2 + s[1] ** 2 + s[2] ** 2);
       if (length <= 1e-12) continue;
-      nodes.push(s.map((v, k) => nodes[j][k] + (segment * v) / length));
+      const next = s.map((v, k) => nodes[j][k] + (segment * v) / length);
+      // A node never grows a second child where it already has one.
+      if (parents.some((parent, c) => parent === j && nodes[c].every((v, k) => v === next[k]))) continue;
+      nodes.push(next);
       parents.push(j);
       if (nodes.length === maxNodes) break;
     }
@@ -245,4 +248,23 @@ test('hostile inputs, cancellation and repeat disposal report coded failures', a
   generator[Symbol.dispose]();
   assert.deepEqual(a.positions, copy);
   assert.throws(() => generator.generate(), { code: 'disposed' });
+});
+
+test('a node never regrows a child it already has (points stuck nearer the parent stall growth)', async () => {
+  using generator = await createTreeGenerator();
+  // Before the fix the default crown of seed 1 had 682 nodes, 315 of them exact copies of a sibling.
+  for (let seed = 1; seed <= 8; seed++) {
+    const tree = generator.generate({ seed }),
+      seen = new Set();
+    for (let i = 1; i < tree.parents.length; i++) {
+      const key = `${tree.parents[i]}:${tree.positions.slice(i * 3, i * 3 + 3).join(',')}`;
+      assert.ok(!seen.has(key), `seed ${seed}: node ${i} repeats a sibling`);
+      seen.add(key);
+    }
+  }
+  // Two points that each lie less than D/2 along the growth direction stay nearest the root: one child, then stall.
+  const stuck = generator.generate({ attractionPoints: new Float64Array([1, 0.05, 0, -1, 0.05, 0]) });
+  assert.equal(stuck.parents.length, 2);
+  assert.equal(stuck.stopped, 'stalled');
+  assert.equal(stuck.remainingAttractions, 2);
 });

@@ -54,7 +54,7 @@ test('LZF: decodes the hand-assembled format vectors byte for byte, with the doc
   expectError(() => decompressLZF(new Uint8Array(0), Number.NaN), {
     name: 'LoaderError',
     code: 'range',
-    message: 'LZF: invalid LZF output length NaN',
+    message: 'LZF: invalid LZF output length NaN; see https://margoengine.com/errors#loader-range',
   });
 });
 

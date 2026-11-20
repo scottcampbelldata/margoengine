@@ -24,7 +24,7 @@ export function setMeshSource(mesh, source) {
 export function clearMeshSource(mesh) {
   sources.delete(mesh);
 }
-/** The gltf-pro record of `mesh` while its model lives, else undefined: meshTriangles without an object per call. */
+/** The gltf/pbr record of `mesh` while its model lives, else undefined: meshTriangles without an object per call. */
 export function meshSource(mesh) {
   const source = mesh && sources.get(mesh);
   return source && !source.model.disposed ? source : undefined;
@@ -42,7 +42,7 @@ export function meshTriangles(mesh) {
 }
 
 /**
- * The triangles of gltf-pro primitives (20-float vertices) in one list: positions (and normals with `normals`) per
+ * The triangles of gltf/pbr primitives (20-float vertices) in one list: positions (and normals with `normals`) per
  * vertex, indices offset per primitive. `check(vertexCount, indexCount)` runs before anything is allocated.
  */
 export function mergePrimitives(primitives, normals = false, check) {
@@ -51,7 +51,7 @@ export function mergePrimitives(primitives, normals = false, check) {
   for (const primitive of primitives) {
     if (primitive.vertices.length % 20)
       throw new RangeError(
-        'PBR vertex array length is not a multiple of its stride; pass gltf-pro primitives with 20-float vertices',
+        'PBR vertex array length is not a multiple of its stride; pass gltf/pbr primitives with 20-float vertices',
       );
     vertexCount += primitive.vertices.length / 20;
     indexCount += primitive.indices.length;

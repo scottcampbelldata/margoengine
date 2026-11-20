@@ -3,9 +3,9 @@ import test from 'node:test';
 import { acquireNativeGlass, nativeGlass, nativeGlassShader } from '../src/native-glass.js';
 import { mockGPU, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
-import { extendedMaterials } from '../../gltf-pro/dist/extended.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
+import { extendedMaterials } from '../../gltf/dist/extended.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 test('registering native glass preserves the existing single HDR model run', async () => {
   const gpu = mockGPU();

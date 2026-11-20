@@ -3,7 +3,7 @@ import test from 'node:test';
 import { getEventListeners } from 'node:events';
 import { Animation as BaseAnimation } from '../dist/index.js';
 import { Animation, PlaybackAnimation, LoopOnce, LoopRepeat, LoopPingPong } from '../dist/playback.js';
-import { PBRModel, GLTFAsset } from '../../gltf-pro/dist/index.js';
+import { PBRModel, GLTFAsset } from '../../gltf/dist/pbr.js';
 import { ownerEngine } from './owner-lifetime.fixture.js';
 import { skinnedStrip } from '../test/fixture.js';
 

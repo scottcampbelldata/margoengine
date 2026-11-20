@@ -56,8 +56,10 @@ export class GraphLayoutReference {
         }
         let scale = ((fa ? s.scaling : s.length * s.length) * m) / Math.max(d2, eps * eps);
         if (fa && this.#overlap) {
-          const gap = d - attrs[i * 4] - attrs[j * 4];
-          scale = gap < 0 ? 100 * s.scaling * m : (s.scaling * m) / Math.max(gap * gap, eps * eps);
+          // Jacomy et al. (2014): kr m / d' along the unit direction apart, k'r m = 100 kr m overlapping, 0 touching.
+          const gap = d - attrs[i * 4] - attrs[j * 4],
+            unit = 1 / (d2 === 0 ? eps : d);
+          scale = gap < 0 ? 100 * s.scaling * m * unit : gap > 0 ? ((s.scaling * m) / Math.max(gap, eps)) * unit : 0;
         }
         f[off] += dx * scale;
         f[off + 1] += dy * scale;
@@ -70,9 +72,11 @@ export class GraphLayoutReference {
           dy = p[j * 3 + 1] - p[off + 1],
           dz = p[j * 3 + 2] - p[off + 2];
         const d = Math.hypot(dx, dy, dz);
+        // With overlap prevention the border distance d' replaces d, and d' <= 0 attracts nothing.
+        const reach = fa && this.#overlap ? Math.max(0, d - attrs[i * 4] - attrs[j * 4]) : d;
         let factor = fa ? 1 / edgeData[edge * 2 + 1] : d / s.length;
-        if (fa && s.linLog) factor *= Math.log1p(d) / Math.max(d, 1e-20);
-        if (fa && this.#overlap && d <= attrs[i * 4] + attrs[j * 4]) factor = 0;
+        if (fa && this.#overlap) factor *= reach / Math.max(d, 1e-20);
+        if (fa && s.linLog) factor *= Math.log1p(reach) / Math.max(reach, 1e-20);
         const weight = factor * edgeData[edge * 2];
         f[off] += dx * weight;
         f[off + 1] += dy * weight;
@@ -94,7 +98,7 @@ export class GraphLayoutReference {
       swing += mass * Math.hypot(f[k] - old[k], f[k + 1] - old[k + 1], f[k + 2] - old[k + 2]);
       traction += (mass * Math.hypot(f[k] + old[k], f[k + 1] + old[k + 1], f[k + 2] + old[k + 2])) / 2;
     }
-    if (swing > 0) this.#speed = Math.min((s.jitterTolerance ** 2 * traction) / swing, this.#speed * 1.5);
+    if (swing > 0) this.#speed = Math.min((s.jitterTolerance * traction) / swing, this.#speed * 1.5);
     for (let i = 0; i < n; i++) {
       if (attrs[i * 4 + 1]) continue;
       const k = i * 3,

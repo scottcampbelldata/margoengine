@@ -1,7 +1,7 @@
 import type { Engine, RenderView } from '@margoengine/core/extension';
-import { MargoError } from '@margoengine/math/errors';
 import type { Frames } from './internal.js';
 import { frameOutput } from './frame-priority.js';
+import { fault } from '../../shared/errors.js';
 
 interface Hold { scale: () => number; pixelated: boolean }
 const managers = new WeakMap<Engine, AdaptiveResolution>();
@@ -106,7 +106,7 @@ class AdaptiveResolution {
 }
 export function adaptiveResolution(engine: Engine, frames: Frames, scale: () => number, pixelated: boolean): () => void {
   if (engine.backend !== 'webgpu' || !engine.gpu || !engine.renderTarget)
-    throw new MargoError('unsupported', 'AdaptiveDpr requires the WebGPU renderer or WebGL2 compatibility layer; use one of those renderers. See https://margoengine.com/errors#webgpu');
+    throw fault('unsupported', 'AdaptiveDpr requires the WebGPU renderer or WebGL2 compatibility layer; use one of those renderers', 'react-usage');
   let manager = managers.get(engine);
   if (!manager) {
     manager = new AdaptiveResolution(engine, frames);

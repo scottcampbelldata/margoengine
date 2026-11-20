@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/tilemap/iso (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/tilemap/test/iso-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/tilemap/test/iso-check.mjs
 // Isometric, x-staggered and hexagonal maps with tall tiles from a second tileset, flips, hex turns, zoom and scroll
 // match images painted on the CPU from the layout rules, pixel for pixel. Results: test-results/tilemap-iso-browser.json.
 import assert from 'node:assert/strict';
@@ -25,6 +25,19 @@ try {
   // Walls and floor tiles of the second layer interleave in paint order: one draw per run of one tileset.
   assert.ok(r.iso.draws >= 3, `iso draws ${r.iso.draws}`);
   assert.equal(r.validation, null, 'no validation errors');
+  // KB-RESTORE-BORROWED1: no frame throws, one report per lost atlas or target, setAtlas with a function (called once)
+  // and setTarget bring the maps back.
+  const help = '; see https://margoengine.com/errors#borrowed-lost';
+  assert.deepEqual(r.loss, {
+    before: 0,
+    frames: [0, 0, 0],
+    reports: [
+      ['state', `GridTileMap atlas lost with the device; pass a function or call setAtlas${help}`],
+      ['state', `GridTileMap target lost with the device; pass a function or call setTarget${help}`],
+    ],
+    after: 0,
+    functionCalls: 1,
+  });
   assert.deepEqual(r.errors, []);
   assert.deepEqual(pageErrors, []);
   console.log('ok grid tile maps: isometric, staggered, hexagonal, flips and turns pixel exact; 0 validation errors');

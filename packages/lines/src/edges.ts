@@ -97,6 +97,59 @@ export function featureEdges(
   return new Float32Array(out);
 }
 
+/**
+ * Every distinct triangle edge of a mesh once, as point pairs for a `segments` line (6 numbers per edge): a full
+ * wireframe. Vertices at one position count as one (within `tolerance`), so an edge shared by two triangles with split
+ * normals or UVs is drawn once; degenerate triangles are left out. For the wireframe without the diagonals of flat
+ * faces, use `featureEdges` with `angle: 0`.
+ * @throws RangeError for a bad stride or tolerance, or an index past the vertices.
+ */
+export function wireframeEdges(
+  { vertices, indices }: EdgeSource,
+  { stride = 6, tolerance = 1e-5 }: Pick<FeatureEdgeOptions, 'stride' | 'tolerance'> = {},
+): Float32Array {
+  if (!Number.isInteger(stride) || stride < 3)
+    throw new RangeError('Invalid stride; pass 3 or more numbers per vertex');
+  if (!(tolerance > 0)) throw new RangeError('Invalid tolerance; pass a positive distance');
+  const count = Math.floor(vertices.length / stride),
+    weld = new Map<string, number>(),
+    ids = new Int32Array(count);
+  for (let v = 0; v < count; v++) {
+    const at = v * stride,
+      key = `${Math.round(vertices[at] / tolerance)},${Math.round(vertices[at + 1] / tolerance)},${Math.round(vertices[at + 2] / tolerance)}`;
+    let id = weld.get(key);
+    if (id === undefined) weld.set(key, (id = v));
+    ids[v] = id;
+  }
+  const seen = new Set<number>(),
+    out: number[] = [];
+  for (let t = 0; t + 2 < indices.length; t += 3) {
+    const face = [indices[t], indices[t + 1], indices[t + 2]];
+    if (face.some((v) => !(v >= 0 && v < count)))
+      throw new RangeError(`Invalid triangle index at ${t}; pass indices below the vertex count`);
+    const [p, q, r] = face.map((v) => ids[v]);
+    if (p === q || q === r || r === p) continue;
+    for (const [a, b] of [
+      [p, q],
+      [q, r],
+      [r, p],
+    ]) {
+      const key = Math.min(a, b) * count + Math.max(a, b);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(
+        vertices[a * stride],
+        vertices[a * stride + 1],
+        vertices[a * stride + 2],
+        vertices[b * stride],
+        vertices[b * stride + 1],
+        vertices[b * stride + 2],
+      );
+    }
+  }
+  return new Float32Array(out);
+}
+
 /** The {@link featureEdges} of a geometry as a `Line`. Give it `mesh` to follow a mesh, like the other helpers. */
 export class EdgesHelper extends Line {
   constructor(source: EdgeSource, options: FeatureEdgeOptions & Omit<LineOptions, 'positions' | 'mode'> = {}) {

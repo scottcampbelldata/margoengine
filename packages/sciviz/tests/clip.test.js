@@ -131,3 +131,16 @@ test('TCIA CT samples retain calibrated Hounsfield units and attributed bytes',a
   const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.length),pointData=Float64Array.from({length:bytes.length/2},(_,i)=>v.getInt16(2*i,true)*meta.slope+meta.intercept);
   const selected=await thresholdGrid({dims:meta.dims,bounds:meta.bounds,pointData},[300,3000],{mode:'any'});assert.ok(selected.types.length>100);assert.ok(selected.types.length<63*63*18);
 });
+test('a box without bounds and a missing range are coded errors, not TypeErrors',async()=>{
+  await assert.rejects(clipGrid(cube,{kind:'box'}),e=>e instanceof RangeError&&/Clip box needs six/.test(e.message));
+  await assert.rejects(isoVolume(cube,undefined),e=>e instanceof RangeError&&/Iso-volume needs/.test(e.message));
+  await assert.rejects(thresholdGrid(cube,undefined),e=>e instanceof RangeError&&/Threshold needs/.test(e.message));
+  await assert.rejects(async()=>clipOperator().execute({inputs:[cube],params:{operation:'isoVolume'},time:0,signal:new AbortController().signal}),e=>e instanceof RangeError&&/Iso-volume needs/.test(e.message));
+});
+test('box crinkle keeps a cell that only touches the box face, as the point rule of the other shapes does',async()=>{
+  for(const bounds of [[1,2,0,1,0,1],[1,2,1,2,1,2],[-1,0,-1,0,-1,0]]){
+    const r=await clipGrid(cube,{kind:'box',bounds},{crinkle:true});assert.deepEqual([...r.types],[12],String(bounds));
+  }
+  const plane=await clipGrid(cube,{kind:'plane',normal:[-1,0,0],offset:0},{crinkle:true});assert.deepEqual([...plane.types],[12]);
+  const apart=await clipGrid(cube,{kind:'box',bounds:[1.5,2,0,1,0,1]},{crinkle:true});assert.equal(apart.types.length,0);
+});

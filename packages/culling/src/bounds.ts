@@ -4,7 +4,8 @@ import type { PassContext } from '@margoengine/core/extension';
 import { CulledMeshes } from './meshes.js';
 import { CulledModels } from './models.js';
 import { DynamicInstances } from './dynamic.js';
-import { localBox, SoftwareDepthBuffer, transform } from './software-depth.js';
+import { localBox, SoftwareDepthBuffer } from './software-depth.js';
+import { hypot } from '../../shared/hypot.js';
 import { exactShader } from './pyramid.js';
 
 // A transformed local AABB stays an oriented parallelepiped under rotation, nonuniform scale and shear.
@@ -39,6 +40,31 @@ fn boxDepth(m:mat4x4f)->bool {
  return reaches(lo,hi,near);
 }
 `;
+/**
+ * Math.hypot of the record's first 12 floats from `at` (the 3x4 of its matrix), by V8's own steps (the largest
+ * magnitude scales every term, then a Kahan sum, as shared/hypot.js), so the same bits with no argument array.
+ */
+function norm12(m: Float32Array, at: number): number {
+  let max = 0,
+    nan = false;
+  for (let k = 0; k < 12; k++) {
+    const term = Math.abs(m[at + k]);
+    if (term > max) max = term;
+    else if (term !== term) nan = true;
+  }
+  if (max === Infinity || nan || !max) return max === Infinity || !nan ? max : Number.NaN;
+  let sum = 0,
+    compensation = 0;
+  for (let k = 0; k < 12; k++) {
+    const n = Math.abs(m[at + k]) / max,
+      summand = n * n - compensation,
+      next = sum + summand;
+    compensation = next - sum - summand;
+    sum = next;
+  }
+  return Math.sqrt(sum) * max;
+}
+
 function shape(): CullShape {
   const cache = new WeakMap<Float32Array, Map<number, Float64Array>>();
   let depth: SoftwareDepthBuffer | undefined,
@@ -97,20 +123,32 @@ function shape(): CullShape {
             depth.rasterize(batch.geometry, row, row[22] >= 0.5);
           }
     },
+    // Runs per instance per frame on the WebGL2 layer's CPU route (compat.ts), called unbound: it reads the record
+    // in place and keeps every value in a local, so it allocates nothing (no subarray, centre array, map or spread).
     cpu(records, at, vertices, stride, padding, frame) {
       const bounds = box(vertices, stride, padding),
-        m = records.subarray(at, at + 16),
-        center = transform(m, (bounds[0] + bounds[3]) / 2, (bounds[1] + bounds[4]) / 2, (bounds[2] + bounds[5]) / 2),
-        half = [0, 1, 2].map((k) => (bounds[k + 3] - bounds[k]) / 2),
-        pad = 1e-5 * (1 + Math.hypot(...center.slice(0, 3)) + Math.hypot(...half) * Math.hypot(...m.slice(0, 12)));
+        m = records,
+        lx = (bounds[0] + bounds[3]) / 2,
+        ly = (bounds[1] + bounds[4]) / 2,
+        lz = (bounds[2] + bounds[5]) / 2,
+        hx = (bounds[3] - bounds[0]) / 2,
+        hy = (bounds[4] - bounds[1]) / 2,
+        hz = (bounds[5] - bounds[2]) / 2,
+        cx = m[at] * lx + m[at + 4] * ly + m[at + 8] * lz + m[at + 12],
+        cy = m[at + 1] * lx + m[at + 5] * ly + m[at + 9] * lz + m[at + 13],
+        cz = m[at + 2] * lx + m[at + 6] * ly + m[at + 10] * lz + m[at + 14],
+        pad = 1e-5 * (1 + hypot(3, cx, cy, cz) + hypot(3, hx, hy, hz) * norm12(m, at));
       for (let p = 16; p < 40; p += 4) {
-        let r = pad * Math.hypot(frame[p], frame[p + 1], frame[p + 2]);
-        for (let k = 0; k < 3; k++)
-          r += Math.abs(frame[p] * m[k * 4] + frame[p + 1] * m[k * 4 + 1] + frame[p + 2] * m[k * 4 + 2]) * half[k];
-        if (frame[p] * center[0] + frame[p + 1] * center[1] + frame[p + 2] * center[2] + frame[p + 3] < -r)
-          return false;
+        const nx = frame[p],
+          ny = frame[p + 1],
+          nz = frame[p + 2];
+        let r = pad * hypot(3, nx, ny, nz);
+        r += Math.abs(nx * m[at] + ny * m[at + 1] + nz * m[at + 2]) * hx;
+        r += Math.abs(nx * m[at + 4] + ny * m[at + 5] + nz * m[at + 6]) * hy;
+        r += Math.abs(nx * m[at + 8] + ny * m[at + 9] + nz * m[at + 10]) * hz;
+        if (nx * cx + ny * cy + nz * cz + frame[p + 3] < -r) return false;
       }
-      return !occlusion || !depth || depth.visible(bounds, m);
+      return !occlusion || !depth || depth.visible(bounds, records.subarray(at, at + 16));
     },
   };
 }

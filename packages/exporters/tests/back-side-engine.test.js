@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Material, Texture, createMesh } from '@margoengine/materials';
-import { parseGLTF } from '@margoengine/gltf-pro';
+import { parseGLTF } from '@margoengine/gltf/pbr';
 import { readZipDirectory, readZipEntry } from '@margoengine/loaders';
 import { exportModel } from '../dist/model.js';
 import { exportDAE, exportGLTF, exportGLB, exportOBJ, exportPLY, exportSTL } from '../dist/index.js';

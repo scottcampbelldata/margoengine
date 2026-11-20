@@ -142,7 +142,7 @@ namespace MargoMesh.Unity.Editor {
             var existing = machine.states;
             ImportProfile.Require(fresh ? existing.Length == 0 : existing.Length == clips.Length, "Existing state inventory changed; no state is removed or adopted.");
             for (int i = 0; i < clips.Length; i++) {
-                var state = fresh ? CreateState(machine, clips[i], i) : existing[i].state;
+                var state = fresh ? CreateState(machine, owner.clipIdentities[i].name, i) : existing[i].state;
                 ImportProfile.Require(state.name == owner.clipIdentities[i].name, "Owned state identity changed; no state GUID is retargeted.");
                 state.motion = clips[i];
                 EditorUtility.SetDirty(state);
@@ -184,9 +184,10 @@ namespace MargoMesh.Unity.Editor {
             return controller;
         }
 
-        static AnimatorState CreateState(AnimatorStateMachine machine, AnimationClip clip, int index) {
-            var state = machine.AddState(clip.name, new Vector3(250, 50 + index * 65, 0));
-            state.name = clip.name;
+        /// <summary>A new state named after the glTF clip <paramref name="name"/>, the name <c>Animator.Play</c> takes.</summary>
+        static AnimatorState CreateState(AnimatorStateMachine machine, string name, int index) {
+            var state = machine.AddState(name, new Vector3(250, 50 + index * 65, 0));
+            state.name = name;
             state.speed = 1;
             state.cycleOffset = 0;
             state.mirror = false;

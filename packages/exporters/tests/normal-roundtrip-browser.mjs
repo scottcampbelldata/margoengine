@@ -1,6 +1,6 @@
 // Real-GPU check that exportModel keeps a normal map's shading: a @margoengine/materials plane with computeTangents
 // tangents (v-up UVs, flipY uploads) and a normal map is drawn, exported to GLB, loaded back with
-// @margoengine/gltf-pro (v-down UVs, glTF image-up normals) and drawn again. The map tilts the upper half of the image
+// @margoengine/gltf/pbr (v-down UVs, glTF image-up normals) and drawn again. The map tilts the upper half of the image
 // toward image-up and leaves the lower half flat, and the light comes from above, so a flipped V, an upside-down image
 // or a flipped bitangent each move or invert the bright band.
 // Run from the repository root after `npm run build:packages`: npm run test:normal:browser --workspace packages/exporters
@@ -19,7 +19,7 @@ page.on('console', (message) => {
   if (message.type() === 'error') errors.push(message.text());
 });
 
-/** Draws one scene (`source`: the materials plane, `export`: its GLB through gltf-pro, `flat`: that GLB without its
+/** Draws one scene (`source`: the materials plane, `export`: its GLB through gltf/pbr, `flat`: that GLB without its
  * normal texture) and returns the canvas pixels. */
 async function draw(kind) {
   await page.evaluate(
@@ -28,7 +28,7 @@ async function draw(kind) {
         { Material, Texture, createMesh } = await import('/packages/materials/dist/index.js'),
         { planeGeometry, computeTangents } = await import('/packages/geometry/dist/index.js'),
         { exportModel } = await import('/packages/exporters/dist/model.js'),
-        { parseGLTFAsync } = await import('/packages/gltf-pro/dist/index.js');
+        { parseGLTFAsync } = await import('/packages/gltf/dist/pbr.js');
       document.querySelector('canvas')?.remove();
       const canvas = document.createElement('canvas');
       canvas.style.cssText = `position:fixed;left:0;top:0;width:${size}px;height:${size}px`;

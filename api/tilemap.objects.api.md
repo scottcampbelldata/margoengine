@@ -20,8 +20,10 @@ export class ObjectTileMap implements EnginePlugin {
     get map(): TileMapData;
     setMap(map: TileMapData): void;
     setAtlas(name: string, source: TileAtlas): void;
+    setTarget(target: TileTarget | undefined): void;
     setImage(source: string, image: TileAtlas): void;
     setup(engine: Engine): void;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(): void;
     dispose(): void;

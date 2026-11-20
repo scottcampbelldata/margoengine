@@ -1,7 +1,7 @@
 /**
  * The URL a server process prints once it listens: the first capture of `pattern` in its stdout or stderr. Start the
  * server on port 0 and read its URL here, never poll a fixed port: on a fixed port another suite's server (another
- * worktree's, under shared GPU slots) answers too, and the suite then tests that server's build while its own exited
+ * worktree's) answers too, and the suite then tests that server's build while its own exited
  * with "address in use". Rejects, with the output so far, when the process exits first or `ms` passes.
  * @param {import('node:child_process').ChildProcess} child spawned with stdout and stderr piped
  * @param {{ pattern: RegExp, name: string, ms?: number }} options

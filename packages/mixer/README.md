@@ -34,7 +34,7 @@ const { peak, rms } = measure(buffer.getChannelData(0));
 
 - **Gain** in dB: `bus.setGain(-6, {at, seconds})`. Changes move smoothly (about 20 ms) unless the context has not started or `seconds` is 0, so there are no clicks and an offline render starts at the right level.
 - **Mute and solo**: `bus.setMuted(true)`, `bus.setSolo(true)`. While anything is soloed, only soloed buses, their ancestors (which carry the sound on), their descendants (which feed them) and `soloSafe` buses such as reverb returns stay audible. A solo-safe bus still plays through its parent, so put returns straight under `master`: under a group that no solo reaches, its sound stops at the group's closed gate. `audibleBuses(states)` is that rule as a pure function, one gate per bus.
-- **Sends**: `bus.send(other, {gain, pre})` copies part of a bus to another (after the gate by default, so muting the bus mutes the send; `pre` taps before the fader). A send that would make a loop throws `RangeError`.
+- **Sends**: `bus.send(other, {gain, pre})` copies part of a bus to another (after the gate by default, so muting the bus mutes the send; `pre` taps before the fader). A send that would make a loop throws `RangeError`. `send.remove()` may be called more than once, and removing a bus with `mixer.removeBus` also disconnects every send to it. The function `mixer.route` returns undoes that route once, and does nothing after the source was routed again.
 - **Ducking**: `bus.duck({amount, attack, at})` lowers a bus and returns a handle; `handle.release({at, seconds})` brings it back. Overlapping ducks hold the deepest one. You decide when to duck (when a voice starts); automatic audio-clock detection is available in the optional `mixer/sidechain` entry below.
 - **Routing**: `mixer.route(source, bus)` connects an AudioNode, or anything with `getOutput()` such as `Audio` and `PositionalAudio` from `margoengine/audio`, to a bus after removing its other connections. Configure the sound's filters first.
 - **Scheduling** uses AudioContext time: every `at` is `context.currentTime` seconds (default now), and `mixer.now` reads the clock.
@@ -65,7 +65,7 @@ The reverb room is synthetic by default: seeded noise that falls 60 dB over `dec
 
 ## Positional sound
 
-`mixer.emitter(bus, {position, refDistance, rolloffFactor, distanceModel, panningModel, cone})` returns an `Emitter`: connect your source to `emitter.input`, move it with `setPosition(x, y, z, at)`, aim it with `setOrientation`. It is panned against the context's own listener. With `AudioListener` from `margoengine/audio` that listener follows the engine camera every frame, so emitters are tied to the camera with no extra code; without it, call `setListenerPose(context, {position, forward, up})` yourself.
+`mixer.emitter(bus, {position, refDistance, rolloffFactor, distanceModel, panningModel, cone})` returns an `Emitter`: connect your source to `emitter.input`, move it with `setPosition(x, y, z, at)`, aim it with `setOrientation`. It is panned against the context's own listener. With `AudioListener` from `margoengine/audio` that listener follows the engine camera every frame, so emitters are tied to the camera with no extra code; without it, call `setListenerPose(context, {position, forward, up})` yourself. Only the part of `up` at right angles to `forward` is used (looking straight down with up +Y gives up `[0, 0, -1]`), so Web Audio's right axis is never zero and sources keep their side.
 
 ## Offline rendering
 

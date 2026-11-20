@@ -1,6 +1,6 @@
 import type { EngineKernel } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
-import { VFX, type VFXObstacle, type VFXTexture } from '@margoengine/vfx/base';
+import { VFX, type VFXObstacle, type VFXOptions, type VFXTexture } from '@margoengine/vfx/base';
 import { obstacles } from '@margoengine/vfx/obstacles';
 import { wrap } from '@margoengine/vfx/wrap';
 import { sort } from '@margoengine/vfx/sort';
@@ -31,9 +31,13 @@ export interface ParticleOptions {
 /** A drifting leaf/weather field: a `@margoengine/vfx` preset that keeps `count` particles wrapping inside a 6 m cube. */
 export class GPUParticles extends VFX {
   override readonly name = 'gpu-particles';
-  /** Same as `engine.use(new GPUParticles(options))`; returns the GPUParticles (VFX.attach would add a plain VFX). */
-  static override attach(engine: EngineKernel, options?: ParticleOptions): GPUParticles {
-    const value = new GPUParticles(options);
+  /**
+   * Same as `engine.use(new GPUParticles(options))`; returns the GPUParticles (VFX.attach would add a plain VFX). Pass
+   * `ParticleOptions`: the type also allows `VFXOptions` only because `VFX.attach` does, and its `wind` (`[x, z]` m/s or a
+   * field) is not this class's `wind` (a 3-value drift acceleration), so it throws `RangeError`.
+   */
+  static override attach(engine: EngineKernel, options?: ParticleOptions | VFXOptions): GPUParticles {
+    const value = new GPUParticles(options as ParticleOptions);
     engine.use(value);
     return value;
   }

@@ -1,6 +1,7 @@
-// Real-GPU measurements for the pipeline toggles. From the repo root after build:packages, under the GPU lock on AC:
+// Real-GPU measurements for the pipeline toggles. From the repo root after build:packages:
 //   node examples/package-benchmarks/pipeline-toggles/toggle.mjs [stall|pixels|gpu|override]...
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { writeFile } from 'node:fs/promises';
 import { decodePNG } from '../../../tests/support/png.js';
 import { requireAC } from '../parts/power.mjs';
@@ -13,6 +14,7 @@ await writeFile(
   '<!doctype html><meta charset="utf-8"><style>body{margin:0}canvas{display:block;width:1280px;height:720px}</style><canvas id="view"></canvas><script type="module" src="/examples/package-benchmarks/pipeline-toggles/toggle.js"></script>',
 );
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   logLevel: 'error',
   server: { host: '127.0.0.1', port: 5293, strictPort: true, hmr: false, watch: { ignored: ['**'] } },

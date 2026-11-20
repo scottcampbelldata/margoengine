@@ -83,6 +83,22 @@ test("core's steady-state frame allocates at most 256 bytes on the CPU", { timeo
   assert.ok(median(bytes) <= 256, `core frame allocated ${bytes.join(', ')} B per frame (${host})`);
 });
 
+// Regression (known-bugs "Edge 157 frames allocate 12 to 20 B over the instanced and shadowed floors"):
+// the engine kept the frame delta in a field V8 stores as a double, so every read of it passed to a call (each onFrame
+// callback, render, Engine.update's camera.advance) made a new number object: 16 B per callback per frame in Node, 24 B
+// a frame in Chromium's frame-alloc scenes. The field now starts null, so V8 keeps it tagged and the frame passes one
+// number object on. 16 callbacks added 256 B a frame before (every tier), 0 after.
+test("onFrame callbacks add nothing to core's steady-state frame", { timeout: 300_000 }, () => {
+  for (const flags of noTier ? [[]] : [[], ['--max-opt=2']]) {
+    const none = median(probeWith(flags)),
+      sixteen = median(probeWith(flags, '--callbacks=16'));
+    assert.ok(
+      sixteen - none < 1,
+      `16 callbacks added ${sixteen - none} B a frame (${sixteen} against ${none}; ${flags.join(' ') || 'default tiers'}; ${host})`,
+    );
+  }
+});
+
 // Regression (item 53.1): Shadows' depth passes cleared and refilled Maps and Sets of every caster each pass, and
 // emptied their batch lists with length = 0 (V8 then drops the storage and the next push allocates it again).
 test('a shadowed frame (eight moving casters, four cascades) adds at most 512 bytes to it', {

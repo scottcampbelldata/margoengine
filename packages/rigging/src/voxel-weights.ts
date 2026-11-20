@@ -238,6 +238,7 @@ export async function voxelWeights(
   }
   const result = new WeightMap(welded.vertexCount, joints.length),
     row = new Float32Array(joints.length),
+    relative = new Float64Array(joints.length),
     straight = new Float64Array(joints.length);
   let unreached = 0;
   for (let i = 0; i < m; i++) {
@@ -253,18 +254,29 @@ export async function voxelWeights(
       }
       for (let j = 0; j < joints.length; j++) if (straight[j] < Infinity) keep(i, j, Math.sqrt(straight[j]));
     }
-    // A vertex on a bone has distance 0: a floor of half a voxel keeps the falloff finite and smooth.
-    let total = 0;
+    // A vertex on a bone has distance 0: a floor of half a voxel keeps the falloff finite and smooth. The falloff is
+    // taken relative to the nearest slot, in float64, as exp(-falloff (ln f(d) - ln f(nearest))): the nearest weighs 1
+    // and the rest at most 1, so no falloff overflows or underflows the whole row before it is normalised.
+    let total = 0,
+      nearest = Infinity;
     row.fill(0);
+    for (let s = 0; s < slots && bestJoint[base + s] !== -1; s++) {
+      const d = Math.max(bestDistance[base + s], cell * 0.5) / cell;
+      nearest = Math.min(nearest, Math.log((1 - curve) * d + curve * d * d));
+    }
     for (let s = 0; s < slots; s++) {
       const joint = bestJoint[base + s];
       if (joint === -1) break;
       const d = Math.max(bestDistance[base + s], cell * 0.5) / cell,
-        w = ((1 - curve) * d + curve * d * d) ** -falloff;
-      row[joint] = w;
+        w = Math.exp(-falloff * (Math.log((1 - curve) * d + curve * d * d) - nearest));
+      relative[joint] = w;
       total += w;
     }
-    for (let j = 0; j < joints.length; j++) row[j] /= total;
+    for (let s = 0; s < slots; s++) {
+      const joint = bestJoint[base + s];
+      if (joint === -1) break;
+      row[joint] = relative[joint] / total;
+    }
     for (let v = first[i]; v !== -1; v = next[v]) result.values.set(row, v * joints.length);
   }
   let voxels = 0;

@@ -407,3 +407,90 @@ test('the narrow band rebuilds only on update(), loads lazily and draws voxel th
   }
   liquid.dispose();
 });
+
+// KB-RESTORE-BORROWED1: a caller's GPUBuffer for the particles belongs to the device that made it (docs/conventions.md,
+// "Borrowed GPU objects"). A plain buffer is dropped at a restore and reported once; `(device) => buffer` comes back.
+function restoreRig(particles, options = {}) {
+  const errors = [];
+  const first = fakeDevice(),
+    second = fakeDevice();
+  const engine = (device) => ({
+    gpu: device,
+    sceneOf: () => undefined,
+    lighting: { direction: [0, 1, 0, 1], radiance: [1, 1, 1], ambient: [0, 0, 0] },
+    onError: (error) => errors.push(error),
+  });
+  const liquid = new ParticleLiquid({ particles, ...options });
+  const host = { depthTexture: { createView: () => ({}) } };
+  liquid.stage = liquid.joinStack(host);
+  const one = engine(first.device);
+  liquid.setup(one);
+  return { liquid, host, errors, first, second, engine, one, restore: () => liquid.onDeviceRestored(engine(second.device)) };
+}
+
+test('plain GPU particle positions are lost with the device: no particles drawn, one report, update() brings them back', () => {
+  const first = fakeDevice();
+  const old = first.device.createBuffer({ size: 16 * 10 });
+  const rig = restoreRig({ positions: old, count: 10, stride: 4 });
+  frame(rig.liquid, rig.first.device, rig.first.encoder, rig.host);
+  assert.equal(rig.liquid.frameStats.particles, 10, 'drawn on the device that made it');
+  rig.restore();
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  assert.equal(rig.liquid.frameStats.particles, 0, 'a buffer of the lost device is not bound');
+  assert.equal(rig.errors.length, 1, 'reported once');
+  assert.equal(rig.errors[0].code, 'state');
+  assert.match(rig.errors[0].message, /ParticleLiquid positions lost with the device; pass a function or call update\(particles\)/);
+  assert.equal(rig.second.device.log.draws.length > 0, true, 'the frame still composites');
+  const fresh = rig.second.device.createBuffer({ size: 16 * 10 });
+  rig.liquid.update({ positions: fresh, count: 10, stride: 4 });
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  assert.equal(rig.liquid.frameStats.particles, 10, 'a buffer handed in after the restore is drawn');
+  assert.equal(rig.errors.length, 1);
+  rig.liquid.dispose();
+});
+
+test('a (device) => buffer for the particle positions is called once per device and is never reported', () => {
+  const calls = [];
+  const make = (device) => (calls.push(device), device.createBuffer({ size: 16 * 10 }));
+  const rig = restoreRig({ positions: make, count: 10, stride: 4 });
+  frame(rig.liquid, rig.first.device, rig.first.encoder, rig.host);
+  frame(rig.liquid, rig.first.device, rig.first.encoder, rig.host);
+  assert.deepEqual(calls, [rig.first.device], 'once for the first device');
+  rig.restore();
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  assert.deepEqual(calls, [rig.first.device, rig.second.device], 'again for the restored device');
+  assert.equal(rig.liquid.frameStats.particles, 10);
+  assert.deepEqual(rig.errors, []);
+  rig.liquid.dispose();
+});
+
+test('a GpuArray-style holder of particle positions is read live and survives a restore', () => {
+  const holder = { buffer: undefined };
+  const rig = restoreRig({ positions: holder, count: 10, stride: 4 });
+  holder.buffer = rig.first.device.createBuffer({ size: 16 * 10 });
+  frame(rig.liquid, rig.first.device, rig.first.encoder, rig.host);
+  rig.restore();
+  holder.buffer = rig.second.device.createBuffer({ size: 16 * 10 });
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  assert.equal(rig.liquid.frameStats.particles, 10);
+  assert.deepEqual(rig.errors, []);
+  rig.liquid.dispose();
+});
+
+test('lost plain particle velocities draw no whitewater and are reported once; the liquid keeps drawing', () => {
+  const first = fakeDevice();
+  const rig = restoreRig(
+    { positions: (device) => device.createBuffer({ size: 16 * 10 }), velocities: first.device.createBuffer({ size: 16 * 10 }), count: 10, stride: 4 },
+    { whitewater: {} },
+  );
+  rig.restore();
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  frame(rig.liquid, rig.second.device, rig.second.encoder, rig.host);
+  assert.equal(rig.liquid.frameStats.particles, 10, 'the liquid still draws');
+  assert.equal(rig.liquid.frameStats.whitewater, 0, 'no whitewater without velocities');
+  assert.equal(rig.errors.length, 1);
+  assert.match(rig.errors[0].message, /ParticleLiquid velocities lost with the device; pass a function or call update\(particles\)/);
+  rig.liquid.dispose();
+});

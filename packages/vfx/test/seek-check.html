@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>VFX seek check</title><style>body{margin:0}canvas{display:inline-block;width:192px;height:128px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas><canvas id="c"></canvas>
+<script type="module">
+// GAP-FILM-TIME bound for particles (class B, world history on the GPU). Three alike effects of capacity 2,000 with a
+// fractional rate and seeded bursts: A runs n + 1 live frames; B is fresh, seeks (n - P) / fps with
+// @margoengine/cutscene/seek, then draws P + 1 live frames (the scene's prewarm, P = 150 frames, longer than the 2 s
+// longest lifetime); C draws P + 1 frames with no seek. A and B must upload the same simulate uniform in the last frame
+// (clock, step number that seeds births, births budget) and their live counts must agree within 5 %. A birth's seed is
+// its step and its birth number in the step, not its slot (GAP-FILM-VFXSEED), so B's live particles are A's, bit for
+// bit, in other slots: every live slot's 64 bytes, sorted, must be equal. Driven by seek-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {VFX} from '/packages/vfx/dist/base.js';
+import {schedule} from '/packages/vfx/dist/schedule.js';
+import {seek} from '/packages/cutscene/dist/seek.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const FPS=60,P=150,errors=[];
+const options=()=>({capacity:2000,rate:637.3,lifetime:[1,2],spread:2,schedule:{seed:9,bursts:[{time:0.1,count:25,cycles:4000,interval:0.5,probability:0.7}]}});
+async function world(id){
+ const engine=await Engine.create(document.getElementById(id),{backend:'webgpu',camera:{position:[0,2,8],target:[0,1,0],near:0.1,far:100}}),device=engine.gpu;
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const vfx=new VFX(options(),{schedule});engine.use(vfx);
+ return {engine,device,vfx};
+}
+async function draw(w,delta=1/FPS){w.engine.render({delta});await w.device.queue.onSubmittedWorkDone();}
+async function live(w){
+ const {device}=w,staging=device.createBuffer({size:20,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+ encoder.copyBufferToBuffer(w.vfx.gpuState.indirect,0,staging,0,20);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const n=new Uint32Array(staging.getMappedRange())[1];staging.unmap();staging.destroy();return n;
+}
+const a=await world('a'),b=await world('b'),c=await world('c');
+// Pipelines compile on warm-up frames of delta 0, which move no clock (a seek needs clocks at 0); every world gets the
+// same number of them.
+const counts=[];
+for(const w of [a,b,c]){let n=0;await waitForPipelines(async()=>{n++;await draw(w,0);});counts.push(n);}
+const most=Math.max(...counts);
+for(const [i,w] of [a,b,c].entries())for(let k=counts[i];k<most;k++)await draw(w,0);
+// Every live slot's 64 bytes (position and life, velocity and size, colour, rotation), as sorted keys: the particles
+// whatever slots they landed in.
+async function particles(w){
+ const {device}=w,{particles:buffer}=w.vfx.gpuState,staging=device.createBuffer({size:buffer.size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),encoder=device.createCommandEncoder();
+ encoder.copyBufferToBuffer(buffer,0,staging,0,buffer.size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const f=new Float32Array(staging.getMappedRange().slice(0)),u=new Uint32Array(f.buffer);staging.unmap();staging.destroy();
+ const n=f.length/16,keys=[];
+ for(let i=0;i<n;i++){if(!(f[i*8+3]>0))continue;const hot=u.subarray(i*8,i*8+8),cold=u.subarray(n*8+i*8,n*8+i*8+8);keys.push([...hot,...cold].join(","));}
+ return keys.sort();
+}
+window.check={async run(n=600){
+ const zero=[a,b,c].map(w=>w.vfx.time);
+ for(let step=0;step<=n;step++)await draw(a);
+ const result=await seek(b.engine,(n-P)/FPS,{fps:FPS});
+ for(let step=n-P;step<=n;step++)await draw(b);
+ for(let step=n-P;step<=n;step++)await draw(c);
+ const uniform=w=>Array.from(w.vfx['values']);
+ const keysA=await particles(a),keysB=await particles(b),inB=new Set(keysB);
+ return {errors,zero,steps:result.steps,clocks:result.clocks,unseekable:result.unseekable,name:b.vfx.name,
+  timeA:a.vfx.time,timeB:b.vfx.time,uniformEqual:JSON.stringify(uniform(a))===JSON.stringify(uniform(b)),
+  birthsA:a.vfx['ints'][53],birthsB:b.vfx['ints'][53],stepA:a.vfx['ints'][54],stepB:b.vfx['ints'][54],stepC:c.vfx['ints'][54],
+  liveA:await live(a),liveB:await live(b),liveC:await live(c),
+  keptA:keysA.length,keptB:keysB.length,shared:keysA.filter(k=>inB.has(k)).length,sameParticles:keysA.join(";")===keysB.join(";")};
+}};
+window.ready=true;
+</script></body></html>

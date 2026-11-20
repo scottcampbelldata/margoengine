@@ -19,9 +19,18 @@ const runtimes = ['./jsx-runtime', './jsx-dev-runtime'];
 const expected = {
   './test': ['TestRenderer', 'act', 'createTestRenderer'],
   './offscreen': ['OffscreenCanvas'],
-  './effects-extra': ['Decal', 'Edges', 'Sparkles', 'Stars', 'Trail'],
-  './portals': ['Hud', 'RenderTexture'],
-  './controls-extra': ['KeyboardControls', 'PresentationControls', 'Scroll', 'ScrollControls', 'useKeyboardControls', 'useScroll'],
+  './effects-extra': ['Decal', 'Edges', 'ScreenQuad', 'Sparkles', 'Stars', 'Trail', 'Wireframe', 'screenQuadVertexShader'],
+  './portals': ['Hud', 'RenderTexture', 'useDepthBuffer', 'useFBO'],
+  './controls-extra': [
+    'KeyboardControls',
+    'MotionPathControls',
+    'PresentationControls',
+    'Scroll',
+    'ScrollControls',
+    'useKeyboardControls',
+    'useMotion',
+    'useScroll',
+  ],
   './textures': ['MappedPbrMaterial', 'TextureMaterial', 'TextureProvider', 'useKTX2', 'useTexture', 'useVideoTexture'],
   './xr-pointer': ['XRPointerEvents', 'dispatchXRPointer'],
   '.': [
@@ -52,30 +61,111 @@ const expected = {
     'useMargoStage',
     'useProgress',
   ],
-  './controls': ['ArcballControls', 'CadControls', 'MapControls', 'OrbitControls', 'PointerLock', 'TransformControls'],
-  './gltf-pro': ['Gltf', 'Model'],
+  './controls': [
+    'ArcballControls',
+    'CadControls',
+    'CameraControls',
+    'DragControls',
+    'FirstPersonControls',
+    'FlyControls',
+    'MapControls',
+    'OrbitControls',
+    'PivotControls',
+    'PointerLock',
+    'TrackballControls',
+    'TransformControls',
+  ],
+  './gltf': ['Gltf', 'Model'],
   './fbx': ['Fbx'],
   './animation': ['Animation'],
-  './environment': ['AmbientLight', 'Environment', 'Fog', 'HemisphereLight'],
+  './environment': ['AmbientLight', 'CubeCamera', 'Environment', 'Fog', 'HemisphereLight', 'Lightformer'],
   './html': ['Html'],
-  './helpers': ['Billboard', 'Bounds', 'Float', 'useBounds'],
-  './lines': ['Grid', 'Line'],
+  './helpers': [
+    'Billboard',
+    'Bounds',
+    'CameraShake',
+    'Clone',
+    'Float',
+    'Preload',
+    'shakeNoise',
+    'useAspect',
+    'useBounds',
+    'useCursor',
+    'useIntersect',
+    'useViewport',
+    'viewportAt',
+  ],
+  './lines': ['Grid', 'Line', 'Segment', 'Segments'],
   './points': ['Points'],
-  './instances': ['Instance', 'Instances'],
-  './performance': ['AdaptiveDpr', 'PerformanceController', 'PerformanceMonitor', 'usePerformanceMonitor'],
+  './instances': ['Instance', 'Instances', 'Merged'],
+  './sampler': ['Sampler', 'useSurfaceSampler'],
+  './marching-cubes': ['MarchingCube', 'MarchingCubes', 'MarchingPlane'],
+  './caustics': ['Caustics'],
+  './accumulative-shadows': ['AccumulativeShadows', 'RandomizedLight', 'accumulativeOptions'],
+  './clouds': ['Cloud', 'Clouds'],
+  './outlines': ['Outlines', 'outlineRGB'],
+  './performance': [
+    'AdaptiveDpr',
+    'AdaptiveEvents',
+    'PerformanceController',
+    'PerformanceMonitor',
+    'usePerformanceMonitor',
+  ],
   './lod': ['Detailed'],
   './selection': ['Outline'],
   './splats': ['Splat'],
   './viewcube': ['GizmoHelper'],
   './cameras': ['OrthographicCamera', 'PerspectiveCamera'],
-  './devtools': ['DevTools'],
-  './shadows': ['ContactShadows', 'Shadows'],
+  './devtools': ['DevTools', 'Stats'],
+  './shadows': ['BakeShadows', 'ContactShadows', 'Shadows', 'SoftShadows'],
   './sky': ['Sky'],
-  './text': ['Text'],
-  './geometry': ['Box', 'Plane', 'PlaneGeometry', 'Sphere', 'SphereGeometry'],
+  './text': ['Text', 'Text3D'],
+  './geometry': [
+    'Backdrop',
+    'Box',
+    'Capsule',
+    'CapsuleGeometry',
+    'Circle',
+    'CircleGeometry',
+    'Cone',
+    'ConeGeometry',
+    'Cylinder',
+    'CylinderGeometry',
+    'Dodecahedron',
+    'DodecahedronGeometry',
+    'Extrude',
+    'ExtrudeGeometry',
+    'Icosahedron',
+    'IcosahedronGeometry',
+    'Lathe',
+    'LatheGeometry',
+    'Octahedron',
+    'OctahedronGeometry',
+    'Plane',
+    'PlaneGeometry',
+    'Polyhedron',
+    'PolyhedronGeometry',
+    'Ring',
+    'RingGeometry',
+    'RoundedBox',
+    'RoundedBoxGeometry',
+    'Shape',
+    'ShapeGeometry',
+    'Sphere',
+    'SphereGeometry',
+    'Svg',
+    'Tetrahedron',
+    'TetrahedronGeometry',
+    'Torus',
+    'TorusGeometry',
+    'TorusKnot',
+    'TorusKnotGeometry',
+    'Tube',
+    'TubeGeometry',
+  ],
   './jsx-runtime': ['Fragment', 'jsx', 'jsxs'],
   './jsx-dev-runtime': ['Fragment', 'jsxDEV'],
-  './materials': ['BatchedItem', 'BatchedMesh', 'MeshTransmissionMaterial'],
+  './materials': ['BatchedItem', 'BatchedMesh', 'Mask', 'MeshReflectorMaterial', 'MeshTransmissionMaterial', 'useMask'],
   './post': [
     'Afterimage',
     'Bloom',
@@ -118,7 +208,6 @@ const expected = {
 const optionalPeers = [
   '@margoengine/headless',
   '@margoengine/worker',
-  '@margoengine/gltf-pro',
   '@margoengine/fbx',
   '@margoengine/environment',
   '@margoengine/html',
@@ -150,6 +239,7 @@ const optionalPeers = [
   '@margoengine/lod',
   '@margoengine/splats',
   '@margoengine/viewcube',
+  '@margoengine/vfx',
 ];
 async function temporary(run) {
   const directory = await mkdtemp(join(testsRoot, '.subpaths-'));
@@ -275,7 +365,7 @@ test('server imports and canonical JSX evaluate no optional peers; a mounted Blo
     import React from 'react';import {renderToString} from 'react-dom/server';
     import {Canvas,Stage,Mesh} from '@margoengine/react';
     import {Center} from '@margoengine/react';
-    import {Gltf} from '@margoengine/react/gltf-pro';import {Box} from '@margoengine/react/geometry';import {Html} from '@margoengine/react/html';
+    import {Gltf} from '@margoengine/react/gltf';import {Box} from '@margoengine/react/geometry';import {Html} from '@margoengine/react/html';
     import {Text} from '@margoengine/react/text';import {Fbx} from '@margoengine/react/fbx';
     import {EffectComposer,Bloom,SSAO} from '@margoengine/react/post';import {DepthOfField} from '@margoengine/react/dof';
     import {Physics,RigidBody} from '@margoengine/react/physics';
@@ -309,7 +399,7 @@ const baseConsumer = `import {createElement as h} from 'react';
   export const PickingCube=()=>h(Canvas,{frameloop:'demand'},h(Stage,null,h(Mesh,{onClick:event=>console.log(event.object.name)},h(BoxGeometry),h(PbrMaterial,{color:'#84d6bd'}))));`;
 const optionalConsumer = `import {createElement as h} from 'react';
   import {Canvas} from '@margoengine/react';import {Box} from '@margoengine/react/geometry';import {Text} from '@margoengine/react/text';
-  import {Gltf} from '@margoengine/react/gltf-pro';import {EffectComposer,Bloom} from '@margoengine/react/post';import {XR,Controller} from '@margoengine/react/xr';
+  import {Gltf} from '@margoengine/react/gltf';import {EffectComposer,Bloom} from '@margoengine/react/post';import {XR,Controller} from '@margoengine/react/xr';
   import {Physics,RigidBody} from '@margoengine/react/physics';
   export const OptionalScene=()=>h(Canvas,null,h(Box),h(Text,null,'Margo'),h(Gltf,{src:'/model.glb'}),h(EffectComposer,null,h(Bloom)),h(Physics,null,h(RigidBody,null,h(Box))),h(XR,null,h(Controller)));`;
 function staticChunks(outputs) {
@@ -326,7 +416,7 @@ function staticChunks(outputs) {
   for (const chunk of chunks.values()) if (chunk.isEntry) visit(chunk);
   return [...seen];
 }
-async function bundle(directory, name, source) {
+async function bundle(directory, name, source, expected = []) {
   const entry = join(directory, name + '.js');
   await writeFile(entry, source);
   // Every warning the build prints, Vite's own and the bundler's. The packages resolve to their workspace folders,
@@ -358,7 +448,17 @@ async function bundle(directory, name, source) {
       },
     },
   });
-  assert.deepEqual(warnings, [], `${name}: the build prints no warnings`);
+  assert.deepEqual(
+    // Paths as the build prints them depend on the working directory: compare them from the package folder.
+    warnings.map((warning) =>
+      warning
+        .replace(/\x1b\[[0-9;]*m/g, '')
+        .replace(/(?:\.\.\/|\S*packages\/)([\w-]+\/dist\/)/g, '$1')
+        .trim(),
+    ),
+    expected,
+    `${name}: the build prints no warnings`,
+  );
   return (Array.isArray(result) ? result.flatMap((output) => output.output) : result.output).filter(
     (item) => item.type === 'chunk',
   );
@@ -407,12 +507,10 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
     );
     for (const name of [
       'fbx',
-      'gltf-pro',
       'selection',
       'shadows',
       'cameras',
       'gltf',
-      'scenery',
       'creative',
       'environment',
     ])
@@ -429,7 +527,7 @@ test('Vite picking-cube initial chunk graph excludes optional React subpaths and
 
 test('an unused binding of the one-install entry emits nothing: preload is not a module-level side effect', async () =>
   temporary(async (directory) => {
-    // `Model.preload = ...` at module level kept model.js, and its lazy gltf-pro import with the Draco and Basis
+    // `Model.preload = ...` at module level kept model.js, and its lazy gltf/pbr import with the Draco and Basis
     // decoders, in every margoengine/react build (bundler matrix, 2026-10-27). The components are pure now.
     const outputs = await bundle(
       directory,
@@ -440,7 +538,7 @@ test('an unused binding of the one-install entry emits nothing: preload is not a
     );
     const emitted = outputs.flatMap((chunk) => Object.keys(chunk.modules)).map((id) => id.replaceAll('\\', '/'));
     for (const name of [
-      'gltf-pro',
+      'gltf',
       'fbx',
       'environment',
       'html',
@@ -463,6 +561,80 @@ test('an unused binding of the one-install entry emits nothing: preload is not a
         `react/${file} is emitted`,
       );
   }));
+
+test('react/materials tree-shakes: a build using one of its components holds none of MeshReflectorMaterial', async () =>
+  temporary(async (directory) => {
+    // MeshReflectorMaterial shares the materials entry; an app importing only MeshTransmissionMaterial must not pay
+    // for it (measured 2026-11-16: 7,344 B gzip minified with react/materials' own code, no reflector code).
+    for (const [name, use] of [
+      ['transmission-only', 'MeshTransmissionMaterial'],
+      ['reflector-only', 'MeshReflectorMaterial'],
+    ]) {
+      const outputs = await bundle(
+        directory,
+        name,
+        `import {${use}} from '@margoengine/react/materials';\n  export const used=${use};`,
+      );
+      const code = outputs.map((chunk) => chunk.code).join('\n'),
+        emitted = staticChunks(outputs)
+          .flatMap((chunk) => Object.keys(chunk.modules))
+          .map((id) => id.replaceAll('\\', '/')),
+        reflector = use === 'MeshReflectorMaterial';
+      assert.equal(code.includes('MeshReflectorMaterial needs a flat geometry'), reflector, `${name}: reflector code`);
+      assert.equal(
+        emitted.some((id) => /\/environment\/(src|dist)\/(mesh-reflector|reflector-pbr)\./.test(id)),
+        false,
+        `${name}: the native reflector stays off the initial chunk graph`,
+      );
+    }
+  }));
+
+test('an Environment without children loads none of the capture binding, CubeCamera or Lightformer', async () =>
+  temporary(async (directory) => {
+    // `forwardRef(...)` at module level without a pure annotation kept CubeCamera and Lightformer in every build that
+    // imported a helper from their modules, and the static capture binding came along: an `<Environment src>` app
+    // loaded 6,762 B gzip minified up front where 3,810 B is its own (measured 2026-11-16).
+    for (const [name, children] of [
+      ['environment-only', false],
+      ['environment-children', true],
+    ]) {
+      const outputs = await bundle(
+        directory,
+        name,
+        `import {createElement as h} from 'react';
+  import {Environment${children ? ',Lightformer' : ''}} from '@margoengine/react/environment';
+  export const App=()=>h(Environment,{src:'studio.hdr'}${children ? ',h(Lightformer)' : ''});`,
+        // Open in docs/known-bugs.md: the environment root re-exports its decoders, so react's lazy import of it
+        // keeps them with it. This fails once that is fixed; then drop the expectation.
+        [
+          '[INEFFECTIVE_DYNAMIC_IMPORT] environment/dist/loaders.js is dynamically imported by environment/dist/main.js but also statically imported by environment/dist/index.js, dynamic import will not move module into another chunk.',
+        ],
+      );
+      const initial = staticChunks(outputs)
+          .map((chunk) => chunk.code)
+          .join('\n'),
+        code = outputs.map((chunk) => chunk.code).join('\n');
+      for (const marker of ['function CubeCamera(', 'function EnvironmentCapture(', ...(children ? [] : ['function Lightformer('])])
+        assert.equal(initial.includes(marker), false, `${name}: ${marker} stays off the initial chunk graph`);
+      assert.ok(code.includes('function EnvironmentCapture('), `${name}: the capture binding is a lazy chunk`);
+      assert.equal(code.includes('function Lightformer('), children, `${name}: Lightformer is emitted only when used`);
+    }
+  }));
+
+test('module-level React factories carry a pure annotation, so unused components tree-shake', async () => {
+  // A bundler keeps a call it cannot prove pure. `export const X = forwardRef(...)` (or createContext, memo, lazy)
+  // without /* @__PURE__ */ stays in every build that imports anything else from its module.
+  const offenders = [];
+  for (const file of await readdir(join(packageRoot, 'dist'))) {
+    if (!file.endsWith('.js')) continue;
+    const lines = (await readFile(join(packageRoot, 'dist', file), 'utf8')).split('\n');
+    lines.forEach((line, index) => {
+      if (/^(export )?(const|let|var) [\w$]+ = (forwardRef|createContext|memo|lazy)\(/.test(line))
+        offenders.push(`dist/${file}:${index + 1}`);
+    });
+  }
+  assert.deepEqual(offenders, []);
+});
 
 test('OrbitControls loads the orbit controls entry only, never the controls index and its BVH raycaster', async () =>
   temporary(async (directory) => {
@@ -502,7 +674,7 @@ test('Vite optional entry includes requested bindings while keeping their native
       '/packages/post/',
       '/packages/xr/',
       '/packages/text/',
-      '/packages/gltf-pro/',
+      '/packages/gltf/',
       'rapier3d',
       'rapier-solver',
     ])
@@ -517,7 +689,7 @@ test('Vite optional entry includes requested bindings while keeping their native
       '/packages/post/',
       '/packages/xr/',
       '/packages/text/',
-      '/packages/gltf-pro/',
+      '/packages/gltf/',
       'rapier-solver',
     ])
       assert.ok(
@@ -532,7 +704,7 @@ test('strict TypeScript consumers compile every public React subpath, callbacks 
       join(directory, 'consumer.tsx'),
       `import React,{Suspense,useRef} from 'react';
     import {Canvas,Stage,Mesh,Group,BoxGeometry,Center,useFrame,useMargo,type MeshRef} from '@margoengine/react';
-    import {Model,Gltf,type GltfProps} from '@margoengine/react/gltf-pro';import {Fbx,type FbxProps} from '@margoengine/react/fbx';
+    import {Model,Gltf,type GltfProps} from '@margoengine/react/gltf';import {Fbx,type FbxProps} from '@margoengine/react/fbx';
     import {Animation} from '@margoengine/react/animation';import {MeshTransmissionMaterial} from '@margoengine/react/materials';
     import {Box,Sphere,Plane,type BoxProps} from '@margoengine/react/geometry';import {Sky} from '@margoengine/react/sky';
     import {ContactShadows} from '@margoengine/react/shadows';import {PointerLock,TransformControls,OrbitControls} from '@margoengine/react/controls';

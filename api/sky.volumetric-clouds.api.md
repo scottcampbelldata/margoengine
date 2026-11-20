@@ -6,6 +6,23 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export const CLOUD_FLOATS = 96;
+
+export interface CloudLayer {
+    readonly coverage: number;
+    readonly bottom: number;
+    readonly top: number;
+    readonly density: number;
+}
+
+export type CloudType = 'cumulus' | 'stratus' | 'storm' | 'hurricane';
+
+export interface CloudTypeWeights {
+    readonly cumulus: number;
+    readonly stratus: number;
+    readonly storm: number;
+}
+
 export class CloudVolumes {
     readonly shape: GPUTexture;
     readonly erosion: GPUTexture;
@@ -15,6 +32,16 @@ export class CloudVolumes {
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
+
+export interface CloudWeather {
+    readonly cloud: number;
+    readonly rain?: number;
+    readonly lightning?: number;
+}
+
+export type MutableCloudLayer = {
+    -readonly [K in keyof CloudLayer]: CloudLayer[K];
+};
 
 export const PLANET_RADIUS = 6360000;
 
@@ -28,6 +55,9 @@ export interface VolumetricCloudFlash {
 export interface VolumetricCloudOptions {
     sky?: VolumetricCloudSky;
     sunDirection?: Vec3;
+    weather?: CloudWeather;
+    type?: CloudType;
+    hurricane?: HurricaneOptions | Hurricane;
     coverage?: number;
     bottom?: number;
     top?: number;
@@ -38,11 +68,15 @@ export interface VolumetricCloudOptions {
     steps?: number;
     lightSteps?: number;
     maxDistance?: number;
+    stepCap?: number;
+    dimLight?: boolean;
+    erosion?: number;
     sunIntensity?: number;
     ambient?: readonly [Vec3, Vec3];
+    groundAlbedo?: number;
     depth?: () => GPUTexture | undefined;
     flash?: VolumetricCloudFlash;
-    temporal?: boolean;
+    temporal?: boolean | 'auto';
 }
 
 export interface VolumetricCloudSky {
@@ -50,13 +84,19 @@ export interface VolumetricCloudSky {
     readonly options: {
         readonly turbidity?: number;
         readonly exposure?: number;
+        readonly lighting?: {
+            readonly intensity?: number;
+        };
     };
     readonly reflectionTexture?: GPUTexture | undefined;
+    readonly lightScale?: number;
     readonly lights?: readonly {
         readonly direction: ArrayLike<number>;
         readonly radiance: ArrayLike<number>;
     }[];
     environmentLayer?: GPUTexture | undefined;
+    environmentLightLayer?: GPUTexture | undefined;
+    deck?: ((up: number) => number) | undefined;
 }
 
 export class VolumetricClouds implements EnginePlugin {
@@ -67,13 +107,160 @@ export class VolumetricClouds implements EnginePlugin {
     static attach(engine: EngineKernel, options?: VolumetricCloudOptions): VolumetricClouds;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get ready(): Promise<void>;
+    get time(): number;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
-export const cloudField = "\nstruct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f}\nfn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}\nfn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}\nfn cloudDensityAt(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,erode:bool)->f32 {\n let h=(cloudAltitude(c,p)-c.layer.x)/(c.layer.y-c.layer.x);if(h<=0.0||h>=1.0){return 0.0;}\n let q=(p+vec3f(c.wind.x,c.wind.z,c.wind.y))*c.shape.x;\n let s=textureSampleLevel(shape,smp,q.xzy,0.0);\n let weather=textureSampleLevel(shape,smp,vec3f(q.xz*0.17,0.37),0.0).g;\n let cover=clamp(c.layer.z*(1.0+2.5*(weather-0.48)),0.0,1.0);\n let low=s.g*0.625+s.b*0.25+s.a*0.125;\n let base=clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);\n let profile=smoothstep(0.0,0.12,h)*smoothstep(1.0,0.45,h);\n let cloud=clamp(cloudRemap(base*profile,1.0-cover,1.0),0.0,1.0)*cover;\n if(cloud<=0.0||!erode){return cloud;}\n let e=textureSampleLevel(detail,smp,((p+vec3f(c.wind.x,c.wind.z*2.0,c.wind.y)*1.5)*c.shape.y).xzy,0.0).rgb;\n let high=e.r*0.625+e.g*0.25+e.b*0.125;\n return clamp(cloudRemap(cloud,mix(high,1.0-high,clamp(h*4.0,0.0,1.0))*0.35,1.0),0.0,1.0);\n}\nfn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,l:vec3f,n:u32)->f32 {\n let reach=(c.layer.y-c.layer.x)*0.75/max(l.y,0.25);var od=0.0;var previous=0.0;\n for(var i=0u;i<n;i++){let f=(f32(i)+1.0)/f32(n);let t=reach*f*f;od+=cloudDensityAt(c,shape,detail,smp,p+l*(0.5*(t+previous)),false)*(t-previous);previous=t;}\n return od*c.layer.w;\n}\n";
+export function cloudDeckTransmittance(layer: CloudLayer, up: number): number;
 
-export function writeLayer(v: Float32Array, options: VolumetricCloudOptions, drift: ArrayLike<number>): void;
+export const cloudField = "\nstruct Clouds {inverse:mat4x4f,eye:vec4f,sun:vec4f,sunColor:vec4f,layer:vec4f,shape:vec4f,wind:vec4f,flags:vec4f,moon:vec4f,moonColor:vec4f,flash:vec4f,flashColor:vec4f,look:vec4f,storm:array<vec4f,8>}\nfn cloudRemap(x:f32,a:f32,b:f32)->f32 {return (x-a)/max(b-a,0.00001);}\nfn cloudAltitude(c:Clouds,p:vec3f)->f32 {let R=c.eye.w;return (dot(p,p)+2.0*R*p.y)/(length(vec3f(p.x,p.y+R,p.z))+R);}\nfn cloudBase(s:vec4f)->f32 {let low=s.g*0.625+s.b*0.25+s.a*0.125;return clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);}\n//[storm-fns]\nfn cloudDensityAt(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,erode:bool)->f32 {\n let h=(cloudAltitude(c,p)-c.layer.x)/(c.layer.y-c.layer.x);if(h<=0.0||h>=1.0){return 0.0;}\n//[storm-branch]\n let q=(p+vec3f(c.wind.x,c.wind.z,c.wind.y))*c.shape.x;\n let s=textureSampleLevel(shape,smp,q.xzy,0.0);\n let weather=textureSampleLevel(shape,smp,vec3f((p.xz+c.flags.zw)*c.shape.x*0.17,0.37),0.0).g;\n let cover=clamp(c.layer.z*(1.0+2.5*(weather-0.48)),0.0,1.0);\n let low=s.g*0.625+s.b*0.25+s.a*0.125;\n let base=clamp((clamp(cloudRemap(s.r,low-1.0,1.0),0.0,1.0)-0.67)/0.21,0.0,1.0);\n let profile=smoothstep(0.0,0.12,h)*smoothstep(1.0,0.45,h);\n let cloud=clamp(cloudRemap(base*profile,1.0-cover,1.0),0.0,1.0)*cover;\n if(cloud<=0.0||!erode){return cloud;}\n let e=textureSampleLevel(detail,smp,((p+vec3f(c.wind.x,c.wind.z*2.0,c.wind.y)*1.5)*c.shape.y).xzy,0.0).rgb;\n let high=e.r*0.625+e.g*0.25+e.b*0.125;\n return clamp(cloudRemap(cloud,mix(high,1.0-high,clamp(h*4.0,0.0,1.0))*0.35*c.look.x,1.0),0.0,1.0);\n}\nfn cloudLightDepth(c:Clouds,shape:texture_3d<f32>,detail:texture_3d<f32>,smp:sampler,p:vec3f,l:vec3f,n:u32)->f32 {\n let reach=(c.layer.y-c.layer.x)*0.75/max(l.y,0.25);var od=0.0;var previous=0.0;\n for(var i=0u;i<n;i++){let f=(f32(i)+1.0)/f32(n);let t=reach*f*f;od+=cloudDensityAt(c,shape,detail,smp,p+l*(0.5*(t+previous)),false)*(t-previous);previous=t;}\n return od*c.layer.w;\n}\n";
+
+export function cloudLayerFor(weather: CloudWeather, out?: MutableCloudLayer, type?: CloudType): CloudLayer;
+
+export function cloudTransmission(tau: number): number;
+
+export function cloudTypeWeights(weather: CloudWeather): CloudTypeWeights;
+
+export function layerOf(options: VolumetricCloudOptions, out?: MutableCloudLayer): CloudLayer;
+
+export function loadStormField(): Promise<StormField>;
+
+export function stormFieldFor(options: VolumetricCloudOptions): StormField | undefined;
+
+export const wantsStorm: (options: VolumetricCloudOptions) => boolean;
+
+export const withStorm: (code: string, field?: StormField) => string;
+
+export function writeLayer(v: Float32Array, options: VolumetricCloudOptions, drift: ArrayLike<number>, seconds?: number): void;
+
+// Not exported from this entry, but used by the exports above:
+
+class Hurricane {
+    readonly options: HurricaneOptions;
+    constructor(options?: HurricaneOptions);
+    get resolved(): ResolvedHurricane;
+    centerAt(t?: number): [number, number];
+    windAt(x: number, z: number, t?: number): HurricaneWind;
+    rainAt(x: number, z: number, t?: number): number;
+    coverAt(x: number, z: number, height?: number, t?: number, depth?: number): HurricaneCover;
+    regionAt(x: number, z: number, t?: number): HurricaneRegion;
+    weatherAt(x: number, z: number, t?: number): HurricaneWeather;
+}
+
+interface HurricaneCover {
+    eye: number;
+    eyewall: number;
+    outerEyewall: number;
+    moat: number;
+    band: number;
+    shield: number;
+    canopy: number;
+    cover: number;
+}
+
+interface HurricaneOptions {
+    center?: readonly [number, number];
+    velocity?: readonly [number, number];
+    pressureDrop?: number;
+    maxWindRadius?: number;
+    holland?: number;
+    latitude?: number;
+    airDensity?: number;
+    surfaceFactor?: number;
+    inflow?: number;
+    gustFactor?: number;
+    eyeRadius?: number;
+    eyeSlope?: number;
+    eyewallWidth?: number;
+    eyeCloud?: number;
+    outerEyewall?: number;
+    outerEyewallStrength?: number;
+    moat?: number;
+    bands?: number;
+    bandPitch?: number;
+    bandWidth?: number;
+    bandStart?: number;
+    bandTop?: number;
+    bandRotation?: number;
+    bandDrift?: number;
+    principalBand?: number;
+    extent?: number;
+    shield?: number;
+    canopy?: number;
+    rainMax?: number;
+    rainExtent?: number;
+    flowPeriod?: number;
+    swirl?: number;
+}
+
+type HurricaneRegion = 'eye' | 'eyewall' | 'moat' | 'outerEyewall' | 'band' | 'shield' | 'outside';
+
+interface HurricaneWeather {
+    weight: number;
+    wind: number;
+    gust: number;
+    windDirection: number;
+    rain: number;
+    cloud: number;
+    lightning: number;
+    humidity: number;
+}
+
+interface HurricaneWind {
+    speed: number;
+    gust: number;
+    velocity: [number, number];
+    direction: number;
+}
+
+interface ResolvedHurricane {
+    cx: number;
+    cz: number;
+    vx: number;
+    vz: number;
+    dp: number;
+    rmax: number;
+    b: number;
+    rho: number;
+    f: number;
+    spin: number;
+    surface: number;
+    inflow: number;
+    gust: number;
+    eye: number;
+    slope: number;
+    wall: number;
+    eyeCloud: number;
+    outer: number;
+    outerStrength: number;
+    moat: number;
+    bands: number;
+    pitch: number;
+    bandWidth: number;
+    bandStart: number;
+    bandTop: number;
+    bandRotation: number;
+    bandDrift: number;
+    principal: number;
+    extent: number;
+    shield: number;
+    canopy: number;
+    rainMax: number;
+    rainExtent: number;
+    flowPeriod: number;
+    swirl: number;
+}
+
+interface StormField {
+    readonly fns: string;
+    readonly branch: string;
+    of(options: VolumetricCloudOptions): ResolvedHurricane | undefined;
+    write(v: Float32Array, options: VolumetricCloudOptions, seconds: number, scale: number): void;
+    coverOver(storm: ResolvedHurricane, x: number, z: number, seconds: number, depth: number): number;
+}
 ```

@@ -1,11 +1,11 @@
 // Dithered cross-fade between levels: for `duration` seconds both levels draw, each pixel from exactly one of them by a
 // fixed noise threshold, so a level switch dissolves instead of popping. Core meshes read the threshold from a buffer
-// indexed by mesh id (a patch of core's shader; the id already travels in the instance data); gltf-pro models and
+// indexed by mesh id (a patch of core's shader; the id already travels in the instance data); gltf/pbr models and
 // materials meshes read it from a lighting effect's uniform. Dither: interleaved gradient noise (Jimenez 2014).
 import { requireWebGPU } from '../../shared/require-webgpu.js';
 import { Geometry, type EngineKernel, type Mesh } from '@margoengine/core';
 import { meshRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import type { LOD, LODObject, LODSystem } from './index.js';
 import { fadeTest } from './fade-pattern.js';
@@ -58,7 +58,7 @@ export function coreFadeShader(code: string): string {
       `@group(0) @binding(${BINDING}) var<storage,read> lod_fades:array<f32>;\n${fadeTest}\n${head}\nif(!lod_fade_keep(i.clip.xy,lod_fades[i.lod_id])){discard;}`,
   );
 }
-/** gltf-pro's shader with the fade, on every entry that shades a surface, read from the uniform at `group` binding 97. */
+/** gltf/pbr's shader with the fade, on every entry that shades a surface, read from the uniform at `group` binding 97. */
 export function modelFadeShader(code: string, group: number): string {
   return `@group(${group}) @binding(97) var<uniform> lod_fade:vec4f;\n${fadeTest}\n${code.replaceAll(
     'let s=surface(i,front);',

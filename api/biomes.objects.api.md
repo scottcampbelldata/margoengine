@@ -4,7 +4,21 @@
 
 ```ts
 import { EngineKernel, PbrMaterial } from "@margoengine/core";
+import { ScatterStateSource, ScatterTextures } from "@margoengine/scatter";
 import { ScatterTiles } from "@margoengine/scatter/tiles";
+
+export interface BiomeMeshData {
+    readonly positions: ArrayLike<number>;
+    readonly normals: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+}
+
+export interface BiomeMeshPart {
+    readonly geometry: BiomeMeshData | readonly [BiomeMeshData, BiomeMeshData, BiomeMeshData];
+    readonly color: readonly [number, number, number];
+    readonly kind: 'bark' | 'foliage' | 'stone';
+    readonly textures?: ScatterTextures;
+}
 
 export class BiomeObjects implements Disposable {
     private constructor();
@@ -38,9 +52,13 @@ export interface BiomeObjectsOptions {
         readonly world: BiomeWorld;
     };
     readonly seasons?: BiomeSeasons;
+    readonly meshes?: Readonly<Record<string, readonly BiomeMeshPart[]>>;
+    readonly states?: (key: string, kind: 'bark' | 'foliage' | 'stone') => ScatterStateSource | undefined;
 }
 
 export const DETAIL_BUDGET = 134217728;
+
+export function checkBiomeMeshes(meshes: unknown): asserts meshes is Readonly<Record<string, readonly BiomeMeshPart[]>>;
 
 export function detailFits(bounds: readonly [number, number, number, number], resolution: number, species: number, limit: number, budget?: number): boolean;
 
@@ -62,6 +80,7 @@ interface BiomeDefinition {
     readonly priority?: number;
     readonly weight?: number;
     readonly zones?: readonly string[];
+    readonly openFuel?: string;
 }
 
 class BiomePlacement implements Disposable {
@@ -440,6 +459,26 @@ interface LayerWrite {
     readonly changed?: readonly [number, number, number, number];
 }
 
+interface MountainValleyOptions {
+    readonly outlet?: 'west' | 'east' | 'north' | 'south';
+    readonly center?: number;
+    readonly floor?: number;
+    readonly fall?: number;
+    readonly wall?: number;
+    readonly steepness?: number;
+    readonly ridges?: 'rounded' | 'sharp';
+    readonly gulches?: number;
+    readonly creek?: {
+        readonly width?: number;
+        readonly depth?: number;
+    };
+    readonly rail?: {
+        readonly grade?: number;
+        readonly width?: number;
+    } | false;
+    readonly step?: number;
+}
+
 interface PaintLayer {
     readonly biome: string;
     readonly mode?: PaintMode;
@@ -449,7 +488,8 @@ interface PaintLayer {
 type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
 
 interface PathCarve {
-    readonly mode?: 'flatten' | 'cut';
+    readonly mode?: 'flatten' | 'cut' | 'level';
+    readonly top?: number;
     readonly depth?: number;
     readonly grade?: number;
 }
@@ -563,8 +603,24 @@ interface ReliefOptions {
     readonly seaDepth?: number;
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
+    readonly ria?: RiaOptions;
     readonly islands?: IslandOptions;
+    readonly mountainValley?: MountainValleyOptions;
     readonly erosion?: ReliefErosionOptions;
+}
+
+interface RiaOptions {
+    readonly center?: number;
+    readonly width?: number;
+    readonly headWidth?: number;
+    readonly length?: number;
+    readonly depth?: number;
+    readonly headDepth?: number;
+    readonly slope?: number;
+    readonly flat?: number;
+    readonly flatHeight?: number;
+    readonly run?: number;
+    readonly river?: boolean;
 }
 
 interface SeasonWeather {
@@ -597,6 +653,7 @@ interface SpeciesRule {
     readonly lod?: readonly [near: number, mid: number, far: number];
     readonly color?: ColorVariation;
     readonly tags?: readonly string[];
+    readonly fuel?: string;
 }
 
 interface StandRule {

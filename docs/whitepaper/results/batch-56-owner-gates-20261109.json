@@ -1263,7 +1263,7 @@
     "base": "09777e77bd027a77900d3396ee9d3e9d3573ff75",
     "repairsTip": "e0d046aec",
     "excludedRegression": "5072698c0",
-    "inheritedPackageProofInputs": "Unchanged from cb5045b61, except removal of the deliberately red capture regression/script wiring. Upstream changes are unrelated optional packages, metadata, documentation and GPU-lock mutex resolution.",
+    "inheritedPackageProofInputs": "Unchanged from cb5045b61, except removal of the deliberately red capture regression/script wiring. Upstream changes are unrelated optional packages, metadata, documentation and the GPU run mutex resolution.",
     "cpu": {
       "landing-build": {
         "code": 0,
@@ -1404,7 +1404,7 @@
         "exports": 8673
       },
       "qualityEntries": 977,
-      "inheritedProofInputs": "Byte-identical to 826a6b2e9 in all repaired packages and GPU-lock. New main commit adds separate bvh/shadows entries and documentation. Existing passing GPU, unit, README and lock results are reused; only affected build/API/quality/docs gates rechecked."
+      "inheritedProofInputs": "Byte-identical to 826a6b2e9 in all repaired packages and the GPU run. New main commit adds separate bvh/shadows entries and documentation. Existing passing GPU, unit, README and lock results are reused; only affected build/API/quality/docs gates rechecked."
     },
     "trsRebase": {
       "base": "fc20cdca6",
@@ -1505,7 +1505,7 @@
         "exports": 8673
       },
       "qualityEntries": 977,
-      "note": "Main advanced during the fast-forward push; no force or overwrite. Rebased again. Repair source and GPU lock unchanged; rebuilt all packages after upstream named TRS/caller migration, reran real-model pathtrace on both backends, HDR-shadow rotation on each backend and all 27 environment/staging/umbrella README examples. All pass. Red capture regression remains excluded."
+      "note": "Main advanced during the fast-forward push; no force or overwrite. Rebased again. Repair source and the GPU run unchanged; rebuilt all packages after upstream named TRS/caller migration, reran real-model pathtrace on both backends, HDR-shadow rotation on each backend and all 27 environment/staging/umbrella README examples. All pass. Red capture regression remains excluded."
     },
     "tierIntegration": {
       "base": "b30aaa010",

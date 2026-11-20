@@ -140,8 +140,9 @@ for (const compat of [false, true]) {
       } catch (error) {
         check(error.message === 'cancel-test', 'Abort preserved');
       }
-      // KB5700i: world-size splats under a perspective camera cover the same pixels in short tiles as in one
-      // whole-image tile (the point scale follows the cropped tile projection, not the full-view fov).
+      // KB5700i: world-size splats under a perspective camera keep their size in a cropped projection (the point scale
+      // follows the cropped projection, not the full-view fov). Short tiles and one whole-image tile give the same
+      // bytes, and an image of 2 by 2 render blocks has its splats at the scale of one of a single block.
       const { Figure } = await import('/packages/sciviz/dist/index.js');
       const worldCanvas = Object.assign(document.createElement('canvas'), { width: 320, height: 240 });
       worldCanvas.style.cssText = 'width:320px;height:240px';
@@ -163,12 +164,37 @@ for (const compat of [false, true]) {
         const background = Array.from(whole.pixels.slice(0, 3));
         let covered = 0;
         for (let i = 0; i < whole.pixels.length; i += 4) {
-          differ += +([0, 1, 2].some((k) => Math.abs(short.pixels[i + k] - whole.pixels[i + k]) > 8));
-          covered += +([0, 1, 2].some((k) => Math.abs(whole.pixels[i + k] - background[k]) > 8));
+          differ += +[0, 1, 2].some((k) => Math.abs(short.pixels[i + k] - whole.pixels[i + k]) > 8);
+          covered += +[0, 1, 2].some((k) => Math.abs(whole.pixels[i + k] - background[k]) > 8);
         }
-        worldCoverage = { differ, covered };
+        const cover = (img) => {
+          let count = 0;
+          for (let i = 0; i < img.pixels.length; i += 4)
+            count += +[0, 1, 2].some((k) => Math.abs(img.pixels[i + k] - background[k]) > 8);
+          return count;
+        };
+        // The splats cover the same share of the image at 1280 x 960 (one block row, 1024 / 960 of the view height)
+        // and at 2560 x 1920 (2 x 2 blocks, 1024 / 1920): 1.07 and 0.53 times too wide with the full-view fov.
+        const coverAt = async (width) =>
+          cover(
+            await image(
+              await exportImage(world, {
+                ...splatOptions,
+                size: { width, height: (width * 3) / 4, unit: 'px' },
+                tileSize: 512,
+              }),
+            ),
+          );
+        const one = await coverAt(1280),
+          four = await coverAt(2560);
+        const scale = four / 4 / one;
+        worldCoverage = { differ, covered, one, four, scale };
         check(covered > 1000, `A perspective tiled export draws its scatter: ${covered} pixels`);
-        check(differ <= covered * 0.01, `World-size splats keep their size in short tiles: ${differ} of ${covered}`);
+        check(differ === 0, `World-size splats are the same bytes in short tiles: ${differ} of ${covered}`);
+        check(
+          Math.abs(scale - 1) < 0.05,
+          `World-size splats keep their size across render blocks: ${four} / 4 / ${one}`,
+        );
       } finally {
         world.dispose();
         worldCanvas.remove();
@@ -189,7 +215,7 @@ for (const compat of [false, true]) {
         zipBytes: zip.length,
       };
     });
-    await browser.page.screenshot({path: `test-results/sciviz-media/wind-${compat ? 'webgl2' : 'webgpu'}.png`});
+    await browser.page.screenshot({ path: `test-results/sciviz-media/wind-${compat ? 'webgl2' : 'webgpu'}.png` });
     await browser.page.evaluate(async () => (await import('/examples/sciviz-wind.ts')).figure.dispose());
     const { images, ...result } = report;
     const comparison = compare(

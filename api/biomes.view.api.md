@@ -4,8 +4,39 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
+import { PlantStates } from "@margoengine/scatter/states";
 import { Terrain, TerrainColorOptions } from "@margoengine/terrain";
+import { WetGround, WetGroundLook } from "@margoengine/terrain/wet-ground";
 import { Water, WaterLight, WaterOptions } from "@margoengine/water";
+
+export const BIOME_LOOKS: {
+    readonly natural: {
+        readonly saturation: 1;
+        readonly detail: 1;
+        readonly bump: 1;
+        readonly macro: 1;
+    };
+    readonly animatedFeature: {
+        readonly saturation: 1.12;
+        readonly detail: 0.6;
+        readonly bump: 0.8;
+        readonly macro: 1.4;
+    };
+};
+
+export interface BiomeDisturbanceSettings extends DisturbanceStatesOptions {
+    readonly history: import('./disturbance.js').Disturbance;
+    readonly cell?: number;
+}
+
+export type BiomeLookName = keyof typeof BIOME_LOOKS;
+
+export interface BiomeLookValues {
+    readonly saturation: number;
+    readonly detail: number;
+    readonly bump: number;
+    readonly macro: number;
+}
 
 export interface BiomeShadows {
     add(source: object): () => void;
@@ -23,12 +54,15 @@ export class BiomeView implements Disposable {
     readonly textureResolution: number;
     readonly tileTimes: number[];
     readonly frameTimes: number[];
+    get horizon(): Terrain | undefined;
     private constructor();
     static attach(engine: EngineKernel, world: BiomeWorld, options?: BiomeViewOptions): Promise<BiomeView>;
     prefetch(rect: readonly [number, number, number, number], options?: {
         readonly signal?: AbortSignal;
     }): Promise<void>;
     get water(): Water | undefined;
+    get plantStates(): PlantStates | undefined;
+    get wetGround(): WetGround | undefined;
     get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined;
     whenIdle(): Promise<void>;
     get streaming(): {
@@ -59,11 +93,19 @@ export interface BiomeViewOptions {
     readonly detailRadius?: number;
     readonly lookahead?: number;
     readonly budget?: number;
+    readonly maxSteps?: number;
+    readonly clock?: () => number;
     readonly detailBudget?: number;
     readonly shadows?: BiomeShadows;
     readonly water?: boolean | 'auto' | BiomeWaterSettings;
+    readonly horizon?: boolean | 'auto';
     readonly sky?: BiomeSky;
     readonly seasons?: BiomeSeasons;
+    readonly exclusions?: readonly import('./placement.js').Exclusion[];
+    readonly meshes?: import('./objects.js').BiomeObjectsOptions['meshes'];
+    readonly states?: import('./objects.js').BiomeObjectsOptions['states'];
+    readonly disturbance?: import('./disturbance.js').Disturbance | BiomeDisturbanceSettings;
+    readonly wetness?: BiomeWetness;
 }
 
 export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon' | 'terrain' | 'spray' | 'fill' | 'still'> & {
@@ -74,6 +116,35 @@ export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon
         readonly substeps?: number;
     };
 };
+
+export interface BiomeWetness extends WetGroundLook {
+    readonly record: () => GPUTexture | undefined;
+    readonly velocity?: () => GPUTexture | undefined;
+    readonly origin: readonly [number, number];
+    readonly size: readonly [number, number];
+}
+
+export const HORIZON_SKIRT = 40;
+
+export interface HorizonHeights {
+    readonly origin: readonly [number, number];
+    readonly size: readonly [number, number];
+    readonly texel: number;
+    readonly width: number;
+    readonly depth: number;
+    readonly heights: Float32Array;
+    readonly nearest: Uint32Array;
+    readonly inside: Uint8Array;
+}
+
+export interface HorizonSource {
+    readonly bounds: readonly [number, number, number, number];
+    readonly heights: Float32Array;
+    readonly width: number;
+    readonly depth: number;
+    readonly seed: number;
+    readonly reach?: number;
+}
 
 export const MATERIALS: Readonly<Record<string, MaterialLook>>;
 
@@ -106,15 +177,23 @@ export interface ViewTile {
     readonly weights: readonly Uint8Array[];
 }
 
+export function biomeMaterials(look: BiomeLookName | BiomeLookValues, base?: Readonly<Record<string, MaterialLook>>): Record<string, Required<MaterialLook>>;
+
 export function clipmapLevels(bounds: readonly [number, number, number, number], radius: number, clipmap?: {
     readonly cellSize?: number;
     readonly resolution?: number;
     readonly levels?: number;
 }): number;
 
+export function disturbanceResponse(key: string, kind: 'bark' | 'foliage' | 'stone', conifer?: {
+    readonly crownBase: number;
+}): Readonly<Record<string, number>> | undefined;
+
 export function groundMaterials(biomes: readonly BiomeDefinition[]): string[];
 
 export function groundWeights(world: BiomeWorld, tile: BiomeTile, materials: readonly string[]): Uint8Array;
+
+export function horizonHeights(source: HorizonSource): HorizonHeights;
 
 export function materialPixels(key: string, material: MaterialLook): Uint8Array[];
 
@@ -147,6 +226,7 @@ interface BiomeDefinition {
     readonly priority?: number;
     readonly weight?: number;
     readonly zones?: readonly string[];
+    readonly openFuel?: string;
 }
 
 interface BiomeSample {
@@ -347,6 +427,16 @@ interface DetailRule {
     readonly blades?: boolean;
 }
 
+interface DisturbanceStatesOptions {
+    readonly intensity?: number | ((x: number, z: number) => number);
+    readonly ambient?: number;
+    readonly wind?: number;
+    readonly burnYears?: number;
+    readonly charYears?: number;
+    readonly floodPeriod?: number;
+    readonly floodMark?: number;
+}
+
 interface ErosionOptions {
     readonly iterations?: number;
     readonly talus?: number;
@@ -399,6 +489,26 @@ interface LayerWrite {
     readonly changed?: readonly [number, number, number, number];
 }
 
+interface MountainValleyOptions {
+    readonly outlet?: 'west' | 'east' | 'north' | 'south';
+    readonly center?: number;
+    readonly floor?: number;
+    readonly fall?: number;
+    readonly wall?: number;
+    readonly steepness?: number;
+    readonly ridges?: 'rounded' | 'sharp';
+    readonly gulches?: number;
+    readonly creek?: {
+        readonly width?: number;
+        readonly depth?: number;
+    };
+    readonly rail?: {
+        readonly grade?: number;
+        readonly width?: number;
+    } | false;
+    readonly step?: number;
+}
+
 interface PaintLayer {
     readonly biome: string;
     readonly mode?: PaintMode;
@@ -408,7 +518,8 @@ interface PaintLayer {
 type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
 
 interface PathCarve {
-    readonly mode?: 'flatten' | 'cut';
+    readonly mode?: 'flatten' | 'cut' | 'level';
+    readonly top?: number;
     readonly depth?: number;
     readonly grade?: number;
 }
@@ -470,8 +581,24 @@ interface ReliefOptions {
     readonly seaDepth?: number;
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
+    readonly ria?: RiaOptions;
     readonly islands?: IslandOptions;
+    readonly mountainValley?: MountainValleyOptions;
     readonly erosion?: ReliefErosionOptions;
+}
+
+interface RiaOptions {
+    readonly center?: number;
+    readonly width?: number;
+    readonly headWidth?: number;
+    readonly length?: number;
+    readonly depth?: number;
+    readonly headDepth?: number;
+    readonly slope?: number;
+    readonly flat?: number;
+    readonly flatHeight?: number;
+    readonly run?: number;
+    readonly river?: boolean;
 }
 
 interface SeasonWeather {
@@ -504,6 +631,7 @@ interface SpeciesRule {
     readonly lod?: readonly [near: number, mid: number, far: number];
     readonly color?: ColorVariation;
     readonly tags?: readonly string[];
+    readonly fuel?: string;
 }
 
 interface StandRule {

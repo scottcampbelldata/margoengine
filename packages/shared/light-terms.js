@@ -11,7 +11,7 @@ export const legacyTerms =
   'let reach=distance/light.positionRange.w;let fade=clamp(1.0-reach*reach*reach*reach,0.0,1.0);let falloff=fade*fade/max(distance*distance,0.000244140625);var cone=1.0;if(light.params.y>0.5){let ramp=clamp((dot(-l,light.directionOuter.xyz)-light.directionOuter.w)/max(light.params.x-light.directionOuter.w,0.000001),0.0,1.0);cone=ramp*ramp*(3.0-2.0*ramp);}';
 export const decayTerms =
   'let kind=light.params.y;let reach=distance/light.positionRange.w;let fade=clamp(1.0-reach*reach*reach*reach,0.0,1.0);let fresh=kind<-0.5||kind>1.5;let power=select(distance*distance,pow(max(distance,0.000001),select(-1.0-kind,kind-2.0,kind>1.5)),fresh);let falloff=fade*fade/max(power,0.000244140625);var cone=1.0;if(kind>0.5){let along=dot(-l,light.directionOuter.xyz);let lo=light.directionOuter.w;let hi=light.params.x;if(fresh){cone=select(select(0.0,1.0,along>=lo),smoothstep(lo,hi,along),hi>lo);}else{let ramp=clamp((along-lo)/max(hi-lo,0.000001),0.0,1.0);cone=ramp*ramp*(3.0-2.0*ramp);}}';
-// The per-light BRDF of clustered's light loop (GGX with Fresnel, as gltf-pro's direct light), in the loop's locals (n, v,
+// The per-light BRDF of clustered's light loop (GGX with Fresnel, as gltf/pbr's direct light), in the loop's locals (n, v,
 // l, h, vh, base, metal, nl, nv, d, g, fresnel, dielectricF0, dielectricF90). @margoengine/materials' Lambert and Phong
 // put their own BRDF in its place. glTF 2.0 Appendix B: material = mix(dielectric_brdf, metal_brdf, metallic), so the
 // specular parts sum to D G F / (4 nl nv) with `fresnel` at the metal-mixed F0, and the Lambert/pi lobe belongs to the
@@ -63,7 +63,7 @@ export const ggxDFloat = ggxD;
  * G2 / (4 nl nv) of glTF 2.0 Appendix B.3.2 (current revision) and Karis 2013 ("Real Shading in Unreal Engine 4"). It
  * never darkens below the separable product of two Smith G1 terms (Walter et al. 2007, eq. 34), which counts a microfacet
  * hidden from both directions twice (Heitz 2014, section 6.2). Every PBR direct light in the engine uses it: core, its
- * WebGL2 twin and gltf-pro since KB5875a; clustered, materials, terrain, lod imposters, animation VAT, post material
+ * WebGL2 twin and gltf/pbr since KB5875a; clustered, materials, terrain, lod imposters, animation VAT, post material
  * decals and voxel since KB6016. The guard only stops 0/0 at nl = a2 = 0: the denominator is never below 2 nl nv, so
  * a floor of 1e-30 (far above the smallest normal float32, 1.2e-38, which no backend flushes) changes no lit pixel. A
  * 1e-4 floor did (KB-G2guard): on a smooth surface at grazing angles the denominator falls far below it (a2 = 1e-6,

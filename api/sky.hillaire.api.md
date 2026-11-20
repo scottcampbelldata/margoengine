@@ -56,6 +56,8 @@ export class HillaireSky implements EnginePlugin {
     get resolvedAtmosphere(): Readonly<Required<AtmosphereParameters>>;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -80,13 +82,17 @@ export function bakeHillaireEnvironment(device: GPUDevice, options?: HillaireEnv
 
 // Not exported from this entry, but used by the exports above:
 
+type MoonPhase = number | MoonPhaseName;
+
+type MoonPhaseName = 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'lastQuarter' | 'waningCrescent' | 'half' | 'quarter';
+
 interface SkyNightOptions {
     zenithColor?: Vec3;
     horizonColor?: Vec3;
     moonColor?: Vec3;
     moonDirection?: Vec3;
     moonSize?: number;
-    moonPhase?: number;
+    moonPhase?: MoonPhase;
     moonLitBySun?: boolean;
     glowIntensity?: number;
     starIntensity?: number;

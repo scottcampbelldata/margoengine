@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/tilemap/test/browser-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/tilemap/test/browser-check.mjs
 // Under exactSize [64, 32] each frame reads back byte for byte against an image composed on the CPU: a 4 x 4 map of 2 x 2
 // tiles, one edit changing exactly 4 pixels, all eight flips, animation, margin and spacing, two tilesets, oversize tiles,
 // layer settings, a camera, chunks and culling, a caller target, a device loss. Results: test-results/tilemap-browser.json.
@@ -29,7 +29,19 @@ try {
   assert.equal(result.hidden.shownDraws, 1, 'showing it again draws it');
   assert.equal(result.idleUpload, 0, 'a frame with no edit uploads nothing');
   assert.equal(result.animatedUpload, 0, 'an animated tile sends no cells');
-  assert.equal(result.lostPlainAtlas, 'state', 'a plain GPUTexture atlas names its fix after a device loss');
+  // KB-RESTORE-BORROWED1: no frame throws, one report per lost atlas or target, the function form is called once per
+  // device, and setAtlas and setTarget bring the maps back.
+  const help = '; see https://margoengine.com/errors#borrowed-lost';
+  assert.deepEqual(result.lostPlainAtlas, {
+    thrown: null,
+    reports: [
+      ['state', `TileMap atlas lost with the device; pass a function or call setAtlas${help}`],
+      ['state', `TileMap target lost with the device; pass a function or call setTarget${help}`],
+    ],
+    functionCalls: 2,
+    functionDevices: true,
+    validation: 0,
+  });
   assert.equal(result.collection, 'unsupported', 'an image collection tileset says so');
   assert.equal(result.validation, null, 'no validation errors');
   assert.deepEqual(result.errors, []);

@@ -2,11 +2,11 @@
 
 Import `margoengine/materials` from the `margoengine` package, or `@margoengine/materials` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf-pro`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf-pro` does not import materials.
+Optional glTF clearcoat, sheen, specular color, anisotropy, iridescence, transmission, IOR, volume, and TypeScript node materials through `@margoengine/gltf/pbr`'s material extension slot. This package is separate from the frozen core and stage facade, and importing `gltf/pbr` does not import materials.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import * as materials from 'margoengine/materials';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/glass.glb');
@@ -18,7 +18,7 @@ model.destroy();
 stage.dispose();
 ```
 
-`install(model)` is synchronous and registers its engine plugin automatically. It reads optional `KHR_materials_clearcoat`, `KHR_materials_sheen`, `KHR_materials_specular`, `KHR_materials_anisotropy`, `KHR_materials_iridescence`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, and the draft `KHR_materials_volume_scatter` data from each primitive's material and uses the model's already loaded images. The baseline `loadGLTF` and `parseGLTF` APIs remain unchanged. Their existing validation rejects these extensions in `extensionsRequired`; use optional metadata for this explicit installation path.
+`install(model)` is synchronous and registers its engine plugin automatically. It reads optional `KHR_materials_clearcoat`, `KHR_materials_sheen`, `KHR_materials_specular`, `KHR_materials_anisotropy`, `KHR_materials_iridescence`, `KHR_materials_transmission`, `KHR_materials_ior`, `KHR_materials_volume`, and the draft `KHR_materials_volume_scatter` data from each primitive's material and uses the model's already loaded images. The baseline `loadGLTF` and `parseGLTF` APIs remain unchanged. Their existing validation rejects these extensions in `extensionsRequired`; use optional metadata for this explicit installation path. `install(model, {features})` also puts optional material features (`skin()`, `hair()`, `eye()`, `alphaHash()`) on materials picked by name; see [On a loaded glTF model](#on-a-loaded-gltf-model).
 
 Normalized author configuration is also supported: `material.clearcoat` uses `factor`, `roughnessFactor`, `clearcoatTexture`, `clearcoatRoughnessTexture`, and `clearcoatNormalTexture`. Normal texture metadata honors `clearcoatNormalTexture.scale`. `material.transmission` uses `factor`, `ior`, and `transmissionTexture`; `material.volume` uses `thicknessFactor`, `thicknessTexture`, `attenuationColor`, `attenuationDistance`, `multiscatterColorFactor`, `multiscatterColorTexture`, and `scatterAnisotropy`. Volume can also be nested in `material.transmission.volume`. Installation composes clearcoat and transmission into the same extension slot.
 
@@ -30,9 +30,9 @@ import {clearcoat} from 'margoengine/materials';
 const extension = clearcoat({factor: 1, roughnessFactor: 0.05});
 ```
 
-`ClearcoatOptions` supports the two factors and three optional textures. Each `ClearcoatTexture` contains a `view`, an optional `sampler`, and an optional `texCoord` (`0` or `1`, or `2` and `3` on a [gltf-pro primitive with `uvs`](../gltf-pro/README.md#more-than-two-uv-sets)); the normal texture also accepts `scale`. A `transform` accepts glTF-style `offset`, `rotation`, `scale`, and overriding `texCoord`. A view without a sampler uses nearest sampling with clamped UVs at mip level `0`. Views and samplers supplied to `clearcoat()` stay caller-owned.
+`ClearcoatOptions` supports the two factors and three optional textures. Each `ClearcoatTexture` contains a `view`, an optional `sampler`, and an optional `texCoord` (`0` or `1`, or `2` and `3` on a [gltf/pbr primitive with `uvs`](../gltf/README.md#more-than-two-uv-sets)); the normal texture also accepts `scale`. A `transform` accepts glTF-style `offset`, `rotation`, `scale`, and overriding `texCoord`. A view without a sampler uses nearest sampling with clamped UVs at mip level `0`. Views and samplers supplied to `clearcoat()` stay caller-owned.
 
-Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. As KHR_materials_clearcoat defines it, everything under the coat (direct, local, ambient and emitted light) keeps `1 - clearcoat * F(n.v)`, 0.96 of itself at normal incidence and 0.73 at n.v 0.25 with clearcoat 1, and the coat adds its own directional and ambient light on top, the ambient from the same `margoCoatAmbient` as gltf-pro's native materials, so an environment lights it. Its normal affects only the coat; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
+Clearcoat adds a second GGX specular lobe with dielectric F0 `0.04`. As KHR_materials_clearcoat defines it, everything under the coat (direct, local, ambient and emitted light) keeps `1 - clearcoat * F(n.v)`, 0.96 of itself at normal incidence and 0.73 at n.v 0.25 with clearcoat 1, and the coat adds its own directional and ambient light on top, the ambient from the same `margoCoatAmbient` as gltf/pbr's native materials, so an environment lights it. Its normal affects only the coat; the base shading and g-buffer normal are unchanged, so SSAO and shadows continue to use the base normal. Clearcoat factor `0` preserves the baseline material.
 
 The coat takes a factor, a roughness and three optional textures (factor, roughness and normal). Missing factor and roughness default to `0`; missing textures do not allocate samplers. Lighting retains bind group 2, while clearcoat resources use the optional material bind group 3.
 
@@ -50,7 +50,7 @@ metadata creates an installation plan on an ordinary PBR primitive.
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {materialLobes, clearcoat} from 'margoengine/materials';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -95,8 +95,9 @@ render bit for bit. Specular's neutral value is factor 1 with white color:
 unaffected by specular factor/color. Uniform values can change without creating
 another pipeline; changing texture/UV shapes or the substrate IOR changes the shader signature.
 
-Sheen uses a Charlie distribution, Neubelt visibility and analytic directional
-albedo scaling. Anisotropy uses tangent-space GGX and a stable derivative frame
+Sheen uses a Charlie distribution with the Estevez and Kulla shadowing the
+KHR_materials_sheen spec gives, and scales the layer underneath by its directional
+albedo, read from a 16 x 16 table. Anisotropy uses tangent-space GGX and a stable derivative frame
 when needed. Iridescence evaluates thin-film Fresnel with two spectral harmonics
 and CIE color integration. These lobes affect the directional BRDF and the
 renderer’s fixed hemisphere approximation. Anisotropy does not change that
@@ -106,13 +107,13 @@ retains its existing single-sample screen-space model.
 
 The sheen and thin-film terms are written from the KHR_materials_sheen and
 KHR_materials_iridescence specifications (Estevez and Kulla 2017; Belcour and Barla
-2017); the sheen albedo fit is our own (`scripts/sheen-albedo-fit.mjs`). Run
+2017); the sheen albedo table is our own fit (`scripts/sheen-albedo-fit.mjs`). Run
 `node scripts/materials-lobe-tests.js` for quantitative GPU and parity checks;
 the complete-asset runner also checks original Khronos models.
 
 Positive transmission opts into a shared opaque-color capture. All opaque and masked PBR primitives, including those from other models, render before the snapshot; blended primitives render afterward. The snapshot preserves the scene format and supports 1x or 4x MSAA, including an existing HDR capture. No frozen core or stage pass is changed. Transmission factor `0` leaves the opaque material and its allocation path unchanged.
 
-Transmission defaults to factor `0` and IOR `1.5`. Its optional texture multiplies the factor using the red channel. The IOR also sets the surface's reflection, F0 = ((IOR - 1) / (IOR + 1))^2 (KHR_materials_ior: 0.04 at 1.5, none at 1), and lobes such as sheen or specular keep only the untransmitted share of their diffuse light, so a fully transmissive IOR `1` surface shows exactly what is behind it. The transmitted light is layered as glTF specifies: it is scaled by 1 - specular x max(Fresnel) (`KHR_materials_specular`), by the sheen's 1 - max(colour) x E(n.v) (`KHR_materials_sheen`) and by the coat's 1 - clearcoat x Fresnel (`KHR_materials_clearcoat`), in linear light. A sheen therefore dims the view through the surface even at IOR `1`. On a display-encoded target the lit colour and the transmitted light add in linear light, so encoded 0.5 over encoded 0.5 reads 0.69, and where either is zero the other stays bit for bit. Refraction samples the opaque color already rendered this frame; IOR `1` samples the same pixel without bending. This is screen-space transmission with one background sample. It does not trace rays or produce multiple bounces.
+Transmission defaults to factor `0` and IOR `1.5`. Its optional texture multiplies the factor using the red channel. The IOR also sets the surface's reflection, F0 = ((IOR - 1) / (IOR + 1))^2 (KHR_materials_ior: 0.04 at 1.5, none at 1), and lobes such as sheen or specular keep only the untransmitted share of their diffuse light, so a fully transmissive IOR `1` surface shows exactly what is behind it. IOR `0` is `KHR_materials_ior`'s specular-glossiness mode: an infinite index whose Fresnel is 1 at every angle, so the surface reflects F0 x specular and transmits none of what is behind it, and dispersion has no effect; `Material`, `materialLobes()`, `transmission()` and installation all take it, and a `Material` whose `ior` is `0` ignores later writes, as the extension requires. The transmitted light is layered as glTF specifies: it is scaled by 1 - specular x max(Fresnel) (`KHR_materials_specular`), by the sheen's 1 - max(colour) x E(n.v) (`KHR_materials_sheen`) and by the coat's 1 - clearcoat x Fresnel (`KHR_materials_clearcoat`), in linear light. A sheen therefore dims the view through the surface even at IOR `1`. On a display-encoded target the lit colour and the transmitted light add in linear light, so encoded 0.5 over encoded 0.5 reads 0.69, and where either is zero the other stays bit for bit. Refraction samples the opaque color already rendered this frame; IOR `1` samples the same pixel without bending. This is screen-space transmission with one background sample. It does not trace rays or produce multiple bounces.
 
 Thin glass (no or zero volume thickness) keeps its sightline: it samples the pixel behind it, as glTF specifies. Only positive thickness bends the view along a refraction path. Off-screen coordinates clamp to the image edge, and transparent layers are absent from the opaque snapshot.
 
@@ -123,7 +124,7 @@ Milky glass and jade come from `KHR_materials_volume_scatter` (draft, Khronos pu
 ```ts
 import {transmission} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadGLTF(engine, '/model.glb');
 // The opaque scene, drawn here by your own pass before this primitive.
@@ -150,7 +151,7 @@ For a caller-owned screen capture, `transmission(options)` returns an extension 
 
 ```ts
 import {transmission} from 'margoengine/materials';
-import type {PBRPrimitive} from 'margoengine/gltf-pro';
+import type {PBRPrimitive} from 'margoengine/gltf/pbr';
 
 function applyTransmission(primitive: PBRPrimitive, opaqueTexture: GPUTexture) {
   primitive.extension = transmission({
@@ -172,16 +173,20 @@ GPU resources and extension reassignment or reinstallation after device restorat
 
 ## Atlas (`@margoengine/materials/atlas`)
 
-`packAtlas` and `transformUVs` (also on the root) without the material classes or gltf-pro, for bakers that only pack
+`packAtlas` and `transformUVs` (also on the root) without the material classes or gltf/pbr, for bakers that only pack
 images (`@margoengine/lightmap` does).
 
-`padTileGrid(image, {tileWidth, tileHeight, padding = 2, margin = 0, spacing = 0})` pads a texture that is already a
+`padTileGrid(image, {tileWidth, tileHeight, padding = 2, margin = 0, spacing = 0, maxSize = 4096})` pads a texture that is already a
 grid of equal tiles (a tileset): each tile is laid out again with `padding` copies of its own border pixels around it,
 so linear filtering and the first mip levels sample the tile's own edge instead of its neighbour, with no seams and
 no bleeding. `margin` and `spacing` are the source's gutters (as Tiled names them) and are dropped. Tile pixels are
-kept exactly; `regions[row * columns + column]` maps a tile's 0-1 UVs onto it, counted from the top-left tile.
+kept exactly; `regions[row * columns + column]` maps a tile's 0-1 UVs onto it, counted from the top-left tile. The
+output keeps the source's columns while both edges fit `maxSize` (an integer up to 4096, under every device's
+`maxTextureDimension2D`); a longer grid, such as one row of hundreds of tiles, wraps into the most square layout that
+fits, and the regions follow the tiles.
 `remapTileUVs(uvs, tiles, grid, source)` moves UVs written for the source grid onto the padded one, given each
-vertex's tile index.
+vertex's tile index. The UVs are the ones that sample the source as a `Texture`: for an image, bitmap or canvas
+(`grid.flipped`, uploaded with flipY) v counts up from the image's bottom row; for raw data it counts data rows.
 
 ```ts
 import {padTileGrid, remapTileUVs} from 'margoengine/materials/atlas';
@@ -197,7 +202,7 @@ const padded = remapTileUVs(uvs, tileOfVertex, grid, {width: tileset.width, heig
 
 ```ts
 import {nodeMaterial} from 'margoengine/materials';
-import type {PBRPrimitive} from 'margoengine/gltf-pro';
+import type {PBRPrimitive} from 'margoengine/gltf/pbr';
 
 function applyBlueMaterial(primitive: PBRPrimitive) {
   primitive.extension = nodeMaterial({nodes: [{
@@ -237,7 +242,7 @@ An output can reference nested nodes absent from the root list. All listed nodes
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {installNodeMaterial} from 'margoengine/materials';
 
 const engine = await Engine.create(document.querySelector('canvas')!);
@@ -342,9 +347,10 @@ smoke.blendSpace = 'display'; // live: back to the default blend next frame
 
 ## Meshes with two UV sets and material groups
 
-`createMesh(engine, geometry, material)` draws CPU geometry through glTF-pro's PBR renderer. `MeshGeometry` accepts
-`positions`, `normals`, optional `indices`, `uvs` (UV0), `uvs1` (UV1), `tangents` and RGB/RGBA `colors`. Both UV arrays
-contain two finite values per vertex. UV0 defaults to zero; omitted UV1 copies UV0. The vertex layout remains 80 bytes.
+`createMesh(engine, geometry, material)` draws CPU geometry through glTF PBR's PBR renderer. `MeshGeometry` accepts
+`positions`, `normals`, optional `indices`, `uvs` (UV0), `uvs1` (UV1), `tangents` and RGB/RGBA `colors`. Colours are floats 0 to 1, or a
+`Uint8Array` or `Uint16Array` normalised over its full range, as glTF's `COLOR_0`. Both UV arrays contain two finite
+values per vertex. UV0 defaults to zero; omitted UV1 copies UV0. The vertex layout remains 80 bytes.
 
 ```ts
 import {Material, createMesh, loadTexture} from 'margoengine/materials';
@@ -499,6 +505,18 @@ canvas.getContext('2d')!.fillRect(32, 48, 16, 16); // a brush stroke
 atlas.update({x: 32, y: 48, width: 16, height: 16}); // uploads 16x16 pixels
 ```
 
+Raw RGBA8 pixels may be any size the GPU holds. `new Texture({data, width, height})` checks only that width and
+height are whole numbers of 1 or more and that `data` holds `width * height * 4` bytes, and each refusal names its own
+cause and numbers. The size is checked at upload against the device's own `maxTextureDimension2D` (8,192 per side on
+a default WebGPU device, more where the adapter allows it), and that `RangeError` names the size and the limit.
+`loadTexture(url)` still refuses images that decode to more than 4096 x 4096 pixels, a guard against small files that
+expand to gigabytes.
+
+```ts
+const photo = new Texture({data: new Uint8Array(6000 * 3375 * 4), width: 6000, height: 3375}, {mipmaps: false});
+console.log(photo.width, photo.height); // 6000 3375: fits an 8,192 device
+```
+
 ## Front, back and double sides
 
 `new Material({side: 'back'})` draws only the triangle's back side. `side` accepts `front` (default), `back` or
@@ -591,7 +609,7 @@ over projected microfacet area with an implicit geometry term. `specular` (defau
 UV transforms work as for `standard`; `basic` is the unlit choice. Roughness, metalness and the metal-roughness map
 are ignored.
 
-Both use the engine's directional light and ambient, and compose with shadows, fog and SSAO through gltf-pro's
+Both use the engine's directional light and ambient, and compose with shadows, fog and SSAO through gltf/pbr's
 lighting hooks. An environment (`EnvironmentLighting`, probes) adds only its diffuse part. Clustered point and spot
 lights use the same Lambert and Blinn-Phong terms as the directional light. Rectangle area lights
 (`@margoengine/clustered/area`) shade these surfaces as a dielectric of the matching roughness
@@ -668,10 +686,12 @@ glass.setUVTransform({texCoord: 1}, 'thicknessMap');
 Maps multiply their corresponding factors; existing factor defaults remain unchanged. Clearcoat normals use
 `clearcoatNormalScale` (default 1). Anisotropy uses `anisotropy` (default 0) and `anisotropyRotation` (radians,
 default 0). Iridescence uses `iridescence` (default 0), `iridescenceIOR` (default 1.3) and
-`iridescenceThicknessRange` (nanometres, default `[100, 400]`).
+`iridescenceThicknessRange` (nanometres, default `[100, 400]`; the minimum may be greater than the maximum, as
+KHR_materials_iridescence allows). `specularColor` takes linear components above 1 (KHR_materials_specular lets F0 pass
+what the IOR gives); the shader clamps F0 to 1.
 
 Physical and transmissive capabilities enable on demand: a physical option or non-null map set at construction or
-later (standard shading only) makes that material physical, and from the next frame gltf-pro draws it with the
+later (standard shading only) makes that material physical, and from the next frame gltf/pbr draws it with the
 matching physical variant; materials that never use them keep the plain shader, uniform layout and queue phase. A
 transmission or thickness map, like `transmission`, makes it transmissive even when its factor is zero. Volume values
 (`thickness`, `attenuationColor`, `attenuationDistance`) are part of transmission: set it first.
@@ -705,13 +725,13 @@ The screen-space volume approximation and existing transmission limitations stil
 After building packages, run the complete dispersion reference checks with:
 
 ```sh
-node scripts/gpu-lock.mjs run --owner=materials-dispersion --wait-max=60 --max=1.5 -- node scripts/material-dispersion-gpu-check.js --backend=native
-node scripts/gpu-lock.mjs run --owner=materials-dispersion --wait-max=60 --max=3 -- node scripts/material-dispersion-gpu-check.js --backend=compat
+node scripts/run-with-timeout.mjs --max=1.5 -- node scripts/material-dispersion-gpu-check.js --backend=native
+node scripts/run-with-timeout.mjs --max=3 -- node scripts/material-dispersion-gpu-check.js --backend=compat
 ```
 
 The canonical leaf without `--backend` selects native WebGPU and full WebGL2
 compatibility explicitly, with separate captures/reports. The commands above
-run each complete backend grid with its own shared GPU hold. Its caller-owned reference checks the shallow
+run each complete backend grid separately. Its caller-owned reference checks the shallow
 shader edit by field value and resource identity; it never serializes GPU handles.
 The independent scalar-IOR images, resource counts, restoration and 1x/4x sample
 checks retain their original bounds. This is correctness coverage on the tested
@@ -749,7 +769,7 @@ Directional (cascaded and virtual), spot and point shadows, contact shadows, TAA
 
 ```js
 import { Picking } from '@margoengine/selection';
-import { ContactShadows } from '@margoengine/staging';
+import { ContactShadows } from '@margoengine/studio';
 import { PbrMaterial, createMesh, loadTexture } from '@margoengine/materials';
 import { planeGeometry } from '@margoengine/geometry';
 import {Engine} from '@margoengine/core';
@@ -769,7 +789,9 @@ await engine.pick(x, y); // null through a hole, and no contact shadow under one
 
 `Material.features` lists optional surface features, each from its own entry of this package: importing the entry is
 the only cost, and a material that does not list a feature keeps its shader text, bindings and uniforms exactly. The list
-is live (assign a new one), holds one feature of each kind, and `clone()` and `copy()` carry it. Every class takes it,
+is live (assign a new one), holds one feature of each kind, and `clone()` and `copy()` carry it: the clone or copy
+joins each feature as a material of its own (alphaHash's raised `alphaTest`, an eye's buffers), so either one can drop
+a feature without changing the other. Every class takes it,
 `WgslMaterial` and `NodeMaterial` included.
 
 ### Hashed alpha (`@margoengine/materials/alpha-hash`)
@@ -778,7 +800,10 @@ is live (assign a new one), holds one feature of each kind, and `clone()` and `c
 fading objects look soft with no sorting, and each pixel writes depth like any cut-out. The noise is a hash of the
 object-space position at a grid about a pixel across (Wyman and McGuire 2017), so it stays on the surface as the object or
 camera moves and does not swim. Opacity is the colour's alpha, `map`, `alphaMap` and vertex colours, the same value
-`alphaTest` reads.
+`alphaTest` reads. Shadows follow it: `Shadows`, `VirtualShadows`, clustered's local and integrated maps and staging's
+contact shadows cut the caster by the same hash, one cell per shadow-map texel, so a card at 40% opacity casts about 40%
+of its shadow and a fading object's shadow fades with it (PlayCanvas calls this `opacityShadowDither`). Picking and TAA
+velocity cut at the feature's `cutoff` (default 0.5).
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -872,19 +897,67 @@ createMesh(engine, ball, new PbrMaterial({ color: [0.9, 0.87, 0.85, 1], features
 iris.pupil = 0.5; // live: the pupil opens
 ```
 
-`hair()` draws the two highlights of a real fibre (Kajiya and Kay 1989; Marschner et al. 2003; Scheuermann 2004): a white
-one shifted toward the root and a wider one, tinted by `color`, shifted the other way. A hash per strand breaks them up.
-Both run across the strands, so they follow the way the hair runs, not the surface. `color` and `map` stay; the highlights
-replace `roughness` and `metalness`. Pair it with `alphaHash()` for soft card edges.
+`hair()` scatters light the way a real fibre does (Marschner et al. 2003, normalised as d'Eon et al. 2011 and Chiang et
+al. 2016): a white highlight off the cuticle shifted toward the root (R); light that crosses the fibre and leaves on the far
+side (TT), so hair lit from behind glows in its own colour; and a tinted second highlight shifted the other way (TRT), with
+every longer path summed into it. With no absorption the lobes return all the light they take (the white furnace test in
+`test/hair-fibre.test.js`). The colour inside the fibre comes from `color` and `map` by Chiang et al.'s fit, or from
+melanin through `absorption: melaninAbsorption(eumelanin, pheomelanin)` (d'Eon et al.'s coefficients: about 0.3 is blond,
+1.3 brown, 8 black). Light bounced between many fibres stays a Kajiya and Kay diffuse in `color`. A hash per strand breaks
+the highlights up. They run across the strands, so they follow the way the hair runs, not the surface. `color` and `map`
+stay; the fibre replaces `roughness` and `metalness`. Pair it with `alphaHash()` for soft card edges.
+
+```ts
+import { hairScattering, melaninAbsorption } from 'margoengine/materials/hair';
+// A blond fibre along +Y, lit from straight behind (+Z) and seen from the front, a little below: TT, warm.
+const glow = hairScattering([0, 0, 1], [0, -0.05, -Math.sqrt(1 - 0.0025)], [0, 1, 0], [1, 1, 1], { absorption: melaninAbsorption(0.3) });
+console.log(glow); // red above green above blue
+```
 
 | Option | Meaning |
 | --- | --- |
 | `direction` | The way strands run, root to tip: `'u'`, `'v'` (the UV's, default `'v'`), or a direction in the mesh's axes, such as `[0, -1, 0]`. A UV direction needs tangents, which the feature derives |
-| `shift` | Angle in radians of the white highlight toward the root, -1 to 1 (default 0.09); the tinted one goes 1.5 times as far the other way |
-| `width` | Width in radians of the white highlight, above 0, at most 1 (default 0.12); the tinted one is twice as wide |
-| `specular` | Strength of both highlights, from 0 (default 1) |
+| `shift` | Angle in radians of the white highlight (R) toward the root, -1 to 1 (default 0.09); TT goes half as far the other way, TRT 1.5 times as far |
+| `width` | Longitudinal width in radians of the white highlight, above 0, at most 1 (default 0.12); TT is half as wide, TRT twice |
+| `roughness` | Azimuthal roughness, above 0, at most 1 (default 0.3): how far light through the fibre spreads round it |
+| `absorption` | Absorption inside the fibre per fibre radius, red, green and blue, such as `melaninAbsorption(1.3)` (default from `color` and `map`) |
+| `specular` | Strength of the light the fibre scatters (R, TT, TRT and longer paths), from 0 (default 1) |
 | `strands` | Strands across one unit of UV (default 200), each with its own highlight |
 | `jitter` | How far a strand's shift wanders in radians, -1 to 1 (default 0.06) |
+| `follow` | A function returning a column-major 4x4 matrix, read on every draw, that turns a mesh-axis `direction` within the mesh: for hair skinned to a joint, that joint's skin matrix (mesh inverse world x joint world x inverse bind), so the strands turn with the head. Only with a direction of three numbers; a `'u'` or `'v'` direction reads the skinned tangents and turns with every joint already (default none; `@margoengine/humans` `addPerson` sets it) |
+
+A mesh-axis direction is one direction for the whole mesh, so on skinned hair it follows one joint: right for hair bound
+rigidly to the head, as most rigs bind it. Hair that bends over several joints (a ponytail, long strands over the
+shoulders) should run along its UVs, whose tangents the skinning turns per vertex.
+
+```ts
+import { hair } from 'margoengine/materials/hair';
+// Strands down the mesh's -Y, on hair skinned to a head joint: `follow` hands over the joint's skin matrix each draw.
+const turned = [0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; // the head turned 90 degrees about z
+const strands = hair({ direction: [0, -1, 0], follow: () => turned });
+console.log(strands.name); // 'hair'
+```
+
+`hairCards()` draws a BLEND hair card (eyelashes, card brows, card hair) as the layer of fibres it stands for. The card's
+alpha is the share of light the layer stops seen straight through; a slanted ray crosses more fibres, so the alpha
+becomes `1 - (1 - a) ^ (1 / |cos|)`, Beer-Lambert over the longer path (the opacity correction of volume rendering: Max
+1995, "Optical models for direct volume rendering", IEEE TVCG; Engel et al. 2006, "Real-Time Volume Graphics"). A lash
+card seen from the front is nearly edge on and its filtered alpha is small (strands averaged with the gaps between
+them): without the feature the fringe darkens the lid line by a few percent. Opaque and MASK materials keep their
+output. `@margoengine/humans` puts it on lash materials by default.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { hairCards } from 'margoengine/materials/hair';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const card = { positions: [-1, 0, 0, 1, 0, 0, 1, 0.2, -1, -1, 0.2, -1], normals: [0, 0.98, 0.2, 0, 0.98, 0.2, 0, 0.98, 0.2, 0, 0.98, 0.2], uvs: [0, 0, 1, 0, 1, 1, 0, 1], indices: [0, 1, 2, 0, 2, 3] };
+createMesh(engine, card, new PbrMaterial({ color: [0.05, 0.03, 0.02], opacity: 0.2, transparent: true, side: 'double', features: [hairCards()] }));
+```
+
+| Option | Meaning |
+| --- | --- |
+| `grazing` | The smallest \|cosine\| between view and card normal the path is taken at, above 0, at most 1 (default 0.1): an edge-on card is a layer as deep as the card is wide, not an endless one |
 
 `skin()` bleeds light past shadow edges, red furthest, on thin and curved parts more than on broad ones: the published
 three-layer diffusion profile (d'Eon and Luebke 2007), integrated around a circle once for every angle and curvature into
@@ -895,23 +968,119 @@ nothing to blur. A normal map scatters too: red reads a softer normal than green
 | Option | Meaning |
 | --- | --- |
 | `unitsPerMeter` | Scene units in a metre, above 0 (default 1, the unit of glTF). The profile is in real lengths, so a model in centimetres needs 100 |
+| `thickness` | With the material's `subsurface` above 0: the depth of skin, in scene units, that `subsurfaceThickness` 1 (times the red of `subsurfaceThicknessMap`) stands for, above 0 (default 0.004, 4 mm at `unitsPerMeter` 1) |
+| `melanin` | Volume fraction of melanin in the epidermis, 0 to 0.5 (0.002 very fair, about 0.3 dark). Default none: the published profile. Set with the three below, the profile is that of skin made of them |
+| `melaninBlend` | Share of the melanin that is eumelanin (brown-black), the rest pheomelanin (yellow-red), 0 to 1 (default 0.7 once any of the four is set) |
+| `hemoglobin` | Volume fraction of blood in the dermis, 0.001 to 0.2 (default 0.005 once any of the four is set) |
+| `oxygenation` | Share of the hemoglobin carrying oxygen, 0 to 1 (default 0.75 once any of the four is set) |
+
+Skin from what is in it: with any of `melanin`, `melaninBlend`, `hemoglobin` or `oxygenation`, the profile is the
+two-layer spectral model of Donner and Jensen 2006 (an epidermis 0.25 mm deep with melanin over a dermis with blood,
+hemoglobin from Prahl's measured spectra), fitted with d'Eon and Luebke's Gaussians and two narrower ones
+(`skinProfileOf`). `skinColor(sameOptions)` gives the matching diffuse colour in linear sRGB and `skinReflectance` the
+spectrum, 380 to 780 nm every 4 (`skinWavelengths`). Measured against that model, the published profile holds fair skin
+(median reach within a factor of 2 per colour) but spreads light more than five times too far for melanin-rich skin,
+whose epidermis absorbs the light the dermis would spread; the model's own fit holds its profile within 0.025 of the
+light at every radius. `diffusionReflectance(scatter, absorb, ior)` is the total reflectance of any half-space of
+translucent material (Jensen et al. 2001); it gives the Rd of their measured skin within 0.012.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { skin, skinColor } from 'margoengine/materials/skin';
+import { sphereGeometry } from 'margoengine/geometry';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const dark = { melanin: 0.3, hemoglobin: 0.01 };
+const cheek = new PbrMaterial({ color: [...skinColor(dark), 1], roughness: 0.45, features: [skin(dark)] });
+createMesh(engine, sphereGeometry(0.05, 64, 48), cheek);
+```
+
+
+Thin parts lit from behind (ears, nostrils, fingers against a lamp) glow red when the material also has `subsurface`:
+light from behind passes through the part's depth by the same profile integrated over the back of a slab, red furthest
+(Jimenez et al. 2010), and the back's light is read on the mesh normal reversed, widened by 0.3 so the glow does not stop
+at the terminator. `subsurface` weighs it, `subsurfaceColor` tints it and `subsurfaceThicknessMap` (red, linear) paints
+the depth; `subsurfaceMode` and the wrap options are not used, since the profile already carries light past the
+terminator. Paint thin parts dark in the map: at 2 mm about a fifth of the red gets through, at 5 mm a fiftieth.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, Texture, createMesh } from 'margoengine/materials';
+import { skin } from 'margoengine/materials/skin';
+import { sphereGeometry } from 'margoengine/geometry';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const depth = new Texture({ data: new Uint8Array([40, 0, 0, 255]), width: 1, height: 1 });
+const ear = new PbrMaterial({
+  color: [0.8, 0.55, 0.45, 1],
+  roughness: 0.45,
+  subsurface: 1,
+  subsurfaceThicknessMap: depth, // red 40 of 255 is 0.16 of `thickness`
+  subsurfaceThickness: 1,
+  features: [skin({ thickness: 0.01 })], // 1 cm at full red: this ear is 1.6 mm deep
+});
+engine.lighting.direction.set([0, 0, -1, Math.PI]); // the sun behind the ear, seen from the front
+createMesh(engine, sphereGeometry(0.01, 32, 24), ear);
+```
 
 `eye()` is for a sphere mesh. The view ray refracts at a clear cornea by Snell's law and meets a flat iris set back inside,
 so the iris shifts with the view instead of being painted on the ball, and the light refracts the same way. Outside the
 cornea the material is the white of the eye: `color`, `map` and `roughness` stay there, and a normal map shows there only.
-The default sizes are those of Gullstrand's schematic eye as usually quoted.
+The rays bend on the cornea's own sphere, 7.8 mm on a 12 mm globe with its apex on the mesh's, and the iris sits 3.6 mm
+behind the apex: Le Grand's full theoretical eye (Atchison and Smith, Optics of the Human Eye, 2000), whose entrance pupil
+appears 1.133 times the real one; the defaults trace to that within 0.015, and the frame matches the trace within
+2.5 pixels on WebGPU and the WebGL2 layer. A tear film (index 1.337, Craig et al. 1995) covers cornea and white: an
+optically smooth coat with the cornea's roughness over the white's own lobe, so a light shows as a point-like catchlight
+on the white as on a living eye; `wetness` 0 is a dry eye.
+
+The upper lid shades the ball under it by default. Its margin is a ledge about 2 mm thick standing out from the globe
+(Snell and Lemp, Clinical Anatomy of the Eye, 1998), so a point under it sees only the sky below the ledge. Its
+cosine-weighted visibility over a sky brighter overhead (the CIE standard overcast sky, Moon and Spencer 1942, over
+ground of albedo 0.2) is the ambient occlusion it gets (Zhukov et al. 1998; the horizon form of Jimenez et al.,
+"Practical Realtime Strategies for Accurate Indirect Occlusion", 2016): 0.20 at the margin, a closed fit
+0.2015 + 0.7985 (1 - 1 / (1 + 0.44 q + 1.15 q^2)) at q = depth under the margin / lid depth, within 0.005 of the
+integral. A light the ledge blocks casts the lid's shadow. In a CC0 frontal eye photograph the sclera reads 0.15, 0.25,
+0.42, 0.55, 0.69, 0.80 of its middle in the twentieths under the margin; the term alone gives 0.28, 0.41, 0.54, 0.66,
+0.75, 0.83 for an 8 mm opening, above the photograph in every band, the rest being lashes and the ball's own curve. The
+margin turns with `follow`, as the upper lid follows the eye up and down (Becker and Fuchs 1988). `@margoengine/humans`
+`personEye` measures the margin on a Character Creator head; the default is an adult's, 4.5 mm above the axis
+(Putterman 2012).
+
+The lower lid (`lowerLid`) is the same ledge turned over: a point above its margin loses the rays going down that see
+only the ground. The ground is even, so the share of the lower half still seen is q / sqrt(1 + q^2) exactly, and the
+ground carries 0.2015 of the light under the overcast sky: V = 1 - 0.2015 (1 - q / sqrt(1 + q^2)), 0.80 at the margin.
+The two ledges block rays either side of the horizon, so the eye's ambient visibility is their sum less 1. A light from
+below casts the lower lid's shadow. The default margin is an adult's, 5.4 mm under the axis (margin reflex distance 2,
+Putterman 2012), rising toward the corners. In the CC0 photograph the lower white reads 0.58 and 0.49 of the middle in
+its bottom fifths, well under this term: there the ball turns away from a light above.
+
+```ts
+import {eye} from 'margoengine/materials/eye';
+const hooded = eye({lid: {height: 0.2, curve: -0.42}}); // the margin 0.2 radii above the axis, falling to the corners
+const low = eye({lowerLid: {height: -0.42, curve: 0.25}}); // the lower margin 0.42 radii under the axis
+const bare = eye({lid: false, lowerLid: false}); // an eyeball on its own
+```
 
 | Option | Meaning |
 | --- | --- |
 | `irisMap` | Iris picture, its centre at the middle of the map (default none: fibres drawn in `irisColor`) |
 | `irisMapPupil` | Pupil radius in `irisMap`, as a share of the iris's radius (default 0.3) |
+| `irisMapRadius` | Iris radius in `irisMap`, in UV units from the map's middle, above 0, at most 0.5 (default 0.5, the iris fills the map; Character Creator's eye maps: 0.123) |
 | `irisColor` | Linear colour of the iris; it multiplies `irisMap`. Live on the feature (default a grey blue) |
 | `pupil` | Pupil radius as a share of the iris's radius, above 0, below 1. Live on the feature (default 0.3) |
 | `irisRadius` | Iris radius as a share of the eyeball's radius (default 0.49) |
-| `depth` | How far the iris sits behind the front of the eyeball, as a share of its radius (default 0.25) |
-| `ior` | Index of refraction of the cornea, above 1, at most 3 (default 1.376) |
+| `depth` | How far the iris sits behind the front of the eyeball, as a share of its radius (default 0.3, 3.6 mm of 12; 0.25 before 2026-11-18) |
+| `corneaRadius` | Radius of the cornea's front as a share of the eyeball's, above 0, at most 1 (default 0.65, 7.8 mm of 12; 1 is the eyeball's own sphere, as before 2026-11-18) |
+| `wetness` | How much of the tear film's reflection shows, 0 to 1. Live on the feature (default 1, a healthy wet eye) |
+| `ior` | Index of refraction of the cornea, which sets its reflection (F0), above 1, at most 3 (default 1.376) |
+| `chamberIor` | Index of the aqueous humour behind the thin cornea, which sets how far the view and light rays bend toward the iris, above 1, at most 3 (default 1.336, Gullstrand) |
 | `axis` | The way the eye looks, in the mesh's axes (default `[0, 0, 1]`) |
+| `up` | The eye's up, in the mesh's axes: where the upper lid is, and the iris picture's up (default `[0, 1, 0]`) |
+| `lid` | The upper lid, or `false` for a bare eyeball: `height` of its margin above the axis in radii, -1 to 1 (default 0.375, 4.5 mm of 12); `tilt`, its rise per radius toward the eye's right (`up` cross `axis`), -2 to 2 (default 0); `curve`, its fall toward the corners, the margin being height + tilt s + curve s^2 at s radii across, -2 to 2 (default -0.4); `depth`, how far it stands out from the ball in radii, above 0, at most 1 (default 1/6, 2 mm of 12) |
+| `lowerLid` | The lower lid: `{height, tilt, curve, depth}` in radii (height negative, under the axis), or `false` (default height -0.45, tilt 0, curve 0.3, depth 1/6) |
 | `center` | The centre of the eyeball, in the mesh's axes (default `[0, 0, 0]`) |
+| `follow` | A function returning a column-major 4x4 matrix, read on every draw, that moves `center` and `axis` within the mesh: for an eyeball skinned to a joint, that joint's skin matrix (mesh inverse world x joint world x inverse bind), so the iris turns with the head (default none; `@margoengine/humans` `addPerson` and `personEye` set it) |
 
 On an RTX A6000 the highlights land within a row of the formula on a flat stand-in and reach 0.117 of the 0.121 possible
 on the real hair mesh of the Seed-san avatar, where turning the strands 90 degrees moves them completely (correlation
@@ -921,9 +1090,74 @@ on a stand-in sphere. The avatar has no eyeball, only a shallow iris plate on a 
 with `center` and `axis` fitted to that plate the pupil sits on the axis and opens as it should.
 
 Area lights, ambient light and environment reflections keep the plain model. A shadow map cuts skin's bleed past the
-terminator, because it multiplies the whole response. `anisotropy` and a thin film are refused at the first draw. The skin
+terminator, because it multiplies the whole response. Light through thin skin comes from the sun only, outside its
+shadow, and its depth is the painted one, not measured from a shadow map; `Clustered` lights do not pass through. `anisotropy` and a thin film are refused at the first draw. The skin
 table's 64 columns blur the terminator by 0.016 of n.l in all three colours. Each is one more shader variant; cost not
 timed. `eye()` on a mesh far from a sphere refracts by its own normals, so the iris bends with them.
+
+#### Slider rows (`@margoengine/materials/settings`)
+
+`MATERIAL_SETTINGS` lists skin's and the eye's controls in the shared row shape: `skin.melanin`, `skin.melaninBlend`,
+`skin.hemoglobin`, `skin.oxygenation` (null keeps the published profile), `skin.thickness`, and `eye.pupil`,
+`eye.irisColor`, `eye.wetness` (live), `eye.corneaRadius`, `eye.depth`, `eye.irisRadius`. `skinFromSettings` and
+`eyeFromSettings` build features from them, and `applyEyeSettings` writes the live eye rows on a feature, so the next frame
+draws them.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { PbrMaterial, createMesh } from 'margoengine/materials';
+import { applyEyeSettings, eyeFromSettings, skinFromSettings } from 'margoengine/materials/settings';
+import { skinColor } from 'margoengine/materials/skin';
+import { sphereGeometry } from 'margoengine/geometry';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const values = { 'skin.melanin': 0.05, 'eye.pupil': 0.35 };
+const face = new PbrMaterial({ color: [...skinColor({ melanin: 0.05 }), 1], features: [skinFromSettings(values)] });
+createMesh(engine, sphereGeometry(0.08, 64, 48), face);
+const iris = eyeFromSettings(values);
+createMesh(engine, sphereGeometry(0.012, 64, 48), new PbrMaterial({ color: [0.9, 0.88, 0.85, 1], roughness: 0.4, features: [iris] }));
+applyEyeSettings(iris, { 'eye.pupil': 0.5, 'eye.wetness': 0.8 }); // in the dark, and a little dry
+```
+
+#### On a loaded glTF model
+
+A model from `loadGLTF` takes the same features through `install(model, {features})`, by glTF material name. Each
+named material keeps its maps, factors and alpha mode, live, and skinned, morphed and instanced primitives keep their
+deformation, so a rigged character exported from Blender gets skin on its face, hair on its strands and eyes on its
+eyeballs with no change to the file: a person exported with materials named Skin, Hair and Eye takes
+`{ Skin: [skin()], Hair: [hair({ direction: 'v' }), alphaHash()], Eye: [eye()] }`. `dispose()` gives the materials
+back as they were. The Khronos Fox sample has one skinned material, `fox_material`:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { Animation } from 'margoengine/animation';
+import { loadGLTF } from 'margoengine/gltf/pbr';
+import { install } from 'margoengine/materials';
+import { hair } from 'margoengine/materials/hair';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const fox = await loadGLTF(engine, '/Fox.glb');
+const fur = install(fox, { features: { fox_material: [hair({ direction: 'v' })] } });
+const animation = Animation.attach(fox);
+animation.play(0); // the fur keeps its sheen as the joints move it
+fur.dispose(); // the file's own material again
+```
+
+A name the model does not have throws and lists the names it has; a material holds one feature of each kind, and a
+second installation with features on the same material throws until the first is disposed. A feature runs after any
+shading hook the material already has. `alphaHash()` on an OPAQUE material makes it MASK at the feature's `cutoff`
+(and OPAQUE with its own cutoff again on dispose), keeps a MASK material's own cutoff, and leaves a BLEND material
+blending; shadow casters cut by the same hash. The features need a lit material: a `KHR_materials_unlit` one (a VRM's
+MToon, for instance) is refused at the first draw. A materials mesh lists its features in `Material.features` instead.
+On a skinned primitive `eye()` and a mesh-axis `hair()` direction move with a joint through their `follow` option (the
+joint's skin matrix, read on every draw); without it they stay where the bind pose put them while the joint turns.
+`@margoengine/humans` `addPerson` passes the joint that carries most of the primitive's weight.
+
+On an RTX A6000, on WebGPU and the WebGL2 layer, a sphere skinned to one joint with a morph target and deformed by
+`Animation` draws the same picture, to the 8-bit level, with each of `skin()`, `hair()` and `eye()` installed by name as
+the same sphere and values drawn as a `PbrMaterial` with the feature, with the joint moved for `skin()` and `eye()` and
+turned 90 degrees for a mesh-axis `hair()` with `follow` (143 levels off without it); without the
+features and after `dispose()` it draws plain glTF exactly.
 
 ### Object-space normal maps (`@margoengine/materials/object-normal`)
 
@@ -1028,6 +1262,61 @@ one is refused, because it would smear past its first tile.
 Limits: 8 layers and 9 distinct textures per feature (a Texture used twice in the same colour space counts once). Maps
 are fixed at creation; numbers stay live. Layer normals use the surface's own tangent frame, which comes from the UVs
 when the geometry has no tangents.
+
+### Soot and presets (`@margoengine/materials/soot`, `/presets`)
+
+`soot()` darkens a surface where a fire's smoke reaches it and returns a `layered()` layer, so firelight, shadows and
+every other light reach the soot as they reach the stone under it. One call per face: a back or side wall, the
+mantel's underside, the floor around the hearth. `/presets` holds plain `PbrMaterial` options for the same scene.
+
+```ts
+import { PbrMaterial } from '@margoengine/materials';
+import { layered } from '@margoengine/materials/layered';
+import { hearthstone, tarnishedCopper } from '@margoengine/materials/presets';
+import { soot, sootDecal } from '@margoengine/materials/soot';
+
+const fire = { fire: [0, 0.05, 0] as const, width: 0.6 };
+// Each face in world space: the point at uv (0, 0) and the world vectors to uv (1, 0) and uv (0, 1).
+const backWall = soot(fire, { origin: [-0.7, 0, -0.35], u: [1.4, 0, 0], v: [0, 1.8, 0] });
+const mantelUnderside = soot(fire, { origin: [-0.9, 0.95, 0.25], u: [1.8, 0, 0], v: [0, 0, -0.35] });
+const floor = soot(fire, { origin: [-1, 0, 1], u: [2, 0, 0], v: [0, 0, -1.4] });
+export const wall = new PbrMaterial({ ...hearthstone, features: [layered({ layers: [backWall] })] });
+export const mantel = new PbrMaterial({ ...hearthstone, features: [layered({ layers: [mantelUnderside] })] });
+export const hearth = new PbrMaterial({ ...hearthstone, features: [layered({ layers: [floor] })] });
+export const kettle = new PbrMaterial({ ...tarnishedCopper });
+// Or a multiply decal for @margoengine/post/decals (give Decals a soot atlas from procedural/textures-pbr).
+const decal = sootDecal(fire, [0, 0, -1]);
+console.log(decal.width.toFixed(2), decal.mode);
+```
+
+The plume is a buoyant plume's (Morton, Taylor and Turner 1956, https://doi.org/10.1098/rspa.1956.0011): its
+half-width starts at `width / 2` (default width 0.6 m) and grows by `spread` per metre of height (default 0.12, which
+is 6 x 0.1 / 5 for the paper's entrainment of about 0.1); the darkness on its axis falls as (b0 / b)^(5/3) from
+`strength` (default 0.85) at the fire, and sideways as exp(-(r / b)^2), where r is the horizontal distance from the
+axis. Below the fire's base a floor patch fades out over `floorDepth` (default 0.1 m). `sootDensity(source, point)`
+gives the same number at any point. The face's `origin`, `u` and `v` must match how the mesh's UVs lie on it (the mask
+is read with the layer's UV set, without tiling); `size` (default 64) sets the mask's texels per side. The layer's
+`color` defaults to [0.03, 0.028, 0.026] linear and `roughness` to 0.95.
+
+`sootDecal(source, direction, {height = 1.5, depth = 1})` returns a `'multiply'` decal into a wall behind or beside the
+fire, from its base to `height` above it, 1.5 plume widths wide; its `rect` reads an atlas with the procedural `soot`
+pattern's fire end at the bottom. Use it where a mesh's UVs do not suit a mask. Decals of `post/material-decals`
+re-light with the sun and ambient only, so under firelight use `soot()` or these multiply decals.
+
+| Preset | Colour (linear) | Roughness | Metalness | Source |
+| --- | --- | --- | --- | --- |
+| copper | 0.955, 0.638, 0.538 | 0.3 | 1 | F0, Hoffman 2013 |
+| tarnishedCopper | copper x 0.6 | 0.55 | 1 | Art default: an oxide film and smoke |
+| iron | 0.562, 0.565, 0.578 | 0.6 | 1 | F0, Hoffman 2013 |
+| castIron | iron x 0.35 | 0.75 | 1 | Art default: blackened stove iron |
+| soot | 0.03, 0.028, 0.026 | 0.95 | 0 | Art default: near-black, matte |
+| hearthstone | 0.042, 0.036, 0.03 | 0.85 | 0 | Art default: smoke-dark stone |
+| weatheredWood | 0.258, 0.205, 0.147 | 0.82 | 0 | Art default: grey, bleached wood (luminance 0.21; at 0.13 a moonlit log wall read black) |
+| brick | 0.3, 0.1, 0.05 | 0.85 | 0 | Art default: fired clay |
+
+Presets are frozen objects; spread one into `new PbrMaterial({...preset, map})` and override what you need. Hoffman,
+"Background: Physics and Math of Shading", SIGGRAPH 2013 course,
+https://blog.selfshadow.com/publications/s2013-shading-course/hoffman/s2013_pbs_physics_math_notes.pdf.
 
 ### Your own mip levels
 
@@ -1139,7 +1428,7 @@ createMesh(engine, planeGeometry(0.3, 0.5), new LambertMaterial({ color: '#4a8a2
 | `parallaxMap`, `parallaxScale` | Height map (red, linear: 1 the surface, 0 the deepest) and the depth of its full range in world units (default 0.05, finite, >= 0). The view ray is marched through it and every map on the same UV set (UV0, unless `setUVTransform(t, 'parallaxMap')` names UV1) is read where the ray meets the relief. Any shading |
 | `parallaxMode` | `'occlusion'` (default): parallax occlusion mapping, stepped along the ray and interpolated between the last two steps (Tatarchuk 2006). `'relief'`: the step refined by six bisections (Policarpo et al. 2005), sharper edges. `'offset'`: one step without dividing by n.v (Welsh 2004), cheapest, flattens at grazing angles |
 | `parallaxSteps` | Steps of the occlusion and relief march, an integer 1 through 64 (default 16). Every step is one texture read per pixel |
-| `triplanar`, `triplanarScale`, `triplanarSharpness` | `true` projects the maps on UV0 (colour, metal-roughness, normal, occlusion, emissive, alpha, bump, parallax and physical maps) from world space along X, Y and Z, `triplanarScale` repeats per world unit (default 1, > 0), blended by the normal's components to the power `triplanarSharpness` (default 4, >= 1). Maps on UV1 (a `lightMap`) keep their UVs. Each projection runs U to the viewer's right and V up, so no face shows its texture mirrored; normal maps tilt in each projection's own plane. Default false; any shading |
+| `triplanar`, `triplanarScale`, `triplanarSharpness` | `true` projects the maps on UV0 (colour, metal-roughness, normal, occlusion, emissive, alpha, bump, parallax and physical maps) from world space along X, Y and Z, `triplanarScale` repeats per world unit (default 1, > 0), blended by the normal's components to the power `triplanarSharpness` (default 4, >= 1). Maps on UV1 (a `lightMap`) keep their UVs. Each projection runs U to the viewer's right and V up, so no face shows its texture mirrored; normal maps tilt in each projection's own plane. A projected map repeats on each axis whose `wrapS` or `wrapT` its `Texture` leaves unset (the default `clamp` would smear its edge texels across every face past the first tile); a wrap the texture sets is kept, and so is a map on UV1. Default false; any shading |
 | `subsurface` | Subsurface scattering weight, 0 through 1 (default 0: off). Standard, Lambert and Phong shading (others throw a `TypeError`). The engine's directional light scatters, tinted by the base colour times `subsurfaceColor` (default white); metals do not |
 | `subsurfaceMode` | `'thick'` (default): light seen through the object around the light's direction (Barre-Brisebois and Bouchard 2011), plus a diffuse that wraps past the terminator and keeps Lambert's total energy (Green 2004). `'thin'`: a sheet lit from behind shows the light through it as a front-lit Lambert surface would (leaves, paper, lampshades) |
 | `subsurfaceThickness`, `subsurfaceThicknessMap` | Local thickness 0 through 1 (default 0.5) times the map's red channel (linear); light passes through 1 - thickness |
@@ -1173,7 +1462,7 @@ lights.add(ground); // clustered local shadows too
 
 ## WGSL materials
 
-`WgslMaterial` runs your WGSL inside gltf-pro's PBR shader, at the sites `@margoengine/shader`'s `NodeMaterial` uses;
+`WgslMaterial` runs your WGSL inside gltf/pbr's PBR shader, at the sites `@margoengine/shader`'s `NodeMaterial` uses;
 every other Material option (shading, maps, render state, the options above) still applies, and the chosen shading
 lights the surface your code returns.
 
@@ -1231,7 +1520,7 @@ rough dielectric. There is no highlight. Use `magFilter: 'nearest'` on a gradien
 import {ToonMaterial, Texture, createMesh, toonModel} from 'margoengine/materials';
 import {Engine} from 'margoengine/core';
 import {sphereGeometry} from 'margoengine/geometry';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const geometry = sphereGeometry(1, 32, 16), model = await loadGLTF(engine, '/hero.glb');
 const bands = new Texture({data: new Uint8Array([40, 40, 40, 255, 140, 140, 140, 255, 255, 255, 255, 255]), width: 3, height: 1},
@@ -1349,22 +1638,24 @@ batch.remove(crate); // its space is reused by a later item that fits
 
 ## Clipping planes
 
-`clippingPlanes` takes up to 6 world-space planes `[a, b, c, d]`; points with `a x + b y + c z + d < 0` are cut away
+`clippingPlanes` takes up to 16 world-space planes `[a, b, c, d]` (a section box is 6, a BCF viewpoint or a CAD
+section view may carry more); points with `a x + b y + c z + d < 0` are cut away
 (the same convention as the scene's section binding), on every material class: standard, physical, unlit, Lambert, Phong,
 toon, normal, matcap, depth, distance, `WgslMaterial` and `@margoengine/shader` node materials. The cut applies in the
 beauty, G-buffer and SSAO passes and, with `clipShadows` (default true), in `@margoengine/shadows` directional shadow
 maps. Planes are normalised on assignment and reading returns copies; assign a new list to change them (live). A
 clipped caster redraws its shadow every frame. `@margoengine/lines` and `@margoengine/points` materials take the same
-option. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's section planes (the `section` binding) still clip everything; with both, the scene's planes clip the shadows. Clustered
+option, with up to 6 planes. `clipIntersection: true` cuts away only what is behind every plane (their intersection: a wedge or a corner out of a solid) instead of what is behind any of them; it is a uniform value, so switching it compiles nothing, and shadows follow it. A scene's section planes (the `section` binding) still clip everything; with both, the scene's planes clip the shadows. Clustered
 point-light shadows and GPU picking ignore material planes.
 
 On a device with the optional `clip-distances` feature the planes cut in the rasterizer, before the fragment stage: there
 is no `discard`, so a clipped surface keeps early depth, and multisampling smooths the cut. Ask for it at creation with
 `Engine.create(canvas, { features: ['clip-distances'] })`; an adapter without it leaves the option out and the planes
-discard as before, with the same picture but for pixels on the cut. Cascaded shadow casters take the same path. Three
-things stay on `discard` on such a device: `clipIntersection`, because a wedge is not a union of half spaces; a material
-whose vertex outputs reach location 13 (`eye()`, `hair()` with a mesh-axis `direction`), because six distances take two
-inter-stage slots and instancing one more; and the passes that do not run the colour shader (picking, TAA velocity,
+discard as before, with the same picture but for pixels on the cut. Cascaded shadow casters take the same path. Four
+things stay on `discard` on such a device: `clipIntersection`, because a wedge is not a union of half spaces; more than
+8 planes, because WGSL's `clip_distances` holds at most 8 (going past 8, or back, compiles the other variant once); a
+material whose vertex outputs reach location 13 (`eye()`, `hair()` with a mesh-axis `direction`), because eight
+distances take two inter-stage slots and instancing one more; and the passes that do not run the colour shader (picking, TAA velocity,
 contact shadows, local shadows).
 
 `npm run test:gpu:features --workspace @margoengine/materials` checks native WebGPU and the full WebGL2 compatibility
@@ -1484,4 +1775,4 @@ The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl
 
 The renderer now refuses the preview during setup, allowing automatic escalation instead of accepting an attachment that cannot draw.
 
-`TransmissionLayers` and the internal native glass capture that gltf-pro installs for tinted or attenuating glass refuse the small preview in their own setup through the shared `requireWebGPU` (`<Name> needs WebGPU`, code `unsupported`, help link). Before 2026-11-10 `TransmissionLayers` refused only through its inner `Transmission` (whose message named that class), and the native glass capture had no refusal at all: on the preview it registered two passes that skipped every frame. gltf-pro already refuses the preview before it can install the capture, so no working scene changes. Regression: `tests/preview.test.js`.
+`TransmissionLayers` and the internal native glass capture that gltf/pbr installs for tinted or attenuating glass refuse the small preview in their own setup through the shared `requireWebGPU` (`<Name> needs WebGPU`, code `unsupported`, help link). Before 2026-11-10 `TransmissionLayers` refused only through its inner `Transmission` (whose message named that class), and the native glass capture had no refusal at all: on the preview it registered two passes that skipped every frame. gltf/pbr already refuses the preview before it can install the capture, so no working scene changes. Regression: `tests/preview.test.js`.

@@ -4,7 +4,7 @@ import { Engine, type CameraOptions } from '@margoengine/core';
 import { engineRuntime, type Renderer, type RenderView } from '@margoengine/core/extension';
 import { HeadlessStage } from './stage.js';
 import { createHeadlessCanvas } from './index.js';
-import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { fault, typeError } from '../../shared/errors.js';
 
 /** Options for a GPU-free scene simulation. */
 export interface NullStageOptions {
@@ -31,27 +31,18 @@ export interface NullStageOptions {
 export class NullStage extends HeadlessStage {
   /** Identifies this stage independently of the engine fallback dispatch label. */
   readonly isNull = true;
-  #stepping = false;
   #time = 0;
   /** Accumulated successful steps in seconds. */
   get time(): number {
     return this.#time;
   }
 
-  /** Advance all live scenes by delta seconds, 0..1. Default 0. Reentrant steps reject. */
+  /** Advance all live scenes by delta seconds, 0..1. Default 0. Invalid and reentrant steps reject before callbacks. */
   override step(delta = 0): void {
-    const engine = engineRuntime(this.engine);
-    if (engine.disposed) throw fault('disposed', 'Null stage disposed; create another stage', 'headless');
-    if (!Number.isFinite(delta) || delta < 0 || delta > 1)
-      throw rangeError('Null stage delta must be in 0..1 seconds', 'headless');
-    if (this.#stepping) throw fault('state', 'Null stage step is already running', 'headless');
-    this.#stepping = true;
-    try {
-      super.step(delta);
-      this.#time += delta;
-    } finally {
-      this.#stepping = false;
-    }
+    if (engineRuntime(this.engine).disposed)
+      throw fault('disposed', 'Null stage disposed; create another stage', 'headless');
+    super.step(delta);
+    this.#time += delta;
   }
 }
 

@@ -1,5 +1,6 @@
 // Node only: a WebSocket server (RFC 6455, written here on node:http and node:crypto, binary messages only) that
 // hands each connection over as a netcode Connection, and `serve`, which runs a GameServer on it.
+import { isUtf8 } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { Duplex } from 'node:stream';
@@ -57,6 +58,9 @@ export interface WebSocketListener extends Listener {
 }
 
 const GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+/** Close codes an endpoint may put in a close frame: RFC 6455 7.4.1, the IANA registry's 1012 to 1014, and 3000 to 4999. */
+const sendable = (code: number): boolean =>
+  (code >= 1000 && code <= 1003) || (code >= 1007 && code <= 1014) || (code >= 3000 && code <= 4999);
 
 /** One server-side WebSocket: frames in, frames out (RFC 6455 section 5). */
 class SocketConnection implements Connection {
@@ -116,7 +120,9 @@ class SocketConnection implements Connection {
     if (this.closed) return;
     const text = Buffer.from(closeReason(reason)),
       payload = Buffer.allocUnsafe(2 + text.length);
-    payload.writeUInt16BE(code === 1005 || code === 1006 ? 1000 : code, 0);
+    // A code no endpoint may put in a frame (1004 to 1006, 1015, the unassigned rest below 3000, 5000 up) goes as 1000;
+    // the local onclose still gets the code given.
+    payload.writeUInt16BE(sendable(code) ? code : 1000, 0);
     text.copy(payload, 2);
     this.socket.end(this.frame(8, payload));
     this.finish(code, reason);
@@ -172,8 +178,14 @@ class SocketConnection implements Connection {
       for (let i = 0; i < length; i++) payload[i] ^= mask[i & 3];
       this.buffer = b.subarray(at + 4 + length);
       if (opcode === 8) {
-        const code = payload.length >= 2 ? payload.readUInt16BE(0) : 1005;
-        return this.close(code === 1005 ? 1000 : code, payload.subarray(2).toString('utf8'));
+        // RFC 6455 5.5.1: a close body is empty or a 2-byte code and a UTF-8 reason; 7.4: 1005, 1006 and 1015 never go
+        // in a frame, and below 3000 only registered codes do. A bad one fails the connection (7.1.7).
+        if (payload.length === 1) return this.close(1002, 'close frame of one byte');
+        const code = payload.length ? payload.readUInt16BE(0) : 1005,
+          text = payload.subarray(2);
+        if (payload.length && !sendable(code)) return this.close(1002, `close code ${code} may not be sent`);
+        if (!isUtf8(text)) return this.close(1007, 'close reason is not UTF-8');
+        return this.close(code === 1005 ? 1000 : code, text.toString('utf8'));
       }
       if (opcode === 9) {
         this.socket.write(this.frame(10, payload));
@@ -266,8 +278,8 @@ export async function listenWebSocket(options: WebSocketServerOptions = {}): Pro
   const http = options.server ?? createServer((_request, response) => response.writeHead(426).end('Upgrade required')),
     connections = new Set<SocketConnection>();
   let accepting = true;
-  const refuse = (socket: Duplex, status: string) => {
-    socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  const refuse = (socket: Duplex, status: string, headers = '') => {
+    socket.end(`HTTP/1.1 ${status}\r\n${headers}Connection: close\r\nContent-Length: 0\r\n\r\n`);
   };
   const upgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
     const key = request.headers['sec-websocket-key'],
@@ -276,10 +288,14 @@ export async function listenWebSocket(options: WebSocketServerOptions = {}): Pro
     if (options.path !== undefined && path !== options.path) return refuse(socket, '404 Not Found');
     if (!originAllowed(request, origins)) return refuse(socket, '403 Forbidden');
     if (connections.size >= maxConnections) return refuse(socket, '503 Service Unavailable');
+    // RFC 6455 4.4: a version this server does not speak is refused with 426 and the version it does.
+    const version = request.headers['sec-websocket-version'];
+    if (version !== undefined && version !== '13')
+      return refuse(socket, '426 Upgrade Required', 'Sec-WebSocket-Version: 13\r\n');
     if (
       request.method !== 'GET' ||
       String(request.headers.upgrade).toLowerCase() !== 'websocket' ||
-      request.headers['sec-websocket-version'] !== '13' ||
+      version !== '13' ||
       typeof key !== 'string' ||
       Buffer.from(key, 'base64').length !== 16
     )

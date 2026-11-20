@@ -8,7 +8,7 @@
 // stops recording once every path of a part has finished. Every other kernel runs as it stands on the layer's own tiers.
 import { FRAME, TRACE } from './shaders.js';
 import { FLAG_SPLIT } from './layout.js';
-import { loopLimit, stagedTrace, type Stage, type StagedTrace } from './compat-staged.js';
+import { LAYERS, liveSteps, loopLimit, stagedTrace, type Stage, type StagedTrace } from './compat-staged.js';
 
 declare const GPUShaderStage: { FRAGMENT: number; COMPUTE: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; RENDER_ATTACHMENT: number; COPY_SRC: number; COPY_DST: number };
@@ -61,10 +61,14 @@ const SUMS = 'rgba32float',
   STATE = 'rgba32uint',
   // Marks the paths every program skips (the census writes 1 where a path finished an iteration ago).
   MARK = 'stencil8',
-  // Paths a part of a dispatch traces at once: its state is 2 x 6 pages x 128 bytes a path (about 200 MB). A program
-  // costs about 12 microseconds of GPU time and 7 of JavaScript whatever its size (RTX A6000, ANGLE Vulkan), so a part
-  // four times the 2^15 paths it had before draws a quarter of the programs for the same paths.
+  // Paths a part of a dispatch traces at once: its state is 2 x 7 pages x 112 bytes a path (about 205 MB). A program
+  // costs about 12 microseconds of GPU time and 7 of JavaScript whatever its size (RTX A6000, ANGLE Vulkan; 12 of
+  // JavaScript on Direct3D 11), so a part four times the 2^15 paths it had before draws a quarter of the programs for
+  // the same paths. A dispatch is cut into round(paths / PART_PATHS) parts of even size, so one of up to 1.5 times
+  // PART_PATHS is one part (480 x 300 pixels a sample: one part, not 273 rows and then 27).
   PART_PATHS = 1 << 17,
+  // The most state a part may hold (both copies of every page): 1.5 times the 205 MB of PART_PATHS paths.
+  PART_BYTES = 307_000_000,
   // Uniform slots for the parts' places, reused in turn (a submission holds far fewer parts than this).
   PART_SLOTS = 4096,
   SLOT = 256,
@@ -77,6 +81,23 @@ const SUMS = 'rgba32float',
   // Occlusion queries a set may hold (WebGPU's limit); a dispatch needing more reads a census after every window.
   MAX_QUERIES = 4096,
   CENSUS_SLOTS = Math.ceil(loopLimit(64) / STEP) + 1;
+
+/**
+ * How a dispatch of `count` samples of `width` x `rows` pixels is cut into parts, for state of `pathBytes` bytes a path
+ * (both copies): `rows` rows and `samples` samples a part. Row bands first, round(paths a sample / PART_PATHS) of them
+ * with the rows split evenly, then runs of samples within a band, the same way; no part holds more than 1.5 times
+ * PART_PATHS paths or PART_BYTES of state. Parts change no value: a path's state is its own, and `finish` adds a
+ * band's samples in sample order whichever part traced them.
+ */
+export function partPlan(width: number, rows: number, count: number, pathBytes: number): { rows: number; samples: number } {
+  const cap = Math.max(1, Math.min(Math.floor(PART_PATHS * 1.5), Math.floor(PART_BYTES / pathBytes)));
+  let bands = Math.max(1, Math.round((width * rows) / PART_PATHS));
+  while (bands < rows && width * Math.ceil(rows / bands) > cap) bands++;
+  const partRows = Math.ceil(rows / bands);
+  let runs = Math.max(1, Math.round((width * partRows * count) / PART_PATHS));
+  while (runs < count && width * partRows * Math.ceil(count / runs) > cap) runs++;
+  return { rows: partRows, samples: Math.ceil(count / runs) };
+}
 
 interface Pages {
   width: number;
@@ -270,7 +291,7 @@ export class TraceRoute {
               entryPoint: 'stage',
               targets: finish
                 ? [{ format: SUMS }, { format: SUMS }, { format: SUMS }, { format: SUMS }]
-                : Array.from({ length: 8 }, () => ({ format: STATE as GPUTextureFormat })),
+                : Array.from({ length: LAYERS }, () => ({ format: STATE as GPUTextureFormat })),
               ...(tables ? { constants: { TABLES: 1 } } : {}),
             },
             // Every program of the loop skips the marked paths; `start` (which clears the marks) and `finish` draw all.
@@ -386,7 +407,7 @@ export class TraceRoute {
       [0, 1].map(() =>
         device.createTexture({
           label: 'voxel-pathtracer path state',
-          size: [w, h, 8],
+          size: [w, h, LAYERS],
           format: STATE,
           usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
         }),
@@ -399,7 +420,7 @@ export class TraceRoute {
       views: textures.map((copies) => copies.map((t) => t.createView({ dimension: '2d-array' }))),
       layers: textures.map((copies) =>
         copies.map((t) =>
-          [...Array(8).keys()].map((layer) =>
+          [...Array(LAYERS).keys()].map((layer) =>
             t.createView({ dimension: '2d', baseArrayLayer: layer, arrayLayerCount: 1 }),
           ),
         ),
@@ -465,8 +486,10 @@ export class TraceRoute {
 
   /**
    * One dispatch of `trace`: `count` samples of `width` x `rows` pixels, the path loop run for `maxBounces` (the
-   * frame's), in parts of at most PART_PATHS paths, the sums kept under `key`; with `add`, the last submission also
-   * adds them into the image buffers (otherwise `add` does that later). `check` runs between windows and may throw to
+   * frame's), in parts of about PART_PATHS paths (partPlan), the sums kept under `key`; with `add`, the last submission
+   * also adds them into the image buffers (otherwise `add` does that later). `frame` is the frame uniform as written for
+   * this dispatch: a light kind it switches off draws no pass (liveSteps; with none given, every kind draws). `check`
+   * runs between windows and may throw to
    * give up (an aborted render, a disposed tracer); runs wait for one another. Resolves once the last submission is
    * made.
    *
@@ -491,11 +514,16 @@ export class TraceRoute {
     check: () => void,
     key: number | string,
     add: boolean,
+    frame?: ArrayBufferLike,
   ): Promise<void> {
     // With no run in progress this one starts at once, so its first submissions are made before `run` returns, as a
     // compute dispatch is submitted inside the frame that records it: `onSubmittedWorkDone` asked right after that frame
     // covers them (KB-L6b-ti: they waited for a microtask, and a frame loop then saw each batch land a frame later).
-    const start = () => this.#run(kernel, inputs, width, rows, count, maxBounces, check, key, add),
+    // The frame uniform as written for this dispatch, copied now: it decides the light kinds drawn (liveSteps).
+    const steps = (this.#device as unknown as { voxelTraceEveryKind?: boolean }).voxelTraceEveryKind === true
+        ? this.#staged.steps
+        : liveSteps(this.#staged, frame?.slice(0)),
+      start = () => this.#run(kernel, inputs, width, rows, count, maxBounces, check, key, add, steps),
       job = this.#pending ? this.#queue.then(start) : start(),
       settled = () => {
         this.#pending--;
@@ -515,6 +543,7 @@ export class TraceRoute {
     check: () => void,
     key: number | string,
     add: boolean,
+    steps: readonly number[],
   ): Promise<void> {
     const live = () => {
       check();
@@ -526,7 +555,7 @@ export class TraceRoute {
       // early stop does, to prove the stop changes no value.
       whole = (this.#device as unknown as { voxelTraceWholeLoop?: boolean }).voxelTraceWholeLoop === true,
       dispatch = (adaptive: boolean, horizon: number) =>
-        this.#dispatch(kernel, inputs, width, rows, count, live, key, adaptive, horizon, limit);
+        this.#dispatch(kernel, inputs, width, rows, count, live, key, adaptive, horizon, limit, steps);
     if (whole) await dispatch(false, limit);
     else {
       const horizon = this.#horizons.get(maxBounces),
@@ -570,6 +599,7 @@ export class TraceRoute {
     asked: boolean,
     horizon: number,
     limit: number,
+    steps: readonly number[],
   ): Promise<{ iterations: number; early: boolean } | undefined> {
     const device = this.#device,
       staged = this.#staged,
@@ -578,8 +608,9 @@ export class TraceRoute {
       groups = this.#bound(inputs),
       maxSide = device.limits.maxTextureDimension2D,
       window = WINDOW,
-      partRows = Math.max(1, Math.min(rows, Math.floor(PART_PATHS / width))),
-      perPart = Math.max(1, Math.min(count, Math.floor(PART_PATHS / (width * partRows)))),
+      plan = partPlan(width, rows, count, 2 * staged.pages * LAYERS * 16),
+      partRows = plan.rows,
+      perPart = plan.samples,
       sx = Math.max(1, Math.min(perPart, Math.floor(maxSide / width))),
       sy = Math.ceil(perPart / sx),
       pages = this.#paged(width * sx, partRows * sy),
@@ -655,7 +686,7 @@ export class TraceRoute {
             run('hit');
             run('vertex');
             run('surface');
-            for (let q = 0; q < staged.kinds; q++) {
+            for (const q of steps) {
               run('sample', q);
               run('shadow', q);
               run('gather', q);
@@ -792,6 +823,21 @@ export class TraceRoute {
     pass.setBindGroup(1, sums.group);
     pass.dispatchWorkgroups(Math.ceil(width / 8), Math.ceil(rows / 8));
     pass.end();
+  }
+
+  /**
+   * Frees the sums kept under `key` (a released viewport view's), once the runs started so far have settled: a run of
+   * that key still in progress draws into them until its next window stops it.
+   */
+  release(key: number | string): void {
+    const free = () => {
+      const sums = this.#sums.get(key);
+      if (!sums) return;
+      this.#sums.delete(key);
+      for (const t of sums.textures) t.destroy();
+    };
+    if (this.#pending) this.#queue.then(free, free);
+    else free();
   }
 
   destroy(): void {

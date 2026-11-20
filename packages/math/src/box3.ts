@@ -1,6 +1,11 @@
 import { Vector3 } from './vector3.js';
 import type { MatrixLike, PlaneLike, SphereLike, Vec3Like } from './types.js';
 
+const isInf = (v: number) => v === Infinity || v === -Infinity;
+const mid = (a: number, b: number) => (isInf(a) || isInf(b) ? 0 : (a + b) / 2);
+// Non-empty axis length; Infinity when min is infinite (min = max = +Infinity would give NaN).
+const span = (min: number, max: number) => (isInf(min) ? Infinity : max - min);
+
 /**
  * Axis-aligned bounding box. Empty boxes have min = +Infinity and max = -Infinity.
  * `camera.fitToBoundingBox(box.min.toArray(), box.max.toArray())` frames it with a core camera.
@@ -48,14 +53,15 @@ export class Box3 {
     this.max.set(center.x + size.x / 2, center.y + size.y / 2, center.z + size.z / 2);
     return this;
   }
+  /** Midpoint per axis; 0 on an axis with an infinite bound, and (0, 0, 0) when empty. */
   getCenter<T extends Vec3Like>(out: T): T {
     if (this.isEmpty()) {
       out.x = out.y = out.z = 0;
       return out;
     }
-    out.x = (this.min.x + this.max.x) / 2;
-    out.y = (this.min.y + this.max.y) / 2;
-    out.z = (this.min.z + this.max.z) / 2;
+    out.x = mid(this.min.x, this.max.x);
+    out.y = mid(this.min.y, this.max.y);
+    out.z = mid(this.min.z, this.max.z);
     return out;
   }
   getSize<T extends Vec3Like>(out: T): T {
@@ -179,12 +185,19 @@ export class Box3 {
     const n = plane.normal;
     let low = 0,
       high = 0;
-    low += n.x > 0 ? n.x * this.min.x : n.x * this.max.x;
-    high += n.x > 0 ? n.x * this.max.x : n.x * this.min.x;
-    low += n.y > 0 ? n.y * this.min.y : n.y * this.max.y;
-    high += n.y > 0 ? n.y * this.max.y : n.y * this.min.y;
-    low += n.z > 0 ? n.z * this.min.z : n.z * this.max.z;
-    high += n.z > 0 ? n.z * this.max.z : n.z * this.min.z;
+    // A zero component adds nothing along its axis, so a bound at infinity (an unbounded box) cannot turn it into NaN.
+    if (n.x !== 0) {
+      low += n.x > 0 ? n.x * this.min.x : n.x * this.max.x;
+      high += n.x > 0 ? n.x * this.max.x : n.x * this.min.x;
+    }
+    if (n.y !== 0) {
+      low += n.y > 0 ? n.y * this.min.y : n.y * this.max.y;
+      high += n.y > 0 ? n.y * this.max.y : n.y * this.min.y;
+    }
+    if (n.z !== 0) {
+      low += n.z > 0 ? n.z * this.min.z : n.z * this.max.z;
+      high += n.z > 0 ? n.z * this.max.z : n.z * this.min.z;
+    }
     return low <= -plane.constant && high >= -plane.constant;
   }
   clampPoint<T extends Vec3Like>(p: Vec3Like, out: T): T {
@@ -202,7 +215,7 @@ export class Box3 {
       dz = Math.max(this.min.z - p.z, 0, p.z - this.max.z);
     return dx * dx + dy * dy + dz * dz;
   }
-  /** Sphere through the box corners (radius -1 when empty). */
+  /** Sphere through the box corners (radius -1 when empty, Infinity with a centre as `getCenter` when unbounded). */
   getBoundingSphere<T extends SphereLike>(out: T): T {
     if (this.isEmpty()) {
       out.center.x = out.center.y = out.center.z = 0;
@@ -210,7 +223,8 @@ export class Box3 {
       return out;
     }
     this.getCenter(out.center);
-    out.radius = Math.hypot(this.max.x - this.min.x, this.max.y - this.min.y, this.max.z - this.min.z) / 2;
+    const { min, max } = this;
+    out.radius = Math.hypot(span(min.x, max.x), span(min.y, max.y), span(min.z, max.z)) / 2;
     return out;
   }
   equals(box: Box3): boolean {

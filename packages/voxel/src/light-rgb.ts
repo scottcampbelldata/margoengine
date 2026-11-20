@@ -12,6 +12,8 @@ import { type BlockType, BlockTypes } from './blocks.js';
 import { VoxelChunk } from './chunk.js';
 import { VoxelLighting } from './light.js';
 import { chunkKey, VoxelWorld } from './world.js';
+import type { VoxelOrigin } from './render.js';
+import { originPoint, wrap } from './origin.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
@@ -30,7 +32,7 @@ export interface VoxelColorLightOptions {
   budget?: number;
   /** Size in blocks of the lit box kept on the GPU around the camera: multiples of 32. Default [128, 64, 128]. */
   extent?: readonly [number, number, number];
-  /** Scale of the coloured light. Live. Default 1. */
+  /** Scale of the coloured light, a finite number >= 0. Live (checked by each update). Default 1. */
   strength?: number;
 }
 
@@ -38,17 +40,20 @@ const BINDING = 40;
 const DECLARATIONS = (group: number) => /* wgsl */ `
 @group(${group}) @binding(${BINDING}) var voxelRgbVolume:texture_3d<f32>;
 @group(${group}) @binding(${BINDING + 1}) var voxelRgbSampler:sampler;
-@group(${group}) @binding(${BINDING + 2}) var<uniform> voxelRgbWindow:vec4f;
+struct VoxelRgbFrame {corner:vec4f,wrap:vec4f}
+@group(${group}) @binding(${BINDING + 2}) var<uniform> voxelRgbWindow:VoxelRgbFrame;
 // Coloured block light at p on a face with normal n: the levels of the open cells around the point half a cell in front
 // (one trilinear fetch of level x open and open, divided), turned to brightness by the renderer's curve (equal CIE L*
-// steps), times the surface colour.
+// steps), times the surface colour. p is in engine cells (world minus the renderer's origin); corner is the window's
+// corner in engine cells and the strength, wrap the origin mod the volume size, so (q + wrap) / size finds world cell
+// q + origin in the wrapping volume while every value stays small.
 fn voxelRgbLight(p:vec3f,n:vec3f,base:vec3f)->vec3f {
- let size=vec3f(textureDimensions(voxelRgbVolume));let q=p+n*0.5;let l=q-voxelRgbWindow.xyz;
+ let size=vec3f(textureDimensions(voxelRgbVolume));let q=p+n*0.5;let l=q-voxelRgbWindow.corner.xyz;
  if(any(l<vec3f(0.5))||any(l>size-vec3f(0.5))){return vec3f(0.0);}
- let t=textureSampleLevel(voxelRgbVolume,voxelRgbSampler,q/size,0.0);
+ let t=textureSampleLevel(voxelRgbVolume,voxelRgbSampler,(q+voxelRgbWindow.wrap.xyz)/size,0.0);
  if(t.a<0.002){return vec3f(0.0);}
  let lightness=clamp(t.rgb/t.a,vec3f(0.0),vec3f(1.0))*100.0;let cube=(lightness+16.0)/116.0;
- return base*select(lightness*(27.0/24389.0),cube*cube*cube,lightness>vec3f(8.0))*voxelRgbWindow.w;
+ return base*select(lightness*(27.0/24389.0),cube*cube*cube,lightness>vec3f(8.0))*voxelRgbWindow.corner.w;
 }`;
 
 interface Gpu {
@@ -59,6 +64,12 @@ interface Gpu {
   entries: GPUBindGroupEntry[];
 }
 
+// The shader multiplies the light by it: anything but a finite number >= 0 would make every lit pixel NaN.
+const checkStrength = (value: unknown): number => {
+  if (typeof value !== 'number' || !(value >= 0) || value === Infinity)
+    throw new RangeError(`VoxelColorLight strength is ${String(value)}; pass a finite number >= 0 such as 1`);
+  return value;
+};
 const isVec3 = (v: unknown): v is Vec3 =>
   Array.isArray(v) && v.length === 3 && v.every((c) => typeof c === 'number' && c >= 0 && c <= 1);
 
@@ -71,7 +82,7 @@ export class VoxelColorLight {
   readonly world: VoxelWorld;
   /** The engine whose device holds the light volume (a renderer of another engine refuses it). */
   readonly owner: EngineKernel;
-  /** Scale of the coloured light. Live. */
+  /** Scale of the coloured light, a finite number >= 0. Live; update() throws RangeError for any other value. */
   strength: number;
   #colors = new Map<string, Vec3>();
   #channels: { blocks: BlockTypes; world: VoxelWorld; lighting: VoxelLighting }[];
@@ -80,6 +91,7 @@ export class VoxelColorLight {
   #origin: [number, number, number] | undefined; // window corner, in chunks
   #upload = new Set<string>();
   #gpu?: Gpu;
+  #voxels?: { readonly origin?: VoxelOrigin | null };
   #hooks = new Map<number, { declarations: string; light: string }>();
   #disposed = false;
 
@@ -106,7 +118,7 @@ export class VoxelColorLight {
       if (!isVec3(color)) throw new RangeError(`VoxelColorLight color of "${name}" must be [r, g, b] in 0..1`);
       this.#colors.set(name, [color[0], color[1], color[2]]);
     }
-    this.strength = strength;
+    this.strength = checkStrength(strength);
     this.owner = engine;
     this.world = world;
     this.#extent = [extent[0], extent[1], extent[2]];
@@ -191,9 +203,12 @@ export class VoxelColorLight {
    * Floods each channel up to `budget` cells, follows the camera and uploads the chunks whose light changed or that came
    * into range. Call it once a frame. Returns the cells flooded.
    * @throws MargoError `disposed` after `dispose()`.
+   * @throws RangeError when the renderer's origin holds a value that is not a finite number, or `strength` is not a
+   * finite number >= 0.
    */
   update(): number {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelColorLight is disposed; attach a new one');
+    checkStrength(this.strength);
     if (this.world.blocks.table.length !== this.#channels[0].blocks.table.length) this.#define();
     let cells = 0;
     for (const c of this.#channels) {
@@ -226,7 +241,7 @@ export class VoxelColorLight {
           addressModeV: 'repeat',
           addressModeW: 'repeat',
         }),
-        window = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        window = device.createBuffer({ size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       gpu = this.#gpu = {
         device,
         texture,
@@ -240,8 +255,12 @@ export class VoxelColorLight {
       };
       this.#origin = undefined;
     }
-    // The window: the chunks around the camera's chunk; chunks newly in it are uploaded.
-    const eye = (this.owner as unknown as { camera: { position: ArrayLike<number> } }).camera.position,
+    // The window: the chunks around the camera's world chunk (camera plus the renderer's origin, in float64); chunks
+    // newly in it are uploaded. The shading works in engine cells: the uniform holds the corner minus the origin and
+    // the origin mod the volume size.
+    const shift = originPoint(this.#voxels?.origin, 'VoxelColorLight'),
+      camera = (this.owner as unknown as { camera: { position: ArrayLike<number> } }).camera.position,
+      eye = [camera[0] + shift[0], camera[1] + shift[1], camera[2] + shift[2]],
       origin: [number, number, number] = [
         Math.floor(eye[0] / 32) - (X >> 6),
         Math.floor(eye[1] / 32) - (Y >> 6),
@@ -260,7 +279,16 @@ export class VoxelColorLight {
     device.queue.writeBuffer(
       gpu.window,
       0,
-      Float32Array.of(origin[0] * 32, origin[1] * 32, origin[2] * 32, this.strength),
+      Float32Array.of(
+        origin[0] * 32 - shift[0],
+        origin[1] * 32 - shift[1],
+        origin[2] * 32 - shift[2],
+        this.strength,
+        wrap(shift[0], X),
+        wrap(shift[1], Y),
+        wrap(shift[2], Z),
+        0,
+      ),
     );
     const data = new Uint8Array(32 * 32 * 32 * 4),
       table = this.world.blocks.table;
@@ -302,9 +330,17 @@ export class VoxelColorLight {
     this.#upload.clear();
   }
 
-  /** Adds the light to a `VoxelRenderer` (its `addLighting`). Returns the remover. */
+  /**
+   * Adds the light to a `VoxelRenderer` (its `addLighting`) and follows that renderer's `origin` from then on: the lit
+   * box is placed around the camera's world chunk and the shading reads it in engine space. Returns the remover.
+   */
   add(voxels: { addLighting(effect: VoxelColorLight): () => void }): () => void {
-    return voxels.addLighting(this);
+    const remove = voxels.addLighting(this);
+    this.#voxels = voxels as { readonly origin?: VoxelOrigin | null };
+    return () => {
+      remove();
+      if (this.#voxels === voxels) this.#voxels = undefined;
+    };
   }
 
   /** The renderer's lighting hooks: the coloured light term. Undefined until the first `update()` made the volume. */

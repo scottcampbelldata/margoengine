@@ -166,7 +166,10 @@ export function createAMR(input: readonly AMRBlock[], options: AMROptions = {}):
   );
   return { blocks, masks, bounds: bounds as unknown as Bounds, range: [low, high], nodes };
 }
-/** Finest owner at a physical position; outside the hierarchy or a missing cell returns NaN. */
+/**
+ * Finest owner at a physical position; outside the hierarchy or a missing cell returns NaN. Cells own [lo, hi) and
+ * the hierarchy's upper faces are closed, the same convention traceAMR uses for rays lying in a face.
+ */
 export function sampleAMR(
   data: AMRData,
   position: readonly [number, number, number],
@@ -219,7 +222,10 @@ export function traceAMR(
       exit = Infinity;
     for (let k = 0; k < 3; k++) {
       if (direction[k] === 0) {
-        if (origin[k] < n.bounds[2 * k] || origin[k] >= n.bounds[2 * k + 1]) exit = -1;
+        // Half-open cells [lo, hi), closed on the hierarchy's upper face: the convention sampleAMR descends by.
+        const hi = n.bounds[2 * k + 1];
+        if (origin[k] < n.bounds[2 * k] || origin[k] > hi || (origin[k] === hi && hi < data.bounds[2 * k + 1]))
+          exit = -1;
       } else {
         const a = (n.bounds[2 * k] - origin[k]) / direction[k],
           b = (n.bounds[2 * k + 1] - origin[k]) / direction[k];

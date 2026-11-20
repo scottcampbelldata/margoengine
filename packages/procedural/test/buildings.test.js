@@ -238,3 +238,47 @@ test('four real CMP facade annotations fit a calibrated split/repeat window regi
     }),
   );
 });
+
+// Every edge of a closed shell is met by exactly one opposite edge between the same two positions. A wall strip beside
+// a window used to run floor to ceiling past the window's corners (a T junction), which rasterises with pinholes.
+function openEdges(m) {
+  const key = (i) => Array.from(m.positions.subarray(i * 3, i * 3 + 3)).join(',');
+  const edges = new Map();
+  for (let t = 0; t < m.indices.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const a = key(m.indices[t + k]),
+        b = key(m.indices[t + ((k + 1) % 3)]),
+        e = `${a}|${b}`;
+      edges.set(e, (edges.get(e) ?? 0) + 1);
+    }
+  let open = 0;
+  for (const [e, n] of edges) {
+    const [a, b] = e.split('|');
+    if (n !== 1 || edges.get(`${b}|${a}`) !== 1) open++;
+  }
+  return open;
+}
+test('the shell is closed: every edge meets one opposite edge, with no T junction at windows, floors, base or roof', async () => {
+  using g = await createBuildingGenerator();
+  for (const o of [
+    {},
+    { roof: 'gable' },
+    {
+      width: 13.7,
+      depth: 7.1,
+      floorHeights: [2.7, 3.1, 0.1],
+      bayWidth: 2.3,
+      window: [0.17, 0.93],
+      roof: 'gable',
+      roofHeight: 4.1,
+      yaw: -1.27,
+      origin: [113, 29, -74],
+    },
+    { width: 0.1, depth: 0.1, floorHeights: [0.1], window: [0.05, 0.95], roof: 'gable', roofHeight: 0.1 },
+    { width: 256, depth: 256, bayWidth: 1, floorHeights: [1, 1, 1, 1], window: [0.95, 0.05], yaw: 0.3 },
+  ]) {
+    const m = g.generate(o);
+    verify(m, o);
+    assert.equal(openEdges(m), 0, JSON.stringify(o));
+  }
+});

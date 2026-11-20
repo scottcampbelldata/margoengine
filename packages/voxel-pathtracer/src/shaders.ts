@@ -218,6 +218,12 @@ fn albedoGlass(mu:f32,r:f32,eta:f32)->f32 {
 }
 `;
 
+// closest() and shadow() walk the hierarchy and the instances of each leaf they reach in one loop (i up to end), in the
+// order a loop over the leaf's instances inside the walk visits them: Direct3D's shader compiler (fxc, under ANGLE's
+// Direct3D 11 back end) takes several times longer for every loop nested around the voxel walk, so the leaf adds none
+// (docs/known-bugs.md, KB-D3D11-NEST). This note sits outside the shader text, which ships without comments.
+// For the same reason march() and marchShadow() walk the bricks and, in a brick with cells (inCell), its cells one turn
+// each in one loop, in the order a cell loop inside the brick loop visits them (Amanatides and Woo 1987 at both levels).
 /** The path tracer: entry points `trace` (accumulate samples) and `ids` (pixel-centre instance and palette ids). */
 export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}${preciseMathWgsl(['preciseSin', 'preciseCos', 'preciseAsin', 'preciseAtan'])}
 const INF=3.0e38;
@@ -318,17 +324,20 @@ fn motionRotation(p:u32)->mat3x3f {
 fn motionScale(p:u32)->vec3f {return mix(vec3f(fl(p+8u),fl(p+9u),fl(p+10u)),vec3f(fl(p+12u),fl(p+13u),fl(p+14u)),motion);}
 fn motionTranslation(b:u32)->vec3f {return mix(vec3f(fl(b+27u),fl(b+31u),fl(b+35u)),vec3f(fl(b+15u),fl(b+19u),fl(b+23u)),motion);}
 // Instance transforms at this path's shutter time (motion 1 = matrix, 0 = previousMatrix).
-fn worldX(i:u32)->Xform {
- let b=f.scene.y+i*INSTANCE;
+fn blendX(b:u32)->Xform {
  let m=Xform(rowAt(b+12u),rowAt(b+16u),rowAt(b+20u));
  if((scene[b+37u]&1u)==0u||motion>=1.0){return m;}
  let q=Xform(rowAt(b+24u),rowAt(b+28u),rowAt(b+32u));
  if(motion<=0.0){return q;}
- if((scene[b+37u]&8u)!=0u){
+ return Xform(mix(q.r0,m.r0,motion),mix(q.r1,m.r1,motion),mix(q.r2,m.r2,motion));
+}
+fn worldX(i:u32)->Xform {
+ let b=f.scene.y+i*INSTANCE;
+ if((scene[b+37u]&9u)==9u&&motion>0.0&&motion<1.0){
   let p=scene[b+39u];let r=motionRotation(p);let s=motionScale(p);let t=motionTranslation(b);
   return Xform(vec4f(vec3f(r[0].x,r[1].x,r[2].x)*s,t.x),vec4f(vec3f(r[0].y,r[1].y,r[2].y)*s,t.y),vec4f(vec3f(r[0].z,r[1].z,r[2].z)*s,t.z));
  }
- return Xform(mix(q.r0,m.r0,motion),mix(q.r1,m.r1,motion),mix(q.r2,m.r2,motion));
+ return blendX(b);
 }
 fn localX(i:u32)->Xform {
  let b=f.scene.y+i*INSTANCE;
@@ -338,7 +347,19 @@ fn localX(i:u32)->Xform {
   let a=r[0]/s.x;let c=r[1]/s.y;let d=r[2]/s.z;
   return Xform(vec4f(a,-dot(a,t)),vec4f(c,-dot(c,t)),vec4f(d,-dot(d,t)));
  }
- return invertX(worldX(i));
+ return invertX(blendX(b));
+}
+struct InstX {world:Xform,local:Xform}
+fn instX(i:u32)->InstX {
+ let b=f.scene.y+i*INSTANCE;
+ if((scene[b+37u]&9u)==9u&&motion>0.0&&motion<1.0){
+  let p=scene[b+39u];let r=motionRotation(p);let s=motionScale(p);let t=motionTranslation(b);
+  let a=r[0]/s.x;let c=r[1]/s.y;let d=r[2]/s.z;
+  return InstX(Xform(vec4f(vec3f(r[0].x,r[1].x,r[2].x)*s,t.x),vec4f(vec3f(r[0].y,r[1].y,r[2].y)*s,t.y),vec4f(vec3f(r[0].z,r[1].z,r[2].z)*s,t.z)),Xform(vec4f(a,-dot(a,t)),vec4f(c,-dot(c,t)),vec4f(d,-dot(d,t))));
+ }
+ let w=blendX(b);
+ if((scene[b+37u]&1u)==0u||motion>=1.0){return InstX(w,Xform(rowAt(b),rowAt(b+4u),rowAt(b+8u)));}
+ return InstX(w,invertX(w));
 }
 
 struct Hit {t:f32,inst:u32,value:u32,axis:u32,sgn:f32,cell:vec3i}
@@ -384,20 +405,19 @@ fn octSpan(mask:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32)->f32 {
 fn planeAxis(l:vec3f,c:vec3i)->u32 {let e=min(abs(l-vec3f(c)),abs(l-vec3f(c+1)));return select(select(2u,1u,e.y<=e.z),0u,e.x<=e.y&&e.x<=e.z);}
 // A cut-out shaped cell (palette v, mask sm) along o + t d from t0 to t1 (inside: the ray starts in it): where it stops
 // on a texel that is not cut away, as (t, axis), t -1 when it passes. Each run through filled half blocks stops at the
-// texel where it enters them, else at the one where it leaves them (an inner face), else goes on.
+// texel where it enters them, else at the one where it leaves them (an inner face), else goes on. KB-L5a-10.
 fn shapeCut(v:u32,sm:u32,o:vec3f,d:vec3f,c:vec3i,t0:f32,t1:f32,inside:bool)->vec2f {
  let cut=mat(v*MV+7u).z;let up=d>=vec3f(0.0);
  var t=t0;var a=select(planeAxis(o+d*t0,c),3u,inside);
- for(var i=0u;i<3u;i++){
-  let r=octWalk(sm,o,d,c,t,t1,a,true);
-  if(r.x<0.0){break;}
-  let ea=u32(r.y);
-  if(ea<3u&&texelAt(v,ea*2u+select(0u,1u,up[ea]),o+d*r.x).a>=cut){return r;}
-  let x=octWalk(sm,o,d,c,r.x,t1,ea,false);
-  let tx=select(t1,x.x,x.x>=0.0);let xa=select(planeAxis(o+d*t1,c),u32(x.y),x.x>=0.0);
-  if(texelAt(v,xa*2u+select(1u,0u,up[xa]),o+d*tx).a>=cut){return vec2f(tx,f32(xa));}
-  if(x.x<0.0){break;}
-  t=tx;a=xa;
+ for(var i=0u;i<select(6u,0u,sm==0u);i++){
+  let fill=(i&1u)==0u;
+  let r=octWalk(sm,o,d,c,t,t1,a,fill);
+  if(fill&&r.x<0.0){break;}
+  let tq=select(select(t1,r.x,r.x>=0.0),r.x,fill);
+  let aq=select(select(planeAxis(o+d*t1,c),u32(r.y),r.x>=0.0),u32(r.y),fill);
+  if((!fill||aq<3u)&&texelAt(v,aq*2u+select(0u,1u,up[aq]==fill),o+d*tq).a>=cut){return vec2f(tq,f32(aq));}
+  if(!fill&&r.x<0.0){break;}
+  t=tq;a=aq;
  }
  return vec2f(-1.0,0.0);
 }
@@ -440,51 +460,56 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
  let step=want==STEP;
  // In STEP mode the cell the ray starts in (inside the box) is passed over.
  var skip=step&&axis==3u;
+ var inCell=false;var entry=0u;var tOut=0.0;var lo=vec3i(0);var hi=vec3i(0);
+ var c=vec3i(0);var vn=vec3f(0.0);var vt=0.0;var va=0u;var uniform=false;
  loop {
-  let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
-  let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
-  let lo=bc*8;let hi=min(lo+8,sz)-1;
-  let ue=select(0u,base|(entry&255u),entry!=0u);
-  if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(ue))){
-   let u=ue;
-   if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}skip=false;}
-   else if(u!=want){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}
+  if(inCell){
+   let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
+   let pv=select((voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+   let v=select(0u,base|pv,pv!=0u);
+   let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform&&!step);
+   if(sm!=0u){
+    // A shaped cell holds v in its filled half blocks and nothing elsewhere.
+    let tc=min(min(vn.x,vn.y),vn.z);
+    // A cut-out one stops only on texels not cut away.
+    var r=vec2f(-1.0,0.0);
+    if(v!=want&&cutMat(v)){r=shapeCut(v,sm,o,d,c,vt,tc,va==3u);}else{r=octWalk(sm,o,d,c,vt,tc,va,v!=want);}
+    if(v==want){if(r.x>=0.0){return found(h,r.x,0u,u32(r.y),stp,d,c);}}
+    else{
+     if(want!=0u&&(r.x<0.0||r.x>vt)){return found(h,vt,0u,va,stp,d,c);}
+     if(r.x>=0.0){return found(h,r.x,v,u32(r.y),stp,d,c);}
+    }
+   }
+   else if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
+   else if(v!=want){
+    if(!cutMat(v)){return found(h,vt,v,va,stp,d,c);}
+    let r=cutThrough(v,o,d,vt,va==3u,c,vn);
+    if(r==0u){return found(h,vt,v,va,stp,d,c);}
+    if(r==2u){
+     let ax=select(select(2u,1u,vn.y<=vn.z),0u,vn.x<=vn.y&&vn.x<=vn.z);
+     return found(h,min(min(vn.x,vn.y),vn.z),v,ax,stp,d,c);
+    }
+   }
+   if(vn.x<vn.y&&vn.x<vn.z){va=0u;vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
+   else if(vn.y<vn.z){va=1u;vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
+   else{va=2u;vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
+   if(!(vt>=tOut||any(c<lo)||any(c>hi))){continue;}
+   inCell=false;
   } else {
-   var c=clamp(forwardCell(o+d*t,d),lo,hi);
-   var vn=(vec3f(c)+up-o)*inv;
-   var vt=t;var va=axis;
-   let uniform=entry>=0x80000000u;
-   loop {
-    let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let pv=select((voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
-    let v=select(0u,base|pv,pv!=0u);
-    let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform&&!step);
-    if(sm!=0u){
-     // A shaped cell holds v in its filled half blocks and nothing elsewhere.
-     let tc=min(min(vn.x,vn.y),vn.z);
-     if(v==want){let r=octWalk(sm,o,d,c,vt,tc,va,false);if(r.x>=0.0){return found(h,r.x,0u,u32(r.y),stp,d,c);}}
-     else{
-      // A cut-out one stops only on texels not cut away.
-      var r=vec2f(-1.0,0.0);
-      if(cutMat(v)){r=shapeCut(v,sm,o,d,c,vt,tc,va==3u);}else{r=octWalk(sm,o,d,c,vt,tc,va,true);}
-      if(want!=0u&&(r.x<0.0||r.x>vt)){return found(h,vt,0u,va,stp,d,c);}
-      if(r.x>=0.0){return found(h,r.x,v,u32(r.y),stp,d,c);}
-     }
-    }
-    else if(step){if(!skip){return found(h,vt,v,va,stp,d,c);}skip=false;}
-    else if(v!=want){
-     if(!cutMat(v)){return found(h,vt,v,va,stp,d,c);}
-     let r=cutThrough(v,o,d,vt,va==3u,c,vn);
-     if(r==0u){return found(h,vt,v,va,stp,d,c);}
-     if(r==2u){
-      let ax=select(select(2u,1u,vn.y<=vn.z),0u,vn.x<=vn.y&&vn.x<=vn.z);
-      return found(h,min(min(vn.x,vn.y),vn.z),v,ax,stp,d,c);
-     }
-    }
-    if(vn.x<vn.y&&vn.x<vn.z){va=0u;vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
-    else if(vn.y<vn.z){va=1u;vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
-    else{va=2u;vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
-    if(vt>=tOut||any(c<lo)||any(c>hi)){break;}
+   entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
+   tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
+   lo=bc*8;hi=min(lo+8,sz)-1;
+   let ue=select(0u,base|(entry&255u),entry!=0u);
+   if(entry==0u||(entry>=0x80000000u&&!step&&!cutMat(ue))){
+    let u=ue;
+    if(step){if(!skip){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}skip=false;}
+    else if(u!=want){return found(h,t,u,axis,stp,d,clamp(forwardCell(o+d*t,d),lo,hi));}
+   } else {
+    c=clamp(forwardCell(o+d*t,d),lo,hi);
+    vn=(vec3f(c)+up-o)*inv;
+    vt=t;va=axis;
+    uniform=entry>=0x80000000u;
+    inCell=true;continue;
    }
   }
   if(tOut>=tExit){break;}
@@ -527,50 +552,55 @@ fn marchShadow(model:u32,o:vec3f,d:vec3f,tMax:f32)->f32 {
  // The cell the ray starts in (when it starts inside the model), and whether it is still in the volume it started in
  // (one material from the start cell on, no gap).
  var start=tEnter==0.0;var own=start;var vol=0u;
+ var inCell=false;var entry=0u;var tOut=0.0;var lo=vec3i(0);var hi=vec3i(0);
+ var c=vec3i(0);var vn=vec3f(0.0);var vt=0.0;var uniform=false;
  loop {
-  let entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
-  let tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
-  let lo=bc*8;let hi=min(lo+8,sz)-1;
-  let ue=base|(entry&255u);
-  if(entry>=0x80000000u&&!cutMat(ue)){
-   // A uniform brick: one material over the whole span (when only the start cell passes light, its share first).
-   own=own&&(vol==0u||vol==ue);vol=ue;
-   var t1=t;
-   if(own&&sunCell){
-    let c0=floor(o+d*t);let cn=(c0+up-o)*inv;t1=min(min(min(cn.x,cn.y),cn.z),tOut);
-    let k=extinction(ue,true);if(k<0.0){return -1.0;}depth+=k*(t1-t);own=false;
+  if(inCell){
+   let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
+   let pv=select((voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
+   let v=select(0u,base|pv,pv!=0u);
+   let next=min(min(vn.x,vn.y),min(vn.z,tOut));
+   let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform);
+   // A shaped cell blocks or dims the ray only where it runs through its filled half blocks.
+   if(sm!=0u){
+    if(cutMat(v)){if(shapeCut(v,sm,o,d,c,vt,next,start&&vt==0.0).x>=0.0){return -1.0;}}
+    else{let span=octSpan(sm,o,d,c,vt,next);if(span>0.0){let x=extinction(v,false);if(x<0.0){return -1.0;}depth+=x*span;}}
+    own=false;
    }
-   if(t1<tOut){let k=extinction(ue,own);if(k<0.0){return -1.0;}depth+=k*(tOut-t1);}
-  } else if(entry==0u){own=false;}
-  else {
-   var c=clamp(vec3i(floor(o+d*t)),lo,hi);
-   var vn=(vec3f(c)+up-o)*inv;
-   var vt=t;
-   let uniform=entry>=0x80000000u;
-   loop {
-    let l=vec3u(c-lo);let k=l.x+8u*(l.z+8u*l.y);
-    let pv=select((voxels[(entry&0x3fffffffu)+(k>>2u)]>>((k&3u)*8u))&255u,entry&255u,uniform);
-    let v=select(0u,base|pv,pv!=0u);
-    let next=min(min(vn.x,vn.y),min(vn.z,tOut));
-    let sm=select(0u,shapeIn(entry,k),pv!=0u&&!uniform);
-    // A shaped cell blocks or dims the ray only where it runs through its filled half blocks.
-    if(sm!=0u){
-     if(cutMat(v)){if(shapeCut(v,sm,o,d,c,vt,next,start&&vt==0.0).x>=0.0){return -1.0;}}
-     else{let span=octSpan(sm,o,d,c,vt,next);if(span>0.0){let x=extinction(v,false);if(x<0.0){return -1.0;}depth+=x*span;}}
-     own=false;
+   // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
+   else if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}own=false;}
+   else if(v!=0u){
+    own=own&&(vol==0u||vol==v);vol=v;
+    let x=extinction(v,own);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);
+    own=own&&!sunCell;
+   } else {own=false;}
+   start=false;
+   if(vn.x<vn.y&&vn.x<vn.z){vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
+   else if(vn.y<vn.z){vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
+   else{vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
+   if(!(vt>=tOut||any(c<lo)||any(c>hi))){continue;}
+   inCell=false;
+  } else {
+   entry=voxels[grid+u32(bc.x+nb.x*(bc.z+nb.z*bc.y))];
+   tOut=min(min(bn.x,bn.y),min(bn.z,tExit));
+   lo=bc*8;hi=min(lo+8,sz)-1;
+   let ue=base|(entry&255u);
+   if(entry>=0x80000000u&&!cutMat(ue)){
+    // A uniform brick: one material over the whole span (when only the start cell passes light, its share first).
+    own=own&&(vol==0u||vol==ue);vol=ue;
+    var t1=t;
+    if(own&&sunCell){
+     let c0=floor(o+d*t);let cn=(c0+up-o)*inv;t1=min(min(min(cn.x,cn.y),cn.z),tOut);
+     let k=extinction(ue,true);if(k<0.0){return -1.0;}depth+=k*(t1-t);own=false;
     }
-    // A cut-out cell lets the shadow through where both its texels on the ray are cut away.
-    else if(cutMat(v)){if(cutThrough(v,o,d,vt,start&&vt==0.0,c,vn)!=1u){return -1.0;}own=false;}
-    else if(v!=0u){
-     own=own&&(vol==0u||vol==v);vol=v;
-     let x=extinction(v,own);if(x<0.0){return -1.0;}depth+=x*max(next-vt,0.0);
-     own=own&&!sunCell;
-    } else {own=false;}
-    start=false;
-    if(vn.x<vn.y&&vn.x<vn.z){vt=vn.x;c.x+=stp.x;vn.x+=ad.x;}
-    else if(vn.y<vn.z){vt=vn.y;c.y+=stp.y;vn.y+=ad.y;}
-    else{vt=vn.z;c.z+=stp.z;vn.z+=ad.z;}
-    if(vt>=tOut||any(c<lo)||any(c>hi)){break;}
+    if(t1<tOut){let k=extinction(ue,own);if(k<0.0){return -1.0;}depth+=k*(tOut-t1);}
+   } else if(entry==0u){own=false;}
+   else {
+    c=clamp(vec3i(floor(o+d*t)),lo,hi);
+    vn=(vec3f(c)+up-o)*inv;
+    vt=t;
+    uniform=entry>=0x80000000u;
+    inCell=true;continue;
    }
   }
   start=false;
@@ -629,7 +659,10 @@ fn closest(o:vec3f,d:vec3f,medium:u32,mInst:u32)->Hit {
  if(f.scene.w==0u){return h;}
  let inv=safeInv(d);
  var stack:array<u32,32>;var sp=0u;var node=0u;
+ var i=0u;var end=0u;var pop=false;
  loop {
+  if(i<end){traceInstance(i,o,d,medium,mInst,&h);i++;continue;}
+  if(pop){pop=false;if(sp==0u){break;}sp--;node=stack[sp];}
   let b=f.scene.z+node*8u;
   let t0=(vec3f(fl(b),fl(b+1u),fl(b+2u))-o)*inv;let t1=(vec3f(fl(b+4u),fl(b+5u),fl(b+6u))-o)*inv;
   let tn=max(max(min(t0.x,t1.x),min(t0.y,t1.y)),max(min(t0.z,t1.z),0.0));
@@ -637,12 +670,11 @@ fn closest(o:vec3f,d:vec3f,medium:u32,mInst:u32)->Hit {
   var down=false;
   if(tn<=tf){
    let count=scene[b+7u];let start=scene[b+3u];
-   if(count>0u){for(var i=start;i<start+count;i++){traceInstance(i,o,d,medium,mInst,&h);}}
+   if(count>0u){i=start;end=start+count;}
    else{down=true;}
   }
   if(down){if(sp<32u){stack[sp]=scene[b+3u]+1u;sp++;}node=scene[b+3u];continue;}
-  if(sp==0u){break;}
-  sp--;node=stack[sp];
+  pop=true;
  }
  return h;
 }
@@ -665,7 +697,16 @@ fn shadow(o:vec3f,d:vec3f,tMax:f32)->f32 {
  let inv=safeInv(d);
  var tau=0.0;
  var stack:array<u32,32>;var sp=0u;var node=0u;
+ var i=0u;var end=0u;var pop=false;
  loop {
+  if(i<end){
+   let m=localX(i);
+   let k=marchShadow(scene[f.scene.y+i*INSTANCE+36u],xpoint(m,o),xdir(m,d),tMax);
+   if(k<0.0){return 0.0;}
+   tau+=k;
+   i++;continue;
+  }
+  if(pop){pop=false;if(sp==0u){break;}sp--;node=stack[sp];}
   let b=f.scene.z+node*8u;
   let t0=(vec3f(fl(b),fl(b+1u),fl(b+2u))-o)*inv;let t1=(vec3f(fl(b+4u),fl(b+5u),fl(b+6u))-o)*inv;
   let tn=max(max(min(t0.x,t1.x),min(t0.y,t1.y)),max(min(t0.z,t1.z),0.0));
@@ -673,18 +714,11 @@ fn shadow(o:vec3f,d:vec3f,tMax:f32)->f32 {
   var down=false;
   if(tn<=tf){
    let count=scene[b+7u];let start=scene[b+3u];
-   if(count>0u){
-    for(var i=start;i<start+count;i++){
-     let m=localX(i);
-     let k=marchShadow(scene[f.scene.y+i*INSTANCE+36u],xpoint(m,o),xdir(m,d),tMax);
-     if(k<0.0){return 0.0;}
-     tau+=k;
-    }
-   } else {down=true;}
+   if(count>0u){i=start;end=start+count;}
+   else {down=true;}
   }
   if(down){if(sp<32u){stack[sp]=scene[b+3u]+1u;sp++;}node=scene[b+3u];continue;}
-  if(sp==0u){break;}
-  sp--;node=stack[sp];
+  pop=true;
  }
  return exp(-tau);
 }
@@ -696,11 +730,10 @@ fn filled(model:u32,c:vec3i)->bool {
  if(any(c<vec3i(0))||any(c>=sz)){return false;}
  return voxelAt(model,c)!=0u;
 }
-// Whether world point p on the face of hit h lies within the edge band: within f.edges.w (voxels) of a face edge where
+// Whether model point l (hit h's point in its instance's model space) on the face of hit h lies within the edge band: within f.edges.w (voxels) of a face edge where
 // the shape turns: the face ends there (outer corner) or meets a filled cell in front of the neighbour (inner corner).
-fn edgeBand(h:Hit,p:vec3f)->bool {
+fn edgeBand(h:Hit,lp:vec3f)->bool {
  let model=scene[f.scene.y+h.inst*INSTANCE+36u];
- let lp=xpoint(localX(h.inst),p);
  let nrm=unitAxis(h.axis)*i32(h.sgn);
  let w=f.edges.w;
  for(var k=1u;k<3u;k++){
@@ -745,10 +778,9 @@ fn texelAt(v:u32,face:u32,l:vec3f)->vec4f {
 }
 // The face of cell c that model point l lies on, across axis a (the side nearer l).
 fn faceOf(a:u32,l:vec3f,c:vec3i)->u32 {return a*2u+select(1u,0u,l[a]-f32(c[a])>0.5);}
-// Hit h's texel at world point p (its face from where p lies on the cell, so a voxel's inner faces read their own).
-fn faceTexel(h:Hit,p:vec3f)->vec4f {
+// Hit h's texel at model point l (its face from where p lies on the cell, so a voxel's inner faces read their own).
+fn faceTexel(h:Hit,l:vec3f)->vec4f {
  if(scene[0]==0u||h.inst>=AREA){return vec4f(1.0);}
- let l=xpoint(localX(h.inst),p);
  var face=faceOf(h.axis,l,h.cell);
  // A shaped cell's mid-cell face reads the face it turns toward.
  if(abs(l[h.axis]-f32(h.cell[h.axis])-0.5)<1e-3){face=h.axis*2u+select(1u,0u,h.sgn>0.0);}
@@ -1125,7 +1157,7 @@ fn sampleEmitter()->LightPoint {
  var lp=vec3f(cell)+vec3f(rand(),rand(),rand())*select(1.0,0.5,quarter);
  if(quarter){lp[a1]+=f32((c1>>21u)&1u)*0.5;lp[a2]+=f32((c1>>22u)&1u)*0.5;}
  lp[axis]=f32(cell[axis])+select(0.0,1.0,sg>0.0)-sg*0.5*f32((c1>>20u)&1u)+sg*EPS;
- let w=worldX(inst);let l=localX(inst);
+ let x=instX(inst);let w=x.world;let l=x.local;
  let area=length(cross(colOf(w,a1),colOf(w,a2)));
  let m=material(scene[mb+7u]|voxelAt(model,cell));
  r.p=xpoint(w,lp);
@@ -1582,7 +1614,7 @@ fn radiance(px:vec2u)->Path {
     m=groundMat();
     if(bounces==0u&&f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
    } else {
-    let lx=localX(h.inst);
+    let lx=localX(h.inst);let lp=xpoint(lx,p);
     n=h.sgn*normalize(rowOf(lx,h.axis));
     off=h.sgn*EPS*colOf(worldX(h.inst),h.axis);
     // Leaving a contact-transmitting blend into the air: the glass share over (1 - 0.4 metal) passes, the rest scatters
@@ -1622,10 +1654,10 @@ fn radiance(px:vec2u)->Path {
      sunFace=dot(n,f.sun.xyz)>0.0;
      medium=h.value;mInst=h.inst;o=p;mediaAdvance=true;continue;
     }
-    if(!inner){let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;}
+    if(!inner){let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;}
     // Edge bands and grid lines on what the camera sees (MagicaVoxel's display settings): the line colour, lit.
     if(bounces==0u&&medium==0u){
-     if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}
+     if(f.edges.w>0.0&&edgeBand(h,lp)){m=lineMat(f.edges.xyz);}
      else if(f.grid2.y>1.5&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
     }
    }
@@ -1639,8 +1671,11 @@ fn radiance(px:vec2u)->Path {
    soft=pb>1e-6||((m.flags&SMOOTH)==0u&&m.metal>0.0);
    if(feature&&(soft||bounces>=3u)){feature=false;res.albedo=tint*m.color;res.normal=n;res.primary=select(0.0,1.0,bounces==0u);}
   }
+  // A surface vertex reached after maxBounces scattering events (bounces counts them) samples no light: it would be one
+  // event too many, and only the light-sampled MIS share of that longer path, since the same limit cuts its BSDF share
+  // below. A medium vertex checks its count where it scatters.
   // Light sampled at a glossy metal seen from a diffuse vertex is a caustic too (light focused by the metal).
-  if(soft){
+  if(soft&&(scatter||bounces<f.config.x)){
    var walk:Walk;
    let lobes=select(0u,1u,nd<f.limits.x)|select(0u,2u,ns<(f.limits.y&0xffffu));
    let add=thr*direct(select(0u,1u,scatter),m,n,-d,p+off,medium,mInst,&walk,lobes);L+=add;
@@ -1744,9 +1779,10 @@ fn radiance(px:vec2u)->Path {
    var n=vec3f(0.0,1.0,0.0);var m:Mat;
    if(h.inst==GROUND){p.y=f.ground.w;m=groundMat();if(f.grid2.y>0.0&&gridLine(p,n)){m=lineMat(f.grid.xyz);}}
    else{
-    n=normalize(h.sgn*rowOf(localX(h.inst),h.axis));m=material(h.value);
-    let tex=faceTexel(h,p).rgb;m.color*=tex;m.metalColor*=tex;
-    if(f.edges.w>0.0&&edgeBand(h,p)){m=lineMat(f.edges.xyz);}else if(f.grid2.y>1.5&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
+    let lx=localX(h.inst);let lp=xpoint(lx,p);
+    n=normalize(h.sgn*rowOf(lx,h.axis));m=material(h.value);
+    let tex=faceTexel(h,lp).rgb;m.color*=tex;m.metalColor*=tex;
+    if(f.edges.w>0.0&&edgeBand(h,lp)){m=lineMat(f.edges.xyz);}else if(f.grid2.y>1.5&&gridLine(p,n)){m=lineMat(f.grid.xyz);}
    }
    if(dot(n,ray.d)>0.0){n=-n;}
    c=select(m.emission,m.seen.xyz,m.seen.w>0.0)+m.color*skyBehind(n);
@@ -2106,6 +2142,8 @@ fn weighed(i:u32,g:vec2u,split:bool)->vec3f {
 `;
 
 /** Draws the accumulated (or denoised) image: bilinear upsampling, exposure, tone mapping, first-hit depth. */
+// The display pass draws the pixel within the view's rectangle: the fragment position less the rectangle's origin
+// (v.encoding.zw), over the rectangle's size (v.size.zw).
 export const DISPLAY: string = /* wgsl */ `${displayShader}
 ${agxShader}
 struct View {matrix:mat4x4f,inverse:mat4x4f,size:vec4f,params:vec4f,encoding:vec4f}
@@ -2125,14 +2163,15 @@ fn encodeOut(c:vec3f)->vec3f {
  return select(srgb(x),pow(x,vec3f(1.0/max(v.encoding.x,1.0))),v.encoding.x>0.0);
 }
 @fragment fn fs(i:VOut)->FOut {
+ let p=i.pos.xy-v.encoding.zw;
  let tw=v.size.x;let th=v.size.y;let W=u32(tw);
- let q=i.pos.xy*vec2f(tw,th)/v.size.zw-0.5;
+ let q=p*vec2f(tw,th)/v.size.zw-0.5;
  let a=floor(q);let fr=q-a;
  let x0=u32(clamp(a.x,0.0,tw-1.0));let x1=u32(clamp(a.x+1.0,0.0,tw-1.0));
  let y0=u32(clamp(a.y,0.0,th-1.0));let y1=u32(clamp(a.y+1.0,0.0,th-1.0));
  var c=mix(mix(color[y0*W+x0].xyz,color[y0*W+x1].xyz,fr.x),mix(color[y1*W+x0].xyz,color[y1*W+x1].xyz,fr.x),fr.y)*v.params.x*v.params.y;
  // Vignette: 1 / (1 + t^2)^2, t = strength x distance from the centre / (0.2238 x height).
- if(v.encoding.y>0.0){let uv=i.pos.xy/v.size.zw-0.5;let t=v.encoding.y*length(vec2f(uv.x*v.size.z/v.size.w,uv.y))/0.2238;c/=(1.0+t*t)*(1.0+t*t);}
+ if(v.encoding.y>0.0){let uv=p/v.size.zw-0.5;let t=v.encoding.y*length(vec2f(uv.x*v.size.z/v.size.w,uv.y))/0.2238;c/=(1.0+t*t)*(1.0+t*t);}
  var rgb=max(c,vec3f(0.0));
  let mode=u32(v.params.z);
  if((mode&1u)==0u){
@@ -2144,11 +2183,11 @@ fn encodeOut(c:vec3f)->vec3f {
  }
  var o:FOut;
  o.color=vec4f(rgb,1.0);
- let nx=u32(clamp(floor(i.pos.x*tw/v.size.z),0.0,tw-1.0));let ny=u32(clamp(floor(i.pos.y*th/v.size.w),0.0,th-1.0));
+ let nx=u32(clamp(floor(p.x*tw/v.size.z),0.0,tw-1.0));let ny=u32(clamp(floor(p.y*th/v.size.w),0.0,th-1.0));
  let inv=features[ny*W+nx].w*v.params.w;
  var z=0.0;
  if(inv>0.0){
-  let ndc=vec2f(i.pos.x/v.size.z*2.0-1.0,1.0-i.pos.y/v.size.w*2.0);
+  let ndc=vec2f(p.x/v.size.z*2.0-1.0,1.0-p.y/v.size.w*2.0);
   let a0=v.inverse*vec4f(ndc,1.0,1.0);let b0=v.inverse*vec4f(ndc,0.5,1.0);
   let pa=a0.xyz/a0.w;let pb=b0.xyz/b0.w;
   let clip=v.matrix*vec4f(pa+normalize(pb-pa)/inv,1.0);

@@ -25,6 +25,7 @@ interface TonemapExtension {
     values?(): Float32Array;
     resources?(): readonly GPUBindingResource[];
     encode?(context: TonemapPassContext): void;
+    dispose?(): void;
 }
 
 interface TonemapPassContext {

@@ -1,0 +1,25 @@
+DragonBones sample exports used as test data by packages/sprites/tests/dragonbones.test.js and dragonbones-check.js.
+
+Source: the DragonBonesJS repository demo resources, commit 64b6c69ae35777c2404be68c9192e2c56906079e,
+https://github.com/DragonBones/DragonBonesJS/tree/64b6c69ae35777c2404be68c9192e2c56906079e/Egret/Demos/resource
+Files (downloaded unchanged, 2026-11-15):
+  effect/Dragon_ske.json, effect/Dragon_tex.json
+  mecha_1406/mecha_1406_ske.json, mecha_1406/mecha_1406_tex.json
+  mecha_1502b/mecha_1502b_ske.json, mecha_1502b/mecha_1502b_tex.json
+  you_xin/body/body_ske.json, you_xin/body/body_tex.json
+  bounding_box_tester/bounding_box_tester_ske.json, bounding_box_tester/bounding_box_tester_tex.json
+Licence: MIT, Copyright (c) 2012-2025 The DragonBones team and other contributors; full text in LICENSE beside these
+files (the repository's LICENSE at the same commit).
+SHA-256:
+  c8bda4df6cf2ed923811dc4296c1a7e5d9e2ec749b46a9469b369bcfb32106c7  Dragon_ske.json
+  cda51effcd91626fa9dc15c9209a8f57248ad4c7546737dbff7e6d86db3b8bfd  Dragon_tex.json
+  52765cecb85bee2d0114a8407baa5eb59ac1f2d24612d82c6459d8b4c47371cf  body_ske.json
+  98cbf3a949043da2ca2939e0eaac6a3259afdc50734bcc467382e9b8c771f1d3  body_tex.json
+  69a6832561f4d9230a51ead259ecac9207c3a6522b4fa443333df6214c90d221  bounding_box_tester_ske.json
+  4bf0c50dc22ac4d61bbe8c8482dab9acdf69dc0fd42fdbb28c5219009d1378e9  bounding_box_tester_tex.json
+  3e6f93a76436b57c98b1e2e54e39d2e41037a22a71b072c8b7b1cc33ac2596ee  mecha_1406_ske.json
+  2b61d795679dcbb1f56a2d13154ce36bdbe9738ffbbc8e0600203d46ac748258  mecha_1406_tex.json
+  58e311cc5f38c3c2f4a30dd183e75109b8e975a3621b0565a238c9d6182774bf  mecha_1502b_ske.json
+  8163604e66bbb93c9ba25cb3eef11334def1042730944feb792ca532ad17da8b  mecha_1502b_tex.json
+Only the exported JSON data is used; no texture images, runtime or editor code are included or were read.
+DragonBones is a project of the DragonBones team; format compatibility implies no affiliation or endorsement.

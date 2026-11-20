@@ -253,6 +253,10 @@ function finishPixels(data: Uint8Array, swap: boolean, premultiplied: boolean): 
 
 /** Encodes RGBA pixels as an 8-bit PNG file (each row filtered against the one above). */
 export async function encodePNG({ width, height, data }: HeadlessPixels): Promise<Uint8Array> {
+  // IHDR sizes are 1 to 2^31 - 1 (W3C PNG 11.2.2); short data would be written as zeros.
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1)
+    throw rangeError('Invalid image size', 'headless');
+  if (data?.length !== width * height * 4) throw rangeError('Frame data does not match its size', 'headless');
   const stride = width * 4;
   const rows = new Uint8Array((stride + 1) * height);
   for (let y = 0; y < height; y++) {

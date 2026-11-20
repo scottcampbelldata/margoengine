@@ -39,6 +39,11 @@ test('GrassField registers itself, exposes its blade count and validates every o
   assert.throws(() => (grass.windSpeed = 101), RangeError);
   assert.throws(() => (grass.windStrength = 3), RangeError);
   assert.throws(() => (grass.windTime = -1), RangeError);
+  // The direction is settable and keeps unit length, so a weather can turn the field's lean .
+  grass.windDirection = [3, 4];
+  assert.deepEqual(grass.windDirection.map((v) => +v.toFixed(6)), [0.6, 0.8]);
+  assert.throws(() => (grass.windDirection = [0, 0]), RangeError);
+  assert.throws(() => (grass.windDirection = [Infinity, 1]), TypeError);
 });
 
 test('GrassField without WebGPU reports unsupported and names the fix', () => {

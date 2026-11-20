@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { Engine, TransformStore } from '../packages/core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../packages/gltf/dist/pbr.js';
 import { Animation } from '../packages/animation/dist/index.js';
 import { Animator } from '../packages/animator/dist/index.js';
 import { MeshRotationWriter } from './support/mesh-rotation-writer.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 function fixture() {
   const result = animatedTriangle(),
@@ -248,8 +248,8 @@ test('default writer retains pre-import and later dynamic Mesh setter dispatch',
     Mesh.prototype.setQuaternion = function(q) { before++; return Reflect.apply(original, this, [q]); };
     const { Animator } = await import(${JSON.stringify(url('packages/animator/dist/index.js'))});
     const { Animation } = await import(${JSON.stringify(url('packages/animation/dist/index.js'))});
-    const { GLTFAsset, PBRModel } = await import(${JSON.stringify(url('packages/gltf-pro/dist/index.js'))});
-    const { animatedTriangle } = await import(${JSON.stringify(url('tests/support/gltf-pro-fixture.js'))});
+    const { GLTFAsset, PBRModel } = await import(${JSON.stringify(url('packages/gltf/dist/pbr.js'))});
+    const { animatedTriangle } = await import(${JSON.stringify(url('tests/support/gltf-pbr-fixture.js'))});
     const store = await TransformStore.create(16), engine = new Engine({width:1,height:1,clientWidth:1,clientHeight:1}, store,
       {backend:'webgl2',add(){},remove(){},render(){},dispose(){}}), f=animatedTriangle(),
       model=new PBRModel(engine,new GLTFAsset(f.doc,f.buffers)), animation=new Animation(model),

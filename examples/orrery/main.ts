@@ -1,9 +1,9 @@
 // Orrery: a brass clockwork orrery under a glass dome in a dim study. The model is built by blender/build_orrery.py;
 // this page turns its wheels and arms to the date on the dial. Planets sit at their heliocentric longitudes from
-// ephemeris.ts; every wheel turns at the rate its tooth counts give (gears.ts).
+// @margoengine/sky/ephemeris; every wheel turns at the rate its tooth counts give (gears.ts).
 import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Shadows } from '@margoengine/shadows';
 import { Clustered } from '@margoengine/clustered';
 import { AreaLights } from '@margoengine/clustered/area';
@@ -23,14 +23,14 @@ import { LabelRenderer } from '@margoengine/labels';
 import { applyQualityTier, paceEngine } from '@margoengine/quality';
 import {
   FITTED_SPAN,
-  PLANETS,
+  HELIOCENTRIC_PLANETS as PLANETS,
   dateOfJulianDay,
   julianDay,
   moonLongitude,
   planetPosition,
   wrap360,
-  type PlanetName,
-} from './ephemeris.ts';
+  type HeliocentricPlanet as PlanetName,
+} from '@margoengine/sky/ephemeris';
 import { designTrains, driveAngle, wheelAngles } from './gears.ts';
 import { PLANET_Z, planetLayouts } from './layout.ts';
 

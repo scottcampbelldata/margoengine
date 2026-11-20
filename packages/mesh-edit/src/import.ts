@@ -173,11 +173,12 @@ export function polygonMeshFromTriangles(source: ImportTriangles, options: Impor
       loop.pop();
       loopUV.pop();
     }
-    if (loop.length < 3 || new Set(loop).size !== loop.length || loop.length > 64) {
+    if (loop.length < 3 || new Set(loop).size !== loop.length) {
       dropped++;
       continue;
     }
-    if (!faceGeometryError(vertices, loop)) {
+    // Polygons over the 64-corner face limit are split into convex pieces like concave ones, never dropped.
+    if (loop.length <= 64 && !faceGeometryError(vertices, loop)) {
       faces.push({ id: `f${f}`, vertices: loop, uv: loopUV });
       origin.set(`f${f}`, f);
       continue;
@@ -194,7 +195,7 @@ export function polygonMeshFromTriangles(source: ImportTriangles, options: Impor
     }
   }
   if (dropped) diagnostics.push(`${dropped} degenerate polygons (no area, repeated or crossing corners) were dropped.`);
-  if (split) diagnostics.push(`${split} concave or nonplanar polygons were split into convex faces.`);
+  if (split) diagnostics.push(`${split} concave, nonplanar or over-64-corner polygons were split into convex faces.`);
   let mesh: PolygonMesh = { vertices, faces },
     sources = new Map([...origin].map(([id, f]) => [id, [f]]));
   assertPolygonMesh(mesh);

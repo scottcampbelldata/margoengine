@@ -259,7 +259,7 @@ test('other extensions on a node stay for the loader, and instancing combines in
   const { engine } = await headlessEngine();
   try {
     const vendor = withNodes({ extensions: { [LIGHTS]: { light: 0 }, VENDOR_thing: {} } });
-    assert.throws(() => load(engine, vendor), /gltf-pro/);
+    assert.throws(() => load(engine, vendor), /gltf\/pbr/);
     const NAME = 'EXT_mesh_gpu_instancing';
     for (const order of [
       [sceneExtras, instancing],
@@ -287,10 +287,10 @@ test('without the entry nodes stay refused, and a model without it holds no data
   const { engine } = await headlessEngine();
   try {
     const camera = withNodes({ camera: 0 });
-    assert.throws(() => parseGLTF(engine, camera.doc, [camera.bytes]), /gltf-pro/);
+    assert.throws(() => parseGLTF(engine, camera.doc, [camera.bytes]), /gltf\/pbr/);
     const required = withNodes(light(0));
     required.doc.extensionsRequired = [LIGHTS];
-    assert.throws(() => parseGLTF(engine, required.doc, [required.bytes]), /gltf-pro/);
+    assert.throws(() => parseGLTF(engine, required.doc, [required.bytes]), /gltf\/pbr/);
     const plain = file();
     const model = parseGLTF(engine, plain.doc, [plain.bytes]);
     assert.deepEqual(sceneData(model), { cameras: [], lights: [] });

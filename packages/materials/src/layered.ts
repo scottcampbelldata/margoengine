@@ -206,7 +206,7 @@ export function layered(options: LayeredOptions = {}): LayeredFeature {
     if (out !== undefined) return out;
     out = source.replace(site, (found) => `${body}  ${found}`);
     if (out === source)
-      throw new TypeError('layered needs the standard gltf-pro PBR shader; use matching gltf-pro and materials versions');
+      throw new TypeError('layered needs the standard gltf/pbr shader; use matching gltf/pbr and materials versions');
     // Vertex colours that weigh layers stop tinting the base; their alpha still counts as opacity.
     if (tinted) out = out.replace('*f.base*i.color;', '*f.base*vec4f(1,1,1,i.color.a);');
     const keep = slots.map((_, k) => `_=margoLayerMap${k};_=margoLayerSampler${k};`).join('');

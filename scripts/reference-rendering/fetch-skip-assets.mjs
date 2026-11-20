@@ -8,7 +8,7 @@ import { externalAssets, externalAssetRoot, requireExternalAssets } from '../sup
 const root = externalAssetRoot();
 const deadline = setTimeout(() => {
   console.error('External test asset acquisition exceeded its 15-minute hard deadline');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 15 * 60_000);
 deadline.unref();
 for (let i = 0; i < externalAssets.length; i += 6) {

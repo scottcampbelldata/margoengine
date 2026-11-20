@@ -1,9 +1,9 @@
-import type { MaterialExtension } from '@margoengine/gltf-pro';
+import type { MaterialExtension } from '@margoengine/gltf/pbr';
 import type { ClearcoatTextureSlot } from './shader.js';
 import { coordinateExpression, coordinateWGSL } from './coordinates.js';
 import { iridescenceWGSL } from './iridescence.js';
 import { ggxNamed } from '../../shared/light-terms.js';
-import { sheenAlbedoWGSL, sheenBrdfWGSL } from '../../shared/sheen.js';
+import { sheenAlbedoWGSL, sheenBrdfWGSL, sheenHalfWGSL } from '../../shared/sheen.js';
 const materialGgx = /* @__PURE__ */ ggxNamed('materialA2', 'materialNH', 'materialNV', 'materialNL');
 
 export interface LobeShaderConfig {
@@ -37,16 +37,22 @@ export interface LobeShaderConfig {
 // (ground (0.35, 0.3, 0.25), specular weight 0.5) is a Margo design choice. Transmitted share: the transmitted light is
 // in fresnel_mix's base (KHR_materials_transmission), so 1 - specular x max(F) (KHR_materials_specular) applies, under
 // the sheen scale 1 - max(sheen colour) E(n.v) (KHR_materials_sheen, its simplified form; on a thin wall l.n equals v.n).
+// Diffuse weight without a specular or film lobe (anisotropy alone): glTF 2.0 Appendix B mixes metal beside the
+// dielectric, whose diffuse takes 1 minus the dielectric Fresnel, 1 - (0.04 + 0.96 (1 - v.h)^5) (KB3240f); the specular
+// lobe keeps Schlick at the mixed F0, the same sum.
 export function lobeShader(
   config: LobeShaderConfig,
 ): Pick<MaterialExtension, 'wgsl' | 'declarations' | 'direct' | 'ambient' | 'output'> {
   const { sheen, specular, anisotropy, iridescence } = config,
     ior = config.ior ?? 1.5;
-  if (!Number.isFinite(Math.fround(ior)) || ior < 1)
-    throw new RangeError('Invalid lobe IOR; pass a finite index of refraction of at least 1.');
+  if (!Number.isFinite(Math.fround(ior)) || (ior < 1 && ior !== 0))
+    throw new RangeError(
+      'Invalid lobe IOR; pass a finite index of refraction of at least 1, or 0 for an infinite one.',
+    );
   // The untransmitted share of diffuse light (shared/pbr-transmission.js); the text stays unchanged without transmission.
   const diffuseShare = config.transmits ? '*(1.0-s.tr)' : '',
     composites = !!config.composites;
+  // ior 0 is KHR_materials_ior's infinite index: ((0 - 1) / (0 + 1))^2 = 1, the mode's Fresnel of 1.
   const dielectricF0 =
     ior === 1.5
       ? '0.04'
@@ -138,8 +144,8 @@ fn materialLobesFilmActive(material:MaterialLobeInputs)->bool {
   return material.iridescence.x>0.0&&material.iridescence.z>0.0&&material.iridescence.y!=1.0;
 }
 fn materialLobesDielectricF0(s:Surface,material:MaterialLobeInputs)->vec3f {return min(${composites ? 's.f0' : `vec3f(${dielectricF0})`}*material.specular.rgb,vec3f(1));}
-// KHR_materials_sheen BRDF and its albedo, shared with gltf-pro's physical shader (shared/sheen.js).
-${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenAlbedo')}fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInputs)->vec3f {
+// KHR_materials_sheen BRDF and its albedo, shared with gltf/pbr's physical shader (shared/sheen.js).
+${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenHalfWGSL('materialLobesSheenHalf')}${sheenAlbedoWGSL('materialLobesSheenAlbedo')}fn materialLobesDirect(i:Out,s:Surface,baseline:vec3f,material:MaterialLobeInputs)->vec3f {
   let materialSpecularActive=materialLobesSpecularActive(s,material);
   let materialFilmActive=materialLobesFilmActive(material);
   let materialSheenActive=any(material.sheen.rgb>vec3f(0));
@@ -171,7 +177,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
     let materialWeight=pow(1-materialVH,5.0);
     let materialBaseF0=mix(vec3f(0.04),s.base.rgb,s.metal);let materialBaseFresnel=materialBaseF0+(1-materialBaseF0)*materialWeight;
     var materialFresnel=materialBaseFresnel;
-    var materialDiffuse=(1-materialBaseFresnel)*(1-s.metal)${diffuseShare}*s.base.rgb/3.14159265;
+    var materialDiffuse=(0.96-0.96*materialWeight)*(1-s.metal)${diffuseShare}*s.base.rgb/3.14159265;
     if(materialSpecularActive||materialFilmActive){
       let materialDielectricF0=materialLobesDielectricF0(s,material);
       var materialDielectric=(materialDielectricF0+(1-materialDielectricF0)*materialWeight)*material.specular.a;
@@ -192,7 +198,7 @@ ${sheenBrdfWGSL('materialLobesSheenBRDF')}${sheenAlbedoWGSL('materialLobesSheenA
   if(materialSheenActive){
     let materialEnergy=max(materialLobesSheenAlbedo(materialNV,material.sheen.a),materialLobesSheenAlbedo(materialNL,material.sheen.a));
     let materialScale=max(0.0,1.0-materialLobesMax(material.sheen.rgb)*materialEnergy);
-    materialResult=materialResult*materialScale+material.sheen.rgb*materialLobesSheenBRDF(material.sheen.a,materialNL,materialNV,materialNH)*materialNL*f.radiance.rgb*f.light.w;
+    materialResult=materialResult*materialScale+material.sheen.rgb*materialLobesSheenBRDF(material.sheen.a,materialNL,materialNV,materialLobesSheenHalf(materialNV,materialNL,materialV,materialL))*materialNL*f.radiance.rgb*f.light.w;
   }
   return materialResult;
 }

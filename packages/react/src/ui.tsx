@@ -25,9 +25,9 @@ import type {
 } from '@margoengine/sprites';
 import type * as UiReact from '@margoengine/ui/react';
 import type { UiRootProps } from '@margoengine/ui/react';
-import { MargoError } from '@margoengine/math/errors';
 import { live, report, useCommit, useCreated, useLiveRef, useScene, type Scene } from './internal.js';
 import { optionalPeer } from './optional.js';
+import { fault } from '../../shared/errors.js';
 
 interface ErrorProps {
   /** Receives a failed load or attach, before the Canvas `onError`. */
@@ -111,7 +111,7 @@ export interface SoundProps extends ErrorProps {
  * A sound of `@margoengine/audio`, with the Canvas's one `AudioListener` following its camera. Inside a `<Mesh>` it is
  * positional and moves with the mesh. The ref is the `Audio` (or `PositionalAudio`).
  */
-export const Sound = forwardRef<AudioObject, SoundProps>(function Sound(props, ref) {
+export const Sound = /* @__PURE__ */ forwardRef<AudioObject, SoundProps>(function Sound(props, ref) {
   const scene = useScene(),
     registry = scene.registry,
     positional = props.positional ?? registry !== null,
@@ -119,7 +119,7 @@ export const Sound = forwardRef<AudioObject, SoundProps>(function Sound(props, r
     [loaded, setLoaded] = useState<AudioBuffer | null>(null);
   latest.current = props;
   if (positional && !registry)
-    throw new MargoError('state', 'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}.');
+    throw fault('state', 'A positional <Sound> follows a mesh; put it inside a <Mesh>, or set positional={false}', 'react-usage');
   const sound = useCreated<typeof AudioModule, { sound: AudioObject; release: () => void }>(
     scene,
     {
@@ -212,7 +212,7 @@ export const Sound = forwardRef<AudioObject, SoundProps>(function Sound(props, r
 
 // --------------------------------------------------------------------------------------------------------------- 2D
 
-const LayerContext = createContext<SpriteLayerObject | null>(null);
+const LayerContext = /* @__PURE__ */ createContext<SpriteLayerObject | null>(null);
 /** Props of {@link SpriteLayer}: the `@margoengine/sprites` layer options. */
 export interface SpriteLayerProps extends SpriteLayerOptions, ErrorProps {
   children?: ReactNode;
@@ -221,7 +221,7 @@ export interface SpriteLayerProps extends SpriteLayerOptions, ErrorProps {
  * A `@margoengine/sprites` layer on the Canvas engine: one instanced draw of its `<Sprite>` children at exact pixels.
  * `atlas` swaps in place; `camera`, `snap` and `ySort` are read each frame; other options recreate the layer.
  */
-export const SpriteLayer = forwardRef<SpriteLayerObject, SpriteLayerProps>(function SpriteLayer(
+export const SpriteLayer = /* @__PURE__ */ forwardRef<SpriteLayerObject, SpriteLayerProps>(function SpriteLayer(
   { children, onError, atlas, camera, snap, ySort, ...options },
   ref,
 ) {
@@ -237,7 +237,7 @@ export const SpriteLayer = forwardRef<SpriteLayerObject, SpriteLayerProps>(funct
       onError,
       ref,
     },
-    [options.order, options.layers, options.capacity, options.name, options.target, options.normals, options.clear],
+    [layerKey(options)],
   );
   useCommit(() => {
     if (!layer) return;
@@ -254,12 +254,32 @@ export const SpriteLayer = forwardRef<SpriteLayerObject, SpriteLayerProps>(funct
   }, [layer, atlas]);
   return <LayerContext.Provider value={layer}>{layer ? children : null}</LayerContext.Provider>;
 });
+/**
+ * The layer's creation options as one key: numbers, strings and tuples (the `clear` colour) by value, so an inline
+ * `clear={[0, 0, 0, 1]}` keeps the layer; objects (target, shader, normals, mask) by identity. Every option counts,
+ * so a new `filter`, `mipmaps`, `shader` or `mask` recreates the layer as documented.
+ */
+function layerKey(options: Record<string, unknown>): string {
+  return Object.keys(options)
+    .sort()
+    .map((name) => {
+      const value = options[name];
+      return `${name}=${
+        Array.isArray(value) && value.every((part) => typeof part !== 'object' && typeof part !== 'function')
+          ? `[${value.join(',')}]`
+          : value !== null && (typeof value === 'object' || typeof value === 'function')
+            ? identity(value)
+            : `${typeof value}:${String(value)}`
+      }`;
+    })
+    .join(';');
+}
 /** Props of {@link Sprite}: the fields of a `@margoengine/sprites` sprite. */
 export interface SpriteProps extends SpriteOptions {}
 /** One sprite of the enclosing `<SpriteLayer>`; props update its fields in place. The ref is the `Sprite`. */
-export const Sprite = forwardRef<SpriteObject, SpriteProps>(function Sprite(props, ref) {
+export const Sprite = /* @__PURE__ */ forwardRef<SpriteObject, SpriteProps>(function Sprite(props, ref) {
   const layer = useContext(LayerContext);
-  if (!layer) throw new MargoError('state', '<Sprite> draws in a layer; put it inside a <SpriteLayer>.');
+  if (!layer) throw fault('state', '<Sprite> draws in a layer; put it inside a <SpriteLayer>', 'react-usage');
   const [sprite, setSprite] = useState<SpriteObject | null>(null),
     latest = useRef(props);
   latest.current = props;
@@ -280,7 +300,7 @@ export const Sprite = forwardRef<SpriteObject, SpriteProps>(function Sprite(prop
 
 // ----------------------------------------------------------------------------------------------------------- SciViz
 
-const FigureContext = createContext<FigureObject | null>(null);
+const FigureContext = /* @__PURE__ */ createContext<FigureObject | null>(null);
 /** Props of {@link Figure}: the `@margoengine/sciviz` figure options. */
 export interface FigureProps extends FigureOptions, ErrorProps {
   /** Axes and labels are drawn (`figure.ready()` resolved). */
@@ -291,7 +311,7 @@ export interface FigureProps extends FigureOptions, ErrorProps {
  * A `@margoengine/sciviz` figure on the Canvas engine, with its plot children (`ScatterPlot`, `LinePlot`,
  * `SurfacePlot`). The camera stays the Canvas's. Changed options (compared by value) recreate the figure. WebGPU only.
  */
-export const Figure = forwardRef<FigureObject, FigureProps>(function Figure(
+export const Figure = /* @__PURE__ */ forwardRef<FigureObject, FigureProps>(function Figure(
   { children, onError, onReady, ...options },
   ref,
 ) {
@@ -334,7 +354,7 @@ function usePlot<L extends Layer>(
     errors = useRef(onError);
   build.current = make;
   errors.current = onError;
-  if (!figure) throw new MargoError('state', `<${name}> plots into a figure; put it inside a <Figure>.`);
+  if (!figure) throw fault('state', `<${name}> plots into a figure; put it inside a <Figure>`, 'react-usage');
   useCommit(() => {
     let closed = false,
       made: L | undefined;
@@ -366,7 +386,7 @@ export interface ScatterPlotProps extends ErrorProps {
   options?: ScatterLayerOptions;
 }
 /** `figure.scatter(data, options)` of the enclosing `<Figure>`. The ref is the layer. */
-export const ScatterPlot = forwardRef<ScatterLayer, ScatterPlotProps>(function ScatterPlot(
+export const ScatterPlot = /* @__PURE__ */ forwardRef<ScatterLayer, ScatterPlotProps>(function ScatterPlot(
   { data, options, onError },
   ref,
 ) {
@@ -379,7 +399,7 @@ export interface LinePlotProps extends ErrorProps {
   options?: LineLayerOptions;
 }
 /** `figure.line(data, options)` of the enclosing `<Figure>`. The ref is the layer. */
-export const LinePlot = forwardRef<LineLayer, LinePlotProps>(function LinePlot({ data, options, onError }, ref) {
+export const LinePlot = /* @__PURE__ */ forwardRef<LineLayer, LinePlotProps>(function LinePlot({ data, options, onError }, ref) {
   usePlot('LinePlot', (figure) => figure.line(data, options), [data, byValue(options)], ref, onError);
   return null;
 });
@@ -389,7 +409,7 @@ export interface SurfacePlotProps extends ErrorProps {
   options?: SurfaceLayerOptions;
 }
 /** `figure.surface(z, options)` of the enclosing `<Figure>`. The ref is the layer. */
-export const SurfacePlot = forwardRef<SurfaceLayer, SurfacePlotProps>(function SurfacePlot(
+export const SurfacePlot = /* @__PURE__ */ forwardRef<SurfaceLayer, SurfacePlotProps>(function SurfacePlot(
   { z, options, onError },
   ref,
 ) {

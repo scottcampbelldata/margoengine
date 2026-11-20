@@ -28,7 +28,12 @@ for (const compat of [false, true]) {
       check(JSON.stringify(demo.selection.rowIds) === JSON.stringify(expected), 'axis brushes intersect by keyed rows');
       const brushed = await Promise.all([pixels(demo.parallel), pixels(demo.matrix)]);
       check(before.every((v, i) => v.hash !== brushed[i].hash), 'shared brushing changes both rendered plots');
+      // The accessible range inputs follow brushes made elsewhere (pointer, code, undo), not only axis edits.
+      const rangeInputs = (name) => [...document.querySelectorAll('#controls fieldset')].find((f) => f.querySelector('legend').textContent === (demo.parallel.data.axes.find((a) => a.column === name).label ?? name)).querySelectorAll('input');
+      check([...rangeInputs('period')].map((i) => Number(i.value)).join() === '1,20', 'the period inputs show the period brush');
+      check([...rangeInputs('radius')].map((i) => Number(i.value)).join() === '1,3', 'the radius inputs show the radius brush');
       demo.selection.undo(); check(demo.selection.rowIds.length > expected.length, 'shared undo restores the prior brush');
+      check([...rangeInputs('radius')].map((i) => Number(i.value)).join() === demo.parallel.data.domains[demo.parallel.data.axes.findIndex((a) => a.column === 'radius')].join(), 'undo returns the radius inputs to the full domain');
       // KB5700c: the undone radius range must not come back with the next period gesture.
       demo.parallel.brush('period', [1, 25]);
       const periodOnly = demo.parallel.data.rowIds.filter((_, i) => { const p = demo.table.value('period', i); return p >= 1 && p <= 25; });
@@ -54,6 +59,12 @@ for (const compat of [false, true]) {
       const density = await pixels(demo.parallel); check(density.hash !== reordered.hash && density.ink > 100, 'density mode draws counts');
       demo.parallel.lines(); const restoredLines = await pixels(demo.parallel); check(restoredLines.hash === reordered.hash, 'line mode restores original geometry');
       demo.parallel.figure.layers[0].restore(); check((await pixels(demo.parallel)).hash === reordered.hash, 'resource restoration preserves row geometry');
+      // The page's accessibility panel makes the canvas parent a containing block whenever its scan attaches. A change
+      // like that between the frame and its read-back must not move the tick labels off the frame in toPNG.
+      const host = document.querySelector('#parallel').parentElement, position = host.style.position, render = demo.parallel.figure.render;
+      demo.parallel.figure.render = function () { render.call(this); setTimeout(() => { host.style.position = getComputedStyle(host).position === 'static' ? 'relative' : 'static'; }); };
+      const moved = await pixels(demo.parallel); delete demo.parallel.figure.render; host.style.position = position;
+      check(moved.hash === reordered.hash, 'a layout change during capture keeps the labels where the frame drew them');
       // Two million physical rows, repeating the public observations; no sampling or expanded line-endpoint arrays.
       const rows = 2000000, columns = {};
       for (const name of ['period', 'radius', 'uncertainty']) columns[name] = Float32Array.from({ length: rows }, (_, i) => Number(demo.table.value(name, i % demo.table.length)));

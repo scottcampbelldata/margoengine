@@ -1,5 +1,5 @@
 // Execute the original Node README setup and load, then inspect the actual full model and rendered pixels.
-// Run after building packages, through scripts/gpu-lock.mjs. No browser, mocked GPU or replacement model.
+// Run after building packages. No browser, mocked GPU or replacement model.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';

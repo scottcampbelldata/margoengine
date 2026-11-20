@@ -1,6 +1,5 @@
-// Real-GPU check of VolumetricFog (`@margoengine/environment/volumetric`). Run on AC power, holding the GPU lock, after
+// Real-GPU check of VolumetricFog (`@margoengine/environment/volumetric`). Run on AC power, after
 // npm run build:packages:  node examples/package-benchmarks/volumetric-gpu.mjs [--no-timing]
-// gpu-lock: correctness with --no-timing
 // At 4x and 1x MSAA (Tonemap capture, 1280x720, volumetric.html):
 // 1. Light shafts: the wall left of the slit (rays cross the sunlit shaft) against the wall right of it (rays stay in
 //    the wall's shadow), slit open vs plugged; perspective and orthographic.
@@ -65,7 +64,7 @@ const luma = (image, [x, y], r = 2) => {
 const mean = (image, points) => points.reduce((s, p) => s + luma(image, p), 0) / points.length;
 const project = (points) => page.evaluate((p) => window.check.project(p), points);
 const round = (v) => +v.toFixed(3),
-  deferred = []; // flicker asserts run after the timings, so one GPU slot yields both
+  deferred = []; // flicker asserts run after the timings, so one run yields both
 try {
   for (const samples of [4, 1]) {
     await open(samples === 1 ? '?samples=1' : '');

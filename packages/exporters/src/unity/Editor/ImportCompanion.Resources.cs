@@ -30,13 +30,19 @@ namespace MargoMesh.Unity.Editor {
             }
         }
 
+        /// <summary>The main object name Unity expects for the native asset file <paramref name="file"/>: its file name without the extension.</summary>
+        internal static string MainObjectName(string file) => System.IO.Path.GetFileNameWithoutExtension(file);
+
         /// <summary>Saves <paramref name="value"/> as the owned asset <paramref name="name"/>, updating an existing one in place.</summary>
+        /// <remarks>A single-object native file (AssetDatabase.CreateAsset) has that object as its main asset, and Unity
+        /// warns "Main Object Name ... does not match filename" when its name differs from the file name, so the saved
+        /// object takes the file name. The glTF clip name stays on the controller state, where users pick the clip.</remarks>
         static T Save<T>(T value, string source, string name, Owner owner) where T : Object {
             CheckName(source, owner, name, typeof(T));
             string path = OutputPath(source, name);
             value.hideFlags = HideFlags.None;
             var existing = AssetDatabase.LoadAssetAtPath<T>(path);
-            string displayName = value.name;
+            string displayName = MainObjectName(name);
             if (existing == null) {
                 AssetDatabase.CreateAsset(value, path);
                 existing = value;
@@ -266,7 +272,7 @@ namespace MargoMesh.Unity.Editor {
                 var clip = resources.clips[i];
                 var policy = p.data.clips[i];
                 RequireOwned(clip, source, owner, ClipFile(i), typeof(AnimationClip));
-                ImportProfile.Require(clip.name == policy.name && clip.frameRate == policy.fps && AnimationUtility.GetAnimationClipSettings(clip).loopTime == policy.loop && !clip.legacy,
+                ImportProfile.Require(clip.name == MainObjectName(ClipFile(i)) && clip.frameRate == policy.fps && AnimationUtility.GetAnimationClipSettings(clip).loopTime == policy.loop && !clip.legacy,
                     "Saved native animation metadata differs.");
             }
             RequireSourceIdentity(p, owner);

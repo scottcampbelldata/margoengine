@@ -171,7 +171,7 @@ export class CompatXRBinding {
     for (const eye of layer.drawn) {
       const { x, y, width, height } = eye.target as Viewport;
       replayer.helperState(helper, width, height);
-      s.set('viewport', `${x},${y},${width},${height}`, () => gl.viewport(x, y, width, height));
+      s.viewport(x, y, width, height);
       s.unit(0, gl.TEXTURE_2D, (eye.color as CompatTexture).texture, null);
       gl.uniform4i(helper.offset, x, y, width, height);
       gl.drawArrays(gl.TRIANGLES, 0, 3);

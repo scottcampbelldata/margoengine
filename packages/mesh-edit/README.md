@@ -93,7 +93,8 @@ console.log(beveled.mesh.faces.length, slid.mesh.faces.length, welded.welded, br
 - `dissolveMeshComponents(mesh, {mode: 'edge' | 'vertex' | 'face', ...})`: merges faces across the selection without
   leaving a hole. Because faces stay planar, only coplanar faces merge; an edge on a fold is kept and reported, so the
   shape never changes. A two-edge vertex is removed from its faces. A region that would enclose a hole or touch
-  itself throws `MargoError` code `unsupported`. Concave merges are split into convex pieces (the first keeps the ID).
+  itself, or whose border has over 4096 corners (the most the convex splitter takes), throws `MargoError` code
+  `unsupported`. Concave merges are split into convex pieces (the first keeps the ID).
 - `weldMeshVertices(mesh, {distance = 0.0001, vertices})`: merge by distance without chaining (each kept vertex
   absorbs later ones within `distance` of itself). Collapsed faces are removed and named in `diagnostics`; faces made
   nonplanar or concave are split into valid pieces.
@@ -188,7 +189,7 @@ console.log(mesh.faces.length, part.mesh.faces.length);
 
 - `smoothMesh(mesh, {method, iterations, factor, passBand, vertices, pinBoundary, signal})` returns a `MeshEditResult`.
 - `method`: `'taubin'` (default; Taubin, 1995) follows each step with a negative one, so the shape does not shrink. `'laplacian'` only pulls each vertex toward its neighbors, and the shape shrinks.
-- `iterations` is 1 to 10000 (default 10). `factor` is above 0 and at most 1 (default 0.5). `passBand` is between 0 and 1 (default 0.1): details below that frequency survive, so a larger value smooths harder.
+- `iterations` is 1 to 10000 (default 10). `factor` is above 0 and at most 1 (default 0.5). `passBand` is between 0 and 1 (default 0.1): details below that frequency survive, so a larger value smooths harder. Taubin smoothing also needs a stable filter, |(1 - 2 factor)(1 - 2 mu)| <= 1 at the top frequency (mu from 1/factor + 1/mu = passBand), so it throws a `RangeError` for a factor above about 0.7 at the default pass band, where each pass would amplify noise instead of removing it.
 - `vertices` limits the moves to a selection. `pinBoundary` (default true) holds open edges still, so a surface keeps its outline.
 - Neighbors weigh equally, so a mesh with uneven triangles drifts a little along its surface. Run `remeshMesh` first on very uneven scans. Corner UVs stay, and a face the move warps is split into valid convex pieces (`id~t1`, ...).
 ## Hole filling
@@ -307,7 +308,7 @@ console.log(mesh.vertices.length, Object.keys(faceMap).length);
 - `new MeshModifierStack(base, modifiers)` copies the base. Set `stack.base` to a new mesh after an edit. `add(modifier, index)`, `update(index, changes)`, `remove(index)` and `move(from, to)` change the list; `evaluate()` returns a `MeshEditResult` whose `vertexMap` and `faceMap` lead back to the base; `apply()` bakes the result into the base and empties the list. `applyMeshModifiers(mesh, modifiers)` is the same as a one-off call.
 - Face IDs are built from base IDs (`id~m`, `id~a2`, `id~s`), so a re-run names each face the same way and selections survive. Any modifier takes `enabled: false` to switch off without being removed.
 - `{type: 'mirror', axis = 'x', origin = 0, merge = 1e-6}`: reflects across the plane, reversing the copy's winding so it faces out. Vertices within `merge` of the plane move onto it and join both halves; faces wholly on it are dropped, so an open half closes. `merge: 0` keeps the halves apart.
-- `{type: 'array', count = 2, offset, relativeOffset, merge = 0}`: `count` copies, the original included, each `offset` plus `relativeOffset` times the bounding box size further on. With neither given the step is one box width along X. `merge` welds touching neighbors with `weldMeshVertices`.
+- `{type: 'array', count = 2, offset, relativeOffset, merge = 0}`: `count` copies, the original included, each `offset` plus `relativeOffset` times the bounding box size further on. With neither given the step is one box width along X. `merge` welds vertices of neighboring copies that close together (merge by distance, without chaining); close vertices inside one copy, such as the two sides of a thin slot, stay apart.
 - `{type: 'solidify', thickness = 0.1, offset = -1, even = true}`: a second shell with reversed winding, and rim faces along open edges. `offset` -1 puts the wall behind the surface, 0 centers it, 1 puts it in front. `even` keeps the thickness at corners. Walls thicker than a concave part's radius fold over themselves: nothing detects that.
 - `{type: 'screw', axis = 'y', origin = [0, 0, 0], angle = 2 pi, steps = 16, height = 0}`: sweeps a surface profile around the axis, climbing `height` over the whole sweep. Open edges make the walls; a sweep that does not close gets the profile as its end caps; a full turn with no `height` closes on itself and leaves no caps. Vertices on the axis stay shared. `PolygonMesh` has no loose edges, so the profile is a surface, not a wire.
 - `{type: 'lattice', min, max, resolution, points}`: free-form deformation (Sederberg and Parry, 1986) with Bernstein weights. Start from `latticePoints(min, max, resolution)`, which changes nothing, and move points. Vertices outside the box stay where they are.
@@ -393,11 +394,11 @@ console.log(session.mesh().faces.length);
 - `brush`: `'draw'` (default) pushes along the brush's average normal, `'inflate'` along each vertex's own normal, `'smooth'` toward neighbors, `'crease'` sinks and pinches toward the center, and `'grab'` holds the vertices under its first dab and drags them with the pointer. `invert` pushes the other way.
 - `radius` (default 0.25), `strength` 0 to 1 (default 0.5), `falloff` `'smooth'` (default), `'linear'`, `'sharp'` or `'constant'`, and `symmetry` `'x'`, `'y'` or `'z'` to repeat each dab across that plane through the origin. All can be set per stroke in `beginStroke`.
 - `pick(origin, direction)` returns the nearest `{point, normal, distance}`. A hash grid finds the triangles along the ray and the vertices under a brush, so a pick and a dab cost what the ray and the brush touch, whatever the size of the mesh. `session.stats` says how much the last pick and dab visited.
-- `dynamicTopology` splits and collapses edges under the brush to hold `detailSize` (default the mean edge length), so a long pull does not stretch triangles. Corner UVs interpolate. For `grab` this runs once at the end of the stroke, since it holds fixed vertices.
+- `dynamicTopology` splits and collapses edges under the brush to hold `detailSize` (default the mean edge length), so a long pull does not stretch triangles. Corner UVs interpolate. For `grab` this runs once at the end of the stroke, since it holds fixed vertices, over every vertex the grab moved wherever the drag took it, splitting until no edge there is longer than 4/3 of `detailSize`.
 - Each stroke is one undo step, `undoLimit` of them (default 32). A step stores only what the stroke changed: vertices, triangles and sharp edges.
 - A session takes up to 200,000 vertices and faces, like every mesh-edit mesh.
 
-Draw it while it changes with `@margoengine/mesh-edit/sculpt-view`, which needs `@margoengine/core` and `@margoengine/gltf-pro`. Each frame uploads only the vertices the brush moved; when triangles change (dynamic topology, or undoing it) the whole mesh is rewritten.
+Draw it while it changes with `@margoengine/mesh-edit/sculpt-view`, which needs `@margoengine/core` and `@margoengine/gltf/pbr`. Each frame uploads only the vertices the brush moved; when triangles change (dynamic topology, or undoing it) the whole mesh is rewritten.
 
 ```ts
 import { Engine } from 'margoengine/core';
@@ -420,9 +421,9 @@ if (hit) {
 console.log(view.stats.uploadedVertices);
 ```
 
-- `SculptView.attach(engine, session, {material})` draws the session as `view.model`, a gltf-pro model, with a matte clay material by default (`material` takes a glTF material). The view owns the model; `dispose()` removes it and leaves the session usable. Normals are smooth, area-weighted over each vertex's faces.
+- `SculptView.attach(engine, session, {material})` draws the session as `view.model`, a gltf/pbr model, with a matte clay material by default (`material` takes a glTF material). The view owns the model; `dispose()` removes it and leaves the session usable. Normals are smooth, area-weighted over each vertex's faces.
 - `view.stats` counts `uploadedVertices` and whole-mesh `rewrites`.
-- `session.drawing()` gives the same buffers without gltf-pro: `vertices` (20 floats a vertex, gltf-pro's prepared layout) and `indices`, and `update()` returns the vertex ranges that changed, or `'all'` when triangles did.
+- `session.drawing()` gives the same buffers without gltf/pbr: `vertices` (20 floats a vertex, gltf/pbr's prepared layout) and `indices`, and `update()` returns the vertex ranges that changed, or `'all'` when triangles did.
 ## Baking maps from a detailed mesh
 
 Keep the look of a detailed mesh on a simplified one: bake its normals, ambient occlusion and colour into textures laid out by the low mesh's UVs.
@@ -449,7 +450,7 @@ Each covered texel casts one ray along the low surface's smooth normal, through 
 | `width`, `height` | 512, the width | Texels, 1 to 8192 |
 | `maps` | `['normal']` | Any of `'normal'`, `'ao'`, `'color'` |
 | `distance` | 5% of the high mesh's size | Ray search each way from the low surface |
-| `color` | none | Image read at the high mesh's UVs, or a function of the hit; needed for `'color'` |
+| `color` | none | Image read at the high mesh's UVs (nearest texel, repeating outside 0 to 1 as glTF's default sampler does), or a function of the hit; needed for `'color'` |
 | `aoRays` | 32 | Cosine-weighted rays per texel, 1 to 1024 |
 | `aoDistance` | the high mesh's size | Hits farther away do not occlude |
 | `padding` | 4 | Texels grown out of each island, 0 to 64, so filtering stays off the background |
@@ -582,7 +583,7 @@ console.log(mesh.faces.length, tiles.merged, diagnostics);
   uv = 'auto', unwrap, signal})`. For an OBJ, pass `parseOBJ`'s (`margoengine/loaders`) `positions`, `uvs`,
   `indices`, `faceSizes` and `positionIndices`: polygons are rebuilt from their fans and positions rejoined exactly.
   Otherwise positions within `weld` (default 0, identical only) are joined, which rejoins vertices split at UV seams;
-  corner UVs never weld. Polygons with repeated or crossing corners or no area are dropped, concave or nonplanar ones
+  corner UVs never weld. Polygons with repeated or crossing corners or no area are dropped, concave, nonplanar or over-64-corner ones
   split into convex faces (both counted in `diagnostics`). `uv: 'auto'` keeps the source UVs when all are within 0 to
   1 and unwraps with `unwrapMesh` otherwise (missing or tiling UVs); `'keep'` throws instead; `'unwrap'` always
   unwraps. Face IDs are `f<index>` of the source polygon, so they are stable between imports; `sourceFaces` maps each

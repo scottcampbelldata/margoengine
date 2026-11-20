@@ -5,7 +5,8 @@
 // that draws the skinned triangles from an atlas with exact texels. Skinning runs on the CPU, so it also runs in Node.
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
-import { atlasTexture } from '../../shared/atlas-texture.js';
+import { borrowedAtlas } from '../../shared/atlas-texture.js';
+import { type BorrowSlot, borrow, fix } from '../../shared/borrowed.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
 import type { SpriteAtlas } from './index.js';
@@ -568,7 +569,7 @@ export class SkeletalLayer implements EnginePlugin {
   private readonly order: number;
   private readonly layerMask: number;
   private atlas: SpriteAtlas;
-  private stale = false;
+  private slot!: BorrowSlot<GPUTexture, SpriteAtlas>;
   private engine?: Engine;
   private device?: GPUDevice;
   private texture?: { texture: GPUTexture; owned: boolean };
@@ -600,6 +601,7 @@ export class SkeletalLayer implements EnginePlugin {
     const order = options.order ?? 10;
     if (!Number.isFinite(order)) throw rangeError('Invalid skeletal order', 'sprite-options');
     this.atlas = options.atlas;
+    this.slot = borrow(options.atlas, 'SkeletalLayer atlas', 'setAtlas');
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.order = order;
     this.layerMask = checkLayers(options.layers ?? 1, 'SkeletalLayer layers');
@@ -669,6 +671,7 @@ export class SkeletalLayer implements EnginePlugin {
         this.disposed ? 'disposed' : 'webgpu',
       );
     this.engine = engine;
+    fix(this.slot, engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
@@ -682,8 +685,7 @@ export class SkeletalLayer implements EnginePlugin {
     if (delta > 0) this.states.prune();
   }
   onDeviceRestored(): void {
-    // A caller's plain GPUTexture went with the device; bytes, bitmaps and functions come back by themselves.
-    this.stale = !!this.texture && typeof this.atlas !== 'function' && 'createView' in this.atlas;
+    // A caller's plain GPUTexture is reported once at its next use (shared/borrowed.js); the rest comes back by itself.
     this.release();
   }
   /** Replaces the atlas; mesh texels are read from it next frame. */
@@ -692,7 +694,7 @@ export class SkeletalLayer implements EnginePlugin {
     if (this.texture?.owned) this.texture.texture.destroy();
     this.texture = undefined;
     this.atlas = atlas;
-    this.stale = false;
+    this.slot = borrow(atlas, 'SkeletalLayer atlas', 'setAtlas', this.engine?.gpu);
     this.generation++;
   }
   dispose(): void {
@@ -809,8 +811,10 @@ export class SkeletalLayer implements EnginePlugin {
       if (this.device) this.release();
       this.device = device;
     }
-    if (this.stale) throw fault('state', 'Skeletal atlas lost with the device; call setAtlas', 'sprite-state');
-    this.texture ??= atlasTexture(device, this.atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
+    this.texture ??= borrowedAtlas(this.slot, device, this.engine, () =>
+      rangeError('Invalid sprite pixels', 'sprite-options'),
+    );
+    if (!this.texture) return;
     if (!this.layout) {
       this.layout = device.createBindGroupLayout({
         entries: [

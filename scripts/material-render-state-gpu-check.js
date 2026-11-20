@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-// Parallel worktrees supply their shared adapter lock using MARGO_GPU_LOCK.
-const release = await acquire({ owner: 'material-render-state-gpu-check' }),
-  output = 'test-results/material-render-state',
+const output = 'test-results/material-render-state',
   report = { checks: [], failures: [], captures: [] },
   points = [
     [80, 120],
@@ -666,5 +663,4 @@ try {
   );
   await browser?.page.evaluate(() => window.renderStateFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

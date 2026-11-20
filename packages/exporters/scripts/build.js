@@ -7,31 +7,34 @@ import { resolve } from 'node:path';
 import { build } from 'vite';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
+import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
 
 // Plain TypeScript emit keeps one module per exporter, so a consumer bundler drops the formats it does not import.
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
-await rm(resolve(root, 'dist'), { recursive: true, force: true });
+// build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
+const dist = distDir(root);
+await rm(dist, { recursive: true, force: true });
 await copyLegal(root);
 execFileSync(process.execPath, [resolve(root, 'scripts/generate-unity-support.js')], { stdio: 'inherit' });
 execFileSync(
   process.execPath,
-  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', resolve(root, 'tsconfig.json')],
+  [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],
   { stdio: 'inherit' },
 );
 // Ship the small registry with the package. Its global symbol shares identity
 // with the loader even when the two packages were built independently.
-await copyFile(resolve(repository, 'packages/shared/mesh-source.js'), resolve(root, 'dist/mesh-source.js'));
-const scene = resolve(root, 'dist/scene.js');
+await copyFile(resolve(repository, 'packages/shared/mesh-source.js'), resolve(dist, 'mesh-source.js'));
+const scene = resolve(dist, 'scene.js');
 await writeFile(scene, (await readFile(scene, 'utf8')).replace('../../shared/mesh-source.js', './mesh-source.js'));
 // The untrusted-JSON parser ships the same way (splitGLB parses caller files with it).
-await copyFile(resolve(repository, 'packages/shared/json.js'), resolve(root, 'dist/json.js'));
-const glb = resolve(root, 'dist/glb.js');
+await copyFile(resolve(repository, 'packages/shared/json.js'), resolve(dist, 'json.js'));
+const glb = resolve(dist, 'glb.js');
 await writeFile(glb, (await readFile(glb, 'utf8')).replace('../../shared/json.js', './json.js'));
 // The writers share one CRC-32, shipped beside them.
-await copyFile(resolve(repository, 'packages/shared/crc32.js'), resolve(root, 'dist/crc32.js'));
+await copyFile(resolve(repository, 'packages/shared/crc32.js'), resolve(dist, 'crc32.js'));
 for (const name of ['archive', 'usdz-write', 'png']) {
-  const file = resolve(root, `dist/${name}.js`);
+  const file = resolve(dist, `${name}.js`);
   await writeFile(file, (await readFile(file, 'utf8')).replace('../../shared/crc32.js', './crc32.js'));
 }
 // The worker replaces tsc's module emit with one self-contained classic script, so it can importScripts the wrappers.
@@ -40,7 +43,7 @@ await build({
   publicDir: false,
   logLevel: 'warn',
   build: {
-    outDir: resolve(root, 'dist'),
+    outDir: dist,
     emptyOutDir: false,
     minify: true,
     target: 'es2022',
@@ -53,9 +56,9 @@ await build({
   },
 });
 // One lazy clean-room Basis feature, with no third-party encoder wrapper.
-await mkdir(resolve(root, 'dist/basis-encoder'), { recursive: true });
-await copyFile(resolve(root, 'src/draco-native-encoder.wasm'), resolve(root, 'dist/draco-native-encoder.wasm'));
-await copyFile(resolve(root, 'native/basis/margo_basis_encoder.wasm'), resolve(root, 'dist/basis-encoder/margo_basis_encoder.wasm'));
+await mkdir(resolve(dist, 'basis-encoder'), { recursive: true });
+await copyFile(resolve(root, 'src/draco-native-encoder.wasm'), resolve(dist, 'draco-native-encoder.wasm'));
+await copyFile(resolve(root, 'native/basis/margo_basis_encoder.wasm'), resolve(dist, 'basis-encoder/margo_basis_encoder.wasm'));
 await packageDeclarations(root);
 // Ship the packages/shared modules the emitted JavaScript imports inside dist.
 await packageRuntime(root);

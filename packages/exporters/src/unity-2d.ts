@@ -48,6 +48,23 @@ const internalIdOf = (name: string): string =>
   (BigInt(`0x${hashOf(`margoengine:unity-2d-id:${name}`).slice(0, 16)}`) >> 1n).toString();
 const yamlName = (text: string): string => JSON.stringify(text);
 const round = (value: number): number => +value.toFixed(6);
+/**
+ * A name that becomes one file under `Assets/<folder>/`, or an asset the Editor C# creates: no folder part, none of the
+ * characters Windows refuses in a file name, no trailing dot or space and no reserved device name. A Tiled image
+ * source such as `../art/ground.png` would otherwise write outside the bundle.
+ */
+const plainName = (kind: string, name: unknown): string => {
+  if (
+    typeof name !== 'string' ||
+    !/^[^\\/:*?"<>|\u0000-\u001f]+$/.test(name) ||
+    /^\.+$|[. ]$/.test(name) ||
+    /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$/i.test(name)
+  )
+    throw new RangeError(
+      `Unity ${kind} ${JSON.stringify(name)} is not a plain file name; rename it without folders or \\ / : * ? " < > |`,
+    );
+  return name;
+};
 
 interface MetaSprite {
   name: string;
@@ -342,7 +359,8 @@ namespace MargoExport.${space}
  * });
  * console.log(files.map((file) => file.name));
  * ```
- * @throws RangeError for a bad folder or scale, a missing image, a bad clip, an image-collection tileset, or a point or
+ * @throws RangeError for a bad folder or scale, a missing image, a bad clip, an image-collection tileset, a page image,
+ * tileset image, tileset or clip name that is not a plain file name, two images with one file name, or a point or
  * polyline collision.
  */
 export function createUnity2DBundle(options: Unity2DOptions): Unity2DFile[] {
@@ -365,6 +383,8 @@ export function createUnity2DBundle(options: Unity2DOptions): Unity2DFile[] {
   if (!manifest && !map) throw new RangeError('createUnity2DBundle needs a manifest or a map; pass at least one');
   const files: Unity2DFile[] = [],
     add = (name: string, data: Uint8Array | string, meta: (path: string) => string): void => {
+      if (files.some((file) => file.name.toLowerCase() === name.toLowerCase()))
+        throw new RangeError(`Unity export writes ${name} twice; give each page and tileset its own image file`);
       files.push({ name, data }, { name: `${name}.meta`, data: meta(`${folder}/${name}`) });
     },
     pageOf = new Map<string, string>(),
@@ -391,9 +411,10 @@ export function createUnity2DBundle(options: Unity2DOptions): Unity2DFile[] {
           border: borders[name],
         });
       }
-      add(image, pages[page], (path) => spriteMeta(path, pixelsPerUnit, sprites));
+      add(plainName('page image', image), pages[page], (path) => spriteMeta(path, pixelsPerUnit, sprites));
     });
     data.clips = Object.entries(clips).map(([name, clip]) => {
+      plainName('clip name', name);
       const seconds = clipSeconds(name, clip, manifest.frames);
       return {
         name,
@@ -418,6 +439,8 @@ export function createUnity2DBundle(options: Unity2DOptions): Unity2DFile[] {
         }),
       }));
     for (const set of tilesets) {
+      plainName('tileset name', set.name);
+      plainName('tileset image', set.image!.source);
       const image = tilesetImages[set.image!.source] ?? tilesetImages[set.name];
       if (!image) throw new RangeError(`Tileset ${set.name} has no image; pass its PNG in tilesetImages by name`);
       const { tileWidth: w, tileHeight: h, margin = 0, spacing = 0, columns, tiles: defs = [] } = set,

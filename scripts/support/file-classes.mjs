@@ -47,9 +47,8 @@ export const CHECK_CODE = [
 ];
 
 /**
- * The GPU package runner: it plans, limits, locks and heat-guards the tests but does not change what a test draws
- * (pinned by tests/heat-containment.test.js, tests/gpu-timing-lock.test.js, tests/voxel-pathtracer-gpu-split.test.js),
- * so a change here runs RUNNER_SMOKE (scripts/gpu-package-tests.mjs) plus every test the change affects otherwise.
+ * The GPU package runner: it plans, limits and heat-guards the tests but does not change what a test draws (pinned
+ * by tests/heat-containment.test.js and tests/voxel-pathtracer-gpu-split.test.js), so a change here runs RUNNER_SMOKE (scripts/gpu-package-tests.mjs) plus every test the change affects otherwise.
  */
 export const RUNNER = [
   'scripts/gpu-package-tests.mjs',
@@ -142,6 +141,40 @@ export function classify(raw, { workspaces = [], checkCode = CHECK_CODE } = {}) 
   if (file.startsWith('examples/assets/')) return { cls: 'asset' };
   if (SCRIPT_DIRS.test(file)) return { cls: 'script' };
   return { cls: 'unknown', reason: `cannot classify ${file}` };
+}
+
+/**
+ * Documents (and recorded results under docs/) that a package's own tests or its build read, by package directory. A
+ * change to one counts as a change to that package's CPU tests only (docReaderPackages, planFiles `scope.unitTests`):
+ * the document stays inert for every GPU step and for the dependents. A document no package reads stays inert whole.
+ * Declare a document here in the same commit that makes a package test or build read it (tests/file-classes.test.js
+ * fails on a read of docs/ that no entry here names).
+ */
+export const DOC_READERS = {
+  // build-corpus.mjs turns each parity matrix page and its "Coming from" guide into dist/porting.json; porting.test.js
+  // asserts on the rows, docs-rows.test.js on the limits page.
+  mcp: [/^docs\/(from-[\w-]+|[\w-]*parity[\w-]*|limits)\.md$/],
+  audio: [/^docs\/whitepaper\/claims\.md$/],
+  biomes: [/^packages\/biomes\/docs\/disturbance\.md$/],
+  exporters: [/^docs\/limits\.md$/],
+  mixer: [
+    /^docs\/(api-surface|clean-room|known-bugs|limits)\.md$/,
+    /^docs\/whitepaper\/(claims|reproduce|build-record)\.md$/,
+  ],
+  pixel: [/^docs\/architecture\/operational-playbook\.md$/],
+  react: [/^docs\/react-(cookbook|from-r3f|integration|r3f)\.md$/],
+  rigging: [/^docs\/whitepaper\/results\/batch213-[\w-]+\.json$/],
+  vfx: [/^docs\/whitepaper\/(build-record|claims)\.md$/, /^docs\/(architecture\/operational-playbook|limits)\.md$/],
+};
+
+/** Package directories (names under packages/) whose tests or build read one of `files`, sorted. */
+export function docReaderPackages(files) {
+  const found = new Set();
+  for (const raw of files) {
+    const file = posix(raw);
+    for (const [dir, patterns] of Object.entries(DOC_READERS)) if (patterns.some((re) => re.test(file))) found.add(dir);
+  }
+  return [...found].sort();
 }
 
 /** The one-line fix for a file the map cannot place (the class gate prints it). */

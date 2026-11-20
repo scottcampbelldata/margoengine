@@ -7,7 +7,7 @@
 // order, and alpha blending (alpha 0.5, in draw order) gives the same mix for every split.
 // A "collapsed" pixel stores the same value in its four samples although the CPU's four values differ: its samples
 // were replaced by their mean. Samples within 0.001 px of a rectangle edge are left out (rasterization ties).
-//   node scripts/gpu-lock.mjs run --max=8 --owner=<you> -- node scripts/gpu-blend-passes.mjs [--adapter=d3d11]
+//   node scripts/run-with-timeout.mjs --max=8 -- node scripts/gpu-blend-passes.mjs [--adapter=d3d11]
 import { serve } from '../bench/lib/browser.mjs';
 import { launchBrowser } from './lib/browser.mjs';
 

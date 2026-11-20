@@ -14,6 +14,7 @@ import {
   mergeGroup,
 } from './boolean.js';
 import { assertOptions } from './edit-support.js';
+import { indexOfLeast } from './least.js';
 import { assertPolygonMesh, dominantAxis, faceGeometryError, newellNormal } from './polygon.js';
 import { convexLoopPieces } from './polygon-split.js';
 import type { PolygonMesh } from './types.js';
@@ -751,7 +752,7 @@ function repairLoops(
         snap = 4 * validityEpsilon(corners),
         { length, along, height } = chordOf(corners),
         sides = corners.map((p, c) => distance(p, corners[(c + 1) % n])),
-        shortest = sides.indexOf(Math.min(...sides));
+        shortest = indexOfLeast(sides);
       if (sides[shortest] <= snap * length || round >= FOLD_ROUNDS) {
         const x = find(vs[shortest]),
           y = find(vs[(shortest + 1) % n]);
@@ -822,7 +823,7 @@ function repairLoops(
 /** Remove pairs of faces with the same corners in opposite order: a fin of no thickness left by folding. */
 function cancelFins(loops: BooleanLoop[]): BooleanLoop[] {
   const keyOf = (vs: readonly number[]): string => {
-      const start = vs.indexOf(Math.min(...vs));
+      const start = indexOfLeast(vs);
       return [...vs.slice(start), ...vs.slice(0, start)].join(',');
     },
     live = new Map<string, number[]>(),
@@ -1001,9 +1002,20 @@ function signedVolume({ vertices, faces }: PolygonMesh): number {
 
 /** Whether the bounding boxes of two meshes meet. */
 function boundsMeet(p: PolygonMesh, q: PolygonMesh): boolean {
+  // Loops, not Math.max(...coordinates): spreading a large shell's coordinates overflows the call stack.
+  const range = (m: PolygonMesh, k: number) => {
+    let low = Infinity,
+      high = -Infinity;
+    for (const v of m.vertices) {
+      low = Math.min(low, v[k]);
+      high = Math.max(high, v[k]);
+    }
+    return [low, high];
+  };
   for (let k = 0; k < 3; k++) {
-    const of = (m: PolygonMesh) => m.vertices.map((v) => v[k]);
-    if (Math.max(...of(p)) < Math.min(...of(q)) || Math.max(...of(q)) < Math.min(...of(p))) return false;
+    const [lowP, highP] = range(p, k),
+      [lowQ, highQ] = range(q, k);
+    if (highP < lowQ || highQ < lowP) return false;
   }
   return true;
 }

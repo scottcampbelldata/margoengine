@@ -22,6 +22,8 @@ export class SplatModifier implements EnginePlugin {
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     get disposed(): boolean;
+    advanceTime(delta: number): void;
+    onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

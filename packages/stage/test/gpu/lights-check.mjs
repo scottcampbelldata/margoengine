@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-// Caller holds one shared GPU slot; compare each light kind and the mixed scene on each real backend.
+// Compares each light kind and the mixed scene on each real backend.
 for (const backend of ['native', 'compat']) {
   const browser = await openBrowser({
       startPath: `/packages/stage/test/gpu/lights.html${backend === 'compat' ? '?compat' : ''}`,

@@ -1,7 +1,8 @@
 // VRML97 and X3D XML scenes: both encodings become one node tree, flattened to the package's common geometry.
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { type BinaryInput, floats, limits, toText, uints } from './util.js';
-import { readXMLTree, type XMLElement } from './xml.js';
+import { triangulate } from '@margoengine/geometry/triangulate';
+import { readXMLTree, type XMLElement, type XMLExternalOptions } from './xml.js';
 
 type Value = number[] | string[] | boolean | Node | Node[] | null;
 interface Node {
@@ -17,7 +18,7 @@ export interface VRMLScene extends LoadedGeometry {
 }
 
 /** Options of {@link parseVRML} and {@link parseX3D}: the shared size limits and how many nodes a scene may visit. */
-export interface VRMLOptions extends ParseLimits {
+export interface VRMLOptions extends ParseLimits, XMLExternalOptions {
   /** Most nodes visited, counting each USE again. Default 1,000,000. */
   maxNodes?: number;
 }
@@ -25,8 +26,10 @@ export interface VRMLOptions extends ParseLimits {
 const MAX_DEPTH = 256;
 
 /**
- * Parses a VRML97 (`#VRML V2.0 utf8`) world: Transform, Group, Shape, Appearance, Material, IndexedFaceSet and DEF/USE.
- * The transforms are baked in, polygons fan-triangulated, and v turned to Margo's convention (v = 0 at the image's top).
+ * Parses a VRML97 (`#VRML V2.0 utf8`) world: Transform, Group, Switch, LOD, Shape, Appearance, Material,
+ * IndexedFaceSet and DEF/USE. The transforms are baked in and v turned to Margo's convention (v = 0 at the image's top).
+ * Faces are fan-triangulated, or ear-clipped when the IndexedFaceSet says `convex FALSE`. A Switch draws the child
+ * its `whichChoice` names (none for -1); an LOD draws its first, most detailed level.
  *
  * @param input The file's bytes or text.
  * @param options Limits.
@@ -72,7 +75,7 @@ export function parseVRML(input: BinaryInput | string, options: VRMLOptions = {}
  */
 export function parseX3D(input: BinaryInput | string, options: VRMLOptions = {}): VRMLScene {
   const F = 'X3D',
-    root = readXMLTree(toText(input, F), F);
+    root = readXMLTree(toText(input, F), F, { external: options.external });
   const x3d = root.name === 'X3D' ? root : root.children.find((child) => child.name === 'X3D'),
     scene = x3d?.children.find((child) => child.name === 'Scene');
   if (!scene) throw new LoaderError(F, 'header', 'missing <X3D> and <Scene> elements');
@@ -384,7 +387,9 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
       ],
       determinant = m[0] * inverse[0] + m[1] * inverse[1] + m[2] * inverse[2],
       keepWinding = flag(geometry, 'ccw', true) === determinant >= 0;
-    const start = indices.length;
+    const start = indices.length,
+      convex = flag(geometry, 'convex', true),
+      flat: number[] = [];
     let first = 0,
       face = 0;
     const read = (list: readonly number[], index: number, width: number, what: string, out: number[]) => {
@@ -431,7 +436,8 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
             colors.push3(rgb[0], rgb[1], rgb[2]);
             anyColor = true;
           } else {
-            const diffuse = numbers(material, 'diffuseColor') ?? [1, 1, 1];
+            // VRML97 6.27 and 6.3: a Material's diffuseColor defaults to 0.8; no Material at all is unlit white.
+            const diffuse = material ? (numbers(material, 'diffuseColor') ?? [0.8, 0.8, 0.8]) : [1, 1, 1];
             colors.push3(diffuse[0], diffuse[1], diffuse[2]);
           }
           if (texCoord?.length) {
@@ -444,9 +450,36 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
             uvs.push(0);
           }
         }
-        for (let c = 1; c < corners - 1; c++)
-          if (keepWinding) indices.push3(base, base + c, base + c + 1);
-          else indices.push3(base, base + c + 1, base + c);
+        if (convex || corners === 3)
+          for (let c = 1; c < corners - 1; c++)
+            if (keepWinding) indices.push3(base, base + c, base + c + 1);
+            else indices.push3(base, base + c + 1, base + c);
+        else {
+          // VRML97 6.23: convex FALSE faces may be concave. Project onto the plane of the face's Newell normal, keeping
+          // its turn, and ear-clip; triangulate returns counter-clockwise triples, the face's own winding.
+          let nx = 0,
+            ny = 0,
+            nz = 0;
+          const p = positions.array;
+          for (let c = 0, d = corners - 1; c < corners; d = c++) {
+            const a = (base + d) * 3,
+              b = (base + c) * 3;
+            nx += (p[a + 1] - p[b + 1]) * (p[a + 2] + p[b + 2]);
+            ny += (p[a + 2] - p[b + 2]) * (p[a] + p[b]);
+            nz += (p[a] - p[b]) * (p[a + 1] + p[b + 1]);
+          }
+          const ax = Math.abs(nx),
+            ay = Math.abs(ny),
+            az = Math.abs(nz),
+            [u, w] =
+              az >= ax && az >= ay ? (nz >= 0 ? [0, 1] : [1, 0]) : ax >= ay ? (nx >= 0 ? [1, 2] : [2, 1]) : ny >= 0 ? [2, 0] : [0, 2];
+          flat.length = 0;
+          for (let c = 0; c < corners; c++) flat.push(p[(base + c) * 3 + u], p[(base + c) * 3 + w]);
+          const triangles = triangulate(flat, [], 2);
+          for (let t = 0; t < triangles.length; t += 3)
+            if (keepWinding) indices.push3(base + triangles[t], base + triangles[t + 1], base + triangles[t + 2]);
+            else indices.push3(base + triangles[t], base + triangles[t + 2], base + triangles[t + 1]);
+        }
       }
       first = i + 1;
       face++;
@@ -491,6 +524,16 @@ function flatten(roots: Node[], F: string, options: VRMLOptions): VRMLScene {
         ])
           world = multiply(world, part);
         break;
+      }
+      case 'Switch':
+      case 'LOD': {
+        // VRML97 6.46 Switch draws choice[whichChoice] (default -1, nothing); 6.26 LOD draws one of its levels, here
+        // the first and most detailed, as there is no viewer distance. X3D names both lists `children`.
+        const list = node.fields[node.type === 'Switch' ? 'choice' : 'level'] ?? node.fields.children,
+          items = Array.isArray(list) ? (list as Node[]) : list && typeof list === 'object' ? [list] : [],
+          pick = node.type === 'Switch' ? (numbers(node, 'whichChoice')?.[0] ?? -1) : 0;
+        if (Number.isInteger(pick) && pick >= 0 && pick < items.length) walk(items[pick], world, depth + 1);
+        return;
       }
       case 'Group':
       case 'Anchor':

@@ -27,3 +27,10 @@ test('GPUParticles is a VFX preset: a wrapping 6 m leaf field with the old optio
   assert.throws(() => new GPUParticles({ curl: 11 }), /options/);
   assert.throws(() => new GPUParticles({ count: 0 }), /options/);
 });
+
+test('GPUParticles keeps its own wind (a drift acceleration); the VFX wind option (m/s, [x, z] or a field) is refused, not mixed up', () => {
+  const leaves = new GPUParticles({ count: 8, wind: [1, 0, 0] });
+  assert.equal(leaves.options.wind, undefined, 'the drift is folded into gravity; no VFX wind force');
+  assert.throws(() => new GPUParticles({ count: 8, wind: [3, 4] }), RangeError);
+  assert.throws(() => new GPUParticles({ count: 8, wind: { sample: () => [1, 0, 0] } }), RangeError);
+});

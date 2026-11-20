@@ -80,12 +80,12 @@
     },
     {
       "check": "gpu",
-      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --exclusive --max=20 --wait-max=40 -- npm run test:gpu --workspace @margoengine/staging",
+      "command": "npm run test:gpu --workspace @margoengine/staging",
       "exitCode": 0
     },
     {
       "check": "readme",
-      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --exclusive --max=20 --wait-max=40 -- npm run check:readme-run -- --packages=staging",
+      "command": "npm run check:readme-run -- --packages=staging",
       "exitCode": 0
     },
     {
@@ -95,12 +95,12 @@
     },
     {
       "check": "env-rebased-gpu",
-      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --max=15 --wait-max=14 -- npm run test:gpu:mirror --workspace @margoengine/environment",
+      "command": "npm run test:gpu:mirror --workspace @margoengine/environment",
       "exitCode": 0
     },
     {
       "check": "env-rebased-readme",
-      "command": "node scripts/gpu-lock.mjs run --owner=codex-56 --max=20 --wait-max=39 -- npm run check:readme-run -- --packages=environment",
+      "command": "npm run check:readme-run -- --packages=environment",
       "exitCode": 0
     },
     {

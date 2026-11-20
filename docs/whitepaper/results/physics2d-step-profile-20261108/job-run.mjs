@@ -29,5 +29,8 @@ for (const job of jobs) {
   clearTimeout(timer);
   appendFileSync(log, `END code=${code} timeout=${timedOut} elapsed=${Date.now() - start}ms\n`);
   console.log(`${job.cmd}: ${code}, timeout=${timedOut}`);
-  if (code !== 0 || timedOut) process.exit(code || 124);
+  if (code !== 0 || timedOut) {
+    process.exitCode = code || 124;
+    break;
+  }
 }

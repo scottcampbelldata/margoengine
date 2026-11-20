@@ -5,6 +5,7 @@
 ```ts
 import { InspectorOptions } from "@margoengine/inspector";
 import { StatsOptions } from "@margoengine/stats";
+import { React } from "react";
 
 export function DevTools(_arg0: DevToolsProps): null;
 
@@ -12,6 +13,13 @@ export interface DevToolsProps {
     enabled?: boolean;
     inspector?: boolean | Omit<InspectorOptions, 'label'>;
     stats?: boolean | StatsOptions;
+    onError?: (error: unknown) => void;
+}
+
+export function Stats(_arg1: StatsProps): React.JSX.Element;
+
+export interface StatsProps extends StatsOptions {
+    enabled?: boolean;
     onError?: (error: unknown) => void;
 }
 ```

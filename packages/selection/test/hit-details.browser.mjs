@@ -11,7 +11,7 @@ try {
  const report=await page.evaluate(async()=>{
   const {Engine,box}=await import('/packages/core/dist/extension.js');
   const {HitDetails}=await import('/packages/selection/dist/hit-details.js');
-  const {loadGLTF}=await import('/packages/gltf-pro/dist/index.js');
+  const {loadGLTF}=await import('/packages/gltf/dist/pbr.js');
   const {Material,createMesh}=await import('/packages/materials/dist/index.js');
   const {CameraProjection}=await import('/packages/cameras/dist/index.js');
   const assert=(ok,m)=>{if(!ok)throw new Error(m)};

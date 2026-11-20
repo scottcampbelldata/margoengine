@@ -3,7 +3,7 @@
 // the same world on the main thread, after paint writes, updates and placement changes too; an aborted job leaves the
 // queue and a retry gives the same bytes; a crashed worker rejects its job with MargoError 'failed' and the next job
 // runs on a fresh replica. The worker file holds one copy of each module and leaves out the digest and presets
-// entries; its optional parts (splines, erosion, graph, zones, multinoise) are files of their own, loaded only by a
+// entries; its optional parts (splines, erosion, valley, graph, zones, multinoise) are files of their own, loaded only by a
 // world that uses them, from the URLs the page sends.
 import test from 'node:test';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -324,6 +324,7 @@ test('the worker and its part files hold one copy of each module, without the di
     'biomes-graph.js',
     'biomes-multinoise.js',
     'biomes-splines.js',
+    'biomes-valley.js',
     'biomes-zones.js',
     'biomes.js',
   ]);
@@ -335,6 +336,7 @@ test('the worker and its part files hold one copy of each module, without the di
   for (const [part, text] of [
     ['splines', 'A path is an object such as'],
     ['erosion', 'erode needs height as an Int32Array'],
+    ['valley', 'Invalid relief mountainValley; outlet'],
     ['graph', 'A placement graph has 1 to 256 nodes'],
     ['zones', 'superarid'],
     ['multinoise', 'multiNoise blend is a number'],
@@ -346,8 +348,14 @@ test('the worker and its part files hold one copy of each module, without the di
   // 129,928 B with every part inside (docs/limits.md, "Biome worker file").
   const core = Buffer.from(files['biomes.js']),
     gzip = gzipSync(core, { level: 9 }).length;
-  assert.ok(gzip <= 39_500, `worker ${gzip} B gzip`);
-  assert.ok(core.length <= 105_000, `worker ${core.length} B raw`);
+  // 40,551 B and 107,306 B raw on 2026-11-17: the worker holds relief, which gained the ria coast (a bay with steep hills and
+  // level ground at its head, 1c72a876e8, +860 B gzip: the worker is 39,590 B without it) after the measure above, and the fuel names of species and biomes (+101 B gzip). The
+  // ceilings follow the measure with a little room; the optional-size rule of AGENTS.md allows a ceiling to rise with its figures.
+  // 40,763 B and 108,185 B raw on 2026-11-17 with the mountainValley option (+212 B gzip, +879 B raw): the worker holds only
+  // its hook call, the entry's missing-hook error and the relief it returns; the valley itself is the biomes-valley.js
+  // part (3,947 B gzip), loaded only for a relief that asks for it.
+  assert.ok(gzip <= 40_900, `worker ${gzip} B gzip`);
+  assert.ok(core.length <= 108_400, `worker ${core.length} B raw`);
 });
 
 test('a worker asked for a part whose URL the page did not send rejects the job clearly', async () => {

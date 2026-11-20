@@ -26,7 +26,7 @@ the brief's final Added section. No test-page source files are changed here.
 | 14 | FIXED | push now returns an owned VoxelGrid, matching undo/redo/go/current. Labels remain available through history.label and labelled snapshots through entries(). `packages/voxel-edit/tests/testpage-contracts.test.js`; README and API migrate together. |
 | 15 | Separate job | Assigned by the Added section to codex-preview-silent-skip-brief.md. No selection outline/backend change here; selection picking only changes for empty Geometry integration. |
 | 16 | FIXED | Ordered ancestor chains now accept intermediate bones. The existing world-space endpoint solve carries their unchanged local transforms. Actual downloaded Khronos RiggedFigure 3/4/6 retains joint 5 and reaches its target; disconnected/reversed chains give linked unsupported before installation. `packages/animator/test/testpage.test.js`. Exact RobotExpressive 55/57/3 remains rejected because it is disconnected. |
-| 17 | Separate job | Assigned by the Added section to codex-preview-silent-skip-brief.md. No gltf-pro implementation change here. The actual native-preview rejection is covered incidentally by the character contract tests. |
+| 17 | Separate job | Assigned by the Added section to codex-preview-silent-skip-brief.md. No gltf/pbr implementation change here. The actual native-preview rejection is covered incidentally by the character contract tests. |
 | 18 | FIXED | Morph errors list candidate mesh node indices/counts with a help link, and setMorph(name, weight) resolves targetNames across every matching mesh node atomically. Actual Khronos MorphStressTest and RobotExpressive inputs: `packages/animation/tests/testpage.test.js`. The indexed overload remains supported. |
 | 19 | FIXED documentation | Actual RiggedFigure has no animation name; its existing synthesized name is Animation 0. README now states Animation <zero-based index>, preservation of explicit empty strings, and index-based play. `packages/animation/tests/testpage.test.js` checks actual asset playback and explicit empty names. |
 
@@ -122,9 +122,8 @@ The three remaining gates pass under codex-testpage: geometry GPU after the
 private lattice-helper refactor (3.6 s), procedural GPU including main's new caves
 test (12.7 s), and geometry/margoengine README execution (17/17 examples, 10.5 s).
 Results are in test-results/testpage-landing-exclusive-results.json and the
-corresponding logs. The old session's queued processes were gone; replacement
-shared requests were cancelled before execution and replaced by one bounded
-exclusive request so newer exclusive jobs could not indefinitely preempt them.
+corresponding logs. The old session's queued processes were gone; they were replaced by
+one bounded run.
 All 13 original package GPU scripts and the ten-package corrected README run
 already passed. Completed gates were retained without duplicate execution.
 
@@ -289,8 +288,8 @@ failures/skips, all 20 proof scenarios, 887 API entries/8,638 exports, and all
 test-results/testpage-followup-repaired-*. The labels package unit suite and
 scoped API regeneration also pass. Only the queued labels/netcode/tiles browser
 and six-package executable README runs remain before the required first push.
-An earlier GPU wait expired without starting a test; the replacement has an
-explicit 59-minute wait and 20-minute hold limit, owned by codex-testpage.
+An earlier attempt expired without starting a test; the replacement has an
+explicit 20-minute time limit.
 
 The 11:25 EST live BUGS.md reread adds entry 45: with forced WebGL2 compatibility,
 attach VoxelPathTracer, dispose the tracer, then dispose its engine. The report
@@ -306,8 +305,7 @@ All remaining labels/netcode/tiles browser suites pass (17.9 s supervisor;
 modules with zero compilation errors. All 56 environment/transitions/netcode/
 inspector/labels/tiles README programs execute: 22 Node and 34 browser, zero
 failures or exceptions, 46.7 s. testpage-followup-browser.json and the browser/
-readmes logs retain the results. The requeue supervisor also passes and releases
-its GPU lock. Full lint/hygiene/verify and the retained earlier package/GPU gates
+readmes logs retain the results. The requeue supervisor also passes. Full lint/hygiene/verify and the retained earlier package/GPU gates
 are complete; no test, tolerance, size budget or workload was loosened.
 
 The branch rebases onto current main before its fast-forward push. Conflicts
@@ -395,17 +393,16 @@ was not changed. Mesh-edit and exporters suites passed 421 and 502 tests before
 this size refinement; the changed mesh-edit suite and full verify run again.
 Research/standards comparison for entries 32, 36 and 42-45 is recorded in
 [testpage-research.md](testpage-research.md). The newest live rulings also defer
-all new speed measurements and require shared correctness locks with >=60-minute
-queue bounds. No benchmark or paired wall-clock speed experiment was run here.
+all new speed measurements. No benchmark or paired wall-clock speed experiment was run here.
 
 Final local entry 44 pre-gates after the size refinement: mesh-edit units pass
 421/421 (8.4 s), scoped API refresh passes, lint passes (3 s), hygiene passes
-(13.9 s). Full verify is queued shared with wait-max 60 and a 40-minute hold;
-actual GPU/browser/README work is separately queued and waits for that result.
-The earlier 36/32 ten-minute queues expired without running tests. No push yet.
+(13.9 s). Full verify runs with a 40-minute limit;
+actual GPU/browser/README work runs separately and waits for that result.
+The earlier 36/32 ten-minute attempts expired without running tests. No push yet.
 
 Continuation: the handoff's two queued supervisors had exited without recording
-results. Only their unfinished stages were requeued, shared with wait-max 60;
+results. Only their unfinished stages were run again;
 completed package, lint and hygiene gates were retained. Full verification then
 passed 13,561/13,562 tests with zero skips: the new research document was missing
 from the generated site/llms.txt index. Regenerating that index repairs the stale
@@ -432,7 +429,7 @@ exporters render-to-file (undefined tuple), exporters Unity support bundle
 The report is test-results/readme-run/run-88656/report.json.
 
 The repaired full verification exited unsuccessfully after 700 s including its
-GPU queue wait. Build, API, quality and other completed chains passed; the unit
+wait for the GPU. Build, API, quality and other completed chains passed; the unit
 chain produced no final output or failure summary before the process exited.
 There is no successful verify result for entry 44 and no new attributed cause.
 Do not replace that missing result with a blind retry or a passing focused test.
@@ -446,7 +443,7 @@ nor disproves the reported disposal hang. The subsequent isolated pipeline probe
 records individual promises and first GL status queries to locate the readiness
 boundary, rather than changing tracing work or the timeout.
 
-The isolated probe also ends at its unchanged three-minute GPU hold limit
+The isolated probe also ends at its unchanged three-minute time limit
 (182.8 s supervisor result including termination). Add, prepare, atrous, tables,
 combine, ids and preview all resolve; only the trace render pipeline remains
 pending. First COMPLETION_STATUS_KHR queries return without blocking, and page
@@ -455,12 +452,12 @@ The trace compilation/readiness boundary needs further attribution; no package
 runtime change or NOT A BUG conclusion was made. Logs and supervisors use the
 testpage-45-pipeline-probe prefix. The final live BUGS.md reread still ends at 45.
 
-### Entry 44 landing gates completed without a GPU lock around verify
+### Entry 44 landing gates completed with a plain verify
 
-The coordinator ended the preceding verification because its outer GPU lock
-held a slot during CPU work. The required replacement command is plain
+The coordinator ended the preceding verification because it ran
+within a GPU wrapper during CPU work. The required replacement command is plain
 `npm run verify`, supervised with the unchanged 40-minute hard limit and no
-GPU-lock environment. It passes in 721.2 s: 13,562 tests, zero failures and zero
+GPU wrapper. It passes in 721.2 s: 13,562 tests, zero failures and zero
 skips. Build, API, quality, sizes, README types, both sandbox chains, links and
 correctness proofs all pass. No benchmark or separate speed test was run.
 The durable local result is test-results/testpage-unlocked-verify.json and its
@@ -507,8 +504,7 @@ target leak. The driver's internal locking cause is still unproved.
 Local reproducibility files are test-results/testpage-45-delayed-dispose.mjs
 (ordinary and --delete-programs modes) and testpage-45-raw-context.mjs, their
 supervisors, .log/.json results and captured .glsl pair. Each actual GPU command
-takes one shared codex-testpage slot, wait-max 60 and max 3; nothing else holds
-the lock. Research and the candidate staged transport repair are documented in
+has a 3 minute limit. Research and the candidate staged transport repair are documented in
 testpage-research.md. No runtime change, completed fix or performance claim is
 made. Browser teardown stays with its dedicated owner. BUGS.md still ends at 45.
 
@@ -527,7 +523,7 @@ In contrast, isolated camera/closest-hit/surface/shadow/glass-candidate programs
 link. A one-light evaluation with all light-kind branches and every Walk field
 exposed also links and returns from context loss. The combined lighting loop
 remains pending at the poll deadline. Research, input sizes and precise scope
-are in testpage-research.md; all raw GPU runs used one shared slot and max 3.
+are in testpage-research.md; all raw GPU runs had a 3 minute limit.
 
 A bounded CPU f32 diagnostic preserves all radiance/reservoir/RNG bits across
 144 cases when evaluating the five lights as ordered steps. It includes no

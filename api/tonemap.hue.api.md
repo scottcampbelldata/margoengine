@@ -7,7 +7,7 @@ export type HueCurve = readonly (readonly [number, number])[];
 
 export class HueGrade extends Grade {
     readonly options: HueGradeOptions;
-    readonly key = "grade-hue";
+    get key(): string;
     constructor(options?: HueGradeOptions);
     patch(shader: string, binding: number): string;
     values(): Float32Array;
@@ -22,8 +22,9 @@ export interface HueGradeOptions extends GradeOptions {
 
 class Grade implements TonemapExtension {
     readonly options: GradeOptions;
-    readonly key: string;
     constructor(options?: GradeOptions);
+    get key(): string;
+    protected tone(): boolean;
     patch(shader: string, binding: number): string;
     values(): Float32Array;
 }
@@ -41,6 +42,10 @@ interface GradeOptions {
         blue?: GradeCurve;
     };
     hueSaturation?: readonly [number, number, number, number, number, number];
+    lift?: GradeWheel;
+    gamma?: readonly [number, number, number];
+    gain?: readonly [number, number, number];
+    saturation?: number;
 }
 
 type GradeWheel = readonly [number, number, number];
@@ -51,6 +56,7 @@ interface TonemapExtension {
     values?(): Float32Array;
     resources?(): readonly GPUBindingResource[];
     encode?(context: TonemapPassContext): void;
+    dispose?(): void;
 }
 
 interface TonemapPassContext {

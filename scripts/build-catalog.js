@@ -3,6 +3,7 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PACKAGE_LISTS, withPackageList } from './package-lists.js';
+import { packageCountFiles, restatePackageCount } from './support/public-truth.mjs';
 
 const existingText = await readFile('docs/catalog.json', 'utf8'),
   existing = JSON.parse(existingText);
@@ -32,11 +33,10 @@ const siteExamples = {
 };
 // Package layers: the catalog and the sizes page list packages in this order.
 const layers = {
-  'Start here': ['stage', 'core', 'game', 'web', 'viz', 'react-kit', 'margoengine'],
+  'Start here': ['stage', 'core', 'game', 'kit-web', 'kit-viz', 'kit-react', 'margoengine'],
   'Setup and diagnostics': ['math', 'quality', 'webgl2-compat', 'worker', 'stats', 'inspector'],
   'Loading and formats': [
     'gltf',
-    'gltf-pro',
     'loaders',
     'decoders',
     'fbx',
@@ -74,7 +74,7 @@ const layers = {
     'video',
     'xr',
     'headless',
-    'staging',
+    'studio',
   ],
   'Post-processing': ['post', 'tonemap', 'dof', 'taa', 'transitions'],
   'World and effects': [
@@ -84,8 +84,8 @@ const layers = {
     'voxel-pathtracer',
     'voxel-edit',
     'water',
-    'scenery',
     'scatter',
+    'scenes',
     'road',
     'tilemap',
     'vfx',
@@ -100,6 +100,9 @@ const layers = {
     'kinematics-constraints',
     'robot-planning',
     'rigging',
+    'humans',
+    'horses',
+    'armies',
     'tween',
     'cinematic',
     'cutscene',
@@ -121,7 +124,6 @@ const layers = {
     'fsm',
     'behavior',
     'save',
-    'net',
     'netcode',
     'voxel-net',
   ],
@@ -189,6 +191,13 @@ for (const [file, packagesPath] of Object.entries(PACKAGE_LISTS)) {
   const markdown = await readFile(file, 'utf8'),
     updated = withPackageList(markdown, entries, packagesPath);
   if (updated !== markdown) await writeFile(file, updated);
+}
+// Every other public statement of the package count follows the catalog too (tests/public-truth.test.js checks them),
+// so adding a package restates them instead of leaving them a package behind.
+for (const file of packageCountFiles(resolve('.'))) {
+  const before = await readFile(file, 'utf8'),
+    after = restatePackageCount(before, entries.length);
+  if (after !== before) await writeFile(file, after);
 }
 console.log(
   `Catalog: ${entries.length} packages, ${entries.filter((entry) => entry.published).length} published on npm.`,

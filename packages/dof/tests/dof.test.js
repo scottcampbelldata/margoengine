@@ -24,11 +24,12 @@ test('DOF validates the thin lens at float32 precision and rejects WebGL', () =>
   assert.throws(() => new DOF().setup({ gpu: null }), /WebGPU/);
 });
 
-test('DOF runs three compute passes, restores attachments, and reuses all steady-state resources', async () => {
+test('DOF runs seven compute passes, restores attachments, and reuses all steady-state resources', async () => {
   const h = gpuHarness(),
     dof = DOF.attach(h.engine, { focalDistance: 5, focalLength: 0.05, aperture: 2 });
   h.frame();
-  assert.equal(h.counts.compute, 3);
+  // CoC, the near chain (level 0 and three levels above it), far blocks and bokeh.
+  assert.equal(h.counts.compute, 7);
   assert.equal(h.counts.render, 4);
   assert.equal(h.context.color, h.originalColor);
   assert.equal(h.context.depth, h.originalDepth);
@@ -195,7 +196,7 @@ test('without a lens DOF builds the plain kernels and leaves the three free unif
   DOF.attach(h.engine, { focalDistance: 5 });
   h.frame();
   const codes = shaderCodes(h);
-  assert.equal(codes.length, 3);
+  assert.equal(codes.length, 5);
   for (const code of codes) assert.ok(!code.includes('fn shape'));
   assert.ok(codes[0].includes('1.0-p.lens.x/z'));
   assert.deepEqual([h.writes[9], h.writes[10], h.writes[11]], [0, 0, 0]);
@@ -295,6 +296,51 @@ test('Autofocus on a world point uses its distance along the view with no read',
   assert.equal(copies, 0);
 });
 
+test('Autofocus ignores a target behind the camera or outside the frame and reads the depth at its point', () => {
+  // A film page kept the focus on its subject while the camera looked away from it: the clip w behind the camera is
+  // negative, so the focus fell to the near limit and the whole view blurred.
+  for (const target of [[0, 0, 8], [100, 0, -8], [0, -100, -8]]) {
+    const h = gpuHarness();
+    h.engine.canvas = { clientWidth: 128, clientHeight: 96, width: 128, height: 96 };
+    let copies = 0;
+    h.context.encoder.copyTextureToBuffer = () => copies++;
+    const dof = DOF.attach(h.engine, { focalDistance: 5 });
+    h.context.camera.matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, 0.1, 0]);
+    h.context.camera.position = [0, 0, 0];
+    Autofocus.attach(h.engine, dof, { smoothing: 0, target });
+    h.frame();
+    assert.equal(dof.options.focalDistance, 5, `target ${target} leaves the focus for the depth read`);
+    assert.equal(copies, 1, `target ${target} reads the depth at the point`);
+  }
+});
+
+test('Autofocus eases by frame time, not the wall clock', () => {
+  // GAP-FILM-TIME: the smoothing read performance.now(), so an offline film render (seconds of wall clock per frame)
+  // jumped where a live run eases, and a scene started at film time T focused elsewhere than a continuous run.
+  const h = gpuHarness();
+  h.engine.canvas = { clientWidth: 128, clientHeight: 96, width: 128, height: 96 };
+  const dof = DOF.attach(h.engine, { focalDistance: 5 });
+  h.context.camera.matrix = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, 0, 0, 0.1, 0]);
+  h.context.camera.position = [0, 0, 0];
+  const focus = Autofocus.attach(h.engine, dof, { smoothing: 0.5, target: [0, 0, -8] });
+  const now = performance.now;
+  let wall = 1000;
+  performance.now = () => (wall += 10000);
+  try {
+    h.context.delta = 0.25;
+    h.frame();
+    assert.ok(Math.abs(dof.options.focalDistance - 8) < 1e-6, 'the first focus jumps');
+    focus.options.target = [0, 0, -4];
+    h.frame();
+    const eased = 4 + (8 - 4) * Math.exp(-0.25 / 0.5);
+    assert.ok(Math.abs(dof.options.focalDistance - eased) < 1e-9, `${dof.options.focalDistance} != ${eased}`);
+    assert.equal(focus.time, 0.5, 'a fresh clock starts at 0, as seek needs, and two frame updates of 0.25 s');
+    assert.throws(() => focus.advanceTime(Number.NaN), RangeError);
+  } finally {
+    performance.now = now;
+  }
+});
+
 // A disk image of `size` pixels whose open part is where `open(x, y)` holds, x and y from -1 to 1 (y down).
 const apertureImage = (size, open) => {
   const data = new Uint8ClampedArray(size * size * 4);
@@ -340,7 +386,7 @@ test('DOFLens aperture image: taps spread over the mirrored shape, the near gath
     assert.ok(Math.abs(mx - 4 / (3 * Math.PI)) < 0.12, `taps ${n} centroid ${mx}`);
   }
   // The mean transmission over the disk, about 0.5 for a half: the rim cells lose a little to the mask's softening.
-  const mean = +/\*aperture\(-vec2f\(nearOffset\)\/radius\)\/([0-9.]+);/.exec(bokeh)[1];
+  const mean = +/\*aperture\(-nearTap\/radius\)\/([0-9.]+);/.exec(bokeh)[1];
   assert.ok(mean > 0.45 && mean < 0.55, `near weight over a half disk divides by about 0.5, got ${mean}`);
   assert.ok(bokeh.includes('farWeight+=farTap.z;'));
   assert.ok(!bokeh.includes('round(spiral(i,16.0)*center.x)'));
@@ -380,9 +426,9 @@ test('temporal DOF gathers at half size with turning taps and a half maxRadius, 
     dof = DOF.attach(h.engine, { focalDistance: 5, maxRadius: 16, temporal: true });
   h.frame();
   const codes = shaderCodes(h);
-  assert.equal(codes.length, 5, 'CoC, bokeh, coarse, halve and join kernels');
+  assert.equal(codes.length, 7, 'CoC, bokeh, coarse, near chain level 0 and levels above, halve and join kernels');
   const find = (text) => codes.find((code) => code.includes(text)),
-    bokeh = find('nearOffset'),
+    bokeh = find('nearTaps:texture_2d'),
     coarse = find('coarse:texture_storage_2d'),
     halve = find('halfScene'),
     join = find('blurred');
@@ -392,7 +438,9 @@ test('temporal DOF gathers at half size with turning taps and a half maxRadius, 
   const live = h.resources.filter((r) => r.width !== undefined && !r.destroyed && r.sampleCount === 1),
     sized = (w, hh, format) => live.filter((r) => r.width === w && r.height === hh && r.format === format).length;
   assert.equal(sized(64, 48, 'rg32float'), 1);
-  assert.equal(sized(64, 48, 'rgba16float'), 2);
+  // The half image, the half gather and the near chain's three textures, four levels each.
+  assert.equal(sized(64, 48, 'rgba16float'), 5);
+  assert.equal(live.filter((r) => r.mipLevelCount === 4).length, 3);
   assert.equal(sized(8, 6, 'r32float'), 1);
   assert.equal(sized(32, 24, 'rgba16float'), 1);
   assert.equal(sized(128, 96, 'rgba16float'), 2, 'full-size scene capture and output');
@@ -426,7 +474,7 @@ test('DOFLens catEye and anamorphic: validated, baked into every gather, and com
       DOF.attach(h.engine, { focalDistance: 5, temporal, lens: new DOFLens({ blades, catEye: 1, anamorphic: 2 }) });
       h.frame();
       const codes = shaderCodes(h),
-        bokeh = codes.find((code) => code.includes('nearOffset')),
+        bokeh = codes.find((code) => code.includes('nearTaps:texture_2d')),
         coarse = codes.find((code) => code.includes('coarse:texture_storage_2d'));
       for (const code of [bokeh, coarse]) {
         assert.ok(code.includes('fn barrel(pixel:vec2i)') && code.includes('farWeight+=w;'));
@@ -434,8 +482,8 @@ test('DOFLens catEye and anamorphic: validated, baked into every gather, and com
       }
       // Near taps keep the whole disk; each foreground disk is tested as its oval, weighed by squeeze over shared area.
       assert.ok(bokeh.includes('return vec2f(s.x*2.000000,s.y);'));
-      assert.ok(bokeh.includes('length(vec2f(nearOffset)*vec2f(2.000000,1.0))<=radius'));
-      assert.ok(bokeh.includes('*2.000000*eye(-vec2f(nearOffset)/radius,pixel)/lensArea(pixel);'));
-      assert.equal(bokeh.includes('shape(atan2(f32(nearOffset.y),f32(nearOffset.x)*2.000000))'), blades !== undefined);
+      assert.ok(bokeh.includes('-length(nearTap*vec2f(2.000000,1.0))+0.5'));
+      assert.ok(bokeh.includes('*2.000000*eye(-nearTap/radius,pixel)/lensArea(pixel);'));
+      assert.equal(bokeh.includes('shape(atan2(nearTap.y,nearTap.x*2.000000))'), blades !== undefined);
     }
 });

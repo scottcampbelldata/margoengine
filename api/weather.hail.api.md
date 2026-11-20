@@ -19,6 +19,7 @@ export class Hail implements EnginePlugin {
     get count(): number;
     update(delta: number): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;

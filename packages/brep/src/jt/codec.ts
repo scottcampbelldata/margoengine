@@ -226,7 +226,7 @@ export function int32Packet(r: JTReader, jt10: boolean, depth = 0): Int32Array {
 function moveToFront(values: Int32Array, offsets: Int32Array, count: number): Int32Array {
   if (offsets.length !== count) fail(`move-to-front packet of ${offsets.length} offsets for ${count} values`);
   const out = new Int32Array(count),
-    window: number[] = [];
+    latest: number[] = [];
   let next = 0;
   for (let i = 0; i < count; i++) {
     const o = offsets[i];
@@ -235,12 +235,12 @@ function moveToFront(values: Int32Array, offsets: Int32Array, count: number): In
       if (next >= values.length) fail('move-to-front offsets ask for more values than the packet holds');
       v = values[next++];
     } else {
-      if (o >= window.length) fail(`move-to-front offset ${o} past a window of ${window.length}`);
-      v = window[o];
-      window.splice(o, 1);
+      if (o >= latest.length) fail(`move-to-front offset ${o} past the ${latest.length} latest values`);
+      v = latest[o];
+      latest.splice(o, 1);
     }
-    window.unshift(v);
-    if (window.length > 16) window.pop();
+    latest.unshift(v);
+    if (latest.length > 16) latest.pop();
     out[i] = v;
   }
   return out;

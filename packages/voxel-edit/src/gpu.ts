@@ -4,7 +4,7 @@
 // Each operation gives exactly the cells of its CPU counterpart in this package.
 import type { Vec3 } from '@margoengine/math';
 import { MargoError } from '@margoengine/math/errors';
-import { brushPipelines, compileBrush, GridBuffers, isDevice, type PassInputs } from './brush-gpu.js';
+import { brushInputs, brushPipelines, compileBrush, GridBuffers, isDevice, type PassInputs } from './brush-gpu.js';
 import {
   checkCell,
   checkGrid,
@@ -16,15 +16,18 @@ import {
 } from './grid.js';
 import { brushes, type ShaderBrush, type ShaderBrushRunOptions } from './shaders.js';
 
+// A box reads its corners, clipped to the grid, from params 0 to 5; a sphere its centre from the tool offset (whole
+// i32 cells, so no f32 rounding) and is refused per axis before the squared distance, which then cannot overflow.
 const FILL = /* wgsl */ `
 fn brush(p: vec3<i32>, value: u32) -> u32 {
-  let lo = vec3<i32>(i32(param(0)), i32(param(1)), i32(param(2)));
   if (param(7) == 0.0) {
+    let lo = vec3<i32>(i32(param(0)), i32(param(1)), i32(param(2)));
     let hi = vec3<i32>(i32(param(3)), i32(param(4)), i32(param(5)));
     if (all(p >= lo) && all(p < hi)) { return u32(param(6)); }
     return value;
   }
-  let d = p - lo;
+  let d = p - info.tool_offset.xyz;
+  if (any(abs(d) > vec3<i32>(128))) { return value; }
   if (f32(dot(d, d)) <= param(3)) { return u32(param(6)); }
   return value;
 }`;
@@ -43,6 +46,9 @@ fn brush(p: vec3<i32>, value: u32) -> u32 {
 }`;
 const REMAP = /* wgsl */ `
 fn brush(p: vec3<i32>, value: u32) -> u32 { return lookup(value); }`;
+
+/** Longest side: box corners travel as f32, exact for whole numbers up to 2^24. */
+const MAX_SIDE = 16_777_216;
 
 const programs = new WeakMap<GPUDevice, Map<string, Promise<GPUComputePipeline>>>();
 const program = (device: GPUDevice, name: string, code: string): Promise<GPUComputePipeline> => {
@@ -95,14 +101,18 @@ export class GpuGrid {
 
   /**
    * Uploads `grid` to `device` (the grid is not kept).
-   * @throws TypeError for a wrong device or grid; RangeError past `maxCells` (default 16,777,216, at most 67,108,864)
-   * or the device's storage binding limit.
+   * @throws TypeError for a wrong device or grid; RangeError past `maxCells` (default 16,777,216, at most 67,108,864),
+   * past 16,777,216 cells on one side, or past the device's storage binding limit.
    */
   static async create(device: GPUDevice, grid: VoxelGrid, limits: GridLimits = {}): Promise<GpuGrid> {
     if (!isDevice(device))
       throw new TypeError('GpuGrid.create needs a GPUDevice; pass (await adapter.requestDevice())');
     checkOptions(limits, 'GpuGrid.create');
     checkGrid(grid, cellLimit(limits));
+    if (grid.size.some((v) => v > MAX_SIDE))
+      throw new RangeError(
+        `GpuGrid.create grid is ${grid.size.join(' x ')}; pass at most ${MAX_SIDE} cells per side (f32 cell bounds)`,
+      );
     const names = { fill: FILL, combine: COMBINE, remap: REMAP, ...brushes },
       entries = await Promise.all(
         Object.entries(names).map(async ([name, code]) => [name, await program(device, name, code)] as const),
@@ -110,9 +120,10 @@ export class GpuGrid {
     return new GpuGrid(device, new GridBuffers(device, grid, 'GpuGrid'), Object.fromEntries(entries));
   }
 
-  #run(name: string, inputs: Partial<PassInputs>): this {
+  /** Queues `name`; `skip` (an edit that changes no cell) queues nothing but still refuses a disposed grid. */
+  #run(name: string, inputs: Partial<PassInputs>, skip = false): this {
     if (this.#disposed) throw new MargoError('disposed', 'GpuGrid is disposed; create a new one');
-    this.#buffers.run(this.#pipelines[name], { ...NO_INPUTS, ...inputs });
+    if (!skip) this.#buffers.run(this.#pipelines[name], { ...NO_INPUTS, ...inputs });
     return this;
   }
 
@@ -129,7 +140,10 @@ export class GpuGrid {
     if (shape.shape === 'box') {
       checkCell(shape.min, 'GpuGrid.fill min');
       checkCell(shape.max, 'GpuGrid.fill max');
-      return this.#run('fill', { params: [...shape.min, ...shape.max, value, 0] });
+      // Clipped to the grid on the CPU, so the corners stay whole f32 values whatever cells were passed.
+      const lo = shape.min.map((v, a) => Math.min(Math.max(v, 0), this.size[a])),
+        hi = shape.max.map((v, a) => Math.min(Math.max(v, 0), this.size[a]));
+      return this.#run('fill', { params: [...lo, ...hi, value, 0] }, lo.some((v, a) => v >= hi[a]));
     }
     if (shape.shape !== 'sphere')
       throw new TypeError("GpuGrid.fill shape is unknown; pass {shape: 'box'} or {shape: 'sphere'}");
@@ -138,8 +152,14 @@ export class GpuGrid {
     if (typeof shape.radius !== 'number' || !(shape.radius >= 0) || shape.radius > 128)
       throw new RangeError(`GpuGrid.fill radius is ${shape.radius}; pass 0 to 128`);
     // Whole-cell distances: d . d <= r^2 holds exactly when it holds for floor(r^2).
-    const center = shape.center.map(Math.round);
-    return this.#run('fill', { params: [...center, Math.floor(shape.radius * shape.radius), 0, 0, value, 1] });
+    const center = shape.center.map(Math.round) as [number, number, number],
+      reach = Math.ceil(shape.radius),
+      outside = center.some((c, a) => c + reach < 0 || c - reach >= this.size[a]);
+    return this.#run(
+      'fill',
+      { toolOffset: center, params: [0, 0, 0, Math.floor(shape.radius * shape.radius), 0, 0, value, 1] },
+      outside,
+    );
   }
 
   /**
@@ -220,35 +240,10 @@ export class GpuGrid {
       throw new TypeError('GpuGrid.brush needs a live ShaderBrush; pass await ShaderBrush.create(device, code)');
     if (entry.device !== this.#device)
       throw new TypeError("GpuGrid.brush brush was made on another device; create it with this grid's device");
-    const pipeline = entry.pipeline;
     checkOptions(options, 'GpuGrid.brush');
-    const { passes = 1, params = [], seed = 0, tool, toolOffset = [0, 0, 0], table } = options;
-    if (!Number.isInteger(passes) || passes < 1 || passes > 1024)
-      throw new RangeError(`GpuGrid.brush passes is ${passes}; pass a whole number from 1 to 1024`);
-    if (
-      !Array.isArray(params) ||
-      params.length > 16 ||
-      !params.every((v) => typeof v === 'number' && Number.isFinite(v))
-    )
-      throw new TypeError('GpuGrid.brush params must be up to 16 finite numbers; pass an array such as [0.5]');
-    if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
-      throw new RangeError(`GpuGrid.brush seed is ${seed}; pass a whole number from 0 to 4294967295`);
-    if (tool !== undefined) checkGrid(tool, Infinity, 'GpuGrid.brush tool');
-    checkCell(toolOffset, 'GpuGrid.brush toolOffset');
-    if (table !== undefined && (typeof table?.length !== 'number' || table.length !== 256))
-      throw new TypeError('GpuGrid.brush table must hold 256 numbers; pass a Uint8Array(256)');
-    let mask: Uint8Array | null = null;
-    if (options.selection !== undefined) {
-      mask = new Uint8Array(Math.ceil(this.cells / 4) * 4);
-      for (let i = 0; i < options.selection.length; i++) {
-        const c = options.selection[i];
-        if (!Number.isInteger(c) || c < 0 || c >= this.cells)
-          throw new RangeError(`GpuGrid.brush selection holds ${c}, not a cell index; pass 0 to ${this.cells - 1}`);
-        mask[c] = 1;
-      }
-    }
+    const inputs = brushInputs(options, this.cells, Infinity, 'GpuGrid.brush');
     if (this.#disposed) throw new MargoError('disposed', 'GpuGrid is disposed; create a new one');
-    this.#buffers.run(pipeline, { passes, params, seed, mask, tool: tool ?? null, toolOffset, table: table ?? null });
+    this.#buffers.run(entry.pipeline, inputs);
     return this;
   }
 

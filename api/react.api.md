@@ -5,7 +5,7 @@
 ```ts
 import { Camera, EngineKernel, EngineOptions, FrameCallback, Geometry, Mesh, RenderView, Vec3 } from "@margoengine/core";
 import { EnginePlugin } from "@margoengine/core/extension";
-import { Texture } from "@margoengine/materials";
+import { EnvMapSource, Texture } from "@margoengine/materials";
 import { ColorInput } from "@margoengine/math";
 import { Stage } from "@margoengine/stage";
 import { CSSProperties, ElementType, ReactNode, RefAttributes } from "react";
@@ -154,6 +154,8 @@ export interface PbrMaterialProps {
     emissiveMap?: Texture | TextureSource | null;
     emissive?: string | readonly number[];
     emissiveIntensity?: number;
+    envMap?: EnvMapSource | null;
+    envMapIntensity?: number;
 }
 
 export interface PointerHandlers {

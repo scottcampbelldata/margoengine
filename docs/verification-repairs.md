@@ -32,11 +32,10 @@ Research/standards checked before repairing the wiring:
   test data; GPU readback/completion, already awaited here, supplies readiness.
 
 No production engine implementation, kernel or optional-entry bytes change.
-GPU commands use one shared slot per lane with wait-max 60; CPU checks hold no
-GPU lock. The local runner initially propagated that one-slot preference into
+CPU checks use no GPU. The local runner initially passed its environment setting into
 fake scheduler unit fixtures that require multiple synthetic readers. Correct
 only the ignored runner's environment for CPU checks; no scheduler test,
-production slot policy, time limit or tolerance is changed for that mistake.
+time limit or tolerance is changed for that mistake.
 
 The viz kit size growth belongs to the separate finding 8 restoration and is
 recorded from an actual static-bundle measurement in docs/guides/kits.md.
@@ -48,5 +47,5 @@ initialization case and all cases after the previously failing top-level await
 are included. Existing successful cases are retained. The affected real-GPU
 compute repairs are the already-landed main changes, with their native and
 compatibility evidence in the operational playbook. A redundant local compute
-GPU request was cancelled while still queued, with no lane GPU holder and no
+GPU request was cancelled before it started, and no
 GPU command executed. No passed GPU result is replayed.

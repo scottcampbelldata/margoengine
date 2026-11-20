@@ -100,6 +100,10 @@ interface FogLike {
   readonly enabled?: boolean;
 }
 
+type GpuContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
 interface MaskStyle {
   readonly mode?: 'fade' | 'highlight' | 'filter';
   readonly fade?: number;
@@ -265,6 +269,7 @@ class PointsPlugin implements EnginePlugin {
         uploads: number;
         uploadBytes: number;
     };
+    pixelScale: ((context: GpuContext) => number) | undefined;
     static attach(engine: EngineKernel, options?: PointsPluginOptions): PointsPlugin;
     constructor(options?: PointsPluginOptions);
     get pointClouds(): ReadonlySet<PointCloud>;
@@ -295,7 +300,7 @@ interface PointsPluginOptions {
     edlRadius?: number;
 }
 
-type PointsTextureSource = GPUTexture | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
+type PointsTextureSource = GPUTexture | ((device: GPUDevice) => GPUTexture) | ImageBitmap | HTMLCanvasElement | OffscreenCanvas | HTMLImageElement | HTMLVideoElement | ImageData;
 
 abstract class SelectionMasked {
   abstract readonly count: number;

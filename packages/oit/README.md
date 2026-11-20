@@ -2,7 +2,7 @@
 
 Import `margoengine/oit` from the `margoengine` package, or `@margoengine/oit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
 
-Order-independent transparency for glTF Pro BLEND primitives and `@margoengine/materials` transparent meshes:
+Order-independent transparency for glTF PBR BLEND primitives and `@margoengine/materials` transparent meshes:
 weighted blended OIT (McGuire and Bavoil, JCGT 2013) by default, [moments](#moments-momentoit) from
 `margoengine/oit/moments` for a closer result, or exact per-pixel layers from
 [`margoengine/oit/exact`](#exact-layers-exactoit). Overlapping transparent parts (a translucent CAD housing over
@@ -13,7 +13,7 @@ the same pass. WebGPU only.
 
 ```ts
 import {OIT} from 'margoengine/oit';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Material, createMesh} from 'margoengine/materials';
 import {boxGeometry} from 'margoengine/geometry';
 import {Engine} from 'margoengine/core';
@@ -26,10 +26,10 @@ oit.add(createMesh(engine, housingGeometry, new Material({color: '#9cc3e6', opac
 // oit.add(model) returns a remover; oit.dispose() puts every model back on sorted blending.
 ```
 
-Models that are not added keep glTF Pro's per-primitive back-to-front sorting, unchanged: the package hooks in through
-glTF Pro's declared transparency hook (`PBRModel.setTransparency`, documented on `PBRTransparency`), not text
+Models that are not added keep glTF PBR's per-primitive back-to-front sorting, unchanged: the package hooks in through
+glTF PBR's declared transparency hook (`PBRModel.setTransparency`, documented on `PBRTransparency`), not text
 patches, and without it every GPU call is identical (`examples/package-benchmarks/proofs/oit-detached.proof.js`).
-Size: 2,210 B min+gzip (`examples/package-benchmarks/results/entry-sizes.json`); the hook adds 323 B to glTF Pro's
+Size: 2,210 B min+gzip (`examples/package-benchmarks/results/entry-sizes.json`); the hook adds 323 B to glTF PBR's
 root entry. Core and the stage are unchanged.
 
 ## Core meshes
@@ -89,7 +89,7 @@ Limits:
 
 ## Linear-light layers (`blendSpace: 'linear'`)
 
-A material with `blendSpace: 'linear'` (materials `Material.blendSpace`, glTF Pro `renderState: {blendSpace: 'linear'}`)
+A material with `blendSpace: 'linear'` (materials `Material.blendSpace`, glTF PBR `renderState: {blendSpace: 'linear'}`)
 goes into the pass like any other transparent material, so it stays order-independent and mixes in linear light on a
 display-encoded canvas. Every pass here takes it: `OIT` (plain and `blending`), `ExactOIT`, `MomentOIT`, `PeelOIT` and
 `PreciseOIT`.
@@ -412,7 +412,7 @@ not a pass: `alphaHash()` from `margoengine/materials/alpha-hash` (materials REA
 - A composite pass draws one full-screen triangle over the scene: average colour `accum.rgb / accum.a` at coverage
   `1 − revealage`, blended premultiplied-over, so `TransparentCanvas` keeps valid alpha. It is the only pass that reads
   textures (the two targets, with `textureLoad`); the transparent draws add no texture bindings, so the 16-texture
-  budget in the glTF Pro README is unchanged.
+  budget in the glTF PBR README is unchanged.
 - MSAA: with a 4x scene the two targets are 4x and resolve at the end of the pass; the composite runs per pixel on the
   4x scene target. Inside `PostStack`, Tonemap, TAA or DOF captures the pass follows their target (HDR `rgba16float`
   colours accumulate linear). No transparent primitive drawn: no OIT pass at all.
@@ -472,7 +472,7 @@ CPU at 45-100 %):
 
 ## Reference measurement
 
-From the built repository run `node scripts/gpu-lock.mjs run --exclusive --owner=docs -- node packages/oit/scripts/rival-bench.mjs`.
+From the built repository run `node scripts/run-with-timeout.mjs -- node packages/oit/scripts/rival-bench.mjs`.
 The external depth-peeling install stays in engine-bench/batch-168 (setup and versions in
 [reproduce](../../docs/whitepaper/reproduce.md)). Five binary-colour panes are compared against exact
 ray-sorted emission/coverage transport, with common sRGB encoding after readback. The measured picture

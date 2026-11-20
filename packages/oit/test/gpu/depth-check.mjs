@@ -1,11 +1,9 @@
-// Real-GPU check for TransparentDepth: glass reaches the depth that TAA, depth of field and picking read. Takes a GPU slot
-// itself. From the repository root, after building packages: node packages/oit/test/gpu/depth-check.mjs
+// Real-GPU check for TransparentDepth: glass reaches the depth that TAA, depth of field and picking read.
+// From the repository root, after building packages: node packages/oit/test/gpu/depth-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'oit-depth' });
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/depth.html', port: 5288 }),
   { page } = context;
 try {
@@ -81,5 +79,4 @@ try {
   console.log('oit depth check passed');
 } finally {
   await context.close();
-  release();
 }

@@ -13,6 +13,7 @@ export class SpriteAnimation {
     get rect(): SpriteRect | undefined;
     play(name: string, restart?: boolean): this;
     update(dt: number): this;
+    advanceTime(dt: number): void;
     apply(sprite: {
         rect?: SpriteRect | undefined;
     }): void;

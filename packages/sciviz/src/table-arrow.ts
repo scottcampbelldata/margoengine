@@ -2,7 +2,7 @@
 import { collectBatches } from './table-batches.js';
 import { decodeColumnarBlock } from '@margoengine/decoders/snappy';
 import { ColumnarTable, type TableColumn, type TableValue } from './table.js';
-import { invalidTable as bad, scalarColumn, tableLimits, type TableReadOptions } from './table-read.js';
+import { half, invalidTable as bad, scalarColumn, tableLimits, type TableReadOptions } from './table-read.js';
 
 class Flat {
   readonly view: DataView;
@@ -35,7 +35,8 @@ function schema(f: Flat, t: number): { fields: Field[]; little: boolean } {
     if (type === 2) { field.bits = f.scalar(detail, 0); field.signed = !!f.scalar(detail, 1, 1); }
     else if (type === 3) field.bits = [16, 32, 64][f.scalar(detail, 0, 2)];
     else if (type === 8) { field.bits = f.scalar(detail, 0, 2, 1) ? 64 : 32; field.unit = field.bits === 32 ? 'date:day' : 'date:ms'; }
-    else if ([9, 10, 18].includes(type)) { field.bits = type === 9 ? f.scalar(detail, 1, 4, 32) : 64; field.unit = `${type === 10 ? 'timestamp' : type === 18 ? 'duration' : 'time'}:${['s', 'ms', 'us', 'ns'][f.scalar(detail, 0, 2)]}${type === 10 && f.string(detail, 1) ? ':' + f.string(detail, 1) : ''}`; }
+    // Schema.fbs defaults: Time and Duration units are MILLISECOND when omitted, Timestamp's is SECOND.
+    else if ([9, 10, 18].includes(type)) { field.bits = type === 9 ? f.scalar(detail, 1, 4, 32) : 64; field.unit = `${type === 10 ? 'timestamp' : type === 18 ? 'duration' : 'time'}:${['s', 'ms', 'us', 'ns'][f.scalar(detail, 0, 2, type === 10 ? 0 : 1)]}${type === 10 && f.string(detail, 1) ? ':' + f.string(detail, 1) : ''}`; }
     else if (type === 7) { field.bits = f.scalar(detail, 2, 4, 128); field.unit = 'decimal:' + (f.scalar(detail, 1) | 0); }
     else if (type === 15) { field.bits = f.scalar(detail, 0) * 8; field.unit = 'binary:hex'; }
     else if (![1, 4, 5, 6, 19, 20].includes(type)) bad(`unsupported non-scalar Arrow type ${type}`);
@@ -49,7 +50,6 @@ function schema(f: Flat, t: number): { fields: Field[]; little: boolean } {
   return { fields, little: f.scalar(t, 0, 2) === 0 };
 }
 const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-function half(v: number): number { const sign = v & 32768 ? -1 : 1, exponent = (v >>> 10) & 31, fraction = v & 1023; return sign * (exponent === 31 ? fraction ? NaN : Infinity : exponent ? 2 ** (exponent - 15) * (1 + fraction / 1024) : 2 ** -14 * fraction / 1024); }
 function primitive(bytes: Uint8Array, field: Field, count: number, little: boolean): TableValue[] {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), width = field.type === 6 ? 0 : field.bits / 8;
   if (field.type === 6) { if (bytes.length < Math.ceil(count / 8)) bad('Arrow boolean buffer is truncated'); return Array.from({ length: count }, (_, i) => (bytes[i >> 3] >>> (i & 7)) & 1); }

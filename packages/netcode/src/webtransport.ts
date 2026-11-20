@@ -104,7 +104,15 @@ class SessionConnection implements Connection {
       used = 0;
     for (;;) {
       const { done, value } = await reader.read().catch(() => ({ done: true, value: undefined }));
-      if (done || this.closed) return;
+      if (this.closed) return;
+      // The stream ended or was reset while the session lives: reliable messages can no longer arrive, so the
+      // connection must not stay open with only its datagrams working. A session that ends errors its streams and
+      // resolves `closed` in the same task (W3C WebTransport, "cleanup"), so waiting one task lets the peer's own
+      // close code and reason win over this one.
+      if (done) {
+        setTimeout(() => this.close(CloseCode.protocol, 'reliable stream ended'), 0);
+        return;
+      }
       const chunk = value as Uint8Array;
       if (used + chunk.length > held.length) {
         const bigger = new Uint8Array(Math.max(held.length * 2, used + chunk.length));
@@ -190,7 +198,13 @@ export async function acceptWebTransport(
     { done, value } = await reader.read();
   reader.releaseLock();
   if (done || !value) throw fault('failed', 'WebTransport session ended before its stream opened; check the client');
-  return webTransportConnection(session, value, options);
+  try {
+    return webTransportConnection(session, value, options);
+  } catch (error) {
+    // The session is up; one that cannot become a connection is closed, not left holding the client's stream.
+    session.close({ closeCode: CloseCode.error, reason: 'no connection' });
+    throw error;
+  }
 }
 
 /**
@@ -226,6 +240,8 @@ export async function openWebTransport(url: string, options: OpenWebTransportOpt
     signal?.throwIfAborted();
     return webTransportConnection(session, stream, options);
   } catch (error) {
+    // Whatever failed, the session must not outlive the rejected open (closing an ended one does nothing).
+    session.close({ closeCode: CloseCode.normal, reason: signal?.aborted ? 'aborted' : 'open failed' });
     if (signal?.aborted) throw signal.reason;
     throw fault('failed', `WebTransport to ${url} did not open (${(error as Error).message}); check the server`);
   } finally {

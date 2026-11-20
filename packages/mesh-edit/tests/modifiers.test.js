@@ -73,6 +73,67 @@ test('array repeats by offset and bounding box, and welds touching copies', () =
   assert.equal(welded.vertexMap.length, plane.vertices.length);
 });
 
+test('array merge joins neighboring copies only, never close vertices inside one copy', () => {
+  // Two quads with a 0.004 slot between them: a merge of 0.01 must join the copies at x = 1 and keep the slot open.
+  const uv = [
+      [0, 0],
+      [1, 0],
+      [1, 1],
+      [0, 1],
+    ],
+    slotted = {
+      vertices: [
+        [0, 0, 0],
+        [0.498, 0, 0],
+        [0.498, 1, 0],
+        [0, 1, 0],
+        [0.502, 0, 0],
+        [1, 0, 0],
+        [1, 1, 0],
+        [0.502, 1, 0],
+      ],
+      faces: [
+        { id: 'a', vertices: [0, 1, 2, 3], uv },
+        { id: 'b', vertices: [4, 5, 6, 7], uv },
+      ],
+    },
+    { mesh } = applyMeshModifiers(slotted, [{ type: 'array', count: 2, merge: 0.01 }]);
+  assert.equal(mesh.vertices.length, 14);
+  assert.equal(mesh.faces.length, 4);
+  for (const x of [0.498, 0.502, 1.498, 1.502])
+    assert.equal(mesh.vertices.filter((p) => Math.abs(p[0] - x) < 1e-12).length, 2, `slot side at x = ${x}`);
+  assert.equal(mesh.vertices.filter((p) => Math.abs(p[0] - 1) < 1e-12).length, 2);
+});
+
+test('array and screw take meshes too large to spread into Math.max', () => {
+  // Spreading over 125,000 numbers into one Math.max call overflows the call stack. The array grid has 130,321
+  // vertices; the screw grid has 58,081, which is 174,243 coordinates.
+  const grid = (n) => {
+    const vertices = [],
+      faces = [];
+    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) vertices.push([i / n, j / n, 0]);
+    for (let j = 0; j < n; j++)
+      for (let i = 0; i < n; i++) {
+        const a = j * (n + 1) + i;
+        faces.push({
+          id: `f${a}`,
+          vertices: [a, a + 1, a + n + 2, a + n + 1],
+          uv: [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [0, 1],
+          ],
+        });
+      }
+    return { vertices, faces };
+  };
+  const array = applyMeshModifiers(grid(360), [{ type: 'array', count: 1 }]).mesh;
+  assert.equal(array.faces.length, 360 * 360);
+  const screw = applyMeshModifiers(grid(240), [{ type: 'screw', axis: 'x', origin: [0, -1, 0], angle: 1, steps: 1 }]);
+  assert.equal(screw.mesh.faces.length, 2 * 240 * 240 + 4 * 240);
+});
+
 test('solidify shells a closed solid and walls an open surface', () => {
   const cube = createPrimitiveMesh('cube', 'box'),
     shell = applyMeshModifiers(cube, [{ type: 'solidify', thickness: 0.1 }]);

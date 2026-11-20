@@ -8,6 +8,11 @@ class Canvas extends EventTarget {
   clientWidth = 64;
   clientHeight = 32;
   style = { touchAction: 'auto' };
+  // A canvas in the page's document when the process has one (a fixture that brings a DOM, such as React's on jsdom).
+  // A fixture may set its own document.
+  #document;
+  get ownerDocument() { return this.#document ?? globalThis.document; }
+  set ownerDocument(value) { this.#document = value; }
   captures = new Set();
   setPointerCapture(id) { this.captures.add(id); }
   releasePointerCapture(id) { this.captures.delete(id); }
@@ -36,20 +41,47 @@ const enums = {
   GPUShaderStage: { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 },
   GPUTextureUsage: { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 },
 };
+// A real GPUDevice has a `lost` promise that settles when it is lost; the inert one gets one, settled by `lose` below.
+const settleLost = new WeakMap();
 function completeDevice(device) {
+  if (!device.lost) device.lost = new Promise((resolve) => settleLost.set(device, resolve));
   device.createPipelineLayout ??= (descriptor) => descriptor;
+  device.createRenderPipelineAsync ??= async (descriptor) => device.createRenderPipeline(descriptor);
+  device.createComputePipelineAsync ??= async (descriptor) => device.createComputePipeline(descriptor);
+  device.createRenderBundleEncoder ??= () => ({
+    setPipeline() {}, setBindGroup() {}, setVertexBuffer() {}, setIndexBuffer() {}, draw() {}, drawIndexed() {},
+    drawIndirect() {}, drawIndexedIndirect() {}, finish: () => ({}),
+  });
   device.pushErrorScope ??= () => {};
   device.popErrorScope ??= async () => null;
   device.queue.writeTexture ??= () => {};
   device.limits.maxTextureArrayLayers ??= 256;
   device.limits.maxTextureDimension2D ??= 8192;
+  // A real GPUTexture reports its layer and mip level counts (mipLevelCount defaults to 1); the inert one does not.
+  const createTexture = device.createTexture;
+  device.createTexture = function (descriptor) {
+    const texture = createTexture.call(this, descriptor);
+    texture.depthOrArrayLayers ??= descriptor.size?.[2] ?? descriptor.size?.depthOrArrayLayers ?? 1;
+    texture.mipLevelCount ??= descriptor.mipLevelCount ?? 1;
+    return texture;
+  };
+  // A real GPUShaderModule answers getCompilationInfo (an empty message list for valid code); the inert one does not.
+  const createShaderModule = device.createShaderModule;
+  device.createShaderModule = function (descriptor) {
+    const module = createShaderModule.call(this, descriptor);
+    module.getCompilationInfo ??= async () => ({ messages: [] });
+    return module;
+  };
 }
-// Core's standard lit shader lines that plugins rewrite (lighting, tone mapping, ambient), and its vertex layout, as a
-// real frame hands them over.
-const standardShader = [
-  '@group(0) @binding(0) var<uniform> frame:Frame;', '@vertex fn vertex(i:Input)->Output {',
-  '@fragment fn fragment(i:In)->@location(0) vec4f {', 'let direct=vec3f(1);',
-  'let ambient=i.color*frame.radiance.w*frame.ambient.rgb;', 'let linear=direct*vec3f(1);',
+// Core's standard lit shader lines that plugins rewrite (lighting, tone mapping, ambient, the clip transform TAA and
+// captures replace), and its vertex layout, as a real frame hands them over.
+export const standardShader = [
+  '@group(0) @binding(0) var<uniform> frame:Frame;',
+  'struct Output { @builtin(position) @invariant clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) color:vec3f,@location(3) material:vec4f }',
+  '@vertex fn vertex(i:Input)->Output {', 'let model=mat4x4f(i.m0,i.m1,i.m2,i.m3);let p=model*vec4f(i.position,1);',
+  'var o:Output;o.clip=frame.camera*p;o.position=p.xyz;',
+  '@fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) vec4f {', 'let direct=vec3f(1);',
+  'let ambient=i.color*frame.radiance.w*frame.ambient.rgb;', 'let linear=direct*frame.radiance.xyz*frame.light.w+i.color*(1.0-i.material.y)*frame.radiance.w*frame.ambient.rgb;',
   'let mapped=pbrNeutral(max(linear,vec3f(0))); return vec4f(mapped,1);}',
 ].join('\n');
 
@@ -75,6 +107,7 @@ export async function nodeLifetimeAdapter() {
           beginRenderPass(descriptor) {
             return { ...begin(descriptor), setViewport() {}, setScissorRect() {}, setStencilReference() {} };
           },
+          copyTextureToBuffer() {},
           finish() { return {}; },
         });
         return h;
@@ -105,6 +138,7 @@ export async function nodeLifetimeAdapter() {
         async lose(observer) {
           // Deterministic notification simulation; browser adapter separately proves real device destruction/recovery.
           observer.lost(renderer.gpu);
+          settleLost.get(renderer.gpu)?.({ reason: 'unknown', message: 'owner-lifetime device loss' });
           gpu = makeGPU();
           renderer.gpu = gpu.engine.gpu;
           observer.watchDevice(renderer.gpu);

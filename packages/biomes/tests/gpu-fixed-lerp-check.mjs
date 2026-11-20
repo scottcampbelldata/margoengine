@@ -10,7 +10,9 @@ async function check() {
   // Deadline only, never a timing measurement; kill our browser process tree if evaluation or launch hangs.
   const deadline = setTimeout(() => {
     console.error('Q16 WebGPU correctness check exceeded its five-minute bound');
-    void endTree(process.pid, { waitMs: 10000 }).finally(() => process.exit(1));
+    void endTree(process.pid, { waitMs: 10000 }).finally(() => {
+      process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
+    });
   }, 290000);
   let context;
   const pageErrors = [];

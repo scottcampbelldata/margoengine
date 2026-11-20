@@ -63,7 +63,7 @@ import { Suspense } from 'react';
 import { Canvas, useProgress } from '@margoengine/react';
 import { OrbitControls } from '@margoengine/react/controls';
 import { Environment } from '@margoengine/react/environment';
-import { Model } from '@margoengine/react/gltf-pro';
+import { Model } from '@margoengine/react/gltf';
 
 function Loading() {
   const { progress } = useProgress();
@@ -93,7 +93,7 @@ export function Viewer() {
 import { useRef } from 'react';
 import { Canvas } from '@margoengine/react';
 import { Animation, type AnimationHandle } from '@margoengine/react/animation';
-import { Model } from '@margoengine/react/gltf-pro';
+import { Model } from '@margoengine/react/gltf';
 
 export function Character() {
   const handle = useRef<AnimationHandle>(null);

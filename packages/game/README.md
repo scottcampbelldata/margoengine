@@ -1,12 +1,12 @@
 # @margoengine/game
 
-Games: models, animation, light and shadow, sky, physics, audio, input, effects.
+Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects.
 
-This package installs only its declared domain members and forwards their original typed modules.
+It holds no code of its own and only re-exports its member packages: it installs only its declared domain members and forwards their original typed modules.
 The root contains common exports; member subpaths expose the complete installed member APIs.
 All packages release together at one version. Optional third-party peers remain app choices.
 
-See the [kits guide](https://margoengine.com/llms/guides/kits.md) for profile contents, independent installs,
+See the [kits guide](https://margoengine.com/llms/docs/guides/kits.md) for profile contents, independent installs,
 model-loading entries and measured package counts.
 
 With a `<div id="viewport" style="height:400px"></div>` in the page:
@@ -33,5 +33,5 @@ stage.onTick((delta) => {
 });
 ```
 
-Model loading is a separate import: `import {loadGLTF} from '@margoengine/game/gltf-pro'`.
+Model loading is a separate import: `import {loadGLTF} from '@margoengine/game/gltf/pbr'`.
 Physics is one too: `import {Physics} from '@margoengine/game/physics'`. A game without it ships no solver Wasm.

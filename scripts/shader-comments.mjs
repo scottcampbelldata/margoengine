@@ -29,6 +29,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { parseSync } from 'rolldown/utils';
+import { distDir } from './support/dist-dir.mjs';
 
 const LINE_BREAK = { wgsl: /[\n\v\f\r\u0085\u2028\u2029]/, glsl: /[\n\r]/ };
 const HORIZONTAL = { wgsl: /[ \t\u200e\u200f]$/, glsl: /[ \t]$/ };
@@ -36,7 +37,8 @@ const BLANK = { wgsl: /[\t\n\v\f\r \u0085\u200e\u200f\u2028\u2029]/, glsl: /[\t\
 
 const WGSL_STRONG =
   /\bfn\s+\w+\s*\(|@(vertex|fragment|compute|group|binding|builtin|location|workgroup_size|interpolate|must_use|diagnostic)\b|\bvar<(storage|uniform|private|workgroup|function)\b|\bstruct\s+\w+\s*\{\s*(@\w+(\([^)]*\))?\s*)*\w+\s*:/;
-const WGSL_FRAGMENT_STATEMENT = /\b(let|var|const)\s+\w+\s*(:\s*[\w<>, ]+)?\s*=[^=]/;
+const WGSL_FRAGMENT_STATEMENT =
+  /\b(let|var|const)\s+\w+\s*(:\s*[\w<>, ]+)?\s*=[^=]|\breturn\s+(vec[234][fiuh]|select|textureSample\w*)\s*\(/;
 const WGSL_FRAGMENT_TYPE =
   /\b(vec[234][fiuh]|vec[234]<|mat[234]x[234][fh]?|f32|u32|i32|f16|array<|texture_\w+|textureSample\w*|textureLoad|unpack\w+|pack\w+)\b|\bselect\(/;
 const GLSL =
@@ -293,13 +295,18 @@ export function shaderCommentsLeft(code, filename, anchors = []) {
 
 // KB-WGSL1 lands package by package, each batch with the GPU tests of the packages it strips: the packages stripped so
 // far. It goes (null) once every package is; the shader-comments quality gate records what is left meanwhile.
-const ROLLOUT = new Set(['cameras', 'compute', 'lod', 'robot-planning', 'taa', 'tonemap']);
+const ROLLOUT = new Set([
+  ...['cameras', 'compute', 'lod', 'robot-planning', 'taa', 'tonemap'],
+  ...['animation', 'biomes', 'blender', 'bvh', 'creative', 'culling', 'decoders', 'fbx', 'geometry', 'lighting2d'],
+  ...['lightmap', 'lines', 'oit', 'pixel', 'points', 'procedural', 'shader', 'sky', 'splats', 'studio'],
+  ...['terrain', 'text', 'tilemap', 'transitions', 'usdz', 'vfx', 'voxel', 'water', 'weather', 'xr'],
+]);
 
 /**
  * Applied after emission, beside declarePackageCore, by every package build: strips the shader comments of every .js
  * and .d.ts file under the package's dist. Returns the number of files rewritten and comments removed.
  */
-export async function stripPackageShaderComments(root) {
+export async function stripPackageShaderComments(root, dist = distDir(root)) {
   if (ROLLOUT && !ROLLOUT.has(basename(root))) return { files: 0, comments: 0 };
   const anchors = packageAnchors(root),
     total = { files: 0, comments: 0 };
@@ -325,6 +332,6 @@ export async function stripPackageShaderComments(root) {
       }
     }
   }
-  await visit(join(root, 'dist'));
+  await visit(dist);
   return total;
 }

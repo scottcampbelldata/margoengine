@@ -37,8 +37,15 @@ const declarations = `@group(0) @binding(8) var<uniform> skyLight:array<vec4f,10
 @group(0) @binding(10) var skyLightMap:texture_2d<f32>;
 @group(0) @binding(11) var skyLightSampler:sampler;
 // Irradiance over pi for a unit normal: the sky's nine coefficients, never below the ambient floor.
+// The coefficients are in the sky's units; skyLight[9].w (Sky.lightScale) takes them into the engine light's.
 fn skyIrradiance(n:vec3f)->vec3f {
- return max(skyLight[0].rgb+skyLight[1].rgb*n.y+skyLight[2].rgb*n.z+skyLight[3].rgb*n.x+skyLight[4].rgb*(n.x*n.y)+skyLight[5].rgb*(n.y*n.z)+skyLight[6].rgb*(3.0*n.z*n.z-1.0)+skyLight[7].rgb*(n.x*n.z)+skyLight[8].rgb*(n.x*n.x-n.y*n.y),skyLight[9].rgb);
+ return max((skyLight[0].rgb+skyLight[1].rgb*n.y+skyLight[2].rgb*n.z+skyLight[3].rgb*n.x+skyLight[4].rgb*(n.x*n.y)+skyLight[5].rgb*(n.y*n.z)+skyLight[6].rgb*(3.0*n.z*n.z-1.0)+skyLight[7].rgb*(n.x*n.z)+skyLight[8].rgb*(n.x*n.x-n.y*n.y))*skyLight[9].w,skyLight[9].rgb);
+}
+// The sky map toward the unit direction r, blurred through its mips by roughness, in the engine light's units. Light
+// probes (@margoengine/environment/probes with a sky) read it with skyIrradiance as their fallback outside the probes.
+fn skyRadiance(r:vec3f,rough:f32)->vec3f {
+ let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,-1.0,1.0))/3.14159265);
+ return textureSampleLevel(skyLightMap,skyLightSampler,uv,rough*3.0).rgb*skyLight[9].w;
 }
 // Diffuse sky light plus split-sum specular (Karis 2013): the sky map blurred through its mips by roughness, times
 // Karis's analytic environment BRDF (2014) instead of a lookup table.
@@ -48,7 +55,7 @@ fn skyLighting(n:vec3f,v:vec3f,base:vec3f,metal:f32,roughness:f32,dielectricF0:v
  let a=min(k.x*k.x,exp2(-9.28*nv))*k.x+k.y;let ab=vec2f(-1.04,1.04)*a+k.zw;
  let specular=mix(dielectricF0,base,metal)*ab.x+mix(dielectricF90,1.0,metal)*ab.y;
  let uv=vec2f(atan2(r.z,r.x)/6.2831853+0.5,acos(clamp(r.y,-1.0,1.0))/3.14159265);
- return (vec3f(1.0)-specular)*(1.0-metal)*base*skyIrradiance(n)+textureSampleLevel(skyLightMap,skyLightSampler,uv,rough*3.0).rgb*specular;
+ return (vec3f(1.0)-specular)*(1.0-metal)*base*skyIrradiance(n)+textureSampleLevel(skyLightMap,skyLightSampler,uv,rough*3.0).rgb*skyLight[9].w*specular;
 }
 `;
 /**
@@ -63,32 +70,57 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       !Number.isFinite(Math.fround(l.intensity ?? 1)) ||
       (l.intensity ?? 1) < 0 ||
       !Number.isFinite(Math.fround(l.minimum ?? 0)) ||
-      (l.minimum ?? 0) < 0
+      (l.minimum ?? 0) < 0 ||
+      !((l.ground ?? 0.2) >= 0 && (l.ground ?? 0.2) <= 1)
     )
       throw new RangeError(
-        'Invalid sky lighting options; set intensity and minimum to finite numbers of 0 or more, or leave them out.',
+        'Invalid sky lighting options; set intensity and minimum to finite numbers of 0 or more and ground to an albedo from 0 to 1, or leave them out.',
       );
     if (
       (l.moon !== undefined &&
         (typeof l.moon !== 'object' ||
           l.moon === null ||
-          !Number.isFinite(Math.fround(l.moon.intensity ?? (l.intensity ?? 1) * 0.1)) ||
-          (l.moon.intensity ?? 0) < 0)) ||
+          !Number.isFinite(Math.fround(l.moon.intensity ?? 0)) ||
+          (l.moon.intensity ?? 0) < 0 ||
+          !((l.moon.extinction ?? 0) >= 0 && (l.moon.extinction ?? 0) <= 2) ||
+          !(typeof l.moon.brightness === 'string'
+            ? l.moon.brightness === 'bright' || l.moon.brightness === 'dim'
+            : (l.moon.brightness ?? 1) >= 0 && (l.moon.brightness ?? 1) <= 1e4) ||
+          (typeof l.moon.color === 'string' && l.moon.color !== 'blood' && l.moon.color !== 'reddened') ||
+          !((l.moon.cloudCover ?? 0) >= 0 && (l.moon.cloudCover ?? 0) <= 1))) ||
       (l.ambient !== undefined && (typeof l.ambient !== 'object' || l.ambient === null))
     )
       throw new RangeError(
-        'Invalid sky night options; give moon and ambient as objects, with a finite moon intensity of 0 or more.',
+        "Invalid sky night options; give moon and ambient as objects, with a finite moon intensity of 0 or more, a moon extinction from 0 to 2, a moon brightness from 0 to 10000 or 'bright' or 'dim', a moon color of linear RGB or 'blood' or 'reddened', and a moon cloudCover from 0 to 1.",
       );
-    for (const color of [l.color, l.sunset, l.moon?.color, l.ambient?.day, l.ambient?.night])
+    for (const color of [l.color, l.sunset, typeof l.moon?.color === 'string' ? undefined : l.moon?.color, l.ambient?.day, l.ambient?.night])
       if (color !== undefined) {
         finiteVector(color, 3, 'Sky color');
         if (color.some((v) => v < 0)) throw new RangeError('Invalid sky color; use non-negative RGB components.');
       }
+    const t = l.twilight;
+    if (
+      t !== undefined &&
+      t !== false &&
+      (typeof t !== 'object' ||
+        t === null ||
+        !((t.brightness ?? 1) >= 0 && (t.brightness ?? 1) <= 1e4) ||
+        !((t.cloudCover ?? 0) >= 0 && (t.cloudCover ?? 0) <= 1))
+    )
+      throw new RangeError(
+        'Invalid sky twilight; give false or an object with a brightness from 0 to 10000 and a cloudCover from 0 to 1.',
+      );
+    if (t && t.color !== undefined) {
+      finiteVector(t.color, 3, 'Sky twilight color');
+      if (t.color.some((v) => v < 0)) throw new RangeError('Invalid sky color; use non-negative RGB components.');
+    }
     if (l.ambient && (!l.ambient.day || !l.ambient.night))
       throw new RangeError('Invalid sky ambient colors; give both ambient.day and ambient.night.');
   },
   create(d, code, entries, owned) {
-    const floor = new Float32Array(4),
+    // Rows 9 and 10 of the light buffer: the ambient floor and the light scale; the sun's light on level ground (E / pi,
+    // the sky's units) and the ground's albedo, which the projection (project.ts) reads.
+    const floor = new Float32Array(8),
       descriptor: GPUComputePassDescriptor = {},
       sizes = [8, 4, 4, 4, 2, 2, 1, 1, 1, 1];
     let source = '',
@@ -96,7 +128,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
     // Built on the first ambient frame, so a sky that only drives the light allocates nothing for it.
     const build = () => {
       const buffer = d.createBuffer({
-          size: 160,
+          size: 176,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }),
         map = d.createTexture({
@@ -181,23 +213,63 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
           entries: [...entries, { binding: 3, resource: gpu.top }],
         });
       },
-      update({ direction, radiance }, sky, l, ambient, night) {
+      update({ direction, radiance }, sky, l, ambient, night, scale) {
+        floor[3] = scale;
         if (ambient) for (let i = 0; i < 3; i++) floor[i] = ambient.day[i] * (1 - night) + ambient.night[i] * night;
+        floor[4] = floor[5] = floor[6] = 0;
+        floor[7] = l?.ground ?? 0.2;
         // Without `lighting` only the ambient floor moves: the fallback environment never drives the engine light.
         if (!l) return;
         // shortcut: one directional source shares PCSS, use separate shadow maps for simultaneous sun/moon shadows.
-        // The engine light is whichever of sun and moon is stronger. The sun fades out through its own transmittance
+        // The engine light is whichever of sun and moon is stronger above the cloud; the moon's is the light under it
+        // (Sky.moonUnderClouds, dimmed by lighting.moon.cloudCover). The sun fades out through its own transmittance
         // as its disc sets before the moon fades in, so at dusk the light switches direction while both are near zero
         // (a cross-fade) instead of sweeping through blended directions across the sky.
+        // Twilight (sky.twilightLight) is the sky's light on the sun's side; it adds to the sun's beam as irradiance
+        // vectors, the sum of both sources as in reality: for any surface both reach, n . (E1 d1 + E2 d2) is the light
+        // the two give, and on the ground it is the measured sum of beam and sky. Both lie in the sun's vertical plane,
+        // so the light rises from the setting sun toward the twilight glow without crossing the sky, and as the beam
+        // goes out the sum becomes the twilight alone (KB-TWILIGHT1). The moon still takes over only as a whole body,
+        // while it is stronger under the cloud than the twilight, when both are dim.
         const sun = sky.lights[0],
           moon = sky.lights[1],
-          body = l.moon && moon.direction[3] > sun.direction[3] ? moon : sun;
-        for (let i = 0; i < 3; i++) {
-          direction[i] = body.direction[i];
-          radiance[i] = body.radiance[i];
+          dusk = sky.twilightLight,
+          below = sky.moonUnderClouds,
+          lum = (c: Float32Array) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2],
+          a = sun.direction,
+          b = dusk.direction,
+          wa = a[3] * lum(sun.radiance),
+          wb = b[3] * lum(dusk.radiance);
+        if (l.moon && moon.direction[3] > a[3] && below.direction[3] * lum(below.radiance) >= wb) {
+          for (let i = 0; i < 3; i++) {
+            direction[i] = below.direction[i];
+            radiance[i] = below.radiance[i];
+          }
+          direction[3] = Math.max(l.minimum ?? 0, below.direction[3]);
+        } else if (b[3] === 0) {
+          for (let i = 0; i < 3; i++) {
+            direction[i] = a[i];
+            radiance[i] = sun.radiance[i];
+          }
+          direction[3] = Math.max(l.minimum ?? 0, a[3]);
+        } else {
+          // Direction: the luminance-weighted sum. Colour: the intensity-weighted mean. Intensity: the sum's length
+          // over that colour's luminance, so the luminance each surface receives is exactly the two lights' sum.
+          const x = wa * a[0] + wb * b[0],
+            y = wa * a[1] + wb * b[1],
+            z = wa * a[2] + wb * b[2],
+            length = Math.hypot(x, y, z),
+            total = a[3] + b[3];
+          for (let i = 0; i < 3; i++) radiance[i] = (a[3] * sun.radiance[i] + b[3] * dusk.radiance[i]) / total;
+          direction[0] = x / length;
+          direction[1] = y / length;
+          direction[2] = z / length;
+          direction[3] = Math.max(l.minimum ?? 0, length / (lum(radiance) || 1));
         }
-        direction[3] = Math.max(l.minimum ?? 0, body.direction[3]);
         if (ambient) radiance[3] = Math.max(floor[0], floor[1], floor[2]);
+        // The engine light on level ground, E / pi in the sky's units, for the ground's reflected light.
+        const level = (Math.max(direction[1], 0) * direction[3]) / (Math.PI * (scale || 1));
+        for (let i = 0; i < 3; i++) floor[4 + i] = radiance[i] * level;
       },
       pass(c, layer) {
         const g = (gpu ??= build()),
@@ -218,9 +290,14 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
         }
         encoder.end();
         c.device.queue.writeBuffer(g.buffer, 144, floor as Float32Array<ArrayBuffer>);
+      },
+      patch(c) {
+        if (!gpu) return;
         if (source !== c.shader) {
           const anchor = /let linear=([^;]+);/.exec(c.shader);
-          if (!anchor?.[1].includes('frame.radiance.w'))
+          // Core's constant ambient term, or a HemisphereLight's sky term in its place (environment, order -1): the
+          // hemisphere's light stays beside the sky's, as when the sky patched first.
+          if (!anchor || !(anchor[1].includes('frame.radiance.w') || anchor[1].includes('margoSkyLight(')))
             throw new MargoError(
               'unsupported',
               "Sky ambient requires the standard PBR shader; remove the plugin that replaced core's shader",
@@ -231,7 +308,7 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
           shader = declarations + c.shader.replace(anchor[0], () => linear);
         }
         c.shader = shader;
-        c.bindings.push(...g.bindings);
+        c.bindings.push(...gpu.bindings);
       },
     };
   },

@@ -10,6 +10,8 @@ import { MargoError } from '@margoengine/math/errors';
 import type { CompoundPart, Physics, PhysicsBody } from '@margoengine/physics';
 import type { BlockType } from './blocks.js';
 import { chunkKey, VoxelWorld } from './world.js';
+import type { VoxelOrigin } from './render.js';
+import { checkOrigin, originPoint } from './origin.js';
 
 /** Options of {@link VoxelDebris}. */
 export interface VoxelDebrisOptions {
@@ -39,6 +41,14 @@ export interface VoxelDebrisOptions {
   friction?: number;
   /** Core material per block type; default a `PbrMaterial` of the type's colour and roughness, one per type. */
   material?: (type: BlockType) => PbrMaterial;
+  /**
+   * Origin rebasing for worlds far from zero, as `VoxelRendererOptions.origin` (pass the same object): an object whose
+   * `origin` is the float64 world point (blocks) drawn at engine zero, such as a `FloatingOrigin` of
+   * `@margoengine/cameras/origin`; read every update. Pieces' meshes sit at their centre minus the origin in float64.
+   * Not with `physics`, which simulates in world coordinates (docs/known-bugs.md). Default null (world and engine
+   * space are the same).
+   */
+  origin?: VoxelOrigin | null;
 }
 
 /** One broken-off group of blocks. */
@@ -130,11 +140,15 @@ export class VoxelDebris {
   #listeners = new Set<(piece: DebrisPiece) => void>();
   #off: () => void;
   #disposed = false;
+  #placed: [number, number, number] = [0, 0, 0];
+  /** Live {@link VoxelDebrisOptions.origin}; null for none. */
+  origin: VoxelOrigin | null;
 
   /**
    * @throws TypeError when `world` is not a VoxelWorld, `physics` not a Physics, `engine` not an Engine or an option
    * of the wrong type.
    * @throws RangeError for an option out of range or an anchor that is not a defined block type.
+   * @throws MargoError `unsupported` for `origin` with `physics`.
    */
   constructor(world: VoxelWorld, options: VoxelDebrisOptions = {}) {
     if (!(world instanceof VoxelWorld))
@@ -151,6 +165,7 @@ export class VoxelDebris {
       density = 1,
       friction = 0.6,
       material,
+      origin,
     } = options;
     if (physics !== undefined && (typeof physics?.addBody !== 'function' || typeof physics.removeBody !== 'function'))
       throw new TypeError(
@@ -173,6 +188,8 @@ export class VoxelDebris {
       );
     this.world = world;
     this.physics = physics ?? null;
+    this.origin = checkOrigin(origin, 'VoxelDebris');
+    this.#shift();
     this.#engine = engine ?? null;
     this.floor = floor;
     this.#anchors = anchors;
@@ -205,13 +222,20 @@ export class VoxelDebris {
 
   /**
    * Breaks off the groups cut loose since the last call, ages every piece by `delta` seconds and removes those past
-   * `lifetime`. Returns the pieces broken off by this call.
-   * @throws RangeError when `delta` is not a number >= 0. @throws MargoError `disposed` after dispose().
+   * `lifetime`. Moves the pieces' meshes first when the origin moved. Returns the pieces broken off by this call.
+   * @throws RangeError when `delta` is not a number >= 0 or the origin holds a value that is not a finite number.
+   * @throws MargoError `disposed` after dispose(); `unsupported` for an origin with `physics`.
    */
   update(delta = 0): DebrisPiece[] {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelDebris is disposed; create a new one');
     if (typeof delta !== 'number' || !(delta >= 0) || delta === Infinity)
       throw new RangeError(`VoxelDebris.update delta is ${delta}; pass seconds >= 0 such as 1 / 60`);
+    const shift = this.#shift();
+    if (shift.some((v, a) => v !== this.#placed[a])) {
+      this.#placed = shift;
+      for (const { meshes, center } of this.#pieces)
+        meshes[0]?.position.set(center[0] - shift[0], center[1] - shift[1], center[2] - shift[2]);
+    }
     const broken: DebrisPiece[] = [];
     if (this.#seeds.length) {
       this.#tables();
@@ -248,6 +272,16 @@ export class VoxelDebris {
 
   [Symbol.dispose](): void {
     this.dispose();
+  }
+
+  // The origin in float64; an origin with physics is refused, since the bodies drive the meshes in world coordinates.
+  #shift(): [number, number, number] {
+    if (this.origin && this.physics)
+      throw new MargoError(
+        'unsupported',
+        'VoxelDebris origin with physics: physics simulates in world coordinates; use physics near zero, or no origin',
+      );
+    return originPoint(this.origin, 'VoxelDebris');
   }
 
   readonly #edit = (x: number, y: number, z: number, state: number, previous: number): void => {
@@ -393,7 +427,8 @@ export class VoxelDebris {
         .createMesh(meshes[0] ?? null)
         .setGeometry(new Geometry(part.p, part.q, part.t))
         .setMaterial(material);
-      if (!meshes.length) mesh.position.set(center[0], center[1], center[2]);
+      if (!meshes.length)
+        mesh.position.set(center[0] - this.#placed[0], center[1] - this.#placed[1], center[2] - this.#placed[2]);
       meshes.push(mesh);
     }
     return meshes;

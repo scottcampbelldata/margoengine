@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/repeat.browser.mjs
 // A still scatter scene at 4x MSAA draws the same bits every frame: lit `Scatter` boxes on three LOD meshes, thin
 // grass blades and `ScatterTiles` records, six frames each with no time step, every value of the linear HDR scene compared. Before the

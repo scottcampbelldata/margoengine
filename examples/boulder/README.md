@@ -37,7 +37,7 @@ fails if a character cannot reach them.
 
 ```ts
 import { Engine } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Animation } from '@margoengine/animation';
 import { addLookAt, Animator } from '@margoengine/animator';
 

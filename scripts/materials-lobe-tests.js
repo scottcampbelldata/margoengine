@@ -5,6 +5,8 @@ import { openBrowser } from './browser.js';
 import { materialQuad } from '../tests/support/materials-fixture.js';
 import { textureQuad, texturePixels, basisTextureQuad } from '../tests/support/texture-fixture.js';
 import { iridescenceCases, iridescenceReference } from '../packages/materials/tests/support/iridescence-reference.js';
+import { sheenAlbedoWGSL } from '../packages/shared/sheen.js';
+import { wgslModule } from '../tests/support/wgsl-eval.js';
 
 export async function lobeBrowserChecks(page) {
   const fixture = materialQuad();
@@ -53,7 +55,7 @@ export async function lobeBrowserChecks(page) {
   return page.evaluate(
     async ({ doc, buffers, ...payload }) => {
       const { Engine } = await import('/packages/core/dist/index.js'),
-        { parseGLTF, loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+        { parseGLTF, loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const materials = await import('/packages/materials/dist/index.js'),
         assert = (value, message) => {
           if (!value) throw new Error(message);
@@ -661,9 +663,9 @@ export async function lobeBrowserChecks(page) {
           centre(transmissionBase.beauty).every((value, c) => Math.abs(value - [160, 80, 40][c]) <= 1),
           `Unlit IOR 1 transmission must show the background 160, 80, 40, got ${centre(transmissionBase.beauty)}`,
         );
-        // A white sheen of roughness 0.5 at normal incidence keeps 1 - E(1, 0.5) = 1 - 0.0413 (Margo's fit, itself checked
+        // A white sheen of roughness 0.5 at normal incidence keeps 1 - E(1, 0.5) (Margo's albedo table, itself checked
         // against an integration), applied in linear light on this display-encoded target.
-        const sheenKeep = 1 - 0.0413,
+        const sheenKeep = 1 - payload.sheenWhite,
           toLinear = (c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92),
           toDisplay = (c) => (c > 0.0031308 ? 1.055 * c ** (1 / 2.4) - 0.055 : c * 12.92),
           sheenExpected = [160, 80, 40].map((value) => Math.round(255 * toDisplay(toLinear(value / 255) * sheenKeep))),
@@ -816,6 +818,8 @@ export async function lobeBrowserChecks(page) {
       filmWGSL,
       filmProgram,
       filmExpected: iridescenceCases.map(iridescenceReference),
+      // E(1, 0.5) of the shipped sheen albedo table (0.0260), evaluated here: the page cannot import the evaluator.
+      sheenWhite: wgslModule(sheenAlbedoWGSL('E')).call('E', 1, 0.5),
     },
   );
 }

@@ -443,6 +443,14 @@ test('attributes keep their stored text and order; a changed typed field rewrite
   same(writeVox(parseVox(named)), named);
   const latin = vox(150, chunk('LAYR', [...i32(0, 1), ...str('_name'), ...i32(1), 0xe9, ...i32(-1)]));
   assert.equal(parseVox(latin).layers[0].name, 'é');
+  // ...and written back in the same bytes, keys too, while a value set since goes out as UTF-8.
+  same(writeVox(parseVox(latin)), latin);
+  const latinKey = vox(150, chunk('LAYR', [...i32(0, 1), ...i32(2), 0x5f, 0xe9, ...str('caf\u00e9'), ...i32(-1)]));
+  same(writeVox(parseVox(latinKey)), latinKey);
+  const renamed = parseVox(latin);
+  renamed.layers[0].name = 'è';
+  assert.equal(parseVox(writeVox(renamed)).layers[0].name, 'è');
+  assert.ok(writeVox(renamed).includes(0xc3), 'a new value is written as UTF-8');
 });
 
 test('a new scene writes in canonical order, and items added to a parsed scene follow the last of their kind', () => {
@@ -1033,4 +1041,22 @@ test('parse, write and paste a 1M-voxel model; speed measurements are a separate
     if (timing)
       t.diagnostic(`paste ${name}: ${batched.ms.toFixed(0)} ms (one setBlock per voxel: ${single.ms.toFixed(0)} ms)`);
   }
+});
+
+test('pasteVoxModel: widening a chunk palette with a freed slot keeps every pasted cell', () => {
+  const blocks = new BlockTypes(),
+    ids = Array.from({ length: 21 }, (_, i) => (i ? blocks.define(`b${i}`) : 0)),
+    world = new VoxelWorld({ blocks });
+  for (let s = 1; s <= 10; s++) world.setBlock(s, 0, 0, ids[s]); // 11 live states: 4-bit indices
+  world.setBlock(5, 0, 0, 0); // b5's palette slot is freed and keeps its old state
+  // Eleven new states make 21 slots: the chunk widens to 8-bit indices before the cells are written.
+  const mapping = Array(256).fill(0),
+    voxels = [];
+  for (let c = 1; c <= 11; c++) {
+    mapping[c] = c === 1 ? ids[5] : ids[c + 9];
+    voxels.push(c - 1, 0, 0, c);
+  }
+  assert.equal(pasteVoxModel(world, { size: [11, 1, 1], voxels: Uint8Array.from(voxels) }, [0, 1, 0], mapping), 11);
+  for (let c = 1; c <= 11; c++) assert.equal(world.getBlock(c - 1, 1, 0), mapping[c], `pasted cell ${c - 1}`);
+  for (let s = 1; s <= 10; s++) assert.equal(world.getBlock(s, 0, 0), s === 5 ? 0 : ids[s]);
 });

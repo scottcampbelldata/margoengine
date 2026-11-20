@@ -1,4 +1,4 @@
-// Binary glTF (GLB) container, from the glTF 2.0 specification section 4.4: the gltf and gltf-pro loaders, gltf-pro's
+// Binary glTF (GLB) container, from the glTF 2.0 specification section 4.4: the gltf and gltf/pbr loaders, gltf/pbr's
 // streamed loader and the exporters writer, splitter and joiner share these constants and one chunk walker.
 import { fault, typeError } from './errors.js';
 

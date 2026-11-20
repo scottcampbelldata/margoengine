@@ -1,16 +1,8 @@
-import { deferSpeed, isSpeedEntry } from './support/speed-phase.mjs';
-if (
-  isSpeedEntry(import.meta.url) &&
-  !process.argv.some((arg) => ['--help', '-h', '--list'].includes(arg)) &&
-  deferSpeed('scripts/benchmark-package-workloads.js')
-)
-  process.exit(0);
+import { deferSpeedEntry, isSpeedEntry } from './support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { decodePNG } from '../tests/support/png.js';
 import { distribution as sampleDistribution } from './lib/percentile.mjs';
 
@@ -1022,4 +1014,5 @@ async function checkInteractions(page, name) {
   return result;
 }
 
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) await runBenchmarks();
+const speedLabel = 'scripts/benchmark-package-workloads.js';
+if (isSpeedEntry(import.meta.url) && !deferSpeedEntry(import.meta.url, speedLabel)) await runBenchmarks();

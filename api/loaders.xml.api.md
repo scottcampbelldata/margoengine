@@ -10,15 +10,41 @@ export interface XMLElement {
     text: string;
 }
 
+export type XMLExternal = ReadonlyMap<string, string>;
+
+export interface XMLExternalOptions {
+    external?: XMLExternal;
+}
+
 export interface XMLHandler {
     open(name: string, attributes: Record<string, string>): void;
     close(name: string): void;
     text?(text: string): void;
 }
 
+export interface XMLReadOptions extends XMLExternalOptions {
+    external?: XMLExternal;
+    base?: string;
+    maxDepth?: number;
+    maxExpansion?: number;
+}
+
+export interface XMLResolveOptions {
+    resolve(id: string, request: {
+        publicId?: string;
+        signal?: AbortSignal;
+    }): Promise<string | Uint8Array | ArrayBuffer> | string | Uint8Array | ArrayBuffer;
+    base?: string;
+    signal?: AbortSignal;
+    maxFiles?: number;
+    maxCharacters?: number;
+}
+
 export function decodeXML(bytes: Uint8Array): string;
 
-export function readXML(xml: string, handler: XMLHandler, format?: string, maxDepth?: number): void;
+export function readXML(xml: string, handler: XMLHandler, format?: string, maxDepth?: number | XMLReadOptions): void;
 
-export function readXMLTree(xml: string, format: string): XMLElement;
+export function readXMLTree(xml: string, format: string, options?: XMLReadOptions): XMLElement;
+
+export function resolveDTD(xml: string, options: XMLResolveOptions, format?: string): Promise<Map<string, string>>;
 ```

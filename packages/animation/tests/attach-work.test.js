@@ -7,7 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { invertMatrixStable, multiplyMatrices } from '@margoengine/math/mat4';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../dist/index.js';
 import { engine, model } from './support/models.js';
 import { animatorGLB } from '../../../tests/support/animator-rig.js';

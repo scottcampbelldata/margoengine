@@ -111,7 +111,9 @@ struct FieldVertex {
  @location(4) @interpolate(flat) na:vec3f,@location(5) @interpolate(flat) nb:vec3f,@location(6) @interpolate(flat) nc:vec3f
 }
 fn rectangle(id:u32,extent:f32,resolution:f32)->FieldVertex {
- let triangle=id/6u*3u;let a=evaluate(triangle);let b=evaluate(triangle+1u);let c=evaluate(triangle+2u);
+ // One call of evaluate() in a loop, as Caustics does: each inlined copy of the surface is compile time (KB-WATER-SURFCOMPILE1).
+ let triangle=id/6u*3u;var corners:array<CaptureVertex,3>;for(var k=0u;k<3u;k++){corners[k]=evaluate(triangle+k);}
+ let a=corners[0];let b=corners[1];let c=corners[2];
  let pad=vec2f(2.0*extent/resolution);
  let low=min(a.world.xz,min(b.world.xz,c.world.xz))-pad;let high=max(a.world.xz,max(b.world.xz,c.world.xz))+pad;
  let corner=array<vec2f,6>(vec2f(0,0),vec2f(0,1),vec2f(1,0),vec2f(1,0),vec2f(0,1),vec2f(1,1))[id%6u];

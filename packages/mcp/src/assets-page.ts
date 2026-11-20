@@ -2,6 +2,7 @@
 import type { EngineKernel, EnginePlugin } from '@margoengine/core';
 import type { Material, MapSlot } from '@margoengine/materials';
 import { fault, typeError } from '../../shared/errors.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import type { Json } from './server.js';
 
 /** Page-side loader options. Materials are explicitly named app targets, never arbitrary object paths. */
@@ -32,9 +33,12 @@ export class AssetInstaller implements Disposable {
     active.throwIfAborted();
     if (typeof args.url !== 'string' || !/^https?:$/.test(new URL(args.url).protocol))
       throw typeError('Pass an HTTP asset URL served by the app', 'mcp');
+    // The scene the request arrived in: what it installs stays there however the active scene changes while it loads.
+    const scope = captureScene(this.engine);
     if (args.kind === 'model') {
-      const { loadGLTF } = await import('@margoengine/gltf-pro');
-      const model = await loadGLTF(this.engine, args.url, { signal: active });
+      const { loadGLTF } = await import('@margoengine/gltf/pbr');
+      const url = args.url,
+        model = await scope.run(() => loadGLTF(this.engine, url, { signal: active }));
       if (active.aborted) {
         this.detach(model);
         active.throwIfAborted();
@@ -52,14 +56,15 @@ export class AssetInstaller implements Disposable {
         environment.dispose();
         active.throwIfAborted();
       }
-      this.engine.use(environment);
-      let lighting: InstanceType<typeof EnvironmentLighting>;
-      try {
-        lighting = EnvironmentLighting.attach(this.engine, environment, { name: `${name}:lighting` });
-      } catch (error) {
-        this.detach(environment);
-        throw error;
-      }
+      const lighting = scope.run(() => {
+        this.engine.use(environment);
+        try {
+          return EnvironmentLighting.attach(this.engine, environment, { name: `${name}:lighting` });
+        } catch (error) {
+          this.detach(environment);
+          throw error;
+        }
+      });
       if (active.aborted) {
         this.detach(lighting);
         this.detach(environment);

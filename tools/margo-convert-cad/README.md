@@ -43,5 +43,5 @@ and timings (`parts`, `meshes`, `instanced`, `triangles`, `edges`, `failedFaces`
 ## Tests
 
 `node --test tests/margo-convert-cad.test.js` from the repository root, after `npm run build:packages`: every GLB is
-checked with the Khronos glTF-Validator, loaded with `@margoengine/gltf-pro` and `@margoengine/gltf`, and compared with
+checked with the Khronos glTF-Validator, loaded with `@margoengine/gltf/pbr` and `@margoengine/gltf`, and compared with
 `loadCAD` of the same file (triangles and part names) and with the closed-form bounds of the shapes.

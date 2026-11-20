@@ -1,5 +1,5 @@
 // Real-GPU proof of SpriteLayer `filter: 'linear'` (from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sprites/tests/smooth-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sprites/tests/smooth-check.mjs
 // A white texel beside a transparent red one, magnified 16 times, must fade by the bilinear weight with no red fringe
 // (premultiplied filtering), from bytes and from a caller's GPUTexture, on the 8-bit canvas and on an sRGB target; 64
 // alternating columns drawn 8 pixels wide must average to linear 0.5 with mipmaps and alias to black without; tint and

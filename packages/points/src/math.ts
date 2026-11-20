@@ -411,7 +411,8 @@ export interface PointsPickHit {
 
 /**
  * Nearest point to the device-pixel position (x, y) among the given slot ranges, within `radius` pixels.
- * Points within half a pixel of the best distance are tie-broken by depth, so the front point wins.
+ * Points within half a pixel of the best distance are tie-broken by depth, so the front point wins. Points for which
+ * `hidden(index)` is true (not drawn, such as those a filter mask hides) are skipped.
  */
 export function pickPoint(
   positions: ArrayLike<number>,
@@ -423,6 +424,7 @@ export function pickPoint(
   x: number,
   y: number,
   radius: number,
+  hidden?: (index: number) => boolean,
 ): PointsPickHit | null {
   const screen = new Float64Array(3),
     candidates: number[] = [];
@@ -435,6 +437,7 @@ export function pickPoint(
   for (const range of ranges) {
     for (let s = range.start; s < range.start + range.count; s++) {
       const p = order ? order[s] : s;
+      if (hidden?.(p)) continue;
       if (!projectToPixels(mvp, positions[p * 3], positions[p * 3 + 1], positions[p * 3 + 2], width, height, screen))
         continue;
       const dx = screen[0] - x,

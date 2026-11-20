@@ -1,12 +1,10 @@
 // Real-GPU check for addMesh: core meshes turn see-through through OIT, the result does not depend on the order they
-// were added, they follow their core mesh, and removing restores the opaque frame exactly. Takes a GPU slot itself. From
+// were added, they follow their core mesh, and removing restores the opaque frame exactly. From
 // the repository root, after building packages: node packages/oit/test/gpu/meshes-check.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../../scripts/browser.js';
-import { acquire } from '../../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'oit-meshes' });
 const context = await openBrowser({ startPath: '/packages/oit/test/gpu/meshes.html', port: 5284 }),
   { page } = context;
 try {
@@ -53,7 +51,6 @@ try {
   assert.deepEqual(pageErrors, []);
   console.log('oit meshes check passed');
 } finally {
-  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hold the GPU slot past 15 s
+  // fixed-wait: a bounded close, so a browser that hangs while closing cannot hang past 15 s
   await Promise.race([context.close(), new Promise((resolve) => setTimeout(resolve, 15000).unref())]);
-  await release();
 }

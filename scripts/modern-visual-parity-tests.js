@@ -36,7 +36,7 @@ browser.page.on('pageerror', (e) => errors.push(e.message));
 try {
   const result = await browser.page.evaluate(async (acesReference) => {
     const { acesShader } = await import('/packages/shared/aces.js');
-    const { pbrShader } = await import('/packages/gltf-pro/src/shader.ts');
+    const { pbrShader } = await import('/packages/gltf/src/shader.ts');
     const { Engine } = await import('/packages/core/dist/index.js');
     const { parseMargo } = await import('/packages/blender/dist/index.js');
     const { SSAO, Bloom } = await import('/packages/post/dist/index.js');

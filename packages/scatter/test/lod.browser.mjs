@@ -145,6 +145,34 @@ try {
         effect.dispose();
       }
       summaries.push({ exclusionSteps });
+      // GAP-FILM-LOOK: a ground path (a road) keeps each footprint more than width / 2 from its centreline, after the
+      // rectangle exclusions in the same buffer, and past its ends too.
+      const pathSteps = [];
+      for (const [center, scale, expected] of [
+        [[0, 0, 0], 1, 0],
+        [[0, 0, 2.6], 1, 0],
+        [[0, 0, 3.6], 1, 1],
+        [[0, 0, 3.6], 2, 0],
+        [[11.5, 0, 0], 1, 0],
+        [[13.5, 0, 0], 1, 1],
+      ]) {
+        engine.camera.position = [center[0], 0, center[2] + 5];
+        engine.camera.target = center;
+        const effect = Scatter.attach(engine, obstacleGeometry, {
+          count: 1,
+          area: [0.001, 0.001],
+          center,
+          scale: [scale, scale],
+          exclusions: [[50, 50, 60, 60]],
+          paths: [{ points: [[-10, 0], [0, 0], [10, 0]], width: 4 }],
+        });
+        await frame();
+        const command = new Uint32Array(await read(effect.commands));
+        check(command[1] + command[6] + command[11] === expected, `Footprint at ${center} scale ${scale} against the path`);
+        pathSteps.push({ center, scale, expected });
+        effect.dispose();
+      }
+      summaries.push({ pathSteps });
       engine.camera.position = [0, 0, 3];
       engine.camera.target = [0, 0, 0];
       const shared = toGeometry(icosahedronGeometry(1, 1, true)),

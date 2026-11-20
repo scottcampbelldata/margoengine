@@ -50,12 +50,12 @@ import {
   iridescence,
   type MaterialLobeOptions,
 } from '@margoengine/materials';
-import type { MaterialExtension } from '@margoengine/gltf-pro';
+import type { MaterialExtension } from '@margoengine/gltf/pbr';
 import { Clustered, type LocalShadowOptions, type LocalLightShadow, type PointLight } from '@margoengine/clustered';
-import type { PBRModel } from '@margoengine/gltf-pro';
-import type { PBRPickingGeometry } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
+import type { PBRPickingGeometry } from '@margoengine/gltf/pbr';
 import type { PickingSource } from '@margoengine/selection';
-import { getSceneBounds, fitScene, gatherSceneBuffers, type SceneBuffers } from '@margoengine/gltf-pro/scene';
+import { getSceneBounds, fitScene, gatherSceneBuffers, type SceneBuffers } from '@margoengine/gltf/scene';
 
 export function mixedSceneHelpers(
   engine: import('@margoengine/core').EngineKernel,
@@ -100,7 +100,7 @@ export async function deformedQueries(engine: import('@margoengine/core').Engine
 }
 import { Group, type CanvasProps, type PointerHandlers, type MargoContextValue } from '@margoengine/react';
 import { Html } from '@margoengine/react/html';
-import { Gltf } from '@margoengine/react/gltf-pro';
+import { Gltf } from '@margoengine/react/gltf';
 
 export const demandCanvas: CanvasProps = { frameloop: 'demand' };
 export const clickHandlers: PointerHandlers = { onClick: (event) => event.mesh.setPosition([1, 0, 0]) };
@@ -175,7 +175,7 @@ import * as module13 from '@margoengine/road';
 import * as module14 from '@margoengine/scatter';
 import * as module15 from '@margoengine/html';
 import * as module16 from '@margoengine/video';
-import * as module17 from '@margoengine/net';
+import * as module17 from '@margoengine/netcode/interpolation';
 import * as module18 from '@margoengine/stats';
 import * as module19 from '@margoengine/inspector';
 import * as module20 from '@margoengine/navmesh/build';

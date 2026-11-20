@@ -1,5 +1,6 @@
 import type { Engine, Mesh } from '@margoengine/core/extension';
 import { normalizeQuaternion, rotationToQuaternion } from '@margoengine/math/quat';
+import { rangeError } from '../../shared/errors.js';
 
 export type Triple = readonly [number, number, number];
 export type Quaternion = readonly [number, number, number, number];
@@ -19,7 +20,7 @@ export function worldPose(mesh: Mesh): WorldPose {
   const determinant =
     m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
   const x = determinant < 0 ? -sx : sx;
-  if (!x || !sy || !sz) throw new RangeError('Physics and XR require invertible transforms');
+  if (!x || !sy || !sz) throw rangeError('Physics and XR require invertible transforms', 'react-arguments');
   const q = rotationToQuaternion(m, [0, 0, 0, 0] as [number, number, number, number], x, sy, sz);
   return {
     position: [m[12], m[13], m[14]],
@@ -50,7 +51,7 @@ export function setWorldPose(mesh: Mesh, position: Triple, rotation: Quaternion)
     i = m[10];
   const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
   if (!Number.isFinite(det) || Math.abs(det) < 1e-12)
-    throw new RangeError('Physics and XR require invertible parent transforms');
+    throw rangeError('Physics and XR require invertible parent transforms', 'react-arguments');
   const x = position[0] - m[12],
     y = position[1] - m[13],
     z = position[2] - m[14];

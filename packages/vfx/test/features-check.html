@@ -18,9 +18,12 @@ window.unit=unit;
  * `samples` x MSAA, over a cleared black target and a depth cleared to 0 (reversed Z: nothing drawn). Returns the RGBA8
  * picture and any validation error.
  */
-async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},read=[],lighting}){
+async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},read=[],lighting,route=false}){
  device.pushErrorScope('validation');
  effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){},sceneOf(){return this},lighting});
+ // `route`: on the WebGL2 layer, simulate on the compatibility route (it loads by import() after setup), not on the
+ // WebGPU kernels the layer also runs until then.
+ if(route&&globalThis.__margoCompat){for(let i=0;i<1000&&!effect.route;i++)await new Promise(r=>setTimeout(r,10));if(!effect.route)throw Error('compat route did not load');}
  setup();
  const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
  const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
@@ -139,7 +142,7 @@ window.checkEvents=async({on='death',capacity=16,short=false,speed=0.5}={})=>{
   :new VFX({...still,capacity,position:[0,1,0],velocity:[0,-5,0],ground:0,bounce:0.5,size:0.1,lifetime:[100,100],intensity:2,events});
  effect.burst(1);
  const frames=on==='death'?(short?7:4):2;
- const {buffers:[p],error}=await run(effect,{frames,dt,read:()=>[effect.gpuState.particles]});
+ const {buffers:[p],error}=await run(effect,{frames,dt,route:true,read:()=>[effect.gpuState.particles]});
  effect.dispose();
  const near=(a,b)=>Math.abs(a-b)<=1e-5*Math.max(1,Math.abs(b)),slot=(i)=>({at:[...p.subarray(i*8,i*8+4)],vs:[...p.subarray(i*8+4,i*8+8)],color:[...p.subarray(capacity*8+i*8,capacity*8+i*8+4)],rotation:[...p.subarray(capacity*8+i*8+4,capacity*8+i*8+8)]});
  const want=(i,what,got,expected)=>{if(got.length!==expected.length||!got.every((g,k)=>expected[k]===null||near(g,expected[k])))mismatches.push({slot:i,what,got,expected});};
@@ -595,6 +598,41 @@ window.checkNodeF32=()=>{
  try{new VFX({...still,capacity:1,nodes:{graph:[{op:'const',value:[1e40,0,0]},{op:'force',inputs:[0]}]}});}
  catch(e){error={name:e.name,message:e.message};}
  return {error,errors:errors.splice(0)};
+};
+// Wind: smoke born rising at w in a wind U (a [x, z] option, any direction) leans atan(U / w) from the vertical once its
+// horizontal velocity has relaxed (3 s is 12 time constants of 0.25 s): every particle older than 1.5 s within 0.5 degrees,
+// and a particle written at rest follows the CPU's exact step of v += (u - v) (1 - exp(-4 dt)), then x += v dt. A particle
+// with no wind option keeps its straight path. On WebGPU and, with route: true, on the WebGL2 compatibility route.
+window.checkWind=async()=>{
+ const dt=0.05,frames=59,rise=3,rows=[],mismatches=[];
+ for(const [U,deg] of [[2,0],[8,35],[20,-120],[0.5,90]]){
+  const u=[U*Math.cos(deg*Math.PI/180),U*Math.sin(deg*Math.PI/180)];
+  const effect=new VFX({...still,capacity:64,rate:20,lifetime:[100,100],velocity:[0,rise,0],wind:u});
+  const {buffers:[p],error}=await run(effect,{frames,dt,route:true,read:()=>[effect.gpuState.particles]});
+  effect.dispose();
+  const want=Math.atan(U/rise)*180/Math.PI;let n=0,worst=0;
+  for(let i=0;i<64;i++){
+   const life=p[i*8+3];if(!(life>0)||life>98.5)continue;
+   const v=[p[i*8+4],p[i*8+5],p[i*8+6]],lean=Math.atan(Math.hypot(v[0],v[2])/v[1])*180/Math.PI,along=(v[0]*u[0]+v[2]*u[1])/Math.max(U,1e-9)/Math.hypot(v[0],v[2]||1e-12);
+   worst=Math.max(worst,Math.abs(lean-want));n++;
+   if(U>1&&Math.abs(along-1)>1e-3)mismatches.push({what:"direction",U,deg,v});
+  }
+  rows.push({U,deg,want,n,worst,error});
+  if(n<10||worst>0.5)mismatches.push({what:"lean",U,deg,want,n,worst});
+ }
+ const u=[6,-2],effect=new VFX({...still,capacity:1,lifetime:[100,100],wind:u});
+ const {buffers:[q],error}=await run(effect,{frames:19,dt,route:true,setup:()=>device.queue.writeBuffer(effect.gpuState.particles,0,records([{at:[0,0,0],velocity:[0,1,0],size:0.01,color:[1,1,1],life:100}],1)),read:()=>[effect.gpuState.particles]});
+ effect.dispose();
+ let at=[0,0,0],v=[0,1,0];const k=1-Math.exp(-4*dt);
+ for(let s=0;s<20;s++){v=[v[0]+(u[0]-v[0])*k,v[1],v[2]+(u[1]-v[2])*k];at=[at[0]+v[0]*dt,at[1]+v[1]*dt,at[2]+v[2]*dt];}
+ const got={at:[...q.subarray(0,3)],v:[...q.subarray(4,7)]},near=(a,b)=>a.every((x,i)=>Math.abs(x-b[i])<=2e-3+2e-3*Math.abs(b[i]));
+ if(!near(got.at,at))mismatches.push({what:"position",got:got.at,want:at});
+ if(!near(got.v,v))mismatches.push({what:"velocity",got:got.v,want:v});
+ const calm=new VFX({...still,capacity:1,lifetime:[100,100]});
+ const {buffers:[r],error:calmError}=await run(calm,{frames:19,dt,route:true,setup:()=>device.queue.writeBuffer(calm.gpuState.particles,0,records([{at:[0,0,0],velocity:[1,1,0],size:0.01,color:[1,1,1],life:100}],1)),read:()=>[calm.gpuState.particles]});
+ calm.dispose();
+ if(Math.abs(r[4]-1)>1e-5||Math.abs(r[6])>1e-5)mismatches.push({what:"no wind option",v:[...r.subarray(4,7)]});
+ return {error:error??calmError,errors:errors.splice(0),mismatches,rows,got,want:{at,v}};
 };
 window.ready=true;
 </script></body></html>

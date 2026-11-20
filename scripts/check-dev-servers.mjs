@@ -287,34 +287,33 @@ function checkDocs() {
 
 if (listOnly) {
   for (const server of servers) console.log(`${server.label}: ${server.command}${server.kind === 'node' && !server.config ? '  (NO ROW)' : ''}`);
-  process.exit(0);
-}
-let failures = 0;
-const report = { notRun: [] };
-if (!docsOnly) {
-  for (const server of runnable) {
-    const { problems, lines } = await runServer(server, report);
-    if (problems.length === 0) console.log(`ok   ${server.label}`);
-    else {
-      failures += 1;
-      console.error(`FAIL ${server.label}`);
-      for (const problem of problems) console.error(`     ${problem}`);
-      if (process.env.MARGO_DEV_SERVERS_VERBOSE) for (const line of lines) console.error(`     | ${line}`);
+} else {
+  let failures = 0;
+  const report = { notRun: [] };
+  if (!docsOnly) {
+    for (const server of runnable) {
+      const { problems, lines } = await runServer(server, report);
+      if (problems.length === 0) console.log(`ok   ${server.label}`);
+      else {
+        failures += 1;
+        console.error(`FAIL ${server.label}`);
+        for (const problem of problems) console.error(`     ${problem}`);
+        if (process.env.MARGO_DEV_SERVERS_VERBOSE) for (const line of lines) console.error(`     | ${line}`);
+      }
     }
+    for (const line of report.notRun) console.log(`not run: ${line}`);
   }
-  for (const line of report.notRun) console.log(`not run: ${line}`);
+  for (const server of servers.filter((s) => s.kind === 'unknown')) {
+    failures += 1;
+    console.error(`FAIL ${server.label}: \`${server.command}\` is a server script this check does not know how to start`);
+  }
+  const docs = checkDocs();
+  if (docs.problems.length) {
+    failures += docs.problems.length;
+    for (const problem of docs.problems) console.error(`FAIL doc ${problem}`);
+  } else console.log(`ok   ${docs.commands} documented start commands map to a checked server`);
+  if (failures > 0) {
+    console.error(`${failures} problem(s) with dev servers or documented start commands.`);
+    process.exitCode = 1;
+  } else if (!docsOnly) console.log(`${runnable.length} servers started clean.`);
 }
-for (const server of servers.filter((s) => s.kind === 'unknown')) {
-  failures += 1;
-  console.error(`FAIL ${server.label}: \`${server.command}\` is a server script this check does not know how to start`);
-}
-const docs = checkDocs();
-if (docs.problems.length) {
-  failures += docs.problems.length;
-  for (const problem of docs.problems) console.error(`FAIL doc ${problem}`);
-} else console.log(`ok   ${docs.commands} documented start commands map to a checked server`);
-if (failures > 0) {
-  console.error(`${failures} problem(s) with dev servers or documented start commands.`);
-  process.exit(1);
-}
-if (!docsOnly) console.log(`${runnable.length} servers started clean.`);

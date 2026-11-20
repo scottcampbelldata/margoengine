@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/origin.browser.mjs            (WebGPU; MARGO_COMPAT=1 for the WebGL2 layer)
 // A terrain under a FloatingOrigin (TerrainOptions.floatingOrigin), the same scene moved with its camera by 0, about
 // 1e5 and about 1e7 m (49 and 4883 times 2048 m: whole multiples of the ring lattice, 32 m, and of the virtual texture's

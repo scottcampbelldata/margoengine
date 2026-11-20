@@ -2,7 +2,7 @@ import { serveVoxelBun, serveVoxelDeno } from '../dist/server-runtimes.js';
 import { testBlocks } from './blocks.js';
 const limit = setTimeout(() => {
   console.error('native fixture exceeded 60 seconds');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 60000);
 const controller = new AbortController();
 const serve = globalThis.Bun ? serveVoxelBun : serveVoxelDeno;

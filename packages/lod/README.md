@@ -16,7 +16,7 @@ GPU-baked octahedral imposters for the farthest level. Core is unchanged.
 import {Engine, PbrMaterial} from 'margoengine/core';
 import {sphereGeometry, toGeometry} from 'margoengine/geometry';
 import {LODSystem, Imposter} from 'margoengine/lod';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const highGeometry = toGeometry(sphereGeometry(1, 64, 32)), midGeometry = toGeometry(sphereGeometry(1, 24, 12));
 const lowGeometry = toGeometry(sphereGeometry(1, 8, 6));
@@ -44,7 +44,7 @@ const data = await imposter.export();          // cache it (IndexedDB, a file) .
 const cached = Imposter.fromData(engine, data); // ... and skip the bake next load
 ```
 
-- **Levels** are a core `Mesh`, anything with a `root` Mesh (a gltf-pro model or a materials mesh), a core `Geometry`
+- **Levels** are a core `Mesh`, anything with a `root` Mesh (a gltf/pbr model or a materials mesh), a core `Geometry`
   (set on the anchor), an `Imposter`, or `null`. Up to 8 per object. Each object picks by `distance` (world units from
   the camera to the anchor) or by `screen` (bounding-sphere height as a fraction of the viewport height, using the
   object's world scale and the camera's fov); `bias` multiplies every distance, a quality knob for tiers.
@@ -57,12 +57,12 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   user just switched away. New objects take effect on the next frame.
 - **Subassembly imposters**: a core `Mesh` with child meshes bakes its whole visible subtree in its own space, each part with its own material (`Imposter.bake(engine, module)`), as it is at bake time. Bake once per distinct subassembly design and share the atlas across every copy (the subtree scan is O(meshes)). Anchor each copy on an empty mesh that is not inside the subtree (a sibling with the same transform), because a hidden anchor or ancestor hides the imposter, and use the subassembly mesh itself as level 0: `lods.add(anchor, [{object: module}, {object: imposter, screen: 0.03}], {radius: imposter.radius})`. Picking: `engine.pick` does not see a subassembly while it shows its imposter (its parts are hidden); `lods.pickProxies()` reports it.
 - **Imposters** bake `frames`² orthographic views over the whole sphere of directions (octahedral layout) on the
-  GPU, through gltf-pro's own shader with an early return, so base-colour textures, vertex colours, normal maps,
+  GPU, through gltf/pbr's own shader with an early return, so base-colour textures, vertex colours, normal maps,
   alpha masks and `@margoengine/materials` maps are all captured. The atlas stores albedo + coverage (RGBA8 sRGB, with
   mips) and normal + depth + roughness/metalness (RGBA16F). At runtime each instance is a camera-facing quad that
   reprojects the pixel's ray onto the three nearest views (with one depth parallax step per view, so the views agree on
   the surface), blends colour, normal, depth and roughness/metalness by the view weights, relights with the engine light (matching core
-  or gltf-pro shading, whichever the source used) and writes per-pixel depth, so imposters occlude and are occluded
+  or gltf/pbr shading, whichever the source used) and writes per-pixel depth, so imposters occlude and are occluded
   correctly. Where the views still disagree (silhouettes), coverage cross-fades over blended alpha 0.25-0.75
   (alpha-to-coverage under MSAA, a fixed per-pixel dither at 1x) instead of a hard cut at 0.5. Each tile is sampled
   with its mip level computed from the smooth coordinate and clamped half a texel of the coarser level read, so
@@ -70,7 +70,7 @@ const cached = Imposter.fromData(engine, data); // ... and skip the bake next lo
   ancestors) are skipped, and all instances of one atlas are one instanced draw (order 1.5, after opaque meshes).
 - **Other instance sources**: `imposterShader` is the imposter WGSL (group 0: frame, instance matrices, atlas, sampler); `@margoengine/scatter/imposter` rewrites its instance read to draw a scatter far ring from the same atlas.
 - **Picking**: an imposter has no triangles, so `lods.pickProxies()` lists the objects showing an imposter level, each
-  `LOD` with `sphere` (the imposter's local bounding sphere) and `model` (the first gltf-pro model among its levels).
+  `LOD` with `sphere` (the imposter's local bounding sphere) and `model` (the first gltf/pbr model among its levels).
   `@margoengine/bvh` (`Raycaster.intersectEngine`, `intersectObjects` with the anchor or that model) and
   `@margoengine/selection` (`Picking`, `engine.pick`) find this hook on the engine themselves (neither imports lod) and
   hit the sphere under the anchor's world matrix: the hit names the anchor and model and has `approximate: true`.
@@ -127,10 +127,11 @@ vertices). Selection outlines do not draw for objects on an imposter level. Impo
 the anchor's origin. Selection reads the previous frame's
 world matrices, so a teleported object can show the old level for one frame. `distance` levels are measured from the camera
 position; `screen` levels use the camera's projection, so they also follow orthographic zoom (use them with
-`@margoengine/cameras`). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
+`@margoengine/cameras`). Both read the camera as it stands when the system runs: a cut, a seek or a lens change picks
+the level for the new view on its own frame (the projection is rebuilt before the pick; core rebuilds it again after). Object removal swaps with the last entry, so `lods.add` order is not kept. WebGPU
 for imposters; distance and screen selection also work on the WebGL2 backend.
 
-Apache-2.0. Optional, tree-shakable package, about 13.9 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); peers: core and gltf-pro
+Apache-2.0. Optional, tree-shakable package, about 13.9 kB min+gzip ([entry-sizes.json](../../examples/package-benchmarks/results/entry-sizes.json)); peers: core and gltf/pbr
 ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/lod. Browser check and benchmark on a real WebGPU adapter:
@@ -143,7 +144,7 @@ An imposter keeps its object's look when a whole forest falls back to one atlas.
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {Imposter, ImposterFrames, LODSystem} from 'margoengine/lod';
 import {Shadows} from 'margoengine/shadows';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
@@ -165,6 +166,8 @@ lods.add(engine.createMesh(), [{object: sway}], {frame: 3}); // default 0: start
 const shadows = Shadows.attach(engine);
 shadows.add(lods); // every imposter casts and receives; {castShadow: false} or {receiveShadow: false} as on any source
 ```
+
+Imposters cast through a depth-only shader of their own, its position `@invariant` (WGSL 12.10) as every Margo shadow caster's is, so another program drawing the same surface writes the same depth bit for bit.
 
 Each frame of `ImposterFrames` is an atlas of its own, so the memory is `count` atlases, and objects on the same frame share a draw: a forest on 8 frames is 8 draws. `shadows` sees an imposter as a card facing the light with the surface of the view nearest the light, standing back from itself by a tile's angle over its radius so that it does not shadow its own surface: an imposter's self-shadowing below that depth is lost, and the shadow it throws on other objects stays in place. Of a lighting effect only the `direct` hook reaches imposters, which is what `Shadows` gives; clustered lights and environment light do not. Casters are not culled against the cascades. The emissive atlas is RGBA8, so baked emissive stops at 1; add more through `lod.emissive`.
 
@@ -235,7 +238,7 @@ A glTF with `MSFT_lod` loads its level nodes too, hidden, as `model.lods`; `extr
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {LOD, LODSystem} from 'margoengine/lod';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/city.glb');
@@ -248,7 +251,7 @@ LOD.fromModel(LODSystem.attach(stage.engine), model);
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {MSFTMaterialLOD} from 'margoengine/lod/msft';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
 const model = await loadGLTF(stage.engine, '/city.glb');
@@ -356,7 +359,7 @@ const lod = await autoLOD(lods, mesh, {ratios: [0.5, 0.25]}); // levels hang und
 
 ```ts
 import {createStage} from 'margoengine';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {LODSystem} from 'margoengine/lod';
 import {autoLOD} from 'margoengine/lod/auto';
 const stage = await createStage('#viewport', {backend: 'webgpu'});
@@ -369,7 +372,7 @@ Skinned and morphed models get levels too. Attach the model's `Animation` first:
 
 ```ts
 import { Animation } from '@margoengine/animation';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { LODSystem } from '@margoengine/lod';
 import { autoLOD } from '@margoengine/lod/auto';
 import {createStage} from 'margoengine';
@@ -395,3 +398,11 @@ The levels are materials meshes of their own: pass each of `lod.levels.slice(1)`
 The small `@margoengine/webgl2-compat/preview` renderer reports `backend: 'webgl2'` and has no GPU device. GPU-only attachments throw a linked `MargoError` with code `unsupported` before allocating resources. Native WebGPU and the full WebGL2 compatibility layer both report `backend: 'webgpu'`. Use [`autoEngine` with `loadCompat`](../webgl2-compat/README.md#automatic-escalation) during scene setup to select a complete tier automatically.
 
 Mesh and geometry LOD selection keeps its CPU preview route. Adding an imposter level refuses before changing the existing levels or mesh visibility; `LODFade` refuses during attachment.
+
+### Scenes
+
+`autoLOD`, `hierarchicalLOD` and `LevelStream` make their levels, far meshes and follow plugins in the scene their source is in (the stream's own scene for a streamed level), whichever scene is active when their awaits finish. A level of a model in a second scene is a mesh of that scene.
+
+## Film time
+
+`LODSystem.advanceTime(delta)` moves the imposter animation clock (`system.time`) without picking levels; the frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it. Level fades are view history and settle after a cut.

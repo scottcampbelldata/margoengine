@@ -96,9 +96,20 @@ function collector(size: Vec3, options: RasterOptions, name: string) {
         throw new RangeError(`${name} covers over ${limit} cells; draw less or raise maxCells`);
       cells.add(index);
     },
+    /**
+     * The whole cells `ceil(lo)` to `floor(hi)` along `axis` to visit; with `'clip'` only those inside the grid, so a
+     * stroke outside the grid costs nothing (every cell it skips would be dropped anyway).
+     */
+    span(lo: number, hi: number, axis: 0 | 1 | 2): [number, number] {
+      const from = Math.ceil(lo),
+        to = Math.floor(hi);
+      return outside === 'clip' ? [Math.max(0, from), Math.min(size[axis] - 1, to)] : [from, to];
+    },
     result: () => Float64Array.from(cells),
   };
 }
+
+type Collector = ReturnType<typeof collector>;
 
 function nonNegative(value: unknown, subject: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
@@ -112,13 +123,16 @@ function checkBox(extents: number[], name: string): void {
 }
 
 /** The ellipsoid test of one centre and radii, cells visited y, then z, then x. */
-function ellipsoid(put: (x: number, y: number, z: number) => void, c: Vec3, r: Vec3): void {
+function ellipsoid(out: Collector, c: Vec3, r: Vec3): void {
   const [cx, cy, cz] = c,
-    [rx, ry, rz] = r;
-  for (let y = Math.ceil(cy - ry); y <= Math.floor(cy + ry); y++)
-    for (let z = Math.ceil(cz - rz); z <= Math.floor(cz + rz); z++)
-      for (let x = Math.ceil(cx - rx); x <= Math.floor(cx + rx); x++)
-        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 <= 1) put(x, y, z);
+    [rx, ry, rz] = r,
+    [y0, y1] = out.span(cy - ry, cy + ry, 1),
+    [z0, z1] = out.span(cz - rz, cz + rz, 2),
+    [x0, x1] = out.span(cx - rx, cx + rx, 0);
+  for (let y = y0; y <= y1; y++)
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++)
+        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 <= 1) out.put(x, y, z);
 }
 
 /**
@@ -135,7 +149,7 @@ export function ellipsoidCells(size: Vec3, options: EllipsoidOptions): Float64Ar
     options.radii.map((r) => 2 * r + 1),
     'ellipsoidCells',
   );
-  ellipsoid(out.put, options.center, options.radii);
+  ellipsoid(out, options.center, options.radii);
   return out.result();
 }
 
@@ -211,10 +225,12 @@ export function thickLineCells(size: Vec3, options: ThickLineOptions): Float64Ar
   if (n > MAX_STEPS) throw new RangeError(`thickLineCells takes over ${MAX_STEPS} steps; draw it in parts`);
   checkBox([2 * half + 1, 2 * half + 1, 2 * half + 1], 'thickLineCells');
   for (let k = 0; k <= n; k++) {
-    const p = [0, 1, 2].map((i) => Math.round(a[i] + ((b[i] - a[i]) * k) / Math.max(1, n)));
-    for (let y = Math.ceil(p[1] - half); y <= Math.floor(p[1] + half); y++)
-      for (let z = Math.ceil(p[2] - half); z <= Math.floor(p[2] + half); z++)
-        for (let x = Math.ceil(p[0] - half); x <= Math.floor(p[0] + half); x++) out.put(x, y, z);
+    const p = [0, 1, 2].map((i) => Math.round(a[i] + ((b[i] - a[i]) * k) / Math.max(1, n))),
+      [y0, y1] = out.span(p[1] - half, p[1] + half, 1),
+      [z0, z1] = out.span(p[2] - half, p[2] + half, 2),
+      [x0, x1] = out.span(p[0] - half, p[0] + half, 0);
+    for (let y = y0; y <= y1; y++)
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) out.put(x, y, z);
   }
   return out.result();
 }
@@ -246,7 +262,7 @@ export function taperedLineCells(size: Vec3, options: TaperedLineOptions): Float
     const t = i / Math.max(1, steps),
       radius = Math.max(min, r + (end - r) * t);
     ellipsoid(
-      out.put,
+      out,
       [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
       [radius, radius, radius],
     );

@@ -85,7 +85,7 @@ engine.views = [{ camera: engine.camera, viewport: [0, 0, 1, 1] }, { camera: hud
 | clustered | Yes | Light grid over the view's rectangle |
 | shadows | Yes | Cascades fit the camera being drawn (maps re-render per view) |
 | points | Yes | Sizes and LOD per view; `pick(x, y, {view})` |
-| selection, gltf-pro, materials, oit, voxel, voxel-pathtracer, vat crowds | Yes | Per-view picking, outlines and draws |
+| selection, gltf/pbr, materials, oit, voxel, voxel-pathtracer, vat crowds | Yes | Per-view picking, outlines and draws |
 | sky, terrain, scatter, creative grass, vfx, lines, text, splats | Yes | Draw inside the rectangle |
 | controls (overlay, TransformControls) | Yes | |
 | labels, html, viewcube | Yes | `view` option binds a renderer or cube to its view (one per view) |
@@ -132,7 +132,7 @@ so rapid clicks in different views each get their own result.
   `core-live-view-state.test.js`, `scene-target-view-retention.test.js`, `deep-render-multiview-depth.test.js`, and each
   package's view tests (taa, water, culling, clustered, points, labels, viewcube, dof, volumetric, inspector,
   exporters capture).
-- Real GPU: `npm run check:views` under the GPU lock (scenes, post effects, temporal history, water, a 4x item preview
+- Real GPU: `npm run check:views` (scenes, post effects, temporal history, water, a 4x item preview
   into 1x textures against a 1x reference) at 1x and 4x MSAA with device restore; then the two demos (picks through
   each view, layers a view leaves out, frame time).
 - Visual check: `split-screen` and `minimap` at high, light and phone.

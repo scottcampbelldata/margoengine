@@ -36,9 +36,9 @@ export function gpuHarness() {
         dimension: descriptor.dimension ?? '2d',
         sampleCount: descriptor.sampleCount ?? 1,
         destroyed: false,
-        createView() {
+        createView(view = {}) {
           counts.views++;
-          return { texture: r };
+          return { ...view, texture: r };
         },
         destroy() {
           this.destroyed = true;
@@ -49,6 +49,9 @@ export function gpuHarness() {
     },
     createShaderModule(descriptor) {
       return descriptor;
+    },
+    createSampler(descriptor = {}) {
+      return { ...descriptor };
     },
     createComputePipeline(descriptor) {
       const p = {
@@ -104,13 +107,13 @@ export function gpuHarness() {
         try {
           graph.withOwner(plugin.name, () => {
             plugin.setup(engine);
-            plugin.registerPasses(graph);
+            plugin.registerPasses?.(graph);
           });
           plugins.set(plugin.name, plugin);
         } catch (error) {
           graph.removeOwner(plugin.name);
           plugins.delete(plugin.name);
-          plugin.dispose();
+          plugin.dispose?.();
           throw error;
         }
       },
@@ -119,7 +122,7 @@ export function gpuHarness() {
         if (p) {
           graph.removeOwner(name);
           plugins.delete(name);
-          p.dispose();
+          p.dispose?.();
         }
       },
     };

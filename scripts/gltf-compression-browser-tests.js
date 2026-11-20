@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { launchBrowser } from './lib/browser.mjs';
 import { build, preview } from 'vite';
 import { closeAll } from './support/shutdown.mjs';
+import { compatBuild, compatRun, compatShim } from './support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results/gltf-compression-browser');
@@ -14,7 +15,7 @@ const consumer = resolve(results, 'consumer'),
 await mkdir(publicDir, { recursive: true });
 const fixtureDir = resolve(root, 'packages/decoders/tests/fixtures');
 await Promise.all(['Box.gltf', 'Box.bin'].map((name) => copyFile(resolve(fixtureDir, name), resolve(publicDir, name))));
-const meshoptDir = resolve(root, 'packages/gltf-pro/tests/fixtures');
+const meshoptDir = resolve(root, 'packages/gltf/test/fixtures');
 await Promise.all(
   ['Triangle.meshopt.gltf', 'Triangle.meshopt.bin'].map((name) =>
     copyFile(resolve(meshoptDir, name), resolve(publicDir, name)),
@@ -59,7 +60,7 @@ await writeFile(
   resolve(consumer, 'main.js'),
   `
 import {Engine} from '@margoengine/core';
-import {loadGLTF, parseGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF, parseGLTF} from '@margoengine/gltf/pbr';
 
 window.runCompressionConsumer = async kind => {
   const NativeWorker = window.Worker, workers = [];
@@ -112,13 +113,13 @@ await build({
   configFile: false,
   root: consumer,
   logLevel: 'warn',
-  build: { target: 'es2022', outDir: output, emptyOutDir: true },
+  build: { target: 'es2022', outDir: output, emptyOutDir: true, ...compatBuild(resolve(consumer, 'index.html')) },
 });
 const emitted = await readdir(resolve(output, 'assets'));
 for (const pattern of [/^decoder\.worker-.*\.js$/, /^draco_decoder-.*\.wasm$/, /^draco_wasm_wrapper-.*\.js$/])
   assert.ok(
     emitted.some((file) => pattern.test(file)),
-    `production gltf-pro consumer did not emit ${pattern}: ${emitted.join(', ')}`,
+    `production gltf/pbr consumer did not emit ${pattern}: ${emitted.join(', ')}`,
   );
 
 const server = await preview({
@@ -135,6 +136,8 @@ try {
   const page = await browser.newPage(),
     errors = [],
     decodedAssets = new Set();
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim, '/compat.js');
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
@@ -146,7 +149,7 @@ try {
   });
   await page.goto(server.resolvedUrls.local[0]);
   await page.waitForFunction(() => typeof window.runCompressionConsumer === 'function');
-  // Run the synchronous codec and ordinary path first: importing gltf-pro must not start Draco.
+  // Run the synchronous codec and ordinary path first: importing gltf/pbr must not start Draco.
   const meshopt = await page.evaluate(() => window.runCompressionConsumer('meshopt'));
   assert.deepEqual(
     meshopt.models,

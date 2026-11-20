@@ -9,7 +9,7 @@ try {
   const result = await browser.page.evaluate(
     async ({ doc, buffers }) => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { parseGLTF, loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF, loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const { Animation, LoopPingPong } = await import('/packages/animation/dist/playback.js');
       const canvas = document.createElement('canvas');
       canvas.style.cssText = 'width:128px;height:128px';

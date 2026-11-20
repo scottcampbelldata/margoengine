@@ -38,7 +38,7 @@ portable web-viewer record layout. No rival or companion implementation read:
   the existing clean-room owning codec implements the same 32-byte layout.
 
 Evidence: `packages/exporters/tests/splats-entry.test.js` round-trips through the
-independent gltf-pro reader, including every SH band and required/optional flags.
+independent gltf/pbr reader, including every SH band and required/optional flags.
 The real raccoon capture subset uses the fixture and source/license notice in
 `packages/splats/test/fixtures/NOTICE.md`, without adding another asset. Existing
 owning-codec tests cover the .splat quantization. No speed claim is made.

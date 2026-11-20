@@ -422,7 +422,11 @@ export function curveSurfaceCrossings(
       return;
     }
     if (!change) {
-      if (Math.abs(fa) <= tol && Math.abs(fm) <= tol && Math.abs(fb) <= tol) return;
+      // On the surface at both ends and the middle, and unable to bend further from it than the resolution between
+      // them: a stretch lying on it. Three points on it alone prove nothing: a circle that starts on a plane through
+      // its centre is on it at its start, its middle and its end (one point twice), and crosses it at the middle.
+      const flat = (k * w * w) / 8 <= tol;
+      if (flat && Math.abs(fa) <= tol && Math.abs(fm) <= tol && Math.abs(fb) <= tol) return;
       // f stays within k w^2 / 8 of the chord between its ends; ends further than that (and than the resolution) from
       // the surface, on one side, leave no crossing between them.
       if (Math.min(Math.abs(fa), Math.abs(fb)) > (k * w * w) / 8 + tol) return;

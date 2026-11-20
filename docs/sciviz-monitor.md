@@ -3,7 +3,8 @@
 The optional `@margoengine/sciviz/monitor` entry provides `installFigureStats(figure)`.
 The returned figure has a typed `stats: FigureStats` property. Installation is explicit,
 idempotent and adds no frame hook. `stats.snapshot()` returns JSON-safe live per-layer
-counts and memory. Disposing a monitor is supported through `dispose()` or `Symbol.dispose`.
+counts and memory. Disposing a monitor is supported through `dispose()` or `Symbol.dispose`;
+installing again on the same figure after that replaces the disposed monitor with a new one.
 The existing `/stats` entry continues to provide statistical charts.
 
 Standard scatter, line, surface, volume, slice, isosurface, rectangle and graph layers
@@ -31,7 +32,8 @@ must enumerate extension resources and any storage they retain outside the stand
 
 `sweepLimits(options)` accepts an increasing positive `sizes` array, a cancellable
 `prepare(size, signal)` returning a frame/stats/dispose case, environment metadata and a
-per-size hard limit (120000 ms by default). It renders each allocation-mode size once,
+per-size hard limit `timeoutMs` (120000 ms by default, at most 2147483647 ms: hosts fire a longer
+timer after 1 ms, so a longer limit rejects). It renders each allocation-mode size once,
 captures counts/memory, preserves coded failures, and stops at the first failure or the
 plan's size ceiling. A reached ceiling is a censored observation, never a hardware limit.
 Outer process-tree deadlines also cover browser/driver or cleanup hangs. Callers honor
@@ -47,7 +49,7 @@ prove this state machine using an injected deterministic clock through the test 
 No timed sweeps are run during the deferred build phase.
 
 Run allocation observations from the repository root after building packages:
-`node scripts/gpu-lock.mjs run --owner=sciviz-limits --gpu=sciviz-allocation-renders --max=3 --wait-max=60 -- node packages/sciviz/tests/limits-browser.mjs`.
+`node scripts/run-with-timeout.mjs --max=3 -- node packages/sciviz/tests/limits-browser.mjs`.
 `--backend=webgl2` selects the complete shared fallback. `--kind=points --sizes=1000,10000,100000`
 selects a custom increasing scale plan. `--output=path.json` selects the JSON destination.
 `--timed` refuses while `scripts/speed-phase.json` says `deferred`; it is for the later

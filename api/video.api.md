@@ -6,12 +6,18 @@
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 
+export type ObjectFit = 'fill' | 'contain' | 'cover' | 'none' | 'scale-down';
+
 export class Video implements EnginePlugin {
     readonly source: HTMLVideoElement | VideoFrame;
     readonly name: string;
     readonly frequencies: Uint8Array<ArrayBuffer>;
     constructor(source: HTMLVideoElement | VideoFrame, options?: VideoOptions);
     static attach(engine: EngineKernel, source: HTMLVideoElement | VideoFrame, options?: VideoOptions): Video;
+    get rect(): [number, number, number, number];
+    get sourceRect(): [number, number, number, number];
+    setRect(rect: readonly [number, number, number, number]): void;
+    setSource(source: readonly [number, number, number, number]): void;
     import(device: GPUDevice): GPUExternalTexture | null;
     sampleFrequency(): Uint8Array;
     setup(engine: Engine): void;
@@ -23,8 +29,18 @@ export class Video implements EnginePlugin {
 
 export interface VideoOptions {
     rect?: readonly [number, number, number, number];
+    source?: readonly [number, number, number, number];
     audio?: AudioContext;
     fftSize?: number;
     onFrequency?: (bins: Uint8Array) => void;
 }
+
+export function objectFit(fit: ObjectFit, picture: readonly [number, number], canvas: readonly [number, number], box?: Rect): {
+    rect: [number, number, number, number];
+    source: [number, number, number, number];
+};
+
+// Not exported from this entry, but used by the exports above:
+
+type Rect = readonly [number, number, number, number];
 ```

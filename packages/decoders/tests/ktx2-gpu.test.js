@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readBasisLZ, readETC1SSlice } from '../dist/etc1s.js';
 import { readKTX2Index } from '../dist/ktx2-file.js';
 import { KTX2GPUDecoder } from '../dist/ktx2-gpu.js';
-import { uastcMode } from '../dist/ktx2-gpu-shaders.js';
+import { uastcBlockValid, uastcMode } from '../dist/ktx2-gpu-shaders.js';
 import { fixture } from './support/ktx2.js';
 
 const device = { limits: { maxTextureDimension2D: 8192, maxStorageBufferBindingSize: 1 << 27 } };
@@ -66,4 +66,59 @@ test('a file that holds no Basis data, and a call with no device', async () => {
     decoder.createTexture(await fixture('cube-etc1s.ktx2'), { signal: controller.signal }),
     /stop/,
   );
+});
+
+test('a file with more layers than the device allows is refused before any texture is made', async () => {
+  // cube-etc1s.ktx2 is a cube: 6 layers. A device that takes 4 cannot hold it; createTexture used to make an invalid
+  // texture (a validation error, no throw).
+  let created = 0;
+  const small = {
+    limits: { ...device.limits, maxTextureArrayLayers: 4 },
+    createTexture: () => created++,
+    createComputePipelineAsync: async () => ({}),
+    createShaderModule: () => ({}),
+  };
+  await assert.rejects(
+    new KTX2GPUDecoder({ device: small }).createTexture(await fixture('cube-etc1s.ktx2')),
+    (error) => error instanceof RangeError && /6 layers exceeds the device's maxTextureArrayLayers/.test(error.message),
+  );
+  assert.equal(created, 0);
+});
+
+test('a UASTC block whose partition pattern is past its mode table is refused, as the reserved mode is', async () => {
+  // The PAT field has room for 32 patterns (16 in mode 3), the specification defines 30 two-subset patterns, 11
+  // three-subset ones (mode 3) and 19 for mode 7; the shader read a neighbouring table for the rest.
+  const block = (first, pattern) => {
+    const bytes = new Uint8Array(16);
+    bytes[0] = first;
+    const field = uastcMode(first) === 9 ? 28 : 20;
+    bytes[field >> 3] |= (pattern << (field & 7)) & 255;
+    bytes[(field >> 3) + 1] |= pattern >> (8 - (field & 7));
+    return bytes;
+  };
+  // First bytes naming modes 2 (0x1d), 3, 4 (0x13), 7 and 9 (0x0f): the last valid pattern, then the first invalid one.
+  for (const [byte, mode, count] of [
+    [0x1d, 2, 30],
+    [0x03, 3, 11],
+    [0x13, 4, 30],
+    [0x07, 7, 19],
+    [0x0f, 9, 30],
+  ]) {
+    assert.equal(uastcMode(byte), mode);
+    assert.equal(uastcBlockValid(block(byte, count - 1), 0), true, `mode ${mode} pattern ${count - 1}`);
+    assert.equal(uastcBlockValid(block(byte, count), 0), false, `mode ${mode} pattern ${count}`);
+  }
+  const bytes = (await fixture('array-uastc.ktx2')).slice(),
+    { offset } = readKTX2Index(bytes).levels[0];
+  bytes.set(block(0x07, 31), offset);
+  globalThis.GPUTextureUsage ??= { TEXTURE_BINDING: 4, COPY_DST: 2 };
+  let destroyed = 0;
+  const mock = {
+    limits: { ...device.limits, maxTextureArrayLayers: 256 },
+    createTexture: () => ({ destroy: () => destroyed++ }),
+    createComputePipelineAsync: async () => ({}),
+    createShaderModule: () => ({}),
+  };
+  await assert.rejects(new KTX2GPUDecoder({ device: mock }).createTexture(bytes), /reserved mode or partition pattern/);
+  assert.equal(destroyed, 1, 'the texture made for it is released');
 });

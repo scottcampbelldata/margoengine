@@ -119,12 +119,56 @@ test('meshGrid checks storage and budgets before scanning, and empty grids give 
   );
 });
 
+// A unit cube chamfered by `b`: every directed edge has its reverse once (closed), the area is 6 panels of side
+// 1 - 2b, 12 strips of 1 - 2b by b * sqrt(2) and 8 equilateral corners of side b * sqrt(2), and the +x panel's
+// corners sit at the full inset.
+function assertChamferedCube(mesh, b) {
+  const p = mesh.positions,
+    key = (i) => [0, 1, 2].map((a) => Math.round(p[i * 3 + a] * 65536)).join(),
+    edges = new Map();
+  let area = 0;
+  for (let t = 0; t < mesh.indices.length; t += 3) {
+    const [a, c, d] = mesh.indices.subarray(t, t + 3),
+      u = [0, 1, 2].map((k) => p[c * 3 + k] - p[a * 3 + k]),
+      v = [0, 1, 2].map((k) => p[d * 3 + k] - p[a * 3 + k]);
+    area += Math.hypot(u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]) / 2;
+    for (const [x, y] of [
+      [a, c],
+      [c, d],
+      [d, a],
+    ]) {
+      const k = `${key(x)}>${key(y)}`;
+      edges.set(k, (edges.get(k) ?? 0) + 1);
+    }
+  }
+  for (const [k, n] of edges) {
+    const [x, y] = k.split('>');
+    assert.ok(n === 1 && edges.get(`${y}>${x}`) === 1, `edge ${k} is shared by exactly two triangles`);
+  }
+  const s = 1 - 2 * b,
+    expected = 6 * s * s + 12 * s * b * Math.SQRT2 + 8 * (Math.sqrt(3) / 2) * b * b;
+  assert.ok(Math.abs(area - expected) < 1e-5, `area ${area} vs ${expected}`);
+  const all = new Set(Array.from({ length: p.length / 3 }, (_, i) => key(i))),
+    at = (x, y, z) => [x, y, z].map((c) => Math.round(Math.fround(c) * 65536)).join();
+  for (const [y, z] of [
+    [b, b],
+    [1 - b, b],
+    [1 - b, 1 - b],
+    [b, 1 - b],
+  ])
+    assert.ok(all.has(at(1, y, z)), `+x panel corner (1, ${y}, ${z})`);
+}
+
 test('chamferGrid insets a cube, keeps the opening, and does not replace the hard mesh', () => {
   const hard = meshGrid(grid([1, 1, 1], [4]));
   assert.equal(hard.stats.quads, 6);
   const { mesh, stats } = chamferGrid(grid([1, 1, 1], [4]), { bevel: 0.2, pivot: [0, 0, 0] });
   assert.equal(stats.quads, 6);
-  assert.equal(stats.triangles, 60);
+  // The Doo and Sabin (1978) chamfer of @margoengine/voxel/bevel: per face a panel (2 triangles), four half strips
+  // (8) and its share of four corner fans (8), so 6 x 18 triangles, closed, with the chamfered cube's exact area.
+  assert.equal(stats.triangles, 108);
+  assert.equal(mesh.indices.length / 3, stats.triangles);
+  assertChamferedCube(mesh, 0.2);
   assert.equal(stats.clamped, 0);
   assert.ok(mesh.min[0] >= 0 && mesh.max[0] <= 1);
   let inside = 0;
@@ -136,7 +180,10 @@ test('chamferGrid insets a cube, keeps the opening, and does not replace the har
   }
   assert.ok(inside >= 8, 'welded corners move inside the cube');
   assert.ok(mesh.trianglePalette.every((index) => index === 4));
-  assert.equal(chamferGrid(grid([1, 1, 1], [4]), { bevel: 0.4 }).stats.clamped, 6);
+  // A wide bevel is not shortened: each unit edge is inset by the full width, below half a cell.
+  const wide = chamferGrid(grid([1, 1, 1], [4]), { bevel: 0.4 });
+  assert.equal(wide.stats.clamped, 0);
+  assertChamferedCube(wide.mesh, 0.4);
   const hole = grid([3, 1, 1], [1, 0, 1]);
   const open = chamferGrid(hole, { bevel: 0.1 });
   const solid = chamferGrid(grid([3, 1, 1], [1, 1, 1]), { bevel: 0.1 });
@@ -183,6 +230,11 @@ test('chamferGrid keeps distinct palettes on adjacent cells', () => {
   const { mesh } = chamferGrid(grid([2, 1, 1], [2, 9]), { bevel: 0.15 });
   const used = new Set(mesh.trianglePalette);
   assert.deepEqual([...used].sort(), [2, 9]);
+  // Each triangle carries the palette of the cell it lies on, whatever number of triangles its face owns.
+  for (let t = 0; t < mesh.trianglePalette.length; t++) {
+    const x = [0, 1, 2].reduce((s, k) => s + mesh.positions[mesh.indices[t * 3 + k] * 3], 0) / 3;
+    assert.equal(mesh.trianglePalette[t], x < 1 ? 2 : 9, `triangle ${t} at x ${x}`);
+  }
 });
 
 test('chamferGrid on a translated rectangle stays inside that rectangle', () => {

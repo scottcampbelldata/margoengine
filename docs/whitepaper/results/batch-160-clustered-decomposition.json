@@ -8,8 +8,8 @@
     "referenceSha256": "f84fb83f72e6af3f7d6cb77501f2c8f56c876551ab9be73465480b6ae00809e9"
   },
   "frozenShadowed": {
-    "native": 567377,
-    "compat": 567377
+    "native": 478366,
+    "compat": 478365
   },
   "native": {
     "hardware": {
@@ -38,15 +38,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 356406,
-        "square": 23081572,
-        "max": 144,
-        "mae": 0.45319366455078125,
-        "rmse": 5.41753971204416,
-        "foreground": 111786,
-        "foregroundAbsolute": 356406,
-        "foregroundMae": 1.0627627788810763,
-        "changed": 31662
+        "absolute": 272725,
+        "square": 13567433,
+        "max": 127,
+        "mae": 0.3467877705891927,
+        "rmse": 4.153538634572148,
+        "foreground": 111847,
+        "foregroundAbsolute": 272725,
+        "foregroundMae": 0.8127918793828474,
+        "changed": 31382
       }
     },
     "map-2048": {
@@ -57,15 +57,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 212780,
-        "square": 7345088,
-        "max": 106,
-        "mae": 0.2705637613932292,
-        "rmse": 3.0561024802502397,
-        "foreground": 111243,
-        "foregroundAbsolute": 212780,
-        "foregroundMae": 0.6375831887549479,
-        "changed": 30716
+        "absolute": 222400,
+        "square": 8593852,
+        "max": 103,
+        "mae": 0.2827962239583333,
+        "rmse": 3.305699307034541,
+        "foreground": 111420,
+        "foregroundAbsolute": 222400,
+        "foregroundMae": 0.6653503260934602,
+        "changed": 30875
       }
     },
     "map-4096": {
@@ -76,15 +76,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 213642,
-        "square": 8855536,
-        "max": 131,
-        "mae": 0.27165985107421875,
-        "rmse": 3.3556514004906086,
-        "foreground": 110998,
-        "foregroundAbsolute": 213642,
-        "foregroundMae": 0.6415791275518478,
-        "changed": 30627
+        "absolute": 202036,
+        "square": 7977102,
+        "max": 117,
+        "mae": 0.2569020589192708,
+        "rmse": 3.1848720114007576,
+        "foreground": 111063,
+        "foregroundAbsolute": 202036,
+        "foregroundMae": 0.6063705584518096,
+        "changed": 30520
       }
     }
   },
@@ -116,15 +116,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 356406,
-        "square": 23081572,
-        "max": 144,
-        "mae": 0.45319366455078125,
-        "rmse": 5.41753971204416,
-        "foreground": 111786,
-        "foregroundAbsolute": 356406,
-        "foregroundMae": 1.0627627788810763,
-        "changed": 31662
+        "absolute": 272724,
+        "square": 13567340,
+        "max": 127,
+        "mae": 0.3467864990234375,
+        "rmse": 4.153524399021658,
+        "foreground": 111847,
+        "foregroundAbsolute": 272724,
+        "foregroundMae": 0.8127888991211208,
+        "changed": 31382
       }
     },
     "map-2048": {
@@ -135,15 +135,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 212777,
-        "square": 7344743,
-        "max": 106,
-        "mae": 0.27055994669596356,
-        "rmse": 3.0560307065875696,
-        "foreground": 111243,
-        "foregroundAbsolute": 212777,
-        "foregroundMae": 0.6375741994252822,
-        "changed": 30716
+        "absolute": 222399,
+        "square": 8593669,
+        "max": 103,
+        "mae": 0.2827949523925781,
+        "rmse": 3.305664110582841,
+        "foreground": 111420,
+        "foregroundAbsolute": 222399,
+        "foregroundMae": 0.6653473344103392,
+        "changed": 30875
       }
     },
     "map-4096": {
@@ -154,15 +154,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 213643,
-        "square": 8855613,
-        "max": 131,
-        "mae": 0.27166112263997394,
-        "rmse": 3.3556659893645158,
-        "foreground": 110998,
-        "foregroundAbsolute": 213643,
-        "foregroundMae": 0.64158213060896,
-        "changed": 30627
+        "absolute": 202037,
+        "square": 7977153,
+        "max": 117,
+        "mae": 0.25690333048502606,
+        "rmse": 3.184882192304359,
+        "foreground": 111063,
+        "foregroundAbsolute": 202037,
+        "foregroundMae": 0.6063735597513723,
+        "changed": 30520
       }
     }
   }

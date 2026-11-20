@@ -50,6 +50,15 @@ window.check={
   const back=randomGrid([8,8,8],0.5);out.roundTrip=same((await g.write(back).read()).voxels,back.voxels);
   const remap=new Uint8Array(256);remap[3]=9;out.remap=(await g.remap(remap).read()).voxels.filter((v)=>v===9).length;out.threes=back.voxels.filter((v)=>v===3).length;
   out.otherDevice='same';const d2=await (await navigator.gpu.requestAdapter()).requestDevice();try{(await GpuGrid.create(d2,{size:[2,2,2],voxels:new Uint8Array(8)})).brush(shell);}catch(e){out.otherDevice=e.message;}d2.destroy();
+  // A sphere far outside fills nothing (its squared distance once wrapped in i32); one half outside matches sphereCells.
+  const edge=await GpuGrid.create(device,{size:[8,8,8],voxels:new Uint8Array(512)});
+  out.farSphere=(await edge.fill({shape:'sphere',center:[50000,3,3],radius:2},5).fill({shape:'box',min:[-(2**40),0,0],max:[-(2**40)+4,8,8]},5).read()).voxels.filter((v)=>v).length;
+  out.edgeSphere=same((await edge.fill({shape:'sphere',center:[-2,3,9],radius:4},5).read()).voxels,stamp({size:[8,8,8],voxels:new Uint8Array(512)},sphereCells([-2,3,9],4),5).voxels);
+  // param(i) past 15 reads param(15).
+  const top=await ShaderBrush.create(device,'fn brush(p: vec3<i32>, value: u32) -> u32 {\n  return u32(param(17u));\n}');
+  const params=new Array(16).fill(0);params[15]=7;
+  out.paramClamp=(await edge.brush(top,{params}).read()).voxels.filter((v)=>v===7).length;
+  top.dispose();edge.dispose();
   g.dispose();shell.dispose();
   try{g.dilate();out.disposed='ran';}catch(e){out.disposed=e.code;}
   return out;

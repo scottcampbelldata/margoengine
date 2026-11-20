@@ -35,6 +35,14 @@ export function compare(measured, baseline, allowance = (v) => v) {
 }
 
 /**
+ * The items `--update` keeps as recorded: those of a package whose dist is stale. A gate with no owner map (duplicates,
+ * tests) keeps none; it used to call the missing map and crash every `--update` of such a gate.
+ */
+export function frozenItems(owner, stale) {
+  return (key) => (owner ? stale.has(owner(key)) : false);
+}
+
+/**
  * The sum a baseline's `total` must hold, when it holds another (a hand-settled merge that added the growth instead of
  * summing the items); undefined when the total is right or absent. `updateBaseline` always writes the true sum.
  */

@@ -58,7 +58,7 @@ test('mesh.material = other draws the new material next frame and moves per-engi
   assert.equal(phongBuffers(log).length, 1, 'meshes sharing a material share its uniform');
   mesh.material = blue;
   assert.equal(mesh.material, blue);
-  assert.equal(mesh.primitives[0].material.base, blue.color, 'gltf-pro reads the new material');
+  assert.equal(mesh.primitives[0].material.base, blue.color, 'gltf/pbr reads the new material');
   log = s.frame();
   const [blueBuffer] = phongBuffers(log);
   assert.ok(blueBuffer, 'the new material gets its uniform on first draw');
@@ -188,7 +188,7 @@ test('a skinned mesh stays skinned across a material swap', async () => {
   s.engine.dispose();
 });
 
-test('swapping between extended physical materials recompiles gltf-pro for the new lobes', async () => {
+test('swapping between extended physical materials recompiles gltf/pbr for the new lobes', async () => {
   const s = await scene(),
     mesh = createMesh(s.engine, quad, new Material({ iridescence: 1 }));
   let log = s.frame();
@@ -589,4 +589,24 @@ test('physical options set after createMesh switch that material to the physical
   }, RangeError);
   assert.equal(plain.physical, undefined, 'a rejected value enables nothing');
   s.engine.dispose();
+});
+
+
+// createMesh made the scene's draw queue (a 'materials:' plugin) before runtime.use(model); when use threw for the
+// scene's first mesh, the queue stayed registered with no member, a pass drawing nothing every frame.
+test('a first mesh whose model fails to register leaves no empty draw queue behind', async () => {
+  const s = await scene(),
+    queues = () => [...s.engine.scene.plugins.keys()].filter((name) => name.startsWith('materials:'));
+  const use = s.engine.use;
+  s.engine.use = function (plugin, ...rest) {
+    if (!plugin.name.startsWith('materials:')) throw new Error('model refused');
+    return use.call(this, plugin, ...rest);
+  };
+  assert.throws(() => createMesh(s.engine, quad, new PhongMaterial()), /model refused/);
+  s.engine.use = use;
+  assert.deepEqual(queues(), []);
+  const mesh = createMesh(s.engine, quad, new PhongMaterial());
+  assert.equal(queues().length, 1);
+  mesh.dispose();
+  assert.deepEqual(queues(), []);
 });

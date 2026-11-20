@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel } from '@margoengine/core';
-import type { Mesh as EngineMesh } from '@margoengine/core/extension';
+import type { EnginePlugin, Mesh as EngineMesh } from '@margoengine/core/extension';
 import type {
   Physics as PhysicsWorld,
   PhysicsOptions,
@@ -17,13 +17,13 @@ import { useScene, useCommit, useResourceEffect, type Scene, type Registry } fro
 import { descendants, worldPose, setWorldPose, type Triple, type Quaternion } from './scene-transform.js';
 import { rotateByQuaternion } from '@margoengine/math/quat';
 import { optionalPeer } from './optional.js';
-import { MargoError } from '@margoengine/math/errors';
+import { fault, rangeError } from '../../shared/errors.js';
 
 interface PhysicsState {
   world: PhysicsWorld | null;
   sync: Set<() => void>;
 }
-const Context = createContext<PhysicsState | null>(null);
+const Context = /* @__PURE__ */ createContext<PhysicsState | null>(null);
 /** Props of the Physics component; every prop is optional unless noted. */
 export interface PhysicsProps extends PhysicsOptions {
   children?: ReactNode;
@@ -48,7 +48,7 @@ export function Physics({
   latest.current = { onReady, onError, gravity, paused, timeScale };
   useResourceEffect(
     (lease) => {
-      let current: PhysicsWorld | undefined;
+      let current: PhysicsWorld | undefined, plugin: EnginePlugin | undefined;
       setWorld(null);
       void optionalPeer('@margoengine/physics', () => import('@margoengine/physics'))
         .then(async (api) => {
@@ -57,7 +57,8 @@ export function Physics({
           current = new api.Physics(null, { ...options, ...latest.current });
           const instance = current;
           // The wrapper's update runs after the solver's step, before the engine ticks transforms.
-          engine.use({
+          // The engine owns the wrapper, not the world, so unmount removes the wrapper from its scene.
+          engine.use((plugin = {
             name: instance.name,
             setup: () => instance.setup(engine as unknown as EngineKernel),
             onPreUpdate(delta) {
@@ -65,7 +66,7 @@ export function Physics({
               for (const update of sync) update();
             },
             dispose: () => instance.dispose(),
-          });
+          }));
           setWorld(instance);
           latest.current.onReady?.(instance);
         })
@@ -80,6 +81,9 @@ export function Physics({
           }
         });
       return () => {
+        // The world's own dispose detaches only a plugin registered as itself, so the wrapper leaves its scene here.
+        const owner = plugin && !engine.disposed ? engine.sceneOf(plugin) : undefined;
+        if (owner) owner.removePlugin(plugin!.name);
         current?.dispose();
       };
     },
@@ -107,7 +111,7 @@ export function Physics({
 /** Returns the Physics world of the nearest Physics component (null until it is ready); throws a MargoError (`state`) outside one. */
 export function usePhysics(): PhysicsWorld | null {
   const state = useContext(Context);
-  if (!state) throw new MargoError('state', 'usePhysics requires <Physics>; call it inside one.');
+  if (!state) throw fault('state', 'usePhysics requires <Physics>; call it inside one', 'react-usage');
   return state.world;
 }
 /** Collider fitted to the mesh geometry: 'cuboid', 'hull' or 'trimesh'. */
@@ -142,7 +146,7 @@ interface BodyState {
   requests: Set<ColliderRequest>;
   refresh: () => void;
 }
-const BodyContext = createContext<BodyState | null>(null);
+const BodyContext = /* @__PURE__ */ createContext<BodyState | null>(null);
 
 /** One body drives a transform group; children retain their local transforms. */
 export function RigidBody({
@@ -170,9 +174,9 @@ export function RigidBody({
 }
 
 const retainedGeometryError =
-  'RigidBody: automatic trimesh collider generation requires retained CPU geometry. Provide an explicit <CuboidCollider> or configure loader geometry retention.';
+  'RigidBody: automatic trimesh collider generation requires retained CPU geometry; provide an explicit <CuboidCollider> or configure loader geometry retention';
 const missingBoundsError =
-  'RigidBody: automatic collider generation requires mesh bounds or retained CPU geometry. Provide an explicit <CuboidCollider>.';
+  'RigidBody: automatic collider generation requires mesh bounds or retained CPU geometry; provide an explicit <CuboidCollider>';
 /** Read only existing CPU arrays and cached loader bounds. Never read a GPU buffer back. */
 function fitCollider(
   scene: Scene,
@@ -191,9 +195,7 @@ function fitCollider(
   const point = (world: Triple) => {
     const p = rotateByQuaternion([world[0] - position[0], world[1] - position[1], world[2] - position[2]], inverse);
     if (p.some((value) => !Number.isFinite(value)))
-      throw new RangeError(
-        'RigidBody: collider geometry contains non-finite positions; fix the mesh data or pass an explicit collider.',
-      );
+      throw rangeError('RigidBody: collider geometry contains non-finite positions; fix the mesh data or pass an explicit collider', 'react-arguments');
     for (let axis = 0; axis < 3; axis++) {
       min[axis] = Math.min(min[axis], p[axis]);
       max[axis] = Math.max(max[axis], p[axis]);
@@ -257,8 +259,8 @@ function fitCollider(
   };
   for (const mesh of meshes)
     if (mesh.geometry && !geometry(mesh, mesh.geometry.vertices, mesh.geometry.indices, 6)) {
-      if (mode === 'trimesh') throw new MargoError('state', retainedGeometryError);
-      if (!boundCorners(mesh.geometry.bounds, mesh)) throw new MargoError('state', missingBoundsError);
+      if (mode === 'trimesh') throw fault('state', retainedGeometryError, 'react-usage');
+      if (!boundCorners(mesh.geometry.bounds, mesh)) throw fault('state', missingBoundsError, 'react-usage');
     }
   for (const model of scene.resources.models)
     if (!model.disposed && meshes.has(model.root)) {
@@ -266,15 +268,15 @@ function fitCollider(
       for (const primitive of model.primitives)
         if (!geometry(primitive.node, primitive.vertices, primitive.indices, 20)) missing = true;
       if (!missing) continue;
-      if (mode === 'trimesh') throw new MargoError('state', retainedGeometryError);
+      if (mode === 'trimesh') throw fault('state', retainedGeometryError, 'react-usage');
       // Plugin-owned primitives may expose bounds without CPU attributes. Their bounds are world-space.
       let bounds: ArrayLike<number> | undefined;
       try {
         bounds = model.bounds;
       } catch {
-        throw new MargoError('state', missingBoundsError);
+        throw fault('state', missingBoundsError, 'react-usage');
       }
-      if (!boundCorners(bounds)) throw new MargoError('state', missingBoundsError);
+      if (!boundCorners(bounds)) throw fault('state', missingBoundsError, 'react-usage');
     }
   if (!Number.isFinite(min[0])) return;
   if (mode === 'trimesh') return { shape: 'trimesh', vertices: points, indices };
@@ -428,7 +430,7 @@ function ColliderBinding({
   onError?: (error: unknown) => void;
 }) {
   const binding = useContext(BodyContext);
-  if (!binding) throw new MargoError('state', 'Collider components require <RigidBody>; render them inside one.');
+  if (!binding) throw fault('state', 'Collider components require <RigidBody>; render them inside one', 'react-usage');
   const { engine, registry } = useScene(),
     latest = useRef({ options, onError });
   latest.current = { options, onError };
@@ -489,7 +491,7 @@ function BodyBinding({
   ...options
 }: Omit<RigidBodyProps, keyof MeshProps> & { transform: Pick<MeshProps, 'position' | 'rotation' | 'scale'> }) {
   const state = useContext(Context);
-  if (!state) throw new MargoError('state', 'RigidBody requires <Physics>; render it inside one.');
+  if (!state) throw fault('state', 'RigidBody requires <Physics>; render it inside one', 'react-usage');
   const binding = useContext(BodyContext)!,
     scene = useScene(),
     { engine, registry } = scene,

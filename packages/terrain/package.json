@@ -25,13 +25,14 @@
   },
   "dependencies": {
     "@margoengine/geometry": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/procedural": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js terrain",
     "test": "npm run build && node --test test/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "prepack": "npm --prefix ../.. run build:packages",
-    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/seams.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs && node packages/terrain/test/layers-pbr.browser.mjs && node packages/terrain/test/stream.browser.mjs && node packages/terrain/test/sculpt.browser.mjs && node packages/terrain/test/holes.browser.mjs && node packages/terrain/test/rvt.browser.mjs && node packages/terrain/test/displace.browser.mjs && node packages/terrain/test/deform.browser.mjs && node packages/terrain/test/blend.browser.mjs && node packages/terrain/test/compat.browser.mjs && node packages/terrain/test/planet.browser.mjs && node packages/terrain/test/imagery.browser.mjs && node packages/terrain/test/overlays.browser.mjs && node packages/terrain/test/origin.browser.mjs && node packages/terrain/test/planet-recipes.browser.mjs"
+    "test:gpu": "cd ../.. && node packages/terrain/test/wetness.browser.mjs && node packages/terrain/test/edge.browser.mjs && node packages/terrain/test/seams.browser.mjs && node packages/terrain/test/bump.browser.mjs && node packages/terrain/test/sand.browser.mjs && node packages/terrain/test/crest.browser.mjs && node packages/terrain/test/query.browser.mjs && node packages/terrain/test/layers-pbr.browser.mjs && node packages/terrain/test/stream.browser.mjs && node packages/terrain/test/sculpt.browser.mjs && node packages/terrain/test/holes.browser.mjs && node packages/terrain/test/rvt.browser.mjs && node packages/terrain/test/displace.browser.mjs && node packages/terrain/test/deform.browser.mjs && node packages/terrain/test/blend.browser.mjs && node packages/terrain/test/compat.browser.mjs && node packages/terrain/test/planet.browser.mjs && node packages/terrain/test/imagery.browser.mjs && node packages/terrain/test/overlays.browser.mjs && node packages/terrain/test/origin.browser.mjs && node packages/terrain/test/planet-recipes.browser.mjs && node packages/terrain/test/ground-change.browser.mjs && node packages/terrain/test/ground-change-terrain.browser.mjs && node packages/terrain/test/ground-change-scatter.browser.mjs && node packages/terrain/test/wet-ground.browser.mjs && node packages/terrain/test/rocks.browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -71,9 +72,21 @@
       "types": "./dist/deform.d.ts",
       "import": "./dist/deform.js"
     },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    },
+    "./dunes": {
+      "types": "./dist/dunes.d.ts",
+      "import": "./dist/dunes.js"
+    },
     "./blend": {
       "types": "./dist/blend.d.ts",
       "import": "./dist/blend.js"
+    },
+    "./height-grid": {
+      "types": "./dist/height-grid.d.ts",
+      "import": "./dist/height-grid.js"
     },
     "./planet-recipes": {
       "types": "./dist/planet-recipes.d.ts",
@@ -90,6 +103,30 @@
     "./overlays": {
       "types": "./dist/overlays.d.ts",
       "import": "./dist/overlays.js"
+    },
+    "./ground-change": {
+      "types": "./dist/ground-change.d.ts",
+      "import": "./dist/ground-change.js"
+    },
+    "./ground-change-settings": {
+      "types": "./dist/ground-change-settings.d.ts",
+      "import": "./dist/ground-change-settings.js"
+    },
+    "./wet-ground": {
+      "types": "./dist/wet-ground.d.ts",
+      "import": "./dist/wet-ground.js"
+    },
+    "./rocks": {
+      "types": "./dist/rocks.d.ts",
+      "import": "./dist/rocks.js"
+    },
+    "./rock-surface": {
+      "types": "./dist/rock-surface.d.ts",
+      "import": "./dist/rock-surface.js"
+    },
+    "./rock-settings": {
+      "types": "./dist/rock-settings.d.ts",
+      "import": "./dist/rock-settings.js"
     }
   },
   "files": [

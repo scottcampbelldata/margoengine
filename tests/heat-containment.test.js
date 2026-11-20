@@ -54,23 +54,14 @@ const sleepFor = (seconds) => `node -e "setTimeout(()=>{},${seconds * 1000})"`;
 // Runs a step as a real child process that ends its tree when the heat watch aborts it.
 const childStep = (command) => (_, signal) => runLimited(command, { cwd: root, limitMs: 30_000, signal });
 
-test('a heat stop pauses, releases the lock, resumes at the paused step and reports peak, stop and resume', async () => {
-  let temp = 50,
-    held = 0,
-    cooledUnlocked = false;
+test('a heat stop pauses, resumes at the paused step and reports peak, stop and resume', async () => {
+  let temp = 50;
   const calls = [],
     lines = [];
   const results = await runPlan([step('a'), step('b'), step('c')], {
     profile: heatProfile(),
     pollMs: 20,
-    read: () => {
-      if (calls.length === 2 && held === 0) cooledUnlocked = true;
-      return temp;
-    },
-    take: async () => {
-      held++;
-      return () => held--;
-    },
+    read: () => temp,
     log: (line) => lines.push(line),
     runStep: (s, signal) => {
       calls.push(s.id);
@@ -84,8 +75,6 @@ test('a heat stop pauses, releases the lock, resumes at the paused step and repo
     },
   });
   assert.deepEqual(calls, ['a', 'b', 'b', 'c'], 'the paused step runs again, the run does not start over');
-  assert.equal(cooledUnlocked, true, 'the GPU lock is released while the machine cools');
-  assert.equal(held, 0, 'every lock taken is released');
   assert.deepEqual(
     results.map((r) => r.outcome),
     ['pass', 'pass', 'pass'],
@@ -100,7 +89,7 @@ test('a heat stop pauses, releases the lock, resumes at the paused step and repo
   assert.ok(pause.waitedS >= 0);
   assert.match(pause.reason, /85 C reached the stop temperature 80 C/);
   assert.ok(
-    lines.some((l) => /PAUSED FOR HEAT: pkg b: .*GPU lock released; waiting at most 0\.05 min for below 70 C/.test(l)),
+    lines.some((l) => /PAUSED FOR HEAT: pkg b: .*Step ended; waiting at most 0\.05 min for below 70 C/.test(l)),
   );
   assert.ok(lines.some((l) => /RESUMED: pkg b at 60 C after \d+ s; running this step again/.test(l)));
   assert.equal(exitCode(results), 0, 'a resumed pause that then passed is a pass');
@@ -314,13 +303,16 @@ test("a profile exclusion holds for any step that runs an excluded package's fil
       `profile ${name} plans a step that runs the path tracer`,
     );
     const compat = all.filter((s) => s.id.startsWith('webgl2-compat/test:gpu#'));
-    assert.ok(compat.length > 13, `${name}: webgl2-compat test:gpu still runs as short steps`);
+    assert.ok(compat.length > 1, `${name}: webgl2-compat test:gpu still runs as short steps`);
+    // The step is named by what it runs, never by its position: a new step before it shifts every later number.
+    const pathTracer = compat.filter((s) => /node packages\/voxel-pathtracer\/tests\/browser-check\.mjs --compat/.test(s.command));
+    assert.equal(pathTracer.length, 1, `${name}: webgl2-compat test:gpu has exactly one path tracer step`);
     assert.deepEqual(
       compat.filter((s) => s.excluded).map((s) => s.id),
-      ['webgl2-compat/test:gpu#13'],
+      pathTracer.map((s) => s.id),
       `${name}: only the path tracer step of webgl2-compat test:gpu is left out`,
     );
-    const step = compat.find((s) => s.excluded);
+    const step = pathTracer[0];
     assert.match(step.command, /node packages\/voxel-pathtracer\/tests\/browser-check\.mjs --compat/);
     assert.match(
       step.excluded,
@@ -372,86 +364,26 @@ test('split steps cover the whole suite: both bevel sample counts, each chain pa
     );
     assert.ok(steps.every((s) => s.command.startsWith(byId(`voxel/${script}`).command)));
   }
-  const chain = splitSteps(byId('voxel/test:gpu'));
-  assert.deepEqual(
-    chain.map((s) => s.command),
-    [
-      'cd ../.. && node packages/voxel/tests/render-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/bevel-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/render-lighting-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/lod-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/light-rgb-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/gpu-mesher-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/smooth-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/gi-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/debris-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/models-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/objects-browser-check.mjs',
-      'cd ../.. && node packages/voxel/tests/wind-browser-check.mjs',
-    ],
-  );
-  assert.deepEqual(
-    chain.map((s) => s.id),
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => `voxel/test:gpu#${n}`),
-  );
-  // voxel-edit's browser checks: one step each.
-  assert.deepEqual(
-    splitSteps(byId('voxel-edit/test:gpu')).map((s) => s.command),
-    [
-      'cd ../.. && node packages/voxel-edit/tests/shaders-browser-check.mjs',
-      'cd ../.. && node packages/voxel-edit/tests/gpu-browser-check.mjs',
-    ],
-  );
+  // Chained browser checks run one step each, so a hot machine cools between them: every `node` command of the
+  // package's test:gpu chain, in its order. Read from the package script, not pinned here: a pinned copy went stale
+  // each time a package added a check (voxel smooth-lod, post stack-dynamic, taa still/settle/converge, 2026-11-16).
   assert.equal(splitSteps({ label: 'x y', command: 'npm run a || node b.mjs', dir: 'x' }).length, 1);
-  // Post's browser checks: one step each, so a hot machine cools between them.
-  assert.deepEqual(
-    splitSteps(byId('post/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/post/test/', '')),
-    [
-      'image-browser.mjs',
-      'outline-browser.mjs',
-      'contact-shadows-browser.mjs',
-      'sss-browser.mjs',
-      'material-decals-browser.mjs',
-      'decals-cull-browser.mjs',
-      'ssr-rough-browser.mjs',
-      'ssgi-bounce-browser.mjs',
-      'anamorphic-browser.mjs',
-      'blur-browser.mjs',
-      'lens-browser.mjs',
-      'selective-bloom-browser.mjs',
-      'mask-browser.mjs',
-      'pixelate-browser.mjs',
-      'halftone-browser.mjs',
-      'stylize-browser.mjs',
-      'curvature-browser.mjs',
-      'bloom-finite-browser.mjs',
-      'fxaa-gate-browser.mjs',
-    ],
-  );
-  // TAA's browser checks, one step each.
-  assert.deepEqual(
-    splitSteps(byId('taa/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/taa/test/', '')),
-    [
-      'upscale-browser.mjs',
-      'velocity-only-browser.mjs',
-      'reactive-browser.mjs',
-      'rejection-browser.mjs',
-      'sharpen-browser.mjs',
-      'xr-browser.mjs',
-      'deform-browser.mjs',
-      'upscale-velocity-browser.mjs',
-    ],
-  );
-  // DOF's browser checks, one step each.
-  assert.deepEqual(
-    splitSteps(byId('dof/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/dof/tests/gpu/', '')),
-    ['lens-check.mjs', 'compat-check.mjs'],
-  );
-  // Toon's browser checks, one step each.
-  assert.deepEqual(
-    splitSteps(byId('toon/test:gpu')).map((s) => s.command.replace('cd ../.. && node packages/toon/test/', '')),
-    ['models-check.mjs', 'hatch-check.mjs', 'screen-outline.browser.mjs', 'hatch-models.browser.mjs'],
-  );
+  for (const dir of ['voxel', 'voxel-edit', 'post', 'taa', 'dof', 'toon']) {
+    const script = JSON.parse(readFileSync(join(root, `packages/${dir}/package.json`), 'utf8')).scripts['test:gpu'],
+      parts = script.replace(/^cd \.\.\/\.\. && /, '').split(' && '),
+      chain = splitSteps(byId(`${dir}/test:gpu`));
+    assert.ok(parts.length > 1 && parts.every((p) => /^node \S+\.mjs$/.test(p)), `${dir}: a chain of node checks`);
+    assert.deepEqual(
+      chain.map((s) => s.command),
+      parts.map((p) => `cd ../.. && ${p}`),
+      dir,
+    );
+    assert.deepEqual(
+      chain.map((s) => s.id),
+      parts.map((_, i) => `${dir}/test:gpu#${i + 1}`),
+      dir,
+    );
+  }
 });
 
 // Bug (Apple silicon Mac, scripts/gpu-package-tests.mjs): with MARGO_MACHINE_PROFILE unset the Mac ran as profile

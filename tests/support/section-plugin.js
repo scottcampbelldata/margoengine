@@ -1,4 +1,4 @@
-// Test-only section plugin. gltf-pro, shadows, materials and selection read a generic scene binding named `section`
+// Test-only section plugin. gltf/pbr, shadows, materials and selection read a generic scene binding named `section`
 // (packages/shared/section.js: `sectionState` finds it by its declaration in the frame's shader). This plugin registers
 // that binding the way a section plugin does, so their tests cover the contract without any optional package:
 // - a frame-graph pass (order -30, also run on `prepare`) prefixes the frame's core shader with the `Section` uniform

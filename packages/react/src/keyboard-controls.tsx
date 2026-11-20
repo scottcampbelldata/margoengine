@@ -1,8 +1,11 @@
 import { createContext, useContext, useMemo, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { MargoError } from '@margoengine/math/errors';
 import { useCommit } from './internal.js';
+import { fault } from '../../shared/errors.js';
 
-/** A named action matching either KeyboardEvent.key or KeyboardEvent.code. */
+/**
+ * A named action matching either KeyboardEvent.key or KeyboardEvent.code. A one-character `key` matches
+ * regardless of case, so 'w' is still held while Shift or Caps Lock is down.
+ */
 export interface KeyboardControlsEntry<T extends string = string> {
   name: T;
   keys: readonly string[];
@@ -22,14 +25,17 @@ type Store = {
   event: (event: KeyboardEvent, down: boolean) => void;
   reset: () => void;
 };
-const KeyboardContext = createContext<Store | null>(null);
+const KeyboardContext = /* @__PURE__ */ createContext<Store | null>(null);
+// A letter's key value changes case with Shift and Caps Lock while the physical key stays the same one.
+const fold = (key: string) => (key.length === 1 ? key.toLowerCase() : key);
 function createStore(map: readonly KeyboardControlsEntry[], change: (name: string, down: boolean, state: KeyboardControlsState) => void): Store {
   const pressed = new Map<string, { key: string; code: string }>(), listeners = new Set<() => void>();
+  const actions = map.map(entry => ({ entry, keys: new Set(entry.keys.map(fold)) }));
   let state: KeyboardControlsState = Object.freeze(Object.fromEntries(map.map(({ name }) => [name, false])));
   const update = (reset = false) => {
     const next = { ...state }, changed: string[] = [];
-    for (const entry of map) {
-      const down = !reset && ((entry.up === false && state[entry.name]) || [...pressed.values()].some(e => entry.keys.includes(e.code) || entry.keys.includes(e.key)));
+    for (const { entry, keys } of actions) {
+      const down = !reset && ((entry.up === false && state[entry.name]) || [...pressed.values()].some(e => keys.has(e.code) || keys.has(e.key)));
       if (down !== state[entry.name]) { next[entry.name] = down; changed.push(entry.name); }
     }
     if (!changed.length) return;
@@ -41,8 +47,8 @@ function createStore(map: readonly KeyboardControlsEntry[], change: (name: strin
     get: () => state,
     listen(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     event(event, down) {
-      const id = event.code || event.key;
-      if (down) pressed.set(id, { key: event.key, code: event.code });
+      const key = fold(event.key), id = event.code || key;
+      if (down) pressed.set(id, { key, code: event.code });
       else pressed.delete(id);
       update();
     },
@@ -81,7 +87,7 @@ export function useKeyboardControls<T extends string = string>(): [KeyboardSubsc
 export function useKeyboardControls<T extends string = string, V = boolean>(selector: (state: KeyboardControlsState<T>) => V): V;
 export function useKeyboardControls<T extends string = string, V = boolean>(selector?: (state: KeyboardControlsState<T>) => V): V | [KeyboardSubscribe<T>, () => KeyboardControlsState<T>] {
   const store = useContext(KeyboardContext);
-  if (!store) throw new MargoError('state', 'useKeyboardControls requires KeyboardControls; wrap the component in it.');
+  if (!store) throw fault('state', 'useKeyboardControls requires KeyboardControls; wrap the component in it', 'react-usage');
   const selected = useMemo(() => {
     let last: KeyboardControlsState | undefined, value: V;
     return () => {

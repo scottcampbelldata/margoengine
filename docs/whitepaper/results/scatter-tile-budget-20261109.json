@@ -1,7 +1,7 @@
 {
   "date": "2026-11-09",
   "parent": "cff40d1274e17597ce595d111c5b4f541783a0b3",
-  "command": "node scripts/gpu-lock.mjs run --owner=codex-77fix --max=5 -- node packages/scatter/test/grass-tiles.browser.mjs",
+  "command": "node packages/scatter/test/grass-tiles.browser.mjs",
   "scope": "Generated packed records, fresh rings on one real GPU; no speed or appearance claim.",
   "hardware": {
     "webglRenderer": "ANGLE (NVIDIA, NVIDIA RTX A6000 (0x00002230) Direct3D11 vs_5_0 ps_5_0, D3D11)",

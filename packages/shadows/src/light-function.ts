@@ -1,7 +1,9 @@
 // Light functions: what shapes the sun between the sky and the ground, given to `Shadows` or `VirtualShadows` in `effects`.
 // Both are one world-position lookup per lit pixel, multiplied into the sun by the shadow pass's shadowLit.
-import type { ShadowEffect, ShadowEffectFrame } from './shader.js';
+import type { ShadowEffect, ShadowEffectFrame, ShadowEffectMap } from './shader.js';
+import { borrow, fix, lend, relend, type Borrowable } from '../../shared/borrowed.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 /** The clouds a {@link cloudShadows} matches: `Sky` from `@margoengine/sky` with the `clouds` feature. */
 export interface CloudLayerSource {
   readonly cloudLayer: { field: string; coverage: number; drift: number; height: number } | undefined;
@@ -15,13 +17,17 @@ export interface CloudShadowOptions {
 }
 /** {@link lightPattern} settings. Everything except `texture` is read every frame from the effect's `options`. */
 export interface LightPatternOptions {
-  /** The mask: its colour multiplies the sun. Any filterable 2D texture view. */
-  texture: GPUTextureView;
+  /**
+   * The mask: its colour multiplies the sun. Any filterable 2D texture view, or `(device) => view`, called once per
+   * device, so the mask comes back by itself after a device restore. A plain view is lost with its device: the sun goes
+   * on unmasked, `engine.onError` hears of it once (`'state'`, #borrowed-lost), and `setTexture` gives a new one.
+   */
+  texture: Borrowable<GPUTextureView>;
   /** World units one repeat of the mask spans, across the light, > 0. Default 10. */
   size?: number;
   /** Mask repeats it has moved, along its own u and v. Default [0, 0]. */
   offset?: readonly [number, number];
-  /** Mask repeats per second it scrolls, along u and v. Default [0, 0]. */
+  /** Mask repeats per second of frame time it scrolls, along u and v. Default [0, 0]. */
   speed?: readonly [number, number];
   /** How much of the mask applies, 0 to 1. Default 1. */
   strength?: number;
@@ -29,6 +35,15 @@ export interface LightPatternOptions {
 /** An effect with live `options`. */
 export interface LightFunction<Options, Context = unknown> extends ShadowEffect<Context> {
   readonly options: Options;
+}
+/** What {@link lightPattern} returns: a light function whose mask can be replaced. */
+export interface LightPattern<Context = unknown> extends LightFunction<LightPatternOptions, Context> {
+  /** Replaces the mask at any time, after a device restore too; the receivers take it on the next frame. */
+  setTexture(texture: Borrowable<GPUTextureView>): void;
+  /** Seconds of frame time the mask has scrolled for: `offset + speed * time`. */
+  readonly time: number;
+  /** Moves `time` by a frame delta; the shadows that hold the pattern run it each frame update. */
+  advanceTime(delta: number): void;
 }
 const unit = (value: number, name: string) => {
   if (!(value >= 0 && value <= 1)) throw new RangeError(`Invalid ${name}; use a number from 0 to 1`);
@@ -127,15 +142,45 @@ ${field}fn shadowFxClouds${at}(position:vec3f)->f32 {
  */
 export function lightPattern<Context extends { device: GPUDevice }>(
   options: LightPatternOptions,
-): LightFunction<LightPatternOptions, Context> {
-  if (!options?.texture) throw new TypeError('lightPattern needs a texture; pass a GPUTextureView');
-  const uniform = new EffectUniform(12);
+): LightPattern<Context> {
+  const needed = (texture: unknown) => {
+    if (!texture)
+      throw new TypeError('lightPattern needs a texture; pass a GPUTextureView or (device) => GPUTextureView');
+  };
+  needed(options?.texture);
+  const uniform = new EffectUniform(12),
+    slot = borrow<GPUTextureView>(options.texture, 'lightPattern texture', 'setTexture');
   let binding = 0,
     sampler: GPUSampler | undefined,
-    time = 0,
-    last = 0;
+    device: GPUDevice | undefined,
+    engine: ShadowEffectMap['engine'],
+    // The mask while the caller's is lost: white, so the sun goes on unmasked.
+    white: GPUTexture | undefined,
+    plain: GPUTextureView | undefined,
+    bound: GPUTextureView | undefined,
+    time = 0;
+  // The white stand-in is made only once a mask is lost, so a pattern with its mask allocates nothing more.
+  const blank = (gpu: GPUDevice) => {
+    if (white) return plain!;
+    const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+    white = gpu.createTexture({ size: [1, 1], format: 'rgba8unorm', usage });
+    gpu.queue.writeTexture({ texture: white }, new Uint8Array([255, 255, 255, 255]), { bytesPerRow: 4 }, [1, 1]);
+    return (plain = white.createView());
+  };
+  const mask = () => lend(slot, device!, engine) ?? blank(device!);
   return {
     options,
+    get time() {
+      return time;
+    },
+    advanceTime(delta) {
+      time += delta;
+    },
+    setTexture(texture) {
+      needed(texture);
+      options.texture = texture;
+      relend(slot, texture, engine?.gpu ?? device);
+    },
     get call() {
       return `shadowFxPattern${binding}(position)`;
     },
@@ -153,11 +198,21 @@ fn shadowFxPattern${at}(position:vec3f)->vec3f {
 `;
     },
     resources() {
-      return [{ buffer: uniform.buffer! }, this.options.texture, sampler!];
+      return [{ buffer: uniform.buffer! }, (bound = mask()), sampler!];
     },
-    setup(device) {
-      uniform.setup(device);
-      sampler ??= device.createSampler({
+    rebind() {
+      return mask() !== bound;
+    },
+    setup(gpu, map) {
+      engine = map.engine;
+      fix(slot, gpu);
+      if (device !== gpu) {
+        white?.destroy();
+        white = plain = undefined;
+      }
+      device = gpu;
+      uniform.setup(gpu);
+      sampler ??= gpu.createSampler({
         magFilter: 'linear',
         minFilter: 'linear',
         addressModeU: 'repeat',
@@ -167,12 +222,9 @@ fn shadowFxPattern${at}(position:vec3f)->vec3f {
     update(frame: ShadowEffectFrame<Context>) {
       const { size = 10, offset = [0, 0], speed = [0, 0], strength = 1 } = this.options,
         v = uniform.values,
-        l = frame.light,
-        now = performance.now() / 1000;
+        l = frame.light;
       if (!(size > 0)) throw new RangeError('Invalid light pattern size; use a number above 0');
       unit(strength, 'light pattern strength');
-      time += last ? now - last : 0;
-      last = now;
       // A basis across the light: right is world up crossed with it, or +X for a sun straight overhead.
       const flat = Math.hypot(l[0], l[2]) < 1e-4,
         rx = flat ? 1 : l[2],
@@ -192,7 +244,8 @@ fn shadowFxPattern${at}(position:vec3f)->vec3f {
     },
     dispose() {
       uniform.dispose();
-      sampler = undefined;
+      white?.destroy();
+      sampler = white = plain = bound = undefined;
     },
   };
 }

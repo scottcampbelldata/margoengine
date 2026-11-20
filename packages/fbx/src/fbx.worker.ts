@@ -1,7 +1,7 @@
-// Worker script for @margoengine/fbx/worker (bundled to dist/workers/fbx.js): fetch, FBX -> GLB, then gltf-pro's
+// Worker script for @margoengine/fbx/worker (bundled to dist/workers/fbx.js): fetch, FBX -> GLB, then gltf/pbr's
 // prepare step (JSON, accessors, packed vertices, decoded textures), all off the main thread.
 import { defaultLimits, type FBXImportLimits } from './limits.js';
-import { prepareGLTF } from '@margoengine/gltf-pro/prepare';
+import { prepareGLTF } from '@margoengine/gltf/prepare';
 import { readResponse } from '../../shared/loading.js';
 import { serve } from '../../shared/worker.js';
 import { convertFBX } from './index.js';

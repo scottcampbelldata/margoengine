@@ -24,7 +24,9 @@ test('TAA jitter and sky ambient use distinct live bindings', () => {
     owned = [];
   const sky = lighting.create(h.engine.gpu, '', [], owned);
   h.engine.use(taa);
+  // The sky's light map at -6, its shader patch after the explicit environments (KB-ENV-AMBIENT-DUP1).
   h.engine.frameGraph.add({ name: 'audit:sky', order: -6, execute: (c) => sky.pass(c) });
+  h.engine.frameGraph.add({ name: 'audit:sky-patch', order: -0.5, execute: (c) => sky.patch(c) });
   try {
     h.engine.frameGraph.execute(h.context);
     const bindings = h.context.bindings.map((entry) => entry.binding);

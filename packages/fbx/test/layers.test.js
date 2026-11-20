@@ -248,3 +248,33 @@ test('the worker holds the entry by name', async () => {
     });
   assert.equal(prepared.doc.animations.length, 1);
 });
+
+// One TCB curve on X with keys at 0, 1, 2 ... seconds; each key's tension, continuity and bias as Float32 bits, as text
+// files write them.
+async function tcbTrack(keys, times = keys.map((_, i) => i)) {
+  const bits = (v) => new Uint32Array(new Float32Array([v]).buffer)[0],
+    n = keys.length,
+    data = keys.flatMap(([value, t = 0, c = 0, b = 0]) => [bits(t), bits(c), bits(b), 0]),
+    text = new TextDecoder()
+      .decode(layerFile([{ values: [0, 0] }]))
+      .replace(`KeyTime: *2 { a: 0,${TICKS} }`, `KeyTime: *${n} { a: ${times.map((t) => t * TICKS).join(',')} }`)
+      .replace('KeyValueFloat: *2 { a: 0,0 }', `KeyValueFloat: *${n} { a: ${keys.map((k) => k[0]).join(',')} }`)
+      .replace('KeyAttrFlags: *1 { a: 4 }', `KeyAttrFlags: *${n} { a: ${keys.map(() => 0x208).join(',')} }`)
+      .replace('KeyAttrDataFloat: *4 { a: 0,0,0,0 }', `KeyAttrDataFloat: *${n * 4} { a: ${data.join(',')} }`)
+      .replace('KeyAttrRefCount: *1 { a: 2 }', `KeyAttrRefCount: *${n} { a: ${keys.map(() => 1).join(',')} }`);
+  return track(await convertFBX(encode(text), { extensions })).at;
+}
+
+test('TCB continuity -1 makes corners: the arriving tangent follows the chord before (Kochanek and Bartels 1984, eq. 9 and 10)', async () => {
+  const at = await tcbTrack([[0, 0, -1], [1, 0, -1], [0, 0, -1], [1, 0, -1]]);
+  // Both tangents of the middle span lie along it, so it is a straight line from 1 to 0.
+  for (const time of [1.25, 1.5, 1.75]) assert.ok(Math.abs(at(time) - (2 - time)) < 1e-3, `${time}: ${at(time)}`);
+});
+
+test('TCB tangents over uneven key spacing keep one slope a second on both sides (Kochanek and Bartels 1984, eq. 11 and 12)', async () => {
+  const at = await tcbTrack([[0], [1], [3]], [0, 1, 3]);
+  // The middle key's slope is 1 per second either side; the end keys are flat. Hermite halfway through each span:
+  // 0 to 1 over 1 s, slopes 0 and 1: 0.5 - 0.125 = 0.375. 1 to 3 over 2 s, slopes 1 and 0: 2 + 0.125 x 2 = 2.25.
+  assert.ok(Math.abs(at(0.5) - 0.375) < 1e-3, String(at(0.5)));
+  assert.ok(Math.abs(at(2) - 2.25) < 1e-3, String(at(2)));
+});

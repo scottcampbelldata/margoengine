@@ -1,0 +1,62 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Water seek check</title><style>body{margin:0}canvas{display:inline-block;width:192px;height:128px}</style></head><body><canvas id="a"></canvas><canvas id="b"></canvas><canvas id="c"></canvas>
+<script type="module">
+// GAP-FILM-TIME: a world seeked to film time draws what a continuous run draws there, bit for bit. Three worlds alike:
+// A runs n + 1 live frames; B is fresh, seeks n / fps (@margoengine/cutscene/seek), then draws one live frame; C draws
+// one frame with no seek (the restart a film cut showed before). `?kind=gerstner`: Water's Gerstner waves with WaterFlow
+// and WaterRain rings; `?kind=fft`: an FFTOcean with its foam off (threshold 0 and gentle chop, so no crest folds; foam is history on the GPU). The HDR scene captures
+// of A and B must be equal float for float, and C must differ. Driven by seek-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Water} from '/packages/water/dist/index.js';
+import {FFTOcean} from '/packages/water/dist/fft.js';
+import {WaterFlow} from '/packages/water/dist/flow.js';
+import {WaterRain} from '/packages/water/dist/rain.js';
+import {seek} from '/packages/cutscene/dist/seek.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+const FPS=60,errors=[],kind=new URLSearchParams(location.search).get('kind')??'gerstner';
+async function world(id){
+ const engine=await Engine.create(document.getElementById(id),{backend:'webgpu',camera:{position:[0,4,12],target:[0,0,-4],near:0.1,far:1000}}),device=engine.gpu;
+ device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const w={engine,device,clocks:[]};
+ if(kind==='fft'){
+  w.ocean=FFTOcean.attach(engine,{resolution:64,size:200,segments:128,amplitude:1,choppiness:0.5,windSpeed:12,seed:5,foamThreshold:0});
+  w.clocks=[w.ocean];
+ }else{
+  w.water=Water.attach(engine,{size:[40,40],segments:128,waves:[{direction:[1,0.3],amplitude:0.25,wavelength:7},{direction:[-0.4,1],amplitude:0.12,wavelength:3.1}]});
+  w.flow=WaterFlow.attach(engine,{surface:w.water,direction:[1,0.5]});
+  w.rain=WaterRain.attach(engine,{surface:w.water});w.rain.rain=1;
+  w.clocks=[w.water,w.flow,w.rain];
+ }
+ w.post=Bloom.attach(engine,{strength:0,threshold:100,exposure:0});
+ return w;
+}
+async function draw(w){w.engine.render({delta:1/FPS});await w.device.queue.onSubmittedWorkDone();}
+async function read(w){
+ const {device}=w,texture=w.post.sceneTexture,module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+ const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const differ=(a,b)=>{let n=0;for(let i=0;i<a.length;i++)if(!Object.is(a[i],b[i]))n++;return n;};
+const lit=(a)=>{let s=0;for(let i=0;i<a.length;i+=4)s+=a[i]+a[i+1]+a[i+2];return s;};
+const a=await world('a'),b=await world('b'),c=await world('c');
+// Pipelines compile on warm-up frames of delta 0, which move no clock (time stays 0, so a seek is allowed); every world
+// gets the same number of them, so all three start from the same state.
+const still=async w=>{w.engine.render({delta:0});await w.device.queue.onSubmittedWorkDone();};
+const counts=[];
+for(const w of [a,b,c]){let n=0;await waitForPipelines(async()=>{n++;await still(w);});counts.push(n);}
+const most=Math.max(...counts);
+for(const [i,w] of [a,b,c].entries())for(let k=counts[i];k<most;k++)await still(w);
+window.check={async run(n=600){
+ for(let step=0;step<=n;step++)await draw(a);
+ const result=await seek(b.engine,n/FPS,{fps:FPS});
+ await draw(b);await draw(c);
+ const [ia,ib,ic]=await Promise.all([read(a),read(b),read(c)]);
+ return {errors,kind,steps:result.steps,clocks:result.clocks,unseekable:result.unseekable,names:b.clocks.map(x=>x.name),values:ia.length,differ:differ(ia,ib),fresh:differ(ia,ic),lit:lit(ia),
+  clocksA:a.clocks.map(x=>x.time),clocksB:b.clocks.map(x=>x.time)};
+}};
+window.ready=true;
+</script></body></html>

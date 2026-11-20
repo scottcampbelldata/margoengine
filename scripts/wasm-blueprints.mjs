@@ -3,12 +3,17 @@
 // to change a crate. Each blueprint has a record beside it (`<blueprint>.json`, or the crate's own record where it had
 // one first) holding a hash of everything that decides its bytes: the crate's sources (and the crates it reaches by a
 // `path =` dependency), rust-toolchain.toml and the build script that sets its flags. `npm run hygiene` fails when a
-// record no longer matches, so a crate change without a rebuild cannot land.
+// record no longer matches, so a crate change without a rebuild cannot land. Every build runs in the environment of
+// scripts/rust-wasm-env.mjs (also hashed), so the same sources give the same bytes on every system; hygiene refuses a
+// blueprint holding a host-specific path.
 //   node scripts/wasm-blueprints.mjs                       check every record (what hygiene runs)
 //   node scripts/wasm-blueprints.mjs --rebuild             rebuild every blueprint from source and write its record
 //   node scripts/wasm-blueprints.mjs --rebuild --only=avif,poisson   just those
 //   node scripts/wasm-blueprints.mjs --rebuild --compare   rebuild and fail when any bytes differ from the committed ones
-//                                                          (proves the committed blueprints are current and reproducible)
+//                                                          (proves the committed blueprints are current and reproducible;
+//                                                          a differing file is put back as committed)
+//   npm run check:wasm-repro                               the same over every blueprint, where the pinned toolchain is
+//                                                          installed (local CI runs it when cargo is there)
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -16,6 +21,7 @@ import { dirname, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gunzipSync, inflateRawSync } from 'node:zlib';
 import { margoError } from '../packages/shared/errors.js';
+import { hostSourcePath } from './rust-wasm-env.mjs';
 
 const repository = resolve(import.meta.dirname, '..');
 
@@ -225,7 +231,9 @@ const content = (bytes) =>
 
 /** Hash of everything that decides an entry's blueprint bytes. */
 export function sourceHash(entry, root = repository) {
-  const files = [...new Set([...crateFiles(entry.crate, root), entry.script, 'rust-toolchain.toml'])]
+  const files = [
+    ...new Set([...crateFiles(entry.crate, root), entry.script, 'rust-toolchain.toml', 'scripts/rust-wasm-env.mjs']),
+  ]
     .filter((file) => existsSync(join(root, file)))
     .sort();
   const hash = createHash('sha256');
@@ -254,6 +262,12 @@ export function writeRecord(entry, root = repository) {
   for (const leak of ['Users', 'Development', '.cargo', '.rustup'])
     if (text.includes(leak))
       throw margoError('WASM_BLUEPRINT_PATH', `${entry.blueprint} holds a build path (${leak}); strip or remap it`);
+  const host = hostSourcePath(wasm);
+  if (host)
+    throw margoError(
+      'WASM_BLUEPRINT_HOST_PATH',
+      `${entry.blueprint} holds the host path ${host}; build it through scripts/rust-wasm-env.mjs`,
+    );
   const record = { sourceHash: sourceHash(entry, root), wasmHash: sha256(wasm), bytes: wasm.length };
   writeFileSync(join(root, recordPath(entry)), `${JSON.stringify(record, null, 2)}\n`);
   return record;
@@ -263,6 +277,11 @@ export function writeRecord(entry, root = repository) {
 export function staleBlueprints(root = repository, entries = BLUEPRINTS) {
   const problems = [];
   for (const entry of entries) {
+    const host = existsSync(join(root, entry.blueprint)) ? hostSourcePath(blueprintBytes(entry, root)) : null;
+    if (host)
+      problems.push(
+        `${entry.name}: ${entry.blueprint} holds the host path ${host}, so its bytes differ by system; run node scripts/wasm-blueprints.mjs --rebuild --only=${entry.name}`,
+      );
     if (entry.own) {
       if (!existsSync(join(root, entry.own))) problems.push(`${entry.name}: its own check ${entry.own} is missing`);
       continue;
@@ -311,10 +330,25 @@ export function assertWasmBlueprintsCurrent(root = repository) {
     throw margoError('WASM_BLUEPRINT_STALE', `Wasm blueprints out of date:\n  ${problems.join('\n  ')}`);
 }
 
+/** The pinned channel of rust-toolchain.toml when the rustc on PATH is that version, else null with the reason. */
+export function pinnedToolchain(root = repository) {
+  const channel = /channel\s*=\s*"([^"]+)"/.exec(readFileSync(join(root, 'rust-toolchain.toml'), 'utf8'))?.[1];
+  const run = spawnSync('rustc', ['--version'], { cwd: root, encoding: 'utf8', timeout: 60_000, windowsHide: true });
+  const version = run.status === 0 ? run.stdout.trim() : null;
+  if (!version) return { channel: null, reason: `no rustc on PATH (rust-toolchain.toml pins ${channel})` };
+  if (!version.startsWith(`rustc ${channel} `))
+    return { channel: null, reason: `${version} is not the pinned ${channel}` };
+  return { channel, reason: version };
+}
+
 function rebuild(entries, compare) {
   const differ = [];
   for (const entry of entries) {
-    const before = existsSync(join(repository, entry.blueprint)) ? blueprintBytes(entry) : null;
+    const committed = [entry.blueprint, recordPath(entry)].map((file) => [
+      file,
+      existsSync(join(repository, file)) ? readFileSync(join(repository, file)) : null,
+    ]);
+    const before = committed[0][1];
     console.log(`wasm blueprint ${entry.name}: building ${entry.crate}`);
     const run = spawnSync(process.execPath, [entry.script, ...(entry.args ?? [])], {
       cwd: repository,
@@ -327,13 +361,18 @@ function rebuild(entries, compare) {
         'WASM_BLUEPRINT_BUILD',
         `${entry.script} failed (${run.error?.message ?? `exit ${run.status}`})`,
       );
-    const after = blueprintBytes(entry);
-    if (!entry.own) writeRecord(entry);
-    const same = before?.equals(after) ?? false;
+    // The committed file is compared, not only the module inside it: a deflated or gzip blueprint is what git holds. A
+    // TypeScript blueprint is compared without its line endings, which are the checkout's, not the build's.
+    const after = readFileSync(join(repository, entry.blueprint));
+    const same = before ? content(before).equals(content(after)) : false;
+    if (same && !before.equals(after)) writeFileSync(join(repository, entry.blueprint), before);
     console.log(
-      `wasm blueprint ${entry.name}: ${after.length} B, ${same ? 'identical to' : 'differs from'} the committed one`,
+      `wasm blueprint ${entry.name}: ${blueprintBytes(entry).length} B, ${same ? 'identical to' : 'differs from'} the committed one`,
     );
     if (!same) differ.push(entry.name);
+    if (compare && !same) {
+      for (const [file, bytes] of committed) if (bytes) writeFileSync(join(repository, file), bytes);
+    } else if (!entry.own) writeRecord(entry);
   }
   if (compare && differ.length)
     throw margoError(
@@ -350,7 +389,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const entries = only ? BLUEPRINTS.filter((entry) => only.includes(entry.name)) : BLUEPRINTS;
   if (only && entries.length !== only.length)
     throw margoError('WASM_BLUEPRINT_UNKNOWN', `Unknown blueprint in --only=${only.join(',')}`);
-  if (process.argv.includes('--rebuild')) rebuild(entries, process.argv.includes('--compare'));
+  if (process.argv.includes('--where-toolchain')) {
+    const { channel, reason } = pinnedToolchain();
+    if (!channel) console.log(`wasm blueprints: not rebuilt here, ${reason}; a machine with it installed proves them`);
+    else rebuild(entries, true);
+  } else if (process.argv.includes('--rebuild')) rebuild(entries, process.argv.includes('--compare'));
   else {
     assertWasmBlueprintsCurrent();
     console.log(

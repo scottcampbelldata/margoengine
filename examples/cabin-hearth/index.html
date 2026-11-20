@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#05070c">
+  <meta name="description" content="A snowbound log cabin at night: one lit window in falling snow, and inside a fire in the hearth and a kettle steaming. Rendered live in WebGPU with Margo Engine.">
+  <title>Cabin Hearth · Margo Engine</title>
+  <!-- Margo engine made for Margie -->
+  <style>
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:#05070c;color:#e8edf2;font:16px/1.4 Georgia,'Times New Roman',serif;overflow:hidden}
+    #viewport{position:fixed;inset:0}canvas{touch-action:none;display:block}
+    h1{position:fixed;top:20px;left:24px;margin:0;font-size:16px;font-weight:400;color:#c9d3dc}
+    h1 a{color:inherit}
+    #hint{position:fixed;top:44px;left:24px;margin:0;font-size:14px;color:#9aa8b4}
+    nav{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:min(620px,calc(100% - 32px))}
+    nav a{display:inline-block;min-height:44px;padding:10px 16px;background:#080b0fd9;border:1px solid #4d5864;border-radius:4px;color:#e8edf2;text-decoration:none}
+    #layers{top:72px;right:24px;bottom:auto;left:auto;transform:none;width:auto;flex-direction:column;align-items:stretch}
+    nav a[aria-current="true"]{border-color:#f2c46d;color:#ffe2a8}
+    :focus-visible{outline:3px solid #ffd98a;outline-offset:2px}
+    #status{position:fixed;top:44%;left:0;right:0;margin:0;padding:0 24px;text-align:center}#error{position:fixed;top:72px;left:24px;right:24px;margin:0;color:#ffd9b5}#error:empty{display:none}
+  </style>
+</head>
+<body>
+  <main id="viewport" aria-label="A snowbound log cabin at night with one lit window; drag to look around"></main>
+  <h1>Cabin Hearth, <a href="../../">Margo Engine</a></h1>
+  <p id="hint">Drag to look around. Pick a view below.</p>
+  <nav aria-label="Views">
+    <a href="?view=outside">Outside</a>
+    <a href="?view=hearth">Hearth</a>
+    <a href="?view=outside&amp;debug=wireframe">Wireframe</a>
+    <a href="?view=outside&amp;debug=layers">Layers</a>
+  </nav>
+  <p id="status" role="status" data-webgpu-status>Lighting the fire. The first load can take up to half a minute.</p>
+  <p id="error" role="alert"></p>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ships riding the sea - Margo Engine Test</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 14px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 70vh; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  button { font: inherit; padding: 6px 10px; }
+  #status { padding: 0 8px 8px; }
+</style>
+<canvas id="view"></canvas>
+<div id="controls">
+  <button id="btnPlay">Play</button>
+  <button id="btnSeek">Seek to 60 s</button>
+  <button id="btnStep">Step 50 to 60 s frame by frame</button>
+  <button id="btnNight">Calm night (lamps)</button>
+  <button id="btnStorm">Heavy weather</button>
+  <button id="btnFollow">Lamps follow the weather</button>
+</div>
+<div id="status"></div>
+<script type="module" src="./ships.ts"></script></html>

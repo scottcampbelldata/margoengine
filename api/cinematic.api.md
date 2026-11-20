@@ -23,6 +23,8 @@ export class Cinematic implements EnginePlugin {
     shake(amplitude: number, duration: number, frequency?: number): void;
     update(delta: number): void;
     setup(engine: Engine): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

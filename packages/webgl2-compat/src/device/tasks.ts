@@ -1,19 +1,17 @@
 // HTML's port-message task source yields to the browser without inheriting the timer nesting level. In a serial
-// map/unmap loop a timer's promise continuations inherit that level, imposing a 4 ms floor on every later poll.
-// A small delayed task also leaves the event loop idle so WebGL sync status can advance, rather than continuously
+// map/unmap loop a timer's promise continuations inherit that level, imposing a 4 ms floor on every later poll (HTML,
+// timer initialisation steps). So each poll posts a port message and, from that task (nesting level 0), sets a 1 ms
+// timer: a small delayed task leaves the event loop idle so WebGL sync status can advance, rather than continuously
 // posting ready port tasks (WebGL 2.0 sync objects only transition outside an executing task).
+// Never scheduler.postTask({ delay }): Chrome on Windows runs its delayed tasks on the system timer tick, 15.6 ms, so a
+// poll measured 15.1 ms for delay 1 where the port hop and setTimeout(1) took 2.0 ms (Chrome 157, 2026-11-18), and
+// every onSubmittedWorkDone and mapAsync of the layer waited about 13 ms more than it had to (KB-COMPAT-POSTTASK1).
 let channel: MessageChannel | undefined;
 const pending: (() => void)[] = [];
 type NodePort = MessagePort & { ref?(): void; unref?(): void };
 
-/** Yields one browser task, so GL fences and queries can become observable, without a clamped timer. */
+/** Yields one browser task and about 1 ms, so GL fences and queries can become observable, without a clamped timer. */
 export function nextGPUTask(): Promise<void> {
-  const scheduler = (
-    globalThis as typeof globalThis & {
-      scheduler?: { postTask(callback: () => void, options: { delay: number }): Promise<void> };
-    }
-  ).scheduler;
-  if (scheduler?.postTask) return scheduler.postTask(() => {}, { delay: 1 });
   if (!channel) {
     channel = new MessageChannel();
     channel.port1.onmessage = () => {

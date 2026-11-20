@@ -3,7 +3,7 @@
 import { AlphaRaycaster, modelAlphaMasks } from '@margoengine/bvh/alpha';
 import { Raycaster } from '@margoengine/bvh';
 import { Engine } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Picking } from '@margoengine/selection';
 import cards from '../../../examples/assets/khronos/AlphaBlendModeTest/AlphaBlendModeTest.glb?url';
 

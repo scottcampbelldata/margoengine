@@ -191,7 +191,9 @@ export async function parseKMZ(input: BinaryInput, options: KMZOptions = {}): Pr
     entries.find((entry) => /(^|\/)doc\.kml$/i.test(entry.name)) ?? entries.find((entry) => /\.kml$/i.test(entry.name));
   const models: KMZModel[] = [];
   if (document) {
-    const tree = readXMLTree(decodeXML(await readZipEntry(bytes, document, options)), F),
+    const tree = readXMLTree(decodeXML(await readZipEntry(bytes, document, options)), F, {
+      external: options.external,
+    }),
       found: [XMLElement, XMLElement | undefined][] = [];
     all(tree, 'Model', found);
     for (const [model, placemark] of found) {

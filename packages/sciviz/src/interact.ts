@@ -47,6 +47,10 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   #outline: SVGSVGElement | undefined;
   #path: number[] = [];
   #dragging = false;
+  /** The pointer drawing the selection: other fingers or pens neither move nor end it. */
+  #dragId = 0;
+  /** The canvas's touch-action before a selection mode took touch drags from the browser, or undefined. */
+  #touchWas: string | undefined;
   #panning: { x: number; y: number; id: number } | undefined;
   #frame = 0;
   #last: { x: number; y: number } | undefined;
@@ -75,7 +79,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
     canvas.addEventListener('pointerleave', () => this.#leave(), { signal });
     canvas.addEventListener('pointerdown', (e) => this.#down(e), { signal });
     canvas.addEventListener('pointerup', (e) => this.#up(e), { signal });
-    canvas.addEventListener('pointercancel', () => this.#cancel(), { signal });
+    canvas.addEventListener('pointercancel', (e) => this.#cancel(e), { signal });
     if (hooks.navigate) {
       const navigate = hooks.navigate;
       this.#mode = 'pan';
@@ -107,6 +111,17 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
     // A 2D chart reports its navigation mode as 'pan', a 3D figure as 'orbit'.
     this.#mode = navigating(mode) ? (this.#hooks.navigate ? 'pan' : 'orbit') : mode;
     this.#canvas.style.cursor = navigating(mode) ? '' : 'crosshair';
+    // A touch drag would otherwise scroll the page and cancel the selection with pointercancel.
+    if (!navigating(mode) && this.#touchWas === undefined) {
+      this.#touchWas = this.#canvas.style.touchAction;
+      this.#canvas.style.touchAction = 'none';
+    } else if (navigating(mode)) this.#restoreTouch();
+  }
+
+  #restoreTouch(): void {
+    if (this.#touchWas === undefined) return;
+    this.#canvas.style.touchAction = this.#touchWas;
+    this.#touchWas = undefined;
   }
 
   /** The hit under the pointer, or null. */
@@ -133,6 +148,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
       return;
     }
     if (this.#dragging) {
+      if (e.pointerId !== this.#dragId) return;
       if (this.#mode === 'lasso') this.#path.push(p.x, p.y);
       else this.#path.splice(2, 2, p.x, p.y);
       this.#draw();
@@ -225,7 +241,9 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
       e.preventDefault();
       return;
     }
+    if (this.#dragging) return;
     this.#dragging = true;
+    this.#dragId = e.pointerId;
     this.#path = [p.x, p.y, p.x, p.y];
     this.#canvas.setPointerCapture?.(e.pointerId);
     if (this.#tooltip) this.#tooltip.hidden = true;
@@ -239,7 +257,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
       this.#canvas.releasePointerCapture?.(e.pointerId);
       return;
     }
-    if (!this.#dragging) return;
+    if (!this.#dragging || e.pointerId !== this.#dragId) return;
     this.#dragging = false;
     this.#canvas.releasePointerCapture?.(e.pointerId);
     const path = this.#path;
@@ -248,8 +266,9 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
     else if (path.length >= 6) this.#hooks.select({ polygon: Float64Array.from(path) });
   }
 
-  #cancel(): void {
-    this.#panning = undefined;
+  #cancel(e: PointerEvent): void {
+    if (this.#panning && e.pointerId === this.#panning.id) this.#panning = undefined;
+    if (!this.#dragging || e.pointerId !== this.#dragId) return;
     this.#dragging = false;
     this.#outline?.replaceChildren();
   }
@@ -283,6 +302,7 @@ export class Interaction<Hit extends { readonly layer: unknown; readonly index: 
   /** Removes the listeners, the tooltip and the outline. */
   dispose(): void {
     this.#abort.abort();
+    this.#restoreTouch();
     if (this.#frame) cancelAnimationFrame(this.#frame);
     this.#tooltip?.remove();
     this.#outline?.remove();

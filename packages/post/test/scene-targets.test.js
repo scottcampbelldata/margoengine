@@ -1,5 +1,5 @@
 // SceneTargets (named MRT outputs) over the recording mock GPU: the core replay's outputs and
-// formats, the gltf-pro capture declarations, clearing per view, resize and release, and the option errors. Pixels are
+// formats, the gltf/pbr capture declarations, clearing per view, resize and release, and the option errors. Pixels are
 // checked on a real GPU by the visual check (demos/scene-targets.html).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -76,7 +76,7 @@ for (const samples of [4, 1])
     );
   });
 
-test('SceneTargets gives gltf-pro capture declarations that build the same outputs', () => {
+test('SceneTargets gives gltf/pbr capture declarations that build the same outputs', () => {
   const h = harness(),
     targets = SceneTargets.attach(h.engine, { outputs }),
     hooks = [];
@@ -96,7 +96,7 @@ test('SceneTargets gives gltf-pro capture declarations that build the same outpu
   assert.match(code, /fn margoCapture\(s:Surface,v:vec3f,k:vec3f\)->MargoCapture/);
   assert.match(
     code,
-    /TargetSurface\(margoPosition,s\.n,s\.base,s\.roughness,s\.metal,s\.occlusion,s\.emissive,f\.eye\.xyz\)/,
+    /TargetSurface\(margoPosition,s\.n,s\.base,s\.roughness,s\.metal,s\.occlusion,s\.emissive,f\.eye\.xyz,1\.0,f\.light\.xyz,0\.0\)/,
   );
   assert.deepEqual(
     hook.targets.map((t) => t.format),
@@ -169,4 +169,119 @@ test('SceneTargets keeps one set of textures per destination size across frames'
     [],
     'dispose releases every size',
   );
+});
+
+// The sun's shadow visibility and the look masks made from it (KB-LOOK-SHADOWMASK1): headless/look's penumbra, subject,
+// lit and shadow masks need a package that draws them.
+const shadowed = (code) =>
+  code.replace('let linear=direct*', 'let linear=shadowLit(direct,i.position,i.normal)*') +
+  '\nfn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {return direct*0.5;}';
+const fakeShadows = {
+  name: 'fake-shadows',
+  setup() {},
+  registerPasses(graph) {
+    graph.add({ name: 'fake-shadows', order: -5, execute: (c) => (c.shader = shadowed(c.shader)) });
+  },
+};
+const live = (replay) => replay.slice(replay.lastIndexOf('}return margoTargets('));
+
+test('SceneTargets keeps the sun visibility a shadow plugin wraps around direct live, attached before it', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, { outputs: { sun: 'shadow' } });
+  h.engine.use(fakeShadows);
+  const replay = modules(h.gpu.record(() => h.frame())).find((code) => code.includes('fn margoTargets('));
+  assert.ok(replay, 'the replay is built');
+  assert.match(
+    live(replay),
+    /TargetSurface\(i\.position,n,vec4f\(i\.color,1\),i\.material\.x,i\.material\.y,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),i\.position,i\.normal\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0\)/,
+    'the visibility is computed outside the dead block, after the -5 shader patch of a plugin attached later',
+  );
+  assert.equal(h.engine.plugins.size, 2);
+  targets.dispose();
+});
+
+test('SceneTargets reads visibility 1 with no shadow plugin', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, { outputs: { sun: 'shadow' } });
+  const replay = modules(h.gpu.record(() => h.frame())).find((code) => code.includes('fn margoTargets('));
+  assert.match(live(replay), /frame\.eye\.xyz,1\.0,frame\.light\.xyz,0\.0\)/);
+  targets.dispose();
+});
+
+test('SceneTargets draws the look masks as r8unorm built-in values', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, {
+      outputs: { sun: 'shadow', penumbra: 'penumbra', lit: 'litGround', shadow: 'shadedGround', subject: 'subject' },
+    });
+  const log = h.gpu.record(() => h.frame()),
+    replay = modules(log).find((code) => code.includes('fn margoTargets('));
+  assert.match(replay, /o\.o0=vec4f\(vec4f\(t\.shadow,max\(dot\(t\.normal,t\.light\),0\.0\),0,1\)\);/);
+  assert.match(
+    replay,
+    /o\.o1=vec4f\(vec4f\(select\(0\.0,1\.0,dot\(t\.normal,t\.light\)>0\.05&&t\.shadow>0\.02&&t\.shadow<0\.98\),0,0,1\)\);/,
+  );
+  assert.match(
+    replay,
+    /o\.o2=vec4f\(vec4f\(select\(0\.0,1\.0,t\.normal\.y>=0\.7071&&dot\(t\.normal,t\.light\)>=0\.2&&t\.shadow>=0\.98\),0,0,1\)\);/,
+  );
+  assert.match(
+    replay,
+    /o\.o3=vec4f\(vec4f\(select\(0\.0,1\.0,t\.normal\.y>=0\.7071&&dot\(t\.normal,t\.light\)>=0\.2&&t\.shadow<=0\.02\),0,0,1\)\);/,
+  );
+  assert.match(replay, /o\.o4=vec4f\(vec4f\(t\.subject,0,0,1\)\);/);
+  const pipeline = log.find((e) => e[0] === 'renderPipeline' && e[2].fragment?.targets?.length === 5)[2];
+  assert.deepEqual(
+    pipeline.fragment.targets.map((t) => t.format),
+    ['rg16float', 'r8unorm', 'r8unorm', 'r8unorm', 'r8unorm'],
+  );
+  targets.dispose();
+});
+
+test('SceneTargets marks subject models and reads their sun visibility; terrain captures too', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, { outputs: { subject: 'subject', sun: 'shadow' } }),
+    made = () => {
+      const hooks = [];
+      return {
+        hooks,
+        setCapture(hook) {
+          hooks.push(hook);
+          return () => hooks.splice(hooks.indexOf(hook), 1);
+        },
+        onDispose: () => () => {},
+        draw() {},
+      };
+    };
+  const person = made(),
+    ground = made(),
+    pbr = 'struct Surface {base:vec4f}\nfn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {return direct;}';
+  targets.add(person, { subject: true });
+  targets.add(ground);
+  const subjectCode = person.hooks[0].declarations(pbr),
+    groundCode = ground.hooks[0].declarations(pbr);
+  assert.match(
+    subjectCode,
+    /f\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,s\.n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),f\.light\.xyz,1\.0\)\);\}/,
+  );
+  assert.match(groundCode, /f\.light\.xyz,0\.0\)\);\}/);
+  // Added again with the other choice, the model moves to that hook.
+  targets.add(person);
+  assert.equal(person.hooks.length, 1);
+  assert.match(person.hooks[0].declarations(pbr), /f\.light\.xyz,0\.0\)\);\}/);
+  assert.throws(() => targets.add(ground, { subject: 'yes' }), TypeError);
+  // Terrain's capture (SSR's contract for shaders without the PBR Surface) gets margoSSR over the same outputs.
+  const terrain =
+    'struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f}\nfn shadowLit(direct:vec3f,position:vec3f,normal:vec3f)->vec3f {return direct;}';
+  const field = made();
+  targets.add(field, { subject: false });
+  const code = field.hooks[0].declarations(terrain);
+  assert.match(code, /struct MargoSSR \{@location\(0\) o0:vec4f,@location\(1\) o1:vec4f\}/);
+  assert.match(
+    code,
+    /fn margoSSR\(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32\)->MargoSSR \{_=v;let o=margoTargets\(TargetSurface\(margoPosition,n,vec4f\(base,1\),rough,metal,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0\)\);return MargoSSR\(o\.o0,o\.o1\);\}/,
+  );
+  assert.throws(() => field.hooks[0].declarations('struct Frame {camera:mat4x4f,eye:vec4f,sun:vec4f}'), {
+    code: 'unsupported',
+  });
+  targets.dispose();
 });

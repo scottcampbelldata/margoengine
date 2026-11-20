@@ -1,6 +1,7 @@
 // Skin checks before export: the faults game engines reject or render wrongly. glTF 2.0 (section 3.7.3.3) requires
-// joint indices inside the skin, weights that are 0 or more and sum to 1 per vertex, and at most four influences in
-// JOINTS_0 / WEIGHTS_0 (engines such as Unity, Unreal, Godot and Roblox default to four).
+// every joint index inside the skin (whatever its weight), no joint twice among a vertex's nonzero weights, weights
+// that are 0 or more and sum to 1 per vertex, and at most four influences in JOINTS_0 / WEIGHTS_0 (engines such as
+// Unity, Unreal, Godot and Roblox default to four).
 import { checkRig, type RigJoint } from './rig.js';
 import { WeightMap, type VertexInfluences } from './weight-map.js';
 
@@ -12,6 +13,7 @@ export type SkinIssueCode =
   | 'negative-weight'
   | 'non-finite'
   | 'invalid-joint'
+  | 'duplicate-joint'
   | 'degenerate-bone';
 
 /** One kind of fault found by {@link checkSkin}, with up to 16 examples. */
@@ -21,7 +23,7 @@ export interface SkinIssue {
   readonly count: number;
   /** The first vertices with it (at most 16). */
   readonly vertices: readonly number[];
-  /** The bones involved (`degenerate-bone`, `invalid-joint`), at most 16. */
+  /** The bones involved (`degenerate-bone`, `invalid-joint`, `duplicate-joint`), at most 16. */
   readonly bones: readonly number[];
   /** The fault and its fix, in one sentence. */
   readonly message: string;
@@ -59,12 +61,14 @@ const FIX: Record<SkinIssueCode, string> = {
   'negative-weight': 'have negative weights; set them to 0 and call normalize()',
   'non-finite': 'have NaN or infinite weights; repaint or recompute them',
   'invalid-joint': 'name joints outside the skin; fix the joint indices or pass jointCount',
+  'duplicate-joint': 'list one joint twice with nonzero weights; add the weights into one slot',
   'degenerate-bone': 'are degenerate (zero length, or a non-invertible bind matrix); move the joint or fix its scale',
 };
 
 /**
  * Checks skin weights before export: unweighted vertices, more than `maxInfluences` (4) influences, weights that do
- * not sum to 1, negative or non-finite weights, joint indices outside the skin, and degenerate bones (a joint at its
+ * not sum to 1, negative or non-finite weights, joint indices outside the skin (in any slot, weighted or not), one
+ * joint in two weighted slots of a vertex, and degenerate bones (a joint at its
  * parent's position, or a non-invertible inverse bind matrix). Returns every kind of fault found; nothing is changed.
  */
 export function checkSkin(input: SkinCheckInput): SkinReport {
@@ -90,17 +94,25 @@ export function checkSkin(input: SkinCheckInput): SkinReport {
   }
   if (!Number.isInteger(jointCount) || jointCount < 1) throw new RangeError('checkSkin jointCount must be at least 1');
   const vertexCount = values.length / width,
-    found = new Map<SkinIssueCode, { count: number; last: number; vertices: number[]; bones: Set<number> }>(),
+    found = new Map<
+      SkinIssueCode,
+      { count: number; last: number; vertices: number[]; bones: Set<number>; counted: Set<number> }
+    >(),
+    // A vertex issue counts vertices; a bone issue (vertex -1) counts distinct bones, so a bone found by two checks
+    // counts once.
     note = (code: SkinIssueCode, vertex: number, bone = -1) => {
       let entry = found.get(code);
-      if (!entry) found.set(code, (entry = { count: 0, last: -1, vertices: [], bones: new Set() }));
+      if (!entry) found.set(code, (entry = { count: 0, last: -1, vertices: [], bones: new Set(), counted: new Set() }));
       if (vertex >= 0) {
         if (entry.last !== vertex) {
           entry.last = vertex;
           entry.count++;
           if (entry.vertices.length < EXAMPLES) entry.vertices.push(vertex);
         }
-      } else entry.count++;
+      } else if (!entry.counted.has(bone)) {
+        entry.counted.add(bone);
+        entry.count++;
+      }
       if (bone >= 0 && entry.bones.size < EXAMPLES) entry.bones.add(bone);
     };
   for (let vertex = 0; vertex < vertexCount; vertex++) {
@@ -109,19 +121,27 @@ export function checkSkin(input: SkinCheckInput): SkinReport {
       broken = false;
     for (let k = 0; k < width; k++) {
       const w = values[vertex * width + k];
+      if (joints) {
+        // glTF 2.0 3.7.3.3: every JOINTS_n index MUST be below the skin's joint count, weighted or not.
+        const j = joints[vertex * width + k];
+        if (!Number.isInteger(j) || j < 0 || j >= jointCount) note('invalid-joint', vertex, j);
+        // ...and joint indices with nonzero weights MUST be unique for a vertex (a non-finite weight is its own fault).
+        else if (w !== 0 && Number.isFinite(w))
+          for (let e = 0; e < k; e++) {
+            const other = values[vertex * width + e];
+            if (joints[vertex * width + e] === j && other !== 0 && Number.isFinite(other)) {
+              note('duplicate-joint', vertex, j);
+              break;
+            }
+          }
+      }
       if (!Number.isFinite(w)) {
         note('non-finite', vertex);
         broken = true;
         continue;
       }
       if (w < 0) note('negative-weight', vertex);
-      if (w !== 0) {
-        nonzero++;
-        if (joints) {
-          const j = joints[vertex * width + k];
-          if (!Number.isInteger(j) || j < 0 || j >= jointCount) note('invalid-joint', vertex, j);
-        }
-      }
+      if (w !== 0) nonzero++;
       sum += w;
     }
     if (broken) continue;

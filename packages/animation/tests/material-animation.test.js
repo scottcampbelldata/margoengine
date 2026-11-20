@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as animation from '../dist/index.js';
 import { pointerChannels } from '../dist/pointer.js';
-import { parseGLTFAsync } from '@margoengine/gltf-pro';
+import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { exportGLB } from '@margoengine/exporters';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 import { fixture, material, channel, quad } from '../../exporters/tests/material-animation-fixture.js';

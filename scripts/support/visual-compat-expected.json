@@ -183,6 +183,11 @@
    "status": "same",
    "exact": true
   },
+  "orrery": {
+   "status": "differs",
+   "over2": 0.0354,
+   "mean": 0.454
+  },
   "scene-targets": {
    "status": "same",
    "exact": true

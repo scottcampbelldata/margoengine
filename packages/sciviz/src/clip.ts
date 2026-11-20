@@ -134,7 +134,7 @@ function scalar(grid: AnalysisGrid, point: boolean, array?: string): ArrayLike<n
 export async function thresholdGrid(input: AnalysisGrid | AnalysisImage, range: readonly [number, number], options: ThresholdOptions = {}): Promise<AnalysisGrid> {
   options.signal?.throwIfAborted(); const grid = asGrid(input); validate(grid);
   // One-sided thresholds (ParaView's "below lower" and "above upper") pass an infinite bound; NaN is never a bound.
-  if (range.length !== 2 || range.some(Number.isNaN) || range[0] > range[1] || range[0] === Infinity || range[1] === -Infinity ||
+  if (range?.length !== 2 || range.some(Number.isNaN) || range[0] > range[1] || range[0] === Infinity || range[1] === -Infinity ||
     (options.association !== undefined && !['point', 'cell'].includes(options.association)) ||
     (options.mode !== undefined && !['all', 'any'].includes(options.mode)))
     throw rangeError('Threshold needs an ordered range (infinite ends allowed), point/cell association and all/any point mode', 'sciviz');
@@ -268,13 +268,12 @@ export async function clipGrid(input: AnalysisGrid | AnalysisImage, shape: ClipS
   if (shape.kind === 'sphere' && (!finite(shape.center) || shape.center.length !== 3 || !(shape.radius > 0) || !Number.isFinite(shape.radius)))
     throw rangeError('Clip sphere needs a finite center and positive finite radius', 'sciviz');
   if (shape.kind === 'scalar' && !Number.isFinite(shape.value)) throw rangeError('Scalar clip value must be finite', 'sciviz');
-  if (shape.kind === 'box' && (shape.bounds.length !== 6 || !finite(shape.bounds) || [0, 1, 2].some(a => shape.bounds[2 * a] > shape.bounds[2 * a + 1])))
+  if (shape.kind === 'box' && (!Array.isArray(shape.bounds) || shape.bounds.length !== 6 || !finite(shape.bounds) || [0, 1, 2].some(a => shape.bounds[2 * a] > shape.bounds[2 * a + 1])))
     throw rangeError('Clip box needs six finite ordered bounds', 'sciviz');
-  if (shape.kind === 'box' && options.crinkle) {
-    const exact = await clipGrid(grid, shape, { ...options, crinkle: false });
-    const retained = new Set(Array.from(exact.sourceCells ?? []));
-    return select(grid, Array.from({ length: grid.types.length }, (_, c) => c).filter(c => retained.has(grid.sourceCells?.[c] ?? c)));
-  }
+  // Box crinkle keeps a cell with a retained point (the rule of every shape, so a cell touching a face stays) or with
+  // positive volume inside the exact six-halfspace cut (a box wholly inside one cell, which no vertex sees).
+  let overlaps: Set<number> | undefined;
+  if (shape.kind === 'box' && options.crinkle) overlaps = new Set(Array.from((await clipGrid(grid, shape, { ...options, crinkle: false })).sourceCells ?? []));
   if (shape.kind === 'box' && !options.crinkle) {
     const pieces: AnalysisGrid[] = [];
     for (let axis = 0; axis < 3; axis++) for (const side of [0, 1]) {
@@ -298,6 +297,7 @@ export async function clipGrid(input: AnalysisGrid | AnalysisImage, shape: ClipS
     const selected: number[] = [];
     for (let c = 0; c < grid.types.length; c++) {
       if (c % 2048 === 0) { await pause(); options.signal?.throwIfAborted(); }
+      if (overlaps?.has(grid.sourceCells?.[c] ?? c)) { selected.push(c); continue; }
       for (let k = c ? grid.offsets[c - 1] : 0; k < grid.offsets[c]; k++) if (field[grid.connectivity[k]] >= 0) { selected.push(c); break; }
     }
     return select(grid, selected);
@@ -321,7 +321,7 @@ function joinGrids(grids: readonly AnalysisGrid[]): AnalysisGrid {
 
 /** Exact interval of the piecewise-linear point scalar, with all associated arrays retained. */
 export async function isoVolume(input: AnalysisGrid | AnalysisImage, range: readonly [number, number], options: { readonly array?: string; readonly signal?: AbortSignal } = {}): Promise<AnalysisGrid> {
-  if (range.length !== 2 || !range.every(Number.isFinite) || range[0] > range[1]) throw rangeError('Iso-volume needs a finite ordered scalar range', 'sciviz');
+  if (range?.length !== 2 || !range.every(Number.isFinite) || range[0] > range[1]) throw rangeError('Iso-volume needs a finite ordered scalar range', 'sciviz');
   const lower = await clipGrid(input, { kind: 'scalar', array: options.array, value: range[0] }, { signal: options.signal });
   return clipGrid(lower, { kind: 'scalar', array: options.array, value: range[1] }, { signal: options.signal, invert: true });
 }

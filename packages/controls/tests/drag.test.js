@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
 import { Engine as Runtime, TransformStore } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { Raycaster } from '@margoengine/bvh';
 import { DragControls } from '../dist/index.js';
@@ -196,7 +196,7 @@ test('DragControls drags a core mesh on the view plane, along an axis and on a g
   assert.equal(canvas.style.touchAction, 'auto');
 });
 
-test('DragControls moves gltf-pro models by their root, with touch and an orthographic camera', async () => {
+test('DragControls moves gltf/pbr models by their root, with touch and an orthographic camera', async () => {
   const { engine, canvas } = await world({ position: [0, 0, 10], target: [0, 0, 0] }),
     model = quad(engine),
     core = engine.createMesh().setGeometry(box()).setPosition([3, 0, 0]);

@@ -1,10 +1,11 @@
 // GPU fixture for scripts/sheen-albedo-gpu-check.js: runs the shipped materialLobesSheenAlbedo WGSL in a compute
 // shader, and draws a lit sphere with the sheen lobe into a linear rgba16float target. setReference() swaps in another
-// body for that one function at shader-module creation (the check passes the previous fit, read from git), so a page
-// loaded for the reference compiles every sheen pipeline with it; nothing else in the shader changes.
+// body for that one function (with its table, when it has one) at shader-module creation (the check passes the
+// previous albedo, read from git), so a page loaded for the reference compiles every sheen pipeline with it; nothing
+// else in the shader changes.
 import { Engine } from '../packages/core/dist/extension.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
-import type { PBRModel } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
+import type { PBRModel } from '../packages/gltf/dist/pbr.js';
 import { materialLobes } from '../packages/materials/dist/index.js';
 import type { MaterialLobeOptions } from '../packages/materials/dist/index.js';
 
@@ -13,7 +14,8 @@ declare const GPUBufferUsage: { STORAGE: number; COPY_SRC: number; COPY_DST: num
 declare const GPUMapMode: { READ: number };
 
 const size = 192,
-  albedoPattern = /fn materialLobesSheenAlbedo\(mu:f32,roughness:f32\)->f32 \{[\s\S]*?\n\}/,
+  albedoPattern =
+    /(?:const materialLobesSheenAlbedoTable=array<f32,256>\([^)]*\);\n)?fn materialLobesSheenAlbedo\(mu:f32,roughness:f32\)->f32 \{[\s\S]*?\n\}/,
   shipped = albedoPattern.exec(materialLobes({ sheen: { colorFactor: [1, 1, 1] } }).declarations ?? '')?.[0],
   canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, { backend: 'webgpu', camera: { position: [0, 0, 3], target: [0, 0, 0] } }),
@@ -24,6 +26,7 @@ if (!shipped) errors.push('materialLobesSheenAlbedo is missing from the built sh
 device.addEventListener('uncapturederror', (event) => errors.push((event as GPUUncapturedErrorEvent).error.message));
 let reference: string | undefined,
   modules = 0,
+  pipelines = 0,
   shippedModules = 0,
   replaced = 0;
 const createShaderModule = device.createShaderModule.bind(device);
@@ -37,6 +40,17 @@ device.createShaderModule = (descriptor) => {
     }
   }
   return createShaderModule(descriptor);
+};
+// Pipelines are counted too, so the check can prove that two draws ran one compiled program.
+const createRenderPipeline = device.createRenderPipeline.bind(device),
+  createRenderPipelineAsync = device.createRenderPipelineAsync.bind(device);
+device.createRenderPipeline = (descriptor) => {
+  pipelines++;
+  return createRenderPipeline(descriptor);
+};
+device.createRenderPipelineAsync = (descriptor) => {
+  pipelines++;
+  return createRenderPipelineAsync(descriptor);
 };
 
 /** A UV sphere as a glTF document, so every view angle from normal to grazing is on screen. */
@@ -144,7 +158,7 @@ const sheenAlbedoFixture = {
   setReference(text: string) {
     reference = text;
   },
-  counts: () => ({ modules, shippedModules, replaced }),
+  counts: () => ({ modules, pipelines, shippedModules, replaced }),
   /** Evaluates the shipped (or reference) WGSL function at [mu, roughness] pairs on the GPU. */
   async evaluate(points: [number, number][]) {
     const code = `${reference ?? shipped}

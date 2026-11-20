@@ -23,6 +23,11 @@ export interface UVLoop {
    * from near one pole to near the other, run up and back). The face lies all round it, as round a hole.
    */
   readonly slit?: boolean;
+  /**
+   * The loop's signed area with each edge's curve end put in where it is apart from the next edge's start (at a
+   * tolerant vertex), when that differs from the points'; its sign is the loop's sense.
+   */
+  readonly area?: number;
 }
 
 /** Samples per edge in (u, v): a line maps to a straight line on the surfaces Booleans take; a curve takes enough points to follow its turn. */
@@ -167,14 +172,19 @@ export class FaceUV {
     }
     // Each sample's curve and its parameter there and at the next sample along the loop (the curve taken into the pole
     // where it ends at one, `toPole`).
-    const spansOf: { curve: Curve; t: number; next: number }[][] = [];
+    const spansOf: { curve: Curve; t: number; next: number }[][] = [],
+      // Where each edge's curve ends along the loop, and the sample the next edge starts from.
+      endsOf: { after: number; point: XYZ }[][] = [];
     const samplesOf = face.loops.map((loop) => {
       const samples: XYZ[] = [],
-        spans: { curve: Curve; t: number; next: number }[] = [];
+        spans: { curve: Curve; t: number; next: number }[] = [],
+        ends: { after: number; point: XYZ }[] = [];
       for (const c of loop.coedges) {
         const { curve, kinks } = this.edgeCurves(c.edge),
           ts = this.graded(curve, withBreaks(edgeParameters(c.edge, edgeSamples(c.edge)), kinks));
         if (!c.forward) ts.reverse();
+        if (ends.length) ends[ends.length - 1].after = samples.length;
+        ends.push({ after: 0, point: curve.at(ts[ts.length - 1]).slice(0, 3) as XYZ });
         for (let k = 0; k < ts.length - 1; k++) {
           samples.push(curve.at(ts[k]).slice(0, 3) as XYZ);
           // An edge over a pole between two samples (a meridian through a sphere's pole) takes the pole as a sample of
@@ -188,6 +198,7 @@ export class FaceUV {
         }
       }
       spansOf.push(spans);
+      endsOf.push(ends);
       return samples;
     });
     this.swapped = swapped ?? roundV(this.raw, samplesOf, face.name);
@@ -216,7 +227,23 @@ export class FaceUV {
           to = this.lineEnd(v, from, this.meridian(b.curve, b.t, b.next, traced.points[at + 1]));
         this.poleLines.push({ loop: li, at, v, from, to });
       }
-      this.loops.push(slit ? { ...traced, slit } : traced);
+      // At a tolerant vertex an edge's curve ends up to the vertex's tolerance from where the next one starts, and the
+      // samples, each edge's from its start, cut across that gap. A face no wider than the gap (a sliver along a line
+      // tangent to a circle, its corner a vertex 3.7 um off both curves) then has samples winding the other way, and
+      // the face would hold everything but itself: its sense is taken with each curve's end put in.
+      const gaps =
+        traced.wrap || lines.length || slit || traced.points.length !== samples.length
+          ? []
+          : endsOf[li].filter(({ after, point }) => distance(point, samples[after]) > this.#miss);
+      if (gaps.length) {
+        const points: UV[] = [];
+        let g = 0;
+        traced.points.forEach((q, i) => {
+          points.push(q);
+          while (g < gaps.length && (gaps[g].after || samples.length) === i + 1) points.push(this.near(gaps[g++].point, q));
+        });
+        this.loops.push({ ...traced, area: polygonArea(points) });
+      } else this.loops.push(slit ? { ...traced, slit } : traced);
     });
     // The face's corners at a pole lie side by side round it: their lines span a turn at most. More, and the loops
     // overlap there (two edges taken through a pole from either side of it, the face between them narrower than the
@@ -684,7 +711,8 @@ function crossings(loop: UVLoop, period: number, u: number, v: number): number {
 
 /** Whether (u, v) lies on the left of a loop: inside a counter-clockwise one, outside a clockwise one, on the side a loop round the period turns to. */
 export function leftOf(loop: UVLoop, period: number, u: number, v: number): boolean {
-  const bias = loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : loop.slit || polygonArea(loop.points) < 0 ? 1 : 0;
+  const bias =
+    loop.wrap > 0 ? 1 : loop.wrap < 0 ? 0 : loop.slit || (loop.area ?? polygonArea(loop.points)) < 0 ? 1 : 0;
   return crossings(loop, period, u, v) + bias === 1;
 }
 

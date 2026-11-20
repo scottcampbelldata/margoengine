@@ -7,10 +7,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-colored' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/colored.html', port: 5276 }),
   { page } = context,
   pageErrors = [];
@@ -18,7 +16,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 const timer = setTimeout(() => {
   console.error('colored-browser: over its 3 minute limit');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 180_000);
 const linear = (v) => {
   const c = v / 255;
@@ -83,5 +81,4 @@ try {
 } finally {
   clearTimeout(timer);
   await context.close?.();
-  await release?.();
 }

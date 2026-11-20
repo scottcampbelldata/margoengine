@@ -151,7 +151,7 @@ room's baked lightmap where they hit it (`albedo * irradiance / pi`) and the amb
 
 ## Drawing a bake: `@margoengine/lightmap/apply`
 
-`applyLightmap(target, baked, options)` draws a bake at draw time on a materials `Material` or `createMesh` mesh, a loaded glTF-pro model or a
+`applyLightmap(target, baked, options)` draws a bake at draw time on a materials `Material` or `createMesh` mesh, a loaded glTF PBR model or a
 core mesh, read on UV1 (glTF `TEXCOORD_1`). The bake can be `bakeLightmap`, `bakeGlobalLightmap`, `bakeMeshLightmap`
 or a live `GPULightmapBaker`, whose texture is drawn as it improves.
 
@@ -161,9 +161,12 @@ or a live `GPULightmapBaker`, whose texture is drawn as it improves.
   `response` overrides the choice. Turn off live lights the bake already holds.
 - **Materials and `createMesh` meshes.** Sets `lightMap`, `lightMapIntensity` and `lightMapResponse` on each material.
   `dispose()` puts back the values it found, unless something has set another `lightMap` since.
-- **glTF-pro models.** Each primitive (or those in `primitives`) draws a copy of its material record with a material
+- **glTF PBR models.** Each primitive (or those in `primitives`) draws a copy of its material record with a material
   extension that adds the light; colours, factors and maps stay shared, so live edits show. A record that already has a
-  material extension (clearcoat from `@margoengine/materials` `install`, or your own) is refused.
+  material extension (clearcoat from `@margoengine/materials` `install`, or your own) is refused. The extension binds
+  the lightmap on the device that draws it, so after a device restore a CPU bake draws the same light again from its
+  own pixels. A live `GPULightmapBaker` lives on the device it was made on and goes with it: after a restore the model
+  draws no baked light until you apply a new baker made on `engine.gpu`.
 - **Core meshes.** Core's shader has no UV1 or lightmap, so pass the lightmap UVs as `uv1`: a materials mesh with the
   core mesh's geometry and colour, roughness, metalness and sidedness draws in its place, parented to it (it follows
   the core mesh's transform). The core mesh draws nothing until `dispose()` gives its geometry back.

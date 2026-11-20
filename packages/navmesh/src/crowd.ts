@@ -39,6 +39,23 @@ export interface CrowdOptions {
   maxNeighbors?: number;
   /** How far ahead avoidance looks, seconds (default 2). */
   timeHorizon?: number;
+  /**
+   * Walkers slow down in a dense crowd as measured pedestrians do: each agent's speed toward its next corner is capped
+   * at `maxSpeed (1 - e^(-gamma (1 / rho - 1 / jam)))` (Weidmann 1993), rho the density of the people ahead of it, so a
+   * crowd of hundreds keeps the speeds and flows of real crowds instead of every agent walking at full speed. `true` uses
+   * Weidmann's fit, in metres; pass {@link CrowdDensityOptions} for another. Default false: agents keep their own speed.
+   */
+  density?: boolean | CrowdDensityOptions;
+}
+
+/** Weidmann's speed and density relation for {@link CrowdOptions.density}. Every field has a default. */
+export interface CrowdDensityOptions {
+  /** How fast speed falls with density, square world units (default 1.913, Weidmann's fit in m^2). */
+  gamma?: number;
+  /** Density at which a crowd stands still, people per square world unit (default 5.4, Weidmann's per m^2). */
+  jam?: number;
+  /** Width of the Gaussian that measures density round an agent, world units (default 1, in m). */
+  radius?: number;
 }
 
 /** A dynamic obstacle for {@link Crowd.addObstacle}: a disc in XZ that agents steer around and do not push. */
@@ -59,6 +76,8 @@ export interface CrowdEventMap {
   unreachable: CrowdAgent;
 }
 
+/** A number for cell (i, j) of the density grid, unique for |i|, |j| below 2^20. */
+const cellKey = (i: number, j: number): number => (i + 1048576) * 2097152 + (j + 1048576);
 const positive = (value: number | undefined, fallback: number, label: string, zero = false): number => {
   const v = value ?? fallback;
   if (!(zero ? v >= 0 : v > 0) || !Number.isFinite(v))
@@ -209,6 +228,8 @@ export class Crowd {
   private readonly obstacles = new Map<number, CrowdObstacle>();
   private readonly listeners = new Map<keyof CrowdEventMap, Set<(event: never) => void>>();
   private readonly neighborDistance: number;
+  private readonly density?: { readonly gamma: number; readonly jam: number; readonly radius: number };
+  private readonly cells = new Map<number, CrowdAgent[]>();
   private readonly maxNeighbors: number;
   private readonly timeHorizon: number;
   private nextId = 1;
@@ -229,6 +250,17 @@ export class Crowd {
     if (typeof navMesh?.route !== 'function')
       throw new TypeError('A crowd needs a NavMesh: new Crowd(new NavMesh(vertices, polygons)).');
     this.neighborDistance = positive(options.neighborDistance, 5, 'Crowd neighborDistance');
+    const density = options.density;
+    if (density !== undefined && typeof density !== 'boolean' && (typeof density !== 'object' || density === null))
+      throw new TypeError('Crowd density must be true, false or {gamma, jam, radius}; pass true for Weidmann\'s fit');
+    if (density) {
+      const fit = density === true ? {} : density;
+      this.density = {
+        gamma: positive(fit.gamma, 1.913, 'Crowd density gamma'),
+        jam: positive(fit.jam, 5.4, 'Crowd density jam'),
+        radius: positive(fit.radius, 1, 'Crowd density radius'),
+      };
+    }
     this.maxNeighbors = options.maxNeighbors ?? 10;
     if (!Number.isInteger(this.maxNeighbors) || this.maxNeighbors < 0 || this.maxNeighbors > 4096)
       throw new RangeError('Crowd maxNeighbors must be an integer from 0 to 4096');
@@ -321,6 +353,7 @@ export class Crowd {
         reciprocal: false,
       });
     }
+    if (this.density) this.bin(this.density.radius * 3);
     for (const agent of this.agents) {
       if (agent.target && (agent.state !== 'arrived' || agent.partial) && agent.planned !== agent.surface.version)
         this.plan(agent, agent.surface.version);
@@ -398,7 +431,10 @@ export class Crowd {
     let ux = dx / d,
       uz = dz / d;
     if (agent.state === 'offmesh') speed = Math.min(agent.maxSpeed, d / dt);
-    else [ux, uz] = this.detour(agent, ux, uz, d);
+    else {
+      [ux, uz] = this.detour(agent, ux, uz, d);
+      if (this.density) speed = Math.min(speed, agent.maxSpeed * this.crowding(agent, ux, uz));
+    }
     disc.preferred[0] = ux * speed;
     disc.preferred[1] = uz * speed;
   }
@@ -443,6 +479,55 @@ export class Crowd {
       cos = Math.cos(angle * sign),
       sin = Math.sin(angle * sign);
     return [bx * cos - bz * sin, bx * sin + bz * cos];
+  }
+
+  /** Puts every agent on the ground into square cells `size` wide, for {@link crowding}. */
+  private bin(size: number): void {
+    const cells = this.cells;
+    for (const list of cells.values()) list.length = 0;
+    for (const agent of this.agents) {
+      if (agent.state === 'offmesh') continue;
+      const key = cellKey(Math.floor(agent.position[0] / size), Math.floor(agent.position[2] / size));
+      let list = cells.get(key);
+      if (!list) cells.set(key, (list = []));
+      list.push(agent);
+    }
+  }
+
+  /**
+   * The share of its top speed Weidmann's relation leaves an agent heading (ux, uz). Density is a Gaussian sum
+   * e^(-d^2 / R^2) / (pi R^2) over the agents (Helbing, Johansson and Al-Abideen 2007), itself included, counting the
+   * others only when ahead, and those twice, since a walker keeps its distance to the people in front (Chraibi, Seyfried
+   * and Schadschneider 2010). Over people spaced s apart the sum misses the true density by about e^(-pi^2 R^2 / s^2)
+   * (Poisson summation), under 1 % for R = 1 m down to half a person a square metre, and a lone walker reads 0.32 and keeps
+   * 99.6 % of its speed.
+   */
+  private crowding(agent: CrowdAgent, ux: number, uz: number): number {
+    const { gamma, jam, radius } = this.density!,
+      size = radius * 3,
+      x = agent.position[0],
+      z = agent.position[2],
+      cx = Math.floor(x / size),
+      cz = Math.floor(z / size),
+      inverse = 1 / (radius * radius);
+    let rho = 1;
+    for (let i = -1; i <= 1; i++)
+      for (let j = -1; j <= 1; j++) {
+        const list = this.cells.get(cellKey(cx + i, cz + j));
+        if (list)
+          for (const other of list) {
+            if (other === agent) continue;
+            const dx = other.position[0] - x,
+              dz = other.position[2] - z,
+              along = dx * ux + dz * uz;
+            if (along < 0) continue;
+            rho += (along > 0 ? 2 : 1) * Math.exp(-(dx * dx + dz * dz) * inverse);
+          }
+      }
+    rho *= inverse / Math.PI;
+    if (rho <= 0) return 1;
+    if (rho >= jam) return 0;
+    return 1 - Math.exp(-gamma * (1 / rho - 1 / jam));
   }
 
   /** The nearest agents and obstacles within `neighborDistance`, at most `maxNeighbors`. */

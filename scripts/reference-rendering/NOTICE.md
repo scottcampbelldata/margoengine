@@ -15,14 +15,14 @@ It is MIT-licensed; no viewer implementation is copied, inspected as source or d
 Only the public UI, rendered output, context attributes and resource identifiers are observed.
 Its PNG depicts the CC0 sample under Margo's authored camera/light setup.
 
-Additional existing gltf-pro GPU checks read outside copies under batch-160/gltf-gpu-samples:
+Additional existing gltf/pbr GPU checks read outside copies under batch-160/gltf-gpu-samples:
 FlightHelmet (CC0-1.0), ScatteringSkull (CC0-1.0), EnvironmentTest (Adobe Stock License),
 from the same glTF-Sample-Assets commit, and CesiumGS/cesium GaussianSplats tower/0/0.glb
 (Apache-2.0, Cesium GS, Inc.; SHA-256 9ef9d8d0756d1f423cd6aa8bd99f7dd26957f96df03dcbcec6e37103e39350b4).
 Their original legal READMEs and download URL/hash manifest are beside the outside files;
 their repository fixture notices already document the tests. No renderer source is read.
 
-packages/gltf-pro/tests/fixtures/pointer-show.glb is Margo-authored test data, not third-party content.
+packages/gltf/test/fixtures/pointer-show.glb is Margo-authored test data, not third-party content.
 
 ## Clearcoat, job 2
 

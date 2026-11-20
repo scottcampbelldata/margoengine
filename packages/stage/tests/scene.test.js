@@ -6,7 +6,7 @@ import { Migrations, encodeSave } from '@margoengine/save';
 
 // The real save package and a real engine on a stand-in renderer; only glTF loading is a stand-in.
 const world = { loads: [], gate: null, models: [], clones: 0, cloneFails: false, lists: [], receivers: [], suns: [] };
-mock.module('@margoengine/gltf-pro', {
+mock.module('@margoengine/gltf/pbr', {
   namedExports: {
     async loadGLTF(engine, url, options) {
       world.loads.push({ url: String(url), options });
@@ -442,7 +442,7 @@ test('point and spot lights go to one Clustered, models receive them, and two sc
     );
   const list = world.lists.at(-1);
   assert.deepEqual(list[0], { position: [1, 2, 3], color: [1, 0, 0], intensity: 4, range: 9 });
-  assert.equal(list[1].range, 16, 'no range: the one gltf-pro gives');
+  assert.equal(list[1].range, 16, 'no range: the one gltf/pbr gives');
   near(list[1].direction, [-1, 0, 0]);
   assert.deepEqual([list[1].innerAngle, list[1].outerAngle], [0.2, 0.5]);
   assert.deepEqual(world.receivers, [first.models.get('tree')]);

@@ -1,21 +1,19 @@
 // Did a side-by-side check:merge do the same work as a serial one? Reads each run's test-results/check-merge.json and
 // gpu-packages.json and fails unless: it really ran side by side, in the same mode as the serial run; every step the
-// serial run ran passed; every suite label of the serial run is present and passed, none excluded or not run; and every
-// timing test held the GPU exclusively with no suite beside it. Suites only the new run has are listed apart: they
+// serial run ran passed; every suite label of the serial run is present and passed, none excluded or not run;. Suites only the new run has are listed apart: they
 // must pass too, and are not a difference in coverage.
 //   node scripts/compare-check-runs.mjs --serial=<folder> [--parallel=test-results]
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { exitOnHelp } from './support/help.mjs';
+import { showHelp } from './support/help.mjs';
 
 const stepName = (command) => /^npm run (\S+)/.exec(command)?.[1] ?? command;
-const overlaps = (a, b) => a.startedAt < b.endedAt && b.startedAt < a.endedAt;
 
 /**
- * The difference between two runs: `{ ok, problems, newSuites, newTiming, suites, steps }`. Each argument is a parsed
- * JSON file: `serialMerge`, `serialGpu`, `parallelMerge`, `parallelGpu`. `newSuites` and `newTiming` hold labels only
- * the parallel run has.
+ * The difference between two runs: `{ ok, problems, newSuites, suites, steps }`. Each argument is a parsed
+ * JSON file: `serialMerge`, `serialGpu`, `parallelMerge`, `parallelGpu`. `newSuites` holds labels only the parallel
+ * run has.
  */
 export function compareRuns({ serialMerge, serialGpu, parallelMerge, parallelGpu }) {
   const problems = [];
@@ -48,21 +46,11 @@ export function compareRuns({ serialMerge, serialGpu, parallelMerge, parallelGpu
       problems.push(`suite ${r.label}: ${r.outcome}${r.reason ? ` (${r.reason})` : ''}`);
   }
 
-  const wasTiming = new Set(serialGpu.results.filter((r) => r.exclusive).map((r) => r.label));
-  for (const r of parallelGpu.results) {
-    if (!r.exclusive && !wasTiming.has(r.label)) continue;
-    if (r.hold !== 'exclusive')
-      problems.push(`timing suite ${r.label} held ${r.hold ?? 'no recorded hold'}, not exclusive`);
-    const beside = parallelGpu.results.filter((o) => o !== r && o.startedAt && r.startedAt && overlaps(r, o));
-    if (beside.length) problems.push(`timing suite ${r.label} ran beside ${beside.map((o) => o.label).join(', ')}`);
-  }
-
   const fresh = parallelGpu.results.filter((r) => !known.has(r.label));
   return {
     ok: problems.length === 0,
     problems,
-    newSuites: fresh.filter((r) => !r.exclusive).map((r) => r.label),
-    newTiming: fresh.filter((r) => r.exclusive).map((r) => r.label),
+    newSuites: fresh.map((r) => r.label),
     suites: before.length,
     steps: serialMerge.results.filter((r) => !r.skipped).length,
   };
@@ -80,8 +68,7 @@ Options:
 Example:
   node scripts/compare-check-runs.mjs --serial=../margoengine-wt-lookat/test-results`;
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  exitOnHelp(USAGE);
+if (import.meta.url === pathToFileURL(process.argv[1]).href && !showHelp(USAGE)) {
   const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3),
     serial = arg('serial'),
     parallel = arg('parallel') ?? 'test-results';
@@ -95,7 +82,6 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   });
   console.log(`compared ${result.steps} steps and ${result.suites} suites of the serial run`);
   if (result.newSuites.length) console.log(`new suites, not in the serial run: ${result.newSuites.join(', ')}`);
-  if (result.newTiming.length) console.log(`new timing suites, not in the serial run: ${result.newTiming.join(', ')}`);
   for (const problem of result.problems) console.error(`DIFFERENT: ${problem}`);
   console.log(result.ok ? 'SAME WORK: every step and suite ran and passed' : `${result.problems.length} differences`);
   process.exitCode = result.ok ? 0 : 1;

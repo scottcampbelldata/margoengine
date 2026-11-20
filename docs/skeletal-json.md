@@ -105,3 +105,11 @@ skins, nonrendering attachments, sequences, physics warnings/round-trips,
 malformed inputs, cancellation and zero-scale bind data. No speed result
 or complete editor/runtime API parity is claimed. README work is owed in
 the README-owed list for the build phase.
+
+## DragonBones on the same runtime
+
+`@margoengine/sprites/dragonbones` (parity 245.4) converts DragonBones 5.x JSON armatures into this document form and
+creates `DragonBonesArmature` rigs, a subclass of `SpineSkeleton`, with `yDown: false` because DragonBones data is
+already y-down with clockwise angles. Bones keep their names; a bone's `skY` is its rotation and `skX - skY` its shear.
+Image displays become four-vertex meshes over the trimmed atlas rectangle, so pivots, skew and trimming draw exactly.
+Nested armatures are flattened into the same rig. See the sprites README, docs/limits.md and docs/clean-room.md.

@@ -1,5 +1,5 @@
 // Real-browser check of every scaffolded Vite template under `vite` dev, as a user first runs it, timed from
-// `create-margo` to the first drawn frame. From the repository root, after `npm run build:packages`, with the GPU lock
+// `create-margo` to the first drawn frame. From the repository root, after `npm run build:packages`
 // held: node tools/create-margo/test/browser-check.mjs [template ...]
 // Apps go to test-results/create-margo-<template>, so their imports resolve to this checkout's packages (no install).
 import assert from 'node:assert/strict';

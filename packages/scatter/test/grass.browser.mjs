@@ -1,4 +1,4 @@
-// Real-GPU proof (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU proof (run from the repository root after building packages):
 //   node packages/scatter/test/grass.browser.mjs
 // @margoengine/scatter/grass builds every blade in the vertex stage from a mesh of (side, along, blade number):
 // 1. Both shaders (diffuse and PBR) compile and draw with no validation error, and blades cover the meadow.

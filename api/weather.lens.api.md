@@ -12,7 +12,9 @@ export class LensDrops implements EnginePlugin {
     readonly name = "weather-lens";
     constructor(options?: LensDropsOptions);
     setup(engine: Engine): void;
+    get time(): number;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;

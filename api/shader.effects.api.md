@@ -138,6 +138,7 @@ type Floats<T extends Type> = Node<VecOf<'f32', Size<T>>>;
 interface Host {
     width: number;
     height: number;
+    time?: number;
     delta?: number;
     frames?: Readonly<Record<string, ArrayLike<number>>>;
     [key: string]: unknown;
@@ -228,7 +229,7 @@ class NodePass implements EnginePlugin {
     readonly name: string;
     readonly kind: 'hdr' | 'ldr';
     readonly program: Program;
-    static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassOptions): NodePass;
+    static attach(engine: EngineKernel, node: Node<'vec3f' | 'vec4f'>, options?: NodePassAttachOptions): Promise<NodePass>;
     constructor(node: Node<'vec3f' | 'vec4f'>, { kind, name }?: NodePassOptions);
     code(encode?: boolean): string;
     setup(engine: Engine): void;
@@ -236,6 +237,10 @@ class NodePass implements EnginePlugin {
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface NodePassAttachOptions extends NodePassOptions {
+    signal?: AbortSignal;
 }
 
 interface NodePassOptions {
@@ -265,7 +270,6 @@ class Program {
         buffer: GPUBuffer;
         view: DataView;
         bytes: Uint8Array;
-        last: number;
     }>;
     constructor(base?: number, compute?: boolean);
     stage(stage: ShaderStage, outputs: readonly Node[]): {

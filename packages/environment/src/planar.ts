@@ -27,6 +27,7 @@ import {
   type CapturePassFilter,
 } from './capture.js';
 import { applyView, checkLayers } from '../../shared/view-rect.js';
+import { borrow, fix, lend, relend, type Borrowable } from '../../shared/borrowed.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 
@@ -58,8 +59,11 @@ export interface PlanarOptions {
   clipBias?: number;
   /** Blur of the captured image, 0 (sharp) to 1 (the coarsest mip). Default 0. */
   roughness?: number;
-  /** Tangent-space normal map that distorts the image: a `GPUTexture` (2D, filterable) or RGBA8 pixels. Default none. */
-  normalMap?: GPUTexture | NormalMapImage;
+  /**
+   * Tangent-space normal map that distorts the image: `(device) => GPUTexture` (made again after a device restore), a
+   * `GPUTexture` (2D, filterable; dropped and reported once after a restore) or RGBA8 pixels. Default none.
+   */
+  normalMap?: Borrowable<GPUTexture> | NormalMapImage;
   /** Image offset, in screen fractions, per unit of normal-map x and y. Default 0.03. */
   distortion?: number;
   /** Normal-map repeats across the surface (u, v). Default [1, 1]. */
@@ -194,7 +198,8 @@ export abstract class PlanarSurface {
   private roughnessValue = 0;
   private distortionValue = 0.03;
   private layersValue = 0xffffffff;
-  private normalSource?: GPUTexture | NormalMapImage;
+  private normalImage?: NormalMapImage;
+  private readonly normalSlot = borrow<GPUTexture>(undefined, 'Surface normalMap', 'normalMap');
   /** Capture resources owned by this surface, available to optional surface renderers. */
   protected readonly target = new CaptureTarget();
   private blur?: Blur;
@@ -202,7 +207,7 @@ export abstract class PlanarSurface {
   private captured = false;
   private readonly captureMatrix = new Float32Array(16);
   private readonly values: Float32Array;
-  private time = 0;
+  private elapsed = 0;
   private stopFrames?: () => void;
   private disposed = false;
   private readonly world = new Float64Array(16);
@@ -298,11 +303,11 @@ export abstract class PlanarSurface {
   set layers(value: number) {
     this.layersValue = checkLayers(value, 'Surface layers');
   }
-  get normalMap(): GPUTexture | NormalMapImage | undefined {
-    return this.normalSource;
+  get normalMap(): Borrowable<GPUTexture> | NormalMapImage | undefined {
+    return this.normalImage ?? this.normalSlot.value ?? undefined;
   }
-  set normalMap(value: GPUTexture | NormalMapImage | undefined) {
-    if (value !== undefined && !isTexture(value)) {
+  set normalMap(value: Borrowable<GPUTexture> | NormalMapImage | undefined) {
+    if (value !== undefined && typeof value !== 'function' && !isTexture(value)) {
       const image = value as NormalMapImage;
       if (
         !Number.isSafeInteger(image?.width) ||
@@ -312,9 +317,15 @@ export abstract class PlanarSurface {
         !(image.data instanceof Uint8Array || image.data instanceof Uint8ClampedArray) ||
         image.data.length !== image.width * image.height * 4
       )
-        throw new TypeError('Surface normalMap must be a GPUTexture or RGBA8 pixels {width, height, data}');
+        throw new TypeError(
+          'Surface normalMap must be (device) => GPUTexture, a GPUTexture or RGBA8 pixels {width, height, data}; pass one of those',
+        );
+      this.normalImage = image;
+      relend(this.normalSlot, undefined);
+      return;
     }
-    this.normalSource = value;
+    this.normalImage = undefined;
+    relend(this.normalSlot, value as Borrowable<GPUTexture> | undefined, this.engine?.gpu);
   }
   /** The latest captured image (linear `rgba16float`), or undefined before the first capture. */
   get texture(): GPUTexture | undefined {
@@ -335,6 +346,7 @@ export abstract class PlanarSurface {
       );
     if (this.engine) throw new MargoError('attached', `${this.name} is attached to an engine; create another surface`);
     this.engine = engine;
+    fix(this.normalSlot, engine.gpu ?? null);
     this.nodeValue = engine.createMesh(this.parent);
     this.nodeValue.name = this.name;
     this.stopFrames = engine.onFrame(() => {
@@ -353,6 +365,20 @@ export abstract class PlanarSurface {
   onDeviceRestored(): void {
     this.release();
   }
+  /** Seconds on the surface's normal-map scroll clock: each frame update moves it (`advanceTime`), a draw does not. */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves the `normalScroll` clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame
+   * update runs it once, so `seek` from `@margoengine/cutscene/seek` replays the scroll exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0 && !this.disposed) this.elapsed += delta;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
 
   /** Points the capture camera for this frame: false when the surface shows nothing (seen from behind, edge-on). */
   protected abstract aim(main: Camera): boolean;
@@ -365,6 +391,15 @@ export abstract class PlanarSurface {
   /** Number of floats in the surface uniform. Default 64. */
   protected get surfaceUniformLength(): number {
     return 64;
+  }
+  /**
+   * Blend state of the surface draw for a variant drawn over a mesh's own surface: when set, the surface writes no depth
+   * and is biased a few depth steps toward the eye so it passes the depth test on the mesh it covers. Without the bias a
+   * subdivided floor seen at a grazing angle loses about three quarters of its reflection, as its triangles interpolate
+   * other depths than the surface's one quad (tests/mesh-reflector-browser.js, grazing). Default none (opaque).
+   */
+  protected get surfaceBlend(): GPUBlendState | undefined {
+    return undefined;
   }
   /** Optional capture-depth binding for a material variant. Default none. */
   protected get surfaceDepth(): GPUTextureView | undefined {
@@ -504,7 +539,6 @@ export abstract class PlanarSurface {
     const node = this.nodeValue,
       engine = this.engine;
     if (this.disposed || this.captureOnly || !node || !engine || activeCapture() === this) return;
-    if (activeCapture() === null) this.time += c.delta;
     const color = this.target.color;
     if (!this.captured || !color || this.target.device !== c.device) return;
     const runtime = engineRuntime(engine),
@@ -528,8 +562,14 @@ export abstract class PlanarSurface {
         label: 'planar surface',
         layout: 'auto',
         vertex: { module, entryPoint: 'vertex' },
-        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format }] },
-        depthStencil: { format: depthFormat, depthWriteEnabled: true, depthCompare: 'greater-equal' },
+        fragment: { module, entryPoint: 'fragment', targets: [{ format: c.format, blend: this.surfaceBlend }] },
+        depthStencil: {
+          format: depthFormat,
+          depthWriteEnabled: !this.surfaceBlend,
+          depthCompare: 'greater-equal',
+          depthBias: this.surfaceBlend ? 4 : 0,
+          depthBiasSlopeScale: this.surfaceBlend ? 1 : 0,
+        },
         multisample: { count: samples },
       });
       state.pipelines.set(key, pipeline);
@@ -575,9 +615,9 @@ export abstract class PlanarSurface {
     v[55] = 1;
     v[56] = this.normalRepeat[0];
     v[57] = this.normalRepeat[1];
-    v[58] = (this.normalScroll[0] * this.time) % 1;
-    v[59] = (this.normalScroll[1] * this.time) % 1;
-    v[60] = this.normalSource ? 1 : 0;
+    v[58] = (this.normalScroll[0] * this.elapsed) % 1;
+    v[59] = (this.normalScroll[1] * this.elapsed) % 1;
+    v[60] = normal === this.view(state.placeholder) ? 0 : 1;
     v[61] = linearHdr(c.format) ? 1 : 0;
     v[62] = v[63] = 0;
     this.surfaceUniforms(c, v);
@@ -606,7 +646,7 @@ export abstract class PlanarSurface {
     return view;
   }
   private normalView(state: DeviceState): GPUTextureView {
-    const source = this.normalSource;
+    const source = this.normalImage ?? lend(this.normalSlot, state.device, this.engine);
     if (!source) return this.view(state.placeholder);
     if (state.normal?.source !== source) {
       if (state.normal?.owned) state.normal.texture.destroy();

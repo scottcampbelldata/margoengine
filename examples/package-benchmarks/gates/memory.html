@@ -14,7 +14,7 @@ GPUBuffer.prototype.destroy=function(){if(live.delete(this))destroyed.buffer++;r
 GPUTexture.prototype.destroy=function(){if(live.delete(this))destroyed.texture++;return destroyTexture.call(this);};
 
 import {Engine} from '/packages/core/dist/index.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 import {parseFBX} from '/packages/fbx/dist/index.js';
 import {parseUSDA,parseUSDC,parseUSDZ} from '/packages/usdz/dist/index.js';
 import {parse3MF,parsePLY,parseVTK,parsePCD,parseOFF,createMeshes} from '/packages/loaders/dist/index.js';
@@ -37,9 +37,9 @@ const meshes=async parsed=>{
 };
 const usd=async asset=>model(await asset.create(engine));
 const sources={
-  'gltf-pro:scifi-helmet':async()=>model(await loadGLTF(engine,'/examples/assets/scifi-helmet.glb')),
-  'gltf-pro:robot-expressive':async()=>model(await loadGLTF(engine,'/examples/assets/robot-expressive.glb')),
-  'gltf-pro:box-textured':async()=>model(await loadGLTF(engine,'/packages/exporters/tests/fixtures/BoxTextured.glb')),
+  'gltf/pbr:scifi-helmet':async()=>model(await loadGLTF(engine,'/examples/assets/scifi-helmet.glb')),
+  'gltf/pbr:robot-expressive':async()=>model(await loadGLTF(engine,'/examples/assets/robot-expressive.glb')),
+  'gltf/pbr:box-textured':async()=>model(await loadGLTF(engine,'/packages/exporters/tests/fixtures/BoxTextured.glb')),
   'fbx:triangle.fbx':async()=>model(await parseFBX(engine,await file('/examples/package-benchmarks/fixtures/triangle.fbx'))),
   'fbx:rich-binary-zlib':async()=>model(await parseFBX(engine,await file('/test-results/gates-fbx-rich.fbx'))),
   'usdz:triangle.usda':async()=>usd(parseUSDA(await file('/packages/usdz/tests/fixtures/triangle.usda'))),

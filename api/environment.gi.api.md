@@ -79,6 +79,7 @@ class Environment implements EnginePlugin {
     onChange(listener: (environment: Environment) => void): () => void;
     restore(target: GPUDevice | EngineKernel): Promise<void>;
     refresh(): Promise<void>;
+    get refreshPending(): boolean;
     setup(engine: EngineKernel): void;
     onDeviceRestored(engine: EngineKernel): void;
     dispose(): void;
@@ -121,6 +122,7 @@ interface IrradianceVolume {
 
 interface LightProbeOptions {
     environment?: Environment;
+    sky?: ProbeSkyLight;
     volume?: IrradianceVolume;
     reflections?: readonly ReflectionProbe[];
     reflectionBlend?: 'order' | 'weighted';
@@ -134,6 +136,7 @@ interface LightProbeOptions {
 
 class LightProbes extends ShaderEffect {
     readonly environment?: Environment;
+    readonly sky?: ProbeSkyLight;
     readonly volume?: Readonly<IrradianceVolume>;
     readonly reflections: readonly Readonly<ReflectionProbe & {
         min: Vec3;
@@ -210,6 +213,13 @@ interface ProbeCaptureOptions {
 interface ProbeCapturePlugin {
     readonly name: string;
     registerPasses?(graph: FrameGraph): void;
+}
+
+interface ProbeSkyLight extends ProbeCapturePlugin {
+    pbr(group: number): {
+        readonly declarations: string;
+    } | undefined;
+    bindings(): GPUBindGroupEntry[];
 }
 
 interface ReflectionProbe {

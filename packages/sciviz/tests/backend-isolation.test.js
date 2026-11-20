@@ -71,18 +71,27 @@ for (const host of ['notebook', 'standalone'])
         (e) => e === failure,
       );
       assert.equal(loads.length, before);
+      // The abort reason differs from the backend error, so each rejection names its own cause.
+      const reason = new Error('caller aborted');
       const controller = new AbortController();
       const cancelled = invoke(async ({ signal }) => {
         assert.equal(signal.aborted, false);
-        controller.abort(failure);
+        controller.abort(reason);
       }, controller.signal);
-      if (host === 'notebook') (await cancelled)();
-      else await assert.rejects(cancelled, (e) => e === failure);
+      // Both hosts reject with the abort reason; a notebook no longer resolves with a torn-down view.
+      await assert.rejects(cancelled, (e) => e === reason);
       assert.equal(loads.length, before);
       await assert.rejects(
         invoke(async () => {
           assert.fail('aborted setup ran');
         }, controller.signal),
+        (e) => e === reason,
+      );
+      // A backend error while the caller's signal is live still reaches the caller, not an abort.
+      await assert.rejects(
+        invoke(async () => {
+          throw failure;
+        }, new AbortController().signal),
         (e) => e === failure,
       );
     } finally {

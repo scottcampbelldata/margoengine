@@ -26,6 +26,8 @@ export function tableLimits(options: TableReadOptions, bytes: number, rows = 0):
   if (bytes > (options.maxBytes ?? 536870912) || rows > (options.maxRows ?? 100000000)) throw rangeError('Table exceeds maxBytes or maxRows; project or partition the source', 'sciviz');
 }
 /** @internal Materialize a scalar column without losing int64 precision or nulls. */
+/** @internal IEEE 754 binary16 bits to a number (Arrow HalfFloat, Parquet FLOAT16). */
+export function half(v: number): number { const sign = v & 32768 ? -1 : 1, exponent = (v >>> 10) & 31, fraction = v & 1023; return sign * (exponent === 31 ? fraction ? NaN : Infinity : exponent ? 2 ** (exponent - 15) * (1 + fraction / 1024) : 2 ** -14 * fraction / 1024); }
 export function scalarColumn(data: readonly TableValue[], unit?: string, storage?: 'i64' | 'u64'): TableColumn {
   const validity = new Uint8Array(Math.ceil(data.length / 8)); let missing = false, strings = false, big = !!storage;
   for (let i = 0; i < data.length; i++) { if (data[i] === null) missing = true; else { validity[i >> 3] |= 1 << (i & 7); strings ||= typeof data[i] === 'string'; big ||= typeof data[i] === 'bigint'; } }
@@ -40,6 +42,13 @@ export function scalarColumn(data: readonly TableValue[], unit?: string, storage
   return { values, categories, validity: missing ? validity : undefined, unit };
 }
 
+const csvDecimal = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+/** A finite decimal, or the NaN and infinity spellings pandas read_csv parses as floats (numpy.savetxt writes them). */
+function csvNumber(v: string): number | undefined {
+  if (csvDecimal.test(v)) { const n = Number(v); return Number.isFinite(n) ? n : undefined; }
+  if (/^[+-]?inf(?:inity)?$/i.test(v)) return v[0] === '-' ? -Infinity : Infinity;
+  return /^-?(?:nan|NaN)$/.test(v) ? NaN : undefined;
+}
 /** Parse UTF-8 CSV with quoted newlines, doubled quotes, nulls, projection and explicit/inferred scalar types. */
 export function readCSV(input: string | Uint8Array, options: CSVOptions = {}): ColumnarTable {
   const text = (typeof input === 'string' ? input : new TextDecoder('utf-8', { fatal: true }).decode(input)).replace(/^\uFEFF/, '');
@@ -49,6 +58,8 @@ export function readCSV(input: string | Uint8Array, options: CSVOptions = {}): C
   let names: string[] | undefined, row: string[] = [], cell = '', quoted = false, closed = false, rows = 0;
   const columns: string[][] = [];
   const finish = () => {
+    // pandas skip_blank_lines: an empty or whitespace-only line (no delimiter, no quotes) is not a row.
+    if (!row.length && !closed && /^[ \t]*$/.test(cell)) { cell = ''; return; }
     row.push(cell); cell = ''; closed = false;
     if (!names) {
       names = row;
@@ -77,14 +88,14 @@ export function readCSV(input: string | Uint8Array, options: CSVOptions = {}): C
   (names ?? []).forEach((name, i) => {
     if (options.columns && !options.columns.includes(name)) return;
     const cells = columns[i], present = cells.filter((v) => !nulls.has(v));
-    const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
-    const kind = (options.types && Object.hasOwn(options.types, name) ? options.types[name] : undefined) ?? (present.length && present.every((v) => numeric.test(v) && Number.isFinite(Number(v))) ? present.every((v) => /^[+-]?\d+$/.test(v)) && present.some((v) => !Number.isSafeInteger(Number(v))) ? 'bigint' : 'number' : 'string');
+    // Integers past the safe range are int64 only when every one fits in 64 bits; otherwise the column is numbers.
+    const kind = (options.types && Object.hasOwn(options.types, name) ? options.types[name] : undefined) ?? (present.length && present.every((v) => csvNumber(v) !== undefined) ? present.every((v) => /^[+-]?\d+$/.test(v) && BigInt.asIntN(64, BigInt(v)) === BigInt(v)) && present.some((v) => !Number.isSafeInteger(Number(v))) ? 'bigint' : 'number' : 'string');
     const values = cells.map((v): TableValue => {
       if (nulls.has(v)) return null;
       if (kind === 'string') return v;
       if (kind === 'boolean') { if (!['true', 'false', '0', '1'].includes(v)) invalidTable(`CSV ${name} is not boolean`); return v === 'true' || v === '1' ? 1 : 0; }
       if (kind === 'bigint') { if (!/^[+-]?\d+$/.test(v)) invalidTable(`CSV ${name} is not an integer`); return BigInt(v); }
-      if (!numeric.test(v) || !Number.isFinite(Number(v))) invalidTable(`CSV ${name} is not numeric`); return Number(v);
+      const n = csvNumber(v); if (n === undefined) invalidTable(`CSV ${name} is not numeric`); return n;
     });
     result[name] = scalarColumn(values);
   });

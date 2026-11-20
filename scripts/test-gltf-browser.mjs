@@ -1,19 +1,20 @@
 // The real-GPU check of the @margoengine/gltf entries that draw. Fake devices cannot show that a texture reads as sRGB,
-// that a cut-out shows what is behind it, or that the claimed batch tracks core's instances. It takes the GPU lock itself:
+// that a cut-out shows what is behind it, or that the claimed batch tracks core's instances.:
 //   npm run test:gpu --workspace @margoengine/gltf
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
+import { compatRun } from './support/compat-shim.js';
 
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
-const release = await acquire({ owner: 'gltf-browser' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/browser/stats-native-passes.html', port: 5367 });
   const { page, hardware } = browser,
     errors = [];
   assert.equal(hardware.webgpu?.fallback, false);
+  // MARGO_COMPAT=1 runs every check below on the WebGL2 compatibility layer; say which device drew them.
+  assert.equal(Boolean(hardware.compat), compatRun(), 'the requested layer is the one in use');
   page.on('pageerror', (error) => errors.push(error.stack ?? error.message));
   const proof = await page.evaluate(async () => {
     const { EngineKernel, box } = await import('/packages/core/dist/index.js');
@@ -224,7 +225,7 @@ try {
     result.instancing = { west, east, drawCalls: engine.stats.drawCalls };
     grove.dispose();
 
-    // loadAuto: a masked map stays light; emission needs gltf-pro, whose real loader draws the file from the same bytes.
+    // loadAuto: a masked map stays light; emission needs gltf/pbr, whose real loader draws the file from the same bytes.
     const serve = (doc) => {
       const asked = [],
         embedded = { ...doc, buffers: [{ byteLength: length, uri: 'quad.bin' }] };
@@ -244,14 +245,14 @@ try {
     light.model.dispose();
     const proFile = serve(file({ emissiveFactor: [0, 1, 0], pbrMetallicRoughness: pbr({ baseColorFactor: [0, 0, 0, 1] }) })),
       pro = await loadAuto(instance, url, proFile);
-    ensure(pro.loader === 'gltf-pro', `Emission moves to gltf-pro: ${pro.loader}`);
+    ensure(pro.loader === 'gltf/pbr', `Emission moves to gltf/pbr: ${pro.loader}`);
     ensure(proFile.asked.length === 2, `Each URL once: ${proFile.asked}`);
     const [glow] = pixels(left);
-    ensure(glow[1] > 200 && glow[0] < 60 && glow[2] < 60, `gltf-pro draws the file: ${glow}`);
+    ensure(glow[1] > 200 && glow[0] < 60 && glow[2] < 60, `gltf/pbr draws the file: ${glow}`);
     result.auto = { light: light.loader, pro: pro.loader, reason: pro.reason, glow };
     pro.model.dispose();
 
-    // Instances past maxNodes: the real gltf-pro takes the file, and the reader loadAuto hands it keeps every instance.
+    // Instances past maxNodes: the real gltf/pbr takes the file, and the reader loadAuto hands it keeps every instance.
     const grown = {
         ...forest,
         buffers: [
@@ -266,9 +267,9 @@ try {
             String(target).endsWith('quad.bin') ? bytes : String(target).endsWith('offsets.bin') ? offsets : JSON.stringify(grown),
           ),
       });
-    ensure(many.loader === 'gltf-pro', `Instances past maxNodes move to gltf-pro: ${many.loader}`);
+    ensure(many.loader === 'gltf/pbr', `Instances past maxNodes move to gltf/pbr: ${many.loader}`);
     const [manyWest, manyMiddle, manyEast] = pixels(left, [32, 32], right);
-    ensure(!near(manyWest, boxOnly, 8) && !near(manyEast, boxOnly, 8), `gltf-pro draws both instances: ${manyWest}, ${manyEast}`);
+    ensure(!near(manyWest, boxOnly, 8) && !near(manyEast, boxOnly, 8), `gltf/pbr draws both instances: ${manyWest}, ${manyEast}`);
     ensure(near(manyMiddle, boxOnly, 8), `Nothing draws between them: ${manyMiddle}`);
     result.autoInstances = { reason: many.reason, west: manyWest, east: manyEast };
     many.model.dispose();
@@ -307,8 +308,7 @@ try {
   });
   assert.deepEqual(proof.errors, []);
   assert.deepEqual(errors, []);
-  console.log('gltf browser', JSON.stringify(proof));
+  console.log(`gltf browser (${hardware.compat ? 'WebGL2 compatibility layer' : 'WebGPU'})`, JSON.stringify(proof));
 } finally {
   await browser?.close();
-  await release();
 }

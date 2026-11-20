@@ -1,8 +1,8 @@
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { skinnedStrip } from '../test/fixture.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 export async function fixtures(load = (entry) => import(entry)) {
   const { Animation, AnimationGroup, Skin, Skeleton } = await load('../dist/index.js');

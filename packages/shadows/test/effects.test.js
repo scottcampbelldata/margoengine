@@ -85,7 +85,7 @@ test('lightPattern lays its mask across the light', () => {
   };
   assert.throws(() => lightPattern({}), TypeError);
   const pattern = lightPattern({ texture: {}, size: 4 });
-  pattern.setup(device);
+  pattern.setup(device, { width: 1, height: 1, layers: 1 });
   const l = [0.6, 0.8, 0];
   pattern.update({ context: { device }, light: l, changed: false });
   const right = written.slice(0, 3),
@@ -96,6 +96,41 @@ test('lightPattern lays its mask across the light', () => {
   assert.equal(written[8], 4);
   pattern.options.size = 0;
   assert.throws(() => pattern.update({ context: { device }, light: l, changed: false }), RangeError);
+});
+test('lightPattern scrolls by frame time, which the shadows that hold it move once a frame update', () => {
+  // GAP-FILM-TIME: the scroll read performance.now(), so an offline film render (seconds of wall clock per frame) and
+  // a scene started at film time T showed another place of the mask than a live run at T.
+  const values = [];
+  const device = {
+    createBuffer: () => ({ destroy() {} }),
+    createSampler: () => ({}),
+    queue: { writeBuffer: (buffer, offset, v) => values.push([v[9], v[10]]) },
+  };
+  const now = performance.now;
+  let wall = 1000;
+  performance.now = () => (wall += 10000);
+  try {
+    for (const Kind of [Shadows, VirtualShadows]) {
+      values.length = 0;
+      const pattern = lightPattern({ texture: {}, size: 4, offset: [0.5, 0], speed: [0.25, -1] }),
+        shadows = new Kind({ effects: [pattern] }),
+        frame = { context: { device }, light: [0, 1, 0], changed: false };
+      pattern.setup(device, { width: 1, height: 1, layers: 1 });
+      assert.equal(shadows.time, 0, 'a fresh clock reads 0, as seek needs');
+      for (let i = 0; i < 3; i++) {
+        shadows.onPreUpdate(0.5);
+        pattern.update(frame);
+        pattern.update(frame); // a second view in the same frame
+      }
+      assert.equal(shadows.time, 1.5);
+      assert.equal(pattern.time, 1.5);
+      assert.deepEqual(values.at(-1), [0.5 + 0.25 * 1.5, -1.5], 'offset + speed * frame time, whatever the wall clock did');
+      assert.deepEqual(values.at(-2), values.at(-1), 'two views of one frame draw the same place');
+      assert.throws(() => shadows.advanceTime(-1), RangeError);
+    }
+  } finally {
+    performance.now = now;
+  }
 });
 test('varianceFilter checks its settings', async () => {
   const { varianceFilter } = await import('../dist/vsm.js');
@@ -143,4 +178,20 @@ test("the 'soft' search reads the pool as float on a device at the compatibility
   const pcf = new VirtualShadows({ filter: 'pcf' });
   pcf.device = { features: new Set() };
   assert.doesNotMatch(pcf.pbr(2).declarations, /shadowDepth/);
+});
+test("an effect's revision composes every receiver again, in both shadow classes", () => {
+  // Code an effect loads on first use (a storm's cloud field) arrives after the receivers first composed: until
+  // 2026-11-17 the shadows kept the first code for good.
+  let code = 'shadowFxTest.xyz';
+  const late = { ...effect, revision: 0, wgsl: (group, binding) => `// ${code}\n` + effect.wgsl(group, binding) };
+  for (const shadows of [new Shadows({ filter: 'hard', effects: [late] }), new VirtualShadows({ filter: 'hard', effects: [late] })]) {
+    late.revision = 0;
+    code = 'before';
+    const first = shadows.pbr(1).declarations;
+    assert.ok(first.includes('// before'));
+    code = 'after';
+    assert.equal(shadows.pbr(1).declarations, first, 'the same revision keeps the composed code');
+    late.revision = 1;
+    assert.ok(shadows.pbr(1).declarations.includes('// after'), 'a new revision composes it again');
+  }
 });

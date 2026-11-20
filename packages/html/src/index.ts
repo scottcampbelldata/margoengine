@@ -288,7 +288,7 @@ export class HTML extends LabelRenderer {
   private setupGPU(): void {
     const engine = this.runtime!;
     if (!engine.gpu || this.settings.depth === false) return;
-    this.shared = this.settings.depth ? undefined : acquireDepth(engine);
+    this.shared = this.settings.depth ? undefined : (this.shared ?? acquireDepth(engine));
     this.source = this.settings.depth || this.shared!.texture;
     this.buffers(engine.gpu);
     if (this.fade)
@@ -529,12 +529,15 @@ export class HTML extends LabelRenderer {
     state.gl.deleteVertexArray(state.vao);
     state.gl.deleteProgram(state.program);
   }
-  private release(): void {
+  /** Frees this overlay's own GPU objects; with `lease`, also its share of the scene depth (which restores itself). */
+  private release(lease = true): void {
     this.releaseGL();
     this.generation++;
     this.pending = false;
-    this.shared?.release();
-    this.shared = undefined;
+    if (lease) {
+      this.shared?.release();
+      this.shared = undefined;
+    }
     this.input?.destroy();
     this.output?.destroy();
     this.read?.destroy();
@@ -545,7 +548,9 @@ export class HTML extends LabelRenderer {
     this.sampledDepth = this.depthGroup = undefined;
   }
   onDeviceRestored(): void {
-    this.release();
+    // The shared scene depth is a plugin of the scene with its own restore; releasing the lease here removed it and
+    // put a new one in its place, so a restore changed the scene's plugins.
+    this.release(false);
     for (const record of this.records.values()) {
       record.hidden = false;
       record.target = 1;

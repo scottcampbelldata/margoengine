@@ -2,10 +2,42 @@ import { madd, rotateAxis, type V3 } from './math.js';
 import { cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
 import { intersectPlane, project, ray, type Basis } from './view.js';
 
-/** What the transform gizmo does: move (`translate`, the default), `rotate` or `scale`. */
-export type TransformMode = 'translate' | 'rotate' | 'scale';
-/** The gizmo handle being hovered or dragged: an axis (`X`, `Y`, `Z`), a plane (`XY`, `YZ`, `XZ`), `XYZ` (free or uniform), `E` (view-aligned ring) or `XYZE` (trackball ring). */
-export type HandleName = 'X' | 'Y' | 'Z' | 'XY' | 'YZ' | 'XZ' | 'XYZ' | 'E' | 'XYZE';
+/**
+ * What the transform gizmo does: move (`translate`, the default), `rotate`, `scale`, or `all` three at once (move arrows,
+ * planes and centre, rotation rings `RX`/`RY`/`RZ` and scale cubes `SX`/`SY`/`SZ` past the arrow tips).
+ */
+export type TransformMode = 'translate' | 'rotate' | 'scale' | 'all';
+/**
+ * The gizmo handle being hovered or dragged: an axis (`X`, `Y`, `Z`), a plane (`XY`, `YZ`, `XZ`), `XYZ` (free or uniform),
+ * `E` (view-aligned ring) or `XYZE` (trackball ring). In the `all` mode the rotation rings are `RX`, `RY`, `RZ` and the
+ * scale handles `SX`, `SY`, `SZ`, so every handle has its own name.
+ */
+export type HandleName =
+  | 'X'
+  | 'Y'
+  | 'Z'
+  | 'XY'
+  | 'YZ'
+  | 'XZ'
+  | 'XYZ'
+  | 'E'
+  | 'XYZE'
+  | 'RX'
+  | 'RY'
+  | 'RZ'
+  | 'SX'
+  | 'SY'
+  | 'SZ';
+/** What a handle does when dragged: `translate`, `rotate` or `scale`, and the axis letters it acts on (`X`, `XY`, `E`...). */
+export function handleAction(
+  name: HandleName,
+  mode: TransformMode,
+): { op: Exclude<TransformMode, 'all'>; axis: HandleName } {
+  if (mode !== 'all') return { op: mode, axis: name };
+  if (name[0] === 'R') return { op: 'rotate', axis: name.slice(1) as HandleName };
+  if (name[0] === 'S') return { op: 'scale', axis: name.slice(1) as HandleName };
+  return { op: 'translate', axis: name };
+}
 export type RGBA = readonly [number, number, number, number];
 
 /** A world-space line strip segment list (pairs of points) drawn `width` CSS pixels wide. */
@@ -52,6 +84,10 @@ export interface GizmoFrame {
   origin: V3;
   /** Unit X, Y and Z axes of the gizmo (world axes, or the object's world rotation in local space). */
   axes: [V3, V3, V3];
+  /** Handles left out: not drawn and not picked (the `all` mode's distinct names let one kind go, such as `RX`). */
+  hide?: readonly HandleName[];
+  /** Axes of the `all` mode's scale handles when they differ from `axes` (one object scales along its own). Default `axes`. */
+  scaleAxes?: [V3, V3, V3];
   /** World units per gizmo unit (constant screen size). */
   size: number;
   /** Unit vector from the origin toward the camera. */
@@ -66,6 +102,12 @@ export interface GizmoFrame {
   flip?: readonly [number, number, number];
   /** The active drag's progress, for {@link buildDelta}. */
   delta?: GizmoDelta | null;
+  /** Colours of the X, Y and Z handles. Default red, green and blue. */
+  colors?: readonly [RGBA, RGBA, RGBA];
+  /** Colour of the hovered or dragged handle. Default yellow. */
+  hover?: RGBA;
+  /** Width in CSS pixels of the arrow shafts, scale lines and rings. Default 2.5. */
+  lineWidth?: number;
 }
 
 const RED: RGBA = [1, 0.25, 0.25, 1],
@@ -77,7 +119,8 @@ const YELLOW: RGBA = [1, 1, 0, 1],
   VIEW: RGBA = [1, 0.85, 0.45, 0.85],
   DELTA: RGBA = [1, 1, 1, 0.8],
   SWEEP: RGBA = [1, 1, 1, 0.16];
-const COLORS = [RED, GREEN, BLUE];
+const AXIS_COLORS = [RED, GREEN, BLUE] as const;
+const PLANE_NAMES: ReadonlySet<HandleName | null> = new Set<HandleName | null>(['XY', 'YZ', 'XZ']);
 const PLANES: Array<[HandleName, number, number, number]> = [
   ['XY', 0, 1, 2],
   ['YZ', 1, 2, 0],
@@ -99,6 +142,8 @@ const LAYOUT = {
   viewRing: 1.25,
   scaleEnd: 0.95,
   cube: 0.06,
+  /** The `all` mode's scale cubes sit past the arrow tips. */
+  allScale: 1.32,
   pickStart: 0.2,
 };
 /** Pick tolerance in CSS pixels. */
@@ -171,91 +216,120 @@ const strip = (points: V3[]): V3[] => {
 
 /** Builds the visible handles for the current frame. */
 export function buildGizmo(f: GizmoFrame): Handle[] {
+  const handles = layout(f);
+  return f.hide?.length ? handles.filter((h) => !f.hide!.includes(h.name)) : handles;
+}
+function layout(f: GizmoFrame): Handle[] {
   const { origin: o, axes, size: s, eye } = f,
     flip = f.flip ?? [1, 1, 1],
+    COLORS = f.colors ?? AXIS_COLORS,
+    line = f.lineWidth ?? 2.5,
     handles: Handle[] = [];
   const hidden = (name: string) =>
     (!f.show.X && name.includes('X')) || (!f.show.Y && name.includes('Y')) || (!f.show.Z && name.includes('Z'));
   const lit = (name: HandleName, color: RGBA): RGBA => {
     if (!f.axis) return color;
-    if (f.axis === name || (f.axis.length === 2 && name.length === 1 && f.axis.includes(name) && f.mode !== 'rotate'))
-      return YELLOW;
+    // A hovered plane also lights the two arrows that span it.
+    if (f.axis === name || (PLANE_NAMES.has(f.axis) && name.length === 1 && f.axis.includes(name))) return f.hover ?? YELLOW;
     return f.dragging ? tint(color, 0.35) : color;
   };
   const screenU = normalize(cross(f.up, eye)),
     screenV = cross(eye, screenU);
-  if (f.mode === 'translate' || f.mode === 'scale') {
+  /** Arrows (translate) or lines with end cubes (scale), named by `prefix` plus the axis letter. */
+  const axisHandles = (kind: 'translate' | 'scale', frame: [V3, V3, V3], prefix: '' | 'S', end: number) => {
     for (let i = 0; i < 3; i++) {
-      const name = 'XYZ'[i] as HandleName,
-        a = scale(axes[i], flip[i]) as V3;
-      if (hidden(name) || Math.abs(dot(a, eye)) > AXIS_END_ON_COS) continue;
+      const letter = 'XYZ'[i],
+        name = (prefix + letter) as HandleName,
+        a = scale(frame[i], frame === axes ? flip[i] : 1) as V3;
+      if (hidden(letter) || Math.abs(dot(a, eye)) > AXIS_END_ON_COS) continue;
       const color = lit(name, COLORS[i]),
         prims: Prim[] = [];
-      if (f.mode === 'translate') {
-        prims.push({ kind: 'lines', points: [o, madd(o, a, LAYOUT.arrow * s)], width: 2.5, colors: [color] });
+      let from = LAYOUT.pickStart,
+        to = end;
+      if (kind === 'translate') {
+        prims.push({ kind: 'lines', points: [o, madd(o, a, LAYOUT.arrow * s)], width: line, colors: [color] });
         prims.push(cone(madd(o, a, (LAYOUT.tip - 0.25) * s), madd(o, a, LAYOUT.tip * s), LAYOUT.coneRadius * s, color));
+      } else if (prefix) {
+        // The combined mode's scale handle is the cube alone, out past the arrow tip.
+        prims.push(cube(madd(o, a, end * s), frame, LAYOUT.cube * 1.2 * s, color));
+        from = end - LAYOUT.cube * 2;
+        to = end + LAYOUT.cube * 2;
       } else {
-        prims.push({ kind: 'lines', points: [o, madd(o, a, LAYOUT.scaleEnd * s)], width: 2.5, colors: [color] });
-        prims.push(cube(madd(o, a, LAYOUT.scaleEnd * s), axes, LAYOUT.cube * s, color));
+        prims.push({ kind: 'lines', points: [o, madd(o, a, end * s)], width: line, colors: [color] });
+        prims.push(cube(madd(o, a, end * s), frame, LAYOUT.cube * s, color));
+        to = end + LAYOUT.cube;
       }
-      const end = f.mode === 'translate' ? LAYOUT.tip : LAYOUT.scaleEnd + LAYOUT.cube;
+      handles.push({ name, prims, pick: { type: 'segment', a: madd(o, a, from * s), b: madd(o, a, to * s) } });
+    }
+  };
+  const planeHandles = () => {
+    for (const [name, i, j, k] of PLANES) {
+      if (hidden(name) || Math.abs(dot(axes[k], eye)) < PLANE_EDGE_ON_COS) continue;
+      const u = scale(axes[i], flip[i]) as V3,
+        v = scale(axes[j], flip[j]) as V3,
+        at = (x: number, y: number) => madd(madd(o, u, x * s), v, y * s),
+        lo = LAYOUT.planeMin,
+        hi = LAYOUT.planeMax;
+      const color = lit(name, tint(COLORS[k], 0.5));
       handles.push({
         name,
-        prims,
-        pick: { type: 'segment', a: madd(o, a, LAYOUT.pickStart * s), b: madd(o, a, end * s) },
-      });
-    }
-    if (f.mode === 'translate' || f.mode === 'scale')
-      for (const [name, i, j, k] of PLANES) {
-        if (hidden(name) || Math.abs(dot(axes[k], eye)) < PLANE_EDGE_ON_COS) continue;
-        const u = scale(axes[i], flip[i]) as V3,
-          v = scale(axes[j], flip[j]) as V3,
-          at = (x: number, y: number) => madd(madd(o, u, x * s), v, y * s),
-          lo = LAYOUT.planeMin,
-          hi = LAYOUT.planeMax;
-        const color = lit(name, tint(COLORS[k], 0.5));
-        handles.push({
-          name,
-          prims: [
-            {
-              kind: 'triangles',
-              points: [at(lo, lo), at(hi, lo), at(hi, hi), at(lo, lo), at(hi, hi), at(lo, hi)],
-              color,
-            },
-          ],
-          pick: { type: 'quad', normal: axes[k], u, v, min: lo - 0.02, max: hi + 0.02, size: s },
-        });
-      }
-    if (!hidden('XYZ')) {
-      const color = lit('XYZ', WHITE);
-      handles.push({
-        name: 'XYZ',
         prims: [
-          f.mode === 'translate'
-            ? octahedron(o, axes, LAYOUT.center * s, color)
-            : cube(o, axes, LAYOUT.center * s, color),
+          {
+            kind: 'triangles',
+            points: [at(lo, lo), at(hi, lo), at(hi, hi), at(lo, lo), at(hi, hi), at(lo, hi)],
+            color,
+          },
         ],
-        pick: { type: 'disc', radius: LAYOUT.center * 1.3 * s, minPx: 10, score: 5 },
+        pick: { type: 'quad', normal: axes[k], u, v, min: lo - 0.02, max: hi + 0.02, size: s },
       });
     }
+  };
+  const centreHandle = (kind: 'translate' | 'scale') => {
+    if (hidden('XYZ')) return;
+    const color = lit('XYZ', WHITE);
+    handles.push({
+      name: 'XYZ',
+      prims: [
+        kind === 'translate' ? octahedron(o, axes, LAYOUT.center * s, color) : cube(o, axes, LAYOUT.center * s, color),
+      ],
+      pick: { type: 'disc', radius: LAYOUT.center * 1.3 * s, minPx: 10, score: 5 },
+    });
+  };
+  /** Axis rings, named by `prefix` plus the axis letter. */
+  const rings = (prefix: '' | 'R') => {
+    for (let i = 0; i < 3; i++) {
+      const letter = 'XYZ'[i],
+        name = (prefix + letter) as HandleName;
+      if (hidden(letter)) continue;
+      const [u, v] = [axes[(i + 1) % 3], axes[(i + 2) % 3]],
+        ring = circle(o, u, v, LAYOUT.ring * s),
+        color = lit(name, COLORS[i]);
+      const facing = ring.map((p) => dot(sub(p, o), eye) >= -1e-6 * s),
+        colors: RGBA[] = [];
+      for (let n = 0; n + 1 < ring.length; n++) colors.push(facing[n] && facing[n + 1] ? color : tint(color, 0.3));
+      handles.push({
+        name,
+        prims: [{ kind: 'lines', points: strip(ring), width: line, colors }],
+        pick: { type: 'ring', points: ring, facing },
+      });
+    }
+  };
+  if (f.mode === 'all') {
+    axisHandles('translate', axes, '', LAYOUT.tip);
+    planeHandles();
+    centreHandle('translate');
+    rings('R');
+    axisHandles('scale', f.scaleAxes ?? axes, 'S', LAYOUT.allScale);
+    return handles;
+  }
+  if (f.mode === 'translate' || f.mode === 'scale') {
+    axisHandles(f.mode, axes, '', f.mode === 'translate' ? LAYOUT.tip : LAYOUT.scaleEnd);
+    planeHandles();
+    centreHandle(f.mode);
     return handles;
   }
   // Rotate: axis rings, the view ring and the free trackball disc.
-  for (let i = 0; i < 3; i++) {
-    const name = 'XYZ'[i] as HandleName;
-    if (hidden(name)) continue;
-    const [u, v] = [axes[(i + 1) % 3], axes[(i + 2) % 3]],
-      ring = circle(o, u, v, LAYOUT.ring * s),
-      color = lit(name, COLORS[i]);
-    const facing = ring.map((p) => dot(sub(p, o), eye) >= -1e-6 * s),
-      colors: RGBA[] = [];
-    for (let n = 0; n + 1 < ring.length; n++) colors.push(facing[n] && facing[n + 1] ? color : tint(color, 0.3));
-    handles.push({
-      name,
-      prims: [{ kind: 'lines', points: strip(ring), width: 2.5, colors }],
-      pick: { type: 'ring', points: ring, facing },
-    });
-  }
+  rings('');
   if (!hidden('E'))
     handles.push({
       name: 'E',

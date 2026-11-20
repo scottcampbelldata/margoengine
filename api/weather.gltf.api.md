@@ -14,6 +14,8 @@ export class GLTFWeather implements EnginePlugin {
     get owner(): Engine | undefined;
     add(model: WeatherGLTFModel): () => void;
     setup(engine: Engine): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     shader(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
@@ -90,6 +92,15 @@ interface PuddleSource {
     readonly rainShare?: number;
 }
 
+interface SnowFieldSource {
+    readonly width: number;
+    readonly depth: number;
+    readonly cellSize: number;
+    readonly origin: readonly [number, number];
+    readonly version: number;
+    fieldData(): Float32Array;
+}
+
 interface SnowOptions {
     weather?: SnowSource;
     cover?: number;
@@ -99,6 +110,8 @@ interface SnowOptions {
     grain?: number;
     color?: readonly [number, number, number];
     roughness?: number;
+    field?: SnowFieldSource;
+    band?: number;
 }
 
 interface SnowSource {

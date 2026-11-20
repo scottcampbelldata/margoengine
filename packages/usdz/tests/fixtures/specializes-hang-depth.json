@@ -1,0 +1,149 @@
+{
+ "chain": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n    )\n    {\n        def \"c\" (\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"b\"\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n)\n{\n    def \"c\" (\n    )\n    {\n        def \"a\" (\n            specializes = </C/a>\n        )\n        {\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    subLayers = [@./l0.usda@ (offset = 1)]\n)\ndef \"M\" (\n)\n{\n    def \"a\" (\n        prepend inherits = </C>\n    )\n    {\n    }\n    over \"c\" (\n        references = @./l0.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\nover \"C\"\n{\n    over \"a\"\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n        over \"c\" (\n            variantSets = \"vs\"\n            variants = { string vs = \"y\" }\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"b\" (\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n)\n{\n    def \"a\" (\n    )\n    {\n        def \"c\" (\n            references = @./l1.usda@</M>\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\ndef \"P\" (\n    payload = @./l1.usda@</M/a> (offset = 3; scale = 2)\n)\n{\n    over \"a\"\n    {\n        def \"a\" (\n            variantSets = \"vs\"\n            variants = { string vs = \"x\" }\n        )\n        {\n            variantSet \"vs\" = {\n                \"x\" {\n                    def \"b\" (\n                        prepend references = @./l2.usda@</M/a>\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    21,
+    9,
+    11,
+    0
+   ],
+   "/P/a": [
+    22,
+    12,
+    1
+   ],
+   "/P/a/c": [
+    2
+   ],
+   "/P/a/a": [
+    23,
+    24
+   ],
+   "/P/a/a/b": [
+    25,
+    19
+   ],
+   "/P/a/a/b/c": [
+    20,
+    8,
+    5
+   ],
+   "/P/a/a/b/c/c": [
+    10,
+    6,
+    5
+   ],
+   "/P/a/a/b/c/c/c": [
+    6
+   ],
+   "/P/a/a/b/c/c/c/a": [
+    7,
+    1,
+    12,
+    14
+   ],
+   "/P/a/a/b/c/c/c/a/c": [
+    2,
+    3,
+    15,
+    16
+   ],
+   "/P/a/a/b/c/c/c/a/c/b": [
+    4,
+    17
+   ],
+   "/P/a/a/b/c/c/a": [
+    7,
+    12,
+    1,
+    14
+   ],
+   "/P/a/a/b/c/c/a/c": [
+    2,
+    3,
+    15,
+    16
+   ],
+   "/P/a/a/b/c/c/a/c/b": [
+    4,
+    17
+   ],
+   "/P/a/a/b/c/a": [
+    13,
+    9,
+    11,
+    0
+   ],
+   "/P/a/a/b/c/a/a": [
+    14,
+    12,
+    1
+   ],
+   "/P/a/a/b/c/a/a/c": [
+    15,
+    16,
+    2,
+    3
+   ],
+   "/P/a/a/b/c/a/a/c/b": [
+    17,
+    4
+   ]
+  }
+ },
+ "tie": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"Shared\" (\n)\n{\n}\ndef \"M\" (\n)\n{\n    over \"c\"\n    {\n        over \"b\" (\n            specializes = </C>\n            references = </Shared>\n        )\n        {\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\nclass \"C\"\n{\n}\ndef \"M\" (\n    append inherits = </C>\n)\n{\n    def \"a\" (\n        prepend references = @./l0.usda@ (offset = 10)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n        def \"c\"\n        {\n        }\n    }\n}\ndef \"M\" (\n)\n{\n    over \"b\" (\n    )\n    {\n        def \"c\" (\n            references = @./l1.usda@</M/a>\n        )\n        {\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n)\ndef \"P\" (\n)\n{\n    over \"c\" (\n        append references = @./l0.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        over \"c\" (\n            prepend references = @./l2.usda@ (offset = 10)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    13
+   ],
+   "/P/c": [
+    14,
+    1
+   ],
+   "/P/c/c": [
+    15,
+    10,
+    2
+   ],
+   "/P/c/c/b": [
+    11,
+    3,
+    0
+   ],
+   "/P/c/c/b/c": [
+    12,
+    8,
+    6,
+    1
+   ],
+   "/P/c/c/b/c/c": [
+    9,
+    2
+   ],
+   "/P/c/c/b/c/c/b": [
+    3,
+    0,
+    7,
+    4
+   ],
+   "/P/c/c/b/c/c/b/a": [
+    8
+   ],
+   "/P/c/c/b/c/c/b/a/c": [
+    9
+   ]
+  }
+ }
+}

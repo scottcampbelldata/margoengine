@@ -1,13 +1,15 @@
 import { compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
-// Run under scripts/gpu-lock.mjs. Original deterministic HDR fixture, not a borrowed asset/reference image.
+// Original deterministic HDR fixture, not a borrowed asset/reference image.
 import assert from 'node:assert/strict';
 import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { listenWhenFree } from '../../../scripts/browser.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: false,
   cacheDir: 'test-results/post-image/vite-cache',
   optimizeDeps: { noDiscovery: true },

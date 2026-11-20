@@ -44,10 +44,24 @@ console.log(nav.route([1,0,1], [8,0,1])?.offMesh, removeCrate);
 ```
 
 - **Crowd.** `crowd.update(dt)` plans each agent's route (A*, funnel), steers toward the next corner, slows over `slowDownDistance` (1) and stops within `arrivalDistance` (0.1), picks a collision-free velocity with ORCA among its `maxNeighbors` (10) nearest agents and obstacles within `neighborDistance` (5), limits the change to `maxAcceleration` (8 per second), and keeps it on the mesh (it slides along edges it would leave by). Agents default to `radius` 0.4 and `maxSpeed` 3.5. `setTarget`, `stop`, `teleport` and `remove` steer one agent; targets and start points off the mesh move to the nearest mesh point. `on('arrive')` and `on('unreachable')` report journeys. Idle and arrived agents still give way to others.
+- **Crowd density.** `new Crowd(nav, {density: true})` makes a crowd of hundreds walk as measured crowds do: each agent's speed toward its next corner is capped by Weidmann's speed and density relation (1993), `maxSpeed (1 - e^(-1.913 (1/rho - 1/5.4)))`, with rho the density of the people ahead of it (a Gaussian of 1 m, itself included, after Helbing et al. 2007, counting only those ahead, after Chraibi et al. 2010). At 2 people a square metre a crowd walks at about 0.6 m/s, and the flow through a corridor peaks near 1.2 people a metre a second, as in `test/crowd-density.test.js`. Lengths are metres; pass `density: {gamma, jam, radius}` for another fit or unit. Off by default.
 - **Area costs.** `nav.setAreaCost(polygon, cost)` multiplies the cost of the walk across a polygon, from the portal a route enters by to the one it leaves by (1 by default; `Infinity` blocks it, like a closed door). `locate(point)` finds the polygon under a point. Agents replan when a cost or link changes (`nav.version` counts the changes).
 - **Off-mesh links.** `nav.addOffMeshLink(start, end, {bidirectional, cost})` joins the polygons under its two ends (a jump, a ladder, a teleporter); `removeOffMeshLink(id)` drops it. `nav.route(start, end)` returns `{points, offMesh}`, where `offMesh` lists the points from which a segment crosses a link; agents cross links straight, at their speed, as state `'offmesh'`. A link may cost less than its length (a teleporter, `cost: 0`): routes still come out the cheapest, as the search scales its straight-line estimate down to the cheapest link's cost per metre.
 - **Obstacles.** Three kinds: `crowd.addObstacle({position, radius, velocity?})` for moving or temporary things agents steer around without replanning (avoidance is one-sided, as for anything that does not give way: an `avoid()` neighbour with `reciprocal: false`); `setAreaCost(polygon, Infinity)` to close a polygon to routes; and `obstacles: [{min, max}]` boxes in the `./build` options, carved out of the walkable area (kept `walkableRadius` clear) when the mesh is built, for lasting changes. Rebuilding is the way to move a carved box; `./tiles` rebuilds only the tiles it reaches.
 - **Queries.** `closestPoint(point)` gives the nearest mesh point and its polygon, `heightAt(polygon, x, z)` the surface height, `polygonCount`, `polygonCenter(i)`, `polygonVertices(i)` and `polygonLinks(i)` the polygons.
+
+```ts
+import {Crowd, NavMesh} from 'margoengine/navmesh';
+
+const plaza = new NavMesh([[0,0,0], [40,0,0], [40,0,40], [0,0,40]], [[0,1,2,3]]);
+const crowd = new Crowd(plaza, {density: true}); // Weidmann's measured speeds, in metres
+for (let k = 0; k < 400; k++) {
+  const walker = crowd.addAgent({position: [1 + (k % 20) * 0.6, 0, 1 + Math.floor(k / 20) * 0.6], radius: 0.25, maxSpeed: 1.34});
+  walker.setTarget([39, 0, 20]);
+}
+for (let k = 0; k < 60; k++) crowd.update(1 / 30);
+console.log(crowd.agents[0].velocity); // the front walks near 1.34 m/s, the packed middle slower
+```
 
 ## Generating a navmesh from triangles (`./build`)
 
@@ -336,6 +350,70 @@ if (perch) console.log(volume.path(perch, [38, 5, 20]));
 | `padding` | 8 voxels | open air around the level |
 
 `path(start, end)` gives corner points clear of every triangle by the radius, or null when an end is not free or nothing joins them. `isFree(point)`, `lineOfSight(a, b)` and `closestFree(point, reach = 8)` answer in the same world; the hollow inside of a closed solid counts as free, so `closestFree` right against a thin wall can pick the far side, and `path` then says null. Free space costs almost nothing: a node with no children is open air however big, so open sky takes no memory. The volume is built once; make a new one if the level changes.
+
+## Formations (`./formations`)
+
+Troops and cavalry in line, column, hollow square, wedge or skirmish line. Each member steers to its slot in the moving formation
+(Reynolds arrival with the slot's own velocity fed forward), avoids its neighbours with this package's ORCA, and is
+pushed out of every other body after each step (position based dynamics, as Weiss et al. 2017 use for crowds), so
+a column marching through a line never walks through a man. Men are discs; horses are capsules along their heading
+that cannot step sideways. A formation marches straight, down a path, to a goal or down any direction field (a
+`@margoengine/behavior/flowfield` field fits), wheels on a flank with the outer flank at marching speed, faces,
+re-forms, charges and halts. The clock is fixed (1/60 s) and every order is kept with its film time, so `seek(t)` gives the
+frame playing reaches. Each member's `distance` is the metres it has walked: a stride phase for its feet or hooves.
+
+```ts
+import {Army} from 'margoengine/navmesh/formations';
+
+const army = new Army();
+const foot = army.add({count: 120, shape: 'line', ranks: 3});
+const horse = army.add({count: 31, kind: 'cavalry', shape: 'wedge', position: [0, -40]});
+foot.march({speed: 1.52});
+horse.march({goal: [0, 60], speed: 6});
+army.seek(10);
+foot.wheel(Math.PI / 2, 'left'); // a quarter wheel, ordered at 10 s
+army.advanceTime(20);
+const m = army.members[0];
+console.log(army.time, m.x.toFixed(2), m.z.toFixed(2), m.heading.toFixed(2), m.distance.toFixed(1));
+```
+
+| Option of `add` | Default |
+| --- | --- |
+| `count` | needed, 1 to 4096 |
+| `shape` `'skirmish'`, `gap` | one rank in extended order, `gap` 1.524 m (two paces, the normal interval between skirmishers) on top of the file interval; a second rank stands in the gaps of the first |
+| `kind` | `'infantry'` (`'cavalry'`) |
+| `shape` | `'line'` (`'column'`, `'square'`, `'wedge'`, `'skirmish'`) |
+| `files`, `ranks` | a line 2 ranks deep; a column 4 files; a square 4 ranks |
+| `interval`, `distance` | 0.56 m and 1.32 m on foot (Infantry Drill Regulations 1911); 0.95 m and 3.4 m mounted |
+| `position`, `heading` | `[0, 0]`, 0 (facing +Z) |
+| `speed`, `maxSpeed` | 1.52 and 2.74 m/s on foot (quick and double time, FM 3-21.5); 1.7 and 7 m/s mounted |
+| `radius`, `length` | 0.25 m disc on foot; 0.33 m by 2.2 m capsule mounted |
+| `turnRate` | 4 rad/s on foot, 1.6 mounted |
+
+`charge({goal, speed, acceleration})` builds the speed from where it is to the charge speed (default `maxSpeed`: double
+time, 180 steps of 36 inches a minute on foot; 7 m/s, a gallop, mounted) at `acceleration` (1 m/s^2 on foot, 0.6
+mounted), so a mounted line walks, trots, canters and gallops in turn under `@margoengine/horses/crowd`. While it
+charges a member may go a sixth over the charge speed to close up on its slot; at the goal it halts and takes up its
+marching speed again. `form('skirmish', {gap})` opens a line into extended order.
+
+```ts
+import {Army} from 'margoengine/navmesh/formations';
+const army = new Army();
+const troop = army.add({count: 40, kind: 'cavalry', shape: 'line', ranks: 2});
+const skirmishers = army.add({count: 30, shape: 'line', ranks: 1, position: [0, 30]});
+skirmishers.form('skirmish');
+troop.charge({goal: [0, 200]});
+army.advanceTime(12);
+console.log(troop.speed.toFixed(1), skirmishers.shape); // 7.0 skirmish
+```
+
+`new Army({step, horizon, neighbours, ground})` sets the clock (1/60 s), the ORCA time horizon (1.5 s), the neighbours
+each member avoids (10) and the ground height `heightAt` reports. `addObstacle([x, z], radius)` adds a post or tree
+every member keeps clear of. `@margoengine/navmesh/formation-settings` holds the `add` options as slider rows on the
+shared shape (`formationOptionsFromSettings(values)`; the charge rows through `chargeOptionsFromSettings(values)`). `@margoengine/horses/crowd` draws the cavalry from `army.members`.
+
+Limits: a body may sit up to 2 cm inside another for a step when a charge meets a halted line (the projection stops
+at 40 passes); members do not climb, so `ground` only gives heights.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

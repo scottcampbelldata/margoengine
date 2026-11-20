@@ -6,6 +6,7 @@
 import { Vec3 } from "@margoengine/core";
 import { Line, LineOptions } from "@margoengine/lines";
 import { ColorInput } from "@margoengine/math";
+import { ReactNode } from "react";
 
 export function Grid(_arg0: GridProps): null;
 
@@ -24,6 +25,29 @@ export interface LineProps extends Omit<LineOptions, 'positions'> {
     points: ArrayLike<number> | readonly Vec3[];
     lineWidth?: number;
     segments?: boolean;
+    onError?: (error: unknown) => void;
+}
+
+export const Segment: import("react").ForwardRefExoticComponent<SegmentProps & import("react").RefAttributes<SegmentHandle>>;
+
+export interface SegmentHandle {
+    readonly start: [number, number, number];
+    readonly end: [number, number, number];
+    readonly color: [number, number, number];
+}
+
+export interface SegmentProps {
+    start: Vec3;
+    end: Vec3;
+    color?: ColorInput;
+}
+
+export const Segments: import("react").ForwardRefExoticComponent<SegmentsProps & import("react").RefAttributes<NativeLine>>;
+
+export interface SegmentsProps extends Omit<LineOptions, 'positions' | 'colors' | 'mode'> {
+    limit?: number;
+    lineWidth?: number;
+    children?: ReactNode;
     onError?: (error: unknown) => void;
 }
 ```

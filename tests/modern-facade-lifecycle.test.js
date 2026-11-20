@@ -45,7 +45,7 @@ const EnvironmentLighting = {
     return { name: 'environment:lighting' };
   },
 };
-mock.module('@margoengine/scenery/sky', { namedExports: { SkyMoon } });
+mock.module('@margoengine/sky/night-preset', { namedExports: { SkyMoon } });
 mock.module('@margoengine/creative/particles', { namedExports: { GPUParticles } });
 mock.module('@margoengine/creative/post', { namedExports: { PostProcessing } });
 mock.module('@margoengine/shadows', { namedExports: { Shadows } });

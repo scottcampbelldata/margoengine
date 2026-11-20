@@ -1,12 +1,12 @@
 import { forwardRef, useContext, useImperativeHandle, useRef } from 'react';
 import type { Animation as ClipAnimation } from '@margoengine/animation';
 import type { AdditiveLayer, Animator, BlendTree } from '@margoengine/animator';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import type { Vec3 } from '@margoengine/core/extension';
 import { useCommit, useResourceEffect, useScene } from './internal.js';
 import { ModelContext } from './internal.js';
 import { optionalPeer } from './optional.js';
-import { MargoError } from '@margoengine/math/errors';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** Props of the Animation component; every prop is optional unless noted. */
 export interface AnimationProps {
@@ -90,17 +90,15 @@ function restore(model: PBRModel, value: Pose): void {
   model.primitives.forEach((primitive, index) => primitive.weights.set(value.weights[index]));
 }
 function validate({ clip, playing = true, loop = true, blend = 0, speed = 1, time, parameters }: AnimationProps): void {
-  if (typeof clip !== 'string' || !clip) throw new TypeError('Animation: clip must name a glTF animation');
+  if (typeof clip !== 'string' || !clip) throw typeError('Animation: clip must name a glTF animation', 'react-arguments');
   if (typeof playing !== 'boolean' || typeof loop !== 'boolean' || !Number.isFinite(blend) || blend < 0)
-    throw new RangeError(
-      'Animation: playing and loop must be booleans and blend a finite number >= 0; pass valid values.',
-    );
-  if (!Number.isFinite(speed) || speed < 0) throw new RangeError('Animation: speed must be a finite number >= 0');
+    throw rangeError('Animation: playing and loop must be booleans and blend a finite number >= 0; pass valid values', 'react-arguments');
+  if (!Number.isFinite(speed) || speed < 0) throw rangeError('Animation: speed must be a finite number >= 0', 'react-arguments');
   if (time !== undefined && (!Number.isFinite(time) || time < 0))
-    throw new RangeError('Animation: time must be a finite number of seconds >= 0');
+    throw rangeError('Animation: time must be a finite number of seconds >= 0', 'react-arguments');
   for (const [name, value] of Object.entries(parameters ?? {}))
     if (!Number.isFinite(value))
-      throw new RangeError('Animation: parameters must be finite numbers, fix "' + name + '"');
+      throw rangeError(`Animation: parameters must be finite numbers, fix "${name}"`, 'react-arguments');
 }
 /** Blending, parameters, blend trees and layers all need the optional Animator. */
 function needsMixer(props: AnimationProps): boolean {
@@ -113,12 +111,10 @@ function checkTrees(current: Playback, props: AnimationProps): void {
   const names = new Set(current.animation.clips.map((clip) => clip.name));
   for (const [name, tree] of Object.entries(props.blendTrees ?? {})) {
     if (names.has(name))
-      throw new RangeError('Animation: blend tree names must differ from clip names, rename "' + name + '"');
+      throw rangeError(`Animation: blend tree names must differ from clip names, rename "${name}"`, 'react-arguments');
     for (const clip of treeClips(tree))
       if (!names.has(clip))
-        throw new RangeError(
-          'Animation: blend tree clips must exist in the model, fix "' + name + '" which uses "' + clip + '"',
-        );
+        throw rangeError(`Animation: blend tree clips must exist in the model, fix "${name}" which uses "${clip}"`, 'react-arguments');
   }
 }
 /** Bring a running Animator in line with the props: states, parameters and additive layers. */
@@ -142,9 +138,7 @@ function select(current: Playback, props: AnimationProps): void {
   validate(props);
   const isClip = current.animation.clips.some((clip) => clip.name === props.clip);
   if (!isClip && !Object.hasOwn(props.blendTrees ?? {}, props.clip))
-    throw new RangeError(
-      `Animation: unknown clip "${props.clip}"; use a clip name from the model or a key of blendTrees.`,
-    );
+    throw rangeError(`Animation: unknown clip "${props.clip}"; use a clip name from the model or a key of blendTrees`, 'react-arguments');
   checkTrees(current, props);
   current.animation.options.loop = props.loop ?? true;
   current.animation.options.speed = props.speed ?? 1;
@@ -183,7 +177,7 @@ function seekTo(current: Playback, time: number): void {
  * `speed`, `time`, `onFinished`, `parameters`, `blendTrees` and `layers` cover the common
  * animation-control needs; `ref` (or `onReady`) gives an {@link AnimationHandle} for the rest.
  */
-export const Animation = forwardRef<AnimationHandle, AnimationProps>(function Animation(props, ref) {
+export const Animation = /* @__PURE__ */ forwardRef<AnimationHandle, AnimationProps>(function Animation(props, ref) {
   const scene = useScene(),
     model = useContext(ModelContext),
     latest = useRef(props),
@@ -209,13 +203,13 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
     },
     seek(time) {
       if (!Number.isFinite(time) || time < 0)
-        throw new RangeError('Animation: time must be a finite number of seconds >= 0');
+        throw rangeError('Animation: time must be a finite number of seconds >= 0', 'react-arguments');
       if (current.current) seekTo(current.current, time);
     },
   };
   useImperativeHandle(ref, () => handle.current!, []);
   if (model === undefined)
-    throw new MargoError('state', 'Animation requires a parent <Gltf>, <Model>, or <Fbx>; render it inside one.');
+    throw fault('state', 'Animation requires a parent <Gltf>, <Model>, or <Fbx>; render it inside one', 'react-usage');
   const report = (error: unknown) => {
     try {
       latest.current.onError?.(error);
@@ -240,10 +234,7 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
         const api = await optionalPeer('@margoengine/animation', () => import('@margoengine/animation'));
         if (!lease.active || scene.engine.disposed || model.disposed) return;
         if (scene.engine.hasPlugin('animation:' + model.name))
-          throw new MargoError(
-            'attached',
-            'Animation: this model already has an animation plugin; mount one <Animation> per model.',
-          );
+          throw fault('attached', 'Animation: this model already has an animation plugin; mount one <Animation> per model', 'react-usage');
         const animation = new api.Animation(model, { loop: latest.current.loop ?? true });
         const rest = pose(model);
         owned = { animation, clip: '', prepareMixer: () => {}, resample: () => {}, layerKey: '[]', layerOff: [] };
@@ -252,9 +243,7 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
           !animation.clips.some((value) => value.name === latest.current.clip) &&
           !Object.hasOwn(latest.current.blendTrees ?? {}, latest.current.clip)
         )
-          throw new RangeError(
-            `Animation: unknown clip "${latest.current.clip}"; use a clip name from the model or a key of blendTrees.`,
-          );
+          throw rangeError(`Animation: unknown clip "${latest.current.clip}"; use a clip name from the model or a key of blendTrees`, 'react-arguments');
         // A non-looping clip that reached its end fires onFinished once per run.
         const watchFinish = () => {
           const props = latest.current;
@@ -313,10 +302,7 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
               restore(model, visual);
             }
             if (scene.engine.hasPlugin(animator.name))
-              throw new MargoError(
-                'attached',
-                'Animation: this model already has an animator plugin; mount one <Animation> per model.',
-              );
+              throw fault('attached', 'Animation: this model already has an animator plugin; mount one <Animation> per model', 'react-usage');
             scene.engine.use(animator);
             playback.animator = animator;
             const advance = animator.onPreUpdate.bind(animator);
@@ -331,9 +317,14 @@ export const Animation = forwardRef<AnimationHandle, AnimationProps>(function An
               }
               const duration = animation.clips.find((value) => value.name === animator.state)?.duration ?? 0;
               if (terminal === animator.state && animator.time >= duration) return;
-              const remaining = Math.max(0, duration - animator.time);
-              if (remaining > 0) advance(Math.min(delta, remaining));
-              if (delta >= remaining) {
+              // The Animator scales frame time by the Animation's speed and its clip rate, so the frame time left
+              // to the end is the clip time left divided by that rate.
+              const rate = (animation.options.speed ?? 1) * animator.clipRate,
+                remaining = Math.max(0, duration - animator.time),
+                left = rate > 0 ? remaining / rate : Infinity;
+              if (remaining > 0) advance(Math.min(delta, left));
+              if (delta >= left) {
+                animator.time = duration;
                 animation.clip = animation.clips.findIndex((value) => value.name === animator.state);
                 animation.seek(duration);
                 terminal = animator.state;

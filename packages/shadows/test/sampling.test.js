@@ -25,14 +25,14 @@ test('PCSS computes its golden-angle spiral in the loop: no constant tables, sam
     s = f32(s0);
   // Turning a unit vector by the column-major matrix, tap after tap, stays on the old spiral (angle j * golden).
   // The blocker search's tap 0 sits on the receiver's own texel (radius 0); the filter's taps are spread from the centre.
-  for (const [taps, scale, start] of [
-    [16, 'search', 0],
-    [32, 'radius', 0.5],
+  for (const [count, taps, scale, start] of [
+    ['searchTaps', 16, 'search', 0],
+    ['taps', 32, 'radius', 0.5],
   ]) {
-    assert.match(source, new RegExp(`for\\(var j=0u;j<${taps}u;j\\+\\+\\)\\{`));
+    assert.match(source, new RegExp(`for\\(var j=0u;j<u32\\(${count}\\);j\\+\\+\\)\\{`));
     const step = start ? `(f32(j)+${start})` : 'f32(j)';
     assert.ok(
-      source.includes(`let offset=direction*sqrt(${step}/${taps}.0)*${scale};direction=shadowGolden*direction;`),
+      source.includes(`let offset=direction*sqrt(${step}/${count})*${scale};direction=shadowGolden*direction;`),
       `${taps}-tap loop`,
     );
     let x = 1,
@@ -46,7 +46,7 @@ test('PCSS computes its golden-angle spiral in the loop: no constant tables, sam
     }
   }
   assert.match(source, /if\(blockers==0\)\{return 1;\}/);
-  assert.match(source, /return visibility\/32\.0/);
+  assert.match(source, /return visibility\/taps;/);
 });
 
 test('each pixel turns the spiral by interleaved gradient noise of its screen position, with no time term', () => {
@@ -121,7 +121,7 @@ test('the frame uniform carries pixels per unit at view depth 1 for the noise (s
     view.begin(0);
     view.camera.fov = 50;
     const log = gpu.record(() => passes(shadows)(view.c)),
-      write = log.find((e) => e[0] === 'writeBuffer' && e[3].length === 368 * 2),
+      write = log.find((e) => e[0] === 'writeBuffer' && e[3].length === 384 * 2),
       values = new Float32Array(Uint8Array.from(Buffer.from(write[3], 'hex')).buffer);
     assert.equal(values[91], f32(150 / (2 * Math.tan((50 * Math.PI) / 360))));
   } finally {
@@ -130,7 +130,52 @@ test('the frame uniform carries pixels per unit at view depth 1 for the noise (s
   }
 });
 
-test('PCSS keeps the core receiver patch, the gltf-pro direct hook and each requested bind group', () => {
+// The soft filter's tap counts and focus are options (React's SoftShadows maps drei's samples and focus onto them):
+// before, 16 blocker reads and 32 taps were constants in the shader text and no option could change them.
+test('samples, blockerSamples and focus reach the frame uniform live and drive the PCSS loops and penumbra', async () => {
+  const source = shadowSampling(0);
+  assert.ok(source.includes('let searchTaps=shadowFrame.soft.y;'));
+  assert.ok(source.includes('let taps=shadowFrame.soft.x;'));
+  assert.ok(
+    source.includes('abs((reference-blocker)*shadowFrame.ranges[layer]-shadowFrame.soft.z)*length(rowX)*0.5'),
+    'the penumbra is sharpest where the blocker gap equals focus',
+  );
+  const gpu = mockGPU(),
+    store = await TransformStore.create(4),
+    engine = new Engine(
+      { width: 128, height: 96, clientWidth: 128, clientHeight: 96 },
+      store,
+      { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {} },
+      { position: [0, 2, 6], target: [0, 0, 0] },
+      null,
+    ),
+    view = context(gpu, { samples: 1, shader: 'let linear=direct*vec3f(1);' }),
+    shadows = new Shadows({ resolution: 64 });
+  const soft = (i) => {
+    store.tick(false);
+    view.begin(i);
+    const write = gpu.record(() => passes(shadows)(view.c)).find((e) => e[0] === 'writeBuffer' && e[3].length === 384 * 2);
+    return [...new Float32Array(Uint8Array.from(Buffer.from(write[3], 'hex')).buffer).subarray(92, 95)];
+  };
+  try {
+    shadows.setup(engine);
+    assert.deepEqual(soft(0), [32, 16, 0], 'defaults: 32 taps, 16 blocker reads, focus 0');
+    Object.assign(shadows.options, { samples: 10, blockerSamples: 10, focus: 0.5 });
+    assert.deepEqual(soft(1), [10, 10, 0.5]);
+    for (const bad of [{ samples: 0 }, { samples: 129 }, { blockerSamples: 2.5 }, { samples: NaN }, { focus: -1 }, { focus: Infinity }]) {
+      const before = { ...shadows.options };
+      Object.assign(shadows.options, bad);
+      assert.throws(() => soft(2), RangeError, JSON.stringify(bad));
+      for (const key of Object.keys(shadows.options)) delete shadows.options[key];
+      Object.assign(shadows.options, before);
+    }
+  } finally {
+    shadows.dispose();
+    engine.dispose();
+  }
+});
+
+test('PCSS keeps the core receiver patch, the gltf/pbr direct hook and each requested bind group', () => {
   const shadows = new Shadows({ resolution: 64 }),
     groups = (output) =>
       [...output.matchAll(/@group\((\d+)\) @binding\((\d+)\)/g)].map((match) => [Number(match[1]), Number(match[2])]);
@@ -192,10 +237,10 @@ test('only an exactly zero direct-light vector bypasses visibility without chang
 test('the PCSS search spans the distance to the nearest caster, reads the own texel first and ignores surfaces behind the receiver', () => {
   for (const anisotropic of [false, true]) {
     const source = shadowSampling(0, 'soft', anisotropic);
-    assert.ok(source.includes(',settings:vec4f,nearest:vec4f}'), "the frame carries each layer's nearest depth");
+    assert.ok(source.includes(',settings:vec4f,soft:vec4f,nearest:vec4f}'), "the frame carries each layer's nearest depth");
     assert.ok(source.includes('max(reference-shadowFrame.nearest[layer],0.0)*shadowFrame.ranges[layer]'));
     assert.doesNotMatch(source, /settings\.x\*reference\*/, 'not the distance to the near plane');
-    assert.ok(source.includes('sqrt(f32(j)/16.0)*search'), "tap 0 reads the receiver's own texel");
+    assert.ok(source.includes('sqrt(f32(j)/searchTaps)*search'), "tap 0 reads the receiver's own texel");
     assert.ok(source.includes('let plane=min(dot((vec2f(coord)+0.5)*texel-uv,slope),0.0);'));
     assert.ok(source.includes('if(d<reference+plane){sum+=d-plane;blockers+=1;}'));
     assert.ok(source.includes('reference+min(dot(offset,slope),0.0));}'), 'the filter taps compare the same way');
@@ -217,9 +262,9 @@ test('the soft filter reduces each layer to its nearest depth once the map chang
     shadows = new Shadows({ resolution: 64, filter: 'pcf' });
   try {
     const setup = gpu.record(() => shadows.setup(engine)),
-      uniform = setup.find((e) => e[0] === 'buffer' && e[2].size === 384 && e[2].usage === (64 | 8))?.[1],
+      uniform = setup.find((e) => e[0] === 'buffer' && e[2].size === 400 && e[2].usage === (64 | 8))?.[1],
       nearest = setup.find((e) => e[0] === 'buffer' && e[2].size === 16 && e[2].usage === (128 | 4 | 8))?.[1];
-    assert.ok(uniform && nearest, 'a 384-byte frame uniform and a 16-byte nearest-depth buffer');
+    assert.ok(uniform && nearest, 'a 400-byte frame uniform and a 16-byte nearest-depth buffer');
     const frame = (i) => {
       store.tick(false);
       view.begin(i);
@@ -239,7 +284,7 @@ test('the soft filter reduces each layer to its nearest depth once the map chang
       log.slice(compute).find((e) => e[0] === 'pass.dispatchWorkgroups'),
       ['pass.dispatchWorkgroups', 2, 2, 4, undefined, undefined],
     );
-    assert.deepEqual(log[copy], ['copyBufferToBuffer', nearest, 0, uniform, 368, 16]);
+    assert.deepEqual(log[copy], ['copyBufferToBuffer', nearest, 0, uniform, 384, 16]);
     const module = setup.concat(log).find((e) => e[0] === 'module' && e[2].code.includes('atomicMin(&nearest[id.z]'));
     assert.ok(module, 'the reduction shader');
     assert.ok(!frame(1).some((e) => e[0] === 'beginComputePass'), 'an unchanged map keeps its nearest depth');

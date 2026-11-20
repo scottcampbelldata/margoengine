@@ -9,6 +9,7 @@ import {
 import { dollyFactor, EPS, finiteInput, type V3 } from './math.js';
 import { basis, intersectPlane, ray } from './view.js';
 import type { KeyAction, NavigationProfile } from './profiles.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 export { Controls };
 
 /** Mouse button actions, for `mouseButtons` and profiles. */
@@ -263,8 +264,8 @@ export class OrbitControls extends Controls {
   }
   set zoom(value: number) {
     const projection = this.zoomed();
-    if (!projection) throw new TypeError('OrbitControls.zoom needs a CameraProjection; attach one or set `projection`');
-    if (!(value > 0) || !Number.isFinite(value)) throw new RangeError('Orbit zoom must be a finite number above 0');
+    if (!projection) throw typeError('OrbitControls.zoom needs a CameraProjection; attach one or set `projection`', 'controls-arguments');
+    if (!(value > 0) || !Number.isFinite(value)) throw rangeError('Orbit zoom must be a finite number above 0', 'controls-arguments');
     const zoom = clamp(value, this.minZoom, this.maxZoom);
     if (zoom === projection.zoom) return;
     projection.zoom = zoom;

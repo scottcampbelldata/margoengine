@@ -20,11 +20,13 @@ window.run=async(compat=false)=>{
   instances:[{id:'floor',modelId:'floor',matrix:transform(-16,-1,-16)},{id:'ceiling',modelId:'ceiling',matrix:transform(-16,4,-16)}],
   materials:[{id:1,type:'diffuse',color:[1,1,1]},{id:2,type:'emit',color:[1,1,1],emission:1}],
   environment:{skyIntensity:0,sunIntensity:0,ground:false}};
- const render=async(Tracer,candidates,samples,seed)=>{
+ // Each tracer is attached once and renders every seed it is asked for (renderImage starts each image afresh).
+ const batches=async(Tracer,candidates,samples,seeds)=>{
   const tracer=Tracer.attach(engine,{scene,denoise:false,maxBounces:1,...(candidates===undefined?{}:{candidates})});
-  try{await tracer.ready;return await tracer.renderImage({width:16,height:16,samples,seed,jitter:false});}
+  try{await tracer.ready;const images=[];for(const seed of seeds)images.push(await tracer.renderImage({width:16,height:16,samples,seed,jitter:false}));return images;}
   finally{tracer.dispose();}
  };
+ const render=async(Tracer,candidates,samples,seed)=>(await batches(Tracer,candidates,samples,[seed]))[0];
  try{
   const reference=await render(VoxelPathTracer,undefined,8192,987);
   const original=await render(VoxelPathTracer,undefined,32,17);
@@ -43,10 +45,14 @@ window.run=async(compat=false)=>{
    let sum=0;for(let i=channel;i<image.color.length;i+=3)sum+=image.color[i];
    return sum/(image.color.length/3);
   });
+  // BATCHES independent batches of the root tracer and of RIS: the per-channel means and the standard error of each
+  // mean from the spread of its batch means, so the bound follows each scene's own noise.
+  const BATCHES=16,seeds=(first)=>Array.from({length:BATCHES},(_,i)=>first+i*7919);
+  const estimate=images=>{const m=images.map(means);return [0,1,2].map(c=>{const mu=m.reduce((s,v)=>s+v[c],0)/m.length;const variance=m.reduce((s,v)=>s+(v[c]-mu)**2,0)/(m.length-1);return {mean:mu,se:Math.sqrt(variance/m.length)};});};
   const compare=async name=>{
-   const reference=await render(VoxelPathTracer,undefined,512,317);
-   const actual=await render(ResampledVoxelPathTracer,8,256,419);
-   return {name,reference:means(reference),actual:means(actual),finite:actual.color.every(Number.isFinite)};
+   const r=estimate(await batches(VoxelPathTracer,undefined,128,seeds(317))),a=estimate(await batches(ResampledVoxelPathTracer,8,64,seeds(419)));
+   const actual=a.map(v=>v.mean);
+   return {name,reference:r.map(v=>v.mean),actual,se:[0,1,2].map(c=>Math.hypot(r[c].se,a[c].se)),finite:actual.every(Number.isFinite)};
   };
   // Coloured candidates exercise RGB reservoir correction rather than only a scalar target.
   scene.materials.push({id:4,type:'emit',color:[0.05,0.2,1],emission:1});
@@ -73,6 +79,17 @@ window.run=async(compat=false)=>{
   scene.revision++;
   coverage.push({...await compare('area light through absorbing media'),expected});
   scene.lights=[];scene.instances.splice(1,0,ceiling);scene.revision++;
+  // Lobes beyond diffuse at the RIS vertex, each against the root tracer: a rough metal receiver, a plastic (coated)
+  // receiver, and scattering media vertices between the camera and the floor.
+  scene.materials[0]={id:1,type:'metal',color:[0.9,0.8,0.6],roughness:0.5};scene.revision++;
+  coverage.push(await compare('rough metal receiver'));
+  scene.materials[0]={id:1,type:'plastic',color:[0.6,0.3,0.2],roughness:0.3,ior:1.5};scene.revision++;
+  coverage.push(await compare('plastic coat receiver'));
+  scene.materials[0]={id:1,type:'diffuse',color:[1,1,1]};
+  scene.materials[2]={id:4,type:'media',color:[0.8,0.8,0.8],density:1.5};
+  scene.instances[2].matrix=transform(-16,0.25,-16);scene.revision++;
+  coverage.push(await compare('scattering media vertices'));
+  scene.instances[2].matrix=transform(-16,2.5,-16);
   // Every proposal must see the same opaque visibility, including null directional candidates.
   scene.materials[2]={id:4,type:'diffuse',color:[0,0,0]};scene.revision++;
   const blocked=await render(ResampledVoxelPathTracer,8,4,31);

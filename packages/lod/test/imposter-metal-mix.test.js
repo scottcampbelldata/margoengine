@@ -1,5 +1,5 @@
 // Regression (KB3240b, 2026-11-12): the imposter relight (packages/lod/src/imposter.ts) weighted its Lambert lobe by 1 minus the Fresnel at the metal-mixed F0,
-// so every part-metal surface came out darker than glTF 2.0 Appendix B's metal/dielectric mix (gltf-pro's sun was fixed
+// so every part-metal surface came out darker than glTF 2.0 Appendix B's metal/dielectric mix (gltf/pbr's sun was fixed
 // for this in KB3240). It now weights the diffuse by 1 minus the dielectric Fresnel. The shipped text of imposter.ts runs
 // on the CPU (tests/support/wgsl-eval.js); the shaders write pi as 3.14159265, so closed forms hold to 1e-8 relative.
 import test from 'node:test';

@@ -1,7 +1,7 @@
 # ANGLE Metal (Apple M6): a dead branch in a fragment shader changes the rounding of live arithmetic (draft, no standalone repro)
 
 Draft for the ANGLE issue tracker (chromium, Internals>GPU>ANGLE) and Apple (Feedback Assistant, Metal shader compiler). Not filed. Margo row: KB6171a.
-Status: draft only. The fault is Metal-specific; there is no Mac on this PC, so no standalone page could be built or run here.
+Status: draft only. Margo no longer emits the dead branch (since 2026-11-14 the sky compiles the stylized night only while it is set), so its check no longer shows this; the compiler behaviour is unchanged. The fault is Metal-specific; there is no Mac on this PC, so no standalone page could be built or run here.
 
 ## Environment (Margo's record, 2026-11-10)
 

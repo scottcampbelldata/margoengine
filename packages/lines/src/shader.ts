@@ -8,7 +8,12 @@ export const clipCut = /* wgsl */ `let clipCount=style.flags.w&0xffffu;var clipB
   for(var p=0u;p<clipCount;p++){if(dot(style.planes[p].xyz,i.world)+style.planes[p].w<0.0){clipBehind++;}}
   if(clipCount>0u&&select(clipBehind>0u,clipBehind==clipCount,(style.flags.w&65536u)!=0u)){discard;}`;
 
-/** Fat line shader. The expansion mirrors `expandLine` in geometry.ts; keep the two in step. */
+/**
+ * Fat line shader. The expansion mirrors `expandLine` in geometry.ts; keep the two in step. `near(i)` reads point i's
+ * nearest distinct neighbours (prev, next; -1 at an end), stored two points per vec4 after the n points: strips and
+ * loops join to them, and a segment between two copies of one point draws nothing unless the whole line is one point
+ * (its caps then draw a dot).
+ */
 export const lineShader: string = /* wgsl */ `
 const FAN:u32=${FAN}u;
 const BLOCK:u32=${BLOCK}u;
@@ -30,6 +35,7 @@ struct Out{
 struct Joint{sOut:f32,miter:bool,innerOk:bool,inner:vec2f,outer0:vec2f,outer1:vec2f,n1:vec2f}
 struct Corner{off:vec2f,d:f32,atB:bool,valid:bool}
 
+fn near(i:u32)->vec2f{let v=points[style.flags.y+i/2u];return select(v.xy,v.zw,(i&1u)==1u);}
 fn project(i:u32)->vec4f{return frame.viewProj*(style.model*vec4f(points[i].xyz,1.0));}
 fn nearSide(c:vec4f)->f32{return c.w-c.z;}
 fn screen(c:vec4f)->vec2f{return c.xy/c.w*0.5*frame.viewport.xy;}
@@ -55,9 +61,11 @@ fn joint(d0:vec2f,d1:vec2f,hwG:f32,len0:f32,len1:f32)->Joint{
   j.n1=n1;
   return j;
 }
+// Rotates the start direction itself: atan2 of a normal such as (-0, 1) is pi/2 by WGSL but -pi/2 on Apple's Metal,
+// which turned a round cap into the segment.
 fn arc(start:vec2f,sweep:f32,step:u32,hwG:f32)->vec2f{
-  let a=atan2(start.y,start.x)+sweep*f32(step)/f32(FAN);
-  return vec2f(cos(a),sin(a))*hwG;
+  let l=length(start);let s=select(vec2f(1.0,0.0),start/l,l>0.0);let a=sweep*f32(step)/f32(FAN);let c=cos(a);let n=sin(a);
+  return vec2f(s.x*c-s.y*n,s.x*n+s.y*c)*hwG;
 }
 // Vertex k of a fan block: triangle t, corner c. Corner 0 is the center.
 fn fanCorner(k:u32,start:vec2f,sweep:f32,hwG:f32,atB:bool)->Corner{
@@ -74,8 +82,13 @@ fn fanCorner(k:u32,start:vec2f,sweep:f32,hwG:f32,atB:bool)->Corner{
   let join=bits&3u;let cap=(bits>>2u)&3u;
   var ia:u32;var ib:u32;var ip:u32=0u;var inx:u32=0u;var hasPrev=false;var hasNext=false;
   if(mode==0u){ia=2u*ii;ib=ia+1u;}
-  else if(mode==2u&&n>=3u){ia=ii;ib=(ii+1u)%n;ip=(ii+n-1u)%n;inx=(ii+2u)%n;hasPrev=true;hasNext=true;}
-  else{ia=ii;ib=ii+1u;hasPrev=ii>0u;ip=select(0u,ii-1u,hasPrev);hasNext=ii+2u<n;inx=select(0u,ii+2u,hasNext);}
+  else{
+    ia=ii;ib=select(ii+1u,(ii+1u)%n,mode==2u&&n>=3u);
+    let na=near(ia);
+    if(na.y!=f32(ib)&&(na.x>=0.0||na.y>=0.0)){return o;}
+    let nb=near(ib).y;
+    hasPrev=na.x>=0.0;ip=u32(max(na.x,0.0));hasNext=nb>=0.0;inx=u32(max(nb,0.0));
+  }
   let oa=project(ia);let ob=project(ib);
   let fa=nearSide(oa);let fb=nearSide(ob);
   if(fa<0.0&&fb<0.0){return o;}

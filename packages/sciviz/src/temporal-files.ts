@@ -36,7 +36,17 @@ function ordered(pattern: string, files: TemporalFile[], units: string): Tempora
   }
   return Object.freeze({ pattern, files: Object.freeze(files), units });
 }
-/** Group the last number in each basename, preserving directories and suffixes; unnumbered files remain separate groups. */
+// The last digit run before a letter-led extension (or extensions, .nii.gz): data_010.h5 and data_011.h5 are steps 10
+// and 11 of one series, not two files numbered 5. A name with no digits before its extension falls back to the last
+// digit run anywhere, so numbered extensions such as foo.vtk.2 still group.
+function sequenceNumber(basename: string): RegExpExecArray | null {
+  const extension = /(?:\.[A-Za-z][A-Za-z0-9]*)+$/.exec(basename)?.[0] ?? '',
+    stem = /^(.*?)(\d+)(\D*)$/.exec(basename.slice(0, basename.length - extension.length));
+  if (!stem) return /^(.*?)(\d+)(\D*)$/.exec(basename);
+  stem[3] += extension;
+  return stem;
+}
+/** Group the last number before each basename's extension, preserving directories and suffixes; unnumbered files remain separate groups. */
 export function groupFileSeries(names: readonly string[], options: FileSeriesOptions = {}): readonly TemporalFileSeries[] {
   const start = options.start ?? 0, step = options.step ?? 1, units = options.units ?? 'seconds';
   if (!Number.isFinite(start) || !Number.isFinite(step) || step <= 0) throw bad('start must be finite and step positive');
@@ -44,7 +54,7 @@ export function groupFileSeries(names: readonly string[], options: FileSeriesOpt
   const groups = new Map<string, { pattern: string; entries: { number: number; name: string }[] }>(), seen = new Set<string>();
   for (const raw of names) {
     const name = nameOf(raw), slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')),
-      directory = name.slice(0, slash + 1), basename = name.slice(slash + 1), match = /^(.*?)(\d+)(\D*)$/.exec(basename),
+      directory = name.slice(0, slash + 1), basename = name.slice(slash + 1), match = sequenceNumber(basename),
       pattern = match ? `${directory}${match[1]}*${match[3]}` : name,
       key = JSON.stringify(match ? [directory, match[1], match[3]] : [name]), number = match ? Number(match[2]) : 0;
     if (!Number.isSafeInteger(number)) throw bad('file sequence number exceeds safe integer range');

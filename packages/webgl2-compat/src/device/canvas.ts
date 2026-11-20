@@ -14,6 +14,10 @@ export class CompatCanvasContext {
   private config: (Omit<GPUCanvasConfiguration, 'device'> & { device: CompatDevice }) | null = null;
   private texture: CompatTexture | null = null;
   private frameOpen = false;
+  /** The callback that ends a frame, made once: an arrow made in getCurrentTexture would allocate a closure and its context each frame. */
+  private readonly closeFrame = (): void => {
+    this.frameOpen = false;
+  };
   private output: ImageBitmapRenderingContext | CanvasRenderingContext2D | null = null;
   /** A page-backed XR source copied into an already selected bitmaprenderer. */
   private copy?: OffscreenCanvas;
@@ -69,7 +73,7 @@ export class CompatCanvasContext {
       // A new frame: WebGPU hands out a cleared texture, and keeps handing out the same one until it is shown.
       this.frameOpen = true;
       t.initialized = false;
-      setTimeout(() => (this.frameOpen = false), 0);
+      setTimeout(this.closeFrame, 0);
     }
     return t;
   }
@@ -123,9 +127,13 @@ export class CompatCanvasContext {
         copy.drawImage(source, 0, 0);
       }
       this.output.transferFromImageBitmap(image.transferToImageBitmap());
-      this.shownBy?.shown.delete(this);
-      this.shownBy = transferable ? device : null;
-      this.shownBy?.shown.add(this);
+      // A Set that is changed each frame makes garbage each frame: change it only when the device showing changes.
+      const showing = transferable ? device : null;
+      if (this.shownBy !== showing) {
+        this.shownBy?.shown.delete(this);
+        this.shownBy = showing;
+        showing?.shown.add(this);
+      }
     } else {
       this.output.clearRect(0, 0, t.width, t.height);
       this.output.drawImage(source, 0, 0);

@@ -1,5 +1,5 @@
 // Real-GPU check of ModelOutlines (@margoengine/toon/models) on Fox.glb, a skinned glTF character posed by
-// @margoengine/animation's compute deformer. Takes a GPU slot itself. From the repository root, after building packages:
+// @margoengine/animation's compute deformer. From the repository root, after building packages:
 //   node packages/toon/test/models-check.mjs
 // The hull must draw a ring around the character's silhouette and nowhere else: every outline pixel lies within the
 // outline's width in pixels (plus 2 for MSAA edges) of the character, in the bind-time pose and in a later pose. The
@@ -7,10 +7,8 @@
 // drawn from the bind-pose vertices instead of the deformed ones fails the check.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 
-const release = await acquire({ owner: 'toon-models' });
 const context = await openBrowser({ startPath: '/packages/toon/test/models-check.html', port: 5400 }),
   { page } = context,
   pageErrors = [];
@@ -18,7 +16,7 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 const timer = setTimeout(() => {
   console.error('toon models-check: over its 2 minute limit');
-  process.exit(1);
+  process.exit(1); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120_000);
 const WIDTH = 1.5,
   // About 3.2 px a world unit at the Fox's distance (512 px, 60 degree field of view, 140 units away).
@@ -169,5 +167,4 @@ try {
 } finally {
   clearTimeout(timer);
   await context.close();
-  release();
 }

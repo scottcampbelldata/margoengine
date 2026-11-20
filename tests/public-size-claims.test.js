@@ -12,7 +12,7 @@ const ceiling = /const CORE_ONLY_CEILING = ([\d_]+);/.exec(read('scripts/build-m
 assert.ok(ceiling, 'scripts/build-modern.js still names CORE_ONLY_CEILING');
 const CORE_ONLY_CEILING = Number(ceiling[1].replaceAll('_', ''));
 
-const stagePhrase = /core\s*(?:\+|plus|and)\s*(?:the\s*)?stage|(?:starts|starting) at/gi;
+const stagePhrase = /core\s*(?:\+|plus|and)\s*(?:the\s*)?(?:high-level\s*)?stage|(?:starts|starting) at/gi;
 const corePhrase = /core alone/gi;
 const number = /\b\d{2},\d{3}\b|\b\d{5}\b/g;
 const WINDOW = 110;
@@ -22,8 +22,13 @@ function sizeClaims(text, file, phrase) {
   const found = [];
   // Markup reads as prose once tags are gone: "<dt>24,209 B gzip</dt><dd>Core plus" becomes one sentence.
   // Table cells too: "<td>61,345</td><td>24,848</td>" must not read as the one number 61,34524,848.
+  // A meta description is read as its text: dropped with its tag, the white paper's search snippet kept 24,843 B
+  // after the page body moved to 24,841 B.
   const prose = (line = '') =>
-    line.replace(/<\/(?:d[td]|t[dh])>\s*<(?:d[td]|t[dh])[^>]*>/g, ' ').replace(/<[^>]+>/g, '');
+    line
+      .replace(/<meta\b[^>]*?\bcontent="([^"]*)"[^>]*>/gi, ' $1 ')
+      .replace(/<\/(?:d[td]|t[dh])>\s*<(?:d[td]|t[dh])[^>]*>/g, ' ')
+      .replace(/<[^>]+>/g, '');
   const lines = text.split('\n');
   lines.forEach((line, index) => {
     // A wrapped paragraph puts the figure on the next line ("The core and the stage" / "together measure 24,630"), so
@@ -130,6 +135,17 @@ test('the size scan reads prose, tables and tag soup, and ignores unrelated numb
     '24,630',
   ]);
   assert.deepEqual(hit('core + stage 24,209 B\nand core + stage 24,848 B'), ['24,209', '24,848']);
+  // Bug (2026-11-16): site/whitepaper/engine.html's meta and og descriptions said 24,843 bytes while its body said the
+  // measured 24,841; the scan dropped every tag, attributes and all, so a stale search snippet passed.
+  assert.deepEqual(hit('<meta name="description" content="Core plus stage is 24,843 bytes gzip; 105 packages">'), [
+    '24,843',
+  ]);
+  // The same page's introduction said "Core plus the high-level stage ... 61,059 bytes minified and 24,843 bytes
+  // gzipped", which the phrase did not match.
+  assert.deepEqual(hit('Core plus the high-level stage measures 61,059 bytes minified and 24,843 bytes gzipped.'), [
+    '61,059',
+    '24,843',
+  ]);
 });
 
 // Bug (2026-11-12): docs/demo-loading.md, docs/desktop-frame-rate.md, MODERN-ENGINE.md and benchmarks/README.md each

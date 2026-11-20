@@ -2,7 +2,7 @@
 import type { MutableVec3, Vec3 } from '@margoengine/math';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import type { GridSource } from './edit.js';
-import { checkGrid, checkPoint, type GridHit, MAX_CELLS, exposedNormal, unitDirection } from './grid.js';
+import { checkGrid, checkPoint, depthRange, type GridHit, MAX_CELLS, exposedNormal, unitDirection } from './grid.js';
 import { SparseGrid } from './sparse.js';
 
 /** A ray in a grid's local cells. */
@@ -13,15 +13,28 @@ export interface GridRay {
   direction: Vec3;
 }
 
+/** Options of {@link pickRay}. */
+export interface PickRayOptions {
+  /**
+   * The backend the matrix was made for, `engine.backend`: `'webgpu'` (default) has reverse depth from 1 at the near
+   * plane to 0 at the far one; `'webgl2'` has OpenGL depth from -1 at the near plane to 1 at the far one.
+   */
+  backend?: 'webgpu' | 'webgl2';
+}
+
 /**
  * The ray under a pointer: `x` and `y` in normalized device coordinates (-1 to 1, y up) and `matrix` the camera's
- * view-projection (`engine.camera.matrix`, WebGPU reverse depth). The origin is on the near plane and the direction
- * unit length. Null when the matrix cannot be inverted. Transform it into a model's cells before casting.
+ * view-projection (`engine.camera.matrix`); pass `{ backend: engine.backend }` so a WebGL2 matrix's depth is read the
+ * right way round. The origin is on the near plane and the direction unit length. Null when the matrix cannot be
+ * inverted. Transform it into a model's cells before casting.
  */
-export function pickRay(matrix: ArrayLike<number>, x: number, y: number): GridRay | null {
+export function pickRay(matrix: ArrayLike<number>, x: number, y: number, options: PickRayOptions = {}): GridRay | null {
   if (!Number.isFinite(x) || !Number.isFinite(y))
     throw new RangeError('pickRay x and y are not finite; pass NDC numbers');
-  const inverse = invertMatrixStable(matrix, new Float64Array(16));
+  if (typeof options !== 'object' || options === null)
+    throw new TypeError('pickRay options are not an object; pass { backend: engine.backend }');
+  const [nearZ, farZ] = depthRange(options.backend, 'pickRay'),
+    inverse = invertMatrixStable(matrix, new Float64Array(16));
   if (!inverse) return null;
   const unproject = (z: number): MutableVec3 | null => {
     const w = inverse[3] * x + inverse[7] * y + inverse[11] * z + inverse[15];
@@ -30,8 +43,8 @@ export function pickRay(matrix: ArrayLike<number>, x: number, y: number): GridRa
       (r) => (inverse[r] * x + inverse[4 + r] * y + inverse[8 + r] * z + inverse[12 + r]) / w,
     ) as MutableVec3;
   };
-  const near = unproject(1),
-    far = unproject(0);
+  const near = unproject(nearZ),
+    far = unproject(farZ);
   if (!near || !far) return null;
   const d = [far[0] - near[0], far[1] - near[1], far[2] - near[2]],
     length = Math.hypot(d[0], d[1], d[2]);
@@ -82,7 +95,11 @@ export function raycastGrid(source: GridSource, ray: GridRay, maxDistance = Infi
     exit = Math.min(exit, Math.max(a, b));
   }
   if (enter > exit) return null;
-  const cell = [0, 1, 2].map((axis) => Math.floor(o[axis] + d[axis] * (enter + 1e-7))),
+  // The entry point is on the box up to rounding, which past about 1e8 cells away outgrows the 1e-7 nudge; clamping
+  // keeps the first cell inside instead of reporting a miss (Amanatides and Woo 1987 start from the entry voxel).
+  const cell = [0, 1, 2].map((axis) =>
+      Math.min(size[axis] - 1, Math.max(0, Math.floor(o[axis] + d[axis] * (enter + 1e-7)))),
+    ),
     step = d.map(Math.sign),
     span = d.map((v) => (v ? Math.abs(1 / v) : Infinity)),
     next = d.map((v, axis) => (v ? (cell[axis] + (v > 0 ? 1 : 0) - o[axis]) / v : Infinity));

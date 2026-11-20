@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import test from 'node:test';
-import { workspacePackages } from '../scripts/check-readme-types.mjs';
+import { readmeTypeProblems, workspacePackages } from '../scripts/check-readme-types.mjs';
 import {
   compareKnown,
   compile,
@@ -18,7 +18,6 @@ import {
   unclosedFences,
   writeExamples,
 } from '../scripts/support/readme-types.mjs';
-import { PARALLEL } from '../scripts/verify.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
@@ -124,7 +123,7 @@ test('the place of an error does not count, so moving a line in a README moves n
   assert.equal(parseErrors(['tsc crashed'], root)[0].name, '(compiler)');
 });
 
-test('the check covers every package and runs in verify, the step every landing runs', () => {
+test('the check covers every package and runs in npm run quality, a step of every fast gate', () => {
   const names = workspacePackages().map((p) => p.name),
     declared = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).workspaces;
   assert.deepEqual(
@@ -132,7 +131,36 @@ test('the check covers every package and runs in verify, the step every landing 
     declared.filter((w) => w.startsWith('packages/')),
   );
   assert.ok(packageMarkdown(join(root, 'packages/tween')).length);
-  assert.ok(PARALLEL.flat().includes('npm run check:readmes'));
+  // 2026-11-18: it ran only in verify, after the push, and a lane runs only its own package tests, so ten examples
+  // broken by changes to their package or to another (a protected Scatter.options, a seek typed for a whole Engine)
+  // reached main. The quality gate, which every fast gate runs, now holds it.
+  const gate = readFileSync(join(root, 'scripts/quality-gate.mjs'), 'utf8');
+  assert.match(gate, /import \{ readmeTypeProblems \} from '\.\/check-readme-types\.mjs'/);
+  assert.match(gate, /'readme-types': \{\s+run: \(\) => readmeTypeProblems\(root\)\.problems/);
+});
+
+test('readmeTypeProblems fails an example that one package types break, and passes the fixed example', () => {
+  // A throwaway repository under test-results, so node_modules resolves @margoengine/* from the real one.
+  const fake = join(root, `test-results/readme-problems-${process.pid}`),
+    readme = join(fake, 'packages/demo/README.md');
+  rmSync(fake, { recursive: true, force: true });
+  mkdirSync(join(fake, 'packages/demo'), { recursive: true });
+  mkdirSync(join(fake, 'scripts/support'), { recursive: true });
+  try {
+    writeFileSync(join(fake, 'package.json'), JSON.stringify({ workspaces: ['packages/demo'] }));
+    writeFileSync(join(fake, 'packages/demo/package.json'), JSON.stringify({ name: '@margoengine/demo', type: 'module' }));
+    writeFileSync(join(fake, 'scripts/support/readme-types-known.json'), '{}');
+    const example = (call) => ['# demo', '', '```js', "import { Vector3 } from '@margoengine/math';", call, '```', ''].join('\n');
+    writeFileSync(readme, example("console.log(new Vector3('1', 0, 2));"));
+    const broken = readmeTypeProblems(fake);
+    assert.equal(broken.count, 1);
+    assert.equal(broken.problems.length, 1, broken.problems.join('\n'));
+    assert.match(broken.problems[0], /error TS2345/);
+    writeFileSync(readme, example('console.log(new Vector3(1, 0, 2));'));
+    assert.deepEqual(readmeTypeProblems(fake).problems, []);
+  } finally {
+    rmSync(fake, { recursive: true, force: true });
+  }
 });
 
 // About 170 `declare const` lines passed the type check while their examples could not run as pasted.

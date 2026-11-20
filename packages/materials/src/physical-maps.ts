@@ -1,6 +1,6 @@
 // Private sparse map specialization for constructed PhysicalMaterial surfaces.
 // Logical slots stay stable even when texture views and samplers are shared.
-// Derived once per source, group and slot plan: every frame derives each material's shader again (gltf-pro
+// Derived once per source, group and slot plan: every frame derives each material's shader again (gltf/pbr
 // draw-memo.ts), and these edits on the whole PBR shader were most of a 400-mesh physical frame's CPU.
 const derived = new Map<string, Map<string, string>>();
 export function physicalMapsShader(
@@ -53,7 +53,7 @@ fn margoPhysicalUV(i:Out,k:u32)->vec2f {
 fn margoPhysicalFrame(i:Out,n:vec3f,k:u32)->mat3x3f {
   let dp1=dpdx(i.position); let dp2=dpdy(i.position);
   let duv1=dpdx(margoPhysicalUV(i,k)); let duv2=dpdy(margoPhysicalUV(i,k));
-  // gltf-pro's shared cotangent frame (shared/tangent-frame.js): B points up the image, as glTF normal maps expect.
+  // gltf/pbr's shared cotangent frame (shared/tangent-frame.js): B points up the image, as glTF normal maps expect.
   return margoCotangentFrame(n,dp1,dp2,duv1,duv2);
 }
 `;

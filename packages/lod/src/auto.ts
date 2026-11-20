@@ -4,9 +4,10 @@
 import { Geometry, type EnginePlugin, type Mesh } from '@margoengine/core';
 import { meshRuntime } from '@margoengine/core/extension';
 import type { Animation } from '@margoengine/animation';
-import type { GLTFDocument, GLTFImage, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf-pro';
+import type { GLTFDocument, GLTFImage, PBRModel, PBRPrimitive, PreparedGeometry } from '@margoengine/gltf/pbr';
 import type { createMesh, Material, MaterialMesh, MeshGeometry, Texture } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
+import { sceneScope } from '../../shared/scene-scope.js';
 import { normalMatrix, simplifyPacked, type Modeling, type PackedGeometry } from './attributes.js';
 import {
   bakeLevels,
@@ -51,7 +52,7 @@ export interface HierarchicalLODOptions {
   /** Cancels the wait for the simplifier and the work after it. */
   signal?: AbortSignal;
 }
-/** A mesh `autoLOD` and `hierarchicalLOD` take: a core mesh, a `createMesh` mesh of `@margoengine/materials`, or a loaded gltf-pro model. */
+/** A mesh `autoLOD` and `hierarchicalLOD` take: a core mesh, a `createMesh` mesh of `@margoengine/materials`, or a loaded gltf/pbr model. */
 export type LODSource = Mesh | MaterialMesh<Material | readonly Material[]> | PBRModel;
 /** What {@link hierarchicalLOD} built. */
 export interface HierarchicalLOD {
@@ -181,7 +182,7 @@ async function materialsPackage(
   return loaded;
 }
 /**
- * Simplifies packed triangles (`primitive.vertices` and `primitive.indices` of a gltf-pro model or materials mesh) and
+ * Simplifies packed triangles (`primitive.vertices` and `primitive.indices` of a gltf/pbr model or materials mesh) and
  * returns one geometry per ratio. Every level is a subset of the source's vertices, so normals, tangents, both UV sets
  * and colours are the source's own, and seams and hard edges stay closed. Each level's `sources` names the source vertex
  * of each of its vertices. `apart` names how a vertex deforms: vertices at one position it tells apart are not welded.
@@ -323,7 +324,9 @@ const MORPHS = ['POSITION', 'NORMAL', 'TANGENT'] as const,
  * Names how vertex `i` of `p` deforms. Exporters write a seam's two sides with the same skin and morphs, up to rounding,
  * so values are compared in steps: a seam stays welded, a closed mouth's lips do not.
  */
-function deformation(model: PBRModel, p: PBRPrimitive): (vertex: number) => string {
+function deformation(model: PBRModel, p: PBRPrimitive, map?: Uint32Array): (vertex: number) => string {
+  // `map` (from whole()) names the definition's vertex of each vertex of a split primitive merged whole again.
+  const at = (i: number) => (map ? map[i] : i);
   const { asset } = model,
     { attributes = {}, targets = [] } = p.definition,
     b = model.bounds,
@@ -335,8 +338,9 @@ function deformation(model: PBRModel, p: PBRPrimitive): (vertex: number) => stri
     deltas = targets.flatMap((target) =>
       target.POSITION === undefined ? [] : [asset.accessor(target.POSITION, 'VEC3')],
     );
-  return (i) => {
-    const parts: number[] = [];
+  return (vertex) => {
+    const i = at(vertex),
+      parts: number[] = [];
     for (const { ids, weights } of joints)
       for (let k = i * 4; k < i * 4 + 4; k++) {
         const weight = Math.round(weights[k] * WEIGHT_STEP);
@@ -345,6 +349,14 @@ function deformation(model: PBRModel, p: PBRPrimitive): (vertex: number) => stri
     for (const delta of deltas) for (let k = i * 3; k < i * 3 + 3; k++) parts.push(Math.round(delta[k] * step));
     return parts.join();
   };
+}
+/**
+ * Runs `work` in the scene `mesh` is in. A level is made after awaits, when the active scene is the default one again,
+ * wherever the source went: its meshes and plugins belong with the source.
+ */
+function inSceneOf<T>(mesh: Mesh, work: () => T): T {
+  const { engine, scene } = meshRuntime(mesh);
+  return sceneScope(engine, scene).run(work);
 }
 /**
  * A new model of `source`'s asset drawing `prepared` instead of its accessors, on the materials `source` draws with now
@@ -359,7 +371,7 @@ async function modelFrom(
   level: number,
   signal?: AbortSignal,
 ): Promise<PBRModel> {
-  const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf-pro');
+  const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf/pbr');
   signal?.throwIfAborted();
   const { asset } = source,
     levelled = bakedDocument(doc, source.shareImages(), records, baked, level);
@@ -375,7 +387,7 @@ async function modelFrom(
     );
     // A level over the source's part size splits as the source did.
     levelAsset.partVertices = asset.partVertices;
-    made = new Model(source.root.engine, levelAsset, levelled.images, prepared);
+    made = inSceneOf(source.root, () => new Model(source.root.engine, levelAsset, levelled.images, prepared));
   } catch (error) {
     closeImages(levelled.images);
     throw error;
@@ -385,7 +397,7 @@ async function modelFrom(
     p.material = levelled.materials[i];
     p.extension = records[i].extension;
   });
-  source.root.engine.use(made);
+  inSceneOf(source.root, () => source.root.engine.use(made));
   return made;
 }
 /**
@@ -422,8 +434,16 @@ function whole(model: PBRModel, p: PBRPrimitive): PBRPrimitive {
   const merged: PBRPrimitive = { ...p, vertices, indices };
   delete merged.part;
   if (uvs) merged.uvs = uvs;
+  wholeSources.set(merged, Uint32Array.from(ids.keys()));
   return merged;
 }
+/** The definition's vertex of each vertex of a primitive whole() merged from parts. */
+const wholeSources = new WeakMap<PBRPrimitive, Uint32Array>();
+/**
+ * The definition's vertex of each vertex of a level, for levels of a split primitive (whose `sources` count the
+ * vertices of the merged whole): rigPrimitive reads the file's skin and morph accessors by it.
+ */
+const levelSources = new WeakMap<PackedGeometry, Uint32Array>();
 /** One level of a loaded model: its node tree and transforms, its triangle primitives simplified, nothing else. */
 async function gltfLevel(
   model: PBRModel,
@@ -501,7 +521,7 @@ function rigPrimitive(model: PBRModel, p: PBRPrimitive['definition'], level: Pac
   const { attributes = {}, targets, material } = p,
     { asset } = model,
     count = level.vertices.length / 20,
-    order = level.sources ?? Uint32Array.from({ length: count }, (_, i) => i),
+    order = levelSources.get(level) ?? level.sources ?? Uint32Array.from({ length: count }, (_, i) => i),
     made: Record<string, number> = {
       POSITION: out.packed(level, 0, 3, 'VEC3'),
       ...(attributes.NORMAL === undefined ? {} : { NORMAL: out.packed(level, 4, 3, 'VEC3') }),
@@ -568,7 +588,7 @@ async function riggedLevel(
   baked: BakedLevels | undefined,
   signal?: AbortSignal,
 ): Promise<PBRModel> {
-  const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf-pro');
+  const { GLTFAsset, PBRModel: Model, closeImages } = await import('@margoengine/gltf/pbr');
   signal?.throwIfAborted();
   const { asset } = model,
     doc = asset.doc,
@@ -598,10 +618,14 @@ async function riggedLevel(
     levelled = bakedDocument(levelDoc, model.shareImages(), records, baked, level);
   let made: PBRModel;
   try {
-    made = new Model(
-      model.root.engine,
-      new GLTFAsset(levelled.doc, [...asset.buffers, bytes], undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
-      levelled.images,
+    made = inSceneOf(
+      model.root,
+      () =>
+        new Model(
+          model.root.engine,
+          new GLTFAsset(levelled.doc, [...asset.buffers, bytes], undefined, asset.hooks, asset.maxBytes, asset.maxNodes),
+          levelled.images,
+        ),
     );
   } catch (error) {
     closeImages(levelled.images);
@@ -613,7 +637,7 @@ async function riggedLevel(
     p.extension = records[i].extension;
     p.weights = records[i].weights;
   });
-  model.root.engine.use(made);
+  inSceneOf(model.root, () => model.root.engine.use(made));
   placeNodes(model, made);
   return made;
 }
@@ -665,7 +689,7 @@ function followNodes(model: PBRModel, made: readonly PBRModel[], lod: LOD): void
       }
     },
   };
-  engine.use(follower);
+  inSceneOf(model.root, () => engine.use(follower));
   // The scene it was attached to, not whichever scene is active when the model goes.
   model.onDispose(() => engine.sceneOf(follower)?.removePlugin(name));
 }
@@ -699,7 +723,7 @@ async function modelLevels(
     for (let level = 0; level < count; level++) {
       const next = await (deforms ? riggedLevel : gltfLevel)(model, simplified, level, baked, signal);
       next.root.setParent(model.root);
-      play?.attach(next, { skeleton: model, skinning: source?.options.skinning });
+      inSceneOf(model.root, () => play?.attach(next, { skeleton: model, skinning: source?.options.skinning }));
       model.onDispose(() => next.dispose());
       made.push(next);
     }
@@ -727,16 +751,18 @@ async function modelLevels(
         return copy;
       }),
       own = owned.length > 0,
-      mesh = own
-        ? createMesh(
-            model.root.engine,
-            meshGeometry(parts, materials.length > 1 ? materials.map((_, i) => i) : undefined),
-            materials.length > 1 ? materials : materials[0],
-            { renderOrder: model.renderOrder },
-          )
-        : createMesh(model.root.engine, meshGeometry(parts, slotsOf(model)), model.material, {
-            renderOrder: model.renderOrder,
-          });
+      mesh = inSceneOf(model.root, () =>
+        own
+          ? createMesh(
+              model.root.engine,
+              meshGeometry(parts, materials.length > 1 ? materials.map((_, i) => i) : undefined),
+              materials.length > 1 ? materials : materials[0],
+              { renderOrder: model.renderOrder },
+            )
+          : createMesh(model.root.engine, meshGeometry(parts, slotsOf(model)), model.material, {
+              renderOrder: model.renderOrder,
+            }),
+      );
     mesh.root.setParent(model.root);
     model.onDispose(() => {
       mesh.dispose();
@@ -765,11 +791,23 @@ async function autoModelLOD(
   const simplify = await modeling(signal),
     simplified = new Map<PBRPrimitive['definition'], PackedGeometry[]>();
   for (const p of model.primitives)
-    if (!p.topology && !simplified.has(p.definition))
-      simplified.set(
-        p.definition,
-        simplifyPacked(simplify, whole(model, p), ratios, signal, rigged(model, p) ? deformation(model, p) : undefined),
-      );
+    if (!p.topology && !simplified.has(p.definition)) {
+      const merged = whole(model, p),
+        map = wholeSources.get(merged),
+        levels = simplifyPacked(
+          simplify,
+          merged,
+          ratios,
+          signal,
+          rigged(model, p) ? deformation(model, p, map) : undefined,
+        );
+      if (map)
+        for (const level of levels) {
+          const order = level.sources ?? Uint32Array.from({ length: level.vertices.length / 20 }, (_, i) => i);
+          levelSources.set(level, order.map((i) => map[i]));
+        }
+      simplified.set(p.definition, levels);
+    }
   const baked = bake
       ? await bakeLevels(
           model.primitives.filter((p) => !p.part?.index).map((p) => whole(model, p)),
@@ -1010,7 +1048,7 @@ export async function hierarchicalLOD(
       const createMesh = shaded.length ? (await materialsPackage(signal)).createMesh : undefined;
       for (const [material, parts] of byPart) {
         const kept = pack(parts, center),
-          mesh = createMesh!(sources[0].root.engine, meshGeometry([kept]), material);
+          mesh = inSceneOf(sources[0].root, () => createMesh!(sources[0].root.engine, meshGeometry([kept]), material));
         for (let o = 0; o < kept.vertices.length; o += 20)
           radius = Math.max(radius, Math.hypot(kept.vertices[o], kept.vertices[o + 1], kept.vertices[o + 2]));
         mesh.root.setPosition(center as [number, number, number]);
@@ -1061,8 +1099,8 @@ export async function hierarchicalLOD(
         return simplify ? simplify(positions, indices, [ratio])[0] : new Geometry(positions, normals, indices);
       };
       const first = meshRuntime(group[0]),
-        mesh = (first.engine as unknown as { createMesh(): Mesh })
-          .createMesh()
+        mesh = (first.engine as unknown as { createMesh(parent: null, scene: unknown): Mesh })
+          .createMesh(null, first.scene)
           .setGeometry(merged())
           .setPosition(center as [number, number, number])
           .setMaterial(first.material);
@@ -1106,7 +1144,7 @@ export async function hierarchicalLOD(
     engine = meshRuntime(far0(meshes)).engine,
     name = 'lod-follow:' + following++;
   const follower: EnginePlugin = { name, setup() {}, onPreUpdate: () => void refresh(1) };
-  if (follow) engine.use(follower);
+  if (follow) inSceneOf(far0(meshes), () => engine.use(follower));
   return {
     lods,
     meshes: [...made, ...models.map((model) => model.root)],

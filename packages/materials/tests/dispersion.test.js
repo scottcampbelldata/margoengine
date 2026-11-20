@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { install, transmission } from '../dist/index.js';
 import { transmissionQuads } from '../../../tests/support/transmission-fixture.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';

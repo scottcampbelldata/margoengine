@@ -1,5 +1,5 @@
 // Physical light units for Margo's lights, as plain conversions (no GPU, no state). Margo's light intensities already are
-// photometric quantities, the convention of glTF's KHR_lights_punctual that gltf-pro's `applyGLTFLights` passes through
+// photometric quantities, the convention of glTF's KHR_lights_punctual that gltf/pbr's `applyGLTFLights` passes through
 // unchanged: a point or spot light's `intensity` is luminous intensity in candela (lm/sr), a directional light's (core's sun,
 // `@margoengine/clustered/directional`) is illuminance in lux (lm/m^2) on a surface facing it, and a rectangle area light's
 // is luminance in nits (cd/m^2). The renderer's linear output is then luminance in nits; `exposureFromEV100` scales it for

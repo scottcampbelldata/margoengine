@@ -2,7 +2,7 @@
 // 1920 x 1080), with the engine's default multisampling. Each case must render with no GPU validation error and the
 // steady-frame work counts (6 passes, 6 draws, 320 uniform bytes, no bind group). GPU frame time (timestamp-query) and
 // wall time are diagnostics whose targets live in docs/work-lists/speed-phase.md.
-// node scripts/gpu-lock.mjs run --owner=<you> --max=10 -- node packages/water/test/liquid-scale.browser.mjs
+// node scripts/run-with-timeout.mjs --max=10 -- node packages/water/test/liquid-scale.browser.mjs
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));

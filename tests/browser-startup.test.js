@@ -15,6 +15,11 @@ const resets = await import('../scripts/support/driver-resets.mjs');
 mock.module('../scripts/support/driver-resets.mjs', {
   namedExports: { ...resets, driverResets: () => current.resets ?? [] },
 });
+// The Windows session lookup (scripts/support/windows-session.mjs), replaced: these runs must not read this PC's session.
+const sessions = await import('../scripts/support/windows-session.mjs');
+mock.module('../scripts/support/windows-session.mjs', {
+  namedExports: { ...sessions, windowsSession: () => current.session ?? null },
+});
 const { openBrowser } = await import('../scripts/browser.js');
 
 function fixture(
@@ -215,4 +220,27 @@ test('an ANGLE Vulkan launch needs a hardware WebGL renderer, not a WebGPU adapt
   // Without the Vulkan launch the WebGPU adapter is still required.
   fixture([], { webgpu: null, webglRenderer: vulkan });
   await assert.rejects(openBrowser(), (error) => error.code === 'no-webgpu-adapter');
+});
+
+// 2026-11-14 (tools/shot over SSH): Edge started from an SSH logon on the dev PC now and then got no WebGPU adapter. The
+// process was in session 0 ("Services"), the non-desktop session Windows isolates from the signed-in one; the error now
+// names that cause instead of a driver reset or a browser update.
+test('no adapter in Windows session 0 names the session as the cause; a desktop session keeps the old reason', async () => {
+  const state = fixture([], { webgpu: null });
+  state.session = { id: 0, name: 'Services' };
+  current.session = state.session;
+  await assert.rejects(openBrowser(), (error) => {
+    assert.equal(error.code, 'no-webgpu-adapter');
+    assert.equal(error.reason, 'windows-session-0');
+    assert.match(error.message, /session 0 \("Services"\).*render queue/);
+    return true;
+  });
+  fixture([], { webgpu: null });
+  current.session = { id: 1, name: 'Console' };
+  await assert.rejects(openBrowser(), (error) => {
+    assert.equal(error.reason, undefined);
+    assert.match(error.message, /KB-C34i/);
+    return true;
+  });
+  current.session = null;
 });

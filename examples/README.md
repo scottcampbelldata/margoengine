@@ -49,6 +49,10 @@ backend can run it.
 | [weather.html](weather.html) | Weather presets that blend: rain, snow, hail, lightning, wind and wet or snowy ground |
 | [windy-meadow.html](windy-meadow.html) | Grass, wind and a changing sky |
 | [orrery/](orrery/index.html) | A brass orrery under a glass dome: any date puts the planets at their real heliocentric longitudes ([details](orrery/README.md)) |
+| [cabin-hearth/](cabin-hearth/index.html) | A snowbound log cabin at night: one lit window in falling snow, a fire in the hearth and a kettle steaming ([details](cabin-hearth/README.md)) |
+| [whiteout-pass/](whiteout-pass/index.html) | A blizzard at dusk on a mountain pass: snow streams past a log hut with one warm lit window, and the storm eases into a lull ([details](whiteout-pass/README.md)) |
+| [event-horizon/](event-horizon/index.html) | A spinning black hole traced through Kerr spacetime: the lensed disk, its jet, the light paths and maps of redshift, beaming, temperature and image order ([details](event-horizon/README.md)) |
+| [kitty-hawk/](kitty-hawk/index.html) | The Wright Flyer's four flights of 17 December 1903 over the Kill Devil Hills dune coast, from the published distances and times, with a film grade and camera rigs for shot files |
 | [storm-light/](storm-light/index.html) | A lighthouse on a headland at night in a building storm: beam shafts in fog, rain, lightning and a heaving sea ([details](storm-light/README.md)) |
 | [molten-words/](molten-words/index.html) | Any typed word as dripping liquid chrome |
 | [cathedral-light/](cathedral-light/index.html) | Sun through stained glass into a dusty hall, with a time-of-day slider |

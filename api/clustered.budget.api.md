@@ -34,6 +34,8 @@ interface PointLight {
     decay?: number;
     shadow?: boolean | LocalLightShadow;
     castShadow?: boolean;
+    radius?: number;
+    bounce?: boolean;
 }
 
 interface SpotLight extends PointLight {

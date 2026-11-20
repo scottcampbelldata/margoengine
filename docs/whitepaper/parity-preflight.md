@@ -5,7 +5,7 @@ the busy PC to exercise the same catalog cases and full input sizes once per eng
 
 ```sh
 npm run build:packages
-node scripts/gpu-lock.mjs run --owner=parity-preflight --max=30 --wait-max=20 -- node scripts/parity-smoke-browser.mjs --runs=1
+node scripts/run-with-timeout.mjs --max=30 -- node scripts/parity-smoke-browser.mjs --runs=1
 ```
 
 The external black-box adapters must already exist in the adjacent `engine-bench`
@@ -17,7 +17,7 @@ against Margo and any adapter named in `engine-bench/margo-bench/engines.json` (
 The smoke runner executes one `task(0)` or one `render(0)` plus GPU idle. It never
 runs the throughput, timestamp, serial-frame or repeated-task phases. It does not
 enable `MARGO_SPEED_PHASE`, write a baseline, or enter `perf-vs-threejs.json`.
-It rejects `--runs` other than 1 and refuses to run outside the GPU lock.
+It rejects `--runs` other than 1.
 
 `test-results/bp-159-smoke.json` is updated after each engine/case with success,
 explicit unsupported status, output counts, native API work counts, and errors.

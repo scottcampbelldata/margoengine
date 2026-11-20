@@ -9,7 +9,7 @@ import test from 'node:test';
 import { checkExampleTypes } from '../scripts/check-example-types.mjs';
 import { planContext, planFiles } from '../scripts/check-merge.mjs';
 import { exampleClosure, exampleScopes } from '../scripts/support/affected-packages.mjs';
-import { PROJECTS } from '../scripts/support/example-projects.mjs';
+import { EXAMPLE_FOLDERS, PROJECTS } from '../scripts/support/example-projects.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const posix = (path) => path.replaceAll('\\', '/');
@@ -110,6 +110,18 @@ test('every example .ts and .tsx file is in a project, and every top-level .js d
   };
   walk('examples');
   assert.deepEqual(missing, [], 'add the folder to a project in scripts/support/example-projects.mjs');
+});
+
+// biomes, cabin-hearth and cad-viewer were in the tsconfig's include but not in EXAMPLE_FOLDERS: the full check typed
+// them, but the narrowed one did not read their imports, so a change to a package they use skipped them.
+test('the examples project lists the same folders as examples/tsconfig.json includes', () => {
+  const include = JSON.parse(readFileSync(join(root, 'examples/tsconfig.json'), 'utf8')).include,
+    folders = include.filter((pattern) => pattern !== '*.ts').map((pattern) => pattern.replace(/\/\*\.ts$/, ''));
+  assert.deepEqual(
+    [...folders].sort(),
+    [...EXAMPLE_FOLDERS].sort(),
+    'list each examples/<folder>/*.ts of examples/tsconfig.json in EXAMPLE_FOLDERS (scripts/support/example-projects.mjs)',
+  );
 });
 
 test('check:merge runs the example projects a change can reach, all of them for the full run, none for a document', async () => {

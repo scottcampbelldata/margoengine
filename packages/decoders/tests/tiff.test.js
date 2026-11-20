@@ -3,7 +3,7 @@
 // configurations, byte orders and extra samples, with exact pixels, then refusals.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTIFF } from '../dist/tiff.js';
+import { openTIFF, parseTIFF } from '../dist/tiff.js';
 import { failed, image, lzwEncode, rejects, rgbaOf, sequence, tiff } from './support/texture-encoders.js';
 
 const COMPRESSIONS = [1, 5, 32773, 8, 32946],
@@ -333,12 +333,12 @@ test('TIFF refuses truncated and malformed headers, IFDs and strips, oversized i
   failed(() => parseTIFF(grey({ compression: 32773, raw: [Uint8Array.of(0, 1)] })), /PackBits data ends early/);
   failed(() => parseTIFF(grey({ compression: 8, raw: [sequence(12)] })), /Compressed data/);
   // Unsupported compressions, colour spaces, sample formats and layouts.
-  for (const compression of [2, 3, 4, 6, 7, 34712])
+  for (const compression of [34712, 34887, 50002])
     failed(
       () => parseTIFF(grey({ compression, raw: [sequence(4)] })),
       new RegExp(`compression ${compression} is not supported; save`),
     );
-  for (const photometric of [4, 5, 6, 8])
+  for (const photometric of [4, 5, 6, 7, 10])
     failed(
       () => parseTIFF(grey({ photometric })),
       new RegExp(`photometric interpretation ${photometric} is not supported`),
@@ -365,7 +365,18 @@ test('TIFF refuses truncated and malformed headers, IFDs and strips, oversized i
     () => parseTIFF(grey({ bits: 32, float: true, photometric: 0, samples: [1, 2, 3, 4] })),
     /photometric interpretation 0/,
   );
-  failed(() => parseTIFF(grey({ bits: 16, tags: [[339, SHORT, [3]]] })), /16-bit float samples/);
+  failed(
+    () =>
+      parseTIFF(
+        grey({
+          tags: [
+            [258, SHORT, [24]],
+            [339, SHORT, [3]],
+          ],
+        }),
+      ),
+    /24-bit float samples/,
+  );
   failed(() => parseTIFF(grey({ predictor: 3 })), /Predictor 3 with 8-bit samples/);
   failed(() => parseTIFF(grey({ bits: 4, predictor: 2 })), /Predictor 2 with 4-bit samples/);
   failed(() => parseTIFF(grey({ tags: [[266, SHORT, [2]]] })), /FillOrder 2 is not supported/);
@@ -563,12 +574,23 @@ test('TIFF refuses malformed and unsupported files with named errors', () => {
   failed(() => parseTIFF(notTiff), /header is missing/);
   failed(
     () =>
-      parseTIFF(tiff({ width: 2, height: 2, spp: 1, bits: 8, photometric: 1, compression: 7, samples: [1, 2, 3, 4] })),
-    /compression 7 is not supported/,
+      parseTIFF(tiff({ width: 2, height: 2, spp: 1, bits: 8, photometric: 1, compression: 9, samples: [1, 2, 3, 4] })),
+    /compression 9 is not supported/,
   );
   failed(
-    () => parseTIFF(tiff({ width: 2, height: 2, spp: 4, bits: 8, photometric: 5, samples: new Array(16).fill(0) })),
-    /photometric interpretation 5/,
+    () =>
+      parseTIFF(
+        tiff({
+          width: 2,
+          height: 2,
+          spp: 4,
+          bits: 8,
+          photometric: 5,
+          samples: new Array(16).fill(0),
+          tags: [[332, 3, [2]]],
+        }),
+      ),
+    /inks other than CMYK/,
   );
   failed(
     () => parseTIFF(tiff({ width: 2, height: 2, spp: 1, bits: 12, photometric: 1, samples: [1, 2, 3, 4] })),
@@ -608,4 +630,58 @@ test('TIFF refuses malformed and unsupported files with named errors', () => {
     p = new DataView(past.buffer);
   p.setUint32(4, past.length + 10, true);
   failed(() => parseTIFF(past), /first IFD offset/);
+});
+
+test('TIFF 16, 32 and 64-bit float with the floating point predictor (Predictor 3), grey and RGB, chunky and planar, every compression, both byte orders', () => {
+  // Adobe Photoshop TIFF Technical Note 3 (2005). Before this, parseTIFF refused Predictor 3 and 16 and 64-bit floats,
+  // so a Deflate heightmap saved by GIS or Photoshop with the float predictor could not be read.
+  const width = 5,
+    height = 3,
+    values = (spp) =>
+      Array.from(
+        { length: width * height * spp },
+        (_, i) => [0.5, -1.25, 3.75, 0.125, 1024, 0, -0.0625, 2][i % 8] * (1 + (i % 3)),
+      ),
+    exact = (bits, v) => (bits === 16 ? Math.f16round(v) : bits === 32 ? Math.fround(v) : v);
+  for (const bits of [16, 32, 64])
+    for (const little of [true, false])
+      for (const [spp, photometric] of [
+        [1, 1],
+        [3, 2],
+      ])
+        for (const planar of [1, 2])
+          for (const compression of [1, 5, 8, 32773])
+            for (const layout of [{ rowsPerStrip: 2 }, { tile: [16, 16] }]) {
+              const samples = values(spp),
+                file = tiff({
+                  little,
+                  width,
+                  height,
+                  spp,
+                  bits,
+                  float: true,
+                  photometric,
+                  planar,
+                  compression,
+                  predictor: 3,
+                  samples,
+                  ...layout,
+                }),
+                copy = file.slice(),
+                label = `${bits}-bit spp ${spp} planar ${planar} compression ${compression} ${JSON.stringify(layout)} little ${little}`,
+                decoded = parseTIFF(file);
+              assert.equal(decoded.format, 'rgba32float', label);
+              const want = [];
+              for (let p = 0; p < width * height; p++)
+                for (let c = 0; c < 4; c++)
+                  want.push(c === 3 ? 1 : Math.fround(exact(bits, samples[p * spp + (spp === 3 ? c : 0)])));
+              assert.deepEqual([...decoded.data], want, label);
+              assert.deepEqual(file, copy, `${label}: the caller's bytes are not changed`);
+              const page = openTIFF(file).read(0);
+              assert.deepEqual(
+                [...page.samples],
+                samples.map((v) => exact(bits, v)),
+                label,
+              );
+            }
 });

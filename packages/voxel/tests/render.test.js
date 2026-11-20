@@ -99,8 +99,7 @@ function fakeDevice() {
 function setup(options = {}, { textures = new BlockTextures(), blocks = defaultBlocks(), limits } = {}) {
   const device = fakeDevice();
   Object.assign(device.limits, limits);
-  const
-    graph = new FrameGraph(),
+  const graph = new FrameGraph(),
     plugins = new Map(),
     errors = [],
     engine = {
@@ -179,11 +178,11 @@ async function settle(frame, done, label = 'renderer') {
     await new Promise((resolve) => setTimeout(resolve, 2));
   }
 }
-// The buffers the renderer binds now: from its newest beauty bind group (the 240-byte frame uniform at binding 0; not
+// The buffers the renderer binds now: from its newest beauty bind group (the 288-byte frame uniform at binding 0; not
 // a lighting group 1 or a shadow group), and the newest live indirect buffer.
 function bound(device) {
   const entries = device.groups.findLast(
-      (g) => g.entries.length >= 7 && g.entries[0]?.resource.buffer?.size === 240,
+      (g) => g.entries.length >= 7 && g.entries[0]?.resource.buffer?.size === 288,
     ).entries,
     buffer = (i) => entries[i].resource.buffer;
   return {
@@ -267,54 +266,58 @@ test('pages: first fit, freed holes reused, in-place remesh, data and page table
 for (const [name, options, limits] of [
   ['maxQuadBytes', { maxQuadBytes: 8000 * 768 }, {}],
   // No maxQuadBytes: the pool may grow to the device's storage binding (here 8,000 pages and a byte; maxBufferSize larger).
-  ['the default, the device binding limit', {}, { maxStorageBufferBindingSize: 8000 * 768 + 1, maxBufferSize: 1 << 30 }],
+  [
+    'the default, the device binding limit',
+    {},
+    { maxStorageBufferBindingSize: 8000 * 768 + 1, maxBufferSize: 1 << 30 },
+  ],
 ])
-test(`pool grows to ${name} keeping its pages, then a mesh that does not fit waits for freed pages, poolFull says so`, async () => {
-  const pages = 8000,
-    { world, renderer, frame, device, STONE } = setup(options, { limits });
-  try {
-    const checkerboard = () => {
-      const chunk = new VoxelChunk();
-      for (let i = 0; i < 32768; i++)
-        if (((i & 31) + ((i >> 5) & 31) + (i >> 10)) % 2 === 0) chunk.set(i & 31, i >> 10, (i >> 5) & 31, STONE);
-      return chunk;
-    };
-    for (let i = 0; i < 5; i++) world.addChunk(i * 2, 0, 0, checkerboard()); // 98,304 quads (1,536 pages) each
-    await settle(frame, () => renderer.stats.chunks === 5);
-    const { pool } = bound(device),
-      pools = device.buffers.filter((b) => b.size % 768 === 0 && b.usage & 128 && b.size >= 5461 * 768);
-    assert.equal(pool.size, pages * 768, 'grown to the limit');
-    assert.deepEqual(
-      pools.map((b) => [b.size, b.destroyed]),
-      [
-        [5461 * 768, true],
-        [pages * 768, false],
-      ],
-    );
-    for (const [key, r] of residents(device)) {
-      const mesh = meshChunk(meshInput(world, key));
+  test(`pool grows to ${name} keeping its pages, then a mesh that does not fit waits for freed pages, poolFull says so`, async () => {
+    const pages = 8000,
+      { world, renderer, frame, device, STONE } = setup(options, { limits });
+    try {
+      const checkerboard = () => {
+        const chunk = new VoxelChunk();
+        for (let i = 0; i < 32768; i++)
+          if (((i & 31) + ((i >> 5) & 31) + (i >> 10)) % 2 === 0) chunk.set(i & 31, i >> 10, (i >> 5) & 31, STONE);
+        return chunk;
+      };
+      for (let i = 0; i < 5; i++) world.addChunk(i * 2, 0, 0, checkerboard()); // 98,304 quads (1,536 pages) each
+      await settle(frame, () => renderer.stats.chunks === 5);
+      const { pool } = bound(device),
+        pools = device.buffers.filter((b) => b.size % 768 === 0 && b.usage & 128 && b.size >= 5461 * 768);
+      assert.equal(pool.size, pages * 768, 'grown to the limit');
       assert.deepEqual(
-        new Uint32Array(pool.data, r.start * 768, mesh.opaque.length),
-        mesh.opaque,
-        `${key} after the copy`,
+        pools.map((b) => [b.size, b.destroyed]),
+        [
+          [5461 * 768, true],
+          [pages * 768, false],
+        ],
       );
+      for (const [key, r] of residents(device)) {
+        const mesh = meshChunk(meshInput(world, key));
+        assert.deepEqual(
+          new Uint32Array(pool.data, r.start * 768, mesh.opaque.length),
+          mesh.opaque,
+          `${key} after the copy`,
+        );
+      }
+      world.addChunk(20, 0, 0, checkerboard()); // 7,680 of 8,000 pages are used
+      for (let i = 0; i < 50; i++) {
+        frame();
+        await new Promise((resolve) => setTimeout(resolve, 2));
+      }
+      assert.equal(renderer.stats.chunks, 5, 'the sixth mesh waits');
+      assert.equal(renderer.stats.poolFull, true, 'and the stats say why');
+      assert.ok(renderer.stats.pending > 0);
+      world.removeChunk(2, 0, 0);
+      await settle(frame, () => residents(device).has('20,0,0'));
+      assert.equal(renderer.stats.chunks, 5);
+      assert.equal(renderer.stats.poolFull, false);
+    } finally {
+      renderer.dispose();
     }
-    world.addChunk(20, 0, 0, checkerboard()); // 7,680 of 8,000 pages are used
-    for (let i = 0; i < 50; i++) {
-      frame();
-      await new Promise((resolve) => setTimeout(resolve, 2));
-    }
-    assert.equal(renderer.stats.chunks, 5, 'the sixth mesh waits');
-    assert.equal(renderer.stats.poolFull, true, 'and the stats say why');
-    assert.ok(renderer.stats.pending > 0);
-    world.removeChunk(2, 0, 0);
-    await settle(frame, () => residents(device).has('20,0,0'));
-    assert.equal(renderer.stats.chunks, 5);
-    assert.equal(renderer.stats.poolFull, false);
-  } finally {
-    renderer.dispose();
-  }
-});
+  });
 
 test('frustum cull per chunk sets instance counts; the bundle draws each chunk layer and re-records only on residency changes', async () => {
   const { world, renderer, frame, device, camera, passes, engine, STONE, LEAVES, GLASS } = setup();
@@ -422,7 +425,7 @@ test('chunks draw in position order, whatever order their meshes arrive in', asy
   assert.deepEqual(backward, forward);
 });
 
-test('translucent chunks draw back to front; near ones re-sort after the camera moves 4 blocks', async () => {
+test('translucent chunks draw back to front by grid distance; a chunk re-sorts when the eye cell changes against it', async () => {
   const { world, renderer, frame, device, camera, passes, GLASS } = setup();
   try {
     for (const [cx, cz] of [
@@ -444,7 +447,9 @@ test('translucent chunks draw back to front; near ones re-sort after the camera 
           return chunkKey(origins[slot * 4] / 32, origins[slot * 4 + 1] / 32, origins[slot * 4 + 2] / 32);
         });
     };
+    // Chunks by descending grid distance from the eye's chunk (along any ray it rises), then centre distance.
     const eye = camera.position,
+      grid = (key) => key.split(',').reduce((sum, c, axis) => sum + Math.abs(+c - Math.floor(eye[axis] / 32)), 0),
       d = (key) => {
         const [cx, cy, cz] = key.split(',').map(Number);
         return Math.hypot(cx * 32 + 16 - eye[0], cy * 32 + 16 - eye[1], cz * 32 + 16 - eye[2]);
@@ -453,7 +458,7 @@ test('translucent chunks draw back to front; near ones re-sort after the camera 
     assert.equal(drawn.length, 4);
     assert.deepEqual(
       drawn,
-      [...drawn].sort((a, b) => d(b) - d(a)),
+      [...drawn].sort((a, b) => grid(b) - grid(a) || d(b) - d(a)),
       'farthest first',
     );
     // Quads inside chunk 0,0,0 as the mesher sorted them for the old eye, then re-sorted on the CPU for the new one.
@@ -473,13 +478,16 @@ test('translucent chunks draw back to front; near ones re-sort after the camera 
     camera.target = [6, 3, 40];
     frame();
     frame();
-    // The renderer sorts its copy again (stable: equal distances keep the previous order).
+    // The eye's cell changed against the chunk: the renderer sorts its copy again (stable: equal keys keep the order).
     const resorted = [...sortQuads(sortQuads(mesh.slice(), [16, 16, -40]), [6, 3, -3])];
     assert.deepEqual(words(), resorted);
     assert.notDeepEqual(resorted, [...sortQuads(mesh.slice(), [16, 16, -40])], 'the order depends on the eye');
-    camera.position = [8, 3, -3]; // 2 blocks: no re-sort
+    camera.position = [6.9, 3.9, -3.9]; // the same cell: no re-sort
     frame();
     assert.deepEqual(words(), resorted);
+    camera.position = [7.5, 3, -3]; // one cell along x, inside the chunk's span: sorted again
+    frame();
+    assert.deepEqual(words(), [...sortQuads(Uint32Array.from(resorted), [7.5, 3, -3])]);
   } finally {
     renderer.dispose();
   }
@@ -641,6 +649,14 @@ test('BlockTextures: rgba8unorm-srgb array with every mip, linear box filter, al
     },
     tiles = BlockTextures.fromAtlas(atlas, { size: 16 });
   assert.equal(tiles.layers, 2);
+  // An atlas past the array's 2,048 layers names that limit (it once said 256).
+  assert.throws(
+    () => BlockTextures.fromAtlas({ width: 4096, height: 1, data: new Uint8Array(4096 * 4) }, { size: 1 }),
+    {
+      name: 'RangeError',
+      message: /holds 4096 tiles of 1 texels; it needs 1 to 2,048 tiles/,
+    },
+  );
   assert.throws(() => new BlockTextures({ size: 12 }), RangeError);
   assert.throws(
     () => new BlockTextures({ images: [{ width: 8, height: 8, data: new Uint8Array(256) }], size: 16 }),
@@ -666,6 +682,33 @@ test('BlockTextures: rgba8unorm-srgb array with every mip, linear box filter, al
     () => textures.set(0, stripes),
     (e) => e.name === 'MargoError' && e.code === 'disposed',
   );
+});
+
+test('BlockTextures: the last renderer drawing with them frees the GPU texture; the next one makes it again', async () => {
+  const textures = new BlockTextures(),
+    { device, engine, world, renderer, frame } = setup({}, { textures });
+  const second = VoxelRenderer.attach(engine, { world, textures, workers: 1 });
+  try {
+    frame();
+    assert.equal(device.textures.length, 1, 'one GPU texture for both renderers');
+    renderer.dispose();
+    assert.ok(!device.textures[0].destroyed, 'kept while the other renderer draws with it');
+    second.dispose();
+    assert.ok(device.textures[0].destroyed, 'freed with the last renderer: nothing left on the device');
+    const third = VoxelRenderer.attach(engine, { world, textures, workers: 1 });
+    try {
+      frame();
+      assert.equal(device.textures.length, 2, 'made again from the kept pixels');
+      assert.ok(!device.textures[1].destroyed);
+    } finally {
+      third.dispose();
+    }
+    assert.ok(device.textures[1].destroyed);
+  } finally {
+    renderer.dispose();
+    second.dispose();
+    textures.dispose();
+  }
 });
 
 test('BlockTextures rejects layers above the device limit before allocating or uploading an invalid texture', () => {
@@ -1159,6 +1202,157 @@ test('blockLightColor: live in the frame uniform, validated', async () => {
   }
 });
 
+test('clock: after a day of play the frame uniform holds the time within 256 s, whole periods and float64 phases', async () => {
+  const { world, renderer, frame, device, context, STONE } = setup();
+  try {
+    world.setBlock(3, 3, 3, STONE);
+    await settle(frame, () => renderer.stats.chunks === 1 && device.groups.length > 0);
+    const before = bound(device).frame[60] + 256 * new Uint32Array(bound(device).frame.buffer)[61];
+    context.delta = 1e6 + 300.25;
+    // The engine's frame update moves the clock (advanceTime) before the passes draw.
+    renderer.onPreUpdate(context.delta);
+    frame();
+    context.delta = 0;
+    const f = bound(device).frame,
+      t = before + 1e6 + 300.25,
+      tau = 2 * Math.PI,
+      wrap = (v) => Math.fround(v - Math.floor(v / tau) * tau);
+    // A float32 time of 1e6 s steps by 0.0625 s; the fields keep it to the float32 step of a value below 256.
+    assert.equal(new Uint32Array(f.buffer)[61], Math.floor(t / 256));
+    assert.equal(f[60], Math.fround(t - Math.floor(t / 256) * 256));
+    assert.equal(f[62], wrap(t * 1.6));
+    assert.deepEqual([...f.subarray(64, 67)], [wrap(t * 1.7), wrap(t * 1.3), wrap(t * 2.9)]);
+    // The shader's animation frame ((periods % n) * (rate % n) % n + floor(t.x * rate / 256)) % n, in float32 and
+    // u32 as the GPU does it, equals floor(t * rate / 256) % n of the float64 time.
+    for (let k = 0; k < 400; k++) {
+      const time = 1e6 + k * 37.3 + 0.11,
+        periods = Math.floor(time / 256),
+        lo = Math.fround(time - periods * 256),
+        rate = [1, 7, 256, 1000, 65535][k % 5],
+        n = [1, 2, 5, 16, 2048][k % 5 === 0 ? 4 : (k >> 2) % 5],
+        gpu = ((((periods % n) * (rate % n)) % n) + Math.floor(Math.fround(Math.fround(lo * rate) / 256))) % n;
+      assert.equal(gpu, Math.floor(((periods * 256 + lo) * rate) / 256) % n, `time ${time} rate ${rate} frames ${n}`);
+    }
+  } finally {
+    renderer.dispose();
+  }
+});
+
+// Resident chunk origins as the GPU reads them, sorted (slot order follows the workers).
+function chunkOrigins(device) {
+  const o = bound(device).origins;
+  return [...residents(device).values()].map(({ slot }) => [...o.subarray(slot * 4, slot * 4 + 3)]).sort();
+}
+
+test('origin: a world 2^24 blocks out, drawn with its origin there, writes the same GPU data as near zero', async () => {
+  const S = 2 ** 24,
+    place = (world, at, { STONE, GLASS }) => {
+      for (const [x, y, z, block] of [
+        [3, 3, 3, STONE],
+        [5, 3, 3, GLASS],
+        [6, 3, 4, GLASS],
+        [7, 4, 3, GLASS],
+      ])
+        world.setBlock(x + at[0], y + at[1], z + at[2], block);
+    },
+    near = setup(),
+    far = setup({ origin: { origin: [S, 2048, -S] } });
+  try {
+    place(near.world, [0, 0, 0], near);
+    place(far.world, [S, 2048, -S], far);
+    for (const h of [near, far])
+      await settle(h.frame, () => h.renderer.stats.chunks === 1 && h.device.groups.length > 0);
+    near.frame();
+    far.frame();
+    const a = bound(near.device),
+      b = bound(far.device),
+      tau = 2 * Math.PI,
+      wrap = (v) => Math.fround(v - Math.floor(v / tau) * tau);
+    assert.deepEqual(chunkOrigins(far.device), chunkOrigins(near.device), 'chunk origins in the integer frame');
+    assert.deepEqual([...b.frame.subarray(0, 64)], [...a.frame.subarray(0, 64)], 'camera, inverse, eye, lights, clock');
+    assert.deepEqual([...b.frame.subarray(68, 72)], [0, 0, 0, 0], 'an origin on the 1,024-cell grid leaves no shift');
+    // The ripple phases carry the base's place in each wave (dot(base.xz, k), float64).
+    assert.deepEqual(
+      [...b.frame.subarray(64, 67)],
+      [wrap(S * 1.3 - S * 0.4), wrap(-S * 0.5 - S * 1.6), wrap(S * 2.9 - S * 2.3)],
+    );
+    // The translucent quads sort from the eye in world cells: the same order, so the same pool bytes.
+    assert.deepEqual(new Uint8Array(b.pool.data), new Uint8Array(a.pool.data));
+    assert.equal(far.renderer.stats.draws, near.renderer.stats.draws);
+  } finally {
+    near.renderer.dispose();
+    far.renderer.dispose();
+  }
+});
+
+test('origin: a fractional origin far out keeps chunk origins small integers and maps world cells to engine space', async () => {
+  const S = 2 ** 24,
+    origin = [S + 700.37, 0.5, -S - 300.9],
+    h = setup({ origin: { origin } });
+  try {
+    // Blocks beside the camera's engine position (16, 16, -40) are at world cell floor(local + origin).
+    const cells = [
+      [16, 10, -20],
+      [40, 10, -20],
+      [16, 10, 20],
+    ].map((l) => l.map((v, a) => Math.floor(v + origin[a])));
+    for (const [x, y, z] of cells) h.world.setBlock(x, y, z, h.STONE);
+    await settle(h.frame, () => h.renderer.stats.chunks === 3 && h.device.groups.length > 0);
+    h.frame();
+    const f = bound(h.device).frame,
+      base = origin.map((v) => Math.round(v / 1024) * 1024);
+    for (const o of chunkOrigins(h.device))
+      for (const v of o) assert.ok(Number.isInteger(v) && Math.abs(v) < 1600, `chunk origin ${o} in the integer frame`);
+    assert.deepEqual(
+      [...f.subarray(68, 71)],
+      origin.map((v, a) => Math.fround(v - base[a])),
+    );
+    // The frame's camera takes a world cell minus the base to the clip position the engine camera gives the world
+    // cell minus the origin; its inverse takes it back.
+    const m = h.camera.matrix,
+      mul = (e, p) => [0, 1, 2, 3].map((r) => e[r] * p[0] + e[4 + r] * p[1] + e[8 + r] * p[2] + e[12 + r]);
+    for (const cell of cells) {
+      const want = mul(
+          m,
+          cell.map((v, a) => v - origin[a]),
+        ),
+        got = mul(
+          f.subarray(0, 16),
+          cell.map((v, a) => v - base[a]),
+        ),
+        back = mul(
+          f.subarray(16, 32),
+          got.map((v) => v / got[3]),
+        );
+      for (let r = 0; r < 4; r++)
+        assert.ok(Math.abs(got[r] - want[r]) <= 2e-4 * Math.abs(want[3]), `clip ${got} ${want}`);
+      for (let a = 0; a < 3; a++)
+        assert.ok(Math.abs(back[a] / back[3] - (cell[a] - base[a])) < 2e-3, `inverse ${back} ${cell} ${base}`);
+    }
+    // The eye stays in engine cells; the origin moving by a whole 1,024 cells rewrites the table, not the frame.
+    assert.deepEqual([...f.subarray(32, 35)], [16, 16, -40]);
+    const before = chunkOrigins(h.device);
+    origin[0] += 1024;
+    h.frame();
+    assert.deepEqual(
+      chunkOrigins(h.device),
+      before.map(([x, y, z]) => [x - 1024, y, z]),
+    );
+  } finally {
+    h.renderer.dispose();
+  }
+});
+
+test('origin: invalid values are refused', () => {
+  assert.throws(() => setup({ origin: 5 }), /origin must be null or an object with origin/);
+  const h = setup({ origin: { origin: [Number.NaN, 0, 0] } });
+  try {
+    assert.throws(() => h.frame(), /origin\[0\] NaN is not a finite number/);
+  } finally {
+    h.renderer.dispose();
+  }
+});
+
 test('post replay: shared capture lifecycle and opaque/cutout native quad material outputs', async () => {
   const h = setup();
   const { renderer, world, STONE, LEAVES, GLASS, frame, context, passes } = h;
@@ -1234,28 +1428,32 @@ test('post replay: shared capture lifecycle and opaque/cutout native quad materi
   }
 });
 
-// Bevel: a stone cube is 6 panels of 2 triangles plus 4 strips of 2 triangles per face.
-const CUBE_TRIANGLES = 60;
-const isBevel = (pipeline) => pipeline.vertex.buffers?.length === 1;
+// Bevel: a stone cube is 6 panels of 2 triangles, 12 edge strips of 2 halves of 2 triangles, and 8 corners of 3 panel
+// corners and 3 strip middles fanned from their centre (6 triangles each).
+const CUBE_TRIANGLES = 108;
+const isBevel = (pipeline) => pipeline.vertex.buffers?.length > 0;
 // Every primitive the passes drew, in order, with its chunk and its centre's squared distance from `eye`: bevel
 // triangles from the bound vertex and index buffers, quads from the bound pool and page table.
 function drawOrder(passes, device, eye) {
   const { pool, pageTable, origins } = bound(device),
     words = new Uint32Array(pool.data),
     out = [];
-  let pipeline, vertices, indices;
+  let pipeline, vertices, indices, at;
   for (const p of passes)
     for (const command of p.commands) {
       const [name] = command;
       if (name === 'setPipeline') pipeline = command[1];
-      else if (name === 'setVertexBuffer') vertices = new Float32Array(command[2].data);
+      else if (name === 'setVertexBuffer' && command[1] === 0) vertices = new Float32Array(command[2].data);
+      // The second vertex buffer is the chunk's origin in the origins table.
+      else if (name === 'setVertexBuffer')
+        at = [...new Float32Array(command[2].data).subarray(command[3] / 4, command[3] / 4 + 3)];
       else if (name === 'setIndexBuffer') indices = new Uint32Array(command[1].data);
       else if (name === 'drawIndexed') {
         const [, count, , first = 0, base = 0] = command;
         if (isBevel(pipeline))
           for (let i = first; i < first + count; i += 3) {
             const c = [0, 1, 2].map(
-              (a) => [0, 1, 2].reduce((sum, k) => sum + vertices[indices[i + k] * 12 + a], 0) / 3,
+              (a) => [0, 1, 2].reduce((sum, k) => sum + vertices[indices[i + k] * 12 + a], 0) / 3 + at[a],
             );
             out.push({ kind: 'triangle', chunk: c.map((x) => Math.floor(x / 32)).join(), c });
           }
@@ -1300,7 +1498,8 @@ test('bevel: cube faces become chamfer triangles; lowered liquids and crosses st
     assert.equal(kept.length, 8);
     assert.ok(kept.some((q) => q.face >= 6));
     assert.ok(kept.filter((q) => q.face < 6).every((q) => q.x === 8 && (q.face === 3 || q.liquidDrop === 3)));
-    const vertices = device.buffers.filter((b) => b.usage & 32 && !b.destroyed);
+    // Vertex buffers that are not the origins table (a storage buffer read per instance by the bevel).
+    const vertices = device.buffers.filter((b) => b.usage & 32 && !(b.usage & 128) && !b.destroyed);
     assert.equal(vertices.length, 1, 'one interleaved vertex buffer');
     const data = new Float32Array(vertices[0].data);
     for (let v = 0; v < data.length; v += 12) {
@@ -1344,7 +1543,7 @@ test('bevel: glass triangles and liquid quads blend back to front together, re-s
     assert.ok(draws.some((d) => d.kind === 'triangle'));
     const index = device.buffers.find((b) => b.usage & 16 && b.size === CUBE_TRIANGLES * 12),
       sorts = writes.get(index);
-    camera.position = [1.5, 1.5, 9]; // under RESORT blocks: no new sort
+    camera.position = [1.2, 1.8, 10.7]; // the same eye cell: no new sort
     frame();
     assert.equal(writes.get(index), sorts);
     camera.position = [1.5, 1.5, -4];
@@ -1417,8 +1616,8 @@ test('bevel: translucent chunks draw back to front for each view', async () => {
         .filter((p) => p.descriptor.colorAttachments.length)
         .flatMap((p) =>
           p.commands
-            .filter(([name]) => name === 'setVertexBuffer')
-            .map(([, , buffer]) => Math.floor(new Float32Array(buffer.data)[2] / 32)),
+            .filter(([name, slot]) => name === 'setVertexBuffer' && slot === 1)
+            .map(([, , buffer, offset]) => new Float32Array(buffer.data)[offset / 4 + 2] / 32),
         );
     assert.deepEqual(chunks(), [0, 1], 'far chunk before near chunk from +z');
     camera.position = [1.5, 1.5, -4];
@@ -1530,6 +1729,71 @@ test('bevel: quads and triangles share one lit shader end; shaders and pipelines
   }
 });
 
+// KB-RESTORE-BORROWED1: a plain atlas belongs to the device that made it. After a restore the renderer binds nothing
+// of it, draws with live lighting, reports it once, and a new lightmap brings the baked light back; a function atlas
+// is made again for the new device with no report.
+test('lightmap atlas across a device restore: a plain one is dropped and reported once, a function one is remade', async () => {
+  const { renderer, device, frame, world, engine, context, STONE } = setup(),
+    errors = [];
+  engine.onError = (error) => errors.push(error);
+  const positions = [16, 16, 1, 17, 16, 1, 17, 17, 1, 16, 17, 1],
+    uv = [0, 0, 1, 0, 1, 1, 0, 1],
+    baked = (d) => d.groups.findLast((g) => g.entries.some((e) => e.binding === 8)),
+    restore = () => {
+      const fresh = fakeDevice();
+      engine.gpu = context.device = fresh;
+      renderer.onDeviceRestored(engine);
+      return fresh;
+    };
+  try {
+    const plain = device.createTexture({ format: 'rgba8unorm', width: 4, height: 4 });
+    renderer.lightmap = voxelLightmap({ texture: plain, positions, uv });
+    world.addChunk(0, 0, 0);
+    world.setBlock(16, 16, 0, blockState(STONE));
+    await settle(frame, () => baked(device));
+    assert.equal(baked(device).entries.find((e) => e.binding === 8).resource.texture, plain);
+    const fresh = restore();
+    await settle(frame, () => renderer.stats.chunks === 1 && fresh.groups.length > 0);
+    for (let i = 0; i < 3; i++) frame();
+    assert.equal(baked(fresh), undefined, 'nothing of the lost atlas is bound on the new device');
+    assert.ok(
+      fresh.groups.every((g) => g.entries.every((e) => e.resource?.texture !== plain)),
+      'the lost texture is never bound',
+    );
+    const lost = errors.filter((e) => /borrowed-lost/.test(e.message));
+    assert.equal(lost.length, 1, 'reported once');
+    assert.equal(lost[0].code, 'state');
+    assert.match(lost[0].message, /VoxelRenderer lightmap texture lost with the device/);
+    assert.equal(plain.destroyed, false, 'borrowed, never destroyed');
+    // A new lightmap on the new device brings the baked light back.
+    const again = fresh.createTexture({ format: 'rgba8unorm', width: 4, height: 4 });
+    renderer.lightmap = voxelLightmap({ texture: again, positions, uv });
+    await settle(frame, () => baked(fresh));
+    assert.equal(baked(fresh).entries.find((e) => e.binding === 8).resource.texture, again);
+    // The function form: called once per device, no report.
+    const made = [];
+    renderer.lightmap = voxelLightmap({
+      texture: (d) => {
+        const t = d.createTexture({ format: 'rgba8unorm', width: 4, height: 4 });
+        made.push(t);
+        return t;
+      },
+      positions,
+      uv,
+    });
+    await settle(frame, () => made.length === 1 && baked(fresh)?.entries.find((e) => e.binding === 8).resource.texture === made[0]);
+    for (let i = 0; i < 3; i++) frame();
+    assert.equal(made.length, 1, 'made once per device');
+    const third = restore();
+    await settle(frame, () => made.length === 2 && baked(third));
+    assert.equal(baked(third).entries.find((e) => e.binding === 8).resource.texture, made[1]);
+    assert.equal(made[1].destroyed, false);
+    assert.equal(errors.filter((e) => /borrowed-lost/.test(e.message)).length, 1, 'no report for the function form');
+  } finally {
+    renderer.dispose();
+  }
+});
+
 test('live lightmap binds a copied atlas mapping and can be cleared without owning its texture', async () => {
   const { renderer, device, frame, world, STONE } = setup();
   const texture = device.createTexture({ format: 'rgba8unorm', width: 4, height: 4 });
@@ -1548,7 +1812,7 @@ test('live lightmap binds a copied atlas mapping and can be cleared without owni
     renderer.lightmap = undefined;
     await settle(
       frame,
-      () => device.groups.findLast((g) => g.entries[0]?.resource.buffer?.size === 240)?.entries.length === 7,
+      () => device.groups.findLast((g) => g.entries[0]?.resource.buffer?.size === 288)?.entries.length === 7,
     );
     assert.equal(texture.destroyed, false);
     const quad = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0],
@@ -1642,4 +1906,51 @@ test('VoxelRenderer.dispose leaves the scene the renderer joined, never the acti
   engine.removePlugin = (name) => active.push(name);
   renderer.dispose();
   assert.deepEqual({ own, active }, { own: [renderer.name], active: [] });
+});
+
+test('BlockTextures.load closes the images it made when another URL fails', async () => {
+  let made = 0,
+    closed = 0;
+  const saved = globalThis.createImageBitmap;
+  globalThis.createImageBitmap = async () => {
+    made++;
+    return { width: 1, height: 1, close: () => closed++ };
+  };
+  try {
+    const fetch = async (url) =>
+      url === 'bad.png'
+        ? { ok: false, status: 404 }
+        : { ok: true, blob: async () => new Promise((done) => setTimeout(() => done(new Blob()), 5)) };
+    await assert.rejects(BlockTextures.load(['a.png', 'bad.png'], { fetch }), { code: 'failed' });
+    assert.equal(made, 1);
+    assert.equal(closed, 1, 'the bitmap of a.png is closed, not leaked');
+  } finally {
+    globalThis.createImageBitmap = saved;
+  }
+});
+
+// GAP-FILM-TIME: the renderer's clock (water waves, voxel motion) moves in the frame update, not in the prepare pass, so
+// a seek from @margoengine/cutscene/seek, which runs no pass, replays it: run A takes n + 1 updates, run B replays n
+// steps with advanceTime, then takes one update; the clocks are equal, and drawing does not move it.
+test('the voxel renderer clock replayed equals a continuous run, and a draw does not move it', () => {
+  for (const n of [1, 600, 54000]) {
+    const a = setup(),
+      b = setup();
+    try {
+      assert.equal(b.renderer.time, 0, 'a fresh VoxelRenderer starts at 0');
+      for (let step = 0; step <= n; step++) a.renderer.onPreUpdate(1 / 60);
+      for (let step = 0; step < n; step++) b.renderer.advanceTime(1 / 60);
+      b.renderer.onPreUpdate(1 / 60);
+      assert.ok(Object.is(b.renderer.time, a.renderer.time));
+      if (n === 1) {
+        const before = a.renderer.time;
+        a.context.delta = 0.5;
+        a.frame();
+        assert.equal(a.renderer.time, before, 'the prepare pass reads the clock and leaves it');
+      }
+    } finally {
+      a.renderer.dispose();
+      b.renderer.dispose();
+    }
+  }
 });

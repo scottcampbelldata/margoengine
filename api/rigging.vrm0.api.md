@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Vec3 } from "@margoengine/core";
-import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFLoadOptions, PBRModel } from "@margoengine/gltf/pbr";
 
 export interface VRM0Conversion {
     document: VRMDocument;
@@ -148,7 +148,7 @@ interface VRMAvatar {
     firstPerson?: {
         meshAnnotations?: {
             node: number;
-            type: string;
+            type: 'auto' | 'both' | 'thirdPersonOnly' | 'firstPersonOnly';
         }[];
         [field: string]: unknown;
     };

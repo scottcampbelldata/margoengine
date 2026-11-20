@@ -7,6 +7,7 @@ import { build, preview } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 import { reference, islandGrid } from './caves-reference.js';
+import { compatBuild, compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
 const fixture = new URL('./fixtures/caves/', import.meta.url),
   ref = JSON.parse(await readFile(new URL('reference.json', fixture))),
@@ -32,7 +33,7 @@ try {
     base: '/caves/',
     configFile: false,
     logLevel: 'error',
-    build: { outDir: join(dir, 'dist') },
+    build: { outDir: join(dir, 'dist'), ...compatBuild(join(dir, 'index.html')) },
   });
   server = await preview({
     root: dir,
@@ -46,6 +47,8 @@ try {
   const page = await browser.newPage(),
     errors = [],
     requests = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim, '/caves/compat.js');
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('request', (r) => {
     if (/\.wasm(?:\?|$)/.test(r.url())) requests.push(r.url());

@@ -1,4 +1,4 @@
-import { PBRModel } from '@margoengine/gltf-pro/model';
+import { PBRModel } from '@margoengine/gltf/pbr-model';
 import { createKeyframeClip, sampleKeyframes, type KeyframeClip, type KeyframeTrackData } from './keyframes.js';
 import { Skeleton, type BonePose } from './skin.js';
 import { normalizeQuaternion } from '@margoengine/math/quat';
@@ -7,7 +7,7 @@ const rotation = [0, 0, 0, 0]; // normalizeQuaternion scratch
 
 /**
  * A bone hierarchy and its rest pose, as {@link Retarget} reads it. Make one with {@link retargetRig} from a
- * `Skeleton` (bones) or a glTF-pro model (every node, so armature and mesh nodes count toward bone orientations).
+ * `Skeleton` (bones) or a glTF PBR model (every node, so armature and mesh nodes count toward bone orientations).
  */
 export interface RetargetRig {
   /** Bone names; a bone's index is its position here (a model's node index). */
@@ -32,7 +32,7 @@ export interface RetargetOptions {
    */
   hipScale?: number;
 }
-/** A glTF-pro model's player, such as an `Animation`, whose clip {@link Retarget.clip} can sample. */
+/** A glTF PBR model's player, such as an `Animation`, whose clip {@link Retarget.clip} can sample. */
 export interface RetargetPlayer {
   readonly model: PBRModel;
   readonly clips: readonly { readonly name: string; readonly duration: number }[];
@@ -182,7 +182,7 @@ function read(from: Skeleton | PBRModel, count: number, label: string, out: Floa
     }
     return;
   }
-  if (!(from instanceof PBRModel)) throw new TypeError(`Retarget ${label} must be a Skeleton or a glTF-pro model`);
+  if (!(from instanceof PBRModel)) throw new TypeError(`Retarget ${label} must be a Skeleton or a glTF PBR model`);
   if (from.nodes.length !== count)
     throw new RangeError(`Retarget ${label} has ${from.nodes.length} nodes but its rig ${count}; use its own rig`);
   const t = from.root.engine.store.transforms;
@@ -203,7 +203,7 @@ function read(from: Skeleton | PBRModel, count: number, label: string, out: Floa
 }
 
 /**
- * The bones and current local pose of a `Skeleton`, or of every node of a glTF-pro model (names, parents and the
+ * The bones and current local pose of a `Skeleton`, or of every node of a glTF PBR model (names, parents and the
  * nodes' local transforms), as a {@link RetargetRig}. The current pose becomes the rig's rest pose, the reference both
  * rigs are compared in, so pose both characters the same way (both in T-pose, say) before making their rigs.
  */
@@ -213,7 +213,7 @@ export function retargetRig(from: Skeleton | PBRModel): RetargetRig {
     read(from, from.count, 'skeleton', rest);
     return { names: from.names, parents: from.parents, rest };
   }
-  if (!(from instanceof PBRModel)) throw new TypeError('retargetRig needs a Skeleton or a glTF-pro model');
+  if (!(from instanceof PBRModel)) throw new TypeError('retargetRig needs a Skeleton or a glTF PBR model');
   const ids = new Map(from.nodes.map((node, i) => [node.id, i])),
     parents = from.root.engine.store.parents,
     rest = new Float64Array(from.nodes.length * 10);
@@ -394,7 +394,7 @@ export class Retarget {
         if (this.map[b] >= 0 || b === this.hip) target.setPose(b, this.poses[b]);
       return;
     }
-    if (!(target instanceof PBRModel)) throw new TypeError('Retarget target must be a Skeleton or a glTF-pro model');
+    if (!(target instanceof PBRModel)) throw new TypeError('Retarget target must be a Skeleton or a glTF PBR model');
     if (target.nodes.length !== this.target.names.length)
       throw new RangeError(
         `Retarget target has ${target.nodes.length} nodes but its rig has ${this.target.names.length}; pass a model with the rig's node count`,

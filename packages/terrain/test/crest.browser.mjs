@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/crest.browser.mjs
 // TerrainLayer.bump on edge-on crest slivers (crest.html). With bump 1 on every layer, biome shot 05 (alpine mountains)
 // drew dotted lines of near-black pixels along its crests. Derivative bump mapping (Mikkelsen 2010) solves for the

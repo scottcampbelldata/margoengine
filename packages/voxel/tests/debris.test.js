@@ -266,3 +266,54 @@ test('options are checked and every message says how to fix it', () => {
   assert.equal(debris.maxCells, 4096);
   assert.equal(debris.maxPieces, 64);
 });
+
+test('origin: a piece 2^24 blocks out, under its origin, gets the same meshes in the same place as near zero', async () => {
+  const { Engine, TransformStore } = await import('../../core/dist/extension.js'),
+    engine = new Engine(
+      { width: 32, height: 32 },
+      await TransformStore.create(64),
+      { backend: 'webgl2', add() {}, remove() {}, dispose() {}, render() {} },
+      { position: [0, 0, 4], target: [0, 0, 0] },
+    ),
+    S = 2 ** 24,
+    // The scene's floor, pillar and beam, moved by (dx, dy, dz) blocks.
+    moved = (dx, dy, dz) => {
+      const world = new VoxelWorld({ blocks });
+      world.addChunk(dx / 32, dy / 32, dz / 32);
+      fill(world, dx, dx + 32, dy, dy + 1, dz, dz + 32, stone);
+      fill(world, dx + 10, dx + 11, dy + 1, dy + 5, dz + 10, dz + 11, wood);
+      fill(world, dx + 10, dx + 16, dy + 5, dy + 6, dz + 10, dz + 11, wood);
+      return world;
+    },
+    cut = (debris, dx, dy, dz) => {
+      debris.world.setBlock(dx + 10, dy + 2, dz + 10, 0);
+      return debris.update();
+    },
+    near = new VoxelDebris(moved(0, 0, 0), { engine }),
+    far = new VoxelDebris(moved(S, 2048, -S), { engine, origin: { origin: [S, 2048, -S] } }),
+    [a] = cut(near, 0, 0, 0),
+    [b] = cut(far, S, 2048, -S),
+    xyz = (m) => [m.position.x, m.position.y, m.position.z];
+  assert.deepEqual(b.center, [a.center[0] + S, a.center[1] + 2048, a.center[2] - S], 'center stays in world blocks');
+  assert.equal(b.meshes.length, a.meshes.length);
+  assert.deepEqual(xyz(b.meshes[0]), xyz(a.meshes[0]));
+  assert.deepEqual([...b.meshes[0].geometry.vertices], [...a.meshes[0].geometry.vertices]);
+  // In place and live: a moved origin moves every piece to its centre minus the new origin, in float64.
+  far.origin.origin[1] = 2048 - 0.75;
+  far.update();
+  assert.deepEqual(xyz(b.meshes[0]), [a.center[0], a.center[1] + 0.75, a.center[2]].map(Math.fround));
+  far.origin = { origin: [Number.POSITIVE_INFINITY, 0, 0] };
+  assert.throws(() => far.update(), RangeError);
+  assert.throws(() => new VoxelDebris(moved(0, 0, 0), { origin: 5 }), TypeError);
+  // Physics simulates world coordinates: an origin with physics is refused, at construction and when set live.
+  const physics = Physics.attach(engine);
+  assert.throws(() => new VoxelDebris(moved(0, 0, 0), { physics, origin: { origin: [0, 0, 0] } }), {
+    code: 'unsupported',
+  });
+  const withPhysics = new VoxelDebris(moved(0, 0, 0), { physics });
+  withPhysics.origin = { origin: [1, 0, 0] };
+  assert.throws(() => withPhysics.update(), { code: 'unsupported' });
+  near.dispose();
+  far.dispose();
+  engine.dispose();
+});

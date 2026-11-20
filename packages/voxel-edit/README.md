@@ -26,6 +26,9 @@ engine.dispose();
 all return an owned `VoxelGrid` directly; read
 `history.label` for the current operation's name. Every returned grid is an owned
 copy. Navigation at either endpoint returns the current grid.
+With `maxBytes`, a push that would retain more bytes drops the oldest steps until it fits (the redo branch goes
+first), the way GIMP's "Maximum undo memory" works; the new step always stays, so one step larger than the whole
+budget is kept as the only step and `history.bytes` is over `maxBytes` only then.
 
 ```ts
 import { VoxelHistory } from '@margoengine/voxel-edit/history';
@@ -56,7 +59,7 @@ const baseUsed = new Uint8Array(256), toolUsed = new Uint8Array(256);
 const { paletteMap } = mergePalettes({ baseKeys, toolKeys, baseUsed, toolUsed });
 const merged = combineGrids(grid, prop, { operation: 'union', offset: [4, 0, 4], paletteMap });
 
-const ray = pickRay(engine.camera.matrix, ndcX, ndcY); // then into the model's cells with its inverse matrix
+const ray = pickRay(engine.camera.matrix, ndcX, ndcY, { backend: engine.backend }); // then into the model's cells
 const hit = ray && raycastGrid(merged.grid, ray); // {cell, adjacent, normal, value, distance}
 const { mesh } = meshGrid(merged.grid, { ambientOcclusion: true, pivot: [16, 0, 16] });
 ```
@@ -89,23 +92,25 @@ corner coordinates.
 
 | Entry | Holds |
 | --- | --- |
-| `./edit` | brush footprints `lineCells`, `boxCells`, `sphereCells`; selections `floodCells` (same index), `connectedCells` (any filled), `faceCells` (an exposed layer), returned as cell indexes in a `Float64Array`; `mirrorCells` expands brush samples through XYZ mirrors (a centre-plane cell once) and `stampCells` writes them as one fill, paint or erase edit; `pasteCells` pastes clip cells with exact palette identities, the selection and an explicit `'overflow'` result when the palette is full; rasterizers `ellipsoidCells`, `cylinderCells`, `ringCells`, `thickLineCells` (cube per step, `'ceil'` or `'span'` step rule) and `taperedLineCells` (spheres of changing radius) give the cell indexes of a grid with exact centre, radius and thickness rules, refusing or clipping cells outside |
-| `./pick` | `pickRay` (pointer ray from the camera matrix, reverse depth), `raycastGrid` (first filled cell, the face and the cell in front of it), `groundCell` |
+| `./edit` | brush footprints `lineCells`, `boxCells`, `sphereCells`; selections `floodCells` (same index), `connectedCells` (any filled), `faceCells` (an exposed layer), returned as cell indexes in a `Float64Array`; `mirrorCells` expands brush samples through XYZ mirrors (a centre-plane cell once) and `stampCells` writes them as one fill, paint or erase edit; `pasteCells` pastes clip cells with exact palette identities (every identity match is taken before a new slot is handed out), the selection and an explicit `'overflow'` result when the palette is full; rasterizers `ellipsoidCells`, `cylinderCells`, `ringCells`, `thickLineCells` (cube per step, `'ceil'` or `'span'` step rule) and `taperedLineCells` (spheres of changing radius) give the cell indexes of a grid with exact centre, radius and thickness rules, refusing or clipping cells outside (a clipped stroke visits only cells inside the grid) |
+| `./pick` | `pickRay` (pointer ray from the camera matrix; pass `{ backend: engine.backend }` so a WebGL2 matrix's -1 to 1 depth is read the right way round, default WebGPU reverse depth), `raycastGrid` (first filled cell, the face and the cell in front of it), `groundCell` |
 | `./sparse` | `SparseGrid`: models far larger than memory holds densely (a 1,000,000-wide grid with two cells holds two chunks), stored as `@margoengine/voxel` chunks, edited by copy-on-write snapshots with `restore` undo; `editWindow` fills, erases, paints, dilates or erodes a box; `serialize` / `deserialize`; `snapshot` / `fromSnapshot` / `restoreSnapshots` and `deltaSnapshot` / `applyDeltaSnapshot` for workers (`snapshotBuffers` is the transfer list); `toWorld` writes into a `VoxelWorld` |
 | `./mesh` | `meshGrid`: greedy quads per palette index with optional corner ambient occlusion (Lysenko 2013 levels 0 to 3 as light 0.4 to 1.0, each unequal quad split along its darker diagonal) and crease-limited smooth normals; dense or sparse, chunk seams leave no inner faces; `partitionMesh` splits a mesh into one-palette parts of at most 250,000 quads (one million vertices, core `Geometry`'s limit), attributes copied; `chamferGrid` bevels the exposed faces by a width in cells into a triangle mesh with a palette index per triangle |
 | `./vox` | `gridFromVox` / `voxFromGrid` (MagicaVoxel's Z up to Y up and back; an unedited model is returned as it was) and scene-graph edits: layers, names, transform and shape keys, groups, instances, `moveVoxNode` (keeps world poses), `deleteVoxNode`; `resolveVoxScene` places every shape instance at a frame (held keys, visibility, names, layers, matrix) under an explicit centering, and `voxFrameRange` gives the key span; `voxTiles` splits a large dense or sparse grid into filled tiles of at most 256 cells per axis, each with its exact cell offset and no axis turned |
 | `./animation` | `packFrames` / `unpackFrames` (each distinct model stored once) and `localFrame` (a clip's clock: offset, speed, loop or hold) |
-| `./history` | `VoxelHistory`: undo/redo of copied grids with depth, per-grid cell and total byte budgets |
+| `./history` | `VoxelHistory`: undo/redo of copied grids with depth, per-grid cell and total byte budgets; a push past `maxBytes` drops the oldest steps (never the new one), and a single step larger than the whole budget is kept as the only step |
 | `./export` | `gridToExportSource`: meshes a grid into one primitive per palette material (corner AO as vertex colours), the `{nodes}` scene `exportGLB`, `exportUSDZ` and `exportOBJ` take |
 | `./formats` | voxel files other tools write: `parseQB` / `writeQB` and `parseQEF` / `writeQEF` (Qubicle), `parseGOX` / `writeGOX` (Goxel), `parseVXM` / `writeVXM` (VoxEdit), `parseBinvox`, `parseKVX` and `parseVXL`; models, palette, positions, with cell budgets |
 | `./smooth` | `smoothGrid`: a smooth Surface Nets mesh of a grid, with relaxation, optional blur and gradient normals, for `gridToExportSource` |
 | `./voxelize` | `voxelizeMesh`: a triangle mesh to a grid and palette, surface or solid, with vertex or texture colours and median cut; `AbortSignal` |
-| `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index) |
-| `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit and abort |
+| `./assist` | `noiseFill` (seeded random fill), `suggestPalette` (seeded hues, linear sRGB) and `paletteUsage` (cells per index, within `maxCells`) |
+| `./library` | `fetchLibrary` / `fetchAsset` / `resolveLibraryUrl`: list and fetch `.vox` packs from a JSON index, with a body size limit (reading stops at `maxBytes`, Content-Length or not) and abort; with no absolute base a relative index gives relative asset URLs |
 | `./shaders` | `ShaderBrush`: your own WGSL `fn brush(p, value)` run on the GPU for every selected cell, pass after pass, to grow, erode or generate; presets `brushes.grow`, `erode`, `noise`, `smooth`; `brushSource` |
-| `./rig` | `VoxelRig`: voxel parts on a skeleton, posed by bone rotations; part matrices for drawing and `bake` to one grid; `sampleRigClip`, `rigRotation`, `slerpRotation` |
-| `./gpu` | `GpuGrid`: a grid kept on the GPU for bulk edits on multi-million-cell models: `fill` (box, sphere), `combine` (union, intersect, subtract), `dilate`, `erode`, `smooth`, `remap`, `brush` (any `ShaderBrush`), then `read` once |
+| `./rig` | `VoxelRig`: voxel parts on a skeleton, posed by bone rotations (any bone name, `constructor` included: only the pose's own keys turn a bone); part matrices for drawing and `bake` to one grid; `sampleRigClip`, `rigRotation`, `slerpRotation` |
+| `./gpu` | `GpuGrid`: a grid kept on the GPU for bulk edits on multi-million-cell models: `fill` (box, sphere), `combine` (union, intersect, subtract), `dilate`, `erode`, `smooth`, `remap`, `brush` (any `ShaderBrush`, the same input checks as `ShaderBrush.run`), then `read` once; at most 16,777,216 cells per side |
 | `./collab` | `VoxelReplica`: shared editing, where edits from several users merge to the same cells in any order with no server; `encodeVoxelOp` / `decodeVoxelOp` for the network |
+| `./generate` | `heightmapToVoxels` (Grey8 or RGBA8 image to Y columns; `alphaThreshold` applies to RGBA only) and `textToVoxels` (a canvas font's mask extruded along z, cropped to the ink) |
+| `./select` | `screenSelection`, `rectangleSelection`, `lassoSelection` (even-odd) and `colorSelection`: filled cells whose centres project into a screen shape; pass `{ backend: engine.backend }` with a WebGL2 camera matrix (-1 to 1 depth) |
 
 Selections, picking and meshing take a dense or a sparse grid. Errors follow
 [docs/conventions.md](../../docs/conventions.md): `TypeError` and `RangeError` for arguments and budgets,
@@ -141,7 +146,7 @@ const text = writeQEF(models[0].grid, palette);
 | Qubicle `.qb` | `parseQB` | `writeQB` | every matrix with its name and position; RGBA or BGRA, RLE or plain, left or right handed; alpha 0 is air; a visibility mask counts as opaque |
 | Qubicle `.qef` | `parseQEF` | `writeQEF` | one model; text; mask 0 is hidden; no alpha |
 | `binvox` | `parseBinvox` | | one model of index 1 (version 2 files: the voxel values 1 to 255 as indices), plus the header's `translate` and `scale` |
-| KVX | `parseKVX` | | the first, largest mip; colour 255 is air; file colour k is index k + 1; `pivot` in cells |
+| KVX | `parseKVX` | | the first, largest mip; colour 255 is air; file colour k is index k + 1; `pivot` in cells; a column offset outside the voxel data is refused as damage |
 | VXL | `parseVXL` | | Voxlap maps, with a header or bare (`size`, default 512 x 512 x 64); solid cells without a colour take the last one above them |
 | Goxel `.gox` | `parseGOX` | `writeGOX` (async) | every layer with its name, `visible`, blend `mode` and `material`; clone and shape layers built; Z up in the file, so file (x, y, z) is cell (x, z, -y); any non-zero alpha is solid |
 | VoxEdit `.vxm` | `parseVXM` | `writeVXM` | versions 3 to 13 read, 12 written; every model (one size, no positions), materials as palette indices 1 to 255, `emissive` flags and `pivot`; the file's X runs mirrored |
@@ -149,6 +154,31 @@ const text = writeQEF(models[0].grid, palette);
 KVX and VXL have z running down in the file, so they turn to Y up on reading: the file's y becomes z. A true-colour file
 with over 255 colours loses low bits from each channel, the same on every run, until 255 are left, and `colorsReduced`
 is true. Block-game `.schematic` is left out on purpose.
+
+MagicaVoxel `.vox` files are read and written by `@margoengine/voxel/vox` (`parseVox`, `writeVox`); `./vox` here turns a
+model into this package's Y-up grid and back. A parsed scene writes back byte for byte, edits included.
+
+```ts
+import { gridFromVox, voxFromGrid } from '@margoengine/voxel-edit/vox';
+import { parseVox, writeVox, type VoxScene } from '@margoengine/voxel/vox';
+
+const palette = new Uint8Array(1024);
+palette.set([232, 48, 21, 255], 4); // index 1: red
+const scene: VoxScene = {
+  version: 200,
+  models: [{ size: [2, 1, 1], voxels: Uint8Array.of(0, 0, 0, 1, 1, 0, 0, 1) }], // x, y, z, index per voxel
+  palette,
+  materials: [],
+  nodes: [],
+  layers: [],
+};
+const file = writeVox(scene); // Uint8Array of a .vox
+const read = parseVox(file);
+const grid = gridFromVox(read.models[0]); // Y up: .vox (x, y, z) is cell (x, z, sizeY - 1 - y)
+grid.voxels[0] = 2; // edit a cell
+read.models[0] = voxFromGrid(grid, read.models[0]);
+console.log(grid.size, writeVox(read).length > 0); // [ 2, 1, 1 ] true
+```
 
 Goxel and VoxEdit files move both ways. A `.gox` keeps each layer's place, so a round trip gives back the same cells,
 positions and colours; a `.vxm` has no positions, so its models share one size and sit at the origin.

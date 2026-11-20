@@ -1,0 +1,230 @@
+<!doctype html><html><head><meta charset="utf-8"><title>GLSL programs as materials</title><style>body{margin:0}canvas{width:32px;height:32px;display:block}</style></head><body><canvas id="margo"></canvas>
+<script type="module">
+// Each program of test/glsl-material-fixtures.js and test/glsl-material-builtins-fixtures.js drawn twice: as written by
+// the browser's own WebGL compiler (the oracle, WebGL 1 for GLSL ES 1.00 and WebGL 2 for 3.00; Donaldson et al.,
+// OOPSLA 2017) and as a ShaderMaterial on a RawMesh. The engine's matrices of the builtins programs are computed here
+// in double precision from the same camera, as GL's.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Texture} from '/packages/materials/dist/index.js';
+import {RawMesh,RawShaders} from '/packages/shader/dist/raw.js';
+import {ShaderMaterial,shaderMesh,shaderScene,glslPrograms} from '/packages/shader/dist/glsl-material.js';
+import {programFixtures,programImage} from '/packages/shader/test/glsl-material-fixtures.js';
+import {builtinFixtures} from '/packages/shader/test/glsl-material-builtins-fixtures.js';
+import {dataFixtures,dataImage,countImage,depthImage} from '/packages/shader/test/glsl-material-data-fixtures.js';
+import {sceneFixtures} from '/packages/shader/test/glsl-material-scene-fixtures.js';
+const fixtures=[...programFixtures,...builtinFixtures,...dataFixtures,...sceneFixtures];
+const W=32,H=32,canvas=document.querySelector('#margo');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:[W,H]}),device=engine.gpu,errors=[];
+engine.scene.background='#000000';
+// The scene fixtures' lights and fog: set on the engine and the RawShaders, and the values their uniforms stand for,
+// worked out here from the documented meanings (README "Lights and fog"), for the oracle.
+const sunAtStart=[...engine.lighting.direction,...engine.lighting.radiance,...engine.lighting.ambient];
+const useScene=(s)=>{
+  const l=s?.lighting??{direction:sunAtStart.slice(0,4),radiance:sunAtStart.slice(4,8),ambient:sunAtStart.slice(8)};
+  engine.lighting.direction.set(l.direction);engine.lighting.radiance.set(l.radiance);engine.lighting.ambient.set(l.ambient);
+  shaderScene(raw).setFog(s?.fog??null).setLights(s?.lights??null);
+};
+function sceneValues(s,program){
+  const [dx,dy,dz,di]=s.lighting.direction,[r,g,b,ra]=s.lighting.radiance,a=s.lighting.ambient,dl=Math.hypot(dx,dy,dz);
+  const f=s.fog??{},hex=f.color??'#ffffff',rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);
+  const scale=typeof s.lights?.intensityScale==='function'?s.lights.intensityScale():s.lights?.intensityScale??1;
+  const room=(root)=>Math.max(0,...program.uniforms.filter(u=>u.root===root).map(u=>u.path[0][0]+1));
+  const points=[],spots=[];
+  for(const x of s.lights?.list??[]){
+    const k=(x.intensity??1)*scale,c=(x.color??[1,1,1]).map(v=>v*k),base={position:x.position,color:c,range:x.range,decay:x.decay??2};
+    if(!x.direction){if(points.length<room('pointLights'))points.push(base);continue;}
+    if(spots.length>=room('spotLights'))continue;
+    const n=Math.hypot(...x.direction),outer=x.angle??x.outerAngle,inner=x.angle===undefined?x.innerAngle??0:x.angle*(1-(x.penumbra??0));
+    spots.push({...base,direction:x.direction.map(v=>v/n),outerCos:Math.cos(outer),innerCos:Math.cos(inner)});
+  }
+  return {sunDirection:[dx/dl,dy/dl,dz/dl],sunColor:[r*di,g*di,b*di],ambientLight:a.map(v=>v*ra),
+    fogColor:rgb,fogNear:f.near??1,fogFar:f.far??1000,fogDensity:f.density??0,fogHeight:f.height??0,fogHeightFalloff:f.heightFalloff??0,
+    pointLights:points,spotLights:spots,pointLightCount:points.length,spotLightCount:spots.length};
+}
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.onError=e=>errors.push(e.message);
+const raw=RawShaders.attach(engine),bytes=programImage();
+const textures={};
+const textureOf=(f)=>textures[f.texture.filter+f.flipY]??=new Texture({data:bytes,width:8,height:8},{colorSpace:'linear',mipmaps:false,minFilter:f.texture.filter,magFilter:f.texture.filter});
+const value=(f,which)=>({...Object.fromEntries(Object.entries(f.uniforms).map(([k,v])=>[k,v[which]??v[1]])),...(f.values?.[which-1]??f.values?.[0])});
+// The value of a leaf of a struct or array uniform, as ShaderMaterial reads it (field names and [element, size] steps).
+const leafOf=(v,path=[])=>{for(const s of path){if(v==null)return v;if(typeof s==='string')v=v[s];else{const [k,n]=s;v=n&&typeof v[0]!=='object'?(n===1?v[k]:v.slice(k*n,k*n+n)):v[k];}}return v;};
+// The data fixtures' textures: 8 x 8 RGBA, unsigned integer RGBA or 16-bit depth, rows from the first in memory.
+const dataOf=(t)=>t.kind==='depth16'?depthImage():t.kind==='rgba8ui'?countImage():dataImage(t.seed);
+const gpuTextures={};
+function gpuTexture(t){
+  const key=JSON.stringify(t);if(gpuTextures[key])return gpuTextures[key];
+  if(t.kind==='rgba8')return gpuTextures[key]=new Texture({data:dataOf(t),width:8,height:8},{colorSpace:'linear',mipmaps:false,minFilter:'nearest',magFilter:'nearest'});
+  const depth=t.kind==='depth16',format=depth?'depth16unorm':'rgba8uint',texture=device.createTexture({size:[8,8],format,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST}),data=dataOf(t);
+  device.queue.writeTexture({texture},data,{bytesPerRow:depth?16:32},[8,8]);
+  return gpuTextures[key]=depth?{texture,sampler:{compare:'less-equal',minFilter:'nearest',magFilter:'nearest'}}:texture;
+}
+const definesOf=(f,which)=>f.defines?.[which-1]??f.defines?.[0]??{};
+const defaultCamera={position:[...engine.camera.position],target:[...engine.camera.target],fov:engine.camera.fov,near:engine.camera.near,far:engine.camera.far};
+// Column-major 4 x 4 helpers in double precision.
+const mul=(a,b)=>{const o=new Array(16).fill(0);for(let c=0;c<4;c++)for(let r=0;r<4;r++)for(let k=0;k<4;k++)o[c*4+r]+=a[k*4+r]*b[c*4+k];return o;};
+const upper=(m)=>[m[0],m[1],m[2],m[4],m[5],m[6],m[8],m[9],m[10]];
+const inverse3=(m)=>{const [a,b,c,d,e,f,g,h,i]=m,A=e*i-f*h,B=-(d*i-f*g),C=d*h-e*g,det=a*A+b*B+c*C;return [A,-(b*i-c*h),b*f-c*e,B,a*i-c*g,-(a*f-c*d),C,-(a*h-b*g),a*e-b*d].map(x=>x/det);};
+const transpose3=(m)=>[m[0],m[3],m[6],m[1],m[4],m[7],m[2],m[5],m[8]];
+const inverse4rigid=(m)=>{const r=transpose3(upper(m)),t=[m[12],m[13],m[14]],p=[0,1,2].map(i=>-(r[i]*t[0]+r[3+i]*t[1]+r[6+i]*t[2]));return [r[0],r[1],r[2],0,r[3],r[4],r[5],0,r[6],r[7],r[8],0,p[0],p[1],p[2],1];};
+// GL's matrices for a look-at camera and a perspective projection (OpenGL ES 3.0 section 2.13, clip z from -w to w).
+function glCamera(c){
+  let z=[0,1,2].map(i=>c.position[i]-c.target[i]);const zl=Math.hypot(...z);z=z.map(v=>v/zl);
+  const up=[0,1,0];let x=[up[1]*z[2]-up[2]*z[1],up[2]*z[0]-up[0]*z[2],up[0]*z[1]-up[1]*z[0]];const xl=Math.hypot(...x);x=x.map(v=>v/xl);
+  const y=[z[1]*x[2]-z[2]*x[1],z[2]*x[0]-z[0]*x[2],z[0]*x[1]-z[1]*x[0]],p=c.position,dot=(a)=>a[0]*p[0]+a[1]*p[1]+a[2]*p[2];
+  const view=[x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,-dot(x),-dot(y),-dot(z),1];
+  const f=1/Math.tan(c.fov*Math.PI/360),n=c.near,fa=c.far,projection=[f,0,0,0,0,f,0,0,0,0,(fa+n)/(n-fa),-1,0,0,2*fa*n/(n-fa),0];
+  return {view,projection};
+}
+function engineValues(f){
+  const c=f.camera??defaultCamera,{view,projection}=glCamera(c),model=f.matrix??[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
+  const mv=mul(view,model),pos=c.position;
+  return {
+    modelMatrix:model,viewMatrix:view,modelViewMatrix:mv,projectionMatrix:projection,normalMatrix:transpose3(inverse3(upper(mv))),cameraPosition:pos,isOrthographic:false,
+    world:model,view,projection,worldView:mv,worldViewProjection:mul(projection,mv),
+    matrix_model:model,matrix_view:view,matrix_projection:projection,matrix_viewProjection:mul(projection,view),matrix_normal:transpose3(inverse3(upper(model))),
+    matrix_viewInverse:inverse4rigid(view),matrix_view3:upper(view),view_position:pos,camera_params:[1/c.far,c.far,c.near,0],screen_size:[W,H,1/W,1/H],viewport_size:[W,H,1/W,1/H],view_index:0,
+  };
+}
+const typeOfValue=(name,v)=>typeof v==='boolean'?'bool':name==='view_index'?'uint':v.length===16?'mat4':v.length===9?'mat3':`vec${v.length}`;
+// The oracle: the fixture's program compiled by the browser, drawn with the same vertices and uniform values.
+function oracle(f,which){
+  const legacy=!/^\s*#\s*version\s+300/m.test(f.vertex),c=document.createElement('canvas');c.width=W;c.height=H;
+  const gl=c.getContext(legacy?'webgl':'webgl2',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false,depth:true});
+  const defines=Object.entries(definesOf(f,which)).map(([k,v])=>`#define ${k} ${typeof v==='boolean'?+v:v}\n`).join('');
+  const prepare=(s,extra='')=>{for(const [a,b] of f.oracle?.replace??[])s=s.replace(a,b);return /^\s*#\s*version/.test(s)?s.replace(/^(\s*#\s*version[^\n]*\n)/,'$1'+defines+extra.replace(/^#version[^\n]*\n/,'')):defines+extra+s;};
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+source);return s;};
+  const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,prepare(f.vertex,f.oracle?.vertex)));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,prepare(f.fragment,f.oracle?.fragment)));gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  gl.useProgram(p);
+  for(const [name,a] of Object.entries(f.attributes)){const at=gl.getAttribLocation(p,name);if(at<0)continue;const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a.data),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,a.size,gl.FLOAT,false,0,0);}
+  for(const [name,v] of Object.entries(f.generic??{})){const at=gl.getAttribLocation(p,name);if(at>=0)gl[`vertexAttrib${v.length}fv`](at,v);}
+  for(const [name,data] of Object.entries(f.instances??{})){
+    const at=gl.getAttribLocation(p,name);if(at<0)continue;const size=data.length/f.instanced,b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(data),gl.STATIC_DRAW);
+    // A mat4 attribute takes four locations, one column each (GLSL ES 3.00 4.3.4).
+    const columns=size===16?4:1,width=size/columns;
+    for(let k=0;k<columns;k++){gl.enableVertexAttribArray(at+k);gl.vertexAttribPointer(at+k,width,gl.FLOAT,false,size*4,k*width*4);gl.vertexAttribDivisor(at+k,1);}
+  }
+  // A wireframe draws each edge of the triangles once, in the order first met.
+  const edges=(index)=>{const seen=new Set(),out=[];for(let i=0;i+2<index.length;i+=3)for(const [a,b] of [[index[i],index[i+1]],[index[i+1],index[i+2]],[index[i+2],index[i]]]){const k=Math.min(a,b)+','+Math.max(a,b);if(!seen.has(k)){seen.add(k);out.push(a,b);}}return out;};
+  const wire=!!f.options?.wireframe,drawn=f.index&&(wire?edges(f.index):f.index);
+  if(drawn){const ib=gl.createBuffer();gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,ib);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(drawn),gl.STATIC_DRAW);}
+  const set=(name,type,v)=>{
+    const at=gl.getUniformLocation(p,name),list=[v].flat(4).map(Number),n=/^mat/.test(type)?type.slice(3):type.match(/\d$/)?.[0];
+    if(at===null)return;
+    if(type==='float')gl.uniform1f(at,list[0]);else if(type==='int'||type==='bool')gl.uniform1i(at,list[0]);else if(type==='uint')gl.uniform1ui(at,list[0]);
+    else if(/^mat/.test(type))gl[`uniformMatrix${n}fv`](at,false,list);else if(/^vec/.test(type))gl[`uniform${n}fv`](at,list);
+    else if(/^[ib]vec/.test(type))gl[`uniform${n}iv`](at,list);else if(/^uvec/.test(type))gl[`uniform${n}uiv`](at,list);
+  };
+  for(const [name,[type,...values]] of Object.entries(f.uniforms))set(name,type,values[which-1]??values[0]);
+  if(f.values){const v=value(f,which);for(const u of material.program.uniforms)set(u.name,u.glsl.replace(/\[\d+\]$/,''),u.root?leafOf(v[u.root],u.path):v[u.name]);}
+  // A light list's elements past its count stay zero, as GL starts them.
+  if(f.scene){const v=sceneValues(f.scene[which-1],material.program);for(const u of material.program.uniforms){const x=u.root?leafOf(v[u.root],u.path):v[u.name];if(x!=null)set(u.name,u.glsl.replace(/\[\d+\]$/,''),x);}}
+  (f.textures??[]).forEach((t,unit)=>{
+    const tex=gl.createTexture(),data=dataOf(t),row=data.length/8,rows=new data.constructor(data.length);
+    // flipY: Margo stores the top row first and GL reads rows bottom up, so the rows go in reversed.
+    for(let y=0;y<8;y++)rows.set(data.subarray((f.flipY?7-y:y)*row,(f.flipY?8-y:y+1)*row),y*row);
+    gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_ALIGNMENT,1);
+    if(t.kind==='rgba8')gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,8,8,0,gl.RGBA,gl.UNSIGNED_BYTE,rows);
+    else if(t.kind==='rgba8ui')gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8UI,8,8,0,gl.RGBA_INTEGER,gl.UNSIGNED_BYTE,rows);
+    else{gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT16,8,8,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_SHORT,rows);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_MODE,gl.COMPARE_REF_TO_TEXTURE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_COMPARE_FUNC,gl.LEQUAL);}
+    for(const [k,x] of [[gl.TEXTURE_MIN_FILTER,gl.NEAREST],[gl.TEXTURE_MAG_FILTER,gl.NEAREST],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,k,x);
+    gl.uniform1i(gl.getUniformLocation(p,t.index===undefined?t.uniform:`${t.uniform}[${t.index}]`),unit);
+  });
+  const values=engineValues(f);
+  for(const name of f.engine??[])set(name,typeOfValue(name,values[name]),values[name]);
+  if(f.texture){
+    const t=gl.createTexture(),filter=f.texture.filter==='linear'?gl.LINEAR:gl.NEAREST;gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t);
+    // flipY: Margo images are stored top row first and GL reads rows bottom up, as an image uploaded with UNPACK_FLIP_Y is.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,!!f.flipY);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,8,8,0,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+    for(const [k,x] of [[gl.TEXTURE_MIN_FILTER,filter],[gl.TEXTURE_MAG_FILTER,filter],[gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE]])gl.texParameteri(gl.TEXTURE_2D,k,x);
+    gl.uniform1i(gl.getUniformLocation(p,f.texture.name),0);
+  }
+  gl.viewport(0,0,W,H);gl.clearColor(0,0,0,1);gl.clearDepth(1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  if(f.depth){gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);}
+  if((f.cull??'back')!=='none'){gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);}
+  const mode=wire?gl.LINES:{'point-list':gl.POINTS,'triangle-strip':gl.TRIANGLE_STRIP}[f.topology]??gl.TRIANGLES;
+  if(f.instanced)gl.drawElementsInstanced(mode,drawn.length,gl.UNSIGNED_SHORT,0,f.instanced);
+  else if(drawn)gl.drawElements(mode,drawn.length,gl.UNSIGNED_SHORT,0);
+  else gl.drawArrays(mode,0,f.attributes.position.data.length/f.attributes.position.size);
+  const out=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  const rgb=[];for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)rgb.push(...out.slice((y*W+x)*4,(y*W+x)*4+3));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return rgb;
+}
+// KB-GLSLP1: a sized point and the view's own size in two side by side views of one frame. GL sizes a point in pixels
+// of the viewport it is drawn in and viewport_size is that viewport (OpenGL ES 3.0.6 sections 2.12.1 and 3.4), while
+// screen_size stays the whole target. Each view is 16 x 32 pixels, so every square is 8 x 8 pixels with its edges on
+// pixel boundaries.
+const viewProgram={
+  vertex:'attribute vec2 position;\nvoid main() { gl_PointSize = 8.0; gl_Position = vec4(position, 0.0, 1.0); }',
+  fragment:'precision highp float;\nuniform vec4 viewport_size;\nuniform vec4 screen_size;\nvoid main() { gl_FragColor = vec4(viewport_size.x / 64.0, screen_size.x / 64.0, gl_PointCoord.x, 1.0); }',
+};
+function viewOracle(){
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const gl=c.getContext('webgl',{preserveDrawingBuffer:true,antialias:false,premultipliedAlpha:false});
+  const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;};
+  const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,viewProgram.vertex));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,viewProgram.fragment));gl.linkProgram(p);gl.useProgram(p);
+  const b=gl.createBuffer(),at=gl.getAttribLocation(p,'position');gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0]),gl.STATIC_DRAW);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(at,2,gl.FLOAT,false,0,0);
+  gl.uniform4f(gl.getUniformLocation(p,'viewport_size'),W/2,H,2/W,1/H);gl.uniform4f(gl.getUniformLocation(p,'screen_size'),W,H,1/W,1/H);
+  gl.viewport(0,0,W,H);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT);
+  for(const x of [0,W/2]){gl.viewport(x,0,W/2,H);gl.drawArrays(gl.POINTS,0,1);}
+  const out=new Uint8Array(W*H*4);gl.readPixels(0,0,W,H,gl.RGBA,gl.UNSIGNED_BYTE,out);if(gl.getError()!==gl.NO_ERROR)throw new Error('oracle GL error');
+  const rgb=[];for(let y=H-1;y>=0;y--)for(let x=0;x<W;x++)rgb.push(...out.slice((y*W+x)*4,(y*W+x)*4+3));
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return rgb;
+}
+let mesh,material;
+const extra=[];
+const settle=async(views)=>{await waitForPipelines(async()=>{engine.render(views?{views}:undefined);await device.queue.onSubmittedWorkDone();await raw.ready();});return errors.splice(0);};
+const useCamera=(c)=>Object.assign(engine.camera,{position:[...c.position],target:[...c.target],fov:c.fov,near:c.near,far:c.far});
+const clear=()=>{useScene();if(mesh){raw.remove(mesh);mesh.dispose();material.dispose();mesh=undefined;}for(const m of extra.splice(0))engine.remove(m);};
+window.check={
+  count:()=>fixtures.length,
+  // Fixture i as a ShaderMaterial with its first uniform values and defines.
+  async draw(i){
+    clear();
+    const f=fixtures[i],uniforms=Object.fromEntries(Object.entries(value(f,1)).map(([k,v])=>[k,{value:v}]));
+    useCamera(f.camera??defaultCamera);
+    if(f.texture)uniforms[f.texture.name]={value:textureOf(f)};
+    for(const t of f.textures??[]){if(t.index===undefined)uniforms[t.uniform]={value:gpuTexture(t)};else (uniforms[t.uniform]??={value:[]}).value[t.index]=gpuTexture(t);}
+    material=new ShaderMaterial({vertexShader:f.vertex,fragmentShader:f.fragment,uniforms,defines:definesOf(f,1),flipY:f.flipY??true,cull:f.cull??'back',depthTest:!!f.depth,depthWrite:!!f.depth,...f.options});
+    if(f.geometry)mesh=raw.add(shaderMesh(f.geometry,material,{instances:f.instances,attributes:f.meshAttributes,...(f.topology?{topology:f.topology}:{}),...(f.matrix?{matrix:f.matrix}:{})}));
+    else{
+      const attributes=Object.fromEntries(Object.entries(f.attributes).map(([k,a])=>[k,{data:a.data,type:a.size===1?'f32':`vec${a.size}f`}]));
+      mesh=raw.add(new RawMesh({material,attributes,index:f.index,frustumCulled:false}));
+    }
+    if(f.scene)useScene(f.scene[0]);
+    const e=await settle();if(material.error)e.push(material.error.message);return e;
+  },
+  // The second uniform values (live, no translation) or defines (one translation more).
+  async change(i){
+    const f=fixtures[i],before=glslPrograms.count;
+    for(const [k,v] of Object.entries(value(f,2)))material.uniforms[k].value=v;
+    if(f.defines?.[1])material.defines=f.defines[1];
+    if(f.scene)useScene(f.scene[1]);
+    const e=await settle();if(material.error)e.push(material.error.message);return {errors:e,translations:glslPrograms.count-before};
+  },
+  oracle:(i,which)=>oracle(fixtures[i],which),
+  async views(){
+    clear();useCamera(defaultCamera);
+    material=new ShaderMaterial({vertexShader:viewProgram.vertex,fragmentShader:viewProgram.fragment,builtins:'matrix_model'});
+    mesh=raw.add(shaderMesh({positions:[0,0,0]},material,{topology:'point-list'}));
+    const e=await settle([{camera:engine.camera,viewport:[0,0,0.5,1]},{camera:engine.camera,viewport:[0.5,0,0.5,1]}]);
+    if(material.error)e.push(material.error.message);return e;
+  },
+  viewOracle,
+  // A GLSL quad and a core box at z = 0, the quad nearer or farther: the nearer one shows at the centre, both ways round.
+  async depthOrder(z){
+    clear();useCamera({position:[0,0,3],target:[0,0,0],fov:60,near:0.5,far:20});
+    const core=engine.createMesh().setGeometry(box(4,4,0.01));extra.push(core);
+    material=new ShaderMaterial({vertexShader:'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',fragmentShader:'precision highp float;\nvoid main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }'});
+    mesh=raw.add(shaderMesh({positions:[-1,-1,0,1,-1,0,1,1,0,-1,1,0],indices:[0,1,2,0,2,3]},material,{matrix:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,z,1]}));
+    const e=await settle();if(material.error)e.push(material.error.message);return e;
+  },
+  close(){clear();for(const t of Object.values(textures))t.dispose();for(const t of Object.values(gpuTextures))(t.texture??t).destroy?.()??t.dispose?.();engine.dispose();return errors.splice(0);},
+};
+window.ready=true;
+</script></body></html>

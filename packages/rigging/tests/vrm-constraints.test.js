@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { evaluateVRMConstraint, readVRMConstraints, addVRMConstraints } from '../dist/vrm-constraints.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { Animator } from '../../animator/dist/index.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 const reference = JSON.parse(
   readFileSync(new URL('../../../docs/whitepaper/results/batch213-constraint-public-values.json', import.meta.url)),
 );

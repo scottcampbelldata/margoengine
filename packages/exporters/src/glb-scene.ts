@@ -17,7 +17,7 @@ import type {
 /** Something of the file {@link sceneOfGLB} left out. */
 export interface GLBSceneSkip {
   /**
-   * What it was: `'primitive'` not triangles or with no position, `'texture'` not PNG or JPEG, `'colors'` under a base colour
+   * What it was: `'primitive'` with no position or an unknown mode, `'texture'` not PNG or JPEG, `'colors'` under a base colour
    * texture, `'channel'` an animation channel with no node, such as one of KHR_animation_pointer.
    */
   kind: 'primitive' | 'texture' | 'colors' | 'channel';
@@ -83,8 +83,7 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
       let data = materials.get(index);
       if (data) return data;
       const m = json.materials[index],
-        pbr = m.pbrMetallicRoughness ?? {},
-        transform = pbr.baseColorTexture?.extensions?.KHR_texture_transform;
+        pbr = m.pbrMetallicRoughness ?? {};
       data = {
         name: m.name,
         color: pbr.baseColorFactor ?? [1, 1, 1, 1],
@@ -106,14 +105,16 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
       ] as const;
       for (const [slot, info] of slots) {
         const read = texture(info, index);
-        if (read) data[slot] = read;
+        if (!read) continue;
+        data[slot] = read;
+        const transform = info?.extensions?.KHR_texture_transform;
+        if (transform)
+          data[`${slot}Transform`] = {
+            offset: transform.offset ?? [0, 0],
+            scale: transform.scale ?? [1, 1],
+            rotation: transform.rotation ?? 0,
+          };
       }
-      if (transform && data.baseColorTexture)
-        data.baseColorTextureTransform = {
-          offset: transform.offset ?? [0, 0],
-          scale: transform.scale ?? [1, 1],
-          rotation: transform.rotation ?? 0,
-        };
       materials.set(index, data);
       return data;
     };
@@ -126,7 +127,8 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
       const primitive = json.meshes[mesh].primitives[at],
         attributes = primitive.attributes ?? {},
         { POSITION, NORMAL, TEXCOORD_0, TEXCOORD_1, COLOR_0, JOINTS_0, WEIGHTS_0, JOINTS_1 } = attributes;
-      if ((primitive.mode ?? 4) !== 4 || POSITION === undefined) {
+      const mode = primitive.mode ?? 4;
+      if (!(Number.isInteger(mode) && mode >= 0 && mode <= 6) || POSITION === undefined) {
         skipped.push({ kind: 'primitive', index: mesh });
         geometries.set(key, null);
         return null;
@@ -135,10 +137,13 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
         throw new TypeError('This GLB has more than four skin influences per vertex; bake it down to four first');
       const positions = floats(readAccessor(parts, POSITION)),
         count = positions.length / 3,
+        // Points, lines, strips and fans keep the file's run; its mode is the primitive's (glTF 2.0 section 3.7.2.1).
         indices =
-          primitive.indices === undefined
-            ? Uint32Array.from({ length: count - (count % 3) }, (_, i) => i)
-            : readAccessor(parts, primitive.indices).values,
+          primitive.indices !== undefined
+            ? readAccessor(parts, primitive.indices).values
+            : mode === 4
+              ? Uint32Array.from({ length: count - (count % 3) }, (_, i) => i)
+              : undefined,
         data: GeometryData = {
           positions,
           // Zero normals are the collector's sign to take them from the faces.
@@ -192,7 +197,8 @@ export function sceneOfGLB(bytes: Uint8Array): { scene: ExportScene; skipped: GL
         skipped.push({ kind: 'colors', index: record.mesh });
         delete geometry.colors;
       }
-      primitives.push({ geometry, material });
+      const mode = primitive.mode ?? 4;
+      primitives.push(mode === 4 ? { geometry, material } : { geometry, material, mode });
     });
     if (!primitives.length) return;
     node.primitives = primitives;

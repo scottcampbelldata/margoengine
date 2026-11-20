@@ -1,11 +1,11 @@
 {
  "proof": "environment-volumetric",
- "ref": "379431fcb8",
- "revision": "379431fcb8d0867558b694d282ca1272bf9996e9",
- "capturedAt": "b0efe42d12657818cc319fe0782e0cf2a1f209fa",
+ "ref": "8c71da0556",
+ "revision": "8c71da0556d86e43094bf3738f8651ad3775c90f",
+ "capturedAt": "b3c8204ded004c631b0bf8e3310b8ac886843431",
  "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
  "facts": {},
  "outputs": {
-  "root": "d9b2b4ef7efbbb5eafdc8b5fc52a0846526d6005899286168e323628cda69585"
+  "root": "f7a04036873c8f0444251f7547cac2769c6d242712c24ade7dd35df4cf1b3d7e"
  }
 }

@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { decodePNG } from '@margoengine/decoders/png';
 import { decodeImage } from '@margoengine/decoders/image';
-import { loadGLTF, parseGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF, parseGLTF } from '@margoengine/gltf/pbr';
 import { encodePNG } from '../dist/capture.js';
 import { exportDAE, exportOBJ, writeOpacityMaps, writeTextures } from '../dist/index.js';
 import { dds } from '../../decoders/tests/support/texture-encoders.js';
@@ -204,4 +204,33 @@ test('a texture with no reachable image is refused by name, and other writers st
     parseGLTF(engine, glb(document({ source: 0 }, [{ uri: 'nowhere.png', mimeType: 'image/png' }])));
     assert.throws(() => exportOBJ(engine, options), /no image the model can reach/);
     assert.throws(() => exportDAE(engine), TypeError);
+  }));
+
+/** The one-quad document with a PNG base colour sampled by set `texCoord`, and a TEXCOORD_2 unlike TEXCOORD_0. */
+async function onSet(texCoord, withSet2 = true) {
+  const png = await encodePNG({ width: 2, height: 2, data: new Uint8Array(16).fill(120) }),
+    doc = document({ source: 0 }, [{ bytes: png, mimeType: 'image/png' }]),
+    set2 = new Uint8Array(new Float32Array([0.125, 0.25, 0.375, 0.25, 0.375, 0.5, 0.125, 0.5]).buffer),
+    at = (doc.bin.length + 3) & ~3,
+    bin = new Uint8Array(at + set2.length);
+  bin.set(doc.bin);
+  bin.set(set2, at);
+  doc.bin = bin;
+  doc.json.buffers[0].byteLength = bin.length;
+  doc.json.bufferViews.push({ buffer: 0, byteOffset: at, byteLength: set2.length });
+  doc.json.accessors.push({ bufferView: doc.json.bufferViews.length - 1, componentType: 5126, count: 4, type: 'VEC2' });
+  if (withSet2) doc.json.meshes[0].primitives[0].attributes.TEXCOORD_2 = doc.json.accessors.length - 1;
+  doc.json.materials[0].pbrMetallicRoughness.baseColorTexture.texCoord = texCoord;
+  return glb(doc);
+}
+
+test('a base colour on TEXCOORD_2 maps with TEXCOORD_2, and a texCoord the primitive lacks is refused on load', () =>
+  headlessModels(async () => {
+    const engine = await headless();
+    parseGLTF(engine, await onSet(2));
+    const { obj } = exportOBJ(engine, options),
+      us = [...obj.matchAll(/^vt (\S+) /gm)].map((m) => Number(m[1])).sort();
+    assert.deepEqual([...new Set(us)], [0.125, 0.375]);
+    // gltf/pbr already refuses a texCoord whose TEXCOORD_<n> the primitive lacks, so no loaded model reaches here without it.
+    await assert.rejects(async () => parseGLTF(await headless(), await onSet(1)), /requires available TEXCOORD_1/);
   }));

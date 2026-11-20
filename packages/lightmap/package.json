@@ -73,7 +73,7 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0"
+    "@margoengine/gltf": "^1.0.0"
   },
   "dependencies": {
     "@margoengine/bvh": "^1.0.0",

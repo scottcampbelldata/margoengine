@@ -5,7 +5,7 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export interface BoneBake {
     bones: number;
@@ -42,9 +42,11 @@ export function bakeBones(animation: Animation, { fps, clips }?: VATBakeOptions)
 
 export function boneTexel(row: number, bone: number, k: number, bones: number, width?: number): [number, number];
 
+export function poseBone(bake: BoneBake, { clip, offset, speed, blendClip, blendOffset, blendSpeed, blend }: SkinnedCrowdInstance, bone: number, time: number, out?: Float32Array<ArrayBuffer>): Float32Array;
+
 export function poseBones(bake: BoneBake, { clip, offset, speed, blendClip, blendOffset, blendSpeed, blend }: SkinnedCrowdInstance, time: number, out?: Float32Array<ArrayBuffer>): Float32Array;
 
-export const skinnedCrowdVertex = "\nstruct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,base:vec4f,options:vec4f,vat:vec4f}\nstruct Instance {m:mat4x4f,p:vec4f,uv:vec4f,q:vec4f}\n@group(0) @binding(0) var<uniform> f:Frame;\n@group(0) @binding(1) var<storage,read> instances:array<Instance>;\n@group(0) @binding(2) var<storage,read> clips:array<vec4f>;\n@group(0) @binding(3) var vat:texture_2d<f32>;\n@group(0) @binding(4) var map:texture_2d<f32>;\n@group(0) @binding(5) var mapSampler:sampler;\nstruct Out {@builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) uv:vec2f}\nstruct SkinPhase {row:u32,w:f32}\nstruct SkinnedVertex {position:vec3f,normal:vec3f}\nfn skinPhase(c:vec4f,time:f32)->SkinPhase {\n var t=time/max(c.z,0.000001);t=select(clamp(t,0.0,1.0),fract(t),c.w>0.5);let x=t*c.y;let a=min(floor(x),c.y-1.0);\n return SkinPhase(u32(c.x+a),x-a);\n}\nfn boneTexel(row:u32,bone:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+bone)*3u+k;let w=u32(f.vat.y);return textureLoad(vat,vec2u(i%w,i/w),0);}\nfn bonePose(a:SkinPhase,bone:u32,k:u32)->vec4f {return mix(boneTexel(a.row,bone,k),boneTexel(a.row+1u,bone,k),a.w);}\nfn skinned(s:Instance,position:vec3f,normal:vec3f,j0:vec4u,j1:vec4u,w0:vec4f,w1:vec4f)->SkinnedVertex {\n let a=skinPhase(clips[u32(s.p.x)],f.options.x*s.p.z+s.p.y);let b=skinPhase(clips[u32(s.q.x)],f.options.x*s.q.z+s.q.y);let blend=s.p.w;\n var r0=vec4f(0.0);var r1=vec4f(0.0);var r2=vec4f(0.0);\n for(var i=0u;i<8u;i++) {\n  let w=select(w1[i&3u],w0[i&3u],i<4u);\n  if(w>0.0) {\n   let j=select(j1[i&3u],j0[i&3u],i<4u);\n   var x=bonePose(a,j,0u);var y=bonePose(a,j,1u);var z=bonePose(a,j,2u);\n   if(blend>0.0) {x=mix(x,bonePose(b,j,0u),blend);y=mix(y,bonePose(b,j,1u),blend);z=mix(z,bonePose(b,j,2u),blend);}\n   r0+=x*w;r1+=y*w;r2+=z*w;\n  }\n }\n let p=vec4f(position,1.0);let c0=cross(r1.xyz,r2.xyz);\n return SkinnedVertex(vec3f(dot(r0,p),dot(r1,p),dot(r2,p)),vec3f(dot(c0,normal),dot(cross(r2.xyz,r0.xyz),normal),dot(cross(r0.xyz,r1.xyz),normal))*sign(dot(r0.xyz,c0)));\n}\n@vertex fn vertex(@location(0) uv:vec2f,@location(1) position:vec3f,@location(2) normal:vec3f,@location(3) j0:vec4u,@location(4) j1:vec4u,@location(5) w0:vec4f,@location(6) w1:vec4f,@builtin(instance_index) id:u32)->Out {\n let s=instances[id];let k=skinned(s,position,normal,j0,j1,w0,w1);\n let m=s.m;let c0=cross(m[1].xyz,m[2].xyz);let world=m*vec4f(k.position,1.0);\n var o:Out;o.clip=f.camera*world;o.position=world.xyz;o.normal=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*k.normal*sign(dot(m[0].xyz,c0));o.uv=s.uv.xy+uv*s.uv.zw;return o;\n}\n";
+export const skinnedCrowdVertex = "\nstruct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,base:vec4f,options:vec4f,vat:vec4f}\nstruct Instance {m:mat4x4f,p:vec4f,uv:vec4f,q:vec4f}\n@group(0) @binding(0) var<uniform> f:Frame;\n@group(0) @binding(1) var<storage,read> instances:array<Instance>;\n@group(0) @binding(2) var<storage,read> clips:array<vec4f>;\n@group(0) @binding(3) var vat:texture_2d<f32>;\n@group(0) @binding(4) var map:texture_2d<f32>;\n@group(0) @binding(5) var mapSampler:sampler;\nstruct Out {@builtin(position) clip:vec4f,@location(0) position:vec3f,@location(1) normal:vec3f,@location(2) uv:vec2f}\nstruct SkinPhase {row:u32,w:f32}\nstruct SkinnedVertex {position:vec3f,normal:vec3f}\nfn skinPhase(c:vec4f,time:f32)->SkinPhase {\n var t=time/max(c.z,0.000001);t=select(clamp(t,0.0,1.0),fract(t),c.w>0.5);let x=t*c.y;let a=min(floor(x),c.y-1.0);\n return SkinPhase(u32(c.x+a),x-a);\n}\nfn boneTexel(row:u32,bone:u32,k:u32)->vec4f {let i=(row*u32(f.vat.x)+bone)*3u+k;let w=u32(f.vat.y);return textureLoad(vat,vec2u(i%w,i/w),0);}\nfn bonePose(a:SkinPhase,bone:u32,k:u32)->vec4f {return mix(boneTexel(a.row,bone,k),boneTexel(a.row+1u,bone,k),a.w);}\nfn skinned(s:Instance,position:vec3f,normal:vec3f,j0:vec4u,j1:vec4u,w0:vec4f,w1:vec4f)->SkinnedVertex {\n let a=skinPhase(clips[u32(s.p.x)],f.options.x*s.p.z+s.p.y);let b=skinPhase(clips[u32(s.q.x)],f.options.x*s.q.z+s.q.y);let blend=s.p.w;\n var r0=vec4f(0.0);var r1=vec4f(0.0);var r2=vec4f(0.0);\n for(var i=0u;i<8u;i++) {\n  let w=select(w1[i&3u],w0[i&3u],i<4u);\n  if(w>0.0) {\n   let j=select(j1[i&3u],j0[i&3u],i<4u);\n   var x=bonePose(a,j,0u);var y=bonePose(a,j,1u);var z=bonePose(a,j,2u);\n   if(blend>0.0) {x=mix(x,bonePose(b,j,0u),blend);y=mix(y,bonePose(b,j,1u),blend);z=mix(z,bonePose(b,j,2u),blend);}\n   r0+=x*w;r1+=y*w;r2+=z*w;\n  }\n }\n let p=vec4f(position,1.0);let c0=cross(r1.xyz,r2.xyz);\n let n=vec3f(dot(c0,normal),dot(cross(r2.xyz,r0.xyz),normal),dot(cross(r0.xyz,r1.xyz),normal))*select(-1.0,1.0,dot(r0.xyz,c0)>=0.0);\n return SkinnedVertex(vec3f(dot(r0,p),dot(r1,p),dot(r2,p)),select(vec3f(0,1,0),n,dot(n,n)>0.0));\n}\n@vertex fn vertex(@location(0) uv:vec2f,@location(1) position:vec3f,@location(2) normal:vec3f,@location(3) j0:vec4u,@location(4) j1:vec4u,@location(5) w0:vec4f,@location(6) w1:vec4f,@builtin(instance_index) id:u32)->Out {\n let s=instances[id];let k=skinned(s,position,normal,j0,j1,w0,w1);\n let m=s.m;let c0=cross(m[1].xyz,m[2].xyz);let world=m*vec4f(k.position,1.0);\n var o:Out;o.clip=f.camera*world;o.position=world.xyz;let n=mat3x3f(c0,cross(m[2].xyz,m[0].xyz),cross(m[0].xyz,m[1].xyz))*k.normal*select(-1.0,1.0,dot(m[0].xyz,c0)>=0.0);o.normal=select(vec3f(0,1,0),n,dot(n,n)>0.0);o.uv=s.uv.xy+uv*s.uv.zw;return o;\n}\n";
 
 // Not exported from this entry, but used by the exports above:
 
@@ -67,6 +69,7 @@ class Animation implements EnginePlugin {
     setMorph(node: number, target: number, weight: number): void;
     setup(engine: Engine, device?: GPUDevice | null): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -234,6 +237,7 @@ class VATCrowd implements EnginePlugin {
     truncate(n: number): void;
     setup(engine: Engine): void;
     onPreUpdate(delta: number): void;
+    advanceTime(delta: number): void;
     registerPasses(graph: FrameGraph): void;
     addLighting(effect: VATLighting): () => void;
     drawShadow({ context: c, pass, matrix, cascade }: {

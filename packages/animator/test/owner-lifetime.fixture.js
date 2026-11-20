@@ -1,4 +1,4 @@
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { skinnedStrip } from '../../animation/test/fixture.js';
 

@@ -76,13 +76,14 @@ fn reaches(l:mat4x4f,c:vec3f,r:f32)->bool {
   }
 }
 `;
-// The same sum as the plain caster shaders, so a kept row lands on the same depth.
+// The same sum as the plain caster shaders, so a kept row lands on the same depth; @invariant, as they are, so no
+// compiler evaluates it in another order here.
 const drawShader = `
 struct Record {m:mat4x4f,color:vec4f,factors:vec4f}
 @group(0) @binding(0) var<uniform> light:mat4x4f;
 @group(0) @binding(1) var<storage,read> records:array<Record>;
 struct Input {@location(0) p:vec3f,@location(1) row:u32}
-@vertex fn vertex(i:Input)->@builtin(position) vec4f {return light*records[i.row].m*vec4f(i.p,1);}
+@vertex fn vertex(i:Input)->@builtin(position) @invariant vec4f {return light*records[i.row].m*vec4f(i.p,1);}
 `;
 const layouts: GPUVertexBufferLayout[] = [
   { arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] },

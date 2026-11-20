@@ -105,8 +105,11 @@ export class UiRenderer implements EnginePlugin {
   setup(engine: Engine): void {
     this.engine = engine;
     const canvas = (engine as unknown as { canvas?: HTMLElement }).canvas;
-    if (this.inputOptions && canvas && !this.detach) this.detach = attachInput(this.ui, canvas, this.inputOptions);
-    if (this.mirrorOptions && canvas && !this.detachMirror)
+    // A headless canvas (Node, `@margoengine/headless`) has no pointer events and no document to hold the mirror: the
+    // UI draws without them, as with `input: false, mirror: false`.
+    if (this.inputOptions && canvas && !this.detach && typeof canvas.addEventListener === 'function')
+      this.detach = attachInput(this.ui, canvas, this.inputOptions);
+    if (this.mirrorOptions && canvas && !this.detachMirror && canvas.ownerDocument)
       this.detachMirror = attachMirror(this.ui, canvas, this.mirrorOptions);
     if (engine.backend !== 'webgpu' || !engine.gpu) {
       if (!this.gl)
@@ -122,9 +125,23 @@ export class UiRenderer implements EnginePlugin {
     graph.add({ name: `${this.name}:draw`, order: this.order, execute: this.execute });
   }
 
-  onPreUpdate(delta: number): void {
-    if (!this.disposed) this.ui.update(delta);
+  /** Seconds of frame updates the renderer has run. */
+  get time(): number {
+    return this.elapsed;
   }
+  /**
+   * Runs `ui.update(delta)` (transitions, toasts, tooltips, the caret blink), all CPU, without drawing. Each frame
+   * update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (this.disposed) return;
+    this.ui.update(delta);
+    this.elapsed += delta;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+  private elapsed = 0;
 
   private readonly execute = (context: PassContext): void => {
     this.stats.rects = this.stats.glyphs = this.stats.drawCalls = this.stats.uploads = 0;

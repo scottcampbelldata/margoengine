@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel/gi (run from the repository root after building packages, one GPU job at a time:
-// node scripts/gpu-lock.mjs run --owner=voxel-gi -- node packages/voxel/tests/gi-browser-check.mjs): with VoxelGI the
+// node scripts/run-with-timeout.mjs -- node packages/voxel/tests/gi-browser-check.mjs): with VoxelGI the
 // white floor in front of a sunlit red wall turns red from the light the wall bounces, and a thin pole casts a sun shadow
 // across the floor; without it the floor there keeps its colour and no shadow is drawn; no WebGPU validation errors.
 import assert from 'node:assert/strict';

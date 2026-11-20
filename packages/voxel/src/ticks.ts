@@ -205,7 +205,8 @@ export class VoxelTicks {
    * One tick: the scheduled updates due, then the random ticks of every loaded chunk (chunks in load order), then the
    * `placed` and `neighbor` hooks of every change so far (changes they make run next tick). Up to `maxUpdates` scheduled and
    * neighbour updates; the rest wait.
-   * @throws MargoError `disposed` after `dispose()`; errors of rules propagate.
+   * @throws MargoError `disposed` after `dispose()`; errors of rules propagate, and the updates after the one that threw
+   * wait for the next tick.
    */
   tick(): void {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelTicks is disposed; attach a new one');
@@ -215,11 +216,16 @@ export class VoxelTicks {
     if (due) {
       this.#scheduled.delete(now);
       let i = 0;
-      for (; i < due.length && budget > 0; i += 3, budget--) {
-        this.#pendingScheduled--;
-        this.#run(due[i], due[i + 1], due[i + 2], 'scheduled');
+      try {
+        for (; i < due.length && budget > 0; budget--) {
+          i += 3;
+          this.#pendingScheduled--;
+          this.#run(due[i - 3], due[i - 2], due[i - 1], 'scheduled');
+        }
+      } finally {
+        // The updates past the budget, or past a rule that threw, wait for the next tick.
+        if (i < due.length) this.#scheduled.set(now + 1, [...due.slice(i), ...(this.#scheduled.get(now + 1) ?? [])]);
       }
-      if (i < due.length) this.#scheduled.set(now + 1, [...due.slice(i), ...(this.#scheduled.get(now + 1) ?? [])]);
     }
     if (this.#randomTicks && this.#rules.size)
       for (const [cx, cy, cz] of [...this.#chunks.values()])
@@ -230,9 +236,14 @@ export class VoxelTicks {
     const list = this.#neighbors;
     this.#neighbors = [];
     let i = 0;
-    for (; i < list.length && budget > 0; i += 4, budget--)
-      this.#run(list[i], list[i + 1], list[i + 2], list[i + 3] ? 'placed' : 'neighbor');
-    if (i < list.length) this.#neighbors = list.slice(i).concat(this.#neighbors);
+    try {
+      for (; i < list.length && budget > 0; budget--) {
+        i += 4;
+        this.#run(list[i - 4], list[i - 3], list[i - 2], list[i - 1] ? 'placed' : 'neighbor');
+      }
+    } finally {
+      if (i < list.length) this.#neighbors = list.slice(i).concat(this.#neighbors);
+    }
   }
 
   /** Stops following the world and drops what is scheduled. */

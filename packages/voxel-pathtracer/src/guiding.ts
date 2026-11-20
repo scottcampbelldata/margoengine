@@ -97,7 +97,7 @@ fn guideBox(o:vec3f,k:u32)->GuideBox {
  let mb=f.scene.x+scene[f.scene.y+inst*INSTANCE+36u]*MODEL;
  var g:GuideBox;
  g.size=vec3f(f32(scene[mb]),f32(scene[mb+1u]),f32(scene[mb+2u]));
- g.world=worldX(inst);g.local=localX(inst);
+ let x=instX(inst);g.world=x.world;g.local=x.local;
  let u=colOf(g.world,0u);let v=colOf(g.world,1u);let w=colOf(g.world,2u);
  g.area=vec3f(length(cross(v,w))*g.size.y*g.size.z,length(cross(w,u))*g.size.z*g.size.x,length(cross(u,v))*g.size.x*g.size.y);
  let p=xpoint(g.local,o);
@@ -138,8 +138,13 @@ fn guidedSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32,o:vec3f,air:bool)->Bounce {
  let count=guideCount();
  if(!air||!guideable(m)||count==0u){return sampleSurface(m,n,wo,etaI);}
  var s:Bounce;
- if(rand()<${guideStrength.toPrecision(9)}){
-  let k=min(u32(rand()*f32(count)),count-1u);let g=guideBox(o,k);
+ let guided=rand()<${guideStrength.toPrecision(9)};
+ var k=0u;
+ if(guided){k=min(u32(rand()*f32(count)),count-1u);}else{s.wi=cosineDir(n);}
+ var pdf=0.0;
+ for(var j=select(1u,0u,guided);j<=count;j++){
+  let g=guideBox(o,select(j-1u,k,j==0u));
+  if(j>0u){pdf+=boxPdf(o,s.wi,g)/f32(count);continue;}
   var pick=rand()*g.total;var selected=0u;
   for(var face=0u;face<6u;face++){
    let axis=face>>1u;let sign=select(-1.0,1.0,(face&1u)!=0u);
@@ -156,8 +161,8 @@ fn guidedSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32,o:vec3f,air:bool)->Bounce {
   let v=xpoint(g.world,p)-o;
   if(dot(v,v)==0.0){return s;}
   s.wi=normalize(v);
- }else{s.wi=cosineDir(n);}
- s.pdf=guidePdf(o,n,s.wi);
+ }
+ s.pdf=${(1 - guideStrength).toPrecision(9)}*(max(dot(n,s.wi),0.0)*INV_PI)+${guideStrength.toPrecision(9)}*pdf;
  if(s.pdf<=0.0||dot(n,s.wi)<=0.0){return s;}
  let e=evalSurface(m,n,wo,s.wi);
  s.w=e.f/s.pdf;s.ok=true;

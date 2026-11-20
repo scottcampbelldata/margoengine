@@ -3,13 +3,16 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const entry = process.argv[2];
 if (!/^[a-z-]+$/.test(entry ?? '')) throw new Error('Pass one optional controls entry name');
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },
@@ -20,6 +23,8 @@ try {
   browser = await launchBrowser({ headless: true });
   const page = await browser.newPage();
   const errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim, compatUrl());
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${server.resolvedUrls.local[0]}tests/optional.html?entry=${entry}`);
   await page.waitForFunction(() => typeof window.runOptionalCheck === 'function');

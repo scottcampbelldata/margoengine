@@ -4,6 +4,8 @@ import { engineRuntime, meshRuntime, type Engine, type Mesh } from '@margoengine
 import { MargoError } from '@margoengine/math/errors';
 import { blockState, type BlockTypeOptions } from './blocks.js';
 import { chunkKey, type VoxelWorld } from './world.js';
+import type { VoxelOrigin } from './render.js';
+import { checkOrigin, originPoint } from './origin.js';
 
 /** A core mesh, or the core mesh graph returned by the glTF loader. Source meshes remain caller owned. */
 export type ObjectBlockSource = MeshHandle | { readonly root: MeshHandle; readonly meshes: readonly MeshHandle[] };
@@ -29,6 +31,16 @@ interface Cell {
   state: number;
   meshes: Mesh[];
 }
+/** Options of {@link VoxelObjects.attach}. */
+export interface VoxelObjectsOptions {
+  /**
+   * Origin rebasing for worlds far from zero, as `VoxelRendererOptions.origin` (pass the same object): an object whose
+   * `origin` is the float64 world point (blocks) drawn at engine zero, such as a `FloatingOrigin` of
+   * `@margoengine/cameras/origin`; read every update. Placements sit at their cell minus the origin in float64, so
+   * their float32 positions stay small wherever the world is. Default null (world and engine space are the same).
+   */
+  origin?: VoxelOrigin | null;
+}
 const xyz = (v: { x: number; y: number; z: number }): [number, number, number] => [v.x, v.y, v.z];
 
 /**
@@ -37,10 +49,16 @@ const xyz = (v: { x: number; y: number; z: number }): [number, number, number] =
  * extending outside a chunk. Call update after block edits and before rendering. No GPU allocation on construction.
  */
 export class VoxelObjects {
-  /** Subscribes object-block placement to this world. Call update before rendering. */
-  static attach(engine: EngineKernel, world: VoxelWorld): VoxelObjects {
-    return new VoxelObjects(engine, world);
+  /**
+   * Subscribes object-block placement to this world. Call update before rendering.
+   * @throws TypeError when `origin` is not null or an object with `origin`.
+   */
+  static attach(engine: EngineKernel, world: VoxelWorld, options: VoxelObjectsOptions = {}): VoxelObjects {
+    return new VoxelObjects(engine, world, options);
   }
+  /** Live {@link VoxelObjectsOptions.origin}; null for none. */
+  origin: VoxelOrigin | null;
+  private placed: [number, number, number] = [0, 0, 0];
   private readonly engine: Engine;
   private readonly templates = new Map<number, readonly Node[]>();
   private readonly pending = new Set<string>();
@@ -50,8 +68,10 @@ export class VoxelObjects {
   constructor(
     engine: EngineKernel,
     readonly world: VoxelWorld,
+    options: VoxelObjectsOptions = {},
   ) {
     this.engine = engineRuntime(engine);
+    this.origin = checkOrigin(options?.origin, 'VoxelObjects');
     this.off = [
       world.onChunk((cx, cy, cz) => this.pending.add(chunkKey(cx, cy, cz))),
       world.onChange((x, y, z) => this.pending.add(chunkKey(x >> 5, y >> 5, z >> 5))),
@@ -98,6 +118,12 @@ export class VoxelObjects {
     for (const mesh of model?.meshes ?? [root]) visit(meshRuntime(mesh));
     if (!nodes.some((n) => n.geometry))
       throw new RangeError('Object source has no geometry; pass a core mesh or loaded glTF Model');
+    // Each placement adds one parent above the copied nodes, and core allows 63 parents above a mesh.
+    const depth = (n: Node): number => (n.parent < 0 ? 0 : 1 + depth(nodes[n.parent]));
+    if (nodes.some((n) => depth(n) >= 63))
+      throw new RangeError(
+        'Object source nests 64 or more meshes deep; placements add one level and core allows 63, so flatten the graph',
+      );
     const id = this.world.blocks.define(name, { solid: false, opacity: 0, ...options, shape: 'object' });
     this.templates.set(id, nodes);
     return id;
@@ -122,9 +148,21 @@ export class VoxelObjects {
       }
     return { chunks: this.chunks.size, cells, meshes };
   }
-  /** Reconciles changed chunks. Unchanged cells retain their handles and GPU instance rows. */
+  /**
+   * Moves every placement when the origin moved, then reconciles changed chunks. Unchanged cells retain their handles
+   * and GPU instance rows.
+   * @throws RangeError when the origin holds a value that is not a finite number.
+   */
   update(): void {
     this.check();
+    const shift = originPoint(this.origin, 'VoxelObjects');
+    if (shift.some((v, a) => v !== this.placed[a])) {
+      this.placed = shift;
+      for (const [key, cells] of this.chunks) {
+        const [cx, cy, cz] = key.split(',').map(Number);
+        for (const [i, cell] of cells) cell.meshes[0].setPosition(this.cellPosition(cx, cy, cz, i, shift));
+      }
+    }
     for (const key of this.pending) {
       const [cx, cy, cz] = key.split(',').map(Number),
         chunk = this.world.getChunk(cx, cy, cz),
@@ -134,49 +172,68 @@ export class VoxelObjects {
         this.chunks.delete(key);
         continue;
       }
-      for (let i = 0; i < 32768; i++) {
-        const x = i & 31,
-          y = i >> 10,
-          z = (i >> 5) & 31,
-          state = chunk.get(x, y, z),
-          nodes = this.templates.get(state & 65535),
-          old = cells.get(i);
-        if (old?.state === state) continue;
-        if (old) {
-          this.remove(old);
-          cells.delete(i);
-        }
-        if (!nodes) continue;
-        const placement = this.engine
-          .createMesh()
-          .setPosition([cx * 32 + x + 0.5, cy * 32 + y, cz * 32 + z + 0.5])
-          .setRotation([0, (((state >>> 16) & 3) * Math.PI) / 2, 0]);
-        const made = [placement],
-          clones: Mesh[] = [];
-        try {
-          for (const n of nodes) {
-            const mesh = this.engine
-              .createMesh(n.parent < 0 ? placement : clones[n.parent])
-              .setGeometry(n.geometry)
-              .setMaterial(n.material)
-              .setPosition(n.position)
-              .setRotation(n.rotation)
-              .setScale(n.scale);
-            mesh.receiveShadow = n.receiveShadow;
-            mesh.name = n.name;
-            clones.push(mesh);
-            made.push(mesh);
+      // The chunk's cell map is stored even when a placement throws part way, so the placements made before it stay
+      // owned (dispose releases them, the retry keeps them); the key stays pending and the next update finishes it.
+      try {
+        for (let i = 0; i < 32768; i++) {
+          const x = i & 31,
+            y = i >> 10,
+            z = (i >> 5) & 31,
+            state = chunk.get(x, y, z),
+            nodes = this.templates.get(state & 65535),
+            old = cells.get(i);
+          if (old?.state === state) continue;
+          if (old) {
+            this.remove(old);
+            cells.delete(i);
           }
-        } catch (error) {
-          this.remove({ state, meshes: made });
-          throw error;
+          if (!nodes) continue;
+          const placement = this.engine
+            .createMesh()
+            .setPosition(this.cellPosition(cx, cy, cz, i, shift))
+            .setRotation([0, (((state >>> 16) & 3) * Math.PI) / 2, 0]);
+          const made = [placement],
+            clones: Mesh[] = [];
+          try {
+            for (const n of nodes) {
+              const mesh = this.engine
+                .createMesh(n.parent < 0 ? placement : clones[n.parent])
+                .setGeometry(n.geometry)
+                .setMaterial(n.material)
+                .setPosition(n.position)
+                .setRotation(n.rotation)
+                .setScale(n.scale);
+              mesh.receiveShadow = n.receiveShadow;
+              mesh.name = n.name;
+              clones.push(mesh);
+              made.push(mesh);
+            }
+          } catch (error) {
+            this.remove({ state, meshes: made });
+            throw error;
+          }
+          cells.set(i, { state, meshes: made });
         }
-        cells.set(i, { state, meshes: made });
+      } finally {
+        if (cells.size) this.chunks.set(key, cells);
+        else this.chunks.delete(key);
       }
-      if (cells.size) this.chunks.set(key, cells);
-      else this.chunks.delete(key);
     }
     this.pending.clear();
+  }
+  // A placement's position: the bottom centre of cell i of chunk (cx, cy, cz) minus the origin, in float64.
+  private cellPosition(
+    cx: number,
+    cy: number,
+    cz: number,
+    i: number,
+    shift: readonly number[],
+  ): [number, number, number] {
+    return [
+      cx * 32 + (i & 31) + 0.5 - shift[0],
+      cy * 32 + (i >> 10) - shift[1],
+      cz * 32 + ((i >> 5) & 31) + 0.5 - shift[2],
+    ];
   }
   private remove(cell: Cell): void {
     for (let i = cell.meshes.length - 1; i >= 0; i--) cell.meshes[i].dispose();

@@ -93,6 +93,6 @@ test('legacy exhaustion follows the coded failure and help-link contract', () =>
   const impossible = [{ neighbors: Array.from({ length: 6 }, () => []) }];
   assert.throws(
     () => new WFC([2, 1, 1], impossible).solve(1, [], 1),
-    (e) => e.code === 'failed' && /https:\/\/margoengine.com\/docs\/wfc/.test(e.message),
+    (e) => e.code === 'failed' && /https:\/\/margoengine.com\/llms\/packages\/wfc\.md/.test(e.message),
   );
 });

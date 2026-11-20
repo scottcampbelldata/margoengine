@@ -362,3 +362,41 @@ test('a video a browser refuses as the copy source (Firefox) reaches the layer t
     globalThis.OffscreenCanvas = Original;
   }
 });
+
+// Audit 2026-11-15: a 'stereo-left-right' or 'stereo-top-bottom' layer allocates one texture holding both views (WebXR
+// Layers, allocation: width or height times the view count) and getSubImage gives eye 'none' only the first view's
+// half (initialize the viewport: x = width * offset / num, width / num, offset 0, num 2). The one image holding both
+// eyes must fill the whole texture, not that half.
+test('a packed stereo layer copies its one image for both eyes over the whole texture', () => {
+  for (const [layout, texture, picture] of [
+    ['stereo-left-right', [128, 64], [128, 64]],
+    ['stereo-top-bottom', [64, 128], [64, 128]],
+  ]) {
+    const { xr, copies } = host();
+    const packed = { width: texture[0], height: texture[1], createView: (d) => ({ d }) };
+    xr.layerBinding.binding.getSubImage = (layer, frame, eye = 'none') => {
+      const index = layer.layout === 'stereo' && eye === 'right' ? 1 : 0;
+      const leftRight = layer.layout === 'stereo-left-right',
+        topBottom = layer.layout === 'stereo-top-bottom';
+      return {
+        colorTexture: packed,
+        viewport: {
+          x: leftRight ? (packed.width * index) / 2 : 0,
+          y: topBottom ? (packed.height * index) / 2 : 0,
+          width: leftRight ? packed.width / 2 : packed.width,
+          height: topBottom ? packed.height / 2 : packed.height,
+        },
+        getViewDescriptor: () => ({ dimension: '2d', baseArrayLayer: 0 }),
+      };
+    };
+    const layers = XRLayers.attach(xr),
+      both = image(...picture),
+      targets = [];
+    layers.quad({ pixels: [64, 64], layout, content: both });
+    layers.quad({ pixels: [64, 64], layout, content: (target) => targets.push(target.viewport) });
+    xr.step();
+    xr.step();
+    assert.deepEqual(copies, [[both, [0, 0, 0], picture]], layout);
+    assert.deepEqual(targets, [{ x: 0, y: 0, width: texture[0], height: texture[1] }], layout);
+  }
+});

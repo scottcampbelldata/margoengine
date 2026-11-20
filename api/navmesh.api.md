@@ -82,6 +82,12 @@ export interface CrowdAgentOptions {
 
 export type CrowdAgentState = 'idle' | 'moving' | 'offmesh' | 'arrived' | 'unreachable';
 
+export interface CrowdDensityOptions {
+    gamma?: number;
+    jam?: number;
+    radius?: number;
+}
+
 export interface CrowdEventMap {
     arrive: CrowdAgent;
     unreachable: CrowdAgent;
@@ -97,6 +103,7 @@ export interface CrowdOptions {
     neighborDistance?: number;
     maxNeighbors?: number;
     timeHorizon?: number;
+    density?: boolean | CrowdDensityOptions;
 }
 
 export type NavFilter = ArrayLike<number>;

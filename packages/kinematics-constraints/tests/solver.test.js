@@ -660,3 +660,14 @@ test('identical input and timestep sequences replay exactly from fresh state', (
   };
   assert.deepEqual(replay(), replay());
 });
+
+test("a solve's acceptPose does not carry over to a later calculatePoleClearance", () => {
+  const solver = new AvoidanceSolver();
+  const rejected = solver.solve([0, 0, 0], [1, 0, 0], [1, 0, 0], 1, 1, 0.02, 0.02, 1 / 60, twoBoneIK(1, 1), {
+    acceptPose: () => false,
+  });
+  assert.equal(rejected.resolved, false);
+  // Nothing is in the way, so the first swivel is clear; the rejecting predicate was the solve's only.
+  const result = solver.calculatePoleClearance([-1, 0, 0], [0, 1, 0], [1, 0, 0], 0.02);
+  assert.equal(result.resolved, true);
+});

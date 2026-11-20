@@ -14,8 +14,18 @@ export interface OpenFOAMOptions extends EngineeringOptions {
   /** Mesh directory relative to the case, default constant/polyMesh. */
   readonly mesh?: string;
 }
+/** One boundaryField entry: its key, whether the key was quoted (a regular expression) and where its value starts. */
+interface PatchEntry {
+  readonly key: string;
+  readonly pattern: boolean;
+  readonly value: number;
+}
 class Foam {
   at = 0;
+  /** The last token was a quoted string, so '' or '{' in it are text, not end of input or syntax. */
+  quoted = false;
+  /** Top-level keyword positions, for `$name` macros and entry lookup. */
+  readonly keys = new Map<string, number>();
   readonly text: string;
   readonly header: Record<string, string> = Object.create(null);
   readonly binary: boolean;
@@ -38,7 +48,106 @@ class Foam {
     this.labelBytes = Number(/label=(32|64)/.exec(arch)?.[1] ?? 32) / 8;
     this.scalarBytes = Number(/scalar=(32|64)/.exec(arch)?.[1] ?? 64) / 8;
   }
+  /** Indexes a dictionary file's top-level entries, stepping over raw binary lists so their bytes are never tokenized. */
+  index(): this {
+    const body = this.at;
+    for (let key = this.token(); key || this.quoted; key = this.token()) {
+      if (key.startsWith('#') && !this.quoted) this.directive();
+      else {
+        this.keys.set(key, this.at);
+        this.skipEntry();
+      }
+    }
+    this.at = body;
+    return this;
+  }
+  /** Steps over `#include "file"`, `#remove (a b)` and the like; included files are not read. */
+  directive(): void {
+    if (this.token() === '(' && !this.quoted) this.skipTo(')');
+  }
+  /** Steps past the closing bracket matching one already read, over nested brackets and raw lists. */
+  skipTo(close: string): void {
+    for (let depth = 1; depth; ) {
+      const t = this.token();
+      if (!t && !this.quoted) bad('unterminated OpenFOAM entry');
+      if (this.quoted) continue;
+      if (t === 'nonuniform') this.skipList();
+      else if ('{(['.includes(t)) depth++;
+      else if ('})]'.includes(t)) depth--;
+    }
+  }
+  /** Steps over one entry's value: a sub-dictionary, or tokens up to the closing ';'. */
+  skipEntry(): void {
+    for (;;) {
+      const t = this.token();
+      if (!t && !this.quoted) bad('unterminated OpenFOAM entry');
+      if (this.quoted) continue;
+      if (t === ';') return;
+      if (t === '{') return this.skipTo('}');
+      if (t === 'nonuniform') this.skipList();
+      else if (t === '(' || t === '[') this.skipTo(t === '(' ? ')' : ']');
+    }
+  }
+  /** Steps over `List<type> n(...)` (or ascii `n{v}`); binary bytes are skipped by the element width. */
+  skipList(): void {
+    const type = this.token(),
+      n = this.count(),
+      open = this.token();
+    if (open === '{' && !this.binary) return this.skipTo('}');
+    if (open !== '(') bad(`expected OpenFOAM (, got ${open}`);
+    if (!this.binary) return this.skipTo(')');
+    const element = /<(\w+)>/.exec(type)?.[1] ?? '',
+      width = { label: 1, scalar: 1, sphericalTensor: 1, vector: 3, symmTensor: 6, tensor: 9 }[element];
+    if (!width) bad(`unsupported OpenFOAM binary list ${type}`);
+    this.values(n * width!, element === 'label' ? 'label' : 'scalar');
+    this.expect(')');
+  }
+  /** Moves to a top-level entry's value. */
+  find(name: string): boolean {
+    const at = this.keys.get(name);
+    if (at !== undefined) this.at = at;
+    return at !== undefined;
+  }
+  /**
+   * boundaryField entries in file order. Precedence (OpenFOAM User Guide, boundary conditions; OpenFOAM 2.2.0
+   * release notes, patch groups): an exact patch name, then a patch group, then the last matching quoted pattern.
+   */
+  patches(): PatchEntry[] {
+    const out: PatchEntry[] = [];
+    if (!this.find('boundaryField')) return out;
+    this.expect('{');
+    for (;;) {
+      const key = this.token(),
+        pattern = this.quoted;
+      if (key === '}' && !pattern) return out;
+      if (!key && !pattern) bad('unterminated boundaryField');
+      if (key.startsWith('#') && !pattern) {
+        this.directive();
+        continue;
+      }
+      const at = this.at;
+      if (this.token() !== '{' || this.quoted) {
+        // A macro or other non-dictionary patch entry: no value is read from it.
+        this.at = at;
+        this.skipEntry();
+        out.push({ key, pattern, value: -1 });
+        continue;
+      }
+      let value = -1;
+      for (;;) {
+        const t = this.token();
+        if (!t && !this.quoted) bad('unterminated boundary patch field');
+        if (this.quoted) continue;
+        if (t === '}') break;
+        if (t === 'value') value = this.at;
+        if (t.startsWith('#')) this.directive();
+        else this.skipEntry();
+      }
+      out.push({ key, pattern, value });
+    }
+  }
   token(): string {
+    this.quoted = false;
     for (;;) {
       while (/\s/.test(this.text[this.at] ?? '') && this.at < this.text.length) this.at++;
       if (this.text.startsWith('//', this.at)) {
@@ -62,6 +171,7 @@ class Foam {
       if (end < 0) bad('unterminated OpenFOAM string');
       const s = this.text.slice(this.at, end);
       this.at = end + 1;
+      this.quoted = true;
       return s;
     }
     const start = this.at - 1;
@@ -119,8 +229,17 @@ class Foam {
     this.expect(')');
     return out;
   }
-  field(width: number, n: number): Float64Array {
+  field(width: number, n: number, depth = 0): Float64Array {
     const kind = this.token();
+    if (kind.startsWith('$') && !this.quoted) {
+      // A `$name` macro names another top-level entry of this file (OpenFOAM User Guide, macro expansion).
+      const back = this.at;
+      if (depth > 8 || !this.find(kind.slice(1).replace(/^\{(.*)\}$/, '$1')))
+        bad(`OpenFOAM macro ${kind} is not a top-level entry of the field file`);
+      const data = this.field(width, n, depth + 1);
+      this.at = back;
+      return data;
+    }
     if (kind === 'uniform') {
       if (width > 1) this.expect('(');
       const tuple = Array.from({ length: width }, () => this.number());
@@ -133,11 +252,15 @@ class Foam {
     if (data.length !== n * width) bad('OpenFOAM field tuple count differs from mesh');
     return data;
   }
-  seek(name: string): boolean {
-    for (let t = this.token(); t; t = this.token()) if (t === name) return true;
-    return false;
-  }
 }
+/** A quoted boundaryField key is a regular expression matched against the whole patch name. */
+const pattern = (key: string): RegExp => {
+  try {
+    return new RegExp(`^(?:${key})$`);
+  } catch {
+    return bad(`invalid OpenFOAM patch pattern "${key}"`);
+  }
+};
 /** Reads ascii/binary polyMesh and volume/point scalar, vector and tensor fields. */
 export async function readOpenFOAM(input: FileInput, options: OpenFOAMOptions = {}): Promise<DataSet> {
   const base = options.mesh ?? 'constant/polyMesh',
@@ -184,9 +307,9 @@ export async function readOpenFOAM(input: FileInput, options: OpenFOAMOptions = 
   }));
   const pointArrays: Record<string, Float64Array> = Object.create(null),
     cellArrays: Record<string, Float64Array> = Object.create(null),
-    fields = new Map<string, { bytes: Uint8Array; width: number }>();
+    fields = new Map<string, { file: Foam; width: number; patches: PatchEntry[] }>();
   for (const name of options.fields ?? []) {
-    const f = await load((options.time ?? '0') + '/' + name),
+    const f = (await load((options.time ?? '0') + '/' + name)).index(),
       cls = f.header.class,
       width = /SphericalTensor/i.test(cls)
         ? 1
@@ -198,10 +321,10 @@ export async function readOpenFOAM(input: FileInput, options: OpenFOAMOptions = 
               ? 3
               : 1,
       n = cls.startsWith('point') ? points.length / 3 : cells.length;
-    if (!f.seek('internalField')) bad('OpenFOAM field has no internalField');
+    if (!f.find('internalField')) bad('OpenFOAM field has no internalField');
     const data = f.field(width, n);
     (cls.startsWith('point') ? pointArrays : cellArrays)[name] = data;
-    fields.set(name, { bytes: f.bytes, width });
+    fields.set(name, { file: f, width, patches: f.patches() });
   }
   const blocks: DataSetInput[] = [
       {
@@ -225,6 +348,7 @@ export async function readOpenFOAM(input: FileInput, options: OpenFOAMOptions = 
       let depth = 1,
         start = -1,
         count = -1;
+      const groups: string[] = [];
       while (depth) {
         const key = b.token();
         if (!key) bad('unterminated OpenFOAM boundary');
@@ -232,48 +356,35 @@ export async function readOpenFOAM(input: FileInput, options: OpenFOAMOptions = 
         if (key === '}') depth--;
         if (depth === 1 && key === 'startFace') start = b.count();
         if (depth === 1 && key === 'nFaces') count = b.count();
+        if (depth === 1 && key === 'inGroups') {
+          // `inGroups List<word> 2(wall heated);`
+          for (let t = b.token(); t !== '('; t = b.token()) if (!t) bad('unterminated OpenFOAM inGroups');
+          for (let t = b.token(); t !== ')'; t = b.token()) {
+            if (!t) bad('unterminated OpenFOAM inGroups');
+            groups.push(t);
+          }
+        }
       }
       if (start < 0 || count < 0 || start + count > faces.length) bad('OpenFOAM boundary face range is invalid');
       const arrays: Record<string, Float64Array> = Object.create(null);
       for (const [key, data] of Object.entries(cellArrays)) {
-        const { width, bytes } = fields.get(key)!;
-        arrays[key] = Float64Array.from(
-          { length: count * width },
-          (_, i) => data[owner[start + Math.floor(i / width)] * width + (i % width)],
-        );
-        const field = new Foam(bytes);
-        if (field.seek('boundaryField')) {
-          field.expect('{');
-          while (true) {
-            const patch = field.token();
-            if (patch === '}') break;
-            if (!patch) bad('unterminated boundaryField');
-            field.expect('{');
-            let depth = 1;
-            while (depth) {
-              const token = field.token();
-              if (!token) bad('unterminated boundary patch field');
-              if (token === '{') depth++;
-              if (token === '}') depth--;
-              if (depth === 1 && patch === name && token === 'value') arrays[key] = field.field(width, count);
-              else if (depth === 1 && token === 'value') {
-                // Consume unrelated raw binary lists without tokenizing arbitrary bytes.
-                const at = field.at,
-                  kind = field.token();
-                field.at = at;
-                if (kind === 'nonuniform') {
-                  field.token();
-                  field.token();
-                  const n = field.count();
-                  field.expect('(');
-                  field.values(n * width, 'scalar');
-                  if (!field.binary && width > 1 && n) field.expect(')');
-                  field.expect(')');
-                }
-              }
-            }
-          }
-        }
+        const { width, file, patches } = fields.get(key)!,
+          last = (match: (e: PatchEntry) => boolean) => {
+            for (let i = patches.length; i--; ) if (match(patches[i])) return patches[i];
+          },
+          entry =
+            last((e) => !e.pattern && e.key === name) ??
+            last((e) => !e.pattern && groups.includes(e.key)) ??
+            last((e) => e.pattern && pattern(e.key).test(name));
+        if (entry && entry.value >= 0) {
+          file.at = entry.value;
+          arrays[key] = file.field(width, count);
+        } else
+          // No written value (zeroGradient and the like): extrapolate the owner cell's value.
+          arrays[key] = Float64Array.from(
+            { length: count * width },
+            (_, i) => data[owner[start + Math.floor(i / width)] * width + (i % width)],
+          );
       }
       blocks.push({
         kind: 'polydata',

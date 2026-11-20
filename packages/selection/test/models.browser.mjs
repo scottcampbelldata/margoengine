@@ -1,5 +1,5 @@
 // Real-adapter check (run from the repository root after building packages): node packages/selection/test/models.browser.mjs
-// GPU picking and outlines on loaded gltf-pro models, cross-checked against the bvh Raycaster, in perspective and orthographic views.
+// GPU picking and outlines on loaded gltf/pbr models, cross-checked against the bvh Raycaster, in perspective and orthographic views.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -9,8 +9,6 @@ import { decodePNG } from '../../../tests/support/png.js';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 // Correctness always runs. The optional latency measurement belongs to the quiet speed phase.
 const timing = process.argv.includes('--time');
-if (timing && process.env.MARGO_GPU_LOCK_NESTED_MODE !== 'exclusive')
-  throw new Error('Model-picking timing requires an exclusive outer GPU lock; do not run it during the build phase.');
 const browser = await openBrowser(),
   { page, hardware } = browser,
   errors = [];
@@ -33,7 +31,7 @@ try {
   const report = await page.evaluate(async (timing) => {
     const { Engine, box, PbrMaterial: _PbrMaterial } = await import('/packages/core/dist/extension.js'),
       { Picking, Selection } = await import('/packages/selection/dist/index.js');
-    const { loadGLTF } = await import('/packages/gltf-pro/dist/index.js'),
+    const { loadGLTF } = await import('/packages/gltf/dist/pbr.js'),
       { Raycaster } = await import('/packages/bvh/dist/index.js'),
       { CameraProjection } = await import('/packages/cameras/dist/index.js');
     const { Material, createMesh } = await import('/packages/materials/dist/index.js');
@@ -177,7 +175,7 @@ try {
     checks.push(ortho);
     assert(ortho.rate === 1, 'orthographic GPU and CPU picking disagree: ' + JSON.stringify(ortho));
     e.removePlugin('cameras');
-    // Outlines: a picked node and a whole model; the equal-depth mask needs the replay to match gltf-pro's depth exactly.
+    // Outlines: a picked node and a whole model; the equal-depth mask needs the replay to match gltf/pbr's depth exactly.
     const selection = Selection.attach(e, { color: [1, 0, 1], width: 3 });
     window.selection = selection;
     window.select = (which) => {

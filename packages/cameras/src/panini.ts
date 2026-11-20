@@ -8,6 +8,7 @@ import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extens
 import type { PostStack } from '@margoengine/post';
 import { group, fullscreen, render } from '../../shared/gpu.js';
 import { margoError } from '../../shared/errors.js';
+import { restoreEffect, retireEffect, type LifecycleEffect } from '../../shared/effect-lifecycle.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { GAIN, INVERSE, MODES, type WideAngleMode } from './wide-laws.js';
@@ -211,13 +212,13 @@ export class WideAngle implements EnginePlugin {
     this.map(60, 1);
   }
   /**
-   * Runs a new WideAngle alone in its own PostStack, which disposing it disposes too (needs `@margoengine/post`).
-   * To combine it with other effects, add `new WideAngle()` after the display effect of your own `PostStack`.
+   * Adds a new WideAngle to the scene's PostStack after its last LDR effect, or to a new PostStack when the scene has
+   * none (needs `@margoengine/post`). Disposing it takes it out, and a stack made for it goes with it.
    */
   static async attach(engine: EngineKernel, options: WideAngleOptions = {}): Promise<WideAngle> {
     const { PostStack } = await import('@margoengine/post'),
       effect = new WideAngle(options);
-    effect.stack = PostStack.attach(engine, [effect]);
+    effect.stack = PostStack.join(engine, effect);
     return effect;
   }
   /** Whether the picture is projected (mirrors `options.enabled`). */
@@ -247,7 +248,7 @@ export class WideAngle implements EnginePlugin {
   setup(engine: Engine): void {
     if (this.disposed) throw margoError('disposed', 'WideAngle is disposed; create a new WideAngle');
     if (!this.stacked)
-      throw margoError('state', 'WideAngle runs inside a PostStack; add it to PostStack.attach(engine, [effect])');
+      throw margoError('state', 'WideAngle runs inside a PostStack; add it to PostStack.join(engine, effect)');
     if (!engine.gpu)
       throw margoError('unsupported', 'WideAngle requires WebGPU; it does not run on the WebGL2 fallback');
     this.engine = engine;
@@ -255,19 +256,12 @@ export class WideAngle implements EnginePlugin {
     this.sampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear' });
   }
   onDeviceRestored(engine: Engine): void {
-    this.release();
-    this.engine = undefined;
-    this.setup(engine);
+    restoreEffect(this as unknown as LifecycleEffect, engine);
   }
   /** Removes the effect and releases its GPU resources. Safe to call twice. */
   dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    const engine = this.engine;
-    this.engine = undefined;
-    engine?.sceneOf(this)?.removePlugin(this.name);
-    this.release();
-    this.stack?.dispose();
+    if (!retireEffect(this as unknown as LifecycleEffect)) return;
+    this.stack?.removeEffect(this);
     this.stack = undefined;
   }
   declare [Symbol.dispose]: () => void;

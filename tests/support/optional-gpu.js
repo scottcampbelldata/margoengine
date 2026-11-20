@@ -54,6 +54,7 @@ export function optionalGPU() {
   engine.gpu.queue.onSubmittedWorkDone ??= () => Promise.resolve();
   engine.gpu.createSampler = () => ({});
   engine.gpu.createBindGroupLayout = () => ({});
+  engine.gpu.createPipelineLayout ??= (descriptor) => descriptor;
   engine.gpu.importExternalTexture = (descriptor) => descriptor;
   const pass = {
     setPipeline() {},
@@ -73,6 +74,7 @@ export function optionalGPU() {
       counts.indirect = (counts.indirect ?? 0) + 1;
     },
     dispatchWorkgroups() {},
+    executeBundles() {},
     end() {},
   };
   c.encoder.beginRenderPass = () => {
@@ -112,7 +114,7 @@ export function optionalGPU() {
   };
 }
 
-/** The bytes of a uniform binding ({buffer, offset, size}) or of a gltf-pro uniform slot, on the fake GPU's buffers. */
+/** The bytes of a uniform binding ({buffer, offset, size}) or of a gltf/pbr uniform slot, on the fake GPU's buffers. */
 export function uniformBytes(binding) {
   const { buffer, offset = 0, size } = binding.binding ?? binding;
   return new Uint8Array(buffer.data, offset, size ?? buffer.size - offset);

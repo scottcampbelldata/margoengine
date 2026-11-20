@@ -280,17 +280,17 @@ const builders = {
   async gltf(canvas, data, marks) {
     const engine = await engineFor(canvas, data.camera, 4096, marks),
       s = performance.now(),
-      { loadGLTF } = await import('@margoengine/gltf-pro');
+      { loadGLTF } = await import('@margoengine/gltf/pbr');
     await loadGLTF(engine, data.url);
     marks.buildMs = +(performance.now() - s).toFixed(1);
-    return app(engine, () => {}, { camera: data.camera, note: 'engine.stats.drawCalls (gltf-pro draws included)' });
+    return app(engine, () => {}, { camera: data.camera, note: 'engine.stats.drawCalls (gltf/pbr draws included)' });
   },
 
   async helmet(canvas, data, marks) {
     const engine = await engineFor(canvas, data.camera, 1024, marks),
       s = performance.now();
     const [{ loadGLTF }, { Environment, EnvironmentLighting }, { Shadows }] = await Promise.all([
-      import('@margoengine/gltf-pro'),
+      import('@margoengine/gltf/pbr'),
       import('@margoengine/environment'),
       import('@margoengine/shadows'),
     ]);

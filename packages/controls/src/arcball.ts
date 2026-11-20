@@ -3,6 +3,7 @@ import { Controls, type ControlElement, type EventTargetLike, type InputEventLis
 import { dollyFactor, EPS, finiteInput, madd, rotateAxis, type V3 } from './math.js';
 import { cross, dot, normalize, sub } from '@margoengine/math/vec3';
 import { basis, intersectPlane, ray, type Basis } from './view.js';
+import { typeError } from '../../shared/errors.js';
 export { Controls };
 export { ArcballGizmo, type ArcballGizmoOptions, type ArcballGizmoTarget } from './arcball-gizmo.js';
 
@@ -159,7 +160,7 @@ export class ArcballControls extends Controls {
     super(source, element);
     const projection = options.projection;
     if (projection != null && typeof projection.zoom !== 'number')
-      throw new TypeError('ArcballControls projection has no numeric zoom; pass a CameraProjection or null');
+      throw typeError('ArcballControls projection has no numeric zoom; pass a CameraProjection or null', 'controls-arguments');
     this.projectionOption = projection;
     this.pick = options.pick ?? null;
     this.saveState();

@@ -1,0 +1,4 @@
+{
+  "about": "Check scripts that open their own browser page without the WebGL2-layer shim, so a MARGO_COMPAT=1 run of them is native WebGPU (KB-SKY-COMPATCHECK1). Each is owed compatShim from scripts/support/compat-shim.js, or a line \"MARGO_COMPAT not applicable: <reason>\". tests/gpu-compat-honoured.test.js keeps this list exact.",
+  "files": []
+}

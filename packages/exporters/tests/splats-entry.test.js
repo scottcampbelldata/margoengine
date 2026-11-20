@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { exportGaussianGLB, exportSplat } from '@margoengine/exporters/splats';
 import { parsePly, parseSplat, encodeSplat } from '@margoengine/splats/data';
-import { GLTFAsset } from '@margoengine/gltf-pro';
-import { readGaussianSplats, gaussianSplats } from '@margoengine/gltf-pro/splats';
+import { GLTFAsset } from '@margoengine/gltf/pbr';
+import { readGaussianSplats, gaussianSplats } from '@margoengine/gltf/splats';
 import { readAccessor, splitGLB } from '../dist/glb.js';
 
 const cloud = () => ({

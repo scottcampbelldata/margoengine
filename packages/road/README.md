@@ -14,6 +14,23 @@ const {geometry, uvs} = road(curve, {width: 6, curbWidth: 0.2, curbHeight: 0.15,
 engine.createMesh().setGeometry(geometry);
 ```
 
+`roadPath(curve, {width, curbWidth, crossSection, segments, margin})` gives the ground the road covers as
+`{points, width}`: the centreline as XZ points sampled by arc length like `road`, and the full width of the road,
+both curbs and `margin` (default 0.5 m) each side; an asymmetric `crossSection` keeps its wider side clear on both.
+It is the shape `Scatter`'s `paths` option and `clearPlacements` take, so grass, trees and rocks keep off the road:
+
+```ts
+import {road, roadPath} from 'margoengine/road';
+import {Scatter} from 'margoengine/scatter';
+import {Spline} from 'margoengine/splines';
+import {Engine} from 'margoengine/core';
+import {icosahedronGeometry, toGeometry} from 'margoengine/geometry';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const curve = new Spline([[0, 0, 0], [40, 0, 30], [90, 0, 20]]);
+engine.createMesh().setGeometry(road(curve, {width: 6}).geometry);
+Scatter.attach(engine, toGeometry(icosahedronGeometry(0.3, 1, true)), {count: 2000, area: [200, 200], paths: [roadPath(curve, {width: 6})]});
+```
+
 Closed splines use periodic tangent frames: corresponding first and last section vertices and normals meet exactly, while UV V keeps the full travelled distance.
 
 Custom crossSection entries are [lateralOffset, height]. UV V follows distance / uvMeters and U follows cross-section distance. The core is frozen and has no UV channel: uvs is separate data for a textured optional renderer/exporter. Sweeps are Y-up and reject vertical or zero tangents; banking is available in the optional entry below; self-intersection repair is available in its own optional entry below.
@@ -38,7 +55,7 @@ Points are horizontal `[x, z]` metres. Each line has `width` (default 6). Option
 
 Limits: 1..64 roads, 2..4096 points per line and 4096 total, no equal neighbours, coordinates/elevation within +/-1,000,000 m, widths in (0,1000], UV scale in (0,1,000,000]. Bevel joins and butt ends, a shared constant elevation, no curbs, turn-radius design or bridge separation. The polygon grid has about 2^26 steps across the footprint; features below two steps may vanish. Result geometry uses float32 coordinates, so place small roads near their local origin. Collapsed or reversed float32 triangles and overflowing UVs reject with coded help-linked errors. Both WebGPU and the WebGL2 compatibility layer render the same CPU-generated geometry. The GPU test checks road and clear pixels, exact restoration after device reboot, and mesh/engine disposal on both.
 
-GPU tests from the repository root: `node scripts/gpu-lock.mjs run --owner=road-tests --max=8 --wait-max=10 -- npm run test:gpu --workspace @margoengine/road`.
+GPU tests from the repository root: `node scripts/run-with-timeout.mjs --max=8 -- npm run test:gpu --workspace @margoengine/road`.
 
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 

@@ -9,9 +9,9 @@ repository builds and never the unrelated registry placeholder.
 | `npm install @margoengine/core` | Rendering and transforms, no other engine package |
 | `npm install @margoengine/stage` | The stage facade plus core, nothing else required |
 | `npm install @margoengine/game` | Game systems, rendering, input, animation, worlds, audio and navigation |
-| `npm install @margoengine/web` | Product viewers and interactive web scenes |
-| `npm install @margoengine/viz` | Scientific figures, compute, spatial data, terrain, points and lines |
-| `npm install @margoengine/react-kit react react-dom` | The web profile with React bindings and sky, also used by Next.js |
+| `npm install @margoengine/kit-web` | Product viewers and interactive web scenes |
+| `npm install @margoengine/kit-viz` | Scientific figures, compute, spatial data, terrain, points and lines |
+| `npm install @margoengine/kit-react react react-dom` | The web profile with React bindings and sky, also used by Next.js |
 | `npm install margoengine` | Every engine package |
 
 A kit is a small package of typed re-exports, with a dependency on each member it exposes. It contains no copied
@@ -23,7 +23,7 @@ already-built physics package without changing it.
 With a `<canvas id="viewport"></canvas>` in the page, a web profile starts a scene directly:
 
 ```ts
-import {createStage} from '@margoengine/web';
+import {createStage} from '@margoengine/kit-web';
 
 const stage = await createStage('#viewport');
 stage.box({color: '#84d6bd'});
@@ -53,7 +53,7 @@ window.addEventListener('pagehide', () => stage.dispose(), {once: true});
 
 For a complete app, `npm create margo@latest my-app -- --template web`, then `cd my-app`, `npm install` and
 `npm run dev`. Choose `game`, `viz`, `react` or `next` for the other starters. Each template declares one domain
-profile; React and Next use `@margoengine/react-kit`. The full engine is never a template dependency.
+profile; React and Next use `@margoengine/kit-react`. The full engine is never a template dependency.
 `scripts/template-install-check.mjs` runs this actual create command through the private packed registry, installs
 and builds all five templates, and checks their exact engine dependency closures. Its separate
 `scripts/template-browser-check.mjs` proves a first frame from each production build, including Next's server.
@@ -64,8 +64,8 @@ Optional third-party peers, including React, remain app choices and are never si
 3D solver comes with `@margoengine/physics`; its optional `@dimforge/rapier3d-compat` peer is only for passing your
 own Rapier through the `rapier` option.
 
-Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/web/gltf-pro'` (or
-`@margoengine/game/gltf-pro`). The loader is installed with the profile, but a page importing only the root emits
+Model loading is a separate one-line import: `import {loadGLTF} from '@margoengine/kit-web/gltf/pbr'` (or
+`@margoengine/game/gltf/pbr`). The loader is installed with the profile, but a page importing only the root emits
 no Draco or Basis files. Bundlers discover decoder assets before tree-shaking, so the root deliberately keeps the
 loader entry separate. A model app keeps the full glTF/compression support of the existing loader. No loader,
 core or stage implementation changed.
@@ -124,12 +124,21 @@ The unchanged legacy bundle profiles below are min+gzip startup JavaScript when 
 They describe browser bundles, separately from npm install bytes. Lazy parts and decoder assets are extra.
 `tests/umbrella.test.js` checks these existing budgets within 3 percent.
 The game row fell from 377,168 B on 2026-11-10, when the physics names moved to `margoengine/physics`.
+The game row rose from 359,499 B on 2026-11-16, measured again after it drifted past the 3 percent check: the
+gltf/pbr, materials, clustered, controls, post, navmesh and audio roots it bundles grew from 2026-11-10 on, each under
+a raised size ceiling; the sky clocks of GAP-FILM-TIME 2 (28 B) took it over the line, the measured flame and moon
+lights of clustered, math and sky took it to 371,584 B, and the vfx and tonemap clocks of GAP-FILM-TIME 5 add 452 B.
+The game row rose from 372,036 B on 2026-11-17, when the kit gained the iceberg and sea ice names of `@margoengine/water/ice`.
+The web row rose from 96,802 B on 2026-11-15, when tonemap gained its Bradford white balance, output dithering and
+vignette colour, centre, roundness and blend.
+The viz row rose from 266,957 B on 2026-11-16, measured again after it had drifted past the 3 percent check while the
+sciviz, post/stack and tonemap roots it bundles grew (their size ceilings rose by 2,097, 798 and 901 B that day).
 
 | Kit | For | Everything in it, at startup |
 | --- | --- | --- |
-| `margoengine/game` | Games | 359,499 B |
-| `margoengine/viz` | Visualization | 266,957 B |
-| `margoengine/web` | Web scenes | 96,802 B |
+| `margoengine/game` | Games | 383,226 B |
+| `margoengine/viz` | Visualization | 284,907 B |
+| `margoengine/web` | Web scenes | 103,021 B |
 
 `node scripts/kit-install-check.mjs` packs the checkout, serves a read-only local registry, installs in new folders
 inside this lane's ignored test-results directory with an isolated cache, and compares every installed engine
@@ -157,7 +166,7 @@ stage plus core; each kit also draws with the separately installed WebGL2 compat
 package is added only after recording the base install. No symlink to workspace engine code participates.
 
 Reproduce: build packages; run `node scripts/kit-install-check.mjs`; then run
-`node scripts/gpu-lock.mjs run --owner=kit-check --wait-max=60 --max=4 --gpu=packed-kit-first-frames -- node scripts/kit-browser-check.mjs`.
+`node scripts/run-with-timeout.mjs --max=4 -- node scripts/kit-browser-check.mjs`.
 The packed-install CPU check is part of local CI's verify. Each kit README holds one example that
 `npm run check:readme-run -- --packages=game,web,viz,react-kit` runs as written.
 
@@ -168,19 +177,19 @@ Generated from `scripts/umbrella.mjs` (`node scripts/umbrella.mjs` rewrites this
 <!-- kits:start -->
 ### Install profile `@margoengine/game`
 
-`stage`, `core`, `animation`, `animator`, `materials`, `geometry`, `shadows`, `clustered`, `environment`, `sky`, `controls`, `input`, `physics`, `navmesh`, `audio`, `vfx`, `text`, `tween`, `post`, `tonemap`, `ecs`, `fsm`, `net`, `netcode`, `behavior`, `save`, `cutscene`, `cinematic`, `cameras`, `terrain`, `water`, `weather`, `biomes`, `scenery`, `creative`, `procedural`, `wfc`, `road`, `splines`, `tilemap`, `sprites`, `pixel`, `lighting2d`, `ui`, `rigging`, `ragdoll`, `mixer`, `transitions`, `toon`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `gltf`, `gltf-pro`, `decoders`, `loaders`, `bvh`, `selection`, `quality`, `stats`, `staging`, `lightmap`, `shader`, `compute`. Every exported subpath of each member is available as `@margoengine/game/<member>[/<entry>]`.
+`stage`, `core`, `animation`, `animator`, `materials`, `geometry`, `shadows`, `clustered`, `environment`, `sky`, `controls`, `input`, `physics`, `navmesh`, `audio`, `vfx`, `text`, `tween`, `post`, `tonemap`, `ecs`, `fsm`, `netcode`, `behavior`, `save`, `cutscene`, `cinematic`, `cameras`, `terrain`, `water`, `weather`, `biomes`, `creative`, `procedural`, `wfc`, `road`, `splines`, `tilemap`, `sprites`, `pixel`, `lighting2d`, `ui`, `rigging`, `ragdoll`, `mixer`, `transitions`, `toon`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `gltf`, `decoders`, `loaders`, `bvh`, `selection`, `quality`, `stats`, `studio`, `lightmap`, `shader`, `compute`. Every exported subpath of each member is available as `@margoengine/game/<member>[/<entry>]`.
 
-### Install profile `@margoengine/web`
+### Install profile `@margoengine/kit-web`
 
-`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `gltf-pro`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `staging`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`. Every exported subpath of each member is available as `@margoengine/web/<member>[/<entry>]`.
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `studio`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`. Every exported subpath of each member is available as `@margoengine/kit-web/<member>[/<entry>]`.
 
-### Install profile `@margoengine/viz`
+### Install profile `@margoengine/kit-viz`
 
-`stage`, `core`, `points`, `sciviz`, `compute`, `lines`, `splats`, `terrain`, `text`, `labels`, `html`, `controls`, `cameras`, `environment`, `tween`, `stats`, `post`, `tonemap`, `geometry`, `materials`, `loaders`, `exporters`, `gltf`, `gltf-pro`, `decoders`, `selection`, `viewcube`, `bvh`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `tiles`, `splines`. Every exported subpath of each member is available as `@margoengine/viz/<member>[/<entry>]`.
+`stage`, `core`, `points`, `sciviz`, `compute`, `lines`, `splats`, `terrain`, `text`, `labels`, `html`, `controls`, `cameras`, `environment`, `tween`, `stats`, `post`, `tonemap`, `geometry`, `materials`, `loaders`, `exporters`, `gltf`, `decoders`, `selection`, `viewcube`, `bvh`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `tiles`, `splines`. Every exported subpath of each member is available as `@margoengine/kit-viz/<member>[/<entry>]`.
 
-### Install profile `@margoengine/react-kit`
+### Install profile `@margoengine/kit-react`
 
-`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `gltf-pro`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `staging`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`, `react`, `sky`. Every exported subpath of each member is available as `@margoengine/react-kit/<member>[/<entry>]`.
+`stage`, `core`, `environment`, `controls`, `shadows`, `html`, `labels`, `tween`, `post`, `tonemap`, `geometry`, `materials`, `gltf`, `decoders`, `animation`, `loaders`, `exporters`, `selection`, `studio`, `cameras`, `quality`, `stats`, `text`, `video`, `transitions`, `shader`, `lod`, `culling`, `oit`, `cache`, `scene`, `worker`, `bvh`, `lightmap`, `react`, `sky`. Every exported subpath of each member is available as `@margoengine/kit-react/<member>[/<entry>]`.
 
 ### `margoengine/game`
 

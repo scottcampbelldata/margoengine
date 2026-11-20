@@ -26,12 +26,15 @@ for (const [field, Ctor, base] of [
     }
   });
 
-test('iridescenceThicknessRange refuses overflowing, negative or reversed ranges', () => {
+// A reversed range is valid: KHR_materials_iridescence says the minimum MAY be greater than the maximum.
+test('iridescenceThicknessRange refuses overflowing or negative ranges and takes reversed ones', () => {
   const m = new PbrMaterial();
-  for (const range of [[0, overflows], [-1, 10], [20, 10], [1], 'thin'])
+  for (const range of [[0, overflows], [-1, 10], [20, -1], [1], 'thin'])
     assert.throws(() => (m.iridescenceThicknessRange = range), RangeError);
   m.iridescenceThicknessRange = [0, rounds];
   assert.deepEqual(m.iridescenceThicknessRange, [0, rounds]);
+  m.iridescenceThicknessRange = [20, 10];
+  assert.deepEqual(m.iridescenceThicknessRange, [20, 10]);
   m.dispose();
 });
 

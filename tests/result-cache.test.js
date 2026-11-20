@@ -666,7 +666,7 @@ test('building three small packages twice gives the same bytes', { timeout: 120_
 });
 
 // Found on 2026-11-06: build:package:fbx and build:package:usdz reported "same inputs built different bytes" after a
-// rebase that changed only gltf-pro. Their worker bundles take in gltf-pro's dist, which the key did not name.
+// rebase that changed only gltf/pbr. Their worker bundles take in gltf/pbr's dist, which the key did not name.
 test('a package build keys on the dist of what it depends on, near and far, and of nothing else', (t) => {
   const files = {
     'package.json': '{}',

@@ -314,3 +314,16 @@ test('control bindings: reads, defaults, reset, labels and checks', () => {
   input.dispose();
   assert.throws(() => input.control('late'), /disposed/);
 });
+
+test('dispose ends a calibration under way: no timer is left, the signal listener goes and it resolves false', async () => {
+  const { getEventListeners } = await import('node:events');
+  const { gyro, turn } = rig(),
+    controller = new AbortController(),
+    waiting = gyro.calibrate({ duration: 60_000, signal: controller.signal });
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 1);
+  turn(5, 5, 5, 3);
+  gyro.dispose();
+  assert.equal(await waiting, false, 'settles at once, with nothing measured');
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  gyro.dispose();
+});

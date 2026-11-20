@@ -146,6 +146,39 @@ test('all three edge axes rotate and snap, without accumulated rounding or scale
     engine.dispose();
   }
 });
+test('an edge drag turns the box by the angle the pointer swept, at any box size and camera distance', async () => {
+  for (const [s, z] of [
+    [1, 5],
+    [4, 20],
+    [0.25, 1.25],
+    [1, 40],
+  ]) {
+    const el = new Canvas(),
+      engine = new Engine(
+        el,
+        await TransformStore.create(32),
+        { backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {} },
+        { position: [0, 0, z], target: [0, 0, 0] },
+        null,
+      );
+    const mesh = engine.createMesh().setGeometry(box()).setScale([s, s, s]),
+      gizmo = new BoxGizmo(engine).attach(mesh);
+    engine.render();
+    const h = gizmo
+        .handles()
+        .find((h) => h.kind === 'rotate' && h.axis === 2 && h.position[0] > 0 && h.position[1] < 0),
+      radius = Math.hypot(h.position[0], h.position[1]),
+      start = Math.atan2(h.position[1], h.position[0]),
+      from = pixel(engine.camera, h.position),
+      to = pixel(engine.camera, [radius * Math.cos(start + 0.1), radius * Math.sin(start + 0.1), h.position[2]]);
+    assert.ok(gizmo.beginDrag(...from, h.id));
+    gizmo.dragTo(...to);
+    const q = quaternion(mesh);
+    close(2 * Math.atan2(q[2], q[3]), 0.1, 1e-3, `scale ${s} at distance ${z}`);
+    gizmo.endDrag();
+    engine.dispose();
+  }
+});
 test('real pointer capture, escape and cancellation restore transforms and release listeners', async () => {
   const { gizmo, el, mesh, engine } = await rig(),
     handle = gizmo

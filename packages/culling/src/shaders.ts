@@ -278,10 +278,10 @@ export const depthShader =
   common +
   `
 @group(0) @binding(11) var<storage,read> records:array<Record>;
-struct V {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) side:vec2f}
+struct V {@builtin(position) @invariant clip:vec4f,@location(0) @interpolate(flat) side:vec2f}
 @vertex fn vertex(@location(0) position:vec3f,@location(2) index:u32)->V {
   let r=records[index];let model=r.m;let p=model*vec4f(position,1);
-  var o:V;o.clip=u.camera*p;o.side=vec2f(sign(dot(model[0].xyz,cross(model[1].xyz,model[2].xyz))),r.factors.z);return o;
+  var o:V;o.clip=u.camera*p;o.side=vec2f(select(-1.0,1.0,dot(model[0].xyz,cross(model[1].xyz,model[2].xyz))>=0.0),r.factors.z);return o;
 }
 // Matches core's single-sided rule (mirrored instances flip the front face).
 @fragment fn fragment(i:V,@builtin(front_facing) front:bool) {if(front!=(i.side.x>0.0)&&i.side.y<0.5){discard;}}

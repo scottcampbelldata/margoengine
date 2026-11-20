@@ -69,13 +69,14 @@ test('TRS, matrix and hierarchy JSON keep exact double values', async () => {
   assert.deepEqual(text.nodes.find((n) => n.name === 'Placed').matrix, matrix);
 });
 
-test('validation still refuses nonfinite values, bad shapes, partial zero scale and sheared matrices', () => {
+test('validation still refuses nonfinite values, bad shapes and sheared matrices', () => {
   const node = (more) => ({ nodes: [{ geometry: quad(), ...more }] });
   for (const bad of [Number.NaN, Infinity, -Infinity])
     assert.throws(() => exportGLB(node({ translation: [bad, 0, 0] })), RangeError);
   assert.throws(() => exportGLB(node({ translation: [0, 0] })), TypeError);
   assert.throws(() => exportGLB(node({ translation: [0, 0, '1'] })), RangeError);
-  assert.throws(() => exportGLB(node({ scale: [1e-50, 0, 1] })), /Scale must be nonzero/);
+  // A zero on one axis is a legal glTF scale and is kept.
+  assert.deepEqual(readGLB(exportGLB(node({ scale: [1e-50, 0, 1] }))).json.nodes[0].scale, [1e-50, 0, 1]);
   assert.throws(() => exportGLB(node({ rotation: [0, 0, 0, 0] })), /Quaternion must be nonzero/);
   assert.throws(() => exportGLB(node({ matrix: [1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] })), /shear/);
   assert.throws(() => exportGLB(node({ matrix: [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] })), /affine/);

@@ -97,9 +97,9 @@ export { toGeometry, toGeometries, splitTriangles, pointsToGeometry, CORE_MAX_VE
 export type { ToGeometryOptions, PointsToGeometryOptions } from './geometry.js';
 export { createMeshes } from './engine.js';
 export type { CreateMeshesOptions, LoadedMeshes } from './engine.js';
-export { fetchBytes, load, DEFAULT_MAX_BYTES } from './load.js';
-export type { FetchOptions } from './load.js';
+export { fetchBytes, fetchResource, isPrivateHost, load, DEFAULT_MAX_BYTES } from './load.js';
+export type { FetchOptions, FetchedResource } from './load.js';
 export { detectFormat, parseAny } from './detect.js';
 export type { LoaderFormat, AnyOptions } from './detect.js';
 export { parseSTL } from './stl.js';
-export type { STLOptions } from './stl.js';
+export type { STLOptions, STLGeometry, STLMaterialise, STLColor } from './stl.js';

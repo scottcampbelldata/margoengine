@@ -6,6 +6,7 @@ import { clonePolygonMesh, createMeshEditResult, faceIdFactory, identityFaceMap,
 import { triangulateLoop } from './polygon-split.js';
 import { typeError } from '../../shared/errors.js';
 import type { PolygonFace, PolygonMesh, MeshEditOptions, MeshEditResult } from './types.js';
+import { greatestOf, leastOf } from './least.js';
 
 const amountInRange = (amount: number, min: number, max: number) => {
   if (!Number.isFinite(amount) || amount < min || amount > max)
@@ -19,10 +20,10 @@ const faceAt = (mesh: PolygonMesh, id: string): PolygonFace => {
 function sideUV(face: PolygonFace): MutableVec2[] {
   const us = face.uv.map((uv) => uv[0]),
     vs = face.uv.map((uv) => uv[1]);
-  const left = Math.max(0, Math.min(1 - 1 / 128, Math.min(...us))),
-    top = Math.max(0, Math.min(1 - 1 / 128, Math.min(...vs)));
-  const right = Math.min(1, Math.max(left + 1 / 128, Math.max(...us))),
-    bottom = Math.min(1, Math.max(top + 1 / 128, Math.max(...vs)));
+  const left = Math.max(0, Math.min(1 - 1 / 128, leastOf(us))),
+    top = Math.max(0, Math.min(1 - 1 / 128, leastOf(vs)));
+  const right = Math.min(1, Math.max(left + 1 / 128, greatestOf(us))),
+    bottom = Math.min(1, Math.max(top + 1 / 128, greatestOf(vs)));
   return [
     [left, bottom],
     [right, bottom],

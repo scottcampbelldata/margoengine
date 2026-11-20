@@ -22,7 +22,6 @@ const requested = [
   'scatter',
   'html',
   'video',
-  'net',
   'stats',
   'inspector',
   'tween',

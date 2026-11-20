@@ -51,7 +51,7 @@ await server.close();
 - **Edits**: shown at once on the client; the server checks rate (10 per second, bursts of 5), reach (6 blocks from the
   eye plus 1 of slack), that a placed block replaces air, liquid or a plant and overlaps no player, and that a break hits
   a block, then sends the change to every client holding that chunk. A refused edit sends the cell back.
-- **Other players**: `client.samplePlayers()` interpolates each one from a `@margoengine/net` `SnapshotBuffer`, 100 ms
+- **Other players**: `client.samplePlayers()` interpolates each one from a `@margoengine/netcode/interpolation` `SnapshotBuffer`, 100 ms
   behind the newest snapshot. `other.name` holds its display name (see below).
 - **Wire format** (`.`): one type byte and a varint body per WebSocket message. `encodeClientMessage`,
   `decodeClientMessage`, `encodeServerMessage` and `decodeServerMessage` check every length; chunks, block changes

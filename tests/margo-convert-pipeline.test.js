@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { meshoptDecodeGltfBuffer } from '@margoengine/decoders/meshopt';
-import { parseGLTFAsync } from '@margoengine/gltf-pro';
+import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { encodeTriangles, encodeVertexBuffer } from '@margoengine/exporters/meshopt';
 import { analyzeVertexCache } from '@margoengine/geometry/optimize';
 import { readModel } from '../tools/margo-convert/pipeline/gltf-io.js';

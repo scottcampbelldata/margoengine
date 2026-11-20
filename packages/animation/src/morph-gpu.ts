@@ -177,11 +177,15 @@ export class MorphWeightPlayer implements EnginePlugin {
     this.engine = engine;
   }
   onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+  /** Moves `time` by `delta` seconds times `speed` when playing; the weights pass samples it, so a seek replays it. */
+  advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid animation delta; pass a finite delta >= 0 seconds');
     if (!Number.isFinite(this.speed) || this.speed < 0)
       throw new RangeError('Invalid morph player speed; use a finite number >= 0');
-    if (this.playing) this.time += delta * this.speed;
+    if (this.playing && !this.disposed) this.time += delta * this.speed;
   }
   registerPasses(graph: FrameGraph): void {
     // Before the deformation pass at -10, which reads what this writes.

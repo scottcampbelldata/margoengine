@@ -116,3 +116,50 @@ test('renderCutscene refuses bad options before it touches the engine', async ()
   await assert.rejects(renderCutscene(null, doc([]), { apply() {}, fps: -1 }), /fps must be/);
   await assert.rejects(renderCutscene(null, doc([]), { apply() {}, to: 9 }), /Render span/);
 });
+
+test('loading the render entry does not load the video encoder; renderCutscene loads it when a render starts', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL(import.meta.resolve('@margoengine/cutscene/render')), 'utf8');
+  const statics = [...source.matchAll(/^\s*(?:import|export)\b[^;'"]*?from\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm)].map(
+    (match) => match[1] ?? match[2],
+  );
+  assert.ok(!statics.some((specifier) => specifier.startsWith('@margoengine/headless')), statics.join(', '));
+  assert.match(source, /import\(\s*['"]@margoengine\/headless\/video['"]\s*\)/);
+});
+
+// GAP-FILM-TIME commit 8: a span from after 0 starts the world's clocks where a run from 0 has them.
+const clock = () => ({ name: 'film:clock', time: 0, setup() {}, advanceTime(delta) { this.time += delta; } });
+const world = (...clocks) => ({ scene: { plugins: new Map(clocks.map((c) => [c.name, c])) } });
+const stepped = (steps, fps) => {
+  const c = clock();
+  for (let i = 0; i < steps; i++) c.advanceTime(1 / fps);
+  return c.time;
+};
+
+test('cutsceneFrames with an engine seeks its clocks to from first, as a run from 0 has them', () => {
+  const c = clock(),
+    frames = cutsceneFrames(new Cutscene(doc([])), { fps: 30, from: 1.5, to: 2, engine: world(c) });
+  assert.equal(c.time, 0, 'nothing moves before the first frame is asked for');
+  assert.equal(frames.next().value.time, 1.5);
+  assert.ok(Object.is(c.time, stepped(45, 30)), `${c.time}: 45 steps of 1 / 30 s`);
+  const from0 = clock();
+  [...cutsceneFrames(new Cutscene(doc([])), { fps: 30, to: 1, engine: world(from0) })];
+  assert.equal(from0.time, 0, 'a span from 0 seeks nothing');
+  const moved = clock();
+  moved.advanceTime(0.5);
+  assert.throws(() => cutsceneFrames(new Cutscene(doc([])), { fps: 30, from: 1, engine: world(moved) }).next(), {
+    code: 'state',
+  });
+});
+
+test('renderCutscene from after 0 seeks the engine clocks before the first frame', async () => {
+  const c = clock(),
+    seen = [],
+    engine = { ...world(c), render() {} };
+  await renderCutscene(engine, doc([]), { fps: 30, from: 2, to: 2.2, apply: () => seen.push(c.time) }).catch(() => {});
+  assert.ok(Object.is(c.time, stepped(60, 30)), `${c.time}: 60 steps of 1 / 30 s before the render`);
+  for (const time of seen) assert.ok(Object.is(time, stepped(60, 30)), 'frames drawn after the seek');
+  const moved = clock();
+  moved.advanceTime(1 / 30);
+  await assert.rejects(renderCutscene({ ...world(moved), render() {} }, doc([]), { from: 1, apply() {} }), { code: 'state' });
+});

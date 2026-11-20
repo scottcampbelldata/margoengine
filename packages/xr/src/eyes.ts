@@ -40,11 +40,11 @@ function blit(samples: number, ar: boolean): string {
   let q = vec2i(p.xy) - o.xy;
   let c = textureLoad(c, q, 0);
   ${
+    // AR: the clear is black and the real world shows where nothing was drawn. Drawn samples, or light from a pass
+    // that writes no depth (a glow, an unlit line), keep the pixel; the colour is already premultiplied by the black
+    // clear. (The comment sits here, not in the WGSL, so the shipped shader carries no comment text: KB-WGSL1.)
     ar
-      ? `// AR: the clear is black and the real world shows where nothing was drawn. Drawn samples, or light from a
-  // pass that writes no depth (a glow, an unlit line), keep the pixel; the colour is already premultiplied by the
-  // black clear.
-  return vec4f(c.rgb, clamp(max((${covered}) / ${samples}.0, max(c.r, max(c.g, c.b))), 0.0, 1.0));`
+      ? `return vec4f(c.rgb, clamp(max((${covered}) / ${samples}.0, max(c.r, max(c.g, c.b))), 0.0, 1.0));`
       : 'return vec4f(c.rgb, 1.0);'
   }
 }
@@ -164,7 +164,7 @@ export class EyeViews {
   }
 
   /** Draws this frame's eyes and puts them in `layer`. `delta` in seconds; `ar` keeps the real world behind the scene. */
-  render(binding: XRBinding, layer: XRProjectionLayer, viewer: XRViewerPose, delta: number, ar: boolean, onEye?: (target: XREyeTarget) => boolean | void): void {
+  render(binding: XRBinding, layer: XRProjectionLayer, viewer: XRViewerPose, delta: number, ar: boolean, onEye?: (target: XREyeTarget) => boolean | void, layers?: number): void {
     const views = this.views,
       images = [];
     views.length = 0;
@@ -175,6 +175,7 @@ export class EyeViews {
       this.place(eye, view, binding.projection?.(view) ?? view.projectionMatrix);
       this.size(eye, image.viewport.width, image.viewport.height);
       eye.view.clear = ar ? { color: '#000000' } : undefined;
+      eye.view.layers = layers;
       views.push(eye.view);
       images.push(image);
     }

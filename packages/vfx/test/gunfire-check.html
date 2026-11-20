@@ -1,0 +1,146 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Gunfire check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body>
+<script type="module">
+// Gunfire on a real GPU (WebGPU, or the WebGL2 layer under MARGO_COMPAT=1), driven by gunfire-check.mjs:
+// - flash: a gun fired at 0.5 s, drawn with and without its flash: the frame that holds the shot differs in many
+//   pixels, the frame before it in none, and a third of a second later the flash has gone;
+// - bank: three seconds on, the white bank covers pixels near where Battery puts it, about as many as its projected
+//   disc, and its centre has moved downwind with the wind it was given;
+// - hull: a burning hull draws orange flames over the deck and dark smoke above them;
+// - repeat: two fresh engines draw the same bytes for the same frames;
+// - sparks: the same shot with and without its burning powder grains: a tenth of a second on, the grains draw bright
+//   pixels out along the barrel beyond the flash's ball, and none without them;
+// - strike: a shot through a ship's side (a Battery target), seen close, throws splinters; with splinters 0 none;
+// - char: a hull side drawn with a layered() char layer whose mask HullFire paints: 200 s after ignition the deck edge
+//   is black where the fire has burnt over a minute and clean beyond its reach (its spread times the time);
+// - live: writing every battery and hull row each frame for 60 frames, with a shot fired, makes no pipeline, buffer
+//   or texture and no GPU error.
+import {Engine} from '/packages/core/dist/index.js';
+import {Battery,HullFire} from '/packages/vfx/dist/gunfire.js';
+import {GUNFIRE_LIVE_SETTINGS,HULL_FIRE_LIVE_SETTINGS,applyGunfireSettings,applyHullFireSettings,gunfireSettingDefaults,hullFireSettingDefaults} from '/packages/vfx/dist/settings.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+import {Texture,UnlitMaterial,createMesh} from '/packages/materials/dist/index.js';
+import {layered} from '/packages/materials/dist/layered.js';
+import {hullMaskImage,hullMaskUVs} from '/packages/vfx/dist/gunfire.js';
+const W=256,H=192,FOV=Math.PI/3;
+const CAM={position:[0,5,80],target:[0,5,0],near:0.5,far:4000};
+async function scene(){
+ const c=document.createElement('canvas');c.width=W;c.height=H;document.body.append(c);
+ const e=await Engine.create(c,{backend:'webgpu',camera:CAM});
+ e.stop();e.scene.background='#6b7480';
+ const errs=[];e.gpu.addEventListener('uncapturederror',x=>errs.push(x.error.message));
+ return {c,e,errs};
+}
+const shot=new OffscreenCanvas(W,H),g=shot.getContext('2d',{willReadFrequently:true});
+async function step(e,c,dt){e.render({delta:dt});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();g.drawImage(c,0,0);return g.getImageData(0,0,W,H).data;}
+const count=(px,test)=>{let n=0;for(let i=0;i<px.length;i+=4)if(test(px[i],px[i+1],px[i+2]))n++;return n;};
+const orange=(r,g,b)=>r>200&&r>b+80;
+// Project a world point to the 256 x 192 canvas for the camera above (looking down -z).
+const project=(p)=>{const d=CAM.position[2]-p[2],f=(H/2)/Math.tan(FOV/2);return [W/2+(p[0]-CAM.position[0])*f/d,H/2-(p[1]-CAM.position[1])*f/d,f/d];};
+window.check={
+ async flash(){
+  // The same shot with and without its flash: the pixels the flash changes, frame by frame.
+  const run=async(flashRadiance)=>{
+   const {c,e,errs}=await scene();
+   const b=Battery.attach(e,{guns:[{position:[-6,4,60],direction:[1,0.02,0]}],shots:[{gun:0,time:0.5}],wind:[0,0],flashRadiance});
+   const frames={};for(let f=1;f<=40;f++){const px=await step(e,c,1/30);if(f===15||f===16||f===26)frames[f]=px.slice();}
+   const fired=b.fired.length;e.dispose();return {frames,errs,fired};
+  };
+  const on=await run(20),off=await run(0);
+  const diff=(f)=>{let n=0;const a=on.frames[f],b=off.frames[f];for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])>20)n++;return n;};
+  return {before:diff(15),at:diff(16),later:diff(26),fired:on.fired,errors:[...on.errs,...off.errs]};
+ },
+ async bank(){
+  const {c,e,errs}=await scene();
+  const empty=await step(e,c,1/30);
+  const b=Battery.attach(e,{guns:[{position:[-30,3,0],direction:[1,0,0]}],shots:[{gun:0,time:0.1}],wind:[4,0],stability:0});
+  let px;for(let f=0;f<95;f++)px=await step(e,c,1/30);
+  const cloud=b.clouds.clouds.find(x=>x.options.opacity>0),m=cloud.matrix,centre=[m[12],m[13],m[14]],R=Math.hypot(m[4],m[5],m[6]);
+  const [cx,cy,s]=project(centre),disc=Math.PI*(R*s)**2;
+  let lit=0,sx=0,sy=0;for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(px[i]>empty[i]+25&&px[i+1]>empty[i+1]+25){lit++;sx+=x;sy+=y;}}
+  const out={lit,disc,cx,cy,mx:sx/Math.max(1,lit),my:sy/Math.max(1,lit),centre,drift:centre[0]-(-30),along:b.puffOf(0).at(b.time-0.1).along,time:b.time,errors:errs};
+  e.dispose();return out;
+ },
+ async hull(){
+  const {c,e,errs}=await scene();
+  const empty=await step(e,c,1/30);
+  const pose=[0,0,1,0,0,1,0,0,-1,0,0,0,0,0,0,1]; // the hull's bow toward +x, side on to the camera
+  const fire=HullFire.attach(e,{ship:pose,ignition:{at:[0,6,0],time:0},spread:0.5,burnTime:60,ports:[{position:[6.5,3,-8]},{position:[6.5,3,8]}],wind:[1,0]});
+  let px;for(let f=0;f<150;f++)px=await step(e,c,1/30);
+  const flames=count(px,orange);
+  let dark=0;for(let y=0;y<H/2;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(px[i]<empty[i]-25&&px[i+1]<empty[i+1]-25)dark++;}
+  const out={flames,dark,heat:fire.heat,errors:errs};e.dispose();return out;
+ },
+ async sparks(){
+  const run=async(sparks)=>{
+   const {c,e,errs}=await scene();
+   Battery.attach(e,{guns:[{position:[-30,4,0],direction:[1,0,0]}],shots:[{gun:0,time:0.5}],wind:[0,0],sparks,flashRadiance:0});
+   let px;for(let f=0;f<19;f++)px=await step(e,c,1/30);e.dispose();return {px,errs};
+  };
+  const on=await run(1),off=await run(0);
+  // Pixels the grains brighten, and how many lie beyond the flash ball (2 m) down the barrel.
+  const [mx]=project([-30,4,0]),[fx]=project([-26,4,0]);let lit=0,beyond=0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(on.px[i]>off.px[i]+30){lit++;if(x>fx)beyond++;}}
+  return {lit,beyond,muzzle:mx,errors:[...on.errs,...off.errs]};
+ },
+ async strike(){
+  const run=async(splinters)=>{
+   const {c,e,errs}=await scene();
+   // Close on the struck side: hand-sized splinters are under a pixel from 80 m.
+   e.camera.position=[-6.5,3,14];e.camera.target=[-6.5,3,0];
+   const ship=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
+   const b=Battery.attach(e,{guns:[{position:[-60,3,0],direction:[1,0,0]}],shots:[{gun:0,time:0.05}],targets:[{ship}],splinters,sparks:0,flashRadiance:0,wind:[0,0]});
+   const frames=[];for(let f=0;f<9;f++){const px=await step(e,c,1/30);if(f>=4)frames.push(px.slice());}
+   const hits=b.hits().map(h=>h.kind);e.dispose();return {frames,errs,hits};
+  };
+  const on=await run(1),off=await run(0);
+  // Splinter pixels: the picture differs from the run without them (the ball and everything else are the same).
+  let near=0;
+  on.frames.forEach((a,k)=>{const b=off.frames[k];for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])>30)near++;});
+  return {near,hits:on.hits,errors:[...on.errs,...off.errs]};
+ },
+ async char(){
+  const {c,e,errs}=await scene();
+  // The port side of a 50 m hull from keel (-5 m) to deck (6 m), drawn in the camera's XY plane: hull-local z is x here.
+  const L=50,deck=6,draft=5,cols=50,rows=11,positions=[],normals=[],local=[],indices=[];
+  for(let j=0;j<=rows;j++)for(let i=0;i<=cols;i++){const x=-L/2+L*i/cols,y=-draft+(deck+draft)*j/rows;positions.push(x,y,0);normals.push(0,0,1);local.push(6.5,y,x);}
+  for(let j=0;j<rows;j++)for(let i=0;i<cols;i++){const a=j*(cols+1)+i,b=a+1,d=a+cols+1,f=d+1;indices.push(a,b,f,a,f,d);}
+  const uv=hullMaskUVs(local,{length:L,deck,draft});
+  const mask=new Texture(hullMaskImage(256,64),{colorSpace:'linear'});
+  createMesh(e,{positions,normals,uvs:[...uv],indices},new UnlitMaterial({color:[0.55,0.4,0.25,1],features:[layered({layers:[{color:[0.03,0.028,0.026],mask}]})]}));
+  const fire=HullFire.attach(e,{ship:[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],ignition:{at:[0,6,0],time:0},spread:0.1,burnTime:600,mask,flames:0,columns:0});
+  let px;for(let f=0;f<200*2;f++)px=await step(e,c,1/2);
+  // The band 0.5 m under the deck edge after 200 s: black within 4 m of the ignition (a minute and more of full fire
+  // over it, a millimetre and more of char), the bare wood past the fire's 20 m reach.
+  const lum=(x,y)=>{const i=(Math.round(y)*W+Math.round(x))*4;return px[i]+px[i+1]+px[i+2];};
+  // The CPU twin: the char layer's weight is the mask's red, 1 - exp(-depth / 0.5 mm), over the wood colour.
+  const srgb=(v)=>Math.round(255*(v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055));
+  const twin=(X)=>{const w=Math.round(255*(1-Math.exp(-fire.charDepth([6.5,5.5,X])/0.5)))/255;return [0.55,0.4,0.25].reduce((s,b,k)=>s+srgb(b*(1-w)+[0.03,0.028,0.026][k]*w),0);};
+  let inside=0,outside=0,expected=0,n=0,m=0;
+  for(let X=-4;X<=4;X+=0.5){const [x,y]=project([X,5.5,0]);inside+=lum(x,y);expected+=twin(X);n++;}
+  for(const s of [-1,1])for(let X=21;X<=24.5;X+=0.5){const [x,y]=project([s*X,5.5,0]);outside+=lum(x,y);m++;}
+  const keel=lum(...project([0,-4,0]));
+  const out={inside:inside/n,expected:expected/n,outside:outside/m,keel,reach:fire.time*0.1,errors:errs};e.dispose();return out;
+ },
+ async repeat(){
+  const run=async()=>{const {c,e}=await scene();Battery.attach(e,{guns:[{position:[-20,4,0],direction:[1,0,0]}],shots:[{gun:0,time:0.2}],wind:[3,0]});let px;for(let f=0;f<45;f++)px=await step(e,c,1/30);e.dispose();return px;};
+  const a=await run(),b=await run();let n=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])n++;return {differing:n,bytes:a.length};
+ },
+ async live(){
+  const {c,e,errs}=await scene(),made={pipelines:0,buffers:0,textures:0};
+  const b=Battery.attach(e,{guns:[{position:[-20,4,0],direction:[1,0,0]}],wind:[2,0]});
+  const fire=HullFire.attach(e,{ship:[1,0,0,0,0,1,0,0,0,0,1,0,20,0,0,1],ports:[{position:[6.5,3,0]}]});
+  b.fire(0,0.05);for(let f=0;f<5;f++)await step(e,c,1/30);
+  for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){const real=e.gpu[method];if(real)e.gpu[method]=function(...a){made[key]++;return real.apply(this,a);};}
+  b.broadside(0.4,0.3);
+  for(let f=0;f<60;f++){
+   const t=f/59,v=gunfireSettingDefaults(),h=hullFireSettingDefaults();
+   for(const r of GUNFIRE_LIVE_SETTINGS)if(r.kind==='number')v[r.name]=r.name.startsWith('wind.')?1+3*t:r.min+(r.max-r.min)*(0.05+0.2*t);
+   v.smokeColor=[0.9,0.9-0.1*t,0.85];v.smokeLife=60+t*100;
+   for(const r of HULL_FIRE_LIVE_SETTINGS)h[r.name]=r.name.startsWith('wind.')?-2*t:r.min+(r.max-r.min)*(0.05+0.2*t);
+   applyGunfireSettings(b,v);applyHullFireSettings(fire,h);await step(e,c,1/30);
+  }
+  e.dispose();return {made,errors:errs,rows:GUNFIRE_LIVE_SETTINGS.length+HULL_FIRE_LIVE_SETTINGS.length,fired:b.fired.length};
+ },
+};
+window.ready=true;
+</script></body></html>

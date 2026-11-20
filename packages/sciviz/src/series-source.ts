@@ -52,7 +52,11 @@ export async function openSeriesSource(url: string | URL, options: { readonly si
   return { size: total!, read };
 }
 
-/** Yield complete CSV records, Arrow record batches or Parquet row groups as soon as decoded. Cancellation/early return stops further requests. */
+/**
+ * Yield complete CSV records, Arrow record batches or Parquet row groups as soon as decoded. Cancellation/early return
+ * stops further requests. A CSV column's kind is inferred from the first chunk where it has a value and kept for later
+ * chunks (a later value that does not fit is a coded error); pass `types` to choose kinds up front.
+ */
 export async function* readSeries(source: SeriesSource, options: SeriesReadOptions = {}): AsyncGenerator<SeriesChunk> {
   const chunkBytes = options.chunkBytes ?? 1048576;
   if (!Number.isSafeInteger(source.size) || source.size < 0 || !Number.isSafeInteger(chunkBytes) || chunkBytes < 1) throw rangeError('Use a safe source size and positive integer chunkBytes', 'sciviz');
@@ -70,6 +74,16 @@ export async function* readSeries(source: SeriesSource, options: SeriesReadOptio
   };
   async function* csv(): AsyncGenerator<ColumnarTable> {
     const decoder = new TextDecoder('utf-8', { fatal: true });
+    // Column kinds come from the first chunk where a column has a value and hold for every later chunk (as a streaming
+    // Arrow CSV reader infers from its first block), so one column never switches between number and text mid-file.
+    const types: Record<string, NonNullable<CSVOptions['types']>[string]> = { ...options.types };
+    const chunk = (text: string): ColumnarTable => {
+      const table = readCSV(text, { ...options, types });
+      for (const [name, column] of Object.entries(table.columns))
+        if (!Object.hasOwn(types, name) && (!column.validity ? table.length > 0 : column.validity.some((bits) => bits)))
+          types[name] = column.categories ? 'string' : column.values instanceof Float64Array ? 'number' : 'bigint';
+      return table;
+    };
     let record = '', header: string | undefined, quoted = false, skipLF = false, pending: string[] = [];
     const consume = (text: string) => {
       for (const ch of text) {
@@ -84,12 +98,12 @@ export async function* readSeries(source: SeriesSource, options: SeriesReadOptio
     };
     for (let at = 0; at < source.size; at += chunkBytes) {
       consume(decoder.decode(await read(at, Math.min(chunkBytes, source.size - at)), { stream: true }));
-      if (pending.length) { const rows = pending; pending = []; yield readCSV(header + '\n' + rows.join('\n') + '\n', options); }
+      if (pending.length) { const rows = pending; pending = []; yield chunk(header + '\n' + rows.join('\n') + '\n'); }
     }
     consume(decoder.decode());
     if (quoted) fail('contains an unterminated CSV record');
     if (record) { if (header === undefined) header = record; else pending.push(record); }
-    if (pending.length || rowOffset === 0) yield readCSV((header ?? '') + '\n' + pending.join('\n') + (pending.length ? '\n' : ''), options);
+    if (pending.length || rowOffset === 0) yield chunk((header ?? '') + '\n' + pending.join('\n') + (pending.length ? '\n' : ''));
   }
   const batches = options.format === 'parquet' ? parquetBatches(read, source.size, options) : options.format === 'arrow' ? arrowBatches(read, source.size, options) : csv();
   for await (const table of batches) {

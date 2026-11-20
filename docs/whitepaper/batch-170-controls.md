@@ -13,8 +13,13 @@ The replay hashes raw Float64 camera position, target, up, moved return and chan
 Float32 engine transform matrices after every grouped translation/rotation step. It includes six arcball rigs,
 pole and oblique views, immediate and damped movement, idle updates, pan, dolly, live limits, and group disposal.
 The parent recorded SHA-256 is `bab1b21b918c4d8f593bd9b63e2934e782211e421b3b37a00023756bf56904fd`;
-the changed implementation matches. This fixture does not certify all possible inputs; the existing controls tests
-cover the other supported modes and edge cases.
+the changed implementation matches. Since 2026-11-15 the replay runs with exactly specified trigonometry, exp and log
+(`tests/support/exact-math.js`) in place of Math's, which ECMA-262 leaves implementation-approximated: the x64
+machine that recorded that hash and an arm64 Mac disagree in their last bit, so the test failed on the Mac with the
+code unchanged (the Mac gave `599b46fa...` for parent and current alike). With exact math the parent and the current
+code give `96c8b474b114c21c95be238b08ba81da54c858d456756ef6c88b7157b89cf062` on any
+machine. This fixture does not certify all possible inputs; the existing controls tests cover the other supported
+modes and edge cases.
 
 Reproduce from the repository root:
 

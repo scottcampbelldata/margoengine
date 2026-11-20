@@ -3,10 +3,10 @@
 Packages extend each other's WGSL in three ways. Prefer them in this order.
 
 1. **Declared hooks.** The package that owns a shader composes other packages' WGSL at named points it guarantees.
-   gltf-pro's PBR shader has lighting hooks (`LightingEffect.pbr`, see `packages/gltf-pro/README.md`, "Lighting hooks");
+   gltf/pbr's PBR shader has lighting hooks (`LightingEffect.pbr`, see `packages/gltf/README.md`, "Lighting hooks");
    shadows, clustered and environment (IBL, fog) use them. Its transparency hook (`setTransparency`, @margoengine/oit)
    and capture hook (`setCapture`, post SSR's `ssr.add(model)`, shader `ScenePass`) add an entry point to the lit shader;
-   capture declarations holding `var<private> margoBeauty:vec4f` have the entry store the beauty colour there first. Tests in gltf-pro
+   capture declarations holding `var<private> margoBeauty:vec4f` have the entry store the beauty colour there first. Tests in gltf/pbr
    and in each user check the contract.
 2. **Pipeline-overridable constants** (`override`) for small toggles inside a package's own pipelines. They work only
    where the package creates the pipeline itself: core builds the mesh pipeline from `PassContext.shader`, so a patch of
@@ -28,7 +28,7 @@ Text anchors in core's shader (the full list, with the package file using each, 
 | `*frame.radiance.w*frame.ambient.rgb` (terrain: `*frame.radiance.w`), or the same zeroed by IBL | environment HemisphereLight (writes `*margoSkyLight(n)` in its place; LightProbes and post SSAO recognise that term) |
 | `let mapped=linear/…return vec4f(…);` | `packages/shared/display.js` `linearShader`, used by tonemap, post stack/bloom/SSAO capture, creative post, dof and environment captures: the HDR capture returns `vec4f(linear,1)` |
 | `let mapped=linear/(1.0+linear);`, `return vec4f(linear,1);` | environment Fog (on the canvas, or after an HDR capture) |
-| `let direct=…return vec4f(…);`, `i.color*(1.0-i.material.y)*frame.radiance.w` | post SSAO ambient replay |
+| `let direct=…return vec4f(…);`, `i.color*(1.0-i.material.y)*frame.radiance.w` | post SSAO ambient replay (keeps the lighting in a dead `if(false)` block and binds every pass binding, as the SSR and SSGI replays do) |
 | `let margoAmbient=` | convention: environment IBL names its term so; post SSAO occludes it on core meshes |
 | `let direct=…return vec4f(…);`, fragment signature `->@location(0) vec4f`, `n`/`v`/`i.color`/`i.material` | post SSR material replay (three targets: IBL specular + roughness, split-sum weight, normal); with `margoAmbient` it also calls environment's `iblBrdfTerms`/`iblPrefiltered` (`packages/environment/src/ibl.ts`) |
 | `o.clip=frame.camera*p` | taa (jittered camera) |
@@ -39,14 +39,14 @@ Text anchors in core's shader (the full list, with the package file using each, 
 `packages/shared/gpu.js` `meshVertex` is a copy of core's vertex inputs for packages that draw core meshes with their own
 fragment (selection, toon outline); the test checks it still matches core's `Frame`/`Input` layout and transform.
 
-The approved camera/ambient/rectangle core exception adds `ambient:vec4f` at the end of the canonical `Frame`. Its original 112-byte prefix remains in place; the complete uniform is 128 bytes, with linear RGB multipliers at floats 28-30. The default is white and `radiance.w` remains ambient intensity. Core-shader consumers, including private pick, culling, XR, scatter and probe buffers, must allocate/write this tail. Scatter's own wind row follows it at float 32. Independent glTF-pro, terrain, VAT and other material layouts are unchanged. SSAO replays the same RGB ambient; Sky's absolute color replaces the complete multiplier and IBL replaces the ambient term.
+The approved camera/ambient/rectangle core exception adds `ambient:vec4f` at the end of the canonical `Frame`. Its original 112-byte prefix remains in place; the complete uniform is 128 bytes, with linear RGB multipliers at floats 28-30. The default is white and `radiance.w` remains ambient intensity. Core-shader consumers, including private pick, culling, XR, scatter and probe buffers, must allocate/write this tail. Scatter's own wind row follows it at float 32. Independent glTF PBR, terrain, VAT and other material layouts are unchanged. SSAO replays the same RGB ambient; Sky's absolute color replaces the complete multiplier and IBL replaces the ambient term.
 
 Every hook or patch adds its bindings to one fragment stage, which WebGPU limits to 16 sampled textures and 16 samplers
-by default. The per-combination counts are in the gltf-pro README ("Texture bindings"); physical materials with
-shadows, IBL and LocalShadows use all 16, and gltf-pro throws naming the combination when a shader exceeds the device.
+by default. The per-combination counts are in the gltf/pbr README ("Texture bindings"); physical materials with
+shadows, IBL and LocalShadows use all 16, and gltf/pbr throws naming the combination when a shader exceeds the device.
 
-gltf-pro text patches that remain (materials' map multiply and shading modes, shader-node `NodeMaterial`, LOD imposter
-baking) target anchors documented in the gltf-pro README and listed in the same test.
+gltf/pbr text patches that remain (materials' map multiply and shading modes, shader-node `NodeMaterial`, LOD imposter
+baking) target anchors documented in the gltf/pbr README and listed in the same test.
 
 `NodeMaterial` inserts its surface overrides before the face-culling guard in both the compact and extended PBR
 shaders. The extended guard includes `margoFaceTest`; the compact guard does not. Its tests exercise compact,
@@ -56,8 +56,8 @@ Core-mesh effects reserve group 0 binding 18 for TAA's jittered camera and 19 fo
 `Hatching` (`@margoengine/toon/hatch`) takes group 0 binding 146 on core meshes and patches after `ToonShading`.
 `LODFade` (`@margoengine/lod/fade`) takes group 0 binding 95 and inter-stage location 14 on core meshes, and binding 97
 in the lit shader's group on models.
-In the lit shader's group (0 for core meshes, 2 for gltf-pro), clustered's directional lights use 141, IES profiles 142
-and projector images 143, contact shadows 145 (storage buffers, no textures), and environment's HemisphereLight 144 (a uniform). gltf-pro's
+In the lit shader's group (0 for core meshes, 2 for gltf/pbr), clustered's directional lights use 141, IES profiles 142
+and projector images 143, contact shadows 145 (storage buffers, no textures), and environment's HemisphereLight 144 (a uniform). gltf/pbr's
 `sky` lighting hook replaces its built-in sky gradient (`mix(vec3f(0.35,0.3,0.25),vec3f(1),...)` times `f.radiance.w`)
 wherever a shader writes it; `packages/shared/pbr-hooks.js` finds it by that text, so it must stay byte for byte.
 Terrain color patches share one mesh-ID varying and one per-pixel block; inside it `i.color`, `i.material` and `n` are
@@ -69,4 +69,4 @@ Terrain's lit shader takes lighting effects in group 1. Its own entries hold fix
 8), displacement 108 and 109, footprints 110 and 111. `packages/terrain/test/bindings.test.js` composes all of them on
 one terrain and fails if two declare or bind the same slot.
 
-ModelHatching (@margoengine/toon/hatch-models) reserves group 2 binding 146, separate from the same pattern's core group 0 binding. It composes the original material shader and bindings, preserves the pattern uniform in surface for auxiliary layouts, and mixes linear ink before display processing. PBRDrawRun must encode any pending batches inside a material adapter call.draw before the adapter changes/restores borrowed records. Regression: packages/gltf-pro/tests/material-draw-run.test.js.
+ModelHatching (@margoengine/toon/hatch-models) reserves group 2 binding 146, separate from the same pattern's core group 0 binding. It composes the original material shader and bindings, preserves the pattern uniform in surface for auxiliary layouts, and mixes linear ink before display processing. PBRDrawRun must encode any pending batches inside a material adapter call.draw before the adapter changes/restores borrowed records. Regression: packages/gltf/test/material-draw-run.test.js.

@@ -1,0 +1,139 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky cloud bounds check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// The volumetric clouds' measured bounds on a real GPU (step 6 of the elements plan), read back from Bloom's HDR scene
+// capture: the step cap's grain, `temporal: 'auto'` with and without TAA, the sun under the deck against
+// cloudDeckTransmittance, and a deck's base over its top against the two-stream transmission. Driven by
+// features-check.mjs (`cloud-bounds`), on WebGPU and under MARGO_COMPAT=1 on the WebGL2 layer.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {TAA} from '/packages/taa/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {VolumetricClouds} from '/packages/sky/dist/compat-clouds.js';
+import {CLOUD_FLOATS,CloudVolumes,cloudDeckTransmittance,cloudField,cloudTransmission,layerOf,writeLayer} from '/packages/sky/dist/volumetric-clouds.js';
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,2,0],target:[0,40,-60],near:0.5,far:200000}}),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+engine.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#4a5a3a',roughness:0.9})).setPosition([0,0,0]);
+// A block 30 m ahead: its sunlit top under the deck.
+engine.createMesh().setGeometry(box(8,8,8)).setMaterial(new PbrMaterial({color:'#b0b0b0',roughness:0.9})).setPosition([0,4,-30]);
+const sky=new Sky({hours:12,timeScale:0});engine.use(sky);void sky.reflectionTexture;
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(any(id.xy>=s)){return;}result[id.y*s.x+id.x]=textureLoad(image,vec2i(id.xy),0);}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function read(texture){
+ const bytes=texture.width*texture.height*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:texture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(texture.width/8),Math.ceil(texture.height/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const data=new Float32Array(staging.getMappedRange()).slice();staging.unmap();output.destroy();staging.destroy();return data;
+}
+const frame=async(delta=0)=>{engine.render({delta});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
+const view=(position,target)=>{engine.camera.position=position;engine.camera.target=target;};
+// The two-stream of the deck's own columns (the independent column approximation, Cahalan et al. 1994): for each of
+// the map's upper texels, the vertical optical depth of the clouds' light field (the base shape) through the column
+// where its ray crosses the middle of the layer, 400 steps; returns the cosine-weighted means of T = cloudTransmission
+// of each column's depth (the light a column passes, direct beam included) and of its depth.
+const volumes=new CloudVolumes(device);{const e=device.createCommandEncoder();volumes.fill(device,e);device.queue.submit([e.finish()]);}
+const columnPipeline=device.createComputePipeline({layout:'auto',compute:{entryPoint:'main',module:device.createShaderModule({code:`${cloudField}
+@group(0) @binding(0) var<uniform> c:Clouds;@group(0) @binding(1) var shape:texture_3d<f32>;@group(0) @binding(2) var detail:texture_3d<f32>;
+@group(0) @binding(3) var smp:sampler;@group(0) @binding(4) var<storage,read_write> result:array<vec4f>;
+@compute @workgroup_size(8,4) fn main(@builtin(global_invocation_id) id:vec3u){
+ if(any(id.xy>=vec2u(64,16))){return;}var sum=vec4f(0);
+ for(var r=0u;r<4u;r++){
+  let uv=(vec2f(id.xy)+vec2f(f32(r&1u),f32(r>>1u))*0.5+0.25)/vec2f(64,32);let phi=(uv.x-0.5)*6.2831853;let theta=uv.y*3.14159265;
+  let d=vec3f(sin(theta)*cos(phi),cos(theta),sin(theta)*sin(phi));let xz=vec2f(d.x,d.z)/max(d.y,0.05)*(0.5*(c.layer.x+c.layer.y)-c.eye.y);
+  let dz=(c.layer.y-c.layer.x)/400.0;var od=0.0;
+  for(var i=0u;i<400u;i++){od+=cloudDensityAt(c,shape,detail,smp,vec3f(c.eye.x+xz.x,c.layer.x+(f32(i)+0.5)*dz,c.eye.z+xz.y),false)*dz;}
+  od*=c.layer.w;sum+=vec4f(1.0/(1.0+0.075*od),od,0,1);
+ }
+ result[id.y*64u+id.x]=sum*0.25;
+}`})}});
+async function columns(options,eye){
+ const v=new Float32Array(CLOUD_FLOATS);writeLayer(v,options,[0,0,0,0,0]);v.set(eye,16);
+ const uniform=device.createBuffer({size:CLOUD_FLOATS*4,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});device.queue.writeBuffer(uniform,0,v);
+ const bytes=64*16*16,output=device.createBuffer({size:bytes,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size:bytes,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(columnPipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:columnPipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}},{binding:1,resource:volumes.shape.createView()},{binding:2,resource:volumes.erosion.createView()},{binding:3,resource:volumes.sampler},{binding:4,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(8,4);pass.end();encoder.copyBufferToBuffer(output,0,staging,0,bytes);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const f=new Float32Array(staging.getMappedRange()).slice();staging.unmap();uniform.destroy();output.destroy();staging.destroy();
+ let w=0,T=0,od=0;for(let y=0;y<16;y++){const th=(y+0.5)/32*Math.PI,k=Math.cos(th)*Math.sin(th);for(let x=0;x<64;x++){const p=(y*64+x)*4;w+=k;T+=f[p]*k;od+=f[p+1]*k;}}
+ return {T:T/w,tau:od/w};
+}
+const W=()=>post.sceneTexture.width,H=()=>post.sceneTexture.height;
+// Mean absolute difference between horizontal neighbours over the rows y0 to y1 (fractions of the height).
+const grain=(f,y0,y1)=>{const w=W(),h=H();let s=0,n=0;for(let y=Math.floor(h*y0);y<Math.floor(h*y1);y++)for(let x=0;x<w-1;x++){const p=(y*w+x)*4;for(let c=0;c<3;c++)s+=Math.abs(f[p+c]-f[p+4+c]);n++;}return s/n;};
+const mean=(f,mask)=>{let s=0,n=0;for(let p=0;p<f.length;p+=4)if(!mask||mask(p/4)){s+=0.2126*f[p]+0.7152*f[p+1]+0.0722*f[p+2];n++;}return s/Math.max(n,1);};
+const differ=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)n+=+(a[p]!==b[p]);return n;};
+const box2=(fx,fy)=>(i)=>{const w=W(),h=H(),x=i%w,y=Math.floor(i/w);return Math.abs(x-w/2)<w*fx&&Math.abs(y-h/2)<h*fy;};
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');const out={};
+  // 1. Grain: a low view across a broken layer at the default 64 steps, the capped march (default 150 m) and even
+  // steps (a cap longer than any step), each against a 256-step even march: the mean absolute error per channel.
+  // Still frames with fixed starts, so only the march's sampling differs.
+  view([0,2,0],[0,300,-4000]);
+  const shotOf=async(stepCap,steps)=>{const c=VolumetricClouds.attach(engine,{sky,coverage:0.5,stepCap,steps,temporal:false,depth:()=>post.depthTexture});await waitForPipelines(frame);const f=await frame();c.dispose();return f;};
+  const reference=await shotOf(10000,256),misfit=(f)=>{let s=0;for(let p=0;p<f.length;p+=4)for(let c=0;c<3;c++)s+=Math.abs(f[p+c]-reference[p+c]);return s/(f.length*0.75);};
+  out.grain={capped:misfit(await shotOf(150,64)),even:misfit(await shotOf(10000,64))};
+  // 2. temporal 'auto' (the default): it turns on when the scene has a plugin named 'taa' (TAA's own name). A stand-in
+  // of that name takes TAA's place here, so the camera does not jitter: at zero delta still frames then move, and
+  // without it they are identical.
+  const moved=async(withTaa)=>{const taa=withTaa?{name:new TAA().name,setup(){},registerPasses(){}}:undefined;if(taa)engine.use(taa);
+   const c=VolumetricClouds.attach(engine,{sky,coverage:0.6,steps:16,depth:()=>post.depthTexture});await waitForPipelines(frame);
+   const a=await frame(),b=await frame();c.dispose();if(taa)engine.removePlugin('taa');await frame();return differ(a,b);};
+  out.temporal={taa:await moved(true),none:await moved(false)};
+  // 3. The sun under the deck: the engine light and the block's sunlit top scale by cloudDeckTransmittance. The
+  // camera looks down at the block (no cloud in view) and the sky light is zero.
+  sky.options.lighting={ambient:{day:[0,0,0],night:[0,0,0]}};
+  view([0,30,-6],[0,8,-30]);
+  await waitForPipelines(frame);await frame();const clearLight=sky.lights[0].direction[3],clear=mean(await frame(),box2(0.02,0.02));
+  const layer={weather:{cloud:1}};
+  const deck=VolumetricClouds.attach(engine,{sky,...layer,depth:()=>post.depthTexture});await frame();
+  const deckLight=sky.lights[0].direction[3],under=mean(await frame(),box2(0.02,0.02));
+  deck.options.dimLight=false;await frame();const undimmed=sky.lights[0].direction[3],undimmedBlock=mean(await frame(),box2(0.02,0.02));deck.dispose();await frame();
+  out.deck={want:cloudDeckTransmittance(layerOf(layer),sky.sun[1]),light:deckLight/clearLight,block:under/clear,undimmed:undimmed/clearLight,undimmedBlock:undimmedBlock/clear,restored:sky.lights[0].direction[3]/clearLight};
+  sky.options.lighting=undefined;
+  // 4. Two-stream: a full deck 1,000 to 2,000 m with the sun overhead over a black ground (groundAlbedo 0), at vertical
+  // optical depths 5, 20 and 80 (density x thickness x 0.35, as cloudDeckTransmittance takes it). From the deck's map
+  // (Sky.environmentLayer) the irradiance it gives a level surface under it (down) and over it from above (up), the
+  // sun's part only: the same deck with sunIntensity 0 (the sky's light alone) is taken away. The sun's irradiance on
+  // the deck is 4 pi sunIntensity times its colour, which the engine light carries (lights[0] at noon, dimLight off).
+  const lum=(c)=>0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
+  // Irradiance over pi on a level surface from the map's upper (rows 0 to 15) or lower half: sum L |cos| dOmega / pi.
+  const flux=(m,lower)=>{let s=0;for(let y=0;y<16;y++){const row=lower?31-y:y,th=(y+0.5)/32*Math.PI,w=Math.cos(th)*Math.sin(th);for(let x=0;x<64;x++)s+=lum(m.subarray((row*64+x)*4))*w;}return s*(Math.PI/32)*(2*Math.PI/64)/Math.PI;};
+  sky.options.lighting={};await frame();await frame();
+  const sunIrr=4*1.6*sky.lights[0].direction[3]*lum(sky.lights[0].radiance);
+  const thick={sky,coverage:1,bottom:1000,top:2000,groundAlbedo:0,dimLight:false,temporal:false,depth:()=>post.depthTexture};
+  const sunPart=async(c,lower)=>{c.options.sunIntensity=1.6;await frame();await frame();const map=await read(sky.environmentLayer),lit=flux(map,lower);
+   // The sun's direct beam the deck lets through (the engine light's part, not in the map): 1 - its opacity toward the
+   // zenith, the map's two top rows.
+   let open=0;for(let i=0;i<128;i++)open+=1-map[i*4+3];direct=open/128;
+   c.options.sunIntensity=0;await frame();await frame();const dark=flux(await read(sky.environmentLayer),lower);c.options.sunIntensity=1.6;return lit-dark;};
+  out.twoStream=[];let direct=0;
+  for(const tau of [5,20,80]){
+   const c=VolumetricClouds.attach(engine,{...thick,density:tau/(1000*0.35)});
+   view([0,2,0],[0.001,1000,-0.5]);await waitForPipelines(frame);const down=await sunPart(c,false),beam=direct;
+   view([0,2600,0],[0.001,1600,-0.5]);const up=await sunPart(c,true);
+   c.dispose();await frame();
+   const ica=await columns({...thick,density:tau/(1000*0.35)},[0,2,0]);
+   out.twoStream.push({tau,down:down/sunIrr,direct:beam,up:up/sunIrr,sum:(down+up)/sunIrr+beam,want:ica.T,columns:ica.tau,plane:cloudTransmission(tau)});
+  }
+  sky.options.lighting=undefined;
+  // 5. The moon disc (the stylized night's default colour) is brighter than the thin deck it lights beside it, so it
+  // blooms: the brightest disc pixel against the brightest cloud 4 to 10 degrees out.
+  sky.options.hours=23;sky.options.night={};sky.options.lighting={moon:{}};await frame();await frame();
+  const moonDir=Array.from(sky.lights[1].direction).slice(0,3);view([0,2,0],moonDir.map((v,i)=>v*1000+[0,2,0][i]));
+  const half=Math.tan(Math.PI/6);
+  const angle=(i)=>{const w=W(),h=H(),x=((i%w+0.5)/w*2-1)*half*w/h,y=(1-(Math.floor(i/w)+0.5)/h*2)*half;return Math.atan(Math.hypot(x,y))*180/Math.PI;};
+  const peak=(f,lo,hi)=>{let m=0;for(let p=0;p<f.length;p+=4){const a=angle(p/4);if(a>=lo&&a<hi)m=Math.max(m,0.2126*f[p]+0.7152*f[p+1]+0.0722*f[p+2]);}return m;};
+  await frame();const bare=await frame();
+  const veil=VolumetricClouds.attach(engine,{sky,coverage:0.9,density:0.002,depth:()=>post.depthTexture});await waitForPipelines(frame);const veiled=await frame();veil.dispose();
+  out.moon={disc:peak(bare,0,1.5),cloud:peak(veiled,4,10),up:moonDir[1]};
+  sky.options.hours=12;sky.options.night=undefined;sky.options.lighting=undefined;await frame();
+  const error=await device.popErrorScope();
+  return {...out,error:error?.message??null,errors:errors.splice(0)};
+ }};
+window.ready=true;
+</script></body></html>

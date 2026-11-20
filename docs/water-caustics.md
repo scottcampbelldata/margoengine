@@ -21,7 +21,7 @@ on both requested backends; Biomes' hardware compute proofs explicitly select
 native WebGPU. The independent caustic assertions run on both actual backends.
 After the final rebase, all four caustics compatibility leaves pass again on
 main's updated WebGL2 backend. Core, stage, water, post, math, shared rendering,
-glTF-pro and Biomes runtime sources are unchanged by that rebase.
+glTF PBR and Biomes runtime sources are unchanged by that rebase.
 
 Main's browser-host repair 919fdc09e closes the prior flow teardown blocker.
 The original flow gate now completes on both backends at its unchanged close

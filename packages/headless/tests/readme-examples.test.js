@@ -44,6 +44,18 @@ test('the ffmpeg and comparing examples say what they need, and the reference is
   assert.throws(() => referenceMaker('const same = compareImages(a, b);'), /no longer starts its comparison/);
 });
 
+test('an example that only sets the GPU up writes no file and is not asked for one; the rest are', () => {
+  // node-check.mjs asked every example for a picture, so the adapter example (it only prints the adapter) failed it.
+  const examples = nodeExamples(readme),
+    setup = examples.filter((code) => !needs(code).writes);
+  assert.ok(setup.length >= 1 && setup.every((code) => code.includes('adapterInfo')), 'the adapter example writes nothing');
+  assert.ok(examples.filter((code) => needs(code).writes).length >= 5);
+  assert.equal(needs("await writeFile('cube.png', png);").writes, true);
+  assert.equal(needs("encodeWithFFmpeg(f, { output: 'clip.webm' });").writes, true);
+  assert.equal(needs('for await (const { name, bytes } of imageSequence(frames)) await writeFile(name, bytes);').writes, true);
+  assert.equal(needs('console.log(engine.gpu.adapterInfo?.device);').writes, false);
+});
+
 test('an example the machine cannot run fails the check as not run, never a skip', () => {
   // node-check.mjs once printed "skip README example ..." and passed where ffmpeg was missing (AGENTS.md: no skips).
   const examples = nodeExamples(readme),

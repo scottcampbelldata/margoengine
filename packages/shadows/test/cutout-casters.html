@@ -4,6 +4,7 @@
 // and its right half cut out, so the two halves' shadows land on known floor points. cutout-casters-browser.mjs reads them.
 import {Engine,box} from '/packages/core/dist/index.js';
 import {PbrMaterial,Texture,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {alphaHash} from '/packages/materials/dist/alpha-hash.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
@@ -39,6 +40,9 @@ const casters={
   // Vertex alpha 0.2 under alphaTest 0.5: vertexColors false draws the whole quad, so it casts whole; on, nothing draws.
   vertexOff:()=>new PbrMaterial({alphaTest:0.5,vertexColors:false}),
   vertexOn:()=>new PbrMaterial({alphaTest:0.5}),
+  // Hashed alpha at a uniform 0.3 and 0.7 (cutoff 0.5): the shadow keeps that share of its texels, not none or all.
+  hashed30:()=>new PbrMaterial({color:[1,1,1,0.3],features:[alphaHash()]}),
+  hashed70:()=>new PbrMaterial({color:[1,1,1,0.7],features:[alphaHash()]}),
 };
 const faint=[1,1,1,0.2,1,1,1,0.2,1,1,1,0.2,1,1,1,0.2],geometries={vertexOff:()=>quad(-3,-1,2,-1,1,faint),vertexOn:()=>quad(-3,-1,2,-1,1,faint)};
 let plugins=[],removers=[],mesh,current;

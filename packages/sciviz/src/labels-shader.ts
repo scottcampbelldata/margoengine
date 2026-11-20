@@ -55,6 +55,13 @@ fn source${i}(world: vec3f, stepLength: f32, direction: vec3f, deltaX: vec3f, de
 }`;
     })
     .join('\n');
+  // mixSample stays finite for every alpha by construction (WGSL 15.7.5: log has absolute error 2^-21 on [0.5, 2],
+  // and subnormals may flush to zero). An alpha below the smallest normal float is zero, so the other sample is the
+  // exact limit. The union alpha is a + b (1 - a), never 1 - (1 - a)(1 - b), which rounds to 0 for alphas below 2^-25.
+  // Optical weights are the optical depths -log(1 - alpha): below 1/16 its Taylor series to a^7/7 (truncation under
+  // 2^-24 relative), which is at least alpha, so the weights sum to a positive normal float; from 1/16, log has at most
+  // 2^-21 absolute error against a depth of at least 0.0645. An opaque sample (alpha 1, infinite depth) wins outright,
+  // and two opaque samples take the symmetric limit, half of each.
   return /* wgsl */ `
 struct Source { toUnit: mat4x4f, dims: vec4f, weights: vec4f }
 struct Volume { toData: mat4x4f, lo: vec4f, hi: vec4f, settings: vec4f, sources: array<Source, ${sources.length}> }
@@ -70,12 +77,17 @@ fn corrected(c: vec4f, length: f32) -> vec4f {
   if (length <= 0.0) { return vec4f(0.0); }
   return vec4f(c.rgb, 1.0 - pow(max(0.0, 1.0 - c.a), length));
 }
+fn opticalDepth(a: f32) -> f32 {
+  if (a < 0.0625) { return a * (1.0 + a * (0.5 + a * (0.33333334 + a * (0.25 + a * (0.2 + a * (0.16666667 + a * 0.14285715)))))); }
+  return -log(1.0 - a);
+}
 fn mixSample(a: vec4f, b: vec4f, mode: f32) -> vec4f {
-  if (a.a <= 0.0) { return b; } if (b.a <= 0.0) { return a; }
+  if (a.a < 1.17549435e-38) { return b; } if (b.a < 1.17549435e-38) { return a; }
   if (mode > 1.5) { return select(a, b, b.a > a.a); }
-  let alpha = 1.0 - (1.0 - a.a) * (1.0 - b.a);
-  if (mode > 0.5) { return vec4f((a.rgb * a.a + b.rgb * b.a * (1.0 - a.a)) / alpha, alpha); }
-  let ta = -log(max(1e-7, 1.0 - a.a)); let tb = -log(max(1e-7, 1.0 - b.a));
+  let alpha = a.a + b.a * (1.0 - a.a);
+  if (mode > 0.5) { return vec4f((a.rgb * a.a + b.rgb * (b.a * (1.0 - a.a))) / alpha, alpha); }
+  if (a.a >= 1.0 || b.a >= 1.0) { return vec4f(mix(b.rgb, a.rgb, select(select(0.0, 1.0, a.a >= 1.0), 0.5, a.a >= 1.0 && b.a >= 1.0)), 1.0); }
+  let ta = opticalDepth(a.a); let tb = opticalDepth(b.a);
   return vec4f((a.rgb * ta + b.rgb * tb) / (ta + tb), alpha);
 }
 ${functions}
@@ -103,8 +115,8 @@ ${functions}
   for (var i = 0u; i < count; i++) {
     let t = enter + f32(i) * stride; let segment = min(stride, exit - t);
     let world = origin + direction * (t + segment * 0.5);
-    let deltaX = originX + directionX * (t + segment * 0.5);
-    let deltaY = originY + directionY * (t + segment * 0.5);
+    let deltaX = (originX + directionX * (t + segment * 0.5)) * frame.origin.z;
+    let deltaY = (originY + directionY * (t + segment * 0.5)) * frame.origin.z;
     var sample = vec4f(0.0);
     ${sources.map((_, i) => `sample = mixSample(sample, source${i}(world, segment, direction, deltaX, deltaY), volume.settings.x);`).join('\n')}
     result = mixSample(result, sample, 1.0);

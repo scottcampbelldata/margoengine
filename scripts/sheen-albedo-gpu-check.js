@@ -1,57 +1,68 @@
-// Real-GPU check of the sheen albedo fit (materialLobesSheenAlbedo, derived by scripts/sheen-albedo-fit.mjs).
+// Real-GPU check of the sheen albedo table (materialLobesSheenAlbedo, fitted by scripts/sheen-albedo-fit.mjs).
 //  1. The shipped WGSL compiles without messages or validation errors and, run in a compute shader, matches the
-//     numerically integrated albedo of our own sheen BRDF within the fit's measured error.
-//  2. A lit sphere with sheen at several roughness values is drawn with the shipped fit and with the previous fit
-//     (its function body read from git, never stored in the tree); the pixel change is measured and bounded.
-//  3. With sheen off (no lobes, lobes with black sheen, black sheen plus specular) the pixels are bit-identical.
-// node scripts/gpu-lock.mjs run --owner=sheen-albedo -- node scripts/sheen-albedo-gpu-check.js [--reference=<rev>]
-// In a worktree outside the main checkout, set MARGO_GPU_LOCK to the main checkout's test-results/gpu.lock.
+//     numerically integrated albedo of our own sheen BRDF within the table's measured error.
+//  2. A lit sphere with sheen at several roughness values is drawn with the shipped albedo and with the previous one,
+//     the closed form the table replaced (pinned in scripts/sheen-albedo-fit.mjs), swapped into the CURRENT shader
+//     in place of that one function; the pixel change is measured and bounded. Later sheen changes elsewhere in the
+//     shader reach both pictures alike, so the comparison stays one of the albedo alone.
+//  3. Sheen off is exact. With no lobes both pages compile one program and must match bit for bit. A black sheen
+//     (alone, and over specular) is drawn at every sheen roughness by one compiled program, only the material data
+//     changing, and every draw must match the first bit for bit: the albedo and the lobe both depend on the
+//     roughness, so any part of them that reached the picture would move it. Black sheen is not compared across the
+//     shipped and the previous page: they compile different programs, and WGSL lets each fuse or reassociate f32
+//     operations its own way (15.7.5; only an @invariant position is the same across programs, 12.10), so terms
+//     that never touch the albedo may round one binary16 step apart (Apple silicon, the WebGL2 layer).
+// node scripts/run-with-timeout.mjs -- node scripts/sheen-albedo-gpu-check.js [--reference=<rev>]
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
-import { sheenAlbedo, validationGrid } from './sheen-albedo-fit.mjs';
+import {
+  closedFormAlbedoCommit,
+  closedFormAlbedoWGSL,
+  sheenAlbedo,
+  shippedAlbedo,
+  validationGrid,
+} from './sheen-albedo-fit.mjs';
 import { materialLobes } from '../packages/materials/dist/index.js';
 
 const port = 5309,
-  path = 'packages/materials/src/lobe-shader.ts',
-  pattern = /fn materialLobesSheenAlbedo\(mu:f32,roughness:f32\)->f32 \{[\s\S]*?\n\}/,
-  // The fit script measured 0.0109 against min(E, 1) on its validation grid.
-  fitTolerance = 0.015,
-  // Largest linear change from the previous fit measured on an NVIDIA Ampere adapter: 0.1016 (roughness 0.25, at the
-  // rim, where the previous fit gave about half of our BRDF's grazing albedo). The bound keeps that change explained.
-  renderTolerance = 0.12;
+  path = 'packages/shared/sheen.js',
+  name = 'materialLobesSheenAlbedo',
+  // The albedo function with its module-scope table when it has one (the table since 2026-11-15).
+  pattern =
+    /(?:const materialLobesSheenAlbedoTable=array<f32,256>\([^)]*\);\n)?fn materialLobesSheenAlbedo\(mu:f32,roughness:f32\)->f32 \{[\s\S]*?\n\}/,
+  // scripts/sheen-albedo-fit.mjs measured at most 0.04109 against min(E, 1) on its validation grid, which this
+  // check samples (every third point).
+  fitTolerance = 0.0411,
+  // Largest linear change from the previous albedo, 0.0632 at sheen roughness 1, measured on an NVIDIA Ampere adapter.
+  renderTolerance = 0.065;
 
-/** The previous fit: the parent of the commit that introduced this fit, or HEAD before that commit exists. */
-function previousFit() {
-  const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).replaceAll('\r\n', '\n'),
-    requested = process.argv.find((arg) => arg.startsWith('--reference='))?.slice(12),
-    introduced = git('log', '-n', '1', '--format=%H', '-S', 'fit by scripts/sheen-albedo-fit.mjs', '--', path).trim(),
-    revision = requested ?? (introduced ? introduced + '^' : 'HEAD'),
-    text = pattern.exec(git('show', `${revision}:${path}`))?.[0];
-  assert.ok(text, `No materialLobesSheenAlbedo in ${revision}:${path}`);
+/**
+ * The previous albedo WGSL. By default the closed form the table replaced, pinned in scripts/sheen-albedo-fit.mjs
+ * (closedFormAlbedoWGSL, from the parent of closedFormAlbedoCommit), never derived from the history of
+ * packages/shared/sheen.js: a later sheen change to that file must neither move the reference nor make it equal the
+ * shipped fit. --reference=<rev> compares against shared/sheen.js at another revision instead.
+ */
+async function previousFit() {
+  const requested = process.argv.find((arg) => arg.startsWith('--reference='))?.slice(12);
+  let revision = `${closedFormAlbedoCommit.slice(0, 9)}^ (closed form, pinned)`,
+    source = closedFormAlbedoWGSL(name);
+  if (requested) {
+    const file = execFileSync('git', ['show', `${requested}:${path}`], { encoding: 'utf8' }).replaceAll('\r\n', '\n'),
+      module = await import('data:text/javascript,' + encodeURIComponent(file));
+    [revision, source] = [requested, module.sheenAlbedoWGSL(name)];
+  }
+  const text = pattern.exec(source)?.[0];
+  assert.ok(text, `No ${name} in ${revision}`);
   return { revision, text };
 }
 
-/** The shipped WGSL function, evaluated in double precision for the GPU-versus-JavaScript comparison. */
+/** The shipped WGSL, and its evaluation in double precision for the GPU-versus-JavaScript comparison. */
 function shippedInJavaScript() {
   const text = pattern.exec(materialLobes({ sheen: { colorFactor: [1, 1, 1] } }).declarations)?.[0];
-  assert.ok(text, 'materialLobesSheenAlbedo is missing from the built package');
-  const body = text
-    .slice(text.indexOf('{') + 1, text.lastIndexOf('}'))
-    .replace(/\blet\b/g, 'const')
-    .replace(/\bvec4f\(/g, 'vec4(');
-  return {
-    text,
-    evaluate: new Function('vec4', 'dot', 'max', 'exp', 'clamp', `return (mu, roughness) => {${body}};`)(
-      (...v) => v,
-      (a, b) => a.reduce((s, v, i) => s + v * b[i], 0),
-      Math.max,
-      Math.exp,
-      (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
-    ),
-  };
+  assert.ok(text, `${name} is missing from the built package`);
+  return { text, evaluate: shippedAlbedo() };
 }
 
 function compare(a, b) {
@@ -81,15 +92,14 @@ function compare(a, b) {
   return { max, mean: sum / (3 * Math.max(pixels, 1)), changed, pixels, maxSRGB8: max8 };
 }
 
-const release = await acquire({ owner: 'sheen-albedo-gpu-check' });
 let browser;
 try {
   await mkdir('test-results/sheen-albedo', { recursive: true });
-  const previous = previousFit(),
+  const previous = await previousFit(),
     shipped = shippedInJavaScript(),
     report = { reference: previous.revision, checks: [], failures: [] },
     fail = (message) => report.failures.push(message);
-  assert.notEqual(previous.text, shipped.text, `${previous.revision} already has the shipped fit; pass --reference`);
+  assert.notEqual(previous.text, shipped.text, `${previous.revision} is the shipped fit`);
   browser = await openBrowser({ startPath: '/tests/sheen-albedo.html', port });
   const page = browser.page,
     pageErrors = [];
@@ -140,33 +150,58 @@ try {
     report.checks.push(check);
   }
 
-  // 2 and 3. Rendered spheres, shipped fit against the previous one, each in a freshly loaded page.
+  // 2. Rendered spheres, shipped fit against the previous one, each in a freshly loaded page.
   const sheenColor = [0.9, 0.7, 0.5],
     scenes = [
       ['no lobes', {}, false],
-      ['lobes with black sheen', { lobes: { sheen: { colorFactor: [0, 0, 0], roughnessFactor: 0.5 } } }, false],
-      [
-        'black sheen with specular',
-        { lobes: { sheen: { colorFactor: [0, 0, 0] }, specular: { factor: 0.6, colorFactor: [1, 0.8, 0.6] } } },
-        false,
-      ],
       ...[0, 0.25, 0.5, 0.75, 1].map((roughness) => [
         `sheen roughness ${roughness}`,
         { lobes: { sheen: { colorFactor: sheenColor, roughnessFactor: roughness } } },
         true,
       ]),
+    ],
+    // 3. Sheen off in one program: black sheen at each roughness, only the factors differing between draws.
+    blackRoughness = [0.5, 0, 0.25, 0.75, 1],
+    blackPrograms = [
+      ['black sheen', (roughness) => ({ sheen: { colorFactor: [0, 0, 0], roughnessFactor: roughness } })],
+      [
+        'black sheen with specular',
+        (roughness) => ({
+          sheen: { colorFactor: [0, 0, 0], roughnessFactor: roughness },
+          specular: { factor: 0.6, colorFactor: [1, 0.8, 0.6] },
+        }),
+      ],
     ];
   async function renderAll(reference) {
     await page.goto(`http://127.0.0.1:${port}/tests/sheen-albedo.html`);
     await page.waitForFunction(() => window.sheenAlbedoFixture);
     if (reference) await page.evaluate((text) => window.sheenAlbedoFixture.setReference(text), reference);
-    const images = [];
-    for (const [, scene] of scenes) images.push(await page.evaluate((s) => window.sheenAlbedoFixture.render(s), scene));
+    const fixture = (method, argument) =>
+        page.evaluate(([m, a]) => window.sheenAlbedoFixture[m](a), [method, argument]),
+      images = [],
+      black = [];
+    for (const [, scene] of scenes) images.push(await fixture('render', scene));
+    for (const [name, lobes] of blackPrograms) {
+      const draws = [];
+      let compiled;
+      for (const roughness of blackRoughness) {
+        const image = await fixture('render', { lobes: lobes(roughness) });
+        if (!draws.length) compiled = await fixture('counts');
+        draws.push({ roughness, image });
+      }
+      const after = await fixture('counts');
+      // Every draw after the first must reuse its shader modules and pipelines.
+      black.push({
+        name,
+        draws,
+        compiled: { modules: after.modules - compiled.modules, pipelines: after.pipelines - compiled.pipelines },
+      });
+    }
     const state = await page.evaluate(() => ({
       counts: window.sheenAlbedoFixture.counts(),
       errors: window.sheenAlbedoFixture.errors,
     }));
-    return { images, ...state };
+    return { images, black, ...state };
   }
   const current = await renderAll(),
     before = await renderAll(previous.text);
@@ -192,6 +227,28 @@ try {
     }
     report.checks.push(check);
   });
+  for (const [label, run] of [
+    ['shipped', current],
+    ['previous', before],
+  ])
+    for (const { name, draws, compiled } of run.black) {
+      const [first, ...rest] = draws,
+        check = { name: `${name}, ${label} fit: one program, roughness ${blackRoughness.join(', ')}`, compiled };
+      if (compiled.modules || compiled.pipelines)
+        fail(
+          `${name}, ${label} fit: changing the sheen roughness compiled ${compiled.modules} shader modules and ${compiled.pipelines} pipelines`,
+        );
+      check.draws = rest.map(({ roughness, image }) => {
+        const change = compare(image, first.image);
+        if (change.pixels < 1000) fail(`${name}, ${label} fit: the sphere covers only ${change.pixels} pixels`);
+        if (change.max !== 0)
+          fail(
+            `${name}, ${label} fit: sheen roughness ${roughness} against ${first.roughness} changed ${change.changed} pixels (max ${change.max})`,
+          );
+        return { roughness, against: first.roughness, ...change };
+      });
+      report.checks.push(check);
+    }
   assert.deepEqual(pageErrors, [], 'Unexpected page errors');
   await writeFile('test-results/sheen-albedo/gpu.json', JSON.stringify(report, null, 2) + '\n');
   console.log(JSON.stringify(report, null, 2));
@@ -199,5 +256,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.sheenAlbedoFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

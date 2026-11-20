@@ -187,6 +187,7 @@ const inherited = [
   'dominant-baseline',
   'color',
   'visibility',
+  'paint-order',
 ];
 type Style = Record<string, string>;
 const styleOf = (el: XMLElement, parent: Style): Style => {
@@ -342,9 +343,17 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
         opacity * ratio(s['stroke-opacity'], 1) * (sc?.a ?? 1),
       ),
     );
-    const even = s['fill-rule'] === 'evenodd';
-    if (f.startsWith('url(')) out.push('q', p, even ? 'W* n' : 'W n', gradient(f, cmd), 'Q');
-    else if (fc) out.push(fc.rgb.map(number).join(' ') + ' rg');
+    const even = s['fill-rule'] === 'evenodd',
+      shaded = f.startsWith('url(');
+    // SVG paint-order: listed layers first, the rest in the order fill, stroke, markers.
+    const listed = (s['paint-order'] ?? 'normal').trim().split(/\s+/),
+      order = [...listed, 'fill', 'stroke'].filter((k) => k === 'fill' || k === 'stroke'),
+      under = !!sc && (shaded || !!fc) && order.indexOf('stroke') < order.indexOf('fill');
+    const fill = () => {
+      if (shaded) out.push('q', p, even ? 'W* n' : 'W n', gradient(f, cmd), 'Q');
+      else if (fc) out.push(fc.rgb.map(number).join(' ') + ' rg');
+    };
+    if (!under) fill();
     if (sc) {
       out.push(
         sc.rgb.map(number).join(' ') + ' RG',
@@ -358,7 +367,11 @@ export async function svgToPDF(svg: string, options: PDFOptions): Promise<Blob> 
           `[${numbers(s['stroke-dasharray']).map(number).join(' ')}] ${number(ratio(s['stroke-dashoffset'], 0))} d`,
         );
     }
-    if (fc || sc) out.push(p, fc ? (sc ? (even ? 'B*' : 'B') : even ? 'f*' : 'f') : 'S');
+    if (under) {
+      out.push(p, 'S');
+      fill();
+      if (fc) out.push(p, even ? 'f*' : 'f');
+    } else if (fc || sc) out.push(p, fc ? (sc ? (even ? 'B*' : 'B') : even ? 'f*' : 'f') : 'S');
   };
   let visited = 0;
   const visit = async (

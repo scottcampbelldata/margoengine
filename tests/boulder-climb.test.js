@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { GLTFAsset } from '@margoengine/gltf-pro';
+import { GLTFAsset } from '@margoengine/gltf/pbr';
 import {
   Climb,
   contactPoint,

@@ -355,3 +355,56 @@ test('SSE preserves normal source exhaustion and closes a returned iterator once
   await early.return();
   assert.equal(returned, 1);
 });
+test('a 3D live trace needs z on every append, like colour and size', async () => {
+  const f = fake('scatter', { x: [0, 1], y: [1, 2] });
+  f.figure.is2d = false;
+  f.layer.positions = Float32Array.of(0, 1, 5, 1, 2, 6);
+  const live = await streamLayer(f.figure, f.layer, { rollover: 4 });
+  await assert.rejects(live.append({ x: [2], y: [3] }), (e) => e instanceof RangeError && /z channel/.test(e.message));
+  assert.deepEqual([...live.streamData.z], [5, 6]);
+  await live.append({ x: [2], y: [3], z: [7] });
+  assert.deepEqual([...live.streamData.z], [5, 6, 7]);
+  live.disposeStream();
+  const flat = fake('scatter', { x: [0, 1], y: [1, 2] }),
+    flatLive = await streamLayer(flat.figure, flat.layer);
+  await flatLive.append({ x: [2], y: [3] });
+  assert.deepEqual([...flatLive.streamData.x], [0, 1, 2]);
+  flatLive.disposeStream();
+});
+test('a layer is claimed while its stream binds, and an abort during binding leaves it free', async () => {
+  const f = fake(),
+    first = streamLayer(f.figure, f.layer),
+    second = streamLayer(f.figure, f.layer);
+  await assert.rejects(second, RangeError);
+  (await first).disposeStream();
+  const g = fake(),
+    controller = new AbortController(),
+    update = g.figure.updateData;
+  g.figure.updateData = async function (l, d, o) {
+    const r = await update.call(this, l, d, o);
+    controller.abort();
+    return r;
+  };
+  await assert.rejects(streamLayer(g.figure, g.layer, { signal: controller.signal }), (e) => e.name === 'AbortError');
+  g.figure.updateData = update;
+  const again = await streamLayer(g.figure, g.layer);
+  await again.append({ x: [2], y: [30] });
+  assert.deepEqual([...again.streamData.x], [0, 1, 2]);
+  again.disposeStream();
+});
+test('SSE accepts the text/event-stream essence as the MIME Sniffing parser and Fetch extract it', async () => {
+  for (const type of ['text/event-stream', 'TEXT/Event-Stream', 'text/event-stream ;charset=utf-8', 'text/event-stream\t', 'text/html, text/event-stream']) {
+    const events = [];
+    for await (const e of eventSource('https://example.invalid/', {
+      fetch: async () => new Response('data: 1\n\n', { headers: { 'Content-Type': type } }),
+    }))
+      events.push(e.data);
+    assert.deepEqual(events, [1], type);
+  }
+  for (const type of ['text/event-streams', 'text/html', 'text/event-stream, text/html', '']) {
+    const it = eventSource('https://example.invalid/', {
+      fetch: async () => new Response('data: 1\n\n', { headers: type ? { 'Content-Type': type } : {} }),
+    });
+    await assert.rejects(it.next(), (e) => e.code === 'failed', type);
+  }
+});

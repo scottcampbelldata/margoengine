@@ -1,5 +1,7 @@
 export const neutralShader: string;
 export const displayShader: string;
+/** Khronos PBR Neutral on the CPU (display-linear, before the sRGB encoding); writes into `out` when given. */
+export function pbrNeutral(c: ArrayLike<number>, out?: number[]): number[];
 /** Core's lighting shader returning linear HDR radiance; throws MargoError 'unsupported' naming `owner` when it cannot. */
 export function linearShader(shader: string): string;
 /** The message for an effect `owner` that found no core display transform to replace. */

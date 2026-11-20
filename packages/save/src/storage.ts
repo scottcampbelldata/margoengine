@@ -167,11 +167,23 @@ const request = <T>(req: IDBRequest<T>, signal?: AbortSignal): Promise<T> =>
     };
   });
 
+/** {@link indexedDBStorage}'s adapter: a {@link SaveStorage} that also lets go of its database connection. */
+export interface IndexedDBStorage extends SaveStorage {
+  /**
+   * Closes the database connection once its transactions finish. The storage stays usable: the next call opens the
+   * database again. Safe to call twice.
+   */
+  close(): Promise<void>;
+  /** Same as {@link IndexedDBStorage.close}, for `using`. */
+  [Symbol.dispose](): void;
+}
+
 /**
- * Saves in IndexedDB: large, binary, asynchronous, one transaction per write. The database opens on first use.
+ * Saves in IndexedDB: large, binary, asynchronous, one transaction per write. The database opens on first use and
+ * stays open until `close()` (or `using`), so an app that is done with saving can release the connection.
  * @throws MargoError `'unsupported'` (on first use) when there is no IndexedDB: pass a factory or use another adapter.
  */
-export function indexedDBStorage(options: IndexedDBStorageOptions = {}): SaveStorage {
+export function indexedDBStorage(options: IndexedDBStorageOptions = {}): IndexedDBStorage {
   const name = options.database ?? 'margo-saves',
     storeName = options.store ?? 'saves';
   let opened: Promise<IDBDatabase> | null = null;
@@ -182,25 +194,52 @@ export function indexedDBStorage(options: IndexedDBStorageOptions = {}): SaveSto
       return Promise.reject(
         new MargoError('unsupported', 'IndexedDB is not available here; pass options.factory or use memoryStorage'),
       );
-    opened ??= new Promise<IDBDatabase>((resolve, reject) => {
-      const req = factory.open(name, 1);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(storeName)) req.result.createObjectStore(storeName);
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => {
-        opened = null;
-        reject(
-          Object.assign(
-            new MargoError(
-              'failed',
-              `IndexedDB database '${name}' did not open; check private-mode and storage settings`,
+    // A store is created only in a version change (Indexed Database 3.0, 5.4 and 5.6), so a database another
+    // storage opened first, with its own store, is opened again one version up to add this store.
+    const connect = (version: number | undefined, ready: () => Promise<IDBDatabase> | null) =>
+      new Promise<IDBDatabase>((resolve, reject) => {
+        const req = version === undefined ? factory.open(name) : factory.open(name, version);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains(storeName)) req.result.createObjectStore(storeName);
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          // Another connection (another storage on this database, another tab) needs a newer version: let it in,
+          // and open again on the next call.
+          db.onversionchange = () => {
+            db.close();
+            if (opened === ready()) opened = null;
+          };
+          resolve(db);
+        };
+        req.onerror = () =>
+          reject(
+            Object.assign(
+              new MargoError(
+                'failed',
+                `IndexedDB database '${name}' did not open; check private-mode and storage settings`,
+              ),
+              { cause: req.error },
             ),
-            { cause: req.error },
-          ),
-        );
-      };
-    });
+          );
+      });
+    if (!opened) {
+      const ready: Promise<IDBDatabase> = (async () => {
+        let db = await connect(undefined, () => ready);
+        // Each pass asks for a newer version than the database had, so another connection adding its own store at
+        // the same moment cannot leave this one without its store.
+        while (!db.objectStoreNames.contains(storeName)) {
+          const version = db.version;
+          db.close();
+          db = await connect(version + 1, () => ready);
+        }
+        return db;
+      })();
+      opened = ready;
+      ready.catch(() => {
+        if (opened === ready) opened = null;
+      });
+    }
     return opened;
   };
   const transaction = async <T>(
@@ -234,7 +273,16 @@ export function indexedDBStorage(options: IndexedDBStorageOptions = {}): SaveSto
       signal?.removeEventListener('abort', abort);
     }
   };
+  const close = async (): Promise<void> => {
+    const ready = opened;
+    opened = null;
+    (await ready?.catch(() => null))?.close();
+  };
   return {
+    close,
+    [Symbol.dispose]() {
+      void close();
+    },
     async read(key, opts) {
       checkKey(key);
       const value = await transaction('readonly', opts?.signal, (store) => store.get(key) as IDBRequest<unknown>);

@@ -59,7 +59,7 @@ function coreReplay(shader: string): string {
     throw margoError('unsupported', 'SSGI requires the standard core lighting shader');
   return code + giStruct;
 }
-// gltf-pro capture (SSR's hook contract): the model's own ambient (`ambient(s)`, occlusion included; clearcoat and sheen
+// gltf/pbr capture (SSR's hook contract): the model's own ambient (`ambient(s)`, occlusion included; clearcoat and sheen
 // scale it by k), albedo and normal.
 const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
 const modelTail = (code: string) => {
@@ -67,7 +67,7 @@ const modelTail = (code: string) => {
   if (!pbrSurface.test(code))
     throw margoError(
       'unsupported',
-      'SSGI captures gltf-pro models and materials meshes only; add terrain and water to SSR',
+      'SSGI captures gltf/pbr models and materials meshes only; add terrain and water to SSR',
     );
   return `
 struct MargoCapture {@location(0) ambient:vec4f,@location(1) albedo:vec4f,@location(2) normal:vec4f}
@@ -210,7 +210,7 @@ function directions(count: number): Float32Array {
  * Screen-space global illumination (one bounce of diffuse light) in a {@link PostStack}: cosine-weighted rays per pixel
  * marched over SSR's hierarchical depth; where a ray hits, the ambient light the scene added at the pixel (SSAO's
  * ambient replay) is replaced by the lit scene the ray hit, times the pixel's diffuse albedo. Core meshes replay their
- * materials; gltf-pro models and materials meshes join with `add(model)` (SSR's capture hook). HDR stage.
+ * materials; gltf/pbr models and materials meshes join with `add(model)` (SSR's capture hook). HDR stage.
  */
 export class SSGI implements EnginePlugin {
   readonly name = 'ssgi';
@@ -323,7 +323,7 @@ export class SSGI implements EnginePlugin {
     effect.stack = PostStack.attach(engine, [effect]);
     return effect;
   }
-  /** Gives a gltf-pro model or materials mesh its own albedo, ambient and normals in the bounce (it is lit by the
+  /** Gives a gltf\/pbr model or materials mesh its own albedo, ambient and normals in the bounce (it is lit by the
    * bounce, not only bounced from). Returns a remover; a model may be added to SSR as well. */
   add(model: SSRModel): () => void {
     if (this.disposed) throw margoError('disposed', 'SSGI is disposed; create a new SSGI');

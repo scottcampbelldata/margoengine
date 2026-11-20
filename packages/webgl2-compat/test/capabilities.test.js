@@ -120,3 +120,96 @@ test('the unmasked renderer is asked for only where RENDERER is masked', () => {
   assert.equal(webgl2Capabilities(masked).renderer, 'Unmasked GPU');
   assert.equal(webgl2Capabilities(fakeContext({ renderer: 'WebKit WebGL' })).renderer, 'WebKit WebGL');
 });
+
+/**
+ * A stand-in that reports highp ints as Firefox on macOS does (24, 24) and draws the measurement shader: `words` are
+ * what its readPixels returns, and every binding it is given is recorded so the test can check they are put back.
+ */
+function shortIntContext(words, { drawable = true } = {}) {
+  const gl = fakeContext({ extensions: ['EXT_color_buffer_float'] }),
+    base = gl.getShaderPrecisionFormat.bind(gl),
+    state = new Map([
+      [0x8ca6, 'user-draw-fb'],
+      [0x8caa, 'user-read-fb'],
+      [0x8b8d, 'user-program'],
+      [0x85b5, 'user-vao'],
+      [0x8069, 'user-texture'],
+      [0x88ed, 'user-pack'],
+      [0x0ba2, [1, 2, 3, 4]],
+      [0x0c23, [true, false, true, false]],
+    ]),
+    enabled = new Set([0x0c11]),
+    deleted = [];
+  gl.getShaderPrecisionFormat = (shader, type) =>
+    type === 0x8df5 ? { precision: 0, rangeMin: 24, rangeMax: 24 } : base(shader, type);
+  if (!drawable) return gl;
+  const param = gl.getParameter.bind(gl);
+  let id = 0;
+  const object = (kind) => () => `${kind}${++id}`;
+  Object.assign(gl, {
+    state,
+    enabled,
+    deleted,
+    getParameter: (p) => (state.has(p) ? state.get(p) : param(p)),
+    createShader: object('shader'),
+    createProgram: object('program'),
+    createTexture: object('texture'),
+    createFramebuffer: object('framebuffer'),
+    createVertexArray: object('vao'),
+    shaderSource() {},
+    compileShader() {},
+    attachShader() {},
+    linkProgram() {},
+    getProgramParameter: () => true,
+    getUniformLocation: () => 'u',
+    uniform4ui() {},
+    texStorage2D() {},
+    framebufferTexture2D() {},
+    checkFramebufferStatus: () => 0x8cd5,
+    drawArrays() {},
+    readPixels: (_x, _y, _w, _h, _format, _type, out) => out.set(words),
+    bindFramebuffer: (target, fb) => {
+      if (target !== 0x8d40) state.set(target === 0x8ca9 ? 0x8ca6 : 0x8caa, fb);
+    },
+    useProgram: (p) => state.set(0x8b8d, p),
+    bindVertexArray: (v) => state.set(0x85b5, v),
+    bindTexture: (_t, tex) => state.set(0x8069, tex),
+    bindBuffer: (_t, b) => state.set(0x88ed, b),
+    viewport: (...v) => state.set(0x0ba2, v),
+    colorMask: (...m) => state.set(0x0c23, m),
+    isEnabled: (cap) => enabled.has(cap),
+    enable: (cap) => enabled.add(cap),
+    disable: (cap) => enabled.delete(cap),
+    deleteShader: (o) => deleted.push(o),
+    deleteProgram: (o) => deleted.push(o),
+    deleteTexture: (o) => deleted.push(o),
+    deleteFramebuffer: (o) => deleted.push(o),
+    deleteVertexArray: (o) => deleted.push(o),
+  });
+  return gl;
+}
+
+test('a short highp int report (Firefox on macOS: 24, 24) is measured: exact 32-bit arithmetic reaches full tier', () => {
+  // GLSL ES 3.00 4.1.3: highp ints are 32-bit two's complement and wrap. The probe's words for its inputs
+  // (0x9e3779b9, 0x80000001, 16, 7), worked in JS with Math.imul and >>> 0.
+  const gl = shortIntContext([3238976083, 2654463870, 2147483651, 766958446]),
+    before = new Map(gl.state),
+    caps = webgl2Capabilities(gl);
+  assert.equal(caps.highpFragment, true);
+  assert.equal(caps.tier, 'full');
+  assert.deepEqual(caps.missing, []);
+  // The caller's context is left as it was: every binding and state put back, every probe object deleted.
+  assert.deepEqual(new Map(gl.state), before);
+  assert.deepEqual([...gl.enabled], [0x0c11]);
+  assert.equal(gl.deleted.length, 6);
+});
+
+test('a short highp int report stays refused when the measurement is wrong or cannot run', () => {
+  // 24-bit ints: the multiply's high byte lost.
+  for (const words of [[3238976083 & 0xffffff, 2654463870, 2147483651, 766958446], [0, 0, 0, 0]]) {
+    const caps = webgl2Capabilities(shortIntContext(words));
+    assert.equal(caps.highpFragment, false);
+    assert.deepEqual(caps.missing, ['highp-fragment']);
+  }
+  assert.equal(webgl2Capabilities(shortIntContext([], { drawable: false })).highpFragment, false);
+});

@@ -62,7 +62,8 @@ function curve(ctx: SceneContext, node: FBXNode): Curve {
         );
       if (!next)
         throw new TypeError(
-          `Unsupported FBX cubic animation: ${objectName(node)}; bake or remove it in your 3D tool before export`,
+          `Unsupported FBX cubic animation on curve ${objectName(node) || id(node.properties[0])}; import it with ` +
+            'animationLayers from @margoengine/fbx/layers (it reads every curve kind), or bake linear keys before export',
         );
       if (mode && mode !== next)
         throw new TypeError(
@@ -295,8 +296,22 @@ function layerTracks(ctx: SceneContext, layer: FBXNode, cache: Map<bigint, Curve
         weights.set(target.parent, tracks[0]);
         continue;
       }
-      if (!ctx.models.has(target.parent))
+      if (!ctx.models.has(target.parent)) {
+        // Object 0 is the scene's root, which has no node of its own: Character Creator keys it once at rest. A
+        // curve that holds the rest value moves nothing and is left out; a root that moves is refused.
+        const rest = path === 'Lcl Scaling' ? 1 : 0;
+        if (
+          target.parent === 0n &&
+          tracks.every(
+            (curve) =>
+              !curve ||
+              (Array.from(curve.values).every((value) => value === rest) &&
+                curve.times.every((time, k) => !k || !curve.at || curve.at((curve.times[k - 1] + time) / 2) === rest)),
+          )
+        )
+          continue;
         throw new TypeError('FBX animation target is not a model; animate a model node');
+      }
       const record = models.get(target.parent) ?? new Map<string, Axes>();
       if (record.has(path)) throw new TypeError('Duplicate animation target; keep one per target when exporting');
       record.set(path, tracks);

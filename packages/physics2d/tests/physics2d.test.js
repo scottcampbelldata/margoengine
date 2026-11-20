@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import RAPIER from '@dimforge/rapier2d-compat';
+import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Physics2D, interactionGroups } from '../dist/index.js';
 
 await RAPIER.init();
@@ -476,4 +477,32 @@ test('ellipses, circles and rotated rectangles in a tile become matching collide
   assert.equal(physics.overlapPoint([8, 8]).length, 1);
   assert.equal(physics.overlapPoint([0.5, 0.5]).length, 0, 'outside the circle');
   physics.dispose();
+});
+
+// KB-OWN-PHYS-SCENE: dispose removed the plugin of its name from the active scene. A world in a second scene, disposed
+// while the default scene was active, stayed in its scene, and a default-scene plugin of that name was removed instead.
+test('dispose removes the world from its own scene, not the active one', async () => {
+  const engine = new Engine(
+    { width: 1, height: 1 },
+    await TransformStore.create(16),
+    { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
+    undefined,
+    null,
+  );
+  try {
+    const other = engine.createScene('b');
+    let physics;
+    other.use({ name: 'loader', setup: () => (physics = new Physics2D(engine, { rapier: RAPIER })) });
+    other.removePlugin('loader');
+    assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
+    const bystander = { name: physics.name, disposed: 0, setup() {}, dispose() { this.disposed++; } };
+    engine.use(bystander);
+    physics.dispose();
+    assert.equal(physics.isDisposed, true);
+    assert.equal(other.plugins.size, 0, 'the world is still in its scene');
+    assert.ok(engine.scene.plugins.get(physics.name) === bystander, 'the default scene lost its own plugin');
+    assert.equal(bystander.disposed, 0);
+  } finally {
+    engine.dispose();
+  }
 });

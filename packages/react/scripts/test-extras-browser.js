@@ -1,15 +1,13 @@
 // React's multi-view (<Scene>, <RenderView>), <BatchedMesh>, <Voxels> and <Sky> on a real GPU: each mode is mounted in
-// StrictMode, left to render, and checked by the colours in its screenshot. Takes the GPU lock.
+// StrictMode, left to render, and checked by the colours in its screenshot.
 //   npm run test:browser:extras --workspace @margoengine/react
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'react-extras-browser' });
 const browser = await openBrowser({ port: 5198, startPath: '/packages/react/tests/extras-browser.html' }),
   { page, hardware } = browser;
 const errors = [];
@@ -153,5 +151,4 @@ try {
   console.log(JSON.stringify(result, null, 2));
 } finally {
   await browser.close();
-  release();
 }

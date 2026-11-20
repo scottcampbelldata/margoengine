@@ -13,11 +13,11 @@
 // Usage (after `npm run build:packages`):
 //   node scripts/make-usdz-quicklook-kit.mjs [outDir] [--glb]
 // `outDir` defaults to ./usdz-quicklook-kit. `--glb` also writes the same eight scenes as .glb files, which the engine
-// loads (with @margoengine/gltf-pro) to draw reference screenshots to compare with Quick Look. Open the .usdz files on
+// loads (with @margoengine/gltf/pbr) to draw reference screenshots to compare with Quick Look. Open the .usdz files on
 // an iPhone, iPad or Mac (iOS 17 / macOS 14 or later) and compare them with the references. Optional independent
 // check with OpenUSD, which you install yourself: pip install usd-core, then
 // python packages/exporters/tests/validate-usdz.py <file>.
-// Texture rotation follows KHR_texture_transform as gltf-pro draws it: a positive angle turns the uvs counter-clockwise
+// Texture rotation follows KHR_texture_transform as gltf/pbr draws it: a positive angle turns the uvs counter-clockwise
 // (v down), so the picture leans clockwise on the sphere. Apple Quick Look (iOS 27.2) drew file 06 leaning clockwise.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

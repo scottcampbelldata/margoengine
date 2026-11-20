@@ -1035,6 +1035,20 @@ export async function parseDICOM(
 // Frame Increment Pointer targets that make the frames of an image time steps: Frame Time and Frame Time Vector.
 const TIME_POINTERS = new Set(['00181063', '00181065']);
 
+/** Options of {@link dicomSeries}. */
+export interface DICOMSeriesOptions {
+  /**
+   * Stack a series whose slice positions skip a step (a gap more than 1.5 times the median gap, as from a missing
+   * file) instead of rejecting it; the gaps are listed in `gaps`. Default false: such a series rejects with code
+   * `invalid`, as a viewer warns that its images are not equally spaced.
+   */
+  readonly allowGaps?: boolean;
+}
+/** What {@link dicomSeries} returns. */
+export interface DICOMSeriesVolume extends FormatVolume {
+  /** Slice indices k (in the stacked order) where the step from slice k to k + 1 is a gap; empty when even. */
+  readonly gaps: readonly number[];
+}
 /**
  * Stacks the slices of one DICOM series into a volume, ordered by position along the slice normal (instance number
  * when positions are missing), with the slice step from the positions, else `SpacingBetweenSlices`, else
@@ -1042,7 +1056,7 @@ const TIME_POINTERS = new Set(['00181063', '00181065']);
  * time steps (`frames`) of each slice; other multi-frame images are refused with code `unsupported`, since their
  * frames are not known to lie in space. Throws when slices differ in size or series.
  */
-export function dicomSeries(images: readonly DICOMImage[]): FormatVolume {
+export function dicomSeries(images: readonly DICOMImage[], options: DICOMSeriesOptions = {}): DICOMSeriesVolume {
   if (!images.length) throw rangeError('dicomSeries needs at least one image', 'sciviz');
   const first = images[0];
   for (const image of images) {
@@ -1061,6 +1075,15 @@ export function dicomSeries(images: readonly DICOMImage[]): FormatVolume {
       );
     if (image.frames !== first.frames)
       throw rangeError('dicomSeries: the images differ in their number of frames', 'sciviz');
+    // One volume has one slice plane and one pixel grid (PS3.3 C.7.6.2): a scout or a reformat in the same series
+    // would otherwise be stacked with the first image's orientation and spacing. DS text rounds, hence 1e-4.
+    const differs = (a: readonly number[] | undefined, b: readonly number[] | undefined) =>
+      !a !== !b || (a && b && a.some((v, k) => Math.abs(v - b[k]) > 1e-4 * Math.max(1, Math.abs(b[k]))));
+    if (differs(image.orientation, first.orientation) || differs(image.pixelSpacing, first.pixelSpacing))
+      throw rangeError(
+        'dicomSeries: the images differ in ImageOrientationPatient or PixelSpacing; pass the slices of one stack',
+        'sciviz',
+      );
   }
   const o = first.orientation ?? [1, 0, 0, 0, 1, 0];
   const normal = [o[1] * o[5] - o[2] * o[4], o[2] * o[3] - o[0] * o[5], o[0] * o[4] - o[1] * o[3]];
@@ -1080,12 +1103,18 @@ export function dicomSeries(images: readonly DICOMImage[]): FormatVolume {
   for (let t = 0; t < frames; t++)
     slices.forEach((s, k) => all.set(s.image.data.subarray(t * plane, (t + 1) * plane), (t * nz + k) * plane));
   let step = first.spacingBetweenSlices ?? first.sliceThickness ?? 1;
+  const gaps: number[] = [];
   if (positioned && nz > 1) {
-    const gaps = slices
-      .slice(1)
-      .map((s, k) => s.key - slices[k].key)
-      .sort((a, b) => a - b);
-    step = gaps[gaps.length >> 1] || step;
+    const steps = slices.slice(1).map((s, k) => s.key - slices[k].key),
+      sorted = [...steps].sort((a, b) => a - b);
+    step = sorted[sorted.length >> 1] || step;
+    // A step well past the median is a missing slice: the matrix would put every later slice in the wrong place.
+    steps.forEach((d, k) => d > 1.5 * Math.abs(step) && gaps.push(k));
+    if (gaps.length && !options.allowGaps)
+      throw rangeError(
+        `dicomSeries: the slice positions skip a step after slice ${gaps.join(', ')} (a missing file?); pass the whole series or allowGaps`,
+        'sciviz',
+      );
   }
   const [rowSpacing, columnSpacing] = first.pixelSpacing;
   const spacing: [number, number, number] = [columnSpacing, rowSpacing, Math.abs(step) || 1];
@@ -1108,18 +1137,18 @@ export function dicomSeries(images: readonly DICOMImage[]): FormatVolume {
     origin[2],
     1,
   ]);
-  return build(all, [first.columns, first.rows, nz], first.samplesPerPixel, frames, spacing, matrix);
+  return { ...build(all, [first.columns, first.rows, nz], first.samplesPerPixel, frames, spacing, matrix), gaps };
 }
 
 /** Fetches DICOM files and stacks them as one series. */
 export async function loadDICOMSeries(
   urls: readonly (string | URL)[],
-  options: FormatOptions & { readonly init?: RequestInit } = {},
-): Promise<FormatVolume> {
+  options: FormatOptions & DICOMSeriesOptions & { readonly init?: RequestInit } = {},
+): Promise<DICOMSeriesVolume> {
   const images = await Promise.all(
     urls.map(async (url) => parseDICOM(await fetchBytes(new URL(url, globalThis.location?.href), options), options)),
   );
-  return dicomSeries(images);
+  return dicomSeries(images, options);
 }
 
 async function fetchBytes(

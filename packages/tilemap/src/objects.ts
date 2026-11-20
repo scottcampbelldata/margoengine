@@ -1,7 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
-import { atlasTexture } from '../../shared/atlas-texture.js';
+import { borrowedAtlas } from '../../shared/atlas-texture.js';
+import { type BorrowSlot, borrow, fix, lend } from '../../shared/borrowed.js';
 import { texelVarying } from '../../shared/texel-varying.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
 import { fault, rangeError } from '../../shared/errors.js';
@@ -9,7 +10,7 @@ import { mapColor } from './chunks.js';
 import { validateTileMap, type TileMapData } from './index.js';
 import { buildMapQuads } from './object-quads.js';
 import type { GridTileMapOptions } from './iso.js';
-import type { TileAtlas, TileCamera, TileMapStats } from './renderer.js';
+import type { TileAtlas, TileCamera, TileMapStats, TileTarget } from './renderer.js';
 
 export { buildMapQuads, type TileQuad, type TileQuadOptions } from './object-quads.js';
 
@@ -80,6 +81,8 @@ export class ObjectTileMap implements EnginePlugin {
   private readonly textures = new Map<string, TextureState>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly sources: { [key: string]: TileAtlas } = {};
+  private readonly slots = new Map<string, BorrowSlot<GPUTexture, TileAtlas>>();
+  private targetSlot!: BorrowSlot<GPUTexture, GPUTexture>;
   private readonly mask: number;
   private disposed = false;
   private readonly states = new ViewStates<ViewState>(
@@ -105,6 +108,7 @@ export class ObjectTileMap implements EnginePlugin {
     this.mask = checkLayers(options.layers ?? 1, 'ObjectTileMap layers');
     for (const [key, value] of Object.entries(options.atlases)) this.sources[`a:${key}`] = value;
     for (const [key, value] of Object.entries(options.images ?? {})) this.sources[`i:${key}`] = value;
+    this.setTarget(options.target);
   }
   /** Create and attach an ordered map renderer. */
   static attach(instance: EngineKernel, options: ObjectTileMapOptions): ObjectTileMap {
@@ -126,6 +130,19 @@ export class ObjectTileMap implements EnginePlugin {
   setAtlas(name: string, source: TileAtlas): void {
     this.setSource(`a:${name}`, source);
   }
+  /**
+   * Replaces the map's own target: a texture, a function read each frame, or undefined for the frame's colour target.
+   * After a device restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: TileTarget | undefined): void {
+    this.options.target = target;
+    this.targetSlot = borrow(
+      typeof target === 'function' ? undefined : target,
+      'ObjectTileMap target',
+      'setTarget',
+      this.engine?.gpu,
+    );
+  }
   /** Replace a collection tile or layer image by its source path. */
   setImage(source: string, image: TileAtlas): void {
     this.setSource(`i:${source}`, image);
@@ -135,6 +152,8 @@ export class ObjectTileMap implements EnginePlugin {
     if (engine.backend !== 'webgpu')
       throw fault('unsupported', 'ObjectTileMap needs WebGPU or its compatibility device', 'webgpu');
     this.engine = engine;
+    fix(this.targetSlot, engine.gpu);
+    for (const slot of this.slots.values()) fix(slot, engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.options.order ?? 10,
@@ -143,11 +162,16 @@ export class ObjectTileMap implements EnginePlugin {
       },
     });
   }
+  /**
+   * Moves the tile animation clock (`time`, in milliseconds) by `delta` seconds without drawing (a delta of 0 or less
+   * moves nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.time += delta * 1000;
+  }
   onPreUpdate(delta: number): void {
-    if (delta > 0) {
-      this.time += delta * 1000;
-      this.states.prune();
-    }
+    this.advanceTime(delta);
+    if (delta > 0) this.states.prune();
   }
   onDeviceRestored(): void {
     this.releaseDevice();
@@ -201,6 +225,15 @@ export class ObjectTileMap implements EnginePlugin {
     if (old?.owned) old.texture.destroy();
     this.textures.delete(key);
     this.sources[key] = source;
+    this.slots.set(
+      key,
+      borrow(
+        source,
+        `ObjectTileMap ${key[0] === 'a' ? 'atlas' : 'image'}`,
+        key[0] === 'a' ? 'setAtlas' : 'setImage',
+        this.engine?.gpu,
+      ),
+    );
   }
   private releaseDevice(): void {
     this.states.clear();
@@ -209,14 +242,27 @@ export class ObjectTileMap implements EnginePlugin {
     this.pipelines.clear();
     this.device = this.module = this.frameLayout = this.textureLayout = undefined;
   }
-  private texture(key: string): TextureState {
+  /** The texture under `key`; undefined while a caller's texture is lost with the device: its quads are skipped. */
+  private texture(key: string): TextureState | undefined {
     let value = this.textures.get(key);
     if (!value) {
       const source = this.sources[key];
       if (!source) throw fault('state', `No image for ${key.slice(2)}`, 'tilemap-options');
-      const atlas = atlasTexture(this.device!, source, () =>
+      let slot = this.slots.get(key);
+      if (!slot) {
+        const atlas = key[0] === 'a';
+        slot = borrow(
+          source,
+          `ObjectTileMap ${atlas ? 'atlas' : 'image'}`,
+          atlas ? 'setAtlas' : 'setImage',
+          this.engine?.gpu,
+        );
+        this.slots.set(key, slot);
+      }
+      const atlas = borrowedAtlas(slot, this.device!, this.engine, () =>
         rangeError('Invalid tile image pixels', 'tilemap-options'),
       );
+      if (!atlas) return undefined;
       value = {
         ...atlas,
         group: this.device!.createBindGroup({
@@ -230,7 +276,9 @@ export class ObjectTileMap implements EnginePlugin {
   }
   private draw(c: Context): void {
     if (c.view?.layers !== undefined && !(c.view.layers & this.mask)) return;
-    const own = typeof this.options.target === 'function' ? this.options.target() : this.options.target;
+    const target = this.options.target,
+      own = typeof target === 'function' ? target() : target && lend(this.targetSlot, c.device, this.engine);
+    if (target && typeof target !== 'function' && !own) return;
     if (own && c.view?.index) return;
     if (!(this.camera.zoom > 0) || !Number.isFinite(this.camera.x + this.camera.y + this.camera.zoom))
       throw rangeError('Invalid tile map camera', 'tilemap-options');
@@ -257,8 +305,9 @@ export class ObjectTileMap implements EnginePlugin {
       parallax: this.parallax,
       view: this.bounds(width, height),
       imageSize: (source) => {
-        const t = this.texture(`i:${source}`).texture;
-        return [t.width, t.height];
+        // A lost GPUTexture still knows its size, so the layer keeps its place while its quads are skipped.
+        const t = this.texture(`i:${source}`)?.texture ?? (this.sources[`i:${source}`] as Partial<GPUTexture>);
+        return t?.width ? [t.width, t.height!] : undefined;
       },
     });
     const words = new Uint32Array(quads.length * 12),
@@ -321,7 +370,9 @@ export class ObjectTileMap implements EnginePlugin {
       pass.setBindGroup(0, state.group);
       pass.setVertexBuffer(0, state.vertices!);
       for (const run of runs) {
-        pass.setBindGroup(1, this.textures.get(run.key)!.group);
+        const texture = this.textures.get(run.key);
+        if (!texture) continue;
+        pass.setBindGroup(1, texture.group);
         pass.draw(4, run.count, 0, run.first);
       }
     }

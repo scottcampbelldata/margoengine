@@ -15,7 +15,7 @@ query correctness and traversal cost without changing mesh data, public signatur
 ```ts
 import {Engine, box} from 'margoengine/core';
 import {MeshBVH, Raycaster, buildAsync, computeGeometryBVHAsync, frustumPlanes} from 'margoengine/bvh';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const canvas = document.querySelector('canvas')!;
 const engine = await Engine.create(canvas);
 
@@ -26,7 +26,7 @@ canvas.addEventListener('pointerdown', event => {
   const [hit] = raycaster.intersectEngine(engine); // {mesh, distance, point, normal, faceNormal, faceIndex, barycoord, frontFace}
 });
 
-// A loaded gltf-pro PBRModel uses its current GPU skin/morph pose.
+// A loaded gltf/pbrModel uses its current GPU skin/morph pose.
 // This explicit asynchronous query reads back only deformed vertices.
 const model = await loadGLTF(engine, '/hero.glb');
 const [animatedHit] = await raycaster.intersectModel(model);
@@ -75,8 +75,31 @@ corrupt node links throw instead of looping.
 - **Flat layout.** One `ArrayBuffer` of 32-byte nodes in depth-first order (six float32 bounds, then either a leaf's triangle offset and count or an internal node's right child and split axis; the left child is always the next node), a `Uint32Array` of vertex indices in leaf order and a `Uint32Array` of original face indices. Nothing else is needed, so `serialize`, `toArrayBuffer` and `postMessage` transfers move the tree without copying or rebuilding. Positions are never copied: a `Geometry`'s interleaved stride-6 `vertices` are read in place, which is also what makes `refit()` work after vertices move.
 - **Float64 queries.** Ray, closest point, sphere, oriented box, triangle/triangle and frustum tests run in float64. A ray Moller-Trumbore rejects is tried again by the watertight test of Woop, Benthin and Wald (JCGT 2013), so a ray through the shared edge of two triangles hits at least one of them (before, about 7% of rays aimed at a random shared edge missed both). Box tests use a tiny relative slack so pruning is always conservative; the tests check that every query returns what a brute-force scan over all triangles returns.
 - **Raycaster.** `setFromCamera` inverts `camera.matrix` and unprojects at the backend's clip depths (WebGPU reversed-Z near 1 and far 0, WebGL -1 and 1); `setFromEngine` takes canvas CSS pixels and refreshes the camera first. `intersectEngine` runs the transform kernel (so edits since the last render count), skips meshes that are hidden or under a hidden parent, applies `layers` and `filter`, rejects by the world bounding sphere (built from 12 matrix and 4 sphere values, each read once per mesh and ray), and casts the ray in each mesh's local space against that geometry's BVH from a `WeakMap` cache. World normals use the inverse-transpose. With `side: 'material'` (default) single-sided materials only hit their front side, defined like the renderer does by local winding, so mirrored meshes behave as drawn.
-- **Deformed picking.** `await raycaster.intersectModel(model)` consumes the structural `DeformedPickingSource` interface implemented by gltf-pro's `PBRModel`. It snapshots the current GPU skin/morph output and local-to-world matrices, builds a separate BVH per primitive and refits it for later poses with unchanged topology. Deformations outside bind-pose bounds remain pickable. Hits have the same side rules, world distances, layer masks and filters as ordinary raycasts, without assigning a core `Geometry` or adding runtime gltf-pro imports. Each hit carries `uv` (TEXCOORD_0 interpolated from the posed snapshot) and the snapshot's `primitiveIndex` and `nodeIndex`, which `PBRModel` captures before its readback, so they stay right when snapshots are filtered, primitives share a node or the model changes while the readback is pending. A custom `DeformedPickingSource` whose snapshots leave those two out gets hits without them; posed hits carry no `model` or `primitive` object. Ray settings are captured before readback; removed, hidden or disposed meshes are skipped when it finishes. GPU readback and CPU refitting have an explicit cost, so use this query for pointer events. Ordinary mesh queries stay synchronous.
+- **Deformed picking.** `await raycaster.intersectModel(model)` consumes the structural `DeformedPickingSource` interface implemented by gltf/pbr's `PBRModel`. It snapshots the current GPU skin/morph output and local-to-world matrices, builds a separate BVH per primitive and refits it for later poses with unchanged topology. Deformations outside bind-pose bounds remain pickable. Hits have the same side rules, world distances, layer masks and filters as ordinary raycasts, without assigning a core `Geometry` or adding runtime gltf/pbr imports. Each hit carries `uv` (TEXCOORD_0 interpolated from the posed snapshot) and the snapshot's `primitiveIndex` and `nodeIndex`, which `PBRModel` captures before its readback, so they stay right when snapshots are filtered, primitives share a node or the model changes while the readback is pending. A custom `DeformedPickingSource` whose snapshots leave those two out gets hits without them; posed hits carry no `model` or `primitive` object. Ray settings are captured before readback; removed, hidden or disposed meshes are skipped when it finishes. GPU readback and CPU refitting have an explicit cost, so use this query for pointer events. Ordinary mesh queries stay synchronous.
 - **Worker and SSR safety.** `buildAsync` uses `new Worker(new URL('./bvh.worker.js', import.meta.url), {type: 'module'})`, which Vite, webpack 5 and Next.js emit as an asset (the browser test checks a production Vite build). Results come back in transfer lists. Without `Worker` (Node, SSR) it builds synchronously. Importing does not create workers or attach engine state. Engine-bound raycasting resolves the verified core runtime for its compatibility checks; use the separate `/tree` entry for engine-free code.
+
+### Face order
+
+Every build is what other BVH libraries call an indirect build: your `indices` (or vertex order, for a mesh without
+indices) are never reordered, moved or written, and every query reports the face numbers of your buffer. The tree
+keeps its own leaf-ordered copy of the vertex indices plus one original face number a triangle, so an editor that keys
+data by face keeps its order with no option to set.
+
+```js
+import { MeshBVH } from '@margoengine/bvh';
+
+// Two faces of a unit square: face 0 below the diagonal, face 1 above it.
+const positions = new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]);
+const indices = new Uint32Array([0, 1, 2, 0, 2, 3]);
+const bvh = MeshBVH.build({ positions, indices });
+console.log(bvh.raycastFirst({ origin: [0.75, 0.25, 1], direction: [0, 0, -1] })?.faceIndex); // 0
+console.log(bvh.raycastFirst({ origin: [0.25, 0.75, 1], direction: [0, 0, -1] })?.faceIndex); // 1
+console.log(indices.join(',')); // 0,1,2,0,2,3: untouched
+```
+
+The copy costs 16 bytes a triangle on top of the 32-byte nodes; it makes the tree self-contained, so `serialize` and
+`postMessage` need no index buffer of yours. A tree reads your positions in place, so `refit()`
+follows moved vertices; after you change `indices` themselves, build again.
 
 ## Options
 
@@ -420,13 +443,13 @@ using refit = await GPUDynamicBVH.create(device, {
 | `stride` | 3 floats from one vertex to the next |
 | `offset` | 0 floats before the first position |
 
-A loaded character needs no buffer plumbing. `fromModel` makes one tree for each deforming primitive of a `PBRModel`, and `fromPrimitive` makes one for a single entry of `model.primitives`. Both read the stride and offset of gltf-pro's deformed output, take `mode` and `bvh`, and in `'refit'` mode default `bvh` to the bind pose.
+A loaded character needs no buffer plumbing. `fromModel` makes one tree for each deforming primitive of a `PBRModel`, and `fromPrimitive` makes one for a single entry of `model.primitives`. Both read the stride and offset of gltf/pbr's deformed output, take `mode` and `bvh`, and in `'refit'` mode default `bvh` to the bind pose.
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {engineRuntime} from 'margoengine/core/extension';
 import {Animation} from 'margoengine/animation';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {GPUDynamicBVH} from 'margoengine/bvh/gpu-build';
 const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
 const model = await loadGLTF(engine, '/fox.glb');
@@ -451,7 +474,7 @@ Rays and hits are in the space `model.readPickingGeometry()` gives its vertices.
 
 ```ts
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 import {AlphaRaycaster, modelAlphaMasks} from 'margoengine/bvh/alpha';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const model = await loadGLTF(engine, '/fence.glb');
@@ -550,11 +573,11 @@ That is roughly 3,000 to 4,200 times the brute-force ray rate. The tree takes ab
 ## Limits
 
 - Raw indices may be any numeric array; each must be a whole number within the vertex range. With `buildAsync({transfer: true})` the input is checked before the buffers move, and normals may not share a buffer with the moved positions or Uint32 indices.
-- Triangles only: no lines or points. Synchronous `intersectMeshes` and `intersectEngine` discover static glTF Pro/FBX triangles as well as core `Geometry`, including several primitives on one node. Once a GPU deformation buffer is active they throw with a direction to use `await raycaster.intersectModel(model)`, which reads the current pose. They never silently test a deformed mesh's bind pose. Hits carry barycentric weights but no `uv`.
+- Triangles only: no lines or points. Synchronous `intersectMeshes` and `intersectEngine` discover static glTF PBR/FBX triangles as well as core `Geometry`, including several primitives on one node. Once a GPU deformation buffer is active they throw with a direction to use `await raycaster.intersectModel(model)`, which reads the current pose. They never silently test a deformed mesh's bind pose. Hits carry barycentric weights but no `uv`.
 - `collectFrustum` with `'triangles'` is the conservative culling test (a triangle is dropped only when all three vertices are outside one plane), not exact clipping.
 - `refit()` keeps the tree topology; rebuild after large deformations for good query speed.
 - Hits on a shared edge report every triangle that contains the point (the tests account for ties).
-- The Raycaster reads engine internals through the same structural fields `engineRuntime` exposes (`store`, `meshes`, `camera`, `canvas`, `backend`). CPU queries test geometric triangles without evaluating fragment alpha masks or custom vertex-shader deformation. Use gltf-pro's GPU picking for rendered coverage and scene occlusion.
+- The Raycaster reads engine internals through the same structural fields `engineRuntime` exposes (`store`, `meshes`, `camera`, `canvas`, `backend`). CPU queries test geometric triangles without evaluating fragment alpha masks or custom vertex-shader deformation. Use gltf/pbr's GPU picking for rendered coverage and scene occlusion.
 
 ## Tests
 
@@ -602,7 +625,7 @@ primitive/model/instance ranges. These face numbers survive BVH leaf permutation
 
 ```js
 import { Engine } from '@margoengine/core';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { alphaWorldTriangles } from '@margoengine/bvh/alpha-triangles';
 import { MeshBVH } from '@margoengine/bvh';
 

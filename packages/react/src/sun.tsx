@@ -1,6 +1,7 @@
 import type { ColorInput, Vec3 } from '@margoengine/math';
 import { parseColor } from '@margoengine/math/color';
 import { useCommit, useScene } from './internal.js';
+import { rangeError } from '../../shared/errors.js';
 
 /** Props of `<Sun>`: the directional light every mesh and model is lit by (core's sun). */
 export interface SunProps {
@@ -20,7 +21,7 @@ export function Sun({ direction = [3, 5, 4], color = '#ffffff', intensity = 3 }:
     key = typeof color === 'object' ? color.join() : color;
   useCommit(() => {
     if (!Number.isFinite(intensity) || intensity < 0)
-      throw new RangeError('Sun intensity must be a finite number of 0 or more');
+      throw rangeError('Sun intensity must be a finite number of 0 or more', 'react-arguments');
     const lighting = (world ?? engine).lighting,
       saved = { direction: lighting.direction.slice(), radiance: lighting.radiance.slice() };
     lighting.direction.set([direction[0], direction[1], direction[2], intensity]);

@@ -67,6 +67,12 @@ interface AtomicType {
     readonly element: ScalarType;
 }
 
+interface Attachments {
+    readonly colors: readonly (Sub | null)[];
+    readonly depth: Sub | null;
+    readonly record: FramebufferRecord;
+}
+
 interface Attribute {
     readonly location: number;
     readonly slot: number;
@@ -119,6 +125,15 @@ interface ColorAttachment {
     readonly clearValue: readonly number[];
     readonly loadOp: GPULoadOp;
     readonly storeOp: GPUStoreOp;
+}
+
+class ColorSnap {
+    view: CompatTextureView;
+    depthSlice: number;
+    resolveTarget: CompatTextureView | undefined;
+    readonly clearValue: number[];
+    loadOp: GPULoadOp;
+    storeOp: GPUStoreOp;
 }
 
 class CompatAdapter {
@@ -191,6 +206,7 @@ class CompatBuffer {
     destroyed: boolean;
     constructor(device: CompatDevice, descriptor: GPUBufferDescriptor);
     write(offset: number, bytes: Uint8Array): void;
+    writeRange(offset: number, source: Uint8Array, from: number, length: number): void;
     settle(force?: boolean): boolean;
     drain(): void;
     land(offset: number, bytes: Uint8Array): void;
@@ -216,20 +232,23 @@ class CompatBuffer {
 }
 
 class CompatCommandBuffer {
-    readonly ops: readonly Op[];
+    readonly ops: Tape;
     label: string;
-    readonly compute: boolean;
-    readonly readback: boolean;
-    readonly uses: Uses;
-    used: boolean;
-    constructor(ops: readonly Op[], label: string,
-    compute?: boolean, readback?: boolean,
-    uses?: Uses);
+    constructor(
+    ops: Tape, label: string, compute?: boolean, readback?: boolean);
+    get used(): boolean;
+    set used(value: boolean);
+    get compute(): boolean;
+    get readback(): boolean;
+    get uses(): Uses;
+    get usesLength(): number;
+    release(): void;
 }
 
 class CompatCommandEncoder {
     label: string;
     constructor(device: CompatDevice, label: string);
+    private get device();
     beginRenderPass(d: GPURenderPassDescriptor): CompatRenderPassEncoder;
     beginComputePass(d?: GPUComputePassDescriptor): CompatComputePassEncoder;
     copyBufferToBuffer(src: CompatBuffer, a: number | CompatBuffer, b?: CompatBuffer | number, c?: number, d?: number): void;
@@ -246,8 +265,8 @@ class CompatCommandEncoder {
 
 class CompatComputePassEncoder {
     label: string;
-    constructor(ops: ((r: Replayer) => void)[], device: CompatDevice, label: string,
-    uses?: Uses);
+    constructor(
+    tape: Tape, label: string);
     setPipeline(pipeline: CompatComputePipeline): void;
     setBindGroup(index: number, group: CompatBindGroup | null, offsets?: Iterable<number> | Uint32Array, start?: number, length?: number): void;
     dispatchWorkgroups(x: number, y?: number, z?: number): void;
@@ -311,13 +330,15 @@ class CompatDevice extends EventTarget {
     onuncapturederror: ((event: Event) => void) | null;
     readonly loadSampler: WebGLSampler;
     frame: number;
-    readonly presents: Set<{
+    readonly presents: {
         present(): void;
-    }>;
+    }[];
+    presentCount: number;
     readonly shown: Set<{
         keepFrame(): void;
     }>;
     readonly replayer: Replayer;
+    readonly tapes: TapePool;
     computeRuntime: ComputeRuntime | null;
     readback: typeof import('./readback.js') | null;
     constructor(gl: WebGL2RenderingContext, adapter: CompatAdapter, features: ReadonlySet<string>, descriptor?: GPUDeviceDescriptor);
@@ -343,7 +364,8 @@ class CompatDevice extends EventTarget {
         present(): void;
     }): void;
     flushPresents(): void;
-    framebuffer(key: string, textures: readonly CompatTexture[], build: (fbo: WebGLFramebuffer, made: boolean) => void): WebGLFramebuffer;
+    framebuffer(key: string, textures: readonly CompatTexture[], build: (fbo: WebGLFramebuffer, made: boolean) => void): FramebufferRecord;
+    framebufferAgain(record: FramebufferRecord): WebGLFramebuffer;
     dropFramebuffers(texture: CompatTexture): void;
     createBuffer(descriptor: GPUBufferDescriptor): CompatBuffer;
     createTexture(descriptor: GPUTextureDescriptor): CompatTexture;
@@ -417,12 +439,14 @@ class CompatQueue {
     constructor(device: CompatDevice);
     afterWaiting(op: () => void): boolean;
     submit(buffers: Iterable<{
-        ops: readonly ((r: Replayer) => void)[];
+        ops: Tape;
         used?: boolean;
         compute?: boolean;
         readback?: boolean;
         label?: string;
         uses?: Uses;
+        usesLength?: number;
+        release?(): void;
     }>): void;
     writeBuffer(buffer: CompatBuffer, offset: number, data: BufferSource | SharedArrayBuffer, dataOffset?: number, size?: number): void;
     writeTexture(destination: GPUTexelCopyTextureInfo, data: BufferSource | SharedArrayBuffer, layout: GPUTexelCopyBufferLayout, size: GPUExtent3D): void;
@@ -431,10 +455,11 @@ class CompatQueue {
 }
 
 class CompatRenderBundle {
-    readonly ops: readonly Op[];
+    readonly ops: Tape;
     label: string;
     readonly uses: readonly Usable[];
-    constructor(ops: readonly Op[], label: string,
+    constructor(
+    ops: Tape, label: string,
     uses?: readonly Usable[]);
 }
 
@@ -471,6 +496,8 @@ class CompatRenderPipeline {
     readonly cull: number;
     readonly frontFace: number;
     readonly targets: readonly (TargetState | null)[];
+    readonly targetGL: readonly TargetGL[];
+    readonly sameTargets: boolean;
     readonly depthStencil?: GPUDepthStencilState;
     readonly alphaToCoverage: boolean;
     readonly sampleCount: number;
@@ -511,6 +538,7 @@ class CompatTexture {
     readonly device: CompatDevice;
     readonly id: number;
     label: string;
+    defaultRange: ViewRange | null;
     readonly width: number;
     readonly height: number;
     readonly depthOrArrayLayers: number;
@@ -535,13 +563,19 @@ class CompatTexture {
     readonly layers: number;
     blockWrites: BlockWrite[] | null;
     blockTwin: TextureStorage | null;
+    blocks: Uint8Array[] | null;
     constructor(device: CompatDevice, descriptor: GPUTextureDescriptor);
+    blockRegion(level: number, x: number, y: number, z: number, w: number, h: number, depth: number, tight: Uint8Array, keep: boolean): void;
     sampled(v: CompatTextureView, alias?: number): TextureStorage;
     attached(v: CompatTextureView): TextureStorage;
+    blocksIn(format: GPUTextureFormat): TextureStorage;
     read(s: TextureStorage, level: number, levels: number, layer: number, layers: number, sync: (from: TextureStorage, to: TextureStorage, level: number, layer: number) => void): void;
     wrote(s: TextureStorage, level: number, levels: number, layer: number, layers: number): void;
     sliceStandIn(s: TextureStorage): WebGLTexture;
     resolvedFor(stencil: boolean): WebGLTexture | null;
+    levelWidth(level: number): number;
+    levelHeight(level: number): number;
+    levelDepth(level: number): number;
     levelSize(level: number): [number, number, number];
     createView(descriptor?: GPUTextureViewDescriptor): CompatTextureView;
     dispose(): void;
@@ -550,17 +584,17 @@ class CompatTexture {
 }
 
 class CompatTextureView {
-    readonly texture: CompatTexture;
-    readonly id: number;
     label: string;
-    readonly format: GPUTextureFormat;
-    readonly dimension: GPUTextureViewDimension;
-    readonly baseMipLevel: number;
-    readonly mipLevelCount: number;
-    readonly baseArrayLayer: number;
-    readonly arrayLayerCount: number;
-    readonly aspect: GPUTextureAspect;
-    constructor(texture: CompatTexture, d: GPUTextureViewDescriptor);
+    constructor(texture: CompatTexture, d?: GPUTextureViewDescriptor);
+    get id(): number;
+    get texture(): CompatTexture;
+    get format(): GPUTextureFormat;
+    get dimension(): GPUTextureViewDimension;
+    get baseMipLevel(): number;
+    get mipLevelCount(): number;
+    get baseArrayLayer(): number;
+    get arrayLayerCount(): number;
+    get aspect(): GPUTextureAspect;
 }
 
 type CompatTier = 'full' | 'half-float' | 'ldr';
@@ -581,12 +615,22 @@ interface ComputeRuntime {
 
 type ConstValue = number | boolean | readonly ConstValue[];
 
+class DepthSnap {
+    view: CompatTextureView;
+    depthClearValue: number;
+    depthLoadOp: GPULoadOp | undefined;
+    depthStoreOp: GPUStoreOp | undefined;
+    depthReadOnly: boolean;
+    stencilClearValue: number;
+    stencilLoadOp: GPULoadOp | undefined;
+    stencilStoreOp: GPUStoreOp | undefined;
+    stencilReadOnly: boolean;
+}
+
 class DrawRecorder {
-    protected readonly ops: Op[];
+    protected readonly tape: Tape;
     label: string;
-    protected readonly uses: Uses;
-    constructor(ops: Op[], label: string,
-    uses: Uses);
+    constructor(tape: Tape, label: string);
     setPipeline(pipeline: CompatRenderPipeline): void;
     setBindGroup(index: number, group: CompatBindGroup | null, offsets?: Iterable<number> | Uint32Array, start?: number, length?: number): void;
     setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset?: number, size?: number): void;
@@ -673,6 +717,13 @@ interface FormatInfo {
 }
 
 type FormatKind = 'float' | 'sint' | 'uint' | 'depth' | 'depth-stencil' | 'stencil';
+
+interface FramebufferRecord {
+    readonly fbo: WebGLFramebuffer;
+    readonly build: (fbo: WebGLFramebuffer, made: boolean) => void;
+    frame: number;
+    dead: boolean;
+}
 
 class GLObjects {
     readonly created: Record<string, number>;
@@ -777,9 +828,13 @@ class GLState {
     forgetVertexArray(v: WebGLVertexArrayObject): void;
     forgetProgram(p: WebGLProgram): void;
     enable(cap: number, on: boolean): void;
-    set(key: string, value: string, set: () => void): void;
-    value(key: string): string | undefined;
-    forget(key: string): void;
+    changed(at: number, n: number, a: number, b?: number, c?: number, d?: number): boolean;
+    num(at: number): number;
+    forget(at: number, n?: number): void;
+    viewport(x: number, y: number, w: number, h: number): void;
+    scissor(x: number, y: number, w: number, h: number): void;
+    blendChanged(i: number, key: string): boolean;
+    forgetBlend(i: number): void;
     uniformBuffer(point: number, buffer: WebGLBuffer, id: number, offset: number, size: number): void;
     unit(index: number, target: number, texture: WebGLTexture | null, sampler: WebGLSampler | null): void;
     activeUnit(index: number): void;
@@ -1027,14 +1082,17 @@ class LinkedProgram {
         baseVertex: number;
         baseInstance: number;
         element: number;
-        pointers: string[];
+        pointerBuffers: number[];
+        pointerOffsets: number[];
         levels: Map<WebGLUniformLocation, number>;
-        sizes: Map<WebGLUniformLocation, string>;
-        modes: Map<WebGLUniformLocation, string>;
-        info: Map<WebGLUniformLocation, string>;
+        sizes: Map<WebGLUniformLocation, Float64Array<ArrayBufferLike>>;
+        mips: Map<WebGLUniformLocation, Float64Array<ArrayBufferLike>>;
+        modes: Map<WebGLUniformLocation, Int32Array<ArrayBufferLike>>;
+        info: Map<WebGLUniformLocation, Float64Array<ArrayBufferLike>>;
     };
     constructor(device: CompatDevice, glsl: GLSLProgram, attributes: readonly Attribute[]);
     done(): boolean;
+    warmed(targets: readonly (TargetState | null)[]): boolean;
     free(): void;
     finish(): void;
 }
@@ -1064,6 +1122,16 @@ interface PassDescriptor {
     readonly queries?: CompatQuerySet;
 }
 
+class PassSnap {
+    readonly colors: (ColorSnap | null)[];
+    depth: DepthSnap | undefined;
+    queries: CompatQuerySet | undefined;
+    readonly slots: ColorSnap[];
+    readonly depthSlot: DepthSnap;
+    constructor(count: number);
+    clear(): void;
+}
+
 interface PointerType {
     readonly kind: 'ptr' | 'ref';
     readonly space: AddressSpace;
@@ -1082,7 +1150,7 @@ class Replayer {
     readonly device: CompatDevice;
     readonly gl: WebGL2RenderingContext;
     constructor(device: CompatDevice);
-    run(ops: readonly Op[]): void;
+    run(tape: Tape): void;
     putBlocks(s: TextureStorage, write: BlockWrite): void;
     zero(texture: WebGLTexture, target: number, info: FormatInfo, levels: number, w: number, h: number, d: number): void;
     attachable(info: FormatInfo): boolean;
@@ -1095,12 +1163,12 @@ class Replayer {
     beginPass(desc: PassDescriptor): void;
     endPass(): void;
     setPipeline(p: CompatRenderPipeline): void;
-    setBindGroup(index: number, group: CompatBindGroup | null, offsets: number[]): void;
+    setBindGroup(index: number, group: CompatBindGroup | null, offsets: ArrayLike<number>, from?: number, count?: number): void;
     setVertexBuffer(slot: number, buffer: CompatBuffer | null, offset: number, _size?: number): void;
     setIndexBuffer(buffer: CompatBuffer, format: GPUIndexFormat, offset: number, _size?: number): void;
     setViewport(x: number, y: number, w: number, h: number, near: number, far: number): void;
     setScissor(x: number, y: number, w: number, h: number): void;
-    setBlendConstant(c: number[]): void;
+    setBlendConstant(r: number, g: number, b: number, a: number): void;
     setStencilReference(reference: number): void;
     executeBundles(bundles: readonly CompatRenderBundle[]): void;
     beginQuery(index: number): void;
@@ -1123,6 +1191,7 @@ class Replayer {
     }, destination: GPUTexelCopyTextureInfo & {
         texture: CompatTexture;
     }, [w, h, depth]: [number, number, number]): void;
+    copyTextures(a: CompatTexture, b: CompatTexture, fromLevel: number, sx: number, sy: number, sz: number, toLevel: number, dx: number, dy: number, dz: number, w: number, h: number, depth: number): void;
 }
 
 interface SamplerType {
@@ -1181,6 +1250,57 @@ interface Sub {
     readonly info: FormatInfo;
     readonly level: number;
     attach(point: number): void;
+    fbs?: Attachments[];
+}
+
+class Tape {
+    pool: TapePool | null;
+    codes: Uint8Array<ArrayBuffer>;
+    nums: Float64Array<ArrayBuffer>;
+    objs: unknown[];
+    length: number;
+    nl: number;
+    ol: number;
+    readonly uses: Uses;
+    usesLength: number;
+    computePipeline: boolean;
+    op(code: number): void;
+    obj(code: number, o: unknown): void;
+    num(code: number, a: number): void;
+    obj2(code: number, a: unknown, b: unknown): void;
+    n4(code: number, a: number, b: number, c: number, d: number): void;
+    n3(code: number, a: number, b: number, c: number): void;
+    n5(code: number, a: number, b: number, c: number, d: number, e: number): void;
+    n6(code: number, a: number, b: number, c: number, d: number, e: number, f: number): void;
+    objNum(code: number, o: unknown, a: number): void;
+    indexBuffer(buffer: unknown, format: GPUIndexFormat, offset: number, size: number): void;
+    objNums3(code: number, o: unknown, a: number, b: number, c: number): void;
+    bindGroup(index: number, group: CompatBindGroup | null, offsets: ArrayLike<number> | undefined, start: number, count: number, code?: number): void;
+    copyBuffer(src: unknown, dst: unknown, srcOffset: number, dstOffset: number, size: number): void;
+    copyTextures(a: unknown, b: unknown, source: GPUTexelCopyTextureInfo, destination: GPUTexelCopyTextureInfo, size: GPUExtent3D): void;
+    closure(fn: Op): void;
+    use(u: Usable | readonly Usable[]): void;
+    snapshot(count: number): PassSnap;
+    reset(): void;
+}
+
+class TapePool {
+    readonly device: CompatDevice;
+    constructor(device: CompatDevice);
+    take(): Tape;
+    give(tape: Tape): void;
+}
+
+interface TargetGL {
+    readonly key: string;
+    readonly mask: number;
+    readonly blend: boolean;
+    readonly colorOp: number;
+    readonly alphaOp: number;
+    readonly colorSrc: number;
+    readonly colorDst: number;
+    readonly alphaSrc: number;
+    readonly alphaDst: number;
 }
 
 interface TargetState {
@@ -1219,8 +1339,9 @@ interface TextureStorage {
     readonly info: FormatInfo;
     readonly layer: number;
     readonly layers: number;
+    readonly alias: number;
     have: Uint32Array | null;
-    levels: string;
+    levels: number;
 }
 
 interface TextureType {
@@ -1268,6 +1389,18 @@ interface VectorType {
 
 interface View {
     readonly projectionMatrix: ArrayLike<number>;
+}
+
+class ViewRange {
+    readonly texture: CompatTexture;
+    readonly format: GPUTextureFormat;
+    readonly dimension: GPUTextureViewDimension;
+    readonly baseMipLevel: number;
+    readonly mipLevelCount: number;
+    readonly baseArrayLayer: number;
+    readonly arrayLayerCount: number;
+    readonly aspect: GPUTextureAspect;
+    constructor(texture: CompatTexture, d: GPUTextureViewDescriptor);
 }
 
 type Viewport = {

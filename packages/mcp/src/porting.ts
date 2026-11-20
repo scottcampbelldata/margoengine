@@ -63,13 +63,14 @@ export interface PortingSources {
   guide?: string;
 }
 
+// GitHub Flavored Markdown tables: a pipe escaped with a backslash is cell text (a literal pipe), not a cell border.
 const cells = (line: string): string[] =>
   line
     .trim()
     .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split('|')
-    .map((cell) => cell.trim());
+    .replace(/(?<!\\)\|$/, '')
+    .split(/(?<!\\)\|/)
+    .map((cell) => cell.replaceAll('\\|', '|').trim());
 
 const MATRIX_COLUMNS = ['Status', 'Margo', 'Shows it', 'Notes'];
 
@@ -300,7 +301,11 @@ export async function loadPortingGuides(file?: string | URL, signal?: AbortSigna
       'mcp',
     );
   }
-  return JSON.parse(text) as PortingGuide[];
+  try {
+    return JSON.parse(text) as PortingGuide[];
+  } catch {
+    throw fault('failed', `The porting guides ${String(target)} are not JSON; rebuild or reinstall @margoengine/mcp`, 'mcp');
+  }
 }
 
 /** The `port_to_margo` tool over `guides`. */

@@ -1,7 +1,7 @@
 import type { Engine } from '@margoengine/core/extension';
 import type { FrameCallback } from '@margoengine/core';
 import type { Frames } from './internal.js';
-import { MargoError } from '@margoengine/math/errors';
+import { fault, rangeError } from '../../shared/errors.js';
 
 const priorities = new WeakMap<FrameCallback, number>();
 /** Cache the stable order until subscription membership changes; ordinary frames need no sorting or array copy. */
@@ -52,7 +52,7 @@ export function frameTakeover(frames: Frames): boolean {
 }
 /** Subscribe in stable registration order, with a finite ascending numeric priority. */
 export function subscribeFrame(frames: Frames, callback: FrameCallback, priority = 0): () => void {
-  if (!Number.isFinite(priority)) throw new RangeError('useFrame priority must be finite; use 0 for automatic rendering.');
+  if (!Number.isFinite(priority)) throw rangeError('useFrame priority must be finite; use 0 for automatic rendering', 'react-arguments');
   priorities.set(callback, priority);
   frames.callbacks.add(callback);
   return () => { frames.callbacks.delete(callback); priorities.delete(callback); };
@@ -119,8 +119,8 @@ export function bridgeFrames(engine: Engine, frames: Frames): () => void {
 /** Optional presentation work runs only when a frame actually draws, after takeover and XR routing. */
 export function frameOutput(frames: Frames, output: FrameOutput): () => void {
   const state = bridges.get(frames);
-  if (!state) throw new MargoError('state', 'Canvas frame bridge is unavailable; mount AdaptiveDpr inside an active Canvas. See https://margoengine.com/errors#state');
-  if (state.output) throw new MargoError('attached', 'Canvas already has a presentation owner; release it before attaching another. See https://margoengine.com/errors#attached');
+  if (!state) throw fault('state', 'Canvas frame bridge is unavailable; mount AdaptiveDpr inside an active Canvas', 'react-usage');
+  if (state.output) throw fault('attached', 'Canvas already has a presentation owner; release it before attaching another', 'react-usage');
   state.output = output;
   return () => { if (state.output === output) state.output = undefined; };
 }

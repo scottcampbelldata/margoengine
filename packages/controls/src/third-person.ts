@@ -2,14 +2,15 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { engineRuntime, meshRuntime } from '@margoengine/core/extension';
 import { Raycaster, isModel, type ModelLike } from '@margoengine/bvh';
 import { Controls, type ControlElement, type EventTargetLike, type InputEventListener } from './controls.js';
-import { EPS, IDENTITY, madd, transformPoint, type V3 } from './math.js';
+import { EPS, IDENTITY, finiteInput, madd, transformPoint, type V3 } from './math.js';
 import { cross, normalize, sub } from '@margoengine/math/vec3';
 import { moved } from './steer.js';
+import { rangeError, typeError } from '../../shared/errors.js';
 export { Controls };
 
-/** What the camera follows: a core mesh, a gltf-pro model (by its `root`), or a function returning a world position. */
+/** What the camera follows: a core mesh, a gltf/pbr model (by its `root`), or a function returning a world position. */
 export type FollowSubject = Mesh | ModelLike | (() => readonly number[]);
-/** Something the arm collides with: a core mesh or a gltf-pro model. */
+/** Something the arm collides with: a core mesh or a gltf/pbr model. */
 export type ArmCollider = Mesh | ModelLike;
 
 /** Options of `ThirdPersonControls`; every field is optional, and all but `element` and `raycaster` can change later as properties. */
@@ -105,7 +106,7 @@ export class ThirdPersonControls extends Controls {
 
   constructor(engine: EngineKernel, subject: FollowSubject, options: ThirdPersonControlsOptions = {}) {
     super(engine, options.element);
-    if (!subject) throw new TypeError('ThirdPersonControls needs a subject: a mesh, a model or a function');
+    if (!subject) throw typeError('ThirdPersonControls needs a subject: a mesh, a model or a function', 'controls-arguments');
     this.subject = subject;
     this.pivotOffset = options.pivotOffset ?? [0, 1.5, 0];
     this.shoulder = options.shoulder ?? 0;
@@ -156,8 +157,9 @@ export class ThirdPersonControls extends Controls {
     this.savedTouchAction = null;
   }
 
-  /** Turns the arm by `yaw` and `pitch` radians, within the pitch limits: for gamepads, pointer lock or `@margoengine/input`. */
+  /** Turns the arm by finite `yaw` and `pitch` radians, within the pitch limits: for gamepads, pointer lock or `@margoengine/input`. */
   rotate(yaw: number, pitch: number): void {
+    finiteInput('Third-person turn', yaw, pitch);
     this.yaw += yaw;
     this.pitch = clamp(this.pitch + pitch, this.minPitch, this.maxPitch);
   }
@@ -172,11 +174,14 @@ export class ThirdPersonControls extends Controls {
     return [-Math.sin(this.yaw), 0, -Math.cos(this.yaw)];
   }
 
-  /** Moves the pivot, sweeps the arm and places the camera for `delta` seconds (default 1/60). Returns true when the camera moved. */
+  /** Moves the pivot, sweeps the arm and places the camera for `delta` seconds (default 1/60; finite and 0 or more, else a RangeError). Returns true when the camera moved. */
   update(delta = 1 / 60): boolean {
+    finiteInput('Third-person update step', delta);
+    if (delta < 0)
+      throw rangeError(`Third-person update step must be 0 or more; pass a finite number of seconds, not ${delta}`, 'controls-arguments');
     const camera = this.camera,
       before = [...camera.position, ...camera.target],
-      dt = Math.max(0, delta);
+      dt = delta;
     this.follow(this.goal(), dt);
     const pitch = clamp(this.pitch, this.minPitch, this.maxPitch),
       across = Math.cos(pitch),
@@ -263,7 +268,9 @@ export class ThirdPersonControls extends Controls {
     ray.filter = (mesh, model) => !this.skips(mesh, model) && (!filter || filter(mesh, model));
     try {
       const options = { refresh },
-        [hit] = this.colliders ? ray.intersectObjects(engine, this.colliders, options) : ray.intersectEngine(engine, options);
+        [hit] = this.colliders
+          ? ray.intersectObjects(engine, this.colliders, options)
+          : ray.intersectEngine(engine, options);
       return hit ? hit.distance : far;
     } finally {
       ray.filter = filter;

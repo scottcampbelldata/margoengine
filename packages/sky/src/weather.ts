@@ -10,6 +10,7 @@ import {
 import { MargoError } from '@margoengine/math/errors';
 import { finiteVector } from '@margoengine/math/validate';
 import type { Vec3 } from '@margoengine/math';
+import { cloudLayerFor, type MutableCloudLayer } from './cloud-types.js';
 import { ParticleOverlay } from '../../shared/particle-overlay.js';
 import { fullscreen } from '../../shared/gpu.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
@@ -37,6 +38,193 @@ export interface WeatherLightningOptions {
   color?: Vec3;
   /** Seed of the strike generator: the same seed and frame times give the same storm. Default 1. */
   seed?: number;
+  /**
+   * Holds the flash at this brightness, 0 to 1, in place of the strikes' own (for stills: the overlay, `flash` and
+   * {@link Weather.lightningLight} all take it, at the last strike's place). Omitted: the strikes drive it.
+   */
+  hold?: number;
+  /** The flash's light in the scene, {@link Weather.lightningLight}. Every field has a measured default. */
+  light?: WeatherLightningLightOptions;
+  /** The flash's light inside the cloud deck, {@link Weather.cloudFlash}. Every field has a measured default. */
+  cloud?: WeatherLightningCloudOptions;
+  /**
+   * Where the flash goes with no wiring: `true` (the default) or an object lights the scene's cloud deck, fog and light
+   * list by themselves ({@link WeatherLightningLinkOptions}); `false` leaves all three to you (`weather.cloudFlash`,
+   * `weather.lightningLight`).
+   */
+  link?: boolean | WeatherLightningLinkOptions;
+  /** The drawn bolt, read by `LightningBolt` (`@margoengine/sky/lightning-bolt`); also the channel the light follows. */
+  bolt?: LightningBoltOptions;
+}
+
+/**
+ * `lightning.link` of {@link Weather}: what the weather wires the flash into among the scene's plugins, found by name
+ * each frame (a plugin attached later is found too). A value you set yourself always wins: a deck given its own `flash`,
+ * a fog given its own `lightning`, are left alone.
+ */
+export interface WeatherLightningLinkOptions {
+  /** Every `VolumetricClouds` (`sky:volumetric-clouds`) without a `flash` takes {@link Weather.cloudFlash}, so the deck lights from inside. Default true. */
+  clouds?: boolean;
+  /** Every `VolumetricFog` (`volumetric-fog`) without a `lightning` takes `{light: weather.lightningLight}`, so the lit deck lights the air under it. Default true. */
+  fog?: boolean;
+  /**
+   * The scene's `LightGroups` (`clustered-groups`, `@margoengine/clustered/groups`) gets a group holding
+   * {@link Weather.lightningLight} while a flash lasts, so the ground, the sea and the props flash by themselves, with
+   * a shadow where the lights have shadow maps. Default true.
+   */
+  lights?: boolean;
+  /** Name of the light group. Default `'lightning'`. */
+  group?: string;
+}
+
+/**
+ * `lightning.cloud` of {@link Weather}: the part of a strike's light given off inside the cloud deck, which lights the
+ * deck from within ({@link Weather.cloudFlash}, for `VolumetricClouds` `flash`).
+ */
+export interface WeatherLightningCloudOptions {
+  /**
+   * Height of the cloud base above the strike point, metres, 0 to 20,000. Default {@link LIGHTNING_CLOUD_BASE}, the
+   * `VolumetricClouds` default `bottom`; give the deck's own `bottom`.
+   */
+  base?: number;
+  /**
+   * Peak luminous intensity in candela, 0 or more. Default the share of `lightning.light.peak` the channel gives off
+   * above `base`, {@link lightningCloudShare}.
+   */
+  peak?: number;
+  /** Size of the flash's core in metres, 1 to 100,000 (`VolumetricClouds` `flash.radius`). Default 200. */
+  radius?: number;
+  /** Multiplies the deck's flash (after the light's own `scale`), 0 to 1,000. Default 1. */
+  scale?: number;
+}
+
+/**
+ * `lightning.bolt` of {@link Weather}: the drawn bolt of `LightningBolt` (`@margoengine/sky/lightning-bolt`), read every
+ * frame; the same object holds the channel's shape and its look. Every field has a default. Changing a shape field
+ * (everything but `scale`, `width`, `glow` and `fade`) grows the channel of a live strike again.
+ */
+export interface LightningBoltOptions {
+  /** Multiplies the bolt's brightness, 0 or more; 0 draws nothing. Default 1. */
+  scale?: number;
+  /** Width of the hot core, metres, 0.01 to 100. Default 1.5 (at least one pixel wide on screen). */
+  width?: number;
+  /** Width of the glow around the channel, metres, 0 to 2,000: 0 draws the core alone. Default 80. */
+  glow?: number;
+  /** Chance each channel point forks a branch, 0 to 0.5. Default 0.06. */
+  branching?: number;
+  /** Half angle of the cone each growth step is drawn in, degrees, 5 to 85: how crooked the channel is. Default 50. */
+  spread?: number;
+  /** Growth steps down the main channel, 8 to 400: how fine its kinks are. Default 80. */
+  detail?: number;
+  /** Seconds the hot core takes to fade to 1/e after a return stroke, 0.001 to 1; the glow keeps the flash's 70 ms. Default 0.03. */
+  fade?: number;
+  /** Height of the channel's top above the strike, metres. Default the cloud base (`lightning.cloud.base`, else 1,500). */
+  top?: number;
+}
+
+/** `lightning.light` of {@link Weather}: the point light a strike gives the scene, {@link Weather.lightningLight}. */
+export interface WeatherLightningLightOptions {
+  /** Peak luminous intensity in candela, 0 or more. Default {@link LIGHTNING_PEAK_CANDELA}, a measured first stroke's light. */
+  peak?: number;
+  /** Height of the light above the strike point, metres, 0 to 20,000. Default {@link LIGHTNING_LIGHT_HEIGHT}. */
+  height?: number;
+  /** Linear RGB, any scale (the largest channel is taken as 1). Default {@link LIGHTNING_COLOR}, a 30,000 K channel. */
+  color?: Vec3;
+  /** Multiplies `peak` (the deck's flash follows it), 0 to 1,000: a slider's brightness. Default 1. */
+  scale?: number;
+  /** Metres where the light ends (a point light's `range`), 1 to 1,000,000. Default 1.5 times `maxDistance`. */
+  range?: number;
+  /**
+   * The light's shadow: `true` or `{near, far}` (metres from the light, `far` default 3,000; near default 1) gives the
+   * light a shadow map when the lights have them (`ClusteredOptions.shadows`), `false` none. Default `true` while the
+   * scene's `Clustered` has a free shadow map slot for it ({@link WeatherLightningLinkOptions.lights}), else none.
+   */
+  shadow?: boolean | { near?: number; far?: number };
+  /**
+   * The light follows the bolt's channel as a few lights along it (Reed and Wyvill 1994 light the scene from the
+   * channel) in place of one point light 700 m up: `true` always (the point light stays where no `LightningBolt`
+   * supplies a channel), `false` never. Default: while a `LightningBolt` is attached to this weather. The total light
+   * stays `peak` times the strokes' level, shared by height as the channel's light falls with it.
+   */
+  line?: boolean;
+  /** Lights along the channel, 1 to 8. Default 3. */
+  segments?: number;
+}
+
+/**
+ * Peak luminous intensity of the lightning light, candela: 1.43e7, a first return stroke's measured light spread over
+ * the scene flash. A first stroke radiates 2.3e9 W at peak (mean of strokes 5 to 35 km away, 0.4 to 1.1 um; Y. Guo
+ * and E. P. Krider, "The optical and radiation field signatures produced by lightning return strokes", J. Geophys.
+ * Res. 87(C11):8913-8922, 1982) for a characteristic width, energy over peak power, of 36 us (the means of M. G. Quick
+ * and E. P. Krider, "Optical power and energy radiated by return strokes in rocket-triggered lightning", J. Geophys.
+ * Res. Atmos. 122:8816-8832, 2017: 150 J/m over 4.2 MW/m), 82 kJ of light. The channel at peak is a plasma of 28,000
+ * to 31,000 K (R. E. Orville, "A high-speed time-resolved spectroscopic study of the lightning return stroke: Part II,
+ * a quantitative analysis", J. Atmos. Sci. 25(5):839-851, 1968); a 30,000 K Planck spectrum over the band, weighted by
+ * the photopic curve (C. Wyman, P.-P. Sloan and P. Shirley, "Simple analytic approximations to the CIE XYZ color
+ * matching functions", JCGT 2(2), 2013), gives 161.7 lm per watt. A frame records that light over its exposure, not
+ * the microseconds it lasts, so the light keeps the stroke's luminous energy over the flash envelope of
+ * {@link lightningFlash} (8 ms rise, 70 ms fall: 0.074 s at peak) and 4 pi sr. The real spectrum is lines, many in
+ * the near infrared (O I 777 nm, N I 868 nm), so the efficacy is an upper estimate; `lightning.light.peak` sets another.
+ */
+export const LIGHTNING_PEAK_CANDELA = (2.3e9 * (150 / 4.2e6) * 161.7) / (0.074 * 4 * Math.PI);
+/**
+ * Height of the lightning light above the strike point, metres: 700. A return stroke's light falls off with height
+ * along the channel as exp(-z / 0.6 to 0.8 km) (C. D. Jordan and M. A. Uman, "Variation in light intensity with height
+ * and time from subsequent lightning return strokes", J. Geophys. Res. 88(C11):6555-6562, 1983), so the light's centre
+ * on a channel much longer than that sits at the decay length.
+ */
+export const LIGHTNING_LIGHT_HEIGHT = 700;
+/** Default height of the cloud base for {@link Weather.cloudFlash}, metres: 1500, the `VolumetricClouds` default `bottom`. */
+export const LIGHTNING_CLOUD_BASE = 1500;
+/**
+ * Share of a return stroke's light the channel gives off above a cloud base `base` metres up: e^(-base / 700). Its
+ * light per metre falls off with height as exp(-z / 0.6 to 0.8 km) (Jordan and Uman 1983, {@link LIGHTNING_LIGHT_HEIGHT}),
+ * so the part above the base carries e^(-base / decay) of it, with its centre one decay length above the base, the
+ * position of {@link Weather.cloudFlash}. 0.117 for the default 1500 m base, 0.395 for a 650 m storm deck.
+ * @throws RangeError for a negative or non-finite base.
+ */
+export function lightningCloudShare(base: number): number {
+  if (!(base >= 0 && base < Infinity)) throw new RangeError('Invalid lightning cloud base; give 0 or more metres.');
+  return Math.exp(-base / LIGHTNING_LIGHT_HEIGHT);
+}
+/**
+ * Colour of a 30,000 K channel (Orville 1968), linear sRGB, largest channel 1: the chromaticity (0.2502, 0.2488) of
+ * its Planck spectrum by Wyman et al.'s fits, through `chromaticityToLinearSRGB` (`@margoengine/math/color`).
+ */
+export const LIGHTNING_COLOR: Vec3 = [0.3623, 0.4973, 1];
+
+/**
+ * A bolt's channel as the light of the scene: `lights` gives up to `count` points along it, each with its share of the
+ * light (`weight`, summing to 1) and the size of the line it stands for. Set by `LightningBolt` on `Weather.channelSource`.
+ */
+export interface LightningChannelSource {
+  lights(strike: LightningStrike, count: number, decay: number): readonly { position: Vec3; weight: number; radius: number }[];
+}
+
+/** A strike whose light has not died away: {@link Weather.liveStrikes}. */
+export interface LiveStrike {
+  readonly strike: LightningStrike;
+  /** Seconds since it struck. */
+  readonly age: number;
+  /** Start of each return stroke, seconds after the strike. */
+  readonly offsets: readonly number[];
+  /** Relative peak of each return stroke, 0..1. */
+  readonly amplitudes: readonly number[];
+}
+
+/** {@link Weather.lightningLight}: a point light (`PointLight` of `@margoengine/clustered`), changed in place each frame. */
+export interface LightningLight {
+  position: [number, number, number];
+  color: [number, number, number];
+  /** Candela over the colour's luminance, so the light gives `peak` times the strokes' level in candela. */
+  intensity: number;
+  range: number;
+  /** 2: inverse square. */
+  decay: number;
+  /** The shadow map the light asks for when the lights have them ({@link WeatherLightningLightOptions.shadow}); unset otherwise. */
+  shadow?: { near: number; far: number };
+  /** Size of the sphere the light stands for, metres (set on the lights along a channel). */
+  radius?: number;
 }
 
 /**
@@ -48,8 +236,16 @@ export interface WeatherOptions {
   precipitation?: 'rain' | 'snow' | 'sleet' | 'none';
   /** With `'sleet'`: the share of the precipitation that falls as snow, 0 to 1; the rest is rain. Default 0.5. */
   snowShare?: number;
-  /** Target amount, 0 (dry) to 1 (storm). The visible {@link Weather.amount} eases to it over `fadeSeconds`. Default 0.5. */
+  /** Target amount, 0 (dry) to 1 (storm). The visible {@link Weather.amount} eases to it over `fadeSeconds`. Default 0.5, or {@link rainIntensity} of `rainRate` when that is given. */
   intensity?: number;
+  /**
+   * Rain rate in millimetres of water per hour, 0 to 300. The rain's drops then fall at the speed of the drops that carry
+   * the water, the median volume diameter {@link rainDropDiameter} of that rate (Marshall and Palmer 1948) at Gunn and
+   * Kinzer's terminal speed ({@link rainFallSpeed}), so the streaks slant by atan(wind / fall) ({@link rainSlant}) and
+   * lengthen with the speed (the streak is the distance a drop falls in the shutter time); a drizzle falls at 1 to 2
+   * m/s, a downpour at 7. Unset keeps a fixed fall of 9 m/s. `WeatherDrive` (`@margoengine/weather`) sets it from the state.
+   */
+  rainRate?: number;
   /** Seconds the amount takes to move across its whole range, 0 or more (0 jumps). Default 4. */
   fadeSeconds?: number;
   /** Horizontal wind in metres per second, world X and Z. Rain slants and snow drifts with it. Default [0, 0]. */
@@ -58,8 +254,23 @@ export interface WeatherOptions {
   radius?: number;
   /** Height in metres of that box, 2..200. Default 20. */
   height?: number;
-  /** Particles at intensity 1, 0..500,000. Default 24,000 for rain and 16,000 for snow. */
+  /**
+   * Particles at intensity 1, 0..2,000,000. Default 24,000 for rain and 500,000 for snow: flakes are drawn at their real
+   * size ({@link snowflakeDiameter}), most of them under a pixel, so it takes this many to give the falling snow its
+   * density (KB-SNOW-NEARCAM2).
+   */
   particles?: number;
+  /**
+   * Snowfall rate in millimetres of melted water per hour, 0.01 to 30: it sets the flakes' size distribution, Gunn and
+   * Marshall's (1958) exponential, which broadens as the snow falls harder ({@link snowflakeDiameter}). Default 1.
+   */
+  snowfallRate?: number;
+  /**
+   * The range of flake sizes drawn, `[smallest, largest]` largest dimension in millimetres, 0.5 to 30, smallest first.
+   * Default `[2, 10]`, the range over which Locatelli and Hobbs (1974) measured the mass of aggregate snowflakes; the
+   * smaller single crystals, outside that mass law, are not drawn (their haze is the fog's).
+   */
+  flakeSizes?: readonly [number, number];
   /** Particle colour, linear RGB. Default a pale grey-blue for rain and white for snow. */
   color?: Vec3;
   /** Scales the particle colour, 0 or more: lower it at night (`1 - sky.nightFactor`). Default 1. */
@@ -72,8 +283,146 @@ export interface WeatherOptions {
    * so they stay crisp over a sky whose history it keeps (volumetric clouds) instead of being averaged away. Default false.
    */
   reactive?: boolean;
+  /**
+   * Seconds the camera's shutter stays open, 0 to 1. Each snow flake is drawn as the capsule it sweeps over that time
+   * along its motion (wind, fall and sway), its light spread over the capsule as a camera's time average records it,
+   * so a flake in a gale streaks instead of showing as a frozen disc, or as a row of dots when sub-frames are summed
+   * (give each sub-frame its own share of the shutter). Rain keeps its fixed streak. Default 0, a still disc; a camera
+   * shooting at 24 fps with a 180 degree shutter opens for 1/48 s (the `snowNight` kit's night exposure).
+   */
+  exposure?: number;
+  /**
+   * The lens the snow is seen through. A flake off the focal plane draws as its blur disc, the thin lens's circle of
+   * confusion added to its own size in quadrature, with its light spread over that disc (Potmesil and Chakravarty
+   * 1981), so a flake right in front of the camera shows as the faint, soft disc a real lens makes of it, not as a
+   * sharp speck. Names and defaults follow `@margoengine/dof`. `false` draws every flake sharp. Default
+   * `{focalDistance: 10, aperture: 2.8, filmGauge: 36}`. Rain keeps its streaks sharp.
+   */
+  lens?: WeatherLensOptions | false;
+  /**
+   * Metres from the camera over which particles fade in: none nearer than the first, all from the second. The first is
+   * never taken nearer than the camera's near plane. Default [0.4, 2].
+   */
+  nearFade?: readonly [number, number];
   /** Storms; omitted means no lightning. */
   lightning?: WeatherLightningOptions;
+}
+
+/** The lens of {@link WeatherOptions.lens}: where it focuses and how wide it opens, as `@margoengine/dof` names them. */
+export interface WeatherLensOptions {
+  /** Metres from the camera to the plane in focus, along the view axis, above the focal length. Default 10. */
+  focalDistance?: number;
+  /** Lens f-number, 0.5 to 64: lower opens the lens and blurs what is off the focal plane more. Default 2.8. */
+  aperture?: number;
+  /**
+   * Sensor size in millimetres along the view's longer side, 1 to 100: with the camera's field of view it gives the
+   * focal length, as a real lens on that sensor would have it (36 full frame, 24.9 Super 35). Default 36.
+   */
+  filmGauge?: number;
+}
+
+/**
+ * The thin lens of {@link WeatherOptions.lens} for a view `width` x `height` pixels and a vertical field of view of
+ * `fov` degrees: `scale`, half the aperture's diameter times the focal length in pixels (pixel metres), `focus`, the
+ * focal distance, and `focalLength`, metres. A point `depth` metres along the view axis blurs to a disc of radius
+ * `scale * |depth - focus| / (depth * (focus - focalLength))` pixels ({@link snowflakeBokeh}).
+ */
+export function weatherLens(
+  lens: WeatherLensOptions | false | undefined,
+  width: number,
+  height: number,
+  fov: number,
+): { scale: number; focus: number; focalLength: number } {
+  const focus = (lens && lens.focalDistance) || 10;
+  if (lens === false) return { scale: 0, focus, focalLength: 0 };
+  const pixels = height / (2 * Math.tan((fov * Math.PI) / 360)),
+    focalLength = (((lens?.filmGauge ?? 36) / 1000) * pixels) / Math.max(width, height),
+    aperture = focalLength / (lens?.aperture ?? 2.8);
+  if (!(focus > focalLength))
+    throw new RangeError('Weather lens focalDistance must be farther than the focal length; pass a larger distance');
+  return { scale: 0.5 * aperture * pixels, focus, focalLength };
+}
+
+/**
+ * How a flake `pixels` in radius when sharp draws `depth` metres from the camera through the lens `weatherLens`
+ * gives: its blur disc's `radius` in pixels, its circle of confusion added in quadrature (a disc convolved with the
+ * aperture's disc keeps about the sum of their second moments), and `alpha`, the share of its peak opacity the disc
+ * keeps when the flake's light is spread over it (pixels^2 / radius^2). A flake under a pixel is drawn a pixel wide
+ * with its alpha scaled by its true area over the pixel's, so it keeps its light without being drawn larger than it
+ * is (the point-sample coverage of Reeves 1983, "Particle systems", ACM TOG 2(2); the area-ratio fade of thin features
+ * of Persson 2014, "Phone-wire AA", GPU Pro 5): light is opacity times disc area, `alpha * radius^2 = pixels^2`.
+ */
+export function snowflakeBokeh(
+  pixels: number,
+  depth: number,
+  lens: { scale: number; focus: number; focalLength: number },
+): { radius: number; alpha: number } {
+  const coc = lens.scale === 0 ? 0 : (lens.scale * Math.abs(depth - lens.focus)) / (depth * (lens.focus - lens.focalLength)),
+    radius = Math.max(Math.hypot(pixels, coc), 1);
+  return { radius, alpha: (pixels * pixels) / (radius * radius) };
+}
+
+/**
+ * Mass of an aggregate snowflake in milligrams per millimetre of its largest dimension to the power 1.4: Locatelli and
+ * Hobbs (1974, "Fall speeds and masses of solid precipitation particles", J. Geophys. Res. 79(15), 2185 to 2197,
+ * doi:10.1029/JC079i015p02185), aggregates of unrimed radiating assemblages of dendrites or dendrites, M = 0.073 D^1.4
+ * for D 2 to 10 mm; the same aggregates fall at V = 0.8 D^0.16 m/s, 0.89 to 1.16 m/s over that range.
+ */
+export const SNOWFLAKE_MASS_COEFFICIENT = 0.073;
+
+/**
+ * The size law of {@link snowflakeDiameter} for a snowfall rate `rate` in mm of melted water per hour and the drawn
+ * range `sizes` (largest dimension, mm): Gunn and Marshall's slope `lambda` per mm of melted diameter and the melted
+ * diameters `low` and `high` (mm) of the range's ends, with `span = 1 - exp(-lambda (high - low))`.
+ */
+export function snowflakeSizeLaw(
+  rate = 1,
+  sizes: readonly [number, number] = [2, 10],
+): { lambda: number; low: number; high: number; span: number } {
+  const melted = (d: number) => Math.cbrt((6 * SNOWFLAKE_MASS_COEFFICIENT * d ** 1.4) / Math.PI),
+    lambda = 2.55 * rate ** -0.48,
+    low = melted(sizes[0]),
+    high = melted(sizes[1]);
+  return { lambda, low, high, span: 1 - Math.exp(-lambda * (high - low)) };
+}
+
+/**
+ * The largest dimension in metres of the flake at quantile `u` (0 to 1) of a snowfall of `rate` mm of melted water per
+ * hour, drawn over `sizes` mm. Melted diameters follow Gunn and Marshall's exponential, N(D) = N0 exp(-lambda D) with
+ * lambda = 25.5 R^-0.48 per cm (Gunn and Marshall 1958, "The distribution with size of aggregate snowflakes", J.
+ * Meteorol. 15(5), 452 to 461; Sekhon and Srivastava 1970, J. Atmos. Sci. 27(2), 299 to 307, refit it with 22.9
+ * R^-0.45), cut to the melted diameters of `sizes` and drawn by its inverse; a melted diameter m (mm) is a flake whose
+ * mass, pi m^3 / 6 mg of water, is Locatelli and Hobbs's 0.073 D^1.4 ({@link SNOWFLAKE_MASS_COEFFICIENT}). At 1 mm/h
+ * over 2 to 10 mm the mean flake is 4.2 mm across. The shader draws each flake's size from the same sum.
+ */
+export function snowflakeDiameter(u: number, rate = 1, sizes: readonly [number, number] = [2, 10]): number {
+  const { lambda, low, span } = snowflakeSizeLaw(rate, sizes),
+    m = low - Math.log(1 - u * span) / lambda;
+  return ((Math.PI * m ** 3) / (6 * SNOWFLAKE_MASS_COEFFICIENT)) ** (1 / 1.4) / 1000;
+}
+
+/**
+ * Fall speed in m/s of an aggregate snowflake 1 mm across, the coefficient of {@link snowflakeFallSpeed}: Locatelli
+ * and Hobbs (1974, Table 1), aggregates of unrimed radiating assemblages of dendrites or dendrites, V = 0.8 D^0.16
+ * (D 2 to 10 mm, 28 flakes), the same aggregates whose mass law ({@link SNOWFLAKE_MASS_COEFFICIENT}) draws the sizes.
+ */
+export const SNOWFLAKE_FALL_COEFFICIENT = 0.8;
+/** The exponent of {@link snowflakeFallSpeed}, Locatelli and Hobbs (1974, Table 1): V = 0.8 D^0.16. */
+export const SNOWFLAKE_FALL_EXPONENT = 0.16;
+
+/**
+ * Terminal fall speed in m/s of an aggregate snowflake whose largest dimension is `diameter` metres: Locatelli and
+ * Hobbs's (1974, Table 1) V = 0.8 D^0.16 with D in mm, 0.89 m/s at 2 mm, 1.00 m/s at the mean 4.2 mm flake and 1.16 m/s
+ * at 10 mm. Each snow flake of a {@link Weather} falls at this speed for its own size ({@link snowflakeDiameter}), in
+ * steps of 1/512 m/s. Later video disdrometer measurements of aggregates over 0.5 to 20 mm find their speeds rising
+ * with temperature (Brandes, Ikeda, Thompson and Schoenhuber 2008, "Aggregate terminal velocity/temperature
+ * relations", J. Appl. Meteorol. Climatol. 47(10), 2729 to 2736, doi:10.1175/2008JAMC1869.1), and turbulence spreads
+ * the speeds of falling snow about its still-air law (Garrett and Yuter 2014, Geophys. Res. Lett. 41(18), 6515 to
+ * 6522, doi:10.1002/2014GL061016). Rimed aggregates fall faster (Locatelli and Hobbs, densely rimed aggregates of
+ * dendrites, V = 0.79 D^0.27) and are heavier for their size (M = 0.037 D^1.9), a different size law not drawn here.
+ */
+export function snowflakeFallSpeed(diameter: number): number {
+  return SNOWFLAKE_FALL_COEFFICIENT * (diameter * 1000) ** SNOWFLAKE_FALL_EXPONENT;
 }
 
 /**
@@ -144,6 +493,19 @@ export function thunderDelay(distance: number, speed: number = speedOfSound): nu
   return distance / speed;
 }
 
+// The `LightGroups` (`@margoengine/clustered/groups`) the flash is listed in: duck-typed, this entry imports none of it.
+interface LinkedGroups {
+  readonly isDisposed: boolean;
+  readonly clustered: { readonly isDisposed: boolean; readonly shadowSlots?: number };
+  readonly list: readonly { shadow?: unknown }[];
+  group(name: string): LinkedGroup;
+}
+interface LinkedGroup {
+  readonly isDisposed: boolean;
+  setLights(lights: readonly object[]): unknown;
+  dispose(): void;
+}
+
 interface Active {
   strike: LightningStrike;
   offsets: number[];
@@ -153,40 +515,84 @@ interface Active {
 }
 
 // Hash: the PCG hash (O'Neill, PCG, 2014; GPU form in Jarzynski and Olano, JCGT 9(3), 2020); integer maths is exact
-// on every GPU. Each particle takes three hashes for its place in the box and one for its size.
+// on every GPU. Each particle takes three hashes for its place in the box and one for its size; the hash of the size
+// hash gives its two sway phases (16 bits each).
+// Snow sway: each flake swings 0.35 m on its own phase. The phase must not follow the flake's place along the axis it
+// swings on: with phase x * 3.1 the map x -> x + 0.35 sin(t + 3.1 x) has slope 1 + 1.085 cos(...), which passes zero, so
+// flakes folded into sheets of x = constant (caustics) that showed as a column of snow wherever one passed the camera
+// (Whiteout Pass, whiteout-window end frame). A phase drawn per flake moves each one on its own and keeps the snow
+// evenly spread (a uniform box shifted by independent offsets stays uniform).
+// Snow sizes (params.y, volume.w, extra.w; `snowflakeDiameter`): each flake's melted diameter is drawn from Gunn and
+// Marshall's exponential by its inverse, cut to the drawn range, and turned into its largest dimension by Locatelli
+// and Hobbs's aggregate mass, D = (pi m^3 / (6 * 0.073))^(1 / 1.4) mm. Its light is opacity times its true area: a
+// flake under a pixel is drawn a pixel wide with alpha sharp^2, so it keeps its light without being drawn larger.
+// Snow exposure (screen.w, seconds; kept out of the shader text, whose comments ship until KB-WGSL1 strips sky): the
+// vertex stage draws each flake as the capsule it sweeps over that time, from where it was (the tail) to where it is,
+// at its velocity: wind, fall and the sway's own rate. Exposure 0 leaves the disc. The fragment shades the time average
+// a camera records of the disc moving along that sweep, (1 / L) times the integral over s from 0 to L of the disc's
+// falloff at (x, y - s), in flake radii (4-point Gauss-Legendre on each side of the middle of the part of the sweep the
+// disc reaches). It keeps the disc's light (1.596 radii squared) for any sweep and tapers at both ends, so the capsules
+// of a shot's consecutive sub-frames add up to an even streak; a capsule shaded at full strength out to its round
+// ends doubled the light where two met, and the streaks showed as rows of beads.
 const shader = `
 struct Weather {
- camera:mat4x4f, eye:vec4f, volume:vec4f, drift:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f,
+ camera:mat4x4f, eye:vec4f, volume:vec4f, drift:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f, lens:vec4f,
 }
 @group(0) @binding(0) var<uniform> w:Weather;
-struct Out {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32}
+struct Out {@builtin(position) position:vec4f,@location(0) uv:vec2f,@location(1) alpha:f32,@location(2) sweep:f32}
 fn pcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let x=((s>>((s>>28u)+4u))^s)*277803737u;return (x>>22u)^x;}
 fn rnd(i:u32,k:u32)->f32 {return f32(pcg(i*4u+k+bitcast<u32>(w.params.z))>>8u)*5.9604645e-8;}
+fn flakeSize(ii:u32)->f32 {
+ let melted=w.volume.w-log(1.0-rnd(ii,3u)*w.extra.w)/w.params.y;
+ let sizeMeters=0.0005*pow(7.172586*melted*melted*melted,0.71428571);
+ return sizeMeters;
+}
 const corners=array<vec2f,6>(vec2f(-1,-1),vec2f(1,-1),vec2f(-1,1),vec2f(-1,1),vec2f(1,-1),vec2f(1,1));
-const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
+const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0,0.0);
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) ii:u32)->Out {
  let corner=corners[vi];
  let size=w.volume.xyz;
  let start=vec3f(rnd(ii,0u),rnd(ii,1u),rnd(ii,2u))*size;
  // The drift (velocity times time, wrapped on the CPU) keeps the numbers small; the box follows the camera.
- let rel=fract((start+w.drift.xyz-w.eye.xyz)/size)-0.5;
+ let sizeMeters=flakeSize(ii);
+ let k=u32(round(w.extra.y*pow(sizeMeters*2000.0,0.16)*512.0));
+ let flakes=w.params.x>0.5;
+ let fall=select(w.extra.y,f32(k)*0.001953125,flakes);
+ let fallen=select(w.drift.y,-f32((k*u32(w.drift.y))&0xffffffu)*5.9604645e-8*size.y,flakes);
+ let rel=fract((start+vec3f(w.drift.x,fallen,w.drift.z)-w.eye.xyz)/size)-0.5;
  var q=w.eye.xyz+rel*size;
  let snow=w.params.x>0.5;
- if(snow){q+=vec3f(sin(w.drift.w+start.x*3.1),0.0,cos(w.drift.w*0.8+start.z*2.7))*0.35;}
+ let ph=pcg(pcg(ii*4u+3u+bitcast<u32>(w.params.z)));
+ let phase=vec2f(f32(ph&0xffffu),f32(ph>>16u))*9.5873799e-5;
+ if(snow){q+=vec3f(sin(w.drift.w+phase.x),0.0,cos(w.drift.w*0.8+phase.y))*0.35;}
  let edge=max(max(abs(rel.x),abs(rel.z)),abs(rel.y));
  let nearDistance=length(q-w.eye.xyz);
- let fade=(1.0-smoothstep(0.7,1.0,edge*2.0))*smoothstep(0.4,2.0,nearDistance);
+ let fade=(1.0-smoothstep(0.7,1.0,edge*2.0))*smoothstep(w.lens.z,w.lens.w,nearDistance);
  let vp=w.screen.xy;
  var out:Out;
  if(snow){
   let c=w.camera*vec4f(q,1);
   if(c.w<0.1){return culled;}
-  let sizeMeters=w.params.y*(0.6+0.8*rnd(ii,3u));
-  let px=max(sizeMeters*w.screen.z/c.w,1.0);
-  out.position=vec4f(c.xy+corner*px*2.0/vp*c.w,c.z,c.w);
-  out.uv=corner;
-  // Flakes smaller than a pixel fade rather than sparkle.
-  out.alpha=fade*min(1.0,sizeMeters*w.screen.z/c.w);
+  let sharp=sizeMeters*w.screen.z/c.w;
+  let coc=w.lens.x*abs(c.w-w.lens.y)/(c.w*w.eye.w);
+  let px=max(sqrt(sharp*sharp+coc*coc),1.0);
+  let sway=vec3f(cos(w.drift.w+phase.x)*1.3,0.0,-sin(w.drift.w*0.8+phase.y)*1.04)*0.35;
+  let velocity=vec3f(w.extra.x,-fall,w.extra.z)+sway;
+  var t=w.camera*vec4f(q-velocity*w.screen.w,1);
+  if(t.w<0.1){t=c;}
+  let pa=c.xy/c.w*vp*0.5;
+  let pb=t.xy/t.w*vp*0.5;
+  let d=pa-pb;
+  let sweep=length(d);
+  let dir=select(vec2f(0,1),d/sweep,sweep>0.0001);
+  let normal=vec2f(dir.y,-dir.x);
+  let head=corner.y>0.0;
+  let along=select(-px,sweep+px,head);
+  let e=select(t,c,head);
+  out.position=vec4f((pb+dir*along+normal*corner.x*px)*2.0/vp*e.w,e.z,e.w);
+  out.uv=vec2f(corner.x,along/px);
+  out.sweep=sweep/px;
+  out.alpha=fade*sharp*sharp/(px*px);
   return out;
  }
  let velocity=vec3f(w.extra.x,-w.extra.y,w.extra.z);
@@ -208,11 +614,26 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
  out.position=vec4f(ndc*c.w,c.z,c.w);
  out.uv=vec2f(corner.x,select(0.0,1.0,head));
  out.alpha=fade*(0.4+0.6*rnd(ii,3u));
+ out.sweep=0.0;
  return out;
+}
+fn disc(r:f32)->f32 {return 1.0-smoothstep(0.4,1.0,r);}
+const gauss=array<vec2f,4>(vec2f(0.18343464,0.36268378),vec2f(0.52553241,0.31370665),vec2f(0.79666648,0.22238103),vec2f(0.96028986,0.10122854));
+fn flake(uv:vec2f,sweep:f32)->f32 {
+ if(sweep<1e-4){return disc(length(uv));}
+ let hw=sqrt(max(0.0,1.0-uv.x*uv.x));
+ let s0=max(0.0,uv.y-hw);
+ let s1=min(sweep,uv.y+hw);
+ if(s1<=s0){return 0.0;}
+ let m=(s0+s1)*0.5;
+ let h=(s1-s0)*0.5;
+ var g=0.0;
+ for(var k=0;k<4;k++){let n=gauss[k];g+=n.y*(disc(length(vec2f(uv.x,uv.y-m-h*n.x)))+disc(length(vec2f(uv.x,uv.y-m+h*n.x))));}
+ return g*h/sweep;
 }
 @fragment fn fragment(i:Out)->@location(0) vec4f {
  var a=i.alpha*w.colour.w;
- if(w.params.x>0.5){a*=1.0-smoothstep(0.4,1.0,length(i.uv));}
+ if(w.params.x>0.5){a*=flake(i.uv,i.sweep);}
  else{a*=(1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,i.uv.y);}
  return vec4f(w.colour.rgb*(1.0+w.params.w*6.0),a);
 }`;
@@ -221,7 +642,7 @@ const culled=Out(vec4f(2,2,2,1),vec2f(0),0.0);
 const reactiveEntry = `
 @fragment fn reactive(i:Out)->@location(0) vec4f {
  var a=i.alpha;
- if(w.params.x>0.5){a*=1.0-smoothstep(0.4,1.0,length(i.uv));}
+ if(w.params.x>0.5){a*=flake(i.uv,i.sweep);}
  else{a*=(1.0-i.uv.x*i.uv.x)*mix(0.15,1.0,i.uv.y);}
  return vec4f(min(1.0,a*1.5),0,0,1);
 }`;
@@ -236,9 +657,67 @@ const flashShader = `${fullscreen}
  return vec4f(flash.rgb*sheet,0.0);
 }`;
 
+/** The fall speed in m/s of rain with no `rainRate`: 9, a drop of about 4 mm. */
+export const RAIN_FALL_DEFAULT = 9;
+
+const rate = (value: number): number => {
+  if (typeof value !== 'number' || !(value >= 0) || !Number.isFinite(value))
+    throw new RangeError('Rain rate must be a finite number of millimetres per hour, 0 or more; got ' + String(value));
+  return Math.max(value, 0.01);
+};
+
+/**
+ * Median volume diameter in millimetres of the drops in rain of `rainRate` mm/h: half the water falls in drops larger
+ * than this. Marshall and Palmer's (1948, "The distribution of raindrops with size", J. Meteor. 5, 165 to 166,
+ * doi:10.1175/1520-0469(1948)005<0165:TDORWS>2.0.CO;2) exponential N(D) = 8000 e^(-L D) with L = 4.1 R^(-0.21) per mm
+ * has D0 = 3.67 / L = 0.895 R^0.21: 0.34 mm at 0.01 mm/h, 1.6 mm at 17, 2.4 mm at 80. Rates under 0.01 count as 0.01.
+ * @throws RangeError for a negative or non-finite rate.
+ */
+export function rainDropDiameter(rainRate: number): number {
+  return (3.67 * rate(rainRate) ** 0.21) / 4.1;
+}
+
+/**
+ * Terminal fall speed in m/s of a raindrop `diameter` millimetres across at sea level: v = 9.65 - 10.3 e^(-0.6 D), the
+ * fit of Atlas, Srivastava and Sekhon (1973, "Doppler radar characteristics of precipitation at vertical incidence",
+ * Rev. Geophys. Space Phys. 11(1), 1 to 35, doi:10.1029/RG011i001p00001) to the measurements of Gunn and Kinzer (1949,
+ * "The terminal velocity of fall for water droplets in stagnant air", J. Meteor. 6, 243 to 248,
+ * doi:10.1175/1520-0469(1949)006<0243:TTVOFF>2.0.CO;2): 6.5 m/s at 2 mm, 9.1 at 5 mm; under 0.1 m/s is taken as 0.1.
+ * @throws RangeError for a diameter that is not a finite number above 0.
+ */
+export function rainFallSpeed(diameter: number): number {
+  if (typeof diameter !== 'number' || !(diameter > 0) || !Number.isFinite(diameter))
+    throw new RangeError('Raindrop diameter must be a finite number of millimetres above 0; got ' + String(diameter));
+  return Math.max(0.1, 9.65 - 10.3 * Math.exp(-0.6 * diameter));
+}
+
+/**
+ * Raindrops per cubic metre of rain of `rainRate` mm/h: the integral of Marshall and Palmer's (1948) N(D) = 8000 e^(-L D)
+ * per m3 per mm over all sizes, N0 / L = 8000 R^0.21 / 4.1: 1,950 per m3 at 1 mm/h, 3,540 at 17, 4,900 at 80 (Marshall and Palmer 1948).
+ * @throws RangeError for a negative or non-finite rate.
+ */
+export function rainDropCount(rainRate: number): number {
+  return (8000 * rate(rainRate) ** 0.21) / 4.1;
+}
+
+/** The fall speed in m/s of rain of `rainRate` mm/h (`rainFallSpeed` of `rainDropDiameter`), or {@link RAIN_FALL_DEFAULT} for undefined. */
+export function rainFall(rainRate?: number): number {
+  return rainRate === undefined ? RAIN_FALL_DEFAULT : rainFallSpeed(rainDropDiameter(rainRate));
+}
+
+/** The angle in degrees from the vertical at which rain falling `fall` m/s in a horizontal `wind` `[x, z]` m/s travels: atan(|wind| / fall). */
+export function rainSlant(wind: readonly [number, number], fall: number): number {
+  return (Math.atan2(Math.hypot(wind[0], wind[1]), fall) * 180) / Math.PI;
+}
+
+/** The amount (0 to 1) that a rain rate stands for: (R / 80)^(1/3), the inverse of `rainRate` in `@margoengine/weather`. */
+export function rainIntensity(rainRate: number): number {
+  return rate(rainRate) === 0.01 && rainRate === 0 ? 0 : Math.min(1, (rate(rainRate) / 80) ** (1 / 3));
+}
+
 const defaults = {
   rain: { particles: 24000, opacity: 0.35, color: [0.62, 0.68, 0.76] as Vec3 },
-  snow: { particles: 16000, opacity: 0.8, color: [1, 1, 1] as Vec3 },
+  snow: { particles: 500000, opacity: 0.8, color: [1, 1, 1] as Vec3 },
 };
 const flashColor: Vec3 = [0.75, 0.82, 1];
 const lightningDefaults = { rate: 6, threshold: 0.6, minDistance: 300, maxDistance: 6000, strength: 0.35, seed: 1 };
@@ -259,14 +738,38 @@ function validate(o: WeatherOptions): void {
     throw new TypeError('Weather precipitation must be "rain", "snow", "sleet" or "none"; pass one of them');
   if (o.snowShare !== undefined) number(o.snowShare, 'snowShare', 0, 1);
   if (o.intensity !== undefined) number(o.intensity, 'intensity', 0, 1);
+  if (o.rainRate !== undefined) number(o.rainRate, 'rainRate', 0, 300);
   if (o.fadeSeconds !== undefined) number(o.fadeSeconds, 'fadeSeconds', 0, 3600);
   if (o.radius !== undefined) number(o.radius, 'radius', 2, 200);
   if (o.height !== undefined) number(o.height, 'height', 2, 200);
-  if (o.particles !== undefined) number(o.particles, 'particles', 0, 500000);
+  if (o.particles !== undefined) number(o.particles, 'particles', 0, 2000000);
+  if (o.snowfallRate !== undefined) number(o.snowfallRate, 'snowfallRate', 0.01, 30);
+  if (o.flakeSizes !== undefined) {
+    if (!Array.isArray(o.flakeSizes) || o.flakeSizes.length !== 2)
+      throw new TypeError('Weather flakeSizes needs [smallest, largest] in millimetres; pass an array of two numbers');
+    number(o.flakeSizes[0], 'flakeSizes[0]', 0.5, 30);
+    number(o.flakeSizes[1], 'flakeSizes[1]', 0.5, 30);
+    if (o.flakeSizes[0] > o.flakeSizes[1]) throw new RangeError('Weather flakeSizes smallest must not exceed largest; swap them');
+  }
   if (o.brightness !== undefined) number(o.brightness, 'brightness', 0, 1e6);
   if (o.opacity !== undefined) number(o.opacity, 'opacity', 0, 1);
+  if (o.exposure !== undefined) number(o.exposure, 'exposure', 0, 1);
   if (o.reactive !== undefined && typeof o.reactive !== 'boolean')
     throw new TypeError('Weather reactive must be true or false; pass a boolean');
+  if (o.lens !== undefined && o.lens !== false) {
+    if (typeof o.lens !== 'object' || o.lens === null)
+      throw new TypeError('Weather lens must be an options object or false; pass {} for the defaults');
+    if (o.lens.focalDistance !== undefined) number(o.lens.focalDistance, 'lens.focalDistance', 0.3, 1e6);
+    if (o.lens.aperture !== undefined) number(o.lens.aperture, 'lens.aperture', 0.5, 64);
+    if (o.lens.filmGauge !== undefined) number(o.lens.filmGauge, 'lens.filmGauge', 1, 100);
+  }
+  if (o.nearFade !== undefined) {
+    if (!Array.isArray(o.nearFade) || o.nearFade.length !== 2)
+      throw new TypeError('Weather nearFade needs [start, end] in metres; pass an array of two numbers');
+    number(o.nearFade[0], 'nearFade[0]', 0, 1000);
+    number(o.nearFade[1], 'nearFade[1]', 0, 1000);
+    if (o.nearFade[0] > o.nearFade[1]) throw new RangeError('Weather nearFade start must not exceed its end; swap them');
+  }
   if (o.wind !== undefined) {
     if (!Array.isArray(o.wind) || o.wind.length !== 2)
       throw new TypeError('Weather wind needs [x, z] in metres per second; pass an array of two numbers');
@@ -289,6 +792,65 @@ function validate(o: WeatherOptions): void {
     throw new RangeError('Weather lightning minDistance must not exceed maxDistance; swap them');
   if (l.strength !== undefined) number(l.strength, 'lightning.strength', 0, 100);
   if (l.seed !== undefined) number(l.seed, 'lightning.seed', -2147483648, 4294967295);
+  if (l.hold !== undefined) number(l.hold, 'lightning.hold', 0, 1);
+  if (l.bolt !== undefined) {
+    const b = l.bolt as LightningBoltOptions;
+    if (typeof b !== 'object' || b === null)
+      throw new TypeError('Weather lightning.bolt must be an options object; pass {} for the defaults');
+    if (b.scale !== undefined) number(b.scale, 'lightning.bolt.scale', 0, 1000);
+    if (b.width !== undefined) number(b.width, 'lightning.bolt.width', 0.01, 100);
+    if (b.glow !== undefined) number(b.glow, 'lightning.bolt.glow', 0, 2000);
+    if (b.branching !== undefined) number(b.branching, 'lightning.bolt.branching', 0, 0.5);
+    if (b.spread !== undefined) number(b.spread, 'lightning.bolt.spread', 5, 85);
+    if (b.detail !== undefined) number(b.detail, 'lightning.bolt.detail', 8, 400);
+    if (b.fade !== undefined) number(b.fade, 'lightning.bolt.fade', 0.001, 1);
+    if (b.top !== undefined) number(b.top, 'lightning.bolt.top', 1, 20000);
+  }
+  if (l.cloud !== undefined) {
+    if (typeof l.cloud !== 'object' || l.cloud === null)
+      throw new TypeError('Weather lightning.cloud must be an options object; pass {} for the defaults');
+    if (l.cloud.base !== undefined) number(l.cloud.base, 'lightning.cloud.base', 0, 20000);
+    if (l.cloud.peak !== undefined) number(l.cloud.peak, 'lightning.cloud.peak', 0, 1e14);
+    if (l.cloud.radius !== undefined) number(l.cloud.radius, 'lightning.cloud.radius', 1, 100000);
+    if (l.cloud.scale !== undefined) number(l.cloud.scale, 'lightning.cloud.scale', 0, 1000);
+  }
+  if (l.light !== undefined) {
+    if (typeof l.light !== 'object' || l.light === null)
+      throw new TypeError('Weather lightning.light must be an options object; pass {} for the defaults');
+    if (l.light.peak !== undefined) number(l.light.peak, 'lightning.light.peak', 0, 1e14);
+    if (l.light.height !== undefined) number(l.light.height, 'lightning.light.height', 0, 20000);
+    if (l.light.scale !== undefined) number(l.light.scale, 'lightning.light.scale', 0, 1000);
+    if (l.light.range !== undefined) number(l.light.range, 'lightning.light.range', 1, 1e6);
+    if (l.light.line !== undefined && typeof l.light.line !== 'boolean')
+      throw new TypeError('Weather lightning.light.line must be true or false');
+    if (l.light.segments !== undefined) {
+      number(l.light.segments, 'lightning.light.segments', 1, 8);
+      if (!Number.isInteger(l.light.segments)) throw new RangeError('Weather lightning.light.segments must be a whole number from 1 to 8');
+    }
+    const shadow = l.light.shadow;
+    if (shadow !== undefined && typeof shadow !== 'boolean') {
+      if (typeof shadow !== 'object' || shadow === null)
+        throw new TypeError('Weather lightning.light.shadow must be true, false or {near, far}');
+      if (shadow.near !== undefined) number(shadow.near, 'lightning.light.shadow.near', 1e-3, 1e5);
+      if (shadow.far !== undefined) number(shadow.far, 'lightning.light.shadow.far', 1e-2, 1e6);
+      if ((shadow.near ?? 1) >= (shadow.far ?? 3000))
+        throw new RangeError('Weather lightning.light.shadow near must be below far; swap them');
+    }
+    if (l.light.color !== undefined) {
+      finiteVector(l.light.color, 3, 'Weather lightning light color');
+      if (l.light.color.some((v) => v < 0) || Math.max(...l.light.color) <= 0)
+        throw new RangeError('Weather lightning light color must be non-negative linear RGB with a channel above 0');
+    }
+  }
+  if (l.link !== undefined && typeof l.link !== 'boolean') {
+    if (typeof l.link !== 'object' || l.link === null)
+      throw new TypeError('Weather lightning.link must be true, false or an options object');
+    for (const key of ['clouds', 'fog', 'lights'] as const)
+      if (l.link[key] !== undefined && typeof l.link[key] !== 'boolean')
+        throw new TypeError(`Weather lightning.link.${key} must be true or false`);
+    if (l.link.group !== undefined && (typeof l.link.group !== 'string' || !l.link.group))
+      throw new TypeError('Weather lightning.link.group must be a non-empty string');
+  }
   if (l.color !== undefined) {
     finiteVector(l.color, 3, 'Weather lightning color');
     if (l.color.some((v) => v < 0)) throw new RangeError('Weather lightning color must be non-negative linear RGB');
@@ -300,14 +862,23 @@ function validate(o: WeatherOptions): void {
  * integer hash and moved by the wind with no per-frame buffer upload, and are depth-tested against the scene. Lightning
  * flashes the frame, reports each strike and, after the distance-based delay, its thunder (`onThunder`, for audio).
  * The weather state (`amount`, `flash`, `wetness`, `snowCover`) is plain numbers, so materials, sky, fog and sound can
- * follow it. Without a GPU engine it still runs: `new Weather(options)` and `onPreUpdate(delta)`.
+ * follow it. Without a GPU engine it still runs: `new Weather(options)` and `onPreUpdate(delta)`. `advanceTime(delta)`
+ * moves the same state with no listener call, so `seek` from `@margoengine/cutscene/seek` replays a storm exactly.
  * @throws TypeError / RangeError on invalid options; MargoError `'unsupported'` on a WebGL engine, `'disposed'` after
  * `dispose()`, `'state'` when a listener changes the weather it is called from.
  */
 export class Weather implements EnginePlugin {
   readonly name: string = 'weather';
-  /** Where the listener (the ear and the eye) is: strikes are placed around it. The render pass follows the camera. */
+  /**
+   * Where the listener (the ear and the eye) is: strikes are placed around it. Attached to an engine it follows the
+   * engine's camera at each update (until 2026-11-16 the draw pass set it, so a strike's place hung on the last draw).
+   */
   readonly listener = new Float32Array(3);
+  /**
+   * Set by `LightningBolt` (`@margoengine/sky/lightning-bolt`): the bolt's channel, which the stroke's light follows
+   * ({@link WeatherLightningLightOptions.line}) and the cloud deck's flash is centred on.
+   */
+  channelSource?: LightningChannelSource;
   /** Set by `WeatherFX` from `@margoengine/sky/weather-fx`: the cover map under which no rain or snow falls. */
   occlusion?: WeatherOcclusion;
   private coverEntries?: GPUBindGroupEntry[];
@@ -315,7 +886,7 @@ export class Weather implements EnginePlugin {
   // Sleet draws its snow as a second overlay with its own uniform: one uploaded buffer holds one draw's values.
   private readonly snowOverlay = new ParticleOverlay();
   private snowUniform?: GPUBuffer;
-  private readonly snowValues = new Float32Array(44);
+  private readonly snowValues = new Float32Array(48);
   private engine?: Engine;
   private uniform?: GPUBuffer;
   private flashUniform?: GPUBuffer;
@@ -332,12 +903,20 @@ export class Weather implements EnginePlugin {
     GPUBuffer,
     { code: string; key: string; pipeline: GPURenderPipeline; bind?: GPUBindGroup; extra?: GPUBindGroupEntry[] }
   >();
-  private readonly values = new Float32Array(44);
+  private readonly values = new Float32Array(48);
   private readonly flashValues = new Float32Array(4);
   private disposed = false;
-  private time = 0;
+  private seconds = 0;
+  // A replayed step (advanceTime) calls no onLightning or onThunder listener: the film heard those strikes already.
+  private silent = false;
+  // How far the wind has carried the particles, metres along world X and Z: the sum of wind times delta over the
+  // frames, so a wind that changes (gusts, a WeatherDrive) moves them on from where they are instead of jumping them
+  // to wind * time.
+  private readonly drift = [0, 0];
   private level = 0;
   private flashLevel = 0;
+  private lightLevel = 0;
+  private last?: LightningStrike;
   private wet = 0;
   private snow = 0;
   private state = 0x9e3779b9;
@@ -347,6 +926,18 @@ export class Weather implements EnginePlugin {
   private lightningListeners = new Set<(strike: LightningStrike) => void>();
   private thunderListeners = new Set<(strike: LightningStrike) => void>();
   private dispatching = false;
+  // The scene plugins the flash is wired into (lightning.link): decks and fogs given the flash, and the light group.
+  private readonly linkedClouds = new Set<object>();
+  private readonly linkedFogs = new Set<object>();
+  private linkedGroup?: LinkedGroup;
+  private linkedName = '';
+  private linkedOn = false;
+  private lineLights: LightningLight[] = [];
+  private foundGroups?: LinkedGroups;
+  private wantLights = false;
+  private deckBottom = LIGHTNING_CLOUD_BASE;
+  private deckTop = Infinity;
+  private readonly deckScratch: MutableCloudLayer = { coverage: 0, bottom: 0, top: 0, density: 0 };
 
   constructor(readonly options: WeatherOptions = {}) {
     validate(options);
@@ -373,6 +964,44 @@ export class Weather implements EnginePlugin {
   get flash(): number {
     return this.flashLevel;
   }
+  /** The strikes whose light has not died away, oldest first; the `LightningBolt` draws them. Do not change them. */
+  get liveStrikes(): readonly LiveStrike[] {
+    return this.active;
+  }
+  /** The latest strike, or undefined before the first. */
+  get lastStrike(): LightningStrike | undefined {
+    return this.last;
+  }
+  /**
+   * The lightning's light in the scene: a point light at the brightest live strike (the last one between strikes),
+   * `lightning.light.height` above it, of `lightning.light.peak` candela times the strokes' level (the flash's rise and
+   * fall, without the overlay's falloff with distance: the inverse square does that). 0 between flashes. Changed in
+   * place at each update, so give the same object to a light list: `lights.setLights([...others,
+   * weather.lightningLight])` with `lights` from `Clustered.attach` (`@margoengine/clustered`).
+   */
+  readonly lightningLight: LightningLight = {
+    position: [0, LIGHTNING_LIGHT_HEIGHT, 1000],
+    color: [...LIGHTNING_COLOR],
+    intensity: 0,
+    range: 9000,
+    decay: 2,
+  };
+  /**
+   * The lightning's light inside the cloud deck, shaped as `VolumetricClouds` `flash` (`@margoengine/sky/volumetric-clouds`):
+   * at the brightest live strike (the last one between strikes), one decay length above `lightning.cloud.base`, of
+   * `lightning.cloud.peak` candela (default the channel's share above the base, {@link lightningCloudShare}) times the
+   * strokes' level, in the lightning's colour. 0 between flashes. Changed in place at each update, so give it once:
+   * `VolumetricClouds.attach(engine, {flash: weather.cloudFlash, ...})`, with `lightning.cloud.base` the deck's `bottom`.
+   * Its intensity is in candela, as {@link Weather.lightningLight}: the deck matches the scene's lights when the sky is lit
+   * in lux (`lighting.intensity: SUN_ILLUMINANCE`).
+   */
+  readonly cloudFlash: { position: [number, number, number]; intensity: number; color: [number, number, number]; radius: number } =
+    {
+      position: [0, LIGHTNING_CLOUD_BASE + LIGHTNING_LIGHT_HEIGHT, 1000],
+      intensity: 0,
+      color: [...LIGHTNING_COLOR],
+      radius: 200,
+    };
   /** How wet surfaces are, 0..1: rises under rain (about 20 s), dries when it stops (about 90 s). Drive roughness with it. */
   get wetness(): number {
     return this.wet;
@@ -386,9 +1015,13 @@ export class Weather implements EnginePlugin {
     const kind = this.options.precipitation ?? 'rain';
     return kind === 'rain' ? 1 : kind === 'sleet' ? 1 - (this.options.snowShare ?? 0.5) : 0;
   }
-  /** Seconds of weather time so far (the sum of the deltas given to `onPreUpdate`). */
+  /** Seconds of weather time so far (the sum of the deltas given to `onPreUpdate` and `advanceTime`). */
   get elapsed(): number {
-    return this.time;
+    return this.seconds;
+  }
+  /** The same as {@link Weather.elapsed}: the clock `seek` from `@margoengine/cutscene/seek` checks and replays. */
+  get time(): number {
+    return this.seconds;
   }
 
   /**
@@ -456,7 +1089,7 @@ export class Weather implements EnginePlugin {
     }
     const strike: LightningStrike = {
       id: ++this.counter,
-      time: this.time,
+      time: this.seconds,
       distance,
       azimuth,
       position: [this.listener[0] + Math.sin(azimuth) * distance, 0, this.listener[2] + Math.cos(azimuth) * distance],
@@ -467,11 +1100,13 @@ export class Weather implements EnginePlugin {
       loudness: 1 / (1 + (distance / 1500) ** 2),
     };
     this.active.push({ strike, offsets, amplitudes, age: 0, heard: false });
+    this.last = strike;
     this.notify(this.lightningListeners, strike);
     return strike;
   }
 
   private notify(listeners: Set<(strike: LightningStrike) => void>, strike: LightningStrike): void {
+    if (this.silent) return;
     this.dispatching = true;
     let failure: unknown,
       failed = false;
@@ -490,15 +1125,37 @@ export class Weather implements EnginePlugin {
   }
 
   onPreUpdate(delta: number): void {
+    this.step(delta);
+  }
+
+  /**
+   * Moves the weather by `delta` seconds as a frame update does (fade, wetness, snow cover, wind drift, the lightning
+   * schedule and live strikes) but calls no `onLightning` or `onThunder` listener: `seek` from
+   * `@margoengine/cutscene/seek` replays a run's steps with it, so a strike falls where and when it fell in the run.
+   */
+  advanceTime(delta: number): void {
+    this.silent = true;
+    try {
+      this.step(delta);
+    } finally {
+      this.silent = false;
+    }
+  }
+
+  private step(delta: number): void {
     this.idle();
     validate(this.options);
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid weather delta; pass a finite delta of 0 or more seconds.');
     const o = this.options,
       precipitation = o.precipitation ?? 'rain',
-      target = precipitation === 'none' ? 0 : (o.intensity ?? 0.5),
+      target = precipitation === 'none' ? 0 : (o.intensity ?? (o.rainRate === undefined ? 0.5 : rainIntensity(o.rainRate))),
       fade = o.fadeSeconds ?? 4;
-    this.time += delta;
+    this.seconds += delta;
+    if (this.engine) this.listener.set(this.engine.camera.position);
+    const wind = o.wind ?? [0, 0];
+    this.drift[0] += wind[0] * delta;
+    this.drift[1] += wind[1] * delta;
     this.level =
       fade === 0
         ? target
@@ -537,22 +1194,201 @@ export class Weather implements EnginePlugin {
   }
 
   private advance(delta: number): void {
-    let flash = 0;
+    let flash = 0,
+      stroke = 0,
+      at = this.last;
     const l = this.options.lightning;
     for (const a of this.active) {
       a.age += delta;
-      flash = Math.max(flash, a.strike.strength * lightningFlash(a.age, a.offsets, a.amplitudes));
+      const level = lightningFlash(a.age, a.offsets, a.amplitudes);
+      flash = Math.max(flash, a.strike.strength * level);
+      if (level > stroke) {
+        stroke = level;
+        at = a.strike;
+      }
       if (!a.heard && a.age >= a.strike.thunderDelay) {
         a.heard = true;
         this.notify(this.thunderListeners, a.strike);
       }
     }
     this.active = this.active.filter((a) => !a.heard || a.age < a.offsets[a.offsets.length - 1] + 0.6);
+    if (l?.hold !== undefined) flash = stroke = l.hold;
     this.flashLevel = flash;
+    this.lightLevel = stroke;
+    this.linkPlugins();
+    this.light(at);
     this.flashValues[3] = 0;
     const strength = l?.strength ?? lightningDefaults.strength,
       color = l?.color ?? flashColor;
     for (let i = 0; i < 3; i++) this.flashValues[i] = color[i] * strength * flash;
+    this.linkLights(this.foundGroups, this.wantLights);
+  }
+
+  // Wires the flash into the scene's plugins found by name (lightning.link). Cheap when nothing changes: a map scan, and
+  // a light list change only while a flash lasts and once when it ends.
+  private linkPlugins(): void {
+    const l = this.options.lightning,
+      k = l?.link,
+      on = l !== undefined && k !== false,
+      want = (key: 'clouds' | 'fog' | 'lights') => on && (typeof k === 'object' ? k[key] !== false : true),
+      plugins = this.engine?.plugins as ReadonlyMap<string, object> | undefined;
+    if (!plugins) return;
+    const wantClouds = want('clouds'),
+      wantFog = want('fog');
+    let bottom = Infinity,
+      top = Infinity;
+    for (const [name, plugin] of plugins) {
+      const o = (plugin as { options?: unknown }).options;
+      if (typeof o !== 'object' || o === null) continue;
+      if (name === 'sky:volumetric-clouds') {
+        const deck = o as {
+          flash?: unknown;
+          weather?: { cloud: number };
+          type?: 'cumulus' | 'stratus' | 'storm';
+          bottom?: number;
+          top?: number;
+        };
+        if (wantClouds && deck.flash === undefined) {
+          deck.flash = this.cloudFlash;
+          this.linkedClouds.add(deck);
+        } else if (!wantClouds && this.linkedClouds.delete(deck)) {
+          if (deck.flash === this.cloudFlash) delete deck.flash;
+        } else if (this.linkedClouds.has(deck) && deck.flash !== this.cloudFlash) this.linkedClouds.delete(deck);
+        if (this.linkedClouds.has(deck)) {
+          const layer =
+              deck.weather || deck.type
+                ? cloudLayerFor(deck.weather ?? { cloud: 0.5 }, this.deckScratch, deck.type)
+                : undefined,
+            b = deck.bottom ?? layer?.bottom ?? LIGHTNING_CLOUD_BASE;
+          if (b < bottom) {
+            bottom = b;
+            top = deck.top ?? layer?.top ?? Infinity;
+          }
+        }
+      } else if (name === 'volumetric-fog') {
+        const fog = o as { lightning?: { light?: unknown } };
+        if (wantFog && fog.lightning === undefined) {
+          fog.lightning = { light: this.lightningLight };
+          this.linkedFogs.add(fog);
+        } else if (!wantFog && this.linkedFogs.delete(fog)) {
+          if (fog.lightning?.light === this.lightningLight) delete fog.lightning;
+        } else if (this.linkedFogs.has(fog) && fog.lightning?.light !== this.lightningLight) this.linkedFogs.delete(fog);
+      }
+    }
+    this.deckBottom = bottom === Infinity ? LIGHTNING_CLOUD_BASE : bottom;
+    this.deckTop = top;
+    this.foundGroups = plugins.get('clustered-groups') as LinkedGroups | undefined;
+    this.wantLights = want('lights');
+  }
+
+  private linkLights(groups: LinkedGroups | undefined, wanted: boolean): void {
+    const link = this.options.lightning?.link,
+      name = (typeof link === 'object' ? link.group : undefined) ?? 'lightning';
+    if (this.linkedGroup && (!wanted || !groups || this.linkedGroup.isDisposed || name !== this.linkedName)) {
+      if (!this.linkedGroup.isDisposed) this.linkedGroup.dispose();
+      this.linkedGroup = undefined;
+      this.linkedOn = false;
+    }
+    if (!wanted || !groups || groups.isDisposed || groups.clustered.isDisposed) return;
+    const light = this.lightningLight,
+      list = this.lineLights.length ? this.lineLights : [light],
+      main = list.reduce((a, b) => ((b.intensity > a.intensity) ? b : a), list[0]),
+      shadow = this.options.lightning?.light?.shadow,
+      far = typeof shadow === 'object' ? (shadow.far ?? 3000) : 3000,
+      near = typeof shadow === 'object' ? (shadow.near ?? 1) : 1,
+      lit = light.intensity > 0;
+    // A shadow map only where the lights have one to spare (a `setLights` with more shadowed lights than slots throws).
+    // Along a channel only the brightest of the lights casts one.
+    for (const x of list) if (x !== main) delete x.shadow;
+    if (lit && shadow !== false) {
+      const slots = groups.clustered.shadowSlots ?? 0,
+        used = groups.list.filter((x) => !list.includes(x as LightningLight) && x.shadow !== undefined && x.shadow !== false).length;
+      if (slots > used) main.shadow = { near, far: Math.min(far, main.range) };
+      else delete main.shadow;
+    } else delete main.shadow;
+    if (!this.linkedGroup) {
+      if (!lit) return;
+      this.linkedGroup = groups.group(name);
+      this.linkedName = name;
+    }
+    // The list changes while a flash lasts (the light moves and fades) and once when it ends.
+    if (lit) {
+      this.linkedGroup.setLights(list);
+      this.linkedOn = true;
+    } else if (this.linkedOn) {
+      this.linkedGroup.setLights([]);
+      this.linkedOn = false;
+    }
+  }
+
+  // Takes the flash out of every plugin it was wired into.
+  private unlink(): void {
+    for (const deck of this.linkedClouds as Set<{ flash?: unknown }>) if (deck.flash === this.cloudFlash) delete deck.flash;
+    for (const fog of this.linkedFogs as Set<{ lightning?: { light?: unknown } }>)
+      if (fog.lightning?.light === this.lightningLight) delete fog.lightning;
+    this.linkedClouds.clear();
+    this.linkedFogs.clear();
+    if (this.linkedGroup && !this.linkedGroup.isDisposed) this.linkedGroup.dispose();
+    this.linkedGroup = undefined;
+    this.linkedOn = false;
+  }
+
+  // The lights along the bolt's channel (lightning.light.line): the point light's candela shared out by `weight`.
+  private alongChannel(
+    at: LightningStrike | undefined,
+    point: LightningLight,
+    o: WeatherLightningLightOptions | undefined,
+  ): void {
+    const source = this.channelSource;
+    if (!at || !source || !(o?.line ?? true)) {
+      this.lineLights.length = 0;
+      return;
+    }
+    const points = source.lights(at, o?.segments ?? 3, o?.height ?? LIGHTNING_LIGHT_HEIGHT);
+    this.lineLights.length = points.length;
+    points.forEach((p, i) => {
+      const x = (this.lineLights[i] ??= { position: [0, 0, 0], color: [1, 1, 1], intensity: 0, range: 0, decay: 2 });
+      x.position[0] = p.position[0];
+      x.position[1] = p.position[1];
+      x.position[2] = p.position[2];
+      x.color[0] = point.color[0];
+      x.color[1] = point.color[1];
+      x.color[2] = point.color[2];
+      x.intensity = point.intensity * p.weight;
+      x.range = point.range;
+      x.radius = p.radius;
+    });
+  }
+
+  private light(at: LightningStrike | undefined): void {
+    const o = this.options.lightning?.light,
+      light = this.lightningLight,
+      color = o?.color ?? LIGHTNING_COLOR,
+      top = Math.max(color[0], color[1], color[2]);
+    for (let i = 0; i < 3; i++) light.color[i] = color[i] / top;
+    if (at) {
+      light.position[0] = at.position[0];
+      light.position[2] = at.position[2];
+    }
+    light.position[1] = o?.height ?? LIGHTNING_LIGHT_HEIGHT;
+    light.range = o?.range ?? 1.5 * Math.max(1000, this.options.lightning?.maxDistance ?? lightningDefaults.maxDistance);
+    const luminance = 0.2126 * light.color[0] + 0.7152 * light.color[1] + 0.0722 * light.color[2],
+      peak = (o?.peak ?? LIGHTNING_PEAK_CANDELA) * (o?.scale ?? 1);
+    light.intensity = (this.lightLevel * peak) / luminance;
+    this.alongChannel(at, light, o);
+    // Inside the deck: the channel's share above the cloud base, centred one decay length above it (Jordan and Uman).
+    const k = this.options.lightning?.cloud,
+      base = k?.base ?? this.deckBottom,
+      cloud = this.cloudFlash;
+    cloud.position[0] = light.position[0];
+    cloud.position[1] = Math.min(base + LIGHTNING_LIGHT_HEIGHT, k?.base === undefined ? this.deckTop : Infinity);
+    cloud.position[2] = light.position[2];
+    cloud.color[0] = light.color[0];
+    cloud.color[1] = light.color[1];
+    cloud.color[2] = light.color[2];
+    cloud.radius = k?.radius ?? 200;
+    cloud.intensity =
+      (this.lightLevel * (k?.peak ?? peak * lightningCloudShare(base)) * (k?.scale ?? 1)) / luminance;
   }
 
   setup(engine: Engine): void {
@@ -575,7 +1411,6 @@ export class Weather implements EnginePlugin {
       order: 6,
       execute: (c) => {
         if (c.backend !== 'webgpu') return;
-        this.listener.set(c.camera.position);
         this.maskDrawn = false;
         this.drawPrecipitation(c);
       },
@@ -621,39 +1456,58 @@ export class Weather implements EnginePlugin {
       height = o.height ?? 20,
       wind = o.wind ?? [0, 0],
       snow = kind === 'snow',
-      fall = snow ? 1.2 : 9,
+      fall = snow ? SNOWFLAKE_FALL_COEFFICIENT : rainFall(o.rainRate),
       color = o.color ?? d.color,
       brightness = o.brightness ?? 1,
-      [width, tall] = viewSize(c) as [number, number];
+      [width, tall] = viewSize(c) as [number, number],
+      size = snowflakeSizeLaw(o.snowfallRate ?? 1, o.flakeSizes ?? [2, 10]);
     v.set(c.camera.matrix, 0);
     v.set(c.camera.position, 16);
-    v[19] = 0;
+    // eye.w and lens: the thin lens's scale, focal distance and focus - focal length (snow only, `weatherLens`), and
+    // the near fade's two distances, the first no nearer than the near plane.
+    const lens = snow ? weatherLens(o.lens, width, tall, c.camera.fov) : { scale: 0, focus: 1, focalLength: 0 },
+      [nearIn, nearFull] = o.nearFade ?? [0.4, 2],
+      fadeIn = Math.max(nearIn, c.camera.near);
+    v[19] = lens.focus - lens.focalLength;
+    v[44] = lens.scale;
+    v[45] = lens.focus;
+    v[46] = fadeIn;
+    v[47] = Math.max(nearFull, fadeIn + 1e-3);
     v[20] = radius * 2;
     v[21] = height;
     v[22] = radius * 2;
-    // Position = start + velocity * time, wrapped into the box on the CPU in double precision so it stays exact.
+    v[23] = snow ? size.low : 0;
+    // Position = start + drift, wrapped into the box on the CPU in double precision so it stays exact. Rain falls at
+    // one speed, so its drift is fall * time; the wind's is the running sum kept by onPreUpdate. Each snow flake falls
+    // at its own speed, k / 512 m/s (`snowflakeFallSpeed` of its size): drift.y is then the fall phase, seconds over
+    // 512 heights as an exact 24-bit count, and the shader takes flake k's fall as k times it, wrapped to 24 bits in
+    // u32, which stays exact and continuous for every k when the count wraps (KB-SNOW-FALLSPEED1).
     const wrap = (value: number, size: number) => ((value % size) + size) % size;
-    v[24] = wrap(wind[0] * this.time, radius * 2);
-    v[25] = wrap(-fall * this.time, height);
-    v[26] = wrap(wind[1] * this.time, radius * 2);
+    v[24] = wrap(this.drift[0], radius * 2);
+    v[25] = snow ? Math.floor(wrap(this.seconds / (512 * height), 1) * 16777216) : wrap(-fall * this.seconds, height);
+    v[26] = wrap(this.drift[1], radius * 2);
     // Snow sways with sin(phase) and cos(0.8 phase): the phase wraps at 10 pi, a whole turn of both.
-    v[27] = (this.time * 1.3) % (Math.PI * 10);
+    v[27] = (this.seconds * 1.3) % (Math.PI * 10);
     for (let i = 0; i < 3; i++) v[28 + i] = color[i] * brightness;
     v[31] = o.opacity ?? d.opacity;
-    // screen: viewport pixels and the focal length in pixels. params: snow flag, flake radius in metres or rain streak
-    // seconds, the hash seed (as bits) and the lightning lift of the colour. extra: wind, fall speed and streak width.
+    // screen: viewport pixels and the focal length in pixels. params: snow flag, the flake sizes' slope per mm of melted
+    // diameter (`snowflakeSizeLaw`) or rain streak seconds, the hash seed (as bits) and the lightning lift of the
+    // colour. extra: wind, the rain's fall speed or the snow's fall law coefficient (`SNOWFLAKE_FALL_COEFFICIENT`),
+    // and the rain streak's width or the snow's share of the size law (`span`);
+    // volume.w: the smallest melted diameter drawn, mm.
+    // screen.w: the snow's exposure in seconds.
     v[32] = width;
     v[33] = tall;
     v[34] = tall / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
-    v[35] = 0;
+    v[35] = snow ? (o.exposure ?? 0) : 0;
     v[36] = +snow;
-    v[37] = snow ? 0.012 : 0.035;
+    v[37] = snow ? size.lambda : 0.035;
     new Uint32Array(v.buffer)[38] = ((this.options.lightning?.seed ?? 1) + salt) >>> 0;
     v[39] = Math.min(1, this.flashLevel);
     v[40] = wind[0];
     v[41] = fall;
     v[42] = wind[1];
-    v[43] = Math.max(1, (tall / 540) * 1.2);
+    v[43] = snow ? size.span : Math.max(1, (tall / 540) * 1.2);
     const cover = this.occlusion;
     if (cover?.buffer && cover.view) {
       const e = this.coverEntries;
@@ -814,6 +1668,7 @@ export class Weather implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.unlink();
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;

@@ -1,3 +1,4 @@
+import { rangeError } from '../../shared/errors.js';
 /** Ground height in metres at world `(x, z)`; the same shape as `@margoengine/math`'s `HeightField`. */
 export type HeightField = (x: number, z: number) => number;
 /** Options of `stepLocomotion`; every field is optional. */
@@ -45,7 +46,7 @@ export function stepLocomotion(
         bounds[0] >= bounds[1] ||
         bounds[2] >= bounds[3]))
   )
-    throw new RangeError('Invalid locomotion inputs; pass finite numbers and bounds with min below max');
+    throw rangeError('Invalid locomotion inputs; pass finite numbers and bounds with min below max', 'controls-arguments');
   const dt = Math.min(0.05, delta);
   const yaw = state[4] - actions[2],
     pitch = Math.max(-1.4, Math.min(0.9, state[5] + actions[3]));
@@ -61,7 +62,7 @@ export function stepLocomotion(
     z = Math.max(bounds[2], Math.min(bounds[3], z));
   }
   const ground = height(x, z);
-  if (!Number.isFinite(ground)) throw new RangeError('Locomotion ground height must be finite');
+  if (!Number.isFinite(ground)) throw rangeError('Locomotion ground height must be finite', 'controls-arguments');
   state[0] = x;
   state[1] = Math.max(options.minHeight ?? -Infinity, ground);
   state[2] = z;

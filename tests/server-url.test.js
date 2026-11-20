@@ -19,7 +19,7 @@ const fakeNext = `
     console.log('- Local:         http://127.0.0.1:' + server.address().port);
     setTimeout(() => console.log('Ready in 5ms'), 50);
   });
-  server.on('error', (error) => { console.error(error.message); process.exit(1); });`;
+  server.on('error', (error) => { console.error(error.message); process.exitCode = 1; });`;
 
 test('the URL is the one the process printed once ready, and it is that process answering', async () => {
   const child = node(fakeNext, '0');

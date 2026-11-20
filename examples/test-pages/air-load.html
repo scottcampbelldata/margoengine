@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Air Load - Margo Engine Test</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 14px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 70vh; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  button { font: inherit; padding: 6px 10px; }
+  #status { padding: 0 8px 8px; }
+</style>
+<canvas id="view"></canvas>
+<div id="controls">
+  <button id="btnClear">Clear</button>
+  <button id="btnSea">Sea spray</button>
+  <button id="btnSurf">Surf haze</button>
+  <button id="btnGale">A gale off the sea</button>
+  <button id="btnBreakers">Walk to the breakers</button>
+  <button id="btnInland">Walk 8 km inland</button>
+  <button id="btnSmoke">Wildfire smoke</button>
+  <button id="btnAsh">Ash fall</button>
+  <button id="btnDark">Darkness at noon</button>
+  <button id="btnErupt">The eruption upwind</button>
+</div>
+<div id="status"></div>
+<script type="module" src="./air-load.ts"></script></html>

@@ -2,7 +2,6 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { runScene } from './support/composition-run.mjs';
 
 function traceProduct() {
@@ -121,31 +120,28 @@ function traceProduct() {
   };
 }
 
-const release = await acquire({ owner: 'integration-product-trace', max: 10, waitMax: 5 });
 const results = [];
-try {
-  for (const [backend, compat, args] of [['webgpu', false, []], ['webgl2-d3d11', true, []], ['webgl2-vulkan', true, ['--use-angle=vulkan']]]) {
-    const browser = await openBrowser({ startPath: '/examples/test-pages/integration-product.html', port: 'free', compat, args });
-    try {
-      await browser.page.route('**/examples/integration/harness.ts*', async (route) => {
-        const response = await route.fetch();
-        const body = (await response.text())
-          .replace(/check\(adapter, ["']adapter required["']\);/, (match) => `${match} (${traceProduct.toString()})();`)
-          .replace('scene?.beforeSnapshot?.();', 'scene?.beforeSnapshot?.(); globalThis.__beginProductTrace();')
-          .replace('context.drawImage(canvas, 0, 0);', 'context.drawImage(canvas, 0, 0); await globalThis.__endProductTrace(engine.gpu);');
-        await route.fulfill({ response, body });
-      });
-      await browser.page.reload();
-      await browser.page.waitForFunction(() => !!window.integration, null, { timeout: 60_000 });
-      const result = await runScene(() => browser.page.evaluate(async () => ({ result: await window.integration.run(), trace: globalThis.__productTrace })), { label: `product trace ${backend}` });
-      const hash = (value) => createHash('sha256').update(value).digest('hex');
-      result.trace.sources = result.trace.sources.map((source) => hash(source));
-      for (const snapshot of result.trace.snapshots)
-        snapshot.uniforms = snapshot.uniforms.map(({ size, bytes }) => ({ size, sha256: hash(Uint8Array.from(bytes)) }));
-      results.push({ backend, ...result });
-      console.log(`${backend}: ${JSON.stringify(result.result.before[1])}, ${result.trace.snapshots[0].passes.length} centre copies`);
-    } finally { await browser.close(); }
-  }
-  mkdirSync('test-results', { recursive: true });
-  writeFileSync('test-results/integration-product-trace.json', `${JSON.stringify(results, null, 2)}\n`);
-} finally { await release(); }
+for (const [backend, compat, args] of [['webgpu', false, []], ['webgl2-d3d11', true, []], ['webgl2-vulkan', true, ['--use-angle=vulkan']]]) {
+  const browser = await openBrowser({ startPath: '/examples/test-pages/integration-product.html', port: 'free', compat, args });
+  try {
+    await browser.page.route('**/examples/integration/harness.ts*', async (route) => {
+      const response = await route.fetch();
+      const body = (await response.text())
+        .replace(/check\(adapter, ["']adapter required["']\);/, (match) => `${match} (${traceProduct.toString()})();`)
+        .replace('scene?.beforeSnapshot?.();', 'scene?.beforeSnapshot?.(); globalThis.__beginProductTrace();')
+        .replace('context.drawImage(canvas, 0, 0);', 'context.drawImage(canvas, 0, 0); await globalThis.__endProductTrace(engine.gpu);');
+      await route.fulfill({ response, body });
+    });
+    await browser.page.reload();
+    await browser.page.waitForFunction(() => !!window.integration, null, { timeout: 60_000 });
+    const result = await runScene(() => browser.page.evaluate(async () => ({ result: await window.integration.run(), trace: globalThis.__productTrace })), { label: `product trace ${backend}` });
+    const hash = (value) => createHash('sha256').update(value).digest('hex');
+    result.trace.sources = result.trace.sources.map((source) => hash(source));
+    for (const snapshot of result.trace.snapshots)
+      snapshot.uniforms = snapshot.uniforms.map(({ size, bytes }) => ({ size, sha256: hash(Uint8Array.from(bytes)) }));
+    results.push({ backend, ...result });
+    console.log(`${backend}: ${JSON.stringify(result.result.before[1])}, ${result.trace.snapshots[0].passes.length} centre copies`);
+  } finally { await browser.close(); }
+}
+mkdirSync('test-results', { recursive: true });
+writeFileSync('test-results/integration-product-trace.json', `${JSON.stringify(results, null, 2)}\n`);

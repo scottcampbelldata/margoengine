@@ -27,7 +27,7 @@ export interface EncodedTexture {
   height: number;
 }
 
-const HELP = 'https://margoengine.com/docs/exporters#textures';
+const HELP = 'https://margoengine.com/llms/docs/exporter-textures.md';
 function mime(format: TextureFormat): string {
   if (!['png', 'jpeg', 'webp', 'avif'].includes(format))
     throw new RangeError('Texture format is unknown; use png, jpeg, webp or avif');

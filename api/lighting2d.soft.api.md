@@ -38,6 +38,8 @@ export class SoftLighting2D implements EnginePlugin {
     addLight(options?: SoftLight2DOptions): SoftLight2D;
     removeLight(light: SoftLight2D): void;
     setOccluders(occluders: readonly Occluder2D[]): void;
+    setTarget(target: GPUTexture | (() => GPUTexture)): void;
+    setNormals(normals: GPUTexture | (() => GPUTexture) | undefined): void;
     setup(engine: Engine): void;
     onDeviceRestored(): void;
     dispose(): void;
@@ -73,6 +75,8 @@ class SoftLighting2D implements EnginePlugin {
     addLight(options?: SoftLight2DOptions): SoftLight2D;
     removeLight(light: SoftLight2D): void;
     setOccluders(occluders: readonly Occluder2D[]): void;
+    setTarget(target: GPUTexture | (() => GPUTexture)): void;
+    setNormals(normals: GPUTexture | (() => GPUTexture) | undefined): void;
     setup(engine: Engine): void;
     onDeviceRestored(): void;
     dispose(): void;

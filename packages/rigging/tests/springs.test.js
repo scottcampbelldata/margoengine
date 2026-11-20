@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation, Skeleton } from '../../animation/dist/index.js';
 import { Animator } from '../../animator/dist/index.js';
 import { GLB_BIN, GLB_JSON, glbChunks } from '../../shared/glb.js';

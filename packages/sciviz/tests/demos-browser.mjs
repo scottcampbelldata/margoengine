@@ -1,5 +1,5 @@
 // Real-data demos and the retained synthetic API test pages, on both renderers and both requested layouts.
-// Run through scripts/gpu-lock.mjs; the parent gives the entire job a hard process-tree limit.
+// The parent gives the entire job a hard process-tree limit.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

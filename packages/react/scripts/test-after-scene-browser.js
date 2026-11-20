@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { animatedTriangle } from '../../../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const fixture = animatedTriangle(),
@@ -142,7 +142,10 @@ try {
   });
   await page.evaluate(() => window.afterScene.playback('Run'));
   const blended = await page.evaluate(() => window.afterScene.draw(0.25));
-  near(blended.jointX, 0.25, 'Half crossfade');
+  // Walk (x 0 to 2 over 1 s) was left at 0.5 s and keeps playing through the 0.5 s crossfade, as the animator
+  // documents for the state a crossfade leaves: at 0.75 s it reads 1.5. Run (x 0 to -2) is at 0.25 s, -0.5. The fade is
+  // halfway, weight 0.5, so 0.5 * 1.5 + 0.5 * -0.5 = 0.5 (a frozen Walk at 1 would give 0.25).
+  near(blended.jointX, 0.5, 'Half crossfade');
   const run = await page.evaluate(() => window.afterScene.draw(0.25));
   near(run.jointX, -1, 'Completed crossfade');
   await page.evaluate(() => window.afterScene.playback('Run', false));

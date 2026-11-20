@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/webgl2-compat/test/adapter-browser.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/webgl2-compat/test/adapter-browser.mjs
 // Core on a device at compatibility level draws the same frame as at the full level, picks and comes back from a device
 // restore at the same level. Package results are the table in docs/limits.md. Results: test-results/compat-adapter.json.
 import assert from 'node:assert/strict';

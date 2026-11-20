@@ -36,5 +36,5 @@
       "cpuMsPerFrame": 0.052
     }
   },
-  "notes": "Counts are one steady frame on the recording mock GPU. gltf-pro draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only)."
+  "notes": "Counts are one steady frame on the recording mock GPU. gltf/pbr draws one call per mesh and caches pipelines per model, so sharing a texture alone does not cut draws; merging atlas-mapped geometry does (static meshes only)."
 }

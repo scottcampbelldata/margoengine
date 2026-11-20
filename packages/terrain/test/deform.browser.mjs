@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/deform.browser.mjs
 // Deformable ground (`@margoengine/terrain/deform`) on a flat snowfield with a checker pattern:
 // 1. the pressed map: a footprint and a track read back from the GPU match the stated profile worked on the CPU

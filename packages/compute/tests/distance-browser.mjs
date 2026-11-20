@@ -1,5 +1,5 @@
 // Jump flooding on the real GPU, native WebGPU and the WebGL2 compatibility layer (one GPU job; from the repository root):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/compute/tests/distance-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/compute/tests/distance-browser.mjs
 // Checks the error bars at 1024^2 and 128^3 against the exact transform, that the nearest-seed buffer equals the CPU
 // backend's bit for bit, the Voronoi map and signed distance, and the limits; prints GPU pass times as diagnostics.
 import assert from 'node:assert/strict';

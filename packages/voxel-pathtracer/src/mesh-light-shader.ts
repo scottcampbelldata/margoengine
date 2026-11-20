@@ -74,8 +74,8 @@ export function meshLightingSource(input:string):string {
  edit('fn direct(',LIGHTS+'\nfn direct(');
  edit('q<5u','q<meshProposalCount()');
  edit('} else if(q<3u){','} else if(q<3u||q==5u){');
- edit('if(q==1u){ls=sampleEmitter();}else{ls=sampleArea();}',
-      'if(q==1u){ls=sampleEmitter();}else if(q==2u){ls=sampleArea();}else{ls=sampleMeshEmitter();}');
+ // Only kind 1's text is left out of the anchor: the resampled feature replaces it, in either order.
+ edit('}else{ls=sampleArea();}','}else if(q==2u){ls=sampleArea();}else{ls=sampleMeshEmitter();}');
  edit('radiance=ls.radiance;lp=ls.pdfA*d2/cl;',`radiance=ls.radiance;lp=ls.pdfA*d2/cl;
    if(q==5u){
     // The sampled face identity and barycentrics are private invocation state.

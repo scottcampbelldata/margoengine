@@ -33,7 +33,7 @@ export interface SkeletonMatch {
     readonly bones: number;
 }
 
-export type SkeletonPreset = 'mixamo' | 'godot' | 'roblox' | 'margo' | 'humanoid';
+export type SkeletonPreset = 'mixamo' | 'godot' | 'roblox' | 'margo' | 'cmu' | 'mpfb' | 'characterCreator' | 'humanoid';
 
 export function detectSkeleton(names: readonly string[]): SkeletonMatch | null;
 

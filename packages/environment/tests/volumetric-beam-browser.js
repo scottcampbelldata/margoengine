@@ -1,14 +1,16 @@
 // Real-GPU check (`@margoengine/environment/volumetric`): clustered lights in the froxel fog. Each froxel column's
-// integrated light is compared with the fog the light really scatters along the column (4,000 steps), for (a) a narrow
-// spot beam crossing the view obliquely, the lighthouse case, along each column's centre ray, as the froxels sample it,
-// and (b) a bulb inside the volume, averaged over each column's footprint (8 x 8 rays). Before the fix the froxel pass lit each slice from one point: the beam broke
-// into one block per slice, and the froxel holding the bulb took 1/d^2 at one point, up to 4096 times what its cell
-// scatters. Run: npm run test:fog-beam:browser.
+// integrated light is compared with the fog the light really scatters over the column's footprint (8 x 8 rays of 4,000
+// steps, volumetric-beam-reference.js), for (a) a narrow spot beam crossing the view obliquely, the lighthouse case, and
+// (b) a bulb inside the volume. Until 2026-11-15 the beam was compared along each column's centre ray, as the froxels
+// sampled it then; they now take the light over their footprint (volumetric-beam-continuity-browser.js). Before the
+// 2026-11-13 fix the froxel pass lit each slice from one point: the beam broke into one block per slice, and the froxel
+// holding the bulb took 1/d^2 at one point, up to 4096 times what its cell scatters. Run: npm run test:fog-beam:browser.
 import { Engine } from '@margoengine/core';
 import { engineRuntime } from '@margoengine/core/extension';
 import { Clustered } from '@margoengine/clustered';
 import { VolumetricFog } from '../dist/volumetric.js';
 import { assert, hardware, readTexture } from './gpu-read.js';
+import { reference } from './volumetric-beam-reference.js';
 
 const grid = [24, 24, 48],
   range = 20,
@@ -24,77 +26,6 @@ function sample(i, j, k) {
     along = camera.near + range * (k / grid[2]) ** 2;
   return [camera.position[0] + x * t * along, camera.position[1] + y * t * along, camera.position[2] - along];
 }
-// The light one froxel sample takes from `light` at p: clustered's legacy terms (packages/shared/light-terms.js),
-// with the isotropic phase 1 / 4 pi (anisotropy 0), dimmed by the fog it crosses on its way from the light to p
-// (2026-11-13: the froxel pass left that out, so a beam lit thick fog as brightly far out as at the lens).
-function lightAt(light, p) {
-  const dx = light.position[0] - p[0],
-    dy = light.position[1] - p[1],
-    dz = light.position[2] - p[2],
-    d = Math.hypot(dx, dy, dz);
-  if (d >= light.range) return 0;
-  const reach = d / light.range,
-    fade = Math.min(Math.max(1 - reach ** 4, 0), 1);
-  let cone = 1;
-  if (light.direction) {
-    const along = -(dx * light.direction[0] + dy * light.direction[1] + dz * light.direction[2]) / d,
-      lo = Math.cos(light.outerAngle),
-      hi = Math.cos(light.innerAngle),
-      ramp = Math.min(Math.max((along - lo) / Math.max(hi - lo, 1e-6), 0), 1);
-    cone = ramp * ramp * (3 - 2 * ramp);
-  }
-  return (
-    (light.intensity * ((fade * fade) / Math.max(d * d, 2 ** -12)) * cone * Math.exp(-density * d)) / (4 * Math.PI)
-  );
-}
-// The light reaching the camera along the ray through ndc (x, y), out to `range` metres beyond the near plane.
-function column(light, direction, x, y) {
-  const t = Math.tan((camera.fov * Math.PI) / 360),
-    dir = [x * t, y * t, -1],
-    stretch = Math.hypot(...dir),
-    steps = 4000,
-    dt = range / steps;
-  let sum = 0;
-  for (let k = 0; k < steps; k++) {
-    const s = (k + 0.5) * dt,
-      along = camera.near + s,
-      p = [
-        camera.position[0] + dir[0] * along,
-        camera.position[1] + dir[1] * along,
-        camera.position[2] + dir[2] * along,
-      ];
-    sum += density * lightAt({ ...light, direction }, p) * Math.exp(-density * stretch * s) * stretch * dt;
-  }
-  return sum;
-}
-// Each column's average over sub x sub rays of its footprint (one ray: its centre), then the 3 x 3 tent the integration applies across columns (clamped at the edges).
-function reference(light, sub) {
-  const [w, h] = grid,
-    raw = new Float64Array(w * h),
-    direction = light.direction && light.direction.map((v) => v / Math.hypot(...light.direction));
-  for (let j = 0; j < h; j++)
-    for (let i = 0; i < w; i++) {
-      let sum = 0;
-      for (let b = 0; b < sub; b++)
-        for (let a = 0; a < sub; a++) {
-          const u = (i + (a + 0.5) / sub) / w,
-            v = (j + (b + 0.5) / sub) / h;
-          sum += column(light, direction, u * 2 - 1, 1 - v * 2);
-        }
-      raw[j * w + i] = sum / (sub * sub);
-    }
-  const at = (i, j) => raw[Math.min(Math.max(j, 0), h - 1) * w + Math.min(Math.max(i, 0), w - 1)],
-    out = new Float64Array(w * h);
-  for (let j = 0; j < h; j++)
-    for (let i = 0; i < w; i++) {
-      let sum = 0;
-      for (let b = -1; b <= 1; b++)
-        for (let a = -1; a <= 1; a++) sum += (2 - Math.abs(a)) * (2 - Math.abs(b)) * at(i + a, j + b);
-      out[j * w + i] = sum / 16;
-    }
-  return out;
-}
-
 window.runTests = async () => {
   const report = { checks: [], cases: {} };
   const canvas = document.querySelector('#scene');
@@ -143,7 +74,7 @@ window.runTests = async () => {
     engine.render();
     await device.queue.onSubmittedWorkDone();
     const read = await readTexture(device, fog.texture),
-      want = reference(light, name === 'beam' ? 1 : 8);
+      want = reference({ grid, range, density, camera }, light, 8);
     let error = 0,
       total = 0,
       peak = 0,
@@ -180,6 +111,34 @@ window.runTests = async () => {
       `a bulb on a froxel sample (${name}): per-column L1 error ${bulb.error.toFixed(3)}, brightest column ${bulb.peak.toFixed(3)} against ${bulb.wantPeak.toFixed(3)}`,
     );
   }
+  // KB-FOG-HOOK-BINDINGS1: a Clustered hook the fog does not read (here a bounce hook, as LightBounce sets, whose
+  // storage buffer only the lit shader reads). The fog's froxel pass takes the lights' declarations and bind group
+  // entries with every hook's, and its `auto` layout dropped the bindings it never used, so the bind group failed
+  // validation ("binding index 164 not present in the bind group layout") and the fog stopped. The beam's fog must be
+  // the same with the hook as without it, and no GPU error.
+  const hookBuffer = device.createBuffer({ size: 16, usage: GPUBufferUsage.STORAGE });
+  lights.setLights([{ color: [1, 1, 1], ...cases.beam }]);
+  engine.render();
+  await device.queue.onSubmittedWorkDone();
+  const without = await readTexture(device, fog.texture);
+  lights.bounce = {
+    declarations: (group) =>
+      `@group(${group}) @binding(164) var<storage,read> clusterBounce:array<vec4f>;
+fn clusterBounceLighting(position:vec3f,n:vec3f,base:vec3f,metal:f32)->vec3f {return vec3f(0.0)*clusterBounce[0].x;}
+`,
+    bindings: () => [{ binding: 164, resource: { buffer: hookBuffer } }],
+  };
+  engine.render();
+  await device.queue.onSubmittedWorkDone();
+  const withHook = await readTexture(device, fog.texture);
+  let hookDiff = 0;
+  for (let j = 0; j < grid[1]; j++)
+    for (let i = 0; i < grid[0]; i++) hookDiff = Math.max(hookDiff, Math.abs(withHook.at(grid[2] - 1, i, j)[0] - without.at(grid[2] - 1, i, j)[0]));
+  assert(errors.length === 0, `a Clustered hook the fog does not read: GPU errors ${errors.join('; ')}`);
+  assert(hookDiff < 1e-6, `the beam's fog is the same with a hook the fog does not read (max difference ${hookDiff})`);
+  report.checks.push(`a Clustered hook the fog does not read: no GPU error, the fog unchanged (max difference ${hookDiff})`);
+  lights.bounce = undefined;
+  hookBuffer.destroy();
   await device.queue.onSubmittedWorkDone();
   assert(errors.length === 0, `GPU errors: ${errors.join('; ')}`);
   report.hardware = hardware(runtime.adapter ?? (await navigator.gpu.requestAdapter()));

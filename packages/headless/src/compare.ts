@@ -15,6 +15,21 @@ export interface PixelDiffOptions {
   threshold?: number;
   /** Also return `image`, showing changed pixels in red over a faded copy of `a`. Default false. */
   image?: boolean;
+  /** Also return `mask`: one byte a pixel, row by row from the top left, 1 where the pixel differs. Default false. */
+  mask?: boolean;
+  /**
+   * Also return `clusters`: one box per group of changed pixels. Touching pixels (8-connected) form a group, and groups
+   * whose boxes lie at most this many pixels apart join. 0 or more; default none.
+   */
+  clusters?: number;
+}
+
+/** A rectangle of pixels: the top left pixel and the size, like `ImageData` and `getImageData(x, y, width, height)`. */
+export interface PixelBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /** What {@link pixelDiff} gives back. Differences are of colours premultiplied by alpha, on 0 to 255. */
@@ -29,8 +44,14 @@ export interface PixelDiff {
   largest: number;
   /** The mean of each pixel's largest channel difference. */
   mean: number;
+  /** The smallest rectangle holding every pixel that differs; null when none does. */
+  box: PixelBox | null;
   /** With `image: true`. */
   image?: HeadlessPixels;
+  /** With `mask: true`: `width * height` bytes, 1 where the pixel differs, 0 elsewhere. */
+  mask?: Uint8Array;
+  /** With `clusters`: the box of each group of changed pixels, top to bottom, then left to right. */
+  clusters?: PixelBox[];
 }
 
 /** Options of {@link ssim}. */
@@ -77,17 +98,24 @@ function checkPair(a: HeadlessPixels, b: HeadlessPixels): void {
 
 /** Counts the pixels that differ. A pixel is compared premultiplied, so colour under full transparency does not count. */
 export function pixelDiff(a: HeadlessPixels, b: HeadlessPixels, options: PixelDiffOptions = {}): PixelDiff {
-  const { threshold = 2, image = false } = options;
+  const { threshold = 2, image = false, mask: wantMask = false, clusters: gap } = options;
   checkPair(a, b);
   if (!(threshold >= 0 && threshold <= 255)) throw rangeError('Invalid threshold', 'headless');
+  if (gap !== undefined && !(gap >= 0 && gap < Infinity))
+    throw rangeError('Invalid clusters; pass a gap in pixels, 0 or more', 'headless');
   const { width, height } = a,
     first = a.data,
     second = b.data,
     total = width * height,
-    picture = image ? new Uint8Array(total * 4) : undefined;
+    picture = image ? new Uint8Array(total * 4) : undefined,
+    mask = wantMask || gap !== undefined ? new Uint8Array(total) : undefined;
   let different = 0,
     largest = 0,
-    sum = 0;
+    sum = 0,
+    left = width,
+    top = height,
+    right = -1,
+    bottom = -1;
   for (let i = 0; i < first.length; i += 4) {
     const alphaA = first[i + 3],
       alphaB = second[i + 3];
@@ -99,7 +127,17 @@ export function pixelDiff(a: HeadlessPixels, b: HeadlessPixels, options: PixelDi
     sum += most;
     if (most > largest) largest = most;
     const changed = most > threshold;
-    if (changed) different++;
+    if (changed) {
+      different++;
+      const pixel = i >> 2,
+        x = pixel % width,
+        y = (pixel - x) / width;
+      if (x < left) left = x;
+      if (x > right) right = x;
+      if (y < top) top = y;
+      bottom = y;
+      if (mask) mask[pixel] = 1;
+    }
     if (picture) {
       if (changed) picture.set([255, 0, 0, 255], i);
       else {
@@ -115,8 +153,75 @@ export function pixelDiff(a: HeadlessPixels, b: HeadlessPixels, options: PixelDi
     ratio: different / total,
     largest,
     mean: sum / total,
+    box: different ? { x: left, y: top, width: right - left + 1, height: bottom - top + 1 } : null,
     ...(picture ? { image: { width, height, data: picture } } : {}),
+    ...(wantMask ? { mask } : {}),
+    ...(gap !== undefined ? { clusters: clusterBoxes(mask!, width, height, gap) } : {}),
   };
+}
+
+// Groups of changed pixels: two-pass connected-component labelling with union-find over 8-connected neighbours
+// (A. Rosenfeld and J. Pfaltz, "Sequential Operations in Digital Picture Processing", JACM 13(4), 1966; K. Wu, E. Otoo
+// and K. Suzuki, "Optimizing two-pass connected-component labeling algorithms", Pattern Analysis and Applications
+// 12(2), 2009), then boxes at most `gap` pixels apart (Chebyshev distance between rectangles) merge until none are.
+function clusterBoxes(mask: Uint8Array, width: number, height: number, gap: number): PixelBox[] {
+  const labels = new Int32Array(mask.length),
+    parent = [0];
+  const find = (x: number) => {
+    while (parent[x] !== x) x = parent[x] = parent[parent[x]];
+    return x;
+  };
+  const join = (x: number, y: number) => {
+    x = find(x);
+    y = find(y);
+    if (x !== y) parent[Math.max(x, y)] = Math.min(x, y);
+  };
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const at = y * width + x;
+      if (!mask[at]) continue;
+      let label = 0;
+      const near = [x > 0 ? at - 1 : -1, y > 0 && x > 0 ? at - width - 1 : -1, y > 0 ? at - width : -1];
+      if (y > 0 && x < width - 1) near.push(at - width + 1);
+      for (const n of near)
+        if (n >= 0 && labels[n]) {
+          if (label) join(label, labels[n]);
+          else label = labels[n];
+        }
+      if (!label) parent.push((label = parent.length));
+      labels[at] = label;
+    }
+  const boxes = new Map<number, [number, number, number, number]>();
+  for (let at = 0; at < labels.length; at++) {
+    if (!labels[at]) continue;
+    const root = find(labels[at]),
+      x = at % width,
+      y = (at - x) / width,
+      box = boxes.get(root);
+    if (!box) boxes.set(root, [x, y, x, y]);
+    else {
+      if (x < box[0]) box[0] = x;
+      if (x > box[2]) box[2] = x;
+      box[3] = y;
+    }
+  }
+  const list = [...boxes.values()];
+  for (let merged = true; merged; ) {
+    merged = false;
+    for (let i = 0; i < list.length; i++)
+      for (let j = i + 1; j < list.length; j++) {
+        const p = list[i],
+          q = list[j],
+          apart = Math.max(q[0] - p[2], p[0] - q[2], q[1] - p[3], p[1] - q[3]) - 1;
+        if (apart > gap) continue;
+        list[i] = [Math.min(p[0], q[0]), Math.min(p[1], q[1]), Math.max(p[2], q[2]), Math.max(p[3], q[3])];
+        list.splice(j--, 1);
+        merged = true;
+      }
+  }
+  return list
+    .sort((p, q) => p[1] - q[1] || p[0] - q[0])
+    .map(([x0, y0, x1, y1]) => ({ x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 }));
 }
 
 /** Rec. 709 luma of each pixel, premultiplied by alpha. */

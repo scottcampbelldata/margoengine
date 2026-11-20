@@ -146,3 +146,61 @@ test('STEP import: a solid with a side swept against STEP normal meshes to its o
     assert.ok(Math.abs(v - volume) < 1e-3 * volume, `${what}: mesh volume ${v} vs ${volume}`);
   }
 });
+
+test('STEP import: a rectangular trimmed surface with one sense false faces against its basis surface, as STEP says', () => {
+  // ISO 10303-42: usense and vsense say whether the trimmed surface's parameters run with its basis surface's; where
+  // exactly one runs against, its normal (Su x Sv) is the basis surface's turned, and the face's same_sense is given
+  // against that. The side of a cylinder written on a trimmed copy of it: with one sense false its face (out of the
+  // solid) is against the trimmed normal. Before, the senses were ignored and that face came out inside out (its mesh
+  // wound inward); massProperties integrated it as it was and still gave V.
+  const text = bodiesToSTEP([cylinder('c', r, h)]),
+    line = text.split('\n').find((l) => l.includes('=CYLINDRICAL_SURFACE(')),
+    basis = /^#\d+=(.*);$/.exec(line)[1],
+    volume = Math.PI * r * r * h;
+  for (const [us, vs] of [
+    [true, true],
+    [false, true],
+    [true, false],
+    [false, false],
+  ]) {
+    const what = `usense ${us}, vsense ${vs}`,
+      flag = (b) => (b ? '.T.' : '.F.'),
+      trimmed = (add) =>
+        `RECTANGULAR_TRIMMED_SURFACE('',${add(basis)},0.,${real(2 * Math.PI)},0.,${real(h)},${flag(us)},${flag(vs)})`,
+      { body } = imported(rewrite(text, 'CYLINDRICAL_SURFACE', trimmed, us === vs)),
+      side = body.faces.find((f) => f.surface.kind === 'cylinder');
+    assert.equal(side.sense, true, what);
+    assert.deepEqual(checkBody(body), [], what);
+    assert.ok(Math.abs(massProperties(body).volume - volume) < 1e-12 * volume, `${what}: mass volume`);
+    const v = meshVolume(body);
+    assert.ok(Math.abs(v - volume) < 1e-3 * volume, `${what}: mesh volume ${v} vs ${volume}`);
+  }
+});
+
+test('STEP import: a plane trimmed with one sense false faces against the plane; a trimmed offset moves with it', () => {
+  // The top cap on a trimmed plane with usense false: its STEP normal is down, so the cap (facing up, out of the
+  // solid) has same_sense false.
+  const text = bodiesToSTEP([cylinder('c', r, h)]),
+    cap = text.split('\n').find((l) => l.includes("ADVANCED_FACE('c/face:+z'")),
+    id = /,#(\d+),\.T\.\);$/.exec(cap)[1],
+    plane = /^#\d+=(.*);$/.exec(text.split('\n').find((l) => l.startsWith(`#${id}=`)))[1],
+    trimmed = (add) => `RECTANGULAR_TRIMMED_SURFACE('',${add(plane)},${real(-r)},${real(r)},${real(-r)},${real(r)},.F.,.T.)`,
+    { body } = imported(rewrite(text, `#${id}`, trimmed, false)),
+    top = body.faces.find((f) => f.surface.kind === 'plane' && f.surface.frame.origin[2] > h / 2);
+  assert.deepEqual(planeNormal(top), [0, 0, 1]);
+  assert.deepEqual(checkBody(body), []);
+  assert.ok(meshVolume(body) > 0);
+  // The side as the offset by d of a cylinder of radius r + d trimmed with vsense false (its normal in): the offset
+  // moves along the trimmed normal, in, to radius r. Before, it moved out, to r + 2 d.
+  const side = text.split('\n').find((l) => l.includes('=CYLINDRICAL_SURFACE(')),
+    wider = /^#\d+=(.*);$/.exec(side)[1].replace(/,([0-9.eE+-]+)\)$/, `,${real(r + d)})`),
+    offset = (add) =>
+      `OFFSET_SURFACE('',${add(`RECTANGULAR_TRIMMED_SURFACE('',${add(wider)},0.,${real(2 * Math.PI)},0.,${real(h)},.T.,.F.)`)},${real(d)},.F.)`,
+    moved = imported(rewrite(text, 'CYLINDRICAL_SURFACE', offset, false)).body,
+    tube = moved.faces.find((f) => f.surface.kind === 'cylinder');
+  assert.ok(Math.abs(tube.surface.radius - r) < 1e-15, `radius ${tube.surface.radius}`);
+  assert.equal(tube.sense, true);
+  const volume = Math.PI * r * r * h;
+  assert.ok(Math.abs(massProperties(moved).volume - volume) < 1e-12 * volume, `volume ${massProperties(moved).volume}`);
+  assert.ok(meshVolume(moved) > 0);
+});

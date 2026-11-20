@@ -6,10 +6,8 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-virtual-custom' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/virtual-custom.html', port: 5274 }),
   { page } = context,
   pageErrors = [];
@@ -62,5 +60,4 @@ try {
   console.log('virtual shadows drawShadow casters: ok');
 } finally {
   await context.close?.();
-  await release?.();
 }

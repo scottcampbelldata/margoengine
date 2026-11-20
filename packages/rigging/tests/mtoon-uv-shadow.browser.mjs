@@ -16,7 +16,7 @@ context.page.on('pageerror', (e) => errors.push(e.message));
 try {
   await context.page.evaluate(async () => {
     const { Engine, box } = await import('/packages/core/dist/index.js');
-    const { parsePreparedPBR } = await import('/packages/gltf-pro/dist/index.js');
+    const { parsePreparedPBR } = await import('/packages/gltf/dist/pbr.js');
     const { Shadows } = await import('/packages/shadows/dist/index.js');
     const { MToon } = await import('/packages/rigging/dist/mtoon.js');
     const { Picking } = await import('/packages/selection/dist/index.js');

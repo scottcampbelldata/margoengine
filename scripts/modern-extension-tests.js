@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { build } from 'vite';
 import { openBrowser } from './browser.js';
-import { animatedTriangle } from '../tests/support/gltf-pro-fixture.js';
+import { animatedTriangle } from '../tests/support/gltf-pbr-fixture.js';
 import { decodePNG } from '../tests/support/png.js';
 import { readResponse } from '../packages/shared/loading.js';
 await mkdir('test-results', { recursive: true });
@@ -79,7 +79,7 @@ try {
   const result = await page.evaluate(
     async ({ doc, buffers, urls }) => {
       const { Engine } = await import('/packages/core/dist/index.js');
-      const { parseGLTF, loadGLTF } = await import('/packages/gltf-pro/dist/index.js');
+      const { parseGLTF, loadGLTF } = await import('/packages/gltf/dist/pbr.js');
       const { Animation } = await import('/packages/animation/dist/index.js');
       const { SSAO } = await import('/packages/post/dist/index.js');
       const assert = (ok, message) => {

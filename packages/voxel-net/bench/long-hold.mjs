@@ -98,6 +98,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       text = JSON.stringify(summary, null, 1);
     console.log(text);
     if (arg('out')) await writeFile(arg('out'), `${text}\n`);
-    process.exit(0);
   } else throw new TypeError('Pass serve or hold; the usage is at the top of bench/long-hold.mjs');
 }

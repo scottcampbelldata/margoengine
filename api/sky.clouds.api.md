@@ -6,7 +6,15 @@
 import { EngineKernel, Vec3 } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export const DECK_ABOVE: number;
+
+export const DECK_DEPTH = 20;
+
+export const DECK_VARIATION = 0.12;
+
 export const clouds: NonNullable<SkyFeatures['clouds']>;
+
+export function overcastDeck(sunlight: readonly number[], sunUp: number, up: number, depth?: number, units?: number): [number, number, number];
 
 // Not exported from this entry, but used by the exports above:
 
@@ -14,6 +22,14 @@ type Lights = {
     direction: Float32Array;
     radiance: Float32Array;
 };
+
+type MoonBrightnessName = 'bright' | 'dim';
+
+type MoonColorName = 'blood' | 'reddened';
+
+type MoonPhase = number | MoonPhaseName;
+
+type MoonPhaseName = 'new' | 'waxingCrescent' | 'firstQuarter' | 'waxingGibbous' | 'full' | 'waningGibbous' | 'lastQuarter' | 'waningCrescent' | 'half' | 'quarter';
 
 type Owned = {
     destroy(): void;
@@ -23,6 +39,10 @@ class Sky implements EnginePlugin {
     readonly options: SkyOptions;
     readonly name: string;
     environmentLayer: GPUTexture | undefined;
+    environmentLightLayer: GPUTexture | undefined;
+    lightScale: number;
+    deck: ((up: number) => number) | undefined;
+    get airControls(): boolean;
     readonly sun: Float32Array<ArrayBuffer>;
     readonly moon: Float32Array<ArrayBuffer>;
     get cloudLayer(): {
@@ -31,6 +51,7 @@ class Sky implements EnginePlugin {
         drift: number;
         height: number;
     } | undefined;
+    get coverageTexture(): GPUTexture | undefined;
     get reflectionTexture(): GPUTexture | undefined;
     get nightFactor(): number;
     readonly lights: readonly [{
@@ -40,6 +61,14 @@ class Sky implements EnginePlugin {
         readonly direction: Float32Array<ArrayBuffer>;
         readonly radiance: Float32Array<ArrayBuffer>;
     }];
+    readonly moonUnderClouds: {
+        direction: Float32Array<ArrayBuffer>;
+        radiance: Float32Array<ArrayBuffer>;
+    };
+    readonly twilightLight: {
+        direction: Float32Array<ArrayBuffer>;
+        radiance: Float32Array<ArrayBuffer>;
+    };
     constructor(options?: SkyOptions, features?: SkyFeatures);
     add(target: SkyLightingTarget): () => void;
     pbr(group: number): {
@@ -50,16 +79,31 @@ class Sky implements EnginePlugin {
     static attach(engine: EngineKernel, options?: SkyOptions, features?: SkyFeatures): Sky;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    get time(): number;
+    advanceTime(delta: number): void;
     onPreUpdate(delta: number): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
 }
 
+interface SkyAtmosphereOptions {
+    sunIntensity?: number;
+    sunColor?: Vec3;
+    rayleigh?: number;
+    rayleighColor?: Vec3;
+    mie?: number;
+    mieColor?: Vec3;
+    mieAnisotropy?: number;
+    ozone?: number;
+    scatteredLight?: Vec3;
+}
+
 interface SkyCloudOptions {
     coverage?: number;
     speed?: number;
     height?: number;
+    depth?: number;
 }
 
 interface SkyFeatures {
@@ -69,7 +113,14 @@ interface SkyFeatures {
     bruneton?: {
         readonly phase: string;
         readonly tail: string;
-        create(device: GPUDevice, uniform: GPUBufferBinding, transmission: GPUTextureView, owned: Owned): SkyTables;
+        readonly sky: string;
+        create(device: GPUDevice, uniform: GPUBufferBinding, transmission: GPUTextureView, owned: Owned, extend?: (code: string) => string): SkyTables;
+    };
+    look?: {
+        extend(code: string, full: boolean): string;
+        validate(options: SkyOptions): void;
+        air(options: SkyOptions, out: Float32Array): Float32Array;
+        write(out: Float32Array, options: SkyOptions, air: Float32Array, zenith?: number): void;
     };
     clouds?: {
         readonly wgsl: string;
@@ -101,8 +152,9 @@ interface SkyFeatures {
             update(target: Lights, sky: Sky, lighting: SkyLightingOptions | undefined, ambient: {
                 readonly day: Vec3;
                 readonly night: Vec3;
-            } | undefined, night: number): void;
+            } | undefined, night: number, scale: number): void;
             pass(c: SkyPassContext, layer?: GPUTexture): void;
+            patch(c: SkyPassContext): void;
             recode(code: string, entries: GPUBindGroupEntry[]): void;
             pbr(group: number): {
                 readonly declarations: string;
@@ -122,6 +174,11 @@ interface SkyFogOptions {
     color?: Vec3;
 }
 
+interface SkyGradientStop {
+    elevation: number;
+    color: Vec3;
+}
+
 interface SkyLightingOptions {
     intensity?: number;
     minimum?: number;
@@ -129,12 +186,21 @@ interface SkyLightingOptions {
     sunset?: Vec3;
     moon?: {
         intensity?: number;
+        brightness?: number | MoonBrightnessName;
+        color?: Vec3 | MoonColorName;
+        extinction?: number;
+        cloudCover?: number;
+    };
+    twilight?: false | {
+        brightness?: number;
+        cloudCover?: number;
         color?: Vec3;
     };
     ambient?: {
         day: Vec3;
         night: Vec3;
     };
+    ground?: number;
 }
 
 interface SkyLightingTarget {
@@ -147,13 +213,35 @@ interface SkyLightingTarget {
     }): () => void;
 }
 
+interface SkyLookOptions {
+    zenithColor?: Vec3;
+    zenithStrength?: number;
+    horizonColor?: Vec3;
+    horizonStrength?: number;
+    groundColor?: Vec3;
+    groundStrength?: number;
+    gradient?: readonly SkyGradientStop[];
+    gradientStrength?: number;
+    gradientIntensity?: number;
+    sunDiscSize?: number;
+    sunDiscColor?: Vec3;
+    sunDiscIntensity?: number;
+    sunDiscSoftness?: number;
+    glowColor?: Vec3;
+    glowStrength?: number;
+    glowWidth?: number;
+    glowSunward?: number;
+    cloudColor?: Vec3;
+    cloudDensity?: number;
+}
+
 interface SkyNightOptions {
     zenithColor?: Vec3;
     horizonColor?: Vec3;
     moonColor?: Vec3;
     moonDirection?: Vec3;
     moonSize?: number;
-    moonPhase?: number;
+    moonPhase?: MoonPhase;
     moonLitBySun?: boolean;
     glowIntensity?: number;
     starIntensity?: number;
@@ -173,7 +261,10 @@ interface SkyOptions {
     turbidity?: number;
     exposure?: number;
     lighting?: SkyLightingOptions;
+    atmosphere?: SkyAtmosphereOptions;
+    look?: SkyLookOptions;
     environment?: boolean;
+    coverage?: boolean;
 }
 
 type SkyPassContext = Extract<PassContext, {
@@ -183,5 +274,6 @@ type SkyPassContext = Extract<PassContext, {
 interface SkyTables {
     view: GPUTextureView;
     run(c: SkyPassContext, albedo?: Readonly<ArrayLike<number>>): void;
+    recode?(extend: ((code: string) => string) | undefined, uniform: GPUBufferBinding): void;
 }
 ```

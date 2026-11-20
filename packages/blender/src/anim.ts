@@ -1,14 +1,15 @@
 // @margoengine/blender/anim: animated .margo files (armatures, skins, shape keys, sampled actions) as glTF 2.0 over
-// the file's own bytes, so glTF Pro draws them and @margoengine/animation plays them. FORMAT.md, "Animated files".
+// the file's own bytes, so glTF PBR draws them and @margoengine/animation plays them. FORMAT.md, "Animated files".
 import { checkCount, countLimit } from "../../shared/limits.js";
 import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
 import { validatePreparedGeometry } from "../../shared/prepared-geometry.js";
 import type { EngineKernel } from "@margoengine/core";
 import {
   parseGLTF,
   type GLTFDocument,
   type PBRModel,
-} from "@margoengine/gltf-pro/model";
+} from "@margoengine/gltf/pbr-model";
 import {
   decodeImages,
   expandCompact,
@@ -54,7 +55,7 @@ const skinAttributes = new Set([
 
 /**
  * Converts `.margo` bytes, animated or static, to a glTF 2.0 document over the same bytes (no copy). Checks the
- * container and geometry as `decodeMargo` does; glTF Pro checks the accessors, skins and clips when it loads them.
+ * container and geometry as `decodeMargo` does; glTF PBR checks the accessors, skins and clips when it loads them.
  *
  * @example
  * const { document } = margoToGLTF(await (await fetch('/hero.margo')).arrayBuffer());
@@ -293,7 +294,7 @@ export function margoToGLTF(
   };
   if (images.length) document.images = images;
   else delete document.images;
-  // Untrusted metadata past the container, section and geometry checks; glTF Pro validates the rest on load.
+  // Untrusted metadata past the container, section and geometry checks; glTF PBR validates the rest on load.
   return {
     document: document as GLTFDocument,
     buffer: new Uint8Array(buffer, base, length),
@@ -302,7 +303,7 @@ export function margoToGLTF(
 }
 
 /**
- * Decodes an animated (or static) `.margo` file and attaches it to `engine` as a glTF Pro `PBRModel` with its skins,
+ * Decodes an animated (or static) `.margo` file and attaches it to `engine` as a glTF PBR `PBRModel` with its skins,
  * morph targets and clips, ready for `Animation.attach(model)` from `@margoengine/animation`. WebGPU only.
  *
  * @example
@@ -314,18 +315,13 @@ export async function parseAnimatedMargo(
   { signal, maxNodes }: MargoOptions & { signal?: AbortSignal } = {},
 ): Promise<PBRModel> {
   signal?.throwIfAborted();
-  const asset = margoToGLTF(input, { maxNodes }),
+  // The model is built after the await below: it goes in the scene this call started in.
+  const scope = captureScene(engine),
+    asset = margoToGLTF(input, { maxNodes }),
     images = await decodeImages(asset.images, signal);
   try {
     signal?.throwIfAborted();
-    return parseGLTF(
-      engine,
-      asset.document,
-      [asset.buffer],
-      images,
-      {},
-      { maxNodes },
-    );
+    return scope.run(() => parseGLTF(engine, asset.document, [asset.buffer], images, {}, { maxNodes }));
   } catch (error) {
     for (const image of images) image.close();
     throw error;
@@ -350,7 +346,8 @@ export async function loadAnimatedMargo(
   }: MargoOptions & { signal?: AbortSignal; fetch?: typeof fetch } = {},
 ): Promise<PBRModel> {
   signal?.throwIfAborted();
-  const target = new URL(url, globalThis.location?.href);
+  const scope = captureScene(engine),
+    target = new URL(url, globalThis.location?.href);
   if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
       ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseAnimatedMargo",
@@ -360,5 +357,6 @@ export async function loadAnimatedMargo(
     signal,
     label: ".margo download",
   });
-  return parseAnimatedMargo(engine, bytes, { signal, maxNodes });
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(() => parseAnimatedMargo(engine, bytes, { signal, maxNodes }));
 }

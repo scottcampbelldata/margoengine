@@ -87,6 +87,7 @@ window.runSculptTests = async () => {
   assert(difference(before, undone) === 0, `undo restores the picture (${difference(before, undone)} pixels)`);
   checks.push('undo draws the first picture again');
   view.dispose();
+  assert(!engine.sceneOf(view), 'a disposed view leaves the scene');
 
   // Dynamic topology draws too: new triangles reach the GPU.
   const growing = new MeshSculptSession(ball(4), { radius: 0.5, strength: 1, dynamicTopology: true, detailSize: 0.03 }),

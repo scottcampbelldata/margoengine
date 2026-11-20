@@ -87,3 +87,45 @@ test('type 0 below a sheared parent keeps its world on an empty parent of the hi
 test('an inherit type that does not exist is refused by name', async () => {
   await assert.rejects(convertFBX(chain([1, ''], [3, ''])), /unsupported InheritType 3 on N1/);
 });
+
+test("type 2 takes away the parent's signed Lcl Scaling, not its decomposed scale (FbxTransform eInheritRrs)", async () => {
+  // S(1,-1,-1) decomposes to scale 1 and a half turn about X; Rrs drops the signed scale itself, so the child is
+  // T(0,-1,0) with no turn: the triangle at (0,-1), (1,-1), (0,0).
+  const buffer = await convertFBX(chain([1, lcl('Scaling', 1, -1, -1)], [2, lcl('Translation', 0, 1, 0)]));
+  const want = [
+    [0, -1, 0],
+    [1, -1, 0],
+    [0, 0, 0],
+  ];
+  assert.ok(farthest(posed(buffer, 0), want) < 1e-6, JSON.stringify(posed(buffer, 0)));
+});
+
+test('a constant scale curve away from the rest Lcl Scaling still gives a type 2 child its helper', async () => {
+  const curve = `
+ AnimationStack: 50, "AnimStack::Take", "" { }
+ AnimationLayer: 51, "AnimLayer::Base", "" { }
+ AnimationCurveNode: 52, "AnimCurveNode::S", "" { }
+ AnimationCurve: 53, "AnimCurve::", "" {
+  KeyTime: *2 { a: 0,46186158000 }
+  KeyValueFloat: *2 { a: 2,2 }
+  KeyAttrFlags: *1 { a: 4 }
+  KeyAttrDataFloat: *4 { a: 0,0,0,0 }
+  KeyAttrRefCount: *1 { a: 2 }
+ }`,
+    links = `
+ C: "OO",51,50
+ C: "OO",52,51
+ C: "OP",52,1,"Lcl Scaling"
+ C: "OP",53,52,"d|X"`,
+    text = new TextDecoder()
+      .decode(chain([1, ''], [2, `${lcl('Translation', 1, 0, 0)}\n${lcl('Rotation', 0, 0, 90)}`]))
+      .replace('\n}\nConnections: {', `${curve}\n}\nConnections: {${links}`);
+  // The clip holds X scale 2 throughout, so the pose is the one of the type 2 test above: (2,0), (2,1) and (1,0).
+  const buffer = await convertFBX(encode(text)),
+    want = [
+      [2, 0, 0],
+      [2, 1, 0],
+      [1, 0, 0],
+    ];
+  assert.ok(farthest(posed(buffer, 0.5), want) < 1e-5, JSON.stringify(posed(buffer, 0.5)));
+});

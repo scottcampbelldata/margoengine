@@ -122,7 +122,7 @@ test('the document colour space reaches a colour; one with no conversion is name
   assert.match(other.skipped[0].reason, /acescg/);
 });
 
-test('images go through the hook once each, with fileprefix, colour space and address modes', async () => {
+test('images go through the hook once each, with fileprefix (an inner one replaces the outer), colour space and address modes', async () => {
   const asked = [];
   const { emit, skipped } = await emitOf(
     `<tiledimage name="C" type="color3"><input name="file" type="filename" value="c.png" colorspace="srgb_texture"/></tiledimage>
@@ -138,11 +138,11 @@ test('images go through the hook once each, with fileprefix, colour space and ad
   );
   assert.equal(emit.color.type, 'texture');
   assert.equal(emit.color.texture.view.file, 'tex/c.png');
-  assert.equal(emit.metalRough.roughness.texture.view.file, 'tex/sub/r.png');
+  assert.equal(emit.metalRough.roughness.texture.view.file, 'sub/r.png');
   assert.equal(emit.metalRough.metal.texture, emit.metalRough.roughness.texture);
   assert.deepEqual(asked, [
     { file: 'tex/c.png', type: 'color3', colorspace: 'srgb_texture' },
-    { file: 'tex/sub/r.png', type: 'float', addressU: 'clamp', addressV: 'mirror', filter: 'closest' },
+    { file: 'sub/r.png', type: 'float', addressU: 'clamp', addressV: 'mirror', filter: 'closest' },
   ]);
   assert.deepEqual(skipped, []);
 });
@@ -417,4 +417,26 @@ test('a standard_surface that names the older definition takes its base and base
   }
   const current = await older('version="1.0.1"', '<input name="base_color" type="color3" value="1, 0, 0" />');
   assert.deepEqual(current.value.slice(0, 3), [1, 0, 0]);
+});
+
+// KB-RESTORE-BORROWED1 (docs/conventions.md, "Borrowed GPU objects"): MaterialXTexture.view and .sampler are what the
+// caller's `texture` hook returns for one request. The converter calls the hook per request, hands the very object to the
+// node material graph and keeps nothing (the registry rows are exempt: the caller makes the object, `@margoengine/materials`
+// holds it by its own rule), so a converted graph carries no copy of a view or sampler of an older device, and a new
+// conversion asks the hook again.
+test('the hook\'s texture reaches the graph as the same object, and each conversion asks the hook again', async () => {
+  const body = `<tiledimage name="C" type="color3"><input name="file" type="filename" value="c.png"/></tiledimage>
+     <gltf_pbr name="S" type="surfaceshader"><input name="base_color" type="color3" nodename="C"/></gltf_pbr>${material('S')}`,
+    made = [],
+    hook = (request) => {
+      const t = { view: { file: request.file, device: made.length }, sampler: { device: made.length } };
+      made.push(t);
+      return t;
+    },
+    first = await emitOf(body, { texture: hook }),
+    second = await emitOf(body, { texture: hook });
+  assert.equal(made.length, 2);
+  assert.equal(first.emit.color.texture, made[0]);
+  assert.equal(second.emit.color.texture, made[1]);
+  assert.notEqual(first.emit.color.texture.view, second.emit.color.texture.view);
 });

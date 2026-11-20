@@ -58,6 +58,10 @@
       "types": "./dist/trackball.d.ts",
       "import": "./dist/trackball.js"
     },
+    "./first-person": {
+      "types": "./dist/first-person.d.ts",
+      "import": "./dist/first-person.js"
+    },
     "./arcball": {
       "types": "./dist/arcball.d.ts",
       "import": "./dist/arcball.js"

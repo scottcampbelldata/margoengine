@@ -15,13 +15,18 @@ import { fileURLToPath } from 'node:url';
 
 const cwd = realpathSync.native(process.cwd());
 if (!existsSync(join(cwd, 'packages', 'margoengine', 'dist', 'index.js'))) {
-  console.error('The packages are not built yet. Run `npm run build:packages` once (no Rust needed), then run this again.');
-  process.exit(1);
+  console.error(
+    'The packages are not built yet. Run `npm run build:packages` once (no Rust needed), then run this again.',
+  );
+  process.exitCode = 1;
+} else {
+  const vite = join(dirname(fileURLToPath(import.meta.resolve('vite/package.json'))), 'bin', 'vite.js');
+  const child = spawn(process.execPath, [vite, '--host', '127.0.0.1', ...process.argv.slice(2)], {
+    cwd,
+    stdio: 'inherit',
+  });
+  for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
+  child.on('exit', (code, signal) => {
+    process.exitCode = code ?? (signal ? 1 : 0);
+  });
 }
-const vite = join(dirname(fileURLToPath(import.meta.resolve('vite/package.json'))), 'bin', 'vite.js');
-const child = spawn(process.execPath, [vite, '--host', '127.0.0.1', ...process.argv.slice(2)], {
-  cwd,
-  stdio: 'inherit',
-});
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
-child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));

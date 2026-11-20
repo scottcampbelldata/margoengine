@@ -3,11 +3,12 @@
 // at a time, drops a fetch nobody asks for any more, and frees the longest unused levels past `maxBytes`.
 import type { EngineKernel, Mesh } from '@margoengine/core';
 import { meshRuntime, type Engine, type EnginePlugin } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
+import type { PBRModel } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import type { DeferredLevel } from './index.js';
+import { sceneScope } from '../../shared/scene-scope.js';
 
-/** What a level's loader gives: a core mesh, or a model with a `root` (gltf-pro, materials). The stream owns it from then on. */
+/** What a level's loader gives: a core mesh, or a model with a `root` (gltf/pbr, materials). The stream owns it from then on. */
 export type StreamedObject = Mesh | { readonly root: Mesh; dispose(): void };
 /** A glTF or GLB URL, loaded with `loadGLTF`, or a loader of your own, which must honour `signal`. */
 export type LevelSource = string | URL | ((signal: AbortSignal) => Promise<StreamedObject>);
@@ -74,7 +75,7 @@ export class StreamedLevel implements DeferredLevel {
   ) {
     this.bytes = options.bytes ?? 0;
   }
-  /** The loaded gltf-pro or materials model, for `@margoengine/lod/fade`; undefined otherwise. */
+  /** The loaded gltf\/pbr or materials model, for `@margoengine/lod/fade`; undefined otherwise. */
   get model(): PBRModel | undefined {
     return (this.object as Partial<PBRModel> | undefined)?.primitives ? (this.object as PBRModel) : undefined;
   }
@@ -185,10 +186,14 @@ export class LevelStream implements EnginePlugin {
     let object: StreamedObject | undefined;
     try {
       if (!this.engine) throw new MargoError('state', 'Use the LevelStream on an engine first');
-      if (typeof source === 'function') object = await source(signal);
+      // The loader starts in the stream's own scene, which a load keeps: the active scene is the default one when a fetch
+      // starts from a frame callback or after the import below.
+      const engine = this.engine,
+        scope = sceneScope(engine, engine.sceneOf(this));
+      if (typeof source === 'function') object = await scope.run(() => source(signal));
       else {
-        const { loadGLTF } = await import('@margoengine/gltf-pro');
-        object = await loadGLTF(this.engine, source, { signal });
+        const { loadGLTF } = await import('@margoengine/gltf/pbr');
+        object = await scope.run(() => loadGLTF(engine, source, { signal }));
       }
       signal.throwIfAborted();
       target(object).visible = level.visible;

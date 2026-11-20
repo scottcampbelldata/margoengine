@@ -337,7 +337,7 @@ export async function compressTextures(
       if (!bytes) skip('external-image');
       else if (!readable) skip('not-png-or-jpeg');
       else {
-        const pixels = isPNGOrJPEG(bytes) ? bytes.slice() : await decoded(imageIndex, bytes, options.signal);
+        const pixels = isPNGOrJPEG(bytes) ? bytes : await decoded(imageIndex, bytes, options.signal);
         let first = true;
         for (const [role, infos] of roles) {
           // The first role keeps this texture; each other role gets a copy, which comes after every original.
@@ -356,7 +356,9 @@ export async function compressTextures(
               name: image.name,
               textures: [target],
               job: {
-                source: pixels,
+                // Each job owns its bytes: a browser worker takes them by transfer, which empties the sender's copy,
+                // so two roles of one image, or two textures of one decoded image, must never share one buffer.
+                source: pixels instanceof Uint8Array ? pixels.slice() : { ...pixels, data: pixels.data.slice() },
                 mode: formats[role],
                 srgb: role === 'color',
                 normalMap: role === 'normal',

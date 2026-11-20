@@ -1,14 +1,14 @@
-// KHR_interactivity on a rendered model. @margoengine/gltf-pro/interactivity holds the graph and the object model; this entry
+// KHR_interactivity on a rendered model. @margoengine/gltf/interactivity holds the graph and the object model; this entry
 // reaches the engine: it ticks the graph with the frame loop, writes properties to the live model, plays the file's
-// animations and turns pointer input into select and hover events. It lives here because this package already sees gltf-pro.
+// animations and turns pointer input into select and hover events. It lives here because this package already sees gltf/pbr.
 import { MargoError } from '@margoengine/math/errors';
 import { screenToWorld } from '@margoengine/math/project';
 import { rotationToQuaternion } from '@margoengine/math/quat';
 import { Ray } from '@margoengine/math/ray';
 import { Vector3 } from '@margoengine/math/vector3';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
-import type { PBRModel } from '@margoengine/gltf-pro';
-import type { GLTFPhysics } from '@margoengine/gltf-pro/physics';
+import type { PBRModel } from '@margoengine/gltf/pbr';
+import type { GLTFPhysics } from '@margoengine/gltf/physics';
 import {
   loadBehaviorGraph,
   type ActiveCamera,
@@ -16,7 +16,7 @@ import {
   type BehaviorGraphOptions,
   type GraphPhysics,
   type GraphValue,
-} from '@margoengine/gltf-pro/interactivity';
+} from '@margoengine/gltf/interactivity';
 import { Animation } from './index.js';
 import { pointerChannels, pointerWriter } from './pointer.js';
 import { sampleTrackInto, type Interpolation } from './sampling.js';

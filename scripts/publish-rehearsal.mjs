@@ -36,7 +36,7 @@ import { homedir, tmpdir, userInfo } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gunzipSync } from 'node:zlib';
-import { killTree, windowsCommandLine } from './gpu-lock.mjs';
+import { killTree, windowsCommandLine } from './run-with-timeout.mjs';
 import { publishedPackages } from './supply-chain.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -83,16 +83,34 @@ export function packageOf(specifier) {
   return builtinModules.includes(name) ? undefined : name;
 }
 
+/** The [start, end] index of every string literal, so text inside one is not read as code. */
+function stringRanges(code) {
+  const ranges = [];
+  for (let i = 0; i < code.length; i++) {
+    const quote = code[i];
+    if (quote !== '"' && quote !== "'" && quote !== '`') continue;
+    let j = i + 1;
+    while (j < code.length && code[j] !== quote && !(quote !== '`' && code[j] === '\n')) j += code[j] === '\\' ? 2 : 1;
+    ranges.push([i, j]);
+    i = j;
+  }
+  return ranges;
+}
+
 /** Bare and relative imports of a piece of JavaScript: static, re-export and literal dynamic ones. */
 export function importsOf(code) {
   const out = new Set();
   const stripped = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  // A call written inside a string (an error message that shows `await import('x')`) is text, not an import.
+  const strings = stringRanges(stripped);
   for (const pattern of [
     /(?:^|[\s;}])(?:import|export)\s[^'"`;]*?\sfrom\s*['"]([^'"]+)['"]/g,
     /(?:^|[\s;}])import\s*['"]([^'"]+)['"]/g,
     /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g,
   ])
-    for (const match of stripped.matchAll(pattern)) if (/^[@\w./:-]+$/.test(match[1])) out.add(match[1]);
+    for (const match of stripped.matchAll(pattern))
+      if (/^[@\w./:-]+$/.test(match[1]) && !strings.some(([from, to]) => match.index > from && match.index < to))
+        out.add(match[1]);
   return [...out];
 }
 
@@ -226,14 +244,24 @@ export function startRegistry(packages, upstream = UPSTREAM) {
         headers: { accept: request.headers.accept ?? 'application/json' },
       });
       relayed.add(path);
-      send(reply.status, Buffer.from(await reply.arrayBuffer()), reply.headers.get('content-type') ?? 'application/json');
+      send(
+        reply.status,
+        Buffer.from(await reply.arrayBuffer()),
+        reply.headers.get('content-type') ?? 'application/json',
+      );
     } catch (error) {
       send(502, JSON.stringify({ error: String(error) }));
     }
   });
   return new Promise((done) => {
     server.listen(0, '127.0.0.1', () =>
-      done({ url: `http://127.0.0.1:${server.address().port}/`, refused, served, relayed, close: () => server.close() }),
+      done({
+        url: `http://127.0.0.1:${server.address().port}/`,
+        refused,
+        served,
+        relayed,
+        close: () => server.close(),
+      }),
     );
   });
 }
@@ -308,7 +336,6 @@ for (const subpath of Object.keys(manifest.exports)) {
 const engine = await import('margoengine');
 if (typeof engine.createStage !== 'function') failed.push('margoengine has no createStage');
 console.log(JSON.stringify({ imported, failed }));
-process.exit(0);
 `;
 
 const FIRST_EXAMPLE_HTML = `<!doctype html><title>rehearsal</title><canvas id="viewport"></canvas>
@@ -391,7 +418,11 @@ async function rehearse(options) {
 
       await npm(['install', ...OPTIONAL_LIBRARIES, ...TOOLS, ...registryArgs], app, 300);
       writeFileSync(join(app, 'every-entry.mjs'), IMPORT_EVERY_ENTRY);
-      const output = await run(process.execPath, ['every-entry.mjs'], { cwd: app, env: options.env(work), seconds: 180 });
+      const output = await run(process.execPath, ['every-entry.mjs'], {
+        cwd: app,
+        env: options.env(work),
+        seconds: 180,
+      });
       const { imported, failed } = JSON.parse(output.trim().split('\n').at(-1));
       report.problems.push(...failed.map((line) => `import ${line}`));
       say(`${imported} entries imported in Node, ${failed.length} failed`);
@@ -432,7 +463,17 @@ async function rehearse(options) {
       for (const template of options.templates) {
         const dir = `${template}-app`;
         await npm(
-          ['exec', '--yes', ...registryArgs, '--package=create-margo@latest', '--', 'create-margo', dir, '--template', template],
+          [
+            'exec',
+            '--yes',
+            ...registryArgs,
+            '--package=create-margo@latest',
+            '--',
+            'create-margo',
+            dir,
+            '--template',
+            template,
+          ],
           work,
           120,
         );
@@ -440,7 +481,11 @@ async function rehearse(options) {
         await npm(['run', 'build'], join(work, dir), 400);
         say(`npm create margo --template ${template}: installed and built`);
       }
-      await npm(['exec', '--yes', ...registryArgs, '--package=margo-convert@latest', '--', 'margo-convert', '--help'], work, 120);
+      await npm(
+        ['exec', '--yes', ...registryArgs, '--package=margo-convert@latest', '--', 'margo-convert', '--help'],
+        work,
+        120,
+      );
       say('margo-convert --help runs');
       if (registry.refused.length) report.problems.push(`registry writes attempted: ${registry.refused.join(', ')}`);
       report.relayed = registry.relayed.size;
@@ -469,7 +514,11 @@ function parseArgs(argv) {
   };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+// The run ends by its event loop with its code (KB-OWN-EXIT2); only the hard limit ends it at once.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) process.exitCode = await cli();
+
+/** The command line run: 0 when the rehearsal passed, 1 when it found problems or failed. */
+async function cli() {
   const options = parseArgs(process.argv.slice(2));
   // Each run gets an empty cache and no user .npmrc: what a first-time reader's install resolves, with no saved token.
   options.env = (work) =>
@@ -479,19 +528,22 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     });
   const limit = setTimeout(() => {
     console.error(`publish rehearsal: over the ${options.limit} s limit`);
-    process.exit(1);
+    process.exit(1); // process.exit: the hard run limit ends the run whatever it is waiting on
   }, options.limit * 1000);
   try {
     const report = await rehearse(options);
-    clearTimeout(limit);
     if (report.problems.length) {
       console.error(`publish rehearsal FAILED: ${report.problems.length} problems`);
-      process.exit(1);
+      return 1;
     }
-    console.log(`publish rehearsal passed; nothing was published (${report.served} of ours served, ${report.relayed} third-party names read)`);
-    process.exit(0);
+    console.log(
+      `publish rehearsal passed; nothing was published (${report.served} of ours served, ${report.relayed} third-party names read)`,
+    );
+    return 0;
   } catch (error) {
     console.error(`publish rehearsal FAILED: ${error.message}`);
-    process.exit(1);
+    return 1;
+  } finally {
+    clearTimeout(limit);
   }
 }

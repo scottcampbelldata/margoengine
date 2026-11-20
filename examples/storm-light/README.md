@@ -19,8 +19,12 @@ to full gale. Everything moves live in WebGPU.
 - **The sky.** `@margoengine/sky`: a stylized night with the moon behind a broken deck of real 3D cloud
   (`VolumetricClouds`), rain and lightning from `@margoengine/sky/weather`. The deck takes a new march start each
   frame and TAA averages it, while the rain's reactive mask keeps the streaks over the sky crisp. A flash lights the
-  deck from inside (the clouds' `flash`, above the strike), and the bolt's light from behind the headland and the moon
-  flare with it for a moment. The deck is in the sky's reflection map and scene light, so the sea mirrors the moonlit
+  scene by itself: the weather's `lightning.link` finds the deck, the fog and the light groups by name, so the deck is
+  lit from inside (the stroke's share of light above the deck's base), the storm air under it lights with it, and the
+  stroke's light (a measured return stroke, shared among lights along the channel by height) lights the cliffs and the
+  sea for a moment. `LightningBolt` (`@margoengine/sky/lightning-bolt`) draws the branching channel those lights follow.
+  The scene picks a moon
+  brighter than the real one (`lighting.moon.intensity`) and the deck's cover dims it (`lighting.moon.cloudCover`). The deck is in the sky's reflection map and scene light, so the sea mirrors the moonlit
   clouds and a flash lights the rock and the sea through them. Every visit opens with one strike behind the headland
   1.6 s in. Click the sky to strike lightning toward where you clicked.
 - **The light.** Moonlight casts shadows through `@margoengine/shadows`; the cottage windows, the lamp post, the boat's

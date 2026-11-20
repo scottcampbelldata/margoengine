@@ -69,12 +69,12 @@ export function groupParts(items: readonly CulledPartItem[]): { batches: CulledP
 // Caster and id draws of the whole part list: hidden and free slots collapse to a point outside clip space.
 const partInput =
   'struct Input {@builtin(instance_index) n:u32,@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(6) factors:vec4f,@location(7) hidden:u32}\nconst away=vec4f(2.0,2.0,2.0,1.0);\n';
-/** Depth-only caster draw for @margoengine/shadows' cascade passes. */
+/** Depth-only caster draw for @margoengine/shadows' cascade passes; @invariant like Shadows' own casters. */
 const partsShadowShader =
   partInput +
   `
 @group(0) @binding(0) var<uniform> light:mat4x4f;
-@vertex fn vertex(i:Input)->@builtin(position) vec4f {
+@vertex fn vertex(i:Input)->@builtin(position) @invariant vec4f {
   if(i.hidden!=0u){return away;}
   return light*mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);
 }
@@ -88,7 +88,7 @@ struct Output {@builtin(position) clip:vec4f,@location(0) @interpolate(flat) id:
 @vertex fn vertex(i:Input)->Output {
   let m=mat4x4f(i.a,i.b,i.c,i.d);var o:Output;o.clip=away;
   if(i.hidden==0u){o.clip=camera*m*vec4f(i.p,1);}
-  o.id=i.n;o.side=vec2f(sign(dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))),i.factors.z);return o;
+  o.id=i.n+1u;o.side=vec2f(select(-1.0,1.0,dot(m[0].xyz,cross(m[1].xyz,m[2].xyz))>=0.0),i.factors.z);return o;
 }
 @fragment fn fragment(i:Output,@builtin(front_facing) front:bool)->@location(0) u32 {
   if(front!=(i.side.x>0.0)&&i.side.y<0.5){discard;}
@@ -414,7 +414,9 @@ export class CulledParts extends CulledInstances {
         group: this.bind(pipeline, [[0, { buffer: uniform }]]),
         descriptor: {
           colorAttachments: [
-            { view: ids.createView(), clearValue: [4294967295, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
+            // The ids are written one up and cleared to 0: Firefox 157 clears an r32uint target through float32, so
+            // 0xffffffff came back 0 (part 0) and every empty pixel picked the first part.
+            { view: ids.createView(), clearValue: [0, 0, 0, 0], loadOp: 'clear', storeOp: 'store' },
           ],
           depthStencilAttachment: {
             view: depth.createView(),
@@ -450,9 +452,9 @@ export class CulledParts extends CulledInstances {
       encoder.copyTextureToBuffer({ texture: t.ids }, { buffer: read }, [1, 1]);
       d.queue.submit([encoder.finish()]);
       await read.mapAsync(GPUMapMode.READ);
-      const id = new Uint32Array(read.getMappedRange().slice(0))[0];
+      const id = new Uint32Array(read.getMappedRange().slice(0))[0] - 1;
       read.unmap();
-      if (id >= this.slots || this.hidden[id]) return null;
+      if (id < 0 || id >= this.slots || this.hidden[id]) return null;
       const batch = this.batchOf[id];
       return { batch, index: id - this.starts[batch] };
     } finally {

@@ -1,12 +1,12 @@
 <!doctype html><html><head><meta charset="utf-8"><style>canvas{width:8px;height:8px}</style></head><body><script type="module">
 import {Engine} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf-pro/dist/index.js';
-import {extendedMaterials} from '/packages/gltf-pro/dist/extended.js';
+import {parseGLTF} from '/packages/gltf/dist/pbr.js';
+import {extendedMaterials} from '/packages/gltf/dist/extended.js';
 import {instancedGLTF} from '/tests/support/instanced-gltf.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 window.nativeGlass=async()=>{
  const rows=[];
- // taa: TAA's scene capture (order -70) owns the live color before native glass begins (-64).
+ // taa: TAA's scene capture (order -70) owns the live color before native glass begins (-40).
  for(const [samples,layers,taa] of [[1,1],[1,2],[4,1],[4,2],[4,1,true],[1,1,true]]){
   const canvas=document.body.appendChild(document.createElement('canvas'));
   const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
@@ -114,5 +114,33 @@ window.externalGlass=async()=>{
   }finally{renderer.dispose();color.destroy();depth.destroy();readback.destroy();}
  }finally{engine.dispose();canvas.remove();}
  return out;
+};
+// GAP-FILM-LATE: glass under an HDR capture (Tonemap, Bloom) drew each frame into the frame after. Settled on a red
+// background, one frame on blue must read blue at once: the same picture as a second blue frame, not the red one.
+window.hdrNesting=async()=>{
+ const {Tonemap}=await import('/packages/tonemap/dist/index.js');
+ const {Bloom}=await import('/packages/post/dist/index.js');
+ const rows=[];
+ for(const [effect,make] of [['tonemap',()=>new Tonemap()],['bloom',()=>new Bloom()]]) for(const samples of [1,4]){
+  const canvas=document.body.appendChild(document.createElement('canvas'));
+  const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
+  try{
+   const input=instancedGLTF([{t:[0,0,0]}],{instanced:false,material:{
+    emissiveFactor:[0.1,0.15,0.2],extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_ior:{ior:1}},
+   }});
+   parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
+   engine.use(make());
+   const frame=async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();};
+   engine.scene.background='#ff0000';
+   await waitForPipelines(frame);
+   const before=canvas.toDataURL('image/png');
+   engine.scene.background='#0000ff';
+   await frame();
+   const after=canvas.toDataURL('image/png');
+   await frame();
+   rows.push({effect,samples,before,after,again:canvas.toDataURL('image/png')});
+  }finally{engine.dispose();canvas.remove();}
+ }
+ return rows;
 };
 </script></body></html>

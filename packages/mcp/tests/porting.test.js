@@ -167,7 +167,10 @@ test('the shipped guide has every matrix row and maps the common names', async (
     assert.equal(best.section?.title, section, `${query} links the guide section`);
     assert.ok(best.section.margo.length > 10, `${query} carries Margo code`);
   }
-  assert.equal(lookupPorting(main, 'StereoCamera')[0].row.status, 'NOT PLANNED');
+  // Statuses follow the parity matrix the guide is built from, as recounted on main: StereoCamera is COVERED by cameras StereoRig, and the
+  // vector SVGRenderer is a decided NOT PLANNED.
+  assert.equal(lookupPorting(main, 'StereoCamera')[0].row.status, 'COVERED');
+  assert.equal(lookupPorting(main, 'SVGRenderer')[0].row.status, 'NOT PLANNED');
 });
 
 test('port_to_margo answers with the row, the code and structured matches, and rejects bad arguments', async () => {
@@ -194,7 +197,10 @@ test('port_to_margo answers with the row, the code and structured matches, and r
   assert.equal(none.content[0].text, formatPorting(parsed, 'qwertyuiop', []));
   assert.match(none.content[0].text, /^No Acme 9 row matches "qwertyuiop"/);
   assert.throws(() => tool.run({}, context), { name: 'TypeError', message: /name is required/ });
-  assert.throws(() => tool.run({ name: 'x', from: 3 }, context), { name: 'TypeError', message: /from must be a string/ });
+  assert.throws(() => tool.run({ name: 'x', from: 3 }, context), {
+    name: 'TypeError',
+    message: /from must be a string/,
+  });
   assert.throws(() => tool.run({ name: 'x', from: 'Other' }, context), {
     name: 'RangeError',
     message: /No porting guide for "Other"; there are guides for Acme 9/,

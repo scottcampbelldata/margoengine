@@ -17,7 +17,7 @@ is your app's input to check.
 
 **Untrusted: everything inside an asset file and everything from the network.** glTF/GLB JSON (names, `extras`,
 extensions, URIs), .margo, OBJ/STL/PLY/3MF/PCD/XYZ/OFF/VTK, FBX, USD/USDA/USDC/USDZ, IFC, KTX2/Basis,
-Draco, meshopt, EXR/HDR/UltraHDR, audio/video metadata, `@margoengine/net` snapshots and replies from Margo's own
+Draco, meshopt, EXR/HDR/UltraHDR, audio/video metadata, `@margoengine/netcode/interpolation` snapshots and replies from Margo's own
 workers.
 
 ## What Margo guarantees for untrusted input
@@ -46,7 +46,7 @@ workers.
   `allowedURLs: ['https://cdn.example.com/models/']` (URL prefixes, matched on a path-segment boundary: `/models`
   covers `/models` and `/models/a.bin` but not `/models-old/`; an entry naming a file covers only that file). Encoded
   separators and dot segments (`%2F`, `%5C`, `%2e%2e`) are refused under an allowed prefix too. `data:` URIs are decoded within
-  the load's byte budget (`maxDownloadBytes` in gltf-pro, 64 MiB in gltf). USDZ and 3MF only read entries of their own
+  the load's byte budget (`maxDownloadBytes` in gltf/pbr, 64 MiB in gltf). USDZ and 3MF only read entries of their own
   archive (paths that escape it are rejected); .margo images are embedded; OBJ `mtllib` is ignored.
 - **Fetches carry no cookies cross-origin.** Margo calls `fetch(url, { signal })`: the browser default
   `credentials: 'same-origin'`. Pass your own `fetch` to change it.

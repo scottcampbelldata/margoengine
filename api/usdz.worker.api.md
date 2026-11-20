@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 import { BinaryInput } from "@margoengine/loaders";
 
 export function loadUSDZInWorker(engine: EngineKernel, url: string | URL, options?: USDOptions): Promise<PBRModel>;

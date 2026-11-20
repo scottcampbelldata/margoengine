@@ -58,3 +58,20 @@ test('the sciviz points status line states its plot time, so the compatibility c
   assert.ok(points, 'sciviz-points is one of the compatibility cases');
   assert.ok((points.demo.mask ?? []).includes('#status'), 'sciviz-points must mask #status');
 });
+
+// The orrery opened on Date.now(), so its planets sat at a new longitude in every capture: its two native captures
+// differed (d > 2 on 0.32%) and the layer's, taken later, differed by 3.27%. A page that takes ?date= opens on the
+// clock without it, so every case of such a page names a date.
+test('every case whose page takes ?date= names one, so its still frame does not follow the clock', () => {
+  const dated = [];
+  for (const c of allCases) {
+    const source = sourceOf(c.demo.path, c.demo.dev);
+    if (!source || !existsSync(resolve(root, source))) continue;
+    const folder = resolve(root, source, '..');
+    const scripts = ['main.ts', 'main.js'].map((name) => resolve(folder, name)).filter(existsSync);
+    if (!scripts.some((file) => /\.get\(['"]date['"]\)/.test(readFileSync(file, 'utf8')))) continue;
+    dated.push(c.id);
+    assert.match(c.demo.path, /[?&]date=\d{4}-\d{2}-\d{2}/, `${c.id} opens on today's date`);
+  }
+  assert.ok(dated.includes('orrery'), 'the orrery takes ?date=');
+});

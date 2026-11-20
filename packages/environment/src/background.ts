@@ -2,7 +2,8 @@
 // Environment background: draws an environment's equirect or cube texture behind the scene, with
 // exposure, rotation and blur.
 import type { EngineKernel } from '@margoengine/core';
-import { engineRuntime, type FrameGraph, type PassContext } from '@margoengine/core/extension';
+import { engineRuntime, type FrameGraph, type FramePass, type PassContext } from '@margoengine/core/extension';
+
 import type { Environment } from './environment.js';
 import { reportRestore } from './restore-report.js';
 import type { RGBA8Image } from './ultrahdr.js';
@@ -11,6 +12,9 @@ import { invertMatrix } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+
+/** The marker of a background pass (shared through the global symbol registry, so no module import is needed). */
+const BACKGROUND_PASS = Symbol.for('margoengine.background-pass');
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -155,7 +159,9 @@ export class EnvironmentBackground {
       execute: (context) => {
         if (context.backend === 'webgpu') this.record(context);
       },
-    });
+      // Marks a background pass, so a capture with its own background (CubeCamera `background`) skips it.
+      [BACKGROUND_PASS]: true,
+    } as FramePass);
   }
   onDeviceRestored(engine: EngineKernel): void {
     this.releaseState();
@@ -352,7 +358,7 @@ export interface ImageBackgroundOptions<Image = RGBA8Image> {
   height?: number;
   /** Rotation about +Y in radians. Default 0; settable later. */
   rotation?: number;
-  /** Frame graph order; must run after core's main pass (order 0). Default 0.5, before glTF-pro models (1). */
+  /** Frame graph order; must run after core's main pass (order 0). Default 0.5, before glTF PBR models (1). */
   order?: number;
   /** Plugin and pass name. Default 'background'. */
   name?: string;
@@ -517,7 +523,9 @@ export class ImageBackground {
       execute: (context) => {
         if (context.backend === 'webgpu') this.record(context);
       },
-    });
+      // Marks a background pass, so a capture with its own background (CubeCamera `background`) skips it.
+      [BACKGROUND_PASS]: true,
+    } as FramePass);
   }
   onDeviceRestored(): void {
     this.release();

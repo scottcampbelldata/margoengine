@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { cpuTimer } from '../../../scripts/support/cpu-budget.mjs';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { P3_TO_SRGB } from '../../math/dist/color.js';
-import { pbrShader } from '../../gltf-pro/src/shader.ts';
+import { pbrShader } from '../../gltf/src/shader.ts';
 import { toHalf, toHalfArray } from '../src/texture-kinds.ts';
 import { CubeTexture, Material, Texture, WgslMaterial, loadKTX2Texture } from '../dist/index.js';
 

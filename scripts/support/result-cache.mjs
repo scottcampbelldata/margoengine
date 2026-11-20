@@ -40,7 +40,6 @@ const KEY_VERSION = 3;
  * Paths excluded from keys, each with the reason. Everything else a step reads is an input or refuses the step.
  */
 export const EXCLUDED_PATHS = [
-  [/^test-results\/gpu[^/]*\.lock(\/|$)/, 'the GPU lock folder is coordination between processes, not an input'],
   [
     /^node_modules\/\.vite[^/]*(\/|$)/,
     'per-server Vite caches hold derived copies of inputs that are hashed themselves',

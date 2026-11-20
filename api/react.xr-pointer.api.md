@@ -6,11 +6,11 @@
 import { LoadingManager } from "@margoengine/cache/manager";
 import { EngineKernel, FrameCallback, Geometry, Mesh } from "@margoengine/core";
 import { Engine, Mesh } from "@margoengine/core/extension";
-import { GLTFAsset, GLTFImage, LightingEffect, PBRModel } from "@margoengine/gltf-pro";
+import { GLTFAsset, GLTFImage, LightingEffect, PBRModel } from "@margoengine/gltf/pbr";
 import { Shadows } from "@margoengine/shadows";
 import { XRPointerEvent, XRPointerOptions, XRPointerPicker } from "@margoengine/xr/pointer";
 import * as EnvironmentModule from "@margoengine/environment";
-import * as GltfProModule from "@margoengine/gltf-pro";
+import * as GltfPbrModule from "@margoengine/gltf/pbr";
 import * as ShadowsModule from "@margoengine/shadows";
 
 export type XRMeshPointerEvent = MargoPointerEvent & {
@@ -104,7 +104,7 @@ interface MargoPointerEvent<E extends MouseEvent = PointerEvent> {
 }
 
 interface ModelSource {
-    api: typeof GltfProModule;
+    api: typeof GltfPbrModule;
     asset: GLTFAsset;
     images: GLTFImage[];
     first: PBRModel | null;
@@ -133,6 +133,7 @@ interface Registry {
     unregister(mesh: EngineMesh): void;
     geometry?: Geometry | null;
     geometryOverride?: (mesh: EngineMesh, geometry: Geometry | null) => void;
+    instanceMeshes?: () => EngineMesh[];
 }
 
 interface Resources {

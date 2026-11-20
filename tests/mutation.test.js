@@ -2,8 +2,9 @@
 // alone, that a mutant applies as one exact text change, that the choice of a sample is repeatable, and the score.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
-import { applyMutant, mutantsOf, pickMutants, scoreOf, TARGETS } from '../scripts/mutation.mjs';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { applyMutant, markEquivalent, mutantsOf, pickMutants, scoreOf, testDirOf, TARGETS } from '../scripts/mutation.mjs';
 
 const source = [
   'type T = 1 | 2;',
@@ -67,7 +68,38 @@ test('every published target names a source file and test files that exist', () 
   for (const [name, targets] of Object.entries(TARGETS))
     for (const t of Object.values(targets)) {
       assert.ok(existsSync(new URL(`../packages/${name}/${t.file}`, import.meta.url)), t.file);
+      const dir = testDirOf(fileURLToPath(new URL(`../packages/${name}/`, import.meta.url)));
       for (const file of t.tests)
-        assert.ok(existsSync(new URL(`../packages/${name}/tests/${file}`, import.meta.url)), file);
+        assert.ok(existsSync(new URL(`../packages/${name}/${dir}/${file}`, import.meta.url)), file);
     }
+});
+
+test('equivalent mutants are named by line and change, carry a reason and leave the score', () => {
+  const results = [
+    { line: 3, from: '>', to: '>=', status: 'survived' },
+    { line: 4, from: '1', to: '2', status: 'survived' },
+    { line: 3, from: '>', to: '>=', status: 'killed' },
+  ];
+  const marked = markEquivalent(results, [{ line: 3, from: '>', to: '>=', reason: 'tie cannot occur' }]);
+  assert.deepEqual(
+    marked.map((r) => r.status),
+    ['equivalent', 'survived', 'killed'],
+  );
+  assert.equal(marked[0].reason, 'tie cannot occur');
+  const s = scoreOf(marked);
+  assert.deepEqual([s.killed, s.survived, s.total], [1, 1, 2]);
+  assert.equal(markEquivalent(results).length, 3);
+});
+
+test('every listed equivalent mutant exists in its source file and has a reason', () => {
+  for (const [name, targets] of Object.entries(TARGETS))
+    for (const [targetName, t] of Object.entries(targets))
+      for (const e of t.equivalent ?? []) {
+        const source = readFileSync(new URL(`../packages/${name}/${t.file}`, import.meta.url), 'utf8');
+        assert.ok(e.reason && e.reason.length > 20, `${name}/${targetName} line ${e.line} needs a reason`);
+        assert.ok(
+          mutantsOf(source, t.file).some((m) => m.line === e.line && m.from === e.from && m.to === e.to),
+          `${name}/${targetName} line ${e.line} ${e.from} -> ${e.to} is not a mutant`,
+        );
+      }
 });

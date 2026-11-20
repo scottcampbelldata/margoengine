@@ -201,3 +201,10 @@ function changedCells(a: VoxelGrid, b: VoxelGrid): number {
       for (let x = 0; x < bx; x++) if ((x >= ax || y >= ay || z >= az) && b.voxels[x + bx * (z + bz * y)]) changed++;
   return changed;
 }
+
+/** @internal The NDC depths of the near and far planes for `backend`. */
+export function depthRange(backend: unknown, subject: string): [near: number, far: number] {
+  if (backend === undefined || backend === 'webgpu') return [1, 0];
+  if (backend === 'webgl2') return [-1, 1];
+  throw new TypeError(`${subject} backend is unknown; pass engine.backend ('webgpu' or 'webgl2')`);
+}

@@ -250,3 +250,79 @@ test('messages with no handler set are kept only up to 4 x maxMessage bytes, the
   client.socket.destroy();
   await new Promise((done) => http.close(done));
 });
+
+// RFC 6455 5.5: a control frame carries at most 125 bytes, so a close reason is cut to 123 bytes of UTF-8, on a whole
+// character. It was cut at 120 UTF-16 units, so 100 'é' (200 bytes) went out as a 202-byte close frame.
+test('a long non-ASCII close reason is cut to fit a 125-byte control frame on a whole character', async () => {
+  const http = createServer((_req, res) => res.end());
+  http.on('upgrade', (req, socket, head) => {
+    const conn = acceptWebSocket(req, socket, head);
+    conn.onmessage = () => conn.close(4000, 'é'.repeat(100));
+  });
+  await new Promise((done) => http.listen(0, '127.0.0.1', done));
+  const client = await rawClient(http.address().port);
+  client.frame(2, Buffer.from([1]));
+  await settle();
+  const got = client.received();
+  assert.equal(got[0], 0x88, 'a close frame');
+  assert.ok(got[1] <= 125, `payload ${got[1]} bytes fits a control frame`);
+  assert.equal(got.readUInt16BE(2), 4000);
+  assert.equal(got.subarray(4, 2 + got[1]).toString('utf8'), 'é'.repeat(61));
+  client.socket.destroy();
+  await new Promise((done) => http.close(done));
+});
+
+// RFC 6455 7.4 and 8.1 (Autobahn cases 7.5 and 7.9): a close code a peer may not send fails the connection with 1002,
+// and a reason that is not UTF-8 with 1007. Both were taken and reported as given.
+for (const [name, payload, code] of [
+  ['code 1005', [0x03, 0xed], 1002],
+  ['code 999', [0x03, 0xe7], 1002],
+  ['code 1004', [0x03, 0xec], 1002],
+  ['code 1006', [0x03, 0xee], 1002],
+  ['code 1016', [0x03, 0xf8], 1002],
+  ['code 2999', [0x0b, 0xb7], 1002],
+  ['a reason that is not UTF-8', [0x03, 0xe8, 0xce, 0xba, 0xff], 1007],
+])
+  test(`a close frame with ${name} fails the connection with ${code}`, async () => {
+    const server = await echoServer(),
+      client = await rawClient(server.port);
+    client.frame(8, Buffer.from(payload));
+    await settle();
+    const got = client.received();
+    assert.equal(got[0], 0x88, 'a close frame');
+    assert.equal(got.readUInt16BE(2), code);
+    assert.deepEqual(server.closes, [code]);
+    client.socket.destroy();
+    await server.close();
+  });
+
+test('close codes a peer may send are echoed and reported', async () => {
+  for (const code of [1000, 1003, 1007, 1014, 3000, 4999]) {
+    const server = await echoServer(),
+      client = await rawClient(server.port),
+      body = Buffer.alloc(2);
+    body.writeUInt16BE(code);
+    client.frame(8, Buffer.concat([body, Buffer.from('κ')]));
+    await settle();
+    const got = client.received();
+    assert.equal(got.readUInt16BE(2), code);
+    assert.deepEqual(server.closes, [code]);
+    client.socket.destroy();
+    await server.close();
+  }
+});
+
+// RFC 6455 4.4: a version the server does not speak is answered with 426 and the versions it does.
+test('a request for another WebSocket version gets 426 naming version 13', async () => {
+  const server = await echoServer(),
+    socket = connect(server.port, '127.0.0.1');
+  socket.write(
+    'GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
+      'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 8\r\n\r\n',
+  );
+  const reply = await new Promise((done) => socket.once('data', (d) => done(d.toString())));
+  assert.match(reply, /^HTTP\/1\.1 426 Upgrade Required\r\n/);
+  assert.match(reply, /\r\nSec-WebSocket-Version: 13\r\n/);
+  socket.destroy();
+  await server.close();
+});

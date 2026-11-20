@@ -160,6 +160,7 @@ mock.module('@margoengine/shadows', {
         effect.owner = engine;
         effect.name = 'shadows';
         effect.disposals = 0;
+        effect.options = {};
         engine.use(effect);
         shadows.push(effect);
         return effect;
@@ -517,6 +518,38 @@ test('Shadows components share the Canvas effect and release it with the last on
   view.unmount();
   assert.equal(current.disposals, 1);
 });
+test("SoftShadows maps drei's size, samples and focus onto the soft filter, live, and restores the defaults", async () => {
+  const { Shadows, SoftShadows } = await import('../dist/shadows.js');
+  const tree = (props, plain = true) =>
+    React.createElement(
+      StrictMode,
+      null,
+      React.createElement(
+        Canvas,
+        null,
+        plain && React.createElement(Shadows, { key: 'plain', distance: 60 }),
+        props && React.createElement(SoftShadows, { key: 'soft', ...props }),
+      ),
+    );
+  const view = render(tree({}));
+  await act(async () => {});
+  const effect = shadows.at(-1);
+  // drei's defaults: size 25, samples 10, focus 0; size 25 is Shadows' default lightSize 0.02.
+  assert.deepEqual(effect.options, { distance: 60, filter: 'soft', lightSize: 0.02, samples: 10, blockerSamples: 10, focus: 0 });
+  view.rerender(tree({ size: 50, samples: 24, focus: 0.3 }));
+  await act(async () => {});
+  assert.equal(shadows.at(-1), effect, 'edits keep the same shadows');
+  assert.deepEqual(effect.options, { distance: 60, filter: 'soft', lightSize: 0.04, samples: 24, blockerSamples: 24, focus: 0.3 });
+  // Before, an unmounted SoftShadows left its options on shadows another component kept on.
+  view.rerender(tree(null));
+  await act(async () => {});
+  assert.equal(effect.disposals, 0);
+  assert.deepEqual(effect.options, { distance: 60 }, 'every option it set is restored; the other keeps its own');
+  view.rerender(tree(null, false));
+  await act(async () => {});
+  assert.equal(effect.disposals, 1, 'the last shadows user releases them');
+  view.unmount();
+});
 test('a Mesh ref never hands a frame callback a disposed mesh when effects recreate it', async () => {
   // A Suspense boundary that shows its content again (and StrictMode's effect replay) recreates the mesh in effects
   // alone, with no render between. A frame that lands then must see the live mesh or null, never the disposed one:
@@ -862,4 +895,55 @@ test('the ui entry binds the UI, audio, sprite and sciviz packages to the Canvas
   // afterEach checks that every plugin left the engine: listener, sprite layer and figure.
   assert.equal(layer.sprites.length, 0);
   assert.equal(figure.layers.size, 0);
+});
+test('SpriteLayer keeps its layer for an equal inline clear colour and recreates it when any option changes', async () => {
+  const { SpriteLayer, Sprite } = await import('../dist/ui.js');
+  const atlas = { width: 1, height: 1, data: new Uint8Array(4) };
+  const tree = (options) =>
+    React.createElement(
+      MargoCanvas,
+      null,
+      React.createElement(SpriteLayer, { atlas, ...options }, React.createElement(Sprite, { x: 3 })),
+    );
+  const layers = () => bindings.filter(([kind]) => kind === 'layer').map(([, layer]) => layer);
+  const start = layers().length;
+  const view = render(tree({ clear: [0, 0, 0, 1], filter: 'nearest' }));
+  for (let i = 0; i < 3; i++) await act(async () => {});
+  assert.equal(layers().length, start + 1);
+  view.rerender(tree({ clear: [0, 0, 0, 1], filter: 'nearest' }));
+  await act(async () => {});
+  assert.equal(layers().length, start + 1, 'an equal inline clear tuple keeps the layer and its sprites');
+  view.rerender(tree({ clear: [0, 0, 0, 1], filter: 'linear' }));
+  for (let i = 0; i < 3; i++) await act(async () => {});
+  assert.equal(layers().length, start + 2, 'a new filter recreates the layer');
+  assert.equal(layers().at(-1).filter, 'linear');
+  assert.deepEqual(
+    layers().at(-1).sprites.map((sprite) => sprite.x),
+    [3],
+  );
+  view.rerender(tree({ clear: [0, 0, 0, 1], filter: 'linear', mipmaps: true }));
+  for (let i = 0; i < 3; i++) await act(async () => {});
+  assert.equal(layers().length, start + 3, 'mipmaps recreates the layer');
+  view.unmount();
+  await act(async () => {});
+});
+test('an inline colour array with the same values keeps the material; a new value replaces it', async () => {
+  const tree = (color) =>
+    React.createElement(
+      MargoCanvas,
+      null,
+      React.createElement(Mesh, null, React.createElement(PbrMaterial, { color, roughness: 0.3 })),
+    );
+  const view = render(tree([0.1, 0.2, 0.3]));
+  await act(async () => {});
+  const node = [...instances.at(-1).meshes.values()][0],
+    first = node.material;
+  assert.deepEqual(first.color, [0.1, 0.2, 0.3]);
+  view.rerender(tree([0.1, 0.2, 0.3]));
+  await act(async () => {});
+  assert.equal(node.material, first, 'an equal colour array is not a change');
+  view.rerender(tree([0.4, 0.2, 0.3]));
+  await act(async () => {});
+  assert.deepEqual(node.material.color, [0.4, 0.2, 0.3]);
+  assert.equal(node.material.roughness, 0.3);
 });

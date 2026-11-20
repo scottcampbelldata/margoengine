@@ -1,7 +1,7 @@
 // Real-GPU check of the bevel mesh, high texture layers, maps, four simultaneous views, live lightmaps and the bevel's
 // post replay, shadows and AO.
 // Run from the repository root after `npm run build:packages`, one GPU job at a time:
-//   node scripts/gpu-lock.mjs run --owner=voxel-render -- node packages/voxel/tests/bevel-browser-check.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/voxel/tests/bevel-browser-check.mjs
 // Source-string tests do not replace this. A machine without navigator.gpu cannot pass it.
 import assert from 'node:assert/strict';
 import { writeFile, mkdir } from 'node:fs/promises';
@@ -149,6 +149,15 @@ try {
       for (let c = 0; c < 3; c++) assert.ok(Math.abs(gaps.ao[i][c] - gaps.seam[i][c]) < 0.02, 'chunk seam keeps AO');
     const replayFrames = ['hard', 'bevel', 'cutout', 'liquid'].map((k) => `${k} ${gaps[k].frames}`).join(', ');
     console.log(`ok ${samples}x lightmaps, bevel replay, shadows and AO (replay drawn after ${replayFrames} frames)`);
+    // The same lump at the corner of eight chunks and inside one, seen from the same offset: the seams bevel as one
+    // mesh would (without the neighbours' faces they leave sharp edges and slivers, so the check sees them).
+    const seams = await page.evaluate(() => window.check.seams());
+    report.results[`${samples}x seams`] = seams;
+    assert.deepEqual(seams.errors, [], `${samples}x WebGPU errors in the seam check`);
+    assert.ok(seams.lit > 5000, `${samples}x the lump fills the view: ${seams.lit} pixels`);
+    assert.ok(seams.without > 50, `${samples}x without borders only ${seams.without} pixels differ`);
+    assert.ok(seams.differ <= 2, `${samples}x ${seams.differ} pixels differ between eight chunks and one`);
+    console.log(`ok ${samples}x seams: eight chunks draw as one (${seams.differ} pixels differ, ${seams.without} without borders)`);
   }
   assert.deepEqual(pageErrors, []);
 } finally {

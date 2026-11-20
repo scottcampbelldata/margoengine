@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
+import { legDevice } from '../../../scripts/support/compat-shim.js';
 const rows = [];
 for (const compat of [false, true]) {
   const context = await openBrowser({
@@ -13,7 +14,7 @@ for (const compat of [false, true]) {
   try {
     await context.page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     const result = await context.page.evaluate((c) => window.run(c), compat);
-    console.log(JSON.stringify({ compat, hardware: context.hardware, result }));
+    console.log(JSON.stringify({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result }));
     assert.deepEqual(errors, []);
     assert.deepEqual(result.errors, []);
     assert.deepEqual(result.messages, []);
@@ -22,7 +23,7 @@ for (const compat of [false, true]) {
       assert.equal(row.finite, true, row.name);
       assert.ok(row.maximumError < 1e-5, `${row.name}: ${row.maximumError}`);
     }
-    rows.push({ compat, hardware: context.hardware, result });
+    rows.push({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result });
   } finally {
     await context.close();
   }

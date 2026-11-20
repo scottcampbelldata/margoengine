@@ -1,0 +1,120 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 90,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -6.5,
+            5.2,
+            95
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38
+        },
+        {
+          "time": 25,
+          "position": [
+            -3.8,
+            3.5,
+            50
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 55,
+          "position": [
+            -1.9,
+            2.05,
+            25
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 78,
+          "position": [
+            -0.95,
+            1.28,
+            15
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 90,
+          "position": [
+            -0.55,
+            0.95,
+            11.8
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 38,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "eh-long-approach",
+    "kind": "long",
+    "seed": 70,
+    "seconds": 90,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1.5,
+    "subframes": 4,
+    "shutter": 180,
+    "warmup": 30,
+    "probes": {
+      "open": 0,
+      "wide": 25,
+      "closing": 55,
+      "near": 78,
+      "end": 89.9
+    },
+    "page": {
+      "path": "examples/event-horizon/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#panel,#status,#error,#telemetry{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "eventHorizon.engine",
+      "apply": "eventHorizon.apply",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

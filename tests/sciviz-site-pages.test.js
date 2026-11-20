@@ -17,6 +17,9 @@ test('all sciviz README examples and their scientific navigation destinations sh
   assert.equal(new Set(scientificPages).size, scientificPages.length, 'build targets are unique');
   for (const page of scientificPages) assert.ok(existsSync(new URL(`examples/${page}.html`, root)), page);
   const builder = readFileSync(new URL('scripts/build-site.js', root), 'utf8');
-  assert.match(builder, /import\s*\{\s*scientificPages\s*\}\s*from\s*'.\/support\/sciviz-site-pages\.mjs'/);
-  assert.match(builder, /\.\.\.scientificPages/, 'the production build consumes the audited target list');
+  const routes = readFileSync(new URL('scripts/support/site-routes.mjs', root), 'utf8');
+  assert.match(routes, /import\s*\{\s*scientificPages\s*\}\s*from\s*'.\/sciviz-site-pages\.mjs'/);
+  assert.match(routes, /\.\.\.scientificPages/, 'the demo page list consumes the audited target list');
+  assert.match(builder, /import\s*\{[^}]*demoPages[^}]*\}\s*from\s*'.\/support\/site-routes\.mjs'/);
+  assert.match(builder, /Object\.fromEntries\(pages\.map/, 'the production build builds every page of the list');
 });

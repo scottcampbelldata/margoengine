@@ -199,3 +199,25 @@ test('the rasterizers check their arguments and budgets before drawing', () => {
   assert.throws(() => ellipsoidCells(SIZE, { center: [1, 1, 1], radii: [1, 1, 1], outside: 'wrap' }), TypeError);
   assert.throws(() => ellipsoidCells([0, 1, 1], { center: [1, 1, 1], radii: [1, 1, 1] }), RangeError);
 });
+
+// A clipped stroke wholly outside the grid once visited every cell of every step's cube or sphere (about 8e12 here)
+// before dropping them all; it now visits only cells inside the grid. The timeout is a hang limit, not a speed budget.
+test('clipped strokes outside the grid finish with no cells, and clipping keeps the cells inside', { timeout: 60000 }, () => {
+  const size = [8, 8, 8];
+  assert.equal(
+    thickLineCells(size, { from: [-2e6, -500, 0], to: [-1e6, -500, 0], halfWidth: 100, outside: 'clip' }).length,
+    0,
+  );
+  assert.equal(
+    taperedLineCells(size, { from: [-2e5, 0, 0], to: [-1e5, 0, 0], radius: 150, outside: 'clip' }).length,
+    0,
+  );
+  const clipped = thickLineCells(size, { from: [-3, 2, 2], to: [10, 5, 2], halfWidth: 2, outside: 'clip' }),
+    whole = thickLineCells([40, 40, 40], { from: [17, 22, 22], to: [30, 25, 22], halfWidth: 2 }),
+    inside = [...whole]
+      .map((i) => [i % 40, Math.floor(i / 1600), Math.floor(i / 40) % 40])
+      .map(([x, y, z]) => [x - 20, y - 20, z - 20])
+      .filter(([x, y, z]) => x >= 0 && y >= 0 && z >= 0 && x < 8 && y < 8 && z < 8)
+      .map(([x, y, z]) => x + 8 * (z + 8 * y));
+  assert.deepEqual([...clipped], inside);
+});

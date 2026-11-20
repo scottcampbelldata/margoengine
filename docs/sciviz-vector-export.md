@@ -62,5 +62,5 @@ missing-data holes, degenerate faces, colour subdivision, surface/line/disc dept
 crossings, limits and cancellation. `export-vector-browser.mjs` checks exact
 committed isosurface readback, latest height updates, complete real-data vectors,
 fallback and exported SVG pixels on native WebGPU and WebGL2 compatibility.
-Run the latter with a shared GPU lock after building the package. No benchmark
+Run the latter after building the package. No benchmark
 or speed claim is made.

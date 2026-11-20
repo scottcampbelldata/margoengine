@@ -13,7 +13,11 @@ export interface LineCameraTile {
   readonly matrix: ArrayLike<number>;
   readonly fullWidth: number;
   readonly fullHeight: number;
-  /** Output tile rectangle in full-image pixels. */
+  /**
+   * The tile camera's viewport rectangle in full-image pixels. It may reach past the right and bottom edges of the
+   * image (draw the image part with a scissor). With power-of-two width and height every tile's line pixels are
+   * exactly the whole image's.
+   */
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -67,17 +71,20 @@ function widen(renderer: Framed): GPUDevice | undefined {
 }
 const BASE_FRAME = 'struct Frame{viewProj:mat4x4f,viewport:vec4f,extra:vec4f}',
   VERTEX_END = '\n  return o;\n}';
-/** Capture vertices share one subpixel grid before applying a tile's integer pixel translation. */
+/**
+ * Capture vertices share one subpixel grid (1/256 of a whole-image pixel, measured from the image centre), then move by
+ * the tile's pixel offset and scale to its viewport. Each step is exact in float32 for a power-of-two viewport, so a
+ * tile's window positions are the whole image's moved by whole pixels.
+ */
 const tileClipWGSL = /* wgsl */ `fn captureClip(c:vec4f)->vec4f{
   if(frame.extra.y<0.5){return c;}
   let pixel=round(c.xy/c.w*0.5*frame.viewport.xy*256.0)/256.0;
-  let translated=pixel+frame.tile.zw*frame.viewport.xy/(2.0*frame.tile.xy);
-  return vec4f(translated*2.0*frame.tile.xy/frame.viewport.xy*c.w,c.zw);
+  return vec4f((pixel+frame.tile.zw)*frame.tile.xy*c.w,c.zw);
 }`;
 /**
- * The tile row of the Frame uniform (full image over tile size, tile offset in tile clip units) and the capture step at
- * the end of every vertex function. A frame whose camera has no tile writes (1, 1, 0, 0) and flag 0, and its vertices
- * pass through unchanged.
+ * The tile row of the Frame uniform (2 over the viewport width and height, then the pixel offset from the image centre
+ * to the viewport centre) and the capture step at the end of every vertex function. A frame whose camera has no tile
+ * writes (1, 1, 0, 0) and flag 0, and its vertices pass through unchanged.
  */
 const tileFrame: FrameExtension = {
   lines(lines) {
@@ -122,10 +129,10 @@ const tileFrame: FrameExtension = {
     data.set(
       tile
         ? [
-            tile.fullWidth / tile.width,
-            tile.fullHeight / tile.height,
-            (tile.fullWidth - 2 * tile.x - tile.width) / tile.width,
-            (2 * tile.y + tile.height - tile.fullHeight) / tile.height,
+            2 / tile.width,
+            2 / tile.height,
+            (tile.fullWidth - 2 * tile.x - tile.width) / 2,
+            (2 * tile.y + tile.height - tile.fullHeight) / 2,
           ]
         : [1, 1, 0, 0],
       24,
@@ -145,10 +152,13 @@ export function setLineCameraTile(camera: Camera, tile: LineCameraTile): () => v
     !Array.from(tile.matrix).every(Number.isFinite) ||
     ![tile.fullWidth, tile.fullHeight, tile.width, tile.height].every((n) => Number.isSafeInteger(n) && n > 0) ||
     ![tile.x, tile.y].every((n) => Number.isSafeInteger(n) && n >= 0) ||
-    tile.x + tile.width > tile.fullWidth ||
-    tile.y + tile.height > tile.fullHeight
+    tile.x >= tile.fullWidth ||
+    tile.y >= tile.fullHeight
   )
-    throw rangeError('Line tile needs a finite matrix and a positive rectangle inside the full image', 'arguments');
+    throw rangeError(
+      'Line tile needs a finite matrix and a positive rectangle starting inside the full image',
+      'arguments',
+    );
   lineFrame.hook = tileFrame;
   const state = { ...tile, matrix: Float32Array.from(tile.matrix) };
   tiles.set(camera, state);

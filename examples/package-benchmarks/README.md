@@ -256,7 +256,7 @@ the asset/effect measurements.
 Animator/TAA/Text/Splats, Audio/Video and Blender now have recorded actual native
 and Intel phone-layout runs: all14 functional cases/56 windows pass, while five
 strict local startup/tail targets fail. Real TAA validation isolated a static PBR
-buffer-usage bug; the glTF-pro fix also passes actual prepared-model/reboot and
+buffer-usage bug; the glTF PBR fix also passes actual prepared-model/reboot and
 bit-exact non-TAA image checks. Hosted cold loads, physical phones and complete
 optimization acceptance remain pending. Details and limitations are in
 the render/media workload log.
@@ -271,7 +271,7 @@ callback mutation, Hermite interpolation and quaternion normalization separately
 Native GPU/FPS acceptance must be recorded after browser testing; these examples
 do not establish a device performance guarantee.
 
-## VFX GPU timing (real GPU, take the GPU lock, AC power)
+## VFX GPU timing (real GPU, AC power)
 
 - `vfx-gpu.mjs`: two @margoengine/vfx builds side by side on one device: simulate and draw pass timestamps over 16
   alternating rounds, plus a particle-state and HDR pixel comparison (id order and atomic order, A/A and A/B).

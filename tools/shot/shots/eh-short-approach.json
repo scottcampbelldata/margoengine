@@ -1,0 +1,88 @@
+{
+  "format": "margo-cutscene",
+  "version": 1,
+  "duration": 30,
+  "tracks": [
+    {
+      "type": "camera",
+      "id": "camera",
+      "path": "catmull-rom",
+      "keys": [
+        {
+          "time": 0,
+          "position": [
+            -6,
+            5,
+            110
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 62
+        },
+        {
+          "time": 18,
+          "position": [
+            -2.2,
+            2.4,
+            34
+          ],
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "fov": 62,
+          "ease": "smoothstep"
+        },
+        {
+          "time": 30,
+          "position": [
+            -0.9,
+            1.4,
+            16
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "fov": 62,
+          "ease": "smoothstep"
+        }
+      ]
+    }
+  ],
+  "shot": {
+    "format": "margo-shot",
+    "version": 1,
+    "id": "eh-short-approach",
+    "kind": "short",
+    "seed": 82,
+    "seconds": 30,
+    "tier": "high",
+    "msaa": 1,
+    "supersample": 1,
+    "subframes": 4,
+    "shutter": 180,
+    "warmup": 30,
+    "probes": {
+      "open": 0,
+      "mid": 15,
+      "end": 29.9
+    },
+    "page": {
+      "path": "examples/event-horizon/index.html",
+      "query": {
+        "ui": 0
+      },
+      "css": "h1,#panel,#status,#error,#telemetry{display:none!important}#viewport{position:fixed!important;inset:0!important}",
+      "engine": "eventHorizon.engine",
+      "apply": "eventHorizon.apply",
+      "canvas": "#viewport canvas",
+      "ready": "#viewport[data-ready=\"true\"]"
+    }
+  }
+}

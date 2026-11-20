@@ -3,6 +3,7 @@ import {
   determinant3,
   drawables,
   normalizeMaterial,
+  polylines,
   type Drawable,
   type ExportSource,
   type Geo,
@@ -12,7 +13,10 @@ import { sceneOfGLB, type GLBSceneSkip } from './glb-scene.js';
 import {
   boxSize,
   checkPlacement,
+  curvesPrim,
+  primWidth,
   emptyBox,
+  listedVertices,
   growBoxWith,
   meshPrim,
   placedBox,
@@ -68,7 +72,7 @@ function worldBox(items: readonly Drawable[]): USDZBox {
 export function measureUSDZ(source: ExportSource | Uint8Array, options: USDZOptions = {}): USDZMeasure {
   checkPlacement(options);
   const read = source instanceof Uint8Array ? sceneOfGLB(source) : { scene: source, skipped: [] },
-    items = drawables(collect(read.scene, options));
+    items = drawables(collect(read.scene, options, undefined, 'refuse', ['points', 'lines']), true);
   if (!items.length) throw new RangeError('USDZ requires at least one mesh');
   const rest = worldBox(items),
     placement = placementOf(rest, options),
@@ -88,12 +92,17 @@ function localShapes(items: readonly Drawable[], fallback: Mat, materials: USDMa
   for (const item of items) {
     const { geometry, material = fallback, world } = item,
       determinant = determinant3(world);
-    if (!determinant || !Number.isFinite(determinant))
-      throw new RangeError('Singular transform; use a transform with a non-zero determinant');
-    const known = determinant > 0 ? plain : mirrored;
+    if (!Number.isFinite(determinant)) throw new RangeError('Transform must be finite');
+    // A point or line has no winding to keep, so its prim takes the node's matrix as it is.
+    if (geometry.topology) {
+      drawn.set(item, shapeOf(geometry.positions, geometry.normals, geometry.indices));
+      continue;
+    }
+    // A zero scale (determinant 0) flattens the shape and reflects nothing, so it shares the plain shape.
+    const known = determinant >= 0 ? plain : mirrored;
     let shape = known.get(geometry);
     if (!shape) {
-      shape = determinant > 0 ? shapeOf(geometry.positions, geometry.normals, geometry.indices) : reflected(geometry);
+      shape = determinant >= 0 ? shapeOf(geometry.positions, geometry.normals, geometry.indices) : reflected(geometry);
       known.set(geometry, shape);
     }
     shape.users++;
@@ -116,7 +125,8 @@ const OUTSIDE_FLOAT32 =
  * its own space, with the node's world matrix as `xformOp:transform`. A geometry drawn by several nodes is written once,
  * as a `class` prim each node's Mesh references. A node with a reflection in its matrix draws a reflected shape, written
  * once for the nodes that mirror that geometry, with the reflection taken out of its matrix. A material shared by several
- * nodes is written once.
+ * nodes is written once. A loaded model's glTF points are a `UsdGeomPoints` prim and its lines a linear
+ * `UsdGeomBasisCurves` prim (one curve per polyline), each `lineWidth` wide.
  *
  * Material textures (`TextureData`, as the glTF writers take them) become `UsdUVTexture` readers of the mesh's
  * `primvars:st` (from `uvs`, V flipped) or `primvars:st1` (from `uvs1`): base color into `diffuseColor` scaled by the
@@ -134,7 +144,16 @@ const OUTSIDE_FLOAT32 =
  */
 export function exportUSDZ(source: ExportSource | Uint8Array, options: USDZOptions = {}): Uint8Array {
   checkPlacement(options);
-  const items = drawables(collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options));
+  const width = options.lineWidth ?? 0.01;
+  if (typeof width !== 'number' || !(width > 0) || !Number.isFinite(width))
+    throw new RangeError('lineWidth must be a positive finite number of scene units');
+  const items = drawables(
+    collect(source instanceof Uint8Array ? sceneOfGLB(source).scene : source, options, undefined, 'refuse', [
+      'points',
+      'lines',
+    ]),
+    true,
+  );
   if (!items.length) throw new RangeError('USDZ requires at least one mesh');
   const placement =
       options.height === undefined && !options.ground ? { scale: 1, lift: 0 } : placementOf(worldBox(items), options),
@@ -153,8 +172,10 @@ export function exportUSDZ(source: ExportSource | Uint8Array, options: USDZOptio
   ];
   for (let i = 0; i < items.length; i++) {
     const item = items[i],
-      { geometry } = item,
-      world = determinant3(item.world) > 0 ? item.world : unreflected(item.world),
+      topology = item.geometry.topology,
+      runs = topology === 'lines' ? polylines(item.geometry.indices) : undefined,
+      geometry = topology ? listedVertices(item.geometry, runs ? runs.flat() : item.geometry.indices) : item.geometry,
+      world = topology || determinant3(item.world) >= 0 ? item.world : unreflected(item.world),
       material = item.material ?? fallback,
       shape = shapes.get(item)!,
       bound = materials.bind(i, geometry, material);
@@ -172,7 +193,19 @@ export function exportUSDZ(source: ExportSource | Uint8Array, options: USDZOptio
         `    matrix4d xformOp:transform = (${row(0)}, ${row(4)}, ${row(8)}, ${row(12)})`,
         '    uniform token[] xformOpOrder = ["xformOp:transform"]',
       ];
-    meshPrim(lines, lines, i, item.name, geometry, shape, bound, { transform });
+    if (topology)
+      curvesPrim(
+        lines,
+        lines,
+        i,
+        item.name,
+        geometry,
+        runs?.map((run) => run.length),
+        primWidth(material, width, world),
+        bound,
+        transform,
+      );
+    else meshPrim(lines, lines, i, item.name, geometry, shape, bound, { transform });
   }
   lines.push('}');
   const content = new TextEncoder().encode(lines.join('\n') + '\n');

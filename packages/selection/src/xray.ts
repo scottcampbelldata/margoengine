@@ -48,7 +48,6 @@ export class XRaySelection implements EnginePlugin {
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({name:this.name+':pulse',order:39.99,execute:c=>{
-      if (!this.manual && (!c.view || c.view.index === 0)) this.clock += c.delta;
       const factor=this.factor(this.clock), o=this.options;
       Object.assign(this.selection.options,{algorithm:o.algorithm,width:o.width,
         color:(o.color ?? [1,0.5,0]).map(v=>v*factor),
@@ -68,6 +67,14 @@ export class XRaySelection implements EnginePlugin {
       throw new RangeError('Invalid outline pulse; use a positive period in seconds and minimum 0..1.');
     return minimum+(1-minimum)*(0.5+0.5*Math.cos(time*2*Math.PI/period));
   }
+  /**
+   * Moves the pulse clock by `delta` seconds unless time is manual, without drawing (a delta of 0 or less moves
+   * nothing). Each frame update runs it, so `seek` from `@margoengine/cutscene/seek` replays it exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0 && !this.manual && !this.disposed) this.clock += delta;
+  }
+  onPreUpdate(delta: number): void { this.advanceTime(delta); }
   onDeviceRestored(engine: Engine): void { this.selection.onDeviceRestored(engine); }
   /** Removes the effect from the scene it was attached to (not the active one) and frees its selection. */
   dispose(): void {

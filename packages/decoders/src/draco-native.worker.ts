@@ -1,6 +1,6 @@
 import { decodeNativeDraco, decodeNativePoints, loadNativeDraco } from './draco-native-codec.js';
-import { dracoPointsTransferables, dracoTransferables, isDecoderCrash } from './codec.js';
-import { decodeFailed } from './errors.js';
+import { dracoPointsTransferables, dracoTransferables } from './draco-codec.js';
+import { decodeFailed, isDecoderCrash } from './errors.js';
 import type { DracoRequest } from './protocol.js';
 
 declare const self: {

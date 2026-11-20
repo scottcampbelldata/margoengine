@@ -9,9 +9,7 @@ import { multiplyMatrices } from '@margoengine/math/mat4';
 import { viewMatrix } from '../../shared/view.js';
 import { applyView, viewSize } from '../../shared/view-rect.js';
 import { overlayPass } from '../../shared/pass.js';
-import { FontOutlines, parseFontOutlines } from './font-outlines.js';
-import type { FontVariationOptions } from './font-variation.js';
-import { Font } from './font.js';
+import { GlyphFieldFont, type GlyphFieldFontLoadOptions, type GlyphFieldFontOptions } from './outline.js';
 import { Text } from './text.js';
 import { toQuadratics, VectorGlyphStore, type VectorGlyph } from './vector-glyph.js';
 import { vectorTextShader } from './vector-shader.js';
@@ -31,13 +29,11 @@ const GLYPH_FLOATS = 12,
   BLOCK_BYTES = 160,
   FRAME_BYTES = 112;
 
-/** Default-ignorable code points (joiners, variation selectors) draw nothing in the vector path. */
-const IGNORABLE = /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ\u{1bca0}-\u{1bca3}\u{1d173}-\u{1d17a}\u{e0000}-\u{e0fff}]/u;
 let families = 0;
 
-/** Options for `new VectorFont(...)`. */
-export interface VectorFontOptions extends FontVariationOptions {
-  /** CSS family the font registers under for measurement and the `TextRenderer` fallback. Default a unique name. */
+/** Options for `new VectorFont(...)`: those of `GlyphFieldFont`. */
+export interface VectorFontOptions extends GlyphFieldFontOptions {
+  /** A name for the font in errors and logs; nothing is registered. Default a unique name. */
   family?: string;
 }
 
@@ -48,38 +44,24 @@ export interface VectorClusterGlyph {
 }
 
 /**
- * A font for vector text: the outline file itself (TrueType or CFF, variable fonts at fixed axis values). Text
- * using it lays out with the file's own advances and ascent; where a FontFace can be registered (browsers and
- * workers) it also measures pair kerning through it and still works with the SDF `TextRenderer`. Glyph bands are
- * built once per glyph, on first use, into a store shared by every renderer.
+ * A font for vector text: the outline file itself (TrueType or CFF, variable fonts at fixed axis values). It is an
+ * `GlyphFieldFont`, so text using it lays out with the file's own advances, ascent and pair kerning (GPOS or `kern`) in a
+ * page, a worker and Node alike, and it also draws with the SDF `TextRenderer` from fields built from the same outlines.
+ * Glyph bands are built once per glyph, on first use, into a store shared by every renderer.
  */
-export class VectorFont extends Font {
-  /** The parsed outlines. */
-  readonly outlines: FontOutlines;
+export class VectorFont extends GlyphFieldFont {
   /** Packed bands of every glyph built so far. */
   readonly store = new VectorGlyphStore();
   private readonly packed = new Map<number, VectorGlyph>();
   private readonly clusters = new Map<string, VectorClusterGlyph[]>();
-  private readonly varied: boolean;
 
-  constructor(data: ArrayBuffer | ArrayBufferView, options: VectorFontOptions = {}) {
-    const outlines = parseFontOutlines(data, options);
-    const family = options.family ?? `margo-vector-${++families}`;
-    let face: FontFace | undefined;
-    if (typeof FontFace !== 'undefined') {
-      const settings = Object.entries(options.variations ?? {})
-        .map(([tag, value]) => `"${tag}" ${value}`)
-        .join(', ');
-      face = new FontFace(family, data as BufferSource, settings ? { variationSettings: settings } : {});
-    }
-    super({ family, face });
-    this.outlines = outlines;
-    this.varied = Object.keys(options.variations ?? {}).length > 0;
+  /** Downloads a font file and returns its VectorFont. Rejects with the signal's reason when aborted. */
+  static override async load(url: string | URL, options: GlyphFieldFontLoadOptions = {}): Promise<VectorFont> {
+    return (await super.load(url, options)) as VectorFont;
   }
 
-  /** Units per em of the font file. */
-  get unitsPerEm(): number {
-    return this.outlines.unitsPerEm;
+  constructor(data: ArrayBuffer | ArrayBufferView, options: VectorFontOptions = {}) {
+    super(data, { ...options, family: options.family ?? `margo-vector-${++families}` });
   }
 
   /** The packed bands of a glyph id, built on first use. */
@@ -92,39 +74,15 @@ export class VectorFont extends Font {
     return glyph;
   }
 
-  /** Glyphs of a grapheme cluster with their pen offsets: one per code point, default-ignorable ones skipped. */
+  /** Glyphs of a grapheme cluster or shaped run with their pen offsets, as `shape` places them (kerning included). */
   clusterGlyphs(cluster: string): readonly VectorClusterGlyph[] {
     let list = this.clusters.get(cluster);
     if (!list) {
-      list = [];
-      let x = 0;
-      for (const char of cluster) {
-        if (IGNORABLE.test(char)) continue;
-        const id = this.outlines.glyphIndex(char);
-        list.push({ glyph: this.vectorGlyph(id), x });
-        x += this.outlines.glyphAdvance(id);
-      }
+      const run = this.shape(cluster);
+      list = run.glyphs.map((id, i) => ({ glyph: this.vectorGlyph(id), x: run.x[i] }));
       this.clusters.set(cluster, list);
     }
     return list;
-  }
-
-  /** Advance in em from the font file (variations applied): the sum over the cluster's code points. */
-  override advance(cluster: string): number {
-    let total = 0;
-    for (const char of cluster) if (!IGNORABLE.test(char)) total += this.outlines.glyphAdvance(this.outlines.glyphIndex(char));
-    return total;
-  }
-
-  /** Pair kerning measured through the registered FontFace once it has loaded; 0 without one or for a variable instance. */
-  override kerning(left: string, right: string): number {
-    if (this.varied || !this.face || this.face.status !== 'loaded') return 0;
-    return super.kerning(left, right);
-  }
-
-  /** Ascent and descent in em from the font's horizontal header. */
-  override metrics(): { ascent: number; descent: number } {
-    return { ascent: this.outlines.ascender / this.unitsPerEm, descent: -this.outlines.descender / this.unitsPerEm };
   }
 }
 

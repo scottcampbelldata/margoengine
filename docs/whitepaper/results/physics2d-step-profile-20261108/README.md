@@ -38,13 +38,13 @@ Build the matched release Wasm artifacts and inspect the retained calibration lo
 node <bundle>/reproduce.mjs --repo=<fc88-repository-root> --tag=complete-step-profile-build
 ```
 
-To run a bounded exclusive profiling session, use another unique tag:
+To run a bounded profiling session, use another unique tag:
 
 ```text
 node <bundle>/reproduce.mjs --repo=<fc88-repository-root> --tag=complete-step-profile-run --profile --firefox=<supported-firefox-executable>
 ```
 
-Outputs stay under `<repo>/.lane/p/<tag>`. Each build has a 600-second process-tree deadline; preparation/inspection/summary have 180 seconds. The complete profile has a 900-second process-tree deadline and uses the repository's exclusive GPU lease with a 6-second acquisition limit and 15-minute hold limit. On timeout the child process tree is killed. No phase, test or timing is retried automatically. The copied runner uses only its own output's TEMP/TMP/npm-cache folders. Omit `--firefox` only when the normal repository browser resolver already supplies the intended Firefox.
+Outputs stay under `<repo>/.lane/p/<tag>`. Each build has a 600-second process-tree deadline; preparation/inspection/summary have 180 seconds. The complete profile has a 900-second process-tree deadline. On timeout the child process tree is killed. No phase, test or timing is retried automatically. The copied runner uses only its own output's TEMP/TMP/npm-cache folders. Omit `--firefox` only when the normal repository browser resolver already supplies the intended Firefox.
 
 The recorded run passes the three explicit u64 pins and shipped checks on both modules, then compares two 100-step Node traces and 1,280 measured browser module-step visits against complete public body/contact/cache state and work fingerprints. Every measured visit returns 5,050 awake bodies. The 17 phases are non-overlapping; raw vectors preserve each real complete step. Phase shares use aggregate sums, and the selected minimum-step vector identifies its actual sample. Marginal phase minima are never added together.
 
@@ -52,4 +52,4 @@ The run occurred at **99.2917% aggregate host CPU busy**. Extra post-timer state
 
 The first attempt stopped before timed samples because Wasm's signed i64 BigInt representation was printed as signed hexadecimal. `BigInt.asUintN(64)` corrects the representation; directed assertions cover signed and unsigned forms of every pin. Frozen physics modules, expected bits, scenes and predicates did not change. Both the original failure and the corrected session remain in this bundle.
 
-`bundle-manifest.json` lists the relative size/hash of every included file and records provenance to the original frozen bundle manifest `7e4140d3fb2d5113f68f806ae4a845168c481e1deb748c94746c2f34faacae9a`. Only the public patch representation and its checked decoding path changed; original raw measurements and historical evidence remain verbatim. Run `node <bundle>/verify.mjs` to verify the bundle without builds or timing. The portable staging smoke test was performed in a source-only extracted archive and compared its generated instrumentation against the frozen original, without a new profiling run.
+`bundle-manifest.json` lists the relative size/hash of every included file and records provenance to the original frozen bundle manifest `7e4140d3fb2d5113f68f806ae4a845168c481e1deb748c94746c2f34faacae9a`. Only the public patch representation and its checked decoding path changed; original raw measurements and historical evidence remain verbatim. Run `node <bundle>/verify.mjs` to verify the bundle without builds or timing. Files that repository-wide sweeps edited after packaging (lock instructions removed, scripts that end by their event loop) are named in the manifest's `editsAfterFreeze` with their restated hashes; their measurements are unchanged, and `tests/physics2d-bundle-verify.test.js` runs `verify.mjs` with the repository's tests. The portable staging smoke test was performed in a source-only extracted archive and compared its generated instrumentation against the frozen original, without a new profiling run.

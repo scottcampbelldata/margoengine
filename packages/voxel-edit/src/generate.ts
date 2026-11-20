@@ -28,7 +28,7 @@ export interface HeightmapOptions extends GridLimits {
   height?: number;
   /** Height source for RGBA; grey input always uses its sample. Default 'luma' (BT.709 encoded RGB). */
   channel?: 'luma' | 'red' | 'green' | 'blue' | 'alpha';
-  /** RGBA samples at or below this alpha are air. Default 0. */
+  /** RGBA samples at or below this alpha are air (grey samples have no alpha). Default 0. */
   alphaThreshold?: number;
   /** Invert the height sample before scaling. Default false. */
   invert?: boolean;
@@ -87,7 +87,8 @@ export function heightmapToVoxels(image: VoxelImage, options: HeightmapOptions =
         g = stride === 1 ? r : image.data[at + 1],
         b = stride === 1 ? r : image.data[at + 2],
         a = stride === 1 ? 255 : image.data[at + 3];
-      if (a <= alpha) continue;
+      // Grey images have no alpha: alphaThreshold applies to RGBA samples only.
+      if (stride === 4 && a <= alpha) continue;
       const sample =
           stride === 1
             ? r
@@ -172,17 +173,22 @@ export function textToVoxels(text: string, options: TextVoxelOptions): Generated
       options.lineHeight ?? Math.max(1, reference.actualBoundingBoxAscent + reference.actualBoundingBoxDescent) * 1.2;
   if (!Number.isFinite(spacing) || spacing <= 0)
     throw new RangeError('lineHeight must be positive; pass pixel spacing');
-  let left = 0,
-    right = 0,
-    top = 0,
-    bottom = 0;
+  // Ink bounds over the lines that have ink; starting at 0 kept a glyph's side bearing (or the gap above ink that sits
+  // below the baseline) as empty columns and rows.
+  let left = Infinity,
+    right = -Infinity,
+    top = Infinity,
+    bottom = -Infinity;
   lines.forEach((line, i) => {
     const m = ctx.measureText(line);
+    if (m.actualBoundingBoxLeft + m.actualBoundingBoxRight <= 0 || m.actualBoundingBoxAscent + m.actualBoundingBoxDescent <= 0)
+      return;
     left = Math.min(left, -m.actualBoundingBoxLeft);
     right = Math.max(right, m.actualBoundingBoxRight);
     top = Math.min(top, i * spacing - m.actualBoundingBoxAscent);
     bottom = Math.max(bottom, i * spacing + m.actualBoundingBoxDescent);
   });
+  if (left === Infinity) left = right = top = bottom = 0;
   left = Math.floor(left);
   top = Math.floor(top);
   const width = Math.max(1, Math.ceil(right) - left),

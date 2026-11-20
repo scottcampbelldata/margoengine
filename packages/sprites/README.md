@@ -66,14 +66,32 @@ coin.visible = false;
 | `capacity` | 256 | Sprites before the buffer grows |
 | `name` | `sprites-1`, ... | Plugin name, unique per scene |
 
-Methods: `add(sprite or options)`, `remove(sprite)`, `clearSprites()`, `setAtlas(atlas)`, `dispose()` (or `using`). Read
+Methods: `add(sprite or options)`, `remove(sprite)`, `clearSprites()`, `setAtlas(atlas)`, `setTarget(target)`,
+`setNormals(normals)`, `dispose()` (or `using`). Read
 `sprites` for the list in draw order.
 
 Exact pixels need one sample per pixel: `exactSize` on the engine, or your own single-sample `target`. A `Tonemap`
 grades whatever is drawn before its order of 31, so set `order: 40` to keep a layer's bytes out of it.
 
-Atlas textures made from bytes or an `ImageBitmap` come back by themselves after a device loss, and so does a function.
-A plain `GPUTexture` belonged to the lost device: the next frame throws `MargoError` `'state'` until you call `setAtlas`.
+Atlas textures made from bytes or an `ImageBitmap` come back by themselves after a device loss, and so does a function
+`(device) => GPUTexture`: the layer calls it once for each device. Pass that form when you make the texture yourself:
+
+```ts
+const atlas = (device: GPUDevice) => {
+  const texture = device.createTexture({
+    size: [2, 2],
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  device.queue.writeTexture({ texture }, new Uint8Array(16).fill(255), { bytesPerRow: 8 }, [2, 2]);
+  return texture;
+};
+```
+
+A plain `GPUTexture` (atlas or `target`) belongs to the device that made it. After a device restore the layer drops it,
+reports it once through `engine.onError` (`MargoError` `'state'`, help `borrowed-lost`) and draws nothing while the
+rest of the frame goes on, until `setAtlas`, `setTarget` or `setNormals` hands in one made on `engine.gpu`, for example
+from your own plugin's `onDeviceRestored(engine)`. `BillboardLayer` and `SkeletalLayer` atlases follow the same rule.
 
 Normals write `n * 0.5 + 0.5` from a same-size normal atlas, turned and flipped with the sprite, with alpha 1 where a
 sprite covers the pixel. They need a single-sample colour target and a single-sample normal target of the same size.
@@ -193,6 +211,31 @@ texel as atlas bytes over 255, straight alpha; return alpha 0 to drop the texel.
 outside the rectangle, so outlines need transparent texels around the art. A shader that does not compile shows as a
 WebGPU validation error on the first frame.
 
+### Blend modes
+
+`margoengine/sprites/blend` gives each sprite its own `blendMode`: `'normal'` (default), `'add'`, `'multiply'` or
+`'screen'`, changeable at any time. Neighbouring sprites with the same mode share one draw, in z, y and insertion order.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { BlendLayer } from 'margoengine/sprites/blend';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+// A 1 x 1 white atlas, tinted per sprite.
+const atlas = { width: 1, height: 1, data: new Uint8Array([255, 255, 255, 255]) };
+const layer = BlendLayer.attach(engine, { atlas });
+layer.addBlend({ x: 8, y: 8, scaleX: 32, scaleY: 16, tint: '#3080ff' });
+const shade = layer.addBlend({ x: 24, y: 12, scaleX: 16, scaleY: 16, tint: '#ff8040', blendMode: 'multiply' });
+engine.start();
+shade.blendMode = 'screen'; // takes effect on the next frame
+```
+
+- Multiply follows the W3C compositing formula, which keeps the sprite's own colour where the target is transparent.
+  One fixed-function blend cannot express it, so each multiply sprite (and each multiply triangle of a `SkeletalLayer`)
+  is two draws, one after the other; four adjacent screen sprites are one draw, three multiply sprites six.
+- Custom `shader` code is not accepted: the layer owns the fragment code that does premultiplication and the
+  multiply correction.
+
 ## Billboards
 
 `margoengine/sprites/billboard` draws camera-facing sprites in a 3D scene: markers, foliage, effects. One instanced draw
@@ -293,6 +336,102 @@ engine.start();
 - Skinning runs on the CPU: about a thousand vertices a frame is light, tens of thousands is not (time not measured).
 - Texels are read at exact positions with no filtering, and the layer needs a single-sample target. WebGPU only.
 
+## DragonBones
+
+`margoengine/sprites/dragonbones` reads DragonBones 5.x JSON exports (`_ske.json` with its `_tex.json` atlas) onto the
+same skeletal runtime as the skeletal JSON reader (`margoengine/sprites/spine`), so a rig is a `Skeleton2D` that a
+`SkeletalLayer` draws. It covers armatures, bones with their inheritance flags, slots with colour multipliers and blend
+modes, skins, image, mesh (weighted and shared) and bounding box displays, nested armatures, bone, slot, display,
+free-form deformation, z-order and IK timelines, IK constraints, and frame events, sound events and play actions.
+
+```ts
+import { EngineKernel } from 'margoengine/core';
+import { parseDragonBonesJSON } from 'margoengine/sprites/dragonbones';
+import { SkeletalLayer } from 'margoengine/sprites/skeletal';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { exactSize: [64, 32] });
+// A 2 x 1 atlas page (an orange texel and a blue texel) and its _tex.json description.
+const data = new Uint8Array([230, 120, 40, 255, 40, 90, 230, 255]);
+const atlas = {
+  width: 2,
+  height: 1,
+  SubTexture: [
+    { name: 'body', x: 0, y: 0, width: 1, height: 1 },
+    { name: 'arm', x: 1, y: 0, width: 1, height: 1 },
+  ],
+};
+// A _ske.json document: a body and an arm that swings, at 24 frames a second.
+const ske = {
+  version: '5.5',
+  frameRate: 24,
+  armature: [
+    {
+      name: 'robot',
+      bone: [
+        { name: 'root', transform: { x: 32, y: 16 } },
+        { name: 'arm', parent: 'root', transform: { x: 6, y: -4 } },
+      ],
+      slot: [
+        { name: 'body', parent: 'root' },
+        { name: 'arm', parent: 'arm' },
+      ],
+      skin: [
+        {
+          slot: [
+            { name: 'body', display: [{ name: 'body', transform: { scX: 10, scY: 16 } }] },
+            { name: 'arm', display: [{ name: 'arm', transform: { x: 6, scX: 12, scY: 3 } }] },
+          ],
+        },
+      ],
+      animation: [
+        {
+          name: 'wave',
+          duration: 24,
+          playTimes: 0,
+          bone: [
+            {
+              name: 'arm',
+              rotateFrame: [
+                { duration: 12, tweenEasing: 0, rotate: -40 },
+                { duration: 12, tweenEasing: 0, rotate: 30 },
+                { rotate: -40 },
+              ],
+            },
+          ],
+        },
+      ],
+      defaultActions: [{ gotoAndPlay: 'wave' }],
+    },
+  ],
+};
+const robot = parseDragonBonesJSON(ske, { atlas }).createArmature('robot');
+const layer = SkeletalLayer.attach(engine, { atlas: { width: 2, height: 1, data } });
+layer.addSkeleton(robot);
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  robot.pose('wave', time);
+});
+engine.start();
+```
+
+| Piece | What it does |
+| --- | --- |
+| `parseDragonBonesJSON(input, options)` | A `_ske.json` string, object or UTF-8 bytes. Options `atlas` (a parsed atlas, or the `_tex.json` text or object; needed for image displays), `maxValues` (1,000,000), `maxVertices` (1,000,000), `signal`. Returns a `DragonBonesData` |
+| `loadDragonBonesJSON(url, options)` | Fetches the document, and the atlas when `atlas` is a URL (resolved beside the document); `signal` covers both |
+| `parseDragonBonesAtlas(input)`, `loadDragonBonesAtlas(url)` | Regions by texture name, trimming (`frameX`, `frameY`, `frameWidth`, `frameHeight`) kept, with `imagePath`, `width`, `height` and `scale` |
+| `DragonBonesData` | `armatures` by name, `createArmature(name?, options)` (default the first), `warnings`, `toJSON()` |
+| `DragonBonesArmatureData` | `animations` (`duration` in seconds, `frames`, `playTimes`, `fadeInTime`, `events`), `defaultAnimation`, `skins`, `asset` (the converted skeletal JSON document) |
+| `DragonBonesArmature` | A `SpineSkeleton`, so a `Skeleton2D`. `pose(name, seconds, { playTimes })` loops (play count 0) or plays N times and holds the last frame; `frameEvents(name, from, to)` lists events with `from <= time < to` across loops; `setSkin`, `getAttachment` and `slotStates` as on the skeletal JSON rig. Options `regions` (default: the parsed atlas), `scale` (1), `skin` (the first) |
+
+- Times are seconds; keys come from frame durations at the armature's `frameRate` (default the document's, else 24).
+- Nested armatures are flattened in place of their slot: their bones are named `<slot>#<display index>/<bone>`, their
+  slots draw only while the host slot shows that display, and they play their default animation on the same clock.
+- Colour offsets, blend modes other than normal, add, multiply and screen, `inheritTranslation: false` and timeline
+  `scale` and `offset` are read but not reproduced; each cause adds one `warnings` entry. Binary `.dbbin`, the 4.x
+  layout, curves of more than four values and rotated atlas regions are refused with a coded error (`docs/limits.md`).
+- DragonBones is a project of the DragonBones team; this independent reader has no affiliation with it.
+
 ## Animation
 
 `@margoengine/sprites/animation` (`margoengine/sprites/animation`) plays sprite-sheet clips. It is plain CPU code, so it
@@ -323,6 +462,11 @@ A clip is `frames` (rectangles, or `{ rect, duration }` for a frame with its own
 a frame starts showing, in order even when one `update` skips several frames. `speed` (default 1) scales time and 0
 pauses. `play(name)` keeps going if that clip is already playing; pass `true` to restart. `finished` turns true when a
 `'once'` clip ends. Read `frame` or `rect` instead of `apply` if the sprite is not a `Sprite`.
+
+Film time: `animation.advanceTime(dt)` steps as `update` does but fires no event, and a `SpriteLayer`'s effect clock
+(`layer.time`) moves in its frame update (`layer.advanceTime(delta)`). Pass the animation to `seek` from
+`@margoengine/cutscene/seek` as an `extra` clock (`seek(engine, t, { extra: [animation] })`, after `play`) and a film
+scene starts on the frame a continuous run shows; the layer is found as a plugin.
 
 ## Aseprite
 

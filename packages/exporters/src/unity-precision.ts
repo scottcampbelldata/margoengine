@@ -4,6 +4,7 @@ import { decodePNG } from '@margoengine/decoders/png';
 import { type AccessorValues, type GLBParts, readAccessor, splitGLB } from './glb.js';
 import { nativeAppNames, nativeExtension } from './native-names.js';
 import {
+  byteStrideAllowed,
   canonicalJSON,
   copyBundleTree,
   float32Within,
@@ -296,6 +297,9 @@ export async function createUnityPrecisionBundle(input: UnityPrecisionBundleInpu
   return { files, manifest };
 }
 
+// glTF 2.0 3.7.2.1: no index may be its type's primitive restart value, the type's maximum.
+const RESTART: Record<number, number> = { 5121: 255, 5123: 65535, 5125: 4294967295 };
+
 function fail(label: string): never {
   throw new RangeError('UNITY_PRECISION_PACKAGE_INVALID: ' + label + '; export the package again');
 }
@@ -325,6 +329,7 @@ function read(bytes: Uint8Array) {
       a.normalized ||
       a.sparse ||
       b.buffer !== 0 ||
+      !byteStrideAllowed(b.byteStride, width === 1) ||
       components[a.type] !== width ||
       !sizes[a.componentType] ||
       !Number.isSafeInteger(a.count) ||
@@ -523,7 +528,7 @@ export async function verifyUnityPrecisionBundle(
     if (
       [p, n, uv, c].some((a) => a.component !== 5126 || a.count !== p.count) ||
       ![5121, 5123, 5125].includes(ix.component) ||
-      ix.count !== faces.length * 6
+      ix.count !== faces.reduce((sum, face) => sum + face.localTriangles.length * 3, 0)
     )
       fail('Complete indexed attribute inventory');
     const referenced = new Uint8Array(p.count);
@@ -563,7 +568,7 @@ export async function verifyUnityPrecisionBundle(
         }
         triangles++;
       }
-    if (!referenced.every((v) => v === 1) || (p.count > 65535 && maxIndex <= 65535))
+    if (!referenced.every((v) => v === 1) || maxIndex >= RESTART[ix.component]!)
       fail('Complete physical references/wide indices');
   }
   same(meshCount, j.meshes.length, 'No unused or substituted native meshes');

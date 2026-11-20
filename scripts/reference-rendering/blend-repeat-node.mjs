@@ -25,7 +25,7 @@ const navigator = { gpu: create([`backend=${backend}`, `adapter=${vendor === 'am
 new Function('navigator', 'window', 'crypto', script)(navigator, window, webcrypto);
 const timer = setTimeout(() => {
   console.error('Dawn blend repeat exceeded its 120-second process deadline');
-  process.exit(124);
+  process.exit(124); // process.exit: the watchdog ends a run that is still going past its hard limit
 }, 120000);
 let result;
 try {

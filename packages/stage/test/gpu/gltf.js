@@ -1,7 +1,7 @@
 import { createStage } from '../../dist/index.js';
 import { addGLTF } from '../../dist/gltf.js';
 import { addShadows } from '../../dist/shadows.js';
-import { loadGLTF } from '../../../gltf-pro/dist/index.js';
+import { loadGLTF } from '../../../gltf/dist/pbr.js';
 import { Animation } from '../../../animation/dist/index.js';
 import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';
 

@@ -1,8 +1,8 @@
-// A primitive gltf-pro split into parts (maxPartVertices) exports as one primitive per part of the same material:
+// A primitive gltf/pbr split into parts (maxPartVertices) exports as one primitive per part of the same material:
 // valid glTF, each part's own vertices and indices, the same triangles at the same positions.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseGLTF } from '@margoengine/gltf-pro';
+import { parseGLTF } from '@margoengine/gltf/pbr';
 import { exportModel } from '../dist/model.js';
 import { materialEngine as headless, readGLB, validate } from './helpers.js';
 

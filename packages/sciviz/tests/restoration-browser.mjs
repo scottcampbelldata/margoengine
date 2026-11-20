@@ -1,5 +1,5 @@
 // Actual device replacement and late source completion, on native WebGPU and webgl2-compat.
-// Run under gpu-lock.mjs with a hard process-tree deadline. Included in test:browser/check:merge.
+// Run with a hard process-tree deadline. Included in test:browser/check:merge.
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

@@ -48,7 +48,7 @@
     "@margoengine/decoders": "^1.0.0",
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
-    "@margoengine/gltf-pro": "^1.0.0",
+    "@margoengine/gltf": "^1.0.0",
     "@margoengine/headless": "^1.0.0",
     "@margoengine/math": "^1.0.0"
   },

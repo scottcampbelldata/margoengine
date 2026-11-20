@@ -1,5 +1,6 @@
 import type { Shape } from '@margoengine/geometry/shapes';
 import { type OutlineCommand, type OutlineFillRule, outlineShapes } from './outline.js';
+import type { FontVariationAxis } from './sfnt-variation.js';
 
 /** One glyph in font units: y up, origin on the baseline at the pen position. */
 export interface OutlineGlyph {
@@ -35,6 +36,8 @@ export interface OutlineFontSource {
   missingGlyph?: number;
   /** Fill rule of the outlines. Default 'nonzero'. */
   fillRule?: OutlineFillRule;
+  /** Variation axes of a variable font. Default none. */
+  variationAxes?: readonly FontVariationAxis[];
 }
 
 /** Layout options of `generateShapes` and `textGeometry`. */
@@ -80,6 +83,8 @@ export class OutlineFont {
   readonly glyphCount: number;
   readonly familyName: string | undefined;
   readonly styleName: string | undefined;
+  /** Variation axes of a variable font (pick an instance with `parseTTF`'s `variations`); empty for a static font. */
+  readonly variationAxes: readonly FontVariationAxis[];
   private readonly source: OutlineFontSource;
   private readonly glyphs = new Map<number, OutlineGlyph>();
 
@@ -100,6 +105,7 @@ export class OutlineFont {
     this.glyphCount = source.glyphCount;
     this.familyName = source.familyName;
     this.styleName = source.styleName;
+    this.variationAxes = source.variationAxes ?? [];
   }
 
   /** Glyph index of a character (a string's first code point) or code point; undefined when the font lacks it. */

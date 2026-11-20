@@ -1,0 +1,110 @@
+{
+ "s5k": {
+  "files": {
+   "l0.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"X\" (\n \n)\n{\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\n\n}\n",
+   "root.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"Q\" (\n references = [@./l0.usda@</X/S>, @./l0.usda@</X/A>]\n)\n{\n\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    7,
+    4,
+    5,
+    0,
+    6
+   ]
+  }
+ },
+ "s7": {
+  "files": {
+   "l0.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"X\" (\n \n)\n{\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\n\n}\n",
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n references = @./l0.usda@</X/B>\n)\n{\n\n}\ndef \"MS\" (\n references = @./l0.usda@</X/S>\n)\n{\n\n}\ndef \"MA\" (\n references = @./l0.usda@</A>\n)\n{\n\n}\n",
+   "root.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"Q\" (\n references = [@./l0.usda@</X/S>, @./l0.usda@</A>]\n)\n{\n\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    12,
+    5,
+    1,
+    0,
+    11
+   ]
+  }
+ },
+ "s10": {
+  "files": {
+   "l0.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"X\" (\n \n)\n{\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\n\n}\n",
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n references = @./l0.usda@</X/B>\n)\n{\n\n}\ndef \"MS\" (\n references = @./l0.usda@</X/S>\n)\n{\n\n}\ndef \"MA\" (\n references = @./l0.usda@</A>\n)\n{\n\n}\n",
+   "root.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"Q\" (\n references = [@./l1.usda@</MS>, @./l0.usda@</A>]\n)\n{\n\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    12,
+    9,
+    5,
+    1,
+    0,
+    11
+   ]
+  }
+ },
+ "s11": {
+  "files": {
+   "l0.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"X\" (\n \n)\n{\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\n\n}\n",
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n references = @./l0.usda@</X/B>\n)\n{\n\n}\ndef \"MS\" (\n references = @./l0.usda@</X/S>\n)\n{\n\n}\ndef \"MA\" (\n references = @./l0.usda@</A>\n)\n{\n\n}\n",
+   "root.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"Q\" (\n references = [@./l1.usda@</MS>, @./l0.usda@</X/A>]\n)\n{\n\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    12,
+    9,
+    5,
+    6,
+    0,
+    11
+   ]
+  }
+ },
+ "s12": {
+  "files": {
+   "l0.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"X\" (\n \n)\n{\ndef \"S\" (\n specializes = </K>\n)\n{\n\n}\ndef \"A\" (\n inherits = </K>\n)\n{\n\n}\ndef \"B\" (\n inherits = </K>\n)\n{\n\n}\n\n}\n",
+   "l1.usda": "#usda 1.0\ndef \"M\" (\n references = @./l0.usda@</X/B>\n)\n{\n\n}\ndef \"MS\" (\n references = @./l0.usda@</X/S>\n)\n{\n\n}\ndef \"MA\" (\n references = @./l0.usda@</A>\n)\n{\n\n}\n",
+   "root.usda": "#usda 1.0\nclass \"K\"\n{\n custom double k = 1\n}\ndef \"Q\" (\n references = [@./l0.usda@</X/S>, @./l1.usda@</MA>]\n)\n{\n\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    12,
+    5,
+    10,
+    1,
+    0,
+    11
+   ]
+  }
+ },
+ "r7-29": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n    variantSets = \"vs\"\n    variants = { string vs = \"x\" }\n)\n{\n    def \"b\" (\n        append inherits = </C>\n    )\n    {\n    }\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\" (\n                specializes = </C>\n            )\n            {\n            }\n        }\n    }\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n}\ndef \"M\" (\n    payload = @./l0.usda@</M> (offset = 3; scale = 2)\n)\n{\n    def \"b\" (\n        append references = @./l0.usda@</M/a> (offset = 10)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n",
+   "root.usda": "#usda 1.0\n(\n)\ndef \"Q\" (\n    references = @./l1.usda@\n)\n{\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    7,
+    5,
+    0,
+    2
+   ],
+   "/Q/a": [
+    3,
+    4
+   ],
+   "/Q/b": [
+    6,
+    4,
+    3,
+    1
+   ]
+  }
+ }
+}

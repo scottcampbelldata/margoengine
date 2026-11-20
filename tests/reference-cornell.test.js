@@ -36,8 +36,13 @@ test('the pictured Cornell scene is exactly the existing batch 168 geometry and 
 });
 
 for (const [family, absolute, compatAbsolute, square, compatSquare, max] of [
-  ['clustered', [38244516, 567377], [38244516, 567377], [7256041740, 44838153], [7256041740, 44838153], [198, 165]],
-  ['clustered-point', [6010641, 730273], [6010645, 730276], [842857153, 19557045], [842857493, 19557048], [214, 156]],
+  // Directional shadowed re-recorded 2026-11-16 (KB-SUNSHADOW-OFFSET1, Scott: "Just fix any bugs you find"): the
+  // receiver-plane compare, 0.25-texel normal offset and texels behind the plane left out took it from 567,377 on both
+  // backends, square 44,838,153, max 165.
+  ['clustered', [38244516, 478366], [38244516, 478365], [7256041740, 29281138], [7256041740, 29280869], [198, 143]],
+  // Point shadowed re-recorded 2026-11-16 (KB-LOCALSHADOW-OFFSET1, Scott: "Fix it, re-record baselines"): the
+  // receiver-plane compare and 0.25-texel normal offset took it from 730,273 / 730,276, square 19,557,045, max 156.
+  ['clustered-point', [6010641, 597154], [6010645, 597155], [842857153, 14188684], [842857493, 14188685], [214, 135]],
 ])
   test(`${family} has first-measured all-pixel budgets for unshadowed and default-shadowed cases`, () => {
     const b = JSON.parse(readFileSync(new URL(`../docs/whitepaper/results/batch-160-${family}.json`, import.meta.url)));
@@ -73,13 +78,13 @@ for (const [family, absolute, compatAbsolute, square, compatSquare, max] of [
 for (const [family, rows, compatRows] of [
   [
     'clustered',
-    { 'map-1024': 356406, 'map-2048': 212780, 'map-4096': 213642 },
-    { 'map-1024': 356406, 'map-2048': 212777, 'map-4096': 213643 },
+    { 'map-1024': 272725, 'map-2048': 222400, 'map-4096': 202036 },
+    { 'map-1024': 272724, 'map-2048': 222399, 'map-4096': 202037 },
   ],
   [
     'clustered-point',
-    { 'no-range-window': 469266, 'map-2048': 595330, 'map-4096': 605700, 'no-range-window-map-4096': 346680 },
-    { 'no-range-window': 469265, 'map-2048': 595333, 'map-4096': 605703, 'no-range-window-map-4096': 346677 },
+    { 'no-range-window': 335970, 'map-2048': 507785, 'map-4096': 528987, 'no-range-window-map-4096': 269736 },
+    { 'no-range-window': 335968, 'map-2048': 507787, 'map-4096': 528989, 'no-range-window-map-4096': 269734 },
   ],
 ])
   test(`${family} shadowed residual decomposes into range window and shadow-map resolution (KB3573)`, () => {
@@ -109,14 +114,16 @@ for (const [family, rows, compatRows] of [
     const base = d.frozenShadowed.native,
       share = (name) => Math.round((1000 * (base - rows[name])) / base) / 10;
     if (point) {
-      // Removing only the window (range 0, same shadow far 20) explains 35.7 %; it darkens nearly every lit pixel.
+      // Removing only the window (range 0, same shadow far 20) explains 43.7 %; it darkens nearly every lit pixel.
       assert.deepEqual(variants[0].light, { range: 0, shadow: { far: 20 } });
-      assert.equal(share('no-range-window'), 35.7);
-      assert.equal(share('map-2048'), 18.5);
-      assert.equal(share('no-range-window-map-4096'), 52.5);
+      assert.equal(share('no-range-window'), 43.7);
+      assert.equal(share('map-2048'), 15);
+      assert.equal(share('no-range-window-map-4096'), 54.8);
     } else {
-      // Map resolution explains 62.5 % and converges by 2048: 4096 is no better.
-      assert.equal(share('map-2048'), 62.5);
-      assert.ok(rows['map-4096'] >= rows['map-2048']);
+      // Map resolution explains 53.5 % at 2048 and 57.8 % at 4096 (KB-SUNSHADOW-OFFSET1: on the receiver plane a finer
+      // map keeps paying; with the old 1.5-texel offset it stopped at 2048, 62.5 % of 567,377).
+      assert.equal(share('map-2048'), 53.5);
+      assert.equal(share('map-4096'), 57.8);
+      assert.ok(rows['map-4096'] < rows['map-2048']);
     }
   });

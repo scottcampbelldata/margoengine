@@ -29,7 +29,7 @@ stage.onTick((delta) => {
 `margoengine/<name>` is a one-line re-export of `@margoengine/<name>`, the same module with the same classes, and
 every file is free of side effects. An app that imports `margoengine/shadows` bundles exactly the bytes it would bundle
 from `@margoengine/shadows` (`tests/umbrella.test.js` compares the two bundles); the other packages are installed but
-never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,844 B gzip.
+never loaded. `import {createStage} from 'margoengine'` is core + stage alone, 24,797 B gzip.
 
 Use either name; they are interchangeable. Each package also has its own name (`@margoengine/shadows`) for
 apps that want a smaller install.
@@ -49,6 +49,27 @@ console.log(cubes.length, typeof Physics.Physics);
 
 A namespace import tree-shakes like named imports in every modern bundler: only the members you use are kept.
 
+## No bundler, served from your own origin
+
+`dist/importmap.json` maps every entry to jsDelivr. A page served from your own origin (a dev server, a local tool, a
+film or CI render) points the same entries at the install in `node_modules` with `margoengine/importmap`. It is pure
+string work, so it runs in Node or in a page; the base is where your server serves the installed packages.
+
+```ts
+import {localImportMap} from 'margoengine/importmap';
+
+// Keep margoengine, one of its entries, and every @margoengine package (the files import each other by name).
+const map = await localImportMap('/node_modules/', {only: ['margoengine', 'margoengine/shadows', '@margoengine/']});
+console.log(map.imports.margoengine); // /node_modules/margoengine/dist/index.js
+const head = `<script type="importmap">${JSON.stringify(map)}</script>`;
+console.log(head.length > 0);
+```
+
+`rebaseImportMap(map, base, {only})` does the same to an import map you already hold. `base` is `/node_modules/` or an
+absolute URL; a missing closing slash is added. A bad base or an `only` entry the map lacks throws with a help link
+([errors#import-map](https://margoengine.com/errors#import-map)). Third-party peers such as web-ifc are not in the map:
+add them yourself.
+
 ## Third-party libraries
 
 Four entries can use a library you install yourself, only when you use that entry. Everything else is in the one
@@ -62,14 +83,14 @@ install.
 | `margoengine/react` | `npm i react react-dom` | It is a React component library |
 | `margoengine/ui/react` | `npm i react` | React bindings for the UI package |
 
-`margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf-pro`
+`margoengine/react` holds every React binding but five groups, each its own entry: `margoengine/react/gltf`
 (`Model`, `Gltf`), `/fbx`, `/animation`, `/materials` and `/physics`. The first four reach the Draco and Basis decoders,
 and Vite copies a decoder's Wasm into the build as soon as it reads the module, used or not. A page that imports none
 of them builds with no Wasm of theirs:
 
 ```tsx
 import { Canvas, Mesh, BoxGeometry } from 'margoengine/react';
-import { Model } from 'margoengine/react/gltf-pro'; // only on a page that loads a model
+import { Model } from 'margoengine/react/gltf'; // only on a page that loads a model
 ```
 
 The kits `margoengine/game`, `/web` and `/viz` include `loadGLTF`, so their builds hold the decoder files; the browser

@@ -1,15 +1,21 @@
-// @margoengine/lightmap/apply: draws a baked lightmap at draw time on materials meshes, loaded glTF-pro models and
+// @margoengine/lightmap/apply: draws a baked lightmap at draw time on materials meshes, loaded glTF PBR models and
 // core meshes. The light it adds is the one `Material.lightMap` adds (packages/materials features.ts): the diffuse
 // reflectance base * (1 - metalness), times occlusion, times the baked value, as indirect light. For physical
 // irradiance E the Lambertian BRDF rho / pi turns it into outgoing radiance rho * E / pi (Pharr, Jakob and Humphreys,
 // "Physically Based Rendering", 4th ed., 2023, section 9.2 "Diffuse Reflection"); the diffuse reflectance of a
 // metallic-roughness surface is base * (1 - metalness) (Khronos glTF 2.0 specification, Appendix B, 2021).
 import type { EngineKernel, Mesh as CoreMesh } from '@margoengine/core';
-import type { MaterialExtension, PBRMaterial, PBRModel, PBRPrimitive } from '@margoengine/gltf-pro/model';
+import type {
+  MaterialExtension,
+  MaterialExtensionTexture,
+  PBRMaterial,
+  PBRModel,
+  PBRPrimitive,
+} from '@margoengine/gltf/pbr-model';
 import { type MaterialMesh, Material, PbrMaterial, Texture, createMesh } from '@margoengine/materials';
 import { MargoError } from '@margoengine/math/errors';
 
-declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
+const black = { colorSpace: 'linear', mipmaps: false } as const;
 
 /** A CPU bake: `bakeLightmap`'s atlas (`textures.lightmap`) or `bakeMeshLightmap`'s record (`lightmap`). */
 export interface BakedLightmap {
@@ -44,7 +50,7 @@ export interface ApplyLightmapOptions {
   response?: 'multiply' | 'lambertian';
   /** A core mesh's lightmap UV per vertex (2 floats each, origin top-left); core geometry holds none. Core meshes only. */
   uv1?: ArrayLike<number>;
-  /** A glTF-pro model's primitives to light, as indices into `model.primitives` or the primitives. Default all. */
+  /** A glTF PBR model's primitives to light, as indices into `model.primitives` or the primitives. Default all. */
   primitives?: readonly (number | PBRPrimitive)[];
 }
 
@@ -83,7 +89,7 @@ export function lightmapTexture(baked: BakedLightmap | LiveLightmap): { texture:
  *
  * - a materials `Material` (or every material of a `createMesh` mesh): sets its `lightMap`, `lightMapIntensity` and
  *   `lightMapResponse`;
- * - a loaded glTF-pro `PBRModel`: each chosen primitive draws a copy of its material record that adds the light, as
+ * - a loaded glTF PBR `PBRModel`: each chosen primitive draws a copy of its material record that adds the light, as
  *   `Material.lightMap` does; the copy shares the record's colours, factors and maps, so live edits still show;
  * - a core `Mesh` (no UV1 or lightmap in core's shader): a materials mesh with the core mesh's geometry and material
  *   values, `options.uv1` and the lightmap, parented to the core mesh, draws in its place; the core mesh keeps its
@@ -103,7 +109,7 @@ export function applyLightmap(
   if (response !== 'multiply' && response !== 'lambertian')
     throw new TypeError("applyLightmap response must be 'multiply' or 'lambertian'; pass one of those");
   if (!target || typeof target !== 'object')
-    bad('applyLightmap needs a Material, a materials or glTF-pro mesh or a core Mesh; pass one of those');
+    bad('applyLightmap needs a Material, a materials or glTF PBR mesh or a core Mesh; pass one of those');
   if (target instanceof Material) return onMaterials([target], baked, intensity, response);
   if (isMaterialMesh(target)) {
     const m = target.material;
@@ -116,7 +122,7 @@ export function applyLightmap(
   }
   if (isModel(target)) return onModel(target, baked, intensity, response, options.primitives);
   if (isCore(target)) return onCore(target, baked, intensity, response, options.uv1);
-  return bad('applyLightmap needs a Material, a materials or glTF-pro mesh or a core Mesh; pass one of those');
+  return bad('applyLightmap needs a Material, a materials or glTF PBR mesh or a core Mesh; pass one of those');
 }
 
 const isLive = (b: unknown): b is LiveLightmap =>
@@ -217,7 +223,7 @@ function onMaterials(
   );
 }
 
-// The light Material.lightMap adds (features.ts), here from the extension's texture 0 on UV1 (i.uv.zw in both glTF-pro
+// The light Material.lightMap adds (features.ts), here from the extension's texture 0 on UV1 (i.uv.zw in both glTF PBR
 // shaders) and its factor row 0 (x: the scale).
 const lightWGSL =
   's.emissive+=s.base.rgb*(1-s.metal)*s.occlusion*textureSample(materialTexture0,materialSampler0,i.uv.zw).rgb*materialFactors[0].x;';
@@ -232,7 +238,7 @@ function onModel(
   if (model.disposed) throw new MargoError('disposed', 'applyLightmap got a disposed model; pass a live PBRModel');
   const device = model.root.engine.gpu;
   if (!device)
-    throw new MargoError('unsupported', 'applyLightmap on a glTF-pro model needs WebGPU; use a WebGPU engine');
+    throw new MargoError('unsupported', 'applyLightmap on a glTF PBR model needs WebGPU; use a WebGPU engine');
   const chosen = (which ?? model.primitives).map((p) => {
     const primitive = typeof p === 'number' ? model.primitives[p] : p;
     if (!primitive || !model.primitives.includes(primitive))
@@ -241,26 +247,40 @@ function onModel(
       );
     if (primitive.material.extension)
       bad(
-        'applyLightmap cannot add to a glTF-pro material that already has a material extension (clearcoat, a custom one); light that model with Material.lightMap on a createMesh mesh',
+        'applyLightmap cannot add to a glTF PBR material that already has a material extension (clearcoat, a custom one); light that model with Material.lightMap on a createMesh mesh',
       );
     return primitive;
   });
+  if (isLive(baked)) sameDevice(baked, device);
   const { texture, intensity: own } = lightmapTexture(baked),
-    scale = (own * intensity) / (response === 'lambertian' ? Math.PI : 1);
-  let gpu: GPUTexture | undefined;
-  const view = isLive(baked)
-    ? sameDevice(baked, device).texture.createView()
-    : (gpu = upload(device, cpuBake(baked as BakedLightmap))).createView();
-  const sampler = device.createSampler({
-    magFilter: 'linear',
-    minFilter: 'linear',
-    addressModeU: 'clamp-to-edge',
-    addressModeV: 'clamp-to-edge',
-  });
+    scale = (own * intensity) / (response === 'lambertian' ? Math.PI : 1),
+    engine = model.root.engine;
+  // A chart's light ends at the atlas edge: clamp there, as for the imported bake.
+  texture.wrapS = texture.wrapT = 'clamp';
+  // WebGPU objects are valid only with the device that made them, and a lost device makes all of them unusable (W3C
+  // WebGPU, "valid to use with", section 3.2.1, and "lose the device", section 3.5.2). A device restore brings a new
+  // device and the model derives its draws again, reading `textures`: it gets a view and sampler made on the device
+  // drawing now. A CPU bake uploads again from its pixels (`Texture` keeps one copy per device). A live bake's texture
+  // is its baker's device's and went with it: on a restored device the model draws no baked light (a 1 x 1 black
+  // texture) until a new baker, made on `engine.gpu`, is applied.
+  let dark: Texture | undefined, bound: { device: GPUDevice; textures: readonly MaterialExtensionTexture[] } | undefined;
+  const bind = (gpu: GPUDevice): readonly MaterialExtensionTexture[] => {
+    const source =
+      isLive(baked) && baked.device !== gpu
+        ? (dark ??= new Texture({ width: 1, height: 1, data: new Uint8Array([0, 0, 0, 255]) }, black))
+        : texture;
+    const [view, sampler] =
+      source.bind(gpu, false) ?? bad('applyLightmap could not bind its lightmap; apply it on a live engine');
+    return [{ view, sampler }];
+  };
   const extension: MaterialExtension = {
     wgsl: lightWGSL,
     factors: new Float32Array([scale, 0, 0, 0]),
-    textures: [{ view, sampler }],
+    get textures() {
+      const gpu = engine.gpu ?? device;
+      if (bound?.device !== gpu) bound = { device: gpu, textures: bind(gpu) };
+      return bound.textures;
+    },
   };
   const copies = new Map<PBRMaterial, PBRMaterial>(),
     restore = new Map<PBRPrimitive, [PBRMaterial, PBRMaterial]>();
@@ -276,7 +296,8 @@ function onModel(
     unsubscribe?.();
     for (const [primitive, [original, copy]] of restore) if (primitive.material === copy) primitive.material = original;
     restore.clear();
-    gpu?.destroy();
+    bound = undefined;
+    dark?.dispose();
   };
   const app = application(texture, scale, off);
   unsubscribe = model.onDispose(() => app.dispose());
@@ -290,16 +311,6 @@ function sameDevice(live: LiveLightmap, device: GPUDevice): LiveLightmap {
       "applyLightmap got a GPULightmapBaker on another GPUDevice; create the baker with the engine's device (engine.gpu)",
     );
   return live;
-}
-
-function upload(device: GPUDevice, { width, height, data }: { width: number; height: number; data: Uint8Array }) {
-  const texture = device.createTexture({
-    size: [width, height],
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-  });
-  device.queue.writeTexture({ texture }, data, { bytesPerRow: width * 4, rowsPerImage: height }, [width, height]);
-  return texture;
 }
 
 function onCore(

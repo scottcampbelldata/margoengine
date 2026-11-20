@@ -49,7 +49,7 @@ engine.start();
 console.log(JSON.stringify(statsReport(stats, memory)));
 ```
 
-Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen.
+Sizes come from the descriptors, so driver padding is not in them, and objects made before `attach` are not seen. Several trackers on one device each count, and disposing one leaves the others counting (StatsPanels makes its own).
 
 Pipeline compile tracking is in its own entry. It shows which shader and pipeline compiles ran near a slow frame, and when. Read a hitch as evidence, not proof: times are CPU time around each call, and browsers compile in another process, so that is the most a page can see. It sees only what is compiled after it starts, so use `trackNext` below to include the engine's startup pipelines:
 
@@ -214,7 +214,7 @@ be mutated through a returned pass.
 The hardware browser regression checks the actual built package's native pass
 layout, fallback behavior, counters, GPU output and timestamp readback. Build
 Stats with `node scripts/build-optional.js stats`, then run
-`node scripts/gpu-lock.mjs run --owner=stats-native-passes -- node scripts/test-stats-native-passes.mjs`.
+`node scripts/run-with-timeout.mjs -- node scripts/test-stats-native-passes.mjs`.
 It requires a hardware WebGPU adapter with timestamp-query support and writes
 its proof to `test-results/stats-native-passes.json`; it does not measure allocations.
 

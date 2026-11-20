@@ -1,4 +1,4 @@
-// A Material whose surface is the caller's WGSL, spliced into gltf-pro's PBR shader through Material.shader() as
+// A Material whose surface is the caller's WGSL, spliced into gltf/pbr's PBR shader through Material.shader() as
 // @margoengine/shader's NodeMaterial is (same sites), with the caller's uniforms and textures in group 2.
 import { whiteTexture } from '../../shared/white-texture.js';
 import type { Engine } from '@margoengine/core/extension';
@@ -26,7 +26,7 @@ export interface WgslMaterialOptions extends MaterialOptions {
   textures?: Readonly<Record<string, Texture>>;
 }
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/,
-  // Module-scope names of gltf-pro's shader and of this package's patches, and the two entry points.
+  // Module-scope names of gltf/pbr's shader and of this package's patches, and the two entry points.
   taken =
     /^(?:f|uv|surface|ambient|hemisphere_ambient|direct_light|layers|ggx|uniforms|shade|displace|fragment|gbuffer|vertex|(?:base|mr|normal|ao|emissive)(?:Map|Sampler)|margo\w*|mat_\w*|nd\w*|cluster\w*|shadow\w*)$/,
   fragmentSite = /if\((?:margoFaceTest&&)?!facing&&f\.settings\.z<0\.5\)\{discard;\}/,
@@ -70,7 +70,7 @@ export class WgslMaterial extends Material {
   private readonly sizes: Record<string, number> = {};
   private data: Float32Array;
   private readonly buffers = new WeakMap<GPUDevice, GPUBuffer>();
-  /** The patched shader per gltf-pro source (and its group). */
+  /** The patched shader per gltf\/pbr source (and its group). */
   private readonly patched = new Map<string, [number, string]>();
   constructor(options: WgslMaterialOptions) {
     const { wgsl, uniforms = {}, textures = {}, ...rest } = options ?? ({} as WgslMaterialOptions);
@@ -166,7 +166,7 @@ export class WgslMaterial extends Material {
     if (count !== (/\bfn\s+displace\b/.test(this.wgsl) ? 3 : 2))
       throw new MargoError(
         'unsupported',
-        'WgslMaterial requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and materials versions',
+        'WgslMaterial requires the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and materials versions',
       );
     const keys = Object.keys(this.sizes),
       type = (n: number) => (n === 1 ? 'f32' : `vec${n}f`),

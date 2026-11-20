@@ -69,6 +69,14 @@ export interface PlanetTerrainOptions {
   /** Milliseconds a frame may spend building patches, at least one patch a frame; 0 or more, Infinity for no limit. Default 4. */
   budget?: number;
   /**
+   * Patches a frame may build, a work count: the same patches are built on any machine, so a film frame is the same on
+   * every run. When set it replaces the millisecond `budget`; 1 or more, Infinity to build until nothing more is wanted.
+   * Default unset (the live `budget` in milliseconds decides).
+   */
+  maxBuilds?: number;
+  /** Clock in milliseconds for the `budget`. Default `performance.now`; pass a simulation clock for replay. */
+  clock?: () => number;
+  /**
    * Patches kept on the GPU at once, an integer 6 to 16,384 (about 24 KB each at resolution 32). Default 2,048. They
    * share one vertex buffer, which must fit the device's `maxBufferSize` (256 MiB unless the device asked for more):
    * 10,992 patches at resolution 32, 2,992 at 64. `attach` throws RangeError past it.
@@ -245,8 +253,11 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
   readonly relief: number;
   screenError: number;
   budget: number;
+  /** Patches a frame may build (a work count that replaces `budget`), or undefined for the millisecond `budget`. */
+  maxBuilds: number | undefined;
   /** What the last planned frame did. */
   readonly stats: PlanetStats = { drawn: 0, built: 0, resident: 0, level: 0 };
+  readonly #clock: () => number;
   readonly #height: PlanetHeight;
   readonly #center = new Float64Array(3);
   readonly #shift = new Float64Array(3);
@@ -316,6 +327,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       maxLevel = 20,
       screenError = 4,
       budget = 4,
+      maxBuilds,
+      clock = () => performance.now(),
       maxPatches = 2048,
       origin,
     } = options;
@@ -332,6 +345,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     if (!(screenError > 0) || !Number.isFinite(screenError))
       throw new RangeError('Invalid screenError; pass pixels above 0');
     if (!(budget >= 0)) throw new RangeError('Invalid budget; pass milliseconds, 0 or more');
+    if (maxBuilds !== undefined && !(maxBuilds >= 1)) throw new RangeError('Invalid maxBuilds; pass a count, 1 or more');
+    if (typeof clock !== 'function') throw new TypeError('Invalid clock; pass a function returning milliseconds');
     if (!Number.isInteger(maxPatches) || maxPatches < 6 || maxPatches > 16384)
       throw new RangeError('Invalid maxPatches; pass an integer 6 to 16384');
     if (options.height !== undefined && typeof options.height !== 'function')
@@ -345,6 +360,8 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
     this.maxLevel = maxLevel;
     this.screenError = screenError;
     this.budget = budget;
+    this.maxBuilds = maxBuilds;
+    this.#clock = clock;
     this.maxPatches = maxPatches;
     this.#height = options.height ?? planetNoise({ radius, relief, seed });
     this.#center.set([center[0], center[1], center[2]]);
@@ -567,10 +584,14 @@ export class PlanetTerrain implements EnginePlugin, Disposable {
       horizon = d > r && r > 0,
       cone = horizon ? Math.asin(r / d) : 0,
       plane = horizon ? (d * d - r * r) / d : 0,
-      start = performance.now();
+      start = this.maxBuilds === undefined ? this.#clock() : 0;
     let builds = 0;
     const wants: { node: Node; error: number }[] = [];
-    const budget = () => builds === 0 || performance.now() - start < this.budget;
+    const limit = this.maxBuilds;
+    const budget =
+      limit === undefined
+        ? () => builds === 0 || this.#clock() - start < this.budget
+        : () => builds < limit;
     const visible = (node: Node): boolean => {
       // Centre relative to the eye.
       const qx = node.center[0] - ex,

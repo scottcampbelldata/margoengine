@@ -22,7 +22,7 @@ fn margoToonRamp(nl:f32)->vec3f {
 }
 `;
 /**
- * Edits of gltf-pro's lit PBR shader for toon shading: the hemisphere and direct terms (Lambert's hemisphere, the ramped
+ * Edits of gltf/pbr's lit PBR shader for toon shading: the hemisphere and direct terms (Lambert's hemisphere, the ramped
  * direct light), the layered-hook surface (margoFront: roughness 1, no metal) and, so the G-buffer and ambient entries
  * keep the beauty bind group layout, the ramp's bindings named in `surface`. The hemisphere colours are a Margo design
  * choice.
@@ -51,7 +51,7 @@ fn margoAmbientLayers(i:Out,s:Surface,v:vec3f)->vec3f {var o=margoFront(s); let 
 const surfaces = new Map<string, string>(),
   lit = new Map<string, string>();
 /**
- * gltf-pro's PBR shader `code` (a loaded model's material) shaded as toon, its ramp bound in `group`. Code with
+ * gltf/pbr's PBR shader `code` (a loaded model's material) shaded as toon, its ramp bound in `group`. Code with
  * layered physical terms (transmission, extended materials) is refused: `toonModel` strips those layers first.
  */
 export function toonShader(code: string, group: number): string {
@@ -62,7 +62,7 @@ export function toonShader(code: string, group: number): string {
   const refuse = () =>
     new MargoError(
       'unsupported',
-      'Toon shading requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and materials versions',
+      'Toon shading requires the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and materials versions',
     );
   if (code.includes('fn margoAmbientLayers(')) throw refuse();
   for (const [from, to] of toonEdits) {

@@ -4,7 +4,7 @@ import { box, PbrMaterial, type Mesh } from '@margoengine/core';
 import { MargoCanvas, useMargoStage, useFrame } from '@margoengine/react';
 import { OrbitControls } from '@margoengine/react/controls';
 import { Environment } from '@margoengine/react/environment';
-import { Model } from '@margoengine/react/gltf-pro';
+import { Model } from '@margoengine/react/gltf';
 import './style.css';
 
 function ImperativeCube() {

@@ -50,11 +50,15 @@ inside a 6 m cube centred on the origin, re-entering on the opposite face. It is
 `size` is the sprite half-width. Use `VFX` directly for emitters, lifetimes, bursts or up to 1,000,000 particles.
 
 `PostProcessing` grades the HDR scene: exponential height fog, screen-space god rays, a depth-of-field focus
-blur, exposure/contrast/saturation/gain/lift, ACES and grain. It has no bloom and no sky backdrop; passing
+blur, exposure/contrast/saturation/gain/lift (contrast is a power about 18% grey, so it deepens shadows without
+clipping them to black; contrast 0 is flat 18% grey, black included), the PBR Neutral display transform and grain. It has no bloom and no sky backdrop; passing
 `bloom`, `threshold` or `atmosphere.sky`/`scattering`/`anisotropy` throws with the replacement. Alone it owns
 scene capture. For bloom, or to combine it with SSAO, DOF or FXAA, add it to a `PostStack` from
 `@margoengine/post/stack` as the display effect: `PostStack.attach(engine, [new SSAO(), new Bloom({strength:
 0.3}), new PostProcessing({atmosphere: {density: 0.02}}), new FXAA()])`. In a stack its `target` is undefined.
+The grain clock (`post.time`) moves in the frame update (`post.advanceTime(delta)`), once a frame however many views
+draw (before 2026-11-16 the capture pass moved it, which a seek does not run), so `seek` from `@margoengine/cutscene/seek` starts a film scene on
+the grain a continuous run shows; a PostProcessing no frame update reaches moves it per draw.
 For a sky behind the fog, attach `Sky` from `@margoengine/sky`.
 
 `PostProcessing` and `Painterly` detach from their owning scene on disposal,
@@ -102,7 +106,7 @@ meadow.dispose();
 | `bladeHeight` | `1.2` | Positive blade height, up to 100; instances vary from 0.7× to 1.25× |
 | `windSpeed` | `1.2` | Noise scrolling and spore drift speed, 0-100; mutable on the field |
 | `windStrength` | `0.45` | Bend strength, 0-2; mutable on the field |
-| `windDirection` | `[1, 0.35]` | Nonzero X/Z direction, normalized at creation |
+| `windDirection` | `[1, 0.35]` | Nonzero X/Z direction, normalized at creation; mutable on the field (assign any nonzero pair) |
 | `drawDistance` | `100` | Positive distance cutoff, up to 100,000 world units |
 | `spores` | `false` | Draw 240 drifting white dandelion particles |
 
@@ -221,7 +225,7 @@ Do not retain surface views or use handles from a lost device. Invalid options a
 pass is begun. GPU allocation/validation errors still follow WebGPU error scopes.
 
 Proof: `node --test --test-timeout=30000 packages/creative/tests/targets.test.js` and
-`node scripts/gpu-lock.mjs run --owner=creative-targets --max=5 -- node packages/creative/scripts/test-targets.js`.
+`node scripts/run-with-timeout.mjs --max=5 -- node packages/creative/scripts/test-targets.js`.
 The generated color fixture checks 78 subresources with full pixel readback, HDR, partial draws with load,
 WebGL2 rejection and replacement-device restoration. Other browser/GPU implementations and speed are unmeasured.
 
@@ -245,7 +249,9 @@ engine.start();
 ```
 
 For an existing stack, add `new Painterly(options)` after its display effect using
-`PostStack.attach(engine, [/* HDR/display effects, then */ new Painterly()])` from `@margoengine/post/stack`.
+`PostStack.attach(engine, [/* HDR/display effects, then */ new Painterly()])` from `@margoengine/post/stack`. On a scene
+that already has a PostStack, `Painterly.attach` and `AnisotropicPainterly.attach` add the effect to it after its last
+LDR effect; disposing the effect takes it out again.
 The stack owns its effects. `Painterly.attach` creates and owns a stack by itself; disposing the returned effect
 releases both. Disposal is terminal, idempotent and supports `using` / `Symbol.dispose`.
 
@@ -270,7 +276,31 @@ stack. A maximum-radius Kuwahara or watercolour pixel reads 324 neighbourhood sa
 also reads eight Sobel neighbours); sketch reads eight neighbours plus the centre. Entry: 7504 B minified,
 3073 B gzip with bare dependencies external. No speed, aesthetic quality or other-device claim. Tests use
 generated images as stand-ins on a real RTX A6000, against an independent CPU pixel reference. Run
-`npm run test:gpu:paint --workspace @margoengine/creative` through the repository GPU lock.
+`npm run test:gpu:paint --workspace @margoengine/creative`.
+
+### Attaching from a second scene
+
+`createTerrainGrass` remembers the scene that is active when you call it, before its first await, and joins that scene when it finishes. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.
+
+## Sliders: `@margoengine/creative/grass-settings`
+
+`GrassField` keeps its blade height, reach, density, wind, blade colours and back-light in its frame uniform and rewrites it every frame, so they change while the scene runs. The setters are `bladeHeight`, `drawDistance`, `density` (0 to 1: the kept fraction of blades, the same blades each time), `windSpeed`, `windStrength`, `windDirection`, `rootColor`, `tipColor`, `tipVariantColor`, `translucencyColor` and `translucency` (0 to 4, default 0.4). `@margoengine/creative/grass-settings` lists them as a table for sliders and panels: `GRASS_SETTINGS` has 12 rows (each has `name`, `group`, `kind`, `default`, `min`, `max`, `step`, `unit`, `about` and `live`), all `live`. `applyGrassSettings(grass, values)` writes a set of values (a name left out takes its default), and `GRASS_LOOKS` names `natural`, `dry` and `windy`. An unknown name throws `TypeError`, a value outside its row `RangeError`, and a wind direction of 0 and 0 `RangeError`. The defaults are the colours and strength the shader had as constants, so a field with no settings draws as before. Not rows: blade count, area and spores (they size buffers at construction). Proof on a real GPU (`npm run test:settings:browser`, native WebGPU and the WebGL2 layer): the defaults written draw the frame exact, 60 frames of every row create no pipeline, buffer or texture, and the last frame equals writing the values once.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {GrassField} from 'margoengine/creative/grass';
+import {GRASS_LOOKS, applyGrassSettings} from 'margoengine/creative/grass-settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const meadow = GrassField.attach(engine, {blades: 60000, area: [30, 30]});
+let time = 0;
+engine.onFrame((_, delta) => {
+  time += delta;
+  // The meadow dries out over the shot.
+  const dry = Math.min(time / 6, 1);
+  applyGrassSettings(meadow, {...GRASS_LOOKS.dry, 'field.density': 1 - 0.3 * dry, 'translucency.strength': 0.4 + dry});
+});
+```
 
 ## Preview tier contract
 

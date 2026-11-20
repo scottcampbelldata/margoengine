@@ -75,18 +75,40 @@ test('the stage root reaches no optional package', () => {
 const REACT_EXTRA = {
   './xr-pointer': ['@margoengine/xr'],
   './devtools': ['@margoengine/inspector', '@margoengine/stats'],
-  './fbx': ['@margoengine/gltf-pro'],
-  './geometry': ['@margoengine/materials'],
+  './fbx': ['@margoengine/gltf'],
+  // Svg loads @margoengine/loaders and Backdrop @margoengine/studio lazily, each only when mounted.
+  './geometry': ['@margoengine/materials', '@margoengine/loaders', '@margoengine/studio'],
   './textures': ['@margoengine/materials', '@margoengine/decoders'],
   './animation': ['@margoengine/animator'],
-  './materials': ['@margoengine/gltf-pro'],
+  // MeshReflectorMaterial loads @margoengine/environment lazily, only when mounted.
+  './materials': ['@margoengine/gltf', '@margoengine/environment'],
   './dof': ['@margoengine/post'],
   './tonemap': ['@margoengine/post'],
   './taa': ['@margoengine/post'],
   './ui': ['@margoengine/audio', '@margoengine/sprites', '@margoengine/sciviz'],
   './controls-extra': ['@margoengine/controls'],
+  // PivotControls annotations load <Html> lazily, only when on.
+  './controls': ['@margoengine/html'],
+  // Text3D's smooth normals and Clone's skinned copies load their peer lazily, only when used; a CFF or variable font
+  // loads the OpenType readers of @margoengine/loaders lazily, only for such a file.
+  './text': ['@margoengine/geometry', '@margoengine/loaders'],
+  './helpers': ['@margoengine/animation'],
+  './marching-cubes': ['@margoengine/procedural'],
+  './caustics': ['@margoengine/studio'],
+  './accumulative-shadows': ['@margoengine/studio'],
+  './outlines': ['@margoengine/toon'],
+  // Clouds draws with @margoengine/vfx; softness adds the scene depth of @margoengine/post, only when on.
+  './clouds': ['@margoengine/vfx', '@margoengine/post'],
+  './sampler': ['@margoengine/geometry'],
   './portals': ['@margoengine/materials'],
-  './effects-extra': ['@margoengine/points', '@margoengine/lines', '@margoengine/geometry', '@margoengine/materials'],
+  // ScreenQuad loads @margoengine/shader lazily, only when mounted.
+  './effects-extra': [
+    '@margoengine/points',
+    '@margoengine/lines',
+    '@margoengine/geometry',
+    '@margoengine/materials',
+    '@margoengine/shader',
+  ],
   './offscreen': ['@margoengine/worker'],
   './test': ['@margoengine/headless'],
 };

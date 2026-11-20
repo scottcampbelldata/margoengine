@@ -140,6 +140,32 @@ test('camera, size, scene, sampling options, enable and reset restart accumulati
   tracer.dispose();
 });
 
+test("a temporal pass's raster jitter is no camera move: accumulation goes on under TAA", async () => {
+  // KB-VPT-TAA-RESTART: TAA hands later passes a wrapper camera whose matrix carries a new Halton offset each frame and
+  // whose source is the still camera (packages/shared/temporal-camera.js). The tracer keyed on the jittered matrix, so
+  // every frame restarted it: one sample forever on WebGPU, and on the WebGL2 route, whose trace lands frames later,
+  // no image at all (composition row c2-010, taa + voxel-pathtracer, `trace samples 0`).
+  const { tracer, frame, device, camera, context } = await ready();
+  frame();
+  const source = Symbol.for('margoengine.temporal-camera-source');
+  for (let i = 0; i < 8; i++) {
+    const matrix = Float32Array.from(camera.matrix);
+    matrix[8] += ((i % 4) - 1.5) / context.width;
+    matrix[9] += (((i >> 1) % 4) - 1.5) / context.height;
+    const jittered = Object.assign(Object.create(camera), { matrix, [source]: camera });
+    context.camera = jittered;
+    const before = traced(device).first;
+    frame();
+    assert.ok(traced(device).first > before, `jittered frame ${i} keeps accumulating`);
+    assert.equal(context.camera, jittered, 'the pass hands the raster camera back');
+  }
+  context.camera = camera;
+  camera.position = [21, 14, 24];
+  frame();
+  assert.equal(traced(device).first, 0, 'a real move still restarts');
+  tracer.dispose();
+});
+
 test('disabled tracers encode nothing and leave the frame alone', async () => {
   const { tracer, frame } = await ready();
   assert.equal(frame().length, 2);

@@ -1,5 +1,5 @@
-// Real-GPU proof (from the repository root after building packages; check:gpu-packages takes the GPU lock around it):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/pixel/tests/scale-check.mjs
+// Real-GPU proof (from the repository root after building packages):
+//   node scripts/run-with-timeout.mjs -- node packages/pixel/tests/scale-check.mjs
 // A 7 x 5 picture drawn by PixelScale at 3.29x, stretched, at 2x and below 2x into textures and onto the canvas, each
 // read back against the filter's maths worked out on the CPU: nearest byte for byte, sharp-bilinear and edge within one
 // step of 255 where they mix, byte for byte where they do not; a live filter change, errors, a device loss.

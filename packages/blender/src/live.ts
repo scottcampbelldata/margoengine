@@ -3,7 +3,7 @@
 // Server-Sent Events; margoLive fetches every announced version, attaches it, disposes the one before and yields it,
 // so artists see the engine's result as they work.
 import type { EngineKernel } from "@margoengine/core";
-import type { PBRModel } from "@margoengine/gltf-pro/model";
+import type { PBRModel } from "@margoengine/gltf/pbr-model";
 import { fault } from "../../shared/errors.js";
 import { readResponse } from "../../shared/loading.js";
 import { maxBytes } from "./container.js";
@@ -33,6 +33,8 @@ export interface MargoLiveOptions extends MargoOptions {
  * model for the version Blender holds now and one for each edit after it. Each yielded model is attached to `engine`;
  * the previous one is disposed just before the next is yielded, and the last when the loop ends (break, return,
  * a thrown error or `signal`, which also ends a load in flight). Edits that arrive while a version loads are coalesced: only the newest is fetched.
+ * After each reconnection the first version announced is loaded again, so a live link started again in a reopened
+ * Blender (its versions count from 1 again) is followed too.
  * Rejects with a `failed` MargoError when the stream cannot be opened (an HTTP error or a reply that is not an event
  * stream). While Blender is closed the browser keeps reconnecting and the last model stays.
  *
@@ -56,7 +58,12 @@ export async function* margoLive(
     throw new TypeError("Live link URL must use HTTP(S); pass the address the Blender add-on's Margo panel shows");
   if (typeof Source !== "function")
     throw fault("unsupported", "Live link needs EventSource; pass it in the EventSource option outside a browser");
-  let wanted = 0,
+  // `latest` is the newest version announced on the current connection and `pending` says it is not attached yet.
+  // Each new connection's first event is always taken: a live link started again (Blender reopened) counts from 1,
+  // so its numbers say nothing about the versions of the connection before it.
+  let latest = 0,
+    fresh = false,
+    pending = false,
     failure: Error | undefined,
     wake: (() => void) | undefined;
   const notify = () => {
@@ -64,9 +71,15 @@ export async function* margoLive(
     wake = undefined;
   };
   const source = new Source(new URL("events", base).href);
+  source.addEventListener("open", () => {
+    fresh = true;
+  });
   source.addEventListener("scene", (event) => {
     const version = Number((event as MessageEvent).data);
-    if (Number.isSafeInteger(version) && version > wanted) wanted = version;
+    if (!Number.isSafeInteger(version) || version < 1 || (!fresh && version <= latest)) return;
+    fresh = false;
+    latest = version;
+    pending = true;
     notify();
   });
   source.addEventListener("error", () => {
@@ -78,14 +91,14 @@ export async function* margoLive(
   });
   const aborted = () => notify();
   signal?.addEventListener("abort", aborted);
-  let model: PBRModel | undefined,
-    shown = 0;
+  let model: PBRModel | undefined;
   try {
     for (;;) {
-      while (wanted <= shown && !failure && !signal?.aborted) await new Promise<void>((resolve) => (wake = resolve));
+      while (!pending && !failure && !signal?.aborted) await new Promise<void>((resolve) => (wake = resolve));
       if (signal?.aborted) return;
       if (failure) throw failure;
-      const version = wanted,
+      pending = false;
+      const version = latest,
         target = new URL("scene.margo", base);
       target.searchParams.set("v", String(version));
       let next: PBRModel;
@@ -102,7 +115,6 @@ export async function* margoLive(
       }
       model?.dispose();
       model = next;
-      shown = version;
       yield model;
     }
   } finally {

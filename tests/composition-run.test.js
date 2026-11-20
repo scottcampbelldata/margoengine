@@ -1,8 +1,8 @@
-import './support/gpu-lock-env.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { SCENE_LIMIT_MS, runScene } from '../scripts/support/composition-run.mjs';
+import { DEFAULT_MINUTES } from '../scripts/run-with-timeout.mjs';
 
 const never = () => new Promise(() => {});
 
@@ -48,9 +48,10 @@ test('a scene that settles keeps its own result or error', async () => {
   );
 });
 
-test('the scene limit ends before the GPU lease reclaims an idle run', () => {
-  // scripts/gpu-lock.mjs: MARGO_GPU_IDLE_MIN defaults to 3 minutes.
+test("the scene limit ends well before the suite's own run limit, so the scene is named", () => {
+  // runLimitMs in scripts/gpu-package-tests.mjs: at most DEFAULT_MINUTES (10) per run.
   assert.ok(SCENE_LIMIT_MS < 3 * 60_000);
+  assert.ok(SCENE_LIMIT_MS < DEFAULT_MINUTES * 60_000);
 });
 
 // The tracer rows ran on ANGLE Vulkan while the path tracer never compiled on Direct3D 11 (04f611773). Its staged route

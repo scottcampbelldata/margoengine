@@ -34,7 +34,7 @@ export function headless() {
   headlessEngine ??= (async () => {
     const [{ Engine, TransformStore }, { PBRModel }] = await Promise.all([
       import(dist('core/dist/extension.js')),
-      import(dist('gltf-pro/dist/index.js')),
+      import(dist('gltf/dist/pbr.js')),
     ]);
     PBRModel.prototype.setup = () => {};
     globalThis.createImageBitmap = imageBitmap;
@@ -335,7 +335,7 @@ export function lightSeeds(seeds) {
   });
 }
 
-/** A textured quad GLB whose base colour is a KHR_texture_basisu KTX2 image (the gltf-pro KTX2 path). */
+/** A textured quad GLB whose base colour is a KHR_texture_basisu KTX2 image (the gltf/pbr KTX2 path). */
 export function ktx2GLB(ktx2, { fallback = false } = {}) {
   const positions = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]),
     uvs = new Float32Array([0, 1, 1, 1, 1, 0, 0, 0]),
@@ -420,7 +420,7 @@ const nested = (depth, leaf) => {
 };
 /** The published files carrying KHR_xmp_json_ld, as JSON text. */
 export function metadataSeeds() {
-  const dir = 'packages/gltf-pro/tests/fixtures/metadata';
+  const dir = 'packages/gltf/test/fixtures/metadata';
   return readdirSync(join(root, dir))
     .filter((name) => /\.(glb|gltf)$/.test(name))
     .sort()
@@ -468,7 +468,7 @@ export function hostileMetadata(r, seeds) {
   }
   return encoder.encode(JSON.stringify(doc));
 }
-// Extension payloads gltf-pro reads, with hostile members, so any seed reaches the extension parsers.
+// Extension payloads gltf/pbr reads, with hostile members, so any seed reaches the extension parsers.
 const extensionPayloads = (r) => ({
   KHR_texture_transform: {
     offset: r.pick([[0, 0], [Number.NaN], 'x', [1e39, 0]]),

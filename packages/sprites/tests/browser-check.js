@@ -406,10 +406,25 @@ window.check = {
     const validation = await engine.gpu.popErrorScope();
     out.validation = validation?.message ?? null;
 
-    // A lost device: pixels and functions come back by themselves, a plain GPUTexture asks for setAtlas.
+    // A lost device (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): pixels and functions come
+    // back by themselves; a plain GPUTexture is reported once through engine.onError, its layer draws nothing and
+    // the frame goes on, until setAtlas gives a new one.
     {
       const layer = SpriteLayer.attach(instance, { atlas });
       layer.add({ x: 10, y: 7, rect: rect(0, 0) });
+      const made = [],
+        makeAtlas = (device) => {
+          made.push(device);
+          const texture = device.createTexture({
+            size: [8, 8],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture }, atlasData, { bytesPerRow: 32 }, [8, 8]);
+          return texture;
+        },
+        made2 = SpriteLayer.attach(instance, { atlas: makeAtlas, order: 16 });
+      made2.add({ x: 50, y: 7, rect: rect(0, 0) });
       frame();
       const previous = engine.gpu,
         plainTexture = previous.createTexture({
@@ -423,25 +438,37 @@ window.check = {
       const both = blank();
       cell(both, 10, 7);
       cell(both, 30, 7);
+      cell(both, 50, 7);
       record('plain GPUTexture atlas', difference(frame(), both));
       previous.destroy();
       await previous.lost;
       await engine.rebootDevice();
       engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
-      plain.onPreUpdate(0);
-      let code = null;
+      const reports = [],
+        onError = engine.onError;
+      engine.onError = (error) => reports.push(error);
+      // Three frames: none throws, the plain layer draws nothing, the others draw, one report.
+      const without = blank();
+      cell(without, 10, 7);
+      cell(without, 50, 7);
+      let thrown = null;
       try {
-        instance.render({ delta: 1 / 60 });
+        // fixed-wait: the three frames after the restore are the check (none throws, one report), not a wait for readiness
+        for (let i = 0; i < 3; i++) record(`lost plain atlas, frame ${i + 1}`, difference(frame(), without));
       } catch (error) {
-        code = error.code;
+        thrown = error.message;
       }
-      out.lostPlainAtlas = code;
-      plain.setAtlas(atlas);
-      const expected = blank();
-      cell(expected, 10, 7);
-      cell(expected, 30, 7);
-      record('after device loss', difference(frame(), expected));
+      engine.onError = onError;
+      out.lostPlainAtlas = {
+        thrown,
+        reports: reports.map((error) => [error.code, error.message]),
+        functionCalls: made.length,
+        functionDevices: made[0] !== made[1],
+      };
+      plain.setAtlas(makeAtlas(engine.gpu));
+      record('after setAtlas', difference(frame(), both));
       plain.dispose();
+      made2.dispose();
       layer.dispose();
       record('after dispose', difference(frame(), blank()));
     }

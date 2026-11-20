@@ -62,9 +62,8 @@ fn flowVelocity(point:vec2i)->vec3f {
  // The sea forcing is the continuous relaxation used by the finite-volume substeps.
  let index=u32(p.y*size.x+p.x)+1u;
  if(connected[index]==0u){
-  var seaLevel=frame.settings.y;
-  for(var j=0u;j<u32(frame.settings.w);j++){for(var c=0u;c<3u;c++){let s=swell(frame.waves[j],xz,c,length(frame.flow.yz));seaLevel+=s.amplitude*sin(s.phase);}}
-  vertical+=(max(0.0,seaLevel-water.y)-water.x)*4.0*smoothstep(0.65,2.4,max(0.0,frame.settings.y-water.y));
+  let sea=surfSea(xz,water.y,size,length(frame.flow.yz));
+  vertical+=(max(0.0,sea.x-water.y)-water.x)*4.0*sea.y;
  }
  return vec3f(horizontal.x,vertical+dot(horizontal,slope),horizontal.y);
 }

@@ -10,10 +10,11 @@ import { ScatterTiles, tilesCullShader } from '../dist/tiles.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 const sha = (s) => createHash('sha256').update(s).digest('hex');
-// SHA-256 of the distribute shader before the world-rectangle options existed (main at 0765a2c1).
-const ORIGINAL = '63b49bcd65f7277d9606496ea67532a1b80a1d72d23baf3f5f46211560f3976d';
+// SHA-256 of the distribute shader with no world-rectangle option: main at 0765a2c1, plus the pixel footprint slot that
+// joined the frame for the grass pixel floor (KB-SCATTER-SUBPIXEL1).
+const ORIGINAL = '6abe44ec2a5dfb535e4243ccafb105868338e0aae336e35e1e2aa7bf0544073f';
 // SHA-256 of the kernel WebGPU compiles from it: the candidate kernel of the ordered cull (src/order.ts), no atomics.
-const ORDERED = '5df19e53e3cae3ef32e5740b504efa0ef30e46fb86b3eff20653b0c28326b9d7';
+const ORDERED = 'f54ee0bcf10466b0019c6b3c5398a343c154ec85536869de8ff41dffc851b00e';
 
 test('off path: without bounds, densityMap and follow the distribute shader and frame are as before', () => {
   assert.equal(sha(scatterCullShader({})), ORIGINAL);
@@ -24,7 +25,7 @@ test('off path: without bounds, densityMap and follow the distribute shader and 
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
   assert.equal(sha(code), ORDERED);
   assert.doesNotMatch(code, /atomic/);
-  assert.equal(h.resources.filter((r) => r.size === 320).length >= 1, true, 'an 80-float frame');
+  assert.equal(h.resources.filter((r) => r.size === 336).length >= 1, true, 'an 84-float frame (80 before the pixel footprint)');
   effect.dispose();
 });
 
@@ -42,7 +43,7 @@ test('inner: only its own shader part, on an extended frame, and off at 0', () =
     effect = new Scatter(box(), { count: 16, inner: 30, innerFade: 5 });
   h.engine.use(effect);
   h.frame();
-  assert.equal(h.resources.filter((r) => r.size === 352).length >= 1, true, 'an 88-float frame');
+  assert.equal(h.resources.filter((r) => r.size === 368).length >= 1, true, 'a 92-float frame (the pixel footprint before the follow offsets and bounds)');
   effect.dispose();
   for (const bad of [{ inner: -1 }, { inner: 120 }, { inner: Number.NaN }, { inner: 10, innerFade: -1 }])
     assert.throws(() => new Scatter(box(), bad), /Scatter inner must be/, JSON.stringify(bad));
@@ -74,7 +75,7 @@ test('follow moves the grid in whole cells and keys each instance by its world c
   h.frame();
   const values = effect.values;
   // 10 x 10 grid of 1 m cells around the camera: offset is the camera cell minus 5, centre on a cell corner.
-  assert.deepEqual([values[80], values[81]], [18, -13]);
+  assert.deepEqual([values[84], values[85]], [18, -13]);
   assert.deepEqual([values[22], values[23]], [23, -8]);
   effect.dispose();
 });
@@ -110,7 +111,7 @@ test('ScatterTiles packs held records, filters a palette index, frees tiles and 
   h.frame();
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
   // The candidate kernel of the tiles shader: the rings' capacities bound the compaction, not an atomic slot.
-  assert.equal(sha(code), 'aaa7d495a2e7b3788e6ec5f9cdfe2c14ef15935038999916cf51426f5f775296');
+  assert.equal(sha(code), '484f90f3c399f74c050a2244f46ac590b50d02820f580412fd56da662288ac86');
   assert.match(code, /var<storage,read> records:array<vec2u>/);
   assert.doesNotMatch(code, /atomic/);
   assert.doesNotMatch(tilesCullShader(), /atomicSub/);
@@ -223,4 +224,22 @@ test('ScatterTiles memory follows what is held: records in pages, rings sized fr
   crowns.dispose();
   trunks.dispose();
   assert.ok(h.resources.every((r) => r.destroyed));
+});
+
+test('a wind on a mesh that shares culling doubles the shared reach, whichever mesh gets it and whenever', () => {
+  const h = optionalGPU(),
+    options = { bounds: [0, 0, 4096, 4096], slots: 4, slotSize: 4096, lod: [100, 300, 1000] },
+    trunks = new ScatterTiles(box(), options),
+    crowns = new ScatterTiles(box(), { ...options, share: trunks });
+  h.engine.use(trunks);
+  h.engine.use(crowns);
+  h.frame();
+  const base = trunks.values[35];
+  assert.ok(base > 0);
+  crowns.options.wind = [1, 0, 0.4];
+  h.frame();
+  assert.equal(trunks.values[35], 2 * base, 'the leader culls for the mesh that bends');
+  crowns.options.wind = undefined;
+  h.frame();
+  assert.equal(trunks.values[35], base);
 });

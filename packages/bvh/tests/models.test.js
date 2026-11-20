@@ -1,9 +1,9 @@
-// Raycaster against real gltf-pro PBRModels (helmet, skinned robot, a generated UV quad) and @margoengine/materials meshes.
+// Raycaster against real gltf/pbrModels (helmet, skinned robot, a generated UV quad) and @margoengine/materials meshes.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore, box } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { CameraProjection } from '../../cameras/dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
 import { Raycaster, getPrimitiveBVH, hasPrimitiveBVH, engineModels, worldTriangles, MeshBVH } from '../dist/index.js';
@@ -107,7 +107,7 @@ function brute(model, origin, direction) {
   return best;
 }
 
-test('Raycaster finds attached gltf-pro models, honours node transforms and matches brute force on the helmet', async () => {
+test('Raycaster finds attached gltf/pbr models, honours node transforms and matches brute force on the helmet', async () => {
   const { engine, load } = await world(),
     model = load(asset('scifi-helmet.glb')),
     raycaster = new Raycaster();
@@ -292,7 +292,7 @@ test('worldTriangles merges models, instances and core meshes in world space; ra
   const { doc, buffers } = quadDoc(),
     quad = new PBRModel(engine, new GLTFAsset(doc, buffers));
   const core = engine.createMesh().setGeometry(box()).setPosition([0, 0, -5]).setScale([2, 1, 1]);
-  // A structural instanced model (gltf-pro PBRInstances shape): two copies of a triangle, 24 floats per instance.
+  // A structural instanced model (gltf/pbrInstances shape): two copies of a triangle, 24 floats per instance.
   const node = engine.createMesh().setPosition([0, 3, 0]),
     data = new Float32Array(48),
     vertices = new Float32Array(60);

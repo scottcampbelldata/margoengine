@@ -63,15 +63,23 @@ Moving a point-light helper then needs zero circle sine/cosine calls instead
 of 1,152, with identical geometry bytes. Helpers without circles allocate no
 circle table. This is a work-count result; timing pending the quiet rerun.
 
+## Export
+
+`lines.lines` is the live, read-only set of lines the plugin draws (empty by default). The `@margoengine/exporters`
+scene writers read it through `engine.plugins`: `exportGLB(engine)` writes each visible line as its centre polyline,
+a glTF LINES primitive, with its width in the primitive's extras as `lineWidth` and `lineWidthUnits` and a
+`Stroke`'s `widths` as `_WIDTH`; OBJ, PLY, COLLADA and USDZ write it in their line forms. Dashes, joins and caps are
+not written. See the exporters README, "Lines and point clouds".
+
 ## How it works
 
-- **Instanced screen-space quads.** Each independent butt or square segment uses six vertices (two body triangles); round caps, connected lines and custom shader extensions keep all 78 vertices. Points come from a storage buffer; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.
+- **Instanced screen-space quads.** Each independent butt or square segment uses six vertices (two body triangles); round caps, connected lines and custom shader extensions keep all 78 vertices. Points come from a storage buffer; there is one draw call per line. The vertex shader projects the segment and its neighbors, then builds the body quad, the join on its end (owned by the incoming segment) and the cap on its start. Miter joins share their corner points with the next segment, so translucent lines have no double-blended overlap; bevel and round joins add a wedge and a 10-triangle fan on the outer side. A miter longer than `miterLimit` times the width falls back to bevel. Repeated points (GPS stops, a loop closed by giving its first point again) are joined across: each point carries the index of its nearest distinct neighbour on either side (`distinctNeighbours`, computed on the CPU when the points change and uploaded after them, 8 bytes a point), a segment between two copies of one point draws nothing, and the join there uses the points around the repeat, as the HTML canvas path rules prune zero-length segments. A line that is all one point keeps its zero-length segment, so round or square caps still draw a dot (SVG 2). `expandLine` in this package is the same algorithm on the CPU, in pixels, and the Node tests check it for exact areas and zero overlap.
 - **Widths.** Pixel widths are CSS pixels, scaled by the ratio of the render target to the canvas client size. World-unit widths are converted per endpoint from the camera's focal length and the clip w, so thick lines taper with perspective. Lines thinner than one pixel are drawn one pixel wide with proportionally lower alpha.
 - **Antialiasing.** Geometry grows by one pixel and the fragment shader ramps coverage over the last pixel of every edge, butt or square cap end and dash end (dash ends use `fwidth` of the distance). This coverage ramp works alongside 4× MSAA on the WebGPU canvas path.
 - **Dashes.** Distances accumulate along the line in world space (after the model or mesh matrix) on the CPU, are recomputed only when the points or the matrix change, and are interpolated perspective-correctly. Segment lists accumulate across segments.
 - **Depth.** Lines test against the scene depth with reversed-Z `greater-equal` and do not write depth unless `depthWrite` is set (see [Depth writing](#depth-writing)). `onTop` lines use `always` and draw after the depth-tested ones. Endpoints behind the near plane are clipped in clip space, so a line passing beside the camera is cut, not mirrored.
 - **Color.** Colors are linear RGB (`'#rrggbb'` and `0xrrggbb` are sRGB and converted, like `PbrMaterial`). Output is sRGB-encoded for unorm canvas formats and left linear for `-srgb` and float targets such as the `rgba16float` target of the post-processing packages. Blending is straight alpha (`src-alpha, one-minus-src-alpha`).
-- **Plugin lifecycle.** The pass is `lines:draw` at frame-graph order 20, after the scene, sky and particles and before post-processing resolves at 30. GPU buffers are created lazily per line and rebuilt from the CPU copies in `onDeviceRestored`. `dispose()` (and `engine.removePlugin`) destroys every buffer and the pass; the lines stay registered with the plugin object, so it can be attached again.
+- **Plugin lifecycle.** The pass is `lines:draw` at frame-graph order 20, after the scene, sky and particles and before post-processing resolves at 30. GPU buffers are created lazily per line and rebuilt from the CPU copies in `onDeviceRestored`. `dispose()` (and `engine.removePlugin`) removes the plugin from its scene and destroys every buffer and the pass; the lines stay registered with the plugin object, so it can be attached again.
 - **Mesh attachment.** `mesh` or `line.attach(mesh)` reads the mesh's world matrix from `engineRuntime(engine).store.matrices` each frame. A hidden or disposed mesh hides its lines. Unattached lines use `line.matrix` (identity by default).
 - **SSR safety.** Nothing touches `window`, `navigator` or GPU globals at import or construction time.
 
@@ -107,7 +115,21 @@ circle table. This is a work-count result; timing pending the quiet rerun.
 
 `new Lines({name, order})` sets the plugin name (default `'lines'`) and pass order (default `20`). `lines.stats` reports lines, segments and draw calls of the last frame.
 
-Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth, solidHead})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color, fillOpacity})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
+Helpers are `Line` subclasses and take the material options too (they default to butt caps and miter joins): `GridHelper({size, divisions, color1, color2, fade})`, `PolarGridHelper({radius, sectors, rings, divisions, color1, color2, fade})`, `AxesHelper({size})`, `Box3Helper(min, max, {color})`, `BoxHelper(mesh, {color})` (world bounds every frame), `ArrowHelper({direction, origin, length, color, headLength, headWidth, solidHead})`, `CameraHelper(camera, {aspect})` (unprojects `camera.matrix`), `PlaneHelper({normal, constant, size, color, fillOpacity})` and `VertexNormalsHelper(mesh, {size, color})` (world space with the normal matrix).
+
+A large grid ends in a hard straight edge against the sky. `fade: {near, far}` (world units from the grid's centre,
+default none) keeps full opacity out to `near` and fades the lines to nothing at `far` along smoothstep; the lines past
+`far` are not drawn at all, so the grid melts into the horizon:
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Lines, GridHelper} from 'margoengine/lines';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {camera: {position: [0, 2, 8], target: [0, 0, 0]}});
+const lines = Lines.attach(engine);
+lines.add(new GridHelper({size: 200, divisions: 200, fade: {near: 20, far: 90}}));
+engine.render();
+```
 
 Light helpers (`PointLightHelper`, `SpotLightHelper`, `DirectionalLightHelper`, `HemisphereLightHelper`,
 `RectAreaLightHelper`) take the light objects themselves, typed by shape so lines imports neither
@@ -145,7 +167,7 @@ A depth-writing line takes two draws, so its edge stays smooth: the part at leas
 
 ## Trails
 
-`Trail` from `margoengine/lines/trail` is a line that follows something and fades behind it: missiles, swords, cursors. It advances with the `Lines` plugin's frames, so there is nothing to call each frame.
+`Trail` from `margoengine/lines/trail` is a line that follows something and fades behind it: missiles, swords, cursors. It advances with the `Lines` plugin's frames, so there is nothing to call each frame. The fade clock (`trail.time`) moves in the frame update (`lines.advanceTime(delta)`), once a frame however many views draw, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the clock a continuous run reads; the points are the target's history, which a warm-up of `lifetime` seconds refills.
 
 ```ts
 import {Engine, box} from 'margoengine/core';
@@ -390,7 +412,7 @@ Lines does not import animation. Colours run from `parentColor` (default green) 
 import {Lines, SkeletonHelper} from 'margoengine/lines';
 import {Skeleton} from 'margoengine/animation';
 import {Engine} from 'margoengine/core';
-import {loadGLTF} from 'margoengine/gltf-pro';
+import {loadGLTF} from 'margoengine/gltf/pbr';
 const engine = await Engine.create(document.querySelector('canvas')!);
 const lines = Lines.attach(engine);
 const model = await loadGLTF(engine, '/hero.glb');
@@ -484,6 +506,9 @@ A hit gives the `line`, the `segment` index, the world `point` on the centre lin
 renders one tile of it, so tiles of a large image meet without seams (`@margoengine/sciviz/export-media` uses it). The
 first `setLineCameraTile` of a page widens the line renderers' Frame uniform from 96 to 112 bytes and adds a capture
 step to their shaders; a page that never calls it keeps the base Frame and shaders and ships none of this code.
+The tile rectangle is the camera's viewport in whole-image pixels, which may reach past the image's right and bottom
+edges (draw the image part with a scissor). With a power-of-two width and height, every step from the whole image's
+1/256 pixel grid to the tile's window is exact in float32, so line vertices land on the same pixel grid in every tile.
 
 ```ts
 import { Camera } from '@margoengine/core';
@@ -507,6 +532,7 @@ release(); // Lines draw this camera normally again; calling it twice is harmles
 
 - Requires native WebGPU or the full WebGL2 compatibility layer. The small preview throws linked `unsupported` during setup.
 - By default lines do not write depth, so crossing lines do not occlude each other unless they set [`depthWrite`](#depth-writing). `engine.pick` finds lines through [`LinePicking`](#gpu-picking) only. Round joins of translucent lines overlap on the inner side only when a segment is shorter than the join (the inner miter would overshoot).
+- Repeated points are found by exact equality of their stored coordinates: two different points that project to less than 1e-4 pixels apart still end in caps there. Every point of a strip or loop carries 8 more GPU bytes for its neighbour indices.
 - Dashes run continuously through joins, and `cap` applies to line ends only; `dashCap` shapes each dash. World-unit widths ignore the mesh scale.
 - Filled helper shapes are flat colour with no lighting, and do not pick; the lines around them do. `CameraHelper` expects a WebGPU (reversed-Z) camera matrix.
 
@@ -517,29 +543,32 @@ release(); // Lines draw this camera normally again; calling it twice is harmles
 ```ts
 import {box} from 'margoengine/core';
 import {Line, Lines} from 'margoengine/lines';
-import {EdgesHelper, featureEdges, gradientColors} from 'margoengine/lines/edges';
+import {EdgesHelper, featureEdges, gradientColors, wireframeEdges} from 'margoengine/lines/edges';
 
 const lines = new Lines();
 // Edges whose faces meet at more than 30 degrees (the default), and the outline of open surfaces.
 lines.add(new EdgesHelper(box(2, 1, 1), {color: '#20242a', width: 2}));
 console.log(featureEdges(box(2, 1, 1)).length / 6);   // 12
+// Every triangle edge once, a full wireframe: the 12 edges and a diagonal on each face.
+lines.add(new Line({positions: wireframeEdges(box(2, 1, 1)), mode: 'segments', color: '#4080ff'}));
+console.log(wireframeEdges(box(2, 1, 1)).length / 6);   // 18
 
 // One rgb per point, by distance along the line.
 const positions = [0, 0, 0, 1, 1, 0, 2, 0, 0];
 lines.add(new Line({positions, colors: gradientColors(positions, ['#ff0000', '#0000ff'])}));
 ```
 
-Vertices at one position count as one (`tolerance`, default 1e-5), so hard-shaded meshes with split normals work. An edge with three or more faces is always kept. `gradientColors` takes `mode: 'segments'` to run over each pair of points, and `stops`. The shader blends between points, so add points where a stop inside a long segment must be exact.
+Vertices at one position count as one (`tolerance`, default 1e-5), so hard-shaded meshes with split normals work, in `featureEdges` and in `wireframeEdges`; `featureEdges` with `angle: 0` is the wireframe without the diagonals of flat faces. An edge with three or more faces is always kept. `gradientColors` takes `mode: 'segments'` to run over each pair of points, and `stops`. The shader blends between points, so add points where a stop inside a long segment must be exact.
 
 ## Tests
 
-`node scripts/gpu-lock.mjs run --owner=fog-all -- node scripts/fog-all-gpu-check.js` (repository root, real GPU) checks
+`node scripts/run-with-timeout.mjs -- node scripts/fog-all-gpu-check.js` (repository root, real GPU) checks
 fog on lines against the analytic fog amount and draws a `SkeletonHelper` over a posed rig (lines present, following a
 new pose, gone when removed).
 
-`npm test` in `packages/lines` runs Node checks on the CPU geometry: segment counts and neighbors per mode, dash distances in world space, exact quad areas for every cap, exact join areas with zero overlap for miter, bevel and round in both turn directions, miter-limit fallback, collinear points, loops, buffer reuse on same-size updates, validation, every helper's geometry (including the normal matrix under non-uniform scale and a reversed-Z frustum unprojection), SSR-safe import and the linked WebGL2 preview refusal.
+`npm test` in `packages/lines` runs Node checks on the CPU geometry: segment counts and neighbors per mode, dash distances in world space, exact quad areas for every cap, exact join areas with zero overlap for miter, bevel and round in both turn directions, repeated points joining across the repeat for every join and cap, miter-limit fallback, collinear points, loops, buffer reuse on same-size updates, validation, every helper's geometry (including the normal matrix under non-uniform scale and a reversed-Z frustum unprojection), SSR-safe import and the linked WebGL2 preview refusal.
 
-`npm run test:browser` drives Chromium or Edge with a real engine and reads pixels back: summed edge coverage in a column equals the width for 10, 4, 2.5, 1 and 0.5 pixels, world-unit width matches the projection, antialiased and hard edges, per-vertex colors and opacity, a line behind a core mesh is hidden while one in front and an `onTop` one are visible, attached lines follow mesh transforms and visibility, dashes produce six dashes with gaps and move with `dashOffset`, depth-writing lines occlude each other in either order with gaps and cut parts writing nothing and a later plugin respecting them, same-size updates allocate no buffers, every join, cap and helper renders with zero validation and WGSL errors, `engine.rebootDevice()` keeps lines rendering, `removePlugin` removes the pass and releases the buffers, and a line passing behind the camera is clipped. It also saves `test-results/lines-gallery.png`. In a container run it with:
+`npm run test:browser` drives Chromium or Edge with a real engine and reads pixels back: summed edge coverage in a column equals the width for 10, 4, 2.5, 1 and 0.5 pixels, world-unit width matches the projection, antialiased and hard edges, per-vertex colors and opacity, a line behind a core mesh is hidden while one in front and an `onTop` one are visible, attached lines follow mesh transforms and visibility, dashes produce six dashes with gaps and move with `dashOffset`, depth-writing lines occlude each other in either order with gaps and cut parts writing nothing and a later plugin respecting them, same-size updates allocate no buffers, every join, cap and helper renders with zero validation and WGSL errors, a polyline with a repeated corner draws the same pixels as one without it, `engine.rebootDevice()` keeps lines rendering, `removePlugin` removes the pass and releases the buffers, and a line passing behind the camera is clipped. It also saves `test-results/lines-gallery.png`. In a container run it with:
 
 ```sh
 BROWSER_CHANNEL=bundled BROWSER_EXECUTABLE=/path/to/chrome BROWSER_ARGS='["--enable-unsafe-webgpu","--use-webgpu-adapter=swiftshader","--no-sandbox"]' npm run test:browser

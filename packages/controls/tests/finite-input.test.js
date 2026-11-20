@@ -3,8 +3,10 @@
 // call never came.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ArcballControls, FirstPersonControls, OrbitControls } from '../dist/index.js';
+import { ArcballControls, FirstPersonControls, OrbitControls, TrackballControls } from '../dist/index.js';
 import { FakeElement, camera } from './control-fakes.js';
+import { Engine as Runtime, TransformStore } from '@margoengine/core/extension';
+import { ThirdPersonControls } from '../dist/third-person.js';
 
 const BAD = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
 const finite = (cam) => [...cam.position, ...cam.target].every(Number.isFinite);
@@ -64,4 +66,41 @@ test('FirstPersonControls reject a non-finite update step and look target', () =
       [`lookAt([0, ${v}, 0])`, (c) => c.lookAt([0, v, 0])],
     ]),
   );
+});
+
+test('TrackballControls reject a non-finite or negative update step', () => {
+  unchanged(
+    (cam) => new TrackballControls(cam, new FakeElement()),
+    [...BAD, -1 / 60].map((v) => [`update(${v})`, (c) => c.update(v)]),
+  );
+});
+
+test('ThirdPersonControls reject non-finite turns and a non-finite or negative update step', async () => {
+  const follow = async () => {
+    const canvas = Object.assign(new FakeElement(), { width: 800, height: 600, getContext: () => null }),
+      engine = new Runtime(
+        canvas,
+        await TransformStore.create(8),
+        { backend: 'webgpu', add() {}, remove() {}, render() {}, dispose() {} },
+        { position: [0, 3, 8], target: [0, 1, 0] },
+        null,
+      );
+    return { engine, control: new ThirdPersonControls(engine, () => [0, 0, 0], { lag: 0, returnTime: 0 }) };
+  };
+  const reference = await follow();
+  reference.control.update(1 / 60);
+  const calls = [...BAD, -1 / 60].map((v) => [`update(${v})`, (c) => c.update(v)]);
+  for (const v of BAD)
+    calls.push([`rotate(${v}, 0)`, (c) => c.rotate(v, 0)], [`rotate(0, ${v})`, (c) => c.rotate(0, v)]);
+  for (const [name, call] of calls) {
+    const { engine, control } = await follow();
+    rejects(() => call(control), name);
+    control.update(1 / 60);
+    assert.ok(finite(engine.camera), `${name}: camera stays finite`);
+    assert.deepEqual(pose(engine.camera), pose(reference.engine.camera), `${name}: camera as if the call never came`);
+    control.dispose();
+    engine.dispose();
+  }
+  reference.control.dispose();
+  reference.engine.dispose();
 });

@@ -70,7 +70,7 @@ test('the frame budget counts only when the layer is over it and at least twice 
   assert.deepEqual(frameProblems(frame(30, 40), 33), []);
   assert.deepEqual(frameProblems(frame(10, 30), 33), []);
   assert.deepEqual(frameProblems(frame(1, 86)), ['median frame on the layer 86.0 ms, over the 50 ms budget']);
-  // The pixel gate runs in a shared GPU slot and holds no frame to a budget, whatever the row carries.
+  // The pixel gate holds no frame to a budget, whatever the row carries.
   assert.deepEqual(gateProblems({ status: 'same', frame: frame(1, 86) }, { status: 'same' }), []);
 });
 
@@ -128,4 +128,26 @@ test('boulder is recorded as the per-sample MSAA difference (KB1926) and fails t
   const section = doc.slice(doc.indexOf('## Accepted difference: per-sample reads of multisampled textures'));
   assert.match(section, /\| `boulder` \(2026-11-11, Edge 157\) \| 1\.02% \| 0\.000%, 5 \|/);
   assert.match(section, /`boulder` \(KB1926[^]*SSAO alone/);
+});
+
+test('the orrery is recorded as the depth-resolve difference and fails the gate if it gets worse', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const expected = JSON.parse(await readFile(new URL('../scripts/support/visual-compat-expected.json', import.meta.url), 'utf8'));
+  const want = expected.demos.orrery;
+  // Scott accepted it on 2026-11-15: the layer's 1x depth is sample 0, native's the nearest of 4. TAAUpscale cycles its
+  // jitter phases with the camera still, so the two native captures differ and the still frame is not recorded exact.
+  assert.deepEqual(want, { status: 'differs', over2: 0.0354, mean: 0.454 });
+  const noise = m(0.0023, 0.0721, 118);
+  assert.deepEqual(gateProblems({ status: 'differs', diff: m(0.0354, 0.454, 80), noise }, want), []);
+  assert.notDeepEqual(gateProblems({ status: 'differs', diff: m(0.0542, 0.454, 80), noise }, want), []);
+  assert.notDeepEqual(gateProblems({ status: 'same', diff: m(0.0009, 0.2, 80), noise }, want), []);
+  // The cause, what native does better and the like-for-like probe figures are written down with the ruling.
+  const doc = await readFile(new URL('../docs/webgl2-compat-demos.md', import.meta.url), 'utf8');
+  const section = doc.slice(doc.indexOf('## Accepted difference: per-sample reads of multisampled textures'));
+  assert.match(section, /`orrery` \(Scott accepted, 2026-11-15/);
+  assert.match(section, /\| Native keeps sample 0, widening off \| 0\.00% \(max d 4\) \|/);
+  assert.match(section, /\| Native keeps sample 0, DOF off \| 0\.00% \(max d 10\) \|/);
+  const bugs = await readFile(new URL('../docs/known-bugs.md', import.meta.url), 'utf8');
+  assert.match(bugs, /### Accepted 2026-11-15: the Orrery draws a different picture on the WebGL2 compatibility layer/);
+  assert.doesNotMatch(bugs, /### Open [^\n]*the Orrery draws a different picture/);
 });

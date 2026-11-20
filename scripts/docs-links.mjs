@@ -109,7 +109,7 @@ export function check(files = documents()) {
   return broken;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const files = process.argv.length > 2 ? process.argv.slice(2) : documents();
   const broken = check(files);
   for (const { file, line, target, reason } of broken) console.log(`${file}:${line}  ${target}  (${reason})`);

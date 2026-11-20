@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel/gpu-mesher (run from the repository root after building packages, one GPU job at
-// a time: node scripts/gpu-lock.mjs run --owner=voxel-gpu-mesher -- node packages/voxel/tests/gpu-mesher-browser-check.mjs):
+// a time: node scripts/run-with-timeout.mjs -- node packages/voxel/tests/gpu-mesher-browser-check.mjs):
 // every chunk of a lit terrain and of five special chunks meshed in compute shaders gives meshChunk's words in every
 // layer and its visibility, also sorted from an eye and after a large edit; the slab chunk is meshed on the CPU and the
 // all-air chunk answered without the GPU; a VoxelRenderer using the GPU mesher draws the worker mesher's picture; no
@@ -36,6 +36,9 @@ try {
   assert.ok(r.lit > r.pixels / 10, `the terrain should fill the picture: ${r.lit} of ${r.pixels} pixels lit`);
   assert.equal(r.differ, 0, `${r.differ} pixels differ between the worker and the GPU mesher`);
   assert.ok(r.rendererStats.gpu >= 20, `renderer meshed ${r.rendererStats.gpu} chunks on the GPU`);
+  assert.deepEqual(r.bordered.bad, [], 'the GPU mesher borders differ from the worker mesher');
+  assert.ok(r.bordered.faces > 1000, `only ${r.bordered.faces} border faces`);
+  assert.equal(r.bevelDiffer, 0, `${r.bevelDiffer} beveled pixels differ between the worker and the GPU mesher`);
   assert.equal(r.disposed, 'disposed');
   console.log(`ok renderer: same picture with the GPU mesher, ${r.lit} pixels lit, draws ${r.draws}`);
   assert.deepEqual(await page.evaluate(() => window.check.errors()), []);

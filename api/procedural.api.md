@@ -32,6 +32,8 @@ export interface FractalOptions {
   frequency?: number;
 }
 
+export type Glazing = 'clear' | 'frosted';
+
 export { HeightField } from "@margoengine/math";
 
 export interface JettyOptions extends MeshDetailOptions {
@@ -40,6 +42,15 @@ export interface JettyOptions extends MeshDetailOptions {
     height?: number;
     ladder?: boolean;
     seed?: number;
+}
+
+export interface LogWallOptions {
+    courses: readonly (readonly [number, number])[];
+    diameter?: number;
+    bottom?: number;
+    openings?: readonly (readonly [number, number, number, number])[];
+    segments?: number;
+    sill?: boolean;
 }
 
 export interface MarchingCubesOptions {
@@ -76,12 +87,38 @@ export interface TreeMesh {
     readonly canopy: GeometryData;
 }
 
+export interface TreeMeshShapeOptions extends MeshDetailOptions {
+    branches?: boolean;
+    shoots?: boolean | 'coarse';
+    flare?: number;
+    breastHeight?: number;
+    breastDiameter?: number;
+}
+
 export const WARP_OFFSETS: readonly number[];
 
 export interface WarpOptions {
     warp?: NoiseFunction;
     strength?: number;
     dimensions?: 2 | 3 | 4;
+}
+
+export interface WindowPane {
+    clear: GeometryData;
+    frosted: GeometryData;
+    bars: GeometryData;
+    frostedShare: number;
+}
+
+export interface WindowPaneOptions {
+    width: number;
+    height: number;
+    thickness?: number;
+    glazing?: Glazing;
+    frost?: number;
+    lites?: readonly [number, number];
+    barWidth?: number;
+    barDepth?: number;
 }
 
 export function contactAO(y: number, groundY: number): number;
@@ -116,6 +153,8 @@ export function generateGrassMesh(blades?: number): GeometryData;
 
 export function generateJettyMesh(options?: JettyOptions): GeometryData;
 
+export function generateLogWall(options: LogWallOptions): GeometryData;
+
 export function generatePalmMesh(options?: MeshDetailOptions): TreeMesh;
 
 export function generateReedMesh(stems?: number): GeometryData;
@@ -126,7 +165,7 @@ export function generateShrubMesh(options?: MeshDetailOptions): GeometryData;
 
 export function generateSnagMesh(): TreeMesh;
 
-export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDetailOptions): {
+export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: TreeMeshShapeOptions): {
     trunk: GeometryData;
     canopy: GeometryData;
     center: Float32Array<ArrayBuffer>;
@@ -134,6 +173,8 @@ export function generateTreeMesh(kind: 'conifer' | 'broadleaf', options?: MeshDe
 };
 
 export function generateTundraShrubMesh(options?: MeshDetailOptions): GeometryData;
+
+export function generateWindowPane(options: WindowPaneOptions): WindowPane;
 
 export function marchingCubes(field: DensityField | ArrayLike<number>, { resolution, bounds, level }?: MarchingCubesOptions): Geometry | null;
 

@@ -1,7 +1,7 @@
 {
   "name": "@margoengine/sky",
   "version": "1.0.0",
-  "description": "Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning).",
+  "description": "Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning), with a moonlit night sky, day presets, preset scenes, scene kits, the Milky Way, aurora and a textured moon.",
   "keywords": [
     "margoengine",
     "webgpu",
@@ -67,6 +67,10 @@
       "types": "./dist/sun.d.ts",
       "import": "./dist/sun.js"
     },
+    "./moonlight": {
+      "types": "./dist/moonlight.d.ts",
+      "import": "./dist/moonlight.js"
+    },
     "./volumetric-clouds": {
       "types": "./dist/volumetric-clouds.d.ts",
       "import": "./dist/volumetric-clouds.js"
@@ -91,6 +95,14 @@
       "types": "./dist/astro.d.ts",
       "import": "./dist/astro.js"
     },
+    "./ephemeris": {
+      "types": "./dist/ephemeris.d.ts",
+      "import": "./dist/ephemeris.js"
+    },
+    "./lightning-bolt": {
+      "types": "./dist/lightning-bolt.d.ts",
+      "import": "./dist/lightning-bolt.js"
+    },
     "./weather-fx": {
       "types": "./dist/weather-fx.d.ts",
       "import": "./dist/weather-fx.js"
@@ -106,6 +118,50 @@
     "./compat-clouds": {
       "types": "./dist/compat-clouds.d.ts",
       "import": "./dist/compat-clouds.js"
+    },
+    "./night-preset": {
+      "types": "./dist/night-preset.d.ts",
+      "import": "./dist/night-preset.js"
+    },
+    "./day-presets": {
+      "types": "./dist/day-presets.d.ts",
+      "import": "./dist/day-presets.js"
+    },
+    "./scenes": {
+      "types": "./dist/scenes.d.ts",
+      "import": "./dist/scenes.js"
+    },
+    "./scene-kits": {
+      "types": "./dist/scene-kits.d.ts",
+      "import": "./dist/scene-kits.js"
+    },
+    "./milky-way": {
+      "types": "./dist/milky-way.d.ts",
+      "import": "./dist/milky-way.js"
+    },
+    "./aurora": {
+      "types": "./dist/aurora.d.ts",
+      "import": "./dist/aurora.js"
+    },
+    "./moon": {
+      "types": "./dist/moon.d.ts",
+      "import": "./dist/moon.js"
+    },
+    "./look": {
+      "types": "./dist/look.d.ts",
+      "import": "./dist/look.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "import": "./dist/settings.js"
+    },
+    "./hurricane": {
+      "types": "./dist/hurricane.d.ts",
+      "import": "./dist/hurricane.js"
+    },
+    "./tornado": {
+      "types": "./dist/tornado.d.ts",
+      "import": "./dist/tornado.js"
     }
   },
   "files": [
@@ -120,13 +176,17 @@
     "@margoengine/core": "^1.0.0"
   },
   "dependencies": {
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/math": "^1.0.0",
+    "@margoengine/post": "^1.0.0",
+    "@margoengine/tonemap": "^1.0.0"
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js sky",
-    "test": "npm run build && node --test test/*.test.js",
+    "test": "npm run build && node --test test/*.test.js ../../tests/deep-render-moonlit.test.js",
     "prepack": "npm run build",
-    "test:gpu": "cd ../.. && node packages/sky/test/browser-check.mjs && node packages/sky/test/dither-check.mjs && node packages/sky/test/features-check.mjs weather volumetric cloud-shadows && node packages/sky/test/features-check.mjs aerial shafts weather-fx && node packages/sky/test/features-check.mjs sleet astro hillaire && node packages/sky/test/features-check.mjs albedo presets",
-    "test:gpu:planet": "cd ../.. && node packages/sciviz/tests/atmosphere-browser.mjs"
+    "test:gpu": "cd ../.. && node packages/sky/test/browser-check.mjs && node packages/sky/test/dither-check.mjs && node packages/sky/test/features-check.mjs weather volumetric cloud-shadows && node packages/sky/test/features-check.mjs cloud-bounds lightning-link lightning-bolt && node packages/sky/test/features-check.mjs aerial shafts weather-fx && node packages/sky/test/features-check.mjs sleet astro hillaire && node packages/sky/test/features-check.mjs albedo presets coverage && node packages/sky/test/features-check.mjs overcast hurricane tornado && node packages/sky/test/features-check.mjs look settings && node packages/sky/test/seek-check.mjs && node packages/sky/test/sky-add-gltf-check.mjs && node packages/sky/test/sky-environment-check.mjs && node packages/sky/test/sky-light-units-check.mjs && node packages/sky/test/rain-frames-check.mjs",
+    "test:gpu:night": "cd ../.. && node packages/sky/test/night-check.mjs && node packages/sky/test/moon-gpu.mjs && node packages/sky/test/compat-gpu.mjs && node packages/sky/test/fire-base-gpu.mjs",
+    "test:gpu:planet": "cd ../.. && node packages/sciviz/tests/atmosphere-browser.mjs",
+    "test:gpu:sky-fog": "cd ../.. && npm run modern:test:sky"
   }
 }

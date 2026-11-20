@@ -113,3 +113,23 @@ test('a stream that cannot be opened rejects with a coded error', async () => {
   await assert.rejects(first, (e) => e.name === 'MargoError' && e.code === 'failed' && /start the live link/.test(e.message));
   await assert.rejects(margoLive({}, 'file:///scene', { EventSource: h.Source }).next(), TypeError);
 });
+
+test('a live link started again counts from 1, and its first version is still loaded (KB-P3a)', { timeout: 5000 }, async () => {
+  const h = harness();
+  const live = margoLive({}, 'http://127.0.0.1:8765/', { EventSource: h.Source, fetch: h.fetch, parse: h.parse });
+  const first = live.next();
+  h.sources[0].dispatchEvent(new Event('open'));
+  h.emit(5);
+  assert.equal((await first).value.version, 5);
+  // Blender closed, the browser reconnects to a new live link whose versions start again at 1.
+  const second = live.next();
+  h.sources[0].dispatchEvent(new Event('error'));
+  h.sources[0].dispatchEvent(new Event('open'));
+  h.emit(1);
+  assert.equal((await second).value.version, 1);
+  const third = live.next();
+  h.emit(2);
+  assert.equal((await third).value.version, 2);
+  await live.return();
+  assert.deepEqual(h.fetched, ['5', '1', '2']);
+});

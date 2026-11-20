@@ -23,7 +23,11 @@ export interface LensOptions {
     distortion?: number;
     dirtIntensity?: number;
     threshold?: number;
-    dirt?: GPUTexture;
+    dirt?: Borrowable<GPUTexture>;
     enabled?: boolean;
 }
+
+// Not exported from this entry, but used by the exports above:
+
+type Borrowable<T> = T | ((device: GPUDevice) => T);
 ```

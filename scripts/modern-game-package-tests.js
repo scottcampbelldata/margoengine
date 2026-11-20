@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
-const names = ['core', 'gltf-pro', 'animation', 'shadows', 'clustered', 'vfx', 'animator', 'taa', 'splats', 'terrain'],
+const names = ['core', 'gltf', 'animation', 'shadows', 'clustered', 'vfx', 'animator', 'taa', 'splats', 'terrain'],
   npm = process.env.npm_execpath;
 assert.ok(npm, 'Run through npm run modern:test:game:packages');
 const archives = resolve('test-results/game-packages');
@@ -41,7 +41,7 @@ for (const name of names.slice(3)) {
 await writeFile(
   join(fixture, 'integration.ts'),
   `import {EngineKernel} from '@margoengine/core';
-import {loadGLTF} from '@margoengine/gltf-pro';
+import {loadGLTF} from '@margoengine/gltf/pbr';
 import {Animation} from '@margoengine/animation';
 import {Shadows} from '@margoengine/shadows';
 import {Clustered} from '@margoengine/clustered';

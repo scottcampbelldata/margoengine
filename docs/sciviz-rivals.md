@@ -11,9 +11,9 @@ Use Node and the repository dependencies specified in package.json. Install VTK.
 npm install --prefix ../engine-bench/batch-167 --no-save @kitware/vtk.js@38.0.5
 npm run build:packages
 node --test --test-timeout=120000 packages/sciviz/tests/rival-contract.test.js packages/sciviz/tests/volume-field.test.js packages/sciviz/tests/volume-workcount.test.js
-node scripts/gpu-lock.mjs run --gpu=sciviz-volume-image-smoke --owner=volume-smoke --max=8 --wait-max=15 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=legacy-64
-node scripts/gpu-lock.mjs run --gpu=sciviz-volume-image-smoke --owner=volume-smoke --max=8 --wait-max=15 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=isotropic-64
-node scripts/gpu-lock.mjs run --gpu=sciviz-volume-image-smoke --owner=volume-smoke --max=8 --wait-max=15 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=isotropic-128
+node scripts/run-with-timeout.mjs --max=8 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=legacy-64
+node scripts/run-with-timeout.mjs --max=8 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=isotropic-64
+node scripts/run-with-timeout.mjs --max=8 -- node packages/sciviz/scripts/rival-bench.mjs --runs=1 --scene=isotropic-128
 ```
 
 MARGO_ENGINE_BENCH overrides that external engine-bench root. All logs, images and
@@ -76,7 +76,7 @@ stage or users who do not import scientific visualization.
 ## Quiet run tonight
 
 After Scott resumes speed runs, set MARGO_SPEED_PHASE=active and run the same
-commands with --exclusive replacing --gpu=sciviz-volume-image-smoke and --runs=7
+commands with --runs=7
 replacing --runs=1. Keep all scenes, controls, images and call counts. Timings include
 one frame and its canvas read; they do not isolate GPU execution. Counts come from the last untimed warmup; instrumentation is restored to original
 API methods before collecting timing samples. Publish every sample,

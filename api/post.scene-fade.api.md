@@ -17,8 +17,8 @@ export class SceneFade implements EnginePlugin {
     readonly duration: number;
     readonly name = "post:scene-fade";
     readonly finished: Promise<void>;
-    constructor(duration?: number);
-    static attach(instance: EngineKernel, duration?: number): SceneFade;
+    constructor(duration?: number, clock?: () => number);
+    static attach(instance: EngineKernel, duration?: number, clock?: () => number): SceneFade;
     setup(engine: Engine): void;
     capture(): void;
     warm(): Promise<void>;

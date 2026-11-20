@@ -5,7 +5,7 @@
 ```ts
 import { Animation } from "@margoengine/animation";
 import { GeometryBuffers } from "@margoengine/core/extension";
-import { PBRModel } from "@margoengine/gltf-pro";
+import { PBRModel } from "@margoengine/gltf/pbr";
 
 export class CADCameraControls {
     readonly camera: Camera;

@@ -2,7 +2,13 @@
 // proved on a real GPU by features-check.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VolumetricClouds, PLANET_RADIUS, cloudField } from '@margoengine/sky/volumetric-clouds';
+import {
+  VolumetricClouds,
+  PLANET_RADIUS,
+  cloudDeckTransmittance,
+  cloudField,
+  layerOf,
+} from '@margoengine/sky/volumetric-clouds';
 import { Sky } from '@margoengine/sky';
 import { tracedGPU } from '../../../tests/support/gpu-trace.js';
 
@@ -85,11 +91,85 @@ test('volumetric clouds take their light from a Sky and draw nothing at coverage
   sky.dispose();
 });
 
+// KB-CLOUD-DECKLIGHT1 (2026-11-17): the deck lit the scene twice, once through the dimmed engine sun (Sky.deck) and
+// again through its sun light laid into the sky's map. The scene's light now takes a second map, the deck without the
+// sun and moon the engine lights carry under dimLight; without dimLight their light comes in matched to the engine
+// lights, in the sky's units (KB-SKY-SUNUNITS1: the engine sun over Sky.lightScale over 4 pi sunIntensity, and the
+// same for the moon over 4 pi 0.15). The ground albedo times
+// the deck's share lights the base from below. The light itself is proved on a real GPU (features-check cloud-bounds).
+test('the deck lights the scene once: a light-only map, and the sun and moon only where no engine light carries them', () => {
+  const h = tracedGPU();
+  h.engine.lighting = { direction: new Float32Array(4), radiance: new Float32Array([1, 1, 1, 0.15]) };
+  const sky = new Sky({ hours: 12, timeScale: 0, lighting: { intensity: 2 } }),
+    clouds = new VolumetricClouds({ sky, weather: { cloud: 1 } });
+  h.engine.use(sky);
+  h.engine.use(clouds);
+  frame(h, sky, clouds);
+  assert.ok(sky.environmentLayer && sky.environmentLightLayer, 'both maps handed to the sky');
+  assert.notEqual(sky.environmentLayer, sky.environmentLightLayer);
+  assert.match(code(h), /var deckLight:texture_storage_2d<rgba16float,write>/);
+  const v = clouds['values'];
+  assert.equal(v[23], Math.fround(0.55), 'the default sun on the clouds');
+  assert.equal(v[61], 0, 'dimLight: the engine sun carries the sun under the deck');
+  assert.equal(v[62], 0, 'dimLight: the moon under the deck is the engine moon');
+  assert.ok(Math.abs(v[63] - 0.2 * cloudDeckTransmittance(layerOf(clouds.options), sky.sun[1])) < 1e-6, 'albedo x share');
+  clouds.options.dimLight = false;
+  clouds.options.groundAlbedo = 0.8;
+  frame(h, sky, clouds);
+  // In the sky's units since KB-SKY-SUNUNITS1: the sky's lighting takes the whole map, this layer included, into the
+  // engine's by Sky.lightScale (intensity 2 over Preetham's 4 pi 0.55), so the sun's part is the engine sun over that
+  // scale (1 at the default sunIntensity) and the moon's 1 over 4 pi 0.15 over it. Before: 2 / (4 pi 0.55) and
+  // 1 / (4 pi 0.15), engine units laid into a map that was itself left in sky units.
+  assert.ok(Math.abs(sky.lightScale - 2 / (4 * Math.PI * 0.55)) < 1e-9, 'the sky scale');
+  assert.ok(Math.abs(v[61] - 1) < 1e-6, 'the sun matched to the engine light, in sky units');
+  assert.ok(Math.abs(v[62] - Math.fround(0.55 / (0.15 * 2))) < 1e-6, 'the moon matched to the engine moon, in sky units');
+  assert.ok(Math.abs(v[63] - 0.8 * cloudDeckTransmittance(layerOf(clouds.options), sky.sun[1])) < 1e-6);
+  for (const groundAlbedo of [-0.1, 1.5, Number.NaN])
+    assert.throws(() => new VolumetricClouds({ groundAlbedo }), /groundAlbedo 0 to 1/);
+  clouds.dispose();
+  assert.equal(sky.environmentLayer, undefined);
+  assert.equal(sky.environmentLightLayer, undefined, 'dispose takes the light map back');
+  sky.dispose();
+});
+
 test('the wind drift wraps at the noise repeat so f32 keeps it exact', () => {
   const clouds = new VolumetricClouds({ wind: [20, -5], evolution: 2, scale: 10000 });
   clouds.onPreUpdate(1000);
-  assert.deepEqual([...clouds.drift], [0, -5000, 2000]);
+  assert.deepEqual([...clouds.drift], [0, -5000, 2000, 20000, -5000]);
   clouds.onPreUpdate(10);
-  assert.deepEqual([...clouds.drift], [200, -5050, 2020]);
+  assert.deepEqual([...clouds.drift], [200, -5050, 2020, 20200, -5050]);
   assert.equal(PLANET_RADIUS, 6_360_000);
+});
+
+test('the coverage map drifts on without a jump where the shapes wrap', () => {
+  // The coverage map repeats every scale / 0.17 metres. It took the shapes' drift, wrapped at scale, so each wrap moved
+  // it back 0.17 of its repeat: the whole sky's cover jumped every scale / wind seconds.
+  const h = tracedGPU();
+  const clouds = new VolumetricClouds({ wind: [10, 3], scale: 14000 }),
+    uniforms = [],
+    queue = h.engine.gpu.queue,
+    write = queue.writeBuffer.bind(queue);
+  queue.writeBuffer = (buffer, offset, data) => {
+    if (data.length === 96) uniforms.push(Float32Array.from(data));
+    return write(buffer, offset, data);
+  };
+  h.engine.use(clouds);
+  let seconds = 0;
+  for (const delta of [700, 699, 2, 700, 1, 5000]) {
+    clouds.onPreUpdate(delta);
+    seconds += delta;
+    h.context.bindings = [];
+    h.engine.frameGraph.execute(h.context);
+    const v = uniforms.at(-1);
+    for (const [axis, wind] of [[0, 10], [1, 3]]) {
+      // Shapes: (p + drift) / scale; coverage map: (p + flags.zw) / scale * 0.17. Each may differ from the unwrapped
+      // drift only by whole repeats.
+      const shapes = (v[36 + axis] - wind * seconds) / 14000,
+        map = ((v[42 + axis] - wind * seconds) / 14000) * 0.17;
+      assert.ok(Math.abs(shapes - Math.round(shapes)) < 1e-6, `shapes ${shapes} at ${seconds} s`);
+      assert.ok(Math.abs(map - Math.round(map)) < 1e-6, `coverage map ${map} at ${seconds} s`);
+    }
+  }
+  assert.match(code(h), /vec3f\(\(p\.xz\+c\.flags\.zw\)\*c\.shape\.x\*0\.17,0\.37\)/);
+  clouds.dispose();
 });

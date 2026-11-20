@@ -1,0 +1,132 @@
+{
+ "held": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n        variants = { string vs = \"y\" }\n    )\n    {\n        variantSet \"vs\" = {\n            \"y\" {\n                def \"c\"\n                {\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    prepend inherits = </C>\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n)\n{\n    def \"c\" (\n        prepend references = @./l0.usda@</M/a>\n        variantSets = \"vs\"\n        variants = { string vs = \"x\" }\n    )\n    {\n        def \"b\" (\n            inherits = </C>\n        )\n        {\n        }\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"b\" (\n                    payload = @./l0.usda@\n                )\n                {\n                }\n            }\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"R\"\n{\n    over \"c\" (\n        payload = @./l1.usda@</M>\n    )\n    {\n        def \"c\" (\n            payload = @./l0.usda@</M/a> (offset = 10)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    4,
+    0
+   ],
+   "/M/a": [
+    1,
+    2
+   ],
+   "/M/a/c": [
+    3
+   ],
+   "/M/c": [
+    6,
+    1,
+    8
+   ],
+   "/M/c/b": [
+    7,
+    0,
+    9,
+    4
+   ],
+   "/M/c/b/a": [
+    1,
+    2
+   ],
+   "/M/c/b/a/c": [
+    3
+   ],
+   "/R": [
+    10
+   ],
+   "/R/c": [
+    11,
+    5
+   ],
+   "/R/c/c": [
+    12,
+    6,
+    8,
+    1
+   ],
+   "/R/c/c/b": [
+    0,
+    7,
+    9,
+    4
+   ],
+   "/R/c/c/b/a": [
+    1,
+    2
+   ],
+   "/R/c/c/b/a/c": [
+    3
+   ]
+  }
+ },
+ "free": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n        variants = { string vs = \"y\" }\n    )\n    {\n        variantSet \"vs\" = {\n            \"y\" {\n                def \"c\"\n                {\n                }\n            }\n        }\n    }\n}\ndef \"M\" (\n    prepend inherits = </C>\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\" (\n)\n{\n    def \"c\" (\n        variantSets = \"vs\"\n        variants = { string vs = \"x\" }\n    )\n    {\n        def \"b\" (\n            inherits = </C>\n        )\n        {\n        }\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"b\" (\n                    payload = @./l0.usda@\n                )\n                {\n                }\n            }\n        }\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"R\"\n{\n    over \"c\" (\n        payload = @./l1.usda@</M>\n    )\n    {\n        def \"c\" (\n            payload = @./l0.usda@</M/a> (offset = 10)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    5,
+    4,
+    0
+   ],
+   "/M/a": [
+    1,
+    2
+   ],
+   "/M/a/c": [
+    3
+   ],
+   "/M/c": [
+    6,
+    8
+   ],
+   "/M/c/b": [
+    7,
+    0,
+    9,
+    4
+   ],
+   "/M/c/b/a": [
+    1,
+    2
+   ],
+   "/M/c/b/a/c": [
+    3
+   ],
+   "/R": [
+    10
+   ],
+   "/R/c": [
+    11,
+    5
+   ],
+   "/R/c/c": [
+    12,
+    1,
+    2,
+    6
+   ],
+   "/R/c/c/b": [
+    0,
+    7
+   ],
+   "/R/c/c/b/a": [
+    1,
+    2
+   ],
+   "/R/c/c/b/a/c": [
+    3
+   ],
+   "/R/c/c/c": [
+    3
+   ]
+  }
+ }
+}

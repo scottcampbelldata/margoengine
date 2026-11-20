@@ -2,16 +2,16 @@
 // made at 3cf1453 (before the capture), and stacks without SSR are unchanged too, over a story of resizes, option edits,
 // SSR toggles, depth-format, sample-count and canvas-format changes, a rejected frame, device restoration and disposal at
 // 1x and 4x, with core's plain shader and with an IBL-patched one (margoAmbient + environment's BRDF helper).
-// gltf-pro's side (no capture hook set: identical calls) is oit-detached.proof.js and gltf-pro-lighting-hooks.proof.js
+// gltf/pbr's side (no capture hook set: identical calls) is oit-detached.proof.js and gltf-pbr-lighting-hooks.proof.js
 // run with the commit before the capture as ref.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/post-ssr-models.proof.js [ref] [pin] [--current]
-// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: 151aa744 against the working tree;
+// Pinned: 3cf1453 against 838ae6e, the commit that made this claim. --current: 206cda6acb (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1; 26451c21fb, Bloom's temporal firefly budget; 41050c560 before it) against the working tree;
 // approved multilevel Bloom, PBR Neutral display and linear HDR handoff changed these calls (claims.md).
 import assert from 'node:assert/strict';
 import { refs, versions, ignoreAgx, current, golden, coreAt } from './compare.js';
 import { mockGPU, context } from './gpu-recorder.js';
 
-const { ref, pin } = refs('3cf1453', '838ae6e', '379431fcb8'),
+const { ref, pin } = refs('3cf1453', '838ae6e', '8c71da0556'),
   { wgsl } = await coreAt(pin),
   post = await versions('post', ref, undefined, pin);
 const ibl =
@@ -73,7 +73,7 @@ function story(m, make, samples, shader) {
       view.begin(i);
       try {
         for (const pass of passes) pass.execute(view.c);
-      } catch (error) {
+      } catch {
         gpu.note('throw');
       }
       view.end();

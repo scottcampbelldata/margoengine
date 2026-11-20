@@ -1,13 +1,13 @@
 // KHR_materials_ior on the transmission extension: the host's reflection F0 follows the IOR, so a fully transmissive
 // IOR 1 surface reflects nothing and shows exactly what is behind it (KHR_materials_ior: F0 = ((ior - 1) / (ior + 1))^2).
-// Runs gltf-pro's composed lighting WGSL on the CPU. Before the fix the host kept F0 0.04 under any extension IOR, and
+// Runs gltf/pbr's composed lighting WGSL on the CPU. Before the fix the host kept F0 0.04 under any extension IOR, and
 // the GPU check "IOR 1 transmission differs from the opaque background" (scripts/materials-transmission-tests.js) found
 // a 13-step highlight. Lobes composed over transmission recompute diffuse light, and before the fix did so at full
 // strength: a fully transmissive IOR 1 surface with a specular or sheen lobe drew about 148 steps of white.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pbrShader } from '../../gltf-pro/src/shader.ts';
-import { materialExtensionShader, prepareMaterialExtension } from '../../gltf-pro/src/material-extension.ts';
+import { pbrShader } from '../../gltf/src/shader.ts';
+import { materialExtensionShader, prepareMaterialExtension } from '../../gltf/src/material-extension.ts';
 import { transmission } from '../dist/transmission.js';
 import { materialLobes, nodeMaterial } from '../dist/index.js';
 import { wgslModule } from './support/wgsl-subset.js';
@@ -84,7 +84,7 @@ test('IOR 1 transmission: no reflection in direct or ambient light, so the surfa
 test('IOR 1.5 keeps F0 0.04: the same light as the host without an extension IOR', () => {
   const { shader } = compose({ ior: 1.5 }),
     f0 = shader.call('hookF0');
-  // ((1.5 - 1) / (1.5 + 1))^2 in f32 arithmetic lands one f32 step above the literal 0.04 (as on gltf-pro's native
+  // ((1.5 - 1) / (1.5 + 1))^2 in f32 arithmetic lands one f32 step above the literal 0.04 (as on gltf/pbr's native
   // physical path, which computes it the same way); the light it gives matches the fixed-F0 host to within 1e-7.
   for (const value of f0) assert.ok(Math.abs(value - f32(0.04)) <= 2 ** -27, 'F0 at IOR 1.5: ' + value);
   const plain = wgslModule([fnText(pbrShader, 'direct_light'), fnText(pbrShader, 'hemisphere_ambient')].join('\n'), {
@@ -122,4 +122,11 @@ test('lobes over transmission scale the diffuse light they recompute by the untr
   assert.equal(glass.ior, 'materialFactors[0].y');
   const code = materialExtensionShader(pbrShader, glass);
   assert.match(code, /struct Surface \{[^}]*tr:f32[^}]*f0:vec3f\}/);
+});
+
+// KHR_materials_ior 0 is the specular-glossiness mode: an infinite index whose Fresnel is 1 at every angle.
+// transmission() refused it (RangeError) and the hook read 0 as IOR 1, F0 0.
+test('IOR 0 transmission: the infinite index of KHR_materials_ior reflects everything (F0 1)', () => {
+  const { shader } = compose({ ior: 0 });
+  assert.deepEqual(shader.call('hookF0'), [1, 1, 1]);
 });

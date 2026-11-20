@@ -1,5 +1,5 @@
 // Minimal repro of the MARGO_COMPAT=1 meadow difference on ANGLE Metal (docs/known-bugs.md, "meadow 4x frame 1"):
-//   MARGO_COMPAT=1 node scripts/gpu-lock.mjs run --gpu=sky-compat-probe --owner=<you> -- node packages/sky/test/compat-night-probe.mjs
+//   MARGO_COMPAT=1 node scripts/run-with-timeout.mjs -- node packages/sky/test/compat-night-probe.mjs
 // Renders meadow with the full Sky, then with the narrow Sky (bruneton, clouds, lighting) whose translated GLSL fragment
 // shader is swapped, just before compiling, for a variant of it. Prints the differing scene pixels per frame. On the M6
 // (2026-11-10): `narrow` [0,2,0]; `withNight` (the emitted GLSL of narrow plus night, which meadow never takes)

@@ -3,7 +3,7 @@
 // chunk carries its own topology, so a mesh may change vertex count as it plays. Only a few chunks are held at a time.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, Scene } from '@margoengine/core/extension';
-import { GLTFAsset, PBRModel, type GLTFDocument } from '@margoengine/gltf-pro/model';
+import { GLTFAsset, PBRModel, type GLTFDocument } from '@margoengine/gltf/pbr-model';
 import { MargoError } from '@margoengine/math/errors';
 
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number };
@@ -500,19 +500,16 @@ export class GeometryCachePlayer implements EnginePlugin {
   get bounds(): Float32Array {
     return this.installed.bounds;
   }
-  /** Moves the clock. A place the player no longer holds starts the stream again, if it can. */
-  seek(seconds: number): this {
-    if (!Number.isFinite(seconds) || seconds < 0)
-      throw new RangeError('Invalid geometry cache time; pass finite seconds >= 0');
-    this.time = seconds;
-    return this;
-  }
-  onPreUpdate(delta: number): void {
+  /**
+   * Moves the clock by `delta` seconds times `speed`, wrapping or stopping at the last frame as `loop` says: the CPU
+   * part of the frame update, which a seek from `@margoengine/cutscene/seek` replays. It reads and shows no frame, so a
+   * replayed step never waits for the stream; the next update shows the frame reached, or waits there for its data.
+   */
+  advanceTime(delta: number): void {
     if (this.disposed) return;
     if (!Number.isFinite(delta) || delta < 0)
       throw new RangeError('Invalid geometry cache delta; pass finite seconds >= 0');
-    const before = this.time,
-      rate = this.installed.rate;
+    const rate = this.installed.rate;
     if (this.playing) this.time += delta * this.speed;
     let at = this.time * rate,
       wrapped = false;
@@ -527,6 +524,25 @@ export class GeometryCachePlayer implements EnginePlugin {
         this.playing = false;
       }
     }
+    this.at = at;
+    this.wrapped = wrapped;
+  }
+  /** The frame place and lap of the last `advanceTime`, read by the frame update that follows it. */
+  private at = 0;
+  private wrapped = false;
+  /** Moves the clock. A place the player no longer holds starts the stream again, if it can. */
+  seek(seconds: number): this {
+    if (!Number.isFinite(seconds) || seconds < 0)
+      throw new RangeError('Invalid geometry cache time; pass finite seconds >= 0');
+    this.time = seconds;
+    return this;
+  }
+  onPreUpdate(delta: number): void {
+    if (this.disposed) return;
+    const before = this.time;
+    this.advanceTime(delta);
+    const at = this.at,
+      wrapped = this.wrapped;
     const frame = Math.floor(at),
       chunk = this.find(frame);
     // A new lap reads again at once, while the first chunk plays, so the wrap does not wait for the network.

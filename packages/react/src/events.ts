@@ -77,6 +77,22 @@ type Path = [EngineMesh, Listeners][];
  * turns, collapses to the latest), then the event goes to the hit mesh and bubbles up its parents, as the DOM's does,
  * until a handler calls `stopPropagation()`. Returns the cleanup.
  */
+// Per engine: how many <AdaptiveEvents> currently pause hover picking.
+const hoverPauses = new WeakMap<object, number>();
+/** Stops hover picking (pointer over, out, enter, leave and move) on `engine`'s Canvas until the returned call. */
+export function pauseHover(engine: object): () => void {
+  hoverPauses.set(engine, (hoverPauses.get(engine) ?? 0) + 1);
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    hoverPauses.set(engine, hoverPauses.get(engine)! - 1);
+  };
+}
+/** Whether hover picking is paused on `engine`'s Canvas. */
+export function hoverPaused(engine: object): boolean {
+  return !!hoverPauses.get(engine);
+}
 export function attachPointerEvents(
   engine: Engine,
   element: HTMLCanvasElement,
@@ -234,6 +250,8 @@ export function attachPointerEvents(
   const capturedBy = (pointer: number) => (pressed.has(pointer) ? captures.get(pointer) : undefined);
   const pick = (slot: Slot, event: MouseEvent, receive: Request['receive'], fixed = capturedBy(pointerOf(event))) => {
     const captured = fixed;
+    // Paused hover keeps the hovered mesh as it was: nothing is picked, so nothing changes until it resumes.
+    if (slot === 'hover' && !captured && hoverPauses.get(engine)) return;
     if (!captured && !canPickHere()) {
       receive(null, false);
       return;

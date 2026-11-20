@@ -1,4 +1,4 @@
-import { reportSpeedPhase, speedEnabled } from './support/speed-phase.mjs';
+import { reportSpeedPhase } from './support/speed-phase.mjs';
 // `npm run check:merge`: the pre-push check, with the work narrowed to what the change can affect (session rule 20:
 // never narrow by skipping a test the change can affect; explicit full validation remains available).
 //   npm run check:merge         the affected work only
@@ -17,6 +17,8 @@ import { reportSpeedPhase, speedEnabled } from './support/speed-phase.mjs';
 // (stepClosure: the files each step's command, each verify command, each GPU test and each visual demo reach), and
 // nothing beyond verify when no closure does. A change to the GPU package runner runs RUNNER_SMOKE
 // (scripts/gpu-package-tests.mjs) plus what it affects.
+// A document a package's tests or build read (DOC_READERS in file-classes.mjs) selects that package's CPU tests (printed as
+// `CPU tests first`, `scope.unitTests`), never a GPU step or its dependents; an unread document stays inert.
 // The steps are the ones in package.json `check:merge:steps`. Verify, the fresh clone, the site build and the
 // quickstart always run; each GPU step runs only when its footprint (scripts/support/affected-gpu.mjs) meets the
 // affected packages or holds a changed file, or runs on a narrowed list (visual demos, GPU test ids, WGSL package
@@ -43,8 +45,8 @@ import { reportSpeedPhase, speedEnabled } from './support/speed-phase.mjs';
 // failure or a skip. The workstation profile (heat null) runs every step exactly as before.
 // Side by side (--parallel or MARGO_CHECK_PARALLEL=1; --serial, MARGO_CHECK_SERIAL=1 and heat or split profiles stay one
 // at a time): the same steps. Verify runs first and alone, the fresh-clone snapshot is taken right after it, then the
-// rest beside each other in STEP_AFTER's order, the GPU suites each in their own slot (scripts/gpu-package-tests.mjs),
-// and the timing tests last with nothing beside them. Each step's output goes to test-results/check-merge-logs/. The
+// rest beside each other in STEP_AFTER's order, the GPU suites side by side too (scripts/gpu-package-tests.mjs). Each
+// step's output goes to test-results/check-merge-logs/. The
 // first failure stops the run, names the step and prints the end of its log. Compare a run with a serial one:
 // node scripts/compare-check-runs.mjs --serial=<dir> --parallel=test-results
 // Keep going (--keep-going or MARGO_CHECK_KEEP_GOING=1, passed on to check:gpu-packages): a failed step stops nothing, so
@@ -56,11 +58,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { exitOnHelp } from './support/help.mjs';
+import { showHelp } from './support/help.mjs';
 import { margoError } from '../packages/shared/errors.js';
 import { describeResets, passedAfterResetLines, retryAfterDriverReset } from './support/driver-resets.mjs';
 import { snapshot } from './fresh-clone-check.mjs';
-import { HEAT_EXIT, pauseText, plan, runPlan, testId } from './gpu-package-tests.mjs';
+import { HEAT_EXIT, pauseText, runPlan } from './gpu-package-tests.mjs';
 import { keepGoingMode, parallelMode, runJobs, tailOf } from './support/parallel-run.mjs';
 import { thermalSource } from './support/heat.mjs';
 import { describeProfile, machineProfile } from './support/machine-profile.mjs';
@@ -76,6 +78,7 @@ import {
   wgslPackages,
 } from './support/affected-gpu.mjs';
 import { exampleClosure, matrixClosure, packageScopes } from './support/affected-packages.mjs';
+import { docReaderPackages } from './support/file-classes.mjs';
 import { changedKernelDirs, rustKernels } from './rust-kernel-tests.mjs';
 import { changedUmbrellaReader, umbrellaChangeIsReexportOnly } from './support/umbrella-change.mjs';
 import { PARALLEL, plantStale, SERIAL } from './verify.mjs';
@@ -95,6 +98,7 @@ export const GPU_STEPS = [
 ];
 /** Steps known to need no GPU narrowing; a step in neither list fails the unit test so someone decides. */
 export const PLAIN_STEPS = [
+  'check:core-stress',
   'check:road-invariants',
   'check:testpage-contracts',
   'verify',
@@ -118,6 +122,7 @@ export const KERNEL_STEPS = ['check:rust-kernels'];
 
 /** Steps that never drive the GPU: no heat watch. */
 export const NO_GPU_STEPS = [
+  'check:core-stress',
   'check:road-invariants',
   'check:testpage-contracts',
   'verify',
@@ -268,16 +273,31 @@ export async function planContext(dir = root) {
   };
 }
 
-/** The decision, the package-step scope and the planned commands for `files` (a full run when `env.MARGO_FULL` is 1). */
-export function planFiles(ctx, files, env = {}) {
+/** The packages whose own CPU tests a change selects through documents they read (scripts/support/file-classes.mjs). */
+function unitTestScope(files) {
+  const dirs = docReaderPackages(files);
+  return {
+    dirs,
+    reason: dirs.length ? `documents read by ${dirs.join(', ')}` : 'no changed document is read by a package',
+  };
+}
+
+/**
+ * The decision, the package-step scope and the planned commands for `files` (a full run when `env.MARGO_FULL` is 1).
+ * `max` replaces MAX_AFFECTED, the affected-package count above which the run is full (test:changed passes Infinity).
+ */
+export function planFiles(ctx, files, env = {}, max) {
   const { workspaces, footprints, checkCode, smoke, mentions, umbrellaReexport } = ctx;
-  const decision = analyse({ files, workspaces, footprints, env, checkCode, smoke, mentions, umbrellaReexport });
+  const decision = analyse({ files, workspaces, footprints, env, max, checkCode, smoke, mentions, umbrellaReexport });
   return planDecision(ctx, decision, files);
 }
 
 function planDecision(ctx, decision, files) {
   const { steps, workspaces, tests, testId, browserFiles, matrix, examples, kernels } = ctx;
   const scope = packageScopes({ decision, files, workspaces, browserFiles, closure: matrix, examples });
+  // Documents a package's tests or build read (DOC_READERS): that package's CPU tests, no GPU step, no dependents.
+  scope.unitTests =
+    decision.mode === 'full' ? { dirs: [], reason: 'the full run runs every unit test' } : unitTestScope(files);
   return { decision, scope, planned: planSteps({ steps, decision, tests, workspaces, testId, scope, kernels, files }) };
 }
 
@@ -330,6 +350,8 @@ async function planRun(args) {
   console.log(
     `  packages: ${scope.packages.full ? 'whole' : 'scoped'} (${scope.packages.reason}); bundlers: ${scope.bundlers.run ? 'run' : 'skip'} (${scope.bundlers.reason}); example types: ${scope.examples.all ? 'all' : scope.examples.ids.join(',') || 'none'} (${scope.examples.reason})`,
   );
+  for (const dir of scope.unitTests.dirs)
+    console.log(`  CPU tests first (${scope.unitTests.reason})  npm test -w packages/${dir}`);
   for (const { command, skip } of planned) console.log(`  ${skip ? `skip (${skip})` : 'run'}  ${command}`);
   return { decision, base, planned };
 }
@@ -351,15 +373,7 @@ async function main() {
   const profile = machineProfile(),
     thermal = profile.heat ? thermalSource() : null,
     sideBySide = parallelMode({ argv: args, env: process.env, profile }),
-    keepGoing = keepGoingMode({ argv: args, env: process.env }),
-    timingTests = plan()
-      .filter((t) => t.exclusive)
-      .map(testId),
-    hasTiming = (command) => {
-      if (!speedEnabled()) return false;
-      const select = /--select=(\S+)/.exec(command)?.[1]?.split(',');
-      return timingTests.some((id) => !select || select.includes(id));
-    };
+    keepGoing = keepGoingMode({ argv: args, env: process.env });
   console.log(`steps: ${sideBySide ? 'side by side' : 'one at a time'} (--parallel, --serial)`);
   // The GPU step reads this from its environment, whichever way it was asked for.
   if (keepGoing) {
@@ -373,10 +387,8 @@ async function main() {
     }),
     { rebuild } = builds;
   if (sideBySide)
-    for (const job of stepJobs(planned, hasTiming, { keepGoing }))
-      console.log(
-        `  ${job.label}${job.after.length ? `  after ${job.after.join(', ')}` : ''}${job.exclusive ? '  alone, last' : ''}`,
-      );
+    for (const job of stepJobs(planned))
+      console.log(`  ${job.label}${job.after.length ? `  after ${job.after.join(', ')}` : ''}`);
   if (args.includes('--plan')) return;
   console.log(describeProfile(profile));
   // A heat profile that cannot read its temperature stops here, before verify, not at its first GPU step.
@@ -390,7 +402,6 @@ async function main() {
   let cloneCommit;
   const parallelRun = () =>
     runStepsParallel(planned, {
-      hasTiming,
       keepGoing,
       rebuild,
       logFor: (id) => join(logDir, `${id.replace(/[^\w.-]+/g, '_')}.log`),
@@ -646,6 +657,8 @@ export async function runSteps(
  */
 export const STEP_AFTER = {
   'check:owners': ['verify'],
+  // Reads verify's core and stage build.
+  'check:core-stress': ['verify'],
   'check:road-invariants': ['verify'],
   'check:testpage-contracts': ['verify'],
   'check:text-extrude': ['verify'],
@@ -663,41 +676,23 @@ export const STEP_AFTER = {
   ...Object.fromEntries(GPU_STEPS.map((step) => [step, ['build:site']])),
 };
 
-/** The id of the last part of check:gpu-packages: its timing tests, after every other step, with nothing beside them. */
-export const TIMING_JOB = 'check:gpu-packages:timing';
-
 /**
- * Side-by-side jobs for the planned steps, after verify: `{ id, label, command, step, after, exclusive? }`. The GPU suites
- * split in two so that nothing else, CPU work included, runs beside a timing test: `--phase=shared` in the lane,
- * `--phase=timing` last, when `hasTiming(command)` says the selection holds one. Skipped steps have no job. With
- * `keepGoing` the timing part needs only what the shared part needs: being exclusive it still runs last, and a failed shared
- * suite says nothing about a timing test.
+ * Side-by-side jobs for the planned steps, after verify: `{ id, label, command, step, after }`, one per step that runs.
+ * Skipped steps have no job.
  */
-export function stepJobs(planned, hasTiming = () => true, { keepGoing = false } = {}) {
+export function stepJobs(planned) {
   const run = planned.filter((p) => !p.skip && stepName(p.command) !== 'verify'),
     names = new Set(run.map((p) => stepName(p.command)));
-  const jobs = run.map(({ command }) => {
+  return run.map(({ command }) => {
     const name = stepName(command),
-      gpu = name === 'check:gpu-packages',
       after = (STEP_AFTER[name] ?? []).filter((d) => names.has(d));
     if (!(name in STEP_AFTER))
       throw margoError(
         'CHECK_MERGE_STEP_UNPLACED',
         `${name} is a check:merge step with no entry in STEP_AFTER; say what it reads so it runs after that`,
       );
-    return { id: name, label: name, step: command, command: gpu ? `${command} --phase=shared` : command, after };
+    return { id: name, label: name, step: command, command, after };
   });
-  const gpu = run.find((p) => stepName(p.command) === 'check:gpu-packages');
-  if (gpu && hasTiming(gpu.command))
-    jobs.push({
-      id: TIMING_JOB,
-      label: TIMING_JOB,
-      step: gpu.command,
-      command: `${gpu.command} --phase=timing`,
-      after: keepGoing ? (STEP_AFTER['check:gpu-packages'] ?? []).filter((d) => names.has(d)) : ['check:gpu-packages'],
-      exclusive: true,
-    });
-  return jobs;
 }
 
 /**
@@ -709,16 +704,7 @@ export function stepJobs(planned, hasTiming = () => true, { keepGoing = false } 
  */
 export async function runStepsParallel(
   planned,
-  {
-    run,
-    logFor,
-    before = () => {},
-    hasTiming,
-    retry = retryAfterDriverReset,
-    log = console.log,
-    keepGoing = false,
-    rebuild,
-  },
+  { run, logFor, before = () => {}, retry = retryAfterDriverReset, log = console.log, keepGoing = false, rebuild },
 ) {
   const results = new Map(),
     failures = [],
@@ -744,7 +730,7 @@ export async function runStepsParallel(
     }
   }
   await before();
-  const jobs = stepJobs(planned, hasTiming, { keepGoing });
+  const jobs = stepJobs(planned);
   log(`\nside by side: ${jobs.map((j) => j.label).join(', ')}`);
   const done = await runJobs(jobs, {
     limit: jobs.length || 1,
@@ -759,15 +745,13 @@ export async function runStepsParallel(
       return { ...r, log: logFile };
     },
   });
-  // Both parts of the GPU suites are one step of the plan: it passed when both did.
   for (const job of done) {
-    const had = results.get(job.step),
-      seconds = job.startedAt ? Math.round((job.endedAt - job.startedAt) / 100) / 10 : 0;
+    const seconds = job.startedAt ? Math.round((job.endedAt - job.startedAt) / 100) / 10 : 0;
     results.set(job.step, {
       command: job.step,
-      ok: job.ok && (had?.ok ?? true),
-      seconds: seconds + (had?.seconds ?? 0),
-      log: had?.log ?? job.log ?? logFor(job.id),
+      ok: job.ok,
+      seconds,
+      log: job.log ?? logFor(job.id),
       ...(job.outcome === 'not-run' && { notRun: job.reason }),
       ...(job.driverReset && { driverReset: { resets: job.driverReset.resets, rerunOk: job.driverReset.rerunOk } }),
     });
@@ -869,7 +853,6 @@ Options:
 Example:
   node scripts/check-merge.mjs --base=origin/main`;
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  exitOnHelp(USAGE);
+if (import.meta.url === pathToFileURL(process.argv[1]).href && !showHelp(USAGE)) {
   await main();
 }

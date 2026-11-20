@@ -61,9 +61,10 @@ export class NearestRoute {
     if (map !== this.source || nearest !== this.buffer) this.build(map, width, height, layers, nearest);
     const pass = encoder.beginComputePass(),
       last = this.groups.length - 1;
-    for (const [i, group] of this.groups.entries()) {
+    // By index: an iterator and a pair array a level would be garbage every frame (KB-COMPAT-FRAMEALLOC1).
+    for (let i = 0; i <= last; i++) {
       pass.setPipeline(this.pipelines[i === last ? 2 : i ? 1 : 0]);
-      pass.setBindGroup(0, group);
+      pass.setBindGroup(0, this.groups[i]);
       const level = this.levels[i];
       if (level) pass.dispatchWorkgroups(Math.ceil(level.width / 8), Math.ceil(level.height / 8), layers);
       else pass.dispatchWorkgroups(1, 1, layers);

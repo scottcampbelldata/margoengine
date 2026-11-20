@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/src/shaders.ts';
-import { parseGLTF } from '../../gltf-pro/dist/index.js';
+import { parseGLTF } from '../../gltf/dist/pbr.js';
 import { TestSectionPlugin } from '../../../tests/support/section-plugin.js';
 import { Shadows } from '../dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';

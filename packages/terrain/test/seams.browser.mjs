@@ -1,4 +1,4 @@
-// Real-GPU check (run from the repository root after building packages, in a shared GPU slot):
+// Real-GPU check (run from the repository root after building packages):
 //   node packages/terrain/test/seams.browser.mjs
 // Clipmap seams must be watertight under float rounding (Rust engine port R22): the rings meet where one ring's edge
 // morphs onto the next ring's coarser lattice, so a crack shows the clear colour through the ground. The camera looks

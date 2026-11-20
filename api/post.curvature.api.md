@@ -43,12 +43,16 @@ type PostPassContext = Extract<PassContext, {
 }>;
 
 class PostStack implements EnginePlugin {
-    readonly effects: readonly EnginePlugin[];
     readonly name = "post:stack";
-    constructor(effects: readonly EnginePlugin[]);
-    static attach(engine: EngineKernel, effects: readonly EnginePlugin[]): PostStack;
+    constructor(effects?: readonly EnginePlugin[]);
+    static attach(engine: EngineKernel, effects?: readonly EnginePlugin[]): PostStack;
+    static join(engine: EngineKernel, effect: EnginePlugin, index?: number): PostStack;
+    get effects(): readonly EnginePlugin[];
     get depthTexture(): GPUTexture | undefined;
     get sceneTexture(): GPUTexture | undefined;
+    addEffect(effect: EnginePlugin, index?: number): this;
+    removeEffect(effect: EnginePlugin): boolean;
+    moveEffect(effect: EnginePlugin, index: number): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(): void;

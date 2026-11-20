@@ -15,6 +15,7 @@ export class SSAO implements EnginePlugin {
     static attach(instance: EngineKernel, options?: SSAOOptions): SSAO;
     get enabled(): boolean;
     protected get stacked(): boolean;
+    get occlusionView(): GPUTextureView | undefined;
     get depthTexture(): GPUTexture | undefined;
     set enabled(value: boolean);
     add(source: SSAOSource): () => void;

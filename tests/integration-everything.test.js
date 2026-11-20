@@ -79,7 +79,7 @@ test('everything test pages and their imports enter the GPU footprint', { timeou
     'exporters',
     'materials',
     'environment',
-    'staging',
+    'studio',
     'tonemap',
     'taa',
     'dof',

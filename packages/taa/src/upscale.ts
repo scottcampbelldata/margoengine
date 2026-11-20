@@ -6,6 +6,14 @@ import { temporalCameraSource } from '../../shared/temporal-camera.js';
 // spline (Catmull & Rom 1974). A sample counts by its distance in output pixels, so jittered samples land as detail. The sharpen
 // (./cas.ts, shared with `Sharpen`) is an unsharp mask whose strength falls as a pixel's neighbours near the ends of the
 // display range. The spatial path is Lanczos-2 (Duchon 1979).
+// History rejection: the reprojected nearest depth (Karis 2014, closest-depth motion) is tested against the min/max
+// of a 3x3 footprint of history depth, taps one render pixel apart, not one history texel. A depth test against a
+// cached depth is the reverse-reprojection cache test of D. Nehab et al., "Accelerating Real-Time Shading with Reverse
+// Reprojection Caching" (Graphics Hardware 2007); L. Yang, S. Liu and M. Salvi, "A Survey of Temporal Antialiasing
+// Techniques" (Computer Graphics Forum 39(2), 2020) note that such a test fails at depth edges under subpixel motion.
+// Both the current and the stored depth are 3x3 dilated at render size, and the jitter moves that dilation by up to
+// one render pixel between frames, so one texel at a silhouette fringe changes surface with the jitter; the footprint
+// holds every surface the fringe can show and rejects only where the reprojected surface is absent (a disocclusion).
 import type { EngineKernel } from '@margoengine/core';
 import {
   engineRuntime,
@@ -22,6 +30,7 @@ import { halton } from './jitter.js';
 import { color, fullscreen } from './shader.js';
 import { sharpenCode } from './cas.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { Settle, settleResolve } from './settle.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -49,12 +58,20 @@ export interface TAAUpscaleOptions {
   temporal?: boolean;
   /** Share of the history in each frame, 0 <= w < 1. Default 0.9. */
   historyWeight?: number;
-  /** Relative reversed-depth difference that rejects history, which removes most ghosts on moving objects, 0 to 1. Default 0.01. */
+  /** Relative reversed-depth distance outside the depth range of the history around the reprojected point (a 3x3 footprint, one render pixel apart) that rejects history, which removes most ghosts on moving objects, 0 to 1. Default 0.01. */
   depthThreshold?: number;
   /** Width of the colour range history may keep, in standard deviations of the 3x3 neighbourhood, above 0. Lower ghosts less and flickers more. Default 1.5. */
   clampGamma?: number;
   /** Sharpening of the output, 0 (off) to 1. Default 0.2. */
   sharpen?: number;
+  /**
+   * Settle a still view: with the camera and a pixel's surroundings unchanged for a whole jitter cycle (each phase's
+   * render samples bit-equal to the ones a cycle before), the pixel shows the mean of the next cycle's phases and keeps
+   * it, so the picture stops moving; any change hands the pixel back to the clamped history the same frame. Costs two
+   * rgba16float textures at output size and (ceil(phases / 3) + 1) 4-byte words per render pixel, about 28 bytes per
+   * output pixel. False keeps the per-frame resolve alone. Fixed at construction. Default true.
+   */
+  settle?: boolean;
 }
 
 const uniforms = `struct U {jittered:mat4x4f,inverse:mat4x4f,previous:mat4x4f,a:vec4f,b:vec4f}
@@ -90,8 +107,9 @@ fn old(at:vec2f,top:vec2i)->vec3f {
    back=last.xy/last.w*vec2f(0.5,-0.5)+0.5;expected=last.z/last.w;
   }
   if(all(back>=vec2f(0))&&all(back<vec2f(1))){
-   let found=textureLoad(historyDepth,vec2i(back*size),0).r;
-   if(abs(found-expected)<=max(0.000001,u.a.y*max(found,expected))){
+   let hp=vec2i(back*size);let ht=vec2i(size)-1;let hs=vec2i(ceil(f));var lo=1e30;var hi=0.0;
+   for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){let h=textureLoad(historyDepth,clamp(hp+vec2i(x,y)*hs,vec2i(0),ht),0).r;lo=min(lo,h);hi=max(hi,h);}}
+   if(max(lo-expected,expected-hi)<=max(0.000001,u.a.y*max(hi,expected))){
     let mean=m1/9;let spread=sqrt(max(m2/9-mean*mean,vec3f(0)))*u.a.z;
     let kept=rgb(clamp(ycocg(old(back*size,vec2i(size)-1)),mean-spread,mean+spread));
     result=mix(kept,current,min(1,(1-u.a.x)*peak*f.x*f.y));
@@ -168,6 +186,9 @@ export class TAAUpscale implements EnginePlugin {
   private readonly workspace = new Float64Array(52);
   private readonly sharpenValue = new Float32Array(4);
   private scene?: GPUTexture;
+  private sceneView?: GPUTextureView;
+  /** Still-view settling (settle.ts), with the temporal resolve unless `settle` is false. */
+  private settle?: Settle;
   protected depth?: GPUTexture;
   private target?: SceneTarget;
   private lowTextures: GPUTexture[] = [];
@@ -182,6 +203,13 @@ export class TAAUpscale implements EnginePlugin {
   private presentGroups: GPUBindGroup[] = [];
   private front = 0;
   private frame = 0;
+  /** Frame updates seen (`advanceTime`); once there is one, the jitter phase follows them instead of the draws. */
+  private steps = 0;
+  private phase = 0;
+  private clocked = false;
+  /** A zero-delta update came since the last step: the next drawn frame steps (KB-FILM-TAAPHASE1). */
+  private pending = false;
+  private seconds = 0;
   protected valid = false;
   private manual = '';
   private originalCamera?: Context['camera'];
@@ -217,6 +245,33 @@ export class TAAUpscale implements EnginePlugin {
     this.valid = false;
   }
 
+  /** Seconds on the jitter clock: the sum of the frame deltas its updates moved it by. */
+  get time(): number {
+    return this.seconds;
+  }
+  /**
+   * Moves the jitter one phase on, and the clock by `delta` seconds: the CPU part of its frame update, which a seek
+   * from `@margoengine/cutscene/seek` replays, so a cut lands on the jitter phase a continuous run has there. A
+   * TAAUpscale no update reaches steps its phase at each drawn frame. A `delta` of 0 is the same instant drawn again
+   * (a capture's render inside the frame): it moves nothing at once, and the next drawn frame steps the phase if no
+   * timed update came first (KB-FILM-TAAPHASE1). The history is view history (docs/limits.md, class C): a cut starts it
+   * empty and the scene's prewarm settles it.
+   */
+  advanceTime(delta: number): void {
+    if (this.disposed) return;
+    this.clocked = true;
+    if (!(delta > 0)) {
+      this.pending = true;
+      return;
+    }
+    this.seconds += delta;
+    this.phase = this.steps++;
+    this.pending = false;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
+
   private validate(): void {
     const o = this.options,
       inside = (value: number | undefined, low: number, high: number) =>
@@ -229,6 +284,8 @@ export class TAAUpscale implements EnginePlugin {
       throw new RangeError('TAAUpscale clampGamma must be finite and above 0');
     if (o.temporal !== undefined && typeof o.temporal !== 'boolean')
       throw new RangeError('TAAUpscale temporal must be a boolean; pass true or false');
+    if (o.settle !== undefined && typeof o.settle !== 'boolean')
+      throw new RangeError('TAAUpscale settle must be a boolean; pass true or false');
   }
 
   setup(engine: Engine): void {
@@ -274,7 +331,9 @@ export class TAAUpscale implements EnginePlugin {
       height = Math.max(1, Math.round(c.height * scale)),
       temporal = o.temporal ?? true;
     const view = renderSizeView(c.view, [c.width, c.height], [width, height]);
-    this.resize(c, width, height);
+    // More phases at lower scales, so every output pixel is covered: 8 per output pixel's share of a render pixel.
+    const phases = Math.min(64, Math.ceil(8 / (scale * scale)));
+    this.resize(c, width, height, phases);
     const camera = c.camera === this.cameraView ? this.originalCamera! : c.camera;
     if (this.originalCamera !== camera || !this.cameraView)
       this.cameraView = Object.assign(Object.create(camera), {
@@ -286,9 +345,9 @@ export class TAAUpscale implements EnginePlugin {
       m = camera.matrix;
     if (!invertMatrixStable(m, v.subarray(16, 32), this.workspace))
       throw new MargoError('state', 'Invalid TAAUpscale camera; give the camera a finite, invertible projection');
-    // More phases at lower scales, so every output pixel is covered: 8 per output pixel's share of a render pixel.
-    const phases = Math.min(64, Math.ceil(8 / (scale * scale))),
-      index = (this.frame % phases) + 1,
+    if (this.clocked && this.pending) this.phase = this.steps++;
+    this.pending = false;
+    const index = ((this.clocked ? this.phase : this.frame) % phases) + 1,
       jx = temporal ? halton(index, 2) - 0.5 : 0,
       jy = temporal ? halton(index, 3) - 0.5 : 0;
     v.set(m);
@@ -299,6 +358,7 @@ export class TAAUpscale implements EnginePlugin {
     v.set(this.valid ? this.last : m, 32);
     v.set([o.historyWeight ?? 0.9, o.depthThreshold ?? 0.01, o.clampGamma ?? 1.5, +(this.valid && temporal)], 48);
     v.set([jx, jy, width, height], 52);
+    this.settle?.write(index - 1, this.valid && temporal && this.last.every((x, i) => x === m[i]));
     c.device.queue.writeBuffer(this.uniform!, 0, v as Float32Array<ArrayBuffer>);
     this.last.set(m);
     this.saved = { width: c.width, height: c.height, view: c.view };
@@ -314,7 +374,7 @@ export class TAAUpscale implements EnginePlugin {
     c.bindings.push(this.cameraBinding!);
   }
 
-  private resize(c: Context, width: number, height: number): void {
+  private resize(c: Context, width: number, height: number, phases: number): void {
     const device = c.device,
       formats = `${c.format}:${c.descriptor.depthStencil!.format}:${c.descriptor.multisample?.count ?? 4}`,
       texture = (size: number[], format: GPUTextureFormat, usage: number, into: GPUTexture[]) => {
@@ -328,6 +388,7 @@ export class TAAUpscale implements EnginePlugin {
       for (const t of this.lowTextures) t.destroy();
       this.lowTextures = [];
       this.scene = texture([width, height], c.format, GPUTextureUsage.RENDER_ATTACHMENT, this.lowTextures);
+      this.sceneView = this.scene.createView();
       this.depth = texture(
         [width, height],
         c.descriptor.depthStencil!.format,
@@ -356,7 +417,8 @@ export class TAAUpscale implements EnginePlugin {
             layout: 'auto',
             compute: { module: device.createShaderModule({ code }), entryPoint: 'main', constants: { manualSRGB } },
           });
-      const code = this.resolveCode(resolve);
+      const patched = this.resolveCode(resolve),
+        code = (this.options.settle ?? true) ? settleResolve(patched, 'base', 'top') : patched;
       this.resolvePipeline = compute(
         compatTier(device) === 'webgl2' && (c.descriptor.multisample?.count ?? 4) === 4 ? coverageDepth(code) : code,
       );
@@ -371,8 +433,16 @@ export class TAAUpscale implements EnginePlugin {
       });
       rebuilt = true;
     }
+    if (rebuilt || (this.settle && this.settle.phases !== phases)) {
+      this.settle?.destroy();
+      this.settle = undefined;
+      if (this.options.settle ?? true) {
+        this.settle = new Settle(device, [width, height], [c.width, c.height], phases);
+        this.settle.bind(this.resolvePipeline!);
+      }
+    }
     if (!rebuilt) return;
-    const scene = this.scene!.createView(),
+    const scene = this.sceneView!,
       entries = (list: GPUBindingResource[], bindings: number[]) =>
         list.map((resource, i) => ({ binding: bindings[i], resource })),
       group = (pipeline: GPUComputePipeline | GPURenderPipeline, list: GPUBindGroupEntry[]) =>
@@ -431,10 +501,12 @@ export class TAAUpscale implements EnginePlugin {
         }),
       );
     }
-    const temporal = this.options.temporal ?? true,
-      compute = c.encoder.beginComputePass();
+    const temporal = this.options.temporal ?? true;
+    if (temporal) this.settle?.run(c.encoder, this.sceneView!);
+    const compute = c.encoder.beginComputePass();
     compute.setPipeline(temporal ? this.resolvePipeline! : this.spatialPipeline!);
     compute.setBindGroup(0, (temporal ? this.resolveGroups : this.spatialGroups)[this.front]);
+    if (temporal && this.settle) compute.setBindGroup(1, this.settle.group(this.front));
     compute.dispatchWorkgroups(Math.ceil(c.width / 8), Math.ceil(c.height / 8));
     compute.end();
     const sharpen = this.options.sharpen ?? 0.2;
@@ -514,6 +586,9 @@ export class TAAUpscale implements EnginePlugin {
   protected release(): void {
     this.target?.dispose();
     for (const t of [...this.lowTextures, ...this.histories, ...this.depths]) t.destroy();
+    this.settle?.destroy();
+    this.settle = undefined;
+    this.sceneView = undefined;
     this.uniform?.destroy();
     this.sharpenUniform?.destroy();
     this.lowTextures = [];

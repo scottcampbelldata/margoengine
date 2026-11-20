@@ -166,6 +166,8 @@ export class PointCloudLayer extends EventTarget {
       { ...options, pointBudget: budget, material: options.material ?? { size: 3, shape: 'round' } },
     );
     this.points = Plugin.attach(figure.engine, { name: `figure-pointcloud-${++serial}`, pointBudget: budget });
+    // Point sizes are CSS pixels, on screen and in export alike (SciRenderer.cssScale).
+    this.points.pixelScale = (context) => figure.renderer.cssScale(context.width);
     figure.engine.use(this.octree);
     this.octree.onError((node, error) => {
       this.#error = error;

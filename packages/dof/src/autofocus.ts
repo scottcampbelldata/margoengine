@@ -20,7 +20,8 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 export interface AutofocusOptions {
   /** CSS pixel whose depth sets the focus, such as the pointer. Default: the middle of the canvas. */
   point?: readonly [number, number];
-  /** World point to keep in focus, with no depth read. Wins over `point`. */
+  /** World point to keep in focus, with no depth read. Wins over `point` while the camera sees it; behind the camera or
+   * outside the frame it is ignored and `point` is read. */
   target?: ArrayLike<number>;
   /** Seconds the focus takes to get about two thirds of the way; 0 jumps. Default 0.2. */
   smoothing?: number;
@@ -54,6 +55,7 @@ export class Autofocus implements EnginePlugin {
   private far = 0;
   private flat = false;
   private previous = 0;
+  private clock = 0;
   private settled = false;
   private disposed = false;
   private readonly point = new Uint32Array(4);
@@ -69,6 +71,22 @@ export class Autofocus implements EnginePlugin {
     readonly options: AutofocusOptions = {},
   ) {
     if (!dof?.options) throw new TypeError('Expected a DOF; pass the effect this autofocus drives');
+  }
+  /** Seconds of frame time this autofocus has run for; the smoothing counts it. A fresh one reads 0. */
+  get time(): number {
+    return this.clock;
+  }
+  /**
+   * Moves the smoothing clock by `delta` seconds: the CPU part of the frame update, which a seek from
+   * `@margoengine/cutscene/seek` replays. The focus follows frame time, not the wall clock, so a frame rendered
+   * slower than real time (an offline film render) eases the same as a live one.
+   */
+  advanceTime(delta: number): void {
+    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid autofocus delta; pass finite seconds >= 0');
+    this.clock += delta;
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
   }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
@@ -106,9 +124,14 @@ export class Autofocus implements EnginePlugin {
       ortho = orthographic(camera.matrix, camera.position);
     if (target) {
       const m = camera.matrix,
-        at = (row: number) => m[row] * target[0] + m[4 + row] * target[1] + m[8 + row] * target[2] + m[12 + row];
-      this.focus(ortho ? ortho.far + (ortho.near - ortho.far) * at(2) : at(3));
-      return;
+        at = (row: number) => m[row] * target[0] + m[4 + row] * target[1] + m[8 + row] * target[2] + m[12 + row],
+        w = at(3);
+      // Only a target the camera sees sets the focus: one behind it (w at or below 0) or outside the frame would give a
+      // distance for nothing on screen, so the depth read at `point` focuses the view instead.
+      if (w > 0 && Math.abs(at(0)) <= w && Math.abs(at(1)) <= w) {
+        this.focus(ortho ? ortho.far + (ortho.near - ortho.far) * at(2) : w);
+        return;
+      }
     }
     if (this.state === 1) {
       this.state = 2;
@@ -166,11 +189,11 @@ export class Autofocus implements EnginePlugin {
   private focus(distance: number): void {
     const o = this.dof.options,
       smoothing = this.options.smoothing ?? 0.2,
-      now = performance.now(),
+      now = this.clock,
       goal = Math.max(distance, (o.focalLength ?? 0.05) * 1.01);
     o.focalDistance =
       this.settled && smoothing > 0
-        ? goal + ((o.focalDistance ?? 5) - goal) * Math.exp((this.previous - now) / (smoothing * 1000))
+        ? goal + ((o.focalDistance ?? 5) - goal) * Math.exp((this.previous - now) / smoothing)
         : goal;
     this.previous = now;
     this.settled = true;

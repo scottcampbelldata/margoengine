@@ -43,7 +43,36 @@ engine.dispose();
 
 Supply the named WGSL function plus optional helper functions, at most 65,536 UTF-16 code units. `sample(image, uv)` is clamped nearest sampling; UV origin is top left. The function receives both images, UV and progress in [0,1]. Exact endpoints bypass it. The returned Transitions uses the supplied function for every kind; kind and displacement do not select built-in effects. Duration defaults to one second. This API validates compilation and its three fixed bindings before attachment; invalid code rejects with code `failed` and a help link. Additional reachable resource bindings are unsupported. Cancellation defaults to no signal and leaves no attached effect. Compilation itself is browser work and cannot be interrupted. Colors use the capture target's existing transfer function; this entry performs no extra color conversion. Shaders should return finite RGBA values. Device restoration recompiles the validated source and cancels missing history. Dispose the returned transition when finished.
 
-GPU proof uses generated solid-color stand-ins and exact per-pixel value assertions, not a claim of artistic quality or measured speed. Run `npm run test:gpu --workspace @margoengine/transitions` through the shared GPU lock.
+GLSL transitions are an optional entry, `@margoengine/transitions/glsl` (also `margoengine/transitions/glsl`). Paste a `vec4 transition(vec2 uv)` written in GLSL ES 1.00 or 3.00 (`#version 300 es`); it is translated to the WGSL contract above once, before the GPU sees it:
+
+```ts
+import { Engine } from 'margoengine/core';
+import { createGLSLTransition } from 'margoengine/transitions/glsl';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const transition = await createGLSLTransition(engine, `#version 300 es
+uniform float bands; // = 6.0
+vec4 transition(vec2 uv) {
+  uint band = uint(uv.y * bands);
+  float edge;
+  switch (band % 3u) {
+    case 0u: edge = uv.x; break;
+    case 1u: edge = 1.0 - uv.x; break;
+    default: edge = abs(uv.x - 0.5) * 2.0;
+  }
+  ivec2 size = textureSize(from, 0);
+  vec4 a = texture(from, uv), b = texelFetch(to, ivec2(uv * vec2(size)), 0);
+  return mix(a, b, step(edge, progress));
+}`);
+engine.render();
+transition.start('wipe', 0.75);
+engine.render({ delta: 0.25 });
+transition.dispose();
+engine.dispose();
+```
+
+The GLSL sees `progress`, `ratio`, the `from` and `to` images and `getFromColor(uv)` / `getToColor(uv)`; UVs have a bottom-left origin unless `flipY: false`. Other uniforms are frozen into constants from `options.uniforms` or a `// = <JSON>` note after the declaration. GLSL ES 3.00 input adds `uint` and the bit operators, `switch` (a case falls into the next as GLSL defines), non-square matrices, array constructors, `.length()` and array equality, `texture`, `textureLod`, `textureGrad`, `textureProj`, `textureOffset`, `texelFetch`, `textureSize`, `inverse`, `outerProduct`, `trunc`, `round`, `isnan`, `isinf`, `modf`, the bit casts and the 2x16 pack functions. Every image has one level and is read at its nearest texel, so a level, bias or gradient selects nothing. Translation errors reject with code `failed` and a help link; the limits are in [docs/limits.md](../../docs/limits.md).
+
+GPU proof uses generated solid-color stand-ins and exact per-pixel value assertions, not a claim of artistic quality or measured speed. Run `npm run test:gpu --workspace @margoengine/transitions`.
 
 Custom WGSL must come from a trusted author. Compilation and interface validation do not bound instruction count, loop iterations, texture reads or execution time. A valid function can stall the GPU or trigger a device timeout. AbortSignal cancels waiting and attachment only; aborting after attachment does not stop rendering or GPU work. Do not compile or run untrusted shaders with this API.
 
@@ -107,3 +136,6 @@ Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/transitions
 
+### Attaching from a second scene
+
+`createCustomTransition` remembers the scene that is active when you call it, before its first await, and joins that scene when it finishes. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.

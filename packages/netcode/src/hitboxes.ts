@@ -5,7 +5,7 @@ import { Capsule } from '@margoengine/math/capsule';
 import { OBB } from '@margoengine/math/obb';
 import { Quaternion } from '@margoengine/math/quaternion';
 import { Vector3 } from '@margoengine/math/vector3';
-import { Timeline } from '@margoengine/net/timeline';
+import { Timeline } from './interpolation-timeline.js';
 import type { RewindHit } from './lag.js';
 
 /** A sphere: `position` [x, y, z] and `radius`. */

@@ -1,5 +1,5 @@
 import type { EngineKernel } from '@margoengine/core';
-import { parseGLTF, type PBRModel } from '@margoengine/gltf-pro/model';
+import { parseGLTF, type PBRModel } from '@margoengine/gltf/pbr-model';
 import {
   readZipDirectory,
   readZipEntry,
@@ -20,6 +20,7 @@ import type {
   USDIssue,
 } from './extension.js';
 import type { GLTFDocument, GLTFMaterial, GLTFNode } from '../../shared/gltf.js';
+import { captureScene } from '../../shared/scene-scope.js';
 import { LinearToSRGB, SRGBToLinear } from '@margoengine/math/color';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 
@@ -394,7 +395,9 @@ export class USDAsset {
   ) {}
   /** Attaches the scene to `engine` as a PBR model; texture ownership passes to the model. Pass `signal` to cancel texture decoding. */
   async create(engine: EngineKernel, { signal }: { signal?: AbortSignal } = {}): Promise<PBRModel> {
-    const images = await this.images({ signal });
+    // The model and what its extensions add go in the scene active now, not the one active after the awaits.
+    const scope = captureScene(engine),
+      images = await this.images({ signal });
     try {
       signal?.throwIfAborted();
       const decoders = Object.assign(
@@ -403,9 +406,10 @@ export class USDAsset {
           (this.extensions as readonly ExtensionHooks[]).map((extension) => extension.decoders?.() ?? {}),
         )),
       );
-      const model = parseGLTF(engine, this.document, this.buffers, images, decoders);
+      const model = scope.run(() => parseGLTF(engine, this.document, this.buffers, images, decoders));
       try {
-        for (const extension of this.extensions as readonly ExtensionHooks[]) await extension.created?.(engine, model);
+        for (const extension of this.extensions as readonly ExtensionHooks[])
+          await scope.run(() => extension.created?.(engine, model));
         signal?.throwIfAborted();
         return model;
       } catch (error) {
@@ -1259,11 +1263,14 @@ export async function parseUSDZ(input: BinaryInput, options: USDOptions = {}): P
 }
 /** Fetches a `.usdz` with a streaming byte limit, parses it and attaches it to `engine`. Pass `signal` to cancel. Returns the PBR model; call `destroy()` to free it. */
 export async function loadUSDZ(engine: EngineKernel, url: string | URL, options: USDOptions = {}): Promise<PBRModel> {
-  const limits = budget(options),
+  // create runs after the download: started inside this call's scene, it builds there.
+  const scope = captureScene(engine),
+    limits = budget(options),
     data = await fetchBytes(url, {
       maxBytes: limits.maxBytes,
       signal: options.signal,
       fetch: options.fetch,
-    });
-  return (await parseUSDZ(data, options)).create(engine, options);
+    }),
+    asset = await parseUSDZ(data, options);
+  return scope.run(() => asset.create(engine, options));
 }

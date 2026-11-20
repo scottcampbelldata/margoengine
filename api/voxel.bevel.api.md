@@ -27,17 +27,18 @@ export interface CubeFace {
 
 export interface VoxelBevel {
     readonly amount: number;
-    mesh(faces: readonly CubeFace[], origin: readonly number[]): {
+    mesh(faces: readonly CubeFace[], origin: readonly number[], context?: readonly CubeFace[]): {
         vertices: Float32Array;
         indices: Uint32Array;
         centers: Float32Array;
     };
     readonly layout: GPUVertexBufferLayout;
+    readonly origins: GPUVertexBufferLayout;
     readonly shader: string;
     readonly shadow: string;
 }
 
-export function bevelQuads(quads: readonly CubeFace[], bevel: number): BevelMesh;
+export function bevelQuads(quads: readonly CubeFace[], bevel: number, context?: readonly CubeFace[]): BevelMesh;
 
 export function voxelBevel(amount: number): VoxelBevel;
 ```

@@ -27,6 +27,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js ifc",
     "test": "npm run build && node --test tests/*.test.js",
+    "test:gpu": "cd ../.. && node packages/ifc/tests/scene-gpu-check.mjs",
     "prepack": "npm run build"
   },
   "sideEffects": false,
@@ -35,21 +36,66 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./bcf": {
+      "types": "./dist/bcf.d.ts",
+      "import": "./dist/bcf.js"
+    },
+    "./data": {
+      "types": "./dist/data.d.ts",
+      "import": "./dist/data.js"
+    },
+    "./ids": {
+      "types": "./dist/ids.d.ts",
+      "import": "./dist/ids.js"
+    },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "import": "./dist/query.js"
+    },
+    "./scene": {
+      "types": "./dist/scene.d.ts",
+      "import": "./dist/scene.js"
+    },
+    "./section": {
+      "types": "./dist/section.d.ts",
+      "import": "./dist/section.js"
+    },
     "./worker": {
       "types": "./dist/worker.d.ts",
       "import": "./dist/worker.js"
+    },
+    "./write": {
+      "types": "./dist/write.d.ts",
+      "import": "./dist/write.js"
     }
   },
   "files": [
     "dist",
+    "NOTICE.md",
     "NOTICE"
   ],
   "peerDependencies": {
+    "@margoengine/core": "^1.0.0",
     "@margoengine/loaders": "^1.0.0",
-    "web-ifc": "^0.0.78"
+    "@margoengine/materials": "^1.0.0",
+    "web-ifc": "^0.0.78",
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/lines": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "web-ifc": {
+      "optional": true
+    },
+    "@margoengine/materials": {
+      "optional": true
+    },
+    "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/geometry": {
+      "optional": true
+    },
+    "@margoengine/lines": {
       "optional": true
     }
   }

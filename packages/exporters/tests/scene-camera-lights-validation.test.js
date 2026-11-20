@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { exportModel } from '../dist/model.js';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 

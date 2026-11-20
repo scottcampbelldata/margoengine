@@ -303,6 +303,33 @@ console.log(sheet.frames.length); // 2; sheet.texture works as a SpriteLayer atl
 
 Every pixel is one colour of the view or the outline colour. For a palette, chain `PaletteQuantize` of `margoengine/pixel/palette`. `outlineMask` is the CPU form of the outline. `renderSpriteFrames` shoots a mesh at each turn about Y into one sheet and puts its rotation back.
 
+## Textures after a device restore
+
+`source` and `target` of `PixelScale`, `CRT` and `PaletteQuantize`, and `target` of `Render3D`, take a texture or a function that returns one. A
+function is read every frame, as a pixel layer's `target` getter is, so a restore needs nothing from you. A plain texture belongs to the device you
+made it on: after the device is lost and restored the pass draws nothing, binds nothing of the old device, and reports one `'state'` error through
+`engine.onError` (help `borrowed-lost`) for each lost texture. `Render3D` puts its picture in its own `output` texture until it has a new target.
+Hand in new textures with `setSource` and `setTarget` (all four passes have `setTarget`), usually from your own `onDeviceRestored`; the setter takes the
+engine's device as it is now.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {PixelScale} from 'margoengine/pixel/scale';
+const canvas = document.querySelector('canvas')!;
+const engine = await EngineKernel.create(canvas, {backend: 'webgpu', exactSize: [64, 64]});
+const make = (size: number) => engine.gpu!.createTexture({size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING});
+const scale = PixelScale.attach(engine, {source: make(16), target: make(32)});
+engine.render({delta: 1 / 60});
+await engine.rebootDevice(); // both textures are gone with the old device
+scale.setSource(make(16));
+scale.setTarget(make(32));
+engine.render({delta: 1 / 60});
+```
+
 ## Rendering tiers
 
 GPU attachments refuse the small `@margoengine/webgl2-compat/preview` engine during setup with linked `MargoError` code `unsupported`. Use native WebGPU, the full WebGL2 compatibility layer, or awaited [automatic escalation](../webgl2-compat/README.md#automatic-escalation). The package-tier browser regression checks refusal and escalation; the package GPU suite checks drawing on both complete tiers.
+
+## Film time
+
+`PixelFollow.advanceTime(delta)` is one frame of the rig with no draw (follow, shake, flash, fade; `rig.time` counts the seconds), so `seek` from `@margoengine/cutscene/seek` replays it while film code moves the target on the way.

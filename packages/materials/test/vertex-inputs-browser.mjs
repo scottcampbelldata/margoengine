@@ -1,5 +1,5 @@
-// Real-GPU regression test: gltf-pro's vertex input trimming (src/vertex-inputs.ts) draws the same pixels. The page is
-// taken twice, as built and with the trimming switched off in the served gltf-pro build. The two must match bit for
+// Real-GPU regression test: gltf/pbr's vertex input trimming (src/vertex-inputs.ts) draws the same pixels. The page is
+// taken twice, as built and with the trimming switched off in the served gltf/pbr build. The two must match bit for
 // bit, and the frame must not be empty. The trimming covers the inputs the shader reads, the colour fetch of all-white
 // instanced vertices, three-float position and normal reads and the unread instance UV row (batch 166 job 2). The
 // ?bench page is the 50,000-box createInstancedMesh frame of the speed matrix.
@@ -7,11 +7,9 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 import { decodePNG } from '../../../tests/support/png.js';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'materials-vertex-inputs' });
 async function run(compat, bench) {
   const page0 = '/packages/materials/test/vertex-inputs.html' + (bench ? '?bench' : ''),
     context = await openBrowser({ startPath: page0, port: 5281, compat }),
@@ -22,7 +20,7 @@ async function run(compat, bench) {
   let off = false,
     patched = 0;
   // Any chunk: the build moves the trimming between them, and `patched` below proves one was switched.
-  await page.route('**/packages/gltf-pro/dist/*.js*', async (route) => {
+  await page.route('**/packages/gltf/dist/*.js*', async (route) => {
     const response = await route.fetch();
     let body = await response.text();
     if (off) {
@@ -69,12 +67,8 @@ async function run(compat, bench) {
     await context.close();
   }
 }
-try {
-  // check:merge runs this leaf through the package GPU suite. Keep both device implementations covered.
-  for (const bench of [false, true]) {
-    await run(false, bench);
-    await run(true, bench);
-  }
-} finally {
-  release();
+// check:merge runs this leaf through the package GPU suite. Keep both device implementations covered.
+for (const bench of [false, true]) {
+  await run(false, bench);
+  await run(true, bench);
 }

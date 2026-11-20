@@ -78,7 +78,9 @@ test('scene picker ownership is synchronous and default aliases restore before r
     const created = engine.createMesh();
     assert.equal(created.scene, engine.scene);
     finish(b);
-    assert.equal(await result, null, 'a mesh allocation invalidates an outstanding readback');
+    // an unrelated mesh made during the readback leaves the answer standing; only a mesh made in the
+    // hit slot after the pick started is stale (tests/deep-core-pick-stale-reentry.test.js).
+    assert.equal(await result, b, 'a mesh made elsewhere during the readback does not void it');
     assert.equal(engine.lighting, engine.scene.lighting);
   } finally {
     finish(b);

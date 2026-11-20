@@ -9,14 +9,12 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 // Pages per level, finest first, for pose 'near' with the default 8 levels and distance 500.
 const LEVEL_PAGES = [0, 40, 38, 27, 12, 0, 0, 4],
   // A deep-shade pixel has cascade shade within this many pixels all around, wider than a coarsest-level texel on screen.
   DEEP = 4;
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-virtual-feedback' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/virtual-feedback.html', port: 5269 }),
   { page } = context,
   pageErrors = [];
@@ -114,5 +112,4 @@ try {
   console.log('shadows virtual feedback: ok');
 } finally {
   await context.close?.();
-  await release?.();
 }

@@ -3,6 +3,7 @@ import { Material, type MaterialOptions } from '@margoengine/materials';
 import type { CasterDisplacement } from '../../shared/caster.js';
 import type { SurfaceGraph } from './graph.js';
 import type { Engine } from '@margoengine/core/extension';
+import { ShaderClock } from './clock.js';
 import {
   Program,
   type Host,
@@ -91,7 +92,7 @@ const maxVaryings = 8,
       return `(${p}[3].z/${p}[2].z)`;
     },
   },
-  // gltf-pro's instanced vertex stage shadows these with `let`s of the instance's values.
+  // gltf/pbr's instanced vertex stage shadows these with `let`s of the instance's values.
   instanceInput = (name: string, type: string, value: string) => (b: Builder) => {
     b.declare(name, `const ${name}:${type}=${value};`);
     return name;
@@ -195,6 +196,18 @@ const scoped = (name: string, lines: string[], value: string) =>
  */
 const eye = (b: Builder) => b.frame('cameraEye', 'vec3f'),
   view = (b: Builder) => b.frame('cameraView', 'mat4x4f');
+/** What a node material's uniforms read: the target size, the engine's frame clock and the camera frames. */
+function frameHost(engine: Engine | undefined): Host {
+  const canvas = engine?.canvas,
+    clock = ShaderClock.find(engine);
+  return {
+    width: canvas?.width ?? 1,
+    height: canvas?.height ?? 1,
+    time: clock?.time ?? 0,
+    delta: clock?.delta ?? 0,
+    frames: cameraFrames(engine),
+  };
+}
 function cameraFrames(engine: Engine | undefined): Host['frames'] {
   const camera = engine?.camera as unknown as
     | { position: ArrayLike<number>; near: number; far: number; view: ArrayLike<number>; projection: ArrayLike<number> }
@@ -344,7 +357,7 @@ function reachedBindings(declared: string, body: string): Map<number, GPUBindGro
  */
 export class NodeMaterial extends Material {
   readonly program = new Program(48);
-  /** Generated statements spliced into gltf-pro's surface() and vertex() (for inspection and tests). */
+  /** Generated statements spliced into gltf\/pbr's surface() and vertex() (for inspection and tests). */
   readonly fragmentCode: string;
   readonly vertexCode: string;
   readonly varyingFields: string;
@@ -501,7 +514,7 @@ export class NodeMaterial extends Material {
     if (count !== 2 + (inputs ? 1 : 0) + (this.varyingFields ? 1 : 0) + (this.rederived ? 1 : 0))
       throw new MargoError(
         'unsupported',
-        'NodeMaterial requires the standard gltf-pro PBR shader; use matching @margoengine/gltf-pro and shader versions',
+        'NodeMaterial requires the standard gltf/pbr shader; use matching @margoengine/gltf/pbr and shader versions',
       );
     code = this.program.declare(group) + '\n' + code;
     this.patched.set(key, code);
@@ -567,12 +580,11 @@ export class NodeMaterial extends Material {
         )
     );
   }
-  /** @internal What a depth pass draws: the record of gltf-pro's `displacement`, undefined for an unchanged shape. */
+  /** @internal What a depth pass draws: the record of gltf\/pbr's `displacement`, undefined for an unchanged shape. */
   override caster(device: GPUDevice, engine?: Engine): CasterDisplacement | undefined {
     if (!this.depthVertex) return undefined;
     if (this.depthRecord?.device === device) return this.depthRecord.record;
-    const canvas = engine?.canvas,
-      body = this.depthVertex + this.depthFragment,
+    const body = this.depthVertex + this.depthFragment,
       // Auto layouts hold what the shader reaches, which can be less than the beauty pass binds.
       reached = reachedBindings(this.program.declare(0), body);
     let layout: GPUBindGroupLayout | undefined;
@@ -586,19 +598,18 @@ export class NodeMaterial extends Material {
       layout: () => (layout ??= device.createBindGroupLayout({ entries: [...reached.values()] })),
       entries: () =>
         this.program
-          .entries(device, { width: canvas?.width ?? 1, height: canvas?.height ?? 1, frames: cameraFrames(engine) })
+          .entries(device, frameHost(engine))
           .filter((entry) => reached.has(entry.binding)),
     };
     this.depthRecord = { device, record };
     return record;
   }
   override bindings(device: GPUDevice, engine?: Engine): GPUBindGroupEntry[] {
-    const canvas = engine?.canvas;
     // The uniforms upload here for every pass, and a block only the depth passes read stays out of the colour pass's group.
     return [
       ...super.bindings(device, engine),
       ...this.program
-        .entries(device, { width: canvas?.width ?? 1, height: canvas?.height ?? 1, frames: cameraFrames(engine) })
+        .entries(device, frameHost(engine))
         .filter((entry) => entry.binding < this.colourBindings),
     ];
   }

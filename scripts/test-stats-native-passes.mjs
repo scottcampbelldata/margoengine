@@ -1,6 +1,6 @@
-// Hardware-only native Stats pass regression. Build Stats first, then run with the GPU lock:
+// Hardware-only native Stats pass regression. Build Stats first, then run:
 //   node scripts/build-optional.js stats
-//   node scripts/gpu-lock.mjs run --owner=stats-native-passes -- node scripts/test-stats-native-passes.mjs
+//   node scripts/run-with-timeout.mjs -- node scripts/test-stats-native-passes.mjs
 // This is an explicit browser correctness check, not part of the fake-GPU CPU suite or an allocation benchmark.
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';

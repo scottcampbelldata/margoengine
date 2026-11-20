@@ -3,7 +3,7 @@ import {Engine} from '/packages/core/dist/index.js';
 import {engineRuntime} from '/packages/core/dist/extension.js';
 import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
 import {meshPBR,traceSceneFromGLTF} from '/packages/voxel-pathtracer/dist/mesh-pbr.js';
-import {loadGLTF} from '/packages/gltf-pro/dist/index.js';
+import {loadGLTF} from '/packages/gltf/dist/pbr.js';
 window.run=async(compat=false)=>{
  if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
  const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,0,4],target:[0,0,0]}});
@@ -30,7 +30,7 @@ window.run=async(compat=false)=>{
   a=scene();b=scene();Object.assign(a.pbrMaterials[0],{specularFactor:.7,specularColorFactor:[2,3,4],specularTexture:tex([255,255,255,128]),specularColorTexture:tex([128,255,64,255])});Object.assign(b.pbrMaterials[0],{specularFactor:.7*128/255,specularColorFactor:[2*linear(128/255),3,4*linear(64/255)]});await compare('specular alpha strength and sRGB F0 color match flat factors',a,b);
   a=scene();b=scene();Object.assign(a.pbrMaterials[0],{iridescenceFactor:.9,iridescenceIor:1.4,iridescenceThicknessMaximum:600,iridescenceTexture:tex([128,255,255,255]),iridescenceThicknessTexture:tex([255,64,255,255])});Object.assign(b.pbrMaterials[0],{iridescenceFactor:.9*128/255,iridescenceIor:1.4,iridescenceThicknessMaximum:100+500*64/255});await compare('iridescence red blend and green thickness match flat factors',a,b);
   a=scene();b=scene();a.environment.sunIntensity=b.environment.sunIntensity=0;Object.assign(a.pbrMaterials[0],{emissiveFactor:[2,4,8],clearcoatFactor:1});b.pbrMaterials[0].emissiveFactor=[2*.96,4*.96,8*.96];await compare('clearcoat attenuates emission with the independently known normal-incidence Fresnel',a,b);
-  const model=await loadGLTF(engine,'/packages/gltf-pro/tests/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});
+  const model=await loadGLTF(engine,'/packages/gltf/test/fixtures/metadata/Box.gltf',{signal:AbortSignal.timeout(120000)});
   model.asset.doc.materials[0].extensions={KHR_materials_clearcoat:{clearcoatFactor:.7,clearcoatRoughnessFactor:.3},KHR_materials_sheen:{sheenColorFactor:[.3,.1,.05],sheenRoughnessFactor:.5},KHR_materials_specular:{specularFactor:.7,specularColorFactor:[2,1,1]},KHR_materials_iridescence:{iridescenceFactor:.6,iridescenceThicknessMaximum:450}};engine.render();const gltf=await traceSceneFromGLTF(model,{signal:AbortSignal.timeout(120000)});model.dispose();
   gltf.environment=scene().environment;const im=await render(gltf);
   rows.push({name:'licensed Khronos Box snapshot traces all four extension records',finite:im.color.every(Number.isFinite),triangles:gltf.meshes.reduce((n,m)=>n+m.indices.length/3,0),drawn:im.instance.some(id=>id<=-4)});

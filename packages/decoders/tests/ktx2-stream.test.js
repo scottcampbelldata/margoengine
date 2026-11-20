@@ -46,10 +46,11 @@ test('levelForPixels picks the smallest level that still covers the screen', () 
   assert.equal(levelForPixels(1024, 1024, 0), 32);
 });
 
-function mockDevice() {
+function mockDevice(limits = {}) {
   const log = { created: [], writes: [], copies: [], destroyed: 0 };
   return {
     log,
+    limits: { maxTextureDimension2D: 8192, maxTextureArrayLayers: 256, ...limits },
     createTexture(descriptor) {
       const texture = { ...descriptor, destroy: () => log.destroyed++ };
       log.created.push(texture);
@@ -83,9 +84,9 @@ function server(bytes) {
   };
 }
 
-async function streamer(bytes, options = {}) {
+async function streamer(bytes, options = {}, limits = {}) {
   const module = await basis(),
-    device = mockDevice(),
+    device = mockDevice(limits),
     web = server(bytes),
     decoder = {
       target: 'bc7',
@@ -245,4 +246,41 @@ test('colorViews lets a texture be viewed in its sRGB or linear twin, across rep
   assert.equal(colorTwin('etc2-rgb8a1unorm'), 'etc2-rgb8a1unorm-srgb');
   assert.equal(colorTwin('astc-4x4-unorm'), 'astc-4x4-unorm-srgb');
   assert.equal(colorTwin('rgba16float'), undefined);
+});
+
+test('a stream larger than the device allows is refused before any texture is made', async () => {
+  const bytes = await fixture('cube-uastc-zstd.ktx2');
+  for (const [limits, message] of [
+    [{ maxTextureDimension2D: 32 }, /64x64 exceeds the device's maxTextureDimension2D/],
+    [{ maxTextureArrayLayers: 4 }, /6 layers exceeds the device's maxTextureArrayLayers/],
+  ]) {
+    const { device, streamer: s } = await streamer(bytes, {}, limits);
+    await assert.rejects(s.open('/cube.ktx2'), (error) => error instanceof RangeError && message.test(error.message));
+    assert.equal(device.log.created.length, 0, 'no texture is made');
+    s.dispose();
+  }
+});
+
+// KB-RESTORE-BORROWED1 (docs/conventions.md, "Borrowed GPU objects"): StreamedKTX2.texture is an output, never a caller's
+// object (the registry row is exempt). A streamer belongs to the device it was given and makes, replaces and copies
+// every texture on it; after a device loss the caller opens the file again on a streamer for the new device, which
+// makes its textures there and touches nothing of the lost one.
+test('a streamed texture is made on the streamer\'s own device; a streamer for the replacement device makes its own', async () => {
+  const bytes = await fixture('cube-uastc-zstd.ktx2'),
+    old = await streamer(bytes),
+    first = await old.streamer.open('/cube.ktx2');
+  first.want(32);
+  old.streamer.update();
+  await settled();
+  const lostLog = old.device.log,
+    made = lostLog.created.length;
+  assert.ok(made >= 2, 'the stream replaced its texture on the first device');
+  const next = await streamer(bytes),
+    again = await next.streamer.open('/cube.ktx2');
+  assert.deepEqual(next.device.log.created[0].size, [4, 4, 6]);
+  assert.equal(again.texture, next.device.log.created.at(-1));
+  assert.equal(lostLog.created.length, made, 'nothing more is made on the first device');
+  assert.equal(first.texture, lostLog.created.at(-1));
+  first.dispose();
+  again.dispose();
 });

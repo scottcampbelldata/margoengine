@@ -19,9 +19,8 @@ test('stems share start and loop phase; beat/bar transitions use the audio clock
   assert.equal(s.music.start('idle', 1), 1);
   const [a,b] = s.context.bufferSources;
   for (const source of [a,b]) {
-    assert.deepEqual(source.started, {when:1,offset:0,duration:undefined});
-    assert.equal(source.loop, true);
-    assert.equal(source.loopEnd, 2);
+    assert.deepEqual(source.started, {when:1,offset:0,duration:2});
+    assert.equal(source.loop, false);
   }
   assert.equal(a.buffer, s.stems.a);
   assert.equal(fader(a).gain.value, 1);
@@ -34,7 +33,7 @@ test('stems share start and loop phase; beat/bar transitions use the audio clock
   assert.deepEqual(fader(b).gain.last(), ['set',1,3]);
   assert.equal(s.music.transition('idle', {after:3.01}), 5);
   s.listener.dispose();
-  assert.ok([a,b].every(source => source.stopped && source.outputs.size === 0));
+  assert.ok(s.context.bufferSources.every(source => source.stopped && source.outputs.size === 0));
   assert.throws(() => s.music.transition('idle'), e => e.code === 'disposed' && /errors#disposed/.test(e.message));
 });
 
@@ -71,5 +70,48 @@ test('grid, buffer length and complete state validation happen before graph allo
   const music = new AudioMusic(listener,{a:buffer},{idle:{}});
   assert.throws(() => music.transition('idle'), e => e.code === 'state');
   assert.throws(() => music.start('idle', -1));
+  listener.dispose();
+});
+
+test('every loop is its own source anchored at origin + k * loop, so whole-frame rounding never accumulates', () => {
+  // 130 bpm, 4 beats: 1.846... s, a fractional frame count at every common rate. A looping source with a
+  // fractional loopEnd drifts in a browser that truncates loop points to whole frames (Firefox).
+  const s = setup({bpm:130, loopBeats:4});
+  const loop = 4 * 60 / 130;
+  s.music.start('idle', 0.5);
+  for (let t = 0; t < 3600; t += 0.7) { s.context.currentTime = t; s.music.update(); }
+  const sources = s.context.bufferSources;
+  assert.ok(sources.length > 2 * 3600 / loop, `${sources.length} sources`);
+  sources.forEach((source, n) => {
+    const k = Math.floor(n / 2);
+    assert.equal(source.loop, false);
+    assert.deepEqual(source.started, {when:0.5 + k * loop, offset:0, duration:loop});
+    assert.equal(source.buffer, n % 2 ? s.stems.b : s.stems.a);
+  });
+  // A loop end refills without a frame pass (a hidden tab), and the ended source leaves the graph.
+  const count = sources.length;
+  s.context.currentTime += 3 * loop;
+  sources[0].end();
+  assert.equal(sources[0].outputs.size, 0);
+  assert.ok(sources.length > count);
+  s.music.dispose(); s.listener.dispose();
+});
+
+test('a loop whose start passed during a stall starts now at its matching offset; an offline render is scheduled whole', () => {
+  const s = setup({bpm:120, loopBeats:4, leadTime:0});
+  s.music.start('idle', 0);
+  const before = s.context.bufferSources.length;
+  s.context.currentTime = 10.5;
+  s.music.update();
+  const late = s.context.bufferSources.slice(before).filter(source => source.started.when === 10.5);
+  assert.equal(late.length, 2);
+  for (const source of late) assert.deepEqual(source.started, {when:10.5, offset:0.5, duration:1.5});
+  s.listener.dispose();
+  const context = new FakeAudioContext({state:'running'});
+  context.length = 48000 * 9; context.sampleRate = 48000; context.startRendering = () => {};
+  const listener = new AudioListener({context});
+  const music = new AudioMusic(listener, {a:context.createBuffer(1, 96000, 48000)}, {on:{a:0}});
+  music.start('on', 0);
+  assert.deepEqual(context.bufferSources.map(source => source.started.when), [0, 2, 4, 6, 8]);
   listener.dispose();
 });

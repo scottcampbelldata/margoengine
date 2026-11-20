@@ -1,0 +1,122 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Clouds check</title><style>body{margin:0}canvas{width:128px;height:128px}</style></head><body><canvas id="engine"></canvas>
+<script type="module">
+// Real-GPU checks of @margoengine/vfx/clouds, driven by clouds-check.mjs. Each check draws the puffs into its own
+// 128 x 128 rgba8unorm target (cleared to transparent black) and reads the bytes back. Puffs use a solid white 4 x 4
+// texture where the expected alpha is computed here, so the alpha of a puff's centre pixel is exactly its shader terms.
+import {Clouds} from '/packages/vfx/dist/clouds.js';
+import {Camera,Engine} from '/packages/core/dist/extension.js';
+const adapter=await navigator.gpu.requestAdapter({powerPreference:'high-performance'}),device=await adapter.requestDevice(),errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const size=128,white={width:4,height:4,data:new Uint8Array(64).fill(255)};
+const makeCamera=(position,target,fov=60)=>{const c=new Camera({position,target,fov,near:0.1,far:100});c.update(1,true);return c;};
+const floorShader=`@group(0) @binding(0) var<uniform> m:mat4x4f;
+@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
+ let q=array<vec2f,6>(vec2f(-50,-50),vec2f(50,-50),vec2f(50,50),vec2f(-50,-50),vec2f(50,50),vec2f(-50,50))[i];
+ return m*vec4f(q.x,0,q.y,1);
+}`;
+// Draws `clouds` once with `camera` (after a floor at y = 0 into the depth when `floor`), returns the bytes and the draws.
+async function render(clouds,camera,{floor=false,samples=1}={}){
+ const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage}),
+  color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),
+  resolved=samples>1?target('rgba8unorm',1,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC):color,
+  depth=target('depth32float',samples,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING),
+  pixels=device.createBuffer({size:size*size*4,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ}),
+  encoder=device.createCommandEncoder(),draws=[],owned=[];
+ clouds.options.depth=()=>depth;
+ if(floor){
+  const module=device.createShaderModule({code:floorShader}),
+   pipeline=device.createRenderPipeline({layout:'auto',vertex:{module,entryPoint:'v'},multisample:{count:samples},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'greater'}}),
+   uniform=device.createBuffer({size:64,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+  owned.push(uniform);device.queue.writeBuffer(uniform,0,camera.matrix);
+  const pass=encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}});
+  pass.setPipeline(pipeline);pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:{buffer:uniform}}]}));pass.draw(6);pass.end();
+ }else encoder.beginRenderPass({colorAttachments:[],depthStencilAttachment:{view:depth.createView(),depthLoadOp:'clear',depthStoreOp:'store',depthClearValue:0}}).end();
+ encoder.beginRenderPass({colorAttachments:[{view:color.createView(),loadOp:'clear',storeOp:'store',clearValue:[0,0,0,0]}]}).end();
+ // Every draw the clouds record, counted through the encoder they are given.
+ const counting=new Proxy(encoder,{get(t,k){if(k==='beginRenderPass')return d=>{const p=t.beginRenderPass(d);return new Proxy(p,{get(pt,pk){if(pk==='draw')return(v,n)=>{draws.push([v,n]);pt.draw(v,n);};const f=pt[pk];return typeof f==='function'?f.bind(pt):f;}});};const f=t[k];return typeof f==='function'?f.bind(t):f;}});
+ const context={backend:'webgpu',device,delta:0,camera,width:size,height:size,format:'rgba8unorm',color:color.createView(),depth:depth.createView(),descriptor:{multisample:{count:samples},depthStencil:{format:'depth32float'}},encoder:counting};
+ clouds['draw'](context);
+ if(samples>1)encoder.beginRenderPass({colorAttachments:[{view:color.createView(),resolveTarget:resolved.createView(),loadOp:'load',storeOp:'store'}]}).end();
+ encoder.copyTextureToBuffer({texture:resolved},{buffer:pixels,bytesPerRow:size*4},[size,size]);
+ device.queue.submit([encoder.finish()]);
+ await pixels.mapAsync(GPUMapMode.READ);
+ const image=new Uint8Array(pixels.getMappedRange().slice(0));
+ pixels.unmap();for(const x of new Set([color,resolved,depth,pixels,...owned]))x.destroy();
+ return {image,draws};
+}
+const attach=options=>{const c=new Clouds({texture:white,shading:"unlit",depth:()=>undefined,...options});c.setup({gpu:device,stats:{drawCalls:0},sceneOf(){return null}});return c;};
+const project=(camera,p)=>{const m=camera.matrix,w=m[3]*p[0]+m[7]*p[1]+m[11]*p[2]+m[15];return[Math.floor(((m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12])/w*0.5+0.5)*size),Math.floor((0.5-(m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13])/w*0.5)*size)];};
+const alphaAt=(image,[x,y])=>image[(y*size+x)*4+3];
+
+// Instanced draw: three clouds of 5, 7 and 9 puffs are one draw of 4 vertices and 21 instances.
+window.checkInstanced=async(samples)=>{
+ const clouds=attach({frustumCulled:false}),camera=makeCamera([0,0,12],[0,0,0]);
+ [5,7,9].forEach((n,k)=>{const cloud=clouds.add({segments:n,volume:1,bounds:[6,2,1]});cloud.matrix[13]=(k-1)*3;});
+ device.pushErrorScope('validation');
+ const {image,draws}=await render(clouds,camera,{samples}),error=await device.popErrorScope();
+ const lit=image.filter((v,i)=>i%4===3&&v>0).length;clouds.dispose();
+ return {error:error?.message??null,errors:errors.splice(0),draws,drawn:clouds.stats.drawn,lit};
+};
+// Depth-soft edges: six puffs of size 0.4 at heights 0.2 to 2 over a floor, seen steeply from above. With softness 1 the
+// centre alpha is Lorach's contrast curve of the gap (floor depth along the pixel ray minus the puff depth along the view
+// axis, over the softness); without it the alpha is 1 (the floor cuts the quad with a hard line elsewhere).
+const heights=[0.2,0.3,0.5,0.8,1.2,2],eye=[0,8,3];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],norm=a=>{const l=Math.hypot(...a);return a.map(c=>c/l);};
+const contrast=x=>{const y=0.5*(2*(x>0.5?1-x:x))**2;return x>0.5?1-y:y;};
+window.checkSoft=async(samples,softness)=>{
+ const camera=makeCamera(eye,[0,0,0],40),clouds=attach({softness,frustumCulled:false}),places=heights.map((h,i)=>[(i-2.5)*0.9,h,0]);
+ clouds.add({segments:6,volume:0.4,fade:0,bounds:[2,2,2],distribute:i=>({point:places[i],volume:1})});
+ device.pushErrorScope('validation');
+ const {image}=await render(clouds,camera,{floor:true,samples}),error=await device.popErrorScope();
+ const F=norm(eye.map(c=>-c)),R=norm(cross(F,[0,1,0])),U=cross(R,F),t=Math.tan(20*Math.PI/180);
+ const rows=places.map(P=>{
+  const [px,py]=project(camera,P),nx=(px+0.5)/size*2-1,ny=1-(py+0.5)/size*2,dir=[0,1,2].map(k=>F[k]+nx*t*R[k]+ny*t*U[k]),
+   depthP=dot(F,[P[0]-eye[0],P[1]-eye[1],P[2]-eye[2]]),gap=-eye[1]/dir[1]-depthP;
+  return {height:P[1],gap,expected:softness?contrast(Math.min(Math.max(gap/softness,0),1))*255:255,got:alphaAt(image,[px,py])};
+ });
+ clouds.dispose();
+ return {error:error?.message??null,errors:errors.splice(0),rows};
+};
+// Fade near the camera: five puffs 2 to 12 m away on rays 7.5 degrees apart, each 0.1 x its distance wide. With fade 8 the
+// centre alpha is smoothstep(0, 8, distance).
+window.checkFade=async(samples)=>{
+ const camera=makeCamera([0,0,10],[0,0,0]),clouds=attach({frustumCulled:false}),
+  places=[2,4,6,8,12].map((d,i)=>{const a=(i-2)*7.5*Math.PI/180;return {d,p:[Math.sin(a)*d,0,10-Math.cos(a)*d]};});
+ const cloud=clouds.add({segments:5,volume:2,fade:8,bounds:[2,2,2],distribute:i=>({point:places[i].p,volume:places[i].d*0.05})});
+ cloud.matrix.set([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+ device.pushErrorScope('validation');
+ const {image}=await render(clouds,camera,{samples}),error=await device.popErrorScope();
+ const smooth=x=>{const t=Math.min(Math.max(x,0),1);return t*t*(3-2*t);};
+ const rows=places.map(({d,p})=>({distance:d,expected:smooth(d/8)*255,got:alphaAt(image,project(camera,p))}));
+ clouds.dispose();
+ return {error:error?.message??null,errors:errors.splice(0),rows};
+};
+// Animation determinism: two fresh Clouds advanced by the same uneven deltas draw the same bytes (sorted, lit, the
+// generated texture); a third advanced a little further draws different ones.
+window.checkDeterminism=async(samples)=>{
+ const camera=makeCamera([0,1,10],[0,1,0]),deltas=Array.from({length:30},(_,i)=>[1/60,1/30,0,1/45][i%4]);
+ const run=async extra=>{
+  const clouds=new Clouds({frustumCulled:true});clouds.setup({gpu:device,stats:{drawCalls:0},sceneOf(){return null}});
+  clouds.add({seed:4,segments:20,speed:1,growth:3,bounds:[6,2,2],volume:3});
+  const second=clouds.add({seed:9,segments:20,speed:0.6,color:'#ffd8c0',bounds:[4,1,2],volume:2});second.matrix[12]=2;second.matrix[13]=1.5;
+  for(const d of deltas)clouds.onPreUpdate(d);clouds.advanceTime(extra);
+  const {image}=await render(clouds,camera,{samples});clouds.dispose();return image;
+ };
+ device.pushErrorScope('validation');
+ const a=await run(0),b=await run(0),c=await run(0.5),error=await device.popErrorScope();
+ let same=0,moved=0,lit=0;for(let i=0;i<a.length;i++){if(a[i]!==b[i])same++;if(a[i]!==c[i])moved++;if(i%4===3&&a[i])lit++;}
+ return {error:error?.message??null,errors:errors.splice(0),differing:same,moved,lit};
+};
+// In an engine: one more draw call per frame with the clouds attached, puffs drawn, no GPU errors.
+window.checkEngine=async()=>{
+ const engine=await Engine.create(document.getElementById('engine'),{backend:'webgpu',camera:{position:[0,1,10],target:[0,1,0],near:0.1,far:100}});
+ engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();
+ const before=engine.stats.drawCalls,clouds=Clouds.attach(engine);clouds.add({segments:12});clouds.add({segments:8,seed:3});
+ engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();
+ const after=engine.stats.drawCalls,drawn=clouds.stats.drawn;
+ clouds.dispose();engine.dispose();
+ return {errors:errors.splice(0),before,after,drawn};
+};
+window.ready=true;
+</script></body></html>

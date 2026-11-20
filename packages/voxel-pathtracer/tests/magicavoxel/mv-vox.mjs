@@ -1,5 +1,5 @@
 // node test-results/mv-vox.mjs <out-dir> <samples> <file.vox>... : renders each .vox with the tracer's MagicaVoxel
-// mapping at 960 x 800 into <out-dir>/<name>-ours.png (run under the GPU lock).
+// mapping at 960 x 800 into <out-dir>/<name>-ours.png (run).
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { openBrowser } from '../scripts/browser.js';

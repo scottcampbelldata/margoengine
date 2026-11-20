@@ -65,6 +65,7 @@ const red = (r, g, b) => r > 200 && g < 50 && b < 50,
   green = (r, g, b) => g > 100 && r < 50 && b < 50,
   blue = (r, g, b) => b > 200 && r < 50 && g < 50,
   lit = (r, g, b) => r + g + b > 0;
+const corners = (b) => [b.minX, b.minY, b.width, b.height];
 const using = (options, run) => {
   const layer = BillboardLayer.attach(instance, { atlas, ...options });
   try {
@@ -165,6 +166,60 @@ window.check = {
     }
     out.msaa = { validation: (await runtime.gpu.popErrorScope())?.message ?? null };
     msaa.dispose();
+
+    // A lost device (KB-RESTORE-BORROWED1, docs/conventions.md "Borrowed GPU objects"): pixels and functions come
+    // back by themselves; a plain GPUTexture is reported once through engine.onError, its layer draws nothing and
+    // the frame goes on, until setAtlas gives a new one.
+    {
+      look([0, 0, 5]);
+      const upload = (device) => {
+          const texture = device.createTexture({
+            size: [4, 4],
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          });
+          device.queue.writeTexture({ texture }, data, { bytesPerRow: 16 }, [4, 4]);
+          return texture;
+        },
+        made = [],
+        makeAtlas = (device) => {
+          made.push(device);
+          return upload(device);
+        },
+        previous = engine.gpu,
+        pixels = BillboardLayer.attach(instance, { atlas }),
+        plain = BillboardLayer.attach(instance, { atlas: upload(previous) }),
+        fromFunction = BillboardLayer.attach(instance, { atlas: makeAtlas });
+      // Red from pixels on the left, green from a plain texture in the middle, blue from a function on the right.
+      pixels.add({ x: -3, width: 2, height: 2, rect: RED });
+      plain.add({ width: 2, height: 2, rect: GREEN });
+      fromFunction.add({ x: 3, width: 2, height: 2, rect: BLUE });
+      const seen = (image) => [red, green, blue].map((match) => corners(extent(image, match)));
+      const loss = { before: seen(frame()) };
+      previous.destroy();
+      await previous.lost;
+      await engine.rebootDevice();
+      engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+      const reports = [],
+        onError = engine.onError;
+      engine.onError = (error) => reports.push(error);
+      loss.frames = [];
+      try {
+        for (let i = 0; i < 3; i++) loss.frames.push(seen(frame()));
+      } catch (error) {
+        loss.thrown = error.message;
+      }
+      engine.onError = onError;
+      loss.reports = reports.map((error) => [error.code, error.message]);
+      loss.functionCalls = made.length;
+      loss.functionDevices = made[0] !== made[1];
+      plain.setAtlas(upload(engine.gpu));
+      loss.after = seen(frame());
+      pixels.dispose();
+      plain.dispose();
+      fromFunction.dispose();
+      out.loss = loss;
+    }
     out.errors = errors;
     return out;
   },

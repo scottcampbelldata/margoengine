@@ -1,4 +1,4 @@
-// Geometry that is not a part, drawn into the occluder depth of `CulledInstances`: core meshes, gltf-pro models, materials
+// Geometry that is not a part, drawn into the occluder depth of `CulledInstances`: core meshes, gltf/pbr models, materials
 // meshes and anything with `drawOccluder`, such as Terrain. An occluder must be a surface the frame really shows, or
 // parts behind it would vanish: so only front faces draw (a double-sided surface just occludes less), and cut-out,
 // blended, displaced and clipped primitives do not occlude at all.
@@ -54,8 +54,8 @@ export type OccluderInput = OccluderMesh | PublicMesh | OccluderSource;
 const shader = `
 struct Occluder {camera:mat4x4f,model:mat4x4f}
 @group(0) @binding(0) var<uniform> o:Occluder;
-@vertex fn plain(@location(0) p:vec3f)->@builtin(position) vec4f {return o.camera*(o.model*vec4f(p,1));}
-@vertex fn rows(@location(0) p:vec3f,@location(5) a:vec4f,@location(6) b:vec4f,@location(7) c:vec4f,@location(8) d:vec4f)->@builtin(position) vec4f {
+@vertex fn plain(@location(0) p:vec3f)->@builtin(position) @invariant vec4f {return o.camera*(o.model*vec4f(p,1));}
+@vertex fn rows(@location(0) p:vec3f,@location(5) a:vec4f,@location(6) b:vec4f,@location(7) c:vec4f,@location(8) d:vec4f)->@builtin(position) @invariant vec4f {
   return o.camera*(o.model*(mat4x4f(a,b,c,d)*vec4f(p,1)));
 }
 `;

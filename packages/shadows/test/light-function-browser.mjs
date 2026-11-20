@@ -5,13 +5,11 @@
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const toLight = [-0.35, 0.8, 0.3];
 const points = [];
 for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) points.push([(i - 7.5) * 450, (j - 7.5) * 450]);
-const release = await acquire({ owner: 'shadows-light-function' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/light-function.html', port: 5275 }),
   { page } = context,
   pageErrors = [];
@@ -69,9 +67,32 @@ try {
       assert.ok(Math.max(...r.open) > 40, `${name} under ${kind} has no light to take away`);
       assert.ok(Math.max(...r.dark) < Math.max(...r.open) * 0.5, `${name} under ${kind} ignored the pattern: ${r.open} to ${r.dark}`);
     }
+  // A device restore (KB-RESTORE-BORROWED1): a plain mask is dropped and reported once, the frame goes on unmasked and
+  // setTexture brings it back; a function mask is made again on the new device. Restores come last: they replace the device.
+  for (const kind of ['shadows', 'virtual']) {
+    // Each kind restores twice; core gives up after 4 losses in a row (reload the page), so each gets a fresh page.
+    if (kind === 'virtual') {
+      await page.reload();
+      await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
+    }
+    const r = await page.evaluate((k) => window.check.restore(k), kind);
+    console.log(JSON.stringify({ restore: kind, plain: r.plain, made: r.made, reports: r.reports }));
+    assert.deepEqual(r.thrown, [], `${kind}: a frame threw after the restore`);
+    assert.deepEqual(r.errors, [], `${kind}: validation errors after the restore`);
+    const near = (x, y, what) => assert.ok(x.every((v, i) => Math.abs(v - y[i]) <= 2), `${kind} ${what}: ${x} against ${y}`);
+    assert.ok(Math.max(...r.plain.dark) < Math.max(...r.plain.open) * 0.5, `${kind}: the plain mask did not darken`);
+    near(r.plain.lost, r.plain.open, 'lost mask equals no mask');
+    near(r.plain.back, r.plain.dark, 'setTexture brings the mask back');
+    assert.equal(r.plain.reports, 1, `${kind}: one report for the lost mask`);
+    assert.equal(r.reports.length, 1, `${kind}: the function form reports nothing`);
+    assert.equal(r.reports[0].code, 'state');
+    assert.match(r.reports[0].message, /lightPattern texture lost with the device; pass a function or call setTexture/);
+    near(r.made.after, r.made.before, 'function mask after the restore');
+    near(r.made.before, r.plain.dark, 'function mask darkens as the plain one');
+    assert.equal(r.made.calls, 2, `${kind}: the function is called once per device`);
+  }
   assert.deepEqual(pageErrors, []);
   console.log('light functions: ok');
 } finally {
   await context.close?.();
-  await release();
 }

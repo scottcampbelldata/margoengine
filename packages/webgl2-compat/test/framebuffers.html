@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>WebGL2 compatibility: framebuffers over steady frames</title>
+</head>
+<body style="margin:0">
+<canvas style="width:400px;height:300px"></canvas>
+<script type="module">
+// The post scene's framebuffers (KB-COMPAT-FRAMEALLOC1): a PostStack of SSAO, Bloom, tone mapping and FXAA draws every pass
+// into textures its stack owns (the engine multisamples, so the depth it samples is a resolved copy), so a steady frame must find the framebuffers it made before by the identity of their
+// subresources and build none. The page counts the calls to the device's framebuffer() (a build of a framebuffer's
+// attachments: a key string, an owner list and closures, even when the GL object already exists) and the WebGL2 calls
+// that create and delete a framebuffer and a texture, over a run of frames.
+import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+import { install } from '/packages/webgl2-compat/dist/index.js';
+import { PostStack } from '/packages/post/dist/index.js';
+import { SSAO } from '/packages/post/dist/ssao.js';
+import { Bloom } from '/packages/post/dist/bloom.js';
+import { FXAA } from '/packages/post/dist/fxaa.js';
+import { Tonemap } from '/packages/tonemap/dist/index.js';
+
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+const counts = { builds: 0, createFramebuffer: 0, deleteFramebuffer: 0, createTexture: 0 };
+const proto = WebGL2RenderingContext.prototype;
+for (const name of ['createFramebuffer', 'deleteFramebuffer', 'createTexture']) {
+  const original = proto[name];
+  proto[name] = function (...args) {
+    counts[name]++;
+    return original.apply(this, args);
+  };
+}
+
+async function main() {
+  const result = await install({ force: true });
+  if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+  const engine = await Engine.create(document.querySelector('canvas'), {
+    backend: 'webgpu',
+    camera: { position: [0, 3, 8], target: [0, 0.5, -3], near: 0.1, far: 100 },
+  });
+  const cube = box(1, 1, 1);
+  for (let i = 0; i < 9; i++)
+    engine
+      .createMesh()
+      .setGeometry(cube)
+      .setMaterial(new PbrMaterial({ color: [0.2 + (i % 3) * 0.3, 0.8 - (i % 4) * 0.15, 0.3], roughness: 0.4 }))
+      .setPosition([(i - 4) * 1.3, 0.5, -i * 1.6]);
+  const buildFramebuffer = engine.gpu.framebuffer;
+  engine.gpu.framebuffer = function (...args) {
+    counts.builds++;
+    return buildFramebuffer.apply(this, args);
+  };
+  PostStack.attach(engine, [new SSAO(), new Bloom({ strength: 0.6 }), new Tonemap(), new FXAA()]);
+  const frame = async () => {
+    engine.render({ delta: 0.016 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+  };
+  window.check = {
+    errors: () => errors.splice(0),
+    /** The calls made by `n` frames after `warm` frames. */
+    async steady(warm = 30, n = 60) {
+      for (let i = 0; i < warm; i++) await frame();
+      const before = { ...counts };
+      for (let i = 0; i < n; i++) await frame();
+      return Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, v - before[k]]));
+    },
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { errors: () => errors.splice(0) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

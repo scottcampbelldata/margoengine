@@ -12,19 +12,31 @@ const filesIn = (root, dir, extensions) =>
     .map((e) => `${dir}/${e.name}`)
     .sort();
 
-/** Folders of examples/ whose .ts files are checked by the project `examples`. */
+/**
+ * Folders of examples/ whose .ts files are checked by the project `examples`: the same folders as the `include` of
+ * examples/tsconfig.json (tests/check-example-types.test.js holds the two lists equal), so the narrowed check knows
+ * which packages each one imports.
+ */
 export const EXAMPLE_FOLDERS = [
+  'biomes',
   'blender-loader',
   'boulder',
+  'cabin-hearth',
+  'cad-viewer',
   'cathedral-light',
+  'dune-coast',
+  'event-horizon',
   'gallery',
+  'kitty-hawk',
   'molten-words',
   'orrery',
   'quickstart',
   'storm-light',
   'test-pages',
+  'timber-valley',
   'usdz-loader',
   'webxr-orbit',
+  'whiteout-pass',
   'xr-device-check',
 ];
 

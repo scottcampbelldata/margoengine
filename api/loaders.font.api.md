@@ -5,6 +5,17 @@
 ```ts
 import { GeometryData, Shape } from "@margoengine/geometry";
 
+export interface FontVariationAxis {
+    tag: string;
+    min: number;
+    default: number;
+    max: number;
+}
+
+export interface OpenTypeReaders {
+    readonly name: 'opentype';
+}
+
 export type OutlineCommand = ['M', number, number] | ['L', number, number] | ['Q', number, number, number, number] | ['C', number, number, number, number, number, number] | ['Z'];
 
 export type OutlineFillRule = 'nonzero' | 'evenodd';
@@ -17,6 +28,7 @@ export class OutlineFont {
     readonly glyphCount: number;
     readonly familyName: string | undefined;
     readonly styleName: string | undefined;
+    readonly variationAxes: readonly FontVariationAxis[];
     constructor(source: OutlineFontSource);
     glyphIndex(char: string | number): number | undefined;
     glyph(char: string | number): OutlineGlyph | undefined;
@@ -37,6 +49,7 @@ export interface OutlineFontSource {
     kerning?(left: number, right: number): number;
     missingGlyph?: number;
     fillRule?: OutlineFillRule;
+    variationAxes?: readonly FontVariationAxis[];
 }
 
 export interface OutlineGlyph {
@@ -45,8 +58,16 @@ export interface OutlineGlyph {
     commands: readonly OutlineCommand[];
 }
 
+export interface TTFFontSource extends OutlineFontSource {
+    readonly variationAxes: readonly FontVariationAxis[];
+    readonly variationCoordinates: readonly number[];
+    table(tag: string): Uint8Array | undefined;
+}
+
 export interface TTFParseOptions {
     fontIndex?: number;
+    variations?: Readonly<Record<string, number>>;
+    openType?: OpenTypeReaders;
 }
 
 export interface TextGeometryOptions extends TextShapeOptions {
@@ -70,6 +91,8 @@ export interface TextShapeOptions {
 }
 
 export function parseTTF(input: BinaryInput, options?: TTFParseOptions): OutlineFont;
+
+export function parseTTFSource(input: BinaryInput, options?: TTFParseOptions): TTFFontSource;
 
 export function textGeometry(text: string, options: TextGeometryOptions): GeometryData;
 

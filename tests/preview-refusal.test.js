@@ -20,10 +20,10 @@ import { SurfelPlugin } from '../packages/points/dist/surfels.js';
 import { TextRenderer } from '../packages/text/dist/index.js';
 import { WorldPanels } from '../packages/ui/dist/world.js';
 import { Selection } from '../packages/selection/dist/index.js';
-import { parseGLTF } from '../packages/gltf-pro/dist/index.js';
+import { parseGLTF } from '../packages/gltf/dist/pbr.js';
 import { TerrainColors } from '../packages/terrain/dist/index.js';
 import { XR } from '../packages/xr/dist/index.js';
-import { animatedTriangle } from './support/gltf-pro-fixture.js';
+import { animatedTriangle } from './support/gltf-pbr-fixture.js';
 
 test('the shared requirement rejects preview even when a device is supplied, and accepts both WebGPU-shaped tiers', () => {
   for (const host of [

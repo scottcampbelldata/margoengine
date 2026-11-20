@@ -1,10 +1,10 @@
 // Proof that HemisphereLight and AmbientLight (environment's root entry) change nothing for apps without them: the root
-// gained the classes, the `sky` lighting hook (packages/shared/pbr-hooks.js, composed by gltf-pro) and LightProbes'
+// gained the classes, the `sky` lighting hook (packages/shared/pbr-hooks.js, composed by gltf/pbr) and LightProbes'
 // patch learned to take a hemisphere as its fallback. Without a hemisphere, at `ref` and in the working tree:
 // 1. EnvironmentLighting, Fog and LightProbes (with and without an environment) patch every core-shader variant other
 //    packages leave before order -1 (plain, shadows, sky ambient, clustered, HDR capture, terrain) to the same text, and
-//    give gltf-pro the same lighting hooks.
-// 2. Those hooks composed by gltf-pro's lightPBR (each alone, IBL + fog, probes + fog) into the standard, extended,
+//    give gltf/pbr the same lighting hooks.
+// 2. Those hooks composed by gltf/pbr's lightPBR (each alone, IBL + fog, probes + fog) into the standard, extended,
 //    physical and transmissive shaders give the same WGSL.
 // 3. Six frames of each effect's passes (uploads, patch, bindings; a device restore) record the same GPU calls.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/environment-hemisphere.proof.js [ref] [pin] [--current]
@@ -14,17 +14,17 @@ import { refs, versions, load as loadAt, commit, announce, atRef, golden } from 
 import { mockGPU, context } from './gpu-recorder.js';
 import { wgsl } from '../../../packages/core/src/shaders.ts';
 
-const { ref, pin } = refs('6c20076d', 'b4700864', '97bd9b4818');
+const { ref, pin } = refs('6c20076d', 'b4700864', '8c71da0556');
 const root = await versions('environment', ref, 'src/index.ts', pin),
   probes = await versions('environment', ref, 'src/probes.ts', pin);
-// gltf-pro's shaders and the hook composer (packages/shared, inlined into gltf-pro) from the same refs.
-announce('gltf-pro src/shader.ts + shared/pbr-hooks.js', ref, pin);
+// gltf/pbr's shaders and the hook composer (packages/shared, inlined into gltf/pbr) from the same refs.
+announce('gltf/pbr src/shader.ts + shared/pbr-hooks.js', ref, pin);
 const gltfAt = async (at) => ({
-  ...(await loadAt('gltf-pro', 'src/shader.ts', at)),
-  ...(await loadAt('gltf-pro', '../shared/pbr-hooks.js', at)),
+  ...(await loadAt('gltf', 'src/shader.ts', at)),
+  ...(await loadAt('gltf', '../shared/pbr-hooks.js', at)),
 });
 const shaders = {
-  baseline: await atRef('gltf-pro shaders', ref, () => gltfAt(commit(ref))),
+  baseline: await atRef('gltf/pbr shaders', ref, () => gltfAt(commit(ref))),
   candidate: await gltfAt(pin && commit(pin)),
 };
 

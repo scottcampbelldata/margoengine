@@ -15,6 +15,19 @@ import {
 import { settledGround } from './surface.js';
 import { WindField } from './wind.js';
 
+/** A 32-bit integer finaliser (MurmurHash3's fmix32): a bijection that spreads neighbouring inputs apart. */
+function mix32(x: number): number {
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b);
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+/** The walk's start state: a hash of the seed's whole 64-bit value, so -1, 4294967295, 1 and 1.5 all differ. */
+function seedState(seed: number): number {
+  const bits = new DataView(new ArrayBuffer(8));
+  bits.setFloat64(0, seed === 0 ? 0 : seed);
+  return mix32(bits.getUint32(4) ^ mix32(bits.getUint32(0) ^ 0x9e3779b9));
+}
+
 /** Settings of a {@link WeatherMachine}. */
 export interface MachineOptions {
   /** Seed of the wind field's gusts and turbulence. Default 1. */
@@ -81,6 +94,11 @@ export const TEMPERATE: NonNullable<RandomWalkOptions['chain']> = {
   blizzard: { snow: 4, overcast: 1 },
 };
 
+const checkEase = (ease: unknown): void => {
+  if (ease !== 'linear' && ease !== 'smoothstep')
+    throw new TypeError(`Transition ease must be "linear" or "smoothstep"; got ${String(ease)}`);
+};
+
 const number = (value: unknown, name: string, min: number, max: number): number => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max)
     throw new RangeError(`${name} must be a finite number from ${min} to ${max}; got ${String(value)}`);
@@ -131,6 +149,8 @@ export class WeatherMachine implements Disposable {
   private listeners = new Set<(event: WeatherEvent) => void>();
   private dispatching = false;
   private disposed = false;
+  // A replayed step (advanceTime) calls no listener: the film saw those transitions already.
+  private silent = false;
 
   /** The wind in this weather: a field kept in step with the state's `wind`, `gust` and `windDirection` on every update. */
   readonly wind: WindField;
@@ -151,7 +171,7 @@ export class WeatherMachine implements Disposable {
   get state(): WeatherState {
     return { ...this.current };
   }
-  /** Seconds of weather time so far (the sum of the deltas). */
+  /** Seconds of weather time so far (the sum of the deltas given to `update` and `advanceTime`). */
   get time(): number {
     return this.clock;
   }
@@ -183,7 +203,11 @@ export class WeatherMachine implements Disposable {
     if (this.disposed) throw new MargoError('disposed', 'WeatherMachine is disposed; create a new one');
   }
 
-  /** Listens for transitions starting and arriving. Returns a function that stops listening. */
+  /**
+   * Listens for transitions starting and arriving. Returns a function that stops listening. A listener may call `set`
+   * or `stop`; `transitionTo`, `schedule`, `randomWalk` and `update` throw MargoError `'state'` there, before they change
+   * anything.
+   */
   on(listener: (event: WeatherEvent) => void): () => void {
     this.alive();
     if (typeof listener !== 'function')
@@ -192,12 +216,21 @@ export class WeatherMachine implements Disposable {
     return () => this.listeners.delete(listener);
   }
 
-  private emit(event: WeatherEvent): void {
+  /**
+   * Throws when a listener is running. A listener's transitionTo, schedule, randomWalk or update would start or end a
+   * transition, whose event would run inside the one being dispatched; the call is refused before it changes anything.
+   */
+  private idle(): void {
     if (this.dispatching)
       throw new MargoError(
         'state',
         'A weather listener changed the weather it was called from; move the change out of the listener (for example to the next frame)',
       );
+  }
+
+  private emit(event: WeatherEvent): void {
+    this.idle();
+    if (this.silent) return;
     this.dispatching = true;
     try {
       for (const listener of [...this.listeners]) listener(event);
@@ -212,6 +245,7 @@ export class WeatherMachine implements Disposable {
    */
   transitionTo(target: WeatherTarget, { seconds = 30, ease = 'smoothstep' }: TransitionOptions = {}): this {
     this.alive();
+    this.idle();
     // Checked before anything stops: a rejected call leaves a running schedule or walk going.
     const to = this.checked(target, seconds, ease);
     this.steps = this.walk = undefined;
@@ -221,8 +255,7 @@ export class WeatherMachine implements Disposable {
 
   private checked(target: WeatherTarget, seconds: number, ease: BlendEase): WeatherState {
     number(seconds, 'Transition seconds', 0, 86400);
-    if (ease !== 'linear' && ease !== 'smoothstep')
-      throw new TypeError(`Transition ease must be "linear" or "smoothstep"; got ${String(ease)}`);
+    checkEase(ease);
     return resolveState(target, this.current);
   }
 
@@ -269,12 +302,14 @@ export class WeatherMachine implements Disposable {
    */
   schedule(list: readonly ScheduleStep[], { loop = false }: { loop?: boolean } = {}): this {
     this.alive();
+    this.idle();
     if (!Array.isArray(list) || list.length === 0)
       throw new RangeError('Schedule needs at least one step such as {to: "rain", hold: 120}; pass a non-empty array');
     for (const step of list) {
       resolveState(step.to, this.current);
       number(step.hold ?? 60, 'Schedule hold', 0, 86400);
       number(step.seconds ?? 30, 'Schedule seconds', 0, 86400);
+      checkEase(step.ease ?? 'smoothstep');
     }
     if (loop && list.reduce((sum, step) => sum + (step.hold ?? 60) + (step.seconds ?? 30), 0) <= 0)
       throw new RangeError('A looping schedule needs some time in it; give a step a hold or seconds above 0');
@@ -290,6 +325,7 @@ export class WeatherMachine implements Disposable {
    */
   randomWalk(from: WeatherPresetName, options: RandomWalkOptions = {}): this {
     this.alive();
+    this.idle();
     const chain = options.chain ?? TEMPERATE,
       hold = options.hold ?? [120, 480],
       blendRange = options.blend ?? [40, 120];
@@ -321,15 +357,15 @@ export class WeatherMachine implements Disposable {
     }
     if (hold[1] + blendRange[1] <= 0)
       throw new RangeError('randomWalk needs some time in it; give hold or blend a maximum above 0');
-    this.steps = undefined;
     const seed = options.seed ?? 1;
     number(seed, 'randomWalk seed', -2147483648, 4294967295);
+    this.steps = undefined;
     this.walk = {
       options: { chain, hold, blend: blendRange },
       at: from,
       held: 0,
       total: -1,
-      state: ((seed | 0) ^ 0x9e3779b9) >>> 0,
+      state: seedState(seed),
     };
     this.begin(from, this.pick(blendRange), 'smoothstep');
     return this;
@@ -361,6 +397,7 @@ export class WeatherMachine implements Disposable {
    */
   update(delta: number): WeatherState {
     this.alive();
+    this.idle();
     if (typeof delta !== 'number' || !Number.isFinite(delta) || delta < 0)
       throw new RangeError(`Weather delta must be a finite number of seconds, 0 or more; got ${String(delta)}`);
     let left = delta;
@@ -370,6 +407,21 @@ export class WeatherMachine implements Disposable {
       this.step(dt);
     }
     return this.state;
+  }
+
+  /**
+   * Moves the weather by `delta` seconds as {@link WeatherMachine.update} does (blend, schedule, random walk, wetness,
+   * snow cover and wind) but calls no listener: `seek` from `@margoengine/cutscene/seek` replays a run's steps with it,
+   * so a schedule or walk is where it was at that time. A listener that changes the weather (`set`, `stop`) is not
+   * replayed; put such changes in the schedule, or make them from film code on the same step.
+   */
+  advanceTime(delta: number): void {
+    this.silent = true;
+    try {
+      this.update(delta);
+    } finally {
+      this.silent = false;
+    }
   }
 
   private step(dt: number): void {

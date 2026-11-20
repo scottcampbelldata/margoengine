@@ -1,7 +1,8 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
-import { atlasTexture } from '../../shared/atlas-texture.js';
+import { borrowedAtlas } from '../../shared/atlas-texture.js';
+import { type BorrowSlot, borrow, fix, lend } from '../../shared/borrowed.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { generateMipmaps } from '../../shared/mipmaps.js';
 import { applyView, checkLayers, ViewStates } from '../../shared/view-rect.js';
@@ -31,7 +32,8 @@ export interface SpritePixels {
 /**
  * Where a layer's texels come from. Pixels and `ImageBitmap`s are uploaded by the layer to an `rgba8unorm` texture it
  * owns and uploads again after a device loss. A function is called with the device, also after a device loss. A plain
- * `GPUTexture` stays the caller's and needs {@link SpriteLayer.setAtlas} after a device loss.
+ * `GPUTexture` stays the caller's: after a device loss the layer draws nothing and reports once through
+ * `engine.onError` until {@link SpriteLayer.setAtlas} gives a new one (docs/conventions.md, "Borrowed GPU objects").
  */
 export type SpriteAtlas = SpritePixels | ImageBitmap | GPUTexture | ((device: GPUDevice) => GPUTexture);
 /**
@@ -48,7 +50,10 @@ export interface SpriteShader {
 export type SpriteMask =
   | { rect: readonly [number, number, number, number]; outside?: boolean }
   | { circle: readonly [number, number, number]; outside?: boolean };
-/** A render target, or a function read each frame for one that changes. */
+/**
+ * A render target, or a function read each frame for one that changes. A plain `GPUTexture` lost with the device
+ * stops the layer drawing, reported once, until {@link SpriteLayer.setTarget} gives a new one.
+ */
 export type SpriteTarget = GPUTexture | (() => GPUTexture);
 
 /** A second colour target holding each sprite's normal, for 2D lighting. */
@@ -262,7 +267,9 @@ let layerCount = 0;
  * conversion. WebGPU only.
  * @throws TypeError / RangeError on invalid options or, each frame, an invalid sprite.
  * @throws MargoError `'unsupported'` on a WebGL engine, `'disposed'` after `dispose()`, `'attached'` when a sprite is
- * already in a layer, `'state'` for a normal target that does not fit or a plain `GPUTexture` atlas after a device loss.
+ * already in a layer, `'state'` for a normal target that does not fit. A plain `GPUTexture` atlas or target held at a
+ * device restore is reported once through `engine.onError` (`'state'`, help `borrowed-lost`); the layer skips its draw
+ * until a setter gives a new one.
  */
 export class SpriteLayer implements EnginePlugin {
   readonly name: string;
@@ -274,9 +281,12 @@ export class SpriteLayer implements EnginePlugin {
   ySort: boolean;
   private readonly order: number;
   private readonly layerMask: number;
-  private readonly target?: SpriteTarget;
+  private target?: SpriteTarget;
+  private targetSlot!: BorrowSlot<GPUTexture, GPUTexture>;
+  private slots!: BorrowSlot<GPUTexture, SpriteAtlas>[];
+  private normalSlots?: [BorrowSlot<GPUTexture, SpriteAtlas>, BorrowSlot<GPUTexture, GPUTexture>];
   private readonly clear: number[] | false;
-  private readonly normals?: SpriteNormals;
+  private normals?: SpriteNormals;
   private readonly smooth: boolean;
   private readonly effect?: string;
   private readonly stride: number;
@@ -295,7 +305,6 @@ export class SpriteLayer implements EnginePlugin {
   private device?: GPUDevice;
   private colorAtlas?: OwnedAtlas;
   private normalAtlas?: OwnedAtlas;
-  private stale = false;
   private layout?: GPUBindGroupLayout;
   private module?: GPUShaderModule;
   private sampler?: GPUSampler;
@@ -338,12 +347,14 @@ export class SpriteLayer implements EnginePlugin {
     if (options.clear && (options.clear.length !== 4 || !options.clear.every(Number.isFinite)))
       throw rangeError('Invalid sprite clear', 'sprite-options');
     this.atlas = options.atlas;
+    this.slots = this.borrowAtlases(options.atlas);
     this.camera = options.camera ?? { x: 0, y: 0, zoom: 1 };
     this.snap = options.snap ?? true;
     this.ySort = options.ySort ?? false;
-    this.target = options.target;
+    this.setTarget(options.target);
     this.clear = options.clear === false ? false : [...(options.clear ?? [0, 0, 0, 0])];
     this.normals = options.normals;
+    if (options.normals) this.setNormals(options.normals);
     this.mask = options.mask;
     this.smooth = options.filter === 'linear';
     if (options.shader !== undefined && !/\bfn\s+effect\s*\(/.test(options.shader?.code ?? ''))
@@ -405,8 +416,44 @@ export class SpriteLayer implements EnginePlugin {
     this.dropAtlas(this.colorAtlas);
     this.colorAtlas = undefined;
     this.atlas = atlas;
-    this.stale = false;
+    this.slots = this.borrowAtlases(atlas);
     this.generation++;
+  }
+  /**
+   * Replaces the layer's own target: a texture, a function read each frame, or undefined for the frame's colour target.
+   * After a device restore, hand in a texture made on `engine.gpu` here.
+   */
+  setTarget(target: SpriteTarget | undefined): void {
+    this.target = target;
+    this.targetSlot = borrow(
+      typeof target === 'function' ? undefined : target,
+      'SpriteLayer target',
+      'setTarget',
+      this.engine?.gpu,
+    );
+  }
+  /**
+   * Replaces the normal atlas and target of a layer made with `normals`. After a device restore, hand in textures made
+   * on `engine.gpu` here, or pass `(device) => GPUTexture` for the atlas and a function for the target.
+   */
+  setNormals(normals: SpriteNormals): void {
+    if (!this.normals || !normals?.atlas || !normals.target)
+      throw typeError('This SpriteLayer was made without normals', 'sprite-options');
+    if (this.normalAtlas?.owned) this.normalAtlas.texture.destroy();
+    this.normalAtlas = undefined;
+    this.normals = normals;
+    const device = this.engine?.gpu,
+      target = normals.target;
+    this.normalSlots = [
+      borrow(normals.atlas, 'SpriteLayer normals atlas', 'setNormals', device),
+      borrow(typeof target === 'function' ? undefined : target, 'SpriteLayer normals target', 'setNormals', device),
+    ];
+    this.generation++;
+  }
+  private borrowAtlases(atlas: SpriteAtlas | readonly SpriteAtlas[]): BorrowSlot<GPUTexture, SpriteAtlas>[] {
+    return (Array.isArray(atlas) ? atlas : [atlas]).map((a: SpriteAtlas) =>
+      borrow<GPUTexture, SpriteAtlas>(a, 'SpriteLayer atlas', 'setAtlas', this.engine?.gpu),
+    );
   }
   setup(engine: Engine): void {
     if (this.disposed || engine.backend !== 'webgpu')
@@ -416,6 +463,7 @@ export class SpriteLayer implements EnginePlugin {
         this.disposed ? 'disposed' : 'webgpu',
       );
     this.engine = engine;
+    for (const slot of [...this.slots, this.targetSlot, ...(this.normalSlots ?? [])]) fix(slot, engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.order,
@@ -424,18 +472,21 @@ export class SpriteLayer implements EnginePlugin {
       },
     });
   }
+  /**
+   * Moves the layer's `time` by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
+   * runs it, so `seek` from `@margoengine/cutscene/seek` replays a shader effect's clock exactly.
+   */
+  advanceTime(delta: number): void {
+    if (delta > 0) this.time += delta;
+  }
   onPreUpdate(delta: number): void {
     this.frameStart = true;
-    if (delta > 0) {
-      this.states.prune();
-      this.time += delta;
-    }
+    if (delta > 0) this.states.prune();
+    this.advanceTime(delta);
   }
   onDeviceRestored(): void {
-    // A caller's plain GPUTexture went with the device; bytes, bitmaps and functions come back by themselves.
-    this.stale =
-      !!this.colorAtlas &&
-      (Array.isArray(this.atlas) ? this.atlas : [this.atlas]).some((a) => typeof a !== 'function' && 'createView' in a);
+    // Bytes, bitmaps and functions come back by themselves; a caller's plain GPUTexture is reported once at its next
+    // use (shared/borrowed.js) and the layer skips its draw until a setter gives a new one.
     this.release();
   }
   dispose(): void {
@@ -475,18 +526,17 @@ export class SpriteLayer implements EnginePlugin {
     this.uploadAll = true;
     this.generation++;
   }
-  private prepare(device: GPUDevice): void {
+  /** False while a caller's texture is lost with the device: the layer draws nothing this frame. */
+  private prepare(device: GPUDevice): boolean {
     if (this.device !== device) {
       if (this.device) this.release();
       this.device = device;
     }
-    if (this.stale) throw fault('state', 'Sprite atlas lost with the device; call setAtlas', 'sprite-state');
-    this.colorAtlas ??=
-      this.smooth || this.pages ? this.composed(device) : this.loadAtlas(device, this.atlas as SpriteAtlas);
+    this.colorAtlas ??= this.smooth || this.pages ? this.composed(device) : this.loadAtlas(device, this.slots[0]);
+    if (!this.colorAtlas) return false;
     if (this.normals && !this.normalAtlas) {
-      this.normalAtlas = atlasTexture(device, this.normals.atlas, () =>
-        rangeError('Invalid sprite pixels', 'sprite-options'),
-      );
+      this.normalAtlas = this.loadAtlas(device, this.normalSlots![0]);
+      if (!this.normalAtlas) return false;
       if (
         this.normalAtlas.texture.width !== this.colorAtlas.texture.width ||
         this.normalAtlas.texture.height !== this.colorAtlas.texture.height
@@ -524,19 +574,23 @@ export class SpriteLayer implements EnginePlugin {
       if (this.smooth)
         this.sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
     }
+    return true;
   }
-  private loadAtlas(device: GPUDevice, atlas: SpriteAtlas): OwnedAtlas {
-    return atlasTexture(device, atlas, () => rangeError('Invalid sprite pixels', 'sprite-options'));
+  private loadAtlas(device: GPUDevice, slot: BorrowSlot<GPUTexture, SpriteAtlas>): OwnedAtlas | undefined {
+    return borrowedAtlas(slot, device, this.engine, () => rangeError('Invalid sprite pixels', 'sprite-options'));
   }
   /**
    * The layer's own copy of its atlases: one layer of a texture array per atlas for a list, and for `filter: 'linear'`
    * premultiplied in linear light with its mip chain. Each source is drawn in with a full-screen triangle, so any
    * texture the caller gives works without copy usage.
    */
-  private composed(device: GPUDevice): OwnedAtlas {
-    const sources = (this.pages ? (this.atlas as readonly SpriteAtlas[]) : [this.atlas as SpriteAtlas]).map((a) =>
-        this.loadAtlas(device, a),
-      ),
+  private composed(device: GPUDevice): OwnedAtlas | undefined {
+    const loaded = this.slots.map((slot) => this.loadAtlas(device, slot));
+    if (loaded.some((source) => !source)) {
+      for (const source of loaded) this.dropAtlas(source);
+      return undefined;
+    }
+    const sources = loaded as OwnedAtlas[],
       { width, height } = sources[0].texture,
       smooth = this.smooth,
       target: GPUTextureFormat = smooth ? 'rgba8unorm-srgb' : 'rgba8unorm',
@@ -694,14 +748,16 @@ export class SpriteLayer implements EnginePlugin {
   private draw(c: SpritesPassContext): void {
     const view = c.view;
     if (view?.layers !== undefined && !(view.layers & this.layerMask)) return;
-    const own = this.target && (typeof this.target === 'function' ? this.target() : this.target);
+    const target = this.target,
+      own = typeof target === 'function' ? target() : target && lend(this.targetSlot, c.device, this.engine);
+    if (target && !own) return;
     // The first view this layer draws in a frame: view 0 may leave it out by its layers.
     const first = this.frameStart || !view?.index;
     this.frameStart = false;
     // A layer with its own target draws once a frame, however many views the frame has.
     if (own && !first) return;
     const device = c.device;
-    this.prepare(device);
+    if (!this.prepare(device)) return;
     const count = this.upload(device);
     let width = view ? view.viewport[2] : c.width,
       height = view ? view.viewport[3] : c.height,
@@ -729,7 +785,8 @@ export class SpriteLayer implements EnginePlugin {
     this.attachments.length = 1;
     if (this.normals) {
       const { target, clear = true } = this.normals,
-        texture = typeof target === 'function' ? target() : target;
+        texture = typeof target === 'function' ? target() : lend(this.normalSlots![1], device, this.engine);
+      if (!texture) return;
       if (
         samples !== 1 ||
         texture.sampleCount !== 1 ||

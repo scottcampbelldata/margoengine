@@ -30,6 +30,8 @@ interface Surface {
   /** The roughness value and map hold glossiness. */
   glossy: boolean;
   emissive: number[];
+  /** What multiplies the emission map, which replaces the emission colour: the family's emission weight. */
+  emissiveWeight: number;
   emissiveMap?: string;
   normalMap?: string;
   occlusionMap?: string;
@@ -80,6 +82,7 @@ function maxPBR(source: FBXNode): Surface {
     roughnessMap: hasGloss ? '3dsMax|main|glossiness_map' : '3dsMax|main|roughness_map',
     glossy,
     emissive: main.color('emit_color', [0, 0, 0]),
+    emissiveWeight: 1,
     emissiveMap: '3dsMax|main|emit_color_map',
     normalMap: '3dsMax|main|norm_map',
     occlusionMap: '3dsMax|main|ao_map',
@@ -107,6 +110,7 @@ function maxPhysical(source: FBXNode): Surface {
     roughnessMap: map('roughness_map'),
     glossy: !!p.number('roughness_inv', 0),
     emissive: emit.map((v) => v * emission),
+    emissiveWeight: emission,
     emissiveMap: map('emit_color_map'),
     opacity: 1,
     opacityMap: map('cutout_map'),
@@ -133,6 +137,7 @@ function stingray(source: FBXNode): Surface {
     roughnessMap: map('use_roughness_map', 'roughness_map'),
     glossy: false,
     emissive: p.color('emissive', [0, 0, 0]).map((v) => v * intensity),
+    emissiveWeight: intensity,
     emissiveMap: map('use_emissive_map', 'emissive_map'),
     normalMap: map('use_normal_map', 'normal_map'),
     occlusionMap: map('use_ao_map', 'ao_map'),
@@ -149,14 +154,17 @@ function arnold(source: FBXNode): Surface {
     emission = p.number('emission', 0);
   return {
     color: p.color('baseColor', [1, 1, 1]),
-    weight: p.number('base', 1),
+    // Autodesk Standard Surface, diffuse reflection: base 0.8, base_color 1 by default.
+    weight: p.number('base', 0.8),
     colorMap: 'Maya|baseColor',
     metalness: p.number('metalness', 0),
     metalnessMap: 'Maya|metalness',
     roughness: p.number('specularRoughness', 0.2),
     roughnessMap: 'Maya|specularRoughness',
     glossy: false,
+    // Standard Surface emits emission x emission_color.
     emissive: p.color('emissionColor', [1, 1, 1]).map((v) => v * emission),
+    emissiveWeight: emission,
     emissiveMap: 'Maya|emissionColor',
     normalMap: 'Maya|normalCamera',
     opacity: (opacity[0] + opacity[1] + opacity[2]) / 3,
@@ -271,14 +279,18 @@ async function mergeOpacity(
     height = Math.max(b?.height ?? 0, o.height),
     data = new Uint8Array(width * height * 4),
     read = opacityReader(o, inverse);
-  let ends = 0;
+  let ends = 0,
+    solid = true;
   for (let y = 0, at = 0; y < height; y++)
     for (let x = 0; x < width; x++, at += 4) {
       const a = read(x, y, width, height);
       if (a < 16 || a > 239) ends++;
+      if (a < 255) solid = false;
       for (let c = 0; c < 3; c++) data[at + c] = same ? texel(o, x, y, width, height, c) : b ? texel(b, x, y, width, height, c) : 255;
       data[at + 3] = a;
     }
+  // A map with no hole anywhere leaves the material as it was: nothing to cut or blend.
+  if (solid) return;
   if (cutout || ends >= width * height * 0.95) {
     out.alphaMode = 'MASK';
     out.alphaCutoff = 0.5;
@@ -294,7 +306,11 @@ const hasAlpha = (image: Pixels): boolean => {
 };
 const sameImage = (a: TextureData, b: TextureData): boolean => a.image === b.image;
 
-/** FbxLayeredTexture blend modes, by number; the other modes of the list composite as a plain layer. */
+/**
+ * FbxLayeredTexture blend modes, by their EBlendMode number (FBX SDK 2017 class reference: eAdditive 1, eModulate 2,
+ * eModulate2 3, eDarken 7, eLighten 11, eScreen 12, eHardMix 21, eDifference 22, eExclusion 23, eSubtract 24); the other
+ * modes of the list composite as a plain layer.
+ */
 const BLEND: Record<number, (bottom: number, top: number) => number> = {
   1: (b, t) => Math.min(1, b + t), // add
   2: (b, t) => b * t, // modulate
@@ -302,8 +318,8 @@ const BLEND: Record<number, (bottom: number, top: number) => number> = {
   7: (b, t) => Math.min(b, t), // darken
   11: (b, t) => Math.max(b, t), // lighten
   12: (b, t) => 1 - (1 - b) * (1 - t), // screen
-  21: (b, t) => Math.abs(b - t), // difference
-  23: (b, t) => Math.max(0, b - t), // subtract
+  22: (b, t) => Math.abs(b - t), // difference
+  24: (b, t) => Math.max(0, b - t), // subtract
 };
 
 /**
@@ -312,10 +328,18 @@ const BLEND: Record<number, (bottom: number, top: number) => number> = {
  */
 async function flatten(read: MaterialRead, node: FBXNode): Promise<TextureData | undefined> {
   const layers = read.children(node).filter((n) => n.name === 'Texture'),
-    textures = (await Promise.all(layers.map((layer) => read.texture(layer)))).filter((t) => t !== undefined);
-  if (textures.length < 2) return textures[0];
-  const blend = findChild(node, 'BlendModes') ? array(node, 'BlendModes') : [],
-    alphas = findChild(node, 'Alphas') ? array(node, 'Alphas') : [],
+    blendIn = findChild(node, 'BlendModes') ? array(node, 'BlendModes') : [],
+    alphasIn = findChild(node, 'Alphas') ? array(node, 'Alphas') : [],
+    // BlendModes and Alphas follow the layers, so a layer whose image is lost takes its mode and alpha with it.
+    kept = (await Promise.all(layers.map((layer) => read.texture(layer))))
+      .map((texture, k) => ({ texture, mode: blendIn[k], alpha: finite(alphasIn[k], 1) }))
+      .filter((layer): layer is { texture: TextureData; mode: number; alpha: number } => layer.texture !== undefined);
+  if (!kept.length) return undefined;
+  // One layer over nothing is its own image, unless its alpha thins it.
+  if (kept.length === 1 && kept[0].alpha === 1) return kept[0].texture;
+  const textures = kept.map((layer) => layer.texture),
+    blend = kept.map((layer) => layer.mode),
+    alphas = kept.map((layer) => layer.alpha),
     images = textures.map(pixels),
     width = Math.max(...images.map((i) => i.width)),
     height = Math.max(...images.map((i) => i.height)),
@@ -328,7 +352,7 @@ async function flatten(read: MaterialRead, node: FBXNode): Promise<TextureData |
         a = 0;
       images.forEach((image, k) => {
         const mode = BLEND[blend[k]],
-          coverage = (texel(image, x, y, width, height, 3) / 255) * finite(alphas[k], 1),
+          coverage = (texel(image, x, y, width, height, 3) / 255) * alphas[k],
           mix = (under: number, channel: number): number => {
             const top = texel(image, x, y, width, height, channel) / 255;
             // The blended colour shows where there is something under it, as in any paint program's layer.
@@ -389,12 +413,6 @@ async function apply(read: MaterialRead): Promise<void> {
     const colorMap = await map(surface.colorMap);
     if (colorMap) out.baseColorTexture = colorMap;
     out.color = colorMap ? [weight, weight, weight, alpha] : [...base.map((v) => v * weight), alpha];
-    if (surface.uvScale && surface.uvOffset && colorMap) {
-      const [su, sv] = surface.uvScale,
-        [ou, ov] = surface.uvOffset;
-      if (su !== 1 || sv !== 1 || ou !== 0 || ov !== 0)
-        out.baseColorTextureTransform = { offset: [ou, ov], scale: [su, sv] };
-    }
     const rough = surface.glossy ? 1 - surface.roughness : surface.roughness,
       metalMap = await map(surface.metalnessMap),
       roughMap = await map(surface.roughnessMap);
@@ -416,14 +434,30 @@ async function apply(read: MaterialRead): Promise<void> {
     if (normal) out.normalTexture = normal;
     const occlusion = await map(surface.occlusionMap);
     if (occlusion) out.occlusionTexture = occlusion;
-    const peak = Math.max(...surface.emissive, 0);
-    out.emissive = peak > 1 ? surface.emissive.map((v) => v / peak) : surface.emissive;
+    // A map replaces the emission colour, so the factor is the weight alone: a weight of 0 keeps the map dark.
+    const emissive = await map(surface.emissiveMap),
+      emission = emissive ? [0, 1, 2].map(() => Math.max(0, surface.emissiveWeight)) : surface.emissive,
+      peak = Math.max(...emission, 0);
+    out.emissive = peak > 1 ? emission.map((v) => v / peak) : emission;
     if (peak > 1) out.emissiveStrength = peak;
     else delete out.emissiveStrength;
-    const emissive = await map(surface.emissiveMap);
-    if (emissive) {
-      out.emissiveTexture = emissive;
-      if (!(peak > 0)) out.emissive = [1, 1, 1];
+    if (emissive) out.emissiveTexture = emissive;
+    // Stingray scales and offsets the file's UVs for every map, and the mesh reader stores V as 1 - V for glTF: v' = ov +
+    // sv v in the file is 1 - sv - ov + sv v in the GLB (KHR_texture_transform: offset + scale x uv).
+    if (surface.uvScale && surface.uvOffset) {
+      const [su, sv] = surface.uvScale,
+        [ou, ov] = surface.uvOffset;
+      if (su !== 1 || sv !== 1 || ou !== 0 || ov !== 0) {
+        const transform = (): { offset: [number, number]; scale: [number, number] } => ({
+          offset: [ou, 1 - sv - ov],
+          scale: [su, sv],
+        });
+        if (out.baseColorTexture) out.baseColorTextureTransform = transform();
+        if (out.metallicRoughnessTexture) out.metallicRoughnessTextureTransform = transform();
+        if (out.normalTexture) out.normalTextureTransform = transform();
+        if (out.occlusionTexture) out.occlusionTextureTransform = transform();
+        if (out.emissiveTexture) out.emissiveTextureTransform = transform();
+      }
     }
     out.alphaMode = alpha < 1 ? 'BLEND' : 'OPAQUE';
     if (surface.transmission) out.transmission = unit(surface.transmission);
@@ -438,7 +472,10 @@ async function apply(read: MaterialRead): Promise<void> {
       emissive.node.name === 'LayeredTexture' ? await flatten(read, emissive.node) : await read.texture(emissive.node);
     if (image) {
       out.emissiveTexture = image;
-      if (!Math.max(...(out.emissive ?? [0]))) out.emissive = [1, 1, 1];
+      // The map replaces EmissiveColor and EmissiveFactor still multiplies it (FbxSurfaceLambert).
+      const factor = unit(finite(property(source, 'EmissiveFactor', 1), 1));
+      out.emissive = [factor, factor, factor];
+      delete out.emissiveStrength;
     }
   }
   const transparent = read.links.find((l) => l.property === 'TransparentColor');
@@ -448,7 +485,12 @@ async function apply(read: MaterialRead): Promise<void> {
       transparent.node.name === 'LayeredTexture'
         ? await flatten(read, transparent.node)
         : await read.texture(transparent.node);
-    if (image) await mergeOpacity(out, image, true, false);
+    // Which way the map reads: the FBX SDK has TransparentColor as transparency scaled by TransparencyFactor, and Maya
+    // writes it so, a factor of 1 on every lambert and phong. 3ds Max, Blender and Character Creator link their opacity
+    // map (white opaque) to the same slot and leave the factor below 1 (0, or 1 minus the material's opacity), as the
+    // Blender importer reads it; inverting theirs dropped Character Creator's boxers and brow cards.
+    const factor = finite(property(source, 'TransparencyFactor', 0), 0);
+    if (image) await mergeOpacity(out, image, factor >= 1, false);
   }
   // What has no slot in glTF stays on the record, so a tool can see what the material lost.
   const left = read.links.map((l) => l.property).filter((p) => !used.has(p) && !read.handled.has(p));

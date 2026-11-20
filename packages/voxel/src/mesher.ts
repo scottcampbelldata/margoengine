@@ -63,6 +63,13 @@ export interface ChunkMesh {
    * when faces `a < b` are connected, so a renderer can skip chunks that no line of sight crosses (cave culling).
    */
   visibility: number;
+  /**
+   * With `border` asked of {@link VoxelMesher.mesh}: the whole cube faces of the shell cells that touch the chunk, one
+   * u32 each, the faces the neighbouring chunks mesh along the seams (a bevel chamfers the chunk's seam edges and
+   * corners with them). Bits: local x + 1 at 0-5, y + 1 at 6-11, z + 1 at 12-17 (cells -1 to 32), face 18-20 (0-5),
+   * render layer 21-22 (0 opaque, 1 cutout, 2 translucent). Undefined when not asked or the mesh has no quads.
+   */
+  border?: Uint32Array;
 }
 
 /** One quad's fields, from {@link decodeQuad} (see {@link ChunkMesh} for their meaning). */
@@ -321,10 +328,12 @@ function merge(w: Work, d: number, s: number, n: number): void {
       height = 1;
     // Half-block bits (key bits 26-30: inset, then the trims): a trimmed quad leaves a gap along its trimmed axis, so
     // it only merges across the other one.
-    const part = (A >>> 26) & 31;
-    if (!w.unmerged[A & 4095] && o0 === o1 && o3 === o2 && l0 === l1 && l3 === l2 && !(part & 6))
+    const part = (A >>> 26) & 31,
+      // Translucent faces stay one per cell face so sortQuads can order them exactly (a merged quad has no one cell).
+      single = w.unmerged[A & 4095] || ((A >>> 24) & 3) === 2;
+    if (!single && o0 === o1 && o3 === o2 && l0 === l1 && l3 === l2 && !(part & 6))
       while (u + width < 32 && keys[m + width] === A && lights[m + width] === B) width++;
-    if (!w.unmerged[A & 4095] && o0 === o3 && o1 === o2 && l0 === l3 && l1 === l2 && !(part & 24))
+    if (!single && o0 === o3 && o1 === o2 && l0 === l3 && l1 === l2 && !(part & 24))
       grow: for (; v + height < 32; height++)
         for (let k = m + (height << 5), end = k + width; k < end; k++) if (keys[k] !== A || lights[k] !== B) break grow;
     for (let j = 0; j < height; j++) for (let k = m + (j << 5), end = k + width; k < end; k++) keys[k] = 0;
@@ -379,7 +388,7 @@ function candidates(w: Work, materials: Uint16Array, boundaryOnly: boolean, part
           if (all || !occ[p - SZ]) add(bucket, filled, 160 + z, x | (y << 5) | (tag || (near[p - SZ] && TAG)));
           continue;
         }
-        const all = f & LIQUID;
+        const all = (f & SHAPE) === LIQUID;
         if (all || !occ[p + 1]) add(bucket, filled, x, z | (y << 5));
         if (all || !occ[p - 1]) add(bucket, filled, 32 + x, z | (y << 5));
         if (all || !occ[p + SY]) add(bucket, filled, 64 + y, x | (z << 5));
@@ -850,11 +859,13 @@ export function meshChunk(input: MeshInput): ChunkMesh {
     seen |= f;
   }
   const first = flags[palette[0] & 0xffff];
-  // A uniform chunk (other than a liquid, whose surface steps inside) has faces only on its boundary slices.
   if (!bits && (first & 3) === INVISIBLE) return empty(ALL);
   w.flags = flags;
   if (seen & PART) halfBlocks(w, prepared);
-  candidates(w, materials, !bits && !(first & LIQUID), (seen & PART) !== 0);
+  // A uniform chunk of whole cubes has faces only on its boundary slices. Every other shape leaves part of each cell
+  // open (a liquid's surface steps inside, a slab's or stair's open half shows the one beside it), so its inner cells
+  // are scanned too; cross, model and object cells take their own path before that test.
+  candidates(w, materials, !bits && (first & SHAPE) === 0, (seen & PART) !== 0);
   faces(w, materials);
   const { out, count } = w;
   return {
@@ -990,9 +1001,14 @@ export function quadCenters(words: Uint32Array): Float32Array {
 }
 
 /**
- * Sorts the quads of a layer array back to front from `eye`, in place: farthest quad centre first, equal distances in
- * their current order. The translucent pass draws a chunk's quads in this order; {@link VoxelMesher.mesh} sorts in its
- * worker when given an eye, and a renderer can re-sort a near chunk's quads after the camera moves.
+ * Sorts the quads of a translucent layer array back to front from `eye`, in place. The order is exact for every quad
+ * on a cell face: a ray from the eye crosses cells whose distance from the eye's cell, counted per axis, never falls
+ * on any axis, so their grid (L1) distance rises by one at every face it crosses (the back-to-front grid order of
+ * Frieder, Gordon and Reynolds 1985, here for a perspective eye anywhere in the grid). A quad on the face between two
+ * cells is keyed by the farther cell, a quad inside a cell (a lowered or waving liquid top, an inset slab face, a
+ * cross) by its cell, and larger keys draw first; quads with one key are inside one cell and draw by centre distance,
+ * then in their current order. The order changes only when the eye's cell does, so a renderer re-sorts then.
+ * The translucent layer is never merged ({@link meshChunk}), so every quad has one cell.
  * @param eye The camera position in the chunk's local block units: world position minus 32 times the chunk coordinates.
  * @returns `words`.
  * @throws TypeError when `words` is not a Uint32Array or `eye` is not three numbers.
@@ -1008,19 +1024,41 @@ export function sortQuads(words: Uint32Array, eye: Vec3): Uint32Array {
     );
   const n = words.length / QUAD_WORDS,
     centers = quadCenters(words),
+    key = new Float64Array(n),
     distance = new Float64Array(n),
     order = new Uint32Array(n),
-    [ex, ey, ez] = eye;
+    [ex, ey, ez] = eye,
+    cx = Math.floor(ex),
+    cy = Math.floor(ey),
+    cz = Math.floor(ez);
   for (let i = 0; i < n; i++) {
+    key[i] = quadKey(words[i * 3], words[i * 3 + 1], cx, cy, cz);
     distance[i] = (centers[i * 3] - ex) ** 2 + (centers[i * 3 + 1] - ey) ** 2 + (centers[i * 3 + 2] - ez) ** 2;
     order[i] = i;
   }
-  // ponytail: centre distance can misorder a large merged quad against a small one beside it; a
-  // topological sort of the quads if that shows.
-  order.sort((a, b) => distance[b] - distance[a] || a - b);
+  order.sort((a, b) => key[b] - key[a] || distance[b] - distance[a] || a - b);
   const copy = words.slice();
   for (let i = 0; i < n; i++) words.set(copy.subarray(order[i] * 3, order[i] * 3 + 3), i * 3);
   return words;
+}
+
+// Sort key of one quad from the eye's cell (cx, cy, cz): twice the grid distance of the quad's cell when the quad lies
+// inside it, else twice the larger grid distance of the two cells either side of its face, less one.
+function quadKey(w0: number, w1: number, cx: number, cy: number, cz: number): number {
+  const x = w0 & 31,
+    y = (w0 >>> 5) & 31,
+    z = (w0 >>> 10) & 31,
+    face = (w0 >>> 15) & 7,
+    near = Math.abs(x - cx) + Math.abs(y - cy) + Math.abs(z - cz);
+  // Crosses and inset faces lie in the cell; a liquid top lowered (drop) or waving (bit 20) lies in the cell too.
+  if (face > 5 || (w1 >>> 21) & 1 || (face === 2 && (w0 >>> 29 || (w1 >>> 20) & 1))) return 2 * near;
+  const axis = face >> 1,
+    step = face & 1 ? -1 : 1,
+    far =
+      Math.abs(x + (axis === 0 ? step : 0) - cx) +
+      Math.abs(y + (axis === 1 ? step : 0) - cy) +
+      Math.abs(z + (axis === 2 ? step : 0) - cz);
+  return 2 * Math.max(near, far) - 1;
 }
 
 function checkEye(eye: Vec3, name: string): void {
@@ -1112,11 +1150,12 @@ export class VoxelMesher {
    * the chunk is not loaded once a worker takes the job (drop its mesh). Rejects when the worker fails.
    * @param priority Lower is meshed sooner, such as the chunk's distance to the camera. Default 0.
    * @param eye The camera's world position: the translucent quads come back sorted from it ({@link sortQuads}).
+   * @param border Also list the shell's cube faces in {@link ChunkMesh.border}. Default false.
    * @throws TypeError when `world` is not a VoxelWorld, `key` is not a string or `eye` is not three numbers.
    * @throws RangeError when `key` is not three chunk coordinates, or `priority` or `eye` is not finite.
    * @throws MargoError `disposed` after {@link VoxelMesher.dispose}.
    */
-  mesh(world: VoxelWorld, key: string, priority = 0, eye?: Vec3): Promise<ChunkMesh | null> {
+  mesh(world: VoxelWorld, key: string, priority = 0, eye?: Vec3, border = false): Promise<ChunkMesh | null> {
     if (this.#disposed) throw new MargoError('disposed', 'VoxelMesher is disposed; create a new VoxelMesher');
     if (typeof world?.getChunk !== 'function') throw new TypeError('VoxelMesher.mesh expects a VoxelWorld and a key');
     const [cx, cy, cz] = chunkCoordinates(key);
@@ -1132,7 +1171,7 @@ export class VoxelMesher {
       .run<ChunkMesh | undefined>(
         () => {
           const input = meshInput(world, key);
-          return input && { input, eye: local };
+          return input && { input, eye: local, border: border === true };
         },
         { priority, signal: job.signal },
       )

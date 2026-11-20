@@ -97,12 +97,12 @@ export function scalarMesh(
   opacity: number,
   missing: readonly number[] = [0.6, 0.65, 0.7],
 ): VectorGeometry {
-  const colors = new Float32Array((positions.length / 3) * 4);
+  const colors = new Float32Array((positions.length / 3) * 4),
+    // Halved values, as mapColours takes them: exact for normal doubles, and a range wider than the largest double
+    // (an overflowing difference) still spreads its values over the map.
+    half = range[1] / 2 - range[0] / 2 || 0.5;
   for (let i = 0; i < values.length; i++) {
-    const c =
-      map.encoding || Number.isFinite(values[i])
-        ? map.sample((values[i] - range[0]) / (range[1] - range[0] || 1))
-        : missing;
+    const c = map.encoding || Number.isFinite(values[i]) ? map.sample((values[i] / 2 - range[0] / 2) / half) : missing;
     colors.set([c[0], c[1], c[2], opacity], i * 4);
   }
   return { kind: 'triangles', positions: Float32Array.from(positions), colors };

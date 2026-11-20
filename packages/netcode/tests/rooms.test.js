@@ -566,3 +566,64 @@ test('rooms: a client that leaves while onAuth runs is not seated', async () => 
   assert.equal(h.rooms.connections, 0);
   h.rooms.close();
 });
+
+test('rooms: a client that leaves while an async onJoin runs gets onLeave after it, and leaves no player behind', async () => {
+  let release;
+  const gate = new Promise((done) => (release = done)),
+    order = [];
+  class SlowJoin extends Plain {
+    autoDispose = false;
+    async onJoin(client) {
+      await gate;
+      this.state.players.set(this.idOf(client), { name: 'late', x: 0 });
+      order.push('join');
+    }
+    onLeave(client) {
+      this.state.players.delete(this.idOf(client));
+      order.push('leave');
+    }
+  }
+  const h = harness(SlowJoin),
+    joining = h.join();
+  await h.settle();
+  const room = await joining;
+  room.leave();
+  await h.settle();
+  release();
+  await h.settle();
+  const [server] = h.rooms.rooms;
+  assert.deepEqual(order, ['join', 'leave'], 'onLeave waits for the onJoin it would undo');
+  assert.equal(server.state.players.size, 0, 'no ghost player stays in the state');
+  h.rooms.close();
+});
+
+test('rooms: a join aborted while connect() runs closes the connection and never joins', async () => {
+  const h = harness(Plain),
+    controller = new AbortController();
+  let opened;
+  const joining = new RoomsClient(async () => {
+    controller.abort(new Error('gone early'));
+    opened = h.network.connect();
+    return opened;
+  }).joinOrCreate('game', {}, { schema, stateType: 'State', signal: controller.signal });
+  joining.catch(() => {});
+  await h.settle();
+  await assert.rejects(joining, /gone early/);
+  assert.equal(opened.open, false, 'the connection opened for the aborted join is closed');
+  assert.equal(h.rooms.rooms.length, 0, 'no room was made for it');
+  h.rooms.close();
+});
+
+test('rooms: a repeated random room id is drawn again instead of replacing a live room', async (t) => {
+  const rooms = new RoomServer().define('game', Plain);
+  let calls = 0;
+  const real = crypto.getRandomValues.bind(crypto);
+  // The first two ids drawn are the same bytes; the third differs.
+  t.mock.method(crypto, 'getRandomValues', (array) => (++calls <= 2 ? array.fill(7) : real(array)));
+  const first = await rooms.create('game'),
+    second = await rooms.create('game');
+  t.mock.restoreAll();
+  assert.notEqual(first.roomId, second.roomId);
+  assert.equal(rooms.rooms.length, 2, 'both rooms stay listed');
+  rooms.close();
+});

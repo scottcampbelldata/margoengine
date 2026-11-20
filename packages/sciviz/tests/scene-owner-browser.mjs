@@ -1,7 +1,7 @@
 // Real-GPU check that sciviz chrome leaves the scene it joined (KB6254c), natively and on the WebGL2 compatibility
 // layer: a figure's axes are disposed while a second scene, holding a plugin under the axis labels' name, is active.
 // From the repository root after building packages:
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sciviz/scripts/browser-root.mjs tests/scene-owner-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sciviz/scripts/browser-root.mjs tests/scene-owner-browser.mjs
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';
 

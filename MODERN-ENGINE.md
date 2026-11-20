@@ -11,7 +11,7 @@ Margo Engine is a WebGPU engine for web applications. A Rust kernel compiled to 
 | TypeScript/packages | Explicit ESM exports and declarations; `sideEffects: false`; precompiled gzip-embedded Wasm; independent core, glTF, React, creative and scenery packages. |
 | React/starters | `MargoCanvas` (`Canvas` alias), `useMargoStage`, `useFrame`, mesh components; SSR-safe setup, ResizeObserver and stable refs; Vite and Next.js starters. |
 | Creative pack | Textured/sorted GPU particles, curl wind/obstacles, procedural sky/scattering/fog/god rays, toon shading, HDR targets, compute bloom/grading/DOF/grain and ACES presentation. |
-| Scenery pack | Optional `SkyMoon` engine plugin and low-level `SkyMoonPass`; procedural moonlit atmosphere, lunar phases, stars, glow and horizon haze with Reversed-Z background depth. See [usage and limits](packages/scenery/README.md). |
+| Scenery pack | Optional `SkyMoon` engine plugin and low-level `SkyMoonPass`; procedural moonlit atmosphere, lunar phases, stars, glow and horizon haze with Reversed-Z background depth. See [usage and limits](packages/sky/README.md). |
 
 Rust owns transforms and culling. TypeScript owns asset orchestration and browser GPU commands. Numeric Wasm exports keep `wasm-bindgen`, `web-sys` and their glue unnecessary for this kernel. Consumers need no Rust installation or Wasm URL configuration. SIMD and browser DecompressionStream gzip support are required; decompression happens once before cached module compilation.
 
@@ -136,7 +136,7 @@ The package declares React 18/19 peers; browser verification used React 19.3.0 a
 
 ## Compressed glTF and USDZ
 
-`@margoengine/gltf-pro` depends on `@margoengine/decoders` and accepts required
+`@margoengine/gltf/pbr` depends on `@margoengine/decoders` and accepts required
 `KHR_draco_mesh_compression` and `EXT_meshopt_compression` extensions. Other
 unsupported required extensions still reject. `loadGLTF(engine, url, options)`
 handles compressed JSON glTF and GLB, fetching external buffers as needed.
@@ -168,7 +168,7 @@ resolves the other engines it measures from the sibling `engine-bench` checkout.
 `parseUSDA` and `parseUSDC` are synchronous; `parseUSDZ`, `USDAsset.create` and
 `loadUSDZ` are asynchronous. The basic `@margoengine/gltf` and the USDA-only
 `@margoengine/loaders` path retain their existing subsets. KTX2 textures in glTF
-and composed USD stages remain unsupported. See the [glTF Pro](packages/gltf-pro/README.md),
+and composed USD stages remain unsupported. See the [glTF PBR](packages/gltf/README.md),
 [USDZ](packages/usdz/README.md) and [decoder](packages/decoders/README.md) guides.
 
 ## glTF

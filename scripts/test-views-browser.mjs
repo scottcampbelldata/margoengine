@@ -1,5 +1,5 @@
 // The real-GPU multi-view check: views and scenes in core, then the view-aware packages, at 1x and 4x MSAA where it
-// matters. Each section draws views and checks pixels, picks and validation errors. The lead runs it under the GPU lock:
+// matters. Each section draws views and checks pixels, picks and validation errors. The lead runs it:
 //   npm run check:views
 // Sections: scenes (separate scenes, picking, resize, device restore), postfx (four views equal one view with Tonemap,
 // DOF, PostStack and zero-density fog), temporal (TAA, motion blur and volumetric fog keep separate histories and
@@ -9,13 +9,11 @@
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
-const release = await acquire({ owner: 'views-browser' });
 let browser;
 try {
-  browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 5293 });
+  browser = await openBrowser({ startPath: '/tests/modern-game.html', port: 'free' });
   const { page, hardware } = browser,
     errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -928,5 +926,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.postfxViewInstance?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

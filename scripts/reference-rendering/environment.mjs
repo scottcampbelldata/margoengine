@@ -51,7 +51,7 @@ const decomposition = existsSync(decompositionPath) ? JSON.parse(readFileSync(de
 assert.ok(!measureDecomposition || !decomposition, '--measure-decomposition cannot replace an established decomposition');
 if (decompose && !measureDecomposition) assert.ok(decomposition, 'Record the decomposition with --measure-decomposition');
 if (process.argv.includes('--capture-decomposition')) {
-  // CUDA Mitsuba (the caller holds the GPU lock); validated against the frozen hashes before any file is replaced.
+  // CUDA Mitsuba; validated against the frozen hashes before any file is replaced.
   const candidate = join(out, `decomposition-${Date.now()}-${process.pid}`);
   mkdirSync(candidate, { recursive: true });
   for (const file of ['scene.glb', 'settings.json']) copyFileSync(join(out, file), join(candidate, file));

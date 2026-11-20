@@ -2,7 +2,7 @@
 // creative PostProcessing) makes exactly the GPU calls it made before, over a story of resizes, option edits, format
 // and sample-count changes, a rejected frame, device restoration and disposal at 1x and 4x.
 // Run: node examples/package-benchmarks/proofs/post-stack.proof.js [ref] [pin] [--current]
-// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: f3d25c892 against the
+// Pinned: 5b1fe66^ against 5b1fe66, the commit that added PostStack and made this claim. --current: 206cda6acb (SSAO's ambient replay keeps the lighting in a dead block and binds every pass binding, KB-POST-GTAO-TERRAINLOOK1); 26451c21fb (Bloom's temporal firefly budget, KB-CABIN-BLOOM1) before it; 40dcf8a22 (the DOF near-field mip chain, its two levels blended in the shader) before it; before that 74ebb5dab (Tonemap's contrast 0 as flat grey; 149501ed0, its power contrast, before it) against the
 // working tree, including the approved multilevel Bloom, PBR Neutral display and Tonemap default (claims.md).
 // creative's PostProcessing is always 00f9ebc193 (before PostStack) against 216781aff4 (the last commit before it lost
 // bloom and the sky backdrop): main's 5b1fe66^, and a commit with 3319317's creative and shared sources (between
@@ -12,7 +12,7 @@ import { refs, versions, ignoreAgx, golden, fact, readOnly, coreAt } from './com
 import { mockGPU, context } from './gpu-recorder.js';
 
 const before = '5b1fe66^',
-  { ref, pin } = refs(before, '5b1fe66', 'f3d25c892'),
+  { ref, pin } = refs(before, '5b1fe66', '8c71da0556'),
   creativeBefore = '00f9ebc193',
   creativeAfter = '216781aff4',
   { wgsl } = await coreAt(pin);
@@ -49,7 +49,7 @@ function story(make, samples, edit) {
       view.begin(i);
       try {
         for (const pass of list) pass.execute(view.c);
-      } catch (error) {
+      } catch {
         gpu.note('throw');
       }
       view.end();

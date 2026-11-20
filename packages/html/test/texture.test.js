@@ -250,3 +250,37 @@ test('HTMLTexture remakes the bind group for a new pipeline and decodes sRGB on 
     dom.window.close();
   }
 });
+
+// A failed raster (a preparation that rejects, a tainting image, a decode error) used to be rethrown in a microtask:
+// an uncaught exception no caller could catch. It now reaches engine.onError as a coded error carrying the cause.
+test('HTMLTexture reports a failed raster through engine.onError with a coded error, never uncaught', async () => {
+  const h = optionalGPU(),
+    dom = new JSDOM('<body><canvas width="128" height="96"></canvas></body>'),
+    reported = [],
+    uncaught = [],
+    cause = new Error('tainted image');
+  globalThis.CanvasRenderingContext2D ??= dom.window.CanvasRenderingContext2D;
+  h.engine.canvas = dom.window.document.querySelector('canvas');
+  h.engine.onError = (error) => reported.push(error);
+  const listener = (error) => uncaught.push(error);
+  process.on('uncaughtException', listener);
+  const textures = HTMLTexture.attach(h.engine, { rasterizer: 'foreign-object', prepare: () => Promise.reject(cause) }),
+    surface = textures.add(dom.window.document.createElement('div'), { width: 1, height: 1, pixelRatio: 1 });
+  try {
+    h.frame();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(uncaught, [], 'No uncaught exception');
+    assert.equal(reported.length, 1);
+    assert.equal(reported[0].name, 'MargoError');
+    assert.equal(reported[0].code, 'failed');
+    assert.equal(reported[0].cause, cause);
+    assert.match(reported[0].message, /tainted image/);
+    assert.match(reported[0].message, /errors#html-texture/);
+    assert.equal(surface.busy, false, 'The surface can be drawn again after invalidate()');
+    assert.equal(surface.draws, 0);
+  } finally {
+    process.off('uncaughtException', listener);
+    textures.dispose();
+    dom.window.close();
+  }
+});

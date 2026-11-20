@@ -1,4 +1,4 @@
-// Real-GPU check of @margoengine/clustered/shadows (run on AC power, holding the GPU lock, after npm run build:packages):
+// Real-GPU check of @margoengine/clustered/shadows (run on AC power, after npm run build:packages):
 //   node examples/package-benchmarks/local-shadows-gpu.mjs
 // 1. For a point and a spot light, on a core-mesh floor and on a materials floor, with a core box, a materials box and an
 //    instanced box as casters: castShadow off equals LocalShadows detached (the feature changes nothing until used); with

@@ -233,6 +233,32 @@ test('switch clauses are scoped blocks that end in break; uint selectors take ui
   assert.match(glsl, /\} break;/);
 });
 
+test('a continue inside a switch leaves the switch by a flag; the loop continues after it (KB-SW1)', () => {
+  // ANGLE's Direct3D 11 back end fails to compile `continue` inside a GLSL switch and loses the context, so the GLSL
+  // has none there: the continue sets a flag and breaks, and the loop continues after the switch. A nested switch
+  // passes the flag outwards.
+  const glsl = frag(
+    '',
+    'var r = 0u; for (var i = 0u; i < 6u; i++) { switch (i) { case 1u: { continue; } case 2u: { switch (i + 1u) { case 3u: { if (r > 9u) { continue; } r += 2u; } default: {} } } default: { r += 1u; } } r += 10u; } loop { r += 1u; switch (r % 4u) { case 0u: { continue; } default: { break; } } continuing { break if r > 40u; } } return vec4u(r);',
+  );
+  const bodies = [...glsl.matchAll(/switch \(/g)].map((m) => {
+    let depth = 0,
+      i = glsl.indexOf('{', m.index);
+    const start = i;
+    for (; i < glsl.length; i++) {
+      if (glsl[i] === '{') depth++;
+      else if (glsl[i] === '}' && --depth === 0) break;
+    }
+    return glsl.slice(start, i);
+  });
+  assert.equal(bodies.length, 3);
+  for (const body of bodies) assert.doesNotMatch(body, /continue;/, body);
+  assert.match(glsl, /bool (_t\d+) = false;\s*switch[\s\S]*\{ \1 = true; break; \}[\s\S]*if \(\1\) continue;/);
+  assert.match(glsl, /if \((_t\d+)\) \{ (_t\d+) = true; break; \}/, 'the inner switch hands its continue to the outer one');
+  // Without a continue the switch is emitted as before.
+  assert.doesNotMatch(frag('', 'var r = 0u; switch (u32(p.x)) { case 1u: { r = 3u; } default: { r = 4u; } } return vec4u(r);'), /bool _t/);
+});
+
 test('pointer lets alias their variable; pointer parameters are inout', () => {
   // Regression (2026-10-28): a `let p = &a[1]` failed to translate ("a memory reference of kind 'address-of'").
   const glsl = frag(
@@ -523,4 +549,69 @@ test('a sampling helper is never called inside its own arguments (ANGLE D3D11 re
   const flat = `${head}\n@fragment fn f()->@location(0) vec4f {return textureSampleLevel(a,s,vec2f(0.5),0.0)+textureSampleLevel(b,s,vec2f(0.25),0.0);}`;
   const helpers = new Set(translateWGSL({ vertex: { source: flat }, fragment: { source: flat } }).fragment.source.match(/\b_g\d+(?=\(highp)/g));
   assert.equal(helpers.size, 1);
+});
+
+// A derivative taken in uniform control flow but used only inside a later per-pixel branch read 0 on ANGLE Direct3D 11
+// (RTX A6000): the compile moved it into the branch (docs/known-bugs.md, "a derivative used only inside a per-pixel
+// branch"; features.html derivativeBranch draws it). Every derivative-made value is added into the pin `_dk`, which
+// each output selects on a run-time value that is never true, so it is live on every path to the outputs.
+const PIN_HEAD = `@group(0) @binding(0) var t:texture_2d<f32>; @group(0) @binding(1) var s:sampler;
+  @group(0) @binding(2) var tc:texture_depth_2d; @group(0) @binding(3) var sc:sampler_comparison;`;
+const fragmentOf = (body, ret = '@location(0) vec4f') =>
+  translateWGSL({
+    vertex: { source: V },
+    fragment: { source: `${V}\n${PIN_HEAD}\n@fragment fn f(@builtin(position) p:vec4f)->${ret} {${body}}` },
+  }).fragment.source;
+
+test('every derivative and implicit-derivative sample of a fragment is pinned into an output', () => {
+  for (const call of [
+    'dpdx(p.x)', 'dpdy(p.xy)', 'fwidth(p.xyz)', 'dpdxFine(p)', 'dpdyFine(p.x)', 'fwidthFine(p.xy)', 'dpdxCoarse(p.xy)',
+    'dpdyCoarse(p.xyz)', 'fwidthCoarse(p)', 'textureSample(t,s,p.xy)', 'textureSampleBias(t,s,p.xy,1.0)',
+    'textureSampleGrad(t,s,p.xy,dpdx(p.xy),dpdy(p.xy))', 'textureSampleCompare(tc,sc,p.xy,0.5)',
+  ]) {
+    const f = fragmentOf(`let d = ${call}; var e = false; if (p.x > 2.0) { e = true; }
+      if (e) { var a = 0.0; for (var k = 0; k < i32(p.y); k++) { a += 1.0; } return vec4f(a * length(d)); }
+      return vec4f(0.0);`);
+    assert.match(f, /^vec4 _dk = vec4\(0\.0\);$/m, call);
+    const helpers = [...f.matchAll(/^(\w+) (_g\d+)\(\1 v\) \{ _dk(\.[xyz]+)? \+= v; return v; \}$/gm)].map((m) => m[2]);
+    assert.ok(helpers.length, `${call}: a pin helper`);
+    // Each derivative and implicit sample in main code is the argument of a pin helper.
+    const pinned = new RegExp(`(?:${helpers.join('|')})[(](?:dFdx|dFdy|fwidth|texture)[(]`, 'g');
+    const raw = /(?<![\w.])(?:dFdx|dFdy|fwidth|texture)\(/g;
+    const code = f.split('\n').filter((l) => !/^\w+ _g\d+\(/.test(l)).join('\n');
+    assert.equal((code.match(raw) ?? []).length, (code.match(pinned) ?? []).length, `${call}: every derivative pinned`);
+    assert.match(f, /_o0 = gl_FragCoord\.w > 0\.0 \? _r : vec4\(_dk\);/, call);
+  }
+});
+
+test('a fragment without derivatives keeps its outputs unchanged and declares no pin', () => {
+  const f = fragmentOf('return textureSampleLevel(t,s,p.xy,0.0) + vec4f(p.x);');
+  assert.doesNotMatch(f, /_dk/);
+  assert.match(f, /_o0 = gl_FragCoord\.w > 0\.0 \? _r : vec4\(0\.0\);/);
+  const v = translateWGSL({ vertex: { source: V }, fragment: { source: `${V}\n@fragment fn f()->@location(0) vec4f {return vec4f(1.0);}` } });
+  assert.doesNotMatch(v.vertex.source, /_dk/);
+});
+
+test('the pin reaches integer, depth and narrower outputs, and a discard when there is no output', () => {
+  const st = translateWGSL({
+    vertex: { source: V },
+    fragment: {
+      source: `${V}\nstruct O { @location(0) a: vec2u, @location(1) b: f32, @builtin(frag_depth) z: f32 }
+      @fragment fn f(@builtin(position) p:vec4f)->O { let d = dpdx(p.x); if (p.y > d) { return O(vec2u(1u), d, 0.5); } return O(vec2u(0u), 0.0, 0.25); }`,
+    },
+  }).fragment.source;
+  assert.match(st, /_o0 = gl_FragCoord\.w > 0\.0 \? _r\.\w+ : uvec2\(_dk\.xy\);/);
+  assert.match(st, /_o1 = gl_FragCoord\.w > 0\.0 \? _r\.\w+ : float\(_dk\.x\);/);
+  assert.match(st, /gl_FragDepth = gl_FragCoord\.w > 0\.0 \? _r\.\w+ : _dk\.x;/);
+  const none = translateWGSL({
+    vertex: { source: V },
+    fragment: { source: `${V}\n@fragment fn f(@builtin(position) p:vec4f) { let d = fwidth(p.x); if (p.y > 1.0) { if (d > 0.5) { discard; } } }` },
+  }).fragment.source;
+  assert.match(none, /if \(gl_FragCoord\.w <= 0\.0 && _dk != vec4\(0\.0\)\) discard;/);
+});
+
+test('a derivative inside select() is evaluated eagerly, never in a per-pixel ternary', () => {
+  const f = fragmentOf('let d = select(-2.0, dpdx(p.x), p.y > 1.5); return vec4f(d);');
+  assert.doesNotMatch(f, /\?[^;:]*dFdx/);
+  assert.match(f, /_g\d+\(-2\.0, _g\d+\(dFdx\(/);
 });

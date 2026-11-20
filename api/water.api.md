@@ -7,6 +7,13 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export const BREAKER_GAMMA = 0.78;
+
+export interface BreakerWave {
+    readonly amplitude: number;
+    readonly wavenumber: number;
+}
+
 export interface FogLike {
   readonly color?: ColorInput;
   readonly near?: number;
@@ -15,6 +22,12 @@ export interface FogLike {
   readonly heightFalloff?: number;
   readonly height?: number;
   readonly enabled?: boolean;
+}
+
+export interface TerrainHeights {
+    readonly data: ArrayLike<number>;
+    readonly width: number;
+    readonly height: number;
 }
 
 export class Water implements EnginePlugin {
@@ -26,9 +39,19 @@ export class Water implements EnginePlugin {
     get depthTexture(): GPUTexture | undefined;
     get fog(): FogLike | null;
     setFog(fog: FogLike | null): this;
-    setWhitecaps(amount: number): this;
+    setWhitecaps(amount: number | null): this;
+    get wind(): Readonly<WaterWind> | undefined;
+    setColor(color: readonly [number, number, number]): this;
+    setSeaLevel(y: number): this;
+    get seaLevel(): number;
+    setGlitterRoughness(roughness: number): this;
+    setFoamSoftness(amount: number): this;
+    setShallow(color: readonly [number, number, number], depth: number): this;
+    setFoamDistance(distance: number): this;
     setChop(amount: number): this;
-    setWaveHeight(height: number): this;
+    breakerLine(): [number, number][][];
+    setWind(wind: number | WaterWind): this;
+    setWaveHeight(height: number | null): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     setCapture(hook: WaterCapture): () => void;
@@ -37,6 +60,9 @@ export class Water implements EnginePlugin {
         backend: 'webgpu';
     }>, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     onDeviceRestored(engine: Engine): void;
+    get time(): number;
+    advanceTime(delta: number): void;
+    setTime(seconds: number): this;
     onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -58,6 +84,7 @@ export interface WaterOptions {
     segments?: number;
     height?: number;
     waves?: readonly Wave[];
+    wind?: number | WaterWind;
     color?: readonly [number, number, number];
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
@@ -68,6 +95,7 @@ export interface WaterOptions {
     sceneColor?: () => GPUTexture | undefined;
     lights?: readonly WaterLight[];
     spray?: boolean;
+    sprayCount?: number;
     horizon?: boolean;
     shadows?: WaterShadowSource;
     whitecaps?: number;
@@ -85,6 +113,13 @@ export interface WaterTerrain {
     heightmap: () => GPUTexture | undefined;
     origin: readonly [number, number];
     size: readonly [number, number];
+    heights?: TerrainHeights;
+}
+
+export interface WaterWind {
+    speed: number;
+    fetch?: number;
+    direction?: readonly [number, number];
 }
 
 export interface Wave {
@@ -94,4 +129,8 @@ export interface Wave {
     steepness?: number;
     phase?: number;
 }
+
+export function breakerDepth(waves: readonly BreakerWave[]): number;
+
+export function contourSegments(heights: TerrainHeights, origin: readonly [number, number], size: readonly [number, number], level: number): [number, number][][];
 ```

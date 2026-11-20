@@ -233,6 +233,13 @@ test('CF model calendars roundtrip impossible Gregorian dates, negative offsets 
   assert.throws(() => cfTimeCodec('seconds since 2000-01-01 00:00:60'), /invalid datetime/);
   assert.equal(cfTimeCodec('months since 2000-01-01').secondsPerUnit, 365.242198781 * 7200);
   assert.equal(cfTimeCodec('hours since 2000-01-01T00:00:00+0530').decode(0).day, 31);
+  // A value a hair before the reference instant is the reference instant, not hour 24 of the day before.
+  const seconds = cfTimeCodec('seconds since 2000-01-01');
+  for (const v of [-1e-12, -1e-300]) {
+    const t = seconds.decode(v);
+    assert.deepEqual([t.year, t.month, t.day, t.hour, t.minute, t.second], [2000, 1, 1, 0, 0, 0]);
+  }
+  assert.equal(cfTimeCodec('days since 2000-01-01').decode(-1e-17).day, 1);
 });
 
 test('CF vertical dimensional direction, SI pressure and broadcast sigma/hybrid/sleve formulas', async () => {
@@ -427,4 +434,82 @@ test('conservative rectilinear cell averages preserve the area integral, CF boun
   );
   near(masked.values[0], 5);
   near(masked.coverage[0], 0.75);
+});
+
+test('CF units take plurals only on unit names, never on symbols or Object prototype keys', () => {
+  near(convertCFUnits([2], 'meters', 'km')[0], 0.002);
+  near(convertCFUnits([1], 'hours', 'seconds')[0], 3600);
+  near(convertCFUnits([1], 'days', 's')[0], 86400);
+  // UDUNITS symbols take no plural: ms is the millisecond and Pa s the viscosity unit, never metre or pascal.
+  assert.throws(() => convertCFUnits([1], 'ms', 'm'), /unknown unit ms/);
+  assert.throws(() => convertCFUnits([1], 'Pas', 'Pa'), /unknown unit Pas/);
+  assert.throws(() => convertCFUnits([1], 'Ns', 'N'), /unknown unit Ns/);
+  for (const key of ['constructor', 'toString', 'valueOf', '__proto__', 'hasOwnProperty'])
+    assert.throws(() => convertCFUnits([1], key, '1'), new RegExp(`unknown unit ${key}`));
+});
+
+test('CF cell bounds read in the same default degrees as their unitless longitude and latitude', async () => {
+  const f = file(
+    { x: 2, y: 2, nv: 2 },
+    {
+      x: [['x'], [0, 10], { standard_name: 'longitude', bounds: 'xb' }],
+      y: [['y'], [10, 0], { standard_name: 'latitude', bounds: 'yb' }],
+      xb: [['x', 'nv'], [-5, 5, 5, 15]],
+      yb: [['y', 'nv'], [15, 5, 5, -5]],
+      tas: [['y', 'x'], [1, 2, 3, 4], { units: 'K' }],
+    },
+  );
+  const g = await readCFField(f, 'tas');
+  assert.deepEqual([...g.longitude], [0, 10]);
+  assert.deepEqual([...g.longitudeBounds], [-5, 5, 5, 15]);
+  assert.deepEqual([...g.latitudeBounds], [15, 5, 5, -5]);
+});
+
+test('conservative remap keeps a longitude cell wider than 180 degrees around its own centre', () => {
+  // Two unequal global cells: [0,200] centred at 100 and [200,360] centred at 280.
+  const s = grid([1, 2], {
+    nx: 2,
+    ny: 1,
+    longitude: Float64Array.of(100, 280),
+    latitude: Float64Array.of(0),
+    longitudeBounds: Float64Array.of(0, 200, 200, 360),
+    latitudeBounds: Float64Array.of(-90, 90),
+  });
+  const whole = {
+    longitude: Float64Array.of(180),
+    latitude: Float64Array.of(0),
+    longitudeBounds: Float64Array.of(0, 360),
+    latitudeBounds: Float64Array.of(-90, 90),
+  };
+  const result = conservativeCF(s, whole);
+  near(result.values[0], (200 * 1 + 160 * 2) / 360, 1e-12);
+  near(result.coverage[0], 1, 1e-12);
+  // The same cell written in descending order is the same interval.
+  s.longitudeBounds.set([200, 0, 360, 200]);
+  near(conservativeCF(s, whole).values[0], (200 * 1 + 160 * 2) / 360, 1e-12);
+});
+test('CF ocean double sigma counts k_c levels from the first, as the HOPS and NCOM formulas Appendix D took', async () => {
+  // HOPS and NCOM are Fortran models: k = 1 is the first level and k_c (like NCOM's nsigma) counts the upper levels.
+  const f = file(
+    { k: 3 },
+    {
+      k: [
+        ['k'],
+        [0.5, 1, 1.5],
+        {
+          standard_name: 'ocean_double_sigma_coordinate',
+          formula_terms: 'sigma: k depth: depth z1: z1 z2: z2 a: a href: href k_c: kc',
+        },
+      ],
+      depth: [[], [1000], { units: 'm' }],
+      z1: [[], [300], { units: 'm' }],
+      z2: [[], [100], { units: 'm' }],
+      a: [[], [0], { units: 'm' }],
+      href: [[], [0], { units: 'm' }],
+      kc: [[], [2], { units: '1' }],
+    },
+  );
+  assert.deepEqual([...(await readCFVertical(f, 'k')).data], [100, 200, 600]);
+  assert.deepEqual([...(await readCFVertical(f, 'k', { indices: { k: 2 } })).data], [600]);
+  assert.deepEqual([...(await readCFVertical(f, 'k', { indices: { k: 1 } })).data], [200]);
 });

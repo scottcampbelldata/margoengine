@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NodeMaterial, uniform } from '../dist/index.js';
 import { Texture } from '../../materials/dist/index.js';
-import { factorPhysicalShader } from '../../gltf-pro/src/shader.ts';
+import { factorPhysicalShader } from '../../gltf/src/shader.ts';
 
 const texture = () =>
   new Texture({ data: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1 }, { mipmaps: false });

@@ -23,9 +23,12 @@ import { MargoError } from '@margoengine/math/errors';
 import { cascadeSplits, fitCascades } from './cascades.js';
 import {
   shadowSampling,
+  checkSoft,
   shadowDepth,
   nearestDepth,
   effectEntries,
+  effectsRevised,
+  rebindEffects,
   moveEffects,
   validEffects,
   type ShadowEffect,
@@ -34,6 +37,7 @@ import {
   type ShadowFilterEffect,
 } from './shader.js';
 import { hiddenInTree } from '../../shared/visibility.js';
+import { CasterGroups, isCasterGroup } from '../../shared/shadow-group.js';
 import { compatibilityLevel, compatTier, loadCompatRoute } from '../../shared/compat.js';
 import { hypot, hypotOf, hypotTerms } from '../../shared/hypot.js';
 import {
@@ -94,8 +98,24 @@ export interface ShadowOptions {
   distance?: number;
   /** Cascade split blend, 0 (uniform) to 1 (logarithmic). Default 0.5. */
   lambda?: number;
-  /** Light size for the `'soft'` filter's penumbra width, 0 or more. Default 0.02. */
+  /**
+   * Light size for the `'soft'` filter's penumbra width, 0 or more. Default 0.02: the penumbra's world width per world
+   * unit between blocker and receiver (about the tangent of the light's angular radius).
+   */
   lightSize?: number;
+  /** The `'soft'` filter's comparison taps per lit pixel, a whole number from 1 to 128. Default 32. Live. */
+  samples?: number;
+  /**
+   * The `'soft'` filter's blocker-search reads per lit pixel, a whole number from 1 to 128. Default 16; fewer give
+   * noisier penumbrae. Live.
+   */
+  blockerSamples?: number;
+  /**
+   * The `'soft'` filter's focus: the blocker-to-receiver distance, world units, 0 or more, at which the penumbra is
+   * sharpest; it widens with the distance from there either way. Default 0: sharpest where a caster touches the
+   * receiver, as a real area light. Live.
+   */
+  focus?: number;
   /**
    * Extra constant depth bias, as a fraction of the map's depth range, 0 or more. Default 0. Every receiver already
    * compares one texel nearer the light, with the texel's world size, so any model scale works without it.
@@ -123,8 +143,8 @@ export interface ShadowOptions {
    */
   frustum?: { position: Vec3; left: number; right: number; top: number; bottom: number; near: number; far: number };
   /**
-   * Edge filter (default `'soft'`). `'soft'` is PCSS: penumbrae widen with blocker distance and `lightSize`, 16
-   * blocker reads and 32 comparison taps per lit pixel. `'pcf'` takes four hardware comparison taps (an edge about
+   * Edge filter (default `'soft'`). `'soft'` is PCSS: penumbrae widen with blocker distance and `lightSize`,
+   * `blockerSamples` reads and `samples` comparison taps per lit pixel. `'pcf'` takes four hardware comparison taps (an edge about
    * three texels wide, `lightSize` unused): the light and phone quality tiers use it. `'hard'` takes one. Read when
    * receiver shaders are built. A {@link ShadowFilterEffect} (`varianceFilter` from `@margoengine/shadows/vsm`) replaces
    * the named filters; fixed at construction.
@@ -144,7 +164,7 @@ export interface ShadowOptions {
   cadence?: readonly number[];
   /**
    * Coloured shadows (default false): light through a caster added with `tint`, or through a source's `tintPrimitives`
-   * (gltf-pro transmissive and blended primitives), takes the caster's colour instead of being blocked. Adds an
+   * (gltf/pbr transmissive and blended primitives), takes the caster's colour instead of being blocked. Adds an
    * `rgba8unorm` and a `depth32float` array of the map's size and two texture bindings on every receiver; those casters
    * redraw every frame, twice. Fixed at construction. Off, the receivers' shaders and the frame are unchanged.
    */
@@ -197,7 +217,7 @@ export interface ShadowPrepareContext {
   /** Cascades drawn this frame, 1-4: the source's `drawShadow` is called once for each. */
   cascades: number;
 }
-/** One drawable shadow caster (the contract gltf-pro models, materials meshes and terrain expose as `shadowPrimitives`). */
+/** One drawable shadow caster (the contract gltf/pbr models, materials meshes and terrain expose as `shadowPrimitives`). */
 export interface ShadowPrimitive {
   /** Linear RGB of the light it lets through; `transmission` from `@margoengine/shadows/transmission` reads it. */
   transmits?: readonly number[];
@@ -250,6 +270,13 @@ export interface ShadowPrimitive {
   animation?: { readonly buffer: GPUBuffer; readonly view: GPUTextureView; readonly sampler: GPUSampler };
   /** False keeps vertex alpha out of the cut-out, as the colour pass does (materials `vertexColors: false`). Default true. */
   vertexAlpha?: boolean;
+  /**
+   * Cuts against hashed noise instead of `cutoff` (materials `alphaHash()`: its record's `castHashed`, the caster edit
+   * shared/alpha-hash.js `hashedDepth`), so a caster at 30% opacity keeps about 30% of its shadow texels and its shadow
+   * fades with it. The material carries the edit, so a scene without `alphaHash` bundles no hash WGSL. Used only while
+   * `cutoff` is above 0. Default none.
+   */
+  hashed?: (code: string) => string;
   /** Skinned, morphed, instanced, or deformed casters redraw every frame. Unset casters are cached while they stay put. */
   dynamic?: boolean;
 }
@@ -259,7 +286,7 @@ export interface TintedShadowPrimitive extends ShadowPrimitive {
   tint: readonly number[];
 }
 /**
- * Anything `shadows.add` takes besides a core mesh: a gltf-pro model, materials mesh, `Terrain`, `ScatterInstances`, or
+ * Anything `shadows.add` takes besides a core mesh: a gltf/pbr model, materials mesh, `Terrain`, `ScatterInstances`, or
  * a custom caster with `drawShadow`. It needs `shadowPrimitives` or `drawShadow`.
  */
 export interface ShadowSource {
@@ -275,7 +302,7 @@ export interface ShadowSource {
    */
   prepareShadow?(context: ShadowPrepareContext): void;
   /**
-   * Casters that tint light instead of blocking it, read every frame when the `Shadows` has `colored`. gltf-pro models
+   * Casters that tint light instead of blocking it, read every frame when the `Shadows` has `colored`. gltf/pbr models
    * give their transmissive and blended primitives here.
    */
   tintPrimitives?: readonly TintedShadowPrimitive[];
@@ -293,6 +320,10 @@ interface Source {
   tint?: readonly number[];
   version: number;
   removeLighting?: () => void;
+  /** Taken out of `sources` (removed, or its mesh was disposed). */
+  gone?: boolean;
+  /** Registered by the walk below an added node, not added by hand. */
+  grouped?: boolean;
   meshPrimitive?: ShadowPrimitive[];
   primitiveBuffers?: ShadowPrimitive[][];
 }
@@ -334,9 +365,13 @@ const BATCH_MIN = 8;
 /** The WebGL2 layer's nearest-depth route once a Shadows has loaded it (import() only on that layer). */
 let compatRoute: typeof import('./compat.js') | undefined;
 // Depth-only, no fragment stage: core casters have no alpha. One world matrix per instance from a storage array.
+// Every caster position is @invariant (WGSL 12.10): WGSL lets a compiler reassociate and fuse float operations per program
+// (15.7.5), so without it the same camera*model*p from this shader, shadowDepth and a ShadowSource's own caster lands up
+// to a few ulps apart (Chromium on Apple M-series GPUs: one in three covered texels), moving the comparison filters'
+// weights by a level on receivers.
 const batchDepth = /* wgsl */ `@group(0) @binding(0) var<uniform> camera:mat4x4f;
 @group(0) @binding(1) var<storage,read> models:array<mat4x4f>;
-@vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) vec4f {return camera*models[k]*vec4f(position,1);}`;
+@vertex fn vertex(@location(0) position:vec3f,@builtin(instance_index) k:u32)->@builtin(position) @invariant vec4f {return camera*models[k]*vec4f(position,1);}`;
 const emptyPrimitives: readonly ShadowPrimitive[] = [];
 /**
  * A primitive whose bounds hold still: range() made once, not a closure per caster per frame. A material's `shading`
@@ -346,7 +381,7 @@ const emptyPrimitives: readonly ShadowPrimitive[] = [];
 const staticPrimitive = (p: MeshSource['primitives'][number]): boolean =>
   !p.deformed && !('instances' in p && p.instances) && !p.material.displacement;
 /**
- * A node whose bounds hold still: a core mesh, a node that draws nothing (a glTF group), or a gltf-pro node with no
+ * A node whose bounds hold still: a core mesh, a node that draws nothing (a glTF group), or a gltf/pbr node with no
  * skin, morph targets, instances or displacement.
  */
 const stillNode = (node: Mesh): boolean => {
@@ -354,7 +389,7 @@ const stillNode = (node: Mesh): boolean => {
   const source = meshSource(node);
   return !source || (!source.skinned && !source.morphed && source.primitives.every(staticPrimitive));
 };
-/** Each still gltf-pro node's local box, kept while its primitives keep their vertex arrays: read twice a frame. */
+/** Each still gltf/pbr node's local box, kept while its primitives keep their vertex arrays: read twice a frame. */
 const boundsCache = new WeakMap<MeshSource, { vertices: Float32Array[]; bounds: Float32Array }>();
 const localBounds = (source: MeshSource | undefined): Float32Array | undefined => {
   if (!source) return undefined;
@@ -431,6 +466,8 @@ export class Shadows implements EnginePlugin {
    * loaded only there); until it has loaded, the WebGPU kernel runs (on the layer's CPU tier, slowly).
    */
   private nearestRoute?: import('./compat.js').NearestRoute;
+  /** True on the WebGL2 layer while ./compat.js loads: the nearest-depth reduction waits for it. */
+  private nearestWaiting = false;
   /** The map changed since the last reduction (while the filter was not `'soft'`, or before the first frame). */
   private nearestStale = true;
   private readonly nearestSeed = new Uint32Array(4).fill(0x3f800000);
@@ -451,6 +488,8 @@ export class Shadows implements EnginePlugin {
   private batchCameras: GPUBuffer[] = [];
   private frameSerial = 0;
   private sources: Source[] = [];
+  /** The casters below each added group, kept in step once a frame. */
+  private readonly groups = new CasterGroups<Source>();
   private primitiveDepth = 0;
   /** Per nesting level: the pass's sources and their primitives by index, and its batches waiting to draw. */
   private readonly frames: {
@@ -487,7 +526,7 @@ export class Shadows implements EnginePlugin {
   } as unknown as Camera;
   private readonly hooks = new Map<number, { declarations: string; direct(direct: string, normal?: string): string }>();
   private readonly lightingOwners = new Map<ShadowSource, { remove: () => void; count: number }>();
-  private readonly values = new Float32Array(92);
+  private readonly values = new Float32Array(96);
   private readonly ranges = this.values.subarray(84, 88);
   private readonly previous = new Float32Array(64);
   private readonly view = this.values.subarray(64, 80);
@@ -512,6 +551,14 @@ export class Shadows implements EnginePlugin {
     cascades: 0,
   } as ShadowPrepareContext;
   private readonly shaders = new Map<number, Map<string, string>>();
+  // The effects' last `revision`s: a change composes every receiver's shader again (code an effect loads has arrived).
+  private readonly revisions: number[] = [];
+  private revise(): void {
+    if (effectsRevised(this.effects as readonly ShadowEffect[], this.revisions)) {
+      this.shaders.clear();
+      this.hooks.clear();
+    }
+  }
   private readonly depthPass = depthPassDescriptor();
   private readonly depthAttachment = this.depthPass.depthStencilAttachment;
   private readonly copySource: GPUTexelCopyTextureInfo = { texture: undefined! };
@@ -685,6 +732,8 @@ export class Shadows implements EnginePlugin {
           'Invalid shadow options; lightSize, bias, normalBias and casterMargin must be finite and 0 or more.',
         );
     }
+    // samples, blockerSamples and focus, checked as VirtualShadows checks them (shader.ts).
+    checkSoft(o);
     this.width = width;
     this.height = height;
     this.cascadeCount = o.bounds || frustum ? 1 : cascades;
@@ -694,8 +743,11 @@ export class Shadows implements EnginePlugin {
     return !!this.options.frustum || this.width !== this.height;
   }
   /**
-   * Adds `source` (a core mesh, gltf-pro model, materials mesh or custom source) as a shadow caster and, for sources
-   * with their own lighting (`addLighting`: gltf-pro models, materials meshes, terrain), a receiver. `castShadow: false`
+   * Adds `source` (a core mesh, gltf/pbr model, materials mesh or custom source) as a shadow caster and, for sources
+   * with their own lighting (`addLighting`: gltf/pbr models, materials meshes, terrain), a receiver. A group (a mesh
+   * with no geometry of its own, such as a model's `root`) casts every mesh with geometry below it, each gltf/pbr model
+   * below it once, with the same options; meshes parented to it later cast from the next frame, and the remover takes
+   * every one of them out. A mesh with its own geometry casts itself and every mesh with geometry below it the same way; one you also add by hand is cast once. `castShadow: false`
    * keeps it out of the shadow map; `receiveShadow: false` leaves its lighting unshadowed (both default true, as
    * Crocotile's per-object Cast Shadows and Receive Shadows). For a core mesh `receiveShadow: false` sets
    * `mesh.receiveShadow = false` and the remover restores it. `static` caches it in the still map. `tint` (linear RGB,
@@ -742,8 +794,52 @@ export class Shadows implements EnginePlugin {
         'attached',
         'Shadow source belongs to another engine; use objects created by the same engine',
       );
-    if (this.sources.some((r) => r.source === runtime))
-      throw new MargoError('attached', 'Duplicate shadow source; add each source once');
+    if (isCasterGroup(runtime)) {
+      if (this.groups.has(runtime)) throw new MargoError('attached', 'Duplicate shadow source; add each source once');
+      return this.below(runtime, { static: cached, castShadow, receiveShadow, tint });
+    }
+    const taken = this.sources.find((r) => r.source === runtime);
+    // A mesh the walk below another node already casts becomes this source; the walk skips it from the next frame.
+    if (taken && !taken.grouped) throw new MargoError('attached', 'Duplicate shadow source; add each source once');
+    if (taken) this.unregister(taken);
+    const r = this.register(runtime, { static: cached, castShadow, receiveShadow, tint });
+    // A mesh with its own geometry casts itself and every mesh below it, those parented later too.
+    const unwatch =
+      'id' in runtime && (runtime as unknown as Mesh).geometry
+        ? this.below(runtime as unknown as Mesh, { static: cached, castShadow, receiveShadow, tint })
+        : undefined;
+    return () => {
+      unwatch?.();
+      this.unregister(r);
+    };
+  }
+  /** Casts every mesh with geometry below `node` with `options`, as they are parented and until the remover runs. */
+  private below(
+    node: Mesh,
+    options: { static: boolean; castShadow: boolean; receiveShadow: boolean; tint?: readonly number[] },
+  ): () => void {
+    return this.groups.add(
+      node,
+      (mesh) => {
+        const r = this.register(mesh, options);
+        r.grouped = true;
+        return r;
+      },
+      (record) => this.unregister(record),
+      (record) => !!record.gone,
+      (mesh) => this.sources.some((r) => r.source === mesh),
+    );
+  }
+  /** Adds one caster that is no group (`runtime` is a live mesh of this engine, or a shadow source). */
+  private register(
+    runtime: ReturnType<typeof meshRuntime> | ShadowSource,
+    {
+      static: cached,
+      castShadow,
+      receiveShadow,
+      tint,
+    }: { static: boolean; castShadow: boolean; receiveShadow: boolean; tint?: readonly number[] },
+  ): Source {
     const triangles = 'id' in runtime ? meshTriangles(runtime) : undefined,
       lightingSource = triangles?.kind === 'pbr' ? (triangles.source.model as ShadowSource) : (runtime as ShadowSource);
     let removeLighting: (() => void) | undefined;
@@ -770,15 +866,17 @@ export class Shadows implements EnginePlugin {
     const r: Source = { source: runtime, static: cached, cast: castShadow && !tint, tint, version: -1, removeLighting };
     this.sources.push(r);
     this.invalidate();
-    return () => {
-      const index = this.sources.indexOf(r);
-      if (index >= 0) {
-        this.sources.splice(index, 1);
-        r.removeLighting?.();
-        this.invalidate();
-        this.clearDraws();
-      }
-    };
+    return r;
+  }
+  private unregister(r: Source): void {
+    const index = this.sources.indexOf(r);
+    if (index >= 0) {
+      this.sources.splice(index, 1);
+      r.gone = true;
+      r.removeLighting?.();
+      this.invalidate();
+      this.clearDraws();
+    }
   }
   invalidate(): void {
     this.dirty = true;
@@ -793,6 +891,7 @@ export class Shadows implements EnginePlugin {
     return shadowSampling(group, filter, anisotropic, this.colored, level, this.effects as readonly ShadowEffect[]);
   }
   shader(source: string, group = 0): string {
+    this.revise();
     const filter = this.options.filter ?? 'soft',
       receive = unshadowedCore(this.engine, source),
       anisotropic = this.anisotropic(),
@@ -822,6 +921,7 @@ export class Shadows implements EnginePlugin {
     return output;
   }
   pbr(group: number): { declarations: string; direct(direct: string, normal?: string): string } {
+    this.revise();
     const filter = this.options.filter ?? 'soft',
       anisotropic = this.anisotropic(),
       key = shaderKey(filter, group, anisotropic);
@@ -836,6 +936,23 @@ export class Shadows implements EnginePlugin {
       );
     return hooks;
   }
+  private elapsed = 0;
+  /** Seconds of frame time the effects' own clocks have moved by (a `lightPattern`'s scroll). A fresh one reads 0. */
+  get time(): number {
+    return this.elapsed;
+  }
+  /**
+   * Moves the effects' own clocks by `delta` seconds: the CPU part of the frame update, which a seek from
+   * `@margoengine/cutscene/seek` replays.
+   */
+  advanceTime(delta: number): void {
+    if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid shadow delta; pass finite seconds >= 0');
+    this.elapsed += delta;
+    for (const effect of this.effects) effect.advanceTime?.(delta);
+  }
+  onPreUpdate(delta: number): void {
+    this.advanceTime(delta);
+  }
   setup(engine: Engine): void {
     if (this.disposed || !engine.gpu)
       throw new MargoError(
@@ -848,11 +965,26 @@ export class Shadows implements EnginePlugin {
     // Once the route has loaded, every later setup (a device restore, another Shadows) takes it at once: waiting for
     // import() again let the first frames on the new device run the WebGPU kernel on the layer's CPU tier.
     if (compatRoute && compatTier(device) === 'webgl2') this.nearestRoute = new compatRoute.NearestRoute(device);
-    else
-      loadCompatRoute(device, () => import('./compat.js'))?.then((route) => {
-        compatRoute = route;
-        if (this.device === device && !this.nearestRoute) this.nearestRoute = new route.NearestRoute(device);
-      });
+    else {
+      const route = loadCompatRoute(device, () => import('./compat.js'));
+      // Until the route loads the reduction waits (nearestStale stays set): the WebGPU kernel there takes the layer's
+      // CPU tier, and a 4,096 map with four cascades is 67 million texels, past the tier's work budget, so the first
+      // frames of a page threw (KB-COMPAT-CPUBUDGET1). Meanwhile the PCSS search spans its widest, as before any map.
+      this.nearestWaiting = !!route;
+      route?.then(
+        (loaded) => {
+          compatRoute = loaded;
+          if (this.device !== device) return;
+          this.nearestRoute ??= new loaded.NearestRoute(device);
+          this.nearestWaiting = false;
+        },
+        (error: unknown) => {
+          // The WebGPU kernel still reduces the same words: take it, and let the page hear why it is slow.
+          if (this.device === device) this.nearestWaiting = false;
+          throw error;
+        },
+      );
+    }
     this.validate();
     this.checkLimits();
     for (const r of this.sources)
@@ -861,9 +993,15 @@ export class Shadows implements EnginePlugin {
           'attached',
           'Shadow mesh belongs to another engine; use objects created by the same engine',
         );
+    for (const { group } of this.groups.list)
+      if (group.engine !== engine)
+        throw new MargoError(
+          'attached',
+          'Shadow mesh belongs to another engine; use objects created by the same engine',
+        );
     this.textures();
-    // 368 bytes written each frame from `values`, then 16 for `nearest`, which the GPU reduction copies in.
-    this.uniform = this.device.createBuffer({ size: 384, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    // 384 bytes written each frame from `values`, then 16 for `nearest`, which the GPU reduction copies in.
+    this.uniform = this.device.createBuffer({ size: 400, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.nearestBuffer = this.device.createBuffer({
       size: 16,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
@@ -940,7 +1078,12 @@ export class Shadows implements EnginePlugin {
   /** Receiver bindings: a fresh array view whenever the maps are reallocated, so receivers rebuild their groups. */
   private bind(): void {
     for (const effect of this.effects)
-      effect.setup?.(this.device!, { width: this.width, height: this.height, layers: this.cascadeCount });
+      effect.setup?.(this.device!, {
+        width: this.width,
+        height: this.height,
+        layers: this.cascadeCount,
+        engine: this.engine,
+      });
     this.entries = [
       { binding: 1, resource: { buffer: this.uniform! } },
       { binding: 2, resource: (this.combinedView = this.combined!.createView({ dimension: '2d-array' })) },
@@ -1025,7 +1168,7 @@ export class Shadows implements EnginePlugin {
       if ('id' in source) core = stillNode(source);
       else if ('drawShadow' in source && source.drawShadow) core = false;
       else {
-        // A model (gltf-pro, materials' createMesh): still when every caster is a still node, as `add(model.root)` is.
+        // A model (gltf/pbr, materials' createMesh): still when every caster is a still node, as `add(model.root)` is.
         const primitives = this.casters(record, this.primitiveDepth);
         for (let j = 0; core && j < primitives.length; j++) {
           const primitive = primitives[j];
@@ -1115,6 +1258,8 @@ export class Shadows implements EnginePlugin {
   private render(c: ShadowPassContext): void {
     this.validate();
     this.frameSerial++;
+    // Meshes parented to an added group since the last frame join the casters, and meshes that left it drop out.
+    if (this.groups.size) this.groups.sync();
     if (this.width !== this.mapWidth || this.height !== this.mapHeight || this.cascadeCount !== this.mapCascades) {
       this.checkLimits();
       this.textures();
@@ -1170,6 +1315,7 @@ export class Shadows implements EnginePlugin {
         ('id' in r.source && this.engine!.meshes.get(r.source.id) !== r.source)
       ) {
         this.sources.splice(i, 1);
+        r.gone = true;
         r.removeLighting?.();
         this.clearDraws();
         this.dirty = true;
@@ -1213,6 +1359,10 @@ export class Shadows implements EnginePlugin {
     this.values[90] = this.options.normalBias ?? 0;
     // Pixels per unit at view depth 1: the sampler rebuilds each fragment's screen pixel for its per-pixel noise.
     this.values[91] = c.height / (2 * Math.tan((c.camera.fov * Math.PI) / 360));
+    // The 'soft' filter's taps, blocker reads and focus (shader.ts `filters.soft`).
+    this.values[92] = this.options.samples ?? 32;
+    this.values[93] = this.options.blockerSamples ?? 16;
+    this.values[94] = this.options.focus ?? 0;
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws = this.stats.dynamicDraws = 0;
     // Before any depth pass opens: a caster's shared per-cascade work, on the frames it draws (a static one only when the
@@ -1253,6 +1403,7 @@ export class Shadows implements EnginePlugin {
     frame.map = this.combinedView;
     for (let i = 0; i < this.effects.length; i++) this.effects[i].update?.(frame);
     frame.context = undefined!;
+    rebindEffects(this.entries, this.effects as readonly ShadowEffect[]);
   }
   /** The light through this frame's tinting casters, in the tint map, and how near they are, in its depth. */
   private tints(c: ShadowPassContext): void {
@@ -1341,6 +1492,10 @@ export class Shadows implements EnginePlugin {
    * spans the receiver's light-space distance to that depth (shader.ts `soft`). Runs when the map changed.
    */
   private nearest(c: ShadowPassContext): void {
+    if (this.nearestWaiting && !this.nearestRoute) {
+      this.nearestStale = true;
+      return;
+    }
     const device = c.device;
     if (this.nearestRoute) {
       device.queue.writeBuffer(this.nearestBuffer!, 0, this.nearestSeed);
@@ -1352,7 +1507,7 @@ export class Shadows implements EnginePlugin {
         this.cascadeCount,
         this.nearestBuffer!,
       );
-      c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 368, 16);
+      c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 384, 16);
       this.nearestStale = false;
       return;
     }
@@ -1373,7 +1528,7 @@ export class Shadows implements EnginePlugin {
     pass.setBindGroup(0, this.nearestGroup);
     pass.dispatchWorkgroups(Math.ceil(this.width / 32), Math.ceil(this.height / 32), this.cascadeCount);
     pass.end();
-    c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 368, 16);
+    c.encoder.copyBufferToBuffer(this.nearestBuffer!, 0, this.uniform!, 384, 16);
     this.nearestStale = false;
   }
   private fitBounds(): void {
@@ -1516,6 +1671,7 @@ export class Shadows implements EnginePlugin {
     hash = this.mixFloat(hash, primitive.cutoff ?? 0);
     hash = this.mixFloat(hash, primitive.texCoord ?? 0);
     hash = Math.imul(hash, 16777619) ^ (primitive.vertexAlpha === false ? 1 : 0);
+    hash = Math.imul(hash, 16777619) ^ (primitive.hashed ? 1 : 0);
     const transform = primitive.alphaTransform;
     hash = Math.imul(hash, 16777619) ^ (transform?.length ?? 0);
     if (transform) for (let i = 0; i < transform.length; i++) hash = this.mixFloat(hash, transform[i]);
@@ -1772,9 +1928,11 @@ export class Shadows implements EnginePlugin {
     if (animation && p.stride !== 80) throw new RangeError('UV-animated shadow casters need 80-byte vertices');
     const lines = p.topology === 'line-list',
       solid = p.stride === 80 && p.vertexAlpha === false,
+      hashed = (p.cutoff ?? 0) > 0 ? p.hashed : undefined,
       key =
         (displacement?.key ?? '') +
         (p.stride +
+          (hashed ? 4096 : 0) +
           (animation ? 1024 : 0) +
           (transform ? 1 : 0) +
           (inst ? 2 : 0) +
@@ -1798,6 +1956,7 @@ export class Shadows implements EnginePlugin {
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
       if (animation) code = animatedDepth(code, 0);
+      if (hashed) code = hashed(code);
       if (section) code = clippedDepth(code, 3, material ? 'materialClip' : 'section', hardware);
       const module = this.device!.createShaderModule({ code });
       pipeline = tinted
@@ -1918,6 +2077,7 @@ export class Shadows implements EnginePlugin {
     this.unfollow?.();
     this.unfollow = undefined;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
+    this.groups.clear();
     for (const r of this.sources) r.removeLighting?.();
     this.sources.length = 0;
     this.frames.length = 0;

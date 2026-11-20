@@ -5,9 +5,12 @@
 // radius, -Z along its bone) and the WebXR Input Profiles registry and assets descriptions (profile lists, layouts by
 // handedness, component states and visual responses). The built-in models need no files; `fetchProfile` finds a
 // device's own model where an app serves the input profile assets.
-import { Geometry, PbrMaterial, type EngineKernel, type Mesh } from '@margoengine/core';
+import { Geometry, PbrMaterial, type EngineKernel, type Mesh, type Scene } from '@margoengine/core';
+import { engineRuntime, type EnginePlugin } from '@margoengine/core/extension';
 import { Quaternion } from '@margoengine/math/quaternion';
 import { margoError } from '../../shared/errors.js';
+import { captureScene, sceneScope } from '../../shared/scene-scope.js';
+import { ownScene } from './scene-owner.js';
 import type { XRController } from './controller.js';
 import type { XRInputSource } from './types.js';
 
@@ -118,6 +121,9 @@ export class XRModels {
   private readonly materials: { body: PbrMaterial; pressed: PbrMaterial; hand: PbrMaterial };
   private readonly geometry: { sphere: Geometry; cylinder: Geometry };
   private readonly unsubscribe: () => void;
+  /** Runs mesh creation in the scene the models belong to; XR frames arrive with any scene active. */
+  private readonly scope: { run<T>(work: () => T): T };
+  private readonly release?: () => void;
   private readonly q = [0, 0, 0, 1];
   private readonly rotation = new Quaternion();
   private readonly joint = { elements: new Float32Array(16) };
@@ -125,7 +131,10 @@ export class XRModels {
   private readonly settings: Required<Pick<XRModelsOptions, 'controllers' | 'hands'>>;
   private disposed = false;
 
-  /** Starts drawing `xr`'s inputs in `engine`. */
+  /**
+   * Starts drawing `xr`'s inputs in `engine`, in the scene `xr` is in (for a host that is no plugin, the scene set up or
+   * drawn when `attach` is called). The models go when that scene is disposed.
+   */
   static attach(xr: XRModelsHost, engine: EngineKernel, options: XRModelsOptions = {}): XRModels {
     return new XRModels(xr, engine, options);
   }
@@ -143,7 +152,11 @@ export class XRModels {
       hand: new PbrMaterial({ color: options.handColor ?? '#e3bfa3', roughness: 0.8 }),
     };
     this.geometry = { sphere: sphere(), cylinder: cylinder() };
+    const runtime = engineRuntime(engine),
+      scene = runtime.sceneOf(xr as unknown as EnginePlugin) ?? (captureScene(runtime).scene as Scene | undefined);
+    this.scope = sceneScope(runtime, scene);
     this.unsubscribe = xr.onFrame(() => this.update());
+    if (scene) this.release = ownScene(scene, () => this.dispose());
   }
   /** The meshes of `source`'s controller model, root first, or undefined before it is first seen. */
   controllerMeshes(source: XRInputSource): readonly Mesh[] | undefined {
@@ -155,8 +168,7 @@ export class XRModels {
   }
 
   private part(parent: Mesh, size: [number, number, number], position: [number, number, number]): Mesh {
-    return this.engine
-      .createMesh()
+    return this.scope.run(() => this.engine.createMesh())
       .setGeometry(this.geometry.cylinder)
       .setMaterial(this.materials.body)
       .setScale(size)
@@ -166,7 +178,7 @@ export class XRModels {
   private controller(source: XRInputSource): ControllerParts {
     let parts = this.controllerParts.get(source);
     if (parts) return parts;
-    const root = this.engine.createMesh(),
+    const root = this.scope.run(() => this.engine.createMesh()),
       // The palm faces -x on a right hand and +x on a left one; the squeeze sits on that side.
       palm = source.handedness === 'left' ? 1 : -1,
       // Handle along z through the grip, head towards the thumb (-z), leaning forward (-y, away from the arm).
@@ -184,7 +196,7 @@ export class XRModels {
     let parts = this.handParts.get(source);
     if (parts) return parts;
     const mesh = (geometry: Geometry) =>
-      this.engine.createMesh().setGeometry(geometry).setMaterial(this.materials.hand);
+      this.scope.run(() => this.engine.createMesh()).setGeometry(geometry).setMaterial(this.materials.hand);
     parts = {
       joints: Array.from({ length: 25 }, () => mesh(this.geometry.sphere)),
       bones: HAND_BONES.map(() => mesh(this.geometry.cylinder)),
@@ -303,6 +315,7 @@ export class XRModels {
     if (this.disposed) return;
     this.disposed = true;
     this.unsubscribe();
+    this.release?.();
     for (const parts of this.controllerParts.values()) for (const mesh of parts.meshes) mesh.dispose();
     for (const parts of this.handParts.values()) for (const mesh of [...parts.joints, ...parts.bones]) mesh.dispose();
     this.controllerParts.clear();

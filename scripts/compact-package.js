@@ -5,13 +5,14 @@ import { dirname, resolve } from 'node:path';
 import { build } from 'vite';
 import { compactInternals } from './compact-internals.js';
 import { compactOutput } from './measure-size.js';
+import { distDir } from './support/dist-dir.mjs';
 
 // The bundler hands the importer over in real form (macOS os.tmpdir() is /var/folders/..., a link to
 // /private/var/folders/...), so both sides of the shared-helper test are compared as real paths.
 const real = (path) => (existsSync(path) ? realpathSync(path) : path);
 
-export async function compactPackage(name, directory = `packages/${name}`) {
-  const root = resolve(directory, 'dist'),
+export async function compactPackage(name, directory = `packages/${name}`, dist = distDir(directory)) {
+  const root = resolve(dist),
     // Every packages/shared helper core and the stage import is bundled into them (shared is not published, so a
     // ../../shared import left in dist breaks an installed package; tests/dts-self-contained.test.js). Everything else stays
     // an import. A fixed list once missed the stage's glTF route and lights helpers.

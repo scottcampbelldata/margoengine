@@ -79,6 +79,21 @@ function finishDescriptor(file: Uint8Array, mode: KTX2Mode, srgb: boolean): void
   if (!srgb) file[descriptor + 13] = 0;
 }
 
+/**
+ * The most bytes the file can take. Both formats code each 4x4 block on every mip level, down to 1 x 1, and an edge
+ * block is whole however few texels it holds: UASTC stores 16 bytes a block, which Zstandard can grow by well under a
+ * quarter; ETC1S codes a block in less, with codebooks of at most one entry a block. 64 KiB covers the headers. A
+ * pixel count does not bound it: a 1-texel-tall strip has a quarter of a block a texel, so 4 bytes a texel.
+ */
+function fileBound(width: number, height: number, mipmaps: boolean): number {
+  let blocks = 0;
+  for (let w = width, h = height; ; w = Math.max(1, w >> 1), h = Math.max(1, h >> 1)) {
+    blocks += Math.ceil(w / 4) * Math.ceil(h / 4);
+    if (!mipmaps || (w === 1 && h === 1)) break;
+  }
+  return blocks * 20 + 65536;
+}
+
 /** Encodes one image to a .ktx2 file. */
 export function encodeBasis(module: BasisEncoderModule, job: BasisJob): BasisResult {
   if (!started.has(module)) {
@@ -108,8 +123,7 @@ export function encodeBasis(module: BasisEncoderModule, job: BasisJob): BasisRes
       encoder.setNormalMap();
       encoder.setMipRenormalize(true);
     }
-    // UASTC holds a byte a pixel and a mip chain a third more; ETC1S less. Twice the pixels leaves room for the headers.
-    const out = new Uint8Array(width * height * 2 + 65536),
+    const out = new Uint8Array(fileBound(width, height, job.mipmaps)),
       size = encoder.encode(out);
     if (!size) throw new MargoError('failed', `Basis could not encode a ${width} x ${height} image; check the pixels`);
     const file = out.slice(0, size);

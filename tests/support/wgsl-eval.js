@@ -1,6 +1,6 @@
 // A small interpreter for the scalar/vector subset of WGSL that the engine's closed-form shading helpers use (let, var,
-// if/else, return, +=, vector constructors and swizzles, mat3x3f * vec3f, and the math builtins below), in double
-// precision. Tests run the shipped WGSL text through it to compare it with independent references without a GPU.
+// if/else, return, +=, vector constructors and swizzles, mat3x3f * vec3f, module-scope `const` arrays read with a
+// runtime index, and the math builtins below), in double precision. Tests run the shipped WGSL text through it to compare it with independent references without a GPU.
 // Unsupported syntax throws, so a helper outside the subset fails loudly instead of being evaluated wrongly.
 
 const SYMBOLS = ['->', '&&', '||', '==', '!=', '<=', '>=', '+=', '-=', '*=', '/=', ...'(){}[],;.:=+-*/<>!'];
@@ -58,6 +58,12 @@ const builtins = {
   vec3f: constructor(3),
   vec4f: constructor(4),
   f32: (v) => v,
+  // f32 to u32 or i32 truncates toward zero; u32 saturates at 0 (WGSL "Conversion" built-ins).
+  u32: (v) => Math.max(0, Math.trunc(v)),
+  i32: (v) => Math.trunc(v),
+  array: (...v) => v,
+  floor: (v) => map(v, Math.floor),
+  log: (v) => map(v, Math.log),
   mat3x3f: (...v) => ({ columns: [v.slice(0, 3), v.slice(3, 6), v.slice(6, 9)] }),
   cos: (v) => map(v, Math.cos),
   sin: (v) => map(v, Math.sin),
@@ -154,6 +160,11 @@ export function wgslModule(text, globals = {}) {
     if (t.value === '-' || t.value === '!') return { kind: 'unary', op: t.value, arg: postfix(primary()) };
     if (t.kind === 'word') {
       if (t.value === 'true' || t.value === 'false') return { kind: 'number', value: t.value === 'true' };
+      // A typed array constructor, array<f32,4>(...): the template is only a type here.
+      if (t.value === 'array' && peek('<')) {
+        p--;
+        skipType();
+      }
       if (peek('(')) {
         p++;
         const args = [];
@@ -169,9 +180,11 @@ export function wgslModule(text, globals = {}) {
     throw new SyntaxError(`wgsl-eval: unexpected ${t.value}`);
   }
   function postfix(e) {
-    while (peek('.')) {
-      p++;
-      e = { kind: 'member', target: e, lanes: tokens[p++].value };
+    while (peek('.') || peek('[')) {
+      if (tokens[p++].value === '[') {
+        e = { kind: 'index', target: e, index: expression(0) };
+        expect(']');
+      } else e = { kind: 'member', target: e, lanes: tokens[p++].value };
     }
     return e;
   }
@@ -232,8 +245,21 @@ export function wgslModule(text, globals = {}) {
     expect(';');
     return { kind: 'assign', target, op, value };
   }
+  const constants = [];
   while (p < tokens.length) {
-    if (!peek('fn')) throw new SyntaxError(`wgsl-eval: only functions are supported, found ${tokens[p].value}`);
+    if (peek('const')) {
+      p++;
+      const name = tokens[p++].value;
+      if (peek(':')) {
+        p++;
+        skipType();
+      }
+      expect('=');
+      constants.push([name, expression(0)]);
+      expect(';');
+      continue;
+    }
+    if (!peek('fn')) throw new SyntaxError(`wgsl-eval: only functions and constants are supported, found ${tokens[p].value}`);
     p++;
     const name = tokens[p++].value,
       params = [];
@@ -262,6 +288,13 @@ export function wgslModule(text, globals = {}) {
       case 'unary': {
         const v = evaluate(e.arg, scope);
         return e.op === '-' ? map(v, (x) => -x) : map(v, (x) => !x);
+      }
+      case 'index': {
+        const v = evaluate(e.target, scope),
+          i = evaluate(e.index, scope);
+        if (!isVector(v) || !Number.isInteger(i) || i < 0 || i >= v.length)
+          throw new RangeError(`wgsl-eval: index ${i} out of range`);
+        return v[i];
       }
       case 'member': {
         const v = evaluate(e.target, scope);
@@ -317,6 +350,7 @@ export function wgslModule(text, globals = {}) {
     }
     throw new Error(`wgsl-eval: ${name} did not return`);
   }
+  for (const [name, value] of constants) globals = { ...globals, [name]: evaluate(value, { ...globals }) };
   return { call, names: Object.keys(functions) };
 }
 
@@ -330,4 +364,13 @@ export function wgslFunction(source, name) {
     else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
   }
   return undefined;
+}
+
+/** The text of the module-scope `const <name>...;` in `source` (up to its terminating semicolon), or undefined. */
+export function wgslConst(source, name) {
+  const match = new RegExp(`(?:^|\\W)(const ${name}\\b)`).exec(source);
+  if (!match) return undefined;
+  const from = match.index + match[0].length - match[1].length,
+    end = source.indexOf(';', from);
+  return end < 0 ? undefined : source.slice(from, end + 1);
 }

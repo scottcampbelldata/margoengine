@@ -182,3 +182,134 @@ export function mtoonShading(cosine: number, shift = 0, toony = 0.9): number {
     coordinate = cosine + shift;
   return width === 0 ? +(coordinate >= 0) : Math.min(1, Math.max(0, (coordinate + width) / (2 * width)));
 }
+
+/** The six MToon maps in uniform and binding order. */
+export const MTOON_MAP_FIELDS = [
+  'shadeMultiplyTexture',
+  'shadingShiftTexture',
+  'matcapTexture',
+  'rimMultiplyTexture',
+  'outlineWidthMultiplyTexture',
+  'uvAnimationMaskTexture',
+] as const;
+type MapField = (typeof MTOON_MAP_FIELDS)[number];
+
+/**
+ * The 1x1 RGBA8 texel a map samples while it has no image (absent, or streamed and not yet arrived). VRMC_materials_mtoon
+ * 1.0: an undefined matcapTexture "must be sampled as having 0.0 in RGB components", and an undefined shading shift adds
+ * nothing, so both are black; the multiply maps and the UV animation mask are white (no change).
+ */
+export function fallbackTexel(field: MapField): Uint8Array {
+  return new Uint8Array(
+    field === 'matcapTexture' || field === 'shadingShiftTexture' ? [0, 0, 0, 255] : [255, 255, 255, 255],
+  );
+}
+
+/** One map's three uniform rows: its KHR_texture_transform with expression moves blended in, texCoord, scale, presence. */
+export function textureRows(
+  v: Float32Array,
+  row: number,
+  map: MToonTextureInfo | undefined,
+  moves: readonly { scale: readonly number[]; offset: readonly number[]; value: number }[],
+): void {
+  const t = map?.extensions?.KHR_texture_transform,
+    offset = [...(t?.offset ?? [0, 0])],
+    scale = [...(t?.scale ?? [1, 1])],
+    angle = t?.rotation ?? 0,
+    c = Math.cos(angle),
+    s = Math.sin(angle);
+  for (let k = 0; k < 2; k++) {
+    const baseOffset = offset[k],
+      baseScale = scale[k];
+    for (const move of moves) {
+      offset[k] += (move.offset[k] - baseOffset) * move.value;
+      scale[k] += (move.scale[k] - baseScale) * move.value;
+    }
+  }
+  v.set(
+    [
+      c * scale[0],
+      s * scale[1],
+      offset[0],
+      t?.texCoord ?? map?.texCoord ?? 0,
+      -s * scale[0],
+      c * scale[1],
+      offset[1],
+      0,
+      map?.scale ?? 1,
+      +!!map,
+      0,
+      0,
+    ],
+    row * 4,
+  );
+}
+
+/**
+ * Writes every map's rows into the uniform `v` from row 8. VRM 1.0 expressions.md: a textureTransformBind applies to
+ * the material's UV-accessed textures, and "the texture that does not have UV access is MToon's matcap", so the
+ * matcap keeps its own transform and takes no expression move.
+ */
+export function mapRows(
+  v: Float32Array,
+  definition: Partial<Record<MapField, MToonTextureInfo | undefined>>,
+  moves: readonly { scale: readonly number[]; offset: readonly number[]; value: number }[],
+): void {
+  MTOON_MAP_FIELDS.forEach((field, k) =>
+    textureRows(v, 8 + k * 3, definition[field], field === 'matcapTexture' ? [] : moves),
+  );
+}
+
+/** glTF CLAMP_TO_EDGE: a sampler axis the UV animation's scroll cannot be wrapped on. */
+const CLAMP = 33071;
+const scratchRows = new Float32Array(12);
+
+/**
+ * Whether the UV animation's scroll along `axis` (0 for x, 1 for y) may be taken modulo 2 without changing what `map`
+ * samples. VRMC_materials_mtoon 1.0 animates before KHR_texture_transform and leaves the UV unclamped and unrepeated,
+ * assuming REPEAT or MIRRORED_REPEAT wrapping; a whole number step of the transform's column through a repeating axis
+ * of the sampler then moves the sampled UV by an even whole number, which samples the same texel under both. A
+ * fractional column (a scale such as 0.5, a rotation) or a clamped axis it reaches keeps the full scroll.
+ */
+export function scrollWraps(
+  map: MToonTextureInfo | undefined,
+  wrap: readonly [number | undefined, number | undefined],
+  axis: 0 | 1,
+  moves: readonly { scale: readonly number[]; offset: readonly number[]; value: number }[] = [],
+): boolean {
+  if (!map) return true;
+  textureRows(scratchRows, 0, map, moves);
+  for (let k = 0; k < 2; k++) {
+    const step = scratchRows[k * 4 + axis];
+    if (step !== 0 && (!Number.isInteger(step) || wrap[k] === CLAMP)) return false;
+  }
+  return true;
+}
+
+/**
+ * The UV animation's phases at `time` seconds, in float64, as the MToon shaders read them: scroll x and y in UV units
+ * and rotation in turns, each split into a whole count `k` and a phase so the shader forms phase x mask +
+ * period x fract(k x mask) with small numbers. Scroll uses period 2 where `wrapX` / `wrapY` allow it (`scrollWraps`)
+ * and keeps the whole scroll as its phase otherwise; rotation always uses period 1 turn. Writes
+ * [phaseX, phaseY, phaseTurns, kX, kY, kTurns] to `out`.
+ */
+export function uvAnimationPhases(
+  out: { [index: number]: number },
+  speeds: readonly [number, number, number],
+  time: number,
+  wrapX: boolean,
+  wrapY: boolean,
+): void {
+  const scroll = (speed: number, wraps: boolean, k: number) => {
+    const s = speed * time,
+      whole = wraps ? Math.floor(s / 2) : 0;
+    out[k] = s - 2 * whole;
+    out[k + 3] = whole;
+  };
+  scroll(speeds[0], wrapX, 0);
+  scroll(speeds[1], wrapY, 1);
+  const turns = (speeds[2] * time) / (2 * Math.PI),
+    whole = Math.floor(turns);
+  out[2] = turns - whole;
+  out[5] = whole;
+}

@@ -1,4 +1,4 @@
-// Real-browser WalkControls check (GPU, not in verify): node scripts/gpu-lock.mjs run --owner=<id> -- npm run test:browser:walk --workspace packages/controls
+// Real-browser WalkControls check (GPU, not in verify): node scripts/run-with-timeout.mjs -- npm run test:browser:walk --workspace packages/controls
 // Desktop: the generated two-storey house walked with the real W key along its scripted path (deck, door, rug, doorway,
 // 16 stairs, upper floor), a screenshot at every waypoint, the capsule's clearance from every box and the glass pane
 // checked each frame, then the dollhouse view and back. Phone (390 x 844, touch): thumbstick walk and drag-look.
@@ -8,12 +8,15 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compat-shim.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url)),
   results = resolve(root, 'test-results/walk');
 await mkdir(results, { recursive: true });
 const server = await createServer({
+  plugins: [noFileWatcher()],
   configFile: resolve(root, 'vite.config.js'),
   logLevel: 'error',
   server: { port: 0 },
@@ -32,6 +35,8 @@ try {
   const open = async (options) => {
     const page = await browser.newPage(options);
     page.on('pageerror', (error) => errors.push(error.message));
+    // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+    if (compatRun()) await page.addInitScript(compatShim, compatUrl());
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });

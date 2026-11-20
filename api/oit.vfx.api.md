@@ -4,7 +4,7 @@
 
 ```ts
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
-import { PBRModel, PBRTransparency } from "@margoengine/gltf-pro";
+import { PBRModel, PBRTransparency } from "@margoengine/gltf/pbr";
 
 export interface TransparentEffect {
     setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;

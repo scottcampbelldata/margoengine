@@ -6,6 +6,7 @@ import { TerrainDisplacement } from '../dist/displace.js';
 import { TerrainImagery } from '../dist/imagery.js';
 import { TerrainDeformation } from '../dist/deform.js';
 import { TerrainVirtualTexture } from '../dist/rvt.js';
+import { GroundChange } from '../dist/ground-change.js';
 import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 
 // Every terrain entry that adds to the lit shader's lighting group (group 1) owns a fixed range of bindings. They must
@@ -13,12 +14,17 @@ import { mockGPU } from '../../../examples/package-benchmarks/proofs/gpu-recorde
 const layers = 4;
 function rig(virtual) {
   const gpu = mockGPU(),
+    createBuffer = gpu.device.createBuffer.bind(gpu.device);
+  // Ground change reads the heightmap back once; the recorder has no mapping, so the read stays pending.
+  gpu.device.createBuffer = (d) => Object.assign(createBuffer(d), { mapAsync: () => new Promise(() => {}) });
+  const
     engine = {
       gpu: gpu.device,
       lighting: { direction: new Float32Array([3, 5, 4, 3]), radiance: new Float32Array([1, 1, 1, 0.15]) },
       stats: { drawCalls: 0 },
       removePlugin() {},
       sceneOf: () => undefined,
+      disposed: false,
     },
     texture = (device, format, count = 1) => device.createTexture({ size: [4, 4, count], format, usage: 6 }),
     terrain = new Terrain({
@@ -26,7 +32,10 @@ function rig(virtual) {
       levels: 2,
       size: [32, 32],
       layers: Array.from({ length: layers }, () => ({ height: [-10, 10], slope: [0, 1], scale: 1 })),
-      textures: (device) => ({ heightmap: texture(device, 'r32float'), layers: texture(device, 'rgba8unorm', layers) }),
+      textures: (device) => ({
+        heightmap: device.createTexture({ size: [4, 4, 1], format: 'r32float', usage: 7 }),
+        layers: texture(device, 'rgba8unorm', layers),
+      }),
     });
   terrain.setup(engine);
   const entries = [];
@@ -50,12 +59,15 @@ function rig(virtual) {
   for (let i = 0; i < 7; i++) imagery.add({ source: { texture: () => photo }, bounds: [0, 0, 32, 32] });
   const deformation = new TerrainDeformation(terrain, {});
   deformation.setup(engine);
-  entries.push(imagery, deformation);
+  // Ground that changes on screen, last: it wraps terrainColor and the fragment entry after the others.
+  const ground = new GroundChange({}, terrain);
+  ground.setup(engine);
+  entries.push(imagery, deformation, ground);
   return { terrain, entries };
 }
 
 for (const virtual of [false, true])
-  test(`terrain entries in the lit lighting group take distinct bindings (${virtual ? 'virtual texture, imagery on the lit path' : 'layer materials, displacement, imagery on the lit path'}, footprints)`, () => {
+  test(`terrain entries in the lit lighting group take distinct bindings (${virtual ? 'virtual texture, imagery on the lit path' : 'layer materials, displacement, imagery on the lit path'}, footprints, ground change)`, () => {
     const { terrain } = rig(virtual),
       code = terrain.shader(),
       declared = [...code.matchAll(/@group\(1\) @binding\((\d+)\)/g)].map((m) => Number(m[1])),

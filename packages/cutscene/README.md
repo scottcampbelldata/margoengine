@@ -103,6 +103,56 @@ time on the top-level timeline. `eventsBetween(from, to)` returns them in a fixe
 events, enters, then document order); splitting a range anywhere returns the same list, so the frame rate never
 changes what fires. Backwards ranges return them latest first.
 
+## Seeking a world to film time
+
+A film rendered scene by scene starts each scene in a fresh process. The clouds, wind, waves, wetness and lightning
+all add up frame deltas, so without help they restart at 0 at every cut and the sky jumps. `@margoengine/cutscene/seek`
+brings a fresh world to film time T: it replays every clock's `advanceTime(1 / fps)` in the same order a continuous run
+made, without drawing, so the next frame draws what a run started at 0 draws at T, bit for bit.
+
+```ts
+import { Engine, type EngineKernel } from 'margoengine/core';
+import { seek } from 'margoengine/cutscene/seek';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+// A time-driven plugin: its frame update runs advanceTime, so a live frame and a replayed step do the same sums.
+class Drift {
+  name = 'drift';
+  time = 0;
+  offset = 0;
+  setup(_engine: EngineKernel) {}
+  advanceTime(delta: number) {
+    this.time += delta;
+    this.offset += delta * 8;
+  }
+  onPreUpdate(delta: number) {
+    this.advanceTime(delta);
+  }
+}
+engine.use(new Drift());
+// Scene 2 starts 95 s into the film: replay the clocks to there, then draw on as a continuous run would.
+const { steps, clocks, unseekable } = await seek(engine, 95, { fps: 30 }); // 2850, ['drift'], []
+engine.render({ delta: 1 / 30 });
+```
+
+- A clock is any plugin with `advanceTime(delta)` and a `time` getter (seconds since it started). `advanceTime` is the
+  CPU part of its frame update only: no GPU call, no listener call (a replayed lightning strike stays silent).
+- `seek(engine, seconds, { fps = 60, scenes, extra, onStep, signal })` runs `Math.round(seconds * fps)` steps over the
+  plugins of each scene (default `[engine.scene]`) in attach order, then `extra` (clocks that are not plugins, such as
+  an unattached `WeatherMachine`). `onStep(step, time)` runs before each step, so film code can set what the clocks
+  read (a wind, a rate) as it did live. It resolves with the steps, the clocks it moved and `unseekable`: plugins with
+  a frame update but no `advanceTime`, which restart at a seek.
+- Every clock must read 0: seek a fresh world once, before its first frame. A clock that already moved throws a
+  `MargoError` with code `state` ([film-seek](https://margoengine.com/errors#film-seek)).
+- `advanceTime(engine, delta, { scenes, extra })` runs one step, for a host that runs its own loop.
+- `seekSync(engine, seconds, options)` is the same seek without waiting (no `onStep`), for code that cannot await.
+- `renderCutscene(engine, cutscene, { from })` with `from` after 0 seeks the engine first, in steps of the render's
+  `1 / fps`, so its first frame equals the frame at `from` of a render from 0; `cutsceneFrames(cutscene, { from,
+  engine })` does the same when you pass the engine you draw with. Until 2026-11-16 both started every clock at 0.
+- Cost: steps x clocks calls, CPU only: 15 minutes at 60 fps is 54,000 steps. Rates of 1 or more steps per second.
+- Exact only for state that is a clock. History on the GPU (particles alive, foam, ripples) and history of the view
+  (TAA, auto exposure) come from the scene's own warm-up frames; `docs/limits.md` lists each with its bound.
+
 ## Playing
 
 `CutscenePlayer` adds a time and a signed `speed` (negative plays backwards; `reverse()` flips it) and fires

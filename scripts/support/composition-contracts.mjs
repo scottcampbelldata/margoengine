@@ -1,4 +1,7 @@
 // Clean-room strength-2 construction. Research and scope: docs/integration-composition.md.
+/** The package a C2 member imports from, where it is not the member's own name: the moon layer lives in the sky package. */
+export const memberPackage = (member) => (member === 'moon' ? 'sky' : member);
+
 export const C2 = [
   'post',
   'taa',
@@ -11,7 +14,7 @@ export const C2 = [
   'creative',
   'toon',
   'transitions',
-  'scenery',
+  'moon',
   'voxel-pathtracer',
   'water',
   'sky',

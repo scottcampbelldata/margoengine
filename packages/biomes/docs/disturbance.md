@@ -77,6 +77,43 @@ Flood follows each D8 path to the first channel or outlet, with memoised drainag
 step squared; fixed-point logarithms avoid overflowing that product. These synthetic layers support authored worlds,
 not forecasts of actual fires or flood risk. No performance or package-size target was measured for this entry.
 
+## Burnt and flooded plants in the view
+
+`BiomeView.attach(engine, world, { disturbance: history })` shows the history on the plants by itself. The view makes a
+`PlantStates` map over the world (`@margoengine/scatter/states`, a cell every 8 m, at most 1,024 a side), marks it from the
+history with `disturbanceStates` and gives each part of every procedural mesh a response, so ground burnt in the
+history's last year has scorched crowns, charred bark and ash, older burns keep charred bark for 30 years, and ground
+the 10-year flood reaches carries a mud line. Conifer and snag crowns start 4 m up and broadleaf crowns 3 m up (a fire
+strips them only where its intensity passes Van Wagner's 1977 crown initiation), shrubs and grass burn whole. Pass
+`{ history, cell, intensity, ambient, wind, burnYears, charYears, floodPeriod, floodMark }` for other values; the
+settings are the rows of `DISTURBANCE_SETTINGS` in `@margoengine/biomes/settings` (all `live: false`, the marks are made
+when the view attaches; `disturbanceOptions(values)` checks them). A `states` option answers first for a part it returns
+a response for. `view.plantStates` is the map: its `setSources` adds a live fire or flood on top of the history.
+A live flood's wetting record can also come in by the view's `wetness` option, which wets the ground as well
+(README, "Wet ground and plants after a flood").
+
+```ts
+import { Engine } from '@margoengine/core';
+import { BiomeWorld } from '@margoengine/biomes';
+import { BiomeView } from '@margoengine/biomes/view';
+import { disturbanceOf } from '@margoengine/biomes/disturbance';
+import { hydrologyOf } from '@margoengine/biomes/hydrology';
+import { disturbanceOptions } from '@margoengine/biomes/settings';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const world = await BiomeWorld.create();
+const history = disturbanceOf(world, hydrologyOf(world), { seed: 7, years: 20 });
+const view = await BiomeView.attach(engine, world, {
+  disturbance: { history, ...disturbanceOptions({ 'disturbance.intensity': 4000 }) },
+});
+await view.ready;
+console.log(view.plantStates !== undefined);
+engine.start();
+```
+
+Real-GPU proof: `node packages/biomes/tests/disturbance-check.mjs` (both backends): a history that burnt the west half draws
+the west plants less green and darker, the east half exactly as without a history.
+
 ## Ecosystem growth
 
 `/ecosystem` grows a forest year by year from a few founders, or from a placed tile's plants. Every year each living

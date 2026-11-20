@@ -1,5 +1,5 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-import type { MaterialExtension, MaterialExtensionTexture, PBRModel, PBRPrimitive } from '@margoengine/gltf-pro';
+import type { MaterialExtension, MaterialExtensionTexture, PBRModel, PBRPrimitive } from '@margoengine/gltf/pbr';
 import type { Engine, EnginePlugin } from '@margoengine/core/extension';
 import type { MaterialGraph, MaterialNode, NodeMaterialOptions } from './node-types.js';
 import { clearcoatShader } from './shader.js';

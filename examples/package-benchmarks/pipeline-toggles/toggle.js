@@ -1,7 +1,7 @@
 // Browser side of the 1d''/1e.f measurements (driven by toggle.mjs). The section-plane toggle and the feature-edge
 // background were removed from the engine (2026-10-29): what stays is the fog toggle and the shader override timings.
 import { Engine, box } from '/packages/core/dist/extension.js';
-import { loadGLTF } from '/packages/gltf-pro/dist/index.js';
+import { loadGLTF } from '/packages/gltf/dist/pbr.js';
 import { Fog } from '/packages/environment/dist/index.js';
 import { Stats } from '/packages/stats/dist/index.js';
 
@@ -141,7 +141,7 @@ window.measure = {
       }
     return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, { n: v.length, median: median(v) }]));
   },
-  // 1e.f: the helmet full screen, gltf-pro's standard shader vs the same shader specialized by constants for its uniform
+  // 1e.f: the helmet full screen, gltf/pbr's standard shader vs the same shader specialized by constants for its uniform
   // toggles (unlit, alpha mask, double-sided discard, HDR output, blend alpha), which is what `override` constants would compile.
   async override(rounds) {
     await scene({ profiling: true, close: true });

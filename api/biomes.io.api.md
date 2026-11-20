@@ -65,6 +65,7 @@ interface BiomeDefinition {
     readonly priority?: number;
     readonly weight?: number;
     readonly zones?: readonly string[];
+    readonly openFuel?: string;
 }
 
 interface BiomeSample {
@@ -292,6 +293,26 @@ interface LayerWrite {
     readonly changed?: readonly [number, number, number, number];
 }
 
+interface MountainValleyOptions {
+    readonly outlet?: 'west' | 'east' | 'north' | 'south';
+    readonly center?: number;
+    readonly floor?: number;
+    readonly fall?: number;
+    readonly wall?: number;
+    readonly steepness?: number;
+    readonly ridges?: 'rounded' | 'sharp';
+    readonly gulches?: number;
+    readonly creek?: {
+        readonly width?: number;
+        readonly depth?: number;
+    };
+    readonly rail?: {
+        readonly grade?: number;
+        readonly width?: number;
+    } | false;
+    readonly step?: number;
+}
+
 interface PaintLayer {
     readonly biome: string;
     readonly mode?: PaintMode;
@@ -301,7 +322,8 @@ interface PaintLayer {
 type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
 
 interface PathCarve {
-    readonly mode?: 'flatten' | 'cut';
+    readonly mode?: 'flatten' | 'cut' | 'level';
+    readonly top?: number;
     readonly depth?: number;
     readonly grade?: number;
 }
@@ -363,8 +385,24 @@ interface ReliefOptions {
     readonly seaDepth?: number;
     readonly shelf?: number;
     readonly valley?: ValleyOptions;
+    readonly ria?: RiaOptions;
     readonly islands?: IslandOptions;
+    readonly mountainValley?: MountainValleyOptions;
     readonly erosion?: ReliefErosionOptions;
+}
+
+interface RiaOptions {
+    readonly center?: number;
+    readonly width?: number;
+    readonly headWidth?: number;
+    readonly length?: number;
+    readonly depth?: number;
+    readonly headDepth?: number;
+    readonly slope?: number;
+    readonly flat?: number;
+    readonly flatHeight?: number;
+    readonly run?: number;
+    readonly river?: boolean;
 }
 
 type SizeDistribution = {
@@ -392,6 +430,7 @@ interface SpeciesRule {
     readonly lod?: readonly [near: number, mid: number, far: number];
     readonly color?: ColorVariation;
     readonly tags?: readonly string[];
+    readonly fuel?: string;
 }
 
 interface StandRule {

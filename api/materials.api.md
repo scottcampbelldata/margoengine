@@ -5,8 +5,8 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { MaterialExtension, MaterialExtensionTexture, PBRModel, PBRPrimitive, PreparedGeometry } from "@margoengine/gltf-pro";
-import { PBRInstances } from "@margoengine/gltf-pro/instancing";
+import { MaterialExtension, MaterialExtensionTexture, PBRMaterial, PBRModel, PBRPrimitive, PreparedGeometry } from "@margoengine/gltf/pbr";
+import { PBRInstances } from "@margoengine/gltf/pbr-instancing";
 import { ColorInput } from "@margoengine/math";
 
 export interface AddNode {
@@ -145,6 +145,10 @@ export interface GeometryRange {
 }
 
 export type ImageSource = ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement | VideoFrame;
+
+export interface InstallOptions {
+    features?: ModelFeatures;
+}
 
 export type InstancedMesh<M extends Material | readonly Material[] = Material> = MaterialMesh<M> & {
     readonly instances: PBRInstances;
@@ -447,6 +451,7 @@ export interface MaterialFeature {
     tangentFrame?: boolean;
     lit?(code: string, material: Material): string;
     bindings?(device: GPUDevice, owner: object, material: Material): GPUBindGroupEntry[];
+    castHashed?(code: string): string;
     attach?(material: Material): void;
     detach?(material: Material): void;
 }
@@ -466,11 +471,11 @@ export interface MaterialGraphOutput {
 
 export class MaterialInstallation implements EnginePlugin {
     readonly model: PBRModel;
-    static attach(model: PBRModel): MaterialInstallation;
+    static attach(model: PBRModel, options?: InstallOptions): MaterialInstallation;
     [Symbol.dispose]: () => void;
     readonly name: string;
     disposed: boolean;
-    constructor(model: PBRModel);
+    constructor(model: PBRModel, options?: InstallOptions);
     setup(engine: Engine): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;
@@ -583,7 +588,7 @@ export interface MaterialOptions extends PhysicalOptions {
     uvTransform?: TextureTransform;
 }
 
-export { MaterialSide } from "@margoengine/gltf-pro";
+export { MaterialSide } from "@margoengine/gltf";
 
 export interface MeshGeometry {
     positions: ArrayLike<number>;
@@ -613,6 +618,13 @@ export interface MixNode {
     b: ValueNode;
     factor: ValueNode;
 }
+
+export interface ModelFeatureMaterial {
+    readonly record: PBRMaterial;
+    alphaTest: number;
+}
+
+export type ModelFeatures = Readonly<Record<string, readonly MaterialFeature[]>>;
 
 export interface MulNode {
     type: 'mul';
@@ -776,7 +788,7 @@ export class Texture {
     dispose(): void;
     [Symbol.dispose]: () => void;
     gpuTexture(device: GPUDevice): GPUTexture | undefined;
-    sampled(device: GPUDevice, srgb: boolean, slot: string): [GPUTextureView, GPUSampler] | undefined;
+    sampled(device: GPUDevice, srgb: boolean, slot: string, tile?: boolean): [GPUTextureView, GPUSampler] | undefined;
     steady(device: GPUDevice): number;
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
 }
@@ -813,7 +825,7 @@ export interface TextureRegion {
 
 export type TextureSource = ImageSource | ImageData | RawImage | DataImage | GPUTexture | CubeTarget | TranscodedTexture | CubeSource;
 
-export { TextureTransform } from "@margoengine/gltf-pro";
+export { TextureTransform } from "@margoengine/gltf";
 
 export interface TileAnimation {
     frames: readonly TileFrame[];
@@ -836,6 +848,7 @@ export interface TileGridAtlas extends Atlas {
     tileWidth: number;
     tileHeight: number;
     padding: number;
+    flipped: boolean;
 }
 
 export interface TileGridOptions {
@@ -844,6 +857,7 @@ export interface TileGridOptions {
     padding?: number;
     margin?: number;
     spacing?: number;
+    maxSize?: number;
 }
 
 export class ToonMaterial extends Material {
@@ -955,7 +969,7 @@ export function createMesh<M extends Material | readonly Material[]>(engine: Eng
     renderOrder?: number;
 }): MaterialMesh<M>;
 
-export function install(model: PBRModel): MaterialInstallation;
+export function install(model: PBRModel, options?: InstallOptions): MaterialInstallation;
 
 export function installNodeMaterial(model: PBRModel, graph: MaterialGraph): NodeMaterialInstallation;
 

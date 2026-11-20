@@ -17,6 +17,12 @@ export interface LiquidFrameStats {
 
 export const MAX_LIQUID_PARTICLES = 4194304;
 
+export type ParticleBuffer = GPUBuffer | {
+    readonly buffer: GPUBuffer;
+} | ((device: GPUDevice) => GPUBuffer | {
+    readonly buffer: GPUBuffer;
+});
+
 export class ParticleLiquid implements EnginePlugin {
     readonly options: ParticleLiquidOptions;
     readonly name = "water:liquid";
@@ -71,15 +77,11 @@ export interface ParticleLiquidOptions {
 }
 
 export interface ParticleSource {
-    positions: Float32Array | GPUBuffer | {
-        readonly buffer: GPUBuffer;
-    };
+    positions: Float32Array | ParticleBuffer;
     count?: number;
     stride?: number;
     offset?: number;
-    velocities?: Float32Array | GPUBuffer | {
-        readonly buffer: GPUBuffer;
-    };
+    velocities?: Float32Array | ParticleBuffer;
     velocityOffset?: number;
 }
 

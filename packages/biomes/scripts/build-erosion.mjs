@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { copyFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { endTree } from '../../../scripts/support/shutdown.mjs';
+import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const child = spawn(
@@ -18,7 +19,7 @@ const child = spawn(
   {
     stdio: 'inherit',
     windowsHide: true,
-    env: { ...process.env, RUSTFLAGS: '-C target-feature=+simd128' },
+    env: blueprintRustEnv(root + 'kernel', '-C target-feature=+simd128'),
   },
 );
 let expired = false,

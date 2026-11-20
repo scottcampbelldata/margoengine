@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/voxel/debris (run from the repository root after building packages, one GPU job at a
-// time: node scripts/gpu-lock.mjs run --owner=voxel-debris -- node packages/voxel/tests/debris-browser-check.mjs): a red
+// time: node scripts/run-with-timeout.mjs -- node packages/voxel/tests/debris-browser-check.mjs): a red
 // beam on a pillar drawn by VoxelRenderer; cutting the pillar breaks the beam off as a dynamic body whose core mesh
 // falls with it onto the floor: red where the beam came to rest, not where it was; no WebGPU validation errors.
 import assert from 'node:assert/strict';

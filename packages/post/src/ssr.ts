@@ -40,8 +40,8 @@ export interface SSROptions {
    * neighbourhood clamp, instead of keeping only the environment. Default false (deterministic frames). */
   stochastic?: boolean;
 }
-/** The capture hook SSR gives models (gltf-pro's `PBRCapture`, terrain's `TerrainCapture`, water's `WaterCapture`;
- * declared here so post imports none of them). For code with gltf-pro's PBR `Surface`, `declarations` holds
+/** The capture hook SSR gives models (gltf/pbr's `PBRCapture`, terrain's `TerrainCapture`, water's `WaterCapture`;
+ * declared here so post imports none of them). For code with gltf/pbr's PBR `Surface`, `declarations` holds
  * `margoCapture(s, v, k)`; for any other code only `struct MargoSSR` and `margoSSR(n, v, base, metal, rough)`: return
  * that, or `MargoSSR(vec4f(specularToReplace, roughness), vec4f(weight, 1), vec4f(n * 0.5 + 0.5, 1))` directly. */
 export interface SSRCapture {
@@ -49,7 +49,7 @@ export interface SSRCapture {
   readonly targets: readonly GPUColorTargetState[];
   begin(): GPURenderPassEncoder;
 }
-/** What `ssr.add` takes: a gltf-pro `PBRModel`, a `@margoengine/materials` mesh, a `Terrain` (@margoengine/terrain) or
+/** What `ssr.add` takes: a gltf/pbr `PBRModel`, a `@margoengine/materials` mesh, a `Terrain` (@margoengine/terrain) or
  * a `Water` (@margoengine/water). */
 export interface SSRModel {
   setCapture(hook: SSRCapture): () => void;
@@ -62,7 +62,7 @@ export interface SSRModel {
 // prefiltered cube, so the composite removes exactly the IBL specular it replaces; without IBL nothing is removed and
 // the weight is Karis' analytic split-sum fit (B. Karis, "Physically Based Shading on Mobile", Unreal Engine blog 2014,
 // a published engine standard after Lazarov 2013; F0 0.04 from glTF 2.0 Appendix B). With LightProbes (`probeSpecular`, @margoengine/environment/probes) the
-// specular removed is the probes' own at the pixel's world position (`margoPosition`, set by the replay and by gltf-pro's
+// specular removed is the probes' own at the pixel's world position (`margoPosition`, set by the replay and by gltf/pbr's
 // capture), so reflection probes are what SSR falls back to off screen.
 const replayTail = (code: string) => {
   const ibl = lit(code),
@@ -82,9 +82,9 @@ ${ibl ? 'let ab=iblBrdfTerms(nv,rough);let w=f0*ab.x+f90*ab.y;' : 'let r=rough*v
 return MargoSSR(vec4f(e,rough),vec4f(w,1),vec4f(n*0.5+0.5,1));
 }`;
 };
-// gltf-pro capture: the same targets from the model's Surface. Its environment ambient is iblShade(...)*s.occlusion, and
+// gltf/pbr capture: the same targets from the model's Surface. Its environment ambient is iblShade(...)*s.occlusion, and
 // clearcoat/sheen scale it by k, so the specular to replace and the weight it is replaced with carry both factors.
-// Shaders without gltf-pro's PBR Surface (terrain, water) get margoSSR and the MargoSSR targets only, and return them.
+// Shaders without gltf/pbr's PBR Surface (terrain, water) get margoSSR and the MargoSSR targets only, and return them.
 const pbrSurface = /struct Surface\s*\{\s*base:vec4f/;
 const modelTail = (code: string) =>
   replayTail(code) +
@@ -294,7 +294,7 @@ export class SSR implements EnginePlugin {
   private readonly modelCode = new Map<string, string>();
   private context?: PostPassContext;
   private pass?: GPURenderPassEncoder;
-  // gltf-pro capture hook: model materials into the same three targets, after the core replay.
+  // gltf/pbr capture hook: model materials into the same three targets, after the core replay.
   private readonly hook: SSRCapture = {
     targets,
     declarations: (code) => {
@@ -347,7 +347,7 @@ export class SSR implements EnginePlugin {
     effect.stack = PostStack.attach(engine, [effect]);
     return effect;
   }
-  /** Makes a gltf-pro model or materials mesh reflect: its own materials (maps, alpha mask, instances, skinning) are drawn
+  /** Makes a gltf\/pbr model or materials mesh reflect: its own materials (maps, alpha mask, instances, skinning) are drawn
    * into SSR's material targets. Returns a remover; models not added are still reflected but do not reflect. */
   add(model: SSRModel): () => void {
     if (this.disposed) throw margoError('disposed', 'SSR is disposed; create a new SSR');

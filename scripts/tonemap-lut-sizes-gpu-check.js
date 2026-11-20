@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
-const release = await acquire({ owner: 'tonemap-lut-sizes-gpu-check' }),
-  output = 'test-results/tonemap-lut-sizes',
+const output = 'test-results/tonemap-lut-sizes',
   report = { checks: [], failures: [], captures: [] },
   sizes = [2, 16, 17, 32, 33, 64, 65],
   clamp = (value, low = 0, high = 1) => Math.max(low, Math.min(high, value));
@@ -235,5 +233,4 @@ try {
   );
   await browser?.page.evaluate(() => window.lutSizeFixture?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

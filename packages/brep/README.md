@@ -72,7 +72,8 @@ console.log(model.massProperties(model.cone('frustum', 10 * mm, 5 * mm, 20 * mm)
   count is a cavity of the innermost solid shell and is turned inward.
 - **`offsetFaces(name, body, faceNames, distance)`, `shell(name, body, openFaceNames, thickness)` and
   `draft(name, body, faceNames, neutral, pull, angle)`:** planes, cylinders, cones, spheres and tori are re-solved (new
-  vertices by Gauss-Newton, circles about the old axis, every new edge checked on both faces); a negative `shell`
+  vertices by Gauss-Newton, circles about the old axis, an edge whose faces now meet in another curve traced between
+  its new ends as a Boolean traces it, every new edge checked on both faces); a negative `shell`
   thickness cuts the walls inward, a positive one grows them outward, with no open faces it makes a closed cavity. A
   cylinder or cone whose axis lies along the pull becomes a cone when drafted. Offsets that change the topology
   (a face moved past a neighbour, walls thicker than the part) and faces on B-spline surfaces are refused with a
@@ -100,11 +101,11 @@ same kernel:
   (100, 104; parabolas and hyperbolas as exact rational quadratics), composite curves (102), linear paths (106),
   lines (110), parametric splines (112, exact), rational B-splines (126), offset curves (130, fitted), curves on
   surfaces (142: the model-space curve, else the parameter-space curve mapped through its surface and fitted).
-  Surfaces: planes (108, 190), ruled surfaces (118: exact for matching rails,
-  sampled otherwise), surfaces of revolution (120), tabulated cylinders (122), rational B-spline surfaces (128), offset
+  Surfaces: planes (108, 190), parametric spline surfaces (114, exact: each bicubic patch a Bezier patch of one
+  B-spline, knots at the breakpoints; patches that part on a shared edge by more than the file's tolerance are refused),
+  ruled surfaces (118: exact for matching rails, sampled otherwise), surfaces of revolution (120), tabulated cylinders (122), rational B-spline surfaces (128), offset
   surfaces (140), cylinders, cones, spheres and tori (192 to 198). Colour numbers and colour definitions (314) colour
-  the faces. Not yet: parametric spline surfaces (114, refused with a MargoError until their coefficient order is
-  verified; `docs/known-bugs.md`), the Compressed and Binary formats, subfigure and solid instances (308/408, 430), CSG
+  the faces. Not yet: the Compressed and Binary formats, subfigure and solid instances (308/408, 430), CSG
   solids (150 to 184), and wireframe-only files (nothing to mesh). Faces of trimmed-surface files keep their own edges (they
   are not sewn into solids).
 

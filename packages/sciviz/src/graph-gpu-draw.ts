@@ -23,6 +23,11 @@ export interface GraphLabelBox {
   readonly width: number;
   readonly height: number;
   /** Larger values are placed first; default 0. */ readonly priority?: number;
+  /**
+   * Anchor clearance in CSS pixels, the node's projected radius: a label starts 4 px beyond it. Default 2, a 6 px
+   * offset. The GPU graph layer passes half each node's nodeSize, so labels clear the node's border at any size.
+   */
+  readonly radius?: number;
 }
 /** Greedy four-position placement with a spatial hash; every returned rectangle fits and is disjoint. */
 export function placeGraphLabels(
@@ -44,16 +49,18 @@ export function placeGraphLabels(
   };
   for (const item of [...input].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))) {
     if (
-      ![item.x, item.y, item.width, item.height, item.priority ?? 0].every(Number.isFinite) ||
+      ![item.x, item.y, item.width, item.height, item.priority ?? 0, item.radius ?? 2].every(Number.isFinite) ||
       item.width < 0 ||
-      item.height < 0
+      item.height < 0 ||
+      (item.radius ?? 2) < 0
     )
       throw invalid('Label bounds must be finite');
+    const gap = (item.radius ?? 2) + 4;
     for (const [dx, dy] of [
-      [6, -item.height / 2],
-      [-item.width - 6, -item.height / 2],
-      [-item.width / 2, -item.height - 6],
-      [-item.width / 2, 6],
+      [gap, -item.height / 2],
+      [-item.width - gap, -item.height / 2],
+      [-item.width / 2, -item.height - gap],
+      [-item.width / 2, gap],
     ]) {
       const b = { ...item, x: item.x + dx, y: item.y + dy };
       if (b.x < 0 || b.y < 0 || b.x + b.width > width || b.y + b.height > height) continue;
@@ -90,7 +97,7 @@ export interface GPUGraphLayerOptions {
   /** CSS-pixel width, or one per edge. Default 1. */ readonly edgeWidth?: number | ArrayLike<number>;
   /** Hex colour, or one per edge. Default '#6b7f94'. */ readonly edgeColor?: string | readonly string[];
   /** Edge alpha in [0,1]. Default 0.45. */ readonly edgeOpacity?: number;
-  /** Arrowhead length in CSS pixels; 0 disables. Default 7. */ readonly arrowSize?: number;
+  /** Arrowhead length in CSS pixels, its tip at the target node's border; 0 disables. Default 7. */ readonly arrowSize?: number;
   /** Optional owned-elsewhere polylines; endpoints must match the layout positions at bundling time. */ readonly bundles?: GraphBundles;
   /** Candidates in priority order. Refresh reads only these nodes, never the whole graph. Default none. */
   readonly labels?: readonly { readonly node: number; readonly text: string; readonly priority?: number }[];
@@ -111,23 +118,26 @@ fn corner(i: u32) -> vec2f {
 struct Out { @builtin(position) position: vec4f, @location(0) color: vec4f, @location(1) local: vec2f }
 @vertex fn nodeVertex(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> Out {
   let q = corner(v) * vec2f(2.0,1.0) - vec2f(1.0,0.0); var p = clip(nodes[i].xyz);
-  p = vec4f(p.xy + q * nodeStyle[i*2u+1u].x * style.pixel.x / frame.viewport.xy * p.w,p.zw);
+  p = vec4f(p.xy + q * nodeStyle[i*2u+1u].x * frame.origin.z / frame.viewport.xy * p.w,p.zw);
   var out: Out; out.position=p; out.color=nodeStyle[i*2u]; out.local=q; return out;
 }
 @vertex fn edgeVertex(@builtin(vertex_index) v: u32, @builtin(instance_index) instance: u32) -> Out {
   let points=u32(style.pixel.y); let segments=max(2u,points)-1u; let e=instance/segments; let segment=instance%segments;
   let ends=edges[e]; var pa=nodes[ends.x].xyz; var pb=nodes[ends.y].xyz;
   if(points>0u) { pa=bundles[e*points+segment].xyz; pb=bundles[e*points+segment+1u].xyz; }
-  let a=clip(pa); let b=clip(pb); let safeA=max(a.w,1e-10); let safeB=max(b.w,1e-10);
+  var a=clip(pa); var b=clip(pb); let da=a.w-a.z; let db=b.w-b.z;
+  if(da<0.0&&db>0.0) { a=mix(a,b,da/(da-db)); }
+  if(db<0.0&&da>0.0) { b=mix(b,a,db/(db-da)); }
+  let safeA=max(a.w,1e-10); let safeB=max(b.w,1e-10);
   let delta=(b.xy/safeB-a.xy/safeA)*frame.viewport.xy; let len=length(delta); let tangent=delta/max(len,1e-10); let normal=vec2f(-tangent.y,tangent.x);
   let s=edgeStyle[e*2u+1u]; var p=a; var offset=vec2f(0.0);
   if(v<6u) { let q=corner(v); p=mix(a,b,q.x); offset=normal*q.y*s.x; }
   else {
-    p=b; let q=v-6u;
-    if(q>0u) { offset=-tangent*s.y*2.0+normal*select(-s.y,s.y,q==1u); }
+    p=b; let q=v-6u; offset=-tangent*nodeStyle[ends.y*2u+1u].x;
+    if(q>0u) { offset+=-tangent*s.y*2.0+normal*select(-s.y,s.y,q==1u); }
     if(segment!=segments-1u||s.y==0.0) { p=vec4f(2.0,2.0,2.0,1.0); }
   }
-  p=vec4f(p.xy+offset*style.pixel.x/frame.viewport.xy*p.w,p.zw);
+  p=vec4f(p.xy+offset*frame.origin.z/frame.viewport.xy*p.w,p.zw);
   if(a.w<=0.0||b.w<=0.0||len<1e-10) { p=vec4f(2.0,2.0,2.0,1.0); }
   var out: Out; out.position=p; out.color=edgeStyle[e*2u]; out.local=vec2f(0.0); return out;
 }
@@ -161,6 +171,8 @@ export class GPUGraphLayer implements Drawable {
   readonly #binding: GPUBindGroupLayout;
   #groups = new Map<GPUBuffer, GPUBindGroup>();
   readonly #labels: NonNullable<GPUGraphLayerOptions['labels']>;
+  /** Each label's node radius in CSS pixels (half its nodeSize), the border the label clears. */
+  readonly #labelRadii: Float32Array;
   #labelPositions = new Float32Array(0);
   #boxes: GraphLabelBox[] = [];
   #overlay?: HTMLCanvasElement;
@@ -231,6 +243,7 @@ export class GPUGraphLayer implements Drawable {
     for (const l of this.#labels)
       if (!Number.isInteger(l.node) || l.node < 0 || l.node >= n || !Number.isFinite(l.priority ?? 0))
         throw invalid('Labels must name valid nodes with finite priority');
+    this.#labelRadii = Float32Array.from(this.#labels, (l) => nodeStyle[l.node * 8 + 4] / 2);
     const limit = layout.gpu.device.limits.maxStorageBufferBindingSize;
     if (Math.max(edgeStyle.byteLength, nodeStyle.byteLength, e * 8) > limit)
       throw invalid('Graph drawing buffers exceed this device storage limit');
@@ -280,12 +293,15 @@ export class GPUGraphLayer implements Drawable {
         'sciviz',
       );
   }
-  /** @internal Uploads only the model and CSS pixel ratio; positions stay on the device. */
+  /**
+   * @internal Uploads only the model and bundle size; positions stay on the device. Node and edge sizes are CSS pixels,
+   * scaled by the frame's pixels per CSS pixel (frame.origin.z), never window.devicePixelRatio: the engine may cap its
+   * backing store below that ratio, and a tiled export draws at its own scale.
+   */
   prepare(): void {
     this.#check();
     const v = new Float32Array(20);
     v.set(this.#model);
-    v[16] = globalThis.devicePixelRatio || 1;
     v[17] = this.#options.bundles?.pointsPerEdge ?? 0;
     this.#layout.gpu.device.queue.writeBuffer(this.#uniform, 0, v);
   }
@@ -385,12 +401,17 @@ export class GPUGraphLayer implements Drawable {
     }
     const canvas = (this.#figure.engine as unknown as { canvas: HTMLCanvasElement }).canvas,
       w = canvas.clientWidth || canvas.width,
-      h = canvas.clientHeight || canvas.height;
-    this.#overlay.width = w;
-    this.#overlay.height = h;
+      h = canvas.clientHeight || canvas.height,
+      ratio = globalThis.devicePixelRatio || 1;
+    // Device-resolution backing store, drawn in CSS pixels, so labels stay sharp on high-density displays.
+    this.#overlay.width = Math.round(w * ratio);
+    this.#overlay.height = Math.round(h * ratio);
+    this.#overlay.style.width = `${w}px`;
+    this.#overlay.style.height = `${h}px`;
     this.#overlay.style.left = `${canvas.offsetLeft}px`;
     this.#overlay.style.top = `${canvas.offsetTop}px`;
     const ctx = this.#overlay.getContext('2d')!;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#24374a';
     const m = dataToClip(this.#figure.engine.camera.matrix, this.#figure.model),
@@ -406,6 +427,7 @@ export class GPUGraphLayer implements Drawable {
         y: ((1 - q[1] / q[3]) * h) / 2,
         width: ctx.measureText(l.text).width,
         height: 16,
+        radius: this.#labelRadii[i],
       });
     }
     this.#boxes = placeGraphLabels(candidates, w, h).slice(0, this.#options.maxLabels ?? 200);
@@ -459,6 +481,13 @@ export function gpuGraphLayer(
   options: GPUGraphLayerOptions = {},
 ): GPUGraphLayer {
   const layer = new GPUGraphLayer(figure, layout, options);
+  // The figure takes the layer before the renderer draws it: a refused layer (a disposed figure) is freed.
+  try {
+    figure.addLayer(layer);
+  } catch (error) {
+    layer.dispose();
+    throw error;
+  }
   figure.renderer.add(layer);
-  return figure.addLayer(layer);
+  return layer;
 }

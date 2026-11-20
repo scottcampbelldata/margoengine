@@ -4,10 +4,10 @@ Choose core or stage alone for the smallest install, a domain profile for an app
 everything. Start with the [kits guide](kits.md), then the [API comparisons](../from-threejs.md) and the
 [porting matrix](../threejs-parity.md). The MCP porting guide is generated from those same documents.
 
-For an existing HTML page with `<canvas id="viewport"></canvas>`, install `@margoengine/web` and start with:
+For an existing HTML page with `<canvas id="viewport"></canvas>`, install `@margoengine/kit-web` and start with:
 
 ```ts
-import {createStage} from '@margoengine/web';
+import {createStage} from '@margoengine/kit-web';
 
 const stage = await createStage('#viewport');
 const cube = stage.box({color: '#84d6bd'});
@@ -47,6 +47,6 @@ manages mounting, default controls, resize and its loop. These are work counts a
 | Elapsed time | Deferred by the build-phase speed rule. The install-to-interactive-frame timing scene is retained in speed-phase.md, with no timing assertion or benchmark run. |
 
 Reproduce with `node scripts/template-install-check.mjs`, then
-`node scripts/gpu-lock.mjs run --owner=template-check --wait-max=60 --max=2 --gpu=packed-template-first-frames -- node scripts/template-browser-check.mjs`.
+`node scripts/run-with-timeout.mjs --max=2 -- node scripts/template-browser-check.mjs`.
 Reports, build logs and first-frame PNGs are under `test-results/template-installs`. This audit does not claim
 unmeasured installation speed or universal parity outside the profile and starter contract.

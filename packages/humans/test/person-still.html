@@ -1,0 +1,182 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>person still</title><style>body{margin:0;background:#000}canvas{display:block}</style></head><body><canvas></canvas>
+<script type="module">
+// GPU check page of @margoengine/humans. window.check.frame(person): Khronos RiggedFigure posed by its clip at 0.6 s
+// under a key light with shadows, dressed either by addPerson or by the hand-wiring it replaces (skin by material
+// name, Animation with dual quaternion skinning, Shadows.add); returns the frame as PNG bytes. window.check.behaviour():
+// the two-clip figure of figure.js through addPerson: seek, cross-fade, dispose. window.check.hair(): strand hair on it.
+import {Engine} from '/packages/core/dist/index.js';
+import {loadGLTF,parseGLTFAsync} from '/packages/gltf/dist/pbr.js';
+import {install} from '/packages/materials/dist/index.js';
+import {skin} from '/packages/materials/dist/skin.js';
+import {Animation} from '/packages/animation/dist/index.js';
+import {dualQuaternionSkinning} from '/packages/animation/dist/dqs.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {addPerson} from '/packages/humans/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {dayPreset} from '/packages/sky/dist/day-presets.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+import {figureGLB} from '/packages/humans/test/figure.js';
+const canvas=document.querySelector('canvas');canvas.width=480;canvas.height=360;canvas.style.width='480px';canvas.style.height='360px';
+const make=async()=>{
+  const engine=await Engine.create(canvas,{camera:{position:[0.4,1.0,2.6],target:[0,0.8,0],fov:35,near:0.05,far:100}});
+  engine.stop();
+  const errors=[];engine.gpu?.addEventListener?.('uncapturederror',e=>errors.push(e.error.message));
+  engine.scene.background='#30333a';
+  engine.lighting.direction.set([0.5,0.6,0.62,3]);engine.lighting.radiance.set([1,0.95,0.88,0.45]);
+  return {engine,errors};
+};
+window.check={
+  // The figure's skin under the overcast day preset's sky, its roughness factor `rough`; `sky` is addPerson's sky
+  // option (undefined: the scene's own). Returns the frame's pixels where the figure is, and whether the model is lit
+  // by the sky.
+  async sky(rough,sky){
+    const {engine,errors}=await make(),lit=Sky.attach(engine,dayPreset('overcast'));
+    const model=await loadGLTF(engine,'/examples/assets/khronos/RiggedFigure/RiggedFigure.glb');
+    const material=model.primitives[0].material;material.factors[0]=rough;material.factors[1]=0;
+    const p=await addPerson(engine,model,{materials:{skin:[material.name]},hands:false,...(sky===undefined?{}:{sky})});
+    p.time=0.6;p.playing=false;
+    for(let i=0;i<3;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}
+    // Read in the task that drew it: WebGPU's canvas texture is gone once the frame is presented.
+    const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+    engine.render({delta:1/30});
+    if(isCompatDevice(engine.gpu))await engine.gpu.queue.onSubmittedWorkDone();
+    g.drawImage(canvas,0,0);
+    const pixels=[...g.getImageData(0,0,c.width,c.height).data];
+    const joined=lit.targets?.has(model)??null;
+    p.dispose();
+    const left=lit.targets?.has(model)??null;
+    engine.dispose();
+    return {pixels,joined,left,errors};
+  },
+  // KB-GLTF-SCENESKY1: a dressed person under the overcast day preset's sky. The person (addPerson) in the middle, an
+  // outfit on the right (the figure loaded again with no addPerson, posed by its own Animation, as a film loads a
+  // character's clothes) and a prop on the left (Khronos Lantern, 0.7 m tall). Neither is given sky.add: each joins
+  // its scene's sky by itself unless `off` sets model.sceneSky false. The outfit's and the prop's roughness factors
+  // are `rough`. Returns the frame's pixels and whether each model is lit by the sky.
+  async outfit(rough,off){
+    const {engine,errors}=await make(),lit=Sky.attach(engine,dayPreset('overcast'));
+    engine.camera.position=[0,0.9,4.2];engine.camera.target=[0,0.7,0];
+    const body=await loadGLTF(engine,'/examples/assets/khronos/RiggedFigure/RiggedFigure.glb');
+    const p=await addPerson(engine,body,{materials:{skin:[body.primitives[0].material.name]},hands:false});
+    p.time=0.6;p.playing=false;
+    const outfit=await loadGLTF(engine,'/examples/assets/khronos/RiggedFigure/RiggedFigure.glb');
+    outfit.root.setPosition([0.85,0,0]);
+    const a=Animation.attach(outfit,{skinning:dualQuaternionSkinning});a.play(0);a.seek(0.6);a.playing=false;
+    const prop=await loadGLTF(engine,'/examples/assets/khronos/Lantern/Lantern.glb'),b=prop.bounds,s=0.7/(b[4]-b[1]);
+    prop.root.setScale([s,s,s]).setPosition([-0.85,-b[1]*s,0]);
+    for(const m of [outfit,prop]){
+      for(const q of m.primitives){q.material.factors[0]=rough;q.material.factors[1]=0;}
+      if(off)m.sceneSky=false;
+    }
+    for(let i=0;i<3;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}
+    const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+    engine.render({delta:1/30});
+    if(isCompatDevice(engine.gpu))await engine.gpu.queue.onSubmittedWorkDone();
+    g.drawImage(canvas,0,0);
+    const pixels=[...g.getImageData(0,0,c.width,c.height).data];
+    const joined={outfit:lit.targets?.has(outfit)??null,prop:lit.targets?.has(prop)??null};
+    prop.dispose();
+    const left=lit.targets?.has(prop)??null;
+    engine.dispose();
+    return {pixels,joined,left,errors};
+  },
+  // The figure under the noon day preset's sky, its albedo Wilbur's forehead (CC texture, linear): 'person' (addPerson,
+  // the scene's sky), 'off' (addPerson, sky: false), 'plain' (no skin look, the hand-wired sky.add) or 'empty' (no
+  // figure). Returns the frame's pixels.
+  async tone(mode){
+    const {engine,errors}=await make(),lit=Sky.attach(engine,dayPreset('noon'));
+    if(mode!=='empty'){
+      const model=await loadGLTF(engine,'/examples/assets/khronos/RiggedFigure/RiggedFigure.glb');
+      const material=model.primitives[0].material;material.base.splice(0,4,0.4124,0.1925,0.1284,1);material.factors[0]=0.5;
+      if(mode==='plain'){
+        lit.add(model);
+        const a=Animation.attach(model,{skinning:dualQuaternionSkinning});a.play(0);a.seek(0.6);a.playing=false;
+      }else{
+        const p=await addPerson(engine,model,{materials:{skin:[material.name]},hands:false,shadows:false,...(mode==='off'?{sky:false}:{})});
+        p.time=0.6;p.playing=false;
+      }
+    }
+    for(let i=0;i<3;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}
+    const c=new OffscreenCanvas(canvas.width,canvas.height),g=c.getContext('2d',{willReadFrequently:true});
+    engine.render({delta:1/30});
+    if(isCompatDevice(engine.gpu))await engine.gpu.queue.onSubmittedWorkDone();
+    g.drawImage(canvas,0,0);
+    const pixels=[...g.getImageData(0,0,c.width,c.height).data];
+    engine.dispose();
+    return {pixels,errors};
+  },
+  async frame(person){
+    const {engine,errors}=await make(),shadows=Shadows.attach(engine,{resolution:1024});
+    const model=await loadGLTF(engine,'/examples/assets/khronos/RiggedFigure/RiggedFigure.glb');
+    const material=model.primitives[0].material.name;
+    if(person){
+      const p=await addPerson(engine,model,{materials:{skin:[material]}});
+      p.time=0.6;p.playing=false;
+    }else{
+      install(model,{features:{[material]:[skin()]}});
+      shadows.add(model);
+      const a=Animation.attach(model,{skinning:dualQuaternionSkinning});a.play(0);a.seek(0.6);a.playing=false;
+    }
+    for(let i=0;i<4;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    const bytes=[...new Uint8Array(await blob.arrayBuffer())];
+    engine.dispose();
+    return {bytes,errors};
+  },
+  async behaviour(){
+    const {engine,errors}=await make(),shadows=Shadows.attach(engine,{resolution:512});
+    const model=await parseGLTFAsync(engine,figureGLB());
+    const store=engine.store,id=model.nodes[1].id,angle=()=>2*Math.atan2(store.transforms.qz[id],store.transforms.qw[id]);
+    const person=await addPerson(engine,model);
+    const out={clips:person.clips,state:person.animator.state,materials:person.materials===undefined,shadowed:shadows.sources?.size};
+    person.playing=false;person.time=0.5;engine.render({delta:1/30});out.stand=angle();
+    person.playing=true;person.play('wave',{fade:0.4,at:0.5});out.time=person.time;
+    engine.render({delta:0.2});out.mid=angle();
+    engine.render({delta:0.25});out.end=angle();
+    person.playing=false;out.seeks=[];
+    for(const at of [0.25,0.75,0.1]){person.time=at;engine.render({delta:1/30});out.seeks.push([at,angle()]);}
+    try{person.play('run');out.unknown='no error';}catch(e){out.unknown=e.name;}
+    person.dispose();person.dispose();
+    out.after=engine.plugins.has(person.animation.name);
+    engine.dispose();
+    return {...out,errors};
+  },
+  // Character Creator's tear line as the FBX alone gives it (a shell, hidden) and as fbx/character-creator draws it
+  // from the CC json (material extras name the RLEyeTearline shader: its glossy strip, kept).
+  async shells(){
+    const {engine,errors}=await make();
+    const model=await parseGLTFAsync(engine,figureGLB((doc)=>{
+      const attributes=doc.meshes[0].primitives[0].attributes;
+      doc.meshes[0].primitives=[{attributes,material:0},{attributes,material:1},{attributes,material:2}];
+      doc.materials=[{name:'Std_Tearline_R',alphaMode:'BLEND'},{name:'Std_Tearline_L',alphaMode:'BLEND',extras:{characterCreator:{shader:'RLEyeTearline'}}},{name:'Std_Eyelash',alphaMode:'BLEND'}];
+    }));
+    const [plain,drawn]=model.primitives.map((p)=>p.material),state=(m)=>[m.settings[0],m.settings[1],m.base[3]];
+    const person=await addPerson(engine,model,{hands:false});
+    // The lash card is the only material with a look here (hairCards), so the person installs materials for it alone.
+    const out={plain:state(plain),drawn:state(drawn),cards:person.materials!==undefined};
+    person.dispose();
+    out.restored=state(plain);
+    const bare=await addPerson(engine,model,{hands:false,cards:false});
+    out.noCards=bare.materials===undefined;
+    bare.dispose();
+    engine.dispose();
+    return {...out,errors};
+  },
+  // Strand hair on the skinned figure's material: a direction in the mesh's axes takes the joint's skin matrix as its
+  // `follow` (the feature then binds the turned direction), a 'v' direction reads the skinned tangents and binds nothing.
+  async hair(){
+    const out={};
+    for(const [key,hair] of [['axis',{direction:[0,-1,0]}],['uv',{}]]){
+      const {engine,errors}=await make(),model=await parseGLTFAsync(engine,figureGLB(undefined,{skinned:true}));
+      const person=await addPerson(engine,model,{materials:{hair:['Suit']},hair,shadows:false,hands:false});
+      person.playing=false;person.time=0.5;
+      for(let i=0;i<2;i++){engine.render({delta:1/30});await engine.gpu?.queue?.onSubmittedWorkDone?.();}
+      const feature=model.primitives[0].material.shading?.features?.find(f=>f.name==='hair');
+      out[key]={hair:!!feature,binds:typeof feature?.bindings==='function',errors};
+      person.dispose();engine.dispose();
+    }
+    return out;
+  },
+};
+window.ready=true;
+</script></body></html>

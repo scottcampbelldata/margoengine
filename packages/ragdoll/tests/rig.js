@@ -2,7 +2,7 @@
 // Only the renderer is a stub; the skeleton, the skin data and the clips are the file's.
 import { readFileSync } from 'node:fs';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
-import { GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { Animation } from '../../animation/dist/index.js';
 import { Animator } from '../../animator/dist/index.js';
 import { Physics } from '@margoengine/physics';

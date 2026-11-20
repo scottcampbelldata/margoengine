@@ -10,7 +10,7 @@ import {
   createStage,
   sphereGeometry,
 } from '@margoengine/game';
-import {loadGLTF} from '@margoengine/game/gltf-pro';
+import {loadGLTF} from '@margoengine/game/gltf/pbr';
 import {Physics} from '@margoengine/game/physics';
 
 // Find the six glowing orbs. WASD or the arrow keys walk, Shift runs; walk into the crates to knock them over.

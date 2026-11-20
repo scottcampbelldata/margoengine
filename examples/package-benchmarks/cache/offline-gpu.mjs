@@ -1,7 +1,7 @@
-// Real-browser check of @margoengine/cache (AC power, after npm run build:packages, under the GPU lock):
-//   node scripts/gpu-lock.mjs run --owner=<agent id> -- node examples/package-benchmarks/cache/offline-gpu.mjs [--reps=3] [--quiet-timeout=900]
+// Real-browser check of @margoengine/cache (AC power, after npm run build:packages):
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/cache/offline-gpu.mjs [--reps=3] [--quiet-timeout=900]
 // For SciFiHelmet (5.1 MB) and a generated 6 x 160k-vertex GLB (about 48 MB; picked when the 62 MB conveyor GLB was not
-// loadable by gltf-pro, since fixed): loadGLTF with plain fetch (baseline), through an empty cache
+// loadable by gltf/pbr, since fixed): loadGLTF with plain fetch (baseline), through an empty cache
 // (cold: download + store) and through a filled cache in a new AssetCache (warm: one conditional request, 304, bytes from
 // IndexedDB), on localhost and on a throttled "factory Wi-Fi" profile (CDP: 20 Mbit/s, 80 ms). Then DevTools offline
 // (context.setOffline): the model loads from the cache with the same geometry digest and the same rendered frame, and a
@@ -126,7 +126,7 @@ try {
       worker: inWorker,
     };
     await network(null);
-    // Worker parsing composes with the cache: bytes from cache.fetch, parsed in gltf-pro's worker (online: its script loads).
+    // Worker parsing composes with the cache: bytes from cache.fetch, parsed in gltf/pbr's worker (online: its script loads).
     const parsed = await page.evaluate((url) => window.check.parseInWorker(url), asset.url);
     assert.deepEqual(parsed.errors, []);
     assert.equal(parsed.digest, online.digest);

@@ -106,10 +106,12 @@ test('render pass clears of a layer of a 6-layer texture are draws there; a sing
   );
   calls = pass(plain.createView(), [1, 0, 0, 1]);
   assert.equal(named(calls, 'drawArrays').length, 0);
-  assert.deepEqual(
-    named(calls, 'clearBufferfv').map((c) => c.slice(3)),
-    [[[1, 0, 0, 1]]],
-  );
+  // The layer hands clearBufferfv one reused Float32Array (KB-COMPAT-FRAMEALLOC1, part 9), valid WebGL2: compare the
+  // values it holds at the call, copied before a later clear refills it.
+  const cleared = named(calls, 'clearBufferfv');
+  assert.equal(cleared.length, 1, 'one colour clear');
+  assert.ok(cleared[0][3] instanceof Float32Array, 'a typed array, so no per-frame array of doubles');
+  assert.deepEqual(Array.from(cleared[0][3]), [1, 0, 0, 1], 'the clear value');
 });
 
 // A clear by draw goes through the colour export, which on the Radeon 680M under ANGLE D3D11 narrows the colour to

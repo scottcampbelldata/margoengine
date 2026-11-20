@@ -1,0 +1,57 @@
+{
+ "ancestral-payload": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    over \"a\" (\n    )\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    over \"a\" (\n        payload = @./l0.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 5)]\n)\nclass \"C\"\n{\n    def \"a\" (\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n)\ndef \"Q\"\n{\n    def \"c\" (\n        payload = @./l2.usda@</M> (offset = 3; scale = 2)\n    )\n    {\n        over \"a\" (\n            references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    7
+   ],
+   "/Q/c": [
+    8,
+    3
+   ],
+   "/Q/c/a": [
+    9,
+    4,
+    2,
+    5,
+    0
+   ],
+   "/Q/c/a/a": [
+    6,
+    1
+   ]
+  }
+ },
+ "reference-only": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    over \"a\" (\n    )\n    {\n    }\n}\ndef \"M\" (\n    specializes = </C>\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n)\ndef \"M\"\n{\n    over \"a\" (\n        payload = @./l0.usda@ (offset = 3; scale = 2)\n    )\n    {\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 5)]\n)\nclass \"C\"\n{\n    def \"a\" (\n    )\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n)\ndef \"Q\"\n{\n    def \"c\" (\n\n    )\n    {\n        over \"a\" (\n            references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/Q": [
+    7
+   ],
+   "/Q/c": [
+    8
+   ],
+   "/Q/c/a": [
+    9,
+    4,
+    2,
+    0,
+    5
+   ],
+   "/Q/c/a/a": [
+    1,
+    6
+   ]
+  }
+ }
+}

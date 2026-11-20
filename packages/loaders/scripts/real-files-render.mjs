@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { noFileWatcher } from '../../../scripts/support/no-file-watcher.js';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
 
@@ -49,7 +50,7 @@ function pack(drawing) {
 /** Draws every drawing, writes a PNG per file into `folder` and marks a blank or failing row in `report` as FAIL. */
 export async function renderAll(drawings, folder, report) {
   await mkdir(folder, { recursive: true });
-  const server = await createServer({ configFile: resolve(here, '../vite.config.js'), logLevel: 'error', server: { port: 0 } });
+  const server = await createServer({ plugins: [noFileWatcher()], configFile: resolve(here, '../vite.config.js'), logLevel: 'error', server: { port: 0 } });
   await server.listen();
   let browser;
   try {

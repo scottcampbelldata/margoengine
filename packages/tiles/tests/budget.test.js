@@ -12,7 +12,7 @@ test('budget: textureBytes counts every mip level of an rgba8 texture', () => {
   assert.equal(textureBytes(8, 8, 1), 256);
 });
 
-/** A gltf-pro-shaped model: two primitives sharing one vertex array, two materials sharing one image. */
+/** A gltf-pbr-shaped model: two primitives sharing one vertex array, two materials sharing one image. */
 function model({ ktx2 = false } = {}) {
   const vertices = new Float32Array(20 * 3), // three 80-byte vertices
     a = new Uint32Array(3),
@@ -29,7 +29,7 @@ function model({ ktx2 = false } = {}) {
   };
 }
 
-test('budget: modelGpuBytes counts unique arrays once and each bound image once, as gltf-pro uploads them', () => {
+test('budget: modelGpuBytes counts unique arrays once and each bound image once, as gltf/pbr uploads them', () => {
   // vertices 240 + indices 12 + 24 + uvs 48, and one 64 x 32 image with its mips (texture 1's basisu is undecoded).
   assert.equal(modelGpuBytes(model()), 240 + 12 + 24 + 48 + textureBytes(64, 32));
   assert.equal(modelGpuBytes(model({ ktx2: true })), 240 + 12 + 24 + 48 + 4096 + 1024);

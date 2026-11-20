@@ -1,4 +1,4 @@
-// margo-convert thumbnail on a fake GPU: real core, gltf-pro and headless code, no device. What it draws is proved by
+// margo-convert thumbnail on a fake GPU: real core, gltf/pbr and headless code, no device. What it draws is proved by
 // @margoengine/headless's real-GPU test; here, the command: files, views, inputs and every refusal.
 import test from 'node:test';
 import assert from 'node:assert/strict';

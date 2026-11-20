@@ -4,10 +4,14 @@
 import type { Engine, EnginePlugin, PassContext } from '@margoengine/core/extension';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { checkLayers, ViewStates } from '../../shared/view-rect.js';
+import { TextureOption } from '../../shared/texture-option.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 
-/** A texture, or a function returning one each frame such as a pixel layer's `target`. */
+/**
+ * A texture, or a function returning one each frame such as a pixel layer's `target`. A function is read every frame and
+ * needs nothing at a device restore; a plain texture belongs to the device it was given on (see `setSource`).
+ */
 export type TextureSource = GPUTexture | (() => GPUTexture);
 
 /** How the picture fills its view: as large as fits keeping its shape (`'contain'`), or all of it (`'stretch'`). */
@@ -62,8 +66,8 @@ export abstract class ScreenPass implements EnginePlugin {
   readonly name: string;
   /** Read each frame. */
   fit: PixelFit;
-  readonly #source: TextureSource;
-  readonly #target?: TextureSource;
+  readonly #source: TextureOption;
+  readonly #target: TextureOption;
   readonly #order: number;
   readonly #layers: number;
   readonly #label: string;
@@ -84,8 +88,8 @@ export abstract class ScreenPass implements EnginePlugin {
     if (!options?.source) throw typeError(`${label} needs a source texture`, 'pixel-options');
     const order = options.order ?? 35;
     if (!Number.isFinite(order)) throw rangeError(`${label} order must be a finite number`, 'pixel-options');
-    this.#source = options.source;
-    this.#target = options.target;
+    this.#source = new TextureOption(options.source, `${label} source`, 'setSource');
+    this.#target = new TextureOption(options.target, `${label} target`, 'setTarget');
     this.#order = order;
     this.#layers = checkLayers(options.layers ?? 1, `${label} layers`);
     this.fit = options.fit ?? 'contain';
@@ -95,6 +99,18 @@ export abstract class ScreenPass implements EnginePlugin {
     this.#values = new ArrayBuffer(bytes);
     this.name = options.name ?? name;
   }
+  /**
+   * Replaces the source from the next frame. A plain texture belongs to the engine's device as it is now, so call this from
+   * `onDeviceRestored` to bring a lost one back.
+   */
+  setSource(source: TextureSource): void {
+    if (!source) throw typeError(`${this.#label} needs a source texture`, 'pixel-options');
+    this.#source.set(source, this.#engine?.gpu);
+  }
+  /** Replaces the target from the next frame (undefined: draw over each canvas view). The same rule as `setSource`. */
+  setTarget(target: TextureSource | undefined): void {
+    this.#target.set(target, this.#engine?.gpu);
+  }
   /** Writes the pass's uniforms: the drawn rectangle in output pixels, and the source's size. */
   protected abstract fill(values: ArrayBuffer, rect: readonly number[], source: GPUTexture): void;
 
@@ -102,6 +118,8 @@ export abstract class ScreenPass implements EnginePlugin {
     if (this.#disposed) throw fault('disposed', `${this.#label} disposed; create a new one`, 'disposed');
     if (engine.backend !== 'webgpu') throw fault('unsupported', `${this.#label} needs WebGPU`, 'webgpu');
     this.#engine = engine;
+    this.#source.fix(engine.gpu);
+    this.#target.fix(engine.gpu);
     engine.frameGraph.add({
       name: this.name,
       order: this.#order,
@@ -135,8 +153,8 @@ export abstract class ScreenPass implements EnginePlugin {
   }
   #run(c: Context): void {
     const view = c.view,
-      pick = (t: TextureSource) => (typeof t === 'function' ? t() : t);
-    if (this.#target ? view?.index : view?.target || (view?.layers !== undefined && !(view.layers & this.#layers)))
+      toTarget = this.#target.value !== undefined;
+    if (toTarget ? view?.index : view?.target || (view?.layers !== undefined && !(view.layers & this.#layers)))
       return;
     if (this.fit !== 'contain' && this.fit !== 'stretch')
       throw rangeError(`${this.#label} fit must be contain or stretch`, 'pixel-options');
@@ -146,8 +164,10 @@ export abstract class ScreenPass implements EnginePlugin {
       this.#device = device;
     }
     this.#module ??= device.createShaderModule({ label: this.#label, code: this.#code });
-    const source = pick(this.#source),
-      target = this.#target ? pick(this.#target) : undefined;
+    // A source or a target lost with the device is reported once and the pass draws nothing until a new one is set.
+    const source = this.#source.get(device, this.#engine),
+      target = toTarget ? this.#target.get(device, this.#engine) : undefined;
+    if (!source || (toTarget && !target)) return;
     if (source === target) throw fault('state', `${this.#label} source and target must differ`, 'pixel-options');
     const format = target ? target.format : c.format,
       samples = target ? 1 : (c.descriptor.multisample?.count ?? 1),

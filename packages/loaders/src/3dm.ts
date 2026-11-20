@@ -4,18 +4,36 @@ import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } 
 import { floats, limits, toBytes, uints, type BinaryInput } from './util.js';
 
 const F = '3DM';
-/** Metres per unit, by the file's unit system number. */
+const AU = 149597870700;
+/**
+ * Metres per unit, by the file's unit system number (RhinoCommon `UnitSystem`). 0 None and 11 CustomUnits name no
+ * metre factor, so they are left out.
+ */
 const UNITS: Record<number, number> = {
   1: 1e-6,
   2: 1e-3,
   3: 1e-2,
   4: 1,
   5: 1e3,
-  6: 1e-10,
-  7: 1e-9,
+  6: 2.54e-8,
+  7: 2.54e-5,
   8: 0.0254,
   9: 0.3048,
   10: 1609.344,
+  12: 1e-10,
+  13: 1e-9,
+  14: 0.1,
+  15: 10,
+  16: 100,
+  17: 1e6,
+  18: 1e9,
+  19: 0.9144,
+  20: 0.0254 / 72,
+  21: 0.0254 / 6,
+  22: 1852,
+  23: AU,
+  24: 9460730472580800,
+  25: (648000 / Math.PI) * AU,
 };
 
 interface Disposable {

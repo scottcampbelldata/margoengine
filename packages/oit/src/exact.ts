@@ -135,7 +135,7 @@ struct Result {@location(0) color:vec4f, @builtin(frag_depth) depth:f32, @builti
 `;
 
 /**
- * Exact order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf-pro) or a transparent
+ * Exact order-independent transparency: `oit.add(model)` draws the model's BLEND primitives (gltf/pbr) or a transparent
  * materials mesh into per-pixel lists, and the nearest `layers` of each pixel blend in true depth order, per fragment, so
  * parts that cut through each other come out as sorted blending would if every pixel were sorted. Heavier than `OIT` in
  * memory and time: use it where the result must be right, such as CAD glass. Models not added keep sorted blending.
@@ -204,7 +204,7 @@ export class ExactOIT extends TransparentPass {
     this.uniform = device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.readback = device.createBuffer({ size: 4, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   declarations(group: number): string {
     return groupCode(this.code, group, (g) => this.surface(g) + pbrLayer);
   }
@@ -212,7 +212,7 @@ export class ExactOIT extends TransparentPass {
   surface(group: number): string {
     return groupCode(this.surfaceCode, group, surface);
   }
-  /** @internal gltf-pro transparency hook. */
+  /** @internal gltf\/pbr transparency hook. */
   bindings(): GPUBindGroupEntry[] {
     return [
       { binding: BINDING, resource: this.binding ?? { buffer: this.uniform! } },
@@ -220,7 +220,7 @@ export class ExactOIT extends TransparentPass {
       { binding: BINDING + 2, resource: { buffer: this.nodes! } },
     ];
   }
-  /** @internal gltf-pro transparency hook: the list pass, begun on the first transparent draw of the frame. */
+  /** @internal gltf\/pbr transparency hook: the list pass, begun on the first transparent draw of the frame. */
   begin(): GPURenderPassEncoder {
     if (this.pass) return this.pass;
     const c = this.context!;

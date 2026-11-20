@@ -414,4 +414,11 @@ export class NavMesh implements NavSurface {
 }
 export { avoid, type Agent } from './orca.js';
 export { Crowd, CrowdAgent } from './crowd.js';
-export type { CrowdOptions, CrowdAgentOptions, CrowdAgentState, CrowdObstacle, CrowdEventMap } from './crowd.js';
+export type {
+  CrowdOptions,
+  CrowdDensityOptions,
+  CrowdAgentOptions,
+  CrowdAgentState,
+  CrowdObstacle,
+  CrowdEventMap,
+} from './crowd.js';

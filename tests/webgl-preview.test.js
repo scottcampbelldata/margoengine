@@ -7,7 +7,7 @@ import { Engine, PbrMaterial, box } from '../packages/core/dist/index.js';
 import { webglRenderer } from '../packages/webgl2-compat/dist/preview.js';
 import { PostProcessing } from '../packages/creative/dist/post.js';
 import { GPUParticles } from '../packages/creative/dist/particles.js';
-import { SkyMoon } from '../packages/scenery/dist/sky.js';
+import { SkyMoon } from '../packages/sky/dist/night-preset.js';
 import { Shadows } from '../packages/shadows/dist/index.js';
 import { glDrawHarness } from './support/core-draw-gpu.js';
 

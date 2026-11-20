@@ -1,12 +1,12 @@
-// exportModel round trips: export a gltf-pro model, re-import it with gltf-pro and compare node trees, decoded accessors
+// exportModel round trips: export a gltf/pbr model, re-import it with gltf/pbr and compare node trees, decoded accessors
 // (byte for byte where the export is lossless), materials, images and animation poses sampled at several times; every
 // output also goes through the Khronos glTF-Validator.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { inflateSync } from 'node:zlib';
-import { parseGLTF, parseGLTFAsync } from '@margoengine/gltf-pro';
-import { instancing } from '@margoengine/gltf-pro/instancing';
+import { parseGLTF, parseGLTFAsync } from '@margoengine/gltf/pbr';
+import { instancing } from '@margoengine/gltf/pbr-instancing';
 import { Animation } from '@margoengine/animation';
 import { Material, Texture, createMesh, createInstancedMesh } from '@margoengine/materials';
 import { exportModel } from '../dist/model.js';
@@ -80,7 +80,7 @@ function assertSameModel(a, b) {
         same(y, x, `${label} ${name}`);
         continue;
       }
-      // Weights are written normalized (gltf-pro divides by the sum when skinning).
+      // Weights are written normalized (gltf/pbr divides by the sum when skinning).
       for (let v = 0; v < x.length; v += 4) {
         const s = x[v] + x[v + 1] + x[v + 2] + x[v + 3];
         for (let k = 0; k < 4; k++) assert.ok(Math.abs(y[v + k] - x[v + k] / s) < 1e-6, `${label} weight ${v + k}`);

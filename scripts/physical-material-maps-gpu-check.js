@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 import { decodePNG } from '../tests/support/png.js';
 
-// Always point MARGO_GPU_LOCK at the main checkout when running in a worktree.
-const release = await acquire({ owner: 'physical-material-maps-gpu-check' });
 let browser;
 try {
   await mkdir('test-results/physical-material-maps', { recursive: true });
@@ -239,5 +236,4 @@ try {
 } finally {
   await browser?.page.evaluate(() => window.physicalMaps?.dispose()).catch(() => {});
   await browser?.close();
-  release();
 }

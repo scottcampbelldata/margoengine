@@ -1,0 +1,324 @@
+{
+  "packages/audio/src/doppler.ts": {
+    "wall": "live audio: the Doppler pitch follows the audio clock offline and the wall clock only for a live page"
+  },
+  "packages/behavior/src/tree.ts": {
+    "delta": "game logic the app steps itself (BehaviorTree.tick(delta)): it is no engine plugin, draws nothing, and each step runs the app's own actions and conditions, so a seek cannot replay it without running game code; a film drives it from its own frame call, steps included"
+  },
+  "packages/biomes/src/view.ts": {
+    "wall": "streaming work budget per frame (load scheduling and its frame-time stats); what is drawn converges on the loaded set",
+    "delta": "view velocity estimate that steers streaming prefetch; no drawn clock"
+  },
+  "packages/bvh/src/sdf.ts": {
+    "wall": "time slice of an SDF bake so the page stays responsive; the baked field does not depend on it"
+  },
+  "packages/cache/src/decoded.ts": {
+    "wall": "cache age and HTTP freshness (RFC 9111) are wall-clock by definition; nothing drawn"
+  },
+  "packages/cache/src/http.ts": {
+    "wall": "cache age and HTTP freshness (RFC 9111) are wall-clock by definition; nothing drawn"
+  },
+  "packages/cache/src/index.ts": {
+    "wall": "cache age and HTTP freshness (RFC 9111) are wall-clock by definition; nothing drawn"
+  },
+  "packages/cache/src/prefetch.ts": {
+    "wall": "prefetch scheduling by wall time; loading only, nothing drawn"
+  },
+  "packages/cache/src/ranges.ts": {
+    "wall": "cache age and HTTP freshness (RFC 9111) are wall-clock by definition; nothing drawn"
+  },
+  "packages/cinematic/src/lens.ts": {
+    "delta": "FocusTracker is a camera stage, not a plugin: its focus and zoom ease run inside the update of the VirtualCamera or CameraBrain that holds it, with that update's delta, so they move only when that camera is stepped, and CameraBrain.advanceTime steps it under the film clock (KB-FILM-BRAIN1)"
+  },
+  "packages/compute/src/autotune.ts": {
+    "wall": "profiling: autotune measures candidate kernels; the chosen kernel gives the same output"
+  },
+  "packages/controls/src/presentation.ts": {
+    "delta": "interactive control smoothing (PathControls progress eases toward the page scroll offset); films drive cameras through cinematic or cutscene"
+  },
+  "packages/controls/src/third-person.ts": {
+    "delta": "interactive control smoothing (camera arm and crouch height ease toward input); films drive cameras through cinematic or cutscene"
+  },
+  "packages/controls/src/walk.ts": {
+    "delta": "interactive control smoothing (camera arm and crouch height ease toward input); films drive cameras through cinematic or cutscene"
+  },
+  "packages/cutscene/src/record.ts": {
+    "wall": "take recorder stamps real capture time (injectable `now`); a recording, not drawn output"
+  },
+  "packages/ecs/src/parallel.ts": {
+    "delta": "game logic the app steps itself (ParallelSchedule.update(delta)): it is no engine plugin, draws nothing, and each step runs the app's own systems in workers, so a seek cannot replay it without running game code; a film drives it from its own frame call, steps included"
+  },
+  "packages/ecs/src/schedule.ts": {
+    "delta": "game logic the app steps itself (Schedule.update(delta)): it is no engine plugin, draws nothing, and each step runs the app's own systems, so a seek cannot replay it without running game code; a film drives it from its own frame call, steps included"
+  },
+  "packages/environment/src/exr-write.ts": {
+    "wall": "encode timing stats for the EXR writer; the file bytes do not depend on it"
+  },
+  "packages/exporters/src/encoder-host.ts": {
+    "wall": "encoder host yields to the page every 50 ms; the encoded output does not depend on it"
+  },
+  "packages/fsm/src/index.ts": {
+    "delta": "game logic the app steps itself (StateMachine.update(delta)): it is no engine plugin, draws nothing, and each step runs the app's own state handlers, so a seek cannot replay it without running game code; a film drives it from its own frame call, steps included"
+  },
+  "packages/gltf/src/interactivity-graph.ts": {
+    "wall": "KHR_interactivity math/random and random flow nodes are random by the spec; graphs stay unseekable (animation README, film never list)"
+  },
+  "packages/gltf/src/progressive.ts": {
+    "wall": "progressive load budget per frame; loading only, the final model is the same"
+  },
+  "packages/gltf/src/stream.ts": {
+    "wall": "stream request timing (network); loading only"
+  },
+  "packages/headless/src/null.ts": {
+    "delta": "the null stage counts its own steps for headless tests and servers; it draws nothing"
+  },
+  "packages/html/src/index.ts": {
+    "delta": "class C, history of the view: anchor opacity eases toward its visible share over fade.duration and settles after a cut"
+  },
+  "packages/ifc/src/write.ts": {
+    "wall": "IFC owner history time stamps (IfcOwnerHistory CreationDate and LastModifiedDate) are wall-clock by definition when editIFC gets no options.now; a saved file, nothing drawn"
+  },
+  "packages/input/src/gestures.ts": {
+    "wall": "input timing: gesture, interaction, motion and replay clocks time real user input (injectable `now`)"
+  },
+  "packages/input/src/interactions.ts": {
+    "wall": "input timing: gesture, interaction, motion and replay clocks time real user input (injectable `now`)"
+  },
+  "packages/input/src/motion.ts": {
+    "wall": "input timing: gesture, interaction, motion and replay clocks time real user input (injectable `now`)"
+  },
+  "packages/input/src/replay.ts": {
+    "wall": "input timing: gesture, interaction, motion and replay clocks time real user input (injectable `now`)"
+  },
+  "packages/inspector/src/frame.ts": {
+    "wall": "inspector profiling and debug ids; a developer tool, never in a film"
+  },
+  "packages/inspector/src/gl.ts": {
+    "wall": "inspector profiling and debug ids; a developer tool, never in a film"
+  },
+  "packages/inspector/src/history.ts": {
+    "wall": "inspector profiling and debug ids; a developer tool, never in a film"
+  },
+  "packages/inspector/src/remote.ts": {
+    "wall": "inspector profiling and debug ids; a developer tool, never in a film"
+  },
+  "packages/inspector/src/shaders.ts": {
+    "wall": "inspector profiling and debug ids; a developer tool, never in a film"
+  },
+  "packages/loaders/src/types.ts": {
+    "wall": "a default argument of httpRefusal: the HTTP-date of a Retry-After header becomes whole seconds from now for a LoaderError; a load error field, nothing drawn"
+  },
+  "packages/machinery/src/telemetry.ts": {
+    "wall": "telemetry receive and sample time of a live machine feed (network timestamps)",
+    "delta": "telemetry sample interval of a live machine feed; no drawn clock"
+  },
+  "packages/mcp/src/http.ts": {
+    "wall": "MCP session expiry and render timing stats (server, network)"
+  },
+  "packages/mcp/src/render.ts": {
+    "wall": "MCP session expiry and render timing stats (server, network)"
+  },
+  "packages/netcode/src/client.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/extrapolate.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/lobby.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/presence.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/rollback.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/rooms.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/server.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/signal.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/netcode/src/smoothing.ts": {
+    "wall": "network timestamps, leases and rate limits (netcode runs on real time, injectable `now`)"
+  },
+  "packages/physics/src/decomposition.ts": {
+    "wall": "physics on hold (Scott 2026-11-10)"
+  },
+  "packages/physics/src/next/physics.ts": {
+    "delta": "physics on hold (Scott 2026-11-10)"
+  },
+  "packages/physics/src/physics.ts": {
+    "delta": "physics on hold (Scott 2026-11-10)"
+  },
+  "packages/physics2d/src/physics.ts": {
+    "delta": "physics on hold (Scott 2026-11-10)"
+  },
+  "packages/points/src/laz.ts": {
+    "wall": "LAZ decode timing stats; the decoded points do not depend on it"
+  },
+  "packages/post/src/glitch.ts": {
+    "wall": "glitch without `seed` picks a random seed once; films pass `seed` (film never list)"
+  },
+  "packages/post/src/scene-fade.ts": {
+    "wall": "scene fade is a page-load fade timed by the wall clock (film never list)"
+  },
+  "packages/quality/src/events.ts": {
+    "wall": "quality events and adaptive resolution follow measured frame time on a live page; films fix the resolution"
+  },
+  "packages/quality/src/resolution.ts": {
+    "wall": "quality events and adaptive resolution follow measured frame time on a live page; films fix the resolution"
+  },
+  "packages/ragdoll/src/balance.ts": {
+    "delta": "physics on hold (Scott 2026-11-10): the balance settle clock steps with the ragdoll it drives"
+  },
+  "packages/ragdoll/src/powered.ts": {
+    "delta": "physics on hold (Scott 2026-11-10)"
+  },
+  "packages/rigging/src/heat.ts": {
+    "wall": "long rigging solves yield to the page every few ms; the weights do not depend on it"
+  },
+  "packages/rigging/src/transfer.ts": {
+    "wall": "long rigging solves yield to the page every few ms; the weights do not depend on it"
+  },
+  "packages/rigging/src/voxel-weights.ts": {
+    "wall": "long rigging solves yield to the page every few ms; the weights do not depend on it"
+  },
+  "packages/robot-planning/src/plan.ts": {
+    "wall": "planner time slice so the page stays responsive; the plan does not depend on it"
+  },
+  "packages/save/src/node.ts": {
+    "wall": "temporary file name and remote retry backoff; storage only"
+  },
+  "packages/save/src/remote.ts": {
+    "wall": "temporary file name and remote retry backoff; storage only"
+  },
+  "packages/scatter/src/interact.ts": {
+    "delta": "class B, history on the GPU: the trample field's time since its last GPU step (recovery e^(-3 P / recover)) settles over the scene's warm-up frames after a cut (GAP-FILM-TIME plan); the wind clock is replayed by Scatter.advanceTime"
+  },
+  "packages/sciviz/src/bench.ts": {
+    "wall": "profiling: benchmark and monitor sweep timings"
+  },
+  "packages/sciviz/src/geo-lod.ts": {
+    "wall": "LOD fade and stream pacing take an injectable `clock` option; a film passes its frame clock"
+  },
+  "packages/sciviz/src/monitor-sweep.ts": {
+    "wall": "profiling: benchmark and monitor sweep timings"
+  },
+  "packages/sciviz/src/progressive.ts": {
+    "wall": "progressive refinement measures frame time on a live page to pick the refinement step"
+  },
+  "packages/sciviz/src/stream.ts": {
+    "wall": "LOD fade and stream pacing take an injectable `clock` option; a film passes its frame clock"
+  },
+  "packages/sciviz/src/timeline.ts": {
+    "wall": "live timeline playback paces itself on the wall clock; a film sets the timeline position itself"
+  },
+  "packages/sky/src/weather-fx.ts": {
+    "delta": "class C, history of the view: the wet lens and splash timer settle over the scene's warm-up frames after a cut, as TAA does (GAP-FILM-TIME plan)"
+  },
+  "packages/stats/src/beacon.ts": {
+    "wall": "stats and profiling (frame, GPU, compile hitches, leaks, phases, beacon sampling); a developer tool"
+  },
+  "packages/stats/src/compile.ts": {
+    "wall": "stats and profiling (frame, GPU, compile hitches, leaks, phases, beacon sampling); a developer tool"
+  },
+  "packages/stats/src/index.ts": {
+    "wall": "stats and profiling (frame, GPU, compile hitches, leaks, phases, beacon sampling); a developer tool"
+  },
+  "packages/stats/src/leaks.ts": {
+    "wall": "stats and profiling (frame, GPU, compile hitches, leaks, phases, beacon sampling); a developer tool"
+  },
+  "packages/stats/src/phases.ts": {
+    "wall": "stats and profiling (frame, GPU, compile hitches, leaks, phases, beacon sampling); a developer tool"
+  },
+  "packages/studio/src/pathtrace.ts": {
+    "delta": "ProgressiveStill idle timer: reset whenever the camera or size changes and capped at 60 s, it only decides when progressive path tracing of a held still starts; no clock a film moves"
+  },
+  "packages/terrain/src/colors.ts": {
+    "delta": "class B, history on the GPU: the wet-sand record's seconds since its last GPU update (moisture e^(-t / wetDryTime), film e^(-t / wetGlossTime)), each pass handed exactly the seconds its frames stepped (packages/terrain/test/colors.test.js); after a cut the record rebuilds from the water's depth over the scene's warm-up of P seconds, so sand last wet before the warm-up holds up to e^(-P / wetDryTime) less moisture than a continuous run (GAP-FILM-TIME plan)"
+  },
+  "packages/terrain/src/planet.ts": {
+    "wall": "planet tile build budget per frame; loading only, the built tiles are the same"
+  },
+  "packages/tiles/src/fade.ts": {
+    "wall": "tile fade takes an injectable `clock` option; a film passes its frame clock (film never list without it)"
+  },
+  "packages/transitions/src/index.ts": {
+    "delta": "a transition reveals the new scene over the frame frozen by start(), a GPU capture no seek can rebuild, so a film scene starts outside a transition and never seeks into one"
+  },
+  "packages/transitions/src/live.ts": {
+    "delta": "LiveTransitions.render({ delta }) is the app's own frame call that draws both scenes and steps the blend; a film scene starts outside a transition, as with Transitions"
+  },
+  "packages/tween/src/inertia.ts": {
+    "delta": "a fling released from a drag (inertia after real pointer input), stepped by the app with update(delta); no film clock"
+  },
+  "packages/tween/src/scroll-pin.ts": {
+    "wall": "scroll pin velocity follows real scroll input"
+  },
+  "packages/ui/src/input.ts": {
+    "delta": "widget clocks move in Ui.update, which UiRenderer.advanceTime runs in the frame update, so seek replays them (seek test: packages/ui/tests/seek.test.js)"
+  },
+  "packages/ui/src/interaction.ts": {
+    "delta": "widget clocks move in Ui.update, which UiRenderer.advanceTime runs in the frame update, so seek replays them (seek test: packages/ui/tests/seek.test.js)"
+  },
+  "packages/ui/src/meters.ts": {
+    "delta": "widget clocks move in Ui.update, which UiRenderer.advanceTime runs in the frame update, so seek replays them (seek test: packages/ui/tests/seek.test.js)"
+  },
+  "packages/voxel-edit/src/voxelize.ts": {
+    "wall": "voxelize yields to the page every 16 ms; the voxels do not depend on it"
+  },
+  "packages/voxel-net/src/bot.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server",
+    "delta": "test bot send interval of a live multiplayer client; no drawn clock"
+  },
+  "packages/voxel-net/src/chat.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server"
+  },
+  "packages/voxel-net/src/client.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server",
+    "delta": "client prediction steps of a live multiplayer client (fixed 1/60 s steps of player input); network play, not film"
+  },
+  "packages/voxel-net/src/entities.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server"
+  },
+  "packages/voxel-net/src/replay.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server"
+  },
+  "packages/voxel-net/src/rooms.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server"
+  },
+  "packages/voxel-net/src/server.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server"
+  },
+  "packages/voxel-net/src/shards.ts": {
+    "wall": "network timestamps, seat expiry, rate limits, retries and spawn picks of a live multiplayer server"
+  },
+  "packages/voxel-pathtracer/src/tracer.ts": {
+    "wall": "auto samplesPerFrame paces samples by frame time on a live page; a film sets a fixed samplesPerFrame"
+  },
+  "packages/voxel/src/physics.ts": {
+    "wall": "voxel physics and chunk stream work budgets per frame; loading only"
+  },
+  "packages/voxel/src/query.ts": {
+    "delta": "VoxelCharacter is a player controller the app steps with its input (update(dt, intent)) in fixed steps; films move people through animation"
+  },
+  "packages/voxel/src/stream.ts": {
+    "wall": "voxel physics and chunk stream work budgets per frame; loading only"
+  },
+  "packages/water/src/ripples.ts": {
+    "delta": "class B, history on the GPU: the ripple field's time to simulate (damped waves) settles over the scene's warm-up frames after a cut (GAP-FILM-TIME plan)"
+  },
+  "packages/webgl2-compat/src/device/render.ts": {
+    "wall": "shader translate and link timing stats of the compatibility layer"
+  },
+  "packages/worker/src/rpc.ts": {
+    "wall": "worker request timeouts; nothing drawn"
+  },
+  "packages/xr/src/locomotion.ts": {
+    "delta": "XR comfort vignette follows the headset motion; XR sessions are not filmed"
+  }
+}

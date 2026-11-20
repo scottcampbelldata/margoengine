@@ -1,5 +1,5 @@
 // Runs one GPU test command with a hard time limit (used by scripts/gpu-package-tests.mjs). A test that hangs would
-// otherwise hold the GPU lock and block a whole check:merge until the overall limit; here its whole process tree
+// otherwise block a whole check:merge until the overall limit; here its whole process tree
 // (shell, node, browser, servers) is ended at the limit and the result names the test and the fix.
 import { spawn } from 'node:child_process';
 import { closeSync, openSync } from 'node:fs';

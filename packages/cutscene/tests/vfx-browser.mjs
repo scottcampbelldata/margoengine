@@ -1,5 +1,5 @@
 // Real-GPU proof of @margoengine/cutscene/vfx (from the repository root after building packages; check:gpu-packages takes
-// the GPU lock around it): node packages/cutscene/tests/vfx-browser.mjs
+// it): node packages/cutscene/tests/vfx-browser.mjs
 // Reaches six times of a cutscene by playing and by seeking, and compares the particle buffer and the picture read back.
 import assert from 'node:assert/strict';
 import { openBrowser } from '../../../scripts/browser.js';

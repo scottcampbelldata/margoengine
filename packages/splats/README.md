@@ -109,7 +109,7 @@ console.log(both.positions.length / 3, saved.size);
 ```
 
 - **`parsePly(bytes)`** reads the PLY layout Gaussian-splat training writes (`binary_little_endian` or `ascii`, one `vertex` element with `x y z`, `f_dc_0..2`, optional `f_rest_*` for SH degrees 1-3, `opacity` as a logit, `scale_0..2` as logs and `rot_0..3` as w x y z). Opacity goes through the sigmoid, scales through exp, rotation and scale become the covariance. These files store display (sRGB) colour; the base colour is converted to linear exactly and the view-dependent terms to first order around it, since the renderer works in linear. Coordinates are kept as stored. Big-endian and packed (chunked) PLY files throw a `MargoError` with code `unsupported`; files without the splat properties throw a `RangeError` naming what is missing.
-- **`splatsFromAttributes(raw, {linear})`** turns attributes as training stores them (`GaussianAttributes`: positions, log scales, w x y z rotations, band-0 and higher SH, opacity) into `SplatData`, for readers of other containers (`@margoengine/gltf-pro/splats` uses it). `linear: true` is for colour stored linear, in place of display colour. Every reader goes through it, so a splat flatter than Float32 can store keeps an axis at 1/1024 of its longest, or a whole file of real captures would be refused; projection adds 0.3 px^2 to each ellipse, so the lift never shows.
+- **`splatsFromAttributes(raw, {linear})`** turns attributes as training stores them (`GaussianAttributes`: positions, log scales, w x y z rotations, band-0 and higher SH, opacity) into `SplatData`, for readers of other containers (`@margoengine/gltf/splats` uses it). `linear: true` is for colour stored linear, in place of display colour. Every reader goes through it, so a splat flatter than Float32 can store keeps an axis at 1/1024 of its longest, or a whole file of real captures would be refused; projection adds 0.3 px^2 to each ellipse, so the lift never shows.
 - **`encodeSplat(data)`** writes the 32-byte `.splat` layout `parseSplat` reads, splitting each covariance into axis scales and a rotation (`decomposeCovariance`, Jacobi). `.splat` has no SH, so the base colour is kept; a round trip is exact to byte precision.
 - **`cropSplats(data, {box: {min, max}} | {sphere: {center, radius}}, {invert})`** keeps the splats whose centres are inside (or outside) the region; **`filterSplats(data, keep)`** keeps those `keep(index)` accepts. SH travels with the kept splats.
 - **`transformSplats(data, matrix)`** applies a column-major 4x4 affine matrix: centres by the matrix, covariances by its linear part (scale and shear stretch the splats), and SH by the matrix's rotation (from its polar decomposition, by an exact least-squares fit per SH band), so view-dependent colour turns with the cloud.
@@ -257,7 +257,7 @@ first.remove(); // its range is free again
 ## Scene light and shadows (`./lighting`)
 
 `SplatLighting` relights a cloud with the engine's directional light and ambient every frame, and is a
-`@margoengine/shadows` source, so the capture casts shadows on meshes:
+`@margoengine/shadows` source, so the capture casts shadows on meshes (its caster shader declares the position `@invariant` (WGSL 12.10) as every Margo shadow caster's is, so another program drawing the same surface writes the same depth bit for bit):
 
 ```ts
 import {Engine, box} from 'margoengine/core';
@@ -398,6 +398,14 @@ engine.start();
   Picking and frees the stand-in; the cloud stays.
 - A pick's cost grows with the cloud: four vertices of projection per splat, every pick. Picking takes up to 8 overlays.
 
+### Attaching from a second scene
+
+`SplatModifier.attach` and `loadProgressiveSplats` remember the scene that is active when you call them, before their first await, and join that scene when they finish. Start it inside a second scene's plugin `setup` and the plugin belongs to that scene; start it anywhere else and it belongs to the default scene. An abort or a failure leaves nothing in either scene.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
+
+## Film time
+
+`SplatSequence` and `SplatModifier` move `time` (by `speed`, while `playing`) in the frame update with `advanceTime(delta)`, not in their passes, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the frame a continuous run shows.

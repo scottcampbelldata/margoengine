@@ -9,11 +9,9 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
-import { acquire } from '../../../scripts/gpu-lock.mjs';
 
 const RMS = 0.02;
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
-const release = await acquire({ owner: 'shadows-virtual-edges' });
 const context = await openBrowser({ startPath: '/packages/shadows/test/virtual-edges.html', port: 5274 }),
   { page } = context,
   pageErrors = [];
@@ -105,5 +103,4 @@ try {
   console.log('shadows virtual edges: ok');
 } finally {
   await context.close?.();
-  await release?.();
 }

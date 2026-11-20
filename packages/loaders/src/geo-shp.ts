@@ -200,8 +200,11 @@ export function parseShapefile(input: BinaryInput, options: ShapefileOptions = {
         const pieces = starts.map((start, p) => coords.slice(start, starts[p + 1] ?? n));
         if ([3, 13, 23].includes(shape)) geometry = { type: 'MultiLineString', coordinates: pieces };
         else if (shape === 31) {
-          const polygons: GeoPosition[][][] = [],
-            rings: GeoPosition[][] = [];
+          const polygons: GeoPosition[][][] = [];
+          // Ring sequences (ESRI Shapefile Technical Description, MultiPatch): an Outer Ring and the Inner Rings
+          // after it, or a First Ring and the Rings after it, make one polygon; a lone Ring is its own.
+          let open: GeoPosition[][] | undefined,
+            opener = -1;
           for (let p = 0; p < pieces.length; p++) {
             const patch = pieces[p],
               kind = patchTypes[p];
@@ -217,10 +220,13 @@ export function parseShapefile(input: BinaryInput, options: ShapefileOptions = {
                       : [patch[i - 2], patch[i - 1], patch[i]];
                 polygons.push([[...tri, tri[0]]]);
               }
-            } else if (kind >= 2 && kind <= 5) rings.push(patch);
-            else throw new LoaderError(GEO, 'unsupported', `unknown multipatch part type ${kind}`);
+              opener = -1;
+            } else if (open && ((kind === 3 && opener === 2) || (kind === 5 && opener === 4))) open.push(patch);
+            else if (kind >= 2 && kind <= 5) {
+              polygons.push((open = [patch]));
+              opener = kind === 2 || kind === 4 ? kind : -1;
+            } else throw new LoaderError(GEO, 'unsupported', `unknown multipatch part type ${kind}`);
           }
-          polygons.push(...ringPolygons(rings));
           geometry = { type: 'MultiPolygon', coordinates: polygons };
         } else geometry = { type: 'MultiPolygon', coordinates: ringPolygons(pieces) };
       }

@@ -403,3 +403,56 @@ test('preintegration spans the range it is asked for and records it (KB0507g)', 
   assert.deepEqual((await preintegrateTransfer(tf, { resolution: 3, samples: 16 })).range, [0, 1]);
   await assert.rejects(preintegrateTransfer(tf, { range: [1, 1] }));
 });
+
+test('a transfer editor whose binding cannot apply leaves no DOM, listener or classification behind', () => {
+  const dom = new JSDOM('<main><p>Keep</p></main>');
+  dom.window.HTMLCanvasElement.prototype.getContext = () => new Proxy({}, { get: () => () => {}, set: () => true });
+  const main = dom.window.document.querySelector('main'),
+    tf = transferPreset('mri'),
+    layer = {
+      valid: false,
+      range: [0, 1],
+      getClassification: () => undefined,
+      setClassification() {
+        throw new Error('layer disposed');
+      },
+    };
+  assert.throws(() => transferEditor(main, tf, { layer }), /layer disposed/);
+  assert.equal(main.children.length, 1);
+  assert.equal(getEventListeners(tf, 'change').length, 0);
+  // A first draw that fails (a canvas without a 2D context) is undone the same way.
+  dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  assert.throws(() => transferEditor(main, tf), TypeError);
+  assert.equal(main.children.length, 1);
+  assert.equal(getEventListeners(tf, 'change').length, 0);
+  dom.window.close();
+});
+
+test('a 2D widget is picked by the shape that holds the click, not by its lower-left corner', () => {
+  const dom = new JSDOM('<main></main>');
+  dom.window.HTMLCanvasElement.prototype.getContext = () => new Proxy({}, { get: () => () => {}, set: () => true });
+  dom.window.HTMLCanvasElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 100 });
+  dom.window.HTMLCanvasElement.prototype.setPointerCapture = () => {};
+  const tf = transferPreset('mri'),
+    { range, gradientMax: g } = tf.state,
+    at = (t) => range[0] + t * (range[1] - range[0]),
+    rgba = [1, 1, 1, 0.5];
+  tf.update({
+    ...tf.state,
+    mode: '2d',
+    widgets: [
+      { kind: 'rectangle', bounds: [at(0), at(0.6), 0, 0.6 * g], rgba },
+      { kind: 'rectangle', bounds: [at(0.7), at(0.9), 0.7 * g, 0.9 * g], rgba },
+    ],
+  });
+  const editor = transferEditor(dom.window.document.querySelector('main'), tf),
+    canvas = editor.element.querySelector('canvas');
+  // (0.55, 0.55) lies inside the large rectangle; the small one's lower-left corner (0.7, 0.7) is nearer.
+  canvas.dispatchEvent(new dom.window.MouseEvent('pointerdown', { clientX: 55, clientY: 45 }));
+  canvas.dispatchEvent(new dom.window.MouseEvent('pointermove', { clientX: 50, clientY: 45 }));
+  const [big, small] = tf.state.widgets;
+  assert.ok(Math.abs(big.bounds[0] - at(-0.05)) < 1e-9, JSON.stringify(big.bounds));
+  assert.deepEqual(small.bounds, [at(0.7), at(0.9), 0.7 * g, 0.9 * g]);
+  editor.dispose();
+  dom.window.close();
+});

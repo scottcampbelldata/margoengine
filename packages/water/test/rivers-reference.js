@@ -21,8 +21,8 @@ const offsets = [
   [0, -1],
   [0, 1],
 ];
-/** One substep of length dt seconds; returns the highest pipe velocity q / depth, m/s. `pipe: 'reconstructed'` is water/rivers; `'surface'` is Water's own coast pipe. */
-export function riverStep(m, dt, sources = [], pipe = 'reconstructed') {
+/** One substep of length dt seconds; returns the highest pipe velocity q / depth, m/s. Water's own coast flow is test/coast-reference.js. */
+export function riverStep(m, dt, sources = []) {
   const { width: w, height: h, ground: b, depth: d, cell: l } = m;
   const next = new Float64Array(m.flux.length);
   let peak = 0;
@@ -37,23 +37,13 @@ export function riverStep(m, dt, sources = [], pipe = 'reconstructed') {
         if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
         const j = ny * w + nx,
           old = m.flux[i * 4 + k] * Math.exp(-dt * 0.12);
-        if (pipe === 'surface') {
-          q[k] =
-            surface > b[j]
-              ? Math.min(
-                  Math.max(0, old + (dt * 9.81 * d[i] * (surface - d[j] - b[j])) / l),
-                  d[i] * Math.min(4 * Math.sqrt(9.81 * d[i]), (0.5 * l) / dt),
-                )
-              : 0;
-        } else {
-          const brink = Math.max(b[i], b[j]),
-            a = Math.max(0, surface - brink),
-            c = Math.max(0, d[j] + b[j] - brink);
-          q[k] = Math.min(
-            Math.max(old + (dt * 9.81 * a * (a - c)) / l, 0),
-            a * Math.min(m.froude * Math.sqrt(9.81 * a), (0.5 * l) / dt),
-          );
-        }
+        const brink = Math.max(b[i], b[j]),
+          a = Math.max(0, surface - brink),
+          c = Math.max(0, d[j] + b[j] - brink);
+        q[k] = Math.min(
+          Math.max(old + (dt * 9.81 * a * (a - c)) / l, 0),
+          a * Math.min(m.froude * Math.sqrt(9.81 * a), (0.5 * l) / dt),
+        );
       }
       const outgoing = (q[0] + q[1] + q[2] + q[3]) / l;
       const scale = Math.min(1, d[i] / Math.max(1e-6, dt * outgoing));

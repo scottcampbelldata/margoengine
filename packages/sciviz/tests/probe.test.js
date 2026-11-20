@@ -54,3 +54,15 @@ test('pipeline executes lazy locator operations; cancellation and malformed data
   await assert.rejects(CellLocator.create({...tet,pointArrays:{bad:[1]}}));await assert.rejects(CellLocator.create({...tet,pointData:[1]}));using l=await CellLocator.create(tet);await assert.rejects(plotOverLine(l,[0,0,0,0,0,0]));assert.throws(()=>l.probe([NaN,0,0]));
   const empty=await integrateGrid({points:[],connectivity:[],offsets:[],types:[],pointData:[]});assert.equal(empty.volume.measure,0);assert.equal(empty.volume.pointData,0);
 });
+test('quads interpolate and integrate bilinearly, the same as the regular image they come from',async()=>{
+  // Corner values 0, 1, 0, 1 give the bilinear field u + v - 2uv; a split into two triangles gives 0 at the centre.
+  const quad={points:[0,0,0,1,0,0,1,1,0,0,1,0],connectivity:[0,1,2,3],offsets:[4],types:[9],pointData:[0,1,0,1]};
+  near((await probeGrid(quad,[0.5,0.5,0])).pointData,0.5);near((await probeGrid(quad,[0.25,0.75,0])).pointData,0.625);
+  assert.equal(await probeGrid(quad,[0.5,0.5,0.1]),null);assert.equal(await probeGrid(quad,[1.2,0.5,0]),null);
+  near((await integrateGrid(quad)).area.pointData,0.5);
+  const image={dims:[2,2,1],bounds:[0,1,0,1,0,0],pointData:[0,1,1,0]},curvilinear={...image,points:[0,0,0,1,0,0,0,1,0,1,1,0]};
+  near((await probeGrid(curvilinear,[0.25,0.75,0])).pointData,(await probeGrid(image,[0.25,0.75,0])).pointData);
+  const i=await integrateGrid(image);near(i.area.measure,1);near(i.area.pointData,0.5);
+  // A trapezoid: area 1.5 and the integral of x, 7/6.
+  const t=await integrateGrid({points:[0,0,0,2,0,0,1,1,0,0,1,0],connectivity:[0,1,2,3],offsets:[4],types:[9],pointData:[0,2,1,0]});near(t.area.measure,1.5);near(t.area.pointData,7/6);
+});

@@ -1,0 +1,172 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Weather settings check</title><style>body{margin:0}canvas{display:block;width:256px;height:192px}</style></head><body><canvas></canvas>
+<script type="module">
+// The master weather panel on a real GPU: a sea (Water with a wind), the sky's rain and a smoke effect under a
+// WeatherDrive that finds them all, with a WeatherMachine that applyWeatherSettings writes. `run()` warms up on the
+// storm look, then writes every live row each frame for 60 frames (each swept between two values away from its
+// default) and counts the pipelines, buffers and textures made meanwhile (R2: none). Driven by settings-check.mjs.
+import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
+import {Sky} from '/packages/sky/dist/index.js';
+import {Weather} from '/packages/sky/dist/weather.js';
+import {Water} from '/packages/water/dist/index.js';
+import {VFX} from '/packages/vfx/dist/index.js';
+import {WeatherMachine,hazeLight} from '/packages/weather/dist/index.js';
+import {WeatherDrive} from '/packages/weather/dist/drive.js';
+import {WEATHER_SETTINGS,WEATHER_LOOKS,applyWeatherSettings} from '/packages/weather/dist/settings.js';
+import {PostStack} from '/packages/post/dist/stack.js';
+import {Tonemap} from '/packages/tonemap/dist/index.js';
+import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
+import {VolumetricFog} from '/packages/environment/dist/volumetric.js';
+import {applyEnvironmentSettings} from '/packages/environment/dist/settings.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,6,30],target:[0,2,-40],fov:60,near:0.5,far:5000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const machine=new WeatherMachine('clear',{seed:2});
+const drive=WeatherDrive.attach(engine,{weather:machine,listener:engine.camera});
+Sky.attach(engine,{hours:14,lighting:{}});
+const sea=Water.attach(engine,{size:[400,400],wind:6});
+const rain=Weather.attach(engine,{});
+const smoke=VFX.attach(engine,{capacity:512,rate:60,velocity:[0,3,0],lifetime:[2,4]});
+engine.createMesh().setGeometry(box(6,3,6)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.7})).setPosition([0,1.5,-20]);
+const made={pipelines:0,buffers:0,textures:0};
+for(const [method,key] of [['createRenderPipeline','pipelines'],['createComputePipeline','pipelines'],['createRenderPipelineAsync','pipelines'],['createComputePipelineAsync','pipelines'],['createBuffer','buffers'],['createTexture','textures']]){
+ const real=device[method];
+ if(real)device[method]=function(...a){made[key]++;return real.apply(this,a);};
+}
+async function frame(delta){engine.render({delta});if(isCompatDevice(device))await device.queue.onSubmittedWorkDone();}
+// A value away from the row's default, and a second one between it and the extreme: the sweep goes from 30% to 100%.
+const pick=(row,t)=>{const lo=row.min+(row.max-row.min)*0.1,hi=row.max-(row.max-row.min)*0.1,k=0.3+0.7*t;return lo+(hi-lo)*k;};
+const values=t=>Object.fromEntries(WEATHER_SETTINGS.map(r=>[r.name,r.name==='visibility'?8000-t*4000:Math.round(pick(r,t)/r.step)*r.step]));
+// Frame exactness: the same scene on a fresh engine, its weather set by `set(machine)`, rendered 30 frames at 1/60 s; the
+// displayed 8-bit frame is kept, read the way a screenshot is. Written at their defaults (or a named look) the rows must
+// draw the very frame the preset they stand for draws (settings on the sea, the sky's rain, the fog and a smoke effect).
+async function exactFrame(set){
+ const c=document.createElement('canvas');c.width=256;c.height=192;
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,6,30],target:[0,2,-40],fov:60,near:0.5,far:5000}});
+ e.stop();
+ const m=new WeatherMachine('clear',{seed:2});
+ WeatherDrive.attach(e,{weather:m,listener:e.camera});
+ Sky.attach(e,{hours:14,lighting:{}});
+ Water.attach(e,{size:[400,400],wind:6});
+ Weather.attach(e,{});
+ VFX.attach(e,{capacity:512,rate:60,velocity:[0,3,0],lifetime:[2,4]});
+ e.createMesh().setGeometry(box(6,3,6)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.7})).setPosition([0,1.5,-20]);
+ set(m);
+ const shot=new OffscreenCanvas(256,192),g=shot.getContext('2d',{willReadFrequently:true});
+ let last;
+ for(let f=0;f<30;f++){
+  e.render({delta:1/60});
+  if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();
+  g.drawImage(c,0,0);last=g.getImageData(0,0,256,192).data;
+ }
+ e.dispose();
+ return last;
+}
+const differ=(a,b)=>{let n=0,max=0;for(let p=0;p<a.length;p++){const d=Math.abs(a[p]-b[p]);if(d){n++;max=Math.max(max,d);}}return {differing:n,max};};
+// Dust in the air: a ground and pillars in the sky's fog (through PostStack and Tonemap), the weather set by `set(machine)`. The
+// frame is read like a screenshot; the mean colour of the far ground rows says whether the haze is dust coloured.
+async function dustFrame(set,wind,skyOptions={}){
+ const c=document.createElement('canvas');c.width=256;c.height=192;
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,1000],fov:70,near:0.5,far:5000}});
+ e.stop();
+ const m=new WeatherMachine('clear',{seed:2}),stack=PostStack.attach(e,[new Tonemap()]);
+ e.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#6b6550',roughness:0.95})).setPosition([0,-1,0]);
+ for(const [x,z] of [[-20,60],[25,120],[-30,200],[40,300],[-10,450]])e.createMesh().setGeometry(box(8,40,8)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.7})).setPosition([x,19,z]);
+ const sky=new Sky({hours:14,lighting:{},fog:{depth:()=>stack.depthTexture,falloff:'exp',start:0},...skyOptions});
+ e.use(sky);
+ WeatherDrive.attach(e,{weather:m,listener:e.camera,dustLight:wind,smokeLight:wind});
+ set(m);
+ const shot=new OffscreenCanvas(256,192),g=shot.getContext('2d',{willReadFrequently:true});
+ let last;
+ for(let f=0;f<4;f++){e.render({delta:1/60});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();g.drawImage(c,0,0);last=g.getImageData(0,0,256,192).data;}
+ const mean=[0,0,0];for(let y=99;y<109;y++)for(let x=0;x<256;x++)for(let k=0;k<3;k++)mean[k]+=last[(y*256+x)*4+k]/(10*256);
+ const near=[0,0,0];for(let y=150;y<160;y++)for(let x=0;x<256;x++)for(let k=0;k<3;k++)near[k]+=last[(y*256+x)*4+k]/(10*256);
+ const color=sky.options.fog.color??null,sun=sky.options.atmosphere?.sunColor??null,light=hazeLight(m.state,Math.asin(Math.min(1,Math.max(-1,sky.sun?.[1]??1))));
+ e.dispose();
+ return {last,mean:mean.map(v=>Math.round(v)),near:near.map(v=>Math.round(v)),color,sun,light};
+}
+window.dust=async()=>{
+ const clear=await dustFrame(m=>applyWeatherSettings(m,{}),1),zero=await dustFrame(m=>applyWeatherSettings(m,{dust:0}),1),
+  haze=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.dustHaze),0.5),storm=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.sandstorm),0.5),
+  haboob=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.haboob),0.5);
+ const d=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)if(a[p]!==b[p])n++;return n;};
+ return {zero:d(clear.last,zero.last),hazeApart:d(clear.last,haze.last),stormApart:d(haze.last,storm.last),haboobApart:d(storm.last,haboob.last),means:{clear:clear.mean,haze:haze.mean,storm:storm.mean,haboob:haboob.mean},colors:{clear:clear.color,storm:storm.color}};
+};
+// Smoke in the air: the same scene with the sky's atmosphere option, so the drive can dim and redden the sun. Smoke 0 draws the
+// smokeless frame exact, each step of smoke changes it, the sun colour the drive wrote is red over green over blue and falls with
+// the smoke, and the lit ground darkens.
+window.smoke=async()=>{
+ const sky={atmosphere:{}},clear=await dustFrame(m=>applyWeatherSettings(m,{}),1,{atmosphere:{}}),zero=await dustFrame(m=>applyWeatherSettings(m,{smoke:0}),1,{atmosphere:{}}),
+  haze=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.smokeHaze),0.5,{atmosphere:{}}),fire=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.wildfireSmoke),0.5,{atmosphere:{}}),
+  black=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.blackDay),0.5,{atmosphere:{}});
+ const d=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)if(a[p]!==b[p])n++;return n;};
+ return {zero:d(clear.last,zero.last),hazeApart:d(clear.last,haze.last),fireApart:d(haze.last,fire.last),blackApart:d(fire.last,black.last),near:{clear:clear.near,haze:haze.near,fire:fire.near,black:black.near},means:{clear:clear.mean,haze:haze.mean,fire:fire.mean,black:black.mean},suns:{clear:clear.sun,haze:haze.sun,fire:fire.sun,black:black.sun},colors:{clear:clear.color,black:black.color}};
+};
+// Ash and sea spray in the air: ash 0 and spray 0 draw the clean frame exact, each look changes it, ash and spray dim
+// the sun grey (equal channels) where smoke reddens it, the ash fog is a neutral grey and the spray fog a pale white.
+window.airLoad=async()=>{
+ const o={atmosphere:{}},clear=await dustFrame(m=>applyWeatherSettings(m,{}),1,{atmosphere:{}}),zero=await dustFrame(m=>applyWeatherSettings(m,{ash:0,spray:0}),1,{atmosphere:{}}),
+  ash=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.ashfall),1,{atmosphere:{}}),dark=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.ashDarkness),1,{atmosphere:{}}),
+  surf=await dustFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.surfHaze),1,{atmosphere:{}});
+ const d=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)if(a[p]!==b[p])n++;return n;};
+ return {zero:d(clear.last,zero.last),ashApart:d(clear.last,ash.last),darkApart:d(ash.last,dark.last),surfApart:d(clear.last,surf.last),near:{clear:clear.near,ash:ash.near,dark:dark.near,surf:surf.near},means:{clear:clear.mean,ash:ash.mean,dark:dark.mean,surf:surf.mean},lights:{ash:ash.light,dark:dark.light},suns:{clear:clear.sun,ash:ash.sun,dark:dark.sun,surf:surf.sun},colors:{clear:clear.color,ash:ash.color,surf:surf.color}};
+};
+// A fog volume in the load: the same ground and pillars in a VolumetricFog the drive finds by name (no sky fog). Ash 0
+// draws the clean frame exact, the ash fall greys the volume's colour and changes the frame, smoke turns it grey brown,
+// and an air.color row set by hand holds against the drive (the override rule). `hold` is the row's value or undefined.
+async function volumeFrame(set,hold){
+ const c=document.createElement('canvas');c.width=256;c.height=192;
+ const e=await Engine.create(c,{backend:'webgpu',camera:{position:[0,2,0],target:[0,2,1000],fov:70,near:0.5,far:5000}});
+ e.stop();
+ const m=new WeatherMachine('clear',{seed:2}),stack=PostStack.attach(e,[new Tonemap()]);
+ e.createMesh().setGeometry(box(4000,0.2,4000)).setMaterial(new PbrMaterial({color:'#6b6550',roughness:0.95})).setPosition([0,-1,0]);
+ for(const [x,z] of [[-20,60],[25,120],[-30,200],[40,300],[-10,450]])e.createMesh().setGeometry(box(8,40,8)).setMaterial(new PbrMaterial({color:'#8a8070',roughness:0.7})).setPosition([x,19,z]);
+ const sky=new Sky({hours:14,lighting:{}});
+ e.use(sky);
+ const fog=VolumetricFog.attach(e,{depth:()=>stack.depthTexture});
+ if(hold!==undefined)applyEnvironmentSettings({air:fog},{'air.color':hold});
+ WeatherDrive.attach(e,{weather:m,listener:e.camera});
+ set(m);
+ const shot=new OffscreenCanvas(256,192),g=shot.getContext('2d',{willReadFrequently:true});
+ let last;
+ for(let f=0;f<4;f++){e.render({delta:1/60});if(isCompatDevice(e.gpu))await e.gpu.queue.onSubmittedWorkDone();g.drawImage(c,0,0);last=g.getImageData(0,0,256,192).data;}
+ const mean=[0,0,0];for(let y=99;y<109;y++)for(let x=0;x<256;x++)for(let k=0;k<3;k++)mean[k]+=last[(y*256+x)*4+k]/(10*256);
+ const up=[0,0,0];for(let y=0;y<10;y++)for(let x=0;x<256;x++)for(let k=0;k<3;k++)up[k]+=last[(y*256+x)*4+k]/(10*256);
+ const color=fog.options.color?[...fog.options.color]:null,skyLight=sky.options.atmosphere?.scatteredLight??null;
+ e.dispose();
+ return {last,mean:mean.map(v=>Math.round(v)),sky:up.map(v=>Math.round(v)),color,skyLight};
+}
+window.volumeLoad=async()=>{
+ const clear=await volumeFrame(m=>applyWeatherSettings(m,{})),zero=await volumeFrame(m=>applyWeatherSettings(m,{ash:0,smoke:0})),
+  ash=await volumeFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.ashfall)),smoke=await volumeFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.wildfireSmoke)),
+  held=await volumeFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.ashfall),[1,1,1]),plain=await volumeFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.ashfall),[1,1,1]);
+ const d=(a,b)=>{let n=0;for(let p=0;p<a.length;p++)if(a[p]!==b[p])n++;return n;};
+ return {zero:d(clear.last,zero.last),ashApart:d(held.last,ash.last),heldRepeat:d(held.last,plain.last),colors:{clear:clear.color,ash:ash.color,smoke:smoke.color,held:held.color},means:{clear:clear.mean,ash:ash.mean,smoke:smoke.mean,held:held.mean},skies:{clear:clear.sky,ash:ash.sky,smoke:smoke.sky},skyLights:{clear:clear.skyLight,ash:ash.skyLight}};
+};
+window.check={
+ // The defaults drew the clear preset's frame, the storm look the storm preset's, and a look that differs a different one.
+ async exact(){
+  const clear=await exactFrame(m=>m.set('clear')),defaults=await exactFrame(m=>applyWeatherSettings(m,{})),
+   storm=await exactFrame(m=>m.set('storm')),look=await exactFrame(m=>applyWeatherSettings(m,WEATHER_LOOKS.storm)),
+   again=await exactFrame(m=>m.set('storm'));
+  return {defaults:differ(clear,defaults),storm:differ(storm,look),repeat:differ(storm,again),apart:differ(clear,storm)};
+ },
+ async run(){
+  device.pushErrorScope('validation');
+  // Warm-up: rain, snow and lightning each appear once (the sky's Weather compiles a pipeline the first time a kind of
+  // precipitation or a bolt is drawn), so the shot starts with them present, as a film keying the rows does.
+  for(const t of [0,1,0.5])for(let i=0;i<3;i++){applyWeatherSettings(machine,values(t));await frame(1/60);}
+  const before={...made};
+  let last;
+  for(let f=0;f<60;f++){last=values(f/59);applyWeatherSettings(machine,last);await frame(1/60);}
+  const after={...made};
+  const state=machine.state,once={...machine.state};
+  applyWeatherSettings(machine,last);
+  const again=machine.state;
+  await frame(0);
+  const error=await device.popErrorScope();
+  return {before,after,errors:[...errors,...(error?[error.message]:[])],rows:WEATHER_SETTINGS.length,wind:state.wind,sea:sea.windSea,rainRate:rain.options.rainRate??null,smokeWind:smoke.options.wind??null,same:JSON.stringify(once)===JSON.stringify(again),visibility:null};
+ },
+};
+window.ready=true;
+</script></body></html>

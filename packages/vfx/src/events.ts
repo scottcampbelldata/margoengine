@@ -8,7 +8,10 @@ declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: numb
  * (turned into offsets), then n x 256 listed slots (each workgroup's event slots in slot order), then the list (every
  * event's slot in slot order, at most capacity). Event data is a second buffer, two vec4s (position, velocity) a slot,
  * in two halves by frame parity: an event stores in this frame's half and births read last frame's, so a slot that
- * raises a new event never overwrites one still waiting to be read.
+ * raises a new event never overwrites one still waiting to be read. `update` keeps a raised event in the invocation and
+ * the kernel stores it (`storeEvents`) once `update` has returned, and the slot's generation is read once into a local:
+ * no invocation reads back a buffer it has stored to, so the WebGL2 layer runs the route's `update` as a point draw
+ * instead of on its CPU tier (KB-VFX-EVENTS-CPU).
  */
 const declarations = /* wgsl */ `
 @group(0) @binding(15) var<storage,read_write> events:array<u32>;
@@ -16,8 +19,11 @@ const declarations = /* wgsl */ `
 struct Events {control:vec4u,shape:vec4f,velocity:vec4f,color:vec4f}
 @group(0) @binding(17) var<uniform> ev:Events;
 var<private> eventHere:u32;
+var<private> eventPosition:vec3f;
+var<private> eventVelocity:vec3f;
 fn eventGroups()->u32 {return (f.control.x+255u)/256u;}
-fn storeEvent(i:u32,p:Particle){let at=(f.control.z%2u)*f.control.x*2u+i*2u;eventData[at]=vec4f(p.positionLife.xyz,0);eventData[at+1u]=vec4f(p.velocitySize.xyz,0);eventHere=1u;}
+fn raiseEvent(p:Particle){eventPosition=p.positionLife.xyz;eventVelocity=p.velocitySize.xyz;eventHere=1u;}
+fn storeEvents(i:u32){if(eventHere==1u){let at=(f.control.z%2u)*f.control.x*2u+i*2u;eventData[at]=vec4f(eventPosition,0);eventData[at+1u]=vec4f(eventVelocity,0);}}
 `;
 /** The scan and compaction of the simulation's own draw list (shader.ts), over the event counts. */
 const kernels = /* wgsl */ `
@@ -32,7 +38,10 @@ const kernels = /* wgsl */ `
   if(l<end-start){events[4u+n*257u+start+l]=events[4u+n+w.x*256u+l];}
 }`;
 
-const edits: Record<'ticket' | 'birth' | 'death' | 'collision' | 'list', [string, string]> = {
+const edits: Record<'generation' | 'ticket' | 'birth' | 'death' | 'collision' | 'list', [string, string]> = {
+  // The slot's generation (rotation.w: 1 for a child), read once before the slot stores anything and kept in step with
+  // the birth's store below, so no event test reads `particles` back after storing to it.
+  generation: ['let at=i*2;let cold=f.control.x*2+at;', 'let at=i*2;let cold=f.control.x*2+at;var generation=particles[cold+1].w;'],
   // A birth whose ticket is past the emitter's budget takes event (ticket - budget) / count of last frame's list, if any.
   ticket: [
     'if(ticket>=f.control.y){particles[at].w=0;return 0u;}',
@@ -46,22 +55,23 @@ const edits: Record<'ticket' | 'birth' | 'death' | 'collision' | 'list', [string
     p.positionLife=vec4f(eventData[source].xyz,max(0.0,childLife-dt));
     p.velocitySize=vec4f(eventData[source+1u].xyz*ev.shape.w+ev.velocity.xyz+(vec3f(random(seed+1u),random(seed+2u),random(seed+3u))*2-1)*ev.velocity.w,ev.shape.z);
     p.color=vec4f(ev.color.rgb*f.emissionExtent.w,ev.color.a);p.rotation=vec4f(p.rotation.x,p.rotation.y,childLife,1);}
-    particles[cold]=p.color;particles[cold+1]=p.rotation;`,
+    particles[cold]=p.color;particles[cold+1]=p.rotation;generation=p.rotation.w;`,
   ],
   // A first-generation particle whose life ends this frame raises a death event where it is.
   death: [
     '  p.positionLife.w-=dt;',
-    '  p.positionLife.w-=dt;if(p.positionLife.w<=0&&particles[at].w>0&&particles[cold+1].w==0){storeEvent(i,p);}',
+    '  p.positionLife.w-=dt;if(p.positionLife.w<=0&&particles[at].w>0&&generation==0){raiseEvent(p);}',
   ],
   // A first-generation particle that meets the ground faster than `speed` raises a collision event as it touches.
   collision: [
     'if(p.velocitySize.y<0){p.velocitySize.y=-p.velocitySize.y*f.physics.z;}',
-    'if(p.velocitySize.y<0){if(-p.velocitySize.y>bitcast<f32>(ev.control.z)&&particles[cold+1].w==0){storeEvent(i,p);}p.velocitySize.y=-p.velocitySize.y*f.physics.z;}',
+    'if(p.velocitySize.y<0){if(-p.velocitySize.y>bitcast<f32>(ev.control.z)&&generation==0){raiseEvent(p);}p.velocitySize.y=-p.velocitySize.y*f.physics.z;}',
   ],
-  // Each workgroup lists its events in slot order, as it lists the drawn particles.
+  // Each slot stores its event once `update` has returned, and each workgroup lists its events in slot order, as it
+  // lists the drawn particles.
   list: [
     'if(l==255u){groups[w.x]=rank;}',
-    'if(l==255u){groups[w.x]=rank;}\n  let er=prefix(l,eventHere);if(eventHere==1u){events[4u+eventGroups()+w.x*256u+er-1u]=id.x;}if(l==255u){events[4u+w.x]=er;}',
+    'if(l==255u){groups[w.x]=rank;}\n  storeEvents(id.x);let er=prefix(l,eventHere);if(eventHere==1u){events[4u+eventGroups()+w.x*256u+er-1u]=id.x;}if(l==255u){events[4u+w.x]=er;}',
   ],
 };
 
@@ -110,7 +120,7 @@ export const events: VFXExtension<VFXEvents> = {
   },
   simulation(code, e) {
     let out = code.replace('fn update(', declarations + 'fn update(');
-    for (const key of ['ticket', 'birth', e.on, 'list'] as const) out = once(out, edits[key]);
+    for (const key of ['generation', 'ticket', 'birth', e.on, 'list'] as const) out = once(out, edits[key]);
     return out + kernels;
   },
   create(state: VFXState, e, owned) {
@@ -148,6 +158,7 @@ export const events: VFXExtension<VFXEvents> = {
       ints = new Uint32Array(values.buffer);
     return {
       births: true,
+      eventList: list,
       compute: [
         { binding: 15, resource: { buffer: list } },
         { binding: 16, resource: { buffer: data } },

@@ -17,7 +17,7 @@ export interface WorkerSolveOptions extends HeapSolveOptions, HeapBackendOptions
   /** Wall-clock limit including startup and loading, 1..2147483647 ms. Default 60000. */ timeout?: number;
 }
 const fault = (code: 'failed' | 'disposed' | 'unsupported' | 'timeout' | 'state', text: string) =>
-  new MargoError(code, `${text}. Help: https://margoengine.com/docs/wfc`);
+  new MargoError(code, `${text}. Help: https://margoengine.com/llms/packages/wfc.md`);
 
 /** One dedicated worker per solve, with a promise result and a bounded, single-consumer progress stream. */
 export class WFCWorkerSolve implements Disposable, AsyncIterable<WFCProgress> {

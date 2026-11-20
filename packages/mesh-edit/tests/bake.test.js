@@ -214,7 +214,19 @@ const leaning = () => {
     normals: [...n, ...n, ...n, ...n],
   });
 };
-const middle = ({ data, width }) => [...data.subarray(((width >> 1) * width + (width >> 1)) * 4, ((width >> 1) * width + (width >> 1)) * 4 + 3)];
+const middle = ({ data, width }) => [
+  ...data.subarray(((width >> 1) * width + (width >> 1)) * 4, ((width >> 1) * width + (width >> 1)) * 4 + 3),
+];
+
+test('a colour texture repeats outside 0 to 1, as the glTF default sampler does', () => {
+  const image = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]) },
+    high = square({ uvs: [0, 0, 2, 0, 2, 1, 0, 1] }),
+    { color } = bakeSurfaceMaps(square(), high, { width: 8, distance: 1, maps: ['color'], color: image });
+  // Low texel 5 reads high u 1.375, the second tile's red half; a clamp would read the edge's blue.
+  assert.deepEqual(texel(color, 5, 4), [255, 0, 0, 255]);
+  assert.deepEqual(texel(color, 6, 4), [0, 0, 255, 255]);
+  assert.deepEqual(texel(color, 1, 4), [255, 0, 0, 255]);
+});
 
 test('bakeSurfaceMaps writes in the frame the low surface shades with', () => {
   const options = { width: 16, distance: 1 },

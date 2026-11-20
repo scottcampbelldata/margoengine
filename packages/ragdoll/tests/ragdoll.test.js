@@ -513,3 +513,38 @@ rtest("a real avatar with exporter scales goes limp: Seed-san's skeleton", async
   rig.dispose();
 });
 
+// KB-OWN-PHYS-SCENE: Ragdoll.attach joined the active scene and dispose removed the plugin of its name from the active
+// scene. A ragdoll on a world in a second scene, attached and disposed while the default scene was active, landed in
+// the wrong scene and removed a default-scene plugin of the same name instead of itself.
+rtest('attach and dispose use the physics world scene, not the active one', async () => {
+  const engine = new Engine(
+    { width: 1, height: 1 },
+    await TransformStore.create(64),
+    { backend: 'webgl2', add() {}, remove() {}, render() {}, dispose() {} },
+    undefined,
+    null,
+  );
+  const other = engine.createScene('b');
+  let physics, body;
+  other.use({
+    name: 'loader',
+    setup() {
+      physics = Physics.attach(engine);
+      body = humanoid(engine);
+    },
+  });
+  other.removePlugin('loader');
+  assert.ok(engine.sceneOf(physics) === other, 'the world is not in the second scene');
+  const ragdoll = Ragdoll.attach(physics, { root: body.hips });
+  assert.ok(engine.sceneOf(ragdoll) === other, 'the ragdoll joined the active scene');
+  assert.equal(engine.scene.plugins.has(ragdoll.name), false);
+  const bystander = { name: ragdoll.name, disposed: 0, setup() {}, dispose() { this.disposed++; } };
+  engine.use(bystander);
+  ragdoll.dispose();
+  assert.equal(other.plugins.has(ragdoll.name), false, 'the ragdoll is still in its scene');
+  assert.ok(engine.scene.plugins.get(ragdoll.name) === bystander, 'the default scene lost its own plugin');
+  assert.equal(bystander.disposed, 0);
+  assert.equal(physics.bodyCount, 0, 'dispose removes every body');
+  physics.dispose();
+  engine.dispose();
+});

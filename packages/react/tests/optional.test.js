@@ -10,7 +10,9 @@ test('browser import failures name the optional peer and preserve the original c
     }),
     (error) => {
       assert.match(error.message, /@margoengine\/geometry/);
-      assert.match(error.message, /Install/);
+      assert.match(error.message, /install @margoengine\/geometry/);
+      assert.equal(error.code, 'failed');
+      assert.match(error.message, /errors#react-usage$/);
       assert.equal(error.cause, cause);
       return true;
     },

@@ -14,7 +14,7 @@ import {
 import { createPBRMeshes } from '../dist/render.js';
 
 // A bumpy height field of side x side vertices: 1,100 squared = 1,210,000 vertices, under the core limit of 11,184,810
-// and past gltf-pro's 1,000,000 a primitive; the split tests cut it at maxPartVertices 1,000,000.
+// and past gltf/pbr's 1,000,000 a primitive; the split tests cut it at maxPartVertices 1,000,000.
 function field(side, normals = false) {
   const positions = new Float32Array(side * side * 3),
     indices = new Uint32Array((side - 1) * (side - 1) * 6);
@@ -156,7 +156,7 @@ test('createMeshes makes one mesh per part of a mesh past maxPartVertices, shari
   );
 });
 
-test('createPBRMeshes renders a mesh past the gltf-pro primitive limit as one node with several primitives', async (t) => {
+test('createPBRMeshes renders a mesh past the gltf/pbr primitive limit as one node with several primitives', async (t) => {
   const gpu = optionalGPU(),
     store = await TransformStore.create(64);
   const engine = new Engine(
@@ -172,7 +172,7 @@ test('createPBRMeshes renders a mesh past the gltf-pro primitive limit as one no
   });
   const colored = { ...big, colors: new Float32Array(big.positions.length).fill(0.5) };
   const model = createPBRMeshes(engine, colored);
-  // 1,212,201 vertices in parts of gltf-pro's default 262,144: each drawn as made, none split again by gltf-pro.
+  // 1,212,201 vertices in parts of gltf/pbr's default 262,144: each drawn as made, none split again by gltf/pbr.
   assert.equal(model.primitives.length, 5);
   assert.equal(
     model.primitives.reduce((sum, p) => sum + p.indices.length, 0),

@@ -1,14 +1,12 @@
 // The real-GPU check of the @margoengine/stats entries that wrap a live device or engine. The fake devices in
 // packages/stats/test cannot show that a wrapper keeps the native receiver or that a hook sits on the engine's real
-// frame path. It takes the GPU lock itself:
+// frame path.:
 //   npm run test:browser --workspace @margoengine/stats
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from './browser.js';
-import { acquire } from './gpu-lock.mjs';
 
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
-const release = await acquire({ owner: 'stats-browser' });
 let browser;
 try {
   browser = await openBrowser({ startPath: '/tests/browser/stats-native-passes.html', port: 5271 });
@@ -216,5 +214,4 @@ try {
   console.log(JSON.stringify({ hardware: hardware.webgpu, proof }, null, 2));
 } finally {
   await browser?.close();
-  await release();
 }

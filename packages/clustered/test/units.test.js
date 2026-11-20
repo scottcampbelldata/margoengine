@@ -13,7 +13,7 @@ import {
   exposureFromEV100,
 } from '../dist/units.js';
 import { parseIES } from '../dist/ies.js';
-import { applyGLTFLights, GLTFAsset, PBRModel } from '../../gltf-pro/dist/index.js';
+import { applyGLTFLights, GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
 import { headless } from '../../../tests/support/pbr-snapshot.js';
 import { iesFile, range } from './ies-reference.js';
 
@@ -85,7 +85,7 @@ test('lux, nits and exposure conversions', () => {
   assert.throws(() => exposureFromEV100(NaN), RangeError);
 });
 
-test("gltf-pro's applyGLTFLights passes KHR_lights_punctual units through: candela and lux, times exposure", async () => {
+test("gltf/pbr's applyGLTFLights passes KHR_lights_punctual units through: candela and lux, times exposure", async () => {
   const engine = await headless(),
     positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
   const doc = {

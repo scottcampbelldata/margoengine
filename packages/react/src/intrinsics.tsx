@@ -4,6 +4,7 @@ import type { ColorInput } from '@margoengine/math';
 import { Mesh, BoxGeometry, PbrMaterial, type MeshProps, type MeshRef, type PbrMaterialProps } from './components.js';
 import { Sun } from './sun.js';
 import { Context } from './internal.js';
+import { typeError } from '../../shared/errors.js';
 
 /** Props of `<directionalLight>`: the light shines from `position` towards the origin, as `<Sun direction>` does. */
 export interface DirectionalLightProps {
@@ -56,9 +57,7 @@ const isComponent = (value: unknown) =>
 export function extend(table: Record<string, ElementType>): void {
   for (const [name, component] of Object.entries(table)) {
     if (!name || !isComponent(component))
-      throw new TypeError(
-        `extend({ ${name || '""'} }) needs a React component as the value; pass the component itself, for example extend({ SphereGeometry }) with SphereGeometry imported from '@margoengine/react/geometry'.`,
-      );
+      throw typeError(`extend({ ${name || '""'} }) needs a React component as the value; pass the component itself, for example extend({ SphereGeometry }) with SphereGeometry imported from '@margoengine/react/geometry'`, 'react-arguments');
     components.set(name[0].toLowerCase() + name.slice(1), component);
   }
 }

@@ -8,8 +8,8 @@
     "referenceSha256": "e5e82e07e153b758d2a417df340563366045cc4eaac260b5e06b55da460df572"
   },
   "frozenShadowed": {
-    "native": 730273,
-    "compat": 730276
+    "native": 597154,
+    "compat": 597155
   },
   "native": {
     "hardware": {
@@ -41,15 +41,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 469266,
-        "square": 19119300,
-        "max": 157,
-        "mae": 0.5967025756835938,
-        "rmse": 4.930663965791492,
-        "foreground": 241029,
-        "foregroundAbsolute": 469266,
-        "foregroundMae": 0.6489758493791203,
-        "changed": 48760
+        "absolute": 335970,
+        "square": 13751010,
+        "max": 135,
+        "mae": 0.42720794677734375,
+        "rmse": 4.181544381628317,
+        "foreground": 241078,
+        "foregroundAbsolute": 335970,
+        "foregroundMae": 0.4645384481371174,
+        "changed": 30025
       }
     },
     "map-2048": {
@@ -60,15 +60,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 595330,
-        "square": 12145136,
+        "absolute": 507785,
+        "square": 10736517,
         "max": 135,
-        "mae": 0.7570012410481771,
-        "rmse": 3.929801398283114,
-        "foreground": 240788,
-        "foregroundAbsolute": 595330,
-        "foregroundMae": 0.824141291647978,
-        "changed": 164172
+        "mae": 0.6456820170084635,
+        "rmse": 3.694886648790746,
+        "foreground": 240777,
+        "foregroundAbsolute": 507785,
+        "foregroundMae": 0.7029810433167066,
+        "changed": 151124
       }
     },
     "map-4096": {
@@ -79,15 +79,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 605700,
-        "square": 13438192,
+        "absolute": 528987,
+        "square": 12305433,
         "max": 143,
-        "mae": 0.7701873779296875,
-        "rmse": 4.133708354385271,
-        "foreground": 240767,
-        "foregroundAbsolute": 605700,
-        "foregroundMae": 0.8385700698185382,
-        "changed": 163850
+        "mae": 0.6726417541503906,
+        "rmse": 3.955650035810871,
+        "foreground": 240765,
+        "foregroundAbsolute": 528987,
+        "foregroundMae": 0.7323697381263888,
+        "changed": 151132
       }
     },
     "no-range-window-map-4096": {
@@ -104,15 +104,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 346680,
-        "square": 13059744,
+        "absolute": 269736,
+        "square": 11937198,
         "max": 143,
-        "mae": 0.440826416015625,
-        "rmse": 4.0750856729874405,
-        "foreground": 240767,
-        "foregroundAbsolute": 346680,
-        "foregroundMae": 0.4799661083121856,
-        "changed": 46950
+        "mae": 0.342987060546875,
+        "rmse": 3.896014911411583,
+        "foreground": 240765,
+        "foregroundAbsolute": 269736,
+        "foregroundMae": 0.37344298382239943,
+        "changed": 28783
       }
     }
   },
@@ -147,15 +147,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 469265,
-        "square": 19119299,
-        "max": 157,
-        "mae": 0.5967013041178385,
-        "rmse": 4.930663836846813,
-        "foreground": 241029,
-        "foregroundAbsolute": 469265,
-        "foregroundMae": 0.6489744664196702,
-        "changed": 48760
+        "absolute": 335968,
+        "square": 13751008,
+        "max": 135,
+        "mae": 0.4272054036458333,
+        "rmse": 4.181544077538324,
+        "foreground": 241078,
+        "foregroundAbsolute": 335968,
+        "foregroundMae": 0.46453568278040025,
+        "changed": 30024
       }
     },
     "map-2048": {
@@ -166,15 +166,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 595333,
-        "square": 12145139,
+        "absolute": 507787,
+        "square": 10736519,
         "max": 135,
-        "mae": 0.7570050557454427,
-        "rmse": 3.929801883638052,
-        "foreground": 240788,
-        "foregroundAbsolute": 595333,
-        "foregroundMae": 0.82414544467886,
-        "changed": 164172
+        "mae": 0.645684560139974,
+        "rmse": 3.69488699293275,
+        "foreground": 240777,
+        "foregroundAbsolute": 507787,
+        "foregroundMae": 0.7029838121304499,
+        "changed": 151124
       }
     },
     "map-4096": {
@@ -185,15 +185,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 605703,
-        "square": 13438195,
+        "absolute": 528989,
+        "square": 12305435,
         "max": 143,
-        "mae": 0.7701911926269531,
-        "rmse": 4.133708815798695,
-        "foreground": 240767,
-        "foregroundAbsolute": 605703,
-        "foregroundMae": 0.8385742232116528,
-        "changed": 163850
+        "mae": 0.672644297281901,
+        "rmse": 3.9556503572664328,
+        "foreground": 240765,
+        "foregroundAbsolute": 528989,
+        "foregroundMae": 0.732372507078133,
+        "changed": 151132
       }
     },
     "no-range-window-map-4096": {
@@ -210,15 +210,15 @@
       },
       "metrics": {
         "pixels": 262144,
-        "absolute": 346677,
-        "square": 13059741,
+        "absolute": 269734,
+        "square": 11937196,
         "max": 143,
-        "mae": 0.4408226013183594,
-        "rmse": 4.07508520493624,
-        "foreground": 240767,
-        "foregroundAbsolute": 346677,
-        "foregroundMae": 0.4799619549190711,
-        "changed": 46948
+        "mae": 0.34298451741536456,
+        "rmse": 3.8960145850355716,
+        "foreground": 240765,
+        "foregroundAbsolute": 269734,
+        "foregroundMae": 0.3734402148706553,
+        "changed": 28782
       }
     }
   }

@@ -7,7 +7,7 @@ import { createStage } from 'margoengine';
 import { parseDAE, bindDAESkin, daeKeyframeClip } from '@margoengine/loaders';
 import { Skeleton, Skin, Animation, createKeyframeClip, applyKeyframeClip, segmentTime } from '@margoengine/animation';
 import { pointerChannels } from '@margoengine/animation/pointer';
-import { loadGLTF } from '@margoengine/gltf-pro';
+import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Material, createMesh, loadTexture } from '@margoengine/materials';
 import { still } from './multi-view.js';
 

@@ -1,7 +1,7 @@
 import { speedEnabled, deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ForceLayout, boundsOf } from '@margoengine/sciviz/graph';
+import { ForceLayout, GraphLayer, boundsOf, graphLayer } from '@margoengine/sciviz/graph';
 
 const ring = (n) => ({ nodes: n, edges: Array.from({ length: n }, (_, i) => [i, (i + 1) % n]).flat() });
 const close = (a, b, eps) => assert.ok(Math.abs(a - b) <= eps, `${a} != ${b}`);
@@ -117,6 +117,14 @@ test('bad graphs are refused', () => {
   assert.throws(() => new ForceLayout({ nodes: 2, edges: [0, 1], weights: [1, 2] }), RangeError);
   assert.throws(() => new ForceLayout({ nodes: 2, edges: [] }, { dimensions: 4 }), RangeError);
   assert.throws(() => new ForceLayout({ nodes: 2, edges: [] }, { positions: [0, 0] }), RangeError);
+  // The drawn layer checks edges as the layout does, before it touches the GPU: an edge to a node past the last
+  // would read a vertex outside the position buffer.
+  const xyz = new Float32Array(6);
+  assert.throws(() => new GraphLayer({}, { nodes: 2, edges: [0, 2] }, xyz), /node 2/);
+  assert.throws(() => new GraphLayer({}, { nodes: 2, edges: [0, -1] }, xyz), /node -1/);
+  assert.throws(() => new GraphLayer({}, { nodes: 2, edges: [0, 0.5] }, xyz), /node 0.5/);
+  assert.throws(() => new GraphLayer({}, { nodes: 2, edges: [0] }, xyz), RangeError);
+  assert.throws(() => new GraphLayer({}, { nodes: 0, edges: [] }, new Float32Array(0)), RangeError);
 });
 
 // One step with no cap, no edges and no pull to the centre moves each node by exactly its push.
@@ -203,4 +211,123 @@ test('the temperature cools to the simmer floor and stays there', () => {
   assert.deepEqual(seen.slice(0, 4), [1, 0.5, 0.25, 0.125]);
   for (const t of seen.slice(4)) close(t, 0.1, 1e-12);
   assert.throws(() => new ForceLayout(ring(3), { simmer: -1 }), RangeError);
+});
+
+test('ForceLayout refuses inputs that turn the layout to NaN', () => {
+  // Each of these was taken and gave NaN or infinite positions after a few steps.
+  const graph = { nodes: 3, edges: [0, 1, 1, 2] };
+  for (const options of [{ temperature: NaN }, { temperature: Infinity }, { length: Infinity }, { gravity: Infinity }])
+    assert.throws(() => new ForceLayout(graph, options), RangeError, JSON.stringify(options));
+  assert.throws(() => new ForceLayout(graph, { positions: [NaN, 0, 0, 1, 0, 0, 2, 0, 0] }), RangeError);
+  for (const weights of [
+    [NaN, 1],
+    [Infinity, 1],
+    [-1, 1],
+  ])
+    assert.throws(() => new ForceLayout({ ...graph, weights }), RangeError, String(weights));
+  const layout = new ForceLayout({ ...graph, weights: [0, 2] }, { temperature: 0.5 });
+  for (let i = 0; i < 5; i++) layout.step();
+  assert.ok(layout.positions.every(Number.isFinite));
+});
+
+// A GPU device stand-in: every member is a callable that returns another stand-in.
+const standIn = () =>
+  new Proxy(function () {}, {
+    get: (_, key) => (key === 'maxStorageBufferBindingSize' ? 2 ** 30 : key === 'then' ? undefined : standIn()),
+    apply: () => standIn(),
+  });
+
+test('graph layers: finite colour range and bounds, checked options, a refused layer freed', () => {
+  globalThis.GPUBufferUsage ??= {
+    MAP_READ: 1,
+    COPY_SRC: 4,
+    COPY_DST: 8,
+    INDEX: 16,
+    VERTEX: 32,
+    UNIFORM: 64,
+    STORAGE: 128,
+  };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  globalThis.GPUTextureUsage ??= {
+    COPY_SRC: 1,
+    COPY_DST: 2,
+    TEXTURE_BINDING: 4,
+    STORAGE_BINDING: 8,
+    RENDER_ATTACHMENT: 16,
+  };
+  const added = new Set(),
+    renderer = { device: standIn(), add: (l) => added.add(l), remove: (l) => added.delete(l) },
+    xyz = new Float32Array([0, 0, 0, 1, 1, 0, Infinity, 2, 0]),
+    graph = { nodes: 3, edges: [0, 1, 1, 2] };
+  // One infinite position stretched the framed bounds to infinity, so nothing drew.
+  assert.deepEqual(boundsOf(xyz), [0, 1, 0, 2, -0.5, 0.5]);
+  // One infinite value made the colour range infinite: every other node took one end colour.
+  const layer = new GraphLayer(renderer, graph, xyz, { values: [1, 3, Infinity] });
+  const writes = [];
+  renderer.device = new Proxy(standIn(), {
+    get: (t, key) => (key === 'queue' ? { writeBuffer: (_, __, v) => writes.push([...v]), writeTexture() {} } : t[key]),
+  });
+  // Two target pixels per CSS pixel: the default 4 CSS pixel node is 8 target pixels, whatever devicePixelRatio says.
+  globalThis.devicePixelRatio = 3;
+  try {
+    layer.prepare({ width: 400 }, { cssScale: (width) => (assert.equal(width, 400), 2) });
+  } finally {
+    delete globalThis.devicePixelRatio;
+  }
+  assert.equal(writes[0][18], 8);
+  // The range [1, 3] as colourFraction's words: start 1, reciprocal half span 1, fraction 0 at the start.
+  assert.deepEqual(writes[0].slice(24, 27), [1, 1, 0]);
+  assert.throws(() => new GraphLayer(renderer, graph, xyz, { range: [2, Number.NaN] }), RangeError);
+  assert.throws(() => new GraphLayer(renderer, graph, xyz, { range: [2, 1] }), RangeError);
+  assert.throws(() => new GraphLayer(renderer, graph, xyz, { nodeSize: Infinity }), RangeError);
+  // A figure that refuses the layer (a 2D chart) left it drawn by the renderer, its GPU buffers held.
+  const refusing = {
+    renderer,
+    addLayer() {
+      throw new TypeError('This layer needs a 3D figure');
+    },
+  };
+  assert.throws(() => graphLayer(refusing, graph, xyz), /3D figure/);
+  assert.equal(added.size, 0);
+});
+
+test('graph layers check node positions and values against the storage limit, not only edges', () => {
+  const limited = new Proxy(standIn(), {
+      get: (t, key) => (key === 'limits' ? { maxStorageBufferBindingSize: 32 } : t[key]),
+    }),
+    renderer = { device: limited, add() {}, remove() {} };
+  assert.throws(
+    () => new GraphLayer(renderer, { nodes: 3, edges: [0, 1] }, new Float32Array(9)),
+    /3 nodes and 1 edges is over this GPU's storage limit of 32 bytes/,
+  );
+  new GraphLayer(renderer, { nodes: 2, edges: [0, 1] }, new Float32Array(6)).dispose();
+});
+
+test('a GPU graph layer the figure refuses is not left drawing with its buffers held', async () => {
+  const { gpuGraphLayer } = await import('@margoengine/sciviz/graph-gpu');
+  globalThis.GPUBufferUsage ??= { COPY_DST: 8, UNIFORM: 64, STORAGE: 128 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  const device = standIn(),
+    added = new Set(),
+    freed = [],
+    array = () => ({ dispose: () => freed.push('array') }),
+    layout = {
+      gpu: { device, array, zeros: array },
+      settings: { side: 1 },
+      graph: { nodes: 2, edges: [0, 1] },
+      positions: { buffer: standIn() },
+    },
+    // A disposed figure refuses every layer.
+    refusing = {
+      renderer: { device, add: (l) => added.add(l), remove: (l) => added.delete(l) },
+      axisScales: [{ type: 'linear' }, { type: 'linear' }, { type: 'linear' }],
+      is2d: false,
+      addLayer() {
+        throw new Error('Figure disposed; create a new figure');
+      },
+    };
+  assert.throws(() => gpuGraphLayer(refusing, layout), /disposed/);
+  assert.equal(added.size, 0);
+  // Edges, edge styles, node styles and the placeholder buffer.
+  assert.equal(freed.length, 4);
 });

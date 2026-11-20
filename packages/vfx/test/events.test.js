@@ -32,7 +32,7 @@ test('death events patch the simulation, count free slots every frame and upload
   });
   h.frame();
   const wgsl = code(h);
-  for (const name of ['fn eventScan', 'fn eventCompact', 'storeEvent(i,p)', 'events[4u+eventGroups()*257u+e]'])
+  for (const name of ['fn eventScan', 'fn eventCompact', 'raiseEvent(p)', 'storeEvents(id.x)', 'events[4u+eventGroups()*257u+e]'])
     assert.ok(wgsl.includes(name), name);
   assert.ok(!wgsl.includes('-p.velocitySize.y>bitcast<f32>(ev.control.z)'), 'no collision test for death events');
   const list = h.resources.find((r) => r.size === (4 + 3 * 257 + 600) * 4);
@@ -113,4 +113,40 @@ test('events are validated, need the feature and keep `on` from attach', () => {
   effect.options.events = { on: 'collision' };
   assert.throws(() => h.frame(), /fixed at attach/);
   effect.dispose();
+});
+
+// On the WebGL2 layer the route runs `update` alone, without WebGPU's main kernel and the workgroup scan that lists
+// the events in it, so the events feature's scan read counts nothing wrote and no sub-emitter was ever born there.
+// The route now lists the events: `update` stores each slot's flag, a prefix count places it, a kernel compacts it.
+test('on the WebGL2 route the route lists the events and the WebGPU event kernels do not run', async () => {
+  const h = optionalGPU();
+  h.engine.stats = { drawCalls: 0 };
+  h.engine.gpu.adapterInfo = { vendor: 'margo-webgl2' };
+  const effect = new VFX({ capacity: 600, rate: 0, events: { on: 'death' } });
+  h.engine.use(effect);
+  for (let i = 0; i < 100 && !effect.route; i++) await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(effect.route, 'the route loaded');
+  const run = [];
+  const begin = h.context.encoder.beginComputePass;
+  h.context.encoder.beginComputePass = () => {
+    const pass = begin();
+    let pipeline;
+    pass.setPipeline = (p) => (pipeline = p);
+    pass.setBindGroup = (_, group) => run.push({ pipeline, group });
+    return pass;
+  };
+  h.frame();
+  const entries = run.map((r) => r.pipeline.compute.entryPoint);
+  assert.ok(!entries.includes('eventScan') && !entries.includes('eventCompact'), entries.join());
+  const texts = run.map((r) => r.pipeline.compute.module.code);
+  const update = run.find((r) => r.pipeline.compute.module.code.includes('eventFlags[id.x]=eventHere'));
+  assert.ok(update, 'update stores each slot event flag');
+  const list = h.resources.find((r) => r.size === (4 + 3 * 257 + 600) * 4);
+  const compact = run.find((r) => r.pipeline.compute.module.code.includes('events[4u+n.y*257u+places[id.x]]=id.x'));
+  assert.ok(compact, 'the events are compacted in slot order');
+  assert.equal(compact.group.entries.find((e) => e.binding === 3).resource.buffer, list, 'into the event list');
+  const total = texts.findIndex((t) => t.includes('events[1]=total['));
+  assert.ok(total > texts.indexOf(compact.pipeline.compute.module.code), 'the total after the list');
+  effect.dispose();
+  assert.ok(h.resources.every((r) => r.destroyed));
 });

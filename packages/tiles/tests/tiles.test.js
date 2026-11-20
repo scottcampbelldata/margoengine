@@ -577,7 +577,7 @@ test('TilesRenderer: ENU frame puts the tileset at the world origin, y up; conte
     removePlugin(name) {
       const p = this.plugins.get(name);
       this.plugins.delete(name);
-      p?.dispose();
+      p?.dispose?.();
     },
   };
   const renderer = await TilesRenderer.load(engine, memory.url, {

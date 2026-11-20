@@ -1,6 +1,6 @@
 // Real-GPU checks of the sciviz entries that draw (grids, graph, geo), natively and on the WebGL2 compatibility layer
 // (one GPU job; from the repository root after building packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node packages/sciviz/tests/entries-browser.mjs
+//   node scripts/run-with-timeout.mjs -- node packages/sciviz/tests/entries-browser.mjs
 // Each case must draw (enough lit pixels), and the layer's pixels must match native WebGPU by the layer's parity
 // measure: at most 0.1% of pixels with a channel difference d > 2, and mean d at most 0.25. Results go to
 // test-results/sciviz-entries.json.

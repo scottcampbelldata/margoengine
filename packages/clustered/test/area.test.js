@@ -231,3 +231,78 @@ test('LTC stays finite at normal incidence, on the light plane and at a corner',
     for (const roughness of [0, 0.3, 1])
       assert.ok(ltc(l, p, n, v, [1, 1, 1], roughness, 0.5).total.every(Number.isFinite), `${p} ${roughness}`);
 });
+
+// KB-BOUNCE-REVEAL1: a light set back in a wall (an opening's light on its glass) lights only what its opening's
+// outer edge and sill let through. Without the clip the snow under a window took the bare rectangle's light.
+test('a recessed light with a sill lights only what its opening lets through, as a traced wall and sill', () => {
+  const window = { position: [0, 1.5, 0], direction: [0, 0, 1], width: 1.2, height: 1.1, intensity: 2 },
+    [bare, recessed] = pack(window, { ...window, recess: 0.22, sill: 0.09 }),
+    up = [0, 1, 0],
+    receivers = [
+      // Snow in front, near (the sill hides most of the pane), further out, and off to one side.
+      ['near snow', [0.3, 0.1, 0.6], up, 'some'],
+      ['snow', [0, 0.1, 1.2], up, 'some'],
+      ['far snow', [0, 0.1, 4], up, 'some'],
+      ['side snow', [1.4, 0.1, 1.5], up, 'some'],
+      ['across', [0.2, 1.6, 2], [0, 0, -1], 'some'],
+      // Inside the reveal: a jamb face and the sill's top behind its front edge see the light past nothing.
+      ['jamb', [-0.594, 1.6, 0.12], [1, 0, 0], 'some'],
+      ['sill top', [0.1, 0.951, 0.28], up, 'some'],
+      // Beside the opening on the wall's face, and under the sill behind its front edge: nothing.
+      ['beside', [-1, 1.5, 0.221], [0, 0, 1], 'none'],
+      ['under sill', [0, 0.8, 0.25], [0, 0, 1], 'none'],
+    ];
+  let differs = 0;
+  for (const [name, p, n, expect] of receivers) {
+    const v = [0, 0, 1],
+      got = ltc(recessed, p, n, v, [0.8, 0.8, 0.8], 0.6, 0).diffuse[0],
+      want = bruteForce(recessed, p, n, v, [0.8, 0.8, 0.8], 0.6, 0, 384).diffuse[0],
+      open = ltc(bare, p, n, v, [0.8, 0.8, 0.8], 0.6, 0).diffuse[0];
+    if (expect === 'none') {
+      assert.equal(got, 0, `${name}: ${got}`);
+      assert.equal(want, 0, `${name}: the traced wall lets ${want} through`);
+      continue;
+    }
+    assert.ok(want > 0, `${name}: traced 0`);
+    assert.ok(Math.abs(got / want - 1) < 0.01, `${name}: clipped ${got} vs traced ${want} (bare ${open})`);
+    if (open > want * 1.1) differs++;
+  }
+  // The reveal and sill shade the near snow and the snow to one side: the bare light is over 10% too bright there
+  // (measured: 12.6 times, 1.56 and 1.52; the far snow 1.05).
+  assert.ok(differs >= 3, `the opening shaded only ${differs} receivers`);
+});
+
+test('recess and sill pack in the half extents w, and switch the shader clip on and off', () => {
+  const window = { position: [0, 1.5, 0], direction: [0, 0, 1], width: 1.2, height: 1.1 },
+    [l] = pack({ ...window, recess: 0.22, sill: 0.09 });
+  close([l[7], l[11]], [0.22, 0.09], 1e-6, 'recess, sill');
+  for (const bad of [{ recess: -0.1 }, { sill: Number.NaN }, { recess: 0.2, twoSided: true }, { recess: '0.2' }])
+    assert.throws(() => pack({ ...window, ...bad }), RangeError, JSON.stringify(bad));
+  const h = optionalGPU(),
+    lights = new Clustered({ grid: [2, 2, 2] });
+  lights.setLights([{ position: [0, 2, 1], range: 6 }]);
+  h.engine.use(lights);
+  const shader = () => {
+    h.context.shader = wgsl;
+    h.context.bindings.length = 0;
+    h.engine.frameGraph.execute(h.context);
+    return h.context.shader;
+  };
+  try {
+    const area = new AreaLights({ lights });
+    h.engine.use(area);
+    area.setLights([window]);
+    const plain = shader();
+    assert.doesNotMatch(plain, /light\.right\.w/);
+    area.setLights([{ ...window, recess: 0.22 }]);
+    const clipped = shader();
+    assert.match(clipped, /let depth=light\.right\.w;let sill=light\.up\.w;/);
+    area.setLights([{ ...window, sill: 0.1 }]);
+    assert.equal(shader(), clipped, 'a changed recess or sill changes only the data');
+    area.setLights([window]);
+    assert.equal(shader(), plain, 'without a recess the shader is the plain one');
+    area.dispose();
+  } finally {
+    lights.dispose();
+  }
+});

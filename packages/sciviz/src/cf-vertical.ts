@@ -161,7 +161,8 @@ export async function readCFVertical(
         const z1 = v('z1'),
           z2 = v('z2'),
           f = 0.5 * (z1 + z2) + 0.5 * (z1 - z2) * Math.tanh(((2 * v('a')) / (z1 - z2)) * (depth - v('href')));
-        value = k <= v('k_c') ? v('sigma') * f : f + (v('sigma') - 1) * (depth - f);
+        // k counts from 1 as in the HOPS and NCOM Fortran formulas Appendix D took: k_c is the upper level count.
+        value = k + 1 <= v('k_c') ? v('sigma') * f : f + (v('sigma') - 1) * (depth - f);
       }
     }
     result[i] = value;

@@ -585,3 +585,26 @@ test('VoxelBot resumes too, keeps its counters, and reports giving up', async (t
   assert.ok(bot.resumeFailed);
   assert.equal(bot.client.stats.resumeFailed, 1);
 });
+
+// A VoxelBot closed while a resume try is still opening its socket once kept that socket when it opened: the try's
+// transport took it as the live connection, the stopped try never attached it, and nothing closed it, so a bench bot
+// process (bench/remote-bot.mjs) could not end by its event loop. The late socket is closed now.
+test('a VoxelBot closed while a resume try is opening closes the socket that opens late', async (t) => {
+  // The server waits a minute for the late socket's hello, so only the bot can close it within the test's wait.
+  const s = await start(t, { helloTimeout: 60_000 }),
+    bot = await VoxelBot.connect({ url: s.url, blocks, editInterval: 0 });
+  t.after(() => bot.close());
+  await until('its spawn', () => {
+    bot.update(1 / 60);
+    return bot.client.spawned && bot.client.loaded;
+  });
+  s.proxy.stall();
+  s.proxy.cut();
+  await until('a resume try opening', () => s.proxy.stalled === 1);
+  const first = bot.connection;
+  bot.close();
+  assert.equal(bot.closeCode, 1000);
+  s.proxy.release();
+  await until('the late socket closed', () => s.proxy.open === 0, 5000);
+  assert.equal(bot.connection, first, 'the closed bot took no late socket as its connection');
+});

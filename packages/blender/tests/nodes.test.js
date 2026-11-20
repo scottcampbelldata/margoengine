@@ -36,6 +36,10 @@ test('untrusted graph bounds, cycles, injected enums, parameter values and anima
   mutate(g=>g.times=[0,0]);mutate(g=>g.bounds=[[1,1,1],[0,0,0]]);
   mutate(g=>g.nodes.find(n=>n.op==='noise').dimensions='3);discard;');
   mutate(g=>g.nodes.find(n=>n.op==='ramp').stops[0][0]={link:0});
+  // Names inherited from Object.prototype are not operations either (KB-P3c): they once crashed with a TypeError.
+  mutate(g=>g.nodes.find(n=>n.op==='math').operation='constructor');
+  mutate(g=>g.nodes.find(n=>n.op==='math').operation='toString');
+  mutate(g=>{const m=g.nodes.find(n=>n.op==='mix'&&n.mode==='RGBA');assert.ok(m,'the fixture has a colour mix');m.blend='hasOwnProperty';});
 });
 test('caller mutation cannot change shader structure or retained animation data',()=>{
   const g=structuredClone(graph),live=new MargoNodeMaterial(g);
@@ -93,4 +97,69 @@ test('KB5339c: Elastic spans match Blender, pinned on 135 black-box probes', asy
     }
   }
   assert.ok(worst > 0 && worst < 2e-5);
+});
+test('KB5339d: Noise-modified F-curves play Blender\'s sampled values back within single-precision rounding', async () => {
+  // Truth: Blender 5.3 at eighth-frame steps (tools/blender-addon/tests/blender_node_noise.py). The add-on samples each
+  // F-curve that carries a Noise modifier with fcurve.evaluate at a power-of-two subframe step of an eighth of a frame or
+  // finer, and writes LINEAR keys; the reader plays them and has no noise model. Every eighth frame is a sampled step.
+  const { graph: noisy, truth, between } = JSON.parse(await readFile(new URL('./fixtures/node-noise.json', import.meta.url), 'utf8'));
+  const f = new Float32Array(1), u = new Uint32Array(f.buffer);
+  const ulp = (v) => { f[0] = Math.abs(v); const a = f[0]; u[0]++; return f[0] - a; };
+  const noise = ['Amount/outputs/0', 'Grain/outputs/0', 'Glow/outputs/0'];
+  for (const key of noise) assert.ok(noisy.parameters[key].curves[0].keys.every((k) => k.i === 'LINEAR'), key);
+  assert.equal(noisy.parameters['Tint/outputs/0'].curves[0].keys[0].i, 'LINEAR');
+  assert.equal(noisy.parameters['Tint/outputs/0'].curves[2], null);
+  // The linear ramp outside Grain's restricted noise range reduces: 385 samples at 1/16 frame become 207 keys.
+  assert.equal(noisy.parameters['Grain/outputs/0'].curves[0].keys.length, 207);
+  const miss = (g, set) => {
+    const live = new MargoNodeMaterial(g), worst = {};
+    for (const { seconds, values } of set) {
+      live.seek(seconds);
+      for (const [key, expected] of Object.entries(values))
+        live.get(key).forEach((v, i) => {
+          const m = Math.abs(Math.fround(v) - expected[i]);
+          worst[`${key}[${i}]`] = Math.max(worst[`${key}[${i}]`] ?? 0, m);
+          // Noise components: the sample or a float32 neighbour; Tint green is a plain Bezier curve (KB5339b bound).
+          if (set === truth && g === noisy) assert.ok(m <= (key === 'Tint/outputs/0' && i === 1 ? 1e-5 : ulp(expected[i])), `${key}[${i}] at ${seconds}s: ${v} against ${expected[i]}`);
+        });
+    }
+    return worst;
+  };
+  miss(noisy, truth);
+  // Off the sampled steps the reader interpolates linearly: under 6e-4 on this fixture (measured 5.9e-4 on red Tint).
+  const off = miss(noisy, between);
+  for (const key of ['Amount/outputs/0[0]', 'Grain/outputs/0[0]', 'Glow/outputs/0[0]', 'Tint/outputs/0[0]']) assert.ok(off[key] > 0 && off[key] < 6e-4, `${key}: ${off[key]}`);
+  // The old export (frame samples alone, interpolated linearly) misses Blender's noise between frames by 0.03 to 0.08.
+  const old = structuredClone(noisy);
+  for (const p of Object.values(old.parameters)) delete p.curves;
+  const before = miss(old, truth);
+  for (const key of ['Amount/outputs/0[0]', 'Grain/outputs/0[0]', 'Glow/outputs/0[0]', 'Tint/outputs/0[0]']) assert.ok(before[key] > 0.03, `${key}: ${before[key]}`);
+});
+test('KB-P3d: a colour wired into a float socket gives Blender\'s luminance, not the mean of R, G and B', async () => {
+  // Truth: Blender 5.3 baking RGB -> Math Add 0 -> Emission in Cycles (tools/blender-addon/tests/blender_node_probes.py).
+  const { graph: probed, cycles, geometry } = JSON.parse(await readFile(new URL('./fixtures/node-probes.json', import.meta.url), 'utf8'));
+  const source = new MargoNodeMaterial(probed).extension.wgsl;
+  const conversions = [...source.matchAll(/dot\((\w+)\.rgb,vec3f\(([^)]*)\)\)/g)];
+  assert.equal(conversions.length, 1, source);
+  const weights = conversions[0][2].split(',').map(Number);
+  assert.equal(weights.length, 3, conversions[0][0]);
+  for (const { color, value } of cycles) {
+    const gray = color.reduce((sum, c, i) => sum + Math.fround(c) * weights[i], 0);
+    assert.ok(Math.abs(gray - value) < 1e-6, `Cycles grey of ${color}: ${gray} against ${value}`);
+  }
+  // Geometry Nodes rounds the same weights to four places (0.2126, 0.7152, 0.0722).
+  for (const { color, value } of geometry) {
+    const gray = color.reduce((sum, c, i) => sum + Math.fround(c) * weights[i], 0);
+    assert.ok(Math.abs(gray - value) < 1e-4, `Geometry Nodes grey of ${color}: ${gray} against ${value}`);
+  }
+});
+test('KB-P3d: LINEAR extrapolation follows each end key\'s own interpolation (CONSTANT flat, LINEAR neighbour, others handle)', async () => {
+  // Truth: Blender 5.3 fcurve.evaluate past both ends of each exported curve (tools/blender-addon/tests/blender_node_probes.py).
+  const { graph: probed, truth } = JSON.parse(await readFile(new URL('./fixtures/node-probes.json', import.meta.url), 'utf8'));
+  const live = new MargoNodeMaterial(probed);
+  for (const { seconds, values } of truth) {
+    live.seek(seconds);
+    for (const [key, expected] of Object.entries(values))
+      assert.ok(Math.abs(live.get(key)[0] - expected[0]) < 1e-6, `${key} at ${seconds}s: ${live.get(key)[0]} against ${expected[0]}`);
+  }
 });

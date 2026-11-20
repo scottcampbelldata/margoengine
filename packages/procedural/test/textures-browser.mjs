@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { build, preview } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatBuild, compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 const dir = await mkdtemp(join(tmpdir(), 'margo-textures-'));
 let browser, server;
 try {
@@ -21,7 +22,7 @@ try {
     resolve: {
       alias: { '@margoengine/procedural/textures': fileURLToPath(new URL('../dist/textures.js', import.meta.url)) },
     },
-    build: { outDir: join(dir, 'dist') },
+    build: { outDir: join(dir, 'dist'), ...compatBuild(join(dir, 'index.html')) },
   });
   server = await preview({
     root: dir,
@@ -33,6 +34,8 @@ try {
   browser = await launchBrowser();
   const page = await browser.newPage(),
     errors = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim, '/compat.js');
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (message) => {
     if (message.type() === 'log') console.log(message.text());

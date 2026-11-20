@@ -298,13 +298,14 @@ class Builder {
   uv: number[] = [];
   t: number[] = [];
   ix: number[] = [];
-  vertex(p: V, n: V, uv: [number, number], t: V): number {
+  /** `w` is the bitangent sign: cross(n, t) * w points toward increasing v. */
+  vertex(p: V, n: V, uv: [number, number], t: V, w = 1): number {
     const i = this.p.length / 3;
     if (i >= 1_000_000) throw invalid();
     this.p.push(...p);
     this.n.push(...n);
     this.uv.push(...uv);
-    this.t.push(...t, 1);
+    this.t.push(...t, w);
     return i;
   }
   finish(flat = false): GeometryData {
@@ -318,7 +319,9 @@ class Builder {
           n = unit(cross(add(p(b), p(a), -1), add(p(c), p(a), -1)));
         for (const j of [a, b, c]) {
           const old = this.t.slice(j * 4, j * 4 + 3) as V;
-          out.ix.push(out.vertex(p(j), n, this.uv.slice(j * 2, j * 2 + 2) as [number, number], frame(n, old)));
+          out.ix.push(
+            out.vertex(p(j), n, this.uv.slice(j * 2, j * 2 + 2) as [number, number], frame(n, old), this.t[j * 4 + 3]),
+          );
         }
       }
       return out.finish();
@@ -466,7 +469,8 @@ export function meshTree(skeleton: TreeMeshSkeleton, options: TreeMeshOptions = 
       if (j === 0 || j === keep.length - 1) {
         const sign = j === 0 ? -1 : 1,
           normal = axis.map((x) => x * sign) as V,
-          center = bark.vertex(pos, normal, [0.5, 0.5], u),
+          // Both caps map v along +v; seen from below, the base cap's (u, v) frame is mirrored.
+          center = bark.vertex(pos, normal, [0.5, 0.5], u, sign),
           cap = bark.p.length / 3;
         for (let k = 0; k <= segments; k++) {
           const a = (k === segments ? 0 : k / segments) * Math.PI * 2;
@@ -475,6 +479,7 @@ export function meshTree(skeleton: TreeMeshSkeleton, options: TreeMeshOptions = 
             normal,
             [0.5 + Math.cos(a) * 0.5, 0.5 + Math.sin(a) * 0.5],
             u,
+            sign,
           );
           if (k) {
             if (sign > 0) bark.ix.push(center, cap + k - 1, cap + k);

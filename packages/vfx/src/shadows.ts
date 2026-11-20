@@ -77,7 +77,7 @@ const depthShader = /* wgsl */ `
 @group(0) @binding(0) var<uniform> shadowMatrix:mat4x4f;
 @group(0) @binding(1) var<storage,read> particles:array<vec4f>;
 const corners=array<vec2f,6>(vec2f(-1.0,-1.0),vec2f(1.0,-1.0),vec2f(1.0,1.0),vec2f(-1.0,-1.0),vec2f(1.0,1.0),vec2f(-1.0,1.0));
-struct ShadowVary {@builtin(position) clip:vec4f,@location(0) local:vec2f,@location(1) centerZ:f32,@location(2) depthRadius:f32}
+struct ShadowVary {@builtin(position) @invariant clip:vec4f,@location(0) local:vec2f,@location(1) centerZ:f32,@location(2) depthRadius:f32}
 @vertex fn vertex(@builtin(vertex_index) v:u32,@builtin(instance_index) slot:u32)->ShadowVary {
   var o:ShadowVary;
   let pos=particles[slot*2u];

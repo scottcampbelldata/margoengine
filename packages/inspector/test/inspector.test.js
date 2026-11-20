@@ -94,9 +94,13 @@ test('live properties update transforms, PBR values and bound effects and reject
   assert.equal(mesh.name, 'Renamed');
   edit(dom, field(inspector, 'position.x'), '4');
   assert.equal(mesh.position.x, 4);
-  edit(dom, field(inspector, 'scale.y'), '0');
+  edit(dom, field(inspector, 'scale.y'), 'x');
   assert.equal(mesh.scale.y, 1);
   assert.equal(field(inspector, 'scale.y').validity.valid, false);
+  edit(dom, field(inspector, 'scale.y'), '0');
+  assert.equal(mesh.scale.y, 0, 'A zero scale is a valid transform (glTF 2.0 section 3.5.3)');
+  assert.equal(field(inspector, 'scale.y').validity.valid, true);
+  edit(dom, field(inspector, 'scale.y'), '1');
   edit(dom, field(inspector, 'roughness'), '0.25', 'input');
   edit(dom, field(inspector, 'metallic'), '0.75', 'input');
   assert.equal(mesh.material.data[4], 0.25);

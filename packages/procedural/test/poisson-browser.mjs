@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { build, preview } from 'vite';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { closeAll } from '../../../scripts/support/shutdown.mjs';
+import { compatBuild, compatRun, compatShim } from '../../../scripts/support/compat-shim.js';
 
 const dir = await mkdtemp(join(tmpdir(), 'margo-poisson-'));
 let browser, server;
@@ -38,7 +39,7 @@ try {
         '@margoengine/procedural/buildings': fileURLToPath(new URL('../dist/buildings.js', import.meta.url)),
       },
     },
-    build: { outDir: join(dir, 'dist') },
+    build: { outDir: join(dir, 'dist'), ...compatBuild(join(dir, 'index.html')) },
   });
   server = await preview({
     root: dir,
@@ -52,6 +53,8 @@ try {
   const page = await browser.newPage(),
     errors = [],
     wasmRequests = [];
+  // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
+  if (compatRun()) await page.addInitScript(compatShim, '/sampling/compat.js');
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('request', (r) => {
     if (/\.wasm(?:\?|$)/.test(r.url())) wasmRequests.push(r.url());

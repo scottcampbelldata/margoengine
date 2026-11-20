@@ -24,15 +24,63 @@ export function compatIgnoredLine(startPath, applied, forced = compatRun()) {
 }
 
 /**
+ * The device a leg of a script that runs its own WebGL2 leg drew on, for its log and its report. `layerLeg` is true for
+ * the script's own layer leg (the page installs the layer itself). In a forced-compatibility run openBrowser installs
+ * the layer on every page (`hardware.compat`), so the script's other leg draws on the layer too, on the browser's
+ * default ANGLE backend (Direct3D 11 on Windows), and is no native WebGPU result: the label then names that backend,
+ * read from the probed WebGL renderer.
+ */
+export function legDevice(layerLeg, hardware) {
+  if (!layerLeg && !hardware?.compat) return 'webgpu';
+  const renderer = hardware?.webglRenderer ?? '';
+  const backend = /vulkan/i.test(renderer)
+    ? 'ANGLE Vulkan'
+    : /direct3d ?11|d3d11/i.test(renderer)
+      ? 'ANGLE D3D11'
+      : /metal/i.test(renderer)
+        ? 'ANGLE Metal'
+        : /opengl/i.test(renderer)
+          ? 'ANGLE OpenGL'
+          : renderer || 'unknown WebGL renderer';
+  return `webgl2-layer on ${backend}`;
+}
+
+/** The devices a script's legs drew on, in order, for its closing line ("webgpu and webgl2-layer on ANGLE Vulkan"). */
+export const legDevices = (rows) => [...new Set(rows.map((row) => row.device).filter(Boolean))].join(' and ');
+
+/**
  * The URL a page served by a package's own Vite server (rooted in the package, with the repository in `fs.allow`)
  * loads the layer from: pass it to `page.addInitScript(compatShim, compatUrl())`.
  */
 export const compatUrl = () =>
-  `/@fs/${join(dirname(fileURLToPath(import.meta.url)), '../../packages/webgl2-compat/dist/device.js').replaceAll('\\', '/').replace(/^\//, '')}`;
+  `/@fs/${join(dirname(fileURLToPath(import.meta.url)), '../../packages/webgl2-compat/dist/device.js')
+    .replaceAll('\\', '/')
+    .replace(/^\//, '')}`;
+
+/**
+ * Vite `build.rollupOptions` for a page served by a production `preview` server in a forced-compatibility run: the
+ * layer is built beside the page as `compat.js` (pass `'/compat.js'`, with the server's base in front, to
+ * `page.addInitScript(compatShim, ...)`). Empty outside a compatibility run. `index` is the page's HTML file.
+ */
+export const compatBuild = (index) =>
+  compatRun()
+    ? {
+        rollupOptions: {
+          input: {
+            index,
+            compat: join(dirname(fileURLToPath(import.meta.url)), '../../packages/webgl2-compat/dist/device.js'),
+          },
+          output: { entryFileNames: '[name].js' },
+        },
+      }
+    : {};
 
 /**
  * Page init script: `navigator.gpu` becomes a stub that installs the WebGL2 compatibility layer on first use, loaded
- * from `url` (default: the repository-root dev server's path).
+ * from `url` (default: the repository-root dev server's path). An init script added after it that patches the GPU
+ * interfaces (an audit of `GPUDevice.prototype.createTexture`, say) defers its patch in a compatibility run with
+ * `globalThis.__margoCompat ? (globalThis.__margoOnLayer ??= []).push(patch) : patch()`, so it patches the layer's
+ * classes once they are installed rather than the browser's own, which the layer's devices never call.
  */
 export function compatShim(url = '/packages/webgl2-compat/dist/device.js') {
   if (globalThis.__margoCompat) return;
@@ -59,6 +107,11 @@ export function compatShim(url = '/packages/webgl2-compat/dist/device.js') {
           return promise;
         };
       }
+      // Audits an init script installs patch the interfaces it sees then, which are the browser's own: the layer's
+      // classes (CompatDevice, CompatQueue, CompatRenderPassEncoder...) replace them only now. An init script that
+      // patches GPU classes queues its patch on `__margoOnLayer` in a compatibility run; each runs once, here, after
+      // the install, with the layer's globals (GPUDevice is CompatDevice) and the module.
+      for (const patch of globalThis.__margoOnLayer?.splice(0) ?? []) patch(m);
       return navigator.gpu;
     }));
   const stub = {

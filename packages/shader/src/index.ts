@@ -25,7 +25,8 @@ export {
   frontFacing,
   type NodeMaterialOptions,
 } from './material.js';
-export { NodePass, inputColor, inputDepth, type NodePassOptions } from './post.js';
+export { NodePass, inputColor, inputDepth, type NodePassOptions, type NodePassAttachOptions } from './post.js';
+export { ShaderClock } from './clock.js';
 export {
   ComputePass,
   StorageBuffer,

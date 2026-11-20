@@ -1,6 +1,5 @@
 // Real-GPU checks of post's newer effects against closed forms (post-effects.html). Run after npm run build:packages,
-// holding the GPU lock:  node scripts/gpu-lock.mjs run --owner=<id> -- node examples/package-benchmarks/post-effects-gpu.mjs [--only=gtao] [--record]
-// gpu-lock: correctness
+//:  node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/post-effects-gpu.mjs [--only=gtao] [--record]
 // Each section writes its report to test-results/post-<section>-gpu.json; only --record writes the tracked record
 // examples/package-benchmarks/results/<section>-gpu.json (post-effects-output.mjs). Frames go to test-results/post-*.png.
 //
@@ -13,7 +12,7 @@
 //   ray from the floor hits the wall, SSGI swaps the floor's ambient light (1, 1, 1) for the wall's (1, 0, 0), so the
 //   floor keeps red and loses green in proportion to the share of its cosine-weighted hemisphere the wall covers: the
 //   form factor F from a floor point to the wall rectangle, integrated here. Measured as 1 - green(on) / green(off),
-//   against F at 5 cm to 2 m from the wall; red stays (ratio 1). Core floor 4x and 1x, a gltf-pro floor added to SSGI
+//   against F at 5 cm to 2 m from the wall; red stays (ratio 1). Core floor 4x and 1x, a gltf/pbr floor added to SSGI
 //   and SSR (one capture hook, shared), orthographic; with GTAO, SSR and TAA no errors and no NaN.
 // motion: a white box before a dark wall, ambient light only. A rigid motion of r pixels of blur radius (half the motion
 //   over the open shutter) turns the frame into its box average along the motion, 2r wide: measured as coverage of the

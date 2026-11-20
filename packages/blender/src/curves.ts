@@ -5,9 +5,10 @@ import type { EngineKernel } from "@margoengine/core";
 import {
   parsePreparedPBR,
   type PBRModel,
-} from "@margoengine/gltf-pro/model";
+} from "@margoengine/gltf/pbr-model";
 import { countLimit, checkCount } from "../../shared/limits.js";
 import { readResponse } from "../../shared/loading.js";
+import { captureScene } from "../../shared/scene-scope.js";
 import {
   decodeImages,
   maxBytes,
@@ -365,12 +366,14 @@ export async function parseMargoCurves(
   { signal, maxNodes }: MargoCurvesOptions = {},
 ): Promise<MargoCurvesScene> {
   signal?.throwIfAborted();
-  const { asset, ...shapes } = decodeMargoCurves(input, { maxNodes });
+  // The model is built after the await below: it goes in the scene this call started in.
+  const scope = captureScene(engine),
+    { asset, ...shapes } = decodeMargoCurves(input, { maxNodes });
   if (!asset) return { model: undefined, ...shapes };
   const images = await decodeImages(asset.images, signal);
   try {
     signal?.throwIfAborted();
-    const model = parsePreparedPBR(engine, asset.document, asset.geometry, images, { maxNodes });
+    const model = scope.run(() => parsePreparedPBR(engine, asset.document, asset.geometry, images, { maxNodes }));
     return { model, ...shapes };
   } catch (error) {
     for (const image of images) image.close();
@@ -390,7 +393,8 @@ export async function loadMargoCurves(
   { fetch: get = globalThis.fetch, ...options }: MargoCurvesOptions & { fetch?: typeof fetch } = {},
 ): Promise<MargoCurvesScene> {
   options.signal?.throwIfAborted();
-  const target = new URL(url, globalThis.location?.href);
+  const scope = captureScene(engine),
+    target = new URL(url, globalThis.location?.href);
   if (!["http:", "https:"].includes(target.protocol))
     throw new TypeError(
       ".margo URL must use HTTP(S); pass an http: or https: URL, or read the file yourself and call parseMargoCurves",
@@ -400,5 +404,6 @@ export async function loadMargoCurves(
     signal: options.signal,
     label: ".margo download",
   });
-  return parseMargoCurves(engine, bytes, options);
+  // Parsed in the scene this call started in, not the one active once the download is done.
+  return scope.run(() => parseMargoCurves(engine, bytes, options));
 }

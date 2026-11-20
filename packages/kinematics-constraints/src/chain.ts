@@ -49,6 +49,22 @@ function turn(v: Vec3View, axis: Vec3View, angle: number): ChainPoint {
   const c = Math.cos(angle), s = Math.sin(angle), k = dot(v, axis)*(1-c), w = cross(axis, v);
   return [v[0]*c+w[0]*s+axis[0]*k, v[1]*c+w[1]*s+axis[1]*k, v[2]*c+w[2]*s+axis[2]*k];
 }
+/**
+ * The swivel angle of a pose about `axis` (root to target), measured from `side`: the azimuth of the sum of the
+ * interior joints' offsets across the axis, or of the farthest joint when that sum cancels. NaN for a straight chain.
+ */
+function swivel(p: readonly ChainPoint[], axis: Vec3View, side: Vec3View): number {
+  const up = cross(axis, side);
+  let x = 0, y = 0, far = 0, fx = 0, fy = 0, scale = 0;
+  for (let i = 1; i < p.length - 1; i++) {
+    const r = sub(p[i], p[0]), a = dot(r, side), b = dot(r, up), d = Math.hypot(a, b);
+    x += a; y += b; scale = Math.max(scale, norm(r));
+    if (d > far) { far = d; fx = a; fy = b; }
+  }
+  const limit = 1e-9 * scale;
+  if (Math.hypot(x, y) > limit) return Math.atan2(y, x);
+  return far > limit ? Math.atan2(fy, fx) : NaN;
+}
 function place(p: ChainPoint[], at: number, anchor: number, length: number, fallback: Vec3View): void {
   const delta = sub(p[at], p[anchor]), direction = norm(delta) > 1e-14 ? unit(delta) : unit([fallback[0],fallback[1],fallback[2]]);
   for (let k=0;k<3;k++) p[at][k] = p[anchor][k]+direction[k]*length;
@@ -112,6 +128,7 @@ export class ChainAvoidanceSolver {
     if (distance(initial[0],target)>lengths.reduce((a,b)=>a+b,0)+tolerance) return fail(0);
     const axis = unit(sub(target,initial[0]));
     const side = unit(cross(axis,Math.abs(axis[0])<0.8 ? [1,0,0] : [0,1,0]));
+    let origin=0;
     for(let candidate=0;candidate<candidates;candidate++) {
       const p=copy(initial), angle=2*Math.PI*candidate/candidates;
       // Non-collinear seeds escape straight-chain fixed points, in several bend planes.
@@ -122,9 +139,13 @@ export class ChainAvoidanceSolver {
       if(candidate>0) for(let i=1;i<p.length;i++) place(p,i,i-1,lengths[i-1],sub(initial[i],initial[i-1]));
       reach(p,target,lengths,algorithm,iterations,tolerance);
       if(distance(p.at(-1)!,target)>tolerance) continue;
-      // Swivel around the fixed endpoints, preserving link lengths and the target.
-      for(let i=1;i<p.length-1;i++) {
-        const v=turn(sub(p[i],p[0]),axis,angle);
+      // Swivel around the fixed endpoints, preserving link lengths and the target. The first candidate keeps its
+      // reached pose; candidate k is turned so its swivel angle is that pose's plus 2 pi k / candidates. Measuring the
+      // swivel each reached pose already has, rather than adding the bend seed's angle to it, keeps the grid even.
+      const own=swivel(p,axis,side);
+      if(candidate===0) origin=Number.isNaN(own) ? 0 : own;
+      else if(!Number.isNaN(own)) for(let i=1;i<p.length-1;i++) {
+        const v=turn(sub(p[i],p[0]),axis,origin+angle-own);
         for(let k=0;k<3;k++) p[i][k]=p[0][k]+v[k];
       }
       if(lengths.some((l,i)=>Math.abs(distance(p[i],p[i+1])-l)>tolerance)) continue;

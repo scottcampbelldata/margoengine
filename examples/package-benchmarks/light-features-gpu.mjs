@@ -1,5 +1,5 @@
-// Real-GPU check of the lighting features added with the three.js parity work (GPU lock, after npm run build:packages):
-//   node scripts/gpu-lock.mjs run --owner=<you> -- node examples/package-benchmarks/light-features-gpu.mjs
+// Real-GPU check of the lighting features added with the three.js parity work (after npm run build:packages):
+//   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/light-features-gpu.mjs
 // Every lit pixel of a grey Lambert floor (BRDF base / pi) is compared, at ~900 pixel centres per scene, with the analytic
 // value pushed through Margo's display transform (PBR Neutral + sRGB, packages/shared/display.js), within 3/255:
 // 1. inverse square and cone: a spot (decay 2, unlimited range, smooth edge) and a point light, base/pi n.l I cone / d^2;

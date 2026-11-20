@@ -19,12 +19,17 @@ for (const compat of [false, true]) {
         p.x + ((l.positions[index * 3] - b[0]) * p.width) / (b[1] - b[0]),
         p.y + (1 - (l.positions[index * 3 + 1] - b[2]) / (b[3] - b[2])) * p.height,
       ];
-      const {attachAccessibility} = await import('/packages/sciviz/dist/a11y.js');
+      const { attachAccessibility } = await import('/packages/sciviz/dist/a11y.js');
       const accessible = attachAccessibility(figure);
       await accessible.ready;
-      const rows = accessible.series.find(s => s.name === secondary.name);
-      const source = await fetch('/examples/assets/sciviz/stats/ghcn.json').then(r => r.json());
-      if (!rows || rows.count !== source.length || rows.datum(index).x !== Date.parse(source[index].date) || rows.datum(index).y !== 32 + 1.8 * source[index].tmin)
+      const rows = accessible.series.find((s) => s.name === secondary.name);
+      const source = await fetch('/examples/assets/sciviz/stats/ghcn.json').then((r) => r.json());
+      if (
+        !rows ||
+        rows.count !== source.length ||
+        rows.datum(index).x !== Date.parse(source[index].date) ||
+        rows.datum(index).y !== 32 + 1.8 * source[index].tmin
+      )
         throw Error('Accessible secondary values lost exact original data units');
       accessible.dispose();
       chart.setVisible(secondary, false);
@@ -86,7 +91,12 @@ for (const compat of [false, true]) {
         document.body.append(host);
         const { createFigure } = await import('/examples/sciviz-demo.ts'),
           { polishFigure } = await import('/packages/sciviz/dist/format.js');
-        const hostileFigure = await createFigure(canvas, { mode: '2d', theme: 'light', tooltips: false, legend: false });
+        const hostileFigure = await createFigure(canvas, {
+          mode: '2d',
+          theme: 'light',
+          tooltips: false,
+          legend: false,
+        });
         const hostileChart = await polishFigure(hostileFigure, {
           xLabel: hostile,
           yLabel: hostile,
@@ -104,6 +114,35 @@ for (const compat of [false, true]) {
         if (d.cluster.dendrogram.querySelectorAll('path').length !== 1) throw Error('Dendrogram did not redraw');
         if (window.__chartXSS !== undefined) throw Error('A hostile chart label ran script');
         hostileChart.dispose();
+        // An explicit `domain: undefined` keeps the default domain; spread after it, it replaced the default and the
+        // controller threw a TypeError while reading the domain.
+        const undefinedDomain = await polishFigure(hostileFigure, {
+          x: { domain: undefined },
+          y: { domain: undefined },
+        });
+        if (![...undefinedDomain.x.domain, ...undefinedDomain.y.domain].every(Number.isFinite))
+          throw Error('An undefined domain option did not fall back to the data domain');
+        undefinedDomain.dispose();
+        // Breaks: a secondary-y break marks the right axis (it drew nothing), and a break a zoom puts outside the plot
+        // draws no mask (its rect was drawn past the plot's edge, over the tick labels).
+        const broken = await polishFigure(hostileFigure, {
+          x: { domain: [0, 100], breaks: [[40, 50]] },
+          y: { domain: [0, 1] },
+          secondaryY: { domain: [0, 10], breaks: [[4, 6]] },
+        });
+        broken.relayout();
+        const plot = hostileFigure.plotArea,
+          rects = () =>
+            [...broken.element.querySelectorAll('rect')].map((r) => [
+              Number(r.getAttribute('x')),
+              Number(r.getAttribute('width')),
+            ]);
+        if (!rects().some(([x, w]) => w === 4 && Math.abs(x - (plot.x + plot.width - 2)) < 1e-6))
+          throw Error('A secondary-y break drew no mask on the right axis');
+        broken.setRange(0, 30);
+        if (rects().some(([x, w]) => x < plot.x - 2 - 1e-6 || x + w > plot.x + plot.width + 2 + 1e-6))
+          throw Error('A break outside the zoomed plot drew a mask past its edge');
+        broken.dispose();
         hostileFigure.dispose();
         host.remove();
       } finally {
